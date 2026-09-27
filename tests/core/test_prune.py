@@ -181,6 +181,7 @@ class StatePruneTest(_Base):
             _write(os.path.join(self.state, f"{s}.json"), age_days=age),
             _write(os.path.join(self.state, f"{s}.turn.json"), age_days=age),
             _write(os.path.join(self.state, f"nudged-{s}.json"), age_days=age),
+            _write(os.path.join(self.state, f"denied-{s}.json"), age_days=age),
             _write(os.path.join(self.state, f"once-{s}-main.json"), age_days=age),
             _write(os.path.join(self.state, f"approved-{s}-agent-1.json"), age_days=age),
             _write(os.path.join(self.state, f"subagent-{s}-guard-records.bounced"), age_days=age),
@@ -229,6 +230,58 @@ class StatePruneTest(_Base):
         self.run_prune()
         for path in keep:
             self.assertTrue(os.path.exists(path), path)
+
+    def test_denied_file_of_a_live_session_is_kept(self):
+        # 拒否の数え（repeat）の控えは、1 度書いたきりで長く続くセッションがある。
+        # 名前をセッションと読めないと、それ自身の日付で消える。
+        kept = self.session_files(S_LIVE, 20)
+        _age(os.path.join(self.state, f"{S_LIVE}.turn.json"), 0.1)
+        self.run_prune()
+        self.assertTrue(os.path.exists(os.path.join(self.state, f"denied-{S_LIVE}.json")))
+        for path in kept:
+            self.assertTrue(os.path.exists(path), path)
+
+    def test_unknown_json_is_left_alone(self):
+        # `<セッション>.json` と読むのは UUID の形だけ。
+        keep = [
+            _write(os.path.join(self.state, name), age_days=90)
+            for name in (
+                "package.json",
+                "tsconfig.json",
+                "review-result-123.json",
+                "risk-judge-i0001.json",
+                "notes.json",
+            )
+        ]
+        report = self.run_prune()
+        self.assertEqual(report.state, [])
+        for path in keep:
+            self.assertTrue(os.path.exists(path), path)
+
+    def link(self, target: str, name: str) -> None:
+        try:
+            os.symlink(target, name, target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"リンクを作れない: {exc}")
+
+    def test_linked_state_dir_is_not_followed(self):
+        elsewhere = tempfile.mkdtemp(prefix="ccnavi-prune-elsewhere-")
+        victim = _write(os.path.join(elsewhere, f"{S_OLD}.turn.json"), age_days=90)
+        linked = os.path.join(self.logs, "state-link")
+        self.link(elsewhere, linked)
+        report = prune.run(self.root, self.log, linked, now=NOW)
+        self.assertTrue(os.path.exists(victim))
+        self.assertEqual(report.state, [])
+        self.assertTrue(any("リンク" in p for p in report.problems), report.problems)
+
+    def test_linked_selfguard_is_not_followed(self):
+        elsewhere = tempfile.mkdtemp(prefix="ccnavi-prune-elsewhere-")
+        victim = _write(os.path.join(elsewhere, S_OLD, "settings"), age_days=90)
+        _age(os.path.dirname(victim), 90)
+        self.link(elsewhere, os.path.join(self.state, "selfguard"))
+        report = self.run_prune()
+        self.assertTrue(os.path.exists(victim))
+        self.assertTrue(any("リンク" in p for p in report.problems), report.problems)
 
     def test_loose_keyed_file_goes_by_its_own_date(self):
         # セッションの綴りが他に無く、切れ目が決まらない。それ自身の日付で見る。
