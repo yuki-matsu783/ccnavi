@@ -29,6 +29,15 @@ set -eu
 # 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
+# fail <識別子> <文面> <終了コード>。文面は標準エラーへ出す契約。識別子は止めた理由の種類を
+# 表す短い語で、診断ログ（docs/claude/logging.md）にだけ残す。文面には名前やパスが入るので、
+# ログには写さない。
+fail() {
+	printf 'ccnavi-clean: %s\n' "$2" >&2
+	log_info 止めた -- "exit=$3" "reason=$1"
+	exit "$3"
+}
+
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-clean.sh <名前> [--dry-run]
@@ -53,13 +62,11 @@ for arg in "$@"; do
 		dry=1
 		;;
 	-*)
-		printf 'ccnavi-clean: %s は通しません。使えるのは --dry-run だけです。\n' "$arg" >&2
-		exit 2
+		fail unknown-option "$arg は通しません。使えるのは --dry-run だけです。" 2
 		;;
 	*)
 		if [ -n "$name" ]; then
-			printf 'ccnavi-clean: ワークツリーは 1 回に 1 本だけ指定します（%s と %s）。\n' "$name" "$arg" >&2
-			exit 2
+			fail two-names "ワークツリーは 1 回に 1 本だけ指定します（$name と ${arg}）。" 2
 		fi
 		name="$arg"
 		;;
@@ -68,32 +75,30 @@ done
 
 [ -n "$name" ] || {
 	usage
+	log_info 止めた -- "exit=2" "reason=missing-name"
 	exit 2
 }
 
 case "$name" in
 . | .. | */* | *\\* | *:*)
-	printf 'ccnavi-clean: 名前にパスは書けません（%s）。.claude/worktrees/ の直下の名前だけを渡してください。\n' "$name" >&2
-	exit 2
+	fail path-in-name "名前にパスは書けません（${name}）。.claude/worktrees/ の直下の名前だけを渡してください。" 2
 	;;
 esac
 
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) ||
+	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+# 解いたルートを logger に渡し、書くたびに探し直させない。
+ccnavi_log_root="$root"
+log_info 受け付けた -- "tree=$name" "dry_run=${dry:-0}"
 
 target="$root/.claude/worktrees/$name"
 
 # ワークツリーの置き場そのものがリンクなら、消す先が置き場の外にある。たどらない。
 if [ -L "$target" ]; then
-	printf 'ccnavi-clean: %s はリンクです。リンクの先は消しません。\n' "$target" >&2
-	exit 2
+	fail linked-tree "$target はリンクです。リンクの先は消しません。" 2
 fi
-[ -d "$target" ] || {
-	printf 'ccnavi-clean: %s がありません。\n' "$target" >&2
-	exit 2
-}
+[ -d "$target" ] ||
+	fail no-tree "$target がありません。" 2
 
 # 未コミットの変更。`.git` が無いときは git に聞かない。聞くと上へ登って
 # ワークスペースのリポジトリを答えてしまう。
@@ -102,11 +107,16 @@ if [ -e "$target/.git" ]; then
 		if [ -n "$changes" ]; then
 			printf 'ccnavi-clean: %s に未コミットの変更があるので、何も消しません。別のセッションが作業している見込みが高いです。\n' "$name" >&2
 			printf '%s\n' "$changes" | head -n 10 >&2
+			log_info 止めた -- "exit=1" "reason=uncommitted"
 			exit 1
 		fi
+		log_debug 判定の材料 -- "tree=$name" "git=clean"
 	else
 		printf 'ccnavi-clean: %s は git の登録が残っていない、消しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
+		log_debug 判定の材料 -- "tree=$name" "git=unregistered"
 	fi
+else
+	log_debug 判定の材料 -- "tree=$name" "git=none"
 fi
 
 # node が無いときの消し方。ccnavi-clean.js と同じものを探し、同じ文面で報告する。
@@ -130,10 +140,12 @@ clean_with_sh() {
 			-o -name "*${cw_nl}*" -print 2>/dev/null || :
 	}) || {
 		printf 'ccnavi-clean: %s に入れません。\n' "$cw_top" >&2
+		log_info 止めた -- "reason=cannot-enter"
 		return 1
 	}
 	if [ -n "$cw_odd" ]; then
 		printf 'ccnavi-clean: 名前に改行を含むものがあるので、sh では何も消しません。node を入れて打ち直してください。\n' >&2
+		log_info 止めた -- "reason=newline-in-name"
 		return 1
 	fi
 
@@ -156,6 +168,7 @@ clean_with_sh() {
 		./*) cw_rel="${cw_rel#./}" ;;
 		*)
 			printf 'ccnavi-clean: find の出力が読めません（%s）。何も消しません。\n' "$cw_rel" >&2
+			log_info 止めた -- "reason=unreadable-find"
 			return 1
 			;;
 		esac
@@ -226,15 +239,25 @@ $cw_targets
 EOF
 
 	if [ -n "$cw_failed" ]; then
+		log_info 消し残した -- "reason=leftover"
 		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（HANDOVER.md の「ワークツリーが消せない」）。\n' >&2
 		return 1
 	fi
 	return 0
 }
 
+# exec で置き換えずに子として走らせ、終了コードをそのまま返す。置き換えると最終の結果
+# （終了コード）を診断ログに残せない。標準出力・標準エラー・終了コードは同じ。
+clean_exit=0
 if command -v node >/dev/null 2>&1; then
-	exec node "$(dirname "$0")/ccnavi-clean.js" "$target" ${dry:+--dry-run}
+	log_debug 判定の材料 -- "tree=$name" "via=node"
+	node "$(dirname "$0")/ccnavi-clean.js" "$target" ${dry:+--dry-run} || clean_exit=$?
+	log_info 終わった -- "tree=$name" "via=node" "exit=$clean_exit"
+	exit "$clean_exit"
 fi
 
 printf 'ccnavi-clean: node が見つからないので、sh で消します。\n' >&2
+# clean_with_sh は `set -e` の効いたまま呼ぶ（`||` を付けると中で -e が外れる）。結果は
+# 抜けるときに残す。
+trap 'clean_exit=$?; log_info 終わった -- "tree=$name" "via=sh" "exit=$clean_exit"; exit "$clean_exit"' EXIT
 clean_with_sh "$target"

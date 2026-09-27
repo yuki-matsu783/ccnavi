@@ -28,6 +28,15 @@ set -eu
 # 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
+# fail <識別子> <文面> <終了コード>。文面は標準エラーへ出す契約。識別子は止めた理由の種類を
+# 表す短い語で、診断ログ（docs/claude/logging.md）にだけ残す。文面には引数やパスが入るので、
+# ログには写さない。
+fail() {
+	printf 'ccnavi-approve: %s\n' "$2" >&2
+	log_info 止めた -- "exit=$3" "reason=$1"
+	exit "$3"
+}
+
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-approve.sh [<識別子>...]
@@ -57,32 +66,44 @@ for id in "$@"; do
 	"" | -*)
 		printf 'ccnavi-approve: 識別子でない引数は取りません (%s)。\n' "$id" >&2
 		usage >&2
+		log_info 止めた -- "exit=2" "reason=not-an-id"
 		exit 2
 		;;
 	esac
 done
 
 # ワークスペースルート。ワークツリーの中から呼ばれても、ツリーの一覧はワークスペースルートの側から数える。
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-approve: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) ||
+	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+# 解いたルートを logger に渡し、書くたびに探し直させない。
+ccnavi_log_root="$root"
+log_info 受け付けた -- "ids=$#"
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 # `set --` の右の "$@" は置き換える前の引数（並べた識別子）に展開される。
 if bin=$(ccnavi_bin "$root"); then
-	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-approve: %s\n' "$skew" >&2
+	skew=$(ccnavi_compat_skew "$root" "$bin") || {
+		printf 'ccnavi-approve: %s\n' "$skew" >&2
+		log_warn 互換の版が食い違う -- "reason=compat-skew"
+	}
 	set -- "$bin" --root "$root" --approve "$@"
+	log_debug 判定の材料 -- "via=bin" "workspace=$root"
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	set -- uv run python -m ccnavi --root "$root" --approve "$@"
+	log_debug 判定の材料 -- "via=source" "workspace=$root"
 else
-	printf 'ccnavi-approve: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
-	exit 2
+	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
 
 # 承認。落ちたらそこで終わり。承認済みチケットが 1 つも書かれていないので、運ぶものも無い。
-"$@" || exit 1
+"$@" || {
+	log_info 終わった -- "exit=1" "reason=not-approved"
+	exit 1
+}
 
 # 運ぶのは ccnavi-push-approved.sh に任せる（設計 1.4）。落ちても承認は巻き戻さない。
-sh "$(dirname "$0")/ccnavi-push-approved.sh" || :
+# ツリーごとの結果は ccnavi-push-approved.sh が自分の診断ログに残す。
+push_exit=0
+sh "$(dirname "$0")/ccnavi-push-approved.sh" || push_exit=$?
+log_info 終わった -- "exit=0" "push_exit=$push_exit"
 exit 0

@@ -26,6 +26,15 @@ set -eu
 # 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
+# fail <識別子> <文面> <終了コード>。文面は標準エラーへ出す契約。識別子は止めた理由の種類を
+# 表す短い語で、診断ログ（docs/claude/logging.md）にだけ残す。文面には引数やパスが入るので、
+# ログには写さない。
+fail() {
+	printf 'ccnavi-ticket: %s\n' "$2" >&2
+	log_info 止めた -- "sub=${sub:-}" "exit=$3" "reason=$1"
+	exit "$3"
+}
+
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel> <識別子> [--reason <理由>]
@@ -59,13 +68,13 @@ esac
 
 [ "$#" -ge 2 ] || {
 	usage
+	log_info 止めた -- "exit=2" "reason=missing-args"
 	exit 2
 }
 case "$1" in
-start | finish | cancel | record-risk) ;;
+start | finish | cancel | record-risk) sub="$1" ;;
 *)
-	printf 'ccnavi-ticket: %s は通しません。使えるのは start / finish / cancel / record-risk です。\n' "$1" >&2
-	exit 2
+	fail unknown-sub "$1 は通しません。使えるのは start / finish / cancel / record-risk です。" 2
 	;;
 esac
 
@@ -74,18 +83,30 @@ esac
 # git には聞かない。モード B（projects/ の下に別リポジトリを clone する形）では、
 # cwd がプロジェクトの中にあると git はプロジェクトを答える。それは git として
 # 正しい答えで、ここで欲しいもの（道具の置き場）とは違う（設計 11.8）。
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) ||
+	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+# 解いたルートを logger に渡し、書くたびに探し直させない。
+ccnavi_log_root="$root"
+log_info 受け付けた -- "sub=$sub" "args=$#"
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
+#
+# exec で置き換えずに子として走らせ、終了コードをそのまま返す。置き換えると
+# 最終の結果（終了コード）を診断ログに残せない。標準出力・標準エラー・終了コードは同じ。
+ticket_exit=0
 if bin=$(ccnavi_bin "$root"); then
-	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
-	exec "$bin" --root "$root" ticket "$@"
+	skew=$(ccnavi_compat_skew "$root" "$bin") || {
+		printf 'ccnavi-ticket: %s\n' "$skew" >&2
+		log_warn 互換の版が食い違う -- "reason=compat-skew"
+	}
+	log_debug 判定の材料 -- "sub=$sub" "via=bin" "workspace=$root"
+	"$bin" --root "$root" ticket "$@" || ticket_exit=$?
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	cd "$root"
-	exec uv run python -m ccnavi --root "$root" ticket "$@"
+	log_debug 判定の材料 -- "sub=$sub" "via=source" "workspace=$root"
+	uv run python -m ccnavi --root "$root" ticket "$@" || ticket_exit=$?
+else
+	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
-printf 'ccnavi-ticket: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
-exit 2
+log_info 終わった -- "sub=$sub" "exit=$ticket_exit"
+exit "$ticket_exit"

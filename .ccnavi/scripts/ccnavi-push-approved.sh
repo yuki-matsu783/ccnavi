@@ -46,14 +46,19 @@ case "${1:-}" in
 *)
 	printf 'ccnavi-push-approved: 引数は取りません。\n' >&2
 	usage >&2
+	log_info 止めた -- "exit=2" "reason=unexpected-arg"
 	exit 2
 	;;
 esac
 
 root=$(ccnavi_workspace) || {
 	printf 'ccnavi-push-approved: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
+	log_info 止めた -- "exit=2" "reason=no-workspace"
 	exit 2
 }
+# 解いたルートを logger に渡し、書くたびに探し直させない。
+ccnavi_log_root="$root"
+log_info 受け付けた
 
 approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
@@ -81,9 +86,12 @@ skip_temp=":(exclude)$approved/flows/.*.tmp"
 # ツリーごとの結果を subshell (while はパイプの右側なので別プロセス) の外へ持ち出すための控え。
 state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {
 	printf 'ccnavi-push-approved: 一時ファイルが作れません。\n' >&2
+	log_info 止めた -- "exit=2" "reason=no-tempfile"
 	exit 2
 }
-trap 'rm -f "$state"' EXIT
+# 抜けるときに最終の結果（終了コード）を診断ログに残す。while はパイプの右側の別プロセスで、
+# この trap はそこでは走らない。
+trap 'pa_exit=$?; rm -f "$state"; log_info 終わった -- "exit=$pa_exit"; exit "$pa_exit"' EXIT
 
 # ワークスペースルートから rel を 1 段ずつ下り、シンボリックリンクの段があれば 0。
 # その段（ルートからの綴り）を linked に残す。`.claude` だけがリンクでも見逃さない。
@@ -114,6 +122,7 @@ trees="$root"
 for place in "$projects" ".claude/worktrees"; do
 	if linked_segment "$place"; then
 		printf 'ccnavi-push-approved: %s はシンボリックリンクなので、その下を辿りません。\n' "$linked" >&2
+		log_debug 辿らなかった -- "place=$linked" "reason=linked"
 		continue
 	fi
 	[ -d "$root/$place" ] || continue
@@ -121,6 +130,7 @@ for place in "$projects" ".claude/worktrees"; do
 		if [ -L "$dir" ]; then
 			printf 'ccnavi-push-approved: %s はシンボリックリンクなので辿りません。\n' \
 				"$place/$(basename "$dir")" >&2
+			log_debug 辿らなかった -- "place=$place" "reason=linked"
 			continue
 		fi
 		# glob が何にも当たらなければ綴りのまま残るので、-d で落とす。
@@ -145,12 +155,15 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
 		printf 'ccnavi-push-approved: %s はブランチの上に居ない。承認済みチケットは手でコミットしてください。\n' \
 			"$name" >&2
+		log_info 飛ばした -- "tree=$name" "reason=detached"
 		continue
 	fi
+	log_debug 判定の材料 -- "tree=$name" "branch=$branch"
 
 	git -C "$tree" add -- "$approved" "$skip_temp" || {
 		printf 'ccnavi-push-approved: %s で承認済みチケットをステージできない。\n' "$name" >&2
 		printf 'fail\n' >>"$state"
+		log_info 運べなかった -- "tree=$name" "reason=stage-failed"
 		continue
 	}
 	# 承認で todo/ から消えた提案。追跡されていたものの削除だけを入れる（`ls-files --deleted`）。
@@ -169,12 +182,14 @@ $proposals/todo"
 	printf '%s\n' "$scope" | tr '\n' '\000' | xargs -0 git -C "$tree" commit --quiet -m "ccnavi: 承認済みチケットを更新" -- || {
 		printf 'ccnavi-push-approved: %s で承認済みチケットをコミットできない。\n' "$name" >&2
 		printf 'fail\n' >>"$state"
+		log_info 運べなかった -- "tree=$name" "reason=commit-failed"
 		continue
 	}
 	case "$branch" in
 	main | master | develop | release | release/*)
 		printf 'ccnavi-push-approved: %s は %s の上に居るので push しません。送るかどうかは人が決めます。\n' \
 			"$name" "$branch" >&2
+		log_info コミットだけした -- "tree=$name" "branch=$branch" "reason=protected-branch"
 		continue
 		;;
 	esac
@@ -182,10 +197,12 @@ $proposals/todo"
 	# push は落ちても巻き戻さない。コミットは残るので、人がもう一度送れる。
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
 		printf '承認済みチケットを %s へ送った（%s）。\n' "$branch" "$name"
+		log_info 送った -- "tree=$name" "branch=$branch"
 	else
 		printf 'ccnavi-push-approved: %s の push が通らなかった。手で送ってください（git push -u origin %s）。\n' \
 			"$name" "$branch" >&2
 		printf 'fail\n' >>"$state"
+		log_info 運べなかった -- "tree=$name" "branch=$branch" "reason=push-failed"
 	fi
 done
 

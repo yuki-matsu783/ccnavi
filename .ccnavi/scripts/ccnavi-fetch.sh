@@ -47,6 +47,9 @@ projects="${CCNAVI_PROJECTS:-projects}"
 
 # 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。
 root=$(ccnavi_workspace) || exit 0
+# 解いたルートを logger に渡し、書くたびに探し直させない。診断ログ（docs/claude/logging.md）は
+# ファイルにしか書かないので、モデルに届く標準出力は変わらない。
+ccnavi_log_root="$root"
 
 # 認証を尋ねない。hook には端末が無く、尋ねれば落ちるか、画面を開いて誰かが閉じるまで待つ。
 GIT_TERMINAL_PROMPT=0
@@ -57,10 +60,14 @@ limit="${CCNAVI_FETCH_TIMEOUT:-15}"
 case "$limit" in
 '' | *[!0-9]*) limit=15 ;;
 esac
+log_info 受け付けた -- "timeout=$limit"
 
 # 落ちた origin の綴り。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
 # 回るので、変数では渡らない。
-scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
+scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || {
+	log_info 止めた -- "exit=0" "reason=no-tempfile"
+	exit 0
+}
 trap 'rm -rf "$scratch"' EXIT
 : >"$scratch/failed"
 
@@ -105,7 +112,15 @@ ccnavi_fetch_or_note() {
 	ccnavi_fetch_git "$1" "$2"
 	ccnavi_fn_rc=$?
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
-	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
+	if [ "$ccnavi_fn_rc" -eq 2 ]; then
+		log_debug 取りに行かなかった -- "path=$1" "branch=$2" "reason=origin-already-failed"
+		return 1
+	fi
+	if [ "$ccnavi_fn_rc" -eq 3 ]; then
+		log_warn 取ってこられなかった -- "path=$1" "branch=$2" "reason=auth-failed"
+	else
+		log_warn 取ってこられなかった -- "path=$1" "branch=$2" "reason=fetch-failed"
+	fi
 	printf '%s\n' "$3"
 	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は認証を尋ねない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
 	return 1
@@ -280,7 +295,11 @@ report=$(
 	done
 )
 
-[ -n "$report" ] || exit 0
+if [ -z "$report" ]; then
+	log_info 終わった -- "exit=0" "reported=no"
+	exit 0
+fi
+log_info 終わった -- "exit=0" "reported=yes"
 printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに乗って届き、ワークツリーの起点はデフォルトブランチになる。セッションの頭で取ってきた結果:\n'
 printf '%s\n' "$report"
 exit 0
