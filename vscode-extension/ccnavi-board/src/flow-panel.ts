@@ -490,8 +490,9 @@ function redraw(current: PanelState): void {
 
 function flowHost(panel: vscode.WebviewPanel, root: string): ScreenHost<FlowData> {
   if (panel.options.retainContextWhenHidden !== true) {
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "flow", retainContextWhenHidden: false });
-    console.error("フロー編集の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）");
   }
   return retainedHost<FlowData>(
     {

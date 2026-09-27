@@ -515,8 +515,9 @@ function redraw(current: PanelState): void {
  */
 function phasesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<PhasesData> {
   if (panel.options.retainContextWhenHidden !== true) {
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "phases", retainContextWhenHidden: false });
-    console.error(`フェーズ管理の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）。偽のままだと、裏に回った画面へ送り続けて中身が古いまま止まる`);
   }
   return retainedHost<PhasesData>(
     {
