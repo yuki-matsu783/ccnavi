@@ -230,6 +230,31 @@ def decide_before(
                 conf=conf,
             )
 
+    # 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
+    # （phase.prune_form）。実行ファイルの端末要求は擬似端末で抜けられる。記録と控えの置き場を
+    # シェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
+    if (
+        payload.tool_name in phase.SHELL_TOOLS
+        and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
+    ):
+        found = phase.prune_form(record.subject, conf.bin)
+        if found:
+            record.code = phase.CODE_RECORDS_PRUNE
+            record.rules = [phase.RECORDS_PRUNE_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        phase.CODE_RECORDS_PRUNE, subject, phase.prune_message()
+                    )
+                ],
+                conf=conf,
+            )
+
     # 人の判断の経路のうち、hook のほかに守りが無い形（端末要求を切る形、ボードの経路の形）は
     # 止める。実行ファイルを呼ぶ綴りは追い切れないので、呼び方ではなく綴りの組で見る
     # （phase.human_path_form）。
