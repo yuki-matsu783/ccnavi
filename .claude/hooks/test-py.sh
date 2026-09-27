@@ -17,6 +17,20 @@ MAX=3
 
 payload=$(cat)
 
+# 診断ログ（docs/claude/logging.md）。ワークスペースの共通部を読めたときだけ書く。
+# 読めない（CLAUDE_PROJECT_DIR が無い・ワークスペースでない）ときは log_* が何もしない。
+# どちらでも hook の振る舞い（標準エラー・終了コード・logs/session/ の状態）は変わらない。
+log_debug() { :; }
+log_info() { :; }
+case "${CLAUDE_PROJECT_DIR:-}" in
+/* | [A-Za-z]:*)
+	if [ -f "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ] && [ -r "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ]; then
+		. "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh"
+		ccnavi_log_root="$CLAUDE_PROJECT_DIR"
+	fi
+	;;
+esac
+
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
 # JSON パーサ無しで取り出す。値は識別子なので引用符の中だけ見れば足りる。
@@ -79,6 +93,7 @@ done
 
 if [ -z "$failed" ]; then
 	rm -f "$counter" "$trees"
+	log_info 通した -- "exit=0"
 	exit 0
 fi
 
@@ -96,6 +111,7 @@ if [ "$tried" -gt "$MAX" ]; then
 	printf 'ccnavi: %s のテストが落ちたまま %s 回差し戻したので、これ以上は止めません。\n' \
 		"$failed" "$MAX" >&2
 	printf '%s\n' "$(printf '%s' "$output" | tail -20)" >&2
+	log_info 上限に達した -- "tree=$failed" "exit=0" "max=$MAX" "reason=retry-limit"
 	exit 0
 fi
 
@@ -104,4 +120,5 @@ printf '%s' "$tried" >"$counter"
 printf 'unittest（%s / 最初に落ちた 1 件 / %s 回目、あと %s 回で打ち切り）:\n%s\n' \
 	"$failed" "$tried" "$((MAX - tried))" "$(printf '%s' "$output" | tail -40)" >&2
 printf '落ちたテストを直してから終わってください。\n' >&2
+log_info 差し戻した -- "tree=$failed" "exit=2" "tried=$tried" "max=$MAX" "reason=test-failed"
 exit 2

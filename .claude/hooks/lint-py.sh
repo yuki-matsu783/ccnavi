@@ -19,6 +19,20 @@ case "$file" in
 *) exit 0 ;;
 esac
 
+# 診断ログ（docs/claude/logging.md）。ワークスペースの共通部を読めたときだけ書く。
+# 読めない（CLAUDE_PROJECT_DIR が無い・ワークスペースでない）ときは log_* が何もしない。
+# どちらでも hook の振る舞い（標準エラー・終了コード・logs/session/ の状態）は変わらない。
+log_debug() { :; }
+log_info() { :; }
+case "${CLAUDE_PROJECT_DIR:-}" in
+/* | [A-Za-z]:*)
+	if [ -f "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ] && [ -r "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ]; then
+		. "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh"
+		ccnavi_log_root="$CLAUDE_PROJECT_DIR"
+	fi
+	;;
+esac
+
 # Windows のパスは区切りがバックスラッシュで、JSON の中では 2 個に増えている。
 # dirname はバックスラッシュを区切りと見ないので、直さないと親を辿れない。
 file=$(printf '%s' "$file" | tr '\\' '/' | tr -s '/')
@@ -82,7 +96,12 @@ fi
 # 実行ファイルはここでは作り直さない。PyInstaller が 11 秒かかるので外してある。
 # 動かして確かめるときに `uv run --with pyinstaller python build.py` を手で回す。
 
-[ -z "$report" ] && exit 0
+# 編集のたびに走るので、通したことは DEBUG に置く。差し戻しは INFO。
+if [ -z "$report" ]; then
+	log_debug 通した -- "tree=$tree"
+	exit 0
+fi
+log_info 差し戻した -- "tree=$tree" "exit=2" "reason=ruff"
 
 printf '検査したツリー: %s\n%s\n' "$tree" "$report" >&2
 printf 'ここで報告された指摘を直してから次へ進んでください。\n' >&2

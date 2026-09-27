@@ -50,6 +50,22 @@ case "$session" in
 '' | */* | *\\*) session=unknown ;;
 esac
 
+# 診断ログ（docs/claude/logging.md）。ワークスペースの共通部を読めたときだけ書く。
+# 編集のたびに走るので DEBUG だけを書く（既定の INFO では 1 行も増えない）。
+# 読めない（CLAUDE_PROJECT_DIR が無い・ワークスペースでない）ときは log_* が何もしない。
+# どちらでも hook の振る舞い（標準エラー・終了コード・logs/session/ の状態）は変わらない。
+log_debug() { :; }
+log_info() { :; }
+case "${CLAUDE_PROJECT_DIR:-}" in
+/* | [A-Za-z]:*)
+	if [ -f "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ] && [ -r "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ]; then
+		. "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh"
+		ccnavi_log_root="$CLAUDE_PROJECT_DIR"
+	fi
+	;;
+esac
+
 mkdir -p "$main/logs/session" || exit 0
 printf '%s\n' "$file" >>"$main/logs/session/$session.ext-files"
+log_debug 印を付けた -- "file=$file"
 exit 0

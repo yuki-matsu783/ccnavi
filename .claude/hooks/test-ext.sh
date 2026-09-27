@@ -16,6 +16,20 @@ MAX=3
 
 payload=$(cat)
 
+# 診断ログ（docs/claude/logging.md）。ワークスペースの共通部を読めたときだけ書く。
+# 読めない（CLAUDE_PROJECT_DIR が無い・ワークスペースでない）ときは log_* が何もしない。
+# どちらでも hook の振る舞い（標準エラー・終了コード・logs/session/ の状態）は変わらない。
+log_debug() { :; }
+log_info() { :; }
+case "${CLAUDE_PROJECT_DIR:-}" in
+/* | [A-Za-z]:*)
+	if [ -f "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ] && [ -r "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh" ]; then
+		. "$CLAUDE_PROJECT_DIR/.ccnavi/scripts/ccnavi-common.sh"
+		ccnavi_log_root="$CLAUDE_PROJECT_DIR"
+	fi
+	;;
+esac
+
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
 session=$(printf '%s' "$payload" |
@@ -47,12 +61,17 @@ esac
 
 # 拡張を触っていないターンは何もしない。触ったかどうかは PostToolUse の
 # mark-ext.sh が書き残している。
-[ -s "$files" ] || exit 0
+# ターンの終わりのたびに走るので、回さなかったことは DEBUG に置く。
+[ -s "$files" ] || {
+	log_debug 回さなかった -- "reason=no-marks"
+	exit 0
+}
 
 # node が無い機械では回せない。モデルが直せることではないので、差し戻さずに人へ言う。
 if ! command -v node >/dev/null 2>&1; then
 	printf 'ccnavi: node が無いので拡張のテストを回していません（要るのは Node 22）。\n' >&2
 	rm -f "$files"
+	log_info 回さなかった -- "exit=0" "reason=no-node"
 	exit 0
 fi
 
@@ -77,6 +96,7 @@ while IFS= read -r root; do
 	[ -n "$root" ] || continue
 	if [ ! -f "$root/scripts/test-groups.js" ]; then
 		printf 'ccnavi: %s にテストの入口が無いので回していません。\n' "$root" >&2
+		log_info 回さなかった -- "tree=$root" "reason=no-entry"
 		continue
 	fi
 	# そのツリーのファイルだけを渡す。2 つのワークツリーを触ったターンでは、
@@ -109,12 +129,16 @@ if [ -z "$failed" ]; then
 	rm -f "$counter" "$files"
 	if [ -n "$notready" ]; then
 		printf '%s\n' "$notready" >&2
+		log_info 回せなかった -- "exit=0" "reason=not-ready"
 		exit 0
 	fi
 	# 印はあるのに 1 つも回せなかった。黙って通すと「テストが通った」と区別が付かない。
 	if [ "$ran" = 0 ]; then
 		printf 'ccnavi: 拡張を触った印はありますが、回せるツリーが見つかりませんでした。\n' >&2
+		log_info 回さなかった -- "exit=0" "reason=no-runnable-tree"
+		exit 0
 	fi
+	log_info 通した -- "exit=0"
 	exit 0
 fi
 
@@ -132,6 +156,7 @@ if [ "$tried" -gt "$MAX" ]; then
 	printf 'ccnavi: %s のテストが落ちたまま %s 回差し戻したので、これ以上は止めません。\n' \
 		"$failed" "$MAX" >&2
 	printf '%s\n' "$(printf '%s' "$output" | tail -20)" >&2
+	log_info 上限に達した -- "tree=$failed" "exit=0" "max=$MAX" "reason=retry-limit"
 	exit 0
 fi
 
@@ -140,4 +165,5 @@ printf '%s' "$tried" >"$counter"
 printf '拡張のテスト（%s / %s 回目、あと %s 回で打ち切り）:\n%s\n' \
 	"$failed" "$tried" "$((MAX - tried))" "$(printf '%s' "$output" | tail -40)" >&2
 printf '落ちたテストを直してから終わってください。\n' >&2
+log_info 差し戻した -- "tree=$failed" "exit=2" "tried=$tried" "max=$MAX" "reason=test-failed"
 exit 2
