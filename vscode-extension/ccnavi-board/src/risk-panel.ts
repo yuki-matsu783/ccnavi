@@ -105,6 +105,7 @@ export async function openRisk(): Promise<void> {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の束ねを読めない", { screen: "risk" });
     vscode.window.showErrorMessage(`リスク管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
@@ -149,6 +150,7 @@ function readPage(root: string): Loaded {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      diaglog.get("ccnavi-board", root).error("配点のファイルを読めない", { path: riskRel, code: (error as NodeJS.ErrnoException).code });
       throw new Error(`配点のファイルを読めません（${riskRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（組み込みの配点）。画面は組み込みを見せ、「作る」だけができる。
@@ -200,8 +202,13 @@ function registerPanelHandlers(current: PanelState): void {
     current.watchers = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
-    } catch {
+    } catch (error) {
       // 一時ファイルの片付けに失敗しても画面の仕事には関係ない
+      diaglog.get("ccnavi-board", current.folder.uri.fsPath).warn("一時ディレクトリを消せない", {
+        screen: "risk",
+        path: current.tmpDir,
+        code: (error as NodeJS.ErrnoException).code,
+      });
     }
     if (state === current) {
       state = undefined;
@@ -492,6 +499,7 @@ function create(current: PanelState): void {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.riskPath, BUILTIN_RISK_TEXT, { encoding: "utf8", flag: "wx" });
   } catch (error) {
+    diaglog.get("ccnavi-board", current.folder.uri.fsPath).error("配点のファイルを作れない", { path: loaded.riskRel, code: (error as NodeJS.ErrnoException).code });
     // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
     current.wroteAt = 0;
     fail(current, `${loaded.riskRel} に書けません: ${(error as Error).message}`);
@@ -518,6 +526,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     tmp = path.join(current.tmpDir, "risks.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("編集中の内容を一時ファイルに書けない", { screen: "risk", code: (error as NodeJS.ErrnoException).code });
     fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
@@ -558,6 +567,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   try {
     mtimeMs = fs.statSync(loaded.riskPath).mtimeMs;
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("配点のファイルを確かめられない", { path: loaded.riskRel, code: (error as NodeJS.ErrnoException).code });
     fail(current, `配点のファイルを確かめられません: ${(error as Error).message}`);
     return;
   }
@@ -570,6 +580,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.riskPath, text, "utf8");
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("配点のファイルに書けない", { path: loaded.riskRel, code: (error as NodeJS.ErrnoException).code });
     current.wroteAt = 0;
     fail(current, `配点のファイルに書けません: ${(error as Error).message}`);
     return;

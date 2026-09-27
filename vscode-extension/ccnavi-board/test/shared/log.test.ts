@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { runLint, runTest } from "../../src/ccnavi.js";
 import { formatLine, get, LEVEL_ENV, maskUserinfo, quote, stamp, threshold } from "../../src/log.js";
 
 const HEAD = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} (DEBUG|INFO |WARN |ERROR) ([^[\s]+)\[(\d+)\] /;
@@ -195,6 +196,83 @@ test("CB-T286 URL と scp 形に埋まった資格情報を *** に伏せる（�
     withLevel(undefined, () => get("probe", root).info("clone https://u:SECRET@h/x", { url: "oauth2:SECRET@h:o/r.git" }));
     const [line] = lines(root);
     assert.equal(line.replace(HEAD, ""), "clone https://***@h/x url=***@h:o/r.git");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/** `run` を走らせる間だけ閾値を置く（logger は書くときの閾値ではなく get の時点の閾値を見る。await を挟むので同期の withLevel では足りない） */
+async function withLevelAsync<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
+  const saved = process.env[LEVEL_ENV];
+  if (value === undefined) {
+    delete process.env[LEVEL_ENV];
+  } else {
+    process.env[LEVEL_ENV] = value;
+  }
+  try {
+    return await run();
+  } finally {
+    if (saved === undefined) {
+      delete process.env[LEVEL_ENV];
+    } else {
+      process.env[LEVEL_ENV] = saved;
+    }
+  }
+}
+
+/** 実行ファイルの代わりの sh。`body` をそのまま書く。実行の権限は `mode` */
+function fakeBin(root: string, body: string, mode = 0o755): string {
+  const file = path.join(root, "fake-ccnavi");
+  fs.writeFileSync(file, `#!/bin/sh\n${body}\n`, { mode });
+  fs.chmodSync(file, mode);
+  return file;
+}
+
+test("CB-T287 実行ファイルの失敗は ERROR に sub・終了コード・標準エラーの長さだけを書く（中身は書かない）。利用者への文面は変わらない", { skip: process.platform === "win32" }, async () => {
+  const root = workspace();
+  try {
+    const bin = fakeBin(root, "echo 'token=SECRET https://u:SECRET@h/x' >&2\nexit 3");
+    const result = await withLevelAsync(undefined, () => runLint(root, bin, { kind: "risk", path: "risks.yml" }));
+    assert.equal(result.ok, false);
+    assert.ok(!result.ok && result.error.startsWith("ccnavi --lint が失敗しました: token=SECRET"), JSON.stringify(result));
+    const found = lines(root, "ccnavi-board");
+    assert.equal(found.length, 1, found.join("\n"));
+    const head = HEAD.exec(found[0]);
+    assert.ok(head !== null, found[0]);
+    assert.equal(head[1], "ERROR");
+    assert.match(found[0].slice(head[0].length), /^実行ファイルが失敗した sub=--lint code=3 ms=\d+ stderr_len=\d+$/);
+    assert.ok(!found[0].includes("SECRET"), found[0]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CB-T288 実行ファイルを起動できない・出力を読めないときは ERROR に理由の種類と長さだけを書く。成功は DEBUG でだけ書く", { skip: process.platform === "win32" }, async () => {
+  const root = workspace();
+  try {
+    // 実行の権限が無い: 起動できない（errno）
+    const denied = fakeBin(root, "exit 0", 0o644);
+    const refused = await withLevelAsync(undefined, () => runTest(root, denied, { kind: "workspace", path: "rules.yml" }, "Bash", "ls"));
+    assert.equal(refused.ok, false);
+    // JSON でない出力: 読めない（kind=json）。中身は書かない
+    fs.rmSync(denied);
+    const garbled = fakeBin(root, "echo 'not json SECRET'");
+    const unread = await withLevelAsync(undefined, () => runTest(root, garbled, { kind: "workspace", path: "rules.yml" }, "Bash", "ls"));
+    assert.equal(unread.ok, false);
+    const found = lines(root, "ccnavi-board").map((line) => line.replace(HEAD, ""));
+    assert.deepEqual(found, [
+      "実行ファイルを起動できない sub=\"--test --json\" errno=EACCES",
+      "実行ファイルの出力を読めない sub=\"--test --json\" kind=json stdout_len=16",
+    ]);
+    // 既定の INFO では成功を書かない。DEBUG なら所要時間を書く
+    fs.rmSync(path.join(root, "logs"), { recursive: true, force: true });
+    const quiet = fakeBin(root, "echo '{}'");
+    await withLevelAsync(undefined, () => runLint(root, quiet, { kind: "risk", path: "risks.yml" }));
+    assert.deepEqual(lines(root, "ccnavi-board"), []);
+    await withLevelAsync("DEBUG", () => runLint(root, quiet, { kind: "risk", path: "risks.yml" }));
+    const debug = lines(root, "ccnavi-board").map((line) => line.replace(HEAD, ""));
+    assert.equal(debug.length, 1, debug.join("\n"));
+    assert.match(debug[0], /^実行ファイルが返った sub=--lint code=0 ms=\d+ stdout_len=3$/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

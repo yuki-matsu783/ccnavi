@@ -46,6 +46,7 @@ import { screens } from "./core/screens.js";
 import { readOrigin } from "./git.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
+import * as diaglog from "./log.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -97,6 +98,7 @@ export async function openProjects(): Promise<void> {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の束ねを読めない", { screen: "projects" });
     vscode.window.showErrorMessage(`プロジェクト管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
@@ -111,7 +113,7 @@ export async function openProjects(): Promise<void> {
     retainContextWhenHidden: false,
   });
   showLoading(panel, TITLE, SCREEN, "プロジェクト");
-  const current: PanelState = { panel, folder, host: projectsHost(panel), watchers: [], loading: false, again: false, wasVisible: panel.visible };
+  const current: PanelState = { panel, folder, host: projectsHost(panel, folder.uri.fsPath), watchers: [], loading: false, again: false, wasVisible: panel.visible };
   state = current;
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
@@ -156,7 +158,7 @@ async function gather(root: string): Promise<Gathered> {
   const knownRels = new Set(board.trees.filter((t) => t.kind !== "main").map((t) => toPosix(path.relative(root, t.root))));
   const strays = findStrayGitDirs({
     projectsRel,
-    list: (rel) => listDir(path.join(root, ...rel.split("/").filter((s) => s !== ""))),
+    list: (rel) => listDir(root, path.join(root, ...rel.split("/").filter((s) => s !== ""))),
     knownRels,
   });
 
@@ -169,7 +171,7 @@ async function gather(root: string): Promise<Gathered> {
       origins,
       strays,
       projectsRel,
-      ignored: gitignoreHasProjects(readText(path.join(root, ".gitignore")), projectsRel),
+      ignored: gitignoreHasProjects(readText(root, path.join(root, ".gitignore")), projectsRel),
       rulesRels,
       rulesExists,
       hasClaudeDir,
@@ -179,19 +181,30 @@ async function gather(root: string): Promise<Gathered> {
   };
 }
 
-function listDir(dir: string): readonly DirEntry[] {
+/** 無い・読めないディレクトリは空。無い（ENOENT）以外は診断ログに残す */
+function listDir(root: string, dir: string): readonly DirEntry[] {
   try {
     return fs.readdirSync(dir, { withFileTypes: true }).map((e) => ({ name: e.name, isDir: e.isDirectory() }));
-  } catch {
+  } catch (error) {
+    noteUnreadable(root, "ディレクトリを読めないので空として進めた", dir, error);
     return [];
   }
 }
 
-function readText(filePath: string): string | undefined {
+/** 無い・読めないファイルは undefined。無い（ENOENT）以外は診断ログに残す */
+function readText(root: string, filePath: string): string | undefined {
   try {
     return fs.readFileSync(filePath, "utf8");
-  } catch {
+  } catch (error) {
+    noteUnreadable(root, "ファイルを読めないので無いとして進めた", filePath, error);
     return undefined;
+  }
+}
+
+function noteUnreadable(root: string, msg: string, target: string, error: unknown): void {
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code !== "ENOENT") {
+    diaglog.get("ccnavi-board", root).warn(msg, { path: toPosix(path.relative(root, target)), code });
   }
 }
 
@@ -368,7 +381,13 @@ function redraw(current: PanelState): void {
  * プロジェクト管理の画面に渡す口。VS Code のパネルを `screenHost` の形に合わせる。
  * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
  */
-function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
+function projectsHost(panel: vscode.WebviewPanel, root: string): ScreenHost<ProjectsData> {
+  if (panel.options.retainContextWhenHidden === true) {
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている（core/screen-host.ts の表）。真のままだと、
+    // 裏に回った画面にも入れ物を入れ直し、編集の途中を持たない画面なのに持つ画面の段取りと食い違う。
+    // 診断ログにだけ残す（console には出さない。docs/claude/logging.md）
+    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "projects", retainContextWhenHidden: true });
+  }
   return screenHost<ProjectsData>(
     {
       get visible(): boolean {
@@ -509,7 +528,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
     return;
   }
   const target = path.join(page.projectsDir, name.name);
-  if (fs.existsSync(target) && listDir(target).length > 0) {
+  if (fs.existsSync(target) && listDir(current.folder.uri.fsPath, target).length > 0) {
     fail(current, `${page.projectsRel}/${name.name} が既にあり、空ではありません`);
     return;
   }
@@ -527,10 +546,11 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
     return;
   }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");
-  const before = readText(file);
+  const before = readText(current.folder.uri.fsPath, file);
   try {
     fs.writeFileSync(file, gitignoreWithProjects(before, page.projectsRel), "utf8");
   } catch (error) {
+    diaglog.get("ccnavi-board", current.folder.uri.fsPath).error(".gitignore に書けない", { path: ".gitignore", code: (error as NodeJS.ErrnoException).code });
     fail(current, `.gitignore に書けません: ${(error as Error).message}`);
     return;
   }
@@ -569,7 +589,7 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
   }
   // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かない（ADR-0052）。
   const sourceRel = DEFAULT_RULES;
-  const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
+  const source = readText(root, path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
   if (source === undefined) {
     fail(current, `共通の設定のルール ${sourceRel} を読めません`);
     return;
@@ -578,6 +598,7 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, rewriteRulesForProject(source, sourceRel, label, new Date().toISOString().slice(0, 10)), { encoding: "utf8", flag: "wx" });
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("ルールファイルを作れない", { path: targetRel, code: (error as NodeJS.ErrnoException).code });
     fail(current, `${targetRel} に書けません: ${(error as Error).message}`);
     return;
   }
