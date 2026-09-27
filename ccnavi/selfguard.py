@@ -240,19 +240,21 @@ _COPY_END = r"(?:[\\/]|$)"
 # チケットの sh は `.ccnavi/scripts/` にあるので、`.claude` の側で守るのは hook と設定ファイルだけ。
 #
 # `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。どちらも判定が読むので
-# 名前を絞って守る。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので
-# 守らない。
+# 名前を絞って守る。ローテートした記録（`logs/log.<日時>.jsonl`、prune）も同じ綴りで守る。
+# 判定は読まないが、「記録が無い = 動かなかった」を読む元で、シェルから消せると自分の呼び出しの
+# 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi --prune` だけ。
+# `logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
 _PLACES = (
     r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
-    r"logs[\\/](log\.jsonl|state)" + _END,
+    r"logs[\\/](log(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
     r"\.claude(?:[\\/](hooks|settings)|" + _COPY_TERM + r")",
     # 行き先が ccnavi ディレクトリそのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
-    r"logs[\\/](log\.jsonl|state)" + _COPY_END,
+    r"logs[\\/](log(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _COPY_END,
     r"ccnavi-git\.sh",
 )
 

@@ -444,6 +444,18 @@ class SelfGuardTest(unittest.TestCase):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_ローテートした記録もシェルからの書き込みで止まる(self):
+        # 消すのはセッションの開始と端末から打つ `ccnavi --prune` だけ（prune）。
+        for command in (
+            "rm logs/log.20260927-120000.jsonl",
+            "rm logs/log.*.jsonl",
+            "echo x > logs/log.20260927-120000-2.jsonl",
+            "cd logs && rm log.20260927-120000.jsonl",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
     def test_git_ラッパースクリプトの記録は止めない(self):
         # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
         result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")

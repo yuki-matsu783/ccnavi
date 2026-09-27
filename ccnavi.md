@@ -243,6 +243,12 @@ ccnavi のリポジトリでの組み立て: `build.py` は PyInstaller の出�
 ツール呼び出しは、通したものも判定しなかったものも 1 件 1 行の JSON として `CCNAVI_LOG`
 （既定 `logs/log.jsonl`）に追記する。1 行の欄は付録 B。判定しなかった回も残すので、記録が無ければ ccnavi が動かなかったと読める。
 
+記録に書く `subject` / `unwrapped` / `detail` は、書く直前に秘密の形を伏せる（`ccnavi/redact.py`）。伏せるのは
+記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `log.<日時>.jsonl` へローテートし、ローテートした
+記録と終わったセッションの控え（`logs/state/`）は 14 日で消す。走るのはセッション開始と `ccnavi --prune` だけで、
+実行前の判定では走らない。控えはセッションごとにまとめて、どれかが保持日数のうちに書かれていれば全部残す
+（`ccnavi/prune.py`、ADR-0089）。「記録が無ければ動かなかった」は、ローテートした分と合わせて読む。
+
 | 欄 | 数えるもの |
 |---|---|
 | `decision` = `allow` / `ask` / `deny` / `handover` / `nudge` / `skip` | 下した判定。`handover` は権限モードに委ねた回。`nudge` は `Stop` で `finish` を促した回（ツール呼び出しの判定ではないので `deny` と数えない。ADR-0087） |
@@ -2426,7 +2432,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 ## 付録 B. 記録の 1 行
 
 `ts`（ISO 8601、ローカルのオフセット付き）、`mode`、`permission_mode`、`event`、`tool`、`subject`
-（1000 字で切り `…(+N)`）、`decision`、`enforced`、`code`、`reason`、`degraded`、`unwrapped`（当たった中で実行されるコマンド。
+（秘密の形を伏せ（4.7）、1000 字で切り `…(+N)`）、`decision`、`enforced`、`code`、`reason`、`degraded`、`unwrapped`（当たった中で実行されるコマンド。
 `\x00` でつなぎ、1000 字で切る。6.3.1）、`fallback`、`detail`、
 `tree`、`project`、`source`、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 23 欄。空欄は落とす。
 `ts` / `mode` / `decision` / `enforced` / `ms` は常に出る。`O_APPEND` で 1 行を 1 回の write で書く。

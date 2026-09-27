@@ -29,6 +29,7 @@ from . import (
     lint,
     modes,
     ops,
+    prune,
     review,
     ruleload,
     selfguard,
@@ -97,6 +98,13 @@ in a file against them, run
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
+
+To rotate the decision log and remove old logs and finished sessions' state
+(SessionStart does the same on its own), run
+
+    ccnavi --prune [--preview]
+
+--preview only lists what would move. Without it, --prune needs a terminal.
 
 To review the pending tickets and approve the work areas they declare, run
 
@@ -350,6 +358,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
+    # 記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。人が端末から打つ。
+    parser.add_argument("--prune", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--tickets", default="")
     parser.add_argument("--approved", default=None)
@@ -486,6 +496,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.explain:
         return diagnose.explain(stdout, stderr, conf, root)
 
+    # 後始末の経路。payload を読まない。セッションの開始でも同じものが走る（events）。
+    if args.prune:
+        return _prune(stdin, stdout, stderr, conf, root, args.preview)
+
     # 承認の経路。人が端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
     # 判断ではなく、これから効く範囲についての合意になる。
@@ -620,6 +634,30 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     code = events.decide(stdout, stderr, mode, conf, root, payload, record, deadline)
     _record(stderr, log, record)
     return code
+
+
+def _prune(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    preview: bool,
+) -> int:
+    """記録と控えの後始末を 1 度走らせ、動かしたものを出す。
+
+    消すのは記録なので、`--preview`（見るだけ）でなければ端末を求める。エージェントが
+    Bash から打てると、しきい値の環境変数を 0 に近づけて前に並べるだけで、自分の呼び出しの
+    記録を消せる。
+    """
+    if not preview and not _from_terminal(stdin, conf, stderr, "--prune"):
+        return EXIT_ERROR
+    report = prune.run(root, conf.log, conf.state, dry_run=preview)
+    for line in prune.lines(report, preview):
+        stdout.write(line + "\n")
+    for problem in report.problems:
+        stderr.write(f"ccnavi: {problem}\n")
+    return EXIT_OK
 
 
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:

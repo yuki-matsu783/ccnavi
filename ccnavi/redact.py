@@ -1,0 +1,156 @@
+"""記録に残す文字列から、秘密の形をした部分を伏せる。
+
+判定には使わない。止める・通すは伏せる前の文字列で決め、伏せるのは `logs/log.jsonl` に
+書く 1 行だけ（audit）。判定の側で伏せると、伏せた形にルールを当てることになり、
+`curl -H 'Authorization: …' …` のような呼び出しの読みが変わる。
+
+記録にはコマンドの全文が入る。`curl -H 'Authorization: Bearer …'`、`mysql -p<パスワード>`、
+`git clone https://oauth2:<トークン>@…` を 1 回打てば、その値が平文でディスクに残り、
+ローテートした記録（prune）と一緒に何日も残る。
+
+伏せ方は長さで 2 通り。短い値（SHORT 字未満）は全部を `***` にする。長い値は頭の
+KEEP_HEAD 字と尻の KEEP_TAIL 字を残し、あいだを `***` にする。残すのは、同じ値が繰り返し
+出ているか、どの種類のトークンかを記録から見分けられるようにするため。短い値で残すと、
+残した字だけで値の大半が読める。
+
+見つけ方は形だけ。値そのものが秘密かどうかは分からないので、取りこぼしも、
+秘密でないものを伏せることもある。後者は記録が少し読みにくくなるだけで、判定は変わらない。
+`$VAR` や `${VAR}` のように変数を指すだけの値は伏せない（値そのものはコマンドに無い）。
+"""
+
+from __future__ import annotations
+
+import re
+
+# これより短い値は全部を伏せる。
+SHORT = 18
+# 長い値で残す頭と尻の字数。
+KEEP_HEAD = 6
+KEEP_TAIL = 4
+MASK = "***"
+
+# 引用の外で、値の終わりとして読む字。
+_BARE_VALUE = r"[^\s'\"&;|,)}<>`]+"
+# 値。引用されていれば閉じ引用まで、されていなければ区切りの字の手前まで。
+_VALUE = r"(?:'(?P<sq>[^'\n]*)'|\"(?P<dq>[^\"\n]*)\"|(?P<bare>" + _BARE_VALUE + r"))"
+
+# 名前が秘密を指す `名前=値` / `名前: 値`。名前はこれで終わるもの（`GITHUB_TOKEN`、
+# `db_password`、`x-api-key`、`aws_secret_access_key`）。途中に含むだけの名前
+# （`tokenizer`、`secretName`）は読まない。
+_KEY_WORDS = (
+    r"token|password|passwd|secret|api[_-]?key|apikey|access[_-]?key|private[_-]?key|"
+    r"client[_-]?secret|auth[_-]?token|credentials?"
+)
+_ASSIGN = re.compile(
+    r"(?<![A-Za-z0-9])[A-Za-z0-9_.-]*(?:" + _KEY_WORDS + r")[\"']?\s*[=:]\s*" + _VALUE,
+    re.IGNORECASE,
+)
+# 空白で値を渡すフラグ（`--password xxx`、`--token xxx`）。`=` の形は _ASSIGN が読む。
+_FLAG = re.compile(
+    r"(?<![A-Za-z0-9-])--(?:password|passwd|token|secret|api-key|apikey|access-token|auth-token)"
+    r"\s+" + _VALUE,
+    re.IGNORECASE,
+)
+# HTTP の Authorization ヘッダの値。方式の語（Bearer / Basic / token など）は残す。
+_AUTH_HEADER = re.compile(
+    r"\b(?:proxy-)?authorization\s*:\s*(?:[A-Za-z]+\s+)?(?P<bare>" + _BARE_VALUE + r")",
+    re.IGNORECASE,
+)
+_BEARER = re.compile(r"\bbearer\s+(?P<bare>[A-Za-z0-9._~+/=-]+)", re.IGNORECASE)
+# URL に埋めた資格情報（`https://user:<値>@host`）。
+_URL_USERINFO = re.compile(r"://[^/\s:@'\"]+:(?P<bare>[^@\s/'\"]+)@")
+# 形そのものがトークンだと言えるもの。
+_TOKENS = re.compile(
+    r"(?<![A-Za-z0-9])(?P<bare>"
+    r"(?:AKIA|ASIA)[0-9A-Z]{16}"  # AWS のアクセスキー ID
+    r"|gh[pousr]_[A-Za-z0-9]{20,}"  # GitHub の各種トークン
+    r"|github_pat_[A-Za-z0-9_]{20,}"  # GitHub の fine-grained トークン
+    r"|glpat-[A-Za-z0-9_-]{20,}"  # GitLab の個人アクセストークン
+    r"|xox[abprs]-[A-Za-z0-9-]{10,}"  # Slack のトークン
+    r")(?![A-Za-z0-9])"
+)
+# 秘密鍵の本文。見出しと結びの行は残し、あいだを伏せる。
+_PRIVATE_KEY = re.compile(
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?P<bare>.*?)(?:-----END [A-Z ]*PRIVATE KEY-----|$)",
+    re.DOTALL,
+)
+
+# コマンドを限って読むフラグ。`-p` や `-u` はほかのコマンドでは別の意味なので
+# （`mkdir -p`、`ssh -p 22`、`sort -u`）、そのコマンドの中でだけ読む。
+# コマンドの範囲は、名前から次のコマンドの切れ目（`;` `|` `&` 改行）の手前まで。
+_SEGMENTS = (
+    # mysql 系の `-p<パスワード>`（空白を挟まない形だけがパスワードになる）。
+    (
+        re.compile(r"\b(?:mysql\w*|mariadb\w*)\b[^\n;|&]*"),
+        re.compile(r"(?<=\s)-p" + _VALUE),
+    ),
+    # curl の `-u user:<パスワード>` / `--user user:<パスワード>`。
+    (
+        re.compile(r"\bcurl\b[^\n;|&]*"),
+        re.compile(r"(?<=\s)(?:-u|--user)[\s=]*['\"]?[^\s:'\"]+:(?P<bare>[^\s'\"]+)"),
+    ),
+)
+
+
+def redact(text: str) -> str:
+    """秘密の形をした部分を伏せた文字列を返す。見つからなければそのまま返す。"""
+    if not text:
+        return text
+    spans = _spans(text)
+    if not spans:
+        return text
+    out = []
+    last = 0
+    for start, end in spans:
+        out.append(text[last:start])
+        out.append(mask(text[start:end]))
+        last = end
+    out.append(text[last:])
+    return "".join(out)
+
+
+def mask(value: str) -> str:
+    """値 1 つを伏せる。短ければ全部、長ければ頭と尻を残す。"""
+    if len(value) < SHORT:
+        return MASK
+    return value[:KEEP_HEAD] + MASK + value[-KEEP_TAIL:]
+
+
+def _spans(text: str) -> list[tuple[int, int]]:
+    """伏せる範囲を、重なりをまとめて前から並べる。
+
+    同じ値に 2 つの形が当たる（`GITHUB_TOKEN=ghp_…` は名前でもトークンの形でも当たる）ので、
+    範囲を先に集めてから 1 度だけ伏せる。形ごとに順に置き換えると、伏せた後の文字列を
+    次の形がもう 1 度伏せ、残した頭と尻まで消える。
+    """
+    found: list[tuple[int, int]] = []
+    for pattern in (_PRIVATE_KEY, _TOKENS, _AUTH_HEADER, _BEARER, _URL_USERINFO, _ASSIGN, _FLAG):
+        found.extend(_value_spans(pattern, text, 0))
+    for segment, option in _SEGMENTS:
+        for part in segment.finditer(text):
+            found.extend(_value_spans(option, part.group(0), part.start()))
+    found.sort()
+    merged: list[tuple[int, int]] = []
+    for start, end in found:
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def _value_spans(pattern: re.Pattern[str], text: str, offset: int) -> list[tuple[int, int]]:
+    """当たった値の範囲。変数を指すだけの値と空の値は外す。"""
+    out = []
+    for m in pattern.finditer(text):
+        for name in ("sq", "dq", "bare"):
+            if name in pattern.groupindex and m.group(name) is not None:
+                start, end = m.span(name)
+                break
+        else:
+            continue
+        value = text[start:end]
+        if not value.strip() or value.startswith("$"):
+            continue
+        out.append((start + offset, end + offset))
+    return out
