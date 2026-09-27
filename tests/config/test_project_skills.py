@@ -1,7 +1,7 @@
 """プロジェクトのスキルの目録（ADR-0091）の受入テスト。
 
 プロジェクトは `.claude/` を持たない（ADR-0033）ので、スキルの形の手順書は
-`projects/<名前>/.ccnavi/skills/<スキル>/SKILL.md` に置く。ccnavi は SessionStart と
+`projects/<名前>/docs/skills/<スキル>/SKILL.md` に置く。ccnavi は SessionStart と
 SubagentStart で、cwd がそのプロジェクトの中にあるときだけ、名前・説明・場所の目録を渡す。
 見るのは次のとおり。
 
@@ -45,7 +45,7 @@ class ProjectSkillsTest(unittest.TestCase):
         os.makedirs(os.path.join(self.lib, ".git"))
 
     def put(self, name: str, text: str) -> str:
-        return write(os.path.join(self.lib, ".ccnavi", "skills", name, "SKILL.md"), text)
+        return write(os.path.join(self.lib, "docs", "skills", name, "SKILL.md"), text)
 
     def context(self, event: str, cwd: str, state: str = "", **extra) -> str:
         payload = {"hook_event_name": event, "session_id": "s1", "cwd": cwd, **extra}
@@ -79,7 +79,7 @@ class ProjectSkillsTest(unittest.TestCase):
         self.put("deploy", skill("deploy", "本番へ出す手順"))
         said = self.context("SessionStart", self.lib)
         self.assertIn("プロジェクト lib のスキル", said)
-        self.assertIn("- deploy: 本番へ出す手順（.ccnavi/skills/deploy/SKILL.md）", said)
+        self.assertIn("- deploy: 本番へ出す手順（docs/skills/deploy/SKILL.md）", said)
 
     def test_subagent_start_inside_the_project_lists_the_skills(self):
         self.put("deploy", skill("deploy", "本番へ出す手順"))
@@ -96,6 +96,14 @@ class ProjectSkillsTest(unittest.TestCase):
         self.assertEqual(self.context("SubagentStart", self.lib, agent_id="a1"), CANDIDATE_NOTE)
 
     # --- 2. frontmatter ---------------------------------------------------------------
+
+    def test_the_ccnavi_directory_is_no_longer_read(self):
+        """置き場は docs/skills/（ADR-0091）。.ccnavi/skills/ に置いたものは目録に載らない。"""
+        write(
+            os.path.join(self.lib, ".ccnavi", "skills", "old", "SKILL.md"),
+            skill("old", "古い置き場"),
+        )
+        self.assertNotIn("古い置き場", self.context("SessionStart", self.lib))
 
     def test_missing_frontmatter_falls_back_to_the_directory_name(self):
         self.put("notes", "# 見出しだけ\n")
@@ -114,10 +122,10 @@ class ProjectSkillsTest(unittest.TestCase):
     @unittest.skipIf(os.name == "nt", "シンボリックリンクを作れない機械がある")
     def test_symlinked_skill_files_are_not_read(self):
         outside = write(os.path.join(self.root, "elsewhere.md"), skill("leak", "外の文"))
-        target = os.path.join(self.lib, ".ccnavi", "skills", "leak")
+        target = os.path.join(self.lib, "docs", "skills", "leak")
         os.makedirs(target)
         os.symlink(outside, os.path.join(target, "SKILL.md"))
-        os.makedirs(os.path.join(self.lib, ".ccnavi", "skills", "empty"))
+        os.makedirs(os.path.join(self.lib, "docs", "skills", "empty"))
         said = self.context("SessionStart", self.lib)
         self.assertNotIn("外の文", said)
         self.assertNotIn("empty", said)

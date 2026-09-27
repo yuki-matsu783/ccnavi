@@ -2,8 +2,9 @@
 
 プロジェクトは `.claude/` を持たない（ADR-0033）。Claude Code がそこのスキルを読み、
 ワークスペースルートの決め方も最初の `.claude/` で止まるため。そこで、プロジェクト向けの
-スキルの形をした手順書は ccnavi ディレクトリの `skills/<名前>/SKILL.md` に置き、ccnavi は
-目録だけを渡す。本文はエージェントが要るときに自分で開く。
+スキルの形をした手順書はプロジェクトの `docs/skills/<名前>/SKILL.md` に置き、ccnavi は
+目録だけを渡す。本文はエージェントが要るときに自分で開く。置き場は ccnavi ディレクトリ
+（`.ccnavi/`）の外で、ふつうのファイルと同じくチケットの範囲の中でだけ書ける（守りは変えない）。
 
 渡すのは cwd がそのプロジェクトのツリー（元リポジトリか、そこから切ったワークツリー）の
 中にあるときだけ。読むのは元リポジトリの版で、ワークツリーに checkout された版は読まない
@@ -24,7 +25,8 @@ import yaml
 
 from . import ctxfile, flow, hookio, rules, settings, tree
 
-SKILLS_DIR = "skills"
+# プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（ADR-0091）。
+SKILLS_DIR = "docs/skills"
 SKILL_FILE = "SKILL.md"
 # 目録に載せる数の上限。超えた分は数だけ言う。
 ITEM_LIMIT = 30
@@ -43,9 +45,8 @@ NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 ONCE_ID = "builtin-project-skills"
 
 
-def skills_dir(conf: settings.Settings, project_root: str) -> str:
-    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
-    return os.path.join(project_root, home, SKILLS_DIR)
+def skills_dir(project_root: str) -> str:
+    return os.path.join(project_root, *SKILLS_DIR.split("/"))
 
 
 def _front(raw: bytes) -> dict:
@@ -67,7 +68,7 @@ def _front(raw: bytes) -> dict:
 
 def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str, str, str]], int]:
     """(名前, 説明, 相対パス) の並びと、上限で落とした数。名前の順。"""
-    base = skills_dir(conf, project_root)
+    base = skills_dir(project_root)
     try:
         names = sorted(os.listdir(base))
     except OSError:
@@ -83,7 +84,7 @@ def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str,
         front = _front(raw)
         shown = flow._line(front.get("name") or name)
         about = flow._line(front.get("description") or "（説明が無い）")
-        # 名前は NAME で絞ってあるが、ccnavi ディレクトリの綴り（設定）も通るので畳んでおく。
+        # 名前は NAME で絞ってあるが、文に出るものは全部畳んでおく（念のため）。
         rel = flow._line(os.path.relpath(path, project_root).replace(os.sep, "/"))
         found.append((shown, about, rel))
     return found[:ITEM_LIMIT], max(0, len(found) - ITEM_LIMIT)
