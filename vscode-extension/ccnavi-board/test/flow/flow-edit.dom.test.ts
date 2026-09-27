@@ -92,6 +92,8 @@ test("CB-D123 元に戻す・やり直すはボタンと Ctrl+Z / Ctrl+Shift+Z /
 test("CB-D124 欄に続けて打った字は元に戻す 1 件にまとまる。フォーカスが外れたら区切る", async () => {
   const dom = await openFlow({ doc: three() });
   try {
+    // 時計を止める（実時間に頼ると、遅い機械で打ち込みの間が 1 秒を超えてまとまりが切れる）
+    (dom.window as unknown as { ccnaviClock: () => number }).ccnaviClock = () => 1000;
     dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
     await dom.settle();
     const area = (): HTMLTextAreaElement => dom.one<HTMLTextAreaElement>("#inspector textarea.f-prompt");
@@ -435,5 +437,81 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
     assert.equal(bare.one<HTMLInputElement>("#inspector input.f-builtInType").getAttribute("list"), null);
   } finally {
     await bare.close();
+  }
+});
+
+test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた古い答えは使わず確かめ直している（のまま）と言う", async () => {
+  const dom = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
+  try {
+    dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
+    await dom.settle();
+    await waitCheck(dom);
+    const first = checksAsked(dom);
+    assert.equal(first.length, 1);
+    // 答えを待つ間に、もう 1 つ直す
+    dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
+    await dom.settle();
+    await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古い写しの答え"], rendered: ["1. 古い"] } });
+    assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確かめ終わったことにしない");
+    assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
+    assert.doesNotMatch(dom.one("body").textContent ?? "", /古い写しの答え/);
+    // 今の写しの答えは使う
+    await waitCheck(dom);
+    const second = checksAsked(dom);
+    assert.equal(second.length, 2);
+    assert.equal(second[1].doc.nodes.length, 5);
+    await dom.send({ type: "checked", seq: second[1].seq, checks: { warns: [], rendered: ["1. 新しい"] } });
+    assert.equal(dom.all("#flow-preview-checking").length, 0);
+    assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 新しい");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D135 外で変わった知らせは最初の 1 回だけ履歴を空にし、送り直し（タブを表に戻した）では空にし直さない", async () => {
+  const dom = await openFlow({ doc: three() });
+  try {
+    dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
+    await dom.settle();
+    await dom.send({ type: "changed" });
+    assert.ok(button(dom, "undo").disabled);
+    dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
+    await dom.settle();
+    assert.ok(!button(dom, "undo").disabled);
+    await dom.send({ type: "changed" });
+    assert.ok(!button(dom, "undo").disabled, "送り直しで、知らせの後に積んだ履歴を消さない");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を出し、並びだけ変わったと言う。時計を進めれば打ち込みは別の 1 件", async () => {
+  const doc = three();
+  const reordered: FlowDoc = { ...doc, nodes: [...doc.nodes].reverse() };
+  const dom = await openFlow({ doc, draft: reordered, reviewSave: true });
+  try {
+    assert.ok(dirty(dom));
+    dom.click(button(dom, "save"));
+    await dom.settle();
+    assert.match(dom.one("#review-order-only").textContent ?? "", /並びだけ変わった/);
+    assert.equal(dom.posted.filter((m) => m.type === "save").length, 0);
+    dom.click(button(dom, "cancel-save"));
+    await dom.settle();
+    // 打ち込みの間が 1 秒を超えれば別の 1 件
+    let clock = 1000;
+    (dom.window as unknown as { ccnaviClock: () => number }).ccnaviClock = () => clock;
+    dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
+    await dom.settle();
+    const area = (): HTMLTextAreaElement => dom.one<HTMLTextAreaElement>("#inspector textarea.f-prompt");
+    dom.type(area(), "a");
+    await dom.settle();
+    clock += 1500;
+    dom.type(area(), "ab");
+    await dom.settle();
+    dom.click(button(dom, "undo"));
+    await dom.settle();
+    assert.equal(area().value, "a");
+  } finally {
+    await dom.close();
   }
 });

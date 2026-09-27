@@ -31,8 +31,9 @@
  * **未保存のまま閉じたとき。** VS Code の Webview パネルには、閉じるのを止める口（保存・破棄・取り消しを聞いてから
  * 閉じる）が無い（`onDidDispose` は閉じた後に鳴る）。代わりに、未保存の間はタブの題の頭に「●」を付け、
  * 画面が送ってくる編集中の写し（`draft`）を控えておく。閉じた後に未保存だったら、「開き直して戻す」
- * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点からファイルが変わっていなければ
- * 写しを未保存のまま戻し、変わっていれば戻さずに写しを名前の無い YAML のエディタで開く（上書きしない）。
+ * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身の指紋が
+ * 変わっていなければ写しを未保存のまま戻し、変わっていれば戻さずに写しを名前の無い YAML のエディタで開く
+ * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -77,6 +78,8 @@ interface Loaded {
   readonly exists: boolean;
   /** 無いときは 0 */
   readonly mtimeMs: number;
+  /** 読んだバイトの指紋（sha256 の 16 進）。無いときは空 */
+  readonly hash: string;
   readonly doc: FlowDoc;
   /** 画面に見せる綴り（ワークスペースルートからの相対。外なら絶対） */
   readonly shown: string;
@@ -87,8 +90,17 @@ interface Loaded {
 /** 未保存のまま閉じた画面から戻す写し。読み込んだときのファイルの様子が今と同じときだけ戻す */
 interface Restore {
   readonly draft: FlowDoc;
+  /** 閉じたときのフローのファイルの置き場 */
+  readonly path: string;
   readonly exists: boolean;
   readonly mtimeMs: number;
+  /** 閉じたときに読んであったバイトの指紋。置き場・有無・時刻・指紋が今と全部同じときだけ戻す */
+  readonly hash: string;
+}
+
+/** 読んだバイトの指紋 */
+function hashOf(bytes: Uint8Array): string {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
 interface PanelState {
@@ -133,6 +145,22 @@ function reviewSetting(): boolean {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<boolean>("flowSaveReview", true);
 }
 
+/**
+ * 保存前の確かめの設定を書く。いま効いている範囲に書く（フォルダの設定があればそこ、次にワークスペースの設定、
+ * どちらも無ければ利用者の設定）。上の範囲に値があると、下に書いても効かないため
+ */
+async function updateReviewSetting(folder: vscode.WorkspaceFolder, value: boolean): Promise<void> {
+  const config = vscode.workspace.getConfiguration("ccnaviBoard", folder.uri);
+  const seen = config.inspect<boolean>("flowSaveReview");
+  const target =
+    seen?.workspaceFolderValue !== undefined
+      ? vscode.ConfigurationTarget.WorkspaceFolder
+      : seen?.workspaceValue !== undefined
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
+  await config.update("flowSaveReview", value, target);
+}
+
 /** ボードのカードの「フロー」の本体 */
 export async function openFlow(ticket: string): Promise<void> {
   await openFlowPanel(ticket, undefined);
@@ -150,6 +178,11 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
   const open = panels.get(ticket);
   if (open !== undefined) {
     open.panel.reveal(open.panel.viewColumn);
+    if (restore !== undefined) {
+      // 既に開いている画面の編集を黙って差し替えない。戻せなかったと言い、写しは YAML で見せる
+      void vscode.window.showWarningMessage(`${ticket} のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は名前の無い YAML で開きます。`);
+      void openDraftAsYaml(restore.draft);
+    }
     return;
   }
   try {
@@ -231,7 +264,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   }
   if (read === undefined) {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
-    return { target, exists: false, mtimeMs: 0, doc: templateFlow(ticket, target.title), shown };
+    return { target, exists: false, mtimeMs: 0, hash: "", doc: templateFlow(ticket, target.title), shown };
   }
   const { bytes, mtimeMs } = read;
   const refuse = (why: string): Error => new Error(`フローのファイルを開かない（${shown}）: ${why}。エディタで直してから再読込する`);
@@ -259,7 +292,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   if (doc === undefined) {
     throw refuse("ノードの並び（id が文字列のノード）が取れないので描けない");
   }
-  return { target, exists: true, mtimeMs, doc, shown, checks: verdict.checks };
+  return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks };
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -320,7 +353,7 @@ function askRestore(current: PanelState): void {
   if (!current.dirty || draft === undefined || loaded === undefined) {
     return;
   }
-  const restore: Restore = { draft, exists: loaded.exists, mtimeMs: loaded.mtimeMs };
+  const restore: Restore = { draft, path: loaded.target.flow.path, exists: loaded.exists, mtimeMs: loaded.mtimeMs, hash: loaded.hash };
   const back = "開き直して戻す";
   const asYaml = "YAML で開く";
   void vscode.window
@@ -499,7 +532,9 @@ async function reload(current: PanelState): Promise<void> {
   current.loaded = loaded;
   current.lock = loaded.target.lock;
   if (restore !== undefined) {
-    if (restore.exists === loaded.exists && restore.mtimeMs === loaded.mtimeMs) {
+    const same =
+      restore.path === loaded.target.flow.path && restore.exists === loaded.exists && restore.mtimeMs === loaded.mtimeMs && restore.hash === loaded.hash;
+    if (same) {
       current.shownDraft = restore.draft;
     } else {
       // 閉じた後にファイルが変わった。写しを戻すと、変わった中身を黙って上書きしうる。写しは YAML で見せる
@@ -540,7 +575,7 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       current.draft = message.doc ?? undefined;
       return;
     case "reviewSave":
-      void vscode.workspace.getConfiguration("ccnaviBoard").update("flowSaveReview", message.value, vscode.ConfigurationTarget.Global);
+      void updateReviewSetting(current.folder, message.value);
       return;
     case "ready":
       current.dirty = false;

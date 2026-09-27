@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
-import { diffFlows, isEmptyDiff, sameFlow, type FlowDiff } from "../../core/flow-diff.js";
+import { diffFlows, sameFlow, type FlowDiff } from "../../core/flow-diff.js";
 import {
   absolutePosition,
   addNode,
@@ -112,6 +112,15 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
+/**
+ * いまの時刻（履歴のまとめに使う）。テストは `window.ccnaviClock` に関数を置いて時計を固定する
+ * （実時間に頼ると、遅い機械で打ち込みのまとまりが切れる）
+ */
+function now(): number {
+  const clock = (window as { ccnaviClock?: unknown }).ccnaviClock;
+  return typeof clock === "function" ? Number((clock as () => number)()) : Date.now();
+}
+
 /** 押した鍵が欄の中か（欄の中の Ctrl+Z や Ctrl+C は欄に任せる） */
 function inField(target: EventTarget | null): boolean {
   const element = target as { tagName?: unknown; isContentEditable?: unknown } | null;
@@ -168,14 +177,17 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 写したノード（画面の中の控え）と、同じ控えを何回貼ったか（貼るたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
-  // 実行ファイルが言ったこと。`checkedDoc` はその答えが指す写し、`checkSeq` は最後に頼んだ確かめの番号
+  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指す写し、`pendingDoc` は頼んで答えを待っている写し、
+  // `checkSeq` は最後に頼んだ確かめの番号。写しが替わるたびに番号を進め、待っていた答えは捨てる
+  // （答えを待つ間に直すと、古い写しの答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | undefined>(undefined);
   const checkedDoc = useRef<FlowDoc | undefined>(pageOf(initial)?.checks === undefined ? undefined : pageOf(initial)?.doc);
+  const pendingDoc = useRef<FlowDoc | undefined>(undefined);
   const checkSeq = useRef(0);
-  // 頼んで答えを待っている
-  const checkPending = useRef(false);
+  // 外で変わった知らせを受けているか。拡張ホストはタブを表に戻すたびに送り直すので、最初の 1 回だけ履歴を空にする
+  const changedSeen = useRef(false);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
@@ -192,6 +204,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         setBusy(false);
         setStatus(undefined);
         setChanged(false);
+        changedSeen.current = false;
         setSelected(undefined);
         setPicked([]);
         setFocus({ ids: [] });
@@ -201,7 +214,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         // 頼んでいた確かめの答えは捨てる（番号を進める）
         checkSeq.current += 1;
         checkedDoc.current = page?.checks === undefined ? undefined : page.doc;
-        checkPending.current = false;
+        pendingDoc.current = undefined;
         setChecks(page?.checks);
         setChecking(false);
         setCheckError(undefined);
@@ -211,18 +224,24 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       } else if (message.type === "lock" && message.lock !== undefined) {
         setLock(message.lock);
       } else if (message.type === "changed") {
-        // 外で変わった。いまの編集は残すが、戻す先はもう読み込んだ中身と噛み合わないので履歴は空にする
-        setChanged(true);
-        setHistory(emptyHistory());
+        // 外で変わった。いまの編集は残すが、戻す先はもう読み込んだ中身と噛み合わないので履歴は空にする。
+        // 送り直し（タブを表に戻した）では空にし直さない（その後に積んだ履歴を消さない）
+        if (!changedSeen.current) {
+          changedSeen.current = true;
+          setChanged(true);
+          setHistory(emptyHistory());
+        }
       } else if (message.type === "cancelled") {
         setBusy(false);
         setStatus(undefined);
       } else if (message.type === "checked") {
         const answer = message as { seq?: unknown; checks?: FlowChecks; error?: string };
-        if (answer.seq !== checkSeq.current) {
+        const asked = pendingDoc.current;
+        if (answer.seq !== checkSeq.current || asked === undefined) {
           return;
         }
-        checkPending.current = false;
+        pendingDoc.current = undefined;
+        checkedDoc.current = asked;
         setChecking(false);
         if (answer.checks !== undefined) {
           setChecks(answer.checks);
@@ -280,20 +299,23 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
 
-  // 編集が止まったら実行ファイルに確かめ直させる。答えが指す写しと同じなら頼まない
+  // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指す写しと同じなら頼まない
   useEffect(() => {
-    if (doc === undefined || checkedDoc.current === doc) {
-      // 答えが指す写しに戻った（元に戻すなど）。待っている答えが無ければ確かめ直さない
-      if (!checkPending.current) {
-        setChecking(false);
-      }
+    if (doc === undefined || pendingDoc.current === doc) {
+      return;
+    }
+    // 写しが替わった。待っていた答えは古い写しのものなので捨てる（番号を進める）
+    checkSeq.current += 1;
+    pendingDoc.current = undefined;
+    if (checkedDoc.current === doc) {
+      // 答えが指す写しに戻った（元に戻すなど）。確かめ直さない
+      setChecking(false);
       return;
     }
     setChecking(true);
     const timer = setTimeout(() => {
       checkSeq.current += 1;
-      checkedDoc.current = doc;
-      checkPending.current = true;
+      pendingDoc.current = doc;
       post({ type: "check", seq: checkSeq.current, doc });
     }, CHECK_MS);
     return () => clearTimeout(timer);
@@ -341,7 +363,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     if (lock.locked || next === doc) {
       return;
     }
-    setHistory((now) => record(now, doc, typing === undefined ? {} : { key: typing }));
+    const at = now();
+    setHistory((history) => record(history, doc, typing === undefined ? {} : { key: typing, now: at }));
     setDoc(next);
   };
 
@@ -460,12 +483,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const save = (): void => {
-    if (reviewSave) {
-      const diff = diffFlows(base, doc);
-      if (!isEmptyDiff(diff)) {
-        setReview(diff);
-        return;
-      }
+    // 未保存なら、差分が空（並びだけ変わった）でも一覧を出す（一覧がそう言う）
+    if (reviewSave && dirty) {
+      setReview(diffFlows(base, doc));
+      return;
     }
     sendSave();
   };

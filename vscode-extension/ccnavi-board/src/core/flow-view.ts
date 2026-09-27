@@ -129,7 +129,8 @@ export interface FlowPage {
   readonly doc: FlowDoc;
   readonly lock: FlowLock;
   /**
-   * 保存の前に差分の一覧を見せて確かめるか（設定 `ccnaviBoard.flowSaveReview`）。無ければ見せる
+   * 保存の前に差分の一覧を見せて確かめるか（設定 `ccnaviBoard.flowSaveReview`）。真のときだけ見せ、無ければ見せない。
+   * 拡張ホストは設定の値を必ず渡す（設定の既定は見せる）
    */
   readonly reviewSave?: boolean;
   /**
