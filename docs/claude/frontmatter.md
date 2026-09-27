@@ -32,6 +32,8 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 ---
 ```
 
+- md は UTF-8 で書き、frontmatter はファイルの頭の 64 KiB の中で閉じる。それより後ろで閉じるものと、UTF-8 でないものは読めず、
+  frontmatter が無い扱い（`null`）になる
 - 値は 1 行で書く。`tags` と `keywords` は並び（`[a, b]`）で書く。スカラーで書いても 1 要素として読むが、揃えておく
 - YAML の別名（`*名前`）は使わない。使うと frontmatter 全体が読まれず `null` になる
 - 既存の語彙は `ccnavi --docs --format jsonl` の `frontmatter.tags` で見られる。同じ意味の別の綴りを増やさない
@@ -59,6 +61,15 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 `projects/<名前>/…` で出る）。プロジェクトの置き場ごとの文書（`docs/spec/` など）は、上の表の近い値を使うか、表に行を足す。
 索引に載るのは、そのリポジトリの `.gitignore` に `**/index.jsonl` があるプロジェクトだけ。無いプロジェクトは SessionStart の
 案内で名指しされる。足すのはそのプロジェクトのチケットの範囲で行う（ccnavi は書き換えない）。
+
+## 索引のファイル
+
+- `index.jsonl` は md のあるディレクトリごとに ccnavi が書く生成物。手で直さない。同じ名前でよその道具のファイルを
+  置いていると、ccnavi はそれを書き換えず、案内で名指しする
+- 初めての回（`--docs` か SessionStart）は md を全部読むので、md が数千本あると数秒かかる。SessionStart は短い期限で打ち切り、
+  続きは次の回に回す。2 回目からは更新日時の変わった md だけを読む
+- md を消しても `index.jsonl` が残ることがある（追跡されていない md だけのディレクトリ、ディレクトリごと消したときなど）。
+  残ったものは読まれないので結果は変わらない。気になれば消してよい（git に無視されているので差分は出ない）
 
 ## 対象外
 
