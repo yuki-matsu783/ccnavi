@@ -1,3 +1,10 @@
+---
+type: adr
+title: 戻す働きは 3 値にし、新しく現れたファイルは消さず退避する
+description: "戻す機能を enable/dry-run/disable の3値にし、新規ファイルは削除せず退避する"
+tags: [records, config]
+keywords: [復元, 戻す, 3値, ファイル退避, enable, dry-run]
+---
 # ADR-0019: 戻す働きは 3 値にし、新しく現れたファイルは消さず退避する
 
 状態: 採用

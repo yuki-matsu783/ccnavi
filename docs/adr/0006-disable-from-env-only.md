@@ -1,3 +1,10 @@
+---
+type: adr
+title: "`disable` は起動側の環境からしか効かせない"
+description: "disable モードを起動側の環境からのみ受け付け、ファイルからの変更を2段の防御で遮断する"
+tags: [rules, approval]
+keywords: [disable, モード, 権限, 起動環境, セキュリティ, ガード]
+---
 # ADR-0006: `disable` は起動側の環境からしか効かせない
 
 状態: 採用

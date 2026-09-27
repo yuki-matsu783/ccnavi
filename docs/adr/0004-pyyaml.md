@@ -1,3 +1,10 @@
+---
+type: adr
+title: 実行時の依存に PyYAML を 1 本だけ許す
+description: "実行時依存を PyYAML のみに限定し、安全な safe_load を使って YAML を読み込む"
+tags: [rules, python]
+keywords: [依存管理, PyYAML, safe_load, YAML, セキュリティ, ライブラリ]
+---
 # ADR-0004: 実行時の依存に PyYAML を 1 本だけ許す
 
 状態: 採用

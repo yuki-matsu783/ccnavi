@@ -1,3 +1,11 @@
+---
+type: adr
+title: push とマージリクエストの作成を親に渡す
+description: 人の手を 3 回に限定するための push とマージリクエスト作成の親への移譲
+tags: [ticket, phase, git]
+keywords: [push, マージリクエスト, 親, 3回, 手作業, git]
+---
+
 # ADR-0030: push とマージリクエストの作成を親に渡し、人の手を 3 回にする
 
 状態: 採用
