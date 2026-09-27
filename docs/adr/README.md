@@ -170,7 +170,7 @@
 | [0074](0074-board-shows-what-moved.md) | ボードは「動いた」を印で見せ、その印を時間では消さない |
 | [0082](0082-phase-graph-groups-tour.md) | フェーズの図を区分の枠で分け、図の下は凡例と当てはまるときだけの注意にし、細かい案内は初回の吹き出しとヘルプに寄せる |
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |
-| [0091](0091-project-skills-in-the-ccnavi-directory.md) | プロジェクトのスキルは ccnavi ディレクトリの `skills/` に置き、ccnavi は目録だけを渡す |
+| [0091](0091-project-skills-in-docs-skills.md) | プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す |
 
 ### 開発と文書
 

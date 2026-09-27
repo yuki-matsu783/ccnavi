@@ -1640,11 +1640,12 @@ factors:
 ### プロジェクトのスキル
 
 プロジェクトは `.claude/` を持たない（[ADR-0033](docs/adr/0033-projects.md)）ので、プロジェクト向けのスキルの形の手順書は
-`projects/<名前>/.ccnavi/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`。[ADR-0091](docs/adr/0091-project-skills-in-the-ccnavi-directory.md)）。
+`projects/<名前>/docs/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`。[ADR-0091](docs/adr/0091-project-skills-in-docs-skills.md)）。
 Claude Code はそこを読まないので、ccnavi が `SessionStart` と `SubagentStart` で、cwd がそのプロジェクトの中にあるときだけ目録
 （名前・説明・場所）を渡す。ワークスペースルートで始めて `cd` で入ったセッションには、cwd がそのプロジェクトの中にある最初の
 `PreToolUse` で 1 度だけ添える。本文はエージェントが要るときに参考に開く（CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う）。
-ディレクトリ名は `^[A-Za-z0-9._-]+$` のものだけを読む。上限は 30 本・4000 文字。`.ccnavi/` の下なので、エージェントは書けない（人が置く）。
+ディレクトリ名は `^[A-Za-z0-9._-]+$` のものだけを読む。上限は 30 本・4000 文字。守りは専用のものが無く、ほかのファイルと同じ判定になる
+（直すのは承認したチケットの範囲の中。`.ccnavi/` の外に置いたのは、組み込みの守りを緩めずに書けるようにするため）。
 
 ### 参考にした運用
 

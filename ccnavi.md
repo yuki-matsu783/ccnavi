@@ -2405,8 +2405,8 @@ dry-run でまず層の分布を見て、Bash の和と、大文字小文字を�
 
 ### 11.13 プロジェクトのスキル
 
-プロジェクトは `.claude/` を持たない（11.1、ADR-0033）。プロジェクト向けのスキルの形をした手順書は、ccnavi ディレクトリの
-`skills/<名前>/SKILL.md`（既定 `.ccnavi/skills/<名前>/SKILL.md`）に置く（ADR-0091）。形は Claude Code のスキルと同じで、頭の
+プロジェクトは `.claude/` を持たない（11.1、ADR-0033）。プロジェクト向けのスキルの形をした手順書は、プロジェクトの
+`docs/skills/<名前>/SKILL.md` に置く（綴りは固定。ADR-0091）。形は Claude Code のスキルと同じで、頭の
 frontmatter に `name` と `description`、必要なら同じディレクトリに `references/`。Claude Code はこれを読まないので、ccnavi が目録を渡す。
 
 | いつ | どう |
@@ -2423,8 +2423,11 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 - 上限は 30 本・4000 文字。超えた分は数だけ言う
 - 予約名のプロジェクト（11.4）は見ない
 
-書き込みは今の守りのまま止まる。`.ccnavi/` の下は組み込みの `builtin-guard-project-home`（Write / Edit / NotebookEdit）と
-`builtin-guard-setting-files`（シェル）が丸ごと止め、チケットの範囲は止まっているものを開けない（9.5）。直すのは人が写す形になる。
+書き込みに専用の守りは無い。`docs/skills/` は ccnavi ディレクトリ（`.ccnavi/`）の外のふつうの場所で、ほかのファイルと同じ判定になる。
+元リポジトリ（ワークスペースルートの下）は `main-tree` が止め、承認済みチケットに結び付いたワークツリーでは範囲の中だけ書け（9.5）、
+チケットの無いワークツリー（直接作業）ではほかのファイルと同じく書ける。スキルを直すのは `skill-improve`（scope `docs/skills/*`）の子か、
+範囲に `docs/skills/<名前>/*` を書いた提案チケットで、MR で人が見る。`.ccnavi/skills/` に置かなかったのは、そこを書かせるには
+`builtin-guard-project-home` などの組み込みの守りを緩める必要があるため（ADR-0091）。
 
 フロー編集画面の候補（`flow.candidates`、9.3.1）は、ワークスペースの `.claude/skills` だけを並べ、プロジェクトのスキルは載せない。
 フローの `skill` に書けるのは Claude Code が起動できるスキルの名前で、プロジェクトのスキルはそれに当たらないため。
