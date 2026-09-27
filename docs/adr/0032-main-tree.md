@@ -1,3 +1,11 @@
+---
+type: adr
+title: ワークスペースルート直下の編集をルールで止める
+description: main 作業木の直下ファイル編集をルールで保護する仕組み
+tags: [rules, git, worktree]
+keywords: [ワークスペース, main, ルール, 保護, 編集, 直下]
+---
+
 # ADR-0032: ワークスペースルート直下の編集をルールで止める
 
 状態: 採用

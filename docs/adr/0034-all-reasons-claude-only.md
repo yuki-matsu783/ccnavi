@@ -1,3 +1,11 @@
+---
+type: adr
+title: 該当した理由を全部 1 回で返す対象は Claude Code に絞る
+description: マッチ理由をすべて一度に返すことで重複を避け、対象を Claude Code に限定
+tags: [cli, review]
+keywords: [理由, マッチ, 返却, Claude Code, 重複, 判定]
+---
+
 # ADR-0034: 該当した理由を全部 1 回で返し、対象は Claude Code に絞る
 
 状態: 採用

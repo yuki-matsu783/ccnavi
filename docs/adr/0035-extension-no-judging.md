@@ -1,3 +1,11 @@
+---
+type: adr
+title: VS Code 拡張は判定を自分で出さない
+description: 拡張機能が独立した判定ロジックを持たず CLI からの結果を表示するのみ
+tags: [extension, cli]
+keywords: [拡張機能, VS Code, 判定, cli, ステートレス]
+---
+
 # ADR-0035: VS Code 拡張は判定を自分で出さない
 
 状態: 採用

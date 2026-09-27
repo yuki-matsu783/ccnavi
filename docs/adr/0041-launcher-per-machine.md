@@ -1,3 +1,11 @@
+---
+type: adr
+title: 実行ファイルは機械ごとの置き場に並べる
+description: ccnavi 実行ファイルを機械ごとの専用ディレクトリに配置し hook が振り分けるシステム
+tags: [launcher, sh-scripts, config]
+keywords: [実行ファイル, launcher, 機械, 置き場, hook, 振り分け]
+---
+
 # ADR-0041: 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する
 
 状態: 置き換え（ADR-0044）
