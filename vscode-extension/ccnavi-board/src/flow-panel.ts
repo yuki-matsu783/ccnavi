@@ -27,6 +27,13 @@
  * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
  * 着手は人か親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
  * 1 回の中（実行ファイルを 1 度起こすぶん）。塞ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
+ *
+ * **未保存のまま閉じたとき。** VS Code の Webview パネルには、閉じるのを止める口（保存・破棄・取り消しを聞いてから
+ * 閉じる）が無い（`onDidDispose` は閉じた後に鳴る）。代わりに、未保存の間はタブの題の頭に「●」を付け、
+ * 画面が送ってくる編集中の写し（`draft`）を控えておく。閉じた後に未保存だったら、「開き直して戻す」
+ * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身の指紋が
+ * 変わっていなければ写しを未保存のまま戻し、変わっていれば戻さずに写しを名前の無い YAML のエディタで開く
+ * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -45,6 +52,7 @@ import {
   asFlowMessage,
   flowTargetOf,
   lockFromFailure,
+  type FlowChecks,
   type FlowData,
   type FlowLock,
   type FlowMessage,
@@ -70,9 +78,29 @@ interface Loaded {
   readonly exists: boolean;
   /** 無いときは 0 */
   readonly mtimeMs: number;
+  /** 読んだバイトの指紋（sha256 の 16 進）。無いときは空 */
+  readonly hash: string;
   readonly doc: FlowDoc;
   /** 画面に見せる綴り（ワークスペースルートからの相対。外なら絶対） */
   readonly shown: string;
+  /** 開くときに実行ファイルが言ったこと（warn・渡る手順・候補）。ファイルが無ければ無い */
+  readonly checks?: FlowChecks;
+}
+
+/** 未保存のまま閉じた画面から戻す写し。読み込んだときのファイルの様子が今と同じときだけ戻す */
+interface Restore {
+  readonly draft: FlowDoc;
+  /** 閉じたときのフローのファイルの置き場 */
+  readonly path: string;
+  readonly exists: boolean;
+  readonly mtimeMs: number;
+  /** 閉じたときに読んであったバイトの指紋。置き場・有無・時刻・指紋が今と全部同じときだけ戻す */
+  readonly hash: string;
+}
+
+/** 読んだバイトの指紋 */
+function hashOf(bytes: Uint8Array): string {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
 interface PanelState {
@@ -92,6 +120,12 @@ interface PanelState {
   changedPending: boolean;
   wroteAt: number;
   dirty: boolean;
+  /** 画面が控えさせた、未保存の写し（未保存でなければ無い） */
+  draft?: FlowDoc;
+  /** 開き直したときに戻す写し。最初の読み込みで確かめて `shownDraft` に移す */
+  restore?: Restore;
+  /** 画面に渡している、戻した写し（次に読み直すまで） */
+  shownDraft?: FlowDoc;
   seq: number;
 }
 
@@ -102,12 +136,37 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-function titleOf(ticket: string): string {
-  return `ccnavi フロー: ${ticket}`;
+function titleOf(ticket: string, dirty = false): string {
+  return `${dirty ? "● " : ""}ccnavi フロー: ${ticket}`;
+}
+
+/** 保存の前に差分を確かめるか（設定。既定は確かめる） */
+function reviewSetting(): boolean {
+  return vscode.workspace.getConfiguration("ccnaviBoard").get<boolean>("flowSaveReview", true);
+}
+
+/**
+ * 保存前の確かめの設定を書く。いま効いている範囲に書く（フォルダの設定があればそこ、次にワークスペースの設定、
+ * どちらも無ければ利用者の設定）。上の範囲に値があると、下に書いても効かないため
+ */
+async function updateReviewSetting(folder: vscode.WorkspaceFolder, value: boolean): Promise<void> {
+  const config = vscode.workspace.getConfiguration("ccnaviBoard", folder.uri);
+  const seen = config.inspect<boolean>("flowSaveReview");
+  const target =
+    seen?.workspaceFolderValue !== undefined
+      ? vscode.ConfigurationTarget.WorkspaceFolder
+      : seen?.workspaceValue !== undefined
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
+  await config.update("flowSaveReview", value, target);
 }
 
 /** ボードのカードの「フロー」の本体 */
 export async function openFlow(ticket: string): Promise<void> {
+  await openFlowPanel(ticket, undefined);
+}
+
+async function openFlowPanel(ticket: string, restore: Restore | undefined): Promise<void> {
   if (!requireTickets("フロー編集画面")) {
     return;
   }
@@ -119,6 +178,11 @@ export async function openFlow(ticket: string): Promise<void> {
   const open = panels.get(ticket);
   if (open !== undefined) {
     open.panel.reveal(open.panel.viewColumn);
+    if (restore !== undefined) {
+      // 既に開いている画面の編集を黙って差し替えない。戻せなかったと言い、写しは YAML で見せる
+      void vscode.window.showWarningMessage(`${ticket} のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は名前の無い YAML で開きます。`);
+      void openDraftAsYaml(restore.draft);
+    }
     return;
   }
   try {
@@ -148,6 +212,7 @@ export async function openFlow(ticket: string): Promise<void> {
     changedPending: false,
     wroteAt: 0,
     dirty: false,
+    restore,
     seq: 0,
   };
   panels.set(ticket, current);
@@ -199,7 +264,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   }
   if (read === undefined) {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
-    return { target, exists: false, mtimeMs: 0, doc: templateFlow(ticket, target.title), shown };
+    return { target, exists: false, mtimeMs: 0, hash: "", doc: templateFlow(ticket, target.title), shown };
   }
   const { bytes, mtimeMs } = read;
   const refuse = (why: string): Error => new Error(`フローのファイルを開かない（${shown}）: ${why}。エディタで直してから再読込する`);
@@ -227,7 +292,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   if (doc === undefined) {
     throw refuse("ノードの並び（id が文字列のノード）が取れないので描けない");
   }
-  return { target, exists: true, mtimeMs, doc, shown };
+  return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks };
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -247,6 +312,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
   panel.onDidDispose(() => {
+    askRestore(current);
     for (const timer of [current.timer, current.lockTimer]) {
       if (timer !== undefined) {
         clearTimeout(timer);
@@ -275,6 +341,36 @@ function registerPanelHandlers(current: PanelState): void {
     watcher.onDidDelete(moved);
     current.watchers.push(watcher);
   }
+}
+
+/**
+ * 未保存のまま閉じた。閉じるのは止められないので、閉じた後に戻すかを聞く（頭のコメント）。
+ * 控えた写しが無い（打ってすぐ閉じた）か、読み込めていなければ何も聞かない
+ */
+function askRestore(current: PanelState): void {
+  const loaded = current.loaded;
+  const draft = current.draft;
+  if (!current.dirty || draft === undefined || loaded === undefined) {
+    return;
+  }
+  const restore: Restore = { draft, path: loaded.target.flow.path, exists: loaded.exists, mtimeMs: loaded.mtimeMs, hash: loaded.hash };
+  const back = "開き直して戻す";
+  const asYaml = "YAML で開く";
+  void vscode.window
+    .showWarningMessage(`${current.ticket} のフローを未保存のまま閉じました。編集を戻しますか？`, { modal: true, detail: "「破棄する」を選ぶと、閉じる前の編集は残りません。" }, back, asYaml, "破棄する")
+    .then((choice) => {
+      if (choice === back) {
+        void openFlowPanel(current.ticket, restore);
+      } else if (choice === asYaml) {
+        void openDraftAsYaml(draft);
+      }
+    });
+}
+
+/** 写しを名前の無い YAML のエディタで開く（ファイルには書かない） */
+async function openDraftAsYaml(draft: FlowDoc): Promise<void> {
+  const document = await vscode.workspace.openTextDocument({ language: "yaml", content: serializeFlow(draft) });
+  await vscode.window.showTextDocument(document);
 }
 
 /** フローのファイルが外で変わったら「外で変わった」を出す。置き場は読み直すたびに変わりうるので張り直す */
@@ -366,6 +462,9 @@ function show(current: PanelState): void {
       exists: loaded.exists,
       doc: loaded.doc,
       lock: current.lock,
+      reviewSave: reviewSetting(),
+      ...(loaded.checks === undefined ? {} : { checks: loaded.checks }),
+      ...(current.shownDraft === undefined ? {} : { draft: current.shownDraft }),
     },
   });
 }
@@ -414,6 +513,9 @@ function flowHost(panel: vscode.WebviewPanel): ScreenHost<FlowData> {
 async function reload(current: PanelState): Promise<void> {
   current.seq += 1;
   const seq = current.seq;
+  const restore = current.restore;
+  current.restore = undefined;
+  current.shownDraft = undefined;
   let loaded: Loaded;
   try {
     loaded = await readPage(current.folder.uri.fsPath, current.ticket, current.tmpDir);
@@ -429,6 +531,17 @@ async function reload(current: PanelState): Promise<void> {
   }
   current.loaded = loaded;
   current.lock = loaded.target.lock;
+  if (restore !== undefined) {
+    const same =
+      restore.path === loaded.target.flow.path && restore.exists === loaded.exists && restore.mtimeMs === loaded.mtimeMs && restore.hash === loaded.hash;
+    if (same) {
+      current.shownDraft = restore.draft;
+    } else {
+      // 閉じた後にファイルが変わった。写しを戻すと、変わった中身を黙って上書きしうる。写しは YAML で見せる
+      void vscode.window.showWarningMessage(`${current.ticket} のフローは閉じた後に変わったので、編集を戻しませんでした。閉じる前の編集は名前の無い YAML で開きます。`);
+      void openDraftAsYaml(restore.draft);
+    }
+  }
   show(current);
   watchFile(current);
 }
@@ -453,9 +566,21 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
   switch (message.type) {
     case "dirty":
       current.dirty = message.dirty;
+      current.panel.title = titleOf(current.ticket, message.dirty);
+      if (!message.dirty) {
+        current.draft = undefined;
+      }
+      return;
+    case "draft":
+      current.draft = message.doc ?? undefined;
+      return;
+    case "reviewSave":
+      void updateReviewSetting(current.folder, message.value);
       return;
     case "ready":
       current.dirty = false;
+      current.draft = undefined;
+      current.panel.title = titleOf(current.ticket);
       current.host.ready();
       redraw(current);
       postAppearance(current.host);
@@ -492,12 +617,31 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
     case "save":
       await save(current, message.doc);
       return;
+    case "check":
+      await check(current, message.seq, message.doc);
+      return;
     default: {
       const unhandled: never = message;
       void unhandled;
       return;
     }
   }
+}
+
+/**
+ * 編集中の写しを実行ファイルに確かめさせ、言ったこと（warn・渡る手順・候補）を画面に返す。書きはしない。
+ * 読み直しの後に届いた答えは画面が番号（`seq`）で捨てる
+ */
+async function check(current: PanelState, seq: number, doc: FlowDoc): Promise<void> {
+  const loaded = current.loaded;
+  if (loaded === undefined) {
+    return;
+  }
+  const verdict = await lintText(current.folder.uri.fsPath, current.tmpDir, serializeFlow(doc), loaded.shown);
+  if (!alive(current)) {
+    return;
+  }
+  current.host.post((verdict.ok ? { type: "checked", seq, checks: verdict.checks } : { type: "checked", seq, error: verdict.error }) satisfies ToFlow);
 }
 
 async function save(current: PanelState, doc: FlowDoc): Promise<void> {

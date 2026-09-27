@@ -1,0 +1,22 @@
+/*
+ * 保存の前の差分の一覧（`SaveReview.tsx`）。画面を覆う幕と、その上の 1 枚（ボードの承認のオーバーレイと同じ作り）。
+ */
+.review-backdrop {
+  position: fixed; inset: 0; z-index: 10;
+  background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.review {
+  width: min(640px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
+  padding: 14px 16px; border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+}
+.review h2 { margin: 0 0 4px; font-size: 1.1em; }
+.review h3 { margin: 10px 0 4px; font-size: .95em; color: var(--vscode-descriptionForeground); }
+.review-list { margin: 0; padding-left: 18px; font-size: .9em; }
+.review-list li { overflow-wrap: anywhere; }
+.review-skip { display: flex; gap: 6px; align-items: center; margin-top: 12px; font-size: .9em; }
+.review-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+.review-actions button.action { margin-left: 0; }

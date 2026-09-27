@@ -280,12 +280,12 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 
 | イベント | ここで何をするか | 登録しないと |
 |---|---|---|
-| `SessionStart` | 実行ファイルの控えを取る。チケット制御が効いていれば、直接作業とチケット作業の使い分けをモデルに渡す | 実行ファイルが差し替えられても戻せない。モデルがチケットをいつ起こすかを知らないまま進む |
+| `SessionStart` | 実行ファイルの控えを取る。チケット制御が効いていれば、直接作業とチケット作業の使い分けをモデルに渡す。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す | 実行ファイルが差し替えられても戻せない。モデルがチケットをいつ起こすかを知らないまま進む |
 | `UserPromptSubmit` | 保護領域の状態とツリーごとの HEAD を控え、ターンの基準にする | ターンの終わりの報告が出ない（コミットに入った変更も見えない） |
 | `PreToolUse` | 呼び出しを判定し、設定ファイルを控える | 判定そのものが働かない |
 | `PostToolUse` | 作業ツリーを見て、変わっていれば戻す。チケットの状態を承認済みチケットへ写す | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない |
-| `Stop` | このターンで変わった保護領域を利用者へ報告する。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す | 変更が人の目に触れない。閉じ忘れたチケットが作業中に残る |
-| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す | サブエージェントが自分の範囲を知らずに始める |
+| `Stop` | このターンで変わった保護領域を利用者へ報告する。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す。`match: Stop` のルールがあれば、その刻みで止めて文を渡す | 変更が人の目に触れない。閉じ忘れたチケットが作業中に残る。ターンの終わりの促しが届かない |
+| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録も | サブエージェントが自分の範囲を知らずに始める |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す | コミット済みの範囲外が親に届く |
 
 `command` を `${CCNAVI_BIN_PATH}` で書くのは、守る対象と起動する実体を 1 か所に寄せるため
@@ -569,6 +569,33 @@ allow:
 - `every: 1` には `--lint` は何も言わない。`0`・負・整数でない値は error で名指しし、判定は 1 として扱って通す。
   渡すものが 1 つも無い `every` は warn
 
+### ターンの終わりに止めて渡す
+
+`match: Stop` の `allow` のルールは、メインエージェントのターンの終わり（`Stop`）に当たる（ADR-0090）。
+渡す回（`every` の刻み）にだけ `{"decision": "block", "reason": "NUDGE_STOP_RULE: …"}` で止め、ルールの文を渡す。
+振り返り（`docs/claude/skill-review.md`）のための仕組みで、`reason` の頭には実行ファイルが決まった前置きを付ける
+（タスクの続きではない。振り返りだけをする。利用者への問いで終わったターンならその問いを最後に書き直す。何も無ければ「振り返り: 無し」）。
+当てる文字列は無いので `glob: "*"` と書く。
+
+```yaml
+allow:
+  - id: skill-review-every-10
+    match: Stop
+    glob: "*"
+    every: 10
+    additionalContextFile: docs/claude/skill-review.md
+```
+
+- 読むのは共通層と自身の層だけ。プロジェクトの層に書いたものは使わない（外のリポジトリの 1 行でメインのターンを止めさせない）。同じ id は 1 本だけ
+- `every` が 2 より小さいものは使わない。本文のファイルはワークスペースルートの版だけを読む
+- 数えは `logs/state/stop-<セッション>.json`。compact・再開・clear では捨てず、起動のときと古いセッションの後始末でだけ捨てる
+- 同じ `Stop` で `finish` の促し（下の「ターンの終わりの報告」）が止めるなら、そちらだけを出し、このルールは数えもしない
+- `stop_hook_active` が真の回、サブエージェント、控えを置けない・読めない・書けないときは止めない（止め続けないため）。
+  サブエージェントには、代わりに `SubagentStart` で「気づいたスキル候補は最後の報告に節を足して返す」の 1 行を渡す
+- `dry-run` では止めず、止めたはずの文を `systemMessage` に載せる。記録の `decision` は `nudge`、`rules` は渡したルールだけ
+- `--test Stop "(stop)"` と見本の `tool: Stop` で、使われるルールを確かめられる
+- `deny` / `ask` に書いたもの（`Bash|Stop` なら `Stop` の部分）、プロジェクトの層に書いたもの、`(stop)` に当たらない綴り、`every` の無いものは `--lint` が warn で言う
+
 ### ファイルの本文を渡す
 
 `additionalContextFile` と `additionalContextOnceFile` は、文の代わりに（または文に続けて）
@@ -666,6 +693,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/log.jsonl | sort | uniq 
 | `Skill` | スキル名 |
 | `Agent` | 起動の見出し（`description`、無ければ `prompt`） |
 | `WebFetch` | URL |
+| `Stop` | 当てる文字列は無い（固定の `(stop)`。`glob: "*"`）。ツールではなく、`allow` に書いてターンの終わりに文を渡すためだけのもの（上の「ターンの終わりに止めて渡す」） |
 
 `WebSearch` のように対象を取り出せないツールは判定に届かないまま通るので、
 `allow` に書いても死んだ行になる（`--lint` が咎める）。`match` は
@@ -1118,6 +1146,8 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 payload の `stop_hook_active` が真なとき、控えを置けないとき、子で親のブランチを引けないときも促さない。チケット制御かモードが `disable`、未着手、書き込み停止中（`blocked`）、親で `finish` が通らない形（開いている子・
 レビュー準備中／レビュー待ち・フィードバック計画待ち・終わっていないフェーズ）、git を読めないとき、`SubagentStop` では促さない。
 `dry-run` では止めず、止めたはずの文を `systemMessage` に載せる。
+
+`finish` を促さなかった回は、`match: Stop` のルールが渡す回ならそこで止める（「ターンの終わりに止めて渡す」、ADR-0090）。
 
 同じ `Stop` で、このセッションで同じ理由の拒否が `CCNAVI_DENY_REPEAT` 回に達した呼び出しを、ルールの id と回数で 1 回だけ並べる
 （「同じ呼び出しを繰り返し止めたとき」）。回数が増えればまた並べる。
@@ -1607,6 +1637,16 @@ factors:
 `SubagentStart` で、cwd のワークツリーに関わる承認済みで開いている子の一覧（識別子・ワークツリー・範囲・満たしていない先行とその状態）を渡す。
 親のワークツリーからならその親の子、子のワークツリーからならその子自身。それ以外には何も渡さない。判定は行き先で決まるので、これは案内でしかない。
 
+### プロジェクトのスキル
+
+プロジェクトは `.claude/` を持たない（[ADR-0033](docs/adr/0033-projects.md)）ので、プロジェクト向けのスキルの形の手順書は
+`projects/<名前>/docs/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`。[ADR-0091](docs/adr/0091-project-skills-in-docs-skills.md)）。
+Claude Code はそこを読まないので、ccnavi が `SessionStart` と `SubagentStart` で、cwd がそのプロジェクトの中にあるときだけ目録
+（名前・説明・場所）を渡す。ワークスペースルートで始めて `cd` で入ったセッションには、cwd がそのプロジェクトの中にある最初の
+`PreToolUse` で 1 度だけ添える。本文はエージェントが要るときに参考に開く（CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う）。
+ディレクトリ名は `^[A-Za-z0-9._-]+$` のものだけを読む。上限は 30 本・4000 文字。守りは専用のものが無く、ほかのファイルと同じ判定になる
+（直すのは承認したチケットの範囲の中。`.ccnavi/` の外に置いたのは、組み込みの守りを緩めずに書けるようにするため）。
+
 ### 参考にした運用
 
 運用層は `参考/issue-mr-ticket-workflow`（`ticket.sh` / `worktree.sh` / `boundary.sh`）をもとにしている（[ADR-0025](docs/adr/0025-reference-workflow.md)）。
@@ -1734,6 +1774,7 @@ uv run python tools/check_rules.py     # 同じことを、控えと記録を外
 
 見本をすべて判定に掛け、期待と食い違ったものを名指しする（1 件でもあれば終了コード 1）。見本は `deny` `ask` `allow` のタイプに置き、
 タイプの名前が期待する判定になる。`subject` の `/repo` は走らせたワークスペースルートに読み替わる。
+`tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば `allow`）。
 ルールを 1 件足したら見本も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
 見本はエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `scratchpad/` に置き、ルールの下書きと一緒に利用者に渡す。
@@ -1939,7 +1980,9 @@ ccnavi --lint --json
 | `projects[]` | 検証の対象になったプロジェクトの名前 |
 | `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(self) (phases) design`、`--flow` で渡したフローなら `(flow)` など。ファイル全体への苦情なら空） |
 | `errors` / `warns` / `infos` | 件数 |
-| `flow` | `--flow` を渡したときだけ在る。`{path, data}`。`path` は確かめたファイルの絶対パス、`data` は実行ファイルが読んだ中身（下）。読めなければ `null` |
+| `flow` | `--flow` を渡したときだけ在る。`{path, data, rendered, candidates}`。`path` は確かめたファイルの絶対パス、`data` は実行ファイルが読んだ中身（下）。読めなければ `null` |
+| `flow.rendered` | `SubagentStart` で担当のサブエージェントに渡る手順の行（文字列の並び。`flow.render` のまま、子のパスやロックの案内は入らない）。読めなければ `null` |
+| `flow.candidates` | フローで選べる名前。`{agents: [{name, source}], skills: [{name, source}]}`。`source` は `builtin`（`general-purpose` `Explore` `Plan`）か `project`（ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md`。名前は frontmatter（頭の `---` の区間だけを YAML として読む）の `name`、無ければファイル・ディレクトリの名前。エージェントはふつうのファイルだけで、`.md` の大文字小文字は区別しない。`.claude` を含む途中にリンクがあれば読まない）。フローが読めなくても載る |
 
 ### 子のフローを保存せずに確かめる
 
@@ -1952,6 +1995,12 @@ ccnavi --lint --json --flow /tmp/flow.yml
 読めなければ場所 `(flow)` の error で言い、`detail` は渡したパスで始まる。無いファイルも error。VS Code の拡張の
 フロー編集画面が、開くときと保存の前に本文を一時ファイルに書いて渡し、`(flow)` の苦情と `flow.data` を読む
 （ほかの設定の苦情ではフローを止めない）。
+
+読めたフローには、手順として怪しいところを `(flow)` の **warn** で足す（読むのも保存も止めない）。線の `from` / `to` が
+無いノードを指す、`start` から届かないノード（`group` は外す）、`start` に入る線、`end` から出る線、分岐・問いの出口に
+線が無い、`start` / `end` が無い、`subAgent` の `builtInType` と `skill` の `name` が `flow.candidates` に無い
+（大文字小文字だけ違えば正しい綴りを添える。空の欄と `:` を含むプラグインのスキルは言わない）。巡回は言わない。
+`detail` は error と同じく渡したパスで始まる。
 
 `flow.data` は読めた中身を JSON にしたもの（`flow.as_json`）。PyYAML（YAML 1.1）の読みのままで、`0755` は 493、
 `yes` は `true`、`0o17` は文字列になる。JSON にそのまま載らない値は `{"$ccnavi": <種類>, ...}` の印にする。

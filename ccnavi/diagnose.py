@@ -57,7 +57,7 @@ BOARD_VERSION = 1
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
 # 試したい人には「当たらない」ではなく「そもそも見ていない」と言う。
 # 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ並び。
-KNOWN_TOOLS = tuple(judge.SUBJECT_FIELDS)
+KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
 
 # `--test --json` と `--test-samples --json` の形の版。読み手は VS Code 拡張の
@@ -99,6 +99,8 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     }
     if not out["known"]:
         return out
+    if tool == rules.STOP_MATCH:
+        return _try_stop(conf, root, out)
 
     field = judge.SUBJECT_FIELDS[tool]
     payload = hookio.Input(
@@ -149,6 +151,22 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     return out
 
 
+def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
+    """`Stop`（ターンの終わり。ADR-0090）の試し。判定ではなく、使われるルールを並べる。
+
+    ターンの終わりに当てるのは、共通層と自身の層の `allow` で、`every` が 2 以上のものだけ
+    （`ruleload.stop_rules`）。使われるものがあれば `allow`、無ければ判定に入らない（`skip`）。
+    `deny` / `ask` にはならない。数えは見ない（試しで控えを進めない）。
+    """
+    picked = ruleload.stop_rules(conf, root)
+    out["verdict"] = audit.ALLOW if picked else audit.SKIP
+    out["rules"] = [
+        {"id": rule.id, "source": "file", "section": rule.decision, **_rule_form(rule)}
+        for rule in picked
+    ]
+    return out
+
+
 def test(
     stdout: TextIO,
     stderr: TextIO,
@@ -164,6 +182,19 @@ def test(
     結果は 1 行目の `verdict:` で読む。
     """
     out = try_one(stderr, conf, root, tool, subject)
+    if tool == rules.STOP_MATCH:
+        stdout.write(f"verdict: {out['verdict']}\ntool: {tool}\n")
+        stdout.write(
+            "note: ターンの終わり（ADR-0090）。使われるのは共通層と自身の層の allow で、"
+            "every が 2 以上のものだけ。渡す回にだけ止める\n"
+        )
+        if not out["rules"]:
+            stdout.write("rules: (使われるルールが無い。ターンの終わりには止めない)\n")
+            return 0
+        stdout.write("rules:\n")
+        for hit in out["rules"]:
+            stdout.write(f"  {hit['id']}\n")
+        return 0
     if not out["known"]:
         stdout.write(f"verdict: (判定に入らない)\ntool: {tool}\n")
         stdout.write(

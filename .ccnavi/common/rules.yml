@@ -154,6 +154,24 @@ allow:
     match: Write|Edit
     glob: "*/.claude/worktrees/*"
 
+  # スキルの振り返り（docs/claude/skill-review.md）。ターンの終わり 10 回に 1 度、止めて手順を渡す（ADR-0090）。
+  # Stop はツールではなくメインエージェントのターンの終わり。何も許可しない。文を渡すためだけに allow に置く。
+  # finish の促しが出る回・連鎖の 2 回目・サブエージェントでは止めず、数えもしない。
+  - id: skill-review-every-10
+    match: Stop
+    glob: "*"
+    every: 10
+    additionalContextFile: docs/claude/skill-review.md
+
+  # 提案を書くとき（親のフィードバック計画の改版を含む）に、振り返りの候補を思い出させる。
+  # 当てるのはワークツリーの中の todo/ だけで、上の worktrees の allow の内側。判定は変わらない。
+  - id: skill-review-at-proposal
+    match: Write|Edit
+    glob: "*/.claude/worktrees/*/wip/proposals/todo/*"
+    additionalContext: >-
+      親の feedback: を書くなら、振り返りで残したスキルの候補（親のワークツリーの
+      scratchpad/skill-candidates.md）を見て、あれば skill-improve を入れる。手順は docs/claude/skill-review.md。
+
   # git の入口。サブコマンドの選別はラッパースクリプトの中で行うので、ここでは区別しない。
   - id: ccnavi-git
     match: Bash

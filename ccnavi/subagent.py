@@ -20,6 +20,7 @@ from . import (
     modes,
     phase,
     post,
+    projskills,
     reasons,
     rules,
     settings,
@@ -28,9 +29,17 @@ from . import (
 from . import ticket as ticket_mod
 from .modes import EXIT_BLOCK, EXIT_OK
 
+# サブエージェントには Stop の振り返り（ADR-0090）が届かないので、始まりに 1 行だけ渡す。
+# メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
+CANDIDATE_NOTE = (
+    "[ccnavi] 作業中に手順の落とし穴やスキルの誤りに気づいたら、最後の報告に「スキル候補」の節を"
+    "足して書く（対象のスキル・何を直すか・根拠）。スキルのファイルは自分では書かない。"
+)
+
 
 def at_start(
     stdout: TextIO,
+    stderr: TextIO,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
@@ -48,21 +57,26 @@ def at_start(
     子の範囲を案内し、調査役が自分の居場所を迷う（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（ADR-0091）。
+    # 子チケットの一覧が無い起動（チケット制御が無い、チケットの無いツリー）でも渡す。
+    skills = projskills.notice(stderr, conf, root, payload, at_start=True)
+    # 振り返りの候補は、止められないサブエージェントには報告で返してもらう（ADR-0090）。
+    skills = f"{skills}\n\n{CANDIDATE_NOTE}" if skills else CANDIDATE_NOTE
     if not conf.tickets_enabled:
-        return EXIT_OK
+        return _say(stdout, skills)
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
-        return EXIT_OK
+        return _say(stdout, skills)
     # 権威のある側（親のツリー）の写しを読む。着手で書かれる基準点は親のツリーの
     # 写しにだけ入るので、子のツリーに checkout されている版では足りない。
     copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     bound = tree.lookup(index, t.name)
     if bound is None:
-        return EXIT_OK
+        return _say(stdout, skills)
     children = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     if not children:
-        return EXIT_OK
+        return _say(stdout, skills)
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
@@ -121,7 +135,17 @@ def at_start(
             "担当が分からなければ、読まずにメインに聞く"
         )
     lines.extend(changed)
-    hookio.write_context(stdout, hookio.SUBAGENT_START, "\n".join(lines), system="\n".join(changed))
+    text = "\n".join(lines)
+    if skills:
+        text = f"{skills}\n\n{text}"
+    hookio.write_context(stdout, hookio.SUBAGENT_START, text, system="\n".join(changed))
+    return EXIT_OK
+
+
+def _say(stdout: TextIO, text: str) -> int:
+    """子チケットの一覧が無い起動で、渡す文（スキルの目録と候補の 1 行）だけを渡す。"""
+    if text:
+        hookio.write_context(stdout, hookio.SUBAGENT_START, text)
     return EXIT_OK
 
 

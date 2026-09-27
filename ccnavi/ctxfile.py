@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import time
 from typing import TextIO
@@ -92,6 +93,8 @@ def for_rules(
     payload: hookio.Input,
     group: list[rules.Rule],
     bases: list[str] | None = None,
+    unsure_speaks: bool = True,
+    counts_path: str = "",
 ) -> str:
     """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で割る。
 
@@ -115,7 +118,17 @@ def for_rules(
 
     控えを置く場所が無いとき（`--state ""`）は刻まず、once の文も毎回渡す。覚えられない
     なら黙るのではなく言うほうを採る。届かない文は書いていないのと同じになるから。
+
+    `unsure_speaks=False` はその逆で、覚えられない回（控えの置き場が無い・読めない）には
+    刻みを持つルールも once を持つルールも渡さない。渡すことが Stop を止めることになる呼び手
+    （`events.stop_rules_nudge`）のためのもの。そこで言うほうを採ると、ターンの終わりの
+    たびに止まる。
+
+    `counts_path` は数えの控えの置き場を差し替える。空なら文脈ごとの `once-*.json`。
+    Stop の促しは compact・再開をまたいで数えたいので、別の控え（`stop_path`）を渡す。
     """
+    if not unsure_speaks and not state_dir:
+        return ""
     parts: list[str] = []
     counted: dict[str, int] | None = None
     consulted = False
@@ -125,8 +138,10 @@ def for_rules(
         # どのみち毎回渡すので、数えても判定 1 回ぶんの書き込みが増えるだけになる。
         if state_dir and (rule.every > 1 or has_once):
             if not consulted:
-                counted = _load_once(stderr, state_dir, payload)
+                counted = _load_once(stderr, counts_path or _path_of(state_dir, payload))
                 consulted = True
+            if counted is None and not unsure_speaks:
+                continue
             if counted is None:
                 # 読めなかったときは、覚えていないものとして渡し、書き戻さない。
                 # `--state ""` と同じ「覚えられないなら言う」側だが、上書きだけは
@@ -165,7 +180,10 @@ def for_rules(
             if once:
                 parts.append(once)
     if counted is not None:
-        _save_once(stderr, state_dir, payload, counted)
+        saved = _save_once(stderr, counts_path or _path_of(state_dir, payload), counted)
+        if not saved and not unsure_speaks:
+            # 数えを書けなかった。次の回も同じ数えから始まり、同じ回に止め続けうる。
+            return ""
     return "\n\n".join(parts)
 
 
@@ -197,7 +215,20 @@ def _once_path(state_dir: str, session: str, agent_id: str) -> str:
     return os.path.join(state_dir, f"once-{session_part}-{agent_part}.json")
 
 
-def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[str, int] | None:
+def _path_of(state_dir: str, payload: hookio.Input) -> str:
+    return _once_path(state_dir, payload.session_id, payload.agent_id)
+
+
+def stop_path(state_dir: str, session: str) -> str:
+    """Stop の促し（ADR-0090）の数えの控え。`once-*` と違い、compact・再開・clear では捨てない。
+
+    捨てるのは起動（`source=startup`）の `forget` と、古いセッションの後始末（prune）だけ。
+    文脈ごとに捨てると、compact が N 回より先に来る長いセッションで一度も届かない。
+    """
+    return os.path.join(state_dir, f"stop-{fsio.safe_name(session) or 'unknown'}.json")
+
+
+def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
     """この文脈で、どのルールが何回当たったか。まだ無ければ空、**読めなければ None**。
 
     `given` は「鍵 → 回数」。
@@ -207,7 +238,6 @@ def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[st
     当たっていない」ものとして書き戻し、覚えていたぶんを消してしまう。
     読めないのは控えが在るときにしか起きないので、消す先はいつも中身のある控えになる。
     """
-    path = _once_path(state_dir, payload.session_id, payload.agent_id)
     data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
@@ -220,26 +250,31 @@ def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[st
     return {k: n for k, n in given.items() if isinstance(k, str) and isinstance(n, int)}
 
 
-def _save_once(
-    stderr: TextIO, state_dir: str, payload: hookio.Input, given: dict[str, int]
-) -> None:
-    path = _once_path(state_dir, payload.session_id, payload.agent_id)
+def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
+    """控えを書く。書けたか。"""
     # 取り合いになる控えなので、途中を見せない書き方で置く。素の open(path, "w") だと
     # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
     # なる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
         stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")
+    return not failed
 
 
-def forget(state_dir: str, session: str) -> None:
+def forget(state_dir: str, session: str, startup: bool = False) -> None:
     """このセッションの数え（渡した回）を全部捨てる。古いセッションの分も掃く。
 
     捨てると「1 度だけ渡す文」はまた渡り、`every` の刻みも 0 から数え直しになる。
     どちらも「この文脈で何回目か」を見ているので、文脈が変われば一緒に忘れる。
+
+    Stop の促しの数え（`stop_path`）は起動（`startup`）のときだけ捨てる。compact・再開・clear では
+    残す（ADR-0090）。
     """
     if not state_dir or not os.path.isdir(state_dir):
         return
+    if startup:
+        with contextlib.suppress(OSError):
+            os.remove(stop_path(state_dir, session))
     mine = os.path.basename(_once_path(state_dir, session, "")).rsplit("-", 1)[0] + "-"
     cutoff = time.time() - ONCE_KEEP_DAYS * 86400
     for name in os.listdir(state_dir):

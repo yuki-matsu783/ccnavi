@@ -131,8 +131,10 @@ def report(
 
     problems = check(root, conf, notes, mode, complaints.getvalue())
     flow_data = None
+    flow_rendered = None
+    flow_candidates = flow.catalog(root) if flow_path else {}
     if flow_path:
-        flow_said, flow_data = flow_problems(flow_path, root)
+        flow_said, flow_data, flow_rendered = flow_problems(flow_path, root, flow_candidates)
         problems.extend(flow_said)
     problems += [
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
@@ -222,8 +224,14 @@ def report(
         }
         if flow_path:
             # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
-            # （README「lint の JSON」）
-            payload["flow"] = {"path": flow_path, "data": flow_data}
+            # （README「lint の JSON」）。`rendered` は SubagentStart で渡る手順の行（読めなければ
+            # null）、`candidates` はフローで選べるサブエージェントとスキルの名前
+            payload["flow"] = {
+                "path": flow_path,
+                "data": flow_data,
+                "rendered": flow_rendered,
+                "candidates": flow_candidates,
+            }
         stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
         stdout.write("\n")
         return EXIT_ERROR if errors else EXIT_OK
@@ -437,10 +445,13 @@ def _risk(conf: settings.Settings, root: str) -> list[Problem]:
 FLOW_WHERE = "(flow)"
 
 
-def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
+def flow_problems(
+    path: str, root: str, candidates: dict | None = None
+) -> tuple[list[Problem], object, list[str] | None]:
     """子のフローのファイル 1 本が、SubagentStart が読むのと同じ読みで読めるか（`--lint --flow`）。
 
-    (苦情, 読めた中身を `flow.as_json` にしたもの。読めなければ None) を返す。
+    (苦情, 読めた中身を `flow.as_json` にしたもの, `SubagentStart` で渡る手順の行（`flow.render`）)
+    を返す。読めなければ中身と行は None。
     読み手も検査も `flow.load` そのもの（大きさ、リンク・ふつうのファイルでない・ハードリンク、
     UTF-8 として読めない、YAML として読めない、別名、形）。ここで別に書くと、画面が
     「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（ADR-0035）。
@@ -448,6 +459,10 @@ def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
     ツリーの中のファイルなら、ツリーのルートからの途中のリンクも見る（SubagentStart と同じ）。
     無いファイルも error にする（確かめたつもりで何も確かめていない形を作らない）。
     中身を返すのは、拡張が値の意味（`0755` や `yes` を何と読むか）を自分で決めずに済ませるため。
+
+    読めたフローには、手順として怪しいところを warn で足す（読むのは止めない）。線の構造
+    （`flow.structure_problems`）と、`candidates`（`flow.catalog`）を渡せばサブエージェントの種類と
+    スキルの名前の綴り（`flow.name_problems`）。どれも `detail` は渡したパスで始まる。
     """
     shown = flow.clean(path)
     try:
@@ -455,7 +470,7 @@ def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
     except (OSError, ValueError):
         exists = False
     if not exists:
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")], None
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")], None, None
     try:
         rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root)) if root else os.pardir
     except ValueError:  # Windows でドライブが違う
@@ -463,12 +478,18 @@ def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
     inside = rel != os.pardir and not rel.startswith(os.pardir + os.sep) and not os.path.isabs(rel)
     data, why = flow.load(path, root if inside else "")
     if why:
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")], None
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")], None, None
     try:
-        return [], flow.as_json(data)
+        shaped = flow.as_json(data)
     except RecursionError:
         deep = f"{shown}: 入れ子が深すぎて中身を渡せない"
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None, None
+    said = flow.structure_problems(data)
+    if candidates is not None:
+        said += flow.name_problems(data, candidates)
+    warns = [Problem(SEVERITY_WARN, FLOW_WHERE, f"{shown}: {line}") for line in said]
+    rendered, _ = flow.render(data)
+    return warns, shaped, rendered
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
@@ -925,7 +946,13 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
             continue
         if view.missing:
             continue
-        from_file = _rules(view.path, root, home=_layer_home(conf, root, view.name), layer=True)
+        from_file = _rules(
+            view.path,
+            root,
+            home=_layer_home(conf, root, view.name),
+            layer=True,
+            project=view.name != ruleload.LAYER_SELF,
+        )
         for c in from_file:
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
         # `survey` は層のファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
@@ -1437,7 +1464,9 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
     return problems
 
 
-def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Problem]:
+def _rules(
+    path: str, root: str, home: str = "", layer: bool = False, project: bool = False
+) -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
@@ -1451,6 +1480,9 @@ def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Pr
     `allow` が空でも穴にはならない（空の層 = 何も足さない）。共通層に掛けている
     「空のガードは入っていないのと同じ」の問いを、層にまで広げると、allow を
     1 件だけ足した層が毎回 error を出し続けることになる。
+
+    `project` はプロジェクトの層かどうか。ターンの終わりのルール（`match: Stop`）は
+    プロジェクトの層から読まないので、そこに書いたものを言う（ADR-0090）。
     """
     home = home or root or os.path.dirname(os.path.abspath(path))
     try:
@@ -1500,18 +1532,19 @@ def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Pr
                 )
             )
         seen.add(rule.id)
-        problems.extend(_rule_problems(rule, name, home))
+        problems.extend(_rule_problems(rule, name, home, project))
 
     return problems
 
 
-def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
+def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False) -> list[Problem]:
     """ルール 1 件の中身。当たらない match、届かない message、指すファイル、広い allow。"""
     problems: list[Problem] = []
     for tool in _inert(rule.match):
         problems.append(
             Problem(SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない")
         )
+    problems.extend(_stop_problems(rule, name, project))
 
     if rule.message and rule.decision != rules.DENY:
         # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
@@ -1580,6 +1613,66 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
                     "ヒットするたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
                 )
             )
+    return problems
+
+
+def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[Problem]:
+    """`match: Stop` のルール（ターンの終わりに止めて文を渡す。ADR-0090）の書き方。
+
+    見るのは 4 つ。どれも判定は変えないので warn。
+
+    1. `deny` / `ask` に置いた。Stop で見るのは allow だけなので、`Stop` の部分は何も起きない
+       （`Bash|Stop` なら `Bash` の部分はふつうに効く）
+    2. プロジェクトの層に置いた。ターンの終わりには共通層と自身の層しか読まない
+    3. 当てる先の `(stop)` に当たらない glob / regex。何も起きない
+    4. `every` が 2 より小さい。実行時にも使わない（ターンの終わりのたびに止まらないように）
+    """
+    wants = [want.strip() for want in rule.match.split("|") if want.strip()]
+    if rules.STOP_MATCH not in wants:
+        return []
+    others = [w for w in wants if w != rules.STOP_MATCH]
+    if rule.decision != rules.ALLOW:
+        rest = f"（{'|'.join(others)} の部分はふつうに効く）" if others else ""
+        return [
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{rule.decision} の match に {rules.STOP_MATCH} がある。ターンの終わりに見るのは "
+                f"allow のルールだけなので、{rules.STOP_MATCH} の部分は何も起きない{rest}。"
+                f"{rules.STOP_MATCH} は allow の別のルールに分けて置く",
+            )
+        ]
+    if project:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"プロジェクトの層の {rules.STOP_MATCH} のルールは使われない。ターンの終わりには"
+                "共通層と自身の層しか読まない"
+                "（外のリポジトリの 1 行でメインのターンを止めさせない）",
+            )
+        ]
+    problems: list[Problem] = []
+    if rule.compiled is not None and not rule.compiled.search(rules.STOP_SUBJECT):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{rules.STOP_MATCH} には当てる文字列が無い"
+                f"（固定の {rules.STOP_SUBJECT} に当てる）。"
+                'この glob / regex では当たらないので何も起きない。glob: "*" と書く',
+            )
+        )
+    if rule.every < 2:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{rules.STOP_MATCH} のルールに every が無い（1）ので使われない。"
+                "使うと渡す回ごとにターンの終わりを止めるので、"
+                "every: 10 のように刻む",
+            )
+        )
     return problems
 
 
@@ -1675,7 +1768,8 @@ def _inert(match: str) -> list[str]:
     inert: list[str] = []
     for want in match.split("|"):
         tool = want.strip()
-        if not tool:
+        if not tool or tool == rules.STOP_MATCH:
+            # ターンの終わりに当てる名前。当てる先は judge ではなく events.stop_rules_nudge が持つ。
             continue
         probe = hookio.Input(tool_name=tool, tool_input=probe_input)
         if not judge.subject_of(probe):

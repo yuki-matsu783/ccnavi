@@ -69,3 +69,13 @@ phases:
     title: 実装フィードバック対応
     review: mr
     scope: inherit
+
+  # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に入れる。
+  # 候補の拾い方と置き場は docs/claude/skill-review.md。子は親の範囲の中にしか置けないので、
+  # 親の範囲に .claude/skills/ が無ければこの種類は使えず、提案チケットに回る。
+  skill-improve:
+    kind: feedback
+    title: スキル改善
+    review: mr
+    scope: [".claude/skills/*"]
+    when: 振り返りでスキルの候補が出たとき（docs/claude/skill-review.md）。候補が無ければ置かない

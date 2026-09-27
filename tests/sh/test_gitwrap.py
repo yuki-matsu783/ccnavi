@@ -386,6 +386,106 @@ class PassTest(GitWrapperTest):
         self.assertIn("topic", head.stdout)
 
 
+class MergeFileTest(GitWrapperTest):
+    """merge-file は結果を標準出力に出す形 (-p / --stdout) だけ通す。
+
+    付けないと git は 1 つめのファイルを直に書き換える。ファイルを書くのは Edit / Write に
+    寄せ、hook が行き先を見られるようにする。
+    """
+
+    def write_versions(self):
+        """衝突する 3 つの版。現在・祖先・相手の順で名前を返す。"""
+        versions = {
+            "current.txt": "a\nmine\nc\n",
+            "base.txt": "a\nb\nc\n",
+            "other.txt": "a\ntheirs\nc\n",
+        }
+        for name, text in versions.items():
+            with open(os.path.join(self.dir, name), "w", encoding="utf-8") as f:
+                f.write(text)
+        return list(versions)
+
+    # 衝突の最中の 3 つの版。merge-file が取る順（現在・祖先・相手）。
+    STAGES = (":2:tracked.txt", ":1:tracked.txt", ":3:tracked.txt")
+
+    def read(self, name):
+        with open(os.path.join(self.dir, name), encoding="utf-8") as f:
+            return f.read()
+
+    def test_forms_that_write_a_file_are_rejected(self):
+        current, base, other = self.write_versions()
+        for args in (
+            # -p が無いと 1 つめのファイルを書き換える。
+            ("merge-file", current, base, other),
+            ("merge-file", "--union", current, base, other),
+            # -L の値の -p はラベル。-p を付けたことにならず、git はファイルを書く。
+            ("merge-file", "-L", "-p", current, base, other),
+            # `--` の後ろはファイル名。
+            ("merge-file", "--union", "--", "-p", base, other),
+            # 打ち消しと略記は git が受け取るので、知らない綴りとして止める。
+            ("merge-file", "-p", "--no-stdout", current, base, other),
+            ("merge-file", "--std", current, base, other),
+            ("merge-file", "-pq", current, base, other),
+            ("merge-file", "-p", "--obj", current, base, other),
+            ("merge-file", "-p", "--no-object-id", current, base, other),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertEqual("a\nmine\nc\n", self.read(current))
+
+    def test_union_to_stdout_goes_through_and_writes_nothing(self):
+        current, base, other = self.write_versions()
+        labels = ("-L", "ours", "-L", "base", "-L", "theirs")
+        result = self.run_wrapper("merge-file", "-p", "--union", *labels, current, base, other)
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertTrue(result.stdout.startswith("ok  git merge-file"), result.stdout)
+        self.assertIn("mine\ntheirs\n", result.stdout)
+        self.assertEqual("a\nmine\nc\n", self.read(current))
+
+    def conflict(self):
+        """tracked.txt を両側で書き換えてマージし、衝突したまま止める。"""
+        branch = git_out(self.dir, "branch", "--show-current")
+        git(self.dir, "checkout", "-q", "-b", "other")
+        with open(os.path.join(self.dir, "tracked.txt"), "w", encoding="utf-8") as f:
+            f.write("other\n")
+        git(self.dir, "commit", "-q", "-am", "other")
+        git(self.dir, "checkout", "-q", branch)
+        with open(os.path.join(self.dir, "tracked.txt"), "w", encoding="utf-8") as f:
+            f.write("mine\n")
+        git(self.dir, "commit", "-q", "-am", "mine")
+        subprocess.run(["git", "merge", "other"], cwd=self.dir, capture_output=True)
+        self.assertIn("UU tracked.txt", git_out(self.dir, "status", "--porcelain"))
+        return self.read("tracked.txt")
+
+    def test_object_id_without_p_is_rejected_and_writes_no_object(self):
+        # -p を外した --object-id は、結果をオブジェクトとしてリポジトリに書く。
+        conflicted = self.conflict()
+        before = git_out(self.dir, "count-objects")
+        self.assertRejected("merge-file", "--union", "--object-id", *self.STAGES)
+        self.assertEqual(before, git_out(self.dir, "count-objects"))
+        self.assertEqual(conflicted, self.read("tracked.txt"))
+
+    def test_union_of_the_three_stages_goes_through_and_writes_nothing(self):
+        # 使い方が勧める 1 回で済む形。一時ファイルを作らずに両方を取り込んだ結果を読む。
+        conflicted = self.conflict()
+        before = git_out(self.dir, "count-objects")
+        result = self.run_wrapper("merge-file", "-p", "--union", "--object-id", *self.STAGES)
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertTrue(result.stdout.startswith("ok  git merge-file"), result.stdout)
+        self.assertIn("mine\nother\n", result.stdout)
+        self.assertNotIn("<<<<<<<", result.stdout)
+        self.assertEqual(conflicted, self.read("tracked.txt"))
+        self.assertEqual(before, git_out(self.dir, "count-objects"))
+
+    def test_the_three_stages_of_a_conflict_can_be_read(self):
+        self.conflict()
+        for stage, expected in (("1", "line 0"), ("2", "mine"), ("3", "other")):
+            with self.subTest(stage=stage):
+                result = self.run_wrapper("show", f":{stage}:tracked.txt")
+                self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+                self.assertIn(expected, result.stdout)
+
+
 class OutputTest(GitWrapperTest):
     def test_success_returns_a_summary_line_and_the_body(self):
         result = self.run_wrapper("status", "--porcelain")

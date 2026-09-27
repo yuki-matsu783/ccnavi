@@ -34,7 +34,15 @@
   --xy-attribution-background-color-default: transparent;
   --xy-selection-background-color-default: var(--vscode-list-hoverBackground);
   --xy-selection-border-default: 1px dotted var(--vscode-focusBorder);
+  /* ミニマップ。地は欄の地、見えていない所は地を薄く覆い、見えている枠は焦点の色で縁取る */
+  --xy-minimap-background-color-default: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --xy-minimap-mask-background-color-default: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+  --xy-minimap-mask-stroke-color-default: var(--vscode-focusBorder);
+  --xy-minimap-mask-stroke-width-default: 1;
+  --xy-minimap-node-background-color-default: var(--vscode-descriptionForeground);
+  --xy-minimap-node-stroke-color-default: transparent;
 }
+.flow-graph .react-flow__minimap { border: 1px solid var(--vscode-panel-border); border-radius: 2px; }
 .flow-graph .react-flow__node-step { width: 190px; font-size: var(--vscode-font-size); }
 .flow-node {
   display: flex; flex-direction: column; gap: 3px;
