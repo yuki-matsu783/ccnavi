@@ -1,7 +1,7 @@
 # 置き場を既定に固定する — 実装の設計
 
 親チケット i0064 / フェーズ 1（design）の成果物。なぜそうするかは
-[ADR-0084](../../docs/adr/0084-places-are-fixed-to-defaults.md)。ここは「どこを、どう変えるか」と、
+[ADR-0092](../../docs/adr/0092-places-are-fixed-to-defaults.md)。ここは「どこを、どう変えるか」と、
 受入テストが確かめることを書く。後のフェーズ（acceptance・implement・staging・docs）はこれに従う。
 
 ## 1. 消す 6 つと固定する値
@@ -29,7 +29,7 @@
   - 表は上書き設定ファイル（`ccnavi.settings.local.json`）と共有なので、そちらの
     `projects` `project_home` `log` `state` `tickets` `approved` キーも読まれなくなる。**これで正しい**
 - `_log_or_none` は `bin` 以外に使われなくなる。使い手が無くなれば消す
-- 定数のコメント（置き場の説明）は「固定。ADR-0084」に書き換える
+- 定数のコメント（置き場の説明）は「固定。ADR-0092」に書き換える
 
 ### 2.2 `ccnavi/lint.py`
 
@@ -68,7 +68,7 @@
 
 ## 4. `projects/` のぶつかりと載せ忘れを知らせる
 
-ADR-0084 の「見つける条件」は「`projects/` の下のファイルを 1 本でも追跡している」で、gitlink を
+ADR-0092 の「見つける条件」は「`projects/` の下のファイルを 1 本でも追跡している」で、gitlink を
 区別していない。この設計は、gitlink だけの場合（載せ忘れ）を改名の案内から外し、索引から外して
 無視に入れる案内にする（利用者の決定）。ADR 側の直しは別に扱う。
 
@@ -133,10 +133,10 @@ git -C <root> ls-files -s -z -- projects/
   いる限り載せ忘れの warn は出す（`.gitignore` は既に索引にあるものには効かない）
 - 予約名と `.claude/` の検査（各プロジェクトごと）は、ぶつかり・載せ忘れの有無に関わらず今どおり出す
 
-名札はどちらも `(projects)`。重さはどちらも warn（error にしない理由は ADR-0084 と同じ。載せ忘れでも
+名札はどちらも `(projects)`。重さはどちらも warn（error にしない理由は ADR-0092 と同じ。載せ忘れでも
 判定は正しく動く）。
 
-**文面（ぶつかり）** — ADR-0084 の案のまま。例のファイルには通常のファイルの 1 本目を入れる。
+**文面（ぶつかり）** — ADR-0092 の案のまま。例のファイルには通常のファイルの 1 本目を入れる。
 
 > `projects/` はワークスペースの git が追跡している（例: `projects/foo/main.py`）。
 > ccnavi はワークスペース直下の `projects/` をプロジェクトの置き場として使い、名前は変えられない。
@@ -233,7 +233,7 @@ sh と `--lint` が同じ文面を持つので、`tests/sh/test_setup.py` の側
   `del` する
 - 消す前に、値が既定と違うものを拾って 1 行ずつ出す:
 
-  > `CCNAVI_STATE` を .claude/settings.json から外しました（値: /var/ccnavi/state）。置き場は既定の logs/state に固定されています（ADR-0084）。
+  > `CCNAVI_STATE` を .claude/settings.json から外しました（値: /var/ccnavi/state）。置き場は既定の logs/state に固定されています（ADR-0092）。
 
   既定と同じ値なら黙って消す
 - `--check` は、6 つのどれかが残っていれば「揃っていない」に数える（打ち直せば消える、と案内する）
@@ -281,7 +281,7 @@ env で置き場を指していたテストは、`--root` の下の既定の置�
 
 ## 7. 文書（docs フェーズ）
 
-- `README.md` の環境変数の表から 6 行を消し、表の前後に「置き場は固定（ADR-0084）」を 1 行
+- `README.md` の環境変数の表から 6 行を消し、表の前後に「置き場は固定（ADR-0092）」を 1 行
 - `README.md` の `CCNAVI_PROJECT_HOME` を引いている他の段落（「ルールは 3 層の和で当たる」など）を
   「`.ccnavi`」に直す
 - `ccnavi.md` の置き場の表（§11 ほか）から `CCNAVI_…` の注記を消す。`CCNAVI_PROJECT_HOME` の既定を
@@ -293,6 +293,6 @@ env で置き場を指していたテストは、`--root` の下の既定の置�
 - 診断のフラグ（`--log` `--state` `--approved` `--tickets` `--projects` `--project-home`）の廃止。別のチケット
 - `CCNAVI_BIN_PATH`・`CCNAVI_WORKSPACE` の変更
 - `.ccnavi/`・`wip/proposals/`・`logs/` の名前のぶつかりの検査
-- 環境に値が残っていることの `--lint` での指摘（ADR-0084 の採らなかった案）
+- 環境に値が残っていることの `--lint` での指摘（ADR-0092 の採らなかった案）
 - 載せ忘れを ccnavi の側で直すこと（導入スクリプトや拡張が `git rm --cached` を打つ、`.gitignore` に
   `/projects/` を足す）。索引とワークスペースの `.gitignore` を変えるのは人（§4.4・§4.5）

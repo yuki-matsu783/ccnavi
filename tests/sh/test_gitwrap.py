@@ -5,6 +5,9 @@
 
 使い捨ての git リポジトリを毎回作る。このリポジトリ自身で走らせると、
 テストが「コードのこと」ではなく「走った機械の作業ツリーのこと」を報告する。
+
+`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
 from __future__ import annotations
@@ -18,7 +21,8 @@ import unittest
 
 from tests import ROOT
 
-SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-git.sh")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SCRIPT = os.path.join(SH_DIR, "ccnavi-git.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 
 
@@ -670,10 +674,10 @@ class ResetGuidanceTest(GitWrapperTest):
 
 
 class PlacesAreNotReadTest(GitWrapperTest):
-    """置き場を動かす環境変数は読まない（ADR-0084、A9）。
+    """置き場を動かす環境変数は読まない（ADR-0092、A9）。
 
-    実装前は赤。sh（`ccnavi-common.sh` の `ccnavi_project`）がまだ `CCNAVI_PROJECTS` を読んでいる。
-    フェーズ 4 で人が写す版（`wip/design/scripts/ccnavi-common.sh`）に差し替えると通る。
+    `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+    写す前の sh（`ccnavi-common.sh` の `ccnavi_project`）は `CCNAVI_PROJECTS` を読むため。
     """
 
     def test_the_projects_variable_does_not_move_where_the_wrapper_logs(self):

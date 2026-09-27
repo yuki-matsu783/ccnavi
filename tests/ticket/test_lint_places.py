@@ -178,7 +178,7 @@ class ProjectsCollisionTest(unittest.TestCase):
     """`projects/` の置き場がワークスペース自身のソースとぶつかったときの `--lint`（A5・A6）。
 
     ワークスペースの git が `projects/` の下のファイルを追跡していると、名前を逃がす手段が
-    無い（置き場は固定。ADR-0084）。`.gitignore` に `/projects/` を足すとソースが追跡から
+    無い（置き場は固定。ADR-0092）。`.gitignore` に `/projects/` を足すとソースが追跡から
     外れるので、「無視されていない」の案内は誤りになる。代わりに `(projects)` の warn を 1 件だけ
     出す。
 

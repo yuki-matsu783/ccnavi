@@ -207,7 +207,7 @@ ROOT_RULE = {
 # YAML として壊れている。閉じていない並び。
 BROKEN = "version: 1\ndeny: [\n"
 
-# ccnavi ディレクトリの名前（設計 §11.2）。固定（ADR-0084）。
+# ccnavi ディレクトリの名前（設計 §11.2）。固定（ADR-0092）。
 HOME = ".ccnavi"
 
 
@@ -426,7 +426,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
         「`projects/` を数えない」を言いたいテストは、`projects/` を動かして無くす
-        （ADR-0084。空文字で言う口は無い）。
+        （ADR-0092。空文字で言う口は無い）。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -1033,7 +1033,7 @@ class WiringTest(ConfigUnionHarness):
         """REQ-MLT-15: `projects/` が無く自身の層も無ければ、共通層だけで判定し記録する。"""
         # 自身の層だけを消す。共通層も同じ ccnavi ディレクトリの下（`.ccnavi/common/`）にある。
         shutil.rmtree(os.path.join(self.ws, HOME, "config"))
-        # `projects/` を作らないワークスペースにする（ADR-0084。数えない口は無い）。消さずに
+        # `projects/` を作らないワークスペースにする（ADR-0092。数えない口は無い）。消さずに
         # 外へ動かす。Windows は .git の中の読み取り専用のファイルを消せない。
         os.rename(self.projects, os.path.join(self.ws, "moved-away"))
 

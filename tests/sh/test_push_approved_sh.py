@@ -319,7 +319,7 @@ class PushApprovedTest(Workspace):
         self.assertNotIn(NOTHING, result.stdout)
 
     def test_does_not_read_the_place_variables(self):
-        """12（改）. 置き場を動かす環境変数は読まない。既定の置き場だけを運ぶ（ADR-0084、A9）。
+        """12（改）. 置き場を動かす環境変数は読まない。既定の置き場だけを運ぶ（ADR-0092、A9）。
 
         `CCNAVI_PROJECTS` / `CCNAVI_TICKETS_APPROVED` / `CCNAVI_TICKETS_PROPOSAL` を既定と違う
         値で入れても、`projects/` の下と既定の置き場（`.ccnavi/approved`）を運び、既定の
@@ -334,8 +334,8 @@ class PushApprovedTest(Workspace):
         - `CCNAVI_TICKETS_PROPOSAL`: `wip/proposals/todo` の削除が運ばれず、env が指す
           `elsewhere/proposals/todo` の削除が運ばれる
 
-        実装前は赤。sh がまだ 3 つの値を読んでいるため。フェーズ 4 で人が写す版
-        （`wip/design/scripts/ccnavi-push-approved.sh`）に差し替えると通る。
+        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+        写す前の sh は 3 つの値を読むため。
         """
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "work")

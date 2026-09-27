@@ -3,6 +3,9 @@
 URL にトークンを埋めた形（`https://oauth2:<token>@host/g/p.git`）は普通にある。
 ホストにユーザ情報が混ざると API の綴りが壊れ、`origin` の出力にトークンが漏れる。
 実物の GitLab で踏んだ穴なので、両方の読み手で固定する。
+
+`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
 from __future__ import annotations
@@ -17,7 +20,8 @@ import unittest
 from ccnavi import review
 from tests import ROOT
 
-SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-review.sh")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SCRIPT = os.path.join(SH_DIR, "ccnavi-review.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
@@ -108,12 +112,12 @@ class OriginSubcommandTest(unittest.TestCase):
         self.assertIn("origin=http://<伏せた>@127.0.0.1:9/root/p.git", result.stdout)
 
     def test_the_state_variable_is_not_read(self):
-        """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（ADR-0084、A9）。
+        """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（ADR-0092、A9）。
 
         sh は起動のたびに控えの置き場を作る（`mkdir -p "$state"`）。以前は `$root/` に
         `CCNAVI_STATE` を継ぎ足すので、絶対パスを入れると存在しない置き場を見ていた。
-        実装前は赤。sh（`ccnavi-review.sh`）がまだ `CCNAVI_STATE` を読んでいる。
-        フェーズ 4 で人が写す版（`wip/design/scripts/ccnavi-review.sh`）に差し替えると通る。
+        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+        写す前の sh（`ccnavi-review.sh`）は `CCNAVI_STATE` を読むため。
         """
         result = self.origin("http://127.0.0.1:9/root/p.git", extra_env={"CCNAVI_STATE": "/x"})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

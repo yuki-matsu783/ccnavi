@@ -74,7 +74,7 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_BIN_PATH")
-# 置き場を動かしていた 6 つ。廃止した（ADR-0084）。導入スクリプトは書かず、既にあれば外す。
+# 置き場を動かしていた 6 つ。廃止した（ADR-0092）。導入スクリプトは書かず、既にあれば外す。
 # 値は既定の置き場（設計 wip/design/i0064-fixed-places.md §1）。
 PLACE_ENV_DEFAULTS = {
     "CCNAVI_PROJECTS": "projects",
@@ -326,7 +326,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_writes_the_paths_ccnavi_reads(self):
         """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。
 
-        置き場を動かす 6 つは書かない（ADR-0084）ので、ここでは見ない。書かないことは
+        置き場を動かす 6 つは書かない（ADR-0092）ので、ここでは見ない。書かないことは
         `RemovesThePlaceVariables` が見る。
         """
         self.run_setup("--mode", "enable")
@@ -439,7 +439,7 @@ class WritesTheExpectedShape(SetupTest):
 
 
 class RemovesThePlaceVariables(SetupTest):
-    """置き場を動かす 6 つの env は書かず、既にあれば外す（ADR-0084、設計 §5、A7）。
+    """置き場を動かす 6 つの env は書かず、既にあれば外す（ADR-0092、設計 §5、A7）。
 
     `env` は導入スクリプトが持つ欄で、読まれない語を残さない（ADR-0052 と同じ理由）。
     外した値が既定と違っていれば、名前と値を 1 行ずつ出す。既定と同じ値は黙って外す。
