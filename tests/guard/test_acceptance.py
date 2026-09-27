@@ -344,7 +344,7 @@ class RecordTest(unittest.TestCase):
     def logged(self, mode, *payloads):
         """複数の payload を 1 つの記録ファイルに通して読み返す。"""
         with tempfile.TemporaryDirectory() as directory:
-            path = os.path.join(directory, "log.jsonl")
+            path = os.path.join(directory, "decisions.jsonl")
             for payload in payloads:
                 run(mode=mode, payload=payload, log=path)
             with open(path, encoding="utf-8") as f:

@@ -119,4 +119,4 @@ git commit -m "<prefix>: <日本語の説明>"
 
 - pre-commit が落ちた → 出力をそのまま見せ、原因を直してから新規コミットを作る
 - 複数コミットの途中で落ちた → そこで停止し、`git status` を出してどこまで完了したかを報告する
-- ccnavi の hook に止められた → 迂回せず、何に当たったかを報告する。`logs/log.jsonl` の判定の行に当たったルールの id がある
+- ccnavi の hook に止められた → 迂回せず、何に当たったかを報告する。`logs/decisions.jsonl` の判定の行に当たったルールの id がある

@@ -315,7 +315,7 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_MODE"], "enable")
-        self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
+        self.assertEqual(env["CCNAVI_LOG"], "logs/decisions.jsonl")
 
     def test_does_not_write_the_common_layer_paths(self):
         """ADR-0052: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。

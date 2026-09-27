@@ -38,6 +38,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
+import * as diaglog from "./log.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -180,7 +181,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-rules-")),
-    host: rulesHost(panel),
+    host: rulesHost(panel, folder.uri.fsPath),
     fileWatchers: [],
     watchers: [],
     lock: lockFromError("確認中…"),
@@ -523,9 +524,11 @@ function redraw(current: PanelState): void {
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
-function rulesHost(panel: vscode.WebviewPanel): ScreenHost<RulesData> {
+function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesData> {
   if (panel.options.retainContextWhenHidden !== true) {
-    console.error(`ルール設定の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）。偽のままだと、裏に回った画面へ送り続けて中身が古いまま止まる`);
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
+    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "rules", retainContextWhenHidden: false });
   }
   return retainedHost<RulesData>(
     {

@@ -243,10 +243,10 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 ### 4.7 記録
 
 ツール呼び出しは、通したものも判定しなかったものも 1 件 1 行の JSON として `CCNAVI_LOG`
-（既定 `logs/log.jsonl`）に追記する。1 行の欄は付録 B。判定しなかった回も残すので、記録が無ければ ccnavi が動かなかったと読める。
+（既定 `logs/decisions.jsonl`）に追記する。1 行の欄は付録 B。判定しなかった回も残すので、記録が無ければ ccnavi が動かなかったと読める。
 
 記録に書く `subject` / `unwrapped` / `detail` は、書く直前に秘密の形を伏せる（`ccnavi/redact.py`）。伏せるのは
-記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `log.<日時>.jsonl` へローテートし、ローテートした
+記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `decisions.<日時>.jsonl` へローテートし、ローテートした
 記録と終わったセッションの控え（`logs/state/`）は 14 日で消す。走るのはセッション開始と `ccnavi --prune` だけで、
 実行前の判定では走らない。控えはセッションごとにまとめて、どれかが保持日数のうちに書かれていれば全部残す
 （`ccnavi/prune.py`、ADR-0089）。`<セッション>.json` と読むのは UUID の形の名前だけで、知らない名前のファイルと、
@@ -359,7 +359,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 |---|---|
 | `rm -rf`、`git push`、`git reset --hard` | 止める |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
-| シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/log.jsonl` `logs/state`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込む綴りと場所の組で見る。8.2） |
+| シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込む綴りと場所の組で見る。8.2） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
@@ -843,11 +843,11 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
-| `builtin-guard-setting-files` | 常に | Bash で、書き込む綴り（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と控えの `logs/log.jsonl` `logs/state`）の組 |
+| `builtin-guard-setting-files` | 常に | Bash で、書き込む綴り（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と控えの `logs/decisions.jsonl` `logs/state`）の組 |
 | `builtin-guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
 | `builtin-guard-project-home` | ccnavi ディレクトリの綴り（`CCNAVI_PROJECT_HOME`）が決まっているとき | 同上 |
 | `builtin-guard-common-layer` | 共通層の 3 本の置き場が決まっているとき（11.6） | 同上 |
-| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と控えの置き場（`logs/log*.jsonl`、`logs/state/`、動かしてあれば `CCNAVI_LOG` とその隣のローテートした分、`CCNAVI_STATE` の下）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
+| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と控えの置き場（`logs/decisions*.jsonl`、`logs/state/`、動かしてあれば `CCNAVI_LOG` とその隣のローテートした分、`CCNAVI_STATE` の下）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
 
 同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase.prune_form`、ADR-0089）。実行ファイルの端末要求は
@@ -1920,7 +1920,7 @@ compact の前後の hook でフローを入れ直すことはしない（理由
 | `--test-samples <見本> [--json]` | 見本をすべて判定に掛け、期待と食い違ったものを名指し | 文字の出力は食い違いがあれば 1、JSON は常に 0、見本が読めなければ 1 |
 | `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い、チケット制御の値、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク。判定は行わない | 0 |
 | `--lint [--json]` | 判定を行わず、防御を無効化しうる記述を error と warn に分けて報告。ルール・フェーズの種類・配点・settings.json の登録・チケット・プロジェクトを見る | error があれば 1 |
-| `--suggest [--json]` | 記録（`log.jsonl` と、同じ置き場で回した `log.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-samples.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-samples` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通層の写しに足した一時ファイルで試す）。`allow` は出さない。何も書かない | 常に 0 |
+| `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-samples.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-samples` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通層の写しに足した一時ファイルで試す）。`allow` は出さない。何も書かない | 常に 0 |
 | `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（README「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
 | `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは対象外にして名指しする（`.gitignore` は書き換えない）。ccnavi の形でない `index.jsonl` は上書きも削除もせず、実体がツリーの外に出るディレクトリは読まない。一時ファイルは `.git/` の中に作る。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
@@ -2015,7 +2015,7 @@ Claude Code はワークスペースを開く。要求は requirements.md の RE
 | ワークツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
 | 提案 | そのツリーの `wip/proposals/<状態>/<識別子>.md`。プロジェクト向けはそのプロジェクトの git が持つ | そのツリーのリポジトリ |
 | 承認済みチケット（閉じたものを含む）、フェーズのマーカー | 親チケットのツリーの `.ccnavi/approved/`（9.2）。承認済みチケットに `project:` が入る | そのツリーのリポジトリ |
-| 記録、控え、セッションの状態 | ワークスペースの `logs/`（`logs/log.jsonl`、`logs/state/`、`logs/session/`） | 管理外 |
+| 記録、控え、セッションの状態 | ワークスペースの `logs/`（`logs/decisions.jsonl`、`logs/state/`、`logs/session/`） | 管理外 |
 | git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` | 管理外 |
 
 `.ccnavi/` は ccnavi ディレクトリの既定の綴り（`CCNAVI_PROJECT_HOME` の既定値）。この章の `.ccnavi/` はその既定の綴りを指す。
@@ -2574,7 +2574,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | 孫の `PreToolUse` に `agent_id` が付くか | 付く（実測）。孫の Bash にも `DENY_SUBAGENT_TICKET_OP` が当たった |
 | 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/approved-<セッション>-<agent_id>.json` のファイル名で確かめた） |
 | `SubagentStart` / `SubagentStop` は孫でも来るか | 子・孫それぞれで来る（実測） |
-| `logs/log.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`log.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/approved-<セッション>-<agent_id>.json` |
+| `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/approved-<セッション>-<agent_id>.json` |
 | サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない）。孫の `cwd` も親のワークツリーになる |
 | 親の `agent_id` や深さは hook の入力にあるか | 文書: 無い |
 | 起動側は子の終了を待つか | 文書: 非対話 / SDK では待たない |

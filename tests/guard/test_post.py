@@ -167,7 +167,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "log.jsonl")
+        self.log = os.path.join(self.repo, "decisions.jsonl")
 
     def dirty(self, text="changed by a build\n"):
         write(os.path.join(self.repo, "protected", "keep.txt"), text)
@@ -486,7 +486,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.repo = outside
         self.rules = write(common_path(outside, "rules"), json.dumps(RULES))
         self.state = os.path.join(outside, "state")
-        self.log = os.path.join(outside, "log.jsonl")
+        self.log = os.path.join(outside, "decisions.jsonl")
 
         result = self.run_hook(command="ls")
 
@@ -501,7 +501,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         # 記録と控えを保護領域の中に置く。置き場を設定でルールが守る場所の中へ
         # 指したときの形。
         self.state = os.path.join(self.repo, "protected", "state")
-        self.log = os.path.join(self.repo, "protected", "log.jsonl")
+        self.log = os.path.join(self.repo, "protected", "decisions.jsonl")
 
         self.run_hook(command="ls")
         result = self.run_hook(command="ls -la")
@@ -734,7 +734,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.repo = ticket_repo()
         self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
         self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "log.jsonl")
+        self.log = os.path.join(self.repo, "decisions.jsonl")
         # 基準を取る。以降に現れたものが、この呼び出しの結果として見られる。
         self.run_hook(command="ls")
 
@@ -743,7 +743,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.repo = repo
         self.addCleanup(shutil.rmtree, repo, ignore_errors=True)
         self.state = os.path.join(repo, "state")
-        self.log = os.path.join(repo, "log.jsonl")
+        self.log = os.path.join(repo, "decisions.jsonl")
         self.run_hook(command="ls")
 
     def path(self, rel):
