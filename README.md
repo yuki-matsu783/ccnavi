@@ -20,7 +20,7 @@ Claude Code のツール呼び出しを hook で止め、止めた理由と代�
 ```json
 "env": {
   "CCNAVI_MODE": "dry-run",
-  "CCNAVI_LOG": "logs/log.jsonl"
+  "CCNAVI_LOG": "logs/decisions.jsonl"
 }
 ```
 
@@ -51,23 +51,23 @@ ccnavi は判定し、呼び出しには手を出さず「`enable` なら何を�
 
 ```sh
 # 判定の内訳
-jq -r '.decision' logs/log.jsonl | sort | uniq -c | sort -rn
+jq -r '.decision' logs/decisions.jsonl | sort | uniq -c | sort -rn
 
 # 止めた回。誤検知はここに出る
 jq -r 'select(.decision=="deny")|[((.rules//[])|join(",")),(.subject|gsub("[ \t\n]+";" "))]|join("\t")' \
-  logs/log.jsonl | sort | uniq -c | sort -rn
+  logs/decisions.jsonl | sort | uniq -c | sort -rn
 
 # どこにも当たらなかった回。enable ではこれが全部、権限モードに渡る
 jq -r 'select(.code=="UNDECLARED")|(.subject|gsub("[ \t\n]+";" "))' \
-  logs/log.jsonl | sort | uniq -c | sort -rn | head -30
+  logs/decisions.jsonl | sort | uniq -c | sort -rn | head -30
 
 # 通した回を、当たったルール別に。広すぎる allow はここに出る
 jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join(",")),(.subject|gsub("[ \t\n]+";" "))]|join("\t")' \
-  logs/log.jsonl | sort | uniq -c | sort -rn | head -30
+  logs/decisions.jsonl | sort | uniq -c | sort -rn | head -30
 ```
 
 `subject` は 1 行に均してから数える（複数行のコマンドを `uniq -c` が行数ぶんに割らないように）。
-ローテートした分（`logs/log.<日時>.jsonl`）も合わせて数えるなら、`logs/log.jsonl` の代わりに `logs/log*.jsonl` を渡す。
+ローテートした分（`logs/decisions.<日時>.jsonl`）も合わせて数えるなら、`logs/decisions.jsonl` の代わりに `logs/decisions*.jsonl` を渡す。
 
 `decision` が `skip` の行は判定が届かなかった回で、`reason` に理由が入る。
 `paths` が付いた行は実行後の監視が拾った変更で、引数に現れない書き込みがそこにある。
@@ -263,7 +263,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
   },
   "env": {
     "CCNAVI_MODE": "dry-run",
-    "CCNAVI_LOG": "logs/log.jsonl",
+    "CCNAVI_LOG": "logs/decisions.jsonl",
     "CCNAVI_BIN_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
@@ -294,7 +294,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | 変数 | 意味 |
 |---|---|
 | `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
-| `CCNAVI_LOG` | 記録先。既定は `logs/log.jsonl`。空文字にすると記録しない |
+| `CCNAVI_LOG` | 記録先。既定は `logs/decisions.jsonl`。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
 | `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない。`1` より小さい値は既定で動く（「記録の後始末」） |
 | `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
@@ -667,7 +667,7 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（ADR-000
 渡した回も記録には `decision` が `handover` の行で残り、人に聞いた回の `ask` とは混ざらない。
 
 ```sh
-jq -r 'select(.decision == "handover") | .subject' logs/log.jsonl | sort | uniq -c | sort -rn
+jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort | uniq -c | sort -rn
 ```
 
 確認できる者が居ないモードでは、ask を返しても誰も答えないまま通るので通さない（REQ-PRE-08）。
@@ -1190,7 +1190,7 @@ payload の `stop_hook_active` が真なとき、控えを置けないとき、�
 ルールファイルが壊れて組み込みの既定を使っている間も同じ。
 
 - `.claude/` の `hooks/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、`ccnavi-git.sh`、実行ファイル、
-  共通層の 3 本（`.ccnavi/common/`）、記録と控え（`logs/log.jsonl` と `logs/state`）
+  共通層の 3 本（`.ccnavi/common/`）、記録と控え（`logs/decisions.jsonl` と `logs/state`）
 - 綴りは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
 - 場所の綴りは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない（ADR-0051）。止める側が広がるだけなので問題にしない
 
@@ -1407,7 +1407,7 @@ Write / Edit の対象を解いた先が `.claude/worktrees/<名前>/` の中な
 チケットの `deny` の項に当たったなら `ticket entry: deny <綴り>` も載る。記録では `rules` が `(ticket-scope)` とルールの id の並びになり、`source` は空になる。
 
 ```sh
-jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subject' logs/log.jsonl
+jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subject' logs/decisions.jsonl
 ```
 
 子の範囲は、子の宣言を親の範囲とフェーズの種類の `scope` の両方で切り詰めたもの（種類が `inherit` か、`phases.yml` がどの層にも無ければ親だけ）。
@@ -1691,8 +1691,8 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 | `source` | 判定を下したルールの層。`common` / `self` / プロジェクトの名前。`rules` の id も層の名前付き（共通層は裸、それ以外は `self:worktrees`、`lib:schema`） |
 
 ```sh
-jq -r 'select(.unwrapped) | .rules[]' logs/log.jsonl | sort | uniq -c
-jq -r 'select(.decision == "deny") | .source' logs/log.jsonl | sort | uniq -c
+jq -r 'select(.unwrapped) | .rules[]' logs/decisions.jsonl | sort | uniq -c
+jq -r 'select(.decision == "deny") | .source' logs/decisions.jsonl | sort | uniq -c
 ```
 
 チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも項目ごとに `source` が入る。
@@ -1707,7 +1707,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 
 セッションが始まるたびに、記録と控えを片付ける。実行前の判定では走らない。
 
-- `log.jsonl` が `CCNAVI_LOG_ROTATE_MB`（既定 10 MB）を超えていたら、`logs/log.<日時>.jsonl` へ名前を変える。中身は捨てない
+- `decisions.jsonl` が `CCNAVI_LOG_ROTATE_MB`（既定 10 MB）を超えていたら、`logs/decisions.<日時>.jsonl` へ名前を変える。中身は捨てない
 - ローテートした記録のうち、最後に書かれてから `CCNAVI_LOG_KEEP_DAYS`（既定 14 日）を過ぎたものを消す
 - `logs/state/` の、セッションを名前に持つ控えを、そのセッションのどれもが `CCNAVI_STATE_KEEP_DAYS`（既定 14 日）
   書かれていなければまとめて消す。いま始まったセッションと、レビューの下書き・退避したファイルなどセッションを
@@ -1786,7 +1786,7 @@ uv run python tools/check_rules.py     # 同じことを、控えと記録を外
 ccnavi --suggest [--json]
 ```
 
-記録（`CCNAVI_LOG` の指すファイルと、同じ置き場で回した `log.*.jsonl`）を数えて、ルールの下書きを出す。何も書かない。
+記録（`CCNAVI_LOG` の指すファイルと、同じ置き場で回した `decisions.*.jsonl`）を数えて、ルールの下書きを出す。何も書かない。
 
 | 候補 | 拾うもの | 出す下書き |
 |---|---|---|

@@ -255,7 +255,7 @@ sh .ccnavi/scripts/ccnavi-push-approved.sh   # 承認済みの領域（flows/ �
   `rules.yml` や `settings.json` が変わると上部に「ファイルの変更を検知しました。更新してください。」と出るので、更新してから直し直す
 - **コメントを残す。** `rules.yml` のコメントと折り返しは、変えていない場所ではそのまま。変えた欄も
   引用符や折り返しの書き方は元のまま。新しく足すルールは glob / regex を単引用符で囲む
-- **記録を汚さない。** 試し打ちは `--ticket-control disable --state "" --log ""` で走らせ、`log.jsonl` に残さない
+- **記録を汚さない。** 試し打ちは `--ticket-control disable --state "" --log ""` で走らせ、`decisions.jsonl` に残さない
 - 上部に `CCNAVI_MODE` が `enable` でないときの注意が出る。試す判定は enable のときの答え
 
 ### リスク管理画面
