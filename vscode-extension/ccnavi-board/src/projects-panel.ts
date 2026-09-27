@@ -22,6 +22,7 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
+import { addProjectsToGitignore } from "./core/gitignore-write.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import {
   buildProjectsPage,
@@ -32,7 +33,6 @@ import {
   fetchCommand,
   findStrayGitDirs,
   gitignoreHasProjects,
-  gitignoreWithProjects,
   pullCommand,
   rewriteRulesForProject,
   type DirEntry,
@@ -545,13 +545,12 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
     fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、足す行がありません");
     return;
   }
-  const file = path.join(current.folder.uri.fsPath, ".gitignore");
-  const before = readText(current.folder.uri.fsPath, file);
-  try {
-    fs.writeFileSync(file, gitignoreWithProjects(before, page.projectsRel), "utf8");
-  } catch (error) {
-    diaglog.get("ccnavi-board", current.folder.uri.fsPath).error(".gitignore に書けない", { path: ".gitignore", code: (error as NodeJS.ErrnoException).code });
-    fail(current, `.gitignore に書けません: ${(error as Error).message}`);
+  const root = current.folder.uri.fsPath;
+  const result = addProjectsToGitignore(path.join(root, ".gitignore"), page.projectsRel);
+  if (!result.ok) {
+    const msg = result.step === "read" ? ".gitignore を読めないので書かなかった" : ".gitignore に書けない";
+    diaglog.get("ccnavi-board", root).error(msg, { path: ".gitignore", code: result.code });
+    fail(current, result.message);
     return;
   }
   info(current, `.gitignore に /${page.projectsRel}/ を足しました。コミットは自分でしてください`);
