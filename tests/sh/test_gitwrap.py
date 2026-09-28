@@ -673,5 +673,230 @@ class ResetGuidanceTest(GitWrapperTest):
             self.assertEqual("書きかけ\n", f.read())
 
 
+class BranchForceMoveTest(GitWrapperTest):
+    """`branch -M`（強制の改名）と `-C`（強制の複製）を止める（ADR-0093 の段階 0）。
+
+    短いオプションの検査は小文字の f・m・u だけを見ていたので、大文字の -M は通っていた。
+    ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、改名すると引けなくなる。
+    """
+
+    def test_force_rename_and_force_copy_are_rejected(self):
+        git(self.dir, "branch", "topic")
+        before = git_out(self.dir, "branch", "--list")
+        for args in (
+            ("branch", "-M", "topic", "renamed"),
+            ("branch", "-M", "renamed"),
+            ("branch", "-rM", "origin/x", "y"),
+            ("branch", "--move", "topic", "renamed"),
+            ("branch", "--move=topic"),
+            ("branch", "-C", "topic", "copied"),
+            ("branch", "-rC", "topic", "copied"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertEqual(before, git_out(self.dir, "branch", "--list"))
+
+    def test_force_rename_names_why_and_the_wrapper(self):
+        stderr = self.assertRejected("branch", "-M", "renamed").stderr
+        self.assertIn("識別子", stderr)
+        self.assertIn("利用者", stderr)
+
+    def test_lower_case_move_stays_rejected(self):
+        # -m は以前から止めている。-M を足しても変わらない。
+        for args in (("branch", "-m", "renamed"), ("branch", "-rm", "x")):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+
+    def test_safe_delete_and_listing_still_pass(self):
+        git(self.dir, "branch", "topic")
+        for args in (("branch", "--list"), ("branch", "-v"), ("branch", "-d", "topic")):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_usage_lists_what_it_rejects(self):
+        usage = self.run_wrapper("--help").stdout
+        self.assertIn("-D -m -M -C -f -u は不可", usage)
+
+
+class FetchRefspecTest(GitWrapperTest):
+    """fetch・pull は refspec（`:` と `+` を含む引数）を通さない（ADR-0093 の段階 0）。
+
+    `+refs/heads/x:refs/heads/x` は取ってきたものを手元のブランチへ直に書き、`+` は
+    早送りでない書き換えも通す。取ってくるのはリモート名とブランチ名だけにする。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", self.bare)
+        self.branch = git_out(self.dir, "branch", "--show-current")
+        git(self.dir, "push", "-q", "origin", self.branch)
+
+    def test_refspecs_and_urls_are_rejected(self):
+        before = git_out(self.dir, "for-each-ref")
+        b = self.branch
+        for args in (
+            ("fetch", "origin", f"+refs/heads/{b}:refs/heads/{b}"),
+            ("fetch", "origin", f"{b}:{b}"),
+            ("fetch", "origin", f"{b}:refs/heads/other"),
+            ("fetch", "origin", f"+{b}"),
+            ("fetch", "origin", f":refs/heads/{b}"),
+            ("fetch", "--refmap=+refs/heads/*:refs/remotes/o/*", "origin"),
+            ("fetch", self.bare + ":x"),
+            ("fetch", "https://example.invalid/x.git", b),
+            ("pull", "origin", f"{b}:{b}"),
+            ("pull", "origin", f"+{b}"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertEqual(before, git_out(self.dir, "for-each-ref"))
+
+    def test_the_rejection_names_the_wrapper_form(self):
+        stderr = self.assertRejected("fetch", "origin", "main:main").stderr
+        self.assertIn("ccnavi-git.sh fetch <リモート> <ブランチ>", stderr)
+        self.assertNotIn("git fetch", stderr.replace("ccnavi-git.sh", ""))
+
+    def test_remote_and_branch_still_pass(self):
+        for args in (
+            ("fetch", "origin"),
+            ("fetch", "origin", self.branch),
+            ("pull", "origin", self.branch),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+
+class StoreRewindTest(GitWrapperTest):
+    """承認済みチケットの置き場を過去の中身に戻す形を止める（ADR-0093 の段階 0）。
+
+    `checkout <ref> <パス>` と `restore --source <ref>` は置き場を別のコミットの中身に戻し、
+    `restore --ours / --theirs` は置き場の衝突を片側に寄せる。どれも承認が無かったことにも、
+    取り下げた承認が戻ったことにもなる。置き場に当たらないパスは今までどおり通す。
+    """
+
+    COPY = ".ccnavi/approved/doing/i0001.md"
+    REVIEW = "wip/proposals/review/i0001-01.md"
+
+    def setUp(self):
+        super().setUp()
+        for rel, text in ((self.COPY, "old\n"), (self.REVIEW, "old\n")):
+            path = os.path.join(self.dir, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+        git(self.dir, "add", self.COPY, self.REVIEW)
+        git(self.dir, "commit", "-q", "-m", "old")
+        for rel in (self.COPY, self.REVIEW, "tracked.txt"):
+            with open(os.path.join(self.dir, rel), "w", encoding="utf-8") as f:
+                f.write("new\n")
+        git(self.dir, "commit", "-q", "-am", "new")
+
+    def read(self, rel):
+        with open(os.path.join(self.dir, rel), encoding="utf-8") as f:
+            return f.read()
+
+    def assertUntouched(self):
+        self.assertEqual("new\n", self.read(self.COPY))
+        self.assertEqual("new\n", self.read(self.REVIEW))
+
+    def test_checkout_of_a_ref_onto_the_store_is_rejected(self):
+        for args in (
+            ("checkout", "HEAD~1", self.COPY),
+            ("checkout", "HEAD~1", self.REVIEW),
+            ("checkout", "HEAD~1", "tracked.txt", self.COPY),
+            ("checkout", "HEAD~1", ".ccnavi"),
+            ("checkout", "HEAD~1", ".ccnavi/approved/"),
+            ("checkout", "HEAD~1", "wip"),
+            ("checkout", "HEAD~1", "x/../" + self.COPY),
+            ("checkout", "HEAD~1", ".CCNAVI/Approved/doing/i0001.md"),
+            ("checkout", "HEAD~1", ".ccnavi\\approved\\doing\\i0001.md"),
+            ("checkout", "HEAD~1", ".ccnavi/approved/*"),
+            ("checkout", "HEAD~1", ":(glob).ccnavi/**"),
+            ("checkout", "-p", "HEAD~1", self.COPY),
+            ("checkout", "HEAD~1", "--pathspec-from-file=list.txt"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertUntouched()
+
+    def test_restore_from_another_commit_onto_the_store_is_rejected(self):
+        for args in (
+            ("restore", "--source", "HEAD~1", self.COPY),
+            ("restore", "--source=HEAD~1", "--", self.COPY),
+            ("restore", "-s", "HEAD~1", self.COPY),
+            ("restore", "-sHEAD~1", self.COPY),
+            ("restore", "-Ws", "HEAD~1", self.COPY),
+            ("restore", "-SWs", "HEAD~1", "--", self.REVIEW),
+            ("restore", "--source", "HEAD~1", ".ccnavi"),
+            ("restore", "--source", "HEAD~1", "--pathspec-from-file=list.txt"),
+            ("restore", "--source", "HEAD~1", "wip/proposals/review/*"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertUntouched()
+
+    def test_resolving_a_store_conflict_to_one_side_is_rejected(self):
+        for args in (
+            ("restore", "--ours", "--", self.COPY),
+            ("restore", "--theirs", self.REVIEW),
+        ):
+            with self.subTest(args=args):
+                stderr = self.assertRejected(*args).stderr
+                self.assertIn("merge --abort", stderr)
+                self.assertIn("ccnavi-git.sh", stderr)
+
+    def test_paths_relative_to_a_subdirectory_are_resolved(self):
+        cwd = os.path.join(self.dir, ".ccnavi")
+        result = subprocess.run(
+            [SHELL, SCRIPT, "checkout", "HEAD~1", "approved/doing/i0001.md"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("置き場", result.stderr)
+        self.assertUntouched()
+
+    def test_a_moved_store_is_followed(self):
+        # 置き場の綴りを設定で動かしても、その綴りで止める。
+        result = self.run_wrapper(
+            "restore",
+            "--source",
+            "HEAD~1",
+            "tickets/approved/doing/i0001.md",
+            env={"CCNAVI_TICKETS_APPROVED": "tickets/approved"},
+        )
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+
+    def test_forms_outside_the_store_still_pass(self):
+        for args in (
+            ("checkout", "HEAD~1", "tracked.txt"),
+            ("restore", "--source", "HEAD~1", "tracked.txt"),
+            ("restore", "--source", "HEAD~1", ".ccnavi-other/x.md"),
+            ("restore", self.COPY),
+            ("restore", "--staged", self.COPY),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertNotEqual(2, result.returncode, result.stdout + result.stderr)
+        # 置き場の外は戻った（HEAD~1 の tracked.txt は見本を作ったときの中身）。
+        self.assertTrue(self.read("tracked.txt").startswith("line 0\n"))
+
+    def test_moving_between_branches_still_passes(self):
+        # 行き先だけの形と、-b / -B の値と起点は、パスと読まない。
+        for args in (
+            ("checkout", "-b", "topic", "HEAD~1"),
+            ("checkout", "-B", "topic2", "HEAD"),
+            ("switch", "topic"),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
