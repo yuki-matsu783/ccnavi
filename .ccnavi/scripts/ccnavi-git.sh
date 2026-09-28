@@ -79,17 +79,20 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
 通すもの:
   読む      status log show diff blame shortlog describe rev-parse rev-list
             ls-files ls-tree merge-base diff-tree cat-file grep
-  一覧      branch (-d は可 / -D -M -f -u は不可)  tag (一覧のみ)
+  一覧      branch (-d は可 / -D -m -M -C -f -u は不可)  tag (一覧のみ)
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
   変える    add  commit (--no-verify は不可)  rm <パス> (-f は不可)
             restore <パス>  (衝突の解決は restore --ours / --theirs -- <パス>)
             checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
+            承認済みチケットの置き場 (.ccnavi/approved/ と wip/proposals/review/) には
+                  restore --source / --ours / --theirs と checkout <ref> <パス> を使えない
             stash (list show push pop apply)
             merge (-X ours / -s ours / --no-verify は不可)
             merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
                   両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
                   (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
-  通信      fetch  pull  (--force / --prune は不可)
+  通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
+                   : や + を含む引数 (refspec・URL) は不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る)
@@ -164,6 +167,92 @@ has() {
 	return 1
 }
 
+# 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に
+# 当たるパスかを見る。当たれば in_store=yes。ADR-0093 の段階 0。
+#
+# `checkout <ref> <パス>`・`restore --source <ref>` で置き場を過去の中身に戻す形と、
+# `restore --ours / --theirs` で置き場の衝突を片側に寄せる形を止めるために使う。
+# 置き場を動かすのは人と ccnavi のスクリプトで、エージェントが git で戻すと、承認が
+# 無かったことにも、取り下げた承認が戻ったことにもなる。
+#
+# 比べるのは git のトップからの綴り。cwd からの相対（`approved/doing/x.md` を `.ccnavi/` の中で打つ）も
+# `..` を畳んでから比べる。置き場の親（`.ccnavi`・`wip`・`.`）も置き場ごと戻すので当たる。
+# `*` `?` `[` と `:` で始まる pathspec は、どこに当たるかをここで決められないので当たるとみなす。
+# 大文字小文字は畳む（Windows と macOS の既定のファイルシステムは区別しない）。
+store_hit() {
+	in_store=no
+	sh_arg=$(printf '%s' "$1" | tr '\\' '/')
+	case "$sh_arg" in
+	:* | *'*'* | *'?'* | *'['*)
+		in_store=yes
+		return 0
+		;;
+	esac
+	sh_approved=$(printf '%s' "${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" | tr '\\' '/')
+	sh_review=$(printf '%s' "${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}/review" | tr '\\' '/')
+	case "$sh_arg" in
+	/* | [A-Za-z]:/*)
+		# 絶対の綴り。トップの綴りは OS で揃わない（`C:/x` と `/c/x`）ので、置き場の綴りを
+		# 含むかだけを見る。
+		sh_path="$sh_arg"
+		;;
+	*)
+		sh_path="$(git rev-parse --show-prefix 2>/dev/null || :)$sh_arg"
+		;;
+	esac
+	# `.` と `..` を畳む。トップより上に出たら、このリポジトリの外なので当たらない。
+	sh_norm=""
+	sh_out=no
+	sh_ifs="$IFS"
+	IFS=/
+	set -f
+	for sh_part in $sh_path; do
+		case "$sh_part" in
+		'' | .) ;;
+		..)
+			case "$sh_norm" in
+			'') sh_out=yes ;;
+			*/*) sh_norm="${sh_norm%/*}" ;;
+			*) sh_norm="" ;;
+			esac
+			;;
+		*) sh_norm="${sh_norm:+$sh_norm/}$sh_part" ;;
+		esac
+	done
+	set +f
+	IFS="$sh_ifs"
+	[ "$sh_out" = yes ] && return 0
+	sh_norm=$(printf '%s' "$sh_norm" | tr '[:upper:]' '[:lower:]')
+	for sh_store in "$sh_approved" "$sh_review"; do
+		sh_store=$(printf '%s' "$sh_store" | tr '[:upper:]' '[:lower:]')
+		sh_store="${sh_store%/}"
+		case "$sh_store" in
+		/* | [a-z]:/*)
+			# 置き場をリポジトリの外に向けた設定。含むかだけを見る。
+			case "/$sh_norm/" in
+			*"$sh_store"/*) in_store=yes ;;
+			esac
+			continue
+			;;
+		esac
+		case "$sh_path" in
+		/* | [A-Za-z]:/*)
+			case "/$sh_norm/" in
+			*/"$sh_store"/*) in_store=yes ;;
+			esac
+			continue
+			;;
+		esac
+		case "$sh_norm" in
+		'' | "$sh_store" | "$sh_store"/*) in_store=yes ;;
+		esac
+		case "$sh_store/" in
+		"$sh_norm"/*) in_store=yes ;;
+		esac
+	done
+	return 0
+}
+
 case "$sub" in
 status | log | show | diff | blame | shortlog | describe | rev-parse | rev-list | ls-files | ls-tree | merge-base | diff-tree | cat-file | grep | whatchanged | show-ref)
 	: # 読むだけ。上のグローバル判定で穴は塞いである
@@ -183,6 +272,11 @@ branch)
 			case "$arg" in
 			*D*)
 				reject branch-delete-unmerged "$arg は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
+				;;
+			# 大文字の -M（強制の改名）と -C（強制の複製）。下の小文字の並びは大文字を拾わないので、
+			# ここで見ないと -M と -rM が通っていた（ADR-0093 の段階 0）。
+			*M* | *C*)
+				reject branch-force-move "$arg はブランチを強制的に改名するか複製し、同じ名前の既存のブランチを上書きします。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューが引けなくなります。必要な理由を利用者に伝えてください。"
 				;;
 			*f* | *m* | *u*)
 				reject branch-move "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
@@ -368,6 +462,63 @@ restore)
 			;;
 		esac
 	done
+	# 別のコミットの中身で戻す形（--source）と、衝突を片側に寄せる形（--ours / --theirs）は、
+	# 承認済みチケットの置き場に当たるパスには使わせない（ADR-0093 の段階 0）。
+	# 置き場を過去の中身に戻すと、承認が無かったことにも、消えた印が戻ったことにもなる。
+	# 置き場の衝突は、どちらの承認を採るかを人が決める。
+	rs_source=no
+	rs_side=no
+	rs_skip=no
+	rs_end=no
+	rs_paths=""
+	for arg in ${1+"$@"}; do
+		if [ "$rs_skip" = yes ]; then
+			rs_skip=no # --source / -s の値
+			continue
+		fi
+		if [ "$rs_end" = yes ]; then
+			store_hit "$arg"
+			[ "$in_store" = yes ] && rs_paths="$arg"
+			continue
+		fi
+		case "$arg" in
+		--) rs_end=yes ;;
+		--source)
+			rs_source=yes
+			rs_skip=yes
+			;;
+		--source=*) rs_source=yes ;;
+		--ours | --theirs) rs_side=yes ;;
+		--pathspec-from-file | --pathspec-from-file=*)
+			# どのパスに当たるかをここで読めない。
+			rs_paths="$arg"
+			;;
+		--*) ;;
+		-*)
+			# 短いオプションは束ねられる（-Ss main、-smain）。s の後ろに字があればそれが値、
+			# 無ければ次の語が値。
+			case "$arg" in
+			*s)
+				rs_source=yes
+				rs_skip=yes
+				;;
+			*s*) rs_source=yes ;;
+			esac
+			;;
+		*)
+			store_hit "$arg"
+			[ "$in_store" = yes ] && rs_paths="$arg"
+			;;
+		esac
+	done
+	if [ -n "$rs_paths" ]; then
+		if [ "$rs_side" = yes ]; then
+			reject restore-store-side "restore --ours / --theirs で承認済みチケットの置き場に当たるパス ($rs_paths) の衝突を片側に寄せる形は通しません。置き場の衝突は、どちらの承認を採るかを人が決めます。$SELF merge --abort で取り込みをやめ、衝突したパスを利用者に伝えてください。"
+		fi
+		if [ "$rs_source" = yes ]; then
+			reject restore-store-source "restore --source で承認済みチケットの置き場に当たるパス ($rs_paths) を別のコミットの中身に戻す形は通しません。置き場を動かすのは人と ccnavi のスクリプトです。置き場の中身が食い違っているなら、利用者に伝えてください（* ? [ や : で始まる指定は、置き場に当たるかを確かめられないので同じく通しません。ファイルを 1 つずつ名指ししてください）。"
+		fi
+	fi
 	;;
 
 merge)
@@ -486,6 +637,34 @@ checkout | switch)
 			;;
 		esac
 	done
+	# `checkout <ref> <パス>` は `--` が無くてもパスを別のコミットの中身に戻す。承認済みチケットの
+	# 置き場に当たるパスは通さない（ADR-0093 の段階 0）。オプションでない最初の語が行き先か起点で、
+	# 2 つ目からがパス。-b / -B / --orphan（switch は -c / -C）は値を次の語で取るので、値ごと飛ばす。
+	co_skip=no
+	co_first=yes
+	for arg in ${1+"$@"}; do
+		if [ "$co_skip" = yes ]; then
+			co_skip=no # 直前のオプションの値
+			continue
+		fi
+		case "$arg" in
+		-b | -B | --orphan | -c | -C) co_skip=yes ;;
+		--pathspec-from-file | --pathspec-from-file=*)
+			reject checkout-store "$sub の $arg は、どのパスを戻すかをここで読めないので通しません。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
+			;;
+		-*) ;;
+		*)
+			if [ "$co_first" = yes ]; then
+				co_first=no
+				continue
+			fi
+			store_hit "$arg"
+			if [ "$in_store" = yes ]; then
+				reject checkout-store "$sub <ref> <パス> で承認済みチケットの置き場に当たるパス ($arg) を別のコミットの中身に戻す形は通しません。置き場を動かすのは人と ccnavi のスクリプトです。置き場の中身が食い違っているなら、利用者に伝えてください（* ? [ や : で始まる指定は、置き場に当たるかを確かめられないので同じく通しません）。"
+			fi
+			;;
+		esac
+	done
 	;;
 
 fetch | pull)
@@ -494,6 +673,12 @@ fetch | pull)
 		case "$arg" in
 		-f | --force | --prune | --unshallow)
 			reject fetch-force "$arg は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
+			;;
+		# refspec（`+refs/heads/x:refs/heads/y`・`x:y`・`--refmap=...`）は、取ってきたものを手元の
+		# ブランチへ直に書く。`+` は早送りでない書き換えも通す。取ってくるのはブランチ名だけにする
+		# （ADR-0093 の段階 0）。URL も `:` を含むので同じく止まる。取得先は設定済みのリモート名で書く。
+		*:* | *+*)
+			reject fetch-refspec "$arg は取ってきたものを手元の参照へ直に書く形（refspec）か URL です。取ってくるのはリモート名とブランチ名だけで、$SELF $sub <リモート> <ブランチ> の形で書いてください。手元のブランチへ入れるのは、取ってきた後の $SELF merge <リモート>/<ブランチ> です。"
 			;;
 		esac
 	done
