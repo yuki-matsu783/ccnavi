@@ -628,6 +628,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     }
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
+    problems.extend(_branch_name_problems(proposals, copies, closed, review))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -864,6 +865,65 @@ def _proposal_problems(
         )
         problems.append(
             Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
+        )
+    return problems
+
+
+def _branch_name_problems(
+    proposals: list, copies: list, closed: list, review: list
+) -> list[Problem]:
+    """識別子を親のブランチ名にできるか（ADR-0093 の 3.1。段階 0 なので warn だけ）。
+
+    親のブランチ名は親の識別子そのものにする。そのために次を名指しする。
+
+    - 新規の提案（`todo/` にあって、承認済みでも閉じてもいないもの）の識別子の形
+      （`ticket.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
+    - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
+      ブランチもワークツリーも同じ名前になる
+    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。家族を引くとき、別の親の子と読まれる
+
+    承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
+    """
+    problems: list[Problem] = []
+    everyone = list(copies) + list(closed) + list(review) + list(proposals)
+    settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
+    said: set[str] = set()
+    for t in proposals:
+        if t.state != ticket_mod.TODO or t.ticket in settled or t.ticket in said:
+            continue
+        said.add(t.ticket)
+        for text in ticket_mod.branch_name_problems(t):
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（ADR-0093）"))
+
+    spellings: dict[str, set[str]] = {}
+    for t in everyone:
+        spellings.setdefault(t.ticket.casefold(), set()).add(t.ticket)
+    for names in spellings.values():
+        if len(names) > 1:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{' と '.join(sorted(names))} は大文字小文字だけが違う。"
+                    "大文字小文字を区別しないファイルシステムでは、ブランチとワークツリーの"
+                    "名前がぶつかる（ADR-0093）",
+                )
+            )
+
+    child = ticket_mod.child_pattern()
+    parents = sorted({t.ticket for t in everyone if not t.is_child})
+    for name in parents:
+        matched = child.match(name)
+        if matched is None:
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{name} は親なのに識別子が子の形（`<親>-<2 桁>`）に当たる。"
+                f"家族を引くとき {matched.group('parent')} の子と読まれる。"
+                "親の識別子の末尾を `-<2 桁>` にしない（ADR-0093）",
+            )
         )
     return problems
 

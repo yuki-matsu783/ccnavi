@@ -127,6 +127,48 @@ def child_pattern() -> re.Pattern:
     return _CHILD
 
 
+# 親のブランチ名は親の識別子そのもの（ADR-0093 の 3.1）。識別子を、ブランチ名として安全で、
+# 統合先や issue の番号と紛れない形に寄せる。いまは `--lint` の warn だけで、承認は止めない。
+#
+# 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じ並び）。
+# 大文字小文字を畳んで比べる。`release/*` は識別子に `/` を書けないので、
+# ここでは `release` と `release-*` だけを見る。
+RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
+# issue から決める識別子の形（`i` + 番号）。`issue:` を持つ提案だけが使う。
+_ISSUE_ID = re.compile(r"^i\d+$", re.IGNORECASE)
+
+
+def branch_name_problems(t: Ticket) -> list[str]:
+    """新規の提案の識別子が、親のブランチ名の規則に合わないところ（ADR-0093 の 3.1 の 2・5・6）。
+
+    見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのは人に見せる文で、
+    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子（3.1 の 3）と、
+    子の形に当たる親の識別子は、他のチケットと並べて見るので `lint` の側で数える。
+    """
+    name = t.ticket
+    folded = name.casefold()
+    found: list[str] = []
+    if ".." in name:
+        found.append("識別子に `..` を含む。git のブランチ名に使えない")
+    if folded.endswith(".lock"):
+        found.append("識別子が `.lock` で終わる。git のブランチ名に使えない")
+    elif name.endswith("."):
+        found.append("識別子が `.` で終わる。git のブランチ名に使えない")
+    if t.is_child:
+        return found
+    if folded in RESERVED_BRANCH_IDS or folded.startswith("release-"):
+        found.append(
+            "識別子が統合先や保護されたブランチの名前（main・master・develop・release・release-*）"
+            "に当たる。親のブランチ名が統合先と同じになる"
+        )
+    if _ISSUE_ID.match(name) and t.issue is None:
+        found.append(
+            "`i<番号>` の形は issue から決める識別子なので、`issue:` の無い提案では使わない。"
+            "issue の番号と紛れる"
+        )
+    return found
+
+
 # スクリプトだけが書く欄。人もエージェントも書かない。承認済みチケットの側で
 # 行単位に書き換える（`set_fields`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
