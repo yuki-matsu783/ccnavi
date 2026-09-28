@@ -2344,6 +2344,11 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
   取り返しがつかない形も、サブコマンドの中で止める
 - `push` は**居るブランチを、そのままの名前で送る形だけ**通す。`--force`・`--force-with-lease`・`--delete`・`--all`・`--mirror`・`--tags`、
   別の綴りへ送る refspec（`HEAD:main` など）は通さない。`main` `master` `develop` `release` `release/*` へ直接は送れない。マージは人の側に残す
+- `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。
+  `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない（ADR-0093）
+- 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
+  `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
+  衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる（ADR-0093）
 - 送るのは親だけ。子チケットのワークツリーからの push はラッパースクリプトが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）
 - サブコマンドより前のオプション（`git -c ...` など）は 1 つも受け取らない。`GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す
 
