@@ -1622,28 +1622,51 @@ def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[s
     入れ、ほかの控え（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
     変わりうる）。ワークスペースの外は絶対パスのまま。
     """
-    held = sorted(trees(conf, root), key=lambda t: len(t.root), reverse=True)
-    state = os.path.normcase(os.path.normpath(conf.state)) if conf.state else ""
+    # 読みの控えの綴りは行き着く先（`fsio.note_read`）なので、比べる側も行き着く先に揃えてから
+    # 大文字小文字を畳む（macOS の /tmp のようなリンクを経たルート、Windows の綴りの揺れ）。
+    held = sorted(
+        ((_real(t.root), t) for t in trees(conf, root)), key=lambda x: len(x[0]), reverse=True
+    )
+    folded_roots = [(_folded(real), real, t) for real, t in held]
+    state_real = _real(conf.state) if conf.state else ""
+    state = _folded(state_real) if state_real else ""
     names: dict[str, str] = {}
     out: dict[str, str] = {}
     for path, digest in seen.items():
-        folded = os.path.normcase(os.path.normpath(path))
+        folded = _folded(path)
         if state and (folded == state or folded.startswith(state + os.sep)):
-            rel = os.path.relpath(path, conf.state).replace(os.sep, "/")
+            rel = os.path.relpath(path, state_real).replace(os.sep, "/")
             if rel.split("/", 1)[0] == syncstate.SYNC_DIR:
                 out[f"(控え):{rel}"] = digest
             continue
         owner = next(
-            (t for t in held if folded == t.root or folded.startswith(t.root + os.sep)), None
+            (
+                (real, t)
+                for key, real, t in folded_roots
+                if folded == key or folded.startswith(key + os.sep)
+            ),
+            None,
         )
         if owner is None:
             out[f"(外):{fsio.slashed(path)}"] = digest
             continue
-        if owner.root not in names:
-            names[owner.root] = tree.branch_of(owner.root) or owner.name
-        rel = os.path.relpath(path, owner.root).replace(os.sep, "/")
-        out[f"{names[owner.root]}:{rel}"] = digest
+        real, t = owner
+        if real not in names:
+            names[real] = tree.branch_of(t.root) or t.name
+        rel = os.path.relpath(path, real).replace(os.sep, "/")
+        out[f"{names[real]}:{rel}"] = digest
     return out
+
+
+def _real(path: str) -> str:
+    try:
+        return os.path.realpath(path)
+    except OSError:
+        return os.path.abspath(path)
+
+
+def _folded(path: str) -> str:
+    return os.path.normcase(os.path.normpath(path))
 
 
 def _carried(cand: Candidate) -> str:

@@ -472,12 +472,25 @@ class DigestTest(AuthorityHarness):
         self.assertNotEqual(first.digest, second.digest)
 
     def test_session_state_is_not_in_the_read_set(self):
-        seen = {
-            os.path.join(self.state, "once-x.json"): "a",
-            os.path.join(self.state, "sync", "self", "families", "i0001"): "b",
-        }
+        once = write(os.path.join(self.state, "once-x.json"), "a")
+        record = self.record("present")
+        with fsio.reading() as seen:
+            fsio.note_read(once, "a")
+            fsio.note_read(record, "b")
         keys = approval.read_set(self.conf(), self.root, seen)
-        self.assertEqual({"(控え):sync/self/families/i0001": "b"}, keys)
+        self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
+
+    def test_keys_do_not_depend_on_a_linked_root(self):
+        # 読みの控えは行き着く先の綴り。ルートをリンク越しに渡しても（macOS の /tmp など）同じ鍵になる。
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        linked = os.path.join(holder.name, "ws")
+        os.symlink(self.root, linked)
+        target = os.path.join(linked, ".claude", "worktrees", "i0001", "x.md")
+        with fsio.reading() as seen:
+            fsio.note_read(target, "x")
+        keys = approval.read_set(self.conf(), linked, seen)
+        self.assertEqual(["i0001:x.md"], list(keys))
 
     def test_line_endings_do_not_change_the_digest(self):
         with fsio.reading() as seen:
