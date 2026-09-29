@@ -1,0 +1,676 @@
+"""C1（ADR-0093 の 4.3・4.4・4.6。段階 2d）の受入テスト。
+
+使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-ticket.sh・ccnavi-review.sh・
+ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを `python -m ccnavi` で
+起こす（本物の判定・見分け・書いたパスの一覧を通す）。リモートを動かすのは別に clone した押し手で、
+ワークスペースからは「他の機械（Chrome）が push した」ように見える。
+
+見るのは次のとおり。
+
+1. 順序: hook の印と跡を先にコミット → 取り込み → 書く → 書いたパスだけ commit --only → push。
+   統合先の控えも同じ回で書く
+2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・運ぶ処理は入れ子で通る
+3. 競合: リモートが進んでいれば取り込んでから書く。衝突したら取りやめて何も書かない
+4. 途中の操作（merge など）があれば始めない
+5. 戻し: push が通らなければ、自分のコミットを比較つきで戻し、書いたパスの中身も戻して
+   1 回だけやり直す
+6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
+7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（D34 の configsync の
+   写しは例外。tests/ticket/test_core.py と tests/config/ が見る）
+8. hook の書きかけ（pending・skipped・跡の追記）は運び、人の判断（c）と知らない変更（d）は止める
+9. 人の判断の入口（ccnavi-review.sh chat など）は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ
+10. D11: 控えの無い家族・origin の無いリポジトリ・chat だけの家族は今のまま
+    （コミットも push もしない）
+11. 運ぶ処理（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import unittest
+
+from tests import ROOT, common_path
+from tests.ticket.test_phases import PHASES, child_text, parent_text
+from tests.ticket.test_ticket import RULES
+
+SHELL = shutil.which("sh") or shutil.which("bash")
+GIT = shutil.which("git")
+SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
+CONFIG = (
+    ("user.email", "t@example.invalid"),
+    ("user.name", "t"),
+    ("commit.gpgsign", "false"),
+)
+PARENT = "i0001"
+CHILD = f"{PARENT}-01"
+APPROVED = ".ccnavi/approved"
+
+# 実行ファイルの代わり。このツリーのソースを起こす。
+EXE = """#!/bin/sh
+PYTHONPATH='{root}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+"""
+
+# git の代わり。push だけ、本物の push を済ませてから落ちたふりをする（応答だけが落ちた形）。
+LOST_REPLY = """#!/bin/sh
+for a in "$@"; do
+  if [ "$a" = push ]; then
+    '{git}' "$@" >/dev/null 2>&1
+    echo 'fatal: the remote end hung up unexpectedly' >&2
+    exit 128
+  fi
+done
+exec '{git}' "$@"
+"""
+
+
+def write(path, text=""):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return path
+
+
+def git(cwd, *args, check=True):
+    done = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if check and done.returncode != 0:
+        raise AssertionError(f"git {args}: {done.stderr}")
+    return done
+
+
+def fields(path):
+    with open(path, encoding="utf-8") as f:
+        return dict((line.rstrip("\n").split(" ", 1) + [""])[:2] for line in f if line.strip())
+
+
+def executable(path, text):
+    write(path, text)
+    os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP)
+    return path
+
+
+@unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
+class C1Harness(unittest.TestCase):
+    """ワークスペース（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。
+
+    親は承認済み（計画は mr で見る 1 フェーズ、子 1 つ）で、送ってあり、取り込み済み
+    （控えが present）。
+    """
+
+    plan = ("design",)
+    imported = True
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        base = self._tmp.name
+        self.ws = os.path.join(base, "ws")
+        self.scripts = os.path.join(self.ws, ".ccnavi", "scripts")
+        os.makedirs(self.scripts)
+        for name in os.listdir(SH_DIR):
+            if name.endswith(".sh"):
+                shutil.copy(os.path.join(SH_DIR, name), self.scripts)
+        git(base, "init", "-q", "-b", "main", self.ws)
+        for key, value in CONFIG:
+            git(self.ws, "config", key, value)
+        write(os.path.join(self.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
+        write(common_path(self.ws, "rules"), json.dumps(RULES))
+        write(common_path(self.ws, "phases"), PHASES)
+        write(os.path.join(self.ws, "src", "keep.py"), "print(1)\n")
+        git(self.ws, "add", "-A")
+        git(self.ws, "commit", "-q", "-m", "seed")
+        self.remote = os.path.join(base, "origin.git")
+        git(base, "init", "-q", "--bare", "-b", "main", self.remote)
+        git(self.ws, "remote", "add", "origin", self.remote)
+        git(self.ws, "push", "-q", "-u", "origin", "main")
+        git(self.ws, "remote", "set-head", "origin", "main")
+        self.bin = executable(
+            os.path.join(base, "bin", "ccnavi"),
+            EXE.format(root=ROOT, python=sys.executable),
+        )
+        self.state = os.path.join(self.ws, "logs", "state")
+        self.record = os.path.join(self.state, "sync", "self", "families", PARENT)
+        self.tree = self.parent_tree()
+        self.approve_family()
+        git(self.tree, "push", "-q", "-u", "origin", PARENT)
+        if self.imported:
+            result = self.sync(PARENT)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(fields(self.record)["state"], "present")
+
+    # ---- 道具
+
+    def parent_tree(self):
+        tree = os.path.join(self.ws, ".claude", "worktrees", PARENT)
+        git(self.ws, "worktree", "add", "-q", tree, "-b", PARENT, "main")
+        return tree
+
+    def approve_family(self):
+        write(
+            os.path.join(self.tree, "wip", "proposals", "todo", PARENT + ".md"),
+            parent_text(PARENT, list(self.plan), allow=("src/*", "wip/*")),
+        )
+        write(
+            os.path.join(self.tree, "wip", "proposals", "todo", CHILD + ".md"),
+            child_text(CHILD, PARENT, 1, ("wip/design/*",), False),
+        )
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "propose")
+        preview = self.exe("--approve", "--preview", "--json")
+        digest = json.loads(preview.stdout)["digest"]
+        done = self.exe("--approve", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "approve")
+
+    def env(self, **extra):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        env.update(
+            {
+                "CCNAVI_BIN_PATH": self.bin,
+                "CCNAVI_SYNC_RETRIES": "0",
+                "CCNAVI_SYNC_RETRY_WAIT": "0",
+                "CCNAVI_LOCK_WAIT": "2",
+            }
+        )
+        env.update(extra)
+        return env
+
+    def exe(self, *args, cwd=None):
+        return subprocess.run(
+            [self.bin, "--root", self.ws, *args],
+            cwd=cwd or self.ws,
+            env=self.env(),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+        )
+
+    def sh(self, name, *args, cwd=None, stdin=None, **extra):
+        return subprocess.run(
+            [SHELL, os.path.join(self.scripts, name), *args],
+            cwd=cwd or self.ws,
+            env=self.env(**extra),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            input=stdin if stdin is not None else "",
+        )
+
+    def sync(self, *args):
+        return self.sh("ccnavi-sync.sh", *args)
+
+    def ticket(self, *args, **extra):
+        return self.sh("ccnavi-ticket.sh", *args, **extra)
+
+    def sha(self, tree, ref):
+        done = git(tree, "rev-parse", "--verify", "-q", ref, check=False)
+        return done.stdout.strip() if done.returncode == 0 else ""
+
+    def remote_sha(self, branch=PARENT):
+        done = git(self.ws, "ls-remote", "origin", f"refs/heads/{branch}")
+        return done.stdout.split("\t")[0] if done.stdout else ""
+
+    def pusher(self):
+        path = os.path.join(self._tmp.name, "pusher")
+        if not os.path.isdir(path):
+            git(self._tmp.name, "clone", "-q", self.remote, path)
+            for key, value in CONFIG:
+                git(path, "config", key, value)
+        git(path, "fetch", "-q", "--prune", "origin")
+        return path
+
+    def remote_commit(self, rel, text, branch=PARENT):
+        path = self.pusher()
+        git(path, "checkout", "-q", "-B", branch, f"origin/{branch}")
+        write(os.path.join(path, rel), text)
+        git(path, "add", "--", rel)
+        git(path, "commit", "-q", "-m", f"remote {rel}")
+        git(path, "push", "-q", "origin", branch)
+        return self.sha(path, "HEAD")
+
+    def dirty(self, tree=None):
+        return git(tree or self.tree, "status", "--porcelain", "--untracked-files=all").stdout
+
+    def committed(self, rev="HEAD", tree=None):
+        out = git(tree or self.tree, "show", "--name-only", "--format=", rev).stdout
+        return sorted(line for line in out.splitlines() if line)
+
+    def subjects(self, n=5, tree=None):
+        out = git(tree or self.tree, "log", f"-{n}", "--format=%s").stdout
+        return out.splitlines()
+
+    def copy(self, ident, where="doing"):
+        return os.path.join(self.tree, *APPROVED.split("/"), where, ident + ".md")
+
+    def read(self, path):
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+
+    def mark(self, n, kind, data):
+        rel = f"{APPROVED}/phases/{PARENT}/{n}.{kind}"
+        write(os.path.join(self.tree, rel), json.dumps(data))
+        return rel
+
+    def lock_dir(self):
+        return os.path.join(self.state, "locks", "self", PARENT)
+
+    def child_tree(self):
+        tree = os.path.join(self.ws, ".claude", "worktrees", CHILD)
+        git(self.ws, "worktree", "add", "-q", tree, "-b", CHILD, PARENT)
+        return tree
+
+
+class C1TicketTest(C1Harness):
+    # ---- 1. 順序と、書いたパスだけのコミット
+
+    def test_start_commits_only_what_it_wrote_and_pushes(self):
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("に着手した", result.stdout)
+        head = self.sha(self.tree, "HEAD")
+        self.assertNotEqual(head, before)
+        self.assertEqual(self.remote_sha(), head)
+        self.assertEqual(
+            self.committed(),
+            [f"{APPROVED}/doing/{PARENT}.md", f"{APPROVED}/events/{PARENT}.ndjson"],
+        )
+        self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
+        self.assertEqual(self.dirty(), "")
+        record = fields(self.record)
+        self.assertEqual(record["state"], "present")
+        self.assertEqual(record["sha"], head)
+        # 統合先の控えも同じ回で書く（2c の相談: 送った直後に控えが無く承認が止まる件）。
+        head_file = os.path.join(self.state, "sync", "self", "integration", "head")
+        self.assertTrue(os.path.isfile(head_file))
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_other_staged_changes_stay_out_of_the_commit(self):
+        """commit --only（D35）: 索引の他の変更はコミットに入らず、索引に残る。"""
+        write(os.path.join(self.tree, "src", "other.py"), "x = 1\n")
+        git(self.tree, "add", "--", "src/other.py")
+        # 取り込みの merge は索引が HEAD と同じときだけなので、リモートと同じ形で見る。
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("src/other.py", self.committed())
+        self.assertIn("A  src/other.py", self.dirty())
+
+    def test_a_child_is_carried_on_the_parent_branch(self):
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+        self.child_tree()
+        result = self.ticket("start", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"{APPROVED}/doing/{CHILD}.md", self.committed())
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    # ---- 8. hook の書きかけ（b）は先に運ぶ。人の判断（c）と知らない変更（d）は止める
+
+    def test_hook_marks_and_events_are_committed_before_the_take_in(self):
+        pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
+        events = os.path.join(self.tree, *APPROVED.split("/"), "events", PARENT + ".ndjson")
+        with open(events, "a", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps({"at": "t", "ticket": PARENT, "kind": "phase-mark"}) + "\n")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.subjects(2),
+            [f"ccnavi: {PARENT} に着手", f"ccnavi: {PARENT} の hook の印と跡を運ぶ"],
+        )
+        self.assertEqual(
+            self.committed("HEAD~1"), sorted([pending, f"{APPROVED}/events/{PARENT}.ndjson"])
+        )
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+
+    def test_a_human_decision_not_yet_sent_stops_without_writing(self):
+        self.mark(1, "reviewed", {"by": "chat", "at": "t"})
+        copy = self.read(self.copy(PARENT))
+        head = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertIn(f"ccnavi-push-approved.sh {PARENT}", result.stderr)
+        self.assertEqual(self.read(self.copy(PARENT)), copy)
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_an_unknown_change_in_the_place_stops(self):
+        write(os.path.join(self.tree, *APPROVED.split("/"), "notes.txt"), "x\n")
+        # 形は hook の印でも、変更前が在る（書き換え）なら hook のものとは読まない。
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ccnavi の知らない変更", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+
+    def test_a_forged_mark_with_other_fields_is_not_carried(self):
+        self.mark(1, "skipped", {"by": "agent", "at": "t"})
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("人の判断が未送信", result.stderr)
+
+    def test_an_unsent_commit_in_the_place_stops(self):
+        """未送信の置き場のコミットが (b) でなければ止める（REQ-APV-11 の補足）。"""
+        rel = f"{APPROVED}/doing/{CHILD}.md"
+        with open(os.path.join(self.tree, rel), "a", encoding="utf-8") as f:
+            f.write("tampered\n")
+        git(self.tree, "commit", "-q", "-am", "edit a copy")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("未送信のコミット", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+
+    # ---- 2. ロック
+
+    def test_a_held_lock_stops_without_writing(self):
+        os.makedirs(self.lock_dir())
+        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
+        system = subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
+        now = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout)
+        write(
+            os.path.join(self.lock_dir(), "owner"),
+            f"{host} {os.getpid()} {now} {os.getpid()}-{now} {system}\n",
+        )
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ロックを持っている", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+        self.assertTrue(os.path.isdir(self.lock_dir()))
+
+    # ---- 3. 競合
+
+    def test_a_remote_ahead_is_taken_in_before_writing(self):
+        rel = f"{APPROVED}/doing/i0001-02.md"
+        remote = self.remote_commit(rel, child_text("i0001-02", PARENT, 1, ("wip/design/*",)))
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isfile(os.path.join(self.tree, rel)))
+        self.assertEqual(self.sha(self.tree, "HEAD~1"), remote)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_a_take_in_that_blocks_the_family_writes_nothing(self):
+        """取り込みの後の検査で家族が止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
+        rel = f"{APPROVED}/doing/i0001-02.md"
+        self.remote_commit(rel, "---\nticket: i0001-02\n---\n")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("blocked", result.stderr)
+        self.assertEqual(fields(self.record)["state"], "blocked")
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_a_diverged_parent_is_merged_before_writing(self):
+        self.mark(1, "pending", {"review": "mr", "at": "t"})
+        self.remote_commit("src/remote.py", "y = 2\n")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isfile(os.path.join(self.tree, "src", "remote.py")))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD~1").stdout.split()
+        self.assertEqual(len(parents), 3)  # 取り込みの merge
+
+    def test_a_conflicting_take_in_writes_nothing(self):
+        events = f"{APPROVED}/events/{PARENT}.ndjson"
+        local = json.dumps({"at": "l", "ticket": PARENT, "kind": "phase-mark"}) + "\n"
+        with open(os.path.join(self.tree, events), "a", encoding="utf-8", newline="\n") as f:
+            f.write(local)
+        git(self.tree, "commit", "-q", "-am", "hook")
+        with open(os.path.join(self.tree, events), encoding="utf-8") as f:
+            base = f.read()[: -len(local)]
+        self.remote_commit(
+            events, base + json.dumps({"at": "r", "ticket": PARENT, "kind": "x"}) + "\n"
+        )
+        head = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("衝突", result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+        merge_head = git(self.tree, "rev-parse", "--git-path", "MERGE_HEAD").stdout.strip()
+        self.assertFalse(os.path.exists(os.path.join(self.tree, merge_head)))
+
+    # ---- 4. 途中の操作
+
+    def test_an_operation_in_progress_stops_before_anything(self):
+        path = git(self.tree, "rev-parse", "--git-path", "MERGE_HEAD").stdout.strip()
+        path = path if os.path.isabs(path) else os.path.join(self.tree, path)
+        write(path, self.sha(self.tree, "HEAD") + "\n")
+        self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
+        result = self.ticket("start", PARENT)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("途中の操作", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+
+    # ---- 5. 戻し
+
+    def reject_pushes(self, times):
+        """リモートの pre-receive が、最初の <times> 回の push を断る（-1 はずっと）。"""
+        counter = os.path.join(self._tmp.name, "rejected")
+        write(counter, "0\n")
+        executable(
+            os.path.join(self.remote, "hooks", "pre-receive"),
+            "#!/bin/sh\n"
+            f"n=$(cat '{counter}'); echo $((n + 1)) > '{counter}'\n"
+            f'if [ {times} -lt 0 ] || [ "$n" -lt {times} ]; then echo busy >&2; exit 1; fi\n',
+        )
+
+    def test_a_rejected_push_is_undone_and_retried_once(self):
+        self.reject_pushes(1)
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("戻した", result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD~1"), before)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+
+    def test_two_rejected_pushes_leave_nothing_written(self):
+        self.reject_pushes(-1)
+        before = self.sha(self.tree, "HEAD")
+        copy = self.read(self.copy(PARENT))
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ccnavi-sync.sh", result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.read(self.copy(PARENT)), copy)
+        self.assertEqual(self.dirty(), "")
+        self.assertEqual(fields(self.record)["state"], "present")
+
+    def test_a_moved_head_is_not_undone(self):
+        """戻すのは先頭が自分のコミットのときだけ（比較つきの update-ref）。"""
+        # push の前に、別の操作が先頭に積んだ形を pre-push で作る。
+        hook = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
+        hook = hook if os.path.isabs(hook) else os.path.join(self.tree, hook)
+        executable(
+            os.path.join(hook, "pre-push"),
+            "#!/bin/sh\ngit commit -q --allow-empty -m other >/dev/null 2>&1\nexit 1\n",
+        )
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("戻さずに止めた", result.stderr)
+        self.assertEqual(self.subjects(2), ["other", f"ccnavi: {PARENT} に着手"])
+
+    # ---- 6. 届いていた push
+
+    def test_a_push_whose_reply_was_lost_counts_as_sent(self):
+        shim = os.path.join(self._tmp.name, "shim")
+        executable(os.path.join(shim, "git"), LOST_REPLY.format(git=GIT))
+        path = shim + os.pathsep + os.environ.get("PATH", "")
+        result = self.ticket("start", PARENT, PATH=path)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("届いていた", result.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(fields(self.record)["sha"], self.sha(self.tree, "HEAD"))
+
+    # ---- 止める家族
+
+    def test_a_gone_family_is_refused_before_any_network(self):
+        with open(self.record, encoding="utf-8") as f:
+            text = f.read()
+        write(self.record, text.replace("state present", "state gone"))
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("書かずに止めた", result.stderr)
+        self.assertIn("ccnavi-sync.sh", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+
+    def test_record_risk_is_not_c1_and_rides_on_the_finish(self):
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+        tree = self.child_tree()
+        self.assertEqual(self.ticket("start", CHILD).returncode, 0)
+        write(os.path.join(tree, "wip", "design", "a.md"), "a\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "-q", "-m", "work")
+        head = self.sha(self.tree, "HEAD")
+        judge = os.path.join(
+            self.tree, *APPROVED.split("/"), "phases", PARENT, f"{CHILD}.judge.json"
+        )
+        write(judge, json.dumps({"x": {"hit": False, "reason": "r", "head": "h", "at": "t"}}))
+        # 記録（judge.json）が未コミットでも、finish の C1 は止めずに運ぶ。
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertIn(os.path.relpath(judge, self.tree).replace(os.sep, "/"), self.committed())
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+
+
+class C1NotImportedTest(C1Harness):
+    """10. D11: 控えの無い家族は今のまま（書くだけ。コミットも push もしない）。"""
+
+    imported = False
+
+    def test_start_only_writes(self):
+        head = self.sha(self.tree, "HEAD")
+        remote = self.remote_sha()
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertEqual(self.remote_sha(), remote)
+        self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
+        self.assertEqual(result.stderr, "")
+        self.assertFalse(os.path.exists(os.path.join(self.state, "c1")))
+
+    def test_the_same_output_as_the_executable(self):
+        """sh を通しても、実行ファイルを直に打ったのと同じ出力と終了コード。"""
+        direct = self.exe("ticket", "cancel", CHILD, "--reason", "r")
+        git(self.tree, "checkout", "-q", "--", ".")
+        git(self.tree, "clean", "-qfd")
+        via = self.ticket("cancel", CHILD, "--reason", "r")
+        self.assertEqual(via.returncode, direct.returncode)
+        self.assertEqual(via.stdout, direct.stdout)
+        self.assertEqual(via.stderr, direct.stderr)
+
+    def test_origin_less_family_with_a_record_is_not_c1(self):
+        write(
+            self.record,
+            f"remote origin\nbranch {PARENT}\nsha x\nfetched_at 1\nstate present\nreason \n",
+        )
+        git(self.ws, "remote", "remove", "origin")
+        head = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
+
+
+class C1ChatOnlyTest(C1Harness):
+    """10. D11: chat だけの家族（マージリクエストを持たない）は、取り込み済みでも C1 にしない。"""
+
+    plan = ("chores",)
+
+    def test_start_only_writes(self):
+        head = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
+        family = self.exe("c1", "family", PARENT)
+        self.assertIn("target no", family.stdout)
+        self.assertIn("chat だけの家族", family.stdout)
+
+
+class C1HumanTest(C1Harness):
+    """9. 人の判断の入口は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ（D27）。11. 運ぶ処理。"""
+
+    plan = ("chores", "design")
+
+    def finish_phase_one(self):
+        """フェーズ 1（chat で見る）の子を着手して閉じる。"""
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+        tree = self.child_tree()
+        started = self.ticket("start", CHILD)
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        write(os.path.join(tree, "wip", "design", "a.md"), "a\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "-q", "-m", "work")
+        finished = self.ticket("finish", CHILD)
+        self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
+
+    def test_chat_review_is_carried(self):
+        self.finish_phase_one()
+        result = self.sh("ccnavi-review.sh", "chat", "1", cwd=self.tree, stdin="y\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
+        self.assertTrue(os.path.isfile(os.path.join(self.tree, rel)))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertIn(rel, self.committed())
+        self.assertEqual(self.dirty(), "")
+
+    def test_push_approved_takes_in_before_sending(self):
+        rel = f"{APPROVED}/flows/{CHILD}.yml"
+        write(os.path.join(self.tree, rel), "steps: []\n")
+        remote = self.remote_commit("src/remote.py", "y = 2\n")
+        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(rel, self.committed())
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertTrue(
+            git(self.tree, "merge-base", "--is-ancestor", remote, "HEAD").returncode == 0
+        )
+
+    def test_push_approved_keeps_the_commit_when_the_push_fails(self):
+        rel = f"{APPROVED}/flows/{CHILD}.yml"
+        write(os.path.join(self.tree, rel), "steps: []\n")
+        executable(os.path.join(self.remote, "hooks", "pre-receive"), "#!/bin/sh\nexit 1\n")
+        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("コミットは残した", result.stderr)
+        self.assertIn(rel, self.committed())
+        # 次の C1 は未送信の人の判断を見つけて止まり、運ぶ処理を打ち直すよう言う。
+        os.remove(os.path.join(self.remote, "hooks", "pre-receive"))
+        stopped = self.ticket("start", PARENT)
+        self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
+        self.assertIn("未送信の人の判断", stopped.stderr)
+        again = self.sh("ccnavi-push-approved.sh", PARENT)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+
+    def test_push_approved_without_names_carries_the_family_through_c1(self):
+        rel = f"{APPROVED}/flows/{CHILD}.yml"
+        write(os.path.join(self.tree, rel), "steps: []\n")
+        self.remote_commit("src/remote.py", "y = 2\n")
+        result = self.sh("ccnavi-push-approved.sh")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("取り込んでから送った", result.stdout)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+
+if __name__ == "__main__":
+    unittest.main()
