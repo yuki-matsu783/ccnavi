@@ -7,8 +7,8 @@
 # push されて届く（設計 9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに
 # 範囲が効かない、レビュー済みなのに止まったまま、という形になる。
 #
-# 2 つめは**ワークツリーの起点になるデフォルトブランチ**（`origin/HEAD` が指すもの。多くは
-# `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
+# 2 つめは**ワークツリーの起点になる統合先**（CCNAVI_INTEGRATION_BRANCH、無ければ ccnavi-sync.sh が
+# 控えに書いた名前、無ければデフォルトブランチ＝`origin/HEAD` が指すもの。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
 # 切り、起点は `<統合先>` の HEAD になる。手元の `main` が古いと、そこから切る枝も古いところから
 # 伸びる。戻すときに fast-forward が通らず、承認済みチケットも古い版で判定することになる
 # （ADR-0060）。
@@ -40,8 +40,8 @@
 # （取れなければ飛ばす。待たない）、`origin/<P>` の祖先なら `merge --ff-only` する。書きかけとの重なりは
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
 # 取り込み（merge）・消えたかの確かめ・控えの書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
-# 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの早送りは飛ばして名指しする
-# （hook の上限は 60 秒）。
+# 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りは飛ばして名指しする。
+# fetch 1 回の見張りも枠の残りより長くしない（hook の上限は 60 秒）。
 #
 # **「リモートにその ref が無い」で落ちた fetch は、その origin を落ちたものに数えない。** 数えると、
 # 同じ origin の統合先の取り込みまで飛ばされる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
@@ -79,7 +79,16 @@ ccnavi_log_root="$root"
 # 落ちた origin の綴り。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
 # 回るので、変数では渡らない。
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
-trap 'ccnavi_lock_drop; rm -rf "$scratch"' EXIT
+# dash は EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。
+fetch_cleaned=""
+fetch_cleanup() {
+	[ -z "$fetch_cleaned" ] || return 0
+	fetch_cleaned=yes
+	ccnavi_lock_drop
+	rm -rf "$scratch"
+}
+trap 'fetch_cleanup' EXIT
+trap 'fetch_cleanup; exit 130' INT TERM HUP
 : >"$scratch/failed"
 
 # 認証で落ちたときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
@@ -87,27 +96,33 @@ auth_failed='Authentication failed|could not read (Username|Password)|terminal p
 auth_failed="$auth_failed"'|Invalid username or password|HTTP Basic: Access denied'
 auth_failed="$auth_failed"'|Permission denied \(publickey|returned error: 40[13]'
 
+# 時間の枠の残り（秒）。負なら 0。
+ccnavi_fetch_left() {
+	ccnavi_fl_now=$(date +%s)
+	ccnavi_fl_left=$((budget - (ccnavi_fl_now - started)))
+	[ "$ccnavi_fl_left" -gt 0 ] || ccnavi_fl_left=0
+	printf '%s\n' "$ccnavi_fl_left"
+}
+
 # origin へ 1 本取りに行く。取れたら 0、落ちたら 1、認証で落ちたら 3。取りに行かなかったら 2。
 # リモートにその ref が無くて落ちたら 4（その origin を落ちたものに数えない）。
+# 時間の枠（CCNAVI_FETCH_BUDGET、既定 45 秒）を過ぎていたら取りに行かずに 5。
 #
-# 見張りの sh が limit 秒で fetch を切る。見張りの出力は捨てる。出力をつないだまま残すと、
-# 見張りの sleep が終わるまで報せの `$( )` が閉じない。
+# 見張り（ccnavi_git_timed）が limit 秒か枠の残りの短い方で切る。hook の上限（60 秒）を超えないため。
+# 単一ブランチの clone でも origin/<ブランチ> が進むよう、行き先を書いて取る（sh の中の git。
+# ccnavi-git.sh の入口の refspec の拒否とは別の話）。
 ccnavi_fetch_git() {
 	ccnavi_fg_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
 	if [ -n "$ccnavi_fg_url" ] && grep -qxF -- "$ccnavi_fg_url" "$scratch/failed"; then
 		return 2
 	fi
-	LC_ALL=C git -C "$1" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
-		fetch --quiet origin "$2" </dev/null >/dev/null 2>"$scratch/err" &
-	ccnavi_fg_pid=$!
-	(
-		sleep "$limit"
-		kill "$ccnavi_fg_pid"
-	) </dev/null >/dev/null 2>&1 &
-	ccnavi_fg_dog=$!
+	ccnavi_fg_left=$(ccnavi_fetch_left)
+	[ "$ccnavi_fg_left" -gt 0 ] || return 5
+	ccnavi_fg_limit="$limit"
+	[ "$ccnavi_fg_left" -lt "$ccnavi_fg_limit" ] && ccnavi_fg_limit="$ccnavi_fg_left"
 	ccnavi_fg_rc=0
-	wait "$ccnavi_fg_pid" 2>/dev/null || ccnavi_fg_rc=$?
-	kill "$ccnavi_fg_dog" 2>/dev/null || :
+	ccnavi_git_timed "$ccnavi_fg_limit" "$scratch/err" "$1" \
+		fetch --quiet origin "+refs/heads/$2:refs/remotes/origin/$2" >/dev/null || ccnavi_fg_rc=$?
 	if [ "$ccnavi_fg_rc" -ne 0 ]; then
 		grep -qi "couldn't find remote ref" "$scratch/err" 2>/dev/null && return 4
 		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
@@ -126,6 +141,11 @@ ccnavi_fetch_or_note() {
 	ccnavi_fn_rc=$?
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
 	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
+	if [ "$ccnavi_fn_rc" -eq 5 ]; then
+		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh か、もう一度セッションを始める\n' \
+			"$(basename "$1")" "$budget" "$2" "$root"
+		return 1
+	fi
 	if [ "$ccnavi_fn_rc" -eq 4 ]; then
 		printf '%s\n' "${4:-$3}"
 		return 1
@@ -158,6 +178,25 @@ ccnavi_fetch_default() {
 		fi
 	done
 	return 1
+}
+
+# ワークツリーの起点にするブランチ（統合先。ADR-0093 の D30。段階 2b のレビューの決定 B6）。
+#
+# 環境変数 CCNAVI_INTEGRATION_BRANCH（SessionStart には settings.local.json の env も渡る）、
+# 無ければ ccnavi-sync.sh が控え（sync/<リポジトリ>/integration/head）に書いた名前、
+# 無ければホストのデフォルトブランチ（ccnavi_fetch_default）。
+ccnavi_fetch_integration() {
+	if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
+		printf '%s\n' "$CCNAVI_INTEGRATION_BRANCH"
+		return 0
+	fi
+	ccnavi_fi_key=$(ccnavi_repo_key "$1" "$root")
+	ccnavi_fi_name=$(ccnavi_record_get "$(ccnavi_state "$root")/sync/$ccnavi_fi_key/integration/head" branch)
+	if [ -n "$ccnavi_fi_name" ]; then
+		printf '%s\n' "$ccnavi_fi_name"
+		return 0
+	fi
+	ccnavi_fetch_default "$1"
 }
 
 # そのブランチをチェックアウトしているツリーの綴り。どこにも無ければ空。
@@ -244,9 +283,8 @@ ccnavi_fetch_forward() {
 	if LC_ALL=C git -C "$1" merge --ff-only --quiet "$ccnavi_fw_remote" </dev/null >/dev/null 2>"$scratch/ff"; then
 		printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$2" "$ccnavi_fw_behind" "$2"
 	else
-		ccnavi_fw_paths=$(sed -n 's/^[[:space:]][[:space:]]*\([^[:space:]].*\)$/\1/p' "$scratch/ff" | tr '\n' ' ' | sed 's/ *$//')
-		printf '%s: 書きかけの %s と重なるので進めない。コミットか退避をしてから sh %s/.ccnavi/scripts/ccnavi-sync.sh %s\n' \
-			"$2" "${ccnavi_fw_paths:-（git が拒んだ）}" "$root" "$2"
+		printf '%s: 早送りできなかった。%s（取り込みは sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
+			"$2" "$(ccnavi_git_refusal "$scratch/ff")" "$root" "$2"
 	fi
 	ccnavi_lock_drop
 	return 0
@@ -314,7 +352,7 @@ report=$(
 		[ -n "$repo" ] || continue
 		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
 		git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
-		default=$(ccnavi_fetch_default "$repo") || continue
+		default=$(ccnavi_fetch_integration "$repo") || continue
 		name=$(basename "$repo")
 		ref="refs/remotes/origin/$default"
 
@@ -324,7 +362,8 @@ report=$(
 		fi
 
 		ccnavi_fetch_or_note "$repo" "$default" \
-			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" ||
+			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" \
+			"${name}: ワークツリーの起点になる ${default}（統合先）がリモートに無い。CCNAVI_INTEGRATION_BRANCH を確かめる" ||
 			continue
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)
