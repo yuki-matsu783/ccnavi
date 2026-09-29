@@ -173,17 +173,17 @@
       "path": ".ccnavi/approved/done/i0001-01.md"
      },
      {
-      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"c7cb6d4f74ca95739358df1ca7d7c4b353fea04c\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"settled\", \"from\": \"review\", \"to\": \"done\", \"via\": \"cli\", \"phase\": 1}\n",
+      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"c7cb6d4f74ca95739358df1ca7d7c4b353fea04c\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"settled\", \"from\": \"review\", \"to\": \"done\", \"via\": \"chrome\", \"phase\": 1}\n",
       "op": "update",
       "path": ".ccnavi/approved/events/i0001-01.ndjson"
      },
      {
-      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"c7cb6d4f74ca95739358df1ca7d7c4b353fea04c\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"reviewed\"}\n",
+      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"c7cb6d4f74ca95739358df1ca7d7c4b353fea04c\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"chrome\", \"phase\": 1, \"mark\": \"reviewed\"}\n",
       "op": "update",
       "path": ".ccnavi/approved/events/i0001.ndjson"
      },
      {
-      "content": "{\"mr\": 7, \"accepted\": [], \"at\": \"2026-09-29T12:00:00+0900\"}",
+      "content": "{\"mr\": 7, \"accepted\": [], \"via\": \"chrome\", \"at\": \"2026-09-29T12:00:00+0900\"}",
       "op": "create",
       "path": ".ccnavi/approved/phases/i0001/1.reviewed"
      },

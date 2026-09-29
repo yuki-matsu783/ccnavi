@@ -44,13 +44,14 @@ test("CX-T060 ボード 1 回ぶんの要求すべてに、Pyodide と手元の 
   }
 });
 
-test("CX-T061 判定のコアの見本（承認・マーカーの消去・改版・フィードバック計画・多段の先行・取り下げ・レビュー済み）に、Pyodide と手元の CPython が手元の書いたとおりのバイト列を返す", { skip: native === null ? "uv が無い" : false }, async () => {
+test("CX-T061 判定のコアの見本（承認・マーカーの消去・改版・フィードバック計画・多段の先行・取り下げ・レビュー済み）に、Pyodide が手元の書いたとおりのバイト列を返す（uv があれば手元の CPython も）", async () => {
+  // Pyodide の側は見本と比べるだけなので、uv が無くても回す。
   const pyodide = await pyodidePy();
   const file = path.join(HERE, "test", "fixtures", "core-scenarios.json");
   const scenarios = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, { request: Record<string, unknown>; answer: Record<string, unknown> }>;
   assert.deepEqual(Object.keys(scenarios).sort(), ["approve-new", "approve-reopen", "confirm", "feedback-plan", "predecessors", "revise", "withdraw"]);
   for (const [name, { request, answer }] of Object.entries(scenarios)) {
     assert.deepEqual(await pyodide.call(request), answer, `Pyodide ${name}`);
-    assert.deepEqual(await native!.call(request), answer, `CPython ${name}`);
+    if (native !== null) assert.deepEqual(await native.call(request), answer, `CPython ${name}`);
   }
 });
