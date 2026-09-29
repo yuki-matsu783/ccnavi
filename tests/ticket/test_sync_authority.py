@@ -17,7 +17,7 @@ import time
 import unittest
 
 from ccnavi import approval, core, fsio, settings, syncstate
-from tests.ticket.test_phases import PhaseHarness, child_text
+from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
 
@@ -88,7 +88,7 @@ class ReaderTest(unittest.TestCase):
         )
         integ = syncstate.integration(self.state, "self")
         self.assertEqual(("main", "abc", ""), (integ.branch, integ.sha, integ.broken))
-        self.assertEqual({"i0009"}, syncstate.done_ids(integ, ".ccnavi/approved"))
+        self.assertEqual(({"i0009"}, ""), syncstate.done_ids(integ, ".ccnavi/approved"))
         content, why = integ.file(".ccnavi/approved/done/i0010.md")
         self.assertIsNone(content)
         self.assertIn("リンク", why)
@@ -110,11 +110,29 @@ class ReaderTest(unittest.TestCase):
         self.assertIsNotNone(found)
         self.assertEqual("new", found.sha)
 
-    def test_a_swap_that_never_ends_reads_as_no_integration(self):
+    def test_a_swap_that_never_ends_reads_as_broken(self):
+        # 取り込んだ跡があるのに入れ替えが終わらなければ、黙って「控えが無い」にせず
+        # 壊れているとする。
         self.put("sync/self/integration.old.9/head", "branch main\n")
         started = time.monotonic()
-        self.assertIsNone(syncstate.integration(self.state, "self"))
+        found = syncstate.integration(self.state, "self")
+        self.assertIn("入れ替えが終わらない", found.broken)
         self.assertGreaterEqual(time.monotonic() - started, 0.2)
+        self.assertEqual((set(), found.broken), syncstate.done_ids(found, ".ccnavi/approved"))
+
+    def test_a_repository_never_taken_in_has_no_integration(self):
+        self.put("sync/p/families/w0001", record_text("w0001", "present"))
+        self.assertIsNone(syncstate.integration(self.state, "self"))
+        self.assertIn("無い", syncstate.integration(self.state, "p").broken)
+
+    def test_names_refuse_dot_dot_and_records_are_not_cut(self):
+        self.put("sync/self/integration/head", "branch main\n")
+        integ = syncstate.integration(self.state, "self")
+        self.assertEqual([], integ.names("../x")[0])
+        self.assertIn("読めない綴り", integ.names("a/../b")[1])
+        self.assertIn("読めない綴り", integ.file("..")[1])
+        self.put("sync/self/families/i0001", "state present\n" + "x" * (64 * 1024))
+        self.assertIn("大きすぎる", syncstate.family(self.state, "self", "i0001").broken)
 
     def test_a_directory_without_head_is_waited_for(self):
         os.makedirs(os.path.join(self.state, "sync", "self", "integration"))
@@ -173,11 +191,17 @@ class AuthorityHarness(PhaseHarness):
 class NoRecordTest(AuthorityHarness):
     """控えの無い家族は前と同じ答え（D11）。`sync/` があっても、その家族の控えが無ければ同じ。"""
 
+    def stable_board(self):
+        # 生成の時刻は秒で変わるので外す（秒の境目で比べがぶれない）。
+        board = self.board()
+        board.pop("generated_at", None)
+        return board
+
     def test_answers_do_not_change_without_a_record(self):
         before = (
             self.decision(self.write_to(self.child_tree, "wip/research/a.md")),
             self.decision(self.write_to(self.child_tree, "src/a.py")),
-            self.board(),
+            self.stable_board(),
             self.ccnavi("--lint", "--json").stdout,
         )
         os.makedirs(os.path.join(self.state, "sync", "self", "families"))
@@ -185,19 +209,26 @@ class NoRecordTest(AuthorityHarness):
         after = (
             self.decision(self.write_to(self.child_tree, "wip/research/a.md")),
             self.decision(self.write_to(self.child_tree, "src/a.py")),
-            self.board(),
+            self.stable_board(),
             self.ccnavi("--lint", "--json").stdout,
         )
         self.assertEqual(before[:3], after[:3])
         self.assertNotEqual("deny", after[0])
-        # lint は他の家族（i0099）の控えのことだけを足して言う。
+        # lint は他の家族（i0099）の控えと、取り込んだ跡があるのに統合先の控えが無いことだけを
+        # 足して言う。
         extra = [
             p
             for p in json.loads(after[3])["problems"]
             if p not in json.loads(before[3])["problems"]
         ]
         self.assertTrue(extra)
-        self.assertTrue(all("i0099" in p["where"] + p["detail"] for p in extra), extra)
+        self.assertTrue(
+            all(
+                "i0099" in p["where"] + p["detail"] or p["where"] == "(sync/self/integration)"
+                for p in extra
+            ),
+            extra,
+        )
 
 
 class PresentTest(AuthorityHarness):
@@ -245,9 +276,13 @@ class PresentTest(AuthorityHarness):
             ),
             lint,
         )
-        check = self.ccnavi("sync", "check", "i0001")
+        check = self.ccnavi("sync", "check", "i0001", "self")
         self.assertEqual(1, check.returncode, check.stdout + check.stderr)
-        self.assertTrue(check.stdout.startswith("error "), check.stdout)
+        lines = check.stdout.splitlines()
+        self.assertEqual("check 1", lines[0])
+        self.assertTrue(lines[1].startswith("error "), check.stdout)
+        # 人が運ぶ手順も言う（3.5）。
+        self.assertIn("運んでコミットと push", check.stdout)
 
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
         self.record("present")
@@ -364,6 +399,131 @@ class UndecidedTest(AuthorityHarness):
         self.assertIn("gone", ready.stderr)
 
 
+class TombstoneTest(AuthorityHarness):
+    """家族の控えは墓標として残り、親のワークツリーを畳んでも止めが外れない（レビューの決定 A）。"""
+
+    def test_folding_the_parent_tree_does_not_lift_the_stop(self):
+        self.record("gone")
+        stray = os.path.join(self.root, ".ccnavi", "approved", "doing")
+        os.makedirs(stray)
+        # 元ツリーに同じ家族の写しを残して、親のワークツリーを畳む。
+        for name in ("i0001.md", "i0001-01.md"):
+            with open(os.path.join(self.approved, "doing", name), encoding="utf-8") as f:
+                write(os.path.join(stray, name), f.read())
+        git(self.root, "worktree", "remove", "--force", self.child_tree)
+        git(self.root, "worktree", "remove", "--force", self.parent_tree)
+        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        self.assertNotEqual(0, finished.returncode)
+        self.assertIn("gone", finished.stderr)
+        lint = json.loads(self.ccnavi("--lint", "--json").stdout)
+        self.assertTrue(
+            any(
+                p["where"] == "(sync/self/i0001)" and p["severity"] == "error"
+                for p in lint["problems"]
+            )
+        )
+
+    def test_a_present_record_without_the_parent_tree_is_undecided_until_closed(self):
+        self.record("present")
+        git(self.root, "worktree", "remove", "--force", self.child_tree)
+        git(self.root, "worktree", "remove", "--force", self.parent_tree)
+        st = syncstate.standing(self.conf(), self.root, "i0001")
+        self.assertTrue(st.stop and not st.closed, st)
+        self.assertIn("墓標", st.stop)
+        # 統合先の控えの done/ に親の写しがあれば、家族の控えに頼らず閉じた家族（墓標は黙る）。
+        base = os.path.join(self.state, "sync", "self", "integration")
+        write(os.path.join(base, "head"), "branch main\nsha abc\n")
+        write(
+            os.path.join(base, ".ccnavi", "approved", "done", "i0001.md"),
+            "---\nversion: 1\nticket: i0001\n---\n",
+        )
+        st = syncstate.standing(self.conf(), self.root, "i0001")
+        self.assertTrue(st.closed, st)
+        lint = json.loads(self.ccnavi("--lint", "--json").stdout)
+        self.assertFalse([p for p in lint["problems"] if p["where"] == "(sync/self/i0001)"])
+
+    def test_an_old_family_with_the_same_id_is_not_read_as_closed(self):
+        # 統合先の done/ の写しの承認の時刻が、親のワークツリーの写しと違えば閉じたとしない。
+        self.record("present")
+        base = os.path.join(self.state, "sync", "self", "integration")
+        write(os.path.join(base, "head"), "branch main\nsha abc\n")
+        write(
+            os.path.join(base, ".ccnavi", "approved", "done", "i0001.md"),
+            "---\nversion: 1\nticket: i0001\nccnavi_approved:\n"
+            "  approved_at: 2000-01-01T00:00:00+0900\n---\n",
+        )
+        st = syncstate.standing(self.conf(), self.root, "i0001")
+        self.assertFalse(st.closed)
+        self.assertEqual("", st.stop)
+
+    def test_the_forget_command_is_for_people(self):
+        result = self.ccnavi(
+            "--guard-ticket-approval",
+            "enable",
+            "--mode",
+            "enable",
+            stdin=json.dumps(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Bash",
+                    "cwd": self.root,
+                    "session_id": "s1",
+                    "tool_input": {"command": "sh .ccnavi/scripts/ccnavi-sync.sh --forget i0001"},
+                }
+            ),
+        )
+        self.assertEqual("deny", self.decision(result), result.stdout + result.stderr)
+        self.assertIn("--forget", self.reason(result))
+
+
+class BusyParentTest(AuthorityHarness):
+    def test_a_parent_tree_in_the_middle_of_a_rebase_says_so(self):
+        self.record("present")
+        gitdir = git(self.parent_tree, "rev-parse", "--git-dir").strip()
+        if not os.path.isabs(gitdir):
+            gitdir = os.path.join(self.parent_tree, gitdir)
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        os.makedirs(os.path.join(gitdir, "rebase-merge"))
+        with open(os.path.join(gitdir, "HEAD"), "w", encoding="utf-8") as f:
+            f.write(head + "\n")
+        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        self.assertNotEqual(0, finished.returncode)
+        self.assertIn("途中の操作（rebase-merge）", finished.stderr)
+
+
+class MarkTest(AuthorityHarness):
+    def test_an_earlier_reason_is_kept(self):
+        self.record("gone")
+        Ticket = approval.ticket_mod.Ticket
+        t = Ticket(
+            ticket="i0001-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
+        )
+        approval.mark_imported(self.conf(), self.root, [t])
+        self.assertTrue(t.blocked.startswith("前の理由 / "), t.blocked)
+        self.assertIn("gone", t.blocked)
+
+    def test_config_synced_stops_for_an_undecided_family(self):
+        import io
+
+        from ccnavi import configsync
+
+        self.record("gone")
+        err = io.StringIO()
+        code = configsync.acknowledge(
+            io.StringIO("y\n"), io.StringIO(), err, self.conf(), self.root, "i0001"
+        )
+        self.assertEqual(1, code)
+        self.assertIn("gone", err.getvalue())
+
+    def test_the_same_family_in_two_repositories_is_not_guessed(self):
+        self.record("present")
+        self.record("present", repo="web")
+        st = syncstate.standing_any(self.conf(), self.root, "i0001")
+        self.assertIn("複数のリポジトリ", st.stop)
+        # リポジトリを添えれば引ける。
+        self.assertEqual("", syncstate.standing_any(self.conf(), self.root, "i0001", "").stop)
+
+
 class IntegrationDoneTest(AuthorityHarness):
     def integration_done(self, ticket_id):
         write(
@@ -384,15 +544,65 @@ class IntegrationDoneTest(AuthorityHarness):
             "---\nticket: x\n---\n",
         )
 
+    def preview(self):
+        return json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+
+    def rejected_with(self, preview, ticket, words):
+        return any(
+            r["ticket"] == ticket and words in " ".join(r["problems"]) for r in preview["rejected"]
+        )
+
     def test_an_identifier_closed_in_the_integration_is_not_new(self):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
+        self.assertIn("i0001-02", [b["ticket"] for b in self.preview()["batch"]])
+        # 家族の控えが無くても、取り込んだ跡のあるリポジトリなら統合先の done/ で確かめる
+        # （3.3 の 4）。
         self.integration_done("i0001-02")
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
-        self.assertIn("i0001-02", [b["ticket"] for b in preview["batch"]])
-        self.record("present")
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = self.preview()
         self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
+        self.assertTrue(self.rejected_with(preview, "i0001-02", "done/ で閉じている"), preview)
+        self.record("present")
+        preview = self.preview()
+        self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
+        # 板にも理由つきで出る（黙って消えない）。
+        lint = json.loads(self.ccnavi("--lint", "--json").stdout)
+        self.assertTrue(any("i0001-02" in p["detail"] for p in lint["problems"]))
+
+    def test_a_new_family_cannot_reuse_a_closed_identifier(self):
+        # 控えの無い新しい家族（別の親）の識別子が、統合先の done/ で閉じている。
+        self.propose("i0005", parent_text("i0005", ["research"]))
+        self.commit_parent()
+        self.assertIn("i0005", [b["ticket"] for b in self.preview()["batch"]])
+        self.integration_done("i0005")
+        preview = self.preview()
+        self.assertNotIn("i0005", [b["ticket"] for b in preview["batch"]])
+        self.assertTrue(self.rejected_with(preview, "i0005", "done/ で閉じている"), preview)
+
+    def test_a_broken_or_missing_integration_does_not_pass_silently(self):
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.commit_parent()
+        base = os.path.join(self.state, "sync", "self")
+        # 取り込んだ跡（家族の控え）はあるのに統合先の控えが無い（push の移り目の直後など）。
+        self.record("present")
+        preview = self.preview()
+        self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
+        self.assertTrue(self.rejected_with(preview, "i0001-02", "決まらない"), preview)
+        # head の無い控え（入れ替えが終わらない）。
+        os.makedirs(os.path.join(base, "integration"))
+        os.makedirs(os.path.join(base, "integration.old.9"))
+        preview = self.preview()
+        self.assertTrue(self.rejected_with(preview, "i0001-02", "入れ替えが終わらない"), preview)
+        # 壊れた head（リンク）。
+        os.rmdir(os.path.join(base, "integration.old.9"))
+        real = write(os.path.join(self.root, "elsewhere-head"), "branch main\n")
+        os.symlink(real, os.path.join(base, "integration", "head"))
+        preview = self.preview()
+        self.assertTrue(self.rejected_with(preview, "i0001-02", "決まらない"), preview)
+        # 直せば通る。
+        os.remove(os.path.join(base, "integration", "head"))
+        write(os.path.join(base, "integration", "head"), "branch main\nsha abc\n")
+        self.assertIn("i0001-02", [b["ticket"] for b in self.preview()["batch"]])
 
 
 class PredecessorTest(AuthorityHarness):
@@ -460,7 +670,10 @@ class DigestTest(AuthorityHarness):
         self.commit_parent()
         first = self.judged()
         self.assertTrue(first.batch)
-        self.assertIn("i0001:.ccnavi/approved/doing/i0001-01.md", first.read_set)
+        self.assertIn("self:i0001:.ccnavi/approved/doing/i0001-01.md", first.read_set)
+        self.assertIn("self:i0001:(HEAD)", first.read_set)
+        self.assertIn("(設定):.claude/settings.json", first.read_set)
+        self.assertIn("(設定値):approved", first.read_set)
         self.assertEqual(first.digest, self.judged().digest)
         # 束の外の写し（作業中の子）の中身が変われば、画面が同じでも指紋は変わる。
         path = os.path.join(self.approved, "doing", "i0001-01.md")
@@ -491,7 +704,38 @@ class DigestTest(AuthorityHarness):
         with fsio.reading() as seen:
             fsio.note_read(target, "x")
         keys = approval.read_set(self.conf(), linked, seen)
-        self.assertEqual(["i0001:x.md"], list(keys))
+        self.assertIn("self:i0001:x.md", keys)
+        self.assertFalse([k for k in keys if k.startswith("(外)")], keys)
+
+    def test_a_settings_change_changes_the_digest(self):
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.commit_parent()
+        first = self.judged()
+        write(os.path.join(self.root, ".claude", "settings.local.json"), "{}\n")
+        self.assertNotEqual(first.digest, self.judged().digest)
+
+    def test_keys_of_two_repositories_do_not_collide(self):
+        # ワークスペースとプロジェクトで同じブランチ名（main）の同じ相対パス。
+        project = os.path.join(self.root, "projects", "web")
+        os.makedirs(project)
+        git(project, "init", "--quiet", "-b", "main")
+        with fsio.reading() as seen:
+            fsio.note_read(os.path.join(self.root, "x.md"), "a")
+            fsio.note_read(os.path.join(project, "x.md"), "b")
+        conf = self.conf()
+        conf.projects = os.path.join(self.root, "projects")
+        keys = approval.read_set(conf, self.root, seen)
+        self.assertIn("self:main:x.md", keys)
+        self.assertIn("web:main:x.md", keys)
+        self.assertNotEqual(keys["self:main:x.md"], keys["web:main:x.md"])
+
+    def test_nested_readers_are_removed_by_identity(self):
+        with fsio.reading() as outer:
+            with fsio.reading() as inner:
+                pass
+            fsio.note_read("/x/after", "a")
+        self.assertEqual({}, inner)
+        self.assertIn(os.path.normpath(fsio.parent_resolved("/x/after")), outer)
 
     def test_line_endings_do_not_change_the_digest(self):
         with fsio.reading() as seen:

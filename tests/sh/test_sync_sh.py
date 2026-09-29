@@ -347,6 +347,68 @@ class SyncTest(unittest.TestCase):
         record = fields(self.record)
         self.assertEqual(("present", ""), (record["state"], record["reason"]))
 
+    def test_an_old_executable_that_cannot_check_does_not_block(self):
+        # 古い実行ファイル（`sync check` を知らない）は、検査の error と分けて警告だけにする。
+        launcher = self.launcher()
+        old = write(
+            os.path.join(self._tmp.name, "bin", "old-ccnavi"),
+            "#!/bin/sh\n"
+            'case "$*" in *"sync check"*) echo "ccnavi: unknown command" >&2; exit 2 ;; esac\n'
+            f'exec "{launcher}" "$@"\n',
+        )
+        os.chmod(old, 0o755)
+        write(
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            child_copy_text(),
+        )
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("検査を実行できなかった", done.stdout)
+        self.assertEqual("present", fields(self.record)["state"])
+
+    def test_the_check_does_not_overwrite_a_record_changed_meanwhile(self):
+        # 検査の間に並行する sync が控えを gone にしたら、blocked で上書きしない。
+        launcher = self.launcher()
+        racer = write(
+            os.path.join(self._tmp.name, "bin", "racer"),
+            "#!/bin/sh\n"
+            'case "$*" in *"sync check"*)\n'
+            f'  sed "s/^state .*/state gone/" "{self.record}" > "{self.record}.x" && '
+            f'mv "{self.record}.x" "{self.record}" ;; esac\n'
+            f'exec "{launcher}" "$@"\n',
+        )
+        os.chmod(racer, 0o755)
+        write(
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            child_copy_text(),
+        )
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=racer)
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertIn("変わった。書き換えない", done.stdout)
+        self.assertEqual("gone", fields(self.record)["state"])
+
+    def test_the_check_that_cannot_write_the_record_ends_with_3(self):
+        # 止める理由があるのにロックが取れない（他の操作が持ち続ける）なら、3 回試して 3 で終わる。
+        launcher = self.launcher()
+        holder = write(
+            os.path.join(self._tmp.name, "bin", "holder"),
+            "#!/bin/sh\n"
+            'case "$*" in *"sync check"*)\n'
+            f'  mkdir -p "{self.state}/locks/self/{PARENT}" && '
+            f'printf "elsewhere 1 9999999999 1-1 Other\\n" '
+            f'> "{self.state}/locks/self/{PARENT}/owner" ;; esac\n'
+            f'exec "{launcher}" "$@"\n',
+        )
+        os.chmod(holder, 0o755)
+        write(
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            child_copy_text(),
+        )
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=holder, CCNAVI_LOCK_WAIT="0")
+        self.assertEqual(3, done.returncode, done.stdout + done.stderr)
+        self.assertIn("まだ止まっていない", done.stdout)
+        self.assertEqual("present", fields(self.record)["state"])
+
     def test_the_check_is_skipped_for_a_closed_family(self):
         # 閉じた家族（控えが closed）は検査しない（状態の操作が無い）。
         self.keep_record()
@@ -437,7 +499,7 @@ class SyncTest(unittest.TestCase):
         self.assertIn("戻し方 1", done.stdout)
         self.assertIn(f"git push origin {kept}:refs/heads/{PARENT}", done.stdout)
         self.assertIn("戻し方 2", done.stdout)
-        self.assertIn("家族の控えも消える", done.stdout)
+        self.assertIn("--forget i0001 を打つと家族の控えが消える", done.stdout)
         record = fields(self.record)
         self.assertEqual("gone", record["state"])
         self.assertEqual(kept, record["sha"])
@@ -495,12 +557,42 @@ class SyncTest(unittest.TestCase):
 
     # ---- 控えの寿命（中 11）
 
-    def test_records_of_removed_worktrees_are_cleared(self):
+    def test_records_of_removed_worktrees_are_kept_as_tombstones(self):
+        # 親のワークツリーを畳んで sync を打っても、gone の控えは消えない（決定 A）。
         self.keep_record("gone")
         git(self.ws, "worktree", "remove", "--force", self.tree)
         done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("家族の控えを消した", done.stdout)
+        self.assertNotIn("控えを消した", done.stdout)
+        self.assertEqual("gone", fields(self.record)["state"])
+        # 同じ名前で切り直しても、控えは gone のまま（push は ccnavi-git.sh が止める）。
+        self.parent_tree(PARENT + "x")  # 別の家族は触らない
+        self.assertEqual("gone", fields(self.record)["state"])
+
+    def test_forget_removes_only_a_record_whose_parent_tree_is_gone(self):
+        self.keep_record("gone")
+        refused = self.sync("--forget", PARENT)
+        self.assertEqual(1, refused.returncode, refused.stdout + refused.stderr)
+        self.assertIn("まだある", refused.stdout)
+        self.assertTrue(os.path.exists(self.record))
+        git(self.ws, "worktree", "remove", "--force", self.tree)
+        done = self.sync("--forget", PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("state gone", done.stdout)
+        self.assertFalse(os.path.exists(self.record))
+        again = self.sync("--forget", PARENT)
+        self.assertEqual(0, again.returncode)
+        self.assertIn("控えは無い", again.stdout)
+
+    def test_forget_needs_a_name_and_does_not_touch_the_network(self):
+        self.assertEqual(2, self.sync("--forget").returncode)
+        self.assertEqual(2, self.sync("--forget", "../x").returncode)
+        # origin が無くても消せる（ネットワークを使わない）。
+        self.keep_record("gone")
+        git(self.ws, "worktree", "remove", "--force", self.tree)
+        git(self.ws, "remote", "remove", "origin")
+        done = self.sync("--forget", PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(self.record))
 
     # ---- 統合先（D30）と統合先の控え（D26）

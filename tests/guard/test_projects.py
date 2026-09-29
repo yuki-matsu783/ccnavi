@@ -528,6 +528,32 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
+    def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
+        """取り込み済みのプロジェクトの家族（控えは sync/<プロジェクト>/）も止まる（2c）。"""
+        write(
+            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
+        git(self.lib, "add", "-A")
+        git(self.lib, "commit", "--quiet", "-m", "approve")
+        tree = self.worktree(self.lib, "i0007")
+        target = os.path.join(tree, "src", "a.py")
+        before = self.hook("Write", self.ws, file_path=target)
+        self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
+        # ワークスペースの控えに同じ名前があっても、プロジェクトの家族には効かない。
+        record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
+        write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
+        write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")
+        still = self.hook("Write", self.ws, file_path=target)
+        self.assertNotEqual(self.decision(still), "deny", still.stdout + still.stderr)
+        write(os.path.join(self.state, "sync", "lib", "families", "i0007"), record.format("gone"))
+        denied = self.hook("Write", self.ws, file_path=target)
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        cancelled = self.ccnavi("ticket", "cancel", "i0007", "--reason", "やめる")
+        self.assertNotEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
+        self.assertIn("gone", cancelled.stderr)
+
     # ---- 5. 実行後の監視はツリーごと
 
     def test_post_monitoring_reads_the_project_tree_the_call_touched(self):
