@@ -20,7 +20,7 @@
 | `src/options/` | 設定画面。リポジトリ（統合先の名前・直近の日数・指定のブランチ）と PAT |
 | `src/worker/` | Pyodide を動かす Web Worker |
 | `src/core/` | 画面に依らない部品（通信先と manifest、GitHub の読み取り、画面と service worker の約束、読み取りの流れ、Markdown の消毒、描画） |
-| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーを組んで今の ccnavi を呼ぶ |
+| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーを組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` も呼べるが、書くものを値で返すだけで、画面はまだ使わない（段階 2a。手元と同じバイト列を出すことの試験に使う） |
 | `hosts.json` | 焼き込む通信先（D24）。組織ごとのビルドはこれを替える |
 
 ## 組み立て
@@ -40,7 +40,9 @@ node scripts/build.js --hosts <一覧の JSON> # 組織ごとのビルド（GHES
 ## 試験
 
 ```sh
-pnpm test       # 単体・Node の上の Pyodide での組み立て・手元の CPython との突き合わせ（uv を使う）
+pnpm test       # 単体・Node の上の Pyodide での組み立て・手元の CPython との突き合わせ（uv を使う）。
+                # 判定のコアの見本 test/fixtures/core-scenarios.json は、リポジトリの tests/ticket/test_core.py が
+                # 書き出す（CCNAVI_CHROME_FIXTURE=1）
 pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BROWSERS_PATH）と模擬の GitHub で実機の試験
 ```
 

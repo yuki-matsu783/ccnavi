@@ -2,10 +2,14 @@
 
 拡張はホストの API でブランチの置き場を読み、その中身（Snapshot）をここへ渡す。ここは
 ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--approve --preview --json`）を
-そのまま動かす（ADR-0093 の 8.1。コアの切り出しは段階 2a）。承認待ちの一覧も、家族の
-見分けも、参照の閉包も、互換の比べも Python が出し、拡張（TS）は並べるだけ（ADR-0035）。
+そのまま動かす（ADR-0093 の 8.1）。承認待ちの一覧も、家族の見分けも、参照の閉包も、
+互換の比べも Python が出し、拡張（TS）は並べるだけ（ADR-0035）。
 
-書き込みは持たない。`--approve --yes` は呼ばない。
+段階 2a から、判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` も呼べる
+（`plan`・`withdraw`・`confirm` の操作）。どれも書くもの（Changes）を値で返すだけで、
+ホストにもディスクにも書かない（fsio の控える段）。拡張の画面はまだ使わず（承認は段階 3、
+レビュー済みは段階 4）、手元の CPython と Pyodide が同じバイト列を出すことの試験に使う
+（ADR-0093 の 6.2）。
 
 呼び方は `handle(<要求の JSON>, root)`。`root` は仮のツリーを組む場所で、Pyodide では `/ws`、
 手元の試験では一時ディレクトリ。答えは JSON の文字列。
@@ -24,6 +28,7 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 import os
@@ -31,7 +36,7 @@ import re
 import shutil
 import sys
 
-from ccnavi import cli, lint, settings, version
+from ccnavi import cli, core, history, lint, review, settings, version
 from ccnavi import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
@@ -291,6 +296,8 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
     shutil.rmtree(root, ignore_errors=True)
     os.makedirs(os.path.join(root, ".git", "worktrees"))
     integ = snap["integration"]["name"]
+    # HEAD はブランチの名前を読む先（承認の記録の `source_tree`。D22）。
+    _head(os.path.join(root, ".git"), integ)
     keep = tuple(p + "/" for p in place["integration_paths"])
     for path, text in _files(snap, integ).items():
         if path.startswith(keep) or path in place["integration_files"]:
@@ -309,8 +316,14 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
             f.write(f"gitdir: {registry}\n")
         with open(os.path.join(registry, "gitdir"), "w", encoding="utf-8") as f:
             f.write(gitfile + "\n")
+        _head(registry, name)
         for path, text in _files(snap, name).items():
             _write(tree, path, text)
+
+
+def _head(gitdir: str, branch: str) -> None:
+    with open(os.path.join(gitdir, "HEAD"), "w", encoding="utf-8") as f:
+        f.write(f"ref: refs/heads/{branch}\n")
 
 
 def _write(base: str, rel: str, text: str) -> None:
@@ -382,9 +395,10 @@ def _op_board(req: dict, root: str) -> dict:
         "family": family,
         "closure": closure,
         "batch": batch,
-        # 画面の本文の提案のパスは仮のツリーの絶対パスなので `<P>:` に畳む（D22 は段階 2a）。
-        # 指紋は承認（段階 3）で使うもので、読み取り専用の段階 1 では返さない。
-        "text": _relative(root, body["text"]) if batch else "",
+        # 画面の本文は提案をツリーからの相対パスで出す（D22）ので、手を加えずに返す。
+        # 指紋はこの本文と写しの中身を覆い、手元の `--approve --preview` と同じ値になる。
+        "text": body["text"] if batch else "",
+        "digest": body["digest"] if batch else "",
         "rejected": [
             {"ticket": r["ticket"], "problems": [_relative(root, p) for p in r["problems"]]}
             for r in first["rejected"]
@@ -428,6 +442,141 @@ def _relative(root: str, text: str) -> str:
     return out.replace(os.sep, "/") if os.sep != "/" else out
 
 
+# ---- 判定のコア（段階 2a。書くものを値で返すだけ） ---------------------------------------
+
+
+def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
+    """家族の仮のツリーを組む。答えは (snapshot, 置き場, 家族, 閉包)。"""
+    snap = _snapshot(req)
+    place = _placement(_text_or_none(req.get("settings")))
+    family = req.get("family")
+    if not isinstance(family, str) or family not in snap["branches"]:
+        raise Refused("family のブランチが snapshot に無い")
+    closure = _closure(snap, place, family)
+    if closure["over_limit"]:
+        raise Refused(closure["message"])
+    if closure["need"]:
+        raise Refused(f"閉包の家族をまだ読んでいない: {', '.join(closure['need'])}")
+    _build(root, snap, place, closure["families"])
+    return snap, place, family, closure
+
+
+def _core_snapshot(req: dict, root: str) -> core.Snapshot:
+    """`ccnavi.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
+    stamp = req.get("stamp")
+    if not isinstance(stamp, str) or not stamp:
+        raise Refused("stamp（オフセット付きの時刻）が無い")
+    actor = req.get("actor") if isinstance(req.get("actor"), dict) else {}
+    conf, _ = settings.load(root)
+    try:
+        return core.read_fs(
+            conf,
+            root,
+            stamp,
+            core.Actor(
+                str(actor.get("account") or ""),
+                history.VIA_CHROME,
+                str(actor.get("version") or ""),
+            ),
+        )
+    except ValueError as exc:
+        raise Refused(str(exc)) from None
+
+
+def _changes(root: str, changes: core.Changes | None) -> dict:
+    """Changes を JSON にする。中身は UTF-8 の本文、読めなければ base64。"""
+    if changes is None:
+        return {"changes": None, "lines": [], "stopped": None}
+    out: dict[str, list[dict]] = {}
+    for branch, entries in changes.per_branch().items():
+        rows = []
+        for e in entries:
+            row = {"op": e["op"], "path": _relative(root, e["path"])}
+            if "content" in e:
+                try:
+                    row["content"] = e["content"].decode("utf-8")
+                except UnicodeDecodeError:
+                    row["base64"] = base64.b64encode(e["content"]).decode("ascii")
+            rows.append(row)
+        out[branch] = rows
+    stopped = changes.planned.stopped
+    return {
+        "changes": out,
+        "lines": [_relative(root, line) for line in changes.lines],
+        "stopped": (
+            {"ticket": stopped[0], "reason": _relative(root, stopped[1])} if stopped else None
+        ),
+    }
+
+
+def _op_plan(req: dict, root: str) -> dict:
+    """家族 1 つの承認で書くもの（6.2 の judge → plan）。書かない。"""
+    snap, place, family, _ = _family_tree(req, root)
+    only = req.get("only")
+    if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only)):
+        raise Refused("only は識別子の並び")
+    with _environ(place["env"]):
+        snapshot = _core_snapshot(req, root)
+        with history.session(snapshot.actor.via or history.VIA_CHROME, None):
+            verdict = core.judge(snapshot, only)
+            refused = verdict.gathered.refused
+            changes = core.plan(snapshot, verdict) if verdict.batch and not refused else None
+    return {
+        "family": family,
+        "identifiers": verdict.identifiers,
+        "text": verdict.screen_text,
+        "digest": verdict.digest,
+        "refused": _relative(root, refused),
+        "rejected": [
+            {"ticket": t.ticket, "problems": [_relative(root, str(p)) for p in complaints]}
+            for t, complaints in verdict.rejected
+        ],
+        **_changes(root, changes),
+    }
+
+
+def _op_withdraw(req: dict, root: str) -> dict:
+    """承認の取り下げで書くもの（8.8）。`prior` は識別子ごとの承認コミットの親の提案の本文。"""
+    _, place, family, _ = _family_tree(req, root)
+    ids = req.get("ids")
+    prior = req.get("prior")
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        raise Refused("ids は識別子の並び")
+    if not isinstance(prior, dict) or not all(isinstance(v, str) for v in prior.values()):
+        raise Refused("prior は識別子ごとの本文")
+    reason = req.get("reason") if isinstance(req.get("reason"), str) else ""
+    with _environ(place["env"]):
+        snapshot = _core_snapshot(req, root)
+        checked = core.withdraw(
+            snapshot, ids, {k: v.encode("utf-8") for k, v in prior.items()}, reason
+        )
+    return {
+        "family": family,
+        "problems": [_relative(root, p) for p in checked.problems],
+        **_changes(root, checked.changes),
+    }
+
+
+def _op_confirm(req: dict, root: str) -> dict:
+    """レビュー済みで書くもの（8.9）。`result` は `ccnavi-review.sh` が組むのと同じ形の写し。"""
+    _, place, family, _ = _family_tree(req, root)
+    phase_no = req.get("phase")
+    if not isinstance(phase_no, int) or isinstance(phase_no, bool):
+        raise Refused("phase はフェーズの番号")
+    changed = req.get("changed") if isinstance(req.get("changed"), str) else ""
+    result = review.Result.from_data(req.get("result"))
+    if result.error:
+        raise Refused(f"result を読めない: {result.error}")
+    with _environ(place["env"]):
+        snapshot = _core_snapshot(req, root)
+        checked = core.confirm(snapshot, family, phase_no, result, changed)
+    return {
+        "family": family,
+        "problems": [_relative(root, p) for p in checked.problems],
+        **_changes(root, checked.changes),
+    }
+
+
 # ---- 互換の印（7.3） --------------------------------------------------------------------
 
 
@@ -466,6 +615,9 @@ _OPS = {
     "families": _op_families,
     "closure": _op_closure,
     "board": _op_board,
+    "plan": _op_plan,
+    "withdraw": _op_withdraw,
+    "confirm": _op_confirm,
     "compat": _op_compat,
     "version": _op_version,
 }
