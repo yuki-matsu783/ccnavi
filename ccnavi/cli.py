@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import re
 import tempfile
 import time
 from typing import TextIO
@@ -218,6 +219,10 @@ scripts in .ccnavi/scripts/, which call
          approved and proposal places, the ccnavi directory, and the integration
          branch written in .claude/settings.local.json env; reads no environment
          for the integration branch)
+    ccnavi sync check <parent>
+        (for ccnavi-sync.sh after it took in <parent>: re-judges the family's
+         approved tickets and its authority; one "<severity> <detail>" per line;
+         exit 1 when an error stops the family)
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
@@ -407,8 +412,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--verify", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
-    # 見せた承認画面の本文と承認済みチケットに写る中身の指紋（preview の `digest`）。
-    # `--yes` と一緒に渡す。
+    # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身の指紋
+    # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
@@ -803,6 +808,11 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）が綴りを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
+    # 取り込みの後の検査（ADR-0093 の 4.2 の 4。段階 2c）。error があれば sh が家族を止める。
+    if len(args.command) == 3 and list(args.command[:2]) == ["sync", "check"]:
+        return (
+            EXIT_OK if sync_check(stdout, stderr, root, conf, args.command[2]) == 0 else EXIT_ERROR
+        )
 
     if args.command or args.reviewed is not None or args.close_early:
         # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
@@ -1153,6 +1163,28 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     for key, value in lines:
         stdout.write(f"{key} {value}\n")
     return 0
+
+
+# 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスに化ける綴りを入れない。
+_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def sync_check(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, family: str
+) -> int:
+    """`ccnavi-sync.sh` が取り込みの後に打つ検査。1 行 1 件（`<深刻度> <中身>`）で返す。
+
+    error が 1 つでもあれば 1。sh は最初の error の中身を家族の控えの `reason` に書いて
+    `blocked` にする（ADR-0093 の 4.2 の 4）。ネットワークにも git にも触らない。
+    """
+    if not _FAMILY.fullmatch(family) or ".." in family:
+        stderr.write(f"ccnavi: sync check の {family!r} は識別子の形ではない\n")
+        return 1
+    problems = lint.family_check(conf, root, family)
+    for p in problems:
+        detail = " ".join(p.detail.split())
+        stdout.write(f"{p.severity} {detail}\n")
+    return 1 if any(p.severity == lint.SEVERITY_ERROR for p in problems) else 0
 
 
 def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:

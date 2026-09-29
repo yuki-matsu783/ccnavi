@@ -44,7 +44,7 @@ import os
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import flow, fsio, history, phasetypes, rules, settings, tree, workflow
+from . import flow, fsio, history, phasetypes, rules, settings, syncstate, tree, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -230,13 +230,123 @@ def scan(
     if not closed:
         # 判定が読むのは作業中の側だけ。閉じたものに印は要らない。
         mark_blocked(conf, kept)
+        mark_imported(conf, root, kept)
     return kept, notes
 
 
 def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """レビュー待ちのチケット。権威のあるツリーの側だけを残す（`scan` と同じ規則）。"""
     found, notes = review_all(conf, root)
-    return _authoritative(found, _everything(conf, root, review=found)), notes
+    kept = _authoritative(found, _everything(conf, root, review=found))
+    mark_imported(conf, root, kept)
+    return kept, notes
+
+
+def mark_imported(conf: settings.Settings, root: str, kept: list[ticket_mod.Ticket]) -> None:
+    """取り込み済みの家族の写しに、信じられない理由の印を付ける（ADR-0093 の 3.3）。
+
+    取り込み済みの家族は、家族の控えがある家族。
+
+    権威は親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
+    写しだけ。次の写しは読むが信じない（`blocked`。判定は範囲を効かせず止める）。
+
+    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、`present` なのに親のワークツリーが
+      無い）
+    - 家族が閉じている（控えが `closed`。統合先の `done/` が権威）
+    - 親のワークツリーの外にしか無い写し（元ツリーに未コミットで残った写しなど。移行の検査）
+
+    **写しの並びは変えない（落とさない）。** 落とすと「在る」ことで止まっていたもの（承認待ちの
+    重複、開いた子のある親を閉じない）が通るようになる。印を足すだけなので、控えの無い家族と、
+    控えがあっても親のワークツリーの写しだけの家族では、答えは前と同じ。
+    """
+    if not syncstate.any_records(conf.state):
+        return
+    cache: dict[tuple[str, str], syncstate.Standing] = {}
+    for t in kept:
+        st = family_standing(conf, root, t, cache)
+        if not st.imported:
+            continue
+        why = st.stop
+        if not why and st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
+            why = (
+                f"親のブランチ {st.family} のワークツリーの外"
+                f"（{t.tree or 'ワークスペースルート'}）にしか無い写し。"
+                "取り込み済みの家族では親のブランチの写しだけが本物"
+            )
+        if why:
+            t.blocked = why
+
+
+def family_standing(
+    conf: settings.Settings,
+    root: str,
+    t: ticket_mod.Ticket,
+    cache: dict[tuple[str, str], syncstate.Standing] | None = None,
+) -> syncstate.Standing:
+    """このチケットの家族の立ち位置（`syncstate.standing`）。家族は `parent` か自分。"""
+    key = (t.project or "", t.parent or t.ticket)
+    if cache is not None and key in cache:
+        return cache[key]
+    st = syncstate.standing(conf, root, key[1], key[0])
+    if cache is not None:
+        cache[key] = st
+    return st
+
+
+def family_problems(
+    conf: settings.Settings, root: str, t: ticket_mod.Ticket, cache: dict | None = None
+) -> list[rules.Problem]:
+    """取り込み済みの家族の提案を承認しない理由（ADR-0093 の 3.3・3.6・8.4）。
+
+    家族が決まらない・閉じているなら承認しない。提案は親のブランチの上で書く（3.2）ので、
+    親のワークツリーの外にある提案も承認しない。控えの無い家族は何も言わない。
+    """
+    if not syncstate.any_records(conf.state):
+        return []
+    st = family_standing(conf, root, t, cache)
+    if not st.imported:
+        return []
+    if st.stop:
+        hint = " / ".join(syncstate.guidance(root, st))
+        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"{st.stop}。承認しない。{hint}")]
+    if st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"提案が親のブランチ {st.family} のワークツリーの外"
+                f"（{t.tree or 'ワークスペースルート'}）にある。取り込み済みの家族の提案は"
+                f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
+                "承認を頼む",
+            )
+        ]
+    return []
+
+
+def integration_closed(
+    conf: settings.Settings, root: str, proposals: list[ticket_mod.Ticket]
+) -> set[str]:
+    """取り込み済みの家族の提案のうち、統合先の `done/` に同じ識別子があるもの（3.3 の 4）。
+
+    開いた家族でも統合先の `done/` は常に一緒に読む。古い統合先から切った `P` で、閉じた
+    識別子の再利用が新規の承認として通らないように。統合先の `done/` は控え（D26）から読む。
+    """
+    if not syncstate.any_records(conf.state):
+        return set()
+    out: set[str] = set()
+    ids: dict[str, set[str]] = {}
+    cache: dict = {}
+    for t in proposals:
+        if t.state != ticket_mod.TODO:
+            continue
+        if not family_standing(conf, root, t, cache).imported:
+            continue
+        repo = syncstate.repo_key(t.project)
+        if repo not in ids:
+            ids[repo] = syncstate.done_ids(syncstate.integration(conf.state, repo), conf.approved)
+        if t.ticket in ids[repo]:
+            out.add(t.ticket)
+    return out
 
 
 def _everything(
@@ -323,6 +433,12 @@ def home_dir(
     先に見ると、承認済みチケットとマーカーが別のツリーに分かれる。
     """
     home = parent or ticket_id
+    # 取り込み済みの家族は親のブランチ（親のワークツリー）だけに書く（ADR-0093 の 3.4）。
+    # 元ツリーに未コミットで書く形（ADR-0073）はやめる。決まらない家族は、ここへ来る前に
+    # 状態の操作と承認が止める。
+    st = syncstate.standing_any(conf, root, home)
+    if st.imported and st.home is not None and not st.stop:
+        return settings.approved_dir(conf, st.home.root)
     named = ""
     holders: list[tuple[tree.Tree, str]] = []
     for t in trees(conf, root):
@@ -651,6 +767,9 @@ PRED_SCATTERED = "scattered"
 PRED_SELF = "self"  # 自分自身
 PRED_ANCESTOR = "ancestor"  # 自分の親（子は親の中の作業で、親は子より先に閉じない）
 PRED_CYCLE = "cycle"  # 先行を辿ると自分に戻る
+# 取り込み済みの家族の先行で、その家族が決まらない・親のブランチの写しに無い
+# （ADR-0093 の 3.3 の 5）。
+PRED_UNDECIDED = "undecided"
 # 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
 PRED_WAITING = (ticket_mod.TODO, ticket_mod.DOING, ticket_mod.REVIEW)
 PRED_LABELS = {
@@ -663,6 +782,7 @@ PRED_LABELS = {
     PRED_SELF: "自分自身",
     PRED_ANCESTOR: "自分の親",
     PRED_CYCLE: "先行を辿ると自分に戻る",
+    PRED_UNDECIDED: "家族が決まらない",
 }
 
 
@@ -714,7 +834,60 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
     review, _ = scan_review(conf, root)
     closed, _ = scan(conf, root, closed=True)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    return predecessor_pool_of(open_copies, review, closed, proposals)
+    pool = predecessor_pool_of(open_copies, review, closed, proposals)
+    align_imported(conf, root, pool)
+    return pool
+
+
+def align_imported(
+    conf: settings.Settings, root: str, pool: dict[str, list[ticket_mod.Ticket]]
+) -> None:
+    """取り込み済みの家族の先行を、その家族の親のブランチの写しで読み直す（ADR-0093 の 3.3 の 5）。
+
+    Chrome は先行を、参照の閉包の家族の `P` から引く。手元もそれに揃える。ただし**通る向きには
+    読み替えない**（段階 2c は締める向きだけ）。
+
+    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、親のワークツリーが無い）:
+      「家族が決まらない」にする（切り直しを案内する）
+    - 親のワークツリーにその識別子の写しが無い: 同じく「家族が決まらない」（親のブランチの外に
+      しか無い）
+    - 親のワークツリーの写しが 1 つで、閉じていない（作業中・レビュー待ち・承認待ち）: それを採る
+    - 親のワークツリーの写しで閉じている、写しが 2 つ以上: 前の池のまま（手元の全ツリーから
+      引いた答え。前の池で満たしていなければ満たさないまま）
+    - 閉じた家族（控えが `closed`）と控えの無い家族: 前の池のまま
+    """
+    if not syncstate.any_records(conf.state):
+        return
+    cache: dict = {}
+    for ident, hits in list(pool.items()):
+        if not hits:
+            continue
+        st = family_standing(conf, root, hits[0], cache)
+        if not st.imported or st.closed:
+            continue
+        if st.stop:
+            pool[ident] = [_undecided(hits[0], st.stop)]
+            continue
+        mine = [
+            h
+            for h in hits
+            if st.home is not None and syncstate.same_tree(h.tree_root, st.home.root)
+        ]
+        if not mine:
+            pool[ident] = [
+                _undecided(
+                    hits[0],
+                    f"親のブランチ {st.family} のワークツリーに {ident} の写しが無い"
+                    f"（{', '.join(h.tree or '(ワークスペースルート)' for h in hits)} にしか無い）",
+                )
+            ]
+        elif len(mine) == 1 and mine[0].state != PRED_DONE:
+            pool[ident] = mine
+
+
+def _undecided(sample: ticket_mod.Ticket, why: str) -> ticket_mod.Ticket:
+    """先行の池に置く「家族が決まらない」の印。理由は `blocked` に入れて運ぶ。"""
+    return replace(sample, state=PRED_UNDECIDED, blocked=why)
 
 
 def predecessor_states(
@@ -737,6 +910,8 @@ def predecessor_states(
                 continue
         if not hits:
             out.append(Predecessor(ident, PRED_MISSING))
+        elif len(hits) == 1 and hits[0].state == PRED_UNDECIDED:
+            out.append(Predecessor(ident, PRED_UNDECIDED, hits[0].blocked))
         elif len(hits) > 1:
             where = ", ".join(f"{h.tree or '(ワークスペースルート)'}:{h.state}" for h in hits)
             out.append(Predecessor(ident, PRED_SCATTERED, where))
@@ -825,6 +1000,16 @@ def predecessor_problems(
                     t.ticket,
                     f"先行 {p.ticket} は{PRED_LABELS[p.state]}。{why}。"
                     "predecessors から外して出し直す",
+                )
+            )
+        elif p.state == PRED_UNDECIDED:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"先行 {p.ticket} の家族が決まらない（{p.where}）。取り込み済みの家族の先行は"
+                    "その親のブランチの写しで確かめる。親のワークツリーを切り直すか、"
+                    "'ccnavi-sync.sh' で取り込み直してから出し直す",
                 )
             )
         elif p.state == PRED_MISSING:
@@ -1235,7 +1420,12 @@ def gather(
     review, _ = scan_review(conf, root)
 
     pending, revisions = waiting(
-        proposals, approved, closed, review, types_resolver(conf, root, approved)
+        proposals,
+        approved,
+        closed,
+        review,
+        types_resolver(conf, root, approved),
+        integration_closed(conf, root, proposals),
     )
     broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
     texts = [str(p) for p in problems] + list(notes)
@@ -1392,26 +1582,68 @@ def _note_line(note: str) -> str:
     return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
 
 
-def approval_digest(text: str, batch: list[Candidate]) -> str:
-    """承認の指紋。承認画面の本文と承認済みチケットに写る中身の SHA-256 の 16 進（小文字）。
+def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | None = None) -> str:
+    """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに写る中身の
+    SHA-256 の 16 進（小文字）。
 
     ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
     見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
     本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
-    本文、知らない frontmatter の欄）は見せたあとに書き換えられる。だから、本文に続けて
-    束のチケットを順に書き出した中身も覆う。
+    本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
 
-    書き出した中身は承認のときに書くもの（`_apply` の `write_copy` / `revise_copy`）と
-    同じ組み立てで、承認の記録の欄（`ccnavi_approved`）だけを除く。記録は承認した時刻を
-    持つので、入れると呼ぶたびに指紋が変わる。本文も呼ぶたびに変わる中身を持たない。
+    **判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）で覆う。** 提案だけでなく、
+    判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の控えのどれかが見せたあとに
+    変われば、指紋が変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
+    入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
+    （`<ブランチ>:<相対パス>` → 中身の指紋）。
+
+    束のチケットの写る中身（`_carried`）も残して覆う。読んだ中身から決まるものだが、読みの
+    記録（`fsio.reading`）を通らない読みが紛れても、写る中身の変化は取りこぼさないように。
 
     部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
     区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
     本文は生の制御文字（`\\x00` も）を素通しするので、どの文字も「中身に出ない」とは言えない。
+    読んだ中身の部分は `<鍵>\\n<中身の指紋>`（指紋は 16 進の固定長なので、最後の改行で切れる）。
     """
     parts = [text] + [_carried(cand) for cand in batch]
+    if read is not None:
+        parts += [f"{key}\n{digest}" for key, digest in sorted(read.items())]
     lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[str, str]:
+    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す（ADR-0093 の 6.2）。
+
+    鍵は `<ブランチ>:<ツリーからの相対パス>`（"/" 区切り）。ブランチはそのツリーの HEAD が指す
+    ブランチ名（読めなければツリーの名前。ワークスペースルートの名前は空）で、`Changes.per_branch`
+    と同じ決め方。ツリーは承認済みチケットを持ちうるもの全部（`trees`）で、最長一致。
+    控えの置き場の下は、取り込みの控え（`sync/`）だけを `(控え):<相対パス>` で
+    入れ、ほかの控え（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
+    変わりうる）。ワークスペースの外は絶対パスのまま。
+    """
+    held = sorted(trees(conf, root), key=lambda t: len(t.root), reverse=True)
+    state = os.path.normcase(os.path.normpath(conf.state)) if conf.state else ""
+    names: dict[str, str] = {}
+    out: dict[str, str] = {}
+    for path, digest in seen.items():
+        folded = os.path.normcase(os.path.normpath(path))
+        if state and (folded == state or folded.startswith(state + os.sep)):
+            rel = os.path.relpath(path, conf.state).replace(os.sep, "/")
+            if rel.split("/", 1)[0] == syncstate.SYNC_DIR:
+                out[f"(控え):{rel}"] = digest
+            continue
+        owner = next(
+            (t for t in held if folded == t.root or folded.startswith(t.root + os.sep)), None
+        )
+        if owner is None:
+            out[f"(外):{fsio.slashed(path)}"] = digest
+            continue
+        if owner.root not in names:
+            names[owner.root] = tree.branch_of(owner.root) or owner.name
+        rel = os.path.relpath(path, owner.root).replace(os.sep, "/")
+        out[f"{names[owner.root]}:{rel}"] = digest
+    return out
 
 
 def _carried(cand: Candidate) -> str:
@@ -1596,6 +1828,8 @@ def candidates(
     cache: dict[str, dict | None] = {}
     # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
+    # 家族の立ち位置（取り込み済みの家族。ADR-0093 の 3.3）。家族ごとに 1 回だけ引く。
+    standings: dict = {}
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
         name = project_of(t, pool)
@@ -1607,6 +1841,7 @@ def candidates(
         current = open_index[t.ticket]
         types = types_for(t)
         complaints = _workflow_field(t) + revision_problems(root, conf, t, current, types)
+        complaints += family_problems(conf, root, t, standings)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -1630,6 +1865,7 @@ def candidates(
         complaints, overflow = validate(t, pool, types)
         complaints += _workflow_field(t)
         complaints += project_problems(t, pool, conf)
+        complaints += family_problems(conf, root, t, standings)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
             if parent is not None:
@@ -2038,6 +2274,7 @@ def waiting(
     closed: list[ticket_mod.Ticket],
     review: list[ticket_mod.Ticket],
     types_for,
+    closed_elsewhere: set[str] | frozenset[str] = frozenset(),
 ) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
     """いま `--approve` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
@@ -2048,11 +2285,15 @@ def waiting(
     （`phases.yml` を直した結果を進行中の親に効かせる道。設計 9.7）。`types_for` は
     チケットに効く種類を引く関数（`types_resolver`）。
     `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
+
+    `closed_elsewhere` は統合先の `done/` にある識別子（`integration_closed`。ADR-0093 の
+    3.3 の 4）。
+    閉じたものと同じく承認待ちに入れない。
     """
     known = by_id(approved + closed + review)
     open_index = by_id(approved)
     todo = [t for t in proposals if t.state == ticket_mod.TODO]
-    pending = [t for t in todo if t.ticket not in known]
+    pending = [t for t in todo if t.ticket not in known and t.ticket not in closed_elsewhere]
     revisions = [
         t
         for t in todo

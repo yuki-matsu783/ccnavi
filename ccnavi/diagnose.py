@@ -641,6 +641,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    approval.align_imported(conf, root, preds)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
@@ -760,9 +761,11 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         closed_copies,
         review_copies,
         approval.types_resolver(conf, root, open_copies),
+        approval.integration_closed(conf, root, proposals),
     )
     # 先行を引く池。承認と着手が使うのと同じ集め方（ADR-0088）。
     preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
+    approval.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
     )

@@ -1128,8 +1128,8 @@ def ready(
 ) -> int:
     """Draft を外してよいかを確かめ、マーカーとコメントの下書きを置く。外すのは sh。
 
-    条件は「親を閉じられる」と同じ（ops.close_problems）。閉じてよい状態と、
-    マージに進んでよい状態は同じもの。親を閉じたあとでも打てる（閉じた承認済みチケットも引く）。
+    条件は「親を閉じられる」と同じ（ops.close_problems）に、「親の承認済みチケットが `done/` に
+    ある」（ADR-0093 の 3.6）を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものは人が行う。
     """
@@ -1137,6 +1137,15 @@ def ready(
     if parent is None:
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
+    # 親の写しが done/ に無いまま Draft を外すと、そのままマージされたときに done/ に親が無いまま
+    # 親のブランチが消え、家族が「決まらない」に落ちる（ADR-0093 の 3.6。締める向き）。
+    if parent.state != ticket_mod.DONE:
+        problems.append(
+            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
+            f"（いまは {parent.state}/）。先に "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish {parent.ticket}' で"
+            "親を閉じ、コミットして push してから打ち直す"
+        )
     problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
         stderr.write("ccnavi: まだ Draft を外せない:\n")
@@ -1595,13 +1604,13 @@ def _parent_any(
     """cwd の親。閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す道のため）。"""
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
-        return parent
+        return None if ops.family_stopped(stderr, root, conf, parent) else parent
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
         closed, _ = approval.scan(conf, root, closed=True)
         found = tree.lookup(approval.by_id(closed), t.name)
         if found is not None and not found.is_child:
-            return found
+            return None if ops.family_stopped(stderr, root, conf, found) else found
     stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
     return None
 
@@ -1703,6 +1712,11 @@ def _parent(
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is None:
         stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
+        return None
+    # 取り込み済みの家族が決まらない・閉じているなら、依頼・確認・行き先・締めの印も置かない
+    # （ADR-0093 の 3.3・3.6）。
+    if ops.family_stopped(stderr, root, conf, parent):
+        return None
     return parent
 
 

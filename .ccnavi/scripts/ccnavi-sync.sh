@@ -40,7 +40,10 @@
 #     書き換えない）。マージされていないと分かったときだけ、控えがあれば gone を書いて止める
 #     （控えが無ければ gone は書かずに止める）
 #
-# この段（2b）では控えを書くだけで、判定はまだ控えを読まない（2c）。
+# 統合先の控えを書いた後、present の家族ごとに実行ファイルの `ccnavi sync check <P>` で判定し直す
+# （権威の検査と、承認済みチケットの判定し直し。4.2 の 4）。error があれば家族の控えを blocked に
+# して、理由を reason に書いて止める。判定（hook・承認・状態の操作）は blocked の家族を止める（2c）。
+# 解き方は、理由を直してから同じ P でこの sh を打ち直すこと（検査し直して通れば present に戻る）。
 #
 # 実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。ここが git で取ってくる。
 # 置き場の綴りと settings.local.json の読みだけを実行ファイル（`ccnavi sync paths`）に聞く。
@@ -634,6 +637,54 @@ sync_absent() {
 	return 0
 }
 
+# ---- 取り込みの後の検査（4.2 の 4。段階 2c）
+
+# 実行ファイルを起こす。`sync paths` を答えたのと同じもの。<引数>...
+run_ccnavi() {
+	case "$info_from" in
+	'uv run python -m ccnavi')
+		(cd "$root" && uv run --quiet python -m ccnavi --root "$root" "$@" </dev/null)
+		;;
+	*)
+		"$info_from" --root "$root" "$@" </dev/null
+		;;
+	esac
+}
+
+# present の家族を判定し直し、error があれば blocked にする。<P> <控えの名前>
+check_family() {
+	cf_record=$(ccnavi_family_record "$root" "$2" "$1")
+	[ "$(ccnavi_record_get "$cf_record" state)" = present ] || return 0
+	if [ -z "$info_from" ]; then
+		printf '%s: 実行ファイルが無いので、取り込みの後の検査（判定し直し）はしなかった\n' "$1"
+		return 0
+	fi
+	cf_rc=0
+	run_ccnavi sync check "$1" >"$scratch/check" 2>"$scratch/check-err" || cf_rc=$?
+	sed -n 's/^warn /  注意: /p' "$scratch/check"
+	[ "$cf_rc" -ne 0 ] || return 0
+	cf_reason=$(sed -n 's/^error //p' "$scratch/check" | head -n 1)
+	[ -n "$cf_reason" ] || cf_reason="取り込みの後の検査が落ちた（$(head -n 1 "$scratch/check-err" 2>/dev/null)）"
+	cf_lock_rc=0
+	ccnavi_lock_take "$root" "$2" "$1" "$lock_wait" || cf_lock_rc=$?
+	if [ "$cf_lock_rc" -ne 0 ]; then
+		printf '%s: 取り込みの後の検査で止める理由があったが、ロックが取れず控えを書けなかった（%s）。打ち直す\n' "$1" "$cf_reason"
+		fail_note
+		return 0
+	fi
+	if ccnavi_record_write "$cf_record" remote origin branch "$1" sha "$(ccnavi_record_get "$cf_record" sha)" \
+		fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state blocked reason "$cf_reason"; then
+		printf '%s: 取り込みの後の検査で家族を止めた（家族の控えを blocked にした）。%s\n' "$1" "$cf_reason"
+		sed -n 's/^error /  - /p' "$scratch/check"
+		printf '  直してから sh %s/ccnavi-sync.sh %s を打ち直す（検査し直して通れば present に戻る）\n' "$here_sh" "$1"
+	else
+		printf '%s: 取り込みの後の検査で止める理由があったが、家族の控え（%s）を書けなかった（%s）\n' "$1" "$cf_record" "$cf_reason"
+	fi
+	ccnavi_lock_drop
+	fail_note
+	return 0
+}
+
 # ---- リポジトリごと
 
 while IFS= read -r key <&4; do
@@ -691,6 +742,10 @@ while IFS= read -r key <&4; do
 		printf '%s統合先の控え（%s/sync/%s/integration）を書けなかった\n' "$label" "$state" "$key"
 		repo_fail
 	fi
+	while IFS="$tab" read -r fam_p fam_tree fam_key <&3; do
+		[ -n "$fam_p" ] || continue
+		check_family "$fam_p" "$fam_key"
+	done 3<"$scratch/these"
 done 4<"$scratch/repos"
 
 if [ -s "$scratch/failed" ]; then

@@ -16,7 +16,19 @@ import os
 from dataclasses import dataclass, replace
 from typing import TextIO
 
-from . import approval, configsync, flow, fsio, gitcmd, history, phase, risk, settings, tree
+from . import (
+    approval,
+    configsync,
+    flow,
+    fsio,
+    gitcmd,
+    history,
+    phase,
+    risk,
+    settings,
+    syncstate,
+    tree,
+)
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -480,15 +492,36 @@ def _where(hits: list[ticket_mod.Ticket]) -> str:
     return ", ".join(f"{t.tree or '(ワークスペースルート)'}:{t.state}" for t in hits)
 
 
-def _undecided(stderr: TextIO, head: str, hits: list[ticket_mod.Ticket]) -> None:
+def _undecided(
+    stderr: TextIO,
+    head: str,
+    hits: list[ticket_mod.Ticket],
+    root: str = "",
+    conf: settings.Settings | None = None,
+) -> None:
     """どれが本物か決まらないときの文面。次の一手まで書く。
 
     「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
     できることが読めない。権威の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。
+    それが決まらない理由を名指しする。取り込み済みの家族は権威が親のブランチに決まって
+    いるので、3.6 の案内（ADR-0093）を出す。
     """
     home = hits[0].parent or hits[0].ticket
     stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
+    st = approval.family_standing(conf, root, hits[0]) if conf is not None else None
+    if st is not None and st.imported:
+        stderr.write(
+            f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）の写しだけ"
+            "（取り込み済みの家族）。ほかのツリーの写しは読まない\n"
+        )
+        for line in syncstate.guidance(root, st) if st.stop else []:
+            stderr.write(f"  {line}\n")
+        if not st.stop:
+            stderr.write(
+                "  親のワークツリーの外の写しは、親のブランチへ運んでから消すか、"
+                "残ったワークツリーを畳んでから打ち直すこと\n"
+            )
+        return
     stderr.write(
         f"  本物は、親 {home} のワークツリーの写し。無ければ元ツリー"
         "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）の写し\n"
@@ -518,9 +551,40 @@ def _find(
             stderr.write(f"  {note}\n")
         return None
     if len(hits) > 1:
-        _undecided(stderr, f"ccnavi: {ticket_id} ", hits)
+        _undecided(stderr, f"ccnavi: {ticket_id} ", hits, root, conf)
+        return None
+    if family_stopped(stderr, root, conf, hits[0]):
         return None
     return hits[0]
+
+
+def family_stopped(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> bool:
+    """取り込み済みの家族が決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
+
+    その家族の状態の操作（着手・終了・取り消し・記録・レビューの印）は止める。引いた写しが
+    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信じない写しを
+    動かさないように止める。控えの無い家族は何も言わない（今の動きのまま。D11）。
+    """
+    st = approval.family_standing(conf, root, found)
+    if not st.imported:
+        return False
+    if st.stop:
+        stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この家族の状態は動かさない\n")
+        for line in syncstate.guidance(root, st):
+            stderr.write(f"  {line}\n")
+        return True
+    if st.home is not None and not syncstate.same_tree(found.tree_root, st.home.root):
+        stderr.write(
+            f"ccnavi: {found.ticket}: 写しが親のブランチ {st.family} のワークツリーの外"
+            f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの家族では"
+            "親のブランチの写しだけが本物なので、この写しは動かさない\n"
+            f"  人がその写しを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
+            "コミットと push をしてから打ち直す\n"
+        )
+        return True
+    return False
 
 
 def _parent_not_started(
@@ -548,7 +612,7 @@ def _parent_not_started(
             stderr.write(f"  {note}\n")
         return True
     if len(hits) > 1:
-        _undecided(stderr, head, hits)
+        _undecided(stderr, head, hits, root, conf)
         return True
     parent = hits[0]
     if parent.state == ticket_mod.TODO:
