@@ -195,11 +195,12 @@ def relative(tree: Tree, full: str) -> str:
 
 
 def branch_of(tree_root: str) -> str | None:
-    """このツリーの作業ツリーが今いるブランチの名前。切り離した HEAD なら空文字。
+    """このツリーの作業ツリーが今いるブランチの名前。分からなければ None。
 
     読むのはファイルだけで、git は起こさない（判定の中から呼ばれうる）。`.git` が
-    ディレクトリならその `HEAD`、ファイル（`gitdir: <場所>`）ならその場所の `HEAD`。
-    読めなければ None（呼び手がツリーの名前などで代える）。
+    ディレクトリならその `HEAD`、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその
+    場所の `HEAD`。`ref: refs/heads/<名前>` の形だけを名前として読み、切り離した HEAD
+    （sha）・空・壊れた中身・読めないものは None（呼び手はツリーの名前で代える）。
     """
     dotgit = os.path.join(tree_root, ".git")
     gitdir = dotgit
@@ -220,7 +221,8 @@ def branch_of(tree_root: str) -> str | None:
     except (OSError, ValueError):
         return None
     prefix = "ref: refs/heads/"
-    return head[len(prefix) :] if head.startswith(prefix) else ""
+    name = head[len(prefix) :].strip() if head.startswith(prefix) else ""
+    return name or None
 
 
 def worktree_path(root: str, name: str) -> str:

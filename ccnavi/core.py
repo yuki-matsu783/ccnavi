@@ -2,12 +2,14 @@
 
 承認・承認の取り下げ・レビュー済みを、同じ形の 3 段に分ける。
 
-    Snapshot（入力）→ judge / withdraw / confirm（判定）→ Changes（書くもの）→ Writer
+    Snapshot（入力）→ judge_approval / withdraw / confirm（判定）→ Changes（書くもの）→ Writer
 
 - **Reader**: 段階 2a では Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
   作業ツリー、Chrome は MEMFS に組んだ仮のツリー（ADR-0093 の 8.2「段階 1〜2a は MEMFS」）。
   ブランチごとの blob の表から読む形（`NOT_FETCHED`）は、権威を `P` に固定する段階 2c 以降
-- **判定**: `judge` は承認の対象と画面と指紋を、`withdraw` と `confirm` は通らない理由を返す
+- **判定**: `judge_approval`（6.2 の `judge`。実行前の判定のモジュール `ccnavi.judge` と
+  紛れないように名前を変えた）は承認の対象と画面と指紋を、`withdraw` と `confirm` は通らない
+  理由を返す
 - **Changes**: 書き込みを値として並べたもの（`plan`）。書くときの落ち方（止める・言って続ける）
   も添えてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
   1 コミットにする（段階 3）
@@ -70,7 +72,7 @@ def read_fs(conf: settings.Settings, root: str, stamp: str = "", actor: Actor | 
 
 @dataclass
 class Verdict:
-    """`judge` の答え。`messages` は標準エラーに出す文面（呼び手が出す）。
+    """`judge_approval` の答え。`messages` は標準エラーに出す文面（呼び手が出す）。
 
     `mismatch` は見せた一覧・指紋（`shown_ids` / `shown_digest`）と今のものが違うときの中身。
     見せたものを渡さなければ None。
@@ -99,7 +101,7 @@ class Verdict:
         return self.gathered.identifiers
 
 
-def judge(
+def judge_approval(
     snapshot: Snapshot,
     only: list[str] | None = None,
     shown_ids: list[str] | None = None,
@@ -153,11 +155,13 @@ class Changes:
     @property
     def lines(self) -> list[str]:
         """人に見せる行（標準出力の分）。書き込みが落ちたときの行は入らない。"""
-        return [
-            item.text
-            for item in self.planned.stage.items
-            if isinstance(item, fsio.Line) and item.stream == fsio.STREAM_OUT
-        ]
+        out: list[str] = []
+        for item in self.planned.stage.items:
+            if isinstance(item, fsio.Line) and item.stream == fsio.STREAM_OUT:
+                out.append(item.text)
+            elif isinstance(item, fsio.Call):
+                out.extend(item.lines)
+        return out
 
     def per_branch(self) -> dict[str, list[dict]]:
         """ブランチ（ツリー）ごとの `{op, path, content}`。path はそのツリーからの相対（"/"）。
@@ -218,21 +222,32 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> appro
     - `FAIL_HISTORY`: 跡の書けなかった知らせに溜める（入口が警告で出す）
 
     並べる段で止まっていたら（`planned.stopped`）、並べた分を書いてから同じ形で言って止める。
+    `view_only` の書き込みは書かない。`Call` は同じ組で書けた名札（`tag`）を渡して呼び、
+    返った行を出す（マーカーの消去の行と跡は、実際に消せた種類で書く）。
     """
     placed: list[str] = []
     skipped: set[int] = set()
+    done: dict[int, set[str]] = {}
     for item in planned.stage.items:
-        group = item.group if isinstance(item, fsio.Line) else item.policy.group
+        group = item.policy.group if isinstance(item, fsio.Op) else item.group
         if group and group in skipped:
             continue
         if isinstance(item, fsio.Line):
             (stderr if item.stream == fsio.STREAM_ERR else stdout).write(item.text + "\n")
+            continue
+        if isinstance(item, fsio.Call):
+            for line in item.run(done.get(item.group, set())):
+                stdout.write(line + "\n")
+            continue
+        if item.view_only:
             continue
         failed = _write_op(item)
         rule = item.policy
         if not failed:
             if rule.places:
                 placed.append(rule.places)
+            if rule.tag:
+                done.setdefault(rule.group, set()).add(rule.tag)
             continue
         message = fsio.failure_text(rule, failed)
         head = f"ccnavi: {rule.ticket}: " if rule.ticket else "ccnavi: "
@@ -271,6 +286,9 @@ def _write_op(op: fsio.Op) -> str:
     if op.kind == fsio.OP_UNLINK:
         return fsio.unlink(op.path)
     if op.kind == fsio.OP_MOVE:
+        # 並べた後に行き先が置かれていたら動かさない（上書きしない。`approval.move_file`）。
+        if os.path.lexists(op.path):
+            return "行き先に既に在る"
         return fsio.move(op.source, op.path)
     if op.kind == fsio.OP_APPEND:
         return fsio.append(op.path, op.data)
@@ -313,10 +331,10 @@ def approve(
     改版が承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
     絞った対象に入らない親を持つ子は「親が承認されていない」で落ちる。
 
-    判定と書き込みはコア（`judge` → `plan` → `write_fs`、ADR-0093 の 6.2）。
+    判定と書き込みはコア（`judge_approval` → `plan` → `write_fs`、ADR-0093 の 6.2）。
     """
     snapshot = read_fs(conf, root)
-    verdict = judge(snapshot, only)
+    verdict = judge_approval(snapshot, only)
     stderr.write(verdict.messages)
     gathered = verdict.gathered
     if gathered.refused:
@@ -364,7 +382,7 @@ def preview(
     「承認待ちは無い」と出す。`only` はボードの絞り込みで見えている分（`--approve` と
     同じ意味）。見せる一覧と承認する対象が同じ絞りを通るようにする。
     """
-    verdict = judge(read_fs(conf, root), only)
+    verdict = judge_approval(read_fs(conf, root), only)
     stderr.write(verdict.messages)
     gathered = verdict.gathered
     if gathered.refused:
@@ -375,8 +393,7 @@ def preview(
         stdout.write(gathered.text + "\n")
         return 0
     stdout.write(
-        json.dumps(approval._preview_body(root, gathered, verdict.digest), ensure_ascii=False)
-        + "\n"
+        json.dumps(approval.preview_body(root, gathered, verdict.digest), ensure_ascii=False) + "\n"
     )
     return 0
 
@@ -420,12 +437,12 @@ def verify(
     1 とは分ける。同じ値にすると、打ち方を間違えた回と提案が落ちる回が読む側から
     区別できず、直すものが無いのに提案を直しに行くことになる。
     """
-    judged = judge(read_fs(conf, root), only)
+    judged = judge_approval(read_fs(conf, root), only)
     stderr.write(judged.messages)
     gathered = judged.gathered
-    verdict = approval._verdict(gathered, conf.tickets)
+    verdict = approval.verify_verdict(gathered, conf.tickets)
     if as_json:
-        body = approval._preview_body(root, gathered, judged.digest)
+        body = approval.preview_body(root, gathered, judged.digest)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
     else:
@@ -467,9 +484,9 @@ def approve_yes(
         )
         return 1
     # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
-    # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる（`judge` が比べる）。
+    # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる（`judge_approval` が比べる）。
     snapshot = read_fs(conf, root)
-    verdict = judge(snapshot, narrowed, shown_ids=wanted, shown_digest=digest)
+    verdict = judge_approval(snapshot, narrowed, shown_ids=wanted, shown_digest=digest)
     stderr.write(verdict.messages)
     gathered = verdict.gathered
     if verdict.mismatch is not None:
@@ -516,7 +533,7 @@ def approve_yes(
         return applied.code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = approval._approved_text(tickets, revisions, root)
+    prompt = approval.approved_text(tickets, revisions, root)
     if not as_json:
         stdout.write(lines.getvalue())
         return 0
@@ -542,7 +559,7 @@ def approve_yes(
 def reviewed_mark(
     mr: int, accepted: list[str], actor: Actor | None = None, stamp: str = ""
 ) -> dict:
-    """レビュー済みの印の中身（8.9）。`actor` が空なら `actor`・`via` の欄を書かない。"""
+    """レビュー済みの印の中身（8.9）。空の欄は書かない（`review.reviewed_mark`）。"""
     who = actor or Actor()
     return review.reviewed_mark(mr, accepted, who.account, who.via, stamp)
 
@@ -576,6 +593,8 @@ def confirm(
     parent = _open_parent(root, conf, parent_id)
     if parent is None:
         return Checked([f"ccnavi: 親 {parent_id} の承認済みチケットが作業中に無い"], None)
+    # フェーズの引き方と「依頼し直す」案内の文面は review の非公開の関数を使う（手元の
+    # confirm と同じ文面にするため。review の中だけの約束なので公開名にはしない）。
     ph = review._phase(root, conf, parent, phase_no)
     if ph is None:
         return Checked([f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"], None)
@@ -597,13 +616,33 @@ def confirm(
     if problems:
         return Checked(problems, None)
     stamp = snapshot.stamp or fsio.stamp()
-    with fsio.staging() as stage, fsio.clock(stamp):
+    notes = io.StringIO()
+    # 跡の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形（8.9）。
+    with (
+        fsio.staging() as stage,
+        fsio.clock(stamp),
+        history.session(snapshot.actor.via or history.via(), notes),
+    ):
         stopped = review.settle_and_mark(
             stage, root, conf, parent, ph, reviewed_mark(result.mr.number, [], snapshot.actor)
         )
+    if notes.getvalue():
+        return Checked(_unwritten(notes.getvalue()), None)
     return Checked([], Changes(approval.Planned(stage, stopped), root, conf))
 
 
+def _unwritten(text: str) -> list[str]:
+    """並べる段で跡を書けないと分かった知らせ。書いても跡が残らないので、error として返す。
+
+    手元の Writer(FS) なら警告で続ける所だが、ここで分かるのは書く前（識別子の形が違う、
+    リンクになっている）なので、書かずに止めて直させる。
+    """
+    return [line.replace("ccnavi: 警告: ", "ccnavi: ", 1) for line in text.splitlines() if line]
+
+
+# `confirm_local` は前の `review.confirm` を移したもの。手元の入力の読み方（cwd の親、git の
+# 差分、`--result` の写し）は review の非公開の関数をそのまま使う。review だけが持つ読み方で、
+# 外に出す値打ちが無いので公開名にはしない。
 def confirm_local(
     stdout: TextIO,
     stderr: TextIO,
@@ -694,10 +733,11 @@ def withdraw(
         return Checked(problems, None)
     stamp = snapshot.stamp or fsio.stamp()
     actor = snapshot.actor
+    notes = io.StringIO()
     with (
         fsio.staging() as stage,
         fsio.clock(stamp),
-        history.session(actor.via or history.via(), None),
+        history.session(actor.via or history.via(), notes),
     ):
         stopped = None
         for ident in wanted:
@@ -726,6 +766,8 @@ def withdraw(
                 reason=reason,
             )
             stage.line(f"  {ident} の承認を取り下げた（doing/ → todo/）")
+    if notes.getvalue():
+        return Checked(_unwritten(notes.getvalue()), None)
     return Checked([], Changes(approval.Planned(stage, stopped), root, conf))
 
 
@@ -766,8 +808,11 @@ def _withdraw_problems(
         try:
             if fsio.listdir(marks_dir):
                 found.append(f"{approval.PHASES_DIR}/{ident}/ にマーカーがある")
-        except OSError:
+        except FileNotFoundError:
             pass
+        except OSError as exc:
+            # 読めないなら、無いとは言えない（取り下げを緩めない）。
+            found.append(f"{approval.PHASES_DIR}/{ident}/ を読めない ({exc})")
     todo = os.path.join(
         copy.tree_root, conf.tickets.replace("/", os.sep), ticket_mod.TODO, ident + ".md"
     )

@@ -350,19 +350,24 @@ def source_path(t: ticket_mod.Ticket) -> str:
     ツリーの外にある（ツリーが分からない）ときだけ、綴りをそのまま返す。
     """
     if t.tree_root and t.path:
-        rel = tree.relative(tree.Tree(t.tree, t.tree_root), t.path)
+        try:
+            rel = tree.relative(tree.Tree(t.tree, t.tree_root), t.path)
+        except ValueError:
+            # Windows で別のドライブ（relpath が相対を作れない）。綴りのまま返す。
+            return t.path
         if rel and not rel.startswith("../") and rel != "..":
             return rel
     return t.path
 
 
 def source_branch(t: ticket_mod.Ticket) -> str:
-    """提案が乗っていたブランチの名前（ADR-0093 の D22）。HEAD を読めなければツリーの名前。"""
-    if t.tree_root:
-        found = tree.branch_of(t.tree_root)
-        if found is not None:
-            return found
-    return t.tree
+    """提案が乗っていたブランチの名前（ADR-0093 の D22）。
+
+    HEAD がブランチを指していなければ（切り離した・壊れた・読めない）ツリーの名前
+    （ワークスペースルートなら空）。Changes の `per_branch` の名前と同じ決め方。
+    """
+    found = tree.branch_of(t.tree_root) if t.tree_root else None
+    return found or t.tree
 
 
 def admit(
@@ -623,7 +628,11 @@ def followup(
         phase=phase_no,
         followup_of=[c.ticket for c in children],
     )
-    clear_marks(where, parent.ticket, phase_no)
+    cleared = clear_marks(where, parent.ticket, phase_no)
+    for warning in cleared.warnings:
+        history.failed_to_write(warning)
+    if cleared.failed:
+        return ident, cleared.failed
     return ident, ""
 
 
@@ -864,28 +873,121 @@ def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict
     return failed
 
 
-def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
-    """このフェーズのマーカーを全部消す。消せた種類を返す。"""
-    cleared = []
-    for kind in MARKS:
+@dataclass
+class Cleared:
+    """`clear_marks` の答え。`kinds` は消せた種類（控える段では消す種類）。
+
+    `failed` は reviewed を消せなかった理由（空でなければ呼び手は止める）。`warnings` は
+    ほかの種類を消せなかった知らせ（残っていて効く）。
+    """
+
+    kinds: list[str]
+    failed: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
+# 消す順。reviewed を先に消す。消せなければ止めるので、ほかの種類に手を付ける前に決める。
+_CLEAR_ORDER = (MARK_REVIEWED,) + tuple(k for k in MARKS if k != MARK_REVIEWED)
+
+
+def clear_marks(
+    approved_dir: str,
+    parent: str,
+    phase: int,
+    announce=None,
+) -> Cleared:
+    """このフェーズのマーカーを全部消す（同じ番号に子を足した。REQ-TKT-21）。
+
+    reviewed を消せなければ止める（`failed`）。残ればフェーズは済んだまま読まれ、足した子を
+    見ないまま先へ進めてしまう（判定を締める向き。ADR-0093 の 11.3）。ほかの種類は
+    消せなくても止めず、残っていて効くと言う（`warnings`）。跡（phase-reopened の
+    `cleared`）には実際に消せた種類だけを書く。
+
+    控える段（承認の plan）では、消す書き込みに同じ扱いを添え、跡と見せる行は Writer(FS) が
+    書けた種類で書く（`fsio.Call`）。`announce` は消せた種類から見せる行を作る関数。
+    """
+    stage = fsio.current_stage()
+    present = [k for k in _CLEAR_ORDER if fsio.lexists(mark_path(approved_dir, parent, phase, k))]
+    if stage is not None:
+        group = stage.new_group()
+        for kind in present:
+            path = mark_path(approved_dir, parent, phase, kind)
+            with fsio.policy(group=group, tag=kind, **_clear_policy(path, phase, kind)):
+                fsio.unlink(path)
+        kinds = [k for k in MARKS if k in present]
+        if kinds:
+            # 見え方（Changes）には全部消えた後の跡を載せる。ディスクへは Call が書く。
+            with fsio.view_only():
+                _note_reopened(approved_dir, parent, phase, kinds)
+
+        # 跡の時刻と経路は並べたときのもの（書く時に時計を読み直すと、Changes と食い違う）。
+        at, via = fsio.stamp(), history.via()
+
+        def run(done: set[str]) -> list[str]:
+            cleared = [k for k in MARKS if k in done]
+            if cleared:
+                before = history.via()
+                history.set_via(via)
+                try:
+                    with fsio.clock(at):
+                        _note_reopened(approved_dir, parent, phase, cleared)
+                finally:
+                    history.set_via(before)
+            return announce(cleared) if announce is not None and cleared else []
+
+        planned = announce(kinds) if announce is not None and kinds else []
+        stage.items.append(fsio.Call(run, group, planned))
+        return Cleared(kinds)
+    cleared: list[str] = []
+    warnings: list[str] = []
+    failed = ""
+    for kind in present:
         path = mark_path(approved_dir, parent, phase, kind)
-        # 消せなかった（無い、権限が無い）ものは数えない。承認の plan では在るものを消したと数え、
-        # Writer(FS) で消せなくても黙る（前と同じく、止めない）。
-        with fsio.policy(on_fail=fsio.FAIL_QUIET):
-            failed = fsio.unlink(path)
-        if not failed:
+        reason = fsio.unlink(path)
+        if not reason:
             cleared.append(kind)
+            continue
+        text = fsio.failure_text(fsio.Policy(**_clear_policy(path, phase, kind)), reason)
+        if kind == MARK_REVIEWED:
+            failed = text
+            break
+        warnings.append(text)
+    cleared = [k for k in MARKS if k in cleared]
     if cleared:
-        history.note(
-            approved_dir,
-            parent,
-            history.KIND_PHASE_REOPENED,
-            None,
-            None,
-            phase=phase,
-            cleared=cleared,
-        )
-    return cleared
+        _note_reopened(approved_dir, parent, phase, cleared)
+    return Cleared(cleared, failed, warnings)
+
+
+def _clear_policy(path: str, phase: int, kind: str) -> dict:
+    if kind == MARK_REVIEWED:
+        return {
+            "on_fail": fsio.FAIL_STOP,
+            "prefix": "",
+            "message": (
+                f"フェーズ {phase} のレビュー済みのマーカー {path} を消せない（{{reason}}）。"
+                "残るとフェーズは済んだまま読まれるので、ここで止める。人がマーカーを消す"
+            ),
+        }
+    return {
+        "on_fail": fsio.FAIL_WARN,
+        "prefix": "",
+        "message": (
+            f"フェーズ {phase} のマーカー {path} を消せなかった（{{reason}}）。"
+            f"{kind} は残っていて効く"
+        ),
+    }
+
+
+def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str]) -> None:
+    history.note(
+        approved_dir,
+        parent,
+        history.KIND_PHASE_REOPENED,
+        None,
+        None,
+        phase=phase,
+        cleared=cleared,
+    )
 
 
 # 親ごとのマーカー。フェーズの番号に付かないもの。
@@ -1181,7 +1283,7 @@ def gather(
     return Gathered(batch, rejected, texts, pool, False, broken, "", note)
 
 
-def _preview_body(root: str, gathered: Gathered, digest: str) -> dict:
+def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
     """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。"""
     return {
         "version": APPROVE_VERSION,
@@ -1214,7 +1316,7 @@ class Verdict:
     text: str
 
 
-def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
+def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは読み替えるだけ。"""
     head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
     # 読めなかったものは、落ちた枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
@@ -1344,7 +1446,7 @@ def _batch_entry(cand: Candidate) -> dict:
     }
 
 
-def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
+def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
     from . import reasons
 
     return reasons.approved(tickets, revisions, root)
@@ -1463,7 +1565,7 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     # 消えた承認済みチケットの分も残す。1 回読めなかっただけで「知らない」に戻すと、
     # 次の回に同じ承認をもう一度伝えることになる。
     _write_known(stderr, path, {**known, **marks})
-    return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
+    return approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
 def candidates(
@@ -1590,6 +1692,16 @@ class Applied:
     reason: str = ""
 
 
+def _reopened_line(parent: str, phase: int):
+    def announce(kinds: list[str]) -> list[str]:
+        return [
+            f"  {parent} のフェーズ {phase} のマーカー（{', '.join(kinds)}）を消した。"
+            "全部閉じたらレビューをもう一度頼むことになる"
+        ]
+
+    return announce
+
+
 @dataclass
 class Planned:
     """承認の書き込みを並べたもの。`stopped` は途中で止まった（識別子, 理由）。止まらなければ None。
@@ -1696,14 +1808,15 @@ def _apply_steps(
             # ＝見られていない子がいるのに止まらなくなるが、そちらは窓がファイル 1 つぶんで、
             # 頻度が桁違いに低い。順番の入れ替えでは直らない（両方の穴を塞ぐなら、マーカーの時刻と
             # 子の承認時刻を比べて止めるかどうかを決める作りが要る）。
+            # マーカーを消せたかは書くときに分かるので、行は Writer(FS) が消せた種類で出す。
+            # reviewed を消せなければそこで止める（`clear_marks`）。
             if t.is_child and t.phase is not None:
-                cleared = clear_marks(home_dir(conf, root, t.parent, ""), t.parent, t.phase)
-                if cleared:
-                    kinds = ", ".join(cleared)
-                    stage.line(
-                        f"  {t.parent} のフェーズ {t.phase} のマーカー（{kinds}）を消した。"
-                        "全部閉じたらレビューをもう一度頼むことになる"
-                    )
+                clear_marks(
+                    home_dir(conf, root, t.parent, ""),
+                    t.parent,
+                    t.phase,
+                    announce=_reopened_line(t.parent, t.phase),
+                )
 
     stage.line(f"\n承認した。{conf.approved}/{DOING_DIR}/ へ動かした。")
     return None

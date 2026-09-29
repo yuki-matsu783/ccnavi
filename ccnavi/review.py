@@ -375,15 +375,17 @@ def reviewed_mark(
 ) -> dict:
     """レビュー済みの印の中身（`phases/<親>/<N>.reviewed`。ADR-0093 の 8.9）。
 
-    `confirm`（コア）と `decide` が使う。`account` が空なら `actor`・`via` の欄を書かない
-    （段階 2a の手元の経路は、印を前と同じバイト列にする）。`stamp` が空なら `at` を書かず、
-    `approval.write_mark` が今の時刻を入れる。
+    `confirm`（コア）と `decide` が使う。欄の並びは 8.9 の `{mr, accepted, actor, via, at}`。
+    `actor` は付けた人（アカウント）が分かるときだけ、`via` は経路が分かるときだけ書く
+    （Chrome は `via: chrome`。段階 2a の手元の経路はどちらも渡さず、印は前と同じバイト列。
+    手元の `actor` と `via: cli` は `--actor` を入れる段で書く）。`stamp` が空なら `at` を
+    書かず、`approval.write_mark` が今の時刻を入れる。
     """
     mark: dict = {"mr": mr, "accepted": list(accepted)}
     if account:
         mark["actor"] = account
-        if via:
-            mark["via"] = via
+    if via:
+        mark["via"] = via
     if stamp:
         mark["at"] = stamp
     return mark
@@ -855,7 +857,7 @@ def apply_decision(
         for name in (DECIDE_FILE, DECIDE_ISSUE_FILE):
             stale = os.path.join(conf.state, name.format(parent=parent.ticket, phase=ph.number))
             if os.path.exists(stale):
-                os.remove(stale)
+                fsio.remove(stale)
     # 受け入れはマーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
     if accepted:
