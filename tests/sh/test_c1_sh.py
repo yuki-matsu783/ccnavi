@@ -445,6 +445,30 @@ class C1TicketTest(C1Harness):
         merge_head = git(self.tree, "rev-parse", "--git-path", "MERGE_HEAD").stdout.strip()
         self.assertFalse(os.path.exists(os.path.join(self.tree, merge_head)))
 
+    def test_a_hook_writing_between_sorting_and_taking_in_is_retried_once(self):
+        """3 と 4 の間に hook が書いて取り込みが重なったら、見分けからもう 1 回だけやり直す。"""
+        rel = f"{APPROVED}/phases/{PARENT}/2.pending"
+        body = json.dumps({"review": "mr", "at": "t"})
+        self.remote_commit(rel, body)
+        once = os.path.join(self._tmp.name, "once")
+        shim = os.path.join(self._tmp.name, "hookshim")
+        target = os.path.join(self.tree, *rel.split("/"))
+        executable(
+            os.path.join(shim, "git"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            f'*" fetch "*"refs/heads/{PARENT}:"*)\n'
+            f"  if [ ! -e '{once}' ]; then : >'{once}'; mkdir -p '{os.path.dirname(target)}';"
+            f" printf '%s' '{body}' >'{target}'; fi ;;\n"
+            "esac\n"
+            f"exec '{GIT}' \"$@\"\n",
+        )
+        result = self.ticket("start", PARENT, PATH=shim + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("もう 1 回だけやり直す", result.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+
     # ---- 4. 途中の操作
 
     def test_an_operation_in_progress_stops_before_anything(self):
@@ -606,10 +630,8 @@ class C1ChatOnlyTest(C1Harness):
         self.assertIn("chat だけの家族", family.stdout)
 
 
-class C1HumanTest(C1Harness):
-    """9. 人の判断の入口は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ（D27）。11. 運ぶ処理。"""
-
-    plan = ("chores", "design")
+class PhaseOne:
+    """フェーズ 1（chat で見る）の子を閉じるまでの道具。"""
 
     def finish_phase_one(self):
         """フェーズ 1（chat で見る）の子を着手して閉じる。"""
@@ -622,6 +644,12 @@ class C1HumanTest(C1Harness):
         git(tree, "commit", "-q", "-m", "work")
         finished = self.ticket("finish", CHILD)
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
+
+
+class C1HumanTest(PhaseOne, C1Harness):
+    """9. 人の判断の入口は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ（D27）。11. 運ぶ処理。"""
+
+    plan = ("chores", "design")
 
     def test_chat_review_is_carried(self):
         self.finish_phase_one()
@@ -670,6 +698,133 @@ class C1HumanTest(C1Harness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("取り込んでから送った", result.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+
+class C1NotImportedHumanTest(PhaseOne, C1Harness):
+    """10. D11: 控えの無い家族では、人の判断の入口は置くだけで運ばない（今のまま）。"""
+
+    plan = ("chores", "design")
+    imported = False
+
+    def test_chat_review_is_not_carried(self):
+        self.finish_phase_one()
+        head = self.sha(self.tree, "HEAD")
+        remote = self.remote_sha()
+        result = self.sh("ccnavi-review.sh", "chat", "1", cwd=self.tree, stdin="y\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
+        self.assertTrue(os.path.isfile(os.path.join(self.tree, rel)))
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertEqual(self.remote_sha(), remote)
+        self.assertNotIn("push-approved", result.stdout + result.stderr)
+
+
+# 実行ファイルの半分の代役。残った指摘の行き先（`--reviewed ... --yes`）だけを代わりに書き
+# （親のワークツリーにレビュー済みの印を置き、書いたパスの一覧を出し、答えの JSON と下書きを書く）、
+# 残り（`c1 family`・`c1 sort`・`sync paths` など）は本物に渡す。
+HALF = """#!/bin/sh
+case " $* " in
+*" --reviewed "*" --yes "*)
+  list=""; tree=""; root=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+    --record-writes) list="$2"; shift 2 ;;
+    --record-tree) tree="$2"; shift 2 ;;
+    --root) root="$2"; shift 2 ;;
+    *) shift ;;
+    esac
+  done
+  rel=.ccnavi/approved/phases/i0001/1.reviewed
+  mkdir -p "$tree/.ccnavi/approved/phases/i0001"
+  printf '{{"mr": 1, "accepted": ["u1"], "at": "t"}}' >"$tree/$rel"
+  [ -z "$list" ] || printf '%s\\n' "$rel" >"$list"
+  mkdir -p "$root/logs/state"
+  printf '<!-- ccnavi:decide -->\\n決めた\\n' >"$root/logs/state/review-decide-i0001-1.md"
+  printf '{{"version":1,"ok":true,"reviewed":true,"followup":""}}\\n'
+  exit 0 ;;
+esac
+PYTHONPATH='{root}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+"""
+
+# git の代役。`remote get-url origin` だけをホストの代役の URL で答え、残りは本物に渡す
+# （取り込みと push は bare のリモート、ホストの API は代役へ）。
+URL_GIT = """#!/bin/sh
+case " $* " in
+*" remote get-url origin "*) printf '%s\\n' '{url}'; exit 0 ;;
+esac
+exec '{git}' "$@"
+"""
+
+
+@unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
+class C1ReviewTest(C1Harness):
+    """ccnavi-review.sh の状態を書く副命令も C1 で回す（decide を代表に見る）。"""
+
+    def setUp(self):
+        super().setUp()
+        import http.server
+        import threading
+
+        from tests.sh.test_review_decide import GitLab
+
+        GitLab.posted = []
+        GitLab.fail_notes = False
+        server = http.server.HTTPServer(("127.0.0.1", 0), GitLab)
+        GitLab.port = server.server_address[1]
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        self.posted = GitLab.posted
+        shim = os.path.join(self._tmp.name, "shim")
+        url = f"http://127.0.0.1:{GitLab.port}/demo/greeter.git"
+        executable(os.path.join(shim, "git"), URL_GIT.format(url=url, git=GIT))
+        self.path = shim + os.pathsep + os.environ.get("PATH", "")
+        self.half = executable(
+            os.path.join(self._tmp.name, "bin", "half"),
+            HALF.format(root=ROOT, python=sys.executable),
+        )
+
+    def decide(self, *args):
+        return self.sh(
+            "ccnavi-review.sh",
+            "decide",
+            *args,
+            cwd=self.tree,
+            PATH=self.path,
+            GITLAB_TOKEN="t0k",
+            CCNAVI_BIN_PATH=self.half,
+        )
+
+    def test_decide_is_carried_and_the_answer_stays_json(self):
+        done = self.decide("1", "--choices", '{"u1":"keep"}', "--digest", "d0")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        answer = json.loads(done.stdout.strip().splitlines()[-1])
+        self.assertTrue(answer["ok"])
+        self.assertEqual(len(done.stdout.strip().splitlines()), 1, done.stdout)
+        rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
+        self.assertEqual(self.committed(), [rel])
+        self.assertEqual(
+            self.subjects(1), [f"ccnavi: {PARENT} のフェーズ 1 の指摘の行き先を決めた"]
+        )
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        # 決めた内容のコメントは、送った後に投稿する。
+        self.assertEqual([kind for kind, _ in self.posted], ["note"])
+
+    def test_decide_preview_takes_no_lock_and_writes_nothing(self):
+        head = self.sha(self.tree, "HEAD")
+        os.makedirs(self.lock_dir())
+        write(os.path.join(self.lock_dir(), "owner"), "other 1 1 1-1 Other\n")
+        shown = self.sh(
+            "ccnavi-review.sh",
+            "decide",
+            "1",
+            "--preview",
+            cwd=self.tree,
+            PATH=self.path,
+            GITLAB_TOKEN="t0k",
+        )
+        self.assertNotIn("ロック", shown.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
 
 
 if __name__ == "__main__":

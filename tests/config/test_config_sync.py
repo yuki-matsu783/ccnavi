@@ -79,6 +79,40 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertEqual(by_path[".ccnavi/config/phases.yml"]["lost"], ["build", "release"])
         self.assertEqual(mark["notified"], "")
 
+    def test_the_start_c1_carries_the_synced_layer(self):
+        """D34: C1 の書いたパスの一覧（基点は親のワークツリー）で、着手の写しは外でも通す。"""
+        write(self.risk, COMMON_SCRIPT_RISK)
+        write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
+        # 取り込み済みの家族（控えがある）の写しは親のワークツリーに在る（2c）。提案を親の
+        # ワークツリーに書いて承認し、それから控えを置く。
+        tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
+        text = ticket_text("i0001", project="lib", allow=SCOPE)
+        write(os.path.join(tree, "wip", "proposals", "todo", "i0001.md"), text)
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(
+            os.path.isfile(os.path.join(tree, ".ccnavi", "approved", "doing", "i0001.md"))
+        )
+        write(
+            os.path.join(self.state, "sync", "lib", "families", "i0001"),
+            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate present\nreason \n",
+        )
+        target = os.path.join(self.ws, "logs", "state", "c1", "lib", "i0001.t.writes")
+        started = self.ccnavi(
+            "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
+        )
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        listed = read(target).splitlines()
+        for rel in (
+            ".ccnavi/config/rules.yml",
+            ".ccnavi/config/phases.yml",
+            ".ccnavi/config/risks.yml",
+            ".ccnavi/scripts/count.sh",
+            ".ccnavi/approved/phases/i0001/config-sync.json",
+        ):
+            self.assertIn(rel, listed)
+        self.assertNotIn("置き場の外", started.stderr)
+
     def test_files_missing_from_the_common_layer_are_left_alone(self):
         """1: 共通層に無いファイルは、プロジェクトの側を消さずに残す。"""
         os.remove(self.phases)
