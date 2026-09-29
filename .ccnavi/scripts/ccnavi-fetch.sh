@@ -35,6 +35,17 @@
 # git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
 # 「取ってこられなかった」に戻るだけ。
 #
+# **取り込み済みの家族は早送りだけ**（ADR-0093 の 4.2。段階 2b）。親のワークツリー（`.claude/worktrees/<P>`
+# で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある）は、ロックを 1 回だけ試し
+# （取れなければ飛ばす。待たない）、`origin/<P>` の祖先なら `merge --ff-only` する。書きかけとの重なりは
+# git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
+# 取り込み（merge）・消えたかの確かめ・控えの書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
+# 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの早送りは飛ばして名指しする
+# （hook の上限は 60 秒）。
+#
+# **「リモートにその ref が無い」で落ちた fetch は、その origin を落ちたものに数えない。** 数えると、
+# 同じ origin の統合先の取り込みまで飛ばされる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
+#
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
 set -u
@@ -57,11 +68,18 @@ limit="${CCNAVI_FETCH_TIMEOUT:-15}"
 case "$limit" in
 '' | *[!0-9]*) limit=15 ;;
 esac
+# 早送りの時間の枠（秒）。sh の開始から数える。
+budget="${CCNAVI_FETCH_BUDGET:-45}"
+case "$budget" in
+'' | *[!0-9]*) budget=45 ;;
+esac
+started=$(date +%s)
+ccnavi_log_root="$root"
 
 # 落ちた origin の綴り。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
 # 回るので、変数では渡らない。
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
-trap 'rm -rf "$scratch"' EXIT
+trap 'ccnavi_lock_drop; rm -rf "$scratch"' EXIT
 : >"$scratch/failed"
 
 # 認証で落ちたときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
@@ -70,6 +88,7 @@ auth_failed="$auth_failed"'|Invalid username or password|HTTP Basic: Access deni
 auth_failed="$auth_failed"'|Permission denied \(publickey|returned error: 40[13]'
 
 # origin へ 1 本取りに行く。取れたら 0、落ちたら 1、認証で落ちたら 3。取りに行かなかったら 2。
+# リモートにその ref が無くて落ちたら 4（その origin を落ちたものに数えない）。
 #
 # 見張りの sh が limit 秒で fetch を切る。見張りの出力は捨てる。出力をつないだまま残すと、
 # 見張りの sleep が終わるまで報せの `$( )` が閉じない。
@@ -90,6 +109,7 @@ ccnavi_fetch_git() {
 	wait "$ccnavi_fg_pid" 2>/dev/null || ccnavi_fg_rc=$?
 	kill "$ccnavi_fg_dog" 2>/dev/null || :
 	if [ "$ccnavi_fg_rc" -ne 0 ]; then
+		grep -qi "couldn't find remote ref" "$scratch/err" 2>/dev/null && return 4
 		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
 		grep -qiE "$auth_failed" "$scratch/err" 2>/dev/null && return 3
 		return 1
@@ -97,7 +117,7 @@ ccnavi_fetch_git() {
 	return 0
 }
 
-# 取りに行く。取れたら 0。<ツリー> <ブランチ> <落ちたときの 1 行>
+# 取りに行く。取れたら 0。<ツリー> <ブランチ> <落ちたときの 1 行> [<リモートに無いときの 1 行>]
 #
 # 落ちたときの 1 行は、その origin で初めて落ちたときだけ出す。同じ origin の 2 件目は
 # 取りに行かずに黙って飛ばす。分け方に要る判定を、報せの `$( )` の外に置くための関数。
@@ -106,6 +126,10 @@ ccnavi_fetch_or_note() {
 	ccnavi_fn_rc=$?
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
 	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
+	if [ "$ccnavi_fn_rc" -eq 4 ]; then
+		printf '%s\n' "${4:-$3}"
+		return 1
+	fi
 	printf '%s\n' "$3"
 	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は認証を尋ねない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
 	return 1
@@ -168,6 +192,66 @@ ccnavi_fetch_seen() {
 	return 0
 }
 
+# そのツリーが、取り込み済みの家族の親のワークツリーか（ADR-0093 の 4.2）。<ツリー> <名前> <ブランチ>
+#
+# `.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある。
+# 当たらないツリーは今までどおり（未コミットがあれば進めない）。他セッションのワークツリーを動かさないため、
+# 条件は全部満たすときだけ。
+ccnavi_fetch_family() {
+	case "$1" in
+	"$root"/.claude/worktrees/*) ;;
+	*) return 1 ;;
+	esac
+	[ "$2" = "$3" ] || return 1
+	[ -L "$1" ] && return 1
+	ccnavi_parent_tree "$1" "$2" || return 1
+	ccnavi_ff_key=$(ccnavi_repo_key "$1" "$root")
+	[ -f "$(ccnavi_family_record "$root" "$ccnavi_ff_key" "$2")" ] || return 1
+	return 0
+}
+
+# 取り込み済みの家族を早送りする（ADR-0093 の 4.2「SessionStart の早送り」）。<ツリー> <P>
+#
+# merge はしない。書きかけとの重なりは git に任せる（拒まれたら重なったパスを言う）。途中の状態
+# （MERGE_HEAD）を残さないのが早送りだけにした理由で、hook の時間の枠で切られても書きかけが残らない。
+ccnavi_fetch_forward() {
+	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
+	ccnavi_fetch_or_note "$1" "$2" \
+		"${2}: リモートを取ってこられなかった。手元の版で判定する" \
+		"${2}: 親のブランチをリモートから取ってこられなかった（リモートに無い）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめる" ||
+		return 0
+	ccnavi_fw_now=$(date +%s)
+	if [ "$((ccnavi_fw_now - started))" -ge "$budget" ]; then
+		printf '%s: 時間の枠（%s 秒）を過ぎたので早送りを飛ばした。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込む\n' \
+			"$2" "$budget" "$root" "$2"
+		return 0
+	fi
+	ccnavi_fw_remote=$(git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$2^{commit}" 2>/dev/null || :)
+	ccnavi_fw_local=$(git -C "$1" rev-parse --verify --quiet "HEAD^{commit}" 2>/dev/null || :)
+	[ -n "$ccnavi_fw_remote" ] && [ -n "$ccnavi_fw_local" ] || return 0
+	[ "$ccnavi_fw_remote" = "$ccnavi_fw_local" ] && return 0
+	git -C "$1" merge-base --is-ancestor "$ccnavi_fw_remote" "$ccnavi_fw_local" 2>/dev/null && return 0
+	if ! git -C "$1" merge-base --is-ancestor "$ccnavi_fw_local" "$ccnavi_fw_remote" 2>/dev/null; then
+		printf '%s: リモートと分かれているので、取り込みが要る（sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' "$2" "$root" "$2"
+		return 0
+	fi
+	# ロックは 1 回だけ試す（待たない）。取れなければ他の操作の最中なので飛ばす。
+	if ! ccnavi_lock_take "$root" "$ccnavi_fw_key" "$2" 0; then
+		printf '%s: 他の操作の最中なので進めなかった。終わってから sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込む\n' "$2" "$root" "$2"
+		return 0
+	fi
+	ccnavi_fw_behind=$(git -C "$1" rev-list --count "$ccnavi_fw_local..$ccnavi_fw_remote" 2>/dev/null || echo '?')
+	if LC_ALL=C git -C "$1" merge --ff-only --quiet "$ccnavi_fw_remote" </dev/null >/dev/null 2>"$scratch/ff"; then
+		printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$2" "$ccnavi_fw_behind" "$2"
+	else
+		ccnavi_fw_paths=$(sed -n 's/^[[:space:]][[:space:]]*\([^[:space:]].*\)$/\1/p' "$scratch/ff" | tr '\n' ' ' | sed 's/ *$//')
+		printf '%s: 書きかけの %s と重なるので進めない。コミットか退避をしてから sh %s/.ccnavi/scripts/ccnavi-sync.sh %s\n' \
+			"$2" "${ccnavi_fw_paths:-（git が拒んだ）}" "$root" "$2"
+	fi
+	ccnavi_lock_drop
+	return 0
+}
+
 # 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、ワークツリー。
 trees="$root"
 for dir in "$root/$projects"/* "$root/.claude/worktrees"/*; do
@@ -193,16 +277,21 @@ report=$(
 	# 第 1 周。そのツリーがチェックアウトしているブランチを upstream まで進める。
 	printf '%s\n' "$trees" | while IFS= read -r tree; do
 		[ -n "$tree" ] || continue
-		[ -d "$tree/$approved" ] || continue
 		git -C "$tree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-
 		branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 		[ -n "$branch" ] && [ "$branch" != "HEAD" ] || continue
-		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
-
 		name=$(basename "$tree")
+		# 取り込み済みの家族は早送りだけ（upstream の設定に依らず origin/<P> を見る）。
+		if ccnavi_fetch_family "$tree" "$name" "$branch"; then
+			ccnavi_fetch_forward "$tree" "$name"
+			continue
+		fi
+
+		[ -d "$tree/$approved" ] || continue
+		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 		ccnavi_fetch_or_note "$tree" "$branch" \
-			"${name}: リモートを取ってこられなかった。手元の版で判定する" || continue
+			"${name}: リモートを取ってこられなかった。手元の版で判定する" \
+			"${name}: ${branch} がリモートに無いので取ってこられなかった。手元の版で判定する" || continue
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
 
