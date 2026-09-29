@@ -89,6 +89,16 @@ ccnavi_abs() {
 	esac
 }
 
+# 実在するディレクトリの、リンクを解いた綴り。無ければ受けた綴りをそのまま返す。
+#
+# git の `rev-parse --show-toplevel` はリンクを解いた綴りを返すので、ワークスペースルート（cwd から
+# 論理の綴りで決まる）と比べるときは両辺をこれで揃える。揃えないと、リンクを経た作業場で
+# 「.claude/worktrees/ の下か」の比較が外れ、守りが効かない。Windows は pwd -W の綴り。
+ccnavi_phys() {
+	[ -n "${1:-}" ] || return 0
+	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; }) || printf '%s\n' "$1"
+}
+
 # ワークスペースルート。道具（hook の登録・実行ファイル・保護済みスクリプト）の置き場。
 #
 # **git に聞かない。** git のトップは git の用途にだけ使う。モード B では
@@ -217,6 +227,9 @@ ccnavi_project() {
 		ccnavi_pj_ws=$(ccnavi_workspace) || return 0
 	fi
 	ccnavi_pj_places="${CCNAVI_PROJECTS:-projects}"
+	# リンクを解いた綴りで揃える（git が返す綴りはリンクを解いている）。
+	ccnavi_pj_dir=$(ccnavi_phys "$ccnavi_pj_dir")
+	ccnavi_pj_ws=$(ccnavi_phys "$ccnavi_pj_ws")
 
 	# ワークスペースの下に無ければ、名乗るプロジェクトは無い。
 	case "$ccnavi_pj_dir" in
@@ -250,7 +263,7 @@ ccnavi_project() {
 		esac
 		ccnavi_pj_owner="${ccnavi_pj_gitdir%/.git/worktrees/*}"
 		# 元リポジトリがワークスペースそのものなら、プロジェクトではない。
-		ccnavi_pj_owner_abs=$(ccnavi_abs "$ccnavi_pj_owner" 2>/dev/null) || return 0
+		ccnavi_pj_owner_abs=$(ccnavi_phys "$ccnavi_pj_owner")
 		case "$ccnavi_pj_owner_abs" in
 		"$ccnavi_pj_ws") return 0 ;;
 		esac
@@ -380,45 +393,72 @@ ccnavi_parent_tree() {
 
 # ロック（D32）。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
-# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪えず、元にも戻せなかった（人に回す）。
+# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（人に回す）。
 # 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<印>" を子に渡す。
-# 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT にも置く）。
+# 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT・INT・TERM・HUP にも置く）。
 #
 # - `mkdir` の原子性で取る。`flock` は macOS に無い
-# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <印>`、印は `<pid>-<開始時刻>`
-# - 古い: 同じホストで `kill -0` が落ちる、10 分を過ぎた、owner が読めず `find -mmin +10` に当たる
-# - 奪い方: owner を控えてから `mv` で脇へ退け、退けた中の owner が控えと同じなら消して取り直す。
-#   違えば（その間に持ち主が替わった）元の名前へ戻して待ちに戻る
-# - 入れ子: CCNAVI_LOCK_HELD が同じ家族を指していれば、取ったものとして進み、外さない
+# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <印> <OS>`、印は `<pid>-<開始時刻>`。
+#   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
+# - 古い: 10 分を過ぎた。ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下でなければ、
+#   `kill -0` が落ちても古い（WSL と Git Bash は同じホスト名で pid が通じないので時刻だけで見る）。
+#   owner が読めなければ `find -mmin +10`
+# - 奪い方: 奪う操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
+#   owner の行と今の owner の行が同じなら `mv` で脇へ退け、退けた中の owner がまだ同じなら消して取り直す。
+#   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
+# - 入れ子: CCNAVI_LOCK_HELD が同じ家族を指し、その印がロックの owner の印と同じなら、取ったものとして
+#   進み、外さない（印の合わない値は偽物として無視する）
 ccnavi_lock_dir=""
 ccnavi_lock_mark=""
+ccnavi_lock_set_held=""
+ccnavi_lock_os() {
+	uname -s 2>/dev/null | tr ' ' '_' || echo unknown
+}
 ccnavi_lock_take() {
 	ccnavi_lk_key="$2/$3"
-	case "${CCNAVI_LOCK_HELD:-}" in
-	"$ccnavi_lk_key":*) return 0 ;;
-	esac
 	ccnavi_lk_dir="$(ccnavi_state "$1")/locks/$2/$3"
+	case "${CCNAVI_LOCK_HELD:-}" in
+	"$ccnavi_lk_key":*)
+		ccnavi_lk_held="${CCNAVI_LOCK_HELD#"$ccnavi_lk_key":}"
+		ccnavi_lk_line=$(ccnavi_lock_owner "$ccnavi_lk_dir")
+		ccnavi_lk_fields=$(printf '%s\n' "$ccnavi_lk_line" | awk '{ print $4 }')
+		if [ -n "$ccnavi_lk_held" ] && [ "$ccnavi_lk_fields" = "$ccnavi_lk_held" ]; then
+			return 0
+		fi
+		log_warn 入れ子の印がロックの持ち主と合わない -- "lock=$ccnavi_lk_key"
+		;;
+	esac
 	mkdir -p "${ccnavi_lk_dir%/*}" 2>/dev/null || return 1
 	ccnavi_lk_host=$(hostname 2>/dev/null || uname -n 2>/dev/null || echo unknown)
+	ccnavi_lk_os=$(ccnavi_lock_os)
 	ccnavi_lk_start=$(date +%s)
 	while :; do
 		if mkdir "$ccnavi_lk_dir" 2>/dev/null; then
 			ccnavi_lk_now=$(date +%s)
-			ccnavi_lock_mark="$$-$ccnavi_lk_now"
-			printf '%s %s %s %s\n' "$ccnavi_lk_host" "$$" "$ccnavi_lk_now" "$ccnavi_lock_mark" \
-				>"$ccnavi_lk_dir/owner" 2>/dev/null || :
-			ccnavi_lock_dir="$ccnavi_lk_dir"
-			CCNAVI_LOCK_HELD="$ccnavi_lk_key:$ccnavi_lock_mark"
-			export CCNAVI_LOCK_HELD
-			log_debug ロックを取った -- "lock=$ccnavi_lk_key"
-			return 0
-		fi
-		if ccnavi_lock_stale "$ccnavi_lk_dir" "$ccnavi_lk_host"; then
-			ccnavi_lock_steal "$ccnavi_lk_dir"
-			case "$?" in
-			0) continue ;;
-			2) return 2 ;;
-			esac
+			ccnavi_lk_mark="$$-$ccnavi_lk_now"
+			ccnavi_lk_want="$ccnavi_lk_host $$ $ccnavi_lk_now $ccnavi_lk_mark $ccnavi_lk_os"
+			if printf '%s\n' "$ccnavi_lk_want" >"$ccnavi_lk_dir/owner" 2>/dev/null &&
+				[ "$(ccnavi_lock_owner "$ccnavi_lk_dir")" = "$ccnavi_lk_want" ]; then
+				ccnavi_lock_dir="$ccnavi_lk_dir"
+				ccnavi_lock_mark="$ccnavi_lk_mark"
+				CCNAVI_LOCK_HELD="$ccnavi_lk_key:$ccnavi_lk_mark"
+				export CCNAVI_LOCK_HELD
+				ccnavi_lock_set_held=yes
+				log_debug ロックを取った -- "lock=$ccnavi_lk_key"
+				return 0
+			fi
+			# 取った直後に奪われた（owner を書けない・別の中身）。取れていないとして待ちに戻る。
+			log_warn 取ったロックの持ち主を書けなかった -- "lock=$ccnavi_lk_key"
+		else
+			ccnavi_lk_seen=$(ccnavi_lock_owner "$ccnavi_lk_dir")
+			if ccnavi_lock_stale "$ccnavi_lk_dir" "$ccnavi_lk_host" "$ccnavi_lk_os" "$ccnavi_lk_seen"; then
+				ccnavi_lk_rc=0
+				ccnavi_lock_steal "$ccnavi_lk_dir" "$ccnavi_lk_seen" || ccnavi_lk_rc=$?
+				case "$ccnavi_lk_rc" in
+				0) continue ;;
+				2) return 2 ;;
+				esac
+			fi
 		fi
 		ccnavi_lk_now=$(date +%s)
 		[ "$((ccnavi_lk_now - ccnavi_lk_start))" -lt "$4" ] || return 1
@@ -431,60 +471,155 @@ ccnavi_lock_owner() {
 	head -n 1 "$1/owner" 2>/dev/null || :
 }
 
-# そのロックが古いか。<ロック> <自分のホスト名>
+# 10 進の数に揃える（先頭の 0 を落とす。`$(( ))` が 8 進に読まないように）。数でなければ空。
+ccnavi_lock_num() {
+	case "${1:-}" in
+	'' | *[!0-9]*) return 0 ;;
+	esac
+	ccnavi_ln_v="${1#"${1%%[!0]*}"}"
+	printf '%s\n' "${ccnavi_ln_v:-0}"
+}
+
+# そのロックが古いか。<ロック> <自分のホスト名> <自分の OS> <読んだ owner の行>
 ccnavi_lock_stale() {
-	ccnavi_ls_line=$(ccnavi_lock_owner "$1")
-	if [ -z "$ccnavi_ls_line" ]; then
+	if [ -z "$4" ]; then
 		# 取った直後で owner がまだ無いこともある。時刻で見る。
 		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
 		return
 	fi
-	set -- "$1" "$2" $ccnavi_ls_line
-	# $3 ホスト名 $4 pid $5 開始時刻
-	case "${5:-}" in
-	'' | *[!0-9]*)
+	set -f
+	# shellcheck disable=SC2086
+	set -- "$1" "$2" "$3" $4
+	set +f
+	# $4 ホスト名 $5 pid $6 開始時刻 $7 印 $8 OS
+	ccnavi_ls_started=$(ccnavi_lock_num "${6:-}")
+	if [ -z "$ccnavi_ls_started" ]; then
 		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
 		return
-		;;
-	esac
-	ccnavi_ls_now=$(date +%s)
-	[ "$((ccnavi_ls_now - $5))" -gt 600 ] && return 0
-	if [ "$3" = "$2" ]; then
-		case "${4:-}" in
-		'' | *[!0-9]*) return 1 ;;
-		esac
-		kill -0 "$4" 2>/dev/null && return 1
-		return 0
 	fi
-	return 1
+	ccnavi_ls_now=$(date +%s)
+	[ "$((ccnavi_ls_now - ccnavi_ls_started))" -gt 600 ] && return 0
+	# 同じ機械の同じ OS のときだけ pid を見る。/mnt/ の下（WSL から Windows の置き場）は時刻だけ。
+	case "$1" in
+	/mnt/*) return 1 ;;
+	esac
+	[ "${4:-}" = "$2" ] && [ "${8:-}" = "$3" ] || return 1
+	ccnavi_ls_pid=$(ccnavi_lock_num "${5:-}")
+	[ -n "$ccnavi_ls_pid" ] || return 1
+	kill -0 "$ccnavi_ls_pid" 2>/dev/null && return 1
+	return 0
 }
 
-# 古いロックを奪う。0 奪えた（取り直す）/ 1 持ち主が替わっていたので戻した / 2 戻せなかった
+# 古いロックを奪う。<ロック> <古いと判断したときに読んだ owner の行>
+# 0 奪えた（取り直す）/ 1 奪わなかった（待ちに戻る）/ 2 退けたものを戻せなかった
 ccnavi_lock_steal() {
-	ccnavi_st_seen=$(ccnavi_lock_owner "$1")
-	ccnavi_st_aside="$1.stale.$$"
-	mv "$1" "$ccnavi_st_aside" 2>/dev/null || return 1
-	ccnavi_st_now=$(ccnavi_lock_owner "$ccnavi_st_aside")
-	if [ "$ccnavi_st_now" = "$ccnavi_st_seen" ]; then
-		rm -rf "$ccnavi_st_aside" 2>/dev/null || :
-		log_info 古いロックを奪った -- "lock=$1"
-		return 0
+	ccnavi_st_gate="$1.steal"
+	if ! mkdir "$ccnavi_st_gate" 2>/dev/null; then
+		# 別の誰かが奪っている最中。10 分を過ぎた門は落ちた奪い手の残りなので外す。
+		if [ -n "$(find "$ccnavi_st_gate" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
+			rmdir "$ccnavi_st_gate" 2>/dev/null || :
+		fi
+		return 1
 	fi
-	mv "$ccnavi_st_aside" "$1" 2>/dev/null && return 1
-	log_warn 奪いかけたロックを戻せなかった -- "lock=$1"
-	return 2
+	ccnavi_st_rc=1
+	ccnavi_st_aside="$1.stale.$$"
+	ccnavi_st_now=$(ccnavi_lock_owner "$1")
+	if [ "$ccnavi_st_now" = "$2" ] && { [ -n "$2" ] || [ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]; } &&
+		mv "$1" "$ccnavi_st_aside" 2>/dev/null; then
+		if [ "$(ccnavi_lock_owner "$ccnavi_st_aside")" = "$2" ]; then
+			rm -rf "$ccnavi_st_aside" 2>/dev/null || :
+			log_info 古いロックを奪った -- "lock=$1"
+			ccnavi_st_rc=0
+		elif [ ! -e "$1" ] && mv "$ccnavi_st_aside" "$1" 2>/dev/null; then
+			ccnavi_st_rc=1
+		else
+			log_warn 奪いかけたロックを戻せなかった -- "lock=$1"
+			ccnavi_st_rc=2
+		fi
+	fi
+	rmdir "$ccnavi_st_gate" 2>/dev/null || :
+	return "$ccnavi_st_rc"
 }
 
 # 自分が取ったロックを外す。入れ子で取ったもの（ccnavi_lock_dir が空）は外さない。
-# owner の印が自分のものでなければ（奪われた後）触らない。
+# owner の印が自分のものでなければ（奪われた後）触らない。自分が渡した CCNAVI_LOCK_HELD も消す。
 ccnavi_lock_drop() {
-	[ -n "$ccnavi_lock_dir" ] || return 0
-	ccnavi_ld_line=$(ccnavi_lock_owner "$ccnavi_lock_dir")
-	case " $ccnavi_ld_line" in
-	*" $ccnavi_lock_mark") rm -rf "$ccnavi_lock_dir" 2>/dev/null || : ;;
-	esac
-	ccnavi_lock_dir=""
+	if [ -n "$ccnavi_lock_dir" ]; then
+		ccnavi_ld_line=$(ccnavi_lock_owner "$ccnavi_lock_dir")
+		ccnavi_ld_mark=$(printf '%s\n' "$ccnavi_ld_line" | awk '{ print $4 }')
+		if [ -n "$ccnavi_lock_mark" ] && [ "$ccnavi_ld_mark" = "$ccnavi_lock_mark" ]; then
+			rm -rf "$ccnavi_lock_dir" 2>/dev/null || :
+		fi
+		ccnavi_lock_dir=""
+	fi
+	if [ -n "$ccnavi_lock_set_held" ]; then
+		unset CCNAVI_LOCK_HELD
+		ccnavi_lock_set_held=""
+	fi
 	return 0
+}
+
+# ---- 見張りつきの git（取ってくる操作。ccnavi-fetch.sh と ccnavi-sync.sh が使う）
+#
+#   ccnavi_git_timed <秒> <標準エラーの書き先> <リポジトリ> <git の引数>...
+#
+# 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
+# ssh の BatchMode は、利用者が GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
+# 見張りの出力は捨てる（つないだままだと、見張りの sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
+# 戻り値は git のもの（切ったときは 0 でない）。標準出力は捨てないので、呼ぶ側がリダイレクトする。
+ccnavi_git_timed() {
+	ccnavi_gt_limit="$1"
+	ccnavi_gt_err="$2"
+	ccnavi_gt_repo="$3"
+	shift 3
+	ccnavi_gt_ssh="${GIT_SSH_COMMAND:-}"
+	if [ -z "$ccnavi_gt_ssh" ] && [ -z "${GIT_SSH:-}" ] &&
+		! git -C "$ccnavi_gt_repo" config --get core.sshCommand >/dev/null 2>&1; then
+		ccnavi_gt_ssh="ssh -o BatchMode=yes"
+	fi
+	if [ -n "$ccnavi_gt_ssh" ]; then
+		GIT_SSH_COMMAND="$ccnavi_gt_ssh" GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never LC_ALL=C \
+			git -C "$ccnavi_gt_repo" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 "$@" \
+			</dev/null 2>"$ccnavi_gt_err" &
+	else
+		GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never LC_ALL=C \
+			git -C "$ccnavi_gt_repo" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 "$@" \
+			</dev/null 2>"$ccnavi_gt_err" &
+	fi
+	ccnavi_gt_pid=$!
+	(
+		sleep "$ccnavi_gt_limit"
+		kill "$ccnavi_gt_pid"
+	) </dev/null >/dev/null 2>&1 &
+	ccnavi_gt_dog=$!
+	ccnavi_gt_rc=0
+	wait "$ccnavi_gt_pid" 2>/dev/null || ccnavi_gt_rc=$?
+	kill "$ccnavi_gt_dog" 2>/dev/null || :
+	return "$ccnavi_gt_rc"
+}
+
+# git が拒んだ理由を 1 行にする（ccnavi-fetch.sh と ccnavi-sync.sh の文面）。<標準エラーを書いたファイル>
+#
+# 書きかけとの重なり（「would be overwritten」の後に git が字下げして並べるパス）、索引のロック、
+# コミットする人の名前が無い、署名の失敗、hook、それ以外は git の 1 行目。理由どおりに言い、
+# 重なっていないのに「重なる」とは言わない。
+ccnavi_git_refusal() {
+	ccnavi_gr_paths=$(awk '/would be overwritten/ { f = 1; next }
+		/^[^ \t]/ { f = 0 }
+		f && /^[ \t]+[^ \t]/ { sub(/^[ \t]+/, ""); printf "%s%s", sep, $0; sep = " " }' "$1" 2>/dev/null)
+	if [ -n "$ccnavi_gr_paths" ]; then
+		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直す' "$ccnavi_gr_paths"
+	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
+		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、落ちた残りなら人が消す'
+	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
+		printf 'コミットする人の名前（user.name・user.email）が決まっていない'
+	elif grep -qi 'gpg\|signing' "$1" 2>/dev/null; then
+		printf 'コミットの署名に失敗した'
+	elif grep -qi 'hook' "$1" 2>/dev/null; then
+		printf 'git の hook が止めた（%s）' "$(head -n 1 "$1")"
+	else
+		printf 'git が拒んだ（%s）' "$(head -n 1 "$1" 2>/dev/null)"
+	fi
 }
 
 # ---- 診断ログ（docs/claude/logging.md）
