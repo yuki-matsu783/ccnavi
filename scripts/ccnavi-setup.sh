@@ -107,13 +107,15 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
 # ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
 # 配らないと案内どおりに打っても届かない。
-# ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。
+# ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh は人が打つ取り込み
+# （分かれた親のブランチの merge、消えた親のブランチの確かめ、控えの書き出し。ADR-0093 の 4.2）。
+# ccnavi-git.sh の拒否の文面がこれを案内するので、配らないと案内どおりに打っても届かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを畳む前に生成物を消す 1 本。Windows では
 # node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して渡す。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # 追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順でも最後に置く。途中で落ちたときに、
 # hook が起動するものだけが在って代わりに通る sh が無い形を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -1209,6 +1211,9 @@ for name in $DEPLOY_SCRIPTS; do
 			;;
 		ccnavi-fetch.sh)
 			why="セッションの頭の取り込み"
+			;;
+		ccnavi-sync.sh)
+			why="人が打つ取り込みと、親のブランチが消えたかの確かめ"
 			;;
 		ccnavi-clean.sh | ccnavi-clean.js)
 			why="ワークツリーを畳む前に生成物を消す"

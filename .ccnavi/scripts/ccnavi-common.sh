@@ -17,6 +17,8 @@
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #
+# 取り込みの控えとロック（ADR-0093 の段階 2b）の関数は、下の「取り込みの控えとロック」にまとめてある。
+#
 # ほかに診断ログの 4 つ（log_debug / log_info / log_warn / log_error）がある。こちらは
 # 標準出力にも標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
 # 決まりは docs/claude/logging.md。
@@ -282,6 +284,207 @@ ccnavi_mask_url() {
 	printf '%s' "${1:-}" | sed -E \
 		-e 's#^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@#\1<伏せた>@#' \
 		-e 's#^[^/:@]*:[^/@]*@#<伏せた>@#'
+}
+
+# ---- 取り込みの控えとロック（ADR-0093 の 3.6・4.2・4.3。段階 2b）
+#
+# 控えは 1 行 1 項目の `<鍵> <値>`（D33）。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない。
+# 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
+#
+#   sync/<リポジトリ>/families/<P>   家族の控え（remote branch sha fetched_at state reason）
+#   sync/<リポジトリ>/integration/   統合先の控え（統合先の done/・層・置き場の綴りの設定の写しと head）
+#   locks/<リポジトリ>/<P>/          ロック（D32）。中の owner に持ち主を 1 行で書く
+#
+# <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。
+
+# 控えの置き場の絶対パス。
+ccnavi_state() {
+	case "${CCNAVI_STATE:-}" in
+	'') printf '%s\n' "$1/logs/state" ;;
+	/* | [A-Za-z]:[\\/]*) printf '%s\n' "$CCNAVI_STATE" ;;
+	*) printf '%s\n' "$1/$CCNAVI_STATE" ;;
+	esac
+}
+
+# そのツリーの控えを分ける名前。<ツリー> <ワークスペースルート>
+ccnavi_repo_key() {
+	ccnavi_rk_name=$(ccnavi_project "$1" "$2")
+	if [ -n "$ccnavi_rk_name" ]; then
+		printf '%s\n' "$ccnavi_rk_name"
+	else
+		printf 'self\n'
+	fi
+}
+
+# 家族の控えのパス。<ワークスペースルート> <リポジトリ> <P>
+ccnavi_family_record() {
+	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
+}
+
+# 控えから 1 項目を読む。無ければ空。<ファイル> <鍵>
+ccnavi_record_get() {
+	[ -f "$1" ] || return 0
+	sed -n "s/^$2 //p" "$1" 2>/dev/null | head -n 1
+}
+
+# 控えを書き直す。<ファイル> <鍵> <値> [<鍵> <値>...]
+#
+# 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
+# 値の改行は空白に畳む（1 行 1 項目の契約）。書けなければ 1。
+ccnavi_record_write() {
+	ccnavi_rw_file="$1"
+	shift
+	mkdir -p "${ccnavi_rw_file%/*}" 2>/dev/null || return 1
+	ccnavi_rw_tmp="$ccnavi_rw_file.tmp.$$"
+	: >"$ccnavi_rw_tmp" 2>/dev/null || return 1
+	while [ "$#" -ge 2 ]; do
+		ccnavi_rw_value=$(printf '%s' "$2" | tr '\r\n' '  ')
+		printf '%s %s\n' "$1" "$ccnavi_rw_value" >>"$ccnavi_rw_tmp" || {
+			rm -f "$ccnavi_rw_tmp"
+			return 1
+		}
+		shift 2
+	done
+	mv -f "$ccnavi_rw_tmp" "$ccnavi_rw_file" 2>/dev/null || {
+		rm -f "$ccnavi_rw_tmp"
+		return 1
+	}
+}
+
+# そのツリーが、名前の家族の親のワークツリーか。<ツリー> <名前>
+#
+# 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親の写しか提案が
+# あれば 0（ADR-0093 の 4.2「SessionStart の早送り」の対象の条件）。子の写し（`parent:` を持つ）は
+# 数えない。置き場の綴りが絶対パス（リポジトリの外）なら家族として扱わない（3.1 の 12）。
+ccnavi_parent_tree() {
+	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
+	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
+	case "$ccnavi_pt_approved$ccnavi_pt_proposals" in
+	/* | [A-Za-z]:*) return 1 ;;
+	esac
+	case "$ccnavi_pt_proposals" in
+	/* | [A-Za-z]:*) return 1 ;;
+	esac
+	ccnavi_pt_approved="${ccnavi_pt_approved%/}"
+	ccnavi_pt_proposals="${ccnavi_pt_proposals%/}"
+	for ccnavi_pt_file in "$1/$ccnavi_pt_approved/doing/$2.md" "$1/$ccnavi_pt_approved/done/$2.md" \
+		"$1/$ccnavi_pt_proposals/todo/$2.md" "$1/$ccnavi_pt_proposals/review/$2.md"; do
+		[ -f "$ccnavi_pt_file" ] || continue
+		grep -q '^parent:' "$ccnavi_pt_file" 2>/dev/null && continue
+		ccnavi_pt_id=$(sed -n 's/^ticket:[[:space:]]*//p' "$ccnavi_pt_file" 2>/dev/null | head -n 1 |
+			sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
+		[ "$ccnavi_pt_id" = "$2" ] && return 0
+	done
+	return 1
+}
+
+# ロック（D32）。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
+#
+# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪えず、元にも戻せなかった（人に回す）。
+# 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<印>" を子に渡す。
+# 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT にも置く）。
+#
+# - `mkdir` の原子性で取る。`flock` は macOS に無い
+# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <印>`、印は `<pid>-<開始時刻>`
+# - 古い: 同じホストで `kill -0` が落ちる、10 分を過ぎた、owner が読めず `find -mmin +10` に当たる
+# - 奪い方: owner を控えてから `mv` で脇へ退け、退けた中の owner が控えと同じなら消して取り直す。
+#   違えば（その間に持ち主が替わった）元の名前へ戻して待ちに戻る
+# - 入れ子: CCNAVI_LOCK_HELD が同じ家族を指していれば、取ったものとして進み、外さない
+ccnavi_lock_dir=""
+ccnavi_lock_mark=""
+ccnavi_lock_take() {
+	ccnavi_lk_key="$2/$3"
+	case "${CCNAVI_LOCK_HELD:-}" in
+	"$ccnavi_lk_key":*) return 0 ;;
+	esac
+	ccnavi_lk_dir="$(ccnavi_state "$1")/locks/$2/$3"
+	mkdir -p "${ccnavi_lk_dir%/*}" 2>/dev/null || return 1
+	ccnavi_lk_host=$(hostname 2>/dev/null || uname -n 2>/dev/null || echo unknown)
+	ccnavi_lk_start=$(date +%s)
+	while :; do
+		if mkdir "$ccnavi_lk_dir" 2>/dev/null; then
+			ccnavi_lk_now=$(date +%s)
+			ccnavi_lock_mark="$$-$ccnavi_lk_now"
+			printf '%s %s %s %s\n' "$ccnavi_lk_host" "$$" "$ccnavi_lk_now" "$ccnavi_lock_mark" \
+				>"$ccnavi_lk_dir/owner" 2>/dev/null || :
+			ccnavi_lock_dir="$ccnavi_lk_dir"
+			CCNAVI_LOCK_HELD="$ccnavi_lk_key:$ccnavi_lock_mark"
+			export CCNAVI_LOCK_HELD
+			log_debug ロックを取った -- "lock=$ccnavi_lk_key"
+			return 0
+		fi
+		if ccnavi_lock_stale "$ccnavi_lk_dir" "$ccnavi_lk_host"; then
+			ccnavi_lock_steal "$ccnavi_lk_dir"
+			case "$?" in
+			0) continue ;;
+			2) return 2 ;;
+			esac
+		fi
+		ccnavi_lk_now=$(date +%s)
+		[ "$((ccnavi_lk_now - ccnavi_lk_start))" -lt "$4" ] || return 1
+		sleep 1
+	done
+}
+
+# ロックの持ち主（owner の 1 行）。読めなければ空。
+ccnavi_lock_owner() {
+	head -n 1 "$1/owner" 2>/dev/null || :
+}
+
+# そのロックが古いか。<ロック> <自分のホスト名>
+ccnavi_lock_stale() {
+	ccnavi_ls_line=$(ccnavi_lock_owner "$1")
+	if [ -z "$ccnavi_ls_line" ]; then
+		# 取った直後で owner がまだ無いこともある。時刻で見る。
+		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
+		return
+	fi
+	set -- "$1" "$2" $ccnavi_ls_line
+	# $3 ホスト名 $4 pid $5 開始時刻
+	case "${5:-}" in
+	'' | *[!0-9]*)
+		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
+		return
+		;;
+	esac
+	ccnavi_ls_now=$(date +%s)
+	[ "$((ccnavi_ls_now - $5))" -gt 600 ] && return 0
+	if [ "$3" = "$2" ]; then
+		case "${4:-}" in
+		'' | *[!0-9]*) return 1 ;;
+		esac
+		kill -0 "$4" 2>/dev/null && return 1
+		return 0
+	fi
+	return 1
+}
+
+# 古いロックを奪う。0 奪えた（取り直す）/ 1 持ち主が替わっていたので戻した / 2 戻せなかった
+ccnavi_lock_steal() {
+	ccnavi_st_seen=$(ccnavi_lock_owner "$1")
+	ccnavi_st_aside="$1.stale.$$"
+	mv "$1" "$ccnavi_st_aside" 2>/dev/null || return 1
+	ccnavi_st_now=$(ccnavi_lock_owner "$ccnavi_st_aside")
+	if [ "$ccnavi_st_now" = "$ccnavi_st_seen" ]; then
+		rm -rf "$ccnavi_st_aside" 2>/dev/null || :
+		log_info 古いロックを奪った -- "lock=$1"
+		return 0
+	fi
+	mv "$ccnavi_st_aside" "$1" 2>/dev/null && return 1
+	log_warn 奪いかけたロックを戻せなかった -- "lock=$1"
+	return 2
+}
+
+# 自分が取ったロックを外す。入れ子で取ったもの（ccnavi_lock_dir が空）は外さない。
+# owner の印が自分のものでなければ（奪われた後）触らない。
+ccnavi_lock_drop() {
+	[ -n "$ccnavi_lock_dir" ] || return 0
+	ccnavi_ld_line=$(ccnavi_lock_owner "$ccnavi_lock_dir")
+	case " $ccnavi_ld_line" in
+	*" $ccnavi_lock_mark") rm -rf "$ccnavi_lock_dir" 2>/dev/null || : ;;
+	esac
+	ccnavi_lock_dir=""
+	return 0
 }
 
 # ---- 診断ログ（docs/claude/logging.md）

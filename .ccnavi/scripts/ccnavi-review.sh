@@ -6,6 +6,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （人が端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた写しを見る）
+#   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
@@ -34,7 +35,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|fetch|origin> [--phase <N>] [--body-file <path>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|fetch|origin|merged> [--phase <N>] [--body-file <path>]
 
   request      --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
@@ -44,6 +45,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の綴り）
+  merged                                          いまのブランチの MR がマージ済みなら "merged <番号>"、無ければ "none"（ccnavi-sync.sh が観測ずれを確かめる）
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が要る。
 USAGE
@@ -68,13 +70,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | confirm | comment | decide | ready | close-early | fetch | origin) ;;
+request | confirm | comment | decide | ready | close-early | fetch | origin | merged) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin です。" 2
+	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin / merged です。" 2
 	;;
 esac
 
@@ -111,7 +113,8 @@ if bin=$(ccnavi_bin "$root"); then
 	}
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
-else
+elif [ "$sub" != merged ]; then
+	# merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。
 	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
 
@@ -515,6 +518,24 @@ origin)
 fetch)
 	fetch_all
 	printf '\n'
+	;;
+merged)
+	# いまのブランチ（親のブランチ）の MR がマージ済みか（ADR-0093 の 3.6 の 5）。ccnavi-sync.sh が、
+	# 親のブランチがリモートから消えて統合先の done/ にも見えないときに、観測ずれかを確かめるために聞く。
+	# 読むだけで、何も書かない。
+	if [ "$kind" = github ]; then
+		owner="${path%%/*}"
+		found=$(api GET "repos/$path/pulls?state=closed&head=$owner:$branch" |
+			"$JQ" -r '[.[] | select(.merged_at != null)][0].number // empty')
+	else
+		found=$(api GET "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch" |
+			"$JQ" -r '.[0].iid // empty')
+	fi
+	if [ -n "$found" ]; then
+		printf 'merged %s\n' "$found"
+	else
+		printf 'none\n'
+	fi
 	;;
 confirm)
 	fetch_all >"$result"
