@@ -70,7 +70,8 @@ TURN_DEFINED = "ターン（利用者が指示を出してから Claude が応�
 # ここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|push)\b"
+    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|chat"
+    r"|config-synced|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -384,6 +385,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         # 家族の控え（墓標）を消す人の入口（ADR-0093 の 11.5.1 の決定 A）。消すと、止めていた家族が
         # 控えの無い家族として今の手元の動きに戻るので、打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
+        # 人の判断の入口（ADR-0093 の 4.6。段階 2d）。中で `--reviewed --chat`・`--config-synced`・
+        # `--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのは人。
+        r"|(^|\x00|[;&|]\s*)((sh|bash)\s+)?\S*ccnavi-review\.sh\s+(chat|config-synced|close-early)\b"
     )
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
@@ -409,7 +413,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
             "家族の控えを消す"
-            f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' も人が打ちます。"
+            f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、人の判断の入口"
+            f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / config-synced / "
+            "close-early'）も人が打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
             "承認待ちの一覧を見るだけなら 'ccnavi --approve --preview' は通ります。"

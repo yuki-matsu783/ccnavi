@@ -21,6 +21,7 @@ from typing import TextIO
 
 from . import (
     audit,
+    c1,
     configsync,
     core,
     diaglog,
@@ -475,6 +476,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （ADR-0093 の 4.3「fsio の記録層」）。C1（段階 2d）の sh が渡し、
     # 一覧のパスだけをコミットする。
     parser.add_argument("--record-writes", default="")
+    # 一覧の基点（C1 の親のワークツリー。段階 2d）。渡すと一覧はこのツリーからの相対になり、
+    # 置き場の外に書いたら error（D34 の例外を除く）。
+    parser.add_argument("--record-tree", default="")
     # 統合先の名前（ADR-0093 の D30。段階 2b）。環境変数は読まず、sh が決めて渡す。
     # いまは `--lint` の識別子の予約（3.1 の 5）が読む。
     parser.add_argument("--integration-branch", default="")
@@ -484,6 +488,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     if args.help:
         stderr.write(USAGE)
+        return EXIT_ERROR
+    if args.record_tree and not args.record_writes:
+        stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
         return EXIT_ERROR
     if args.record_writes and not args.version:
         return _recorded_run(stdin, stdout, stderr, parser, args)
@@ -532,25 +539,61 @@ def _recorded_run(
             f"ccnavi: --record-writes の書き出し先は {place}{os.sep}... の下だけ（{refused}）\n"
         )
         return EXIT_ERROR
+    base = _real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
     with fsio.recording() as written:
         code = _parsed(stdin, stdout, stderr, parser, args)
     lines = []
+    reals = []
     for path in written:
         real = fsio.parent_resolved(path)
         if _inside(real, state) or _same(real, target):
             continue
         rel = real
-        if _inside(real, real_root):
+        if _inside(real, base):
             try:
-                rel = os.path.relpath(real, real_root)
+                rel = os.path.relpath(real, base)
             except ValueError:
                 rel = real
         lines.append(rel.replace(os.sep, "/"))
+        reals.append(real)
     failed = _write_record(target, "".join(f"{line}\n" for line in lines))
     if failed:
         stderr.write(f"ccnavi: 書いたパスの一覧を {target} に書けない ({failed})\n")
         return EXIT_ERROR
+    if args.record_tree:
+        outside = _outside_places(root, args, base, reals)
+        if outside:
+            stderr.write(
+                "ccnavi: C1 は状態だけを運ぶ。置き場の外に書いた（"
+                + ", ".join(outside)
+                + "）。コミットしない\n"
+            )
+            return code if code != EXIT_OK else EXIT_ERROR
     return code
+
+
+def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[str]) -> list[str]:
+    """一覧のうち、C1 の置き場（承認済み・レビュー待ち）の外のもの（ADR-0093 の 4.3）。
+
+    例外は 1 つだけ（D34）: `ticket start` の中で configsync が写したプロジェクトの層と、
+    指す先を直した配点のスクリプト（`configsync.is_synced_write` が内容で読めるもの）。
+    """
+    conf, _ = settings.load(root)
+    _override(conf, args)
+    approved = settings.approved_dir(conf, base)
+    review_dir = os.path.join(
+        base, (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep), "review"
+    )
+    places = [_real(approved), _real(review_dir)]
+    starting = list(args.command[:2]) == ["ticket", "start"]
+    found = []
+    for real in reals:
+        if _inside(real, base) and any(_inside(real, p) for p in places):
+            continue
+        if starting and _inside(real, base) and configsync.is_synced_write(conf, root, real):
+            continue
+        found.append(real)
+    return found
 
 
 def _real(path: str) -> str:
@@ -812,6 +855,22 @@ def _parsed(
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None
         code = sync_check(stdout, stderr, root, conf, args.command[2], repo)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    # C1（ADR-0093 の 4.3・4.4。段階 2d）の sh が聞くこと。読むだけで、何も書かない。
+    if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
+        if not _FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
+            stderr.write(f"ccnavi: c1 family の {args.command[2]!r} は識別子の形ではない\n")
+            return EXIT_ERROR
+        return EXIT_OK if c1.family(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
+    if len(args.command) in (3, 4) and list(args.command[:2]) == ["c1", "sort"]:
+        since = args.command[3] if len(args.command) == 4 else ""
+        if not _FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
+            stderr.write(f"ccnavi: c1 sort の {args.command[2]!r} は識別子の形ではない\n")
+            return EXIT_ERROR
+        if since and not _REVISION.fullmatch(since):
+            stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")
+            return EXIT_ERROR
+        code = c1.sort(stdout, stderr, conf, root, args.command[2], since)
         return EXIT_OK if code == 0 else EXIT_ERROR
 
     if args.command or args.reviewed is not None or args.close_early:
@@ -1167,6 +1226,8 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
 
 # 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスに化ける綴りを入れない。
 _FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数に化ける綴りを入れない）。
+_REVISION = re.compile(r"[0-9a-f]{7,64}|refs/remotes/origin/[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが

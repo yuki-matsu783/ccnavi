@@ -649,6 +649,16 @@ def _record(path: str) -> None:
         seen.setdefault(key, None)
 
 
+def note_input(path: str) -> None:
+    """読んだ入力を、書いたものと同じく一覧に載せる（在るときだけ）。
+
+    record-risk の記録（`<子>.judge.json`）は自分では運ばず、それを読む `finish` の C1 が運ぶ
+    （ADR-0093 の 4.3）。
+    """
+    if _RECORDERS and os.path.lexists(path) and not os.path.islink(path):
+        _record(path)
+
+
 def _recorded(path: str, failed: str) -> str:
     if not failed:
         _record(path)

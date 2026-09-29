@@ -417,6 +417,11 @@ def _score_child(
         approval.read_child_record(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
         or {}
     )
+    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、この C1 で運ぶ
+    # （ADR-0093 の 4.3「そのほか」）。
+    fsio.note_input(
+        approval.child_record_path(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
+    )
     env = {
         "CCNAVI_BASE_SHA": diff.base,
         "CCNAVI_HEAD": diff.head,
