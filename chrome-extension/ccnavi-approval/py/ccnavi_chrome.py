@@ -36,7 +36,7 @@ import re
 import shutil
 import sys
 
-from ccnavi import cli, core, history, lint, review, settings, version
+from ccnavi import cli, core, fsio, history, lint, review, settings, version
 from ccnavi import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
@@ -446,7 +446,8 @@ def _relative(root: str, text: str) -> str:
 
 
 def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
-    """家族の仮のツリーを組む。答えは (snapshot, 置き場, 家族, 閉包)。"""
+    """家族の仮のツリーを組む。答えは (snapshot, 置き場, 家族, 閉包)。時刻は組む前に確かめる。"""
+    _stamp(req)
     snap = _snapshot(req)
     place = _placement(_text_or_none(req.get("settings")))
     family = req.get("family")
@@ -461,26 +462,33 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     return snap, place, family, closure
 
 
-def _core_snapshot(req: dict, root: str) -> core.Snapshot:
-    """`ccnavi.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
+def _stamp(req: dict) -> str:
+    """要求の時刻（`fsio.stamp` と同じ、オフセット付き）。読めなければ Refused。"""
     stamp = req.get("stamp")
     if not isinstance(stamp, str) or not stamp:
         raise Refused("stamp（オフセット付きの時刻）が無い")
-    actor = req.get("actor") if isinstance(req.get("actor"), dict) else {}
-    conf, _ = settings.load(root)
     try:
-        return core.read_fs(
-            conf,
-            root,
-            stamp,
-            core.Actor(
-                str(actor.get("account") or ""),
-                history.VIA_CHROME,
-                str(actor.get("version") or ""),
-            ),
-        )
+        with fsio.clock(stamp):
+            pass
     except ValueError as exc:
         raise Refused(str(exc)) from None
+    return stamp
+
+
+def _core_snapshot(req: dict, root: str) -> core.Snapshot:
+    """`ccnavi.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
+    actor = req.get("actor") if isinstance(req.get("actor"), dict) else {}
+    conf, _ = settings.load(root)
+    return core.read_fs(
+        conf,
+        root,
+        _stamp(req),
+        core.Actor(
+            str(actor.get("account") or ""),
+            history.VIA_CHROME,
+            str(actor.get("version") or ""),
+        ),
+    )
 
 
 def _changes(root: str, changes: core.Changes | None) -> dict:
@@ -518,7 +526,7 @@ def _op_plan(req: dict, root: str) -> dict:
     with _environ(place["env"]):
         snapshot = _core_snapshot(req, root)
         with history.session(snapshot.actor.via or history.VIA_CHROME, None):
-            verdict = core.judge(snapshot, only)
+            verdict = core.judge_approval(snapshot, only)
             refused = verdict.gathered.refused
             changes = core.plan(snapshot, verdict) if verdict.batch and not refused else None
     return {
