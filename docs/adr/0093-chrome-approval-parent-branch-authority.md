@@ -422,18 +422,25 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 #### ロック（D32）
 
 - 置き場: 控えの `locks/<リポジトリ>/<P>/`（ディレクトリ）。`mkdir` の原子性は Git Bash・Linux・macOS で同じ。`flock` は macOS に無いので使わない
-- 取れたら中の `owner` に 1 行で `<ホスト名> <pid> <開始時刻（date +%s）> <印>` を書く。`<印>` は `<pid>-<開始時刻>`
+- 取れたら中の `owner` に 1 行で `<ホスト名> <pid> <開始時刻（date +%s）> <印> <OS（uname -s）>` を書く。`<印>` は `<pid>-<開始時刻>`。
+  書けない・読み返した中身が違うときは取れていないとして待ちに戻る（段階 2b のレビューで直した）
 - **古いロックの判断**:
-  - 同じホスト名で、`kill -0 <pid>` が失敗すれば、すぐ古い
-  - ホスト名が違う（WSL と Windows で同じ置き場を見る場合など）か、`owner` が読めなければ、時刻だけで判断する（`owner` が無ければ `find <ロック> -maxdepth 0 -mmin +10` で見る）
+  - 同じホスト名で同じ OS、置き場が `/mnt/` の下でなければ、`kill -0 <pid>` が失敗すればすぐ古い
+  - ホスト名か OS が違う（WSL と Git Bash は同じホスト名になり pid が通じない）、置き場が `/mnt/` の下、`owner` が読めない、のどれかなら時刻だけで判断する（`owner` が無ければ `find <ロック> -maxdepth 0 -mmin +10` で見る）
+  - 数は先頭の 0 を落としてから比べる（`$(( ))` が 8 進に読まない）
   - 年齢の上限は **10 分**。pid が生きていても、10 分を過ぎれば古い（pid の再利用に備える。C1 は通常 1 分以内に終わる）
   - Git Bash の `$$` は MSYS の番号で、`kill -0` はロックを取る側も見る側も sh なので通る見込み（確信中。段階 2d の試験で確かめ、駄目なら Git Bash では時刻だけにする）
-- **奪い方**: 古いと判断したら、見た `owner` の中身を控えてから `mv <ロック> <ロック>.stale.<自分の pid>` で退避し、退避した中の `owner` が控えたものと同じか確かめる。
-  同じなら退避を消して `mkdir` から取り直す。違えば（その間に別の持ち主に替わった）退避を元の名前に `mv` で戻して待ちに戻る。戻せなければ失敗にして人に回す
+- **奪い方**（段階 2b のレビューで直した）:
+  1. 奪う操作を門 `<ロック>.steal`（`mkdir`）で 1 つにする。門が取れなければ奪わずに待ちに戻る。10 分を過ぎた門は落ちた奪い手の残りとして外す
+  2. 門の中で、古いと判断したときに読んだ `owner` の行と今の行を比べる。違えば（持ち主が替わった）奪わない。行が空なら、ロックの年齢（`-mmin +10`）をもう一度確かめる
+  3. 同じなら `mv <ロック> <ロック>.stale.<自分の pid>` で退け、退けた中の `owner` がまだ同じなら退けたものを消して `mkdir` から取り直す
+  4. 違えば（`mv` までの間に替わった）、元の名前が空いているときだけ `mv` で戻して待ちに戻る。空いていなければ（別の持ち主が取った）戻さずに失敗にして人に回す
+  5. 門を外す
 - **待ち**: 既定 120 秒、1 秒おきに試す（`CCNAVI_LOCK_WAIT` で変えられる）。並列の子 3 つがそれぞれ fetch と push を往復すると 30 秒を超えるため、30 秒より長くした。
   SessionStart だけは待たない（4.2）
-- **入れ子**: 取った sh は `CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<印>"` を子に渡す。C1 の中から呼ばれた sh（運ぶ処理など）は、自分の家族とこの値が一致すればロックを取ったものとして進み、外さない
-- 外すのは取った sh だけ（`trap` で EXIT のときにも外す）
+- **入れ子**: 取った sh は `CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<印>"` を子に渡す。C1 の中から呼ばれた sh（運ぶ処理など）は、自分の家族とこの値が一致し、その印がロックの `owner` の印と同じならロックを取ったものとして進み、外さない（印の合わない値は偽物として無視する）
+- 外すのは取った sh だけ。`owner` の印が自分のものでなければ（奪われた後）外さない。外すときに自分が渡した `CCNAVI_LOCK_HELD` も消す。
+  `trap` は EXIT と INT・TERM・HUP の両方に置く（dash は EXIT の trap をシグナルで走らせない）
 
 #### 戻しの定義
 
@@ -1222,7 +1229,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 |---|---|---|
 | 取り込みの sh（4.2・3.6） | `.ccnavi/scripts/ccnavi-sync.sh`（新規） | `ccnavi-sync.sh [<P>...]`。省けば `.claude/worktrees/` の下の親のワークツリー全部。リポジトリごとに `ls-remote --heads origin` を 1 回（2 列目を `grep -F -x` で完全一致）、落ちたら止める。`P` があれば fetch して早送りか merge（索引が HEAD と同じときだけ。衝突したら `merge --abort` して人に回す）、家族の控えを `present` で書く。`P` が無く控えも無ければ「まだ送っていない家族」で今のまま。控えがあれば統合先の `done/<P>.md` を `cat-file -e` で見て `closed`、無ければ統合先を取り直して確かめ直し（既定 3 回、5 秒おき）、`ccnavi-review.sh merged` でマージ済みと分かれば「反映待ち」で止め、どれにも当たらなければ `gone` を書いて理由と戻し方 1・2 を出して止める。ロックは待って取る |
 | 統合先の名前（D30） | `ccnavi-sync.sh`、`ccnavi sync paths`、`settings.integration_local` | 環境変数 `CCNAVI_INTEGRATION_BRANCH`、空なら `.claude/settings.local.json` の `env` の値（JSON は実行ファイルが読んで 1 行で返す。D33）、空ならホストのデフォルトブランチ（リモートの一覧にある `origin/HEAD`、無ければ `main`・`master`）。設定した名前がリモートに無ければ既定に落とさずに止める。使った名前とどこから決めたかを出力の頭と控えの `head`（`source` は `env`・`settings.local.json`・`default`）に出す。実行ファイルは環境変数を読まない |
-| 統合先の控え（D26） | `logs/state/sync/<リポジトリ>/integration/` | 統合先の先頭から `<置き場>/done/`・`.ccnavi/common/`・`<ccnavi ディレクトリ>/config/`・`.claude/settings.json` をファイルのまま同じ並びで写し（`git archive` と `tar`）、`head` に `remote`・`branch`・`source`・`sha`・`fetched_at`。一時の置き場に組んでから入れ替える |
+| 統合先の控え（D26） | `logs/state/sync/<リポジトリ>/integration/` | 統合先の先頭から `<置き場>/done/`・`.ccnavi/common/`・`<ccnavi ディレクトリ>/config/`・`.claude/settings.json` をファイルのまま同じ並びで写し（11.4.2 で `ls-tree` と `cat-file blob` に替えた）、`head` に `remote`・`branch`・`source`・`sha`・`fetched_at`。一時の置き場に組んでから入れ替える |
 | 家族の控え（3.6） | `logs/state/sync/<リポジトリ>/families/<P>` | 1 行 1 項目（`remote`・`branch`・`sha`・`fetched_at`・`state`・`reason`）。`state` は `present`・`closed`・`gone`（`blocked` は 2c） |
 | ロック（D32） | `ccnavi-common.sh` の `ccnavi_lock_take` / `ccnavi_lock_drop` | `mkdir` で取り、`owner` に `<ホスト名> <pid> <開始時刻> <印>`。古いロック（同じホストで `kill -0` が落ちる・10 分を過ぎた・`owner` が読めず `find -mmin +10`）は `mv` で奪い、持ち主が替わっていたら戻す。入れ子は `CCNAVI_LOCK_HELD`。sync は `CCNAVI_LOCK_WAIT`（既定 120 秒）待ち、SessionStart は 1 回だけ試す |
 | SessionStart の早送りだけ（D12） | `ccnavi-fetch.sh` | 取り込み済みの家族（`.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある）は、ロックを 1 回だけ試し、`origin/<P>` の祖先なら `merge --ff-only`。書きかけとの重なりは git に任せ、拒まれたら重なったパスと `ccnavi-sync.sh <P>` を言う。分かれていれば「取り込みが要る」と 1 行言う（merge しない）。開始から 45 秒（`CCNAVI_FETCH_BUDGET`）を過ぎたら飛ばして名指しする。それ以外のツリーは前のまま |
@@ -1259,10 +1266,50 @@ ADR に無かった判断:
 - `settings.local.json` に承認に効く値を置かせない lint と、`P` の上のプロジェクトの層の食い違いの warn: 2c
 - `ccnavi-fetch.sh` の 2 周目（ワークツリーの起点）は今までどおりデフォルトブランチを進める。統合先の名前には合わせていない
 
+#### 11.4.2 レビューで直したもの（2026-09-29）
+
+段階 2b の後の敵対的レビューの指摘を、利用者の承認を得て直した。判定を締める向きだけで、緩めた所は無い。
+
+| # | 何 | 直し方 |
+|---|---|---|
+| 1（重大） | `ccnavi-git.sh` の `checkout`・`switch`・`branch`・`pull` などが、長いオプションの略（`switch --force-c`・`checkout --det`・`--orph=`・`--for`・`switch --discard-ch`・`branch --mov`・`pull --rebas`）と値を束ねた短いオプション（`checkout -bnew`・`-qbnew`・`switch -cbar`）で抜けた | 決定 A: `branch`・`checkout`・`switch`・`fetch`・`pull`・`merge`・`commit`・`rm`・`restore`・`cat-file`・`worktree`（list・prune・remove）を許可リストで読む（`opt_walk`）。長いオプションは一覧にそのままの綴りであるものだけ通し、略は断る。短いオプションの束は 1 字ずつ読み、値を取る字（`b`・`B`・`c`・`C`・`m`・`s` など）の後ろは値とする。止める名前は一覧に入れた上で名前を見て止める。読むだけの副命令も、止める長いオプション（`--output`・`--upload-pack`・`--exec`・`--textconv` など）の頭に当たる略を止め、`grep -O`（`--open-files-in-pager`）を止め、`cat-file` は許可リストにした。`pull --rebase` と `commit --amend` も止める（履歴の書き換え）。親のワークツリーでは、語が無い・自分のブランチ・`HEAD`・`checkout <ref> <パス>` のほかは通さない |
+| 2（重大） | 控えの無い家族が閉じていても「まだ送っていない」になった | 控えの有無より先に統合先で閉じているかを見る。控えが無くても `origin/<P>` か追跡の設定があれば「送った跡あり」として 3.6 の確かめをし、消えていても gone は書かずに止める（決定 B5。控えの無い家族は今のまま） |
+| 3（重大） | ロックの奪い方に ABA と二重の `mv` があった | 4.3 の「奪い方」のとおり、門で奪う操作を 1 つにし、古いと判断したときに読んだ行と比べ、戻す前に元の名前が空いているかを見る。取った側も `owner` を書けたかを読み返す |
+| 4（重大） | `ccnavi-sync.sh` が利用者自身の途中の merge を取りやめた | 途中の操作（`MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`sequencer`・`rebase-merge`・`rebase-apply`。`rev-parse --git-path` で引く）があれば何もせず止める。`merge --abort` は、この sh が始めた merge のときだけ |
+| 5 | `ccnavi-review.sh merged` の API の失敗が `none`（→ gone）になった。jq のパイプで失敗が消えた | 決定 B2: 答えを受けてから jq に渡し、API か jq が落ちれば `unknown`（終了コード 3）。道具・トークンが無ければ `none` を出さずに止まる。sync は終了コード 0 の `none` のときだけ gone を書き、ほかは控えを変えずに「確かめられなかった」で止める |
+| 6 | 閉じたかを `done/<P>.md` が在るかだけで見ていた | 中身の `ticket:` が P で、`parent:` が無く、承認の時刻（`approved_at`）が親のワークツリーの写しと同じときだけ閉じたとする（同じ識別子の古い家族の写しを取り違えない） |
+| 7 | 入れ子の印を確かめていなかった。家族が重なっていた | 4.3 の「入れ子」のとおり印を `owner` と照らし、外すときに消す。同じ `<P>` を 2 度渡しても 1 度だけ取り込む |
+| 8 | sync の fetch・ls-remote に見張りが無く、ssh が尋ねて止まりえた | 見張りを `ccnavi-common.sh` の `ccnavi_git_timed` に移して fetch.sh と共用（sync は `CCNAVI_SYNC_TIMEOUT`、既定 60 秒）。ssh は `BatchMode=yes`（`GIT_SSH_COMMAND`・`GIT_SSH`・`core.sshCommand` があればそちらを尊重） |
+| 9 | SessionStart の 45 秒の枠を fetch の前に見ていなかった | fetch の前にも見て、過ぎたら fetch ごと飛ばして名指しする（2 周目も）。fetch 1 回の見張りは枠の残りより長くしない |
+| 10 | 統合先の控えの入れ替えがアトミックでなく、並行で壊れえた。`git archive` の属性で中身が変わった | リポジトリごとのロック（`locks/<リポジトリ>/_integration`）の中で書き、前の回の残り（`*.tmp.*`・`*.old.*`）を消し、統合先の先頭が前と同じなら写さない（`head` の時刻だけ書き直す）。`git archive` をやめ、`ls-tree` と `cat-file blob` でコミットのバイト列をそのまま書く（export-ignore・export-subst・eol の影響を受けない）。**限界**: ディレクトリの入れ替えは `mv` 2 回で、その間の一瞬だけ控えが無い（入れ替えられないのは rename が空でないディレクトリを上書きしないため）。2c の読む側は、`integration/` か `head` が無ければ少し待って読み直し、それでも無ければ「控えが無い」と読む |
+| 11 | 家族の控えに寿命が無く、同じ名前で切り直すと push が止まり続けた | sync の頭で、親のワークツリーが無い家族の控えを消す。gone の戻し方 2 に「片付けて sync を打つと控えも消える」を書いた |
+| 12 | リンクを経た作業場で、`show-toplevel` とワークスペースルートの比較が外れて守りが効かなかった | 両辺をリンクを解いた綴り（`ccnavi_phys`。`pwd -P`、Windows は `pwd -W`）で揃える。`ccnavi_project` も同じ |
+| 13 | 単一ブランチの clone で `origin/<P>` が進まず古い ref を読んだ | sh の中の fetch は `+refs/heads/<b>:refs/remotes/origin/<b>` と行き先を書く（sync・fetch.sh。段階 0 の refspec の拒否は `ccnavi-git.sh` の入口の話で、sh の中の git には掛からない） |
+| 14 | `sync paths` が落ちると統合先が黙って既定に戻った | 実行ファイルが在るのに答えなければ止める（終了コード 2）。無いときだけ環境変数の綴りに落とす |
+| 15 | WSL と Git Bash で同じホスト名のとき、pid でロックを古いと誤った | `owner` に OS を足し、OS が違うか置き場が `/mnt/` の下なら時刻だけで見る |
+| 16 | dash で EXIT の trap が INT・TERM・HUP で走らなかった | sync・fetch とも INT・TERM・HUP にも trap を置く。sync は自分の merge の途中の印を立て、切られたらその merge を取りやめる |
+| 17 | `worktree add <行き先> <語>` の語がタグ・sha だと detached になった | 語が `refs/heads/<語>` か `refs/remotes/origin/<語>` に当たるときだけ通す |
+| 18 | push の控えを、送り先を解かずに作っていた | 引数のリモート → `branch.<b>.pushRemote` → `remote.pushDefault` → `branch.<b>.remote` → origin の順に解き、origin 以外なら控えを作らない |
+| 19 | 「書きかけの（空）と重なる」など、理由と違う文面が出た | `ccnavi_git_refusal` で理由どおりに言う（重なり・`index.lock`・`user.name` が無い・署名・hook・ほかは git の 1 行目） |
+| 20〜23 | 固定文字列の比較、家族の無いプロジェクトの失敗、ホストの既定の読み方、先頭 0 の数 | 家族の並びは `awk` で列を比べる。引数を省いた回で家族の無いリポジトリが落ちても名指しして続け、1 にしない。ホストの既定ブランチは `ls-remote --symref origin HEAD` で読む（読めなければ `origin/HEAD`・`main`・`master`）。数は先頭の 0 を落とす。使っていない関数を消し、戻し方 1 の sha を「控えにある、最後に取り込んだか送った P の先頭」と書いた |
+| 24 | 試験の穴 | 上の各項目の再現を回帰試験にした（略と束、控えの無い閉じた家族、途中の merge、ロックの門・入れ子の偽物・別の OS・先頭 0、`merged` の失敗、同じ識別子の古い `done/`、単一ブランチの clone、リンクを経た作業場、`sync paths` の失敗、fetch の枠、dash の TERM、タグ・sha の `worktree add`、送り先の解き方、控えのリンク、控えの寿命） |
+
+前回の相談点への決定（利用者）:
+
+- B1: chat だけの家族の見分けは段階 2d（C1 と一緒）で入れる
+- B3: hook・VS Code の `--lint` が読む統合先の名前は、`--integration-branch` が無ければ sync が控えに書いた名前（`sync/self/integration/head` の `branch`）。控えが無ければ固定の並びだけ。控えの途中のリンクは辿らない
+- B4: 控えのシンボリックリンクは写すときに落とす（`ls-tree` で 120000 を飛ばし、最後に `find -type l` でも消す）。**読む側（2c）も控えの中のリンクを辿らない**（lstat で見て、リンクなら読まずに「控えが壊れている」とする）
+- B6: SessionStart の 2 周目（ワークツリーの起点）は統合先に合わせる（`CCNAVI_INTEGRATION_BRANCH`、無ければ sync が控えに書いた名前、無ければデフォルトブランチ）
+
+直さなかったもの:
+
+- `tag` の位置の引数（`ccnavi-git.sh tag <名前>` で軽いタグを作れる）: 今回の指摘の外で、副命令の分類の見直しになるので、利用者に相談する
+- `stash`・`add`・`push` の短いオプションの束: `push` はもともと一覧の綴りだけを通す。`stash`・`add` は止める名前を持たないので、許可リストにしなかった
+
 #### 11.4.1 段階 2b で触った守りの対象
 
 `.ccnavi/scripts/` の `ccnavi-git.sh`・`ccnavi-fetch.sh`・`ccnavi-common.sh`・`ccnavi-review.sh`（`merged` の副命令）と、新しい `ccnavi-sync.sh`。
-利用者の承認を得て直接直した。
+利用者の承認を得て直接直した。11.4.2 のレビューの直しでも同じ 5 本を直した。
 
 ## 得たもの・失ったもの
 
