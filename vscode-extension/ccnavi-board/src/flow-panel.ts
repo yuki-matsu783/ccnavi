@@ -43,6 +43,7 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runFlowLint } from "./ccnavi.js";
+import { PUSH_APPROVED_SCRIPT, pushApprovedCommand } from "./core/commands.js";
 import { flowDisagreement, openDisagreementText, saveDisagreementText } from "./core/flow-agree.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
@@ -64,6 +65,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
+import { runInTerminal } from "./terminal.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -693,7 +695,25 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     return;
   }
   await reload(current);
+  // 承認と同じく、運ぶ処理を端末に 1 行送る（ADR-0093 の 4.6）。取り込み済みの家族なら取り込んでから送り、
+  // そうでない家族は運ばない（今どおり人がコミットする）。
+  const root = current.folder.uri.fsPath;
+  const carrier = target.parent !== "" && isFile(path.join(root, PUSH_APPROVED_SCRIPT));
+  if (carrier) {
+    runInTerminal(root, pushApprovedCommand(root, [target.parent]));
+  }
   vscode.window.showInformationMessage(
-    `${loaded.shown} に保存した。承認済みチケットと同じく人がコミットする（sh .ccnavi/scripts/ccnavi-push-approved.sh）`,
+    carrier
+      ? `${loaded.shown} に保存した。運ぶ処理（${PUSH_APPROVED_SCRIPT} ${target.parent}）を端末に送った。取り込み済みでない家族は、今どおり人がコミットする`
+      : `${loaded.shown} に保存した。承認済みチケットと同じく人がコミットする（sh ${PUSH_APPROVED_SCRIPT}）`,
   );
+}
+
+/** 普通のファイルが在るか（運ぶ sh が配られているか） */
+function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
 }

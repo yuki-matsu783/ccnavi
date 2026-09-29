@@ -90,6 +90,10 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
   assert.equal(
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
+  );  // 家族を並べると、その家族だけを運ぶ（ADR-0093 の 4.6。フローの保存の後）。
+  assert.equal(
+    pushApprovedCommand("/ws", ["i0001"]),
+    "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",
   );
 });
 

@@ -134,7 +134,10 @@ export function reviewedPrompt(
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
+ * `parents` を渡すとその家族だけを運ぶ（ADR-0093 の 4.6。取り込み済みの家族だけが送られ、
+ * そうでない家族は今どおり人がコミットする）。
  */
-export function pushApprovedCommand(root: string): string {
-  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}`;
+export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {
+  const names = parents.map((p) => ` ${shellQuote(p)}`).join("");
+  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}${names}`;
 }
