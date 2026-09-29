@@ -88,6 +88,21 @@ class BranchNameRulesTest(unittest.TestCase):
                 self.assertEqual(1, len(found), found)
                 self.assertIn("統合先", found[0])
 
+    def test_the_integration_branch_is_reserved_when_given(self):
+        # その時点の統合先の名前（D30。段階 2b）。環境変数は読まず、渡されたときだけ見る。
+        ticket = ticket_mod.Ticket(ticket="Trunk")
+        self.assertEqual([], ticket_mod.branch_name_problems(ticket))
+        found = ticket_mod.branch_name_problems(ticket, "trunk")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("統合先の名前（trunk）", found[0])
+        # 固定の並びに当たるものは 1 行だけ。
+        self.assertEqual(
+            1, len(ticket_mod.branch_name_problems(ticket_mod.Ticket(ticket="main"), "main"))
+        )
+        # 子は見ない。
+        child = ticket_mod.Ticket(ticket="trunk-01", parent="trunk")
+        self.assertEqual([], ticket_mod.branch_name_problems(child, "trunk-01"))
+
     def test_issue_shaped_names_need_an_issue(self):
         for name in ("i0131", "I0131", "i7"):
             with self.subTest(name=name):
@@ -126,11 +141,13 @@ class LintBranchNamesTest(unittest.TestCase):
             ticket_text(name, approved=True, **kwargs),
         )
 
-    def lint(self):
+    def lint(self, *extra, env=None):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
+        environment.update(env or {})
         result = run_ccnavi(
             [
+                *extra,
                 "--root",
                 self.ws,
                 "--rules",
@@ -162,6 +179,15 @@ class LintBranchNamesTest(unittest.TestCase):
         self.assertNotIn("i0132:", joined)
         self.assertIn("develop: 識別子が統合先", joined)
         self.assertIn("fix..it: 識別子に `..`", joined)
+
+    def test_the_integration_branch_flag_reserves_its_name(self):
+        self.propose("trunk")
+        self.assertEqual([], self.lint())
+        # 環境変数は読まない（sh が決めて --integration-branch で渡す。D30）。
+        self.assertEqual([], self.lint(env={"CCNAVI_INTEGRATION_BRANCH": "trunk"}))
+        lines = self.lint("--integration-branch", "trunk")
+        self.assertEqual(1, len(lines), lines)
+        self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
     def test_approved_and_closed_ids_are_left_alone(self):
         # 既存の i0055 などは issue: を持たない。承認済みの識別子は変えられないので言わない。

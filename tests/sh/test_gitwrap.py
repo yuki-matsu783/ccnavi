@@ -618,11 +618,11 @@ def git_out(cwd, *args):
 
 
 class ResetGuidanceTest(GitWrapperTest):
-    """reset は通さず、ブランチをリモートに合わせたいときは checkout -B を案内する。
+    """reset は通さず、リモートに合わせたいときは ccnavi-sync.sh を案内する（ADR-0093 の 2b。D36）。
 
-    squash マージの後は、ローカルのブランチがリモートと分かれて fast-forward できない。
-    reset --hard は書きかけごと消すので通さない。checkout -B は書きかけとぶつかれば git が
-    拒むが、ブランチにしか無いコミットは黙って外すので、案内には外れるものの確かめ方を添える。
+    前は `checkout -B <ブランチ> <リモート>/<ブランチ>` を案内していた。付け替えはブランチにしか無い
+    コミットを黙って外し、親のブランチなら承認済みチケットの置き場ごと中身を変えるので、
+    ccnavi-sync.sh（早送りか merge、衝突したら取りやめる）ができた段階 2b で塞ぎ、案内を移した。
     """
 
     def diverge(self):
@@ -639,38 +639,53 @@ class ResetGuidanceTest(GitWrapperTest):
         git(self.dir, "commit", "-q", "-m", "local")
         return branch
 
-    def test_reset_names_checkout_B_and_how_to_check_what_it_drops(self):
+    def test_reset_names_ccnavi_sync_and_merge_not_checkout_B(self):
         stderr = self.assertRejected("reset", "--hard", "origin/main").stderr
-        for form in ("checkout -B", "fetch", "log --oneline", "diff HEAD", "黙って外れ", "利用者"):
+        for form in (
+            "ccnavi-sync.sh <P>",
+            "fetch <リモート> <ブランチ>",
+            "merge <リモート>/<ブランチ>",
+            "利用者",
+        ):
             self.assertIn(form, stderr)
+        self.assertNotIn("checkout -B", stderr)
         # 勧める形はラッパースクリプトの形で名乗る。生の git を勧めると、勧めた先でもう 1 度止まる。
-        rest = stderr.replace("ccnavi-git.sh", "")
-        for raw in ("git checkout", "git log", "git diff", "git fetch", "git stash"):
+        rest = stderr.replace("ccnavi-git.sh", "").replace("ccnavi-sync.sh", "")
+        for raw in ("git checkout", "git merge", "git fetch", "git stash"):
             self.assertNotIn(raw, rest)
+
+    def test_usage_names_ccnavi_sync_not_checkout_B(self):
+        usage = self.run_wrapper("--help").stdout
+        self.assertIn("ccnavi-sync.sh <P>", usage)
+        self.assertNotIn("checkout -B <ブランチ>", usage)
 
     def test_clean_does_not_mention_checkout_B(self):
         stderr = self.assertRejected("clean", "-fd").stderr
         self.assertNotIn("checkout -B", stderr)
 
-    def test_the_named_checkout_B_moves_the_branch_and_keeps_untracked_files(self):
+    def test_forced_branch_moves_are_rejected(self):
         branch = self.diverge()
-        result = self.run_wrapper("checkout", "-B", branch, "upstream")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertEqual(
-            git_out(self.dir, "rev-parse", "upstream"), git_out(self.dir, "rev-parse", "HEAD")
-        )
-        self.assertTrue(os.path.exists(os.path.join(self.dir, "untracked.txt")))
+        before = git_out(self.dir, "rev-parse", branch)
+        for args in (
+            ("checkout", "-B", branch, "upstream"),
+            ("checkout", "-qB", branch, "upstream"),
+            ("switch", "--force-create", branch, "upstream"),
+            ("switch", "--force-create=" + branch, "upstream"),
+        ):
+            with self.subTest(args=args):
+                result = self.assertRejected(*args)
+                self.assertIn("ccnavi-sync.sh", result.stderr)
+                self.assertIn("付け替え", result.stderr)
+        # switch -C は、全引数の `-C`（判定の起点を動かす）で前から止まっている。
+        self.assertRejected("switch", "-C", branch, "upstream")
+        self.assertEqual(before, git_out(self.dir, "rev-parse", branch))
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "local.txt")))
 
-    def test_the_named_checkout_B_refuses_and_keeps_work_in_progress(self):
-        branch = self.diverge()
-        before = git_out(self.dir, "rev-parse", "HEAD")
-        with open(os.path.join(self.dir, "tracked.txt"), "w", encoding="utf-8") as f:
-            f.write("書きかけ\n")
-        result = self.run_wrapper("checkout", "-B", branch, "upstream")
-        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertEqual(before, git_out(self.dir, "rev-parse", "HEAD"))
-        with open(os.path.join(self.dir, "tracked.txt"), encoding="utf-8") as f:
-            self.assertEqual("書きかけ\n", f.read())
+    def test_creating_a_new_branch_still_passes(self):
+        for args in (("checkout", "-b", "fresh", "HEAD"), ("switch", "--create", "fresh2", "HEAD")):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 class BranchForceMoveTest(GitWrapperTest):
@@ -756,6 +771,8 @@ class FetchRefspecTest(GitWrapperTest):
         stderr = self.assertRejected("fetch", "origin", "main:main").stderr
         self.assertIn("ccnavi-git.sh fetch <リモート> <ブランチ>", stderr)
         self.assertNotIn("git fetch", stderr.replace("ccnavi-git.sh", ""))
+        # 手元の ref を進めるのは ccnavi-sync.sh（段階 2b で文面を書き換えた。3.1 の 10）。
+        self.assertIn("ccnavi-sync.sh <ブランチ> が進めます", stderr)
 
     def test_remote_and_branch_still_pass(self):
         for args in (
@@ -887,15 +904,227 @@ class StoreRewindTest(GitWrapperTest):
         self.assertTrue(self.read("tracked.txt").startswith("line 0\n"))
 
     def test_moving_between_branches_still_passes(self):
-        # 行き先だけの形と、-b / -B の値と起点は、パスと読まない。
+        # 行き先だけの形と、-b / -c の値と起点は、パスと読まない（-B / -C は段階 2b で塞いだ）。
         for args in (
             ("checkout", "-b", "topic", "HEAD~1"),
-            ("checkout", "-B", "topic2", "HEAD"),
+            ("switch", "--create", "topic2", "HEAD"),
             ("switch", "topic"),
         ):
             with self.subTest(args=args):
                 result = self.run_wrapper(*args)
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+
+def run_in(cwd, *args):
+    """ラッパースクリプトを cwd で動かす（ワークツリーの中から打つ形）。"""
+    return subprocess.run(
+        [SHELL, SCRIPT, *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+
+def write_text(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
+class WorktreeNameTest(GitWrapperTest):
+    """worktree add は行き先の名前とブランチ名を揃える形だけ通す（ADR-0093 の 3.1 の 10。段階 2b）。
+
+    親のブランチ名は親の識別子で、ワークツリーの名前も同じ。-B（既存のブランチの付け替え）・
+    --detach・-f はその結び付きを崩すか、親のブランチを別のコミットへ向け直す。
+    """
+
+    def test_mismatched_and_forced_forms_are_rejected(self):
+        git(self.dir, "branch", "other")
+        for args in (
+            ("worktree", "add", ".claude/worktrees/a", "-b", "b"),
+            ("worktree", "add", ".claude/worktrees/a", "-b", "b", "HEAD"),
+            ("worktree", "add", "-B", "a", ".claude/worktrees/a"),
+            ("worktree", "add", "--detach", ".claude/worktrees/a", "HEAD"),
+            ("worktree", "add", "-d", ".claude/worktrees/a", "HEAD"),
+            ("worktree", "add", "-f", ".claude/worktrees/a", "-b", "a"),
+            ("worktree", "add", "--force", ".claude/worktrees/a", "-b", "a"),
+            # 2 つ目の語がブランチ名と違えば、名前の違う行き先に出すか detached になる。
+            ("worktree", "add", ".claude/worktrees/a", "HEAD"),
+            ("worktree", "add", ".claude/worktrees/a", "other"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertFalse(os.path.exists(os.path.join(self.dir, ".claude", "worktrees", "a")))
+
+    def test_the_rejection_says_how_to_write_it(self):
+        stderr = self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "b").stderr
+        self.assertIn("-b b", stderr)
+        self.assertIn("worktree add .claude/worktrees/b -b b", stderr)
+
+    def test_matching_forms_pass(self):
+        git(self.dir, "branch", "c")
+        for args, name in (
+            (("worktree", "add", ".claude/worktrees/a", "-b", "a", "HEAD"), "a"),
+            (("worktree", "add", ".claude/worktrees/b"), "b"),
+            (("worktree", "add", ".claude/worktrees/c", "c"), "c"),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                tree = os.path.join(self.dir, ".claude", "worktrees", name)
+                self.assertEqual(name, git_out(tree, "branch", "--show-current"))
+
+
+class ParentWorktreeSwitchTest(GitWrapperTest):
+    """親のワークツリーでは別のブランチへ移らない（ADR-0093 の 3.1 の 10。段階 2b）。
+
+    親のワークツリーは .claude/worktrees/<P> で、親の写しか提案（`ticket: <P>`、`parent:` なし）が
+    あるもの。親のブランチの名前は識別子で、ワークツリーが別のブランチの上に居ると家族を引けなくなる。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.base = git_out(self.dir, "branch", "--show-current")
+        self.parent = os.path.join(self.dir, ".claude", "worktrees", "i0001")
+        git(self.dir, "worktree", "add", "-q", self.parent, "-b", "i0001")
+        write_text(
+            os.path.join(self.parent, "wip", "proposals", "todo", "i0001.md"),
+            "---\nversion: 1\nticket: i0001\n---\n",
+        )
+        self.free = os.path.join(self.dir, ".claude", "worktrees", "free")
+        git(self.dir, "worktree", "add", "-q", self.free, "-b", "free")
+
+    def test_moving_away_from_the_parent_branch_is_rejected(self):
+        before = git_out(self.parent, "rev-parse", "--abbrev-ref", "HEAD")
+        for args in (
+            ("checkout", self.base),
+            ("switch", self.base),
+            ("checkout", "-b", "other"),
+            ("switch", "--create", "other"),
+            ("switch", "--create=other"),
+            ("checkout", "--orphan", "other"),
+            ("checkout", "--detach"),
+            ("switch", "--detach"),
+            ("switch", "-d", "HEAD"),
+            ("checkout", "-"),
+            ("checkout", "HEAD~0"),
+        ):
+            with self.subTest(args=args):
+                result = run_in(self.parent, *args)
+                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+                self.assertIn("親のワークツリー", result.stderr)
+                self.assertIn("識別子", result.stderr)
+        self.assertEqual(before, git_out(self.parent, "rev-parse", "--abbrev-ref", "HEAD"))
+        self.assertEqual([], logs_of(self.dir), "拒否したのに git が走って記録が残っている")
+
+    def test_staying_on_the_parent_branch_passes(self):
+        for args in (("checkout", "i0001"), ("checkout", "HEAD", "tracked.txt")):
+            with self.subTest(args=args):
+                result = run_in(self.parent, *args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_other_worktrees_move_as_before(self):
+        result = run_in(self.free, "checkout", "-b", "elsewhere")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_a_child_worktree_is_not_a_parent(self):
+        child = os.path.join(self.dir, ".claude", "worktrees", "i0001-01")
+        git(self.dir, "worktree", "add", "-q", child, "-b", "i0001-01")
+        write_text(
+            os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01.md"),
+            "---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n",
+        )
+        result = run_in(child, "checkout", "-b", "elsewhere")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+
+class FamilyRecordPushTest(GitWrapperTest):
+    """push が通ったら親のブランチの家族の控えを作り、控えが gone なら送らない（ADR-0093 の 4.3）。
+
+    控えは ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", self.bare)
+        self.tree = os.path.join(self.dir, ".claude", "worktrees", "i0001")
+        git(self.dir, "worktree", "add", "-q", self.tree, "-b", "i0001")
+        self.copy = os.path.join(self.tree, ".ccnavi", "approved", "doing", "i0001.md")
+        write_text(self.copy, "---\nversion: 1\nticket: i0001\n---\n")
+        git(self.tree, "add", ".ccnavi/approved/doing/i0001.md")
+        git(self.tree, "commit", "-q", "-m", "copy")
+        self.record = os.path.join(self.dir, "logs", "state", "sync", "self", "families", "i0001")
+
+    def push(self, tree=None, branch="i0001"):
+        return run_in(tree or self.tree, "push", "-u", "origin", branch)
+
+    def fields(self):
+        with open(self.record, encoding="utf-8") as f:
+            return dict(line.rstrip("\n").split(" ", 1) for line in f if " " in line)
+
+    def remote_sha(self, branch="i0001"):
+        return subprocess.run(
+            ["git", "--git-dir", self.bare, "rev-parse", "--verify", "-q", branch],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    def test_the_first_push_writes_a_present_record(self):
+        result = self.push()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        fields = self.fields()
+        self.assertEqual("present", fields["state"])
+        self.assertEqual("i0001", fields["branch"])
+        self.assertEqual("origin", fields["remote"])
+        self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), fields["sha"])
+        self.assertTrue(fields["fetched_at"].isdigit())
+        self.assertIn("家族の控えを作った", result.stdout)
+        self.assertIn("ccnavi-sync.sh i0001", result.stdout)
+
+    def test_uncommitted_store_changes_keep_the_family_out(self):
+        with open(self.copy, "a", encoding="utf-8") as f:
+            f.write("書きかけ\n")
+        result = self.push()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertFalse(os.path.exists(self.record))
+        self.assertIn("未コミットの状態", result.stdout)
+        self.assertIn(".ccnavi/approved/doing/i0001.md", result.stdout)
+
+    def test_a_present_record_follows_the_new_head(self):
+        self.assertEqual(0, self.push().returncode)
+        write_text(os.path.join(self.tree, "more.txt"), "x\n")
+        git(self.tree, "add", "more.txt")
+        git(self.tree, "commit", "-q", "-m", "more")
+        result = self.push()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.fields()["sha"])
+        self.assertNotIn("家族の控えを作った", result.stdout)
+
+    def test_a_gone_family_is_not_pushed(self):
+        write_text(
+            self.record,
+            "remote origin\nbranch i0001\nsha abc\nfetched_at 1\nstate gone\nreason x\n",
+        )
+        result = self.push()
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("消えた", result.stderr)
+        self.assertIn("ccnavi-sync.sh i0001", result.stderr)
+        self.assertEqual("", self.remote_sha())
+        self.assertEqual("gone", self.fields()["state"])
+
+    def test_other_trees_get_no_record(self):
+        free = os.path.join(self.dir, ".claude", "worktrees", "free")
+        git(self.dir, "worktree", "add", "-q", free, "-b", "free")
+        result = self.push(free, "free")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertFalse(
+            os.path.exists(
+                os.path.join(self.dir, "logs", "state", "sync", "self", "families", "free")
+            )
+        )
 
 
 if __name__ == "__main__":
