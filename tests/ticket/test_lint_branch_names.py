@@ -189,6 +189,30 @@ class LintBranchNamesTest(unittest.TestCase):
         self.assertEqual(1, len(lines), lines)
         self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
+    def test_the_name_ccnavi_sync_recorded_is_reserved(self):
+        # --integration-branch が無ければ、ccnavi-sync.sh が控えに書いた名前を読む（決定 B3）。
+        self.propose("trunk")
+        write(
+            os.path.join(self.ws, "state", "sync", "self", "integration", "head"),
+            "remote origin\nbranch trunk\nsource default\nsha x\nfetched_at 1\n",
+        )
+        lines = self.lint()
+        self.assertEqual(1, len(lines), lines)
+        self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
+        # 渡された名前が先。
+        self.assertEqual([], self.lint("--integration-branch", "main-line"))
+
+    def test_a_linked_record_is_not_followed(self):
+        self.propose("trunk")
+        real = write(os.path.join(self.ws, "elsewhere", "head"), "branch trunk\n")
+        place = os.path.join(self.ws, "state", "sync", "self", "integration")
+        os.makedirs(place)
+        try:
+            os.symlink(real, os.path.join(place, "head"))
+        except (OSError, NotImplementedError):
+            self.skipTest("リンクを作れない")
+        self.assertEqual([], self.lint())
+
     def test_approved_and_closed_ids_are_left_alone(self):
         # 既存の i0055 などは issue: を持たない。承認済みの識別子は変えられないので言わない。
         self.place("doing", "i0055")

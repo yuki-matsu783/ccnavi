@@ -1127,5 +1127,208 @@ class FamilyRecordPushTest(GitWrapperTest):
         )
 
 
+class AllowListTest(GitWrapperTest):
+    """オプションは許可リストで読む（ADR-0093 の段階 2b のレビュー。利用者の決定 A）。
+
+    git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
+    名前を並べるやり方では抜ける。束ねた短いオプション（`-qbnew`）は 1 字ずつ読み、値を取る字の
+    後ろは値として扱う。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.base = git_out(self.dir, "branch", "--show-current")
+        git(self.dir, "branch", "topic")
+        write_text(os.path.join(self.dir, ".ccnavi", "approved", "doing", "i0001.md"), "old\n")
+        git(self.dir, "add", ".ccnavi/approved/doing/i0001.md")
+        git(self.dir, "commit", "-q", "-m", "store")
+
+    def test_abbreviated_and_bundled_forms_are_rejected(self):
+        store = ".ccnavi/approved/doing/i0001.md"
+        before = git_out(self.dir, "for-each-ref")
+        for args in (
+            ("switch", "--force-c", "topic", "HEAD"),
+            ("switch", "--force-cr=topic", "HEAD"),
+            ("switch", "--discard-ch", "topic"),
+            ("switch", "--for", "topic"),
+            ("checkout", "--for", "topic"),
+            ("checkout", "-qB", "topic", "HEAD"),
+            ("checkout", "-fq", "topic"),
+            ("branch", "--mov", "topic", "renamed"),
+            ("branch", "--forc", "-d", "topic"),
+            ("branch", "-rM", "a", "b"),
+            ("pull", "--rebas", "origin", "main"),
+            ("pull", "-r", "origin", "main"),
+            ("pull", "-Xours", "origin", "main"),
+            ("fetch", "--prun", "origin"),
+            ("fetch", "-p", "origin"),
+            ("merge", "--strategy-o=ours", "topic"),
+            ("merge", "--strategy-option", "theirs", "topic"),
+            ("merge", "-Xours", "topic"),
+            ("merge", "-sours", "topic"),
+            ("merge", "--no-verif", "topic"),
+            ("commit", "--no-verif", "-m", "x"),
+            ("commit", "-anm", "x"),
+            ("commit", "--amend", "-m", "x"),
+            ("commit", "--amen", "-m", "x"),
+            ("rm", "--forc", "tracked.txt"),
+            ("rm", "-rf", "tracked.txt"),
+            ("worktree", "remove", "--forc", "x"),
+            ("worktree", "remove", "-ff", "x"),
+            ("restore", "--sour=HEAD~1", store),
+            ("restore", "-sHEAD~1", store),
+            ("restore", "-Ss", "HEAD~1", store),
+            ("cat-file", "--textc", "HEAD:tracked.txt"),
+            ("cat-file", "--filters", "HEAD:tracked.txt"),
+            ("grep", "-O", "line"),
+            ("grep", "-iOvim", "line"),
+            ("grep", "--open-f", "line"),
+            ("log", "--outp=out.txt"),
+            ("diff", "--ext"),
+            ("show", "--textc"),
+            ("fetch", "--upload-p=touch x", "origin"),
+            ("checkout", "--unknown-option"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertEqual(before, git_out(self.dir, "for-each-ref"))
+
+    def test_plain_forms_still_pass(self):
+        for args in (
+            ("checkout", "-b", "new1"),
+            ("checkout", "-qbnew2", self.base),
+            ("switch", "-cnew3"),
+            ("switch", "--create", "new4", self.base),
+            ("checkout", self.base),
+            ("branch", "--list"),
+            ("branch", "-vv"),
+            ("branch", "-d", "new1"),
+            ("commit", "--allow-empty", "-qm", "x"),
+            ("cat-file", "-p", "HEAD:tracked.txt"),
+            ("grep", "-e", "line 1", "--", "tracked.txt"),
+            ("grep", "-C3", "line 5", "--", "tracked.txt"),
+            ("diff", "--text", "HEAD"),
+            ("restore", "--staged", "tracked.txt"),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_the_refusal_says_to_spell_it_out(self):
+        stderr = self.assertRejected("switch", "--force-c", "topic").stderr
+        self.assertIn("略さずに", stderr)
+
+
+class ParentWorktreeValueBundleTest(ParentWorktreeSwitchTest):
+    """親のワークツリーでは、値を束ねた綴り（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
+
+    def test_moving_away_from_the_parent_branch_is_rejected(self):
+        for args in (
+            ("checkout", "-bnew1"),
+            ("checkout", "-qbnew3"),
+            ("switch", "-cbar"),
+            ("switch", "-qcbar"),
+            ("checkout", "--orphan=x"),
+            ("checkout", "--track", "origin/x"),
+            ("checkout", f"refs/heads/{self.base}"),
+            ("switch", "--det"),
+            ("checkout", "--orph", "x"),
+        ):
+            with self.subTest(args=args):
+                result = run_in(self.parent, *args)
+                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertEqual("i0001", git_out(self.parent, "branch", "--show-current"))
+
+    def test_staying_on_the_parent_branch_passes(self):
+        super().test_staying_on_the_parent_branch_passes()
+        for args in (("checkout",), ("checkout", "-q", "HEAD")):
+            with self.subTest(args=args):
+                result = run_in(self.parent, *args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_other_worktrees_move_as_before(self):
+        result = run_in(self.free, "checkout", "-qbelsewhere")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_a_child_worktree_is_not_a_parent(self):
+        pass
+
+
+class WorktreeDetachTest(GitWrapperTest):
+    """2 つ目の語がタグ・sha だと detached になる。名前が揃っていても止める（軽 17）。"""
+
+    def test_tags_and_shas_are_rejected(self):
+        sha = git_out(self.dir, "rev-parse", "HEAD")
+        git(self.dir, "tag", "v1")
+        for args in (
+            ("worktree", "add", ".claude/worktrees/v1", "v1"),
+            ("worktree", "add", f".claude/worktrees/{sha}", sha),
+        ):
+            with self.subTest(args=args):
+                result = self.assertRejected(*args)
+                self.assertIn("detached", result.stderr)
+
+    def test_a_remote_branch_of_the_same_name_passes(self):
+        bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", bare)
+        git(self.dir, "push", "-q", "origin", "HEAD:refs/heads/i0002")
+        git(self.dir, "fetch", "-q", "origin")
+        result = self.run_wrapper("worktree", "add", ".claude/worktrees/i0002", "i0002")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+
+class SymlinkedWorkspaceTest(GitWrapperTest):
+    """リンクを経た作業場でも守りが効く（git の綴りとワークスペースの綴りを揃える。中 12）。"""
+
+    def setUp(self):
+        super().setUp()
+        self.link = self.dir + "-link"
+        try:
+            os.symlink(self.dir, self.link)
+        except (OSError, NotImplementedError):
+            self.skipTest("リンクを作れない")
+        self.addCleanup(os.unlink, self.link)
+        self.bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", self.bare)
+        tree = os.path.join(self.dir, ".claude", "worktrees", "i0001")
+        git(self.dir, "worktree", "add", "-q", tree, "-b", "i0001")
+        write_text(
+            os.path.join(tree, ".ccnavi", "approved", "doing", "i0001.md"),
+            "---\nversion: 1\nticket: i0001\n---\n",
+        )
+        git(tree, "add", ".ccnavi/approved/doing/i0001.md")
+        git(tree, "commit", "-q", "-m", "copy")
+        self.via_link = os.path.join(self.link, ".claude", "worktrees", "i0001")
+
+    def test_the_parent_worktree_is_seen_through_the_link(self):
+        result = run_in(self.via_link, "checkout", "-b", "other")
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("親のワークツリー", result.stderr)
+
+    def test_the_family_record_is_written_through_the_link(self):
+        result = run_in(self.via_link, "push", "-u", "origin", "i0001")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("家族の控えを作った", result.stdout)
+
+
+class PushRemoteResolutionTest(FamilyRecordPushTest):
+    """送り先は git と同じ順で解き、origin 以外へ送ったら控えを作らない（軽 18）。"""
+
+    def test_a_push_remote_other_than_origin_writes_no_record(self):
+        other = self.make_bare()
+        git(self.dir, "remote", "add", "other", other)
+        git(self.tree, "config", "branch.i0001.pushRemote", "other")
+        result = run_in(self.tree, "push")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertFalse(os.path.exists(self.record))
+
+    def test_push_default_to_origin_writes_a_record(self):
+        git(self.tree, "config", "remote.pushDefault", "origin")
+        git(self.tree, "config", "push.default", "current")
+        result = run_in(self.tree, "push")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual("present", self.fields()["state"])
+
+
 if __name__ == "__main__":
     unittest.main()

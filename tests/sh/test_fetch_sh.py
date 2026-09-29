@@ -395,6 +395,72 @@ class FetchTest(unittest.TestCase):
         self.assertIn("ccnavi-sync.sh i0001", done.stdout)
         self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
 
+    def test_the_budget_is_checked_before_fetching(self):
+        # 枠を過ぎたら fetch ごと飛ばして名指しする（レビューの中 9）。起点も進めない。
+        tree = self.family()
+        before = self.sha(tree, "HEAD")
+        main_before = self.sha(self.ws, "refs/heads/main")
+        self.advance(self.remote, "i0001")
+        self.advance(self.remote)
+        started = time.monotonic()
+        done = self.fetch(CCNAVI_FETCH_BUDGET="0")
+        self.assertLess(time.monotonic() - started, 10)
+        self.assertEqual(before, self.sha(tree, "HEAD"))
+        self.assertEqual(main_before, self.sha(self.ws, "refs/heads/main"))
+        self.assertIn("時間の枠", done.stdout)
+        self.assertIn("取りに行かなかった", done.stdout)
+
+    def test_a_refusal_that_is_not_an_overlap_says_why(self):
+        # 重なっていないのに「重なる」と言わない（レビューの軽 19）。
+        tree = self.family()
+        before = self.sha(tree, "HEAD")
+        self.advance(self.remote, "i0001")
+        lock = git(tree, "rev-parse", "--git-path", "index.lock").stdout.strip()
+        write(lock if os.path.isabs(lock) else os.path.join(tree, lock), "")
+        done = self.fetch()
+        self.assertEqual(before, self.sha(tree, "HEAD"))
+        self.assertIn("index.lock", done.stdout)
+        self.assertNotIn("と重なる", done.stdout)
+
+    def test_a_family_in_a_single_branch_clone_is_forwarded(self):
+        # origin の fetch の並びが main だけでも origin/P を進める（レビューの中 13）。
+        tree = self.family()
+        git(self.ws, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+        head = self.advance(self.remote, "i0001")
+        self.fetch()
+        self.assertEqual(head, self.sha(tree, "HEAD"))
+
+    def test_the_worktree_base_follows_the_integration_branch(self):
+        # 2 周目（ワークツリーの起点）は統合先に合わせる（決定 B6）。
+        git(self.ws, "push", "-q", "origin", "main:develop")
+        git(self.ws, "branch", "-q", "develop", "main")
+        self.leave_main()
+        head = self.advance(self.remote, "develop")
+        main_before = self.sha(self.ws, "refs/heads/main")
+        self.advance(self.remote)
+        done = self.fetch(CCNAVI_INTEGRATION_BRANCH="develop")
+        self.assertEqual(head, self.sha(self.ws, "refs/heads/develop"))
+        self.assertEqual(main_before, self.sha(self.ws, "refs/heads/main"))
+        self.assertIn("develop", done.stdout)
+
+    def test_the_worktree_base_follows_the_name_ccnavi_sync_recorded(self):
+        git(self.ws, "push", "-q", "origin", "main:develop")
+        git(self.ws, "branch", "-q", "develop", "main")
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "remote origin\nbranch develop\nsource settings.local.json\nsha x\nfetched_at 1\n",
+        )
+        self.leave_main()
+        head = self.advance(self.remote, "develop")
+        self.fetch()
+        self.assertEqual(head, self.sha(self.ws, "refs/heads/develop"))
+
+    def test_a_missing_integration_branch_is_named(self):
+        self.leave_main()
+        done = self.fetch(CCNAVI_INTEGRATION_BRANCH="nope")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertIn("nope（統合先）がリモートに無い", done.stdout)
+
     def test_a_worktree_without_a_record_keeps_the_old_rule(self):
         # 控えの無い（取り込み済みでない）家族は今までどおり。書きかけがあれば進めない。
         tree = self.family(record=False)
