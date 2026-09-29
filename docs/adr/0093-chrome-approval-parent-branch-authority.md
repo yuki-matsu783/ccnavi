@@ -8,7 +8,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 
 # ADR-0093: 承認は Chrome 拡張から API で行い、写しの権威は親のブランチ 1 枚に固定する
 
-状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。段階 2 以降は 11 章のとおり、入れる前に利用者に相談する）
+状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、利用者が段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。段階 3 以降は 11 章のとおり、入れる前に利用者に相談する）
 
 本文の `ファイル:行` は、この ADR を書いた時点（`6d0e53e`）の行番号です。段階 0 の変更で `ccnavi-git.sh` の行はずれています。
 
@@ -1157,6 +1157,43 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 - GitLab の読み取り: 段階 5（`hosts.json` には既定のとおり `gitlab.com` を置き、設定画面で「段階 5」と出す）
 - `source_path` の相対化（D22）: 段階 2a。段階 1 は画面の本文の仮のツリーの絶対パスを `<P>:` に畳んで見せるだけ
 - 3.3 の「決まらない」の規則（`P_X` が無ければ止める）: 段階 2c。段階 1 は今の ccnavi の答え（先行が無い）をそのまま出す
+
+### 11.3 段階 2a で入れたもの（2026-09-29）
+
+判定は変えていない（試験で確かめた）。手元の書き込みも、落ち方を含めて前と同じ（1 か所だけ違う。下の「分かったこと」）。
+
+| 何 | 場所 | 形 |
+|---|---|---|
+| 判定のコアと差し口（6.2） | `ccnavi/core.py` | `Snapshot`（Reader(FS)）→ `judge` → `plan` → `Changes` → `write_fs`（Writer(FS)）。`judge` は見せた識別子と指紋を今のものと比べる（前の `--yes` の検査）。`Changes` は書き込みと見せる行の並びと、ブランチごとの create / update / delete（`per_branch`、ツリーからの相対パス） |
+| 書けなかったときの扱い | `fsio.policy`・`core.write_fs` | 並べる段では書き込みが落ちないので、止める・言って続ける・行を出して同じ組を飛ばす・黙る・跡の知らせに溜める、のどれかを書き込みに添え、Writer(FS) が前と同じ文面と順で落ちる（置けた分は残す。マーカーは置けた後だけ消す。フローが運べなければ行で言い、元を残す） |
+| 手元の `--approve` | `approval.approve`・`approve_yes`・`preview`・`verify` | どれも `core.judge` を通る。書くのは `core.plan` → `core.write_fs`。前の `_apply` は並べる手順（`plan_batch`）になり、書き込みの手順のコードは 1 つ |
+| `confirm`（8.9） | `core.confirm`・`review.confirm` | 検査（依頼の記録・動いたか・同じ MR か・変更要求・未解決）と書くもの（レビュー待ちの子を `done/` へ・レビュー済みの印）をコアへ。手元は cwd の親・git の差分・`--result` の写しを前と同じ順で読んで渡す |
+| `reviewed_mark`（8.9） | `core.reviewed_mark` | `confirm` と `decide` が使う。`actor` が空なら `actor`・`via` の欄を書かず、手元の印は前と同じバイト列 |
+| `withdraw`（8.8） | `core.withdraw` | 条件（新規・followup でない・未着手・子もマーカーも無い・戻す先が空いている・承認コミットの親の提案がある）と書くもの（`doing/` を消し、`todo/` に元のバイト列、跡）。呼ぶのは Chrome の入口の試験だけ（画面は段階 3）。跡の種類 `withdrawn` と経路 `chrome` を `history` に足した（コアの書くものに要るため） |
+| 時計（Clock） | `fsio.clock`・`stamp`・`utc_stamp`、`history.stamp` | 固定した 1 つの時刻から、承認の記録（オフセット付き）と跡（UTC）を出す。plan の間は `Snapshot.stamp`（空なら今）に固定する |
+| D22 | `approval.admit`・`source_path`・`source_branch`・`_origin_line`、`tree.branch_of` | `source_path` は提案のツリーからの相対（"/"）、`source_tree` はそのツリーの HEAD のブランチ名（ファイルだけを読み、git は起こさない。読めなければツリーの名前）。承認画面の「提案:」も相対パスにした |
+| 控える段 | `fsio.staging`・`Stage`・`Op`・`Line` | 中では書き込みを控え、読み（`read_*`・`exists`・`lexists`・`listdir`・`load_text`）は控えた中身を先に見る。承認の手順が同じ承認で動かした後の置き場を読む（`home_dir`・`settle_review`・マーカー・跡） |
+| fsio の記録層（4.3） | `fsio.recording`、`cli` の `--record-writes <ファイル>` | 書いた・消したパスを 1 行 1 つ、ワークスペースルートからの相対（"/"）で書き出す。ルートの外は絶対パス、控えの置き場の下（リポジトリに入らない）は載せない。書き出し先は控えの置き場の下の `c1/` だけ（実行ファイルがどこへでもファイルを置ける道にしない） |
+| fsio を通らない書き込みを揃えた | `approval`（`admit`・`carry_flow`・`move_file`・`clear_marks`・改版の提案の削除）、`history._append`、`configsync._replace`・`_restore`、読みの `ticket.load`・`approval._load_dir`・`home_dir` | `fsio.unlink`・`move`・`write_new`・`append`・`replace_bytes` を足して通した。置き場を書くモジュールに素の書き込みが残っていないことを試験で見る |
+| Chrome の入口 | `chrome-extension/ccnavi-approval/py/ccnavi_chrome.py` | ボードの本文を畳まずに返し、指紋（`digest`）も返す（段階 1 で外したもの。D22 で機械に依らなくなった）。仮のツリーに HEAD を書く。`plan`・`withdraw`・`confirm` の操作（書くものを値で返すだけ。ホストにもディスクにも書かない） |
+| 見本 | `tests/ticket/test_core.py`、拡張の `test/fixtures/core-scenarios.json`・CX-T061 | 7 場面（新規、レビュー済みのフェーズに子を足してマーカーを消す、改版、フィードバック計画、多段の先行で通る子と落ちる子、取り下げ、レビュー済み）。Chrome の入口の答えが、手元のコアが実際に書いたバイト列と同じことを手元で見て見本に書き出し、拡張の試験が Pyodide と手元の CPython でも同じ答えになることを見る |
+
+分かったこと:
+
+- Pyodide（314.0.7、Python 3.14）と手元の CPython 3.12 が、7 場面で同じバイト列（写し・跡・マーカー・提案の削除）を出した。比べ方は中身のバイト比較（6.2 の「差分のパスの一覧だけ」から広げた）
+- D22 で承認画面の本文が機械に依らなくなり、Chrome のボードの指紋と手元の `--approve --preview` の指紋が同じ値になった
+- 後方互換: このリポジトリの `.ccnavi/approved/done/` の 18 本（`source_path` が Windows の絶対パス）で、`--explain --json`・`--lint --json`・`--approve --preview --json`・`--verify --json` の答え（時刻の欄を除く）と標準エラーが段階 2a の前と同じ。前の形の写しに書き換えても承認と実行前の判定が同じことは試験で見る
+- 落ち方が前と違う 1 か所: 子を足してマーカーを消すとき、在るのに消せなかったマーカーも「消した」と行と跡に出る（前は出さなかった）。消せなかったマーカーはそのまま効くので、判定は変わらない
+- 時刻: 1 回の承認の記録（`approved_at`）と跡（`at`）は同じ時刻になった（前は別々に時計を読んでいた）
+
+入れなかったもの:
+
+- `judge` の `read_set` と、それで作る指紋（6.2）: Reader が FS のままなので、判定が読んだものを数えきれない。指紋は前のまま（画面の本文 + 写しに写る中身）。ブランチごとの blob の表から読む Snapshot（`NOT_FETCHED`）と一緒に入れる（8.2 の「コアに移ってから」）
+- 承認のハーネス `approve()` を使う約 20 の試験をコアの直呼びへ（9 章のテスト）: CLI がコアを通るので、今の試験がそのままコアを通る
+- `confirm` の `--actor` と、`ccnavi-review.sh` のアカウントの引き当て（8.7・8.9）: sh の変更で、段階 2a の行に無い。手元の印の `actor` は空（書かない）
+- 記録の一覧に置き場の外があれば error にすることと D34 の例外: C1 の側（段階 2d）
+- VS Code のボードの呼び名（`withdrawn`・`chrome`）: 段階 2d
+- Chrome の画面で `plan`・`withdraw`・`confirm` を使うこと: 段階 3・4
 
 ## 得たもの・失ったもの
 
