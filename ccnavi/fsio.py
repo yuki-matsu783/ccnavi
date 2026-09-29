@@ -582,7 +582,12 @@ def reading() -> Iterator[dict[str, str]]:
     try:
         yield seen
     finally:
-        _READERS.remove(seen)
+        # 同一性で外す（`list.remove` は等価で比べるので、中身の同じ別の控えを外しうる。
+        # 入れ子の内と外がどちらも空のときなど）。
+        for i in range(len(_READERS) - 1, -1, -1):
+            if _READERS[i] is seen:
+                del _READERS[i]
+                break
 
 
 def note_read(path: str, content: str | bytes | None) -> None:
@@ -590,12 +595,13 @@ def note_read(path: str, content: str | bytes | None) -> None:
     if not _READERS:
         return
     key = os.path.normpath(parent_resolved(os.path.abspath(path)))
-    digest = READ_ABSENT if content is None else _content_digest(content)
+    digest = READ_ABSENT if content is None else content_digest(content)
     for seen in _READERS:
         seen.setdefault(key, digest)
 
 
-def _content_digest(content: str | bytes) -> str:
+def content_digest(content: str | bytes) -> str:
+    """中身の指紋。改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。"""
     if isinstance(content, bytes):
         try:
             content = content.decode("utf-8")

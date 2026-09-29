@@ -153,7 +153,7 @@ def _sync_config(
             + "\n"
         )
         return None
-    where = approval.home_dir(conf, root, found.ticket, "")
+    where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
     failed = configsync.apply(where, found.ticket, copied)
     if failed:
         stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {failed}\n")
@@ -247,7 +247,7 @@ def _close_parent(
     """
     from .review import WIP_ROOT
 
-    where = approval.home_dir(conf, root, found.ticket, "")
+    where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
     venues = phase.review_venues(root, conf, found.ticket)
     failed = approval.write_parent_mark(
         where,
@@ -353,7 +353,7 @@ def record_risk(
     if not head:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
-    where = approval.home_dir(conf, root, ticket_id, found.parent)
+    where = approval.home_dir(conf, root, ticket_id, found.parent, project=found.project)
     record = (
         approval.read_child_record(where, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE)
         or {}
@@ -412,7 +412,7 @@ def _score_child(
     if diff is None:
         stderr.write(f"ccnavi: {found.ticket} のリスクを測れない: {why}\n")
         return None
-    where = approval.home_dir(conf, root, found.ticket, found.parent)
+    where = approval.home_dir(conf, root, found.ticket, found.parent, project=found.project)
     judgements = (
         approval.read_child_record(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
         or {}

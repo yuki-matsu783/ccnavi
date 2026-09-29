@@ -122,6 +122,7 @@ def judge_approval(
         if shown_ids is not None and gathered.refused:
             shown = approval.gather(err, snapshot.conf, snapshot.root)
     read = approval.read_set(snapshot.conf, snapshot.root, seen)
+    read.update(approval.settings_read_set(snapshot.conf, snapshot.root))
     text = shown.text
     digest = approval.approval_digest(text, shown.batch, read)
     mismatch = None
@@ -548,7 +549,8 @@ def approve_yes(
         "approved": [t.ticket for t in tickets],
         "copies": [
             approval.copy_path(
-                approval.home_dir(conf, root, t.ticket, t.parent, t.tree_root), t.ticket
+                approval.home_dir(conf, root, t.ticket, t.parent, t.tree_root, project=t.project),
+                t.ticket,
             )
             for t in tickets
         ],

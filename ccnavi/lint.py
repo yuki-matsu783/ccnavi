@@ -726,7 +726,6 @@ def _approval_problems(
         closed,
         review,
         approval.types_resolver(conf, root, copies),
-        approval.integration_closed(conf, root, proposals),
     )
     if not pending and not revisions:
         return []
@@ -1124,8 +1123,9 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
 
     - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査 3.5 の 1）
     - 家族の控えが壊れている・gone・blocked、`present` なのに親のワークツリーが無い: error
-      （その家族は決まらないので、承認も状態の操作も止まる）。閉じた家族は info
-    - 統合先の控えが壊れている: error
+      （その家族は決まらないので、承認も状態の操作も止まる）。閉じた家族は、親のワークツリーが
+      残っていれば info（片付けてよい）、片付いていれば何も言わない（墓標）
+    - 統合先の控えが壊れている・無い・読めない: error（識別子の再利用を確かめられない）
     - 作業ツリーの層と統合先の控えの層が違う: warn
     - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn（D28）
 
@@ -1133,23 +1133,24 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
     `_copy_problems` が error で言う。控えの無い家族は、最初の 1 つのほかは何も言わない。
     """
     problems = _parent_trees_off_branch(conf, root)
-    if not syncstate.any_records(conf.state):
+    fams = syncstate.Families(conf, root)
+    if not fams.active:
         return problems
-    for repo, name in _family_records(conf.state):
-        project = "" if repo == syncstate.SELF else repo
-        st = syncstate.standing(conf, root, name, project)
+    for repo, name in syncstate.family_names(conf.state):
+        st = fams.standing(name, syncstate.project_of_key(repo))
         if not st.imported:
             continue
         where = f"(sync/{repo}/{name})"
         hint = " / ".join(syncstate.guidance(root, st))
         if st.closed:
-            problems.append(Problem(SEVERITY_INFO, where, f"{st.stop}。{hint}"))
+            if st.home is not None:
+                problems.append(Problem(SEVERITY_INFO, where, f"{st.stop}。{hint}"))
         elif st.stop:
             problems.append(Problem(SEVERITY_ERROR, where, f"{st.stop}。{hint}"))
-        elif project and st.home is not None:
+        elif st.repo != syncstate.SELF and st.home is not None:
             problems.extend(_projected_layer_problems(conf, st, where))
-    for repo in _integration_repos(conf.state):
-        integ = syncstate.integration(conf.state, repo)
+    for repo in syncstate.repos(conf.state):
+        integ = fams.integration(repo)
         if integ is None:
             continue
         where = f"(sync/{repo}/integration)"
@@ -1158,8 +1159,9 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"統合先の控えが壊れている（{integ.broken}）。"
-                    f"'{settings.script_command(root, 'ccnavi-sync.sh')}' を打ち直す",
+                    f"統合先の控えを読めない（{integ.broken}）。閉じた識別子の再利用を確かめられない"
+                    "ので、このリポジトリの新規の提案は承認しない。オンラインで"
+                    f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を打ち直す",
                 )
             )
             continue
@@ -1209,28 +1211,6 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
         if t is not None and t.ticket == work.name and not t.parent:
             return True
     return False
-
-
-def _family_records(state_dir: str) -> list[tuple[str, str]]:
-    """家族の控えの (リポジトリ, 親の識別子) の並び。書きかけ（`*.tmp.*`）は数えない。"""
-    base = os.path.join(state_dir, syncstate.SYNC_DIR)
-    out: list[tuple[str, str]] = []
-    for repo in _names(base):
-        for name in _names(os.path.join(base, repo, syncstate.FAMILIES_DIR)):
-            if ".tmp." not in name:
-                out.append((repo, name))
-    return out
-
-
-def _integration_repos(state_dir: str) -> list[str]:
-    return _names(os.path.join(state_dir, syncstate.SYNC_DIR))
-
-
-def _names(directory: str) -> list[str]:
-    try:
-        return sorted(os.listdir(directory))
-    except OSError:
-        return []
 
 
 def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]]:
@@ -1341,36 +1321,44 @@ def _projected_layer_problems(
     return problems
 
 
-def family_check(conf: settings.Settings, root: str, family: str) -> list[Problem]:
-    """取り込みの後の検査（ADR-0093 の 4.2 の 4。`ccnavi sync check <P>`）。
+def family_check(
+    conf: settings.Settings, root: str, family: str, repo: str | None = None
+) -> list[Problem]:
+    """取り込みの後の検査（ADR-0093 の 4.2 の 4。`ccnavi sync check <P> [<リポジトリ>]`）。
 
     この家族の承認済みチケットを判定し直し（C3）、権威の検査（親のワークツリーの外の写し・
     決まらない）とあわせて、止める理由（error）を返す。層の食い違い（D28）は warn で返す。
-    error があれば sh が家族の控えを `blocked` にする。
+    error があれば sh が家族の控えを `blocked` にする。`repo` は控えの名前（`self` か
+    プロジェクト名）で、sh が渡す。無ければ控えのあるリポジトリを全部探す。
     """
-    copies, notes = approval.scan(conf, root)
-    closed, closed_notes = approval.scan(conf, root, closed=True)
-    review, review_notes = approval.scan_review(conf, root)
-    mine = [t for t in copies if (t.parent or t.ticket) == family]
-    st = syncstate.standing_any(conf, root, family)
-    # 親のワークツリーの中の読めない写しも止める理由（読めない写しは並びに入らないので、
-    # 判定し直しの対象から黙って落ちる）。文面にはそのファイルの綴りが入る。
-    unreadable = []
-    if st.home is not None:
-        inside = os.path.join(st.home.root, "")
-        unreadable = [n for n in notes + closed_notes + review_notes if inside in n]
+    fams = syncstate.Families(conf, root)
+    project = None if repo is None else syncstate.project_of_key(repo)
+    st = fams.standing_any(family, project)
+    copies, _ = approval.scan(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True)
+    review, _ = approval.scan_review(conf, root)
+
+    def ours(t: ticket_mod.Ticket) -> bool:
+        return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo
+
+    mine = [t for t in copies if ours(t)]
     index = approval.by_id(copies)
     problems = [
         p for p in _copy_problems(root, conf, mine, index, closed) if p.severity == SEVERITY_ERROR
     ]
-    problems += [Problem(SEVERITY_ERROR, "(ticket)", n) for n in unreadable]
+    # 親のワークツリーの中の読めない写しも止める理由（読めない写しは並びに入らないので、
+    # 判定し直しの対象から黙って落ちる）。
+    if st.home is not None:
+        for _, message in approval.unreadable_copies(conf, st.home.root):
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", message))
     for t in review:
-        if (t.parent or t.ticket) == family and t.blocked:
+        if ours(t) and t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
+    where = f"(sync/{st.repo}/{family})"
     if st.imported and st.stop and not st.closed:
-        problems.append(Problem(SEVERITY_ERROR, f"(sync/{st.repo}/{family})", st.stop))
+        problems.append(Problem(SEVERITY_ERROR, where, st.stop))
     if st.imported and not st.stop and st.repo != syncstate.SELF and st.home is not None:
-        problems.extend(_projected_layer_problems(conf, st, f"(sync/{st.repo}/{family})"))
+        problems.extend(_projected_layer_problems(conf, st, where))
     return problems
 
 
@@ -1779,14 +1767,26 @@ def _project_settings(root: str) -> list[Problem]:
 # 置き場の綴り・プロジェクトの置き場・ccnavi ディレクトリ・控えの置き場（取り込みの控えを読む先）・
 # チケット制御と承認の守りの切り替え・動作モード。例外は統合先の名前（D30 で置き場に決めた）だけ。
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
+#
+# 守りと判定の働きを変える値（戻す働き・ccnavi 自身の設定の守り・確かめられないモードの止め・
+# 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、人が端末で打つ sh と
+# 他の機械で同じ家族の守りが別になる。入れないのは、判定の答えを変えない値だけ:
+# 実行ファイルの綴り（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
+# 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、見張りと待ちの秒（`CCNAVI_*_TIMEOUT`・
+# `CCNAVI_LOCK_WAIT`）。
 _LOCAL_FORBIDDEN = (
     settings.TICKETS_ENV,
     settings.APPROVED_ENV,
     settings.PROJECTS_ENV,
     settings.PROJECT_HOME_ENV,
     settings.STATE_ENV,
+    settings.LOG_ENV,
     settings.TICKET_CONTROL_ENV,
     settings.GUARD_TICKET_APPROVAL_ENV,
+    settings.GUARD_CORE_FILES_ENV,
+    settings.GUARD_UNWATCHED_ENV,
+    settings.RESTORE_IF_DENY_ENV,
+    settings.DENY_REPEAT_ENV,
     settings.MODE_ENV,
 )
 

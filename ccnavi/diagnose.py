@@ -663,7 +663,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = phase.stage(root, conf, parent)
         if where:
             stdout.write(f"  {parent.ticket} の局面: {where}\n")
-        where = approval.home_dir(conf, root, parent.ticket, "")
+        where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
         wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
         if wrapped:
             stdout.write(f"  {parent.ticket} は利用者が締めた: {wrapped.get('reason', '')}\n")
@@ -761,7 +761,6 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         closed_copies,
         review_copies,
         approval.types_resolver(conf, root, open_copies),
-        approval.integration_closed(conf, root, proposals),
     )
     # 先行を引く池。承認と着手が使うのと同じ集め方（ADR-0088）。
     preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
@@ -1011,7 +1010,7 @@ def _ticket_record(
         # 状態が動いた跡の新しい側（ADR-0086）。補助で、状態の正は上の置き場の欄。
         "history": [],
     }
-    where = approval.home_dir(conf, root, ticket_id, source.parent)
+    where = approval.home_dir(conf, root, ticket_id, source.parent, project=source.project)
     entries, unreadable = history.read(where, ticket_id)
     record["history"] = entries
     if unreadable:
@@ -1060,7 +1059,7 @@ def _parent_record(
     conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
 ) -> dict:
     """親 1 件。局面、計画、親のマーカー、フェーズの並び。"""
-    where = approval.home_dir(conf, root, parent.ticket, "")
+    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     closed = parent.ticket in closed_index
     return {
         "ticket": parent.ticket,

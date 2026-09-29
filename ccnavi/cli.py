@@ -219,10 +219,10 @@ scripts in .ccnavi/scripts/, which call
          approved and proposal places, the ccnavi directory, and the integration
          branch written in .claude/settings.local.json env; reads no environment
          for the integration branch)
-    ccnavi sync check <parent>
+    ccnavi sync check <parent> [<repo>]
         (for ccnavi-sync.sh after it took in <parent>: re-judges the family's
-         approved tickets and its authority; one "<severity> <detail>" per line;
-         exit 1 when an error stops the family)
+         approved tickets and its authority; a "check 1" line, then one
+         "<severity> <detail>" per line; exit 1 when an error stops the family)
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
@@ -809,10 +809,10 @@ def _parsed(
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
     # 取り込みの後の検査（ADR-0093 の 4.2 の 4。段階 2c）。error があれば sh が家族を止める。
-    if len(args.command) == 3 and list(args.command[:2]) == ["sync", "check"]:
-        return (
-            EXIT_OK if sync_check(stdout, stderr, root, conf, args.command[2]) == 0 else EXIT_ERROR
-        )
+    if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
+        repo = args.command[3] if len(args.command) == 4 else None
+        code = sync_check(stdout, stderr, root, conf, args.command[2], repo)
+        return EXIT_OK if code == 0 else EXIT_ERROR
 
     if args.command or args.reviewed is not None or args.close_early:
         # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
@@ -1169,18 +1169,31 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
 _FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
+# `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
+# 知らない副命令を断った、など）と読み、家族を止めない（検査の error と分ける）。
+SYNC_CHECK_HEAD = "check 1"
+
+
 def sync_check(
-    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, family: str
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    family: str,
+    repo: str | None = None,
 ) -> int:
-    """`ccnavi-sync.sh` が取り込みの後に打つ検査。1 行 1 件（`<深刻度> <中身>`）で返す。
+    """`ccnavi-sync.sh` が取り込みの後に打つ検査。頭に `check 1`、続けて 1 行 1 件。
 
     error が 1 つでもあれば 1。sh は最初の error の中身を家族の控えの `reason` に書いて
-    `blocked` にする（ADR-0093 の 4.2 の 4）。ネットワークにも git にも触らない。
+    `blocked` にする（ADR-0093 の 4.2 の 4）。`repo` は控えの名前（`self` かプロジェクト名）。
+    ネットワークにも git にも触らない。
     """
-    if not _FAMILY.fullmatch(family) or ".." in family:
-        stderr.write(f"ccnavi: sync check の {family!r} は識別子の形ではない\n")
-        return 1
-    problems = lint.family_check(conf, root, family)
+    for name, value in (("識別子", family), ("リポジトリ", repo or "self")):
+        if not _FAMILY.fullmatch(value) or ".." in value:
+            stderr.write(f"ccnavi: sync check の{name} {value!r} は識別子の形ではない\n")
+            return 1
+    problems = lint.family_check(conf, root, family, repo)
+    stdout.write(SYNC_CHECK_HEAD + "\n")
     for p in problems:
         detail = " ".join(p.detail.split())
         stdout.write(f"{p.severity} {detail}\n")

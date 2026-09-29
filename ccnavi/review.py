@@ -230,7 +230,7 @@ def prepare(
     body = _covered_header(root, conf, parent, ph) + body
     # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
     # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が印に残す。
-    home = approval.home_dir(conf, root, parent.ticket, "")
+    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     synced = configsync.pending(home, parent.ticket)
     if synced:
         body = configsync.notice(synced) + body
@@ -344,7 +344,7 @@ def requested(
     # 落ちて黙って除かれる。
     if not _mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         phase_no,
         approval.MARK_REQUESTED,
@@ -422,7 +422,10 @@ def review_problems(
     unresolved = _unresolved(
         result.threads,
         approval.accepted_threads(
-            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+            approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+            parent.ticket,
+            phase_no,
+            parent,
         ),
     )
     if not unresolved:
@@ -473,7 +476,7 @@ def settle_and_mark(
                 f"レビュー待ちの子を {conf.approved}/{ticket_mod.DONE}/ へ動かした: "
                 f"{', '.join(moved)}"
             )
-        home = approval.home_dir(conf, root, parent.ticket, "")
+        home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
         with fsio.policy(prefix="マーカーを置けない: "):
             failed = approval.write_mark(
                 home, parent.ticket, ph.number, approval.MARK_REVIEWED, mark
@@ -635,7 +638,10 @@ def _decision(
     unresolved = _unresolved(
         result.threads,
         approval.accepted_threads(
-            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+            approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+            parent.ticket,
+            phase_no,
+            parent,
         ),
     )
     can_issue = parent.has_plan and parent.feedback is not None
@@ -842,7 +848,7 @@ def apply_decision(
     assert d.result.mr is not None
     parent, ph = d.parent, d.ph
     stamp = approval.now()
-    home = approval.home_dir(conf, root, parent.ticket, "")
+    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     picked = {c: [t for t in d.unresolved if choices.get(thread_key(t)) == c] for c in CHOICES}
     accepted = [thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
     fix = picked[CHOICE_FIX]
@@ -1059,7 +1065,9 @@ def _reviewed_in_chat(
     if approval.MARK_REVIEWED in ph.marks:
         stdout.write(f"OK: フェーズ {ph.number} はすでにレビュー済み\n")
         return 0
-    synced = configsync.pending(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket)
+    synced = configsync.pending(
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
+    )
     if synced:
         stdout.write(configsync.notice(synced))
     stdout.write(f"フェーズ {ph.label}（親 {parent.ticket}）の子:\n")
@@ -1090,7 +1098,7 @@ def _reviewed_in_chat(
         return 1
     if not _mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         ph.number,
         approval.MARK_REVIEWED,
@@ -1164,7 +1172,7 @@ def ready(
         stderr.write("ccnavi: 控えの置き場が空。コメントの下書きを置く場所が無い\n")
         return 1
     wrapped = approval.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval.PARENT_MARK_CLOSE_EARLY,
     )
@@ -1182,7 +1190,7 @@ def ready(
         return 1
     if not _parent_mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval.PARENT_MARK_READY,
         {"mr": result.mr.number, "url": result.mr.url},
@@ -1247,7 +1255,7 @@ def close_early(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
         )
         return 1
-    home = approval.home_dir(conf, root, parent.ticket, "")
+    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     left = _leftovers(home, parent, phases, result)
     # 着手で共通層を写したことをまだ知らせていなければ、締める前にここで見せる。y で締めたら
     # 見たものとして残す。見せないと、締めたあとの finish でもう 1 度端末を求めることになる。
@@ -1272,14 +1280,16 @@ def close_early(
     cancelled, skipped, reviewed_now = settled
     accepted = [thread_key(t) for t in left.unresolved]
     failed = approval.remember_accepted(
-        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+        parent.ticket,
+        accepted,
     )
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
     if not _parent_mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval.PARENT_MARK_CLOSE_EARLY,
         {
@@ -1406,7 +1416,7 @@ def _settle(
                 continue
             if not _mark(
                 stderr,
-                approval.home_dir(conf, root, parent.ticket, ""),
+                approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
                 parent.ticket,
                 ph.number,
                 approval.MARK_SKIPPED,
@@ -1419,7 +1429,7 @@ def _settle(
                 return None
             if not _mark(
                 stderr,
-                approval.home_dir(conf, root, parent.ticket, ""),
+                approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
                 parent.ticket,
                 ph.number,
                 approval.MARK_REVIEWED,

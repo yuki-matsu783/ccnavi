@@ -30,7 +30,7 @@ from typing import TextIO
 
 import yaml
 
-from . import approval, fsio, gitcmd, phasetypes, risk, rules, settings, tree
+from . import approval, fsio, gitcmd, phasetypes, risk, rules, settings, syncstate, tree
 
 # 親ごとの印の名前。`phases/<親>/config-sync.json`。
 MARK = "config-sync"
@@ -341,7 +341,17 @@ def acknowledge(
     root: str,
     parent: str,
 ) -> int:
-    """レビューの無いまま閉じる親で、人が上書きを見たことを残す（`ccnavi --config-synced`）。"""
+    """レビューの無いまま閉じる親で、人が上書きを見たことを残す（`ccnavi --config-synced`）。
+
+    取り込み済みの家族が決まらない・閉じているなら、ほかの状態の操作と同じく止める
+    （書く先が元ツリーの旧経路に落ちないように。ADR-0093 の 3.3）。
+    """
+    st = syncstate.Families(conf, root).standing_any(parent)
+    if st.imported and st.stop:
+        stderr.write(f"ccnavi: {parent}: {st.stop}。この家族の状態は動かさない\n")
+        for line in syncstate.guidance(root, st):
+            stderr.write(f"  {line}\n")
+        return 1
     home = approval.home_dir(conf, root, parent, "")
     mark = pending(home, parent)
     if mark is None:
