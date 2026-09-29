@@ -481,7 +481,8 @@ class DigestTest(AuthorityHarness):
         self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
 
     def test_keys_do_not_depend_on_a_linked_root(self):
-        # 読みの控えは行き着く先の綴り。ルートをリンク越しに渡しても（macOS の /tmp など）同じ鍵になる。
+        # 読みの控えは行き着く先の綴り。ルートをリンク越しに渡しても（macOS の /tmp など）
+        # 同じ鍵になる。
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)
         linked = os.path.join(holder.name, "ws")
