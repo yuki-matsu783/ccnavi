@@ -8,7 +8,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 
 # ADR-0093: 承認は Chrome 拡張から API で行い、写しの権威は親のブランチ 1 枚に固定する
 
-状態: 提案（2026-09-28。段階 0 だけを採用して実装した。段階 1 以降は 11 章のとおり、入れる前に利用者に相談する）
+状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。段階 2 以降は 11 章のとおり、入れる前に利用者に相談する）
 
 本文の `ファイル:行` は、この ADR を書いた時点（`6d0e53e`）の行番号です。段階 0 の変更で `ccnavi-git.sh` の行はずれています。
 
@@ -1082,6 +1082,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
    `refs/merge-requests/<N>/head` がブランチ消去後も残るか、GraphQL の `blobs(paths:)` で束で取れるか（8.2・8.4）。段階 5 の 2 段目の前
 3. GitLab.com の無料版で project access token が使えるか（使えない見込み、確信中）。project access token で `GET /personal_access_tokens/self` が期限を返すか（5.5・8.5）
 4. Pyodide が MV3 の CSP（`'wasm-unsafe-eval'` だけ）で動くか。`EM_ASM`/`EM_JS` の `eval` で落ちないか（7.2。段階 1）
+   → 動いた（2026-09-29、Pyodide 314.0.7・Chromium 141 の headless=new）。拡張のページのモジュール Worker で起動し、ccnavi を import して承認待ちを出すまで CSP の違反は無い。sandbox ページは要らない（11.2）
 5. GitHub の `github-authentication-token-expiration` を拡張の fetch で読めるか。`host_permissions` を持つ拡張の fetch は CORS を受けないので読めるはず（確信中。5.5。段階 3）
 6. Git Bash で、別の sh が取ったロックの pid に `kill -0` が効くか（D32。段階 2d）
 7. GitHub の `GET /commits?sha=P&path=` が merge コミットを返すか・飛ばすか（取り下げの承認コミットの選び方。8.8。段階 3）
@@ -1126,6 +1127,36 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 - `worktree add` の `--detach`・`-f`・`-B`、`checkout -B`・`switch -C`、`:99`・`:607` の文面: D36 のとおり段階 2b（`ccnavi-sync.sh` と同時）
 - 予約の「その時点の統合先の名前」（3.1 の 5）: 統合先の名前の読み（D30）は段階 2b で入る。段階 0 では固定の並びだけを見る
 - 3.1 の 4（issue の番号と識別子の一致）・7（プロジェクトの `<名前>-i<番号>`）・8（`owner/repo#N`）: 段階 0 の行に無い。7 はプロジェクト名の決め方が未決（10.3 の 1）
+
+### 11.2 段階 1 で入れたもの（2026-09-29）
+
+置き場は `chrome-extension/ccnavi-approval/`（`vscode-extension/ccnavi-board` と同じ並び）。手元の ccnavi・sh・hook は変えていない。
+
+| 何 | 場所 | 形 |
+|---|---|---|
+| MV3 の拡張（ボード・設定画面・service worker・Worker） | `src/` | ボードは拡張のページ（タブ）。Pyodide はそのページのモジュール Worker で動かす（8.1）。sandbox ページは使わない（10.2 の 4） |
+| 判定の入口 | `py/ccnavi_chrome.py` | MEMFS に統合先をワークスペースルート、家族をワークツリー（相互参照の `gitdir` つき）として組み、今の `--approve --preview --json` を呼ぶ。家族の見分け・参照の閉包（上限 16 家族）・互換の比べも Python。TS は並べるだけ |
+| 判定の入力（D2） | `src/core/snapshot.ts` | 直近 N 日（既定 3）と指定のブランチは家族を見つけるのに使うだけ。家族ごとに統合先・`P`・閉包の `P_X` だけを渡す。統合先から読むのは `done/`・共通層・自身の層・置き場の綴り（`.claude/settings.json` の `env`）・互換の印 |
+| 読み取り（8.2） | `src/core/github.ts` | 置き場のパスの tree を GraphQL で引いて REST の `?recursive=1` で読み、blob は sha で 50 件ずつ GraphQL で取る。`truncated` と、本文が大きさと合わない blob は止める。blob は IndexedDB に控える。GitHub だけ（GitLab は段階 5） |
+| PAT（5.5） | `src/core/protocol.ts`・`src/background/` | `chrome.storage.local` に平文。読むのは service worker だけ。画面は名前で限った読み取りの操作を頼む。書く・消すは設定画面からだけ受ける。`externally_connectable` は宣言しない |
+| 描画（5.5 の 2） | `src/core/sanitize.ts` | Markdown は marked で HTML にし、DOMPurify で消毒した DOM の断片で入れる。リンクは `http:`・`https:`・`mailto:` だけ。画像・SVG・MathML・フォーム・style も落とす（画像は外への通信になるため。ADR より締めた） |
+| 通信先の焼き込み（D24） | `hosts.json`・`scripts/build.js` | 一覧から `host_permissions` と CSP の `connect-src` を組む。CSP は `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' <API のオリジン>` |
+| 互換の印（7.3） | `py/ccnavi_chrome.py` | 統合先の `CCNAVI_COMPAT` と同梱の `version.COMPAT` を比べ、違えば帯に出す（段階 1 は表示だけ） |
+| 同梱物 | `scripts/build.js`・`scripts/python.js` | Pyodide は npm の版を固定し、写した物のハッシュを突き合わせる。PyYAML は純 Python 版を `uv.lock` の sdist とハッシュで取る。ccnavi と入口は .pyc（unchecked-hash）付きの zip。リポジトリには入れない |
+
+試験: 単体（通信先と manifest、service worker の約束、GitHub の読み取り、悪意のある Markdown）、Node の上の Pyodide でのボードの組み立て、
+ボード 1 回ぶんの要求への Pyodide と手元の CPython の答えの突き合わせ、拡張を読み込んだ Chromium での実機の試験（CSP の違反が無いこと、悪意のある Markdown で何も動かないこと）。
+
+測った値（Chromium 141 の headless=new、Linux）: Pyodide の起動 約 3.7 秒、ccnavi の読み込み 約 0.6 秒、ボードが描けるまで 約 5.5 秒。
+同梱の大きさは 14.3MB（Pyodide 12.9MB、Python の zip 1.3MB）。
+
+入れなかったもの:
+
+- 承認・取り下げ・レビュー済み・「始める」と、その指紋（`digest`）: 段階 3〜5
+- PAT の期限の知らせ（D25）と期限ヘッダの確認（確認事項 5）: 段階 3
+- GitLab の読み取り: 段階 5（`hosts.json` には既定のとおり `gitlab.com` を置き、設定画面で「段階 5」と出す）
+- `source_path` の相対化（D22）: 段階 2a。段階 1 は画面の本文の仮のツリーの絶対パスを `<P>:` に畳んで見せるだけ
+- 3.3 の「決まらない」の規則（`P_X` が無ければ止める）: 段階 2c。段階 1 は今の ccnavi の答え（先行が無い）をそのまま出す
 
 ## 得たもの・失ったもの
 
