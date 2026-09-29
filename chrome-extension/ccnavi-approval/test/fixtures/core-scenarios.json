@@ -33,7 +33,7 @@
      }
     ]
    },
-   "digest": "e94abdc7d356e77b469f0ff4487b955184bb536796e940a9edf2117eb2ed02e7",
+   "digest": "91fb982163efeb6e73ec63e104c5789e4def62fd793f3aceed6985f93982ba7a",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -112,7 +112,7 @@
      }
     ]
    },
-   "digest": "ad80488c791fc010c3544db73c2e84dc05ecae3ebf7068f2d5819303eff531ac",
+   "digest": "a8620ad44b58f6e6343cba8ddcdb6fe8c62054ebe2a6195ab0f6a3c1533a067a",
    "family": "i0001",
    "identifiers": [
     "i0001-02"
@@ -278,7 +278,7 @@
      }
     ]
    },
-   "digest": "dbaf0bde8b3d1fda47c00bc1cca8eca59866e3fc55884d91cc171d6500d46938",
+   "digest": "5e2cf9c2d79d93eeeb085a599e133c1c1c44e83bb1f2dc9cc533c79a3c335bc8",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -312,15 +312,6 @@
        ".ccnavi/approved/phases/i0001/i0001-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01.yml\",\n \"at\": \"2026-09-29T12:00:00+0900\"\n}\n",
        ".ccnavi/approved/phases/i0001/i0001-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"45b8ad582198bf9af43b9e94b7832c794aa8f4ac\",\n \"base\": \"c7cb6d4f74ca95739358df1ca7d7c4b353fea04c\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
        "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nfeedback: []\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
-      },
-      "head": "0000000000000000000000000000000000000000"
-     },
-     "i0001-01": {
-      "files": {
-       ".ccnavi/approved/doing/i0001-01.md": "---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\nccnavi_approved:\n  approved_at: 2026-09-29T12:00:00+0900\n  source_tree: i0001\n  source_path: wip/proposals/todo/i0001-01.md\n---\n\n本文\n",
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\nworkflow:\n  order: sequential\n  waits:\n    1: []\n  review_at: {}\nccnavi_approved:\n  approved_at: 2026-09-29T12:00:00+0900\n  source_tree: i0001\n  source_path: wip/proposals/todo/i0001.md\n---\n\n本文\n",
-       ".ccnavi/approved/events/i0001-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n",
-       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
@@ -361,7 +352,7 @@
      }
     ]
    },
-   "digest": "d2d36c866d2c4bdf2bd6622a1cc115329204ead9cb01338f59775e5c45aeaa5b",
+   "digest": "654e9d180157964cf8839e0d857e452adea48f72d78c3fe2362798b90636b386",
    "family": "i0003",
    "identifiers": [
     "i0003-01"
@@ -449,7 +440,7 @@
      }
     ]
    },
-   "digest": "834537dac03220014eec78c8d1ff00728d94f5882e583717e90d09a7abe29c43",
+   "digest": "167ea3d7ac1c2f7660201197b1305e23c7450f665f560d2e9f420982faad0272",
    "family": "i0001",
    "identifiers": [
     "i0001"

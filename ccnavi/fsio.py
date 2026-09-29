@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import datetime
 import errno
+import hashlib
 import json
 import os
 import re
@@ -137,9 +138,12 @@ def read_text(path: str, errors: str = "strict") -> str | None:
         return None if content is None else _decode(content, errors)
     try:
         with open(path, encoding="utf-8", errors=errors) as f:
-            return f.read()
+            text = f.read()
     except OSError:
+        note_read(path, None)
         return None
+    note_read(path, text)
+    return text
 
 
 def read_bytes(path: str) -> bytes | None:
@@ -153,9 +157,12 @@ def read_bytes(path: str) -> bytes | None:
         return content
     try:
         with open(path, "rb") as f:
-            return f.read()
+            data = f.read()
     except OSError:
+        note_read(path, None)
         return None
+    note_read(path, data)
+    return data
 
 
 # 同じ名前への書き込みが一時的に失敗する errno。同じイベントの hook は並列に走り、
@@ -316,7 +323,9 @@ def read_json(path: str) -> tuple[Any, Exception | None]:
 
     def read() -> Any:
         with open(path, encoding="utf-8") as f:
-            return json.load(f)
+            text = f.read()
+        note_read(path, text)
+        return json.loads(text)
 
     for attempt in range(_READ_RETRIES + 1):
         try:
@@ -324,6 +333,7 @@ def read_json(path: str) -> tuple[Any, Exception | None]:
         except OSError as exc:
             # 無い（ENOENT）は普通の状態なので打ち直さない。待っても現れない。
             if exc.errno not in _TRANSIENT_ERRNO or attempt == _READ_RETRIES:
+                note_read(path, None)
                 return None, exc
             time.sleep(_READ_RETRY_WAIT_SECONDS)
         except ValueError as exc:
@@ -536,8 +546,63 @@ def load_text(path: str) -> str:
         if content is None:
             raise _missing(path)
         return _decode(content)
-    with open(path, encoding="utf-8") as f:
-        return f.read()
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        note_read(path, None)
+        raise
+    note_read(path, text)
+    return text
+
+
+# ---- 判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）
+#
+# 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
+# 読んだファイルの中身の指紋を控える。無かった・読めなかったファイルも「無い」として控える
+# （後から現れれば判定が変わりうる）。控える段（`staging`）から読んだ分は数えない（判定の
+# 入力ではなく、plan の途中の姿）。承認の指紋（`approval.approval_digest`）がこれを使う。
+#
+# 中身は改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。機械の
+# 改行で指紋が変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
+
+# 無い・読めないファイルの印。
+READ_ABSENT = "-"
+_READERS: list[dict[str, str]] = []
+
+
+@contextlib.contextmanager
+def reading() -> Iterator[dict[str, str]]:
+    """この間に読んだファイル（絶対パス → 中身の指紋か `READ_ABSENT`）を集める。
+
+    同じファイルを 2 度読んだら最初の中身を採る。入れ子にすると外側にも同じものが入る。
+    """
+    seen: dict[str, str] = {}
+    _READERS.append(seen)
+    try:
+        yield seen
+    finally:
+        _READERS.remove(seen)
+
+
+def note_read(path: str, content: str | bytes | None) -> None:
+    """読んだ中身を控える（`reading` の外では何もしない）。fsio を通らない読みもこれを呼ぶ。"""
+    if not _READERS:
+        return
+    key = os.path.normpath(parent_resolved(os.path.abspath(path)))
+    digest = READ_ABSENT if content is None else _content_digest(content)
+    for seen in _READERS:
+        seen.setdefault(key, digest)
+
+
+def _content_digest(content: str | bytes) -> str:
+    if isinstance(content, bytes):
+        try:
+            content = content.decode("utf-8")
+        except UnicodeDecodeError:
+            return hashlib.sha256(content).hexdigest()
+    text = content.replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 # ---- この実行で書いたパスの記録（ADR-0093 の 4.3「fsio の記録層」）

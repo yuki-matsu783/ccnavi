@@ -481,8 +481,8 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     }
     case "approve": {
       // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
-      // 見せた指紋（承認画面の本文と承認済みチケットに写る中身）も渡す。識別子が同じでも、
-      // 見せたあとに提案の中身が変われば承認しない
+      // 見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身）も渡す。識別子が同じでも、
+      // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       if (state === current) {
         // 運ぶ sh があるかは、承認が返ったこの時点で見る

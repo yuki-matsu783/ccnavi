@@ -83,6 +83,8 @@ class Verdict:
     digest: str
     messages: str
     mismatch: dict | None = None
+    # 判定が読んだ中身（`<ブランチ>:<相対パス>` → 中身の指紋）。指紋はこれと本文から作る。
+    read_set: dict[str, str] = field(default_factory=dict)
 
     @property
     def batch(self) -> list[approval.Candidate]:
@@ -113,12 +115,15 @@ def judge_approval(
     一覧を今の一覧として比べる（ボードが古い）。識別子と指紋のどちらかが違えば `mismatch`。
     """
     err = io.StringIO()
-    gathered = approval.gather(err, snapshot.conf, snapshot.root, only)
-    shown = gathered
-    if shown_ids is not None and gathered.refused:
-        shown = approval.gather(err, snapshot.conf, snapshot.root)
+    # 判定が読んだ中身（read_set）を控え、指紋に入れる（ADR-0093 の 6.2。段階 2c）。
+    with fsio.reading() as seen:
+        gathered = approval.gather(err, snapshot.conf, snapshot.root, only)
+        shown = gathered
+        if shown_ids is not None and gathered.refused:
+            shown = approval.gather(err, snapshot.conf, snapshot.root)
+    read = approval.read_set(snapshot.conf, snapshot.root, seen)
     text = shown.text
-    digest = approval.approval_digest(text, shown.batch)
+    digest = approval.approval_digest(text, shown.batch, read)
     mismatch = None
     if shown_ids is not None:
         wanted = sorted({s.strip() for s in shown_ids if s.strip()})
@@ -130,7 +135,7 @@ def judge_approval(
                 "current": current,
                 "digest": {"expected": shown_digest or "", "current": digest},
             }
-    return Verdict(gathered, text, digest, err.getvalue(), mismatch)
+    return Verdict(gathered, text, digest, err.getvalue(), mismatch, read)
 
 
 # ---- 書くもの --------------------------------------------------------------------------------
@@ -464,8 +469,8 @@ def approve_yes(
 
     端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
-    ものを承認する道を塞ぐため。識別子に加えて、見せた承認画面の本文と承認済みチケットに
-    写る中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
+    ものを承認する道を塞ぐため。識別子に加えて、見せた承認画面の本文・判定が読んだ中身・
+    承認済みチケットに写る中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
     画面に出ない欄（`issue` など）が書き換われば承認しない。
     指紋が無ければ承認しない。
 
@@ -479,8 +484,8 @@ def approve_yes(
     shown = digest.strip()
     if not shown:
         stderr.write(
-            "ccnavi: --yes には --digest（見せた承認画面の本文と承認済みチケットに写る中身の"
-            "指紋）が要る\n"
+            "ccnavi: --yes には --digest（見せた承認画面の本文・判定が読んだ中身・"
+            "承認済みチケットに写る中身の指紋）が要る\n"
         )
         return 1
     # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
@@ -502,8 +507,9 @@ def approve_yes(
             )
         else:
             stderr.write(
-                "ccnavi: 見せた承認画面の本文と承認済みチケットに写る中身が、今のものと違う"
-                "（識別子は同じで、提案の中身が変わった）。見直してから承認する\n"
+                "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身が、"
+                "今のものと違う（識別子は同じで、提案か、判定が読んだ承認済みチケット・マーカーなどの"
+                "中身が変わった）。見直してから承認する\n"
             )
         return 1
     if not gathered.batch:

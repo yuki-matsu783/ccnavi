@@ -28,6 +28,7 @@ import unittest
 from unittest import mock
 
 from ccnavi import approval, core, fsio, history, settings
+from ccnavi import tree as tree_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, git, write
 
@@ -219,8 +220,11 @@ class SourcePathTest(CoreHarness):
         verify_old = self.ccnavi("--approve", "--preview", "--verify")
         board_old = json.loads(self.ccnavi("--explain", "--json").stdout)
         a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
-        for key in ("batch", "text", "digest", "rejected", "problems"):
+        for key in ("batch", "text", "rejected", "problems"):
             self.assertEqual(a[key], b[key], key)
+        # 指紋は判定が読んだ中身（read_set。ADR-0093 の段階 2c）で作るので、読んだ写しの
+        # バイト列が変われば変わる（見せたあとに写しが書き換わった承認を通さない）。
+        self.assertNotEqual(a["digest"], b["digest"])
         self.assertEqual(verify_new.returncode, verify_old.returncode)
         self.assertEqual(verify_new.stdout, verify_old.stdout)
         # 板の違いは、出所をそのまま見せる欄（copy.source_tree）だけ。ここは同じ値。
@@ -753,6 +757,16 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent("reviewed")
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
+        # 合流した子のワークツリーを畳む。手元の判定は全ツリーの写しを読む（控えの無い家族。
+        # D11）ので、残すと手元だけが子のツリーの古い写しを読み、判定が読んだ中身（read_set）
+        # で作る指紋が Chrome（統合先と P だけを読む）と割れる。
+        git(
+            self.root,
+            "worktree",
+            "remove",
+            "--force",
+            tree_mod.worktree_path(self.root, "i0001-01"),
+        )
         answer = self.same_as_cli("feedback-plan", "i0001")
         self.assertIn("  i0001 のフィードバック計画を改版した", answer["lines"])
 

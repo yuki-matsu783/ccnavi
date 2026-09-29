@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import globmatch, rules
+from . import fsio, globmatch, rules
 from . import ticket as ticket_mod
 from .rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
@@ -170,6 +170,7 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
         with open(path, encoding="utf-8") as f:
             text = f.read()
     except FileNotFoundError:
+        fsio.note_read(path, None)
         return None, []
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
@@ -177,6 +178,8 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
         # 実行後の監視）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う道に
         # 届かない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
+    # 承認の指紋（read_set）に入れる。種類は待ち方と止め方を決める判定の入力。
+    fsio.note_read(path, text)
     return parse(text, path, refs)
 
 
