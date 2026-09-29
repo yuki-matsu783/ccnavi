@@ -142,6 +142,11 @@ class Result:
             return cls(error=f"結果を読めない ({failed})")
         if failed is not None:
             return cls(error=f"結果が JSON として読めない ({failed})")
+        return cls.from_data(data)
+
+    @classmethod
+    def from_data(cls, data: object) -> Result:
+        """読んだ JSON の値から組む。Chrome は sh と同じ形の写しを組んで渡す（ADR-0093 の 8.9）。"""
         if not isinstance(data, dict):
             return cls(error="結果の最上位が辞書ではない")
         if data.get("error"):
@@ -365,85 +370,116 @@ def requested(
     return 0
 
 
-def confirm(
-    stdout: TextIO,
-    stderr: TextIO,
-    root: str,
-    conf: settings.Settings,
-    cwd: str,
-    phase_no: int,
-    result_path: str,
-) -> int:
-    """依頼の後を見る。通ればマーカーを置いて先へ進めるようになる。"""
-    found = _parent_phase(stderr, root, conf, cwd, phase_no)
-    if found is None:
-        return 1
-    parent, ph = found
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
-    if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
-        return 1
-    tree_root = tree.worktree_path(root, parent.ticket)
-    moved = _moved_since_request(tree_root, conf, requested_mark)
-    if moved:
-        stderr.write(
-            f"ccnavi: {moved}。人が見たものと今の HEAD が違う。{_redo_request(root, phase_no)}\n"
-        )
-        return 1
-    result = _matching(stderr, result_path, requested_mark)
-    if result is None:
-        return 1
+def reviewed_mark(
+    mr: int, accepted: list[str], account: str = "", via: str = "", stamp: str = ""
+) -> dict:
+    """レビュー済みの印の中身（`phases/<親>/<N>.reviewed`。ADR-0093 の 8.9）。
+
+    `confirm`（コア）と `decide` が使う。`account` が空なら `actor`・`via` の欄を書かない
+    （段階 2a の手元の経路は、印を前と同じバイト列にする）。`stamp` が空なら `at` を書かず、
+    `approval.write_mark` が今の時刻を入れる。
+    """
+    mark: dict = {"mr": mr, "accepted": list(accepted)}
+    if account:
+        mark["actor"] = account
+        if via:
+            mark["via"] = via
+    if stamp:
+        mark["at"] = stamp
+    return mark
+
+
+def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
+    """依頼したのと同じマージリクエストの写しか。違えばその説明（標準エラーの行）。"""
+    if result is None or result.mr is None:
+        return ["ccnavi: 結果にマージリクエストが無い"]
+    if requested_mark.get("host") and result.host != requested_mark.get("host"):
+        return [
+            f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"
+            f"結果のホスト（{result.host}）が違う"
+        ]
+    if requested_mark.get("mr") and int(requested_mark["mr"]) != result.mr.number:
+        return [
+            f"ccnavi: 依頼したマージリクエスト（{requested_mark['mr']}）と"
+            f"結果のもの（{result.mr.number}）が違う"
+        ]
+    return []
+
+
+def review_problems(
+    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, phase_no: int, result: Result
+) -> list[str]:
+    """レビュー済みにできない理由（変更要求のレビュー、未解決のスレッド）。標準エラーの行。"""
     changes = [r for r in effective(result.reviews) if r.state.upper() == CHANGES_REQUESTED]
     if changes:
-        stderr.write(
+        return [
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "レビュアーの approve / dismiss を待つこと\n"
-        )
-        for r in changes:
-            stderr.write(f"  - {r.url}\n")
-        return 1
+            "レビュアーの approve / dismiss を待つこと",
+            *[f"  - {r.url}" for r in changes],
+        ]
     unresolved = _unresolved(
         result.threads,
         approval.accepted_threads(
             approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
         ),
     )
-    if unresolved:
-        stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
-        for t in unresolved:
-            stderr.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
-        review_sh = settings.script_command(root, "ccnavi-review.sh")
-        if _is_last_feedback_review(parent, phase_no):
-            # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
-            stderr.write(
-                "フィードバック対応の最後のレビューです。道は 2 つ。\n"
-                f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
-                f"  - 利用者が '{review_sh} decide {phase_no}'（ボードの「決める」）で"
-                "残りを受け入れるか、別の issue に回す\n"
-                "新しいフィードバック作業フェーズは足せません。\n"
-            )
-        else:
-            stderr.write(
-                "解決してもらって再実行するか、利用者が端末で "
-                f"'{review_sh} decide {phase_no}'（ボードの「決める」）で、指摘ごとに"
-                "受け入れて進むか、続きの子チケットで直すかを選ぶ\n"
-            )
-        return 1
-    assert result.mr is not None
-    if not _settle_children(stdout, stderr, root, conf, parent, ph):
-        return 1
-    if not _mark(
-        stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
-        parent.ticket,
-        phase_no,
-        approval.MARK_REVIEWED,
-        {"mr": result.mr.number, "accepted": []},
+    if not unresolved:
+        return []
+    lines = [f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている"]
+    lines += [f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in unresolved]
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    if _is_last_feedback_review(parent, phase_no):
+        # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
+        # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
+        lines += [
+            "フィードバック対応の最後のレビューです。道は 2 つ。",
+            f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）",
+            f"  - 利用者が '{review_sh} decide {phase_no}'（ボードの「決める」）で"
+            "残りを受け入れるか、別の issue に回す",
+            "新しいフィードバック作業フェーズは足せません。",
+        ]
+    else:
+        lines.append(
+            "解決してもらって再実行するか、利用者が端末で "
+            f"'{review_sh} decide {phase_no}'（ボードの「決める」）で、指摘ごとに"
+            "受け入れて進むか、続きの子チケットで直すかを選ぶ"
+        )
+    return lines
+
+
+def settle_and_mark(
+    stage,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    ph: phase.Phase,
+    mark: dict,
+) -> tuple[str, str] | None:
+    """レビュー済みで書くもの（子を `done/` へ、レビュー済みの印）を fsio の控える段に並べる。
+
+    順は `_settle_children` → `_mark` と同じ（子を先に動かす。理由は `_settle_children`）。
+    止まったら（"", 理由）。Writer(FS) は `ccnavi: <理由>` と言って止まる（前と同じ文面）。
+    """
+    with fsio.policy(
+        on_fail=fsio.FAIL_STOP, ticket="", message="{reason}", prefix="", undo=(), places=""
     ):
-        return 1
-    stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。先へ進める\n")
-    return 0
+        moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
+        if failed:
+            return "", failed
+        if moved:
+            stage.line(
+                f"レビュー待ちの子を {conf.approved}/{ticket_mod.DONE}/ へ動かした: "
+                f"{', '.join(moved)}"
+            )
+        home = approval.home_dir(conf, root, parent.ticket, "")
+        with fsio.policy(prefix="マーカーを置けない: "):
+            failed = approval.write_mark(
+                home, parent.ticket, ph.number, approval.MARK_REVIEWED, mark
+            )
+        if failed:
+            return "", f"マーカーを置けない: {failed}"
+    stage.line(f"OK: フェーズ {ph.number} はレビュー済み。先へ進める")
+    return None
 
 
 def _settle_children(
@@ -842,7 +878,7 @@ def apply_decision(
         parent.ticket,
         ph.number,
         approval.MARK_REVIEWED,
-        {"mr": d.result.mr.number, "accepted": accepted},
+        reviewed_mark(d.result.mr.number, accepted),
     ):
         return None
     issue_draft = ""
@@ -1785,22 +1821,10 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
     result = _result(stderr, path)
     if result is None:
         return None
-    if result.mr is None:
-        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
-        return None
-    if requested_mark.get("host") and result.host != requested_mark.get("host"):
-        stderr.write(
-            f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"
-            f"結果のホスト（{result.host}）が違う\n"
-        )
-        return None
-    if requested_mark.get("mr") and int(requested_mark["mr"]) != result.mr.number:
-        stderr.write(
-            f"ccnavi: 依頼したマージリクエスト（{requested_mark['mr']}）と"
-            f"結果のもの（{result.mr.number}）が違う\n"
-        )
-        return None
-    return result
+    problems = matching_problems(result, requested_mark)
+    for line in problems:
+        stderr.write(line + "\n")
+    return None if problems else result
 
 
 def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:

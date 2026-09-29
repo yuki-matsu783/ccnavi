@@ -69,7 +69,7 @@ from typing import TextIO
 
 import yaml
 
-from . import ctxfile, globmatch, hookio, rules, selfguard, settings, tree
+from . import ctxfile, fsio, globmatch, hookio, rules, selfguard, settings, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
@@ -498,8 +498,9 @@ class Ticket:
 def load(path: str) -> tuple[Ticket | None, list[Problem]]:
     """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
+        # fsio を通す。承認の plan（控える段）の中では、同じ承認で動かしたチケットを動かした後の
+        # 姿で読む（ADR-0093 の 6.2）。
+        text = fsio.load_text(path)
     except FileNotFoundError:
         return None, []
     except OSError as exc:

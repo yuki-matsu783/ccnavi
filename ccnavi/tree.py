@@ -194,6 +194,35 @@ def relative(tree: Tree, full: str) -> str:
     return os.path.relpath(_resolved(full), tree.root).replace(os.sep, "/")
 
 
+def branch_of(tree_root: str) -> str | None:
+    """このツリーの作業ツリーが今いるブランチの名前。切り離した HEAD なら空文字。
+
+    読むのはファイルだけで、git は起こさない（判定の中から呼ばれうる）。`.git` が
+    ディレクトリならその `HEAD`、ファイル（`gitdir: <場所>`）ならその場所の `HEAD`。
+    読めなければ None（呼び手がツリーの名前などで代える）。
+    """
+    dotgit = os.path.join(tree_root, ".git")
+    gitdir = dotgit
+    if os.path.isfile(dotgit):
+        try:
+            with open(dotgit, encoding="utf-8") as f:
+                line = f.read().strip()
+        except (OSError, ValueError):
+            return None
+        if not line.startswith("gitdir:"):
+            return None
+        gitdir = line[len("gitdir:") :].strip()
+        if not os.path.isabs(gitdir):
+            gitdir = os.path.join(tree_root, gitdir)
+    try:
+        with open(os.path.join(gitdir, "HEAD"), encoding="utf-8") as f:
+            head = f.read().strip()
+    except (OSError, ValueError):
+        return None
+    prefix = "ref: refs/heads/"
+    return head[len(prefix) :] if head.startswith(prefix) else ""
+
+
 def worktree_path(root: str, name: str) -> str:
     """この名前のワークツリーが置かれるはずの場所。在るかどうかは見ない。"""
     return os.path.join(root, WORKTREES_DIR, name)

@@ -17,9 +17,9 @@ import time
 from typing import TextIO
 
 from . import (
-    approval,
     audit,
     configsync,
+    core,
     diaglog,
     diagnose,
     docsearch,
@@ -459,6 +459,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("-h", "--help", action="store_true")
     # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
     parser.add_argument("--version", action="store_true")
+    # この実行で書いた・消したパスを、控えの置き場の下のファイルに 1 行 1 つで書き出す
+    # （ADR-0093 の 4.3「fsio の記録層」）。C1（段階 2d）の sh が渡し、
+    # 一覧のパスだけをコミットする。
+    parser.add_argument("--record-writes", default="")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
@@ -466,6 +470,71 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.help:
         stderr.write(USAGE)
         return EXIT_ERROR
+    if args.record_writes and not args.version:
+        return _recorded_run(stdin, stdout, stderr, parser, args)
+    return _parsed(stdin, stdout, stderr, parser, args)
+
+
+def _recorded_run(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> int:
+    """`--record-writes <ファイル>` つきの 1 回。書いたパスを集め、終わったら書き出す。
+
+    書き出す先は控えの置き場（`conf.state`）の下の `c1/` だけに限る。どこへでも書けると、
+    実行ファイルが任意の場所へファイルを置く道になる。
+
+    1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外は絶対パス。
+    控えの置き場の下（リポジトリに入らない）は載せない。置き場の外が入っていたら止めるのは
+    C1 の側（段階 2d）で、ここは集めて書くだけ。書き出せなければ 1 で終わる。
+    """
+    wrapper = argparse.Namespace(**vars(args))
+    if not _one_wrapper_flag_each(stderr, wrapper):
+        return EXIT_ERROR
+    root = wrapper.root if wrapper.root is not None else default_root()
+    conf, _ = settings.load(root)
+    _override(conf, wrapper)
+    target = os.path.abspath(args.record_writes)
+    place = os.path.join(os.path.abspath(conf.state), "c1") if conf.state else ""
+    if not place or not _inside(target, place):
+        stderr.write(
+            "ccnavi: --record-writes の書き出し先は控えの置き場の下（"
+            f"{place or '控えの置き場が空'}{os.sep}...）だけ\n"
+        )
+        return EXIT_ERROR
+    with fsio.recording() as written:
+        code = _parsed(stdin, stdout, stderr, parser, args)
+    base = os.path.abspath(root)
+    state = os.path.abspath(conf.state)
+    lines = []
+    for path in written:
+        if _inside(path, state) or path == target:
+            continue
+        rel = os.path.relpath(path, base) if _inside(path, base) else path
+        lines.append(rel.replace(os.sep, "/"))
+    failed = fsio.write_text(target, "".join(f"{line}\n" for line in lines), "\n")
+    if failed:
+        stderr.write(f"ccnavi: 書いたパスの一覧を {target} に書けない ({failed})\n")
+        return EXIT_ERROR
+    return code
+
+
+def _inside(path: str, base: str) -> bool:
+    path = os.path.normcase(os.path.normpath(path))
+    base = os.path.normcase(os.path.normpath(base))
+    return path == base or path.startswith(base.rstrip(os.sep) + os.sep)
+
+
+def _parsed(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> int:
     # 設定もワークスペースも読まない。フラグは上の定義から引くので、足したものはそのまま並ぶ。
     if args.version:
         return version.report(stdout, parser, args.json)
@@ -613,11 +682,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         # 通るかどうかを終了コードで返すところ（REQ-APV-13）。答えは 0（はい）と
         # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
         if args.verify:
-            return approval.verify(stdout, stderr, conf, root, args.json, list(args.command))
+            return core.verify(stdout, stderr, conf, root, args.json, list(args.command))
         # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
         # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
-            code = approval.preview(stdout, stderr, conf, root, args.json, list(args.command))
+            code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
         # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
@@ -625,7 +694,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.yes:
             history.set_via(history.VIA_BOARD)
             # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
-            code = approval.approve_yes(
+            code = core.approve_yes(
                 stdout,
                 stderr,
                 conf,
@@ -641,7 +710,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         history.set_via(history.VIA_TERMINAL)
         rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
         # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
-        approved = approval.approve(
+        approved = core.approve(
             stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
         )
         return EXIT_OK if approved == 0 else EXIT_ERROR
@@ -979,7 +1048,7 @@ def operate(
         elif verb == "requested":
             code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
-            code = review.confirm(stdout, stderr, root, conf, cwd, args.phase, args.result)
+            code = core.confirm_local(stdout, stderr, root, conf, cwd, args.phase, args.result)
     elif kind == "review" and verb == "ready":
         if not args.result:
             stderr.write("ccnavi: review ready には --result <json> が要る\n")
