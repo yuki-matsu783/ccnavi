@@ -613,3 +613,28 @@ def integration_local(root: str) -> str:
         return ""
     # 1 行で返す契約（D33）。改行を含む値は使えないので空に落とす。
     return "" if ("\n" in value or "\r" in value) else value.strip()
+
+
+def integration_recorded(state: str) -> str:
+    """`ccnavi-sync.sh` が統合先の控えに書いた統合先の名前（ADR-0093 の D30。段階 2b のレビュー）。
+
+    `<控えの置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目。D33）。控えが無い・
+    読めない・途中にシンボリックリンクがあるときは空（既定の予約だけになる）。環境変数は読まない。
+    控えの中のリンクは辿らない（写すときに落としてあり、読む側でも辿らない決まり）。
+    """
+    if not state:
+        return ""
+    path = state
+    for part in ("sync", "self", "integration", "head"):
+        path = os.path.join(path, part)
+        if os.path.islink(path):
+            return ""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                key, _, value = line.rstrip("\r\n").partition(" ")
+                if key == "branch":
+                    return value.strip()
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return ""

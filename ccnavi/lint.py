@@ -629,7 +629,13 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
     problems.extend(
-        _branch_name_problems(proposals, copies, closed, review, conf.integration_branch)
+        _branch_name_problems(
+            proposals,
+            copies,
+            closed,
+            review,
+            conf.integration_branch or settings.integration_recorded(conf.state),
+        )
     )
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
@@ -885,8 +891,8 @@ def _branch_name_problems(
     - 子の形（`<親>-<2 桁>`）に当たる親の識別子。家族を引くとき、別の親の子と読まれる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
-    `integration` はその時点の統合先の名前（`--integration-branch`。段階 2b）で、渡されたときだけ
-    予約に足す。
+    `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
+    控えに書いた名前（段階 2b）。どちらも無ければ固定の並びだけを見る。
     """
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
