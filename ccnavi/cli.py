@@ -213,6 +213,11 @@ scripts in .ccnavi/scripts/, which call
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review confirm   --cwd <dir> --phase N --result <json>
     ccnavi review ready     --cwd <dir> --result <json>
+    ccnavi sync paths
+        (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
+         approved and proposal places, the ccnavi directory, and the integration
+         branch written in .claude/settings.local.json env; reads no environment
+         for the integration branch)
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
@@ -465,6 +470,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （ADR-0093 の 4.3「fsio の記録層」）。C1（段階 2d）の sh が渡し、
     # 一覧のパスだけをコミットする。
     parser.add_argument("--record-writes", default="")
+    # 統合先の名前（ADR-0093 の D30。段階 2b）。環境変数は読まず、sh が決めて渡す。
+    # いまは `--lint` の識別子の予約（3.1 の 5）が読む。
+    parser.add_argument("--integration-branch", default="")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
@@ -677,6 +685,8 @@ def _parsed(
             return EXIT_ERROR
         swaps[name] = os.path.abspath(path)
 
+    conf.integration_branch = args.integration_branch.strip()
+
     # フローの確かめは `--lint` だけが読む。判定にも採点にも効かないが、ほかの差し替えと同じく
     # 診断の外では落として言う。診断でも `--lint` でなければ読む先が無いので、そう言って落とす。
     if args.flow:
@@ -789,6 +799,10 @@ def _parsed(
         history.set_via(history.VIA_TERMINAL)
         code = configsync.acknowledge(stdin, stdout, stderr, conf, root, args.config_synced)
         return EXIT_OK if code == 0 else EXIT_ERROR
+
+    # 取り込みの sh（`ccnavi-sync.sh`）が綴りを聞く経路。読むだけで、チケット制御の有無に依らない。
+    if list(args.command) == ["sync", "paths"]:
+        return EXIT_OK if sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
 
     if args.command or args.reviewed is not None or args.close_early:
         # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
@@ -1120,6 +1134,25 @@ def operate(
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR
+
+
+def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
+    """`ccnavi-sync.sh` が要る綴りを 1 行 1 項目（`<鍵> <値>`）で返す（ADR-0093 の 4.2・D33）。
+
+    sh は jq を使わず、JSON も読まない。置き場の綴り（ツリーのルートからの相対）と、
+    `.claude/settings.local.json` の `env` に書かれた統合先の名前をここが読んで渡す。
+    統合先の名前は環境変数からは読まない（sh が先に環境変数を見る。D30）。
+    ネットワークにも git にも触らない。
+    """
+    lines = (
+        ("approved", fsio.slashed(conf.approved).strip("/")),
+        ("proposals", fsio.slashed(conf.tickets).strip("/")),
+        ("home", fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")),
+        ("integration", settings.integration_local(root)),
+    )
+    for key, value in lines:
+        stdout.write(f"{key} {value}\n")
+    return 0
 
 
 def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:

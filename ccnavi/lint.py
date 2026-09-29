@@ -628,7 +628,9 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     }
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
-    problems.extend(_branch_name_problems(proposals, copies, closed, review))
+    problems.extend(
+        _branch_name_problems(proposals, copies, closed, review, conf.integration_branch)
+    )
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -870,7 +872,7 @@ def _proposal_problems(
 
 
 def _branch_name_problems(
-    proposals: list, copies: list, closed: list, review: list
+    proposals: list, copies: list, closed: list, review: list, integration: str = ""
 ) -> list[Problem]:
     """識別子を親のブランチ名にできるか（ADR-0093 の 3.1。段階 0 なので warn だけ）。
 
@@ -883,6 +885,8 @@ def _branch_name_problems(
     - 子の形（`<親>-<2 桁>`）に当たる親の識別子。家族を引くとき、別の親の子と読まれる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
+    `integration` はその時点の統合先の名前（`--integration-branch`。段階 2b）で、渡されたときだけ
+    予約に足す。
     """
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
@@ -892,7 +896,7 @@ def _branch_name_problems(
         if t.state != ticket_mod.TODO or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
-        for text in ticket_mod.branch_name_problems(t):
+        for text in ticket_mod.branch_name_problems(t, integration):
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（ADR-0093）"))
 
     spellings: dict[str, set[str]] = {}
