@@ -8,7 +8,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 
 # ADR-0093: 承認は Chrome 拡張から API で行い、写しの権威は親のブランチ 1 枚に固定する
 
-状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、利用者が段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。同日、段階 2b を実装した（11.4）。同日、段階 2c を実装した（11.5）。段階 3 以降は 11 章のとおり、入れる前に利用者に相談する）
+状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、利用者が段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。同日、段階 2b を実装した（11.4）。同日、段階 2c を実装した（11.5）。同日、段階 2d を実装した（11.6）。段階 3 以降は 11 章のとおり、入れる前に利用者に相談する）
 
 本文の `ファイル:行` は、この ADR を書いた時点（`6d0e53e`）の行番号です。段階 0 の変更で `ccnavi-git.sh` の行はずれています。
 
@@ -1434,6 +1434,71 @@ ADR に無かった判断:
 
 `.ccnavi/scripts/ccnavi-sync.sh`（取り込みの後の検査と `blocked` の書き込み。レビューの後に `--forget`・墓標・書き込みの再試行と終了コード 3）、
 `.ccnavi/scripts/ccnavi-git.sh`（gone の push の拒否文に `--forget` を書いた）。
+
+### 11.6 段階 2d で入れたもの（2026-09-29）
+
+C1（4.3・4.4）、運ぶ処理の改修（4.6）、人の判断の入口の sh。変えたのは締める向きだけで、C1 の対象外の家族
+（控えが無い、origin が無い、chat だけの家族、置き場の綴りが絶対パス）は前と同じ動き（D11）。
+
+| 何 | 場所 | 形 |
+|---|---|---|
+| C1 の対象の見分け（D11） | `ccnavi/c1.py` の `family`、`ccnavi c1 family <識別子>` | 1 行 1 項目で `family`（子なら親）・`repo`・`target`（`yes` / `no` / `stop`）・`why`・`tree`・置き場の綴り・止めたときの `hint`。`yes` は置き場の綴りが相対で、家族の控えがあり、chat だけの家族（`phase.chat_only`）でなく、2c の止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い家族。origin の有無は sh が見る。答えない古い実行ファイルでは、家族の控えがあれば `stop`、無ければ `no` |
+| C1 の外の変更の見分け（4.4） | `c1.sort`・`classify`、`ccnavi c1 sort <親> [<版>]` | 置き場（承認済みと `wip/proposals/review/`）の変更を分ける。(b) は `phases/<親>/<N>.pending`・`.skipped` で変更前が無く中身が hook の欄（`at`・`review`・`source`・`deferred_to`・`tickets`）だけの JSON と、`events/<識別子>.ndjson` で変更前が前置きで足した行がどれも跡の行（`at`・`ticket`・`kind` が文字列）のもの。(c) は形で見る人の判断（フロー・`reviewed`・(b) でない `skipped`・`close-early.json`・`config-sync.json`・`accepted.json`・新しく置かれた `doing/` の写し）。ほかは (d)。`keep` は未コミットの `<子>.judge.json`、`skip` は書きかけの一時ファイル。`<版>` を渡すと `<版>..HEAD` でコミットに入った分を同じ規則で見る（4.3 の 5） |
+| 書いたパスの一覧の基点と置き場の外（4.3） | `cli` の `--record-tree <親のワークツリー>` | 一覧をそのツリーからの相対にし、置き場の外に書いたら標準エラーで名指しして 1 で終わる（一覧は書く。C1 は戻すのに使う）。例外は `ticket start` の中の configsync の写し（`configsync.is_synced_write` が内容で読めるもの。D34） |
+| record-risk の記録を finish で運ぶ | `ops`・`fsio.note_input` | finish が読んだ `<子>.judge.json` を、書いたものと同じく一覧に載せる |
+| C1 の手順（4.3 の 1〜11） | `ccnavi-common.sh` の `ccnavi_c1_family`・`begin`・`write`・`end` | 1 ロック（待つ。`CCNAVI_LOCK_WAIT`）2 途中の操作（`MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`rebase-merge`・`rebase-apply`・`sequencer`・`index.lock`）3 見分け → (c)・(d) があれば止め、(b) を `commit --only` 4 取り込み（`ccnavi-sync.sh <P>` を入れ子のロックで起こす。統合先の控えも同じ回で書く）→ 家族の控えが `present` のままか確かめる 5 `origin/<P>..HEAD` の置き場の変更が (b) だけか 6 元の先頭 7 実行ファイルを `--record-writes`・`--record-tree` つきで起こす 8 一覧のパスだけ `commit --only`（新しいファイルは先に `add`）9 `push origin P`（`--force` なし）10 落ちたら `ls-remote` の完全一致で届いたかを見る 11 届いていなければ先頭が自分のコミットのときだけ `update-ref` で戻し、索引と書いたパスの中身を元に戻して、3 から 1 回だけやり直す |
+| C1 を回す入口 | `ccnavi-ticket.sh` の start・finish・cancel、`ccnavi-review.sh` の request（マーカー）・confirm・decide（`--preview` を除く）・ready | 対象でなければ前と同じ（実行ファイルに渡すだけ）。`stop` なら書かずに止め、2c の解き方を出す |
+| 運ぶ処理（4.6） | `ccnavi-push-approved.sh [<親>...]` | 取り込み済みの家族の親のワークツリーは、ロック（入れ子を許す）→ 途中の操作 → 取り込み → 置き場（承認済み、`review/`、消えた `todo/` の提案）を `commit --only` → push → 届いたかの確かめ。落ちてもコミットは残す。`<親>` を並べるとその家族だけで、取り込み済みでない家族は運ばない（今のまま人がコミットする）。省けば前どおり変更のある全ツリーで、取り込み済みの家族だけ上の手順 |
+| 人の判断の入口（D27） | `ccnavi-review.sh chat <N>`・`config-synced <親>`・`close-early` | 実行ファイル（`--reviewed <N> --chat`・`--config-synced`・`--close-early`）が書いた後、取り込み済みの家族なら `ccnavi-push-approved.sh <親>` を呼ぶ。送れなければ 1 で終わり、打ち直しを言う。chat と config-synced はホストに触らないので origin も jq も要らない |
+| エージェントから止める | `phase.ticket_approval_rule`・`_FORBIDDEN_COMMAND` | `ccnavi-review.sh chat / config-synced / close-early` を組み込みの deny とサブエージェントの禁止に足した（締める向き） |
+| ボード | `vscode-extension/ccnavi-board` | フローを保存したら `ccnavi-push-approved.sh <親>` を端末に送る。跡の呼び名に `withdrawn`（承認の取り下げ）と `chrome`（Chrome 拡張）を足した |
+| REQ-APV-11 の補足 | `requirements.md` | 4.3 のそのほかの引用文のとおり |
+
+直したもの（段階 2b の関数）: 入れ子で起こされた sh が別のロック（統合先の控えのロック）を取って外すと、
+`CCNAVI_LOCK_HELD` を消していた。C1 から起こした `ccnavi-sync.sh` が、その後の取り込みの後の検査で家族のロックを
+入れ子と読めず、`blocked` を書けなかった（試験で見つけた）。取る前の値を控え、外すときに戻す。
+
+`history` の `actor`・`version` 欄は段階 2a の `history.note` の追加の欄で書ける（取り下げが書く）。2d で足したのは
+ボードの呼び名だけ。
+
+後方互換（このワークスペース。家族の控えは無い）: 6437196 と後で `--explain --json`・`--lint --json`・
+`--approve --preview --json`・`--approve --preview --verify --json` と、実行前の判定 12 通り（ワークスペースルートと
+ワークツリー 2 つへの Write、承認済みの置き場への Write、Edit、Bash 7 つ）を打ち比べた。違いは `generated_at`（時刻）と、
+`ccnavi-review.sh chat 1`・`close-early` が ask（言及の無い呼び出し）から deny になったこと、deny の文面に人の判断の
+入口を足したことだけ。終了コードは同じ。sh は試験のワークスペースで、控えの無い家族・origin の無い家族・chat だけの
+家族の `ticket start` がコミットも push もしないこと、実行ファイルを直に打ったのと同じ出力と終了コードになることを見た。
+
+ADR に無かった判断:
+
+- C1 の取り込みは `ccnavi-sync.sh <P>` をそのまま起こす（入れ子のロック）。消えたかの確かめ・統合先の控え・
+  取り込みの後の検査が同じ回に入る。3 と 4 の間に hook が書いて重なったかは、sync の文面（「書きかけの」）で見る
+- 止める理由のある取り込み済みの家族（`stop`）は、ネットワークに出る前に sh が止める（実行ファイルも 2c で止めるが、
+  ロックと取り込みを先にしない）
+- 実行ファイルが落ちた回も、書いたパスの中身を元に戻す（コミットしない）。この実行の前から未コミットだった
+  `judge.json`（`keep`）は戻さない
+- `ccnavi-review.sh` では、C1 の 1〜5 をホストに触る前に済ませ、送れなかったときのやり直しは状態を書く実行ファイルの
+  1 回だけにする（依頼の投稿や issue の作成を 2 度しない）。決めた内容のコメントは送った後に投稿する
+- C1 の文面はすべて標準エラーに出す（ボードが標準出力の JSON を読むため）
+- (c) と (d) の分けは文面だけの違い（どちらも止める）。(c) の形は 4.4 の表から取った
+- 運ぶ処理で名指しした家族が取り込み済みでなければ運ばない（0 で終わる）。人の判断の入口とフローの保存は、
+  取り込み済みの家族だけが送られ、控えの無い家族は前と同じ（置くだけ）になる
+- 運ぶ処理のコミットに、`review/` の変更（人のレビューで done/ へ動いた子の削除）を足した（C1 の 5 が未送信の (d) で
+  止まり続けないため）。取り込み済みでない家族の前の経路は変えていない
+- C1 のコミットの文は「ccnavi: <識別子> に着手」など人が読む説明だけ（D37）。(b) は「ccnavi: <P> の hook の印と跡を運ぶ」
+
+入れなかったもの:
+
+- `confirm` の `--actor` と `ccnavi-review.sh` のアカウントの引き当て（8.7・8.9）: 11 章の段階 2d の行に無い
+- GitLab の `phases/<P>/seq`（8.4）: 段階 5
+- Git Bash で別の sh の pid に `kill -0` が効くか（10.2 の 6）: この環境（Linux）では確かめられない。Windows で確かめるまで
+  前のまま（同じホスト・同じ OS なら pid を見る）
+- hook の告知の文（「利用者が端末で 'ccnavi --reviewed <N> --chat' を打つ」）を新しい入口の sh に書き換えること:
+  実行ファイルを直に打っても書けて、取り込み済みの家族では次の C1 が止まって運ぶ処理を案内するので、今は変えていない
+
+#### 11.6.1 段階 2d で触った守りの対象
+
+`.ccnavi/scripts/ccnavi-common.sh`（C1 の関数、ロックの `CCNAVI_LOCK_HELD` の戻し）、`ccnavi-ticket.sh`・`ccnavi-review.sh`
+（C1 と人の判断の入口）、`ccnavi-push-approved.sh`（家族を取る、取り込んでから送る）。利用者の承認（段階 2d の実施）を得て直接直した。
 
 ## 得たもの・失ったもの
 
