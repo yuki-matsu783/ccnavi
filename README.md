@@ -1380,6 +1380,12 @@ ccnavi --approve --preview --verify i0002 i0002-01   # 承認できる状態か�
 リモートに届かないときも止めず、手元の版で判定する。認証は尋ねず、fetch 1 回を `CCNAVI_FETCH_TIMEOUT` 秒（既定 15）で切る。
 認証で落ちたときはそう 1 行添えるので、人が端末で一度 `git fetch origin` を打って資格情報を保存すれば、次のセッションから通る。
 
+親のワークツリーのうち家族の控え（`logs/state/sync/<リポジトリ>/families/<P>`）があるものは、未コミットの変更があっても
+早送りを試し、書きかけと重なれば重なったパスを言う。分かれていれば「取り込みが要る」と 1 行言うだけで merge はしない。
+取り込み（merge）と、親のブランチがリモートから消えたかの確かめは、人が打つ `.ccnavi/scripts/ccnavi-sync.sh [<P>...]` がする（ADR-0093 の 4.2・3.6）。
+統合先は環境変数 `CCNAVI_INTEGRATION_BRANCH`（`.claude/settings.local.json` の `env` でもよい）、空ならホストのデフォルトブランチで、
+使った名前を出力の頭に出す。家族の控えは、親のブランチへの push が `ccnavi-git.sh` で通ったときに作られる。
+
 順序は「承認 → 承認済みチケットをコミット → 子のワークツリーを作る → `start`」。コミットの前にワークツリーを作ると、その子には範囲が効かない。
 
 **承認を頼む前に、エージェントが自分で確かめる。** `--approve --preview --verify [<識別子>...]` は、置かずに「いま `--approve` を打てば
@@ -2407,6 +2413,7 @@ hook の文字列一致は外れる。そこまで塞ぐなら `permissions.deny
 | `.ccnavi/scripts/ccnavi-approve.sh` | 承認し、`ccnavi-push-approved.sh` で運ぶ。人が端末で打つ。本体は `ccnavi --approve` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。人が打つ（エージェントからは止まる）。端末の `ccnavi-approve.sh` とボードの承認のあとに呼ばれる |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチと、ワークツリーの起点になるデフォルトブランチを取ってくる。進めるのは fast-forward だけ（ADR-0060） |
+| `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめて人に回す）。リモートから消えた親のブランチを閉じた・消えたに分け、家族の控えと統合先の控えを書く（ADR-0093 の段階 2b） |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |

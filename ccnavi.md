@@ -192,7 +192,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,approve,fetch,clean,launcher}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
+| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,approve,fetch,sync,clean,launcher}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
 | 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/index.jsonl` の 1 行（別の見出し。`index.jsonl` の行が既にあれば足さない）。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトには足さない |
 
 置き場は 2 つに分けて固定する（ADR-0044）。
@@ -1001,6 +1001,13 @@ ccnavi ディレクトリの守り（`builtin-guard-project-home`）が止める
 起点になるデフォルトブランチ（`origin/HEAD` が指すもの）も、チェックアウトされていなければ `update-ref` で
 進める（ADR-0060）。リモートに届かないときは手元の版で判定を続ける。fetch は 1 回ずつ見張りで切り、hook の
 上限に当たらないようにする。
+
+取り込み済みの家族（家族の控えがある親のワークツリー）は、SessionStart では早送りだけにし、ロックが取れなければ
+飛ばす。分かれた家族の merge、リモートから消えた親のブランチの確かめ（統合先の `done/` にあれば閉じた家族、
+無ければ止めて戻し方を出す）、家族の控えと統合先の控え（`logs/state/sync/`）の書き出しは、人が打つ
+`ccnavi-sync.sh` が持つ。統合先は `CCNAVI_INTEGRATION_BRANCH`（無ければホストのデフォルトブランチ）で、
+設定した名前がリモートに無ければ止める。控えを最初に作るのは、親のブランチへの push が通ったときの
+`ccnavi-git.sh`（ADR-0093 の段階 2b。判定が控えを読むのは 2c から）。
 
 既知の制限: 承認は push するまで他の機械に効かない。承認の記録は履歴に残る。ccnavi が入っていない機械の
 エージェントが偽の承認済みチケットを push できる（塞ぐには承認への署名が要る。未実装）。
