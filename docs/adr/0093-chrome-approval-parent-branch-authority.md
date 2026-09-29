@@ -1160,20 +1160,20 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 
 ### 11.3 段階 2a で入れたもの（2026-09-29）
 
-判定は変えていない（試験で確かめた）。手元の書き込みも、落ち方を含めて前と同じ（1 か所だけ違う。下の「分かったこと」）。
+判定は変えていない（試験で確かめた）。手元の書き込みも、落ち方を含めて前と同じ。違うのはレビューで直した 1 か所（マーカーの消去。11.3.1 の決定 A）で、判定を締める向き。
 
 | 何 | 場所 | 形 |
 |---|---|---|
-| 判定のコアと差し口（6.2） | `ccnavi/core.py` | `Snapshot`（Reader(FS)）→ `judge` → `plan` → `Changes` → `write_fs`（Writer(FS)）。`judge` は見せた識別子と指紋を今のものと比べる（前の `--yes` の検査）。`Changes` は書き込みと見せる行の並びと、ブランチごとの create / update / delete（`per_branch`、ツリーからの相対パス） |
+| 判定のコアと差し口（6.2） | `ccnavi/core.py` | `Snapshot`（Reader(FS)）→ `judge_approval` → `plan` → `Changes` → `write_fs`（Writer(FS)）。`judge_approval` は 6.2 の `judge`（実行前の判定のモジュール `ccnavi.judge` と紛れないように名前を変えた）で、見せた識別子と指紋を今のものと比べる（前の `--yes` の検査）。`Changes` は書き込みと見せる行の並びと、ブランチごとの create / update / delete（`per_branch`、ツリーからの相対パス。中身の改行は LF に固定） |
 | 書けなかったときの扱い | `fsio.policy`・`core.write_fs` | 並べる段では書き込みが落ちないので、止める・言って続ける・行を出して同じ組を飛ばす・黙る・跡の知らせに溜める、のどれかを書き込みに添え、Writer(FS) が前と同じ文面と順で落ちる（置けた分は残す。マーカーは置けた後だけ消す。フローが運べなければ行で言い、元を残す） |
-| 手元の `--approve` | `approval.approve`・`approve_yes`・`preview`・`verify` | どれも `core.judge` を通る。書くのは `core.plan` → `core.write_fs`。前の `_apply` は並べる手順（`plan_batch`）になり、書き込みの手順のコードは 1 つ |
-| `confirm`（8.9） | `core.confirm`・`review.confirm` | 検査（依頼の記録・動いたか・同じ MR か・変更要求・未解決）と書くもの（レビュー待ちの子を `done/` へ・レビュー済みの印）をコアへ。手元は cwd の親・git の差分・`--result` の写しを前と同じ順で読んで渡す |
-| `reviewed_mark`（8.9） | `core.reviewed_mark` | `confirm` と `decide` が使う。`actor` が空なら `actor`・`via` の欄を書かず、手元の印は前と同じバイト列 |
+| 手元の `--approve` | `core.approve`・`approve_yes`・`preview`・`verify` | どれも `core.judge_approval` を通る。書くのは `core.plan` → `core.write_fs`。前の `_apply` は並べる手順（`approval.plan_batch`）になり、書き込みの手順のコードは 1 つ。入口は approval から core へ移した（approval に置くと import が循環する） |
+| `confirm`（8.9） | `core.confirm`・`core.confirm_local` | 検査（依頼の記録・動いたか・同じ MR か・変更要求・未解決）と書くもの（レビュー待ちの子を `done/` へ・レビュー済みの印）をコアへ。手元（`confirm_local`、前の `review.confirm`）は cwd の親・git の差分・`--result` の写しを前と同じ順で読んで渡す。跡の経路は Snapshot の経路（Chrome なら `chrome`） |
+| `reviewed_mark`（8.9） | `core.reviewed_mark`・`review.reviewed_mark` | `confirm` と `decide` が使う。欄は 8.9 の並び（`mr`・`accepted`・`actor`・`via`・`at`）で、`actor` はアカウントが分かるときだけ、`via` は経路が分かるときだけ書く（Chrome は `via: chrome`）。段階 2a の手元はどちらも渡さないので、手元の印は前と同じバイト列 |
 | `withdraw`（8.8） | `core.withdraw` | 条件（新規・followup でない・未着手・子もマーカーも無い・戻す先が空いている・承認コミットの親の提案がある）と書くもの（`doing/` を消し、`todo/` に元のバイト列、跡）。呼ぶのは Chrome の入口の試験だけ（画面は段階 3）。跡の種類 `withdrawn` と経路 `chrome` を `history` に足した（コアの書くものに要るため） |
 | 時計（Clock） | `fsio.clock`・`stamp`・`utc_stamp`、`history.stamp` | 固定した 1 つの時刻から、承認の記録（オフセット付き）と跡（UTC）を出す。plan の間は `Snapshot.stamp`（空なら今）に固定する |
-| D22 | `approval.admit`・`source_path`・`source_branch`・`_origin_line`、`tree.branch_of` | `source_path` は提案のツリーからの相対（"/"）、`source_tree` はそのツリーの HEAD のブランチ名（ファイルだけを読み、git は起こさない。読めなければツリーの名前）。承認画面の「提案:」も相対パスにした |
+| D22 | `approval.admit`・`source_path`・`source_branch`・`_origin_line`、`tree.branch_of` | `source_path` は提案のツリーからの相対（"/"。別のドライブなら綴りのまま）、`source_tree` はそのツリーの HEAD が指すブランチ名（ファイルだけを読み、git は起こさない）。HEAD が切り離し（sha）・空・壊れている・読めないときはツリーの名前（ワークスペースルートなら空）に落とし、`Changes.per_branch` の名前と同じ決め方にした。承認画面の「提案:」も相対パスにした |
 | 控える段 | `fsio.staging`・`Stage`・`Op`・`Line` | 中では書き込みを控え、読み（`read_*`・`exists`・`lexists`・`listdir`・`load_text`）は控えた中身を先に見る。承認の手順が同じ承認で動かした後の置き場を読む（`home_dir`・`settle_review`・マーカー・跡） |
-| fsio の記録層（4.3） | `fsio.recording`、`cli` の `--record-writes <ファイル>` | 書いた・消したパスを 1 行 1 つ、ワークスペースルートからの相対（"/"）で書き出す。ルートの外は絶対パス、控えの置き場の下（リポジトリに入らない）は載せない。書き出し先は控えの置き場の下の `c1/` だけ（実行ファイルがどこへでもファイルを置ける道にしない） |
+| fsio の記録層（4.3） | `fsio.recording`、`cli` の `--record-writes <ファイル>` | 書いた・消したパスを 1 行 1 つ、ワークスペースルートからの相対（"/"）で書き出す。比べるのは行き着く先の綴り（リンクを解き、大文字小文字を畳む）。ルートの外と別のドライブは絶対パス、既定の控えの置き場の下（リポジトリに入らない）と一覧自身は載せない。書き出し先は 11.3.1 の 1 |
 | fsio を通らない書き込みを揃えた | `approval`（`admit`・`carry_flow`・`move_file`・`clear_marks`・改版の提案の削除）、`history._append`、`configsync._replace`・`_restore`、読みの `ticket.load`・`approval._load_dir`・`home_dir` | `fsio.unlink`・`move`・`write_new`・`append`・`replace_bytes` を足して通した。置き場を書くモジュールに素の書き込みが残っていないことを試験で見る |
 | Chrome の入口 | `chrome-extension/ccnavi-approval/py/ccnavi_chrome.py` | ボードの本文を畳まずに返し、指紋（`digest`）も返す（段階 1 で外したもの。D22 で機械に依らなくなった）。仮のツリーに HEAD を書く。`plan`・`withdraw`・`confirm` の操作（書くものを値で返すだけ。ホストにもディスクにも書かない） |
 | 見本 | `tests/ticket/test_core.py`、拡張の `test/fixtures/core-scenarios.json`・CX-T061 | 7 場面（新規、レビュー済みのフェーズに子を足してマーカーを消す、改版、フィードバック計画、多段の先行で通る子と落ちる子、取り下げ、レビュー済み）。Chrome の入口の答えが、手元のコアが実際に書いたバイト列と同じことを手元で見て見本に書き出し、拡張の試験が Pyodide と手元の CPython でも同じ答えになることを見る |
@@ -1183,7 +1183,6 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 - Pyodide（314.0.7、Python 3.14）と手元の CPython 3.12 が、7 場面で同じバイト列（写し・跡・マーカー・提案の削除）を出した。比べ方は中身のバイト比較（6.2 の「差分のパスの一覧だけ」から広げた）
 - D22 で承認画面の本文が機械に依らなくなり、Chrome のボードの指紋と手元の `--approve --preview` の指紋が同じ値になった
 - 後方互換: このリポジトリの `.ccnavi/approved/done/` の 18 本（`source_path` が Windows の絶対パス）で、`--explain --json`・`--lint --json`・`--approve --preview --json`・`--verify --json` の答え（時刻の欄を除く）と標準エラーが段階 2a の前と同じ。前の形の写しに書き換えても承認と実行前の判定が同じことは試験で見る
-- 落ち方が前と違う 1 か所: 子を足してマーカーを消すとき、在るのに消せなかったマーカーも「消した」と行と跡に出る（前は出さなかった）。消せなかったマーカーはそのまま効くので、判定は変わらない
 - 時刻: 1 回の承認の記録（`approved_at`）と跡（`at`）は同じ時刻になった（前は別々に時計を読んでいた）
 
 入れなかったもの:
@@ -1194,6 +1193,26 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 - 記録の一覧に置き場の外があれば error にすることと D34 の例外: C1 の側（段階 2d）
 - VS Code のボードの呼び名（`withdrawn`・`chrome`）: 段階 2d
 - Chrome の画面で `plan`・`withdraw`・`confirm` を使うこと: 段階 3・4
+
+#### 11.3.1 レビューで直したもの（2026-09-29）
+
+段階 2a の後の敵対的レビューの指摘を、利用者の承認を得て直した。
+
+| # | 何 | 直し方 |
+|---|---|---|
+| 1 | `--record-writes` の書き出し先の制限に抜けがあった | 置き場は `--state`・`CCNAVI_STATE` で上書きする前の既定（ワークスペースルートの `logs/state/c1/`）だけ。行き先・置き場・ルートは行き着く先（`realpath`、大文字小文字を畳む）で比べ、`..`・上書きした置き場・`c1/` の下のリンク・行き先そのもののリンクを断る。書き出しは同じディレクトリの一時ファイルから `os.replace` で置き換える（行き先のリンクの先を開かない。Windows でも同じ）。**C1（段階 2d）の前提**: コマンドが落ちても、そこまでに書いたパスで一覧を書き、終了コードはコマンドのもの。一覧を書けなければ、コマンドの結果に依らず 1 で終わる。行き先を断ったときはコマンドを走らせずに 1 |
+| 2（決定 A） | 子を足してマーカーを消すとき、在るのに消せなかったマーカーも「消した」と出ていた | reviewed を先に消し、消せなければその場で止める（残るとフェーズが済んだまま読まれる。判定を締める向きで、利用者が承認）。ほかの種類は消せなければ「消せなかった（理由）。<種類> は残っていて効く」と言って続ける（`FAIL_WARN`）。行と跡（`phase-reopened` の `cleared`）は Writer(FS) が実際に消せた種類だけで書く（`fsio.Call`）。Changes（Chrome の 1 コミット）は全部消した姿。控える段の消去はリンクを辿らない（`lexists`）。続きの子（`approval.followup`）も同じ規則 |
+| 3 | macOS などで記録の一覧が絶対パスになった | 1 と同じく行き着く先の綴りで控え、比べる |
+| 4 | Chrome の `confirm` の跡の経路が `cli` になっていた | 並べる段を Snapshot の経路の `history.session` で包む（取り下げと同じ形）。印の `via` は 8.9 のとおり経路が分かるときに書く |
+| 5 | 取り下げの条件で、マーカーの置き場を読めないのを「無い」と読んでいた | 無い（`FileNotFoundError`）だけを無いとし、ほかの読めない理由は問題として返す（緩めない） |
+| 6 | Chrome の入口が、読めない時刻で例外を漏らした | 仮のツリーを組む前に時刻を確かめ、`error` で返す |
+| 7 | `branch_of` と `source_branch` の決め方が `per_branch` と違った | 上の D22 の行のとおり揃えた |
+| 8 | 並べた後に動かす先が置かれても、書くときに確かめていなかった | Writer(FS) が動かす前に行き先を確かめ、在れば止める（上書きしない） |
+| 9 | Windows で別のドライブの相対パスが作れず落ちた | 綴りのまま返す |
+| 10 | Changes の中身の改行が機械で変わった | LF に固定。ディスクへは前と同じ改行で書く |
+| 11 | 取り下げとレビュー済みを並べる段で分かった跡の書けなさが、黙って消えていた | error として返し、何も並べない |
+| 12 | 試験の穴 | Writer(FS) の落ちる枝（提案を消せない→戻す、改版の提案を消せない→言って続ける、跡を書けない→警告、マーカー、動かす先）、Windows の絶対パスの旧写し、HEAD の形（切り離し・壊れた・ワークスペースルート・相対の gitdir）、記録の書き出し先の抜け、手元の CLI の出力（行・止まったか・問題点・本文・指紋）と Chrome の答えの突き合わせを全場面に（取り下げは CLI が無いのでコアと）、見本の新旧を場面ごとにその場で比べる、CX-T061 の Pyodide の側は uv が無くても回す、素の書き込みの検査に review・phase・ticket・gitstate を足した（`gitstate.restore` の `shutil.move` は実行後の監視が範囲外の変更を脇へ退けるもので、状態の操作ではないので許す） |
+| 13 | 名前 | `core.judge` を `core.judge_approval` に改名。core が使う approval の関数は公開名にした（`preview_body`・`verify_verdict`・`approved_text`）。review の非公開の関数は、手元の confirm と同じ読み方と文面にするために使い、理由をコメントに書いた |
 
 ## 得たもの・失ったもの
 
