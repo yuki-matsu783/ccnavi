@@ -1,0 +1,11 @@
+{
+  "hosts": [
+    {
+      "id": "github.com",
+      "kind": "github",
+      "api": "http://127.0.0.1:18787",
+      "graphql": "http://127.0.0.1:18787/graphql",
+      "web": "http://127.0.0.1:18787"
+    }
+  ]
+}
