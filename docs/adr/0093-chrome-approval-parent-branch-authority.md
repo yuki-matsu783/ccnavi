@@ -8,7 +8,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 
 # ADR-0093: 承認は Chrome 拡張から API で行い、写しの権威は親のブランチ 1 枚に固定する
 
-状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、利用者が段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。段階 3 以降は 11 章のとおり、入れる前に利用者に相談する）
+状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、利用者が段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。同日、段階 2b を実装した（11.4）。段階 3 以降は 11 章のとおり、入れる前に利用者に相談する）
 
 本文の `ファイル:行` は、この ADR を書いた時点（`6d0e53e`）の行番号です。段階 0 の変更で `ccnavi-git.sh` の行はずれています。
 
@@ -1214,6 +1214,56 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | 12 | 試験の穴 | Writer(FS) の落ちる枝（提案を消せない→戻す、改版の提案を消せない→言って続ける、跡を書けない→警告、マーカー、動かす先）、Windows の絶対パスの旧写し、HEAD の形（切り離し・壊れた・ワークスペースルート・相対の gitdir）、記録の書き出し先の抜け、手元の CLI の出力（行・止まったか・問題点・本文・指紋）と Chrome の答えの突き合わせを全場面に（取り下げは CLI が無いのでコアと）、見本の新旧を場面ごとにその場で比べる、CX-T061 の Pyodide の側は uv が無くても回す、素の書き込みの検査に review・phase・ticket・gitstate を足した（`gitstate.restore` の `shutil.move` は実行後の監視が範囲外の変更を脇へ退けるもので、状態の操作ではないので許す） |
 | 13 | 名前 | `core.judge` を `core.judge_approval` に改名。core が使う approval の関数は公開名にした（`preview_body`・`verify_verdict`・`approved_text`）。review の非公開の関数は、手元の confirm と同じ読み方と文面にするために使い、理由をコメントに書いた |
 
+### 11.4 段階 2b で入れたもの（2026-09-29）
+
+取り込みと控え。控えは書くだけで、判定はまだ読まない（2c）。判定の答えは変えていない。
+
+| 何 | 場所 | 形 |
+|---|---|---|
+| 取り込みの sh（4.2・3.6） | `.ccnavi/scripts/ccnavi-sync.sh`（新規） | `ccnavi-sync.sh [<P>...]`。省けば `.claude/worktrees/` の下の親のワークツリー全部。リポジトリごとに `ls-remote --heads origin` を 1 回（2 列目を `grep -F -x` で完全一致）、落ちたら止める。`P` があれば fetch して早送りか merge（索引が HEAD と同じときだけ。衝突したら `merge --abort` して人に回す）、家族の控えを `present` で書く。`P` が無く控えも無ければ「まだ送っていない家族」で今のまま。控えがあれば統合先の `done/<P>.md` を `cat-file -e` で見て `closed`、無ければ統合先を取り直して確かめ直し（既定 3 回、5 秒おき）、`ccnavi-review.sh merged` でマージ済みと分かれば「反映待ち」で止め、どれにも当たらなければ `gone` を書いて理由と戻し方 1・2 を出して止める。ロックは待って取る |
+| 統合先の名前（D30） | `ccnavi-sync.sh`、`ccnavi sync paths`、`settings.integration_local` | 環境変数 `CCNAVI_INTEGRATION_BRANCH`、空なら `.claude/settings.local.json` の `env` の値（JSON は実行ファイルが読んで 1 行で返す。D33）、空ならホストのデフォルトブランチ（リモートの一覧にある `origin/HEAD`、無ければ `main`・`master`）。設定した名前がリモートに無ければ既定に落とさずに止める。使った名前とどこから決めたかを出力の頭と控えの `head`（`source` は `env`・`settings.local.json`・`default`）に出す。実行ファイルは環境変数を読まない |
+| 統合先の控え（D26） | `logs/state/sync/<リポジトリ>/integration/` | 統合先の先頭から `<置き場>/done/`・`.ccnavi/common/`・`<ccnavi ディレクトリ>/config/`・`.claude/settings.json` をファイルのまま同じ並びで写し（`git archive` と `tar`）、`head` に `remote`・`branch`・`source`・`sha`・`fetched_at`。一時の置き場に組んでから入れ替える |
+| 家族の控え（3.6） | `logs/state/sync/<リポジトリ>/families/<P>` | 1 行 1 項目（`remote`・`branch`・`sha`・`fetched_at`・`state`・`reason`）。`state` は `present`・`closed`・`gone`（`blocked` は 2c） |
+| ロック（D32） | `ccnavi-common.sh` の `ccnavi_lock_take` / `ccnavi_lock_drop` | `mkdir` で取り、`owner` に `<ホスト名> <pid> <開始時刻> <印>`。古いロック（同じホストで `kill -0` が落ちる・10 分を過ぎた・`owner` が読めず `find -mmin +10`）は `mv` で奪い、持ち主が替わっていたら戻す。入れ子は `CCNAVI_LOCK_HELD`。sync は `CCNAVI_LOCK_WAIT`（既定 120 秒）待ち、SessionStart は 1 回だけ試す |
+| SessionStart の早送りだけ（D12） | `ccnavi-fetch.sh` | 取り込み済みの家族（`.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある）は、ロックを 1 回だけ試し、`origin/<P>` の祖先なら `merge --ff-only`。書きかけとの重なりは git に任せ、拒まれたら重なったパスと `ccnavi-sync.sh <P>` を言う。分かれていれば「取り込みが要る」と 1 行言う（merge しない）。開始から 45 秒（`CCNAVI_FETCH_BUDGET`）を過ぎたら飛ばして名指しする。それ以外のツリーは前のまま |
+| 「ref が無い」で落ちた fetch（3.6） | `ccnavi-fetch.sh` | `couldn't find remote ref` で落ちたら、その origin を落ちたものに数えない（同じ origin の統合先の取り込みを飛ばさない）。家族なら「`ccnavi-sync.sh <P>` で確かめる」と言う |
+| push の移り目と `gone` の拒否（4.3・3.6） | `ccnavi-git.sh` の `push)` | 送る前に、控えが `gone` の `P` への push を拒否する（控えを読むだけ。`ls-remote` はしない）。通った後、送った先が親のブランチ（ディレクトリ名 = ブランチ名、親の写しか提案がある）で送り先が origin なら、控えを `present` で作る。置き場（`approved/`・`proposals/review/`。未追跡を含む）に未コミットの変更があれば作らずに言う。`present` の控えは `sha` だけ書き直し、`closed` は触らない |
+| 付け替えと移動の拒否（D36・5.2・3.1 の 10） | `ccnavi-git.sh` の `worktree)`・`checkout \| switch)` | `worktree add` の `-B`・`--detach`/`-d`・`-f`/`--force` を拒否し、`-b` の名前（`-b` が無ければ 2 つ目の語）が行き先の名前と違えば拒否。`checkout -B`（束ねた `-qB` も）・`switch --force-create` を拒否（`switch -C` は全引数の `-C` で前から止まる）。親のワークツリーでは、自分のブランチと `HEAD` 以外へ移る形（`checkout <別>`・`-b`・`--orphan`・`--detach`・`switch --create`・`-d`・`-`）を拒否し、「親のブランチの名前は識別子で、変えると家族が止まる」と言う |
+| 案内文の書き換え（D36・3.1 の 10） | `ccnavi-git.sh` の使い方と `reset` の拒否文、`fetch`・`pull` の refspec の拒否文 | 「リモートに合わせるなら、親のブランチは `ccnavi-sync.sh <P>`。ほかのブランチは `fetch` のあと `merge <リモート>/<ブランチ>`。分かれていて進めないなら人に回す」。refspec の文は「手元の ref は `ccnavi-sync.sh <ブランチ>` が進める」 |
+| 統合先の名前の予約（3.1 の 5） | `ticket.branch_name_problems`、`lint`、`cli` の `--integration-branch` | 渡された統合先の名前（大文字小文字を畳む）に当たる新規の親の識別子を `--lint` の warn で言う。環境変数は読まない |
+| 配る sh | `scripts/ccnavi-setup.sh` | `ccnavi-sync.sh` を配る一覧に足した（拒否の文面が案内するため） |
+
+後方互換（D11）: origin の無いリポジトリと、一度も push していない `P`（控えが無い）は前と同じ動き。
+chat だけの家族（MR を持たない家族）も、送らなければ控えができず前と同じ。送れば控えができる（見分けは実行ファイルの種類の読みが要るので、C1 の対象を決める 2d で入れる）。
+控えができた家族で段階 2b が変えるのは、SessionStart の早送りの規則、`ccnavi-sync.sh` の消えたかの確かめ、`gone` の `P` への push の拒否の 3 つ。
+控えの無い親のワークツリーは、SessionStart でも前の規則（未コミットがあれば進めない）のまま。控えができるのは、段階 2b の後に `ccnavi-git.sh push` が通ったときか、`ccnavi-sync.sh` を打ったとき。
+判定（hook・lint・承認）は控えを読まないので、答えは変わらない。
+
+ADR に無かった判断:
+
+- 置き場の綴りと settings.local.json の統合先の値は、実行ファイルの `ccnavi sync paths`（1 行 1 項目）で sh に渡す。実行ファイルが無ければ環境変数の綴りに落とす。統合先の名前は環境変数が settings.local.json より先
+- `--integration-branch` を今渡す呼び手は無い（2c で sync の lint がこれを渡す）
+- MR の確認は `ccnavi-review.sh merged`（新しい副命令。実行ファイルを起こさない）で行い、答えが `merged <番号>` のときだけ「反映待ち」にする
+- 「3 回まで 5 秒おき」は最初の確かめの後の確かめ直しの回数と読んだ。試験のために `CCNAVI_SYNC_RETRIES`・`CCNAVI_SYNC_RETRY_WAIT`・`CCNAVI_FETCH_BUDGET` で変えられる（既定は ADR の値）
+- `ccnavi-sync.sh` が扱うのは親のワークツリーだけ。ほかのブランチには `merge <リモート>/<ブランチ>` を案内する
+- 早送りや merge が止まったときも、控えは `present`（リモートにあること）で書く
+- 引数を省いた `ccnavi-sync.sh` は、家族が無くても origin のあるリポジトリ（ワークスペースとプロジェクト）の統合先の控えを書く
+
+入れなかったもの:
+
+- 判定が控えを読むこと（権威・閉じた家族・閉包の池・統合先の控えからの層）、取り込みの後の `--lint` と C3 の判定し直し、控えの `blocked`、`ready` の前提: 段階 2c
+- 指紋を `read_set` にすること: 2c（Reader の差し替えと同時。利用者の決定）
+- 書いたパスの一覧の基点を `P` のワークツリーに絞ることと、置き場の外を error にすること: 2d（利用者の決定）
+- C1、運ぶ処理の改修、人の入口の sh: 2d。ロックの関数は入れたが、C1 からの入れ子の使い方と Git Bash の `kill -0`（10.2 の 6）は 2d で確かめる
+- `phases/<P>/seq` だけの衝突を origin 側で解くこと: GitLab の段階 5
+- `settings.local.json` に承認に効く値を置かせない lint と、`P` の上のプロジェクトの層の食い違いの warn: 2c
+- `ccnavi-fetch.sh` の 2 周目（ワークツリーの起点）は今までどおりデフォルトブランチを進める。統合先の名前には合わせていない
+
+#### 11.4.1 段階 2b で触った守りの対象
+
+`.ccnavi/scripts/` の `ccnavi-git.sh`・`ccnavi-fetch.sh`・`ccnavi-common.sh`・`ccnavi-review.sh`（`merged` の副命令）と、新しい `ccnavi-sync.sh`。
+利用者の承認を得て直接直した。
+
 ## 得たもの・失ったもの
 
 決定ごとの得失は 10.1 の表に 1 行ずつ置いた。まとめると次のとおり。
@@ -1223,6 +1273,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 - 失ったもの: 取り込み済みの家族では状態の操作にネットワークが要り、sh（`ccnavi-sync.sh`・C1・ロック）が増える。`approval.py`・`phase.py`・`review.py` の広い範囲に手が入る
 - 失ったもの: Chrome 拡張に Pyodide（約 14MB）を同梱し、初回に数秒待つ
 - 段階 0 で失ったもの: 置き場に当たるパスを `checkout <ref>`・`restore --source`・`restore --ours / --theirs` で戻す道と、`fetch`・`pull` の refspec と URL と、`branch -M`・`-C` がエージェントから使えなくなる。要るときは利用者が打つ
+- 段階 2b で失ったもの: `checkout -B`・`switch --force-create`・`worktree add -B / --detach / -f`、行き先の名前とブランチ名の違う `worktree add`、親のワークツリーでの別のブランチへの移動がエージェントから使えなくなる。squash マージの後で早送りできないブランチは人に回す
 
 ## 採らなかった案
 
