@@ -73,6 +73,8 @@ WS=$(ccnavi_workspace) ||
 	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 # 解いたルートを logger に渡し、書くたびに探し直させない。
 ccnavi_log_root="$WS"
+# git の綴り（リンクを解いたもの）と比べるための、リンクを解いたルート。
+WS_P=$(ccnavi_phys "$WS")
 
 usage() {
 	cat <<'USAGE'
@@ -113,6 +115,10 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
                 読み取り専用のサブコマンドでも任意コマンドの実行や書き込みに
                 なってしまうので、値を見ずに一律で拒否する
+
+オプション: branch checkout switch fetch pull merge commit rm restore cat-file worktree は
+            許可リストで読む。長いオプションは略さずに書く (略した綴りは通らない)。
+            短いオプションは束ねてよく、値を取る字 (-b など) の後ろは値として読む
 
 出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
 環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS
@@ -157,6 +163,21 @@ for arg in ${1+"$@"}; do
 	--git-dir | --git-dir=* | --work-tree | --work-tree=* | --namespace | --namespace=* | -C)
 		reject moved-root "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
 		;;
+	--?*)
+		# 略した綴り（`--outp=x`・`--upload-p=...`）。parse-options を使う副命令は長いオプションの
+		# 略を受けるので、止める名前の頭に当たる綴りも止める（ADR-0093 の段階 2b のレビュー）。
+		# `--text`（diff の正式な名前）だけは textconv の頭でも通す。
+		gl_name="${arg#--}"
+		gl_name="${gl_name%%=*}"
+		for gl_bad in output upload-pack receive-pack exec-path exec ext-diff textconv git-dir work-tree namespace; do
+			case "$gl_bad" in
+			"$gl_name"*)
+				[ "$gl_name" = text ] && continue
+				reject output-or-exec "$arg は、止めているオプション（--${gl_bad}）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので通しません。"
+				;;
+			esac
+		done
+		;;
 	esac
 done
 
@@ -172,6 +193,137 @@ has() {
 		[ "$a" = "$needle" ] && return 0
 	done
 	return 1
+}
+
+# オプションを許可リストで読む（ADR-0093 の段階 2b のレビュー。利用者の決定 A）。
+#
+#   ow_flags="' quiet detach '"   値を取らない長いオプション（前後を空白で挟む）
+#   ow_values="' orphan '"         値を取る長いオプション（`--x=v` か次の語）
+#   ow_optvals="' track '"         値を `=` でだけ取れる長いオプション（`--x` だけでもよい）
+#   ow_sflags="qmt"               値を取らない短いオプションの字
+#   ow_svalues="b"                値を取る短いオプションの字（束の残りか次の語が値）
+#   ow_soptvals="u"               値を束の残りでだけ取れる短いオプションの字
+#   opt_walk <コールバック> [<引数>...]
+#
+# git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
+# 名前を並べるやり方では抜ける。ここは一覧に**そのままの綴り**である名前だけを通し、ほかの `--` は
+# 断る（略した綴りも断る）。短いオプションの束（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら束の
+# 残りをその値として扱う。
+#
+# コールバックは `<コールバック> opt <-x か --name> <値>`・`pos <語>`・`end`（`--` を見た）で呼ぶ。
+# 止める判定はコールバックが持つ（一覧に入れた上で、名前を見て reject する）。
+ow_reject() {
+	reject option-not-allowed "$sub の $1 は通しません。通すオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した綴りは、git が止めているオプションに読み替えることがあります）。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
+}
+opt_walk() {
+	ow_cb="$1"
+	shift
+	ow_end=no
+	ow_need=""
+	for ow_arg in ${1+"$@"}; do
+		if [ -n "$ow_need" ]; then
+			"$ow_cb" opt "$ow_need" "$ow_arg"
+			ow_need=""
+			continue
+		fi
+		if [ "$ow_end" = yes ]; then
+			"$ow_cb" pos "$ow_arg"
+			continue
+		fi
+		case "$ow_arg" in
+		--)
+			ow_end=yes
+			"$ow_cb" end
+			;;
+		--*)
+			ow_name="${ow_arg#--}"
+			ow_name="${ow_name%%=*}"
+			ow_val=""
+			ow_eq=no
+			case "$ow_arg" in
+			*=*)
+				ow_val="${ow_arg#*=}"
+				ow_eq=yes
+				;;
+			esac
+			case "$ow_values" in
+			*" $ow_name "*)
+				if [ "$ow_eq" = yes ]; then
+					"$ow_cb" opt "--$ow_name" "$ow_val"
+				else
+					ow_need="--$ow_name"
+				fi
+				continue
+				;;
+			esac
+			case "$ow_optvals" in
+			*" $ow_name "*)
+				"$ow_cb" opt "--$ow_name" "$ow_val"
+				continue
+				;;
+			esac
+			case "$ow_flags" in
+			*" $ow_name "*)
+				[ "$ow_eq" = no ] || ow_reject "$ow_arg"
+				"$ow_cb" opt "--$ow_name" ""
+				continue
+				;;
+			esac
+			ow_reject "$ow_arg"
+			;;
+		-)
+			"$ow_cb" pos "-"
+			;;
+		-*)
+			ow_rest="${ow_arg#-}"
+			while [ -n "$ow_rest" ]; do
+				ow_ch="${ow_rest%"${ow_rest#?}"}"
+				ow_rest="${ow_rest#?}"
+				case "$ow_svalues" in
+				*"$ow_ch"*)
+					if [ -n "$ow_rest" ]; then
+						"$ow_cb" opt "-$ow_ch" "$ow_rest"
+					else
+						ow_need="-$ow_ch"
+					fi
+					ow_rest=""
+					continue
+					;;
+				esac
+				case "$ow_soptvals" in
+				*"$ow_ch"*)
+					"$ow_cb" opt "-$ow_ch" "$ow_rest"
+					ow_rest=""
+					continue
+					;;
+				esac
+				case "$ow_sflags" in
+				*"$ow_ch"*)
+					"$ow_cb" opt "-$ow_ch" ""
+					continue
+					;;
+				esac
+				ow_reject "$ow_arg"
+			done
+			;;
+		*)
+			"$ow_cb" pos "$ow_arg"
+			;;
+		esac
+	done
+	# 値を取るオプションで終わった（値が無い）。git も落とすが、読み違えないよう断る。
+	[ -z "$ow_need" ] || ow_reject "$ow_need"
+	return 0
+}
+
+# 許可リストを空に戻す。副命令ごとに必要なものだけ入れる。
+ow_spec() {
+	ow_flags=" $1 "
+	ow_values=" $2 "
+	ow_optvals=" $3 "
+	ow_sflags="$4"
+	ow_svalues="$5"
+	ow_soptvals="${6:-}"
 }
 
 # 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に
@@ -261,37 +413,74 @@ store_hit() {
 }
 
 case "$sub" in
-status | log | show | diff | blame | shortlog | describe | rev-parse | rev-list | ls-files | ls-tree | merge-base | diff-tree | cat-file | grep | whatchanged | show-ref)
+status | log | show | diff | blame | shortlog | describe | rev-parse | rev-list | ls-files | ls-tree | merge-base | diff-tree | whatchanged | show-ref)
 	: # 読むだけ。上のグローバル判定で穴は塞いである
 	;;
 
-branch)
-	# 短いオプションは束ねられる (-rd は -r -d と同じ) ので、1 文字ずつ見る。
-	# 見るのはダッシュ 1 個で始まる語だけ。長いオプションまで 1 文字で見ると、
-	# `--contains=feature/dev` のような値の中の f と d に当たって誤検知する。
+cat-file)
+	# `--textconv`・`--filters` は設定の外部コマンドを走らせ、parse-options なので略も効く。
+	# 通すのは中身と型を読む形だけ（許可リスト）。
+	ow_spec "batch batch-check batch-all-objects buffer unordered allow-unknown-type" "" "" "etsp" ""
+	catfile_cb() { :; }
+	opt_walk catfile_cb ${1+"$@"}
+	;;
+
+grep)
+	# `-O` / `--open-files-in-pager` は当たったファイルを外部コマンドで開く。束（`-iO`）と略も見る。
+	# 値を取る短いオプション（-e -f -A -B -C -m）より後ろの字は値なので数えない。
 	for arg in ${1+"$@"}; do
 		case "$arg" in
-		--force | --delete=* | --move | --move=* | --set-upstream-to | --set-upstream-to=* | --edit-description)
-			reject branch-force "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
-			;;
-		--*) ;;
-		-*)
-			case "$arg" in
-			*D*)
-				reject branch-delete-unmerged "$arg は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
-				;;
-			# 大文字の -M（強制の改名）と -C（強制の複製）。下の小文字の並びは大文字を拾わないので、
-			# ここで見ないと -M と -rM が通っていた（ADR-0093 の段階 0）。
-			*M* | *C*)
-				reject branch-force-move "$arg はブランチを強制的に改名するか複製し、同じ名前の既存のブランチを上書きします。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューが引けなくなります。必要な理由を利用者に伝えてください。"
-				;;
-			*f* | *m* | *u*)
-				reject branch-move "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
+		--) break ;;
+		--?*)
+			gr_name="${arg#--}"
+			gr_name="${gr_name%%=*}"
+			case "open-files-in-pager" in
+			"$gr_name"*)
+				[ "${#gr_name}" -ge 2 ] &&
+					reject grep-pager "$arg は当たったファイルを外部コマンドで開きます。通しません。"
 				;;
 			esac
 			;;
+		-?*)
+			gr_rest="${arg#-}"
+			while [ -n "$gr_rest" ]; do
+				gr_ch="${gr_rest%"${gr_rest#?}"}"
+				gr_rest="${gr_rest#?}"
+				case "$gr_ch" in
+				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。当たったファイルを外部コマンドで開くので通しません。" ;;
+				e | f | A | B | C | m) gr_rest="" ;;
+				esac
+			done
+			;;
 		esac
 	done
+	;;
+
+branch)
+	# 許可リストで読む（略した長いオプションと、束ねた短いオプションを 1 字ずつ見る）。
+	# 消す・改名する・複製する・追跡先を書き換える形は、一覧に入れた上で名前を見て止める。
+	ow_spec "list all remotes verbose quiet show-current no-column no-color ignore-case omit-empty no-track delete create-reflog no-create-reflog force move copy unset-upstream edit-description" \
+		"sort format points-at set-upstream-to" \
+		"contains no-contains merged no-merged color column abbrev track" \
+		"arvqdlitDMCfmuc" ""
+	branch_cb() {
+		[ "$1" = opt ] || return 0
+		case "$2" in
+		-D)
+			reject branch-delete-unmerged "branch -D は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
+			;;
+		-M | -C | -c | --move | --copy)
+			reject branch-force-move "branch $2 はブランチを改名するか複製し、同じ名前の既存のブランチを上書きしえます。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューが引けなくなります。必要な理由を利用者に伝えてください。"
+			;;
+		--force | --set-upstream-to | --unset-upstream | --edit-description)
+			reject branch-force "branch $2 はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
+			;;
+		-f | -m | -u)
+			reject branch-move "branch $2 はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
+			;;
+		esac
+	}
+	opt_walk branch_cb ${1+"$@"}
 	;;
 
 tag)
@@ -423,15 +612,35 @@ worktree)
 			if [ "$wt_new" != "$wt_leaf" ]; then
 				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします（親のブランチなら親の識別子。変えると家族が止まります）。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。"
 			fi
+		elif [ -n "$wt_base" ] && [ "$wt_base" = "$wt_leaf" ] &&
+			! git show-ref --verify --quiet "refs/heads/$wt_base" &&
+			! git show-ref --verify --quiet "refs/remotes/origin/$wt_base"; then
+			# 名前が揃っていても、ブランチでない（タグ・sha）ならブランチの外に作る。
+			reject worktree-detach "worktree add $wt_dest $wt_base の $wt_base は手元のブランチでも origin/$wt_base でもないので、ブランチの外（detached HEAD）にワークツリーを作ります。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf <起点> にしてください。"
 		elif [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; then
 			reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う行き先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前はブランチ名と同じにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$wt_base にしてください。"
 		fi
 		;;
-	list | prune) ;;
-	remove)
-		if has --force ${1+"$@"} || has -f ${1+"$@"}; then
-			reject worktree-remove-force "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してからオプション無しの $SELF worktree remove を使ってください。"
-		fi
+	list | prune | remove)
+		# 許可リスト。remove の --force（略した --forc も）は止める。
+		case "$action" in
+		list) ow_spec "porcelain verbose" "expire" "" "vz" "" ;;
+		prune) ow_spec "dry-run verbose" "expire" "" "nv" "" ;;
+		remove) ow_spec "force" "" "" "f" "" ;;
+		esac
+		wt_cb() {
+			[ "$1" = opt ] || return 0
+			case "$2" in
+			--force | -f)
+				reject worktree-remove-force "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してからオプション無しの $SELF worktree remove を使ってください。"
+				;;
+			esac
+		}
+		wt_walk() {
+			shift
+			opt_walk wt_cb ${1+"$@"}
+		}
+		wt_walk ${1+"$@"}
 		;;
 	*) reject worktree-action "worktree $action は通しません。使えるのは list / add / prune / remove です。" ;;
 	esac
@@ -457,28 +666,22 @@ rm)
 	# 索引や HEAD と食い違うファイルを既定で拒む。`rm -rf` の代わりとして
 	# rules.yml が名指しで勧める経路なので、勧めた先が通らない形にはしない。
 	#
-	# 通さないのは -f。それを付けると、コミットしていない変更ごと消える。
+	# 通さないのは -f（略した --forc と束の -rf も）。それを付けると、コミットしていない変更ごと消える。
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
 	# -r は通す。付けても、中の 1 つでも書きかけがあれば git が止める。
 	[ "$#" -eq 0 ] && reject rm-no-path "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
-	for arg in ${1+"$@"}; do
-		case "$arg" in
-		. | :/ | "*" | ":/*" | "./")
-			reject rm-whole-tree "rm にツリー全体 ($arg) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
+	ow_spec "cached quiet dry-run ignore-unmatch sparse pathspec-file-nul force" "pathspec-from-file" "" "rqnf" ""
+	rm_cb() {
+		case "$1:${2:-}" in
+		opt:--force | opt:-f)
+			reject rm-force "rm の $2 (--force) はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてから利用者に伝えてください。"
 			;;
-		--force)
-			reject rm-force "$arg はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてから利用者に伝えてください。"
-			;;
-		--*) ;;
-		-*)
-			case "$arg" in
-			*f*)
-				reject rm-force "$arg には -f (--force) が含まれます。コミットしていない変更ごと消すので通しません。付けずに実行してください。"
-				;;
-			esac
+		pos:. | pos::/ | "pos:*" | "pos::/*" | pos:./)
+			reject rm-whole-tree "rm にツリー全体 ($2) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
 			;;
 		esac
-	done
+	}
+	opt_walk rm_cb ${1+"$@"}
 	;;
 
 restore)
@@ -490,63 +693,39 @@ restore)
 	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
 	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
 	# 既定もこの形は止めない（ccnavi/builtin.py）。
-	[ "$#" -eq 0 ] && reject restore-no-path "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
-	for arg in ${1+"$@"}; do
-		case "$arg" in
-		. | :/ | "*" | ":/*" | "./")
-			reject restore-whole-tree "restore にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。戻したいファイルを 1 つずつ名指ししてください。"
-			;;
-		esac
-	done
+	#
 	# 別のコミットの中身で戻す形（--source）と、衝突を片側に寄せる形（--ours / --theirs）は、
 	# 承認済みチケットの置き場に当たるパスには使わせない（ADR-0093 の段階 0）。
 	# 置き場を過去の中身に戻すと、承認が無かったことにも、消えた印が戻ったことにもなる。
-	# 置き場の衝突は、どちらの承認を採るかを人が決める。
+	# 置き場の衝突は、どちらの承認を採るかを人が決める。オプションは許可リストで読む（段階 2b）。
+	[ "$#" -eq 0 ] && reject restore-no-path "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	rs_source=no
 	rs_side=no
-	rs_skip=no
-	rs_end=no
 	rs_paths=""
-	for arg in ${1+"$@"}; do
-		if [ "$rs_skip" = yes ]; then
-			rs_skip=no # --source / -s の値
-			continue
-		fi
-		if [ "$rs_end" = yes ]; then
-			store_hit "$arg"
-			[ "$in_store" = yes ] && rs_paths="$arg"
-			continue
-		fi
-		case "$arg" in
-		--) rs_end=yes ;;
-		--source)
-			rs_source=yes
-			rs_skip=yes
-			;;
-		--source=*) rs_source=yes ;;
-		--ours | --theirs) rs_side=yes ;;
-		--pathspec-from-file | --pathspec-from-file=*)
-			# どのパスに当たるかをここで読めない。
-			rs_paths="$arg"
-			;;
-		--*) ;;
-		-*)
-			# 短いオプションは束ねられる（-Ss main、-smain）。s の後ろに字があればそれが値、
-			# 無ければ次の語が値。
-			case "$arg" in
-			*s)
-				rs_source=yes
-				rs_skip=yes
-				;;
-			*s*) rs_source=yes ;;
+	ow_spec "staged worktree ours theirs merge quiet progress no-progress overlay no-overlay ignore-unmerged ignore-skip-worktree-bits pathspec-file-nul recurse-submodules no-recurse-submodules" \
+		"source conflict pathspec-from-file" "" "SWqm" "s"
+	restore_cb() {
+		case "$1" in
+		opt)
+			case "$2" in
+			--source | -s) rs_source=yes ;;
+			--ours | --theirs) rs_side=yes ;;
+			--pathspec-from-file) rs_paths="--pathspec-from-file" ;;
 			esac
 			;;
-		*)
-			store_hit "$arg"
-			[ "$in_store" = yes ] && rs_paths="$arg"
+		pos)
+			case "$2" in
+			. | :/ | "*" | ":/*" | "./")
+				reject restore-whole-tree "restore にツリー全体 ($2) を渡すと、作業中の変更が黙って消えます。戻したいファイルを 1 つずつ名指ししてください。"
+				;;
+			esac
+			store_hit "$2"
+			[ "$in_store" = yes ] && rs_paths="$2"
 			;;
 		esac
-	done
+		return 0
+	}
+	opt_walk restore_cb ${1+"$@"}
 	if [ -n "$rs_paths" ]; then
 		if [ "$rs_side" = yes ]; then
 			reject restore-store-side "restore --ours / --theirs で承認済みチケットの置き場に当たるパス ($rs_paths) の衝突を片側に寄せる形は通しません。置き場の衝突は、どちらの承認を採るかを人が決めます。$SELF merge --abort で取り込みをやめ、衝突したパスを利用者に伝えてください。"
@@ -566,27 +745,21 @@ merge)
 	# 止めるのは、衝突を人が見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
 	# もう一方の変更を黙って落とす。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、落ちたことは差分にも記録にも残らない。
-	prev=""
-	for arg in ${1+"$@"}; do
-		case "$prev" in
-		-X | -s | --strategy | --strategy-option)
-			case "$arg" in
-			ours | theirs)
-				reject merge-discard-side "$prev $arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
-				;;
-			esac
+	# オプションは許可リストで読む（略した --strategy-o=ours・束の -sours も同じに読む。段階 2b）。
+	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify" \
+		"message file strategy strategy-option" "log" "qvne" "mFsX"
+	merge_cb() {
+		[ "$1" = opt ] || return 0
+		case "$2:${3:-}" in
+		--strategy:ours | --strategy:theirs | -s:ours | -s:theirs | --strategy-option:ours | --strategy-option:theirs | -X:ours | -X:theirs)
+			reject merge-discard-side "$2 $3 は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
+			;;
+		--no-verify:*)
+			reject merge-no-verify "$2 はマージ前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
 			;;
 		esac
-		case "$arg" in
-		-Xours | -Xtheirs | --strategy-option=ours | --strategy-option=theirs | -sours | --strategy=ours)
-			reject merge-discard-side "$arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
-			;;
-		--no-verify)
-			reject merge-no-verify "$arg はマージ前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
-			;;
-		esac
-		prev="$arg"
-	done
+	}
+	opt_walk merge_cb ${1+"$@"}
 	;;
 
 merge-file)
@@ -631,125 +804,113 @@ merge-file)
 
 commit)
 	# 通す。中身の点検は /commit スキルと ask ルールの側でやる。
-	# ここで見るのは、点検そのものを飛ばす形だけ。
-	for arg in ${1+"$@"}; do
-		case "$arg" in
-		--no-verify)
-			reject commit-no-verify "$arg はコミット前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
+	# ここで見るのは、点検そのものを飛ばす形（--no-verify・-n）と、直前のコミットを書き換える
+	# --amend。オプションは許可リストで読む（略した --no-verif・束の -an も同じに読む。段階 2b）。
+	ow_spec "all quiet verbose signoff no-signoff only include allow-empty allow-empty-message dry-run short porcelain long branch null status no-status reset-author edit no-edit verify no-verify pathspec-file-nul amend" \
+		"message file author date cleanup trailer pathspec-from-file template" "untracked-files" \
+		"aqvsoiezn" "mFt" "u"
+	commit_cb() {
+		[ "$1" = opt ] || return 0
+		case "$2" in
+		--no-verify | -n)
+			reject commit-no-verify "commit の $2 (--no-verify) はコミット前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
 			;;
-		--*) ;;
-		-*)
-			case "$arg" in
-			*n*)
-				reject commit-no-verify "$arg には -n (--no-verify) が含まれます。コミット前の検査は飛ばさず、落ちた理由を直してください。"
-				;;
-			esac
+		--amend)
+			reject commit-amend "commit --amend は直前のコミットを書き換えます。直すなら新しいコミットを積んでください。"
 			;;
 		esac
-	done
+	}
+	opt_walk commit_cb ${1+"$@"}
 	;;
 
 checkout | switch)
 	# ブランチを移る形は通す。作業ツリーの中身を捨てる形だけ止める。
 	# `git checkout -- .` は、書きかけを何も言わずに消す。取り返せない。
-	for arg in ${1+"$@"}; do
-		case "$arg" in
-		--force | --discard-changes | --ours | --theirs)
-			reject checkout-discard "$arg は作業中の変更を捨てます。退避は $SELF stash push -u です。"
-			;;
-		--)
+	#
+	# オプションは許可リストで読む（ADR-0093 の段階 2b のレビュー。利用者の決定 A）。略した長い
+	# オプション（`--force-c`・`--det`・`--orph=`）は断り、束ねた短いオプションは 1 字ずつ読んで、
+	# 値を取る字（checkout の b・B、switch の c・C）の後ろは値として扱う（`-qbnew` は -q -b new）。
+	#
+	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C・--force-create）は通さない
+	# （5.2。D36）。親のブランチを付け替えると、承認済みチケットの置き場ごと別の中身になる。
+	#
+	# `checkout <ref> <パス>` は `--` が無くてもパスを別のコミットの中身に戻す。承認済みチケットの
+	# 置き場に当たるパスは通さない（段階 0）。オプションでない最初の語が行き先か起点で、2 つ目からがパス。
+	if [ "$sub" = checkout ]; then
+		ow_spec "quiet progress no-progress detach track no-track guess no-guess merge overlay no-overlay recurse-submodules no-recurse-submodules ignore-skip-worktree-bits force ours theirs" \
+			"orphan conflict pathspec-from-file" "track recurse-submodules" "qmtlf" "bB"
+	else
+		ow_spec "quiet progress no-progress detach track no-track guess no-guess merge recurse-submodules no-recurse-submodules force discard-changes" \
+			"create orphan conflict force-create" "track recurse-submodules" "qmtdf" "cC"
+	fi
+	co_new=""
+	co_detach=no
+	co_words=0
+	co_one=""
+	checkout_cb() {
+		case "$1" in
+		end)
 			reject checkout-path "$sub にパスを渡す形は、そのファイルの書きかけを消します。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
 			;;
-		. | :/)
-			reject checkout-whole-tree "$sub にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。$SELF restore <パス> を名指しで使ってください。"
+		pos)
+			case "$2" in
+			. | :/)
+				reject checkout-whole-tree "$sub にツリー全体 ($2) を渡すと、作業中の変更が黙って消えます。$SELF restore <パス> を名指しで使ってください。"
+				;;
+			esac
+			co_words=$((co_words + 1))
+			if [ "$co_words" -eq 1 ]; then
+				co_one="$2"
+				return 0
+			fi
+			store_hit "$2"
+			if [ "$in_store" = yes ]; then
+				reject checkout-store "$sub <ref> <パス> で承認済みチケットの置き場に当たるパス ($2) を別のコミットの中身に戻す形は通しません。置き場を動かすのは人と ccnavi のスクリプトです。置き場の中身が食い違っているなら、利用者に伝えてください（* ? [ や : で始まる指定は、置き場に当たるかを確かめられないので同じく通しません）。"
+			fi
 			;;
-		--*) ;;
-		-*)
-			case "$arg" in
-			*f*)
-				reject checkout-force "$arg には -f (--force) が含まれます。作業中の変更を捨てるので通しません。退避は $SELF stash push -u です。"
+		opt)
+			case "$sub:$2" in
+			*:--force | *:-f)
+				reject checkout-force "$sub の $2 (--force) は作業中の変更を捨てるので通しません。退避は $SELF stash push -u です。"
+				;;
+			switch:--discard-changes | checkout:--ours | checkout:--theirs)
+				reject checkout-discard "$2 は作業中の変更を捨てます。退避は $SELF stash push -u です。"
+				;;
+			checkout:-B | switch:-C | switch:--force-create)
+				reject checkout-force-branch "$sub $2 は、同じ名前の既存のブランチを別のコミットへ付け替えます。そのブランチにしか無いコミットが黙って外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。リモートに合わせるなら、親のブランチは $SYNC <P>、ほかのブランチは $SELF merge <リモート>/<ブランチ> です。分かれていて進めないなら利用者に伝えてください。新しいブランチは -b（switch は --create）で切ります。"
+				;;
+			checkout:--pathspec-from-file)
+				reject checkout-store "$sub の $2 は、どのパスを戻すかをここで読めないので通しません。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
+				;;
+			checkout:-b | checkout:--orphan | switch:--create | switch:-c | switch:--orphan)
+				co_new="${3:-}"
+				;;
+			*:--detach | switch:-d)
+				co_detach=yes
 				;;
 			esac
 			;;
 		esac
-	done
-	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C）は通さない
-	# （ADR-0093 の 5.2。段階 2b で ccnavi-sync.sh と同時に塞ぐ。D36）。親のブランチを付け替えると、
-	# 承認済みチケットの置き場ごと別の中身になる。リモートに合わせる道は ccnavi-sync.sh。
-	for arg in ${1+"$@"}; do
-		co_force_branch=no
-		case "$sub:$arg" in
-		checkout:-B | switch:-C | switch:--force-create | switch:--force-create=*) co_force_branch=yes ;;
-		*:--*) ;;
-		checkout:-*B* | switch:-*C*) co_force_branch=yes ;;
-		esac
-		if [ "$co_force_branch" = yes ]; then
-			reject checkout-force-branch "$sub $arg は、同じ名前の既存のブランチを別のコミットへ付け替えます。そのブランチにしか無いコミットが黙って外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。リモートに合わせるなら、親のブランチは $SYNC <P>、ほかのブランチは $SELF merge <リモート>/<ブランチ> です。分かれていて進めないなら利用者に伝えてください。新しいブランチは -b（switch は -c）で切ります。"
-		fi
-	done
-	# `checkout <ref> <パス>` は `--` が無くてもパスを別のコミットの中身に戻す。承認済みチケットの
-	# 置き場に当たるパスは通さない（ADR-0093 の段階 0）。オプションでない最初の語が行き先か起点で、
-	# 2 つ目からがパス。-b / -B / --orphan（switch は -c / -C）は値を次の語で取るので、値ごと飛ばす。
-	co_skip=no
-	co_first=yes
-	for arg in ${1+"$@"}; do
-		if [ "$co_skip" = yes ]; then
-			co_skip=no # 直前のオプションの値
-			continue
-		fi
-		case "$arg" in
-		-b | -B | --orphan | -c | -C | --create) co_skip=yes ;;
-		--pathspec-from-file | --pathspec-from-file=*)
-			reject checkout-store "$sub の $arg は、どのパスを戻すかをここで読めないので通しません。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
-			;;
-		-*) ;;
-		*)
-			if [ "$co_first" = yes ]; then
-				co_first=no
-				continue
-			fi
-			store_hit "$arg"
-			if [ "$in_store" = yes ]; then
-				reject checkout-store "$sub <ref> <パス> で承認済みチケットの置き場に当たるパス ($arg) を別のコミットの中身に戻す形は通しません。置き場を動かすのは人と ccnavi のスクリプトです。置き場の中身が食い違っているなら、利用者に伝えてください（* ? [ や : で始まる指定は、置き場に当たるかを確かめられないので同じく通しません）。"
-			fi
-			;;
-		esac
-	done
-	# 親のワークツリー（.claude/worktrees/<P> で、親の写しか提案があるもの）では、別のブランチへ
-	# 移らない（ADR-0093 の 3.1 の 10。段階 2b）。親のブランチの名前は識別子で、ワークツリーが別の
-	# ブランチの上に居ると、着手・取り込み・push の守りが家族を引けなくなる。
-	co_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+		return 0
+	}
+	opt_walk checkout_cb ${1+"$@"}
+	# 親のワークツリー（.claude/worktrees/<P> で、親の写しか提案があるもの）では、許す形
+	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない（3.1 の 10）。
+	# 親のブランチの名前は識別子で、ワークツリーが別のブランチの上に居ると、着手・取り込み・
+	# push の守りが家族を引けなくなる。
+	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
 	case "$co_top" in
-	"$WS"/.claude/worktrees/*)
-		co_name="${co_top#"$WS"/.claude/worktrees/}"
+	"$WS_P"/.claude/worktrees/*)
+		co_name="${co_top#"$WS_P"/.claude/worktrees/}"
 		co_name="${co_name%%/*}"
 		if ccnavi_parent_tree "$co_top" "$co_name"; then
 			co_to=""
-			co_one=""
-			co_words=0
-			co_skip=no
-			for arg in ${1+"$@"}; do
-				if [ "$co_skip" = yes ]; then
-					co_skip=no
-					co_to="$arg" # -b / -c / --orphan の新しいブランチ
-					continue
-				fi
-				case "$sub:$arg" in
-				*:-b | *:-c | *:--orphan | *:-B | *:-C | switch:--create) co_skip=yes ;;
-				switch:--create=*) co_to="${arg#--create=}" ;;
-				*:--orphan=*) co_to="${arg#--orphan=}" ;;
-				*:--detach | switch:-d) co_to="（ブランチの外）" ;;
-				*:-) co_words=$((co_words + 1)) ;;
-				*:-*) ;;
-				*)
-					co_words=$((co_words + 1))
-					[ "$co_words" -eq 1 ] && co_one="$arg"
-					;;
-				esac
-			done
-			# 語が 1 つだけなら、それが移る先（2 つ以上は `checkout <ref> <パス>` で、上で見た）。
-			if [ -z "$co_to" ] && [ "$co_words" -eq 1 ]; then
-				co_to="${co_one:--}"
+			if [ -n "$co_new" ]; then
+				co_to="$co_new"
+			elif [ "$co_detach" = yes ]; then
+				co_to="（ブランチの外）"
+			elif [ "$co_words" -eq 1 ] || { [ "$co_words" -ge 2 ] && [ "$sub" = switch ]; }; then
+				co_to="$co_one"
 			fi
 			case "$co_to" in
 			'' | "$co_name" | HEAD) ;;
@@ -764,19 +925,40 @@ checkout | switch)
 
 fetch | pull)
 	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗になる。
-	for arg in ${1+"$@"}; do
-		case "$arg" in
-		-f | --force | --prune | --unshallow)
-			reject fetch-force "$arg は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
+	# オプションは許可リストで読む（略した --prun・--rebas も断る。段階 2b）。
+	if [ "$sub" = fetch ]; then
+		ow_spec "quiet verbose progress no-progress tags no-tags all dry-run no-recurse-submodules force prune prune-tags unshallow" \
+			"jobs" "" "qvntfpP" "j"
+	else
+		ow_spec "quiet verbose ff ff-only no-ff no-rebase stat no-stat no-edit edit commit no-commit progress no-progress tags no-tags force prune unshallow" \
+			"" "rebase" "qvnfpr" ""
+	fi
+	fetch_cb() {
+		case "$1" in
+		opt)
+			case "$2" in
+			-f | --force | --prune | -p | -P | --prune-tags | --unshallow)
+				reject fetch-force "$2 は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
+				;;
+			--rebase | -r)
+				reject pull-rebase "pull の $2 は手元のコミットを取ってきた側へ付け直し、履歴を書き換えます。取り込むのは $SELF pull（merge）か、親のブランチなら $SYNC <P> です。"
+				;;
+			esac
 			;;
-		# refspec（`+refs/heads/x:refs/heads/y`・`x:y`・`--refmap=...`）は、取ってきたものを手元の
-		# ブランチへ直に書く。`+` は早送りでない書き換えも通す。取ってくるのはブランチ名だけにする
-		# （ADR-0093 の段階 0）。URL も `:` を含むので同じく止まる。取得先は設定済みのリモート名で書く。
-		*:* | *+*)
-			reject fetch-refspec "$arg は取ってきたものを手元の参照へ直に書く形（refspec）か URL です。取ってくるのはブランチ名だけで、$SELF $sub <リモート> <ブランチ> の形で書いてください。手元の ref は $SYNC <ブランチ> が進めます（親のワークツリー以外のブランチは、取ってきた後の $SELF merge <リモート>/<ブランチ>）。"
+		pos)
+			# refspec（`+refs/heads/x:refs/heads/y`・`x:y`）は、取ってきたものを手元の
+			# ブランチへ直に書く。`+` は早送りでない書き換えも通す。取ってくるのはブランチ名だけにする
+			# （ADR-0093 の段階 0）。URL も `:` を含むので同じく止まる。取得先は設定済みのリモート名で書く。
+			case "$2" in
+			*:* | *+*)
+				reject fetch-refspec "$2 は取ってきたものを手元の参照へ直に書く形（refspec）か URL です。取ってくるのはブランチ名だけで、$SELF $sub <リモート> <ブランチ> の形で書いてください。手元の ref は $SYNC <ブランチ> が進めます（親のワークツリー以外のブランチは、取ってきた後の $SELF merge <リモート>/<ブランチ>）。"
+				;;
+			esac
 			;;
 		esac
-	done
+		return 0
+	}
+	opt_walk fetch_cb ${1+"$@"}
 	;;
 
 push)
@@ -803,8 +985,8 @@ push)
 	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
 	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
-	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	push_root="$WS"
+	push_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
+	push_root="$WS_P"
 	log_debug push の判定の材料 -- "branch=$push_branch" "top=$push_top" "workspace=$WS"
 	if [ -n "$push_root" ]; then
 		case "$push_top" in
@@ -919,12 +1101,17 @@ esac
 # blocked は触らない。控えが無く、置き場に未コミットの変更があれば作らずに言う（未送信の状態を
 # 持ち込まないため）。控えがあると SessionStart の早送りと ccnavi-sync.sh の消えたかの確かめの対象になる。
 push_record_family() {
-	case "${push_seen_remote:-origin}" in
-	origin) ;;
-	*) return 0 ;;
-	esac
+	# 送り先は git と同じ順で解く: 引数のリモート → branch.<b>.pushRemote → remote.pushDefault →
+	# branch.<b>.remote → origin。origin 以外へ送ったなら控えを作らない（控えは origin の P を見る）。
+	pr_remote="${push_seen_remote:-}"
+	if [ -z "$pr_remote" ]; then
+		pr_remote=$(git config --get "branch.$push_branch.pushRemote" 2>/dev/null ||
+			git config --get remote.pushDefault 2>/dev/null ||
+			git config --get "branch.$push_branch.remote" 2>/dev/null || echo origin)
+	fi
+	[ "$pr_remote" = origin ] || return 0
 	case "$push_top" in
-	"$WS"/.claude/worktrees/*) ;;
+	"$WS_P"/.claude/worktrees/*) ;;
 	*) return 0 ;;
 	esac
 	[ "${push_top##*/}" = "$push_branch" ] || return 0
