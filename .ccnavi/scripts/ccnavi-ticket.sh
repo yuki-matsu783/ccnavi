@@ -19,7 +19,13 @@
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
 # 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
-# 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
+#
+# 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の start・finish・cancel は
+# C1 で回す（ADR-0093 の 4.3。段階 2d）: ロック → 途中の操作の確認 → hook の印と跡を先にコミット →
+# 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
+# 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish が運ぶ）。
+# それ以外の家族は今のまま（書くだけ。コミットと push はエージェント）。
+# 終了コード: 0 成功 / 1 前提の未充足（C1 で止めた・送れなかったを含む） / 2 引数か環境の誤り
 
 set -eu
 
@@ -82,10 +88,49 @@ root=$(ccnavi_workspace) || {
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
-	exec "$bin" --root "$root" ticket "$@"
+	ccnavi_c1_exe() { "$bin" --root "$root" "$@"; }
 elif [ -f "$root/ccnavi/__main__.py" ]; then
-	cd "$root"
-	exec uv run python -m ccnavi --root "$root" ticket "$@"
+	ccnavi_c1_exe() { (cd "$root" && uv run python -m ccnavi --root "$root" "$@"); }
+else
+	printf 'ccnavi-ticket: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
+	exit 2
 fi
-printf 'ccnavi-ticket: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
-exit 2
+
+# C1（取り込み済みの家族の start・finish・cancel）。
+case "$1" in
+start | finish | cancel)
+	ccnavi_log_root="$root"
+	ccnavi_c1_root="$root"
+	ccnavi_c1_label=ccnavi-ticket
+	ccnavi_c1_sh="$(dirname "$0")"
+	trap 'ccnavi_c1_end' EXIT
+	trap 'ccnavi_c1_end; exit 130' INT TERM HUP
+	ccnavi_c1_family "$2"
+	case "$ccnavi_c1_target" in
+	stop)
+		ccnavi_c1_refuse
+		exit 1
+		;;
+	yes)
+		case "$1" in
+		start) c1_words="$2 に着手" ;;
+		finish) c1_words="$2 の作業を終えた" ;;
+		*) c1_words="$2 を取り消した" ;;
+		esac
+		ccnavi_c1_begin || exit 1
+		c1_rc=0
+		ccnavi_c1_write "ccnavi: ${c1_words}" -- ticket "$@" || c1_rc=$?
+		ccnavi_c1_end
+		exit "$c1_rc"
+		;;
+	esac
+	ccnavi_c1_end
+	trap - EXIT INT TERM HUP
+	;;
+esac
+
+if [ -n "${bin:-}" ]; then
+	exec "$bin" --root "$root" ticket "$@"
+fi
+cd "$root"
+exec uv run python -m ccnavi --root "$root" ticket "$@"

@@ -7,6 +7,8 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （人が端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた写しを見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
+#   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （人が端末で打つ。chat のフェーズのレビュー済み）
+#   sh .ccnavi/scripts/ccnavi-review.sh config-synced <親>    （人が端末で打つ。着手で上書きした設定を見た）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
@@ -28,6 +30,13 @@
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
+# 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）では、状態を書く
+# request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す（ADR-0093 の 4.3。段階 2d）。
+# ロック → 途中の操作の確認 → hook の印と跡を先にコミット → 取り込み → 未送信の確かめを済ませてから
+# ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
+# 人の判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
+# 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る（D27）。それ以外の家族は今のまま。
+#
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
 
@@ -35,7 +44,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|fetch|origin|merged> [--phase <N>] [--body-file <path>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|chat|config-synced|fetch|origin|merged> [--phase <N>] [--body-file <path>]
 
   request      --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
@@ -43,6 +52,8 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
   ready                                           閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
+  chat         <N>                                chat で見るフェーズを人がこのセッションで見終えた（人が端末で打つ。ccnavi --reviewed <N> --chat）
+  config-synced <親>                              着手で上書きした設定を人が端末で見た（人が端末で打つ。ccnavi --config-synced <親>）
   fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の綴り）
   merged                                          いまのブランチの MR がマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
@@ -70,13 +81,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | confirm | comment | decide | ready | close-early | fetch | origin | merged) ;;
+request | confirm | comment | decide | ready | close-early | chat | config-synced | fetch | origin | merged) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin / merged です。" 2
+	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / chat / config-synced / fetch / origin / merged です。" 2
 	;;
 esac
 
@@ -119,98 +130,105 @@ elif [ "$sub" != merged ]; then
 fi
 
 # ---- リモート。origin の URL でホストを見分ける。
-
-origin=$(git remote get-url origin 2>/dev/null || :)
-[ -z "$origin" ] && fail no-origin "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
-# 伏せた綴りを、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
-# 生の $origin を文面に入れる綴りを 1 つも残さないことで、次に fail を足す人が
-# 素通りできないようにする。URL に資格情報を埋める使い方は普通にあり、
-# 出力はエージェントの文脈にも記録にも残る。
-origin_shown=$(ccnavi_mask_url "$origin")
-# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
-# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の綴りには
-# scheme が無いので、そこだけ https にする。
-# host には**ポートを残す**。落とすと `:8929` のような立て方が全滅し、しかも
-# 落ちたポートがプロジェクトのパスの先頭に混ざる（`8929/demo/greeter`）。
-case "$origin" in
-http://*) scheme=http ;;
-*) scheme=https ;;
+# 人の判断の入口（chat・config-synced）はホストに触らないので、origin も道具も要らない。
+needs_host=yes
+case "$sub" in
+chat | config-synced) needs_host=no ;;
 esac
-rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
-[ "$rest" = "$origin" ] && fail origin-unreadable "origin の綴りを読めない ($origin_shown)。"
-# `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
-# 落とさないと host にトークンが混ざり、API の綴りにも `origin` の出力にも漏れる（実測）。
-# 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
-authority="${rest%%/*}"
-case "$authority" in
-*@*) rest="${authority##*@}${rest#"$authority"}" ;;
-esac
-host="${rest%%/*}"
-# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
-# そうでなければパスの先頭なので落とす。
-case "$host" in
-*:*)
-	case "${host##*:}" in
-	'' | *[!0-9]*) host="${host%%:*}" ;;
+if [ "$needs_host" = yes ]; then
+	origin=$(git remote get-url origin 2>/dev/null || :)
+	[ -z "$origin" ] && fail no-origin "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
+	# 伏せた綴りを、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
+	# 生の $origin を文面に入れる綴りを 1 つも残さないことで、次に fail を足す人が
+	# 素通りできないようにする。URL に資格情報を埋める使い方は普通にあり、
+	# 出力はエージェントの文脈にも記録にも残る。
+	origin_shown=$(ccnavi_mask_url "$origin")
+	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
+	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の綴りには
+	# scheme が無いので、そこだけ https にする。
+	# host には**ポートを残す**。落とすと `:8929` のような立て方が全滅し、しかも
+	# 落ちたポートがプロジェクトのパスの先頭に混ざる（`8929/demo/greeter`）。
+	case "$origin" in
+	http://*) scheme=http ;;
+	*) scheme=https ;;
 	esac
-	;;
-esac
-[ -n "$host" ] || fail origin-no-host "origin からホストを読めない ($origin_shown)。"
-tail="${rest#"$host"}"
-while :; do
-	case "$tail" in
-	[/:]*) tail="${tail#?}" ;;
-	*) break ;;
+	rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
+	[ "$rest" = "$origin" ] && fail origin-unreadable "origin の綴りを読めない ($origin_shown)。"
+	# `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
+	# 落とさないと host にトークンが混ざり、API の綴りにも `origin` の出力にも漏れる（実測）。
+	# 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
+	authority="${rest%%/*}"
+	case "$authority" in
+	*@*) rest="${authority##*@}${rest#"$authority"}" ;;
 	esac
-done
-path="${tail%.git}"
-path="${path%/}"
-[ -n "$path" ] || fail origin-no-path "origin からプロジェクトのパスを読めない ($origin_shown)。"
-case "$host" in
-github.com | github.com:*)
-	kind=github
-	token_name=GITHUB_TOKEN
-	api_base="https://api.github.com"
-	;;
-*)
-	kind=gitlab
-	token_name=GITLAB_TOKEN
-	api_base="$scheme://$host/api/v4"
-	;;
-esac
-branch=$(git rev-parse --abbrev-ref HEAD)
+	host="${rest%%/*}"
+	# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
+	# そうでなければパスの先頭なので落とす。
+	case "$host" in
+	*:*)
+		case "${host##*:}" in
+		'' | *[!0-9]*) host="${host%%:*}" ;;
+		esac
+		;;
+	esac
+	[ -n "$host" ] || fail origin-no-host "origin からホストを読めない ($origin_shown)。"
+	tail="${rest#"$host"}"
+	while :; do
+		case "$tail" in
+		[/:]*) tail="${tail#?}" ;;
+		*) break ;;
+		esac
+	done
+	path="${tail%.git}"
+	path="${path%/}"
+	[ -n "$path" ] || fail origin-no-path "origin からプロジェクトのパスを読めない ($origin_shown)。"
+	case "$host" in
+	github.com | github.com:*)
+		kind=github
+		token_name=GITHUB_TOKEN
+		api_base="https://api.github.com"
+		;;
+	*)
+		kind=gitlab
+		token_name=GITLAB_TOKEN
+		api_base="$scheme://$host/api/v4"
+		;;
+	esac
+	branch=$(git rev-parse --abbrev-ref HEAD)
 
-# ---- 道具。絶対パスに解いて固定する。
+	# ---- 道具。絶対パスに解いて固定する。
 
-JQ=$(command -v jq 2>/dev/null || :)
-[ -z "$JQ" ] && fail no-jq "jq が無い。結果の JSON を組み立てられない。" 2
-# gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
-# 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
-# 1 度だけ疎通を試して、通らなければ curl とトークンに切り替える。
-transport=""
-if [ "$kind" = github ]; then
-	CLI=$(command -v gh 2>/dev/null || :)
-	if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "repos/$path" >/dev/null 2>&1; then
-		transport=gh
-	fi
-else
-	CLI=$(command -v glab 2>/dev/null || :)
-	if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "projects/$(printf '%s' "$path" | "$JQ" -Rr '@uri')" >/dev/null 2>&1; then
-		transport=glab
-	fi
-fi
-if [ -z "$transport" ]; then
-	CURL=$(command -v curl 2>/dev/null || :)
-	eval "token=\${$token_name:-}"
-	if [ "$kind" = github ]; then cli_name=gh; else cli_name=glab; fi
-	if [ -n "$CURL" ] && [ -n "$token" ]; then
-		transport=curl
-	elif [ -n "$CURL" ]; then
-		fail no-transport-token "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
+	JQ=$(command -v jq 2>/dev/null || :)
+	[ -z "$JQ" ] && fail no-jq "jq が無い。結果の JSON を組み立てられない。" 2
+	# gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
+	# 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
+	# 1 度だけ疎通を試して、通らなければ curl とトークンに切り替える。
+	transport=""
+	if [ "$kind" = github ]; then
+		CLI=$(command -v gh 2>/dev/null || :)
+		if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "repos/$path" >/dev/null 2>&1; then
+			transport=gh
+		fi
 	else
-		fail no-transport "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' を人が打つ形にしてください。" 2
+		CLI=$(command -v glab 2>/dev/null || :)
+		if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "projects/$(printf '%s' "$path" | "$JQ" -Rr '@uri')" >/dev/null 2>&1; then
+			transport=glab
+		fi
+	fi
+	if [ -z "$transport" ]; then
+		CURL=$(command -v curl 2>/dev/null || :)
+		eval "token=\${$token_name:-}"
+		if [ "$kind" = github ]; then cli_name=gh; else cli_name=glab; fi
+		if [ -n "$CURL" ] && [ -n "$token" ]; then
+			transport=curl
+		elif [ -n "$CURL" ]; then
+			fail no-transport-token "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
+		else
+			fail no-transport "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' を人が打つ形にしてください。" 2
+		fi
 	fi
 fi
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 
 # api <METHOD> <path> [<JSON body>] — レスポンスの JSON を標準出力へ。path は api_base からの相対。
 #
@@ -498,14 +516,72 @@ fetch_all() {
 }
 
 log_info 受け付けた -- "sub=$sub" "args=$#"
-log_debug 判定の材料 -- "sub=$sub" "kind=$kind" "host=$host" "branch=$branch" "transport=$transport" "bin=${bin:-}"
+log_debug 判定の材料 -- "sub=$sub" "kind=${kind:-}" "host=${host:-}" "branch=$branch" "transport=${transport:-}" "bin=${bin:-}"
 
 mkdir -p "$state"
 result="$state/review-result-$$.json"
 # 抜けるときに写しを消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても（写しの名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
 # 元の終了コードを上書きしないよう、失敗を飲んでから元の値で抜け直す。
-trap 'review_exit=$?; rm -f "$result" 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'ccnavi_c1_end; exit 130' INT TERM HUP
+
+# ---- C1（ADR-0093 の 4.3。段階 2d）と人の判断の運び（4.6・D27）
+ccnavi_c1_root="$root"
+ccnavi_c1_label=ccnavi-review
+ccnavi_c1_sh="$(dirname "$0")"
+ccnavi_c1_exe() { ccnavi "$@"; }
+c1_on=no
+
+# C1 を始める（1〜5）。<識別子>。対象でなければ何もしない（今の手元の動き）。止める理由があれば抜ける。
+c1_start() {
+	ccnavi_c1_family "$1"
+	case "$ccnavi_c1_target" in
+	stop)
+		ccnavi_c1_refuse
+		exit 1
+		;;
+	yes)
+		ccnavi_c1_begin || exit 1
+		c1_on=yes
+		;;
+	esac
+	return 0
+}
+
+# 状態を書く実行ファイルの 1 回。C1 の中なら書いたパスだけをコミットして送る（6〜11）。
+# <文> -- <実行ファイルの引数>...。ccnavi_c1_capture に書き先があれば標準出力をそこへ書く。
+c1_ccnavi() {
+	c1_words="$1"
+	shift
+	[ "${1:-}" = "--" ] && shift
+	if [ "$c1_on" = yes ]; then
+		ccnavi_c1_write "ccnavi: ${c1_words}" -- "$@"
+	elif [ -n "$ccnavi_c1_capture" ]; then
+		ccnavi "$@" >"$ccnavi_c1_capture"
+	else
+		ccnavi "$@"
+	fi
+}
+
+# 人の判断を運ぶ（D27）。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
+carry_human() {
+	ccnavi_c1_family "$1"
+	case "$ccnavi_c1_target" in
+	yes)
+		sh "$ccnavi_c1_sh/ccnavi-push-approved.sh" "$ccnavi_c1_family_id" || {
+			printf 'ccnavi-review: 人の判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s を人が打ち直す（送るまで、この家族の状態の操作は止まる）\n' \
+				"$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
+			return 1
+		}
+		;;
+	stop)
+		ccnavi_c1_refuse
+		return 1
+		;;
+	esac
+	return 0
+}
 
 case "$sub" in
 origin)
@@ -554,10 +630,13 @@ merged)
 	fi
 	;;
 confirm)
+	c1_start "$branch"
 	fetch_all >"$result"
-	ccnavi review confirm "$@" --result "$result"
+	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
 	;;
 request)
+	# 段 0: 取り込み済みの家族なら C1 の前半（ロック・取り込み）を先に済ませる。
+	c1_start "$branch"
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
 	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
@@ -579,7 +658,7 @@ request)
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
-	ccnavi review requested "$@" --result "$result"
+	c1_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
 	;;
 comment)
 	body=""
@@ -643,6 +722,8 @@ decide)
 	if [ -n "$choices" ] || [ -n "$digest" ]; then
 		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡す。" 2
 	fi
+	# 見るだけの --preview は何も書かないので C1 にしない。
+	[ "$preview" -eq 1 ] || c1_start "$branch"
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
 		ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
@@ -651,7 +732,15 @@ decide)
 	if [ -n "$choices" ]; then
 		# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
 		tell_skew
-		out=$(ccnavi --reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result") || {
+		ccnavi_c1_capture="$state/review-decide-$$.out"
+		decide_rc=0
+		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" ||
+			decide_rc=$?
+		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
+		rm -f "$ccnavi_c1_capture"
+		ccnavi_c1_capture=""
+		[ "$decide_rc" -eq 0 ] || {
 			printf '%s\n' "$out"
 			exit 1
 		}
@@ -659,7 +748,7 @@ decide)
 		printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
 		exit 0
 	fi
-	ccnavi --reviewed "$n" --accept-unresolved --result "$result"
+	c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- --reviewed "$n" --accept-unresolved --result "$result"
 	post_decision "$n"
 	[ -n "$issue_url" ] && printf 'issue に回した: %s\n' "$issue_url"
 	[ -n "$post_warning" ] && printf 'ccnavi-review: %s\n' "$post_warning" >&2
@@ -668,9 +757,16 @@ decide)
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
 	# ここが外してコメントを投稿する。マージは人。
+	c1_start "$branch"
 	fetch_all >"$result"
 	tell_skew
-	noted=$(ccnavi review ready --result "$result") || exit $?
+	ccnavi_c1_capture="$state/review-ready-$$.out"
+	ready_rc=0
+	c1_ccnavi "$branch の Draft を外す印を置いた" -- review ready --result "$result" || ready_rc=$?
+	noted=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
+	rm -f "$ccnavi_c1_capture"
+	ccnavi_c1_capture=""
+	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	still=$(undraft "$number")
@@ -720,6 +816,30 @@ close-early)
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
+	# 取り込み済みの家族なら、締めの印（人の判断）を運ぶ処理で送る（D27）。
+	carry_human "$branch" || exit 1
 	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせる。マージは利用者が行う\n' "$url"
+	;;
+chat)
+	# 人が端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
+	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	n="${1:-}"
+	case "$n" in
+	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
+	esac
+	[ "$#" -eq 1 ] || fail chat-bad-args "chat は <N> だけを取る。" 2
+	ccnavi --reviewed "$n" --chat || exit $?
+	carry_human "$branch" || exit 1
+	;;
+config-synced)
+	# 人が端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
+	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	parent="${1:-}"
+	case "$parent" in
+	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;
+	esac
+	[ "$#" -eq 1 ] || fail config-synced-bad-args "config-synced は <親> だけを取る。" 2
+	ccnavi --config-synced "$parent" || exit $?
+	carry_human "$parent" || exit 1
 	;;
 esac
