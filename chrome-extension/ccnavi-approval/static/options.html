@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ccnavi 承認ボード: 設定</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1>設定</h1>
+<section>
+  <h2>リポジトリ</h2>
+  <ul id="repo-list"></ul>
+  <form id="repo-form">
+    <label>ホスト <select name="host" id="repo-host"></select></label>
+    <label>owner <input name="owner" required></label>
+    <label>リポジトリ <input name="repo" required></label>
+    <label>統合先の名前 <input name="integration" placeholder="空ならデフォルトブランチ"></label>
+    <label>直近の日数（表示用） <input name="recentDays" type="number" min="0" max="90" value="3"></label>
+    <label>指定のブランチ（表示用。空白かカンマで区切る） <input name="extraBranches"></label>
+    <button type="submit">登録</button>
+  </form>
+  <p id="repo-msg" role="status"></p>
+  <p class="note">直近の日数と指定のブランチは、承認待ちを見つけるのに使うだけです。判定には統合先・親のブランチ・先行の閉包だけを入れます（ADR-0093 の D2）。</p>
+</section>
+<section>
+  <h2>PAT</h2>
+  <ul id="token-list"></ul>
+  <form id="token-form">
+    <label>ホスト <select name="host" id="token-host"></select></label>
+    <label>PAT <input id="token-value" type="password" autocomplete="off" required></label>
+    <button type="submit">登録</button>
+    <button type="button" id="token-clear">消す</button>
+  </form>
+  <p id="token-msg" role="status"></p>
+  <p class="note">段階 1 は読み取りだけです。GitHub の fine-grained token でリポジトリを限り、Contents: Read-only と Metadata: Read-only を選びます。エージェント用のトークンとは別にします。PAT はこのブラウザのプロファイルに平文で置かれます（ADR-0093 の 5.5）。</p>
+  <ul id="token-links"></ul>
+</section>
+<script type="module" src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+:root { color-scheme: light dark; --warn: #b26a00; --error: #c62828; --ok: #2e7d32; --line: #8884; }
+body { font: 14px/1.6 system-ui, sans-serif; margin: 0 auto; max-width: 64rem; padding: 1rem; }
+.top { display: flex; gap: .5rem; align-items: center; }
+.top h1 { flex: 1; font-size: 1.3rem; }
+.badge { font-size: .75rem; border: 1px solid var(--line); border-radius: .3rem; padding: 0 .3rem; margin-left: .4rem; }
+.repo { border-top: 2px solid var(--line); margin-top: 1rem; }
+.family { border: 1px solid var(--line); border-radius: .4rem; padding: .5rem 1rem; margin: .8rem 0; }
+.entry, .rejected { border-top: 1px dashed var(--line); padding-top: .4rem; }
+.notice.warn { color: var(--warn); }
+.notice.error, .rejected h4 { color: var(--error); }
+.notice.ok { color: var(--ok); }
+.path, .scope, .stats, .closure, .integration { color: GrayText; font-size: .85rem; margin: .2rem 0; }
+.markdown { overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+label { display: block; margin: .3rem 0; }
+.note { font-size: .85rem; }

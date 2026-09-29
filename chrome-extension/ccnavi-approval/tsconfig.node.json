@@ -1,0 +1,16 @@
+{
+  // Node で回す部品（src/core）と試験を out/ に出す。ビルドの manifest の組み立てと試験が読む。
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "outDir": "out",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "sourceMap": false
+  },
+  "include": ["src/core/**/*.ts", "test/**/*.ts"]
+}
