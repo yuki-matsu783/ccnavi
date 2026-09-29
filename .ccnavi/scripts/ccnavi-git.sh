@@ -51,6 +51,8 @@ unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJ
 # 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
 # $0 は呼ばれたときの綴りそのままなので、ワークツリーの中から相対で呼ばれても合う。
 SELF="sh $0"
+# 取り込みの sh（ADR-0093 の段階 2b）。リモートに合わせる道はここへ案内する。
+SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
 
 # reject <識別子> <文面>。文面は標準エラーへ出す契約。識別子は拒否の種類を表す短い語で、
 # 診断ログにだけ残す。文面には利用者の引数（URL など）が入るので、ログには写さない。
@@ -81,9 +83,12 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             ls-files ls-tree merge-base diff-tree cat-file grep
   一覧      branch (-d は可 / -D -m -M -C -f -u は不可)  tag (一覧のみ)
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
+            worktree add は行き先の名前とブランチ名を揃える形だけ
+                  (add <行き先> -b <行き先の名前> [<起点>]。-B / --detach / -f は不可)
   変える    add  commit (--no-verify は不可)  rm <パス> (-f は不可)
             restore <パス>  (衝突の解決は restore --ours / --theirs -- <パス>)
-            checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
+            checkout / switch (ブランチを移る形だけ。-f・checkout -B・switch -C と -- <パス> は不可。
+                  親のワークツリーでは別のブランチへ移れない)
             承認済みチケットの置き場 (.ccnavi/approved/ と wip/proposals/review/) には
                   restore --source / --ours / --theirs と checkout <ref> <パス> を使えない
             stash (list show push pop apply)
@@ -92,15 +97,17 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                   両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
                   (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
   通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
-                   : や + を含む引数 (refspec・URL) は不可)
+                   : や + を含む引数 (refspec・URL) は不可。手元の ref は ccnavi-sync.sh が進める)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
-                   子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る)
+                   子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
+                   リモートから消えた (家族の控えが gone の) 親のブランチへは送れない)
 
 通さないもの (代わりの手段):
   reset clean   sh .ccnavi/scripts/ccnavi-git.sh stash push -u で退避する。消さない
-                ブランチをリモートに合わせるなら checkout -B <ブランチ> <リモート>/<ブランチ>
-                (外れるコミットの変更が行き先に入っていることを確かめてから)
+                リモートに合わせるなら sh .ccnavi/scripts/ccnavi-sync.sh <P> (親のブランチ)。
+                ほかのブランチは fetch <リモート> <ブランチ> のあと merge <リモート>/<ブランチ>。
+                分かれていて進めないなら人に回す (checkout -B で付け替えない)
   rebase cherry-pick revert am apply bisect  履歴を書き換えない
   config clone submodule  利用者に依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
@@ -322,23 +329,40 @@ worktree)
 		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと飛ばす。
 		# 知らないオプションは通さない。通すと行き先を取り違え、検査そのものが
 		# 意味を失う（2026-09-12 の決定）。
+		#
+		# 行き先の名前とブランチ名を揃える（ADR-0093 の 3.1 の 10。段階 2b）。親のブランチ名は親の
+		# 識別子で、ワークツリーの名前も同じ。`-B`（既存のブランチの付け替え）・`--detach`（ブランチの
+		# 外）・`-f`（他のワークツリーが使うブランチや残った登録の上書き）は、その結び付きを崩すか、
+		# 親のブランチを別のコミットへ向け直すので通さない。
 		wt_dest=""
-		wt_skip=0
+		wt_base=""
+		wt_new=""
+		wt_skip=""
 		wt_first=1
 		for wt_word in ${1+"$@"}; do
 			if [ "$wt_first" -eq 1 ]; then
 				wt_first=0 # 先頭の `add` 自身
 				continue
 			fi
-			if [ "$wt_skip" -eq 1 ]; then
-				wt_skip=0 # 直前のオプションの値
+			if [ -n "$wt_skip" ]; then
+				# 直前のオプションの値。-b なら新しいブランチ名。
+				[ "$wt_skip" = b ] && wt_new="$wt_word"
+				wt_skip=""
 				continue
 			fi
 			case "$wt_word" in
-			-b | -B | --reason)
-				wt_skip=1
+			-b) wt_skip=b ;;
+			--reason) wt_skip=r ;;
+			-B)
+				reject worktree-force-branch "worktree add -B は、同じ名前の既存のブランチを別のコミットへ付け替えます。そのブランチにしか無いコミットが外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。新しく切るなら $SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>、既にあるブランチを出すなら $SELF worktree add .claude/worktrees/<ブランチ> <ブランチ> です。リモートに合わせるのは $SYNC <P> です。"
 				;;
-			--detach | -d | --force | -f | --checkout | --no-checkout | --lock | \
+			--detach | -d)
+				reject worktree-detach "worktree add $wt_word はブランチの外（detached HEAD）にワークツリーを作ります。ワークツリーはブランチの上に作り、名前をブランチ名に揃えます（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
+				;;
+			--force | -f)
+				reject worktree-force "worktree add $wt_word は、他のワークツリーが出しているブランチや、登録の残った行き先を上書きします。$SELF worktree list で確かめ、要らない登録は $SELF worktree prune で外してから、オプション無しで打ってください。"
+				;;
+			--checkout | --no-checkout | --lock | \
 				--guess-remote | --no-guess-remote | --track | --no-track | --quiet | -q) ;;
 			-*)
 				reject worktree-option "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中にワークツリーを作ってしまいます。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
@@ -346,6 +370,8 @@ worktree)
 			*)
 				if [ -z "$wt_dest" ]; then
 					wt_dest="$wt_word"
+				elif [ -z "$wt_base" ]; then
+					wt_base="$wt_word"
 				fi
 				;;
 			esac
@@ -389,6 +415,16 @@ worktree)
 				;;
 			esac
 			reject worktree-outside "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+		fi
+		# 行き先の名前 = ブランチ名（ADR-0093 の 3.1 の 10）。-b が無く 2 つ目の語も無ければ、
+		# git は行き先の名前でブランチを切るので揃う。
+		wt_leaf="${wt_abs##*/}"
+		if [ -n "$wt_new" ]; then
+			if [ "$wt_new" != "$wt_leaf" ]; then
+				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします（親のブランチなら親の識別子。変えると家族が止まります）。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。"
+			fi
+		elif [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; then
+			reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う行き先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前はブランチ名と同じにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$wt_base にしてください。"
 		fi
 		;;
 	list | prune) ;;
@@ -637,6 +673,20 @@ checkout | switch)
 			;;
 		esac
 	done
+	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C）は通さない
+	# （ADR-0093 の 5.2。段階 2b で ccnavi-sync.sh と同時に塞ぐ。D36）。親のブランチを付け替えると、
+	# 承認済みチケットの置き場ごと別の中身になる。リモートに合わせる道は ccnavi-sync.sh。
+	for arg in ${1+"$@"}; do
+		co_force_branch=no
+		case "$sub:$arg" in
+		checkout:-B | switch:-C | switch:--force-create | switch:--force-create=*) co_force_branch=yes ;;
+		*:--*) ;;
+		checkout:-*B* | switch:-*C*) co_force_branch=yes ;;
+		esac
+		if [ "$co_force_branch" = yes ]; then
+			reject checkout-force-branch "$sub $arg は、同じ名前の既存のブランチを別のコミットへ付け替えます。そのブランチにしか無いコミットが黙って外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。リモートに合わせるなら、親のブランチは $SYNC <P>、ほかのブランチは $SELF merge <リモート>/<ブランチ> です。分かれていて進めないなら利用者に伝えてください。新しいブランチは -b（switch は -c）で切ります。"
+		fi
+	done
 	# `checkout <ref> <パス>` は `--` が無くてもパスを別のコミットの中身に戻す。承認済みチケットの
 	# 置き場に当たるパスは通さない（ADR-0093 の段階 0）。オプションでない最初の語が行き先か起点で、
 	# 2 つ目からがパス。-b / -B / --orphan（switch は -c / -C）は値を次の語で取るので、値ごと飛ばす。
@@ -648,7 +698,7 @@ checkout | switch)
 			continue
 		fi
 		case "$arg" in
-		-b | -B | --orphan | -c | -C) co_skip=yes ;;
+		-b | -B | --orphan | -c | -C | --create) co_skip=yes ;;
 		--pathspec-from-file | --pathspec-from-file=*)
 			reject checkout-store "$sub の $arg は、どのパスを戻すかをここで読めないので通しません。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
 			;;
@@ -665,6 +715,51 @@ checkout | switch)
 			;;
 		esac
 	done
+	# 親のワークツリー（.claude/worktrees/<P> で、親の写しか提案があるもの）では、別のブランチへ
+	# 移らない（ADR-0093 の 3.1 の 10。段階 2b）。親のブランチの名前は識別子で、ワークツリーが別の
+	# ブランチの上に居ると、着手・取り込み・push の守りが家族を引けなくなる。
+	co_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	case "$co_top" in
+	"$WS"/.claude/worktrees/*)
+		co_name="${co_top#"$WS"/.claude/worktrees/}"
+		co_name="${co_name%%/*}"
+		if ccnavi_parent_tree "$co_top" "$co_name"; then
+			co_to=""
+			co_one=""
+			co_words=0
+			co_skip=no
+			for arg in ${1+"$@"}; do
+				if [ "$co_skip" = yes ]; then
+					co_skip=no
+					co_to="$arg" # -b / -c / --orphan の新しいブランチ
+					continue
+				fi
+				case "$sub:$arg" in
+				*:-b | *:-c | *:--orphan | *:-B | *:-C | switch:--create) co_skip=yes ;;
+				switch:--create=*) co_to="${arg#--create=}" ;;
+				*:--orphan=*) co_to="${arg#--orphan=}" ;;
+				*:--detach | switch:-d) co_to="（ブランチの外）" ;;
+				*:-) co_words=$((co_words + 1)) ;;
+				*:-*) ;;
+				*)
+					co_words=$((co_words + 1))
+					[ "$co_words" -eq 1 ] && co_one="$arg"
+					;;
+				esac
+			done
+			# 語が 1 つだけなら、それが移る先（2 つ以上は `checkout <ref> <パス>` で、上で見た）。
+			if [ -z "$co_to" ] && [ "$co_words" -eq 1 ]; then
+				co_to="${co_one:--}"
+			fi
+			case "$co_to" in
+			'' | "$co_name" | HEAD) ;;
+			*)
+				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移りません。親のブランチの名前は識別子で、変えると家族が止まります（ADR-0093 の 3.6）。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
+				;;
+			esac
+		fi
+		;;
+	esac
 	;;
 
 fetch | pull)
@@ -678,7 +773,7 @@ fetch | pull)
 		# ブランチへ直に書く。`+` は早送りでない書き換えも通す。取ってくるのはブランチ名だけにする
 		# （ADR-0093 の段階 0）。URL も `:` を含むので同じく止まる。取得先は設定済みのリモート名で書く。
 		*:* | *+*)
-			reject fetch-refspec "$arg は取ってきたものを手元の参照へ直に書く形（refspec）か URL です。取ってくるのはリモート名とブランチ名だけで、$SELF $sub <リモート> <ブランチ> の形で書いてください。手元のブランチへ入れるのは、取ってきた後の $SELF merge <リモート>/<ブランチ> です。"
+			reject fetch-refspec "$arg は取ってきたものを手元の参照へ直に書く形（refspec）か URL です。取ってくるのはブランチ名だけで、$SELF $sub <リモート> <ブランチ> の形で書いてください。手元の ref は $SYNC <ブランチ> が進めます（親のワークツリー以外のブランチは、取ってきた後の $SELF merge <リモート>/<ブランチ>）。"
 			;;
 		esac
 	done
@@ -756,6 +851,15 @@ push)
 		reject push-integration-branch "$push_branch は統合先です。統合は利用者がマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
+	# リモートから消えた親のブランチ（家族の控えが gone）へは送らない（ADR-0093 の 3.6。段階 2b）。
+	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた家族）を確かめないまま家族が
+	# 動き出す。毎回の ls-remote はせず、控えを読むだけにする。人が戻した後は ccnavi-sync.sh が
+	# present に書き直して、この拒否が解ける。
+	push_key=$(ccnavi_repo_key "${push_top:-.}" "$WS")
+	push_record=$(ccnavi_family_record "$WS" "$push_key" "$push_branch")
+	if [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
+		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（家族の控えが gone）。普通の push で作り直すと、消えた理由を確かめないまま家族が動き出すので通しません。改名や消し間違いなら利用者に元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。家族を捨てたなら親のワークツリーを片付けてください。"
+	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do
 		case "$arg" in
@@ -789,7 +893,7 @@ push)
 	done
 	;;
 reset)
-	reject reset "reset は作業中の変更やコミットを消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。ブランチをリモートに合わせたい（squash マージの後で fast-forward できない、など）なら、$SELF fetch <リモート> <ブランチ> のあと $SELF checkout -B <ブランチ> <リモート>/<ブランチ> を使ってください。書きかけとぶつかるなら git が拒みます。ただし、そのブランチにしか無いコミットは黙って外れます。先に $SELF log --oneline <リモート>/<ブランチ>..HEAD で外れるコミットを見て、それが触ったファイルについて $SELF diff HEAD <リモート>/<ブランチ> -- <ファイル> が空（変更が行き先に入っている）ことを確かめてから打ってください。空でなければ打たずに利用者に伝えてください。"
+	reject reset "reset は作業中の変更やコミットを消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。リモートに合わせたいなら、親のブランチは $SYNC <P> を打ってください（早送りか merge で取り込み、衝突したら取りやめます）。ほかのブランチは $SELF fetch <リモート> <ブランチ> のあと $SELF merge <リモート>/<ブランチ> です。分かれていて進めない（squash マージの後で fast-forward できない、など）なら、ブランチを付け替えずに利用者に伝えてください。"
 	;;
 clean)
 	reject clean "$sub は作業中の変更を消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
@@ -807,6 +911,54 @@ clone | submodule | lfs)
 	reject not-allowed "$sub はホワイトリストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
 	;;
 esac
+
+# push が通ったら、親のブランチなら家族の控えを作る（ADR-0093 の 4.3 の移り目。段階 2b）。
+#
+# 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親の写しか提案が
+# ある）で、送り先が origin のときだけ。控えがあれば（present）sha を書き直すだけで、closed・
+# blocked は触らない。控えが無く、置き場に未コミットの変更があれば作らずに言う（未送信の状態を
+# 持ち込まないため）。控えがあると SessionStart の早送りと ccnavi-sync.sh の消えたかの確かめの対象になる。
+push_record_family() {
+	case "${push_seen_remote:-origin}" in
+	origin) ;;
+	*) return 0 ;;
+	esac
+	case "$push_top" in
+	"$WS"/.claude/worktrees/*) ;;
+	*) return 0 ;;
+	esac
+	[ "${push_top##*/}" = "$push_branch" ] || return 0
+	ccnavi_parent_tree "$push_top" "$push_branch" || return 0
+	pr_sha=$(git rev-parse --verify --quiet HEAD 2>/dev/null || :)
+	[ -n "$pr_sha" ] || return 0
+	pr_state=$(ccnavi_record_get "$push_record" state)
+	case "$pr_state" in
+	present)
+		ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
+			fetched_at "$(ccnavi_record_get "$push_record" fetched_at)" state present \
+			reason "$(ccnavi_record_get "$push_record" reason)" || :
+		return 0
+		;;
+	'') ;;
+	*) return 0 ;;
+	esac
+	pr_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
+	pr_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
+	pr_dirty=$(git -C "$push_top" status --porcelain --untracked-files=all -- \
+		"${pr_approved%/}" "${pr_proposals%/}/review" 2>/dev/null | cut -c4- | tr '\n' ' ' | sed 's/ *$//')
+	if [ -n "$pr_dirty" ]; then
+		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この家族は取り込み（%s %s）の対象になる\n' \
+			"$pr_dirty" "$SYNC" "$push_branch"
+		return 0
+	fi
+	if ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
+		fetched_at "$(date +%s)" state present reason ""; then
+		log_info 家族の控えを作った -- "branch=$push_branch" "repo=$push_key"
+		printf '案内: %s の家族の控えを作った。以後、リモートでの承認は %s %s で取り込む\n' \
+			"$push_branch" "$SYNC" "$push_branch"
+	fi
+	return 0
+}
 
 # 外部 diff ドライバは設定にも書けるので、読む系では毎回無効にして呼ぶ。
 case "$sub" in
@@ -889,6 +1041,9 @@ if [ "$status" -eq 0 ]; then
 	body | head -n "$MAX_LINES"
 	if [ "$lines" -gt "$MAX_LINES" ]; then
 		printf '... 残り %d 行は %s にある\n' "$((lines - MAX_LINES))" "$logrel"
+	fi
+	if [ "$sub" = push ]; then
+		push_record_family
 	fi
 else
 	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"
