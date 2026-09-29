@@ -484,12 +484,27 @@ branch)
 	;;
 
 tag)
+	# 一覧だけ通す。位置の引数（`tag <名前>` はタグを作る）は -l / --list のときの絞り込みだけ
+	# （ADR-0093 の段階 2b のレビューの相談 1）。--contains などの値を次の語で取る形は、値ごと飛ばす。
+	tg_list=no
+	tg_words=""
+	tg_skip=no
 	for arg in ${1+"$@"}; do
+		if [ "$tg_skip" = yes ]; then
+			tg_skip=no # 直前のオプションの値
+			continue
+		fi
 		case "$arg" in
-		-l | --list | --contains | --contains=* | --points-at | --points-at=* | --merged | --no-merged | --sort=* | --format=* | -n | -n[0-9]*) ;;
+		-l | --list) tg_list=yes ;;
+		--contains | --no-contains | --points-at | --merged | --no-merged) tg_skip=yes ;;
+		--contains=* | --no-contains=* | --points-at=* | --merged=* | --no-merged=* | --sort=* | --format=* | -n | -n[0-9]*) ;;
 		-*) reject tag-write "tag は一覧だけ通します ($arg は不可)。タグを作る・消すのは利用者に依頼してください。" ;;
+		*) tg_words="$arg" ;;
 		esac
 	done
+	if [ -n "$tg_words" ] && [ "$tg_list" = no ]; then
+		reject tag-write "tag $tg_words はタグを作ります。tag は一覧だけ通します（絞り込むなら $SELF tag -l <型>）。タグを作るのは利用者に依頼してください。"
+	fi
 	;;
 
 remote)
@@ -746,7 +761,7 @@ merge)
 	# もう一方の変更を黙って落とす。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、落ちたことは差分にも記録にも残らない。
 	# オプションは許可リストで読む（略した --strategy-o=ours・束の -sours も同じに読む。段階 2b）。
-	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify" \
+	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash" \
 		"message file strategy strategy-option" "log" "qvne" "mFsX"
 	merge_cb() {
 		[ "$1" = opt ] || return 0
@@ -807,7 +822,7 @@ commit)
 	# ここで見るのは、点検そのものを飛ばす形（--no-verify・-n）と、直前のコミットを書き換える
 	# --amend。オプションは許可リストで読む（略した --no-verif・束の -an も同じに読む。段階 2b）。
 	ow_spec "all quiet verbose signoff no-signoff only include allow-empty allow-empty-message dry-run short porcelain long branch null status no-status reset-author edit no-edit verify no-verify pathspec-file-nul amend" \
-		"message file author date cleanup trailer pathspec-from-file template" "untracked-files" \
+		"message file author date cleanup trailer pathspec-from-file template fixup squash" "untracked-files" \
 		"aqvsoiezn" "mFt" "u"
 	commit_cb() {
 		[ "$1" = opt ] || return 0
@@ -927,17 +942,17 @@ fetch | pull)
 	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗になる。
 	# オプションは許可リストで読む（略した --prun・--rebas も断る。段階 2b）。
 	if [ "$sub" = fetch ]; then
-		ow_spec "quiet verbose progress no-progress tags no-tags all dry-run no-recurse-submodules force prune prune-tags unshallow" \
-			"jobs" "" "qvntfpP" "j"
+		ow_spec "quiet verbose progress no-progress tags no-tags all dry-run no-recurse-submodules force prune prune-tags unshallow show-forced-updates no-show-forced-updates write-fetch-head no-write-fetch-head" \
+			"jobs depth deepen shallow-since" "" "qvntfpP" "j"
 	else
-		ow_spec "quiet verbose ff ff-only no-ff no-rebase stat no-stat no-edit edit commit no-commit progress no-progress tags no-tags force prune unshallow" \
-			"" "rebase" "qvnfpr" ""
+		ow_spec "quiet verbose ff ff-only no-ff no-rebase stat no-stat no-edit edit commit no-commit progress no-progress tags no-tags force prune unshallow autostash no-autostash" \
+			"depth deepen shallow-since" "rebase" "qvnfpr" ""
 	fi
 	fetch_cb() {
 		case "$1" in
 		opt)
 			case "$2" in
-			-f | --force | --prune | -p | -P | --prune-tags | --unshallow)
+			-f | --force | --prune | -p | -P | --prune-tags)
 				reject fetch-force "$2 は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
 				;;
 			--rebase | -r)
