@@ -434,9 +434,14 @@ ccnavi_lock_take() {
 	ccnavi_lk_start=$(date +%s)
 	while :; do
 		if mkdir "$ccnavi_lk_dir" 2>/dev/null; then
+			# 作った直後に控える。owner を書く前に切られても（INT・TERM）、trap の drop が外せるように。
+			ccnavi_lock_dir="$ccnavi_lk_dir"
+			ccnavi_lock_mark=""
 			ccnavi_lk_now=$(date +%s)
 			ccnavi_lk_mark="$$-$ccnavi_lk_now"
 			ccnavi_lk_want="$ccnavi_lk_host $$ $ccnavi_lk_now $ccnavi_lk_mark $ccnavi_lk_os"
+			# 書く前に印を控える（書いた直後に切られても、drop が自分の owner と分かるように）。
+			ccnavi_lock_mark="$ccnavi_lk_mark"
 			if printf '%s\n' "$ccnavi_lk_want" >"$ccnavi_lk_dir/owner" 2>/dev/null &&
 				[ "$(ccnavi_lock_owner "$ccnavi_lk_dir")" = "$ccnavi_lk_want" ]; then
 				ccnavi_lock_dir="$ccnavi_lk_dir"
@@ -448,6 +453,8 @@ ccnavi_lock_take() {
 				return 0
 			fi
 			# 取った直後に奪われた（owner を書けない・別の中身）。取れていないとして待ちに戻る。
+			ccnavi_lock_dir=""
+			ccnavi_lock_mark=""
 			log_warn 取ったロックの持ち主を書けなかった -- "lock=$ccnavi_lk_key"
 		else
 			ccnavi_lk_seen=$(ccnavi_lock_owner "$ccnavi_lk_dir")
@@ -549,6 +556,10 @@ ccnavi_lock_drop() {
 		ccnavi_ld_mark=$(printf '%s\n' "$ccnavi_ld_line" | awk '{ print $4 }')
 		if [ -n "$ccnavi_lock_mark" ] && [ "$ccnavi_ld_mark" = "$ccnavi_lock_mark" ]; then
 			rm -rf "$ccnavi_lock_dir" 2>/dev/null || :
+		elif [ -z "$ccnavi_ld_line" ]; then
+			# 作ったが owner を書く前に切られた。中身が空のままなら自分の作ったものなので外す。
+			rmdir "$ccnavi_lock_dir" 2>/dev/null || rm -f "$ccnavi_lock_dir/owner" 2>/dev/null || :
+			rmdir "$ccnavi_lock_dir" 2>/dev/null || :
 		fi
 		ccnavi_lock_dir=""
 	fi
