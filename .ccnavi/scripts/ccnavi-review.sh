@@ -45,7 +45,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の綴り）
-  merged                                          いまのブランチの MR がマージ済みなら "merged <番号>"、無ければ "none"（ccnavi-sync.sh が観測ずれを確かめる）
+  merged                                          いまのブランチの MR がマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が要る。
 USAGE
@@ -522,14 +522,30 @@ fetch)
 merged)
 	# いまのブランチ（親のブランチ）の MR がマージ済みか（ADR-0093 の 3.6 の 5）。ccnavi-sync.sh が、
 	# 親のブランチがリモートから消えて統合先の done/ にも見えないときに、観測ずれかを確かめるために聞く。
-	# 読むだけで、何も書かない。
+	# 読むだけで、何も書かない。答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
+	#   merged <番号>  終了コード 0
+	#   none          終了コード 0（マージ済みの MR が無いと分かった）
+	#   unknown       終了コード 3（API が落ちた・答えを読めなかった）。道具やトークンが無ければ、
+	#                 上の道具の選び方が 2 で止める（none は出さない）
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
-		found=$(api GET "repos/$path/pulls?state=closed&head=$owner:$branch" |
-			"$JQ" -r '[.[] | select(.merged_at != null)][0].number // empty')
+		answer=$(api GET "repos/$path/pulls?state=closed&head=$owner:$branch") || {
+			printf 'unknown\n'
+			exit 3
+		}
+		found=$(printf '%s' "$answer" | "$JQ" -r '[.[] | select(.merged_at != null)][0].number // empty') || {
+			printf 'unknown\n'
+			exit 3
+		}
 	else
-		found=$(api GET "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch" |
-			"$JQ" -r '.[0].iid // empty')
+		answer=$(api GET "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
+			printf 'unknown\n'
+			exit 3
+		}
+		found=$(printf '%s' "$answer" | "$JQ" -r '.[0].iid // empty') || {
+			printf 'unknown\n'
+			exit 3
+		}
 	fi
 	if [ -n "$found" ]; then
 		printf 'merged %s\n' "$found"
