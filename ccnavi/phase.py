@@ -368,6 +368,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
     合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのは人。
 
+    取り込みの家族の控えを消す `ccnavi-sync.sh --forget` も止める。控え（墓標）を消すと、
+    決まらないで止めていた家族（gone など）が控えの無い家族に戻って動けるようになる。
+
     ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
     ここではなく `human_path_form` が止める。実行ファイルの綴りに頼らず見るため。
     """
@@ -376,7 +379,12 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     if clause:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
-    script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
+    script = (
+        r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
+        # 家族の控え（墓標）を消す人の入口（ADR-0093 の 11.5.1 の決定 A）。消すと、止めていた家族が
+        # 控えの無い家族として今の手元の動きに戻るので、打つのは人。
+        r"|(^|\x00|[;&|]\s*)((sh|bash)\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
+    )
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
     # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
@@ -400,6 +408,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "残った指摘の対応方針は利用者がボードか端末で決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
+            "家族の控えを消す"
+            f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' も人が打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
             "承認待ちの一覧を見るだけなら 'ccnavi --approve --preview' は通ります。"
@@ -834,7 +844,7 @@ def _type_source(phase: Phase) -> dict:
 def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。"""
     texts = []
-    where = approval.home_dir(conf, root, parent.ticket, "")
+    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     phases = phases_of(root, conf, parent.ticket)
     for phase in phases:
         if not phase.ended or phase.marks:
@@ -1146,7 +1156,7 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
             groups.setdefault(p.review_label, []).append(p.label)
         return "、".join(f"{label}（{'、'.join(names)}）" for label, names in groups.items())
     if approval.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval.PARENT_MARK_CLOSE_EARLY,
     ):

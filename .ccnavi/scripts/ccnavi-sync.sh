@@ -3,6 +3,7 @@
 # （ADR-0093 の 4.2・3.6。段階 2b）。
 #
 #   sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
+#   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （人が打つ。家族の控えを消す）
 #
 # 人が打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
 # ccnavi-fetch.sh は早送りしかしないので、分かれた家族を取り込むのと、親のブランチが
@@ -11,8 +12,10 @@
 # <P> は親のブランチ名（= 親の識別子 = .claude/worktrees/<P>）。省けば、.claude/worktrees/ の下の
 # 親のワークツリー（ディレクトリ名 = ブランチ名で、親の写しか提案がある）を全部。
 #
-# 始めに、親のワークツリーが無くなった家族の控えを消す（片付けた家族。同じ名前で切り直したときに
-# 古い控えで push が止まり続けないため）。
+# 家族の控えは墓標として残す（段階 2c のレビューの決定 A）。親のワークツリーを片付けても消さない。
+# 消すと、決まらないで止めていた家族（gone など）が控えの無い家族に戻り、止めが外れるため。
+# 消すのは人が打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
+# エージェントからは組み込みの deny（builtin-guard-ticket-approval）が止める。
 #
 # リポジトリ（ワークスペース自身と、家族の元のプロジェクト）ごとに 1 回:
 #
@@ -40,10 +43,15 @@
 #     書き換えない）。マージされていないと分かったときだけ、控えがあれば gone を書いて止める
 #     （控えが無ければ gone は書かずに止める）
 #
-# 統合先の控えを書いた後、present の家族ごとに実行ファイルの `ccnavi sync check <P>` で判定し直す
-# （権威の検査と、承認済みチケットの判定し直し。4.2 の 4）。error があれば家族の控えを blocked に
-# して、理由を reason に書いて止める。判定（hook・承認・状態の操作）は blocked の家族を止める（2c）。
-# 解き方は、理由を直してから同じ P でこの sh を打ち直すこと（検査し直して通れば present に戻る）。
+# 統合先の控えを書いた後、present の家族ごとに実行ファイルの `ccnavi sync check <P> <リポジトリ>` で
+# 判定し直す（権威の検査と、承認済みチケットの判定し直し。4.2 の 4）。error があれば家族の控えを
+# blocked にして、理由を reason に書いて止める。判定（hook・承認・状態の操作）は blocked の家族を
+# 止める（2c）。解き方は、理由を直してから同じ P でこの sh をオンラインで打ち直すこと（取り込みで
+# present に書き直してから検査し直すので、通れば present に戻る）。書く前にロックを取り直し、控えが
+# まだ present かを確かめる（並行する sync が書いた gone・closed を上書きしない）。ロックが取れない・
+# 書けないときは 3 回まで試し、それでも書けなければ終了コード 3 で終わる（止めるべき家族が止まって
+# いない）。実行ファイルが検査を実行できなかった（古い実行ファイルが `sync check` を知らない、など。
+# 答えの頭に `check 1` が無い）ときは、家族を止めずに警告だけ出す（検査の error とは分ける）。
 #
 # 実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。ここが git で取ってくる。
 # 置き場の綴りと settings.local.json の読みだけを実行ファイル（`ccnavi sync paths`）に聞く。
@@ -54,7 +62,7 @@
 #   CCNAVI_SYNC_RETRIES（観測ずれの確かめ直しの回数、既定 3）/ CCNAVI_SYNC_RETRY_WAIT（その間隔の秒、既定 5）/
 #   CCNAVI_SYNC_TIMEOUT（ls-remote・fetch 1 回の見張りの秒、既定 60）
 # 終了コード: 0 全部取り込んだ（取り込むものが無いを含む） / 1 止めた家族かリポジトリがある /
-#           2 引数か環境の誤り
+#           2 引数か環境の誤り / 3 取り込みの後の検査で止める理由があったのに家族の控えを書けなかった
 
 set -eu
 
@@ -63,21 +71,35 @@ set -eu
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
+sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
 
   親のブランチ <P>（省けば .claude/worktrees/ の下の親のワークツリー全部）をリモートから取り込み、
   家族の控えと統合先の控えを書く。分かれていれば merge し、衝突したら取りやめて人に回す。
   リモートから消えた親のブランチは、統合先の done/ を見て「閉じた」か「消えた」かを決める。
-  親のワークツリーが無くなった家族の控えは消す。
+  取り込んだ後、家族を判定し直し、止める理由があれば家族の控えを blocked にする。
+  家族の控えは親のワークツリーを片付けても消えない（墓標）。
+
+  --forget <P>...  人が打つ。捨てた家族の控えを消す（親のワークツリーを片付けた後だけ）。
+                   消すと、その名前で切り直した家族は控えの無い家族として扱われる。
 
   統合先: CCNAVI_INTEGRATION_BRANCH（環境変数か .claude/settings.local.json の env）、
           空ならホストのデフォルトブランチ
 USAGE
 }
 
+forget=no
 case "${1:-}" in
 -h | --help | help)
 	usage
 	exit 0
+	;;
+--forget)
+	forget=yes
+	shift
+	if [ "$#" -eq 0 ]; then
+		printf 'ccnavi-sync: --forget には親のブランチ名（識別子）が要ります。\n' >&2
+		exit 2
+	fi
 	;;
 -*)
 	printf 'ccnavi-sync: %s は受けません。\n' "$1" >&2
@@ -137,7 +159,52 @@ cleanup() {
 trap 'cleanup' EXIT
 trap 'cleanup; exit 130' INT TERM HUP
 
-log_info 受け付けた -- "args=$#"
+log_info 受け付けた -- "args=$#" "forget=$forget"
+
+# ---- 人が打つ --forget（家族の控えを消す）。ネットワークも実行ファイルも使わない。
+
+if [ "$forget" = yes ]; then
+	forget_rc=0
+	for want in "$@"; do
+		if [ -e "$root/.claude/worktrees/$want" ] || [ -L "$root/.claude/worktrees/$want" ]; then
+			printf '%s: 親のワークツリー（.claude/worktrees/%s）がまだある。控えを消すのは捨てた家族だけ。先に片付けてから打つ（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）\n' \
+				"$want" "$want" "$here_sh" "$want"
+			forget_rc=1
+			continue
+		fi
+		fg_found=no
+		for fg_record in "$state"/sync/*/families/"$want"; do
+			[ -e "$fg_record" ] || [ -L "$fg_record" ] || continue
+			fg_key="${fg_record%/families/*}"
+			fg_key="${fg_key##*/}"
+			if [ -L "$state/sync/$fg_key" ] || [ -L "$state/sync/$fg_key/families" ]; then
+				printf '%s: 控えの置き場（sync/%s）がシンボリックリンク。辿らないので消さない。人が中身を確かめる\n' "$want" "$fg_key"
+				forget_rc=1
+				continue
+			fi
+			fg_found=yes
+			fg_lock_rc=0
+			ccnavi_lock_take "$root" "$fg_key" "$want" "$lock_wait" || fg_lock_rc=$?
+			if [ "$fg_lock_rc" -ne 0 ]; then
+				printf '%s: 他の操作がロックを持っている。終わってから打ち直す\n' "$want"
+				forget_rc=1
+				continue
+			fi
+			fg_state=$(ccnavi_record_get "$fg_record" state)
+			if rm -f "$fg_record"; then
+				printf '%s: 家族の控え（sync/%s/families/%s。state %s）を消した。この名前の家族は控えの無い家族として扱われる\n' \
+					"$want" "$fg_key" "$want" "${fg_state:-?}"
+				log_info 家族の控えを消した -- "family=$want" "repo=$fg_key" "state=$fg_state"
+			else
+				printf '%s: 家族の控え（sync/%s/families/%s）を消せなかった\n' "$want" "$fg_key" "$want"
+				forget_rc=1
+			fi
+			ccnavi_lock_drop
+		done
+		[ "$fg_found" = yes ] || printf '%s: 家族の控えは無い（消すものは無い）\n' "$want"
+	done
+	exit "$forget_rc"
+fi
 
 # `git rev-parse --git-path <名前>` をツリーからの綴りにする（ワークツリーでは git ディレクトリが別）。
 git_path() {
@@ -382,19 +449,6 @@ add_family() {
 	grep -F -x -q -- "$af_key" "$scratch/repos" 2>/dev/null || printf '%s\n' "$af_key" >>"$scratch/repos"
 }
 
-# 親のワークツリーが無くなった家族の控えを消す（D11 の寿命。片付けた家族）。
-for fam_record in "$state"/sync/*/families/*; do
-	[ -f "$fam_record" ] || continue
-	case "$fam_record" in
-	*.tmp.*) continue ;;
-	esac
-	fam_name="${fam_record##*/}"
-	if [ ! -d "$root/.claude/worktrees/$fam_name" ]; then
-		rm -f "$fam_record"
-		printf '%s: 親のワークツリーが無いので家族の控えを消した（片付けた家族）\n' "$fam_name"
-	fi
-done
-
 if [ "$#" -gt 0 ]; then
 	for want in "$@"; do
 		has_family_line "$want" && continue
@@ -631,8 +685,8 @@ sync_absent() {
 	fi
 	printf '  戻し方 1（改名・消し間違い）: 元の名前 %s でブランチを作り直す。端末なら git push origin %s:refs/heads/%s（控えにある、最後に取り込んだか送った %s の先頭）、GitHub なら PR の画面の「Restore branch」、GitLab なら MR の refs/merge-requests/<番号>/head から %s を作る。戻したら sh %s/ccnavi-sync.sh %s を打ち直す\n' \
 		"$P" "${kept_sha:-<最後に取り込んだ sha>}" "$P" "$P" "$P" "$here_sh" "$P"
-	printf '  戻し方 2（家族を捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、sh %s/ccnavi-sync.sh を打つと家族の控えも消える（同じ名前で切り直せる）\n' \
-		"$here_sh" "$P" "$here_sh"
+	printf '  戻し方 2（家族を捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、人が sh %s/ccnavi-sync.sh --forget %s を打つと家族の控えが消える（同じ名前で切り直せる。エージェントは打たない）\n' \
+		"$here_sh" "$P" "$here_sh" "$P"
 	fail_note
 	return 0
 }
@@ -660,28 +714,53 @@ check_family() {
 		return 0
 	fi
 	cf_rc=0
-	run_ccnavi sync check "$1" >"$scratch/check" 2>"$scratch/check-err" || cf_rc=$?
+	run_ccnavi sync check "$1" "$2" >"$scratch/check" 2>"$scratch/check-err" || cf_rc=$?
+	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
+		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、落ちた）。検査の error ではない
+		# ので家族は止めない。前（段階 2b）と同じ動き。
+		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。家族は止めていない。実行ファイルを新しくして打ち直す\n' \
+			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"
+		log_warn 取り込みの後の検査を実行できなかった -- "family=$1" "rc=$cf_rc"
+		return 0
+	fi
 	sed -n 's/^warn /  注意: /p' "$scratch/check"
 	[ "$cf_rc" -ne 0 ] || return 0
 	cf_reason=$(sed -n 's/^error //p' "$scratch/check" | head -n 1)
 	[ -n "$cf_reason" ] || cf_reason="取り込みの後の検査が落ちた（$(head -n 1 "$scratch/check-err" 2>/dev/null)）"
-	cf_lock_rc=0
-	ccnavi_lock_take "$root" "$2" "$1" "$lock_wait" || cf_lock_rc=$?
-	if [ "$cf_lock_rc" -ne 0 ]; then
-		printf '%s: 取り込みの後の検査で止める理由があったが、ロックが取れず控えを書けなかった（%s）。打ち直す\n' "$1" "$cf_reason"
-		fail_note
-		return 0
-	fi
-	if ccnavi_record_write "$cf_record" remote origin branch "$1" sha "$(ccnavi_record_get "$cf_record" sha)" \
-		fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state blocked reason "$cf_reason"; then
+	cf_try=0
+	cf_done=""
+	while [ "$cf_try" -lt 3 ] && [ -z "$cf_done" ]; do
+		cf_try=$((cf_try + 1))
+		cf_lock_rc=0
+		ccnavi_lock_take "$root" "$2" "$1" "$lock_wait" || cf_lock_rc=$?
+		[ "$cf_lock_rc" -eq 0 ] || continue
+		# 検査の間に並行する sync が控えを書き換えていたら（gone・closed・blocked）、上書きしない。
+		cf_now=$(ccnavi_record_get "$cf_record" state)
+		if [ "$cf_now" != present ]; then
+			printf '%s: 取り込みの後の検査で止める理由があったが、その間に家族の控えが %s に変わった。書き換えない（%s）\n' \
+				"$1" "${cf_now:-（無い）}" "$cf_reason"
+			ccnavi_lock_drop
+			fail_note
+			return 0
+		fi
+		if ccnavi_record_write "$cf_record" remote origin branch "$1" sha "$(ccnavi_record_get "$cf_record" sha)" \
+			fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state blocked reason "$cf_reason"; then
+			cf_done=yes
+		fi
+		ccnavi_lock_drop
+		[ -n "$cf_done" ] || sleep 1
+	done
+	if [ -n "$cf_done" ]; then
 		printf '%s: 取り込みの後の検査で家族を止めた（家族の控えを blocked にした）。%s\n' "$1" "$cf_reason"
 		sed -n 's/^error /  - /p' "$scratch/check"
-		printf '  直してから sh %s/ccnavi-sync.sh %s を打ち直す（検査し直して通れば present に戻る）\n' "$here_sh" "$1"
+		printf '  直してから、オンラインで sh %s/ccnavi-sync.sh %s を打ち直す（検査し直して通れば present に戻る）\n' "$here_sh" "$1"
+		fail_note
 	else
-		printf '%s: 取り込みの後の検査で止める理由があったが、家族の控え（%s）を書けなかった（%s）\n' "$1" "$cf_record" "$cf_reason"
+		printf '%s: 取り込みの後の検査で止める理由があったが、ロックが取れないか家族の控え（%s）を書けず、3 回試しても止められなかった（%s）。家族はまだ止まっていない。打ち直す\n' \
+			"$1" "$cf_record" "$cf_reason"
+		printf 'fail\n' >>"$scratch/unblocked"
+		fail_note
 	fi
-	ccnavi_lock_drop
-	fail_note
 	return 0
 }
 
@@ -748,6 +827,10 @@ while IFS= read -r key <&4; do
 	done 3<"$scratch/these"
 done 4<"$scratch/repos"
 
+if [ -s "$scratch/unblocked" ]; then
+	log_info 終わった -- "exit=3"
+	exit 3
+fi
 if [ -s "$scratch/failed" ]; then
 	log_info 終わった -- "exit=1"
 	exit 1

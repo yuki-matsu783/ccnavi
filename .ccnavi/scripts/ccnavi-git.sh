@@ -1055,7 +1055,7 @@ push)
 	push_key=$(ccnavi_repo_key "${push_top:-.}" "$WS")
 	push_record=$(ccnavi_family_record "$WS" "$push_key" "$push_branch")
 	if [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
-		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（家族の控えが gone）。普通の push で作り直すと、消えた理由を確かめないまま家族が動き出すので通しません。改名や消し間違いなら利用者に元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。家族を捨てたなら親のワークツリーを片付けてください。"
+		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（家族の控えが gone）。普通の push で作り直すと、消えた理由を確かめないまま家族が動き出すので通しません。改名や消し間違いなら利用者に元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。家族を捨てたなら親のワークツリーを片付け、人が $SYNC --forget $push_branch で家族の控えを消します（エージェントは打ちません）。"
 	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do
