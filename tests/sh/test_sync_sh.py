@@ -37,10 +37,18 @@ COPY = f".ccnavi/approved/doing/{PARENT}.md"
 APPROVED_AT = "2026-09-01T00:00:00+0900"
 
 
+# 読める承認済みチケットにするための範囲（取り込みの後の検査は読めない写しで家族を止める）。
+ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
+
+
 def copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
     """親の承認済みの写し（ブロックの形の ccnavi_approved）。"""
-    head = f"---\nversion: 1\nticket: {name}\n"
+    head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
     return f"{head}ccnavi_approved:\n  approved_at: {approved_at}\n---\n{body}"
+
+
+def child_copy_text(name=f"{PARENT}-01", parent=PARENT):
+    return f"---\nversion: 1\nticket: {name}\nparent: {parent}\nphase: 1\n{ALLOW}---\n"
 
 
 def write(path, text=""):
@@ -308,7 +316,50 @@ class SyncTest(unittest.TestCase):
     def test_a_repeated_argument_is_taken_once(self):
         done = self.sync(PARENT, PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual(1, done.stdout.count(f"{PARENT}: "), done.stdout)
+        self.assertEqual(1, done.stdout.count(f"{PARENT}: リモートと同じ"), done.stdout)
+        # 取り込みの後の検査も 1 度だけ（ここは実行ファイルが無いので、しなかったと 1 度言う）。
+        self.assertEqual(1, done.stdout.count(f"{PARENT}: 実行ファイルが無い"), done.stdout)
+
+    # ---- 取り込みの後の検査（4.2 の 4。段階 2c）
+
+    def test_the_check_blocks_the_family_and_a_later_run_clears_it(self):
+        launcher = self.launcher()
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+        # 元ツリーに未コミットで残った子の写し（親のワークツリーの外）。取り込み済みの家族では
+        # 信じないので、検査が家族を止める。
+        stray = write(
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            child_copy_text(),
+        )
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        record = fields(self.record)
+        self.assertEqual("blocked", record["state"])
+        self.assertIn("ワークツリーの外", record["reason"])
+        self.assertIn("blocked にした", done.stdout)
+        self.assertIn("打ち直す", done.stdout)
+        # 理由を片付けて打ち直せば、検査し直して present に戻る。
+        os.remove(stray)
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        record = fields(self.record)
+        self.assertEqual(("present", ""), (record["state"], record["reason"]))
+
+    def test_the_check_is_skipped_for_a_closed_family(self):
+        # 閉じた家族（控えが closed）は検査しない（状態の操作が無い）。
+        self.keep_record()
+        write(
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            child_copy_text(),
+        )
+        self.remote_commit("main", f".ccnavi/approved/done/{PARENT}.md", copy_text())
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=self.launcher())
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("closed", fields(self.record)["state"])
+        self.assertNotIn("検査", done.stdout)
 
     def test_a_single_branch_clone_still_sees_the_parent_branch(self):
         # origin の fetch の並びが main だけでも、origin/P を進めて取り込む（レビューの中 13）。
