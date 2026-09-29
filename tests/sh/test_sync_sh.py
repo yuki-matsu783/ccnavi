@@ -706,7 +706,8 @@ class SyncTest(unittest.TestCase):
         self.addCleanup(self.kill_group, proc)
         lock = self.lock_dir()
         deadline = time.monotonic() + 20
-        while not os.path.isdir(lock) and time.monotonic() < deadline:
+        owner = os.path.join(lock, "owner")
+        while not os.path.exists(owner) and time.monotonic() < deadline:
             time.sleep(0.1)
         self.assertTrue(os.path.isdir(lock), "ロックを取る前に終わった")
         # 端末の Ctrl-C と同じく、プロセスのまとまりへ送る（子も止まり、sh の trap が走る）。

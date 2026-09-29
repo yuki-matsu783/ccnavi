@@ -1330,5 +1330,94 @@ class PushRemoteResolutionTest(FamilyRecordPushTest):
         self.assertEqual("present", self.fields()["state"])
 
 
+class SafeAdditionsTest(GitWrapperTest):
+    """許可リストに足した、履歴を書き換えない形（ADR-0093 の段階 2b のレビューの相談 2）。
+
+    足したもの: commit --fixup・--squash、fetch と pull の --depth・--deepen・--shallow-since・
+    --unshallow、merge と pull の --autostash・--no-autostash、fetch の --show-forced-updates・
+    --no-show-forced-updates・--write-fetch-head・--no-write-fetch-head。
+    拒否されない（終了コード 2 にならない）ことを見る。git 自身が断る形（完全な clone への
+    --unshallow など）は 1 で終わってよい。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", self.bare)
+        self.branch = git_out(self.dir, "branch", "--show-current")
+        git(self.dir, "push", "-q", "origin", self.branch)
+
+    def test_added_forms_are_not_rejected(self):
+        head = git_out(self.dir, "rev-parse", "HEAD")
+        b = self.branch
+        for args in (
+            ("commit", "--allow-empty", f"--fixup={head}"),
+            ("commit", "--allow-empty", "--fixup", head),
+            ("commit", "--allow-empty", f"--squash={head}", "-m", "x"),
+            ("fetch", "--depth=1", "origin", b),
+            ("fetch", "--depth", "1", "origin", b),
+            ("fetch", "--deepen=1", "origin", b),
+            ("fetch", "--shallow-since=2000-01-01", "origin", b),
+            ("fetch", "--unshallow", "origin", b),
+            ("fetch", "--show-forced-updates", "origin", b),
+            ("fetch", "--no-show-forced-updates", "origin", b),
+            ("fetch", "--no-write-fetch-head", "origin", b),
+            ("fetch", "--write-fetch-head", "origin", b),
+            ("pull", "--depth=1", "origin", b),
+            ("pull", "--autostash", "origin", b),
+            ("pull", "--no-autostash", "origin", b),
+            ("merge", "--autostash", "origin/" + b),
+            ("merge", "--no-autostash", "origin/" + b),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertNotEqual(2, result.returncode, result.stdout + result.stderr)
+
+    def test_risky_neighbours_stay_rejected(self):
+        for args in (
+            ("fetch", "--prune", "origin"),
+            ("fetch", "--force", "origin"),
+            ("fetch", "--refmap=x", "origin"),
+            ("fetch", "--depth=1", "origin", "+main:main"),
+            ("pull", "--rebase", "origin", self.branch),
+            ("pull", "--rebase=merges", "origin", self.branch),
+            ("commit", "--amend", "-m", "x"),
+            ("commit", "--fixu=x"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+
+
+class TagListOnlyTest(GitWrapperTest):
+    """tag は一覧だけ。位置の引数は -l / --list のときの絞り込みだけ（相談 1）。"""
+
+    def test_creating_a_tag_is_rejected(self):
+        for args in (
+            ("tag", "v1"),
+            ("tag", "v1", "HEAD"),
+            ("tag", "--contains", "HEAD", "v1"),
+            ("tag", "-n", "v1"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertEqual("", git_out(self.dir, "tag", "--list"))
+
+    def test_listing_still_passes(self):
+        git(self.dir, "tag", "v0")
+        for args in (
+            ("tag",),
+            ("tag", "-l"),
+            ("tag", "-l", "v*"),
+            ("tag", "--list", "v*"),
+            ("tag", "--contains", "HEAD"),
+            ("tag", "--points-at", "HEAD"),
+            ("tag", "--merged=HEAD"),
+            ("tag", "-n", "-l", "v*"),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
