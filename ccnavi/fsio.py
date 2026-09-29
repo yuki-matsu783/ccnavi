@@ -356,7 +356,7 @@ def read_line(stream: Any) -> str:
 def remove(path: str) -> None:
     """消す。無くても、消せなくても黙る。"""
     if _STAGE["current"] is not None:
-        if exists(path):
+        if lexists(path):
             _stage_put(Op(OP_REMOVE, path, None), quiet=True)
         return
     with contextlib.suppress(OSError):
@@ -367,7 +367,8 @@ def remove(path: str) -> None:
 def unlink(path: str) -> str:
     """消す。消せたら空文字、無い・消せないなら理由（`remove` と違って黙らない）。"""
     if _STAGE["current"] is not None:
-        if not exists(path):
+        # リンクは辿らない（`os.remove` はリンクそのものを消す）。
+        if not lexists(path):
             return str(_missing(path))
         return _stage_put(Op(OP_UNLINK, path, None))
     try:
@@ -570,7 +571,9 @@ def recording() -> Iterator[list[str]]:
 def _record(path: str) -> None:
     if not _RECORDERS:
         return
-    key = os.path.normpath(os.path.abspath(path))
+    # 行き着く先の綴りで控える（ディレクトリのリンクを解く。macOS の /var → /private/var など）。
+    # 最後の名前は解かない（消したファイル・リンクそのものを書いた場合も、その名前で数える）。
+    key = os.path.normpath(parent_resolved(os.path.abspath(path)))
     for seen in _RECORDERS:
         seen.setdefault(key, None)
 
@@ -618,6 +621,7 @@ class Policy:
     書けたらその識別子を「置いた」と数える。`group` が同じ行と書き込みは 1 つの組で、
     `FAIL_LINE` で落ちたら残りを飛ばす。`ticket` は知らせの頭に付ける識別子。
     `prefix` は `message` の前に付ける語（呼び手の用件。「マーカーを置けない: 」など）。
+    `tag` は書けたときに組ごとに控える名札で、`Call` が「実際に書けたもの」を知るのに使う。
     """
 
     on_fail: str = FAIL_STOP
@@ -627,6 +631,7 @@ class Policy:
     places: str = ""
     group: int = 0
     ticket: str = ""
+    tag: str = ""
 
 
 def failure_text(policy: Policy, reason: str) -> str:
@@ -647,6 +652,22 @@ class Op:
     data: bytes = b""
     temp_suffix: str = ""
     policy: Policy = field(default_factory=Policy)
+    # 見え方（Changes）にだけ載せ、Writer(FS) は書かない。同じ中身を `Call` が書く（跡）。
+    view_only: bool = False
+
+
+@dataclass
+class Call:
+    """Writer(FS) が、同じ組の書き込みを済ませた後に呼ぶ手順。
+
+    `run` は組の中で書けた `tag` の集まりを受け、見せる行を返す。書けたものに合わせて
+    行と跡を書く所（マーカーの消去）で使う。控える段では呼ばない。
+    """
+
+    run: Callable[[set[str]], list[str]]
+    group: int = 0
+    # 全部書けたときに出る行（Changes の見せる行。Chrome は 1 コミットで全部書く）。
+    lines: list[str] = field(default_factory=list)
 
 
 STREAM_OUT = "stdout"
@@ -666,7 +687,7 @@ class Stage:
     """控えた書き込みの並びと、控えた後の中身の見え方。"""
 
     def __init__(self) -> None:
-        self.items: list[Op | Line] = []
+        self.items: list[Op | Line | Call] = []
         self._view: dict[str, tuple[str, bytes | None]] = {}
         # 最初に控えたときに、ディスクに在ったか（create と update を分けるため）。
         self._before: dict[str, bool] = {}
@@ -711,7 +732,7 @@ class Stage:
         ]
 
 
-_STAGE: dict = {"current": None, "policy": Policy()}
+_STAGE: dict = {"current": None, "policy": Policy(), "view_only": False}
 
 
 @contextlib.contextmanager
@@ -742,9 +763,21 @@ def policy(**changes: Any) -> Iterator[None]:
         _STAGE["policy"] = before
 
 
+@contextlib.contextmanager
+def view_only() -> Iterator[None]:
+    """この間に控える書き込みは見え方（Changes）にだけ載せ、Writer(FS) は書かない。"""
+    before = _STAGE["view_only"]
+    _STAGE["view_only"] = True
+    try:
+        yield
+    finally:
+        _STAGE["view_only"] = before
+
+
 def _stage_put(op: Op, quiet: bool = False) -> str:
     stage: Stage = _STAGE["current"]
     op.policy = _STAGE["policy"]
+    op.view_only = _STAGE["view_only"]
     if quiet:
         op.policy = Policy(**{**op.policy.__dict__, "on_fail": FAIL_QUIET})
     if op.kind == OP_MOVE:
@@ -778,10 +811,14 @@ def _missing(path: str) -> FileNotFoundError:
 
 
 def _encode(text: str, newline: str | None) -> bytes:
-    """`open(path, "w", newline=...)` が書くのと同じバイト列。"""
-    if newline is None:
-        newline = os.linesep
-    if newline not in ("", "\n"):
+    """控える中身のバイト列。改行は `newline` を明示したときだけ書き換える。
+
+    `newline=None`（`open` の既定）はディスクでは機械の改行（Windows は CRLF）になるが、
+    Changes の中身は LF に固定する。Chrome のコミットと手元の plan が機械に依らず同じ
+    バイト列になるように。ディスクへは Writer(FS) が元の `newline` で書くので、手元の
+    ファイルは前と同じ。
+    """
+    if newline not in (None, "", "\n"):
         text = text.replace("\n", newline)
     return text.encode("utf-8")
 

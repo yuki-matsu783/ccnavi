@@ -12,7 +12,9 @@ ops / review へ渡す。
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
+import tempfile
 import time
 from typing import TextIO
 
@@ -484,45 +486,106 @@ def _recorded_run(
 ) -> int:
     """`--record-writes <ファイル>` つきの 1 回。書いたパスを集め、終わったら書き出す。
 
-    書き出す先は控えの置き場（`conf.state`）の下の `c1/` だけに限る。どこへでも書けると、
-    実行ファイルが任意の場所へファイルを置く道になる。
+    **書き出す先**は、ワークスペースルートの既定の控えの置き場（`logs/state`）の下の `c1/`
+    だけ。`--state` と `CCNAVI_STATE` の上書きは見ない（上書きで置き場を動かせば、
+    どこへでも書ける道になる）。行き先・置き場・ルートは行き着く先（リンクを解いた綴り、
+    大文字小文字を畳んだもの）で比べ、`c1/` までの途中にリンクがあれば断る。書き出しは
+    同じディレクトリの一時ファイルから `os.replace` で置き換えるので、行き先にリンクが
+    あってもその先は開かない（リンクの行き先は書き換えない。Windows でも同じ）。
 
-    1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外は絶対パス。
-    控えの置き場の下（リポジトリに入らない）は載せない。置き場の外が入っていたら止めるのは
-    C1 の側（段階 2d）で、ここは集めて書くだけ。書き出せなければ 1 で終わる。
+    **一覧の形**は 1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外と、
+    別のドライブ（Windows）は絶対パスのまま。既定の控えの置き場の下（リポジトリに入らない）と
+    一覧のファイル自身は載せない。上書きした控えの置き場への書き込みは載る（C1 が
+    「置き場の外」として止める側）。置き場の外が入っていたら止めるのは C1（段階 2d）で、
+    ここは集めて書くだけ。
+
+    **終了コード**: コマンドが落ちても、そこまでに書いたパスで一覧を書く（C1 は落ちた回も
+    戻すのに一覧を使う）。一覧を書けなければ、コマンドの結果に依らず 1 で終わる
+    （C1 はそれを「書いたものが分からない」として扱う）。行き先が断られたときはコマンドを
+    走らせずに 1 で終わる。
     """
     wrapper = argparse.Namespace(**vars(args))
     if not _one_wrapper_flag_each(stderr, wrapper):
         return EXIT_ERROR
     root = wrapper.root if wrapper.root is not None else default_root()
-    conf, _ = settings.load(root)
-    _override(conf, wrapper)
-    target = os.path.abspath(args.record_writes)
-    place = os.path.join(os.path.abspath(conf.state), "c1") if conf.state else ""
-    if not place or not _inside(target, place):
+    real_root = _real(root)
+    state = os.path.join(real_root, settings.DEFAULT_STATE)
+    place = os.path.join(state, "c1")
+    given = os.path.abspath(args.record_writes)
+    target = os.path.join(_real(os.path.dirname(given)), os.path.basename(given))
+    refused = _record_place_problem(place, target, args.record_writes)
+    if refused:
         stderr.write(
-            "ccnavi: --record-writes の書き出し先は控えの置き場の下（"
-            f"{place or '控えの置き場が空'}{os.sep}...）だけ\n"
+            f"ccnavi: --record-writes の書き出し先は {place}{os.sep}... の下だけ（{refused}）\n"
         )
         return EXIT_ERROR
     with fsio.recording() as written:
         code = _parsed(stdin, stdout, stderr, parser, args)
-    base = os.path.abspath(root)
-    state = os.path.abspath(conf.state)
     lines = []
     for path in written:
-        if _inside(path, state) or path == target:
+        real = fsio.parent_resolved(path)
+        if _inside(real, state) or _same(real, target):
             continue
-        rel = os.path.relpath(path, base) if _inside(path, base) else path
+        rel = real
+        if _inside(real, real_root):
+            try:
+                rel = os.path.relpath(real, real_root)
+            except ValueError:
+                rel = real
         lines.append(rel.replace(os.sep, "/"))
-    failed = fsio.write_text(target, "".join(f"{line}\n" for line in lines), "\n")
+    failed = _write_record(target, "".join(f"{line}\n" for line in lines))
     if failed:
         stderr.write(f"ccnavi: 書いたパスの一覧を {target} に書けない ({failed})\n")
         return EXIT_ERROR
     return code
 
 
+def _real(path: str) -> str:
+    try:
+        return os.path.realpath(path)
+    except OSError:
+        return os.path.normpath(os.path.abspath(path))
+
+
+def _record_place_problem(place: str, target: str, given: str) -> str:
+    """書き出し先が `place` の下でない・途中にリンクがある理由。よければ空文字。"""
+    if os.path.lexists(place) and os.path.islink(place):
+        return "c1 がシンボリックリンク"
+    if not _inside(target, place) or _same(target, place):
+        return f"{given} は外"
+    if os.path.islink(target):
+        return f"{given} はシンボリックリンク"
+    return ""
+
+
+def _write_record(target: str, text: str) -> str:
+    """一覧を書く。一時ファイルに書いて置き換える（行き先のリンクは辿らない）。"""
+    directory = os.path.dirname(target)
+    try:
+        os.makedirs(directory, exist_ok=True)
+        # 作った後にも、途中のディレクトリがリンクで外へ出ていないかを見る。
+        if _real(directory) != os.path.normpath(directory):
+            return "書き出し先のディレクトリがリンクを含む"
+        handle, part = tempfile.mkstemp(dir=directory, prefix=".record.", suffix=".part")
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as f:
+                f.write(text)
+            os.replace(part, target)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.remove(part)
+            raise
+    except OSError as exc:
+        return str(exc)
+    return ""
+
+
+def _same(a: str, b: str) -> bool:
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
 def _inside(path: str, base: str) -> bool:
+    """`path` が `base` の下（か同じ）か。どちらも行き着く先の綴りで渡す。大文字小文字は畳む。"""
     path = os.path.normcase(os.path.normpath(path))
     base = os.path.normcase(os.path.normpath(base))
     return path == base or path.startswith(base.rstrip(os.sep) + os.sep)
