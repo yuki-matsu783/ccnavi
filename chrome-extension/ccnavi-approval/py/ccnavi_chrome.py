@@ -37,6 +37,22 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
     }
 
 統合先のブランチも `branches` に入る。読むのは置き場のサブツリーだけ（8.2）。
+
+段階 5 から、プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）
+も読む。Snapshot に `project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの
+統合先の中身。共通層・自身の層・`.claude/settings.json`・互換の印）が付く。仮のツリーは
+手元と同じ形で組む: ワークスペースルートにワークスペースの統合先、`projects/<名前>/` に
+プロジェクトの統合先（`done/` と、D28 の計算の層）、家族は `projects/<名前>` のワークツリー
+として `.claude/worktrees/<P>` に置く。控えは `sync/self/` と `sync/<名前>/` に分けて組む。
+
+    "project": "<プロジェクト名>",
+    "workspace": {"integration": {"name": ..., "source": ..., "head": ...},
+                  "files": {...}, "binary": [...], "links": [...]}
+
+段階 5 から「始める」（8.6）の `start` も答える。issue の番号から識別子を決め
+（`ticket.issue_identifier`。3.1 の 11）、始められない理由（統合先の `done/` にある・同じ名前の
+ブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版の違い）を返す。
+ブランチを作るのは拡張（service worker）。
 """
 
 from __future__ import annotations
@@ -49,7 +65,7 @@ import re
 import shutil
 import sys
 
-from ccnavi import cli, core, fsio, history, lint, review, settings, syncstate, version
+from ccnavi import cli, configsync, core, fsio, history, lint, review, settings, syncstate, version
 from ccnavi import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
@@ -145,6 +161,12 @@ def _placement(settings_text: str | None) -> dict:
         "integration_files": [SETTINGS_FILE, COMPAT_FILE],
         # 家族のブランチから読むもの。
         "branch_paths": [approved, tickets],
+        # プロジェクトのリポジトリ（段階 5）。ワークスペースの統合先から読むもの（共通層・自身の層・
+        # 設定・互換の印）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
+        "workspace_paths": sorted({COMMON_LAYER, own_layer}),
+        "workspace_files": [SETTINGS_FILE, COMPAT_FILE],
+        "project_paths": sorted({f"{approved}/{ticket_mod.DONE}", own_layer}),
+        "layer_dir": own_layer,
     }
 
 
@@ -167,14 +189,42 @@ def _snapshot(req: dict) -> dict:
     if not isinstance(name, str) or name not in branches:
         raise Refused("統合先のブランチの中身が snapshot に無い")
     for bname, branch in branches.items():
-        files = branch.get("files") if isinstance(branch, dict) else None
-        if not isinstance(files, dict):
-            raise Refused(f"ブランチ {bname} の files が無い")
-        for path, text in files.items():
-            _check_rel(path)
-            if not isinstance(text, str):
-                raise Refused(f"{bname}:{path} の本文が文字列でない")
+        _check_files(bname, branch)
+    project = snap.get("project") or ""
+    if project:
+        if not isinstance(project, str) or not ticket_mod.is_valid_id(project):
+            raise Refused(f"プロジェクト名が読めない: {project!r}")
+        if settings.is_reserved_layer_name(project):
+            raise Refused(f"プロジェクト名 {project} は層の名札に予約してある（common・self）")
+        ws = snap.get("workspace")
+        if not isinstance(ws, dict) or not isinstance(ws.get("integration"), dict):
+            raise Refused("プロジェクトのリポジトリにはワークスペースの統合先（workspace）が要る")
+        if not isinstance(ws["integration"].get("name"), str):
+            raise Refused("ワークスペースの統合先の名前が無い")
+        _check_files("(ワークスペース)", ws)
     return snap
+
+
+def _check_files(bname: str, branch: object) -> None:
+    files = branch.get("files") if isinstance(branch, dict) else None
+    if not isinstance(files, dict):
+        raise Refused(f"ブランチ {bname} の files が無い")
+    for path, text in files.items():
+        _check_rel(path)
+        if not isinstance(text, str):
+            raise Refused(f"{bname}:{path} の本文が文字列でない")
+
+
+def _project(snap: dict) -> str:
+    """このリポジトリのプロジェクト名（ワークスペース自身なら空。段階 5）。"""
+    return str(snap.get("project") or "")
+
+
+def _workspace_files(snap: dict) -> dict[str, str]:
+    """ワークスペースの統合先の中身（共通層・設定・互換の印）。ワークスペース自身なら統合先。"""
+    if _project(snap):
+        return snap["workspace"]["files"]
+    return _files(snap, snap["integration"]["name"])
 
 
 def _check_rel(path: object) -> str:
@@ -311,16 +361,39 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
 
 
 def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
-    """統合先をワークスペースルートに、家族をワークツリーに置いた仮のツリーを組む。"""
+    """統合先をワークスペースルートに、家族をワークツリーに置いた仮のツリーを組む。
+
+    プロジェクトのリポジトリ（段階 5）は、ワークスペースの統合先をワークスペースルートに、
+    プロジェクトの統合先を `projects/<名前>/` に置き、家族をそのプロジェクトのワークツリーにする。
+    """
     shutil.rmtree(root, ignore_errors=True)
     os.makedirs(os.path.join(root, ".git", "worktrees"))
     integ = snap["integration"]["name"]
-    # HEAD はブランチの名前を読む先（承認の記録の `source_tree`。D22）。
-    _head(os.path.join(root, ".git"), integ)
-    keep = tuple(p + "/" for p in place["integration_paths"])
-    for path, text in _files(snap, integ).items():
-        if path.startswith(keep) or path in place["integration_files"]:
-            _write(root, path, text)
+    project = _project(snap)
+    owner = root
+    if not project:
+        # HEAD はブランチの名前を読む先（承認の記録の `source_tree`。D22）。
+        _head(os.path.join(root, ".git"), integ)
+        keep = tuple(p + "/" for p in place["integration_paths"])
+        for path, text in _files(snap, integ).items():
+            if path.startswith(keep) or path in place["integration_files"]:
+                _write(root, path, text)
+    else:
+        ws = snap["workspace"]
+        _head(os.path.join(root, ".git"), ws["integration"]["name"])
+        keep = tuple(p + "/" for p in place["workspace_paths"])
+        for path, text in ws["files"].items():
+            if path.startswith(keep) or path in place["workspace_files"]:
+                _write(root, path, text)
+        owner = os.path.join(root, settings.DEFAULT_PROJECTS, project)
+        os.makedirs(os.path.join(owner, ".git", "worktrees"))
+        _head(os.path.join(owner, ".git"), integ)
+        done = f"{place['approved']}/{ticket_mod.DONE}/"
+        for path, text in _files(snap, integ).items():
+            if path.startswith(done):
+                _write(owner, path, text)
+        for rel, text in project_layer(snap, place).items():
+            _write(owner, rel, text)
     for name in families:
         if name not in snap["branches"] or name == integ:
             continue
@@ -328,7 +401,7 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
             raise Refused(f"家族のブランチ名が識別子の形でない: {name!r}")
         tree = os.path.join(root, *WORKTREES.split("/"), name)
         os.makedirs(tree, exist_ok=True)
-        registry = os.path.join(root, ".git", "worktrees", name)
+        registry = os.path.join(owner, ".git", "worktrees", name)
         os.makedirs(registry)
         gitfile = os.path.join(tree, ".git")
         with open(gitfile, "w", encoding="utf-8") as f:
@@ -340,6 +413,28 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
             _write(tree, path, text)
     for rel, text in records(snap, place, families).items():
         _write(root, f"{STATE_DIR}/{rel}", text)
+
+
+def project_layer(snap: dict, place: dict) -> dict[str, str]:
+    """プロジェクトの層（プロジェクトからの相対パス → 中身）。ADR-0093 の D28 の計算。
+
+    「プロジェクトの統合先の現在の層に、ワークスペースの統合先の共通層を `configsync.projected` で
+    写したもの」。共通層にあるファイルだけを写し、無いファイルはプロジェクトの側を残す（着手の
+    configsync と同じ）。`P` の上の層は読まない（3.3 の 6）。
+    """
+    ws = snap["workspace"]["files"]
+    own = _files(snap, snap["integration"]["name"])
+    with _environ(place["env"]):
+        conf, _ = settings.load("/nonexistent-ccnavi-root")
+    out: dict[str, str] = {}
+    for kind, name in settings.LAYER_FILE_NAMES.items():
+        rel = f"{place['layer_dir']}/{name}"
+        common = ws.get(f"{COMMON_LAYER}/{name}")
+        if common is not None:
+            out[rel] = configsync.projected(conf, kind, common.encode("utf-8")).decode("utf-8")
+        elif rel in own:
+            out[rel] = own[rel]
+    return out
 
 
 def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
@@ -354,16 +449,34 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
     これを控えの置き場に書き、同じ控えで判定させる。
     """
     integ = snap["integration"]
-    base = f"sync/{SELF_REPO}"
+    project = _project(snap)
+    base = f"sync/{project or SELF_REPO}"
     out: dict[str, str] = {
         f"{base}/integration/head": (
             f"remote origin\nbranch {integ['name']}\nsource {integ.get('source') or ''}\n"
         ),
     }
-    keep = tuple(p + "/" for p in place["integration_paths"])
-    for path, text in _files(snap, integ["name"]).items():
-        if path.startswith(keep) or path == SETTINGS_FILE:
-            out[f"{base}/integration/{path}"] = text
+    if not project:
+        keep = tuple(p + "/" for p in place["integration_paths"])
+        for path, text in _files(snap, integ["name"]).items():
+            if path.startswith(keep) or path == SETTINGS_FILE:
+                out[f"{base}/integration/{path}"] = text
+    else:
+        # プロジェクトの統合先の控え（閉じたものとプロジェクトの層）と、ワークスペースの統合先の控え
+        keep = tuple(p + "/" for p in place["project_paths"])
+        for path, text in _files(snap, integ["name"]).items():
+            if path.startswith(keep):
+                out[f"{base}/integration/{path}"] = text
+        ws = snap["workspace"]
+        wsbase = f"sync/{SELF_REPO}"
+        out[f"{wsbase}/integration/head"] = (
+            f"remote origin\nbranch {ws['integration']['name']}\n"
+            f"source {ws['integration'].get('source') or ''}\n"
+        )
+        keep = tuple(p + "/" for p in place["workspace_paths"])
+        for path, text in ws["files"].items():
+            if path.startswith(keep) or path == SETTINGS_FILE:
+                out[f"{wsbase}/integration/{path}"] = text
     absent = set(snap.get("absent") or [])
     for name in families:
         if name == integ["name"]:
@@ -494,6 +607,13 @@ def _unreadable(snap: dict, closure: dict) -> str:
         for key, what in (("binary", "バイナリ"), ("links", "シンボリックリンク"))
         for path in (snap["branches"].get(name) or {}).get(key) or []
     ]
+    if _project(snap):
+        ws = snap["workspace"]
+        found += [
+            f"(ワークスペース) {ws['integration']['name']}:{path}（{what}）"
+            for key, what in (("binary", "バイナリ"), ("links", "シンボリックリンク"))
+            for path in ws.get(key) or []
+        ]
     if not found:
         return ""
     return (
@@ -828,7 +948,8 @@ def _op_compat(req: dict, root: str) -> dict:
 
 
 def _compat(snap: dict) -> dict:
-    text = _files(snap, snap["integration"]["name"]).get(COMPAT_FILE)
+    # 互換の印はワークスペースの統合先にある（プロジェクトのリポジトリはワークスペースのものを読む）
+    text = _workspace_files(snap).get(COMPAT_FILE)
     ours = version.COMPAT
     found = lint._SH_COMPAT.search(text) if text else None
     theirs = int(found.group(1)) if found else None
@@ -845,6 +966,64 @@ def _compat(snap: dict) -> dict:
     return {"extension": ours, "repository": theirs, "same": theirs == ours, "message": message}
 
 
+# ---- 「始める」（8.6。段階 5） -------------------------------------------------------------
+
+
+def _op_start(req: dict, root: str) -> dict:
+    """issue から始める親のブランチの名前と、始められない理由（8.6・3.1 の 4・5・7）。
+
+    ブランチは作らない（拡張の service worker が作る）。入力は統合先（と、プロジェクトなら
+    ワークスペースの統合先）と、拡張が見たブランチ（`snapshot.branches` と `taken` の名前）。
+    """
+    snap = _snapshot(req)
+    place = _placement(_text_or_none(req.get("settings")))
+    number = req.get("issue")
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        raise Refused("issue は正の整数（issue の番号）")
+    taken = req.get("taken") or []
+    if not isinstance(taken, list) or not all(isinstance(n, str) for n in taken):
+        raise Refused("taken はブランチ名の並び")
+    project = _project(snap)
+    ident = ticket_mod.issue_identifier(number, project)
+    integ = snap["integration"]["name"]
+    folded = ident.casefold()
+    problems = list(
+        ticket_mod.branch_name_problems(
+            ticket_mod.Ticket(ticket=ident, issue=number, project=project), integ
+        )
+    )
+    if folded in {i.casefold() for i in _closed(snap, place)}:
+        problems.append(
+            f"{ident} は統合先 {integ} の done/ で閉じている（閉じた識別子は使い直さない。"
+            "ADR-0093 の 3.1 の 5）"
+        )
+    names = [n for n in [*snap["branches"], *taken] if n != integ]
+    same = sorted({n for n in names if n.casefold() == folded})
+    if same:
+        problems.append(f"同じ名前のブランチが既にある（{', '.join(same)}）")
+    for name in sorted(snap["branches"]):
+        if name == integ:
+            continue
+        hits = sorted(
+            {
+                t.ticket
+                for _, t in _tickets_in(_files(snap, name), place)
+                if t.ticket.casefold() == folded or family_of(t.ticket).casefold() == folded
+            }
+        )
+        if hits:
+            problems.append(f"開いた家族 {name} に同じ識別子がある（{', '.join(hits)}）")
+    compat = _compat(snap)
+    if not compat["same"]:
+        problems.append(f"{compat['message']}（ADR-0093 の 7.3）")
+    if problems:
+        problems.append(
+            "この issue からは始められない。識別子を人が付けて（フォールバック）始める"
+            "（ADR-0093 の 3.2・8.6）"
+        )
+    return {"identifier": ident, "integration": integ, "problems": problems}
+
+
 def _op_version(req: dict, root: str) -> dict:
     return {"version": version.VERSION, "compat": version.COMPAT, "python": sys.version.split()[0]}
 
@@ -858,6 +1037,7 @@ _OPS = {
     "withdraw": _op_withdraw,
     "confirm": _op_confirm,
     "compat": _op_compat,
+    "start": _op_start,
     "version": _op_version,
 }
 
