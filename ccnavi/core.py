@@ -606,6 +606,9 @@ def confirm(
     ph = review._phase(root, conf, parent, phase_no)
     if ph is None:
         return Checked([f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"], None)
+    if approval.MARK_REVIEWED in ph.marks:
+        # 重ね打ちで印と跡を書き直さない（11.8.1 の決定 B。`_already_requested` と同じ文面の形）
+        return Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
         return Checked(["ccnavi: 依頼の記録が無い。先に request すること"], None)
@@ -681,7 +684,8 @@ def confirm_local(
     moved = ""
     result = None
     # 読む順は前と同じ。依頼の記録が無ければ差分も写しも見ない。動いていれば写しを読まない。
-    if requested_mark is not None:
+    # レビュー済みなら差分も写しも読まない（コアが「レビュー済み」で止める。Chrome と同じ文面）
+    if requested_mark is not None and approval.MARK_REVIEWED not in ph.marks:
         moved = review._moved_since_request(
             tree.worktree_path(root, parent.ticket), conf, requested_mark
         )

@@ -85,6 +85,8 @@ class Thread:
     line: int = 0
     body: str = ""
     created_at: str = ""
+    # 最初のコメントを書いたアカウント。GitLab の写しだけが持つ（ccnavi の投稿を見分けるため）
+    author: str = ""
 
 
 @dataclass
@@ -100,12 +102,22 @@ class Review:
 # 変更要求の状態。GitHub の CHANGES_REQUESTED と、GitLab の requested_changes をここに寄せる。
 CHANGES_REQUESTED = "CHANGES_REQUESTED"
 DISMISSED = "DISMISSED"
+APPROVED = "APPROVED"
+# 人ごとの最新を選ぶ対象。コメントだけのレビュー（COMMENTED）と、書きかけ（PENDING）は判断を
+# 変えないので飛ばす（ADR-0093 の 11.8.1 の決定 A）。変更要求は同じ人の Approve か dismiss まで残る
+_DECIDING = (APPROVED, CHANGES_REQUESTED, DISMISSED)
 
 
 def effective(reviews: list[Review]) -> list[Review]:
-    """レビュアーごとに最新の 1 件。取り下げられたものは無い扱い。"""
+    """レビュアーごとに、判断を示した最新の 1 件。取り下げられたものは無い扱い。
+
+    判断を示したレビューは Approve・変更要求・取り下げ（dismiss）だけ。コメントだけのレビューや
+    書きかけは数えない（前は数えたので、変更要求の後に同じ人がコメントするだけで変更要求が消えた）。
+    """
     latest: dict[str, Review] = {}
     for r in reviews:
+        if r.state.upper() not in _DECIDING:
+            continue
         key = r.author or r.url or id(r)
         current = latest.get(key)
         if current is None or _epoch(r.submitted_at) >= _epoch(current.submitted_at):
@@ -133,6 +145,8 @@ class Result:
     reviews: list[Review] = field(default_factory=list)
     url: str = ""
     created_at: str = ""
+    # 投稿したアカウント（`requested` の結果だけ。ccnavi の投稿を見分けるため依頼の記録に残す）
+    author: str = ""
     error: str = ""
 
     @classmethod
@@ -167,6 +181,7 @@ class Result:
                     line=int(t.get("line") or 0),
                     body=str(t.get("body") or ""),
                     created_at=str(t.get("created_at") or ""),
+                    author=str(t.get("author") or ""),
                 )
                 for t in data.get("threads") or []
                 if isinstance(t, dict)
@@ -183,6 +198,7 @@ class Result:
             ],
             url=str(data.get("url") or ""),
             created_at=str(data.get("created_at") or ""),
+            author=str(data.get("author") or ""),
         )
 
 
@@ -361,6 +377,9 @@ def requested(
             "url": result.url,
             "host": result.host,
             "since": result.created_at,
+            # 依頼を投稿したアカウント。GitLab で ccnavi の投稿のスレッドを見分けるのに使う
+            # （分からなければ書かず、見分けずに数える。`_unresolved`）
+            **({"poster": result.author} if result.author else {}),
         },
     ):
         return 1
@@ -402,12 +421,15 @@ def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
     """依頼したのと同じマージリクエストの写しか。違えばその説明（標準エラーの行）。"""
     if result is None or result.mr is None:
         return ["ccnavi: 結果にマージリクエストが無い"]
-    if requested_mark.get("host") and result.host != requested_mark.get("host"):
+    if not requested_mark.get("host") or not requested_mark.get("mr"):
+        # 照合できない依頼の記録で通すと、別の MR のスレッドでレビュー済みにできる（11.8.1 の 8）
+        return ["ccnavi: 依頼の記録にホストかマージリクエストの番号が無い。依頼し直すこと"]
+    if result.host != requested_mark.get("host"):
         return [
             f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"
             f"結果のホスト（{result.host}）が違う"
         ]
-    if requested_mark.get("mr") and int(requested_mark["mr"]) != result.mr.number:
+    if str(requested_mark["mr"]) != str(result.mr.number):
         return [
             f"ccnavi: 依頼したマージリクエスト（{requested_mark['mr']}）と"
             f"結果のもの（{result.mr.number}）が違う"
@@ -434,6 +456,8 @@ def review_problems(
             phase_no,
             parent,
         ),
+        result.host,
+        _poster(parent, phase_no, root, conf),
     )
     if not unresolved:
         return []
@@ -650,6 +674,8 @@ def _decision(
             phase_no,
             parent,
         ),
+        result.host,
+        str(requested_mark.get("poster") or ""),
     )
     can_issue = parent.has_plan and parent.feedback is not None
     return Decision(parent, ph, result, unresolved, can_issue)
@@ -1916,7 +1942,9 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
     return None if problems else result
 
 
-def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:
+def _unresolved(
+    threads: list[Thread], accepted: set[str], host: str = "", poster: str = ""
+) -> list[Thread]:
     """まだ解決されていない指摘。
 
     付いた時刻では絞らない。依頼より後のものだけを数えると、
@@ -1925,15 +1953,33 @@ def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:
 
     数えないのは 2 つだけ。機構自身が置いた投稿と、人が「未解決のまま進める」と
     受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。
+
+    機構自身の投稿と見るのは、GitLab の写しで、本文が目印で始まり、書いたのが依頼を投稿した
+    アカウント（`poster`）のときだけ（ADR-0093 の 11.8.1 の決定 C）。GitHub の依頼は MR のコメントで
+    スレッドにならないので、目印で始まるスレッドは人が書いたものとして数える。投稿者が分からなければ
+    見分けずに数える（誰でも目印を書けるので、本文だけで除くと未解決を隠せる）。
     """
     return [
         t
         for t in threads
         if not t.resolved
-        and not t.body.startswith(MARKER_PREFIX)
+        and not _ccnavi_post(t, host, poster)
         and t.url not in accepted
         and t.id not in accepted
     ]
+
+
+def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:
+    """ccnavi 自身が投稿したスレッドか（`_unresolved`）。"""
+    mine = host == "gitlab" and bool(poster) and t.author == poster
+    return mine and t.body.startswith(MARKER_PREFIX)
+
+
+def _poster(parent: ticket_mod.Ticket, phase_no: int, root: str, conf: settings.Settings) -> str:
+    """そのフェーズの依頼を投稿したアカウント（依頼の記録の `poster`）。無ければ空。"""
+    ph = _phase(root, conf, parent, phase_no)
+    mark = ph.marks.get(approval.MARK_REQUESTED) if ph is not None else None
+    return str((mark or {}).get("poster") or "")
 
 
 def _branch(tree_root: str) -> str:
