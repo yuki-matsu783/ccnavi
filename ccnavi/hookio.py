@@ -199,4 +199,9 @@ def rebind_streams() -> None:
         # 再設定できない差し替え済みのストリームは黙って飛ばす。
         # テストが渡してくる文字列バッファがこれにあたる。
         with contextlib.suppress(AttributeError, ValueError):
-            stream.reconfigure(encoding="utf-8", errors="replace")
+            if stream is sys.stdin:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            else:
+                # 出す改行は LF に固定する。Windows の既定（CRLF）だと、1 行 1 項目の答えを
+                # 読む sh（`sed -n 's/^鍵 //p'`）の値の末尾に CR が残る（ADR-0093 の段階 2d）。
+                stream.reconfigure(encoding="utf-8", errors="replace", newline="\n")

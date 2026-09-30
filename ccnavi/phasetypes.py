@@ -51,7 +51,8 @@ KINDS = (KIND_WORK, KIND_FEEDBACK)
 
 REVIEW_NONE = "none"
 # chat は、このセッションで人が差分を見る。ホストへは出ない。先へ進めるのは
-# 端末から打つ `ccnavi --reviewed <N> --chat` で、エージェントには打てない
+# 端末から打つ `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で、
+# エージェントには打てない
 # （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 9.8）。
 REVIEW_CHAT = "chat"
 REVIEW_MR = "mr"

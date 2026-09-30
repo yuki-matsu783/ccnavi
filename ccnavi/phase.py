@@ -69,7 +69,7 @@ TURN_DEFINED = "ターン（利用者が指示を出してから Claude が応�
 # サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、素性で止める層を
 # ここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
-    r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
+    r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
     r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|chat"
     r"|config-synced|push)\b"
 )
@@ -381,13 +381,15 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
     script = (
-        r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
+        # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る（段階 2d のレビュー）。
+        r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(approve|push-approved)\.sh\b"
         # 家族の控え（墓標）を消す人の入口（ADR-0093 の 11.5.1 の決定 A）。消すと、止めていた家族が
         # 控えの無い家族として今の手元の動きに戻るので、打つのは人。
-        r"|(^|\x00|[;&|]\s*)((sh|bash)\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
+        r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
         # 人の判断の入口（ADR-0093 の 4.6。段階 2d）。中で `--reviewed --chat`・`--config-synced`・
         # `--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのは人。
-        r"|(^|\x00|[;&|]\s*)((sh|bash)\s+)?\S*ccnavi-review\.sh\s+(chat|config-synced|close-early)\b"
+        r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
+        r"(chat|config-synced|close-early)\b"
     )
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
@@ -815,7 +817,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             "やること: 子の成果を親ブランチへ合流し、利用者に差分を見てもらって、"
             f"{TURN_DEFINED}を終えて利用者を待ってください。このフェーズはこのセッションで見る計画"
             "（review: chat）なので、マージリクエストは要りません。先へ進めるのは、"
-            f"利用者が端末で打つ 'ccnavi --reviewed {n} --chat' です"
+            f"利用者が親のワークツリーの端末で打つ '{review_sh} chat {n}' です"
             f"（エージェントからは打てません）。{later}"
         )
     else:
@@ -911,8 +913,9 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                     "子の成果を親ブランチへ合流し、利用者に差分を見てもらってください。"
                     f"{advise}"
                     "レビュー"
-                    f"{covers}が済んだら、利用者が端末で "
-                    f"'ccnavi --reviewed {n} --chat' を打つと先へ進めます"
+                    f"{covers}が済んだら、利用者が親のワークツリーの端末で "
+                    f"'{settings.script_command(root, 'ccnavi-review.sh')} chat {n}' を"
+                    "打つと先へ進めます"
                     "（この経路はエージェントには打てません）。"
                     f"{TURN_DEFINED}を終えて利用者を待ってください。{hold_note}"
                 )

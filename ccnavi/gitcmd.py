@@ -26,8 +26,13 @@ def _env() -> dict[str, str]:
     残り、以後の add や commit が止まる。この設定が止めるのは `status` のついでの lock
     だけで、作業ツリーと比べる `diff` の更新や、restore のように index を書き換える
     操作の lock は取られる。
+
+    `GIT_NO_LAZY_FETCH=1` は partial clone の遅延取得を止める。無い blob を読むとき git は
+    promisor のリモートへ取りに行くので、実行ファイルがネットワークに出ることになる
+    （docs/claude/exe-boundary.md。ADR-0093 の段階 2d のレビュー）。取れない blob は
+    「読めない」になる。
     """
-    return {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+    return {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1"}
 
 
 @dataclass

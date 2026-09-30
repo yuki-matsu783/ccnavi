@@ -717,6 +717,61 @@ def reviewed(
         f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘: "
         f"{len(d.unresolved)} 件\n"
     )
+    choices = _ask_choices(stdin, stdout, stderr, d)
+    if choices is None:
+        return 1
+    summary = apply_decision(stdout, stderr, root, conf, d, choices)
+    return 0 if summary is not None else 1
+
+
+def choose(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    result_path: str,
+    out_path: str,
+) -> int:
+    """対話の decide の前半（`--reviewed N --accept-unresolved --choose-out <ファイル>`）。
+
+    残った指摘を見せて 1 件ずつ選ばせ、選択と指紋を `{"choices": …, "digest": …}` で書くだけ。
+    何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ
+    （ADR-0093 の段階 2d のレビューの決定 A。選ぶのを C1 のロックの外で済ませる）。
+    """
+    d = _decision(stderr, root, conf, cwd, phase_no, result_path)
+    if d is None:
+        return 1
+    choices: dict[str, str] = {}
+    if d.unresolved:
+        stdout.write(
+            f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘: "
+            f"{len(d.unresolved)} 件\n"
+        )
+        picked_all = _ask_choices(stdin, stdout, stderr, d)
+        if picked_all is None:
+            return 1
+        choices = picked_all
+    else:
+        stdout.write(
+            f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘なし\n"
+        )
+    failed = fsio.write_text(
+        out_path,
+        json.dumps({"choices": choices, "digest": decision_digest(d)}, ensure_ascii=False) + "\n",
+    )
+    if failed:
+        stderr.write(f"ccnavi: 選んだものを {out_path} に書けない（{failed}）\n")
+        return 1
+    return 0
+
+
+def _ask_choices(
+    stdin: TextIO, stdout: TextIO, stderr: TextIO, d: Decision
+) -> dict[str, str] | None:
+    """残った指摘の行き先を 1 件ずつ端末で選ばせる。決めなければ None。"""
     keys = "k / f / i" if d.can_issue else "k / f"
     stdout.write(
         "未解決（Unresolved）の指摘の対応方針を 1 件ずつ選びます。"
@@ -736,10 +791,9 @@ def reviewed(
         picked = _CHOICE_KEYS.get(fsio.read_line(stdin).strip().lower(), "")
         if not picked or (picked == CHOICE_ISSUE and not d.can_issue):
             stderr.write("ccnavi: 決めなかった。何も置いていない\n")
-            return 1
+            return None
         choices[thread_key(t)] = picked
-    summary = apply_decision(stdout, stderr, root, conf, d, choices)
-    return 0 if summary is not None else 1
+    return choices
 
 
 def decide_preview(

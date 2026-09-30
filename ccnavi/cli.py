@@ -35,6 +35,7 @@ from . import (
     lint,
     modes,
     ops,
+    phase,
     prune,
     review,
     ruleload,
@@ -479,6 +480,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 一覧の基点（C1 の親のワークツリー。段階 2d）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error（D34 の例外を除く）。
     parser.add_argument("--record-tree", default="")
+    # 対話の decide の前半（ADR-0093 の段階 2d のレビューの決定 A）。選択と指紋をこのファイルに
+    # 書くだけで、何も置かない（控えの置き場の下だけ）。
+    parser.add_argument("--choose-out", default="")
     # 統合先の名前（ADR-0093 の D30。段階 2b）。環境変数は読まず、sh が決めて渡す。
     # いまは `--lint` の識別子の予約（3.1 の 5）が読む。
     parser.add_argument("--integration-branch", default="")
@@ -540,13 +544,18 @@ def _recorded_run(
         )
         return EXIT_ERROR
     base = _real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
+    # 上書きした控えの置き場（`--state`・`CCNAVI_STATE`）も、リポジトリに入らない書き込み
+    # （レビューの下書きなど）の置き場なので一覧から外す（ADR-0093 の段階 2d のレビュー）。
+    conf_for_state, _ = settings.load(root)
+    _override(conf_for_state, args)
+    moved_state = _real(conf_for_state.state) if conf_for_state.state else state
     with fsio.recording() as written:
         code = _parsed(stdin, stdout, stderr, parser, args)
     lines = []
     reals = []
     for path in written:
         real = fsio.parent_resolved(path)
-        if _inside(real, state) or _same(real, target):
+        if _inside(real, state) or _inside(real, moved_state) or _same(real, target):
             continue
         rel = real
         if _inside(real, base):
@@ -1110,6 +1119,16 @@ def operate(
         stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
         return EXIT_ERROR
     cwd = args.cwd or os.getcwd()
+    bypass = _c1_bypass(root, conf, args, cwd)
+    if bypass:
+        stderr.write(
+            f"ccnavi: 家族 {bypass} は取り込み済み（C1 の対象）。状態の操作は "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' か "
+            f"'{settings.script_command(root, 'ccnavi-review.sh')}' から打つ。"
+            "C1 を通らない書き込みは親のブランチへ送られないので、何も書かずに止めた"
+            "（ADR-0093 の 4.3）\n"
+        )
+        return EXIT_ERROR
     if args.close_early:
         if not args.result:
             stderr.write("ccnavi: --close-early には --reason <理由> と --result <json> が要る\n")
@@ -1144,6 +1163,16 @@ def operate(
                 args.yes,
                 args.digest,
             )
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    if args.reviewed is not None and args.choose_out:
+        # 対話の decide の前半（利用者の決定 A）。人が端末で選び、選択と指紋を控えの置き場に
+        # 書くだけ。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ。
+        if not _inside(_real(os.path.abspath(args.choose_out)), _real(conf.state)):
+            stderr.write("ccnavi: --choose-out の書き出し先は控えの置き場の下だけ\n")
+            return EXIT_ERROR
+        code = review.choose(
+            stdin, stdout, stderr, root, conf, cwd, args.reviewed, args.result, args.choose_out
+        )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
         history.set_via(history.VIA_TERMINAL)
@@ -1203,6 +1232,40 @@ def operate(
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR
+
+
+def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd) -> str:
+    """C1 を通らずに、取り込み済みの家族の状態を書こうとしているなら、その家族。無ければ空。
+
+    状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
+    行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の家族では sh が `--record-tree` を
+    付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を素通りしている
+    （ADR-0093 の段階 2d のレビュー）。人の判断の入口（`--reviewed --chat`・`--config-synced`・
+    `--close-early`）と、書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
+    """
+    if args.record_tree:
+        return ""
+    words = list(args.command)
+    family_id = ""
+    if len(words) >= 3 and words[0] == "ticket" and words[1] in ("start", "finish", "cancel"):
+        family_id = c1.family_of(words[2])
+    elif (
+        len(words) >= 2 and words[0] == "review" and words[1] in ("requested", "confirm", "ready")
+    ) or (
+        args.reviewed is not None
+        and args.accept_unresolved
+        and not args.preview
+        and not args.choose_out
+        and not args.chat
+    ):
+        where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
+        parent = phase.parent_for_cwd(root, conf, where) if where else None
+        if parent is not None:
+            family_id = parent.parent or parent.ticket
+    if not family_id or not _FAMILY.fullmatch(family_id):
+        return ""
+    verdict, _, _ = c1.target(conf, root, family_id)
+    return family_id if verdict == c1.TARGET_YES else ""
 
 
 def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:

@@ -714,7 +714,8 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
         return [
             f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
             "（レビューを通っていない）。閉じる前に、利用者に端末で "
-            f"'ccnavi --config-synced {parent_id}' を打って見てもらうこと"
+            f"'{settings.script_command(root, 'ccnavi-review.sh')} config-synced {parent_id}' を"
+            "打って見てもらうこと"
         ]
     if approval.read_parent_mark(
         approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_CLOSE_EARLY
