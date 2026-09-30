@@ -71,7 +71,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 | D18 | C1 の外の書き手の書き込みは、内容で見分けて C1 が取り込みの前にコミットして運ぶ。(c) が置き場にあれば C1 は止める（規則は 1 つ） | 書き手ごとに C1 を持たせる / 見分けず止める | 4.4 |
 | D19 | Chrome の「始める」を載せる。統合先の `done/` にある識別子は拒否 | 載せない / issue の作成まで載せる | 8.6 |
 | D20 | 承認中に `P` が動いたら、新しい Snapshot で判定と plan をやり直す。指紋が同じなら見せ直さない | 古い plan を新しい先頭に書く | 8.3 |
-| D21 | GitLab の競合は事後確認と打ち消しで始め、`last_commit_id` の確認が取れたら印ファイル `seq` の比較つき書き込みを足す。GitHub は `expectedHeadOid` だけ | 一時ブランチ + ff マージ / 両ホストで `seq` | 8.4 |
+| D21 | GitLab の競合はファイル単位の比較（書き換える・消すファイルの `last_commit_id`）と事後確認と打ち消しで始め、`last_commit_id` の確認が取れたら印ファイル `seq` の比較つき書き込みを足す。GitHub は `expectedHeadOid` だけ | 一時ブランチ + ff マージ / 両ホストで `seq` | 8.4 |
 | D22 | `source_path` はリポジトリからの相対パス、`source_tree` はブランチ名 | 絶対パスのまま | 6.1 |
 | D23 | PAT は `chrome.storage.local` に平文で永続保存し、XSS だけ対策する | 毎回入力 / 暗号化 | 5.5 |
 | D24 | 通信先は配布するときにビルドへ焼き込む（組織ごとにビルド） | 設定画面でホストを足す | 5.5 |
@@ -878,9 +878,12 @@ GitHub の上限（REST 5,000 回/時、GraphQL 5,000 点/時）に対して十�
 - **GitHub**: GraphQL の `createCommitOnBranch`（`expectedHeadOid = H`）。先頭が `H` でなければ落ちるので、そのまま競合の検出になる。
   Git Data API + `PATCH refs` は force push 後の巻き戻しを早送りとして通すので採らない。**`seq` は書かない**（`expectedHeadOid` で足りる）
 - **GitLab**: `POST projects/:id/repository/commits`（`branch: P`、`actions`）。既存ブランチに「先頭がこの sha のときだけ」の指定が無い見込み。2 段で入れます（D21）
-  - **1 段目（段階 5 の最初。11.9 で入れた）: 事後確認と打ち消しだけ**。書いた後にコミットの `parent_ids[0]` が `H` と同じか確かめ、違えば新しい先頭で判定をやり直し、
-    結論が違えば打ち消しのコミットを積んで知らせる。打ち消しがさらに競合して 2 回で収まらなければ、止めて人に回す（ボードに家族を「要確認」で出す）。
-    この段では、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に `P` に残りうる
+  - **1 段目（段階 5 の最初。11.9 で入れた）: ファイル単位の比較と事後確認と打ち消し**。書き換える・消すファイルには `last_commit_id`
+    （そのファイルを最後に変えたコミット。読んだ先頭の上の値）を付け、同じファイルを他人が変えていれば GitLab が断るので書かない（11.9.1 の決定 A）。
+    書いた後にコミットの `parent_ids[0]` が `H` と同じか確かめ、違えば（別のファイルへの書き込みが間に入った）自分の書き込みの直前の姿（その親）で
+    同じ時刻で判定し直し、書くものが違えば打ち消しのコミットを積んで知らせる。打ち消しの各ファイルには「最後に変えたのは自分のコミット」を付け、
+    他人の変更の上には書かない。打ち消しがさらに競合して 2 回で収まらなければ、止めて人に回す（ボードに家族を「要確認」で出す）。
+    この段では、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に `P` に残りうる（別のファイルどうしの競合は `last_commit_id` で捕まらない）
   - **2 段目（確認事項 2 が取れたら。段階 5b）: 印ファイル `phases/<P>/seq` を足す**。ccnavi の全コミット（Chrome の承認・取り下げ・レビュー済み、C1、運ぶ処理）が
     GitLab のリポジトリでだけ必ず更新する家族ごとの小さなファイル（中身は通し番号と最後の操作）。
     Chrome は書く直前に `GET repository/commits?path=phases/<P>/seq&ref_name=P&per_page=1` で「`seq` を最後に変えたコミット」の sha を引き、
@@ -1106,7 +1109,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | D18 | C1 の外の書き込みは見分けて取り込みの前にコミット、(c) があれば止める | hook の書きかけで取り込みが止まり続けず、規則が 1 つで読める | 見分けの規則を hook の書き込みの形と揃え続ける手間 |
 | D19 | 「始める」を載せ、`done/` の識別子と予約の名前は拒否 | 親のブランチ名の直し忘れと識別子の衝突が無くなる | PAT にブランチを作る権限が要る |
 | D20 | 承認中に `P` が動いたら新しい Snapshot でやり直す | 相手の追記を消さず、無関係な push で見せ直さない | 書き直しの間に動けばもう 1 周読む |
-| D21 | GitLab は事後確認と打ち消しで始め、確認後に `seq`。GitHub は `expectedHeadOid` だけ | 確かめていない前提に頼らずに出せ、GitHub は余計なファイルを持たない | 1 段目の間は親の無い子が一時的に残りうる。ホストで `Changes` が変わる |
+| D21 | GitLab はファイル単位の比較と事後確認と打ち消しで始め、確認後に `seq`。GitHub は `expectedHeadOid` だけ | 確かめていない前提に頼らずに出せ、GitHub は余計なファイルを持たない | 1 段目の間は親の無い子が一時的に残りうる。ホストで `Changes` が変わる |
 | D22 | `source_path` は相対、`source_tree` はブランチ名 | 手元と Chrome で写しの中身が同じになる | 既存の写しの絶対パスと混在する |
 | D23 | PAT は平文で永続保存、XSS だけ対策 | 一度の登録で使い続けられる | 同じ OS ユーザーのプロセスから読める |
 | D24 | 通信先をビルドに焼き込む | 通信先を絞ったままセルフホストに対応できる | 組織ごとのビルドと配布が要る |
@@ -1148,9 +1151,9 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
    - `GET /pulls?state=open&head=<owner>:<branch>` の `:` を URL の符号化（`%3A`）で送っても同じ答えになること（拡張は符号化し、sh はしない）
    - レビュー済みのコミットで、MR の Approve が「新しいコミットで外す」設定のとき外れること（8.10。画面の注意が合っているか）
    - レビューの一覧に書きかけ（PENDING）が出るのはトークンの持ち主のものだけか、`submitted_at` が無いか（11.8.1 の決定 A と見本 `pending`）
-   - 投稿の答え（GitHub の issue のコメントの `user.login`、GitLab の note の `author.username`）と、GitLab の discussions の `notes[0].author.username`（11.8.1 の決定 C）
-9. 段階 5（11.9）で使う GitLab と「始める」の応答の形。見本（`test/fixtures/host/gitlab/`）と模擬の GitLab は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
-   - `merge_requests/:iid/discussions` の `notes[].resolvable`・`resolved`・`position.new_path`・`new_line`・`author.username`、
+   - 投稿の答え（GitHub の issue のコメントの `user.login`、GitLab の note の `author.id`）と、GitLab の discussions の `notes[0].author.id`（11.8.1 の決定 C。11.9.1 の 15 で名前から id に変えた）
+9. 段階 5（11.9・11.9.1）で使う GitLab と「始める」の応答の形。見本（`test/fixtures/host/gitlab/`）と模擬の GitLab は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
+   - `merge_requests/:iid/discussions` の `notes[].resolvable`・`resolved`・`position.new_path`・`new_line`・`author.id`、
      MR の一般のコメント（依頼の投稿）が `resolvable: true` になるか、システムのノートが `resolvable: false` か
    - `merge_requests/:iid/reviewers` の `state`（`unreviewed`・`reviewed`・`requested_changes`・`approved`）と `updated_at` の有無。
      `merge_requests/:iid/approvals` の `approved_by`（8.10 の注意）
@@ -1159,12 +1162,18 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
    - `repository/tree?path=&ref=&recursive=true` のページング（`per_page=100` と `page`）と `truncated` に当たるものが無いこと、`type: commit`（サブモジュール）
    - `repository/blobs/:sha` の `encoding: base64`・`size`
    - `repository/commits?ref_name=<sha>&path=`（承認コミット）と `first_parent=true`（鎖）。merge コミットの扱いは確認事項 2 と同じく未確認
-   - `repository/merge_base?refs[]=&refs[]=` と `repository/compare?from=&to=` の `diffs`・`compare_timeout`。差分の件数の上限（拡張は 1000 件で打ち切られたとみなす）
+   - `repository/merge_base?refs[]=&refs[]=` と `repository/compare?from=&to=` の `diffs`・`compare_timeout`。差分の件数の上限（拡張は 900 件以上で打ち切られたとみなす。11.9.1 の 9）
    - `GET /personal_access_tokens/self` の `expires_at`（個人の PAT と project access token の両方。確認事項 3）
    - 「始める」: GitHub の `POST /git/refs`（fine-grained の Contents: Read and write で通るか、既にあれば 422）と `GET /issues`（PR が混ざり `pull_request` で見分けられること、Issues: Read で読めること）。
      GitLab の `POST repository/branches`（既にあれば 400）と `GET /issues`（`iid`）
    - GitLab の入れ子のグループ（`group/sub/proj`）を `projects/<符号化した綴り>` で引けること
    - 本物の GitLab での事後確認: 2 つの書き手をほぼ同時に書かせたとき、打ち消しのコミットが意図どおりに積まれ、ボードに「要確認」が出ること
+   - 11.9.1: Commits API の `last_commit_id`（update・delete。そのファイルを最後に変えたコミットと比べ、違えば 400 で書かないか）と、
+     `repository/files/:path?ref=<sha>` の `last_commit_id` がそれと同じ値か（merge コミットの扱いを含む）
+   - 11.9.1: MR の `source_project_id`（フォークの MR が同じ `source_branch` で並ぶこと）、discussions の `notes[].author.id`
+   - 11.9.1: compare の打ち切り: 件数（`diff_max_files`）のほかに行数（`diff_max_lines`）や大きさで畳まれた diff に `collapsed`・`too_large` が付くか。
+     拡張は 900 件以上・`collapsed`・`too_large`・`compare_timeout` のどれでも一覧を読めないとする
+   - 11.9.1: `GET /repository/branches` の全件のページング（「始める」の大文字小文字を畳んだ重なりの検査。GitHub は `GET /branches`）
 
 ### 10.3 後の段階で決めること（段階 5 で決めたもの）
 
@@ -1904,9 +1913,59 @@ ADR に無かった判断:
 - Chrome から人が名前を付けて始める（フォールバック）: 8.6 は issue から始めるだけ。フォールバックは今どおり手元で切る
 - VS Code のボードの `issue_repo` の表示（`owner/repo#N` を `#N` と出す）
 
-#### 11.9.1 段階 5 で触った守りの対象
+#### 11.9.1 レビューで直したもの（2026-09-30）
+
+段階 5 の後の敵対的レビューの指摘を、利用者の承認を得て直した。判定は締める向きだけで、緩めた所は無い。
+
+レビューの後の決定（利用者）:
+
+- **A（GitLab のファイル単位の比較）**: 書き込み（本体と打ち消しの両方）の update・delete に `last_commit_id` を付ける。本体は読んだ先頭の上で
+  そのファイルを最後に変えたコミット（service worker が `repository/files/:path?ref=` で引く）、打ち消しは自分のコミット。他人が同じファイルを
+  変えていれば GitLab が断る（400）。本体は書かずに読み直して周を回し（GitHub の `expectedHeadOid` の競合と同じ扱い。3 周で人に回す）、
+  打ち消しは人に回す（要確認）。`seq`（段階 5b）は本物で確かめてからのまま。8.4・D21 に書いた
+- **B（要確認の家族）**: そのブラウザでは承認・レビュー済み・取り下げのボタンを出さず、押す前にも見て書かない。画面に「このブラウザにだけ控えている
+  （ほかの承認者には見えない）」と出す。MR へのコメントは書かない。「確かめた」は確認を挟む
+- **C（古い実行ファイル）**: sh は実行ファイルの `--version --json` の flags を見て、知っているときだけ `--actor`・`--via` を渡す（decide は両方を
+  知っているときだけ。confirm の `--actor` も同じ）。無ければ前と同じバイト列。COMPAT は上げない
+
+| # | 何 | 直し方 |
+|---|---|---|
+| 1（重大） | 応答が落ちた書き込みを、先頭の親が 1 つで中身が合えば自分のものとして受け直していた（上に別の書き込みが積まれると取り違えた。PROBE-2・3） | 今の先頭から最初の親を 20 まで遡り、「そのコミットの上で書いた各パスが書いたとおりで、親の上ではそうでない」コミットを探す（書いた中身と親の組。コミットメッセージの目印は使わない。D37）。GitHub は親が読んだ先頭のものだけ、GitLab は親から最初の親を遡って読んだ先頭に届くものだけ。見つからず、先頭に書いた中身が在れば（見分けられない）人に回す |
+| 2（重大） | 事後確認の判定し直しで時刻を読み直し、跡の `at` が変わるだけで「書くものが違う」として打ち消した | 周ごとに時刻を 1 回決め、書くものを決めるときと判定し直すときに同じ値を渡す |
+| 3（重大） | 事後確認と打ち消しの途中の例外（429・5xx・MR が消えた など）が失敗（failed）になった | 全部「書いたが確認できなかった」の要確認にする（失敗と文面を分ける） |
+| 4（重大） | 打ち消しが、確かめてから送るまでの間に他人が変えたファイルを上書きした（PROBE-1） | 決定 A の `last_commit_id`（打ち消しは自分のコミット）で GitLab に断らせ、人に回す |
+| 5 | 古い実行ファイルに知らないフラグを渡すと decide・confirm が落ちた | 決定 C |
+| 6 | GitLab の MR 探しがフォークの同じ名前のブランチの MR を拾いえた | sh（`find_mr`・`merged`）と TS（`openMr`・`pullApprovals`）とも、`source_project_id` がそのプロジェクトのものだけ。依頼の記録の番号との照合は前から（`matching_problems`） |
+| 7 | 「始める」の重なりの検査が直近のブランチの名前だけだった。service worker が Python の答えを信じていた | 全部のブランチの名前（`branchNames`。上限 5,000）を大文字小文字を畳んで比べる。service worker も統合先の今の先頭で、畳んだ名前の重なり・`done/` の閉じた識別子・互換の版（ビルドが焼き込む同梱の版と、ワークスペースの統合先の `CCNAVI_COMPAT`）を確かめ直す |
+| 8 | service worker の読み取りの受け口が、登録していないリポジトリも読んだ | すべての操作を登録したリポジトリ（プロジェクトのワークスペースも登録したもの）に限る。断った頼みでは GitLab の期限も聞かない |
+| 9 | GitLab の compare が、畳まれた・大きすぎる差分や上限に近い件数でも一覧を信じた | `compare_timeout`・各 diff の `collapsed`・`too_large`、900 件以上のどれでも読めない（動いたと数える）。確認事項 9 に行数での打ち切りを足した |
+| 10 | 打ち消しの応答が落ちたとき、届いていたのに「後から変わった」と誤って人に回しえた | 今の先頭の親が送った先で中身が戻したとおりなら、届いたとする |
+| 11 | 実行ファイルが `--via` を呼び手から受けていた | 値は `board`・`terminal` だけで、端末で 1 件ずつ選ぶ形（`--yes` 無し）に `board` は受けない |
+| 12 | jq と TS で欄の型の読み方が違った（行番号・時刻・本文・`ascii_upcase`） | TS も jq と同じく型をそのまま写し、`state` が文字列でなければ止める。見本に型の違う場面（`odd-types`）を足した |
+| 13 | 打ち消しで BOM が落ちた | GitLab の blob を BOM を落とさずに読み、打ち消しの中身はバイト列（base64）で戻し、送る前と戻した後に blob の sha で確かめる |
+| 14 | GitLab の要求が転送を追いえた | GitHub と GitLab の要求に `redirect: "error"` |
+| 15 | GitLab のスレッドの書き手と依頼の投稿者を名前で比べていた | sh と TS とも `author.id` で写し、依頼の記録の `poster` も id で残す（前の記録の名前とは合わないので、ccnavi の依頼のスレッドも数える。締める向き） |
+| 16 | GitLab のパスで引くとシンボリックリンクを blob として読んだ | tree の mode 120000 を `link` とし、読まずに「決まらない」にする |
+| 17 | lint の `<名前>-i<番号>` の warn が人の付けた名前にも当たった | `issue:` があるときだけ形の食い違いを言い、無いときはそのプロジェクトの issue から決まる名前と重なるときだけ言う |
+| 18 | 「確かめた」が確認なしに外れた | 確認を挟む（決定 B） |
+| 19 | 試験の穴 | 入れ子のグループ（代役の綴りを直し、場面 `nested`）、フォークの MR（場面 `impostor`）、PROBE-1〜3、時計が進む事後確認、途中の例外、compare の打ち切り、tree の 50 ページ・discussions の 20 ページの上限、429・403、転送、シンボリックリンク、BOM、要確認でボタンを出さない、古い実行ファイル（`--version --json` を知らない・`--actor` だけ知っている 387d4a6 の形）を回帰試験にした。見本は「手で組んだ」と書いた |
+| 20 | 8.4 の「新しい先頭で判定をやり直し」と実装（直前の姿で判定し直す）が食い違った | 8.4 を実装に合わせた |
+
+ADR に無かった判断:
+
+- 本体の書き込みが `last_commit_id` で断られたときは、人に回さずに読み直して周を回す（何も書いていないので、GitHub の `expectedHeadOid` の競合と同じ）。3 周で人に回す
+- 応答の落ちた書き込みの見分けは、GitHub でも最初の親を遡る（親が読んだ先頭のコミットだけを受ける。上に無関係な書き込みが積まれても受け直せる）
+- 「始める」の互換の版は、ビルドが `ccnavi/version.py` の COMPAT を焼き込んだ値と比べる
+
+直さなかったもの:
+
+- 別のファイルどうしの競合（取り下げと子の承認が同時に通るなど）は `last_commit_id` で捕まらず、事後確認で打ち消すまで乗りうる（8.4。`seq` の段階 5b）
+- GitHub のパスで引く GraphQL のシンボリックリンク（11.7.1 から）
+
+#### 11.9.2 段階 5 で触った守りの対象
 
 `.ccnavi/scripts/ccnavi-review.sh`（`decide` のアカウントの引き当てと `--actor=`・`--via=` の受け渡し）。利用者の承認（段階 5 の実施）を得て直接直した。
+11.9.1 のレビューの直しでも同じ 1 本を直した（実行ファイルの flags を見てから渡す、GitLab の MR を `source_project_id` で絞る、書き手と投稿者を id で写す）。
 
 本物の GitHub・GitLab で確かめてほしい点（段階 3・4 のものに足す。10.2 の 9）:
 
@@ -1914,6 +1973,11 @@ ADR に無かった判断:
 - 「始める」の権限（GitHub の fine-grained の Contents: Read and write・Issues: Read、GitLab の `api`）と、既にある名前で断られること
 - GitLab.com の無料版の project access token と `GET /personal_access_tokens/self`（確認事項 3）
 - decide の印の `actor`（`gh`・`glab`・curl のどれでも、トークンの持ち主が入ること）
+- 11.9.1: GitLab の Commits API の `last_commit_id` が、同じファイルを他人が変えていれば 400 で書かないこと。`repository/files/:path?ref=<sha>` の
+  `last_commit_id` がそれと同じ値か（merge コミットを挟むときを含む）。並行に書かせたとき、打ち消しが他人の変更を消さずに断られ「要確認」になること
+- 11.9.1: MR の `source_project_id` でフォークの MR を外せること、discussions と note の `author.id`、compare の `collapsed`・`too_large`（行数での打ち切り）、
+  `GET /repository/branches`（GitHub は `GET /branches`）の全件のページング
+- 11.9.1: 古い実行ファイル（`--version --json` を知らない・flags に `--via` が無い）と新しい sh の組み合わせで、confirm・decide が前と同じ印を置くこと
 
 ## 得たもの・失ったもの
 

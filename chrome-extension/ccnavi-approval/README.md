@@ -27,9 +27,11 @@ GitLab の印ファイル `seq`（8.4 の 2 段目）は持たない（段階 5b
 - PAT の期限（D25）: service worker が応答ヘッダ `github-authentication-token-expiration` から読み、読めなければ登録のときの日付。
   切れる 7 日前からボードの帯とアイコンのバッジで知らせる（`chrome.alarms` で 1 日 1 回）
 - GitLab（段階 5）: 同じ操作を REST（v4）で読み書きする（`src/core/gitlab.ts`）。Commits API には「先頭がこの sha のときだけ」の指定が
-  無いので、書く直前に先頭を読み、書いた後にコミットの親が読んだ先頭かを確かめる（8.4 の 1 段目）。違えば直前の姿で判定し直し、
-  書くものが同じなら残し、違えば打ち消しのコミットを積んで読み直す。打ち消しも収まらなければ人に回し、ボードに家族を「要確認」で出す
-  （人が「確かめた」を押すまで。このブラウザの `chrome.storage.local`）。PAT の期限は `GET /personal_access_tokens/self` を 1 日 1 回読む
+  無いので、書く直前に先頭を読み、書き換える・消すファイルに `last_commit_id` を付け（同じファイルを他人が変えていれば GitLab が断る）、
+  書いた後にコミットの親が読んだ先頭かを確かめる（8.4 の 1 段目）。違えば直前の姿で同じ時刻で判定し直し、書くものが同じなら残し、
+  違えば打ち消しのコミット（各ファイルに自分のコミットを `last_commit_id` で付ける）を積んで読み直す。打ち消しも収まらない・途中で
+  ホストが落ちたときは人に回し、ボードに家族を「要確認」で出す（人が確認を挟んで「確かめた」を押すまで。このブラウザの
+  `chrome.storage.local` にだけ控え、ほかの承認者には見えない。要確認の家族にはこのブラウザから書かない）。PAT の期限は `GET /personal_access_tokens/self` を 1 日 1 回読む
 - プロジェクトのリポジトリ（段階 5。3.3 の 7）: 設定画面でプロジェクト名（手元の `projects/<名前>` の名前）と、先に登録したワークスペースの
   リポジトリを選ぶ。置き場の綴り・共通層・互換の印はワークスペースの統合先から、閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先
   から読み、層は D28 の計算（共通層を写したもの）で判定する。Chrome の登録の名前は手元のディレクトリ名と揃える（ずれると手元の取り込みの後の
@@ -77,8 +79,8 @@ pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BR
 
 ### ホストの応答の見本（レビュー済み。ADR-0093 の 8.9）
 
-GitHub（段階 4）と GitLab（段階 5）の 2 つ。GitLab の見本は `test/fixtures/host/gitlab/<場面>/`（`scene.json` に名前空間・プロジェクト・
-親のブランチ・依頼を投稿したアカウント `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
+GitHub（段階 4）と GitLab（段階 5）の 2 つ。どちらも本物の形に合わせて手で組んだもので、本物からは録っていない。GitLab の見本は `test/fixtures/host/gitlab/<場面>/`（`scene.json` に名前空間・プロジェクト・
+親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
 代役は sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `tests/sh/test_review_host_fixture.py` の
 `GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）は `poster` の ccnavi の依頼のスレッドを数えない（11.8.1 の決定 C）。
 更新の手順は下の GitHub と同じ（本物は `glab api` で取る）。
