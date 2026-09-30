@@ -78,7 +78,7 @@ const actions: Actions = {
   approve(repoBoard: RepoBoard, family) {
     void act(async () => {
       const r = family.result;
-      if (!r?.digest || !r.batch) return;
+      if (!r?.digest || !r.batch) return false;
       const deps = await writeDeps(repoBoard.repo);
       const ids = r.batch.map((e) => e.ticket);
       // ホストの Approve が外れうることを出す（8.10。止めはしない）
@@ -89,33 +89,43 @@ const actions: Actions = {
       } catch {
         // 読めなくても承認は止めない（注意の表示だけ）
       }
-      if (!window.confirm(`${family.family.name} に ${ids.join(", ")} の承認を書く（1 コミット）。${warn}`)) return;
+      if (!window.confirm(`${family.family.name} に ${ids.join(", ")} の承認を書く（1 コミット）。${warn}`)) return false;
       say(await approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps), "承認");
+      return true;
     });
   },
   withdraw(repoBoard: RepoBoard, family, ticket) {
     void act(async () => {
       const reason = window.prompt(`${ticket} の承認を取り下げて todo/ に戻す。理由（任意）`, "");
-      if (reason === null) return;
+      if (reason === null) return false;
       const deps = await writeDeps(repoBoard.repo);
       say(await withdrawTicket(repoBoard.repo, family.family.name, ticket, reason, deps), "取り下げ");
+      return true;
     });
   },
 };
 
-async function act(fn: () => Promise<void>): Promise<void> {
+/** 書く操作を 1 つずつ走らせる。書いた（書こうとした）ときだけ、ボードを読み直して描き直す */
+async function act(fn: () => Promise<boolean>): Promise<void> {
   if (busy) return;
   busy = true;
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>("button.action")];
+  for (const b of buttons) b.disabled = true;
   document.body.dataset.state = "writing";
-  for (const b of document.querySelectorAll<HTMLButtonElement>("button.action")) b.disabled = true;
+  let tried = true;
   try {
-    await fn();
+    tried = await fn();
   } catch (err) {
     result.dataset.kind = "failed";
     result.textContent = `書けなかった: ${(err as Error).message ?? String(err)}`;
   } finally {
     busy = false;
-    await refresh(false);
+    if (tried) {
+      await refresh(false);
+    } else {
+      for (const b of buttons) b.disabled = false;
+      document.body.dataset.state = "done";
+    }
   }
 }
 
