@@ -105,7 +105,33 @@ start | finish | cancel)
 	ccnavi_c1_sh="$(dirname "$0")"
 	trap 'ccnavi_c1_end' EXIT
 	trap 'ccnavi_c1_end; exit 130' INT TERM HUP
-	ccnavi_c1_family "$2"
+	# 識別子は実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を飛ばした最初の語
+	# （`start -- <親>` で C1 を素通りさせない。段階 2d のレビュー）。
+	c1_id=""
+	c1_skip=""
+	c1_first=yes
+	for c1_arg in "$@"; do
+		if [ -n "$c1_first" ]; then
+			c1_first=""
+			continue
+		fi
+		if [ -n "$c1_skip" ]; then
+			c1_skip=""
+			continue
+		fi
+		case "$c1_arg" in
+		--reason) c1_skip=yes ;;
+		--* | -?*) ;;
+		*) [ -n "$c1_id" ] || c1_id="$c1_arg" ;;
+		esac
+	done
+	case "$c1_id" in
+	'' | *..* | */* | *[!A-Za-z0-9._-]*)
+		printf 'ccnavi-ticket: %s には識別子が要る（%s は識別子の形ではない）。\n' "$1" "${c1_id:-（無い）}" >&2
+		exit 2
+		;;
+	esac
+	ccnavi_c1_family "$c1_id"
 	case "$ccnavi_c1_target" in
 	stop)
 		ccnavi_c1_refuse
@@ -113,9 +139,9 @@ start | finish | cancel)
 		;;
 	yes)
 		case "$1" in
-		start) c1_words="$2 に着手" ;;
-		finish) c1_words="$2 の作業を終えた" ;;
-		*) c1_words="$2 を取り消した" ;;
+		start) c1_words="$c1_id に着手" ;;
+		finish) c1_words="$c1_id の作業を終えた" ;;
+		*) c1_words="$c1_id を取り消した" ;;
 		esac
 		ccnavi_c1_begin || exit 1
 		c1_rc=0

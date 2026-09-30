@@ -228,6 +228,8 @@ elif [ -f "$root/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
 	sync_info=$(cd "$root" && uv run --quiet python -m ccnavi --root "$root" sync paths 2>"$scratch/info" </dev/null) ||
 		info_from="failed:uv run python -m ccnavi"
 fi
+# Windows の実行ファイルの CRLF を落とす（1 行 1 項目の値の末尾に CR を残さない）。
+sync_info=$(printf '%s\n' "$sync_info" | tr -d '\r')
 case "$info_from" in
 failed:*)
 	printf 'ccnavi-sync: 実行ファイル（%s）が置き場の綴りと統合先の設定を答えなかった（%s）。統合先を取り違えないよう止めた。\n' \
@@ -714,7 +716,8 @@ check_family() {
 		return 0
 	fi
 	cf_rc=0
-	run_ccnavi sync check "$1" "$2" >"$scratch/check" 2>"$scratch/check-err" || cf_rc=$?
+	run_ccnavi sync check "$1" "$2" >"$scratch/check-raw" 2>"$scratch/check-err" || cf_rc=$?
+	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
 	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
 		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、落ちた）。検査の error ではない
 		# ので家族は止めない。前（段階 2b）と同じ動き。

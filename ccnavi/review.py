@@ -224,7 +224,6 @@ def prepare(
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
-    marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} -->\n"
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # 人が読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
@@ -234,6 +233,14 @@ def prepare(
     synced = configsync.pending(home, parent.ticket)
     if synced:
         body = configsync.notice(synced) + body
+    # 目印に、本文と親のブランチの先頭から作った鍵を入れる。sh は同じ目印の投稿が MR に
+    # 既にあれば投稿し直さない（打ち直し・C1 のやり直しで依頼を二重にしない。段階 2d の
+    # レビューの決定 D）。子を足してやり直した依頼は先頭が違うので、別の鍵になる。
+    head = gitcmd.run(tree_root, ["rev-parse", "HEAD"])
+    key = hashlib.sha256(
+        (body + "\n" + (head.out.strip() if head.ok else "")).encode("utf-8")
+    ).hexdigest()[:16]
+    marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
     draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
     failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(

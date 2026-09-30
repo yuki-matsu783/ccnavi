@@ -420,6 +420,24 @@ comment() {
 	fi
 }
 
+# ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
+
+find_posted() {
+	case "$3" in
+	'<!-- ccnavi:'*) ;;
+	*) return 0 ;;
+	esac
+	if [ "$kind" = github ]; then
+		found_all=$(pages "repos/$path/issues/$1/comments") || return 1
+		printf '%s' "$found_all" | "$JQ" -c --arg m "$3" \
+			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: (.html_url // ""), created_at: (.created_at // "")}'
+	else
+		found_all=$(pages "projects/$(encoded_path)/merge_requests/$1/notes") || return 1
+		printf '%s' "$found_all" | "$JQ" -c --arg m "$3" --arg u "$2" \
+			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // "")}'
+	fi
+}
+
 # ---- Draft を外す。GitHub は GraphQL でしか外せない。GitLab は題の "Draft: " を落とす。
 
 undraft() {
@@ -653,8 +671,16 @@ request)
 	fi
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
-	# 段 2: 投稿。
-	posted=$(comment "$number" "$url" "$file")
+	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや C1 の
+	# やり直しで依頼を二重にしない。段階 2d のレビューの決定 D）。
+	request_marker=$(head -n 1 "$file" | tr -d '\r')
+	posted=$(find_posted "$number" "$url" "$request_marker") ||
+		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
+	if [ -n "$posted" ]; then
+		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
+	else
+		posted=$(comment "$number" "$url" "$file")
+	fi
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
@@ -722,8 +748,9 @@ decide)
 	if [ -n "$choices" ] || [ -n "$digest" ]; then
 		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡す。" 2
 	fi
-	# 見るだけの --preview は何も書かないので C1 にしない。
-	[ "$preview" -eq 1 ] || c1_start "$branch"
+	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
+	# 済ませる（ロックを持ったまま人を待たない。段階 2d のレビューの決定 A）ので、ここでは始めない。
+	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$branch"
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
 		ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
@@ -748,7 +775,45 @@ decide)
 		printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
 		exit 0
 	fi
-	c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- --reviewed "$n" --accept-unresolved --result "$result"
+	ccnavi_c1_family "$branch"
+	case "$ccnavi_c1_target" in
+	stop)
+		ccnavi_c1_refuse
+		exit 1
+		;;
+	yes)
+		# 1. 人が端末で選ぶ（何も置かない。選択と指紋を控えの置き場に書くだけ）。
+		chosen="$state/review-choose-$$.json"
+		ccnavi --reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
+			rm -f "$chosen"
+			exit 1
+		}
+		choices=$("$JQ" -c '.choices' "$chosen") && digest=$("$JQ" -r '.digest' "$chosen") || {
+			rm -f "$chosen"
+			fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
+		}
+		rm -f "$chosen"
+		# 2. C1 の中で、選んだものを置く（`--yes`。見せた指摘と今の指摘の指紋が同じときだけ）。
+		ccnavi_c1_begin || exit 1
+		c1_on=yes
+		ccnavi_c1_capture="$state/review-decide-$$.out"
+		decide_rc=0
+		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" ||
+			decide_rc=$?
+		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
+		rm -f "$ccnavi_c1_capture"
+		ccnavi_c1_capture=""
+		if [ "$decide_rc" -ne 0 ]; then
+			[ -z "$out" ] || printf '%s\n' "$out"
+			exit 1
+		fi
+		printf 'OK: フェーズ %s の指摘の行き先を置いて送った（%s）\n' "$n" "$out"
+		;;
+	*)
+		ccnavi --reviewed "$n" --accept-unresolved --result "$result"
+		;;
+	esac
 	post_decision "$n"
 	[ -n "$issue_url" ] && printf 'issue に回した: %s\n' "$issue_url"
 	[ -n "$post_warning" ] && printf 'ccnavi-review: %s\n' "$post_warning" >&2
