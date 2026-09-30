@@ -260,6 +260,40 @@ class HostFixtureTest(unittest.TestCase):
         self.assertIn("data", ask(q))
         self.assertIn("createdAt", ask(q.replace(" createdAt", ""))["errors"][0]["message"])
 
+    def test_decide_passes_the_token_owner_and_the_way(self):
+        """段階 5: decide の印にも actor と via（ボードは board、端末は terminal）"""
+        for args, via in (
+            (["decide", "1", "--choices", "{}", "--digest", "d"], "board"),
+            (["decide", "1"], "terminal"),
+        ):
+            with self.subTest(via=via):
+                if os.path.exists(self.args):
+                    os.remove(self.args)
+                done = self.review("resolved", *args)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                passed = self.passed()
+                self.assertIn("--accept-unresolved", passed)
+                self.assertIn("--actor=octo-reviewer", passed)
+                self.assertIn(f"--via={via}", passed)
+
+    def test_decide_without_an_owner_or_for_preview_passes_no_actor(self):
+        for args, extra in (
+            (["decide", "1", "--choices", "{}", "--digest", "d"], {"FAKE_GITHUB_NO_USER": "1"}),
+            (["decide", "1", "--preview"], {}),
+        ):
+            with self.subTest(args=args):
+                if os.path.exists(self.args):
+                    os.remove(self.args)
+                done = self.review("resolved", *args, **extra)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn("--accept-unresolved", self.passed())
+                self.assertFalse(any(a.startswith(("--actor", "--via")) for a in self.passed()))
+
+    def test_decide_does_not_take_an_actor_from_the_caller(self):
+        done = self.review("resolved", "decide", "1", "--actor=someone")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(self.args))
+
     def test_confirm_does_not_take_an_actor_from_the_caller(self):
         for given in (["--actor", "someone"], ["--actor=someone"]):
             done = self.review("resolved", "confirm", "--phase", "1", *given)

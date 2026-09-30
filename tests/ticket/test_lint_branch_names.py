@@ -51,9 +51,11 @@ def ticket_text(name, *, parent="", issue=None, approved=False):
 class BranchNameRulesTest(unittest.TestCase):
     """`ticket.branch_name_problems` の見本表。識別子と `issue:` だけを見る。"""
 
-    def problems(self, name, *, parent="", issue=None):
+    def problems(self, name, *, parent="", issue=None, issue_repo="", project=""):
         return ticket_mod.branch_name_problems(
-            ticket_mod.Ticket(ticket=name, parent=parent, issue=issue)
+            ticket_mod.Ticket(
+                ticket=name, parent=parent, issue=issue, issue_repo=issue_repo, project=project
+            )
         )
 
     def test_names_that_are_fine(self):
@@ -61,7 +63,7 @@ class BranchNameRulesTest(unittest.TestCase):
             ("i0131", 131),
             ("i12345", 12345),
             ("login-form", None),
-            ("web-i0012", None),
+            ("login-form", 12),
             ("mainline", None),
             ("releases", None),
             ("v1.2", None),
@@ -109,7 +111,56 @@ class BranchNameRulesTest(unittest.TestCase):
                 found = self.problems(name)
                 self.assertEqual(1, len(found), found)
                 self.assertIn("`issue:`", found[0])
-                self.assertEqual([], self.problems(name, issue=131))
+        self.assertEqual([], self.problems("i0131", issue=131))
+
+    def test_issue_shaped_names_must_match_the_issue(self):
+        """段階 5: issue から決める形の識別子は番号と置き場に合わせる（3.1 の 4・7）。"""
+        for name, issue, project in (
+            ("I0131", 131, ""),
+            ("i7", 7, ""),
+            ("i0132", 131, ""),
+            ("i0131", 131, "web"),
+            ("web-i0013", 12, "web"),
+            ("api-i0012", 12, "web"),
+        ):
+            with self.subTest(name=name, project=project):
+                found = self.problems(name, issue=issue, project=project)
+                self.assertEqual(1, len(found), found)
+                self.assertIn("から決まる", found[0])
+        self.assertEqual([], self.problems("i0007", issue=7))
+        self.assertEqual([], self.problems("web-i0012", issue=12, project="web"))
+        self.assertEqual([], self.problems("web-i12345", issue=12345, project="web"))
+
+    def test_project_shaped_names_are_reserved(self):
+        """段階 5: `<名前>-i<番号>` は issue の無い提案とワークスペースの提案では使わない。"""
+        found = self.problems("web-i0012")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("`issue:` の無い提案", found[0])
+        found = self.problems("web-i0012", issue=12)
+        self.assertEqual(1, len(found), found)
+        self.assertIn("ワークスペースの提案", found[0])
+        # 形に当たらない名前は、issue があっても人が付けた名前でよい（フォールバック。8.6）
+        self.assertEqual([], self.problems("fix-i18n"))
+        self.assertEqual([], self.problems("login", issue=12, project="web"))
+
+    def test_an_issue_in_another_repository_needs_a_human_name(self):
+        """段階 5: `owner/repo#N` の課題は、識別子を issue から決める形にしない（3.1 の 8）。"""
+        for name, project in (("i0012", ""), ("web-i0012", "web")):
+            with self.subTest(name=name):
+                found = self.problems(name, issue=12, issue_repo="acme/other", project=project)
+                self.assertEqual(1, len(found), found)
+                self.assertIn("acme/other#12", found[0])
+        self.assertEqual([], self.problems("login", issue=12, issue_repo="acme/other"))
+
+    def test_issue_identifier(self):
+        self.assertEqual("i0012", ticket_mod.issue_identifier(12))
+        self.assertEqual("i12345", ticket_mod.issue_identifier(12345))
+        self.assertEqual("web-i0012", ticket_mod.issue_identifier(12, "web"))
+        for bad in (0, -1, True, "12"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                ticket_mod.issue_identifier(bad)
+        with self.assertRaises(ValueError):
+            ticket_mod.issue_identifier(12, "../x")
 
     def test_children_are_only_checked_for_ref_safety(self):
         # 子の識別子は `<親>-<2 桁>` で、親の名前の規則は親の側で見る。

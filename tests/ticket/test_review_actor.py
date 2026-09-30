@@ -295,3 +295,92 @@ class ReviewRuleTest(ActorHarness):
         )
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(read_json(self.mark_path("requested"))["poster"], "ccnavi-bot")
+
+
+class DecideActorTest(ActorHarness):
+    """段階 5: decide の印にも `actor` と `via`（confirm と同じ形。8.9）。"""
+
+    def decide(self, fixture, *extra):
+        preview = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--preview",
+            "--json",
+            "--result",
+            fixture,
+        )
+        self.assertEqual(preview.returncode, 0, preview.stderr)
+        digest = json.loads(preview.stdout)["digest"]
+        return self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--yes",
+            "{}",
+            "--digest",
+            digest,
+            "--json",
+            "--result",
+            fixture,
+            *extra,
+        )
+
+    def test_without_an_actor_the_decide_mark_is_as_before(self):
+        fixture = self.ready()
+        done = self.decide(fixture)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        mark = read_json(self.mark_path())
+        self.assertEqual(sorted(mark), ["accepted", "at", "mr"])
+        self.assertNotIn("actor", self.last_event())
+
+    def test_an_actor_and_the_way_go_into_the_decide_mark(self):
+        for via in ("board", "terminal"):
+            with self.subTest(via=via):
+                fixture = self.ready() if via == "board" else self.again()
+                done = self.decide(fixture, "--actor=octo-reviewer", f"--via={via}")
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                mark = read_json(self.mark_path())
+                self.assertEqual(list(mark), ["mr", "accepted", "actor", "via", "at"])
+                self.assertEqual((mark["actor"], mark["via"]), ("octo-reviewer", via))
+                # 印を置いた跡（親の phase-mark）にもアカウントと経路が入る
+                event = self.last_event("i0001")
+                self.assertEqual(event["kind"], history.KIND_PHASE_MARK)
+                self.assertEqual((event["actor"], event["via"]), ("octo-reviewer", via))
+
+    def again(self):
+        """印を外して、同じフェーズをもう 1 度決められるようにする。"""
+        os.remove(self.mark_path())
+        fixture = os.path.join(self.root, "again.json")
+        write(fixture, json.dumps(RESULT))
+        return fixture
+
+    def test_the_way_is_refused_alone_or_with_the_wrong_word(self):
+        fixture = self.ready()
+        for extra, word in (
+            (["--via=board"], "--via は decide の --actor"),
+            (["--actor=octo", "--via=chrome"], "--via は terminal か board"),
+        ):
+            with self.subTest(extra=extra):
+                done = self.decide(fixture, *extra)
+                self.assertNotEqual(done.returncode, 0)
+                self.assertIn(word, done.stderr)
+                self.assertFalse(os.path.exists(self.mark_path()))
+        preview = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--preview",
+            "--json",
+            "--result",
+            fixture,
+            "--actor=octo",
+        )
+        self.assertNotEqual(preview.returncode, 0)
+        self.assertIn("--actor", preview.stderr)
