@@ -1848,7 +1848,7 @@ sh が渡す写し（`--result <JSON>`）の判定とマーカーの操作だけ
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
 | `request --phase <N> --body-file <文>` | `review prepare`（前提を確かめ、本文とマージリクエストの下書きを控えの置き場に書き出す）→ sh がマージリクエストを（無ければ下書きで）作り、依頼を投稿 → `review requested`（HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く） |
-| `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm`（判定して `reviewed` のマーカーを置き、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす） |
+| `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm`（判定して `reviewed` のマーカーを置き、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす）。sh がトークンの持ち主を引けたら `--actor` で渡し、マーカーに `actor` と `via: cli` を残す（引けなければ前と同じ中身。ADR-0093 の 8.9・11.8）。Chrome 拡張のレビュー済みも同じ判定（`core.confirm`）を通る |
 | `decide <N>` | 人が打つ（ボードの「決める」か端末）。sh が取ってくる → `--reviewed N --accept-unresolved`（残っているスレッドを 1 件ずつ見せ、対応方針を選ばせる。対応しない＝`accepted.json` に控える、このフェーズで直す＝続きの子チケットを同じフェーズの番号で `.ccnavi/approved/doing/` に直に置く、issue に回す＝控えたうえで issue の下書きを書く。直す指摘が無ければ `reviewed` のマーカーを置き、あればマーカーを消す。どちらでも `review/` の子は `done/` へ）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `--preview`（一覧と指紋）と `--choices <JSON> --digest <指紋>`（実行ファイルは `--yes`。見せた指紋と今の指紋が一致するときだけ置く）で同じ道を通る |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらない。レビューの状態は変えない |
 | `ready` | `review ready`（親を閉じられる条件と、親の承認済みチケットが `done/` にあること（ADR-0093 の 3.6）と、`wip/` が追跡から消えていて未コミットが無く push 済みであることを確かめ、`ready.json` とコメントの下書きを置く）→ sh が Draft を外し（GitLab は `squash` を立てる）、コメントを投稿する。親が閉じたあとに打つ。同じ親に 2 度打っても通る。マージは人 |
