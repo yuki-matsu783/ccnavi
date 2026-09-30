@@ -141,3 +141,16 @@ export function pushApprovedCommand(root: string, parents: readonly string[] = [
   const names = parents.map((p) => ` ${shellQuote(p)}`).join("");
   return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}${names}`;
 }
+
+/**
+ * `ccnavi c1 family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `c1 1` が無ければ
+ * 空文字（古い実行ファイル）。行末の CR は落とす
+ */
+export function c1TargetOf(stdout: string): string {
+  const lines = stdout.split("\n").map((line) => line.replace(/\r$/, ""));
+  if (lines[0] !== "c1 1") {
+    return "";
+  }
+  const found = lines.find((line) => line.startsWith("target "));
+  return found === undefined ? "" : found.slice("target ".length).trim();
+}

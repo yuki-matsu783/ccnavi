@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as commands from "../../src/core/commands.js";
 import {
   approveArgs,
+  c1TargetOf,
   decideArgs,
   decidePreviewArgs,
   previewArgs,
@@ -90,11 +91,19 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
   assert.equal(
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
-  );  // 家族を並べると、その家族だけを運ぶ（ADR-0093 の 4.6。フローの保存の後）。
+  );
+  // 家族を並べると、その家族だけを運ぶ（ADR-0093 の 4.6。フローの保存の後）。
   assert.equal(
     pushApprovedCommand("/ws", ["i0001"]),
     "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",
   );
+});
+
+test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 が無ければ空、CR は落とす", () => {
+  assert.equal(c1TargetOf("c1 1\nfamily i0001\ntarget yes\ntree /ws/x y\n"), "yes");
+  assert.equal(c1TargetOf("c1 1\r\nfamily i0001\r\ntarget no\r\n"), "no");
+  assert.equal(c1TargetOf("usage: ccnavi ...\n"), "");
+  assert.equal(c1TargetOf("c1 1\nfamily i0001\n"), "");
 });
 
 test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と同じ引用の規則。空白や記号があるときだけ引用する（root を解くのは呼び手）", () => {
