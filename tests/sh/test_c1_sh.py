@@ -22,6 +22,8 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 10. D11: 控えの無い家族・origin の無いリポジトリ・chat だけの家族は今のまま
     （コミットも push もしない）
 11. 運ぶ処理（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
+12. Chrome のレビュー済み（段階 4）: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
+    書いて送ったものが、経路・時刻・拡張の版のほかは同じ
 """
 
 from __future__ import annotations
@@ -1237,6 +1239,157 @@ class C1HostTest(C1Harness):
         synced = self.review("config-synced", PARENT)
         self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/config-sync.json")
+
+
+@unittest.skipIf(shutil.which("jq") is None, "jq が要る")
+class C1ChromeConfirmTest(PhaseOne, C1Harness):
+    """Chrome のレビュー済みと手元の confirm の突き合わせ（ADR-0093 の 8.9。段階 4 の決定 3）。
+
+    取り込み済みの家族では、手元の CLI を直に打つと C1 に断られる（`--record-tree` が無い）。そこで
+    C1 と同じ手順（`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
+    回し、同じ状態から Chrome の入口が出す書くものと、C1 が親のブランチへ書いて送ったものを比べる。
+    違ってよいのは経路（`via`）と時刻（`at`）と拡張の版だけ。アカウント（`actor`）は、手元は sh が
+    トークンの持ち主を引いたもの、Chrome は PAT の持ち主で、同じ見本なので同じになる。
+    """
+
+    SCENE = "resolved"
+
+    def setUp(self):
+        super().setUp()
+        from tests.sh import github_host
+
+        self.host = github_host
+        shim = os.path.join(self._tmp.name, "shim")
+        executable(
+            os.path.join(shim, "git"),
+            URL_GIT.format(url="https://github.com/acme/widgets.git", git=GIT),
+        )
+        fakes = os.path.join(self._tmp.name, "fakes")
+        github_host.install(fakes, sys.executable)
+        self.path = os.pathsep.join([shim, fakes, os.environ.get("PATH", "")])
+        self.finish_phase_one()
+        git(self.tree, "merge", "-q", "--no-edit", CHILD)
+        git(self.tree, "push", "-q", "origin", PARENT)
+
+    def review(self, *args):
+        return self.sh(
+            "ccnavi-review.sh",
+            *args,
+            cwd=self.tree,
+            PATH=self.path,
+            GITHUB_TOKEN="t0k",
+            FAKE_GITHUB_SCENE=self.SCENE,
+            FAKE_GITHUB_STATE=os.path.join(self._tmp.name, "comments.json"),
+        )
+
+    def files(self, base, prefixes):
+        found = {}
+        for prefix in prefixes:
+            for current, dirs, names in os.walk(os.path.join(base, *prefix.split("/"))):
+                dirs[:] = [d for d in dirs if d != ".git"]
+                for name in names:
+                    full = os.path.join(current, name)
+                    rel = os.path.relpath(full, base).replace(os.sep, "/")
+                    found[rel] = self.read(full)
+        return found
+
+    def chrome_request(self):
+        """拡張が組むのと同じ要求（統合先 main、家族 i0001、見本の写し、依頼の後の変更の一覧）。"""
+        from tests.ticket.test_core import _chrome
+
+        chrome = _chrome()
+        place = chrome._placement(None)
+        keep = tuple(p + "/" for p in place["integration_paths"])
+        main = {
+            rel: text
+            for rel, text in self.files(self.ws, (".ccnavi", ".claude")).items()
+            if rel.startswith(keep) or rel in place["integration_files"]
+        }
+        mine = self.files(self.tree, place["branch_paths"])
+        recorded = json.loads(self.read(os.path.join(self.tree, *self.requested.split("/"))))
+        head = self.sha(self.tree, "HEAD")
+        names = git(self.tree, "diff", "--name-only", "--no-renames", f"{recorded['head']}..HEAD")
+        with open(
+            os.path.join(self.host.SCENES, self.SCENE, "expected.json"), encoding="utf-8"
+        ) as f:
+            copy = json.load(f)
+        request = {
+            "schema": chrome.SCHEMA,
+            "op": "confirm",
+            "family": PARENT,
+            "phase": 1,
+            "stamp": "2026-09-29T12:00:00+0900",
+            "actor": {"account": "octo-reviewer", "version": "9.9.9"},
+            "result": copy,
+            "compare": {"base": recorded["head"], "head": head, "files": names.stdout.split()},
+            "snapshot": {
+                "integration": {"name": "main", "source": "default", "head": "0" * 40},
+                "branches": {
+                    "main": {"head": "0" * 40, "files": main},
+                    PARENT: {"head": head, "files": mine},
+                },
+                "absent": [],
+            },
+        }
+        answer = json.loads(
+            chrome.handle(json.dumps(request), os.path.join(self._tmp.name, "memfs"))
+        )
+        self.assertNotIn("error", answer, answer)
+        return answer
+
+    @property
+    def requested(self):
+        return f"{APPROVED}/phases/{PARENT}/1.requested"
+
+    @staticmethod
+    def normalized(path, text):
+        """経路・時刻・拡張の版を落とす（違ってよいもの）。"""
+        drop = ("via", "at", "version")
+        if path.endswith(".ndjson"):
+            rows = [json.loads(line) for line in text.splitlines() if line.strip()]
+            return [{k: v for k, v in r.items() if k not in drop} for r in rows]
+        if path.endswith((".reviewed", ".json")):
+            return {k: v for k, v in json.loads(text).items() if k not in drop}
+        return text
+
+    def test_chrome_writes_what_c1_writes_and_sends(self):
+        body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
+        requested = self.review("request", "--phase", "1", "--body-file", body)
+        self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
+        self.assertIn(self.requested, self.committed())
+
+        answer = self.chrome_request()
+        self.assertEqual(answer["problems"], [])
+        rows = answer["changes"][PARENT]
+
+        # 手元を直に打つと C1 に断られる（だから C1 の手順で回す）
+        direct = self.exe("--cwd", self.tree, "review", "confirm", "--phase", "1", "--result", body)
+        self.assertNotEqual(direct.returncode, 0)
+
+        before = self.sha(self.tree, "HEAD")
+        confirmed = self.review("confirm", "--phase", "1")
+        self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+        sent = git(self.tree, "diff", "--name-only", "--no-renames", f"{before}..HEAD")
+        self.assertEqual(sorted(sent.stdout.split()), sorted(r["path"] for r in rows))
+        for row in rows:
+            full = os.path.join(self.tree, *row["path"].split("/"))
+            if row["op"] == "delete":
+                self.assertFalse(os.path.exists(full), row["path"])
+                continue
+            self.assertEqual(
+                self.normalized(row["path"], row["content"]),
+                self.normalized(row["path"], self.read(full)),
+                row["path"],
+            )
+        remote = json.loads(next(r["content"] for r in rows if r["path"].endswith("1.reviewed")))
+        local = json.loads(
+            self.read(os.path.join(self.tree, *f"{APPROVED}/phases/{PARENT}/1.reviewed".split("/")))
+        )
+        self.assertEqual((remote["actor"], remote["via"]), ("octo-reviewer", "chrome"))
+        self.assertEqual((local["actor"], local["via"]), ("octo-reviewer", "cli"))
+        self.assertEqual(list(remote), list(local))
 
 
 if __name__ == "__main__":
