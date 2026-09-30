@@ -62,6 +62,15 @@ export interface Withdrawable {
   readonly problems: readonly string[];
 }
 
+/** 依頼済みでまだレビュー済みでないフェーズ（8.9。段階 4）。通るかは `confirm` が決める */
+export interface Reviewable {
+  readonly phase: number;
+  readonly mr: number;
+  /** 依頼のマーカーのホスト（`github`・`gitlab`） */
+  readonly host: string;
+  readonly children: readonly string[];
+}
+
 export interface BoardResult {
   readonly family: string;
   readonly closure: Closure;
@@ -70,6 +79,8 @@ export interface BoardResult {
   /** 書けるか（互換の版・書く先の名前。Python が決める。7.3・8.5） */
   readonly write?: { readonly allowed: boolean; readonly reason: string };
   readonly withdrawable?: readonly Withdrawable[];
+  /** レビュー済みを付けられる候補（段階 4） */
+  readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
   /** 見せた画面の指紋（承認のときに Python が読み直した中身と比べる。8.3） */
@@ -113,6 +124,19 @@ export interface WithdrawResult extends Written {
   readonly problems: readonly string[];
 }
 
+export interface ConfirmResult extends Written {
+  readonly problems: readonly string[];
+  /** 依頼の後に親のブランチが動いていれば、比べる 2 つ（拡張が compare API で読んで呼び直す） */
+  readonly need_compare?: { readonly base: string; readonly head: string };
+}
+
+/** compare API の変更の一覧（`github.compareFiles` の答え。`files` が null なら読めない・打ち切られた） */
+export interface Compare {
+  readonly base: string;
+  readonly head: string;
+  readonly files: readonly string[] | null;
+}
+
 export interface Actor {
   readonly account: string;
   readonly version: string;
@@ -151,4 +175,17 @@ export const py = {
     call: PyCall,
     body: { settings: string | null; snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
+  confirm: (
+    call: PyCall,
+    body: {
+      settings: string | null;
+      snapshot: Snapshot;
+      family: string;
+      phase: number;
+      result: unknown;
+      compare?: Compare;
+      stamp: string;
+      actor?: Actor;
+    },
+  ) => ask<ConfirmResult>(call, "confirm", { ...body }, ""),
 };

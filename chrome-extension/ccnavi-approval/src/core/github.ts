@@ -559,3 +559,151 @@ export async function pullApprovals(client: Client, owner: string, repo: string,
   }
   return out;
 }
+
+// ---- 段階 4: レビュー済み（8.9）。MR のスレッドとレビューの写しと、依頼の後の変更の一覧 --------------
+
+/** スレッド 1 つ（`ccnavi-review.sh` の `threads` と同じ形） */
+export interface ReviewThread {
+  readonly id: string;
+  readonly resolved: boolean;
+  readonly url: string;
+  readonly path: string;
+  readonly line: number;
+  readonly body: string;
+  readonly created_at: string;
+}
+
+/** レビュー 1 つ（`ccnavi-review.sh` の `reviews` と同じ形） */
+export interface PullReview {
+  readonly state: string;
+  readonly url: string;
+  readonly submitted_at: string;
+  readonly author: string;
+}
+
+/** ホストの写し（`ccnavi-review.sh fetch` と同じ形。Python の `review.Result` が読む） */
+export interface ReviewCopy {
+  readonly host: "github";
+  readonly mr: { readonly number: number; readonly url: string };
+  readonly threads: readonly ReviewThread[];
+  readonly reviews: readonly PullReview[];
+  readonly fetched_at: string;
+}
+
+/** sh の読みの上限と同じ（スレッドは 21 ページ目で、レビューは 20 ページを超えたら止める） */
+const THREAD_PAGES = 20;
+const REVIEW_PAGES = 20;
+const PER_PAGE = 100;
+
+/** jq の `a // b`。null と false のときだけ b（空文字や 0 は a のまま） */
+function alt<T>(value: unknown, fallback: T): T {
+  return value === null || value === undefined || value === false ? fallback : (value as T);
+}
+
+/** 親のブランチの開いた MR（sh の `find_mr` と同じ: `pulls?state=open&head=<owner>:<branch>` の先頭） */
+export async function openPull(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; url: string } | null> {
+  const head = encodeURIComponent(`${checkName(owner, "owner")}:${checkBranch(branch)}`);
+  const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls?state=open&head=${head}`);
+  const first = status === 404 || !Array.isArray(body) ? undefined : (body[0] as { number?: unknown; html_url?: unknown } | undefined);
+  if (!first) return null;
+  if (typeof first.number !== "number" || !Number.isInteger(first.number)) {
+    throw new HostError("MR の番号を読めない");
+  }
+  return { number: first.number, url: String(alt(first.html_url, "")) };
+}
+
+const THREADS = `query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id isResolved comments(first: 1) { nodes { url path line body createdAt } } }
+      }
+    }
+  }
+}`;
+
+type ThreadNode = { id?: unknown; isResolved?: unknown; comments?: { nodes?: Record<string, unknown>[] } | null };
+
+/** MR のスレッド（sh の `threads` と同じ読み方。最初のコメントの url・path・line・本文・時刻） */
+export async function reviewThreads(client: Client, owner: string, repo: string, number: number): Promise<ReviewThread[]> {
+  const out: ReviewThread[] = [];
+  let after: string | null = null;
+  for (let page = 0; ; page += 1) {
+    const data = await graphql(client, THREADS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), number, after });
+    const threads = (data.repository as { pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: ThreadNode[] } } | null } | null)
+      ?.pullRequest?.reviewThreads;
+    if (!threads) throw new HostError(`MR #${number} のスレッドを読めない`);
+    for (const t of threads.nodes) {
+      const c = t.comments?.nodes?.[0] ?? {};
+      out.push({
+        id: String(t.id),
+        resolved: t.isResolved === true,
+        url: String(alt(c.url, "")),
+        path: String(alt(c.path, "")),
+        line: Number(alt(c.line, 0)),
+        body: String(alt(c.body, "")),
+        created_at: String(alt(c.createdAt, "")),
+      });
+    }
+    if (!threads.pageInfo.hasNextPage) return out;
+    if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れない");
+    after = threads.pageInfo.endCursor;
+  }
+}
+
+/** MR のレビュー（sh の `reviews` と同じ: 100 件ずつページの番号で読み、100 件に満たないページで終える） */
+export async function pullReviews(client: Client, owner: string, repo: string, number: number): Promise<PullReview[]> {
+  const out: PullReview[] = [];
+  for (let page = 1; ; page += 1) {
+    const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
+    const chunk = status === 404 || !Array.isArray(body) ? [] : (body as Record<string, unknown>[]);
+    for (const r of chunk) {
+      const user = (r.user ?? null) as { id?: unknown; login?: unknown } | null;
+      out.push({
+        state: String(alt(r.state, "")),
+        url: String(alt(r.html_url, "")),
+        submitted_at: String(alt(r.submitted_at, "")),
+        author: String(alt(user?.id, alt(user?.login, ""))),
+      });
+    }
+    if (chunk.length < PER_PAGE) return out;
+    if (page + 1 > REVIEW_PAGES) throw new HostError("レビューが多すぎて読み切れない");
+  }
+}
+
+/**
+ * 親のブランチの MR のスレッドとレビューの写し（8.9）。`ccnavi-review.sh fetch` と同じ形で、
+ * 同じ見本（test/fixtures/host/github/）から同じ写しになることを試験が見る。MR が無ければ投げる。
+ */
+export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
+  const mr = await openPull(client, owner, repo, branch);
+  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する開いた MR が無い`);
+  const threads = await reviewThreads(client, owner, repo, mr.number);
+  const reviews = await pullReviews(client, owner, repo, mr.number);
+  return { host: "github", mr, threads, reviews, fetched_at: new Date().toISOString() };
+}
+
+/** compare API が返す変更の一覧の上限（GitHub は 300 件で切る）。これに届けば打ち切られたとみなす */
+export const COMPARE_FILES_LIMIT = 300;
+
+/**
+ * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス（8.9）。改名は元と先の両方を入れる（手元の
+ * `--no-renames` と同じ）。読めない・打ち切られた・`base` が祖先でない（`ahead`・`identical` でない）なら
+ * `files` は null で、Python が「動いた」と数える。
+ */
+export async function compareFiles(client: Client, owner: string, repo: string, base: string, head: string): Promise<{ base: string; head: string; files: string[] | null }> {
+  const b = checkOid(base);
+  const h = checkOid(head);
+  const { status, body } = await rest(client, `${repoPath(owner, repo)}/compare/${b}...${h}`);
+  const res = (body ?? {}) as { status?: unknown; files?: { filename?: unknown; previous_filename?: unknown }[] };
+  if (status === 404 || (res.status !== "ahead" && res.status !== "identical")) return { base: b, head: h, files: null };
+  const list = Array.isArray(res.files) ? res.files : [];
+  if (list.length >= COMPARE_FILES_LIMIT) return { base: b, head: h, files: null };
+  const files: string[] = [];
+  for (const f of list) {
+    if (typeof f.filename === "string") files.push(f.filename);
+    if (typeof f.previous_filename === "string") files.push(f.previous_filename);
+  }
+  return { base: b, head: h, files };
+}

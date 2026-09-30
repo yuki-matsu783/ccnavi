@@ -5,6 +5,9 @@
  * 操作を頼む。PAT を書く・消すのは設定画面からだけ受ける。送り手は拡張の自分のページに限り、
  * 他の拡張・ウェブページからの呼び出し（`onMessageExternal`）は受けない。
  *
+ * 段階 4 から、レビュー済みのために MR のスレッドとレビューの写し（`reviewCopy`）と、依頼の後の変更の
+ * 一覧（`compareFiles`）を読む。どちらも読むだけで、書くのは段階 3 と同じ `commit` だけ。
+ *
  * 段階 3 から、書く操作 `commit`（`createCommitOnBranch`）を受ける。受けるのはボードからだけで、
  * 設定画面で登録したリポジトリだけに書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か
  * 統合先の名前（ボードの値を信じず自分で引く）なら断り、書くパスは置き場（統合先の `.claude/settings.json`
@@ -28,6 +31,8 @@ export type HostOp =
   | "approvalCommit"
   | "pullApprovals"
   | "commitParents"
+  | "reviewCopy"
+  | "compareFiles"
   | "commit";
 
 export type Request =
@@ -303,6 +308,13 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     }
     case "commitParents":
       value = await github.commitParents(client, o, r, github.checkOid(a));
+      break;
+    case "reviewCopy":
+      // レビュー済み（段階 4）: MR のスレッドとレビューの写し。読むだけ
+      value = await github.reviewCopy(client, o, r, github.checkBranch(a));
+      break;
+    case "compareFiles":
+      value = await github.compareFiles(client, o, r, github.checkOid(a), github.checkOid(b));
       break;
     default:
       return { ok: false, error: `知らない操作: ${String(op)}` };

@@ -20,3 +20,8 @@ label { display: block; margin: .3rem 0; }
 .approved-item { margin: .3rem 0; }
 .why-not { font-size: .85rem; }
 #result:empty, #banner:empty { display: none; }
+.review { border-top: 1px dashed var(--line); padding-top: .4rem; }
+.threads { list-style: none; padding-left: 0; }
+.thread { border-left: 3px solid var(--line); padding-left: .5rem; margin: .4rem 0; }
+.thread[data-resolved="false"] { border-left-color: #b3261e; }
+.threads-count, .thread-head { font-size: .85rem; margin: .2rem 0; }

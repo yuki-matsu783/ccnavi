@@ -94,7 +94,7 @@ export function manifest(hosts: readonly Host[], version: string): Record<string
   return {
     manifest_version: 3,
     name: "ccnavi 承認ボード",
-    description: "リモートのブランチの承認待ちを見せ、承認と取り下げを親のブランチへ書く（ADR-0093 段階 3）",
+    description: "リモートのブランチの承認待ちを見せ、承認・取り下げ・レビュー済みを親のブランチへ書く（ADR-0093 段階 4）",
     version,
     minimum_chrome_version: "116",
     permissions: ["storage", "alarms"],

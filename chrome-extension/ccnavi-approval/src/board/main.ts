@@ -1,6 +1,6 @@
 /**
- * ボード（ADR-0093 段階 3）。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
- * レビュー済み・「始める」は持たない（段階 4・5）。
+ * ボード（ADR-0093 段階 3・4）。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
+ * 段階 4 から、依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。「始める」は持たない（段階 5）。
  *
  * PAT はこのページに来ない。ホストの API は service worker に名前で頼む（5.5 の 4）。
  */
@@ -9,7 +9,7 @@ import { renderRepo, type Actions } from "../core/render.js";
 import { createRenderer } from "../core/sanitize.js";
 import { readRepos, type RepoConfig } from "../core/settings.js";
 import { collectRepo, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
-import { approveFamily, withdrawTicket, type Outcome, type WriteDeps } from "../core/write.js";
+import { approveFamily, confirmPhase, withdrawTicket, type Outcome, type WriteDeps } from "../core/write.js";
 import { blobCache } from "./cache.js";
 import { startWorker, type PyWorker } from "./py-client.js";
 
@@ -91,6 +91,22 @@ const actions: Actions = {
       }
       if (!window.confirm(`${family.family.name} に ${ids.join(", ")} の承認を書く（1 コミット）。${warn}`)) return false;
       say(await approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps), "承認");
+      return true;
+    });
+  },
+  review(repoBoard: RepoBoard, family, phase) {
+    void act(async () => {
+      const deps = await writeDeps(repoBoard.repo);
+      let warn = "";
+      try {
+        const prs = (await deps.call("pullApprovals", [repoBoard.repo.owner, repoBoard.repo.repo, family.family.name])) as { number: number }[];
+        if (prs.length > 0) warn = `\n\n注意: MR ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いている。このコミットで MR の Approve が外れることがある`;
+      } catch {
+        // 読めなくても止めない（注意の表示だけ。8.10）
+      }
+      const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする（レビュー待ちの子を done/ へ動かし、印を 1 コミットで書く）。押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
+      if (!window.confirm(msg)) return false;
+      say(await confirmPhase(repoBoard.repo, family.family.name, phase, deps), "レビュー済み");
       return true;
     });
   },

@@ -13,12 +13,16 @@
  * 5. 書いた後、新しい先頭の中身が書いたとおりか確かめる（blob の sha を突き合わせる）
  *
  * 取り下げも同じ流れで書く。見せた指紋は無いが、毎周 Python が条件（8.8）を見直す。
+ * レビュー済み（段階 4。8.9）も同じ流れで、毎周 MR のスレッドとレビューを読み直して Python の `confirm`
+ * （手元の `ccnavi review confirm` と同じコア）に通るかを決めさせる。
  */
 import { py, PyError, type Actor, type ChangeRow, type PlanResult, type Written } from "./py.js";
 import type { RepoConfig } from "./settings.js";
 import { findPrior, MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
-import type { FileAddition, PathObject } from "./github.js";
+import type { FileAddition, PathObject, ReviewCopy } from "./github.js";
+import { askConfirm } from "./reviewed.js";
 import { underPlaces } from "./guard.js";
+import { localStamp } from "./stamp.js";
 
 /** 先頭が動いたときに読み直して書き直す回数の上限（8.3 の 4） */
 export const MAX_ROUNDS = 3;
@@ -62,17 +66,7 @@ export interface Shown {
   readonly only: readonly string[] | null;
 }
 
-/** `fsio.stamp` と同じ形の今の時刻（現地時刻とオフセット。`2026-09-30T12:00:00+0900`） */
-export function localStamp(now: Date): string {
-  const pad = (n: number, w = 2) => String(Math.abs(n)).padStart(w, "0");
-  const off = -now.getTimezoneOffset();
-  const sign = off >= 0 ? "+" : "-";
-  return (
-    `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T` +
-    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}` +
-    `${sign}${pad(Math.floor(Math.abs(off) / 60))}${pad(Math.abs(off) % 60)}`
-  );
-}
+export { localStamp } from "./stamp.js";
 
 /** 本文（UTF-8）か base64 の中身をバイト列にする */
 export function rowBytes(row: ChangeRow): Uint8Array {
@@ -281,6 +275,44 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
       if (done.kind === "failed") return { kind: "failed", message: done.message };
     }
     return { kind: "conflict", message: `書く間に ${family} が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新して取り下げ直す` };
+  } catch (err) {
+    return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
+  }
+}
+
+/**
+ * フェーズをレビュー済みにする（8.9。段階 4）。毎周、家族と MR のスレッド・レビューを読み直し、
+ * Python の `confirm` が通したときだけ、レビュー待ちの子の `done/` への移動と印（`actor` = PAT の持ち主、
+ * `via: chrome`）を 1 コミットで書く。未解決のスレッドや変更要求が残れば書かない。
+ */
+export async function confirmPhase(repo: RepoConfig, family: string, phase: number, deps: WriteDeps): Promise<Outcome> {
+  try {
+    const actor = await actorOf(deps, repo);
+    const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
+    for (let round = 1; round <= MAX_ROUNDS; round += 1) {
+      const read = await readOrMoved(repo, family, deps);
+      if (read === null) continue;
+      const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+      const res = await askConfirm(deps.py, ask, {
+        settings: read.settings,
+        snapshot: read.input,
+        family,
+        phase,
+        copy,
+        stamp: localStamp(deps.now()),
+        actor,
+      });
+      if (res.problems.length > 0 || !res.changes) {
+        return { kind: "refused", message: res.problems.join("\n") || "レビュー済みにするものが無い" };
+      }
+      const rows = rowsOf(res, family, read);
+      if (typeof rows === "string") return { kind: "refused", message: rows };
+      const message = commitMessage([family], `のフェーズ ${phase} のレビュー済みを置いた`, "レビュー済みを置いた", deps.version);
+      const done = await commitOnce(deps, repo, read, family, message, rows);
+      if (done.kind === "written") return await finish(deps, repo, done.oid, rows, round, res.lines);
+      if (done.kind === "failed") return { kind: "failed", message: done.message };
+    }
+    return { kind: "conflict", message: `書く間に ${family} が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新してレビュー済みにし直す` };
   } catch (err) {
     return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
   }

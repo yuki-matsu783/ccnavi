@@ -5,9 +5,13 @@
  * 段階 3 から、承認と取り下げのボタンを出す。出すかは Python の答え（`write.allowed`・
  * `withdrawable` の理由）で決まり、ここは答えのとおりに並べるだけ。押したときの動き（`Actions`）は
  * 呼び手が渡す。渡さなければボタンを出さない（読み取りだけ）。
- * レビュー済み・「始める」は段階 4・5。
+ * 段階 4 から、依頼済みのフェーズのレビューの欄（MR のスレッドと、通らない理由）と「レビュー済みにする」を出す。
+ * スレッドの本文は承認の画面と同じ規則で描く（Markdown は消毒した断片、隠れる書き方は通さない、HTML コメントは
+ * 見える印。5.5 の 2・段階 3 のレビューの決定 A）。「始める」は段階 5。
  */
 import type { Renderer } from "./sanitize.js";
+import type { ReviewPanel } from "./reviewed.js";
+import { ALLOWED_URI } from "./sanitize.js";
 import type { FamilyBoard, RepoBoard } from "./snapshot.js";
 import { repoKey } from "./settings.js";
 
@@ -22,6 +26,8 @@ function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, cls = 
 export interface Actions {
   approve(repo: RepoBoard, family: FamilyBoard): void;
   withdraw(repo: RepoBoard, family: FamilyBoard, ticket: string): void;
+  /** レビュー済みにする（段階 4）。渡さなければ「レビュー済みにする」を出さない */
+  review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
 }
 
 export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, actions?: Actions): HTMLElement {
@@ -53,7 +59,18 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（家族）は無い"));
   }
   for (const f of board.families) {
-    section.append(renderFamily(doc, md, f, actions && { approve: () => actions.approve(board, f), withdraw: (t) => actions.withdraw(board, f, t) }));
+    section.append(
+      renderFamily(
+        doc,
+        md,
+        f,
+        actions && {
+          approve: () => actions.approve(board, f),
+          withdraw: (t) => actions.withdraw(board, f, t),
+          review: actions.review ? (n: number) => actions.review?.(board, f, n) : undefined,
+        },
+      ),
+    );
   }
   const s = board.stats;
   section.append(el(doc, "p", "stats", `読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（控えから ${s.blobsCached} 件）`));
@@ -69,6 +86,7 @@ function notice(doc: Document, kind: "error" | "warn", text: string): HTMLElemen
 export interface FamilyActions {
   approve(): void;
   withdraw(ticket: string): void;
+  review?(phase: number): void;
 }
 
 function button(doc: Document, text: string, action: string, onClick: () => void): HTMLButtonElement {
@@ -166,6 +184,9 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
     }
     box.append(list);
   }
+  for (const panel of f.reviews ?? []) {
+    box.append(renderReview(doc, md, panel, write.allowed, actions));
+  }
   for (const rej of r.rejected ?? []) {
     const item = el(doc, "section", "rejected");
     item.dataset.ticket = rej.ticket;
@@ -179,6 +200,67 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
     const ul = el(doc, "ul", "problems");
     for (const p of r.problems ?? []) ul.append(el(doc, "li", "", p));
     box.append(ul);
+  }
+  return box;
+}
+
+/** リンクを http(s)・mailto の綴りのときだけ付ける。ほかは文字だけ（5.5 の 2） */
+function link(doc: Document, href: string, text: string): HTMLElement {
+  if (!ALLOWED_URI.test(href.trim())) return el(doc, "span", "", text);
+  const a = el(doc, "a", "", text);
+  a.setAttribute("href", href);
+  a.setAttribute("target", "_blank");
+  a.setAttribute("rel", "noopener noreferrer");
+  return a;
+}
+
+/** ccnavi が投稿した依頼（数えない。`review.MARKER_PREFIX`） */
+const CCNAVI_POST = "<!-- ccnavi:";
+
+/**
+ * 依頼済みのフェーズのレビューの欄（8.9）。スレッドは未解決を先に、本文は承認の画面と同じ消毒で描く。
+ * 「レビュー済みにする」は、Python が通さない理由を返さず、書ける家族で、読めたときだけ出す。
+ */
+export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, writable: boolean, actions?: FamilyActions): HTMLElement {
+  const box = el(doc, "section", "review");
+  box.dataset.phase = String(panel.phase);
+  const h = el(doc, "h4");
+  h.append(doc.createTextNode(`フェーズ ${panel.phase} のレビュー（`));
+  h.append(panel.copy ? link(doc, panel.copy.mr.url, `MR #${panel.copy.mr.number}`) : doc.createTextNode(`MR #${panel.mr}`));
+  h.append(doc.createTextNode(`）: ${panel.children.join(", ")}`));
+  box.append(h);
+  if (panel.error) {
+    box.append(notice(doc, "error", panel.error));
+    return box;
+  }
+  const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
+  const unresolved = threads.filter((t) => !t.resolved && !t.body.startsWith(CCNAVI_POST)).length;
+  box.append(el(doc, "p", "threads-count", `スレッド ${threads.length} 件（未解決 ${unresolved} 件）・レビュー ${panel.copy?.reviews.length ?? 0} 件`));
+  const list = el(doc, "ul", "threads");
+  for (const t of threads) {
+    const item = el(doc, "li", "thread");
+    item.dataset.resolved = String(t.resolved);
+    if (t.body.startsWith(CCNAVI_POST)) item.dataset.ccnavi = "true";
+    const head = el(doc, "p", "thread-head");
+    head.append(el(doc, "span", "badge", t.body.startsWith(CCNAVI_POST) ? "ccnavi の投稿" : t.resolved ? "解決済み" : "未解決"));
+    head.append(doc.createTextNode(" "));
+    head.append(link(doc, t.url, t.path ? `${t.path}:${t.line}` : "（行なし）"));
+    item.append(head);
+    const body = el(doc, "div", "markdown");
+    body.append(md.markdown(t.body));
+    item.append(body);
+    list.append(item);
+  }
+  box.append(list);
+  if (panel.problems.length > 0) {
+    const ul = el(doc, "ul", "problems");
+    for (const p of panel.problems) ul.append(el(doc, "li", "", p));
+    box.append(ul);
+  } else if (writable && actions?.review) {
+    const review = actions.review;
+    const bar = el(doc, "div", "actions");
+    bar.append(button(doc, `フェーズ ${panel.phase} をレビュー済みにする`, "review", () => review(panel.phase)));
+    box.append(bar);
   }
   return box;
 }

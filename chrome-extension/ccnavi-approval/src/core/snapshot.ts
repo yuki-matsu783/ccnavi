@@ -10,12 +10,15 @@
  * 4. 直近 N 日と利用者の指定のブランチ（表示用）の置き場を読み、家族を Python に見分けさせる
  * 5. 家族ごとに、参照の閉包（3.3 の 5）の足りないブランチを読み足し、Python に承認待ちを出させる。
  *    判定の入力は統合先・`P`・閉包の `P_X` だけ（D2）。表示用のブランチは入れない
+ * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、Python の
+ *    `confirm` に通るかを聞く（段階 4。書かない）
  *
  * blob は sha で引き、控え（IndexedDB）にあれば読まない（8.2）。判定はここでは出さない。
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
 import { BLOB_BATCH, LINK_MODE, type ApprovalCommit } from "./github.js";
 import { py, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot } from "./py.js";
+import { reviewPanels, type ReviewPanel } from "./reviewed.js";
 import type { RepoConfig } from "./settings.js";
 
 /** service worker へ頼む口。`owner`・`repo` はここで前に付ける */
@@ -46,6 +49,8 @@ export interface FamilyBoard {
   readonly family: Family;
   readonly result: BoardResult | null;
   readonly error: string;
+  /** レビュー済みの候補のフェーズと、通るか（段階 4） */
+  readonly reviews?: readonly ReviewPanel[];
 }
 
 export interface RepoBoard {
@@ -264,7 +269,14 @@ async function familyBoard(
     const input = await closureInput(family.name, reader, integration, settings, place, deps);
     const board = await py.board(deps.py, settings, input, family.name);
     const result = await withdrawableHere(board, reader, place, family.name);
-    return { family, result, error: "" };
+    const reviews = await reviewPanels(
+      board.reviewable ?? [],
+      deps.py,
+      (op, args) => reader.call(op, ...args),
+      { settings, snapshot: input, family: family.name },
+      deps.now(),
+    );
+    return { family, result, error: "", reviews };
   } catch (err) {
     return { family, result: null, error: (err as Error).message ?? String(err) };
   }

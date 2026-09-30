@@ -33,7 +33,7 @@
     <button type="button" id="token-clear">消す</button>
   </form>
   <p id="token-msg" role="status"></p>
-  <p class="note">承認と取り下げを親のブランチへ書きます（段階 3）。GitHub の fine-grained token でリポジトリを限り、Contents: Read and write・Metadata: Read-only・Pull requests: Read-only を選びます。期限は 90 日を選びます。エージェント用のトークンとは別にします。PAT はこのブラウザのプロファイルに平文で置かれます（ADR-0093 の 5.5）。期限はホストの応答から読みます。読めないときは上の欄の日付を使い、切れる 7 日前からボードとアイコンで知らせます。</p>
+  <p class="note">承認・取り下げ・レビュー済みを親のブランチへ書きます（段階 4）。レビュー済みは MR のスレッドとレビューを読みます（Pull requests: Read-only で足ります）。GitHub の fine-grained token でリポジトリを限り、Contents: Read and write・Metadata: Read-only・Pull requests: Read-only を選びます。期限は 90 日を選びます。エージェント用のトークンとは別にします。PAT はこのブラウザのプロファイルに平文で置かれます（ADR-0093 の 5.5）。期限はホストの応答から読みます。読めないときは上の欄の日付を使い、切れる 7 日前からボードとアイコンで知らせます。</p>
   <ul id="token-links"></ul>
 </section>
 <script type="module" src="options.js"></script>

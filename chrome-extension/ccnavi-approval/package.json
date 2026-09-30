@@ -1,8 +1,8 @@
 {
   "name": "ccnavi-approval",
   "displayName": "ccnavi 承認ボード",
-  "description": "リモートのブランチの承認待ちを、ブラウザと PAT だけで見せ、承認と取り下げを親のブランチへ書く Chrome 拡張（ADR-0093 段階 3）。判定は同梱の ccnavi を Pyodide で動かして出す",
-  "version": "0.2.0",
+  "description": "リモートのブランチの承認待ちを、ブラウザと PAT だけで見せ、承認・取り下げ・レビュー済みを親のブランチへ書く Chrome 拡張（ADR-0093 段階 4）。判定は同梱の ccnavi を Pyodide で動かして出す",
+  "version": "0.3.0",
   "private": true,
   "license": "MIT",
   "type": "module",
