@@ -1345,15 +1345,23 @@ def family_check(
 
     mine = [t for t in copies if ours(t)]
     index = approval.by_id(copies)
-    problems = _chrome_disagrees(
-        conf,
-        mine,
-        [
+    problems: list[Problem] = []
+    for t in mine:
+        # 写しごとに判定し直し、error がどの写しのものかを構造で持つ（文面の書式に頼らない）
+        found = [
             p
-            for p in _copy_problems(root, conf, mine, index, closed)
+            for p in _copy_problems(root, conf, [t], index, closed)
             if p.severity == SEVERITY_ERROR
-        ],
-    )
+        ]
+        written = _written_by_chrome(conf, t) if found else None
+        if written is not None:
+            found = [
+                replace(
+                    p, detail=f"Chrome {written} と手元 {version.VERSION} で判定が違う: {p.detail}"
+                )
+                for p in found
+            ]
+        problems.extend(found)
     # 親のワークツリーの中の読めない写しも止める理由（読めない写しは並びに入らないので、
     # 判定し直しの対象から黙って落ちる）。
     if st.home is not None:
@@ -1370,42 +1378,25 @@ def family_check(
     return problems
 
 
-def _chrome_disagrees(
-    conf: settings.Settings, mine: list[ticket_mod.Ticket], problems: list[Problem]
-) -> list[Problem]:
-    """Chrome が書いた写しに手元の判定し直しで error が出たら、版の違いとして名指しする（7.3）。
+def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | None:
+    """この写しを最後に書いたのが Chrome 拡張なら、その拡張の版（7.3）。そうでなければ None。
 
-    互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として止める
-    （家族の控えを `blocked` にするのは sh）。理由の頭に「Chrome <拡張の版> と手元 <版> で
-    判定が違う」を足す。どの写しを Chrome が書いたかは、その写しの跡の最後の承認・改版の行の
-    経路（`via: chrome`）と版（`version`）で見る。止めるかどうかは変えない。
+    跡の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
+    その後に手元の
+    操作（着手・マーカーなど）の跡があれば、違いが手元の操作から来ることもあるので名指ししない。
+    互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として版を名指しする
+    （止めるかどうかは変えない。家族の控えを `blocked` にするのは sh）。
     """
-    by_id = {t.ticket: t for t in mine}
-    written: dict[str, str] = {}
-    for ident, t in by_id.items():
-        events, _ = history.read(settings.approved_dir(conf, t.tree_root), ident)
-        last = next(
-            (
-                e
-                for e in reversed(events)
-                if e.get("kind") in (history.KIND_APPROVED, history.KIND_REVISED)
-            ),
-            None,
-        )
-        if last is not None and last.get("via") == history.VIA_CHROME:
-            written[ident] = str(last.get("version") or "?")
-    if not written:
-        return problems
-    out = []
-    for p in problems:
-        ident = p.detail.split(": ", 1)[0]
-        if ident in written:
-            p = replace(
-                p,
-                detail=f"Chrome {written[ident]} と手元 {version.VERSION} で判定が違う: {p.detail}",
-            )
-        out.append(p)
-    return out
+    events, _ = history.read(settings.approved_dir(conf, t.tree_root), t.ticket)
+    if not events:
+        return None
+    last = events[-1]
+    if last.get("via") != history.VIA_CHROME or last.get("kind") not in (
+        history.KIND_APPROVED,
+        history.KIND_REVISED,
+    ):
+        return None
+    return str(last.get("version") or "?")
 
 
 def _files_under(base: str) -> list[str]:
