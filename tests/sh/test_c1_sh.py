@@ -33,6 +33,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 from tests import ROOT, common_path
@@ -691,6 +692,22 @@ class C1TicketTest(C1Harness):
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("ロックが長い", result.stderr)
+        self.assertTrue(os.path.isdir(self.lock_dir()))
+
+    def test_a_long_lock_names_its_owner_and_how_to_stop_it(self):
+        os.makedirs(self.lock_dir())
+        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
+        system = subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
+        old = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout) - 3600
+        write(
+            os.path.join(self.lock_dir(), "owner"),
+            f"{host} {os.getpid()} {old} {os.getpid()}-{old} {system}\n",
+        )
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(old))
+        self.assertIn(f"持ち主は pid {os.getpid()}・ホスト {host}・開始 {at}", result.stderr)
+        self.assertIn("人が終了させてから打ち直す", result.stderr)
         self.assertTrue(os.path.isdir(self.lock_dir()))
 
     # ---- 基点のリンク
