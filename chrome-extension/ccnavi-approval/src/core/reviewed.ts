@@ -59,7 +59,10 @@ export interface ReviewPanel {
   readonly error: string;
 }
 
-/** 候補のフェーズごとに、写しを読んで Python に通るかを聞く（書かない） */
+/**
+ * 候補のフェーズごとに Python に通るかを聞く（書かない）。MR・スレッド・レビューの写しは家族（親のブランチ）に
+ * 1 つなので、GitHub の候補があれば 1 度だけ読んで全部のフェーズに使う。
+ */
 export async function reviewPanels(
   reviewable: readonly Reviewable[],
   call: PyCall,
@@ -68,14 +71,26 @@ export async function reviewPanels(
   now: Date,
 ): Promise<ReviewPanel[]> {
   const out: ReviewPanel[] = [];
+  let copy: ReviewCopy | null = null;
+  let copyError = "";
+  if (reviewable.some((r) => r.host === "github")) {
+    try {
+      copy = (await ask("reviewCopy", [base.family])) as ReviewCopy;
+    } catch (err) {
+      copyError = (err as Error).message ?? String(err);
+    }
+  }
   for (const r of reviewable) {
     const panel = { phase: r.phase, mr: r.mr, children: r.children };
     if (r.host !== "github") {
       out.push({ ...panel, copy: null, problems: [], error: `依頼したホストが ${r.host || "（記録なし）"}。Chrome のレビュー済みは GitHub だけ（GitLab は段階 5）` });
       continue;
     }
+    if (copy === null) {
+      out.push({ ...panel, copy: null, problems: [], error: copyError });
+      continue;
+    }
     try {
-      const copy = (await ask("reviewCopy", [base.family])) as ReviewCopy;
       const res = await askConfirm(call, ask, { ...base, phase: r.phase, copy, stamp: localStamp(now) });
       out.push({ ...panel, copy, problems: res.problems, error: "" });
     } catch (err) {

@@ -214,9 +214,6 @@ function link(doc: Document, href: string, text: string): HTMLElement {
   return a;
 }
 
-/** ccnavi が投稿した依頼（数えない。`review.MARKER_PREFIX`） */
-const CCNAVI_POST = "<!-- ccnavi:";
-
 /**
  * 依頼済みのフェーズのレビューの欄（8.9）。スレッドは未解決を先に、本文は承認の画面と同じ消毒で描く。
  * 「レビュー済みにする」は、Python が通さない理由を返さず、書ける家族で、読めたときだけ出す。
@@ -233,16 +230,16 @@ export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, wr
     box.append(notice(doc, "error", panel.error));
     return box;
   }
+  // GitHub では目印で始まるスレッドも人のものとして数える（ccnavi の依頼はスレッドにならない。11.8.1 の決定 C）
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
-  const unresolved = threads.filter((t) => !t.resolved && !t.body.startsWith(CCNAVI_POST)).length;
+  const unresolved = threads.filter((t) => !t.resolved).length;
   box.append(el(doc, "p", "threads-count", `スレッド ${threads.length} 件（未解決 ${unresolved} 件）・レビュー ${panel.copy?.reviews.length ?? 0} 件`));
   const list = el(doc, "ul", "threads");
   for (const t of threads) {
     const item = el(doc, "li", "thread");
     item.dataset.resolved = String(t.resolved);
-    if (t.body.startsWith(CCNAVI_POST)) item.dataset.ccnavi = "true";
     const head = el(doc, "p", "thread-head");
-    head.append(el(doc, "span", "badge", t.body.startsWith(CCNAVI_POST) ? "ccnavi の投稿" : t.resolved ? "解決済み" : "未解決"));
+    head.append(el(doc, "span", "badge", t.resolved ? "解決済み" : "未解決"));
     head.append(doc.createTextNode(" "));
     head.append(link(doc, t.url, t.path ? `${t.path}:${t.line}` : "（行なし）"));
     item.append(head);

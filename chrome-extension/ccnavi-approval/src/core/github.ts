@@ -657,7 +657,10 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
   const out: PullReview[] = [];
   for (let page = 1; ; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
-    const chunk = status === 404 || !Array.isArray(body) ? [] : (body as Record<string, unknown>[]);
+    // 404 や並びでない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
+    if (status === 404) throw new HostError(`MR #${number} のレビューを読めない（404）`, 404);
+    if (!Array.isArray(body)) throw new HostError(`MR #${number} のレビューの答えが並びでない`);
+    const chunk = body as Record<string, unknown>[];
     for (const r of chunk) {
       const user = (r.user ?? null) as { id?: unknown; login?: unknown } | null;
       out.push({
@@ -698,7 +701,9 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   const { status, body } = await rest(client, `${repoPath(owner, repo)}/compare/${b}...${h}`);
   const res = (body ?? {}) as { status?: unknown; files?: { filename?: unknown; previous_filename?: unknown }[] };
   if (status === 404 || (res.status !== "ahead" && res.status !== "identical")) return { base: b, head: h, files: null };
-  const list = Array.isArray(res.files) ? res.files : [];
+  // 一覧が無い・並びでない答えは「変わっていない」と読まない（動いたと数える）
+  if (!Array.isArray(res.files)) return { base: b, head: h, files: null };
+  const list = res.files;
   if (list.length >= COMPARE_FILES_LIMIT) return { base: b, head: h, files: null };
   const files: string[] = [];
   for (const f of list) {

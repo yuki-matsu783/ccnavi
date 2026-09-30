@@ -219,6 +219,11 @@ function commitArgs(args: unknown[]) {
   return { name, expected: github.checkOid(expected), headline: text(headline, "コミットの見出し", MAX_HEADLINE), body, adds, dels };
 }
 
+/** 設定画面で登録したリポジトリか（書く頼みと、レビュー済みの読み取りの受け口） */
+async function registered(deps: Deps, client: github.Client, o: string, r: string): Promise<boolean> {
+  return (await deps.getRepos()).some((x) => x.host === client.host.id && x.owner === o && x.repo === r);
+}
+
 /** 統合先の先頭の `.claude/settings.json` から置き場の綴りを読む */
 async function placesAt(client: github.Client, o: string, r: string, integ: string): Promise<Places> {
   const head = await github.branchHead(client, o, r, integ);
@@ -310,10 +315,12 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = await github.commitParents(client, o, r, github.checkOid(a));
       break;
     case "reviewCopy":
-      // レビュー済み（段階 4）: MR のスレッドとレビューの写し。読むだけ
+      // レビュー済み（段階 4）: MR のスレッドとレビューの写し。読むだけ。登録したリポジトリだけ
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
       value = await github.reviewCopy(client, o, r, github.checkBranch(a));
       break;
     case "compareFiles":
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
       value = await github.compareFiles(client, o, r, github.checkOid(a), github.checkOid(b));
       break;
     default:
