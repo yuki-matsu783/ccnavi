@@ -1549,6 +1549,23 @@ ADR に無かった判断:
   状態は食い違わない（2 度書かれることは無い）
 - `ccnavi_git_timed` の見張りの `sleep` が、見張りを止めた後も時間まで残る（前からの形。入出力は閉じてあり、何も握らない）
 
+レビューの後に決めたもの（2026-09-30。利用者）:
+
+- **(a) 実行ファイルを直に打つ**: C1 の対象の家族（`ccnavi c1 family` が `yes`）では、`ccnavi` を直に打って状態を変える
+  （`ticket start/finish/cancel`、`review requested/confirm/ready`、書く形の `--reviewed N --accept-unresolved`）ことはできない。
+  `--record-tree` の無い呼び出しを実行ファイルが断る（上の表の 3）。sh の入口（`ccnavi-ticket.sh`・`ccnavi-review.sh`）を通す。
+  締める向きで、手で打てなくなることは受け入れる。人の判断の入口（`--chat`・`--config-synced`・`--close-early`）、書かない形、
+  `record-risk` は前のまま
+- **(b) 依頼の二重投稿の残り（受け入れる危険）**: 依頼の目印の鍵（決定 D）は本文と親のブランチの先頭から作るので、1 回目と打ち直しの間に
+  P が動くと（取り込みで Chrome の承認が入る、別の操作が送る など）鍵が変わり、同じ依頼がもう 1 度 MR に投稿されうる。起きても
+  記録にはその回の投稿を使い、先の投稿はコメントとして残るだけ。鍵から先頭を外すと、子を足してやり直した依頼を
+  別に出せなくなるので、この形のまま受け入れる。見つけたら人が古いほうのコメントを消す
+- **(c) 長いロックの文面**: 持ち主が生きていて 10 分を超えて持たれているロック（`ccnavi_lock_long`）で落とすとき、C1 と運ぶ処理の文面に
+  持ち主の pid・ホスト・開始時刻（読める形。GNU の `date -d @N`、BSD の `date -r N`、どちらも落ちれば数のまま）と止め方
+  （「そのプロセスが固まっているなら、人が終了させてから打ち直す」）を足した（`ccnavi-common.sh` の `ccnavi_lock_describe`）。
+  文面だけで、奪う・待つの判断は変えていない（締める・緩めるの変化は無い）。回帰試験は `tests/sh/test_c1_sh.py` の
+  `test_a_long_lock_names_its_owner_and_how_to_stop_it`
+
 #### 11.6.2 段階 2d で触った守りの対象
 
 `.ccnavi/scripts/ccnavi-common.sh`（C1 の関数、ロックの `CCNAVI_LOCK_HELD` の戻し）、`ccnavi-ticket.sh`・`ccnavi-review.sh`
