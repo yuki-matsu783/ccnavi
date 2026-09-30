@@ -14,7 +14,7 @@ export interface Host {
   readonly kind: HostKind;
   /** REST の根。`https://api.github.com`、GHES なら `https://<ホスト>/api/v3` */
   readonly api: string;
-  /** GitHub の GraphQL。GitLab は段階 5 まで使わない */
+  /** GitHub の GraphQL。GitLab は使わない（REST だけ。段階 5） */
   readonly graphql: string;
   /** 人が開く画面の根。PAT の作成画面へのリンクに使う */
   readonly web: string;
@@ -94,7 +94,7 @@ export function manifest(hosts: readonly Host[], version: string): Record<string
   return {
     manifest_version: 3,
     name: "ccnavi 承認ボード",
-    description: "リモートのブランチの承認待ちを見せ、承認・取り下げ・レビュー済みを親のブランチへ書く（ADR-0093 段階 4）",
+    description: "リモートのブランチの承認待ちを見せ、承認・取り下げ・レビュー済みを親のブランチへ書き、issue から親のブランチを始める（ADR-0093 段階 5。GitHub と GitLab）",
     version,
     minimum_chrome_version: "116",
     permissions: ["storage", "alarms"],

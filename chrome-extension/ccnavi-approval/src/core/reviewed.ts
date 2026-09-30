@@ -8,7 +8,9 @@
  * - 依頼の後に親のブランチが動いていれば、Python が求める 2 つ（`need_compare`）の変更の一覧（`compareFiles`）
  *
  * ボードはこれで候補のフェーズごとに「通るか」と理由とスレッドを出し、書く流れ（`write.ts` の
- * `confirmPhase`）は押したときに同じ手順を読み直して 1 コミットにする。
+ * `confirmPhase`）は押したときに同じ手順を読み直して 1 コミットにする。段階 5 から GitLab の MR も読む
+ * （写しの形は同じ。GitLab のスレッドは最初のノートの書き手 `author` を持ち、Python が依頼の投稿者
+ * `poster` と比べて ccnavi の依頼のスレッドを除く。11.8.1 の決定 C）。
  */
 import type { Compare, ConfirmResult, PyCall, Reviewable, Snapshot, Actor } from "./py.js";
 import { py } from "./py.js";
@@ -50,6 +52,8 @@ export async function askConfirm(call: PyCall, ask: Ask, input: ConfirmInput): P
 export interface ReviewPanel {
   readonly phase: number;
   readonly mr: number;
+  /** 依頼を記録したホスト（`github`・`gitlab`） */
+  readonly host?: string;
   readonly children: readonly string[];
   /** 読んだ MR のスレッドとレビュー（読めなければ null） */
   readonly copy: ReviewCopy | null;
@@ -73,7 +77,7 @@ export async function reviewPanels(
   const out: ReviewPanel[] = [];
   let copy: ReviewCopy | null = null;
   let copyError = "";
-  if (reviewable.some((r) => r.host === "github")) {
+  if (reviewable.some((r) => r.host === "github" || r.host === "gitlab")) {
     try {
       copy = (await ask("reviewCopy", [base.family])) as ReviewCopy;
     } catch (err) {
@@ -81,13 +85,18 @@ export async function reviewPanels(
     }
   }
   for (const r of reviewable) {
-    const panel = { phase: r.phase, mr: r.mr, children: r.children };
-    if (r.host !== "github") {
-      out.push({ ...panel, copy: null, problems: [], error: `依頼したホストが ${r.host || "（記録なし）"}。Chrome のレビュー済みは GitHub だけ（GitLab は段階 5）` });
+    const panel = { phase: r.phase, mr: r.mr, host: r.host, children: r.children };
+    if (r.host !== "github" && r.host !== "gitlab") {
+      out.push({ ...panel, copy: null, problems: [], error: `依頼したホストが ${r.host || "（記録なし）"}。Chrome のレビュー済みは GitHub と GitLab だけ` });
       continue;
     }
     if (copy === null) {
       out.push({ ...panel, copy: null, problems: [], error: copyError });
+      continue;
+    }
+    if (copy.host !== r.host) {
+      // 依頼を記録したホストと、このリポジトリのホストが違う（別のホストの MR で依頼した）
+      out.push({ ...panel, copy: null, problems: [], error: `依頼したホスト（${r.host}）とこのリポジトリのホスト（${copy.host}）が違う。依頼し直す` });
       continue;
     }
     try {

@@ -12,6 +12,11 @@ export interface Placement {
   readonly integration_paths: readonly string[];
   readonly integration_files: readonly string[];
   readonly branch_paths: readonly string[];
+  /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの（段階 5） */
+  readonly workspace_paths: readonly string[];
+  readonly workspace_files: readonly string[];
+  /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層） */
+  readonly project_paths: readonly string[];
 }
 
 export interface Branch {
@@ -22,10 +27,27 @@ export interface Branch {
   readonly links?: readonly string[];
 }
 
+export interface Integration {
+  readonly name: string;
+  readonly source: "setting" | "default";
+  readonly head: string;
+}
+
+/** プロジェクトのリポジトリのワークスペースの統合先の中身（段階 5。共通層・自身の層・設定・互換の印） */
+export interface Workspace {
+  readonly integration: Integration;
+  readonly files: Record<string, string>;
+  readonly binary: readonly string[];
+  readonly links: readonly string[];
+}
+
 export interface Snapshot {
-  readonly integration: { readonly name: string; readonly source: "setting" | "default"; readonly head: string };
+  readonly integration: Integration;
   readonly branches: Record<string, Branch>;
   readonly absent: readonly string[];
+  /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い（段階 5） */
+  readonly project?: string;
+  readonly workspace?: Workspace;
 }
 
 export interface Family {
@@ -137,6 +159,13 @@ export interface Compare {
   readonly files: readonly string[] | null;
 }
 
+/** 「始める」の答え（8.6。段階 5）。`problems` が空なら `identifier` の名前でブランチを作れる */
+export interface StartResult {
+  readonly identifier: string;
+  readonly integration: string;
+  readonly problems: readonly string[];
+}
+
 export interface Actor {
   readonly account: string;
   readonly version: string;
@@ -175,6 +204,8 @@ export const py = {
     call: PyCall,
     body: { settings: string | null; snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
+  start: (call: PyCall, body: { settings: string | null; snapshot: Snapshot; issue: number; taken: readonly string[] }) =>
+    ask<StartResult>(call, "start", { ...body }, ""),
   confirm: (
     call: PyCall,
     body: {

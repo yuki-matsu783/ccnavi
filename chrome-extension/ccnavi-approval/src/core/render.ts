@@ -7,12 +7,15 @@
  * 呼び手が渡す。渡さなければボタンを出さない（読み取りだけ）。
  * 段階 4 から、依頼済みのフェーズのレビューの欄（MR のスレッドと、通らない理由）と「レビュー済みにする」を出す。
  * スレッドの本文は承認の画面と同じ規則で描く（Markdown は消毒した断片、隠れる書き方は通さない、HTML コメントは
- * 見える印。5.5 の 2・段階 3 のレビューの決定 A）。「始める」は段階 5。
+ * 見える印。5.5 の 2・段階 3 のレビューの決定 A）。
+ * 段階 5 から GitLab の MR（`!番号`）とプロジェクトのリポジトリ、「始める」（issue の一覧と、押すと親のブランチを
+ * 作るボタン。8.6）、打ち消しが収まらなかった家族の「要確認」（8.4）を出す。issue の題も素の文字列（textContent）。
  */
 import type { Renderer } from "./sanitize.js";
 import type { ReviewPanel } from "./reviewed.js";
 import { ALLOWED_URI } from "./sanitize.js";
 import type { FamilyBoard, RepoBoard } from "./snapshot.js";
+import type { Issue } from "./github.js";
 import { repoKey } from "./settings.js";
 
 function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
@@ -28,13 +31,31 @@ export interface Actions {
   withdraw(repo: RepoBoard, family: FamilyBoard, ticket: string): void;
   /** レビュー済みにする（段階 4）。渡さなければ「レビュー済みにする」を出さない */
   review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
+  /** issue の一覧を読む（段階 5。「始める」）。渡さなければ「始める」の欄を出さない */
+  loadIssues?(repo: RepoBoard): void;
+  /** issue から親のブランチを作る（段階 5。8.6） */
+  start?(repo: RepoBoard, issue: Issue): void;
+  /** 「要確認」を外す（人が確かめた。8.4） */
+  dismiss?(repo: RepoBoard, family: string): void;
 }
 
-export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, actions?: Actions): HTMLElement {
+/** ボードの外から足すもの（段階 5）。家族ごとの「要確認」と、読んだ issue の一覧 */
+export interface Extras {
+  /** 家族の名前 → 打ち消しが収まらなかったときの文面 */
+  readonly attention?: Readonly<Record<string, string>>;
+  readonly issues?: { readonly list: readonly Issue[] | null; readonly error: string };
+}
+
+export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, actions?: Actions, extras: Extras = {}): HTMLElement {
   const section = el(doc, "section", "repo");
   section.dataset.repo = repoKey(board.repo);
   const head = el(doc, "header", "repo-head");
   head.append(el(doc, "h2", "", `${board.repo.owner}/${board.repo.repo}`));
+  if (board.repo.project) {
+    const line = el(doc, "p", "project", `プロジェクト ${board.repo.project}（ワークスペース ${board.repo.workspace}。手元では projects/${board.repo.project}）`);
+    line.dataset.testid = "project";
+    head.append(line);
+  }
   if (board.integration) {
     const source = board.integration.source === "setting" ? "設定" : "ホストのデフォルトブランチ";
     const line = el(doc, "p", "integration", `統合先: ${board.integration.name}（${source}） ${board.integration.head.slice(0, 7)}`);
@@ -59,22 +80,69 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（家族）は無い"));
   }
   for (const f of board.families) {
-    section.append(
-      renderFamily(
-        doc,
-        md,
-        f,
-        actions && {
-          approve: () => actions.approve(board, f),
-          withdraw: (t) => actions.withdraw(board, f, t),
-          review: actions.review ? (n: number) => actions.review?.(board, f, n) : undefined,
-        },
-      ),
+    const box = renderFamily(
+      doc,
+      md,
+      f,
+      actions && {
+        approve: () => actions.approve(board, f),
+        withdraw: (t) => actions.withdraw(board, f, t),
+        review: actions.review ? (n: number) => actions.review?.(board, f, n) : undefined,
+      },
     );
+    const why = extras.attention?.[f.family.name];
+    if (why) box.insertBefore(attention(doc, why, actions?.dismiss ? () => actions.dismiss?.(board, f.family.name) : undefined), box.children[1] ?? null);
+    section.append(box);
   }
+  // 家族として見えていない（ブランチが見えなくなった）家族の「要確認」も出す
+  for (const [name, why] of Object.entries(extras.attention ?? {})) {
+    if (board.families.some((f) => f.family.name === name)) continue;
+    const box = el(doc, "article", "family");
+    box.dataset.family = name;
+    box.append(el(doc, "h3", "", name));
+    box.append(attention(doc, why, actions?.dismiss ? () => actions.dismiss?.(board, name) : undefined));
+    section.append(box);
+  }
+  if (actions?.loadIssues && actions.start) section.append(renderStart(doc, board, actions, extras.issues));
   const s = board.stats;
   section.append(el(doc, "p", "stats", `読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（控えから ${s.blobsCached} 件）`));
   return section;
+}
+
+/** 打ち消しが収まらなかった家族（8.4）。人がホストの履歴を確かめたら外す */
+function attention(doc: Document, text: string, onDismiss?: () => void): HTMLElement {
+  const box = el(doc, "div", "attention");
+  box.dataset.testid = "attention";
+  box.append(notice(doc, "error", `要確認: ${text}`));
+  if (onDismiss) box.append(button(doc, "確かめた（要確認を外す）", "dismiss", onDismiss));
+  return box;
+}
+
+/** 「始める」（8.6）の欄。issue は押されてから読む（ボードを開くたびには読まない） */
+function renderStart(doc: Document, board: RepoBoard, actions: Actions, issues?: Extras["issues"]): HTMLElement {
+  const box = el(doc, "section", "start");
+  box.dataset.testid = "start";
+  box.append(el(doc, "h3", "", "issue から始める（親のブランチを統合先の先頭から作る。PR/MR は最初の push の後に作られる）"));
+  if (!issues) {
+    box.append(button(doc, "issue を読む", "issues", () => actions.loadIssues?.(board)));
+    return box;
+  }
+  if (issues.error) {
+    box.append(notice(doc, "error", issues.error));
+    return box;
+  }
+  const list = issues.list ?? [];
+  if (list.length === 0) box.append(el(doc, "p", "empty", "開いた issue は無い"));
+  const ul = el(doc, "ul", "issues");
+  for (const issue of list) {
+    const li = el(doc, "li", "issue");
+    li.dataset.issue = String(issue.number);
+    li.append(link(doc, issue.url, `#${issue.number}`), doc.createTextNode(` ${issue.title} `));
+    li.append(button(doc, "始める", "start", () => actions.start?.(board, issue)));
+    ul.append(li);
+  }
+  box.append(ul);
+  return box;
 }
 
 function notice(doc: Document, kind: "error" | "warn", text: string): HTMLElement {
@@ -223,14 +291,17 @@ export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, wr
   box.dataset.phase = String(panel.phase);
   const h = el(doc, "h4");
   h.append(doc.createTextNode(`フェーズ ${panel.phase} のレビュー（`));
-  h.append(panel.copy ? link(doc, panel.copy.mr.url, `MR #${panel.copy.mr.number}`) : doc.createTextNode(`MR #${panel.mr}`));
+  // GitLab の MR は `!番号`、GitHub の PR は `#番号`
+  const mark = (panel.copy?.host ?? panel.host) === "gitlab" ? "!" : "#";
+  h.append(panel.copy ? link(doc, panel.copy.mr.url, `MR ${mark}${panel.copy.mr.number}`) : doc.createTextNode(`MR ${mark}${panel.mr}`));
   h.append(doc.createTextNode(`）: ${panel.children.join(", ")}`));
   box.append(h);
   if (panel.error) {
     box.append(notice(doc, "error", panel.error));
     return box;
   }
-  // GitHub では目印で始まるスレッドも人のものとして数える（ccnavi の依頼はスレッドにならない。11.8.1 の決定 C）
+  // 並べるのは写しのとおり。GitHub では目印で始まるスレッドも人のものとして数え、GitLab で依頼を投稿したアカウントの
+  // ccnavi の依頼のスレッドを数えないのは Python（11.8.1 の決定 C）。ここは未解決の件数を写しのとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;
   box.append(el(doc, "p", "threads-count", `スレッド ${threads.length} 件（未解決 ${unresolved} 件）・レビュー ${panel.copy?.reviews.length ?? 0} 件`));

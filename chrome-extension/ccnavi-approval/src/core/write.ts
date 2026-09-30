@@ -15,11 +15,17 @@
  * 取り下げも同じ流れで書く。見せた指紋は無いが、毎周 Python が条件（8.8）を見直す。
  * レビュー済み（段階 4。8.9）も同じ流れで、毎周 MR のスレッドとレビューを読み直して Python の `confirm`
  * （手元の `ccnavi review confirm` と同じコア）に通るかを決めさせる。
+ *
+ * 段階 5 から GitLab にも書く。GitLab の Commits API には比較つきの書き込みが無い（8.4）ので、1 段目は事後確認と
+ * 打ち消しだけ（D21）: 書いた答えのコミットの親が読んだ先頭と違えば（間に別の書き込みが入った）、自分の書き込みの
+ * 直前の姿で判定し直す。同じ書くものになれば、そのまま残す。違えば（結論が変わった）打ち消しのコミットを積み、
+ * 新しい先頭から読み直して周を回す。打ち消しもさらに競合して 2 回で収まらなければ、止めて人に回す（`attention`）。
+ * `seq`（2 段目）は書かない。この段では、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に残りうる（8.4）。
  */
 import { py, PyError, type Actor, type ChangeRow, type PlanResult, type Written } from "./py.js";
 import type { RepoConfig } from "./settings.js";
 import { findPrior, MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
-import type { FileAddition, PathObject, ReviewCopy } from "./github.js";
+import type { BlobText, FileAddition, PathObject, ReviewCopy } from "./github.js";
 import { askConfirm } from "./reviewed.js";
 import { underPlaces } from "./guard.js";
 import { localStamp } from "./stamp.js";
@@ -57,7 +63,9 @@ export type Outcome =
   | { readonly kind: "changed"; readonly message: string }
   | { readonly kind: "refused"; readonly message: string }
   | { readonly kind: "conflict"; readonly message: string }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly message: string }
+  /** 打ち消しが収まらなかった（GitLab の連鎖競合）。ボードは家族を「要確認」で出す（8.4） */
+  | { readonly kind: "attention"; readonly message: string };
 
 export interface Shown {
   readonly ids: readonly string[];
@@ -83,13 +91,18 @@ function base64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
+/** 書くもの 1 つ（足す）。`op` は GitLab の Commits API の action（作るか書き換えるか）。GitHub は使わない */
+export interface Addition extends FileAddition {
+  readonly op: "create" | "update";
+}
+
 /** Changes の 1 ブランチぶんを、1 コミットの足す・消すに分ける（8.4） */
-export function fileChanges(rows: readonly ChangeRow[]): { additions: FileAddition[]; deletions: string[] } {
-  const additions: FileAddition[] = [];
+export function fileChanges(rows: readonly ChangeRow[]): { additions: Addition[]; deletions: string[] } {
+  const additions: Addition[] = [];
   const deletions: string[] = [];
   for (const row of rows) {
     if (row.op === "delete") deletions.push(row.path);
-    else additions.push({ path: row.path, contents: base64(rowBytes(row)) });
+    else additions.push({ op: row.op, path: row.path, contents: base64(rowBytes(row)) });
   }
   return { additions, deletions };
 }
@@ -143,12 +156,24 @@ function why(res: PlanResult): string {
   return lines.join("\n") || "承認するものが無い";
 }
 
-type Attempt = { kind: "written"; oid: string } | { kind: "moved" } | { kind: "failed"; message: string };
+/** service worker の `commit` の答え。`parent` はホストが実際に積んだ先 */
+interface Committed {
+  readonly oid: string;
+  readonly parent: string;
+}
+
+type Attempt = { kind: "written"; oid: string; parent: string } | { kind: "moved" } | { kind: "failed"; message: string };
+
+/** 1 コミットを送る。答えは書いたコミットと、その親 */
+async function send(deps: WriteDeps, repo: RepoConfig, family: string, expected: string, message: { headline: string; body: string }, rows: readonly ChangeRow[]): Promise<Committed> {
+  const { additions, deletions } = fileChanges(rows);
+  return (await deps.call("commit", [repo.owner, repo.repo, family, expected, message.headline, message.body, additions, deletions])) as Committed;
+}
 
 /**
  * 1 コミットで書く。service worker が形や守りで断ったら（400）、原因を言って失敗にする。
- * ほかの失敗では先頭を読み直し、動いていれば「動いた」（やり直す）。ただし新しい先頭の親が読んだ先頭で、
- * 中身が自分の書いたとおりなら（応答だけが落ちた）、書けたとする。
+ * ほかの失敗では先頭を読み直し、動いていれば「動いた」（やり直す）。ただし新しい先頭の中身が自分の書いたとおりで、
+ * 親が 1 つなら（応答だけが落ちた）、書けたとする（親はその親。GitLab では読んだ先頭と違いうる）。
  */
 async function commitOnce(
   deps: WriteDeps,
@@ -158,19 +183,9 @@ async function commitOnce(
   message: { headline: string; body: string },
   rows: readonly ChangeRow[],
 ): Promise<Attempt> {
-  const { additions, deletions } = fileChanges(rows);
   try {
-    const oid = (await deps.call("commit", [
-      repo.owner,
-      repo.repo,
-      family,
-      read.head,
-      message.headline,
-      message.body,
-      additions,
-      deletions,
-    ])) as string;
-    return { kind: "written", oid };
+    const done = await send(deps, repo, family, read.head, message, rows);
+    return { kind: "written", oid: done.oid, parent: done.parent };
   } catch (err) {
     const text = (err as Error).message ?? String(err);
     if ((err as { status?: number }).status === REFUSED) return { kind: "failed", message: text };
@@ -178,8 +193,8 @@ async function commitOnce(
     if (now === null) return { kind: "failed", message: `親のブランチ ${family} がホストから消えた（${text}）` };
     if (now === read.head) return { kind: "failed", message: text };
     const parents = (await deps.call("commitParents", [repo.owner, repo.repo, now])) as string[];
-    if (parents.length === 1 && parents[0] === read.head && (await verifySettled(deps, repo, now, rows)).length === 0) {
-      return { kind: "written", oid: now };
+    if (parents.length === 1 && (await verifySettled(deps, repo, now, rows)).length === 0) {
+      return { kind: "written", oid: now, parent: parents[0] };
     }
     return { kind: "moved" };
   }
@@ -205,36 +220,154 @@ export function rowsOf(res: Written, family: string, read: Pick<FamilyRead, "pla
   return rows;
 }
 
-/** 家族 1 つの承認待ちを承認する（8.3） */
-export async function approveFamily(repo: RepoConfig, family: string, shown: Shown, deps: WriteDeps): Promise<Outcome> {
+/** 読んだ家族から、書くもの（1 コミット）か、書かずに終える答え */
+type Planned =
+  | { readonly kind: "rows"; readonly rows: readonly ChangeRow[]; readonly message: { headline: string; body: string }; readonly lines: readonly string[] }
+  | { readonly kind: "stop"; readonly outcome: Outcome };
+
+type Plan = (read: FamilyRead) => Promise<Planned>;
+
+/** 同じ書くものか（パス・作るか書き換えるか消すか・中身のバイト列）。並びは問わない */
+async function sameRows(a: readonly ChangeRow[], b: readonly ChangeRow[]): Promise<boolean> {
+  if (a.length !== b.length) return false;
+  const key = async (r: ChangeRow) => `${r.path}\0${r.op}\0${r.op === "delete" ? "" : await blobSha(rowBytes(r))}`;
+  const x = (await Promise.all(a.map(key))).sort();
+  const y = (await Promise.all(b.map(key))).sort();
+  return x.every((k, i) => k === y[i]);
+}
+
+/** 自分の書き込みを打ち消す書くもの: 書いた各パスを、自分の書き込みの直前（`parent`）の中身に戻す */
+async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows: readonly ChangeRow[]): Promise<ChangeRow[] | string> {
+  const out: ChangeRow[] = [];
+  for (let i = 0; i < rows.length; i += 20) {
+    const part = rows.slice(i, i + 20);
+    const objs = (await deps.call("pathObjects", [repo.owner, repo.repo, parent, part.map((r) => r.path)])) as Record<string, PathObject | null>;
+    const shas = part.map((r) => objs[r.path]).filter((o): o is PathObject => !!o && o.type === "blob").map((o) => o.oid);
+    const texts = shas.length > 0 ? ((await deps.call("blobs", [repo.owner, repo.repo, [...new Set(shas)]])) as Record<string, BlobText>) : {};
+    for (const row of part) {
+      const obj = objs[row.path];
+      if (!obj) {
+        // 直前には無かった。自分が作ったものを消す（自分も消していたなら戻すものは無い）
+        if (row.op !== "delete") out.push({ op: "delete", path: row.path });
+        continue;
+      }
+      const blob = obj.type === "blob" ? texts[obj.oid] : undefined;
+      if (!blob || blob.binary || typeof blob.text !== "string") return `${row.path} の直前の中身を読めない`;
+      out.push({ op: row.op === "delete" ? "create" : "update", path: row.path, content: blob.text });
+    }
+  }
+  return out;
+}
+
+/** 打ち消しを積む回数の上限（8.4 の「2 回で収まらなければ人に回す」） */
+export const REVERT_TRIES = 2;
+
+/**
+ * 自分の書き込み（`done`）を打ち消す。今の先頭で、書いた各パスがまだ自分の書いたとおりのときだけ積む
+ * （後から別の書き手が同じファイルを変えていれば、打ち消すとその変更を消すので人に回す）。
+ * 打ち消しがさらに競合したら、間に入った書き込みが同じパスを変えていなければ打ち消しは効いている。
+ */
+async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: Committed, rows: readonly ChangeRow[]): Promise<{ kind: "reverted" } | { kind: "stop"; outcome: Outcome }> {
+  const human = (why: string): { kind: "stop"; outcome: Outcome } => ({
+    kind: "stop",
+    outcome: {
+      kind: "attention",
+      message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、判定が変わったが打ち消せなかった（${why}）。ホストの履歴を人が確かめる（ADR-0093 の 8.4）`,
+    },
+  });
+  const undo = await undoRows(deps, repo, done.parent, rows);
+  if (typeof undo === "string") return human(undo);
+  if (undo.length === 0) return { kind: "reverted" };
+  const message = commitMessage([family], "への書き込みを打ち消す", "打ち消した", deps.version);
+  for (let attempt = 1; attempt <= REVERT_TRIES; attempt += 1) {
+    const cur = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
+    if (cur === null) return human(`親のブランチ ${family} がホストから消えた`);
+    const touched = await verifyWritten(deps, repo, cur, rows);
+    if (touched.length > 0) return human(`後から別の書き込みが同じファイルを変えた: ${touched.join(", ")}`);
+    let res: Committed;
+    try {
+      res = await send(deps, repo, family, cur, { headline: message.headline, body: `打ち消すコミット: ${done.oid}\n` }, undo);
+    } catch (err) {
+      if ((err as { status?: number }).status === REFUSED) return human((err as Error).message ?? String(err));
+      continue;
+    }
+    if (res.parent === cur) return { kind: "reverted" };
+    // 打ち消しの間にも別の書き込みが入った。それが同じパスを変えていなければ打ち消しは効いている
+    if ((await verifyWritten(deps, repo, res.parent, rows)).length === 0) return { kind: "reverted" };
+    return human("打ち消しの間にも別の書き込みが同じファイルを変えた");
+  }
+  return human(`打ち消しが ${REVERT_TRIES} 回とも書けなかった`);
+}
+
+/**
+ * 事後確認（8.4 の 1 段目）。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の姿で
+ * 判定し直す。同じ書くものなら残す（`kept`）。違えば打ち消す（`reverted` で周を回す）。
+ */
+async function settleRace(
+  deps: WriteDeps,
+  repo: RepoConfig,
+  family: string,
+  done: Committed,
+  planned: Extract<Planned, { kind: "rows" }>,
+  plan: Plan,
+): Promise<{ kind: "kept" } | { kind: "reverted" } | { kind: "stop"; outcome: Outcome }> {
+  let again: Planned | null = null;
   try {
-    const actor = await actorOf(deps, repo);
+    again = await plan(await readFamily(repo, family, deps, done.parent));
+  } catch (err) {
+    if (!(err instanceof MovedError) && !(err instanceof PyError)) throw err;
+    again = null;
+  }
+  if (again !== null && again.kind === "rows" && (await sameRows(again.rows, planned.rows))) return { kind: "kept" };
+  return await revert(deps, repo, family, done, planned.rows);
+}
+
+/** 書く流れの周（8.3 の 2〜5 と、GitLab の事後確認 8.4）。周ごとに家族を読み直して書くものを決め直す */
+async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what: string, plan: Plan): Promise<Outcome> {
+  try {
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
       const read = await readOrMoved(repo, family, deps);
       if (read === null) continue;
-      const res = await py.plan(deps.py, {
-        settings: read.settings,
-        snapshot: read.input,
-        family,
-        only: shown.only,
-        shown: { ids: shown.ids, digest: shown.digest },
-        stamp: localStamp(deps.now()),
-        actor,
-      });
-      if (res.mismatch) {
-        return { kind: "changed", message: "見せた後に承認待ちの中身が変わった。見直してから承認し直す" };
-      }
-      if (!res.changes) return { kind: "refused", message: why(res) };
-      const rows = rowsOf(res, family, read);
-      if (typeof rows === "string") return { kind: "refused", message: rows };
-      const done = await commitOnce(deps, repo, read, family, commitMessage(res.identifiers, "を承認", "承認した", deps.version), rows);
-      if (done.kind === "written") return await finish(deps, repo, done.oid, rows, round, res.lines);
+      const planned = await plan(read);
+      if (planned.kind === "stop") return planned.outcome;
+      const done = await commitOnce(deps, repo, read, family, planned.message, planned.rows);
       if (done.kind === "failed") return { kind: "failed", message: done.message };
+      if (done.kind === "moved") continue;
+      if (done.parent === read.head) return await finish(deps, repo, done.oid, planned.rows, round, planned.lines);
+      const settled = await settleRace(deps, repo, family, done, planned, plan);
+      if (settled.kind === "kept") return await finish(deps, repo, done.oid, planned.rows, round, planned.lines);
+      if (settled.kind === "stop") return settled.outcome;
     }
-    return { kind: "conflict", message: `書く間に ${family} が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新して承認し直す` };
+    return { kind: "conflict", message: `書く間に ${family} が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新して${what}` };
   } catch (err) {
     return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
   }
+}
+
+/** 家族 1 つの承認待ちを承認する（8.3） */
+export async function approveFamily(repo: RepoConfig, family: string, shown: Shown, deps: WriteDeps): Promise<Outcome> {
+  let actor: Actor;
+  try {
+    actor = await actorOf(deps, repo);
+  } catch (err) {
+    return { kind: "failed", message: (err as Error).message ?? String(err) };
+  }
+  return await writeLoop(repo, family, deps, "承認し直す", async (read) => {
+    const res = await py.plan(deps.py, {
+      settings: read.settings,
+      snapshot: read.input,
+      family,
+      only: shown.only,
+      shown: { ids: shown.ids, digest: shown.digest },
+      stamp: localStamp(deps.now()),
+      actor,
+    });
+    if (res.mismatch) return { kind: "stop", outcome: { kind: "changed", message: "見せた後に承認待ちの中身が変わった。見直してから承認し直す" } };
+    if (!res.changes) return { kind: "stop", outcome: { kind: "refused", message: why(res) } };
+    const rows = rowsOf(res, family, read);
+    if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
+    return { kind: "rows", rows, message: commitMessage(res.identifiers, "を承認", "承認した", deps.version), lines: res.lines };
+  });
 }
 
 /** 家族を読み直す。読んでいる間に先頭が動いたら null（周を回す） */
@@ -249,35 +382,31 @@ async function readOrMoved(repo: RepoConfig, family: string, deps: WriteDeps): P
 
 /** 承認を取り下げる（8.8）。着手前の新規の承認だけ。元の提案は承認コミットの親から戻す */
 export async function withdrawTicket(repo: RepoConfig, family: string, ident: string, reason: string, deps: WriteDeps): Promise<Outcome> {
+  let actor: Actor;
   try {
-    const actor = await actorOf(deps, repo);
-    for (let round = 1; round <= MAX_ROUNDS; round += 1) {
-      const read = await readOrMoved(repo, family, deps);
-      if (read === null) continue;
-      const prior = await findPrior((op, args) => deps.call(op, [repo.owner, repo.repo, ...args]), read.place, read.head, ident);
-      const res = await py.withdraw(deps.py, {
-        settings: read.settings,
-        snapshot: read.input,
-        family,
-        ids: [ident],
-        prior: prior === null ? {} : { [ident]: prior },
-        reason,
-        stamp: localStamp(deps.now()),
-        actor,
-      });
-      if (res.problems.length > 0 || !res.changes) {
-        return { kind: "refused", message: res.problems.join("\n") || "取り下げるものが無い" };
-      }
-      const rows = rowsOf(res, family, read);
-      if (typeof rows === "string") return { kind: "refused", message: rows };
-      const done = await commitOnce(deps, repo, read, family, commitMessage([ident], "の承認を取り下げ", "取り下げた", deps.version), rows);
-      if (done.kind === "written") return await finish(deps, repo, done.oid, rows, round, res.lines);
-      if (done.kind === "failed") return { kind: "failed", message: done.message };
-    }
-    return { kind: "conflict", message: `書く間に ${family} が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新して取り下げ直す` };
+    actor = await actorOf(deps, repo);
   } catch (err) {
-    return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
+    return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
+  return await writeLoop(repo, family, deps, "取り下げ直す", async (read) => {
+    const prior = await findPrior((op, args) => deps.call(op, [repo.owner, repo.repo, ...args]), read.place, read.head, ident);
+    const res = await py.withdraw(deps.py, {
+      settings: read.settings,
+      snapshot: read.input,
+      family,
+      ids: [ident],
+      prior: prior === null ? {} : { [ident]: prior },
+      reason,
+      stamp: localStamp(deps.now()),
+      actor,
+    });
+    if (res.problems.length > 0 || !res.changes) {
+      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || "取り下げるものが無い" } };
+    }
+    const rows = rowsOf(res, family, read);
+    if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
+    return { kind: "rows", rows, message: commitMessage([ident], "の承認を取り下げ", "取り下げた", deps.version), lines: res.lines };
+  });
 }
 
 /**
@@ -286,34 +415,30 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
  * `via: chrome`）を 1 コミットで書く。未解決のスレッドや変更要求が残れば書かない。
  */
 export async function confirmPhase(repo: RepoConfig, family: string, phase: number, deps: WriteDeps): Promise<Outcome> {
+  let actor: Actor;
   try {
-    const actor = await actorOf(deps, repo);
-    const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
-    for (let round = 1; round <= MAX_ROUNDS; round += 1) {
-      const read = await readOrMoved(repo, family, deps);
-      if (read === null) continue;
-      const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
-      const res = await askConfirm(deps.py, ask, {
-        settings: read.settings,
-        snapshot: read.input,
-        family,
-        phase,
-        copy,
-        stamp: localStamp(deps.now()),
-        actor,
-      });
-      if (res.problems.length > 0 || !res.changes) {
-        return { kind: "refused", message: res.problems.join("\n") || "レビュー済みにするものが無い" };
-      }
-      const rows = rowsOf(res, family, read);
-      if (typeof rows === "string") return { kind: "refused", message: rows };
-      const message = commitMessage([family], `のフェーズ ${phase} のレビュー済みを置いた`, "レビュー済みを置いた", deps.version);
-      const done = await commitOnce(deps, repo, read, family, message, rows);
-      if (done.kind === "written") return await finish(deps, repo, done.oid, rows, round, res.lines);
-      if (done.kind === "failed") return { kind: "failed", message: done.message };
-    }
-    return { kind: "conflict", message: `書く間に ${family} が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新してレビュー済みにし直す` };
+    actor = await actorOf(deps, repo);
   } catch (err) {
-    return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
+    return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
+  const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
+  return await writeLoop(repo, family, deps, "レビュー済みにし直す", async (read) => {
+    const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+    const res = await askConfirm(deps.py, ask, {
+      settings: read.settings,
+      snapshot: read.input,
+      family,
+      phase,
+      copy,
+      stamp: localStamp(deps.now()),
+      actor,
+    });
+    if (res.problems.length > 0 || !res.changes) {
+      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || "レビュー済みにするものが無い" } };
+    }
+    const rows = rowsOf(res, family, read);
+    if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
+    const message = commitMessage([family], `のフェーズ ${phase} のレビュー済みを置いた`, "レビュー済みを置いた", deps.version);
+    return { kind: "rows", rows, message, lines: res.lines };
+  });
 }

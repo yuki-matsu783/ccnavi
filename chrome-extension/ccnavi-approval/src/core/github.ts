@@ -571,6 +571,8 @@ export interface ReviewThread {
   readonly line: number;
   readonly body: string;
   readonly created_at: string;
+  /** 最初のコメントを書いたアカウント（GitLab の写しだけ。ccnavi の依頼のスレッドを見分ける。11.8.1 の決定 C） */
+  readonly author?: string;
 }
 
 /** レビュー 1 つ（`ccnavi-review.sh` の `reviews` と同じ形） */
@@ -583,7 +585,7 @@ export interface PullReview {
 
 /** ホストの写し（`ccnavi-review.sh fetch` と同じ形。Python の `review.Result` が読む） */
 export interface ReviewCopy {
-  readonly host: "github";
+  readonly host: "github" | "gitlab";
   readonly mr: { readonly number: number; readonly url: string };
   readonly threads: readonly ReviewThread[];
   readonly reviews: readonly PullReview[];
@@ -711,4 +713,41 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
     if (typeof f.previous_filename === "string") files.push(f.previous_filename);
   }
   return { base: b, head: h, files };
+}
+
+// ---- 段階 5: 「始める」（8.6）。issue の一覧と、親のブランチを作る -------------------------------
+
+export interface Issue {
+  readonly number: number;
+  readonly title: string;
+  readonly url: string;
+}
+
+/** 開いた issue（新しい順に 50 件。PR は除く）。「始める」の一覧 */
+export async function issues(client: Client, owner: string, repo: string): Promise<Issue[]> {
+  const { status, body } = await rest(client, `${repoPath(owner, repo)}/issues?state=open&sort=created&direction=desc&per_page=50`);
+  if (status === 404 || !Array.isArray(body)) throw new HostError(`リポジトリ ${owner}/${repo} の issue を読めない`, status);
+  const out: Issue[] = [];
+  for (const i of body as { number?: unknown; title?: unknown; html_url?: unknown; pull_request?: unknown }[]) {
+    if (i.pull_request !== undefined && i.pull_request !== null) continue;
+    if (typeof i.number !== "number" || !Number.isInteger(i.number) || i.number <= 0) continue;
+    out.push({ number: i.number, title: String(alt(i.title, "")), url: String(alt(i.html_url, "")) });
+  }
+  return out;
+}
+
+/** ブランチを `sha` から作る（`POST /git/refs`。Contents の書き込みの権限）。既にあれば断られる（422） */
+export async function createBranch(client: Client, owner: string, repo: string, name: string, sha: string): Promise<string> {
+  const path = `${repoPath(owner, repo)}/git/refs`;
+  client.counter.rest += 1;
+  const res = await send(
+    client,
+    `${client.host.api}${path}`,
+    { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ ref: `refs/heads/${checkBranch(name)}`, sha: checkOid(sha) }) },
+    `POST ${path}`,
+  );
+  if (!res.ok) throw new HostError(`GitHub がブランチを作らなかった（${res.status}。同じ名前のブランチが既にあるか、権限が無い）`, res.status);
+  const made = (await res.json()) as { ref?: unknown; object?: { sha?: unknown } };
+  if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が違う");
+  return checkOid(made.object?.sha);
 }

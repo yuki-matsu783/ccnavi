@@ -1,14 +1,19 @@
 /**
- * ボード（ADR-0093 段階 3・4）。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
- * 段階 4 から、依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。「始める」は持たない（段階 5）。
+ * ボード（ADR-0093 段階 3・4・5）。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
+ * 段階 4 から、依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。
+ * 段階 5 から、GitLab とプロジェクトのリポジトリも読み、「始める」（issue から親のブランチを作る。8.6）を出す。
+ * GitLab へ書いて打ち消しが収まらなかった家族は「要確認」を控え（`chrome.storage.local` の `attention`）、
+ * 人が確かめて外すまで出す（8.4）。
  *
  * PAT はこのページに来ない。ホストの API は service worker に名前で頼む（5.5 の 4）。
  */
 import type { TokenStatus, Response } from "../core/protocol.js";
-import { renderRepo, type Actions } from "../core/render.js";
+import type { Issue } from "../core/github.js";
+import { renderRepo, type Actions, type Extras } from "../core/render.js";
 import { createRenderer } from "../core/sanitize.js";
-import { readRepos, type RepoConfig } from "../core/settings.js";
-import { collectRepo, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
+import { readRepos, repoKey, type RepoConfig } from "../core/settings.js";
+import { collectRepo, type Deps, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
+import { listIssues, startIssue } from "../core/start.js";
 import { approveFamily, confirmPhase, withdrawTicket, type Outcome, type WriteDeps } from "../core/write.js";
 import { blobCache } from "./cache.js";
 import { startWorker, type PyWorker } from "./py-client.js";
@@ -39,10 +44,58 @@ function newStats(): Stats {
   return { rest: 0, graphql: 0, blobsFetched: 0, blobsCached: 0 };
 }
 
+/** 登録したリポジトリ（設定画面の値） */
+let repos: RepoConfig[] = [];
+/** リポジトリごとの最後のボードと、読んだ issue の一覧（「始める」） */
+const boards = new Map<string, RepoBoard>();
+const issues = new Map<string, { list: Issue[] | null; error: string }>();
+
+/** プロジェクトのリポジトリのワークスペース（登録したもの）とそのホストへ頼む口（段階 5） */
+function workspaceOf(repo: RepoConfig, stats: Stats): Deps["workspace"] {
+  if (!repo.project) return undefined;
+  const ws = repos.find((r) => repoKey(r) === repo.workspace && !r.project);
+  return ws ? { repo: ws, call: hostCall(ws.host, stats) } : undefined;
+}
+
 async function writeDeps(repo: RepoConfig): Promise<WriteDeps> {
   const stats = newStats();
   if (worker === null) worker = startWorker();
-  return { call: hostCall(repo.host, stats), py: worker.call, cache: await blobCache(), now: () => new Date(), stats, version: VERSION };
+  return {
+    call: hostCall(repo.host, stats),
+    py: worker.call,
+    cache: await blobCache(),
+    now: () => new Date(),
+    stats,
+    version: VERSION,
+    workspace: workspaceOf(repo, stats),
+  };
+}
+
+type Attention = Record<string, Record<string, string>>;
+
+async function readAttention(): Promise<Attention> {
+  const got = await chrome.storage.local.get("attention");
+  const v = got.attention;
+  return v && typeof v === "object" ? (v as Attention) : {};
+}
+
+/** 打ち消しが収まらなかった家族を控える（8.4。人が確かめて外すまでボードに出す） */
+async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
+  if (outcome.kind !== "attention") return;
+  const all = await readAttention();
+  const key = repoKey(repo);
+  all[key] = { ...(all[key] ?? {}), [family]: outcome.message };
+  await chrome.storage.local.set({ attention: all });
+}
+
+function drawRepo(board: RepoBoard, attention: Attention): HTMLElement {
+  const key = repoKey(board.repo);
+  const extras: Extras = { attention: attention[key] ?? {}, issues: issues.get(key) };
+  const node = renderRepo(document, md, board, actions, extras);
+  const old = main.querySelector(`section.repo[data-repo="${CSS.escape(key)}"]`);
+  if (old) old.replaceWith(node);
+  else main.append(node);
+  return node;
 }
 
 /** PAT の期限の帯（D25）。PAT の無いホストは出さない */
@@ -69,7 +122,9 @@ function say(outcome: Outcome, what: string): void {
         ? `${what}を書かなかった: ${outcome.message}`
         : outcome.kind === "conflict"
           ? `${what}を書けなかった（人に回す）: ${outcome.message}`
-          : `${what}を書かなかった: ${outcome.message}`;
+          : outcome.kind === "attention"
+            ? `${what}を書いた後に別の書き込みが入り、打ち消しが収まらなかった（要確認。人に回す）: ${outcome.message}`
+            : `${what}を書かなかった: ${outcome.message}`;
   result.textContent = head;
   result.className = `notice ${outcome.kind === "written" ? "ok" : "error"}`;
 }
@@ -90,7 +145,9 @@ const actions: Actions = {
         // 読めなくても承認は止めない（注意の表示だけ）
       }
       if (!window.confirm(`${family.family.name} に ${ids.join(", ")} の承認を書く（1 コミット）。${warn}`)) return false;
-      say(await approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps), "承認");
+      const outcome = await approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps);
+      await noteAttention(repoBoard.repo, family.family.name, outcome);
+      say(outcome, "承認");
       return true;
     });
   },
@@ -106,7 +163,9 @@ const actions: Actions = {
       }
       const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする（レビュー待ちの子を done/ へ動かし、印を 1 コミットで書く）。押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
       if (!window.confirm(msg)) return false;
-      say(await confirmPhase(repoBoard.repo, family.family.name, phase, deps), "レビュー済み");
+      const outcome = await confirmPhase(repoBoard.repo, family.family.name, phase, deps);
+      await noteAttention(repoBoard.repo, family.family.name, outcome);
+      say(outcome, "レビュー済み");
       return true;
     });
   },
@@ -115,9 +174,46 @@ const actions: Actions = {
       const reason = window.prompt(`${ticket} の承認を取り下げて todo/ に戻す。理由（任意）`, "");
       if (reason === null) return false;
       const deps = await writeDeps(repoBoard.repo);
-      say(await withdrawTicket(repoBoard.repo, family.family.name, ticket, reason, deps), "取り下げ");
+      const outcome = await withdrawTicket(repoBoard.repo, family.family.name, ticket, reason, deps);
+      await noteAttention(repoBoard.repo, family.family.name, outcome);
+      say(outcome, "取り下げ");
       return true;
     });
+  },
+  loadIssues(repoBoard: RepoBoard) {
+    void (async () => {
+      const key = repoKey(repoBoard.repo);
+      try {
+        issues.set(key, { list: await listIssues(repoBoard.repo, await writeDeps(repoBoard.repo)), error: "" });
+      } catch (err) {
+        issues.set(key, { list: null, error: `issue を読めなかった: ${(err as Error).message ?? String(err)}` });
+      }
+      drawRepo(boards.get(key) ?? repoBoard, await readAttention());
+    })();
+  },
+  start(repoBoard: RepoBoard, issue: Issue) {
+    void act(async () => {
+      if (!window.confirm(`issue #${issue.number} から親のブランチを統合先 ${repoBoard.integration?.name ?? ""} の先頭に作る（PR/MR は作らない）`)) return false;
+      const deps = await writeDeps(repoBoard.repo);
+      const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
+      const out = await startIssue(repoBoard.repo, issue.number, repoBoard.seen ?? null, taken, deps);
+      result.dataset.kind = out.kind === "started" ? "written" : out.kind;
+      result.className = `notice ${out.kind === "started" ? "ok" : "error"}`;
+      result.textContent =
+        out.kind === "started"
+          ? `親のブランチ ${out.name} を作った（${out.head.slice(0, 7)}）。エージェントに ${out.name} で作業を始めてもらう`
+          : `始めなかった: ${out.message}`;
+      return true;
+    });
+  },
+  dismiss(repoBoard: RepoBoard, family: string) {
+    void (async () => {
+      const all = await readAttention();
+      const key = repoKey(repoBoard.repo);
+      if (all[key]) delete all[key][family];
+      await chrome.storage.local.set({ attention: all });
+      drawRepo(boards.get(key) ?? repoBoard, all);
+    })();
   },
 };
 
@@ -153,7 +249,7 @@ async function refresh(clearResult = true): Promise<void> {
   }
   main.replaceChildren();
   const got = await chrome.storage.local.get("repos");
-  const repos = readRepos(got.repos, HOSTS);
+  repos = readRepos(got.repos, HOSTS);
   if (repos.length === 0) {
     status.textContent = "リポジトリが登録されていない。設定画面で登録する";
     document.body.dataset.state = "done";
@@ -167,10 +263,12 @@ async function refresh(clearResult = true): Promise<void> {
   status.dataset.importMs = String(t.import_ms);
   status.dataset.violations = String(t.violations.length);
   const cache = await blobCache();
+  const attention = await readAttention();
   for (const repo of repos) {
     const stats = newStats();
-    const board = await collectRepo(repo, { call: hostCall(repo.host, stats), py: worker.call, cache, now: () => new Date(), stats });
-    main.append(renderRepo(document, md, board, actions));
+    const board = await collectRepo(repo, { call: hostCall(repo.host, stats), py: worker.call, cache, now: () => new Date(), stats, workspace: workspaceOf(repo, stats) });
+    boards.set(repoKey(repo), board);
+    drawRepo(board, attention);
   }
   await drawBanner(repos);
   document.body.dataset.state = "done";

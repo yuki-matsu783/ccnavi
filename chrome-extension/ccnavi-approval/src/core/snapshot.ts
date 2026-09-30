@@ -17,7 +17,7 @@
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
 import { BLOB_BATCH, LINK_MODE, type ApprovalCommit } from "./github.js";
-import { py, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot } from "./py.js";
+import { py, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot, type Workspace } from "./py.js";
 import { reviewPanels, type ReviewPanel } from "./reviewed.js";
 import type { RepoConfig } from "./settings.js";
 
@@ -43,6 +43,11 @@ export interface Deps {
   readonly now: () => Date;
   /** 呼んだ回数を数える（service worker が返す数を足す） */
   readonly stats: Stats;
+  /**
+   * プロジェクトのリポジトリのワークスペース（段階 5）。登録したワークスペースのリポジトリと、そのホストへ頼む口。
+   * プロジェクトのリポジトリを読むときに要る（無ければ止める）
+   */
+  readonly workspace?: { readonly repo: RepoConfig; readonly call: HostCall };
 }
 
 export interface FamilyBoard {
@@ -62,6 +67,8 @@ export interface RepoBoard {
   readonly families: readonly FamilyBoard[];
   readonly error: string;
   readonly stats: Stats;
+  /** 読んだブランチ（統合先と表示用のブランチ）。「始める」が開いた家族を見分けるのに使う（段階 5） */
+  readonly seen?: Snapshot | null;
 }
 
 /** 読んでいる間にブランチの先頭が動いた。書く流れは読み直して周を回す（レビューの 13） */
@@ -70,6 +77,9 @@ export class MovedError extends Error {}
 export class Reader {
   readonly branches: Record<string, Branch> = {};
   readonly absent: string[] = [];
+  /** プロジェクトのリポジトリなら、その名前とワークスペースの統合先の中身（段階 5） */
+  project = "";
+  workspace: Workspace | undefined = undefined;
 
   constructor(
     private readonly repo: RepoConfig,
@@ -104,7 +114,8 @@ export class Reader {
       if (obj.type === "blob") {
         wanted.push({ path: p, sha: obj.oid });
       } else {
-        const entries = await this.call<TreeEntry[]>("tree", obj.oid);
+        // GitLab は tree の sha でなく、コミットとパスで引く（GitHub は後ろの 2 つを使わない）
+        const entries = await this.call<TreeEntry[]>("tree", obj.oid, head, p);
         for (const e of entries) {
           // シンボリックリンクは中身（指す先の綴り）をファイルとして読まない。Python が「決まらない」にする
           if (e.mode === LINK_MODE) {
@@ -159,7 +170,8 @@ export class Reader {
   }
 
   snapshot(integration: Snapshot["integration"]): Snapshot {
-    return { integration, branches: { ...this.branches }, absent: [...this.absent] };
+    const base = { integration, branches: { ...this.branches }, absent: [...this.absent] };
+    return this.project && this.workspace ? { ...base, project: this.project, workspace: this.workspace } : base;
   }
 }
 
@@ -170,20 +182,50 @@ export interface IntegrationRead {
   readonly compat: Compat;
 }
 
-/** 1〜3: 統合先を決め、置き場の綴り・統合先の中身・互換の印を読む。統合先が無ければ投げる */
-export async function readIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
+/** 統合先の名前と先頭（設定か、ホストのデフォルトブランチ。D30）。無ければ投げる */
+async function integrationOf(repo: RepoConfig, reader: Reader, what: string): Promise<Snapshot["integration"]> {
   const info = await reader.call<{ defaultBranch: string }>("repoInfo");
   const name = repo.integration || info.defaultBranch;
   const source = repo.integration ? "setting" : "default";
   const head = await reader.head(name);
   if (head === null) {
-    throw new Error(`統合先 ${name} がリモートに無い。設定を直す`);
+    throw new Error(`${what}統合先 ${name} がリモートに無い。設定を直す`);
   }
-  const integration = { name, source, head } as const;
+  return { name, source, head } as const;
+}
+
+/** 1〜3: 統合先を決め、置き場の綴り・統合先の中身・互換の印を読む。統合先が無ければ投げる */
+export async function readIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
+  if (repo.project) return await readProjectIntegration(repo, reader, deps);
+  const integration = await integrationOf(repo, reader, "");
+  const { name, head } = integration;
   const first = await reader.read(name, head, [".claude/settings.json"]);
   const settings = first.files[".claude/settings.json"] ?? null;
   const place: Placement = await py.placement(deps.py, settings);
   await reader.read(name, head, [...place.integration_paths, ...place.integration_files]);
+  const compat = await py.compat(deps.py, reader.snapshot(integration));
+  return { integration, settings, place, compat };
+}
+
+/**
+ * プロジェクトのリポジトリ（段階 5。3.3 の 7）: 置き場の綴り・共通層・互換の印はワークスペースの統合先から、
+ * 閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先から読む。プロジェクトの層の計算（D28）は Python
+ */
+async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
+  const ws = deps.workspace;
+  if (!ws || ws.repo.project) {
+    throw new Error(`プロジェクト ${repo.project} のワークスペースのリポジトリ（${repo.workspace || "未設定"}）が設定画面に登録されていない`);
+  }
+  const wsReader = new Reader(ws.repo, { ...deps, call: ws.call, workspace: undefined });
+  const wsInteg = await integrationOf(ws.repo, wsReader, "ワークスペースの");
+  const first = await wsReader.read(wsInteg.name, wsInteg.head, [".claude/settings.json"]);
+  const settings = first.files[".claude/settings.json"] ?? null;
+  const place: Placement = await py.placement(deps.py, settings);
+  const wsBranch = await wsReader.read(wsInteg.name, wsInteg.head, [...place.workspace_paths, ...place.workspace_files]);
+  reader.project = repo.project;
+  reader.workspace = { integration: wsInteg, files: wsBranch.files, binary: wsBranch.binary, links: wsBranch.links ?? [] };
+  const integration = await integrationOf(repo, reader, "");
+  await reader.read(integration.name, integration.head, place.project_paths);
   const compat = await py.compat(deps.py, reader.snapshot(integration));
   return { integration, settings, place, compat };
 }
@@ -224,7 +266,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
     for (const family of families) {
       boards.push(await familyBoard(family, reader, integration, settings, place, deps));
     }
-    return { repo, integration, compat, candidates, missingExtras, families: boards, error: "", stats: deps.stats };
+    return { repo, integration, compat, candidates, missingExtras, families: boards, error: "", stats: deps.stats, seen: reader.snapshot(integration) };
   } catch (err) {
     return { ...empty, integration, error: (err as Error).message ?? String(err) };
   }
@@ -254,7 +296,7 @@ async function closureInput(
   const keep = new Set([integration.name, ...closure.families]);
   const branches: Record<string, Branch> = {};
   for (const [k, v] of Object.entries(all.branches)) if (keep.has(k)) branches[k] = v;
-  return { integration, branches, absent: all.absent.filter((a) => keep.has(a)) };
+  return { ...all, integration, branches, absent: all.absent.filter((a) => keep.has(a)) };
 }
 
 async function familyBoard(
@@ -324,11 +366,14 @@ export interface FamilyRead extends IntegrationRead {
   readonly head: string;
 }
 
-/** 書く流れのために、家族 1 つぶんを新しく読み直す（8.3 の 2・4。毎回 Snapshot を組み直す） */
-export async function readFamily(repo: RepoConfig, family: string, deps: Deps): Promise<FamilyRead> {
+/**
+ * 書く流れのために、家族 1 つぶんを新しく読み直す（8.3 の 2・4。毎回 Snapshot を組み直す）。
+ * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の姿を読み直す。8.4）
+ */
+export async function readFamily(repo: RepoConfig, family: string, deps: Deps, at?: string): Promise<FamilyRead> {
   const reader = new Reader(repo, deps);
   const base = await readIntegration(repo, reader, deps);
-  const head = await reader.head(family);
+  const head = at ?? (await reader.head(family));
   if (head === null) {
     throw new Error(`親のブランチ ${family} がホストに無い`);
   }

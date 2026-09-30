@@ -33,7 +33,8 @@ async function drawRepos(): Promise<void> {
     const li = document.createElement("li");
     const integ = r.integration === "" ? "デフォルトブランチ" : r.integration;
     const extra = r.extraBranches.length > 0 ? `・指定 ${r.extraBranches.join(", ")}` : "";
-    li.textContent = `${repoKey(r)}（統合先 ${integ}・直近 ${r.recentDays} 日${extra}） `;
+    const proj = r.project ? `・プロジェクト ${r.project}（ワークスペース ${r.workspace}）` : "";
+    li.textContent = `${repoKey(r)}（統合先 ${integ}・直近 ${r.recentDays} 日${extra}${proj}） `;
     const del = document.createElement("button");
     del.type = "button";
     del.textContent = "外す";
@@ -44,6 +45,20 @@ async function drawRepos(): Promise<void> {
     });
     li.append(del);
     list.append(li);
+  }
+  // プロジェクトのリポジトリが選ぶワークスペース（登録したワークスペース自身のリポジトリ）
+  const select = $<HTMLSelectElement>("repo-workspace");
+  select.replaceChildren();
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "（選ぶ）";
+  select.append(none);
+  for (const r of await loadRepos()) {
+    if (r.project) continue;
+    const opt = document.createElement("option");
+    opt.value = repoKey(r);
+    opt.textContent = repoKey(r);
+    select.append(opt);
   }
 }
 
@@ -56,7 +71,7 @@ async function drawTokens(): Promise<void> {
     const set = st?.set === true;
     const li = document.createElement("li");
     const when = st?.notice ? `（${st.notice.text}）` : "";
-    li.textContent = `${h.id}: ${set ? "登録済み" : "未登録"}${when}${h.kind === "gitlab" ? "（GitLab は段階 5）" : ""}`;
+    li.textContent = `${h.id}（${h.kind === "gitlab" ? "GitLab" : "GitHub"}）: ${set ? "登録済み" : "未登録"}${when}`;
     list.append(li);
   }
 }
@@ -79,6 +94,9 @@ $<HTMLFormElement>("repo-form").addEventListener("submit", async (e) => {
   try {
     const repo = normalizeRepo(Object.fromEntries(form.entries()) as Record<string, unknown>, HOSTS);
     const rest = (await loadRepos()).filter((o) => repoKey(o) !== repoKey(repo));
+    if (repo.project && !rest.some((o) => repoKey(o) === repo.workspace && !o.project)) {
+      throw new Error(`ワークスペースのリポジトリ ${repo.workspace} を先に登録する`);
+    }
     await chrome.storage.local.set({ repos: [...rest, repo] });
     say("repo-msg", `${repoKey(repo)} を登録した`, true);
     await drawRepos();
