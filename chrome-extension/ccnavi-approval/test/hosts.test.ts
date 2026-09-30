@@ -28,10 +28,10 @@ test("CX-T002 CSP に 'unsafe-eval'・'unsafe-inline'・外のスクリプトを
   assert.equal(script, "'self' 'wasm-unsafe-eval'");
 });
 
-test("CX-T003 manifest は externally_connectable を宣言しない。権限は storage だけ", () => {
+test("CX-T003 manifest は externally_connectable を宣言しない。権限は storage と PAT の期限を比べる alarms だけ", () => {
   const m = manifest(defaults(), "0.1.0");
   assert.equal("externally_connectable" in m, false);
-  assert.deepEqual(m.permissions, ["storage"]);
+  assert.deepEqual(m.permissions, ["storage", "alarms"]);
   assert.equal(m.manifest_version, 3);
 });
 

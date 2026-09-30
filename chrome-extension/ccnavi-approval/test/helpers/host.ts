@@ -1,6 +1,7 @@
 /**
  * service worker の `dispatch` を、模擬の GitHub と控えの無い PAT の置き場で組む。
  */
+import type { TokenMeta } from "../../src/core/expiry.js";
 import { dispatch, type Deps } from "../../src/core/protocol.js";
 import { parseHosts } from "../../src/core/hosts.js";
 import type { BlobCache, HostCall, Stats } from "../../src/core/snapshot.js";
@@ -20,7 +21,12 @@ export const HOSTS = parseHosts(
   }),
 );
 
-export function deps(mock: MockGitHub, tokens: Map<string, string> = new Map()): Deps {
+export function deps(
+  mock: MockGitHub,
+  tokens: Map<string, string> = new Map(),
+  metas: Map<string, TokenMeta> = new Map(),
+  now: () => Date = () => new Date(),
+): Deps {
   return {
     hosts: HOSTS,
     extensionId: EXT_ID,
@@ -29,6 +35,9 @@ export function deps(mock: MockGitHub, tokens: Map<string, string> = new Map()):
     getToken: async (h) => tokens.get(h) ?? "",
     setToken: async (h, t) => void tokens.set(h, t),
     clearToken: async (h) => void tokens.delete(h),
+    getMeta: async (h) => metas.get(h) ?? {},
+    setMeta: async (h, m) => void metas.set(h, m),
+    now,
   };
 }
 

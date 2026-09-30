@@ -13,6 +13,7 @@ import path from "node:path";
 
 import type { PyCall } from "../src/core/py.js";
 import { collectRepo } from "../src/core/snapshot.js";
+import { approveFamily, withdrawTicket } from "../src/core/write.js";
 import { fixture, NOW } from "./fixtures/repo.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
@@ -53,5 +54,31 @@ test("CX-T061 判定のコアの見本（承認・マーカーの消去・改版
   for (const [name, { request, answer }] of Object.entries(scenarios)) {
     assert.deepEqual(await pyodide.call(request), answer, `Pyodide ${name}`);
     if (native !== null) assert.deepEqual(await native.call(request), answer, `CPython ${name}`);
+  }
+});
+
+test("CX-T062 承認と取り下げで Python に投げた要求（plan・withdraw を含む）すべてに、Pyodide と手元の CPython が同じ答えを返す", { skip: native === null ? "uv が無い" : false }, async () => {
+  const pyodide = await pyodidePy();
+  const log: { req: Record<string, unknown>; res: Record<string, unknown> }[] = [];
+  const spy: PyCall = async (req) => {
+    const res = await pyodide.call(req);
+    log.push({ req, res });
+    return res;
+  };
+  const branches = fixture();
+  delete branches.i0001.files["wip/proposals/todo/i0001-01.md"];
+  const mock = new MockGitHub(branches);
+  const stats = newStats();
+  const repo = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] };
+  const d = { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), py: spy, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9" };
+  const board = await collectRepo(repo, d);
+  const r = board.families.find((f) => f.family.name === "i0001")?.result;
+  const shown = { ids: (r?.batch ?? []).map((e) => e.ticket), digest: r?.digest ?? "", only: r?.only ?? null };
+  assert.equal((await approveFamily(repo, "i0001", shown, d)).kind, "written");
+  assert.equal((await withdrawTicket(repo, "i0001", "i0001", "押し間違い", d)).kind, "written");
+  const ops = new Set(log.map((l) => l.req.op));
+  for (const op of ["board", "plan", "withdraw"]) assert.ok(ops.has(op), op);
+  for (const { req, res } of log) {
+    assert.deepEqual(await native!.call(req), res, `${String(req.op)} ${String(req.family ?? "")}`);
   }
 });
