@@ -247,6 +247,19 @@ class HostFixtureTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("--actor=lab-reviewer", self.passed())
 
+    def test_the_stand_in_refuses_a_query_that_drops_a_field(self):
+        q = (
+            "query { repository { pullRequest { reviewThreads { pageInfo { hasNextPage endCursor }"
+            " nodes { id isResolved comments { nodes { url path line body createdAt } } } } } } }"
+        )
+
+        def ask(query):
+            body = json.dumps({"query": query, "variables": {"n": 42, "c": None}})
+            return github_host.answer("resolved", "POST", "/graphql", body)[1]
+
+        self.assertIn("data", ask(q))
+        self.assertIn("createdAt", ask(q.replace(" createdAt", ""))["errors"][0]["message"])
+
     def test_confirm_does_not_take_an_actor_from_the_caller(self):
         for given in (["--actor", "someone"], ["--actor=someone"]):
             done = self.review("resolved", "confirm", "--phase", "1", *given)

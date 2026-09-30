@@ -1271,14 +1271,14 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         git(self.tree, "merge", "-q", "--no-edit", CHILD)
         git(self.tree, "push", "-q", "origin", PARENT)
 
-    def review(self, *args):
+    def review(self, *args, scene=None):
         return self.sh(
             "ccnavi-review.sh",
             *args,
             cwd=self.tree,
             PATH=self.path,
             GITHUB_TOKEN="t0k",
-            FAKE_GITHUB_SCENE=self.SCENE,
+            FAKE_GITHUB_SCENE=scene or self.SCENE,
             FAKE_GITHUB_STATE=os.path.join(self._tmp.name, "comments.json"),
         )
 
@@ -1293,7 +1293,24 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
                     found[rel] = self.read(full)
         return found
 
-    def chrome_request(self):
+    def host_compare(self, base, head):
+        """GitHub の compare API の答えを、拡張の `compareFiles` と同じ規則で一覧にする。
+
+        GitHub は改名を検出して `filename` と `previous_filename` を返し、拡張は両方を入れる。
+        ここでは git の改名の検出（`--find-renames`）で同じ組を作り、同じ規則で並べる
+        （TS の関数そのものは拡張の試験 CX-T130・139 が見る）。
+        """
+        out = git(self.tree, "diff", "--name-status", "--find-renames", f"{base}..{head}").stdout
+        files = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if parts[0].startswith("R"):
+                files += [parts[2], parts[1]]
+            else:
+                files.append(parts[1])
+        return files
+
+    def chrome_request(self, scene=None):
         """拡張が組むのと同じ要求（統合先 main、家族 i0001、見本の写し、依頼の後の変更の一覧）。"""
         from tests.ticket.test_core import _chrome
 
@@ -1308,10 +1325,9 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         mine = self.files(self.tree, place["branch_paths"])
         recorded = json.loads(self.read(os.path.join(self.tree, *self.requested.split("/"))))
         head = self.sha(self.tree, "HEAD")
-        names = git(self.tree, "diff", "--name-only", "--no-renames", f"{recorded['head']}..HEAD")
-        with open(
-            os.path.join(self.host.SCENES, self.SCENE, "expected.json"), encoding="utf-8"
-        ) as f:
+        files = self.host_compare(recorded["head"], head)
+        where = os.path.join(self.host.SCENES, scene or self.SCENE, "expected.json")
+        with open(where, encoding="utf-8") as f:
             copy = json.load(f)
         request = {
             "schema": chrome.SCHEMA,
@@ -1321,7 +1337,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
             "stamp": "2026-09-29T12:00:00+0900",
             "actor": {"account": "octo-reviewer", "version": "9.9.9"},
             "result": copy,
-            "compare": {"base": recorded["head"], "head": head, "files": names.stdout.split()},
+            "compare": {"base": recorded["head"], "head": head, "files": files},
             "snapshot": {
                 "integration": {"name": "main", "source": "default", "head": "0" * 40},
                 "branches": {
@@ -1352,19 +1368,49 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
             return {k: v for k, v in json.loads(text).items() if k not in drop}
         return text
 
-    def test_chrome_writes_what_c1_writes_and_sends(self):
+    def request(self):
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
         requested = self.review("request", "--phase", "1", "--body-file", body)
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.assertIn(self.requested, self.committed())
+        return body
+
+    def same_refusal(self, scene):
+        """Chrome が通さない理由が、C1 で回した手元の confirm の標準エラーにそのまま出る。"""
+        answer = self.chrome_request(scene)
+        self.assertIsNone(answer["changes"], scene)
+        self.assertTrue(answer["problems"], scene)
+        head, remote = self.sha(self.tree, "HEAD"), self.remote_sha()
+        local = self.review("confirm", "--phase", "1", scene=scene)
+        self.assertNotEqual(local.returncode, 0, scene)
+        said = local.stderr.replace(self.ws + os.sep, "").splitlines()
+        for line in answer["problems"]:
+            self.assertIn(line, said, scene)
+        self.assertEqual((self.sha(self.tree, "HEAD"), self.remote_sha()), (head, remote), scene)
+        self.assertEqual(self.dirty(), "", scene)
+        return answer
+
+    STOPPING = ("paged", "changes-requested", "cr-commented", "pending")
+
+    def test_unresolved_threads_and_change_requests_stop_both_the_same(self):
+        self.request()
+        said = {s: self.same_refusal(s)["problems"][0] for s in self.STOPPING}
+        self.assertIn("未解決のスレッドが 4 件", said["paged"])
+        for scene in ("changes-requested", "cr-commented", "pending"):
+            self.assertIn("変更要求のレビューが立っている", said[scene], scene)
+
+    def test_chrome_writes_what_c1_writes_and_sends(self):
+        body = self.request()
 
         answer = self.chrome_request()
         self.assertEqual(answer["problems"], [])
         rows = answer["changes"][PARENT]
 
-        # 手元を直に打つと C1 に断られる（だから C1 の手順で回す）
+        # 手元を直に打つと C1 に断られる（だから C1 の手順で回す）。文面まで見る
         direct = self.exe("--cwd", self.tree, "review", "confirm", "--phase", "1", "--result", body)
         self.assertNotEqual(direct.returncode, 0)
+        self.assertIn(f"家族 {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
+        self.assertIn("何も書かずに止めた", direct.stderr)
 
         before = self.sha(self.tree, "HEAD")
         confirmed = self.review("confirm", "--phase", "1")
@@ -1390,6 +1436,10 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         self.assertEqual((remote["actor"], remote["via"]), ("octo-reviewer", "chrome"))
         self.assertEqual((local["actor"], local["via"]), ("octo-reviewer", "cli"))
         self.assertEqual(list(remote), list(local))
+
+        # レビュー済みに重ねて打てば、手元も Chrome も同じ文面で止め、何も送らない（決定 B）
+        again = self.same_refusal(self.SCENE)
+        self.assertEqual(again["problems"], ["ccnavi: フェーズ 1 はレビュー済み"])
 
 
 if __name__ == "__main__":
