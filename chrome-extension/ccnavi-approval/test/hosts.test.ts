@@ -16,7 +16,7 @@ test("CX-T001 既定の通信先は api.github.com と gitlab.com だけ。host_
   assert.deepEqual(m.host_permissions, ["https://api.github.com/*", "https://gitlab.com/*"]);
   assert.equal(
     m.content_security_policy.extension_pages,
-    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://api.github.com https://gitlab.com",
+    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' https://api.github.com https://gitlab.com",
   );
 });
 

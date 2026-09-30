@@ -2,6 +2,7 @@
  * service worker の `dispatch` を、模擬の GitHub と控えの無い PAT の置き場で組む。
  */
 import type { TokenMeta } from "../../src/core/expiry.js";
+import type { RepoConfig } from "../../src/core/settings.js";
 import { dispatch, type Deps } from "../../src/core/protocol.js";
 import { parseHosts } from "../../src/core/hosts.js";
 import type { BlobCache, HostCall, Stats } from "../../src/core/snapshot.js";
@@ -26,6 +27,7 @@ export function deps(
   tokens: Map<string, string> = new Map(),
   metas: Map<string, TokenMeta> = new Map(),
   now: () => Date = () => new Date(),
+  repos: RepoConfig[] = REPOS,
 ): Deps {
   return {
     hosts: HOSTS,
@@ -38,13 +40,17 @@ export function deps(
     getMeta: async (h) => metas.get(h) ?? {},
     setMeta: async (h, m) => void metas.set(h, m),
     now,
+    getRepos: async () => repos,
   };
 }
+
+/** 設定画面で登録したリポジトリ（模擬の GitHub の acme/widgets） */
+export const REPOS: RepoConfig[] = [{ host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] }];
 
 export function hostCall(d: Deps, stats: Stats): HostCall {
   return async (op, args) => {
     const res = await dispatch({ kind: "host", host: "github.com", op, args }, BOARD, d);
-    if (!res.ok) throw new Error(res.error);
+    if (!res.ok) throw Object.assign(new Error(res.error), { status: res.status });
     if (res.counter) {
       stats.rest += res.counter.rest;
       stats.graphql += res.counter.graphql;

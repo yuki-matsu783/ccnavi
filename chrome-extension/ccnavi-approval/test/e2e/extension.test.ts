@@ -30,8 +30,9 @@ let id: string;
 let closeServer: () => Promise<void>;
 let profile: string;
 const mock = new MockGitHub(fixture(), "main", new Date());
+mock.apiBase = `http://127.0.0.1:${18787}`;
 // 3 日後に切れる PAT（ヘッダの綴りは GitHub と同じ「UTC」つき）
-const EXPIRES = new Date(Date.now() + 3 * 86400000 + 3600000);
+const EXPIRES = new Date(Date.now() + 3 * 86400000 - 3600000);
 mock.expiration = `${EXPIRES.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 const problems: string[] = [];
 
@@ -65,7 +66,7 @@ test("CX-T070 組んだ manifest の CSP は 'wasm-unsafe-eval' だけを足し�
   const m = JSON.parse(fs.readFileSync(path.join(DIST, "manifest.json"), "utf8"));
   assert.equal(
     m.content_security_policy.extension_pages,
-    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' http://127.0.0.1:18787",
+    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' http://127.0.0.1:18787",
   );
   assert.deepEqual(m.host_permissions, ["http://127.0.0.1:18787/*"]);
 });
@@ -113,6 +114,15 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   const actions = await page.locator("main button").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).closest<HTMLElement>("[data-family]")?.dataset.family}:${(e as HTMLElement).dataset.action}`));
   assert.deepEqual(actions, ["i0001:approve", "i0002:approve"]);
   assert.equal(await page.locator("main form").count(), 0);
+  // 承認の画面の本文は開いた形でボタンの上に見えている（決定 A）
+  assert.ok(await page.locator('[data-family="i0001"] [data-testid=screen] pre').isVisible());
+  const above = await page.evaluate(() => {
+    const box = document.querySelector('[data-family="i0001"]') as HTMLElement;
+    const screen = box.querySelector("[data-testid=screen]") as HTMLElement;
+    const button = box.querySelector("button[data-action=approve]") as HTMLElement;
+    return screen.getBoundingClientRect().top < button.getBoundingClientRect().top;
+  });
+  assert.ok(above);
   // 開いただけでは何も書かない
   assert.ok(mock.calls.every((c) => c.startsWith("GET ") || c === "POST /graphql"), mock.calls.join("\n"));
   assert.equal(mock.commitCalls.length, 0);

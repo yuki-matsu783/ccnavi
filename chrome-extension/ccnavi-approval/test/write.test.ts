@@ -38,6 +38,7 @@ function depsFor(mock: MockGitHub): WriteDeps {
     now: () => new Date(NOW),
     stats,
     version: VERSION,
+    sleep: async () => undefined,
   };
 }
 

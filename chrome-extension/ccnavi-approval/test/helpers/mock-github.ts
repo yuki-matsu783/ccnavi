@@ -19,13 +19,20 @@ export const EXPIRATION_HEADER = "github-authentication-token-expiration";
 
 const sha1 = (s: string | Buffer) => createHash("sha1").update(s).digest("hex");
 
+/** 中身が似ているか（rename 検出の代わり。行の半分以上が同じ） */
+function similar(a: string, b: string): boolean {
+  const x = a.split("\n");
+  const y = new Set(b.split("\n"));
+  return x.filter((l) => y.has(l)).length * 2 >= Math.max(x.length, y.size);
+}
+
 export function blobSha(text: string): string {
   const buf = Buffer.from(text, "utf8");
   return sha1(Buffer.concat([Buffer.from(`blob ${buf.length}\0`), buf]));
 }
 
 interface Tree {
-  readonly entries: { path: string; sha: string }[];
+  readonly entries: { path: string; sha: string; mode: string }[];
 }
 
 export interface Commit {
@@ -40,6 +47,7 @@ export interface CommitCall {
   readonly branch: string;
   readonly expected: string;
   readonly headline: string;
+  readonly body: string;
   readonly additions: { path: string; contents: string }[];
   readonly deletions: { path: string }[];
   readonly result: "written" | "stale" | "error";
@@ -63,6 +71,16 @@ export class MockGitHub {
   loseCommitResponse = false;
   /** 本文を返さない（バイナリとして返す）blob の sha */
   readonly binaryBlobs = new Set<string>();
+  /** 本文を切って返す（isTruncated）blob の sha */
+  readonly truncatedBlobs = new Set<string>();
+  /** シンボリックリンク（tree の mode 120000）として返すパス */
+  readonly linkPaths = new Set<string>();
+  /** 次の要求（`match` に当たるもの）をレート制限で断る（1 回ずつ消える） */
+  readonly limits: { match: RegExp; status: number; headers: Record<string, string>; graphql?: boolean }[] = [];
+  /** 要求を受けるたびに呼ぶ（試験が割り込みの書き手を作る） */
+  onRequest: ((method: string, url: URL) => void) | null = null;
+  /** コミットの変更の一覧（`GET /commits/<sha>` の files）を切る件数（本物は 300） */
+  filesLimit = 300;
   /** 開いた MR（ブランチ → 番号と Approve） */
   readonly pulls: Record<string, { number: number; reviews: { user: string; state: string }[] }[]> = {};
 
@@ -99,6 +117,11 @@ export class MockGitHub {
     return this.commits.get(this.heads.get(name) ?? "")?.files ?? {};
   }
 
+  /** `from` の先頭から新しいブランチを作る */
+  branch(name: string, from: string): void {
+    this.heads.set(name, this.heads.get(from) as string);
+  }
+
   /** 他の書き手が普通の push をする。`null` の中身は消す */
   push(branch: string, change: Record<string, string | null>, message = "push"): string {
     const parent = this.heads.get(branch) as string;
@@ -112,11 +135,20 @@ export class MockGitHub {
     return sha;
   }
 
-  /** `from` を `branch` に merge する（中身は両方を足したもの。`from` が勝つ） */
+  /** `from` を `branch` に merge する。共通の祖先から `from` が変えたパス（消したものを含む）は `from` を採る */
   merge(branch: string, from: string): string {
-    const parents = [this.heads.get(branch) as string, this.heads.get(from) as string];
-    const files = { ...this.files(branch), ...this.files(from) };
-    const sha = this.store({ parents, files, date: this.now.toISOString(), message: `merge ${from}` });
+    const ours = this.heads.get(branch) as string;
+    const theirs = this.heads.get(from) as string;
+    const mine = new Set(this.ancestors(ours).map((c) => c.sha));
+    const base = this.ancestors(theirs).find((c) => mine.has(c.sha))?.files ?? {};
+    const files = { ...this.files(branch) };
+    const other = this.files(from);
+    for (const p of new Set([...Object.keys(base), ...Object.keys(other)])) {
+      if (base[p] === other[p]) continue;
+      if (p in other) files[p] = other[p];
+      else delete files[p];
+    }
+    const sha = this.store({ parents: [ours, theirs], files, date: this.now.toISOString(), message: `merge ${from}` });
     this.heads.set(branch, sha);
     return sha;
   }
@@ -127,39 +159,102 @@ export class MockGitHub {
     const entries = Object.keys(files)
       .filter((p) => p.startsWith(`${dir}/`))
       .sort()
-      .map((p) => ({ path: p.slice(dir.length + 1), sha: blobSha(files[p]) }));
+      .map((p) => ({ path: p.slice(dir.length + 1), sha: blobSha(files[p]), mode: this.linkPaths.has(p) ? "120000" : "100644" }));
     if (entries.length === 0) return null;
     const oid = sha1(`tree\n${JSON.stringify(entries)}`);
     this.trees.set(oid, { entries });
     return oid;
   }
 
-  /** 最初の親を辿った履歴（新しい順） */
-  private history(sha: string): Commit[] {
+  /** 祖先の全部（日付の新しい順） */
+  private ancestors(sha: string): Commit[] {
+    const seen = new Map<string, Commit>();
+    const stack = [sha];
+    while (stack.length > 0) {
+      const c = this.commits.get(stack.pop() as string);
+      if (!c || seen.has(c.sha)) continue;
+      seen.set(c.sha, c);
+      stack.push(...c.parents);
+    }
+    return [...seen.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }
+
+  /**
+   * `git log <sha> -- <path>` の既定の簡略化に寄せた履歴（新しい順）。path を変えたコミットを出す。
+   * merge コミットは、path がどれかの親と同じなら出さずにその親だけを辿り（別の枝に入ることもある）、
+   * どの親とも違えば出して全部の親を辿る。path が無ければ最初の親の鎖を全部出す。
+   */
+  private history(sha: string, path = ""): Commit[] {
     const out: Commit[] = [];
-    let c = this.commits.get(sha);
-    while (c) {
-      out.push(c);
-      c = this.commits.get(c.parents[0] ?? "");
+    const seen = new Set<string>();
+    const stack = [sha];
+    while (stack.length > 0) {
+      const c = this.commits.get(stack.pop() as string);
+      if (!c || seen.has(c.sha)) continue;
+      seen.add(c.sha);
+      if (!path) {
+        out.push(c);
+        if (c.parents[0]) stack.push(c.parents[0]);
+        continue;
+      }
+      const mine = c.files[path];
+      const same = c.parents.find((p) => this.commits.get(p)?.files[path] === mine);
+      if (c.parents.length > 1 && same !== undefined) {
+        stack.push(same);
+        continue;
+      }
+      if (c.parents.length === 0 ? mine !== undefined : same === undefined) out.push(c);
+      for (const p of [...c.parents].reverse()) stack.push(p);
     }
-    return out;
+    return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
-  private changed(c: Commit): { filename: string; status: string }[] {
+  /** コミットの変更の一覧。消えたファイルと同じ中身で足されたファイルは renamed（本物の rename 検出に寄せる） */
+  private changed(c: Commit): { filename: string; status: string; previous_filename?: string }[] {
     const before = this.commits.get(c.parents[0] ?? "")?.files ?? {};
-    const out: { filename: string; status: string }[] = [];
-    for (const p of new Set([...Object.keys(before), ...Object.keys(c.files)])) {
-      if (!(p in before)) out.push({ filename: p, status: "added" });
-      else if (!(p in c.files)) out.push({ filename: p, status: "removed" });
-      else if (before[p] !== c.files[p]) out.push({ filename: p, status: "modified" });
+    const added = Object.keys(c.files).filter((p) => !(p in before));
+    const removed = Object.keys(before).filter((p) => !(p in c.files));
+    const out: { filename: string; status: string; previous_filename?: string }[] = [];
+    const renamedFrom = new Set<string>();
+    for (const p of added) {
+      const from = removed.find((r) => !renamedFrom.has(r) && similar(before[r], c.files[p]));
+      if (from) {
+        renamedFrom.add(from);
+        out.push({ filename: p, status: "renamed", previous_filename: from });
+      } else {
+        out.push({ filename: p, status: "added" });
+      }
     }
-    return out.sort((a, b) => (a.filename < b.filename ? -1 : 1));
+    for (const p of removed) if (!renamedFrom.has(p)) out.push({ filename: p, status: "removed" });
+    for (const p of Object.keys(c.files)) if (p in before && before[p] !== c.files[p]) out.push({ filename: p, status: "modified" });
+    return out.sort((a, b) => (a.filename < b.filename ? -1 : 1)).slice(0, this.filesLimit);
   }
 
-  handle(method: string, url: string, headers: Record<string, string>, body: string): { status: number; json: unknown } {
+  /** 並びを per_page・page で切り、続きがあれば Link を付ける */
+  private paged(u: URL, items: unknown[]): { status: number; json: unknown; headers?: Record<string, string> } {
+    const per = Number(u.searchParams.get("per_page") ?? "30");
+    const page = Number(u.searchParams.get("page") ?? "1");
+    const slice = items.slice((page - 1) * per, page * per);
+    if (page * per >= items.length) return { status: 200, json: slice };
+    const next = new URL(u.toString());
+    next.searchParams.set("page", String(page + 1));
+    return { status: 200, json: slice, headers: { link: `<${this.apiBase}${next.pathname}${next.search}>; rel="next"` } };
+  }
+
+  /** Link に書く API の根（単体試験は api.github.com、実機は serve の根） */
+  apiBase = "https://api.github.com";
+
+  handle(method: string, url: string, headers: Record<string, string>, body: string): { status: number; json: unknown; headers?: Record<string, string> } {
     const u = new URL(url, "http://mock");
     this.calls.push(`${method} ${u.pathname}`);
+    this.onRequest?.(method, u);
     if (headers.authorization !== `Bearer ${TOKEN}`) return { status: 401, json: { message: "Bad credentials" } };
+    const limit = this.limits.findIndex((l) => l.match.test(`${method} ${u.pathname}${u.search}`));
+    if (limit >= 0) {
+      const l = this.limits.splice(limit, 1)[0];
+      if (l.graphql) return { status: 200, json: { data: null, errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }] }, headers: l.headers };
+      return { status: l.status, json: { message: "You have exceeded a secondary rate limit" }, headers: l.headers };
+    }
     const base = `/repos/${this.owner}/${this.repo}`;
     if (method === "GET" && u.pathname === base) return { status: 200, json: { default_branch: this.defaultBranch } };
     if (method === "GET" && u.pathname.startsWith(`${base}/git/ref/heads/`)) {
@@ -170,18 +265,15 @@ export class MockGitHub {
     if (method === "GET" && u.pathname.startsWith(`${base}/git/trees/`)) {
       const tree = this.trees.get(u.pathname.slice(`${base}/git/trees/`.length));
       if (!tree) return { status: 404, json: { message: "Not Found" } };
-      return { status: 200, json: { truncated: false, tree: tree.entries.map((e) => ({ path: e.path, type: "blob", sha: e.sha })) } };
+      return { status: 200, json: { truncated: false, tree: tree.entries.map((e) => ({ path: e.path, type: "blob", mode: e.mode, sha: e.sha })) } };
     }
     if (method === "GET" && u.pathname === `${base}/commits`) {
       const start = u.searchParams.get("sha") ?? "";
       const path = u.searchParams.get("path") ?? "";
       const per = Number(u.searchParams.get("per_page") ?? "30");
       if (!this.commits.has(start)) return { status: 404, json: { message: "Not Found" } };
-      const list = this.history(start)
-        .filter((c) => !path || this.changed(c).some((f) => f.filename === path))
-        .slice(0, per)
-        .map((c) => ({ sha: c.sha, parents: c.parents.map((p) => ({ sha: p })) }));
-      return { status: 200, json: list };
+      const list = this.history(start, path).map((c) => ({ sha: c.sha, parents: c.parents.map((p) => ({ sha: p })) }));
+      return this.paged(u, list);
     }
     if (method === "GET" && u.pathname.startsWith(`${base}/commits/`)) {
       const c = this.commits.get(u.pathname.slice(`${base}/commits/`.length));
@@ -191,14 +283,14 @@ export class MockGitHub {
     if (method === "GET" && u.pathname === `${base}/pulls`) {
       const head = u.searchParams.get("head") ?? "";
       const branch = head.startsWith(`${this.owner}:`) ? head.slice(this.owner.length + 1) : "";
-      return { status: 200, json: (this.pulls[branch] ?? []).map((p) => ({ number: p.number })) };
+      return this.paged(u, (this.pulls[branch] ?? []).map((p) => ({ number: p.number })));
     }
     const reviews = new RegExp(`^${base}/pulls/(\\d+)/reviews$`).exec(u.pathname);
     if (method === "GET" && reviews) {
       const pr = Object.values(this.pulls)
         .flat()
         .find((p) => p.number === Number(reviews[1]));
-      return { status: 200, json: (pr?.reviews ?? []).map((r) => ({ user: { login: r.user }, state: r.state })) };
+      return this.paged(u, (pr?.reviews ?? []).map((r) => ({ user: { login: r.user }, state: r.state })));
     }
     if (method === "POST" && u.pathname.endsWith("/graphql")) return this.graphql(JSON.parse(body));
     return { status: 404, json: { message: "Not Found" } };
@@ -206,6 +298,11 @@ export class MockGitHub {
 
   private graphql(req: { query: string; variables: Record<string, unknown> }): { status: number; json: unknown } {
     const { query, variables } = req;
+    if (query.includes("history(first:")) {
+      // 本物の history は first-parent に限らず祖先を日付順に返す。ここでも全部の祖先を返す
+      const all = this.ancestors(String(variables.oid)).map((c) => ({ oid: c.sha, parents: { nodes: c.parents.slice(0, 1).map((p) => ({ oid: p })) } }));
+      return { status: 200, json: { data: { repository: { object: { history: { nodes: all.slice(0, 100) } } } } } };
+    }
     if (query.includes("createCommitOnBranch")) return this.createCommit(variables.input as Record<string, unknown>);
     if (query.includes("viewer")) return { status: 200, json: { data: { viewer: { login: LOGIN } } } };
     if (variables.owner !== this.owner || variables.name !== this.repo) return { status: 200, json: { data: { repository: null } } };
@@ -238,8 +335,10 @@ export class MockGitHub {
         text === undefined
           ? null
           : this.binaryBlobs.has(oid)
-            ? { text: null, isBinary: true, byteSize: Buffer.byteLength(text) }
-            : { text, isBinary: false, byteSize: Buffer.byteLength(text) };
+            ? { text: null, isBinary: true, isTruncated: false, byteSize: Buffer.byteLength(text) }
+            : this.truncatedBlobs.has(oid)
+              ? { text: text.slice(0, 1), isBinary: false, isTruncated: true, byteSize: Buffer.byteLength(text) }
+              : { text, isBinary: false, isTruncated: false, byteSize: Buffer.byteLength(text) };
     }
     return { status: 200, json: { data: { repository } } };
   }
@@ -253,6 +352,7 @@ export class MockGitHub {
       branch,
       expected,
       headline: String((input.message as { headline?: string })?.headline ?? ""),
+      body: String((input.message as { body?: string })?.body ?? ""),
       additions: changes.additions ?? [],
       deletions: changes.deletions ?? [],
     };
@@ -301,7 +401,7 @@ export class MockGitHub {
     const lower: Record<string, string> = {};
     for (const [k, v] of Object.entries(init.headers)) lower[k.toLowerCase()] = v;
     const r = this.handle(init.method, url, lower, init.body ?? "");
-    const h = this.responseHeaders();
+    const h: Record<string, string> = { ...this.responseHeaders(), ...(r.headers ?? {}) };
     return { status: r.status, ok: r.status >= 200 && r.status < 300, json: async () => r.json, headers: { get: (n: string) => h[n.toLowerCase()] ?? null } };
   };
 
@@ -323,7 +423,7 @@ export class MockGitHub {
           return;
         }
         const r = this.handle(req.method ?? "GET", req.url ?? "/", headers, Buffer.concat(chunks).toString("utf8"));
-        res.writeHead(r.status, { ...cors, ...this.responseHeaders(), "Content-Type": "application/json" }).end(JSON.stringify(r.json));
+        res.writeHead(r.status, { ...cors, ...this.responseHeaders(), ...(r.headers ?? {}), "Content-Type": "application/json" }).end(JSON.stringify(r.json));
       });
     });
     return new Promise((resolve) => server.listen(port, "127.0.0.1", () => resolve(() => new Promise((r) => server.close(() => r())))));
