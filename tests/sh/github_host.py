@@ -6,10 +6,10 @@
 - `GET /user` → `user.json`（無ければ 403）
 - `GET /repos/<o>/<r>/pulls?head=<o>:<branch>` → `branch` が `scene.json` のものなら
   `pulls.json`、違えば `[]`
-- `GET /repos/<o>/<r>/pulls/<番号>/reviews?page=<N>` → `reviews.<N>.json`
-  （無ければ `[]`。N の既定は 1）
-- `POST /graphql` の `reviewThreads` → 変数の cursor（sh は `c`、拡張は `after`）が null なら
-  `threads.1.json`、`threads.<k>.json` の `endCursor` と同じなら `threads.<k+1>.json`
+- `GET /repos/<o>/<r>/pulls/<番号>/reviews?page=<N>` → 番号が `pulls.json` のものなら
+  `reviews.<N>.json`（無ければ `[]`。N の既定は 1）
+- `POST /graphql` の `reviewThreads` → 番号が同じで、変数の cursor（sh は `c`、拡張は `after`）が
+  null なら `threads.1.json`、`threads.<k>.json` の `endCursor` と同じなら `threads.<k+1>.json`
 - `POST /graphql` の `viewer` → `user.json` の `login`
 - 依頼の投稿（`GET`/`POST /repos/<o>/<r>/issues/<番号>/comments`）は、状態のファイル
   （環境変数 `FAKE_GITHUB_STATE`）に溜めて返す（C1 のハーネスで request を通すため。見本に置かない）
@@ -70,7 +70,10 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
             return 200, _load(scene, "pulls.json")
         return 200, []
     pieces = path[len(base) + 1 :].split("/") if path.startswith(base + "/") else []
-    if method == "GET" and len(pieces) == 3 and pieces[0] == "pulls" and pieces[2] == "reviews":
+    number = str(((_load(scene, "pulls.json") or [{}])[0] or {}).get("number", ""))
+    if method == "GET" and pieces[:1] == ["pulls"] and pieces[2:] == ["reviews"]:
+        if pieces[1] != number:
+            return 200, []
         page = query.get("page", "1")
         found = _load(scene, f"reviews.{page}.json") if page.isdigit() else None
         return 200, found if found is not None else []
@@ -93,7 +96,7 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
     if method == "POST" and path == "/graphql":
         req = json.loads(body or "{}")
         q, variables = req.get("query", ""), req.get("variables") or {}
-        if "reviewThreads" in q:
+        if "reviewThreads" in q and str(variables.get("n", variables.get("number"))) == number:
             cursor = variables.get("c", variables.get("after"))
             k = 1
             while True:

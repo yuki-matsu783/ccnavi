@@ -7,11 +7,15 @@
  * PAT の期限のヘッダを返す。試験は `push`・`merge` で他の書き手を、`beforeCommit` で書く直前の
  * 割り込みを作る。
  *
+ * 段階 4 から、録ったホストの応答の見本（test/fixtures/host/github/。`host-fixture.ts`）をブランチに付けると、
+ * その MR・スレッド・レビューを見本のとおりに返す（`attachScene`）。依頼の後の変更の一覧（`GET /compare/<b>...<h>`）も返す。
+ *
  * 単体試験は `fetch` の代わりに `mockFetch` を渡し、実機の試験は `serve` で HTTP に出す。
  */
 import { createHash } from "node:crypto";
 import http from "node:http";
 import { NOW, type FixtureBranch } from "../fixtures/repo.js";
+import { sceneAnswer, type Scene } from "./host-fixture.js";
 
 export const TOKEN = "test-token-0123456789";
 export const LOGIN = "alice";
@@ -81,6 +85,8 @@ export class MockGitHub {
   onRequest: ((method: string, url: URL) => void) | null = null;
   /** コミットの変更の一覧（`GET /commits/<sha>` の files）を切る件数（本物は 300） */
   filesLimit = 300;
+  /** 付けた見本（ブランチ → 場面）。その MR・スレッド・レビューを見本のとおりに返す */
+  readonly scenes = new Map<string, Scene>();
   /** 開いた MR（ブランチ → 番号と Approve） */
   readonly pulls: Record<string, { number: number; reviews: { user: string; state: string }[] }[]> = {};
 
@@ -106,6 +112,13 @@ export class MockGitHub {
     for (const text of Object.values(c.files)) this.blobs.set(blobSha(text), text);
     this.commits.set(sha, { sha, ...c });
     return sha;
+  }
+
+  /** 見本の場面をブランチに付ける（同じ MR 番号の場面は 1 つずつ付ける） */
+  attachScene(branch: string, scene: Scene): void {
+    this.scenes.clear();
+    scene.branch = branch;
+    this.scenes.set(branch, scene);
   }
 
   head(name: string): string | undefined {
@@ -255,8 +268,14 @@ export class MockGitHub {
       if (l.graphql) return { status: 200, json: { data: null, errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }] }, headers: l.headers };
       return { status: l.status, json: { message: "You have exceeded a secondary rate limit" }, headers: l.headers };
     }
+    for (const scene of this.scenes.values()) {
+      const answered = sceneAnswer(scene, method, u, body);
+      if (answered) return answered;
+    }
     const base = `/repos/${this.owner}/${this.repo}`;
     if (method === "GET" && u.pathname === base) return { status: 200, json: { default_branch: this.defaultBranch } };
+    const compare = new RegExp(`^${base}/compare/([0-9a-f]{40})\\.\\.\\.([0-9a-f]{40})$`).exec(u.pathname);
+    if (method === "GET" && compare) return this.compare(compare[1], compare[2]);
     if (method === "GET" && u.pathname.startsWith(`${base}/git/ref/heads/`)) {
       const name = decodeURIComponent(u.pathname.slice(`${base}/git/ref/heads/`.length));
       const sha = this.heads.get(name);
@@ -294,6 +313,19 @@ export class MockGitHub {
     }
     if (method === "POST" && u.pathname.endsWith("/graphql")) return this.graphql(JSON.parse(body));
     return { status: 404, json: { message: "Not Found" } };
+  }
+
+  /** `GET /compare/<base>...<head>`。`base` が祖先なら ahead、同じなら identical、ほかは diverged。一覧は filesLimit で切る */
+  private compare(b: string, h: string): { status: number; json: unknown } {
+    const from = this.commits.get(b);
+    const to = this.commits.get(h);
+    if (!from || !to) return { status: 404, json: { message: "Not Found" } };
+    const status = b === h ? "identical" : this.ancestors(h).some((c) => c.sha === b) ? "ahead" : "diverged";
+    const files = [...new Set([...Object.keys(from.files), ...Object.keys(to.files)])]
+      .filter((p) => from.files[p] !== to.files[p])
+      .sort()
+      .map((p) => ({ filename: p, status: !(p in from.files) ? "added" : !(p in to.files) ? "removed" : "modified" }));
+    return { status: 200, json: { status, files: files.slice(0, this.filesLimit) } };
   }
 
   private graphql(req: { query: string; variables: Record<string, unknown> }): { status: number; json: unknown } {

@@ -6,6 +6,8 @@
  * - 設定画面で PAT とリポジトリを登録し、ボードが描ける
  * - 悪意のある Markdown を描いても、承認しても何も動かない
  * - ボードから承認と取り下げを書く（`createCommitOnBranch` の 1 コミット）
+ * - 段階 4: 依頼済みのフェーズに MR のスレッドを出し（悪意のある本文でも何も動かず、隠れない）、
+ *   ボードからレビュー済みの印を書く
  * - service worker が PAT の期限のヘッダを CORS に公開されていなくても読み、ボードの帯とバッジで知らせる（確認事項 5。模擬のホストで）
  * - PAT はボードに渡らない
  *
@@ -18,8 +20,9 @@ import os from "node:os";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
 
-import { fixture } from "../fixtures/repo.js";
-import { MockGitHub, TOKEN } from "../helpers/mock-github.js";
+import { fixture, requestedMark, reviewFamilyFiles } from "../fixtures/repo.js";
+import { loadScene } from "../helpers/host-fixture.js";
+import { LOGIN, MockGitHub, TOKEN } from "../helpers/mock-github.js";
 import { HERE } from "../helpers/python.js";
 
 const DIST = path.join(HERE, "dist-e2e");
@@ -231,6 +234,45 @@ test("CX-T079 PAT はボードに渡らない（画面にも、service worker �
     ]);
   });
   assert.ok(!answers.includes(TOKEN), answers);
+  await page.close();
+});
+
+test("CX-T138 レビュー済み: スレッドの悪意のある本文を描いても何も動かず隠れない。解決したらボードから印を 1 コミットで書く", async () => {
+  mock.branch("i0004", "main");
+  const at = mock.push("i0004", reviewFamilyFiles("i0004"), "作業とレビュー待ちの子");
+  mock.push("i0004", { ".ccnavi/approved/phases/i0004/1.requested": requestedMark(at) }, "ccnavi: レビューを依頼した");
+  mock.attachScene("i0004", loadScene("hostile"));
+  let page = await openBoard();
+  const box = page.locator('[data-family="i0004"] .review[data-phase="1"]');
+  assert.equal(await box.locator(".thread").count(), 8);
+  assert.equal(await box.locator("script, img, svg, iframe, form, style, details, summary, font").count(), 0);
+  const text = (await box.textContent()) ?? "";
+  for (const seen of ["畳んで隠した指摘", "〈HTML コメント: 隠したつもりの指摘〉", "hidden で隠した指摘", "白文字の指摘", "style で隠した指摘"]) {
+    assert.ok(text.includes(seen), seen);
+  }
+  for (const seen of ["畳んで隠した指摘", "hidden で隠した指摘", "style で隠した指摘"]) {
+    assert.ok(await box.getByText(seen).first().isVisible(), seen);
+  }
+  for (const a of await box.locator(".markdown a").all()) await a.click();
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => (window as unknown as { __pwned?: string }).__pwned ?? null), null);
+  assert.match((await box.locator(".problems").textContent()) ?? "", /未解決のスレッドが 8 件残っている/);
+  assert.equal(await box.locator("button").count(), 0);
+  await page.close();
+
+  mock.attachScene("i0004", loadScene("resolved"));
+  page = await openBoard();
+  const said = await press(page, '[data-family="i0004"] button[data-action=review]');
+  assert.match(said, /^written: レビュー済みを書いた/);
+  const mark = JSON.parse(mock.files("i0004")[".ccnavi/approved/phases/i0004/1.reviewed"]);
+  assert.deepEqual([mark.mr, mark.actor, mark.via], [42, LOGIN, "chrome"]);
+  assert.equal(await page.locator('[data-family="i0004"] .review').count(), 0);
+  assert.ok(!(await page.content()).includes(TOKEN));
+  const copy = await page.evaluate(async () => {
+    const send = (m: unknown) => (globalThis as unknown as { chrome: { runtime: { sendMessage(m: unknown): Promise<unknown> } } }).chrome.runtime.sendMessage(m);
+    return JSON.stringify(await send({ kind: "host", host: "github.com", op: "reviewCopy", args: ["acme", "widgets", "i0004"] }));
+  });
+  assert.ok(copy.includes('"ok":true') && !copy.includes(TOKEN), copy);
   await page.close();
 });
 
