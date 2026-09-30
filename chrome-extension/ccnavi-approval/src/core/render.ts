@@ -112,6 +112,15 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   if (batch.length === 0) {
     box.append(el(doc, "p", "empty", "承認待ちは無い"));
   }
+  if (r.text) {
+    // ccnavi が出した承認の画面の本文（範囲・リスク・計画など）を、最初に開いた形で出す（REQ-APV-01 の
+    // 「範囲を最初に」。レビューの決定 A）。閉じた details には入れない。素の文字列なので textContent
+    const screen = el(doc, "section", "screen");
+    screen.dataset.testid = "screen";
+    screen.append(el(doc, "h4", "", "承認の画面（ccnavi が出したもの。承認するとこのとおりに書く）"));
+    screen.append(el(doc, "pre", "", r.text));
+    box.append(screen);
+  }
   for (const entry of batch) {
     const item = el(doc, "section", "entry");
     item.dataset.ticket = entry.ticket;
@@ -126,12 +135,6 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
     body.append(md.markdown(entry.body));
     item.append(body);
     box.append(item);
-  }
-  if (r.text) {
-    const details = el(doc, "details", "screen");
-    details.append(el(doc, "summary", "", "承認の画面の本文（ccnavi が出したもの）"));
-    details.append(el(doc, "pre", "", r.text));
-    box.append(details);
   }
   const write = r.write ?? { allowed: false, reason: "" };
   if (batch.length > 0 && r.digest) {
