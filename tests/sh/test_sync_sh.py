@@ -801,8 +801,21 @@ class SyncTest(unittest.TestCase):
         self.assertTrue(os.path.isdir(lock))
 
     def test_an_old_lock_with_leading_zeros_is_taken_over(self):
-        # 先頭の 0 を 8 進に読んで落ちない。
-        lock = self.own_lock("0123", "0000000001")
+        # 先頭の 0 を 8 進に読んで落ちない。pid を確かめられない（別の OS）ので時刻で古いと見る。
+        lock = self.own_lock("0123", "0000000001", os_part="OtherOS")
+        done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(lock))
+
+    def test_a_live_owner_is_not_robbed_after_ten_minutes(self):
+        # 決定 B: 同じ機械で持ち主が生きていれば、10 分を過ぎても奪わない。
+        lock = self.own_lock(os.getpid(), int(time.time()) - 3600)
+        done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertTrue(os.path.isdir(lock))
+
+    def test_an_old_lock_of_another_os_is_taken_over_by_time(self):
+        lock = self.own_lock(os.getpid(), int(time.time()) - 3600, os_part="OtherOS")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(lock))

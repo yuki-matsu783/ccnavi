@@ -326,7 +326,8 @@ class C1TicketTest(C1Harness):
         pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
         events = os.path.join(self.tree, *APPROVED.split("/"), "events", PARENT + ".ndjson")
         with open(events, "a", encoding="utf-8", newline="\n") as f:
-            f.write(json.dumps({"at": "t", "ticket": PARENT, "kind": "phase-mark"}) + "\n")
+            row = {"at": "t", "ticket": PARENT, "kind": "phase-mark", "phase": 1, "mark": "pending"}
+            f.write(json.dumps(row) + "\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(
@@ -541,6 +542,153 @@ class C1TicketTest(C1Harness):
         self.assertIn("届いていた", result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(fields(self.record)["sha"], self.sha(self.tree, "HEAD"))
+
+    def test_a_delivered_push_whose_check_also_failed_is_not_written_twice(self):
+        """push の応答も ls-remote も落ちたが届いていた（段階 2d のレビューの 5）。
+
+        戻して取り込み直すと自分のコミットが戻るので、書き直さずに成功で終える。
+        """
+        count = os.path.join(self._tmp.name, "ls-count")
+        write(count, "0\n")
+        shim = os.path.join(self._tmp.name, "shim2")
+        executable(
+            os.path.join(shim, "git"),
+            "#!/bin/sh\n"
+            'for a in "$@"; do\n'
+            '  if [ "$a" = push ]; then\n'
+            f"    '{GIT}' \"$@\" >/dev/null 2>&1; echo 'fatal: hung up' >&2; exit 128\n"
+            "  fi\n"
+            f'  if [ "$a" = refs/heads/{PARENT} ]; then\n'
+            f"    n=$(cat '{count}'); echo $((n + 1)) > '{count}'\n"
+            "    if [ \"$n\" = 0 ]; then echo 'fatal: unable to access' >&2; exit 128; fi\n"
+            "  fi\n"
+            "done\n"
+            f"exec '{GIT}' \"$@\"\n",
+        )
+        result = self.ticket("start", PARENT, PATH=shim + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("書き直さずに終える", result.stderr)
+        self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
+        self.assertEqual(self.subjects(2)[1], "approve")
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+
+    # ---- コミット（決定 C）と、落ちたときの索引
+
+    def test_a_failed_commit_leaves_nothing_staged(self):
+        """署名に落ちてコミットできなければ、add した新しいファイルも索引から外す（レビューの 1）。"""
+        git(self.ws, "config", "commit.gpgsign", "true")
+        git(self.ws, "config", "gpg.program", "false")
+        self.assertEqual(self.ticket("start", PARENT).returncode, 1)
+        git(self.ws, "config", "commit.gpgsign", "false")
+        self.child_tree()
+        before = self.sha(self.tree, "HEAD")
+        git(self.ws, "config", "commit.gpgsign", "true")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("コミットできなかった", result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(git(self.tree, "diff", "--cached", "--name-only").stdout, "")
+        self.assertEqual(self.dirty(), "")
+
+    def test_a_hanging_signer_is_cut_off(self):
+        signer = executable(os.path.join(self._tmp.name, "slow-gpg"), "#!/bin/sh\nsleep 30\n")
+        git(self.ws, "config", "commit.gpgsign", "true")
+        git(self.ws, "config", "gpg.program", signer)
+        result = self.ticket("start", PARENT, CCNAVI_C1_COMMIT_TIMEOUT="2")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("見張り", result.stderr)
+        self.assertEqual(self.dirty(), "")
+
+    def test_the_users_commit_hooks_are_skipped(self):
+        hooks = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
+        hooks = hooks if os.path.isabs(hooks) else os.path.join(self.tree, hooks)
+        for name in ("pre-commit", "commit-msg"):
+            executable(os.path.join(hooks, name), "#!/bin/sh\nexit 1\n")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    # ---- 素通りさせない（段階 2d のレビューの 3）
+
+    def test_a_double_dash_does_not_slip_past_c1(self):
+        result = self.ticket("start", "--", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_the_executable_refuses_a_state_operation_without_c1(self):
+        refused = self.exe("ticket", "start", PARENT)
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("C1 の対象", refused.stderr)
+        self.assertEqual(self.dirty(), "")
+
+    # ---- 改行（autocrlf）と偽の跡
+
+    def test_autocrlf_hook_events_are_carried(self):
+        git(self.ws, "config", "core.autocrlf", "true")
+        events = f"{APPROVED}/events/{PARENT}.ndjson"
+        path = os.path.join(self.tree, *events.split("/"))
+        os.remove(path)
+        git(self.tree, "checkout", "--", events)
+        with open(path, "rb") as f:
+            self.assertIn(b"\r\n", f.read())
+        row = {"at": "t", "ticket": PARENT, "kind": "phase-mark", "phase": 1, "mark": "pending"}
+        with open(path, "ab") as f:
+            f.write(json.dumps(row).encode() + b"\n")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"ccnavi: {PARENT} の hook の印と跡を運ぶ", self.subjects(2))
+
+    def test_a_forged_event_line_stops(self):
+        events = f"{APPROVED}/events/{PARENT}.ndjson"
+        with open(os.path.join(self.tree, events), "a", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps({"at": "t", "ticket": PARENT, "kind": "approved"}) + "\n")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+
+    # ---- ロック（決定 B）
+
+    def test_a_long_lock_of_a_live_owner_is_not_taken(self):
+        os.makedirs(self.lock_dir())
+        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
+        system = subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
+        old = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout) - 3600
+        write(
+            os.path.join(self.lock_dir(), "owner"),
+            f"{host} {os.getpid()} {old} {os.getpid()}-{old} {system}\n",
+        )
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ロックが長い", result.stderr)
+        self.assertTrue(os.path.isdir(self.lock_dir()))
+
+    # ---- 基点のリンク
+
+    def test_a_linked_workspace_still_carries(self):
+        linked = self.ws + "-link"
+        os.symlink(self.ws, linked)
+        self.addCleanup(os.remove, linked)
+        result = subprocess.run(
+            [
+                SHELL,
+                os.path.join(linked, ".ccnavi", "scripts", "ccnavi-ticket.sh"),
+                "start",
+                PARENT,
+            ],
+            cwd=linked,
+            env=self.env(),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            input="",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
 
     # ---- 止める家族
 
