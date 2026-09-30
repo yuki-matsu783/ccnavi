@@ -53,13 +53,27 @@ export interface BatchEntry {
   readonly body: string;
 }
 
+export interface Withdrawable {
+  readonly ticket: string;
+  readonly title: string;
+  /** 取り下げられない理由（空なら取り下げを出す。承認コミットが引けるかは押したときに見る） */
+  readonly problems: readonly string[];
+}
+
 export interface BoardResult {
   readonly family: string;
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
+  /** 書けるか（互換の版・書く先の名前。Python が決める。7.3・8.5） */
+  readonly write?: { readonly allowed: boolean; readonly reason: string };
+  readonly withdrawable?: readonly Withdrawable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
+  /** 見せた画面の指紋（承認のときに Python が読み直した中身と比べる。8.3） */
+  readonly digest?: string;
+  /** 承認するときに `plan` へ渡す絞り（指紋を出したときの絞り。null なら絞らない） */
+  readonly only?: readonly string[] | null;
   readonly rejected?: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
   readonly problems?: readonly string[];
 }
@@ -69,6 +83,37 @@ export interface Compat {
   readonly repository: number | null;
   readonly same: boolean;
   readonly message: string;
+}
+
+/** 書くもの 1 つ（Changes の 1 行）。中身は本文か base64 */
+export interface ChangeRow {
+  readonly op: "create" | "update" | "delete";
+  readonly path: string;
+  readonly content?: string;
+  readonly base64?: string;
+}
+
+export interface Written {
+  readonly changes: Record<string, readonly ChangeRow[]> | null;
+  readonly lines: readonly string[];
+  readonly stopped: { readonly ticket: string; readonly reason: string } | null;
+}
+
+export interface PlanResult extends Written {
+  readonly identifiers: readonly string[];
+  readonly digest: string;
+  readonly mismatch: unknown;
+  readonly refused: string;
+  readonly rejected: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
+}
+
+export interface WithdrawResult extends Written {
+  readonly problems: readonly string[];
+}
+
+export interface Actor {
+  readonly account: string;
+  readonly version: string;
 }
 
 /** Python を呼ぶ口。Worker でも、試験の Node の Pyodide でも同じ形 */
@@ -96,4 +141,12 @@ export const py = {
   board: (call: PyCall, settings: string | null, snapshot: Snapshot, family: string) =>
     ask<BoardResult>(call, "board", { settings, snapshot, family }, ""),
   compat: (call: PyCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
+  plan: (
+    call: PyCall,
+    body: { settings: string | null; snapshot: Snapshot; family: string; only: readonly string[] | null; shown: { ids: readonly string[]; digest: string }; stamp: string; actor: Actor },
+  ) => ask<PlanResult>(call, "plan", { ...body }, ""),
+  withdraw: (
+    call: PyCall,
+    body: { settings: string | null; snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
+  ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
 };

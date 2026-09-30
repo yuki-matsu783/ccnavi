@@ -1,8 +1,11 @@
 /**
- * 読み取り専用ボードの DOM を組む。判定は出さず、Python の答えを並べるだけ（ADR-0035）。
+ * ボードの DOM を組む。判定は出さず、Python の答えを並べるだけ（ADR-0035）。
  *
  * 素の文字列はすべて `textContent`。Markdown の本文だけを消毒した断片で入れる（5.5 の 2）。
- * 承認・取り下げ・レビュー済み・「始める」のボタンは段階 1 では出さない。
+ * 段階 3 から、承認と取り下げのボタンを出す。出すかは Python の答え（`write.allowed`・
+ * `withdrawable` の理由）で決まり、ここは答えのとおりに並べるだけ。押したときの動き（`Actions`）は
+ * 呼び手が渡す。渡さなければボタンを出さない（読み取りだけ）。
+ * レビュー済み・「始める」は段階 4・5。
  */
 import type { Renderer } from "./sanitize.js";
 import type { FamilyBoard, RepoBoard } from "./snapshot.js";
@@ -15,7 +18,13 @@ function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, cls = 
   return node;
 }
 
-export function renderRepo(doc: Document, md: Renderer, board: RepoBoard): HTMLElement {
+/** ボタンを押したときの動き。呼び手（ボード）が渡す */
+export interface Actions {
+  approve(repo: RepoBoard, family: FamilyBoard): void;
+  withdraw(repo: RepoBoard, family: FamilyBoard, ticket: string): void;
+}
+
+export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, actions?: Actions): HTMLElement {
   const section = el(doc, "section", "repo");
   section.dataset.repo = repoKey(board.repo);
   const head = el(doc, "header", "repo-head");
@@ -33,7 +42,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard): HTMLE
     return section;
   }
   if (board.compat && !board.compat.same) {
-    section.append(notice(doc, "warn", `${board.compat.message}（段階 1 は表示だけ）`));
+    section.append(notice(doc, "warn", `${board.compat.message}（承認と取り下げは出さない。表示だけ）`));
   }
   if (board.missingExtras.length > 0) {
     section.append(notice(doc, "warn", `指定したブランチがリモートに無い: ${board.missingExtras.join(", ")}`));
@@ -44,7 +53,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard): HTMLE
     section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（家族）は無い"));
   }
   for (const f of board.families) {
-    section.append(renderFamily(doc, md, f));
+    section.append(renderFamily(doc, md, f, actions && { approve: () => actions.approve(board, f), withdraw: (t) => actions.withdraw(board, f, t) }));
   }
   const s = board.stats;
   section.append(el(doc, "p", "stats", `読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（控えから ${s.blobsCached} 件）`));
@@ -57,7 +66,20 @@ function notice(doc: Document, kind: "error" | "warn", text: string): HTMLElemen
   return p;
 }
 
-export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard): HTMLElement {
+export interface FamilyActions {
+  approve(): void;
+  withdraw(ticket: string): void;
+}
+
+function button(doc: Document, text: string, action: string, onClick: () => void): HTMLButtonElement {
+  const b = el(doc, "button", "action", text);
+  b.type = "button";
+  b.dataset.action = action;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, actions?: FamilyActions): HTMLElement {
   const box = el(doc, "article", "family");
   box.dataset.family = f.family.name;
   const title = el(doc, "h3");
@@ -110,6 +132,36 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard): HTMLE
     details.append(el(doc, "summary", "", "承認の画面の本文（ccnavi が出したもの）"));
     details.append(el(doc, "pre", "", r.text));
     box.append(details);
+  }
+  const write = r.write ?? { allowed: false, reason: "" };
+  if (batch.length > 0 && r.digest) {
+    if (!write.allowed) {
+      box.append(notice(doc, "warn", write.reason || "この家族は書けない"));
+    } else if (actions) {
+      const bar = el(doc, "div", "actions");
+      bar.append(button(doc, `承認する（${batch.map((e) => e.ticket).join(", ")}）`, "approve", actions.approve));
+      bar.append(el(doc, "span", "digest", `指紋 ${r.digest.slice(0, 12)}`));
+      box.append(bar);
+    }
+  }
+  const withdrawable = r.withdrawable ?? [];
+  if (withdrawable.length > 0) {
+    const list = el(doc, "section", "approved");
+    list.append(el(doc, "h4", "", "作業中の承認済みチケット"));
+    for (const w of withdrawable) {
+      const item = el(doc, "div", "approved-item");
+      item.dataset.ticket = w.ticket;
+      item.append(el(doc, "code", "", w.ticket), doc.createTextNode(` ${w.title} `));
+      if (w.problems.length === 0 && write.allowed && actions) {
+        item.append(button(doc, "承認を取り下げる", "withdraw", () => actions.withdraw(w.ticket)));
+      } else if (w.problems.length > 0) {
+        const ul = el(doc, "ul", "why-not");
+        for (const p of w.problems) ul.append(el(doc, "li", "", `取り下げられない: ${p}`));
+        item.append(ul);
+      }
+      list.append(item);
+    }
+    box.append(list);
   }
   for (const rej of r.rejected ?? []) {
     const item = el(doc, "section", "rejected");

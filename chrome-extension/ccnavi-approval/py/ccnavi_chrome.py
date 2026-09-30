@@ -444,7 +444,8 @@ def _op_board(req: dict, root: str) -> dict:
         return {"family": family, "closure": closure, "refused": _refused(root, code, err)}
     mine = [e["ticket"] for e in first["batch"] if (e.get("parent") or e["ticket"]) == family]
     body = first
-    if mine and len(mine) != len(first["batch"]):
+    narrowed = bool(mine) and len(mine) != len(first["batch"])
+    if narrowed:
         # 画面の本文と指紋を、この家族の分だけで組み直す（1 回の承認は 1 つの `P`。8.3）。
         code, body, err = _preview(root, place["env"], mine)
         if body is None:
@@ -464,6 +465,8 @@ def _op_board(req: dict, root: str) -> dict:
         # 指紋はこの本文と写しの中身を覆い、手元の `--approve --preview` と同じ値になる。
         "text": body["text"] if batch else "",
         "digest": body["digest"] if batch else "",
+        # 承認するときに `plan` へ渡す絞り（この指紋を出したときの絞り。絞らなければ null）
+        "only": mine if narrowed else None,
         "rejected": [
             {"ticket": r["ticket"], "problems": [_relative(root, p) for p in r["problems"]]}
             for r in first["rejected"]

@@ -7,11 +7,13 @@
 </head>
 <body data-state="loading">
 <header class="top">
-  <h1>ccnavi 承認ボード <span class="badge">読み取り専用</span></h1>
+  <h1>ccnavi 承認ボード</h1>
   <button type="button" id="refresh">更新</button>
   <button type="button" id="options">設定</button>
 </header>
 <p id="status" role="status">読み込み中…</p>
+<div id="banner"></div>
+<p id="result" role="status" aria-live="polite"></p>
 <main id="boards"></main>
 <script type="module" src="board.js"></script>
 </body>

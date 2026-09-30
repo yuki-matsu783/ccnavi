@@ -1,5 +1,6 @@
 /**
- * リポジトリ 1 つの読み取り専用ボードを組む（ADR-0093 の 8.1・8.2）。
+ * リポジトリ 1 つのボードを組む（ADR-0093 の 8.1・8.2）。書く流れ（`write.ts`）も同じ読み方で、
+ * 家族 1 つぶんの判定の入力を組み直す（`readFamily`）。
  *
  * 流れ:
  *
@@ -58,7 +59,7 @@ export interface RepoBoard {
   readonly stats: Stats;
 }
 
-class Reader {
+export class Reader {
   readonly branches: Record<string, Branch> = {};
   readonly absent: string[] = [];
 
@@ -146,27 +147,42 @@ class Reader {
   }
 }
 
+export interface IntegrationRead {
+  readonly integration: Snapshot["integration"];
+  readonly settings: string | null;
+  readonly place: Placement;
+  readonly compat: Compat;
+}
+
+/** 1〜3: 統合先を決め、置き場の綴り・統合先の中身・互換の印を読む。統合先が無ければ投げる */
+export async function readIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
+  const info = await reader.call<{ defaultBranch: string }>("repoInfo");
+  const name = repo.integration || info.defaultBranch;
+  const source = repo.integration ? "setting" : "default";
+  const head = await reader.head(name);
+  if (head === null) {
+    throw new Error(`統合先 ${name} がリモートに無い。設定を直す`);
+  }
+  const integration = { name, source, head } as const;
+  const first = await reader.read(name, head, [".claude/settings.json"]);
+  const settings = first.files[".claude/settings.json"] ?? null;
+  const place: Placement = await py.placement(deps.py, settings);
+  await reader.read(name, head, [...place.integration_paths, ...place.integration_files]);
+  const compat = await py.compat(deps.py, reader.snapshot(integration));
+  return { integration, settings, place, compat };
+}
+
 /** リポジトリ 1 つを読んで、家族ごとの承認待ちを組む。失敗は `error` に入れて返す */
 export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoard> {
   const empty = { repo, integration: null, compat: null, candidates: [], missingExtras: [], families: [], stats: deps.stats };
   const reader = new Reader(repo, deps);
+  let integration: Snapshot["integration"] | null = null;
   try {
-    // 1. 統合先
-    const info = await reader.call<{ defaultBranch: string }>("repoInfo");
-    const name = repo.integration || info.defaultBranch;
-    const source = repo.integration ? "setting" : "default";
-    const head = await reader.head(name);
-    if (head === null) {
-      return { ...empty, error: `統合先 ${name} がリモートに無い。設定を直す` };
-    }
-    const integration = { name, source, head } as const;
-
-    // 2・3. 置き場の綴り、統合先の中身、互換の印
-    const first = await reader.read(name, head, [".claude/settings.json"]);
-    const settings = first.files[".claude/settings.json"] ?? null;
-    const place: Placement = await py.placement(deps.py, settings);
-    await reader.read(name, head, [...place.integration_paths, ...place.integration_files]);
-    const compat = await py.compat(deps.py, reader.snapshot(integration));
+    // 1〜3. 統合先、置き場の綴り、統合先の中身、互換の印
+    const base = await readIntegration(repo, reader, deps);
+    integration = base.integration;
+    const { settings, place, compat } = base;
+    const name = integration.name;
 
     // 4. 表示用のブランチ（直近 N 日と利用者の指定）
     const since = new Date(deps.now().getTime() - repo.recentDays * 24 * 3600 * 1000);
@@ -194,8 +210,35 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
     }
     return { repo, integration, compat, candidates, missingExtras, families: boards, error: "", stats: deps.stats };
   } catch (err) {
-    return { ...empty, error: (err as Error).message ?? String(err) };
+    return { ...empty, integration, error: (err as Error).message ?? String(err) };
   }
+}
+
+/** 閉包の足りない家族を読み足し、判定の入力を統合先・P・閉包だけに絞る（D2） */
+async function closureInput(
+  family: string,
+  reader: Reader,
+  integration: Snapshot["integration"],
+  settings: string | null,
+  place: Placement,
+  deps: Deps,
+): Promise<Snapshot> {
+  // 閉包の足りない家族を読み足す。無いブランチは `absent` に入り、Python が決める
+  for (let round = 0; round < 32; round += 1) {
+    const closure = await py.closure(deps.py, settings, reader.snapshot(integration), family);
+    if (closure.over_limit || closure.need.length === 0) break;
+    for (const n of closure.need) {
+      const sha = await reader.head(n);
+      if (sha !== null) await reader.read(n, sha, place.branch_paths);
+    }
+  }
+  // 判定の入力は統合先・P・閉包だけ（D2）。表示用のブランチを混ぜないよう、ここで絞る
+  const all = reader.snapshot(integration);
+  const closure = await py.closure(deps.py, settings, all, family);
+  const keep = new Set([integration.name, ...closure.families]);
+  const branches: Record<string, Branch> = {};
+  for (const [k, v] of Object.entries(all.branches)) if (keep.has(k)) branches[k] = v;
+  return { integration, branches, absent: all.absent.filter((a) => keep.has(a)) };
 }
 
 async function familyBoard(
@@ -207,25 +250,30 @@ async function familyBoard(
   deps: Deps,
 ): Promise<FamilyBoard> {
   try {
-    // 閉包の足りない家族を読み足す。無いブランチは `absent` に入り、Python が決める
-    for (let round = 0; round < 32; round += 1) {
-      const closure = await py.closure(deps.py, settings, reader.snapshot(integration), family.name);
-      if (closure.over_limit || closure.need.length === 0) break;
-      for (const n of closure.need) {
-        const sha = await reader.head(n);
-        if (sha !== null) await reader.read(n, sha, place.branch_paths);
-      }
-    }
-    // 判定の入力は統合先・P・閉包だけ（D2）。表示用のブランチを混ぜないよう、ここで絞る
-    const all = reader.snapshot(integration);
-    const closure = await py.closure(deps.py, settings, all, family.name);
-    const keep = new Set([integration.name, ...closure.families]);
-    const branches: Record<string, Branch> = {};
-    for (const [k, v] of Object.entries(all.branches)) if (keep.has(k)) branches[k] = v;
-    const input: Snapshot = { integration, branches, absent: all.absent.filter((a) => keep.has(a)) };
+    const input = await closureInput(family.name, reader, integration, settings, place, deps);
     const result = await py.board(deps.py, settings, input, family.name);
     return { family, result, error: "" };
   } catch (err) {
     return { family, result: null, error: (err as Error).message ?? String(err) };
   }
+}
+
+export interface FamilyRead extends IntegrationRead {
+  /** 判定の入力（統合先・P・閉包の P_X） */
+  readonly input: Snapshot;
+  /** 読んだときの P の先頭。書く条件（`expectedHeadOid`）にする（8.3） */
+  readonly head: string;
+}
+
+/** 書く流れのために、家族 1 つぶんを新しく読み直す（8.3 の 2・4。毎回 Snapshot を組み直す） */
+export async function readFamily(repo: RepoConfig, family: string, deps: Deps): Promise<FamilyRead> {
+  const reader = new Reader(repo, deps);
+  const base = await readIntegration(repo, reader, deps);
+  const head = await reader.head(family);
+  if (head === null) {
+    throw new Error(`親のブランチ ${family} がホストに無い`);
+  }
+  await reader.read(family, head, base.place.branch_paths);
+  const input = await closureInput(family, reader, base.integration, base.settings, base.place, deps);
+  return { ...base, input, head };
 }
