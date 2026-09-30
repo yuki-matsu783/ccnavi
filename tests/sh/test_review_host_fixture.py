@@ -115,7 +115,16 @@ class HostFixtureTest(unittest.TestCase):
 
     def test_the_sh_copy_matches_each_recorded_scene(self):
         self.assertEqual(
-            github_host.scene_names(), ["changes-requested", "hostile", "paged", "resolved"]
+            github_host.scene_names(),
+            [
+                "changes-requested",
+                "cr-commented",
+                "full-page",
+                "hostile",
+                "paged",
+                "pending",
+                "resolved",
+            ],
         )
         for scene in github_host.scene_names():
             with self.subTest(scene=scene):
@@ -140,10 +149,14 @@ class HostFixtureTest(unittest.TestCase):
                 return json.load(f)
 
         self.assertEqual(said("resolved"), {"changes_requested": [], "unresolved": []})
+        self.assertEqual(said("full-page"), {"changes_requested": [], "unresolved": []})
         paged = said("paged")
         self.assertEqual(paged["changes_requested"], [])
-        self.assertEqual(len(paged["unresolved"]), 3)
-        self.assertEqual(len(said("changes-requested")["changes_requested"]), 1)
+        # GitHub では目印で始まるスレッドも人のものとして数える（11.8.1 の決定 C）
+        self.assertEqual(len(paged["unresolved"]), 4)
+        self.assertIn("PRRT_kwDOAbCdEs5P2003", paged["unresolved"])
+        for scene in ("changes-requested", "cr-commented", "pending"):
+            self.assertEqual(len(said(scene)["changes_requested"]), 1, scene)
         self.assertEqual(len(said("hostile")["unresolved"]), 8)
 
     def test_confirm_passes_the_token_owner_as_the_actor(self):
@@ -151,25 +164,88 @@ class HostFixtureTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         passed = self.passed()
         self.assertIn("confirm", passed)
-        at = passed.index("--actor")
-        self.assertEqual(passed[at + 1], "octo-reviewer")
+        self.assertIn("--actor=octo-reviewer", passed)
 
     def test_without_an_owner_confirm_passes_no_actor(self):
         done = self.review("resolved", "confirm", "--phase", "1", FAKE_GITHUB_NO_USER="1")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("confirm", self.passed())
-        self.assertNotIn("--actor", self.passed())
+        self.assertFalse(any(a.startswith("--actor") for a in self.passed()))
         # 引けなかったことで止めず、ホストの失敗の文面も出さない
         self.assertNotIn("失敗した", done.stderr)
 
+    def scene_with_login(self, login):
+        scene = os.path.join(tempfile.mkdtemp(dir=self._tmp.name), "odd")
+        shutil.copytree(os.path.join(github_host.SCENES, "resolved"), scene)
+        write(os.path.join(scene, "user.json"), json.dumps({"login": login}))
+        return scene
+
     def test_a_malformed_owner_is_not_passed(self):
-        user = os.path.join(github_host.SCENES, "resolved", "user.json")
-        scene = os.path.join(self._tmp.name, "scenes", "odd")
-        shutil.copytree(os.path.dirname(user), scene)
-        write(os.path.join(scene, "user.json"), json.dumps({"login": "a b;rm -rf /"}))
-        done = self.review(scene, "confirm", "--phase", "1")
+        for login in ("a b;rm -rf /", "-rf", "--actor", "ａｂｃ", "a" * 101):
+            if os.path.exists(self.args):
+                os.remove(self.args)
+            done = self.review(self.scene_with_login(login), "confirm", "--phase", "1")
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertFalse(any(a.startswith("--actor") for a in self.passed()), login)
+
+    def test_a_carriage_return_is_dropped_from_the_owner(self):
+        done = self.review(self.scene_with_login("octo-reviewer\r"), "confirm", "--phase", "1")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertNotIn("--actor", self.passed())
+        self.assertIn("--actor=octo-reviewer", self.passed())
+
+    def gh_path(self):
+        """gh が認証済みの形（疎通が通る）。curl は置かない（gh の経路だけを通す）。"""
+        fakes = os.path.join(self._tmp.name, "ghbin")
+        os.makedirs(fakes, exist_ok=True)
+        write(
+            os.path.join(fakes, "gh"),
+            f"#!/bin/sh\nexec '{sys.executable}' '{github_host.__file__}' gh \"$@\"\n",
+        )
+        os.chmod(os.path.join(fakes, "gh"), 0o755)
+        return os.pathsep.join([fakes, os.environ.get("PATH", "")])
+
+    def test_through_gh_the_owner_is_passed_and_its_stderr_is_not_mixed_in(self):
+        done = self.review("resolved", "confirm", "--phase", "1", PATH=self.gh_path())
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("--actor=octo-reviewer", self.passed())
+
+    def test_a_slow_gh_is_cut_off_and_no_actor_is_passed(self):
+        done = self.review(
+            "resolved",
+            "confirm",
+            "--phase",
+            "1",
+            PATH=self.gh_path(),
+            FAKE_GH_SLOW_USER="5",
+            CCNAVI_REVIEW_ACCOUNT_TIMEOUT="1",
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("confirm", self.passed())
+        self.assertFalse(any(a.startswith("--actor") for a in self.passed()))
+
+    def test_through_glab_the_username_is_passed(self):
+        glab = os.path.join(self._tmp.name, "glabbin", "glab")
+        write(
+            glab,
+            "#!/bin/sh\n"
+            "echo 'glab: 雑音' >&2\n"
+            'for a in "$@"; do last="$a"; done\n'
+            'case "$last" in\n'
+            'user) printf \'{"username": "lab-reviewer"}\' ;;\n'
+            '*merge_requests\\?*) printf \'[{"iid": 7, "web_url": "u"}]\' ;;\n'
+            "*/discussions*|*/reviewers*) printf '[]' ;;\n"
+            "*) printf '{}' ;;\n"
+            "esac\n",
+        )
+        os.chmod(glab, 0o755)
+        subprocess.run(
+            ["git", "-C", self.ws, "remote", "set-url", "origin", "https://gitlab.example/g/p.git"],
+            check=True,
+        )
+        path = os.pathsep.join([os.path.dirname(glab), os.environ.get("PATH", "")])
+        done = self.review("resolved", "confirm", "--phase", "1", PATH=path)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("--actor=lab-reviewer", self.passed())
 
     def test_confirm_does_not_take_an_actor_from_the_caller(self):
         for given in (["--actor", "someone"], ["--actor=someone"]):

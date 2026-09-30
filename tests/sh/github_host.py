@@ -11,6 +11,8 @@
 - `POST /graphql` の `reviewThreads` → 番号が同じで、変数の cursor（sh は `c`、拡張は `after`）が
   null なら `threads.1.json`、`threads.<k>.json` の `endCursor` と同じなら `threads.<k+1>.json`
 - `POST /graphql` の `viewer` → `user.json` の `login`
+- GraphQL は、見本の応答が持つ欄（`THREAD_FIELDS`・`login`）が問い合わせに語として全部あるとき
+  だけ答える
 - 依頼の投稿（`GET`/`POST /repos/<o>/<r>/issues/<番号>/comments`）は、状態のファイル
   （環境変数 `FAKE_GITHUB_STATE`）に溜めて返す（C1 のハーネスで request を通すため。見本に置かない）
 - ほかは 404
@@ -23,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from urllib.parse import parse_qs, urlsplit
 
@@ -32,6 +35,30 @@ SCENES = os.path.join(
     ROOT, "chrome-extension", "ccnavi-approval", "test", "fixtures", "host", "github"
 )
 API = "https://api.github.com"
+
+
+# 見本の応答が持つ欄。問い合わせがどれかを落とせば、本物は答えにその欄を入れないので、代役も答えない
+# （欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。拡張の代役と同じ
+THREAD_FIELDS = (
+    "reviewThreads",
+    "pageInfo",
+    "hasNextPage",
+    "endCursor",
+    "nodes",
+    "id",
+    "isResolved",
+    "comments",
+    "url",
+    "path",
+    "line",
+    "body",
+    "createdAt",
+)
+
+
+def _missing_fields(query: str, fields) -> list[str]:
+    """問い合わせに語として現れない欄の名前。"""
+    return [f for f in fields if not re.search(rf"(?<![A-Za-z0-9_]){f}(?![A-Za-z0-9_])", query)]
 
 
 def scene_names() -> list[str]:
@@ -97,6 +124,9 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
         req = json.loads(body or "{}")
         q, variables = req.get("query", ""), req.get("variables") or {}
         if "reviewThreads" in q and str(variables.get("n", variables.get("number"))) == number:
+            missing = _missing_fields(q, THREAD_FIELDS)
+            if missing:
+                return 200, {"errors": [{"message": f"問い合わせに欄が無い: {', '.join(missing)}"}]}
             cursor = variables.get("c", variables.get("after"))
             k = 1
             while True:
@@ -109,7 +139,7 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
                 if info["endCursor"] == cursor:
                     cursor = None
                 k += 1
-        if "viewer" in q:
+        if "viewer" in q and not _missing_fields(q, ("login",)):
             return 200, {"data": {"viewer": {"login": (_load(scene, "user.json") or {})["login"]}}}
     return 404, {"message": "Not Found"}
 
@@ -156,6 +186,45 @@ def curl(argv: list[str]) -> int:
     return 0
 
 
+def gh(argv: list[str]) -> int:
+    """gh の代役（`gh api --hostname <h> [--method <M>] [--input -] <rel>`）。
+
+    見本を返し、標準エラーに雑音を出す。
+
+    標準エラーの雑音は、`ccnavi-review.sh` が gh の応答に標準エラーを混ぜないことを見るため。
+    `FAKE_GH_SLOW_USER` に秒を入れると、`user` の答えをその秒だけ遅らせる（時間の上限の試験）。
+    """
+    if argv[:1] != ["api"]:
+        return 1
+    method, rel, body, i = "GET", "", "", 1
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--hostname", "--method", "--input"):
+            if a == "--method":
+                method = argv[i + 1]
+            if a == "--input":
+                body = sys.stdin.read()
+            i += 2
+            continue
+        rel = a
+        i += 1
+    sys.stderr.write("gh: 更新があります（雑音）\n")
+    path = "/" + rel if not rel.startswith("/") else rel
+    if path == "/user" and os.environ.get("FAKE_GH_SLOW_USER"):
+        import time
+
+        time.sleep(float(os.environ["FAKE_GH_SLOW_USER"]))
+    meta = _load(os.environ["FAKE_GITHUB_SCENE"], "scene.json") or {}
+    if path == f"/repos/{meta.get('owner')}/{meta.get('repo')}":
+        sys.stdout.write("{}")
+        return 0
+    status, data = answer(
+        os.environ["FAKE_GITHUB_SCENE"], method, path, body, os.environ.get("FAKE_GITHUB_STATE", "")
+    )
+    sys.stdout.write(json.dumps(data, ensure_ascii=False))
+    return 0 if status < 400 else 1
+
+
 def install(bin_dir: str, python: str) -> None:
     """PATH の先頭に置く代役（`curl` と、使えない `gh`）を bin_dir に書く。"""
     os.makedirs(bin_dir, exist_ok=True)
@@ -173,5 +242,7 @@ def install(bin_dir: str, python: str) -> None:
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "curl":
         sys.exit(curl(sys.argv[2:]))
-    sys.stderr.write("使い方: github_host.py curl <curl の引数>...\n")
+    if len(sys.argv) > 1 and sys.argv[1] == "gh":
+        sys.exit(gh(sys.argv[2:]))
+    sys.stderr.write("使い方: github_host.py curl|gh <引数>...\n")
     sys.exit(2)

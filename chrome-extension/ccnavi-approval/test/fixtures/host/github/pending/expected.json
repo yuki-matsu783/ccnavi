@@ -1,0 +1,22 @@
+{
+  "host": "github",
+  "mr": {
+    "number": 42,
+    "url": "https://github.com/acme/widgets/pull/42"
+  },
+  "threads": [],
+  "reviews": [
+    {
+      "state": "CHANGES_REQUESTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9301",
+      "submitted_at": "2026-09-29T02:00:00Z",
+      "author": "9001"
+    },
+    {
+      "state": "PENDING",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9302",
+      "submitted_at": "",
+      "author": "9001"
+    }
+  ]
+}
