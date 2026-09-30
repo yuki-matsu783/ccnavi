@@ -5,13 +5,14 @@
  * この鍵を読まない（画面が読むのは `repos` だけ）。PAT の期限は `tokenMeta:<ホスト>` に控え（D25）、
  * 1 日 1 回（`chrome.alarms`）比べて、切れる 7 日前からバッジに出す。
  */
+import { ALARM, ensureDailyAlarm } from "../core/alarm.js";
 import { badgeText, expiryNotice, type TokenMeta } from "../core/expiry.js";
 import { dispatch, type Deps } from "../core/protocol.js";
+import { readRepos } from "../core/settings.js";
 
 const HOSTS = __CCNAVI_HOSTS__;
 const tokenKey = (host: string) => `token:${host}`;
 const metaKey = (host: string) => `tokenMeta:${host}`;
-const ALARM = "pat-expiry";
 
 async function getToken(host: string): Promise<string> {
   const got = await chrome.storage.local.get(tokenKey(host));
@@ -57,6 +58,10 @@ const deps: Deps = {
     await refreshBadge();
   },
   now: () => new Date(),
+  async getRepos() {
+    const got = await chrome.storage.local.get("repos");
+    return readRepos(got.repos, HOSTS);
+  },
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -71,5 +76,6 @@ chrome.action.onClicked.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) void refreshBadge();
 });
-void chrome.alarms.create(ALARM, { periodInMinutes: 24 * 60, delayInMinutes: 1 });
+// 起き直すたびに作り直さない（周期が数え直しになる）。無いときだけ作る
+void ensureDailyAlarm(chrome.alarms);
 void refreshBadge();

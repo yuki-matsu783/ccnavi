@@ -77,7 +77,12 @@ export function origins(hosts: readonly Host[]): string[] {
   return out;
 }
 
-export const CSP_BASE = "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'";
+/**
+ * 画像・フォームの送り先・base を塞ぐ（レビューの 14）。足すのは Pyodide に要る 'wasm-unsafe-eval' だけ。
+ * `default-src 'self'` は入れない: 悪意のある本文の style 属性を DOMPurify が落とす前の解析で、Chromium が
+ * インラインの style の違反を毎回報告する（止まるのは同じで、表示の守りは DOMPurify が持つ）
+ */
+export const CSP_BASE = "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'";
 
 /** 拡張のページの CSP。`connect-src` は通信先だけ */
 export function csp(hosts: readonly Host[]): string {

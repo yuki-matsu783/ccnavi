@@ -6,13 +6,16 @@
  * 他の拡張・ウェブページからの呼び出し（`onMessageExternal`）は受けない。
  *
  * 段階 3 から、書く操作 `commit`（`createCommitOnBranch`）を受ける。受けるのはボードからだけで、
- * 書く先が予約の名前（`main`・`master`・`develop`・`release*`）か、頼みに添えた統合先の名前なら
- * 断る（8.5。Python も同じ検査をする。ここは二重の守り）。PAT の期限（D25）は応答ヘッダから読んで控え、
+ * 設定画面で登録したリポジトリだけに書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か
+ * 統合先の名前（ボードの値を信じず自分で引く）なら断り、書くパスは置き場（統合先の `.claude/settings.json`
+ * から自分で引く）の下に限る（8.5・レビューの決定 D。Python も同じ検査をする。ここは二重の守り）。PAT の期限（D25）は応答ヘッダから読んで控え、
  * 画面へは期限だけを返す（PAT そのものは返さない）。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
+import { placesFromSettings, writeRefusal, type Places } from "./guard.js";
 import type { Host } from "./hosts.js";
+import type { RepoConfig } from "./settings.js";
 
 export type HostOp =
   | "repoInfo"
@@ -24,6 +27,7 @@ export type HostOp =
   | "viewer"
   | "approvalCommit"
   | "pullApprovals"
+  | "commitParents"
   | "commit";
 
 export type Request =
@@ -77,6 +81,10 @@ export interface Deps {
   clearToken(host: string): Promise<void>;
   /** PAT の期限の控え（D25）。PAT そのものとは別の鍵に置く */
   getMeta(host: string): Promise<TokenMeta>;
+  /** 設定画面で登録したリポジトリ（書く頼みはここにあるものだけ受ける。決定 D） */
+  getRepos(): Promise<RepoConfig[]>;
+  /** 待つ（レート制限の Retry-After）。無ければ本物の時計 */
+  readonly sleep?: (ms: number) => Promise<void>;
   setMeta(host: string, meta: TokenMeta): Promise<void>;
   /** 今の時刻（期限の比べ） */
   now(): Date;
@@ -90,10 +98,12 @@ export interface TokenStatus {
 
 const TOKEN = /^[A-Za-z0-9_\-.]{8,255}$/;
 /** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字を畳んで比べる */
-const PROTECTED = /^(?:main|master|develop|release|release[-/].*)$/i;
 /** 1 コミットで書くファイルの上限と、1 ファイルの大きさの上限（base64 の字数） */
 const MAX_FILES = 200;
 const MAX_CONTENTS = 4 * 1024 * 1024;
+/** コミットの見出しと本文の字数の上限（見出しは件数に畳む。全件は本文。write.ts） */
+export const MAX_HEADLINE = 200;
+const MAX_BODY = 64 * 1024;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 function hostOf(deps: Deps, id: unknown): Host {
@@ -165,9 +175,9 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
   }
   const counter: github.Counter = { rest: 0, graphql: 0 };
   const seen = { expiration: "" };
-  const client: github.Client = { host, token, fetch: deps.fetch, counter, seen };
+  const client: github.Client = { host, token, fetch: deps.fetch, counter, seen, sleep: deps.sleep };
   try {
-    return await hostOp(client, op, args, counter);
+    return await hostOp(client, op, args, counter, deps);
   } finally {
     // 応答から期限を読めたら控える（D25。ホストの値が正）
     const iso = seen.expiration ? github.parseExpiration(seen.expiration) : "";
@@ -178,6 +188,44 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
   }
 }
 
+/** 書く頼みの断り（形が悪い・守りに当たった）。書く流れはこれを「先頭が動いた」と取り違えない */
+export const REFUSED = 400;
+
+function refuse(error: string): Response {
+  return { ok: false, error, status: REFUSED };
+}
+
+function commitArgs(args: unknown[]) {
+  const [, , branch, expected, headline, body, additions, deletions] = args;
+  const name = github.checkBranch(branch);
+  if (!Array.isArray(additions) || !Array.isArray(deletions) || additions.length + deletions.length > MAX_FILES) {
+    throw new Error(`書くファイルは ${MAX_FILES} 件までの並び`);
+  }
+  if (additions.length + deletions.length === 0) throw new Error("書くものが無い");
+  const adds = additions.map((x: unknown) => {
+    const e = x as { path?: unknown; contents?: unknown };
+    if (typeof e.contents !== "string" || e.contents.length > MAX_CONTENTS || !BASE64.test(e.contents)) {
+      throw new Error("contents が base64 でないか大きすぎる");
+    }
+    return { path: github.checkPath(e.path), contents: e.contents };
+  });
+  const dels = deletions.map((p: unknown) => github.checkPath(p));
+  if (typeof body !== "string" || body.length > MAX_BODY) throw new Error(`コミットの本文は ${MAX_BODY} 字までの文字列`);
+  return { name, expected: github.checkOid(expected), headline: text(headline, "コミットの見出し", MAX_HEADLINE), body, adds, dels };
+}
+
+/** 統合先の先頭の `.claude/settings.json` から置き場の綴りを読む */
+async function placesAt(client: github.Client, o: string, r: string, integ: string): Promise<Places> {
+  const head = await github.branchHead(client, o, r, integ);
+  if (head === null) throw new Error(`統合先 ${integ} がリモートに無い`);
+  const objs = await github.pathObjects(client, o, r, head, [".claude/settings.json"]);
+  const obj = objs[".claude/settings.json"];
+  if (!obj) return placesFromSettings(null);
+  const blob = (await github.blobs(client, o, r, [obj.oid]))[obj.oid];
+  if (!blob || blob.binary || blob.text === null) throw new Error(".claude/settings.json を読めない");
+  return placesFromSettings(blob.text);
+}
+
 function text(value: unknown, what: string, max: number): string {
   if (typeof value !== "string" || value === "" || value.length > max || /[\x00-\x1f\x7f]/.test(value)) {
     throw new github.HostError(`${what} が読めない`);
@@ -185,7 +233,7 @@ function text(value: unknown, what: string, max: number): string {
   return value;
 }
 
-async function hostOp(client: github.Client, op: unknown, args: unknown[], counter: github.Counter): Promise<Response> {
+async function hostOp(client: github.Client, op: unknown, args: unknown[], counter: github.Counter, deps: Deps): Promise<Response> {
   const [owner, repo, a, b] = args as unknown[];
   const o = github.checkName(owner, "owner");
   const r = github.checkName(repo, "repo");
@@ -231,29 +279,31 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = await github.pullApprovals(client, o, r, github.checkBranch(a));
       break;
     case "commit": {
-      const [, , branch, expected, headline, additions, deletions, integration] = args;
-      const name = github.checkBranch(branch);
-      const integ = github.checkBranch(integration);
-      if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return { ok: false, error: `${name} は保護されたブランチか統合先の名前なので書かない（ADR-0093 の 8.5）` };
+      // 書く頼みの形が悪ければ 400 で断る（書く流れは「先頭が動いた」と取り違えずに原因を言う）
+      let checked: { name: string; expected: string; headline: string; body: string; adds: github.FileAddition[]; dels: string[] };
+      try {
+        checked = commitArgs(args);
+      } catch (err) {
+        return refuse((err as Error).message);
       }
-      if (!Array.isArray(additions) || !Array.isArray(deletions) || additions.length + deletions.length > MAX_FILES) {
-        return { ok: false, error: `書くファイルは ${MAX_FILES} 件までの並び` };
+      // 書く先の守り（決定 D）: 登録したリポジトリだけ。統合先の名前と置き場の綴りはボードの値を信じず、自分で引く
+      const cfg = (await deps.getRepos()).find((x) => x.host === client.host.id && x.owner === o && x.repo === r);
+      if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなので書かない`);
+      const integ = cfg.integration || (await github.repoInfo(client, o, r)).defaultBranch;
+      let places: Places;
+      try {
+        places = await placesAt(client, o, r, integ);
+      } catch (err) {
+        return refuse(`統合先 ${integ} の置き場の綴りを読めないので書かない（${(err as Error).message}）`);
       }
-      if (additions.length + deletions.length === 0) {
-        return { ok: false, error: "書くものが無い" };
-      }
-      const adds = additions.map((x: unknown) => {
-        const e = x as { path?: unknown; contents?: unknown };
-        if (typeof e.contents !== "string" || e.contents.length > MAX_CONTENTS || !BASE64.test(e.contents)) {
-          throw new github.HostError("contents が base64 でないか大きすぎる");
-        }
-        return { path: github.checkPath(e.path), contents: e.contents };
-      });
-      const dels = deletions.map((p: unknown) => github.checkPath(p));
-      value = await github.createCommit(client, o, r, name, github.checkOid(expected), text(headline, "コミットの見出し", 200), adds, dels);
+      const why = writeRefusal(checked.name, integ, [...checked.adds.map((a) => a.path), ...checked.dels], places);
+      if (why) return refuse(why);
+      value = await github.createCommit(client, o, r, checked.name, checked.expected, checked.headline, checked.body, checked.adds, checked.dels);
       break;
     }
+    case "commitParents":
+      value = await github.commitParents(client, o, r, github.checkOid(a));
+      break;
     default:
       return { ok: false, error: `知らない操作: ${String(op)}` };
   }

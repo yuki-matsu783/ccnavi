@@ -33,7 +33,9 @@ declare namespace chrome {
   namespace alarms {
     interface Alarm {
       name: string;
+      periodInMinutes?: number;
     }
+    function get(name: string): Promise<Alarm | undefined>;
     function create(name: string, info: { periodInMinutes?: number; delayInMinutes?: number }): Promise<void>;
     const onAlarm: { addListener(cb: (alarm: Alarm) => void): void };
   }
