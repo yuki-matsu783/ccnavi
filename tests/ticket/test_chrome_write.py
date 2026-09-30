@@ -220,6 +220,55 @@ class WrittenCopyTest(ChromeWriteHarness):
             problems[0].detail,
         )
 
+    def test_a_later_local_touch_is_not_blamed_on_chrome(self):
+        """Chrome の承認の後に手元の跡（着手など）があれば、違いを Chrome の版のせいにしない。"""
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        body = self.plan()
+        self.apply(body["changes"]["i0001"], self.parent_tree)
+        events = os.path.join(self.approved, "events", "i0001.ndjson")
+        with open(events, "a", encoding="utf-8") as f:
+            f.write(
+                json.dumps({"at": "x", "ticket": "i0001", "kind": "started", "via": "cli"}) + "\n"
+            )
+        copy = os.path.join(self.approved, "doing", "i0001.md")
+        with open(copy, encoding="utf-8") as f:
+            text = f.read()
+        write(copy, text.replace("  - research", "  - no-such-phase", 1))
+        problems = lint.family_check(self.conf(), self.root, "i0001", "self")
+        self.assertTrue(problems)
+        self.assertFalse(any(p.detail.startswith("Chrome ") for p in problems), problems)
+
+
+class EntryDetailTest(ChromeWriteHarness):
+    def test_relative_folds_only_at_the_head_of_a_path(self):
+        chrome = _chrome()
+        self.assertEqual(chrome._relative("/ws", "wip/ws/todo/i0001.md"), "wip/ws/todo/i0001.md")
+        self.assertEqual(
+            chrome._relative("/ws", "読めない: /ws/.claude/worktrees/i0001/wip/ws/x.md"),
+            "読めない: i0001:wip/ws/x.md",
+        )
+        self.assertEqual(chrome._relative("/ws", "'/ws/a' と a/ws/b"), "'a' と a/ws/b")
+
+    def test_a_history_that_cannot_be_written_stops_the_plan(self):
+        chrome = _chrome()
+        chrome._unwritten("/ws", "")
+        with self.assertRaises(chrome.Refused) as caught:
+            chrome._unwritten("/ws", "ccnavi: 警告: i0001 の履歴を /ws/x に書けない\n")
+        self.assertEqual(str(caught.exception), "ccnavi: i0001 の履歴を x に書けない")
+
+    def test_every_writing_op_checks_compat_and_the_branch(self):
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        self.compat(version.COMPAT + 1)
+        for op, extra in (
+            ("plan", {}),
+            ("withdraw", {"ids": ["i0001"], "prior": {}}),
+            ("confirm", {"phase": 1, "result": {"host": "h", "mr": {"number": 1, "url": "u"}}}),
+        ):
+            body = self.answer(self.chrome_request(op, "i0001", **extra))
+            self.assertIn("7.3", body.get("error", ""), op)
+
 
 class WithdrawableTest(ChromeWriteHarness):
     def test_the_board_says_which_copies_can_be_withdrawn(self):
