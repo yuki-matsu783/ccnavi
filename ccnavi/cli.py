@@ -239,6 +239,9 @@ cannot reach them by the relative path)
 which fetches the threads and runs
 
     ccnavi --reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
+        [--actor=<account> --via=terminal|board]
+        (the script passes the token owner when it can read it; the reviewed mark
+         keeps the account and the way. Without it the mark is as before)
 
 A phase whose type says `review: chat` is reviewed in the session itself. There
 is no merge request and no copy to read, so a human opens that gate from the
