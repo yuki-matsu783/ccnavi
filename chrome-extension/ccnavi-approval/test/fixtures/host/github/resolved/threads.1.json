@@ -1,0 +1,46 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpHOAAAAAg=="
+          },
+          "nodes": [
+            {
+              "id": "PRRT_kwDOAbCdEs5AAAAB",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r1001",
+                    "path": "src/app.py",
+                    "line": 3,
+                    "body": "ここは直す",
+                    "createdAt": "2026-09-29T01:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5AAAAC",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r1002",
+                    "path": "wip/design/plan.md",
+                    "line": 12,
+                    "body": "表を足す\n\n- 列を 1 つ",
+                    "createdAt": "2026-09-29T01:05:00Z"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

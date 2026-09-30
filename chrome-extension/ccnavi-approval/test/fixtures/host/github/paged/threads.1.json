@@ -1,0 +1,1516 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "Y3Vyc29yOnYyOpHOAAAAZA=="
+          },
+          "nodes": [
+            {
+              "id": "PRRT_kwDOAbCdEs5P1000",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2000",
+                    "path": "src/mod0.py",
+                    "line": 1,
+                    "body": "指摘 0",
+                    "createdAt": "2026-09-28T00:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1001",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2001",
+                    "path": "src/mod1.py",
+                    "line": 2,
+                    "body": "指摘 1",
+                    "createdAt": "2026-09-28T00:01:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1002",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2002",
+                    "path": "src/mod2.py",
+                    "line": 3,
+                    "body": "指摘 2",
+                    "createdAt": "2026-09-28T00:02:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1003",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2003",
+                    "path": "src/mod3.py",
+                    "line": 4,
+                    "body": "指摘 3",
+                    "createdAt": "2026-09-28T00:03:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1004",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2004",
+                    "path": "src/mod4.py",
+                    "line": 5,
+                    "body": "指摘 4",
+                    "createdAt": "2026-09-28T00:04:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1005",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2005",
+                    "path": "src/mod5.py",
+                    "line": 6,
+                    "body": "指摘 5",
+                    "createdAt": "2026-09-28T00:05:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1006",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2006",
+                    "path": "src/mod6.py",
+                    "line": 7,
+                    "body": "指摘 6",
+                    "createdAt": "2026-09-28T00:06:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1007",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2007",
+                    "path": "src/mod0.py",
+                    "line": 8,
+                    "body": "指摘 7",
+                    "createdAt": "2026-09-28T00:07:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1008",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2008",
+                    "path": "src/mod1.py",
+                    "line": 9,
+                    "body": "指摘 8",
+                    "createdAt": "2026-09-28T00:08:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1009",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2009",
+                    "path": "src/mod2.py",
+                    "line": 10,
+                    "body": "指摘 9",
+                    "createdAt": "2026-09-28T00:09:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1010",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2010",
+                    "path": "src/mod3.py",
+                    "line": 11,
+                    "body": "指摘 10",
+                    "createdAt": "2026-09-28T00:10:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1011",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2011",
+                    "path": "src/mod4.py",
+                    "line": 12,
+                    "body": "指摘 11",
+                    "createdAt": "2026-09-28T00:11:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1012",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2012",
+                    "path": "src/mod5.py",
+                    "line": 13,
+                    "body": "指摘 12",
+                    "createdAt": "2026-09-28T00:12:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1013",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2013",
+                    "path": "src/mod6.py",
+                    "line": 14,
+                    "body": "指摘 13",
+                    "createdAt": "2026-09-28T00:13:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1014",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2014",
+                    "path": "src/mod0.py",
+                    "line": 15,
+                    "body": "指摘 14",
+                    "createdAt": "2026-09-28T00:14:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1015",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2015",
+                    "path": "src/mod1.py",
+                    "line": 16,
+                    "body": "指摘 15",
+                    "createdAt": "2026-09-28T00:15:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1016",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2016",
+                    "path": "src/mod2.py",
+                    "line": 17,
+                    "body": "指摘 16",
+                    "createdAt": "2026-09-28T00:16:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1017",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2017",
+                    "path": "src/mod3.py",
+                    "line": 18,
+                    "body": "指摘 17",
+                    "createdAt": "2026-09-28T00:17:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1018",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2018",
+                    "path": "src/mod4.py",
+                    "line": 19,
+                    "body": "指摘 18",
+                    "createdAt": "2026-09-28T00:18:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1019",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2019",
+                    "path": "src/mod5.py",
+                    "line": 20,
+                    "body": "指摘 19",
+                    "createdAt": "2026-09-28T00:19:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1020",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2020",
+                    "path": "src/mod6.py",
+                    "line": 21,
+                    "body": "指摘 20",
+                    "createdAt": "2026-09-28T00:20:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1021",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2021",
+                    "path": "src/mod0.py",
+                    "line": 22,
+                    "body": "指摘 21",
+                    "createdAt": "2026-09-28T00:21:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1022",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2022",
+                    "path": "src/mod1.py",
+                    "line": 23,
+                    "body": "指摘 22",
+                    "createdAt": "2026-09-28T00:22:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1023",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2023",
+                    "path": "src/mod2.py",
+                    "line": 24,
+                    "body": "指摘 23",
+                    "createdAt": "2026-09-28T00:23:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1024",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2024",
+                    "path": "src/mod3.py",
+                    "line": 25,
+                    "body": "指摘 24",
+                    "createdAt": "2026-09-28T00:24:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1025",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2025",
+                    "path": "src/mod4.py",
+                    "line": 26,
+                    "body": "指摘 25",
+                    "createdAt": "2026-09-28T00:25:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1026",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2026",
+                    "path": "src/mod5.py",
+                    "line": 27,
+                    "body": "指摘 26",
+                    "createdAt": "2026-09-28T00:26:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1027",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2027",
+                    "path": "src/mod6.py",
+                    "line": 28,
+                    "body": "指摘 27",
+                    "createdAt": "2026-09-28T00:27:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1028",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2028",
+                    "path": "src/mod0.py",
+                    "line": 29,
+                    "body": "指摘 28",
+                    "createdAt": "2026-09-28T00:28:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1029",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2029",
+                    "path": "src/mod1.py",
+                    "line": 30,
+                    "body": "指摘 29",
+                    "createdAt": "2026-09-28T00:29:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1030",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2030",
+                    "path": "src/mod2.py",
+                    "line": 31,
+                    "body": "指摘 30",
+                    "createdAt": "2026-09-28T00:30:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1031",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2031",
+                    "path": "src/mod3.py",
+                    "line": 32,
+                    "body": "指摘 31",
+                    "createdAt": "2026-09-28T00:31:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1032",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2032",
+                    "path": "src/mod4.py",
+                    "line": 33,
+                    "body": "指摘 32",
+                    "createdAt": "2026-09-28T00:32:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1033",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2033",
+                    "path": "src/mod5.py",
+                    "line": 34,
+                    "body": "指摘 33",
+                    "createdAt": "2026-09-28T00:33:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1034",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2034",
+                    "path": "src/mod6.py",
+                    "line": 35,
+                    "body": "指摘 34",
+                    "createdAt": "2026-09-28T00:34:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1035",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2035",
+                    "path": "src/mod0.py",
+                    "line": 36,
+                    "body": "指摘 35",
+                    "createdAt": "2026-09-28T00:35:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1036",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2036",
+                    "path": "src/mod1.py",
+                    "line": 37,
+                    "body": "指摘 36",
+                    "createdAt": "2026-09-28T00:36:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1037",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2037",
+                    "path": "src/mod2.py",
+                    "line": 38,
+                    "body": "指摘 37",
+                    "createdAt": "2026-09-28T00:37:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1038",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2038",
+                    "path": "src/mod3.py",
+                    "line": 39,
+                    "body": "指摘 38",
+                    "createdAt": "2026-09-28T00:38:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1039",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2039",
+                    "path": "src/mod4.py",
+                    "line": 40,
+                    "body": "指摘 39",
+                    "createdAt": "2026-09-28T00:39:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1040",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2040",
+                    "path": "src/mod5.py",
+                    "line": 41,
+                    "body": "指摘 40",
+                    "createdAt": "2026-09-28T00:40:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1041",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2041",
+                    "path": "src/mod6.py",
+                    "line": 42,
+                    "body": "指摘 41",
+                    "createdAt": "2026-09-28T00:41:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1042",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2042",
+                    "path": "src/mod0.py",
+                    "line": 43,
+                    "body": "指摘 42",
+                    "createdAt": "2026-09-28T00:42:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1043",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2043",
+                    "path": "src/mod1.py",
+                    "line": 44,
+                    "body": "指摘 43",
+                    "createdAt": "2026-09-28T00:43:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1044",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2044",
+                    "path": "src/mod2.py",
+                    "line": 45,
+                    "body": "指摘 44",
+                    "createdAt": "2026-09-28T00:44:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1045",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2045",
+                    "path": "src/mod3.py",
+                    "line": 46,
+                    "body": "指摘 45",
+                    "createdAt": "2026-09-28T00:45:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1046",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2046",
+                    "path": "src/mod4.py",
+                    "line": 47,
+                    "body": "指摘 46",
+                    "createdAt": "2026-09-28T00:46:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1047",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2047",
+                    "path": "src/mod5.py",
+                    "line": 48,
+                    "body": "指摘 47",
+                    "createdAt": "2026-09-28T00:47:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1048",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2048",
+                    "path": "src/mod6.py",
+                    "line": 49,
+                    "body": "指摘 48",
+                    "createdAt": "2026-09-28T00:48:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1049",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2049",
+                    "path": "src/mod0.py",
+                    "line": 50,
+                    "body": "指摘 49",
+                    "createdAt": "2026-09-28T00:49:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1050",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2050",
+                    "path": "src/mod1.py",
+                    "line": 51,
+                    "body": "指摘 50",
+                    "createdAt": "2026-09-28T00:50:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1051",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2051",
+                    "path": "src/mod2.py",
+                    "line": 52,
+                    "body": "指摘 51",
+                    "createdAt": "2026-09-28T00:51:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1052",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2052",
+                    "path": "src/mod3.py",
+                    "line": 53,
+                    "body": "指摘 52",
+                    "createdAt": "2026-09-28T00:52:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1053",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2053",
+                    "path": "src/mod4.py",
+                    "line": 54,
+                    "body": "指摘 53",
+                    "createdAt": "2026-09-28T00:53:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1054",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2054",
+                    "path": "src/mod5.py",
+                    "line": 55,
+                    "body": "指摘 54",
+                    "createdAt": "2026-09-28T00:54:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1055",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2055",
+                    "path": "src/mod6.py",
+                    "line": 56,
+                    "body": "指摘 55",
+                    "createdAt": "2026-09-28T00:55:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1056",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2056",
+                    "path": "src/mod0.py",
+                    "line": 57,
+                    "body": "指摘 56",
+                    "createdAt": "2026-09-28T00:56:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1057",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2057",
+                    "path": "src/mod1.py",
+                    "line": 58,
+                    "body": "指摘 57",
+                    "createdAt": "2026-09-28T00:57:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1058",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2058",
+                    "path": "src/mod2.py",
+                    "line": 59,
+                    "body": "指摘 58",
+                    "createdAt": "2026-09-28T00:58:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1059",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2059",
+                    "path": "src/mod3.py",
+                    "line": 60,
+                    "body": "指摘 59",
+                    "createdAt": "2026-09-28T00:59:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1060",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2060",
+                    "path": "src/mod4.py",
+                    "line": 61,
+                    "body": "指摘 60",
+                    "createdAt": "2026-09-28T01:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1061",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2061",
+                    "path": "src/mod5.py",
+                    "line": 62,
+                    "body": "指摘 61",
+                    "createdAt": "2026-09-28T01:01:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1062",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2062",
+                    "path": "src/mod6.py",
+                    "line": 63,
+                    "body": "指摘 62",
+                    "createdAt": "2026-09-28T01:02:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1063",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2063",
+                    "path": "src/mod0.py",
+                    "line": 64,
+                    "body": "指摘 63",
+                    "createdAt": "2026-09-28T01:03:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1064",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2064",
+                    "path": "src/mod1.py",
+                    "line": 65,
+                    "body": "指摘 64",
+                    "createdAt": "2026-09-28T01:04:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1065",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2065",
+                    "path": "src/mod2.py",
+                    "line": 66,
+                    "body": "指摘 65",
+                    "createdAt": "2026-09-28T01:05:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1066",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2066",
+                    "path": "src/mod3.py",
+                    "line": 67,
+                    "body": "指摘 66",
+                    "createdAt": "2026-09-28T01:06:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1067",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2067",
+                    "path": "src/mod4.py",
+                    "line": 68,
+                    "body": "指摘 67",
+                    "createdAt": "2026-09-28T01:07:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1068",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2068",
+                    "path": "src/mod5.py",
+                    "line": 69,
+                    "body": "指摘 68",
+                    "createdAt": "2026-09-28T01:08:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1069",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2069",
+                    "path": "src/mod6.py",
+                    "line": 70,
+                    "body": "指摘 69",
+                    "createdAt": "2026-09-28T01:09:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1070",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2070",
+                    "path": "src/mod0.py",
+                    "line": 71,
+                    "body": "指摘 70",
+                    "createdAt": "2026-09-28T01:10:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1071",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2071",
+                    "path": "src/mod1.py",
+                    "line": 72,
+                    "body": "指摘 71",
+                    "createdAt": "2026-09-28T01:11:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1072",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2072",
+                    "path": "src/mod2.py",
+                    "line": 73,
+                    "body": "指摘 72",
+                    "createdAt": "2026-09-28T01:12:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1073",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2073",
+                    "path": "src/mod3.py",
+                    "line": 74,
+                    "body": "指摘 73",
+                    "createdAt": "2026-09-28T01:13:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1074",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2074",
+                    "path": "src/mod4.py",
+                    "line": 75,
+                    "body": "指摘 74",
+                    "createdAt": "2026-09-28T01:14:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1075",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2075",
+                    "path": "src/mod5.py",
+                    "line": 76,
+                    "body": "指摘 75",
+                    "createdAt": "2026-09-28T01:15:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1076",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2076",
+                    "path": "src/mod6.py",
+                    "line": 77,
+                    "body": "指摘 76",
+                    "createdAt": "2026-09-28T01:16:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1077",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2077",
+                    "path": "src/mod0.py",
+                    "line": 78,
+                    "body": "指摘 77",
+                    "createdAt": "2026-09-28T01:17:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1078",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2078",
+                    "path": "src/mod1.py",
+                    "line": 79,
+                    "body": "指摘 78",
+                    "createdAt": "2026-09-28T01:18:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1079",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2079",
+                    "path": "src/mod2.py",
+                    "line": 80,
+                    "body": "指摘 79",
+                    "createdAt": "2026-09-28T01:19:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1080",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2080",
+                    "path": "src/mod3.py",
+                    "line": 81,
+                    "body": "指摘 80",
+                    "createdAt": "2026-09-28T01:20:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1081",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2081",
+                    "path": "src/mod4.py",
+                    "line": 82,
+                    "body": "指摘 81",
+                    "createdAt": "2026-09-28T01:21:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1082",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2082",
+                    "path": "src/mod5.py",
+                    "line": 83,
+                    "body": "指摘 82",
+                    "createdAt": "2026-09-28T01:22:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1083",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2083",
+                    "path": "src/mod6.py",
+                    "line": 84,
+                    "body": "指摘 83",
+                    "createdAt": "2026-09-28T01:23:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1084",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2084",
+                    "path": "src/mod0.py",
+                    "line": 85,
+                    "body": "指摘 84",
+                    "createdAt": "2026-09-28T01:24:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1085",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2085",
+                    "path": "src/mod1.py",
+                    "line": 86,
+                    "body": "指摘 85",
+                    "createdAt": "2026-09-28T01:25:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1086",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2086",
+                    "path": "src/mod2.py",
+                    "line": 87,
+                    "body": "指摘 86",
+                    "createdAt": "2026-09-28T01:26:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1087",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2087",
+                    "path": "src/mod3.py",
+                    "line": 88,
+                    "body": "指摘 87",
+                    "createdAt": "2026-09-28T01:27:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1088",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2088",
+                    "path": "src/mod4.py",
+                    "line": 89,
+                    "body": "指摘 88",
+                    "createdAt": "2026-09-28T01:28:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1089",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2089",
+                    "path": "src/mod5.py",
+                    "line": 90,
+                    "body": "指摘 89",
+                    "createdAt": "2026-09-28T01:29:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1090",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2090",
+                    "path": "src/mod6.py",
+                    "line": 91,
+                    "body": "指摘 90",
+                    "createdAt": "2026-09-28T01:30:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1091",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2091",
+                    "path": "src/mod0.py",
+                    "line": 92,
+                    "body": "指摘 91",
+                    "createdAt": "2026-09-28T01:31:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1092",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2092",
+                    "path": "src/mod1.py",
+                    "line": 93,
+                    "body": "指摘 92",
+                    "createdAt": "2026-09-28T01:32:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1093",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2093",
+                    "path": "src/mod2.py",
+                    "line": 94,
+                    "body": "指摘 93",
+                    "createdAt": "2026-09-28T01:33:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1094",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2094",
+                    "path": "src/mod3.py",
+                    "line": 95,
+                    "body": "指摘 94",
+                    "createdAt": "2026-09-28T01:34:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1095",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2095",
+                    "path": "src/mod4.py",
+                    "line": 96,
+                    "body": "指摘 95",
+                    "createdAt": "2026-09-28T01:35:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1096",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2096",
+                    "path": "src/mod5.py",
+                    "line": 97,
+                    "body": "指摘 96",
+                    "createdAt": "2026-09-28T01:36:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1097",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2097",
+                    "path": "src/mod6.py",
+                    "line": 98,
+                    "body": "指摘 97",
+                    "createdAt": "2026-09-28T01:37:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1098",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2098",
+                    "path": "src/mod0.py",
+                    "line": 99,
+                    "body": "指摘 98",
+                    "createdAt": "2026-09-28T01:38:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P1099",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r2099",
+                    "path": "src/mod1.py",
+                    "line": 100,
+                    "body": "指摘 99",
+                    "createdAt": "2026-09-28T01:39:00Z"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

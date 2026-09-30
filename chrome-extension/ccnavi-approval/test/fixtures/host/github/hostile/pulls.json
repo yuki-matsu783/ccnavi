@@ -1,0 +1,28 @@
+[
+  {
+    "url": "https://api.github.com/repos/acme/widgets/pulls/42",
+    "id": 2100000042,
+    "node_id": "PR_kwDOAbCdEs6AAAAq",
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "number": 42,
+    "state": "open",
+    "locked": false,
+    "title": "Draft: i0001 見本の親",
+    "user": {
+      "login": "dev-agent",
+      "id": 7,
+      "type": "User"
+    },
+    "draft": true,
+    "head": {
+      "label": "acme:i0001",
+      "ref": "i0001",
+      "sha": "1111111111111111111111111111111111111111"
+    },
+    "base": {
+      "label": "acme:main",
+      "ref": "main",
+      "sha": "2222222222222222222222222222222222222222"
+    }
+  }
+]
