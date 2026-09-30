@@ -189,7 +189,7 @@ class C1Harness(unittest.TestCase):
         env.update(extra)
         return env
 
-    def exe(self, *args, cwd=None):
+    def exe(self, *args, cwd=None, stdin=""):
         return subprocess.run(
             [self.bin, "--root", self.ws, *args],
             cwd=cwd or self.ws,
@@ -198,7 +198,7 @@ class C1Harness(unittest.TestCase):
             text=True,
             encoding="utf-8",
             errors="replace",
-            stdin=subprocess.DEVNULL,
+            input=stdin,
         )
 
     def sh(self, name, *args, cwd=None, stdin=None, **extra):
@@ -531,6 +531,34 @@ class C1TicketTest(C1Harness):
         self.assertIn("戻さずに止めた", result.stderr)
         self.assertEqual(self.subjects(2), ["other", f"ccnavi: {PARENT} に着手"])
 
+    def test_a_term_before_the_push_ends_undoes_the_commit(self):
+        """送る前に TERM が来たら、自分のコミットを戻して抜ける（段階 2d のレビューの 16）。"""
+        import signal
+        import time
+
+        mark = os.path.join(self._tmp.name, "pushing")
+        hooks = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
+        hooks = hooks if os.path.isabs(hooks) else os.path.join(self.tree, hooks)
+        executable(os.path.join(hooks, "pre-push"), f"#!/bin/sh\n: >'{mark}'\nsleep 5\nexit 1\n")
+        before = self.sha(self.tree, "HEAD")
+        running = subprocess.Popen(
+            [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "start", PARENT],
+            cwd=self.ws,
+            env=self.env(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        deadline = time.monotonic() + 60
+        while not os.path.exists(mark) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        running.send_signal(signal.SIGTERM)
+        _, err = running.communicate(timeout=60)
+        self.assertIn("送る前に止められた", err.decode("utf-8", "replace"))
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.dirty(), "")
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
     # ---- 6. 届いていた push
 
     def test_a_push_whose_reply_was_lost_counts_as_sent(self):
@@ -576,7 +604,7 @@ class C1TicketTest(C1Harness):
     # ---- コミット（決定 C）と、落ちたときの索引
 
     def test_a_failed_commit_leaves_nothing_staged(self):
-        """署名に落ちてコミットできなければ、add した新しいファイルも索引から外す（レビューの 1）。"""
+        """署名に落ちてコミットできなければ、add した新しいファイルも索引から外す（レビュー 1）。"""
         git(self.ws, "config", "commit.gpgsign", "true")
         git(self.ws, "config", "gpg.program", "false")
         self.assertEqual(self.ticket("start", PARENT).returncode, 1)
@@ -809,6 +837,32 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertIn(rel, self.committed())
         self.assertEqual(self.dirty(), "")
 
+    def test_a_chat_review_typed_directly_is_named_as_a_human_decision(self):
+        """直に打った chat の書き込みは、次の C1 で (c) として止まり、運ぶ処理を案内する。"""
+        self.finish_phase_one()
+        typed = self.exe("--cwd", self.tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertEqual(typed.returncode, 0, typed.stdout + typed.stderr)
+        stopped = self.ticket("finish", CHILD)
+        self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
+        self.assertIn("人の判断が未送信", stopped.stderr)
+        self.assertNotIn("知らない変更", stopped.stderr)
+        carried = self.sh("ccnavi-push-approved.sh", PARENT)
+        self.assertEqual(carried.returncode, 0, carried.stdout + carried.stderr)
+        self.assertEqual(self.dirty(), "")
+
+    def test_push_approved_without_names_skips_child_trees(self):
+        """名前を省いた運ぶ処理: 親は 1 度だけ運び、子のワークツリーの置き場は運ばずに言う。"""
+        rel = f"{APPROVED}/flows/{CHILD}.yml"
+        write(os.path.join(self.tree, rel), "steps: []\n")
+        child = self.child_tree()
+        write(os.path.join(child, APPROVED, "doing", "stray.md"), "x\n")
+        result = self.sh("ccnavi-push-approved.sh")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("子のワークツリー", result.stderr)
+        self.assertEqual(result.stdout.count("取り込んでから送った"), 1, result.stdout)
+        self.assertIn(rel, self.committed())
+        self.assertEqual(self.remote_sha(CHILD), "")
+
     def test_push_approved_takes_in_before_sending(self):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
@@ -973,6 +1027,199 @@ class C1ReviewTest(C1Harness):
         )
         self.assertNotIn("ロック", shown.stderr)
         self.assertEqual(self.sha(self.tree, "HEAD"), head)
+
+
+# 実行ファイルの代役（ホストに触る副命令の試験用）。状態を書く副命令だけを代わりに書き
+# （親のワークツリーに印を置き、書いたパスの一覧を出す）、`c1`・`sync` などは本物に渡す。
+# HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ落とす（打ち直しの試験）。
+HOST_HALF = """#!/bin/sh
+list=""; tree="${{HALF_TREE:-}}"; root=""
+for a in "$@"; do :; done
+set -- "$@"
+i=0
+for a in "$@"; do
+  case "$prev" in
+  --record-writes) list="$a" ;;
+  --record-tree) tree="$a" ;;
+  --root) root="$a" ;;
+  esac
+  prev="$a"
+done
+put() {{
+  mkdir -p "$tree/$(dirname "$1")"
+  printf '%s' "$2" >"$tree/$1"
+  [ -z "$list" ] || printf '%s\\n' "$1" >>"$list"
+}}
+m=.ccnavi/approved/phases/i0001
+case " $* " in
+*" review prepare "*)
+  mkdir -p "$root/logs/state"
+  printf '<!-- ccnavi:request i0001:1 key=k1 -->\\n見てほしい\\n' >"$root/logs/state/req.md"
+  printf '題\\n\\n本文\\n' >"$root/logs/state/mr.md"
+  printf '%s\\n%s\\n' "$root/logs/state/req.md" "$root/logs/state/mr.md"
+  exit 0 ;;
+*" review requested "*)
+  if [ -n "${{HALF_FAIL:-}}" ] && [ ! -e "$HALF_FAIL" ]; then
+    : >"$HALF_FAIL"; : >"$list"; exit 1
+  fi
+  : >"$list"; put "$m/1.requested" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
+*" review confirm "*)
+  : >"$list"; put "$m/1.reviewed" '{{"mr": 1, "accepted": [], "at": "t"}}'; exit 0 ;;
+*" review ready "*) : >"$list"; put "$m/ready.json" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
+*" --close-early "*) put "$m/2.skipped" '{{"by": "close-early", "at": "t"}}'; exit 0 ;;
+*" --config-synced "*)
+  put "$m/config-sync.json" '{{"files": [], "notified": "terminal"}}'; exit 0 ;;
+esac
+PYTHONPATH='{root}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+"""
+
+
+class Host(__import__("http.server").server.BaseHTTPRequestHandler):
+    """GitLab の代役。MR 1 つ、コメント（notes）の投稿と一覧、Draft 外し。"""
+
+    notes: list = []
+    port = 0
+
+    def log_message(self, *args):
+        pass
+
+    def reply(self, code, payload):
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path.endswith("/merge_requests"):
+            url = f"http://127.0.0.1:{self.port}/demo/greeter/-/merge_requests/1"
+            self.reply(200, [{"iid": 1, "web_url": url}])
+        elif path.endswith("/notes"):
+            page = "page=1" in self.path
+            self.reply(200, list(Host.notes) if page else [])
+        elif path.endswith("/merge_requests/1"):
+            self.reply(200, {"iid": 1, "title": "Draft: x"})
+        else:
+            self.reply(200, [] if "per_page" in self.path else {"id": 1})
+
+    def do_PUT(self):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        self.rfile.read(length)
+        self.reply(200, {"draft": False})
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        data = json.loads(self.rfile.read(length) or b"{}")
+        if self.path.split("?")[0].endswith("/notes"):
+            note = {"id": len(Host.notes) + 1, "body": data.get("body", ""), "created_at": "t"}
+            Host.notes.append(note)
+            self.reply(201, note)
+        else:
+            self.reply(201, {"iid": 1, "web_url": "u"})
+
+
+@unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
+class C1HostTest(C1Harness):
+    """ホストに触る副命令（request・confirm・ready・decide・close-early・config-synced）の C1。"""
+
+    def setUp(self):
+        super().setUp()
+        import threading
+
+        Host.notes = []
+        server = __import__("http.server").server.HTTPServer(("127.0.0.1", 0), Host)
+        Host.port = server.server_address[1]
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        shim = os.path.join(self._tmp.name, "shim")
+        url = f"http://127.0.0.1:{Host.port}/demo/greeter.git"
+        executable(os.path.join(shim, "git"), URL_GIT.format(url=url, git=GIT))
+        self.path = shim + os.pathsep + os.environ.get("PATH", "")
+        self.half = executable(
+            os.path.join(self._tmp.name, "bin", "hosthalf"),
+            HOST_HALF.format(root=ROOT, python=sys.executable),
+        )
+
+    def review(self, *args, stdin="", **extra):
+        env = {
+            "PATH": self.path,
+            "GITLAB_TOKEN": "t0k",
+            "CCNAVI_BIN_PATH": self.half,
+            "HALF_TREE": self.tree,
+        }
+        env.update(extra)
+        return self.sh("ccnavi-review.sh", *args, cwd=self.tree, stdin=stdin, **env)
+
+    def carried(self, rel):
+        self.assertIn(rel, self.committed())
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+
+    def test_request_confirm_and_ready_are_carried(self):
+        body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
+        requested = self.review("request", "--phase", "1", "--body-file", body)
+        self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
+        self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
+        self.assertEqual(len(Host.notes), 1)
+        confirmed = self.review("confirm", "--phase", "1")
+        self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
+        self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
+        ready = self.review("ready")
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
+
+    def test_a_request_is_not_posted_twice_across_runs(self):
+        """決定 D: 投稿の後に落ちた依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
+        body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
+        once = os.path.join(self._tmp.name, "failed-once")
+        first = self.review("request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
+        self.assertNotEqual(first.returncode, 0, first.stdout + first.stderr)
+        self.assertEqual(len(Host.notes), 1)
+        again = self.review("request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertIn("投稿済み", again.stdout)
+        self.assertEqual(len(Host.notes), 1)
+        self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
+
+    def test_terminal_decide_chooses_outside_c1_and_writes_inside(self):
+        """決定 A: 端末の decide は、選ぶのを C1 の外で済ませ、C1 の中では --yes で書くだけ。"""
+        chooser = executable(
+            os.path.join(self._tmp.name, "bin", "chooser"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            '*" --choose-out "*)\n'
+            '  prev=""; for a in "$@"; do [ "$prev" = --choose-out ] && out="$a"; prev="$a"; done\n'
+            f"  [ -d '{self.lock_dir()}' ] && echo LOCKED-WHILE-CHOOSING >&2\n"
+            '  printf \'{"choices": {"u1": "keep"}, "digest": "d0"}\' >"$out"\n'
+            "  exit 0 ;;\n"
+            '*" --yes "*)\n'
+            '  prev=""; for a in "$@"; do\n'
+            '    [ "$prev" = --record-writes ] && list="$a"\n'
+            '    [ "$prev" = --record-tree ] && tree="$a"\n'
+            '    prev="$a"; done\n'
+            '  mkdir -p "$tree/.ccnavi/approved/phases/i0001"\n'
+            "  printf '{}' >\"$tree/.ccnavi/approved/phases/i0001/1.reviewed\"\n"
+            "  printf '.ccnavi/approved/phases/i0001/1.reviewed\\n' >\"$list\"\n"
+            '  printf \'{"version":1,"ok":true}\\n\'; exit 0 ;;\n'
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        done = self.review("decide", "1", CCNAVI_BIN_PATH=chooser)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("行き先を置いて送った", done.stdout)
+        self.assertNotIn("LOCKED-WHILE-CHOOSING", done.stderr)
+        self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
+
+    def test_close_early_and_config_synced_hand_over_to_the_carrier(self):
+        closed = self.review("close-early", "--reason", "r", "--no-issue")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        self.carried(f"{APPROVED}/phases/{PARENT}/2.skipped")
+        synced = self.review("config-synced", PARENT)
+        self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+        self.carried(f"{APPROVED}/phases/{PARENT}/config-sync.json")
 
 
 if __name__ == "__main__":
