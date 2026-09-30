@@ -133,9 +133,14 @@ class BranchNameRulesTest(unittest.TestCase):
 
     def test_project_shaped_names_are_reserved(self):
         """段階 5: `<名前>-i<番号>` は issue の無い提案とワークスペースの提案では使わない。"""
-        found = self.problems("web-i0012")
+        # 人が付けた名前（issue が無い）は、そのプロジェクトの issue から決まる名前と
+        # 重なるときだけ言う（11.9.1 の 17）
+        self.assertEqual([], self.problems("web-i0012"))
+        self.assertEqual([], self.problems("fix-i2", project="web"))
+        found = self.problems("web-i0012", project="web")
         self.assertEqual(1, len(found), found)
         self.assertIn("`issue:` の無い提案", found[0])
+        self.assertEqual(1, len(self.problems("WEB-i0012", project="web")))
         found = self.problems("web-i0012", issue=12)
         self.assertEqual(1, len(found), found)
         self.assertIn("ワークスペースの提案", found[0])

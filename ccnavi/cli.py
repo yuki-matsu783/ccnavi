@@ -521,6 +521,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.via and args.via not in (history.VIA_TERMINAL, history.VIA_BOARD):
         stderr.write(f"ccnavi: --via は {history.VIA_TERMINAL} か {history.VIA_BOARD}\n")
         return EXIT_ERROR
+    # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
+    # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
+    if args.via == history.VIA_BOARD and not args.yes:
+        stderr.write("ccnavi: --via board は --yes（ボードの押した選択）と一緒に使う\n")
+        return EXIT_ERROR
     if args.record_writes and not args.version:
         return _recorded_run(stdin, stdout, stderr, parser, args)
     return _parsed(stdin, stdout, stderr, parser, args)

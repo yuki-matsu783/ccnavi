@@ -209,10 +209,16 @@ def _issue_form_problems(t: Ticket) -> list[str]:
         expected = "" if t.issue_repo else issue_identifier(t.issue, t.project)
     elif project_form:
         if t.issue is None:
-            return [
-                "`<プロジェクト名>-i<番号>` の形はプロジェクトの issue から決める識別子なので、"
-                "`issue:` の無い提案では使わない"
-            ]
+            # 人が付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
+            # 重なりだけを言う
+            # （`fix-i2` のような名前をプロジェクトの外で咎めない。11.9.1 の 17）
+            if t.project and project_form.group("project").casefold() == t.project.casefold():
+                return [
+                    f"`{t.project}-i<番号>` の形はこのプロジェクトの issue から決める識別子と"
+                    "重なるので、"
+                    "`issue:` の無い提案では使わない"
+                ]
+            return []
         expected = issue_identifier(t.issue, t.project) if t.project and not t.issue_repo else ""
     else:
         return []

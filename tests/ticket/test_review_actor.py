@@ -384,3 +384,21 @@ class DecideActorTest(ActorHarness):
         )
         self.assertNotEqual(preview.returncode, 0)
         self.assertIn("--actor", preview.stderr)
+
+    def test_board_is_refused_for_the_way_that_picks_one_by_one(self):
+        """11.9.1 の 11: 端末で 1 件ずつ選ぶ形（--yes 無し）に --via board は受けない。"""
+        fixture = self.ready()
+        done = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--result",
+            fixture,
+            "--actor=octo",
+            "--via=board",
+        )
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("--via board は --yes", done.stderr)
+        self.assertFalse(os.path.exists(self.mark_path()))
