@@ -819,6 +819,18 @@ decide)
 	if [ -n "$choices" ] || [ -n "$digest" ]; then
 		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡す。" 2
 	fi
+	# 印に残すアカウント（ADR-0093 の 8.9。段階 5）。confirm と同じくトークンの持ち主をホストに聞き、
+	# ロックを取る前に引く。引けなければ渡さず、印も跡も前と同じ。見るだけの --preview は引かない。
+	# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
+	decide_who=""
+	if [ "$preview" -eq 0 ]; then
+		decide_actor=$(account || :)
+		log_debug 印のアカウント -- "actor=${decide_actor:+set}"
+		if [ -n "$decide_actor" ]; then
+			if [ -n "$choices" ]; then decide_via=board; else decide_via=terminal; fi
+			decide_who="--actor=$decide_actor --via=$decide_via"
+		fi
+	fi
 	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
 	# 済ませる（ロックを持ったまま人を待たない。段階 2d のレビューの決定 A）ので、ここでは始めない。
 	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$branch"
@@ -832,8 +844,9 @@ decide)
 		tell_skew
 		ccnavi_c1_capture="$state/review-decide-$$.out"
 		decide_rc=0
+		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
 		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" ||
+			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" $decide_who ||
 			decide_rc=$?
 		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
 		rm -f "$ccnavi_c1_capture"
@@ -869,8 +882,9 @@ decide)
 		c1_on=yes
 		ccnavi_c1_capture="$state/review-decide-$$.out"
 		decide_rc=0
+		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
 		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" ||
+			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" $decide_who ||
 			decide_rc=$?
 		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
 		rm -f "$ccnavi_c1_capture"
@@ -882,7 +896,8 @@ decide)
 		printf 'OK: フェーズ %s の指摘の行き先を置いて送った（%s）\n' "$n" "$out"
 		;;
 	*)
-		ccnavi --reviewed "$n" --accept-unresolved --result "$result"
+		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
+		ccnavi --reviewed "$n" --accept-unresolved --result "$result" $decide_who
 		;;
 	esac
 	post_decision "$n"

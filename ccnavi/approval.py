@@ -2320,7 +2320,7 @@ def screen(
                 lines.append("■ フィードバック計画")
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
         if not t.is_child and t.issue is not None:
-            lines.append(f"■ 課題: #{t.issue}")
+            lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
             lines.append(
                 "    この親のマージリクエストの本文に Closes として書く番号。"
                 "マージされると、この課題も閉じる"
@@ -2589,7 +2589,11 @@ def revision_problems(
                 "改版で変えられるのは plan と feedback だけ。範囲が承認済みチケットと違う",
             )
         )
-    if revised.title != current.title or revised.issue != current.issue:
+    if (
+        revised.title != current.title
+        or revised.issue != current.issue
+        or revised.issue_repo != current.issue_repo
+    ):
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,

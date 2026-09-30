@@ -136,6 +136,25 @@ def child_pattern() -> re.Pattern:
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 # issue から決める識別子の形（`i` + 番号）。`issue:` を持つ提案だけが使う。
 _ISSUE_ID = re.compile(r"^i\d+$", re.IGNORECASE)
+# プロジェクトの issue から決める識別子の形（`<プロジェクト名>-i<番号>`。3.1 の 7。段階 5）。
+_PROJECT_ISSUE_ID = re.compile(r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i\d+$", re.IGNORECASE)
+
+
+def issue_identifier(number: int, project: str = "") -> str:
+    """issue の番号から親の識別子を決める（ADR-0093 の 3.1 の 4・7・11）。
+
+    `i` + 4 桁の 0 埋め（5 桁以上はそのまま）。プロジェクトの issue なら頭に
+    `<プロジェクト名>-` を付ける（`web-i0012`）。「issue → 識別子」はこの 1 つだけで、
+    Chrome 拡張も Pyodide の上でこれを呼ぶ。番号が正の整数でなければ ValueError。
+    """
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        raise ValueError(f"issue の番号は正の整数: {number!r}")
+    base = f"i{number:04d}"
+    if not project:
+        return base
+    if not _ID.match(project):
+        raise ValueError(f"プロジェクト名が識別子の形でない: {project!r}")
+    return f"{project}-{base}"
 
 
 def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
@@ -168,12 +187,51 @@ def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
         found.append(
             f"識別子が統合先の名前（{integration}）に当たる。親のブランチ名が統合先と同じになる"
         )
-    if _ISSUE_ID.match(name) and t.issue is None:
-        found.append(
-            "`i<番号>` の形は issue から決める識別子なので、`issue:` の無い提案では使わない。"
-            "issue の番号と紛れる"
-        )
+    found.extend(_issue_form_problems(t))
     return found
+
+
+def _issue_form_problems(t: Ticket) -> list[str]:
+    """issue から決める形（`i<番号>`・`<プロジェクト名>-i<番号>`）の識別子が、`issue:` と
+    置き場に合っているか（3.1 の 4・5・7。段階 5 で `<名前>-i<番号>` と番号の一致を足した）。
+
+    形に当たらない識別子（人が付けた名前）は見ない。`issue:` を持っていても人が付けた名前でよい
+    （既に同じ識別子が閉じていて、その issue からは始められないときのフォールバック。8.6）。
+    """
+    name = t.ticket
+    project_form = _PROJECT_ISSUE_ID.match(name)
+    if _ISSUE_ID.match(name):
+        if t.issue is None:
+            return [
+                "`i<番号>` の形は issue から決める識別子なので、`issue:` の無い提案では使わない。"
+                "issue の番号と紛れる"
+            ]
+        expected = "" if t.issue_repo else issue_identifier(t.issue, t.project)
+    elif project_form:
+        if t.issue is None:
+            return [
+                "`<プロジェクト名>-i<番号>` の形はプロジェクトの issue から決める識別子なので、"
+                "`issue:` の無い提案では使わない"
+            ]
+        expected = issue_identifier(t.issue, t.project) if t.project and not t.issue_repo else ""
+    else:
+        return []
+    if t.issue_repo:
+        return [
+            f"`issue: {issue_label(t)}` は別のリポジトリの課題。識別子は issue から決める形"
+            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、人が付ける（ADR-0093 の 3.1 の 8）"
+        ]
+    if not expected:
+        return [
+            "`<プロジェクト名>-i<番号>` の形はプロジェクトの issue から決める識別子なので、"
+            "ワークスペースの提案では使わない"
+        ]
+    if name != expected:
+        return [
+            f"識別子が `issue: {t.issue}` から決まる `{expected}` と違う。"
+            "issue から決める形の識別子は番号と置き場（プロジェクト）に合わせる"
+        ]
+    return []
 
 
 # スクリプトだけが書く欄。人もエージェントも書かない。承認済みチケットの側で
@@ -230,6 +288,30 @@ def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem
         )
         return None, problems
     return items, problems
+
+
+# 別のリポジトリの課題の綴り（`owner/repo#12`。GitLab の入れ子のグループ `group/sub/proj#12` も）。
+_ISSUE_REF = re.compile(r"^(?P<repo>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)#(?P<number>\d+)$")
+
+
+def _issue_ref(raw) -> tuple[str, int | None]:
+    """課題の綴り。答えは (別のリポジトリの `owner/repo` か空, 番号か None)。"""
+    if isinstance(raw, str):
+        m = _ISSUE_REF.match(raw.strip())
+        if m:
+            repo = m.group("repo")
+            if any(part in (".", "..") for part in repo.split("/")):
+                return "", None
+            number = int(m.group("number"))
+            return repo, (number if number > 0 else None)
+    return "", _issue_number(raw)
+
+
+def issue_label(t: Ticket) -> str:
+    """課題の綴り（`#12`・`owner/repo#12`）。MR の `Closes` と承認の画面が使う。無ければ空。"""
+    if t.issue is None:
+        return ""
+    return f"{t.issue_repo}#{t.issue}"
 
 
 def _issue_number(raw) -> int | None:
@@ -375,6 +457,9 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
+    # issue_repo は、課題が別のリポジトリにあるときのその綴り（`issue: owner/repo#N` の
+    # `owner/repo`。ADR-0093 の 3.1 の 8）。同じリポジトリの課題なら空。
+    issue_repo: str = ""
     # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
     # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
@@ -645,16 +730,22 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
 
     raw_issue = front.get("issue")
     if raw_issue is not None:
-        number = _issue_number(raw_issue)
+        repo, number = _issue_ref(raw_issue)
         if number is None:
             problems.append(
-                Problem(SEVERITY_ERROR, name, "`issue` は課題の番号（正の整数）で書く。`#12` も可")
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    "`issue` は課題の番号（正の整数）で書く。`#12` も可。"
+                    "別のリポジトリの課題は `owner/repo#12`",
+                )
             )
             return True
         if ticket.is_child:
             problems.append(Problem(SEVERITY_WARN, name, "`issue` は親だけの欄。子では読まない"))
         else:
             ticket.issue = number
+            ticket.issue_repo = repo
     return False
 
 

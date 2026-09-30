@@ -488,8 +488,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--integration-branch", default="")
     # レビュー済みの印に入れるアカウント（ADR-0093 の 8.9。段階 4）。ccnavi-review.sh が
     # トークンの持ち主をホストに聞いて渡す（実行ファイルはネットワークに出ない）。
-    # `review confirm` だけが読む。
+    # `review confirm` と、書く形の decide（`--reviewed N --accept-unresolved`。段階 5）が読む。
     parser.add_argument("--actor", default="")
+    # decide の印の経路（`terminal`・`board`。8.9。段階 5）。`--actor` と一緒にだけ受ける
+    # （アカウントを引けなかったときは印も跡も前と同じにするため）。
+    parser.add_argument("--via", default="")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
@@ -503,8 +506,17 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.actor and not _ACTOR.fullmatch(args.actor):
         stderr.write("ccnavi: --actor はホストのアカウント名（英数字と _ . - の 1〜100 字）\n")
         return EXIT_ERROR
-    if args.actor and list(args.command[:2]) != ["review", "confirm"]:
-        stderr.write("ccnavi: --actor は review confirm と一緒に使う\n")
+    if args.actor and list(args.command[:2]) != ["review", "confirm"] and not _decide_writes(args):
+        stderr.write(
+            "ccnavi: --actor は review confirm か、書く形の decide"
+            "（--reviewed <N> --accept-unresolved）と一緒に使う\n"
+        )
+        return EXIT_ERROR
+    if args.via and (not args.actor or not _decide_writes(args)):
+        stderr.write("ccnavi: --via は decide の --actor と一緒に使う\n")
+        return EXIT_ERROR
+    if args.via and args.via not in (history.VIA_TERMINAL, history.VIA_BOARD):
+        stderr.write(f"ccnavi: --via は {history.VIA_TERMINAL} か {history.VIA_BOARD}\n")
         return EXIT_ERROR
     if args.record_writes and not args.version:
         return _recorded_run(stdin, stdout, stderr, parser, args)
@@ -1157,6 +1169,7 @@ def operate(
             stderr.write("ccnavi: ボードの経路は --json と --result <json> を付けて打つ\n")
             return EXIT_ERROR
         history.set_via(history.VIA_BOARD)
+        _decide_actor(args)
         if args.preview:
             code = review.decide_preview(
                 stdout, stderr, root, conf, cwd, args.reviewed, args.result
@@ -1186,6 +1199,7 @@ def operate(
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
         history.set_via(history.VIA_TERMINAL)
+        _decide_actor(args)
         code = review.reviewed(
             stdin,
             stdout,
@@ -1297,6 +1311,30 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     for key, value in lines:
         stdout.write(f"{key} {value}\n")
     return 0
+
+
+def _decide_writes(args) -> bool:
+    """書く形の decide か（`--reviewed N --accept-unresolved` の、見るだけ・chat でないもの）。"""
+    return (
+        args.reviewed is not None
+        and args.accept_unresolved
+        and not args.preview
+        and not args.choose_out
+        and not args.chat
+    )
+
+
+def _decide_actor(args) -> None:
+    """decide の印と跡に入れるアカウントと経路（ADR-0093 の 8.9。段階 5）。
+
+    `--actor` があれば跡の行にアカウントを足し、`--via` があれば経路を差し替える。印の
+    `actor`・`via` は `review.apply_decision` がこの起動の値から書く。無ければ印も跡も前と同じ。
+    """
+    if not args.actor:
+        return
+    history.set_actor(args.actor)
+    if args.via:
+        history.set_via(args.via)
 
 
 # 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスに化ける綴りを入れない。

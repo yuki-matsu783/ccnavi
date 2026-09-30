@@ -112,6 +112,20 @@ def set_via(via: str) -> None:
     _state["via"] = via
 
 
+def set_actor(actor: str) -> None:
+    """いまの起動の間に書く跡の行に、アカウントの欄を足す（ADR-0093 の 8.9。段階 5 の decide）。
+
+    空なら何もしない（跡は前のまま）。`session` を抜けるときに前の値へ戻る。
+    """
+    if actor:
+        _state["extra"] = {**_state["extra"], "actor": actor}
+
+
+def extra() -> dict:
+    """いまの起動の間に跡の行へ足す欄（`actor`・`version`）の写し。"""
+    return dict(_state["extra"])
+
+
 def via() -> str:
     return str(_state["via"])
 

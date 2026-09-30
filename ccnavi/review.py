@@ -46,7 +46,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, configsync, fsio, gitcmd, ops, phase, phasetypes, settings, tree
+from . import (
+    approval,
+    configsync,
+    fsio,
+    gitcmd,
+    history,
+    ops,
+    phase,
+    phasetypes,
+    settings,
+    tree,
+)
 from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
@@ -310,7 +321,8 @@ def mr_draft(parent: ticket_mod.Ticket) -> str:
     title = parent.title.strip() or parent.ticket
     lines = [f"Draft: {title}", ""]
     if parent.issue:
-        lines += [f"Closes #{parent.issue}", ""]
+        # 別のリポジトリの課題は `Closes owner/repo#N`（ADR-0093 の 3.1 の 8・8.7）
+        lines += [f"Closes {ticket_mod.issue_label(parent)}", ""]
     lines += [
         f"チケット `{parent.ticket}`。ワークツリーは `.claude/worktrees/{parent.ticket}`。",
         "",
@@ -915,6 +927,17 @@ def decide_yes(
     return 0
 
 
+def _decide_actor() -> tuple[str, str]:
+    """decide の印に入れる (アカウント, 経路)（ADR-0093 の 8.9。段階 5）。
+
+    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（跡の行の
+    `actor`）。経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
+    どちらも書かない（confirm と同じく、引けなければ印は前と同じバイト列）。
+    """
+    account = str(history.extra().get("actor") or "")
+    return (account, history.via()) if account else ("", "")
+
+
 def apply_decision(
     stdout: TextIO,
     stderr: TextIO,
@@ -973,7 +996,7 @@ def apply_decision(
         parent.ticket,
         ph.number,
         approval.MARK_REVIEWED,
-        reviewed_mark(d.result.mr.number, accepted),
+        reviewed_mark(d.result.mr.number, accepted, *_decide_actor()),
     ):
         return None
     issue_draft = ""
