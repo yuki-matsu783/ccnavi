@@ -399,7 +399,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(len(said("hostile")["unresolved"]), 8)
 
     def test_request_records_the_account_that_posted(self):
-        """依頼の記録に投稿したアカウント（ノートの author.username）が入り、打ち直しても 1 度だけ。"""
+        """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
         out = os.path.join(self._tmp.name, "out")
         os.makedirs(out)
         stub = write(
