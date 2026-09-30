@@ -8,7 +8,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 
 # ADR-0093: 承認は Chrome 拡張から API で行い、写しの権威は親のブランチ 1 枚に固定する
 
-状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、利用者が段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。同日、段階 2b を実装した（11.4）。同日、段階 2c を実装した（11.5）。同日、段階 2d を実装した（11.6）。2026-09-30 に利用者が段階 3 に進むことを承認し（REQ-APV-07 の改訂が効き始める、判定が緩む段階）、段階 3 を実装した（11.7）。同日、レビューの指摘を直した（11.7.1）。段階 4 以降は 11 章のとおり、入れる前に利用者に相談する）
+状態: 提案（2026-09-28。段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、利用者が段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。同日、段階 2b を実装した（11.4）。同日、段階 2c を実装した（11.5）。同日、段階 2d を実装した（11.6）。2026-09-30 に利用者が段階 3 に進むことを承認し（REQ-APV-07 の改訂が効き始める、判定が緩む段階）、段階 3 を実装した（11.7）。同日、レビューの指摘を直した（11.7.1）。同日、利用者が段階 4 に進むことを承認し（本物の GitHub での段階 3 の確認は後回しにした）、段階 4 を実装した（11.8）。段階 5 以降は 11 章のとおり、入れる前に利用者に相談する）
 
 本文の `ファイル:行` は、この ADR を書いた時点（`6d0e53e`）の行番号です。段階 0 の変更で `ccnavi-git.sh` の行はずれています。
 
@@ -984,7 +984,7 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
 - 既存の欄 `by` は**経路名**（`"feedback-plan"` `phase.py:1128`、`"chat"` `review.py:1043`、`"close-early"` `review.py:1366,1379`）なので、
   アカウントは新しい欄 **`actor`** に入れる。`confirm` の印は今どおり `by` を持たない
 - Chrome の `actor` は PAT の持ち主。手元の `confirm` の `actor` は `ccnavi-review.sh` がトークンの持ち主を API で引いて `--actor` で渡す
-  （引けなければ git の `user.name`）。`via` は `cli`。`decide` の印も同じ関数で書く（`via` は `terminal` か `board`）
+  （引けなければ `actor` を書かず、印は前と同じ中身。段階 4 の決定 1 で「git の `user.name`」から改めた）。`via` は `cli`。`decide` の印も同じ関数で書く（`via` は `terminal` か `board`。段階 4 では入れていない。11.8）
 - 読む側（`phase.py` の止める判定）は印が在るかと `mr`・`accepted` しか見ないので、欄を足しても判定は変わらない。`actor` は記録で、表示や警報には使わない（D29）
 
 **`confirm` の検査を Chrome で同じにできるか**:
@@ -1004,10 +1004,12 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
 
 **sh と TS の二重実装の見本と更新手順**（段階 4）:
 
-- ホストの応答を録った見本を `tests/fixtures/host/<github|gitlab>/<場面>/` に置く（ページングの 2 ページ目、解決済みと未解決の混在、変更要求の後の承認など）
+- ホストの応答を録った見本を拡張の試験の置き場 `chrome-extension/ccnavi-approval/test/fixtures/host/<github|gitlab>/<場面>/` に置く
+  （ページングの 2 ページ目、解決済みと未解決の混在、変更要求の後の承認など。段階 4 の決定 2 で置き場を拡張の側にした。段階 4 は github だけ）
 - 期待値は「その見本から sh が組んだ写しの JSON」1 つで、sh の試験と TS の試験の両方がそれと突き合わせる
-- 更新の手順: (1) ホストの応答の形が変わったら、録り直しの sh で見本を取り直す、(2) sh の試験を回して期待値の JSON を作り直す、
-  (3) TS の試験を回し、落ちたら TS を直す、(4) 見本・期待値・sh・TS の変更を**同じコミット**に入れる。片方だけの変更は CI で落ちる
+- 更新の手順（手で行う。段階 4 の決定 2）: (1) ホストの応答の形が変わったら、本物の MR から取り直すか形の変わった欄を手で直す、(2) sh の試験を
+  `CCNAVI_HOST_FIXTURE=1` で回して期待値の JSON を作り直す、(3) TS の試験を回し、落ちたら TS を直す、(4) 見本・期待値・sh・TS の変更を
+  **同じコミット**に入れる。片方だけの変更は試験で落ちる。手順の詳細は拡張の README の「ホストの応答の見本」
 - メリット: レビューした本人がその場で印を付けられ、印に誰が付けたかが残る
 - デメリット: ホストのスレッドの取り方が sh と TS で二重になる（判定はコアで 1 か所）
 
@@ -1135,6 +1137,14 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 6. Git Bash で、別の sh が取ったロックの pid に `kill -0` が効くか（D32。段階 2d）
 7. GitHub の `GET /commits?sha=P&path=` が merge コミットを返すか・飛ばすか（取り下げの承認コミットの選び方。8.8。段階 3）
    → 確かめていない（PAT が無い）。実装はどちらでも同じ答えになる形にした（一覧の merge コミットは飛ばし、各コミットの変更で「足した」かを確かめる。11.7）
+8. レビュー済み（8.9。段階 4）で使う GitHub の応答の形。見本（11.8）は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
+   - GraphQL の `pullRequest.reviewThreads(first: 100, after:)` の `pageInfo`・`isResolved`・最初のコメントの `url`・`path`・`line`（古い行への指摘で null）・`body`・`createdAt`
+   - `GET /pulls/<N>/reviews?per_page=100&page=<N>` の `state`・`html_url`・`submitted_at`・`user.id`（消えた人で `user` が null）
+   - `GET /compare/<base>...<head>` の `status`（`ahead`・`identical`・`diverged`）、`files` が 300 件で切れること、改名の `previous_filename`
+   - `GET /user`（sh）と GraphQL の `viewer`（拡張）が、fine-grained の PAT でトークンの持ち主の `login` を返すこと。GitHub Actions の `GITHUB_TOKEN` では 403 になり、印に `actor` が入らないこと
+   - fine-grained の PAT の「Pull requests: Read」と「Contents: Read and write」で、`reviewThreads`・レビュー・compare が読めること（8.5 の表）
+   - `GET /pulls?state=open&head=<owner>:<branch>` の `:` を URL の符号化（`%3A`）で送っても同じ答えになること（拡張は符号化し、sh はしない）
+   - レビュー済みのコミットで、MR の Approve が「新しいコミットで外す」設定のとき外れること（8.10。画面の注意が合っているか）
 
 ### 10.3 後の段階で決めること
 
@@ -1679,6 +1689,74 @@ ADR に無かった判断:
   置き場の下（`done/`・層・提案・承認済み）は tree の mode で見分ける
 - 読んでいる間に先頭が動く例外（`MovedError`）は、家族 1 つぶんの読み直しでは同じブランチを 2 度違う先頭で読まないので起きにくく、試験は周を回す枝を直に見ていない
 
+### 11.8 段階 4 で入れたもの（2026-09-30）
+
+Chrome で「レビュー済み」（8.9）。GitHub・ワークスペースのリポジトリだけ。利用者が「段階 4 に進む」と承認した（本物の GitHub での
+段階 3 の確認は後回し）。Chrome からレビュー済みを付けられること自体は承認済みの決定（D15）で、confirm の検査は手元より緩めていない
+（同じ関数。依頼の後に動いたかは Chrome の方が締まる所がある。下の ADR に無かった判断）。手元の判定は変えていない。
+
+利用者の決定（段階 4 の前）:
+
+1. `confirm --actor` を入れる。手元は `ccnavi-review.sh` が `gh` か API（`GITHUB_TOKEN`/`GITLAB_TOKEN` と curl）でトークンの持ち主を引いて
+   `--actor` で渡す。引けなければ渡さず、印は前と同じ（8.9 の「git の `user.name`」をやめた）。Chrome は PAT の持ち主。欄は `actor`（`by` は経路名のまま）
+2. ホストの応答の見本は拡張の試験の fixtures に置き、ホストの API が変わったら手で更新する（手順は拡張の README）。confirm の検査は Python の同じ関数で、
+   スレッドを取ってくる処理（sh と TS）が同じ見本で同じ写しを組むことを試験で見る
+3. Chrome と手元の confirm の突き合わせは、手元の CLI を直に打つと C1 に断られるので、試験の中で C1 と同じ手順（C1 のハーネス）で手元を回して比べる
+4. スレッドの本文は承認の画面と同じ規則で描く（隠れる書き方を通さない、HTML コメントは見える印、DOMPurify、CSP を緩めない）
+
+| 何 | 場所 | 形 |
+|---|---|---|
+| 印の `actor`（8.9） | `cli` の `--actor`、`core.confirm_local`・`confirm` | `review confirm` だけが受ける（ほかの形と、`[A-Za-z0-9_.-]{1,100}` でない値は断る）。あれば印に `actor` と `via: cli`、跡に `actor` を書く。無ければ印も跡も前と同じバイト列 |
+| アカウントの引き当て（4.5・D17） | `ccnavi-review.sh` の `account`・`confirm` | `GET /user`（gh・glab・curl のどれでも）の GitHub は `login`、GitLab は `username`。落ちる・形が違う（英数字と `_ . -` の 1〜100 字でない）なら空で、止めずに渡さない。ロックを取る前に引く。呼び手が `--actor` を渡せば断る（印のアカウントを偽らせない） |
+| 依頼の後に動いたか（8.9 の表の 2 行目） | `review.moved_since` | 手元の `_moved_since_request` から git を読む所を外した関数。手元は `git diff --name-only --no-renames <依頼時>..HEAD`、Chrome は compare API の一覧を渡す。一覧が無い（読めない・打ち切られた）なら「動いた」 |
+| Chrome の confirm（8.9） | `py/ccnavi_chrome.py` の `_op_confirm`、`core.requested_head`・`moved_on_host`・`reviewable` | 依頼時の先頭は Python がマーカーから読み、読んだ `P` の先頭と違えば `need_compare`（`{base, head}`）で返す。拡張が compare API で読んで呼び直す（閉包の `need` と同じ形）。`compare` の 2 つがマーカーの先頭と読んだ先頭でなければ使わない。前の `changed`（文字列を TS が渡す形）はやめた。ボードの答えに `reviewable`（依頼済みでまだレビュー済みでないフェーズ）を足した |
+| スレッドとレビューの写し（8.9） | `src/core/github.ts` の `openPull`・`reviewThreads`・`pullReviews`・`reviewCopy`、`protocol.ts` の `reviewCopy` | `ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と同じ問い合わせ・同じページの切り方（スレッドは GraphQL の cursor で 21 ページ目、レビューは REST の `page` で 20 ページを超えたら止める）・同じ欄の落とし方（jq の `//`）で、`{host, mr, threads, reviews, fetched_at}` を組む。読むだけ |
+| 依頼の後の変更の一覧 | `github.compareFiles`、`protocol.ts` の `compareFiles` | `GET /compare/<base>...<head>`。改名は元と先の両方。`status` が `ahead`・`identical` でない、404、一覧が 300 件（打ち切り）なら `files: null` |
+| ボード（8.9・5.5） | `src/core/reviewed.ts`・`snapshot.ts`・`render.ts` | 候補のフェーズごとに写しを読み、Python の `confirm`（書かない）で通るかを聞く。スレッドは未解決を先に、本文は承認の画面と同じ消毒（`md.markdown`）で描く。リンクは `http(s)`・`mailto` だけ。通らなければ理由（手元の confirm の標準エラーと同じ文面）を出し、通って書ける家族にだけ「フェーズ N をレビュー済みにする」を出す。依頼したホストが GitHub でなければ「段階 5」と出す |
+| 書く流れ（8.3・8.4） | `write.ts` の `confirmPhase`、ボードの `review` | 押すと 8.10 の注意を添えて確かめ、毎周、家族とスレッド・レビューを読み直して Python の `confirm` に通させ、Changes を `createCommitOnBranch` の 1 コミットにする（承認と同じ競合の扱い・書いた後の確かめ）。見出しは「ccnavi: <P> のフェーズ N のレビュー済みを置いた（Chrome 拡張 <版>）」。拡張の版を 0.3.0 に上げた |
+| 見本（決定 2） | `chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`、`tests/sh/github_host.py`、`test/helpers/host-fixture.ts` | 4 場面（`resolved`・`paged`・`changes-requested`・`hostile`）。代役は sh 用と TS 用の 2 つで、同じ規則で見本を返す。期待値は sh が組んだ写し（`expected.json`）と結論（`conclusion.json`） |
+| 要件 | `requirements.md` | REQ-APV-18（Chrome のレビュー済み）と、手元のレビューの確認の印のアカウントの補足を足した |
+
+試験: Python は `tests/ticket/test_review_actor.py`（印の `actor` と引けないときに前と同じバイト列、`--actor` の形、`moved_since` の規則、依頼の後の
+コードの変更で Chrome と手元が同じ文面で止める、compare の打ち切り・不一致、Chrome と手元の印が経路と時刻のほかは同じ、ボードの候補）、
+`tests/sh/test_review_host_fixture.py`（見本ごとに sh の写しが期待値と同じ、結論、`--actor` の引き当てと失敗と形の違い、呼び手の `--actor` を断る）、
+`tests/sh/test_c1_sh.py` の `C1ChromeConfirmTest`（C1 の手順で依頼と confirm を回し、同じ状態からの Chrome の書くものと、C1 が書いて送ったものが
+経路・時刻・拡張の版のほかは同じ）、判定のコアの見本（CX-T061 の `confirm`。compare を渡す形に作り直した）。拡張は `test/reviewed.test.ts` の
+CX-T129〜137（見本ごとに TS の写しが期待値と同じ、compare、ボードの出し分け、書く流れと印の中身、未解決・変更要求・後から増えた未解決で書かない、
+依頼の後のコードの変更で書かない、悪意のある本文の描画、PAT が答えに入らない、Pyodide と CPython の一致）と、Chromium の実機の CX-T138
+（悪意のある本文を描いても何も動かず隠れない、解決したらボードから書く、PAT が画面に渡らない）。
+
+ADR に無かった判断:
+
+- `via: cli` は `actor` を書くときだけ書く（引けなかったときに印を前と同じバイト列にするため。決定 1 の「前と同じ」）
+- 呼び手が `ccnavi-review.sh confirm --actor` を渡したら断る。実行ファイルの `--actor` は `review confirm` のときだけ受け、形を確かめる。
+  実行ファイルを直に打てる形（C1 の対象でない家族）では、エージェントが `--actor` を偽れる。`actor` は記録で判定にも表示にも使わない（D29）ので受け入れる
+- 依頼の後に動いたかの比べる相手（依頼時の先頭）は Python が出し、拡張は求められた 2 つだけを compare で読む（`need_compare`。TS に判定の材料を選ばせない）
+- Chrome は依頼時の先頭が祖先でない（`diverged`）・ホストに無い（404）ときも「動いた」と数える。手元は 2 点の木の差分で見るので、
+  履歴を書き換えて同じ木に戻した形では手元は通り Chrome は止める（締まる向きの食い違い）
+- 拡張のレビューの一覧は sh と同じページの番号で読む（Link ヘッダを使わない）。同じ見本を同じ規則で返すため
+- ボードを開くたびに、候補のフェーズごとに MR・スレッド・レビュー（と要れば compare）を読み、Python に通るかを聞く（書かない）。候補の無い家族は読まない
+- 見本は本物の形に合わせて手で組んだ（PAT が無く、本物からは録っていない。10.2 の 8）
+- confirm の跡（`phase-mark` の `reviewed`、子の `settled`）にも `actor` と拡張の版を入れる（承認・取り下げと揃えた）
+- 描画の `Actions.review` は省ける（渡さなければ「レビュー済みにする」を出さない。読み取りだけのボード）
+
+入れなかったもの:
+
+- `decide` の印の `actor` と `via`（`terminal`・`board`）: 8.9 に書いてあるが、11 章の段階 4 の行と決定 1 は `confirm` だけ。入れると `decide` の印の
+  中身が変わるので、入れる時期を相談する
+- GitLab（スレッドの読み・印・`seq`）、プロジェクトのリポジトリ、「始める」: 段階 5。GitLab の MR で依頼したフェーズは、ボードで「段階 5」と出して書かない
+- 見本を本物から録り直す sh: 決定 2 で手で更新することにした
+
+本物の GitHub で確かめてほしい点（段階 3 のものに足す）:
+
+- 段階 3 から: 期限のヘッダ（10.2 の 5）、`GET /commits?sha=&path=` と merge コミット（10.2 の 7）、`createCommitOnBranch` の競合の応答の形
+- 段階 4: 10.2 の 8 の各点。特に、見本（`test/fixtures/host/github/`）の形が本物の応答と合っているか（合わなければ README の手順で見本を直す）、
+  レビュー済みのコミットで Approve が外れるときの画面の注意、fine-grained の PAT の権限で読めること
+
+#### 11.8.1 段階 4 で触った守りの対象
+
+`.ccnavi/scripts/ccnavi-review.sh`（`confirm` のアカウントの引き当てと `--actor`、呼び手の `--actor` を断る）。利用者の承認（段階 4 の実施）を得て直接直した。
+
 ## 得たもの・失ったもの
 
 決定ごとの得失は 10.1 の表に 1 行ずつ置いた。まとめると次のとおり。
@@ -1689,6 +1767,8 @@ ADR に無かった判断:
 - 失ったもの: Chrome 拡張に Pyodide（約 14MB）を同梱し、初回に数秒待つ
 - 段階 0 で失ったもの: 置き場に当たるパスを `checkout <ref>`・`restore --source`・`restore --ours / --theirs` で戻す道と、`fetch`・`pull` の refspec と URL と、`branch -M`・`-C` がエージェントから使えなくなる。要るときは利用者が打つ
 - 段階 2b で失ったもの: `checkout -B`・`switch --force-create`・`worktree add -B / --detach / -f`、行き先の名前とブランチ名の違う `worktree add`、親のワークツリーでの別のブランチへの移動がエージェントから使えなくなる。squash マージの後で早送りできないブランチは人に回す
+- 段階 4 で失ったもの: MR のスレッドとレビューを取ってくる処理が sh と TS の 2 か所になり、ホストの API が変わると見本・sh・TS を揃えて直す手間がかかる。
+  ボードを開くたびに、依頼済みのフェーズごとにホストの API を 3〜4 回多く読む。Chrome は依頼時の先頭が祖先でないときも止めるので、手元の confirm が通る形でも止まることがある
 - 段階 3 で失ったもの: **REQ-APV-07 が緩む**（上の 1 つめ）。ホストの API へ直接書いた写しと、Chrome で人が承認した写しを区別できない。判定の入力に読めない（バイナリの）ファイルがある家族は、Chrome では承認も表示も「決まらない」になる
 
 ## 採らなかった案
