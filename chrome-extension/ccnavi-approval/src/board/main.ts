@@ -26,7 +26,7 @@ let busy = false;
 function hostCall(host: string, stats: Stats): HostCall {
   return async (op, args) => {
     const res = (await chrome.runtime.sendMessage({ kind: "host", host, op, args })) as Response;
-    if (!res.ok) throw new Error(res.error);
+    if (!res.ok) throw Object.assign(new Error(res.error), { status: res.status });
     if (res.counter) {
       stats.rest += res.counter.rest;
       stats.graphql += res.counter.graphql;

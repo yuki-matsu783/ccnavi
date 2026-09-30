@@ -16,8 +16,9 @@
  */
 import { py, PyError, type Actor, type ChangeRow, type PlanResult, type Written } from "./py.js";
 import type { RepoConfig } from "./settings.js";
-import { readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
-import type { ApprovalCommit, BlobText, FileAddition, PathObject } from "./github.js";
+import { findPrior, MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
+import type { FileAddition, PathObject } from "./github.js";
+import { underPlaces } from "./guard.js";
 
 /** 先頭が動いたときに読み直して書き直す回数の上限（8.3 の 4） */
 export const MAX_ROUNDS = 3;
@@ -25,6 +26,26 @@ export const MAX_ROUNDS = 3;
 export interface WriteDeps extends ReadDeps {
   /** 拡張の版（跡の `version` とコミットの見出し。7.3） */
   readonly version: string;
+  /** 待つ（書いた直後の読み取りの遅れ）。無ければ本物の時計。試験は 0 秒にする */
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
+/** 書いた直後の確かめを読み直す回数と間隔（ホストの読み取りの遅れ。レビューの 13） */
+const VERIFY_TRIES = 3;
+const VERIFY_WAIT_MS = 1000;
+/** 見出しに並べる識別子の数。残りは件数に畳み、全件は本文に書く（レビューの 3） */
+const HEADLINE_IDS = 3;
+
+/** service worker が書く頼みを形や守りで断ったときの status（protocol.ts の REFUSED と同じ） */
+const REFUSED = 400;
+
+/** コミットの見出しと本文。見出しは 200 字に収まるよう先頭の数件と件数に畳み、全件は本文に書く */
+export function commitMessage(ids: readonly string[], verb: string, done: string, version: string): { headline: string; body: string } {
+  const shown = ids.slice(0, HEADLINE_IDS).join(", ");
+  const rest = ids.length > HEADLINE_IDS ? ` ほか ${ids.length - HEADLINE_IDS} 件` : "";
+  const headline = `ccnavi: ${shown}${rest} ${verb}（Chrome 拡張 ${version}）`;
+  const body = ids.length > HEADLINE_IDS ? `${done}もの（${ids.length} 件）:\n${ids.map((i) => `- ${i}`).join("\n")}\n` : "";
+  return { headline, body };
 }
 
 export type Outcome =
@@ -107,6 +128,17 @@ export async function verifyWritten(deps: ReadDeps, repo: RepoConfig, oid: strin
   return wrong;
 }
 
+/** 書いた後の確かめ。ホストの読み取りの遅れを見込み、合わなければ少し待って読み直す */
+async function verifySettled(deps: WriteDeps, repo: RepoConfig, oid: string, rows: readonly ChangeRow[]): Promise<string[]> {
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let wrong = await verifyWritten(deps, repo, oid, rows);
+  for (let i = 1; i < VERIFY_TRIES && wrong.length > 0; i += 1) {
+    await sleep(VERIFY_WAIT_MS);
+    wrong = await verifyWritten(deps, repo, oid, rows);
+  }
+  return wrong;
+}
+
 async function actorOf(deps: WriteDeps, repo: RepoConfig): Promise<Actor> {
   const login = (await deps.call("viewer", [repo.owner, repo.repo])) as string;
   return { account: login, version: deps.version };
@@ -120,15 +152,16 @@ function why(res: PlanResult): string {
 type Attempt = { kind: "written"; oid: string } | { kind: "moved" } | { kind: "failed"; message: string };
 
 /**
- * 1 コミットで書く。落ちたら先頭を読み直し、動いていれば「動いた」（やり直す）。
- * ただし動いた先が自分の書いたとおりなら（応答だけが落ちた）、書けたとする。
+ * 1 コミットで書く。service worker が形や守りで断ったら（400）、原因を言って失敗にする。
+ * ほかの失敗では先頭を読み直し、動いていれば「動いた」（やり直す）。ただし新しい先頭の親が読んだ先頭で、
+ * 中身が自分の書いたとおりなら（応答だけが落ちた）、書けたとする。
  */
 async function commitOnce(
   deps: WriteDeps,
   repo: RepoConfig,
   read: FamilyRead,
   family: string,
-  headline: string,
+  message: { headline: string; body: string },
   rows: readonly ChangeRow[],
 ): Promise<Attempt> {
   const { additions, deletions } = fileChanges(rows);
@@ -138,36 +171,44 @@ async function commitOnce(
       repo.repo,
       family,
       read.head,
-      headline,
+      message.headline,
+      message.body,
       additions,
       deletions,
-      read.integration.name,
     ])) as string;
     return { kind: "written", oid };
   } catch (err) {
-    const message = (err as Error).message ?? String(err);
+    const text = (err as Error).message ?? String(err);
+    if ((err as { status?: number }).status === REFUSED) return { kind: "failed", message: text };
     const now = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
-    if (now === null) return { kind: "failed", message: `親のブランチ ${family} がホストから消えた（${message}）` };
-    if (now === read.head) return { kind: "failed", message };
-    if ((await verifyWritten(deps, repo, now, rows)).length === 0) return { kind: "written", oid: now };
+    if (now === null) return { kind: "failed", message: `親のブランチ ${family} がホストから消えた（${text}）` };
+    if (now === read.head) return { kind: "failed", message: text };
+    const parents = (await deps.call("commitParents", [repo.owner, repo.repo, now])) as string[];
+    if (parents.length === 1 && parents[0] === read.head && (await verifySettled(deps, repo, now, rows)).length === 0) {
+      return { kind: "written", oid: now };
+    }
     return { kind: "moved" };
   }
 }
 
 async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: readonly ChangeRow[], rounds: number, lines: readonly string[]): Promise<Outcome> {
-  const wrong = await verifyWritten(deps, repo, oid, rows);
+  const wrong = await verifySettled(deps, repo, oid, rows);
   if (wrong.length > 0) {
     return { kind: "failed", message: `書いた後の中身が書いたものと違う（${wrong.join(", ")}）。ホストの履歴を人が確かめる` };
   }
   return { kind: "written", oid, rounds, lines };
 }
 
-function rowsOf(res: Written, family: string): readonly ChangeRow[] | string {
+/** Python の Changes から、この家族の P に書く行を取り出す。P の外・置き場の外に及べば理由（決定 D） */
+export function rowsOf(res: Written, family: string, read: Pick<FamilyRead, "place">): readonly ChangeRow[] | string {
   if (res.stopped) return `${res.stopped.ticket}: ${res.stopped.reason}`;
   const names = Object.keys(res.changes ?? {});
   if (names.some((n) => n !== family)) return `書くものが親のブランチ ${family} の外に及ぶ（${names.join(", ")}）`;
   const rows = res.changes?.[family] ?? [];
-  return rows.length === 0 ? "書くものが無い" : rows;
+  if (rows.length === 0) return "書くものが無い";
+  const outside = rows.filter((r) => !underPlaces(r.path, read.place)).map((r) => r.path);
+  if (outside.length > 0) return `書くパスが置き場の外にある（${outside.join(", ")}）`;
+  return rows;
 }
 
 /** 家族 1 つの承認待ちを承認する（8.3） */
@@ -175,7 +216,8 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
   try {
     const actor = await actorOf(deps, repo);
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
-      const read = await readFamily(repo, family, deps);
+      const read = await readOrMoved(repo, family, deps);
+      if (read === null) continue;
       const res = await py.plan(deps.py, {
         settings: read.settings,
         snapshot: read.input,
@@ -189,10 +231,9 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
         return { kind: "changed", message: "見せた後に承認待ちの中身が変わった。見直してから承認し直す" };
       }
       if (!res.changes) return { kind: "refused", message: why(res) };
-      const rows = rowsOf(res, family);
+      const rows = rowsOf(res, family, read);
       if (typeof rows === "string") return { kind: "refused", message: rows };
-      const headline = `ccnavi: ${res.identifiers.join(", ")} を承認（Chrome 拡張 ${deps.version}）`;
-      const done = await commitOnce(deps, repo, read, family, headline, rows);
+      const done = await commitOnce(deps, repo, read, family, commitMessage(res.identifiers, "を承認", "承認した", deps.version), rows);
       if (done.kind === "written") return await finish(deps, repo, done.oid, rows, round, res.lines);
       if (done.kind === "failed") return { kind: "failed", message: done.message };
     }
@@ -202,18 +243,14 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
   }
 }
 
-/** 承認コミットの親にあった提案の本文（8.8 の 2）。引けなければ null */
-async function priorProposal(deps: WriteDeps, repo: RepoConfig, read: FamilyRead, ident: string): Promise<string | null> {
-  const doing = `${read.place.approved}/doing/${ident}.md`;
-  const todo = `${read.place.tickets}/todo/${ident}.md`;
-  const found = (await deps.call("approvalCommit", [repo.owner, repo.repo, read.head, doing])) as ApprovalCommit | null;
-  if (found === null) return null;
-  const objs = (await deps.call("pathObjects", [repo.owner, repo.repo, found.parent, [todo]])) as Record<string, PathObject | null>;
-  const obj = objs[todo];
-  if (!obj || obj.type !== "blob") return null;
-  const texts = (await deps.call("blobs", [repo.owner, repo.repo, [obj.oid]])) as Record<string, BlobText>;
-  const blob = texts[obj.oid];
-  return blob && !blob.binary && typeof blob.text === "string" ? blob.text : null;
+/** 家族を読み直す。読んでいる間に先頭が動いたら null（周を回す） */
+async function readOrMoved(repo: RepoConfig, family: string, deps: WriteDeps): Promise<FamilyRead | null> {
+  try {
+    return await readFamily(repo, family, deps);
+  } catch (err) {
+    if (err instanceof MovedError) return null;
+    throw err;
+  }
 }
 
 /** 承認を取り下げる（8.8）。着手前の新規の承認だけ。元の提案は承認コミットの親から戻す */
@@ -221,8 +258,9 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
   try {
     const actor = await actorOf(deps, repo);
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
-      const read = await readFamily(repo, family, deps);
-      const prior = await priorProposal(deps, repo, read, ident);
+      const read = await readOrMoved(repo, family, deps);
+      if (read === null) continue;
+      const prior = await findPrior((op, args) => deps.call(op, [repo.owner, repo.repo, ...args]), read.place, read.head, ident);
       const res = await py.withdraw(deps.py, {
         settings: read.settings,
         snapshot: read.input,
@@ -236,10 +274,9 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
       if (res.problems.length > 0 || !res.changes) {
         return { kind: "refused", message: res.problems.join("\n") || "取り下げるものが無い" };
       }
-      const rows = rowsOf(res, family);
+      const rows = rowsOf(res, family, read);
       if (typeof rows === "string") return { kind: "refused", message: rows };
-      const headline = `ccnavi: ${ident} の承認を取り下げ（Chrome 拡張 ${deps.version}）`;
-      const done = await commitOnce(deps, repo, read, family, headline, rows);
+      const done = await commitOnce(deps, repo, read, family, commitMessage([ident], "の承認を取り下げ", "取り下げた", deps.version), rows);
       if (done.kind === "written") return await finish(deps, repo, done.oid, rows, round, res.lines);
       if (done.kind === "failed") return { kind: "failed", message: done.message };
     }
