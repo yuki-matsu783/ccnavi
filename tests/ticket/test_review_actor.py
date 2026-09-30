@@ -18,6 +18,7 @@ import shutil
 
 from ccnavi import history, lint, review, settings, version
 from tests.ticket.test_core import STAMP, CoreHarness
+from tests.ticket.test_phases import child_text
 from tests.ticket.test_ticket import git, read_json, write
 
 RESULT = {"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "reviews": []}
@@ -212,3 +213,85 @@ class ReviewableTest(ActorHarness):
         self.commit_parent("reviewed")
         board = self.ask_chrome(self.chrome_request("board", "i0001"))
         self.assertEqual(board["reviewable"], [])
+
+
+class ReviewRuleTest(ActorHarness):
+    """段階 4 のレビューの後の決定（ADR-0093 の 11.8.1 の A・B・C と 8）。どれも締める向き。"""
+
+    @staticmethod
+    def review(state, at, author="9001"):
+        return review.Review(state, f"r/{state}/{at}", at, author)
+
+    def test_a_comment_or_a_pending_review_does_not_clear_a_change_request(self):
+        cr = self.review("CHANGES_REQUESTED", "2026-09-29T01:00:00Z")
+        for later in ("COMMENTED", "PENDING"):
+            got = review.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
+            self.assertEqual([r.state for r in got], ["CHANGES_REQUESTED"], later)
+        pending = review.Review("PENDING", "r/p", "", "9001")
+        self.assertEqual([r.state for r in review.effective([cr, pending])], ["CHANGES_REQUESTED"])
+        for later, left in (("APPROVED", ["APPROVED"]), ("DISMISSED", [])):
+            got = review.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
+            self.assertEqual([r.state for r in got], left, later)
+        self.assertEqual(review.effective([self.review("COMMENTED", "2026-09-29T00:00:00Z")]), [])
+
+    def test_a_marker_thread_is_skipped_only_on_gitlab_by_the_poster(self):
+        marker = review.Thread(id="t", body="<!-- ccnavi:request i0001:1 -->", author="bot")
+        self.assertEqual(review._unresolved([marker], set(), "github", "bot"), [marker])
+        self.assertEqual(review._unresolved([marker], set(), "gitlab", ""), [marker])
+        self.assertEqual(review._unresolved([marker], set(), "gitlab", "someone"), [marker])
+        self.assertEqual(review._unresolved([marker], set(), "gitlab", "bot"), [])
+
+    def test_a_request_record_without_host_or_mr_is_not_matched(self):
+        result = review.Result(host="github", mr=review.MergeRequest(7, "u"))
+        for mark in ({"mr": 7}, {"host": "github"}, {}):
+            self.assertIn("依頼し直すこと", review.matching_problems(result, mark)[0], mark)
+        self.assertEqual(review.matching_problems(result, {"host": "github", "mr": 7}), [])
+        self.assertTrue(review.matching_problems(result, {"host": "github", "mr": 8}))
+
+    def test_a_reviewed_phase_is_not_confirmed_again_locally_or_from_chrome(self):
+        fixture = self.ready()
+        compare = self.host_compare()
+        self.assertEqual(self.confirm_as(fixture).returncode, 0)
+        before = read_json(self.mark_path())
+        again = self.confirm_as(fixture, "--actor", "someone")
+        self.assertEqual(again.returncode, 1)
+        self.assertEqual(again.stderr.splitlines(), ["ccnavi: フェーズ 1 はレビュー済み"])
+        self.assertEqual(read_json(self.mark_path()), before)
+        self.commit_parent("reviewed")
+        compare = {**compare, "head": git(self.parent_tree, "rev-parse", "HEAD").strip()}
+        chrome = self.chrome_confirm(compare)
+        self.assertEqual(chrome["problems"], ["ccnavi: フェーズ 1 はレビュー済み"])
+        self.assertIsNone(chrome["changes"])
+
+    def test_the_request_records_the_poster_when_known(self):
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        self.remote()
+        body = write(os.path.join(self.root, "body.md"), "見てほしい\n")
+        prepared = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "--body-file", body, "review", "prepare"
+        )
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        posted = write(
+            os.path.join(self.root, "posted.json"),
+            json.dumps(
+                {
+                    "host": "gitlab",
+                    "mr": {"number": 7, "url": "u/7"},
+                    "url": "u/7#1",
+                    "created_at": "t",
+                    "author": "ccnavi-bot",
+                }
+            ),
+        )
+        done = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "requested", "--result", posted
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(read_json(self.mark_path("requested"))["poster"], "ccnavi-bot")

@@ -826,7 +826,10 @@ class PhaseTest(PhaseHarness):
         self.assertTrue(text.startswith("レビューで残った指摘（i0001 のフェーズ 2）\n\n"))
         self.assertIn("u/7#t1", text)
         self.assertNotIn("u/7#t0", text)
-        self.assertEqual(self.confirm(fixture, 2).returncode, 0)
+        # レビュー済みのフェーズに confirm を重ねない（ADR-0093 の 11.8.1 の決定 B）
+        again = self.confirm(fixture, 2)
+        self.assertEqual(again.returncode, 1)
+        self.assertIn("フェーズ 2 はレビュー済み", again.stderr)
 
     # ---- 7. Draft を外す（ready）と、人が締める（close-early）
 
