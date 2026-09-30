@@ -1611,7 +1611,7 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 | 任意 → `skipped` | `ccnavi-review.sh close-early`（人） | 終わっていないフェーズの全部に置く（9.11） |
 | 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提。`pending` は要らない |
 | `requested` → `reviewed` | `ccnavi-review.sh confirm`（親）、`ccnavi-review.sh decide`（人）、フィードバック計画の承認、`close-early` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決を人が受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
-| `pending` → `reviewed` | `ccnavi --reviewed <N> --chat`（人が端末で） | 見る場所が `chat`。依頼の記録は要らない（9.8） |
+| `pending` → `reviewed` | `ccnavi-review.sh chat <N>`（人が端末で。中身は `ccnavi --reviewed <N> --chat`） | 見る場所が `chat`。依頼の記録は要らない（9.8） |
 | 任意 → 無し | `ccnavi --approve` で同じ番号の子が承認された | 4 種を全部消す |
 
 マーカーは人が子を再開しても残る。再開の意図がレビューのやり直しなら、そのフェーズのマーカーも手で消す。
@@ -1764,7 +1764,7 @@ workflow:              # 親の承認済みチケット。--approve が書く。
 | 最後の子を閉じた呼び出しの `PostToolUse` で返す文 | 「合流と push を済ませ、`request` でレビューを頼み、ターンを終えて利用者を待て」 | 「合流して利用者に差分を見てもらい、ターンを終えて待て。先へ進めるのは利用者が端末で」 | 「人間レビューを省略して次のフェーズへ進む」 |
 | マーカー | `pending` | `pending` | `skipped` |
 | HITL ポイント | 来る。`reviewed` のマーカーまで止まる | 来る。`reviewed` のマーカーまで止まる | 来ない |
-| 開ける者 | `ccnavi-review.sh confirm` / `decide`（9.10） | 人が端末で `ccnavi --reviewed <N> --chat` | — |
+| 開ける者 | `ccnavi-review.sh confirm` / `decide`（9.10） | 人が親のワークツリーの端末で `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`） | — |
 
 `chat` で通したあと、人が端末で指摘を 1 行ずつ打てば、`decide` の「このフェーズで直す」と同じ形で続きの子を
 `.ccnavi/approved/doing/` に起こす（9.10）。何も打たなければ起こさない。
@@ -1833,7 +1833,7 @@ JSON の欄名は `gate_closed`（判定とボードの契約。この呼び名�
 
 ### 9.10 レビューの依頼と確認
 
-ここは見る場所が `mr` のフェーズの話。`chat` のフェーズは `ccnavi --reviewed <N> --chat` で進める（9.8）。
+ここは見る場所が `mr` のフェーズの話。`chat` のフェーズは `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で進める（9.8）。
 ただし `request` は `chat` のフェーズでも通る（厳しくする向きなので）。`--chat` は `mr` のフェーズに当たらない。
 
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
