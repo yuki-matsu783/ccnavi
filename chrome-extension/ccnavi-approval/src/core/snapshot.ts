@@ -14,7 +14,7 @@
  * blob は sha で引き、控え（IndexedDB）にあれば読まない（8.2）。判定はここでは出さない。
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
-import { BLOB_BATCH } from "./github.js";
+import { BLOB_BATCH, LINK_MODE, type ApprovalCommit } from "./github.js";
 import { py, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot } from "./py.js";
 import type { RepoConfig } from "./settings.js";
 
@@ -59,6 +59,9 @@ export interface RepoBoard {
   readonly stats: Stats;
 }
 
+/** 読んでいる間にブランチの先頭が動いた。書く流れは読み直して周を回す（レビューの 13） */
+export class MovedError extends Error {}
+
 export class Reader {
   readonly branches: Record<string, Branch> = {};
   readonly absent: string[] = [];
@@ -83,12 +86,13 @@ export class Reader {
 
   /** ブランチの上のパス（ディレクトリかファイル）を読んで、そのブランチの中身に足す */
   async read(name: string, head: string, paths: readonly string[]): Promise<Branch> {
-    const branch = this.branches[name] ?? { head, files: {}, binary: [] };
+    const branch = this.branches[name] ?? { head, files: {}, binary: [], links: [] };
     if (branch.head !== head) {
-      throw new Error(`${name} の先頭が読んでいる間に動いた。読み直す`);
+      throw new MovedError(`${name} の先頭が読んでいる間に動いた。読み直す`);
     }
     const objects = await this.call<Record<string, PathObject | null>>("pathObjects", head, paths);
     const wanted: { path: string; sha: string }[] = [];
+    const links = [...(branch.links ?? [])];
     for (const p of paths) {
       const obj = objects[p];
       if (!obj) continue;
@@ -96,7 +100,14 @@ export class Reader {
         wanted.push({ path: p, sha: obj.oid });
       } else {
         const entries = await this.call<TreeEntry[]>("tree", obj.oid);
-        for (const e of entries) wanted.push({ path: `${p}/${e.path}`, sha: e.sha });
+        for (const e of entries) {
+          // シンボリックリンクは中身（指す先の綴り）をファイルとして読まない。Python が「決まらない」にする
+          if (e.mode === LINK_MODE) {
+            if (!links.includes(`${p}/${e.path}`)) links.push(`${p}/${e.path}`);
+          } else {
+            wanted.push({ path: `${p}/${e.path}`, sha: e.sha });
+          }
+        }
       }
     }
     const texts = await this.blobs(wanted.map((w) => w.sha));
@@ -107,7 +118,7 @@ export class Reader {
       if (typeof t === "string") files[w.path] = t;
       else if (!binary.includes(w.path)) binary.push(w.path);
     }
-    const next = { head, files, binary };
+    const next = { head, files, binary, links };
     this.branches[name] = next;
     return next;
   }
@@ -251,11 +262,47 @@ async function familyBoard(
 ): Promise<FamilyBoard> {
   try {
     const input = await closureInput(family.name, reader, integration, settings, place, deps);
-    const result = await py.board(deps.py, settings, input, family.name);
+    const board = await py.board(deps.py, settings, input, family.name);
+    const result = await withdrawableHere(board, reader, place, family.name);
     return { family, result, error: "" };
   } catch (err) {
     return { family, result: null, error: (err as Error).message ?? String(err) };
   }
+}
+
+/**
+ * 取り下げを出すのは、承認コミットを引けて、その親に提案が読めるときだけ（8.8。レビューの 8。締める向き）。
+ * Python が理由を返さなかった写しでも、引けなければ理由を足す。
+ */
+async function withdrawableHere(board: BoardResult, reader: Reader, place: Placement, family: string): Promise<BoardResult> {
+  const head = reader.branches[family]?.head;
+  if (!board.withdrawable || !head) return board;
+  const out = [];
+  for (const w of board.withdrawable) {
+    if (w.problems.length > 0) {
+      out.push(w);
+      continue;
+    }
+    const prior = await findPrior((op, args) => reader.call(op, ...args), place, head, w.ticket);
+    out.push(prior === null ? { ...w, problems: ["承認コミット（この写しを足した、親のブランチの first-parent の鎖の上のコミット）を引けないか、その親に提案が無い"] } : w);
+  }
+  return { ...board, withdrawable: out };
+}
+
+type Ask = (op: string, args: readonly unknown[]) => Promise<unknown>;
+
+/** 承認コミットの親にあった提案の本文（8.8 の 2）。引けなければ null */
+export async function findPrior(ask: Ask, place: Placement, head: string, ident: string): Promise<string | null> {
+  const doing = `${place.approved}/doing/${ident}.md`;
+  const todo = `${place.tickets}/todo/${ident}.md`;
+  const found = (await ask("approvalCommit", [head, doing])) as ApprovalCommit | null;
+  if (found === null) return null;
+  const objs = (await ask("pathObjects", [found.parent, [todo]])) as Record<string, PathObject | null>;
+  const obj = objs[todo];
+  if (!obj || obj.type !== "blob") return null;
+  const texts = (await ask("blobs", [[obj.oid]])) as Record<string, BlobText>;
+  const blob = texts[obj.oid];
+  return blob && !blob.binary && typeof blob.text === "string" ? blob.text : null;
 }
 
 export interface FamilyRead extends IntegrationRead {

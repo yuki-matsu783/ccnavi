@@ -18,6 +18,8 @@ export interface Branch {
   readonly head: string;
   readonly files: Record<string, string>;
   readonly binary: readonly string[];
+  /** シンボリックリンク（読まない。Python が「決まらない」にする） */
+  readonly links?: readonly string[];
 }
 
 export interface Snapshot {

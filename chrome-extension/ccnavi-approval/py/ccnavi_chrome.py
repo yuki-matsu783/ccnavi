@@ -477,21 +477,24 @@ def _op_board(req: dict, root: str) -> dict:
 
 
 def _unreadable(snap: dict, closure: dict) -> str:
-    """判定の入力に本文を読めなかった（バイナリの）ファイルがあれば、止める理由。
+    """判定の入力に本文を読めなかったファイルがあれば、止める理由。
 
-    判定がそれを読むかは分からないので、無いとも空とも読ませず「決まらない」で止める
+    バイナリ（`binary`）とシンボリックリンク（`links`。中身は指す先の綴りで、手元の読み方と違う）は
+    読まない。判定がそれを読むかは分からないので、無いとも空とも読ませず「決まらない」で止める
     （6.2 の `NOT_FETCHED`。段階 1 は言うだけだった。段階 3 で書くようになったので締めた）。
+    リンクの家族は止まるので、リンクの綴りへ書くことも無い。
     """
     names = [snap["integration"]["name"], *closure["families"]]
     found = [
-        f"{name}:{path}"
+        f"{name}:{path}（{what}）"
         for name in dict.fromkeys(names)
-        for path in (snap["branches"].get(name) or {}).get("binary") or []
+        for key, what in (("binary", "バイナリ"), ("links", "シンボリックリンク"))
+        for path in (snap["branches"].get(name) or {}).get(key) or []
     ]
     if not found:
         return ""
     return (
-        f"判定の入力に本文を読めない（バイナリの）ファイルがある（{', '.join(found)}）。"
+        f"判定の入力に本文を読めないファイルがある（{', '.join(found)}）。"
         "この家族は決まらない。手元で `--approve --preview --verify` を打って確かめる"
     )
 
