@@ -24,7 +24,7 @@ before(async () => {
   py = (await pyodidePy()).call;
 });
 
-const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] };
+const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const noWait = async () => undefined;

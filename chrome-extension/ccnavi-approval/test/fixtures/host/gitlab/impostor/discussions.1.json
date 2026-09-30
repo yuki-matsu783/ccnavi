@@ -1,0 +1,80 @@
+[
+  {
+    "id": "0e3a5d7c5f6b8a9d0e1f2a3b4c5d6e7f8a9b0c1d",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5201,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+        "author": {
+          "id": 107,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "1f4b6e8d6a7c9b0e1f2a3b4c5d6e7f8a9b0c1d2e",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5202,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "2a5c7f9e7b8d0c1f2a3b4c5d6e7f8a9b0c1d2e3f",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5203,
+        "type": "DiscussionNote",
+        "body": "全体の方針について",
+        "author": {
+          "id": 112,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5204,
+        "type": "DiscussionNote",
+        "body": "追加の指摘",
+        "author": {
+          "id": 112,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": null
+      }
+    ]
+  }
+]

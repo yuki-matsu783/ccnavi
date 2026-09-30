@@ -1,0 +1,242 @@
+[
+  {
+    "id": "0000000000000000000000000000000000000000",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5300,
+        "type": "DiffNote",
+        "body": "<script>window.__pwned = 'gl-script'</script>スクリプトの指摘",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 1
+        }
+      }
+    ]
+  },
+  {
+    "id": "0000000000000000000000000000000000000001",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5301,
+        "type": "DiffNote",
+        "body": "<img src=\"x\" onerror=\"window.__pwned = 'gl-img'\">画像の指摘",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 2
+        }
+      }
+    ]
+  },
+  {
+    "id": "0000000000000000000000000000000000000002",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5302,
+        "type": "DiffNote",
+        "body": "[クリック](javascript:window.__pwned='gl-link')",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 3
+        }
+      }
+    ]
+  },
+  {
+    "id": "0000000000000000000000000000000000000003",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5303,
+        "type": "DiffNote",
+        "body": "<a href=\"jav&#x61;script:window.__pwned='gl-entity'\">実体参照で崩したスキーム</a>",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 4
+        }
+      }
+    ]
+  },
+  {
+    "id": "0000000000000000000000000000000000000004",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5304,
+        "type": "DiffNote",
+        "body": "<svg onload=\"window.__pwned='gl-svg'\"><circle r=\"4\"/></svg>",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 5
+        }
+      }
+    ]
+  },
+  {
+    "id": "0000000000000000000000000000000000000005",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5305,
+        "type": "DiffNote",
+        "body": "<p style=\"display:none\" hidden>隠れた本文</p><details><summary>畳んだ</summary>中身</details>",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 6
+        }
+      }
+    ]
+  },
+  {
+    "id": "0000000000000000000000000000000000000006",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5306,
+        "type": "DiffNote",
+        "body": "<!-- 見えないコメント -->見える本文",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 7
+        }
+      }
+    ]
+  },
+  {
+    "id": "0000000000000000000000000000000000000007",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5307,
+        "type": "DiffNote",
+        "body": "[普通のリンク](https://example.com/ok)",
+        "author": {
+          "id": 107,
+          "username": "mallory",
+          "name": "mallory"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "start_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "old_path": "src/app.py",
+          "new_path": "src/app.py",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 8
+        }
+      }
+    ]
+  }
+]

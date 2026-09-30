@@ -56,3 +56,25 @@ test("CX-T005 組織ごとのビルド: GHES の一覧なら通信先はその�
   assert.deepEqual(m.host_permissions, ["https://ghe.example.com/*"]);
   assert.match(csp(hosts), /connect-src 'self' https:\/\/ghe\.example\.com$/);
 });
+
+test("CX-T157 セルフホストの GitLab を足したビルド: 通信先はそのホストだけで、既定の gitlab.com は入らない（D24。段階 5）", () => {
+  const hosts = parseHosts(
+    JSON.stringify({
+      hosts: [
+        { id: "github.com", kind: "github", api: "https://api.github.com", graphql: "https://api.github.com/graphql", web: "https://github.com" },
+        { id: "gitlab.example.com", kind: "gitlab", api: "https://gitlab.example.com/api/v4", web: "https://gitlab.example.com" },
+      ],
+    }),
+  );
+  const m = manifest(hosts, "0.4.0") as { host_permissions: string[]; content_security_policy: { extension_pages: string } };
+  assert.deepEqual(m.host_permissions, ["https://api.github.com/*", "https://gitlab.example.com/*"]);
+  assert.match(m.content_security_policy.extension_pages, /connect-src 'self' https:\/\/api\.github\.com https:\/\/gitlab\.example\.com$/);
+  assert.ok(!JSON.stringify(m).includes("https://gitlab.com"));
+  // GitLab の graphql 欄は読まない（REST だけ。通信先に余計なオリジンを足さない）
+  assert.equal(hosts[1].graphql, "https://gitlab.example.com/api/v4");
+  // http のセルフホストは試験用の loopback のほかは受けない
+  assert.throws(
+    () => parseHosts(JSON.stringify({ hosts: [{ id: "gl.local", kind: "gitlab", api: "http://gl.local/api/v4", web: "http://gl.local" }] })),
+    /https/,
+  );
+});

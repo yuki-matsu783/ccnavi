@@ -1,0 +1,90 @@
+{
+  "host": "gitlab",
+  "mr": {
+    "number": 7,
+    "url": "https://gitlab.com/acme/widgets/-/merge_requests/7"
+  },
+  "threads": [
+    {
+      "id": "0000000000000000000000000000000000000000",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5300",
+      "path": "src/app.py",
+      "line": 1,
+      "body": "<script>window.__pwned = 'gl-script'</script>スクリプトの指摘",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    },
+    {
+      "id": "0000000000000000000000000000000000000001",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5301",
+      "path": "src/app.py",
+      "line": 2,
+      "body": "<img src=\"x\" onerror=\"window.__pwned = 'gl-img'\">画像の指摘",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    },
+    {
+      "id": "0000000000000000000000000000000000000002",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5302",
+      "path": "src/app.py",
+      "line": 3,
+      "body": "[クリック](javascript:window.__pwned='gl-link')",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    },
+    {
+      "id": "0000000000000000000000000000000000000003",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5303",
+      "path": "src/app.py",
+      "line": 4,
+      "body": "<a href=\"jav&#x61;script:window.__pwned='gl-entity'\">実体参照で崩したスキーム</a>",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    },
+    {
+      "id": "0000000000000000000000000000000000000004",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5304",
+      "path": "src/app.py",
+      "line": 5,
+      "body": "<svg onload=\"window.__pwned='gl-svg'\"><circle r=\"4\"/></svg>",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    },
+    {
+      "id": "0000000000000000000000000000000000000005",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5305",
+      "path": "src/app.py",
+      "line": 6,
+      "body": "<p style=\"display:none\" hidden>隠れた本文</p><details><summary>畳んだ</summary>中身</details>",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    },
+    {
+      "id": "0000000000000000000000000000000000000006",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5306",
+      "path": "src/app.py",
+      "line": 7,
+      "body": "<!-- 見えないコメント -->見える本文",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    },
+    {
+      "id": "0000000000000000000000000000000000000007",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5307",
+      "path": "src/app.py",
+      "line": 8,
+      "body": "[普通のリンク](https://example.com/ok)",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "mallory"
+    }
+  ],
+  "reviews": []
+}

@@ -59,14 +59,15 @@ test("CX-T013 操作は名前で限る。知らない操作・焼き込んでい
   assert.equal((await call({ kind: "host", host: "github.com", op: "branchHead", args: ["acme", "widgets", "a..b"] })).ok, false);
 });
 
-test("CX-T014 PAT が無ければ呼ばない。GitLab は段階 5 まで読まない", async () => {
+test("CX-T014 PAT が無ければ呼ばない（GitHub も GitLab も。段階 5 から GitLab も読む）", async () => {
   const m = mock();
   const d = deps(m, new Map());
-  const res = await dispatch({ kind: "host", host: "github.com", op: "repoInfo", args: ["acme", "widgets"] }, BOARD, d);
-  assert.equal(res.ok, false);
+  for (const host of ["github.com", "gitlab.com"]) {
+    const res = await dispatch({ kind: "host", host, op: "repoInfo", args: ["acme", "widgets"] }, BOARD, d);
+    assert.equal(res.ok, false, host);
+    assert.equal((res as { status?: number }).status, 401, host);
+  }
   assert.equal(m.calls.length, 0);
-  const gl = await dispatch({ kind: "host", host: "gitlab.com", op: "repoInfo", args: ["acme", "widgets"] }, BOARD, deps(m, new Map([["gitlab.com", "glpat-xxxxxxxxxx"]])));
-  assert.match((gl as { error: string }).error, /段階 5/);
 });
 
 test("CX-T015 PAT が通らなければ（401）差し替えを促す", async () => {

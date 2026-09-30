@@ -1,0 +1,43 @@
+{
+  "host": "gitlab",
+  "mr": {
+    "number": 7,
+    "url": "https://gitlab.com/acme/widgets/-/merge_requests/7"
+  },
+  "threads": [
+    {
+      "id": "6a9c1f3e1b2d4c5f6a7b8c9d0e1f2a3b4c5d6e7f",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5001",
+      "path": "",
+      "line": 0,
+      "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "lab-bot"
+    },
+    {
+      "id": "7b0d2a4f2c3e5d6a7b8c9d0e1f2a3b4c5d6e7f8a",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5002",
+      "path": "src/app.py",
+      "line": 3,
+      "body": "変数名が分かりにくい",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "lab-reviewer"
+    }
+  ],
+  "reviews": [
+    {
+      "state": "APPROVED",
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
+      "submitted_at": "2026-09-29T04:00:00.000Z",
+      "author": "9"
+    },
+    {
+      "state": "UNREVIEWED",
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
+      "submitted_at": "2026-09-29T04:00:00.000Z",
+      "author": "11"
+    }
+  ]
+}

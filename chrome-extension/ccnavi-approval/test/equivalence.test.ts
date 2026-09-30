@@ -33,7 +33,7 @@ test("CX-T060 ボード 1 回ぶんの要求すべてに、Pyodide と手元の 
   const mock = new MockGitHub(fixture());
   const stats = newStats();
   await collectRepo(
-    { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 60, extraBranches: [] },
+    { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 60, extraBranches: [], project: "", workspace: "" },
     { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), py: spy, cache: memoryCache(), now: () => new Date(NOW), stats },
   );
   const ops = new Set(log.map((l) => l.req.op));
@@ -69,7 +69,7 @@ test("CX-T062 承認と取り下げで Python に投げた要求（plan・withdr
   delete branches.i0001.files["wip/proposals/todo/i0001-01.md"];
   const mock = new MockGitHub(branches);
   const stats = newStats();
-  const repo = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] };
+  const repo = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
   const d = { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), py: spy, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9" };
   const board = await collectRepo(repo, d);
   const r = board.families.find((f) => f.family.name === "i0001")?.result;

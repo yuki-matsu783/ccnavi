@@ -64,9 +64,9 @@ export class MockGitHub {
   readonly calls: string[] = [];
   readonly commits = new Map<string, Commit>();
   readonly commitCalls: CommitCall[] = [];
-  private readonly heads = new Map<string, string>();
-  private readonly blobs = new Map<string, string>();
-  private readonly trees = new Map<string, Tree>();
+  protected readonly heads = new Map<string, string>();
+  protected readonly blobs = new Map<string, string>();
+  protected readonly trees = new Map<string, Tree>();
   /** 応答ヘッダに載せる PAT の期限（空なら載せない） */
   expiration = "";
   /** createCommitOnBranch を受けたとき、比べる前に 1 度だけ呼ぶ（割り込みの書き手） */
@@ -89,15 +89,19 @@ export class MockGitHub {
   readonly scenes = new Map<string, Scene>();
   /** 開いた MR（ブランチ → 番号と Approve） */
   readonly pulls: Record<string, { number: number; reviews: { user: string; state: string }[] }[]> = {};
+  /** 開いた issue（「始める」。段階 5） */
+  readonly issues: { number: number; title: string; pull?: boolean }[] = [];
+  /** 作ったブランチ（「始める」の頼み。名前と元の sha） */
+  readonly createdBranches: { name: string; sha: string }[] = [];
 
   /** 見本の日時（`NOW` 基準）を、実機の試験では今の時刻へずらす */
-  private readonly shift: number;
-  private seq = 0;
+  protected readonly shift: number;
+  protected seq = 0;
 
   constructor(
     readonly branches: Record<string, FixtureBranch>,
     readonly defaultBranch = "main",
-    private readonly now: Date = new Date(NOW),
+    protected readonly now: Date = new Date(NOW),
   ) {
     this.shift = now.getTime() - Date.parse(NOW);
     for (const [name, b] of Object.entries(branches)) {
@@ -107,7 +111,7 @@ export class MockGitHub {
     }
   }
 
-  private store(c: Omit<Commit, "sha">, salt = ""): string {
+  protected store(c: Omit<Commit, "sha">, salt = ""): string {
     const sha = sha1(`commit ${salt}\n${this.seq++}\n${c.parents.join(",")}\n${JSON.stringify(c.files)}`);
     for (const text of Object.values(c.files)) this.blobs.set(blobSha(text), text);
     this.commits.set(sha, { sha, ...c });
@@ -167,7 +171,7 @@ export class MockGitHub {
   }
 
   /** ディレクトリの tree。無ければ登録して oid を返す */
-  private treeOf(commit: string, dir: string): string | null {
+  protected treeOf(commit: string, dir: string): string | null {
     const files = this.commits.get(commit)?.files ?? {};
     const entries = Object.keys(files)
       .filter((p) => p.startsWith(`${dir}/`))
@@ -180,7 +184,7 @@ export class MockGitHub {
   }
 
   /** 祖先の全部（日付の新しい順） */
-  private ancestors(sha: string): Commit[] {
+  protected ancestors(sha: string): Commit[] {
     const seen = new Map<string, Commit>();
     const stack = [sha];
     while (stack.length > 0) {
@@ -197,7 +201,7 @@ export class MockGitHub {
    * merge コミットは、path がどれかの親と同じなら出さずにその親だけを辿り（別の枝に入ることもある）、
    * どの親とも違えば出して全部の親を辿る。path が無ければ最初の親の鎖を全部出す。
    */
-  private history(sha: string, path = ""): Commit[] {
+  protected history(sha: string, path = ""): Commit[] {
     const out: Commit[] = [];
     const seen = new Set<string>();
     const stack = [sha];
@@ -223,7 +227,7 @@ export class MockGitHub {
   }
 
   /** コミットの変更の一覧。消えたファイルと同じ中身で足されたファイルは renamed（本物の rename 検出に寄せる） */
-  private changed(c: Commit): { filename: string; status: string; previous_filename?: string }[] {
+  protected changed(c: Commit): { filename: string; status: string; previous_filename?: string }[] {
     const before = this.commits.get(c.parents[0] ?? "")?.files ?? {};
     const added = Object.keys(c.files).filter((p) => !(p in before));
     const removed = Object.keys(before).filter((p) => !(p in c.files));
@@ -244,7 +248,7 @@ export class MockGitHub {
   }
 
   /** 並びを per_page・page で切り、続きがあれば Link を付ける */
-  private paged(u: URL, items: unknown[]): { status: number; json: unknown; headers?: Record<string, string> } {
+  protected paged(u: URL, items: unknown[]): { status: number; json: unknown; headers?: Record<string, string> } {
     const per = Number(u.searchParams.get("per_page") ?? "30");
     const page = Number(u.searchParams.get("page") ?? "1");
     const slice = items.slice((page - 1) * per, page * per);
@@ -311,12 +315,25 @@ export class MockGitHub {
         .find((p) => p.number === Number(reviews[1]));
       return this.paged(u, (pr?.reviews ?? []).map((r) => ({ user: { login: r.user }, state: r.state })));
     }
+    if (method === "GET" && u.pathname === `${base}/issues`) {
+      const list = this.issues.map((i) => ({ number: i.number, title: i.title, html_url: `https://github.com/${this.owner}/${this.repo}/issues/${i.number}`, ...(i.pull ? { pull_request: {} } : {}) }));
+      return { status: 200, json: list };
+    }
+    if (method === "POST" && u.pathname === `${base}/git/refs`) {
+      const req = JSON.parse(body || "{}") as { ref?: string; sha?: string };
+      const name = String(req.ref ?? "").replace(/^refs\/heads\//, "");
+      if (!name || this.heads.has(name)) return { status: 422, json: { message: "Reference already exists" } };
+      if (!this.commits.has(String(req.sha))) return { status: 422, json: { message: "Object does not exist" } };
+      this.heads.set(name, String(req.sha));
+      this.createdBranches.push({ name, sha: String(req.sha) });
+      return { status: 201, json: { ref: `refs/heads/${name}`, object: { sha: req.sha, type: "commit" } } };
+    }
     if (method === "POST" && u.pathname.endsWith("/graphql")) return this.graphql(JSON.parse(body));
     return { status: 404, json: { message: "Not Found" } };
   }
 
   /** `GET /compare/<base>...<head>`。`base` が祖先なら ahead、同じなら identical、ほかは diverged。一覧は filesLimit で切る */
-  private compare(b: string, h: string): { status: number; json: unknown } {
+  protected compare(b: string, h: string): { status: number; json: unknown } {
     const from = this.commits.get(b);
     const to = this.commits.get(h);
     if (!from || !to) return { status: 404, json: { message: "Not Found" } };
@@ -328,7 +345,7 @@ export class MockGitHub {
     return { status: 200, json: { status, files: files.slice(0, this.filesLimit) } };
   }
 
-  private graphql(req: { query: string; variables: Record<string, unknown> }): { status: number; json: unknown } {
+  protected graphql(req: { query: string; variables: Record<string, unknown> }): { status: number; json: unknown } {
     const { query, variables } = req;
     if (query.includes("history(first:")) {
       // 本物の history は first-parent に限らず祖先を日付順に返す。ここでも全部の祖先を返す
@@ -375,7 +392,7 @@ export class MockGitHub {
     return { status: 200, json: { data: { repository } } };
   }
 
-  private createCommit(input: Record<string, unknown>): { status: number; json: unknown } {
+  protected createCommit(input: Record<string, unknown>): { status: number; json: unknown } {
     const target = input.branch as { repositoryNameWithOwner?: string; branchName?: string };
     const branch = String(target?.branchName ?? "");
     const expected = String(input.expectedHeadOid ?? "");
@@ -424,7 +441,7 @@ export class MockGitHub {
     return { status: 200, json: { data: { createCommitOnBranch: { commit: { oid } } } } };
   }
 
-  private responseHeaders(): Record<string, string> {
+  protected responseHeaders(): Record<string, string> {
     return this.expiration ? { [EXPIRATION_HEADER]: this.expiration } : {};
   }
 
@@ -449,7 +466,7 @@ export class MockGitHub {
       req.on("end", () => {
         const headers: Record<string, string> = {};
         for (const [k, v] of Object.entries(req.headers)) if (typeof v === "string") headers[k] = v;
-        const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, accept, x-github-api-version" };
+        const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, accept, x-github-api-version, private-token" };
         if (req.method === "OPTIONS") {
           res.writeHead(204, cors).end();
           return;

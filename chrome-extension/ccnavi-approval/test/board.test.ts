@@ -20,7 +20,7 @@ before(async () => {
   py = (await pyodidePy()).call;
 });
 
-const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] };
+const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 
 async function run(
   branches: Record<string, FixtureBranch> = fixture(),

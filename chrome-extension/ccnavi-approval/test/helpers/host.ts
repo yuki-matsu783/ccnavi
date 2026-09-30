@@ -45,11 +45,14 @@ export function deps(
 }
 
 /** 設定画面で登録したリポジトリ（模擬の GitHub の acme/widgets） */
-export const REPOS: RepoConfig[] = [{ host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] }];
+export const REPOS: RepoConfig[] = [{ host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" }];
 
-export function hostCall(d: Deps, stats: Stats): HostCall {
+/** 設定画面で登録した GitLab のリポジトリ（模擬の GitLab の acme/widgets。段階 5） */
+export const GITLAB_REPO: RepoConfig = { host: "gitlab.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
+
+export function hostCall(d: Deps, stats: Stats, host = "github.com"): HostCall {
   return async (op, args) => {
-    const res = await dispatch({ kind: "host", host: "github.com", op, args }, BOARD, d);
+    const res = await dispatch({ kind: "host", host, op, args }, BOARD, d);
     if (!res.ok) throw Object.assign(new Error(res.error), { status: res.status });
     if (res.counter) {
       stats.rest += res.counter.rest;

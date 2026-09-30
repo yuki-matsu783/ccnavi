@@ -26,7 +26,7 @@ before(async () => {
   py = (await pyodidePy()).call;
 });
 
-const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] };
+const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 const VERSION = "9.9.9";
 
 function depsFor(mock: MockGitHub): WriteDeps {
@@ -231,7 +231,7 @@ test(`CX-T109 ${MAX_ROUNDS} 周しても先頭が動き続けたら、人に回�
   assert.ok(mock.commitCalls.every((c) => c.result === "stale"));
 });
 
-test("CX-T110 Changes を 1 コミットの足す・消すに分ける（本文は UTF-8 の base64、base64 の中身はそのまま）", () => {
+test("CX-T110 Changes を 1 コミットの足す・消すに分ける（本文は UTF-8 の base64、base64 の中身はそのまま。GitLab のために作るか書き換えるかも持つ）", () => {
   const { additions, deletions } = fileChanges([
     { op: "create", path: "a.md", content: "日本語\n" },
     { op: "update", path: "b.bin", base64: "AAEC" },
@@ -239,8 +239,8 @@ test("CX-T110 Changes を 1 コミットの足す・消すに分ける（本文�
   ]);
   assert.deepEqual(deletions, ["c.md"]);
   assert.deepEqual(additions, [
-    { path: "a.md", contents: Buffer.from("日本語\n").toString("base64") },
-    { path: "b.bin", contents: "AAEC" },
+    { op: "create", path: "a.md", contents: Buffer.from("日本語\n").toString("base64") },
+    { op: "update", path: "b.bin", contents: "AAEC" },
   ]);
   assert.match(localStamp(new Date(NOW)), /^2026-09-\d\dT\d\d:\d\d:\d\d[+-]\d{4}$/);
 });

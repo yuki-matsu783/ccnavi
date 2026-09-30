@@ -1,0 +1,39 @@
+{
+  "host": "gitlab",
+  "mr": {
+    "number": 7,
+    "url": "https://gitlab.com/acme/widgets/-/merge_requests/7"
+  },
+  "threads": [
+    {
+      "id": "9d2f4c6b4e5a7f8c9d0e1f2a3b4c5d6e7f8a9b0c",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5101",
+      "path": "src/app.py",
+      "line": 1,
+      "body": "ここは直してほしい",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "lab-reviewer"
+    }
+  ],
+  "reviews": [
+    {
+      "state": "CHANGES_REQUESTED",
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
+      "submitted_at": "2026-09-29T04:00:00.000Z",
+      "author": "9"
+    },
+    {
+      "state": "REVIEWED",
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
+      "submitted_at": "2026-09-29T04:00:00.000Z",
+      "author": "11"
+    },
+    {
+      "state": "UNREVIEWED",
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
+      "submitted_at": "2026-09-29T04:00:00.000Z",
+      "author": "12"
+    }
+  ]
+}

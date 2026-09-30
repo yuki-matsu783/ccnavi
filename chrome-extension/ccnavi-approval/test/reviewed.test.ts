@@ -36,7 +36,7 @@ before(async () => {
 const native = nativePy();
 after(() => native?.close());
 
-const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [] };
+const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 const FAMILY = "i0004";
 const MARK = `.ccnavi/approved/phases/${FAMILY}/1.reviewed`;
 const REQUESTED = `.ccnavi/approved/phases/${FAMILY}/1.requested`;

@@ -244,7 +244,36 @@ export function reviewFamilyFiles(id: string, phases = 1): Record<string, string
   return out;
 }
 
-/** 依頼のマーカー（`ccnavi review requested` が置く形） */
-export function requestedMark(head: string, mr = 42): string {
-  return JSON.stringify({ head, mr, url: `https://github.com/acme/widgets/pull/${mr}#issuecomment-1`, host: "github", since: "2026-09-29T00:00:00Z" });
+/** 依頼のマーカー（`ccnavi review requested` が置く形）。GitLab は依頼を投稿したアカウント（`poster`）も持つ（11.8.1 の決定 C） */
+export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" = "github", poster = ""): string {
+  const url = host === "gitlab" ? `https://gitlab.com/acme/widgets/-/merge_requests/${mr}#note_1` : `https://github.com/acme/widgets/pull/${mr}#issuecomment-1`;
+  return JSON.stringify({ head, mr, url, host, since: "2026-09-29T00:00:00Z", ...(poster ? { poster } : {}) });
+}
+
+/**
+ * プロジェクトのリポジトリ（段階 5。手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
+ *
+ * - `main`（プロジェクトの統合先）: 閉じた家族 web-i0003 の `done/` とプロジェクトの層（rules.yml だけ）。
+ *   共通層・置き場の綴り・互換の印はワークスペース（`fixture()` の `main`）から読む
+ * - `web-i0012`（直近）: issue #12 から始めた親と子の提案
+ * - `web-i0012` の上の `.ccnavi/config/phases.yml` は読まない（置き場の外。3.3 の 6）
+ */
+export function projectFixture(): Record<string, FixtureBranch> {
+  const main = {
+    ".ccnavi/config/rules.yml": RULES,
+    ".ccnavi/approved/done/web-i0003.md": done("web-i0003", null, null),
+    "README.md": "プロジェクト\n",
+  };
+  return {
+    main: { committedDate: "2026-09-20T00:00:00Z", files: main },
+    "web-i0012": {
+      committedDate: "2026-09-28T10:00:00Z",
+      files: {
+        ...main,
+        ".ccnavi/config/phases.yml": "version: 1\nphases: {}\n",
+        "wip/proposals/todo/web-i0012.md": parent("web-i0012", "プロジェクトの親 web-i0012", "プロジェクトの本文\n"),
+        "wip/proposals/todo/web-i0012-01.md": child("web-i0012-01", "web-i0012", 1, "wip/research/*"),
+      },
+    },
+  };
 }
