@@ -23,11 +23,12 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import unittest
 from unittest import mock
 
-from ccnavi import approval, core, fsio, history, settings
+from ccnavi import approval, core, fsio, history, lint, settings, version
 from ccnavi import tree as tree_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, git, write
@@ -141,7 +142,7 @@ class CoreHarness(PhaseHarness):
                     if rel.startswith(wanted)
                 }
             branches[name] = {"head": "0" * 40, "files": dict(sorted(files.items()))}
-        return {
+        request = {
             "schema": chrome.SCHEMA,
             "op": op,
             "family": family,
@@ -153,6 +154,24 @@ class CoreHarness(PhaseHarness):
             },
             **extra,
         }
+        if op != "confirm":
+            # レビュー済み（段階 4）は手元の CLI の confirm と比べる。控えがあると手元は C1 の
+            # 対象の家族として sh を通さない書き込みを断るので、控えは Chrome の側だけに組む。
+            self.mirror_records(chrome, request)
+        return request
+
+    def mirror_records(self, chrome, request):
+        """Chrome の入口が仮のツリーに組む取り込みの控え相当を、手元の控えの置き場にも書く。
+
+        手元も同じ控えで判定する（取り込み済みの家族として読む。ADR-0093 の 3.3）ので、
+        画面の本文と指紋（判定が読んだ中身。控えを含む）が Chrome と同じになる。
+        """
+        snap = request["snapshot"]
+        place = chrome._placement(None)
+        closure = chrome._closure(snap, place, request["family"])
+        shutil.rmtree(os.path.join(self.state, "sync"), ignore_errors=True)
+        for rel, text in chrome.records(snap, place, closure["families"]).items():
+            write(os.path.join(self.state, *rel.split("/")), text)
 
     def ask_chrome(self, request):
         root = os.path.join(self.root, "memfs")
@@ -645,6 +664,11 @@ class CoreChromeTest(CoreHarness):
         clock.__enter__()
         self.addCleanup(clock.__exit__, None, None, None)
         super().setUp()
+        # 統合先の互換の印（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）。
+        write(
+            os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
+            f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
+        )
 
     @classmethod
     def tearDownClass(cls):
