@@ -10,6 +10,9 @@
  *   ボードからレビュー済みの印を書く
  * - service worker が PAT の期限のヘッダを CORS に公開されていなくても読み、ボードの帯とバッジで知らせる（確認事項 5。模擬のホストで）
  * - PAT はボードに渡らない
+ * - 段階 5: 通信先にセルフホストの GitLab（模擬。127.0.0.1:18788）を足したビルドで、GitLab のリポジトリを登録し、
+ *   ボードを描き（スレッドの悪意のある本文でも何も動かない）、Commits API で承認を書き、「始める」で issue から
+ *   親のブランチを作る。PAT は画面に渡らない
  *
  * `node scripts/test.js --e2e` で回す。
  */
@@ -22,11 +25,16 @@ import { chromium, type BrowserContext, type Page } from "playwright-core";
 
 import { fixture, requestedMark, reviewFamilyFiles } from "../fixtures/repo.js";
 import { loadScene } from "../helpers/host-fixture.js";
+import { loadGitLabScene } from "../helpers/gitlab-fixture.js";
 import { LOGIN, MockGitHub, TOKEN } from "../helpers/mock-github.js";
+import { MockGitLab } from "../helpers/mock-gitlab.js";
 import { HERE } from "../helpers/python.js";
 
 const DIST = path.join(HERE, "dist-e2e");
 const PORT = 18787;
+const GITLAB_PORT = 18788;
+const lab = new MockGitLab(fixture(), "main", new Date());
+let closeLab: () => Promise<void>;
 
 let ctx: BrowserContext;
 let id: string;
@@ -48,6 +56,7 @@ function watch(page: Page): void {
 
 before(async () => {
   closeServer = await mock.serve(PORT);
+  closeLab = await lab.serve(GITLAB_PORT);
   profile = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-chrome-profile-"));
   ctx = await chromium.launchPersistentContext(profile, {
     channel: "chromium",
@@ -62,16 +71,17 @@ before(async () => {
 after(async () => {
   await ctx?.close();
   await closeServer?.();
+  await closeLab?.();
   fs.rmSync(profile, { recursive: true, force: true });
 });
 
-test("CX-T070 組んだ manifest の CSP は 'wasm-unsafe-eval' だけを足し、通信先は試験の 127.0.0.1 だけ", () => {
+test("CX-T070 組んだ manifest の CSP は 'wasm-unsafe-eval' だけを足し、通信先は試験の 127.0.0.1（GitHub と、足したセルフホストの GitLab）だけ", () => {
   const m = JSON.parse(fs.readFileSync(path.join(DIST, "manifest.json"), "utf8"));
   assert.equal(
     m.content_security_policy.extension_pages,
-    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' http://127.0.0.1:18787",
+    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' http://127.0.0.1:18787 http://127.0.0.1:18788",
   );
-  assert.deepEqual(m.host_permissions, ["http://127.0.0.1:18787/*"]);
+  assert.deepEqual(m.host_permissions, ["http://127.0.0.1:18787/*", "http://127.0.0.1:18788/*"]);
 });
 
 test("CX-T071 設定画面で PAT とリポジトリを登録する。PAT は画面に読み返さない", async () => {
@@ -113,9 +123,10 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   assert.match((await page.textContent('[data-family="i0001"] .closure')) ?? "", /i0003/);
   // 見た目を目で確かめるとき: CCNAVI_E2E_SHOT=<png のパス>
   if (process.env.CCNAVI_E2E_SHOT) await page.screenshot({ path: process.env.CCNAVI_E2E_SHOT, fullPage: true });
-  // 段階 3: 承認のボタンは承認待ちのある家族だけ。レビュー済み・「始める」とフォームは出さない
-  const actions = await page.locator("main button").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).closest<HTMLElement>("[data-family]")?.dataset.family}:${(e as HTMLElement).dataset.action}`));
-  assert.deepEqual(actions, ["i0001:approve", "i0002:approve"]);
+  // 段階 3: 承認のボタンは承認待ちのある家族だけ。レビュー済みとフォームは出さない。段階 5 の「始める」は
+  // issue を押してから読む（ボードを開くたびには読まない）
+  const actions = await page.locator("main button").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).closest<HTMLElement>("[data-family]")?.dataset.family ?? "-"}:${(e as HTMLElement).dataset.action}`));
+  assert.deepEqual(actions, ["i0001:approve", "i0002:approve", "-:issues"]);
   assert.equal(await page.locator("main form").count(), 0);
   // 承認の画面の本文は開いた形でボタンの上に見えている（決定 A）
   assert.ok(await page.locator('[data-family="i0001"] [data-testid=screen] pre').isVisible());
@@ -128,6 +139,7 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   assert.ok(above);
   // 開いただけでは何も書かない
   assert.ok(mock.calls.every((c) => c.startsWith("GET ") || c === "POST /graphql"), mock.calls.join("\n"));
+  assert.ok(!mock.calls.some((c) => c.includes("/issues")), mock.calls.join("\n"));
   assert.equal(mock.commitCalls.length, 0);
   await page.close();
 });
@@ -274,6 +286,70 @@ test("CX-T138 レビュー済み: スレッドの悪意のある本文を描い�
   });
   assert.ok(copy.includes('"ok":true') && !copy.includes(TOKEN), copy);
   await page.close();
+});
+
+const GL_REPO = '[data-repo="gitlab.e2e/acme/widgets"]';
+
+test("CX-T159 セルフホストの GitLab（足した通信先）: 登録してボードを描き、Commits API で承認を書く。スレッドの悪意のある本文でも何も動かず、PAT は画面に渡らない", async () => {
+  const setup = await ctx.newPage();
+  watch(setup);
+  await setup.goto(`chrome-extension://${id}/options.html`);
+  await setup.selectOption("#repo-host", "gitlab.e2e");
+  await setup.fill("#repo-form [name=owner]", "acme");
+  await setup.fill("#repo-form [name=repo]", "widgets");
+  await setup.click("#repo-form button[type=submit]");
+  await setup.waitForFunction(() => document.getElementById("repo-list")?.textContent?.includes("gitlab.e2e/acme/widgets"));
+  await setup.selectOption("#token-host", "gitlab.e2e");
+  await setup.fill("#token-value", TOKEN);
+  await setup.click("#token-form button[type=submit]");
+  await setup.waitForFunction(() => document.getElementById("token-list")?.textContent?.includes("gitlab.e2e（GitLab）: 登録済み"));
+  await setup.close();
+
+  lab.branch("i0004", "main");
+  const at = lab.push("i0004", reviewFamilyFiles("i0004"), "作業とレビュー待ちの子");
+  lab.push("i0004", { ".ccnavi/approved/phases/i0004/1.requested": requestedMark(at, 7, "gitlab", "lab-bot") }, "ccnavi: レビューを依頼した");
+  lab.attachGitLabScene("i0004", loadGitLabScene("hostile"));
+  const page = await openBoard();
+  const repo = page.locator(`section${GL_REPO}`);
+  const families = await repo.locator("[data-family]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.family));
+  assert.deepEqual(families, ["i0001", "i0002", "i0004"]);
+  const review = repo.locator('[data-family="i0004"] .review[data-phase="1"]');
+  assert.match((await review.locator("h4").textContent()) ?? "", /MR !7/);
+  assert.equal(await review.locator(".thread").count(), 8);
+  assert.equal(await review.locator("script, img, svg, iframe, form, style, details, summary").count(), 0);
+  for (const a of await review.locator(".markdown a").all()) await a.click();
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => (window as unknown as { __pwned?: string }).__pwned ?? null), null);
+  assert.ok((await review.textContent())?.includes("隠れた本文"));
+
+  const before = lab.head("i0001");
+  const said = await press(page, `${GL_REPO} [data-family="i0001"] button[data-action=approve]`);
+  assert.match(said, /^written: 承認を書いた/);
+  assert.equal(lab.glCommits.length, 1);
+  assert.deepEqual([lab.glCommits[0].branch, lab.glCommits[0].parent, lab.glCommits[0].result], ["i0001", before, "written"]);
+  assert.match(lab.files("i0001")[".ccnavi/approved/doing/i0001.md"], /^ccnavi_approved:/m);
+  assert.ok(lab.calls.some((c) => c.endsWith("/personal_access_tokens/self")));
+  assert.ok(!(await page.content()).includes(TOKEN));
+  await page.close();
+});
+
+test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（i<番号>）の親のブランチを統合先の先頭に作る。閉じた識別子の issue は作らない", async () => {
+  lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた家族と重なる" });
+  const page = await openBoard();
+  await page.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
+  await page.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="12"]`);
+  const said = await press(page, `${GL_REPO} [data-testid=start] li[data-issue="12"] button[data-action=start]`);
+  assert.match(said, /^written: 親のブランチ i0012 を作った/);
+  assert.deepEqual(lab.createdBranches, [{ name: "i0012", sha: lab.head("main") }]);
+  await page.close();
+  const again = await openBoard();
+  await again.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
+  await again.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="5"]`);
+  const refused = await press(again, `${GL_REPO} [data-testid=start] li[data-issue="5"] button[data-action=start]`);
+  assert.match(refused, /^refused: 始めなかった: i0005 は統合先 main の done\/ で閉じている/);
+  assert.equal(lab.createdBranches.length, 1);
+  assert.ok(!(await again.content()).includes(TOKEN));
+  await again.close();
 });
 
 test("CX-T074 画面にも Worker にも CSP の違反とエラーが出ていない", () => {
