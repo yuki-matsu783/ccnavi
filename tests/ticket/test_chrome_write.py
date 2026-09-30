@@ -236,3 +236,16 @@ class WithdrawableTest(ChromeWriteHarness):
         board = self.answer(self.chrome_request("board", "i0001"))
         problems = board["withdrawable"][0]["problems"]
         self.assertTrue(any("着手済み" in p for p in problems), problems)
+
+
+class ProjectTest(ChromeWriteHarness):
+    def test_a_proposal_naming_a_project_is_not_approved_from_the_workspace(self):
+        """段階 3 はワークスペースのリポジトリだけ。プロジェクトの提案は承認しない（3.3 の 7）"""
+        text = parent_text("i0001", ["research"]).replace(
+            "ticket: i0001\n", "ticket: i0001\nproject: web\n", 1
+        )
+        self.propose("i0001", text)
+        self.commit_parent()
+        body = self.preview()
+        self.assertEqual(body["identifiers"], [])
+        self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001"])
