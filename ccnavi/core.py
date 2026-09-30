@@ -779,6 +779,31 @@ def withdraw(
     return Checked([], Changes(approval.Planned(stage, stopped), root, conf))
 
 
+def withdrawable(snapshot: Snapshot, family: str) -> list[tuple[str, str, list[str]]]:
+    """家族の作業中（`doing/`）の写しごとの (識別子, 題, 取り下げられない理由)。
+
+    Chrome のボードが「取り下げ」を出すかを決めるのに使う（8.8）。条件は `withdraw` と同じで、
+    承認コミットの親の提案（`prior_proposals`）だけは引ける前提で見る（引くのはホストを読む側。
+    引けなければ `withdraw` がその理由で止める）。判定は緩めない。書くときは `withdraw` が
+    新しい Snapshot で全部を見直す。
+    """
+    conf, root = snapshot.conf, snapshot.root
+    approved, _ = approval.scan(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True)
+    review_waiting, _ = approval.scan_review(conf, root)
+    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    everything = approved + closed + review_waiting
+    out = []
+    for copy in sorted(approved, key=lambda t: t.ticket):
+        if (copy.parent or copy.ticket) != family or copy.tree != family:
+            continue
+        problems = _withdraw_problems(
+            conf, copy.ticket, copy, everything, proposals, {copy.ticket: b""}
+        )
+        out.append((copy.ticket, copy.title, problems))
+    return out
+
+
 def _withdraw_problems(
     conf: settings.Settings,
     ident: str,
@@ -795,6 +820,9 @@ def _withdraw_problems(
     meta = copy.raw.get(ticket_mod.APPROVAL_KEY)
     meta = meta if isinstance(meta, dict) else {}
     found: list[str] = []
+    if copy.blocked:
+        # 家族が決まらない・親のブランチの外の写しなど（ADR-0093 の 3.3）。状態の操作と同じく止める
+        found.append(copy.blocked)
     if meta.get("revised_at") or meta.get("feedback_at"):
         found.append("改版した承認は取り下げられない（改版で動いたものを戻せない）")
     if meta.get("followup_of") or not meta.get("source_path"):

@@ -43,6 +43,7 @@ import io
 import json
 import os
 import re
+from dataclasses import replace
 from typing import TextIO
 
 from . import (
@@ -53,6 +54,7 @@ from . import (
     fsio,
     gitcmd,
     gitstate,
+    history,
     hookio,
     judge,
     modes,
@@ -1343,9 +1345,15 @@ def family_check(
 
     mine = [t for t in copies if ours(t)]
     index = approval.by_id(copies)
-    problems = [
-        p for p in _copy_problems(root, conf, mine, index, closed) if p.severity == SEVERITY_ERROR
-    ]
+    problems = _chrome_disagrees(
+        conf,
+        mine,
+        [
+            p
+            for p in _copy_problems(root, conf, mine, index, closed)
+            if p.severity == SEVERITY_ERROR
+        ],
+    )
     # 親のワークツリーの中の読めない写しも止める理由（読めない写しは並びに入らないので、
     # 判定し直しの対象から黙って落ちる）。
     if st.home is not None:
@@ -1360,6 +1368,44 @@ def family_check(
     if st.imported and not st.stop and st.repo != syncstate.SELF and st.home is not None:
         problems.extend(_projected_layer_problems(conf, st, where))
     return problems
+
+
+def _chrome_disagrees(
+    conf: settings.Settings, mine: list[ticket_mod.Ticket], problems: list[Problem]
+) -> list[Problem]:
+    """Chrome が書いた写しに手元の判定し直しで error が出たら、版の違いとして名指しする（7.3）。
+
+    互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として止める
+    （家族の控えを `blocked` にするのは sh）。理由の頭に「Chrome <拡張の版> と手元 <版> で
+    判定が違う」を足す。どの写しを Chrome が書いたかは、その写しの跡の最後の承認・改版の行の
+    経路（`via: chrome`）と版（`version`）で見る。止めるかどうかは変えない。
+    """
+    by_id = {t.ticket: t for t in mine}
+    written: dict[str, str] = {}
+    for ident, t in by_id.items():
+        events, _ = history.read(settings.approved_dir(conf, t.tree_root), ident)
+        last = next(
+            (
+                e
+                for e in reversed(events)
+                if e.get("kind") in (history.KIND_APPROVED, history.KIND_REVISED)
+            ),
+            None,
+        )
+        if last is not None and last.get("via") == history.VIA_CHROME:
+            written[ident] = str(last.get("version") or "?")
+    if not written:
+        return problems
+    out = []
+    for p in problems:
+        ident = p.detail.split(": ", 1)[0]
+        if ident in written:
+            p = replace(
+                p,
+                detail=f"Chrome {written[ident]} と手元 {version.VERSION} で判定が違う: {p.detail}",
+            )
+        out.append(p)
+    return out
 
 
 def _files_under(base: str) -> list[str]:

@@ -80,19 +80,23 @@ KIND_PHASE_MARK = "phase-mark"
 KIND_PHASE_REOPENED = "phase-reopened"  # フェーズのマーカーを消した（同じ番号に子が足された）
 KIND_PARENT_MARK = "parent-mark"  # 親のマーカーを置いた（ready / close-early / closed）
 
-_state: dict = {"via": VIA_CLI, "failures": []}
+_state: dict = {"via": VIA_CLI, "failures": [], "extra": {}}
 
 
 @contextlib.contextmanager
-def session(via: str, stderr: TextIO | None) -> Iterator[None]:
+def session(via: str, stderr: TextIO | None, actor: str = "", version: str = "") -> Iterator[None]:
     """1 回の起動の間、動かした経路を覚え、抜けるときに書けなかった分を警告として出す。
 
     入れ子になっても外側の経路と溜まりに戻す。テストは同じプロセスで何度も起動するので、
     前の起動の経路や溜まりが次へ漏れないようにする。
+
+    `actor`・`version` は、この間に書く跡の行に足す欄（ADR-0093 の 7.3・8.8。Chrome の
+    承認は、ホストのアカウントと拡張の版を跡に残す）。空なら足さない（手元の跡は前のまま）。
     """
     before = dict(_state)
     _state["via"] = via
     _state["failures"] = []
+    _state["extra"] = {k: v for k, v in (("actor", actor), ("version", version)) if v}
     try:
         yield
     finally:
@@ -156,6 +160,8 @@ def note(
         "to": target,
         "via": via(),
     }
+    # 起動の間の欄（`session` の actor・version）。呼び手が同じ欄を渡せばそちらを採る。
+    entry.update(_state.get("extra") or {})
     for key, value in extra.items():
         if value is None or value == "" or value == [] or value == {}:
             continue
