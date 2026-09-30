@@ -1,10 +1,11 @@
 /**
  * 設定画面。リポジトリ（統合先の名前・直近 N 日・指定のブランチ）と PAT を登録する。
  *
- * PAT は service worker に渡して置かせ、この画面では読み返さない（登録済みかだけを聞く）。
+ * PAT は service worker に渡して置かせ、この画面では読み返さない（登録済みかと期限だけを聞く）。
+ * 期限（D25）はホストの応答から読む。読めないときのために、登録のときに日付を入れられる。
  * 通信先は焼き込んだ一覧から選ぶだけで、ここで足せない（D24）。
  */
-import type { Response } from "../core/protocol.js";
+import type { Response, TokenStatus } from "../core/protocol.js";
 import { normalizeRepo, readRepos, repoKey, type RepoConfig } from "../core/settings.js";
 
 const HOSTS = __CCNAVI_HOSTS__;
@@ -51,9 +52,11 @@ async function drawTokens(): Promise<void> {
   list.replaceChildren();
   for (const h of HOSTS) {
     const res = await ask({ kind: "token.status", host: h.id });
-    const set = res.ok && (res.value as { set: boolean }).set;
+    const st = res.ok ? (res.value as TokenStatus) : null;
+    const set = st?.set === true;
     const li = document.createElement("li");
-    li.textContent = `${h.id}: ${set ? "登録済み" : "未登録"}${h.kind === "gitlab" ? "（GitLab の読み取りは段階 5）" : ""}`;
+    const when = st?.notice ? `（${st.notice.text}）` : "";
+    li.textContent = `${h.id}: ${set ? "登録済み" : "未登録"}${when}${h.kind === "gitlab" ? "（GitLab は段階 5）" : ""}`;
     list.append(li);
   }
 }
@@ -89,8 +92,10 @@ $<HTMLFormElement>("token-form").addEventListener("submit", async (e) => {
   const form = e.target as HTMLFormElement;
   const host = String(new FormData(form).get("host") ?? "");
   const input = $<HTMLInputElement>("token-value");
-  const res = await ask({ kind: "token.set", host, token: input.value.trim() });
+  const expires = $<HTMLInputElement>("token-expires");
+  const res = await ask({ kind: "token.set", host, token: input.value.trim(), expires: expires.value });
   input.value = "";
+  expires.value = "";
   say("token-msg", res.ok ? `${host} の PAT を登録した。差し替えたなら古いトークンをホストで失効させる` : res.error, res.ok);
   await drawTokens();
 });

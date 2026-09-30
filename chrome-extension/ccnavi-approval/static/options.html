@@ -28,11 +28,12 @@
   <form id="token-form">
     <label>ホスト <select name="host" id="token-host"></select></label>
     <label>PAT <input id="token-value" type="password" autocomplete="off" required></label>
+    <label>期限（ホストの応答から読めないときに使う。YYYY-MM-DD） <input id="token-expires" name="expires" type="date"></label>
     <button type="submit">登録</button>
     <button type="button" id="token-clear">消す</button>
   </form>
   <p id="token-msg" role="status"></p>
-  <p class="note">段階 1 は読み取りだけです。GitHub の fine-grained token でリポジトリを限り、Contents: Read-only と Metadata: Read-only を選びます。エージェント用のトークンとは別にします。PAT はこのブラウザのプロファイルに平文で置かれます（ADR-0093 の 5.5）。</p>
+  <p class="note">承認と取り下げを親のブランチへ書きます（段階 3）。GitHub の fine-grained token でリポジトリを限り、Contents: Read and write・Metadata: Read-only・Pull requests: Read-only を選びます。期限は 90 日を選びます。エージェント用のトークンとは別にします。PAT はこのブラウザのプロファイルに平文で置かれます（ADR-0093 の 5.5）。期限はホストの応答から読みます。読めないときは上の欄の日付を使い、切れる 7 日前からボードとアイコンで知らせます。</p>
   <ul id="token-links"></ul>
 </section>
 <script type="module" src="options.js"></script>

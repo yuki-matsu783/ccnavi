@@ -26,6 +26,16 @@ declare namespace chrome {
   }
   namespace action {
     const onClicked: { addListener(cb: () => void): void };
+    function setBadgeText(details: { text: string }): Promise<void>;
+    function setBadgeBackgroundColor(details: { color: string }): Promise<void>;
+    function setTitle(details: { title: string }): Promise<void>;
+  }
+  namespace alarms {
+    interface Alarm {
+      name: string;
+    }
+    function create(name: string, info: { periodInMinutes?: number; delayInMinutes?: number }): Promise<void>;
+    const onAlarm: { addListener(cb: (alarm: Alarm) => void): void };
   }
 }
 

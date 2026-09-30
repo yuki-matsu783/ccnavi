@@ -1,9 +1,9 @@
 /**
- * GitHub の読み取り（ADR-0093 の 8.2）。service worker だけが呼ぶ。PAT は引数で受け、外へ返さない。
+ * GitHub の読み書き（ADR-0093 の 8.2・8.4・8.8）。service worker だけが呼ぶ。PAT は引数で受け、外へ返さない。
  *
  * 操作は名前で限る（5.5 の 4）。画面から来るのは操作の名前と引数だけで、URL・クエリ・ヘッダは
  * ここで組む。GraphQL の問い合わせは固定の文で、引数は変数で渡す（文に継ぎ足さない）。
- * 段階 1 は読み取りだけで、mutation は持たない。
+ * 書くのは `createCommitOnBranch`（`expectedHeadOid` つき）の 1 つだけ（段階 3）。
  */
 import type { Host } from "./hosts.js";
 
@@ -11,7 +11,12 @@ export type Fetch = (url: string, init: { method: string; headers: Record<string
   status: number;
   ok: boolean;
   json(): Promise<unknown>;
+  /** 応答ヘッダ。PAT の期限（`github-authentication-token-expiration`）を読む（5.5・D25） */
+  headers?: { get(name: string): string | null };
 }>;
+
+/** PAT の期限を返す応答ヘッダ（GitHub の fine-grained / classic のトークン） */
+export const EXPIRATION_HEADER = "github-authentication-token-expiration";
 
 /** 呼んだ回数。読み取り量の見積もり（8.2）と突き合わせるために数える */
 export interface Counter {
@@ -77,6 +82,13 @@ export interface Client {
   readonly token: string;
   readonly fetch: Fetch;
   readonly counter: Counter;
+  /** 応答から読んだもの（PAT の期限。読めなければ空）。呼び手が控える */
+  readonly seen?: { expiration: string };
+}
+
+function note(client: Client, res: Awaited<ReturnType<Fetch>>): void {
+  const exp = res.headers?.get(EXPIRATION_HEADER);
+  if (client.seen && typeof exp === "string" && exp.trim() !== "") client.seen.expiration = exp.trim();
 }
 
 function headers(client: Client): Record<string, string> {
@@ -90,6 +102,7 @@ function headers(client: Client): Record<string, string> {
 async function rest(client: Client, path: string): Promise<{ status: number; body: unknown }> {
   client.counter.rest += 1;
   const res = await client.fetch(`${client.host.api}${path}`, { method: "GET", headers: headers(client) });
+  note(client, res);
   if (res.status === 401) {
     throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
   }
@@ -109,6 +122,7 @@ async function graphql(client: Client, query: string, variables: Record<string, 
     headers: { ...headers(client), "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),
   });
+  note(client, res);
   if (res.status === 401) {
     throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
   }
@@ -300,5 +314,117 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
     }
     out[oid] = { text: b.text, binary: false };
   });
+  return out;
+}
+
+// ---- 段階 3: 書き込みと、取り下げのための履歴・MR の Approve・PAT の期限 ----------------------
+
+/** 期限のヘッダの綴り（`2026-12-31 00:00:00 UTC`・`2026-12-31 09:00:00 +0900`）を ISO にする。読めなければ空 */
+export function parseExpiration(text: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)\s*(UTC|Z|[+-]\d{2}:?\d{2})?$/.exec(text.trim());
+  if (!m) return "";
+  const zone = !m[3] || m[3] === "UTC" || m[3] === "Z" ? "Z" : m[3].replace(/^([+-]\d{2}):?(\d{2})$/, "$1:$2");
+  const t = Date.parse(`${m[1]}T${m[2].length === 5 ? `${m[2]}:00` : m[2]}${zone}`);
+  return Number.isNaN(t) ? "" : new Date(t).toISOString();
+}
+
+const VIEWER = `query { viewer { login } }`;
+
+/** PAT の持ち主のアカウント名（跡の `actor`。8.8・8.9） */
+export async function viewer(client: Client): Promise<string> {
+  const data = await graphql(client, VIEWER, {});
+  const login = (data.viewer as { login?: unknown } | undefined)?.login;
+  if (typeof login !== "string" || !NAME.test(login)) {
+    throw new HostError("PAT の持ち主を読めない");
+  }
+  return login;
+}
+
+const CREATE_COMMIT = `mutation($input: CreateCommitOnBranchInput!) {
+  createCommitOnBranch(input: $input) { commit { oid } }
+}`;
+
+export interface FileAddition {
+  readonly path: string;
+  /** base64 */
+  readonly contents: string;
+}
+
+/**
+ * 親のブランチへ 1 コミットで書く（8.4）。`expectedHeadOid` が先頭と違えば GitHub が断るので、
+ * そのまま競合の検出になる（Git Data API + PATCH refs は使わない）。答えは新しいコミットの sha。
+ */
+export async function createCommit(
+  client: Client,
+  owner: string,
+  repo: string,
+  branch: string,
+  expectedHeadOid: string,
+  headline: string,
+  additions: readonly FileAddition[],
+  deletions: readonly string[],
+): Promise<string> {
+  const input = {
+    branch: { repositoryNameWithOwner: `${checkName(owner, "owner")}/${checkName(repo, "repo")}`, branchName: checkBranch(branch) },
+    expectedHeadOid: checkOid(expectedHeadOid),
+    message: { headline },
+    fileChanges: {
+      additions: additions.map((a) => ({ path: checkPath(a.path), contents: a.contents })),
+      deletions: deletions.map((p) => ({ path: checkPath(p) })),
+    },
+  };
+  const data = await graphql(client, CREATE_COMMIT, { input });
+  const oid = (data.createCommitOnBranch as { commit?: { oid?: unknown } } | undefined)?.commit?.oid;
+  return checkOid(oid);
+}
+
+export interface ApprovalCommit {
+  readonly commit: string;
+  readonly parent: string;
+}
+
+/** 1 回の取り下げで履歴を遡る上限（コミットの数） */
+const HISTORY_LIMIT = 30;
+
+/**
+ * 承認コミット（8.8 の 2）: `sha` から遡った履歴で `path`（`doing/<識別子>.md`）を足したコミットのうち、
+ * 最新の、親が 1 つのもの。merge コミットは飛ばす（一覧に出ても出なくても同じ答えになるよう、
+ * 各コミットの変更で「足した」かを確かめる。10.2 の確認事項 7）。無ければ null。
+ */
+export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
+  const q = `?sha=${checkOid(sha)}&path=${encodeURIComponent(checkPath(path))}&per_page=${HISTORY_LIMIT}`;
+  const { status, body } = await rest(client, `${repoPath(owner, repo)}/commits${q}`);
+  if (status === 404 || !Array.isArray(body)) return null;
+  for (const c of body as { sha?: unknown; parents?: { sha?: unknown }[] }[]) {
+    const parents = Array.isArray(c.parents) ? c.parents : [];
+    if (parents.length !== 1) continue;
+    const commit = checkOid(c.sha);
+    const detail = await rest(client, `${repoPath(owner, repo)}/commits/${commit}`);
+    const files = (detail.body as { files?: { filename?: unknown; status?: unknown }[] } | null)?.files ?? [];
+    const touched = files.find((f) => f.filename === path);
+    if (!touched) continue;
+    if (touched.status === "added") return { commit, parent: checkOid(parents[0].sha) };
+    // 最新の変更が「足した」でなければ（書き換え・消去）、それより古い承認は今の写しの元ではない
+    return null;
+  }
+  return null;
+}
+
+/** 親のブランチの開いた MR に付いている Approve（8.10）。付いていれば、書くと外れうることを出す */
+export async function pullApprovals(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; approvals: number }[]> {
+  const head = encodeURIComponent(`${checkName(owner, "owner")}:${checkBranch(branch)}`);
+  const { body } = await rest(client, `${repoPath(owner, repo)}/pulls?head=${head}&state=open&per_page=10`);
+  const out: { number: number; approvals: number }[] = [];
+  for (const pr of Array.isArray(body) ? (body as { number?: unknown }[]) : []) {
+    if (typeof pr.number !== "number" || !Number.isInteger(pr.number)) continue;
+    const reviews = await rest(client, `${repoPath(owner, repo)}/pulls/${pr.number}/reviews?per_page=100`);
+    const last = new Map<string, string>();
+    for (const r of Array.isArray(reviews.body) ? (reviews.body as { user?: { login?: unknown }; state?: unknown }[]) : []) {
+      const who = typeof r.user?.login === "string" ? r.user.login : "";
+      if (who && typeof r.state === "string" && r.state !== "COMMENTED") last.set(who, r.state);
+    }
+    const approvals = [...last.values()].filter((s) => s === "APPROVED").length;
+    if (approvals > 0) out.push({ number: pr.number, approvals });
+  }
   return out;
 }

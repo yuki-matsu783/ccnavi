@@ -4,14 +4,30 @@
  * PAT を読むのは service worker だけ。画面は PAT を受け取らず、ホストの API は名前で限った
  * 操作を頼む。PAT を書く・消すのは設定画面からだけ受ける。送り手は拡張の自分のページに限り、
  * 他の拡張・ウェブページからの呼び出し（`onMessageExternal`）は受けない。
+ *
+ * 段階 3 から、書く操作 `commit`（`createCommitOnBranch`）を受ける。受けるのはボードからだけで、
+ * 書く先が予約の名前（`main`・`master`・`develop`・`release*`）か、頼みに添えた統合先の名前なら
+ * 断る（8.5。Python も同じ検査をする。ここは二重の守り）。PAT の期限（D25）は応答ヘッダから読んで控え、
+ * 画面へは期限だけを返す（PAT そのものは返さない）。
  */
+import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
 import type { Host } from "./hosts.js";
 
-export type HostOp = "repoInfo" | "branchHead" | "recentRefs" | "pathObjects" | "tree" | "blobs";
+export type HostOp =
+  | "repoInfo"
+  | "branchHead"
+  | "recentRefs"
+  | "pathObjects"
+  | "tree"
+  | "blobs"
+  | "viewer"
+  | "approvalCommit"
+  | "pullApprovals"
+  | "commit";
 
 export type Request =
-  | { readonly kind: "token.set"; readonly host: string; readonly token: string }
+  | { readonly kind: "token.set"; readonly host: string; readonly token: string; readonly expires?: string }
   | { readonly kind: "token.clear"; readonly host: string }
   | { readonly kind: "token.status"; readonly host: string }
   | { readonly kind: "host"; readonly host: string; readonly op: HostOp; readonly args: readonly unknown[] };
@@ -43,6 +59,14 @@ export function trustedSender(sender: Sender, extensionId: string, base: string,
   return !options || url.pathname === "/options.html";
 }
 
+function fromBoard(sender: Sender): boolean {
+  try {
+    return new URL(sender.url ?? "").pathname === "/board.html";
+  } catch {
+    return false;
+  }
+}
+
 export interface Deps {
   readonly hosts: readonly Host[];
   readonly extensionId: string;
@@ -51,9 +75,26 @@ export interface Deps {
   getToken(host: string): Promise<string>;
   setToken(host: string, token: string): Promise<void>;
   clearToken(host: string): Promise<void>;
+  /** PAT の期限の控え（D25）。PAT そのものとは別の鍵に置く */
+  getMeta(host: string): Promise<TokenMeta>;
+  setMeta(host: string, meta: TokenMeta): Promise<void>;
+  /** 今の時刻（期限の比べ） */
+  now(): Date;
+}
+
+/** `token.status` の答え。PAT そのものは入れない */
+export interface TokenStatus {
+  readonly set: boolean;
+  readonly notice: Notice | null;
 }
 
 const TOKEN = /^[A-Za-z0-9_\-.]{8,255}$/;
+/** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字を畳んで比べる */
+const PROTECTED = /^(?:main|master|develop|release|release[-/].*)$/i;
+/** 1 コミットで書くファイルの上限と、1 ファイルの大きさの上限（base64 の字数） */
+const MAX_FILES = 200;
+const MAX_CONTENTS = 4 * 1024 * 1024;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 function hostOf(deps: Deps, id: unknown): Host {
   const host = deps.hosts.find((h) => h.id === id);
@@ -73,20 +114,33 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
     if (!trustedSender(sender, deps.extensionId, deps.base, msg.kind === "token.set" || msg.kind === "token.clear")) {
       return { ok: false, error: "送り手を受けない" };
     }
+    if (msg.kind === "host" && msg.op === "commit" && !fromBoard(sender)) {
+      return { ok: false, error: "書く頼みはボードからだけ受ける" };
+    }
     const host = hostOf(deps, msg.host);
     switch (msg.kind) {
       case "token.set": {
         if (typeof msg.token !== "string" || !TOKEN.test(msg.token)) {
           return { ok: false, error: "PAT の形が違う（英数字と _ - . の 8〜255 字）" };
         }
+        const manual = msg.expires === undefined || msg.expires === "" ? "" : parseManual(msg.expires);
+        if (msg.expires !== undefined && msg.expires !== "" && !manual) {
+          return { ok: false, error: "期限は YYYY-MM-DD の日付" };
+        }
         await deps.setToken(host.id, msg.token);
+        // 差し替えたら、前のトークンの期限は捨てる（ホストの応答で読み直す）
+        await deps.setMeta(host.id, manual ? { manual } : {});
         return { ok: true, value: null };
       }
       case "token.clear":
         await deps.clearToken(host.id);
+        await deps.setMeta(host.id, {});
         return { ok: true, value: null };
-      case "token.status":
-        return { ok: true, value: { set: (await deps.getToken(host.id)) !== "" } };
+      case "token.status": {
+        const set = (await deps.getToken(host.id)) !== "";
+        const status: TokenStatus = { set, notice: set ? expiryNotice(host.id, await deps.getMeta(host.id), deps.now()) : null };
+        return { ok: true, value: status };
+      }
       case "host":
         return await hostCall(host, msg.op, msg.args, deps);
       default:
@@ -110,7 +164,28 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
     return { ok: false, error: `${host.id} の PAT が無い。設定画面で登録する`, status: 401 };
   }
   const counter: github.Counter = { rest: 0, graphql: 0 };
-  const client: github.Client = { host, token, fetch: deps.fetch, counter };
+  const seen = { expiration: "" };
+  const client: github.Client = { host, token, fetch: deps.fetch, counter, seen };
+  try {
+    return await hostOp(client, op, args, counter);
+  } finally {
+    // 応答から期限を読めたら控える（D25。ホストの値が正）
+    const iso = seen.expiration ? github.parseExpiration(seen.expiration) : "";
+    if (iso) {
+      const meta = await deps.getMeta(host.id);
+      if (meta.host !== iso) await deps.setMeta(host.id, { ...meta, host: iso });
+    }
+  }
+}
+
+function text(value: unknown, what: string, max: number): string {
+  if (typeof value !== "string" || value === "" || value.length > max || /[\x00-\x1f\x7f]/.test(value)) {
+    throw new github.HostError(`${what} が読めない`);
+  }
+  return value;
+}
+
+async function hostOp(client: github.Client, op: unknown, args: unknown[], counter: github.Counter): Promise<Response> {
   const [owner, repo, a, b] = args as unknown[];
   const o = github.checkName(owner, "owner");
   const r = github.checkName(repo, "repo");
@@ -144,6 +219,39 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
         return { ok: false, error: "oids が並びでない" };
       }
       value = await github.blobs(client, o, r, a.map(github.checkOid));
+      break;
+    }
+    case "viewer":
+      value = await github.viewer(client);
+      break;
+    case "approvalCommit":
+      value = await github.approvalCommit(client, o, r, github.checkOid(a), github.checkPath(b));
+      break;
+    case "pullApprovals":
+      value = await github.pullApprovals(client, o, r, github.checkBranch(a));
+      break;
+    case "commit": {
+      const [, , branch, expected, headline, additions, deletions, integration] = args;
+      const name = github.checkBranch(branch);
+      const integ = github.checkBranch(integration);
+      if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
+        return { ok: false, error: `${name} は保護されたブランチか統合先の名前なので書かない（ADR-0093 の 8.5）` };
+      }
+      if (!Array.isArray(additions) || !Array.isArray(deletions) || additions.length + deletions.length > MAX_FILES) {
+        return { ok: false, error: `書くファイルは ${MAX_FILES} 件までの並び` };
+      }
+      if (additions.length + deletions.length === 0) {
+        return { ok: false, error: "書くものが無い" };
+      }
+      const adds = additions.map((x: unknown) => {
+        const e = x as { path?: unknown; contents?: unknown };
+        if (typeof e.contents !== "string" || e.contents.length > MAX_CONTENTS || !BASE64.test(e.contents)) {
+          throw new github.HostError("contents が base64 でないか大きすぎる");
+        }
+        return { path: github.checkPath(e.path), contents: e.contents };
+      });
+      const dels = deletions.map((p: unknown) => github.checkPath(p));
+      value = await github.createCommit(client, o, r, name, github.checkOid(expected), text(headline, "コミットの見出し", 200), adds, dels);
       break;
     }
     default:
