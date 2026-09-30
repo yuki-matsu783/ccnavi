@@ -9,7 +9,8 @@
 （`plan`・`withdraw`・`confirm` の操作）。どれも書くもの（Changes）を値で返すだけで、
 ホストにもディスクにも書かない（fsio の控える段）。段階 3 から、拡張は `plan`（承認）と
 `withdraw`（取り下げ）の答えを親のブランチへの 1 コミットにして書く（8.3・8.4）。
-`confirm`（レビュー済み）の画面は段階 4。
+段階 4 から `confirm`（レビュー済み）の答えも同じく書く（8.9）。ボードの答えの `reviewable` が
+候補のフェーズで、ホストのスレッドとレビューの写しは拡張が組んで `result` で渡す。
 
 段階 3 から、仮のツリーに手元の取り込みの控え相当（`logs/state/sync/self/`。統合先の
 `done/`・層・設定の写しと、閉包の家族の控え）も組む（3.3。段階 2c の「Chrome の入口で控えを
@@ -460,6 +461,8 @@ def _op_board(req: dict, root: str) -> dict:
             "reason": _write_refusal(snap, family),
         },
         "withdrawable": _withdrawable(req, root, place, family),
+        # レビュー済みを付けられる候補（段階 4）。通るかは `confirm` がホストの写しで決める
+        "reviewable": _reviewable(root, place, family),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出す（D22）ので、手を加えずに返す。
         # 指紋はこの本文と写しの中身を覆い、手元の `--approve --preview` と同じ値になる。
@@ -749,18 +752,37 @@ def _op_withdraw(req: dict, root: str) -> dict:
 
 
 def _op_confirm(req: dict, root: str) -> dict:
-    """レビュー済みで書くもの（8.9）。`result` は `ccnavi-review.sh` が組むのと同じ形の写し。"""
+    """レビュー済みで書くもの（8.9。段階 4）。書かない。
+
+    `result` は `ccnavi-review.sh` が組むのと同じ形の写し（`{host, mr, threads, reviews}`）。
+    依頼の後に人が見るものが動いたかは、手元の confirm と同じ関数（`review.moved_since`）で決める。
+    材料は読んだ `P` の先頭と、依頼時の先頭からの変更の一覧（`compare`）。依頼時の先頭は Python が
+    マーカーから読み、一覧が要るのに無ければ `need_compare`（`{base, head}`）で返す。拡張は
+    compare API で読んでから呼び直す（閉包の `need` と同じ形）。
+    """
     snap, place, family, _ = _family_tree(req, root)
     _writable(snap, family)
     phase_no = req.get("phase")
     if not isinstance(phase_no, int) or isinstance(phase_no, bool):
         raise Refused("phase はフェーズの番号")
-    changed = req.get("changed") if isinstance(req.get("changed"), str) else ""
     result = review.Result.from_data(req.get("result"))
     if result.error:
         raise Refused(f"result を読めない: {result.error}")
+    head = str(snap["branches"][family].get("head") or "")
+    compare = req.get("compare")
     with _environ(place["env"]):
         snapshot = _core_snapshot(req, root)
+        recorded = core.requested_head(snapshot, family, phase_no)
+        if compare is None and recorded and recorded != head and review._is_sha(recorded):
+            return {
+                "family": family,
+                "need_compare": {"base": recorded, "head": head},
+                "problems": [],
+                **_changes(root, None),
+            }
+        changed = core.moved_on_host(
+            snapshot, family, phase_no, head, _compare_files(compare, recorded, head)
+        )
         checked = core.confirm(snapshot, family, phase_no, result, changed)
     body = _changes(root, checked.changes)
     _one_branch(body, family)
@@ -769,6 +791,33 @@ def _op_confirm(req: dict, root: str) -> dict:
         "problems": [_relative(root, p) for p in checked.problems],
         **body,
     }
+
+
+def _compare_files(compare: object, base: str | None, head: str) -> list[str] | None:
+    """compare API の変更の一覧（`{base, head, files}`）。読めなければ None（動いたと数える）。
+
+    比べた 2 つがマーカーの先頭と読んだ `P` の先頭でなければ使わない。`files` が null（一覧が
+    打ち切られた・依頼時のコミットが祖先でない・ホストに無い）も None。
+    """
+    if compare is None:
+        return None
+    if not isinstance(compare, dict):
+        raise Refused("compare は {base, head, files}")
+    files = compare.get("files")
+    if files is not None and not (
+        isinstance(files, list) and all(isinstance(f, str) for f in files)
+    ):
+        raise Refused("compare の files はパスの並びか null")
+    if compare.get("base") != base or compare.get("head") != head or files is None:
+        return None
+    return list(files)
+
+
+def _reviewable(root: str, place: dict, family: str) -> list[dict]:
+    """依頼済みでまだレビュー済みでないフェーズ（8.9）。仮のツリーは組んである前提。"""
+    with _environ(place["env"]):
+        conf, _ = settings.load(root)
+        return core.reviewable(core.read_fs(conf, root), family)
 
 
 # ---- 互換の印（7.3） --------------------------------------------------------------------

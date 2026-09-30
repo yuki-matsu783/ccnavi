@@ -1601,6 +1601,12 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
     置き場の中のパスになってしまい、除外の側に入る。
     """
+    paths, failed = _diff_paths(tree_root, ref)
+    return [p for p in paths if not _is_own_place(conf, p)], failed
+
+
+def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
+    """`ref..HEAD` で変わったパス（置き場で絞らない）。2 つめは読めなかった理由。"""
     if not ref:
         return [], "比べる相手が無い"
     rc, out = _git(
@@ -1609,11 +1615,7 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     )
     if rc != 0:
         return [], f"{ref[:12]} からの差分を読めない"
-    changed = []
-    for path in out.split("\0"):
-        if path and not _is_own_place(conf, path):
-            changed.append(path)
-    return changed, ""
+    return [path for path in out.split("\0") if path], ""
 
 
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
@@ -1961,21 +1963,43 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     if rc != 0:
         return "親の HEAD を読めない"
     recorded = str(requested_mark.get("head") or "")
+    paths: list[str] | None = None
+    if recorded and head != recorded and _is_sha(recorded):
+        found, failed = _diff_paths(tree_root, recorded)
+        paths = None if failed else found
+    moved = moved_since(conf, requested_mark, head, paths)
+    if moved:
+        return moved
+    branch = _branch(tree_root)
+    if not branch or _unpushed(tree_root, conf, branch):
+        return "親ブランチの HEAD が push されていない"
+    return ""
+
+
+def moved_since(
+    conf: settings.Settings, requested_mark: dict, head: str, changed: list[str] | None
+) -> str:
+    """依頼の後に、人が見るものが動いたか（`_moved_since_request` の読みを除いた判定）。
+
+    手元の confirm と Chrome のレビュー済み（ADR-0093 の 8.9）が同じこの関数で決める。
+    `head` は親のブランチの今の先頭。`changed` は依頼時の先頭（マーカーの `head`）から `head` までに
+    変わったパスで、置き場で絞る前のもの。読めなかった（差分を取れない、ホストの一覧が
+    打ち切られた、依頼時のコミットが祖先でない）なら None で、動いたと数える。
+    手元は git の差分、Chrome は compare API の変更の一覧から作る。
+    """
+    recorded = str(requested_mark.get("head") or "")
     if not recorded:
         # 記録が無ければ照合できない。素通りさせると、依頼の後のコミットが全部
         # 「人が見たもの」になる。出し直しで書き直させる。
         return "依頼時の親の HEAD が記録されていない"
-    if head != recorded:
-        moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
-        # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
-        if not _is_sha(recorded):
-            return moved
-        changed, failed = _outside_approved(tree_root, conf, recorded)
-        if failed or changed:
-            return moved
-    branch = _branch(tree_root)
-    if not branch or _unpushed(tree_root, conf, branch):
-        return "親ブランチの HEAD が push されていない"
+    if head == recorded:
+        return ""
+    moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
+    # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
+    if not _is_sha(recorded) or changed is None:
+        return moved
+    if any(not _is_own_place(conf, path) for path in changed):
+        return moved
     return ""
 
 

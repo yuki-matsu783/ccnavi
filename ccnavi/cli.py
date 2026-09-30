@@ -214,7 +214,7 @@ scripts in .ccnavi/scripts/, which call
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
-    ccnavi review confirm   --cwd <dir> --phase N --result <json>
+    ccnavi review confirm   --cwd <dir> --phase N --result <json> [--actor <account>]
     ccnavi review ready     --cwd <dir> --result <json>
     ccnavi sync paths
         (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
@@ -486,6 +486,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 統合先の名前（ADR-0093 の D30。段階 2b）。環境変数は読まず、sh が決めて渡す。
     # いまは `--lint` の識別子の予約（3.1 の 5）が読む。
     parser.add_argument("--integration-branch", default="")
+    # レビュー済みの印に入れるアカウント（ADR-0093 の 8.9。段階 4）。ccnavi-review.sh が
+    # トークンの持ち主をホストに聞いて渡す（実行ファイルはネットワークに出ない）。
+    # `review confirm` だけが読む。
+    parser.add_argument("--actor", default="")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
@@ -495,6 +499,12 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
+        return EXIT_ERROR
+    if args.actor and not _ACTOR.fullmatch(args.actor):
+        stderr.write("ccnavi: --actor はホストのアカウント名（英数字と _ . - の 1〜100 字）\n")
+        return EXIT_ERROR
+    if args.actor and list(args.command[:2]) != ["review", "confirm"]:
+        stderr.write("ccnavi: --actor は review confirm と一緒に使う\n")
         return EXIT_ERROR
     if args.record_writes and not args.version:
         return _recorded_run(stdin, stdout, stderr, parser, args)
@@ -1223,7 +1233,9 @@ def operate(
         elif verb == "requested":
             code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
-            code = core.confirm_local(stdout, stderr, root, conf, cwd, args.phase, args.result)
+            code = core.confirm_local(
+                stdout, stderr, root, conf, cwd, args.phase, args.result, args.actor
+            )
     elif kind == "review" and verb == "ready":
         if not args.result:
             stderr.write("ccnavi: review ready には --result <json> が要る\n")
@@ -1289,6 +1301,8 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
 
 # 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスに化ける綴りを入れない。
 _FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
+_ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 # `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数に化ける綴りを入れない）。
 _REVISION = re.compile(r"[0-9a-f]{7,64}|refs/remotes/origin/[A-Za-z0-9][A-Za-z0-9._-]*")
 

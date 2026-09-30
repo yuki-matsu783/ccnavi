@@ -207,7 +207,14 @@
    "stopped": null
   },
   "request": {
-   "changed": "",
+   "compare": {
+    "base": "3ade85b9b97c596d95bf8ee9f3d45e90d0b1765b",
+    "files": [
+     ".ccnavi/approved/events/i0001.ndjson",
+     ".ccnavi/approved/phases/i0001/1.requested"
+    ],
+    "head": "2f245193581a014d3ec65de7816b019d9813196a"
+   },
    "family": "i0001",
    "op": "confirm",
    "phase": 1,
@@ -234,7 +241,7 @@
        ".ccnavi/approved/phases/i0001/i0001-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"45b8ad582198bf9af43b9e94b7832c794aa8f4ac\",\n \"base\": \"c7cb6d4f74ca95739358df1ca7d7c4b353fea04c\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
        "wip/proposals/review/i0001-01.md": "---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"c7cb6d4f74ca95739358df1ca7d7c4b353fea04c\"\nccnavi_approved:\n  approved_at: 2026-09-29T12:00:00+0900\n  source_tree: i0001\n  source_path: wip/proposals/todo/i0001-01.md\n---\n\n本文\n"
       },
-      "head": "0000000000000000000000000000000000000000"
+      "head": "2f245193581a014d3ec65de7816b019d9813196a"
      },
      "i0001-01": {
       "files": {

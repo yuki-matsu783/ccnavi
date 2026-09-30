@@ -33,7 +33,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, fsio, history, modes, review, rules, settings, tree
+from . import approval, fsio, history, modes, phase, review, rules, settings, tree
 from . import ticket as ticket_mod
 
 # ---- 入力 -----------------------------------------------------------------------------------
@@ -625,11 +625,13 @@ def confirm(
         return Checked(problems, None)
     stamp = snapshot.stamp or fsio.stamp()
     notes = io.StringIO()
-    # 跡の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形（8.9）。
+    # 跡の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形（8.9）。アカウントと
+    # 拡張の版も跡に足す（分かるときだけ。手元で引けなかったときは前と同じ中身）。
+    actor = snapshot.actor
     with (
         fsio.staging() as stage,
         fsio.clock(stamp),
-        history.session(snapshot.actor.via or history.via(), notes),
+        history.session(actor.via or history.via(), notes, actor.account, actor.version),
     ):
         stopped = review.settle_and_mark(
             stage, root, conf, parent, ph, reviewed_mark(result.mr.number, [], snapshot.actor)
@@ -659,6 +661,7 @@ def confirm_local(
     cwd: str,
     phase_no: int,
     result_path: str,
+    actor: str = "",
 ) -> int:
     """依頼の後を見る。通ればマーカーを置いて先へ進めるようになる。
 
@@ -666,6 +669,9 @@ def confirm_local(
     （cwd の親、git の差分、`--result` の写し）を読んで渡し、並べたものを書く（Writer(FS)）。
     Chrome の「レビュー済み」も同じコアを通る。前は review.py に居た（コアより下の段に
     置くと review → core → review の循環になる）。
+
+    `actor` は `ccnavi-review.sh` がトークンの持ち主を引いて `--actor` で渡すアカウント（8.9。
+    段階 4）。あれば印に `actor` と `via: cli` を書く。空（引けなかった）なら印も跡も前と同じ。
     """
     found = review._parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
@@ -683,12 +689,71 @@ def confirm_local(
             result = review._result(stderr, result_path)
             if result is None:
                 return 1
-    checked = confirm(read_fs(conf, root), parent.ticket, phase_no, result, moved)
+    who = Actor(actor, history.VIA_CLI) if actor else Actor()
+    checked = confirm(read_fs(conf, root, actor=who), parent.ticket, phase_no, result, moved)
     for line in checked.problems:
         stderr.write(line + "\n")
     if checked.changes is None:
         return 1
     return write_fs(stdout, stderr, checked.changes.planned).code
+
+
+def reviewable(snapshot: Snapshot, parent_id: str) -> list[dict]:
+    """依頼済みで、まだレビュー済みでないフェーズ（8.9）。Chrome のボードが出す候補。
+
+    並べるだけで、通るかは見ない（通るかは `confirm` がホストの写しで決める）。
+    答えは `{phase, mr, host, children}` の並び。`mr` と `host` は依頼のマーカーの値。
+    """
+    parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
+    if parent is None:
+        return []
+    out = []
+    for ph in phase.phases_of(snapshot.root, snapshot.conf, parent.ticket):
+        mark = ph.marks.get(approval.MARK_REQUESTED)
+        if mark is None or approval.MARK_REVIEWED in ph.marks:
+            continue
+        try:
+            mr = int(mark.get("mr") or 0)
+        except (TypeError, ValueError):
+            mr = 0
+        out.append(
+            {
+                "phase": ph.number,
+                "mr": mr,
+                "host": str(mark.get("host") or ""),
+                "children": [t.ticket for t in ph.tickets],
+            }
+        )
+    return out
+
+
+def _requested_mark(snapshot: Snapshot, parent_id: str, phase_no: int) -> dict | None:
+    """依頼のマーカー。親・フェーズ・依頼の記録のどれかが無ければ None。"""
+    parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
+    ph = review._phase(snapshot.root, snapshot.conf, parent, phase_no) if parent else None
+    return ph.marks.get(approval.MARK_REQUESTED) if ph is not None else None
+
+
+def requested_head(snapshot: Snapshot, parent_id: str, phase_no: int) -> str | None:
+    """依頼のマーカーに記録された親の先頭。依頼の記録（か親・フェーズ）が無ければ None。
+
+    Chrome は依頼の後に親のブランチが動いたかを compare API で確かめる（8.9）。比べる相手は
+    TS に読ませず、ここが出す。
+    """
+    mark = _requested_mark(snapshot, parent_id, phase_no)
+    return None if mark is None else str(mark.get("head") or "")
+
+
+def moved_on_host(
+    snapshot: Snapshot, parent_id: str, phase_no: int, head: str, changed: list[str] | None
+) -> str:
+    """ホストで読んだ親の先頭 `head` と変更の一覧から、依頼の後に人が見るものが動いたかを言う。
+
+    手元の confirm と同じ関数（`review.moved_since`）で決める。依頼の記録が無ければ空を返し、
+    `confirm` が「依頼の記録が無い」で止める。
+    """
+    mark = _requested_mark(snapshot, parent_id, phase_no)
+    return "" if mark is None else review.moved_since(snapshot.conf, mark, head, changed)
 
 
 def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_mod.Ticket | None:
