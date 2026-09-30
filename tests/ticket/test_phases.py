@@ -1354,7 +1354,7 @@ class ChatReviewTest(PhaseHarness):
         self.commit_parent("close 02")
         self.merge("i0001-02")
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
-        self.assertIn("--reviewed 2 --chat", said)
+        self.assertIn("ccnavi-review.sh chat 2", said)
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "2.reviewed"))
