@@ -232,6 +232,9 @@ if [ "$needs_host" = yes ]; then
 fi
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 
+# curl の 1 回の時間の上限（秒）。応答しないホストで止まり続けないように。gh / glab は道具に任せる
+api_max_time=120
+
 # api <METHOD> <path> [<JSON body>] — レスポンスの JSON を標準出力へ。path は api_base からの相対。
 #
 # 失敗したら標準出力には何も出さず、ホストが返した本文ごと標準エラーへ出して 1 を返す。
@@ -243,17 +246,22 @@ api() {
 	body="${3:-}"
 	case "$transport" in
 	gh | glab)
+		# 標準エラー（更新の知らせなど）は応答に混ぜない。落ちたときだけ本文と一緒に見せる
+		api_err="$state/review-api-err-$$"
 		if [ -n "$body" ]; then
-			out=$(printf '%s' "$body" | "$CLI" api --hostname "$host" --method "$method" --input - "$rel" 2>&1) || {
-				api_failed "$method" "$rel" "$out"
+			out=$(printf '%s' "$body" | "$CLI" api --hostname "$host" --method "$method" --input - "$rel" 2>"$api_err") || {
+				api_failed "$method" "$rel" "$out$(cat "$api_err" 2>/dev/null)"
+				rm -f "$api_err"
 				return 1
 			}
 		else
-			out=$("$CLI" api --hostname "$host" --method "$method" "$rel" 2>&1) || {
-				api_failed "$method" "$rel" "$out"
+			out=$("$CLI" api --hostname "$host" --method "$method" "$rel" 2>"$api_err") || {
+				api_failed "$method" "$rel" "$out$(cat "$api_err" 2>/dev/null)"
+				rm -f "$api_err"
 				return 1
 			}
 		fi
+		rm -f "$api_err"
 		;;
 	curl)
 		if [ "$kind" = github ]; then
@@ -262,12 +270,12 @@ api() {
 			auth="PRIVATE-TOKEN: $token"
 		fi
 		if [ -n "$body" ]; then
-			out=$(printf '%s' "$body" | "$CURL" -fsS -X "$method" -H "$auth" -H 'Content-Type: application/json' --data-binary @- "$api_base/$rel" 2>&1) || {
+			out=$(printf '%s' "$body" | "$CURL" -fsS --connect-timeout 15 --max-time "$api_max_time" -X "$method" -H "$auth" -H 'Content-Type: application/json' --data-binary @- "$api_base/$rel" 2>&1) || {
 				api_failed "$method" "$rel" "$out"
 				return 1
 			}
 		else
-			out=$("$CURL" -fsS -X "$method" -H "$auth" "$api_base/$rel" 2>&1) || {
+			out=$("$CURL" -fsS --connect-timeout 15 --max-time "$api_max_time" -X "$method" -H "$auth" "$api_base/$rel" 2>&1) || {
 				api_failed "$method" "$rel" "$out"
 				return 1
 			}
@@ -388,7 +396,7 @@ threads() {
 			"$JQ" --arg u "$mr_url" '[.[] | select((.notes // []) | length > 0) | select(.notes[0].resolvable) | . as $d | .notes[0] as $n |
 				{id: ($d.id | tostring), resolved: ([$d.notes[] | select(.resolvable) | .resolved] | all),
 				 url: ($u + "#note_" + ($n.id | tostring)), path: ($n.position.new_path // ""), line: ($n.position.new_line // 0),
-				 body: ($n.body // ""), created_at: ($n.created_at // "")}]'
+				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: ($n.author.username // "")}]'
 	fi
 }
 
@@ -415,10 +423,10 @@ comment() {
 	body_json=$("$JQ" -Rs '{body: .}' <"$3")
 	if [ "$kind" = github ]; then
 		api POST "repos/$path/issues/$mr_number/comments" "$body_json" |
-			"$JQ" '{url: (.html_url // ""), created_at: (.created_at // "")}'
+			"$JQ" '{url: (.html_url // ""), created_at: (.created_at // ""), author: (.user.login // "")}'
 	else
 		api POST "projects/$(encoded_path)/merge_requests/$mr_number/notes" "$body_json" |
-			"$JQ" --arg u "$mr_url" '{url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // "")}'
+			"$JQ" --arg u "$mr_url" '{url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: (.author.username // "")}'
 	fi
 }
 
@@ -432,11 +440,11 @@ find_posted() {
 	if [ "$kind" = github ]; then
 		found_all=$(pages "repos/$path/issues/$1/comments") || return 1
 		printf '%s' "$found_all" | "$JQ" -c --arg m "$3" \
-			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: (.html_url // ""), created_at: (.created_at // "")}'
+			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: (.html_url // ""), created_at: (.created_at // ""), author: (.user.login // "")}'
 	else
 		found_all=$(pages "projects/$(encoded_path)/merge_requests/$1/notes") || return 1
 		printf '%s' "$found_all" | "$JQ" -c --arg m "$3" --arg u "$2" \
-			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // "")}'
+			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: (.author.username // "")}'
 	fi
 }
 
@@ -526,13 +534,48 @@ post_decision() {
 #
 # gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
 # GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
-# 形（英数字と _ . - の 1〜100 字。実行ファイルの --actor と同じ）に合わなければ使わない。
+# 形（英数字と _ . - の 1〜100 字で、- で始まらない。実行ファイルの --actor と同じ）に合わなければ使わない。
+# 印に残すだけなので、長く待たない（account_max_time 秒）。gh / glab の標準エラーは応答に混ぜない。
+
+account_max_time="${CCNAVI_REVIEW_ACCOUNT_TIMEOUT:-15}"
+
+# timed <秒> <書き先> <コマンド>... — 標準出力を書き先へ、標準エラーは捨てる。時間を過ぎたら止めて 1。
+timed() {
+	timed_limit="$1"
+	timed_out="$2"
+	shift 2
+	"$@" </dev/null >"$timed_out" 2>/dev/null &
+	timed_pid=$!
+	(
+		exec </dev/null >/dev/null 2>&1
+		sleep "$timed_limit"
+		kill "$timed_pid"
+	) &
+	timed_dog=$!
+	timed_rc=0
+	wait "$timed_pid" 2>/dev/null || timed_rc=$?
+	kill "$timed_dog" 2>/dev/null || :
+	return "$timed_rc"
+}
 
 account() {
 	if [ "$kind" = github ]; then field=login; else field=username; fi
-	who=$(api GET user 2>/dev/null | "$JQ" -r --arg f "$field" '.[$f] // empty' 2>/dev/null) || who=""
+	account_out="$state/review-account-$$.json"
+	case "$transport" in
+	gh | glab) timed "$account_max_time" "$account_out" "$CLI" api --hostname "$host" user || : >"$account_out" ;;
+	curl)
+		api_max_time="$account_max_time"
+		api GET user >"$account_out" 2>/dev/null || : >"$account_out"
+		api_max_time=120
+		;;
+	esac
+	who=$("$JQ" -r --arg f "$field" '.[$f] // empty' <"$account_out" 2>/dev/null | tr -d '\r') || who=""
+	rm -f "$account_out"
+	[ -n "$who" ] || return 0
+	# 形は C ロケールで見る（ロケールによって [A-Za-z] が英字の外に当たらないように）
+	if printf '%s\n' "$who" | LC_ALL=C grep -q '[^A-Za-z0-9_.-]'; then return 0; fi
 	case "$who" in
-	'' | *[!A-Za-z0-9_.-]*) return 0 ;;
+	-*) return 0 ;;
 	esac
 	[ "${#who}" -le 100 ] || return 0
 	printf '%s' "$who"
@@ -675,7 +718,7 @@ confirm)
 	# 印に残すアカウント。ロックを取る前に引く（引けなくても止めない。前と同じ印になる）
 	actor=$(account || :)
 	log_debug 印のアカウント -- "actor=${actor:+set}"
-	[ -z "$actor" ] || set -- "$@" --actor "$actor"
+	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
 	c1_start "$branch"
 	fetch_all >"$result"
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
