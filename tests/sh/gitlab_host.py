@@ -9,6 +9,9 @@
 - `GET .../merge_requests/<iid>/discussions?page=<N>` → iid が `mrs.json` のものなら
   `discussions.<N>.json`（無ければ `[]`。N の既定は 1）
 - `GET .../merge_requests/<iid>/reviewers?page=<N>` → 同じく `reviewers.<N>.json`
+- 依頼の投稿（`GET`/`POST .../merge_requests/<iid>/notes`）は、状態のファイル（環境変数
+  `FAKE_GITLAB_STATE`）に溜めて返す。投稿したアカウントは `FAKE_GITLAB_POSTER`（既定 `lab-bot`）。
+  見本に置かない（依頼の記録の `poster` を試すため。11.8.1 の決定 C）
 - ほかは 404
 
 sh の試験は PATH の先頭に `curl` の代役を置き、このファイルを
@@ -42,7 +45,16 @@ def _load(scene: str, name: str):
         return json.load(f)
 
 
-def answer(scene: str, method: str, url: str) -> tuple[int, object]:
+def _notes(state: str) -> list[dict]:
+    if not state or not os.path.exists(state):
+        return []
+    with open(state, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def answer(
+    scene: str, method: str, url: str, body: str = "", state: str = ""
+) -> tuple[int, object]:
     """1 つの要求への答え（状態, JSON）。`url` は API の根からのパスとクエリ（%2F のまま）"""
     meta = _load(scene, "scene.json") or {}
     parts = urlsplit(url)
@@ -71,12 +83,27 @@ def answer(scene: str, method: str, url: str) -> tuple[int, object]:
         page = query.get("page", "1")
         found = _load(scene, f"{pieces[2]}.{page}.json") if page.isdigit() else None
         return 200, found if found is not None else []
+    if len(pieces) == 3 and pieces[0] == "merge_requests" and pieces[2] == "notes":
+        posted = _notes(state)
+        if method == "GET":
+            return 200, posted if query.get("page", "1") == "1" else []
+        if method == "POST" and pieces[1] == iid:
+            n = len(posted) + 1
+            note = {
+                "id": 7000 + n,
+                "body": json.loads(body or "{}").get("body", ""),
+                "created_at": "2026-09-29T00:00:00.000Z",
+                "author": {"username": os.environ.get("FAKE_GITLAB_POSTER", "lab-bot")},
+            }
+            with open(state, "w", encoding="utf-8") as f:
+                json.dump([*posted, note], f)
+            return 201, note
     return 404, {"message": "404 Not Found"}
 
 
 def curl(argv: list[str]) -> int:
     """curl の代役。`ccnavi-review.sh` が打つ形（`-fsS -X <M> -H ... [--data-binary @-] <URL>`）"""
-    method, url = "GET", ""
+    method, url, body = "GET", "", ""
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -88,7 +115,7 @@ def curl(argv: list[str]) -> int:
             i += 2
             continue
         if a == "--data-binary":
-            sys.stdin.read()
+            body = sys.stdin.read()
             i += 2
             continue
         if a.startswith("http"):
@@ -100,7 +127,13 @@ def curl(argv: list[str]) -> int:
     if os.environ.get("FAKE_GITLAB_NO_USER") and url[len(API) :] == "/user":
         sys.stderr.write("curl: (22) The requested URL returned error: 403\n")
         return 22
-    status, data = answer(os.environ["FAKE_GITLAB_SCENE"], method, url[len(API) :])
+    status, data = answer(
+        os.environ["FAKE_GITLAB_SCENE"],
+        method,
+        url[len(API) :],
+        body,
+        os.environ.get("FAKE_GITLAB_STATE", ""),
+    )
     with open(os.environ.get("FAKE_GITLAB_LOG", os.devnull), "a", encoding="utf-8") as log:
         log.write(f"{method} {url[len(API) :]}\n")
     if status >= 400:

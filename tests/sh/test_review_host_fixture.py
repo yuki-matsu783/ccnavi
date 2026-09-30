@@ -398,6 +398,39 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(len(said("paged")["unresolved"]), 11)
         self.assertEqual(len(said("hostile")["unresolved"]), 8)
 
+    def test_request_records_the_account_that_posted(self):
+        """依頼の記録に投稿したアカウント（ノートの author.username）が入り、打ち直しても 1 度だけ。"""
+        out = os.path.join(self._tmp.name, "out")
+        os.makedirs(out)
+        stub = write(
+            os.path.join(self._tmp.name, "exe2", "ccnavi"),
+            "#!/bin/sh\n"
+            'case " $* " in *" --version "*) printf \'compat: %s\\n\' '
+            + str(version.COMPAT)
+            + "; exit 0 ;; esac\n"
+            'case " $* " in *" prepare "*)\n'
+            f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"
+            f"  printf 'Draft: t\\n\\nb\\n' >'{out}/draft.md'\n"
+            f"  printf '%s\\n%s\\n' '{out}/body.md' '{out}/draft.md'; exit 0 ;;\n"
+            "esac\n"
+            'prev=""\n'
+            'for a in "$@"; do [ "$prev" = --result ] && cp "$a" '
+            f"'{out}/result.json'; prev=\"$a\"; done\n"
+            "exit 0\n",
+        )
+        os.chmod(stub, 0o755)
+        state = os.path.join(self._tmp.name, "notes.json")
+        extra = {"CCNAVI_BIN_PATH": stub, "FAKE_GITLAB_STATE": state}
+        for _ in range(2):
+            done = self.review("resolved", "request", "--phase", "1", "--body-file", "x", **extra)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
+                result = json.load(f)
+            self.assertEqual((result["host"], result["author"]), ("gitlab", "lab-bot"))
+            self.assertEqual(result["mr"]["number"], 7)
+        with open(state, encoding="utf-8") as f:
+            self.assertEqual(len(json.load(f)), 1)
+
     def test_confirm_and_decide_pass_the_token_owner(self):
         done = self.review("resolved", "confirm", "--phase", "1")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
