@@ -543,11 +543,23 @@ def _entry(root: str, entry: dict) -> dict:
     }
 
 
+# 仮のツリーの綴りの前に来てよい字（行の頭・空白・引用符・括弧・区切り）。
+# 途中の段（`wip/ws/`）は畳まない。
+_BEFORE_ROOT = r"(?<![^\s'\"`(（「:：,、=])"
+
+
 def _relative(root: str, text: str) -> str:
-    """仮のツリーの綴り（`<root>/.claude/worktrees/<P>/`）を `<P>:` に畳む。"""
+    """文面の中の仮のツリーの綴りを畳む。
+
+    `<root>/.claude/worktrees/<P>/` を `<P>:` に、`<root>/` を空にする。畳むのは綴りの頭（行の頭か、
+    空白・引用符・括弧・区切りの直後）に在るときだけで、パスの途中の同じ綴り（`wip/ws/x`）は
+    畳まない。書くもの（Changes）のパスは既にツリーからの相対なので、ここを通さない。
+    """
     base = re.escape(os.path.join(root, *WORKTREES.split("/")) + os.sep)
-    out = re.sub(base + r"([A-Za-z0-9][A-Za-z0-9._-]*)" + re.escape(os.sep), r"\1:", text)
-    out = out.replace(root + os.sep, "")
+    out = re.sub(
+        _BEFORE_ROOT + base + r"([A-Za-z0-9][A-Za-z0-9._-]*)" + re.escape(os.sep), r"\1:", text
+    )
+    out = re.sub(_BEFORE_ROOT + re.escape(root + os.sep), "", out)
     return out.replace(os.sep, "/") if os.sep != "/" else out
 
 
@@ -572,6 +584,17 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
         raise Refused(unreadable)
     _build(root, snap, place, closure["families"])
     return snap, place, family, closure
+
+
+def _unwritten(root: str, notes: str) -> None:
+    """並べる段で跡を書けないと分かったら、書くものを出さずに止める（`core.withdraw` と揃える）。"""
+    lines = [
+        _relative(root, line.replace("ccnavi: 警告: ", "ccnavi: ", 1))
+        for line in notes.splitlines()
+        if line
+    ]
+    if lines:
+        raise Refused("\n".join(lines))
 
 
 def _writable(snap: dict, family: str) -> None:
@@ -632,7 +655,9 @@ def _changes(root: str, changes: core.Changes | None) -> dict:
     for branch, entries in changes.per_branch().items():
         rows = []
         for e in entries:
-            row = {"op": e["op"], "path": _relative(root, e["path"])}
+            # per_branch のパスはツリーからの相対（ツリーの外は `""` の鍵で絶対パス。
+            # `_one_branch` が断る）
+            row = {"op": e["op"], "path": e["path"]}
             if "content" in e:
                 try:
                     row["content"] = e["content"].decode("utf-8")
@@ -667,18 +692,19 @@ def _op_plan(req: dict, root: str) -> dict:
         ):
             raise Refused("shown は見せた識別子の並び（ids）と指紋（digest）")
         shown_ids, shown_digest = ids, digest
-        _writable(snap, family)
+    _writable(snap, family)
+    notes = io.StringIO()
     with _environ(place["env"]):
         snapshot = _core_snapshot(req, root)
         actor = snapshot.actor
-        with history.session(actor.via or history.VIA_CHROME, None, actor.account, actor.version):
+        with history.session(actor.via or history.VIA_CHROME, notes, actor.account, actor.version):
             verdict = core.judge_approval(snapshot, only, shown_ids, shown_digest)
             refused = verdict.gathered.refused
             ready = verdict.batch and not refused and verdict.mismatch is None
             changes = core.plan(snapshot, verdict) if ready else None
+    _unwritten(root, notes.getvalue())
     body = _changes(root, changes)
-    if shown is not None:
-        _one_branch(body, family)
+    _one_branch(body, family)
     return {
         "family": family,
         "identifiers": verdict.identifiers,
@@ -721,7 +747,8 @@ def _op_withdraw(req: dict, root: str) -> dict:
 
 def _op_confirm(req: dict, root: str) -> dict:
     """レビュー済みで書くもの（8.9）。`result` は `ccnavi-review.sh` が組むのと同じ形の写し。"""
-    _, place, family, _ = _family_tree(req, root)
+    snap, place, family, _ = _family_tree(req, root)
+    _writable(snap, family)
     phase_no = req.get("phase")
     if not isinstance(phase_no, int) or isinstance(phase_no, bool):
         raise Refused("phase はフェーズの番号")
@@ -732,10 +759,12 @@ def _op_confirm(req: dict, root: str) -> dict:
     with _environ(place["env"]):
         snapshot = _core_snapshot(req, root)
         checked = core.confirm(snapshot, family, phase_no, result, changed)
+    body = _changes(root, checked.changes)
+    _one_branch(body, family)
     return {
         "family": family,
         "problems": [_relative(root, p) for p in checked.problems],
-        **_changes(root, checked.changes),
+        **body,
     }
 
 
