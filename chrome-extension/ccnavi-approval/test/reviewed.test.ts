@@ -24,7 +24,7 @@ import { collectRepo } from "../src/core/snapshot.js";
 import { confirmPhase, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, requestedMark, reviewFamilyFiles } from "./fixtures/repo.js";
 import { BOARD, deps, hostCall, HOSTS, memoryCache, newStats } from "./helpers/host.js";
-import { loadScene, SCENES, sceneFetch, sceneNames } from "./helpers/host-fixture.js";
+import { loadScene, SCENES, sceneAnswer, sceneFetch, sceneNames } from "./helpers/host-fixture.js";
 import { dispatch } from "../src/core/protocol.js";
 import { LOGIN, MockGitHub, TOKEN } from "./helpers/mock-github.js";
 import { nativePy, pyodidePy } from "./helpers/python.js";
@@ -70,7 +70,7 @@ async function panelOf(mock: MockGitHub) {
 }
 
 test("CX-T129 録ったホストの応答の見本ごとに、TS が組む写しは sh が組んだ期待値（expected.json）と同じ", async () => {
-  assert.deepEqual(sceneNames(), ["changes-requested", "hostile", "paged", "resolved"]);
+  assert.deepEqual(sceneNames(), ["changes-requested", "cr-commented", "full-page", "hostile", "paged", "pending", "resolved"]);
   for (const name of sceneNames()) {
     const scene = loadScene(name);
     const copy = (await gh.reviewCopy(client(sceneFetch(scene)), scene.owner, scene.repo, scene.branch)) as unknown as Record<string, unknown>;
@@ -107,8 +107,13 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
   const noop = { approve: () => undefined, withdraw: () => undefined, review: () => undefined };
   for (const [scene, button, why] of [
     ["resolved", 1, null],
-    ["paged", 0, /未解決のスレッドが 3 件残っている/],
+    ["full-page", 1, null],
+    // GitHub では目印で始まるスレッドも数える（11.8.1 の決定 C）
+    ["paged", 0, /未解決のスレッドが 4 件残っている/],
     ["changes-requested", 0, /変更要求のレビューが立っている/],
+    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない（決定 A）
+    ["cr-commented", 0, /変更要求のレビューが立っている/],
+    ["pending", 0, /変更要求のレビューが立っている/],
   ] as const) {
     const mock = reviewing(scene);
     const { board, panel } = await panelOf(mock);
@@ -151,7 +156,7 @@ test("CX-T132 レビュー済みにする: 子を done/ へ動かし、印（act
 });
 
 test("CX-T133 未解決・変更要求が残れば書かない。ボードを開いた後に未解決が増えても、押したときに読み直して止める", async () => {
-  for (const scene of ["paged", "changes-requested", "hostile"]) {
+  for (const scene of ["paged", "changes-requested", "cr-commented", "pending", "hostile"]) {
     const mock = reviewing(scene);
     const out = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));
     assert.equal(out.kind, "refused", scene);
@@ -163,7 +168,7 @@ test("CX-T133 未解決・変更要求が残れば書かない。ボードを開
   mock.attachScene(FAMILY, loadScene("paged"));
   const out = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));
   assert.equal(out.kind, "refused");
-  assert.match(out.message, /未解決のスレッドが 3 件残っている/);
+  assert.match(out.message, /未解決のスレッドが 4 件残っている/);
   assert.equal(mock.commitCalls.length, 0);
 });
 
@@ -238,4 +243,64 @@ test("CX-T137 レビュー済みで Python に投げた要求（board・confirm�
   for (const { req, res } of log) {
     assert.deepEqual(await native!.call(req), res, `${String(req.op)} ${String(req.family ?? "")}`);
   }
+});
+
+test("CX-T139 レビューの一覧が 404・並びでないなら投げ（レビュー無しと読まない）、compare の一覧が並びでないなら null", async () => {
+  const answer = (status: number, json: unknown) => async () => ({ status, ok: status < 300, json: async () => json, headers: { get: () => null } });
+  await assert.rejects(gh.pullReviews(client(answer(404, { message: "Not Found" })), "acme", "widgets", 42), /404/);
+  await assert.rejects(gh.pullReviews(client(answer(200, { message: "?" })), "acme", "widgets", 42), /並びでない/);
+  const a = "a".repeat(40);
+  const b = "b".repeat(40);
+  assert.equal((await gh.compareFiles(client(answer(200, { status: "ahead" })), "acme", "widgets", a, b)).files, null);
+  assert.equal((await gh.compareFiles(client(answer(200, { status: "ahead", files: "x" })), "acme", "widgets", a, b)).files, null);
+  assert.deepEqual((await gh.compareFiles(client(answer(200, { status: "identical", files: [] })), "acme", "widgets", a, b)).files, []);
+});
+
+test("CX-T140 レビュー済みの読み取りの受け口も、設定画面で登録したリポジトリだけ受ける", async () => {
+  const mock = reviewing("resolved");
+  const d = deps(mock, new Map([["github.com", TOKEN]]), new Map(), () => new Date(), []);
+  const at = JSON.parse(mock.files(FAMILY)[REQUESTED]).head as string;
+  for (const [op, args] of [
+    ["reviewCopy", ["acme", "widgets", FAMILY]],
+    ["compareFiles", ["acme", "widgets", at, mock.head(FAMILY)]],
+  ] as const) {
+    const res = await dispatch({ kind: "host", host: "github.com", op, args }, BOARD, d);
+    assert.equal(res.ok, false, op);
+    assert.match((res as { error: string }).error, /登録していないリポジトリ/);
+  }
+  assert.ok(!mock.calls.some((c) => c.includes("/pulls")), mock.calls.join("\n"));
+});
+
+test("CX-T141 同じ家族の依頼済みのフェーズが 2 つでも、MR・スレッド・レビューは 1 度だけ読む", async () => {
+  const mock = new MockGitHub(fixture());
+  mock.branch(FAMILY, "main");
+  const at = mock.push(FAMILY, reviewFamilyFiles(FAMILY, 2), "2 フェーズぶんのレビュー待ち");
+  mock.push(FAMILY, { [REQUESTED]: requestedMark(at), [`.ccnavi/approved/phases/${FAMILY}/2.requested`]: requestedMark(at) }, "依頼");
+  mock.attachScene(FAMILY, loadScene("resolved"));
+  const { fam } = await panelOf(mock);
+  assert.deepEqual(fam.reviews?.map((p) => [p.phase, p.error, p.problems.length]), [
+    [1, "", 0],
+    [2, "", 0],
+  ]);
+  const count = (re: RegExp) => mock.calls.filter((c) => re.test(c)).length;
+  assert.equal(count(/^GET \/repos\/acme\/widgets\/pulls$/), 1);
+  assert.equal(count(/^GET \/repos\/acme\/widgets\/pulls\/42\/reviews$/), 1);
+});
+
+test("CX-T142 レビュー済みのフェーズに Chrome から重ねて書かない（押した時点で読み直して止める）", async () => {
+  const mock = reviewing("resolved");
+  assert.equal((await confirmPhase(REPO, FAMILY, 1, depsFor(mock))).kind, "written");
+  const again = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));
+  assert.equal(again.kind, "refused");
+  assert.match(again.message, /フェーズ 1 はレビュー済み/);
+  assert.equal(mock.commitCalls.length, 1);
+});
+
+test("CX-T143 見本の代役は、問い合わせが見本の欄を落としていれば答えない（欄を削っても試験が通らないように）", () => {
+  const scene = loadScene("resolved");
+  const full = "query { repository { pullRequest { reviewThreads { pageInfo { hasNextPage endCursor } nodes { id isResolved comments { nodes { url path line body createdAt } } } } } } }";
+  const ask = (q: string) => sceneAnswer(scene, "POST", new URL("https://api.github.com/graphql"), JSON.stringify({ query: q, variables: { number: 42, after: null } }));
+  assert.ok((ask(full)?.json as { data?: unknown }).data);
+  const without = ask(full.replace(" isResolved", ""))?.json as { errors?: { message: string }[] };
+  assert.match(without.errors?.[0].message ?? "", /isResolved/);
 });

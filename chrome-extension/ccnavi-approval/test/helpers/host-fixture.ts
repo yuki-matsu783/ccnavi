@@ -9,7 +9,8 @@
  *   （無ければ `[]`。N の既定は 1）
  * - `POST /graphql` の `reviewThreads` → 番号が同じで、cursor（sh は `c`、拡張は `after`）が null なら `threads.1.json`、
  *   `threads.<k>.json` の `endCursor` と同じなら `threads.<k+1>.json`
- * - `GET /user`・`viewer` → `user.json`
+ * - `GET /user` → `user.json`
+ * - GraphQL は、見本の応答が持つ欄（`THREAD_FIELDS`）が問い合わせに語として全部あるときだけ答える
  *
  * 期待値（`expected.json`）は sh が見本から組んだ写しで、拡張の試験（CX-T129）は TS が組んだ写しと比べる。
  */
@@ -48,6 +49,17 @@ function prNumber(scene: Scene): number {
   return ((scene.files["pulls.json"] as { number: number }[])[0] ?? { number: -1 }).number;
 }
 
+/**
+ * 見本の応答が持つ欄。問い合わせがどれかを落とせば、本物は答えにその欄を入れないので、代役も答えない
+ * （欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。sh の代役と同じ並び。
+ */
+export const THREAD_FIELDS = ["reviewThreads", "pageInfo", "hasNextPage", "endCursor", "nodes", "id", "isResolved", "comments", "url", "path", "line", "body", "createdAt"];
+
+/** 問い合わせに語として現れない欄の名前 */
+export function missingFields(query: string, fields: readonly string[]): string[] {
+  return fields.filter((f) => !new RegExp(`(?<![A-Za-z0-9_])${f}(?![A-Za-z0-9_])`).test(query));
+}
+
 /** 見本に当たる要求なら答え、当たらなければ null（呼び手のほかの道へ） */
 export function sceneAnswer(scene: Scene, method: string, u: URL, body: string): { status: number; json: unknown } | null {
   const base = `/repos/${scene.owner}/${scene.repo}`;
@@ -66,6 +78,8 @@ export function sceneAnswer(scene: Scene, method: string, u: URL, body: string):
     const q = req.query ?? "";
     const v = req.variables ?? {};
     if (q.includes("reviewThreads") && Number(v.number ?? v.n) === prNumber(scene)) {
+      const missing = missingFields(q, THREAD_FIELDS);
+      if (missing.length > 0) return { status: 200, json: { errors: [{ message: `問い合わせに欄が無い: ${missing.join(", ")}` }] } };
       let cursor = (v.after ?? v.c ?? null) as string | null;
       for (let k = 1; ; k += 1) {
         const page = scene.files[`threads.${k}.json`] as { data: { repository: { pullRequest: { reviewThreads: { pageInfo: { endCursor: string } } } } } } | undefined;

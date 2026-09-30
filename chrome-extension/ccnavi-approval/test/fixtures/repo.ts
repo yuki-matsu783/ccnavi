@@ -200,12 +200,12 @@ export function fixture(compat = 1): Record<string, FixtureBranch> {
 }
 
 /** 承認済みの写し（作業中の親、レビュー待ちの子）。段階 4 のレビュー済みの見本 */
-function approvedCopy(id: string, parentId: string | null, lines: string[]): string {
+function approvedCopy(id: string, parentId: string | null, lines: string[], phases = 1, phase = 1): string {
   return [
     "---",
     "version: 1",
     `ticket: ${id}`,
-    ...(parentId ? [`parent: ${parentId}`, "phase: 1"] : ["plan:", "  - design"]),
+    ...(parentId ? [`parent: ${parentId}`, `phase: ${phase}`] : ["plan:", ...Array.from({ length: phases }, () => "  - design")]),
     `title: ${parentId ? `設計の子 ${id}` : `レビューを待つ親 ${id}`}`,
     "human_review:",
     "  required: true",
@@ -232,12 +232,16 @@ function approvedCopy(id: string, parentId: string | null, lines: string[]): str
  * レビューを依頼したフェーズを持つ家族（段階 4）。親は作業中（計画は MR で見る design の 1 フェーズ）、
  * 子はレビュー待ち。依頼のマーカーは `requested`（`head` は依頼時の先頭。見本を積んでから書く）
  */
-export function reviewFamilyFiles(id: string): Record<string, string> {
-  return {
-    [`.ccnavi/approved/doing/${id}.md`]: approvedCopy(id, null, ['completed_at: ""']),
-    [`wip/proposals/review/${id}-01.md`]: approvedCopy(`${id}-01`, id, ["completed_at: 2026-09-28T10:00:00+0900"]),
+export function reviewFamilyFiles(id: string, phases = 1): Record<string, string> {
+  const out: Record<string, string> = {
+    [`.ccnavi/approved/doing/${id}.md`]: approvedCopy(id, null, ['completed_at: ""'], phases),
     "wip/design/plan.md": "設計\n",
   };
+  for (let n = 1; n <= phases; n += 1) {
+    const child = `${id}-0${n}`;
+    out[`wip/proposals/review/${child}.md`] = approvedCopy(child, id, ["completed_at: 2026-09-28T10:00:00+0900"], 1, n);
+  }
+  return out;
 }
 
 /** 依頼のマーカー（`ccnavi review requested` が置く形） */
