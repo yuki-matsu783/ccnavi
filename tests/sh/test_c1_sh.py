@@ -1114,7 +1114,7 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.endswith("/merge_requests"):
             url = f"http://127.0.0.1:{self.port}/demo/greeter/-/merge_requests/1"
-            self.reply(200, [{"iid": 1, "web_url": url}])
+            self.reply(200, [{"iid": 1, "web_url": url, "source_project_id": 1}])
         elif path.endswith("/notes"):
             page = "page=1" in self.path
             self.reply(200, list(Host.notes) if page else [])
