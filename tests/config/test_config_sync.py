@@ -418,7 +418,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
 
         refused = self.ccnavi("ticket", "finish", "i0001")
         self.assertNotEqual(refused.returncode, 0, refused.stdout)
-        self.assertIn("--config-synced i0001", refused.stderr)
+        self.assertIn("ccnavi-review.sh config-synced i0001", refused.stderr)
 
         seen = self.ccnavi("--config-synced", "i0001", stdin="y\n")
         self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
@@ -546,7 +546,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
 
         problems = ops.close_problems(self.ws, conf, "i0001")
 
-        self.assertTrue(any("--config-synced i0001" in p for p in problems), problems)
+        self.assertTrue(any("config-synced i0001" in p for p in problems), problems)
 
     def test_a_synced_script_factor_is_counted_once_after_it_lands(self):
         """写した配点が統合先に入っても、共通層の同じ項目と 2 重に数えない。"""

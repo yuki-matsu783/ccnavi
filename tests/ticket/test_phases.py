@@ -1153,13 +1153,13 @@ class ChatReviewTest(PhaseHarness):
         said = self.chat_phase()
         # 告知は push も request も言わない。言うのは「見てもらって待て」と開け方。
         self.assertIn("差分を見てもらって", said)
-        self.assertIn("--reviewed 1 --chat", said)
+        self.assertIn("ccnavi-review.sh chat 1", said)
         self.assertNotIn("request --phase", said)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
         # レビューが要るフェーズなので、mr のときと同じに止まる。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
-        self.assertIn("--reviewed 1 --chat", self.reason(spawn))
+        self.assertIn("ccnavi-review.sh chat 1", self.reason(spawn))
         # n と答えればマーカーは置かれない。
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="n\n")
         self.assertNotEqual(refused.returncode, 0)
