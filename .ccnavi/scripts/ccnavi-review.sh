@@ -20,7 +20,9 @@
 #            人はレビューをマージリクエストで行うので、入れ物が無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
-#            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす
+#            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
+#            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、印に残す
+#            （ADR-0093 の 8.9。段階 4）。引けなければ渡さず、印は前と同じ
 #   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、指摘ごとに
 #            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
 #            → issue に回す分があればここが issue を作り、決めた内容をコメントに写す
@@ -520,6 +522,22 @@ post_decision() {
 	fi
 }
 
+# ---- トークンの持ち主（レビュー済みの印の actor。ADR-0093 の 8.9）。引けなければ空で、止めない。
+#
+# gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
+# GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
+# 形（英数字と _ . - の 1〜100 字。実行ファイルの --actor と同じ）に合わなければ使わない。
+
+account() {
+	if [ "$kind" = github ]; then field=login; else field=username; fi
+	who=$(api GET user 2>/dev/null | "$JQ" -r --arg f "$field" '.[$f] // empty' 2>/dev/null) || who=""
+	case "$who" in
+	'' | *[!A-Za-z0-9_.-]*) return 0 ;;
+	esac
+	[ "${#who}" -le 100 ] || return 0
+	printf '%s' "$who"
+}
+
 # ---- 写し。exe に渡す JSON。
 
 fetch_all() {
@@ -648,6 +666,16 @@ merged)
 	fi
 	;;
 confirm)
+	# 印に残すアカウントはここがホストに聞く。呼び手が渡したもの（--actor）は受けない
+	for a in "$@"; do
+		case "$a" in
+		--actor | --actor=*) fail confirm-actor "confirm は --actor を受けない。印のアカウントはトークンの持ち主をホストに聞いて入れる。" 2 ;;
+		esac
+	done
+	# 印に残すアカウント。ロックを取る前に引く（引けなくても止めない。前と同じ印になる）
+	actor=$(account || :)
+	log_debug 印のアカウント -- "actor=${actor:+set}"
+	[ -z "$actor" ] || set -- "$@" --actor "$actor"
 	c1_start "$branch"
 	fetch_all >"$result"
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
