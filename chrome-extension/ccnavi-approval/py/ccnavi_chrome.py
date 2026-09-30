@@ -7,9 +7,21 @@
 
 段階 2a から、判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` も呼べる
 （`plan`・`withdraw`・`confirm` の操作）。どれも書くもの（Changes）を値で返すだけで、
-ホストにもディスクにも書かない（fsio の控える段）。拡張の画面はまだ使わず（承認は段階 3、
-レビュー済みは段階 4）、手元の CPython と Pyodide が同じバイト列を出すことの試験に使う
-（ADR-0093 の 6.2）。
+ホストにもディスクにも書かない（fsio の控える段）。段階 3 から、拡張は `plan`（承認）と
+`withdraw`（取り下げ）の答えを親のブランチへの 1 コミットにして書く（8.3・8.4）。
+`confirm`（レビュー済み）の画面は段階 4。
+
+段階 3 から、仮のツリーに手元の取り込みの控え相当（`logs/state/sync/self/`。統合先の
+`done/`・層・設定の写しと、閉包の家族の控え）も組む（3.3。段階 2c の「Chrome の入口で控えを
+組む」）。手元と同じ判定のコードが、取り込み済みの家族として読む:
+
+- ホストに在る家族（`P` と閉包の `P_X`）は `present`
+- ホストに無く、統合先の `done/` でも閉じていない家族は `gone`（決まらない。3.3 の 3）
+- 判定の入力に読めない（バイナリの）ファイルがあれば、何も判定せず「決まらない」で止める
+  （6.2 の `NOT_FETCHED` と同じ考え。無いとも空とも読ませない）
+
+書く操作（`plan`・`withdraw`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば受けない
+（7.3・D31）。書く先は家族の親のブランチ `P` だけで、予約の名前・統合先の名前は受けない（8.5）。
 
 呼び方は `handle(<要求の JSON>, root)`。`root` は仮のツリーを組む場所で、Pyodide では `/ws`、
 手元の試験では一時ディレクトリ。答えは JSON の文字列。
@@ -36,11 +48,14 @@ import re
 import shutil
 import sys
 
-from ccnavi import cli, core, fsio, history, lint, review, settings, version
+from ccnavi import cli, core, fsio, history, lint, review, settings, syncstate, version
 from ccnavi import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
 SCHEMA = 1
+
+# 控えの名前（ワークスペース自身）。段階 3 はワークスペースのリポジトリだけ（11 章）。
+SELF_REPO = syncstate.SELF
 
 # 参照の閉包で辿る家族の上限（ADR-0093 の 3.3 の 5）。
 FAMILY_LIMIT = 16
@@ -55,6 +70,9 @@ COMPAT_FILE = lint.SH_COMPAT_FILE.replace(os.sep, "/")
 
 # 置き場の綴りに効く環境変数。統合先の `.claude/settings.json` の `env` から読む（3.3 の 6）。
 PLACEMENT_ENV = (settings.TICKETS_ENV, settings.APPROVED_ENV, settings.PROJECT_HOME_ENV)
+
+# 取り込みの控え相当の置き場（仮のツリーの中。手元の既定の控えの置き場と同じ綴り）。
+STATE_DIR = settings.DEFAULT_STATE.replace(os.sep, "/")
 
 # 絶対パスの綴り。置き場がリポジトリの外を指すワークスペースは Chrome の対象外（3.1 の 12）。
 _ABSOLUTE = re.compile(r"^(?:[/\\~]|[A-Za-z]:)")
@@ -319,6 +337,44 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
         _head(registry, name)
         for path, text in _files(snap, name).items():
             _write(tree, path, text)
+    for rel, text in records(snap, place, families).items():
+        _write(root, f"{STATE_DIR}/{rel}", text)
+
+
+def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
+    """取り込みの控え相当（控えの置き場からの相対パス → 中身）。手元の `ccnavi-sync.sh` が書く形。
+
+    - 統合先の控え（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
+      `.claude/settings.json` の写しと `head`
+    - 家族の控え（`sync/self/families/<P>`）: ホストに在る家族は `present`、無い家族は `gone`
+
+    先頭の sha と取り込んだ時刻は書かない。判定が読んだ中身（read_set）に入り、指紋が
+    関係の無い push で変わるため（6.2「全ブランチの head_sha は入れない」）。手元の試験も
+    これを控えの置き場に書き、同じ控えで判定させる。
+    """
+    integ = snap["integration"]
+    base = f"sync/{SELF_REPO}"
+    out: dict[str, str] = {
+        f"{base}/integration/head": (
+            f"remote origin\nbranch {integ['name']}\nsource {integ.get('source') or ''}\n"
+        ),
+    }
+    keep = tuple(p + "/" for p in place["integration_paths"])
+    for path, text in _files(snap, integ["name"]).items():
+        if path.startswith(keep) or path == SETTINGS_FILE:
+            out[f"{base}/integration/{path}"] = text
+    absent = set(snap.get("absent") or [])
+    for name in families:
+        if name == integ["name"]:
+            continue
+        if name in snap["branches"]:
+            out[f"{base}/families/{name}"] = f"remote origin\nbranch {name}\nstate present\n"
+        elif name in absent:
+            out[f"{base}/families/{name}"] = (
+                f"remote origin\nbranch {name}\nstate gone\n"
+                f"reason 親のブランチ {name} がホストに無い\n"
+            )
+    return dict(sorted(out.items()))
 
 
 def _head(gitdir: str, branch: str) -> None:
@@ -378,6 +434,9 @@ def _op_board(req: dict, root: str) -> dict:
         return {"family": family, "undecided": closure["message"], "closure": closure}
     if closure["need"]:
         raise Refused(f"閉包の家族をまだ読んでいない: {', '.join(closure['need'])}")
+    unreadable = _unreadable(snap, closure)
+    if unreadable:
+        return {"family": family, "undecided": unreadable, "closure": closure}
     _build(root, snap, place, closure["families"])
 
     code, first, err = _preview(root, place["env"], [])
@@ -394,6 +453,12 @@ def _op_board(req: dict, root: str) -> dict:
     return {
         "family": family,
         "closure": closure,
+        # 書けるか（互換の版・書く先の名前。7.3・8.5）。書けなければ表示だけにする。
+        "write": {
+            "allowed": not _write_refusal(snap, family),
+            "reason": _write_refusal(snap, family),
+        },
+        "withdrawable": _withdrawable(req, root, place, family),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出す（D22）ので、手を加えずに返す。
         # 指紋はこの本文と写しの中身を覆い、手元の `--approve --preview` と同じ値になる。
@@ -404,17 +469,58 @@ def _op_board(req: dict, root: str) -> dict:
             for r in first["rejected"]
             if family_of(r["ticket"]) == family
         ],
-        "problems": [_relative(root, p) for p in first["problems"]] + _binary(snap, closure),
+        "problems": [_relative(root, p) for p in first["problems"]],
     }
 
 
-def _binary(snap: dict, closure: dict) -> list[str]:
-    """本文を読めなかった（バイナリの）ファイル。判定がそれを読んだかは分からないので言う。"""
+def _unreadable(snap: dict, closure: dict) -> str:
+    """判定の入力に本文を読めなかった（バイナリの）ファイルがあれば、止める理由。
+
+    判定がそれを読むかは分からないので、無いとも空とも読ませず「決まらない」で止める
+    （6.2 の `NOT_FETCHED`。段階 1 は言うだけだった。段階 3 で書くようになったので締めた）。
+    """
     names = [snap["integration"]["name"], *closure["families"]]
-    return [
-        f"{name}:{path} はバイナリで読めなかった"
+    found = [
+        f"{name}:{path}"
         for name in dict.fromkeys(names)
         for path in (snap["branches"].get(name) or {}).get("binary") or []
+    ]
+    if not found:
+        return ""
+    return (
+        f"判定の入力に本文を読めない（バイナリの）ファイルがある（{', '.join(found)}）。"
+        "この家族は決まらない。手元で `--approve --preview --verify` を打って確かめる"
+    )
+
+
+def _write_refusal(snap: dict, family: str) -> str:
+    """この家族の `P` へ書けない理由（空なら書ける）。
+
+    - 同梱の互換の版が統合先と違う（7.3・D31）。表示だけにする
+    - 書く先が予約の名前か統合先の名前（8.5。保護されたブランチと統合先へは書かない）
+    """
+    compat = _compat(snap)
+    if not compat["same"]:
+        return f"{compat['message']}。承認と取り下げは出さない（ADR-0093 の 7.3）"
+    folded = family.casefold()
+    if (
+        folded in ticket_mod.RESERVED_BRANCH_IDS
+        or folded.startswith("release-")
+        or folded == snap["integration"]["name"].casefold()
+    ):
+        return f"{family} は予約の名前か統合先の名前なので、Chrome からは書かない"
+    return ""
+
+
+def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
+    """作業中の写しごとの取り下げの可否（8.8）。仮のツリーは組んである前提。"""
+    with _environ(place["env"]):
+        conf, _ = settings.load(root)
+        snapshot = core.read_fs(conf, root)
+        found = core.withdrawable(snapshot, family)
+    return [
+        {"ticket": ident, "title": title, "problems": [_relative(root, p) for p in problems]}
+        for ident, title, problems in found
     ]
 
 
@@ -458,8 +564,32 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
         raise Refused(closure["message"])
     if closure["need"]:
         raise Refused(f"閉包の家族をまだ読んでいない: {', '.join(closure['need'])}")
+    unreadable = _unreadable(snap, closure)
+    if unreadable:
+        raise Refused(unreadable)
     _build(root, snap, place, closure["families"])
     return snap, place, family, closure
+
+
+def _writable(snap: dict, family: str) -> None:
+    """書く操作の前に、書けない理由があれば受けない（`_write_refusal`）。"""
+    why = _write_refusal(snap, family)
+    if why:
+        raise Refused(why)
+
+
+def _one_branch(changes: dict, family: str) -> None:
+    """書くものが親のブランチ `P` の中だけか（1 回の承認は 1 つの `P`。8.3・8.4）。
+
+    提案が `P` 以外のブランチ（閉包の `P_X` など）にあると、消す先が別のブランチになる。
+    その形は承認しない（8.4「P 以外のブランチにある提案は承認しない」）。
+    """
+    others = sorted(k for k in (changes.get("changes") or {}) if k != family)
+    if others:
+        raise Refused(
+            f"書くものが親のブランチ {family} の外（{', '.join(others or ['?'])}）に及ぶ。"
+            f"提案は {family} の上に置いてから承認を頼む（ADR-0093 の 3.2）"
+        )
 
 
 def _stamp(req: dict) -> str:
@@ -523,29 +653,48 @@ def _op_plan(req: dict, root: str) -> dict:
     only = req.get("only")
     if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only)):
         raise Refused("only は識別子の並び")
+    shown = req.get("shown")
+    shown_ids = shown_digest = None
+    if shown is not None:
+        # 見せた一覧と指紋（8.3 の 2）。違えば書くものを出さず、preview からやり直させる。
+        ids = shown.get("ids") if isinstance(shown, dict) else None
+        digest = shown.get("digest") if isinstance(shown, dict) else None
+        if not (isinstance(ids, list) and all(isinstance(i, str) for i in ids)) or not (
+            isinstance(digest, str) and digest
+        ):
+            raise Refused("shown は見せた識別子の並び（ids）と指紋（digest）")
+        shown_ids, shown_digest = ids, digest
+        _writable(snap, family)
     with _environ(place["env"]):
         snapshot = _core_snapshot(req, root)
-        with history.session(snapshot.actor.via or history.VIA_CHROME, None):
-            verdict = core.judge_approval(snapshot, only)
+        actor = snapshot.actor
+        with history.session(actor.via or history.VIA_CHROME, None, actor.account, actor.version):
+            verdict = core.judge_approval(snapshot, only, shown_ids, shown_digest)
             refused = verdict.gathered.refused
-            changes = core.plan(snapshot, verdict) if verdict.batch and not refused else None
+            ready = verdict.batch and not refused and verdict.mismatch is None
+            changes = core.plan(snapshot, verdict) if ready else None
+    body = _changes(root, changes)
+    if shown is not None:
+        _one_branch(body, family)
     return {
         "family": family,
         "identifiers": verdict.identifiers,
         "text": verdict.screen_text,
         "digest": verdict.digest,
+        "mismatch": verdict.mismatch,
         "refused": _relative(root, refused),
         "rejected": [
             {"ticket": t.ticket, "problems": [_relative(root, str(p)) for p in complaints]}
             for t, complaints in verdict.rejected
         ],
-        **_changes(root, changes),
+        **body,
     }
 
 
 def _op_withdraw(req: dict, root: str) -> dict:
     """承認の取り下げで書くもの（8.8）。`prior` は識別子ごとの承認コミットの親の提案の本文。"""
-    _, place, family, _ = _family_tree(req, root)
+    snap, place, family, _ = _family_tree(req, root)
+    _writable(snap, family)
     ids = req.get("ids")
     prior = req.get("prior")
     if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
@@ -558,10 +707,12 @@ def _op_withdraw(req: dict, root: str) -> dict:
         checked = core.withdraw(
             snapshot, ids, {k: v.encode("utf-8") for k, v in prior.items()}, reason
         )
+    body = _changes(root, checked.changes)
+    _one_branch(body, family)
     return {
         "family": family,
         "problems": [_relative(root, p) for p in checked.problems],
-        **_changes(root, checked.changes),
+        **body,
     }
 
 
@@ -589,7 +740,10 @@ def _op_confirm(req: dict, root: str) -> dict:
 
 
 def _op_compat(req: dict, root: str) -> dict:
-    snap = _snapshot(req)
+    return {"compat": _compat(_snapshot(req))}
+
+
+def _compat(snap: dict) -> dict:
     text = _files(snap, snap["integration"]["name"]).get(COMPAT_FILE)
     ours = version.COMPAT
     found = lint._SH_COMPAT.search(text) if text else None
@@ -604,14 +758,7 @@ def _op_compat(req: dict, root: str) -> dict:
     else:
         hint = "拡張を更新する" if theirs > ours else "リポジトリの ccnavi の更新を待つ"
         message = f"拡張は互換 {ours}、リポジトリは互換 {theirs}。{hint}"
-    return {
-        "compat": {
-            "extension": ours,
-            "repository": theirs,
-            "same": theirs == ours,
-            "message": message,
-        }
-    }
+    return {"extension": ours, "repository": theirs, "same": theirs == ours, "message": message}
 
 
 def _op_version(req: dict, root: str) -> dict:
