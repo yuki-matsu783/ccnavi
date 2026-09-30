@@ -42,6 +42,7 @@ async function refreshBadge(): Promise<void> {
 
 const deps: Deps = {
   hosts: HOSTS,
+  compat: __CCNAVI_COMPAT__,
   extensionId: chrome.runtime.id,
   base: chrome.runtime.getURL(""),
   fetch: (url, init) => fetch(url, { ...init, credentials: "omit", cache: "no-store", redirect: "error" }),

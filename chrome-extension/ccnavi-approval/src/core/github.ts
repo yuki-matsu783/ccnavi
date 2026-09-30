@@ -7,7 +7,7 @@
  */
 import type { Host } from "./hosts.js";
 
-export type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<{
+export type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string; redirect?: "error" }) => Promise<{
   status: number;
   ok: boolean;
   json(): Promise<unknown>;
@@ -136,7 +136,8 @@ async function pause(client: Client, seconds: number): Promise<void> {
  */
 async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
-    const res = await client.fetch(url, init);
+    // 別のホストへの転送を追わない（PAT を載せた要求を焼き込んだ通信先の外へ出さない）
+    const res = await client.fetch(url, { ...init, redirect: "error" });
     note(client, res);
     if (res.status === 401) {
       throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
@@ -292,7 +293,8 @@ export async function recentRefs(client: Client, owner: string, repo: string, si
 }
 
 export interface PathObject {
-  readonly type: "tree" | "blob";
+  /** `link` はシンボリックリンク（GitLab は tree の mode 120000 で見分ける。GitHub のパスで引く GraphQL は見分けない） */
+  readonly type: "tree" | "blob" | "link";
   readonly oid: string;
 }
 
@@ -716,6 +718,16 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
 }
 
 // ---- 段階 5: 「始める」（8.6）。issue の一覧と、親のブランチを作る -------------------------------
+
+/** 全部のブランチの名前を読むページの上限（100 × 50）。超えたら読み切れないので止める（「始める」の重なりの検査） */
+export const BRANCH_PAGES = 50;
+
+/** 全部のブランチの名前（「始める」が大文字小文字を畳んで重なりを見る。直近 N 日の上限を掛けない） */
+export async function branchNames(client: Client, owner: string, repo: string): Promise<string[]> {
+  const { items, more } = await restPages(client, `${repoPath(owner, repo)}/branches?per_page=100`, BRANCH_PAGES);
+  if (more) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行う");
+  return (items as { name?: unknown }[]).map((b) => b.name).filter((n): n is string => typeof n === "string");
+}
 
 export interface Issue {
   readonly number: number;

@@ -10,8 +10,12 @@
  * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、打ち消す（D21 の 1 段目）。`seq` は書かない（2 段目）。
  *
  * MR のスレッドとレビューの写し（`reviewCopy`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
- * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の落とし方（jq の `//`）で組む。同じ見本
- * （test/fixtures/host/gitlab/）から同じ写しになることを試験が見る。
+ * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の落とし方（jq の `//`・`tostring`、型は jq と同じく
+ * そのまま写す）で組む。同じ見本（test/fixtures/host/gitlab/。手で組んだもの）から同じ写しになることを試験が見る。
+ *
+ * レビューの後（11.9.1）: 書き込みの update・delete には `last_commit_id`（そのファイルを最後に変えたコミット）を付け、
+ * 同じファイルを他人が変えていれば GitLab が断る（決定 A。ファイル単位の比較つきの書き込み）。MR は同じプロジェクトから
+ * 出たもの（`source_project_id`）だけを拾う（フォークの MR を拾わない）。転送は追わない（`redirect: "error"`）。
  */
 import type { Host } from "./hosts.js";
 import {
@@ -70,7 +74,8 @@ async function pause(client: Client, seconds: number): Promise<void> {
 /** 1 回の呼び出し。401 は差し替えを促し、429（レート制限）は Retry-After が短ければ 1 回だけ待ち直す */
 async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
-    const res = await client.fetch(url, init);
+    // 別のホストへの転送を追わない（PAT を載せた要求を焼き込んだ通信先の外へ出さない）
+    const res = await client.fetch(url, { ...init, redirect: "error" });
     if (res.status === 401) throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
     if (res.status === 429) {
       const after = header(res, "retry-after");
@@ -212,7 +217,9 @@ export async function pathObjects(client: Client, owner: string, repo: string, c
     const name = cut < 0 ? path : path.slice(cut + 1);
     if (!dirs.has(dir)) dirs.set(dir, await listTree(client, owner, repo, commit, dir, false));
     const hit = (dirs.get(dir) ?? []).find((e) => e.name === name);
-    out[p] = hit && (hit.type === "tree" || hit.type === "blob") ? { type: hit.type, oid: checkOid(hit.id) } : null;
+    // シンボリックリンク（mode 120000）は中身を読まず、読む側が「決まらない」にする
+    const type = hit?.type === "tree" ? "tree" : hit?.type === "blob" ? (hit.mode === "120000" ? "link" : "blob") : null;
+    out[p] = hit && type ? { type, oid: checkOid(hit.id) } : null;
   }
   return out;
 }
@@ -231,7 +238,8 @@ export async function tree(client: Client, owner: string, repo: string, _oid: st
   return out;
 }
 
-const DECODER = new TextDecoder("utf-8", { fatal: true });
+/** BOM を落とさない（落とすと、打ち消しで戻すバイト列が元と変わる） */
+const DECODER = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 function fromBase64(text: string): Uint8Array {
   const bin = atob(text.replace(/\s+/g, ""));
@@ -331,10 +339,30 @@ export async function commitParents(client: Client, owner: string, repo: string,
 
 // ---- MR（8.9・8.10） ------------------------------------------------------------------------
 
-/** 親のブランチの開いた MR（sh の `find_mr` と同じ: `merge_requests?state=opened&source_branch=<branch>` の先頭） */
+/** プロジェクトの数の id（MR が同じプロジェクトから出たかを見る） */
+async function projectId(client: Client, owner: string, repo: string): Promise<number> {
+  const { status, body } = await get(client, project(owner, repo));
+  const id = (body as { id?: unknown } | null)?.id;
+  if (status === 404 || typeof id !== "number") throw new HostError(`プロジェクト ${owner}/${repo} の id を読めない`, status);
+  return id;
+}
+
+type MrItem = { iid?: unknown; web_url?: unknown; source_project_id?: unknown };
+
+/** 開いた MR のうち、このプロジェクトのブランチから出たもの（フォークの同じ名前のブランチの MR を拾わない） */
+async function openMrs(client: Client, owner: string, repo: string, branch: string, extra = ""): Promise<MrItem[]> {
+  const pid = await projectId(client, owner, repo);
+  const { status, body } = await get(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}${extra}`);
+  if (status === 404 || !Array.isArray(body)) return [];
+  return (body as MrItem[]).filter((m) => m && m.source_project_id === pid);
+}
+
+/**
+ * 親のブランチの開いた MR（sh の `find_mr` と同じ: `merge_requests?state=opened&source_branch=<branch>` のうち、
+ * `source_project_id` がこのプロジェクトのものの先頭）
+ */
 export async function openMr(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; url: string } | null> {
-  const { status, body } = await get(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}`);
-  const first = status === 404 || !Array.isArray(body) ? undefined : (body[0] as { iid?: unknown; web_url?: unknown } | undefined);
+  const first = (await openMrs(client, owner, repo, branch))[0];
   if (!first) return null;
   if (typeof first.iid !== "number" || !Number.isInteger(first.iid)) throw new HostError("MR の番号を読めない");
   return { number: first.iid, url: String(alt(first.web_url, "")) };
@@ -342,10 +370,8 @@ export async function openMr(client: Client, owner: string, repo: string, branch
 
 /** 親のブランチの開いた MR に付いている Approve（8.10。`merge_requests/:iid/approvals` の `approved_by`） */
 export async function pullApprovals(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; approvals: number }[]> {
-  const { status, body } = await get(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}&per_page=30`);
-  if (status === 404 || !Array.isArray(body)) return [];
   const out: { number: number; approvals: number }[] = [];
-  for (const mr of body as { iid?: unknown }[]) {
+  for (const mr of await openMrs(client, owner, repo, branch, "&per_page=30")) {
     if (typeof mr.iid !== "number" || !Number.isInteger(mr.iid)) continue;
     const got = await get(client, `${project(owner, repo)}/merge_requests/${mr.iid}/approvals`);
     const by = (got.body as { approved_by?: unknown } | null)?.approved_by;
@@ -358,7 +384,7 @@ export async function pullApprovals(client: Client, owner: string, repo: string,
 /** sh の読みの上限と同じ（20 ページを超えたら止める） */
 const THREAD_PAGES = 20;
 
-type Note = { id?: unknown; body?: unknown; created_at?: unknown; resolvable?: unknown; resolved?: unknown; author?: { username?: unknown } | null; position?: { new_path?: unknown; new_line?: unknown } | null };
+type Note = { id?: unknown; body?: unknown; created_at?: unknown; resolvable?: unknown; resolved?: unknown; author?: { id?: unknown; username?: unknown } | null; position?: { new_path?: unknown; new_line?: unknown } | null };
 
 /**
  * MR のスレッド（sh の `threads` の GitLab の枝と同じ読み方）。最初のノートが解決できる discussion だけ。
@@ -374,15 +400,16 @@ export async function discussions(client: Client, owner: string, repo: string, n
     if (alt(first.resolvable, false) === false) continue;
     const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
     const pos = first.position ?? null;
+    // jq と同じく、欄の型はそのまま写す（文字列の行番号を数に直さない）。書き手は username でなく id（11.9.1 の 15）
     out.push({
       id: tostring(d.id),
       resolved: resolvable.every((n) => alt(n.resolved, false) !== false),
       url: `${mrUrl}#note_${tostring(first.id)}`,
-      path: String(alt(pos?.new_path, "")),
-      line: Number(alt(pos?.new_line, 0)),
-      body: String(alt(first.body, "")),
-      created_at: String(alt(first.created_at, "")),
-      author: String(alt(first.author?.username, "")),
+      path: alt(pos?.new_path, "") as string,
+      line: alt(pos?.new_line, 0) as number,
+      body: alt(first.body, "") as string,
+      created_at: alt(first.created_at, "") as string,
+      author: tostring(alt(first.author?.id, "")),
     });
   }
   return out;
@@ -391,12 +418,17 @@ export async function discussions(client: Client, owner: string, repo: string, n
 /** MR のレビュアーの状態（sh の `reviews` の GitLab の枝と同じ）。`requested_changes` を CHANGES_REQUESTED に寄せる */
 export async function reviewers(client: Client, owner: string, repo: string, number: number, mrUrl: string): Promise<PullReview[]> {
   const all = await pages(client, `${project(owner, repo)}/merge_requests/${number}/reviewers`, THREAD_PAGES, `MR !${number} のレビュアー`);
-  return (all as { state?: unknown; updated_at?: unknown; created_at?: unknown; user?: { id?: unknown; username?: unknown } | null }[]).map((r) => ({
-    state: r.state === "requested_changes" ? "CHANGES_REQUESTED" : asciiUpcase(String(alt(r.state, ""))),
-    url: mrUrl,
-    submitted_at: String(alt(r.updated_at, alt(r.created_at, ""))),
-    author: tostring(alt(r.user?.id, alt(r.user?.username, ""))),
-  }));
+  return (all as { state?: unknown; updated_at?: unknown; created_at?: unknown; user?: { id?: unknown; username?: unknown } | null }[]).map((r) => {
+    const raw = alt(r.state, "");
+    // jq の ascii_upcase は文字列でなければ落ちる（sh は写しを組めずに止まる）。同じく止める
+    if (r.state !== "requested_changes" && typeof raw !== "string") throw new HostError(`MR !${number} のレビュアーの state が文字列でない`);
+    return {
+      state: r.state === "requested_changes" ? "CHANGES_REQUESTED" : asciiUpcase(raw as string),
+      url: mrUrl,
+      submitted_at: alt(r.updated_at, alt(r.created_at, "")) as string,
+      author: tostring(alt(r.user?.id, alt(r.user?.username, ""))),
+    };
+  });
 }
 
 export interface GitLabReviewCopy {
@@ -416,8 +448,9 @@ export async function reviewCopy(client: Client, owner: string, repo: string, br
   return { host: "gitlab", mr, threads, reviews, fetched_at: new Date().toISOString() };
 }
 
-/** compare の変更の一覧を打ち切られたとみなす件数（GitLab の既定の差分の上限。確認事項 2 で確かめる） */
+/** compare の変更の一覧を打ち切られたとみなす件数（GitLab の既定の差分の上限。確認事項 9 で確かめる）。上限に近ければ（9 割）打ち切られたとみなす */
 export const COMPARE_FILES_LIMIT = 1000;
+export const COMPARE_FILES_NEAR = 900;
 
 /**
  * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス（8.9）。`base` が `head` の祖先でなければ
@@ -432,9 +465,12 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   const { status, body } = await get(client, `${project(owner, repo)}/repository/compare?from=${b}&to=${h}`);
   const res = (body ?? {}) as { diffs?: unknown; compare_timeout?: unknown };
   if (status === 404 || res.compare_timeout === true || !Array.isArray(res.diffs)) return { base: b, head: h, files: null };
-  if (res.diffs.length >= COMPARE_FILES_LIMIT) return { base: b, head: h, files: null };
+  if (res.diffs.length >= COMPARE_FILES_NEAR) return { base: b, head: h, files: null };
+  // 行数などで畳まれた・大きすぎる差分があれば、一覧が揃っていると言えない（動いたと数える。11.9.1 の 9）
+  const diffs = res.diffs as { old_path?: unknown; new_path?: unknown; collapsed?: unknown; too_large?: unknown }[];
+  if (diffs.some((d) => d?.collapsed === true || d?.too_large === true)) return { base: b, head: h, files: null };
   const files: string[] = [];
-  for (const d of res.diffs as { old_path?: unknown; new_path?: unknown }[]) {
+  for (const d of diffs) {
     if (typeof d.new_path === "string") files.push(d.new_path);
     if (typeof d.old_path === "string" && d.old_path !== d.new_path) files.push(d.old_path);
   }
@@ -443,11 +479,19 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
 
 // ---- 書き込み（8.4 の 1 段目） -----------------------------------------------------------------
 
-/** 書くもの 1 つ（Commits API の action）。中身は base64 */
+/** 書くもの 1 つ（Commits API の action）。中身は base64。`last` はそのファイルを最後に変えたと呼び手が知っているコミット */
 export interface GitLabAction {
   readonly op: "create" | "update" | "delete";
   readonly path: string;
   readonly contents?: string;
+  readonly last?: string;
+}
+
+/** `ref` の上でそのファイルを最後に変えたコミット（`repository/files/:path?ref=` の `last_commit_id`）。無ければ投げる */
+export async function lastCommit(client: Client, owner: string, repo: string, ref: string, path: string): Promise<string> {
+  const { status, body } = await get(client, `${project(owner, repo)}/repository/files/${encodeURIComponent(checkPath(path))}?ref=${checkOid(ref)}`);
+  if (status === 404) throw new HostError(`${path} が ${ref.slice(0, 7)} に無い（書き換える・消すものが無い）`, 409);
+  return checkOid((body as { last_commit_id?: unknown } | null)?.last_commit_id);
 }
 
 /** 書いた答え。`parent` は GitLab が実際に積んだ先（読んだ先頭と違えば、間に別の書き込みが入った） */
@@ -474,15 +518,23 @@ export async function createCommit(
   const name = checkBranch(branch);
   const now = await branchHead(client, owner, repo, name);
   if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が読んだものと違う（書く前に動いた）`, 409);
-  const payload = {
-    branch: name,
-    commit_message: body ? `${headline}\n\n${body}` : headline,
-    actions: actions.map((a) =>
+  // update・delete には、そのファイルを最後に変えたコミットを付ける（決定 A）。呼び手が知っていればそれ（打ち消しは自分の
+  // コミット）、無ければ読んだ先頭の上の値。その後に他人が変えていれば GitLab が断る（400。ここでは 409 にする）
+  const out: Record<string, unknown>[] = [];
+  for (const a of actions) {
+    const file = checkPath(a.path);
+    if (a.op === "create") {
+      out.push({ action: "create", file_path: file, content: a.contents ?? "", encoding: "base64" });
+      continue;
+    }
+    const last = a.last ? checkOid(a.last) : await lastCommit(client, owner, repo, expected, file);
+    out.push(
       a.op === "delete"
-        ? { action: "delete", file_path: checkPath(a.path) }
-        : { action: a.op, file_path: checkPath(a.path), content: a.contents ?? "", encoding: "base64" },
-    ),
-  };
+        ? { action: "delete", file_path: file, last_commit_id: last }
+        : { action: "update", file_path: file, content: a.contents ?? "", encoding: "base64", last_commit_id: last },
+    );
+  }
+  const payload = { branch: name, commit_message: body ? `${headline}\n\n${body}` : headline, actions: out };
   const res = await post(client, `${project(owner, repo)}/repository/commits`, payload);
   if (res.status === 400 || res.status === 409 || res.status === 422) {
     const why = (res.body as { message?: unknown } | null)?.message;
@@ -512,6 +564,21 @@ export async function issues(client: Client, owner: string, repo: string): Promi
     out.push({ number: i.iid, title: String(alt(i.title, "")), url: String(alt(i.web_url, "")) });
   }
   return out;
+}
+
+/** 全部のブランチの名前を読むページの上限（100 × 50）。超えたら読み切れないので止める（「始める」の重なりの検査） */
+export const BRANCH_PAGES = 50;
+
+/** 全部のブランチの名前（「始める」が大文字小文字を畳んで重なりを見る） */
+export async function branchNames(client: Client, owner: string, repo: string): Promise<string[]> {
+  const all: string[] = [];
+  for (let page = 1; ; page += 1) {
+    const { status, body } = await get(client, `${project(owner, repo)}/repository/branches?per_page=100&page=${page}`);
+    if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} のブランチを読めない`);
+    for (const b of body as { name?: unknown }[]) if (typeof b.name === "string") all.push(b.name);
+    if (body.length < 100) return all;
+    if (page >= BRANCH_PAGES) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行う");
+  }
 }
 
 /** ブランチを `sha` から作る（`POST repository/branches`）。既にあれば断られる（400） */

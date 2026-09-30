@@ -40,6 +40,7 @@ export type HostOp =
   | "reviewCopy"
   | "compareFiles"
   | "issues"
+  | "branchNames"
   | "createBranch"
   | "commit";
 
@@ -86,6 +87,8 @@ function fromBoard(sender: Sender): boolean {
 
 export interface Deps {
   readonly hosts: readonly Host[];
+  /** 同梱の ccnavi の互換の版（「始める」の前に統合先の CCNAVI_COMPAT と比べる。無ければ比べずに断る） */
+  readonly compat?: number;
   readonly extensionId: string;
   readonly base: string;
   readonly fetch: github.Fetch;
@@ -186,8 +189,11 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
   const counter: github.Counter = { rest: 0, graphql: 0 };
   const seen = { expiration: "" };
   const client: github.Client = { host, token, fetch: deps.fetch, counter, seen, sleep: deps.sleep };
+  let gitlabOk = false;
   try {
-    return await hostOp(client, op, args, counter, deps);
+    const res = await hostOp(client, op, args, counter, deps);
+    gitlabOk = res.ok && host.kind === "gitlab";
+    return res;
   } finally {
     // 応答から期限を読めたら控える（D25。ホストの値が正）
     const iso = seen.expiration ? github.parseExpiration(seen.expiration) : "";
@@ -195,7 +201,8 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
       const meta = await deps.getMeta(host.id);
       if (meta.host !== iso) await deps.setMeta(host.id, { ...meta, host: iso });
     }
-    if (host.kind === "gitlab") await gitlabExpiry(client, deps);
+    // GitLab の期限は、受けた頼みがホストに届いたときだけ聞く（断った頼みでは外へ出ない）
+    if (gitlabOk) await gitlabExpiry(client, deps);
   }
 }
 
@@ -225,6 +232,8 @@ function refuse(error: string): Response {
 interface Addition extends github.FileAddition {
   /** GitLab の Commits API の action（作るか書き換えるか）。GitHub は使わない */
   readonly op?: "create" | "update";
+  /** GitLab: そのファイルを最後に変えたと書き手が知っているコミット（打ち消し。決定 A） */
+  readonly last?: string;
 }
 
 function commitArgs(args: unknown[]) {
@@ -235,14 +244,16 @@ function commitArgs(args: unknown[]) {
   }
   if (additions.length + deletions.length === 0) throw new Error("書くものが無い");
   const adds: Addition[] = additions.map((x: unknown) => {
-    const e = x as { path?: unknown; contents?: unknown; op?: unknown };
+    const e = x as { path?: unknown; contents?: unknown; op?: unknown; last?: unknown };
     if (typeof e.contents !== "string" || e.contents.length > MAX_CONTENTS || !BASE64.test(e.contents)) {
       throw new Error("contents が base64 でないか大きすぎる");
     }
     if (e.op !== undefined && e.op !== "create" && e.op !== "update") throw new Error("op は create か update");
-    return { path: github.checkPath(e.path), contents: e.contents, ...(e.op ? { op: e.op } : {}) };
+    return { path: github.checkPath(e.path), contents: e.contents, ...(e.op ? { op: e.op } : {}), ...(e.last !== undefined ? { last: github.checkOid(e.last) } : {}) };
   });
-  const dels = deletions.map((p: unknown) => github.checkPath(p));
+  const dels = deletions.map((p: unknown) =>
+    typeof p === "string" ? { path: github.checkPath(p) } : { path: github.checkPath((p as { path?: unknown })?.path), last: github.checkOid((p as { last?: unknown })?.last) },
+  );
   if (typeof body !== "string" || body.length > MAX_BODY) throw new Error(`コミットの本文は ${MAX_BODY} 字までの文字列`);
   return { name, expected: github.checkOid(expected), headline: text(headline, "コミットの見出し", MAX_HEADLINE), body, adds, dels };
 }
@@ -292,6 +303,44 @@ async function workspaceOf(deps: Deps, cfg: RepoConfig): Promise<{ client: githu
   return { client, cfg: ws, integ, head };
 }
 
+/** 統合先の先頭で読むファイルの本文（無ければ null） */
+async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path: string): Promise<string | null> {
+  const a = api(client);
+  const obj = (await a.pathObjects(client, cfg.owner, cfg.repo, head, [path]))[path];
+  if (!obj) return null;
+  if (obj.type !== "blob") throw new Error(`${path} を読めない（ファイルでない）`);
+  const blob = (await a.blobs(client, cfg.owner, cfg.repo, [obj.oid]))[obj.oid];
+  if (!blob || blob.binary || blob.text === null) throw new Error(`${path} を読めない`);
+  return blob.text;
+}
+
+/** 互換の印の綴り（`ccnavi_chrome.COMPAT_FILE`） */
+const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
+
+/**
+ * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（8.6。二重の守り）: 閉じた識別子（`done/` の名前を
+ * 大文字小文字を畳んで）と互換の版（ワークスペースの統合先の CCNAVI_COMPAT と同梱の版）。空なら作ってよい
+ */
+async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string, head: string, name: string): Promise<string> {
+  const { places } = await placesAt(deps, client, cfg, integ);
+  const ws = cfg.project ? await workspaceOf(deps, cfg) : { client, cfg, integ, head };
+  const text = await fileAt(ws.client, ws.cfg, ws.head, COMPAT_FILE);
+  const theirs = text === null ? null : Number(/^CCNAVI_COMPAT=(\d+)\s*$/m.exec(text)?.[1] ?? NaN);
+  if (deps.compat === undefined || theirs === null || theirs !== deps.compat) {
+    return `統合先の互換の版（${theirs ?? "無い"}）と拡張の互換の版（${deps.compat ?? "不明"}）が違うので作らない（ADR-0093 の 7.3）`;
+  }
+  const a = api(client);
+  const done = `${places.approved}/done`;
+  const obj = (await a.pathObjects(client, cfg.owner, cfg.repo, head, [done]))[done];
+  if (obj && obj.type === "tree") {
+    const entries = client.host.kind === "gitlab" ? await gitlab.tree(client, cfg.owner, cfg.repo, obj.oid, head, done) : await github.tree(client, cfg.owner, cfg.repo, obj.oid);
+    const folded = name.toLowerCase();
+    const hit = entries.find((e) => !e.path.includes("/") && e.path.toLowerCase() === `${folded}.md`);
+    if (hit) return `${name} は統合先 ${integ} の done/ で閉じている（閉じた識別子は使い直さない。ADR-0093 の 3.1 の 5）`;
+  }
+  return "";
+}
+
 /** 「始める」で作るブランチの名前の形（issue から決める形。3.1 の 4・7）。プロジェクトなら頭に `<名前>-` */
 function startName(name: unknown, cfg: RepoConfig): string {
   const branch = github.checkBranch(name);
@@ -315,6 +364,12 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
   const o = lab ? gitlab.checkNamespace(owner) : github.checkName(owner, "owner");
   const r = github.checkName(repo, "repo");
   const x = api(client);
+  // 読み取りも、設定画面で登録したリポジトリ（プロジェクトのワークスペースも登録したもの）だけ受ける（11.9.1 の 8）
+  const known = await registeredRepo(deps, client, o, r);
+  if (!known) {
+    const why = `${o}/${r} は設定画面に登録していないリポジトリなので${op === "commit" || op === "createBranch" ? "書かない" : "読まない"}`;
+    return op === "commit" || op === "createBranch" ? refuse(why) : { ok: false, error: why };
+  }
   let value: unknown;
   switch (op) {
     case "repoInfo":
@@ -377,17 +432,27 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       } catch (err) {
         return refuse(`統合先 ${integ} の置き場の綴りを読めないので書かない（${(err as Error).message}）`);
       }
-      const why = writeRefusal(checked.name, integ, [...checked.adds.map((e) => e.path), ...checked.dels], places);
+      const why = writeRefusal(checked.name, integ, [...checked.adds.map((e) => e.path), ...checked.dels.map((d) => d.path)], places);
       if (why) return refuse(why);
       if (lab) {
         if (checked.adds.some((e) => !e.op)) return refuse("GitLab へ書くときは作るか書き換えるか（op）が要る");
         const actions: gitlab.GitLabAction[] = [
-          ...checked.adds.map((e) => ({ op: e.op as "create" | "update", path: e.path, contents: e.contents })),
-          ...checked.dels.map((p) => ({ op: "delete" as const, path: p })),
+          ...checked.adds.map((e) => ({ op: e.op as "create" | "update", path: e.path, contents: e.contents, ...(e.last ? { last: e.last } : {}) })),
+          ...checked.dels.map((d) => ({ op: "delete" as const, path: d.path, ...(d.last ? { last: d.last } : {}) })),
         ];
         value = await gitlab.createCommit(client, o, r, checked.name, checked.expected, checked.headline, checked.body, actions);
       } else {
-        const oid = await github.createCommit(client, o, r, checked.name, checked.expected, checked.headline, checked.body, checked.adds, checked.dels);
+        const oid = await github.createCommit(
+          client,
+          o,
+          r,
+          checked.name,
+          checked.expected,
+          checked.headline,
+          checked.body,
+          checked.adds.map((e) => ({ path: e.path, contents: e.contents })),
+          checked.dels.map((d) => d.path),
+        );
         // expectedHeadOid で書いたので、親は読んだ先頭に決まる
         value = { oid, parent: checked.expected };
       }
@@ -404,6 +469,9 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     case "compareFiles":
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
       value = await x.compareFiles(client, o, r, github.checkOid(a), github.checkOid(b));
+      break;
+    case "branchNames":
+      value = await x.branchNames(client, o, r);
       break;
     case "issues":
       // 「始める」（段階 5）: 開いた issue の一覧。読むだけ。登録したリポジトリだけ
@@ -427,7 +495,17 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
       if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が読んだものと違う。ボードを更新してから始め直す`);
-      if ((await x.branchHead(client, o, r, name)) !== null) return refuse(`${name} は既にある`);
+      // 統合先の今の先頭で確かめ直す（Python の答えを信じない。11.9.1 の 7）: 大文字小文字を畳んだ重なり・閉じた識別子・互換の版
+      const folded = name.toLowerCase();
+      const same = (await x.branchNames(client, o, r)).filter((n) => n.toLowerCase() === folded);
+      if (same.length > 0) return refuse(`${name} は既にある（${same.join(", ")}）`);
+      let guard: string;
+      try {
+        guard = await startGuard(deps, client, cfg, integ, head, name);
+      } catch (err) {
+        return refuse(`統合先 ${integ} を確かめられないので作らない（${(err as Error).message}）`);
+      }
+      if (guard) return refuse(guard);
       value = { name, head: await x.createBranch(client, o, r, name, head) };
       break;
     }

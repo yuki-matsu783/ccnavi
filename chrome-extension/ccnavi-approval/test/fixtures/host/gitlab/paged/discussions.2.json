@@ -8,7 +8,7 @@
         "type": "DiffNote",
         "body": "2 ページ目の指摘 0",
         "author": {
-          "id": 112,
+          "id": 202,
           "username": "lab-reviewer",
           "name": "lab-reviewer"
         },
@@ -38,7 +38,7 @@
         "type": "DiffNote",
         "body": "2 ページ目の指摘 1",
         "author": {
-          "id": 112,
+          "id": 202,
           "username": "lab-reviewer",
           "name": "lab-reviewer"
         },
@@ -68,7 +68,7 @@
         "type": "DiffNote",
         "body": "2 ページ目の指摘 2",
         "author": {
-          "id": 112,
+          "id": 202,
           "username": "lab-reviewer",
           "name": "lab-reviewer"
         },

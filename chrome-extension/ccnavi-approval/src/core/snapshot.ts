@@ -111,7 +111,10 @@ export class Reader {
     for (const p of paths) {
       const obj = objects[p];
       if (!obj) continue;
-      if (obj.type === "blob") {
+      if (obj.type === "link") {
+        // シンボリックリンク（GitLab が mode で見分けたもの）は読まない。Python が「決まらない」にする
+        if (!links.includes(p)) links.push(p);
+      } else if (obj.type === "blob") {
         wanted.push({ path: p, sha: obj.oid });
       } else {
         // GitLab は tree の sha でなく、コミットとパスで引く（GitHub は後ろの 2 つを使わない）

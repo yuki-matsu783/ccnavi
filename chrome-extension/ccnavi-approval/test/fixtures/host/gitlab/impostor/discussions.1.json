@@ -8,7 +8,7 @@
         "type": "DiscussionNote",
         "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
         "author": {
-          "id": 107,
+          "id": 201,
           "username": "lab-bot",
           "name": "lab-bot"
         },
@@ -29,7 +29,7 @@
         "type": "DiscussionNote",
         "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -50,7 +50,7 @@
         "type": "DiscussionNote",
         "body": "全体の方針について",
         "author": {
-          "id": 112,
+          "id": 202,
           "username": "lab-reviewer",
           "name": "lab-reviewer"
         },
@@ -65,7 +65,7 @@
         "type": "DiscussionNote",
         "body": "追加の指摘",
         "author": {
-          "id": 112,
+          "id": 202,
           "username": "lab-reviewer",
           "name": "lab-reviewer"
         },

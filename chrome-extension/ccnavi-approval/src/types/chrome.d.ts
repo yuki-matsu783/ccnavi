@@ -44,3 +44,5 @@ declare namespace chrome {
 // ビルドが焼き込む通信先（scripts/build.js の define）。
 declare const __CCNAVI_HOSTS__: import("../core/hosts.js").Host[];
 declare const __CCNAVI_VERSION__: string;
+/** 同梱の ccnavi の互換の版（`ccnavi/version.py` の COMPAT。ビルドが焼き込む） */
+declare const __CCNAVI_COMPAT__: number;

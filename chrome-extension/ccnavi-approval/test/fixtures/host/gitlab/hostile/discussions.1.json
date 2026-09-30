@@ -8,7 +8,7 @@
         "type": "DiffNote",
         "body": "<script>window.__pwned = 'gl-script'</script>スクリプトの指摘",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -38,7 +38,7 @@
         "type": "DiffNote",
         "body": "<img src=\"x\" onerror=\"window.__pwned = 'gl-img'\">画像の指摘",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -68,7 +68,7 @@
         "type": "DiffNote",
         "body": "[クリック](javascript:window.__pwned='gl-link')",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -98,7 +98,7 @@
         "type": "DiffNote",
         "body": "<a href=\"jav&#x61;script:window.__pwned='gl-entity'\">実体参照で崩したスキーム</a>",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -128,7 +128,7 @@
         "type": "DiffNote",
         "body": "<svg onload=\"window.__pwned='gl-svg'\"><circle r=\"4\"/></svg>",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -158,7 +158,7 @@
         "type": "DiffNote",
         "body": "<p style=\"display:none\" hidden>隠れた本文</p><details><summary>畳んだ</summary>中身</details>",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -188,7 +188,7 @@
         "type": "DiffNote",
         "body": "<!-- 見えないコメント -->見える本文",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },
@@ -218,7 +218,7 @@
         "type": "DiffNote",
         "body": "[普通のリンク](https://example.com/ok)",
         "author": {
-          "id": 107,
+          "id": 203,
           "username": "mallory",
           "name": "mallory"
         },

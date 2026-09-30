@@ -80,17 +80,20 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（家族）は無い"));
   }
   for (const f of board.families) {
+    const why = extras.attention?.[f.family.name];
+    // 「要確認」の家族には、このブラウザでは書くボタンを出さない（人が確かめて外すまで。11.9.1 の決定 B）
     const box = renderFamily(
       doc,
       md,
       f,
-      actions && {
-        approve: () => actions.approve(board, f),
-        withdraw: (t) => actions.withdraw(board, f, t),
-        review: actions.review ? (n: number) => actions.review?.(board, f, n) : undefined,
-      },
+      why || !actions
+        ? undefined
+        : {
+            approve: () => actions.approve(board, f),
+            withdraw: (t) => actions.withdraw(board, f, t),
+            review: actions.review ? (n: number) => actions.review?.(board, f, n) : undefined,
+          },
     );
-    const why = extras.attention?.[f.family.name];
     if (why) box.insertBefore(attention(doc, why, actions?.dismiss ? () => actions.dismiss?.(board, f.family.name) : undefined), box.children[1] ?? null);
     section.append(box);
   }
@@ -114,6 +117,9 @@ function attention(doc: Document, text: string, onDismiss?: () => void): HTMLEle
   const box = el(doc, "div", "attention");
   box.dataset.testid = "attention";
   box.append(notice(doc, "error", `要確認: ${text}`));
+  box.append(
+    el(doc, "p", "note", "この印はこのブラウザにだけ控えている（ほかの承認者には見えない）。ホストの履歴を確かめて直すまで、この家族にはここから書かない"),
+  );
   if (onDismiss) box.append(button(doc, "確かめた（要確認を外す）", "dismiss", onDismiss));
   return box;
 }

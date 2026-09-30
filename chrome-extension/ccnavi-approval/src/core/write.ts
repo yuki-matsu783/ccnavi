@@ -34,6 +34,8 @@ import { localStamp } from "./stamp.js";
 export const MAX_ROUNDS = 3;
 
 export interface WriteDeps extends ReadDeps {
+  /** ホストの種類（応答が落ちた書き込みの見分け方が違う。無ければ github） */
+  readonly kind?: "github" | "gitlab";
   /** 拡張の版（跡の `version` とコミットの見出し。7.3） */
   readonly version: string;
   /** 待つ（書いた直後の読み取りの遅れ）。無ければ本物の時計。試験は 0 秒にする */
@@ -162,18 +164,69 @@ interface Committed {
   readonly parent: string;
 }
 
-type Attempt = { kind: "written"; oid: string; parent: string } | { kind: "moved" } | { kind: "failed"; message: string };
+type Attempt =
+  | { kind: "written"; oid: string; parent: string }
+  | { kind: "moved" }
+  | { kind: "failed"; message: string }
+  | { kind: "attention"; message: string };
 
-/** 1 コミットを送る。答えは書いたコミットと、その親 */
-async function send(deps: WriteDeps, repo: RepoConfig, family: string, expected: string, message: { headline: string; body: string }, rows: readonly ChangeRow[]): Promise<Committed> {
+/**
+ * 1 コミットを送る。答えは書いたコミットと、その親。`last` を渡すと、書き換える・消す各ファイルに
+ * 「最後に変えたコミット」として付ける（GitLab。打ち消しは自分のコミットを渡す。決定 A）。
+ * 渡さなければ service worker が読んだ先頭の上の値を引いて付ける
+ */
+async function send(
+  deps: WriteDeps,
+  repo: RepoConfig,
+  family: string,
+  expected: string,
+  message: { headline: string; body: string },
+  rows: readonly ChangeRow[],
+  last?: string,
+): Promise<Committed> {
   const { additions, deletions } = fileChanges(rows);
-  return (await deps.call("commit", [repo.owner, repo.repo, family, expected, message.headline, message.body, additions, deletions])) as Committed;
+  const adds = last ? additions.map((x) => (x.op === "update" ? { ...x, last } : x)) : additions;
+  const dels = last ? deletions.map((p) => ({ path: p, last })) : deletions;
+  return (await deps.call("commit", [repo.owner, repo.repo, family, expected, message.headline, message.body, adds, dels])) as Committed;
+}
+
+/** 遡る最初の親の数の上限（応答が落ちた書き込みを探す） */
+const FIND_DEPTH = 20;
+
+/**
+ * 応答が落ちた書き込みを、今の先頭から最初の親を遡って探す（11.9.1 の 1）。見分け方は「書いた中身と親の組」:
+ * そのコミットの上で書いた各パスが書いたとおりで、親の上ではそうでない（この書き込みで変わった）。
+ * GitHub は `expectedHeadOid` で書くので、親が読んだ先頭のものだけ。GitLab は親から最初の親を遡って読んだ先頭に
+ * 届くものだけ（読んだ後に積まれた）。見つからなければ null
+ */
+async function findWritten(deps: WriteDeps, repo: RepoConfig, now: string, read: FamilyRead, rows: readonly ChangeRow[]): Promise<Committed | null> {
+  const parentsOf = async (sha: string) => (await deps.call("commitParents", [repo.owner, repo.repo, sha])) as string[];
+  let at = now;
+  for (let i = 0; i < FIND_DEPTH && at !== read.head; i += 1) {
+    const ps = await parentsOf(at);
+    if (ps.length !== 1) return null;
+    if ((await verifyWritten(deps, repo, at, rows)).length === 0 && (await verifyWritten(deps, repo, ps[0], rows)).length > 0) {
+      if (ps[0] === read.head) return { oid: at, parent: ps[0] };
+      if (deps.kind !== "gitlab") return null;
+      // GitLab: 親から最初の親を遡って読んだ先頭に届くか
+      let back = ps[0];
+      for (let j = 0; j < FIND_DEPTH && back !== read.head; j += 1) {
+        const bp = await parentsOf(back);
+        if (bp.length === 0) return null;
+        back = bp[0];
+      }
+      return back === read.head ? { oid: at, parent: ps[0] } : null;
+    }
+    at = ps[0];
+  }
+  return null;
 }
 
 /**
  * 1 コミットで書く。service worker が形や守りで断ったら（400）、原因を言って失敗にする。
- * ほかの失敗では先頭を読み直し、動いていれば「動いた」（やり直す）。ただし新しい先頭の中身が自分の書いたとおりで、
- * 親が 1 つなら（応答だけが落ちた）、書けたとする（親はその親。GitLab では読んだ先頭と違いうる）。
+ * ほかの失敗では先頭を読み直し、動いていなければ失敗。動いていれば、応答だけが落ちた自分の書き込みを探し
+ * （`findWritten`）、見つかれば書けたとする。見つからず、今の先頭に書いた中身が在るなら（書いたか見分けられない）
+ * 人に回す。無ければ「動いた」（読み直して周を回す）
  */
 async function commitOnce(
   deps: WriteDeps,
@@ -192,9 +245,16 @@ async function commitOnce(
     const now = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
     if (now === null) return { kind: "failed", message: `親のブランチ ${family} がホストから消えた（${text}）` };
     if (now === read.head) return { kind: "failed", message: text };
-    const parents = (await deps.call("commitParents", [repo.owner, repo.repo, now])) as string[];
-    if (parents.length === 1 && (await verifySettled(deps, repo, now, rows)).length === 0) {
-      return { kind: "written", oid: now, parent: parents[0] };
+    for (let i = 0; i < VERIFY_TRIES; i += 1) {
+      const found = await findWritten(deps, repo, now, read, rows);
+      if (found) return { kind: "written", ...found };
+      if (i + 1 < VERIFY_TRIES) await (deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(VERIFY_WAIT_MS);
+    }
+    if ((await verifyWritten(deps, repo, now, rows)).length === 0) {
+      return {
+        kind: "attention",
+        message: `${family} へ書いた応答が落ち、書いた中身は先頭に在るが、自分の書き込みを見分けられなかった（${text}）。ホストの履歴を人が確かめる`,
+      };
     }
     return { kind: "moved" };
   }
@@ -225,7 +285,11 @@ type Planned =
   | { readonly kind: "rows"; readonly rows: readonly ChangeRow[]; readonly message: { headline: string; body: string }; readonly lines: readonly string[] }
   | { readonly kind: "stop"; readonly outcome: Outcome };
 
-type Plan = (read: FamilyRead) => Promise<Planned>;
+/**
+ * 読んだ家族と時刻から書くものを決める。時刻（`stamp`）は周ごとに 1 回決め、事後確認の判定し直しにも同じ値を渡す
+ * （時計が進んで跡の `at` が変わるだけで「書くものが違う」にしない。11.9.1 の 2）
+ */
+type Plan = (read: FamilyRead, stamp: string) => Promise<Planned>;
 
 /** 同じ書くものか（パス・作るか書き換えるか消すか・中身のバイト列）。並びは問わない */
 async function sameRows(a: readonly ChangeRow[], b: readonly ChangeRow[]): Promise<boolean> {
@@ -234,6 +298,11 @@ async function sameRows(a: readonly ChangeRow[], b: readonly ChangeRow[]): Promi
   const x = (await Promise.all(a.map(key))).sort();
   const y = (await Promise.all(b.map(key))).sort();
   return x.every((k, i) => k === y[i]);
+}
+
+/** 本文を UTF-8 のバイト列のまま base64 にする（BOM を含めて変えない） */
+function textBase64(text: string): string {
+  return base64(new TextEncoder().encode(text));
 }
 
 /** 自分の書き込みを打ち消す書くもの: 書いた各パスを、自分の書き込みの直前（`parent`）の中身に戻す */
@@ -253,7 +322,10 @@ async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows:
       }
       const blob = obj.type === "blob" ? texts[obj.oid] : undefined;
       if (!blob || blob.binary || typeof blob.text !== "string") return `${row.path} の直前の中身を読めない`;
-      out.push({ op: row.op === "delete" ? "create" : "update", path: row.path, content: blob.text });
+      // バイト列のまま戻す（BOM も落とさない。戻した後に blob の sha で確かめる）
+      const undo: ChangeRow = { op: row.op === "delete" ? "create" : "update", path: row.path, base64: textBase64(blob.text) };
+      if ((await blobSha(rowBytes(undo))) !== obj.oid) return `${row.path} の直前の中身をバイト列のまま読めない`;
+      out.push(undo);
     }
   }
   return out;
@@ -262,19 +334,25 @@ async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows:
 /** 打ち消しを積む回数の上限（8.4 の「2 回で収まらなければ人に回す」） */
 export const REVERT_TRIES = 2;
 
+/** GitLab が書き込みを断ったとき（同じファイルを他人が変えた・無い）の status（`gitlab.createCommit`） */
+const HOST_REFUSED = 409;
+
+/** 書いたが確かめ切れなかった・打ち消せなかったときの答え（人に回す。8.4） */
+function attention(family: string, done: Committed, why: string): Outcome {
+  return {
+    kind: "attention",
+    message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、書いたものを確かめ切れないか打ち消せなかった（${why}）。ホストの履歴を人が確かめる（ADR-0093 の 8.4）`,
+  };
+}
+
 /**
- * 自分の書き込み（`done`）を打ち消す。今の先頭で、書いた各パスがまだ自分の書いたとおりのときだけ積む
- * （後から別の書き手が同じファイルを変えていれば、打ち消すとその変更を消すので人に回す）。
- * 打ち消しがさらに競合したら、間に入った書き込みが同じパスを変えていなければ打ち消しは効いている。
+ * 自分の書き込み（`done`）を打ち消す。今の先頭で、書いた各パスがまだ自分の書いたとおりのときだけ積み、各ファイルに
+ * 「最後に変えたのは自分のコミット」を付ける（GitLab が他人の変更の上に書かないよう断る。決定 A）。
+ * 送った応答が落ちたら、届いたか（今の先頭の親が送った先で、中身が戻したとおり）を見る。打ち消しがさらに競合して
+ * 同じパスが変わっていれば、人に回す。
  */
 async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: Committed, rows: readonly ChangeRow[]): Promise<{ kind: "reverted" } | { kind: "stop"; outcome: Outcome }> {
-  const human = (why: string): { kind: "stop"; outcome: Outcome } => ({
-    kind: "stop",
-    outcome: {
-      kind: "attention",
-      message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、判定が変わったが打ち消せなかった（${why}）。ホストの履歴を人が確かめる（ADR-0093 の 8.4）`,
-    },
-  });
+  const human = (why: string): { kind: "stop"; outcome: Outcome } => ({ kind: "stop", outcome: attention(family, done, why) });
   const undo = await undoRows(deps, repo, done.parent, rows);
   if (typeof undo === "string") return human(undo);
   if (undo.length === 0) return { kind: "reverted" };
@@ -286,11 +364,21 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
     if (touched.length > 0) return human(`後から別の書き込みが同じファイルを変えた: ${touched.join(", ")}`);
     let res: Committed;
     try {
-      res = await send(deps, repo, family, cur, { headline: message.headline, body: `打ち消すコミット: ${done.oid}\n` }, undo);
+      res = await send(deps, repo, family, cur, { headline: message.headline, body: `打ち消すコミット: ${done.oid}\n` }, undo, done.oid);
     } catch (err) {
-      if ((err as { status?: number }).status === REFUSED) return human((err as Error).message ?? String(err));
+      const status = (err as { status?: number }).status;
+      if (status === REFUSED || status === HOST_REFUSED) return human((err as Error).message ?? String(err));
+      // 応答だけが落ちたか: 今の先頭の親が送った先で、中身が戻したとおりなら届いている
+      const now = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
+      if (now !== null && now !== cur) {
+        const ps = (await deps.call("commitParents", [repo.owner, repo.repo, now])) as string[];
+        if (ps.length === 1 && ps[0] === cur && (await verifySettled(deps, repo, now, undo)).length === 0) return { kind: "reverted" };
+      }
       continue;
     }
+    // 戻した後に中身を確かめる（バイト列が元と同じか）
+    const wrong = await verifySettled(deps, repo, res.oid, undo);
+    if (wrong.length > 0) return human(`打ち消した後の中身が戻したものと違う: ${wrong.join(", ")}`);
     if (res.parent === cur) return { kind: "reverted" };
     // 打ち消しの間にも別の書き込みが入った。それが同じパスを変えていなければ打ち消しは効いている
     if ((await verifyWritten(deps, repo, res.parent, rows)).length === 0) return { kind: "reverted" };
@@ -300,8 +388,9 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
 }
 
 /**
- * 事後確認（8.4 の 1 段目）。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の姿で
- * 判定し直す。同じ書くものなら残す（`kept`）。違えば打ち消す（`reverted` で周を回す）。
+ * 事後確認（8.4 の 1 段目）。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の姿で、
+ * 同じ時刻で判定し直す。同じ書くものなら残す（`kept`）。違えば打ち消す（`reverted` で周を回す）。
+ * 途中でホストや Python が落ちたら（429・5xx・MR が消えた など）、書いたものを確かめ切れないので人に回す
  */
 async function settleRace(
   deps: WriteDeps,
@@ -310,16 +399,21 @@ async function settleRace(
   done: Committed,
   planned: Extract<Planned, { kind: "rows" }>,
   plan: Plan,
+  stamp: string,
 ): Promise<{ kind: "kept" } | { kind: "reverted" } | { kind: "stop"; outcome: Outcome }> {
-  let again: Planned | null = null;
   try {
-    again = await plan(await readFamily(repo, family, deps, done.parent));
+    let again: Planned | null = null;
+    try {
+      again = await plan(await readFamily(repo, family, deps, done.parent), stamp);
+    } catch (err) {
+      if (!(err instanceof MovedError) && !(err instanceof PyError)) throw err;
+      again = null;
+    }
+    if (again !== null && again.kind === "rows" && (await sameRows(again.rows, planned.rows))) return { kind: "kept" };
+    return await revert(deps, repo, family, done, planned.rows);
   } catch (err) {
-    if (!(err instanceof MovedError) && !(err instanceof PyError)) throw err;
-    again = null;
+    return { kind: "stop", outcome: attention(family, done, `書いたが確認できなかった: ${(err as Error).message ?? String(err)}`) };
   }
-  if (again !== null && again.kind === "rows" && (await sameRows(again.rows, planned.rows))) return { kind: "kept" };
-  return await revert(deps, repo, family, done, planned.rows);
 }
 
 /** 書く流れの周（8.3 の 2〜5 と、GitLab の事後確認 8.4）。周ごとに家族を読み直して書くものを決め直す */
@@ -328,13 +422,15 @@ async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
       const read = await readOrMoved(repo, family, deps);
       if (read === null) continue;
-      const planned = await plan(read);
+      const stamp = localStamp(deps.now());
+      const planned = await plan(read, stamp);
       if (planned.kind === "stop") return planned.outcome;
       const done = await commitOnce(deps, repo, read, family, planned.message, planned.rows);
       if (done.kind === "failed") return { kind: "failed", message: done.message };
+      if (done.kind === "attention") return { kind: "attention", message: done.message };
       if (done.kind === "moved") continue;
       if (done.parent === read.head) return await finish(deps, repo, done.oid, planned.rows, round, planned.lines);
-      const settled = await settleRace(deps, repo, family, done, planned, plan);
+      const settled = await settleRace(deps, repo, family, done, planned, plan, stamp);
       if (settled.kind === "kept") return await finish(deps, repo, done.oid, planned.rows, round, planned.lines);
       if (settled.kind === "stop") return settled.outcome;
     }
@@ -352,14 +448,14 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
   } catch (err) {
     return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
-  return await writeLoop(repo, family, deps, "承認し直す", async (read) => {
+  return await writeLoop(repo, family, deps, "承認し直す", async (read, stamp) => {
     const res = await py.plan(deps.py, {
       settings: read.settings,
       snapshot: read.input,
       family,
       only: shown.only,
       shown: { ids: shown.ids, digest: shown.digest },
-      stamp: localStamp(deps.now()),
+      stamp,
       actor,
     });
     if (res.mismatch) return { kind: "stop", outcome: { kind: "changed", message: "見せた後に承認待ちの中身が変わった。見直してから承認し直す" } };
@@ -388,7 +484,7 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
   } catch (err) {
     return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
-  return await writeLoop(repo, family, deps, "取り下げ直す", async (read) => {
+  return await writeLoop(repo, family, deps, "取り下げ直す", async (read, stamp) => {
     const prior = await findPrior((op, args) => deps.call(op, [repo.owner, repo.repo, ...args]), read.place, read.head, ident);
     const res = await py.withdraw(deps.py, {
       settings: read.settings,
@@ -397,7 +493,7 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
       ids: [ident],
       prior: prior === null ? {} : { [ident]: prior },
       reason,
-      stamp: localStamp(deps.now()),
+      stamp,
       actor,
     });
     if (res.problems.length > 0 || !res.changes) {
@@ -422,7 +518,7 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
     return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
   const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
-  return await writeLoop(repo, family, deps, "レビュー済みにし直す", async (read) => {
+  return await writeLoop(repo, family, deps, "レビュー済みにし直す", async (read, stamp) => {
     const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
     const res = await askConfirm(deps.py, ask, {
       settings: read.settings,
@@ -430,7 +526,7 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
       family,
       phase,
       copy,
-      stamp: localStamp(deps.now()),
+      stamp,
       actor,
     });
     if (res.problems.length > 0 || !res.changes) {

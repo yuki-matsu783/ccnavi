@@ -131,6 +131,22 @@ elif [ "$sub" != merged ]; then
 	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
 
+# 実行ファイルがそのフラグを知っているか（`--version --json` の flags。ADR-0093 の 11.9.1 の決定 C）。
+# 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで落ちる。印は前と同じ中身になる）。
+# 答えは 1 度だけ引いて控える。`$( )` の中から呼ぶと控えが親に残らないので、親で呼ぶ。
+exe_flags=""
+exe_flags_read=""
+exe_knows() {
+	if [ -z "$exe_flags_read" ]; then
+		exe_flags_read=1
+		exe_flags=$(ccnavi --version --json </dev/null 2>/dev/null | tr -d '\r') || exe_flags=""
+	fi
+	case "$exe_flags" in
+	*"\"$1\""*) return 0 ;;
+	esac
+	return 1
+}
+
 # ---- リモート。origin の URL でホストを見分ける。
 # 人の判断の入口（chat・config-synced）はホストに触らないので、origin も道具も要らない。
 needs_host=yes
@@ -332,9 +348,21 @@ find_mr() {
 		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url}'
 	else
+		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない。ADR-0093 の 11.9.1 の 6）
+		pid=$(project_id) || return 1
 		api GET "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch" |
-			"$JQ" '.[0] // empty | {number: .iid, url: .web_url}'
+			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url}'
 	fi
+}
+
+# GitLab のプロジェクトの数の id。読めなければ 1
+project_id() {
+	pid_out=$(api GET "projects/$(encoded_path)") || return 1
+	pid_val=$(printf '%s' "$pid_out" | "$JQ" -r '.id // empty') || return 1
+	case "$pid_val" in
+	'' | *[!0-9]*) return 1 ;;
+	esac
+	printf '%s' "$pid_val"
 }
 
 # ---- マージリクエストを作る。下書きの 1 行目が題、3 行目からが本文。
@@ -396,7 +424,7 @@ threads() {
 			"$JQ" --arg u "$mr_url" '[.[] | select((.notes // []) | length > 0) | select(.notes[0].resolvable) | . as $d | .notes[0] as $n |
 				{id: ($d.id | tostring), resolved: ([$d.notes[] | select(.resolvable) | .resolved] | all),
 				 url: ($u + "#note_" + ($n.id | tostring)), path: ($n.position.new_path // ""), line: ($n.position.new_line // 0),
-				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: ($n.author.username // "")}]'
+				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring)}]'
 	fi
 }
 
@@ -426,7 +454,7 @@ comment() {
 			"$JQ" '{url: (.html_url // ""), created_at: (.created_at // ""), author: (.user.login // "")}'
 	else
 		api POST "projects/$(encoded_path)/merge_requests/$mr_number/notes" "$body_json" |
-			"$JQ" --arg u "$mr_url" '{url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: (.author.username // "")}'
+			"$JQ" --arg u "$mr_url" '{url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)}'
 	fi
 }
 
@@ -444,7 +472,7 @@ find_posted() {
 	else
 		found_all=$(pages "projects/$(encoded_path)/merge_requests/$1/notes") || return 1
 		printf '%s' "$found_all" | "$JQ" -c --arg m "$3" --arg u "$2" \
-			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: (.author.username // "")}'
+			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)}'
 	fi
 }
 
@@ -693,11 +721,15 @@ merged)
 			exit 3
 		}
 	else
+		pid=$(project_id) || {
+			printf 'unknown\n'
+			exit 3
+		}
 		answer=$(api GET "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
 			printf 'unknown\n'
 			exit 3
 		}
-		found=$(printf '%s' "$answer" | "$JQ" -r '.[0].iid // empty') || {
+		found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0].iid // empty') || {
 			printf 'unknown\n'
 			exit 3
 		}
@@ -716,7 +748,8 @@ confirm)
 		esac
 	done
 	# 印に残すアカウント。ロックを取る前に引く（引けなくても止めない。前と同じ印になる）
-	actor=$(account || :)
+	actor=""
+	exe_knows --actor && actor=$(account || :)
 	log_debug 印のアカウント -- "actor=${actor:+set}"
 	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
 	c1_start "$branch"
@@ -823,7 +856,7 @@ decide)
 	# ロックを取る前に引く。引けなければ渡さず、印も跡も前と同じ。見るだけの --preview は引かない。
 	# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
 	decide_who=""
-	if [ "$preview" -eq 0 ]; then
+	if [ "$preview" -eq 0 ] && exe_knows --actor && exe_knows --via; then
 		decide_actor=$(account || :)
 		log_debug 印のアカウント -- "actor=${decide_actor:+set}"
 		if [ -n "$decide_actor" ]; then

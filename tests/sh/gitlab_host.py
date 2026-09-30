@@ -4,13 +4,17 @@
 （`test/helpers/gitlab-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
 
 - `GET /api/v4/user` → `user.json`（無ければ 403）
-- `GET /api/v4/projects/<namespace>%2F<project>/merge_requests?state=opened&source_branch=<b>`
-  → `b` が `scene.json` のものなら `mrs.json`、違えば `[]`
-- `GET .../merge_requests/<iid>/discussions?page=<N>` → iid が `mrs.json` のものなら
+- `GET /api/v4/projects/<namespace と project を符号化>` → `{"id": 42}`
+  （MR が同じプロジェクトから出たかを見る）
+- `GET .../merge_requests?state=opened&source_branch=<b>` → `b` が `scene.json` のものなら
+  `mrs.json`
+  （フォークの MR を含みうる。呼び手が `source_project_id` で絞る）、違えば `[]`
+- `GET .../merge_requests/<iid>/discussions?page=<N>` → iid が `mrs.json` のどれかなら
   `discussions.<N>.json`（無ければ `[]`。N の既定は 1）
 - `GET .../merge_requests/<iid>/reviewers?page=<N>` → 同じく `reviewers.<N>.json`
 - 依頼の投稿（`GET`/`POST .../merge_requests/<iid>/notes`）は、状態のファイル（環境変数
-  `FAKE_GITLAB_STATE`）に溜めて返す。投稿したアカウントは `FAKE_GITLAB_POSTER`（既定 `lab-bot`）。
+  `FAKE_GITLAB_STATE`）に溜めて返す。投稿したアカウントは id 201
+  （名前は `FAKE_GITLAB_POSTER`、既定 `lab-bot`）。
   見本に置かない（依頼の記録の `poster` を試すため。11.8.1 の決定 C）
 - ほかは 404
 
@@ -23,7 +27,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -63,7 +67,9 @@ def answer(
     if method == "GET" and path == "/user":
         found = _load(scene, "user.json")
         return (200, found) if found is not None else (403, {"message": "403 Forbidden"})
-    base = f"/projects/{meta.get('namespace', '')}%2F{meta.get('project', '')}"
+    # 入れ子のグループ（`acme/team`）も、名前空間とプロジェクトをまとめて符号化する
+    # （`acme%2Fteam%2Fwidgets`）
+    base = "/projects/" + quote(f"{meta.get('namespace', '')}/{meta.get('project', '')}", safe="")
     if method == "GET" and path == base:
         return 200, {"id": 42, "default_branch": "main"}
     if method == "GET" and path == f"{base}/merge_requests":
@@ -71,14 +77,14 @@ def answer(
             return 200, _load(scene, "mrs.json")
         return 200, []
     pieces = path[len(base) + 1 :].split("/") if path.startswith(base + "/") else []
-    iid = str(((_load(scene, "mrs.json") or [{}])[0] or {}).get("iid", ""))
+    iids = {str((m or {}).get("iid", "")) for m in (_load(scene, "mrs.json") or [])}
     if (
         method == "GET"
         and len(pieces) == 3
         and pieces[0] == "merge_requests"
         and pieces[2] in ("discussions", "reviewers")
     ):
-        if pieces[1] != iid:
+        if pieces[1] not in iids:
             return 200, []
         page = query.get("page", "1")
         found = _load(scene, f"{pieces[2]}.{page}.json") if page.isdigit() else None
@@ -87,13 +93,13 @@ def answer(
         posted = _notes(state)
         if method == "GET":
             return 200, posted if query.get("page", "1") == "1" else []
-        if method == "POST" and pieces[1] == iid:
+        if method == "POST" and pieces[1] in iids:
             n = len(posted) + 1
             note = {
                 "id": 7000 + n,
                 "body": json.loads(body or "{}").get("body", ""),
                 "created_at": "2026-09-29T00:00:00.000Z",
-                "author": {"username": os.environ.get("FAKE_GITLAB_POSTER", "lab-bot")},
+                "author": {"id": 201, "username": os.environ.get("FAKE_GITLAB_POSTER", "lab-bot")},
             }
             with open(state, "w", encoding="utf-8") as f:
                 json.dump([*posted, note], f)

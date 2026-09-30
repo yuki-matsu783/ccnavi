@@ -68,7 +68,18 @@ async function writeDeps(repo: RepoConfig): Promise<WriteDeps> {
     stats,
     version: VERSION,
     workspace: workspaceOf(repo, stats),
+    kind: HOSTS.find((h) => h.id === repo.host)?.kind ?? "github",
   };
+}
+
+/** 「要確認」の家族へは、このブラウザから書かない（11.9.1 の決定 B。ボタンを出さないのに加えて、押す前にも見る） */
+async function blocked(repo: RepoConfig, family: string): Promise<boolean> {
+  const why = (await readAttention())[repoKey(repo)]?.[family];
+  if (!why) return false;
+  result.dataset.kind = "refused";
+  result.className = "notice error";
+  result.textContent = `${family} は要確認のまま。ホストの履歴を確かめて「確かめた」を押すまで、ここからは書かない`;
+  return true;
 }
 
 type Attention = Record<string, Record<string, string>>;
@@ -132,6 +143,7 @@ function say(outcome: Outcome, what: string): void {
 const actions: Actions = {
   approve(repoBoard: RepoBoard, family) {
     void act(async () => {
+      if (await blocked(repoBoard.repo, family.family.name)) return false;
       const r = family.result;
       if (!r?.digest || !r.batch) return false;
       const deps = await writeDeps(repoBoard.repo);
@@ -153,6 +165,7 @@ const actions: Actions = {
   },
   review(repoBoard: RepoBoard, family, phase) {
     void act(async () => {
+      if (await blocked(repoBoard.repo, family.family.name)) return false;
       const deps = await writeDeps(repoBoard.repo);
       let warn = "";
       try {
@@ -171,6 +184,7 @@ const actions: Actions = {
   },
   withdraw(repoBoard: RepoBoard, family, ticket) {
     void act(async () => {
+      if (await blocked(repoBoard.repo, family.family.name)) return false;
       const reason = window.prompt(`${ticket} の承認を取り下げて todo/ に戻す。理由（任意）`, "");
       if (reason === null) return false;
       const deps = await writeDeps(repoBoard.repo);
@@ -208,6 +222,7 @@ const actions: Actions = {
   },
   dismiss(repoBoard: RepoBoard, family: string) {
     void (async () => {
+      if (!window.confirm(`${family} の要確認を外す。ホストの履歴を確かめ、親のブランチの置き場が正しいことを確かめたときだけ外す`)) return;
       const all = await readAttention();
       const key = repoKey(repoBoard.repo);
       if (all[key]) delete all[key][family];

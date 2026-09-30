@@ -1,15 +1,17 @@
 /**
- * 録ったホストの応答の見本（test/fixtures/host/gitlab/<場面>/。ADR-0093 の 8.9。段階 5）を返す GitLab の代役。
+ * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/。本物の形に合わせて手で組んだもの。ADR-0093 の 8.9。段階 5）を
+ * 返す GitLab の代役。
  *
  * リポジトリの sh の試験（tests/sh/gitlab_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
  *
- * - `GET /api/v4/projects/<namespace>%2F<project>/merge_requests?state=opened&source_branch=<b>` → `b` が場面のもの
- *   （`scene.json`。差し替えられる）なら `mrs.json`、違えば `[]`
- * - `GET .../merge_requests/<iid>/discussions?page=<N>`・`.../reviewers?page=<N>` → iid が `mrs.json` のものなら
+ * - `GET /api/v4/projects/<namespace と project をまとめて符号化>` → `{"id": 42}`（入れ子のグループも同じ綴り）
+ * - `GET .../merge_requests?state=opened&source_branch=<b>` → `b` が場面のもの（`scene.json`。差し替えられる）なら
+ *   `mrs.json`（フォークの MR を含みうる。呼び手が `source_project_id` で絞る）、違えば `[]`
+ * - `GET .../merge_requests/<iid>/discussions?page=<N>`・`.../reviewers?page=<N>` → iid が `mrs.json` のどれかなら
  *   `discussions.<N>.json`・`reviewers.<N>.json`（無ければ `[]`。N の既定は 1）
  * - `GET /api/v4/user` → `user.json`
  *
- * 期待値（`expected.json`）は sh が見本から組んだ写しで、拡張の試験（CX-T140）は TS が組んだ写しと比べる。
+ * 期待値（`expected.json`）は sh が見本から組んだ写しで、拡張の試験（CX-T144）は TS が組んだ写しと比べる。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -43,22 +45,23 @@ export function loadGitLabScene(name: string): GitLabScene {
   return { name, namespace: meta.namespace, project: meta.project, branch: meta.branch, poster: meta.poster, files };
 }
 
-function iid(scene: GitLabScene): number {
-  return ((scene.files["mrs.json"] as { iid: number }[])[0] ?? { iid: -1 }).iid;
+function iids(scene: GitLabScene): number[] {
+  return (scene.files["mrs.json"] as { iid: number }[]).map((m) => m.iid);
 }
 
 /** 見本に当たる要求なら答え、当たらなければ null（呼び手のほかの道へ）。`u.pathname` は API の根（`/api/v4`）を含む */
 export function gitlabSceneAnswer(scene: GitLabScene, method: string, u: URL): { status: number; json: unknown } | null {
   const p = u.pathname.replace(/^.*?\/api\/v4/, "");
-  const base = `/projects/${scene.namespace}%2F${scene.project}`;
+  const base = `/projects/${encodeURIComponent(`${scene.namespace}/${scene.project}`)}`;
   if (method === "GET" && p === "/user") return { status: 200, json: scene.files["user.json"] };
+  if (method === "GET" && p === base) return { status: 200, json: { id: 42, default_branch: "main" } };
   if (method === "GET" && p === `${base}/merge_requests` && u.searchParams.get("state") === "opened" && u.searchParams.get("source_branch") === scene.branch) {
     return { status: 200, json: scene.files["mrs.json"] };
   }
-  // 名前空間とプロジェクトは英数字と . _ - だけ（見本の約束）。`.` は 1 字に当たっても試験の答えは変わらない
-  const m = new RegExp(`^${base}/merge_requests/(\\d+)/(discussions|reviewers)$`).exec(p);
+  const rest = p.startsWith(`${base}/`) ? p.slice(base.length) : "";
+  const m = /^\/merge_requests\/(\d+)\/(discussions|reviewers)$/.exec(rest);
   if (method === "GET" && m) {
-    if (Number(m[1]) !== iid(scene)) return { status: 200, json: [] };
+    if (!iids(scene).includes(Number(m[1]))) return { status: 200, json: [] };
     const page = u.searchParams.get("page") ?? "1";
     return { status: 200, json: scene.files[`${m[2]}.${page}.json`] ?? [] };
   }
