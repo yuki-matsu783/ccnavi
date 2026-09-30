@@ -1,0 +1,214 @@
+"""レビュー済みの印の `actor` と、依頼の後に動いたかの判定（ADR-0093 の 8.9。段階 4）の受入テスト。
+
+見るのは 4 つ。
+
+1. 手元の `review confirm --actor <アカウント>` は、印に `actor` と `via: cli` を書き、
+   跡にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）印も跡も前と同じ中身
+2. `--actor` の形と、`review confirm` の外で渡されたときは断る
+3. 依頼の後に人が見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）で決める。
+   Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
+4. Chrome のレビュー済みの印は、手元の `--actor` つきの印と経路（`via`）と時刻のほかは同じ
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+
+from ccnavi import history, lint, review, settings, version
+from tests.ticket.test_core import STAMP, CoreHarness
+from tests.ticket.test_ticket import git, read_json, write
+
+RESULT = {"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "reviews": []}
+
+
+class ActorHarness(CoreHarness):
+    def setUp(self):
+        super().setUp()
+        # 統合先の互換の印（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）
+        write(
+            os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
+            f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
+        )
+
+    def mark_path(self, kind="reviewed"):
+        return os.path.join(self.parent_tree, ".ccnavi", "approved", "phases", "i0001", f"1.{kind}")
+
+    def ready(self):
+        """フェーズ 1 を依頼まで進め、写しを置いた fixture を返す。"""
+        fixture = self.reviewed_phase_one()
+        self.commit_parent("requested")
+        write(fixture, json.dumps(RESULT))
+        return fixture
+
+    def confirm_as(self, fixture, *extra):
+        return self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "review",
+            "confirm",
+            "--result",
+            fixture,
+            *extra,
+        )
+
+    def last_event(self, ident="i0001-01"):
+        events, _ = history.read(self.approved, ident)
+        return events[-1]
+
+    def host_compare(self):
+        recorded = read_json(self.mark_path("requested"))["head"]
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        names = git(self.parent_tree, "diff", "--name-only", "--no-renames", f"{recorded}..HEAD")
+        return {"base": recorded, "head": head, "files": names.split()}
+
+    def chrome_confirm(self, compare, actor=None, head=None):
+        """Chrome の confirm。読んだ `P` の先頭は `head`（既定は compare の先頭）。"""
+        request = self.chrome_request(
+            "confirm",
+            "i0001",
+            heads={"i0001": head or compare["head"]},
+            phase=1,
+            result=RESULT,
+            compare=compare,
+            **({"actor": actor} if actor else {}),
+        )
+        return self.ask_chrome(request)
+
+
+class LocalActorTest(ActorHarness):
+    def test_without_an_actor_the_mark_is_as_before(self):
+        fixture = self.ready()
+        done = self.confirm_as(fixture)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        mark = read_json(self.mark_path())
+        self.assertEqual(sorted(mark), ["accepted", "at", "mr"])
+        self.assertEqual((mark["mr"], mark["accepted"]), (7, []))
+        event = self.last_event()
+        self.assertNotIn("actor", event)
+        self.assertEqual(event["via"], history.VIA_CLI)
+
+    def test_an_actor_goes_into_the_mark_and_the_event(self):
+        fixture = self.ready()
+        done = self.confirm_as(fixture, "--actor", "octo-reviewer")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        mark = read_json(self.mark_path())
+        self.assertEqual(list(mark), ["mr", "accepted", "actor", "via", "at"])
+        self.assertEqual(
+            {k: mark[k] for k in ("mr", "accepted", "actor", "via")},
+            {"mr": 7, "accepted": [], "actor": "octo-reviewer", "via": "cli"},
+        )
+        event = self.last_event()
+        self.assertEqual((event["actor"], event["via"]), ("octo-reviewer", history.VIA_CLI))
+
+    def test_a_malformed_actor_is_refused_and_nothing_is_written(self):
+        fixture = self.ready()
+        for bad in ("a b", "x/y", "<script>", "a" * 101):
+            done = self.confirm_as(fixture, "--actor", bad)
+            self.assertNotEqual(done.returncode, 0, bad)
+            self.assertIn("--actor", done.stderr)
+            self.assertFalse(os.path.exists(self.mark_path()), bad)
+
+    def test_an_actor_outside_review_confirm_is_refused(self):
+        done = self.ccnavi("--actor", "octo", "--explain", "--json")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("review confirm", done.stderr)
+
+
+class MovedSinceTest(ActorHarness):
+    def conf(self):
+        conf, _ = settings.load(self.root)
+        conf.state = self.state
+        conf.approved = ".ccnavi/approved"
+        return conf
+
+    def test_the_rule(self):
+        conf = self.conf()
+        mark = {"head": "a" * 40}
+        self.assertEqual(review.moved_since(conf, mark, "a" * 40, None), "")
+        self.assertEqual(review.moved_since(conf, mark, "b" * 40, [".ccnavi/approved/x.md"]), "")
+        self.assertEqual(review.moved_since(conf, mark, "b" * 40, ["wip/proposals/todo/x.md"]), "")
+        for changed in (None, ["src/app.py"], [".ccnavi/approved/x", "README.md"]):
+            self.assertIn(
+                "依頼の後に親の HEAD が動いている",
+                review.moved_since(conf, mark, "b" * 40, changed),
+            )
+        self.assertIn("記録されていない", review.moved_since(conf, {}, "b" * 40, []))
+        self.assertIn("動いている", review.moved_since(conf, {"head": "HEAD"}, "b" * 40, []))
+
+    def test_code_moved_after_the_request_is_refused_the_same_by_chrome_and_locally(self):
+        fixture = self.ready()
+        write(os.path.join(self.parent_tree, "src", "late.py"), "print(1)\n")
+        self.commit_parent("late code")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        compare = self.host_compare()
+        self.assertIn("src/late.py", compare["files"])
+        chrome = self.chrome_confirm(compare)
+        local = self.confirm_as(fixture)
+        self.assertEqual(local.returncode, 1)
+        # 手元の案内はワークスペースルートからの絶対パス、Chrome は仮のツリーを畳んだ相対パス
+        said = local.stderr.replace(self.root + os.sep, "").splitlines()
+        self.assertEqual(chrome["problems"], said)
+        self.assertIn("依頼の後に親の HEAD が動いている", chrome["problems"][0])
+        self.assertIsNone(chrome["changes"])
+
+    def test_a_truncated_or_mismatched_compare_counts_as_moved(self):
+        self.ready()
+        compare = self.host_compare()
+        for broken in (
+            {**compare, "files": None},
+            {**compare, "base": "c" * 40},
+            {**compare, "head": "d" * 40},
+        ):
+            chrome = self.chrome_confirm(broken, head=compare["head"])
+            self.assertIsNone(chrome["changes"], broken)
+            self.assertTrue(
+                any("依頼の後に親の HEAD が動いている" in p for p in chrome["problems"]), chrome
+            )
+
+    def test_only_the_places_moved_so_chrome_writes(self):
+        self.ready()
+        chrome = self.chrome_confirm(self.host_compare())
+        self.assertEqual(chrome["problems"], [])
+        self.assertIsNotNone(chrome["changes"])
+
+
+class SameMarkTest(ActorHarness):
+    def test_chrome_and_local_marks_differ_only_by_the_route_and_the_time(self):
+        fixture = self.ready()
+        chrome = self.chrome_confirm(
+            self.host_compare(), actor={"account": "octo-reviewer", "version": "9.9.9"}
+        )
+        row = next(r for r in chrome["changes"]["i0001"] if r["path"].endswith("1.reviewed"))
+        remote = json.loads(row["content"])
+        done = self.confirm_as(fixture, "--actor", "octo-reviewer")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        local = read_json(self.mark_path())
+        self.assertEqual((remote["via"], local["via"]), ("chrome", "cli"))
+        self.assertEqual(remote["at"], STAMP)
+        drop = ("via", "at")
+        self.assertEqual(
+            {k: v for k, v in remote.items() if k not in drop},
+            {k: v for k, v in local.items() if k not in drop},
+        )
+        self.assertEqual(list(remote), list(local))
+
+
+class ReviewableTest(ActorHarness):
+    def test_the_board_names_requested_phases_until_they_are_reviewed(self):
+        fixture = self.ready()
+        board = self.ask_chrome(self.chrome_request("board", "i0001"))
+        self.assertEqual(
+            board["reviewable"],
+            [{"phase": 1, "mr": 7, "host": "fixture", "children": ["i0001-01"]}],
+        )
+        # ボードの要求は取り込みの控え相当を手元にも写す（手元は C1 の対象になり、直打ちの
+        # confirm を断る）。ここでは手元の印を置くためだけに控えを外す
+        shutil.rmtree(os.path.join(self.state, "sync"))
+        self.assertEqual(self.confirm_as(fixture).returncode, 0)
+        self.commit_parent("reviewed")
+        board = self.ask_chrome(self.chrome_request("board", "i0001"))
+        self.assertEqual(board["reviewable"], [])

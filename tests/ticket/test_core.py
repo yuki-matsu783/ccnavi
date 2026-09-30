@@ -31,7 +31,7 @@ from unittest import mock
 from ccnavi import approval, core, fsio, history, lint, settings, version
 from ccnavi import tree as tree_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
-from tests.ticket.test_ticket import ROOT, git, write
+from tests.ticket.test_ticket import ROOT, git, read_json, write
 
 CHROME = os.path.join(ROOT, "chrome-extension", "ccnavi-approval")
 SCENARIOS = os.path.join(CHROME, "test", "fixtures", "core-scenarios.json")
@@ -119,10 +119,28 @@ class CoreHarness(PhaseHarness):
         self.assertEqual(applied.code, 0, out + err)
         return changes, self.diff(before, self.disk())
 
+    def reviewed_phase_one(self):
+        """フェーズ 1（MR で見る設計）の子を閉じて合流し、レビューを依頼したところまで進める。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        return fixture
+
     # ---- Chrome の要求
 
-    def chrome_request(self, op, family, **extra):
-        """手元のツリーから、拡張が組むのと同じ形の要求を作る（統合先は main）。"""
+    def chrome_request(self, op, family, heads=None, **extra):
+        """手元のツリーから、拡張が組むのと同じ形の要求を作る（統合先は main）。
+
+        ブランチの先頭は既定で `0` の並び。`heads` で名前ごとに本物の先頭を渡せる（レビュー済みは
+        依頼時の先頭と比べるので、親のブランチの本物の先頭が要る）。
+        """
         chrome = _chrome()
         place = chrome._placement(None)
         branches = {}
@@ -141,7 +159,8 @@ class CoreHarness(PhaseHarness):
                     for rel, body in _files(path).items()
                     if rel.startswith(wanted)
                 }
-            branches[name] = {"head": "0" * 40, "files": dict(sorted(files.items()))}
+            head = (heads or {}).get(name, "0" * 40)
+            branches[name] = {"head": head, "files": dict(sorted(files.items()))}
         request = {
             "schema": chrome.SCHEMA,
             "op": op,
@@ -762,19 +781,6 @@ class CoreChromeTest(CoreHarness):
         answer = self.same_as_cli("revise", "i0001")
         self.assertIn("  i0001 の全体計画を改版した", answer["lines"])
 
-    def reviewed_phase_one(self):
-        self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
-        self.commit_parent("close 01")
-        self.merge("i0001-01")
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture, 1).returncode, 0)
-        return fixture
-
     def test_feedback_plan(self):
         fixture = self.reviewed_phase_one()
         self.assertEqual(self.confirm(fixture, 1).returncode, 0)
@@ -879,6 +885,21 @@ class CoreChromeTest(CoreHarness):
         self.assertEqual(events[-1]["reason"], "押し間違い")
         self.keep_scenario("withdraw", request, answer)
 
+    def host_compare(self):
+        """compare API の代わり: 依頼時の先頭から親の今の先頭までに変わったパス。"""
+        recorded = read_json(
+            os.path.join(self.parent_tree, ".ccnavi", "approved", "phases", "i0001", "1.requested")
+        )["head"]
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        names = git(self.parent_tree, "diff", "--name-only", "--no-renames", f"{recorded}..HEAD")
+        return {"base": recorded, "head": head, "files": names.split()}
+
+    def confirm_request(self, result, compare):
+        heads = {"i0001": compare["head"]}
+        return self.chrome_request(
+            "confirm", "i0001", heads=heads, phase=1, result=result, compare=compare
+        )
+
     def test_confirm(self):
         """レビュー済み: レビュー待ちの子を done/ へ動かし（settle_review）、印を置く。"""
         fixture = self.reviewed_phase_one()
@@ -889,11 +910,19 @@ class CoreChromeTest(CoreHarness):
             "threads": [],
             "reviews": [],
         }
+        compare = self.host_compare()
+        # 依頼の後に親の先頭が動いていれば、Python が compare の一覧を求める
+        # （比べる相手は Python が出す）
+        need = self.ask_chrome(
+            self.chrome_request(
+                "confirm", "i0001", heads={"i0001": compare["head"]}, phase=1, result=result
+            )
+        )
+        self.assertEqual(need["need_compare"], {"base": compare["base"], "head": compare["head"]})
+        self.assertIsNone(need["changes"])
         # 変更要求があれば通さない。問題点の文面は手元の CLI の標準エラーと同じ。
         changes_requested = {**result, "reviews": [{"state": "CHANGES_REQUESTED", "url": "r/1"}]}
-        refused = self.ask_chrome(
-            self.chrome_request("confirm", "i0001", phase=1, result=changes_requested, changed="")
-        )
+        refused = self.ask_chrome(self.confirm_request(changes_requested, compare))
         write(fixture, json.dumps(changes_requested))
         local = self.confirm(fixture, 1)
         self.assertEqual(local.returncode, 1)
@@ -901,7 +930,7 @@ class CoreChromeTest(CoreHarness):
         self.assertIsNone(refused["changes"])
         write(fixture, json.dumps(result))
 
-        request = self.chrome_request("confirm", "i0001", phase=1, result=result, changed="")
+        request = self.confirm_request(result, compare)
         answer = self.ask_chrome(request)
         self.assertEqual(answer["problems"], [])
         before = self.disk()
