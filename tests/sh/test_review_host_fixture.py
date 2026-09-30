@@ -35,6 +35,9 @@ NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
 # 実行ファイルの代役。受けた引数を 1 行ずつ書き残し、何も書かずに 0 で終わる。
 STUB = """#!/bin/sh
 case " $* " in
+*" --version --json "*)
+  printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
+  exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 esac
 for a in "$@"; do printf '%s\\n' "$a"; done >>'{log}'
@@ -237,8 +240,10 @@ class HostFixtureTest(unittest.TestCase):
             'for a in "$@"; do last="$a"; done\n'
             'case "$last" in\n'
             'user) printf \'{"username": "lab-reviewer"}\' ;;\n'
-            '*merge_requests\\?*) printf \'[{"iid": 7, "web_url": "u"}]\' ;;\n'
+            "*merge_requests\\?*)\n"
+            '  printf \'[{"iid": 7, "web_url": "u", "source_project_id": 1}]\' ;;\n'
             "*/discussions*|*/reviewers*) printf '[]' ;;\n"
+            "projects/*) printf '{\"id\": 1}' ;;\n"
             "*) printf '{}' ;;\n"
             "esac\n",
         )
@@ -293,6 +298,59 @@ class HostFixtureTest(unittest.TestCase):
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
                 self.assertIn("--accept-unresolved", self.passed())
                 self.assertFalse(any(a.startswith(("--actor", "--via")) for a in self.passed()))
+
+    def old_exe(self, flags):
+        """古い実行ファイルの代役。知らないフラグ（--actor・--via）を渡されると引数の誤りで落ちる。
+
+        `flags` が None なら `--version --json` を知らない（段階 4 より前）。
+        387d4a6 の実行ファイルは
+        `--actor` を知っていて `--via` を知らない（`["--actor"]`）。
+        """
+        known = " ".join(flags or [])
+        answer = (
+            "exit 2"
+            if flags is None
+            else 'printf \'{"compat": %s, "flags": [%s]}\\n\' '
+            + str(version.COMPAT)
+            + " '"
+            + ", ".join(f'"{f}"' for f in flags or [])
+            + "'; exit 0"
+        )
+        path = write(
+            os.path.join(self._tmp.name, "old", "ccnavi"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            f'*" --version --json "*) {answer} ;;\n'
+            f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
+            "esac\n"
+            'for a in "$@"; do case "$a" in --actor*|--via*)\n'
+            f'  case " {known} " in *" ${{a%%=*}} "*) ;;\n'
+            '  *) echo "unrecognized $a" >&2; exit 2 ;; esac ;;\n'
+            "esac; done\n"
+            f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{self.args}'\n"
+            "exit 0\n",
+        )
+        os.chmod(path, 0o755)
+        return path
+
+    def test_an_old_exe_gets_only_the_flags_it_knows(self):
+        """決定 C: `--version --json` の flags に無いフラグは渡さない（古いものが落ちる）。"""
+        for flags, confirm_actor in ((None, False), (["--actor"], True)):
+            with self.subTest(flags=flags):
+                exe = self.old_exe(flags)
+                for args in (
+                    ["confirm", "--phase", "1"],
+                    ["decide", "1", "--choices", "{}", "--digest", "d"],
+                    ["decide", "1"],
+                ):
+                    if os.path.exists(self.args):
+                        os.remove(self.args)
+                    done = self.review("resolved", *args, CCNAVI_BIN_PATH=exe)
+                    self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                    passed = self.passed()
+                    self.assertFalse(any(a.startswith("--via") for a in passed), args)
+                    want = confirm_actor and args[0] == "confirm"
+                    self.assertEqual(any(a.startswith("--actor") for a in passed), want, args)
 
     def test_decide_does_not_take_an_actor_from_the_caller(self):
         done = self.review("resolved", "decide", "1", "--actor=someone")
@@ -360,13 +418,29 @@ class GitLabHostFixtureTest(unittest.TestCase):
         with open(self.args, encoding="utf-8") as f:
             return f.read().splitlines()
 
+    def origin_of(self, scene):
+        """場面の名前空間とプロジェクトに origin を合わせる（入れ子のグループの場面のため）。"""
+        with open(os.path.join(gitlab_host.SCENES, scene, "scene.json"), encoding="utf-8") as f:
+            meta = json.load(f)
+        url = f"https://gitlab.com/{meta['namespace']}/{meta['project']}.git"
+        subprocess.run(["git", "-C", self.ws, "remote", "set-url", "origin", url], check=True)
+
     def test_the_sh_copy_matches_each_recorded_scene(self):
         self.assertEqual(
             gitlab_host.scene_names(),
-            ["hostile", "impostor", "paged", "requested-changes", "resolved"],
+            [
+                "hostile",
+                "impostor",
+                "nested",
+                "odd-types",
+                "paged",
+                "requested-changes",
+                "resolved",
+            ],
         )
         for scene in gitlab_host.scene_names():
             with self.subTest(scene=scene):
+                self.origin_of(scene)
                 done = self.review(scene, "fetch")
                 self.assertEqual(done.returncode, 0, done.stderr)
                 copy = json.loads(done.stdout)
@@ -397,6 +471,14 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(len(said("impostor")["unresolved"]), 2)
         self.assertEqual(len(said("paged")["unresolved"]), 11)
         self.assertEqual(len(said("hostile")["unresolved"]), 8)
+        self.assertEqual(said("nested"), said("resolved"))
+        self.assertEqual(len(said("odd-types")["unresolved"]), 2)
+
+    def test_a_fork_merge_request_is_not_picked(self):
+        """フォークの同じ名前のブランチの MR（source_project_id が違う）は拾わない。"""
+        done = self.review("impostor", "fetch")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["mr"]["number"], 7)
 
     def test_request_records_the_account_that_posted(self):
         """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
@@ -426,7 +508,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
                 result = json.load(f)
-            self.assertEqual((result["host"], result["author"]), ("gitlab", "lab-bot"))
+            # 投稿者は名前でなく id で残す（11.9.1 の 15）
+            self.assertEqual((result["host"], result["author"]), ("gitlab", "201"))
             self.assertEqual(result["mr"]["number"], 7)
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)

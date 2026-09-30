@@ -307,7 +307,7 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
 
   lab.branch("i0004", "main");
   const at = lab.push("i0004", reviewFamilyFiles("i0004"), "作業とレビュー待ちの子");
-  lab.push("i0004", { ".ccnavi/approved/phases/i0004/1.requested": requestedMark(at, 7, "gitlab", "lab-bot") }, "ccnavi: レビューを依頼した");
+  lab.push("i0004", { ".ccnavi/approved/phases/i0004/1.requested": requestedMark(at, 7, "gitlab", "201") }, "ccnavi: レビューを依頼した");
   lab.attachGitLabScene("i0004", loadGitLabScene("hostile"));
   const page = await openBoard();
   const repo = page.locator(`section${GL_REPO}`);

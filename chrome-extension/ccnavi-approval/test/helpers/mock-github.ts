@@ -315,6 +315,9 @@ export class MockGitHub {
         .find((p) => p.number === Number(reviews[1]));
       return this.paged(u, (pr?.reviews ?? []).map((r) => ({ user: { login: r.user }, state: r.state })));
     }
+    if (method === "GET" && u.pathname === `${base}/branches`) {
+      return this.paged(u, [...this.heads.keys()].sort().map((name) => ({ name, commit: { sha: this.heads.get(name) } })));
+    }
     if (method === "GET" && u.pathname === `${base}/issues`) {
       const list = this.issues.map((i) => ({ number: i.number, title: i.title, html_url: `https://github.com/${this.owner}/${this.repo}/issues/${i.number}`, ...(i.pull ? { pull_request: {} } : {}) }));
       return { status: 200, json: list };

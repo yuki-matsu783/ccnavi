@@ -133,11 +133,14 @@ test("CX-T122 置き場のシンボリックリンクは読まずに「決まら
 
 test("CX-T123 service worker が書く頼みを断ったら（登録していないリポジトリ）、先頭が動いたと取り違えずに原因を言う", async () => {
   const mock = new MockGitHub(fixture());
+  const seen = await shown(depsFor(mock));
+  const before = mock.calls.length;
   const d = depsFor(mock, []);
-  const out = await approveFamily(REPO, "i0001", await shown(d), d);
+  const out = await approveFamily(REPO, "i0001", seen, d);
   assert.equal(out.kind, "failed");
   assert.match(out.kind === "failed" ? out.message : "", /登録していない/);
-  assert.equal(mock.calls.filter((c) => c === "POST /graphql").length > 0, true);
+  // 段階 5 のレビューの後（11.9.1 の 8）は、読み取りも登録したリポジトリだけ受けるので、ホストに何も頼まない
+  assert.equal(mock.calls.length, before);
   assert.equal(mock.commitCalls.length, 0);
 });
 

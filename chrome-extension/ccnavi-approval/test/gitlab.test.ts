@@ -49,7 +49,16 @@ const TOKENS = new Map([
 function glDeps(mock: MockGitHub, host = "gitlab.com", repos: RepoConfig[] = [GITLAB_REPO, GH_REPO], pyCall: PyCall = py): WriteDeps {
   const stats = newStats();
   const d = { ...deps(mock, TOKENS, new Map(), () => new Date(NOW), repos), sleep: noWait };
-  return { call: hostCall(d, stats, host), py: pyCall, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9", sleep: noWait };
+  return {
+    call: hostCall(d, stats, host),
+    py: pyCall,
+    cache: memoryCache(),
+    now: () => new Date(NOW),
+    stats,
+    version: "9.9.9",
+    sleep: noWait,
+    kind: host === "gitlab.com" ? "gitlab" : "github",
+  };
 }
 
 function parentOnly(): Record<string, FixtureBranch> {
@@ -72,8 +81,8 @@ const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
 
-test("CX-T144 録った GitLab の応答の見本ごとに、TS が組む写しは sh が組んだ期待値（expected.json）と同じ", async () => {
-  assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "paged", "requested-changes", "resolved"]);
+test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む写しは sh が組んだ期待値（expected.json）と同じ", async () => {
+  assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "requested-changes", "resolved"]);
   for (const name of gitlabSceneNames()) {
     const scene = loadGitLabScene(name);
     const client = { host: GL, token: TOKEN, fetch: gitlabSceneFetch(scene), counter: { rest: 0, graphql: 0 }, sleep: noWait };
@@ -158,13 +167,14 @@ test("CX-T147 事後確認: 書く直前に関係の無い書き込み（コー�
   assert.ok(DOING in files && "src/other.py" in files);
 });
 
-test("CX-T148 事後確認: 判定の変わる書き込みが割り込むと、打ち消しのコミットを積み、読み直して見直しを求める", async () => {
+test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル）が割り込むと、打ち消しのコミットを積み、読み直して見直しを求める。同じファイルなら書かずに止まる", async () => {
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
   let raced = "";
+  const CHILD = "wip/proposals/todo/i0001-01.md";
   mock.beforeCommit = (b) => {
-    raced = mock.push(b, { [TODO]: `${mock.files(b)[TODO]}\n割り込みで足した本文\n` }, "割り込んだ提案の書き換え");
+    raced = mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込んだ子の提案");
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "changed", JSON.stringify(out));
@@ -175,30 +185,46 @@ test("CX-T148 事後確認: 判定の変わる書き込みが割り込むと、�
       ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
     ],
   );
+  // 打ち消しは各ファイルに「最後に変えたのは自分のコミット」を付ける（決定 A）
+  const mine = mock.glCommits[0].oid;
+  assert.ok(mock.glCommits[1].actions.filter((a) => a.action !== "create").every((a) => a.last_commit_id === mine));
   // 打ち消した後の置き場は、割り込んだ書き込みの直後と同じ（承認は残らない）
   assert.deepEqual(placeFiles(mock.files("i0001")), placeFiles(mock.commits.get(raced)!.files));
+
+  // 同じファイル（消す提案）を割り込みが変えていれば、GitLab が断るので何も書かない（last_commit_id。決定 A）
+  const same = new MockGitLab(parentOnly());
+  const sd = glDeps(same);
+  const sshown = shownOf(await collectRepo(GITLAB_REPO, sd), "i0001");
+  same.beforeCommit = (b) => void same.push(b, { [TODO]: `${same.files(b)[TODO]}\n割り込みで足した本文\n` }, "割り込んだ提案の書き換え");
+  const sout = await approveFamily(GITLAB_REPO, "i0001", sshown, sd);
+  assert.equal(sout.kind, "changed", JSON.stringify(sout));
+  assert.deepEqual(same.glCommits.map((c) => c.result), ["error"]);
+  assert.ok(!(DOING in same.files("i0001")));
 });
 
-test("CX-T149 連鎖競合: 打ち消しの間にも同じファイルが変わると、止めて人に回す（要確認）", async () => {
+test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変わると、止めて人に回す（要確認）。他人の変更は消さない（PROBE-1）", async () => {
+  const CHILD = "wip/proposals/todo/i0001-01.md";
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
   mock.beforeCommit = (b) => {
-    mock.push(b, { [TODO]: `${mock.files(b)[TODO]}\n割り込み 1\n` }, "割り込み 1");
+    mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み 1");
     mock.beforeCommit = (b2) => void mock.push(b2, { [DOING]: "別の書き手が書いた\n" }, "割り込み 2");
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
   assert.match(out.kind === "attention" ? out.message : "", /8\.4/);
-  assert.equal(mock.glCommits.length, 2);
-  // 後から別の書き手が同じファイルを変えていれば、打ち消しを積む前に止める
+  // 打ち消しは last_commit_id で断られ、割り込み 2 の変更は残る（PROBE-1）
+  assert.deepEqual(mock.glCommits.map((c) => c.result), ["written", "error"]);
+  assert.equal(mock.files("i0001")[DOING], "別の書き手が書いた\n");
+
+  // 書いた後、打ち消す前に同じファイルが変わっていれば、打ち消しを送らずに止める
   const late = new MockGitLab(parentOnly());
   const ld = glDeps(late);
   const lshown = shownOf(await collectRepo(GITLAB_REPO, ld), "i0001");
-  late.beforeCommit = (b) => void late.push(b, { [TODO]: `${late.files(b)[TODO]}\n割り込み\n` }, "割り込み");
+  late.beforeCommit = (b) => void late.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
   let pushed = false;
   late.onRequest = (method, u) => {
-    // 書いた後、打ち消す前に親のブランチの先頭を読むところで、書いた写しを別の書き手が変える
     if (!pushed && late.glCommits.length === 1 && method === "GET" && u.pathname.endsWith("/repository/branches/i0001")) {
       pushed = true;
       late.push("i0001", { [DOING]: "後から変えた\n" }, "後から");
@@ -207,6 +233,7 @@ test("CX-T149 連鎖競合: 打ち消しの間にも同じファイルが変わ�
   const lout = await approveFamily(GITLAB_REPO, "i0001", lshown, ld);
   assert.equal(lout.kind, "attention", JSON.stringify(lout));
   assert.equal(late.glCommits.length, 1);
+  assert.equal(late.files("i0001")[DOING], "後から変えた\n");
 });
 
 test("CX-T150 「始める」: issue から i<番号> のブランチを統合先の先頭に作る（GitHub と GitLab）。閉じた識別子・既にある名前は作らない", async () => {
@@ -234,7 +261,8 @@ test("CX-T150 「始める」: issue から i<番号> のブランチを統合�
     assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にある（i0001）/);
     const again = await startIssue(repo, 12, b.seen ?? null, taken, d);
     assert.equal(again.kind, "refused", host);
-    assert.match(again.kind === "refused" ? again.message : "", /i0012 は既にある/);
+    // 全部のブランチの名前を大文字小文字を畳んで比べる（直近 N 日の外のブランチも。11.9.1 の 7）
+    assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にある（i0012）/);
     assert.equal(mock.createdBranches.length, 1, host);
   }
 });
@@ -277,7 +305,8 @@ function reviewingOnGitLab(scene: string, host: "github" | "gitlab" = "gitlab"):
   const mock = new MockGitLab(fixture());
   mock.branch(FAMILY, "main");
   const at = mock.push(FAMILY, reviewFamilyFiles(FAMILY), "作業とレビュー待ちの子");
-  mock.push(FAMILY, { [REQUESTED]: requestedMark(at, 7, host, "lab-bot") }, "ccnavi: レビューを依頼した");
+  // 依頼を投稿したアカウントは id で残る（11.9.1 の 15。見本の lab-bot は id 201）
+  mock.push(FAMILY, { [REQUESTED]: requestedMark(at, 7, host, "201") }, "ccnavi: レビューを依頼した");
   mock.attachGitLabScene(FAMILY, loadGitLabScene(scene));
   return mock;
 }
@@ -350,6 +379,7 @@ function twoHosts() {
       stats,
       version: "9.9.9",
       sleep: noWait,
+      kind: "gitlab",
       workspace: { repo: GH_REPO, call: hostCall(d, stats, "github.com") },
     };
   };

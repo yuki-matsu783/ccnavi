@@ -31,6 +31,8 @@ export function deps(
 ): Deps {
   return {
     hosts: HOSTS,
+    // 同梱の互換の版（見本の統合先の CCNAVI_COMPAT と同じ）
+    compat: 1,
     extensionId: EXT_ID,
     base: BASE,
     fetch: mock.fetch,

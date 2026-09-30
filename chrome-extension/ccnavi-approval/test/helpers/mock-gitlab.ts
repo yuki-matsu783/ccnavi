@@ -18,7 +18,7 @@ export const GL_LOGIN = "lab-approver";
 export interface GitLabCommitCall {
   readonly branch: string;
   readonly message: string;
-  readonly actions: { action: string; file_path: string; content?: string; encoding?: string }[];
+  readonly actions: { action: string; file_path: string; content?: string; encoding?: string; last_commit_id?: string }[];
   readonly result: "written" | "error";
   readonly oid?: string;
   readonly parent?: string;
@@ -30,8 +30,17 @@ export class MockGitLab extends MockGitHub {
   glExpiry = "";
   /** 付けた見本（GitLab の MR・スレッド・レビュアー） */
   readonly glScenes = new Map<string, GitLabScene>();
-  /** compare の変更の一覧を切る件数（拡張は 1000 件で打ち切られたとみなす） */
+  /** compare の変更の一覧を切る件数（拡張は 900 件以上で打ち切られたとみなす） */
   compareLimit = 1000;
+  /** compare の答えに足す欄（`compare_timeout`、各 diff の `collapsed`・`too_large`） */
+  compareExtra: { timeout?: boolean; collapsed?: boolean; tooLarge?: boolean } = {};
+  /** フォーク（source_project_id 99）の同じ名前のブランチの開いた MR */
+  readonly forkMrs: { branch: string; number: number }[] = [];
+
+  /** `ref` の上でそのファイルを最後に変えたコミット（`git log -1 -- path`） */
+  lastChange(ref: string, path: string): string {
+    return this.history(ref, path)[0]?.sha ?? "";
+  }
 
   attachGitLabScene(branch: string, scene: GitLabScene): void {
     this.glScenes.clear();
@@ -157,13 +166,33 @@ export class MockGitLab extends MockGitHub {
       const diffs = [...new Set([...Object.keys(from.files), ...Object.keys(to.files)])]
         .filter((q) => from.files[q] !== to.files[q])
         .sort()
-        .map((q) => ({ old_path: q, new_path: q, new_file: !(q in from.files), deleted_file: !(q in to.files), renamed_file: false }));
-      return { status: 200, json: { commits: [], diffs: diffs.slice(0, this.compareLimit), compare_timeout: false, compare_same_ref: false } };
+        .map((q) => ({
+          old_path: q,
+          new_path: q,
+          new_file: !(q in from.files),
+          deleted_file: !(q in to.files),
+          renamed_file: false,
+          ...(this.compareExtra.collapsed ? { collapsed: true } : {}),
+          ...(this.compareExtra.tooLarge ? { too_large: true } : {}),
+        }));
+      return { status: 200, json: { commits: [], diffs: diffs.slice(0, this.compareLimit), compare_timeout: this.compareExtra.timeout === true, compare_same_ref: false } };
+    }
+    if (method === "GET" && rest.startsWith("/repository/files/")) {
+      const path = decodeURIComponent(rest.slice("/repository/files/".length));
+      const ref = u.searchParams.get("ref") ?? "";
+      if (!this.commits.get(ref)?.files[path]) return { status: 404, json: { message: "404 File Not Found" } };
+      return { status: 200, json: { file_path: path, last_commit_id: this.lastChange(ref, path) } };
     }
     if (method === "POST" && rest === "/repository/commits") return this.commitActions(JSON.parse(body || "{}"));
     if (method === "GET" && rest === "/merge_requests") {
       const branch = u.searchParams.get("source_branch") ?? "";
-      return { status: 200, json: (this.pulls[branch] ?? []).map((m) => ({ iid: m.number, web_url: `https://gitlab.com/${this.owner}/${this.repo}/-/merge_requests/${m.number}` })) };
+      return {
+        status: 200,
+        json: [
+          ...this.forkMrs.filter((m) => m.branch === branch).map((m) => ({ iid: m.number, source_project_id: 99, web_url: `https://gitlab.com/fork/${this.repo}/-/merge_requests/${m.number}` })),
+          ...(this.pulls[branch] ?? []).map((m) => ({ iid: m.number, source_project_id: 42, web_url: `https://gitlab.com/${this.owner}/${this.repo}/-/merge_requests/${m.number}` })),
+        ],
+      };
     }
     const approvals = /^\/merge_requests\/(\d+)\/approvals$/.exec(rest);
     if (method === "GET" && approvals) {
@@ -196,6 +225,11 @@ export class MockGitLab extends MockGitHub {
       if ((a.action === "create" && exists) || (a.action !== "create" && !exists)) {
         this.glCommits.push({ ...call, result: "error" });
         return { status: 400, json: { message: a.action === "create" ? "A file with this name already exists" : "A file with this name doesn't exist" } };
+      }
+      // 本物と同じく、last_commit_id がそのファイルを最後に変えたコミットでなければ断る（決定 A）
+      if (a.action !== "create" && a.last_commit_id !== undefined && a.last_commit_id !== this.lastChange(parent, a.file_path)) {
+        this.glCommits.push({ ...call, result: "error" });
+        return { status: 400, json: { message: "You are attempting to update a file that has changed since you started editing it." } };
       }
       if (a.action === "delete") delete files[a.file_path];
       else files[a.file_path] = a.encoding === "base64" ? Buffer.from(a.content ?? "", "base64").toString("utf8") : (a.content ?? "");
