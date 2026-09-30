@@ -632,14 +632,17 @@ ccnavi_git_timed() {
 			</dev/null 2>"$ccnavi_gt_err" &
 	fi
 	ccnavi_gt_pid=$!
+	# 見張りの中で標準入出力を先に閉じる（呼ぶ側のパイプを握ったまま残らないように）。
 	(
+		exec </dev/null >/dev/null 2>&1
 		sleep "$ccnavi_gt_limit"
 		kill "$ccnavi_gt_pid"
-	) </dev/null >/dev/null 2>&1 &
+	) &
 	ccnavi_gt_dog=$!
 	ccnavi_gt_rc=0
 	wait "$ccnavi_gt_pid" 2>/dev/null || ccnavi_gt_rc=$?
 	kill "$ccnavi_gt_dog" 2>/dev/null || :
+	ccnavi_gt_dog=""
 	return "$ccnavi_gt_rc"
 }
 
@@ -1154,6 +1157,11 @@ ccnavi_c1_inflight=""
 ccnavi_c1_inflight_h0=""
 ccnavi_c1_inflight_list=""
 ccnavi_c1_end() {
+	# 見張りの途中で切られたら、見張りも止める（後で別のプロセスを kill しないように）。
+	if [ -n "${ccnavi_gt_dog:-}" ]; then
+		kill "$ccnavi_gt_dog" 2>/dev/null || :
+		ccnavi_gt_dog=""
+	fi
 	if [ -n "$ccnavi_c1_inflight" ] && [ -n "$ccnavi_c1_tmp" ]; then
 		# 送る前に切られた。自分のコミットを比較つきで戻す（先頭が動いていれば戻さない）。
 		ccnavi_ce_c="$ccnavi_c1_inflight"
