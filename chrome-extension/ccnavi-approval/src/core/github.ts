@@ -84,6 +84,8 @@ export interface Client {
   readonly counter: Counter;
   /** 応答から読んだもの（PAT の期限。読めなければ空）。呼び手が控える */
   readonly seen?: { expiration: string };
+  /** 待つ（レート制限の Retry-After）。試験は差し替える */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 function note(client: Client, res: Awaited<ReturnType<Fetch>>): void {
@@ -99,41 +101,121 @@ function headers(client: Client): Record<string, string> {
   };
 }
 
-async function rest(client: Client, path: string): Promise<{ status: number; body: unknown }> {
-  client.counter.rest += 1;
-  const res = await client.fetch(`${client.host.api}${path}`, { method: "GET", headers: headers(client) });
-  note(client, res);
-  if (res.status === 401) {
-    throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
+/** Retry-After を待ち直す上限（秒）。これより長ければ待たずに原因を言う */
+export const RETRY_LIMIT_SECONDS = 60;
+
+type Res = Awaited<ReturnType<Fetch>>;
+
+function header(res: Res, name: string): string {
+  return res.headers?.get(name)?.trim() ?? "";
+}
+
+/** 403/429 がレート制限なら、その説明と待つ秒数（待てなければ null）。レート制限でなければ null */
+function rateLimit(res: Res): { text: string; wait: number | null } | null {
+  const after = header(res, "retry-after");
+  const remaining = header(res, "x-ratelimit-remaining");
+  const reset = Number(header(res, "x-ratelimit-reset"));
+  if (!(res.status === 429 || (res.status === 403 && (after !== "" || remaining === "0")))) return null;
+  const seconds = after !== "" && /^\d+$/.test(after) ? Number(after) : null;
+  const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `。回復は ${new Date(reset * 1000).toISOString()}` : "";
+  const kind = after !== "" ? "二次のレート制限" : "レート制限";
+  return {
+    text: `GitHub の${kind}に当たった（${res.status}${seconds !== null ? `、${seconds} 秒待つよう言われた` : ""}${when}）。少し待ってからボードを更新する`,
+    wait: seconds !== null && seconds <= RETRY_LIMIT_SECONDS ? seconds : null,
+  };
+}
+
+async function pause(client: Client, seconds: number): Promise<void> {
+  const sleep = client.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  await sleep(seconds * 1000);
+}
+
+/**
+ * 1 回の呼び出し。401 は差し替えを促し、レート制限（403・429、Retry-After）は原因を言う。
+ * Retry-After が短ければ 1 回だけ待ち直す（15 の決定）。
+ */
+async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
+  for (let attempt = 0; ; attempt += 1) {
+    const res = await client.fetch(url, init);
+    note(client, res);
+    if (res.status === 401) {
+      throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
+    }
+    const limited = rateLimit(res);
+    if (limited) {
+      if (limited.wait !== null && attempt === 0) {
+        await pause(client, limited.wait);
+        continue;
+      }
+      throw new HostError(limited.text, res.status);
+    }
+    if (res.status === 403) {
+      throw new HostError(`GitHub が断った（403）: ${what}。PAT の権限（リポジトリ・Contents など）を見直す`, 403);
+    }
+    return res;
   }
+}
+
+async function rest(client: Client, path: string): Promise<{ status: number; body: unknown; next: string }> {
+  client.counter.rest += 1;
+  const res = await send(client, `${client.host.api}${path}`, { method: "GET", headers: headers(client) }, `GET ${path}`);
   if (res.status === 404) {
-    return { status: 404, body: null };
+    return { status: 404, body: null, next: "" };
   }
   if (!res.ok) {
     throw new HostError(`GitHub が ${res.status} を返した: GET ${path}`, res.status);
   }
-  return { status: res.status, body: await res.json() };
+  return { status: res.status, body: await res.json(), next: nextPage(client, header(res, "link")) };
+}
+
+/** Link ヘッダの rel="next" を、同じ API の根からのパスにする。無い・根の外なら空 */
+function nextPage(client: Client, link: string): string {
+  const m = /<([^>]+)>\s*;\s*rel="next"/.exec(link);
+  if (!m || !m[1].startsWith(`${client.host.api}/`)) return "";
+  return m[1].slice(client.host.api.length);
+}
+
+/** 並びを返す REST をページごとに読み、`pages` まで足す。答えと、まだ続きがあるか */
+async function restPages(client: Client, path: string, pages: number): Promise<{ items: unknown[]; more: boolean }> {
+  const items: unknown[] = [];
+  let next = path;
+  for (let i = 0; i < pages && next; i += 1) {
+    const { status, body, next: after } = await rest(client, next);
+    if (status === 404 || !Array.isArray(body)) break;
+    items.push(...body);
+    next = after;
+  }
+  return { items, more: next !== "" && next !== path };
 }
 
 async function graphql(client: Client, query: string, variables: Record<string, unknown>): Promise<Record<string, unknown>> {
-  client.counter.graphql += 1;
-  const res = await client.fetch(client.host.graphql, {
-    method: "POST",
-    headers: { ...headers(client), "Content-Type": "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
-  note(client, res);
-  if (res.status === 401) {
-    throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
+  for (let attempt = 0; ; attempt += 1) {
+    client.counter.graphql += 1;
+    const res = await send(
+      client,
+      client.host.graphql,
+      { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ query, variables }) },
+      "GraphQL",
+    );
+    if (!res.ok) {
+      throw new HostError(`GitHub の GraphQL が ${res.status} を返した`, res.status);
+    }
+    const body = (await res.json()) as { data?: Record<string, unknown>; errors?: { type?: string; message?: string }[] };
+    const errors = body.errors ?? [];
+    if (errors.some((e) => e.type === "RATE_LIMITED")) {
+      const after = header(res, "retry-after");
+      const seconds = /^\d+$/.test(after) ? Number(after) : null;
+      if (seconds !== null && seconds <= RETRY_LIMIT_SECONDS && attempt === 0) {
+        await pause(client, seconds);
+        continue;
+      }
+      throw new HostError("GitHub の GraphQL のレート制限に当たった（RATE_LIMITED）。少し待ってからボードを更新する", 429);
+    }
+    if (errors.length > 0) {
+      throw new HostError(`GitHub の GraphQL が失敗した: ${errors.map((e) => e.message ?? "?").join(" / ")}`);
+    }
+    return body.data ?? {};
   }
-  if (!res.ok) {
-    throw new HostError(`GitHub の GraphQL が ${res.status} を返した`, res.status);
-  }
-  const body = (await res.json()) as { data?: Record<string, unknown>; errors?: { message?: string }[] };
-  if (body.errors && body.errors.length > 0) {
-    throw new HostError(`GitHub の GraphQL が失敗した: ${body.errors.map((e) => e.message ?? "?").join(" / ")}`);
-  }
-  return body.data ?? {};
 }
 
 function repoPath(owner: string, repo: string): string {
@@ -252,7 +334,12 @@ export async function pathObjects(
 export interface TreeEntry {
   readonly path: string;
   readonly sha: string;
+  /** git の mode（`100644`・`100755`・`120000` はシンボリックリンク） */
+  readonly mode: string;
 }
+
+/** シンボリックリンクの mode。中身は指す先の綴りなので、ファイルとして読まない（12） */
+export const LINK_MODE = "120000";
 
 /** tree を再帰で読む。`truncated` なら取り切れないので止める（8.2） */
 export async function tree(client: Client, owner: string, repo: string, oid: string): Promise<TreeEntry[]> {
@@ -260,14 +347,14 @@ export async function tree(client: Client, owner: string, repo: string, oid: str
   if (status === 404) {
     throw new HostError(`tree ${oid} が無い`);
   }
-  const b = body as { truncated?: boolean; tree?: { path?: unknown; type?: unknown; sha?: unknown }[] };
+  const b = body as { truncated?: boolean; tree?: { path?: unknown; type?: unknown; sha?: unknown; mode?: unknown }[] };
   if (b.truncated) {
     throw new HostError("置き場の tree が大きすぎて取り切れない（truncated）。Chrome では読めない");
   }
   const out: TreeEntry[] = [];
   for (const e of b.tree ?? []) {
     if (e.type === "blob") {
-      out.push({ path: checkPath(e.path), sha: checkOid(e.sha) });
+      out.push({ path: checkPath(e.path), sha: checkOid(e.sha), mode: typeof e.mode === "string" ? e.mode : "" });
     }
   }
   return out;
@@ -289,20 +376,23 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   oids.forEach((oid, i) => {
     vars[`o${i}`] = checkOid(oid);
     decl.push(`$o${i}: GitObjectID!`);
-    fields.push(`b${i}: object(oid: $o${i}) { ... on Blob { text isBinary byteSize } }`);
+    fields.push(`b${i}: object(oid: $o${i}) { ... on Blob { text isBinary isTruncated byteSize } }`);
   });
   if (fields.length === 0) {
     return {};
   }
   const query = `query(${decl.join(", ")}) { repository(owner: $owner, name: $name) { ${fields.join(" ")} } }`;
   const data = await graphql(client, query, vars);
-  const repoData = (data.repository ?? {}) as Record<string, { text?: string | null; isBinary?: boolean; byteSize?: number } | null>;
+  const repoData = (data.repository ?? {}) as Record<string, { text?: string | null; isBinary?: boolean; isTruncated?: boolean; byteSize?: number } | null>;
   const out: Record<string, BlobText> = {};
   const encoder = new TextEncoder();
   oids.forEach((oid, i) => {
     const b = repoData[`b${i}`];
     if (!b) {
       throw new HostError(`blob ${oid} を取れなかった`);
+    }
+    if (b.isTruncated) {
+      throw new HostError(`blob ${oid} の本文が切られている（isTruncated）。取り切れていない`);
     }
     if (b.isBinary || typeof b.text !== "string") {
       out[oid] = { text: null, binary: true };
@@ -361,13 +451,14 @@ export async function createCommit(
   branch: string,
   expectedHeadOid: string,
   headline: string,
+  body: string,
   additions: readonly FileAddition[],
   deletions: readonly string[],
 ): Promise<string> {
   const input = {
     branch: { repositoryNameWithOwner: `${checkName(owner, "owner")}/${checkName(repo, "repo")}`, branchName: checkBranch(branch) },
     expectedHeadOid: checkOid(expectedHeadOid),
-    message: { headline },
+    message: body ? { headline, body } : { headline },
     fileChanges: {
       additions: additions.map((a) => ({ path: checkPath(a.path), contents: a.contents })),
       deletions: deletions.map((p) => ({ path: checkPath(p) })),
@@ -383,43 +474,83 @@ export interface ApprovalCommit {
   readonly parent: string;
 }
 
-/** 1 回の取り下げで履歴を遡る上限（コミットの数） */
-const HISTORY_LIMIT = 30;
+/** 1 回の取り下げで履歴を遡る上限（1 ページのコミットの数とページの数） */
+const HISTORY_PAGE = 30;
+const HISTORY_PAGES = 3;
+/** first-parent の鎖を確かめるのに読む祖先の数 */
+const CHAIN_DEPTH = 100;
+
+const HISTORY = `query($owner: String!, $name: String!, $oid: GitObjectID!) {
+  repository(owner: $owner, name: $name) {
+    object(oid: $oid) { ... on Commit { history(first: ${CHAIN_DEPTH}) { nodes { oid parents(first: 1) { nodes { oid } } } } } }
+  }
+}`;
+
+/** `sha` から最初の親を辿った鎖（`CHAIN_DEPTH` の祖先の中で辿れたところまで） */
+export async function firstParentChain(client: Client, owner: string, repo: string, sha: string): Promise<Set<string>> {
+  const data = await graphql(client, HISTORY, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), oid: checkOid(sha) });
+  const nodes =
+    ((data.repository as { object?: { history?: { nodes?: { oid?: unknown; parents?: { nodes?: { oid?: unknown }[] } }[] } } } | null)?.object?.history
+      ?.nodes ?? []);
+  const first = new Map<string, string>();
+  for (const n of nodes) {
+    if (typeof n.oid !== "string") continue;
+    const p = n.parents?.nodes?.[0]?.oid;
+    first.set(n.oid, typeof p === "string" ? p : "");
+  }
+  const chain = new Set<string>();
+  let at = sha;
+  while (at && first.has(at) && !chain.has(at)) {
+    chain.add(at);
+    at = first.get(at) as string;
+  }
+  return chain;
+}
 
 /**
- * 承認コミット（8.8 の 2）: `sha` から遡った履歴で `path`（`doing/<識別子>.md`）を足したコミットのうち、
- * 最新の、親が 1 つのもの。merge コミットは飛ばす（一覧に出ても出なくても同じ答えになるよう、
- * 各コミットの変更で「足した」かを確かめる。10.2 の確認事項 7）。無ければ null。
+ * 承認コミット（8.8 の 2）: `sha` から遡って `path`（`doing/<識別子>.md`）を最後に変えたコミットが、
+ * 最初の親に `path` が無く自分には在る（足した）コミットで、親が 1 つで、`sha` の first-parent の鎖の上に
+ * あるときだけ、そのコミットと親を返す（決定 B）。どれかを確かめられなければ null（取り下げを出さない）。
+ *
+ * 「足した」はコミットの変更の一覧（`files` の `status`）に頼らない。GitHub は承認コミット（提案の削除と
+ * 写しの追加）を `renamed` と返すことがあり、一覧は 300 件で切れるため。両方の木で `path` を引いて比べる。
+ * 一覧（`GET /commits?path=`）は `git log -- path` の簡略化で、merge や別の枝のコミットも出うる。
  */
 export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
-  const q = `?sha=${checkOid(sha)}&path=${encodeURIComponent(checkPath(path))}&per_page=${HISTORY_LIMIT}`;
-  const { status, body } = await rest(client, `${repoPath(owner, repo)}/commits${q}`);
-  if (status === 404 || !Array.isArray(body)) return null;
-  for (const c of body as { sha?: unknown; parents?: { sha?: unknown }[] }[]) {
-    const parents = Array.isArray(c.parents) ? c.parents : [];
-    if (parents.length !== 1) continue;
-    const commit = checkOid(c.sha);
-    const detail = await rest(client, `${repoPath(owner, repo)}/commits/${commit}`);
-    const files = (detail.body as { files?: { filename?: unknown; status?: unknown }[] } | null)?.files ?? [];
-    const touched = files.find((f) => f.filename === path);
-    if (!touched) continue;
-    if (touched.status === "added") return { commit, parent: checkOid(parents[0].sha) };
-    // 最新の変更が「足した」でなければ（書き換え・消去）、それより古い承認は今の写しの元ではない
-    return null;
-  }
-  return null;
+  const q = `?sha=${checkOid(sha)}&path=${encodeURIComponent(checkPath(path))}&per_page=${HISTORY_PAGE}`;
+  const { items } = await restPages(client, `${repoPath(owner, repo)}/commits${q}`, HISTORY_PAGES);
+  const newest = items[0] as { sha?: unknown; parents?: { sha?: unknown }[] } | undefined;
+  if (!newest) return null;
+  const commit = checkOid(newest.sha);
+  const parents = Array.isArray(newest.parents) ? newest.parents : [];
+  if (parents.length !== 1) return null;
+  const parent = checkOid(parents[0].sha);
+  const here = await pathObjects(client, owner, repo, commit, [path]);
+  const before = await pathObjects(client, owner, repo, parent, [path]);
+  if (here[path]?.type !== "blob" || before[path] !== null) return null;
+  const chain = await firstParentChain(client, owner, repo, sha);
+  return chain.has(commit) ? { commit, parent } : null;
+}
+
+/** コミットの親（書いた後の確かめ。応答だけが落ちたとき、新しい先頭が自分の書いたものかを見る） */
+export async function commitParents(client: Client, owner: string, repo: string, sha: string): Promise<string[]> {
+  const { status, body } = await rest(client, `${repoPath(owner, repo)}/commits/${checkOid(sha)}`);
+  if (status === 404) return [];
+  const parents = (body as { parents?: { sha?: unknown }[] } | null)?.parents ?? [];
+  return parents.map((p) => checkOid(p.sha));
 }
 
 /** 親のブランチの開いた MR に付いている Approve（8.10）。付いていれば、書くと外れうることを出す */
 export async function pullApprovals(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; approvals: number }[]> {
   const head = encodeURIComponent(`${checkName(owner, "owner")}:${checkBranch(branch)}`);
-  const { body } = await rest(client, `${repoPath(owner, repo)}/pulls?head=${head}&state=open&per_page=10`);
+  const { items: pulls } = await restPages(client, `${repoPath(owner, repo)}/pulls?head=${head}&state=open&per_page=30`, 3);
   const out: { number: number; approvals: number }[] = [];
-  for (const pr of Array.isArray(body) ? (body as { number?: unknown }[]) : []) {
+  for (const pr of pulls as { number?: unknown }[]) {
     if (typeof pr.number !== "number" || !Number.isInteger(pr.number)) continue;
-    const reviews = await rest(client, `${repoPath(owner, repo)}/pulls/${pr.number}/reviews?per_page=100`);
+    // 100 件を超えるレビューも Link で読み切る（古い側に Approve、新しい側に取り消しがありうる）
+    const { items: reviews } = await restPages(client, `${repoPath(owner, repo)}/pulls/${pr.number}/reviews?per_page=100`, 10);
     const last = new Map<string, string>();
-    for (const r of Array.isArray(reviews.body) ? (reviews.body as { user?: { login?: unknown }; state?: unknown }[]) : []) {
+    for (const r of reviews as { user?: { login?: unknown }; state?: unknown }[]) {
       const who = typeof r.user?.login === "string" ? r.user.login : "";
       if (who && typeof r.state === "string" && r.state !== "COMMENTED") last.set(who, r.state);
     }
