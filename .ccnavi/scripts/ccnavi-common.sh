@@ -542,6 +542,27 @@ ccnavi_lock_long() {
 	[ "$(($(date +%s) - ccnavi_ll_started))" -gt 600 ]
 }
 
+# 長いロックの持ち主と止め方を 1 文で出す（文面だけ。判定には使わない）。<ロック>
+# 開始時刻は GNU の `date -d @N` か BSD の `date -r N` で読める形にし、落ちれば数のまま。
+ccnavi_lock_describe() {
+	ccnavi_lds_line=$(ccnavi_lock_owner "$1")
+	ccnavi_lds_host=$(printf '%s\n' "$ccnavi_lds_line" | awk '{ print $1 }')
+	ccnavi_lds_pid=$(ccnavi_lock_num "$(printf '%s\n' "$ccnavi_lds_line" | awk '{ print $2 }')")
+	ccnavi_lds_started=$(ccnavi_lock_num "$(printf '%s\n' "$ccnavi_lds_line" | awk '{ print $3 }')")
+	ccnavi_lds_at=""
+	if [ -n "$ccnavi_lds_started" ]; then
+		# BSD の `date -d` は別の意味なので、GNU（`--version` が通る）のときだけ `-d` を使う。
+		if date --version >/dev/null 2>&1; then
+			ccnavi_lds_at=$(date -d "@$ccnavi_lds_started" '+%Y-%m-%d %H:%M:%S' 2>/dev/null) || ccnavi_lds_at=""
+		else
+			ccnavi_lds_at=$(date -r "$ccnavi_lds_started" '+%Y-%m-%d %H:%M:%S' 2>/dev/null) || ccnavi_lds_at=""
+		fi
+		[ -n "$ccnavi_lds_at" ] || ccnavi_lds_at="$ccnavi_lds_started"
+	fi
+	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人が終了させてから打ち直す（ロックは持ち主が消えれば次の実行が片付ける）\n' \
+		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
+}
+
 # 古いロックを奪う。<ロック> <古いと判断したときに読んだ owner の行>
 # 0 奪えた（取り直す）/ 1 奪わなかった（待ちに戻る）/ 2 退けたものを戻せなかった
 ccnavi_lock_steal() {
@@ -846,7 +867,7 @@ ccnavi_c1_begin() {
 	*)
 		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/$ccnavi_c1_family_id"
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが長い（10 分を超えて持たれている。$(ccnavi_lock_owner "$ccnavi_cb_lock")）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる"
+			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
 			ccnavi_c1_say "家族 $ccnavi_c1_family_id は他の操作がロックを持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直す"
 		fi

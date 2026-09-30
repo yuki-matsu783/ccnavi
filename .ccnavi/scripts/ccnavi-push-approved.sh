@@ -137,7 +137,8 @@ carry_family() {
 	ccnavi_lock_take "$root" "$ccnavi_c1_repo" "$cf_p" "$(ccnavi_c1_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
 		if ccnavi_lock_long "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p"; then
-			printf 'ccnavi-push-approved: %s のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。\n' "$cf_p" >&2
+			printf 'ccnavi-push-approved: %s のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。%s\n' \
+				"$cf_p" "$(ccnavi_lock_describe "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p")" >&2
 		else
 			printf 'ccnavi-push-approved: %s は他の操作がロックを持っている。終わってから打ち直す。\n' "$cf_p" >&2
 		fi
