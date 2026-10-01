@@ -22,7 +22,6 @@ clone した人からは見えない。そこで親チケットに着手する�
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import os
 import re
@@ -31,7 +30,7 @@ from typing import TextIO
 
 import yaml
 
-from . import approval, fsio, gitcmd, phasetypes, risk, rules, settings, tree
+from . import approval, fsio, gitcmd, phasetypes, risk, rules, settings, syncstate, tree
 
 # 親ごとの印の名前。`phases/<親>/config-sync.json`。
 MARK = "config-sync"
@@ -342,7 +341,17 @@ def acknowledge(
     root: str,
     parent: str,
 ) -> int:
-    """レビューの無いまま閉じる親で、人が上書きを見たことを残す（`ccnavi --config-synced`）。"""
+    """レビューの無いまま閉じる親で、人が上書きを見たことを残す（`ccnavi --config-synced`）。
+
+    取り込み済みの家族が決まらない・閉じているなら、ほかの状態の操作と同じく止める
+    （書く先が元ツリーの旧経路に落ちないように。ADR-0093 の 3.3）。
+    """
+    st = syncstate.Families(conf, root).standing_any(parent)
+    if st.imported and st.stop:
+        stderr.write(f"ccnavi: {parent}: {st.stop}。この家族の状態は動かさない\n")
+        for line in syncstate.guidance(root, st):
+            stderr.write(f"  {line}\n")
+        return 1
     home = approval.home_dir(conf, root, parent, "")
     mark = pending(home, parent)
     if mark is None:
@@ -539,27 +548,17 @@ def _read_strict(path: str) -> tuple[bytes | None, str]:
 
 
 def _replace(path: str, content: bytes) -> str:
-    """一時ファイルに書いてから置き換える。途中で止まっても半端な中身を残さない。"""
-    temp = path + ".ccnavi-sync"
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(temp, "wb") as f:
-            f.write(content)
-        os.replace(temp, path)
-    except OSError as exc:
-        with contextlib.suppress(OSError):
-            os.remove(temp)
-        return str(exc)
-    return ""
+    """一時ファイル（`*.ccnavi-sync`）に書いてから置き換える。途中で止まっても半端な中身を残さない。
+
+    fsio を通す（C1 の記録層が、写した層を「この実行で書いたパス」に数える。ADR-0093 の 4.3）。
+    """
+    return fsio.replace_bytes(path, content, ".ccnavi-sync")
 
 
 def _restore(path: str, previous: bytes | None) -> bool:
     """写した 1 本や印を前の中身へ戻す。前が無かったなら消す。戻せたか。"""
     if previous is None:
-        with contextlib.suppress(FileNotFoundError):
-            try:
-                os.remove(path)
-            except OSError:
-                return False
-        return True
+        if not os.path.lexists(path):
+            return True
+        return not fsio.unlink(path) or not os.path.lexists(path)
     return not _replace(path, previous)

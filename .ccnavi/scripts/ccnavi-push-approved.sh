@@ -2,11 +2,22 @@
 # ccnavi-push-approved — 承認済みチケットの置き場（と、承認で todo/ から消えた提案）だけをコミットし、
 # 保護されたブランチでなければ push する。
 #
-#   sh .ccnavi/scripts/ccnavi-push-approved.sh
+#   sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
 #
-# 承認はしない。実行ファイルも起動しない。承認済みチケットは置かれただけでは他の機械に
-# 届かない（設計 9.2）ので、置いたあとに運ぶのがこの sh。端末の承認は ccnavi-approve.sh が、
-# ボードの承認は端末に送った 1 行が呼ぶ。対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
+# 承認はしない。承認済みチケットは置かれただけでは他の機械に届かない（設計 9.2）ので、置いたあとに
+# 運ぶのがこの sh。端末の承認は ccnavi-approve.sh が、ボードの承認とフローの保存は端末に送った 1 行が、
+# 人の判断の入口（ccnavi-review.sh chat・config-synced・close-early）は最後に呼ぶ（D27）。
+# 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
+#
+# 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の親のワークツリーは、
+# C1 と同じ手順で運ぶ（ADR-0093 の 4.6。段階 2d）: ロック（C1 の中からの入れ子を許す）→ 途中の操作の
+# 確認 → 取り込み（ccnavi-sync.sh）→ 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた
+# todo/ の提案）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
+# push が落ちてもコミットは残す（人が打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
+# 答えない実行ファイルで家族の控えがあれば、運ばずに止める。
+#
+# <親> を並べると、その家族だけを運ぶ。取り込み済みでない家族は運ばない（今のまま、人がコミット
+# する）。省けば今どおり、置き場に変更のあるツリー全部。
 #
 # 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
 # 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
@@ -30,25 +41,29 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-push-approved.sh
+sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
 
   承認済みチケットの置き場に変更があるツリーごとに、その置き場だけをコミットし、
-  保護されたブランチでなければ push する。引数は取らない。
+  保護されたブランチでなければ push する。取り込み済みの家族の親のワークツリーは、
+  取り込んでから送る（C1 と同じ手順）。<親> を並べるとその家族だけ。
 USAGE
 }
 
 case "${1:-}" in
-"") ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
-*)
-	printf 'ccnavi-push-approved: 引数は取りません。\n' >&2
-	usage >&2
-	exit 2
-	;;
 esac
+for want in ${1+"$@"}; do
+	case "$want" in
+	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*)
+		printf 'ccnavi-push-approved: %s は親の識別子の形ではありません。\n' "$want" >&2
+		usage >&2
+		exit 2
+		;;
+	esac
+done
 
 root=$(ccnavi_workspace) || {
 	printf 'ccnavi-push-approved: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
@@ -83,7 +98,132 @@ state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {
 	printf 'ccnavi-push-approved: 一時ファイルが作れません。\n' >&2
 	exit 2
 }
-trap 'rm -f "$state"' EXIT
+trap 'rm -f "$state"; ccnavi_c1_end' EXIT
+trap 'rm -f "$state"; ccnavi_c1_end; exit 130' INT TERM HUP
+
+# ---- 取り込み済みの家族（ADR-0093 の 4.6）
+ccnavi_log_root="$root"
+ccnavi_c1_root="$root"
+ccnavi_c1_label=ccnavi-push-approved
+ccnavi_c1_sh="$(dirname "$0")"
+if bin=$(ccnavi_bin "$root"); then
+	ccnavi_c1_exe() { "$bin" --root "$root" "$@"; }
+elif [ -f "$root/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+	ccnavi_c1_exe() { (cd "$root" && uv run --quiet python -m ccnavi --root "$root" "$@"); }
+else
+	ccnavi_c1_exe() { return 1; }
+fi
+tab=$(printf '\t')
+
+# 置き場の変更のパス（承認済み、レビュー待ちの review/、承認で消えた todo/ の提案）を ccnavi_c1_tmp/carry に。
+# 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part*`、フローの保存の `flows/.*.tmp`、configsync の
+# `*.ccnavi-sync`）は運ばない。
+carry_paths() {
+	: >"$ccnavi_c1_tmp/carry"
+	git -C "$1" -c core.quotepath=false status --porcelain -z --untracked-files=all --no-renames \
+		-- "$approved" "$proposals/review" 2>/dev/null | tr '\000' '\n' |
+		sed -n 's/^...//p' >"$ccnavi_c1_tmp/carry-all" || :
+	git -C "$1" ls-files --deleted -z -- "$proposals/todo" 2>/dev/null | tr '\000' '\n' \
+		>>"$ccnavi_c1_tmp/carry-all" || :
+	grep -v -E '(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$' \
+		"$ccnavi_c1_tmp/carry-all" >"$ccnavi_c1_tmp/carry" || :
+}
+
+# 取り込み済みの家族 1 つを運ぶ。ccnavi_c1_family を済ませた後に呼ぶ。0 運んだ（運ぶものが無いを含む）/ 1 落ちた
+carry_family() {
+	cf_p="$ccnavi_c1_family_id"
+	cf_tree="$ccnavi_c1_tree"
+	cf_rc=0
+	ccnavi_lock_take "$root" "$ccnavi_c1_repo" "$cf_p" "$(ccnavi_c1_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
+	if [ "$cf_rc" -ne 0 ]; then
+		if ccnavi_lock_long "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p"; then
+			printf 'ccnavi-push-approved: %s のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。%s\n' \
+				"$cf_p" "$(ccnavi_lock_describe "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p")" >&2
+		else
+			printf 'ccnavi-push-approved: %s は他の操作がロックを持っている。終わってから打ち直す。\n' "$cf_p" >&2
+		fi
+		return 1
+	fi
+	cf_busy=$(ccnavi_c1_busy "$cf_tree")
+	if [ -n "$cf_busy" ]; then
+		printf 'ccnavi-push-approved: %s の親のワークツリーに途中の操作（%s）がある。済ませてから打ち直す。\n' "$cf_p" "$cf_busy" >&2
+		ccnavi_lock_drop
+		return 1
+	fi
+	# 取り込んでから送る（Chrome の承認と重なっても push が拒まれにくい）。衝突したら取りやめて人に回す。
+	cf_rc=0
+	sh "$(dirname "$0")/ccnavi-sync.sh" "$cf_p" </dev/null >"$ccnavi_c1_tmp/sync" 2>&1 || cf_rc=$?
+	sed 's/^/  /' "$ccnavi_c1_tmp/sync" >&2
+	cf_record=$(ccnavi_family_record "$root" "$ccnavi_c1_repo" "$cf_p")
+	if [ "$cf_rc" -ne 0 ] || [ "$(ccnavi_record_get "$cf_record" state)" != present ]; then
+		printf 'ccnavi-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。人の判断はまだ送っていない。直してから打ち直す。\n' "$cf_p" >&2
+		ccnavi_lock_drop
+		return 1
+	fi
+	carry_paths "$cf_tree"
+	if [ -s "$ccnavi_c1_tmp/carry" ]; then
+		cf_base=$(git -C "$cf_tree" rev-parse HEAD)
+		while IFS= read -r cf_path; do
+			[ -n "$cf_path" ] || continue
+			git -C "$cf_tree" add -A -- ":(literal)$cf_path" 2>/dev/null || :
+		done <"$ccnavi_c1_tmp/carry"
+		sed 's/^/:(literal)/' "$ccnavi_c1_tmp/carry" | tr '\n' '\000' >"$ccnavi_c1_tmp/pathspec"
+		# C1 と同じく、利用者の hook は飛ばし、署名などで止まらないよう見張りの時間で切る（決定 C）。
+		if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$cf_tree" \
+			commit --quiet --only --no-verify -m "ccnavi: 承認済みチケットを更新" \
+			--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
+			cat "$ccnavi_c1_tmp/out" >>"$ccnavi_c1_tmp/err"
+			printf 'ccnavi-push-approved: %s で承認済みチケットをコミットできない（%s）。\n' "$cf_p" "$(ccnavi_git_refusal "$ccnavi_c1_tmp/err")" >&2
+			ccnavi_c1_tree="$cf_tree"
+			ccnavi_c1_unstage "$ccnavi_c1_tmp/carry" "$cf_base"
+			ccnavi_lock_drop
+			return 1
+		fi
+	fi
+	cf_head=$(git -C "$cf_tree" rev-parse HEAD)
+	if [ "$cf_head" = "$(git -C "$cf_tree" rev-parse --verify -q "refs/remotes/origin/$cf_p" 2>/dev/null || :)" ]; then
+		printf '%s: 運ぶものは無い。\n' "$cf_p"
+		ccnavi_lock_drop
+		return 0
+	fi
+	cf_timeout=$(ccnavi_c1_number "${CCNAVI_C1_TIMEOUT:-}" 60)
+	if ccnavi_git_timed "$cf_timeout" "$ccnavi_c1_tmp/push-err" "$cf_tree" \
+		push --quiet origin "refs/heads/$cf_p:refs/heads/$cf_p" >/dev/null ||
+		{ ccnavi_git_timed "$cf_timeout" "$ccnavi_c1_tmp/ls-err" "$cf_tree" \
+			ls-remote origin "refs/heads/$cf_p" >"$ccnavi_c1_tmp/ls" &&
+			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_p" "$ccnavi_c1_tmp/ls"; }; then
+		ccnavi_record_write "$cf_record" remote origin branch "$cf_p" sha "$cf_head" \
+			fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state present reason "" || :
+		printf '承認済みチケットを %s へ送った（取り込んでから送った）。\n' "$cf_p"
+		ccnavi_lock_drop
+		return 0
+	fi
+	# 落ちてもコミットは残す（人が打ち直せる）。C1 は未送信を見つけて止まり、これを打ち直すよう言う。
+	printf 'ccnavi-push-approved: %s の push が通らなかった（%s）。コミットは残した。接続を戻して sh %s/ccnavi-push-approved.sh %s を打ち直す。\n' \
+		"$cf_p" "$(head -n 1 "$ccnavi_c1_tmp/push-err" 2>/dev/null)" "$(dirname "$0")" "$cf_p" >&2
+	ccnavi_lock_drop
+	return 1
+}
+
+# 家族を名指しされたとき。取り込み済みなら運び、そうでなければ運ばない（今のまま）。
+if [ "$#" -gt 0 ]; then
+	named_rc=0
+	for want in "$@"; do
+		ccnavi_c1_family "$want"
+		case "$ccnavi_c1_target" in
+		yes) carry_family || named_rc=1 ;;
+		stop)
+			ccnavi_c1_refuse
+			named_rc=1
+			;;
+		*)
+			printf '%s: 取り込み済みの家族でない（%s）。ここでは運ばない（今のまま、人がコミットする）。\n' \
+				"$want" "${ccnavi_c1_why:-対象外}"
+			;;
+		esac
+	done
+	exit "$named_rc"
+fi
 
 # ワークスペースルートから rel を 1 段ずつ下り、シンボリックリンクの段があれば 0。
 # その段（ルートからの綴り）を linked に残す。`.claude` だけがリンクでも見逃さない。
@@ -130,6 +270,11 @@ $dir"
 	done
 done
 
+# 一時の置き場は先に作る（下のループはパイプの右側の別プロセスで、そこで作ると後始末が届かない）。
+ccnavi_c1_scratch || {
+	printf 'ccnavi-push-approved: 一時ディレクトリが作れません。\n' >&2
+	exit 2
+}
 printf '%s\n' "$trees" | while IFS= read -r tree; do
 	[ -n "$tree" ] || continue
 	[ -d "$tree/$approved" ] || continue
@@ -147,6 +292,36 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 			"$name" >&2
 		continue
 	fi
+
+	# 取り込み済みの家族の親のワークツリー（ディレクトリ名 = ブランチ名）は、取り込んでから送る。
+	case "$tree" in
+	"$root/.claude/worktrees/$branch")
+		ccnavi_c1_family "$branch"
+		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$branch" ]; then
+			# 取り込み済みの家族の子のワークツリー。写しとマーカーは親のワークツリーに置くので、
+			# 子のツリーの置き場の変更は運ばない（子のブランチはリモートに出さない）。
+			printf 'ccnavi-push-approved: %s は家族 %s の子のワークツリー。子のツリーの置き場の変更は運ばない（写しは親のワークツリーに置く）。人が中身を確かめる。\n' \
+				"$name" "$ccnavi_c1_family_id" >&2
+			printf 'fail\n' >>"$state"
+			continue
+		fi
+		case "$ccnavi_c1_target" in
+		yes)
+			if grep -F -x -q -- "$ccnavi_c1_family_id" "$ccnavi_c1_tmp/carried" 2>/dev/null; then
+				continue
+			fi
+			printf '%s\n' "$ccnavi_c1_family_id" >>"$ccnavi_c1_tmp/carried"
+			carry_family </dev/null || printf 'fail\n' >>"$state"
+			continue
+			;;
+		stop)
+			ccnavi_c1_refuse
+			printf 'fail\n' >>"$state"
+			continue
+			;;
+		esac
+		;;
+	esac
 
 	git -C "$tree" add -- "$approved" "$skip_temp" || {
 		printf 'ccnavi-push-approved: %s で承認済みチケットをステージできない。\n' "$name" >&2

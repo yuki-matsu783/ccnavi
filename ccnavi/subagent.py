@@ -82,6 +82,7 @@ def at_start(
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ（ADR-0088）。
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    approval.align_imported(conf, root, preds)
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先のワークツリーのチケットで判定される。"

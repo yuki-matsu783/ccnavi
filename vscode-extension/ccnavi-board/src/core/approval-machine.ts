@@ -350,7 +350,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     // 押し続けて全部を承認しかねない。見せているのは `approving` のままで、返ったら差し替える
     const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
     const notice = sameIds
-      ? "表示した承認内容と今の本文が違います（提案の中身が変わりました）。見直してから承認してください"
+      ? "表示した承認内容と今の中身が違います（提案か、判定が読んだ承認済みチケット・マーカーなどが変わりました）。見直してから承認してください"
       : "表示した一覧と今の一覧が違います（提案が増えたか減りました）。見直してから承認してください";
     return move(
       state,

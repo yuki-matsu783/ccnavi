@@ -499,6 +499,7 @@ class SetupTest(unittest.TestCase):
             "ccnavi-push-approved.sh",
             "ccnavi-approve.sh",
             "ccnavi-fetch.sh",
+            "ccnavi-sync.sh",
             "ccnavi-clean.sh",
             "ccnavi-clean.js",
         ):

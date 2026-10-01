@@ -1,0 +1,17 @@
+{
+  "hosts": [
+    {
+      "id": "github.com",
+      "kind": "github",
+      "api": "https://api.github.com",
+      "graphql": "https://api.github.com/graphql",
+      "web": "https://github.com"
+    },
+    {
+      "id": "gitlab.com",
+      "kind": "gitlab",
+      "api": "https://gitlab.com/api/v4",
+      "web": "https://gitlab.com"
+    }
+  ]
+}

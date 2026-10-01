@@ -1,0 +1,136 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpHOAAAACA=="
+          },
+          "nodes": [
+            {
+              "id": "PRRT_kwDOAbCdEs5H0000",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8000",
+                    "path": "src/app.py",
+                    "line": 1,
+                    "body": "<script>window.__pwned = 'thread-script'</script>スクリプトの指摘",
+                    "createdAt": "2026-09-29T06:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5H0001",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8001",
+                    "path": "src/app.py",
+                    "line": 2,
+                    "body": "<img src=\"x\" onerror=\"window.__pwned = 'thread-img'\">画像の指摘",
+                    "createdAt": "2026-09-29T06:01:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5H0002",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8002",
+                    "path": "src/app.py",
+                    "line": 3,
+                    "body": "[押す](javascript:window.__pwned='thread-link') と <a href=\"jav&#x61;script:window.__pwned='thread-entity'\">崩した綴り</a>",
+                    "createdAt": "2026-09-29T06:02:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5H0003",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8003",
+                    "path": "src/app.py",
+                    "line": 4,
+                    "body": "<svg onload=\"window.__pwned='thread-svg'\"><circle r=\"4\"/></svg>SVG の指摘",
+                    "createdAt": "2026-09-29T06:03:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5H0004",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8004",
+                    "path": "src/app.py",
+                    "line": 5,
+                    "body": "<details><summary>何でもない</summary>畳んで隠した指摘</details>",
+                    "createdAt": "2026-09-29T06:04:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5H0005",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8005",
+                    "path": "src/app.py",
+                    "line": 6,
+                    "body": "見える指摘<!-- 隠したつもりの指摘 -->",
+                    "createdAt": "2026-09-29T06:05:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5H0006",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8006",
+                    "path": "src/app.py",
+                    "line": 7,
+                    "body": "<span hidden>hidden で隠した指摘</span><font color=\"white\">白文字の指摘</font>",
+                    "createdAt": "2026-09-29T06:06:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5H0007",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r8007",
+                    "path": "src/app.py",
+                    "line": 8,
+                    "body": "<p style=\"display:none\" onclick=\"window.__pwned='thread-click'\">style で隠した指摘</p>",
+                    "createdAt": "2026-09-29T06:07:00Z"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+[
+  {
+    "user": {
+      "username": "lab-other"
+    },
+    "state": "approved",
+    "created_at": "2026-09-29T04:00:00.000Z"
+  },
+  {
+    "user": null,
+    "state": "unreviewed",
+    "updated_at": null,
+    "created_at": null
+  }
+]

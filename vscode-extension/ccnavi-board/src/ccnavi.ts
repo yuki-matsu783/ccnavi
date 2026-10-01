@@ -31,6 +31,7 @@ import {
 } from "./core/approvemodel.js";
 import {
   approveArgs,
+  c1TargetOf,
   decideArgs,
   decidePreviewArgs,
   previewArgs,
@@ -594,4 +595,17 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);
   return { ok: false, error: said === "" ? `${what} の出力を読めません（${parsed.error}）` : `${what} の出力: ${said}` };
+}
+
+/**
+ * 家族が C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * フローの保存の後、運ぶ処理を送るかを決めるのに使う（ADR-0093 の 4.6）。
+ */
+export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return "";
+  }
+  const ran = await run(launcher, root, ["c1", "family", parent], EXPLAIN_TIMEOUT_MS);
+  return ran.code === 0 ? c1TargetOf(ran.stdout) : "";
 }

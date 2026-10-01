@@ -1,0 +1,32 @@
+{
+  "host": "github",
+  "mr": {
+    "number": 42,
+    "url": "https://github.com/acme/widgets/pull/42"
+  },
+  "threads": [
+    {
+      "id": "PRRT_kwDOAbCdEs5CC001",
+      "resolved": true,
+      "url": "https://github.com/acme/widgets/pull/42#discussion_r9101",
+      "path": "src/app.py",
+      "line": 2,
+      "body": "済み",
+      "created_at": "2026-09-29T01:00:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "state": "CHANGES_REQUESTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9201",
+      "submitted_at": "2026-09-29T02:00:00Z",
+      "author": "9001"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9202",
+      "submitted_at": "2026-09-29T03:00:00Z",
+      "author": "9001"
+    }
+  ]
+}

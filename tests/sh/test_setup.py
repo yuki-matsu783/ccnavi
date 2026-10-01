@@ -101,6 +101,7 @@ DEPLOY_SCRIPTS = (
     "ccnavi-push-approved.sh",
     "ccnavi-approve.sh",
     "ccnavi-fetch.sh",
+    "ccnavi-sync.sh",
     "ccnavi-clean.sh",
     "ccnavi-clean.js",
 )

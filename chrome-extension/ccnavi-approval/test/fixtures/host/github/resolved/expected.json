@@ -1,0 +1,35 @@
+{
+  "host": "github",
+  "mr": {
+    "number": 42,
+    "url": "https://github.com/acme/widgets/pull/42"
+  },
+  "threads": [
+    {
+      "id": "PRRT_kwDOAbCdEs5AAAAB",
+      "resolved": true,
+      "url": "https://github.com/acme/widgets/pull/42#discussion_r1001",
+      "path": "src/app.py",
+      "line": 3,
+      "body": "ここは直す",
+      "created_at": "2026-09-29T01:00:00Z"
+    },
+    {
+      "id": "PRRT_kwDOAbCdEs5AAAAC",
+      "resolved": true,
+      "url": "https://github.com/acme/widgets/pull/42#discussion_r1002",
+      "path": "wip/design/plan.md",
+      "line": 12,
+      "body": "表を足す\n\n- 列を 1 つ",
+      "created_at": "2026-09-29T01:05:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "state": "APPROVED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-5001",
+      "submitted_at": "2026-09-29T02:00:00Z",
+      "author": "9001"
+    }
+  ]
+}

@@ -581,8 +581,8 @@ test("CB-T174 食い違いは、見せたまま同じ絞りで読み直し、返
   assert.equal(shown.state.overlay?.kind, "preview");
   assert.equal(
     shown.state.overlay?.kind === "preview" ? shown.state.overlay.notice : "",
-    "表示した承認内容と今の本文が違います（提案の中身が変わりました）。見直してから承認してください",
-    "識別子が同じなら、変わったのは本文",
+    "表示した承認内容と今の中身が違います（提案か、判定が読んだ承認済みチケット・マーカーなどが変わりました）。見直してから承認してください",
+    "識別子が同じなら、変わったのは中身（提案か判定が読んだもの）",
   );
   assert.equal(shown.state.recheck, undefined);
 

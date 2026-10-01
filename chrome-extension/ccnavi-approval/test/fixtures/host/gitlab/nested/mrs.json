@@ -1,0 +1,14 @@
+[
+  {
+    "id": 9007,
+    "iid": 7,
+    "project_id": 42,
+    "title": "Draft: レビューを待つ親",
+    "state": "opened",
+    "source_branch": "i0001",
+    "target_branch": "main",
+    "draft": true,
+    "web_url": "https://gitlab.com/acme/team/widgets/-/merge_requests/7",
+    "source_project_id": 42
+  }
+]

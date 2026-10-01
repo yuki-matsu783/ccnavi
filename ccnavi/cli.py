@@ -12,14 +12,18 @@ ops / review へ渡す。
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
+import re
+import tempfile
 import time
 from typing import TextIO
 
 from . import (
-    approval,
     audit,
+    c1,
     configsync,
+    core,
     diaglog,
     diagnose,
     docsearch,
@@ -31,6 +35,7 @@ from . import (
     lint,
     modes,
     ops,
+    phase,
     prune,
     review,
     ruleload,
@@ -209,8 +214,17 @@ scripts in .ccnavi/scripts/, which call
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
-    ccnavi review confirm   --cwd <dir> --phase N --result <json>
+    ccnavi review confirm   --cwd <dir> --phase N --result <json> [--actor <account>]
     ccnavi review ready     --cwd <dir> --result <json>
+    ccnavi sync paths
+        (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
+         approved and proposal places, the ccnavi directory, and the integration
+         branch written in .claude/settings.local.json env; reads no environment
+         for the integration branch)
+    ccnavi sync check <parent> [<repo>]
+        (for ccnavi-sync.sh after it took in <parent>: re-judges the family's
+         approved tickets and its authority; a "check 1" line, then one
+         "<severity> <detail>" per line; exit 1 when an error stops the family)
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
@@ -225,6 +239,9 @@ cannot reach them by the relative path)
 which fetches the threads and runs
 
     ccnavi --reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
+        [--actor=<account> --via=terminal|board]
+        (the script passes the token owner when it can read it; the reviewed mark
+         keeps the account and the way. Without it the mark is as before)
 
 A phase whose type says `review: chat` is reviewed in the session itself. There
 is no merge request and no copy to read, so a human opens that gate from the
@@ -400,8 +417,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--verify", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
-    # 見せた承認画面の本文と承認済みチケットに写る中身の指紋（preview の `digest`）。
-    # `--yes` と一緒に渡す。
+    # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身の指紋
+    # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
@@ -459,6 +476,26 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("-h", "--help", action="store_true")
     # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
     parser.add_argument("--version", action="store_true")
+    # この実行で書いた・消したパスを、控えの置き場の下のファイルに 1 行 1 つで書き出す
+    # （ADR-0093 の 4.3「fsio の記録層」）。C1（段階 2d）の sh が渡し、
+    # 一覧のパスだけをコミットする。
+    parser.add_argument("--record-writes", default="")
+    # 一覧の基点（C1 の親のワークツリー。段階 2d）。渡すと一覧はこのツリーからの相対になり、
+    # 置き場の外に書いたら error（D34 の例外を除く）。
+    parser.add_argument("--record-tree", default="")
+    # 対話の decide の前半（ADR-0093 の段階 2d のレビューの決定 A）。選択と指紋をこのファイルに
+    # 書くだけで、何も置かない（控えの置き場の下だけ）。
+    parser.add_argument("--choose-out", default="")
+    # 統合先の名前（ADR-0093 の D30。段階 2b）。環境変数は読まず、sh が決めて渡す。
+    # いまは `--lint` の識別子の予約（3.1 の 5）が読む。
+    parser.add_argument("--integration-branch", default="")
+    # レビュー済みの印に入れるアカウント（ADR-0093 の 8.9。段階 4）。ccnavi-review.sh が
+    # トークンの持ち主をホストに聞いて渡す（実行ファイルはネットワークに出ない）。
+    # `review confirm` と、書く形の decide（`--reviewed N --accept-unresolved`。段階 5）が読む。
+    parser.add_argument("--actor", default="")
+    # decide の印の経路（`terminal`・`board`。8.9。段階 5）。`--actor` と一緒にだけ受ける
+    # （アカウントを引けなかったときは印も跡も前と同じにするため）。
+    parser.add_argument("--via", default="")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
@@ -466,6 +503,196 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.help:
         stderr.write(USAGE)
         return EXIT_ERROR
+    if args.record_tree and not args.record_writes:
+        stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
+        return EXIT_ERROR
+    if args.actor and not _ACTOR.fullmatch(args.actor):
+        stderr.write("ccnavi: --actor はホストのアカウント名（英数字と _ . - の 1〜100 字）\n")
+        return EXIT_ERROR
+    if args.actor and list(args.command[:2]) != ["review", "confirm"] and not _decide_writes(args):
+        stderr.write(
+            "ccnavi: --actor は review confirm か、書く形の decide"
+            "（--reviewed <N> --accept-unresolved）と一緒に使う\n"
+        )
+        return EXIT_ERROR
+    if args.via and (not args.actor or not _decide_writes(args)):
+        stderr.write("ccnavi: --via は decide の --actor と一緒に使う\n")
+        return EXIT_ERROR
+    if args.via and args.via not in (history.VIA_TERMINAL, history.VIA_BOARD):
+        stderr.write(f"ccnavi: --via は {history.VIA_TERMINAL} か {history.VIA_BOARD}\n")
+        return EXIT_ERROR
+    # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
+    # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
+    if args.via == history.VIA_BOARD and not args.yes:
+        stderr.write("ccnavi: --via board は --yes（ボードの押した選択）と一緒に使う\n")
+        return EXIT_ERROR
+    if args.record_writes and not args.version:
+        return _recorded_run(stdin, stdout, stderr, parser, args)
+    return _parsed(stdin, stdout, stderr, parser, args)
+
+
+def _recorded_run(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> int:
+    """`--record-writes <ファイル>` つきの 1 回。書いたパスを集め、終わったら書き出す。
+
+    **書き出す先**は、ワークスペースルートの既定の控えの置き場（`logs/state`）の下の `c1/`
+    だけ。`--state` と `CCNAVI_STATE` の上書きは見ない（上書きで置き場を動かせば、
+    どこへでも書ける道になる）。行き先・置き場・ルートは行き着く先（リンクを解いた綴り、
+    大文字小文字を畳んだもの）で比べ、`c1/` までの途中にリンクがあれば断る。書き出しは
+    同じディレクトリの一時ファイルから `os.replace` で置き換えるので、行き先にリンクが
+    あってもその先は開かない（リンクの行き先は書き換えない。Windows でも同じ）。
+
+    **一覧の形**は 1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外と、
+    別のドライブ（Windows）は絶対パスのまま。既定の控えの置き場の下（リポジトリに入らない）と
+    一覧のファイル自身は載せない。上書きした控えの置き場への書き込みは載る（C1 が
+    「置き場の外」として止める側）。置き場の外が入っていたら止めるのは C1（段階 2d）で、
+    ここは集めて書くだけ。
+
+    **終了コード**: コマンドが落ちても、そこまでに書いたパスで一覧を書く（C1 は落ちた回も
+    戻すのに一覧を使う）。一覧を書けなければ、コマンドの結果に依らず 1 で終わる
+    （C1 はそれを「書いたものが分からない」として扱う）。行き先が断られたときはコマンドを
+    走らせずに 1 で終わる。
+    """
+    wrapper = argparse.Namespace(**vars(args))
+    if not _one_wrapper_flag_each(stderr, wrapper):
+        return EXIT_ERROR
+    root = wrapper.root if wrapper.root is not None else default_root()
+    real_root = _real(root)
+    state = os.path.join(real_root, settings.DEFAULT_STATE)
+    place = os.path.join(state, "c1")
+    given = os.path.abspath(args.record_writes)
+    target = os.path.join(_real(os.path.dirname(given)), os.path.basename(given))
+    refused = _record_place_problem(place, target, args.record_writes)
+    if refused:
+        stderr.write(
+            f"ccnavi: --record-writes の書き出し先は {place}{os.sep}... の下だけ（{refused}）\n"
+        )
+        return EXIT_ERROR
+    base = _real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
+    # 上書きした控えの置き場（`--state`・`CCNAVI_STATE`）も、リポジトリに入らない書き込み
+    # （レビューの下書きなど）の置き場なので一覧から外す（ADR-0093 の段階 2d のレビュー）。
+    conf_for_state, _ = settings.load(root)
+    _override(conf_for_state, args)
+    moved_state = _real(conf_for_state.state) if conf_for_state.state else state
+    with fsio.recording() as written:
+        code = _parsed(stdin, stdout, stderr, parser, args)
+    lines = []
+    reals = []
+    for path in written:
+        real = fsio.parent_resolved(path)
+        if _inside(real, state) or _inside(real, moved_state) or _same(real, target):
+            continue
+        rel = real
+        if _inside(real, base):
+            try:
+                rel = os.path.relpath(real, base)
+            except ValueError:
+                rel = real
+        lines.append(rel.replace(os.sep, "/"))
+        reals.append(real)
+    failed = _write_record(target, "".join(f"{line}\n" for line in lines))
+    if failed:
+        stderr.write(f"ccnavi: 書いたパスの一覧を {target} に書けない ({failed})\n")
+        return EXIT_ERROR
+    if args.record_tree:
+        outside = _outside_places(root, args, base, reals)
+        if outside:
+            stderr.write(
+                "ccnavi: C1 は状態だけを運ぶ。置き場の外に書いた（"
+                + ", ".join(outside)
+                + "）。コミットしない\n"
+            )
+            return code if code != EXIT_OK else EXIT_ERROR
+    return code
+
+
+def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[str]) -> list[str]:
+    """一覧のうち、C1 の置き場（承認済み・レビュー待ち）の外のもの（ADR-0093 の 4.3）。
+
+    例外は 1 つだけ（D34）: `ticket start` の中で configsync が写したプロジェクトの層と、
+    指す先を直した配点のスクリプト（`configsync.is_synced_write` が内容で読めるもの）。
+    """
+    conf, _ = settings.load(root)
+    _override(conf, args)
+    approved = settings.approved_dir(conf, base)
+    review_dir = os.path.join(
+        base, (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep), "review"
+    )
+    places = [_real(approved), _real(review_dir)]
+    starting = list(args.command[:2]) == ["ticket", "start"]
+    found = []
+    for real in reals:
+        if _inside(real, base) and any(_inside(real, p) for p in places):
+            continue
+        if starting and _inside(real, base) and configsync.is_synced_write(conf, root, real):
+            continue
+        found.append(real)
+    return found
+
+
+def _real(path: str) -> str:
+    try:
+        return os.path.realpath(path)
+    except OSError:
+        return os.path.normpath(os.path.abspath(path))
+
+
+def _record_place_problem(place: str, target: str, given: str) -> str:
+    """書き出し先が `place` の下でない・途中にリンクがある理由。よければ空文字。"""
+    if os.path.lexists(place) and os.path.islink(place):
+        return "c1 がシンボリックリンク"
+    if not _inside(target, place) or _same(target, place):
+        return f"{given} は外"
+    if os.path.islink(target):
+        return f"{given} はシンボリックリンク"
+    return ""
+
+
+def _write_record(target: str, text: str) -> str:
+    """一覧を書く。一時ファイルに書いて置き換える（行き先のリンクは辿らない）。"""
+    directory = os.path.dirname(target)
+    try:
+        os.makedirs(directory, exist_ok=True)
+        # 作った後にも、途中のディレクトリがリンクで外へ出ていないかを見る。
+        if _real(directory) != os.path.normpath(directory):
+            return "書き出し先のディレクトリがリンクを含む"
+        handle, part = tempfile.mkstemp(dir=directory, prefix=".record.", suffix=".part")
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as f:
+                f.write(text)
+            os.replace(part, target)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.remove(part)
+            raise
+    except OSError as exc:
+        return str(exc)
+    return ""
+
+
+def _same(a: str, b: str) -> bool:
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
+def _inside(path: str, base: str) -> bool:
+    """`path` が `base` の下（か同じ）か。どちらも行き着く先の綴りで渡す。大文字小文字は畳む。"""
+    path = os.path.normcase(os.path.normpath(path))
+    base = os.path.normcase(os.path.normpath(base))
+    return path == base or path.startswith(base.rstrip(os.sep) + os.sep)
+
+
+def _parsed(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> int:
     # 設定もワークスペースも読まない。フラグは上の定義から引くので、足したものはそのまま並ぶ。
     if args.version:
         return version.report(stdout, parser, args.json)
@@ -545,6 +772,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_ERROR
         swaps[name] = os.path.abspath(path)
 
+    conf.integration_branch = args.integration_branch.strip()
+
     # フローの確かめは `--lint` だけが読む。判定にも採点にも効かないが、ほかの差し替えと同じく
     # 診断の外では落として言う。診断でも `--lint` でなければ読む先が無いので、そう言って落とす。
     if args.flow:
@@ -613,11 +842,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         # 通るかどうかを終了コードで返すところ（REQ-APV-13）。答えは 0（はい）と
         # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
         if args.verify:
-            return approval.verify(stdout, stderr, conf, root, args.json, list(args.command))
+            return core.verify(stdout, stderr, conf, root, args.json, list(args.command))
         # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
         # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
-            code = approval.preview(stdout, stderr, conf, root, args.json, list(args.command))
+            code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
         # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
@@ -625,7 +854,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.yes:
             history.set_via(history.VIA_BOARD)
             # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
-            code = approval.approve_yes(
+            code = core.approve_yes(
                 stdout,
                 stderr,
                 conf,
@@ -641,7 +870,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         history.set_via(history.VIA_TERMINAL)
         rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
         # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
-        approved = approval.approve(
+        approved = core.approve(
             stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
         )
         return EXIT_OK if approved == 0 else EXIT_ERROR
@@ -656,6 +885,31 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
         code = configsync.acknowledge(stdin, stdout, stderr, conf, root, args.config_synced)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+
+    # 取り込みの sh（`ccnavi-sync.sh`）が綴りを聞く経路。読むだけで、チケット制御の有無に依らない。
+    if list(args.command) == ["sync", "paths"]:
+        return EXIT_OK if sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
+    # 取り込みの後の検査（ADR-0093 の 4.2 の 4。段階 2c）。error があれば sh が家族を止める。
+    if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
+        repo = args.command[3] if len(args.command) == 4 else None
+        code = sync_check(stdout, stderr, root, conf, args.command[2], repo)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    # C1（ADR-0093 の 4.3・4.4。段階 2d）の sh が聞くこと。読むだけで、何も書かない。
+    if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
+        if not _FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
+            stderr.write(f"ccnavi: c1 family の {args.command[2]!r} は識別子の形ではない\n")
+            return EXIT_ERROR
+        return EXIT_OK if c1.family(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
+    if len(args.command) in (3, 4) and list(args.command[:2]) == ["c1", "sort"]:
+        since = args.command[3] if len(args.command) == 4 else ""
+        if not _FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
+            stderr.write(f"ccnavi: c1 sort の {args.command[2]!r} は識別子の形ではない\n")
+            return EXIT_ERROR
+        if since and not _REVISION.fullmatch(since):
+            stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")
+            return EXIT_ERROR
+        code = c1.sort(stdout, stderr, conf, root, args.command[2], since)
         return EXIT_OK if code == 0 else EXIT_ERROR
 
     if args.command or args.reviewed is not None or args.close_early:
@@ -895,6 +1149,16 @@ def operate(
         stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
         return EXIT_ERROR
     cwd = args.cwd or os.getcwd()
+    bypass = _c1_bypass(root, conf, args, cwd)
+    if bypass:
+        stderr.write(
+            f"ccnavi: 家族 {bypass} は取り込み済み（C1 の対象）。状態の操作は "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' か "
+            f"'{settings.script_command(root, 'ccnavi-review.sh')}' から打つ。"
+            "C1 を通らない書き込みは親のブランチへ送られないので、何も書かずに止めた"
+            "（ADR-0093 の 4.3）\n"
+        )
+        return EXIT_ERROR
     if args.close_early:
         if not args.result:
             stderr.write("ccnavi: --close-early には --reason <理由> と --result <json> が要る\n")
@@ -913,6 +1177,7 @@ def operate(
             stderr.write("ccnavi: ボードの経路は --json と --result <json> を付けて打つ\n")
             return EXIT_ERROR
         history.set_via(history.VIA_BOARD)
+        _decide_actor(args)
         if args.preview:
             code = review.decide_preview(
                 stdout, stderr, root, conf, cwd, args.reviewed, args.result
@@ -930,8 +1195,19 @@ def operate(
                 args.digest,
             )
         return EXIT_OK if code == 0 else EXIT_ERROR
+    if args.reviewed is not None and args.choose_out:
+        # 対話の decide の前半（利用者の決定 A）。人が端末で選び、選択と指紋を控えの置き場に
+        # 書くだけ。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ。
+        if not _inside(_real(os.path.abspath(args.choose_out)), _real(conf.state)):
+            stderr.write("ccnavi: --choose-out の書き出し先は控えの置き場の下だけ\n")
+            return EXIT_ERROR
+        code = review.choose(
+            stdin, stdout, stderr, root, conf, cwd, args.reviewed, args.result, args.choose_out
+        )
+        return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
         history.set_via(history.VIA_TERMINAL)
+        _decide_actor(args)
         code = review.reviewed(
             stdin,
             stdout,
@@ -979,7 +1255,9 @@ def operate(
         elif verb == "requested":
             code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
-            code = review.confirm(stdout, stderr, root, conf, cwd, args.phase, args.result)
+            code = core.confirm_local(
+                stdout, stderr, root, conf, cwd, args.phase, args.result, args.actor
+            )
     elif kind == "review" and verb == "ready":
         if not args.result:
             stderr.write("ccnavi: review ready には --result <json> が要る\n")
@@ -988,6 +1266,122 @@ def operate(
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR
+
+
+def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd) -> str:
+    """C1 を通らずに、取り込み済みの家族の状態を書こうとしているなら、その家族。無ければ空。
+
+    状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
+    行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の家族では sh が `--record-tree` を
+    付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を素通りしている
+    （ADR-0093 の段階 2d のレビュー）。人の判断の入口（`--reviewed --chat`・`--config-synced`・
+    `--close-early`）と、書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
+    """
+    if args.record_tree:
+        return ""
+    words = list(args.command)
+    family_id = ""
+    if len(words) >= 3 and words[0] == "ticket" and words[1] in ("start", "finish", "cancel"):
+        family_id = c1.family_of(words[2])
+    elif (
+        len(words) >= 2 and words[0] == "review" and words[1] in ("requested", "confirm", "ready")
+    ) or (
+        args.reviewed is not None
+        and args.accept_unresolved
+        and not args.preview
+        and not args.choose_out
+        and not args.chat
+    ):
+        where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
+        parent = phase.parent_for_cwd(root, conf, where) if where else None
+        if parent is not None:
+            family_id = parent.parent or parent.ticket
+    if not family_id or not _FAMILY.fullmatch(family_id):
+        return ""
+    verdict, _, _ = c1.target(conf, root, family_id)
+    return family_id if verdict == c1.TARGET_YES else ""
+
+
+def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
+    """`ccnavi-sync.sh` が要る綴りを 1 行 1 項目（`<鍵> <値>`）で返す（ADR-0093 の 4.2・D33）。
+
+    sh は jq を使わず、JSON も読まない。置き場の綴り（ツリーのルートからの相対）と、
+    `.claude/settings.local.json` の `env` に書かれた統合先の名前をここが読んで渡す。
+    統合先の名前は環境変数からは読まない（sh が先に環境変数を見る。D30）。
+    ネットワークにも git にも触らない。
+    """
+    lines = (
+        ("approved", fsio.slashed(conf.approved).strip("/")),
+        ("proposals", fsio.slashed(conf.tickets).strip("/")),
+        ("home", fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")),
+        ("integration", settings.integration_local(root)),
+    )
+    for key, value in lines:
+        stdout.write(f"{key} {value}\n")
+    return 0
+
+
+def _decide_writes(args) -> bool:
+    """書く形の decide か（`--reviewed N --accept-unresolved` の、見るだけ・chat でないもの）。"""
+    return (
+        args.reviewed is not None
+        and args.accept_unresolved
+        and not args.preview
+        and not args.choose_out
+        and not args.chat
+    )
+
+
+def _decide_actor(args) -> None:
+    """decide の印と跡に入れるアカウントと経路（ADR-0093 の 8.9。段階 5）。
+
+    `--actor` があれば跡の行にアカウントを足し、`--via` があれば経路を差し替える。印の
+    `actor`・`via` は `review.apply_decision` がこの起動の値から書く。無ければ印も跡も前と同じ。
+    """
+    if not args.actor:
+        return
+    history.set_actor(args.actor)
+    if args.via:
+        history.set_via(args.via)
+
+
+# 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスに化ける綴りを入れない。
+_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
+_ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
+# `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数に化ける綴りを入れない）。
+_REVISION = re.compile(r"[0-9a-f]{7,64}|refs/remotes/origin/[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+# `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
+# 知らない副命令を断った、など）と読み、家族を止めない（検査の error と分ける）。
+SYNC_CHECK_HEAD = "check 1"
+
+
+def sync_check(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    family: str,
+    repo: str | None = None,
+) -> int:
+    """`ccnavi-sync.sh` が取り込みの後に打つ検査。頭に `check 1`、続けて 1 行 1 件。
+
+    error が 1 つでもあれば 1。sh は最初の error の中身を家族の控えの `reason` に書いて
+    `blocked` にする（ADR-0093 の 4.2 の 4）。`repo` は控えの名前（`self` かプロジェクト名）。
+    ネットワークにも git にも触らない。
+    """
+    for name, value in (("識別子", family), ("リポジトリ", repo or "self")):
+        if not _FAMILY.fullmatch(value) or ".." in value:
+            stderr.write(f"ccnavi: sync check の{name} {value!r} は識別子の形ではない\n")
+            return 1
+    problems = lint.family_check(conf, root, family, repo)
+    stdout.write(SYNC_CHECK_HEAD + "\n")
+    for p in problems:
+        detail = " ".join(p.detail.split())
+        stdout.write(f"{p.severity} {detail}\n")
+    return 1 if any(p.severity == lint.SEVERITY_ERROR for p in problems) else 0
 
 
 def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:

@@ -52,7 +52,7 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
-| `.ccnavi/scripts/ccnavi-fetch.sh` | `sh` |
+| `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh` | `sh` |
 | `.claude/hooks/test-py.sh` | `e2e` |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`vscode-extension/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/fixtures/` | `guard` `ticket` |

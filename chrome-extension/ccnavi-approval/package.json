@@ -1,0 +1,28 @@
+{
+  "name": "ccnavi-approval",
+  "displayName": "ccnavi 承認ボード",
+  "description": "リモートのブランチの承認待ちを、ブラウザと PAT だけで見せ、承認・取り下げ・レビュー済みを親のブランチへ書き、issue から親のブランチを始める Chrome 拡張（ADR-0093 段階 5。GitHub と GitLab）。判定は同梱の ccnavi を Pyodide で動かして出す",
+  "version": "0.4.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node scripts/test.js",
+    "test:e2e": "node scripts/test.js --e2e",
+    "clean": "node scripts/clean.js"
+  },
+  "dependencies": {
+    "dompurify": "3.4.16",
+    "marked": "18.0.14",
+    "pyodide": "314.0.7"
+  },
+  "devDependencies": {
+    "@types/jsdom": "30.0.0",
+    "@types/node": "22.20.2",
+    "esbuild": "0.25.12",
+    "jsdom": "30.1.0",
+    "playwright-core": "1.56.1",
+    "typescript": "5.9.3"
+  }
+}

@@ -42,7 +42,8 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runFlowLint } from "./ccnavi.js";
+import { loadBoard, runC1Target, runFlowLint } from "./ccnavi.js";
+import { PUSH_APPROVED_SCRIPT, pushApprovedCommand } from "./core/commands.js";
 import { flowDisagreement, openDisagreementText, saveDisagreementText } from "./core/flow-agree.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
@@ -64,6 +65,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
+import { runInTerminal } from "./terminal.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -693,7 +695,35 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     return;
   }
   await reload(current);
-  vscode.window.showInformationMessage(
-    `${loaded.shown} に保存した。承認済みチケットと同じく人がコミットする（sh .ccnavi/scripts/ccnavi-push-approved.sh）`,
+  // 取り込み済みの家族（C1 の対象）だけ、運ぶ処理を送る（ADR-0093 の 4.6）。端末は対話中のことがあるので、
+  // 勝手に打ち込まず、人がボタンを押したときだけ送る（段階 2d のレビューの決定 E）。それ以外の家族は今どおり
+  // 人がコミットする。
+  const root = current.folder.uri.fsPath;
+  const carrier =
+    target.parent !== "" &&
+    isFile(path.join(root, PUSH_APPROVED_SCRIPT)) &&
+    (await runC1Target(root, binSetting(), target.parent)) === "yes";
+  if (!carrier) {
+    vscode.window.showInformationMessage(
+      `${loaded.shown} に保存した。承認済みチケットと同じく人がコミットする（sh ${PUSH_APPROVED_SCRIPT}）`,
+    );
+    return;
+  }
+  const send = "端末で送る";
+  const picked = await vscode.window.showInformationMessage(
+    `${loaded.shown} に保存した。家族 ${target.parent} は取り込み済みなので、運ぶ処理（${PUSH_APPROVED_SCRIPT} ${target.parent}）で送る`,
+    send,
   );
+  if (picked === send) {
+    runInTerminal(root, pushApprovedCommand(root, [target.parent]));
+  }
+}
+
+/** 普通のファイルが在るか（運ぶ sh が配られているか） */
+function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
 }

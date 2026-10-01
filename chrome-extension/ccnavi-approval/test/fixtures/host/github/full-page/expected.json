@@ -1,0 +1,620 @@
+{
+  "host": "github",
+  "mr": {
+    "number": 42,
+    "url": "https://github.com/acme/widgets/pull/42"
+  },
+  "threads": [
+    {
+      "id": "PRRT_kwDOAbCdEs5FP001",
+      "resolved": true,
+      "url": "https://github.com/acme/widgets/pull/42#discussion_r9401",
+      "path": "src/app.py",
+      "line": 5,
+      "body": "<!-- ccnavi:request i0001:1 key=zz -->\n目印をまねた人の指摘",
+      "created_at": "2026-09-29T01:00:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9500",
+      "submitted_at": "2026-09-28T00:00:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9501",
+      "submitted_at": "2026-09-28T00:01:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9502",
+      "submitted_at": "2026-09-28T00:02:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9503",
+      "submitted_at": "2026-09-28T00:03:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9504",
+      "submitted_at": "2026-09-28T00:04:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9505",
+      "submitted_at": "2026-09-28T00:05:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9506",
+      "submitted_at": "2026-09-28T00:06:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9507",
+      "submitted_at": "2026-09-28T00:07:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9508",
+      "submitted_at": "2026-09-28T00:08:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9509",
+      "submitted_at": "2026-09-28T00:09:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9510",
+      "submitted_at": "2026-09-28T00:10:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9511",
+      "submitted_at": "2026-09-28T00:11:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9512",
+      "submitted_at": "2026-09-28T00:12:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9513",
+      "submitted_at": "2026-09-28T00:13:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9514",
+      "submitted_at": "2026-09-28T00:14:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9515",
+      "submitted_at": "2026-09-28T00:15:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9516",
+      "submitted_at": "2026-09-28T00:16:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9517",
+      "submitted_at": "2026-09-28T00:17:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9518",
+      "submitted_at": "2026-09-28T00:18:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9519",
+      "submitted_at": "2026-09-28T00:19:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9520",
+      "submitted_at": "2026-09-28T00:20:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9521",
+      "submitted_at": "2026-09-28T00:21:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9522",
+      "submitted_at": "2026-09-28T00:22:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9523",
+      "submitted_at": "2026-09-28T00:23:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9524",
+      "submitted_at": "2026-09-28T00:24:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9525",
+      "submitted_at": "2026-09-28T00:25:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9526",
+      "submitted_at": "2026-09-28T00:26:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9527",
+      "submitted_at": "2026-09-28T00:27:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9528",
+      "submitted_at": "2026-09-28T00:28:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9529",
+      "submitted_at": "2026-09-28T00:29:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9530",
+      "submitted_at": "2026-09-28T00:30:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9531",
+      "submitted_at": "2026-09-28T00:31:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9532",
+      "submitted_at": "2026-09-28T00:32:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9533",
+      "submitted_at": "2026-09-28T00:33:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9534",
+      "submitted_at": "2026-09-28T00:34:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9535",
+      "submitted_at": "2026-09-28T00:35:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9536",
+      "submitted_at": "2026-09-28T00:36:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9537",
+      "submitted_at": "2026-09-28T00:37:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9538",
+      "submitted_at": "2026-09-28T00:38:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9539",
+      "submitted_at": "2026-09-28T00:39:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9540",
+      "submitted_at": "2026-09-28T00:40:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9541",
+      "submitted_at": "2026-09-28T00:41:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9542",
+      "submitted_at": "2026-09-28T00:42:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9543",
+      "submitted_at": "2026-09-28T00:43:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9544",
+      "submitted_at": "2026-09-28T00:44:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9545",
+      "submitted_at": "2026-09-28T00:45:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9546",
+      "submitted_at": "2026-09-28T00:46:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9547",
+      "submitted_at": "2026-09-28T00:47:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9548",
+      "submitted_at": "2026-09-28T00:48:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9549",
+      "submitted_at": "2026-09-28T00:49:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9550",
+      "submitted_at": "2026-09-28T00:50:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9551",
+      "submitted_at": "2026-09-28T00:51:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9552",
+      "submitted_at": "2026-09-28T00:52:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9553",
+      "submitted_at": "2026-09-28T00:53:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9554",
+      "submitted_at": "2026-09-28T00:54:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9555",
+      "submitted_at": "2026-09-28T00:55:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9556",
+      "submitted_at": "2026-09-28T00:56:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9557",
+      "submitted_at": "2026-09-28T00:57:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9558",
+      "submitted_at": "2026-09-28T00:58:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9559",
+      "submitted_at": "2026-09-28T00:59:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9560",
+      "submitted_at": "2026-09-28T01:00:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9561",
+      "submitted_at": "2026-09-28T01:01:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9562",
+      "submitted_at": "2026-09-28T01:02:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9563",
+      "submitted_at": "2026-09-28T01:03:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9564",
+      "submitted_at": "2026-09-28T01:04:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9565",
+      "submitted_at": "2026-09-28T01:05:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9566",
+      "submitted_at": "2026-09-28T01:06:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9567",
+      "submitted_at": "2026-09-28T01:07:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9568",
+      "submitted_at": "2026-09-28T01:08:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9569",
+      "submitted_at": "2026-09-28T01:09:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9570",
+      "submitted_at": "2026-09-28T01:10:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9571",
+      "submitted_at": "2026-09-28T01:11:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9572",
+      "submitted_at": "2026-09-28T01:12:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9573",
+      "submitted_at": "2026-09-28T01:13:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9574",
+      "submitted_at": "2026-09-28T01:14:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9575",
+      "submitted_at": "2026-09-28T01:15:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9576",
+      "submitted_at": "2026-09-28T01:16:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9577",
+      "submitted_at": "2026-09-28T01:17:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9578",
+      "submitted_at": "2026-09-28T01:18:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9579",
+      "submitted_at": "2026-09-28T01:19:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9580",
+      "submitted_at": "2026-09-28T01:20:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9581",
+      "submitted_at": "2026-09-28T01:21:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9582",
+      "submitted_at": "2026-09-28T01:22:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9583",
+      "submitted_at": "2026-09-28T01:23:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9584",
+      "submitted_at": "2026-09-28T01:24:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9585",
+      "submitted_at": "2026-09-28T01:25:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9586",
+      "submitted_at": "2026-09-28T01:26:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9587",
+      "submitted_at": "2026-09-28T01:27:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9588",
+      "submitted_at": "2026-09-28T01:28:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9589",
+      "submitted_at": "2026-09-28T01:29:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9590",
+      "submitted_at": "2026-09-28T01:30:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9591",
+      "submitted_at": "2026-09-28T01:31:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9592",
+      "submitted_at": "2026-09-28T01:32:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9593",
+      "submitted_at": "2026-09-28T01:33:00Z",
+      "author": "203"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9594",
+      "submitted_at": "2026-09-28T01:34:00Z",
+      "author": "204"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9595",
+      "submitted_at": "2026-09-28T01:35:00Z",
+      "author": "200"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9596",
+      "submitted_at": "2026-09-28T01:36:00Z",
+      "author": "201"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9597",
+      "submitted_at": "2026-09-28T01:37:00Z",
+      "author": "202"
+    },
+    {
+      "state": "COMMENTED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9598",
+      "submitted_at": "2026-09-28T01:38:00Z",
+      "author": "203"
+    },
+    {
+      "state": "APPROVED",
+      "url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9599",
+      "submitted_at": "2026-09-29T05:00:00Z",
+      "author": "9001"
+    }
+  ]
+}

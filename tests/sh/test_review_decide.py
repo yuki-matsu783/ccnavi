@@ -122,7 +122,7 @@ class GitLab(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if "/merge_requests?" in self.path:
             url = f"http://127.0.0.1:{self.port}/demo/greeter/-/merge_requests/1"
-            self.reply(200, [{"iid": 1, "web_url": url}])
+            self.reply(200, [{"iid": 1, "web_url": url, "source_project_id": 1}])
         elif "/merge_requests" not in self.path and "per_page" not in self.path:
             self.reply(200, {"id": 1})
         else:

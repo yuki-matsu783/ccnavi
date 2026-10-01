@@ -1,0 +1,47 @@
+{
+  "host": "gitlab",
+  "mr": {
+    "number": 7,
+    "url": "https://gitlab.com/acme/widgets/-/merge_requests/7"
+  },
+  "threads": [
+    {
+      "id": "0e3a5d7c5f6b8a9d0e1f2a3b4c5d6e7f8a9b0c1d",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5201",
+      "path": "",
+      "line": 0,
+      "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "201"
+    },
+    {
+      "id": "1f4b6e8d6a7c9b0e1f2a3b4c5d6e7f8a9b0c1d2e",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5202",
+      "path": "",
+      "line": 0,
+      "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "203"
+    },
+    {
+      "id": "2a5c7f9e7b8d0c1f2a3b4c5d6e7f8a9b0c1d2e3f",
+      "resolved": false,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5203",
+      "path": "",
+      "line": 0,
+      "body": "全体の方針について",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "202"
+    }
+  ],
+  "reviews": [
+    {
+      "state": "APPROVED",
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
+      "submitted_at": "2026-09-29T04:00:00.000Z",
+      "author": "9"
+    }
+  ]
+}

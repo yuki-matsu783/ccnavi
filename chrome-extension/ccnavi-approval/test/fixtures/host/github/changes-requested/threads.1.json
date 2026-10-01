@@ -1,0 +1,31 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpHOAAAAAQ=="
+          },
+          "nodes": [
+            {
+              "id": "PRRT_kwDOAbCdEs5CR001",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r4001",
+                    "path": "src/app.py",
+                    "line": 8,
+                    "body": "済み",
+                    "createdAt": "2026-09-29T01:00:00Z"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

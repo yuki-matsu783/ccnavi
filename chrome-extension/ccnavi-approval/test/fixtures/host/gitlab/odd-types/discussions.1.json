@@ -1,0 +1,41 @@
+[
+  {
+    "id": 12345,
+    "individual_note": false,
+    "notes": [
+      {
+        "id": "n-1",
+        "body": null,
+        "author": null,
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "new_path": "src/app.py",
+          "new_line": "7"
+        }
+      }
+    ]
+  },
+  {
+    "id": "3b6d8a0f8c9e1d2a3b4c5d6e7f8a9b0c1d2e3f4a",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5401,
+        "body": "数の行",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer"
+        },
+        "created_at": null,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "new_path": null,
+          "new_line": 12
+        }
+      }
+    ]
+  }
+]

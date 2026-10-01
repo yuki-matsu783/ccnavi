@@ -1381,6 +1381,12 @@ class TicketTest(unittest.TestCase):
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
         self.assertFalse(os.path.exists(stale))
+        # レビュー済みのフェーズに confirm を重ねない（ADR-0093 の 11.8.1 の決定 B）
+        again = self.confirm(fixture)
+        self.assertEqual(again.returncode, 1)
+        self.assertIn("フェーズ 1 はレビュー済み", again.stderr)
+        # 印を外して確かめ直しても、受け入れた指摘は数えない
+        os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
 
     def test_decide_yes_refuses_what_was_not_shown(self):
@@ -2492,6 +2498,9 @@ class TicketTest(unittest.TestCase):
             stdin="k\n",
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        # 受け入れでレビュー済みになった。印を外して確かめ直しても、受け入れた分は数えない
+        # （レビュー済みのフェーズには confirm を重ねない。ADR-0093 の 11.8.1 の決定 B）
+        os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
 
     def test_the_acceptance_survives_a_later_check(self):
@@ -2522,7 +2531,9 @@ class TicketTest(unittest.TestCase):
         kept = os.path.join(self.approved, "phases", "i0001", "accepted.json")
         self.assertIn("u1", read_json(kept)["threads"])
 
-        # check が通るとマーカーは書き換わるが、控えは残る。
+        # check が通るとマーカーは書き換わるが、控えは残る（レビュー済みには重ねないので、印を外して
+        # から確かめる。ADR-0093 の 11.8.1 の決定 B）。
+        os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
         self.assertIn("u1", read_json(kept)["threads"])
 
