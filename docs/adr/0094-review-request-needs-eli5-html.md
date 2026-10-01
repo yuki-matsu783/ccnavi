@@ -7,7 +7,7 @@ keywords: [レビュー, 依頼, ELI5, HTML, crit, ccnavi-review.sh, request, co
 ---
 # ADR-0094: レビューの依頼には ELI5 の HTML を必須で添え、人は crit で見る
 
-状態: 採用
+状態: 採用（置き場・crit の指摘の写し方・依頼文の末尾の 1 行・標準出力の案内は置き換え（ADR-0095））
 
 ## 状況
 
