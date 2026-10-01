@@ -30,7 +30,7 @@ export class MockGitLab extends MockGitHub {
   glExpiry = "";
   /** 付けた見本（GitLab の MR・スレッド・レビュアー） */
   readonly glScenes = new Map<string, GitLabScene>();
-  /** compare の変更の一覧を切る件数（拡張は 900 件以上で打ち切られたとみなす） */
+  /** compare の変更の一覧を切る件数（拡張は 450 件以上で打ち切られたとみなす） */
   compareLimit = 1000;
   /** compare の答えに足す欄（`compare_timeout`、各 diff の `collapsed`・`too_large`） */
   compareExtra: { timeout?: boolean; collapsed?: boolean; tooLarge?: boolean } = {};
@@ -186,13 +186,11 @@ export class MockGitLab extends MockGitHub {
     if (method === "POST" && rest === "/repository/commits") return this.commitActions(JSON.parse(body || "{}"));
     if (method === "GET" && rest === "/merge_requests") {
       const branch = u.searchParams.get("source_branch") ?? "";
-      return {
-        status: 200,
-        json: [
-          ...this.forkMrs.filter((m) => m.branch === branch).map((m) => ({ iid: m.number, source_project_id: 99, web_url: `https://gitlab.com/fork/${this.repo}/-/merge_requests/${m.number}` })),
-          ...(this.pulls[branch] ?? []).map((m) => ({ iid: m.number, source_project_id: 42, web_url: `https://gitlab.com/${this.owner}/${this.repo}/-/merge_requests/${m.number}` })),
-        ],
-      };
+      // フォークの MR を先に並べる（1 ページ目がフォークで埋まる形を作れるように）。ページは per_page と page で切る
+      return this.list(u, [
+        ...this.forkMrs.filter((m) => m.branch === branch).map((m) => ({ iid: m.number, source_project_id: 99, web_url: `https://gitlab.com/fork/${this.repo}/-/merge_requests/${m.number}` })),
+        ...(this.pulls[branch] ?? []).map((m) => ({ iid: m.number, source_project_id: 42, web_url: `https://gitlab.com/${this.owner}/${this.repo}/-/merge_requests/${m.number}` })),
+      ]);
     }
     const approvals = /^\/merge_requests\/(\d+)\/approvals$/.exec(rest);
     if (method === "GET" && approvals) {

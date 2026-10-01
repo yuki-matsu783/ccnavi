@@ -352,6 +352,56 @@ test("CX-T160 「始める」: ボードで issue を読み、押すと issue �
   await again.close();
 });
 
+test("CX-T173 「要確認」: 描いた後に控えが付いた家族は、押しても書かずに「要確認のまま」と言う。外すのは確認を挟み、断れば残る", async () => {
+  const key = "gitlab.e2e/acme/widgets";
+  const page = await openBoard();
+  const approve = `${GL_REPO} [data-family="i0002"] button[data-action=approve]`;
+  assert.equal(await page.locator(approve).count(), 1);
+  // ボタンを描いた後に（別のタブで）要確認が付いた: 押す前にも見て、書かない
+  await page.evaluate(async (k) => {
+    const c = (globalThis as unknown as { chrome: { storage: { local: { set(v: object): Promise<void> } } } }).chrome;
+    await c.storage.local.set({ attention: { [k]: { i0002: "試験で付けた要確認" } } });
+  }, key);
+  const before = lab.glCommits.length;
+  const said = await press(page, approve);
+  assert.match(said, /^refused: i0002 は要確認のまま/);
+  assert.equal(lab.glCommits.length, before);
+  await page.close();
+
+  // 開き直すとボタンは出ず、外すボタンだけ。確認を断れば残る
+  const again = await ctx.newPage();
+  watch(again);
+  let answer = false;
+  const asked: string[] = [];
+  again.on("dialog", (d) => {
+    asked.push(d.message());
+    void (answer ? d.accept() : d.dismiss());
+  });
+  await again.goto(`chrome-extension://${id}/board.html`);
+  await again.waitForFunction(() => document.body.dataset.state === "done", null, { timeout: 120_000 });
+  const box = again.locator(`${GL_REPO} [data-family="i0002"]`);
+  assert.deepEqual(await box.locator("button").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.action)), ["dismiss"]);
+  assert.match((await box.textContent()) ?? "", /ほかの承認者には見えない/);
+  await box.locator("button[data-action=dismiss]").click();
+  await again.waitForTimeout(300);
+  assert.equal(asked.length, 1);
+  assert.match(asked[0], /要確認を外す/);
+  const kept = await again.evaluate(
+    async () => (await (globalThis as unknown as { chrome: { storage: { local: { get(k: string): Promise<Record<string, unknown>> } } } }).chrome.storage.local.get("attention")).attention,
+  );
+  assert.equal((kept as Record<string, Record<string, string>>)[key]?.i0002, "試験で付けた要確認");
+  // 確認を受ければ外れ、ボタンが戻る
+  answer = true;
+  await box.locator("button[data-action=dismiss]").click();
+  await again.waitForSelector(approve);
+  const gone = await again.evaluate(
+    async () => (await (globalThis as unknown as { chrome: { storage: { local: { get(k: string): Promise<Record<string, unknown>> } } } }).chrome.storage.local.get("attention")).attention,
+  );
+  assert.equal((gone as Record<string, Record<string, string>>)[key]?.i0002, undefined);
+  assert.equal(lab.glCommits.length, before);
+  await again.close();
+});
+
 test("CX-T074 画面にも Worker にも CSP の違反とエラーが出ていない", () => {
   const csp = problems.filter((p) => /Content Security Policy|unsafe-eval/i.test(p));
   assert.deepEqual(csp, []);

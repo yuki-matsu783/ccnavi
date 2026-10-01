@@ -10,6 +10,9 @@
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
  * - 打ち消しはバイト列のまま戻す（BOM も）
  * - 「要確認」の家族には、そのブラウザで書くボタンを出さない
+ *
+ * 最新のレビュー（11.9.3）で足したもの: 確かめが落ちたら要確認、打ち消しの前の 412 で打ち消し直す、別の線に付け替わったら
+ * 人に回す、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,7 +26,7 @@ import { renderRepo } from "../src/core/render.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
-import { approveFamily, type WriteDeps } from "../src/core/write.js";
+import { approveFamily, withdrawTicket, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats } from "./helpers/host.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
@@ -191,6 +194,10 @@ test("CX-T167 「始める」: service worker も統合先の先頭で閉じた�
   mock.branch("I0012", "main");
   const folded = await ask(d, "i0012");
   assert.match((folded as { error: string }).error, /i0012 は既にある（I0012）/);
+  // 互換分解で同じになる名前（全角）も重なりとして拾う（11.9.3 の 14）
+  mock.branch("ｉ００１３", "main");
+  const wide = await ask(d, "i0013");
+  assert.match((wide as { error: string }).error, /i0013 は既にある（ｉ００１３）/);
   assert.equal(mock.createdBranches.length, 0);
 });
 
@@ -270,4 +277,148 @@ test("CX-T172 「要確認」の家族には、そのブラウザで承認・取
   assert.match(box.textContent ?? "", /ほかの承認者には見えない/);
   // ほかの家族は今までどおり
   assert.equal(html.querySelectorAll('[data-family="i0002"] button[data-action=approve]').length, 1);
+});
+
+// ---- 最新のレビューで直したもの（ADR-0093 の 11.9.3） ------------------------------------------------
+
+test("CX-T174 応答が落ちた後の確かめや、書いた後の確かめが落ちたら、失敗でなく要確認（書いたかもしれないが確認できない）", async () => {
+  // 応答が落ちた直後に先頭を読む要求も落ちる
+  const lost = new MockGitLab(parentOnly());
+  const a = await start(lost);
+  lost.loseCommitResponse = true;
+  lost.onRequest = (method, u) => {
+    if (lost.glCommits.length === 1 && method === "GET" && u.pathname.endsWith("/repository/branches/i0001")) throw new Error("503 Service Unavailable");
+  };
+  const out = await approveFamily(GITLAB_REPO, "i0001", a.shown, a.d);
+  assert.equal(out.kind, "attention", JSON.stringify(out));
+  assert.match(out.kind === "attention" ? out.message : "", /書いたかもしれないが確認できなかった/);
+  assert.equal(lost.glCommits.length, 1);
+
+  // 割り込みは無く書けたが、書いた後の中身を読む要求が落ちる
+  const after = new MockGitLab(parentOnly());
+  const b = await start(after);
+  after.onRequest = (method, u) => {
+    if (after.glCommits.length === 1 && method === "GET" && u.pathname.endsWith("/repository/tree")) throw new Error("502 Bad Gateway");
+  };
+  const out2 = await approveFamily(GITLAB_REPO, "i0001", b.shown, b.d);
+  assert.equal(out2.kind, "attention", JSON.stringify(out2));
+  assert.match(out2.kind === "attention" ? out2.message : "", /書いた後の中身を確認できなかった/);
+});
+
+test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何も送っていない）なら、上限の範囲で読み直して打ち消し直す", async () => {
+  const mock = new MockGitLab(parentOnly());
+  const { d, shown } = await start(mock);
+  mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
+  const statuses: (number | undefined)[] = [];
+  let commits = 0;
+  const call = d.call;
+  const wrapped: WriteDeps = {
+    ...d,
+    call: async (op, args) => {
+      if (op === "commit" && (commits += 1) === 2) mock.push("i0001", { "src/zzz.py": "z\n" }, "打ち消しの直前の無関係な push");
+      try {
+        return await call(op, args);
+      } catch (err) {
+        if (op === "commit") statuses.push((err as { status?: number }).status);
+        throw err;
+      }
+    },
+  };
+  const out = await approveFamily(GITLAB_REPO, "i0001", shown, wrapped);
+  assert.equal(out.kind, "changed", JSON.stringify(out));
+  assert.deepEqual(statuses, [gl.HOST_MOVED]);
+  assert.deepEqual(mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]), [
+    ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],
+    ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
+  ]);
+  const files = mock.files("i0001");
+  assert.ok(!(DOING in files) && TODO in files && "src/zzz.py" in files);
+});
+
+test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らず人に回す", async () => {
+  const mock = new MockGitLab(parentOnly());
+  const { d, shown } = await start(mock);
+  const read = mock.head("i0001") as string;
+  mock.loseCommitResponse = true;
+  let forged = "";
+  mock.onRequest = () => {
+    if (forged || mock.glCommits.length !== 1) return;
+    // 読んだ先頭を含まない線: main から、読んだ先頭と同じ中身 → 自分の書いた中身、の 2 つを積む
+    const inner = mock as unknown as { store(c: object, salt?: string): string; heads: Map<string, string> };
+    const ours = mock.glCommits[0].oid as string;
+    const p1 = inner.store({ parents: [mock.head("main")], files: { ...mock.commits.get(read)!.files }, date: NOW, message: "別の線 1" }, "forged-1");
+    forged = inner.store({ parents: [p1], files: { ...mock.commits.get(ours)!.files }, date: NOW, message: "別の線 2" }, "forged-2");
+    inner.heads.set("i0001", forged);
+  };
+  const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
+  assert.equal(out.kind, "attention", JSON.stringify(out));
+  assert.match(out.kind === "attention" ? out.message : "", /見分けられなかった/);
+  assert.equal(mock.head("i0001"), forged);
+  assert.equal(mock.glCommits.length, 1);
+});
+
+test("CX-T177 GitLab の update には、読んだ先頭でそのファイルを最後に変えたコミットを last_commit_id に付ける。割り込みで変わっていれば 400 で何も書かない", async () => {
+  const mock = new MockGitLab(parentOnly());
+  const d = glDeps(mock);
+  const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
+  assert.equal((await approveFamily(GITLAB_REPO, "i0001", shown, d)).kind, "written");
+  const approval = mock.head("i0001") as string;
+  // 取り下げは events を書き換える（update）。その last_commit_id は承認コミット（読んだ先頭でそのファイルを最後に変えた）
+  const back = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", "", glDeps(mock));
+  assert.equal(back.kind, "written", JSON.stringify(back));
+  const update = mock.glCommits[1].actions.find((a) => a.action === "update");
+  assert.deepEqual([update?.file_path, update?.last_commit_id], [EVENTS, approval]);
+  const deleted = mock.glCommits[1].actions.find((a) => a.action === "delete");
+  assert.deepEqual([deleted?.file_path, deleted?.last_commit_id], [DOING, approval]);
+
+  // 書く直前に、書き換える events を別の書き手が変える: GitLab が 400 で断り、そのコミットは何も書かない
+  const race = new MockGitLab(parentOnly());
+  const rd = glDeps(race);
+  assert.equal((await approveFamily(GITLAB_REPO, "i0001", shownOf(await collectRepo(GITLAB_REPO, rd), "i0001"), rd)).kind, "written");
+  const line = '{"at": "2026-09-30T00:00:00Z", "ticket": "i0001", "kind": "note", "by": "別の書き手"}\n';
+  race.beforeCommit = (b) => void race.push(b, { [EVENTS]: `${race.files(b)[EVENTS]}${line}` }, "別の書き手の events");
+  const raced = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", "", glDeps(race));
+  assert.equal(race.glCommits[1].result, "error");
+  assert.equal(race.glCommits[1].actions.find((a) => a.action === "update")?.last_commit_id, race.glCommits[0].oid);
+  // 読み直して書いたとしても、別の書き手の行は残る（上書きしない）
+  assert.ok(race.files("i0001")[EVENTS].includes(line), JSON.stringify(raced));
+});
+
+test("CX-T178 GitLab の開いた MR は全ページを読んでからこのプロジェクトのものに絞る（1 ページ目がフォークで埋まっても外さない）。Approve の数もフォークを数えない", async () => {
+  const mock = new MockGitLab(parentOnly());
+  const client = { host: GL, token: TOKEN, fetch: mock.fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait };
+  // フォークだけ: 拾わない
+  mock.forkMrs.push({ branch: "i0001", number: 900 });
+  assert.equal(await gl.openMr(client, "acme", "widgets", "i0001"), null);
+  assert.deepEqual(await gl.pullApprovals(client, "acme", "widgets", "i0001"), []);
+  // 1 ページ目（100 件）がフォークで埋まり、本物は 2 ページ目
+  for (let i = 1; i < 120; i += 1) mock.forkMrs.push({ branch: "i0001", number: 900 + i });
+  mock.pulls.i0001 = [{ number: 7, reviews: [{ user: "reviewer", state: "APPROVED" }] }];
+  assert.equal((await gl.openMr(client, "acme", "widgets", "i0001"))?.number, 7);
+  assert.deepEqual((await gl.pullApprovals(client, "acme", "widgets", "i0001")).map((p) => p.number), [7]);
+  assert.ok(mock.calls.some((c) => c.includes("/merge_requests")));
+});
+
+test("CX-T179 転送は追わない: GitHub と GitLab の要求に redirect: \"error\" を付け、fetch そのものが落ちたら原因の分かる文面にする", async () => {
+  const seen: string[] = [];
+  const ok = async (_url: string, init: { redirect?: string }) => {
+    seen.push(String(init.redirect));
+    return { status: 200, ok: true, json: async () => ({ default_branch: "main", id: 42 }), headers: { get: () => null } };
+  };
+  const GH = HOSTS.find((h) => h.id === "github.com")!;
+  await gh.repoInfo({ host: GH, token: TOKEN, fetch: ok, counter: { rest: 0, graphql: 0 }, sleep: noWait }, "acme", "widgets");
+  await gl.repoInfo({ host: GL, token: TOKEN, fetch: ok, counter: { rest: 0, graphql: 0 }, sleep: noWait }, "acme", "widgets");
+  assert.deepEqual(seen, ["error", "error"]);
+  const broken = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+  for (const [mod, host] of [
+    [gh, GH],
+    [gl, GL],
+  ] as const) {
+    await assert.rejects(
+      mod.repoInfo({ host, token: TOKEN, fetch: broken, counter: { rest: 0, graphql: 0 }, sleep: noWait }, "acme", "widgets"),
+      (err: Error & { status?: number }) => /転送された/.test(err.message) && /owner\/repo/.test(err.message) && /Failed to fetch/.test(err.message) && !err.status,
+    );
+  }
 });
