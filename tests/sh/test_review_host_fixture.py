@@ -489,16 +489,19 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertIn("id を読めない", done.stderr)
         self.assertEqual(done.stdout, "")
 
-    def test_request_records_the_account_that_posted(self):
-        """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
-        out = os.path.join(self._tmp.name, "out")
-        os.makedirs(out)
+    def request_stub(self, out):
+        """実行ファイルの代役。`review prepare` で本文と下書きを書き、`--result` の写しを控える。
+
+        受け取った引数は 1 行 1 つで `out/args.txt` に溜める。
+        """
+        os.makedirs(out, exist_ok=True)
         stub = write(
             os.path.join(self._tmp.name, "exe2", "ccnavi"),
             "#!/bin/sh\n"
             'case " $* " in *" --version "*) printf \'compat: %s\\n\' '
             + str(version.COMPAT)
             + "; exit 0 ;; esac\n"
+            f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"
             f"  printf 'Draft: t\\n\\nb\\n' >'{out}/draft.md'\n"
@@ -510,10 +513,23 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "exit 0\n",
         )
         os.chmod(stub, 0o755)
+        return stub
+
+    def eli5(self, rel="wip/tmp/eli5.html", text="<!doctype html><p>やさしい説明</p>\n"):
+        """ELI5 の HTML をワークツリーの中の追跡しない場所に置く。"""
+        return write(os.path.join(self.ws, *rel.split("/")), text)
+
+    def test_request_records_the_account_that_posted(self):
+        """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        html = self.eli5()
         state = os.path.join(self._tmp.name, "notes.json")
         extra = {"CCNAVI_BIN_PATH": stub, "FAKE_GITLAB_STATE": state}
         for _ in range(2):
-            done = self.review("resolved", "request", "--phase", "1", "--body-file", "x", **extra)
+            done = self.review(
+                "resolved", "request", "--phase", "1", "--body-file", "x", "--eli5", html, **extra
+            )
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
                 result = json.load(f)
@@ -522,6 +538,75 @@ class GitLabHostFixtureTest(unittest.TestCase):
             self.assertEqual(result["mr"]["number"], 7)
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)
+
+    def test_request_stops_without_an_eli5_html(self):
+        """--eli5 が無い・ファイルが無い・空・HTML でないなら止める（ADR-0094）。
+
+        実行ファイルもホストも触らない。
+        """
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        state = os.path.join(self._tmp.name, "notes.json")
+        extra = {"CCNAVI_BIN_PATH": stub, "FAKE_GITLAB_STATE": state}
+        blank = self.eli5("wip/tmp/blank.html", " \n\t\n")
+        notes = self.eli5("wip/tmp/eli5.md", "# やさしい説明\n")
+        cases = {
+            "無い": ([], 2),
+            "値が無い": (["--eli5"], 2),
+            "ファイルが無い": (["--eli5", "wip/tmp/missing.html"], 1),
+            "空": (["--eli5", blank], 1),
+            "拡張子が違う": (["--eli5", notes], 2),
+        }
+        for name, (flag, code) in cases.items():
+            with self.subTest(name):
+                done = self.review(
+                    "resolved", "request", "--phase", "1", "--body-file", "x", *flag, **extra
+                )
+                self.assertEqual(done.returncode, code, done.stdout + done.stderr)
+                self.assertIn("--eli5", done.stderr)
+                self.assertIn("HTML", done.stderr)
+                self.assertFalse(os.path.exists(os.path.join(out, "body.md")))
+                self.assertFalse(os.path.exists(state))
+
+    def test_request_points_to_crit_and_keeps_eli5_from_the_exe(self):
+        """投稿が済んだら人が打つ crit <絶対パス> を出す（ADR-0094）。
+
+        相対は打った場所から解く。--eli5 は実行ファイルには渡さない。
+        """
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        html = self.eli5()
+        state = os.path.join(self._tmp.name, "notes.json")
+        # crit の無い PATH でも止めない（人の手元で打つ道具なので案内だけ）
+        done = self.review(
+            "resolved",
+            "request",
+            "--phase",
+            "1",
+            "--body-file",
+            "x",
+            "--eli5=wip/tmp/eli5.html",
+            CCNAVI_BIN_PATH=stub,
+            FAKE_GITLAB_STATE=state,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        said = [line for line in done.stdout.splitlines() if line.startswith("ELI5 を見る: ")]
+        self.assertEqual(len(said), 1, done.stdout)
+        shown = said[0].split("crit ", 1)[1].split(" ", 1)[0].strip("'")
+        self.assertTrue(os.path.isabs(shown), shown)
+        self.assertTrue(os.path.samefile(shown, html), shown)
+        if shutil.which("crit") is None:
+            self.assertIn("PATH に crit は無い", done.stdout)
+        with open(os.path.join(out, "args.txt"), encoding="utf-8") as f:
+            passed = f.read()
+        self.assertNotIn("eli5", passed)
+        # 依頼の本文には添えたことだけを 1 行載せ、HTML の中身は載せない
+        with open(state, encoding="utf-8") as f:
+            body = json.load(f)[0]["body"]
+        self.assertTrue(body.startswith("<!-- ccnavi:request i0001:1 key=k -->"), body)
+        self.assertIn("eli5.html", body)
+        self.assertIn("crit", body)
+        self.assertNotIn("やさしい説明", body)
 
     def test_confirm_and_decide_pass_the_token_owner(self):
         done = self.review("resolved", "confirm", "--phase", "1")
