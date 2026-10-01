@@ -1609,7 +1609,7 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 | 無し → `pending` | `PostToolUse` の告知（cwd が親のワークツリー） | 終わっていて、マーカーが 1 つも無く、レビュー要。文を 1 度だけ返す |
 | 無し → `skipped` | 同上 | 終わっていて、マーカーが 1 つも無く、レビュー不要（または延期） |
 | 任意 → `skipped` | `ccnavi-review.sh close-early`（人） | 終わっていないフェーズの全部に置く（9.11） |
-| 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提と ELI5 の HTML（`--eli5`）。`pending` は要らない |
+| 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提と ELI5 の HTML（`--eli5`。`wip/` の下にコミット済み）。`pending` は要らない |
 | `requested` → `reviewed` | `ccnavi-review.sh confirm`（親）、`ccnavi-review.sh decide`（人）、フィードバック計画の承認、`close-early` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決を人が受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
 | `pending` → `reviewed` | `ccnavi-review.sh chat <N>`（人が端末で。中身は `ccnavi --reviewed <N> --chat`） | 見る場所が `chat`。依頼の記録は要らない（9.8） |
 | 任意 → 無し | `ccnavi --approve` で同じ番号の子が承認された | 4 種を全部消す |
@@ -1847,10 +1847,10 @@ sh が渡す写し（`--result <JSON>`）の判定とマーカーの操作だけ
 
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
-| `request --phase <N> --body-file <文> --eli5 <HTML>` | sh が `--eli5` を確かめる（無い・値が無い・拡張子が `.html` / `.htm` でないなら 2、ファイルが無い・空白だけなら 1。ロックの前で、何も書かない。実行ファイルには渡さない。ADR-0094）→ `review prepare`（前提を確かめ、本文とマージリクエストの下書きを控えの置き場に書き出す）→ sh がマージリクエストを（無ければ下書きで）作り、依頼を投稿 → `review requested`（HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く）。投稿する本文の末尾に「ELI5 の HTML（ファイル名）を添えた。依頼者の手元で crit で開ける」の 1 行を足す（HTML の中身は載せない）。終わったら、人が打つ `crit <HTML の絶対パス>` を標準出力に出す（sh は crit を起動しない。PATH に無くても止めない） |
+| `request --phase <N> --body-file <文> --eli5 <HTML>` | sh が `--eli5` を確かめる（無い・値が無い・拡張子が `.html` / `.htm` でないなら 2。ファイルが無い・空白だけ・打った場所のワークツリーの外・ツリーのルートからの相対が `wip/` で始まらない・HEAD に無い・手元の中身が HEAD と違う、は全部を挙げて 1。ロックの前で、何も書かない。実行ファイルには渡さない。ADR-0094・ADR-0095）→ `review prepare`（前提を確かめ、本文とマージリクエストの下書きを控えの置き場に書き出す）→ sh がマージリクエストを（無ければ下書きで）作り、依頼を投稿 → `review requested`（HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く）。投稿する本文の末尾に「ELI5 は差分の `<相対パス>`。ルートで `crit review <相対パス>` を開いてソースの行に指摘を付け、`crit push <番号>` で送る」の 1 行を足す（HTML の中身は載せない）。終わったら、人が打つ `cd <ツリーのルート>`・`crit review <相対パス>`・`crit push <番号>` を標準出力に出す（sh は crit を起動しない。crit・gh・glab が PATH に無くても止めない） |
 | `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm`（判定して `reviewed` のマーカーを置き、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす）。sh がトークンの持ち主を引けたら `--actor` で渡し、マーカーに `actor` と `via: cli` を残す（引けない・実行ファイルの `--version --json` の flags に `--actor` が無いなら渡さず、前と同じ中身。ADR-0093 の 8.9・11.8・11.9.1）。Chrome 拡張のレビュー済みも同じ判定（`core.confirm`）を通る |
 | `decide <N>` | 人が打つ（ボードの「決める」か端末）。sh が取ってくる → `--reviewed N --accept-unresolved`（残っているスレッドを 1 件ずつ見せ、対応方針を選ばせる。対応しない＝`accepted.json` に控える、このフェーズで直す＝続きの子チケットを同じフェーズの番号で `.ccnavi/approved/doing/` に直に置く、issue に回す＝控えたうえで issue の下書きを書く。直す指摘が無ければ `reviewed` のマーカーを置き、あればマーカーを消す。どちらでも `review/` の子は `done/` へ）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `--preview`（一覧と指紋）と `--choices <JSON> --digest <指紋>`（実行ファイルは `--yes`。見せた指紋と今の指紋が一致するときだけ置く）で同じ道を通る。sh がトークンの持ち主を引けたら `--actor=<名前> --via=<terminal|board>` で渡し、`reviewed` のマーカーに `actor` と `via` を残す（引けない・実行ファイルの flags に `--actor` と `--via` の両方が無いなら渡さず、前と同じ中身。実行ファイルは `--yes` の無い形に `--via board` を受けない。ADR-0093 の 8.9・11.9・11.9.1） |
-| `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらない。レビューの状態は変えない。crit で人が付けた指摘を写すのもこれ（下の「ELI5 と crit」） |
+| `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらない。レビューの状態は変えない。crit の指摘を写すのには使わない（人が `crit push` で送る。下の「ELI5 と crit」） |
 | `ready` | `review ready`（親を閉じられる条件と、親の承認済みチケットが `done/` にあること（ADR-0093 の 3.6）と、`wip/` が追跡から消えていて未コミットが無く push 済みであることを確かめ、`ready.json` とコメントの下書きを置く）→ sh が Draft を外し（GitLab は `squash` を立てる）、コメントを投稿する。親が閉じたあとに打つ。同じ親に 2 度打っても通る。マージは人 |
 | `close-early --reason <理由> [--no-issue]` | 人が端末で打つ。`--close-early`（残りを見せて y/N。未着手の子（`doing/` で着手の欄が空）を取り消して `done/` へ、終わっていないフェーズに `skipped`、レビュー未了のフェーズに `reviewed`（その `review/` の子は `done/` へ）、未解決を `accepted.json` へ、`close-early.json` を置く。変更要求のレビューが立っていれば拒む）→ sh が残りを issue に写し、コメントを投稿する |
 | `fetch` / `origin` | 取ってきた写しを標準出力へ / origin をどう読んだか |
@@ -1860,23 +1860,30 @@ sh が渡す写し（`--result <JSON>`）の判定とマーカーの操作だけ
 ワークツリーに未コミットの変更が無い（未追跡は数えない）、親ブランチの HEAD が push 済み、
 まだ依頼していない（依頼の後に親の HEAD が動き、まだレビュー済みでなければ出し直せる。依頼文を
 投稿し直し、マーカーの `head` と `since` を今のものに書き換える。レビュー済みのフェーズは、依頼の記録が
-無くても（`close-early` が置いた形）拒む）。1 つでも欠けたら全件を列挙して拒み、何もしない。マージリクエストの題・本文・
+無くても（`close-early` が置いた形）拒む）。1 つでも欠けたら全件を列挙して拒み、何もしない。その前に sh が ELI5 の HTML を確かめる（下の「ELI5 と crit」）。マージリクエストの題・本文・
 `Closes #<課題>` は親チケットの `title` / `rationale` / 本文 / `issue` から写す。
 
-**ELI5 と crit**（ADR-0094）。`request` には、変更をやさしく説明した HTML を `--eli5` で必ず添える。人はそれを
-手元の端末で外部の CLI `crit` で開いて見る。手順は次のとおり。
+**ELI5 と crit**（ADR-0094・ADR-0095）。`request` には、変更をやさしく説明した HTML を `--eli5` で必ず添える。HTML は
+マージリクエストの差分に載せ、人は手元の端末で外部の CLI `crit` で開いて、指摘を `crit push` でマージリクエストの行のスレッドとして送る。
+手順は次のとおり。
 
-1. エージェントは依頼の前に ELI5 の HTML を書く。置き場は依頼文と同じ追跡しない場所（例 `wip/tmp/eli5.html`）。
-   親のワークツリーの中でも、未追跡は `request` の前提を落とさない（ADR-0029）。相対パスは `--body-file` と同じく打った場所から
+1. エージェントは依頼の前に ELI5 の HTML を書き、親のワークツリーの `wip/` の下（既定の名前は `wip/eli5/phase-<N>.html`）に置いて
+   コミットし、push する。相対パスは `--body-file` と同じく打った場所から。親チケットの範囲（`allow`）に `wip/eli5/*`（か `wip/*`）が
+   無いと、親のワークツリーへの書き込みが範囲の外として止まるので、提案を書くときに範囲へ入れておく
 2. 中身の目安: 変更の目的・何が変わるか・リスクを専門用語なしで書く。1 枚で完結させ、外部の読み込み（CSS・JS・画像・フォントの URL）を
    使わない。スタイルは `<style>` に入れる
-3. `request --phase <N> --body-file <依頼文> --eli5 <HTML>` を打つ。投稿が済むと `ELI5 を見る: 人が端末で crit <絶対パス> を打つ` が出るので、
-   その行を利用者に渡してターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
-4. 人が crit で付けた指摘（利用者が渡すか、crit が書き出したもの）を、エージェントは読んで依頼文と同じ置き場に書き、
-   `comment --body-file <本文>` でマージリクエストに投稿する。写した投稿は機構の投稿（`<!-- ccnavi:comment -->`）で、
-   `confirm` の未解決には数えないのが普通（GitHub ではスレッドにならず、GitLab では依頼を投稿したアカウントの機構の投稿として除く。
-   投稿者が分からなければ数える。`review._ccnavi_post`）。判定は今までどおりで、止めるのはマージリクエストの未解決のスレッドと変更要求（`confirm`）、
-   残った指摘の行き先は人の `decide` が受け持つ。crit の指摘で次へ進むのを止めたいなら、人がマージリクエストにスレッドを立てる
+3. `request --phase <N> --body-file <依頼文> --eli5 wip/eli5/phase-<N>.html` を打つ。投稿が済むと
+   `ELI5 を見る: 人が端末で cd <ルート> してから crit review <相対パス> を打ち、… crit push <番号> で …` が出るので、その行を利用者に渡して
+   ターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
+4. 人はツリーのルート（か、同じブランチのチェックアウトのルート）で `crit review <相対パス>` を開き、HTML のソースの行に指摘を付けて、
+   `crit push <番号>` で送る。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは `crit push` で送られない（crit v0.21.0 で確認。
+   ADR-0095）。crit push は GitHub では `gh`、GitLab では `glab` を使い、マージリクエストの差分にあるファイルの行にだけ送れる
+5. 送られた指摘は人のスレッドで、本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
+   （`review._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューになり、
+   `decide` でも通せない
+6. ELI5 だけを直したコミットも「人が見るものが動いた」に数えるので、依頼の後に直したら push して `request` を打ち直す。直す前の行に
+   付いたスレッドは未解決のまま残る
+7. `wip/` は `ready` の前に丸ごと消してコミットする（`ready` の前提）。ELI5 もここで消え、squash した成果物には残らない
 
 **`confirm`** は `requested` が無ければ拒む。依頼のマーカーにあるホストとマージリクエストの番号が承認済みチケットと
 一致しなければ拒む。依頼時の HEAD と今の HEAD が同じで push 済みであることを求める。ただし

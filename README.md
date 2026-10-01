@@ -1562,20 +1562,26 @@ phases:
 ### レビューの依頼と確認
 
 ```sh
-sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md --eli5 wip/tmp/eli5.html
+sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md --eli5 wip/eli5/phase-2.html
 sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
 sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 ```
 
 設計は [ccnavi.md](ccnavi.md) の 9.10 と 9.11。
 
-- `request` には ELI5 の HTML（`--eli5`）が必須（ADR-0094）。無い・空・拡張子が `.html` / `.htm` でないなら何もせずに止まる。
-  変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML で、外部の読み込み（CSS・JS・画像の URL）は使わない。
-  置き場は依頼文と同じ追跡しない場所（`wip/tmp/` など。未追跡は前提を落とさない）
-- 投稿が済むと `ELI5 を見る: 人が端末で crit <絶対パス> を打つ` が出る。人はその `crit …` を手元の端末で打って見る
-  （sh は crit を起動しない。crit が無い環境でも依頼は通る）。依頼の本文には HTML を添えたことだけを 1 行載せる
-- crit で付けた指摘は、エージェントが読んで `comment --body-file` でマージリクエストに写す。止める・通すの判定は今までどおり
-  （未解決のスレッドと変更要求を `confirm` が見て、残りは人の `decide`）。crit の指摘で止めたいなら、人がマージリクエストにスレッドを立てる
+- `request` には ELI5 の HTML（`--eli5`）が必須（ADR-0094・ADR-0095）。変更の目的・何が変わるか・リスクを専門用語なしで書いた
+  1 枚の HTML で、外部の読み込み（CSS・JS・画像の URL）は使わない。親のワークツリーの `wip/` の下（既定の名前は
+  `wip/eli5/phase-<N>.html`）に置いてコミットし、push しておく。マージリクエストの差分に載せるため。
+  拡張子が `.html` / `.htm` でないか `--eli5` が無いなら 2、ファイルが無い・空・`wip/` の外・HEAD に無い（未追跡・未コミット）・
+  HEAD と中身が違う、なら全部を挙げて 1 で止まる。追跡しない `wip/tmp/` に置く前の形は止まる。親チケットの範囲に `wip/eli5/*`
+  （か `wip/*`）を入れておかないと、親のワークツリーで HTML を書けない
+- 投稿が済むと `ELI5 を見る: 人が端末で cd <ルート> してから crit review <相対パス> を打ち、… crit push <番号> で …` が出る。
+  人はその手順を手元の端末で打つ（sh は crit を起動しない。crit・gh・glab が無い環境でも依頼は通る）。依頼の本文にも同じ手順を 1 行載せる
+- 人は `crit review <相対パス>` で HTML のソースの行に指摘を付け、`crit push <番号>` でマージリクエストの行のスレッドとして送る
+  （GitHub は `gh`、GitLab は `glab` が要る）。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは送られない。
+  送った指摘は人のスレッドなので、`confirm` が未解決として数えて止め、`decide` で 1 件ずつ行き先を選べる
+- ELI5 だけを直しても、依頼の後なら `request` の打ち直しが要る（人が見るものが動いたと数える）。`wip/` は `ready` の前に丸ごと消すので、
+  squash した成果物に HTML は残らない
 
 - `request` は前提（フェーズが終わっている・レビューが延期されていない・子ブランチが親に取り込まれている・未コミット無し・push 済み・未依頼）を
   確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿し、マーカーを残す。マージリクエストが無ければ Draft で作る

@@ -162,7 +162,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
 | [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ |
 | [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、写しの権威は親のブランチ 1 枚に固定する（提案。段階 0 だけ実装） |
-| [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、人は crit で見る |
+| [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、人は crit で見る（置き場と指摘の写し方は置き換え（ADR-0095）） |
+| [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘は人が crit push で送る |
 
 ### 複数のリポジトリと VS Code 拡張
 
