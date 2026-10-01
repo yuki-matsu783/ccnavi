@@ -32,31 +32,33 @@
    sh <ccnavi のリポジトリ>/scripts/ccnavi-setup.sh ~/ccnavi-verify-gh --mode dry-run
    ```
 
-3. 置かれたもの（`.claude/settings.json`・`.ccnavi/common/`・`.ccnavi/config/`・`.ccnavi/scripts/`・`.gitignore`・`.vscode/settings.json`）を
+   `--mode dry-run` は判定を記録するだけで止めません。手元の hook が本番どおりに止める流れ（git のラッパーの拒否、C1 の取り込み）まで
+   見る回は `--mode enable` にします（こちらを勧めます）。
+
+3. `.gitignore` に `logs/` と `.claude/worktrees/` が無ければ足します（判定の記録とエージェントのワークツリーを送らないため）。
+
+   ```sh
+   cd ~/ccnavi-verify-gh
+   grep -qxF 'logs/' .gitignore || printf 'logs/\n' >> .gitignore
+   grep -qxF '.claude/worktrees/' .gitignore || printf '.claude/worktrees/\n' >> .gitignore
+   ```
+
+4. 置かれたもの（`.claude/settings.json`・`.ccnavi/common/`・`.ccnavi/config/`・`.ccnavi/scripts/`・`.gitignore`・`.vscode/settings.json`）を
    コミットして `main` へ push します。`.ccnavi/bin/` は `.gitignore` に入るので送りません。
+   **統合先（`main`）への commit と push は人が素の `git` で打ちます。** ccnavi のラッパー（`ccnavi-git.sh`）は `main` へ直接は送らず、
+   エージェントにも打たせません。
    拡張は統合先の `.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT` と `.claude/settings.json` を読むので、この 2 つが統合先に要ります。
-4. 統合先は `main`（デフォルトブランチ）のままにします。別の名前を試すときだけ、手元は `.claude/settings.local.json` の env に
+5. 統合先は `main`（デフォルトブランチ）のままにします。別の名前を試すときだけ、手元は `.claude/settings.local.json` の env に
    `CCNAVI_INTEGRATION_BRANCH`、拡張は設定画面の「統合先の名前」に同じ名前を書きます。
-5. ブランチ保護は 2 通りで試します。GitHub と GitLab の両方で同じにします。
+6. ブランチ保護は 2 通りで試します。GitHub と GitLab の両方で同じにします。
    - **保護なし**: 何も設定しない
    - **保護あり**: 統合先（`main`）を保護し、必須のチェック（何でもよい。例: 常に通る CI のジョブ 1 本）と、
      「新しいコミットで既存の Approve を外す」設定（GitHub の Dismiss stale pull request approvals、GitLab の
      Remove all approvals when commits are added to the source branch）を有効にします。
      親のブランチの名前の形（例 `i*`）にも保護を掛けた回を 1 回入れます（4.8 の X6）
-6. GitLab は同じことを `ccnavi-verify-gl` で行います。入れ子のグループを試すなら `group/sub/ccnavi-verify-gl` に作ります（L9）。
-7. プロジェクトのリポジトリ（4.6）を試すときは、もう 1 つ使い捨てのリポジトリ（例 `ccnavi-verify-proj`）を作り、
+7. GitLab は同じことを `ccnavi-verify-gl` で行います。入れ子のグループを試すなら `group/sub/ccnavi-verify-gl` に作ります（L9）。
+8. プロジェクトのリポジトリ（4.6）を試すときは、もう 1 つ使い捨てのリポジトリ（例 `ccnavi-verify-proj`）を作り、
    ワークスペースの clone の `projects/verify/` に clone します（手元の名前 `verify` を拡張の設定でも使います）。
-
-### 1.3 試すための家族を用意する
-
-承認待ちを作るのは開発者の側（エージェント）です。使い捨てのワークスペースで Claude Code を開き、ADR の 3.2 の流れで進めさせます。
-
-1. issue を 1 つ作り（例 #1）、拡張の「始める」（S1）かホストの画面で親のブランチ `i0001` を `main` の先頭から作ります。
-2. エージェントに、親のワークツリーで提案（`issue: 1`、子を 1〜2 本、子の 1 本は `human_review.required: true`）を書かせ、
-   `ccnavi --approve --preview --verify <識別子>` で確かめてから、コミットして `i0001` を push させます。
-3. 「始める」を使わない家族（フォールバック。例 `verify-a`）も 1 つ用意します。名前は `^i\d+$` と `-\d{2}$` の形を避けます。
-
-詳しい流れ（着手・終了・依頼）はエージェントが SessionStart で受ける案内と、`ccnavi-ticket.sh`・`ccnavi-review.sh` の `--help` のとおりです。
 
 ## 2. 拡張を組み立てて Chrome に読み込む
 
@@ -126,6 +128,18 @@
 2. 「PAT」でホストを選び、トークンを貼って登録します。期限の欄は空にします（ホストの応答から読めるかを確かめるため。X3）。
 3. ボードを開き、統合先の名前が見出しに出ることを確かめます。
 
+### 3.4 試すための家族を用意する
+
+承認待ちを作るのは開発者の側（エージェント）です。使い捨てのワークスペースで Claude Code を開き、ADR の 3.2 の流れで進めさせます。
+拡張の「始める」（S1）で親のブランチを作るなら、拡張の読み込み（2 章）と PAT の登録（3.1〜3.3）の後に行います。
+
+1. issue を 1 つ作り（例 #1）、拡張の「始める」（S1）かホストの画面で親のブランチ `i0001` を `main` の先頭から作ります。
+2. エージェントに、親のワークツリーで提案（`issue: 1`、子を 1〜2 本、子の 1 本は `human_review.required: true`）を書かせ、
+   `ccnavi --approve --preview --verify <識別子>` で確かめてから、コミットして `i0001` を push させます。
+3. 「始める」を使わない家族（フォールバック。例 `verify-a`）も 1 つ用意します。名前は `^i\d+$` と `-\d{2}$` の形を避けます。
+
+詳しい流れ（着手・終了・依頼）はエージェントが SessionStart で受ける案内と、`ccnavi-ticket.sh`・`ccnavi-review.sh` の `--help` のとおりです。
+
 ## 4. 確かめる項目
 
 各項目の「控えるもの」は、ずれたとき（期待と違ったとき）に控えます。通ったときは「通った」だけで構いません。
@@ -136,7 +150,7 @@
 
 | # | 操作 | 期待する結果 | 控えるもの |
 |---|---|---|---|
-| R1 | 1.3 の家族を push した後、ボードを開く | 家族ごとに承認待ちが並ぶ。範囲・リスク・計画が最初に開いた形で出る | 画面の文面 |
+| R1 | 3.4 の家族を push した後、ボードを開く | 家族ごとに承認待ちが並ぶ。範囲・リスク・計画が最初に開いた形で出る | 画面の文面 |
 | R2 | 設定の統合先に無いブランチ名を書いて開く | 止まり、統合先が無いと言う（既定に落ちない） | 画面の文面 |
 | R3 | 統合先の `CCNAVI_COMPAT` を書き換えて push し、開く | どちらを更新するかが出て、承認・取り下げのボタンが出ない | 画面の文面。戻した後に元に戻ること |
 | R4 | 提案の本文に `<script>`・`<img onerror>`・`javascript:` のリンク・HTML コメントを書いて push し、開く | 実行されず、HTML コメントは「〈HTML コメント: …〉」で見える | 画面の見た目（スクリーンショット） |
@@ -185,15 +199,35 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 | # | 操作 | 期待する結果 | 控えるもの |
 |---|---|---|---|
 | L1 | 承認を押す | `POST repository/commits` で 1 コミット。答えの `parent_ids[0]` が読んだ先頭 | 応答の `parent_ids` |
-| L2 | 2 つのブラウザで同じファイルを書く操作（同じ家族の承認と取り下げなど）をほぼ同時に押す | 後の方は `last_commit_id` で 400 になり書かない。読み直して周を回す | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
-| L3 | 別のファイルへの書き込みが間に入るよう、2 つのブラウザで別の子の承認と取り下げを同時に押す | 事後確認で判定し直し、書くものが違えば打ち消しのコミットが積まれる。収まらなければ家族が「要確認」で出て、「確かめた」を押すまでそのブラウザから書かない | 両方の画面の文面、積まれたコミットの並び |
+| L2 | 本体の書き込みで同じファイルを競合させる（下の「同じファイルを競合させる手順」の A か B。対象は承認で書き換わる `events/<識別子>.ndjson` など update になるファイル） | `last_commit_id` が合わず 400 になり書かない。拡張は読み直して周を回し、3 周で書けなければ人に回す | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
+| L3 | 打ち消しで同じファイルを競合させる（L11 で打ち消しの `POST repository/commits` が出るときに、下の手順 A で止めて、同じファイルへ手元から push する） | 打ち消しは自分のコミットを `last_commit_id` に付けるので 400 になり、他人の変更を消さない。家族が「要確認」で出て、「確かめた」を押すまでそのブラウザから書かない | 400 の応答本文、push したコミットが残っていること |
+| L11 | 別のファイルへの書き込みが間に入るよう、2 つのブラウザで別の子の承認と取り下げを同時に押す | 事後確認で判定し直し、書くものが違えば打ち消しのコミットが積まれる。収まらなければ家族が「要確認」で出る | 両方の画面の文面、積まれたコミットの並び |
+| L12 | 確認事項 2: MR を出したブランチを消した後に `GET projects/:id/repository/commits/refs/merge-requests/<N>/head`（または `git ls-remote origin 'refs/merge-requests/*'`）を見る | ブランチ消去後も残るか（どちらでも拡張の答えは変わらない。`seq` の前提の確認） | 応答 |
+| L13 | 確認事項 2: GraphQL（`https://<ホスト>/api/graphql`）で `project(fullPath:) { repository { blobs(ref:, paths:) { nodes { path rawTextBlob } } } }` を `curl` で投げる | 束で取れるか（拡張は REST で 1 件ずつ読む。取れれば速くできる） | 応答の形 |
 | L4 | merge コミットを挟んだ後の `last_commit_id` と `repository/commits?ref_name=&path=&first_parent=true` | 承認コミットの選び方が GitHub と同じ答え | 応答 |
 | L5 | MR の discussions と reviewers を見る | 一般のコメント（依頼の投稿）の `resolvable`、システムのノートの `resolvable: false`、`notes[].author.id`、reviewers の `state` | 応答 |
-| L6 | 置き場に大きな差分（多数のファイル・多数の行）を入れて依頼の後に push する | compare の `collapsed`・`too_large`・`compare_timeout`・900 件以上のどれかで「動いた」と数え、通らない | `repository/compare` の応答の該当の欄 |
+| L6 | 置き場に大きな差分（多数のファイル・多数の行）を入れて依頼の後に push する | compare の `collapsed`・`too_large`・`compare_timeout`・450 件以上のどれかで「動いた」と数え、通らない | `repository/compare` の応答の該当の欄。インスタンスの `diff_max_files`・`diff_max_lines`（管理者の Settings → General → Diff limits。GitLab.com は公開の設定値）を控える |
 | L7 | フォークから同じ `source_branch` の MR を出す | `source_project_id` で外れ、元の MR だけを見る | 画面の文面、`merge_requests` の応答 |
 | L8 | PAT の期限 | `GET /personal_access_tokens/self` の `expires_at` が読める（個人の PAT と、作れたなら project access token の両方） | 応答の `expires_at` |
 | L9 | 入れ子のグループのリポジトリを登録して開く | `projects/<符号化した綴り>` で引ける | 画面の文面 |
 | L10 | `repository/tree` と `repository/blobs/:sha` | ページングで取り切れる。`encoding: base64` と `size` が合う | 応答 |
+
+同じファイルを競合させる手順（L2・L3）。**使い捨てのリポジトリに限ります。**
+
+- **A（ブレークポイント）**: `chrome://extensions` の拡張の「service worker」から開発者ツールを開き、Sources で `background.js` の
+  `repository/commits` への POST の直前（`createCommit` の中の `post(` の行）にブレークポイントを置きます（minify されているので、
+  Network の Initiator から辿るか、「Pretty print」で `repository/commits` を探します）。ボードで操作を押し、止まったら手元の clone から
+  同じファイル（例 `.ccnavi/approved/events/<識別子>.ndjson` に 1 行足す）をコミットして親のブランチへ push し、再開します
+- **B（curl で直接）**: `repository/files/<符号化したパス>?ref=<親のブランチ>` で今の `last_commit_id` を控え、手元から同じファイルを変えて push した後、
+  控えた古い値を付けて直接 POST します。
+
+  ```sh
+  curl -sS -X POST -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H 'Content-Type: application/json' \
+    "https://gitlab.com/api/v4/projects/<符号化した綴り>/repository/commits" \
+    -d '{"branch":"i0001","commit_message":"verify","actions":[{"action":"update","file_path":"<パス>","content":"x","last_commit_id":"<控えた古い値>"}]}'
+  ```
+
+  400 で書かれないことを確かめます（書かれたら L2 は「ずれた」。その親のブランチは捨てます）
 
 ### 4.6 プロジェクトのリポジトリ（段階 5）
 
@@ -208,7 +242,8 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 | # | 操作 | 期待する結果 | 控えるもの |
 |---|---|---|---|
 | S1 | ボードの「issue を読む」で開いた issue の「始める」を押す | 識別子 `i<4 桁>`（プロジェクトは `<名前>-i<4 桁>`）のブランチが統合先の先頭から作られる。PR/MR は作られない | 作られたブランチと起点の sha |
-| S2 | 同じ issue でもう一度押す | 既にあるので断る（GitHub は `POST /git/refs` の 422、GitLab は `POST repository/branches` の 400 を受けた形） | 画面の文面、応答 |
+| S2 | 同じ issue でもう一度押す | 拡張（Python）が既にある名前だと見て「始めなかった」と断り、ホストへブランチを作る要求が出ない（Network に `git/refs`・`repository/branches` への POST が無い） | 画面の文面 |
+| S2b | ホストの断り方を見る: 既にある名前で `curl` から直接 POST する（GitHub `POST /repos/<o>/<r>/git/refs`、GitLab `POST projects/:id/repository/branches`） | GitHub は 422、GitLab は 400 | 応答 |
 | S3 | 統合先の `done/` に同じ識別子があるとき・大文字小文字だけ違うブランチがあるときに押す | 作らない | 画面の文面 |
 | S4 | GitHub の `GET /issues` の一覧 | PR が混ざっても `pull_request` で見分けて出さない。Issues: Read で読める | 応答 |
 | S5 | ブランチが 100 本を超えるリポジトリで押す | 全件のページングで重なりを見る（GitHub `GET /branches`、GitLab `GET /repository/branches`） | 画面の文面 |
@@ -226,6 +261,8 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 | X7 | レート制限 | 当てるのは難しいので、当たったときだけ控える。拡張は原因と回復の時刻を言い、Retry-After が 60 秒以内なら 1 回だけ待ち直す | 画面の文面、`x-ratelimit-*`・`retry-after` のヘッダ |
 | X8 | PAT を失効させてからボードを開く | 401 で差し替えを促す | 画面の文面 |
 | X9 | 権限の足りない PAT（例 Pull requests を外す）で開く | 権限が原因だと言う | 画面の文面、応答 |
+| X11 | 古い実行ファイルと新しい sh の組み合わせ: 段階 4 より前の実行ファイル（`--version --json` を知らない）か、flags に `--via` の無い実行ファイルを `CCNAVI_BIN_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を打つ | どちらも落ちず、`--actor`・`--via` を渡さずに前と同じ印を置く（`actor` が無い） | 印の中身、sh の出力 |
+| X12 | 確認事項 6: Windows の Git Bash を 2 つ開き、片方で `sh -c 'echo $$; exec sleep 300'` を打って pid を控え、もう一方から `kill -0 <pid>; echo $?` を打つ。`sleep` が終わった後にもう一度打つ | 生きている間は 0、終わった後は 0 以外（ロックの持ち主が生きているかを sh が見分けられる。D32） | 2 回の終了コード |
 | X10 | 確認事項 1: GitHub の stale の外しにパスの除外があるか、GitLab の Code Owners で `.ccnavi/approved/` を外せるか | ホストの設定画面で確かめる（拡張の操作ではない） | 見つけた設定の名前、無ければ「無い」 |
 
 ## 5. 結果の返し方
@@ -240,7 +277,8 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
    L3: ずれた — 画面「...」、コミットの並び: abc1234 → def5678
    ```
 
-   - ADR の確認事項（10.2 の 1〜9。9 は小項目の見出しも）と、4 章の番号（R1・A2 など）ごとに「通った」か「ずれた」を書きます
+   - 4 章の番号（R1・A2 など）ごとに「通った」か「ずれた」を書きます。ADR の確認事項（10.2）との対応は、1 が X10、2 が L2・L4・L12・L13、
+     3 が L8、5 が X3、6 が X12、7 が W3、8 が 4.4、9 が 4.5・4.7 です。4 は解決済み（11.2）なので要りません
    - ずれたものには、画面の文面、ホストの応答の抜粋（欄の名前と値。全文は要りません）、関係するコミットの sha を添えます
    - 見本（`test/fixtures/host/`）と形が違う応答を見つけたら、その応答の該当部分を添えます（README の「ホストの応答の見本」の手順で直します）
 2. **PAT・トークン・`Authorization`／`PRIVATE-TOKEN` のヘッダ・Cookie は貼りません。** 応答を貼る前に、個人の名前・社内の URL も伏せます。
@@ -258,4 +296,4 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 
 - 親のブランチに保護と必須チェックを掛けたとき（X6）の拡張の振る舞いは、ADR にも試験にも無く、どの文面になるかは分かりません。
 - GitLab の project access token が無料版で作れるか、作れたとして `GET /personal_access_tokens/self` が期限を返すかは未確認です（確認事項 3）。
-- 開発者の側（1.3）の細かい手順は、使い捨てのワークスペースでエージェントが受ける案内に任せています。この手順書では流れだけを書きました。
+- 開発者の側（3.4）の細かい手順は、使い捨てのワークスペースでエージェントが受ける案内に任せています。この手順書では流れだけを書きました。
