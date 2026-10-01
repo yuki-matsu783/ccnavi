@@ -1396,6 +1396,74 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(any("wip/" in p for p in problems), problems)
         self.assertEqual(git(self.parent_tree, "ls-files", "--", "wip").strip(), "")
 
+    def test_an_eli5_only_commit_does_not_move_the_request(self):
+        """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない（ADR-0096）。
+
+        confirm は止まらず、request の打ち直しも要らない（依頼済みと答える）。ただし push は求める
+        （差分に無い ELI5 には crit push が届かない）。ELI5 とほかのファイルを一緒に変えたコミットは
+        今までどおり数え、confirm が止まって打ち直しを求める。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        eli5 = os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html")
+        write(eli5, "<p>やさしい説明</p>\n")
+        git(self.parent_tree, "add", "--", "wip/eli5/phase-1.html")
+        git(self.parent_tree, "commit", "--quiet", "-m", "docs: ELI5")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertEqual(self.request(fixture).returncode, 0)
+
+        def confirm():
+            return self.ccnavi(
+                "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
+            )
+
+        def edit(rel, text, message):
+            write(os.path.join(self.parent_tree, *rel.split("/")), text)
+            git(self.parent_tree, "add", "--", rel)
+            git(self.parent_tree, "commit", "--quiet", "-m", message)
+
+        # ELI5 だけを直したコミット。push していなければまだ止める
+        edit("wip/eli5/phase-1.html", "<p>直した説明</p>\n", "docs: ELI5 を直す")
+        unpushed = confirm()
+        self.assertNotEqual(unpushed.returncode, 0)
+        self.assertIn("push されていない", unpushed.stderr)
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        again = self.request(fixture)
+        self.assertNotEqual(again.returncode, 0)
+        self.assertIn("依頼済み", again.stderr)
+        # ELI5 とほかのファイルを一緒に変えたコミットは動いたと数える
+        write(os.path.join(self.parent_tree, "src", "a", "fix.py"), "x = 1\n")
+        git(self.parent_tree, "add", "--", "src/a/fix.py")
+        edit("wip/eli5/phase-1.html", "<p>もう一度直した</p>\n", "fix: 直しと ELI5")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        moved = confirm()
+        self.assertNotEqual(moved.returncode, 0)
+        self.assertIn("依頼の後に親の HEAD が動いている", moved.stderr)
+        redo = self.request(fixture)
+        self.assertEqual(redo.returncode, 0, redo.stderr)
+        # 出し直したあとに ELI5 だけを直しても、confirm は止まらない
+        edit("wip/eli5/phase-1.html", "<p>三度目</p>\n", "docs: ELI5 をもう一度直す")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        done = confirm()
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_eli5_lookalikes_still_move_the_request(self):
+        """`wip/eli5x/` や `wip/` のほかの場所は、今までどおり動いたと数える。"""
+        conf, _ = settings.load(self.root)
+        mark = {"head": "a" * 40}
+        for path, moves in (
+            ("wip/eli5/phase-1.html", False),
+            ("wip/eli5/old/phase-1.html", False),
+            ("wip/eli5x/phase-1.html", True),
+            ("wip/design/plan.md", True),
+            ("wip\\eli5\\phase-1.html", True),
+            ("src/a/x.py", True),
+        ):
+            with self.subTest(path=path):
+                said = review.moved_since(conf, mark, "b" * 40, [path])
+                self.assertEqual(bool(said), moves, said)
+
     def test_decide_yes_places_each_choice(self):
         """指摘ごとの行き先。対応しない分は受け入れ、直す分は続きの子に載せ、フェーズは開き直る。"""
         fixture = self.two_threads()
