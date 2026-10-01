@@ -1162,7 +1162,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
    - `repository/tree?path=&ref=&recursive=true` のページング（`per_page=100` と `page`）と `truncated` に当たるものが無いこと、`type: commit`（サブモジュール）
    - `repository/blobs/:sha` の `encoding: base64`・`size`
    - `repository/commits?ref_name=<sha>&path=`（承認コミット）と `first_parent=true`（鎖）。merge コミットの扱いは確認事項 2 と同じく未確認
-   - `repository/merge_base?refs[]=&refs[]=` と `repository/compare?from=&to=` の `diffs`・`compare_timeout`。差分の件数の上限（拡張は 900 件以上で打ち切られたとみなす。11.9.1 の 9）
+   - `repository/merge_base?refs[]=&refs[]=` と `repository/compare?from=&to=` の `diffs`・`compare_timeout`。差分の件数の上限（拡張は 450 件以上で打ち切られたとみなす。11.9.1 の 9・11.9.3 の 3）。インスタンスの `diff_max_files`（既定 1000、最小 500）
    - `GET /personal_access_tokens/self` の `expires_at`（個人の PAT と project access token の両方。確認事項 3）
    - 「始める」: GitHub の `POST /git/refs`（fine-grained の Contents: Read and write で通るか、既にあれば 422）と `GET /issues`（PR が混ざり `pull_request` で見分けられること、Issues: Read で読めること）。
      GitLab の `POST repository/branches`（既にあれば 400）と `GET /issues`（`iid`）
@@ -1172,7 +1172,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
      `repository/files/:path?ref=<sha>` の `last_commit_id` がそれと同じ値か（merge コミットの扱いを含む）
    - 11.9.1: MR の `source_project_id`（フォークの MR が同じ `source_branch` で並ぶこと）、discussions の `notes[].author.id`
    - 11.9.1: compare の打ち切り: 件数（`diff_max_files`）のほかに行数（`diff_max_lines`）や大きさで畳まれた diff に `collapsed`・`too_large` が付くか。
-     拡張は 900 件以上・`collapsed`・`too_large`・`compare_timeout` のどれでも一覧を読めないとする
+     拡張は 450 件以上・`collapsed`・`too_large`・`compare_timeout` のどれでも一覧を読めないとする（11.9.3 の 3）
    - 11.9.1: `GET /repository/branches` の全件のページング（「始める」の大文字小文字を畳んだ重なりの検査。GitHub は `GET /branches`）
 
 ### 10.3 後の段階で決めること（段階 5 で決めたもの）
@@ -1915,7 +1915,10 @@ ADR に無かった判断:
 
 #### 11.9.1 レビューで直したもの（2026-09-30）
 
-段階 5 の後の敵対的レビューの指摘を、利用者の承認を得て直した。判定は締める向きだけで、緩めた所は無い。
+段階 5 の後の敵対的レビューの指摘を、利用者の承認を得て直した。判定はおおむね締める向きだが、次の 2 つは正確には締める向きだけではない（11.9.3 で書き直した）。
+
+- 17 は lint の warn を**緩めた**。`issue:` の無い提案の `<名前>-i<番号>` は、前は名前の形だけで warn だったが、その提案のプロジェクトの issue から決まる名前と重なるときだけにした。ワークスペースの提案の `web-i0012` は warn しなくなった（warn なので判定は止めない）。ワークスペースの家族とプロジェクト web の issue 12 の家族が同じ名前になったときは、lint の「複数のリポジトリにある」（error）と、家族の控えを名前で引く処理（`syncstate.standing_any`）が止める（11.9.3 の 13）
+- 15 は移行の段差がある。GitLab の依頼の記録の `poster` を名前から id に変えたので、前の版で記録した依頼（`poster` が名前）は ccnavi の依頼のスレッドと見分けられず、依頼の投稿が解決できるスレッド（`resolvable`。確認事項 9）なら未解決として数える。そのため、実行中の依頼（依頼済みで、まだレビュー済みでないフェーズ）は、依頼し直すか `decide` で受け入れるまで confirm・Chrome のレビュー済みが通らない（止まる向き）
 
 レビューの後の決定（利用者）:
 
@@ -1978,6 +1981,31 @@ ADR に無かった判断:
 - 11.9.1: MR の `source_project_id` でフォークの MR を外せること、discussions と note の `author.id`、compare の `collapsed`・`too_large`（行数での打ち切り）、
   `GET /repository/branches`（GitHub は `GET /branches`）の全件のページング
 - 11.9.1: 古い実行ファイル（`--version --json` を知らない・flags に `--via` が無い）と新しい sh の組み合わせで、confirm・decide が前と同じ印を置くこと
+
+#### 11.9.3 最新レビューで直したもの（2026-10-01）
+
+11.9.1・11.9.2 の後の差分（32f6b18..0c8dca9）の敵対的レビューの指摘を直した。直しは締める向きか、試験と文書だけ。
+
+| # | 何 | 直し方 |
+|---|---|---|
+| 1 | 書いた応答が落ちた後の確かめ（先頭・親・中身の読み取り）が落ちると、書いたかもしれないのに失敗（failed）になった。書いた後の中身の確かめが合わない・落ちたときも失敗だった | どれも要確認（attention。「書いたかもしれないが確認できなかった」「書いた後の中身を確認できなかった」）にし、ボードの控え（`noteAttention`）に載る |
+| 2 | GitLab の書き込みの断り（409）が、送る前の確認で先頭が動いた（何も送っていない）ときと、`last_commit_id` で GitLab が断ったときで同じだった | 前者を 412（`gitlab.HOST_MOVED`）、後者を 409（`gitlab.HOST_REFUSED`）に分けた。打ち消しは 412 なら上限（2 回）の範囲で読み直して打ち消し直し、409 なら人に回す。本体の書き込みは 412 なら「動いた」で周を回す |
+| 3 | compare の打ち切りを 900 件とみなしていたが、GitLab の `diff_max_files` は管理者が 500 まで下げられる | 450 件以上で打ち切られたとみなす。VERIFY.md の L6 でインスタンスの値を控える。`commits` の数での裏取りは、差分の打ち切りと関係が無い（merge だけのコミットで差分が空になる）ので入れていない |
+| 4 | ボードの要確認の文面が「打ち消しが収まらなかった」に決め打ちだった | 「書いたかどうか・何が残ったかを、ホストの履歴で人が確かめる」に本文を添える |
+| 5 | 転送（`redirect: "error"`）や通信の失敗で fetch が投げると、`TypeError: Failed to fetch` だけが出た | GitHub と GitLab の要求で包み、「通信が落ちたか、転送された。通信先と登録の owner/repo を見直す」と言う。status は 0 のまま（書く流れは届いたか分からないとして確かめる） |
+| 6 | sh の `find_mr` がプロジェクトの id を読めないと、理由を言わずに落ちた。GitLab の MR の一覧は 1 ページ目しか読まず、フォークの MR で埋まると本物を外した | id を読めなければ理由を言って止める（MR が無いと取り違えて作り直さない）。sh（`find_mr`・`merged`）と TS（`openMr`・`pullApprovals`）とも全ページ（20 ページまで）を読んでから `source_project_id` で絞る（API はこの欄で絞れない）。sh の `pages` は API の失敗と並びでない答えで 1 を返す |
+| 7〜11 | 変異試験で空洞だった試験 | update の `last_commit_id` と割り込みでの 400（CX-T177）、要確認の家族で押しても書かない・外すのに確認を挟む（e2e の CX-T173）、`merged` の GitLab の枝（フォーク・2 ページ目・id が読めなければ unknown。`test_review_merged.py`）と `find_mr` の id の失敗、TS の MR のフォークの除外と全ページ（CX-T178）、GitHub の `redirect: "error"`（CX-T179）、読んだ先頭に届かない線の同じ中身を自分のものと取らない（CX-T176）、打ち消しの 412 で打ち消し直す（CX-T175）、確かめが落ちたら要確認（CX-T174）。打ち消しの 409 で人に回すのは CX-T149 |
+| 12 | VERIFY.md の手順の穴 | L2・L3 を同じファイルを update で競合させる手順（service worker のブレークポイントか、curl で古い `last_commit_id` を付けて直接 POST）に、S2 を「Python が断り、ホストへの要求が出ない」にし、ホストの 422・400 は S2b に分けた。家族の用意（3.4）を PAT の登録の後へ。古い実行ファイルと新しい sh の組み合わせ（X11）、確認事項 2（L12・L13）と 6（X12）の手順を足し、4 は解決済みと書いた。`.gitignore` に `logs/`・`.claude/worktrees/` を足す手順、統合先への push は人が素の git で打つこと、本番どおりの流れを見る回は `--mode enable` |
+| 13 | 11.9.1 の冒頭の「緩めた所は無い」が不正確。ワークスペースの家族とプロジェクトの家族が同じ名前のとき、家族の控えを名前で引く処理が取り違えうる | 冒頭を直した（17 は lint の warn を緩めた、15 は実行中の依頼が止まる移行）。`standing_any`（リポジトリを添えずに引く: C1・config-synced・lint の一部）は、控えが 2 つ以上なら前から止めていた。控えが 1 つでも同じ名前の親のワークツリーが別のリポジトリにあれば、どちらとも決めずに止めるようにした |
+| 14 | service worker の `toLowerCase` と Python の `casefold` の違い | 作る名前は ASCII に限る（`startName` と `ticket._ID`）ので同じ答えになる。比べる相手のホストのブランチの名前は ASCII とは限らないので、service worker は NFKC で互換分解してから畳む（全角や合字も重なりとして拾う。締める向き） |
+
+ADR に無かった判断:
+
+- 本体の書き込みが `last_commit_id` で断られた（409）ときは、11.9.1 のとおり人に回さず読み直して周を回す（何も書いていない。3 周で人に回す）。人に回すのは打ち消しだけ
+- `find_mr` に統合先（`target_branch`）の絞りは足さない。依頼の MR を作る側（`create_mr`）が `origin/HEAD` を統合先にしており、人が別の統合先へ出した MR を見落とすと
+  `request` が MR を作り直すため
+
+触った守りの対象: `.ccnavi/scripts/ccnavi-review.sh`（`find_mr` の止め方と全ページ、`merged` の全ページ、`pages` の失敗の返し方）。利用者の承認（レビューの直し）を得て直接直した。
 
 ## 得たもの・失ったもの
 
