@@ -1623,6 +1623,22 @@ def _is_own_place(conf: settings.Settings, path: str) -> bool:
     return any(path.startswith(place + "/") for place in _own_places(conf))
 
 
+def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
+    """依頼の後に変わっても「人が見るものが動いた」に数えない場所か。
+
+    ccnavi 自身の置き場と、ELI5 の HTML の置き場（`wip/eli5/`。ADR-0096）。ELI5 は依頼に添える
+    説明で、成果物ではない（`ready` の前に消える）。直すたびに依頼し直させると、指摘を受けて
+    説明を直すたびに依頼のコメントが増え、レビュー済みが遠のく。代わりに、直した ELI5 を人が
+    見直す保証は無くなる。
+
+    未コミットの検査（`_dirty`）と push の検査（`_unpushed`）はこれを使わない。ELI5 の未コミットは
+    sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
+    （crit push が届かない）。
+    """
+    # git の `-z` の綴りをそのまま見る（`\\` を `/` に直さない。`_outside_approved` と同じ理由）。
+    return _is_own_place(conf, path) or path.startswith(ticket_mod.ELI5 + "/")
+
+
 # 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
 _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 
@@ -1637,7 +1653,9 @@ def _is_sha(value: str) -> bool:
     return bool(_SHA.match(value))
 
 
-def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tuple[list[str], str]:
+def _outside_approved(
+    tree_root: str, conf: settings.Settings, ref: str, eli5: bool = False
+) -> tuple[list[str], str]:
     """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
 
     NUL 区切りで読む理由は phase.scope_findings と同じ。既定の出力は非 ASCII を
@@ -1650,9 +1668,12 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
     置き場の中のパスになってしまい、除外の側に入る。
+
+    `eli5` なら ELI5 の置き場も外す（`_unseen_by_review`。依頼済みの見分けだけが使う）。
     """
     paths, failed = _diff_paths(tree_root, ref)
-    return [p for p in paths if not _is_own_place(conf, p)], failed
+    keep = _unseen_by_review if eli5 else _is_own_place
+    return [p for p in paths if not keep(conf, p)], failed
 
 
 def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
@@ -2068,7 +2089,8 @@ def moved_since(
     # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
     if not _is_sha(recorded) or changed is None:
         return moved
-    if any(not _is_own_place(conf, path) for path in changed):
+    # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、人が見るものを動かさない（ADR-0096）。
+    if any(not _unseen_by_review(conf, path) for path in changed):
         return moved
     return ""
 
@@ -2102,7 +2124,7 @@ def _already_requested(
     if rc == 0 and head.strip() != recorded:
         if not _is_sha(recorded):
             return ""
-        changed, failed = _outside_approved(tree_root, conf, recorded)
+        changed, failed = _outside_approved(tree_root, conf, recorded, eli5=True)
         if failed or changed:
             return ""
     return f"フェーズ {phase_no} は依頼済み（人が見るものは依頼時のまま）"
