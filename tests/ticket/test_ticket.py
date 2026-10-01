@@ -2372,7 +2372,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(self.confirm(fixture).returncode, 0)
 
     def move_rename_into_the_store(self, fixture):
-        # 改名を 1 行にまとめられると移動元が消え、人が見た木から消えたことが映らない。
+        # 改名を 1 行にまとめられると移動元が差分から消え、レビューされたコードからファイルが消えたことを検出できない。
         git(self.parent_tree, "mv", "src/keep.py", ".ccnavi/approved/keep.py")
         git(self.parent_tree, "commit", "--quiet", "-m", "置き場へ移す")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
