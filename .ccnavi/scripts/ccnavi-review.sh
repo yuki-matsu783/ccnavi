@@ -326,9 +326,10 @@ pages() {
 	esac
 	all='[]'
 	while :; do
-		chunk=$(api GET "$rel${sep}per_page=100&page=$page")
+		# 呼び手が `|| ...` で受けると set -e が効かないので、落ちたらここで 1 を返す（並びでない答えも）
+		chunk=$(api GET "$rel${sep}per_page=100&page=$page") || return 1
+		n=$(printf '%s' "$chunk" | "$JQ" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
 		all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
-		n=$(printf '%s' "$chunk" | "$JQ" 'length')
 		[ "$n" -lt 100 ] && break
 		page=$((page + 1))
 		[ "$page" -gt 20 ] && fail too-many-pages "$rel が多すぎて読み切れない。"
@@ -348,9 +349,12 @@ find_mr() {
 		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url}'
 	else
-		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない。ADR-0093 の 11.9.1 の 6）
-		pid=$(project_id) || return 1
-		api GET "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch" |
+		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない。ADR-0093 の 11.9.1 の 6）。
+		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない。11.9.3 の 6）
+		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。MR がこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の綴りを見直す）。"
+		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
+			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
+		printf '%s' "$mrs" |
 			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url}'
 	fi
 }
@@ -725,7 +729,8 @@ merged)
 			printf 'unknown\n'
 			exit 3
 		}
-		answer=$(api GET "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
+		# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない。11.9.3 の 6）
+		answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
 			printf 'unknown\n'
 			exit 3
 		}
