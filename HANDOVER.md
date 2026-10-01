@@ -119,7 +119,8 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 ### 並行するチケット（REQ-TKT、設計 9）で実測が要るもの
 
 - `SubagentStart` の `additionalContext` がサブエージェントに届くか。届かなければ最初の `PreToolUse` で渡す（設計 9.12）
-- `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`（親を cwd で引くので、そこが割れる）
+- `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`。レビュー準備中・レビュー待ちで止めるかは cwd の
+  ワークツリーから親を引いて決めるので、届く cwd が親のワークツリーか `isolation` が作った別のワークツリーかで、止まるかどうかが分かれる
 - GitHub の実物に `request` / `confirm` を当てる。GraphQL の `reviewThreads` は文書どおりに書いただけ。
   GitLab の `request_changes` は EE でしか当てられない
 
