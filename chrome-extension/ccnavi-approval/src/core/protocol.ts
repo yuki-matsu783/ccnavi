@@ -314,6 +314,15 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
   return blob.text;
 }
 
+/**
+ * 大文字小文字を畳む（「始める」の重なりの検査）。作る名前は ASCII に限る（`startName`・Python の `ticket._ID`）ので
+ * Python の casefold と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
+ * 互換分解（NFKC）してから畳み、`ﬁ`・`ſ` のように casefold で ASCII に畳まれる字も重なりとして拾う（締める向き。11.9.3 の 14）
+ */
+function fold(text: string): string {
+  return text.normalize("NFKC").toLowerCase();
+}
+
 /** 互換の印の綴り（`ccnavi_chrome.COMPAT_FILE`） */
 const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
 
@@ -334,8 +343,8 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
   const obj = (await a.pathObjects(client, cfg.owner, cfg.repo, head, [done]))[done];
   if (obj && obj.type === "tree") {
     const entries = client.host.kind === "gitlab" ? await gitlab.tree(client, cfg.owner, cfg.repo, obj.oid, head, done) : await github.tree(client, cfg.owner, cfg.repo, obj.oid);
-    const folded = name.toLowerCase();
-    const hit = entries.find((e) => !e.path.includes("/") && e.path.toLowerCase() === `${folded}.md`);
+    const folded = fold(name);
+    const hit = entries.find((e) => !e.path.includes("/") && fold(e.path) === `${folded}.md`);
     if (hit) return `${name} は統合先 ${integ} の done/ で閉じている（閉じた識別子は使い直さない。ADR-0093 の 3.1 の 5）`;
   }
   return "";
@@ -496,8 +505,8 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
       if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が読んだものと違う。ボードを更新してから始め直す`);
       // 統合先の今の先頭で確かめ直す（Python の答えを信じない。11.9.1 の 7）: 大文字小文字を畳んだ重なり・閉じた識別子・互換の版
-      const folded = name.toLowerCase();
-      const same = (await x.branchNames(client, o, r)).filter((n) => n.toLowerCase() === folded);
+      const folded = fold(name);
+      const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
       if (same.length > 0) return refuse(`${name} は既にある（${same.join(", ")}）`);
       let guard: string;
       try {

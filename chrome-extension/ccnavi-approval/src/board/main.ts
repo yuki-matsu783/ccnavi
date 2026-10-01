@@ -90,7 +90,7 @@ async function readAttention(): Promise<Attention> {
   return v && typeof v === "object" ? (v as Attention) : {};
 }
 
-/** 打ち消しが収まらなかった家族を控える（8.4。人が確かめて外すまでボードに出す） */
+/** 要確認の家族を控える（打ち消しが収まらない・書いたか確かめられない など。8.4。人が確かめて外すまでボードに出す） */
 async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
   if (outcome.kind !== "attention") return;
   const all = await readAttention();
@@ -134,7 +134,7 @@ function say(outcome: Outcome, what: string): void {
         : outcome.kind === "conflict"
           ? `${what}を書けなかった（人に回す）: ${outcome.message}`
           : outcome.kind === "attention"
-            ? `${what}を書いた後に別の書き込みが入り、打ち消しが収まらなかった（要確認。人に回す）: ${outcome.message}`
+            ? `${what}は要確認になった（書いたかどうか・何が残ったかを、ホストの履歴で人が確かめる）: ${outcome.message}`
             : `${what}を書かなかった: ${outcome.message}`;
   result.textContent = head;
   result.className = `notice ${outcome.kind === "written" ? "ok" : "error"}`;

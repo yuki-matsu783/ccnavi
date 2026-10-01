@@ -125,6 +125,20 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
   };
 }
 
+/**
+ * 転送を追わずに呼ぶ（`redirect: "error"`）。fetch そのものが落ちたら（転送された・通信が落ちた。ブラウザは両者を
+ * 見分けさせない）、原因の分かる文面に包む。status は 0 のまま（書く流れは「届いたか分からない」として確かめる）
+ */
+export async function fetchNoRedirect(client: Pick<Client, "fetch">, url: string, init: Parameters<Fetch>[1], what: string): ReturnType<Fetch> {
+  try {
+    return await client.fetch(url, { ...init, redirect: "error" });
+  } catch (err) {
+    throw new HostError(
+      `${what} が届かなかった（通信が落ちたか、別の場所へ転送された。転送は追わない）。通信先と、設定画面に登録した owner/repo（改名・移動していないか）を見直す: ${(err as Error).message ?? String(err)}`,
+    );
+  }
+}
+
 async function pause(client: Client, seconds: number): Promise<void> {
   const sleep = client.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   await sleep(seconds * 1000);
@@ -137,7 +151,7 @@ async function pause(client: Client, seconds: number): Promise<void> {
 async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
     // 別のホストへの転送を追わない（PAT を載せた要求を焼き込んだ通信先の外へ出さない）
-    const res = await client.fetch(url, { ...init, redirect: "error" });
+    const res = await fetchNoRedirect(client, url, init, what);
     note(client, res);
     if (res.status === 401) {
       throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);

@@ -50,6 +50,10 @@ const HEADLINE_IDS = 3;
 
 /** service worker が書く頼みを形や守りで断ったときの status（protocol.ts の REFUSED と同じ） */
 const REFUSED = 400;
+/** GitLab が書き込みを断ったとき（`last_commit_id` が違う＝同じファイルを他人が変えた・無い）の status（`gitlab.HOST_REFUSED`）。人に回す */
+const HOST_REFUSED = 409;
+/** GitLab へ送る前の確認で先頭が動いていたときの status（`gitlab.HOST_MOVED`）。何も送っていないので読み直して試し直す */
+const HOST_MOVED = 412;
 
 /** コミットの見出しと本文。見出しは 200 字に収まるよう先頭の数件と件数に畳み、全件は本文に書く */
 export function commitMessage(ids: readonly string[], verb: string, done: string, version: string): { headline: string; body: string } {
@@ -66,7 +70,7 @@ export type Outcome =
   | { readonly kind: "refused"; readonly message: string }
   | { readonly kind: "conflict"; readonly message: string }
   | { readonly kind: "failed"; readonly message: string }
-  /** 打ち消しが収まらなかった（GitLab の連鎖競合）。ボードは家族を「要確認」で出す（8.4） */
+  /** 人に回す（打ち消しが収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは家族を「要確認」で出す（8.4） */
   | { readonly kind: "attention"; readonly message: string };
 
 export interface Shown {
@@ -223,10 +227,11 @@ async function findWritten(deps: WriteDeps, repo: RepoConfig, now: string, read:
 }
 
 /**
- * 1 コミットで書く。service worker が形や守りで断ったら（400）、原因を言って失敗にする。
- * ほかの失敗では先頭を読み直し、動いていなければ失敗。動いていれば、応答だけが落ちた自分の書き込みを探し
- * （`findWritten`）、見つかれば書けたとする。見つからず、今の先頭に書いた中身が在るなら（書いたか見分けられない）
- * 人に回す。無ければ「動いた」（読み直して周を回す）
+ * 1 コミットで書く。service worker が形や守りで断ったら（400）、原因を言って失敗にする。GitLab で書く前の確認で先頭が
+ * 動いていたら（412。何も送っていない）「動いた」。ほかの失敗では先頭を読み直し、動いていなければ失敗。動いていれば、
+ * 応答だけが落ちた自分の書き込みを探し（`findWritten`）、見つかれば書けたとする。見つからず、今の先頭に書いた中身が
+ * 在るなら（書いたか見分けられない）人に回す。無ければ「動いた」（読み直して周を回す）。
+ * 応答が落ちた後の確かめそのものが落ちたら（429・5xx など）、書いたかもしれないが確認できないので人に回す（11.9.3 の 1）
  */
 async function commitOnce(
   deps: WriteDeps,
@@ -236,12 +241,17 @@ async function commitOnce(
   message: { headline: string; body: string },
   rows: readonly ChangeRow[],
 ): Promise<Attempt> {
+  let text: string;
   try {
     const done = await send(deps, repo, family, read.head, message, rows);
     return { kind: "written", oid: done.oid, parent: done.parent };
   } catch (err) {
-    const text = (err as Error).message ?? String(err);
-    if ((err as { status?: number }).status === REFUSED) return { kind: "failed", message: text };
+    text = (err as Error).message ?? String(err);
+    const status = (err as { status?: number }).status;
+    if (status === REFUSED) return { kind: "failed", message: text };
+    if (status === HOST_MOVED) return { kind: "moved" };
+  }
+  try {
     const now = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
     if (now === null) return { kind: "failed", message: `親のブランチ ${family} がホストから消えた（${text}）` };
     if (now === read.head) return { kind: "failed", message: text };
@@ -257,13 +267,27 @@ async function commitOnce(
       };
     }
     return { kind: "moved" };
+  } catch (err) {
+    return {
+      kind: "attention",
+      message: `${family} へ書いた応答が落ち（${text}）、書いたかもしれないが確認できなかった（${(err as Error).message ?? String(err)}）。ホストの履歴を人が確かめる`,
+    };
   }
 }
 
+/** 書いた後の確かめ。合わない・確かめが落ちたら、書いたものが残っているので人に回す（failed にしない。11.9.3 の 1） */
 async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: readonly ChangeRow[], rounds: number, lines: readonly string[]): Promise<Outcome> {
-  const wrong = await verifySettled(deps, repo, oid, rows);
+  let wrong: string[];
+  try {
+    wrong = await verifySettled(deps, repo, oid, rows);
+  } catch (err) {
+    return {
+      kind: "attention",
+      message: `書いた（${oid.slice(0, 7)}）が、書いた後の中身を確認できなかった（${(err as Error).message ?? String(err)}）。ホストの履歴を人が確かめる`,
+    };
+  }
   if (wrong.length > 0) {
-    return { kind: "failed", message: `書いた後の中身が書いたものと違う（${wrong.join(", ")}）。ホストの履歴を人が確かめる` };
+    return { kind: "attention", message: `書いた後の中身が書いたものと違う（${oid.slice(0, 7)}: ${wrong.join(", ")}）。ホストの履歴を人が確かめる` };
   }
   return { kind: "written", oid, rounds, lines };
 }
@@ -334,8 +358,6 @@ async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows:
 /** 打ち消しを積む回数の上限（8.4 の「2 回で収まらなければ人に回す」） */
 export const REVERT_TRIES = 2;
 
-/** GitLab が書き込みを断ったとき（同じファイルを他人が変えた・無い）の status（`gitlab.createCommit`） */
-const HOST_REFUSED = 409;
 
 /** 書いたが確かめ切れなかった・打ち消せなかったときの答え（人に回す。8.4） */
 function attention(family: string, done: Committed, why: string): Outcome {
@@ -368,6 +390,8 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
     } catch (err) {
       const status = (err as { status?: number }).status;
       if (status === REFUSED || status === HOST_REFUSED) return human((err as Error).message ?? String(err));
+      // 送る前の確認で先頭が動いた（何も送っていない）: 上限の範囲で今の先頭から確かめ直す
+      if (status === HOST_MOVED) continue;
       // 応答だけが落ちたか: 今の先頭の親が送った先で、中身が戻したとおりなら届いている
       const now = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
       if (now !== null && now !== cur) {

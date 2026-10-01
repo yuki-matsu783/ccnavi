@@ -22,6 +22,7 @@ import {
   checkBranch,
   checkOid,
   checkPath,
+  fetchNoRedirect,
   HostError,
   RETRY_LIMIT_SECONDS,
   type ApprovalCommit,
@@ -75,7 +76,7 @@ async function pause(client: Client, seconds: number): Promise<void> {
 async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
     // 別のホストへの転送を追わない（PAT を載せた要求を焼き込んだ通信先の外へ出さない）
-    const res = await client.fetch(url, { ...init, redirect: "error" });
+    const res = await fetchNoRedirect(client, url, init, what);
     if (res.status === 401) throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
     if (res.status === 429) {
       const after = header(res, "retry-after");
@@ -350,11 +351,12 @@ async function projectId(client: Client, owner: string, repo: string): Promise<n
 type MrItem = { iid?: unknown; web_url?: unknown; source_project_id?: unknown };
 
 /** 開いた MR のうち、このプロジェクトのブランチから出たもの（フォークの同じ名前のブランチの MR を拾わない） */
-async function openMrs(client: Client, owner: string, repo: string, branch: string, extra = ""): Promise<MrItem[]> {
+async function openMrs(client: Client, owner: string, repo: string, branch: string): Promise<MrItem[]> {
   const pid = await projectId(client, owner, repo);
-  const { status, body } = await get(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}${extra}`);
-  if (status === 404 || !Array.isArray(body)) return [];
-  return (body as MrItem[]).filter((m) => m && m.source_project_id === pid);
+  // API は source_project_id で絞れないので、全ページ（20 ページまで）を読んでから絞る（1 ページ目がフォークで埋まっても
+  // 本物を外さない。sh の find_mr と同じ。11.9.3 の 6）
+  const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}`, THREAD_PAGES, `${branch} の MR の一覧`);
+  return (all as MrItem[]).filter((m) => m && m.source_project_id === pid);
 }
 
 /**
@@ -371,7 +373,7 @@ export async function openMr(client: Client, owner: string, repo: string, branch
 /** 親のブランチの開いた MR に付いている Approve（8.10。`merge_requests/:iid/approvals` の `approved_by`） */
 export async function pullApprovals(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; approvals: number }[]> {
   const out: { number: number; approvals: number }[] = [];
-  for (const mr of await openMrs(client, owner, repo, branch, "&per_page=30")) {
+  for (const mr of await openMrs(client, owner, repo, branch)) {
     if (typeof mr.iid !== "number" || !Number.isInteger(mr.iid)) continue;
     const got = await get(client, `${project(owner, repo)}/merge_requests/${mr.iid}/approvals`);
     const by = (got.body as { approved_by?: unknown } | null)?.approved_by;
@@ -448,9 +450,13 @@ export async function reviewCopy(client: Client, owner: string, repo: string, br
   return { host: "gitlab", mr, threads, reviews, fetched_at: new Date().toISOString() };
 }
 
-/** compare の変更の一覧を打ち切られたとみなす件数（GitLab の既定の差分の上限。確認事項 9 で確かめる）。上限に近ければ（9 割）打ち切られたとみなす */
+/**
+ * compare の変更の一覧を打ち切られたとみなす件数。GitLab の差分の件数の上限（`diff_max_files`）は既定が 1000 で、
+ * インスタンスの管理者が 500 まで下げられる。その最小値より下（450）から打ち切られたとみなす（11.9.3 の 3。確認事項 9 で
+ * インスタンスの値を確かめる）
+ */
 export const COMPARE_FILES_LIMIT = 1000;
-export const COMPARE_FILES_NEAR = 900;
+export const COMPARE_FILES_NEAR = 450;
 
 /**
  * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス（8.9）。`base` が `head` の祖先でなければ
@@ -479,6 +485,11 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
 
 // ---- 書き込み（8.4 の 1 段目） -----------------------------------------------------------------
 
+/** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。打ち消しなら人に回す */
+export const HOST_REFUSED = 409;
+/** 送る前の確認で先頭が読んだものと違った（何も送っていない）。読み直して試し直してよい */
+export const HOST_MOVED = 412;
+
 /** 書くもの 1 つ（Commits API の action）。中身は base64。`last` はそのファイルを最後に変えたと呼び手が知っているコミット */
 export interface GitLabAction {
   readonly op: "create" | "update" | "delete";
@@ -490,7 +501,7 @@ export interface GitLabAction {
 /** `ref` の上でそのファイルを最後に変えたコミット（`repository/files/:path?ref=` の `last_commit_id`）。無ければ投げる */
 export async function lastCommit(client: Client, owner: string, repo: string, ref: string, path: string): Promise<string> {
   const { status, body } = await get(client, `${project(owner, repo)}/repository/files/${encodeURIComponent(checkPath(path))}?ref=${checkOid(ref)}`);
-  if (status === 404) throw new HostError(`${path} が ${ref.slice(0, 7)} に無い（書き換える・消すものが無い）`, 409);
+  if (status === 404) throw new HostError(`${path} が ${ref.slice(0, 7)} に無い（書き換える・消すものが無い）`, HOST_REFUSED);
   return checkOid((body as { last_commit_id?: unknown } | null)?.last_commit_id);
 }
 
@@ -517,7 +528,7 @@ export async function createCommit(
 ): Promise<Written> {
   const name = checkBranch(branch);
   const now = await branchHead(client, owner, repo, name);
-  if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が読んだものと違う（書く前に動いた）`, 409);
+  if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が読んだものと違う（書く前に動いた）`, HOST_MOVED);
   // update・delete には、そのファイルを最後に変えたコミットを付ける（決定 A）。呼び手が知っていればそれ（打ち消しは自分の
   // コミット）、無ければ読んだ先頭の上の値。その後に他人が変えていれば GitLab が断る（400。ここでは 409 にする）
   const out: Record<string, unknown>[] = [];
@@ -538,7 +549,7 @@ export async function createCommit(
   const res = await post(client, `${project(owner, repo)}/repository/commits`, payload);
   if (res.status === 400 || res.status === 409 || res.status === 422) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitLab が書き込みを断った（${res.status}）: ${typeof why === "string" ? why : "?"}`, 409);
+    throw new HostError(`GitLab が書き込みを断った（${res.status}）: ${typeof why === "string" ? why : "?"}`, HOST_REFUSED);
   }
   if (res.status < 200 || res.status >= 300) throw new HostError(`GitLab が ${res.status} を返した: POST repository/commits`, res.status);
   const c = (res.body ?? {}) as { id?: unknown; parent_ids?: unknown };
