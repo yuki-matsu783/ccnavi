@@ -34,8 +34,8 @@ GitLab の印ファイル `seq`（8.4 の 2 段目）は持たない（段階 5b
   `chrome.storage.local` にだけ控え、ほかの承認者には見えない。要確認の家族にはこのブラウザから書かない）。PAT の期限は `GET /personal_access_tokens/self` を 1 日 1 回読む
 - プロジェクトのリポジトリ（段階 5。3.3 の 7）: 設定画面でプロジェクト名（手元の `projects/<名前>` の名前）と、先に登録したワークスペースの
   リポジトリを選ぶ。置き場の綴り・共通層・互換の印はワークスペースの統合先から、閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先
-  から読み、層は D28 の計算（共通層を写したもの）で判定する。Chrome の登録の名前は手元のディレクトリ名と揃える（ずれると手元の取り込みの後の
-  判定し直しが家族を止める）
+  から読み、層は D28 の計算（共通層を写したもの）で判定する。Chrome の登録の名前は手元のディレクトリ名と揃える（ずれると、手元で取り込んだ後に
+  判定し直したとき家族が止まる）
 - 「始める」（段階 5。8.6）: ボードの「issue を読む」で開いた issue を読み、「始める」を押すと、issue の番号から決めた識別子
   （`i<番号>`・`<プロジェクト名>-i<番号>`。同梱の ccnavi の `ticket.issue_identifier`）の親のブランチを統合先の今の先頭から作る。
   統合先の `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版が違う、のどれかなら作らない。
@@ -62,7 +62,7 @@ pnpm build                                  # dist/ に組む。Chrome の「パ
 node scripts/build.js --hosts <一覧の JSON> # 組織ごとのビルド（GHES など）
 ```
 
-- Pyodide（約 13MB）はリポジトリに入れない。npm の `pyodide` から写し、`scripts/pyodide-files.json` のハッシュと突き合わせる
+- Pyodide（約 13MB）はリポジトリに入れない。npm の `pyodide` から写し、`scripts/pyodide-files.json` のハッシュと照らし合わせる
 - PyYAML は純 Python 版を PyPI の sdist から取り、版とハッシュはリポジトリの `uv.lock` から読む（手元の ccnavi と同じ版）。
   プロキシの内側では `NODE_USE_ENV_PROXY=1` を付ける
 - ccnavi は組み立てたときのリポジトリの `ccnavi/` をそのまま同梱する（.pyc 付きの zip）
@@ -82,7 +82,7 @@ pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BR
 GitHub（段階 4）と GitLab（段階 5）の 2 つ。どちらも本物の形に合わせて手で組んだもので、本物からは録っていない。GitLab の見本は `test/fixtures/host/gitlab/<場面>/`（`scene.json` に名前空間・プロジェクト・
 親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
 代役は sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `tests/sh/test_review_host_fixture.py` の
-`GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）は `poster` の ccnavi の依頼のスレッドを数えない（11.8.1 の決定 C）。
+`GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（11.8.1 の決定 C）。
 更新の手順は下の GitHub と同じ（本物は `glab api` で取る）。
 
 MR のスレッドとレビューを取ってくる処理は、手元の sh（`.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews`）と
@@ -95,7 +95,7 @@ MR のスレッドとレビューを取ってくる処理は、手元の sh（`.
 - 見本を返す代役は 2 つ（sh の試験の `tests/sh/github_host.py`、拡張の試験の `test/helpers/host-fixture.ts`）で、同じ規則で返す
 - 試験: sh はリポジトリの `tests/sh/test_review_host_fixture.py`、拡張は `test/reviewed.test.ts` の CX-T129。どちらも同じ `expected.json` と比べる
 
-ホストの API の形が変わったら（応答の欄が増える・名前が変わる・ページの切り方が変わる）、手で更新する:
+ホストの API の形が変わったら（応答の欄が増える・名前が変わる・ページの切り方が変わる）、次の手順で手作業で更新する。
 
 1. 見本を直す。本物の MR を `gh api`（REST）と `gh api graphql`（`ccnavi-review.sh` の `threads` と同じ問い合わせ）で取り、
    該当の場面のファイルを置き換えるか、形の変わった欄だけを手で直す。トークン・個人の名前・社内の URL は見本に残さない
