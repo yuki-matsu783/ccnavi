@@ -1562,12 +1562,20 @@ phases:
 ### レビューの依頼と確認
 
 ```sh
-sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md
+sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md --eli5 wip/tmp/eli5.html
 sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
 sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 ```
 
 設計は [ccnavi.md](ccnavi.md) の 9.10 と 9.11。
+
+- `request` には ELI5 の HTML（`--eli5`）が必須（ADR-0094）。無い・空・拡張子が `.html` / `.htm` でないなら何もせずに止まる。
+  変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML で、外部の読み込み（CSS・JS・画像の URL）は使わない。
+  置き場は依頼文と同じ追跡しない場所（`wip/tmp/` など。未追跡は前提を落とさない）
+- 投稿が済むと `ELI5 を見る: 人が端末で crit <絶対パス> を打つ` が出る。人はその `crit …` を手元の端末で打って見る
+  （sh は crit を起動しない。crit が無い環境でも依頼は通る）。依頼の本文には HTML を添えたことだけを 1 行載せる
+- crit で付けた指摘は、エージェントが読んで `comment --body-file` でマージリクエストに写す。止める・通すの判定は今までどおり
+  （未解決のスレッドと変更要求を `confirm` が見て、残りは人の `decide`）。crit の指摘で止めたいなら、人がマージリクエストにスレッドを立てる
 
 - `request` は前提（フェーズが終わっている・レビューが延期されていない・子ブランチが親に取り込まれている・未コミット無し・push 済み・未依頼）を
   確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿し、マーカーを残す。マージリクエストが無ければ Draft で作る

@@ -178,7 +178,7 @@
 
 ### 4.4 レビュー済み（GitHub。段階 4）
 
-人のレビューの要る子を `finish` させ、エージェントに `ccnavi-review.sh request --phase <N> --body-file <依頼文>` を打たせて Draft の PR と依頼を作らせてから試します。
+人のレビューの要る子を `finish` させ、エージェントに `ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 <ELI5 の HTML>` を打たせて Draft の PR と依頼を作らせてから試します。
 Approve の付いた PR を試すには、PR の作者と別のアカウントが要ります（自分の PR に Approve は付けられません）。
 
 | # | 操作 | 期待する結果 | 控えるもの |
