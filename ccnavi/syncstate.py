@@ -416,11 +416,18 @@ class Families:
             for repo in repos(self.conf.state)
             if family(self.conf.state, repo, family_id) is not None
         ]
-        if len(hits) == 1:
-            return hits[0]
         if not hits:
             return Standing(family_id, SELF)
-        where = ", ".join(h.repo for h in hits)
+        # 控えは 1 つでも、同じ名前の親のワークツリーが別のリポジトリにもあれば、
+        # どちらの家族か決めない（ワークスペースの人の付けた名前 `web-i0012` と、
+        # プロジェクト web の issue 12 の家族など。11.9.3 の 13）
+        other = sorted(
+            {repo_key(w.project) for w in self.worktrees() if w.name == family_id}
+            - {h.repo for h in hits}
+        )
+        if len(hits) == 1 and not other:
+            return hits[0]
+        where = ", ".join([h.repo for h in hits] + other)
         return Standing(
             family_id,
             hits[0].repo,

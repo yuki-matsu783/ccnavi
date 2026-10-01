@@ -523,6 +523,30 @@ class MarkTest(AuthorityHarness):
         # リポジトリを添えれば引ける。
         self.assertEqual("", syncstate.standing_any(self.conf(), self.root, "i0001", "").stop)
 
+    def test_a_same_named_tree_in_another_repository_is_not_guessed(self):
+        """控えが 1 つでも、同じ名前の親のワークツリーが別のリポジトリにあれば決めない。
+
+        11.9.3 の 13。
+
+        ワークスペースの人の付けた名前 `web-i0012` と、プロジェクト web の issue 12 の家族が並ぶ形。
+        """
+        from ccnavi import tree
+
+        self.record("present")
+        fams = syncstate.Families(self.conf(), self.root)
+        mine = [w for w in fams.worktrees() if w.name == "i0001"]
+        self.assertEqual(1, len(mine), mine)
+        self.assertEqual("", fams.standing_any("i0001").stop)
+        fams = syncstate.Families(self.conf(), self.root)
+        fams._worktrees = [
+            *fams.worktrees(),
+            tree.Tree("i0001", os.path.join(self.root, "x"), "web"),
+        ]
+        st = fams.standing_any("i0001")
+        self.assertIn("複数のリポジトリ（self, web）", st.stop)
+        # リポジトリを添えれば引ける。
+        self.assertEqual("", fams.standing_any("i0001", "").stop)
+
 
 class IntegrationDoneTest(AuthorityHarness):
     def integration_done(self, ticket_id):
