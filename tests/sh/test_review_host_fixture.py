@@ -480,6 +480,15 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(json.loads(done.stdout)["mr"]["number"], 7)
 
+    def test_an_unreadable_project_id_stops_with_a_reason(self):
+        """プロジェクトの id を読めなければ、MR が無いと取り違えず（作り直さず）、
+        理由を言って止める（11.9.3 の 6）。"""
+        done = self.review("impostor", "fetch", FAKE_GITLAB_NO_PROJECT="1")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("プロジェクト", done.stderr)
+        self.assertIn("id を読めない", done.stderr)
+        self.assertEqual(done.stdout, "")
+
     def test_request_records_the_account_that_posted(self):
         """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
         out = os.path.join(self._tmp.name, "out")

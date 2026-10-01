@@ -116,5 +116,100 @@ class ReviewMergedTest(unittest.TestCase):
         self.assertNotIn("none", done.stdout)
 
 
+@unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
+class ReviewMergedGitLabTest(ReviewMergedTest):
+    """GitLab の枝（ADR-0093 の 11.9.1 の 6・11.9.3 の 9）。
+
+    フォークの MR を数えず、プロジェクトの id が引けなければ unknown。
+    """
+
+    def setUp(self):
+        super().setUp()
+        subprocess.run(
+            ["git", "-C", self.ws, "remote", "set-url", "origin", "https://gitlab.com/o/r.git"],
+            check=True,
+        )
+
+    def gitlab_says(self, mrs, project='{"id": 42}', project_code=0, pages=None):
+        """URL ごとに答える curl の代役。`pages` を渡すと MR の一覧をページの番号で引く。"""
+        mr_cases = (
+            "".join(
+                f"*merge_requests*page={n}) printf '%s' '{body}' ;;\n" for n, body in pages.items()
+            )
+            if pages
+            else f"*merge_requests*) printf '%s' '{mrs}' ;;\n"
+        )
+        path = write(
+            os.path.join(self.bin, "curl"),
+            "#!/bin/sh\n"
+            'for a in "$@"; do url="$a"; done\n'
+            'case "$url" in\n'
+            + mr_cases
+            + f"*/projects/o%2Fr) printf '%s' '{project}'; exit {project_code} ;;\n"
+            "*) exit 22 ;;\n"
+            "esac\n",
+        )
+        os.chmod(path, 0o755)
+
+    def merged(self, token="t"):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("GITHUB_TOKEN", None)
+        env.pop("GITLAB_TOKEN", None)
+        if token:
+            env["GITLAB_TOKEN"] = token
+        env["PATH"] = os.pathsep.join([self.bin, os.environ.get("PATH", "")])
+        return subprocess.run(
+            [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh"), "merged"],
+            cwd=self.ws,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+
+    def curl_says(self, body, code=0):
+        # 親の試験（GitHub の形）を GitLab の答えの形で回す
+        if code:
+            self.gitlab_says("", project_code=code)
+        elif body.startswith("[") and "merged_at" in body:
+            self.gitlab_says('[{"iid": 9, "source_project_id": 42}]')
+        else:
+            self.gitlab_says(body)
+
+    def test_a_merged_request_is_named(self):
+        self.gitlab_says('[{"iid": 9, "source_project_id": 42}]')
+        done = self.merged()
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 9", done.stdout.strip())
+
+    def test_a_fork_merge_request_is_not_counted(self):
+        """フォーク（source_project_id 99）の同じ名前のブランチのマージ済みの MR は数えない。"""
+        self.gitlab_says('[{"iid": 5, "source_project_id": 99}]')
+        done = self.merged()
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("none", done.stdout.strip())
+
+    def test_the_real_request_on_a_later_page_is_found(self):
+        """1 ページ目がフォークで埋まっても、2 ページ目の本物を見落とさない。"""
+        forks = (
+            "[" + ", ".join(f'{{"iid": {n}, "source_project_id": 99}}' for n in range(100)) + "]"
+        )
+        self.gitlab_says("", pages={1: forks, 2: '[{"iid": 300, "source_project_id": 42}]'})
+        done = self.merged()
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 300", done.stdout.strip())
+
+    def test_an_unreadable_project_id_is_unknown(self):
+        for project, code in (('{"id": "x"}', 0), ("{}", 0), ("", 22)):
+            with self.subTest(project=project, code=code):
+                self.gitlab_says(
+                    '[{"iid": 9, "source_project_id": 42}]', project=project, project_code=code
+                )
+                done = self.merged()
+                self.assertEqual(3, done.returncode, done.stdout + done.stderr)
+                self.assertEqual("unknown", done.stdout.strip())
+
+
 if __name__ == "__main__":
     unittest.main()
