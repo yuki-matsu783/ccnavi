@@ -921,9 +921,14 @@ def _under(rel: str, place_rel: str) -> bool:
 
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
+
+    `rel` の `\\` は `/` に直さない。呼び手が渡すのは `tree.relative`
+    （`os.sep` を `/` に直した綴り）か
+    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\proposals\\todo\\x.py` という
+    名前のファイル 1 個が置き場の中に見え、範囲を逃れる。置き場の綴り（設定の値）だけは直す。
     """
     base = _fold(place_rel.replace("\\", "/").strip("/"))
-    return bool(base) and _fold(rel.replace("\\", "/")).startswith(base + "/")
+    return bool(base) and _fold(rel).startswith(base + "/")
 
 
 def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -974,8 +979,10 @@ def is_scratch_place(rel: str) -> bool:
     （`/scratchpad/` の先頭の `/` はツリーのルートに掛かる）。`scratchpad` という名前の
     ファイルも置き場ではない（末尾の `/` はディレクトリにしか当たらない）。
     `scratchpadX/` も置き場ではない。
+
+    `\\` は `/` に直さない（`_under` と同じ理由。`scratchpad\\x.py` は置き場ではない）。
     """
-    return rel.replace("\\", "/").startswith(SCRATCH + "/")
+    return rel.startswith(SCRATCH + "/")
 
 
 # ELI5 の HTML の置き場（ADR-0095・ADR-0096）。依頼に添える、変更をやさしく説明した HTML を置く。
@@ -997,8 +1004,13 @@ def is_eli5_place(rel: str) -> bool:
 
     綴りの大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
     （`git ls-files -- wip`）も区別して `wip/` を見るので、区別しない側に広げない。
+
+    `\\` は `/` に直さない。呼び手の綴りは `tree.relative`（`os.sep` を `/` に直したもの）か
+    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
+    名前のファイル 1 個が置き場に
+    見え、範囲を逃れ、しかも `ready` の片付け（`git ls-files -- wip`）にも掛からない。
     """
-    return rel.replace("\\", "/").startswith(ELI5 + "/")
+    return rel.startswith(ELI5 + "/")
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:

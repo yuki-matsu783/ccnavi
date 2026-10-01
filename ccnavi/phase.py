@@ -1368,7 +1368,10 @@ def scope_findings(
     pt = type_for(conf, root, child, parent)
     outside = []
     for rel in sorted(paths):
-        rel = rel.replace("\\", "/")
+        # git の `-z` の綴りをそのまま使う。git はどの OS でも区切りを `/` で返すので、
+        # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
+        # 名前のファイル 1 個が、置き場の中や範囲の中のパスに見えて素通りする
+        # （実行前の判定は直さない。ADR-0097）。
         # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
         # 見ているのは `base_sha..HEAD` の差分（追跡ファイルだけ）と `git status`
         # （`--ignored` を付けない）で、追跡から外れている `scratchpad/` はどちらにも現れない。
