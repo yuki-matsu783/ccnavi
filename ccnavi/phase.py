@@ -1377,6 +1377,9 @@ def scope_findings(
         # コミットに乗って統合先へ行く道を見ているのはここだけなので、そこは黙らせない。
         if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前の判定と揃える。ADR-0096）。
+        if ticket_mod.is_eli5_place(rel):
+            continue
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:
             outside.append((rel, found))
