@@ -33,7 +33,12 @@ link-mode = "copy"
 [tool.ruff]
 line-length = 100
 # PyInstaller の作業場所と出力。生成物なので読ませない。
-exclude = ["build", "dist"]
+exclude = [
+    "build",
+    "dist",
+    # vendored（upstream nanaism/yomiyasu）なので書き換えない。
+    ".claude/skills/yomiyasu",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]

@@ -79,5 +79,6 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 | チケット（`wip/proposals/**`、`.ccnavi/approved/**`、`wip/design/scripts/i*.md` などの下書き） | 付けない | チケットは独自の frontmatter（`version:` `ticket:` …）を持ち、ccnavi が読む。`.ccnavi/` の下は索引にも載らない |
 | `SKILL.md` の `name` と `description` | 変えない | Claude Code がスキルを選ぶのに使う実キー。`description` は流用し、`type` などを下に足す |
 | 下書き（`scratchpad/`） | 付けなくてよい | 使い捨て。`.gitignore` にあるので索引にも載らない |
+| `.claude/skills/yomiyasu/**` | 付けない | vendored（`UPSTREAM.md`）。中身を書き換えないので frontmatter も足さない |
 
 既にある md に付けるときは、既存のキーの値と順を変えず、足りないキーだけを下に足す。
