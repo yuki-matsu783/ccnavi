@@ -30,7 +30,7 @@ import tempfile
 import unittest
 
 from ccnavi import phase as phase_mod
-from ccnavi import settings, shellread, ticket
+from ccnavi import review, settings, shellread, ticket
 from ccnavi.subagent import CANDIDATE_NOTE
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
@@ -885,6 +885,8 @@ class TicketTest(unittest.TestCase):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("フェーズ 1 が終わりました", self.reason(said))
         self.assertIn("request", self.reason(said))
+        # ELI5 の置き場を名指しする（ADR-0095）
+        self.assertIn("--eli5 wip/eli5/phase-1.html", self.reason(said))
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
@@ -1338,6 +1340,61 @@ class TicketTest(unittest.TestCase):
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
+
+    def test_a_crit_push_thread_on_the_eli5_blocks_and_leaves_with_wip(self):
+        """ELI5 の HTML を wip/ にコミットし、人が crit push で行に指摘を送った形（ADR-0095）。
+
+        crit push はマージリクエストの行のスレッド（GitHub はレビューのコメント、GitLab は差分の
+        discussion）を立てる。目印で始まらない人の投稿なので、confirm は未解決として数えて止め、
+        decide はその 1 件を選べる。wip/ が追跡されている間は ready の前提（_merge_problems）が
+        落ち、wip/ を消してコミットすると外れる。squash した成果物に HTML は残らない。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        eli5 = "wip/eli5/phase-1.html"
+        write(
+            os.path.join(self.parent_tree, *eli5.split("/")),
+            "<!doctype html>\n<p>やさしい説明</p>\n",
+        )
+        git(self.parent_tree, "add", "--", eli5)
+        git(self.parent_tree, "commit", "--quiet", "-m", "docs: ELI5")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        # crit push の 1 件を写した形（sh の fetch が組むスレッド。path と line は HTML のソース）
+        data["threads"] = [
+            {
+                "id": "crit-1",
+                "resolved": False,
+                "url": "https://example/mr/7#discussion_crit-1",
+                "path": eli5,
+                "line": 2,
+                "body": "ここは X ではなく Y では",
+                "author": "201",
+            }
+        ]
+        write(fixture, json.dumps(data))
+        check = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
+        )
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("未解決", check.stderr)
+        self.assertIn(eli5, check.stderr)
+        shown = self.decide(fixture, "--preview", "--json")
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        keys = [t["key"] for t in json.loads(shown.stdout)["threads"]]
+        self.assertEqual(keys, ["https://example/mr/7#discussion_crit-1"])
+        # ready の前提: wip/ が追跡されている間は落ち、消してコミットして push すると外れる
+        conf, _ = settings.load(self.root)
+        problems = review._merge_problems(self.parent_tree, conf, self.root)
+        self.assertTrue(any("`wip/` に追跡されているファイル" in p for p in problems), problems)
+        git(self.parent_tree, "rm", "-r", "-q", "wip")
+        git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        problems = review._merge_problems(self.parent_tree, conf, self.root)
+        self.assertFalse(any("wip/" in p for p in problems), problems)
+        self.assertEqual(git(self.parent_tree, "ls-files", "--", "wip").strip(), "")
 
     def test_decide_yes_places_each_choice(self):
         """指摘ごとの行き先。対応しない分は受け入れ、直す分は続きの子に載せ、フェーズは開き直る。"""

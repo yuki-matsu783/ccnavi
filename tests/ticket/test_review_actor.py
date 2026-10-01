@@ -241,6 +241,17 @@ class ReviewRuleTest(ActorHarness):
         self.assertEqual(review._unresolved([marker], set(), "gitlab", "someone"), [marker])
         self.assertEqual(review._unresolved([marker], set(), "gitlab", "bot"), [])
 
+    def test_a_crit_push_thread_is_counted_even_from_the_poster(self):
+        """crit push の行のスレッドは目印で始まらないので、依頼を投稿したアカウントからでも数える。
+
+        人が依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める（ADR-0095）。
+        """
+        crit = review.Thread(
+            id="d1", body="ここは X ではなく Y では", author="bot", path="wip/eli5/phase-1.html"
+        )
+        for host in ("github", "gitlab"):
+            self.assertEqual(review._unresolved([crit], set(), host, "bot"), [crit], host)
+
     def test_a_request_record_without_host_or_mr_is_not_matched(self):
         result = review.Result(host="github", mr=review.MergeRequest(7, "u"))
         for mark in ({"mr": 7}, {"host": "github"}, {}):
