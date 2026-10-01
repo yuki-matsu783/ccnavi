@@ -686,6 +686,14 @@ class Eli5Place(Workspace):
         ("docs/wip/eli5/a.html", False, "ルートの直下の wip/ だけ"),
         ("WIP/eli5/a.html", False, "綴りは区別する。依頼の検査と ready も区別する"),
     )
+    # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える
+    # （ADR-0097）
+    BACKSLASHED = (
+        "wip\\eli5\\evil.py",
+        "wip/eli5\\evil.py",
+        "wip\\proposals\\todo\\evil.py",
+        "scratchpad\\evil.py",
+    )
 
     def setUp(self):
         super().setUp()
@@ -701,6 +709,24 @@ class Eli5Place(Workspace):
                     code = "" if exempt else "DENY_TICKET_SCOPE"
                     self.assertEqual(self.decision(result), want, self.reason(result))
                     self.assertEqual(self.last_record().get("code", ""), code)
+
+    @unittest.skipIf(os.name == "nt", "名前に \\ を含むファイルは Windows では作れない")
+    def test_a_backslashed_name_is_not_a_place_anywhere(self):
+        """`wip\\eli5\\evil.py` のような名前は、どの置き場にも見なさない。"""
+        for rel in self.BACKSLASHED:
+            for name, tree in (("親", self.parent_tree), ("子", self.child)):
+                with self.subTest(tree=name, path=rel):
+                    result = self.write_hook(tree, rel)
+                    self.assertEqual(self.decision(result), "deny", self.reason(result))
+                    self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
+        reported = self.after_shell(self.child, "wip\\eli5\\evil.py", session="e-bs")
+        self.assertIn("POST_TICKET_SCOPE", reported.stderr)
+        for rel in self.BACKSLASHED:
+            write(os.path.join(self.child, rel), "x\n")
+        bounced = self.hook("SubagentStop", "", self.child, agent_id="sub-e3")
+        self.assertEqual(bounced.returncode, 2, bounced.stdout + bounced.stderr)
+        for rel in self.BACKSLASHED:
+            self.assertIn(rel, bounced.stderr)
 
     def test_a_file_named_like_the_place_is_not_the_place(self):
         result = self.write_hook(self.child, "wip/eli5")

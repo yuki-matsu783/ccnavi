@@ -5,6 +5,7 @@ import type { TokenMeta } from "../../src/core/expiry.js";
 import type { RepoConfig } from "../../src/core/settings.js";
 import { dispatch, type Deps } from "../../src/core/protocol.js";
 import { parseHosts } from "../../src/core/hosts.js";
+import { COMPAT } from "./compat.js";
 import type { BlobCache, HostCall, Stats } from "../../src/core/snapshot.js";
 import type { MockGitHub } from "./mock-github.js";
 
@@ -32,7 +33,7 @@ export function deps(
   return {
     hosts: HOSTS,
     // 同梱の互換の版（見本の統合先の CCNAVI_COMPAT と同じ）
-    compat: 1,
+    compat: COMPAT,
     extensionId: EXT_ID,
     base: BASE,
     fetch: mock.fetch,

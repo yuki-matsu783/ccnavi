@@ -1448,6 +1448,37 @@ class TicketTest(unittest.TestCase):
         done = confirm()
         self.assertEqual(done.returncode, 0, done.stderr)
 
+    @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
+    def test_ready_catches_wip_in_any_case_and_a_backslashed_name(self):
+        """ready の前提は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も止める。
+
+        大文字小文字を区別しない FS では範囲の除外が `WIP/eli5/` を通しうるので、ready の側で
+        区別せずに拾う（ADR-0097）。
+        """
+        self.family()
+        self.close_phase()
+        self.remote()
+        conf, _ = settings.load(self.root)
+        git(self.parent_tree, "rm", "-r", "-q", "--ignore-unmatch", "wip")
+        git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "chore: wip を片付ける")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertFalse(
+            any("wip/" in p for p in review._merge_problems(self.parent_tree, conf, self.root))
+        )
+        for rel in ("WIP/eli5/phase-1.html", "wip\\eli5\\phase-1.html"):
+            with self.subTest(path=rel):
+                write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
+                git(self.parent_tree, "add", "--", rel)
+                git(self.parent_tree, "commit", "--quiet", "-m", f"add {rel}")
+                git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+                problems = review._merge_problems(self.parent_tree, conf, self.root)
+                self.assertTrue(
+                    any("`wip/` に追跡されているファイルが 1 件" in p for p in problems), problems
+                )
+                git(self.parent_tree, "rm", "-q", "--", rel)
+                git(self.parent_tree, "commit", "--quiet", "-m", f"rm {rel}")
+                git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
     def test_eli5_lookalikes_still_move_the_request(self):
         """`wip/eli5x/` や `wip/` のほかの場所は、今までどおり動いたと数える。"""
         conf, _ = settings.load(self.root)

@@ -18,6 +18,7 @@ import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
 import { approveFamily, fileChanges, localStamp, MAX_ROUNDS, withdrawTicket, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
+import { COMPAT } from "./helpers/compat.js";
 import { blobSha, LOGIN, MockGitHub, TOKEN } from "./helpers/mock-github.js";
 import { pyodidePy } from "./helpers/python.js";
 
@@ -155,7 +156,7 @@ test("CX-T104 決まらない家族では書かない（読めない入力・ホ
 });
 
 test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3）。ボタンも出さない", async () => {
-  const { mock, d } = world(fixture(2));
+  const { mock, d } = world(fixture(COMPAT + 1));
   const b = await board(d);
   const r = b.families.find((f) => f.family.name === "i0001")?.result;
   assert.equal(r?.write?.allowed, false);

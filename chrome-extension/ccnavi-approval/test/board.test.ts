@@ -12,6 +12,7 @@ import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type BlobCache, type RepoBoard } from "../src/core/snapshot.js";
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
+import { COMPAT } from "./helpers/compat.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
 import { pyodidePy } from "./helpers/python.js";
 
@@ -93,9 +94,9 @@ test("CX-T044 統合先の名前: 設定したブランチが無ければ止め�
 });
 
 test("CX-T045 互換の印が違えば、どちらを更新するかを言う（7.3）", async () => {
-  const newer = await run(fixture(2));
+  const newer = await run(fixture(COMPAT + 1));
   assert.equal(newer.board.compat?.same, false);
-  assert.equal(newer.board.compat?.message, "拡張は互換 1、リポジトリは互換 2。拡張を更新する");
+  assert.equal(newer.board.compat?.message, `拡張は互換 ${COMPAT}、リポジトリは互換 ${COMPAT + 1}。拡張を更新する`);
   const b = fixture();
   b.main.files[".ccnavi/scripts/ccnavi-common.sh"] = "#!/bin/sh\n";
   const none = await run(b);
