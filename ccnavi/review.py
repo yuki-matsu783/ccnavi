@@ -8,7 +8,8 @@
 （`--result <path>`）。その JSON の形が sh と exe の契約で、テストも同じ経路を通る。
 
 API のパス、トークンの権限、ページング、セルフホストの差は実物に当てないと決まらない。
-exe が API を直接呼ぶと、それが配布物の中に閉じて、壊れたときに exe を作り直すしかない。
+exe が API を直接呼ぶと、その呼び出しが配布物に組み込まれ、動かなくなったときに exe を
+作り直すしかない。
 sh ならプロジェクトごとに直せる。
 
 ## 依頼は prepare と requested の 2 段
@@ -20,14 +21,14 @@ sh ならプロジェクトごとに直せる。
 ## 変更要求は人の端末でも通せない
 
 未解決スレッドは人が `--reviewed --accept-unresolved` で受け入れて進めるが、
-変更要求（changes requested）のレビューが立っている間はマーカーを置かない。
-「このままではマージしない」の意思表示を、別の人が端末から上書きする形は残さない。
+変更要求（changes requested）のレビューが残っている間はマーカーを置かない。
+「このままではマージしない」の意思表示を、別の人が端末から上書きできるようにはしない。
 
 ## 未解決の指摘は、付いた時刻で絞らない
 
 数えるのは「いま解決されていない指摘」全部。依頼より後のものだけを数えると、
 指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで前回の
-指摘が数から消える。人が解決も受け入れもしていないのに通る形になる。
+指摘が数から消える。人が解決も受け入れもしていないのに通ってしまう。
 除くのは機構自身の投稿と、人が受け入れたものだけ。
 
 レビューの状態（変更要求）はレビュアーごとの最新だけを見る。こちらは時刻で
@@ -110,7 +111,7 @@ class Review:
     author: str = ""
 
 
-# 変更要求の状態。GitHub の CHANGES_REQUESTED と、GitLab の requested_changes をここに寄せる。
+# 変更要求の状態。GitHub の CHANGES_REQUESTED と、GitLab の requested_changes をこの値にまとめる。
 CHANGES_REQUESTED = "CHANGES_REQUESTED"
 DISMISSED = "DISMISSED"
 APPROVED = "APPROVED"
@@ -278,7 +279,7 @@ def prepare(
         return 1
     if synced:
         # 本文に載せたことを印に残す。`requested` はこれを見て知らせ済みにする。載せていない
-        # 投稿で知らせ済みにすると、人が一度も見ないまま知らせが消える。
+        # 投稿で知らせ済みにすると、人が一度も見ないまま知らせが出なくなる。
         failed = configsync.mark_prepared(home, parent.ticket, phase_no)
         if failed:
             stderr.write(f"ccnavi: 設定の上書きを本文に載せた印を書けない ({failed})\n")
@@ -375,8 +376,8 @@ def requested(
             stderr.write(f"  - {line}\n")
         return 1
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
-    # since はホストの時計。手元の時計と比べると、依頼直後の指摘が「依頼より前」に
-    # 落ちて黙って除かれる。
+    # since はホストの時計。手元の時計と比べると、依頼直後の指摘が「依頼より前」と
+    # 判定され、気づかないうちに除かれる。
     if not _mark(
         stderr,
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
@@ -543,7 +544,7 @@ def _settle_children(
     人が見たことの記録はマーカーで、場所の移動はその写し（ADR-0055）。動かせなければ言って False。
 
     呼ぶ側はこれをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかった
-    ときに「レビュー済みなのに子が `review/` に残る」形になり、`confirm` は「レビュー済み」で
+    ときに「レビュー済みなのに子が `review/` に残る」状態になり、`confirm` は「レビュー済み」で
     拒み、`--reviewed --chat` も「すでにレビュー済み」で戻るので、取り出す操作が無くなる。
     逆順なら、動いたのにマーカーが置けなくても、次の `confirm` が置き直す（動かす分は空）。
     """
@@ -623,7 +624,7 @@ class Decision:
 
 
 def thread_key(t: Thread) -> str:
-    """選択を結ぶ鍵。受け入れの控えと同じく、URL を先に使う。"""
+    """選択をスレッドに対応づける鍵。受け入れの控えと同じく、URL を先に使う。"""
     return t.url or t.id
 
 
@@ -733,7 +734,7 @@ def reviewed(
     書き出す。sh がそれを投稿する。
 
     `chat` はこのセッションで見たフェーズ（`review: chat`）を通す枝。写しも依頼の記録も
-    要らない代わりに、種類が chat と宣言しているフェーズにしか当たらない。
+    要らない代わりに、種類が chat と宣言しているフェーズにしか使えない。
     """
     if chat:
         found = _parent_phase(stderr, root, conf, cwd, phase_no)
@@ -874,7 +875,7 @@ def decide_yes(
 ) -> int:
     """オーバーレイで人が押した選択を置く（`--yes <選択の JSON> --digest <指紋> --json`）。
 
-    端末の壁の代わりに、見せた指摘と今の指摘の指紋が一致することを求める。エージェントが
+    人が端末で打つという制約の代わりに、見せた指摘と今の指摘の指紋が一致することを求める。エージェントが
     これをシェルで打つ形は、組み込みの deny（`phase.ticket_approval_rule`）が止める。
     結果は JSON で返す。違えば何も置かず `mismatch` を返す。
     """
@@ -1133,9 +1134,9 @@ def _reviewed_in_chat(
     """このセッションで見たフェーズを、人が端末で通す（設計 9.8）。
 
     ホストへ出ないので写しも依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
-    あること（`mr` と宣言したフェーズを安い経路で通させない）と、フェーズが終わって
+    あること（`mr` と宣言したフェーズを手軽な経路で通させない）と、フェーズが終わって
     いること、そして依頼が出ていないこと。依頼を出した先には指摘が付いているかもしれず、
-    それを数えずに通す道はここには置かない（数えるのは `confirm`、受け入れるのは `decide`）。
+    それを数えずに通す手段はここには用意しない（数えるのは `confirm`、受け入れるのは `decide`）。
     実績のリスクが高ければマージリクエストを勧めるが、止めはしない（ADR-0065）。
     """
     if accept_unresolved:
@@ -1166,7 +1167,8 @@ def _reviewed_in_chat(
         return 1
     if approval.MARK_REQUESTED in ph.marks:
         # 依頼を出したあとに --chat で通すと、マージリクエストに付いた指摘を数えずに
-        # 止まっていたのが解ける。数える道（confirm）と、数えたうえで受け入れる道（decide）がある。
+        # 止めていた判定を外せてしまう。数える手段（confirm）と、数えたうえで受け入れる手段
+        # （decide）がある。
         stderr.write(
             f"ccnavi: フェーズ {ph.label} はマージリクエストに依頼済み。--chat では通せない。"
             f"'{review_sh} confirm --phase {ph.number}'（指摘が残っていれば "
@@ -1257,7 +1259,7 @@ def ready(
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
     # 親の写しが done/ に無いまま Draft を外すと、そのままマージされたときに done/ に親が無いまま
-    # 親のブランチが消え、家族が「決まらない」に落ちる（ADR-0093 の 3.6。締める向き）。
+    # 親のブランチが消え、家族の判定が「決まらない」になる（ADR-0093 の 3.6。締める向き）。
     if parent.state != ticket_mod.DONE:
         problems.append(
             f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
@@ -1327,11 +1329,12 @@ def close_early(
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
     未着手の子を取り消し、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
     親のマーカー `close-early.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
-    issue を作る。黙って消えるものは作らない。
+    issue を作る。人が知らないうちに消えるものは作らない。
 
     Draft を外すのはここではなく `ready`。締めたあとに親が状態の移動をコミットし、
     途中の作業の置き場を消して push する。それが済んだことを `ready` が確かめて外す。
-    外す道を 1 本にしておくと、外れたマージリクエストは必ず「片付いて push 済み」になる。
+    外す経路を `ready` の 1 つにしておくと、外れたマージリクエストは必ず
+    「片付いて push 済み」になる。
 
     作業中の子がいる間は打てない。締めるのは、手が止まっているときだけ。
     """
@@ -1628,7 +1631,7 @@ def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
 
     ccnavi 自身の置き場と、ELI5 の HTML の置き場（`wip/eli5/`。ADR-0096）。ELI5 は依頼に添える
     説明で、成果物ではない（`ready` の前に消える）。直すたびに依頼し直させると、指摘を受けて
-    説明を直すたびに依頼のコメントが増え、レビュー済みが遠のく。代わりに、直した ELI5 を人が
+    説明を直すたびに依頼のコメントが増え、レビュー済みにしにくくなる。代わりに、直した ELI5 を人が
     見直す保証は無くなる。
 
     未コミットの検査（`_dirty`）と push の検査（`_unpushed`）はこれを使わない。ELI5 の未コミットは
@@ -1648,7 +1651,8 @@ def _is_sha(value: str) -> bool:
 
     マーカーは親のブランチに乗って他の機械から届くファイル（設計 9.2）なので、中身を
     git の revision としてそのまま渡さない。`HEAD` や `@` のような「今」を指す値は
-    `head..HEAD` を空差分にして判定を素通りさせ、`-` で始まる値は git のオプションになってしまう。
+    `head..HEAD` を空差分にして「変更が無い」と判定させ、`-` で始まる値は git のオプションに
+    なってしまう。
     """
     return bool(_SHA.match(value))
 
@@ -1659,11 +1663,12 @@ def _outside_approved(
     """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
 
     NUL 区切りで読む理由は phase.scope_findings と同じ。既定の出力は非 ASCII を
-    引用して 8 進に逃がすので、そのまま当てると日本語のファイルが置き場の外か中かで
-    読み違える。`--no-renames` を付けるのは、改名を 1 行にまとめられると移動元が消え、
+    引用符で囲んで 8 進でエスケープするので、そのまま照らし合わせると日本語のファイルが
+    置き場の外か中かを読み違える。`--no-renames` を付けるのは、改名を 1 行にまとめられると
+    移動元のパスが出力に出ず、
     置き場の外から中へ動かしたファイルが「置き場の中だけ」に見えるため。
     `--ignore-submodules=none` は、`.gitmodules` の `ignore = all` で submodule の
-    進みが差分から丸ごと消えるのを止める（`.gitmodules` は追跡されるので、外から届く）。
+    進みが差分にまったく出なくなるのを防ぐ（`.gitmodules` は追跡されるので、外から届く）。
 
     `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
@@ -1695,17 +1700,18 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
-    `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
+    `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業による未コミットの変更とは
+    別に扱う。
     """
     rc, status = _git(
         tree_root, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
     )
     if rc != 0:
         return True
-    # `-z` で読む。既定の出力は非 ASCII を引用して 8 進に逃がすので、置き場の中の
-    # 日本語のファイルが置き場の外に見え、「未コミットがある」で依頼が止まる。
+    # `-z` で読む。既定の出力は非 ASCII を引用符で囲んで 8 進でエスケープするので、置き場の中の
+    # 日本語のファイルが置き場の外と判定され、「未コミットがある」で依頼が止まる。
     # `--no-renames` は、改名のときに出る 2 つめの綴り（移動元）が XY を持たない形で
-    # 混ざるのを避けるため。phase.scope_findings と同じ読み方。
+    # 入り込むのを避けるため。phase.scope_findings と同じ読み方。
     for entry in status.split("\0"):
         if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
             return True
@@ -1763,7 +1769,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
 def _parent_any(
     stderr: TextIO, root: str, conf: settings.Settings, cwd: str
 ) -> ticket_mod.Ticket | None:
-    """cwd の親。閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す道のため）。"""
+    """cwd の親。閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す `ready` のため）。"""
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
         return None if ops.family_stopped(stderr, root, conf, parent) else parent
@@ -1821,8 +1827,8 @@ def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
 
 # ---- リモートに要る道具の有無。exe は使わないが、--lint が言う。
 
-# ホストにはポートが付く（`localhost:8929`）。落とすと、手元や社内に立てた
-# GitLab を GitHub と見分ける手掛かりまで狂う。ssh の `git@host:group/proj` の
+# ホストにはポートが付く（`localhost:8929`）。ポートを捨てると、手元や社内に立てた
+# GitLab を GitHub と見分ける判定まで誤る。ssh の `git@host:group/proj` の
 # `:` はパスの区切りなので、数字だけのときにポートと見なす。
 # `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh と同じく、authority の
 # 最後の `@` までをユーザ情報と見る（git がそう切る。トークンに `@` が入る形がある）。
@@ -1951,8 +1957,8 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
         rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", sha.strip(), "HEAD"])
         if rc != 0:
             unmet.append(f"子 {child.ticket} のブランチが親に取り込まれていない")
-    # 未追跡は数えない。依頼文そのものをワークツリーに置く形が普通にあり、それが
-    # 前提を落とすと依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
+    # 未追跡は数えない。依頼文そのものをワークツリーに置く使い方が普通にあり、未追跡で
+    # 前提を満たさないと判定すると依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
     if _dirty(tree_root, conf):
         unmet.append("親のワークツリーに未コミットの変更がある")
     branch = _branch(tree_root)
@@ -2059,9 +2065,10 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
     依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 9.2）。
-    数えると「依頼 → マーカー → コミット」の順のせいで依頼の直後に必ず自分の足を踏み、
+    数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
+    コミットで「動いた」と判定され、
     承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを
-    待っている間の承認も依頼を壊す。未コミットの側は `_dirty` が同じ理由で外しており、
+    待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty` が同じ理由で外しており、
     基準をそこに揃える。人がレビューで見るものは 1 バイトも変わらない。
 
     push の判定も同じ基準で見る。置き場だけが手元に残っていても、リモートにあるものと
@@ -2098,7 +2105,7 @@ def moved_since(
     """
     recorded = str(requested_mark.get("head") or "")
     if not recorded:
-        # 記録が無ければ照合できない。素通りさせると、依頼の後のコミットが全部
+        # 記録が無ければ照合できない。確かめずに通すと、依頼の後のコミットが全部
         # 「人が見たもの」になる。出し直しで書き直させる。
         return "依頼時の親の HEAD が記録されていない"
     if head == recorded:
