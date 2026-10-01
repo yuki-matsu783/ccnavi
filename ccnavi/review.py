@@ -1151,7 +1151,7 @@ def _reviewed_in_chat(
                 f"ccnavi: フェーズ {ph.label} はマージリクエストで見るフェーズ。"
                 "--chat では通せない。"
                 f"'{review_sh} request --phase {ph.number} --body-file <依頼文> "
-                "--eli5 <ELI5 の HTML>' から\n"
+                f"--eli5 wip/eli5/phase-{ph.number}.html' から\n"
             )
         else:
             stderr.write(
@@ -2113,7 +2113,7 @@ def _redo_request(root: str, phase_no: int) -> str:
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     return (
         f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文> "
-        "--eli5 <ELI5 の HTML>' で"
+        f"--eli5 wip/eli5/phase-{phase_no}.html' で"
         "依頼を出し直すこと"
     )
 

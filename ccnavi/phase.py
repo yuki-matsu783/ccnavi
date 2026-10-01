@@ -822,8 +822,10 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         )
     else:
         todo = (
-            "やること: 子の成果を親ブランチへ合流して push し、"
-            f"'{review_sh} request --phase {n} --body-file <依頼文> --eli5 <ELI5 の HTML>' "
+            "やること: 子の成果を親ブランチへ合流し、ELI5 の HTML を "
+            f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
+            f"'{review_sh} request --phase {n} --body-file <依頼文> "
+            f"--eli5 wip/eli5/phase-{n}.html' "
             f"でレビューを頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
             f"利用者がレビューを終えたら '{review_sh} confirm --phase {n}' "
             f"で確かめます。{later}"
@@ -923,9 +925,10 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 texts.append(
                     f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
                     f"（{LABEL_PREPARING}）。{who}"
-                    f"子の成果を親ブランチへ合流して push し、"
+                    "子の成果を親ブランチへ合流し、ELI5 の HTML を "
+                    f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
                     f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
-                    "--body-file <依頼文> --eli5 <ELI5 の HTML>' "
+                    f"--body-file <依頼文> --eli5 wip/eli5/phase-{n}.html' "
                     f"でレビュー{covers}を頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
                     f"{hold_note}"
                 )
