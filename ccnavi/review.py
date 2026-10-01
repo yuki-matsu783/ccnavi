@@ -1635,7 +1635,7 @@ def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
     （crit push が届かない）。
     """
-    # git の `-z` の綴りをそのまま見る（`\\` を `/` に直さない。`_outside_approved` と同じ理由）。
+    # git の `-z` の綴りをそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
     return _is_own_place(conf, path) or path.startswith(ticket_mod.ELI5 + "/")
 
 
@@ -1712,6 +1712,12 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     return False
 
 
+def _in_wip(path: str) -> bool:
+    """git の綴りが、途中の作業の置き場（`wip`）の下か。大文字小文字と `\\` の区切りを問わない。"""
+    folded = path.lower()
+    return folded == WIP_ROOT or folded.startswith((WIP_ROOT + "/", WIP_ROOT + "\\"))
+
+
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
     """マージに進む前にワークツリーの側で満たしていること。root は文面の sh の綴りに使う。
 
@@ -1722,13 +1728,25 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
     if not os.path.isdir(tree_root):
         return [f"親のワークツリーが無い ({tree_root})"]
     wip = WIP_ROOT
-    rc, tracked = _git(tree_root, ["ls-files", "--", wip])
-    if rc == 0 and tracked.strip():
-        n = len(tracked.strip().splitlines())
+    # 大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
+    # （`tree.relative` は書いた綴りを返す）は `wip/eli5/` として通すのに、
+    # git には `WIP/...` で入る。
+    # 区別して見ると、それが既定のブランチまで残る。名前に `\` を含む 1 ファイル（`wip\eli5\x`。
+    # Linux / macOS では作れる）も `wip` の下と見なして止める（ADR-0097）。pathspec の `:(icase)` に
+    # 頼らず全部を `-z` で読んで絞るのは、`\` の名前を pathspec で拾えないのと、
+    # git の版に依らないため。
+    rc, tracked = _git(tree_root, ["ls-files", "-z"])
+    names = [p for p in tracked.split("\0") if p and _in_wip(p)] if rc == 0 else []
+    if rc != 0:
+        problems.append(f"`{wip}/` が追跡されているかを読めない")
+    elif names:
+        tops = sorted({p.split("/", 1)[0] for p in names})
+        git_sh = settings.script_command(root, "ccnavi-git.sh")
+        removes = " と ".join(f"'{git_sh} rm -r {top}'" for top in tops)
         problems.append(
-            f"`{wip}/` に追跡されているファイルが {n} 件ある。"
+            f"`{wip}/` に追跡されているファイルが {len(names)} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"'{settings.script_command(root, 'ccnavi-git.sh')} rm -r {wip}' で消してコミットする"
+            f"{removes} で消してコミットする"
         )
     if _dirty(tree_root, conf):
         problems.append("親のワークツリーに未コミットの変更がある")
