@@ -921,9 +921,14 @@ def _under(rel: str, place_rel: str) -> bool:
 
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
+
+    `rel` の `\\` は `/` に直さない。呼び手が渡すのは `tree.relative`
+    （`os.sep` を `/` に直した綴り）か
+    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\proposals\\todo\\x.py` という
+    名前のファイル 1 個が置き場の中に見え、範囲を逃れる。置き場の綴り（設定の値）だけは直す。
     """
     base = _fold(place_rel.replace("\\", "/").strip("/"))
-    return bool(base) and _fold(rel.replace("\\", "/")).startswith(base + "/")
+    return bool(base) and _fold(rel).startswith(base + "/")
 
 
 def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -974,8 +979,38 @@ def is_scratch_place(rel: str) -> bool:
     （`/scratchpad/` の先頭の `/` はツリーのルートに掛かる）。`scratchpad` という名前の
     ファイルも置き場ではない（末尾の `/` はディレクトリにしか当たらない）。
     `scratchpadX/` も置き場ではない。
+
+    `\\` は `/` に直さない（`_under` と同じ理由。`scratchpad\\x.py` は置き場ではない）。
     """
-    return rel.replace("\\", "/").startswith(SCRATCH + "/")
+    return rel.startswith(SCRATCH + "/")
+
+
+# ELI5 の HTML の置き場（ADR-0095・ADR-0096）。依頼に添える、変更をやさしく説明した HTML を置く。
+# 名前は固定。設定で動かさない（動かせると、その値をソースの置き場に向けるだけで範囲を迂回できる）。
+ELI5 = "wip/eli5"
+
+
+def is_eli5_place(rel: str) -> bool:
+    """ツリーのルートからの相対パスが、ELI5 の HTML の置き場（`wip/eli5/`）の下にあるか。
+
+    チケットの範囲を当てない（ADR-0096）。ELI5 はレビューの依頼に必ず添える材料で、親の範囲に
+    毎回 `wip/eli5/*` を書かせると、書き忘れた親は依頼の手前で止まる。ここは `wip/` の下なので
+    `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
+    `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
+
+    `scratchpad/` と違って git が追跡する置き場なので、実行後の監視（`post.ScopeGuard.finding`）と
+    サブエージェント終了時の検査（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
+    実行前に通った書き込みがコミットのあとで範囲の外として咎められる。
+
+    綴りの大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
+    （`git ls-files -- wip`）も区別して `wip/` を見るので、区別しない側に広げない。
+
+    `\\` は `/` に直さない。呼び手の綴りは `tree.relative`（`os.sep` を `/` に直したもの）か
+    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
+    名前のファイル 1 個が置き場に
+    見え、範囲を逃れ、しかも `ready` の片付け（`git ls-files -- wip`）にも掛からない。
+    """
+    return rel.startswith(ELI5 + "/")
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -998,8 +1033,15 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     だから外さない。実行前に通ったものが実行後に咎められる形は残るが、咎められる
     のは「そのリポジトリで `scratchpad/` が追跡されている」ときだけで、それは本当に
     知らせるべきことになる。
+
+    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後の監視と
+    サブエージェント終了時の検査も同じく外す（ADR-0096）。
     """
-    return is_ticket_place(rel, tickets_rel, approved_rel) or is_scratch_place(rel)
+    return (
+        is_ticket_place(rel, tickets_rel, approved_rel)
+        or is_scratch_place(rel)
+        or is_eli5_place(rel)
+    )
 
 
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:

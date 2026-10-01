@@ -72,6 +72,10 @@ exec '{git}' "$@"
 """
 
 
+# ELI5 の HTML の置き場。親のワークツリーの wip/ の下にコミットして push する（ADR-0095）
+ELI5 = "wip/eli5/phase-1.html"
+
+
 def write(path, text=""):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -254,6 +258,17 @@ class C1Harness(unittest.TestCase):
     def committed(self, rev="HEAD", tree=None):
         out = git(tree or self.tree, "show", "--name-only", "--format=", rev).stdout
         return sorted(line for line in out.splitlines() if line)
+
+    def eli5(self):
+        """ELI5 の HTML を親のワークツリーの wip/ の下に書き、コミットして push する（ADR-0095）。
+
+        マージリクエストの差分に載せる置き場。返すのはツリーのルートからの相対。
+        """
+        write(os.path.join(self.tree, *ELI5.split("/")), "<p>やさしい説明</p>\n")
+        git(self.tree, "add", "--", ELI5)
+        git(self.tree, "commit", "-q", "-m", "docs: ELI5")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        return ELI5
 
     def subjects(self, n=5, tree=None):
         out = git(tree or self.tree, "log", f"-{n}", "--format=%s").stdout
@@ -1179,10 +1194,14 @@ class C1HostTest(C1Harness):
 
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
-        requested = self.review("request", "--phase", "1", "--body-file", body)
+        self.eli5()
+        requested = self.review("request", "--phase", "1", "--body-file", body, "--eli5", ELI5)
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
         self.assertEqual(len(Host.notes), 1)
+        # 依頼文は ELI5 の在りか（差分の中の相対パス）と crit push の送り先を言う（ADR-0095）
+        self.assertIn(f"`crit review {ELI5}`", Host.notes[0]["body"])
+        self.assertIn("`crit push 1`", Host.notes[0]["body"])
         confirmed = self.review("confirm", "--phase", "1")
         self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
@@ -1194,10 +1213,15 @@ class C1HostTest(C1Harness):
         """決定 D: 投稿の後に落ちた依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
         once = os.path.join(self._tmp.name, "failed-once")
-        first = self.review("request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
+        html = self.eli5()
+        first = self.review(
+            "request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
+        )
         self.assertNotEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertEqual(len(Host.notes), 1)
-        again = self.review("request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
+        again = self.review(
+            "request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
+        )
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn("投稿済み", again.stdout)
         self.assertEqual(len(Host.notes), 1)
@@ -1370,7 +1394,8 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
 
     def request(self):
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
-        requested = self.review("request", "--phase", "1", "--body-file", body)
+        html = self.eli5()
+        requested = self.review("request", "--phase", "1", "--body-file", body, "--eli5", html)
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.assertIn(self.requested, self.committed())
         return body

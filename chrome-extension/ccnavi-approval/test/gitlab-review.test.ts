@@ -30,6 +30,7 @@ import { approveFamily, withdrawTicket, type WriteDeps } from "../src/core/write
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats } from "./helpers/host.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
+import { COMPAT } from "./helpers/compat.js";
 import { MockGitLab } from "./helpers/mock-gitlab.js";
 import { pyodidePy } from "./helpers/python.js";
 
@@ -189,7 +190,7 @@ test("CX-T167 「始める」: service worker も統合先の先頭で閉じた�
   const d: Deps = deps(mock, TOKENS, new Map(), () => new Date(NOW), [GITLAB_REPO]);
   const closed = await ask(d, "i0005");
   assert.match((closed as { error: string }).error, /i0005 は統合先 main の done\/ で閉じている/);
-  const skew = await ask({ ...d, compat: 2 }, "i0012");
+  const skew = await ask({ ...d, compat: COMPAT + 1 }, "i0012");
   assert.match((skew as { error: string }).error, /互換の版/);
   mock.branch("I0012", "main");
   const folded = await ask(d, "i0012");

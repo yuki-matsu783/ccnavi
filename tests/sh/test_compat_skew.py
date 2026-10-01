@@ -150,6 +150,13 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertEqual(sh_compat(), version.COMPAT)
         self.assertEqual(extension_compat(), version.COMPAT)
 
+    def test_v7_the_eli5_request_change_raised_the_compat_to_2(self):
+        """V7 ELI5 の依頼の形（ADR-0094〜0097）で sh と実行ファイルの契約が変わったので 2 以上。
+
+        古い sh（互換 1）と組み合わせると、食い違いとして知らせる。
+        """
+        self.assertGreaterEqual(version.COMPAT, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

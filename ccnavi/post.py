@@ -526,6 +526,9 @@ class ScopeGuard:
         # （追跡されないので統合先へ乗らない）が崩れている。そこは黙らせずに言う。
         if ticket_mod.is_ticket_place(rel, self.tickets, self.approved):
             return None
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前の判定と揃える。ADR-0096）。
+        if ticket_mod.is_eli5_place(rel):
+            return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
         item = phase.plan_item(ticket, parent)
         pt = (

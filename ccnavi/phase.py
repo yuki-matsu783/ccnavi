@@ -822,8 +822,10 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         )
     else:
         todo = (
-            "やること: 子の成果を親ブランチへ合流して push し、"
-            f"'{review_sh} request --phase {n} --body-file <依頼文>' "
+            "やること: 子の成果を親ブランチへ合流し、ELI5 の HTML を "
+            f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
+            f"'{review_sh} request --phase {n} --body-file <依頼文> "
+            f"--eli5 wip/eli5/phase-{n}.html' "
             f"でレビューを頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
             f"利用者がレビューを終えたら '{review_sh} confirm --phase {n}' "
             f"で確かめます。{later}"
@@ -923,9 +925,10 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 texts.append(
                     f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
                     f"（{LABEL_PREPARING}）。{who}"
-                    f"子の成果を親ブランチへ合流して push し、"
+                    "子の成果を親ブランチへ合流し、ELI5 の HTML を "
+                    f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
                     f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
-                    "--body-file <依頼文>' "
+                    f"--body-file <依頼文> --eli5 wip/eli5/phase-{n}.html' "
                     f"でレビュー{covers}を頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
                     f"{hold_note}"
                 )
@@ -1365,7 +1368,10 @@ def scope_findings(
     pt = type_for(conf, root, child, parent)
     outside = []
     for rel in sorted(paths):
-        rel = rel.replace("\\", "/")
+        # git の `-z` の綴りをそのまま使う。git はどの OS でも区切りを `/` で返すので、
+        # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
+        # 名前のファイル 1 個が、置き場の中や範囲の中のパスに見えて素通りする
+        # （実行前の判定は直さない。ADR-0097）。
         # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
         # 見ているのは `base_sha..HEAD` の差分（追跡ファイルだけ）と `git status`
         # （`--ignored` を付けない）で、追跡から外れている `scratchpad/` はどちらにも現れない。
@@ -1373,6 +1379,9 @@ def scope_findings(
         # 外してよい根拠（追跡されないので統合先へ乗らない）が崩れている。範囲外のものが
         # コミットに乗って統合先へ行く道を見ているのはここだけなので、そこは黙らせない。
         if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
+            continue
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前の判定と揃える。ADR-0096）。
+        if ticket_mod.is_eli5_place(rel):
             continue
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:

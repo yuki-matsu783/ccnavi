@@ -45,6 +45,10 @@ exit 0
 """
 
 
+# ELI5 の HTML の既定の置き場。ワークツリーの wip/ の下にコミットする（ADR-0095）
+ELI5 = "wip/eli5/phase-1.html"
+
+
 def write(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -489,16 +493,19 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertIn("id を読めない", done.stderr)
         self.assertEqual(done.stdout, "")
 
-    def test_request_records_the_account_that_posted(self):
-        """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
-        out = os.path.join(self._tmp.name, "out")
-        os.makedirs(out)
+    def request_stub(self, out):
+        """実行ファイルの代役。`review prepare` で本文と下書きを書き、`--result` の写しを控える。
+
+        受け取った引数は 1 行 1 つで `out/args.txt` に溜める。
+        """
+        os.makedirs(out, exist_ok=True)
         stub = write(
             os.path.join(self._tmp.name, "exe2", "ccnavi"),
             "#!/bin/sh\n"
             'case " $* " in *" --version "*) printf \'compat: %s\\n\' '
             + str(version.COMPAT)
             + "; exit 0 ;; esac\n"
+            f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"
             f"  printf 'Draft: t\\n\\nb\\n' >'{out}/draft.md'\n"
@@ -510,10 +517,28 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "exit 0\n",
         )
         os.chmod(stub, 0o755)
+        return stub
+
+    def eli5(self, rel=ELI5, text="<!doctype html><p>やさしい説明</p>\n", commit=True):
+        """ELI5 の HTML をワークツリーに書く。commit なら追跡してコミットする（ADR-0095）。"""
+        path = write(os.path.join(self.ws, *rel.split("/")), text)
+        if commit:
+            git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+            subprocess.run([*git, "add", "--", rel], check=True)
+            subprocess.run([*git, "commit", "-q", "-m", f"add {rel}"], check=True)
+        return path
+
+    def test_request_records_the_account_that_posted(self):
+        """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        html = self.eli5()
         state = os.path.join(self._tmp.name, "notes.json")
         extra = {"CCNAVI_BIN_PATH": stub, "FAKE_GITLAB_STATE": state}
         for _ in range(2):
-            done = self.review("resolved", "request", "--phase", "1", "--body-file", "x", **extra)
+            done = self.review(
+                "resolved", "request", "--phase", "1", "--body-file", "x", "--eli5", html, **extra
+            )
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
                 result = json.load(f)
@@ -522,6 +547,168 @@ class GitLabHostFixtureTest(unittest.TestCase):
             self.assertEqual(result["mr"]["number"], 7)
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)
+
+    def test_request_stops_without_an_eli5_html(self):
+        """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める（ADR-0097）。
+
+        実行ファイルもホストも触らない。旧方式（追跡しない wip/tmp/ の HTML）も、wip/eli5/ の外の
+        wip/ も、名前に `'`・`$`・空白・日本語を含むものも、リンクや実行の印付きも止まる。
+        """
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        state = os.path.join(self._tmp.name, "notes.json")
+        extra = {"CCNAVI_BIN_PATH": stub, "FAKE_GITLAB_STATE": state}
+        blank = self.eli5("wip/eli5/blank.html", " \n\t\n")
+        notes = self.eli5("wip/eli5/eli5.md", "# やさしい説明\n")
+        docs = self.eli5("docs/eli5.html")
+        blank_docs = self.eli5("docs/blank.html", "\n")
+        design = self.eli5("wip/design/x.html")
+        old_way = self.eli5("wip/tmp/eli5.html", commit=False)
+        dirty = self.eli5("wip/eli5/phase-2.html")
+        write(dirty, "<p>書き換えた</p>\n")
+        outside = write(os.path.join(self._tmp.name, "elsewhere", "eli5.html"), "<p>x</p>\n")
+        quote = self.eli5("wip/eli5/a'$(id)'.html")
+        dollar = self.eli5("wip/eli5/a$HOME.html")
+        space = self.eli5("wip/eli5/a b.html")
+        japanese = self.eli5("wip/eli5/説明.html")
+        self.eli5("wip/eli5/target.html")
+        link = os.path.join(self.ws, "wip", "eli5", "link.html")
+        os.symlink("target.html", link)
+        executable = self.eli5("wip/eli5/run.html", commit=False)
+        os.chmod(executable, 0o755)
+        git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+        subprocess.run(
+            [
+                *git,
+                "-c",
+                "core.fileMode=true",
+                "add",
+                "--",
+                "wip/eli5/link.html",
+                "wip/eli5/run.html",
+            ],
+            check=True,
+        )
+        subprocess.run([*git, "commit", "-q", "-m", "link and exec"], check=True)
+        untracked = self.eli5("wip/eli5/untracked.html", commit=False)
+        bad_name = ["名前に使えない字がある"]
+        cases = {
+            "無い": ([], 2, []),
+            "値が無い": (["--eli5"], 2, []),
+            "拡張子が違う": (["--eli5", notes], 2, []),
+            "ファイルが無い": (["--eli5", "wip/eli5/missing.html"], 1, ["ファイルが無い"]),
+            "空": (["--eli5", blank], 1, ["中身が空"]),
+            "wip/ の外": (["--eli5", docs], 1, ["wip/eli5/ の下に無い"]),
+            "空で wip/ の外": (["--eli5", blank_docs], 1, ["中身が空", "wip/eli5/ の下に無い"]),
+            "wip/eli5/ の外の wip/": (["--eli5", design], 1, ["wip/eli5/ の下に無い"]),
+            "旧方式（wip/tmp/）": (["--eli5", old_way], 1, ["wip/eli5/ の下に無い"]),
+            "未追跡": (["--eli5", untracked], 1, ["HEAD に無い"]),
+            "未コミット": (["--eli5", dirty], 1, ["HEAD から変わっている"]),
+            "ワークツリーの外": (["--eli5", outside], 1, ["このワークツリーの外"]),
+            "名前に '": (["--eli5", quote], 1, bad_name),
+            "名前に $": (["--eli5", dollar], 1, bad_name),
+            "名前に空白": (["--eli5", space], 1, bad_name),
+            "名前に日本語": (["--eli5", japanese], 1, bad_name),
+            "シンボリックリンク": (["--eli5", link], 1, ["普通のファイルでない（モード 120000"]),
+            "実行の印付き": (["--eli5", executable], 1, ["普通のファイルでない（モード 100755"]),
+        }
+        for name, (flag, code, said) in cases.items():
+            with self.subTest(name):
+                done = self.review(
+                    "resolved", "request", "--phase", "1", "--body-file", "x", *flag, **extra
+                )
+                self.assertEqual(done.returncode, code, done.stdout + done.stderr)
+                self.assertIn("--eli5", done.stderr)
+                self.assertIn("HTML", done.stderr)
+                self.assertIn("wip/eli5/phase-<N>.html", done.stderr)
+                listed = [line for line in done.stderr.splitlines() if line.startswith("  - ")]
+                self.assertEqual(len(listed), len(said), done.stderr)
+                for words in said:
+                    self.assertIn(words, done.stderr)
+                self.assertFalse(os.path.exists(os.path.join(out, "body.md")))
+                self.assertFalse(os.path.exists(state))
+
+    def test_request_points_to_crit_push_and_keeps_eli5_from_the_exe(self):
+        """投稿が済んだら、人が打つ crit review <相対> と crit push <番号> を出す（ADR-0095）。
+
+        相対は打った場所から解く。--eli5 は実行ファイルには渡さない。crit・glab が PATH に
+        無くても止めない。
+        """
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        self.eli5()
+        state = os.path.join(self._tmp.name, "notes.json")
+        done = self.review(
+            "resolved",
+            "request",
+            "--phase",
+            "1",
+            "--body-file",
+            "x",
+            f"--eli5={ELI5}",
+            CCNAVI_BIN_PATH=stub,
+            FAKE_GITLAB_STATE=state,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
+            number = json.load(f)["mr"]["number"]
+        said = [line for line in done.stdout.splitlines() if line.startswith("ELI5 を見る: ")]
+        self.assertEqual(len(said), 1, done.stdout)
+        # ツリーの絶対パスはいつも '…' で包む（中の ' は '\'' に。ADR-0097）
+        self.assertIn("cd '", said[0])
+        top = said[0].split("cd ", 1)[1].split(" ", 1)[0].strip("'")
+        self.assertTrue(os.path.isabs(top), top)
+        self.assertTrue(os.path.samefile(top, self.ws), top)
+        self.assertIn(f"crit review {ELI5} ", said[0])
+        self.assertIn(f"crit push {number} ", said[0])
+        if shutil.which("crit") is None:
+            self.assertIn("PATH に crit は無い", done.stdout)
+        with open(os.path.join(out, "args.txt"), encoding="utf-8") as f:
+            passed = f.read()
+        self.assertNotIn("eli5", passed)
+        # 依頼の本文には在りかと送り方を 1 行載せ、HTML の中身は載せない
+        with open(state, encoding="utf-8") as f:
+            body = json.load(f)[0]["body"]
+        self.assertTrue(body.startswith("<!-- ccnavi:request i0001:1 key=k -->"), body)
+        self.assertIn(f"差分の `{ELI5}`", body)
+        self.assertIn(f"`crit review {ELI5}`", body)
+        self.assertIn(f"`crit push {number}`", body)
+        self.assertNotIn("やさしい説明", body)
+
+    def test_the_tree_path_is_quoted_for_the_shell(self):
+        """ツリーの絶対パスに `'`・`$`・空白があっても、案内の cd は 1 語のまま（ADR-0097）。"""
+        moved = os.path.join(self._tmp.name, "w s'$(touch pwned)")
+        shutil.move(self.ws, moved)
+        self.ws = moved
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        self.eli5()
+        state = os.path.join(self._tmp.name, "notes.json")
+        done = self.review(
+            "resolved",
+            "request",
+            "--phase",
+            "1",
+            "--body-file",
+            "x",
+            f"--eli5={ELI5}",
+            CCNAVI_BIN_PATH=stub,
+            FAKE_GITLAB_STATE=state,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        said = [line for line in done.stdout.splitlines() if line.startswith("ELI5 を見る: ")]
+        self.assertEqual(len(said), 1, done.stdout)
+        word = said[0].split("cd ", 1)[1].split(" してから ", 1)[0]
+        # 打った人のシェルがその 1 語を読んだ結果が、元の絶対パスと同じで、何も実行されない
+        echoed = subprocess.run(
+            [SHELL, "-c", f"printf '%s' {word}"],
+            cwd=self._tmp.name,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertTrue(os.path.samefile(echoed.stdout, moved), echoed.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self._tmp.name, "pwned")))
 
     def test_confirm_and_decide_pass_the_token_owner(self):
         done = self.review("resolved", "confirm", "--phase", "1")

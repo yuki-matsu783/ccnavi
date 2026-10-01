@@ -1150,7 +1150,8 @@ def _reviewed_in_chat(
             stderr.write(
                 f"ccnavi: フェーズ {ph.label} はマージリクエストで見るフェーズ。"
                 "--chat では通せない。"
-                f"'{review_sh} request --phase {ph.number} --body-file <依頼文>' から\n"
+                f"'{review_sh} request --phase {ph.number} --body-file <依頼文> "
+                f"--eli5 wip/eli5/phase-{ph.number}.html' から\n"
             )
         else:
             stderr.write(
@@ -1622,6 +1623,22 @@ def _is_own_place(conf: settings.Settings, path: str) -> bool:
     return any(path.startswith(place + "/") for place in _own_places(conf))
 
 
+def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
+    """依頼の後に変わっても「人が見るものが動いた」に数えない場所か。
+
+    ccnavi 自身の置き場と、ELI5 の HTML の置き場（`wip/eli5/`。ADR-0096）。ELI5 は依頼に添える
+    説明で、成果物ではない（`ready` の前に消える）。直すたびに依頼し直させると、指摘を受けて
+    説明を直すたびに依頼のコメントが増え、レビュー済みが遠のく。代わりに、直した ELI5 を人が
+    見直す保証は無くなる。
+
+    未コミットの検査（`_dirty`）と push の検査（`_unpushed`）はこれを使わない。ELI5 の未コミットは
+    sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
+    （crit push が届かない）。
+    """
+    # git の `-z` の綴りをそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
+    return _is_own_place(conf, path) or path.startswith(ticket_mod.ELI5 + "/")
+
+
 # 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
 _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 
@@ -1636,7 +1653,9 @@ def _is_sha(value: str) -> bool:
     return bool(_SHA.match(value))
 
 
-def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tuple[list[str], str]:
+def _outside_approved(
+    tree_root: str, conf: settings.Settings, ref: str, eli5: bool = False
+) -> tuple[list[str], str]:
     """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
 
     NUL 区切りで読む理由は phase.scope_findings と同じ。既定の出力は非 ASCII を
@@ -1649,9 +1668,12 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
     置き場の中のパスになってしまい、除外の側に入る。
+
+    `eli5` なら ELI5 の置き場も外す（`_unseen_by_review`。依頼済みの見分けだけが使う）。
     """
     paths, failed = _diff_paths(tree_root, ref)
-    return [p for p in paths if not _is_own_place(conf, p)], failed
+    keep = _unseen_by_review if eli5 else _is_own_place
+    return [p for p in paths if not keep(conf, p)], failed
 
 
 def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
@@ -1690,6 +1712,12 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     return False
 
 
+def _in_wip(path: str) -> bool:
+    """git の綴りが、途中の作業の置き場（`wip`）の下か。大文字小文字と `\\` の区切りを問わない。"""
+    folded = path.lower()
+    return folded == WIP_ROOT or folded.startswith((WIP_ROOT + "/", WIP_ROOT + "\\"))
+
+
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
     """マージに進む前にワークツリーの側で満たしていること。root は文面の sh の綴りに使う。
 
@@ -1700,13 +1728,25 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
     if not os.path.isdir(tree_root):
         return [f"親のワークツリーが無い ({tree_root})"]
     wip = WIP_ROOT
-    rc, tracked = _git(tree_root, ["ls-files", "--", wip])
-    if rc == 0 and tracked.strip():
-        n = len(tracked.strip().splitlines())
+    # 大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
+    # （`tree.relative` は書いた綴りを返す）は `wip/eli5/` として通すのに、
+    # git には `WIP/...` で入る。
+    # 区別して見ると、それが既定のブランチまで残る。名前に `\` を含む 1 ファイル（`wip\eli5\x`。
+    # Linux / macOS では作れる）も `wip` の下と見なして止める（ADR-0097）。pathspec の `:(icase)` に
+    # 頼らず全部を `-z` で読んで絞るのは、`\` の名前を pathspec で拾えないのと、
+    # git の版に依らないため。
+    rc, tracked = _git(tree_root, ["ls-files", "-z"])
+    names = [p for p in tracked.split("\0") if p and _in_wip(p)] if rc == 0 else []
+    if rc != 0:
+        problems.append(f"`{wip}/` が追跡されているかを読めない")
+    elif names:
+        tops = sorted({p.split("/", 1)[0] for p in names})
+        git_sh = settings.script_command(root, "ccnavi-git.sh")
+        removes = " と ".join(f"'{git_sh} rm -r {top}'" for top in tops)
         problems.append(
-            f"`{wip}/` に追跡されているファイルが {n} 件ある。"
+            f"`{wip}/` に追跡されているファイルが {len(names)} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"'{settings.script_command(root, 'ccnavi-git.sh')} rm -r {wip}' で消してコミットする"
+            f"{removes} で消してコミットする"
         )
     if _dirty(tree_root, conf):
         problems.append("親のワークツリーに未コミットの変更がある")
@@ -2067,7 +2107,8 @@ def moved_since(
     # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
     if not _is_sha(recorded) or changed is None:
         return moved
-    if any(not _is_own_place(conf, path) for path in changed):
+    # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、人が見るものを動かさない（ADR-0096）。
+    if any(not _unseen_by_review(conf, path) for path in changed):
         return moved
     return ""
 
@@ -2101,7 +2142,7 @@ def _already_requested(
     if rc == 0 and head.strip() != recorded:
         if not _is_sha(recorded):
             return ""
-        changed, failed = _outside_approved(tree_root, conf, recorded)
+        changed, failed = _outside_approved(tree_root, conf, recorded, eli5=True)
         if failed or changed:
             return ""
     return f"フェーズ {phase_no} は依頼済み（人が見るものは依頼時のまま）"
@@ -2111,7 +2152,8 @@ def _redo_request(root: str, phase_no: int) -> str:
     """HEAD が動いたときの案内。push 済みの今の HEAD で依頼を出し直す。"""
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     return (
-        f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文>' で"
+        f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文> "
+        f"--eli5 wip/eli5/phase-{phase_no}.html' で"
         "依頼を出し直すこと"
     )
 

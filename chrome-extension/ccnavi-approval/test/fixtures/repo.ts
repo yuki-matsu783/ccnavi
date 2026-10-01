@@ -10,6 +10,8 @@
  * - `feature-x`（直近）: コードだけのブランチ（家族ではない）
  */
 
+import { COMPAT } from "../helpers/compat.js";
+
 export const NOW = "2026-09-29T00:00:00Z";
 
 const PHASES = `version: 1
@@ -163,7 +165,7 @@ const MAIN_FILES: Record<string, string> = {
   "src/app.py": "print('main')\n",
 };
 
-export function fixture(compat = 1): Record<string, FixtureBranch> {
+export function fixture(compat = COMPAT): Record<string, FixtureBranch> {
   const main = { ...MAIN_FILES, ".ccnavi/scripts/ccnavi-common.sh": COMMON_SH(compat) };
   return {
     main: { committedDate: "2026-09-20T00:00:00Z", files: main },

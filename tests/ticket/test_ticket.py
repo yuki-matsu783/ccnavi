@@ -30,7 +30,7 @@ import tempfile
 import unittest
 
 from ccnavi import phase as phase_mod
-from ccnavi import settings, shellread, ticket
+from ccnavi import review, settings, shellread, ticket
 from ccnavi.subagent import CANDIDATE_NOTE
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
@@ -885,6 +885,8 @@ class TicketTest(unittest.TestCase):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("フェーズ 1 が終わりました", self.reason(said))
         self.assertIn("request", self.reason(said))
+        # ELI5 の置き場を名指しする（ADR-0095）
+        self.assertIn("--eli5 wip/eli5/phase-1.html", self.reason(said))
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
@@ -1338,6 +1340,160 @@ class TicketTest(unittest.TestCase):
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
+
+    def test_a_crit_push_thread_on_the_eli5_blocks_and_leaves_with_wip(self):
+        """ELI5 の HTML を wip/ にコミットし、人が crit push で行に指摘を送った形（ADR-0095）。
+
+        crit push はマージリクエストの行のスレッド（GitHub はレビューのコメント、GitLab は差分の
+        discussion）を立てる。目印で始まらない人の投稿なので、confirm は未解決として数えて止め、
+        decide はその 1 件を選べる。wip/ が追跡されている間は ready の前提（_merge_problems）が
+        落ち、wip/ を消してコミットすると外れる。squash した成果物に HTML は残らない。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        eli5 = "wip/eli5/phase-1.html"
+        write(
+            os.path.join(self.parent_tree, *eli5.split("/")),
+            "<!doctype html>\n<p>やさしい説明</p>\n",
+        )
+        git(self.parent_tree, "add", "--", eli5)
+        git(self.parent_tree, "commit", "--quiet", "-m", "docs: ELI5")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        # crit push の 1 件を写した形（sh の fetch が組むスレッド。path と line は HTML のソース）
+        data["threads"] = [
+            {
+                "id": "crit-1",
+                "resolved": False,
+                "url": "https://example/mr/7#discussion_crit-1",
+                "path": eli5,
+                "line": 2,
+                "body": "ここは X ではなく Y では",
+                "author": "201",
+            }
+        ]
+        write(fixture, json.dumps(data))
+        check = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
+        )
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("未解決", check.stderr)
+        self.assertIn(eli5, check.stderr)
+        shown = self.decide(fixture, "--preview", "--json")
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        keys = [t["key"] for t in json.loads(shown.stdout)["threads"]]
+        self.assertEqual(keys, ["https://example/mr/7#discussion_crit-1"])
+        # ready の前提: wip/ が追跡されている間は落ち、消してコミットして push すると外れる
+        conf, _ = settings.load(self.root)
+        problems = review._merge_problems(self.parent_tree, conf, self.root)
+        self.assertTrue(any("`wip/` に追跡されているファイル" in p for p in problems), problems)
+        git(self.parent_tree, "rm", "-r", "-q", "wip")
+        git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        problems = review._merge_problems(self.parent_tree, conf, self.root)
+        self.assertFalse(any("wip/" in p for p in problems), problems)
+        self.assertEqual(git(self.parent_tree, "ls-files", "--", "wip").strip(), "")
+
+    def test_an_eli5_only_commit_does_not_move_the_request(self):
+        """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない（ADR-0096）。
+
+        confirm は止まらず、request の打ち直しも要らない（依頼済みと答える）。ただし push は求める
+        （差分に無い ELI5 には crit push が届かない）。ELI5 とほかのファイルを一緒に変えたコミットは
+        今までどおり数え、confirm が止まって打ち直しを求める。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        eli5 = os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html")
+        write(eli5, "<p>やさしい説明</p>\n")
+        git(self.parent_tree, "add", "--", "wip/eli5/phase-1.html")
+        git(self.parent_tree, "commit", "--quiet", "-m", "docs: ELI5")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertEqual(self.request(fixture).returncode, 0)
+
+        def confirm():
+            return self.ccnavi(
+                "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
+            )
+
+        def edit(rel, text, message):
+            write(os.path.join(self.parent_tree, *rel.split("/")), text)
+            git(self.parent_tree, "add", "--", rel)
+            git(self.parent_tree, "commit", "--quiet", "-m", message)
+
+        # ELI5 だけを直したコミット。push していなければまだ止める
+        edit("wip/eli5/phase-1.html", "<p>直した説明</p>\n", "docs: ELI5 を直す")
+        unpushed = confirm()
+        self.assertNotEqual(unpushed.returncode, 0)
+        self.assertIn("push されていない", unpushed.stderr)
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        again = self.request(fixture)
+        self.assertNotEqual(again.returncode, 0)
+        self.assertIn("依頼済み", again.stderr)
+        # ELI5 とほかのファイルを一緒に変えたコミットは動いたと数える
+        write(os.path.join(self.parent_tree, "src", "a", "fix.py"), "x = 1\n")
+        git(self.parent_tree, "add", "--", "src/a/fix.py")
+        edit("wip/eli5/phase-1.html", "<p>もう一度直した</p>\n", "fix: 直しと ELI5")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        moved = confirm()
+        self.assertNotEqual(moved.returncode, 0)
+        self.assertIn("依頼の後に親の HEAD が動いている", moved.stderr)
+        redo = self.request(fixture)
+        self.assertEqual(redo.returncode, 0, redo.stderr)
+        # 出し直したあとに ELI5 だけを直しても、confirm は止まらない
+        edit("wip/eli5/phase-1.html", "<p>三度目</p>\n", "docs: ELI5 をもう一度直す")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        done = confirm()
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
+    def test_ready_catches_wip_in_any_case_and_a_backslashed_name(self):
+        """ready の前提は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も止める。
+
+        大文字小文字を区別しない FS では範囲の除外が `WIP/eli5/` を通しうるので、ready の側で
+        区別せずに拾う（ADR-0097）。
+        """
+        self.family()
+        self.close_phase()
+        self.remote()
+        conf, _ = settings.load(self.root)
+        git(self.parent_tree, "rm", "-r", "-q", "--ignore-unmatch", "wip")
+        git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "chore: wip を片付ける")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertFalse(
+            any("wip/" in p for p in review._merge_problems(self.parent_tree, conf, self.root))
+        )
+        for rel in ("WIP/eli5/phase-1.html", "wip\\eli5\\phase-1.html"):
+            with self.subTest(path=rel):
+                write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
+                git(self.parent_tree, "add", "--", rel)
+                git(self.parent_tree, "commit", "--quiet", "-m", f"add {rel}")
+                git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+                problems = review._merge_problems(self.parent_tree, conf, self.root)
+                self.assertTrue(
+                    any("`wip/` に追跡されているファイルが 1 件" in p for p in problems), problems
+                )
+                git(self.parent_tree, "rm", "-q", "--", rel)
+                git(self.parent_tree, "commit", "--quiet", "-m", f"rm {rel}")
+                git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+    def test_eli5_lookalikes_still_move_the_request(self):
+        """`wip/eli5x/` や `wip/` のほかの場所は、今までどおり動いたと数える。"""
+        conf, _ = settings.load(self.root)
+        mark = {"head": "a" * 40}
+        for path, moves in (
+            ("wip/eli5/phase-1.html", False),
+            ("wip/eli5/old/phase-1.html", False),
+            ("wip/eli5x/phase-1.html", True),
+            ("wip/design/plan.md", True),
+            ("wip\\eli5\\phase-1.html", True),
+            ("src/a/x.py", True),
+        ):
+            with self.subTest(path=path):
+                said = review.moved_since(conf, mark, "b" * 40, [path])
+                self.assertEqual(bool(said), moves, said)
 
     def test_decide_yes_places_each_choice(self):
         """指摘ごとの行き先。対応しない分は受け入れ、直す分は続きの子に載せ、フェーズは開き直る。"""
