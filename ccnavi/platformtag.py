@@ -7,10 +7,10 @@ hook が起動するのは `.ccnavi/scripts/ccnavi-launcher.sh` に置いた振�
 
 語は 4 か所で揃える。ここ、scripts/ccnavi-setup.sh の host_target、
 .ccnavi/scripts/ccnavi-launcher.sh、VS Code 拡張の src/core/locate.ts の hostTarget。
-どれかだけ変えると、配った場所と探す場所がずれる。
+どれかだけ変えると、配った場所と探す場所が食い違う。
 
 突き合わせているのは sh とここの 2 つだけ（tests/sh/test_launcher.py）。setup.sh と
-拡張の語は、どのテストも比べていない。未知の OS と CPU の扱いは既に割れていて、
+拡張の語は、どのテストも比べていない。未知の OS と CPU の扱いは既に分かれていて、
 ここは読めた値をそのまま使い、sh は `unknown` として扱う。
 """
 

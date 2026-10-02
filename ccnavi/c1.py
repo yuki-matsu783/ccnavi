@@ -126,7 +126,7 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     stdout.write(HEAD + "\n")
     for key, value in lines:
         stdout.write(f"{key} {' '.join(str(value).split())}\n")
-    # パスは空白を潰さずにそのまま出す（改行を含むパスは target で止めてある）。
+    # パスは空白をまとめずにそのまま出す（改行を含むパスは target で止めてある）。
     if verdict == TARGET_YES and st.home is not None:
         stdout.write(f"tree {st.home.root}\n")
     return 0

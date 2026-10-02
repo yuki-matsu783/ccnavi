@@ -2,7 +2,7 @@
 
 言うのは 5 つ。版・組み立ての元になったコミット・受け付けるフラグ・互換の版・読み書きする
 書式の版。VS Code 拡張と `.ccnavi/scripts/` の sh は、起動のときにこれを読んで自分と
-噛み合っているかを見る。前は拡張が `--flow` を渡してみて、argparse の「知らない
+合っているかを見る。前は拡張が `--flow` を渡してみて、argparse の「知らない
 オプション」の苦情で古い実行ファイルを見分けていた。フラグ 1 本ごとに渡してみる形は、
 フラグが増えるたびに見分け方も増える。
 
@@ -12,8 +12,8 @@ VS Code 拡張）との契約の版。呼ぶ側が頼っているフラグや出
 `EXTENSION_COMPAT`（src/core/version.ts）も同じ値に揃える。フラグを足すだけ、JSON の欄を
 足すだけなら上げない。足したものが在るかは `flags` を見れば分かる。
 
-層（共通層・自身の層・プロジェクトの層）の 3 本は、ファイルの頭の `version:` が書式の版を
-名乗る。読めない版は、読む側（rules / phasetypes / risk）がもう error にしている
+層（共通層・自身の層・プロジェクトの層）の 3 本は、ファイルの頭の `version:` に書式の版を
+書く。読めない版は、読む側（rules / phasetypes / risk）がもう error にしている
 （`--lint` が名指しする）。ここでは実行ファイルが読む版を `formats` に並べるだけで、
 層ごとに別の版を足さない。
 
@@ -50,7 +50,7 @@ BUILDINFO_MODULE = "ccnavi_buildinfo"
 
 def commit() -> str:
     """組み立ての元になったコミット。埋めていなければ `unknown`。"""
-    # 綴りは BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller が束ねる。
+    # 綴りは BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller がまとめる。
     try:
         import ccnavi_buildinfo  # type: ignore[import-not-found]
     except ImportError:
