@@ -1,4 +1,4 @@
-// 組み立ての出口と控えを消す。
+// 組み立ての出力先と控えを消す。
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

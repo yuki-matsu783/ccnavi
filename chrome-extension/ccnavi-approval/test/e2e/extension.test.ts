@@ -2,7 +2,7 @@
  * 実機の試験（ADR-0093 段階 1・3、確認事項 4・5）。試験用の通信先（127.0.0.1）で組んだ拡張（dist-e2e/）を
  * Chromium（headless=new）に読み込み、模擬の GitHub を相手に次を確かめる。
  *
- * - 拡張のページの Web Worker で Pyodide が MV3 の CSP（'wasm-unsafe-eval' だけ）の下で起き、ccnavi を import できる
+ * - 拡張のページの Web Worker で Pyodide が MV3 の CSP（'wasm-unsafe-eval' だけ）の下で起動し、ccnavi を import できる
  * - 設定画面で PAT とリポジトリを登録し、ボードが描ける
  * - 悪意のある Markdown を描いても、承認しても何も動かない
  * - ボードから承認と取り下げを書く（`createCommitOnBranch` の 1 コミット）

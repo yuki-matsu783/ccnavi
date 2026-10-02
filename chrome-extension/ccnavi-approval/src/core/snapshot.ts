@@ -21,7 +21,7 @@ import { py, type BoardResult, type Branch, type Compat, type Family, type Place
 import { reviewPanels, type ReviewPanel } from "./reviewed.js";
 import type { RepoConfig } from "./settings.js";
 
-/** service worker へ頼む口。`owner`・`repo` はここで前に付ける */
+/** service worker へ頼む関数。`owner`・`repo` はここで前に付ける */
 export type HostCall = (op: string, args: readonly unknown[]) => Promise<unknown>;
 
 export interface BlobCache {
@@ -44,7 +44,7 @@ export interface Deps {
   /** 呼んだ回数を数える（service worker が返す数を足す） */
   readonly stats: Stats;
   /**
-   * プロジェクトのリポジトリのワークスペース（段階 5）。登録したワークスペースのリポジトリと、そのホストへ頼む口。
+   * プロジェクトのリポジトリのワークスペース（段階 5）。登録したワークスペースのリポジトリと、そのホストへ頼む関数。
    * プロジェクトのリポジトリを読むときに要る（無ければ止める）
    */
   readonly workspace?: { readonly repo: RepoConfig; readonly call: HostCall };

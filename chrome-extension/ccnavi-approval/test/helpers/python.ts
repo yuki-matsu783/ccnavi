@@ -1,5 +1,5 @@
 /**
- * 試験から Python の入口を呼ぶ口を 2 つ作る。
+ * 試験から Python の入口を呼ぶ手段を 2 つ作る。
  *
  * - `pyodidePy`: Node の上の Pyodide に、ビルドが組んだ zip（dist/py/ccnavi-py.zip）を展開したもの。
  *   拡張の Worker と同じ中身

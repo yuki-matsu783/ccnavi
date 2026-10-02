@@ -45,7 +45,7 @@ export interface WriteDeps extends ReadDeps {
 /** 書いた直後の確かめを読み直す回数と間隔（ホストの読み取りの遅れ。レビューの 13） */
 const VERIFY_TRIES = 3;
 const VERIFY_WAIT_MS = 1000;
-/** 見出しに並べる識別子の数。残りは件数に畳み、全件は本文に書く（レビューの 3） */
+/** 見出しに並べる識別子の数。残りは件数にまとめ、全件は本文に書く（レビューの 3） */
 const HEADLINE_IDS = 3;
 
 /** service worker が書く頼みを形や守りで断ったときの status（protocol.ts の REFUSED と同じ） */
@@ -55,7 +55,7 @@ const HOST_REFUSED = 409;
 /** GitLab へ送る前の確認で先頭が動いていたときの status（`gitlab.HOST_MOVED`）。何も送っていないので読み直して試し直す */
 const HOST_MOVED = 412;
 
-/** コミットの見出しと本文。見出しは 200 字に収まるよう先頭の数件と件数に畳み、全件は本文に書く */
+/** コミットの見出しと本文。見出しは 200 字に収まるよう先頭の数件と件数にまとめ、全件は本文に書く */
 export function commitMessage(ids: readonly string[], verb: string, done: string, version: string): { headline: string; body: string } {
   const shown = ids.slice(0, HEADLINE_IDS).join(", ");
   const rest = ids.length > HEADLINE_IDS ? ` ほか ${ids.length - HEADLINE_IDS} 件` : "";
@@ -404,7 +404,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
     const wrong = await verifySettled(deps, repo, res.oid, undo);
     if (wrong.length > 0) return human(`打ち消した後の中身が戻したものと違う: ${wrong.join(", ")}`);
     if (res.parent === cur) return { kind: "reverted" };
-    // 打ち消しの間にも別の書き込みが入った。それが同じパスを変えていなければ打ち消しは効いている
+    // 打ち消しの間にも別の書き込みが入った。それが同じパスを変えていなければ打ち消しは反映されている
     if ((await verifyWritten(deps, repo, res.parent, rows)).length === 0) return { kind: "reverted" };
     return human("打ち消しの間にも別の書き込みが同じファイルを変えた");
   }

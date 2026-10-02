@@ -50,7 +50,7 @@ let repos: RepoConfig[] = [];
 const boards = new Map<string, RepoBoard>();
 const issues = new Map<string, { list: Issue[] | null; error: string }>();
 
-/** プロジェクトのリポジトリのワークスペース（登録したもの）とそのホストへ頼む口（段階 5） */
+/** プロジェクトのリポジトリのワークスペース（登録したもの）とそのホストへ頼む関数（段階 5） */
 function workspaceOf(repo: RepoConfig, stats: Stats): Deps["workspace"] {
   if (!repo.project) return undefined;
   const ws = repos.find((r) => repoKey(r) === repo.workspace && !r.project);

@@ -17,7 +17,7 @@ import { py } from "./py.js";
 import type { ReviewCopy } from "./github.js";
 import { localStamp } from "./stamp.js";
 
-/** service worker へ頼む口（`owner`・`repo` は呼び手が前に付ける） */
+/** service worker へ頼む関数（`owner`・`repo` は呼び手が前に付ける） */
 export type Ask = (op: string, args: readonly unknown[]) => Promise<unknown>;
 
 export interface ConfirmInput {

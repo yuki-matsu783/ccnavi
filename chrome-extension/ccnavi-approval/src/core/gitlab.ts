@@ -75,7 +75,7 @@ async function pause(client: Client, seconds: number): Promise<void> {
 /** 1 回の呼び出し。401 は差し替えを促し、429（レート制限）は Retry-After が短ければ 1 回だけ待ち直す */
 async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
-    // 別のホストへの転送を追わない（PAT を載せた要求を焼き込んだ通信先の外へ出さない）
+    // 別のホストへの転送を追わない（PAT を載せた要求を埋め込んだ通信先の外へ出さない）
     const res = await fetchNoRedirect(client, url, init, what);
     if (res.status === 401) throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
     if (res.status === 429) {
@@ -417,7 +417,7 @@ export async function discussions(client: Client, owner: string, repo: string, n
   return out;
 }
 
-/** MR のレビュアーの状態（sh の `reviews` の GitLab の枝と同じ）。`requested_changes` を CHANGES_REQUESTED に寄せる */
+/** MR のレビュアーの状態（sh の `reviews` の GitLab の枝と同じ）。`requested_changes` を CHANGES_REQUESTED にそろえる */
 export async function reviewers(client: Client, owner: string, repo: string, number: number, mrUrl: string): Promise<PullReview[]> {
   const all = await pages(client, `${project(owner, repo)}/merge_requests/${number}/reviewers`, THREAD_PAGES, `MR !${number} のレビュアー`);
   return (all as { state?: unknown; updated_at?: unknown; created_at?: unknown; user?: { id?: unknown; username?: unknown } | null }[]).map((r) => {
@@ -472,7 +472,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   const res = (body ?? {}) as { diffs?: unknown; compare_timeout?: unknown };
   if (status === 404 || res.compare_timeout === true || !Array.isArray(res.diffs)) return { base: b, head: h, files: null };
   if (res.diffs.length >= COMPARE_FILES_NEAR) return { base: b, head: h, files: null };
-  // 行数などで畳まれた・大きすぎる差分があれば、一覧が揃っていると言えない（動いたと数える。11.9.1 の 9）
+  // 行数などで折りたたまれた・大きすぎる差分があれば、一覧が揃っていると言えない（動いたと数える。11.9.1 の 9）
   const diffs = res.diffs as { old_path?: unknown; new_path?: unknown; collapsed?: unknown; too_large?: unknown }[];
   if (diffs.some((d) => d?.collapsed === true || d?.too_large === true)) return { base: b, head: h, files: null };
   const files: string[] = [];
@@ -580,7 +580,7 @@ export async function issues(client: Client, owner: string, repo: string): Promi
 /** 全部のブランチの名前を読むページの上限（100 × 50）。超えたら読み切れないので止める（「始める」の重なりの検査） */
 export const BRANCH_PAGES = 50;
 
-/** 全部のブランチの名前（「始める」が大文字小文字を畳んで重なりを見る） */
+/** 全部のブランチの名前（「始める」が大文字小文字をそろえて重なりを見る） */
 export async function branchNames(client: Client, owner: string, repo: string): Promise<string[]> {
   const all: string[] = [];
   for (let page = 1; ; page += 1) {

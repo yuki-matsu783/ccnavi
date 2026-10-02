@@ -6,7 +6,7 @@
  * 書く頼みを直に送られても、保護されたブランチ・統合先・置き場の外・登録していないリポジトリには書かない。
  */
 
-/** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字を畳んで比べる */
+/** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
 export const PROTECTED = /^(?:main|master|develop|release|release[-/].*)$/i;
 
 /** 置き場の綴りの既定（`ccnavi/settings.py` の DEFAULT_TICKETS・DEFAULT_APPROVED と同じ） */

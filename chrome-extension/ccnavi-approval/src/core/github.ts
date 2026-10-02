@@ -126,8 +126,8 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
 }
 
 /**
- * 転送を追わずに呼ぶ（`redirect: "error"`）。fetch そのものが落ちたら（転送された・通信が落ちた。ブラウザは両者を
- * 見分けさせない）、原因の分かる文面に包む。status は 0 のまま（書く流れは「届いたか分からない」として確かめる）
+ * 転送を追わずに呼ぶ（`redirect: "error"`）。fetch そのものが落ちたら（転送された・通信が落ちた。ブラウザでは両者を
+ * 見分けられない）、原因の分かる文面に包む。status は 0 のまま（書く流れは「届いたか分からない」として確かめる）
  */
 export async function fetchNoRedirect(client: Pick<Client, "fetch">, url: string, init: Parameters<Fetch>[1], what: string): ReturnType<Fetch> {
   try {
@@ -150,7 +150,7 @@ async function pause(client: Client, seconds: number): Promise<void> {
  */
 async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
-    // 別のホストへの転送を追わない（PAT を載せた要求を焼き込んだ通信先の外へ出さない）
+    // 別のホストへの転送を追わない（PAT を載せた要求を埋め込んだ通信先の外へ出さない）
     const res = await fetchNoRedirect(client, url, init, what);
     note(client, res);
     if (res.status === 401) {
@@ -736,7 +736,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
 /** 全部のブランチの名前を読むページの上限（100 × 50）。超えたら読み切れないので止める（「始める」の重なりの検査） */
 export const BRANCH_PAGES = 50;
 
-/** 全部のブランチの名前（「始める」が大文字小文字を畳んで重なりを見る。直近 N 日の上限を掛けない） */
+/** 全部のブランチの名前（「始める」が大文字小文字をそろえて重なりを見る。直近 N 日の上限を掛けない） */
 export async function branchNames(client: Client, owner: string, repo: string): Promise<string[]> {
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/branches?per_page=100`, BRANCH_PAGES);
   if (more) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行う");

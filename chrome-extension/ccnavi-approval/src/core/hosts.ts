@@ -1,7 +1,7 @@
 /**
  * 通信先（ホストの API）の一覧と、そこから組む manifest（ADR-0093 の D24・5.5 の 5）。
  *
- * 通信先は配布するときにビルドへ焼き込む。設定画面でホストを足す道は持たない。
+ * 通信先は配布するときにビルドへ埋め込む。設定画面でホストを足す方法は持たない。
  * `host_permissions` と CSP の `connect-src` は、この一覧の API のオリジンだけにする。
  * CSP に足すのは Pyodide に要る `'wasm-unsafe-eval'` だけ（5.5 の 3）。
  */
@@ -78,7 +78,7 @@ export function origins(hosts: readonly Host[]): string[] {
 }
 
 /**
- * 画像・フォームの送り先・base を塞ぐ（レビューの 14）。足すのは Pyodide に要る 'wasm-unsafe-eval' だけ。
+ * 画像・フォームの送り先・base を制限する（レビューの 14）。足すのは Pyodide に要る 'wasm-unsafe-eval' だけ。
  * `default-src 'self'` は入れない: 悪意のある本文の style 属性を DOMPurify が落とす前の解析で、Chromium が
  * インラインの style の違反を毎回報告する（止まるのは同じで、表示の守りは DOMPurify が持つ）
  */

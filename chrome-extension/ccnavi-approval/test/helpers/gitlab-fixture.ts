@@ -49,7 +49,7 @@ function iids(scene: GitLabScene): number[] {
   return (scene.files["mrs.json"] as { iid: number }[]).map((m) => m.iid);
 }
 
-/** 見本に当たる要求なら答え、当たらなければ null（呼び手のほかの道へ）。`u.pathname` は API の根（`/api/v4`）を含む */
+/** 見本に当たる要求なら答え、当たらなければ null（呼び手のほかの経路へ）。`u.pathname` は API の根（`/api/v4`）を含む */
 export function gitlabSceneAnswer(scene: GitLabScene, method: string, u: URL): { status: number; json: unknown } | null {
   const p = u.pathname.replace(/^.*?\/api\/v4/, "");
   const base = `/projects/${encodeURIComponent(`${scene.namespace}/${scene.project}`)}`;

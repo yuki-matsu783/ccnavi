@@ -171,7 +171,7 @@ export interface Actor {
   readonly version: string;
 }
 
-/** Python を呼ぶ口。Worker でも、試験の Node の Pyodide でも同じ形 */
+/** Python を呼ぶ関数。Worker でも、試験の Node の Pyodide でも同じ形 */
 export type PyCall = (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
 export class PyError extends Error {}

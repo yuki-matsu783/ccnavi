@@ -1,5 +1,5 @@
 /**
- * ボードから Pyodide の Worker を呼ぶ口。
+ * ボードから Pyodide の Worker を呼ぶ手段。
  */
 import type { PyCall } from "../core/py.js";
 

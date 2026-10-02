@@ -261,7 +261,7 @@ test("CX-T150 「始める」: issue から i<番号> のブランチを統合�
     assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にある（i0001）/);
     const again = await startIssue(repo, 12, b.seen ?? null, taken, d);
     assert.equal(again.kind, "refused", host);
-    // 全部のブランチの名前を大文字小文字を畳んで比べる（直近 N 日の外のブランチも。11.9.1 の 7）
+    // 全部のブランチの名前を大文字小文字をそろえて比べる（直近 N 日の外のブランチも。11.9.1 の 7）
     assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にある（i0012）/);
     assert.equal(mock.createdBranches.length, 1, host);
   }

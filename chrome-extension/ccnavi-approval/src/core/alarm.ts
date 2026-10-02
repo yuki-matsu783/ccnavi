@@ -1,7 +1,7 @@
 /**
  * PAT の期限を比べる 1 日 1 回の alarm（ADR-0093 の D25）。
  *
- * service worker は止まっては起き直すので、起きるたびに alarm を作り直すと周期が起きた時刻から
+ * service worker は止まっては起動し直すので、起動するたびに alarm を作り直すと周期が起動した時刻から
  * 数え直しになり、1 日 1 回にならない（レビューの 6）。在るときは作らない。
  */
 export const ALARM = "pat-expiry";

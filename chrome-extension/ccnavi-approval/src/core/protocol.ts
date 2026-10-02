@@ -9,7 +9,7 @@
  * 一覧（`compareFiles`）を読む。どちらも読むだけ。
  *
  * 段階 3 から、書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
- * 書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か統合先の名前（ボードの値を信じず
+ * 書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か統合先の名前（ボードの値を信頼せず
  * 自分で引く）なら断り、書くパスは置き場（統合先の `.claude/settings.json` から自分で引く）の下に限る
  * （8.5・レビューの決定 D。Python も同じ検査をする。ここは二重の守り）。PAT の期限（D25）は応答ヘッダ
  * （GitHub）か `GET /personal_access_tokens/self`（GitLab。1 日 1 回）から読んで控え、画面へは期限だけを返す。
@@ -113,11 +113,11 @@ export interface TokenStatus {
 }
 
 const TOKEN = /^[A-Za-z0-9_\-.]{8,255}$/;
-/** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字を畳んで比べる */
+/** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
 /** 1 コミットで書くファイルの上限と、1 ファイルの大きさの上限（base64 の字数） */
 const MAX_FILES = 200;
 const MAX_CONTENTS = 4 * 1024 * 1024;
-/** コミットの見出しと本文の字数の上限（見出しは件数に畳む。全件は本文。write.ts） */
+/** コミットの見出しと本文の字数の上限（見出しは件数にまとめる。全件は本文。write.ts） */
 export const MAX_HEADLINE = 200;
 const MAX_BODY = 64 * 1024;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -258,7 +258,7 @@ function commitArgs(args: unknown[]) {
   return { name, expected: github.checkOid(expected), headline: text(headline, "コミットの見出し", MAX_HEADLINE), body, adds, dels };
 }
 
-/** 設定画面で登録したリポジトリ（書く頼みと、レビュー済みの読み取りの受け口） */
+/** 設定画面で登録したリポジトリ（書く頼みと、レビュー済みの読み取りを受け付ける範囲） */
 async function registeredRepo(deps: Deps, client: github.Client, o: string, r: string): Promise<RepoConfig | undefined> {
   return (await deps.getRepos()).find((x) => x.host === client.host.id && x.owner === o && x.repo === r);
 }
@@ -315,9 +315,9 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
 }
 
 /**
- * 大文字小文字を畳む（「始める」の重なりの検査）。作る名前は ASCII に限る（`startName`・Python の `ticket._ID`）ので
+ * 大文字小文字をそろえる（「始める」の重なりの検査）。作る名前は ASCII に限る（`startName`・Python の `ticket._ID`）ので
  * Python の casefold と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
- * 互換分解（NFKC）してから畳み、`ﬁ`・`ſ` のように casefold で ASCII に畳まれる字も重なりとして拾う（締める向き。11.9.3 の 14）
+ * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（締める向き。11.9.3 の 14）
  */
 function fold(text: string): string {
   return text.normalize("NFKC").toLowerCase();
@@ -328,7 +328,7 @@ const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
 
 /**
  * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（8.6。二重の守り）: 閉じた識別子（`done/` の名前を
- * 大文字小文字を畳んで）と互換の版（ワークスペースの統合先の CCNAVI_COMPAT と同梱の版）。空なら作ってよい
+ * 大文字小文字をそろえて）と互換の版（ワークスペースの統合先の CCNAVI_COMPAT と同梱の版）。空なら作ってよい
  */
 async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string, head: string, name: string): Promise<string> {
   const { places } = await placesAt(deps, client, cfg, integ);
@@ -431,7 +431,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       } catch (err) {
         return refuse((err as Error).message);
       }
-      // 書く先の守り（決定 D）: 登録したリポジトリだけ。統合先の名前と置き場の綴りはボードの値を信じず、自分で引く
+      // 書く先の守り（決定 D）: 登録したリポジトリだけ。統合先の名前と置き場の綴りはボードの値を信頼せず、自分で引く
       const cfg = await registeredRepo(deps, client, o, r);
       if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなので書かない`);
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
@@ -504,7 +504,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
       if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が読んだものと違う。ボードを更新してから始め直す`);
-      // 統合先の今の先頭で確かめ直す（Python の答えを信じない。11.9.1 の 7）: 大文字小文字を畳んだ重なり・閉じた識別子・互換の版
+      // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない。11.9.1 の 7）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
       if (same.length > 0) return refuse(`${name} は既にある（${same.join(", ")}）`);
