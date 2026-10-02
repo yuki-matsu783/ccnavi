@@ -32,7 +32,7 @@ import { Document, parseDocument, Scalar, visit } from "yaml";
 
 import { yaml11Ambiguous } from "./yaml11.js";
 
-/** ノード 1 つ。読んだまま。欄は `nodeType` などの読み口で読む */
+/** ノード 1 つ。読んだまま。欄は `nodeType` などの読む関数で読む */
 export interface FlowNode {
   readonly id: string;
   readonly [key: string]: unknown;
@@ -112,7 +112,7 @@ export const CHILD_LAYER = 1;
 /** 子のフローの中で重ねてよい段の数。子の下 2 段まで */
 export const NEST_ALLOWED = SPAWN_LIMIT - CHILD_LAYER;
 
-// ---- 読み口（欠けた欄は既定で読む。書き足さない）
+// ---- 読む関数（欠けた欄は既定で読む。書き足さない）
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -273,7 +273,7 @@ export function yamlText(value: unknown): string {
  * C1 の制御文字（U+0085 を除く）、U+FFFE・U+FFFF、対になっていないサロゲート
  */
 const PYYAML_UNPRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-/** PyYAML（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に畳まれる）と、文書の頭で読み飛ばす BOM */
+/** PyYAML（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に置き換えられる）と、文書の頭で読み飛ばす BOM */
 const PYYAML_BREAKS = /[\u0085\u2028\u2029\uFEFF]/;
 
 /**
@@ -375,7 +375,7 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
 
 /**
  * 使われていない id。`<種類>-<番号>`。どこかのノードの `parentId` が指している id も使っているとみなす
- * （指す先の無い `parentId` を持つノードが、新しく作ったグループに黙って入らないように）
+ * （指す先の無い `parentId` を持つノードが、新しく作ったグループに気づかないうちに入らないように）
  */
 export function freshNodeId(doc: FlowDoc, type: string): string {
   const used = new Set(doc.nodes.map((node) => node.id));
@@ -601,7 +601,7 @@ export function nodeSize(node: FlowNode): FlowSize {
 /**
  * ノードが入っているグループ。`parentId` が在るグループを指しているときだけ。グループ自身は
  * どこにも入らない（グループの中にグループは置かない）。指す先が無い・グループでない `parentId` は
- * 読むだけで効かせない（図でも親にしない。書き換えもしない）
+ * 読むだけで反映しない（図でも親にしない。書き換えもしない）
  */
 export function groupOf(doc: FlowDoc, node: FlowNode): FlowNode | undefined {
   if (isGroup(node) || typeof node.parentId !== "string" || node.parentId === node.id) {
@@ -993,7 +993,7 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
   return { inputs, outputs };
 }
 
-/** 線に添える言葉。`condition` があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
+/** 線につける言葉。`condition` があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
 /**
  * 線の言葉に使う値の綴り。実行ファイルの `flow._text` と同じ読み方にする。真偽値は空、数は整数ならその綴り
  * （`1.0` は `1`）、文字列はそのまま、ほかは空
@@ -1094,7 +1094,7 @@ export function nesting(doc: FlowDoc): Nesting {
  * 図の上に出す注意。**当てはまるときだけ出す。** 良し悪しは決めない（保存は止めない）。
  *
  * 実行ファイル（`--lint --flow`）の warn と並べて出す。`exe` を真にすると、実行ファイルが同じことを言うもの
- * （開始が無い。実行ファイルは「start が無い」と言う）は出さず、実行ファイルの答えに寄せる（二重に出さない）。
+ * （開始が無い。実行ファイルは「start が無い」と言う）は出さず、実行ファイルの答えにそろえる（二重に出さない）。
  */
 export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = {}): readonly string[] {
   const out: string[] = [];

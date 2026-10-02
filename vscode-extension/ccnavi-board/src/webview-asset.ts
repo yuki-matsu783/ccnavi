@@ -39,7 +39,7 @@ function asset(name: string): string {
 
 /**
  * 束ねた画面のスクリプト。渡すのは**画面の名前**（`"board"`。`src/webview/<名前>/` の `board`）で、
- * 拡張子はここが付ける。名前だけを受けるので、`.js` と `.css` を取り違える道が無い
+ * 拡張子はここが付ける。名前だけを受けるので、`.js` と `.css` を取り違えることが無い
  */
 export function webviewScript(name: string): string {
   return asset(`${name}.js`);

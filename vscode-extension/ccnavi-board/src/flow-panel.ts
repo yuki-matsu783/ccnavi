@@ -26,10 +26,10 @@
  *
  * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
  * 着手は人か親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
- * 1 回の中（実行ファイルを 1 度起こすぶん）。塞ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
+ * 1 回の中（実行ファイルを 1 度起こすぶん）。防ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
  *
- * **未保存のまま閉じたとき。** VS Code の Webview パネルには、閉じるのを止める口（保存・破棄・取り消しを聞いてから
- * 閉じる）が無い（`onDidDispose` は閉じた後に鳴る）。代わりに、未保存の間はタブの題の頭に「●」を付け、
+ * **未保存のまま閉じたとき。** VS Code の Webview パネルには、閉じるのを止める手段（保存・破棄・取り消しを聞いてから
+ * 閉じる）が無い（`onDidDispose` は閉じた後に呼ばれる）。代わりに、未保存の間はタブの題の頭に「●」を付け、
  * 画面が送ってくる編集中の写し（`draft`）を控えておく。閉じた後に未保存だったら、「開き直して戻す」
  * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身の指紋が
  * 変わっていなければ写しを未保存のまま戻し、変わっていれば戻さずに写しを名前の無い YAML のエディタで開く
@@ -73,7 +73,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 const DEBOUNCE_MS = 120;
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
 const SCREEN = "flow";
-/** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
+/** 自分の保存で監視が反応するのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
@@ -149,8 +149,8 @@ function reviewSetting(): boolean {
 }
 
 /**
- * 保存前の確かめの設定を書く。いま効いている範囲に書く（フォルダの設定があればそこ、次にワークスペースの設定、
- * どちらも無ければ利用者の設定）。上の範囲に値があると、下に書いても効かないため
+ * 保存前の確かめの設定を書く。いま有効な範囲に書く（フォルダの設定があればそこ、次にワークスペースの設定、
+ * どちらも無ければ利用者の設定）。上の範囲に値があると、下に書いても反映されないため
  */
 async function updateReviewSetting(folder: vscode.WorkspaceFolder, value: boolean): Promise<void> {
   const config = vscode.workspace.getConfiguration("ccnaviBoard", folder.uri);
@@ -182,7 +182,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
   if (open !== undefined) {
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
-      // 既に開いている画面の編集を黙って差し替えない。戻せなかったと言い、写しは YAML で見せる
+      // 既に開いている画面の編集を何も言わずに差し替えない。戻せなかったと言い、写しは YAML で見せる
       void vscode.window.showWarningMessage(`${ticket} のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は名前の無い YAML で開きます。`);
       void openDraftAsYaml(restore.draft);
     }
@@ -542,7 +542,7 @@ async function reload(current: PanelState): Promise<void> {
     if (same) {
       current.shownDraft = restore.draft;
     } else {
-      // 閉じた後にファイルが変わった。写しを戻すと、変わった中身を黙って上書きしうる。写しは YAML で見せる
+      // 閉じた後にファイルが変わった。写しを戻すと、変わった中身を気づかないうちに上書きしうる。写しは YAML で見せる
       void vscode.window.showWarningMessage(`${current.ticket} のフローは閉じた後に変わったので、編集を戻しませんでした。閉じる前の編集は名前の無い YAML で開きます。`);
       void openDraftAsYaml(restore.draft);
     }

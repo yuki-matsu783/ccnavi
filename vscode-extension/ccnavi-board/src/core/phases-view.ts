@@ -140,7 +140,7 @@ export type PhasesMessage =
   /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  /** 共通層のファイルが無いときの案内から、自身の層を開く（プロジェクト管理画面の入口と同じ道） */
+  /** 共通層のファイルが無いときの案内から、自身の層を開く（プロジェクト管理画面の入口と同じ経路） */
   | { readonly type: "openSelf" }
   | { readonly type: "save"; readonly form: PhasesForm }
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */

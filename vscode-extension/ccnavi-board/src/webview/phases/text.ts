@@ -11,7 +11,7 @@ export function hasRelations(phase: PhaseForm): boolean {
   return phase.overlap.length > 0 || phase.requires.length > 0 || phase.after.length > 0 || phase.agent !== "" || phase.when !== "";
 }
 
-/** 「ほかの種類との関係・補足」の見出しに添える一言 */
+/** 「ほかの種類との関係・補足」の見出しにつける一言 */
 export function relationsNote(phase: PhaseForm): string {
   return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に必要な種類・先に済ませる種類・案内するエージェント・使う場面";
 }
@@ -68,12 +68,12 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
  */
 export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolean): readonly string[] {
   const out: string[] = [];
-  // after を 1 つでも書いていれば言う（線にならない、ほかの設定を指す after も効かないのは同じ）
+  // after を 1 つでも書いていれば言う（線にならない、ほかの設定を指す after も使われないのは同じ）
   const hasAfter = form.phases.some((phase) => phase.after.some((id) => id.trim() !== ""));
   if (form.order === "sequential" && hasAfter) {
     out.push("待ち方が sequential なので、after は判定に効きません。全体計画は plan: に並べた順に一つずつ進みます");
   }
-  // ワークスペースとプロジェクトの設定の dag は、合成に入るほかの設定が全部 dag のときだけ効く（`phasetypes.py` の `merged_order`）
+  // ワークスペースとプロジェクトの設定の dag は、合成に入るほかの設定が全部 dag のときだけ有効になる（`phasetypes.py` の `merged_order`）
   if (layer && form.order === "dag") {
     out.push("共通の設定が sequential なら、合わせたときの判定は sequential で待ちます（このファイルの after は効きません）");
   }

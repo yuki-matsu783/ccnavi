@@ -115,7 +115,7 @@ export function skewMessage(probe: VersionProbe, fromSource: boolean): string | 
 
 /**
  * フラグを使う前に、実行ファイルが知っているかを見る。知っていれば undefined、知らなければ理由。
- * `what` は使おうとしたもの（`ccnavi --lint --json --flow`）。確かめられないものは進めない側に倒す
+ * `what` は使おうとしたもの（`ccnavi --lint --json --flow`）。確かめられないものは進めない扱いにする
  */
 export function missingFlags(probe: VersionProbe, flags: readonly string[], what: string, fromSource: boolean): string | undefined {
   if (probe.kind === "failed") {

@@ -196,7 +196,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
   for (const form of edited.phases) {
     const id = form.id.trim();
     if (seen.has(id)) {
-      // 同じキーを 2 つ書くと、実行ファイル（yaml.safe_load）は後ろで黙って上書きし、種類が 1 つ消える。
+      // 同じキーを 2 つ書くと、実行ファイル（yaml.safe_load）は後ろで何も出さずに上書きし、種類が 1 つ消える。
       throw new Error(`id \`${id}\` が 2 つあります。同じ id の種類は 1 つにしてください`);
     }
     seen.add(id);
@@ -301,7 +301,7 @@ function adoptLeadingComment(map: YAMLMap, first: Pair | undefined): Pair | unde
 
 /**
  * 種類の前の空行は、種類ではなく「対応表の何番目か」に付いていたものとして揃える。
- * 先頭に来た種類が空行を連れてくると `phases:` の直後に空白だけの行が出るため。
+ * 先頭に来た種類と一緒に空行も移ると `phases:` の直後に空白だけの行が出るため。
  */
 function keepSpacing(before: readonly Pair[], after: readonly Pair[]): void {
   const slots = before.map((p) => isNode(p.key) && p.key.spaceBefore === true);

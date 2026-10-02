@@ -188,8 +188,8 @@ function Body({
 
 /**
  * 承認画面の本文。実行ファイルが組んだ文字列を行のまま出し、**説明の付く見出しだけ**その次の行を
- * ツールチップに畳む（`approvalBody`）。畳んだ説明は目には出さないが、読み上げと選択には残す。
- * 畳めるかどうかを決めるのは見出しの綴りだけで、画面は中身を解釈しない。
+ * ツールチップにまとめる（`approvalBody`）。まとめた説明は目には出さないが、読み上げと選択には残す。
+ * まとめられるかどうかを決めるのは見出しの綴りだけで、画面は中身を解釈しない。
  */
 function BodyText({ text }: { readonly text: string }): JSX.Element {
   const lines = approvalBody(text);

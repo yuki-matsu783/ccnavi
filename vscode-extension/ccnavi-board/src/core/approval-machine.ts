@@ -25,7 +25,7 @@
  * | 無し（`overlay` が `undefined`） | 閉じている |
  * | `loading` | 承認待ちの一覧を読んでいる |
  * | `preview` | 一覧と本文を見せた。押されるまで何も置かない |
- * | `approving` | 承認を打っている。**ここでは閉じない**（Esc も効かない。画面の側も同じ） |
+ * | `approving` | 承認を打っている。**ここでは閉じない**（Esc も受け付けない。画面の側も同じ） |
  * | `done` | 承認した。渡す文がある |
  * | `error` | 読めなかった |
  * | `prompt` | 承認以外で渡す文（レビュー済みの連絡、残った指摘を決めた結果） |
@@ -78,7 +78,7 @@ export interface ApprovalState {
   readonly only: readonly string[];
   /**
    * 食い違い（`mismatch`）で一覧を読み直している最中。見せている `overlay` は `approving` のままで、
-   * 返ってきた一覧にこの `notice` を添えて `preview` に切り替える。
+   * 返ってきた一覧にこの `notice` をつけて `preview` に切り替える。
    * `dropped` は、絞りが通らなかったので絞りを外して読み直したか（外したあとは、もう外さない）。
    *
    * **不変条件: これがあるとき `overlay` は必ず `approving`。** 置くのは `answered` の食い違いの枝
@@ -92,7 +92,7 @@ export interface ApprovalState {
 /** 閉じている状態 */
 export const CLOSED: ApprovalState = { only: [] };
 
-/** 人が押したことと、外から返ってきたこと。どちらも「入力」として同じ口から入れる */
+/** 人が押したことと、外から返ってきたこと。どちらも「入力」として同じ関数から入れる */
 export type ApprovalInput =
   /**
    * 「承認」を押した。`filtered` はボードが絞り込まれているか、`tickets` はそのとき見えている
@@ -320,8 +320,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
     // 読み直る。拾えないのは、その置き場が監視の綴りと違うとき（`CCNAVI_TICKETS_APPROVED` が
     // 既定と違う。監視の綴りは `core/watch.ts` に固定してあり、この env を読まない）、
-    // `files.watcherExclude` でそこを外したとき、監視の効かないファイルシステムのとき。
-    // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回に畳む（`board-panel.ts` の `again`）ので、
+    // `files.watcherExclude` でそこを外したとき、監視が使えないファイルシステムのとき。
+    // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回にまとめる（`board-panel.ts` の `again`）ので、
     // 監視と重なっても画面はちらつかない。**1 件も置かれていないなら読み直さない**（何も動いていない）。
     //
     // 運ぶ sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる

@@ -44,7 +44,7 @@ const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/common/risks.yml";
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "risk";
-/** 自分の保存で監視が鳴るのを、この間だけ「ファイルの変更を検知しました」と言わない */
+/** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
@@ -361,7 +361,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * リスク管理の画面に渡す口。VS Code のパネルを `retainedHost` の形に合わせる。
+ * リスク管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
  * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
@@ -417,7 +417,7 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
   }
   if (message.type === "ready") {
     // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す道
+    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す経路
     // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
     current.host.ready();
     redraw(current);
@@ -434,7 +434,7 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     return;
   }
   // 読み直せていない画面では、配点に当たる操作はどれも行き先が無い（「更新」は
-  // 押せるが、その道は `reload` が読み直しからやり直す）
+  // 押せるが、その経路は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
   }
@@ -492,7 +492,7 @@ function create(current: PanelState): void {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.riskPath, BUILTIN_RISK_TEXT, { encoding: "utf8", flag: "wx" });
   } catch (error) {
-    // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
+    // 書けなかったのに猶予を残したままだと、その間の本物の外部変更が知らされない。
     current.wroteAt = 0;
     fail(current, `${loaded.riskRel} に書けません: ${(error as Error).message}`);
     return;

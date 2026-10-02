@@ -1,12 +1,12 @@
 /**
- * フローの図。点がノード、線が `connections`。見た目は cc-wf-studio に寄せてあるが、コードは
+ * フローの図。点がノード、線が `connections`。見た目は cc-wf-studio に似せてあるが、コードは
  * 使っていない（あちらは AGPL。ここは React Flow の部品を組んだだけ）。
  *
  * 図が持つのは描き方だけで、フローの中身は持たない。動かす・繋ぐ・選ぶは `onMove` などで
  * 呼び手（`App.tsx`）に返し、呼び手が `core/flow-doc.ts` の関数で写しを作り直して戻す。
  *
  * **点の位置は React Flow の手元（`nodes`）で動かし、放したときだけ写しに書く。** ドラッグの間に
- * 写しを作り直すと、放すまでに何十回も「未保存」を立て直すことになる。写しが替わったら手元を
+ * 写しを作り直すと、放すまでに何十回も「未保存」にし直すことになる。写しが替わったら手元を
  * 作り直すが、測った大きさ（`measured`）は引き継ぐ（引き継がないと点が一瞬消える）。
  *
  * グループ（`type: "group"`）は React Flow の親子で描く。中のノードに `parentId` を付け、位置は
@@ -106,7 +106,7 @@ interface EdgeData extends Record<string, unknown> {
 type FlowEdge = Edge<EdgeData, "flow">;
 
 /**
- * 点と線の部品から呼び手へ返す口。部品は React Flow が描くので、props では渡せない。
+ * 点と線の部品から呼び手へ返す手段。部品は React Flow が描くので、props では渡せない。
  * `data` に関数を入れると写しが替わるたびに点を作り直すことになるので、context で渡す
  */
 interface CanvasActions {

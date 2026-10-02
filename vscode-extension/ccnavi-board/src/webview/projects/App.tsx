@@ -31,7 +31,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
-  // 受け口（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので写しておく
+  // 受け取る側（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので写しておく
   const cloneRef = useRef<CloneState>(clone);
   cloneRef.current = clone;
 
@@ -48,7 +48,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         // 開いていたメニューの持ち主が一覧から消えていたら閉じる。残すと、同じ名前で
         // 戻ってきたときに押していないメニューが開いた状態で出る。
         // 一致は `menuId` が組んだ綴りそのもので見る（前方一致だと、`:` を含む名前の
-        // メニューを、その接頭辞になっている別のプロジェクトが自分のものだと言い出す）
+        // メニューを、その接頭辞になっている別のプロジェクトのものと取り違える）
         const rows = message.data.kind === "page" ? message.data.page.rows : [];
         const alive = new Set(rows.flatMap((r) => MENU_KINDS.map((kind) => menuId(r.name, kind))));
         setOpenMenu((now) => (now !== undefined && !alive.has(now) ? undefined : now));

@@ -103,7 +103,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     return () => window.removeEventListener("message", onMessage);
   }, [nextKey, requestTour]);
 
-  // 足した行の id へ焦点を移す。畳んだままでは何を足したか分からないので、行は開いて出してある
+  // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
     if (focusKey === undefined) {
       return;
@@ -115,7 +115,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
 
   /**
    * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
-   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で黙って消えるため。
+   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
    * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
   const reload = (): void => {

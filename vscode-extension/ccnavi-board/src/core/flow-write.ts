@@ -31,7 +31,7 @@ export type FlowWriteResult = { readonly ok: true } | { readonly ok: false; read
 /** 読み書きするファイルの大きさの上限（バイト）。実行ファイル（`flow.FILE_LIMIT`）と同じ 256KB */
 export const FLOW_FILE_LIMIT = 256 * 1024;
 
-// Windows には無い。無ければ 0（確かめ直しだけが効く）
+// Windows には無い。無ければ 0（確かめ直しだけが有効）
 const O_NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
 const O_NONBLOCK = fs.constants.O_NONBLOCK ?? 0;
 

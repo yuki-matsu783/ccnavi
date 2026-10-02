@@ -224,7 +224,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       } else if (message.type === "lock" && message.lock !== undefined) {
         setLock(message.lock);
       } else if (message.type === "changed") {
-        // 外で変わった。いまの編集は残すが、戻す先はもう読み込んだ中身と噛み合わないので履歴は空にする。
+        // 外で変わった。いまの編集は残すが、戻す先はもう読み込んだ中身と合わないので履歴は空にする。
         // 送り直し（タブを表に戻した）では空にし直さない（その後に積んだ履歴を消さない）
         if (!changedSeen.current) {
           changedSeen.current = true;
@@ -324,7 +324,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
   const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc, { exe: checks !== undefined })), [doc, checks]);
 
-  // 鍵の受け口は 1 度だけ張り、中身は描くたびに最新へ差し替える
+  // 鍵を受け取る側は 1 度だけ張り、中身は描くたびに最新へ差し替える
   const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
     const listener = (event: KeyboardEvent): void => onKey.current(event);

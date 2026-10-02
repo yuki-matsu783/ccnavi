@@ -8,7 +8,7 @@
  * ときだけ（人が「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ（ADR-0062）。
  *
- * **id の重なりだけは画面で止める。** 同じ id が 2 つあると実行ファイルは後ろで黙って上書きする。
+ * **id の重なりだけは画面で止める。** 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
  * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す（ADR-0035）。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -50,7 +50,7 @@ interface Editing {
   readonly open: ReadonlySet<string>;
   /**
    * 「ほかの種類との関係・補足」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとは人の開閉で動く。**
-   * 描くたびに値の有無で決め直すと、最後の値を消した瞬間に、打っている欄ごと畳まれる
+   * 描くたびに値の有無で決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly more: ReadonlyMap<string, boolean>;
 }
@@ -130,7 +130,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     return () => window.removeEventListener("message", onMessage);
   }, [nextKey]);
 
-  // 足した行の id へ焦点を移す。畳んだままでは何を足したか分からないので、行は開いて出してある
+  // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
     if (focusKey === undefined) {
       return;
@@ -142,7 +142,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   /**
    * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
-   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で黙って消えるため。
+   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
    * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
   /**
@@ -383,7 +383,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
     showView("list");
     setFind("");
-    // 足した種類は関係も補足も空なので、「ほかの種類との関係・補足」は畳んで出す
+    // 足した種類は関係も補足も空なので、「ほかの種類との関係・補足」は折りたたんで出す
     setEditing((now) => ({ ...now, more: new Map(now.more).set(row.key, false) }));
     setFocusKey(row.key);
   };
@@ -575,7 +575,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 /**
  * ファイルが無いときの帯。ワークスペースとプロジェクトの設定は欄を触れ、最初の保存でファイルを作る。
  * どの設定にも雛形は置かない。雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる。
- * 共通の設定は画面から作らせず、種類を置くワークスペースの設定を開く道だけを出す。
+ * 共通の設定は画面から作らせず、種類を置くワークスペースの設定を開く方法だけを出す。
  */
 function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readonly busy: boolean; readonly onOpenSelf: () => void }): JSX.Element {
   if (page.layer === true) {

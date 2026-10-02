@@ -1,5 +1,5 @@
 /**
- * 項目 1 件の行。畳んだときは要約 1 行、開くと欄が出る。
+ * 項目 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
  * 値の欄は加点条件で名前も placeholder も変わり、上限（`max`）は glob のときだけ出る。
@@ -51,7 +51,7 @@ export function Factor(props: FactorProps): JSX.Element {
       <div
         className="row-head"
         onClick={() => {
-          // 文字を選んだだけのときは開閉しない（要約をコピーする操作を奪わない）
+          // 文字を選んだだけのときは開閉しない（要約をコピーする操作を妨げない）
           if (window.getSelection !== undefined && String(window.getSelection()) !== "") {
             return;
           }

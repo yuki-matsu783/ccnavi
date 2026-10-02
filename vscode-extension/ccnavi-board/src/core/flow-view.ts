@@ -135,7 +135,7 @@ export interface FlowPage {
   readonly reviewSave?: boolean;
   /**
    * 未保存のまま閉じた画面から戻す編集中の写し。あれば画面は `doc` の代わりにこれを開き、
-   * `doc`（読み込んだ中身）と比べて未保存を立てる
+   * `doc`（読み込んだ中身）と比べて未保存にする
    */
   readonly draft?: FlowDoc;
   /** 開くときに実行ファイルが `doc` について言ったこと */

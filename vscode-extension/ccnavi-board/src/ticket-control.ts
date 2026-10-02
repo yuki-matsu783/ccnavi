@@ -27,7 +27,7 @@ export function onDidChangeTicketControl(listener: (value: TicketControl) => voi
 }
 
 /**
- * チケット制御が効いていれば真。disable なら理由を出して偽を返す。
+ * チケット制御が有効なら真。disable なら理由を出して偽を返す。
  *
  * 一覧と `when` は disable の入口を隠すが、キーバインド・他の拡張・前に開いた画面の中の
  * ボタンはそこを通らない。開く側でもう一度見て、隠れている画面が横から開かないようにする。
@@ -65,7 +65,7 @@ export function watchTicketControl(context: vscode.ExtensionContext): void {
       listener(value);
     }
   };
-  // 最初の 1 回は値が同じでも context key を立てる。既定の enable を VS Code 側は知らない。
+  // 最初の 1 回は値が同じでも context key を設定する。既定の enable を VS Code 側は知らない。
   current = folder === undefined ? "enable" : readTicketControl(folder.uri.fsPath);
   void vscode.commands.executeCommand("setContext", CONTEXT_KEY, current);
   if (folder === undefined) {

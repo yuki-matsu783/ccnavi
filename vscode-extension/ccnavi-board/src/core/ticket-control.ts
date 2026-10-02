@@ -1,6 +1,6 @@
 /**
  * チケット制御を使うかの読み取り。`.claude/settings.json` と `.claude/settings.local.json` の
- * env `CCNAVI_TICKET_CONTROL` を見る。Claude Code は両方の env を hook に渡し、local が勝つ。
+ * env `CCNAVI_TICKET_CONTROL` を見る。Claude Code は両方の env を hook に渡し、local のほうを採る。
  *
  * 拡張は hook が受け取るプロセスの環境を見られないので、設定ファイルの本文から読む。
  * シェルから渡された値は拾えない（README に「設定ファイルに書く」と決めてある）。

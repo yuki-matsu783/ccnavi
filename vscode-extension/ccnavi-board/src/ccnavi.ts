@@ -83,7 +83,7 @@ const APPROVE_TIMEOUT_MS = 60_000;
 
 /**
  * ボードの読み直し（`--explain --json`）に付ける期限（ミリ秒）。返らないと画面の「更新」が
- * 押されたまま戻らず、以後の読み直しも黙って捨てられる（board-panel の loading が立ちっぱなしになる）。
+ * 押されたまま戻らず、以後の読み直しも何も出さずに捨てられる（board-panel の loading が真のまま残る）。
  * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て承認と同じ 60 秒。
  */
 const EXPLAIN_TIMEOUT_MS = 60_000;
@@ -112,7 +112,7 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
  * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
  * ワークスペースの設定は同じオプションに名札 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
  * `self` を名乗るプロジェクトはプロジェクトの設定として数えないので取り違えない。
- * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ効き、
+ * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
  * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
@@ -283,7 +283,7 @@ export async function runApprovePreview(
   }
   if (ran.code !== 0) {
     // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
-    // 読めない提案の行より後ろに出るので、1 行目だけでは届かない。
+    // 読めない提案の行より後ろに出るので、1 行目だけでは伝わらない。
     return { ok: false, error: `ccnavi --approve --preview --json が失敗しました:\n${ran.stderr.trim()}` };
   }
   const parsed = parseApprovePreview(ran.stdout);
@@ -327,7 +327,7 @@ export async function runApproveYes(
   if ("mismatch" in parsed) {
     return parsed;
   }
-  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで黙ると人は
+  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで何も言わないと人は
   // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
   if ("partial" in parsed) {
     return { ok: false, error: partialMessage(parsed.partial) };

@@ -3,7 +3,7 @@
  *
  * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いたカードの印も、
  * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、人が触って
- * 決めるもの（絞り込み・畳んだ列・列の幅・「更新」を押したか）だけ。判定はしない。
+ * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -23,7 +23,7 @@ const MIN_WIDTH = 220;
 
 /**
  * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース（プロジェクト外）」（空）と各プロジェクト。
- * プロジェクトが無いボードでは欄を出さないので、候補も「すべて」だけ。覚えていた値がここに無ければ効かせない
+ * プロジェクトが無いボードでは欄を出さないので、候補も「すべて」だけ。覚えていた値がここに無ければ使わない
  * （欄が無いまま「絞り込み中」になると、人には解除する手立てが無い）
  */
 function projectOptions(board: Board | undefined): readonly string[] {
@@ -39,13 +39,13 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     const board = initial.kind === "board" ? initial.board : undefined;
     return asked !== undefined && projectOptions(board).includes(asked) ? { ...saved, project: asked } : saved;
   });
-  // 「更新」は押した瞬間に非活性にして回り記号を出す。活性に戻すのは、拡張ホストが読み直しを終えて
-  // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す道は要らない。
+  // 「更新」は押した時点で非活性にして回り記号を出す。活性に戻すのは、拡張ホストが読み直しを終えて
+  // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す経路は要らない。
   // 実行ファイルが返らない場合は期限（ccnavi.ts）が切る。
   const [refreshing, setRefreshing] = useState(false);
 
   const board = data.kind === "board" ? data.board : undefined;
-  // 受け口（メッセージ）はいまのボードを知らないので、描くたびに写しておく
+  // 受け取る側（メッセージ）はいまのボードを知らないので、描くたびに写しておく
   const boardRef = useRef<Board | undefined>(board);
   boardRef.current = board;
   // 初回の案内はボードが出てから始める。承認のオーバーレイが出ている間は、その下を指しても見えないので待つ
@@ -93,7 +93,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、落とした後の値
   const project = projectOptions(board).includes(view.project) ? view.project : EMPTY.project;
   const parent = board !== undefined && board.parents.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
-  // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が効いたままにすると、
+  // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が有効なままにすると、
   // 出すものが無いのに「絞り込み中」になる
   const attention = board !== undefined && view.attention;
   const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
@@ -122,7 +122,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const movedOf = (card: Card): Moved | undefined => moved.get(card.id);
 
   // 見本は絞り込みに当てない。見本のカードはどのプロジェクトにも親にも属さないので、覚えていた絞り込みが
-  // 効いたままだと全部隠れ、案内が指す先を失う
+  // 有効なままだと全部隠れ、案内が指す先を失う
   const hiddenOf = (card: Card): boolean =>
     sample === undefined &&
     ((project !== EMPTY.project && card.project !== project) ||
@@ -306,7 +306,7 @@ function Footer({ board }: { readonly board: Board }): JSX.Element {
 }
 
 /**
- * 1 つの列。見出しを押すと畳み、右端の取っ手をドラッグすると幅が px で固定される
+ * 1 つの列。見出しを押すと折りたたみ、右端の取っ手をドラッグすると幅が px で固定される
  * （ダブルクリックで元の伸び縮みに戻る）。件数は絞り込みで見えているカードの数。
  * 上部の集計（残り・全・不備・承認待ち）は絞り込みに関係なくボード全体の数のまま。
  */
