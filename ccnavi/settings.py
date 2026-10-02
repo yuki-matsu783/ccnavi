@@ -151,9 +151,10 @@ DEFAULT_RISK = os.path.join(".ccnavi", "common", "risks.yml")
 DEFAULT_PROJECTS = "projects"
 # ccnavi ディレクトリ。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
 # 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
-# `--lint` が迷い子として拾う）。`config/` でもなく `.ccnavi/` にするのは、3 本と
-# スクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
-# 済ませるため（設計 11.2）。
+# `--lint` が「ワークツリーでもワークスペースルートでもないのに `.claude/` を持つ」と
+# 警告する）。`config/` でもなく `.ccnavi/` にするのは、3 本とスクリプトを 1 つの
+# ディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため
+# （設計 11.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
 # 引用せずにシェルへ渡せる綴り。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
@@ -450,7 +451,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     # ccnavi 自身を触っている場合。ここでファイルを読むと、編集が次のセッション
     # ではなく次のツール呼び出しから反映される。道具を自分自身に当てて試すには
     # これが要る。開発のための便宜であって境界ではない。反映されるのはここだけで、
-    # off には手が届かないままにしてある。
+    # このファイルに `disable` と書いてもモードの解決で無視され、判定は止まらない。
     conf, problems = _read_local(root)
     if conf is None:
         return settings, problems
