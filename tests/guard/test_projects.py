@@ -457,7 +457,7 @@ class ProjectsTest(unittest.TestCase):
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/proposals/ に置く。プロジェクトのワークツリーの中も普通の置き場で、
         # 承認をプロジェクトの git で運ぶために、そこに置く（設計 9.4、REQ-MLT-14）。
-        # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録した道から
+        # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録したパスから
         # 引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
         write(
