@@ -147,7 +147,7 @@ test("CB-T122 項目の一覧は 1 件 1 行で、控えてある id の行は�
       ["f2", "f4"],
     );
     assert.equal(dom.all("#find").length, 1);
-    // 畳むと控えからも消える
+    // 折りたたむと控えからも消える
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
     assert.deepEqual((dom.state() as { open: string[] }).open, ["q"]);
@@ -319,7 +319,7 @@ test("CB-D65 再読込を押した時点で欄を止め、人がやめたら戻�
     dom.click(dom.one('header button[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload"), [{ type: "reload", dirty: false }]);
-    // 止めていないと、読み直しを待つ間に打った内容が、届いた中身で黙って消える
+    // 止めていないと、読み直しを待つ間に打った内容が、届いた中身で気づかないうちに消える
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("f1")} input.f-points`).disabled);
     await dom.send({ type: "cancelled" });
     assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("f1")} input.f-points`).disabled);

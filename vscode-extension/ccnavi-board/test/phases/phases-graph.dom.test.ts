@@ -73,7 +73,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）。良し悪しも言わない
     assert.doesNotMatch(notes[0], /他の層の種類を指す/);
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
-    // sequential でも after が無ければ、効かないという注意は出さない
+    // sequential でも after が無ければ、判定に使われないという注意は出さない
     assert.doesNotMatch(notes.join(""), /sequential/);
     // 「人が見る」の意味は札のツールチップにある
     assert.match(dom.one(".tag.hitl").getAttribute("title") ?? "", /種類の宣言（review）/);
@@ -81,7 +81,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     await dom.close();
   }
 
-  // sequential なのに after がある。矢印が判定に効かないことを言う
+  // sequential なのに after がある。矢印が判定に使われないことを言う
   const seq = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n  b:\n    kind: work\n    review: mr\n    after: [a]\n") });
   try {
     assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に効きません/);
@@ -144,7 +144,7 @@ test("CB-D77 控えてある位置で点が置かれ、図を触っても phases
 
 test("CB-D80 点を掴んで離すと、その位置が控えに入る（jsdom）", async () => {
   // **この 1 本だけ jsdom で走る。** happy-dom では d3-drag の待ちが終わらず固まる
-  // （`test/helpers/jsdom.ts` の頭）。控えに入る道（onNodeDragStop → withSpot → saveSpots）は
+  // （`test/helpers/jsdom.ts` の頭）。控えに入る経路（onNodeDragStop → withSpot → saveSpots）は
   // ここでしか通らない
   const dom = await loadDrag();
   try {

@@ -1,14 +1,14 @@
 /**
  * 画面の HTML を happy-dom に読み込み、埋め込んだスクリプトを実際に動かすための土台。
  *
- * 画面のスクリプトは文字列で HTML に埋めてあり、型検査が効かない。イベントの付け忘れや
+ * 画面のスクリプトは文字列で HTML に埋めてあり、型検査の対象にならない。イベントの付け忘れや
  * 無い id への参照は、DOM で動かして初めて分かる。ここでは VS Code の Webview が渡す
  * `acquireVsCodeApi` を差し替え、postMessage と state を控えて、テストから読めるようにする。
  *
  * happy-dom は innerHTML で入れた script を実行しないので、CSP の meta を外したうえで
  * 本文を入れ、JSON でない script だけを順に window.eval で走らせる。
- * happy-dom で動かないものだけ jsdom に逃がす方針（`test/helpers/jsdom.ts`）。
- * いま逃がしているのは、図の点のドラッグだけ。
+ * happy-dom で動かないものだけ jsdom に回す方針（`test/helpers/jsdom.ts`）。
+ * いま回しているのは、図の点のドラッグだけ。
  */
 import type { Document, Element, HTMLElement, Window } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -55,7 +55,7 @@ export interface LoadOptions {
   /**
    * 要素の大きさを測れるようにする（`measure: true`）。**図の画面だけが要る。**
    *
-   * happy-dom は `ResizeObserver` の殻を持つが `observe()` が何もせず、`offsetWidth` は 0 を返す。
+   * happy-dom は `ResizeObserver` を形だけ持つが `observe()` が何もせず、`offsetWidth` は 0 を返す。
    * React Flow は点の大きさを `ResizeObserver` の報せで知り、測れていない点を `visibility: hidden` の
    * まま置き、**線を 1 本も描かない**。落ちないので、細工をしないとテストは「空の絵」を見て通る。
    *
@@ -125,7 +125,7 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   const { Window } = await happyDom;
   const window = new Window({ url: "vscode-webview://ccnavi/" });
   const posted: Posted[] = [];
-  // イベントハンドラの中の例外は happy-dom が window の error に流す。黙って通さず、テストを落とす。
+  // イベントハンドラの中の例外は happy-dom が window の error に流す。気づかれないまま通さず、テストを落とす。
   // 非同期のハンドラ（async や Promise）の例外は window の unhandledrejection に来る。
   const errors: Error[] = [];
   const toError = (value: unknown, fallback: string): Error => (value instanceof Error ? value : new Error(String(value ?? fallback)));

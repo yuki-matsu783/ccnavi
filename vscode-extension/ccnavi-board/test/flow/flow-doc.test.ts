@@ -355,7 +355,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(again.doc, "a").parentId, "group-1");
   assert.deepEqual(absolutePosition(again.doc, "b"), { x: 400, y: 200 });
   assert.deepEqual(again.doc.nodes.map((n) => n.id), ["group-1", "a", "group-2", "b", "c"]);
-  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに黙って入らない）
+  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに気づかないうちに入らない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 700, y: 500 }, parentId: "group-1" }, ...three().nodes] };
   const fresh = groupNodes(stray, ["a", "b"]);
   assert.ok(fresh !== undefined);
@@ -414,7 +414,7 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
   assert.equal(byId(into, "a").parentId, "g");
   assert.deepEqual(byId(into, "a").position, { x: 50, y: 50 });
   assert.deepEqual(into.nodes.map((n) => n.id), ["g", "a", "b", "c"]);
-  // 指す先の無い parentId は効かせない（位置は図の上の位置として読み、書き換えない）
+  // 指す先の無い parentId は反映しない（位置は図の上の位置として読み、書き換えない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 5, y: 5 }, parentId: "missing" }] };
   assert.equal(groupOf(stray, byId(stray, "x")), undefined);
   assert.deepEqual(absolutePosition(stray, "x"), { x: 5, y: 5 });

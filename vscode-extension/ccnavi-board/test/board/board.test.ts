@@ -240,7 +240,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
     assert.equal(cards.get(id)!.seenIn.length, 0, id);
   }
 
-  // 決まらないときは、実行ファイルが挙げた候補をそのまま持つ。畳み直さない。
+  // 決まらないときは、実行ファイルが挙げた候補をそのまま持つ。まとめ直さない。
   const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
   const lost: TicketJson = {
     ...child,
@@ -298,7 +298,7 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   assert.equal(card.mrUrl, "https://example.com/o/r/pull/18");
   assert.equal(card.mrNumber, 18);
   assert.equal(cards.get("i0001-02")!.mrUrl, "");
-  // 引く道具。承認と残った指摘を決めるボタンが使う parentTreeOf と同じ場所を見る
+  // 引く関数。承認と残った指摘を決めるボタンが使う parentTreeOf と同じ場所を見る
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001")?.id, "i0001");
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001-02"), undefined);
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 2)?.mrUrl, "u");
