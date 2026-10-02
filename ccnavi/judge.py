@@ -35,7 +35,8 @@ from . import ticket as ticket_mod
 from .modes import EXIT_OK
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
-# それより先に自前の判定を出し終えることが、遅い判定が黙った許可になってしまうのを防ぐ。
+# それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
+# しまうのを防ぐ。
 DEADLINE_SECONDS = 3.0
 
 # Claude Code 側の権限モード。ルールがどこも言及しなかった呼び出しの結末が、
@@ -43,7 +44,7 @@ DEADLINE_SECONDS = 3.0
 # 「下した判定を適用するか」、こちらは「そもそも誰が判断するか」を決める。
 #
 # ルールが言及していない呼び出しについて、ccnavi は判定を持たない。持っていない
-# 判定を ask として返すと、判断できる相手が居るモードでも必ず人に止まる。だから
+# 判定を ask として返すと、判断できる相手が居るモードでも必ず人の確認で止まる。だから
 # 返さず、Claude Code の権限モードに従う。
 # ルールに書いていないものは、ルールに書いていないものとして渡す。
 #
@@ -51,7 +52,7 @@ DEADLINE_SECONDS = 3.0
 # 自身の権限の仕組み（settings.json の permissions と、モードごとの既定）が決める。
 # ccnavi がそこに確認を上乗せしても、判断する者が増えるわけではなく、同じ呼び出しで
 # 2 度聞かれるだけになる。ここに無い綴りは ask として扱う。名前が 1 つ増えたときに、
-# それが素通りではなく確認になるように。
+# それが確認なしに通るのではなく確認になるように。
 PERMISSION_JUDGED = ("auto", "default", "acceptEdits", "plan")
 
 # 人にも classifier にも確認できないモード。ここで ask を返すと「誰も答えないまま
@@ -65,7 +66,7 @@ HANDOVER = "(handover)"
 # 範囲の中かどうかを問うツール。作業ツリーを書き換えるものだけ。
 # Bash は入れていない。コマンド文字列に現れるパスは追えないので、ここで
 # 当てると当たったり当たらなかったりする判定になる。シェル経由の書き込みは
-# 実行後の監視が作業ツリーの実物を見て捕まえる。
+# 実行後の監視が作業ツリーの実物を見て拾う。
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # サブエージェントの起動ツール。レビューが済むまで止める対象で、対象の文字列を持たないので
@@ -78,7 +79,7 @@ AGENT_TOOL = "Agent"
 # 候補の順になる。
 #
 # 対象を差し込む側（試験の diagnose と lint の probe）はこの表を読む。欄の名前を
-# subject_of の中にだけ持つと、ツールを足したときにそちらが黙って古くなる。
+# subject_of の中にだけ持つと、ツールを足したときにそちらが気づかないうちに古くなる。
 SUBJECT_FIELDS: dict[str, str] = {
     "Bash": "command",
     "PowerShell": "command",
@@ -144,8 +145,8 @@ def decide_before(
 ) -> int:
     """実行前の判定に達し、何が起きたかを record に書き込む。
     記録と応答が必ず同じ結論から作られるようにするため。"""
-    # 控えを取るのは判定より先。ここで取る断面が、この呼び出しが何かを壊した
-    # ときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
+    # 控えを取るのは判定より先。ここで取る断面が、この呼び出しが何かを書き換えて
+    # しまったときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
     # 弾けなかったものだけが作業ツリーに届くので、届いた側から見れば
     # 「直前」は判定の前だから。
     guard = guard_setting_files(mode, conf, root, payload, record, selfguard.before)
@@ -161,7 +162,7 @@ def decide_before(
     # ツリー。ワークスペースの外へ書くときに cwd のワークツリーの範囲を当てないため。
     dest = target
     if target is None and payload.cwd:
-        # Bash には行き先が無い。記録には cwd のツリーを添える。判定には使わない。
+        # Bash には行き先が無い。記録には cwd のツリーをつける。判定には使わない。
         target = tree.tree_of(root, payload.cwd, conf.projects)
     if target is not None:
         record.tree, record.project = target.name, target.project
@@ -182,7 +183,7 @@ def decide_before(
             (conf.log, conf.state),
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
-    # 誰がやっても止める。チケット制御が効いているときだけ足す。
+    # 誰がやっても止める。チケット制御が有効なときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
@@ -237,7 +238,7 @@ def decide_before(
             )
 
     # 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
-    # （phase.prune_form）。実行ファイルの端末要求は擬似端末で抜けられる。記録と控えの置き場を
+    # （phase.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と控えの置き場を
     # シェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
     if (
         payload.tool_name in phase.SHELL_TOOLS
@@ -325,7 +326,7 @@ def decide_before(
         and phase.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
     ):
         # 禁止は中で実行されるコマンドにも当てる。`env sh …ccnavi-ticket.sh start` を
-        # 元の形だけで見ると、先頭の `sh` に固定した形が外れて素通りになる。
+        # 元の形だけで見ると、先頭の `sh` に固定した形が外れて止まらずに通る。
         runner, layer = ("", "")
         if not phase.forbidden(subject):
             runner, layer = next((r, x) for r, x, _ in inner if phase.forbidden(x))
@@ -378,7 +379,7 @@ def decide_before(
 
     # 着手中の子のフローは書き換えさせない（設計 9.3.1、ADR-0085）。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの守りでも止まる。ロックは
-    # その守りを切った設定でも効き、止めた理由（着手中）を名指しする（締める向きだけ）。
+    # その守りを切った設定でも当てはまり、止めた理由（着手中）を名指しする（締める向きだけ）。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         locked, scanned = flow_lock(conf, root, payload, record.subject, scanned)
         if index is None and scanned is not None:
@@ -390,8 +391,8 @@ def decide_before(
     # 書き直しを求める形は、ルールより先に止める（ADR-0046、ADR-0047）。ブレース展開と、実行する
     # ときに決まるコマンド名は、ルールを当てる読みと実行されるものが食い違う。
     # `{git,push,origin,main}` も `c=git; $c push origin main` も、raw-git に当たらないまま push を
-    # 実行する。バッククォートとシェルで読みが割れる形は、読み分けると規則が増え、読み違えると
-    # 素通りになる。どれも書き直す道が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
+    # 実行する。バッククォートとシェルで読みが分かれる形は、読み分けると規則が増え、読み違えると
+    # 止まらずに通る。どれも書き直す方法が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
     # 1 回で返す。
     if rewrites:
         forms = list(dict.fromkeys(form for form, _ in rewrites))
@@ -405,7 +406,7 @@ def decide_before(
 
     # 強いタイプから順に見て、最初に当たったところで止める。deny に当たった
     # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
-    # 確認もしろ」という読めない結論に届く道ができる。
+    # 確認もしろ」という読めない結論になる経路ができる。
     verdict, group = "", []
     # group と同じ並びで、中で実行されるコマンドで当たったときの
     # （実行役のコマンド, そのコマンド, 引用の中から切り出したコマンドの層か）。
@@ -470,9 +471,9 @@ def decide_before(
 
     # ルールの判定とチケットの判定を合わせ、強い側を採る（設計 9.5）。同じ強さならルール。
     # ルールの deny はどう書いても最も強いので、そのときはチケットを見ない。
-    # チケットは閉じる向きにしか効かない（範囲の外・deny・ask）。人が書いたルールの allow を
-    # 作業 1 本のあいだ狭めることはあっても、ルールの deny や ask を開けることは無い。
-    # チケットが効くのは人が承認したあとだけで、承認画面が「ルールの allow も範囲の外では
+    # チケットが当てはまるのは閉じる向きだけ（範囲の外・deny・ask）。人が書いたルールの allow を
+    # 作業 1 本のあいだ狭めることはあっても、ルールの deny や ask を緩めることは無い。
+    # チケットが判定に使われるのは人が承認したあとだけで、承認画面が「ルールの allow も範囲の外では
     # 止まる」と言う。
     ticket_reason = ""
     ticket_code = ""
@@ -497,11 +498,11 @@ def decide_before(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
     # このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）は、
-    # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と
-    # 同じ経路（additionalContext）に合流させる。
+    # 判定がどれでも 1 度だけつける。応答は 1 つの JSON なので、ルールの文と
+    # 同じ経路（additionalContext）にまとめる。
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
-    # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ口から渡す。
+    # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ経路で渡す。
     if conf.tickets_enabled:
         told = "\n\n".join(
             p
@@ -512,7 +513,7 @@ def decide_before(
             if p
         )
     # cwd がプロジェクトの中に入った最初の呼び出しで、そのプロジェクトのスキルの目録を 1 度だけ
-    # 添える（ADR-0091）。セッションはワークスペースルートで始まり、あとから cd で入るのがふつう。
+    # つける（ADR-0091）。セッションはワークスペースルートで始まり、あとから cd で入るのがふつう。
     skills = projskills.notice(stderr, conf, root, payload)
     if skills:
         told = "\n\n".join(p for p in (told, skills) if p)
@@ -522,10 +523,10 @@ def decide_before(
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
         if notices or context:
-            # 通した回にも言う。ガードが今なにを見ていないのかを黙っていると、
+            # 通した回にも言う。ガードが今なにを見ていないのかを言わないでいると、
             # 誰も知らないまま作業が進む。呼び出しごとに出るのでうるさいが、
             # うるさいのが正しい。壊れた設定と未承認のチケットはどちらも
-            # 短命であるべきで、黙って居座られるより気づかれたほうがよい。
+            # 短命であるべきで、気づかないうちに残り続けるより気づかれたほうがよい。
             # ルールの additionalContext も同じ経路で、通す代わりに一言添える。
             hookio.write_context(
                 stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([context] if context else []))
@@ -581,11 +582,11 @@ def decide_before(
     if verdict == HANDOVER:
         # 判定は渡した。ここで残せるのは記録だけで、それがこの分担の要点になる。
         # ルールが言及していない場所は log の handover を数えれば分かり、その数は
-        # 人に聞いた回とも、classifier が通した回とも混ざらない。
+        # 人に聞いた回とも、classifier が通した回とも区別できる。
         #
         # 文面は返さない。呼び出しごとに「ルールが言及していない」と言うと、
         # 渡した先が判断するだけの回に毎度コンテキストを 1 段積むことになる。
-        # 穴の在処は記録から読む。
+        # ルールが言及していない場所は記録から読む。
         record.decision, record.enforced = audit.HANDOVER, False
         # 新しい承認だけは、渡す回にも言う。言わないと、その承認を伝える機会が
         # 権限モードに渡す呼び出しの分だけ遅れる。
@@ -617,7 +618,7 @@ def refuse(
     文面の末尾に「言い換えずに相談する」一文を足す。判定は変えない。数えるのは実際に
     止めた回（enable の deny）だけで、dry-run と確認は数えない。
     """
-    # 空行で割るのは、1 件ずつが閉じた文であることを見た目でも保つため。
+    # 空行で区切るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(parts)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK
 
@@ -681,7 +682,7 @@ def screen(
 
     3 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
-    コマンドの層か）。読み切れないコマンドでもトークンに割れる限り返る。Bash 以外は空。
+    コマンドの層か）。読み切れないコマンドでもトークンに分けられる限り返る。Bash 以外は空。
     `cd` で移った先から見た綴り（`shellread.Reading.moved`）も、実行役のコマンドの名前を
     `shellread.MOVED` にしてここに並ぶ。どちらも止める側のルールにだけ当てる。
 
@@ -735,7 +736,7 @@ def project_mismatch(
         return ""
     # 読むのは権威のある側（親のツリー）の写し。子のツリーにも checkout されているが、
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
-    # チケットの範囲がいつまでも効く。
+    # チケットの範囲がいつまでも判定に使われる。
     assert index is not None
     ticket = index.get(t.name)
     if ticket is None:
@@ -769,9 +770,9 @@ def flow_lock(
     """着手中の子のフローへの書き込みなら、その理由の文。と、読んだ承認済みチケットの並び。
 
     当てるのは解いた綴り（`full`）と、解く前の綴り（payload のパスを cwd から繋いで `..` を
-    畳んだだけのもの）と、ディレクトリだけを解いた綴りの 3 通り。フローのファイルかその途中が
+    整えただけのもの）と、ディレクトリだけを解いた綴りの 3 通り。フローのファイルかその途中が
     リンクでも、どれかの綴りが置き場に当たれば止める（止める向きだけ）。承認済みの領域の
-    `flows/` の下でなければ承認済みチケットを読まない。並びは識別子で畳む前のもので、
+    `flows/` の下でなければ承認済みチケットを読まない。並びは識別子でまとめる前のもので、
     どのツリーの写しでも着手中なら止める。
     """
     field = SUBJECT_FIELDS.get(payload.tool_name, "")
@@ -820,7 +821,7 @@ def ticket_verdict(
     """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
 
     コードは空のことが多い。記録に残す綴りを呼び手が決められないとき（範囲の外ではなく
-    チケット自体が信じられないとき、ADR-0058）だけ、ここが名乗る。
+    チケット自体が信頼できないとき、ADR-0058）だけ、ここが返す。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
     同じ識別子の承認済みチケットで判定する。ワークスペースルートの直下ならチケットは無く、ルールだけで判定する。
@@ -828,12 +829,12 @@ def ticket_verdict(
 
     範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
-    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側が勝つ（phase.scope_verdict）。
+    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側を採る（phase.scope_verdict）。
     承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
     名指しする。ルールの判定と比べて強い側を採るのは呼び手。
 
     注記は、親が計画を持つのに子の番号の種類が読めないときの 1 文。そのときは種類では
-    切り詰めない（親の範囲では切り詰める）ので、効いていない上限があることを判定に添える。
+    切り詰めない（親の範囲では切り詰める）ので、使われていない上限があることを判定につける。
 
     t は full の行き先のツリー（`ruleload.rules_for` が返したもの。cwd で置き換える前）。
     ここで引き直さない。引き直すと、索引を読むかを決めたときのツリーとファイルシステムの
@@ -848,7 +849,7 @@ def ticket_verdict(
     読めないと、受け取った側はルールファイルを探しに行って見つけられない。
 
     チケットの置き場（提案と承認済みチケット）については何も言わない。承認された範囲の外に
-    あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
+    あるのが普通で、そこを deny にすると、いちど承認した範囲から出る方法が無くなる。
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS:
         return "", "", "", ""
@@ -857,7 +858,7 @@ def ticket_verdict(
     assert index is not None
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切ったワークツリーは案内では
-    # 「効いている」と言われながら判定では権限モード任せになる。
+    # 有効と言われながら判定では権限モード任せになる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:
         return "", "", "", ""
@@ -884,7 +885,7 @@ def ticket_verdict(
         return rules.ALLOW, "", notice, ""
 
     if found.limit == phase.LIMIT_BLOCKED:
-        # 範囲の外に書いたのではなく、チケット自体が信じられない。範囲を見せても
+        # 範囲の外に書いたのではなく、チケット自体が信頼できない。範囲を見せても
         # 直しようが無いので、代わりに引っかかった検査を名指しする（ADR-0058）。
         return (
             rules.DENY,
@@ -941,7 +942,7 @@ def ticket_verdict(
             notice,
             "",
         )
-    # 上限ごとに次の一手が違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
+    # 上限ごとに次にすることが違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
     # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
     if found.limit == phase.LIMIT_TYPE and found.type is not None:
         pt = found.type
@@ -986,7 +987,7 @@ def undeclared_verdict(permission_mode: str, degraded: str, guard_unwatched: str
     現れないので、渡すと「判断材料が足りない」ことが誰にも伝わらないまま
     モードの既定になる。読めなかったことを言えるのはここだけ（REQ-PRE-04）。
 
-    知らないモードは ask として扱う。名前が 1 つ増えたときに、それが素通りではなく
+    知らないモードは ask として扱う。名前が 1 つ増えたときに、それが確認なしに通るのではなく
     確認になるように。設定漏れがガードの消失にならない側へ既定を置く。
 
     確認できる者が居ないモードは、既定では通さない（REQ-PRE-08）。そこで ask を

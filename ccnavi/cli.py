@@ -4,7 +4,7 @@ run は終了コードを返す。自分で終了しないので、道具ぜん�
 テストから動かせる。
 
 ここに置くのは引数の解釈と振り分けだけ。hook のイベントごとの手順は events、
-実行前の判定は judge、判定に添える文面は reasons、モードと終了コードは modes に
+実行前の判定は judge、判定につける文面は reasons、モードと終了コードは modes に
 ある。チケットとレビューの操作（`ticket ...` / `review ...`）は operate が
 ops / review へ渡す。
 """
@@ -268,7 +268,7 @@ until a human has seen it at the terminal with
 
 # フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。
 # 空文字を受ける欄は、既定が None のフラグで運ぶ。「記録しない」「控えを持たない」を
-# 言えないと、診断のための 1 回が、走っているセッションの記録と控えに必ず混ざる。
+# 言えないと、診断のための 1 回が、走っているセッションの記録と控えに必ず入り込む。
 OVERRIDES = (
     ("log", True),
     ("rules", False),
@@ -281,14 +281,14 @@ OVERRIDES = (
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
 # 層の置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
-# 同じで診断の経路でだけ効く。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
+# 同じで診断の経路でだけ使われる。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
 # RELATIVE_OVERRIDES と同じ読み方で決めるため（`--rules ""` は指定と数えず、
 # `--risk ""` は数える）。
 #
 # 前の 3 本は共通層の中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
 # **層を探す先**。`--projects` はプロジェクトの層の置き場、`--project-home` は
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
-# プロジェクトの層がまるごと消える。実測では `ticket finish <子> --project-home .nothere`
+# プロジェクトの層がまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
 # 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ門に載せる。
 LAYER_OVERRIDES = (
@@ -307,20 +307,20 @@ DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）で�
 # （`exec "$bin" --root "$root" ticket "$@"`）。argparse は同じオプションを後勝ちで読むので、
 # 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
 # `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
-# 実測では、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
+# 実際に試すと、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
 # 本物の置き場に「リスク 0」で閉じられた（ADR-0067）。
 #
 # 正しい 1 本が先に在ることに頼らず、2 本目が在ること自体を断る。落として先へ進むのでは
 # なく止めるのは、この 2 つに「2 度渡す」正しい使い方が無いから。診断の 5 本と違って、
-# 効く経路の話ではない。
+# 使われる経路の話ではない。
 WRAPPER_FLAGS = (("--root", "root", None), ("--cwd", "cwd", ""))
 
 
 def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
-    """sh が渡す綴りが 2 度来ていないかを見て、1 本に均す。2 度来ていたら False。
+    """sh が渡す綴りが 2 度来ていないかを見て、1 本にまとめる。2 度来ていたら False。
 
     数えるのは argparse に任せる（`action="append"`）。argv を自分で数えると、
-    オプションの位置に立っていない `--root` という語まで数えてしまう
+    オプションの位置に無い `--root` という語まで数えてしまう
     （`--reason=--root` のように別のオプションの値として書かれた形）。
     """
     for flag, name, absent in WRAPPER_FLAGS:
@@ -337,7 +337,7 @@ def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
 
     フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
     `phases.yml` / `risks.yml` で判定と採点が走り、層そのものも外せる。届く経路は
-    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへ素通しする（ADR-0067）。
+    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す（ADR-0067）。
     """
     for flag, name, absent in LAYER_OVERRIDES:
         if getattr(args, name) == absent:
@@ -392,7 +392,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
 def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
-    # 走り、全部綴った形しか見ない組み込みの deny（`phase._CLI_FORMS`）を抜ける。
+    # 走り、全部綴った形しか見ない組み込みの deny（`phase._CLI_FORMS`）に止められない。
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
     # 綴りは sh が計算して渡す。2 度来ていないかを見るので、束ねて受ける（WRAPPER_FLAGS）。
     parser.add_argument("--root", action="append", default=None)
@@ -426,7 +426,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--explain", action="store_true")
     # 記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。人が端末から打つ。
     parser.add_argument("--prune", action="store_true")
-    # 記録からルールの候補を起こす（suggest）。読むだけで、何も書かない。
+    # 記録からルールの候補を作る（suggest）。読むだけで、何も書かない。
     parser.add_argument("--suggest", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--tickets", default="")
@@ -446,7 +446,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # VS Code 拡張のフロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルで渡す。
     parser.add_argument("--flow", default="")
     # md の frontmatter の索引を引く（docsearch）。読むのと、無視された索引を書くだけ。
-    # 絞り込みと出力の形のフラグは `--docs` でだけ効く（DOCS_FLAGS）。
+    # 絞り込みと出力の形のフラグは `--docs` でだけ使われる（DOCS_FLAGS）。
     parser.add_argument("--docs", action="store_true")
     parser.add_argument("--type", action="append", default=None)
     parser.add_argument("--tag", action="append", default=None)
@@ -542,8 +542,8 @@ def _recorded_run(
 
     **書き出す先**は、ワークスペースルートの既定の控えの置き場（`logs/state`）の下の `c1/`
     だけ。`--state` と `CCNAVI_STATE` の上書きは見ない（上書きで置き場を動かせば、
-    どこへでも書ける道になる）。行き先・置き場・ルートは行き着く先（リンクを解いた綴り、
-    大文字小文字を畳んだもの）で比べ、`c1/` までの途中にリンクがあれば断る。書き出しは
+    どこへでも書ける経路になる）。行き先・置き場・ルートは行き着く先（リンクを解いた綴り、
+    大文字小文字をそろえたもの）で比べ、`c1/` までの途中にリンクがあれば断る。書き出しは
     同じディレクトリの一時ファイルから `os.replace` で置き換えるので、行き先にリンクが
     あってもその先は開かない（リンクの行き先は書き換えない。Windows でも同じ）。
 
@@ -680,7 +680,10 @@ def _same(a: str, b: str) -> bool:
 
 
 def _inside(path: str, base: str) -> bool:
-    """`path` が `base` の下（か同じ）か。どちらも行き着く先の綴りで渡す。大文字小文字は畳む。"""
+    """`path` が `base` の下（か同じ）か。
+
+    どちらも行き着く先の綴りで渡す。大文字小文字は区別しない。
+    """
     path = os.path.normcase(os.path.normpath(path))
     base = os.path.normcase(os.path.normpath(base))
     return path == base or path.startswith(base.rstrip(os.sep) + os.sep)
@@ -702,9 +705,9 @@ def _parsed(
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
 
-    # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ効く。
+    # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ使われる。
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
-    # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0067）。
+    # 設定を保存せずに緩める経路になるので、そこでは無視する（ADR-0067）。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。
     diagnosing = (
@@ -731,7 +734,7 @@ def _parsed(
         selfguard.GATE_SETTINGS,
     )
     # チケット制御も 2 値。読めない値は enable（使う側）として扱う。切ったつもりで
-    # 綴りを誤った設定は、判定では効いたままになり、--lint が error で名指しする。
+    # 綴りを誤った設定は、判定では有効なままになり、--lint が error で名指しする。
     if args.ticket_control:
         conf.ticket_control_declared = args.ticket_control
     conf.ticket_control = selfguard.resolve(
@@ -756,7 +759,7 @@ def _parsed(
     else:
         return _docs(stdout, stderr, conf, root, args)
 
-    # 1 つの層だけを差し替える形。効く経路は共通層の 3 本と同じ。
+    # 1 つの層だけを差し替える形。使われる経路は共通層の 3 本と同じ。
     for flag, value, swaps in (
         ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
         ("--project-phases-file", args.project_phases_file, conf.project_phases_files),
@@ -774,7 +777,7 @@ def _parsed(
 
     conf.integration_branch = args.integration_branch.strip()
 
-    # フローの確かめは `--lint` だけが読む。判定にも採点にも効かないが、ほかの差し替えと同じく
+    # フローの確かめは `--lint` だけが読む。判定にも採点にも影響しないが、ほかの差し替えと同じく
     # 診断の外では落として言う。診断でも `--lint` でなければ読む先が無いので、そう言って落とす。
     if args.flow:
         if not diagnosing:
@@ -824,7 +827,7 @@ def _parsed(
 
     # 承認の経路。人が端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
-    # 判断ではなく、これから効く範囲についての合意になる。
+    # 判断ではなく、これから判定に使われる範囲についての合意になる。
     if args.approve:
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
@@ -832,7 +835,7 @@ def _parsed(
         if args.preview and args.yes:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
-        # 確かめるだけの枝は `--preview` に相乗りする。単独で打てる形にすると、組み込みの
+        # 確かめるだけの枝は `--preview` と一緒に使う。単独で打てる形にすると、組み込みの
         # deny（phase.ticket_approval_rule）が免除するのは `--preview` の付いた `--approve`
         # だけなので、エージェントが打てないものを案内することになる。
         if args.verify and not args.preview:
@@ -843,12 +846,12 @@ def _parsed(
         # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
         if args.verify:
             return core.verify(stdout, stderr, conf, root, args.json, list(args.command))
-        # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
+        # 見るだけの経路。承認済みチケットを置かないので端末の確認は要らない。後ろに並べた語は
         # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
             code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
-        # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた一覧と今の一覧が
+        # 拡張のオーバーレイで人が押した承認。端末の確認の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase.ticket_approval_rule）が止める。
         if args.yes:
@@ -1011,8 +1014,8 @@ DOCS_FLAGS = (
     ("--no-refresh", "no_refresh", False),
 )
 DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
-# `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。黙って無視すると、
-# 打った人は効いたと思う。
+# `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。何も出さずに無視すると、
+# 打った人は反映されたと思う。
 _NOT_WITH_DOCS = (
     "--lint",
     "--test",
@@ -1113,7 +1116,7 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
 
     `--approve` と `--reviewed` と `--close-early` は人の合意そのもの。エージェントが
     Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
-    hook の中や `echo y |` から来ていないことの、いちばん安い証拠になる。
+    hook の中や `echo y |` から来ていないことの、いちばん手間の少ない証拠になる。
     CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
     """
     if conf.guard_ticket_approval == selfguard.DISABLE:
@@ -1124,7 +1127,7 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     except (AttributeError, ValueError):
         pass
     # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
-    # 人の判断を自分で出す道を教えることになる。切り方は README の設定の表にある。
+    # 人の判断を自分で出す方法を教えることになる。切り方は README の設定の表にある。
     stderr.write(
         f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない。利用者に端末で打ってもらう\n"
     )
@@ -1273,8 +1276,8 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
 
     状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
     行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の家族では sh が `--record-tree` を
-    付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を素通りしている
-    （ADR-0093 の段階 2d のレビュー）。人の判断の入口（`--reviewed --chat`・`--config-synced`・
+    付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を通っていない
+    （ADR-0093 の段階 2d のレビュー）。人の判断の操作（`--reviewed --chat`・`--config-synced`・
     `--close-early`）と、書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
     """
     if args.record_tree:
@@ -1345,11 +1348,12 @@ def _decide_actor(args) -> None:
         history.set_via(args.via)
 
 
-# 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスに化ける綴りを入れない。
+# 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスとして読まれる綴りを入れない。
 _FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
 _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
-# `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数に化ける綴りを入れない）。
+# `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数として読まれる綴りを
+# 入れない）。
 _REVISION = re.compile(r"[0-9a-f]{7,64}|refs/remotes/origin/[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
@@ -1386,7 +1390,7 @@ def sync_check(
 
 def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
     """1 行を書く。書けなかったことは報告して捨てる。
-    それがツールの実行可否を変えられてはいけない。"""
+    書けなかったことでツールの実行可否を変えてはいけない。"""
     try:
         log.write(record)
     except OSError as exc:
