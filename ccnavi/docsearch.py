@@ -1,6 +1,6 @@
 """md の frontmatter の索引を組み、それを引く（`ccnavi --docs`）。
 
-ドキュメントを探すエージェントは、ふだん grep や Glob で本文を舐める。当たるのは行で、
+ドキュメントを探すエージェントは、ふだん grep や Glob で本文を端から探す。当たるのは行で、
 そのファイルが何の文書かは開くまで分からず、よそからの言及も同じ重みで混ざる。
 頭の frontmatter（`type` `title` `description` `tags` `keywords`）を索引にしておけば、
 「何の文書か」で引ける。形は参考にした運用（`参考/MR-driven-workflow` の
@@ -25,7 +25,7 @@
   書くのは一時ファイルに書いて置き換える形で、中身が同じなら書かない。一時ファイルは
   git のディレクトリ（`.git/`）の中に排他で作る（作業ツリーの `git status` に出さない）
 - **書くのは、git がそこの `index.jsonl` を無視しているときだけ。** 作業ツリーに追跡されて
-  いないファイルを撒くと、`git status`・実行後の監視・`worktree remove` のどれにも出る。
+  いないファイルを置くと、`git status`・実行後の監視・`worktree remove` のどれにも出る。
   md を持つディレクトリのどれでも無視されていないツリーは、索引の対象外にして引かない
   （案内と標準エラーで名指しする。`.gitignore` は書き換えない）。一部のディレクトリだけが
   無視されていないなら（追跡されている index.jsonl など）、そこは書かずに行だけを組む
@@ -90,7 +90,8 @@ ROOT_DIRECTORY = "."
 
 SORTS = ("path", "mtime", "type", "title")
 FORMATS = ("table", "path", "detail", "json", "jsonl", "count")
-# `--since` / `--until` に受ける形と、その形の読み方。綴りを誤った値が黙って 0 件になるのを避ける。
+# `--since` / `--until` に受ける形と、その形の読み方。綴りを誤った値が気づかないうちに
+# 0 件になるのを避ける。
 _WHEN_FORMATS = {
     10: "%Y-%m-%d",
     13: "%Y-%m-%dT%H",
@@ -631,7 +632,10 @@ def collect(
     refresh: bool = True,
     deadline: float | None = None,
 ) -> Collected:
-    """ワークスペースとプロジェクトの索引を新しくして集める。`.git` の無いツリーは黙って飛ばす。"""
+    """ワークスペースとプロジェクトの索引を新しくして集める。
+
+    `.git` の無いツリーは何も出さずに飛ばす。
+    """
     result = Collected()
     seen: set[str] = set()
     for place in places(conf, root):
@@ -835,7 +839,7 @@ def _pad(text: str, width: int) -> str:
 
 
 def _one_line(text: str) -> str:
-    """表と詳しい形に出す値を 1 行に畳む（改行で行が割れないように）。"""
+    """表と詳しい形に出す値を 1 行にまとめる（改行で行が分かれないように）。"""
     return " ".join(text.split()) if ("\n" in text or "\r" in text) else text
 
 
@@ -887,7 +891,7 @@ def render(out: TextIO, hits: list[dict], matched: int, total: int, fmt: str) ->
 
 # SessionStart で索引を新しくするのに使ってよい時間（秒）の上限。実際には hook の判定の
 # 期限（events.decide が持つ deadline）の残りと小さいほう。過ぎたら残りは次の回に回す。
-# 使い回しが効いていれば数百本の md でも 1 秒に届かない。初めての大きなプロジェクトだけが
+# 使い回せていれば数百本の md でも 1 秒に届かない。初めての大きなプロジェクトだけが
 # ここに当たり、書けたディレクトリの分は次のセッションで使い回される。
 START_SECONDS = 3.0
 
@@ -939,8 +943,8 @@ def at_start(conf: settings.Settings, root: str, deadline: float | None = None) 
     """SessionStart。ワークスペースとプロジェクトの索引を差分で新しくし、引き方の案内を返す。
 
     使う時間は START_SECONDS と、渡された期限（hook の判定の期限）の残りの小さいほう。
-    何が起きても開始は止めない。md が 1 本も無い・何かが壊れたときは黙る（空を返す）。
-    索引の対象外にしたツリーと、触らなかった index.jsonl があれば短く添える。git への
+    何が起きても開始は止めない。md が 1 本も無い・何かが壊れたときは何も出さない（空を返す）。
+    索引の対象外にしたツリーと、触らなかった index.jsonl があれば短くつける。git への
     問い合わせに失敗したツリーは何も言わない（対象外と取り違えさせない）。
     """
     try:

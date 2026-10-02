@@ -28,7 +28,7 @@
 
 `sync/<リポジトリ>/` が無ければ、そのリポジトリは一度も取り込んでいない（`integration` は None で、
 今どおり作業ツリーを読む）。在るのに統合先の控えが無い・`head` が無い・壊れている・入れ替えが
-終わらないときは `broken` に理由を入れて返す。呼び手は `done/` の検査を黙って通さない
+終わらないときは `broken` に理由を入れて返す。呼び手は `done/` の検査を何も出さずに通すことはしない
 （識別子の再利用を確かめられないので「決まらない」として止める）。
 
 ## リンクは辿らない
@@ -292,7 +292,7 @@ def _swapping(base: str, directory: str) -> bool:
 def done_ids(integ: Integration | None, approved_rel: str) -> tuple[set[str], str]:
     """統合先の `done/` にある識別子（ファイル名から。閉じた・取り消し済みの両方）と、読めない理由。
 
-    控えが無ければ（None）空で理由も空。壊れていれば空と理由（呼び手は黙って通さない）。
+    控えが無ければ（None）空で理由も空。壊れていれば空と理由（呼び手は何も出さずに通すことはしない）。
     """
     if integ is None:
         return set(), ""
@@ -603,7 +603,7 @@ def _names(directory: str) -> list[str]:
 
 
 def _parts(rel: str) -> tuple[tuple[str, ...], str]:
-    """相対の綴り（"/" 区切り）を部品に分ける。`.`・`..` と空は断る。"""
+    """相対の綴り（"/" 区切り）を部品に分ける。`.`・`..` と空は受け付けない。"""
     parts = tuple(p for p in rel.split("/") if p)
     if not parts or any(p in (".", "..") for p in parts):
         return (), f"読めない綴り（{rel}）"

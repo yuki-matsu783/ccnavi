@@ -87,7 +87,7 @@ def full_path(path: str, cwd: str) -> str:
     名前を 1 つ増やすだけで済む。守る対象は名前ではなく場所なので、
     場所まで解いてから当てる。
 
-    解けなかったときも、絶対パスにして `..` を畳むところまではやる。
+    解けなかったときも、絶対パスにして `..` を取り除くところまではやる。
     まだ存在しないファイルへの書き込みがこれにあたる。
 
     実行前の判定（judge）と実行後の監視（gitstate）が同じ綴りに直す。別々に持つと、
@@ -104,7 +104,7 @@ def full_path(path: str, cwd: str) -> str:
 
 
 def spelled_path(path: str, cwd: str) -> str:
-    """ファイルのパスを、リンクを解かずに絶対の綴りに直す。`..` は畳む。
+    """ファイルのパスを、リンクを解かずに絶対の綴りに直す。`..` は取り除く。
 
     `full_path` は行き着く先に直すので、リンクそのものの綴りが消える。置き場の綴りに当てる
     止める向きの検査（フローのロック）は、解いた先と解く前の両方に当てるためにこちらも使う。
@@ -222,15 +222,15 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
 
     一時ファイルの名前は、拡張子の前に一意な部分を挟んで作る（`a.json` なら
     `a.<一意>.part.json`）。固定の名前にすると、同時に書く 2 つが同じ一時ファイルを
-    取り合い、片方の書きかけをもう片方が差し替えることになる。直そうとした事故が
+    取り合い、片方の書きかけをもう片方が差し替えることになる。直そうとした問題が
     形を変えて戻るので、ここは一意でなければならない。拡張子と先頭を残すのは、
-    落ちて残った一時ファイルを、本番と同じふるい（`ctxfile.forget` など）で
+    落ちて残った一時ファイルを、本番と同じ名前の条件（`ctxfile.forget` など）で
     掃除できるようにするため。
 
     **守るのは「同時に読む側」までで、電源断は守らない。** 差し替えの前に
     `fsync` をしていないので、ディスクへ実際に届く順はファイルシステム任せ。
     電源断の直後に「新しいほうに差し替わっているが中身が古い／空」になる
-    余地は残る。控えは失っても取り直せるものなので、そこまでの値段は払わない。
+    余地は残る。控えは失っても取り直せるものなので、そこまでの手間はかけない。
 
     **名前が伸びる。** 一時ファイルの名前は元より 20 文字ほど長い。Windows の
     260 文字の上限ぎりぎりの行き先では、`write_text` なら書けたものがここでは
@@ -248,7 +248,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
         handle, part = tempfile.mkstemp(dir=directory, prefix=f"{stem}.", suffix=f".part{suffix}")
         try:
             # mkstemp は必ず 0600 で作る。os.replace は inode ごと差し替えるので、
-            # そのままだと行き先の権限が黙って 0600 に締まる（POSIX で実測）。
+            # そのままだと行き先の権限が気づかないうちに 0600 に締まる（POSIX で実際に確かめた）。
             # 素の open(path, "w") と同じ見え方に戻す。既に在るファイルを
             # 上書きするなら、その権限を引き継ぐ。
             os.chmod(part, _mode_for(path))
@@ -264,7 +264,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
             os.replace(part, path)
         except BaseException:
             # 差し替えまで行けなかった一時ファイルは置いていかない。消せなくても
-            # 名前が本番と同じふるいに掛かるので、次の掃除で消える。
+            # 名前が本番と同じ条件に当たるので、次の掃除で消える。
             with contextlib.suppress(OSError):
                 os.remove(part)
             raise
@@ -303,13 +303,13 @@ def read_json(path: str) -> tuple[Any, Exception | None]:
     """JSON を読む。読めなければ (None, 例外)。
 
     例外を返すのは、呼ぶ側が「無い」と「壊れている」を分けるため。無いのは
-    普通の状態で黙ってよいが、壊れているのは言わないと直らない。
+    普通の状態で何も言わなくてよいが、壊れているのは言わないと直らない。
 
     一時的に開けないだけなら数回打ち直す。`write_text_atomic` の差し替えは
     中身を壊さないが、Windows ではその一瞬に開こうとした側が共有違反
-    （EACCES）で弾かれる。打ち直さないと、控えを読む側はそれを「読めなかった」
+    （EACCES）で開けない。打ち直さないと、控えを読む側はそれを「読めなかった」
     ＝「まだ何も無い」と読み、数えが 0 に戻る。書き込み側が同じ errno を
-    打ち直しているのと対で、片方だけでは並んで走る hook を捌けない。
+    打ち直しているのと対で、片方だけでは並んで走る hook に対応できない。
     """
 
     staged, content = _staged(path)
@@ -364,7 +364,7 @@ def read_line(stream: Any) -> str:
 
 
 def remove(path: str) -> None:
-    """消す。無くても、消せなくても黙る。"""
+    """消す。無くても、消せなくても何も出さない。"""
     if _STAGE["current"] is not None:
         if lexists(path):
             _stage_put(Op(OP_REMOVE, path, None), quiet=True)
@@ -375,7 +375,7 @@ def remove(path: str) -> None:
 
 
 def unlink(path: str) -> str:
-    """消す。消せたら空文字、無い・消せないなら理由（`remove` と違って黙らない）。"""
+    """消す。消せたら空文字、無い・消せないなら理由（`remove` と違って理由を返す）。"""
     if _STAGE["current"] is not None:
         # リンクは辿らない（`os.remove` はリンクそのものを消す）。
         if not lexists(path):
@@ -392,9 +392,9 @@ def unlink(path: str) -> str:
 def move(source: str, target: str) -> str:
     """ファイルを動かす。動かせたら空文字、駄目なら理由。行き先の有無は呼び手が見る。
 
-    同じファイルシステムの中なら rename で 1 手。またぐとき（EXDEV）だけ写して消し、
-    消せなければ写した側を消して戻す（両方に残さない）。写して消す側へ流すのは EXDEV に
-    限る。rename が他の理由で落ちたときまで流すと、その間に別のプロセスが置いた行き先を消す。
+    同じファイルシステムの中なら rename 1 回で済む。またぐとき（EXDEV）だけ写して消し、
+    消せなければ写した側を消して戻す（両方に残さない）。写して消す処理に回すのは EXDEV に
+    限る。rename が他の理由で落ちたときまで回すと、その間に別のプロセスが置いた行き先を消す。
     """
     if _STAGE["current"] is not None:
         staged, content = _staged(source)
@@ -673,14 +673,14 @@ def _recorded(path: str, failed: str) -> str:
 # 動かすと、何をどの順に書くか（`Changes`）が値として出る。手元の Writer(FS) はそれを
 # ディスクに書き、Chrome は同じ値を 1 コミットにする。
 #
-# 書けなかったときの扱いは、書く側のコードが `policy` で添える（控える段では書き込みが
+# 書けなかったときの扱いは、書く側のコードが `policy` でつける（控える段では書き込みが
 # 落ちないので、落ちたときの枝のコードは走らない）。
 
 OP_TEXT = "text"  # write_text
 OP_TEXT_ATOMIC = "text-atomic"  # write_text_atomic / write_json_atomic
 OP_BYTES = "bytes"  # write_bytes
 OP_NEW = "new"  # write_new（在れば書かない）
-OP_REMOVE = "remove"  # remove（無くても消せなくても黙る）
+OP_REMOVE = "remove"  # remove（無くても消せなくても何も出さない）
 OP_UNLINK = "unlink"  # unlink（消せなければ理由）
 OP_MOVE = "move"  # move（path が行き先、source が元）
 OP_APPEND = "append"  # append（data を足す。content は足した後の全体）
@@ -690,7 +690,7 @@ OP_REPLACE = "replace"  # replace_bytes
 FAIL_STOP = "stop"  # そこで止め、理由を呼び手へ返す
 FAIL_WARN = "warn"  # 標準エラーに言って続ける
 FAIL_LINE = "line"  # 知らせる行を標準出力に出し、同じ組の残りを飛ばす
-FAIL_QUIET = "quiet"  # 黙って続ける
+FAIL_QUIET = "quiet"  # 何も出さずに続ける
 FAIL_HISTORY = "history"  # 跡の書けなかった知らせに溜めて続ける（history.py）
 
 

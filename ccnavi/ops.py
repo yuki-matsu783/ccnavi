@@ -65,7 +65,7 @@ def start(
         return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
-    # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
+    # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。
     owner = tree.project_root(conf.projects, found.project) or root
     worktree = tree.worktree_path(root, ticket_id)
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
@@ -475,7 +475,7 @@ def _places(
 ) -> tuple[list[ticket_mod.Ticket], list[str], list[ticket_mod.Problem]]:
     """この識別子のチケットが在る置き場を全部引く。読めなかった理由と提案の不備も返す。
 
-    権威のあるツリーの側だけを読む（approval.scan / ticket.scan の畳み）。
+    権威のあるツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
     """
     hits: list[ticket_mod.Ticket] = []
     copies, notes = approval.scan(conf, root)
@@ -504,7 +504,7 @@ def _undecided(
     root: str = "",
     conf: settings.Settings | None = None,
 ) -> None:
-    """どれが本物か決まらないときの文面。次の一手まで書く。
+    """どれが本物か決まらないときの文面。次にすることまで書く。
 
     「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
     できることが読めない。権威の決まり方（親のツリー → 元ツリー）と、この場面で
@@ -569,7 +569,7 @@ def family_stopped(
     """取り込み済みの家族が決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
 
     その家族の状態の操作（着手・終了・取り消し・記録・レビューの印）は止める。引いた写しが
-    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信じない写しを
+    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信頼しない写しを
     動かさないように止める。控えの無い家族は何も言わない（今の動きのまま。D11）。
     """
     st = approval.family_standing(conf, root, found)
@@ -598,7 +598,7 @@ def _parent_not_started(
     """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 9.6、REQ-TKT-48）。
 
     親の `start` を飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。壊れない
-    ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる瞬間
+    ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる時点
     （最初の子の着手）で止めれば、いちばん早い場所で言える。
 
     親は別の置き場に在ることもある（未承認、閉じた）。どれも子に着手してよい状態では
@@ -627,7 +627,7 @@ def _parent_not_started(
         )
         return True
     if parent.state != ticket_mod.DOING:
-        # 置き場だけを言う。`review/` に親が居るのは壊れたデータのときだけだが、そこで
+        # 置き場だけを言う。`review/` に親があるのは壊れたデータのときだけだが、そこで
         # 「閉じた」と言うと、文面が事実と違う。
         stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。子を足す相手ではない\n")
         return True
@@ -750,7 +750,7 @@ def _deliverables_missing(
     """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 9.8）。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
-    「調査したことにする」は塞げる。
+    「調査したことにする」は防げる。
     """
     if not found.is_child or found.phase is None:
         return False
@@ -853,14 +853,14 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
 
     - 作業中（`doing/`）で着手済み。終わっても取り消されてもいない（`in_progress`）
-    - 信じられない印（`blocked`）が無い。範囲が効いていないチケットに終わりを勧めない
+    - 信頼できない印（`blocked`）が無い。範囲が判定に使われていないチケットに終わりを勧めない
     - 基準点（`base_sha`）を持つ
     - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
       フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
     - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
     - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
 
-    git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり黙って通す。
+    git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり何も出さずに通す。
     """
     here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if here is None or here.is_main:
