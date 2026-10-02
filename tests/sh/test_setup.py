@@ -48,7 +48,7 @@ LAUNCHER = _launcher_source()
 
 def _load_build():
     """build.py を名前でなく場所で読む。`import build` は PyInstaller の作業場所
-    （build/）や同名のパッケージを掴みうる。"""
+    （build/）や同名のパッケージを読み込みうる。"""
     spec = importlib.util.spec_from_file_location("ccnavi_build", os.path.join(ROOT, "build.py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -56,7 +56,7 @@ def _load_build():
 
 
 # この機械で組み立てたときに build.py が書く目印。導入スクリプトはこれを自分の uname と
-# 比べる。ここを本物の build_target から取るので、2 つの語がずれればテストが落ちる。
+# 比べる。ここを本物の build_target から取るので、2 つの語が食い違えばテストが落ちる。
 THIS_MACHINE = _load_build().build_target()
 # どの機械とも一致しない目印。
 ANOTHER_MACHINE = "haiku-riscv64"
@@ -75,7 +75,7 @@ EVENTS = (
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
-# 書かなければ enable で動くので、dry-run で導入したときにここだけ本気で動くと、
+# 書かなければ enable で動くので、dry-run で導入したときにここだけ実際に動くと、
 # 様子を見ている人の手元でファイルが勝手に戻る。
 GUARD_ENV = ("CCNAVI_RESTORE_IF_DENY", "CCNAVI_GUARD_CORE_FILES")
 # チケットの承認の経路。enable か disable しか取らないので、モードには合わせない。
@@ -84,12 +84,12 @@ UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。README「設定」の見本と対になる。綴りが変わると、
-# ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものがずれる。
+# ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものが食い違う。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する（ADR-0060）。
 FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 # --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
-# 無いと止められた側に逃げ道がない。
+# 無いと止められた側にほかに取れる方法がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
@@ -348,7 +348,7 @@ class WritesTheExpectedShape(SetupTest):
         """戻す働きの 2 つは CCNAVI_MODE と同じ値で並ぶ。
 
         書かなければ 2 つとも enable で動く。dry-run で導入したつもりの
-        プロジェクトで、判定は止めないのに戻す働きだけが本気で動く形になり、
+        プロジェクトで、判定は止めないのに戻す働きだけが実際に動く形になり、
         様子を見ている人の手元でファイルが勝手に戻る。
         """
         self.run_setup()
@@ -451,7 +451,7 @@ class KeepsWhatItFinds(SetupTest):
         """ccnavi と関係のない hook・env・権限を消さない。
 
         導入は既にあるプロジェクトに対して打つものなので、消してしまうと
-        入れた瞬間に、そのプロジェクトの他の道具が止まる。
+        入れた時点で、そのプロジェクトの他の道具が止まる。
         """
         self.write_settings(
             {
@@ -479,7 +479,7 @@ class KeepsWhatItFinds(SetupTest):
         """控えは最初の 1 回だけ取る。
 
         毎回取り直すと、打ち直した数だけ控えが新しくなり、戻れるのは 1 手前
-        ――そこには既に ccnavi が入っている――までになる。入れる前の姿へ
+        までになる。そこには既に ccnavi が入っているので、入れる前の姿へ
         戻す手立てが消える。
         """
         self.write_settings({"env": {"MY_IMPORTANT": "keep"}})
@@ -506,11 +506,11 @@ class DoesNotWeakenTheGuard(SetupTest):
 
 class TellsWhatItDidNotChange(SetupTest):
     def test_reports_a_value_it_will_not_replace(self):
-        """揃っているように見えて防御が消えている形を、黙って見逃さない。
+        """揃っているように見えて防御が消えている形を、何も言わずに見逃さない。
 
         `CCNAVI_MODE=disable` が既に書かれた設定は、env も hook も欠けて
-        いないので「変えるところがない」に見える。そこを黙って通ると、
-        導入スクリプトが最も直接的な違反を素通りさせることになる。
+        いないので「変えるところがない」に見える。そこを何も言わずに通すと、
+        導入スクリプトが最も直接的な違反をそのまま通すことになる。
         """
         self.run_setup("--mode", "dry-run")
         result = self.run_setup("--mode", "enable")
@@ -535,7 +535,7 @@ class TellsWhatItDidNotChange(SetupTest):
     def test_keeps_an_existing_value_unless_the_option_is_named(self):
         """置き換えるのは、この実行で名指しした値だけ。
 
-        `--force` が既定値まで押し込むと、`--all` を足しに来た打ち直しが、
+        `--force` が既定値まで書き込むと、`--all` を足しに来た打ち直しが、
         その場で指定していない CCNAVI_MODE を既定の dry-run に戻す。
         """
         self.run_setup("--mode", "enable")
@@ -582,8 +582,8 @@ class ReadsTheRegistrationCarefully(SetupTest):
     def test_says_so_when_the_registration_is_spelled_differently(self):
         """別の綴りで登録されているイベントは、足さずに人へ見せる。
 
-        どちらが正しいかをここで決められない。黙って足すと判定が 2 回走り、
-        黙って飛ばすとそのイベントが落ちたままになる。
+        どちらが正しいかをここで決められない。何も言わずに足すと判定が 2 回走り、
+        何も言わずに飛ばすとそのイベントが落ちたままになる。
         """
         self.write_settings(
             {
@@ -604,7 +604,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         self.assertEqual(len(self.commands_of(self.read_settings(), "PreToolUse")), 1)
 
     def test_registers_when_the_name_only_happens_to_be_a_substring(self):
-        """無関係な hook にたまたま名前が混ざっているだけなら、登録する。
+        """無関係な hook にたまたま名前が入っているだけなら、登録する。
 
         部分一致だけで見ていると、この 1 件があるだけでイベントが丸ごと
         落ちる。しかも設定lint は PreToolUse の登録を検査していないので、
@@ -930,9 +930,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_puts_the_executable_in_the_fixed_place(self):
         """実行ファイルは .ccnavi/bin/<built>/ に置く。置き場は固定（S3）。
 
-        設定に書く綴りと実体の置き場が割れると、設定は書けているのに hook が
+        設定に書く綴りと実体の置き場が食い違うと、設定は書けているのに hook が
         どこにも無いものを起動する形になる。sh は自分の隣でなく ../bin/ を探すので、
-        置き場がこの 1 か所に決まっていれば割れない。
+        置き場がこの 1 か所に決まっていれば食い違わない。
         """
         src = self.make_source()
         result = self.run_setup("--deploy", src)
@@ -1052,7 +1052,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """実行の許しを落とさない。
 
         落ちていると hook は「実行ファイルが無い」ではなく「起動できない」で
-        黙って死ぬ。設定lint も実行ファイルは在ると言うので、誰も気付かない。
+        何も言わずに失敗する。設定lint も実行ファイルは在ると言うので、誰も気付かない。
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
@@ -1076,7 +1076,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """`--force` なら入れ替える。前の組み立ての残りも持ち越さない。
 
         PyInstaller の同梱物は名前で引かれるので、前の版の同梱物が残ると
-        新しい実行ファイルがそれを掴む。
+        新しい実行ファイルがそれを読み込む。
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
@@ -1094,7 +1094,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             self.assertEqual(f.read(), "deny: []\n")
 
     def test_refuses_a_source_that_was_never_built(self):
-        """組み立てていない配布元では、黙って進まない。
+        """組み立てていない配布元では、何も言わずに進まない。
 
         報告だけにすると「配ったはずなのに実行ファイルが無い」が最後の一覧に
         しか出ず、打った人は配れたものとして先へ進む。
@@ -1106,7 +1106,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertFalse(os.path.exists(self.settings_path()))
 
     def test_names_what_the_source_does_not_have(self):
-        """配布元に無いものは、黙って飛ばさずに名前を挙げる。
+        """配布元に無いものは、何も言わずに飛ばすのではなく名前を挙げる。
 
         判定するものだけが入って何を止めるかが入らない形は、配った側の
         落ち度に見えないまま残る。
@@ -1193,7 +1193,7 @@ class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
 
     PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かない。機械ごとに
     置き場を分けるので、別の機械向けを配ってもこの機械の実行ファイルは上書きされない。
-    ただしこの機械で動くものが無いことは、黙らずに言う。
+    ただしこの機械で動くものが無いことは、省かずに言う。
     """
 
     def test_places_a_named_source_for_another_machine_in_its_own_place(self):
@@ -1540,7 +1540,7 @@ class WritesTheVscodeSettings(SetupTest):
     def test_does_not_touch_a_file_it_cannot_read(self):
         """VS Code の設定ファイルはコメントを書ける（JSONC）。jq は読めない。
 
-        ここで死ぬと、ccnavi と関係のない書き方のせいで .claude/settings.json
+        ここで止まると、ccnavi と関係のない書き方のせいで .claude/settings.json
         まで書けなくなる。触らずに人へ渡して、残りは進める。
         """
         jsonc = '{\n  // worktree は見せない\n  "git.detectWorktrees": false\n}\n'

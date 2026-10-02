@@ -141,7 +141,7 @@ class FlowPlaceTest(unittest.TestCase):
         self.assertEqual(outside, ("i0001-01.yml", None))
 
     def test_every_copy_counts_for_the_lock(self):
-        """識別子で畳む前の並びを見る。1 本でも着手中なら止める（L1）。"""
+        """識別子でまとめる前の並びを見る。1 本でも着手中なら止める（L1）。"""
         idle, running = child_ticket(), child_ticket(started=True)
         self.assertIs(flow.lock_hit([idle, running], "", "i0001-01.yml"), running)
         self.assertIsNone(flow.lock_hit([idle], "", "i0001-01.yml"))
@@ -653,7 +653,7 @@ class FlowGuardTest(FlowHarness):
         self.assertNotIn("POST_TICKET_SCOPE", said)
         self.assertNotIn("POST_VIOLATION", said)
         self.assertNotIn("flows/", said.replace("\\", "/"))
-        # 監視は効いている。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
+        # 監視は有効。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
         write(os.path.join(self.parent_tree, "references", CHILD, "flow.json"), "{}")
         ok4 = write(os.path.join(self.parent_tree, "wip", "d.md"), "d\n")
         fourth = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok4, content="d")

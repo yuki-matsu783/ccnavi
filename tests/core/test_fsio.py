@@ -79,9 +79,9 @@ class ReadRetryTest(unittest.TestCase):
     """読みの打ち直しの受入テスト。
 
     差し替え（write_text_atomic）は中身を壊さないが、Windows ではその一瞬に
-    開こうとした側が共有違反で弾かれる。打ち直さないと、控えを読む側はそれを
+    開こうとした側が共有違反で開けない。打ち直さないと、控えを読む側はそれを
     「まだ何も無い」と読む。数えを持つ控えではそこで 0 に戻るので、書き込み側
-    だけを直しても並んで走る hook は捌けない。
+    だけを直しても並んで走る hook に対応できない。
     """
 
     def setUp(self):
@@ -135,8 +135,8 @@ class WriteAtomicTest(unittest.TestCase):
 
     見るのは 3 つ。書き切れなかったときに前の中身が残ること、一時ファイルを
     置いていかないこと、そして一時ファイルの名前が「同じ場所・一意・本番と同じ
-    ふるいに掛かる」の 3 つを満たすこと。最後の 1 つが崩れると、直そうとした
-    事故（書きかけを読まれる・書きかけを差し替える）が形を変えて戻る。
+    条件に当たる」の 3 つを満たすこと。最後の 1 つが成り立たないと、直そうとした
+    問題（書きかけを読まれる・書きかけを差し替える）が形を変えて戻る。
     """
 
     def setUp(self):
@@ -195,12 +195,12 @@ class WriteAtomicTest(unittest.TestCase):
         self.assertEqual(os.path.dirname(seen[0]), os.path.dirname(self.path))
 
     def test_temporary_names_are_unique_and_swept_by_the_same_sieve(self):
-        """一時ファイルの名前は毎回変わり、本番と同じふるいに掛かる。
+        """一時ファイルの名前は毎回変わり、本番と同じ条件に当たる。
 
         固定の名前（`<行き先>.part` など）だと、同時に書く 2 つが同じ一時
         ファイルを取り合い、片方の書きかけをもう片方が差し替える。
         先頭と拡張子を残すのは、落ちて残った分を ctxfile.forget の
-        「`once-` で始まり `.json` で終わる」ふるいで掃除させるため。
+        「`once-` で始まり `.json` で終わる」という条件で掃除させるため。
         """
         seen: list[str] = []
         real = tempfile.mkstemp

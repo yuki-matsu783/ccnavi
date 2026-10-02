@@ -8,7 +8,7 @@
 4. ルールがチケットより強いこと
 
 3 つ目が要る理由は ADR-0009 にある。権限モードへの委譲は設定の穴に起因するので、
-穴が塞がるまで同じ問いが繰り返される。ルールが置いた確認は人が意図して置いた
+穴が直るまで同じ問いが繰り返される。ルールが置いた確認は人が意図して置いた
 確認ポイントで、繰り返されること自体に価値がある。混ぜると前者の数に
 後者が埋もれる。
 """
@@ -49,7 +49,7 @@ class SectionsTest(unittest.TestCase):
         話に付き合わずに済む。
         """
         body = {"version": 1, **sections}
-        # 置くのは共通層の既定の場所。`--rules` は診断でだけ効き、hook の判定には
+        # 置くのは共通層の既定の場所。`--rules` は診断でだけ有効で、hook の判定には
         # 届かない（ADR-0067）。
         return write(common_path(self.root, "rules"), json.dumps(body))
 
@@ -153,7 +153,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_タイプをまたいで当たっても強いほうだけを返す(self):
         # 弱い側の文面まで返すと、拒否された呼び出しに「確認すれば通る」と
-        # 読める文が並ぶ。次の一手が 2 つに割れる。
+        # 読める文が並ぶ。次の一手が 2 つに分かれる。
         self.rules(
             deny=[rule("a", "Bash", "*git push*", message="拒否の文面")],
             ask=[rule("b", "Bash", "*git *", message="確認の文面")],

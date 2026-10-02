@@ -1,7 +1,7 @@
-"""GraphQL が塞がれている環境での逃げ道を、詰まったその場で案内する。
+"""GraphQL が制限されている環境での別の方法を、止まったその場で案内する。
 
 GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undraft`）が GraphQL でしか
-扱えない。GraphQL を塞ぐ実行環境があり（Claude Code のセッションは REST だけ通す）、
+扱えない。GraphQL を制限する実行環境があり（Claude Code のセッションは REST だけ通す）、
 そこでは `confirm` / `fetch` / `ready` だけが 403 で止まる。curl の経路は `-f` が本文を
 捨てるので、画面に残るのは番号だけになり、認証の失敗と見分けが付かない。
 
@@ -30,7 +30,7 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
 
-# 案内が名指しするもの。どれが欠けても、読んだ人は次の一手に届かない。
+# 案内が名指しするもの。どれが欠けても、読んだ人は次に何をすればよいか分からない。
 MUST_NAME = (
     "ccnavi review confirm",
     "--result",
@@ -56,13 +56,13 @@ class TheHintIsInTheFailurePathTest(unittest.TestCase):
     """案内は `api_failed` に置く。"""
 
     def test_api_failed_has_a_graphql_branch(self):
-        """`confirm` の側ではなく `api_failed`。`fetch` と `ready` も同じ経路で詰まる。"""
+        """`confirm` の側ではなく `api_failed`。`fetch` と `ready` も同じ経路で止まる。"""
         body = api_failed_body(script_text())
         self.assertIn('case "$2" in', body, "GraphQL のときだけ足す枝が無い")
         self.assertIn("graphql)", body)
 
     def test_the_hint_names_the_next_move(self):
-        """番号だけでは次の一手に届かない。写しの作り方まで名指しする。"""
+        """番号だけでは次に何をすればよいか分からない。写しの作り方まで名指しする。"""
         body = api_failed_body(script_text())
         for word in MUST_NAME:
             with self.subTest(word=word):

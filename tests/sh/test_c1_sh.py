@@ -655,7 +655,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    # ---- 素通りさせない（段階 2d のレビューの 3）
+    # ---- C1 を飛ばさせない（段階 2d のレビューの 3）
 
     def test_a_double_dash_does_not_slip_past_c1(self):
         result = self.ticket("start", "--", PARENT)

@@ -303,7 +303,7 @@ class PredecessorTest(TicketTest):
     # ---- 6. 迂回できない
 
     def test_an_agent_cannot_drop_the_predecessor_from_the_approved_ticket(self):
-        """止められたエージェントが、承認済みチケットの predecessors を消して通る道は無い。"""
+        """止められたエージェントが、承認済みチケットの predecessors を消して通る経路は無い。"""
         self.family(review=(False, False))
         self.propose(
             "i0001-03", parent="i0001", phase=1, allow=("src/c/*",), predecessors=("i0001-01",)
@@ -318,7 +318,7 @@ class PredecessorTest(TicketTest):
             decision = json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
             self.assertEqual(decision, "deny", (tool, result.stdout))
 
-        # シェルから書く形。組み込みの守り（コアファイル）を本番と同じく効かせて打つ
+        # シェルから書く形。組み込みの守り（コアファイル）を本番と同じく有効にして打つ
         # （このテストの道具は既定で切っている）。
         def bash(command, permission_mode=""):
             payload = {
@@ -339,13 +339,14 @@ class PredecessorTest(TicketTest):
 
         # リダイレクトは ccnavi ディレクトリの守りが止める。
         self.assertEqual(bash("echo x > .ccnavi/approved/doing/i0001-03.md"), "deny")
-        # 書き込み先を読めないコマンド（sed -i）は黙っては通らない。聞ける者が居る権限モードでは
-        # Claude Code が利用者に聞き（ccnavi は判定を出さない）、居なければ ccnavi が断る
-        # （judge.undeclared_verdict）。書かれても実行後の監視が書き換えとして言う（ADR-0075）。
+        # 書き込み先を読めないコマンド（sed -i）は何も言われずに通ることはない。
+        # 聞ける者が居る権限モードでは Claude Code が利用者に聞き（ccnavi は判定を出さない）、
+        # 居なければ ccnavi が断る（judge.undeclared_verdict）。
+        # 書かれても実行後の監視が書き換えとして言う（ADR-0075）。
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))
         self.assertEqual(bash(sed, "bypassPermissions"), "deny")
-        # 承認を自分で出す道（端末の外からの --approve / --yes）も止まる。
+        # 承認を自分で出す経路（端末の外からの --approve / --yes）も止まる。
         approve = self.hook(
             "PreToolUse",
             "Bash",

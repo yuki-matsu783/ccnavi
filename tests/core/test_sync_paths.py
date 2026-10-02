@@ -75,7 +75,7 @@ class SyncPathsTest(unittest.TestCase):
                 self.assertEqual("", self.paths()["integration"])
 
     def test_a_value_with_a_newline_is_not_used(self):
-        # 1 行 1 項目の契約（D33）を崩す値は使わない。
+        # 1 行 1 項目の契約（D33）に合わない値は使わない。
         write(
             os.path.join(self.ws, ".claude", "settings.local.json"),
             '{"env": {"CCNAVI_INTEGRATION_BRANCH": "a\\nb"}}',

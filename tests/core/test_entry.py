@@ -54,7 +54,7 @@ class EntryTest(unittest.TestCase):
 
     def test_japanese_in_the_payload_survives_the_round_trip(self):
         # 判定の理由は対象を名指しする。日本語を含む対象がそのまま返ることで、
-        # 入口の付け替えが効いていることが分かる。
+        # 入口の付け替えが有効なことが分かる。
         command = "git push origin 統合先"
         payload = json.dumps(
             {

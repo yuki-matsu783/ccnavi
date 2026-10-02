@@ -150,7 +150,7 @@ class MovedSinceTest(ActorHarness):
         chrome = self.chrome_confirm(compare)
         local = self.confirm_as(fixture)
         self.assertEqual(local.returncode, 1)
-        # 手元の案内はワークスペースルートからの絶対パス、Chrome は仮のツリーを畳んだ相対パス
+        # 手元の案内はワークスペースルートからの絶対パス、Chrome は仮のツリーの部分を除いた相対パス
         said = local.stderr.replace(self.root + os.sep, "").splitlines()
         self.assertEqual(chrome["problems"], said)
         self.assertIn("依頼の後に親の HEAD が動いている", chrome["problems"][0])

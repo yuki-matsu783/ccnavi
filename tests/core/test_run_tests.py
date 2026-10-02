@@ -7,7 +7,7 @@
 契約は 1 つだけ。**`modules()` が並べたものの和集合が、`unittest discover` が拾う
 モジュールと一致すること。** 並べる順や同時に回す本数は速さの都合なので、契約に入れない。
 
-`tests/fixtures/` を拾わないことを名指しで見るのは、ここが実際に踏みやすい穴だから。
+`tests/fixtures/` を拾わないことを名指しで見るのは、ここが実際に起きやすい穴だから。
 `tests/` の下のディレクトリを名前だけで数えるとグループに見えるが、`__init__.py` が
 無いので discover は飛ばす。道具の側だけが拾うと `unittest tests.fixtures` が
 「importable でない」で落ち、実行全体が失敗になる。
@@ -67,7 +67,7 @@ class CoversTheSameModulesTest(unittest.TestCase):
         self.assertEqual(len(planned), len(set(planned)))
 
     def test_fixtures_is_not_a_group(self):
-        """固定データの置き場はグループではない。`__init__.py` が無いほうで弾く。"""
+        """固定データの置き場はグループではない。`__init__.py` が無いので外す。"""
         self.assertNotIn("fixtures", TOOL.groups())
         self.assertTrue(os.path.isdir(os.path.join(ROOT, "tests", "fixtures")), "見本が動いた")
 
@@ -87,7 +87,10 @@ class TakesTheSpellingsPeopleTypeTest(unittest.TestCase):
         self.assertEqual(["tests.core.test_run_tests"], TOOL.modules(["tests.core.test_run_tests"]))
 
     def test_an_unknown_name_plans_nothing(self):
-        """知らない名前で黙って全件にならない。そうなると、名指しが効いていないことに気づけない。"""
+        """知らない名前で何も言わずに全件を回さない。
+
+        そうなると、名指しが反映されていないことに気づけない。
+        """
         self.assertEqual([], TOOL.modules(["tests/nosuchgroup"]))
 
 

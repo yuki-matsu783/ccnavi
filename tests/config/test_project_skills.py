@@ -7,7 +7,7 @@ SubagentStart で、cwd がそのプロジェクトの中にあるときだけ�
 
 1. cwd がプロジェクトの中なら SessionStart と SubagentStart に目録が載る。外なら載らない
 2. frontmatter の name / description を使い、無ければディレクトリ名と「説明が無い」
-3. データとして囲み、改行を畳む。シンボリックリンクと SKILL.md の無いディレクトリは読まない
+3. データとして囲み、改行を空白に変える。シンボリックリンクと SKILL.md の無いディレクトリは読まない
 4. 載せる数に上限があり、超えた分は数だけ言う
 """
 
@@ -141,7 +141,7 @@ class ProjectSkillsTest(unittest.TestCase):
         self.assertIn("ほかに 3 本", said)
 
     def test_subagents_are_asked_to_report_skill_candidates(self):
-        """Stop の振り返りが届かないサブエージェントには、候補を報告に添えるよう 1 行渡す。"""
+        """Stop の振り返りが届かないサブエージェントには、候補を報告につけるよう 1 行渡す。"""
         self.put("deploy", skill("deploy", "本番へ出す手順"))
         said = self.context("SubagentStart", self.lib, agent_id="a1")
         self.assertIn("「スキル候補」の節", said)

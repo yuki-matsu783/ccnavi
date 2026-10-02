@@ -5,7 +5,7 @@
 
 見本の表（CHILD_CASES）は、写す版の `ccnavi-git.sh` にも同じものを渡して、sh の検査が
 2 重目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
-別の実装で持つので、ずれはこの表で捕まえる。
+別の実装で持つので、食い違いはこの表で見つける。
 """
 
 from __future__ import annotations

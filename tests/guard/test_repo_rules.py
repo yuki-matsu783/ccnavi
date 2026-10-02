@@ -4,7 +4,7 @@ tests/fixtures/ のルールではなく、運用に使っている rules.yml �
 渡す。見るのは、shellread が目印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
 4「見本 → 判定」）。ルールの `[^\\x00]*` が「同じコマンドの中」だけを指すようになり、
 引用付きの grep / find が allow に当たる一方、引用の空白をまたいだ書き換えが deny に
-届くこと。変わってはいけないもの（3 章）も同じ表で固定する。
+当たること。変わってはいけないもの（3 章）も同じ表で固定する。
 
 後半は承認の経路と、実行役のコマンド（`env`・`sudo`・`sh -c`・`xargs` など）が
 中で実行するコマンドを止める側のルールに当てること（wip/design/launcher-scripts.md
@@ -48,7 +48,7 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     """1 件を本物のルールで判定して、試験の JSON を返す。
 
     写しと控えは外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
-    既定のまま効かせる。4 の表はそれを含めた判定なので。
+    既定のまま有効にする。4 の表はそれを含めた判定なので。
 
     `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルの綴りから
     当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
@@ -115,8 +115,8 @@ class RepoRulesTest(unittest.TestCase):
             'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml',
             """grep -n "regex: '(>" /repo/.ccnavi/common/rules.yml""",
             'grep -n "<<EOF" /repo/README.md',
-            # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の目印を
-            # 食わなくなって、はじめて allow に届く。
+            # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の目印まで
+            # 一致しなくなって、はじめて allow に当たる。
             'grep -n "> /repo/.ccnavi/common/rules.yml" f',
         ]:
             with self.subTest(subject=subject):
@@ -172,12 +172,12 @@ class RepoRulesTest(unittest.TestCase):
                 self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
 
     def test_語にくっついた_preview_は承認の免除にならない(self):
-        """免除の理由になるのは、単独の語として立った `--preview` だけ。
+        """免除の理由になるのは、単独の語として現れた `--preview` だけ。
 
         別のフラグの**値**に書いた `--preview` で免除が成立していた。argparse は
-        `--reason=--preview` を値として食うので `--preview` は立たず、実行ファイルは
+        `--reason=--preview` を値として読み取るので `--preview` はフラグにならず、実行ファイルは
         本物の `--approve` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
-        そこでズレる（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
+        そこで食い違う（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
         """
         for subject in [
             "ccnavi --approve --reason=--preview",
@@ -455,7 +455,7 @@ class MovedJudgeTest(LauncherJudgeTest):
     """`cd` で移った先から見た綴りに、止める側のルールを当てる（ADR-0069、issue #61）。"""
 
     def test_守られた場所へ入ってから書く形は止まる(self):
-        # issue #61 の表。どれも綴りからディレクトリの名前が消えて素通りしていた。
+        # issue #61 の表。どれも綴りからディレクトリの名前が消えて止められずに通っていた。
         for subject in [
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .ccnavi && echo x > common/rules.yml",
@@ -785,7 +785,7 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     def test_シェルで読みが割れる形は一律に止める(self):
         # ADR-0047。`coproc` は敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）で、
-        # NAME の読みが bash 4 と zsh で割れる。読み分けずに止める。
+        # NAME の読みが bash 4 と zsh で分かれる。読み分けずに止める。
         code = "DENY_AMBIGUOUS_FORM"
         self.check(
             [

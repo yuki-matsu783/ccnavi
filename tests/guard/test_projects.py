@@ -16,7 +16,7 @@
 5. `projects/` を数えない設定では、この機能が入る前と同じに動く
 
 層の和そのもの（重複の排除、同 id、`--explain`）は tests/config/test_config_union.py が見る。
-ここが見るのは、置き場とツリーの結び付きが今までどおり噛み合っていること。
+ここが見るのは、置き場とツリーの結び付きが今までどおり合っていること。
 """
 
 from __future__ import annotations
@@ -146,7 +146,7 @@ class ProjectsTest(unittest.TestCase):
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
         self.rules = write(common_path(self.ws, "rules"), json.dumps(WS_RULES))
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
@@ -186,7 +186,7 @@ class ProjectsTest(unittest.TestCase):
     def ccnavi(self, *args, stdin="", env=None):
         """実行ファイルを 1 回起動する。
 
-        `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ効く
+        `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ有効な
         （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
         数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
         """
@@ -260,7 +260,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["tree"], "app")
         self.assertEqual(record["rules"], ["app:schema"])
 
-        # lib に schema の deny は無い。app の deny は lib には届かない。
+        # lib に schema の deny は無い。app の deny は lib には当たらない。
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
@@ -278,7 +278,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["rules"], ["ws-src"])
         self.assertNotIn("project", record)
 
-        # ワークスペースの schema/ は誰も守っていない。app の deny は漏れない。
+        # ワークスペースの schema/ は誰も守っていない。app の deny は当たらない。
         passed = self.hook("Write", self.app, file_path=os.path.join(self.ws, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
@@ -317,7 +317,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("app", record["detail"])
         self.assertNotIn("built-in defaults", self.reason(passed))
 
-        # 共通層の deny は壊れた層の上でも効いたまま。
+        # 共通層の deny は壊れた層の上でも当たったまま。
         guarded = os.path.join(self.app, ".ccnavi", "approved", "x")
         denied = self.hook("Write", self.ws, file_path=guarded)
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
@@ -498,7 +498,7 @@ class ProjectsTest(unittest.TestCase):
         # 名前が projects/ に在っても、ワークスペースの wip/<名前>/proposals/ は走査されない。
         # 提案はそのプロジェクトの側 projects/<名前>/wip/proposals/ に置く
         # （設計 11.5、REQ-MLT-14）。
-        # 黙ると提案が消えたように見えるので、正しい置き場を添えて名指しする
+        # 何も言わないと提案が消えたように見えるので、正しい置き場をつけて名指しする
         write(
             os.path.join(self.ws, "wip", "lib", "proposals", "todo", "i0011.md"),
             ticket_text("i0011", allow=("src/*",)),
@@ -541,7 +541,7 @@ class ProjectsTest(unittest.TestCase):
         target = os.path.join(tree, "src", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
-        # ワークスペースの控えに同じ名前があっても、プロジェクトの家族には効かない。
+        # ワークスペースの控えに同じ名前があっても、プロジェクトの家族には当たらない。
         record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
         write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
         write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")
@@ -579,7 +579,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
         self.assertEqual(record["rules"], ["app:schema"])
 
-        # ターンの終わりは全部のツリーを見て、ツリーの名前を添えて人に言う。
+        # ターンの終わりは全部のツリーを見て、ツリーの名前をつけて人に言う。
         stopped = self.hook("", self.ws, event="Stop")
         self.assertEqual(stopped.returncode, 0, stopped.stderr)
         self.assertIn("app: schema/x.sql", self.system_message(stopped))
@@ -688,7 +688,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(any(w.startswith("(projects/lib)") for w in wheres), linted.stdout)
         self.assertFalse(any(w.startswith("(projects/app)") for w in wheres), linted.stdout)
 
-        # hook からの判定は差し替えを見ない。保存していないルールが判定に効く道を持たない。
+        # hook からの判定は差し替えを見ない。保存していないルールが判定に使われる経路を持たない。
         ignored = self.ccnavi(
             "--mode",
             "enable",

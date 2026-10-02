@@ -51,7 +51,7 @@ RULES = {
         },
     ],
     # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
-    # （post._restorable）。文面は書かない――ask に message を書くと lint が error。
+    # （post._restorable）。文面は書かない。ask に message を書くと lint が error。
     "ask": [
         {
             "id": "watched",
@@ -163,7 +163,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")
@@ -526,7 +526,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("restored: ccnavi", result.stderr)
         # 戻していないので、戻す手順は載せたままにする。
         self.assertIn('git restore --staged --worktree -- "watched/deps.txt"', result.stderr)
-        # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由を添える。
+        # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
         self.assertIn("`ask`, not `deny`", result.stderr)
 
@@ -642,7 +642,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     def test_基準を持たないツリーは数えていないと言う(self):
         # ターンの途中で切ったワークツリーは、プロンプトのときに無いので基準を
-        # 持たない。黙って飛ばすと、そのツリーで何も起きなかったのと見分けが付かない。
+        # 持たない。何も言わずに飛ばすと、そのツリーで何も起きなかったのと見分けが付かない。
         self.run_hook(event="UserPromptSubmit")
         later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
         git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
@@ -727,7 +727,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
     ここは ccnavi の副命令（`ticket start` / `finish`、`review request` / `confirm` / `ready`）が
     書く場所で、同時にプロジェクトが `deny` と宣言した場所でもある。外さないと、自分の
     手順を自分で違反として報告し、戻す設定では自分で戻して手順が進まなくなる。外しすぎると、
-    承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる道ができる。
+    承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる経路ができる。
     """
 
     def setUp(self):
@@ -878,7 +878,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_同じ姿が2つ動くときは移動として外さない(self):
-        # 正規の移動 1 件に、同じ姿のチケットのただの削除が相乗りできてはいけない。
+        # 正規の移動 1 件に、同じ姿のチケットのただの削除が一緒に通ってはいけない。
         # 姿が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
         write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET)
         git(self.repo, "add", "--", ".ccnavi/approved/doing/i0002.md")
@@ -898,7 +898,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("i0002", result.stderr)
 
     def test_行き先に同じ姿が2つあるときも外さない(self):
-        # 正規の移動に、行き先へ直接置いた偽物が相乗りする形。
+        # 正規の移動に、行き先へ直接置いた偽物が一緒に通る形。
         self.run_hook(command="ls")
         os.remove(self.path(DOING))
         moved = TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody')

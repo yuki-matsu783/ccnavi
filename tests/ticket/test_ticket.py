@@ -127,7 +127,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0067）。
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
@@ -209,7 +209,7 @@ class TicketTest(unittest.TestCase):
         """承認して、写しを親のブランチに乗せる。
 
         写しは親のツリーに置かれ、コミットして初めて子のワークツリーへ渡る。
-        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
+        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順でたどる。
         """
         result = self.ccnavi("--approve", stdin=answer + "\n")
         if os.path.isdir(self.approved):
@@ -343,7 +343,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_no_worktree_means_no_ticket(self):
-        """ワークツリーが無い子は効かない。"""
+        """ワークツリーが無い子は判定に使われない。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.assertEqual(self.approve().returncode, 0)
@@ -357,7 +357,7 @@ class TicketTest(unittest.TestCase):
         """区別しない機械で綴り違いに切ったワークツリーでも、判定は承認済みチケットで行う。
 
         案内（SubagentStart）は綴りの違いを吸収するのに判定だけ厳密だと、
-        「効いている」と言われながら権限モード任せになる（敵対的レビューで実測）。
+        「有効」と言われながら権限モード任せになる（敵対的レビューで実際に確かめた）。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
@@ -477,7 +477,7 @@ class TicketTest(unittest.TestCase):
     def test_editing_the_proposal_does_not_widen_the_scope(self):
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
-        # 承認後に同じ識別子の提案を todo/ に書き足しても、効いているのは承認済みチケット。
+        # 承認後に同じ識別子の提案を todo/ に書き足しても、判定に使われるのは承認済みチケット。
         write(
             os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md"),
             ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*")),
@@ -516,7 +516,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_TICKET", self.reason(inside), self.reason(inside))
 
-        # 範囲は効いている。外は今までどおり止まる。
+        # 範囲は有効。外は今までどおり止まる。
         outside = self.hook(
             "PreToolUse",
             "Write",
@@ -614,8 +614,8 @@ class TicketTest(unittest.TestCase):
 
         判定と `--lint` にしか伝わらないと、ボードしか見ない人には書き込みが全部
         止まっていることが見えず、`status` は素の `open` のままになる。あわせて
-        「印が付いていないのに親を引けない子」が居ないこと（池が割れていないこと）も
-        同じ出力から確かめる。池が割れると、その子は自分の宣言だけで範囲が決まる。
+        「印が付いていないのに親を引けない子」が居ないこと（池が分かれていないこと）も
+        同じ出力から確かめる。池が分かれると、その子は自分の宣言だけで範囲が決まる。
         """
         self.propose("i0001", allow=("src/*",))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
@@ -729,7 +729,7 @@ class TicketTest(unittest.TestCase):
         """実行役のコマンドを前に置いても、サブエージェントの禁止は外れない。
 
         禁止の形はコマンドの先頭の `sh` に固定していたので、`env sh` `command sh` `/bin/sh`
-        と `sh -c '…'` は素通りだった（wip/design/launcher-scripts.md 3.5.1、12 節 W5）。
+        と `sh -c '…'` は止められずに通っていた（wip/design/launcher-scripts.md 3.5.1、12 節 W5）。
         禁止は中で実行されるコマンドにも当てる（3.5.3）。先頭の形は対照として今のまま止まる。
         """
         self.family()
@@ -798,7 +798,7 @@ class TicketTest(unittest.TestCase):
         """親が未着手のまま子を着手できないこと。案内は親の `start`（REQ-TKT-48）。
 
         飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。止める場所を
-        最初の子の着手に置けば、親の作業が実際に始まる瞬間に言える。
+        最初の子の着手に置けば、親の作業が実際に始まる時点で言える。
         """
         self.family_without_starting()
         refused = self.ccnavi("ticket", "start", "i0001-01")
@@ -827,7 +827,7 @@ class TicketTest(unittest.TestCase):
     def test_a_closed_parent_does_not_take_a_new_child(self):
         """閉じた親の下では子を着手できず、親の置き場を名指しすること。
 
-        `doing/` から出た親は判定にも効かない（REQ-TKT-12）。そこに子を足すのは未着手とは
+        `doing/` から出た親は判定にも使われない（REQ-TKT-12）。そこに子を足すのは未着手とは
         別の異常なので、親の `start` は案内せず、いまの置き場を出す。
         """
         self.family_without_starting()
@@ -845,7 +845,7 @@ class TicketTest(unittest.TestCase):
         """親が承認前なら、案内は承認から始めること。
 
         人が子だけ置き場を動かすと起きる（ADR-0058 の運び。承認画面なら落ちる）。`start` は
-        `doing/` の承認済みチケットにしか効かないので、`todo/` の親にそのまま `start` を
+        `doing/` の承認済みチケットにしか通らないので、`todo/` の親にそのまま `start` を
         勧めると、案内のとおりに打っても通らない。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -971,7 +971,7 @@ class TicketTest(unittest.TestCase):
         """レビューで止まっている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
 
         免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ目印で
-        渡っていた間は、`-m "docs: a b"` が 3 本に割れて `a` と `b` が免除の形に
+        渡っていた間は、`-m "docs: a b"` が 3 本に分かれて `a` と `b` が免除の形に
         当たらず、レビューの依頼そのものが止まっていた（wip/design/shellread-sep.md 3）。
         """
         self.family()
@@ -1603,7 +1603,7 @@ class TicketTest(unittest.TestCase):
     def test_a_ticket_in_two_homes_is_not_operated_on(self):
         """同じ識別子が doing/ と done/ に在れば、どちらが本物か決まらないので止める。
 
-        動かした跡が両方に残った形。黙ってどちらかを選ぶと、閉じた記録を上書きするか、
+        動かした跡が両方に残った形。何も言わずにどちらかを選ぶと、閉じた記録を上書きするか、
         閉じたはずのものが作業中として復活する。止めて、--lint が同じ 1 行で名指しする。
         """
         self.family()
@@ -1622,7 +1622,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
 
     def test_folding_the_parent_worktree_does_not_stop_the_operations(self):
-        """親のワークツリーを畳んでも操作は通る。元ツリーの写しが権威になる。
+        """親のワークツリーを片付けても操作は通る。元ツリーの写しが権威になる。
 
         承認済みチケットは親のブランチに乗り、合流すると元ツリーにも写る。親のツリーが
         消えたあとに行き先を決めないと、残った子のツリーの写しと並んで「どれが本物か
@@ -1755,7 +1755,7 @@ class TicketTest(unittest.TestCase):
         """範囲外のファイルを範囲の中へ改名しても、移動元が数から消えないこと。
 
         `git diff --name-only` は改名を 1 行（移動先）にまとめるので、まとめさせると
-        範囲外から範囲の中への移動が素通りする。
+        範囲外から範囲の中への移動が止められずに通る。
         """
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
@@ -1906,10 +1906,10 @@ class TicketTest(unittest.TestCase):
     # ---- 7. 人の判断の経路
 
     def test_cli_flags_take_no_abbreviation(self):
-        """人の判断のフラグは全部綴ったときだけ効く。
+        """人の判断のフラグは全部綴ったときだけ有効。
 
         組み込みの deny は全部綴った形しか見ないので、前方一致で走ると `--close` や
-        `--review` がそこを抜ける。実行ファイルの側で受けないことを確かめる。
+        `--review` がそこで止められずに通る。実行ファイルの側で受けないことを確かめる。
         """
         self.family()
         for args in (
@@ -2026,8 +2026,8 @@ class TicketTest(unittest.TestCase):
             "env sh .ccnavi/scripts/ccnavi-review.sh decide 1 --choices j --digest d",
             "/tmp/x --reviewed 1 --accept-unresolved --yes j --digest d --json",
             "./copy --yes i0001 --approve --digest d",
-            # 敵対的レビューで抜けた形。読み取り用の道具に似た名前、文字列を実行する道具、
-            # 引数のリスト、変数に入れた副命令、分け書き
+            # 敵対的レビューで止められずに通った形。読み取り用の道具に似た名前、
+            # 文字列を実行する道具、引数のリスト、変数に入れた副命令、分け書き
             "/tmp/cat.bin --reviewed 1 --accept-unresolved --yes j --digest d",
             "awk 'BEGIN{system(\"ccnavi --approve --yes a --digest X\")}'",
             "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
@@ -2096,7 +2096,7 @@ class TicketTest(unittest.TestCase):
                 "[Environment]::SetEnvironmentVariable('CCNAVI_GUARD_TICKET_APPROVAL','x')",
             ),
             ("PowerShell", "Set-Item env:CCNAVI_GUARD_TICKET_APPROVAL disable"),
-            # 敵対的レビューで抜けた形。引用と分け書き、言語の中からの設定、名前の参照
+            # 敵対的レビューで止められずに通った形。引用と分け書き、言語の中からの設定、名前の参照
             ("Bash", '/tmp/cc "--guard-ticket-approval" disable --approve'),
             ("Bash", "/tmp/cc --guard-ticket-''approval disable --approve"),
             (
@@ -2270,7 +2270,7 @@ class TicketTest(unittest.TestCase):
     def test_a_japanese_name_in_the_store_is_still_the_store(self):
         """置き場の中の日本語のファイルが、置き場の外に見えないこと。
 
-        `git status --porcelain` は `-z` が無いと非 ASCII を 8 進に逃がして引用符で包む。
+        `git status --porcelain` は `-z` が無いと非 ASCII を 8 進にエスケープして引用符で包む。
         そのまま前置き一致に当てると、置き場の中のファイルが「人の作業の汚れ」になってしまい、
         依頼が「未コミットの変更がある」で止まる。
         """
@@ -2285,7 +2285,7 @@ class TicketTest(unittest.TestCase):
         got = self.request(fixture)
         self.assertEqual(got.returncode, 0, got.stderr)
 
-    # ---- 9-2. マーカーと置き場: 何が動いたか × 道 → 通る・止まる
+    # ---- 9-2. マーカーと置き場: 何が動いたか × 経路 → 通る・止まる
 
     def snapshot(self):
         """self.root の今を写し、写しの置き場を返す。"""
@@ -2316,7 +2316,7 @@ class TicketTest(unittest.TestCase):
         return os.path.join(self.approved, "phases", "i0001", "1.requested")
 
     def reviewed(self, fixture):
-        """人が端末で打つ道（--reviewed）。未解決の指摘は受け入れる。"""
+        """人が端末で打つ経路（--reviewed）。未解決の指摘は受け入れる。"""
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -2367,7 +2367,7 @@ class TicketTest(unittest.TestCase):
         return move
 
     def move_forged_head_then_request_again(self, fixture):
-        # 偽の head で check が止まった後にも、出し直しの道は残す（残さないと打つ手が無い）。
+        # 偽の head で check が止まった後にも、出し直しの経路は残す（残さないと打つ手が無い）。
         self.move_code_and_forge_head("HEAD")(fixture)
         self.assertNotEqual(self.confirm(fixture).returncode, 0)
 
@@ -2395,7 +2395,7 @@ class TicketTest(unittest.TestCase):
         self.commit_markers()
 
     def move_code_after_the_human_accepted(self, fixture):
-        # 人の道で一度受け入れた後に、見ていない変更を積んで受け入れをやり直す。
+        # 人の経路で一度受け入れた後に、見ていない変更を積んで受け入れをやり直す。
         self.move_markers_with_an_open_thread(fixture)
         accepted = self.reviewed(fixture)
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
@@ -2421,10 +2421,11 @@ class TicketTest(unittest.TestCase):
         - check: 置き場だけが動いた形（push 済みでも手元だけでも）では止まらない。
           人がレビューで見るものは変わっていない。置き場の外が動いていれば、
           置き場に見せかけたもの（改名、置き場に見える名前、sha でない head）も含めて止まる
-        - 人が端末で打つ道（--reviewed）も check と同じ基準で見る
+        - 人が端末で打つ経路（--reviewed）も check と同じ基準で見る
 
         前置き（親子の承認・着手、フェーズの終わり、origin への push、依頼）は 1 度だけ作り、
-        行ごとに「依頼の前」か「依頼の後」の写しへ戻してから動かす。行の間で木は漏れない。
+        行ごとに「依頼の前」か「依頼の後」の写しへ戻してから動かす。
+        行の間でツリーの状態は持ち越されない。
         """
         self.family()
         self.close_phase()
@@ -2435,7 +2436,7 @@ class TicketTest(unittest.TestCase):
 
         moved = "HEAD が動いている"
         forged = self.move_code_and_forge_head
-        # (何が動いたか, 始まり, 動かし方, 道, 通るか, stderr に出る言葉, 後で見ること)
+        # (何が動いたか, 始まり, 動かし方, 経路, 通るか, stderr に出る言葉, 後で見ること)
         rows = [
             ("依頼の前: 置き場だけ・未 push", before, self.move_markers_unpushed_before_request,
              "request", True, None, None),
@@ -2807,7 +2808,7 @@ class TicketTest(unittest.TestCase):
         """origin の綴りから、ホスト・ポート・scheme を落とさずに API の綴りを組むこと。
 
         host を `[^/:]+` で切るとポートが落ち、落ちたポートがプロジェクトのパスの先頭に
-        混ざる（`8929/demo/greeter`）。scheme を https に決め打ちすると、手元や社内に
+        入り込む（`8929/demo/greeter`）。scheme を https に決め打ちすると、手元や社内に
         平文で立てた GitLab（`http://localhost:8929`）に届かない。
         """
         script = self.script()

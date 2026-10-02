@@ -194,7 +194,7 @@ class FlowLintTest(unittest.TestCase):
                 self.assertEqual(data["nodes"][0]["data"]["v"], read)
 
     def test_merge_keys_are_read_as_pyyaml_reads_them(self):
-        # 別名を使わないマージキーは PyYAML が畳む。拡張の読み手は畳まないので、
+        # 別名を使わないマージキーは PyYAML が展開する。拡張の読み手は展開しないので、
         # 画面は食い違いとして断る。
         data = self.flow_data("nodes: [{<<: {id: a}}]\n")
         self.assertEqual(data["nodes"], [{"id": "a"}])
