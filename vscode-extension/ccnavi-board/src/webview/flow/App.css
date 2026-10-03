@@ -17,12 +17,16 @@
 }
 .flow-palette button.action.small.palette-item {
   margin-left: 0; text-align: left;
-  display: flex; gap: 6px; align-items: center; justify-content: space-between;
+  display: flex; gap: 2px 6px; align-items: center; justify-content: space-between;
+  /* 列は 150px。名前と印が並ばないときは印を次の行へ回す（回さないと印がボタンの外へ出る） */
+  flex-wrap: wrap; white-space: normal;
 }
 /* 印（種類の性質）。askUserQuestion はメインへ戻る、subAgent は入れ子。色だけに頼らず文字で言う */
 .flow-badge {
   display: inline-block; padding: 0 6px; border-radius: 8px; font-size: .8em;
   border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground);
 }
-.flow-badge.ask { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
-.flow-badge.nest { border-color: var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)); color: var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)); }
+/* 部品箱のボタンの地（secondaryBackground）は灰色で、印の文字が 4.5:1 に届かない。印は本文の地で塗る */
+.flow-palette .flow-badge { background: var(--vscode-editor-background); }
+.flow-badge.ask { border-color: var(--vscode-editorWarning-foreground); color: var(--warn-text); }
+.flow-badge.nest { border-color: var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)); color: var(--info-text); }

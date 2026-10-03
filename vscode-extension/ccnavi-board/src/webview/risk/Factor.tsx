@@ -62,7 +62,9 @@ export function Factor(props: FactorProps): JSX.Element {
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
-          <span className={factor.id === "" ? "sum-id dim" : "sum-id"}>{summaryId(factor)}</span>
+          <span className={factor.id === "" ? "sum-id dim" : "sum-id"} title={summaryId(factor)}>
+            {summaryId(factor)}
+          </span>
           <span className={factor.points === "" ? "sum-points dim" : "sum-points"} title="points">
             {summaryPoints(factor)}
           </span>
