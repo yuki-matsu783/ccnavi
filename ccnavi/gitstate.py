@@ -61,6 +61,11 @@ KIND_LABELS = {
 # 大きなリポジトリでは status も待たされるが、待たせるくらいなら何も言わない。
 TIMEOUT_SECONDS = 2.0
 
+# index を書き換える git（restore と rm --cached）に与える時間。読む側より長く待つ。
+# これらは `.git/index.lock` を必ず取り、期限で殺すとその lock が残って、以後の
+# add や commit が止まる。1 回が hook の期限（.claude/settings.json の 10 秒）に収まる長さにする。
+WRITE_TIMEOUT_SECONDS = 5.0
+
 # 読めなかった理由。記録に入れるので、監視が動いていない期間を後から数えられる。
 REASON_NO_WORKTREE = "not-a-git-worktree"
 REASON_NO_GIT = "git-not-found"
@@ -270,7 +275,7 @@ def undo(change: Change) -> str:
     return f"git clean -f -- {quoted}"
 
 
-def restore(top: str, change: Change, aside: str, timeout: float = TIMEOUT_SECONDS) -> str:
+def restore(top: str, change: Change, aside: str, timeout: float = WRITE_TIMEOUT_SECONDS) -> str:
     """この 1 件を実際に元に戻す。戻せたら空文字、駄目なら理由を返す。
 
     現れたファイルは消さずに退避する。設計は削除と書いているが、消してしまうと
@@ -299,7 +304,7 @@ def restore(top: str, change: Change, aside: str, timeout: float = TIMEOUT_SECON
     return ""
 
 
-def restore_committed(top: str, path: str, timeout: float = TIMEOUT_SECONDS) -> str:
+def restore_committed(top: str, path: str, timeout: float = WRITE_TIMEOUT_SECONDS) -> str:
     """名指しした 1 つのパスを、コミット済みの内容へ戻す。
     戻せたら空文字、駄目なら理由を返す。
 
