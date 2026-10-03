@@ -1,6 +1,6 @@
 /**
- * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/。本物の形に合わせて手で組んだもの。ADR-0093 の 8.9。段階 5）を
- * 返す GitLab の代役。
+ * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/）を返す GitLab の代役。見本は本物の形に合わせて
+ * 手で組んだもの（ADR-0093 の 8.9、段階 5）。
  *
  * リポジトリの sh の試験（tests/sh/gitlab_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
  *

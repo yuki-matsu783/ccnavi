@@ -492,7 +492,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # トークンの持ち主をホストに聞いて渡す（実行ファイルはネットワークに出ない）。
     # `review confirm` と、書く形の decide（`--reviewed N --accept-unresolved`。段階 5）が読む。
     parser.add_argument("--actor", default="")
-    # decide の印の経路（`terminal`・`board`。8.9。段階 5）。`--actor` と一緒にだけ受ける
+    # decide の印の経路で、`terminal` か `board`（8.9、段階 5）。`--actor` と一緒にだけ受ける
     # （アカウントを引けなかったときは印も跡も前と同じにするため）。
     parser.add_argument("--via", default="")
     try:

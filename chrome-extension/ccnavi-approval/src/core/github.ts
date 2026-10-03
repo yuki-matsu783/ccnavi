@@ -587,7 +587,7 @@ export interface ReviewThread {
   readonly line: number;
   readonly body: string;
   readonly created_at: string;
-  /** 最初のコメントを書いたアカウント（GitLab の写しだけ。ccnavi の依頼のスレッドを見分ける。11.8.1 の決定 C） */
+  /** 最初のコメントを書いたアカウント。GitLab の写しだけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（11.8.1 の決定 C） */
   readonly author?: string;
 }
 

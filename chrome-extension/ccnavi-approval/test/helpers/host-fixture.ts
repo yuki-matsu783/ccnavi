@@ -1,5 +1,5 @@
 /**
- * 録ったホストの応答の見本（test/fixtures/host/github/<場面>/。ADR-0093 の 8.9。段階 4）を返す代役。
+ * 録ったホストの応答の見本（test/fixtures/host/github/<場面>/）を返す代役（ADR-0093 の 8.9、段階 4）。
  *
  * リポジトリの sh の試験（tests/sh/github_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
  *

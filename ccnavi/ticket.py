@@ -137,7 +137,7 @@ def child_pattern() -> re.Pattern:
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 # issue から決める識別子の形（`i` + 番号）。`issue:` を持つ提案だけが使う。
 _ISSUE_ID = re.compile(r"^i\d+$", re.IGNORECASE)
-# プロジェクトの issue から決める識別子の形（`<プロジェクト名>-i<番号>`。3.1 の 7。段階 5）。
+# プロジェクトの issue から決める識別子の形は `<プロジェクト名>-i<番号>`（3.1 の 7、段階 5）。
 _PROJECT_ISSUE_ID = re.compile(r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i\d+$", re.IGNORECASE)
 
 

@@ -180,7 +180,7 @@ ccnavi_fetch_default() {
 	return 1
 }
 
-# ワークツリーの起点にするブランチ（統合先。ADR-0093 の D30。段階 2b のレビューの決定 B6）。
+# ワークツリーの起点にするブランチ。これが統合先にあたる（ADR-0093 の D30、段階 2b のレビューの決定 B6）。
 #
 # 環境変数 CCNAVI_INTEGRATION_BRANCH（SessionStart には settings.local.json の env も渡る）、
 # 無ければ ccnavi-sync.sh が控え（sync/<リポジトリ>/integration/head）に書いた名前、

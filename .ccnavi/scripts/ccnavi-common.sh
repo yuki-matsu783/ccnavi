@@ -173,8 +173,8 @@ ccnavi_bin() {
 }
 
 # 実行ファイルの `--version` が言う互換の版と CCNAVI_COMPAT を比べる。揃っていれば何も出さずに 0、
-# 食い違えば直し方を含む 1 行を標準出力に出して 1 を返す。呼ぶ側は標準エラーへ書いて先へ進む
-# （止めない。止める・通すの判定は実行ファイルと hook が持つ。docs/claude/exe-boundary.md）。
+# 食い違えば直し方を含む 1 行を標準出力に出して 1 を返す。呼ぶ側は標準エラーへ書いて、止めずに先へ進む。
+# 止める・通すの判定は実行ファイルと hook が持つ（docs/claude/exe-boundary.md）。
 #
 # `--version` を知らない古い実行ファイルは、互換の版を答えないので古いとして言う。
 # 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら配り直し。
@@ -693,8 +693,8 @@ ccnavi_git_refusal() {
 
 # ---- C1（ADR-0093 の 4.3・4.4。段階 2d）
 #
-# 取り込み済みの家族（origin があり、家族の控えが present。chat だけの家族を除く。D11）で、状態を書く
-# 操作を 1 操作にする。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に打つ。
+# 取り込み済みの家族で、状態を書く操作を 1 操作にする。取り込み済みの家族とは、origin があり、家族の
+# 控えが present のもので、chat だけの家族を除く（D11）。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に打つ。
 #
 #   ccnavi_c1_family <識別子>   家族と、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
