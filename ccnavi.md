@@ -997,8 +997,10 @@ ccnavi ディレクトリの守り（`builtin-guard-project-home`）が止める
 **承認済みチケットは git で運ぶ。** 承認した機械と作業する機械が違っても承認が届くよう、承認済み
 チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-push-approved.sh` がコミットして push する（9.4）。
 受け取る側はセッションの頭に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
-起点になるデフォルトブランチ（`origin/HEAD` が指すもの）も、チェックアウトされていなければ `update-ref` で
-進める（ADR-0060）。リモートに届かないときは手元の版で判定を続ける。fetch は 1 回ずつ時間を見張って打ち切り、hook の
+起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` の控え、無ければデフォルトブランチ＝
+`origin/HEAD` が指すもの。ADR-0093 の D30）も、チェックアウトされていなければ `update-ref` で
+進める（ADR-0060）。統合先の決め方は `ccnavi-common.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は
+その名前への直接の push を（`main` などの固定の並びと同じく）拒み、`ccnavi-review.sh` はそれをマージリクエストの宛先にする。リモートに届かないときは手元の版で判定を続ける。fetch は 1 回ずつ時間を見張って打ち切り、hook の
 上限に当たらないようにする。
 
 取り込み済みの家族（家族の控えがある親のワークツリー）は、SessionStart では早送りだけにし、ロックが取れなければ
