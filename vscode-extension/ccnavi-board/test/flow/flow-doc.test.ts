@@ -258,7 +258,7 @@ test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え
   // 巡るサブフローは数えきれないと言う
   const loop = nested(2, true);
   assert.equal(nesting(loop).cyclic, true);
-  assert.ok(flowNotices(loop).some((n) => n.includes("ループしています")));
+  assert.ok(flowNotices(loop).some((n) => n.includes("サブフローの呼び出しが循環しています（subAgentFlowId が輪になっています）")));
   // サブフローの中身は描かないことも言う
   assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が 1 本")));
 });

@@ -45,6 +45,8 @@ test("CB-T252 場所は nodes の中ならノードの id と欄のパスで言�
   assert.ok(found !== undefined);
   assert.match(openDisagreementText(found), /ノード "p-1" の data\.branches\[0\]\.label。画面: 文字列 "yes"、実行ファイル: 真偽値 true/);
   assert.match(openDisagreementText(found), /エディタで引用符を付ける/);
+  // 「開きません」は呼び手（flow-panel.ts）が頭に付ける。ここでも言うと 1 文に 2 度出る
+  assert.doesNotMatch(openDisagreementText(found), /開きません/);
   assert.match(saveDisagreementText(found), /書き込みません/);
   assert.equal(flowDisagreement({ connections: [{ condition: "y" }] }, { connections: [{ condition: "x" }] })?.where, "connections[0].condition");
   assert.equal(flowDisagreement({ "a b": 1 }, { "a b": 2 })?.where, '["a b"]');

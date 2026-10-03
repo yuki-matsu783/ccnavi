@@ -97,7 +97,7 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnavi の実行ファイルのパスです。空のときは .claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh の順に探し、どれも無ければ uv run python -m ccnavi を使います。振り分けの sh（ccnavi-launcher.sh）を指定したときは、sh を通さず、sh のあるフォルダの親の bin/<os>-<arch>/ にある、この OS と CPU 向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
+          "description": "ccnavi の実行ファイルのパスです。空のときは .claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh の順に探し、どれも無く、ccnavi/__main__.py があれば uv run python -m ccnavi を使います。振り分けの sh（ccnavi-launcher.sh）を指定したときは、sh を通さず、sh のあるフォルダの親の bin/<os>-<arch>/ にある、この OS と CPU 向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",
@@ -112,7 +112,7 @@
         "ccnaviBoard.flowSaveReview": {
           "type": "boolean",
           "default": true,
-          "description": "フロー編集画面で「保存」を押したとき、読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で表示し、確かめてから保存します。チェックを外すと、確かめずに保存します。一覧で「次から確かめずに保存する」を選んでも外れます。"
+          "description": "フロー編集画面で「保存」を押したとき、読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で表示し、確かめてから保存します。チェックを外すと、確かめずに保存します。一覧の「次から確かめずに保存する」にチェックを付けて保存しても外れます。"
         },
         "ccnaviBoard.appearance": {
           "type": "string",

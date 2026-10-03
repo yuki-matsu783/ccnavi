@@ -904,6 +904,7 @@ test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新�
       "Draft を外した",
       "フェーズ 1: エージェントに終了を通知済み",
     ]);
+    assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-via'), ["ターミナル", "sh（ccnavi-ticket.sh など）", "hook"]);
   } finally {
     await page.close();
   }

@@ -709,9 +709,9 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     );
     return;
   }
-  const send = "端末で送る";
+  const send = "ターミナルで送る";
   const picked = await vscode.window.showInformationMessage(
-    `${loaded.shown} に保存しました。親 ${target.parent} とその子は取り込み済みのため、コミットと push は ${PUSH_APPROVED_SCRIPT} ${target.parent} で送ります`,
+    `${loaded.shown} に保存しました。親 ${target.parent} とその子は取り込み済みのため、コミットと push は、「${send}」を押すと ${PUSH_APPROVED_SCRIPT} ${target.parent} で送れます`,
     send,
   );
   if (picked === send) {

@@ -234,7 +234,7 @@ export function describeExecutable(value: unknown): string {
 export function openDisagreementText(found: FlowDisagreement): string {
   return (
     `画面と実行ファイルとで、値の読み方が食い違っています（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
-    "このまま画面で直して保存すると値の意味が変わるため、開きません。エディタで引用符を付けるなどして、" +
+    "このまま画面で直して保存すると、値の意味が変わります。エディタで引用符を付けるなどして、" +
     "実行ファイルが意図どおりの値として読むように直してください"
   );
 }
