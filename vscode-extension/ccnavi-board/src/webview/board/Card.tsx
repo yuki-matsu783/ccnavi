@@ -1,5 +1,5 @@
 /**
- * 1 枚のカード。バッジ（人が動く必要がある状態）・属性の行・親のフェーズ一覧・不備・操作。
+ * 1 枚のカード。バッジ（ユーザが動く必要がある状態）・属性の行・親のフェーズ一覧・不備・操作。
  * 何を出すかは組み立て（core/board.ts）が決めた値のとおりで、ここで判定し直さない。
  */
 import type { JSX } from "react";
@@ -136,7 +136,7 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 }
 
 /**
- * 枠付きのバッジは、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
+ * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
  * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
  * 本物が決まらない写り。出すバッジが無ければ行ごと出さない。
  */
@@ -340,7 +340,7 @@ function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string
       data-action="flow"
       data-ticket={id}
       data-flow={state}
-      title={`子チケットの作業の手順（フロー）を図で${flow.locked ? "見る。着手中は書き換えられない" : `${flow.exists ? "直す" : "作る"}。着手すると、終わるまで書き換えられなくなる`}（${flow.rel}）`}
+      title={`子チケットの作業の手順（フロー）を図で${flow.locked ? "見ます。着手中は書き換えられません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで書き換えられなくなります`}（${flow.rel}）`}
       onClick={() => post({ type: "flow", ticket: id })}
     >
       {flowButtonLabel(flow)}
@@ -348,7 +348,7 @@ function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string
   );
 }
 
-/** 人が押せる操作。押したら拡張ホストへ返すだけで、画面は何も置かない */
+/** ユーザが押せる操作。押したら拡張ホストへ返すだけで、画面は何も置かない */
 function ActionButton({ action, id }: { readonly action: Action; readonly id: string }): JSX.Element {
   switch (action.kind) {
     case "approve":

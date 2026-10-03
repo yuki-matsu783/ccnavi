@@ -1,11 +1,11 @@
 /**
  * リスク管理画面の本体。リスクレベルの境目の点と、加点する項目の一覧。
  *
- * 見せる中身は拡張ホストが渡す（`RiskData`）。画面が持つのは、人が触って決めるもの
+ * 見せる中身は拡張ホストが渡す（`RiskData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中の配点、開いている行、絞り込み、直前の操作の一言）だけ。点は数えず、ファイルも書かない。
  *
  * **中身（`data`）が届いたら、編集中の配点はその中身で置き換える。** 届くのは編集を捨ててよい
- * ときだけ（人が「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
+ * ときだけ（ユーザが「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ（ADR-0062）。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
@@ -56,7 +56,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
-  /** ファイルが外で変わった。破棄して読み直すかは人が決める */
+  /** ファイルが外で変わった。破棄して読み直すかはユーザが決める */
   const [changed, setChanged] = useState(false);
   const [find, setFind] = useState("");
   /** 足した直後の行。id の欄に焦点を移したら忘れる */
@@ -116,7 +116,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   /**
    * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
    * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
-   * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
+   * ユーザが「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
   const reload = (): void => {
     setBusy(true);
@@ -260,7 +260,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルの境目の点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが上がります。HIGH 以上の場合は、次フェーズに進む前に人間レビューが必須になります
+          リスクレベルの境目の点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが上がります。HIGH 以上の場合は、次のフェーズに進む前に人間レビューが必須になります
           </span>
         </h2>
         <details className="help">

@@ -7,7 +7,7 @@
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ。D30）。設定したブランチが無ければ止める
  * 2. 統合先の `.claude/settings.json` を読み、置き場の綴りを Python に出させる
  * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python（7.3）
- * 4. 直近 N 日と利用者の指定のブランチ（表示用）の置き場を読み、家族を Python に見分けさせる
+ * 4. 直近 N 日とユーザの指定のブランチ（表示用）の置き場を読み、家族を Python に見分けさせる
  * 5. 家族ごとに、参照の閉包（3.3 の 5）の足りないブランチを読み足し、Python に承認待ちを出させる。
  *    判定の入力は統合先・`P`・閉包の `P_X` だけ（D2）。表示用のブランチは入れない
  * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、Python の
@@ -245,7 +245,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
     const { settings, place, compat } = base;
     const name = integration.name;
 
-    // 4. 表示用のブランチ（直近 N 日と利用者の指定）
+    // 4. 表示用のブランチ（直近 N 日とユーザの指定）
     const since = new Date(deps.now().getTime() - repo.recentDays * 24 * 3600 * 1000);
     const recent = repo.recentDays > 0 ? await reader.call<RecentRef[]>("recentRefs", since.toISOString()) : [];
     const heads = new Map<string, string>();

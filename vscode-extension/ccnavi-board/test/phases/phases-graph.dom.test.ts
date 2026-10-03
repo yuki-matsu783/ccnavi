@@ -75,7 +75,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
     // sequential でも after が無ければ、判定に使われないという注意は出さない
     assert.doesNotMatch(notes.join(""), /sequential/);
-    // 「人が見る」の意味は札のツールチップにある
+    // 「ユーザが見る」の意味は札のツールチップにある
     assert.match(dom.one(".tag.hitl").getAttribute("title") ?? "", /種類の宣言（review）/);
   } finally {
     await dom.close();
@@ -84,7 +84,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
   // sequential なのに after がある。矢印が判定に使われないことを言う
   const seq = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n  b:\n    kind: work\n    review: mr\n    after: [a]\n") });
   try {
-    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に効きません/);
+    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に使われません/);
   } finally {
     await seq.close();
   }
@@ -135,7 +135,7 @@ test("CB-D77 控えてある位置で点が置かれ、図を触っても phases
     const node = dom.all('.react-flow__node[data-id="implement"]')[0];
     assert.match((node as unknown as { style: { transform: string } }).style.transform, /translate\(40px,\s*80px\)/);
 
-    // 図を触っても保存には渡らない（座標は人が持つ設定に入れない）
+    // 図を触っても保存には渡らない（座標はユーザが持つ設定に入れない）
     assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
   } finally {
     await dom.close();
@@ -159,7 +159,7 @@ test("CB-D80 点を掴んで離すと、その位置が控えに入る（jsdom�
     assert.ok(Number.isFinite(spots.implement.x) && Number.isFinite(spots.implement.y), "控えが数でない");
     // 動いた先は図の倍率で決まるので、値そのものは約束しない
 
-    // ドラッグしても保存には渡らない（座標は人が持つ設定に入れない）
+    // ドラッグしても保存には渡らない（座標はユーザが持つ設定に入れない）
     assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
   } finally {
     dom.close();

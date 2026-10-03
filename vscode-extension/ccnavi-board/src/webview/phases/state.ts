@@ -3,7 +3,7 @@
  * 作りはリスク管理（`webview/risk/state.ts`）と同じで、鍵の綴りだけ `p1`、`p2`、… と違う。
  *
  * 契約の `PhasesForm` は並びだけを持つが、画面は**行ごとに動かない鍵**が要る（足す・消す・
- * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id は人が打つもので、
+ * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
  * 空にも重複にもなるので鍵には使えない（この画面は重複を保存前に止める）。
  *
  * 開いている行の控えは Webview の state（`{ open: [id, …] }`）。
@@ -89,7 +89,7 @@ export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlyS
 export type View = "list" | "graph";
 
 /**
- * 人がドラッグで動かした点の位置。**`phases.yml` には書かない**（人が持つ設定に座標は入れない）。
+ * ユーザがドラッグで動かした点の位置。**`phases.yml` には書かない**（ユーザが持つ設定に座標は入れない）。
  * 控えるのは Webview の state で、鍵は種類の id。id を打ち替えれば控えは捨てられる（`Graph.tsx`）。
  *
  * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。

@@ -8,7 +8,7 @@
 4. ルールがチケットより強いこと
 
 3 つ目が要る理由は ADR-0009 にある。権限モードへの委譲は設定の穴に起因するので、
-穴が直るまで同じ問いが繰り返される。ルールが置いた確認は人が意図して置いた
+穴が直るまで同じ問いが繰り返される。ルールが置いた確認はユーザが意図して置いた
 確認ポイントで、繰り返されること自体に価値がある。混ぜると前者の数に
 後者が埋もれる。
 """
@@ -90,7 +90,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_どのルールも言及しなければ確認になる(self):
         # 既定が許可ではなく確認であること。allow を書き切るまで、
-        # 言及されていない呼び出しは人が見る側になる。
+        # 言及されていない呼び出しはユーザが見る側になる。
         self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         out = self.judge("Bash", "ls -la")
@@ -118,7 +118,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_ルールが置いた確認は未言及と区別して返る(self):
         self.rules(
-            ask=[rule("migrations", "Write", "*/migrations/*", message="人が中身を見ます")],
+            ask=[rule("migrations", "Write", "*/migrations/*", message="ユーザが中身を見ます")],
             allow=[rule("anything", "Write", "*", message="")],
         )
 
@@ -126,8 +126,8 @@ class SectionsTest(unittest.TestCase):
 
         self.assertEqual(out.get("permissionDecision"), "ask")
         self.assertIn("RULE_ASK", out["permissionDecisionReason"])
-        # 人が置いた文面が届くこと。届かないと、何を見て判断するのか分からない。
-        self.assertIn("人が中身を見ます", out["permissionDecisionReason"])
+        # ユーザが置いた文面が届くこと。届かないと、何を見て判断するのか分からない。
+        self.assertIn("ユーザが中身を見ます", out["permissionDecisionReason"])
 
     def test_deny_が明示的_ask_より強い(self):
         self.rules(
@@ -181,7 +181,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_読み切れないコマンドは拒否ではなく確認になる(self):
         # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
-        # 設計 6.3 の PARSE_UNCERTAIN は人に確認を出す。
+        # 設計 6.3 の PARSE_UNCERTAIN はユーザに確認を出す。
         self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("anything", "Bash", "*", message="")],
@@ -193,7 +193,7 @@ class SectionsTest(unittest.TestCase):
         self.assertIn("PARSE_UNCERTAIN", out["permissionDecisionReason"])
 
     def test_実行される部分が無いコマンドは何も返さない(self):
-        # コメントだけの行。何も走らないものについて人に聞く意味は無い。
+        # コメントだけの行。何も走らないものについてユーザに聞く意味は無い。
         self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         self.assertEqual(self.judge("Bash", "# git push origin main"), {})

@@ -41,7 +41,7 @@ def ruleset(*allow: dict, deny: tuple[dict, ...] = (), ask: tuple[dict, ...] = (
     body = {
         "version": 1,
         "deny": [
-            {"id": "push", "match": "Bash", "glob": "*git push*", "message": "push は人が行う"},
+            {"id": "push", "match": "Bash", "glob": "*git push*", "message": "push はユーザが行う"},
             *deny,
         ],
         "ask": list(ask),

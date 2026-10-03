@@ -292,7 +292,7 @@ const GUARDS: readonly Guard[] = [
     },
   },
   {
-    what: "残った指摘を読むのは、人のレビュー待ちのフェーズだけ",
+    what: "残った指摘を読むのは、ユーザのレビュー待ちのフェーズだけ",
     find: "if (chip.reviewWaiting !== true) {",
     into: "if (false) {",
     check(step) {
@@ -664,11 +664,11 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
     { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 が無いので、レビュー済みの連絡文を作れません" },
   ]);
 
-  // 人のレビュー待ちでなければ、ボタンの前提が無い。言って読み直す
+  // ユーザのレビュー待ちでなければ、ボタンの前提が無い。言って読み直す
   const notWaiting = approvalStep(CLOSED, { ...input, chip: chipOf({ reviewWaiting: false }) });
   assert.equal(notWaiting.state.overlay, undefined);
   assert.deepEqual(notWaiting.effects, [
-    { kind: "warn", text: "親 i0001 のフェーズ 1 設計 は人のレビュー待ちではありません。チケット管理画面を更新しました" },
+    { kind: "warn", text: "親 i0001 のフェーズ 1 設計 はユーザのレビュー待ちではありません。チケット管理画面を更新しました" },
     { kind: "refresh" },
   ]);
 });
@@ -706,7 +706,7 @@ test("CB-T179 「やめる」は閉じる。承認の結果は、どの状態で
   // 閉じているところへ届いても、変わっていないので描き直さない
   assert.equal(approvalStep(CLOSED, { kind: "cancel" }).redraw, false);
 
-  // 承認の結果だけは見張らない。承認済みチケットは既に置かれていることがあり、捨てると人に届かない
+  // 承認の結果だけは見張らない。承認済みチケットは既に置かれていることがあり、捨てるとユーザに届かない
   const late = approvalStep(CLOSED, {
     kind: "approved",
     outcome: { ok: true, value: resultOf(["i0001"], "文") },

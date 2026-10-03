@@ -5,8 +5,8 @@
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
- * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
+ * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
  * 対象は 3 種（設計 11.2）。共通の設定のルール（`.ccnavi/common/rules.yml`）、
  * ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの設定のルール
@@ -267,13 +267,13 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（ここのルールは 1 件も効いていません）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（このファイルのルールは 1 件も判定に使われていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;
@@ -445,7 +445,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
  * ときと、保存が通って中身が入れ替わったときだけ（ADR-0062）。
  */
 function show(current: PanelState): void {
@@ -552,7 +552,7 @@ function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesDa
 /**
  * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what` は捨てるもの。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 判定とサンプルはファイルに触らないが、捨てた編集で出した答えを
  * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。

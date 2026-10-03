@@ -4,7 +4,7 @@
 
 状態の正は置き場（ADR-0055、ADR-0058）。ここは「いつ・どの経路で・どこからどこへ動いたか」を
 あとから読むための跡で、判定も状態の操作もここを読まない。置き場と食い違ったら置き場を信頼する。
-人が hook の外で置き場を動かした分（手で承認する、再開する）は、跡が残らない。
+ユーザが hook の外で置き場を動かした分（手で承認する、再開する）は、跡が残らない。
 
 ## 追記だけ
 
@@ -55,7 +55,7 @@ BOARD_LIMIT = 20
 
 # 動かした経路。
 #   cli       エージェントが sh（ccnavi-ticket.sh / ccnavi-review.sh）から打った副命令
-#   terminal  人が端末で打った判断（--approve / --reviewed / --close-early）
+#   terminal  ユーザが端末で打った判断（--approve / --reviewed / --close-early）
 #   board     VS Code のボードから押した判断（--approve --yes / --reviewed --yes）
 #   hook      hook（フェーズの終わりの告知が置くマーカー）
 VIA_CLI = "cli"
@@ -68,11 +68,11 @@ VIA_CHROME = "chrome"
 # 種類。チケットの置き場が動いたもの。
 KIND_APPROVED = "approved"  # todo → doing（承認）
 KIND_REVISED = "revised"  # doing → doing（親の計画の改版）
-KIND_RAISED = "raised"  # 無し → doing（人が起こした続きの子）
+KIND_RAISED = "raised"  # 無し → doing（ユーザが起こした続きの子）
 KIND_STARTED = "started"  # doing → doing（着手の欄）
 KIND_FINISHED = "finished"  # doing → review か done
 KIND_CANCELLED = "cancelled"  # doing → done（取り消しの欄）
-KIND_SETTLED = "settled"  # review → done（人のレビューが済んだ）
+KIND_SETTLED = "settled"  # review → done（ユーザのレビューが済んだ）
 KIND_WITHDRAWN = "withdrawn"  # doing → todo（承認の取り下げ。ADR-0093 の 8.8）
 # マーカー。親の跡に残す。`from` / `to` は null で、`phase` と `mark` を持つ。
 # フェーズのマーカーを置いた（pending / requested / reviewed / skipped）

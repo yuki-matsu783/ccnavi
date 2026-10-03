@@ -3,7 +3,7 @@
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR: 拡張の画面を React にする）。
  * 拡張ホストが渡すのは「いま何を見せるか」（`BoardData`）だけで、列やカードの DOM は画面が作る。
- * 画面が返すのは人が押した操作（`BoardMessage`）だけで、判定も実行ファイルの呼び出しもしない。
+ * 画面が返すのはユーザが押した操作（`BoardMessage`）だけで、判定も実行ファイルの呼び出しもしない。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
  * 片方だけが持てるものを置くと束ねられなくなる。
@@ -39,7 +39,7 @@ export type ApprovalOverlay =
       readonly title: string;
       readonly note: string;
       readonly prompt: string;
-      /** 渡したときに人へ言う呼び名（「…をコピーした」）。無ければレビュー済みの連絡の文 */
+      /** 渡したときにユーザへ言う呼び名（「…をコピーした」）。無ければレビュー済みの連絡の文 */
       readonly what?: string;
       /**
        * 取り返せない文か（残った指摘を決めた結果。続きの子はもう置かれている）。真なら、

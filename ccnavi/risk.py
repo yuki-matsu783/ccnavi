@@ -315,7 +315,7 @@ def _factors(
         ident = str(item.get("id") or "").strip()
         if ID_SEPARATOR in ident:
             # 層の名前をつけた形（`lib:schema`）と見分けが付かない。共通層に書けば
-            # lib の配点に見え、記録を読んだ人がどのファイルを直すのか決められない。
+            # lib の配点に見え、記録を読んだユーザがどのファイルを直すのか決められない。
             problems.append(
                 Problem(
                     SEVERITY_ERROR,

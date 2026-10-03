@@ -113,7 +113,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   });
   assert.ok(stopped.includes("i0001-01 で止まりました"));
   assert.ok(stopped.includes("i0001 の 1 件は承認済みチケットに入っています"));
-  assert.ok(stopped.includes("コミットと push は送っていません"));
+  assert.ok(stopped.includes("コミットと push はターミナルに送っていません"));
   assert.ok(stopped.includes("マーカーを消した"), "端末に出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
