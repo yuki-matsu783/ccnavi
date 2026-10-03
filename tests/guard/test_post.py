@@ -448,6 +448,22 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
+    def test_HEADを持たない控えは基準なしとして扱う(self):
+        # heads の無い控えは、控えが無いときと同じ。コミットのぶんを数えられない
+        # 基準で報告すると、このターンに入ったコミットを黙って落とす。
+        self.run_hook(event="UserPromptSubmit")
+        turn = os.path.join(self.state, "s1.turn.json")
+        with open(turn, encoding="utf-8") as f:
+            data = json.load(f)
+        del data["heads"]
+        write(turn, json.dumps(data))
+        self.dirty()
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
+
     def test_ターンの終わりの報告は一度伝えた変更も含む(self):
         # 呼び出しごとの報告は控えを見て繰り返さないが、人はまだ 1 度も
         # 見ていないことがある。宛先が違うので、控えを共有しない。

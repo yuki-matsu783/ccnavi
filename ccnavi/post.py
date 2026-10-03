@@ -1066,7 +1066,8 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     持っていないなら、ターンの始まりを見ていない。登録されていないか、
     そのイベントで読めなかったか。そこで「全部このターンの成果」として
     報告すると、前から在ったものまで並ぶので、そのときは何も言わない。
-    見えていない期間を、見えたことにしない。
+    見えていない期間を、見えたことにしない。`heads` を持たない控え（壊れたものや
+    HEAD を控える前の版）も、控えが無いときと同じく基準なしとして扱う。
     """
     if not state_dir:
         return set(), False, {}
@@ -1080,9 +1081,7 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
         return set(), False, {}
     heads = data.get("heads")
     if not isinstance(heads, dict):
-        # 古い控え（HEAD を持たない版）でも基準としては読める。コミットのぶんだけ
-        # 言えないが、ターンの始まりを見ていないことにするより害が小さい。
-        heads = {}
+        return set(), False, {}
     return (
         {s for s in base if isinstance(s, str)},
         True,
