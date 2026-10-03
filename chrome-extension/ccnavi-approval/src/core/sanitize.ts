@@ -5,7 +5,7 @@
  * Markdown を HTML に変えた後に DOMPurify で消毒し、文字列ではなく DOM の断片で返す
  * （`innerHTML` に文字列を戻さない）。
  *
- * - リンクは `http:`・`https:`・`mailto:` だけ。ほかの綴り（`javascript:`・`data:`・相対）は href を外す
+ * - リンクは `http:`・`https:`・`mailto:` だけ。ほかの表記（`javascript:`・`data:`・相対）は href を外す
  * - 画像・SVG・MathML・フォーム・style は出さない。画像は外への通信（読んだことの漏れ）になるため
  * - リンクは新しいタブで開き、`noopener noreferrer` を付ける
  * - 中身を隠す書き方は通さない（段階 3 のレビューの決定 A。承認者に見えないまま承認させない）:
@@ -15,7 +15,7 @@
 import createDOMPurify, { type Config, type WindowLike } from "dompurify";
 import { Marked } from "marked";
 
-/** 許すリンクの綴り。DOMPurify は属性の値を DOM で読んだ後（実体参照を解いた後）に当てる */
+/** 許すリンクの表記。DOMPurify は属性の値を DOM で読んだ後（実体参照を解いた後）に当てる */
 export const ALLOWED_URI = /^(?:https?|mailto):/i;
 
 const FORBID_TAGS = [

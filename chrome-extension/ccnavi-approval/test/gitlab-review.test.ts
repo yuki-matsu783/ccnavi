@@ -3,15 +3,15 @@
  *
  * - 応答が落ちた書き込みの受け直し（PROBE-2・3）: 自分のコミットを「書いた中身と親の組」で見分けたときだけ受け直す。
  *   見分けられなければユーザに回す
- * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは打ち消さない）
- * - 事後確認と打ち消しの途中でホストが落ちたら、書いたが確認できなかったとしてユーザに回す
+ * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは元に戻さない）
+ * - 事後確認と元に戻すコミットの途中でホストが落ちたら、書いたが確認できなかったとしてユーザに回す
  * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭で閉じた識別子と互換の版を確かめ直す
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
- * - 打ち消しはバイト列のまま戻す（BOM も）
- * - 「要確認」の家族には、そのブラウザで書くボタンを出さない
+ * - 元に戻すコミットはバイト列のまま戻す（BOM も）
+ * - 「要確認」の親のブランチには、そのブラウザで書くボタンを出さない
  *
- * 最新のレビュー（11.9.3）で足したもの: 確かめが落ちたら要確認、打ち消しの前の 412 で打ち消し直す、別の線に付け替わったら
+ * 最新のレビュー（11.9.3）で足したもの: 確かめが落ちたら要確認、元に戻す前の 412 で元に戻し直す、別の線に付け替わったら
  * ユーザに回す、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
  */
 import { before, test } from "node:test";
@@ -100,7 +100,7 @@ test("CX-T161 GitLab で応答が落ち、その上に無関係な書き込み�
   assert.equal(out.kind, "changed", JSON.stringify(out));
   assert.deepEqual(mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]), [
     ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],
-    ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
+    ["written", "ccnavi: i0001 への書き込みを元に戻す（Chrome 拡張 9.9.9）"],
   ]);
   const files = mock.files("i0001");
   assert.ok(!(DOING in files) && TODO in files && CHILD in files && "src/zzz.py" in files);
@@ -144,7 +144,7 @@ test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けら�
   assert.equal(mock.glCommits.length, 1);
 });
 
-test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時計が呼ぶたびに進んでも、無関係な割り込みでは打ち消さない", async () => {
+test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時計が呼ぶたびに進んでも、無関係な割り込みでは元に戻さない", async () => {
   const mock = new MockGitLab(parentOnly());
   let t = Date.parse(NOW);
   const { d, shown } = await start(mock, "gitlab.com", GITLAB_REPO, () => new Date((t += 61_000)));
@@ -240,7 +240,7 @@ test("CX-T169 GitLab の読みの上限と断り: tree は 50 ページ、discus
   assert.ok(redirects.length > 0 && redirects.every((r) => r === "error"), redirects.join(","));
 });
 
-test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで引いても読まず、家族は決まらない", async () => {
+test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで引いても読まず、親のブランチは決まらない", async () => {
   const f = parentOnly();
   f.main.files[".ccnavi/common/linked.yml"] = "../../etc/passwd";
   const mock = new MockGitLab(f);
@@ -253,7 +253,7 @@ test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで
   assert.match(fam?.result?.undecided ?? "", /シンボリックリンク/);
 });
 
-test("CX-T171 打ち消しはバイト列のまま戻す（BOM も落とさない）", async () => {
+test("CX-T171 元に戻すコミットはバイト列のまま戻す（BOM も落とさない）", async () => {
   const f = parentOnly();
   const original = '﻿{"at": "2026-09-01T00:00:00Z", "ticket": "i0001", "kind": "note"}\n';
   f.i0001.files[EVENTS] = original;
@@ -266,17 +266,17 @@ test("CX-T171 打ち消しはバイト列のまま戻す（BOM も落とさな�
   assert.equal(mock.files("i0001")[EVENTS], original);
 });
 
-test("CX-T172 「要確認」の家族には、そのブラウザで承認・取り下げ・レビュー済みのボタンを出さず、ほかの承認者には見えないと言う", async () => {
+test("CX-T172 「要確認」の親のブランチには、そのブラウザで承認・取り下げ・レビュー済みのボタンを出さず、ほかの承認者には見えないと言う", async () => {
   const mock = new MockGitLab(fixture());
   const b = await collectRepo(GITLAB_REPO, glDeps(mock));
   const dom = new JSDOM("<!doctype html><body></body>");
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
   const actions = { approve: () => undefined, withdraw: () => undefined, review: () => undefined, dismiss: () => undefined };
-  const html = renderRepo(dom.window.document, md, b, actions, { attention: { i0001: "打ち消せなかった" } });
+  const html = renderRepo(dom.window.document, md, b, actions, { attention: { i0001: "元に戻せなかった" } });
   const box = html.querySelector('[data-family="i0001"]') as HTMLElement;
   assert.deepEqual([...box.querySelectorAll("button")].map((x) => (x as HTMLElement).dataset.action), ["dismiss"]);
   assert.match(box.textContent ?? "", /ほかの承認者には見えない/);
-  // ほかの家族は今までどおり
+  // ほかの親のブランチは今までどおり
   assert.equal(html.querySelectorAll('[data-family="i0002"] button[data-action=approve]').length, 1);
 });
 
@@ -306,7 +306,7 @@ test("CX-T174 応答が落ちた後の確かめや、書いた後の確かめが
   assert.match(out2.kind === "attention" ? out2.message : "", /書いた後の中身を確認できなかった/);
 });
 
-test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何も送っていない）なら、上限の範囲で読み直して打ち消し直す", async () => {
+test("CX-T175 元に戻すコミットを送る前の確認で先頭が動いた（412。何も送っていない）なら、上限の範囲で読み直して元に戻し直す", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
@@ -316,7 +316,7 @@ test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何
   const wrapped: WriteDeps = {
     ...d,
     call: async (op, args) => {
-      if (op === "commit" && (commits += 1) === 2) mock.push("i0001", { "src/zzz.py": "z\n" }, "打ち消しの直前の無関係な push");
+      if (op === "commit" && (commits += 1) === 2) mock.push("i0001", { "src/zzz.py": "z\n" }, "元に戻す直前の無関係な push");
       try {
         return await call(op, args);
       } catch (err) {
@@ -330,7 +330,7 @@ test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何
   assert.deepEqual(statuses, [gl.HOST_MOVED]);
   assert.deepEqual(mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]), [
     ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],
-    ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
+    ["written", "ccnavi: i0001 への書き込みを元に戻す（Chrome 拡張 9.9.9）"],
   ]);
   const files = mock.files("i0001");
   assert.ok(!(DOING in files) && TODO in files && "src/zzz.py" in files);

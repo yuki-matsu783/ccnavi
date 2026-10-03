@@ -4,12 +4,12 @@
  * 判定（依頼の記録・依頼の後に動いたか・同じ MR か・変更要求・未解決のスレッド）は Python の
  * `confirm`（手元の `ccnavi review confirm` と同じコア）が出す。ここはホストから材料を取ってきて渡すだけ:
  *
- * - MR のスレッドとレビューの写し（`reviewCopy`。`ccnavi-review.sh fetch` と同じ形）
+ * - MR のスレッドとレビューを取得した結果（`reviewCopy`。`ccnavi-review.sh fetch` と同じ形）
  * - 依頼の後に親のブランチが動いていれば、Python が求める 2 つ（`need_compare`）の変更の一覧（`compareFiles`）
  *
  * ボードはこれで候補のフェーズごとに「通るか」と理由とスレッドを出し、書く流れ（`write.ts` の
  * `confirmPhase`）は押したときに同じ手順を読み直して 1 コミットにする。段階 5 から GitLab の MR も読む
- * （写しの形は同じ。GitLab のスレッドは最初のノートの書き手 `author` を持ち、Python が依頼の投稿者
+ * （取得した結果の形は同じ。GitLab のスレッドは最初のノートの書き手 `author` を持ち、Python が依頼の投稿者
  * `poster` と比べて ccnavi の依頼のスレッドを除く。11.8.1 の決定 C）。
  */
 import type { Compare, ConfirmResult, PyCall, Reviewable, Snapshot, Actor } from "./py.js";
@@ -64,7 +64,7 @@ export interface ReviewPanel {
 }
 
 /**
- * 候補のフェーズごとに Python に通るかを聞く（書かない）。MR・スレッド・レビューの写しは家族（親のブランチ）に
+ * 候補のフェーズごとに Python に通るかを聞く（書かない）。MR・スレッド・レビューを取得した結果は親のブランチに
  * 1 つなので、GitHub の候補があれば 1 度だけ読んで全部のフェーズに使う。
  */
 export async function reviewPanels(

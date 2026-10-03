@@ -2,7 +2,7 @@
  * service worker。PAT を持ち、ホストの API を呼ぶのはここだけ（ADR-0093 の 5.5 の 4）。
  *
  * PAT は `chrome.storage.local` に平文で置く（D23）。鍵は `token:<ホスト>` で、画面の側は
- * この鍵を読まない（画面が読むのは `repos` だけ）。PAT の期限は `tokenMeta:<ホスト>` に控え（D25）、
+ * この鍵を読まない（画面が読むのは `repos` だけ）。PAT の期限は `tokenMeta:<ホスト>` に記録し（D25）、
  * 1 日 1 回（`chrome.alarms`）比べて、切れる 7 日前からバッジに出す。
  */
 import { ALARM, ensureDailyAlarm } from "../core/alarm.js";

@@ -5,19 +5,20 @@
  * 操作を頼む。PAT を書く・消すのは設定画面からだけ受ける。送り手は拡張の自分のページに限り、
  * 他の拡張・ウェブページからの呼び出し（`onMessageExternal`）は受けない。
  *
- * 段階 4 から、レビュー済みのために MR のスレッドとレビューの写し（`reviewCopy`）と、依頼の後の変更の
+ * 段階 4 から、レビュー済みのために MR のスレッドとレビュー（`reviewCopy`）と、依頼の後の変更の
  * 一覧（`compareFiles`）を読む。どちらも読むだけ。
  *
  * 段階 3 から、書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
  * 書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か統合先の名前（ボードの値を信頼せず
  * 自分で引く）なら断り、書くパスは置き場（統合先の `.claude/settings.json` から自分で引く）の下に限る
- * （8.5・レビューの決定 D）。同じ検査を Python も行うので、書く先とパスは 2 か所で確かめる。PAT の期限（D25）は応答ヘッダ
- * （GitHub）か `GET /personal_access_tokens/self`（GitLab。1 日 1 回）から読んで控え、画面へは期限だけを返す。
+ * （8.5・レビューの決定 D）。同じ検査を Python も行うので、書く先とパスは 2 か所で確かめる。PAT の期限（D25）は、
+ * GitHub なら応答ヘッダから、GitLab なら `GET /personal_access_tokens/self` から読んで記録し、画面へは期限だけを返す。
+ * GitLab に問い合わせるのは 1 日 1 回。
  *
- * 段階 5 から GitLab（`gitlab.ts`）も同じ操作の名前で受ける。`commit` の答えは `{oid, parent}`（parent は
- * ホストが実際に積んだ先。GitHub は `expectedHeadOid` で読んだ先頭に決まる。GitLab は事後に確かめる。8.4）。
- * 「始める」の `issues`（読む）と `createBranch`（ボードからだけ。登録したリポジトリの統合先の今の先頭から、
- * issue から決める形の名前で作る。予約の名前・統合先の名前は断る。8.6）を足した。
+ * 段階 5 から GitLab（`gitlab.ts`）も同じ操作の名前で受ける。`commit` の答えは `{oid, parent}` で、`parent` は
+ * ホストが実際に積んだ先（8.4）。GitHub では `expectedHeadOid` で読んだ先頭に決まり、GitLab では事後に確かめる。
+ * 「始める」のために、読む操作 `issues` と、ボードからだけ受ける `createBranch` を足した（8.6）。`createBranch` は
+ * 登録したリポジトリの統合先の今の先頭から、issue から決める形の名前でブランチを作り、予約の名前・統合先の名前は断る。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
@@ -95,7 +96,7 @@ export interface Deps {
   getToken(host: string): Promise<string>;
   setToken(host: string, token: string): Promise<void>;
   clearToken(host: string): Promise<void>;
-  /** PAT の期限の控え（D25）。PAT そのものとは別の鍵に置く */
+  /** PAT の期限の記録（D25）。PAT そのものとは別の鍵に置く */
   getMeta(host: string): Promise<TokenMeta>;
   /** 設定画面で登録したリポジトリ（書く頼みはここにあるものだけ受ける。決定 D） */
   getRepos(): Promise<RepoConfig[]>;
@@ -195,7 +196,7 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
     gitlabOk = res.ok && host.kind === "gitlab";
     return res;
   } finally {
-    // 応答から期限を読めたら控える（D25。ホストの値が正）
+    // 応答から期限を読めたら記録する（D25。ホストの値が正）
     const iso = seen.expiration ? github.parseExpiration(seen.expiration) : "";
     if (iso) {
       const meta = await deps.getMeta(host.id);
@@ -208,7 +209,7 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
 
 const DAY_MS = 24 * 3600 * 1000;
 
-/** GitLab の PAT の期限を 1 日 1 回聞いて控える（D25。読めなければ登録のときの日付のまま） */
+/** GitLab の PAT の期限を 1 日 1 回聞いて記録する（D25。読めなければ登録のときの日付のまま） */
 async function gitlabExpiry(client: github.Client, deps: Deps): Promise<void> {
   const meta = await deps.getMeta(client.host.id);
   const last = meta.checked ? Date.parse(meta.checked) : NaN;
@@ -222,7 +223,7 @@ async function gitlabExpiry(client: github.Client, deps: Deps): Promise<void> {
   await deps.setMeta(client.host.id, { ...meta, ...(iso ? { host: iso } : {}), checked: deps.now().toISOString() });
 }
 
-/** 書く頼みの断り（形が悪い・守りに当たった）。書く流れはこれを「先頭が動いた」と取り違えない */
+/** 書く頼みの断り（形が悪い・保護に当たった）。書く流れはこれを「先頭が動いた」と取り違えない */
 export const REFUSED = 400;
 
 function refuse(error: string): Response {
@@ -232,7 +233,7 @@ function refuse(error: string): Response {
 interface Addition extends github.FileAddition {
   /** GitLab の Commits API の action（作るか書き換えるか）。GitHub は使わない */
   readonly op?: "create" | "update";
-  /** GitLab: そのファイルを最後に変えたと書き手が知っているコミット（打ち消し。決定 A） */
+  /** GitLab: そのファイルを最後に変えたと書き手が知っているコミット（元に戻すコミットに使う。決定 A） */
   readonly last?: string;
 }
 
@@ -267,17 +268,17 @@ async function registered(deps: Deps, client: github.Client, o: string, r: strin
   return (await registeredRepo(deps, client, o, r)) !== undefined;
 }
 
-/** ホストの種類ごとの読み取り（書く頼みの守りが使う） */
+/** ホストの種類ごとの読み取り（書く頼みの保護が使う） */
 function api(client: github.Client) {
   return client.host.kind === "gitlab" ? gitlab : github;
 }
 
-/** 統合先の先頭の `.claude/settings.json` から置き場の綴りを読む。答えは置き場と、統合先の先頭 */
+/** 統合先の先頭の `.claude/settings.json` から置き場のパスの設定を読む。答えは置き場と、統合先の先頭 */
 async function placesAt(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string): Promise<{ places: Places; head: string }> {
   const a = api(client);
   const head = await a.branchHead(client, cfg.owner, cfg.repo, integ);
   if (head === null) throw new Error(`統合先 ${integ} がリモートに無い`);
-  // プロジェクトのリポジトリは、置き場の綴りをワークスペースの統合先の設定から読む（段階 5。3.3 の 7）
+  // プロジェクトのリポジトリは、置き場のパスをワークスペースの統合先の設定から読む（段階 5。3.3 の 7）
   const where = cfg.project ? await workspaceOf(deps, cfg) : { client, cfg, integ, head };
   const w = api(where.client);
   const objs = await w.pathObjects(where.client, where.cfg.owner, where.cfg.repo, where.head, [".claude/settings.json"]);
@@ -317,17 +318,17 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
 /**
  * 大文字小文字をそろえる（「始める」の重なりの検査）。作る名前は ASCII に限る（`startName`・Python の `ticket._ID`）ので
  * Python の casefold と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
- * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（締める向き。11.9.3 の 14）
+ * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（厳しくする向き。11.9.3 の 14）
  */
 function fold(text: string): string {
   return text.normalize("NFKC").toLowerCase();
 }
 
-/** 互換のマーカーの綴り（`ccnavi_chrome.COMPAT_FILE`） */
+/** 互換のマーカーのパス（`ccnavi_chrome.COMPAT_FILE`） */
 const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
 
 /**
- * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（8.6。二重の守り）: 閉じた識別子（`done/` の名前を
+ * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（8.6。二重の確認）: 閉じた識別子（`done/` の名前を
  * 大文字小文字をそろえて）と互換の版（ワークスペースの統合先の CCNAVI_COMPAT と同梱の版）。空なら作ってよい
  */
 async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string, head: string, name: string): Promise<string> {
@@ -431,7 +432,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       } catch (err) {
         return refuse((err as Error).message);
       }
-      // 書く先の守り（決定 D）: 登録したリポジトリだけ。統合先の名前と置き場の綴りはボードの値を信頼せず、自分で引く
+      // 書く先の保護（決定 D）: 登録したリポジトリだけ。統合先の名前と置き場のパスはボードの値を信頼せず、自分で引く
       const cfg = await registeredRepo(deps, client, o, r);
       if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなので書かない`);
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
@@ -439,7 +440,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       try {
         places = (await placesAt(deps, client, cfg, integ)).places;
       } catch (err) {
-        return refuse(`統合先 ${integ} の置き場の綴りを読めないので書かない（${(err as Error).message}）`);
+        return refuse(`統合先 ${integ} の置き場のパスを読めないので書かない（${(err as Error).message}）`);
       }
       const why = writeRefusal(checked.name, integ, [...checked.adds.map((e) => e.path), ...checked.dels.map((d) => d.path)], places);
       if (why) return refuse(why);
@@ -471,7 +472,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = await x.commitParents(client, o, r, github.checkOid(a));
       break;
     case "reviewCopy":
-      // レビュー済み（段階 4）: MR のスレッドとレビューの写し。読むだけ。登録したリポジトリだけ
+      // レビュー済み（段階 4）: MR のスレッドとレビューを取得する。読むだけ。登録したリポジトリだけ
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
       value = await x.reviewCopy(client, o, r, github.checkBranch(a));
       break;

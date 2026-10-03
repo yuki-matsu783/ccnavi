@@ -7,11 +7,11 @@
  *
  * GitLab の Commits API には「先頭がこの sha のときだけ」の指定が無い（8.4）。書く直前に先頭を読み、違えば書かずに
  * 「動いた」（409）で返す。それでも間に入った書き込みは防げないので、答えにコミットの親（`parent_ids[0]`）を返し、
- * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、打ち消す（D21 の 1 段目）。`seq` は書かない（2 段目）。
+ * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、元に戻す（D21 の 1 段目）。`seq` は書かない（2 段目）。
  *
- * MR のスレッドとレビューの写し（`reviewCopy`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
+ * MR のスレッドとレビュー（`reviewCopy`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
  * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の落とし方（jq の `//`・`tostring`、型は jq と同じく
- * そのまま写す）で組む。同じ見本（test/fixtures/host/gitlab/。手で組んだもの）から同じ写しになることを試験が見る。
+ * そのまま残す）で組む。同じ見本（test/fixtures/host/gitlab/。手で組んだもの）から同じ結果になることを試験が見る。
  *
  * レビューの後（11.9.1）: 書き込みの update・delete には `last_commit_id`（そのファイルを最後に変えたコミット）を付け、
  * 同じファイルを他人が変えていれば GitLab が断る（決定 A。ファイル単位の比較つきの書き込み）。MR は同じプロジェクトから
@@ -239,7 +239,7 @@ export async function tree(client: Client, owner: string, repo: string, _oid: st
   return out;
 }
 
-/** BOM を落とさない（落とすと、打ち消しで戻すバイト列が元と変わる） */
+/** BOM を落とさない（落とすと、元に戻すコミットで戻すバイト列が元と変わる） */
 const DECODER = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 function fromBase64(text: string): Uint8Array {
@@ -274,7 +274,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   return out;
 }
 
-/** PAT の持ち主のアカウント名（跡と印の `actor`。8.8・8.9） */
+/** PAT の持ち主のアカウント名（状態の履歴とレビュー済みのマーカーの `actor`。8.8・8.9） */
 export async function viewer(client: Client): Promise<string> {
   const { status, body } = await get(client, "/user");
   const name = (body as { username?: unknown } | null)?.username;
@@ -402,7 +402,7 @@ export async function discussions(client: Client, owner: string, repo: string, n
     if (alt(first.resolvable, false) === false) continue;
     const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
     const pos = first.position ?? null;
-    // jq と同じく、欄の型はそのまま写す（文字列の行番号を数に直さない）。書き手は username でなく id（11.9.1 の 15）
+    // jq と同じく、欄の型はそのまま残す（文字列の行番号を数に直さない）。書き手は username でなく id（11.9.1 の 15）
     out.push({
       id: tostring(d.id),
       resolved: resolvable.every((n) => alt(n.resolved, false) !== false),
@@ -422,7 +422,7 @@ export async function reviewers(client: Client, owner: string, repo: string, num
   const all = await pages(client, `${project(owner, repo)}/merge_requests/${number}/reviewers`, THREAD_PAGES, `マージリクエスト !${number} のレビュアー`);
   return (all as { state?: unknown; updated_at?: unknown; created_at?: unknown; user?: { id?: unknown; username?: unknown } | null }[]).map((r) => {
     const raw = alt(r.state, "");
-    // jq の ascii_upcase は文字列でなければ落ちる（sh は写しを組めずに止まる）。同じく止める
+    // jq の ascii_upcase は文字列でなければ落ちる（sh は取得した結果を組めずに止まる）。同じく止める
     if (r.state !== "requested_changes" && typeof raw !== "string") throw new HostError(`マージリクエスト !${number} のレビュアーの state が文字列でない`);
     return {
       state: r.state === "requested_changes" ? "CHANGES_REQUESTED" : asciiUpcase(raw as string),
@@ -441,7 +441,7 @@ export interface GitLabReviewCopy {
   readonly fetched_at: string;
 }
 
-/** 親のブランチの MR のスレッドとレビューの写し（8.9。`ccnavi-review.sh fetch` の GitLab の枝と同じ形） */
+/** 親のブランチの MR のスレッドとレビューを取得した結果（8.9。`ccnavi-review.sh fetch` の GitLab の枝と同じ形） */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<GitLabReviewCopy> {
   const mr = await openMr(client, owner, repo, branch);
   if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、開いているマージリクエストが無い`);
@@ -485,7 +485,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
 
 // ---- 書き込み（8.4 の 1 段目） -----------------------------------------------------------------
 
-/** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。打ち消しならユーザに回す */
+/** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。元に戻すコミットならユーザに回す */
 export const HOST_REFUSED = 409;
 /** 送る前の確認で先頭が読んだものと違った（何も送っていない）。読み直して試し直してよい */
 export const HOST_MOVED = 412;
@@ -529,7 +529,7 @@ export async function createCommit(
   const name = checkBranch(branch);
   const now = await branchHead(client, owner, repo, name);
   if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が読んだものと違う（書く前に動いた）`, HOST_MOVED);
-  // update・delete には、そのファイルを最後に変えたコミットを付ける（決定 A）。呼び手が知っていればそれ（打ち消しは自分の
+  // update・delete には、そのファイルを最後に変えたコミットを付ける（決定 A）。呼び手が知っていればそれ（元に戻すコミットでは自分の
   // コミット）、無ければ読んだ先頭の上の値。その後に他人が変えていれば GitLab が断る（400。ここでは 409 にする）
   const out: Record<string, unknown>[] = [];
   for (const a of actions) {
