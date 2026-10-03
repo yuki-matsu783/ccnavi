@@ -248,7 +248,7 @@ function fromBase64(text: string): Uint8Array {
 }
 
 /**
- * blob を sha で 1 件ずつ取る（`repository/blobs/:sha`）。8.2 の束の取り方は確認事項 2。
+ * blob を sha で 1 件ずつ取る（`repository/blobs/:sha`）。GraphQL の `blobs(paths:)` でまとめて取れるかは、まだ確かめていない（8.2、10.2 の確認事項 2）。
  * NUL を含むか UTF-8 として読めなければバイナリ。大きさが `size` と合わなければ止める
  */
 export async function blobs(client: Client, owner: string, repo: string, oids: readonly string[]): Promise<Record<string, BlobText>> {
