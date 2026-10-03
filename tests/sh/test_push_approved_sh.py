@@ -319,7 +319,7 @@ class PushApprovedTest(Workspace):
         self.assertNotIn(NOTHING, result.stdout)
 
     def test_does_not_read_the_place_variables(self):
-        """12（改）. 置き場を動かす環境変数は読まない。既定の置き場だけを運ぶ（ADR-0092、A9）。
+        """12（改）. 置き場を動かす環境変数は読まない。既定の置き場だけを運ぶ（置き場は固定。A9）。
 
         `CCNAVI_PROJECTS` / `CCNAVI_TICKETS_APPROVED` / `CCNAVI_TICKETS_PROPOSAL` を既定と違う
         値で入れても、`projects/` の下と既定の置き場（`.ccnavi/approved`）を運び、既定の

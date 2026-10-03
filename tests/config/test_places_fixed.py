@@ -1,4 +1,4 @@
-"""置き場は既定だけ（ADR-0092 の受入テスト。設計 wip/design/i0064-fixed-places.md §6 の A1・A2）。
+"""置き場は既定だけ（置き場の固定の受入。設計 wip/design/i0064-fixed-places.md §6 の A1・A2）。
 
 置き場を動かしていた 6 つの環境変数
 （`CCNAVI_PROJECTS` / `CCNAVI_PROJECT_HOME` / `CCNAVI_TICKETS_PROPOSAL` /
