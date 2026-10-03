@@ -4,3 +4,4 @@
 {"at": "2026-09-27T12:58:31Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 4, "mark": "requested"}
 {"at": "2026-09-27T13:05:27Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "board", "phase": 4, "mark": "reviewed"}
 {"at": "2026-09-27T23:26:26Z", "ticket": "i0064", "kind": "phase-reopened", "from": null, "to": null, "via": "board", "phase": 3, "cleared": ["requested", "reviewed", "pending"]}
+{"at": "2026-10-03T06:18:11Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 3, "mark": "pending"}
