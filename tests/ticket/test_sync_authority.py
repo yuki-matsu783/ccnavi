@@ -657,7 +657,8 @@ class PredecessorTest(AuthorityHarness):
         after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertNotIn("i0001-02", [b["ticket"] for b in after["batch"]])
         self.assertTrue(
-            any("家族が決まらない" in " ".join(r["problems"]) for r in after["rejected"]), after
+            any("親子のチケットが決まらない" in " ".join(r["problems"]) for r in after["rejected"]),
+            after,
         )
 
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):

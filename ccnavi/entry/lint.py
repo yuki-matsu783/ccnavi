@@ -904,7 +904,7 @@ def _branch_name_problems(
       （`ticket.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
     - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
       ブランチもワークツリーも同じ名前になる
-    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。家族を引くとき、別の親の子と読まれる
+    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。親子のチケットを引くとき、別の親の子と読まれる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
     `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
@@ -949,7 +949,7 @@ def _branch_name_problems(
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{name} は親なのに、識別子が子の形（`<親>-<2 桁>`）と一致する。"
-                f"家族をまとめるとき {matched.group('parent')} の子として扱われる。"
+                f"親子のチケットをまとめるとき {matched.group('parent')} の子として扱われる。"
                 "親の識別子の末尾を `-<2 桁>` にしないでください（親のブランチ名の規則）",
             )
         )
@@ -1125,18 +1125,18 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _sync(conf: settings.Settings, root: str) -> list[Problem]:
-    """取り込みの控えと、取り込み済みの家族の権威（写しの権威は親のブランチ 1 枚）。
+    """取り込みの控えと、取り込み済みの親子のチケットの権威（写しの権威は親のブランチ 1 枚）。
 
     - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査）
-    - 家族の控えが壊れている・gone・blocked、`present` なのに親のワークツリーが無い: error
-      （その家族は決まらないので、承認も状態の操作も止まる）。閉じた家族は、親のワークツリーが
+    - 親子のチケットの控えが壊れている・gone・blocked、`present` なのに親のワークツリーが無い: error
+      （その親子のチケットは決まらないので、承認も状態の操作も止まる）。閉じた親子のチケットは、親のワークツリーが
       残っていれば info（片付けてよい）、片付いていれば何も言わない（墓標）
     - 統合先の控えが壊れている・無い・読めない: error（識別子の再利用を確かめられない）
     - 作業ツリーの層と統合先の控えの層が違う: warn
     - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn
 
     親のワークツリーの外にしか無い写し（移行の検査）は、写しの `blocked` として
-    `_copy_problems` が error で言う。控えの無い家族は、最初の 1 つのほかは何も言わない。
+    `_copy_problems` が error で言う。控えの無い親子のチケットは、最初の 1 つのほかは何も言わない。
     """
     problems = _parent_trees_off_branch(conf, root)
     fams = syncstate.Families(conf, root)
@@ -1337,9 +1337,9 @@ def family_check(
 ) -> list[Problem]:
     """取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）。
 
-    この家族の承認済みチケットを判定し直し（C3）、権威の検査（親のワークツリーの外の写し・
+    この親子のチケットの承認済みチケットを判定し直し（C3）、権威の検査（親のワークツリーの外の写し・
     決まらない）とあわせて、止める理由（error）を返す。層の食い違いは warn で返す。
-    error があれば sh が家族の控えを `blocked` にする。`repo` は控えの名前（`self` か
+    error があれば sh が親子のチケットの控えを `blocked` にする。`repo` は控えの名前（`self` か
     プロジェクト名）で、sh が渡す。無ければ控えのあるリポジトリを全部探す。
     """
     fams = syncstate.Families(conf, root)
@@ -1394,7 +1394,7 @@ def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | N
     その後に手元の
     操作（着手・マーカーなど）の跡があれば、違いが手元の操作から来ることもあるので名指ししない。
     互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として版を名指しする
-    （止めるかどうかは変えない。家族の控えを `blocked` にするのは sh）。
+    （止めるかどうかは変えない。親子のチケットの控えを `blocked` にするのは sh）。
     """
     events, _ = history.read(settings.approved_dir(conf, t.tree_root), t.ticket)
     if not events:
@@ -1819,7 +1819,7 @@ LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 #
 # 守りと判定の働きを変える値（戻す働き・ccnavi 自身の設定の守り・確かめられないモードの止め・
 # 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
-# 他の機械で同じ家族の守りが別になる。入れないのは、判定の答えを変えない次の値だけ。
+# 他の機械で、同じ親子のチケットへの守りが別になる。入れないのは、判定の答えを変えない次の値だけ。
 # 実行ファイルの綴り（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
 # 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、見張りと待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
@@ -1845,7 +1845,7 @@ def _local_settings(root: str) -> list[Problem]:
 
     承認と判定は、置き場の綴りなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
-    ユーザが端末で打つ sh には使われないので、同じ家族を別の綴りで読むことになる。
+    ユーザが端末で打つ sh には使われないので、同じ親子のチケットを別の綴りで読むことになる。
     例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前はリポジトリに置かず、手元では環境変数で
     持つと決めた）。
     """
@@ -1865,8 +1865,8 @@ def _local_settings(root: str) -> list[Problem]:
             SEVERITY_ERROR,
             "(project)",
             f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
-            "ファイルに置かない（Chrome と端末の sh には使われないので、同じ家族をプロセスごとに"
-            "別の綴りで読むことになる）。"
+            "ファイルに置かない（Chrome と端末の sh には使われないので、同じ親子のチケットを"
+            "プロセスごとに別の綴りで読むことになる）。"
             f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
             "渡してください。"
             f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",

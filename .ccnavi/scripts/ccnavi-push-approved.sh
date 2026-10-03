@@ -10,14 +10,14 @@
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
-# 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の親のワークツリーは、
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの控えが present。chat だけのものを除く）の親のワークツリーは、
 # C1 と同じ手順で運ぶ。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（C1 の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
 # 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
 # push が落ちてもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
-# 答えない実行ファイルで家族の控えがあれば、運ばずに止める。
+# 答えない実行ファイルで親子のチケットの控えがあれば、運ばずに止める。
 #
-# <親> を並べると、その家族だけを運ぶ。取り込み済みでない家族は運ばない（今のまま、ユーザがコミット
+# <親> を並べると、その親子のチケットだけを運ぶ。取り込み済みでない親子のチケットは運ばない（今のまま、ユーザがコミット
 # する）。省けば今どおり、置き場に変更のあるツリー全部。
 #
 # 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
@@ -45,8 +45,8 @@ usage() {
 sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
 
   承認済みチケットの置き場に変更があるツリーごとに、その置き場だけをコミットし、
-  保護されたブランチでなければ push する。取り込み済みの家族の親のワークツリーは、
-  取り込んでから送る（C1 と同じ手順）。<親> を並べるとその家族だけ。
+  保護されたブランチでなければ push する。取り込み済みの親子のチケットの親のワークツリーは、
+  取り込んでから送る（C1 と同じ手順）。<親> を並べるとその親子のチケットだけ。
 USAGE
 }
 
@@ -102,7 +102,7 @@ state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {
 trap 'rm -f "$state"; ccnavi_c1_end' EXIT
 trap 'rm -f "$state"; ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- 取り込み済みの家族は C1 と同じ手順で運ぶ
+# ---- 取り込み済みの親子のチケットは C1 と同じ手順で運ぶ
 ccnavi_log_root="$root"
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-push-approved
@@ -130,7 +130,7 @@ carry_paths() {
 		"$ccnavi_c1_tmp/carry-all" >"$ccnavi_c1_tmp/carry" || :
 }
 
-# 取り込み済みの家族 1 つを運ぶ。ccnavi_c1_family を済ませた後に呼ぶ。0 運んだ（運ぶものが無いを含む）/ 1 落ちた
+# 取り込み済みの親子のチケット 1 つを運ぶ。ccnavi_c1_family を済ませた後に呼ぶ。0 運んだ（運ぶものが無いを含む）/ 1 落ちた
 carry_family() {
 	cf_p="$ccnavi_c1_family_id"
 	cf_tree="$ccnavi_c1_tree"
@@ -206,7 +206,7 @@ carry_family() {
 	return 1
 }
 
-# 家族を名指しされたとき。取り込み済みなら運び、そうでなければ運ばない（今のまま）。
+# 親子のチケットを名指しされたとき。取り込み済みなら運び、そうでなければ運ばない（今のまま）。
 if [ "$#" -gt 0 ]; then
 	named_rc=0
 	for want in "$@"; do
@@ -218,7 +218,7 @@ if [ "$#" -gt 0 ]; then
 			named_rc=1
 			;;
 		*)
-			printf '%s: 取り込み済みの家族でない（%s）。ここでは運ばない（今のまま、ユーザがコミットする）。\n' \
+			printf '%s: 取り込み済みの親子のチケットでない（%s）。ここでは運ばない（今のまま、ユーザがコミットする）。\n' \
 				"$want" "${ccnavi_c1_why:-対象外}"
 			;;
 		esac
@@ -294,14 +294,14 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		continue
 	fi
 
-	# 取り込み済みの家族の親のワークツリー（ディレクトリ名 = ブランチ名）は、取り込んでから送る。
+	# 取り込み済みの親子のチケットの親のワークツリー（ディレクトリ名 = ブランチ名）は、取り込んでから送る。
 	case "$tree" in
 	"$root/.claude/worktrees/$branch")
 		ccnavi_c1_family "$branch"
 		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$branch" ]; then
-			# 取り込み済みの家族の子のワークツリー。写しとマーカーは親のワークツリーに置くので、
+			# 取り込み済みの親子のチケットの子のワークツリー。写しとマーカーは親のワークツリーに置くので、
 			# 子のツリーの置き場の変更は運ばない（子のブランチはリモートに出さない）。
-			printf 'ccnavi-push-approved: %s は家族 %s の子のワークツリー。子のツリーの置き場の変更は運ばない（写しは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
+			printf 'ccnavi-push-approved: %s は親子のチケット %s の子のワークツリー。子のツリーの置き場の変更は運ばない（写しは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
 				"$name" "$ccnavi_c1_family_id" >&2
 			printf 'fail\n' >>"$state"
 			continue

@@ -849,7 +849,7 @@ def withdraw(
 
 
 def withdrawable(snapshot: Snapshot, family: str) -> list[tuple[str, str, list[str]]]:
-    """家族の作業中（`doing/`）の写しごとの (識別子, 題, 取り下げられない理由)。
+    """親子のチケットの作業中（`doing/`）の写しごとの (識別子, 題, 取り下げられない理由)。
 
     Chrome のボードが「取り下げ」を出すかを決めるのに使う。条件は `withdraw` と同じで、
     承認コミットの親の提案（`prior_proposals`）だけは引ける前提で見る（引くのはホストを読む側。
@@ -890,7 +890,7 @@ def _withdraw_problems(
     meta = meta if isinstance(meta, dict) else {}
     found: list[str] = []
     if copy.blocked:
-        # 家族が決まらない・親のブランチの外の写しなど。状態の操作と同じく止める
+        # 親子のチケットが決まらない・親のブランチの外の写しなど。状態の操作と同じく止める
         found.append(copy.blocked)
     if meta.get("revised_at") or meta.get("feedback_at"):
         found.append("改版した承認は取り下げられない（改版で動いたものを戻せない）")

@@ -5,16 +5,17 @@
 `ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
 ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
 
-- `ccnavi c1 family <識別子>`: その識別子の家族と、C1 の対象か
-  - 対象は、置き場の綴りが相対で、家族の控えがあり（取り込み済み）、chat だけの家族でなく、
-    止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い家族
-  - 止める理由のある取り込み済みの家族は `target stop`。sh は何も書かずに止める
+- `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象か
+  - 対象は、置き場の綴りが相対で、親子のチケットの控えがあり（取り込み済み）、chat だけの
+    親子のチケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の
+    無い親子のチケット
+  - 止める理由のある取り込み済みの親子のチケットは `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
 - `ccnavi c1 sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
   `wip/proposals/review/`）の変更を次の (b)・(c)・(d) に分ける
   - 版が無ければ未コミットの変更（取り込みの前にコミットする分）、版があれば `<版>..HEAD` で
     コミットに入った変更（取り込みの後に未送信を確かめる分）
-  - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その家族の
+  - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
     `phases/<親>/<N>.pending`・`.skipped` と、その印の跡（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
   - (c) ユーザが運ぶもの（ユーザの判断）。C1 は運ばずに止める。ユーザの判断が一緒に書く
@@ -73,7 +74,7 @@ _TIMEOUT = 20.0
 
 
 def family_of(ident: str) -> str:
-    """識別子の家族の親。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
+    """識別子が属する親子のチケットの親。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
     matched = ticket_mod.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
 
@@ -97,9 +98,11 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
     if _relative_places(conf) is None:
         return TARGET_NO, "置き場の綴りが絶対パス（C1 と Chrome の対象外）", st
     if not st.imported:
-        return TARGET_NO, "家族の控えが無い（取り込み済みでない。今の手元の動きのまま）", st
+        why = "親子のチケットの控えが無い（取り込み済みでない。今の手元の動きのまま）"
+        return TARGET_NO, why, st
     if _chat_only(conf, root, parent):
-        return TARGET_NO, "chat だけの家族（マージリクエストを持たない。今の手元の動きのまま）", st
+        why = "chat だけの親子のチケット（マージリクエストを持たない。今の手元の動きのまま）"
+        return TARGET_NO, why, st
     if st.stop or st.home is None:
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
     origin = gitcmd.run(st.home.root, ["config", "--get", "remote.origin.url"], _TIMEOUT)
@@ -111,7 +114,7 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
 
 
 def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
-    """`ccnavi c1 family <識別子>`。家族と、C1 の対象か。"""
+    """`ccnavi c1 family <識別子>`。親子のチケットと、C1 の対象か。"""
     parent = family_of(ident)
     lines = [("family", parent)]
     places = _relative_places(conf)
@@ -155,7 +158,7 @@ def sort(
     places = _relative_places(conf)
     st = syncstate.standing_any(conf, root, parent)
     if places is None or st.home is None:
-        stderr.write(f"ccnavi: c1 sort: 家族 {parent} の親のワークツリーが決まらない\n")
+        stderr.write(f"ccnavi: c1 sort: 親子のチケット {parent} の親のワークツリーが決まらない\n")
         return 1
     tree_root = st.home.root
     changed, why = _changed(tree_root, places, since)
@@ -281,7 +284,9 @@ def _lf(data: bytes) -> bytes:
 
 
 def _hook_mark(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:
-    """その家族の `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、中身が hook の欄だけ。"""
+    """その親子のチケットの `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、
+    中身が hook の欄だけ。
+    """
     if len(parts) != 3 or parts[0] != approval.PHASES_DIR or parts[1] != parent:
         return False
     if before is not None or now is None:
@@ -332,7 +337,7 @@ def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) ->
 
 
 def _hook_events(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:
-    """その家族の親の跡への、hook の印（pending・skipped）の行だけの追記か。"""
+    """その親子のチケットの親の跡への、hook の印（pending・skipped）の行だけの追記か。"""
     if len(parts) != 2 or parts[1] != f"{parent}{history.SUFFIX}":
         return False
     rows = _appended_rows(parts, now, before)

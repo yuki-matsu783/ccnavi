@@ -40,12 +40,12 @@
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
-# 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）では、状態を書く
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの控えが present。chat だけのものを除く）では、状態を書く
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook の印と跡を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
-# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
+# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
 # 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る。
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、運ぶ処理の打ち直しを案内する。
 # それ以外は今のまま。
@@ -693,13 +693,13 @@ c1_ccnavi() {
 	fi
 }
 
-# ユーザの判断を運ぶ。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
+# ユーザの判断を運ぶ。取り込み済みの親子のチケットだけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
 carry_human() {
 	ccnavi_c1_family "$1"
 	case "$ccnavi_c1_target" in
 	yes)
 		sh "$ccnavi_c1_sh/ccnavi-push-approved.sh" "$ccnavi_c1_family_id" || {
-			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが打ち直す（送るまで、この家族の状態の操作は止まる）\n' \
+			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが打ち直す（送るまで、この親子のチケットの状態の操作は止まる）\n' \
 				"$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
 			return 1
 		}
@@ -881,7 +881,7 @@ request)
 		fail explainer-unmet "ELI5 の HTML ($eli5) が依頼の前提を満たさない:${eli5_unmet}
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
-	# 段 0: 取り込み済みの家族なら C1 の前半（ロック・取り込み）を先に済ませる。
+	# 段 0: 取り込み済みの親子のチケットなら C1 の前半（ロック・取り込み）を先に済ませる。
 	c1_start "$branch"
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
 	tell_skew
@@ -1147,13 +1147,13 @@ close-early)
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	# 取り込み済みの家族なら、締めの印（ユーザの判断）を運ぶ処理で送る。
+	# 取り込み済みの親子のチケットなら、締めの印（ユーザの判断）を運ぶ処理で送る。
 	carry_human "$branch" || exit 1
 	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
 	;;
 chat)
 	# ユーザが端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る。
+	# 取り込み済みの親子のチケットなら、置いた後に運ぶ処理で送る。
 	n="${1:-}"
 	case "$n" in
 	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
@@ -1164,7 +1164,7 @@ chat)
 	;;
 config-synced)
 	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る。
+	# 取り込み済みの親子のチケットなら、置いた後に運ぶ処理で送る。
 	parent="${1:-}"
 	case "$parent" in
 	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;

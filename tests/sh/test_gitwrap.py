@@ -1094,7 +1094,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         self.assertEqual("origin", fields["remote"])
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), fields["sha"])
         self.assertTrue(fields["fetched_at"].isdigit())
-        self.assertIn("家族の控えを作った", result.stdout)
+        self.assertIn("親子のチケットの控えを作った", result.stdout)
         self.assertIn("ccnavi-sync.sh i0001", result.stdout)
 
     def test_uncommitted_store_changes_keep_the_family_out(self):
@@ -1114,7 +1114,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         result = self.push()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.fields()["sha"])
-        self.assertNotIn("家族の控えを作った", result.stdout)
+        self.assertNotIn("親子のチケットの控えを作った", result.stdout)
 
     def test_a_gone_family_is_not_pushed(self):
         write_text(
@@ -1321,7 +1321,7 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
     def test_the_family_record_is_written_through_the_link(self):
         result = run_in(self.via_link, "push", "-u", "origin", "i0001")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("家族の控えを作った", result.stdout)
+        self.assertIn("親子のチケットの控えを作った", result.stdout)
 
 
 class PushRemoteResolutionTest(FamilyRecordPushTest):

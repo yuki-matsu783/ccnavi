@@ -349,12 +349,12 @@ def acknowledge(
 ) -> int:
     """レビューの無いまま閉じる親で、ユーザが上書きを見たことを残す（`ccnavi --config-synced`）。
 
-    取り込み済みの家族が決まらない・閉じているなら、ほかの状態の操作と同じく止める
+    取り込み済みの親子のチケットが決まらない・閉じているなら、ほかの状態の操作と同じく止める
     （書く先が元ツリーの旧経路に落ちないように）。
     """
     st = syncstate.Families(conf, root).standing_any(parent)
     if st.imported and st.stop:
-        stderr.write(f"ccnavi: {parent}: {st.stop}。この家族の状態は動かさない\n")
+        stderr.write(f"ccnavi: {parent}: {st.stop}。この親子のチケットの状態は動かさない\n")
         for line in syncstate.guidance(root, st):
             stderr.write(f"  {line}\n")
         return 1

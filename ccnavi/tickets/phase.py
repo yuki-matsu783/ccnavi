@@ -362,8 +362,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
     合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのはユーザ。
 
-    取り込みの家族の控えを消す `ccnavi-sync.sh --forget` も止める。控え（墓標）を消すと、
-    決まらないで止めていた家族（gone など）が控えの無い家族に戻って動けるようになる。
+    取り込みの親子のチケットの控えを消す `ccnavi-sync.sh --forget` も止める。控え（墓標）を
+    消すと、決まらないで止めていた親子のチケット（gone など）が控えの無いものに戻り、
+    動けるようになる。
 
     ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
     ここではなく `human_path_form` が止める。実行ファイルの綴りに頼らず見るため。
@@ -377,8 +378,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
         # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古い写しが残っていても止める。
         r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(agree|approve|push-approved)\.sh\b"
-        # 家族の控え（墓標）を消す、ユーザが打つスクリプト。
-        # 消すと、止めていた家族が控えの無い家族として今の手元の動きに戻るので、打つのはユーザ。
+        # 親子のチケットの控え（墓標）を消す、ユーザが打つスクリプト。
+        # 消すと、止めていた親子のチケットが控えの無いものとして今の手元の動きに戻るので、
+        # 打つのはユーザ。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
         # ユーザの判断に使うスクリプト。中で `--reviewed --chat`・
         # `--config-synced`・`--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのはユーザ。
@@ -408,7 +410,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "残った指摘の対応方針はユーザがボードか端末で決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）もユーザが打ちます。"
-            "家族の控えを消す "
+            "親子のチケットの控えを消す "
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / config-synced / "
             "close-early'）もユーザが打ちます。"

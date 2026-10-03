@@ -523,7 +523,7 @@ class PushApprovedTest(Workspace):
         self.place(tree)
         named = self.push("i0001")
         self.assertEqual(named.returncode, 0, named.stdout + named.stderr)
-        self.assertIn("取り込み済みの家族でない", named.stdout)
+        self.assertIn("取り込み済みの親子のチケットでない", named.stdout)
         self.assertTrue(self.dirty(tree, APPROVED))
         self.assertEqual(self.remote_head("i0001"), "")
         outside = os.path.join(self._tmp.name, "elsewhere")
