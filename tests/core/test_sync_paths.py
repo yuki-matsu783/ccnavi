@@ -3,6 +3,7 @@
 `ccnavi-sync.sh` は jq を使わず JSON も読まない。置き場の綴りと、`.claude/settings.local.json` の
 `env` に書かれた統合先の名前を、実行ファイルが 1 行 1 項目（`<鍵> <値>`）で返す。
 統合先の名前は環境変数からは読まない（sh が先に環境変数を見る）。
+置き場は固定で、env では動かない（設計 wip/design/i0064-fixed-places.md）。
 """
 
 from __future__ import annotations
@@ -47,17 +48,29 @@ class SyncPathsTest(unittest.TestCase):
             self.paths(),
         )
 
-    def test_places_follow_the_environment(self):
+    def test_places_do_not_follow_the_environment(self):
+        # 置き場を動かしていた 6 つの env を、既定と違う綴り（相対・絶対・末尾 `/` 付き）で
+        # 全部入れても、返すのは既定の置き場。項目ごとではなく辞書全体で見る。
+        elsewhere = os.path.join(tempfile.gettempdir(), "ccnavi-elsewhere")
         found = self.paths(
             {
                 "CCNAVI_TICKETS_APPROVED": "tickets/approved/",
-                "CCNAVI_TICKETS_PROPOSAL": "tickets/proposals",
+                "CCNAVI_TICKETS_PROPOSAL": os.path.join(elsewhere, "proposals"),
                 "CCNAVI_PROJECT_HOME": ".nav",
+                "CCNAVI_PROJECTS": "repos/",
+                "CCNAVI_LOG": os.path.join(elsewhere, "log.jsonl"),
+                "CCNAVI_STATE": "state",
             }
         )
-        self.assertEqual("tickets/approved", found["approved"])
-        self.assertEqual("tickets/proposals", found["proposals"])
-        self.assertEqual(".nav", found["home"])
+        self.assertEqual(
+            {
+                "approved": ".ccnavi/approved",
+                "proposals": "wip/proposals",
+                "home": ".ccnavi",
+                "integration": "",
+            },
+            found,
+        )
 
     def test_the_integration_branch_comes_from_settings_local_json_only(self):
         # 環境変数は読まない。

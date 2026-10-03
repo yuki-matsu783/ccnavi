@@ -882,16 +882,22 @@ class StoreRewindTest(GitWrapperTest):
         self.assertIn("置き場", result.stderr)
         self.assertUntouched()
 
-    def test_a_moved_store_is_followed(self):
-        # 置き場の綴りを設定で動かしても、その綴りで止める。
+    def test_the_store_does_not_move_with_the_environment(self):
+        """置き場の env を入れても、既定の置き場を戻す形を止める（置き場は固定。A9）。
+
+        env で守りを外せないことを見る。`.ccnavi/scripts/` が写す版（i0064-10）になる前は落ちる。
+        写す前の sh（`ccnavi-git.sh` の `store_hit`）は `CCNAVI_TICKETS_APPROVED` の綴りを
+        置き場と読み、既定の置き場の restore を止めないため。
+        """
         result = self.run_wrapper(
             "restore",
             "--source",
             "HEAD~1",
-            "tickets/approved/doing/i0001.md",
+            self.COPY,
             env={"CCNAVI_TICKETS_APPROVED": "tickets/approved"},
         )
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertUntouched()
 
     def test_forms_outside_the_store_still_pass(self):
         for args in (
