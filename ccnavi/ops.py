@@ -259,10 +259,11 @@ def _close_parent(
     if failed:
         stderr.write(f"ccnavi: 締めた記録を書けない: {failed}\n")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
+    wip = ticket_mod.WIP_ROOT
     if phase.chat_only(root, conf, found.ticket, venues):
         stdout.write(
-            f"次は、この移動をコミットし、`{ticket_mod.WIP_ROOT}/` を消して"
-            f"（'{git_sh} rm -r {ticket_mod.WIP_ROOT}'）コミットし、統合先のブランチへ戻してください。"
+            f"次は、この移動をコミットし、`{wip}/` を消して"
+            f"（'{git_sh} rm -r {wip}'）コミットし、統合先のブランチへ戻してください。"
             "このチケットにはマージリクエストで見るフェーズが無いので、"
             "Draft を外す手順は無い。途中の作業は既定のブランチに残さない\n"
         )
@@ -272,8 +273,8 @@ def _close_parent(
         return
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     stdout.write(
-        f"次は、この移動をコミットし、`{ticket_mod.WIP_ROOT}/` を消して"
-        f"（'{git_sh} rm -r {ticket_mod.WIP_ROOT}'）コミットし、"
+        f"次は、この移動をコミットし、`{wip}/` を消して"
+        f"（'{git_sh} rm -r {wip}'）コミットし、"
         f"push してから '{review_sh} ready' で Draft を外してください"
         "（「マージに進んでよい」の合図）。途中の作業は既定のブランチに残さない。"
         "マージは利用者が squash で行う\n"
