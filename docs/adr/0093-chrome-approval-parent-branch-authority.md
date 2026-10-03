@@ -142,6 +142,9 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
       `--detach`・`-f`/`--force`・`-B`（今は `ccnavi-git.sh:247` で通している）、`checkout -B`/`switch -C`、親のワークツリーで別のブランチへ移る形を拒否する。
       同時に `:99` の使い方と `:607` の reset の拒否文を「リモートに合わせるなら `ccnavi-sync.sh <P>`。分かれていて進めないなら人に回す」に書き換える
     - 親のブランチに当たったときの文面は「親のブランチの名前は識別子で、変えると家族が止まる（3.6）」
+      「家族が止まる」とは次のことを指す。手元は親のワークツリーを「名前が `P` で、HEAD がブランチ `P` を指すもの」として探す。
+      HEAD が別のブランチを指すと、取り込み（`ccnavi-sync.sh`・SessionStart の早送り）がそのワークツリーを飛ばし、
+      取り込み済みの家族では親を決められず、親と子の承認・状態の操作・実行前の判定が止まる（3.3、3.5 の 3）
 11. **同じ関数**: 「チケット → 親のブランチ名」は `t.parent or t.ticket`。「issue → 識別子」は `f(番号, プロジェクト名)` の 1 つだけを `ticket.py` に置き、Pyodide でも使う
 12. **置き場の綴りが絶対パス**（`CCNAVI_TICKETS_APPROVED` などをリポジトリの外に向けた設定）のワークスペースは、C1 と Chrome の対象外にする。
     ブランチに乗らないので権威を `P` に置けない。lint がその旨を info で出す
@@ -1322,7 +1325,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | SessionStart の早送りだけ（D12） | `ccnavi-fetch.sh` | 取り込み済みの家族（`.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある）は、ロックを 1 回だけ試し、`origin/<P>` の祖先なら `merge --ff-only`。書きかけとの重なりは git に任せ、拒まれたら重なったパスと `ccnavi-sync.sh <P>` を言う。分かれていれば「取り込みが要る」と 1 行言う（merge しない）。開始から 45 秒（`CCNAVI_FETCH_BUDGET`）を過ぎたら飛ばして名指しする。それ以外のツリーは前のまま |
 | 「ref が無い」で落ちた fetch（3.6） | `ccnavi-fetch.sh` | `couldn't find remote ref` で落ちたら、その origin を落ちたものに数えない（同じ origin の統合先の取り込みを飛ばさない）。家族なら「`ccnavi-sync.sh <P>` で確かめる」と言う |
 | 最初の push と `gone` の拒否（4.3・3.6） | `ccnavi-git.sh` の `push)` | 送る前に、控えが `gone` の `P` への push を拒否する（控えを読むだけ。`ls-remote` はしない）。通った後、送った先が親のブランチ（ディレクトリ名 = ブランチ名、親の写しか提案がある）で送り先が origin なら、控えを `present` で作る。置き場（`approved/`・`proposals/review/`。未追跡を含む）に未コミットの変更があれば作らずに言う。`present` の控えは `sha` だけ書き直し、`closed` は触らない |
-| 付け替えと移動の拒否（D36・5.2・3.1 の 10） | `ccnavi-git.sh` の `worktree)`・`checkout \| switch)` | `worktree add` の `-B`・`--detach`/`-d`・`-f`/`--force` を拒否し、`-b` の名前（`-b` が無ければ 2 つ目の語）が行き先の名前と違えば拒否。`checkout -B`（束ねた `-qB` も）・`switch --force-create` を拒否（`switch -C` は全引数の `-C` で前から止まる）。親のワークツリーでは、自分のブランチと `HEAD` 以外へ移る形（`checkout <別>`・`-b`・`--orphan`・`--detach`・`switch --create`・`-d`・`-`）を拒否し、「親のブランチの名前は識別子で、変えると家族が止まる」と言う |
+| 付け替えと移動の拒否（D36・5.2・3.1 の 10） | `ccnavi-git.sh` の `worktree)`・`checkout \| switch)` | `worktree add` の `-B`・`--detach`/`-d`・`-f`/`--force` を拒否し、`-b` の名前（`-b` が無ければ 2 つ目の語）が行き先の名前と違えば拒否。`checkout -B`（束ねた `-qB` も）・`switch --force-create` を拒否（`switch -C` は全引数の `-C` で前から止まる）。親のワークツリーでは、自分のブランチと `HEAD` 以外へ移る形（`checkout <別>`・`-b`・`--orphan`・`--detach`・`switch --create`・`-d`・`-`）を拒否し、「親のブランチの名前は識別子で、変えると家族が止まる」と言う（「家族が止まる」の中身は 3.1 の 10） |
 | 案内文の書き換え（D36・3.1 の 10） | `ccnavi-git.sh` の使い方と `reset` の拒否文、`fetch`・`pull` の refspec の拒否文 | 「リモートに合わせるなら、親のブランチは `ccnavi-sync.sh <P>`。ほかのブランチは `fetch` のあと `merge <リモート>/<ブランチ>`。分かれていて進めないなら人に回す」。refspec の文は「手元の ref は `ccnavi-sync.sh <ブランチ>` が進める」 |
 | 統合先の名前の予約（3.1 の 5） | `ticket.branch_name_problems`、`lint`、`cli` の `--integration-branch` | 渡された統合先の名前（大文字小文字を区別しない）に当たる新規の親の識別子を `--lint` の warn で言う。環境変数は読まない |
 | 配る sh | `scripts/ccnavi-setup.sh` | `ccnavi-sync.sh` を配る一覧に足した（拒否の文面が案内するため） |
