@@ -18,7 +18,8 @@
 # コミットはパスを限る。`-a` も `add -A` も使わない。親のワークツリーにはユーザや他の
 # セッションの書きかけがあるので、巻き込むと承認のコミットに他人の変更が入る。
 #
-# 統合先が保護されている（main / master / develop / release）ときは push しない。
+# 統合先が保護されている（main / master / develop / release / release/*）か、そのリポジトリの
+# 統合先（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の控え → origin/HEAD）の上に居るときは push しない。
 # そこへ直接送る判断はユーザのものなので、綴りを出して止める。
 #
 # 終了コード: 0 成功 / 1 承認が通らなかった / 2 引数か環境の誤り

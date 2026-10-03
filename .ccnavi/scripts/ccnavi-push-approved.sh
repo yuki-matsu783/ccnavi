@@ -28,7 +28,8 @@
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
 #   1 件ずつも。辿るとワークスペースの外のリポジトリにコミットして push する
 # - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
-# - main / master / develop / release / release/* はコミットだけして push しない
+# - main / master / develop / release / release/* と、そのリポジトリの統合先（ccnavi-common.sh の
+#   ccnavi_integration。決まらなければ固定の並びだけ）はコミットだけして push しない
 # - 1 本のツリーで add・commit・push が落ちても、他のツリーは運ぶ
 #
 # 終了コード: 0 運ぶものが無い・全部コミットした（push しなかったブランチ、処理しなかったツリーを含む） /
@@ -353,6 +354,15 @@ $proposals/todo"
 		continue
 		;;
 	esac
+	# 固定の並びに無い名前の統合先（develop-v1.0.0 など）も送らない。名前は ccnavi-fetch.sh・
+	# ccnavi-git.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の控え → origin/HEAD →
+	# origin/main・master）で、そのツリーが属するリポジトリについて決める。決まらなければ固定の並びだけ。
+	integ=$(ccnavi_integration "$tree" "$root") || integ=""
+	if [ -n "$integ" ] && [ "$branch" = "$integ" ]; then
+		printf 'ccnavi-push-approved: %s は統合先 %s の上に居るので push しません。送るかどうかはユーザが決めます。\n' \
+			"$name" "$branch" >&2
+		continue
+	fi
 
 	# push は落ちても巻き戻さない。コミットは残るので、ユーザがもう一度送れる。
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
