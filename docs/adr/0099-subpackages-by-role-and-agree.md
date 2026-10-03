@@ -54,3 +54,9 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
   拡張の Pyodide の入口・テスト・`mock.patch` の文字列）の綴りが全部変わった。`--approve` を打っていた
   人と、改名の前の sh・拡張は動かなくなる（互換の版の食い違いとして知らせる）。`.ccnavi/scripts/` は
   保護された場所なので、sh の改名と互換の版の書き換えは人の手で入れる必要がある
+- 失ったもの（配布済みの Chrome 拡張）: COMPAT を 3 に上げたので、同梱の compat が 2 の配布済みの
+  Chrome 拡張は、統合先が COMPAT=3 になると「始める」・承認・取り下げを拒み、表示だけになる
+  （`chrome-extension/ccnavi-approval/src/core/protocol.ts:333-338`、`render.ts:71`。ADR-0093 の
+  7.3 の設計どおり）。拡張の配り直しが要る
+- 失ったもの（実行ファイル）: マージ後は `build.py` で実行ファイルを組み直すまで、端末の承認が通らない。
+  旧い実行ファイルは `--agree` を知らないので、新しい sh（`ccnavi-agree.sh`）から呼ぶと落ちる
