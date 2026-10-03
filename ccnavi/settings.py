@@ -33,7 +33,7 @@ from typing import NamedTuple
 # 判定の入口は固定される。
 MODE_ENV = "CCNAVI_MODE"
 # 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）も env では
-# 動かない。既定に固定で、下の DEFAULT_* がそれ（ADR-0084）。診断のために動かす道は `--log` /
+# 動かない。既定に固定で、下の DEFAULT_* がそれ。診断のために動かす道は `--log` /
 # `--state` / `--tickets` / `--approved` / `--projects` / `--project-home` のフラグだけで、
 # cli._override が重ねる。
 #
@@ -108,8 +108,8 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # 記録と控えは `logs/` に置く（ADR-0042）。`.claude/` には Claude Code 自身のもの
 # （settings.json・hooks・skills・worktrees）だけを残す。
 #
-# 置き場はどれもここに固定で、env でも上書き設定ファイルでも動かない（共通層は ADR-0052、
-# 残りは ADR-0084）。診断のために別の場所を指すのはフラグ（`--rules` / `--log` など）だけで、
+# 置き場はどれもここに固定で、env でも上書き設定ファイルでも動かない（共通層の
+# 決まりは ADR-0052）。診断のために別の場所を指すのはフラグ（`--rules` / `--log` など）だけで、
 # hook は引数を渡さずに起動するから、判定の入口はここから動かない。
 # 判定の記録のファイル名は `decisions.jsonl`（ADR-0092）。
 DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
@@ -415,7 +415,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     #
     # 置き場（共通層の 3 本、記録・控え・提案・承認済みチケット・プロジェクト・ccnavi
     # ディレクトリ）はこの表に無い。env でも上書き設定ファイルでも動かず、既定のまま。
-    # 動かせるのはフラグだけで、そちらは cli._override が重ねる（ADR-0052・ADR-0084）。
+    # 動かせるのはフラグだけで、そちらは cli._override が重ねる（ADR-0052。置き場は固定）。
     # 残る `bin` は置き場ではなく、hook が起動する実行ファイルの指定で、既定を持たない。
     overrides = (("bin", BIN_ENV, _resolve_bin),)
     for name, env, read in overrides:
