@@ -16,7 +16,7 @@ keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, ワーク
 - 使える道具は`jq` 1.6、Node 22（pnpm 10）、Python 3.12（uv）、goだけ。これ以外の道具がある前提で書かない
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
   `uv run --with pyinstaller python build.py`でビルドする。ビルドしていないとランチャーが終了コード127で終わり、
-  hookは何もしない（2026-09-25、Claude Code 2.1.282で実測）
+  hookは何もしない
 
 ## 呼び名
 
