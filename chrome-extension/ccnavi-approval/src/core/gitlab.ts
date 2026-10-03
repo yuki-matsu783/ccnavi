@@ -274,7 +274,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   return out;
 }
 
-/** PAT の持ち主のアカウント名（跡と印の `actor`。8.8・8.9） */
+/** PAT の持ち主のアカウント名（状態の履歴とマーカーの `actor`。8.8・8.9） */
 export async function viewer(client: Client): Promise<string> {
   const { status, body } = await get(client, "/user");
   const name = (body as { username?: unknown } | null)?.username;

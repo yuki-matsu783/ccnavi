@@ -42,10 +42,10 @@
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）では、状態を書く
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す（ADR-0093 の 4.3。段階 2d）。
-# ロック → 途中の操作の確認 → hook の印と跡を先にコミット → 取り込み → 未送信の確かめを済ませてから
+# ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
 # 人の判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
-# 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る（D27）。それ以外の家族は今のまま。
+# 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る（D27）。それ以外の家族は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
@@ -652,7 +652,7 @@ eli5_posted=""
 trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- C1（ADR-0093 の 4.3。段階 2d）と人の判断を運ぶ処理（4.6・D27）
+# ---- C1（ADR-0093 の 4.3。段階 2d）と、人の判断を送る承認の push（4.6・D27）
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
 ccnavi_c1_sh="$(dirname "$0")"
@@ -690,7 +690,7 @@ c1_ccnavi() {
 	fi
 }
 
-# 人の判断を運ぶ（D27）。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
+# 人の判断をコミットして push する（D27）。取り込み済みの家族だけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
 carry_human() {
 	ccnavi_c1_family "$1"
 	case "$ccnavi_c1_target" in
@@ -997,7 +997,7 @@ decide)
 		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡してください。" 2
 	fi
 	# 印に残すアカウント（ADR-0093 の 8.9。段階 5）。confirm と同じくトークンの持ち主をホストに聞き、
-	# ロックを取る前に引く。引けなければ渡さず、印も跡も前と同じ。見るだけの --preview は引かない。
+	# ロックを取る前に引く。引けなければ渡さず、マーカーも状態の履歴も前と同じ。見るだけの --preview は引かない。
 	# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
 	decide_who=""
 	if [ "$preview" -eq 0 ] && exe_knows --actor && exe_knows --via; then
@@ -1144,13 +1144,13 @@ close-early)
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	# 取り込み済みの家族なら、締めの印（人の判断）を運ぶ処理で送る（D27）。
+	# 取り込み済みの家族なら、締めのマーカー（人の判断）を承認の push で送る（D27）。
 	carry_human "$branch" || exit 1
 	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージは利用者が行う\n' "$url"
 	;;
 chat)
 	# 人が端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	# 取り込み済みの家族なら、置いた後に承認の push で送る（D27）。
 	n="${1:-}"
 	case "$n" in
 	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
@@ -1161,7 +1161,7 @@ chat)
 	;;
 config-synced)
 	# 人が端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	# 取り込み済みの家族なら、置いた後に承認の push で送る（D27）。
 	parent="${1:-}"
 	case "$parent" in
 	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;

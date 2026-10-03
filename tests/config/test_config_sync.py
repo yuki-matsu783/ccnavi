@@ -564,7 +564,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertIn("rules.yml", said.stdout + said.stderr)
 
     def test_close_problems_hold_ready_until_a_human_saw_it(self):
-        """Draft を外す `ready` も同じ門を通る。知らせていない上書きがあれば止める。"""
+        """Draft を外す `ready` も同じ人の確認を通る。知らせていない上書きがあれば止める。"""
         conf = self.settings()
         self.start_parent()
 

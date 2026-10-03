@@ -111,7 +111,7 @@ export type ApprovalInput =
   | { readonly kind: "confirm"; readonly tickets: readonly string[] }
   /**
    * 承認（`--approve --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
-   * `carrier` は承認済みチケットを運ぶ sh が置いてあるか（呼ぶ側が見て渡す）
+   * `carrier` は承認の push の sh が置いてあるか（呼ぶ側が見て渡す）
    */
   | { readonly kind: "approved"; readonly outcome: ApproveOutcome; readonly carrier: boolean }
   /** 「やめる」「閉じる」を押した（画面の Esc も同じ） */
@@ -158,7 +158,7 @@ export type ApprovalEffect =
       readonly digest: string;
       readonly only: readonly string[];
     }
-  /** 承認済みチケットを運ぶ sh を端末に送る */
+  /** 承認の push の sh を端末に送る */
   | { readonly kind: "carry" }
   /** 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す */
   | { readonly kind: "loadDecide"; readonly tree: string; readonly phase: number }
@@ -314,7 +314,7 @@ function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalSt
 function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolean): ApprovalStep {
   if (outcome.ok) {
     const count = outcome.value.approved.length;
-    // 運ぶ 1 行は、文を渡すのを待たずに端末へ出す。承認と同じ時点で出しておく
+    // 承認の push の 1 行は、文を渡すのを待たずに端末へ出す。承認と同じ時点で出しておく
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
@@ -324,7 +324,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回にまとめる（`board-panel.ts` の `again`）ので、
     // 監視と重なっても画面はちらつかない。**1 件も置かれていないなら読み直さない**（何も動いていない）。
     //
-    // 運ぶ sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる
+    // 承認の push の sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる
     const effects: ApprovalEffect[] =
       count === 0
         ? []

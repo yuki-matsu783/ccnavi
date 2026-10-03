@@ -195,7 +195,7 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
     gitlabOk = res.ok && host.kind === "gitlab";
     return res;
   } finally {
-    // 応答から期限を読めたら控える（D25。ホストの値が正）
+    // 応答から期限を読めたら控える（D25。ホストの値を優先する）
     const iso = seen.expiration ? github.parseExpiration(seen.expiration) : "";
     if (iso) {
       const meta = await deps.getMeta(host.id);

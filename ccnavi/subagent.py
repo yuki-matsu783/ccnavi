@@ -68,7 +68,7 @@ def at_start(
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return _say(stdout, skills)
-    # 権威のある側（親のツリー）の写しを読む。着手で書かれる基準点は親のツリーの
+    # 優先する側（親のツリー）の写しを読む。着手で書かれる基準点は親のツリーの
     # 写しにだけ入るので、子のツリーに checkout されている版では足りない。
     copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)

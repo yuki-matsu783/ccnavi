@@ -266,7 +266,7 @@ until a human has seen it at the terminal with
 
 
 # フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。
-# 空文字を受ける欄は、既定が None のフラグで運ぶ。「記録しない」「控えを持たない」を
+# 空文字を受ける欄は、既定が None のフラグで渡す。「記録しない」「控えを持たない」を
 # 言えないと、診断のための 1 回が、走っているセッションの記録と控えに必ず入り込む。
 OVERRIDES = (
     ("log", True),
@@ -289,7 +289,7 @@ RELATIVE_OVERRIDES = ("tickets", "project_home")
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
 # プロジェクトの層がまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
-# 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ門に載せる。
+# 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ制限に載せる。
 LAYER_OVERRIDES = (
     ("--rules", "rules", ""),
     ("--phases", "phases", None),
@@ -297,7 +297,7 @@ LAYER_OVERRIDES = (
     ("--projects", "projects", None),
     ("--project-home", "project_home", ""),
 )
-# 落としたときの文面。5 本のフラグで同じものを使う。門が 2 つあるように読ませない。
+# 落としたときの文面。5 本のフラグで同じものを使う。制限が 2 つあるように読ませない。
 DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
 # `.ccnavi/scripts/` の sh が自分で計算して渡す綴りと、渡されなかったときの値。
 # どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。
@@ -381,8 +381,8 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
-    状態の跡（history）の経路はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
-    人の判断の経路（端末・ボード）と hook は枝の中で差し替える。跡を書けなかった知らせは、
+    状態の履歴（history）の経路はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
+    人の判断の経路（端末・ボード）と hook は枝の中で差し替える。状態の履歴を書けなかった知らせは、
     起動を抜けるときに標準エラーへ出す（状態の操作は止めない。ADR-0086）。
     """
     with history.session(history.VIA_CLI, stderr):
@@ -493,7 +493,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # `review confirm` と、書く形の decide（`--reviewed N --accept-unresolved`。段階 5）が読む。
     parser.add_argument("--actor", default="")
     # decide の印の経路（`terminal`・`board`。8.9。段階 5）。`--actor` と一緒にだけ受ける
-    # （アカウントを引けなかったときは印も跡も前と同じにするため）。
+    # （アカウントを引けなかったときはマーカーも状態の履歴も前と同じにするため）。
     parser.add_argument("--via", default="")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
@@ -604,7 +604,7 @@ def _recorded_run(
         outside = _outside_places(root, args, base, reals)
         if outside:
             stderr.write(
-                "ccnavi: C1 が運ぶのは状態だけで、置き場の外に書き込みがあった（"
+                "ccnavi: C1 がコミットするのは状態だけで、置き場の外に書き込みがあった（"
                 + ", ".join(outside)
                 + "）。コミットしない\n"
             )
@@ -732,7 +732,7 @@ def _parsed(
     # フラグは設定ファイルより強い。書かれた綴りのほうも、そこに合わせて差し替える。
     if args.guard_ticket_approval:
         conf.guard_ticket_approval_declared = args.guard_ticket_approval
-    # この門は dry-run を取らない（selfguard.GATE_SETTINGS）。取れない語で書かれて
+    # この切り替えの環境変数は dry-run を取らない（selfguard.GATE_SETTINGS）。取れない語で書かれて
     # いたら、読めない値と同じく enable として扱う。--lint はそれを error にする。
     conf.guard_ticket_approval = selfguard.resolve(
         stderr,
@@ -884,7 +884,8 @@ def _parsed(
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
-    # 着手で上書きした設定を、人が端末で見たと残す。レビューの代わりなので、人の判断と同じ門。
+    # 着手で上書きした設定を、人が端末で見たと残す。
+    # レビューの代わりなので、人の判断と同じ扱いにする。
     if args.config_synced:
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
@@ -945,7 +946,7 @@ def _parsed(
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
     )
-    # この門は enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が
+    # この切り替えの環境変数は enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が
     # 持つので、ここに dry-run は無い。読めない値は enable になる。
     conf.guard_unwatched = selfguard.resolve(
         stderr,
@@ -1379,10 +1380,11 @@ def _decide_writes(args) -> bool:
 
 
 def _decide_actor(args) -> None:
-    """decide の印と跡に入れるアカウントと経路（ADR-0093 の 8.9。段階 5）。
+    """decide のマーカーと状態の履歴に入れるアカウントと経路（ADR-0093 の 8.9。段階 5）。
 
-    `--actor` があれば跡の行にアカウントを足し、`--via` があれば経路を差し替える。印の
-    `actor`・`via` は `review.apply_decision` がこの起動の値から書く。無ければ印も跡も前と同じ。
+    `--actor` があれば履歴の行にアカウントを足し、`--via` があれば経路を差し替える。印の
+    `actor`・`via` は `review.apply_decision` がこの起動の値から書く。
+    無ければマーカーも状態の履歴も前と同じ。
     """
     if not args.actor:
         return

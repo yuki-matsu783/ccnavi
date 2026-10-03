@@ -9,14 +9,16 @@
 2. 端末の無い `ccnavi-approve.sh` は承認の壁で止まり、何も置かず何も送らない
 3. `ccnavi-approve.sh` で承認する。承認済みチケットが `doing/` に置かれ、
    `ccnavi-push-approved.sh` が置き場（と消えた提案）だけをコミットして push する。
-   同じツリーの書きかけは運ばない。別の機械（clone）から承認済みチケットが読める
-4. 運ぶものが無ければ `ccnavi-push-approved.sh` は 0 で「運ぶ承認済みチケットは無い。」と言う
-5. `ccnavi-ticket.sh start` が承認済みチケットに書いた着手の欄を、`ccnavi-push-approved.sh` が運ぶ
+   同じツリーの書きかけはコミットしない。別の機械（clone）から承認済みチケットが読める
+4. コミットするものが無ければ `ccnavi-push-approved.sh` は 0 で
+   「コミットして push する承認済みチケットは無い。」と言う
+5. `ccnavi-ticket.sh start` が承認済みチケットに書いた着手の欄を、
+   `ccnavi-push-approved.sh` がコミットして push する
 
 単体のテスト（tests/ticket/test_ticket.py、tests/ticket/test_approve_json.py、
 tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で呼ぶか、承認を stub の sh で
-済ませていて、「実行ファイルが置いたものを sh が運ぶ」つなぎ目は通っていない。ここはその
-つなぎ目だけを見る。個々の分岐はあちらが見るので、ここで増やさない。
+済ませていて、「実行ファイルが置いたものを sh がコミットして push する」つなぎ目は
+通っていない。ここはそのつなぎ目だけを見る。個々の分岐はあちらが見るので、ここで増やさない。
 
 組み立て済みの実行ファイルが無ければ skip する（tests/e2e/test_e2e_sh.py と同じ前準備を使う）。
 試すのはソースではなくその実行ファイルなので、`ccnavi/` を直したら組み立て直してから回す。
@@ -47,7 +49,7 @@ TICKET = "i0001"
 APPROVED = ".ccnavi/approved/doing"
 PROPOSAL = "wip/proposals/todo"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
-NOTHING = "運ぶ承認済みチケットは無い。"
+NOTHING = "コミットして push する承認済みチケットは無い。"
 
 PROPOSAL_TEXT = f"""---
 version: 1
@@ -175,7 +177,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.ok(preview)
         self.assertEqual([TICKET], [b["ticket"] for b in json.loads(preview.stdout)["batch"]])
 
-        # 同じツリーの書きかけ。承認の段で運ばれてはいけない。
+        # 同じツリーの書きかけ。承認の段でコミットされてはいけない。
         write(os.path.join(self.tree, "seed.txt"), "書きかけ\n")
         write(os.path.join(self.tree, "src", "draft.py"), "x\n")
 
@@ -187,7 +189,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.assertEqual(proposed, out(self.tree, "rev-parse", "HEAD"))
         self.assertEqual("", self.remote_head())
 
-        # 3. 承認。実行ファイルが doing/ に置き、ccnavi-push-approved.sh が運ぶ。
+        # 3. 承認。実行ファイルが doing/ に置き、ccnavi-push-approved.sh がコミットして push する。
         approved = self.ok(
             self.run_sh(
                 "ccnavi-approve.sh", stdin="y\n", env={"CCNAVI_GUARD_TICKET_APPROVAL": "disable"}
@@ -197,7 +199,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.assertNotIn("読めない", approved.stderr)
         self.assertIn("ccnavi_approved:", self.read(self.approved_copy()))
         self.assertEqual(MESSAGE, out(self.tree, "log", "-1", "--format=%s"))
-        # 運んだのは置き場と、承認で todo/ から消えた提案だけ。
+        # コミットしたのは置き場と、承認で todo/ から消えた提案だけ。
         self.assertEqual(
             sorted([f"{APPROVED}/{TICKET}.md", f"{PROPOSAL}/{TICKET}.md"]), self.committed()
         )
@@ -213,14 +215,15 @@ class ApproveAndPushTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(there, "src", "draft.py")))
         self.assertEqual("seed\n", self.read(os.path.join(there, "seed.txt")))
 
-        # 4. もう運ぶものは無い。コミットもリモートも動かない。
+        # 4. もうコミットするものは無い。コミットもリモートも動かない。
         pushed = self.remote_head()
         idle = self.ok(self.run_sh("ccnavi-push-approved.sh", cwd=self.tree))
         self.assertIn(NOTHING, idle.stdout)
         self.assertEqual(pushed, out(self.tree, "rev-parse", "HEAD"))
         self.assertEqual(pushed, self.remote_head())
 
-        # 5. 着手の欄は実行ファイルが承認済みチケットに書く。運ぶのは ccnavi-push-approved.sh。
+        # 5. 着手の欄は実行ファイルが承認済みチケットに書く。
+        # コミットして push するのは ccnavi-push-approved.sh。
         self.ok(self.run_sh("ccnavi-ticket.sh", "start", TICKET, cwd=self.tree))
         started = self.read(self.approved_copy())
         self.assertNotIn('started_at: ""', started)

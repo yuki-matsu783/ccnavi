@@ -1,6 +1,6 @@
 """ccnavi の設定を解決する。
 
-設定は環境変数で運ぶ。プロジェクトはそれを Claude Code の設定ファイルの env
+設定は環境変数で渡す。プロジェクトはそれを Claude Code の設定ファイルの env
 ブロックに書く。エージェント側の設定スキーマが独自キーを拒むため、そこが独自の値を書ける
 唯一の場所になる。
 
@@ -63,7 +63,7 @@ GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # 「誰も見ないまま通った」になる。disable なら判定を返さず、そのモードの
 # 取り決めに委ねる。ccnavi はルールに書かれたものだけを止める道具になる。
 #
-# この門に dry-run は無い。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
+# この切り替えの環境変数に dry-run は無い。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
 GUARD_UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
@@ -136,7 +136,7 @@ DEFAULT_STATE = os.path.join("logs", "state")
 DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
-# 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
+# 承認をプロジェクトの git で共有するため。承認した人の機械にだけ在る形だと、A が承認して
 # B の機械で作業する流れが成り立たない（設計 9.2）。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ（ADR-0055）。
@@ -327,7 +327,7 @@ class Settings:
     #
     # guard_ticket_approval_declared は、解決する前に人が書いた綴り。判定はこれを
     # 読まない。読むのは --lint で、dry-run のように「書けるつもりで書かれたが
-    # この門には無い値」を名指しするために要る。解決した値だけを持っていると、
+    # この切り替えの環境変数には無い値」を名指しするために要る。解決した値だけを持っていると、
     # 書いた人の思い違いが enable として扱われた時点で消える。
     guard_ticket_approval: str = ""
     guard_ticket_approval_declared: str = ""
@@ -350,7 +350,7 @@ class Settings:
 
     # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
     # approved は承認済みチケットの置き場（各ツリーのルートからの相対、"/" 区切り）。
-    # 絶対で 1 か所を指さないのは、そのツリーの git に乗って運ばれるから。判定が読むのは
+    # 絶対で 1 か所を指さないのは、そのツリーの git に乗って他の PC に届くから。判定が読むのは
     # approved だけ。
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
     tickets: str = ""

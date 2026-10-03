@@ -3,7 +3,8 @@
 見るのは 4 つ。
 
 1. 手元の `review confirm --actor <アカウント>` は、印に `actor` と `via: cli` を書き、
-   跡にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）印も跡も前と同じ中身
+   状態の履歴にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）
+   マーカーも状態の履歴も前と同じ中身
 2. `--actor` の形と、`review confirm` の外で渡されたときは断る
 3. 依頼の後に人が見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）で決める。
    Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
@@ -358,7 +359,7 @@ class DecideActorTest(ActorHarness):
                 mark = read_json(self.mark_path())
                 self.assertEqual(list(mark), ["mr", "accepted", "actor", "via", "at"])
                 self.assertEqual((mark["actor"], mark["via"]), ("octo-reviewer", via))
-                # 印を置いた跡（親の phase-mark）にもアカウントと経路が入る
+                # マーカーを置いた履歴の行（親の phase-mark）にもアカウントと経路が入る
                 event = self.last_event("i0001")
                 self.assertEqual(event["kind"], history.KIND_PHASE_MARK)
                 self.assertEqual((event["actor"], event["via"]), ("octo-reviewer", via))

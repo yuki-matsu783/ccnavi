@@ -521,7 +521,7 @@ def _past(deadline: float | None) -> bool:
 
 @dataclass
 class _Dir:
-    """1 つのディレクトリの途中の姿。"""
+    """1 つのディレクトリの途中の状態。"""
 
     directory: str
     index_rel: str

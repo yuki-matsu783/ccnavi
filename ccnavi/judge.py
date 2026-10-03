@@ -734,7 +734,7 @@ def project_mismatch(
     """
     if t.is_main:
         return ""
-    # 読むのは権威のある側（親のツリー）の写し。子のツリーにも checkout されているが、
+    # 読むのは優先する側（親のツリー）の写し。子のツリーにも checkout されているが、
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
     # チケットの範囲がいつまでも判定に使われる。
     assert index is not None

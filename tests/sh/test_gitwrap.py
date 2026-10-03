@@ -271,7 +271,7 @@ class PassTest(GitWrapperTest):
     def test_push_sends_the_current_branch(self):
         """作業用のブランチは、そのままの名前で送れる。
 
-        レビューはマージリクエストの実物に結ぶので、そこまではエージェントが運べる。
+        レビューはマージリクエストの実物に結ぶので、そこまではエージェントが進められる。
         統合（マージ）は利用者の側に残してある。
         """
         bare = self.make_bare()

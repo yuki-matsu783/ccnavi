@@ -599,7 +599,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 
 /**
  * 家族が C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
- * フローの保存の後、運ぶ処理を送るかを決めるのに使う（ADR-0093 の 4.6）。
+ * フローの保存の後、承認の push を送るかを決めるのに使う（ADR-0093 の 4.6）。
  */
 export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
   const launcher = findLauncher(root, setting);

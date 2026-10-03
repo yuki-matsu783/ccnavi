@@ -124,7 +124,7 @@ def report(
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
     )
-    # 確認できる者が居ないモードの門。2 値しか取らないので、受け皿も分ける。
+    # 確認できる者が居ないモードの切り替えの環境変数。2 値しか取らないので、受け皿も分ける。
     unwatched_said = io.StringIO()
     guard_unwatched = selfguard.resolve(
         unwatched_said,
@@ -149,7 +149,7 @@ def report(
         Problem(SEVERITY_WARN, "(unwatched)", line.removeprefix("ccnavi: "))
         for line in unwatched_said.getvalue().splitlines()
     ]
-    # この門に dry-run は無い。書いた人は「止めずに報告する」つもりでいるのに、
+    # この切り替えの環境変数に dry-run は無い。書いた人は「止めずに報告する」つもりでいるのに、
     # 実際は enable と同じに止める。設定ファイルを読んだだけでは、その食い違いが
     # どこにも現れない。warn ではなく error にするのは、直すまで意味が変わらない、
     # つまり直さないと設定ファイルの書き方と実際の動きが食い違ったままになるため。
@@ -264,7 +264,8 @@ def report(
 
 
 # 戻す働きの 2 つが、切られている・予行になっているときに言うこと。
-# 3 値（enable / dry-run / disable）を取る門なので、止めない 2 つの値それぞれに文がある。
+# 3 値（enable / dry-run / disable）を取る切り替えの環境変数なので、
+# 止めない 2 つの値それぞれに文がある。
 _CORE_FILES_VOICE = {
     selfguard.DISABLE: (
         "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
@@ -299,15 +300,16 @@ def _shown(declared: str, mode: str) -> str:
 
 
 def _gate(name: str, declared: str, mode: str, voices: dict[str, str]) -> list[Problem]:
-    """守る働きを持つ門が、止めない値になっていることを言う。enable なら何も言わない。
+    """守る働きを持つ切り替えの環境変数が、止めない値になっていることを言う。
+    enable なら何も言わない。
 
     見るのは `CCNAVI_MODE` を反映したあとの値（`modes.effective_setting`）。書かれた値だけを
-    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた門を「守っている」と読むことに
+    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた切り替えを「守っている」と読むことに
     なる。実行時はモードに従って戻さないので、それはこの検査がいちばん言うべき
     「切れているのに揃って見える」そのものになる。
 
     実際の値が書かれた値と違うときは、そのことも言う。言わないと、直す先が
-    その門なのか `CCNAVI_MODE` なのかが読めない。
+    その切り替えの環境変数なのか `CCNAVI_MODE` なのかが読めない。
     """
     effective = modes.effective_setting(mode, declared)
     said = voices.get(effective)
@@ -521,7 +523,7 @@ def _copy_problems(
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する（ADR-0058）。
 
-    置き場を動かして承認する運びでは `--approve` を通らないので、承認のときにしか
+    置き場を動かして承認する進め方では `--approve` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
     止まる場所は書き込みのときで、そこで初めて知るのは遅い。ここで全部言う。
 
@@ -772,10 +774,10 @@ def _proposal_problems(
 
     `closed` は `done/` の承認済みチケット。`proposals` は `todo/` と `review/`。作業中と
     レビュー待ちと閉じたの 3 つを横断して数えないと、`doing/` と `done/` に同じ識別子が
-    在る形（動かす途中で止まった跡）を CI が見逃し、状態の操作が「複数の場所にある」で
+    在る形（動かす途中で止まって残ったもの）を CI が見逃し、状態の操作が「複数の場所にある」で
     止まって初めて知ることになる。
 
-    **同じリポジトリの中ではツリーごとに数える。** 承認済みチケットは git に入れて運ぶので、
+    **同じリポジトリの中ではツリーごとに数える。** 承認済みチケットは git に入れて共有するので、
     切ったワークツリーの数だけ写しができる。しかもワークツリーはそれぞれ別のコミットを指すので、
     古いほうで `doing`・新しいほうで `done` になるのも普通の形。ツリーをまたいだ食い違いまで
     咎めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、`--lint` が
@@ -789,7 +791,7 @@ def _proposal_problems(
     problems: list[Problem] = []
 
     # ツリーと状態は分けて持つ。同じ識別子が別のツリーに在るのは普通で（承認済みチケットは
-    # git に入れて運ぶので、切ったワークツリーの数だけ写しができる）、しかもワークツリーは
+    # git に入れて共有するので、切ったワークツリーの数だけ写しができる）、しかもワークツリーは
     # それぞれ別のコミットを指すから、古いほうが doing・新しいほうが done になるのも普通。
     # 咎めるのは 1 つのツリーの中で 2 つの状態に在る形だけ。
     def place(t, state: str) -> tuple[str, str, str]:
@@ -797,7 +799,7 @@ def _proposal_problems(
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
-    # 写りそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket.collisions` が
+    # 写りそのものも識別子ごとに持つ。どれを優先するか決まるかの判断は `ticket.collisions` が
     # 決め、ボードの `scattered` と状態の操作が止まる条件に揃える（同じ答えを 2 か所で
     # 出さない）。数えるのは `index`（識別子ごとに 1 つ）ではなく全部。同じ識別子が 2 つ
     # 残っているのがまさに言いたい形なので、引き当ての表で数えると自分でまとめてしまう。
@@ -882,8 +884,8 @@ def _proposal_problems(
                 )
             )
             continue
-        # 権威のツリーでまとめて 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
-        # 置き場に在る形（動かす途中で止まった跡）。`todo/` に在るのは親の改版の途中なので
+        # 優先するツリーでまとめて 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
+        # 置き場に在る形（動かす途中で止まって残ったもの）。`todo/` に在るのは親の改版の途中なので
         # 咎めない。ツリーをまたいだ写りはまとめれば 1 つに決まるので、ここには出てこない。
         caught = ticket_mod.collisions(held[ticket_id])
         if not caught:
@@ -1060,7 +1062,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     """各層の phases / risk が、共通層と合成できるか（設計 11.4.1、11.4.2）。
 
-    見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
+    見るのは合成したあとの内容。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
     全欄一致で捨てた重複を info で言う。共通層自身の苦情は `_phases` / `_risk` が
     別に言うので、ここでは層の側だけを数える。
@@ -1128,7 +1130,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _sync(conf: settings.Settings, root: str) -> list[Problem]:
-    """取り込みの控えと、取り込み済みの家族の権威（ADR-0093 の 3.3・3.5・3.6。段階 2c）。
+    """取り込みの控えと、取り込み済みの家族で優先するツリー（ADR-0093 の 3.3・3.5・3.6。段階 2c）。
 
     - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査 3.5 の 1）
     - 家族の控えが壊れている・gone・blocked、`present` なのに親のワークツリーが無い: error
@@ -1195,7 +1197,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                 f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
                 f"親のブランチの名前は識別子（{work.name}）と同じで、取り込み（ccnavi-sync.sh）と"
-                "権威の検査は同じ名前のブランチだけを見る。"
+                "どのツリーを優先するかの確認は同じ名前のブランチだけを見る。"
                 "親が閉じるのを待ってから、ブランチを切り替えてください",
             )
         )
@@ -1336,7 +1338,7 @@ def family_check(
 ) -> list[Problem]:
     """取り込みの後の検査（ADR-0093 の 4.2 の 4。`ccnavi sync check <P> [<リポジトリ>]`）。
 
-    この家族の承認済みチケットを判定し直し（C3）、権威の検査（親のワークツリーの外の写し・
+    この家族の承認済みチケットを判定し直し（C3）、どのツリーを優先するかの確認（親のワークツリーの外の写し・
     決まらない）とあわせて、止める理由（error）を返す。層の食い違い（D28）は warn で返す。
     error があれば sh が家族の控えを `blocked` にする。`repo` は控えの名前（`self` か
     プロジェクト名）で、sh が渡す。無ければ控えのあるリポジトリを全部探す。
@@ -1389,9 +1391,9 @@ def family_check(
 def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | None:
     """この写しを最後に書いたのが Chrome 拡張なら、その拡張の版（7.3）。そうでなければ None。
 
-    跡の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
+    状態の履歴の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
     その後に手元の
-    操作（着手・マーカーなど）の跡があれば、違いが手元の操作から来ることもあるので名指ししない。
+    操作（着手・マーカーなど）の履歴の行があれば、違いが手元の操作から来ることもあるので名指ししない。
     互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として版を名指しする
     （止めるかどうかは変えない。家族の控えを `blocked` にするのは sh）。
     """

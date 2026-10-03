@@ -1,7 +1,7 @@
 /**
  * PAT の期限の知らせ（ADR-0093 の 5.5・D25）。
  *
- * 期限の正はホストの PAT の期限。GitHub は応答ヘッダ `github-authentication-token-expiration` で
+ * 期限はホストの PAT の期限を優先する。GitHub は応答ヘッダ `github-authentication-token-expiration` で
  * 返すので、service worker がホストを呼ぶたびに読んで控える。読めなければ、登録のときに利用者が
  * 入れた日付を使う。どちらも無ければ「期限不明」と出し続ける。
  * 切れる 7 日前から、service worker が 1 日 1 回比べてバッジに出し、ボードは帯で出す。

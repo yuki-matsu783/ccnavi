@@ -366,8 +366,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     端末であることを求めるので、hook から呼んでも通らないが、綴りで止めておけば
     「なぜ通らないのか」が当たったルールの id で分かる。
 
-    承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
-    合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのは人。
+    承認の push（`ccnavi-push-approved.sh`）も止める。コミットして push することは
+    合意そのものではないが、push は外へ出す操作で、その時機を決めるのは人。
 
     取り込みの家族の控えを消す `ccnavi-sync.sh --forget` も止める。控え（墓標）を消すと、
     決まらないで止めていた家族（gone など）が控えの無い家族に戻って動けるようになる。
@@ -387,7 +387,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         # 消すと、止めていた家族が控えの無い家族として今の手元の動きに戻るので、打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
         # 人の判断に使うスクリプト（ADR-0093 の 4.6。段階 2d）。中で `--reviewed --chat`・
-        # `--config-synced`・`--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのは人。
+        # `--config-synced`・`--close-early` を起こし、最後に承認の push を呼ぶ。打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
         r"(chat|config-synced|close-early)\b"
     )
@@ -1127,7 +1127,7 @@ def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[in
 def chat_only(
     root: str, conf: settings.Settings, parent_id: str, venues: dict[int, str] | None = None
 ) -> bool:
-    """マージリクエストに出さない運び方か。フェーズが 1 つも無ければ False。
+    """マージリクエストに出さない進め方か。フェーズが 1 つも無ければ False。
 
     1 つでも `mr` で見るフェーズがあれば、その親にはマージリクエストが在る（レビューの依頼が作る）
     ので、締めたあとも Draft を外す手順を通る。`venues` は数え直しを省くために呼ぶ側が渡す値。

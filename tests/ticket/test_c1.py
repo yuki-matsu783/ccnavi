@@ -126,9 +126,9 @@ class SortTest(AuthorityHarness):
         )
 
     def test_b_is_only_the_hook_marks_of_this_family(self):
-        """跡は親の phase-mark の pending・skipped だけ。
+        """状態の履歴は親の phase-mark の pending・skipped だけ。
 
-        別の親・別の種類・全角の数字・新しい跡のファイルは (b) にしない。
+        別の親・別の種類・全角の数字・新しい状態の履歴のファイルは (b) にしない。
         """
         self.append_event(
             {"at": "t", "ticket": "i0001", "kind": "phase-mark", "phase": 1, "mark": "reviewed"}
@@ -159,7 +159,7 @@ class SortTest(AuthorityHarness):
         self.assertTrue(any("UTF-8" in why for why in self.last_why), self.last_why)
 
     def test_crlf_in_the_working_tree_still_reads_as_an_append(self):
-        """autocrlf で作業ツリーの跡だけが CRLF でも、hook の追記は (b)。"""
+        """autocrlf で作業ツリーの状態の履歴だけが CRLF でも、hook の追記は (b)。"""
         path = os.path.join(self.parent_tree, *self.events().split("/"))
         with open(path, "rb") as f:
             body = f.read()

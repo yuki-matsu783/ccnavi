@@ -114,7 +114,7 @@ test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出�
   assert.equal(parsed.board.tickets[1].blocked, "");
 });
 
-test("CB-T259 history は実行ファイルの跡を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+test("CB-T259 history は実行ファイルが渡す状態の履歴を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら履歴を出さない。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));

@@ -242,10 +242,10 @@ def _close_parent(
     """親を閉じたあとの記録と案内。
 
     記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
-    統合先へ戻す前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
+    統合先へ戻す前に `wip/` ごと消えるので、マージリクエストを作らない進め方では
     締めた事実の残る先がここしか無い（設計 9.8）。
 
-    案内は運び方で分かれる。マージリクエストがあるなら Draft を外す合図まで、無いなら統合先へ戻す
+    案内は進め方で分かれる。マージリクエストがあるなら Draft を外す合図まで、無いなら統合先へ戻す
     ところまで。ccnavi はどちらでもマージしない。
     """
     from .review import WIP_ROOT
@@ -385,7 +385,7 @@ def record_risk(
 def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
     """このチケットの層を決める `project:`（設計 11.4.1、11.4.2）。
 
-    権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
+    優先するのは承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値は人が承認していないので、判定の根拠にしない。
     """
     if not found.is_child:
@@ -420,7 +420,7 @@ def _score_child(
         approval.read_child_record(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
         or {}
     )
-    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、この C1 で運ぶ
+    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、この C1 でコミットする
     # （ADR-0093 の 4.3「そのほか」）。
     fsio.note_input(
         approval.child_record_path(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
@@ -478,7 +478,7 @@ def _places(
 ) -> tuple[list[ticket_mod.Ticket], list[str], list[ticket_mod.Problem]]:
     """この識別子のチケットが在る置き場を全部引く。読めなかった理由と提案の不備も返す。
 
-    権威のあるツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
+    優先するツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
     """
     hits: list[ticket_mod.Ticket] = []
     copies, notes = approval.scan(conf, root)
@@ -488,7 +488,7 @@ def _places(
     closed, _ = approval.scan(conf, root, closed=True)
     hits += [t for t in closed if t.ticket == ticket_id]
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
-    # `todo/` は承認の前の姿。承認済みチケット（作業中・レビュー待ち・閉じた）が在れば、同じ
+    # `todo/` は承認の前の状態。承認済みチケット（作業中・レビュー待ち・閉じた）が在れば、同じ
     # 識別子の `todo/` は改版の候補か書き損じで、状態の操作の相手ではない（`--lint` が言う）。
     if not hits:
         hits += [t for t in proposals if t.ticket == ticket_id and t.state == ticket_mod.TODO]
@@ -507,11 +507,11 @@ def _undecided(
     root: str = "",
     conf: settings.Settings | None = None,
 ) -> None:
-    """どれが本物か決まらないときの文面。次にすることまで書く。
+    """どれを優先するか決まらないときの文面。次にすることまで書く。
 
     「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
-    できることが読めない。権威の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの家族は権威が親のブランチに決まって
+    できることが読めない。優先するツリーの決まり方（親のツリー → 元ツリー）と、この場面で
+    それが決まらない理由を名指しする。取り込み済みの家族は優先するツリーが親のブランチに決まって
     いるので、3.6 の案内（ADR-0093）を出す。
     """
     home = hits[0].parent or hits[0].ticket
@@ -519,23 +519,24 @@ def _undecided(
     st = approval.family_standing(conf, root, hits[0]) if conf is not None else None
     if st is not None and st.imported:
         stderr.write(
-            f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）の写しだけ"
-            "（取り込み済みの家族）。ほかのツリーの写しは読まない\n"
+            f"  優先するのは、親のブランチ {home} のワークツリー"
+            f"（.claude/worktrees/{home}）にある承認済みチケットだけ"
+            "（取り込み済みの家族）。ほかのツリーのものは読まない\n"
         )
         for line in syncstate.guidance(root, st) if st.stop else []:
             stderr.write(f"  {line}\n")
         if not st.stop:
             stderr.write(
-                "  親のワークツリーの外の写しは、親のブランチへ運んでから消すか、"
+                "  親のワークツリーの外の写しは、親のブランチにコミットしてから消すか、"
                 "残ったワークツリーを片付けてから打ち直してください\n"
             )
         return
     stderr.write(
-        f"  本物は、親 {home} のワークツリーの写し。無ければ元ツリー"
-        "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）の写し\n"
+        f"  優先するのは、親 {home} のワークツリーにある承認済みチケット。無ければ元ツリー"
+        "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）のもの\n"
     )
     stderr.write(
-        "  どちらにも無いか、元ツリーより先の置き場に在る写しがあると、どれが本物か決まらない。"
+        "  どちらにも無いか、元ツリーより先の置き場に在る写しがあると、どれを優先するか決まらない。"
         "先に進んだ側を合流させるか、残ったワークツリーを片付けてから打ち直してください\n"
     )
 
@@ -545,7 +546,7 @@ def _find(
 ) -> ticket_mod.Ticket | None:
     """この識別子のチケットを、どの置き場に在っても 1 つ引く。`state` に置き場が入る。
 
-    2 つ以上残れば、どれが本物か決まらないので止める。
+    2 つ以上残れば、どれを優先するか決まらないので止める。
     """
     hits, notes, problems = _places(root, conf, ticket_id)
     if not hits:
@@ -587,8 +588,8 @@ def family_stopped(
         stderr.write(
             f"ccnavi: {found.ticket}: 写しが親のブランチ {st.family} のワークツリーの外"
             f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの家族では"
-            "親のブランチの写しだけが本物なので、この写しは動かさない\n"
-            f"  人がその写しを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
+            "親のブランチにある承認済みチケットだけを優先するので、この写しは動かさない\n"
+            f"  人がその写しを親のワークツリー（.claude/worktrees/{st.family}）へ移して"
             "コミットと push をしてから打ち直す\n"
         )
         return True
@@ -650,7 +651,7 @@ def _predecessors_unmet(
     """子の先行が全部 `done/` に在って取り消しでないか（ADR-0088）。欠けていれば止めて言う。
 
     承認でも同じ検査を当てるが、承認のあとに先行が動くこと（人が `done/` から戻す）と、置き場を
-    手で動かして承認する運び（ADR-0058）があるので、着手の手前でもう一度見る。どの先行が何の
+    手で動かして承認する進め方（ADR-0058）があるので、着手の手前でもう一度見る。どの先行が何の
     状態か、どうすればよいかを 1 本ずつ言う。
     """
     unmet = approval.unmet_predecessors(found, approval.predecessor_pool(conf, root))
@@ -939,7 +940,9 @@ def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
 
 
 def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
-    """促した (チケット, HEAD) を控える。書けなければ理由。git で運ぶ跡（history）には入れない。"""
+    """促した (チケット, HEAD) を控える。書けなければ理由。
+    git で共有する状態の履歴（history）には入れない。
+    """
     path = _nudge_path(state_dir, session)
     data = fsio.read_dict(path) or {}
     data[found.ticket.ticket] = found.head

@@ -765,7 +765,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         review_copies,
         approval.types_resolver(conf, root, open_copies),
     )
-    # 先行を引く池。承認と着手が使うのと同じ集め方（ADR-0088）。
+    # 先行を引く対応表。承認と着手が使うのと同じ集め方（ADR-0088）。
     preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
     approval.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
@@ -778,9 +778,9 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     proposal_index = approval.by_id(proposals)
     open_index = approval.by_id(open_copies + review_copies)
     closed_index = approval.by_id(closed_copies)
-    # 同じ識別子が写っている場所の全部。権威の側は proposal に、残りは seen_in に出す。
+    # 同じ識別子が写っている場所の全部。優先するツリーの側は proposal に、残りは seen_in に出す。
     # 写りがあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
-    # 食い違いを意味しない。どれが本物か決まらないぶんだけを scattered に出す。数え方は
+    # 食い違いを意味しない。どれを優先するか決まらないぶんだけを scattered に出す。数え方は
     # `ticket.collisions` に置いてあり、--lint と同じ関数を通る（同じ答えを 2 か所で出さない）。
     grouped = ticket_mod.by_ticket(everything)
     seen = {tid: [_where(t) for t in hits] for tid, hits in grouped.items()}
@@ -1010,7 +1010,7 @@ def _ticket_record(
         "flow": flow.info(conf, root, copy if copy is not None else source),
         "risk": None,
         "judge": None,
-        # 状態が動いた跡の新しい側（ADR-0086）。補助で、状態の正は上の置き場の欄。
+        # 状態の履歴の新しい側（ADR-0086）。補助で、状態は上の置き場の欄で決まる。
         "history": [],
     }
     where = approval.home_dir(conf, root, ticket_id, source.parent, project=source.project)

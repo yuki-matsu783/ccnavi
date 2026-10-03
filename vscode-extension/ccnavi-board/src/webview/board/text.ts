@@ -196,7 +196,7 @@ export const VIA_LABELS: Readonly<Record<string, string>> = {
 
 /**
  * 履歴の 1 行の本文。「承認（承認待ち → 作業中）」「フェーズ 1: レビュー依頼済み」「取り消し（作業中 → 完了）: 理由」。
- * 実行ファイルが書いた跡を言い換えるだけで、ここから状態を組み直さない
+ * 実行ファイルが書いた状態の履歴を言い換えるだけで、ここから状態を組み直さない
  */
 export function historyText(e: HistoryEntryJson): string {
   const phase = e.phase === null ? "" : `フェーズ ${e.phase}: `;

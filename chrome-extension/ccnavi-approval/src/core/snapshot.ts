@@ -371,7 +371,7 @@ export interface FamilyRead extends IntegrationRead {
 
 /**
  * 書く流れのために、家族 1 つぶんを新しく読み直す（8.3 の 2・4。毎回 Snapshot を組み直す）。
- * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の姿を読み直す。8.4）
+ * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の状態を読み直す。8.4）
  */
 export async function readFamily(repo: RepoConfig, family: string, deps: Deps, at?: string): Promise<FamilyRead> {
   const reader = new Reader(repo, deps);

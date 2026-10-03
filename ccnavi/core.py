@@ -6,7 +6,7 @@
 
 - **Reader**: 段階 2a では Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
   作業ツリー、Chrome は MEMFS に組んだ仮のツリー（ADR-0093 の 8.2「段階 1〜2a は MEMFS」）。
-  ブランチごとの blob の表から読む形（`NOT_FETCHED`）は、権威を `P` に固定する段階 2c 以降
+  ブランチごとの blob の表から読む形（`NOT_FETCHED`）は、優先するツリーを `P` に固定する段階 2c 以降
 - **判定**: `judge_approval`（6.2 の `judge`。実行前の判定のモジュール `ccnavi.judge` と
   紛れないように名前を変えた）は承認の対象と画面と指紋を、`withdraw` と `confirm` は通らない
   理由を返す
@@ -16,7 +16,7 @@
 - **Writer(FS)**: `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
   （`fsio.recording`）がそのまま使われる
 - **Clock**: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
-  記録と跡に同じ時刻を書く
+  記録と状態の履歴に同じ時刻を書く
 
 判定そのもの（`approval.gather` / `candidates` / `waiting`、`review` の検査）は今のコードを
 そのまま通る。ここは入口と出口の形を揃えるだけで、判定は変えない。
@@ -43,7 +43,7 @@ from . import ticket as ticket_mod
 class Actor:
     """誰がどの経路で動かしたか。`account` はホストのアカウント名か手元の git の user（8.9）。
 
-    空なら書かない（段階 2a の手元の経路は、印と跡の中身を今のままにする）。
+    空なら書かない（段階 2a の手元の経路は、マーカーと状態の履歴の中身を今のままにする）。
     """
 
     account: str = ""
@@ -225,11 +225,11 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> appro
     - `FAIL_WARN`: 同じ形で言って続ける
     - `FAIL_LINE`: 行を出し、同じ組の残り（続く書き込みと行）を飛ばす
     - `FAIL_QUIET`: 何も出さずに続ける
-    - `FAIL_HISTORY`: 跡の書けなかった知らせに溜める（入口が警告で出す）
+    - `FAIL_HISTORY`: 状態の履歴を書けなかった知らせに溜める（入口が警告で出す）
 
     並べる段で止まっていたら（`planned.stopped`）、並べた分を書いてから同じ形で言って止める。
     `view_only` の書き込みは書かない。`Call` は同じ組で書けた名札（`tag`）を渡して呼び、
-    返った行を出す（マーカーの消去の行と跡は、実際に消せた種類で書く）。
+    返った行を出す（マーカーの消去の行と状態の履歴は、実際に消せた種類で書く）。
     """
     placed: list[str] = []
     skipped: set[int] = set()
@@ -606,7 +606,8 @@ def confirm(
     if ph is None:
         return Checked([f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"], None)
     if approval.MARK_REVIEWED in ph.marks:
-        # 重ね打ちで印と跡を書き直さない（11.8.1 の決定 B。`_already_requested` と同じ文面の形）
+        # 重ね打ちでマーカーと状態の履歴を書き直さない
+        # （11.8.1 の決定 B。`_already_requested` と同じ文面の形）
         return Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
@@ -627,8 +628,9 @@ def confirm(
         return Checked(problems, None)
     stamp = snapshot.stamp or fsio.stamp()
     notes = io.StringIO()
-    # 跡の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形（8.9）。アカウントと
-    # 拡張の版も跡に足す（分かるときだけ。手元で引けなかったときは前と同じ中身）。
+    # 状態の履歴の経路は Snapshot の経路（Chrome なら chrome）。
+    # 取り下げと同じ形（8.9）。アカウントと
+    # 拡張の版も状態の履歴に足す（分かるときだけ。手元で引けなかったときは前と同じ中身）。
     actor = snapshot.actor
     with (
         fsio.staging() as stage,
@@ -644,7 +646,8 @@ def confirm(
 
 
 def _unwritten(text: str) -> list[str]:
-    """並べる段で跡を書けないと分かった知らせ。書いても跡が残らないので、error として返す。
+    """並べる段で状態の履歴を書けないと分かった知らせ。
+    書いても履歴が残らないので、error として返す。
 
     手元の Writer(FS) なら警告で続ける所だが、ここで分かるのは書く前（識別子の形が違う、
     リンクになっている）なので、書かずに止めて直させる。
@@ -673,7 +676,8 @@ def confirm_local(
     置くと review → core → review の循環になる）。
 
     `actor` は `ccnavi-review.sh` がトークンの持ち主を引いて `--actor` で渡すアカウント（8.9。
-    段階 4）。あれば印に `actor` と `via: cli` を書く。空（引けなかった）なら印も跡も前と同じ。
+    段階 4）。あれば印に `actor` と `via: cli` を書く。
+    空（引けなかった）ならマーカーも状態の履歴も前と同じ。
     """
     found = review._parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
@@ -760,7 +764,7 @@ def moved_on_host(
 
 
 def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_mod.Ticket | None:
-    """作業中の親の承認済みチケット（権威のある側）。`phase.parent_for_cwd` と同じ引き方。"""
+    """作業中の親の承認済みチケット（優先する側）。`phase.parent_for_cwd` と同じ引き方。"""
     open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval.by_id(open_copies), parent_id)
     if found is None or found.is_child:

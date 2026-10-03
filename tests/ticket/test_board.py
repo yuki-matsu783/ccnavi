@@ -85,7 +85,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(parent["copy"]["status"], "open")
 
     def test_scattered_is_empty_while_the_home_tree_holds_one_copy(self):
-        """写りがあること自体は普通。権威のツリーに 1 つあれば散在ではない。"""
+        """写りがあること自体は普通。優先するツリーに 1 つあれば散在ではない。"""
         self.scene()
         for t in self.board()["tickets"]:
             self.assertEqual(t["scattered"], [], t["ticket"])
@@ -99,7 +99,7 @@ class BoardTest(PhaseHarness):
         )
 
     def move(self, ticket_id, source_tree, target_tree, state="todo"):
-        """提案を 1 つ、ツリーからツリーへ手で動かす。権威のツリーを作り変えるため。"""
+        """提案を 1 つ、ツリーからツリーへ手で動かす。優先するツリーを作り変えるため。"""
         source = os.path.join(source_tree, "wip", "proposals", state, ticket_id + ".md")
         with open(source, encoding="utf-8") as f:
             text = f.read()
@@ -107,7 +107,7 @@ class BoardTest(PhaseHarness):
         return write(os.path.join(target_tree, "wip", "proposals", state, ticket_id + ".md"), text)
 
     def test_scattered_is_empty_when_the_home_tree_is_gone_but_the_origin_holds_one(self):
-        """親のツリーが無ければ元ツリーが権威。片付けただけの形を散在に数えない。
+        """親のツリーが無ければ元ツリーを優先する。片付けただけの形を散在に数えない。
 
         親のワークツリーは合流したら片付ける。そこを行き先の無いまま数えると、片付けた
         家族のカードが全部「複数の場所にある」になり、状態の操作も止まる。
@@ -124,7 +124,7 @@ class BoardTest(PhaseHarness):
         )
 
     def test_scattered_lists_every_copy_when_no_authoritative_tree_holds_one(self):
-        """親のツリーにも元ツリーにも無ければ、どれが本物か決まらない。候補を全部出す。"""
+        """親のツリーにも元ツリーにも無ければ、どれを優先するか決まらない。候補を全部出す。"""
         self.scene()
         elsewhere = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
         self.move("i0001-03", self.parent_tree, elsewhere)
@@ -138,7 +138,9 @@ class BoardTest(PhaseHarness):
         self.assertEqual(by_id["i0001-02"]["scattered"], [])
 
     def test_scattered_says_the_same_tree_holding_two_places(self):
-        """動かす途中で止まった跡は、権威のツリーの中でも言う（`--lint` と同じ数え方）。"""
+        """動かす途中で止まって残ったものは、優先するツリーの中でも言う
+        （`--lint` と同じ数え方）。
+        """
         self.scene()
         doing = os.path.join(self.approved, "doing", "i0001-02.md")
         with open(doing, encoding="utf-8") as f:

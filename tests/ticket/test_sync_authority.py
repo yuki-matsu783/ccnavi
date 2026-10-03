@@ -1,6 +1,6 @@
-"""取り込み済みの家族の権威（ADR-0093 の 3.3〜3.6。段階 2c）。
+"""取り込み済みの家族で優先するツリー（ADR-0093 の 3.3〜3.6。段階 2c）。
 
-家族の控え（`<控えの置き場>/sync/<リポジトリ>/families/<P>`）がある家族は、権威を親のブランチ
+家族の控え（`<控えの置き場>/sync/<リポジトリ>/families/<P>`）がある家族は、優先するツリーを親のブランチ
 （`.claude/worktrees/<P>` で HEAD が `<P>` を指すツリー）に固定し、決まらなければ承認も状態の操作も
 実行前の判定も止める。控えの無い家族は前と同じ答え（D11）。
 
@@ -111,7 +111,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual("new", found.sha)
 
     def test_a_swap_that_never_ends_reads_as_broken(self):
-        # 取り込んだ跡があるのに入れ替えが終わらなければ、何も言わずに「控えが無い」にせず
+        # 取り込んだ形跡があるのに入れ替えが終わらなければ、何も言わずに「控えが無い」にせず
         # 壊れているとする。
         self.put("sync/self/integration.old.9/head", "branch main\n")
         started = time.monotonic()
@@ -214,7 +214,7 @@ class NoRecordTest(AuthorityHarness):
         )
         self.assertEqual(before[:3], after[:3])
         self.assertNotEqual("deny", after[0])
-        # lint は他の家族（i0099）の控えと、取り込んだ跡があるのに統合先の控えが無いことだけを
+        # lint は他の家族（i0099）の控えと、取り込んだ形跡があるのに統合先の控えが無いことだけを
         # 足して言う。
         extra = [
             p
@@ -281,8 +281,8 @@ class PresentTest(AuthorityHarness):
         lines = check.stdout.splitlines()
         self.assertEqual("check 1", lines[0])
         self.assertTrue(lines[1].startswith("error "), check.stdout)
-        # 人が運ぶ手順も言う（3.5）。
-        self.assertIn("運んでコミットと push", check.stdout)
+        # 人が親のブランチへ移してコミットする手順も言う（3.5）。
+        self.assertIn("移してコミットと push", check.stdout)
 
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
         self.record("present")
@@ -584,7 +584,7 @@ class IntegrationDoneTest(AuthorityHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         self.assertIn("i0001-02", [b["ticket"] for b in self.preview()["batch"]])
-        # 家族の控えが無くても、取り込んだ跡のあるリポジトリなら統合先の done/ で確かめる
+        # 家族の控えが無くても、取り込んだ形跡のあるリポジトリなら統合先の done/ で確かめる
         # （3.3 の 4）。
         self.integration_done("i0001-02")
         preview = self.preview()
@@ -611,7 +611,7 @@ class IntegrationDoneTest(AuthorityHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         base = os.path.join(self.state, "sync", "self")
-        # 取り込んだ跡（家族の控え）はあるのに統合先の控えが無い
+        # 取り込んだ形跡（家族の控え）はあるのに統合先の控えが無い
         # （最初の push で家族の控えができた直後など）。
         self.record("present")
         preview = self.preview()
@@ -636,7 +636,8 @@ class IntegrationDoneTest(AuthorityHarness):
 
 class PredecessorTest(AuthorityHarness):
     def test_an_undecided_predecessor_family_is_not_met(self):
-        # 先行 i0002-01 は元ツリーの done/ にある（前の池では満たす）。家族 i0002 は取り込み済みだが
+        # 先行 i0002-01 は元ツリーの done/ にある（前の対応表では満たす）。
+        # 家族 i0002 は取り込み済みだが
         # 親のワークツリーが無い（決まらない）ので、満たしたとみなさない。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done", "i0002-01.md"),
@@ -659,7 +660,7 @@ class PredecessorTest(AuthorityHarness):
         )
 
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
-        # 締める向きだけ: 親のワークツリーで閉じていても、前の池で満たしていなければ満たさない。
+        # 締める向きだけ: 親のワークツリーで閉じていても、前の対応表で満たしていなければ満たさない。
         Ticket = approval.ticket_mod.Ticket
         done = Ticket(ticket="i0001-09", parent="i0001", state="done", tree_root=self.parent_tree)
         stale = Ticket(ticket="i0001-09", parent="i0001", state="doing", tree_root=self.root)
@@ -667,7 +668,7 @@ class PredecessorTest(AuthorityHarness):
         self.record("present")
         approval.align_imported(self.conf(), self.root, pool)
         self.assertEqual([done, stale], pool["i0001-09"])
-        # 親のワークツリーで閉じていなければ、それを採る（前の池が満たしていても）。
+        # 親のワークツリーで閉じていなければ、それを採る（前の対応表が満たしていても）。
         doing = Ticket(ticket="i0001-08", parent="i0001", state="doing", tree_root=self.parent_tree)
         closed = Ticket(ticket="i0001-08", parent="i0001", state="done", tree_root=self.root)
         pool = {"i0001-08": [doing, closed]}

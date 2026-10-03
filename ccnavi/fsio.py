@@ -34,7 +34,7 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 # ---- 時計（Clock の差し口。ADR-0093 の 6.2）
 #
 # 時刻はこの 2 つの関数だけが読む。`clock` で固定すると、その間の `stamp` と `utc_stamp` は
-# 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と跡（`at`）に同じ時刻を
+# 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と状態の履歴（`at`）に同じ時刻を
 # 書き、Chrome（Pyodide）と手元が同じ入力から同じバイト列を出すため。
 _CLOCK: dict = {"fixed": ""}
 _STAMP_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
@@ -66,7 +66,9 @@ def stamp() -> str:
 
 
 def utc_stamp() -> str:
-    """跡に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。固定した時刻があればそれを直す。"""
+    """状態の履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。
+    固定した時刻があればそれを直す。
+    """
     fixed = _CLOCK["fixed"]
     if fixed:
         return _parse_stamp(fixed).astimezone(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -561,7 +563,7 @@ def load_text(path: str) -> str:
 # 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
 # 読んだファイルの中身の指紋を控える。無かった・読めなかったファイルも「無い」として控える
 # （後から現れれば判定が変わりうる）。控える段（`staging`）から読んだ分は数えない（判定の
-# 入力ではなく、plan の途中の姿）。承認の指紋（`approval.approval_digest`）がこれを使う。
+# 入力ではなく、plan の途中の内容）。承認の指紋（`approval.approval_digest`）がこれを使う。
 #
 # 中身は改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。機械の
 # 改行で指紋が変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
@@ -652,8 +654,8 @@ def _record(path: str) -> None:
 def note_input(path: str) -> None:
     """読んだ入力を、書いたものと同じく一覧に載せる（在るときだけ）。
 
-    record-risk の記録（`<子>.judge.json`）は自分では運ばず、それを読む `finish` の C1 が運ぶ
-    （ADR-0093 の 4.3）。
+    record-risk の記録（`<子>.judge.json`）は自分ではコミットせず、
+    それを読む `finish` の C1 がコミットする（ADR-0093 の 4.3）。
     """
     if _RECORDERS and os.path.lexists(path) and not os.path.islink(path):
         _record(path)
@@ -691,7 +693,7 @@ FAIL_STOP = "stop"  # そこで止め、理由を呼び手へ返す
 FAIL_WARN = "warn"  # 標準エラーに言って続ける
 FAIL_LINE = "line"  # 知らせる行を標準出力に出し、同じ組の残りを飛ばす
 FAIL_QUIET = "quiet"  # 何も出さずに続ける
-FAIL_HISTORY = "history"  # 跡の書けなかった知らせに溜めて続ける（history.py）
+FAIL_HISTORY = "history"  # 状態の履歴を書けなかった知らせに溜めて続ける（history.py）
 
 
 @dataclass(frozen=True)
@@ -733,7 +735,7 @@ class Op:
     data: bytes = b""
     temp_suffix: str = ""
     policy: Policy = field(default_factory=Policy)
-    # 見え方（Changes）にだけ載せ、Writer(FS) は書かない。同じ中身を `Call` が書く（跡）。
+    # 見え方（Changes）にだけ載せ、Writer(FS) は書かない。同じ中身を `Call` が書く（状態の履歴）。
     view_only: bool = False
 
 
@@ -742,7 +744,7 @@ class Call:
     """Writer(FS) が、同じ組の書き込みを済ませた後に呼ぶ手順。
 
     `run` は組の中で書けた `tag` の集まりを受け、見せる行を返す。書けたものに合わせて
-    行と跡を書く所（マーカーの消去）で使う。控える段では呼ばない。
+    行と状態の履歴を書く所（マーカーの消去）で使う。控える段では呼ばない。
     """
 
     run: Callable[[set[str]], list[str]]

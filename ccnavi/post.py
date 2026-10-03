@@ -300,7 +300,7 @@ def _committed_findings(
     数えていない期間を、数えたことにしない。
 
     チケットの置き場は外す。承認は人が提案を `.ccnavi/approved/` へ動かして
-    コミットする運びで（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
+    コミットする進め方で（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
     外さないと、人が承認するたびに、その操作が違反としてターンの報告に並ぶ。
     置き場の綴りは `places` で受け取る。チケット制御を切ったワークスペースでも
     承認のコミットは在りうるので、`scope` の有無で外れたり外れなかったりさせない。
@@ -730,8 +730,8 @@ def _script_writes(
 
     * どちらの版も範囲を宣言していないもの（マーカー、`.risk.json`、閉じの記録）
     * スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
-    * `finish` と `cancel` の移動。同じ姿のチケットが `doing/` から消えて、レビュー待ちか
-      閉じた置き場に現れた組。片側だけなら外さない
+    * `finish` と `cancel` の移動。正規化した内容が同じチケットが `doing/` から消えて、
+      レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
 
     範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済みチケット、消えただけの
     チケットは外さず、今までどおり報告する。承認済みチケットの frontmatter はそのワークツリーの
@@ -769,7 +769,7 @@ def _script_writes(
         # （`ticket.script_fields_set`）。
         drop = _droppable(before)
         if _shape(before, drop) == _shape(now, drop):
-            # 同じ姿。どちらも範囲を宣言していない（マーカー・記録）か、
+            # 正規化した内容が同じ。どちらも範囲を宣言していない（マーカー・記録）か、
             # まだ無かったスクリプトの欄が足されただけか。
             out.add(change.full)
         elif now is None or _shape(now, drop) is None:
@@ -780,15 +780,15 @@ def _script_writes(
         ):
             arrived.append((change, now))
     for change, before, drop in gone:
-        # 行き先の姿は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
+        # 行き先の正規化した内容は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
         # 消えた側がまだ持っていないので落ち、着手の時刻と基準点は両側に残る。
         shape = _shape(before, drop)
         landed = [c for c, now in arrived if _shape(now, drop) == shape]
         leaving = [c for c, other, _ in gone if _shape(other, drop) == shape]
-        # **組は 1 対 1 のときだけ外す。** どちらかの側に同じ姿が 2 つ以上あると、
+        # **組は 1 対 1 のときだけ外す。** どちらかの側に同じ内容が 2 つ以上あると、
         # どれがどれの行き先なのかを内容からは決められない。正規の移動 1 件に、
-        # 同じ姿のチケットのただの削除や、行き先に直接置いた偽物も一緒に外れる。
-        # 同じ姿ということは識別子まで同じということなので、揃うのは普通の手順では
+        # 同じ内容のチケットのただの削除や、行き先に直接置いた偽物も一緒に外れる。
+        # 同じ内容ということは識別子まで同じということなので、揃うのは普通の手順では
         # 起きない。曖昧なら全部報告する側を採る。
         if len(landed) == 1 and len(leaving) == 1:
             out.add(change.full)
@@ -797,13 +797,13 @@ def _script_writes(
 
 
 def _droppable(before: str | None) -> tuple[str, ...]:
-    """姿から落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
+    """正規化するときに落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
     held = ticket_mod.script_fields_set(before) if before is not None else ()
     return tuple(f for f in ticket_mod.SCRIPT_FIELDS if f not in held)
 
 
 def _shape(text: str | None, drop: tuple[str, ...]) -> str | None:
-    """その版の姿。無い・読めない・チケットでないなら None。"""
+    """その版を正規化した内容。無い・読めない・チケットでないなら None。"""
     return ticket_mod.script_shape(text, drop) if text is not None else None
 
 

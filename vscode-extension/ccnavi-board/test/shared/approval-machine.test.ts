@@ -534,7 +534,7 @@ test("CB-T172 「この N 件を承認する」は、見せた指紋と絞りを
   assert.deepEqual(approvalStep(preview, { kind: "confirm", tickets: [] }).effects, []);
 });
 
-test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送り、ボードを読み直す。sh が無ければ言う。0 件なら何もしない", () => {
+test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を端末に送り、ボードを読み直す。sh が無ければ言う。0 件なら何もしない", () => {
   const approving = toApproving(approvalStep);
   const done = approvalStep(approving, {
     kind: "approved",
@@ -563,7 +563,7 @@ test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送�
     carrier: true,
   });
   assert.deepEqual(zero.state.overlay, { kind: "done", count: 0, prompt: "文", carried: false });
-  assert.deepEqual(kinds(zero.effects), [], "1 件も置かれていないなら、運びも読み直しもしない");
+  assert.deepEqual(kinds(zero.effects), [], "1 件も置かれていないなら、承認の push も読み直しもしない");
 });
 
 test("CB-T174 食い違いは、見せたまま同じ絞りで読み直し、返った一覧に理由を添える", () => {

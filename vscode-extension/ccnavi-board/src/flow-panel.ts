@@ -679,7 +679,7 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     fail(current, lock.reason);
     return;
   }
-  // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（権威のツリー）が替わることがある
+  // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（優先するツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
     fail(current, `フローの置き場が変わった（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直してください`);
@@ -695,8 +695,8 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     return;
   }
   await reload(current);
-  // 取り込み済みの家族（C1 の対象）だけ、運ぶ処理を送る（ADR-0093 の 4.6）。端末は対話中のことがあるので、
-  // 勝手に打ち込まず、人がボタンを押したときだけ送る（段階 2d のレビューの決定 E）。それ以外の家族は今どおり
+  // 取り込み済みの親子チケット（C1 の対象）だけ、承認の push を送る（ADR-0093 の 4.6）。端末は対話中のことがあるので、
+  // 勝手に打ち込まず、人がボタンを押したときだけ送る（段階 2d のレビューの決定 E）。それ以外の親子チケットは今どおり
   // 人がコミットする。
   const root = current.folder.uri.fsPath;
   const carrier =
@@ -719,7 +719,7 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   }
 }
 
-/** 普通のファイルが在るか（運ぶ sh が配られているか） */
+/** 普通のファイルが在るか（承認の push の sh が配られているか） */
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();

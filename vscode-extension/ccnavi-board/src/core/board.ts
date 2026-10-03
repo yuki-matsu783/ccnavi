@@ -94,7 +94,7 @@ export interface Card {
   readonly riskLevel: string;
   readonly riskPoints: number | null;
   readonly seenIn: readonly SeenInJson[];
-  /** どれが本物か決まらない写りの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
+  /** どれを優先するか決まらない写りの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
   readonly scattered: readonly SeenInJson[];
   /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
@@ -121,7 +121,7 @@ export interface Card {
   /**
    * 人が動く必要があるか。「要対応のみ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
    * 親の改版。バッジの「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
-   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらない写り、不備、
+   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、どれを優先するか決まらない写り、不備、
    * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
@@ -131,7 +131,7 @@ export interface Card {
    */
   readonly flow: FlowJson | null;
   /**
-   * 状態が動いた跡の新しい側（古い順。ADR-0086）。補助の記録で、列やバッジはここから組まない。
+   * 状態の履歴の新しい側（古い順。ADR-0086）。履歴は補助で、列やバッジはここから組まない。
    * カードの折りたためる「履歴」に並べるだけ
    */
   readonly history: readonly HistoryEntryJson[];
@@ -318,7 +318,7 @@ function isHighRisk(level: string): boolean {
 /**
  * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
  * 断片を落としてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
- * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうが本物）。
+ * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうを採る）。
  */
 function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | null } {
   for (let i = phases.length - 1; i >= 0; i -= 1) {

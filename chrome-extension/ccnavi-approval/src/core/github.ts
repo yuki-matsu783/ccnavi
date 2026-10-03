@@ -436,7 +436,7 @@ export function parseExpiration(text: string): string {
 
 const VIEWER = `query { viewer { login } }`;
 
-/** PAT の持ち主のアカウント名（跡の `actor`。8.8・8.9） */
+/** PAT の持ち主のアカウント名（状態の履歴の `actor`。8.8・8.9） */
 export async function viewer(client: Client): Promise<string> {
   const data = await graphql(client, VIEWER, {});
   const login = (data.viewer as { login?: unknown } | undefined)?.login;

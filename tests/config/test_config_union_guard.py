@@ -490,7 +490,7 @@ class SetupTest(unittest.TestCase):
         write(os.path.join(src, ".ccnavi", "common", "rules.yml"), "deny: []\n")
         write(os.path.join(src, ".ccnavi", "common", "risks.yml"), COMMON_RISK)
         write(os.path.join(src, HOME, "config", "phases.yml"), COMMON_PHASES)
-        # 承認済みチケットを運ぶ sh と、端末で承認する sh も配るもの。
+        # 承認の push の sh と、端末で承認する sh も配るもの。
         # 無いと「まだ無いもの」に名前が出る。
         for name in (
             "ccnavi-ticket.sh",

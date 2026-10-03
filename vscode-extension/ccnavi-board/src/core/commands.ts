@@ -12,7 +12,7 @@
  */
 import * as path from "node:path";
 
-/** 承認済みチケットを運ぶ sh の、ワークスペースルートからの綴り */
+/** 承認の push（`ccnavi-push-approved.sh`）の、ワークスペースルートからの表記 */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
@@ -134,8 +134,8 @@ export function reviewedPrompt(
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
- * `parents` を渡すとその家族だけを運ぶ（ADR-0093 の 4.6。取り込み済みの家族だけが送られ、
- * そうでない家族は今どおり人がコミットする）。
+ * `parents` を渡すとその親子チケットだけをコミットして push する（ADR-0093 の 4.6。取り込み済みの親子チケットだけが送られ、
+ * そうでない親子チケットは今どおり人がコミットする）。
  */
 export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {
   const names = parents.map((p) => ` ${shellQuote(p)}`).join("");

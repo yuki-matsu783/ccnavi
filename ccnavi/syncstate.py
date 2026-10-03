@@ -3,7 +3,7 @@
 控えは `ccnavi-sync.sh` と、親のブランチを最初に push したときの `ccnavi-git.sh push` が書き、
 判定はここで読むだけ。
 判定は git もネットワークも起こさない（`tree.py` の前提）ので、統合先と親のブランチの
-リモートの姿は、sh が控えに書き出したものしか知らない。
+リモートの状態は、sh が控えに書き出したものしか知らない。
 
     <控えの置き場>/sync/<リポジトリ>/families/<P>   家族の控え（1 行 1 項目。D33）
     <控えの置き場>/sync/<リポジトリ>/integration/   統合先の控え（done/・層・設定の写しと head）
@@ -12,7 +12,7 @@
 
 ## 取り込み済みの家族
 
-家族の控えがある家族を「取り込み済みの家族」と呼び、権威を親のブランチ `P`（手元では
+家族の控えがある家族を「取り込み済みの家族」と呼び、優先するツリーを親のブランチ `P`（手元では
 `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）に固定する（3.3）。控えの無い家族
 （2b より前に送った、origin が無い、一度も push していない）は今の動きのまま（D11）。
 
@@ -20,10 +20,10 @@
 `ccnavi-sync.sh --forget <P>` だけ）。控えと統合先の控えから、家族の立ち位置（`Standing`）を決める。
 
 - 閉じた: 統合先の控えの `done/` に親の写しがある（親のワークツリーが無いか、あれば親の写しの
-  承認の時刻が同じ）、または控えが `closed`。統合先の `done/` が権威（3.6 の正常系）
+  承認の時刻が同じ）、または控えが `closed`。統合先の `done/` を優先する（3.6 の正常系）
 - `gone`・`blocked`・控えが壊れている・`present` なのに親のワークツリーが無い: **決まらない**。
   その家族の承認も状態の操作も止める（3.3 の 3、3.6）
-- `present` で親のワークツリーがある: 親のブランチの写しだけが本物
+- `present` で親のワークツリーがある: 親のブランチにある承認済みチケットだけを優先する
 
 ## 統合先の控え
 
@@ -97,7 +97,7 @@ def any_records(state_dir: str) -> bool:
 
 
 def repo_seen(state_dir: str, repo: str) -> bool:
-    """そのリポジトリを取り込んだ跡（`sync/<リポジトリ>/`）が在るか。"""
+    """そのリポジトリを取り込み済みか（`sync/<リポジトリ>/` が在るか）。"""
     return any_records(state_dir) and os.path.lexists(os.path.join(state_dir, SYNC_DIR, repo))
 
 
@@ -232,7 +232,7 @@ class Integration:
 def integration(state_dir: str, repo: str) -> Integration | None:
     """統合先の控え。そのリポジトリを一度も取り込んでいなければ None（今どおり作業ツリーを読む）。
 
-    取り込んだ跡（`sync/<リポジトリ>/`）が在るのに読めなければ、`broken` に理由を入れて返す。
+    取り込んだ形跡（`sync/<リポジトリ>/`）が在るのに読めなければ、`broken` に理由を入れて返す。
     """
     if not state_dir or not repo_seen(state_dir, repo):
         return None
@@ -397,7 +397,7 @@ class Families:
         return self._done[repo]
 
     def standing(self, family_id: str, project: str = "") -> Standing:
-        """この家族の立ち位置（3.3 の権威の規則）。"""
+        """この家族の立ち位置（3.3 の優先するツリーの規則）。"""
         key = (project or "", family_id)
         if key not in self._standings:
             self._standings[key] = self._standing(family_id, project or "")
@@ -483,18 +483,18 @@ class Families:
             if busy:
                 stop = (
                     f"親のワークツリー（{where}）に途中の操作（{busy}）がある。"
-                    "済ませるか取りやめるまで、取り込み済みの家族でどの写しを本物とするかが"
+                    "済ませるか取りやめるまで、取り込み済みの家族でどの承認済みチケットを優先するかが"
                     "決まらない"
                 )
             elif named is not None:
                 stop = (
                     f"親のワークツリー（{where}）の HEAD がブランチ {family_id} を指していない。"
-                    "取り込み済みの家族でどの写しを本物とするかが決まらない"
+                    "取り込み済みの家族でどの承認済みチケットを優先するかが決まらない"
                 )
             else:
                 stop = (
                     f"親のワークツリー（{where}）が無い。"
-                    "取り込み済みの家族でどの写しを本物とするかが決まらない"
+                    "取り込み済みの家族でどの承認済みチケットを優先するかが決まらない"
                     "（家族の控えは、親のワークツリーを片付けても残る）"
                 )
         else:
@@ -536,7 +536,7 @@ def _home_parent_copy(
 
 
 def standing(conf: settings.Settings, root: str, family_id: str, project: str = "") -> Standing:
-    """この家族の立ち位置（3.3 の権威の規則）。1 回だけ引くときの形。"""
+    """この家族の立ち位置（3.3 の優先するツリーの規則）。1 回だけ引くときの形。"""
     return Families(conf, root).standing(family_id, project)
 
 

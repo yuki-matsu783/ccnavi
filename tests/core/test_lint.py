@@ -149,7 +149,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 1)
 
     def test_承認の門にdry_runと書いたらerrorになる(self):
-        # この門は enable か disable しか取らない。dry-run と書いた人は止まらない
+        # この切り替えの環境変数は enable か disable しか取らない。dry-run と書いた人は止まらない
         # つもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
         # だけでは、その食い違いがどこにも現れない。
         result = ccnavi(
@@ -305,7 +305,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 0)
 
     def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
-        # 動かす途中で止まった跡（写せたが消せなかった）。状態の操作は「複数の場所にある」で
+        # 動かす途中で止まって残ったもの（写せたが消せなかった）。状態の操作は「複数の場所にある」で
         # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
         # 閉じた側との重複だけが通る。
         for state in ("doing", "done"):
@@ -388,7 +388,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("BOM (U+FEFF)", result.stdout)
 
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
-        # 承認の権威は置き場（ADR-0058）。`.ccnavi/approved/` は組み込みの守りが
+        # 承認したかどうかは置き場で決まる（ADR-0058）。`.ccnavi/approved/` は組み込みの守りが
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
         # 読む。端末もボードも無い人が、置き場を動かすだけで承認できる方法。
         write(
@@ -550,7 +550,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(errors, 0)
         self.assertIn("dry-run なので判定はしても、呼び出しには何もしない", result.stdout)
         # 戻す働きの 2 つは、書かれた値が enable でもモードに合わせて dry-run になる。
-        # 実効値で見るので、そのぶんも言う（門の名前と、モードに合わせたことの両方）。
+        # 実効値で見るので、そのぶんも言う
+        # （切り替えの環境変数の名前と、モードに合わせたことの両方）。
         self.assertEqual(warns, 3, result.stdout)
         self.assertIn("CCNAVI_MODE=dry-run なので実際は dry-run", result.stdout)
 
@@ -693,7 +694,7 @@ class LintTest(unittest.TestCase):
 
     def test_json_は同じ苦情を機械可読な形で返し終了コードも同じ(self):
         # VS Code 拡張が読む形（README「lint の JSON」）。文面の版と同じ判定を
-        # 同じ深刻度で運ぶ。error があれば終了コードも同じく非ゼロ。
+        # 同じ深刻度で返す。error があれば終了コードも同じく非ゼロ。
         path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")
 
         result = ccnavi(self.root, "--lint", "--json", "--rules", path, "--mode", "dry-run")

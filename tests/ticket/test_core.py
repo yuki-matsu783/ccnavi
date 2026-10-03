@@ -2,11 +2,11 @@
 
 見るのは 6 つ。
 
-1. 時計（Clock の差し口）: `fsio.clock` で固定した時刻を、承認の記録と跡が同じに書く
+1. 時計（Clock の差し口）: `fsio.clock` で固定した時刻を、承認の記録と状態の履歴が同じに書く
 2. D22: 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
    前の形（絶対パス・ツリーの名前）の写しも同じに読み、判定の答えは変わらない
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
-   書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの運び・フィードバック計画）
+   書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
 4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
    （新規・マーカーの消去・改版・フィードバック計画・多段の先行と落ちる提案・取り下げ・レビュー済み）。
    同じ要求と答えを拡張の試験の見本（`chrome-extension/ccnavi-approval/test/fixtures/core-scenarios.json`）
@@ -461,7 +461,7 @@ class PlanWriterTest(CoreHarness):
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
 
     def test_a_flow_is_carried_to_the_parent_tree(self):
-        """提案が別のツリー（ワークスペースルート）に在れば、フローも親のツリーへ運ぶ。"""
+        """提案が別のツリー（ワークスペースルート）に在れば、フローも親のツリーへ移す。"""
         self.family(plan=["design"])
         todo = os.path.join(self.root, "wip", "proposals", "todo")
         write(
@@ -476,7 +476,7 @@ class PlanWriterTest(CoreHarness):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "flows", "i0001-01.yml")))
 
     def test_a_flow_that_cannot_be_written_says_so_and_skips_the_rest(self):
-        """運べなかったフローは行で言い、元を消さない（前と同じ落ち方）。"""
+        """移せなかったフローは行で言い、元を消さない（前と同じ落ち方）。"""
         self.family(plan=["design"])
         todo = os.path.join(self.root, "wip", "proposals", "todo")
         write(
@@ -492,8 +492,8 @@ class PlanWriterTest(CoreHarness):
         write(os.path.join(self.approved, "flows", "i0001-01.yml"), "other\n")
         applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("へ運べない", out)
-        self.assertNotIn("から", out.split("へ運べない")[1].split("\n")[0])
+        self.assertIn("へ移せない", out)
+        self.assertNotIn("から", out.split("へ移せない")[1].split("\n")[0])
         self.assertTrue(os.path.exists(flow))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
 
@@ -580,7 +580,7 @@ class WriterFailureTest(CoreHarness):
         self.assertNotIn("を消した", out)
 
     def test_another_mark_that_cannot_be_removed_is_said_and_left(self):
-        """reviewed 以外は言って続ける。行と跡は実際に消せた種類だけ。"""
+        """reviewed 以外は言って続ける。行と状態の履歴は実際に消せた種類だけ。"""
         marks = self.reopened()
         changes = self.planned()
         # 見え方（Chrome の 1 コミット）では両方消える。
@@ -671,7 +671,8 @@ class CoreChromeTest(CoreHarness):
     collected: dict = {}
 
     def setUp(self):
-        # 見本は走らせるたびに同じ中身にする。時刻（承認の記録・跡・マーカー）は fsio の時計で、
+        # 見本は走らせるたびに同じ中身にする。
+        # 時刻（承認の記録・状態の履歴・マーカー）は fsio の時計で、
         # コミットの sha（依頼のマーカーの `head`）は git の日時で固定する。
         for key in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
             if key in os.environ:

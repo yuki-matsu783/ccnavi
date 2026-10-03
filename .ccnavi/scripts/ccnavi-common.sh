@@ -568,7 +568,7 @@ ccnavi_lock_describe() {
 ccnavi_lock_steal() {
 	ccnavi_st_gate="$1.steal"
 	if ! mkdir "$ccnavi_st_gate" 2>/dev/null; then
-		# 別の誰かが奪っている最中。10 分を過ぎた門は落ちた奪い手の残りなので外す。
+		# 別の誰かが奪っている最中。10 分を過ぎた取得用のロック（.steal）は、途中で落ちた取得の残りなので外す。
 		if [ -n "$(find "$ccnavi_st_gate" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
 			rmdir "$ccnavi_st_gate" 2>/dev/null || :
 		fi
@@ -917,12 +917,12 @@ ccnavi_c1_prepare() {
 		# 3. C1 の外の変更を見分け、(b) を取り込みの前にコミットする。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "人の判断が未送信" \
-			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
 			"置き場に ccnavi の知らない変更がある" "。ユーザが確かめてください。何も書いていない" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
-			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hook の印と跡を運ぶ" || return 1
+			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hook のマーカーと状態の履歴をコミットする" || return 1
 		fi
 		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。統合先の控えも同じ回で書く。
 		ccnavi_cp_rc=0
@@ -946,9 +946,9 @@ ccnavi_c1_prepare() {
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_family_id" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信の人の判断のコミットがある" \
-			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
 			"置き場に ccnavi の知らない未送信のコミットがある" \
-			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了された跡なら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、人がそのコミットを取り除く。何も書いていない" || return 1
+			"。ユーザが確かめてください。前の状態の操作が push の前に中断して残ったものなら、中身を確かめてから承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、人がそのコミットを取り除く。何も書いていない" || return 1
 		return 0
 	done
 }

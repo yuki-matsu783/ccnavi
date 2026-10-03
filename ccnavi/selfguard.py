@@ -128,7 +128,7 @@ from .modes import DISABLE, DRY_RUN, ENABLE
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
 SETTINGS = (ENABLE, DRY_RUN, DISABLE)
-# 戻す働きを持たない門の値。dry-run が無い。
+# 戻す働きを持たない切り替えの環境変数の値。dry-run が無い。
 #
 # 「止めずに報告する」は、止めたあとに何が起きたかを見せられる働き（deny の場所を
 # 戻す、コアファイルを控えから戻す）があって初めて意味を持つ。チケットの承認の経路は
@@ -587,7 +587,7 @@ def resolve(
     固定された 3 つだけで、しかも戻す先はこちらが取った直前の断面になる。
 
     `allowed` を絞ると、そこに無い語も「読めない値」として扱う。dry-run を
-    持たない門（GATE_SETTINGS）に dry-run と書かれた設定が、止めているのに
+    持たない切り替えの環境変数（GATE_SETTINGS）に dry-run と書かれた設定が、止めているのに
     止めていないように読める形で残らないようにする。
     """
     value = (flag or declared or "").strip().lower()
@@ -724,7 +724,7 @@ def targets(
 
     layers は `settings.LayerFile`（層の種別, 名札, kind, そのファイル）の並び
     （`ruleload.layer_files`）。kind は rules / phases / risk。共通層は phases と
-    risk の 2 本で来る。rules は `rules_path` が運んでいて、両方から並べると同じ
+    risk の 2 本で来る。rules は `rules_path` が渡していて、両方から並べると同じ
     ファイルを 2 度守ることになる。
 
     控えの key は層ごとに分ける。共通層は kind そのまま（`rules` / `phases` /
@@ -1063,7 +1063,7 @@ def after(
                 Outcome(target, ACTION_RESTORED, "このツール呼び出しの直前の内容に戻した")
             )
     # 何も起きていない回は落とす。ACTION_KEPT はここまでの経路で「調べたが
-    # 変わっていなかった」を運ぶための値で、報告に出す用件ではない。
+    # 変わっていなかった」を伝えるための値で、報告に出す用件ではない。
     return [o for o in outcomes if o.action != ACTION_KEPT]
 
 
@@ -1495,7 +1495,7 @@ def _absent_path(state_dir: str, session: str, target: Target) -> str:
     """「このファイルは置かれていない」というマーカーの置き場。
 
     マーカーを持つのは、無いことを毎回 git に確かめに行かないため。設定ファイルを
-    置いていないプロジェクトでは、無いことがそのプロジェクトの正常な姿になる。
+    置いていないプロジェクトでは、無いことがそのプロジェクトの正常な状態になる。
     そこで呼び出しのたびに外部プロセスを起こすと、何も起きていない作業が
     いちばん重くなる。
     """

@@ -600,7 +600,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("protected/keep.txt", message, "前のターンのコミットは並べない")
 
     def test_承認のコミットはターンの報告に並べない(self):
-        # 承認は人が提案を .ccnavi/approved/ へ動かしてコミットする運び。
+        # 承認は人が提案を .ccnavi/approved/ へ動かしてコミットする進め方。
         # そこは deny でもあるので、外さないと承認のたびに違反として並ぶ。
         self.run_hook(event="UserPromptSubmit")
         write(os.path.join(self.repo, ".ccnavi", "approved", "doing", "i0001.md"), "x\n")
@@ -716,7 +716,7 @@ allow:
 body
 """
 
-# 着手済みの版。`ticket start` が書いたあと、人がコミットして親のブランチに乗った姿。
+# 着手済みの版。`ticket start` が書いたあと、人がコミットして親のブランチに乗った状態。
 STARTED = TICKET.replace(
     "---\nbody", 'started_at: "2026-09-21T00:00:00Z"\nbase_sha: "1111111111111111"\n---\nbody'
 )
@@ -796,7 +796,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertTrue(os.path.exists(self.path(marker)), "退避されるとレビューの依頼が消える")
 
     def test_レビュー待ちへの移動は言わない(self):
-        # `ticket finish`。`doing/` から消えて、同じ姿が `review/` に現れる。
+        # `ticket finish`。`doing/` から消えて、正規化した内容が同じものが `review/` に現れる。
         os.remove(self.path(DOING))
         write(
             self.path("wip/proposals/review/i0001.md"),
@@ -860,7 +860,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
     def test_基準点の書き換えは言う(self):
         # `base_sha` はサブエージェント終了時の検査と実績リスクの基準点。書き換えられると
-        # コミット済みの範囲外の変更が検査から消えるので、姿から落としてはいけない。
+        # コミット済みの範囲外の変更が検査から消えるので、正規化で落としてはいけない。
         self.use(ticket_repo(text=STARTED))
         write(self.path(DOING), STARTED.replace("1111111111111111", "2222222222222222"))
 
@@ -894,8 +894,8 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_同じ姿が2つ動くときは移動として外さない(self):
-        # 正規の移動 1 件に、同じ姿のチケットのただの削除が一緒に通ってはいけない。
-        # 姿が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
+        # 正規の移動 1 件に、同じ内容のチケットのただの削除が一緒に通ってはいけない。
+        # 内容が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
         write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET)
         git(self.repo, "add", "--", ".ccnavi/approved/doing/i0002.md")
         git(self.repo, "commit", "--quiet", "-m", "twin")

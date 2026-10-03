@@ -931,7 +931,7 @@ def decide_yes(
 def _decide_actor() -> tuple[str, str]:
     """decide の印に入れる (アカウント, 経路)（ADR-0093 の 8.9。段階 5）。
 
-    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（跡の行の
+    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（履歴の行の
     `actor`）。経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
     どちらも書かない（confirm と同じく、引けなければ印は前と同じバイト列）。
     """
@@ -1976,8 +1976,8 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
     """人が見るものが、まだリモートに届いていないか。
 
     ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。人がレビューで
-    見るのはコードで、置き場を運ぶのは `ccnavi-push-approved.sh` の仕事（push が落ちても
-    コミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
+    見るのはコードで、置き場をコミットして push するのは `ccnavi-push-approved.sh` の仕事
+    （push が落ちてもコミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
     `confirm` の側（`_moved_since_request`）と同じ基準。
 
     `ready` の前提（`_merge_problems`）はこれを使わない。あちらは人がリモートを見て
@@ -2067,10 +2067,10 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
-    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 9.2）。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの（設計 9.2）。
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
-    承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを
+    承認の push（`ccnavi-push-approved.sh`）が置き場をまとめてコミットするので、レビューを
     待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty` が同じ理由で外しており、
     基準をそこに揃える。人がレビューで見るものは 1 バイトも変わらない。
 

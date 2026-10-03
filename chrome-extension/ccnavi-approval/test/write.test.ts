@@ -81,7 +81,7 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.equal(call.headline, `ccnavi: i0001 を承認（Chrome 拡張 ${VERSION}）`);
   assert.deepEqual(call.deletions, [{ path: TODO }]);
   assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING, EVENTS].sort());
-  // 書いた中身: 承認済みチケットと跡（経路・アカウント・拡張の版。7.3・8.8）
+  // 書いた中身: 承認済みチケットと状態の履歴（経路・アカウント・拡張の版。7.3・8.8）
   const files = mock.files("i0001");
   assert.ok(!(TODO in files));
   assert.match(files[DOING], /^ccnavi_approved:/m);

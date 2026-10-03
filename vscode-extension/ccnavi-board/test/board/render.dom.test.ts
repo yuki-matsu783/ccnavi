@@ -227,7 +227,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
-    // 運ぶ sh を端末に送ったときだけ、そう言う。
+    // 承認の push の sh を端末に送ったときだけ、そう言う。
     assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
   } finally {
     await page.close();
@@ -660,7 +660,7 @@ test("CB-T16 本文の文字列で表示を壊さない", async () => {
   }
 });
 
-test("CB-T118 本物が決まらない写りだけをバッジにし、場所を tooltip に出す", async () => {
+test("CB-T118 どれを優先するか決まらない写りだけをバッジにし、場所を tooltip に出す", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
   const where = [
@@ -866,7 +866,7 @@ test("CB-T142 見た目の切り替えは body のクラスだけを付け替え
   }
 });
 
-test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新しい順に時刻・何が動いたか・経路が並ぶ。跡が無いカードには出さない", async () => {
+test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新しい順に時刻・何が動いたか・経路が並ぶ。状態の履歴が無いカードには出さない", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const parent = base.tickets.find((t) => t.ticket === "i0001")!;

@@ -4,7 +4,7 @@
 
 1. H-1 名前付きパイプ（FIFO）を読まない。SubagentStart が固まらない
 2. M-1 ハードリンクのフローを読まない。ハードリンクの別名への書き込みもロックで止める
-3. M-2 フローは権威のツリーの版だけを読む。着手のときに指紋を控え、着手のあとに書き換わったら
+3. M-2 フローは優先するツリーの版だけを読む。着手のときに指紋を控え、着手のあとに書き換わったら
    SubagentStart と SubagentStop が知らせる（止めない）。案内は「書けない」と言わない
 4. M-4 親のツリーからの起動では手順を並べず、各子のフローのパスと「自分の担当だけ」を言う
 5. M-3 承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす
@@ -234,7 +234,7 @@ class FlowNeutralTest(unittest.TestCase):
 
 
 class FlowReadPlaceTest(FlowHarness):
-    """読むのは権威のツリーの版だけ（M-2a）。案内は「書けない」と言わない（M-2c）。"""
+    """読むのは優先するツリーの版だけ（M-2a）。案内は「書けない」と言わない（M-2c）。"""
 
     def test_the_child_worktree_copy_is_not_read(self):
         os.remove(self.flow_path)
@@ -442,7 +442,7 @@ class FlowCarriedOnApprovalTest(PhaseHarness):
         held = write(os.path.join(self.approved, "flows", f"{CHILD}.yml"), "nodes: []\n")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("運ばなかった", result.stdout)
+        self.assertIn("移さなかった", result.stdout)
         self.assertIn("上書きしない", result.stdout)
         with open(held, encoding="utf-8") as f:
             self.assertEqual(f.read(), "nodes: []\n")

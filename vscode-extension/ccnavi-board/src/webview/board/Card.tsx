@@ -115,8 +115,8 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
 const NOT_OPENING = "button, a, details";
 
 /**
- * 状態が動いた跡（ADR-0086）。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
- * （状態の正は置き場。実行ファイルが渡した新しい側だけを並べる）
+ * 状態の履歴（ADR-0086）。既定で折りたたみ、開くと新しい順に並ぶ。履歴は補助で、列やバッジはここから決めない
+ * （状態は置き場で決まる。実行ファイルが渡した新しい側だけを並べる）
  */
 function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
   return (
@@ -138,7 +138,7 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 /**
  * 枠付きのバッジは、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
  * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
- * 本物が決まらない写り。出すバッジが無ければ行ごと出さない。
+ * どれを優先するか決まらない写り。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   const badges: JSX.Element[] = [];
@@ -178,7 +178,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (isHighRisk(card.riskLevel)) {
     badges.push(<Badge key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
   }
-  // 写りがあること自体は普通なので数では出さない。どれが本物か決まらないときだけ言う。
+  // 写りがあること自体は普通なので数では出さない。どれを優先するか決まらないときだけ言う。
   if (card.scattered.length > 0) {
     const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
     badges.push(<Badge key="seen" kind="seen" text={`複数の場所にある（${card.scattered.length} か所）`} title={where} />);

@@ -9,7 +9,7 @@ env を渡しても共通層は既定の置き場のままになる。
 hook は引数を渡さずに起動するので、hook からの判定の入口は固定される。
 
 フラグが有効な範囲は ADR-0067 が診断の経路に限った。ここで見るのは env が使われないことと、
-その門が有効なことの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
+その制限が有効なことの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
 
 起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
 読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
@@ -219,7 +219,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
                 self.assertIn(f"{flag} は診断", result.stderr)
 
     def test_the_wording_is_the_one_the_project_file_flags_use(self):
-        """文面は `--project-rules-file` と同じ。門が 2 つあるように読ませない。"""
+        """文面は `--project-rules-file` と同じ。制限が 2 つあるように読ませない。"""
         one = self.decide("Read", flags=("--rules", self.other_rules), file_path=self.target())
         other = self.decide(
             "Read",

@@ -133,7 +133,7 @@ function edgesOf(kept: readonly PhasesForm["phases"][number][], known: ReadonlyS
 
 /**
  * 図を組む。id が空の種類は出さない（指すことも指されることもできないので、線を持てない）。
- * 同じ id が 2 つあるときは先に出てきたほうだけを出す（保存は画面が止めるので、直すまでの間の姿）。
+ * 同じ id が 2 つあるときは先に出てきたほうだけを出す（保存は画面が止めるので、直すまでの間の表示）。
  */
 export function graphOf(form: PhasesForm): PhasesGraph {
   const first = new Map<string, PhasesForm["phases"][number]>();

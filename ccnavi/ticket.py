@@ -1,6 +1,6 @@
 """作業チケットの読み込みと、そこが宣言する作業範囲。
 
-## チケットは提案であって権威ではない
+## チケットは提案で、判定の根拠ではない
 
 チケットはエージェントが書く。だからチケットの中身をそのまま判定に使うと、
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の範囲を広げられる。
@@ -503,7 +503,7 @@ class Ticket:
     tree_root: str = ""
     path: str = ""
     # 承認済みチケットにだけある。`ccnavi_approved` を持たない（人が置き場を動かしただけの）
-    # チケットでは空になる。承認の権威は置き場で、この欄は記録（設計 9.2）。
+    # チケットでは空になる。承認したかどうかは置き場で決まり、この欄は記録（設計 9.2）。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
@@ -598,7 +598,7 @@ def load(path: str) -> tuple[Ticket | None, list[Problem]]:
     """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
         # fsio を通す。承認の plan（控える段）の中では、同じ承認で動かしたチケットを動かした後の
-        # 姿で読む（ADR-0093 の 6.2）。
+        # 内容で読む（ADR-0093 の 6.2）。
         text = fsio.load_text(path)
     except FileNotFoundError:
         return None, []
@@ -1059,7 +1059,7 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
     置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
     プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 11.5、REQ-MLT-14）。
     ワークスペースの `wip/<名前>/proposals/` は読まない。
-    同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
+    同じ識別子が複数のツリーにあれば、優先するツリーの側だけを残す。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
     return dedupe(found), problems
@@ -1078,7 +1078,7 @@ def scan_all(
     ws = tree.main_tree(root)
     # 置き場がプロジェクトを決める（設計 11.5）。提案はどのツリーでも同じ相対の置き場に
     # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
-    # git で運ぶので、提案も同じブランチに乗せる（設計 9.2、REQ-MLT-14）。
+    # git で共有するので、提案も同じブランチに乗せる（設計 9.2、REQ-MLT-14）。
     # frontmatter の `project:` は照合に使うだけ。
     places = [
         (t, tickets_rel, t.project)
@@ -1137,11 +1137,11 @@ def scan_all(
 
 
 def fold(hits: list[Ticket]) -> list[Ticket]:
-    """同じ識別子の写りを、権威のあるツリーの側にまとめる。
+    """同じ識別子の写りを、優先するツリーの側にまとめる。
 
     子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
-    写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
-    あればそれが本物で、残りは写し。
+    写っている。優先するのは親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
+    あればそれを採り、残りは写し。
 
     親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
     そのプロジェクト）の側を採る。ワークツリーは片付ければ消えるが、元ツリーは消えない。
@@ -1149,16 +1149,16 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
     片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。
 
     **ただし、元ツリーより先の置き場に在る写しが 1 つでもあれば採らない。** 元ツリーを
-    権威にしてよい根拠は「他の写しは合流の結果で、同じか手前の状態」であって、合流
+    優先してよい根拠は「他の写しは合流の結果で、同じか手前の状態」であって、合流
     していないワークツリーで先に進んだ写し（親のツリーで閉じ、子のツリーが取り込んだ形）
     があるときは成り立たない。そこで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
     記録を別の差分で書き直す。決めずに残し、人に合流させる。
 
-    どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
+    どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれを優先するか
     決まらない（検証が「複数の場所にある」と言う状態）。
 
     リポジトリをまたいだ衝突はまとめない。識別子は人が選ぶ短い連番なので、プロジェクトが
-    独立に振ればぶつかる（設計 11）。それは写しではなく違うチケットなので、どちらかを権威に
+    独立に振ればぶつかる（設計 11）。それは写しではなく違うチケットなので、どちらかを優先
     すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
     """
     if len({t.project for t in hits}) > 1:
@@ -1201,9 +1201,9 @@ def behind(some: list[Ticket], hits: list[Ticket]) -> bool:
 
 
 def collided_states(states: list[str]) -> list[str]:
-    """1 つのツリーの中で、どれが本物か決まらない置き場の並び。決まっていれば空。
+    """1 つのツリーの中で、どれを優先するか決まらない置き場の並び。決まっていれば空。
 
-    同じ識別子が 2 つの置き場に在るのは、動かす途中で止まった跡（写せたが消せなかった）。
+    同じ識別子が 2 つの置き場に在るのは、動かす途中で止まって残ったもの（写せたが消せなかった）。
     ただし `todo/` は親の改版の途中なので、承認済みチケットと並んでいてよい。
     `--lint` の ERROR と、ボードの `scattered` が同じ数え方をするためにここに置く。
     """
@@ -1216,7 +1216,7 @@ def collided_states(states: list[str]) -> list[str]:
 
 
 def collisions(hits: list[Ticket]) -> list[Ticket]:
-    """どれが本物か決まらない写りの全部。決まっていれば空。
+    """どれを優先するか決まらない写りの全部。決まっていれば空。
 
     まとめて 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
     状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
@@ -1238,7 +1238,7 @@ def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
 
 
 def dedupe(found: list[Ticket]) -> list[Ticket]:
-    """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。"""
+    """同じ識別子が複数のツリーにあるとき、優先するツリーの側だけを残す。"""
     kept: list[Ticket] = []
     for hits in by_ticket(found).values():
         kept.extend(fold(hits))
@@ -1358,7 +1358,7 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
 
 
 def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
-    """文と、数えの鍵になる id を運ぶ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
+    """文と、数えの鍵になる id を持つ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
     return rules.Rule(
         id=PROPOSE_RULE_ID,
         additional_context_once=(
@@ -1403,7 +1403,7 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
 def script_fields_set(text: str) -> tuple[str, ...]:
     """その版が既に値を持っている、スクリプトの欄。
 
-    姿を突き合わせる側が「落としてよい欄」を決めるのに使う（`post._script_writes`）。
+    正規化した内容を突き合わせる側が「落としてよい欄」を決めるのに使う（`post._script_writes`）。
     **落としてよいのは、コミット済みの版がまだ持っていない欄だけ。** 副命令はどれも
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
@@ -1430,7 +1430,7 @@ def script_fields_set(text: str) -> tuple[str, ...]:
 
 
 def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None:
-    """frontmatter を持つチケットなら、`drop` の欄を落とした姿を返す。無ければ None。
+    """frontmatter を持つチケットなら、`drop` の欄を落として正規化した内容を返す。無ければ None。
 
     実行後の監視が「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
     答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
@@ -1441,10 +1441,10 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
     `SCRIPT_FIELDS` の部分集合で、決めるのは呼ぶ側（`script_fields_set` を引いて、
     コミット済みの版がまだ持っていない欄だけを渡す）。範囲
     （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
-    そこが 1 文字でも変われば別の姿になり、監視は今までどおり報告する。
+    そこが 1 文字でも変われば別の内容になり、監視は今までどおり報告する。
 
     切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
-    落とす。揃えないと、スクリプトが書いた直後の姿が「スクリプトが書いていない形」に見える。
+    落とす。揃えないと、スクリプトが書いた直後の内容が「スクリプトが書いていない形」に見える。
 
     frontmatter を持たないもの（マーカー、`.risk.json`、閉じの記録）は None。範囲を
     宣言しないので、正規の設置と偽の設置を内容からは見分けられない。**そこは外れる。**
@@ -1581,7 +1581,7 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
         # 通す側にはしない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、
-        # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う姿で通る。弾いたまま、
+        # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う内容で通る。弾いたまま、
         # 目に見えない原因だけを名指しする。
         if lines and lines[0].lstrip(BOM).strip() == FENCE:
             detail = (

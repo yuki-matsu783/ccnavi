@@ -8,7 +8,7 @@
    受けない
 3. 見せた一覧と指紋（8.3 の 2）: 違えば書くものを出さない
 4. 書く先は親のブランチ `P` だけ（8.4）。予約の名前・統合先の名前へは書かない（8.5）
-5. 跡の行に経路（chrome）・アカウント・拡張の版が入る（7.3・8.8）
+5. 履歴の行に経路（chrome）・アカウント・拡張の版が入る（7.3・8.8）
 6. 手元の ccnavi が、Chrome の書いた写しを同じに読む（判定し直しで error が出ない）。
    error が出れば、Chrome と手元の版の違いとして名指しする（7.3）
 7. 取り下げの可否をボードに出す（8.8）
@@ -221,7 +221,9 @@ class WrittenCopyTest(ChromeWriteHarness):
         )
 
     def test_a_later_local_touch_is_not_blamed_on_chrome(self):
-        """Chrome の承認の後に手元の跡（着手など）があれば、違いを Chrome の版のせいにしない。"""
+        """Chrome の承認の後に手元の操作（着手など）の履歴の行があれば、
+        違いを Chrome の版のせいにしない。
+        """
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         body = self.plan()

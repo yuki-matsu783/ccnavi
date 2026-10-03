@@ -822,7 +822,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(lock))
 
     def test_another_thief_holds_the_steal_gate(self):
-        # 奪う操作は 1 つずつ。門（<ロック>.steal）が新しければ奪わずに待つ。
+        # 奪う操作は 1 つずつ。取得用のロック（<ロック>.steal）が新しければ奪わずに待つ。
         lock = self.own_lock(self.dead_pid(), int(time.time()))
         os.makedirs(lock + ".steal")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")

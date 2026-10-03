@@ -107,7 +107,9 @@ class PredecessorTest(TicketTest):
         self.assertFalse(self.placed("i0001-03"))
 
     def test_a_predecessor_in_two_places_is_not_taken_as_done(self):
-        """同じ識別子が doing/ と done/ の両方に在る（動かす途中で止まった跡）なら満たさない。"""
+        """同じ識別子が doing/ と done/ の両方に在る
+        （動かす途中で止まって残ったもの）なら満たさない。
+        """
         self.family(review=(False, False))
         self.finish("i0001-01")
         shutil.copyfile(

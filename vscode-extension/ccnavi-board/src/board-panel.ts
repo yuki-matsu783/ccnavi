@@ -485,12 +485,12 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       if (state === current) {
-        // 運ぶ sh があるかは、承認が返ったこの時点で見る
+        // 承認の push の sh があるかは、承認が返ったこの時点で見る
         dispatch(current, { kind: "approved", outcome, carrier: isFile(path.join(root, PUSH_APPROVED_SCRIPT)) });
       }
       return;
     }
-    // 承認の実行ファイルは承認済みチケットを置くだけで、運ぶ（コミットして push する）のはこの sh
+    // 承認の実行ファイルは承認済みチケットを置くだけで、コミットして push するのはこの sh
     case "carry":
       runInTerminal(root, pushApprovedCommand(root));
       return;

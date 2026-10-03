@@ -15,12 +15,12 @@
   - 版が無ければ未コミットの変更（C1 の 3）、版があれば `<版>..HEAD` でコミットに入った
     変更（C1 の 5）
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その家族の
-    `phases/<親>/<N>.pending`・`.skipped` と、その印の跡（`events/<親>.ndjson` の
+    `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの状態の履歴（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
-  - (c) 人が運ぶもの（人の判断）。C1 は運ばずに止める。人の判断が一緒に書く移動（review/ から
-    done/、doing/ から done/）とマーカーの消去、跡の追記もここ
+  - (c) 人がコミットするもの（人の判断）。C1 はコミットせずに止める。人の判断が一緒に書く移動
+    （review/ から done/、doing/ から done/）とマーカーの消去、状態の履歴の追記もここ
   - (d) 見分けられないもの。C1 は止める
-  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 が運ぶ。
+  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 がコミットする。
     未コミットのときだけ）
   - `skip` は書きかけの一時ファイル（数えない、コミットもしない）
 
@@ -56,7 +56,7 @@ KIND_SKIP = "skip"
 # hook の告知が置くマーカーの欄（phase.announce）。これ以外の欄があれば (b) にしない。
 _HOOK_MARK_FIELDS = frozenset({"at", "review", "source", "deferred_to", "tickets"})
 _HOOK_MARKS = (approval.MARK_PENDING, approval.MARK_SKIPPED)
-# 跡の行が必ず持つ欄（history.note）。
+# 履歴の行が必ず持つ欄（history.note）。
 _EVENT_FIELDS = ("at", "ticket", "kind")
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
 # configsync の `*.ccnavi-sync`）。
@@ -191,7 +191,7 @@ def _changed(tree_root: str, places: tuple[str, str], since: str) -> tuple[list[
 
 
 class _Unreadable(Exception):
-    """中身を読めない（UTF-8 でない跡など）。理由を持って (d) にする。"""
+    """中身を読めない（UTF-8 でない状態の履歴など）。理由を持って (d) にする。"""
 
 
 def classify_all(
@@ -272,7 +272,10 @@ _NUMBER = re.compile(r"[0-9]+")
 
 
 def _lf(data: bytes) -> bytes:
-    """改行を LF に揃える（autocrlf で作業ツリーだけ CRLF になった跡を、コミット済みと比べる）。"""
+    """改行を LF に揃える。
+
+    autocrlf で作業ツリーだけ CRLF になったファイルを、コミット済みと比べる。
+    """
     return data.replace(b"\r\n", b"\n")
 
 
@@ -295,7 +298,7 @@ def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) ->
     """`events/<名前>.ndjson` の追記の行（JSON）。追記でなければ None。読めなければ _Unreadable。
 
     変更前が在り、変更前（改行を LF に揃えたもの）が前置きで、足した部分が改行で終わるときだけ。
-    新しい跡のファイルは追記と読まない。
+    新しい状態の履歴のファイルは追記と読まない。
     """
     if len(parts) != 2 or parts[0] != history.EVENTS_DIR or now is None or before is None:
         return None
@@ -312,7 +315,7 @@ def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) ->
     try:
         text = tail.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise _Unreadable(f"跡の追記を UTF-8 として読めない（{exc.reason}）") from exc
+        raise _Unreadable(f"状態の履歴の追記を UTF-8 として読めない（{exc.reason}）") from exc
     rows = []
     for line in text.split("\n")[:-1]:
         try:
@@ -328,7 +331,9 @@ def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) ->
 
 
 def _hook_events(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:
-    """その家族の親の跡への、hook の印（pending・skipped）の行だけの追記か。"""
+    """その親子チケットの親の状態の履歴への、
+    hook のマーカー（pending・skipped）の行だけの追記か。
+    """
     if len(parts) != 2 or parts[1] != f"{parent}{history.SUFFIX}":
         return False
     rows = _appended_rows(parts, now, before)
@@ -356,7 +361,7 @@ def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool
 
     フローの本文、人の承認で置かれた写し、reviewed・(b) でない skipped・close-early・設定を見た印・
     受け入れたスレッド、人の判断が消したマーカー、人の判断が一緒に書く移動（review/ から done/、
-    doing/ から done/）、跡の追記（読める行だけ）。
+    doing/ から done/）、状態の履歴の追記（読める行だけ）。
     """
     rel = f"{approved_rel}/{'/'.join(parts)}"
     if len(parts) == 2 and parts[0] == "flows" and parts[1].endswith((".yml", ".yaml")):

@@ -57,7 +57,7 @@ class VerdictTest(unittest.TestCase):
     def test_拒否には理由と代わりの手段が付く(self):
         result = run(payload=pre_tool_use("Bash", "command", "git push origin main"))
 
-        self.assertEqual(result.returncode, 0, "判定は JSON で運ぶので終了コードは 0")
+        self.assertEqual(result.returncode, 0, "判定は JSON で返すので終了コードは 0")
         out = verdict(self, result)
         self.assertEqual(out["permissionDecision"], "deny")
         self.assertEqual(out["hookEventName"], "PreToolUse")
