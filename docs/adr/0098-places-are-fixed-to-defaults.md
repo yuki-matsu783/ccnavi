@@ -23,7 +23,7 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 | `CCNAVI_TICKETS_PROPOSAL` | `wip/proposals` | 各ツリーのルート | 既定のまま |
 | `CCNAVI_TICKETS_APPROVED` | `.ccnavi/approved` | 各ツリーのルート | 既定のまま（`--lint` が言う） |
 | `CCNAVI_LOG` | `logs/log.jsonl` | ワークスペースルート | 記録しない |
-| `CCNAVI_STATE` | `logs/state` | ワークスペースルート | 控えを持たない |
+| `CCNAVI_STATE` | `logs/state` | ワークスペースルート | state を持たない |
 
 **既定から変えている配布先は見当たらなかった。** 導入スクリプト（`scripts/ccnavi-setup.sh`）が
 配る `settings.json` に書くのは既定と同じ値だけで、`CCNAVI_LOG` は常に、残りの 4 つ
@@ -38,9 +38,9 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 | 食い違い | 起きること |
 |---|---|
 | `CCNAVI_PROJECTS` の絶対パスを、実行ファイルと `ccnavi-git.sh push` は受けるが、`ccnavi-common.sh` の `ccnavi_project` は相対としか照らさない | ラッパーの記録が `logs/<プロジェクト>/` に分かれない |
-| `CCNAVI_STATE` の絶対パスを、実行ファイルは受けるが、`ccnavi-review.sh` は `$root/` に継ぎ足す | `ccnavi-review.sh` だけが存在しない控えの置き場を見る |
-| VS Code 拡張は `CCNAVI_TICKETS_PROPOSAL` を読まず、既定の綴りを見張る | 既定から動かすと、提案の増減でボードが自動で更新されない（README に注記していた） |
-| `ccnavi-push-approved.sh` は、末尾の `/` を落として空になる綴りと `.` を既定に戻す | 置き場が動くことを前提にした正規化とテストを、sh が抱える |
+| `CCNAVI_STATE` の絶対パスを、実行ファイルは受けるが、`ccnavi-review.sh` は `$root/` に継ぎ足す | `ccnavi-review.sh` だけが存在しないstateの置き場を見る |
+| VS Code 拡張は `CCNAVI_TICKETS_PROPOSAL` を読まず、既定のパスを見張る | 既定から動かすと、提案の増減でボードが自動で更新されない（README に注記していた） |
+| `ccnavi-push-approved.sh` は、末尾の `/` を落として空になるパスと `.` を既定に戻す | 置き場が動くことを前提にした正規化とテストを、sh が抱える |
 
 加えて、ADR-0077 の `DENY_SCRIPT_ENV_OVERRIDE` は、保護済みの sh を呼ぶコマンド行で `CCNAVI_*` を
 置く形を止めている。変数が在る限り、その先で sh が読む値を差し替えられる道も在る。
@@ -56,12 +56,12 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 - `settings.py` から 6 つの定数と overrides 表の 6 行を落とす。**この表は
   `ccnavi.settings.local.json`（ccnavi 自身を開発するときだけ読む上書き設定）と共有しているので、
   そちらの同じキーも読まなくなる**（ADR-0052 と同じ）
-- **空文字の口も消す。** 「記録しない」「控えを持たない」「プロジェクトを数えない」は言えなくなる。
+- **空文字の口も消す。** 「記録しない」「state を持たない」「プロジェクトを数えない」は言えなくなる。
   プロジェクトを数えたくなければ `projects/` を作らなければよい
 - 環境に値が残っていても**無視する。止めない。** 残った値のために判定を止めると、既定と同じ値を
   書いていた導入済みの環境がすべて止まる
 - `Settings` の欄（`conf.projects` など）は既定の値を持って残す。渡している先の 20 か所ほどは触らない
-- sh は既定の綴りを直に書く。`ccnavi-push-approved.sh` の綴りの正規化は消す
+- sh は既定のパスを直に書く。`ccnavi-push-approved.sh` のパスの正規化は消す
 - VS Code 拡張は置き場の env を読まない。プロジェクト画面の「置き場が無効（`CCNAVI_PROJECTS` が空）」の
   分岐・文面・ボタンの抑止を消す
 
@@ -160,15 +160,15 @@ gitlink（入れ子のリポジトリを 1 つの版として載せたもの）�
 
 - 置き場の決まり方が 1 通りになる。実行ファイル・sh・拡張から分岐が消える
 - 状況の表の食い違いが 4 つとも消える
-- `ccnavi-push-approved.sh` の綴りの正規化とそのテストが要らなくなる
+- `ccnavi-push-approved.sh` のパスの正規化とそのテストが要らなくなる
 - ADR-0077 が止める `CCNAVI_*` のうち、sh の置き場を差し替えられた 6 つが意味を失う
 - README の環境変数の表が 6 行減る
 - `projects/` がぶつかったとき、サブモジュールを黙って層として読むのではなく、原因と直し方が出る
 
 失ったもの:
 
-- **「記録しない」「控えを持たない」「プロジェクトを数えない」を env で言えなくなる。**
-  控えを持たないと実行後チェックが働かないので、控えを止める意味はもともと薄い。記録を止めたいユーザは
+- **「記録しない」「state を持たない」「プロジェクトを数えない」を env で言えなくなる。**
+  state を持たないと実行後チェックが働かないので、state を止める意味はもともと薄い。記録を止めたいユーザは
   止められない
 - **名前がぶつかったワークスペースは、自分のソースの `projects/` を改名するしかない。**
   そのリポジトリの参照（ビルド設定、CI、import）を直す仕事になる

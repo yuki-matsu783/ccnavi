@@ -37,14 +37,14 @@ sh .ccnavi/scripts/ccnavi-ticket.sh done <子> --risk scratchpad/my-risk.yml
 `check` に `--phases` を足せば、そのフェーズの `review` の種類（`mr` が要るか `chat` で
 足りるか）を差し替えられた。
 
-**記録側に跡が残らない。** `.risk.json` の `source` は層の名前（`common`）だけで、どの
+**記録側に形跡が残らない。** `.risk.json` の `source` は層の名前（`common`）だけで、どの
 物理ファイルを読んだかを持たない。フェーズのマーカーも同じ。あとから見て「別の配点で
 採点された」とは分からない。
 
 hook は引数を渡さずに実行ファイルを起動するので、**hook からの判定の入口は前から固定**
 だった。穴が開くのは、エージェントが 2 本の sh を直接打つ経路だけ。
 
-**同じ経路には、フラグ 5 本の表に載らない穴がもう 1 つあった。** sh は自分の綴りを先に
+**同じ経路には、フラグ 5 本の表に載らない穴がもう 1 つあった。** sh は自分の引数を先に
 置き、エージェントの引数を後ろに繋ぐ（`exec "$bin" --root "$root" ticket "$@"`、
 `ccnavi-review.sh` は `--cwd "$here"` も渡す）。argparse は同じオプションを後勝ちで読むので、
 **後ろに `--root` を 1 本足すだけで sh が渡した本物を上書きできた。** `settings.load` は
@@ -64,7 +64,7 @@ hook は引数を渡さずに実行ファイルを起動するので、**hook �
 
 `.ccnavi/scripts/ccnavi-approve.sh` は**まさにこれを警戒していた**。「`--yes` や `--root` が
 混ざると、端末の y/N を経ない経路や別のワークスペースの承認になってしまう」と書いて、`-*` で
-始まる引数を全部断っている。`ccnavi-ticket.sh` と `ccnavi-review.sh` にその守りは無い。
+始まる引数を全部断っている。`ccnavi-ticket.sh` と `ccnavi-review.sh` にその保護は無い。
 
 ADR-0052 はこの 3 本を「診断のためのフラグ」と呼んだが、それは実装と合っていなかった。
 同 ADR は訂正だけを書き、門は「別に設計して直す」として残していた。これがその 1 枚。
@@ -95,13 +95,13 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
   5 本を「渡されなかった」値に戻す。渡されたかどうかの読み方は `_override` と揃える
   （`--rules ""` は指定と数えず、`--risk ""` は数える）
 - テストのハーネスは 3 本をフラグで渡すのをやめ、`--root` の下の既定の置き場
-  （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。綴りは `tests.common_path` が
+  （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。パスは `tests.common_path` が
   実行ファイルの既定から引く
 - 受入テスト（`tests/guard/test_acceptance.py`、`tests/core/test_entry.py`、
   `tests/guard/test_permission_mode.py`）は、見本のルールを共通層に据えた一時の
   ワークスペース（`tests.fixture_workspace`）を `--root` に渡す
 
-**あわせて、sh が計算して渡す綴り（`--root` / `--cwd`）は 2 度渡せないことにする。**
+**あわせて、sh が計算して渡す引数（`--root` / `--cwd`）は 2 度渡せないことにする。**
 2 本目が在ったら止める（`_one_wrapper_flag_each`）。数えるのは argparse に任せる
 （`action="append"`）。argv を自分で数えると、別のオプションの**値**に書いた `--root`
 という語まで数えてしまう。
@@ -120,7 +120,7 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
 **穴が実行ファイルの側で閉じる。** sh の側で名指しにする案は、実行ファイルを変えずに
 済むが、閉じるのはその 2 本の経路だけになる。実行ファイルを直に打つ経路は組み込みの
 deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
-`CCNAVI_GUARD_TICKET_APPROVAL=disable` と dry-run で外れる。守りが 2 つの設定の積に
+`CCNAVI_GUARD_TICKET_APPROVAL=disable` と dry-run で外れる。保護が 2 つの設定の積に
 なるより、入口そのものが受け付けないほうが単純で済む。
 
 `--root` / `--cwd` も同じ理由で実行ファイルの側に置く。sh を直せば済む話ではあるが、
@@ -128,7 +128,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 側なら、sh が何本あっても、将来もう 1 本足しても、同じところで止まる。
 
 **テストのハーネスは、既定の置き場を使えば何も失わない。** ハーネスはもともと自分の
-一時ディレクトリを `--root` に渡している。設定をその下の既定の綴りに置けば、フラグは
+一時ディレクトリを `--root` に渡している。設定をその下の既定のパスに置けば、フラグは
 要らない。むしろ受入テストは、これまでリポジトリ自身をワークスペースルートにして
 動いていた。今回の変更で、実行した機械の `.ccnavi/common/rules.yml` が判定に混ざらなくなる。
 
@@ -147,7 +147,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
   env を廃したあとも「hook の command にフラグを書き足す」手段が残ると書いていた。
   その手段も無くなる。複数のワークスペースで 1 本の `rules.yml` を共有したいユーザは
   シンボリックリンクに頼ることになる
-- `selfguard.common_shell_clause`（共通層が既定の外にあるとき、その綴りをシェルの
+- `selfguard.common_shell_clause`（共通層が既定の外にあるとき、そのパスをシェルの
   書き込みの禁止に足す働き）は、**判定の経路では当たらなくなる。** 消さなかったのは、
   診断（`--test`）が判定と同じ関数を通るため、そこで動かした先を守らないと
   「`Write` では止まってシェルでは通る」食い違いが残るから（ADR-0051 と同じ判断）。
@@ -182,7 +182,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
   「副命令かどうか」になり、`--project-rules-file` と揃わない。テストのハーネスが
   副命令を打つ箇所（46 か所以上）は結局動くので、手当ての量もあまり減らない
 - **穴は閉じず、差し替えを記録に残すだけにする。** `.risk.json` の `source` と
-  フェーズのマーカーに、実際に読んだファイルの綴りを残す。差分は最小だが、気付くのは
+  フェーズのマーカーに、実際に読んだファイルのパスを残す。差分は最小だが、気付くのは
   事後で、しかも記録を見たユーザだけ
 
 ## 関連

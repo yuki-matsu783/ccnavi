@@ -58,6 +58,6 @@ ADR-0030 の語をそのまま引き継いだもので、この道具だけの�
 
 - 得たもの: 止められた文面から次の一手が読める。ボードの札が 1 枚減る。「ゲート」という
   この道具だけの語を覚えなくてよくなる
-- 失ったもの: 内部の綴り（JSON の `gate_closed`）と表示名が一致しなくなった。`phase.review_label`
+- 失ったもの: 内部の表記（JSON の `gate_closed`）と表示名が一致しなくなった。`phase.review_label`
   と `holdLabel()` の 2 か所が対応表を持つ
 - 記録（`logs/log.jsonl`）の `code` が変わるので、`DENY_PHASE_GATE` で数えていた集計は繋がらない
