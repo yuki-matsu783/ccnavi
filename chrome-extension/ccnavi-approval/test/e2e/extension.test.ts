@@ -314,7 +314,7 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   const families = await repo.locator("[data-family]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.family));
   assert.deepEqual(families, ["i0001", "i0002", "i0004"]);
   const review = repo.locator('[data-family="i0004"] .review[data-phase="1"]');
-  assert.match((await review.locator("h4").textContent()) ?? "", /MR !7/);
+  assert.match((await review.locator("h4").textContent()) ?? "", /マージリクエスト !7/);
   assert.equal(await review.locator(".thread").count(), 8);
   assert.equal(await review.locator("script, img, svg, iframe, form, style, details, summary").count(), 0);
   for (const a of await review.locator(".markdown a").all()) await a.click();

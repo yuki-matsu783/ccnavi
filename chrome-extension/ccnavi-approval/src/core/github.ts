@@ -117,7 +117,7 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
   const reset = Number(header(res, "x-ratelimit-reset"));
   if (!(res.status === 429 || (res.status === 403 && (after !== "" || remaining === "0")))) return null;
   const seconds = after !== "" && /^\d+$/.test(after) ? Number(after) : null;
-  const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `。回復は ${new Date(reset * 1000).toISOString()}` : "";
+  const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `。制限が解けるのは ${new Date(reset * 1000).toISOString()}` : "";
   const kind = after !== "" ? "二次のレート制限" : "レート制限";
   return {
     text: `GitHub の${kind}にかかった（${res.status}${seconds !== null ? `、${seconds} 秒待つよう求められた` : ""}${when}）。少し待ってからボードを更新してください`,
@@ -699,7 +699,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
  */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
   const mr = await openPull(client, owner, repo, branch);
-  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する開いた MR が無い`);
+  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、開いているマージリクエストが無い`);
   const threads = await reviewThreads(client, owner, repo, mr.number);
   const reviews = await pullReviews(client, owner, repo, mr.number);
   return { host: "github", mr, threads, reviews, fetched_at: new Date().toISOString() };

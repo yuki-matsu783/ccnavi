@@ -69,7 +69,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     return section;
   }
   if (board.compat && !board.compat.same) {
-    section.append(notice(doc, "warn", `${board.compat.message}（承認と取り下げは出さない。表示だけ）`));
+    section.append(notice(doc, "warn", `${board.compat.message}（表示だけにして、承認と取り下げのボタンは出さない）`));
   }
   if (board.missingExtras.length > 0) {
     section.append(notice(doc, "warn", `指定したブランチがリモートに無い: ${board.missingExtras.join(", ")}`));
@@ -299,7 +299,7 @@ export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, wr
   h.append(doc.createTextNode(`フェーズ ${panel.phase} のレビュー（`));
   // GitLab の MR は `!番号`、GitHub の PR は `#番号`
   const mark = (panel.copy?.host ?? panel.host) === "gitlab" ? "!" : "#";
-  h.append(panel.copy ? link(doc, panel.copy.mr.url, `MR ${mark}${panel.copy.mr.number}`) : doc.createTextNode(`MR ${mark}${panel.mr}`));
+  h.append(panel.copy ? link(doc, panel.copy.mr.url, `マージリクエスト ${mark}${panel.copy.mr.number}`) : doc.createTextNode(`マージリクエスト ${mark}${panel.mr}`));
   h.append(doc.createTextNode(`）: ${panel.children.join(", ")}`));
   box.append(h);
   if (panel.error) {

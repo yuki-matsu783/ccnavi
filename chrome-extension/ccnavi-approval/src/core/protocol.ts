@@ -355,7 +355,7 @@ function startName(name: unknown, cfg: RepoConfig): string {
   const branch = github.checkBranch(name);
   const m = /^(?:(?<project>[A-Za-z0-9][A-Za-z0-9._-]*)-)?i\d{4,}$/.exec(branch);
   if (!m || (m.groups?.project ?? "") !== cfg.project) {
-    throw new Error(`${branch} は issue から決める親のブランチの名前の形でない（${cfg.project ? `${cfg.project}-i<番号>` : "i<番号>"}）`);
+    throw new Error(`${branch} は、issue から作る親のブランチの名前の形（${cfg.project ? `${cfg.project}-i<番号>` : "i<番号>"}）になっていない`);
   }
   return branch;
 }
@@ -503,7 +503,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
-      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が読んだものと違う。ボードを更新してから始め直してください`);
+      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで読んだときから動いている。ボードを更新してから始め直してください`);
       // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない。11.9.1 の 7）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);

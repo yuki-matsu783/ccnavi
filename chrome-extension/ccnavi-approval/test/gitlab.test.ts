@@ -275,10 +275,10 @@ test("CX-T151 service worker の「始める」の守り: ボードからだけ�
   const refused: [unknown[], typeof BOARD, RegExp][] = [
     [["acme", "widgets", "i0012", head], OPTIONS, /ボードからだけ/],
     [["acme", "other", "i0012", head], BOARD, /登録していない/],
-    [["acme", "widgets", "main", head], BOARD, /issue から決める/],
-    [["acme", "widgets", "i12", head], BOARD, /issue から決める/],
-    [["acme", "widgets", "web-i0012", head], BOARD, /issue から決める/],
-    [["acme", "widgets", "i0012", "f".repeat(40)], BOARD, /先頭が読んだものと違う/],
+    [["acme", "widgets", "main", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "i12", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "web-i0012", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "i0012", "f".repeat(40)], BOARD, /先頭が、ボードで読んだときから動いている/],
   ];
   for (const [args, sender, why] of refused) {
     const res = await ask(args, sender);
@@ -349,7 +349,7 @@ test("CX-T153 GitLab のスレッドの悪意のある本文は描いても実�
   const html = renderRepo(dom.window.document, md, board, { approve: () => undefined, withdraw: () => undefined, review: () => undefined });
   dom.window.document.body.append(html);
   const box = dom.window.document.querySelector(`[data-family="${FAMILY}"] .review`) as HTMLElement;
-  assert.match(box.querySelector("h4")?.textContent ?? "", /MR !7/);
+  assert.match(box.querySelector("h4")?.textContent ?? "", /マージリクエスト !7/);
   assert.equal(box.querySelectorAll(".thread").length, 8);
   assert.equal(box.querySelectorAll("script, img, svg, iframe, form, style, details, summary").length, 0);
   const attrs = [...box.querySelectorAll(".markdown *")].flatMap((e) => [...e.attributes].map((a) => a.name));

@@ -630,7 +630,10 @@ def _write_refusal(snap: dict, family: str) -> str:
     """
     compat = _compat(snap)
     if not compat["same"]:
-        return f"{compat['message']}。承認と取り下げは出さない（ADR-0093 の 7.3）"
+        return (
+            f"{compat['message']}。表示だけにして、承認と取り下げのボタンは出さない"
+            "（ADR-0093 の 7.3）"
+        )
     folded = family.casefold()
     if (
         folded in ticket_mod.RESERVED_BRANCH_IDS
