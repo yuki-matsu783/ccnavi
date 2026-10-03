@@ -1,14 +1,14 @@
 ---
 type: handover
 title: 引き継ぎ
-description: ccnavi の現状と次に入るユーザが知るべきこと。実装状況、未実装機能、次の作業
+description: ccnavi の現状と次に入る人が知るべきこと。実装状況、未実装機能、次の作業
 tags: [testing, extension, sh-scripts, ticket]
 keywords: [引き継ぎ, 実装状況, 未実装, 次の作業, ADR, テスト, hook]
 ---
 
 # 引き継ぎ
 
-現状と次の一手。次に入るユーザが最初に読む想定。判断の理由は [docs/adr/](docs/adr/README.md)。
+現状と次の一手。次に入る人が最初に読む想定。判断の理由は [docs/adr/](docs/adr/README.md)。
 
 ## この道具は何か
 

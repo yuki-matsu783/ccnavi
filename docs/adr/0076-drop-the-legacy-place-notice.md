@@ -19,7 +19,7 @@ warn で名指しする案内を一緒に置いた（`lint._legacy_tickets`）�
 気づかれずに「承認待ちは無い」で通るのを防ぐためのもので、**判定はこの値を一切読まない**。
 
 案内のために、旧の綴りが定数として 4 つ残った。`settings.LEGACY_TICKETS`、`settings.LEGACY_APPROVED`、
-`ticket.LEGACY_STATES`、`approval.LEGACY_CLOSED_DIR`。コードを読むユーザは、置き場の綴りを見るたびに
+`ticket.LEGACY_STATES`、`approval.LEGACY_CLOSED_DIR`。コードを読む人は、置き場の綴りを見るたびに
 どちらが生きているのかを確かめることになる。
 
 ## 決定
