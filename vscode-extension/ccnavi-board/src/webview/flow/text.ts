@@ -44,7 +44,7 @@ export function summaryOf(node: FlowNode): string {
     case "codex":
       return line(dataText(node, "prompt"));
     case "subAgent":
-      return line(dataText(node, "description") || dataText(node, "agentDefinition") || dataText(node, "prompt"));
+      return line(dataText(node, "description") || dataText(node, "prompt"));
     case "askUserQuestion":
       return line(dataText(node, "questionText"));
     case "ifElse":
