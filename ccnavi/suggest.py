@@ -190,7 +190,7 @@ def _shape(tool: str, subject: str, root: str) -> tuple[str, dict, str] | None:
 
 
 def _usable(rec: dict) -> bool:
-    """候補の材料にできる実行前の判定の行か。切れた綴りと、読み切れなかった呼び出しは使わない。"""
+    """候補の材料にできる実行前チェックの行か。切れた綴りと、読み切れなかった呼び出しは使わない。"""
     subject = rec.get("subject")
     return (
         rec.get("event") == hookio.PRE_TOOL_USE

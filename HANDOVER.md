@@ -27,7 +27,7 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 ## いま動くもの
 
-hook の 7 イベントの全部、実行前のルール照合、実行後の監視、コアファイルの自己防衛、チケット制御、
+hook の 7 イベントの全部、実行前のルール照合、実行後チェック、コアファイルの自己防衛、チケット制御、
 複数のリポジトリ（層の和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
 VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理・フェーズ管理）。
 このリポジトリ自身には dry-run で仕掛けてある。
@@ -59,7 +59,7 @@ uv run --with pyinstaller python build.py
 - 記憶の消去（REQ-DIA-05）
 - 期限（REQ-CMN-08）はループの中で見ているだけで、実測していない
 - GitHub の実物に対する `request` と `confirm` は実測していない。GitLab は実物（CE 18.5）で 1 周を確かめてある。
-  自動テストは写し（`--result`）を渡す形で通す
+  自動テストはJSON（`--result`）を渡す形で通す
 - REQ-TKT-35 の後半。`SubagentStart` は親の局面を名指ししない（フェーズの番号と種類までは渡す）
 
 ## 次にやること
@@ -133,7 +133,7 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 - **権限モードへの委譲。** `code` が `UNDECLARED` の行を数え、`tool` と `subject` の傾向を見る。同じ場所が繰り返すなら
   `allow` に 1 行足す、毎回違うなら `allow` の粒度が細かすぎる。`RULE_ASK` との比も見る
-- **実行後の監視。** `event` が `PostToolUse` で `deny` の回を見る。`worktree-unreadable` が出ていないか、`detail` の
+- **実行後チェック。** `event` が `PostToolUse` で `deny` の回を見る。`worktree-unreadable` が出ていないか、`detail` の
   `preexisting` が毎セッション大量に出ていないか、`paths` に同じ場所が繰り返し出ていないか。`ms` を `PreToolUse` と比べる
 - **誤検知。** `degraded` の割合を数える（`echo "git push"` の類が止まっていないことも）。大きければ縮退の条件が広すぎる
 

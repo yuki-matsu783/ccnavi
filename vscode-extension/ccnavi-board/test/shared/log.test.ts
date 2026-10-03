@@ -1,6 +1,6 @@
 /**
  * 診断ログ（`src/log.ts`）。行の形・logfmt のエスケープのしかた・レベルの絞り込み・置き場・書けないときに何も出さないこと・
- * リンクを辿らないこと・出どころの名前・0600・URL と scp 形の伏せ字。
+ * リンクをたどらないこと・出どころの名前・0600・URL と scp 形式の資格情報の伏せ方。
  * sh と Python が同じ行を出すことは Python のテスト（tests/sh/test_diaglog_sh.py）が見る。
  */
 import { test } from "node:test";

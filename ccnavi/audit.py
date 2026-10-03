@@ -42,7 +42,7 @@ REASON_NO_SUBJECT = "no-subject"
 REASON_NOTHING_TO_RUN = "nothing-to-run"
 REASON_PAYLOAD_UNUSABLE = "payload-unusable"
 REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
-# 実行後の監視だけが出す 2 つは post.py が持っている。判定に至らなかった
+# 実行後チェックだけが出す 2 つは post.py が持っている。判定に至らなかった
 # 理由という点では同じだが、あちらは作業ツリーを読めたかどうかの話なので、
 # 名前もそちらに置いてある。
 # ルールが読めないことは、ここには無い。判定に至らなかった理由ではなく、
@@ -110,7 +110,7 @@ class Record:
     # 書いた側が文字のつもりでいた場所で止めた回を、あとから数えられるように。
     # 多ければ、直すのは文面の案内か、よく書かれる形の側。
     quoted: list[str] = field(default_factory=list)
-    # paths は実行後の監視が保護領域の中に見つけた変更。件数ではなく綴りで
+    # paths は実行後チェックが保護領域の中に見つけた変更。件数ではなく綴りで
     # 残すのは、同じ場所が繰り返し汚れているのか毎回違う場所なのかで、
     # 直す先が変わるため。前者は出力先の設定 1 つ、後者は経路そのもの。
     paths: list[str] = field(default_factory=list)
@@ -168,7 +168,7 @@ class Log:
         # コマンドの全文が入る欄は、秘密の形を伏せてから書く（redact）。伏せるのは記録だけで、
         # record そのものは書き換えない。判定は伏せる前の文字列で済んでいる。切る前に伏せるのは、
         # 上限で値の途中が切れると、形が崩れて伏せられなくなるため。ただし伏せる前にも
-        # 上限の数倍（REDACT_LIMIT）で切る。どれだけ長くても、伏せる手間が実行前の判定の
+        # 上限の数倍（REDACT_LIMIT）で切る。どれだけ長くても、伏せる手間が実行前チェックの
         # 期限に届かないように。そこで切れた値は、残った字数の側で上限に切られて見えない。
         # detail は ccnavi が組む文で、上限を持たないので切らない。
         subject = _limited(_redacted(record.subject[:REDACT_LIMIT]), len(record.subject))
