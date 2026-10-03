@@ -17,7 +17,7 @@
                     "url": "https://github.com/acme/widgets/pull/42#discussion_r9401",
                     "path": "src/app.py",
                     "line": 5,
-                    "body": "<!-- ccnavi:request i0001:1 key=zz -->\n目印をまねた人の指摘",
+                    "body": "<!-- ccnavi:request i0001:1 key=zz -->\n目印をまねたユーザの指摘",
                     "createdAt": "2026-09-29T01:00:00Z"
                   }
                 ]

@@ -111,7 +111,7 @@ def gather(
 ) -> Gathered:
     """承認の対象を組む。提案を走査し、承認済みチケットと突き合わせ、載せるものと落とすものに分ける。
 
-    読めない提案や承認済みチケット、落とした提案の理由は標準エラーにも出す。端末の人は
+    読めない提案や承認済みチケット、落とした提案の理由は標準エラーにも出す。端末のユーザは
     そこで読み、拡張は JSON の `problems` / `rejected` で読む。
 
     `only` は承認の対象を識別子で絞る（`ccnavi --agree <識別子>...`、拡張のオーバーレイ）。
@@ -222,7 +222,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
     # 読めなかったものは、落ちた枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
     # 1 件も無い）が「読めないのは自分が書いた 1 本」である見込みのいちばん高い枝で、
-    # そこで出さないと、置いたばかりの人に「todo/ に置け」とだけ言うことになる。
+    # そこで出さないと、置いたばかりのユーザに「todo/ に置け」とだけ言うことになる。
     unreadable = _unreadable(gathered)
     if gathered.refused:
         return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
@@ -258,11 +258,11 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         reason = VERIFY_REJECTED
         tail = (
             f"\n{len(gathered.rejected)} 件が承認の対象にならない。"
-            "提案を直してから、利用者に承認を依頼してください。\n"
+            "提案を直してから、ユーザに承認を依頼してください。\n"
         )
     else:
         reason = VERIFY_OK
-        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。利用者に承認を依頼してよい。\n"
+        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。ユーザに承認を依頼してよい。\n"
     lines.append(tail)
     return Verdict(reason == VERIFY_OK, reason, "".join(lines))
 
@@ -469,7 +469,7 @@ def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: s
 
     `--agree --yes` の `prompt`（拡張が Claude Code に渡す）と、hook が次の
     UserPromptSubmit / PreToolUse で渡す `additionalContext` の両方がここから出る。
-    2 か所で文を持つと、人が貼った文と hook が渡した文が食い違う。
+    2 か所で文を持つと、ユーザが貼った文と hook が渡した文が食い違う。
 
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
     revisions は親の改版だった識別子。root はワークスペースルートで、sh の綴りに使う。
@@ -735,7 +735,7 @@ class Applied:
     """承認済みチケットを置いた結果。途中で止まったときに、どこまで置いたかを呼び手へ返す。
 
     置いたものは戻さない（戻す途中でまた落ちる）。代わりに、どこで止まって何が置かれたかを
-    そのまま返し、拡張が人に伝える（README「承認の JSON」の `partial`）。
+    そのまま返し、拡張がユーザに伝える（README「承認の JSON」の `partial`）。
     """
 
     code: int
@@ -880,7 +880,7 @@ def _apply_steps(
 def _origin_line(t: ticket_mod.Ticket) -> str:
     """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
 
-    プロジェクトは提案を置いた場所で決まる。人はここで、書き込みが向かうリポジトリを
+    プロジェクトは提案を置いた場所で決まる。ユーザはここで、書き込みが向かうリポジトリを
     見て承認する。提案はそのツリーからの相対パスで見せる（ADR-0093 の D22）。絶対パスは
     機械ごとに違い、承認の指紋（画面の本文を含む）が Chrome と手元で揃わない。
     """
@@ -896,7 +896,7 @@ def screen(
 ) -> str:
     """承認を求める画面を組む。
 
-    frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
+    frontmatter の全文は見せない。ユーザに見せるのは「何が新たに書けるようになるか」
     「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
@@ -948,7 +948,7 @@ def screen(
                 "allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、"
                 "deny はこのチケットでも編集できない場所"
             )
-            # チケットの範囲はルールの allow より強い（設計 7）。承認する人は「ルールで
+            # チケットの範囲はルールの allow より強い（設計 7）。承認するユーザは「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
                 "    ルールの allow で許可してある場所も、この範囲の外では止まる。"
@@ -1035,7 +1035,7 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
 
 
 def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
-    """`dag` の計画の待ち。辺の書き漏れを人が見つける場所（設計 9.7）。"""
+    """`dag` の計画の待ち。辺の書き漏れをユーザが見つける場所（設計 9.7）。"""
     found = workflow.lines(t, wf)
     if not found:
         return []
@@ -1097,7 +1097,7 @@ def waiting(
     """いま `--agree` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
-    無いもの。閉じたものは対象外で、再開は人が承認済みチケットを戻す。
+    無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
     改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
     計画が同じでも、いまの種類で計算した待ち方が承認済みチケットの写しと違えば改版になる
     （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
@@ -1409,7 +1409,7 @@ def validate(
     形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
     検査を当てる（`blocking_problems`、ADR-0058）ので「判定では補えない」わけではないが、
     判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
-    承認は人がまとめて見て決める場所なので、そこで落ちるものはそこで言う。
+    承認はユーザがまとめて見て決める場所なので、そこで落ちるものはそこで言う。
     """
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []

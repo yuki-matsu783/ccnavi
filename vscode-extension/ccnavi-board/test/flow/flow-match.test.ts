@@ -29,8 +29,8 @@ test("CB-T251 整数と浮動小数は決め打ちで揃える。整数の値を
   assert.notEqual(flowMismatch({ v: "yes" }, { v: true }), undefined);
   assert.notEqual(flowMismatch({ v: 755 }, { v: 493 }), undefined);
   assert.notEqual(flowMismatch({ v: [1, 2] }, { v: [1] }), undefined);
-  assert.deepEqual(flowMismatch({ v: 1, w: 2 }, { v: 1 }), { where: "w", screen: "整数 2", executable: "無い" });
-  assert.deepEqual(flowMismatch({ v: 1 }, { v: 1, w: 2 }), { where: "w", screen: "無い", executable: "整数 2" });
+  assert.deepEqual(flowMismatch({ v: 1, w: 2 }, { v: 1 }), { where: "w", screen: "整数 2", executable: "なし" });
+  assert.deepEqual(flowMismatch({ v: 1 }, { v: 1, w: 2 }), { where: "w", screen: "なし", executable: "整数 2" });
   // 画面の側で値が undefined のキーは無いものとして読む
   assert.equal(flowMismatch({ v: 1, w: undefined }, { v: 1 }), undefined);
   // 画面の側の作りの違う値（Buffer など）は食い違い
@@ -45,7 +45,9 @@ test("CB-T252 場所は nodes の中ならノードの id と欄のパスで言�
   assert.ok(found !== undefined);
   assert.match(openMismatchText(found), /ノード "p-1" の data\.branches\[0\]\.label。画面: 文字列 "yes"、実行ファイル: 真偽値 true/);
   assert.match(openMismatchText(found), /エディタで引用符を付ける/);
-  assert.match(saveMismatchText(found), /書かない/);
+  // 「開きません」は呼び手（flow-panel.ts）が頭に付ける。ここでも言うと 1 文に 2 度出る
+  assert.doesNotMatch(openMismatchText(found), /開きません/);
+  assert.match(saveMismatchText(found), /書き込みません/);
   assert.equal(flowMismatch({ connections: [{ condition: "y" }] }, { connections: [{ condition: "x" }] })?.where, "connections[0].condition");
   assert.equal(flowMismatch({ "a b": 1 }, { "a b": 2 })?.where, '["a b"]');
   assert.equal(flowMismatch("x", { nodes: [] })?.where, "最上位");

@@ -97,29 +97,37 @@ class AdditionalContextTest(unittest.TestCase):
     def test_deny_and_ask_carry_reason_and_context_together(self):
         self.rules(
             deny=[
-                rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
+                rule(
+                    "push", "Bash", "push はユーザが行う", glob="*git push*", additionalContext=NOTE
+                )
             ],
             ask=[
                 rule(
-                    "mig", "Write", "移行は人が見る", glob="*/migrations/*", additionalContext=NOTE
+                    "mig",
+                    "Write",
+                    "移行はユーザが見る",
+                    glob="*/migrations/*",
+                    additionalContext=NOTE,
                 )
             ],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
         denied = self.judge("Bash", "git push origin main")
         self.assertEqual(denied.get("permissionDecision"), "deny")
-        self.assertIn("push は人が行う", denied["permissionDecisionReason"])
+        self.assertIn("push はユーザが行う", denied["permissionDecisionReason"])
         self.assertEqual(denied.get("additionalContext"), NOTE)
 
         asked = self.judge("Write", os.path.join(self.root, "migrations", "001.sql"))
         self.assertEqual(asked.get("permissionDecision"), "ask")
-        self.assertIn("移行は人が見る", asked["permissionDecisionReason"])
+        self.assertIn("移行はユーザが見る", asked["permissionDecisionReason"])
         self.assertEqual(asked.get("additionalContext"), NOTE)
 
     def test_dry_run_still_delivers_the_text(self):
         self.rules(
             deny=[
-                rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
+                rule(
+                    "push", "Bash", "push はユーザが行う", glob="*git push*", additionalContext=NOTE
+                )
             ],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
@@ -130,7 +138,7 @@ class AdditionalContextTest(unittest.TestCase):
 
     def test_rules_without_the_field_add_nothing(self):
         self.rules(
-            deny=[rule("push", "Bash", "push は人が行う", glob="*git push*")],
+            deny=[rule("push", "Bash", "push はユーザが行う", glob="*git push*")],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
         self.assertNotIn("additionalContext", self.judge("Bash", "git push"))
@@ -236,13 +244,15 @@ class AdditionalContextTest(unittest.TestCase):
     def test_test_shows_reason_and_context(self):
         self.rules(
             deny=[
-                rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
+                rule(
+                    "push", "Bash", "push はユーザが行う", glob="*git push*", additionalContext=NOTE
+                )
             ],
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContext=NOTE)],
         )
         done = self.run_ccnavi("--test", "Bash", "git push", "--json")
         body = json.loads(done.stdout)
-        self.assertIn("push は人が行う", body["response"])
+        self.assertIn("push はユーザが行う", body["response"])
         self.assertIn(NOTE, body["response"])
         allowed = self.run_ccnavi("--test", "Write", os.path.join(self.root, "src", "a.py"))
         self.assertIn("verdict: allow", allowed.stdout)

@@ -100,7 +100,8 @@ def describe(parser: argparse.ArgumentParser) -> dict[str, object]:
 
 
 def report(stdout: TextIO, parser: argparse.ArgumentParser, as_json: bool) -> int:
-    """版を書く。人向けの形も 1 行 1 項目の `<名前>: <値>` にして、sh が sed で読めるようにする。"""
+    """版を書く。ユーザ向けの形も 1 行 1 項目の `<名前>: <値>` にして、
+    sh が sed で読めるようにする。"""
     body = describe(parser)
     if as_json:
         stdout.write(json.dumps(body, ensure_ascii=True, indent=1))

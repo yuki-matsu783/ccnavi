@@ -98,12 +98,12 @@ function differ(screen: unknown, exec: unknown, at: readonly Segment[]): Found |
     const keys = Object.keys(screen).filter((key) => screen[key] !== undefined);
     for (const key of keys) {
       if (!Object.prototype.hasOwnProperty.call(exec, key)) {
-        return { path: [...at, key], screen: describeScreen(screen[key]), executable: "無い" };
+        return { path: [...at, key], screen: describeScreen(screen[key]), executable: "なし" };
       }
     }
     for (const key of Object.keys(exec)) {
       if (!keys.includes(key)) {
-        return { path: [...at, key], screen: "無い", executable: describeExecutable(exec[key]) };
+        return { path: [...at, key], screen: "なし", executable: describeExecutable(exec[key]) };
       }
       const inner = differ(screen[key], exec[key], [...at, key]);
       if (inner !== undefined) {
@@ -155,7 +155,7 @@ function quoted(text: string): string {
 /** 画面の値の言い方 */
 export function describeScreen(value: unknown): string {
   if (value === undefined) {
-    return "無い";
+    return "なし";
   }
   if (value === null) {
     return "null";
@@ -170,10 +170,10 @@ export function describeScreen(value: unknown): string {
     return Number.isInteger(value) ? `整数 ${value}` : `数 ${value}`;
   }
   if (Array.isArray(value)) {
-    return `並び（${value.length} 件）`;
+    return `リスト（${value.length} 件）`;
   }
   if (isPlain(value)) {
-    return "キーと値の並び";
+    return "マップ（キーと値の組）";
   }
   if (isRecord(value)) {
     return `${(value as object).constructor?.name ?? "値"}（JSON にできない値）`;
@@ -196,7 +196,7 @@ export function describeExecutable(value: unknown): string {
     return `整数 ${value}`;
   }
   if (Array.isArray(value)) {
-    return `並び（${value.length} 件）`;
+    return `リスト（${value.length} 件）`;
   }
   if (isMark(value)) {
     const text = typeof value.text === "string" ? quoted(value.text).slice(1, -1) : "";
@@ -207,9 +207,9 @@ export function describeExecutable(value: unknown): string {
         }
         return `浮動小数 ${text}`;
       case "int":
-        return `整数 ${text}（画面の数では正確に持てない）`;
+        return `整数 ${text}（画面の数値では正確に表せません）`;
       case "map":
-        return "キーが文字列でないキーと値の並び";
+        return "キーが文字列でないマップ";
       case "date":
         return `日付 ${text}`;
       case "datetime":
@@ -225,7 +225,7 @@ export function describeExecutable(value: unknown): string {
     }
   }
   if (isRecord(value)) {
-    return "キーと値の並び";
+    return "マップ（キーと値の組）";
   }
   return typeof value;
 }
@@ -233,8 +233,8 @@ export function describeExecutable(value: unknown): string {
 /** 開くときに食い違ったときの文面 */
 export function openMismatchText(found: FlowMismatch): string {
   return (
-    `画面の読みと実行ファイルの読みが食い違う（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
-    "このまま画面で直して保存すると値の意味が変わるので開かない。エディタで引用符を付けるなどして、" +
+    `画面と実行ファイルとで、値の読み方が食い違っています（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
+    "このまま画面で直して保存すると、値の意味が変わります。エディタで引用符を付けるなどして、" +
     "実行ファイルが意図どおりの値として読むように直してください"
   );
 }
@@ -242,7 +242,7 @@ export function openMismatchText(found: FlowMismatch): string {
 /** 保存の前に食い違ったときの文面 */
 export function saveMismatchText(found: FlowMismatch): string {
   return (
-    `書き出す本文を、実行ファイルが画面とは違う値として読む（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
-    "保存すると値の意味が変わるので書かない"
+    `書き出す本文を、実行ファイルが画面とは違う値として読みます（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
+    "保存すると値の意味が変わるため、書き込みません"
   );
 }

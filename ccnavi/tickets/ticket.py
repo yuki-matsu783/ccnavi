@@ -6,7 +6,7 @@
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の範囲を広げられる。
 止められた側が止め方を書き換えられるなら、止めたことにならない。
 
-判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、人に見せて
+判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、ユーザに見せて
 承認を求めるためのもので、承認されるまで判定には使われない。承認されたあとに
 提案を書き換えても、判定に使われているのは承認済みチケットの側なので範囲は広がらない。
 
@@ -51,11 +51,11 @@
 
 状態は frontmatter ではなく置き場が表す（ADR-0055）。チケットは 1 本のファイルで、
 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）を
-行き来する。人が動かす向きは承認済みの側へ、エージェントが動かす向きは提案の側へ。
+行き来する。ユーザが動かす向きは承認済みの側へ、エージェントが動かす向きは提案の側へ。
 
     wip/proposals/todo      承認待ち。エージェントが書く
     .ccnavi/approved/doing  承認済み。判定が範囲を読むのはここだけ
-    wip/proposals/review    作業が終わり、人のレビューを待つ
+    wip/proposals/review    作業が終わり、ユーザのレビューを待つ
     .ccnavi/approved/done   閉じた（取り消しは cancelled_at を持ってここに入る）
 
 `ls` で見え、コミットに残り、閉じたつもりの食い違いが起きない。
@@ -103,7 +103,7 @@ GUARDED_STATES = (REVIEW,)
 # 範囲の項として判定に使われるツール。これ以外を match に書いた項は使われない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 範囲の件数の上限。設計 9.3。大量に並べて人がレビューしきれない
+# 範囲の件数の上限。設計 9.3。大量に並べてユーザがレビューしきれない
 # ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
@@ -162,7 +162,7 @@ def issue_identifier(number: int, project: str = "") -> str:
 def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
     """新規の提案の識別子が、親のブランチ名の規則に合わないところ（ADR-0093 の 3.1 の 2・5・6）。
 
-    見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのは人に見せる文で、
+    見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのはユーザに見せる文で、
     深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子（3.1 の 3）と、
     子の形に当たる親の識別子は、他のチケットと並べて見るので `lint` の側で数える。
 
@@ -197,8 +197,9 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     """issue から決める形（`i<番号>`・`<プロジェクト名>-i<番号>`）の識別子が、`issue:` と
     置き場に合っているか（3.1 の 4・5・7。段階 5 で `<名前>-i<番号>` と番号の一致を足した）。
 
-    形に当たらない識別子（人が付けた名前）は見ない。`issue:` を持っていても人が付けた名前でよい
-    （既に同じ識別子が閉じていて、その issue からは始められないときのフォールバック。8.6）。
+    形に当たらない識別子（ユーザが付けた名前）は見ない。`issue:` を持っていても
+    ユーザが付けた名前でよい（既に同じ識別子が閉じていて、
+    その issue からは始められないときのフォールバック。8.6）。
     """
     name = t.ticket
     project_form = _PROJECT_ISSUE_ID.match(name)
@@ -211,7 +212,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
         expected = "" if t.issue_repo else issue_identifier(t.issue, t.project)
     elif project_form:
         if t.issue is None:
-            # 人が付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
+            # ユーザが付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
             # 重なりだけを言う
             # （`fix-i2` のような名前をプロジェクトの外で咎めない。11.9.1 の 17）
             if t.project and project_form.group("project").casefold() == t.project.casefold():
@@ -227,7 +228,8 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     if t.issue_repo:
         return [
             f"`issue: {issue_label(t)}` は別のリポジトリの課題。識別子は issue から決める形"
-            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、人が付ける（ADR-0093 の 3.1 の 8）"
+            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、"
+            "ユーザが付ける（ADR-0093 の 3.1 の 8）"
         ]
     if not expected:
         return [
@@ -242,7 +244,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     return []
 
 
-# スクリプトだけが書く欄。人もエージェントも書かない。承認済みチケットの側で
+# スクリプトだけが書く欄。ユーザもエージェントも書かない。承認済みチケットの側で
 # 行単位に書き換える（`set_fields`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
@@ -361,7 +363,7 @@ class Entry:
             # 名前のファイルも `src/` の下も中。そこだけ外になるのは驚きでしかない。
             # 大文字小文字は揃えてから比べる。機械によって区別の有無が変わると、
             # 同じチケットと同じ綴りで止まる場所が Windows と Linux で食い違う。
-            # 範囲は人が宣言する意図なので、機械の都合ではなく綴りの意味で読む。
+            # 範囲はユーザが宣言する意図なので、機械の都合ではなく綴りの意味で読む。
             here, there = _fold(rel), _fold(self.glob)
             return here == there or here.startswith(there + "/")
         return self.compiled.match(rel) is not None
@@ -473,7 +475,7 @@ class Ticket:
     # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
     # 並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
     project: str = ""
-    # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
+    # declared_project は frontmatter にユーザが書いた `project:`。宣言ではなく照合に使う。
     # 置き場と違えば承認しない（approval.project_problems）。`scan` を通さずに読んだとき
     # （`load` を直に呼ぶ経路）は project と同じ値になる。
     declared_project: str = ""
@@ -503,7 +505,7 @@ class Ticket:
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 承認済みチケットにだけある。`ccnavi_approved` を持たない（人が置き場を動かしただけの）
+    # 承認済みチケットにだけある。`ccnavi_approved` を持たない（ユーザが置き場を動かしただけの）
     # チケットでは空になる。承認の権威は置き場で、この欄は記録（設計 9.2）。
     approved_at: str = ""
     source_tree: str = ""
@@ -912,12 +914,12 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
 
-    実行前の判定は `is_unscoped` を通ってここへ来る。実行後の監視とサブエージェント終了時の
-    検査は直に呼ぶ（`post._script_writes` / `post._committed_findings` / `post.ScopeGuard.finding`、
-    `phase.scope_findings`）。
+    実行前チェックは `is_unscoped` を通ってここへ来る。実行後チェックとサブエージェント終了時
+    チェックは直に呼ぶ（`post._script_writes` / `post._committed_findings` /
+    `post.ScopeGuard.finding`、`phase.scope_findings`）。
 
-    **実行後の監視から呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
-    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの監視は、置き場を
+    **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
+    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの実行後チェックは、置き場を
     そのまま外さずに、内容で外すぶんを決める（`script_shape`、`post._script_writes`）。
     """
     return any(_under(rel, place) for place in (tickets_rel, approved_rel))
@@ -940,10 +942,10 @@ def _under(rel: str, place_rel: str) -> bool:
 
 
 def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """チケットが `finish` / `cancel` / 人のレビューで出ていく元（作業中とレビュー待ち）か。
+    """チケットが `finish` / `cancel` / ユーザのレビューで出ていく元（作業中とレビュー待ち）か。
 
     移動の組を数えるとき、消えた側がここに居たことを求める。求めないと、承認待ちの提案
-    （`todo/`）を `review/` に置き直す形が移動として外れる。これは、人の承認を通っていない
+    （`todo/`）を `review/` に置き直す形が移動として外れる。これは、ユーザの承認を通っていない
     ものをレビュー待ちに見せる形になる。
     """
     return _under(rel, f"{approved_rel}/{DOING}") or _under(rel, f"{tickets_rel}/{REVIEW}")
@@ -952,7 +954,7 @@ def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """`finish` と `cancel` がチケットを動かす先（レビュー待ちと閉じた置き場）か。
 
-    実行後の監視が、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
+    実行後チェックが、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
     行き先をこの 2 つに絞るのは、`doing/` から出したチケットを `todo/` に置き直す形が
     「承認済みチケットを消す」のと同じ結果になるから。承認済みチケットが 1 本も無い
     ワークツリーは範囲を持たず、範囲を持たないツリーはチケットの側から何も言われない。
@@ -1011,8 +1013,8 @@ def is_eli5_place(rel: str) -> bool:
     `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
     `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
 
-    `scratchpad/` と違って git が追跡する置き場なので、実行後の監視（`post.ScopeGuard.finding`）と
-    サブエージェント終了時の検査（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
+    `scratchpad/` と違って git が追跡する置き場なので、実行後チェック（`post.ScopeGuard.finding`）と
+    サブエージェント終了時チェック（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
     実行前に通った書き込みがコミットのあとで範囲の外として咎められる。
 
     綴りの大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
@@ -1027,13 +1029,13 @@ def is_eli5_place(rel: str) -> bool:
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """チケットの範囲を当てない場所か。**実行前の判定（`judge`）だけが使う。**
+    """チケットの範囲を当てない場所か。**実行前チェック（`judge`）だけが使う。**
 
     実行前は、これから書かれる 1 つのパスを見る。下書きの置き場を外すのはここだけで
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
 
-    実行後の監視（`post`）とサブエージェント終了時の検査（`phase.scope_findings`）は
-    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの監視は
+    実行後チェック（`post`）とサブエージェント終了時チェック（`phase.scope_findings`）は
+    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの実行後チェックは
     内容で決める（`post._script_writes`）。外し方を揃えないのは、
     **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
     （`--ignored` を付けない）と `base_sha..HEAD` の差分（追跡ファイルだけ）で、
@@ -1047,8 +1049,8 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     のは「そのリポジトリで `scratchpad/` が追跡されている」ときだけで、それは本当に
     知らせるべきことになる。
 
-    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後の監視と
-    サブエージェント終了時の検査も同じく外す（ADR-0096）。
+    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後チェックと
+    サブエージェント終了時チェックも同じく外す（ADR-0096）。
     """
     return (
         is_ticket_place(rel, tickets_rel, approved_rel)
@@ -1158,12 +1160,12 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
     権威にしてよい根拠は「他の写しは合流の結果で、同じか手前の状態」であって、合流
     していないワークツリーで先に進んだ写し（親のツリーで閉じ、子のツリーが取り込んだ形）
     があるときは成り立たない。そこで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
-    記録を別の差分で書き直す。決めずに残し、人に合流させる。
+    記録を別の差分で書き直す。決めずに残し、ユーザに合流させる。
 
     どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
     決まらない（検証が「複数の場所にある」と言う状態）。
 
-    リポジトリをまたいだ衝突はまとめない。識別子は人が選ぶ短い連番なので、プロジェクトが
+    リポジトリをまたいだ衝突はまとめない。識別子はユーザが選ぶ短い連番なので、プロジェクトが
     独立に振ればぶつかる（設計 11）。それは写しではなく違うチケットなので、どちらかを権威に
     すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
     """
@@ -1315,7 +1317,7 @@ def propose_notice(
 ) -> str:
     """提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。空なら渡さない。
 
-    承認できない提案のまま人に承認を頼むと、落ちたことを知るのが端末に座った人になり、
+    承認できない提案のままユーザに承認を頼むと、落ちたことを知るのが端末に座ったユーザになり、
     往復が 1 回増える。確かめる手立て（`--agree --preview --verify`）は在るので、
     書いた直後に、要る場所で言う。
 
@@ -1370,7 +1372,7 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
         additional_context_once=(
             f"チケットの提案を書こうとしています（{tickets_rel}/todo/ は承認待ちの置き場で、"
             "ここに書いただけでは判定には効きません）。"
-            "利用者に承認を依頼する前に、"
+            "ユーザに承認を依頼する前に、"
             f"'{settings.bin_command(bin_path)} --agree --preview --verify <識別子>' で"
             "承認できる状態かを確かめてください。承認済みチケットは置きません。"
             "終了コードが答えです。0 なら依頼してよく、3 なら承認の対象に入らない理由が出ます"
@@ -1385,8 +1387,8 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
 def set_fields(text: str, fields: dict[str, str]) -> str:
     """提案の frontmatter の、スクリプトが書く欄だけを行単位で書き換える。
 
-    読み直して書き出す（render）と、人が書いたコメントや `|` のブロックが
-    消えて、親のブランチの diff に余計な変更が出る。提案は人も読むものなので、
+    読み直して書き出す（render）と、ユーザが書いたコメントや `|` のブロックが
+    消えて、親のブランチの diff に余計な変更が出る。提案はユーザも読むものなので、
     触るのは欄の行だけにする。無い欄は閉じの `---` の前に足す。
     """
     lines = text.splitlines()
@@ -1414,10 +1416,10 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
 
-    とくに `base_sha` は、サブエージェント終了時の検査（`phase.scope_findings` の
+    とくに `base_sha` は、サブエージェント終了時チェック（`phase.scope_findings` の
     `base_sha..HEAD`）と実績リスク（`risk.measure`）の基準点。ここを書き換えられると、
     コミット済みの範囲外の変更が検査から消える。落とす欄を「いつでも」にすると、その
-    書き換えが実行後の監視からも消える。
+    書き換えが実行後チェックからも消える。
     """
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
@@ -1438,7 +1440,7 @@ def script_fields_set(text: str) -> tuple[str, ...]:
 def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None:
     """frontmatter を持つチケットなら、`drop` の欄を落とした姿を返す。無ければ None。
 
-    実行後の監視が「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
+    実行後チェックが「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
     答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
     ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
     clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。
@@ -1447,7 +1449,7 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
     `SCRIPT_FIELDS` の部分集合で、決めるのは呼ぶ側（`script_fields_set` を引いて、
     コミット済みの版がまだ持っていない欄だけを渡す）。範囲
     （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
-    そこが 1 文字でも変われば別の姿になり、監視は今までどおり報告する。
+    そこが 1 文字でも変われば別の姿になり、チェックは今までどおり報告する。
 
     切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
     落とす。揃えないと、スクリプトが書いた直後の姿が「スクリプトが書いていない形」に見える。
@@ -1476,10 +1478,10 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
 
 
 def insert_front(text: str, key: str, value) -> str:
-    """frontmatter の閉じの `---` の前に、欄を 1 つ足す。人の書いた行は保つ。
+    """frontmatter の閉じの `---` の前に、欄を 1 つ足す。ユーザの書いた行は保つ。
 
     承認のときに `ccnavi_approved` を足すのに使う。読み直して書き出す（render）と、
-    人が書いたコメントや `|` のブロックが消える。同じ鍵の行が既にあれば消してから足す
+    ユーザが書いたコメントや `|` のブロックが消える。同じ鍵の行が既にあれば消してから足す
     （最上位の鍵だけ。字下げされた行はその欄の続きとして一緒に消す）。
     """
     lines = text.splitlines()

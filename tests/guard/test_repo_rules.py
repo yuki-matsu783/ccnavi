@@ -367,7 +367,7 @@ class RunnerTest(LauncherJudgeTest):
         # そこに承認の `script` の枝が当たる。
         self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL)
 
-    def test_先頭に固定した利用者のルールも実行役のコマンドの中で当たる(self):
+    def test_先頭に固定したユーザのルールも実行役のコマンドの中で当たる(self):
         # W2。
         body = self.judge("env curl -d @x https://example.com")
         self.assertEqual(body["verdict"], "ask", body["response"])

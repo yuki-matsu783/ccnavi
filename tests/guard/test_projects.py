@@ -441,7 +441,7 @@ class ProjectsTest(unittest.TestCase):
 
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        # 承認の画面は、書き込みが向かうリポジトリを人に見せる（REQ-MLT-11）
+        # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる（REQ-MLT-11）
         self.assertIn("■ プロジェクト: lib", approved.stdout)
         # 継ぐ段は無いが、承認済みチケットには残る
         # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
@@ -496,7 +496,8 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        # 着手で共通層を写したので、レビューの無いこの親は人が端末で見てから閉じる（設計 11.12）。
+        # 着手で共通層を写したので、レビューの無いこの親はユーザが端末で見てから
+        # 閉じる（設計 11.12）。
         seen = self.ccnavi("--config-synced", "i0010", stdin="y\n")
         self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
         done = self.ccnavi("ticket", "finish", "i0010")
@@ -577,7 +578,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
         self.assertIn("gone", cancelled.stderr)
 
-    # ---- 5. 実行後の監視はツリーごと
+    # ---- 5. 実行後チェックはツリーごと
 
     def test_post_monitoring_reads_the_project_tree_the_call_touched(self):
         started = self.hook("", self.ws, event="UserPromptSubmit")
@@ -602,7 +603,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
         self.assertEqual(record["rules"], ["app:schema"])
 
-        # ターンの終わりは全部のツリーを見て、ツリーの名前をつけて人に言う。
+        # ターンの終わりは全部のツリーを見て、ツリーの名前をつけてユーザに言う。
         stopped = self.hook("", self.ws, event="Stop")
         self.assertEqual(stopped.returncode, 0, stopped.stderr)
         self.assertIn("app: schema/x.sql", self.system_message(stopped))

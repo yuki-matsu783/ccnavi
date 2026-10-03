@@ -270,7 +270,7 @@ class SourcePathTest(CoreHarness):
         self.assertEqual(verify_new.stdout, verify_old.stdout)
         # 板の違いは、出所をそのまま見せる欄（copy.source_tree）だけ。ここは同じ値。
         self.assertEqual(board_new["parents"], board_old["parents"])
-        # 実行前の判定も同じ（子の範囲で書ける・範囲の外は止まる）。
+        # 実行前チェックも同じ（子の範囲で書ける・範囲の外は止まる）。
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree("i0001-01", "i0001")
         self.start_parent()
@@ -1193,7 +1193,7 @@ class RecordWritesTest(CoreHarness):
         )
         # 素の書き込みを許す所と理由。
         allowed = {
-            # 実行後の監視が範囲の外の変更を脇へ退ける（`gitstate.restore`）。状態の操作では
+            # 実行後チェックが範囲の外の変更を脇へ退ける（`gitstate.restore`）。状態の操作では
             # なく、C1 の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }

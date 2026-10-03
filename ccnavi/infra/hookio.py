@@ -30,7 +30,7 @@ DENY = "deny"
 
 
 class NoPayload(Exception):
-    """標準入力が空だった。hook ではなく人が直接打っている。
+    """標準入力が空だった。hook ではなくユーザが直接打っている。
 
     独立した型にしてある。ここで 0 を返すと、設置を誤った hook が
     正常に動いている hook と見分けられなくなる。
@@ -138,7 +138,7 @@ def write_context(stream: TextIO, event: str, text: str, system: str = "") -> No
     PreToolUse でも、ccnavi がこの呼び出しの判定を持たない（handover）ときや
     dry-run で知らせるだけのときはこちらを使う。素の標準出力は捨てられる。
 
-    system は人に見せる文（`systemMessage`）。同じ 1 つの JSON の一番外に並べる。
+    system はユーザに見せる文（`systemMessage`）。同じ 1 つの JSON の一番外に並べる。
     空なら鍵ごと出さない。
     """
     body: dict[str, Any] = {
@@ -151,12 +151,12 @@ def write_context(stream: TextIO, event: str, text: str, system: str = "") -> No
 
 
 def write_system_message(stream: TextIO, text: str) -> None:
-    """人に見せる文を書き出す。
+    """ユーザに見せる文を書き出す。
 
     `additionalContext` との違いは宛先。あちらはモデルが読み、これは
-    トランスクリプトに出て人が読む。ターンの終わりに「宣言した保護領域が
+    トランスクリプトに出てユーザが読む。ターンの終わりに「宣言した保護領域が
     こう変わっている」と言う相手は、次の一手を打つエージェントではなく、
-    それを見ている人になる。エージェントには実行後の監視が呼び出しごとに
+    それを見ているユーザになる。エージェントには実行後チェックが呼び出しごとに
     返しているので、同じことを 2 度モデルへ送らない。
 
     このキーは hookSpecificOutput の中ではなく、応答の一番外に置く。
@@ -169,7 +169,7 @@ def write_stop_block(stream: TextIO, reason: str, system: str = "") -> None:
     """Stop を止めて、モデルに続けさせる。`reason` はモデルが読む次の一手。
 
     Stop の応答は `hookSpecificOutput` ではなく一番外の `decision` / `reason` で返す。exit 2 と
-    標準エラーの経路は使わない。同じ Stop で人への報告（`systemMessage`）も返したいので、1 つの
+    標準エラーの経路は使わない。同じ Stop でユーザへの報告（`systemMessage`）も返したいので、1 つの
     JSON にまとめる（exit 2 だと標準出力の JSON は読まれない）。空の `system` は鍵ごと出さない。
     """
     body: dict[str, Any] = {"decision": "block", "reason": reason}

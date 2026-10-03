@@ -3,7 +3,7 @@
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR-0064）。拡張ホストが渡すのは
  * 「いま何を見せるか」（`RulesData`）だけで、ルールの行も判定の結果も hook の表も画面が作る。
- * 画面が返すのは人が押した操作（`RulesMessage`）だけで、判定もせず、ファイルも書かない。
+ * 画面が返すのはユーザが押した操作（`RulesMessage`）だけで、判定もせず、ファイルも書かない。
  *
  * **ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）もここに置く。** 読み書き（`rules-doc.ts`）の側に
  * 置いたままだと、画面がそこから `yaml` を辿ることになり、束ねたものに YAML の解析器が丸ごと入る。
@@ -11,8 +11,8 @@
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
  * 入れ物は 1 度しか入らない（ADR-0062）。**中身（`data`）が届くのは、画面の編集を捨ててよいとき
- * だけ**（人が「再読込」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
- * ときは `changed` の帯を出し、捨てるかどうかは人が決める。
+ * だけ**（ユーザが「再読込」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
+ * ときは `changed` の帯を出し、捨てるかどうかはユーザが決める。
  */
 import type { AppearanceMessage } from "./appearance.js";
 import type { HookEntry } from "./hooks.js";
@@ -30,7 +30,7 @@ export type PatternKind = "glob" | "regex";
 /** タイプの言い換え。画面の見出しで `deny` などの綴りにつける */
 export const SECTION_LABELS: Readonly<Record<Section, string>> = {
   deny: "拒否する",
-  ask: "人に確認する",
+  ask: "ユーザに確認する",
   allow: "許可する",
 };
 
@@ -141,7 +141,7 @@ export type ToRules =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
-  /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
+  /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   /** 選んだファイルの綴り。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
   | { readonly type: "picked"; readonly key: string; readonly field: FileField; readonly path: string }

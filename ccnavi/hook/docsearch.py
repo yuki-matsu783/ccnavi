@@ -28,7 +28,7 @@
   （git に無視されることを確かめてから）に作る
 - 期限（SessionStart）を過ぎたら md を読むのをやめるが、どのディレクトリも読めた分までは書く
 - **書くのは、git がそこの `index.jsonl` を無視しているときだけ。** 作業ツリーに追跡されて
-  いないファイルを置くと、`git status`・実行後の監視・`worktree remove` のどれにも出る。
+  いないファイルを置くと、`git status`・実行後チェック・`worktree remove` のどれにも出る。
   md を持つディレクトリのどれでも無視されていないツリーは、索引の対象外にして引かない
   （案内と標準エラーで名指しする。`.gitignore` は書き換えない）。一部のディレクトリだけが
   無視されていないなら（追跡されている index.jsonl など）、そこは書かずに行だけを組む
@@ -175,7 +175,7 @@ def _listed(base: str, timeout: float = GIT_TIMEOUT_SECONDS) -> list[str]:
     """基準のディレクトリの下の、git が挙げる md（基準からの相対、`/` 区切り）。"""
     if not os.path.exists(os.path.join(base, ".git")):
         raise NotARepository(base)
-    # pathspec（`*.md`）は渡さず、ここで `.md` を選ぶ。利用者の環境に `GIT_LITERAL_PATHSPECS`
+    # pathspec（`*.md`）は渡さず、ここで `.md` を選ぶ。ユーザの環境に `GIT_LITERAL_PATHSPECS`
     # などがあると `*.md` の読み方が変わる。
     done = gitcmd.run(
         base,

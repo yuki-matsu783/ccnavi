@@ -64,7 +64,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
         return DRY_RUN
 
     if normalized == DISABLE:
-        # disable の経路は 1 本だけ。セッションを起動した人の環境から来て、
+        # disable の経路は 1 本だけ。セッションを起動したユーザの環境から来て、
         # かつ作業ツリーの中の何もそれを求めていないとき。設定ファイルもフラグも
         # エージェントが書ける場所から来るし、そこでの編集は次のツール呼び出しから
         # 反映されるので、どちらの off を認めても、見張られている側が見張りを

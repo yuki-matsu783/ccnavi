@@ -14,12 +14,12 @@
       - id: guard-config
         match: Write|Edit
         glob: "*/.ccnavi/*"
-        message: ガード自身の設定です。利用者に依頼してください。
+        message: ガード自身の設定です。ユーザに依頼してください。
     ask:
       - id: migrations
         match: Write|Edit
         glob: "*/migrations/*"
-        message: 移行ファイルは実行前に人が中身を見ます。
+        message: 移行ファイルは実行前にユーザが中身を見ます。
     allow:
       - id: source
         match: Read|Write|Edit
@@ -82,7 +82,7 @@ VERSION = 1
 # 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
-# info は「そう書いてあるとおりに判定に使われているが、書いた人が知りたいはずのこと」。
+# info は「そう書いてあるとおりに判定に使われているが、書いたユーザが知りたいはずのこと」。
 # 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 11.4）。
 # warn と分けるのは、重複は普通の形（見本から始めたプロジェクト）で、これを warn に
 # 混ぜると本当に緩んでいる warn が埋もれるため。
@@ -101,7 +101,7 @@ SECTIONS = (DENY, ASK, ALLOW)
 STOP_MATCH = "Stop"
 STOP_SUBJECT = "(stop)"
 
-# 文面が要るタイプ。deny だけ。ask の文面は人の確認ダイアログにしか出ず、allow は
+# 文面が要るタイプ。deny だけ。ask の文面はユーザの確認ダイアログにしか出ず、allow は
 # 通すだけで届く先が無い（どちらも実際に動かして確かめた、設計 付録 C）。モデルに渡す文は
 # additionalContext に書く。ask と allow に書いた文面は lint が error にするが、
 # ここで落とすとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
@@ -178,7 +178,7 @@ def root_pattern(root: str) -> str:
     """ワークスペースルートの実パスを、regex に埋めて安全な形にする。
 
     区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
-    解いた綴り（judge.full_path）で、Windows では `\\` になるが、ルールを書く人は
+    解いた綴り（judge.full_path）で、Windows では `\\` になるが、ルールを書くユーザは
     `/` で考える。大文字小文字は式ごと区別せずに当てるので（_build）、ここでは機械を
     見ない。見ると `c:` と `C:` の扱いが機械で分かれる。
     """
@@ -306,7 +306,7 @@ class Rule:
     id: str = ""
     # bare_id は書かれたままの id。層の名前をつける前の綴りで、層をまたいで
     # 同じルールかどうかを見るときの鍵になる（設計 11.4「重複は後ろを捨てる」）。
-    # id から前置きを取り除いて求める形にすると、`:` を含む id を書いた人の定義が
+    # id から前置きを取り除いて求める形にすると、`:` を含む id を書いたユーザの定義が
     # 取り除かれる側になるので、書いたときの綴りをそのまま持つ。
     bare_id: str = ""
     # source はこのルールが来た層（common / self / プロジェクトの名前）。記録の
@@ -360,7 +360,7 @@ class Rule:
     # degraded_message は、ルールが書かれたとおりに組み立てられず、守りを消さないために
     # 別の形で判定に使っているときに、止められた側へ返す文面。`{!root}` を展開できなかった
     # `deny` / `ask` がこれにあたる（_ungeneratable）。書いた文面（message）を上書きすると
-    # 書いた人の言葉が消え、`--explain` と記録にも出なくなるので、別の欄に持つ。
+    # 書いたユーザの言葉が消え、`--explain` と記録にも出なくなるので、別の欄に持つ。
     degraded_message: str = ""
 
     compiled: re.Pattern | None = None
@@ -566,7 +566,7 @@ def _build(
             name,
             f"id に `{ID_SEPARATOR}` は書けない。層の名前を添えた形"
             f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
-            "見分けが付かず、記録を読んだ人がどのファイルを直すのか決められない",
+            "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
         )
     if not builtin and written_id.lower().startswith(RESERVED_ID_PREFIX):
         return None, Problem(
@@ -645,7 +645,7 @@ def _build(
     # 変えると、同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた
     # 守りを `.Ccnavi/` と書くだけで止められずに通せ、どの機械でも区別しないチケットの範囲とも
     # 食い違う。
-    # ルールは人が宣言する場所の意図なので、機械の都合ではなく綴りの意味で読む
+    # ルールはユーザが宣言する場所の意図なので、機械の都合ではなく綴りの意味で読む
     # （phasetypes._globs / risk._factors / selfguard._folded / チケットの範囲と同じ形）。
     # 区別が要る `regex` は `(?-i:...)` で囲む。
     flags = re.IGNORECASE
@@ -698,7 +698,7 @@ def _not_root_suffix(expression: str) -> str:
 
     続けてよいかどうかは意味の問題で、機械には判定できない。展開結果が読み終える
     位置がパスの区切りである保証は無いので、区切りを前提にした綴り
-    （`^{!root}[\\\\/]foo`）は壊れてはいないが、まず書いた人の勘違い。
+    （`^{!root}[\\\\/]foo`）は壊れてはいないが、まず書いたユーザの勘違い。
     止めるほどではないので warn（設計 i0061 3.3）。
     """
     rest = expression[len("^" + NOT_ROOT_PLACEHOLDER) :]
@@ -723,7 +723,7 @@ def _expand_not_root(expression: str, root: str) -> tuple[str, str]:
         )
     generated = not_root_pattern(real)
     # 生成した部分が契約（繰り返しも先読みも含まない）を守っているかを自分で見る。
-    # 見るのは `not_root_pattern` が作った部分だけで、書いた人が後ろに続けた式は含めない。
+    # 見るのは `not_root_pattern` が作った部分だけで、書いたユーザが後ろに続けた式は含めない。
     # `.*` のような繰り返しをそこに書くのは許している（設計 3.3）ので、
     # 全体に掛けると正しい書き方まで落とす。
     #
@@ -753,7 +753,7 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
       記録には `deny` と当たったルールの id が既に残り、なぜ止めたかはこの文面が言う。
       新しい名前を足すと、判定に至らなかったものと同じ欄に別の意味が混ざる
     - **SessionStart では何も言わない**（設計 6.1 を「何もしない」に決めた）。
-      256 字のルートは Windows の MAX_PATH の外で実用にならず、当てはまる人はまずいない。
+      256 字のルートは Windows の MAX_PATH の外で実用にならず、当てはまるユーザはまずいない。
       当てはまったときはこの文面が理由と直し方を言う。めったに起きないことのために
       SessionStart を毎回重くしない
     """
@@ -766,7 +766,7 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
     rule.degraded_message = (
         f"{detail}。守りが消えるのを避けるため、ルール '{rule.id or name}' が見るツール"
         f"（{rule.match}）を止めています。ワークスペースをもっと浅い場所へ移すか、"
-        "利用者に、このルールが書かれているルールファイルから外してもらってください。"
+        "ユーザに、このルールが書かれているルールファイルから外してもらってください。"
     )
     return rule, problem
 

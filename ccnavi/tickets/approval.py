@@ -1,7 +1,7 @@
-"""承認済みチケットの置き場。人がチケットに合意したことの記録で、判定はここだけを読む。
+"""承認済みチケットの置き場。ユーザがチケットに合意したことの記録で、判定はここだけを読む。
 
 置き場は approval、合意の手続きは agree。ここは承認済みチケット・フェーズのマーカー・子の記録が
-どこにどう置かれているかを読み書きする。提案を集めて人に見せ、合意を受けて置き場へ動かす
+どこにどう置かれているかを読み書きする。提案を集めてユーザに見せ、合意を受けて置き場へ動かす
 手続き（`ccnavi --agree`）は `agree.py` にある。approval は agree を知らない。
 
 ## なぜ承認済みチケットが権威なのか
@@ -16,7 +16,7 @@
 守りがエージェントの書き込みを止める。
 
 **権威はこの置き場で、`ccnavi_approved` の欄ではない（ADR-0058）。** 欄は承認の記録で、
-持たないチケットも承認済みとして読む。そこに置けたのは書ける権限を持つ人だけだから。
+持たないチケットも承認済みとして読む。そこに置けたのは書ける権限を持つユーザだけだから。
 だから提案を手で `doing/` へ動かすことが、端末とボードに続く 3 つめの承認の経路になる。
 その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
 `blocking_problems` が判定の側で当てる。
@@ -25,14 +25,14 @@
 
 承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。
 エージェントが打つ `finish` は `doing/` から `wip/proposals/review/`
-（レビュー要）か `.ccnavi/approved/done/`（不要）へ動かし、人がレビューを済ませると
-`review/` から `done/` へ動く。人が動かす向きは `.ccnavi/approved/` へ、エージェントが
+（レビュー要）か `.ccnavi/approved/done/`（不要）へ動かし、ユーザがレビューを済ませると
+`review/` から `done/` へ動く。ユーザが動かす向きは `.ccnavi/approved/` へ、エージェントが
 動かす向きは `wip/proposals/` へ。
 
 ## 閉じる向きだけは承認が要らない
 
 範囲が消える向きなので、エージェントが動かしても危険は増えない。逆に承認済みチケットを
-`done/` から戻す（再開）のは人の手でやる。
+`done/` から戻す（再開）のはユーザの手でやる。
 
 ## フェーズのマーカー
 
@@ -167,7 +167,7 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_mod.Ticke
         return None, detail
     # `ccnavi_approved` は承認の記録であって、承認そのものではない（ADR-0058）。権威は
     # 置き場で、`.ccnavi/approved/` は組み込みの守りがエージェントの書き込みを止める。
-    # 欄を必須にすると、端末もボードも無い人が置き場を動かして承認する経路が使えなくなる。
+    # 欄を必須にすると、端末もボードも無いユーザが置き場を動かして承認する経路が使えなくなる。
     # 欄が無いぶんの検査（親子・計画・置き場）は `blocking_problems` が判定の側で当てる。
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
     if require_record and not isinstance(meta, dict):
@@ -308,11 +308,12 @@ def mark_imported(
 
 
 def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
-    """親のワークツリーの外にしか無い写しを信頼しない理由と、人が運ぶ手順（ADR-0093 の 3.5）。"""
+    """親のワークツリーの外にしか無い写しを信頼しない理由と、ユーザが運ぶ手順
+    （ADR-0093 の 3.5）。"""
     return (
         f"親のブランチ {st.family} のワークツリーの外"
         f"（{t.tree or 'ワークスペースルート'}）にしか無い写し。"
-        "取り込み済みの家族では親のブランチの写しだけが本物。人がその写しを親のワークツリー"
+        "取り込み済みの家族では親のブランチの写しだけが本物。ユーザがその写しを親のワークツリー"
         f"（.claude/worktrees/{st.family}）の同じ置き場へ運んでコミットと push をし、"
         "元の写しを消す"
     )
@@ -591,7 +592,7 @@ def admit(
         "source_path": source_path(ticket),
     }
     target = copy_path(approved_dir, ticket.ticket)
-    # 人の書いた行（コメント、`|` のブロック）を保つ。読み直して書き出さず、承認の記録の
+    # ユーザの書いた行（コメント、`|` のブロック）を保つ。読み直して書き出さず、承認の記録の
     # 欄と、置き場から決まった `project:`（frontmatter に無ければ）だけを足す。
     try:
         text = fsio.load_text(ticket.path)
@@ -625,7 +626,7 @@ def admit(
 
 
 def update_fields(path: str, fields: dict) -> str:
-    """チケットの、スクリプトが書く欄だけを行単位で書き換える。人の書いた本文は保つ。"""
+    """チケットの、スクリプトが書く欄だけを行単位で書き換える。ユーザの書いた本文は保つ。"""
     try:
         with open(path, encoding="utf-8") as f:
             text = f.read()
@@ -651,9 +652,9 @@ def carry_flow(
 ) -> list[str]:
     """承認した子のフローを、提案のツリーから承認済みチケットのツリーへ動かす。知らせる行を返す。
 
-    フローの置き場は承認済みチケットと同じツリー（設計 9.3.1）。人は承認の前に、提案が在る
+    フローの置き場は承認済みチケットと同じツリー（設計 9.3.1）。ユーザは承認の前に、提案が在る
     ツリーの置き場へボードで保存する。承認で子が別のツリー（親のワークツリーなど）へ動くと、
-    フローだけが元のツリーに残り、読まれなくなる（M-3）。承認は人の操作なので、ここで一緒に
+    フローだけが元のツリーに残り、読まれなくなる（M-3）。承認はユーザの操作なので、ここで一緒に
     動かす。行き先に違う中身のフローが既に在れば上書きせず、そう言う（元のほうも残す）。
     リンク・ふつうのファイルでないもの・ハードリンクは運ばない（`flow.load` と同じ読み方）。
     """
@@ -680,7 +681,7 @@ def carry_flow(
         if held != raw:
             return [
                 f"{proposal.ticket} のフローを {target} へ運ばなかった: 行き先に違う中身のフローが"
-                f"既に在る（上書きしない）。{source} と見比べて、人が 1 本に決める"
+                f"既に在る（上書きしない）。{source} と見比べて、ユーザが 1 本に決める"
             ]
         fsio.remove(source)
         return []
@@ -726,7 +727,7 @@ def settle_review(
 ) -> tuple[list[str], str]:
     """この親の、この番号のフェーズのレビュー待ちの子を `done/` へ動かす。
 
-    人がレビューを済ませたときに呼ぶ（`confirm` / `decide` / `--reviewed --chat` /
+    ユーザがレビューを済ませたときに呼ぶ（`confirm` / `decide` / `--reviewed --chat` /
     `close-early` と、フィードバック計画の承認）。返すのは動かした識別子と、動かせなかった理由。
     """
     review, _ = scan_review(conf, root)
@@ -766,9 +767,9 @@ def followup(
     items: list[str],
     stamp: str,
 ) -> tuple[str, str]:
-    """レビューで残った指摘の続きの子を、人の判断で `doing/` に直に起こす（ADR-0055）。
+    """レビューで残った指摘の続きの子を、ユーザの判断で `doing/` に直に起こす（ADR-0055）。
 
-    人が端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
+    ユーザが端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
     そのフェーズは開き直り、マーカーは消える（REQ-TKT-21）。範囲は見た子の範囲の和。
     本文には指摘を写す。返すのは識別子と、起こせなかった理由。
     """
@@ -789,7 +790,7 @@ def followup(
     front["title"] = f"フェーズ {phase_no} のレビューの指摘に応える"
     front["rationale"] = (
         f"フェーズ {phase_no} のレビューで残った指摘に応える。"
-        "利用者が端末で起こした続きの子で、承認はその判断で済んでいる。\n"
+        "ユーザが端末で起こした続きの子で、承認はその判断で済んでいる。\n"
     )
     for name in rules.SECTIONS:
         entries = []
@@ -1057,7 +1058,8 @@ def predecessor_problems(
                     t.ticket,
                     f"先行 {p.ticket} が閉じていない（いまは {p.label}）。{p.ticket} が "
                     f"{approved_rel}/{ticket_mod.DONE}/ に入る（作業を終え、レビューが要るなら"
-                    "人のレビューが済む）まで承認しない。先行が要らないなら predecessors から外して"
+                    "ユーザのレビューが済む）まで承認しない。先行が要らないなら "
+                    "predecessors から外して"
                     "出し直してください",
                     rules.KIND_NOT_YET,
                 )
@@ -1236,7 +1238,7 @@ def _clear_policy(path: str, phase: int, kind: str) -> dict:
             "prefix": "",
             "message": (
                 f"フェーズ {phase} のレビュー済みのマーカー {path} を消せない（{{reason}}）。"
-                "残るとフェーズは済んだまま読まれるので、ここで止める。人がマーカーを消す"
+                "残るとフェーズは済んだまま読まれるので、ここで止める。ユーザがマーカーを消す"
             ),
         }
     return {
@@ -1263,10 +1265,10 @@ def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str
 
 # 親ごとのマーカー。フェーズの番号に付かないもの。
 #   ready.json   Draft を外した（外してよいと確かめた）。「マージに進んでよい」の合図
-#   close-early.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
+#   close-early.json  ユーザが「キリの良いところまでやった」と締めた。残りは別の issue へ
 #   closed.json  親を閉じた（`ticket finish <親>`）。どのフェーズをどこで見たかを残す
 #
-# closed.json が要るのは、提案（wip/）が統合先へ戻す前に消えるから。マージリクエストを
+# closed.json が要るのは、提案（wip/）が統合先に取り込む前に消えるから。マージリクエストを
 # 作らない運び方（全フェーズが `review: chat`）では、締めた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
 PARENT_MARK_CLOSE_EARLY = "close-early"
@@ -1320,7 +1322,7 @@ def write_child_record(approved_dir: str, parent: str, child: str, kind: str, da
     )
 
 
-# 人が受け入れたスレッドの控え。フェーズのマーカーとは別の場所に、親ごとに 1 つ置く。
+# ユーザが受け入れたスレッドの控え。フェーズのマーカーとは別の場所に、親ごとに 1 つ置く。
 ACCEPTED_FILE = "accepted.json"
 
 
@@ -1334,7 +1336,7 @@ def accepted_threads(
     phase: int | None = None,
     owner: ticket_mod.Ticket | None = None,
 ) -> set[str]:
-    """この親で、人が「未解決のまま進める」と受け入れたスレッドの識別。
+    """この親で、ユーザが「未解決のまま進める」と受け入れたスレッドの識別。
 
     `phase` を渡すと、その番号のレビューで受け入れ済みと数えてよいものだけを返す。
     受け入れはそのフェーズと、それを待つ番号（写しの `waits`）にだけ当てはまる（設計 9.8）。
@@ -1365,8 +1367,8 @@ def remember_accepted(
 
     フェーズのマーカーとは別の場所に置く。マーカーは 2 つの理由で消える。同じ番号のマーカーは
     `confirm` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
-    丸ごと消す。どちらでも受け入れの記録が消え、人がもう一度同じスレッドを
-    受け入れることになる。人が 1 度言った「これは承知で進める」は、
+    丸ごと消す。どちらでも受け入れの記録が消え、ユーザがもう一度同じスレッドを
+    受け入れることになる。ユーザが 1 度言った「これは承知で進める」は、
     取り消されるまで残す。
     """
     if not threads:
@@ -1492,7 +1494,7 @@ def child_problems(
     """
     if parent is None:
         # 文面だけは呼び手が差し替える。承認のときは「まだ承認されていない」しか起きないが、
-        # 判定のときは「承認されたが閉じた」も同じ検査に当たる。検査は同じで、読む人の
+        # 判定のときは「承認されたが閉じた」も同じ検査に当たる。検査は同じで、読むユーザの
         # 次にすることが違うだけなので、分けるのは言葉だけにする。
         detail = missing or f"親 {t.parent} が承認されていない"
         return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, detail)]
@@ -1542,8 +1544,8 @@ def blocking_problems(
 def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:
     """判定が読む承認済みチケットに、信頼できない理由の印を付ける（ADR-0058）。
 
-    印を読むのは `phase.scope_verdict` で、実行前の判定・実行後の監視・サブエージェント
-    終了時の検査の 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
+    印を読むのは `phase.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
+    終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
 
     **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
@@ -1554,7 +1556,7 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None
 
     親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
     開いた子のある親を閉じさせない）。置き場を手で動かして起きたなら、親を閉じたのは
-    人なので、その子を止めるのが人の意思に沿う。
+    ユーザなので、その子を止めるのがユーザの意思に沿う。
     """
     pool = by_id(kept)
     for t in kept:

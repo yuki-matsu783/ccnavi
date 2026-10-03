@@ -2,7 +2,7 @@
 
 家族の控え（`<控えの置き場>/sync/<リポジトリ>/families/<P>`）がある家族は、権威を親のブランチ
 （`.claude/worktrees/<P>` で HEAD が `<P>` を指すツリー）に固定し、決まらなければ承認も状態の操作も
-実行前の判定も止める。控えの無い家族は前と同じ答え（D11）。
+実行前チェックも止める。控えの無い家族は前と同じ答え（D11）。
 
 控えは sh（`ccnavi-sync.sh`）が書くものを、ここでは手で置く。判定は git もネットワークも使わない。
 """
@@ -283,7 +283,7 @@ class PresentTest(AuthorityHarness):
         lines = check.stdout.splitlines()
         self.assertEqual("check 1", lines[0])
         self.assertTrue(lines[1].startswith("error "), check.stdout)
-        # 人が運ぶ手順も言う（3.5）。
+        # ユーザが運ぶ手順も言う（3.5）。
         self.assertIn("運んでコミットと push", check.stdout)
 
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
@@ -534,7 +534,8 @@ class MarkTest(AuthorityHarness):
 
         11.9.3 の 13。
 
-        ワークスペースの人の付けた名前 `web-i0012` と、プロジェクト web の issue 12 の家族が並ぶ形。
+        ワークスペースのユーザの付けた名前 `web-i0012` と、プロジェクト web の issue 12
+        の家族が並ぶ形。
         """
         from ccnavi.infra import tree
 

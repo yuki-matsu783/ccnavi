@@ -257,7 +257,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("", git(self.tree, "status", "--porcelain").stdout.strip())
 
     def test_a_merge_in_progress_is_left_alone(self):
-        # 利用者自身の途中の merge を取りやめない（レビューの重大 4）。
+        # ユーザ自身の途中の merge を取りやめない（レビューの重大 4）。
         other = os.path.join(self._tmp.name, "other")
         git(self.tree, "checkout", "-q", "-b", "side")
         self.local_commit(COPY, copy_text(body="side\n"))
@@ -270,7 +270,7 @@ class SyncTest(unittest.TestCase):
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("途中の操作（MERGE_HEAD）", done.stdout)
-        self.assertTrue(os.path.exists(merge_head), "利用者の merge を取りやめた")
+        self.assertTrue(os.path.exists(merge_head), "ユーザの merge を取りやめた")
         self.assertFalse(os.path.exists(other))
 
     def test_staged_changes_stop_a_merge(self):
@@ -697,7 +697,7 @@ class SyncTest(unittest.TestCase):
         return path
 
     def test_settings_local_json_names_the_integration_branch(self):
-        # 人が端末で打つ sh には settings.local.json の env が反映されない。
+        # ユーザが端末で打つ sh には settings.local.json の env が反映されない。
         # 実行ファイルが読んで渡す。
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
         write(

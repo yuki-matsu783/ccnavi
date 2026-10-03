@@ -1,17 +1,17 @@
-"""判定を実行せずに試す。人が端末から打つ経路。
+"""判定を実行せずに試す。ユーザが端末から打つ経路。
 
 ## なぜ要るか
 
 ルールを 1 件書いたとき、それが何に当たるのかは走らせるまで分からない。
 `glob` は正規表現に翻訳されるし、Bash のコマンドは実行される部分まで
-絞られてから当たる。書いた人の頭の中の当たり方と、実際の当たり方が食い違っても、
+絞られてから当たる。書いたユーザの頭の中の当たり方と、実際の当たり方が食い違っても、
 食い違ったことに気づく手立てが無かった。食い違いに気づかれないルールは、足したつもりで
 何も止めていない 1 行になる。
 
 ## 判定と同じ経路を通る
 
 ここは判定を作り直さない。payload を組み立てて `judge.decide_before` を
-そのまま呼び、返った応答と記録を読んで人に見せる。別の経路で判定すると、
+そのまま呼び、返った応答と記録を読んでユーザに見せる。別の経路で判定すると、
 試験で通ったものが実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
 
 モードは常に enable で動かす。試験は「止まるかどうか」を問うものなので、
@@ -41,7 +41,7 @@ from ..tickets import ticket as ticket_mod
 BOARD_VERSION = 1
 
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
-# 試したい人には「当たらない」ではなく「そもそも見ていない」と言う。
+# 試したいユーザには「当たらない」ではなく「そもそも見ていない」と言う。
 # 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ並び。
 KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
@@ -120,7 +120,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["verdict"] = record.decision or audit.ALLOW
     out["code"] = record.code or ""
     # ファイルのパスは行き着く先まで解いてから当てる。解いた先を見せないと、
-    # 当たらなかった理由が「綴りが違う」なのかどうかを人が言えない。
+    # 当たらなかった理由が「綴りが違う」なのかどうかをユーザが言えない。
     out["resolved"] = record.subject if record.subject and record.subject != subject else ""
     out["reason"] = record.reason or ""
     out["degraded"] = record.degraded or ""
@@ -255,7 +255,7 @@ def _rules_hit(
 
     翻訳後の式を出すのがこの試験の要。`glob` は正規表現に変わるので、
     書いたものと当たるものの間に見えない変換が 1 つ挟まる。その変換を見せないと、
-    当たらなかった理由を人が自分で辿れない。
+    当たらなかった理由をユーザが自分で辿れない。
 
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
     ルールファイルの外から来た根拠）。層のルールは `self:docs` / `lib:source` の形の
@@ -473,7 +473,7 @@ def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> st
 
 
 def _written(entry) -> str:
-    """範囲の 1 件を、書かれた綴りで出す。翻訳後の式ではなく、人が書いたほう。"""
+    """範囲の 1 件を、書かれた綴りで出す。翻訳後の式ではなく、ユーザが書いたほう。"""
     return entry.glob or entry.regex
 
 
@@ -599,7 +599,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         "Claude Code の判定役のモデル）が判断する\n"
     )
     stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
-    stdout.write("    不明なモード                  人に確認が出る\n")
+    stdout.write("    不明なモード                  ユーザに確認が出る\n")
     # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
     if (conf.guard_unwatched or "").strip().lower() == selfguard.DISABLE:
         stdout.write(
@@ -656,7 +656,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             stdout.write(f"  {parent.ticket} はユーザが締めた: {wrapped.get('reason', '')}\n")
         if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
             stdout.write(
-                f"  {parent.ticket} のマージリクエストの Draft を外した。マージは利用者が行う\n"
+                f"  {parent.ticket} のマージリクエストの Draft を外した。マージはユーザが行う\n"
             )
         for ph in phase.phases_of(root, conf, parent.ticket):
             marks = ", ".join(sorted(ph.marks)) or "マーカーなし"
@@ -940,7 +940,7 @@ def _ticket_record(
         "issue": source.issue,
         "predecessors": list(source.predecessors),
         # 満たしていない先行（ADR-0088）。承認と着手はこれが空でなければ止まる。閉じたチケットは空。
-        # `label` は人向けの言葉で、ボードは写すだけ。
+        # `label` はユーザ向けの言葉で、ボードは写すだけ。
         "predecessors_unmet": (
             []
             if status == "closed"
@@ -965,7 +965,7 @@ def _ticket_record(
         ),
         # blocked は「読めるが信頼できない」理由（ADR-0058）。判定はこのチケットの
         # ワークツリーへの書き込みを全部止めるので、ボードが素の open として見せると、
-        # 止まっていること自体が人に届かない。
+        # 止まっていること自体がユーザに届かない。
         "blocked": (open_index[ticket_id].blocked if ticket_id in open_index else ""),
         "copy": (
             {

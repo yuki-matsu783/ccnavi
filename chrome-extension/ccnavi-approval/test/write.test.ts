@@ -217,7 +217,7 @@ test("CX-T108 書けたのに応答だけが落ちたら、先頭が書いたと
   assert.deepEqual(mock.commitCalls.map((c) => c.result), ["written"]);
 });
 
-test(`CX-T109 ${MAX_ROUNDS} 周しても先頭が動き続けたら、人に回す`, async () => {
+test(`CX-T109 ${MAX_ROUNDS} 周しても先頭が動き続けたら、ユーザに回す`, async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
   let n = 0;

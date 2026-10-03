@@ -27,7 +27,7 @@ deny:
   - id: git-push
     match: Bash
     glob: "*git push*"
-    message: "push は人が行う"
+    message: "push はユーザが行う"
   - id: no-rm
     match: Bash
     glob: "*rm -rf*"

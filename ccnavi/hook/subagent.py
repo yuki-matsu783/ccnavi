@@ -108,7 +108,7 @@ def at_start(
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
         # 子のフロー（設計 9.12、ADR-0085）。在ればファイルを名指しし、手順を並べる。
-        # フローは人が書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
+        # フローはユーザが書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
         scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
         try:
             brief = flow.briefing(conf, root, t, scope, budget, full=full)
@@ -153,7 +153,7 @@ def at_stop(
 
     見るのは、cwd が子のワークツリーならその子、親のワークツリーならその親の開いている
     子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
-    範囲は実行前の判定と同じく親の範囲と種類の上限で切り詰め、子の範囲の中でも
+    範囲は実行前チェックと同じく親の範囲と種類の上限で切り詰め、子の範囲の中でも
     上限の外なら、どの上限かをパスの後ろにつける。
     """
     record.decision, record.enforced = audit.ALLOW, True

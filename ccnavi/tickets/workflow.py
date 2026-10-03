@@ -170,7 +170,7 @@ def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
 
 
 def lines(parent: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
-    """人向けの待ちの一覧。承認画面と `--explain` に出す。一直線なら延期の引き受け手だけ。"""
+    """ユーザ向けの待ちの一覧。承認画面と `--explain` に出す。一直線なら延期の引き受け手だけ。"""
     if wf.order != ticket_mod.WORKFLOW_DAG:
         defers = [
             f"{n}: {parent.plan[n - 1].type} — レビューは {at} と一緒に"

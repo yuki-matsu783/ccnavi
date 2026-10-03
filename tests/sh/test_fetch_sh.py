@@ -183,7 +183,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("手元に無かった", done.stdout)
 
     def test_default_branch_is_left_alone_when_it_diverged(self):
-        # 手元にしか無いコミットがあるときは触らない。ff で入らないものは人が合流させる。
+        # 手元にしか無いコミットがあるときは触らない。ff で入らないものはユーザが合流させる。
         write(os.path.join(self.ws, "local.txt"), "local\n")
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "-q", "-m", "local")
@@ -263,7 +263,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("認証", done.stdout)
 
     def test_an_authentication_failure_says_so(self):
-        """401 を返すリモート。尋ねずに落ち、認証で落ちたことと、人がすることを言う。"""
+        """401 を返すリモート。尋ねずに落ち、認証で落ちたことと、ユーザがすることを言う。"""
 
         class Unauthorized(http.server.BaseHTTPRequestHandler):
             def do_GET(self):

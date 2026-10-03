@@ -17,7 +17,7 @@ deny:
     glob: "*/.claude/hooks/*"
     message: >-
       hook 本体です。エージェントの判断で書き換えず、理由を
-      伝えて利用者に変更を依頼してください。
+      伝えてユーザに変更を依頼してください。
 
   # ラッパースクリプトの場所
   - id: guard-scripts
@@ -25,7 +25,7 @@ deny:
     glob: "*/.ccnavi/scripts/*"
     message: >-
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
-      エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼してください。
+      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
 
   # ccnavi の設定（ルール・フェーズの種類・リスクの配点）
   - id: guard-ccnavi-config
@@ -33,7 +33,7 @@ deny:
     regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risks)\.yml$'
     message: >-
       ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
-      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼してください
+      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください
       （/ccnavi-config）
 
   # チェックアウトしたブランチでは編集しない。`.claude/worktrees/` だけが編集可能。
@@ -44,7 +44,7 @@ deny:
     message: >-
       チェックアウトしたブランチ直下では編集しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add
       .claude/worktrees/<名前> -b <名前>' でワークツリーを切り、その中で編集して、
-      ff-only で統合先に戻してください。
+      ff-only で統合先に取り込んでください。
 
   # PowerShell はまとめて止め、Bash に寄せる。
   - id: no-powershell
@@ -53,7 +53,7 @@ deny:
     message: >-
       PowerShell は使いません。同じことを Bash ツールで打ってください。
       ファイルを読む・書く・探すなら Read / Write / Edit / Grep / Glob ツールを使ってください。 
-      PowerShell でしか実行できないことは利用者に実行を依頼してください。     
+      PowerShell でしか実行できないことはユーザに実行を依頼してください。     
 
   # 生の git はまとめて止め、入口を .ccnavi/scripts/ccnavi-git.sh の 1 本に寄せる。
   # 止める理由は 2 つ。
@@ -77,7 +77,7 @@ deny:
   - id: credentials
     match: Bash|Read|Write|Edit|NotebookEdit
     regex: '(^|[ \\/])\.(env|dev\.vars|netrc|npmrc|pypirc)\b|(^|[ \\/])\.(aws|ssh)[\\/]|[\w\-\\/]\.(pem|key)\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\b(id_rsa|id_ed25519)\b'
-    message: 認証情報を含む場所です。中身を読まず、必要な値を利用者に尋ねてください。
+    message: 認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。
 
   # 再帰的な強制削除は止める。
   - id: recursive-delete
@@ -109,7 +109,7 @@ deny:
     match: Write|Edit|NotebookEdit
     glob: "*/.ccnavi/approved/*"
     message: >-
-      承認済みチケットです。承認は利用者が VS Code のボード（端末なら
+      承認済みチケットです。承認はユーザが VS Code のボード（端末なら
       'ccnavi --agree'）で行います。
       作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で
       レビュー待ち（wip/proposals/review/）へ動かしてください。
@@ -122,7 +122,7 @@ deny:
     regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
     message: >-
       hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。
-      エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼してください。
+      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
 
 ask:
   # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。

@@ -1,6 +1,6 @@
 """フェーズの種類。`.ccnavi/common/phases.yml` を読む（設計 9.7）。
 
-## 種類は人が持つ
+## 種類はユーザが持つ
 
 エージェントが種類を書けると、レビュー不要の種類を作ってから使える。だから置き場は
 ルールの `guard-ccnavi-config` の内側で、ワークツリー側の設定も含めてエージェントの Write は
@@ -51,7 +51,7 @@ KIND_FEEDBACK = "feedback"
 KINDS = (KIND_WORK, KIND_FEEDBACK)
 
 REVIEW_NONE = "none"
-# chat は、このセッションで人が差分を見る。ホストへは出ない。先へ進めるのは
+# chat は、このセッションでユーザが差分を見る。ホストへは出ない。先へ進めるのは
 # 端末から打つ `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で、
 # エージェントには打てない
 # （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 9.8）。
@@ -177,7 +177,7 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
         # ファイルとして苦情付きで返す。上げると、判定（実行前・レビューで止めるところ・
-        # 実行後の監視）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う処理まで
+        # 実行後チェック）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う処理まで
         # 進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     # 承認の指紋（read_set）に入れる。種類は待ち方と止め方を決める判定の入力。
@@ -216,7 +216,7 @@ def parse(
         ident = str(key).strip()
         if rules.ID_SEPARATOR in ident:
             # 層の名前をつけた形（`lib:build`）と見分けが付かない。共通層に書けば
-            # lib の定義に見え、記録を読んだ人がどのファイルを直すのか決められない。
+            # lib の定義に見え、記録を読んだユーザがどのファイルを直すのか決められない。
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
@@ -237,7 +237,7 @@ def parse(
         problems.extend(own)
         if pt is None:
             continue
-        # 表示名も一意。人は表示名で見るので、同じ名前が 2 つあると承認画面で見分けられない。
+        # 表示名も一意。ユーザは表示名で見るので、同じ名前が 2 つあると承認画面で見分けられない。
         if pt.title in titles:
             problems.append(
                 Problem(
@@ -296,7 +296,7 @@ def conflict_problems(pool: dict[str, PhaseType]) -> list[Problem]:
     """同じ組を `after`（待つ）と `overlap`（並行してよい）の両方に挙げていないか。
 
     両方あると、待ち方の計算は `overlap` を採って待たず、書いた依存が気づかないうちに消える。
-    どちらのつもりかを人に決めさせる。
+    どちらのつもりかをユーザに決めさせる。
     """
     problems: list[Problem] = []
     for pt in pool.values():
@@ -368,10 +368,10 @@ def merge(
 
     足すだけで、後ろの層が前の層を上書きすることはない。同 `id` で全欄が一致する
     ものは重複とみなして後ろを捨て（info）、中身が違えば error。`title` の重なりも
-    層をまたいで error（人は表示名で見るので、承認画面で見分けられない）。
+    層をまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
 
     error があるとき、その層は空として扱い、共通層の種類だけを返す。衝突した片方を
-    何も言わずに採ると、どちらの `review:` が使われているかを人が読めない。止まる側を採る。
+    何も言わずに採ると、どちらの `review:` が使われているかをユーザが読めない。止まる側を採る。
 
     `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。層から共通層の種類を
     指すのは正しい形なので、層 1 本の中では確かめられない。
@@ -404,7 +404,7 @@ def merge(
                         ident,
                         f"`{ident}` は前の層（{prior.source or 'common'}）と同じ id で中身が違う。"
                         f"{layer} の層は空として扱う。どちらの `review:` が効いているかを"
-                        "人が読み取れないので、断りなく片方を採ることはしない",
+                        "ユーザが読み取れないので、断りなく片方を採ることはしない",
                     )
                 )
             continue
@@ -455,7 +455,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         return None, problems
     pt.review = review
     if kind == KIND_FEEDBACK and review == REVIEW_NONE:
-        # フィードバック対応の結果を人が見ない経路は作らない。見る場所は chat でも mr でもよい。
+        # フィードバック対応の結果をユーザが見ない経路は作らない。見る場所は chat でも mr でもよい。
         problems.append(
             Problem(
                 SEVERITY_ERROR,
@@ -532,7 +532,7 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
         glob = glob.replace("\\", "/").strip("/")
         # 子チケットの範囲と同じく、大文字小文字は区別しない（`ticket.entries`）。
         # 機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
-        # 承認を拒まれ、Windows では通る。範囲は人が宣言する意図なので、機械の
+        # 承認を拒まれ、Windows では通る。範囲はユーザが宣言する意図なので、機械の
         # 都合ではなく綴りの意味で読む。子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える。
         try:
             compiled = re.compile("^" + globmatch.translate(glob), re.IGNORECASE)

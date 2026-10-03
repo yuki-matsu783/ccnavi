@@ -133,7 +133,7 @@ class BranchNameRulesTest(unittest.TestCase):
 
     def test_project_shaped_names_are_reserved(self):
         """段階 5: `<名前>-i<番号>` は issue の無い提案とワークスペースの提案では使わない。"""
-        # 人が付けた名前（issue が無い）は、そのプロジェクトの issue から決まる名前と
+        # ユーザが付けた名前（issue が無い）は、そのプロジェクトの issue から決まる名前と
         # 重なるときだけ言う（11.9.1 の 17）
         self.assertEqual([], self.problems("web-i0012"))
         self.assertEqual([], self.problems("fix-i2", project="web"))
@@ -144,7 +144,7 @@ class BranchNameRulesTest(unittest.TestCase):
         found = self.problems("web-i0012", issue=12)
         self.assertEqual(1, len(found), found)
         self.assertIn("ワークスペースの提案", found[0])
-        # 形に当たらない名前は、issue があっても人が付けた名前でよい（フォールバック。8.6）
+        # 形に当たらない名前は、issue があってもユーザが付けた名前でよい（フォールバック。8.6）
         self.assertEqual([], self.problems("fix-i18n"))
         self.assertEqual([], self.problems("login", issue=12, project="web"))
 

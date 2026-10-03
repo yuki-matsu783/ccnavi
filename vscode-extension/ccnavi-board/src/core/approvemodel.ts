@@ -76,7 +76,7 @@ export type PreviewParse =
 
 /**
  * 途中で止まった承認（README「承認の JSON」の `partial`）。置いたものは戻らないので、
- * どこまで置いたかをそのまま受け取って人に伝える。
+ * どこまで置いたかをそのまま受け取ってユーザに伝える。
  */
 export interface ApprovePartial {
   /** 承認済みチケットに入ったぶん（新規は置いた、改版は書き換えた） */
@@ -90,7 +90,7 @@ export interface ApprovePartial {
 }
 
 /**
- * 途中で止まったことを人に伝える文。何が残っているかを言い切る。
+ * 途中で止まったことをユーザに伝える文。何が残っているかを言い切る。
  * `placed` に止まった識別子自身が入るのは、書けたあとの後始末（マーカーを置く）で
  * 落ちたとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
  */
@@ -101,7 +101,7 @@ export function partialMessage(partial: ApprovePartial): string {
     placed.length === 0
       ? "承認済みになったチケットはありません"
       : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っています。` +
-        "コミットと push は送っていません（送るのは承認できたときだけです）。チケット管理画面を更新して確かめてください";
+        "コミットと push はターミナルに送っていません（送るのは承認できたときだけです）。チケット管理画面を更新して確かめてください";
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
   return `ccnavi --agree --yes が${where === "" ? "" : ` ${where}`}止まりました: ${reason}。${what}${done}`;
 }

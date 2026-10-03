@@ -60,7 +60,7 @@ export async function lintFlowText(
     try {
       fs.writeFileSync(tmp, text, typeof text === "string" ? { encoding: "utf8", flag: "wx" } : { flag: "wx" });
     } catch (error) {
-      return { ok: false, error: `確かめるための一時ファイルを書けない: ${(error as Error).message}` };
+      return { ok: false, error: `確かめるための一時ファイルを書けません: ${(error as Error).message}` };
     }
     const ran = await lint(tmp);
     if (!ran.ok) {
@@ -72,13 +72,13 @@ export async function lintFlowText(
     const errors = problems.filter((p) => p.severity === "error");
     if (errors.length > 0) {
       const said = errors.map((p) => rename(p.detail)).join("\n");
-      return { ok: false, error: `実行ファイル（--lint --flow）がフローを読めないと返した: ${said}` };
+      return { ok: false, error: `実行ファイル（--lint --flow）が、フローを読めないと返しました: ${said}` };
     }
     const flow = ran.value.flow;
     if (flow === undefined || flow.data === null || flow.data === undefined) {
       return {
         ok: false,
-        error: "実行ファイル（--lint --flow）が読んだ中身（flow）を返さない（古い版）。確かめられないので進めない。実行ファイルを更新してください",
+        error: "実行ファイル（--lint --flow）が、読んだ中身（flow）を返しません（古い版です）。確かめられないため、先へ進めません。実行ファイルを更新してください",
       };
     }
     const checks: FlowChecks = {

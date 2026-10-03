@@ -156,7 +156,7 @@ test("CB-D02 state に控えた id の行は、読み直したあとも開いて
   }
 });
 
-test("CB-D03 コンテキストの欄は値があるルールだけ最初から開き、利用者が閉じれば描き直しても閉じたまま", async () => {
+test("CB-D03 コンテキストの欄は値があるルールだけ最初から開き、ユーザが閉じれば描き直しても閉じたまま", async () => {
   const dom = await openRules();
   try {
     assert.ok(!dom.one(`${rowSelector("git-push")} details.more`).hasAttribute("open"));
@@ -639,7 +639,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
-    assert.equal(dom.all(".tour").length, 0, "人が始めていない案内が出直した");
+    assert.equal(dom.all(".tour").length, 0, "ユーザが始めていない案内が出直した");
   } finally {
     await dom.close();
   }

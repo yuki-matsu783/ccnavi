@@ -1,7 +1,7 @@
 """hook のイベントごとの手順。1 回の起動で何が起きるかは、ここを上から読めば分かる。
 
-実行前の判定は judge、サブエージェントの始まりと終わりは subagent、実行後の
-監視は post に本体があり、ここはイベント名からそれらへ振り分け、記録と応答を
+実行前チェックは judge、サブエージェントの始まりと終わりは subagent、実行後
+チェックは post に本体があり、ここはイベント名からそれらへ振り分け、記録と応答を
 繋ぐだけ。イベントが増えるたびに 1 本の関数が長くならないように、イベント 1 つに
 つき関数 1 つ。
 """
@@ -25,7 +25,7 @@ CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
 # 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
 STOP_PREFACE = (
     "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めないでください。"
-    "このターンが利用者への問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書いてください。"
+    "このターンがユーザへの問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書いてください。"
     "振り返って何も無ければ「振り返り: 無し」とだけ答えてください。"
 )
 
@@ -73,7 +73,7 @@ def watch_context(
 ) -> tuple[list[post.Watched], post.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
-    保護領域も範囲も、実行前の判定と同じ経路で解く。別に書くと、実行前に
+    保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
     通った書き込みがターンの終わりに咎められる（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
     """
@@ -91,7 +91,7 @@ def watched_for(
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
-    ルールの引き方は実行前の判定と同じで、共通層にそのツリーの層を足した和。
+    ルールの引き方は実行前チェックと同じで、共通層にそのツリーの層を足した和。
     別に書くと、実行前に通った書き込みがターンの終わりに咎められる。
     """
     ws = tree.main_tree(root)
@@ -149,14 +149,14 @@ def decide_at_prompt(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """利用者が何か言ったとき。ターンの基準をここで取る。
+    """ユーザが何か言ったとき。ターンの基準をここで取る。
 
     原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
 
-    例外は、このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）。
-    それは 1 度だけ伝える。伝えないと、人が「承認した」とチャットで打つまで
+    例外は、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）。
+    それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
     モデルは後工程に入れない。
     """
     watched, scope = watch_context(stderr, conf, root, record)
@@ -186,11 +186,11 @@ def decide_at_stop(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """ターンが終わったとき。宣言した保護領域の今の状態を人へ報告する。
+    """ターンが終わったとき。宣言した保護領域の今の状態をユーザへ報告する。
 
-    宛先が人なので `systemMessage` で返す。呼び出しごとの報告はモデルへ届く
+    宛先がユーザなので `systemMessage` で返す。呼び出しごとの報告はモデルへ届く
     経路に載せてあり、そこは既に足りている。足りていないのは、ターンが終わった
-    あとに人が「結局どこが変わったのか」を 1 度で見る場所のほう。
+    あとにユーザが「結局どこが変わったのか」を 1 度で見る場所のほう。
 
     報告のためには止めない。このイベントで止めることはターンを続けさせる意味になり、
     報告のために作業を終わらせない形になる。報告は言うだけにする。
@@ -221,7 +221,7 @@ def decide_at_stop(
         functools.partial(configsync.is_synced_write, conf, root),
     )
     # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
-    # 言い換えで回っているかもしれないことを人にも 1 度言う。止めはしない。
+    # 言い換えで回っているかもしれないことをユーザにも 1 度言う。止めはしない。
     repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
@@ -234,7 +234,8 @@ def decide_at_stop(
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
     if nudge:
-        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後の監視と同じ言い方）。
+        # dry-run は止めない。止めたはずのことをユーザへの報告に載せる
+        # （実行後チェックと同じ言い方）。
         told = f"[ccnavi dry-run] {modes.ENABLE} would have blocked this stop:\n{nudge}"
         report = f"{report}\n\n{told}" if report else told
     if report:
@@ -269,7 +270,7 @@ def stop_rules_nudge(
       ターンの終わりのたびに止まるので、何も言わない側を採る（ADR-0087 と同じ）
 
     数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
-    `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、利用者への問いで終わった
+    `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、ユーザへの問いで終わった
     ターンの問いが消えないように。記録の `rules` には、実際に渡したルールだけを残す。
     """
     if payload.stop_hook_active or payload.agent_id or not conf.state:
@@ -397,7 +398,7 @@ def decide_at_start(
 def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
     """記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。
 
-    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前の判定に置くと、呼び出しの
+    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前チェックに置くと、呼び出しの
     たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
     動かしたものの数は記録の `detail` に残す（消したことも記録に残る）。
     """
@@ -427,7 +428,7 @@ def decide_after(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """実行後の監視を 1 回動かし、言うことがあれば返す。
+    """実行後チェックを 1 回動かし、言うことがあれば返す。
 
     期限を渡していない。実行前の期限は、遅い判定が気づかないうちに許可と同じ扱いになるのを
     防ぐためのもので、止められるイベントでしか意味を持たない。ここは
@@ -449,10 +450,10 @@ def decide_after(
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:
         record.tree, record.project = watched[-1].tree.name, watched[-1].tree.project
-    # 既定に戻ったことをこのイベントでは言わない。実行前の判定が呼び出しごとに
+    # 既定に戻ったことをこのイベントでは言わない。実行前チェックが呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 範囲は実行前の判定と同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
+    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
     scope = scope_guard(conf, root)
 
     text = post.check(
@@ -472,7 +473,7 @@ def decide_after(
         places=(conf.tickets, conf.approved),
         synced=synced,
     )
-    # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
+    # 設定ファイルについて言うことは、実行後チェックの報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
@@ -510,7 +511,7 @@ def decide_after(
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
     # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
-    # 届かない。人にも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
+    # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
     # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
     system = bounced if payload.agent_id else ""
     hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)

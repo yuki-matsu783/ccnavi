@@ -90,7 +90,7 @@ def full_path(path: str, cwd: str) -> str:
     解けなかったときも、絶対パスにして `..` を取り除くところまではやる。
     まだ存在しないファイルへの書き込みがこれにあたる。
 
-    実行前の判定（judge）と実行後の監視（gitstate）が同じ綴りに直す。別々に持つと、
+    実行前チェック（judge）と実行後チェック（gitstate）が同じ綴りに直す。別々に持つと、
     同じ場所が 2 通りの綴りで当たり、実行前に通った書き込みが実行後に咎められる。
     """
     if not path:
@@ -356,7 +356,7 @@ def write_json_atomic(path: str, data: Any, indent: int | None = None) -> str:
 
 
 def read_line(stream: Any) -> str:
-    """人の答えを 1 行読む。読めなければ空文字（端末が閉じている、など）。"""
+    """ユーザの答えを 1 行読む。読めなければ空文字（端末が閉じている、など）。"""
     try:
         return stream.readline()
     except (OSError, ValueError):
@@ -757,7 +757,7 @@ STREAM_ERR = "stderr"
 
 @dataclass
 class Line:
-    """人に見せる 1 行。書き込みと同じ並びに置き、同じ組が落ちたら出さない。"""
+    """ユーザに見せる 1 行。書き込みと同じ並びに置き、同じ組が落ちたら出さない。"""
 
     text: str
     group: int = 0

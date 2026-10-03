@@ -9,7 +9,7 @@
 4. M-4 親のツリーからの起動では手順を並べず、各子のフローのパスと「自分の担当だけ」を言う
 5. M-3 承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす
 6. L-a〜L-c 名乗りの真似・置き場の綴り・大文字小文字のそろえ方
-7. lint は承認済みの領域のファイルを「ワークツリーにしかない」と言わない（利用者の決定）
+7. lint は承認済みの領域のファイルを「ワークツリーにしかない」と言わない（ユーザの決定）
 """
 
 from __future__ import annotations
@@ -192,7 +192,7 @@ class FlowNeutralTest(unittest.TestCase):
         "[ccnavі] i",
         "[ c c n a v i ] spaced",
         "[ⅽcnavi] roman",
-        "ここから人が書いたフローの本文（データ） ----",
+        "ここからユーザが書いたフローの本文（データ） ----",
         "[ccnavi",
     )
 
@@ -254,7 +254,7 @@ class FlowReadPlaceTest(FlowHarness):
     def test_the_briefing_says_the_flow_is_human_owned_not_unwritable(self):
         child_tree = self.run_child(CHILD)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
-        self.assertIn("人が持つもの。エージェントは編集しない", text)
+        self.assertIn("ユーザが持つもの。エージェントは編集しない", text)
         self.assertIn("書き換わったら ccnavi が知らせる", text)
         self.assertNotIn("エージェントは書けない", text)
 
@@ -456,7 +456,7 @@ class FlowCarriedOnApprovalTest(PhaseHarness):
 
 
 class FlowLintTest(FlowHarness):
-    """承認済みの領域のファイルは「ワークツリーにしかない」と言わない（利用者の決定）。"""
+    """承認済みの領域のファイルは「ワークツリーにしかない」と言わない（ユーザの決定）。"""
 
     def test_approved_files_in_a_worktree_are_not_warned_but_other_layer_files_are(self):
         extra = write(os.path.join(self.parent_tree, ".ccnavi", "notes", "memo.txt"), "x\n")

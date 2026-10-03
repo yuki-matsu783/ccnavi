@@ -194,7 +194,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ルールを空にされても保護は消えない(self):
         # ルール由来の保護は、保護領域をルールファイルから導く。deny を空に
-        # されるとその一覧ごと消えるので、実行後の監視は何も検知しない。
+        # されるとその一覧ごと消えるので、実行後チェックは何も検知しない。
         # この仕組みはルールを読まずに対象を決めるので、そこで止まらない。
         self.run_hook("PreToolUse")
         write(self.rules, json.dumps({"version": 1, "deny": [], "ask": [], "allow": []}))
@@ -216,7 +216,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(self.settings))["hooks"], SETTINGS["hooks"])
 
     def test_直前の断面に戻すのでコミットしていない編集は残る(self):
-        # git から戻すとコミット済みの内容まで巻き戻り、人の書きかけが消える。
+        # git から戻すとコミット済みの内容まで巻き戻り、ユーザの書きかけが消える。
         # 控えから戻せば、戻る先はこのツール呼び出しの直前になる。
         edited = json.dumps(
             RULES
@@ -268,7 +268,7 @@ class SelfGuardTest(unittest.TestCase):
 
         result = self.run_hook("PostToolUse")
 
-        self.assertTrue(os.path.exists(local), "人が置くこともあるファイルを消さない")
+        self.assertTrue(os.path.exists(local), "ユーザが置くこともあるファイルを消さない")
         self.assertIn("settings.local.json", result.stdout)
 
     # ワークツリー側の設定
@@ -299,7 +299,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ワークツリーでないディレクトリは守らない(self):
         # `.claude/worktrees/` の下に在るだけのディレクトリ。参考実装の写しを
-        # 置いた形がこれで、守りに行くと人のファイルを勝手に戻すことになる。
+        # 置いた形がこれで、守りに行くとユーザのファイルを勝手に戻すことになる。
         fake = os.path.join(self.repo, ".claude", "worktrees", "not-a-tree")
         copy = self.copy_in(fake, "settings.json")
         write(copy, "{}\n")
@@ -753,7 +753,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_セッション開始では設定ファイルも控える(self):
         # 実行前の控えが始まるのは最初のツール呼び出しから。それより前に
-        # 設定ファイルを消されると、控えを持たないまま実行後の監視に入る。
+        # 設定ファイルを消されると、控えを持たないまま実行後チェックに入る。
         self.run_hook("SessionStart")
 
         saved = os.path.join(self.state, "selfguard", "s1", "rules")

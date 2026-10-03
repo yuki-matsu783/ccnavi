@@ -2,7 +2,7 @@
  * 残った指摘を決める JSON の形（実行ファイルとの契約）と読み取り。README「残った指摘の JSON」。
  *
  * `ccnavi-review.sh decide <N> --preview` が残った指摘と指紋を見せ、
- * `ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>` が人の選んだ行き先を置く。
+ * `ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>` がユーザの選んだ行き先を置く。
  * 拡張は見せられた指摘をそのまま並べ、選んだ行き先を鍵ごとに返すだけ。指摘を自分で数え直したり、
  * マージリクエストを読んだりはしない（読むのは sh、判断するのは実行ファイル）。
  */

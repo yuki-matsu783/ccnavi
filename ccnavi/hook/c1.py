@@ -17,8 +17,8 @@
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その家族の
     `phases/<親>/<N>.pending`・`.skipped` と、その印の跡（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
-  - (c) 人が運ぶもの（人の判断）。C1 は運ばずに止める。人の判断が一緒に書く移動（review/ から
-    done/、doing/ から done/）とマーカーの消去、跡の追記もここ
+  - (c) ユーザが運ぶもの（ユーザの判断）。C1 は運ばずに止める。ユーザの判断が一緒に書く
+    移動（review/ から done/、doing/ から done/）とマーカーの消去、跡の追記もここ
   - (d) 見分けられないもの。C1 は止める
   - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 が運ぶ。
     未コミットのときだけ）
@@ -62,8 +62,8 @@ _EVENT_FIELDS = ("at", "ticket", "kind")
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
 # configsync の `*.ccnavi-sync`）。
 _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$")
-# 人の判断が書くもの（4.4 の表）。フローの本文、reviewed・close-early の印、設定を見た印、
-# 受け入れたスレッド、人の承認で置かれた写し。
+# ユーザの判断が書くもの（4.4 の表）。フローの本文、reviewed・close-early の印、設定を見た印、
+# 受け入れたスレッド、ユーザの承認で置かれた写し。
 _HUMAN_MARK_NAMES = (
     f"{approval.PARENT_MARK_CLOSE_EARLY}.json",
     "config-sync.json",
@@ -203,7 +203,7 @@ def classify_all(
     since: str = "",
 ) -> list[tuple[str, str, str]]:
     """変更の並びを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
-    HEAD）、あれば HEAD と `since`。人の判断が一緒に書く移動は、組の両側を見て (c) にする。
+    HEAD）、あれば HEAD と `since`。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。
     """
     approved_rel, review_rel = places
     states: dict[str, tuple[bytes | None, bytes | None, bool]] = {}
@@ -353,22 +353,22 @@ def _judge_record(parts: list[str]) -> bool:
 
 
 def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool:
-    """人の判断が書くものの形（4.4 の表）。形だけで見る（(c) も (d) も C1 は止める）。
+    """ユーザの判断が書くものの形（4.4 の表）。形だけで見る（(c) も (d) も C1 は止める）。
 
-    フローの本文、人の承認で置かれた写し、reviewed・(b) でない skipped・close-early・設定を見た印・
-    受け入れたスレッド、人の判断が消したマーカー、人の判断が一緒に書く移動（review/ から done/、
-    doing/ から done/）、跡の追記（読める行だけ）。
+    フローの本文、ユーザの承認で置かれた写し、reviewed・(b) でない skipped・close-early・
+    設定を見た印・受け入れたスレッド、ユーザの判断が消したマーカー、ユーザの判断が一緒に書く
+    移動（review/ から done/、doing/ から done/）、跡の追記（読める行だけ）。
     """
     rel = f"{approved_rel}/{'/'.join(parts)}"
     if len(parts) == 2 and parts[0] == "flows" and parts[1].endswith((".yml", ".yaml")):
         return True
     if len(parts) == 2 and parts[0] == ticket_mod.DOING:
         if added(rel):
-            return True  # 人の承認で置かれた写し
+            return True  # ユーザの承認で置かれた写し
         # 締め（close-early）の取り消しで done/ へ動いた
         return removed(rel) and added(f"{approved_rel}/{ticket_mod.DONE}/{parts[1]}")
     if len(parts) == 2 and parts[0] == ticket_mod.DONE and added(rel):
-        # 人のレビュー（review/ から）か締めの取り消し（doing/ から）で動いた先
+        # ユーザのレビュー（review/ から）か締めの取り消し（doing/ から）で動いた先
         return removed(f"{review_rel}/{parts[1]}") or removed(
             f"{approved_rel}/{ticket_mod.DOING}/{parts[1]}"
         )
@@ -378,7 +378,7 @@ def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool
             return True
         number, _, kind = name.partition(".")
         if _NUMBER.fullmatch(number) and kind in approval.MARKS and removed(rel):
-            return True  # 人の承認が消したマーカー（子が足された）
+            return True  # ユーザの承認が消したマーカー（子が足された）
         if _NUMBER.fullmatch(number) and kind in (approval.MARK_REVIEWED, approval.MARK_SKIPPED):
             return True
     if len(parts) == 2 and parts[0] == history.EVENTS_DIR:
