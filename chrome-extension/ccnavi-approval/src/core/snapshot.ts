@@ -328,7 +328,7 @@ async function familyBoard(
 }
 
 /**
- * 取り下げを出すのは、承認コミットを引けて、その親に提案が読めるときだけ（8.8、レビューの 8）。締める向きの条件。
+ * 取り下げを出すのは、承認コミットを引けて、その親で提案を読めるときだけにする（8.8、レビューの指摘 8）。取り下げを出せる場合を狭める条件。
  * Python が理由を返さなかった写しでも、引けなければ理由を足す。
  */
 async function withdrawableHere(board: BoardResult, reader: Reader, place: Placement, family: string): Promise<BoardResult> {

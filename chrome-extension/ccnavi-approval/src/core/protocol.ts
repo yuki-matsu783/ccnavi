@@ -11,7 +11,7 @@
  * 段階 3 から、書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
  * 書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か統合先の名前（ボードの値を信頼せず
  * 自分で引く）なら断り、書くパスは置き場（統合先の `.claude/settings.json` から自分で引く）の下に限る
- * （8.5・レビューの決定 D）。Python も同じ検査をし、ここは二重の守りになる。PAT の期限（D25）は応答ヘッダ
+ * （8.5・レビューの決定 D）。同じ検査を Python も行うので、書く先とパスは 2 か所で確かめる。PAT の期限（D25）は応答ヘッダ
  * （GitHub）か `GET /personal_access_tokens/self`（GitLab。1 日 1 回）から読んで控え、画面へは期限だけを返す。
  *
  * 段階 5 から GitLab（`gitlab.ts`）も同じ操作の名前で受ける。`commit` の答えは `{oid, parent}`（parent は

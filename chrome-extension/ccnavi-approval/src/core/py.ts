@@ -98,7 +98,7 @@ export interface BoardResult {
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
-  /** 互換の版と書く先の名前から見て、書けるか。Python が決める（7.3・8.5） */
+  /** 書けるかどうか。互換の版と書く先の名前をもとに Python が決める（7.3・8.5） */
   readonly write?: { readonly allowed: boolean; readonly reason: string };
   readonly withdrawable?: readonly Withdrawable[];
   /** レビュー済みを付けられる候補（段階 4） */

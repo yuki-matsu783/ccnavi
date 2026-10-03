@@ -90,7 +90,7 @@ async function readAttention(): Promise<Attention> {
   return v && typeof v === "object" ? (v as Attention) : {};
 }
 
-/** 要確認の家族を控え、ユーザが確かめて外すまでボードに出す。要確認になるのは、打ち消しが収まらない・書いたか確かめられない などのとき（8.4） */
+/** 要確認になった家族を `chrome.storage.local` に残し、ユーザが確かめて外すまでボードに出す。要確認になるのは、打ち消しのコミットを積んでも競合が収まらないときや、書けたかを確かめられないときなど（8.4） */
 async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
   if (outcome.kind !== "attention") return;
   const all = await readAttention();

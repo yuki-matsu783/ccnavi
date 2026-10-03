@@ -17,7 +17,7 @@ export interface TokenMeta {
   readonly host?: string;
   /** 登録のときにユーザが入れた期限（YYYY-MM-DD）。空なら入れていない */
   readonly manual?: string;
-  /** GitLab で期限を最後に聞いた時刻（ISO）。`GET /personal_access_tokens/self` で聞き、聞くのは 1 日 1 回まで（段階 5） */
+  /** GitLab に `GET /personal_access_tokens/self` で期限を最後に問い合わせた時刻（ISO）。問い合わせは 1 日 1 回まで（段階 5） */
   readonly checked?: string;
 }
 
