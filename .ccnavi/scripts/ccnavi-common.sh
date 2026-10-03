@@ -289,9 +289,9 @@ ccnavi_project() {
 #
 # `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。
 #
-# 綴りの要点が 3 つ。
+# 書き方の要点が 3 つ。
 #   - `[^/]*@` で**最後の `@` まで**消す。解析側（authority の ${##*@}）が最後まで
-#     見ているので、伏せ字も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
+#     見ているので、伏せる範囲も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
 #   - scheme は大文字も `git+ssh` も拾う
 #   - scheme の無い `git@host:path` の形も伏せる
 ccnavi_mask_url() {
@@ -1206,36 +1206,37 @@ ccnavi_c1_end() {
 # 本文の語はスペースでつなぐ。`--` の後ろは 1 つずつ `キー=値` として logfmt で並べる。
 # 出る行の形は次のとおり（Python の ccnavi/diaglog.py、拡張の src/log.ts と同じ）。
 #
-#   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] push を拒否した reason=unapproved
+#   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] 拒否した sub=push reason=unapproved
 #
 # 置き場はワークスペースルートの `logs/diag/<出どころ>.log`。ルートは呼ぶ側が
 # ccnavi_log_root に入れておけばそれを使い、空なら ccnavi_workspace で探す。出どころは
-# `$0` の名前から拡張子を落としたもので、CCNAVI_LOG_NAME で上書きできる。出どころに
-# `[A-Za-z0-9_-]` 以外の字があれば書かない（パスの区切りや `..` を名前に入れさせない）。
+# `$0` の名前から拡張子を除いたもので、CCNAVI_LOG_NAME で上書きできる。出どころに
+# `[A-Za-z0-9_-]` 以外の文字があれば書かない（パスの区切りや `..` を名前に入れさせない）。
 #
-# **リンクは辿らない。** `logs`・`logs/diag`・書き先のファイルのどれかがシンボリックリンクなら
-# 書かずに捨てる。リンクの先へ追記すると、置き場の外のファイル（判定の記録など）を書き換える。
+# **シンボリックリンクはたどらない。** `logs`・`logs/diag`・書き込み先のファイルのどれかが
+# シンボリックリンクなら書かずに捨てる。リンク先へ追記すると、置き場の外のファイル（判定の記録など）を書き換えてしまう。
 # ファイルを新しく作るときは umask 077 のサブシェルで作り、持ち主だけが読める 0600 にする。
 #
 # **標準出力と標準エラーには何も出さず、何があっても 0 を返す。** 書けない（置き場が
 # 作れない・権限・容量）ときは何も出さずに捨てる。`set -eu` の下で呼んでも、呼ぶ側を止めない。
-# 契約の文面（reject / fail の標準エラー、ok / fail の 1 行目）とは違うもので、そちらは変えない。
+# 契約として決まっている出力（reject / fail の標準エラー、ok / fail の 1 行目）とは分けてあり、
+# そちらは変えない。
 #
-# 本文と値の中の、URL と scp 形に埋まった資格情報を `***` に伏せる（ccnavi_log_mask）。
+# 本文と値の中の、URL と scp 形式に埋まった資格情報を `***` に伏せる（ccnavi_log_mask）。
 #
-# 出さないレベルでは、date を起こさず、文字列も組み立てない（ccnavi_log_on で先に見る）。
-# 1 行を書くときに起こす外部コマンドは date と、置き場が無いときの mkdir だけ。ほかに、
+# 出さないレベルでは、date を起動せず、文字列も組み立てない（ccnavi_log_on で先に見る）。
+# 1 行を書くときに起動する外部コマンドは date と、置き場が無いときの mkdir だけ。ほかに、
 # 新しくファイルを作るときの umask のサブシェルと、ccnavi_log_root が空のときに 1 度だけ
-# 走る ccnavi_workspace（dirname などを起こす）がある。残りはシェルの展開で済ませる。
+# 走る ccnavi_workspace（dirname などを起動する）がある。残りはシェルの展開で済ませる。
 
 ccnavi_log_min=""
 ccnavi_log_file=""
 ccnavi_log_name=""
-# 呼ぶ側が解いたワークスペースルート。入れておくと ccnavi_workspace で探し直さない。
+# 呼ぶ側が求めたワークスペースルート。入れておくと ccnavi_workspace で探し直さない。
 ccnavi_log_root=""
 # CR は printf でしか作れない。読み込むときに 1 度だけ作る。
 ccnavi_log_cr=$(printf '\r')
-# 語の切れ目（空白・タブ・LF・CR）。伏せ字で語を切り出すのに使う。
+# 語の切れ目（空白・タブ・LF・CR）。資格情報を伏せるときに語を切り出すのに使う。
 ccnavi_log_space=" 	
 $ccnavi_log_cr"
 
@@ -1273,7 +1274,7 @@ log_error() {
 	return 0
 }
 
-# 書き先。1 度解いたら覚える。出どころが使えない字を含むか、ワークスペースルートが
+# 書き込み先。1 度求めたら覚える。出どころが使えない字を含むか、ワークスペースルートが
 # 見つからなければ 1 を返す（捨てる）。
 ccnavi_log_target() {
 	[ -z "$ccnavi_log_file" ] || return 0
@@ -1343,7 +1344,7 @@ ccnavi_log_emit() {
 
 	ccnavi_le_line="$ccnavi_le_now $ccnavi_le_level ${ccnavi_log_name}[$$] $ccnavi_le_msg$ccnavi_le_fields"
 	ccnavi_le_dir="${ccnavi_log_file%/*}"
-	# リンクは辿らない。logs・logs/diag・書き先のどれかがリンクなら捨てる。
+	# シンボリックリンクはたどらない。logs・logs/diag・書き込み先のどれかがリンクなら捨てる。
 	if [ -L "${ccnavi_le_dir%/*}" ] || [ -L "$ccnavi_le_dir" ] || [ -L "$ccnavi_log_file" ]; then
 		return 0
 	fi
@@ -1351,7 +1352,7 @@ ccnavi_log_emit() {
 		mkdir -p "$ccnavi_le_dir" >/dev/null 2>&1 || return 0
 	fi
 	# `>>` は O_APPEND で開く。printf は 1 行を 1 度の write で出す。
-	# 無いファイルは umask 077 のサブシェルで作り、0600 にする。在ればサブシェルを起こさない。
+	# 無いファイルは umask 077 のサブシェルで作り、0600 にする。在ればサブシェルを起動しない。
 	if [ -e "$ccnavi_log_file" ]; then
 		{ printf '%s\n' "$ccnavi_le_line" >>"$ccnavi_log_file"; } >/dev/null 2>&1 || :
 	else
@@ -1417,15 +1418,15 @@ ccnavi_log_value() {
 }
 
 # 埋まった資格情報を `***` に伏せる。Python の diaglog.mask_userinfo と拡張の maskUserinfo と
-# 同じ読みで、3 つが 1 字まで同じ結果を出す（tests/sh/test_diaglog_sh.py）。結果は ccnavi_log_out。
+# 同じ規則で伏せ、3 つの結果は 1 文字も違わない（tests/sh/test_diaglog_sh.py）。結果は ccnavi_log_out。
 #
 # 空白・タブ・LF・CR で切った語ごとに見る。
 #   - `://` を含む語: `://` の後ろから次の `/` までを authority とし、`@` があれば最後の `@` より
 #     前を `***` にする（`https://user:tok@host/x` → `https://***@host/x`）
 #   - `://` を含まない語: 最初の `/` より前に `@` があり、最後の `@` より前に `:` があれば、そこを
-#     `***` にする（scp 形 `user:tok@host:path` → `***@host:path`）。`git@host:path` は伏せない
+#     `***` にする（scp 形式 `user:tok@host:path` → `***@host:path`）。`git@host:path` は伏せない
 # `@` の無い文字列は語に切らずにそのまま返す（ほとんどの行はこれで済む）。
-# 利用者向けの ccnavi_mask_url（`<伏せた>@host`）とは綴りが違う。そちらは契約の文面なので変えない。
+# 利用者向けの ccnavi_mask_url（`<伏せた>@host`）とは表記が違う。そちらは契約として決まっている出力なので変えない。
 ccnavi_log_mask() {
 	ccnavi_log_out="$1"
 	case "$1" in
