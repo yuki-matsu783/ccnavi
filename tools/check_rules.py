@@ -24,30 +24,39 @@ RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
 SAMPLES = os.path.join(ROOT, ".ccnavi", "common", "rule-samples.yml")
 
 
+def arguments(rules_path: str = RULES) -> list[str]:
+    """`python -m ccnavi` に渡す引数。
+
+    全件テスト（tests/core/test_check_rules.py）も同じものを使う。
+    """
+    return [
+        "--root",
+        ROOT,
+        "--rules",
+        rules_path,
+        # 見るのはルールだけ。承認済みチケットと控えは外し、記録も残さない。
+        "--approved",
+        "",
+        "--state",
+        "",
+        "--log",
+        "",
+        "--test-samples",
+        SAMPLES,
+    ]
+
+
+def environment() -> dict[str, str]:
+    """`CCNAVI_*` を外した環境。走らせた人の dry-run や設定の差し替えを判定に入れない。"""
+    return {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+
+
 def main() -> int:
     rules_path = sys.argv[1] if len(sys.argv) > 1 else RULES
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     done = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "ccnavi",
-            "--root",
-            ROOT,
-            "--rules",
-            rules_path,
-            # 見るのはルールだけ。承認済みチケットと控えは外し、記録も残さない。
-            "--approved",
-            "",
-            "--state",
-            "",
-            "--log",
-            "",
-            "--test-samples",
-            SAMPLES,
-        ],
+        [sys.executable, "-m", "ccnavi", *arguments(rules_path)],
         cwd=ROOT,
-        env=environment,
+        env=environment(),
     )
     return done.returncode
 
