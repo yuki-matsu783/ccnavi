@@ -328,7 +328,7 @@ SessionStart は「`P` を取ってこられなかった。`ccnavi-sync.sh <P>` 
 | 書き手 | 書くもの | 書く場所 |
 |---|---|---|
 | 承認者（Chrome 拡張） | 承認済みチケット、改版、提案の削除、マーカーの消去（`clear_marks`）、フローの移動、承認の取り下げ（8.8）、レビュー済みのマーカーと子の `done/` への移動（8.9） | リモートの `P` |
-| 開発者の手元（ccnavi のコマンド） | 着手・終了・取り消し・続きの子・マーカー・レビュー済みのマーカー・リスクの記録・フローのダイジェスト・configsync のコピー | 親のワークツリー |
+| 開発者の手元（ccnavi のコマンド） | 着手・終了・取り消し・続きの子・マーカー・レビュー済みのマーカー・リスクの記録・フローのハッシュ・configsync のコピー | 親のワークツリー |
 | 開発者の手元（hook） | フェーズの終わりの告知が置く `N.pending`/`N.skipped` と状態の履歴（4.4） | 親のワークツリー |
 | 人（端末・ボード） | 人の判断（4.4 の (c)） | 親のワークツリー |
 
@@ -480,7 +480,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 
 「書いたパス」の一覧をコアの `Changes`（6.2）だけから取ると漏れます。コアの外で書いている箇所があるためです:
 `ops.start`・`finish`・`cancel`、`approval.followup`（`approval.py:540-615`）、`configsync.apply`（`configsync.py:159`）、
-フローのダイジェスト `flow.record_digest`（`flow.py:964-`）、リスクの記録 `phases/<親>/<子>.risk.json`（`approval.py:914`）。
+フローのハッシュ `flow.record_digest`（`flow.py:964-`）、リスクの記録 `phases/<親>/<子>.risk.json`（`approval.py:914`）。
 
 - `fsio` の書き込みの関数（`write_text`・`write_text_atomic`・`write_bytes`・`write_json_atomic`・`remove`、`fsio.py:143-293`）に、
   記録が有効なあいだだけ「書いた・消したパス」を書いておく層を入れる。有効にするのは CLI の入口で、sh から `--record-writes <ファイル>` を渡されたときだけ

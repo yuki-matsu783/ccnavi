@@ -104,19 +104,18 @@ def start(
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
     if found.is_child:
-        # 着手のときのフローのダイジェストを保存する。SubagentStart / SubagentStop が、着手のあとに
+        # 着手のときのフローのハッシュを保存する。SubagentStart / SubagentStop が、着手のあとに
         # 書き換わったら知らせる（設計 9.3.1、ADR-0085。止めない）。
         started = replace(found, started_at=fields["started_at"])
         where, failed = flow.record_digest(conf, root, started)
         if failed:
             stderr.write(
-                f"ccnavi: {ticket_id} のフローのダイジェストを保存できない（{failed}）。"
+                f"ccnavi: {ticket_id} のフローのハッシュを保存できない（{failed}）。"
                 "着手のあとの書き換えは知らせられない\n"
             )
         else:
             stdout.write(
-                f"フローのダイジェストを {where} に保存した。"
-                "承認済みチケットと同じく人がコミットする\n"
+                f"フローのハッシュを {where} に保存した。承認済みチケットと同じく人がコミットする\n"
             )
     for line in synced:
         stdout.write(line + "\n")

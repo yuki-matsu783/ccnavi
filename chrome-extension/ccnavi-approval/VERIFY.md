@@ -172,7 +172,7 @@
 |---|---|---|---|
 | W1 | 着手前の新規の承認に「承認を取り下げる」を押す | 1 コミットで `doing/` が消え、承認コミットの親にあった提案のバイト列が `todo/` に戻る。`events/<識別子>.ndjson` に `withdrawn` の行（`actor` が PAT の持ち主、`via: chrome`） | コミットの sha、戻った提案と元の提案の差分 |
 | W2 | 取り下げた後に承認し直し、もう一度取り下げる | 新しい方の承認コミットを選ぶ | コミット |
-| W3 | 承認を別の枝で行って merge で `i0001` に入れる（手元の端末の承認を merge する、など）| 取り下げのボタンが出ない（確認事項 7。`GET /commits?sha=&path=` が merge コミットを返すか・飛ばすかに依らず同じ答え） | `GET /commits?sha=<P>&path=<doing の綴り>` の応答に merge コミットが入るか |
+| W3 | 承認を別の枝で行って merge で `i0001` に入れる（手元の端末の承認を merge する、など）| 取り下げのボタンが出ない（確認事項 7。`GET /commits?sha=&path=` が merge コミットを返すか・飛ばすかに依らず同じ答え） | `GET /commits?sha=<P>&path=<doing のパス>` の応答に merge コミットが入るか |
 | W4 | 着手の後にボードを開く | 取り下げが出ず、`ccnavi-ticket.sh cancel` を案内する | 画面の文面 |
 | W5 | 取り下げの後、手元で `ccnavi-sync.sh i0001` | blocked にならない | sync の出力 |
 

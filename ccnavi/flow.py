@@ -61,7 +61,7 @@ error で言う。ボードのフロー編集画面は、開くときと保存�
 ## 着手のあとの書き換え
 
 ロックと承認済みの領域の守りが止めるのは Write / Edit と、パスが書かれたシェルの書き込みまで。
-行き先を追えないシェルの書き込みは止まらない。着手のときにフローのダイジェストを
+行き先を追えないシェルの書き込みは止まらない。着手のときにフローのハッシュを
 `phases/<親>/<子>.flow.json` に保存し（`record_digest`）、SubagentStart と SubagentStop が
 いまのダイジェストと比べて、違えば人とメインに知らせる（`changed_notice`。止めない）。
 
@@ -177,7 +177,7 @@ HARD_LINKED = (
 )
 SWAPPED = "開いているあいだに別のファイルに差し替わったので読まない"
 
-# 着手のときに保存するフローのダイジェストの記録（`phases/<親>/<子>.flow.json`）。
+# 着手のときに保存するフローのハッシュの記録（`phases/<親>/<子>.flow.json`）。
 PHASES_DIR = "phases"
 DIGEST_RECORD = "flow"
 # 着手のあとにフローが書き換わったと知らせる理由コード。止めない（知らせるだけ）。
@@ -971,7 +971,7 @@ def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Tic
 
 
 def record_digest(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str]:
-    """着手のときのフローのダイジェストを保存する。(書いた記録のパス, 書けなかった理由)。
+    """着手のときのフローのハッシュを保存する。(書いた記録のパス, 書けなかった理由)。
 
     置き場は子の記録（`.risk.json` など）と同じ `phases/<親>/` で、承認済みの領域にあるので
     エージェントは書けず、親のブランチに乗って他の機械へ届く。フローが無くても保存する
