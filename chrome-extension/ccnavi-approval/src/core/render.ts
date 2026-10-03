@@ -9,7 +9,7 @@
  * スレッドの本文は承認の画面と同じ規則で描く（Markdown は消毒した断片、隠れる書き方は通さない、HTML コメントは
  * 見える印。承認者に見えないまま承認させないため）。
  * GitLab の MR（`!番号`）とプロジェクトのリポジトリ、「始める」（issue の一覧と、押すと親のブランチを
- * 作るボタン）、打ち消しが収まらなかった家族の「要確認」を出す。issue の題も素の文字列（textContent）。
+ * 作るボタン）、打ち消しが収まらなかった親子のチケットの「要確認」を出す。issue の題も素の文字列（textContent）。
  */
 import type { Renderer } from "./sanitize.js";
 import type { ReviewPanel } from "./reviewed.js";
@@ -39,9 +39,9 @@ export interface Actions {
   dismiss?(repo: RepoBoard, family: string): void;
 }
 
-/** ボードの外から足すもの。家族ごとの「要確認」と、読んだ issue の一覧 */
+/** ボードの外から足すもの。親子のチケットごとの「要確認」と、読んだ issue の一覧 */
 export interface Extras {
-  /** 家族の名前 → 打ち消しが収まらなかったときの文面 */
+  /** 親のブランチ名 → 打ち消しが収まらなかったときの文面 */
   readonly attention?: Readonly<Record<string, string>>;
   readonly issues?: { readonly list: readonly Issue[] | null; readonly error: string };
 }
@@ -77,11 +77,11 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
   const scope = el(doc, "p", "scope", `見たブランチ（表示用）: ${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`);
   section.append(scope);
   if (board.families.length === 0) {
-    section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（家族）は無い"));
+    section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（親子のチケット）は無い"));
   }
   for (const f of board.families) {
     const why = extras.attention?.[f.family.name];
-    // 「要確認」の家族には、このブラウザでは書くボタンを出さない（ユーザが確かめて外すまで）
+    // 「要確認」の親子のチケットには、このブラウザでは書くボタンを出さない（ユーザが確かめて外すまで）
     const box = renderFamily(
       doc,
       md,
@@ -97,7 +97,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     if (why) box.insertBefore(attention(doc, why, actions?.dismiss ? () => actions.dismiss?.(board, f.family.name) : undefined), box.children[1] ?? null);
     section.append(box);
   }
-  // 家族として見えていない（ブランチが見えなくなった）家族の「要確認」も出す
+  // ブランチが見えなくなった親子のチケットの「要確認」も出す
   for (const [name, why] of Object.entries(extras.attention ?? {})) {
     if (board.families.some((f) => f.family.name === name)) continue;
     const box = el(doc, "article", "family");
@@ -112,13 +112,13 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
   return section;
 }
 
-/** 打ち消しが収まらなかった家族。ユーザがホストの履歴を確かめたら外す */
+/** 打ち消しが収まらなかった親子のチケット。ユーザがホストの履歴を確かめたら外す */
 function attention(doc: Document, text: string, onDismiss?: () => void): HTMLElement {
   const box = el(doc, "div", "attention");
   box.dataset.testid = "attention";
   box.append(notice(doc, "error", `要確認: ${text}`));
   box.append(
-    el(doc, "p", "note", "この要確認はこのブラウザにだけ記録している（ほかの承認者には見えない）。ホストの履歴を確かめて直すまで、このブラウザからはこの家族に書かない"),
+    el(doc, "p", "note", "この要確認はこのブラウザにだけ記録している（ほかの承認者には見えない）。ホストの履歴を確かめて直すまで、このブラウザからはこの親子のチケットに書かない"),
   );
   if (onDismiss) box.append(button(doc, "確かめた（要確認を外す）", "dismiss", onDismiss));
   return box;
@@ -187,10 +187,10 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   }
   const others = r.closure.families.filter((n) => n !== f.family.name);
   if (others.length > 0) {
-    box.append(el(doc, "p", "closure", `判定に入れたほかの家族（先行をたどって行き着くもの）: ${others.join(", ")}`));
+    box.append(el(doc, "p", "closure", `判定に入れたほかの親子のチケット（先行をたどって行き着くもの）: ${others.join(", ")}`));
   }
   if (r.closure.absent.length > 0) {
-    box.append(notice(doc, "warn", `先行の家族のブランチがリモートに無い: ${r.closure.absent.join(", ")}`));
+    box.append(notice(doc, "warn", `先行の親子のチケットのブランチがリモートに無い: ${r.closure.absent.join(", ")}`));
   }
   if (r.undecided) {
     box.append(notice(doc, "error", r.undecided));
@@ -231,7 +231,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   const write = r.write ?? { allowed: false, reason: "" };
   if (batch.length > 0 && r.digest) {
     if (!write.allowed) {
-      box.append(notice(doc, "warn", write.reason || "この家族には書けない"));
+      box.append(notice(doc, "warn", write.reason || "この親子のチケットには書けない"));
     } else if (actions) {
       const bar = el(doc, "div", "actions");
       bar.append(button(doc, `承認する（${batch.map((e) => e.ticket).join(", ")}）`, "approve", actions.approve));
@@ -290,7 +290,7 @@ function link(doc: Document, href: string, text: string): HTMLElement {
 
 /**
  * 依頼済みのフェーズのレビューの欄。スレッドは未解決を先に、本文は承認の画面と同じ消毒で描く。
- * 「レビュー済みにする」は、Python が通さない理由を返さず、書ける家族で、読めたときだけ出す。
+ * 「レビュー済みにする」は、Python が通さない理由を返さず、書ける親子のチケットで、読めたときだけ出す。
  */
 export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, writable: boolean, actions?: FamilyActions): HTMLElement {
   const box = el(doc, "section", "review");

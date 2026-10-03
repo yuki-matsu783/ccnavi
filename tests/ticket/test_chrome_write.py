@@ -2,7 +2,7 @@
 
 見るのは 7 つ。
 
-1. 取り込みの控え相当: ホストに無く統合先でも閉じていない家族は `gone` で組み、その家族の
+1. 取り込みの控え相当: ホストに無く統合先でも閉じていない親子のチケットは `gone` で組み、その
    写しは決まらない。判定の入力に読めない（バイナリの）ファイルがあれば止める
 2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
    受けない
@@ -193,7 +193,8 @@ class WrittenCopyTest(ChromeWriteHarness):
         body = self.plan()
         self.assertEqual(body["identifiers"], ["i0001", "i0001-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        # 手元の控えは Chrome と同じ（取り込み済みの家族）。判定し直し（C3）で error が出ない
+        # 手元の控えは Chrome と同じ（取り込み済みの親子のチケット）。
+        # 判定し直し（C3）で error が出ない
         self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual(preview["batch"], [])

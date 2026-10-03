@@ -6,8 +6,8 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
 
 見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は tests/sh/test_c1_sh.py が見る。
 
-1. `ccnavi c1 family <識別子>`: 家族（子なら親）と、C1 の対象か。控えの無い家族・chat だけの家族は
-   対象外、決まらない家族は stop
+1. `ccnavi c1 family <識別子>`: 親子のチケット（子なら親）と、C1 の対象か。
+   控えの無い親子のチケット・chat だけの親子のチケットは対象外、決まらない親子のチケットは stop
 2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（ccnavi が書いたと内容で分かるもの・
    ユーザが運ぶもの・見分けられないもの、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
@@ -468,7 +468,9 @@ class ChooseTest(PhaseHarness):
 
 
 class BypassTest(AuthorityHarness):
-    """C1 の対象の家族（取り込み済みで origin がある）では、C1 を通らない状態の操作を断る。"""
+    """C1 の対象の親子のチケット（取り込み済みで origin がある）では、C1 を通らない
+    状態の操作を断る。
+    """
 
     def setUp(self):
         super().setUp()

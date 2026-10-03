@@ -553,7 +553,10 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
     def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
-        """取り込み済みのプロジェクトの家族（控えは sync/<プロジェクト>/）も止まる（2c）。"""
+        """取り込み済みのプロジェクトの親子のチケットも止まる（2c）。
+
+        控えは sync/<プロジェクト>/ に置く。
+        """
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
@@ -565,7 +568,7 @@ class ProjectsTest(unittest.TestCase):
         target = os.path.join(tree, "src", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
-        # ワークスペースの控えに同じ名前があっても、プロジェクトの家族には当たらない。
+        # ワークスペースの控えに同じ名前があっても、プロジェクトの親子のチケットには当たらない。
         record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
         write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
         write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")

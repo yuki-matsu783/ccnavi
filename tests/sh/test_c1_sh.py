@@ -22,8 +22,9 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
    プロジェクトの層へ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・跡の追記）は運び、ユーザの判断（c）と知らない変更（d）は止める
-9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ
-10. 控えの無い家族・origin の無いリポジトリ・chat だけの家族は今のまま
+9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親子のチケットなら
+   運ぶ処理を自動で呼ぶ
+10. 控えの無い親子のチケット・origin の無いリポジトリ・chat だけの親子のチケットは今のまま
     （コミットも push もしない）
 11. 運ぶ処理（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
@@ -429,7 +430,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
     def test_a_take_in_that_blocks_the_family_writes_nothing(self):
-        """取り込みの後の検査で家族が止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
+        """取り込みの後の検査で親子のチケットが止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
         rel = f"{APPROVED}/doing/i0001-02.md"
         self.remote_commit(rel, "---\nticket: i0001-02\n---\n")
         result = self.ticket("start", PARENT)
@@ -757,7 +758,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 
-    # ---- 止める家族
+    # ---- 止める親子のチケット
 
     def test_a_gone_family_is_refused_before_any_network(self):
         with open(self.record, encoding="utf-8") as f:
@@ -791,7 +792,7 @@ class C1TicketTest(C1Harness):
 
 
 class C1NotImportedTest(C1Harness):
-    """10. 控えの無い家族は今のまま（書くだけ。コミットも push もしない）。"""
+    """10. 控えの無い親子のチケットは今のまま（書くだけ。コミットも push もしない）。"""
 
     imported = False
 
@@ -830,7 +831,9 @@ class C1NotImportedTest(C1Harness):
 
 
 class C1ChatOnlyTest(C1Harness):
-    """10. chat だけの家族（マージリクエストを持たない）は、取り込み済みでも C1 にしない。"""
+    """10. chat だけの親子のチケット（マージリクエストを持たない）は、取り込み済みでも
+    C1 にしない。
+    """
 
     plan = ("chores",)
 
@@ -862,7 +865,10 @@ class PhaseOne:
 
 
 class C1HumanTest(PhaseOne, C1Harness):
-    """9. ユーザの判断の入口は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ。11. 運ぶ処理。"""
+    """9. ユーザの判断の入口は、取り込み済みの親子のチケットなら運ぶ処理を自動で呼ぶ。
+
+    11. 運ぶ処理。
+    """
 
     plan = ("chores", "design")
 
@@ -944,7 +950,7 @@ class C1HumanTest(PhaseOne, C1Harness):
 
 
 class C1NotImportedHumanTest(PhaseOne, C1Harness):
-    """10. 控えの無い家族では、ユーザの判断の入口は置くだけで運ばない（今のまま）。"""
+    """10. 控えの無い親子のチケットでは、ユーザの判断の入口は置くだけで運ばない（今のまま）。"""
 
     plan = ("chores", "design")
     imported = False
@@ -1277,7 +1283,8 @@ class C1HostTest(C1Harness):
 class C1ChromeConfirmTest(PhaseOne, C1Harness):
     """Chrome のレビュー済みと手元の confirm の突き合わせ。
 
-    取り込み済みの家族では、手元の CLI を直に打つと C1 に断られる（`--record-tree` が無い）。そこで
+    取り込み済みの親子のチケットでは、手元の CLI を直に打つと C1 に断られる
+    （`--record-tree` が無い）。そこで
     C1 と同じ手順（`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
     回し、同じ状態から Chrome の入口が出す書くものと、C1 が親のブランチへ書いて送ったものを比べる。
     違ってよいのは経路（`via`）と時刻（`at`）と拡張の版だけ。アカウント（`actor`）は、手元は sh が
@@ -1343,7 +1350,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         return files
 
     def chrome_request(self, scene=None):
-        """拡張が組むのと同じ要求（統合先 main、家族 i0001、見本の写し、依頼の後の変更の一覧）。"""
+        """拡張が組むのと同じ要求（統合先 main、親 i0001、見本の写し、依頼の後の変更の一覧）。"""
         from tests.ticket.test_core import _chrome
 
         chrome = _chrome()

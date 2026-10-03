@@ -2,7 +2,7 @@
  * ボード。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
  * 依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。
  * GitLab とプロジェクトのリポジトリも読み、「始める」（issue から親のブランチを作る）を出す。
- * GitLab へ書いて打ち消しが収まらなかった家族は「要確認」を控え（`chrome.storage.local` の `attention`）、
+ * GitLab へ書いて打ち消しが収まらなかった親子のチケットは「要確認」を控え（`chrome.storage.local` の `attention`）、
  * ユーザが確かめて外すまで出す。
  *
  * PAT はこのページに来ない。ホストの API は service worker に名前で頼む。
@@ -72,7 +72,7 @@ async function writeDeps(repo: RepoConfig): Promise<WriteDeps> {
   };
 }
 
-/** 「要確認」の家族へは、このブラウザから書かない（ボタンを出さないのに加えて、押す前にも見る） */
+/** 「要確認」の親子のチケットへは、このブラウザから書かない（ボタンを出さないのに加えて、押す前にも見る） */
 async function blocked(repo: RepoConfig, family: string): Promise<boolean> {
   const why = (await readAttention())[repoKey(repo)]?.[family];
   if (!why) return false;
@@ -90,7 +90,7 @@ async function readAttention(): Promise<Attention> {
   return v && typeof v === "object" ? (v as Attention) : {};
 }
 
-/** 要確認の家族を控える（打ち消しが収まらない・書いたか確かめられない など。ユーザが確かめて外すまでボードに出す） */
+/** 要確認の親子のチケットを控える（打ち消しが収まらない・書いたか確かめられない など。ユーザが確かめて外すまでボードに出す） */
 async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
   if (outcome.kind !== "attention") return;
   const all = await readAttention();

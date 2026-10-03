@@ -452,10 +452,9 @@ export async function reviewCopy(client: Client, owner: string, repo: string, br
 
 /**
  * compare の変更の一覧を打ち切られたとみなす件数。GitLab の差分の件数の上限（`diff_max_files`）は既定が 1000 で、
- * インスタンスの管理者が 500 まで下げられる。その最小値より下（450）から打ち切られたとみなす（本物の
+ * インスタンスの管理者が 500 まで下げられる。その最小値より下の 450 件以上で、打ち切られたとみなす（本物の
  * インスタンスの値は確かめていない）
  */
-export const COMPARE_FILES_LIMIT = 1000;
 export const COMPARE_FILES_NEAR = 450;
 
 /**

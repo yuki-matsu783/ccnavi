@@ -46,7 +46,7 @@ function client(fetch: gh.Fetch) {
   return { host: HOSTS[0], token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait };
 }
 
-/** 依頼を済ませた家族 i0004 を積み、場面の見本を付けた模擬の GitHub */
+/** 依頼を済ませた親子のチケット i0004 を積み、場面の見本を付けた模擬の GitHub */
 function reviewing(scene: string): MockGitHub {
   const mock = new MockGitHub(fixture());
   mock.branch(FAMILY, "main");
@@ -271,7 +271,7 @@ test("CX-T140 レビュー済みの読み取りの受け口も、設定画面で
   assert.ok(!mock.calls.some((c) => c.includes("/pulls")), mock.calls.join("\n"));
 });
 
-test("CX-T141 同じ家族の依頼済みのフェーズが 2 つでも、MR・スレッド・レビューは 1 度だけ読む", async () => {
+test("CX-T141 同じ親子のチケットの依頼済みのフェーズが 2 つでも、MR・スレッド・レビューは 1 度だけ読む", async () => {
   const mock = new MockGitHub(fixture());
   mock.branch(FAMILY, "main");
   const at = mock.push(FAMILY, reviewFamilyFiles(FAMILY, 2), "2 フェーズぶんのレビュー待ち");

@@ -40,7 +40,8 @@ COPY = f".ccnavi/approved/doing/{PARENT}.md"
 APPROVED_AT = "2026-09-01T00:00:00+0900"
 
 
-# 読める承認済みチケットにするための範囲（取り込みの後の検査は読めない写しで家族を止める）。
+# 読める承認済みチケットにするための範囲。取り込みの後の検査は、読めない写しで
+# 親子のチケットを止める。
 ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
 
@@ -189,7 +190,7 @@ class SyncTest(unittest.TestCase):
         return done.stdout.strip() if done.returncode == 0 else ""
 
     def keep_record(self, state="present"):
-        """前に取り込んだ（控えがある）家族にする。"""
+        """前に取り込んだ（控えがある）親子のチケットにする。"""
         write(
             self.record,
             f"remote origin\nbranch {PARENT}\nsha {self.sha(self.tree, 'HEAD')}\n"
@@ -330,8 +331,8 @@ class SyncTest(unittest.TestCase):
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
-        # 元ツリーに未コミットで残った子の写し（親のワークツリーの外）。取り込み済みの家族では
-        # 信頼しないので、検査が家族を止める。
+        # 元ツリーに未コミットで残った子の写し（親のワークツリーの外）。取り込み済みの
+        # 親子のチケットでは信頼しないので、検査が親子のチケットを止める。
         stray = write(
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
             child_copy_text(),
@@ -413,7 +414,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("present", fields(self.record)["state"])
 
     def test_the_check_is_skipped_for_a_closed_family(self):
-        # 閉じた家族（控えが closed）は検査しない（状態の操作が無い）。
+        # 閉じた親子のチケット（控えが closed）は検査しない（状態の操作が無い）。
         self.keep_record()
         write(
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
@@ -461,7 +462,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("closed", fields(self.record)["state"])
 
     def test_a_closed_family_without_a_record_is_closed(self):
-        # 控えが無くても、統合先で閉じていれば閉じた家族。
+        # 控えが無くても、統合先で閉じていれば閉じた親子のチケット。
         self.close_on_main()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
@@ -471,7 +472,8 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("closed", fields(self.record)["state"])
 
     def test_an_old_done_copy_of_the_same_id_is_not_this_family(self):
-        # 同じ識別子の古い家族の写し（承認の時刻が違う）は、この家族が閉じた記録ではない。
+        # 同じ識別子の古い親子のチケットの写し（承認の時刻が違う）は、
+        # 今の親子のチケットが閉じた記録ではない。
         self.review_says("none")
         self.keep_record()
         self.close_on_main(approved_at="2020-01-01T00:00:00+0900")
@@ -509,7 +511,8 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(kept, record["sha"])
 
     def test_a_pushed_branch_without_a_record_stops_without_writing_gone(self):
-        # 送った跡（origin/P・追跡の設定）はあるが控えの無い家族（2b より前に送った家族）。
+        # 送った跡（origin/P・追跡の設定）はあるが、控えの無い親子のチケット
+        # （2b より前に送ったもの）。
         self.review_says("none")
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
@@ -570,7 +573,7 @@ class SyncTest(unittest.TestCase):
         self.assertNotIn("控えを消した", done.stdout)
         self.assertEqual("gone", fields(self.record)["state"])
         # 同じ名前で切り直しても、控えは gone のまま（push は ccnavi-git.sh が止める）。
-        self.parent_tree(PARENT + "x")  # 別の家族は触らない
+        self.parent_tree(PARENT + "x")  # 別の親子のチケットは触らない
         self.assertEqual("gone", fields(self.record)["state"])
 
     def test_forget_removes_only_a_record_whose_parent_tree_is_gone(self):
@@ -745,7 +748,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.record))
 
     def test_a_project_without_families_does_not_fail_the_run(self):
-        # 引数を省いた回で、家族の無いプロジェクトの ls-remote が落ちても 1 にしない。
+        # 引数を省いた回で、親子のチケットの無いプロジェクトの ls-remote が落ちても 1 にしない。
         project = os.path.join(self.ws, "projects", "p")
         git(self._tmp.name, "init", "-q", "-b", "main", project)
         git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))

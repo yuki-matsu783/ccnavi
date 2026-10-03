@@ -9,7 +9,7 @@
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
  * - 打ち消しはバイト列のまま戻す（BOM も）
- * - 「要確認」の家族には、そのブラウザで書くボタンを出さない
+ * - 「要確認」の親子のチケットには、そのブラウザで書くボタンを出さない
  *
  * 最新のレビューで足したもの: 確かめが落ちたら要確認、打ち消しの前の 412 で打ち消し直す、別の線に付け替わったら
  * ユーザに回す、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
@@ -240,7 +240,7 @@ test("CX-T169 GitLab の読みの上限と断り: tree は 50 ページ、discus
   assert.ok(redirects.length > 0 && redirects.every((r) => r === "error"), redirects.join(","));
 });
 
-test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで引いても読まず、家族は決まらない", async () => {
+test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで引いても読まず、親子のチケットは決まらない", async () => {
   const f = parentOnly();
   f.main.files[".ccnavi/common/linked.yml"] = "../../etc/passwd";
   const mock = new MockGitLab(f);
@@ -266,7 +266,7 @@ test("CX-T171 打ち消しはバイト列のまま戻す（BOM も落とさな�
   assert.equal(mock.files("i0001")[EVENTS], original);
 });
 
-test("CX-T172 「要確認」の家族には、そのブラウザで承認・取り下げ・レビュー済みのボタンを出さず、ほかの承認者には見えないと言う", async () => {
+test("CX-T172 「要確認」の親子のチケットには、そのブラウザで承認・取り下げ・レビュー済みのボタンを出さず、ほかの承認者には見えないと言う", async () => {
   const mock = new MockGitLab(fixture());
   const b = await collectRepo(GITLAB_REPO, glDeps(mock));
   const dom = new JSDOM("<!doctype html><body></body>");
@@ -276,7 +276,7 @@ test("CX-T172 「要確認」の家族には、そのブラウザで承認・取
   const box = html.querySelector('[data-family="i0001"]') as HTMLElement;
   assert.deepEqual([...box.querySelectorAll("button")].map((x) => (x as HTMLElement).dataset.action), ["dismiss"]);
   assert.match(box.textContent ?? "", /ほかの承認者には見えない/);
-  // ほかの家族は今までどおり
+  // ほかの親子のチケットは今までどおり
   assert.equal(html.querySelectorAll('[data-family="i0002"] button[data-action=approve]').length, 1);
 });
 

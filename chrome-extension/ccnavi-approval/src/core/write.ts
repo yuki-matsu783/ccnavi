@@ -5,7 +5,7 @@
  * 親のブランチ `P` への 1 コミットにして送るだけ。TS が判定を出すと手元と答えが 2 か所に分かれるため。流れは次のとおり。
  *
  * 1. preview: ボードが見せた画面の指紋（`digest`）と一覧（`ids`）を持っている
- * 2. yes: 家族 1 つぶんを読み直して Snapshot を組み直し、Python に見せたものと比べさせる。
+ * 2. yes: 親子のチケット 1 組ぶんを読み直して Snapshot を組み直し、Python に見せたものと比べさせる。
  *    違えば書かずに「見直す」（preview からやり直し）
  * 3. `plan` の変更を `createCommitOnBranch` の 1 コミットで書く。条件は `expectedHeadOid` = 読んだ `P` の先頭
  * 4. 先頭が動いていたら、新しい先頭で Snapshot を組み直して判定と plan を必ずやり直す。
@@ -69,7 +69,7 @@ export type Outcome =
   | { readonly kind: "refused"; readonly message: string }
   | { readonly kind: "conflict"; readonly message: string }
   | { readonly kind: "failed"; readonly message: string }
-  /** ユーザに回す（打ち消しが収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは家族を「要確認」で出す */
+  /** ユーザに回す（打ち消しが収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは親子のチケットを「要確認」で出す */
   | { readonly kind: "attention"; readonly message: string };
 
 export interface Shown {
@@ -291,7 +291,7 @@ async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: read
   return { kind: "written", oid, rounds, lines };
 }
 
-/** Python の Changes から、この家族の P に書く行を取り出す。P の外・置き場の外に及べば理由 */
+/** Python の Changes から、この親子のチケットの P に書く行を取り出す。P の外・置き場の外に及べば理由 */
 export function rowsOf(res: Written, family: string, read: Pick<FamilyRead, "place">): readonly ChangeRow[] | string {
   if (res.stopped) return `${res.stopped.ticket}: ${res.stopped.reason}`;
   const names = Object.keys(res.changes ?? {});
@@ -303,13 +303,13 @@ export function rowsOf(res: Written, family: string, read: Pick<FamilyRead, "pla
   return rows;
 }
 
-/** 読んだ家族から、書くもの（1 コミット）か、書かずに終える答え */
+/** 読んだ親子のチケットから、書くもの（1 コミット）か、書かずに終える答え */
 type Planned =
   | { readonly kind: "rows"; readonly rows: readonly ChangeRow[]; readonly message: { headline: string; body: string }; readonly lines: readonly string[] }
   | { readonly kind: "stop"; readonly outcome: Outcome };
 
 /**
- * 読んだ家族と時刻から書くものを決める。時刻（`stamp`）は周ごとに 1 回決め、事後確認の判定し直しにも同じ値を渡す
+ * 読んだ親子のチケットと時刻から書くものを決める。時刻（`stamp`）は周ごとに 1 回決め、事後確認の判定し直しにも同じ値を渡す
  * （時計が進んで跡の `at` が変わるだけで「書くものが違う」にしない）
  */
 type Plan = (read: FamilyRead, stamp: string) => Promise<Planned>;
@@ -439,7 +439,7 @@ async function settleRace(
   }
 }
 
-/** 書く流れの周（読み直し・指紋の比べ・書き込み・先頭が動いたときのやり直しと、GitLab の事後確認）。周ごとに家族を読み直して書くものを決め直す */
+/** 書く流れの周（読み直し・指紋の比べ・書き込み・先頭が動いたときのやり直しと、GitLab の事後確認）。周ごとに親子のチケットを読み直して書くものを決め直す */
 async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what: string, plan: Plan): Promise<Outcome> {
   try {
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
@@ -463,7 +463,7 @@ async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what
   }
 }
 
-/** 家族 1 つの承認待ちを承認する */
+/** 親子のチケット 1 組の承認待ちを承認する */
 export async function approveFamily(repo: RepoConfig, family: string, shown: Shown, deps: WriteDeps): Promise<Outcome> {
   let actor: Actor;
   try {
@@ -489,7 +489,7 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
   });
 }
 
-/** 家族を読み直す。読んでいる間に先頭が動いたら null（周を回す） */
+/** 親子のチケットを読み直す。読んでいる間に先頭が動いたら null（周を回す） */
 async function readOrMoved(repo: RepoConfig, family: string, deps: WriteDeps): Promise<FamilyRead | null> {
   try {
     return await readFamily(repo, family, deps);
@@ -529,7 +529,7 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
 }
 
 /**
- * フェーズをレビュー済みにする。毎周、家族と MR のスレッド・レビューを読み直し、
+ * フェーズをレビュー済みにする。毎周、親子のチケットと MR のスレッド・レビューを読み直し、
  * Python の `confirm` が通したときだけ、レビュー待ちの子の `done/` への移動と印（`actor` = PAT の持ち主、
  * `via: chrome`）を 1 コミットで書く。未解決のスレッドや変更要求が残れば書かない。
  */
