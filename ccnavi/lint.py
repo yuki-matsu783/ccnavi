@@ -522,7 +522,7 @@ def _copy_problems(
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する（ADR-0058）。
 
-    置き場を動かして承認する運びでは `--approve` を通らないので、承認のときにしか
+    置き場を動かして承認する運びでは `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
     止まる場所は書き込みのときで、そこで初めて知るのは遅い。ここで全部言う。
 
@@ -718,7 +718,7 @@ def _approval_problems(
     **承認と同じ関数を通す**（`agree.candidates`）。ここだけ `agree.validate` を
     当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・計画に無い番号・
     `project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、片方が
-    気づかないうちに弱くなる。`--approve --preview --verify` と同じ答えをここでも言う。
+    気づかないうちに弱くなる。`--agree --preview --verify` と同じ答えをここでも言う。
 
     範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
 
@@ -843,7 +843,7 @@ def _proposal_problems(
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{t.ticket} は承認待ち（{t.tree or '(ワークスペースルート)'} の todo/）。"
-                "'ccnavi --approve' を通すまで範囲は効かない",
+                "'ccnavi --agree' を通すまで範囲は効かない",
             )
         )
     for t in index.values():

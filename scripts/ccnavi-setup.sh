@@ -105,7 +105,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
 # 起動時に落ちる。ccnavi-push-approved.sh はボードが承認のあと端末に送る 1 行の中身。
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
+# ccnavi-agree.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
 # 配らないと案内どおりに打っても届かない。
 # ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh は人が打つ取り込み
 # （分かれた親のブランチの merge、消えた親のブランチの確かめ、控えの書き出し。ADR-0093 の 4.2）。
@@ -115,7 +115,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # 追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順でも最後に置く。途中で落ちたときに、
 # hook が起動するものだけが在って代わりに通る sh が無い形を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -1227,7 +1227,7 @@ for name in $DEPLOY_SCRIPTS; do
 		ccnavi-push-approved.sh)
 			why="ボードが承認のあと端末で走らせる、承認済みチケットのコミットと push"
 			;;
-		ccnavi-approve.sh)
+		ccnavi-agree.sh)
 			why="端末で承認する形"
 			;;
 		ccnavi-fetch.sh)

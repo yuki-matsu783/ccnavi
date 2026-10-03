@@ -290,7 +290,7 @@ class PresentTest(AuthorityHarness):
             os.path.join(self.root, "wip", "proposals", "todo", "i0001-02.md"),
             child_text("i0001-02", "i0001", 1, ["wip/research/*"]),
         )
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual([], preview["batch"])
         self.assertTrue(
             any("ワークツリーの外" in " ".join(r["problems"]) for r in preview["rejected"]),
@@ -355,7 +355,7 @@ class UndecidedTest(AuthorityHarness):
         self.assertIn("ccnavi-sync.sh", finished.stderr)
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual([], preview["batch"])
         self.assertTrue(any("gone" in " ".join(r["problems"]) for r in preview["rejected"]))
 
@@ -573,7 +573,7 @@ class IntegrationDoneTest(AuthorityHarness):
         )
 
     def preview(self):
-        return json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        return json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
 
     def rejected_with(self, preview, ticket, words):
         return any(
@@ -649,10 +649,10 @@ class PredecessorTest(AuthorityHarness):
         )
         self.propose("i0001-02", text)
         self.commit_parent()
-        before = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertIn("i0001-02", [b["ticket"] for b in before["batch"]], before)
         self.record("present", name="i0002")
-        after = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertNotIn("i0001-02", [b["ticket"] for b in after["batch"]])
         self.assertTrue(
             any("家族が決まらない" in " ".join(r["problems"]) for r in after["rejected"]), after

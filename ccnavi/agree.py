@@ -68,14 +68,14 @@ class Candidate:
         )
 
 
-# 承認の JSON の版。`--approve --preview --json` と `--approve --yes … --json` が名乗る。
+# 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が名乗る。
 # VS Code のボード拡張が読み、知らない番号なら読まずに版の違いを言う。
-APPROVE_VERSION = 1
+AGREE_VERSION = 1
 
 
 @dataclass
 class Gathered:
-    """いま `--approve` が見せる一覧と、その周りのもの。見せる・承認するの両方がここから出る。
+    """いま `--agree` が見せる一覧と、その周りのもの。見せる・承認するの両方がここから出る。
 
     一覧を組む関数を 1 つにしてあるのは、拡張が見せたものと実行ファイルが承認する
     ものを同じ答えにするため。`--explain --json` の `pending_approval` も同じ
@@ -112,7 +112,7 @@ def gather(
     読めない提案や承認済みチケット、落とした提案の理由は標準エラーにも出す。端末の人は
     そこで読み、拡張は JSON の `problems` / `rejected` で読む。
 
-    `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`、拡張のオーバーレイ）。
+    `only` は承認の対象を識別子で絞る（`ccnavi --agree <識別子>...`、拡張のオーバーレイ）。
     ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
     落ちるものを通してはいけない。だから、承認待ちに無い識別子が入っていたら何も
     承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の改版が
@@ -185,7 +185,7 @@ def gather(
 def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
     """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。"""
     return {
-        "version": APPROVE_VERSION,
+        "version": AGREE_VERSION,
         "root": root,
         "generated_at": approval.now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
@@ -268,7 +268,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
 def _unreadable(gathered: Gathered) -> str:
     """読めなかったものを名指しする段。落ちた枝でも通った枝でも同じものを出す。
 
-    終了コードは動かさない。`--approve` も、承認待ちが 1 件も無いとき以外はこれで
+    終了コードは動かさない。`--agree` も、承認待ちが 1 件も無いとき以外はこれで
     止まらないので、ここで落とすと「確かめは『いいえ』なのに承認は通る」になる。走査は絞る前の
     全ツリーを見るから、他のセッションの書きかけ 1 本で自分の提案が止まることにもなる。
     出さずに済ませることもしない。自分が書いた 1 本かもしれないので、件数と綴りを本文に出す。
@@ -465,7 +465,7 @@ def _batch_entry(cand: Candidate) -> dict:
 def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
     """チケットが承認されたことをモデルに伝える文。
 
-    `--approve --yes` の `prompt`（拡張が Claude Code に渡す）と、hook が次の
+    `--agree --yes` の `prompt`（拡張が Claude Code に渡す）と、hook が次の
     UserPromptSubmit / PreToolUse で渡す `additionalContext` の両方がここから出る。
     2 か所で文を持つと、人が貼った文と hook が渡した文が食い違う。
 
@@ -624,7 +624,7 @@ def candidates(
 ) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
     """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための池。
 
-    承認（`approve`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
+    承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
     ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
     （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に何も言わなかった）。
     """
@@ -703,14 +703,14 @@ def candidates(
 
 
 def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案に待ち方の写し（`workflow:`）が書いてあれば拒む。写しを書くのは `--approve` だけ。"""
+    """提案に待ち方の写し（`workflow:`）が書いてあれば拒む。写しを書くのは `--agree` だけ。"""
     if ticket_mod.WORKFLOW_KEY not in t.raw:
         return []
     return [
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"`{ticket_mod.WORKFLOW_KEY}` は --approve が書く欄。提案には書かない",
+            f"`{ticket_mod.WORKFLOW_KEY}` は --agree が書く欄。提案には書かない",
         )
     ]
 
@@ -1092,7 +1092,7 @@ def waiting(
     review: list[ticket_mod.Ticket],
     types_for,
 ) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
-    """いま `--approve` で承認の対象に入るもの。新規の承認待ちと、親の改版。
+    """いま `--agree` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開は人が承認済みチケットを戻す。
@@ -1100,7 +1100,7 @@ def waiting(
     計画が同じでも、いまの種類で計算した待ち方が承認済みチケットの写しと違えば改版になる
     （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
     チケットに使う種類を引く関数（`types_resolver`）。
-    `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
+    `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     統合先の控えの `done/` にある識別子（ADR-0093 の 3.3 の 4）はここでは外さず、`candidates` が
     理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
     """

@@ -55,8 +55,8 @@ BOARD_LIMIT = 20
 
 # 動かした経路。
 #   cli       エージェントが sh（ccnavi-ticket.sh / ccnavi-review.sh）から打った副命令
-#   terminal  人が端末で打った判断（--approve / --reviewed / --close-early）
-#   board     VS Code のボードから押した判断（--approve --yes / --reviewed --yes）
+#   terminal  人が端末で打った判断（--agree / --reviewed / --close-early）
+#   board     VS Code のボードから押した判断（--agree --yes / --reviewed --yes）
 #   hook      hook（フェーズの終わりの告知が置くマーカー）
 VIA_CLI = "cli"
 VIA_TERMINAL = "terminal"

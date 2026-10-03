@@ -965,14 +965,14 @@ def ticket_verdict(
             f"{parent.ticket}. The ticket was approved with that overflow shown as a warning; "
             "writes there stay blocked. Do the work inside the parent's area, or, if the task "
             "genuinely needs this path, tell the parent so it can propose a ticket whose parent "
-            "covers it and ask the user to approve it."
+            "covers it and ask the user to agree to it."
         )
     else:
         body = (
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
-            "so it can propose a ticket that covers it and ask the user to approve it (from the "
-            "ccnavi board in VS Code, or 'ccnavi --approve' in a terminal). "
+            "so it can propose a ticket that covers it and ask the user to agree to it (from the "
+            "ccnavi board in VS Code, or 'ccnavi --agree' in a terminal). "
             "Editing a proposal alone changes nothing."
         )
     return (

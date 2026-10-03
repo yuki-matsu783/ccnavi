@@ -38,7 +38,7 @@ from .modes import EXIT_OK
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-COMPAT = 2
+COMPAT = 3
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 組み立ての元のコミットが分からないときの綴り。

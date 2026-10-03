@@ -328,7 +328,7 @@ class DagApprovalTest(PhaseHarness):
         self.assertIn("3: implement — 待つ: 1", result.stdout)
 
     def test_a_workflow_written_in_a_proposal_is_refused(self):
-        """待ち方の写しを書くのは `--approve` だけ。提案に書いてあれば承認しない。
+        """待ち方の写しを書くのは `--agree` だけ。提案に書いてあれば承認しない。
 
         引用符付きの鍵でも同じ。
         """
@@ -342,7 +342,7 @@ class DagApprovalTest(PhaseHarness):
             self.commit_parent()
             result = self.approve()
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("--approve が書く欄", result.stderr)
+            self.assertIn("--agree が書く欄", result.stderr)
             self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_an_approved_parent_without_a_workflow_is_read_as_sequential(self):

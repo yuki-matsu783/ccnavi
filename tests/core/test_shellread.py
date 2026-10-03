@@ -314,9 +314,9 @@ class UnwrappedTest(unittest.TestCase):
     def test_途中の層も並ぶ(self):
         # U1。承認のルールの `script` の枝は `sh …approve.sh` の層に当たる。外側から内側へ並ぶ。
         cases = {
-            "env sh .ccnavi/scripts/ccnavi-approve.sh": [
-                "sh .ccnavi/scripts/ccnavi-approve.sh",
-                ".ccnavi/scripts/ccnavi-approve.sh",
+            "env sh .ccnavi/scripts/ccnavi-agree.sh": [
+                "sh .ccnavi/scripts/ccnavi-agree.sh",
+                ".ccnavi/scripts/ccnavi-agree.sh",
             ],
             "/bin/sh x.sh": ["sh x.sh", "x.sh"],
             "/usr/bin/env rm x": ["env rm x", "rm x"],

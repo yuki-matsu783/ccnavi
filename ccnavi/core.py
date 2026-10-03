@@ -21,7 +21,7 @@
 判定そのもの（`agree.gather` / `candidates` / `waiting`、`review` の検査）は今のコードを
 そのまま通る。ここは入口と出口の形を揃えるだけで、判定は変えない。
 
-手元の入口（`--approve` の 4 つの枝と `review confirm`）もここに置く。コアを通す入口を
+手元の入口（`--agree` の 4 つの枝と `review confirm`）もここに置く。コアを通す入口を
 コアより下の段（agree・review）に置くと、import が循環する（tests/core/test_module_layers.py）。
 """
 
@@ -111,7 +111,7 @@ def judge_approval(
 ) -> Verdict:
     """承認の対象を組み、画面の本文と指紋を出す。見せたものを渡せば、今のものと比べる。
 
-    比べ方は前の `--approve --yes` と同じ。絞り（`only`）が通らなかったときは、絞らない
+    比べ方は前の `--agree --yes` と同じ。絞り（`only`）が通らなかったときは、絞らない
     一覧を今の一覧として比べる（ボードが古い）。識別子と指紋のどちらかが違えば `mismatch`。
     """
     err = io.StringIO()
@@ -303,7 +303,7 @@ def _write_op(op: fsio.Op) -> str:
     return f"知らない書き込みの種類: {op.kind}"
 
 
-# ---- 手元の入口（`--approve`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
+# ---- 手元の入口（`--agree`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #
 # 前は approval.py にあった。コアを通す入口なので、コアより下の段（agree）には置かない
 # （agree → core → agree の循環になる。tests/core/test_module_layers.py）。
@@ -329,7 +329,7 @@ def approve(
     親の改版（計画の変更）も一緒に承認の対象に入る。承認済みチケットは動かないのが原則で、改版はその
     唯一の例外（設計 9.7）。変えられるのは `plan` と `feedback` だけ。
 
-    `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
+    `only` は承認の対象を識別子で絞る（`ccnavi --agree <識別子>...`）。VS Code 拡張の
     ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
     落ちるものを通してはいけない。だから、承認待ちに無い識別子が入っていたら
     何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の
@@ -381,10 +381,10 @@ def preview(
     as_json: bool,
     only: list[str] | None = None,
 ) -> int:
-    """`--approve --preview`。一覧を見せるだけで、承認済みチケットは置かない。端末の壁は要らない。
+    """`--agree --preview`。一覧を見せるだけで、承認済みチケットは置かない。端末の壁は要らない。
 
     JSON の形は README「承認の JSON」。一覧が空でも 0 で返す。拡張は `batch` が空なら
-    「承認待ちは無い」と出す。`only` はボードの絞り込みで見えている分（`--approve` と
+    「承認待ちは無い」と出す。`only` はボードの絞り込みで見えている分（`--agree` と
     同じ意味）。見せる一覧と承認する対象が同じ絞りを通るようにする。
     """
     verdict = judge_approval(read_fs(conf, root), only)
@@ -411,7 +411,7 @@ def verify(
     as_json: bool,
     only: list[str] | None = None,
 ) -> int:
-    """`--approve --preview --verify`。いま `--approve` を打てば通るかを、置かずに返す。
+    """`--agree --preview --verify`。いま `--agree` を打てば通るかを、置かずに返す。
 
     エージェントが提案を書いたあと、人に承認を頼む前に自分で確かめるための枝
     （REQ-APV-13）。置かないところも端末を求めないところも `--preview` と同じで、
@@ -429,7 +429,7 @@ def verify(
       提案の置き場を間違えた回がここに出る
     - 承認の対象にしない提案がある（`rejected`）
 
-    落とさないものが 2 つある。どちらも `--approve` が落とさないもので、ここで落とすと
+    落とさないものが 2 つある。どちらも `--agree` が落とさないもので、ここで落とすと
     「確かめは『いいえ』なのに承認は通る」という食い違いになる。
 
     - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
@@ -465,7 +465,7 @@ def approve_yes(
     only: list[str] | None = None,
     digest: str = "",
 ) -> int:
-    """`--approve --yes <識別子,…> --digest <指紋> [<絞り>...]`。拡張のオーバーレイで押した承認。
+    """`--agree --yes <識別子,…> --digest <指紋> [<絞り>...]`。拡張のオーバーレイで押した承認。
 
     端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
@@ -475,7 +475,7 @@ def approve_yes(
     指紋が無ければ承認しない。
 
     引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
-    「そのとき掛けていた絞り」（`--approve --preview` に渡したものと同じ）。分けないと検査が
+    「そのとき掛けていた絞り」（`--agree --preview` に渡したものと同じ）。分けないと検査が
     必ず通る。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
     絞りは preview と同じものを通し、比べるのは「その絞りで今できる一覧」と「見せた識別子」。
     """
@@ -497,7 +497,7 @@ def approve_yes(
     if verdict.mismatch is not None:
         current = verdict.mismatch["current"]
         if as_json:
-            body = {"version": agree.APPROVE_VERSION, "mismatch": verdict.mismatch}
+            body = {"version": agree.AGREE_VERSION, "mismatch": verdict.mismatch}
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
         if wanted != current:
             stderr.write(
@@ -523,7 +523,7 @@ def approve_yes(
         # 失敗を返すと、人は「何も起きていない」と読む（README「承認の JSON」の `partial`）。
         if as_json:
             body = {
-                "version": agree.APPROVE_VERSION,
+                "version": agree.AGREE_VERSION,
                 "partial": {
                     "placed": applied.placed,
                     "ticket": applied.stopped_at,
@@ -544,7 +544,7 @@ def approve_yes(
         stdout.write(lines.getvalue())
         return 0
     body = {
-        "version": agree.APPROVE_VERSION,
+        "version": agree.AGREE_VERSION,
         "approved": [t.ticket for t in tickets],
         "copies": [
             approval.copy_path(

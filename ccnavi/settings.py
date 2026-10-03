@@ -48,7 +48,7 @@ STATE_ENV = "CCNAVI_STATE"
 RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
 GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # GUARD_TICKET_APPROVAL_ENV は、チケットの承認の経路を守るか。enable（既定）なら、
-# シェルから ccnavi の実行ファイルに `--approve` `--reviewed` `--close-early` `ticket` `review` を
+# シェルから ccnavi の実行ファイルに `--agree` `--reviewed` `--close-early` `ticket` `review` を
 # 付けた呼び出しを止め、この 3 つのフラグは標準入力が端末でなければ拒む。
 # テストは disable にする。
 #

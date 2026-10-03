@@ -1,7 +1,7 @@
 """Chrome 拡張（ADR-0093 段階 1）が Pyodide の上で呼ぶ入口。
 
 拡張はホストの API でブランチの置き場を読み、その中身（Snapshot）をここへ渡す。ここは
-ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--approve --preview --json`）を
+ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--agree --preview --json`）を
 そのまま動かす（ADR-0093 の 8.1）。承認待ちの一覧も、家族の見分けも、参照の閉包も、
 互換の比べも Python が出し、拡張（TS）は並べるだけ（ADR-0035）。
 
@@ -350,7 +350,7 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
         "message": (
             f"先行を辿ると {FAMILY_LIMIT} を超える家族に広がった（{', '.join(families)}）。"
             "Chrome では判定できない。計画を分けて先行を減らすか、手元で "
-            "`--approve --preview --verify` を打って確かめる"
+            "`--agree --preview --verify` を打って確かめる"
             if over
             else ""
         ),
@@ -527,7 +527,7 @@ def _preview(root: str, env: dict[str, str], only: list[str]) -> tuple[int, dict
     out, err = io.StringIO(), io.StringIO()
     with _environ(env):
         code = cli.run(
-            io.StringIO(""), out, err, ["--root", root, "--approve", "--preview", "--json", *only]
+            io.StringIO(""), out, err, ["--root", root, "--agree", "--preview", "--json", *only]
         )
     try:
         body = json.loads(out.getvalue()) if code == 0 else None
@@ -578,7 +578,7 @@ def _op_board(req: dict, root: str) -> dict:
         "reviewable": _reviewable(root, place, family),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出す（D22）ので、手を加えずに返す。
-        # 指紋はこの本文と写しの中身を覆い、手元の `--approve --preview` と同じ値になる。
+        # 指紋はこの本文と写しの中身を覆い、手元の `--agree --preview` と同じ値になる。
         "text": body["text"] if batch else "",
         "digest": body["digest"] if batch else "",
         # 承認するときに `plan` へ渡す絞り（この指紋を出したときの絞り。絞らなければ null）
@@ -618,7 +618,7 @@ def _unreadable(snap: dict, closure: dict) -> str:
         return ""
     return (
         f"判定の入力に本文を読めないファイルがある（{', '.join(found)}）。"
-        "この家族は決まらない。手元で `--approve --preview --verify` を打って確かめる"
+        "この家族は決まらない。手元で `--agree --preview --verify` を打って確かめる"
     )
 
 
@@ -657,7 +657,7 @@ def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
 
 
 def _refused(root: str, code: int, err: str) -> str:
-    """`--approve --preview` が承認待ちを出せなかった理由（標準エラーの文面）。"""
+    """`--agree --preview` が承認待ちを出せなかった理由（標準エラーの文面）。"""
     return _relative(root, err.strip()) or f"終了 {code}"
 
 

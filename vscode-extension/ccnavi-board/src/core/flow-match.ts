@@ -22,7 +22,7 @@
 /** 実行ファイル（`flow.as_json`）の印の鍵 */
 export const JSON_MARK = "$ccnavi";
 
-export interface FlowDisagreement {
+export interface FlowMismatch {
   /** 食い違った場所。`ノード a の data.prompt`、`connections[0].condition` など */
   readonly where: string;
   /** 画面の読み */
@@ -51,7 +51,7 @@ function isMark(value: unknown): value is Record<string, unknown> {
 }
 
 /** 画面の中身（`screen`）と実行ファイルが読んだ中身（`executable`）の最初の食い違い。同じなら undefined */
-export function flowDisagreement(screen: unknown, executable: unknown): FlowDisagreement | undefined {
+export function flowMismatch(screen: unknown, executable: unknown): FlowMismatch | undefined {
   const found = differ(screen, executable, []);
   if (found === undefined) {
     return undefined;
@@ -231,7 +231,7 @@ export function describeExecutable(value: unknown): string {
 }
 
 /** 開くときに食い違ったときの文面 */
-export function openDisagreementText(found: FlowDisagreement): string {
+export function openMismatchText(found: FlowMismatch): string {
   return (
     `画面の読みと実行ファイルの読みが食い違う（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
     "このまま画面で直して保存すると値の意味が変わるので開かない。エディタで引用符を付けるなどして、" +
@@ -240,7 +240,7 @@ export function openDisagreementText(found: FlowDisagreement): string {
 }
 
 /** 保存の前に食い違ったときの文面 */
-export function saveDisagreementText(found: FlowDisagreement): string {
+export function saveMismatchText(found: FlowMismatch): string {
   return (
     `書き出す本文を、実行ファイルが画面とは違う値として読む（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
     "保存すると値の意味が変わるので書かない"

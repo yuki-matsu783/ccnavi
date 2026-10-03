@@ -223,7 +223,7 @@ class SourcePathTest(CoreHarness):
         text = parent_text("i0001", ["research"])
         self.propose("i0001", text)
         self.commit_parent()
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertIn("提案: wip/proposals/todo/i0001.md", preview["text"])
         self.assertNotIn(self.root, preview["text"])
         self.assertEqual(self.approve().returncode, 0)
@@ -238,8 +238,8 @@ class SourcePathTest(CoreHarness):
         self.assertEqual(self.approve().returncode, 0)
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
-        new_form = self.ccnavi("--approve", "--preview", "--json")
-        verify_new = self.ccnavi("--approve", "--preview", "--verify")
+        new_form = self.ccnavi("--agree", "--preview", "--json")
+        verify_new = self.ccnavi("--agree", "--preview", "--verify")
         board_new = json.loads(self.ccnavi("--explain", "--json").stdout)
         path = os.path.join(self.approved, "doing", "i0001.md")
         with open(path, encoding="utf-8") as f:
@@ -254,8 +254,8 @@ class SourcePathTest(CoreHarness):
         write(path, legacy)
         copy, _ = approval.load_copy(path)
         self.assertEqual(copy.source_path, old)
-        old_form = self.ccnavi("--approve", "--preview", "--json")
-        verify_old = self.ccnavi("--approve", "--preview", "--verify")
+        old_form = self.ccnavi("--agree", "--preview", "--json")
+        verify_old = self.ccnavi("--agree", "--preview", "--verify")
         board_old = json.loads(self.ccnavi("--explain", "--json").stdout)
         a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
         for key in ("batch", "text", "rejected", "problems"):
@@ -726,14 +726,14 @@ class CoreChromeTest(CoreHarness):
         """同じ状態で、Chrome の plan と手元の CLI（preview → --yes）を比べる。"""
         request = self.chrome_request("plan", family, **({"only": only} if only else {}))
         answer = self.ask_chrome(request)
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json", *(only or [])).stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json", *(only or [])).stdout)
         self.assertEqual(answer["text"], preview["text"])
         self.assertEqual(answer["digest"], preview["digest"])
         self.assertEqual(answer["identifiers"], sorted(b["ticket"] for b in preview["batch"]))
         self.assertEqual(answer["rejected"], preview["rejected"])
         before = self.disk()
         result = self.ccnavi(
-            "--approve",
+            "--agree",
             "--yes",
             ",".join(answer["identifiers"]),
             "--digest",
@@ -1062,9 +1062,9 @@ class RecordWritesTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
-        digest = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)["digest"]
+        digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         steps = [
-            ("--approve", "--yes", "i0001,i0001-01", "--digest", digest, "--json"),
+            ("--agree", "--yes", "i0001,i0001-01", "--digest", digest, "--json"),
             ("ticket", "start", "i0001"),
         ]
         for args in steps:
@@ -1095,7 +1095,7 @@ class RecordWritesTest(CoreHarness):
     def test_an_unwritable_list_ends_with_one(self):
         target = os.path.join(self.place(), "self", "busy")
         os.makedirs(os.path.join(target, "inside"))
-        result, _ = self.record("--approve", "--preview", "--json", target=target)
+        result, _ = self.record("--agree", "--preview", "--json", target=target)
         self.assertEqual(result.returncode, 1)
         self.assertIn("書いたパスの一覧を", result.stderr)
 
@@ -1142,7 +1142,7 @@ class RecordWritesTest(CoreHarness):
         self.addCleanup(os.remove, linked)
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
-        digest = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)["digest"]
+        digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         target = os.path.join(linked, "logs", "state", "c1", "self", "l.writes")
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -1164,7 +1164,7 @@ class RecordWritesTest(CoreHarness):
                 "disable",
                 "--record-writes",
                 target,
-                "--approve",
+                "--agree",
                 "--yes",
                 "i0001",
                 "--digest",

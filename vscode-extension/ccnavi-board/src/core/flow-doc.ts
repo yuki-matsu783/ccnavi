@@ -202,7 +202,7 @@ export function parseFlow(text: string): FlowRead {
 
 /**
  * YAML の本文を `yaml` の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
- * （`flow-agree.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
+ * （`flow-match.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
  * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。**例外は外に出さない。**
  */
 export function parseFlowValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
@@ -244,7 +244,7 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
  * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
  *
  * 書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に実行ファイルに読ませて見比べる
- * （`flow-agree.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
+ * （`flow-match.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
  */
 export function serializeFlow(doc: FlowDoc): string {
   return yamlText(doc);

@@ -1695,7 +1695,7 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
-    `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業による未コミットの変更とは
+    `ccnavi-review.sh` と `ccnavi-agree.sh` の仕事で、人の作業による未コミットの変更とは
     別に扱う。
     """
     rc, status = _git(

@@ -1559,7 +1559,7 @@ def _layers(
 ) -> None:
     """1 本のコマンドから、実行役のコマンドを 1 枚ずつ外した層を out に足す。
 
-    途中の層も残す。`env sh …approve.sh` の `sh …approve.sh` の層に、承認のルールの
+    途中の層も残す。`env sh …agree.sh` の `sh …agree.sh` の層に、承認のルールの
     `sh` から始まる枝が当たる。
     """
     if depth >= UNWRAP_DEPTH:

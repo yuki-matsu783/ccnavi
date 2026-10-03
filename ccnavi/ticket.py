@@ -411,7 +411,7 @@ WORKFLOW_DAG = "dag"
 
 @dataclass
 class Workflow:
-    """全体計画の待ち方の写し。`--approve` が計算して親の承認済みチケットに書く（設計 9.7）。
+    """全体計画の待ち方の写し。`--agree` が計算して親の承認済みチケットに書く（設計 9.7）。
 
     `waits` は全体計画の番号 → 待つ番号、`review_at` は延期した番号 → 引き受ける番号。
     判定はこの写しだけを読み、`phases.yml` を読み直さない。
@@ -481,7 +481,7 @@ class Ticket:
     # 「見たうえで対応なし」。設計 9.7。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
-    # workflow は全体計画の待ち方の写し。親の承認済みチケットだけが持ち、書くのは `--approve`。
+    # workflow は全体計画の待ち方の写し。親の承認済みチケットだけが持ち、書くのは `--agree`。
     workflow: Workflow | None = None
     review_required: bool = True
     review_reason: str = ""
@@ -1130,7 +1130,7 @@ def scan_all(
                     continue
                 ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
                 ticket.project = place_project
-                # 待ち方の写しは `--approve` だけが書く。提案に書かれていても読まない。
+                # 待ち方の写しは `--agree` だけが書く。提案に書かれていても読まない。
                 ticket.workflow = None
                 if place_project and not ticket.declared_project:
                     # 承認済みチケットにも残す。judge は親の承認済みチケットを引けないとき
@@ -1315,7 +1315,7 @@ def propose_notice(
     """提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。空なら渡さない。
 
     承認できない提案のまま人に承認を頼むと、落ちたことを知るのが端末に座った人になり、
-    往復が 1 回増える。確かめる手立て（`--approve --preview --verify`）は在るので、
+    往復が 1 回増える。確かめる手立て（`--agree --preview --verify`）は在るので、
     書いた直後に、要る場所で言う。
 
     **判定には足さない。** これは文であって判定ではないので、ルールの表（`rule_set`）には
@@ -1370,7 +1370,7 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
             f"チケットの提案を書こうとしています（{tickets_rel}/todo/ は承認待ちの置き場で、"
             "ここに書いただけでは判定には効きません）。"
             "利用者に承認を依頼する前に、"
-            f"'{settings.bin_command(bin_path)} --approve --preview --verify <識別子>' で"
+            f"'{settings.bin_command(bin_path)} --agree --preview --verify <識別子>' で"
             "承認できる状態かを確かめてください。承認済みチケットは置きません。"
             "終了コードが答えです。0 なら依頼してよく、3 なら承認の対象に入らない理由が出ます"
             "（親が承認されていない、計画に無いフェーズ、順序、承認待ちに無い識別子）。"

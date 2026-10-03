@@ -80,26 +80,28 @@ SHELL_TOOLS = ("Bash", "PowerShell")
 # レビューが済むまで止めるツール。
 HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 
-# ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` `--close-early` と、
+# ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--agree` `--reviewed` `--close-early` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
-# `--approve --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
-# `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
+# 前の綴り `--approve` も同じに止める。実行ファイルはもう受け付けないが、古い実行ファイルが
+# 手元に残っていれば通ってしまう。止める側にだけ広がる（ADR-0099）。
+# `--agree --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
+# `--agree` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
 # 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
 # 免除される。承認を通す形は、免除の理由が何であっても止める。
 #
 # 免除の範囲はコマンド 1 本まで。Bash なら shellread が `\x00` で切るが、PowerShell は
 # 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
 # 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
-# 前のコマンドの `--approve` を免除する。
+# 前のコマンドの `--agree` を免除する。
 # 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
-# `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
+# `ccnavi --agree x "a --preview"` の `--preview` が免除の理由になる。
 #
-# **免除の理由になるのは、単独の語として現れた `--preview` だけ。** 前は生の空白（`--approve` の
+# **免除の理由になるのは、単独の語として現れた `--preview` だけ。** 前は生の空白（`--agree` の
 # 後ろに必ず 1 つある）、後ろは空白か区切りか行末。これを見ないと、別のフラグの**値**に書いた
-# `--preview` で免除が成立する。`ccnavi --approve --reason=--preview` は、argparse が
+# `--preview` で免除が成立する。`ccnavi --agree --reason=--preview` は、argparse が
 # `--reason` の値として受け取るので `--preview` は単独の語にならず、実行ファイルは本物の
-# `--approve` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝がそこで食い違う。
+# `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝がそこで食い違う。
 # `=` を挟む形だけでなく、`--preview=x` や `x--preview` のように語にくっついた形も免除しない。
 # 語の切れ目は生の空白だけで数える。語の中の目印（引用がつないだ空白）は数えない。
 # 数えると、引用の中に書いた `"a --preview"` が単独の語に見えて、再び免除が成立する。
@@ -107,7 +109,7 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
-    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--config-synced\b"
+    rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--config-synced\b"
     r"|\b(ticket|review)\s+"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
@@ -145,7 +147,7 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 #    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
 #    側で止まる
 # 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の守りになる。
-#    `--approve` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組
+#    `--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組
 #
 # 実行ファイルを呼ぶ綴りは追い切れない（`uv run -m ccnavi`、名前を変えた写し、`awk` の `system()`、
 # `python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、**コマンド行の生の文字列の
@@ -164,7 +166,7 @@ _GUARD_FLAG = re.compile(
     r"--guard-ticket-approval(?:\s*=\s*|\s+)(?!enable(?![\w-]))", re.IGNORECASE
 )
 _BOARD_FORMS = (
-    re.compile(r"(?<![\w-])--(?:approve|reviewed)(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--(?:agree|approve|reviewed)(?![\w-])", re.IGNORECASE),
     re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
 )
 _DECIDE_FORMS = (
@@ -361,7 +363,7 @@ def prune_message() -> str:
 def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 
-    承認のスクリプト（`ccnavi-approve.sh`）も同じ形で止める。中身は `--approve` の
+    承認のスクリプト（`ccnavi-agree.sh`）も同じ形で止める。中身は `--agree` の
     呼び出しと写しの push で、打つのは端末に座っている人。実行ファイルの側は標準入力が
     端末であることを求めるので、hook から呼んでも通らないが、綴りで止めておけば
     「なぜ通らないのか」が当たったルールの id で分かる。
@@ -382,7 +384,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
     script = (
         # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る（段階 2d のレビュー）。
-        r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(approve|push-approved)\.sh\b"
+        # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古い写しが残っていても止める。
+        r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(agree|approve|push-approved)\.sh\b"
         # 家族の控え（墓標）を消す、人が打つスクリプト（ADR-0093 の 11.5.1 の決定 A）。
         # 消すと、止めていた家族が控えの無い家族として今の手元の動きに戻るので、打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
@@ -392,7 +395,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         r"(chat|config-synced|close-early)\b"
     )
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
-    # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
+    # 区別しないので、`SH .ccnavi/scripts/CCNAVI-AGREE.sh` や `CCNAVI.EXE --agree` でも
     # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
     # 広がるが、実行ファイルの引数は大小を区別するので、広がるのは止める側だけ
     # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
@@ -410,7 +413,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
-            f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
+            f"'{settings.script_command(root, 'ccnavi-agree.sh')}' で、"
             "残った指摘の対応方針は利用者がボードか端末で決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
@@ -420,7 +423,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "close-early'）も人が打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
-            "承認待ちの一覧を見るだけなら 'ccnavi --approve --preview' は通ります。"
+            "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
         ),
         decision=rules.DENY,
     )

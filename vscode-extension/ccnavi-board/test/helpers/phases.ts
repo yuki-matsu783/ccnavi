@@ -27,7 +27,7 @@ export const NONCE = "TEST-NONCE-123";
 export const SAMPLE_PHASES_TEXT = `# フェーズの種類（設計 9.7）。人が持つ設定で、エージェントは書き換えない。
 #
 # 親チケットの \`plan:\` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
-# \`ccnavi --approve\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
+# \`ccnavi --agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
 # \`kind: feedback\` の種類を並べて改版を出す（対応が無くても \`[]\` で出す）。
 #
 # \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。

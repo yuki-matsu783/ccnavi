@@ -49,7 +49,7 @@ def start(
         stderr.write(
             f"ccnavi: {ticket_id} は承認済みの作業中ではない（いまは {found.state}/）。"
             + (
-                "先に利用者に 'ccnavi --approve' を通してもらってください"
+                "先に利用者に 'ccnavi --agree' を通してもらってください"
                 if found.state == ticket_mod.TODO
                 else ""
             )
@@ -624,8 +624,7 @@ def _parent_not_started(
     parent = hits[0]
     if parent.state == ticket_mod.TODO:
         stderr.write(
-            head
-            + "がまだ承認されていない（todo/）。先に利用者に 'ccnavi --approve' を通してもらい、"
+            head + "がまだ承認されていない（todo/）。先に利用者に 'ccnavi --agree' を通してもらい、"
             f"'{ticket_sh} start {found.parent}' で着手してください\n"
         )
         return True

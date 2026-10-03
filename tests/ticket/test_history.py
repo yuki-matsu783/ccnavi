@@ -90,11 +90,11 @@ class HistoryTest(TicketTest):
         self.assertEqual(last["reason"], "要らなくなった")
 
     def test_a_board_approval_says_board(self):
-        """ボードの `--approve --yes` は経路 board で残る。"""
+        """ボードの `--agree --yes` は経路 board で残る。"""
         self.propose("i0001", allow=("src/*",))
-        shown = self.ccnavi("--approve", "--preview", "--json")
+        shown = self.ccnavi("--agree", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
-        placed = self.ccnavi("--approve", "--yes", "i0001", "--digest", digest, "--json")
+        placed = self.ccnavi("--agree", "--yes", "i0001", "--digest", digest, "--json")
         self.assertEqual(placed.returncode, 0, placed.stdout + placed.stderr)
         self.assertEqual(self.kinds("i0001"), [("approved", "todo", "doing", "board")])
 
@@ -223,7 +223,7 @@ class HistoryTest(TicketTest):
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         write(os.path.join(self.approved, "events"), "ディレクトリではない\n")
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         for name in ("i0001", "i0001-01", "i0001-02"):
             self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", name + ".md")))

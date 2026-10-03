@@ -48,7 +48,7 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 | `ccnavi/*.py`・`main.py` | `guard` `config` `ticket` |
 | `ccnavi/platformtag.py` | 上に加えて `sh` |
 | `build.py` | `guard` `sh` `e2e` |
-| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-approve.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |

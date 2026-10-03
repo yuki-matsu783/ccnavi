@@ -464,7 +464,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
                 )
 
     def test_a_ticket_cannot_name_a_reserved_layer_name(self):
-        """11.4: `project: self` / `project: common` のチケットは `--approve` で通らない。"""
+        """11.4: `project: self` / `project: common` のチケットは `--agree` で通らない。"""
         for name in settings.RESERVED_LAYER_NAMES:
             self.project(name, rules=RESERVED_PROJECT_RULES)
         # 前提。同じ本文で `project: lib` なら通る。止まる理由が予約名であることを固定する。

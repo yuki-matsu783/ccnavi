@@ -157,6 +157,13 @@ class CompatAgreesTest(unittest.TestCase):
         """
         self.assertGreaterEqual(version.COMPAT, 2)
 
+    def test_v8_renaming_the_approve_flag_to_agree_raised_the_compat_to_3(self):
+        """V8 `--approve` を `--agree` に改名した（ADR-0099）ので 3 以上。
+
+        改名の前の sh（互換 2）は `--approve` を渡して落ちるので、食い違いとして知らせる。
+        """
+        self.assertGreaterEqual(version.COMPAT, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -159,10 +159,10 @@ Each draft passed the same checks as --lint and --test-samples; the rest are
 counted and dropped. Nothing is written. --json prints the shape documented in
 README.md ("候補の JSON"); the VS Code extension reads it.
 
-To review the pending tickets and approve the work areas they declare, run
+To review the pending tickets and agree to the work areas they declare, run
 
-    ccnavi --approve
-    ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board;
+    ccnavi --agree
+    ccnavi --agree i0002 i0002-01        (only these, e.g. from a filtered board;
                                             ids go last, after every flag)
 
 It scans wip/proposals/todo/ in every worktree, shows what each ticket makes
@@ -170,12 +170,12 @@ writable and whether it needs a human review, then moves the approved ticket to
 .ccnavi/approved/doing/. Only that place is consulted when judging calls, so
 writing a proposal never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
-its parent's pending revision, approves nothing.
+its parent's pending revision, agrees to nothing.
 
-Before asking the user to approve, the agent verifies that the proposal it just
+Before asking the user to agree, the agent verifies that the proposal it just
 wrote is in a state that can be approved:
 
-    ccnavi --approve --preview --verify [--json] [<id>...]
+    ccnavi --agree --preview --verify [--json] [<id>...]
 
 It places nothing and needs no terminal. Exit 0 is yes: every named ticket (or
 every pending one, when no id is given) goes into the batch as it stands, so the
@@ -184,18 +184,18 @@ all, or a proposal the approval drops. The reasons are printed per ticket. Exit
 1 stays what it is everywhere else - a usage or settings error, not an answer -
 so a wrong spelling is never read as a proposal to fix.
 
-Two things are not a no, because --approve does not drop them either: scope that
+Two things are not a no, because --agree does not drop them either: scope that
 exceeds the parent or the phase type (writes there stay blocked after approval),
 and a proposal that cannot be read (the scan covers every worktree, before the
 ids narrow it, so another session's draft would answer no). Both are printed.
-Having nothing pending is the one place where the two differ: --approve calls
+Having nothing pending is the one place where the two differ: --agree calls
 that a success with nothing to do, the verify calls it a no.
 
-The VS Code board extension approves from an overlay instead of the terminal:
+The VS Code board extension agrees from an overlay instead of the terminal:
 
-    ccnavi --approve --preview --json [<id>...]  (show the batch; places nothing)
-    ccnavi --approve --yes <id,id,...> --digest <hex> --json [<id>...]
-        (approve exactly what was shown; --digest is the preview's `digest`,
+    ccnavi --agree --preview --json [<id>...]  (show the batch; places nothing)
+    ccnavi --agree --yes <id,id,...> --digest <hex> --json [<id>...]
+        (agree to exactly what was shown; --digest is the preview's `digest`,
          the trailing ids are the same filter)
 
 --yes needs no terminal; it refuses when the batch or the text changed since it
@@ -407,7 +407,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # リモートの写し（JSON）。.ccnavi/scripts/ccnavi-review.sh が取ってきて渡す。
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
-    parser.add_argument("--approve", action="store_true")
+    parser.add_argument("--agree", action="store_true")
     # 承認の対象の一覧を見るだけ（承認済みチケットを置かない）。
     # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
@@ -468,7 +468,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("--chat", action="store_true")
-    # 人が端末で打つ締め。`--approve` / `--reviewed` と同じく、人の判断はフラグで受ける。
+    # 人が端末で打つ締め。`--agree` / `--reviewed` と同じく、人の判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
     # 人が端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 11.12）。
     parser.add_argument("--config-synced", default="")
@@ -836,7 +836,7 @@ def _parsed(
     # 承認の経路。人が端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
     # 判断ではなく、これから判定に使われる範囲についての合意になる。
-    if args.approve:
+    if args.agree:
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
             return EXIT_ERROR
@@ -844,10 +844,10 @@ def _parsed(
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
         # 確かめるだけの枝は `--preview` と一緒に使う。単独で打てる形にすると、組み込みの
-        # deny（phase.ticket_approval_rule）が免除するのは `--preview` の付いた `--approve`
+        # deny（phase.ticket_approval_rule）が免除するのは `--preview` の付いた `--agree`
         # だけなので、エージェントが打てないものを案内することになる。
         if args.verify and not args.preview:
-            stderr.write("ccnavi: --verify は --approve --preview と一緒に使う\n")
+            stderr.write("ccnavi: --verify は --agree --preview と一緒に使う\n")
             return EXIT_ERROR
         # 承認できる状態かを確かめるだけ。置かないのは `--preview` と同じで、違うのは
         # 通るかどうかを終了コードで返すところ（REQ-APV-13）。答えは 0（はい）と
@@ -855,7 +855,7 @@ def _parsed(
         if args.verify:
             return core.verify(stdout, stderr, conf, root, args.json, list(args.command))
         # 見るだけの経路。承認済みチケットを置かないので端末の確認は要らない。後ろに並べた語は
-        # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
+        # `--agree` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
             code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
@@ -876,10 +876,10 @@ def _parsed(
                 digest=args.digest,
             )
             return EXIT_OK if code == 0 else EXIT_ERROR
-        if not _from_terminal(stdin, conf, stderr, "--approve"):
+        if not _from_terminal(stdin, conf, stderr, "--agree"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
-        # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
+        # `--agree` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = core.approve(stdin, stdout, stderr, conf, root, only=list(args.command))
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
@@ -1028,7 +1028,7 @@ _NOT_WITH_DOCS = (
     "--explain",
     "--suggest",
     "--prune",
-    "--approve",
+    "--agree",
     "--reviewed",
     "--close-early",
     "--config-synced",
@@ -1156,7 +1156,7 @@ def _prune(
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
     """人の判断の経路が、端末の前の人から打たれているか。
 
-    `--approve` と `--reviewed` と `--close-early` は人の合意そのもの。エージェントが
+    `--agree` と `--reviewed` と `--close-early` は人の合意そのもの。エージェントが
     Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん手間の少ない証拠になる。
     CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
@@ -1209,7 +1209,7 @@ def operate(
         if not args.result:
             stderr.write("ccnavi: --close-early には --reason <理由> と --result <json> が要る\n")
             return EXIT_ERROR
-        # 人の判断。`--approve` / `--reviewed` と同じく端末を求める。
+        # 人の判断。`--agree` / `--reviewed` と同じく端末を求める。
         if not _from_terminal(stdin, conf, stderr, "--close-early"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
