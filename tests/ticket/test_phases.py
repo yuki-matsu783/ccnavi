@@ -1365,7 +1365,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(mark["by"], "chat")
 
     def test_closing_a_chat_only_parent_records_where_each_phase_was_seen(self):
-        """締めた事実は親のブランチに残る。案内は Draft ではなく統合先へ戻すところまで。"""
+        """締めた事実は親のブランチに残る。案内は Draft ではなく統合先に取り込むところまで。"""
         self.chat_phase(plan=["chores"])
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)

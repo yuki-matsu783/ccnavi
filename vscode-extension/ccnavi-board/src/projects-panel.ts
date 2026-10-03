@@ -523,7 +523,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
   if (page.projectsRel === "") {
-    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、足す行がありません");
+    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、.gitignore に足す行がありません");
     return;
   }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");

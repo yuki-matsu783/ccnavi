@@ -960,7 +960,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 self.make_git()
                 result = self.run_setup("--mode", "enable", "--deploy", src, *args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertIn("--bin は知らないオプションです", result.stderr)
+                self.assertIn("--bin は使えないオプションです", result.stderr)
                 self.assertEqual(os.listdir(self.dir), [".git"])
 
     def test_names_the_push_script_when_the_source_lacks_it(self):
@@ -1427,14 +1427,14 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
                 self.write_gitignore(before)
 
                 checked = self.run_setup("--deploy", src, "--check")
-                self.assertIn("ユーザが除外しているので", checked.stdout)
+                self.assertIn("ユーザが索引を追跡しているので", checked.stdout)
                 self.assertIn(negation, checked.stdout)
                 self.assertNotIn(INDEX_LINE, section(checked.stdout, ".gitignore に足す"))
                 self.assertEqual(self.gitignore(), before)
 
                 result = self.run_setup("--deploy", src)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("ユーザが除外しているので", result.stdout)
+                self.assertIn("ユーザが索引を追跡しているので", result.stdout)
                 self.assertEqual(self.gitignore(), before)
 
     def test_compares_lines_without_cr_and_trailing_spaces(self):

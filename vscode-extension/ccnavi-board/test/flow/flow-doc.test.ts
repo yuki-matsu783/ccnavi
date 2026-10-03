@@ -148,14 +148,14 @@ test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そ�
 
 test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
   const refused: [string, RegExp][] = [
-    ["nodes: [", /画面の YAML パーサーで読めないので図にできない/],
-    ["a: 1\na: 2\n", /画面の YAML パーサーで読めないので図にできない/],
-    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読めないので図にできない/],
-    ["", /描けない/],
-    ["- 1\n", /描けない/],
-    ["name: x\n", /描けない/],
-    ["nodes:\n  - {type: start}\n", /描けない/],
-    ["nodes: [1]\n", /描けない/],
+    ["nodes: [", /画面の YAML パーサーで読めないため、図にできません/],
+    ["a: 1\na: 2\n", /画面の YAML パーサーで読めないため、図にできません/],
+    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読めないため、図にできません/],
+    ["", /描けません/],
+    ["- 1\n", /描けません/],
+    ["name: x\n", /描けません/],
+    ["nodes:\n  - {type: start}\n", /描けません/],
+    ["nodes: [1]\n", /描けません/],
   ];
   for (const [text, reason] of refused) {
     const result = parseFlow(text);
@@ -247,18 +247,18 @@ test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え
   assert.deepEqual(flowNotices(single), []);
   // サブフロー（1 段）の中の subAgent（2 段）。子の下 2 段で、まだ上限の中
   assert.equal(nesting(nested(1)).depth, 2);
-  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("段重なる")));
+  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("段重なっています")));
   // もう 1 段重ねると 3 段。既定の上限（メインの下 3 段、子は 1 段目）を超える
   assert.equal(nesting(nested(2)).depth, 3);
-  const warned = flowNotices(nested(2)).find((n) => n.includes("段重なる"));
+  const warned = flowNotices(nested(2)).find((n) => n.includes("段重なっています"));
   assert.ok(warned !== undefined);
-  assert.match(warned, /子の下に 3 段重なる/);
+  assert.match(warned, /子の下に 3 段重なっています/);
   assert.match(warned, /メインの下 3 段/);
-  assert.match(warned, /そのノードで止まってメインへ戻る/);
+  assert.match(warned, /そのノードで止まってメインへ戻ります/);
   // 巡るサブフローは数えきれないと言う
   const loop = nested(2, true);
   assert.equal(nesting(loop).cyclic, true);
-  assert.ok(flowNotices(loop).some((n) => n.includes("巡っている")));
+  assert.ok(flowNotices(loop).some((n) => n.includes("サブフローの呼び出しが循環しています（subAgentFlowId が輪になっています）")));
   // サブフローの中身は描かないことも言う
   assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が 1 本")));
 });

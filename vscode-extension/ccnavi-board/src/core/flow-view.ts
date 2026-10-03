@@ -30,20 +30,20 @@ export const OPEN_LOCK: FlowLock = { locked: false, reason: "" };
 /** 実行ファイルが着手中と言った子の錠の文面。いつ外れるかまで言う */
 export function lockedReason(ticket: string): string {
   return (
-    `子チケット ${ticket} は着手中なので、フローは書き換えられない（ccnavi が DENY_TICKET_FLOW_LOCKED で止めている）。` +
-    "担当のサブエージェントが読んでいる手順が作業の途中で変わるのを防ぐため。" +
-    `ロックは ${ticket} が finish で終わるか cancel で取り消されると外れる。手順を直すなら、終わってから直すか、次の子チケットのフローに書いてください`
+    `子チケット ${ticket} は着手中のため、フローを書き換えられません（ccnavi が DENY_TICKET_FLOW_LOCKED で止めています）。` +
+    "担当のサブエージェントが読んでいる手順が、作業の途中で変わるのを防ぐためです。" +
+    `ロックは、${ticket} が finish で終わるか cancel で取り消されると外れます。手順を直すなら、終わってから直すか、次の子チケットのフローに書いてください`
   );
 }
 
 /** 置き場の途中かファイルがシンボリックリンク。読まないし書かない */
 export function linkedReason(rel: string): string {
-  return `フローの置き場（${rel}）かその途中がシンボリックリンクなので、読まないし書かない。リンクの先は承認済みの領域の外かもしれない。リンクを外してから開き直してください`;
+  return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み書きしません。リンク先は承認済みの領域の外かもしれません。リンクを外してから開き直してください`;
 }
 
 /** 確かめられなかったとき。閉じる側にする */
 export function lockFromFailure(error: string): FlowLock {
-  return { locked: true, reason: `着手中かを確かめられないので、書かない: ${error}` };
+  return { locked: true, reason: `着手中かどうかを確かめられないため、書き込みません: ${error}` };
 }
 
 /** ボードの JSON から引いた、この子のフロー */
@@ -64,13 +64,13 @@ export type FlowTargetResult = { readonly ok: true; readonly target: FlowTarget 
 export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult {
   const found = board.tickets.find((t) => t.ticket === ticket);
   if (found === undefined) {
-    return { ok: false, error: `チケット ${ticket} が実行ファイルの答えに無い` };
+    return { ok: false, error: `チケット ${ticket} が実行ファイルの出力にありません` };
   }
   if (found.parent === "") {
-    return { ok: false, error: `${ticket} は親チケット。フローを持つのは子チケットだけ` };
+    return { ok: false, error: `${ticket} は親チケットです。フローを持つのは子チケットだけです` };
   }
   if (found.flow === null) {
-    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの答えに無い（完了・取り消しの子でファイルが無いか、実行ファイルが古い）` };
+    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルが無いか、実行ファイルが古いかのどちらかです）` };
   }
   return {
     ok: true,
@@ -85,7 +85,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
         : found.flow.linked
           ? { locked: true, reason: linkedReason(found.flow.rel) }
           : found.flow.tree === ""
-            ? lockFromFailure("フローを持つツリーが実行ファイルの答えに無い（実行ファイルが古い）")
+            ? lockFromFailure("フローを持つツリーが実行ファイルの出力にありません（実行ファイルが古いためです）")
             : OPEN_LOCK,
     },
   };

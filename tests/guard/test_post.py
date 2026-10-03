@@ -616,7 +616,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn(".ccnavi/approved", message)
 
     def test_統合先を取り込んだマージの持ち込みは並べない(self):
-        # ワークツリーを切って作業し、`merge <統合先>` で取り込んでから戻すのが
+        # ワークツリーを切って作業し、`merge <統合先>` を打ってから統合先へ取り込むのが
         # このリポジトリの手順。二点の差分で数えると、ユーザが統合先で直した保護領域が
         # 打つたびに並ぶ。数えるのはこのツリーが積んだコミットだけ。
         git(self.repo, "checkout", "--quiet", "-b", "feature")

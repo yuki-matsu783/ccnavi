@@ -625,7 +625,7 @@ worktree)
 		wt_leaf="${wt_abs##*/}"
 		if [ -n "$wt_new" ]; then
 			if [ "$wt_new" != "$wt_leaf" ]; then
-				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします（親のブランチなら親の識別子。変えると家族が止まります）。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。"
+				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします。ccnavi は親チケットのワークツリーを、名前が親チケットの識別子で、同じ名前のブランチをチェックアウトしているものとして探します。親チケットのブランチを識別子と違う名前のワークツリーに出すと、リモートでの承認を取り込む処理（ccnavi-sync.sh と、セッション開始時に ccnavi-fetch.sh が fast-forward で進める処理）がそのワークツリーを見つけられません。親チケットのブランチを一度でも push したか ccnavi-sync.sh で取り込んだことがあると、親と子のチケットの承認・状態の操作（start・finish など）・実行前の判定も止まります。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。"
 			fi
 		elif [ -n "$wt_base" ] && [ "$wt_base" = "$wt_leaf" ] &&
 			! git show-ref --verify --quiet "refs/heads/$wt_base" &&
@@ -911,8 +911,12 @@ checkout | switch)
 	opt_walk checkout_cb ${1+"$@"}
 	# 親のワークツリー（.claude/worktrees/<P> で、親の写しか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない（3.1 の 10）。
-	# 親のブランチの名前は識別子で、ワークツリーが別のブランチの上に居ると、着手・取り込み・
-	# push の守りが家族を引けなくなる。
+	# 親の写しか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
+	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
+	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
+	# このツリーへ取り込まなくなる。家族の控えがある親（親のブランチを一度でも origin へ push したか、
+	# ccnavi-sync.sh で取り込んだ親）では、実行ファイル（syncstate.standing）が親のワークツリーを決められず、
+	# 親と子のチケットの承認・状態の操作・実行前の判定を止める。
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
 	case "$co_top" in
 	"$WS_P"/.claude/worktrees/*)
@@ -930,7 +934,7 @@ checkout | switch)
 			case "$co_to" in
 			'' | "$co_name" | HEAD) ;;
 			*)
-				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移れません。親のブランチの名前は識別子で、変えると家族が止まります（ADR-0093 の 3.6）。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
+				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移れません。ccnavi は親チケットのワークツリーを、名前が親チケットの識別子で、同じ名前のブランチをチェックアウトしているものとして探します。別のブランチに移ると、リモートでの承認を取り込む処理（ccnavi-sync.sh と、セッション開始時に ccnavi-fetch.sh が fast-forward で進める処理）がこのワークツリーを飛ばします。親チケットのブランチを一度でも push したか ccnavi-sync.sh で取り込んだことがあると、親と子のチケットの承認・状態の操作（start・finish など）・実行前の判定も止まります。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
 				;;
 			esac
 		fi

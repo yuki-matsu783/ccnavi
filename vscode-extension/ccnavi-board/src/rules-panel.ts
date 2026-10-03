@@ -267,13 +267,13 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（ここのルールは 1 件も効いていません）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（このファイルのルールは 1 件も判定に使われていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;

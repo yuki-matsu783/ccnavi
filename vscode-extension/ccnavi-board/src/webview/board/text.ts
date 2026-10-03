@@ -188,7 +188,7 @@ const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
  */
 export const VIA_LABELS: Readonly<Record<string, string>> = {
   cli: "sh（ccnavi-ticket.sh など）",
-  terminal: "端末",
+  terminal: "ターミナル",
   board: "ボード",
   hook: "hook",
   chrome: "Chrome 拡張",

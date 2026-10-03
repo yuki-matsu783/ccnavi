@@ -32,7 +32,7 @@ export type PhaseOrder = (typeof ORDERS)[number];
 
 /** 待ち方の説明。select のラベル */
 export const ORDER_LABELS: Readonly<Record<PhaseOrder, string>> = {
-  sequential: "sequential（既定。全体計画は一直線で、前の番号を全部待つ）",
+  sequential: "sequential（既定。全体計画を番号順に進め、前の番号をすべて待つ）",
   dag: "dag（after でつないだ流れ。after をたどった先にある種類だけを待ち、他は並行して進む）",
 };
 
@@ -79,7 +79,7 @@ export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
 
 /** レビューの既定の説明。select のラベル */
 export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
-  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上なら要る）",
+  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが要る）",
   mr: "mr（マージリクエストのレビューを受ける）",
 };
 

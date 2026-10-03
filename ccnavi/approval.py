@@ -1264,7 +1264,7 @@ def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str
 #   close-early.json  ユーザが「キリの良いところまでやった」と締めた。残りは別の issue へ
 #   closed.json  親を閉じた（`ticket finish <親>`）。どのフェーズをどこで見たかを残す
 #
-# closed.json が要るのは、提案（wip/）が統合先へ戻す前に消えるから。マージリクエストを
+# closed.json が要るのは、提案（wip/）が統合先に取り込む前に消えるから。マージリクエストを
 # 作らない運び方（全フェーズが `review: chat`）では、締めた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
 PARENT_MARK_CLOSE_EARLY = "close-early"

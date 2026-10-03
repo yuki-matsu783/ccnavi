@@ -260,7 +260,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルの境目の点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが上がります。HIGH 以上の場合は、次フェーズに進む前に人間レビューが必須になります
+          リスクレベルの境目の点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが上がります。HIGH 以上の場合は、次のフェーズに進む前に人間レビューが必須になります
           </span>
         </h2>
         <details className="help">
