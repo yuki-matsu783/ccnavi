@@ -37,7 +37,9 @@
 どちらも `ccnavi/` では 1 度も使っていないので、綴りごと止めるほうが安い。
 同じ理由で、パッケージの中の書き方を相対の 2 形に限る。同じサブパッケージは
 `from . import x`、別のサブパッケージは `from ..infra import fsio`（`from ..infra.modes import
-EXIT_OK` も可）。3 段以上の相対（`from ...`）、`from .. import infra`（行き先がサブパッケージ
+EXIT_OK` も可）。3 段以上の相対（`from ...`）、自分のサブパッケージを `..` で指す形
+（`infra` の中の `from ..infra import fsio`。同じサブパッケージは `from . import fsio`）、
+`from .. import infra`（行き先がサブパッケージ
 そのもので、モジュールが import 文に出ない）、パッケージの中の `ccnavi.` で始まる絶対の import
 は止める。**回避できないわけではない。** `getattr` や `exec` で組み立てれば、いまでも
 隠せる。そこまで防ぐには import を実行時に捕まえるしかなく、この速さを手放す。
@@ -305,6 +307,8 @@ def hiding_in(module: str) -> list[str]:
     - `importlib` / `__import__` / `sys.modules`。行き先が文字列になる
     - 3 段以上の相対（`from ...`）。`ccnavi/` は 2 階層までなので、外へ出るか、行き先を
       読み違える
+    - 自分の居るサブパッケージを `..` で指す形（`infra` の中の `from ..infra import fsio`）。
+      同じサブパッケージは `from . import fsio` と書く。2 つの綴りが同じ行き先に並ぶのを避ける
     - `from .. import infra`（`from . import infra` を直下から書くのも同じ）。行き先が
       サブパッケージそのもので、使うモジュールが import 文に出ない
     - パッケージの中の `ccnavi.` で始まる絶対の import。相対の 2 形に揃えておかないと、
@@ -332,6 +336,13 @@ def hiding_in(module: str) -> list[str]:
                 found.append(f"{rel}:{node.lineno} from {'.' * node.level}{node.module or ''}")
             elif node.level == 2 and not node.module:
                 found.append(f"{rel}:{node.lineno} from .. import ...")
+            elif (
+                node.level == 2 and node.module and node.module.split(".")[0] == package_of(module)
+            ):
+                found.append(
+                    f"{rel}:{node.lineno} from ..{node.module} import ... "
+                    f"（同じサブパッケージは `from . import x` と書く）"
+                )
             elif (
                 node.level == 1
                 and not node.module
@@ -534,7 +545,8 @@ class ModuleTiersTest(unittest.TestCase):
             "import の行き先が import 文に残らない書き方をしている。1 から 4 と 6 は"
             "この形を見つけられないか読み違えるので、綴りのほうを止める。パッケージの中は"
             "`from . import x`（同じサブパッケージ）と `from ..infra import fsio`（別の"
-            "サブパッケージ）の 2 形で書く。どうしても要るなら、なぜ要るかを添えてここに"
+            "サブパッケージ）の 2 形で書く。自分のサブパッケージを `..` で指さず、同じ"
+            "サブパッケージの中は `from . import x`。どうしても要るなら、なぜ要るかを添えてここに"
             "例外を書く",
         )
 
