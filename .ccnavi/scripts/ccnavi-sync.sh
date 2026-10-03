@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-sync — 親のブランチをリモートから取り込み、家族の控えと統合先の控えを書く
+# ccnavi-sync 親のブランチをリモートから取り込み、家族の控えと統合先の控えを書く
 # （ADR-0093 の 4.2・3.6。段階 2b）。
 #
 #   sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
@@ -17,7 +17,7 @@
 # 消すのは人が打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
 # エージェントからは組み込みの deny（builtin-guard-ticket-approval）が止める。
 #
-# リポジトリ（ワークスペース自身と、家族の元のプロジェクト）ごとに 1 回:
+# リポジトリ（ワークスペース自身と、家族の元のプロジェクト）ごとに 1 回、次の順に行う。
 #
 #   1. `ls-remote --heads origin` で全ブランチの有無を得る。落ちたら（オフライン・認証）止める
 #   2. 統合先の名前を決める。CCNAVI_INTEGRATION_BRANCH（環境変数、無ければ
@@ -28,7 +28,7 @@
 #      .claude/settings.json）を統合先の控え sync/<リポジトリ>/integration/ へ同じ並びで写し、head に
 #      remote・branch・source・sha・fetched_at を書く（D26）。統合先の先頭が前と同じなら写さない
 #
-# 家族ごと（ロックを待って取る。D32）:
+# 家族ごとに次を行う（ロックを待って取る。D32）。
 #
 #   - 途中の操作（merge・cherry-pick・revert・rebase）があれば何もせず止める（利用者の途中の
 #     merge を取りやめない）
@@ -815,7 +815,7 @@ while IFS= read -r key <&4; do
 		continue
 	fi
 	awk -F "$tab" -v k="$key" '$3 == k' "$scratch/families" >"$scratch/these"
-	# 読む先は fd 3。中で起こす git が標準入力を読んでも、家族の並びを食べない。
+	# 読む先は fd 3。中で起こす git が標準入力を読んでも、家族の並びを読み取ってしまわない。
 	while IFS="$tab" read -r fam_p fam_tree fam_key <&3; do
 		[ -n "$fam_p" ] || continue
 		sync_family "$fam_p" "$fam_tree" "$fam_key" "$repo" "$integ" "$heads"

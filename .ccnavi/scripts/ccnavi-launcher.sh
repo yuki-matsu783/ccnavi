@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-launcher — hook が起動する 1 本。CCNAVI_BIN_PATH はここを指す。1 つ上の bin/ に
+# ccnavi-launcher hook が起動する 1 本。CCNAVI_BIN_PATH はここを指す。1 つ上の bin/ に
 # 並ぶ機械ごとの組み立てから、この機械で動くものを選んで起動する。
 #
 #   .ccnavi/scripts/ccnavi-launcher.sh      ← これ
@@ -12,13 +12,13 @@
 #
 # hook の command は 1 行しか書けず、settings.json は Windows・WSL・Linux・macOS で
 # 同じものを開く。PyInstaller の実行ファイルは組み立てた機械でしか動かないので、
-# どれを起動するかは起動の瞬間に、起動した機械が決めるしかない。
+# どれを起動するかは起動した時点で、起動した機械が決めるしかない。
 #
-# 代償は、ツール呼び出しのたびに sh の起動と uname 1 回ぶんが乗ること。uname は
+# 代償は、ツール呼び出しのたびに sh の起動と uname 1 回ぶんが加わること。uname は
 # 1 回で OS と CPU の両方を取る。
 #
 # bin_dir は `..` を含むまま使い、正規化しない。`${here%/*}` で切る形は here が `.` や
-# 1 段の名前のときに壊れる。シンボリックリンクは解かない。
+# 1 段の名前のときに正しいパスにならない。シンボリックリンクは解かない。
 #
 # 語は ccnavi/platformtag.py と scripts/ccnavi-setup.sh の host_target と揃える。
 #

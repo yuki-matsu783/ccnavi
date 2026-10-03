@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-ticket — チケットの状態を動かす。親（メインエージェント）だけが呼ぶ。
+# ccnavi-ticket チケットの状態を動かす。親（メインエージェント）だけが呼ぶ。
 #
 #   sh .ccnavi/scripts/ccnavi-ticket.sh start       <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh finish      <識別子>
@@ -23,7 +23,7 @@
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の start・finish・cancel は
 # C1 で回す（ADR-0093 の 4.3。段階 2d）: ロック → 途中の操作の確認 → hook の印と跡を先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
-# 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish が運ぶ）。
+# 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
 # それ以外の家族は今のまま（書くだけ。コミットと push はエージェント）。
 # 終了コード: 0 成功 / 1 前提の未充足（C1 で止めた・送れなかったを含む） / 2 引数か環境の誤り
 
@@ -105,8 +105,8 @@ start | finish | cancel)
 	ccnavi_c1_sh="$(dirname "$0")"
 	trap 'ccnavi_c1_end' EXIT
 	trap 'ccnavi_c1_end; exit 130' INT TERM HUP
-	# 識別子は実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を飛ばした最初の語
-	# （`start -- <親>` で C1 を素通りさせない。段階 2d のレビュー）。
+	# 識別子は実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語
+	# （`start -- <親>` で C1 を経ずに通らないようにする。段階 2d のレビュー）。
 	c1_id=""
 	c1_skip=""
 	c1_first=yes

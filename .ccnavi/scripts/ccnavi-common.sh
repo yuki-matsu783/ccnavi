@@ -1,4 +1,4 @@
-# ccnavi-common — 保護済み sh が共有する部分。単体では動かない。
+# ccnavi-common 保護済み sh が共有する部分。単体では動かない。
 #
 #   . "$(dirname "$0")/ccnavi-common.sh"
 #
@@ -44,7 +44,7 @@ ccnavi_abs() {
 		(cd "$1" 2>/dev/null && pwd -W 2>/dev/null || pwd) || return 1
 		return 0
 	fi
-	# 在るところまで cd して綴りを揃え、残りは文字で継ぐ。
+	# 在るところまで cd して綴りを揃え、残りは文字列としてつなぐ。
 	ccnavi_abs_dir=$(dirname "$1")
 	ccnavi_abs_base=$(basename "$1")
 	if ccnavi_abs_head=$(cd "$ccnavi_abs_dir" 2>/dev/null && { pwd -W 2>/dev/null || pwd; }); then
@@ -60,7 +60,7 @@ ccnavi_abs() {
 	/* | [A-Za-z]:[\\/]*) ccnavi_abs_joined="$1" ;;
 	*) ccnavi_abs_joined="$(pwd -W 2>/dev/null || pwd)/$1" ;;
 	esac
-	# `\` を `/` に寄せ、`.` と `..` を畳む。
+	# `\` を `/` にそろえ、`.` と `..` を取り除く。
 	ccnavi_abs_joined=$(printf '%s' "$ccnavi_abs_joined" | tr '\\' '/')
 	ccnavi_abs_out=""
 	ccnavi_abs_rest="$ccnavi_abs_joined"
@@ -94,13 +94,13 @@ ccnavi_abs() {
 #
 # git の `rev-parse --show-toplevel` はリンクを解いた綴りを返すので、ワークスペースルート（cwd から
 # 論理の綴りで決まる）と比べるときは両辺をこれで揃える。揃えないと、リンクを経た作業場で
-# 「.claude/worktrees/ の下か」の比較が外れ、守りが効かない。Windows は pwd -W の綴り。
+# 「.claude/worktrees/ の下か」の比較が外れ、守りが当てはまらない。Windows は pwd -W の綴り。
 ccnavi_phys() {
 	[ -n "${1:-}" ] || return 0
 	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; }) || printf '%s\n' "$1"
 }
 
-# ワークスペースルート。道具（hook の登録・実行ファイル・保護済みスクリプト）の置き場。
+# ワークスペースルート。hook の登録・実行ファイル・保護済みスクリプトの置き場。
 #
 # **git に聞かない。** git のトップは git の用途にだけ使う。モード B では
 # `cwd` がプロジェクトの中にあると git はプロジェクトを答える。それは git として
@@ -112,21 +112,21 @@ ccnavi_phys() {
 # `.git` は駄目（プロジェクトも持つ）。`.claude/` だけも駄目（Claude Code が作る場合が
 # あり、プロジェクト側にできたものに当たる）。
 #
-# **ワークツリーは飛ばし、最初に当たったものを返す。**
+# **ワークツリーは候補にせず、最初に当たったものを返す。**
 #
 # `.ccnavi/scripts/` は git で追跡されているので、どのワークツリーにも写しがある。
 # 単純に「最初に当たったもの」にすると、ワークツリーの中から打ったときワークツリー自身が
 # 根になる。ところが `logs/state/`（控え）は追跡外でワークツリーには無く、承認済みチケットも
-# ワークスペースルートに置かれたばかりのものはワークツリーに届いていないので、どちらも見つからなくなる。道具のうち
-# git が運ぶものと運ばないものがあり、根は運ばれないほうに合わせる必要がある。
+# ワークスペースルートに置かれたばかりのものはワークツリーに届いていないので、どちらも見つからなくなる。ccnavi が使うもののうち
+# git でワークツリーに届くものと届かないものがあり、根は届かないほうに合わせる必要がある。
 #
 # だから `.claude/worktrees/` の下にあるものは候補にしない。最初に当たった
 # 「ワークツリーでない」ディレクトリが根になる。
 #
 # 最外を取る形にはしない。ワークスペースが利用者のホームの下にあり、そこに
-# `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを掴む。近いほうから決める。
+# `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを選ぶ。近いほうから決める。
 #
-# `cd` は使わない。`set -e` の下で戻り忘れが事故になる。パスを削って登る。
+# `cd` は使わない。`set -e` の下で戻り忘れが問題になる。パスを削って登る。
 ccnavi_workspace() {
 	if [ -n "${CCNAVI_WORKSPACE:-}" ]; then
 		ccnavi_ws_named=$(ccnavi_abs "$CCNAVI_WORKSPACE") || return 1
@@ -153,7 +153,7 @@ ccnavi_workspace() {
 
 # 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。
 #
-# 人が端末から打つ場面では settings.json の env が効かないので、CCNAVI_BIN_PATH が
+# 人が端末から打つ場面では settings.json の env が反映されないので、CCNAVI_BIN_PATH が
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
 # hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
@@ -213,7 +213,7 @@ ccnavi_bin_try() {
 #   <ws>/.claude/worktrees/<id>/...   -> 元リポジトリがプロジェクトならその名前
 #   それ以外                           -> 空
 #
-# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。綴りは実測で確定して
+# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。綴りは実際に確かめて確定して
 # いる（git 2.39.2、Git Bash と PowerShell の両方）。絶対パス、区切りは `/` のみ、
 # ドライブレターは大文字、`gitdir:` の後ろは半角空白 1 個。
 #
@@ -344,7 +344,7 @@ ccnavi_record_get() {
 # 控えを書き直す。<ファイル> <鍵> <値> [<鍵> <値>...]
 #
 # 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
-# 値の改行は空白に畳む（1 行 1 項目の契約）。書けなければ 1。
+# 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。
 ccnavi_record_write() {
 	ccnavi_rw_file="$1"
 	shift
@@ -653,7 +653,7 @@ ccnavi_git_timed() {
 			</dev/null 2>"$ccnavi_gt_err" &
 	fi
 	ccnavi_gt_pid=$!
-	# 見張りの中で標準入出力を先に閉じる（呼ぶ側のパイプを握ったまま残らないように）。
+	# 見張りの中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
 	(
 		exec </dev/null >/dev/null 2>&1
 		sleep "$ccnavi_gt_limit"
@@ -702,7 +702,7 @@ ccnavi_git_refusal() {
 #                               6 元の先頭 7 書く 8 コミット 9 push 10 届いたか 11 戻して 1 回だけやり直す
 #   ccnavi_c1_end               ロックを外す（trap の EXIT・INT・TERM・HUP にも置く）
 #
-# 呼ぶ側が先に決めるもの:
+# 呼ぶ側が先に決めるもの。
 #   ccnavi_c1_root   ワークスペースルート
 #   ccnavi_c1_label  文面の頭（ccnavi-ticket など）
 #   ccnavi_c1_exe    関数。実行ファイルを `--root <ルート>` つきで起こし、引数を渡す
@@ -718,7 +718,7 @@ ccnavi_git_refusal() {
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
 #   見張りの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回の見張りの秒、既定 60）
 #
-# コミットは `--no-verify` で利用者の hook（pre-commit・commit-msg）を飛ばす。運ぶのは状態のファイル
+# コミットは `--no-verify` で利用者の hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
 # だけで、コードの検査の対象ではないため（段階 2d のレビューの決定 C）。署名は利用者の設定に従うが、
 # 見張りの時間を付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
@@ -993,7 +993,7 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# 利用者の hook は飛ばす。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
+	# 利用者の hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
@@ -1204,7 +1204,7 @@ ccnavi_c1_end() {
 #   log_info <本文の語>... [-- <キー>=<値>...]
 #
 # 本文の語はスペースでつなぐ。`--` の後ろは 1 つずつ `キー=値` として logfmt で並べる。
-# 出る行（Python の ccnavi/diaglog.py、拡張の src/log.ts と同じ形）:
+# 出る行の形は次のとおり（Python の ccnavi/diaglog.py、拡張の src/log.ts と同じ）。
 #
 #   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] push を拒否した reason=unapproved
 #
@@ -1218,8 +1218,8 @@ ccnavi_c1_end() {
 # ファイルを新しく作るときは umask 077 のサブシェルで作り、持ち主だけが読める 0600 にする。
 #
 # **標準出力と標準エラーには何も出さず、何があっても 0 を返す。** 書けない（置き場が
-# 作れない・権限・容量）ときは黙って捨てる。`set -eu` の下で呼んでも、呼ぶ側を止めない。
-# 契約の文面（reject / fail の標準エラー、ok / fail の 1 行目）とは別物で、そちらは変えない。
+# 作れない・権限・容量）ときは何も出さずに捨てる。`set -eu` の下で呼んでも、呼ぶ側を止めない。
+# 契約の文面（reject / fail の標準エラー、ok / fail の 1 行目）とは違うもので、そちらは変えない。
 #
 # 本文と値の中の、URL と scp 形に埋まった資格情報を `***` に伏せる（ccnavi_log_mask）。
 #
@@ -1384,7 +1384,7 @@ ccnavi_log_replace() {
 	done
 }
 
-# 改行（CR LF・CR・LF）を `\n` の 2 字に畳む。結果は ccnavi_log_out。
+# 改行（CR LF・CR・LF）を `\n` の 2 字に置き換える。結果は ccnavi_log_out。
 ccnavi_log_fold() {
 	ccnavi_log_out="$1"
 	ccnavi_lf_nl='
@@ -1399,7 +1399,7 @@ ccnavi_log_fold() {
 }
 
 # logfmt の値。資格情報を伏せ、空白・タブ・`"`・`=`・改行を含めば
-# `"` で囲んで `\` と `"` を逃がす。結果は ccnavi_log_out。
+# `"` で囲んで `\` と `"` をエスケープする。結果は ccnavi_log_out。
 ccnavi_log_value() {
 	ccnavi_log_mask "$1"
 	ccnavi_lv_v="$ccnavi_log_out"

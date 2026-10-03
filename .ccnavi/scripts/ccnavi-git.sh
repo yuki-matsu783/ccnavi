@@ -1,20 +1,20 @@
 #!/bin/sh
-# ccnavi-git — 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト。
+# ccnavi-git 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト。
 #
 # 生の `git` は PreToolUse で拒否し、拒否の文面からここへ誘導する。狙いは 2 つ。
 #
 #   1. 出力がコンテキストに丸ごと載るのを止める。`git log -p` や `git diff` は
 #      入力次第で数千行になる。全量は logs/ に残し、標準出力へは要約と先頭数十行
 #      だけを返す。足りなければログを名指しで読ませる
-#   2. オプションの穴を入口 1 本で塞ぐ。`permissions.allow` の `Bash(git diff:*)`
+#   2. 入口を 1 本にして、オプションの穴を防ぐ。`permissions.allow` の `Bash(git diff:*)`
 #      は前方一致でしかないので、後ろに何を足されても通る。サブコマンドごとに
 #      使ってよい形を書けるのは、入口を 1 本にしたここだけ
 #
 # ホワイトリストに無いものは既定で拒否する。拒否の文面には必ず「代わりに何をするか」を
 # 書く。理由だけ返すとエージェントは言い換えて再試行する。
 #
-# これは事故と浪費を減らすためのもので、敵対的な回避への防御ではない。
-# `sh -c` や `python -c` に埋めれば hook の文字列一致は外れる。そこまで塞ぐなら
+# これは失敗と浪費を減らすためのもので、敵対的な回避への防御ではない。
+# `sh -c` や `python -c` に埋めれば hook の文字列一致は外れる。そこまで防ぐなら
 # permissions.deny か sandbox が要る。
 #
 # 使い方:  sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
@@ -31,7 +31,7 @@ FAIL_LINES="${CCNAVI_GIT_FAIL_LINES:-30}"
 # 残す記録の本数。放っておくと増え続けるので世代で切る。
 KEEP_LOGS="${CCNAVI_GIT_KEEP_LOGS:-50}"
 
-# 対話になる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
+# 対話になる経路を全部止める。Bash ツールの stdin は /dev/null だが、git の
 # 資格情報プロンプトは /dev/tty を直接開くので stdin だけでは止まらない。
 GIT_TERMINAL_PROMPT=0
 GIT_PAGER=cat
@@ -39,9 +39,9 @@ PAGER=cat
 GIT_EDITOR=true
 export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 
-# 環境変数から設定を差し込む道を閉じる。`-c diff.external=<コマンド>` を引数で
-# 弾いても、GIT_CONFIG_COUNT/KEY/VALUE と GIT_EXTERNAL_DIFF で同じことができる。
-# 引数だけ見て環境を見ないと、塞いだつもりの穴が横に開いたままになる。
+# 環境変数から設定を差し込む経路を閉じる。`-c diff.external=<コマンド>` を引数で
+# 拒否しても、GIT_CONFIG_COUNT/KEY/VALUE と GIT_EXTERNAL_DIFF で同じことができる。
+# 引数だけ見て環境を見ないと、防いだつもりの穴が別の経路で開いたままになる。
 # GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が門になっているので、
 # 番号を数えて消す必要はない。門を閉じれば全部読まれない。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || :
@@ -51,7 +51,7 @@ unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJ
 # 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
 # $0 は呼ばれたときの綴りそのままなので、ワークツリーの中から相対で呼ばれても合う。
 SELF="sh $0"
-# 取り込みの sh（ADR-0093 の段階 2b）。リモートに合わせる道はここへ案内する。
+# 取り込みの sh（ADR-0093 の段階 2b）。リモートに合わせる経路はここへ案内する。
 SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
 
 # reject <識別子> <文面>。文面は標準エラーへ出す契約。識別子は拒否の種類を表す短い語で、
@@ -66,9 +66,9 @@ reject() {
 # 共通部分。ワークスペースルートの探し方と、プロジェクト名の導出はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-# ワークスペースルート。道具と記録の置き場。git のトップとは別物で、
+# ワークスペースルート。道具と記録の置き場。git のトップとは違うもので、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
-# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 11.8）。
+# 上へたどって `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 11.8）。
 WS=$(ccnavi_workspace) ||
 	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 # 解いたルートを logger に渡し、書くたびに探し直させない。
@@ -141,7 +141,7 @@ esac
 #
 # `-c diff.external=<コマンド>` は分類上ただの `git diff` のまま任意コマンドを
 # 実行する。危ない設定名 (diff.external / core.pager / core.sshCommand ...) を
-# 列挙して弾く手は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
+# 列挙して拒否するやり方は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
 # 形で落とす。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
 case "$1" in
 -*) reject global-option "サブコマンドより前のオプション ($1) は受け取りません。素の形 ($SELF <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由を利用者に伝えてください。" ;;
@@ -206,7 +206,7 @@ has() {
 #   opt_walk <コールバック> [<引数>...]
 #
 # git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
-# 名前を並べるやり方では抜ける。ここは一覧に**そのままの綴り**である名前だけを通し、ほかの `--` は
+# 名前を並べるやり方では略した綴りが通ってしまう。ここは一覧に**そのままの綴り**である名前だけを通し、ほかの `--` は
 # 断る（略した綴りも断る）。短いオプションの束（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら束の
 # 残りをその値として扱う。
 #
@@ -330,14 +330,14 @@ ow_spec() {
 # 当たるパスかを見る。当たれば in_store=yes。ADR-0093 の段階 0。
 #
 # `checkout <ref> <パス>`・`restore --source <ref>` で置き場を過去の中身に戻す形と、
-# `restore --ours / --theirs` で置き場の衝突を片側に寄せる形を止めるために使う。
+# `restore --ours / --theirs` で置き場の衝突を片側の中身で解く形を止めるために使う。
 # 置き場を動かすのは人と ccnavi のスクリプトで、エージェントが git で戻すと、承認が
 # 無かったことにも、取り下げた承認が戻ったことにもなる。
 #
 # 比べるのは git のトップからの綴り。cwd からの相対（`approved/doing/x.md` を `.ccnavi/` の中で打つ）も
-# `..` を畳んでから比べる。置き場の親（`.ccnavi`・`wip`・`.`）も置き場ごと戻すので当たる。
+# `..` を取り除いてから比べる。置き場の親（`.ccnavi`・`wip`・`.`）も置き場ごと戻すので当たる。
 # `*` `?` `[` と `:` で始まる pathspec は、どこに当たるかをここで決められないので当たるとみなす。
-# 大文字小文字は畳む（Windows と macOS の既定のファイルシステムは区別しない）。
+# 大文字小文字はそろえる（Windows と macOS の既定のファイルシステムは区別しない）。
 store_hit() {
 	in_store=no
 	sh_arg=$(printf '%s' "$1" | tr '\\' '/')
@@ -359,7 +359,7 @@ store_hit() {
 		sh_path="$(git rev-parse --show-prefix 2>/dev/null || :)$sh_arg"
 		;;
 	esac
-	# `.` と `..` を畳む。トップより上に出たら、このリポジトリの外なので当たらない。
+	# `.` と `..` を取り除く。トップより上に出たら、このリポジトリの外なので当たらない。
 	sh_norm=""
 	sh_out=no
 	sh_ifs="$IFS"
@@ -418,7 +418,7 @@ status | log | show | diff | blame | shortlog | describe | rev-parse | rev-list 
 	;;
 
 cat-file)
-	# `--textconv`・`--filters` は設定の外部コマンドを走らせ、parse-options なので略も効く。
+	# `--textconv`・`--filters` は設定の外部コマンドを走らせ、parse-options なので略も有効。
 	# 通すのは中身と型を読む形だけ（許可リスト）。
 	ow_spec "batch batch-check batch-all-objects buffer unordered allow-unknown-type" "" "" "etsp" ""
 	catfile_cb() { :; }
@@ -485,7 +485,7 @@ branch)
 
 tag)
 	# 一覧だけ通す。位置の引数（`tag <名前>` はタグを作る）は -l / --list のときの絞り込みだけ
-	# （ADR-0093 の段階 2b のレビューの相談 1）。--contains などの値を次の語で取る形は、値ごと飛ばす。
+	# （ADR-0093 の段階 2b のレビューの相談 1）。--contains などの値を次の語で取る形は、値ごと読み飛ばす。
 	tg_list=no
 	tg_words=""
 	tg_skip=no
@@ -528,9 +528,9 @@ worktree)
 		# できる。プロジェクトに .claude/ ができて --lint が error になり、
 		# tree_of の探す場所からも外れる（設計 4.1）。
 		#
-		# 書き換えずに止める。打った綴りと起きたことがずれると、記録を読んだ
+		# 書き換えずに止める。打った綴りと起きたことが食い違うと、記録を読んだ
 		# 人が追えなくなる。
-		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと飛ばす。
+		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと読み飛ばす。
 		# 知らないオプションは通さない。通すと行き先を取り違え、検査そのものが
 		# 意味を失う（2026-09-12 の決定）。
 		#
@@ -703,13 +703,13 @@ restore)
 	# 作業中の変更を捨てる側。rules.yml が reset --hard の代わりに名指しで勧める
 	# 経路でもあるので、対象を 1 つずつ名指しさせる形だけ通す。
 	#
-	# --ours / --theirs もここを通る。衝突したパスにしか効かない（普段は
+	# --ours / --theirs もここを通る。衝突したパスにしか使えない（普段は
 	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
-	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
+	# 衝突したときに解く方法はここしかない。ルールファイルに衝突マーカーが
 	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
 	# 既定もこの形は止めない（ccnavi/builtin.py）。
 	#
-	# 別のコミットの中身で戻す形（--source）と、衝突を片側に寄せる形（--ours / --theirs）は、
+	# 別のコミットの中身で戻す形（--source）と、衝突を片側の中身で解く形（--ours / --theirs）は、
 	# 承認済みチケットの置き場に当たるパスには使わせない（ADR-0093 の段階 0）。
 	# 置き場を過去の中身に戻すと、承認が無かったことにも、消えた印が戻ったことにもなる。
 	# 置き場の衝突は、どちらの承認を採るかを人が決める。オプションは許可リストで読む（段階 2b）。
@@ -755,10 +755,10 @@ merge)
 	# 早送り以外も通す。docs/claude/worktree.md の手順は、main が先に進んだ状態から
 	# ブランチへ main を取り込む形を必ず通る。そこを --ff-only に絞ると、
 	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
-	# 解こうとする手をラッパースクリプトが止めてしまっては、止めた先に進む道が無くなる。
+	# 解こうとする操作をラッパースクリプトが止めてしまうと、先に進む方法が無くなる。
 	#
 	# 止めるのは、衝突を人が見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
-	# もう一方の変更を黙って落とす。並行して動いている他セッションの書きかけが
+	# もう一方の変更を気づかないうちに落とす。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、落ちたことは差分にも記録にも残らない。
 	# オプションは許可リストで読む（略した --strategy-o=ours・束の -sours も同じに読む。段階 2b）。
 	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash" \
@@ -778,14 +778,14 @@ merge)
 	;;
 
 merge-file)
-	# 衝突を両方取り込む形 (--union) を作るための道。通すのは結果を標準出力に出す形
+	# 衝突を両方取り込む形 (--union) を作るための方法。通すのは結果を標準出力に出す形
 	# (-p / --stdout) だけ。付けないと git は 1 つめのファイルを直に書き換える。
-	# ファイルを書くのは Edit / Write に寄せる。そちらなら hook が行き先を見られる。
+	# ファイルを書く手段は Edit / Write にそろえる。そちらなら hook が行き先を見られる。
 	#
 	# オプションは知っているものだけ通す。git は長いオプションの略記 (--std) も
 	# 打ち消し (--no-stdout) も受け取るので、知らない綴りを通すと -p を付けたつもりで
 	# 書き込みに戻る。-L と --marker-size は値を次の語で取る。`-L -p` の -p は
-	# ラベルで、-p を付けたことにならない (git はファイルを書く)。だから値ごと飛ばす。
+	# ラベルで、-p を付けたことにならない (git はファイルを書く)。だから値ごと読み飛ばす。
 	# `--` の後ろはファイル名。そこに -p があっても数えない。
 	# 束ねた短いオプション (-pq) は分けて書かせる。1 文字ずつ読むと -L の値を取り違える。
 	#
@@ -819,7 +819,7 @@ merge-file)
 
 commit)
 	# 通す。中身の点検は /commit スキルと ask ルールの側でやる。
-	# ここで見るのは、点検そのものを飛ばす形（--no-verify・-n）と、直前のコミットを書き換える
+	# ここで見るのは、点検そのものを行わない形（--no-verify・-n）と、直前のコミットを書き換える
 	# --amend。オプションは許可リストで読む（略した --no-verif・束の -an も同じに読む。段階 2b）。
 	ow_spec "all quiet verbose signoff no-signoff only include allow-empty allow-empty-message dry-run short porcelain long branch null status no-status reset-author edit no-edit verify no-verify pathspec-file-nul amend" \
 		"message file author date cleanup trailer pathspec-from-file template fixup squash" "untracked-files" \
@@ -978,9 +978,9 @@ fetch | pull)
 
 push)
 	# 自分が居るブランチを、同じ名前でそのまま送る形だけを通す。レビューは
-	# マージリクエストの実物に結ぶので、そこまではエージェントが自分で運べたほうがよい。
+	# マージリクエストの実物に結ぶので、そこまではエージェントが自分で進められたほうがよい。
 	#
-	# 通さないのは「戻せなくなる形」と「人の判断を飛び越す形」の 2 つ。
+	# 通さないのは「戻せなくなる形」と「人の判断を経ない形」の 2 つ。
 	# 履歴を書き換える force、消す delete、まとめて送る all/mirror/tags、
 	# 別の綴りへ送る refspec（`HEAD:main` が書ける）、そして統合先そのものへの直接の push。
 	# 統合は人がマージリクエストで行う。
@@ -991,15 +991,15 @@ push)
 	# 子チケットのワークツリーからは送らない。レビューはマージリクエストの実物に結び、
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
-	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
+	# あるブランチができ、人が見た HEAD と合流した HEAD が食い違うことになる。
 	# 見分けるのは承認済みチケット（各ツリーの `.ccnavi/approved/{doing,done}/<名前>.md` と
 	# レビュー待ちの `wip/proposals/review/<名前>.md`）に `parent:` があるかだけ。
 	# 承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# ワークツリーはワークスペースの .claude/worktrees/ の下にある。元リポジトリが
 	# プロジェクトでも置き場はワークスペース（設計 11.2）なので、git の
 	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
-	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
-	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
+	# 条件が一致せず、承認済みチケットの検査が丸ごと行われない。ガードが「有効な
+	# つもりで有効になっていない」形になるので、ワークスペースルートを基準にする。
 	push_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
 	push_root="$WS_P"
 	log_debug push の判定の材料 -- "branch=$push_branch" "top=$push_top" "workspace=$WS"
@@ -1022,8 +1022,8 @@ push)
 				[ -d "$push_tree" ] || continue
 				case "${CCNAVI_TICKETS_APPROVED:-}" in
 				/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
-				# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。ずれると、
-				# env を書いていないワークスペースで、この検査が黙って飛ぶ。
+				# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。食い違うと、
+				# env を書いていないワークスペースで、この検査が気づかないうちに行われなくなる。
 				*) push_copies="$push_tree/${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" ;;
 				esac
 				case "${CCNAVI_TICKETS_PROPOSAL:-}" in
@@ -1109,7 +1109,7 @@ clone | submodule | lfs)
 	;;
 esac
 
-# push が通ったら、親のブランチなら家族の控えを作る（ADR-0093 の 4.3 の移り目。段階 2b）。
+# push が通ったら、親のブランチなら家族の控えを作る（ADR-0093 の 4.3「最初の push で C1 の対象に入る」。段階 2b）。
 #
 # 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親の写しか提案が
 # ある）で、送り先が origin のときだけ。控えがあれば（present）sha を書き直すだけで、closed・
@@ -1172,9 +1172,9 @@ root=$(git rev-parse --show-toplevel 2>/dev/null || :)
 log_info 受け付けた -- "sub=$sub" "args=$#"
 log_debug 判定の材料 -- "sub=$sub" "action=${action:-}" "top=$root" "cwd=$PWD" "workspace=$WS"
 
-# 記録はワークスペースの下に寄せる（REQ-MLT-14、設計 4.1）。git のトップに書くと、
+# 記録はワークスペースの下にまとめる（REQ-MLT-14、設計 4.1）。git のトップに書くと、
 # モード B ではプロジェクトのリポジトリの中に出る。ワークスペースの .gitignore の
-# /logs/ はワークスペースルート起点なので効かず、public のリポジトリに運用の痕跡が入る。
+# /logs/ はワークスペースルート起点なので当てはまらず、public のリポジトリに運用の痕跡が入る。
 logproject=$(ccnavi_project "$(pwd)" "$WS")
 if [ -n "$logproject" ]; then
 	logdir="$WS/logs/$logproject"
@@ -1212,12 +1212,12 @@ if [ ! -f "$logrel" ]; then
 fi
 
 # 本文は目印の次の行から。目印と同じ行が出力に含まれても、awk は最初の 1 件で
-# 立ち上がるので取り違えない。
+# f を立て、それより後ろだけを出すので取り違えない。
 body() { awk 'f; /^--- 出力 ---$/ { f = 1 }' "$logfile"; }
 
 lines=$(body | awk 'END { print NR + 0 }')
 
-# 要約は「次の判断に効く数値」だけにする。本文をもう 1 度読ませないためのもので、
+# 要約は「次の判断に使う数値」だけにする。本文をもう 1 度読ませないためのもので、
 # 本文の代わりではない。
 summary=$(body | awk -v cmd="$sub" '
 	/^diff --git /			{ files++ }
@@ -1250,11 +1250,11 @@ if [ "$status" -eq 0 ]; then
 else
 	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"
 	body | tail -n "$FAIL_LINES"
-	# Windows では、プロセスの cwd がそのディレクトリを掴む。Bash ツールの cwd は呼び出しを
+	# Windows では、プロセスの cwd になっているディレクトリは使用中になる。Bash ツールの cwd は呼び出しを
 	# またいで残る親のシェルのものなので、ワークツリーの中へ cd したまま remove すると、git が
 	# 中身を消したあと最後のディレクトリで Permission denied になり、空のディレクトリが残る。
 	# サブシェルの中で cd してから打っても防げず、ここで pwd を見ても親の cwd は分からないので、
-	# 起きたときに立て直し方を言う。
+	# 起きたときに直し方を言う。
 	if [ "$sub" = worktree ] && [ "${action:-}" = remove ] && body | grep -q 'Permission denied'; then
 		printf '案内: ワークツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直します。中にファイルが残っているなら消さずに利用者に報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
 	fi

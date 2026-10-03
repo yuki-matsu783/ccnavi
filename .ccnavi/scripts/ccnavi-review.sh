@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-review — レビューの依頼と確認。親（メインエージェント）だけが呼ぶ。
+# ccnavi-review レビューの依頼と確認。親（メインエージェント）だけが呼ぶ。
 #
 #   sh .ccnavi/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 <HTML>
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
@@ -17,7 +17,7 @@
 #   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
 #            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
 #            → `ccnavi review requested` がマーカーを置く
-#            人はレビューをマージリクエストで行うので、入れ物が無いことで止めない。題から Draft を
+#            人はレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
 #            --eli5 <HTML> は必須（ADR-0094・ADR-0095）。変更をやさしく説明した 1 枚の HTML で、
 #            このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html）にコミットしておく。
@@ -34,7 +34,7 @@
 #   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、指摘ごとに
 #            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
 #            → issue に回す分があればここが issue を作り、決めた内容をコメントに写す
-#            ボードは同じ道を --preview（一覧を読む）と --choices --digest（押した選択を置く）で通る
+#            ボードは同じ経路を --preview（一覧を読む）と --choices --digest（押した選択を置く）で通る
 #
 # リモートへの道具は、gh / glab があればそれ（認証はツールに任せる）、無ければ curl と
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
@@ -110,8 +110,8 @@ esac
 # ---- 場所。ワークスペースルートと、いまのワークツリー。Windows の Git Bash では pwd -W で綴りを直す。
 #
 # 根は git に聞かない。モード B では cwd がプロジェクトの中にあると git は
-# プロジェクトを答え、写し・マーカー・状態の置き場がプロジェクト側にずれる。
-# 道具の置き場は上へ歩いて探す（設計 11.8）。
+# プロジェクトを答え、写し・マーカー・状態の置き場がプロジェクト側を指してしまう。
+# 道具の置き場は上へたどって探す（設計 11.8）。
 root=$(ccnavi_workspace) ||
 	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 # 解いたルートを logger に渡し、書くたびに探し直させない。
@@ -122,7 +122,7 @@ state="$root/${CCNAVI_STATE:-logs/state}"
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
 # 実行ファイルと互換の版が食い違っていれば、最初に呼ぶときに 1 度だけ言う（止めない）。
-# 引数の誤りで断る道と、実行ファイルを使わない副命令（origin / fetch / comment）では起こさない。
+# 引数の誤りで断る経路と、実行ファイルを使わない副命令（origin / fetch / comment）では起こさない。
 # `$( )` の中から呼ぶと印が親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
 told_skew=""
 tell_skew() {
@@ -172,14 +172,14 @@ if [ "$needs_host" = yes ]; then
 	[ -z "$origin" ] && fail no-origin "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
 	# 伏せた綴りを、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
 	# 生の $origin を文面に入れる綴りを 1 つも残さないことで、次に fail を足す人が
-	# 素通りできないようにする。URL に資格情報を埋める使い方は普通にあり、
+	# 気づかずに生の綴りを使わないようにする。URL に資格情報を埋める使い方は普通にあり、
 	# 出力はエージェントの文脈にも記録にも残る。
 	origin_shown=$(ccnavi_mask_url "$origin")
 	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
 	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の綴りには
 	# scheme が無いので、そこだけ https にする。
-	# host には**ポートを残す**。落とすと `:8929` のような立て方が全滅し、しかも
-	# 落ちたポートがプロジェクトのパスの先頭に混ざる（`8929/demo/greeter`）。
+	# host には**ポートを残す**。落とすと `:8929` のような立て方がすべて当たらなくなり、しかも
+	# 落ちたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
 	case "$origin" in
 	http://*) scheme=http ;;
 	*) scheme=https ;;
@@ -187,7 +187,7 @@ if [ "$needs_host" = yes ]; then
 	rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
 	[ "$rest" = "$origin" ] && fail origin-unreadable "origin の綴りを読めない ($origin_shown)。"
 	# `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
-	# 落とさないと host にトークンが混ざり、API の綴りにも `origin` の出力にも漏れる（実測）。
+	# 落とさないと host にトークンが入り込み、API の綴りにも `origin` の出力にも漏れる（実際に確かめた）。
 	# 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
 	authority="${rest%%/*}"
 	case "$authority" in
@@ -265,11 +265,11 @@ branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 # curl の 1 回の時間の上限（秒）。応答しないホストで止まり続けないように。gh / glab は道具に任せる
 api_max_time=120
 
-# api <METHOD> <path> [<JSON body>] — レスポンスの JSON を標準出力へ。path は api_base からの相対。
+# api <METHOD> <path> [<JSON body>] レスポンスの JSON を標準出力へ。path は api_base からの相対。
 #
 # 失敗したら標準出力には何も出さず、ホストが返した本文ごと標準エラーへ出して 1 を返す。
 # gh と glab は 4xx でも本文を標準出力へ書くので、そのまま流すと `{"message":"Not Found"}` が
-# jq に渡り、`{number: null}` の形で「マージリクエストができた」ことになる（実測）。
+# jq に渡り、`{number: null}` の形で「マージリクエストができた」ことになる（実際に確かめた）。
 api() {
 	method="$1"
 	rel="$2"
@@ -317,11 +317,11 @@ api() {
 
 api_failed() {
 	printf 'ccnavi-review: %s への %s %s が失敗した:\n%s\n' "$host" "$1" "$2" "$3" >&2
-	# GraphQL を塞いでいる実行環境がある（Claude Code のセッションは REST だけ通す）。
+	# GraphQL を制限している実行環境がある（Claude Code のセッションは REST だけ通す）。
 	# GitHub ではスレッドの解決状態（threads）と Draft 外し（undraft）が GraphQL でしか
 	# 扱えないので、そこだけが 403 で止まる。curl の経路は -f が本文を捨てるため、
-	# 画面に残るのは番号だけになり、認証の失敗と見分けが付かない。詰まったその場で
-	# 逃げ道を名指しする。綴りは transport を選ぶところの案内と揃える。
+	# 画面に残るのは番号だけになり、認証の失敗と見分けが付かない。止まったその場で
+	# 代わりの方法を名指しする。綴りは transport を選ぶところの案内と揃える。
 	case "$2" in
 	graphql)
 		printf 'ccnavi-review: %s\n' \
@@ -330,7 +330,7 @@ api_failed() {
 	esac
 }
 
-# pages <path> — 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。
+# pages <path> 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。
 pages() {
 	rel="$1"
 	page=1
@@ -340,7 +340,7 @@ pages() {
 	esac
 	all='[]'
 	while :; do
-		# 呼び手が `|| ...` で受けると set -e が効かないので、落ちたらここで 1 を返す（並びでない答えも）
+		# 呼び手が `|| ...` で受けると set -e が有効にならないので、落ちたらここで 1 を返す（並びでない答えも）
 		chunk=$(api GET "$rel${sep}per_page=100&page=$page") || return 1
 		n=$(printf '%s' "$chunk" | "$JQ" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
 		all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
@@ -446,7 +446,7 @@ threads() {
 	fi
 }
 
-# ---- レビュー。変更要求の状態を CHANGES_REQUESTED に寄せる。
+# ---- レビュー。変更要求の状態を CHANGES_REQUESTED にそろえる。
 
 reviews() {
 	mr_number="$1"
@@ -520,7 +520,7 @@ undraft() {
 			printf 'false\n'
 			return 0
 		fi
-		# squash も立てる。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
+		# squash も有効にする。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
 		# （マージのときに人が選ぶ）ので、コメントに書くだけ。
 		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')
 		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" | "$JQ" -r '.draft // .work_in_progress // false'
@@ -585,7 +585,7 @@ post_decision() {
 
 account_max_time="${CCNAVI_REVIEW_ACCOUNT_TIMEOUT:-15}"
 
-# timed <秒> <書き先> <コマンド>... — 標準出力を書き先へ、標準エラーは捨てる。時間を過ぎたら止めて 1。
+# timed <秒> <書き先> <コマンド>... 標準出力を書き先へ、標準エラーは捨てる。時間を過ぎたら止めて 1。
 timed() {
 	timed_limit="$1"
 	timed_out="$2"
@@ -647,12 +647,12 @@ mkdir -p "$state"
 result="$state/review-result-$$.json"
 # 抜けるときに写しを消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても（写しの名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
-# 元の終了コードを上書きしないよう、失敗を飲んでから元の値で抜け直す。
+# 元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
 eli5_posted=""
 trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- C1（ADR-0093 の 4.3。段階 2d）と人の判断の運び（4.6・D27）
+# ---- C1（ADR-0093 の 4.3。段階 2d）と人の判断を運ぶ処理（4.6・D27）
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
 ccnavi_c1_sh="$(dirname "$0")"
@@ -711,7 +711,7 @@ carry_human() {
 
 case "$sub" in
 origin)
-	# origin をどう読んだか。当たらないときに、どこで読み違えたかを見る出口。
+	# origin をどう読んだか。当たらないときに、どこで読み違えたかを見るための出力。
 	# URL に埋まった資格情報は伏せる（`ccnavi_mask_url` が作る `origin_shown`）。
 	# ここの出力はエージェントの文脈と記録に残る。
 	printf 'origin=%s\nkind=%s\nscheme=%s\nhost=%s\npath=%s\napi_base=%s\nbranch=%s\ntransport=%s\n' \
@@ -885,7 +885,7 @@ ${eli5_how}"
 	prepared=$(ccnavi review prepare "$@") || exit $?
 	file=$(printf '%s\n' "$prepared" | sed -n 1p)
 	draft=$(printf '%s\n' "$prepared" | sed -n 2p)
-	# 段 1.5: 入れ物が無ければ作る。人はレビューをここで行うので、
+	# 段 1.5: マージリクエストが無ければ作る。人はレビューをここで行うので、
 	# 「見る場所が無い」で止めない。統合するのは人なので下書きで作る。
 	mr=$(find_mr)
 	if [ -z "$mr" ]; then
@@ -1107,7 +1107,7 @@ ready)
 close-early)
 	# 人が端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
 	# ここが残りを issue に写し、コメントを投稿する。Draft を外すのは、親が片付けて
-	# push したあとの ready（外す道は 1 本）。
+	# push したあとの ready（外す経路は 1 本）。
 	reason=""
 	make_issue=1
 	while [ "$#" -gt 0 ]; do

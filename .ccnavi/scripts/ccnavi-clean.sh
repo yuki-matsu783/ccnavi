@@ -1,20 +1,20 @@
 #!/bin/sh
-# ccnavi-clean — ワークツリー 1 本の生成物を消す。`git worktree remove` の前に打つ。
+# ccnavi-clean ワークツリー 1 本の生成物を消す。`git worktree remove` の前に打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前>
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
 #
 # Windows では、pnpm の node_modules が深すぎる（260 文字を超える）ことと、uv の
-# .venv が掴まれていることで、`git worktree remove` が途中で止まり、消しきれなかったディレクトリが残る。
+# .venv が使用中であることで、`git worktree remove` が途中で止まり、消しきれなかったディレクトリが残る。
 # 先に生成物だけを消しておく。
 #
 # <名前> は .claude/worktrees/ の直下のディレクトリの名前。パスは受け付けない。
-# `rm -rf` の代わりに任意の場所を消す道具にしないためで、ccnavi の recursive-delete の
+# `rm -rf` の代わりに任意の場所を消す手段にしないためで、ccnavi の recursive-delete の
 # 趣旨（消す対象を名指しする）に合わせてある。
 #
 # 消すのは、作り直せば戻る決まった名前のディレクトリだけ。何を消すかと消し方は
 # ccnavi-clean.js にある。node が無ければ、同じものを sh で消す（clean_with_sh）。
-# sh の rm は Windows の深い node_modules で粘りきれないことがあり、そのときは
+# sh の rm は Windows の深い node_modules を消しきれないことがあり、そのときは
 # 消し残しとして 1 で返る。
 #
 # ワークツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
@@ -138,7 +138,7 @@ clean_with_sh() {
 	fi
 
 	# 決まった名前はそこで降りるのをやめる（-prune）。out は package.json の隣かどうかを
-	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find の文句は捨てる）。
+	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find のエラー出力は捨てる）。
 	cw_found=$(cd "$cw_top" && {
 		find . -name .git -prune \
 			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache \) \
@@ -204,7 +204,7 @@ EOF
 			printf 'would remove %s\n' "$cw_rel"
 			continue
 		fi
-		# 掴みがすぐ離れることがあるので、3 回まで試す（JS の maxRetries に合わせる）。
+		# 使用中の状態がすぐ解けることがあるので、3 回まで試す（JS の maxRetries に合わせる）。
 		cw_tries=0
 		cw_err=""
 		while :; do

@@ -1,12 +1,12 @@
 #!/bin/sh
-# ccnavi-push-approved — 承認済みチケットの置き場（と、承認で todo/ から消えた提案）だけをコミットし、
+# ccnavi-push-approved 承認済みチケットの置き場（と、承認で todo/ から消えた提案）だけをコミットし、
 # 保護されたブランチでなければ push する。
 #
 #   sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
 #
 # 承認はしない。承認済みチケットは置かれただけでは他の機械に届かない（設計 9.2）ので、置いたあとに
-# 運ぶのがこの sh。端末の承認は ccnavi-approve.sh が、ボードの承認とフローの保存は端末に送った 1 行が、
-# 人の判断の入口（ccnavi-review.sh chat・config-synced・close-early）は最後に呼ぶ（D27）。
+# 運ぶ（コミットして push する）のがこの sh。端末の承認は ccnavi-approve.sh が、ボードの承認とフローの保存は端末に送った 1 行が、
+# 人の判断の入口（ccnavi-review.sh chat・config-synced・close-early）が、それぞれ最後にこの sh を呼ぶ（D27）。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の親のワークツリーは、
@@ -27,11 +27,11 @@
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけを運ばない
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
 #   1 件ずつも。辿るとワークスペースの外のリポジトリにコミットして push する
-# - ブランチの上に居ない（detached）ツリーは名指しして飛ばす。失敗には数えない
+# - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
 # - main / master / develop / release / release/* はコミットだけして push しない
 # - 1 本のツリーで add・commit・push が落ちても、他のツリーは運ぶ
 #
-# 終了コード: 0 運ぶものが無い・全部コミットした（push しなかったブランチ、飛ばしたツリーを含む） /
+# 終了コード: 0 運ぶものが無い・全部コミットした（push しなかったブランチ、処理しなかったツリーを含む） /
 #           1 ステージかコミットできなかったツリーか、push が落ちたツリーが 1 つ以上ある /
 #           2 引数の誤り・ワークスペースルートが見つからない・一時ファイルが作れない
 
@@ -168,7 +168,7 @@ carry_family() {
 			git -C "$cf_tree" add -A -- ":(literal)$cf_path" 2>/dev/null || :
 		done <"$ccnavi_c1_tmp/carry"
 		sed 's/^/:(literal)/' "$ccnavi_c1_tmp/carry" | tr '\n' '\000' >"$ccnavi_c1_tmp/pathspec"
-		# C1 と同じく、利用者の hook は飛ばし、署名などで止まらないよう見張りの時間で切る（決定 C）。
+		# C1 と同じく、利用者の hook は実行せず、署名などで止まらないよう見張りの時間で切る（決定 C）。
 		if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$cf_tree" \
 			commit --quiet --only --no-verify -m "ccnavi: 承認済みチケットを更新" \
 			--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
@@ -282,7 +282,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	changed=$(git -C "$tree" status --porcelain -- "$approved" "$skip_temp" 2>/dev/null || :)
 	[ -n "$changed" ] || continue
 
-	# 何か 1 つでも運ぶ対象があったことの印。detached で飛ばしても「無い」とは言わない。
+	# 何か 1 つでも運ぶ対象があったことの印。detached で処理しなくても「無い」とは言わない。
 	printf 'seen\n' >>"$state"
 
 	name=$(basename "$tree")
