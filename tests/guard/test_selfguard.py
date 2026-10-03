@@ -18,8 +18,9 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest import mock
 
-from ccnavi import platformtag, selfguard, settings, shellread
+from ccnavi import platformtag, rules, selfguard, settings, shellread
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -858,6 +859,42 @@ class SelfGuardTest(unittest.TestCase):
         line = self.records()[-1]
         self.assertIn("guarded", line)
         self.assertIn("rules:restored", line["guarded"])
+
+
+class InsertTest(unittest.TestCase):
+    """組み込みの守りを組み立てられないときの扱い。"""
+
+    BROKEN = {
+        "id": selfguard.RECORDS_RULE_ID,
+        "match": "Write|Edit|NotebookEdit",
+        "regex": "(",
+        "message": selfguard.RECORDS_MESSAGE,
+    }
+
+    def test_組み立てられない守りは判定を止めずに外し診断ログに残す(self):
+        for root, expected in (("/ws", "/ws"), ("", None)):
+            with self.subTest(root=root):
+                rule_set = rules.RuleSet(version=rules.VERSION)
+                with mock.patch.object(selfguard.diaglog, "get") as get:
+                    selfguard._insert(rule_set, dict(self.BROKEN), root)
+                self.assertEqual(rule_set.deny, [])
+                # root が無ければ省いた扱い（CLAUDE_PROJECT_DIR）。出どころは実行ファイルと同じ。
+                get.assert_called_once_with("ccnavi", expected)
+                warned = get.return_value.warn
+                warned.assert_called_once()
+                fields = warned.call_args.kwargs
+                self.assertEqual(fields["rule"], selfguard.RECORDS_RULE_ID)
+                self.assertGreaterEqual(fields["problems"], 1)
+                # 綴り（守る先のパス）は渡さない。
+                self.assertEqual(set(fields), {"rule", "problems"})
+
+    def test_組み立てられる守りは先頭に挿し診断ログに書かない(self):
+        rule_set = rules.RuleSet(version=rules.VERSION)
+        good = dict(self.BROKEN, regex="x$")
+        with mock.patch.object(selfguard.diaglog, "get") as get:
+            selfguard._insert(rule_set, good, "/ws")
+        self.assertEqual([r.id for r in rule_set.deny], [selfguard.RECORDS_RULE_ID])
+        get.assert_not_called()
 
 
 if __name__ == "__main__":

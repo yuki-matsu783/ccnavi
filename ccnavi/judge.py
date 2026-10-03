@@ -738,7 +738,9 @@ def project_mismatch(
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
     # チケットの範囲がいつまでも判定に使われる。
     assert index is not None
-    ticket = index.get(t.name)
+    # ticket_verdict と同じ引き方。ここだけ厳密に引くと、区別しない機械で `I0001-01` と
+    # 切ったワークツリーは範囲の判定に掛かりながら、取り違えの検査を素通りする。
+    ticket = tree.lookup(index, t.name)
     if ticket is None:
         return ""
     parent = index.get(ticket.parent) if ticket.is_child else None

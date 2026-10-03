@@ -123,7 +123,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
-from . import fsio, gitstate, platformtag, rules, settings, shellread, tree
+from . import diaglog, fsio, gitstate, platformtag, rules, settings, shellread, tree
 from .modes import DISABLE, DRY_RUN, ENABLE
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
@@ -641,6 +641,7 @@ def add_rules(
             "regex": guard_shell_regex(root, bin_path, project_home, common_files),
             "message": SHELL_MESSAGE,
         },
+        root,
     )
     clause = binary_clause(bin_path)
     if clause:
@@ -653,6 +654,7 @@ def add_rules(
                 "regex": clause + "$",
                 "message": BINARY_MESSAGE,
             },
+            root,
         )
     home_glob = project_home_glob(project_home)
     if home_glob:
@@ -667,6 +669,7 @@ def add_rules(
                 "glob": home_glob,
                 "message": PROJECT_HOME_MESSAGE,
             },
+            root,
         )
     _insert(
         rule_set,
@@ -676,6 +679,7 @@ def add_rules(
             "regex": records_regex(*records),
             "message": RECORDS_MESSAGE,
         },
+        root,
     )
     common = common_layer_regex(root, common_files)
     if common:
@@ -688,14 +692,20 @@ def add_rules(
                 "regex": common,
                 "message": COMMON_LAYER_MESSAGE,
             },
+            root,
         )
 
 
-def _insert(rule_set: rules.RuleSet, raw: dict) -> None:
+def _insert(rule_set: rules.RuleSet, raw: dict, root: str) -> None:
     built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]}, builtin=True)
     if problems or not built.deny:
         # 組み立てられないのは、このファイルの書き損じ。判定を止める理由には
-        # しない。止まると、直すための呼び出しごと止まる。
+        # しない。止まると、直すための呼び出しごと止まる。ただ黙って外すと、守りが
+        # 1 本欠けたことに誰も気づけないので、診断ログに残す。書くのは組み込みの id と
+        # 問題の件数だけ（綴りには守る先のパスが入る）。root が無ければ CLAUDE_PROJECT_DIR。
+        diaglog.get("ccnavi", root or None).warn(
+            "組み込みの守りを組み立てられず外した", rule=raw.get("id", ""), problems=len(problems)
+        )
         return
     rule_set.deny.insert(0, built.deny[0])
 

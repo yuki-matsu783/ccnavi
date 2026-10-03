@@ -33,7 +33,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, fsio, history, modes, phase, review, rules, settings, tree
+from . import approval, fsio, history, modes, phase, review, settings, tree
 from . import ticket as ticket_mod
 
 # ---- 入力 -----------------------------------------------------------------------------------
@@ -314,7 +314,6 @@ def approve(
     stdout: TextIO,
     stderr: TextIO,
     conf: settings.Settings,
-    rule_set: rules.RuleSet,
     root: str,
     only: list[str] | None = None,
 ) -> int:

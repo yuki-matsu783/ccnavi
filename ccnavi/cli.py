@@ -38,7 +38,6 @@ from . import (
     phase,
     prune,
     review,
-    ruleload,
     selfguard,
     settings,
     suggest,
@@ -880,11 +879,8 @@ def _parsed(
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
-        rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
         # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
-        approved = core.approve(
-            stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
-        )
+        approved = core.approve(stdin, stdout, stderr, conf, root, only=list(args.command))
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。

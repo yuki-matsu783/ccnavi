@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+from unittest import mock
 
 from ccnavi import configsync, ops, phase, risk, settings
 from tests.config.test_config_union import (
@@ -358,6 +359,29 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertIn("プロジェクトの層として読めない", started.stderr)
         self.assertEqual(read(config_of(tree, "rules")), before)
         self.assertIsNone(self.mark())
+
+    def test_a_common_file_that_vanishes_after_listing_stops_the_plan(self):
+        """一覧に載せたあとで消えた共通層は、空として写さずに止める。"""
+        conf = self.settings()
+        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree(self.lib, "i0001")
+        before = read(config_of(tree, "rules"))
+        real = configsync._read_strict
+
+        def vanished(path):
+            # isfile で見えたあとに消えた競合。_read_strict は「無い」を (None, "") で返す。
+            if path == conf.rules:
+                return None, ""
+            return real(path)
+
+        with mock.patch.object(configsync, "_read_strict", vanished):
+            copied, why = configsync.plan(conf, self.ws, tree)
+
+        self.assertEqual(copied, [])
+        self.assertIn("を読めない (無い)", why)
+        self.assertIn(os.path.basename(conf.rules), why)
+        self.assertEqual(read(config_of(tree, "rules")), before)
 
     def test_uncommitted_edits_stop_the_start(self):
         """写す先に未コミットの変更があれば、人の書きかけを上書きしないよう止める。"""
