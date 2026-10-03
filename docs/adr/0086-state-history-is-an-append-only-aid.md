@@ -75,7 +75,7 @@ keywords: [状態, 遷移, 追記, 履歴, チケット, 記録, 経路, 置き�
 
 ## 追記（ADR-0093、2026-09-30）
 
-- 種類 `withdrawn`（承認の取り下げ。`doing` → `todo`。ADR-0093 の 8.8）と、経路 `chrome`（Chrome 拡張）を足した
+- 種類 `withdrawn` と、経路 `chrome`（Chrome 拡張）を足した。`withdrawn` は承認の取り下げで、`doing` → `todo` に動く（ADR-0093 の 8.8）
 - 欄 `actor`（ホストのアカウント名）と `version`（Chrome 拡張の版）を足した。Chrome 拡張が書く跡（承認・改版・
   取り下げ）に入る。手元の経路の跡には書かない（前と同じ中身）
 - 手元の取り込みの後の判定し直しは、`via: chrome` の承認・改版の跡の `version` を読み、Chrome と手元の判定の違いを

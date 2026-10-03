@@ -581,8 +581,8 @@ allow:
 
 `match: Stop` の `allow` のルールは、メインエージェントのターンの終わり（`Stop`）に当たる（ADR-0090）。
 渡す回（`every` で決まる回）にだけ `{"decision": "block", "reason": "NUDGE_STOP_RULE: …"}` で止め、ルールの文を渡す。
-振り返り（`docs/claude/skill-review.md`）のための仕組みで、`reason` の頭には実行ファイルが決まった前置きを付ける
-（タスクの続きではない。振り返りだけをする。ユーザへの問いで終わったターンならその問いを最後に書き直す。何も無ければ「振り返り: 無し」）。
+振り返り（`docs/claude/skill-review.md`）のための仕組みで、`reason` の頭には実行ファイルが決まった前置きを付ける。
+前置きの中身は、タスクの続きではないこと、振り返りだけをすること、ユーザへの問いで終わったターンならその問いを最後に書き直すこと、何も無ければ「振り返り: 無し」と書くこと。
 当てる文字列は無いので `glob: "*"` と書く。
 
 ```yaml
@@ -1149,7 +1149,7 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 着手済みで、そのワークツリーに未コミットの変更が無く（追跡していないファイルも数える）、基準点より先に自分で作ったコミットがあれば
 （子なら親のブランチ、親なら `origin/HEAD` を取り込んだだけのコミットとマージのコミットは数えない）、
 `{"decision": "block", "reason": …}` で止め、`ccnavi-ticket.sh finish <識別子>` の綴りと「まだ続けるなら理由を書いてから終える」を
-渡す（理由コード `NUDGE_TICKET_FINISH`。報告があれば同じ JSON の `systemMessage` に載る。記録の `decision` は `nudge`）。同じセッションで
+渡す（理由コード `NUDGE_TICKET_FINISH`）。報告があれば同じ JSON の `systemMessage` に載る。記録の `decision` は `nudge`。同じセッションで
 同じチケットを同じ HEAD のまま促すのは 1 回だけで（控えは `logs/state/nudged-<セッション>.json`）、コミットを足せばまた促す。
 payload の `stop_hook_active` が真なとき、控えを置けないとき、子で親のブランチを引けないときも促さない。チケット制御かモードが `disable`、未着手、書き込み停止中（`blocked`）、親で `finish` が通らない形（開いている子・
 レビュー準備中／レビュー待ち・フィードバック計画待ち・終わっていないフェーズ）、git を読めないとき、`SubagentStop` では促さない。
@@ -1441,7 +1441,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
 - 下書きの置き場（ワークツリーのルートの直下 1 段の `scratchpad/`。大文字小文字を区別する）。**実行前チェックだけ**で、実行後チェックと
   サブエージェント終了時チェックは外さない。そこに現れるのは `scratchpad/` が追跡されているときなので、範囲外として報告する
-- ELI5 の HTML の置き場（ワークツリーのルートからの `wip/eli5/` の下。大文字小文字を区別する。ADR-0096）。追跡される置き場なので、
+- ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字を区別する（ADR-0096）。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
   チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に適用される（ADR-0097）
 - どの置き場も `\` を `/` に直さずに見る。`wip\eli5\x.py` や `wip\proposals\todo\x.py` という名前の 1 ファイル（Linux / macOS で作れる）は
@@ -1947,11 +1947,11 @@ error 2 件、warn 2 件、info 0 件
 |---|---|
 | error | `.claude/settings.json` の `env` が `CCNAVI_MODE=disable` を宣言している |
 | error | `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL` が 2 値として読めない値（`enable` として扱って動く） |
-| error | `.claude/settings.json` の `env` の `CCNAVI_BIN_PATH` が指す先が在るのに実行できない（hook が 126 で起動せず、何も判定していない。POSIX だけで見る。Windows は実行ビットを持たない。書いた綴りをそのまま見て、`.exe` は補わない） |
+| error | `.claude/settings.json` の `env` の `CCNAVI_BIN_PATH` が指す先が在るのに実行できない。hook が 126 で起動せず、何も判定していない。POSIX だけで見る。Windows は実行ビットを持たない。書いた綴りをそのまま見て、`.exe` は補わない |
 | warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
 | warn | 守る働きを持つ設定が止めない値になっている（`CCNAVI_GUARD_CORE_FILES` と `CCNAVI_RESTORE_IF_DENY` が `disable` か `dry-run`、`CCNAVI_GUARD_UNWATCHED` と `CCNAVI_GUARD_TICKET_APPROVAL` が `disable`） |
-| warn | 上書き設定ファイル（`ccnavi.settings.local.json`。ccnavi 自身のソースツリーだけで読む。設計 4.3）が読めない |
+| warn | 上書き設定ファイル（`ccnavi.settings.local.json`）が読めない。このファイルは ccnavi 自身のソースツリーだけで読む（設計 4.3） |
 | warn | `CCNAVI_TICKET_CONTROL=disable`（チケットの範囲も HITL ポイントも適用されない） |
 
 **層**
@@ -2001,7 +2001,7 @@ error 2 件、warn 2 件、info 0 件
 | warn | ワークツリーでもワークスペースルートでもないのに `.claude/` を持つディレクトリがある |
 | warn | 下書きの置き場（`scratchpad/`）に追跡されているファイルがある、または `scratchpad/` が git で無視されていない（ワークスペースと各プロジェクトのそれぞれ。追跡されていると、実行後チェックが下書きを範囲外として報告しはじめる） |
 
-**取り込みと権威**（ADR-0093 の段階 2c。取り込みの控え `logs/state/sync/` があるときだけ。1 行目と 2 行目は控えが無くても見る）
+**取り込みと権威**（ADR-0093 の段階 2c）。取り込みの控え `logs/state/sync/` があるときだけ見る。ただし 1 行目と 2 行目は控えが無くても見る。
 
 | 深刻度 | 拾うもの |
 |---|---|
@@ -2041,7 +2041,7 @@ ccnavi --lint --json
 | `errors` / `warns` / `infos` | 件数 |
 | `flow` | `--flow` を渡したときだけ在る。`{path, data, rendered, candidates}`。`path` は確かめたファイルの絶対パス、`data` は実行ファイルが読んだ中身（下）。読めなければ `null` |
 | `flow.rendered` | `SubagentStart` で担当のサブエージェントに渡る手順の行（文字列の並び。`flow.render` のまま、子のパスやロックの案内は入らない）。読めなければ `null` |
-| `flow.candidates` | フローで選べる名前。`{agents: [{name, source}], skills: [{name, source}]}`。`source` は `builtin`（`general-purpose` `Explore` `Plan`）か `project`（ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md`。名前は frontmatter（頭の `---` の区間だけを YAML として読む）の `name`、無ければファイル・ディレクトリの名前。エージェントはふつうのファイルだけで、`.md` の大文字小文字は区別しない。`.claude` を含む途中にリンクがあれば読まない）。フローが読めなくても載る |
+| `flow.candidates` | フローで選べる名前。`{agents: [{name, source}], skills: [{name, source}]}`。`source` は `builtin`（`general-purpose` `Explore` `Plan`）か `project`（ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md`）。`project` の名前は frontmatter（頭の `---` の区間だけを YAML として読む）の `name`、無ければファイル・ディレクトリの名前。エージェントはふつうのファイルだけで、`.md` の大文字小文字は区別しない。`.claude` を含む途中にリンクがあれば読まない。フローが読めなくても載る |
 
 ### 子のフローを保存せずに確かめる
 
@@ -2134,7 +2134,7 @@ ccnavi --explain --json
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、親の提案が写っているのが普通 |
 | `scattered[]` | どれが本物か決まらない、写っている場所の全部。`{tree, state, path}`。決まっていれば空。権威のツリー（親のツリー → 元ツリーの順。ADR-0073）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
-| `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked}`。`path` は読む先の絶対パス（権威のツリー＝承認済みチケットが在るツリーの版だけ。子のワークツリーの写しは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く）、`rel` はツリーのルートからの相対（承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml`。中身は YAML）、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
+| `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。`path` が指すのは権威のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリーの写しは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 | `history[]` | 状態が動いた跡（ADR-0086）の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（権威のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled`（置き場が動いたもの）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の跡に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook`。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態の正は置き場の欄。跡が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
 
@@ -2183,7 +2183,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `verify.reason` | 答えの理由の名前。全部入るなら `ok`、入らないなら `refused`（絞りが通らない）/ `nothing-pending`（承認待ちが 1 件も無い）/ `rejected`（承認の対象にしない提案がある）。読めない提案（`problems[]`）はここに出ない |
 
 `--verify` は、`--approve` が承認を止めない範囲の超過（`batch[].overflow`）と読めない提案（`problems[]`）では「いいえ」にしない。どちらも本文には出す。
-承認されないものは `ccnavi --lint` も同じ関数で名指しする（ただし「まだ承認できない」子は `--lint` では warn。先行が閉じれば通る子もここに入る。取り消し済み・どこにも無い・複数の場所にある・自分自身・自分の親・輪になった先行は error）。
+承認されないものは `ccnavi --lint` も同じ関数で名指しする。ただし「まだ承認できない」子は `--lint` では warn で、先行が閉じれば通る子もここに入る。取り消し済み・どこにも無い・複数の場所にある・自分自身・自分の親・輪になった先行は error。
 
 `--yes` の答え。値は `--preview` の `batch[].ticket` をカンマで並べたもの。
 
@@ -2350,8 +2350,9 @@ md が 1 本も無い・git の外なら何も出さない。新しくするの�
 | `--since <日時>` / `--until <日時>` | `mtime`（`YYYY-MM-DD[THH[:MM[:SS]]]`。在る日時だけ受ける）。`--until` は書いた桁の終わりまで（日付だけなら `T23:59:59`、`THH` なら `:59:59`、`THH:MM` なら `:59`） | 以上 / 以下 |
 
 同じオプションの繰り返しは OR、違うオプションどうしは AND。大文字小文字は区別せず、文字列は NFC に揃えてから比べる。
-並べ方は `--sort path|mtime|type|title`（既定 `path`。`type` と `title` は大文字小文字を区別しない。第 2 キーは `concept_id`）、
+並べ方は `--sort path|mtime|type|title`（既定 `path`）、
 `-r` / `--reverse` で逆、`--limit <N>` で並べた後の先頭 N 件（0 以下は全部）。
+`--sort` の `type` と `title` は大文字小文字を区別しない。第 2 キーは `concept_id`。
 `--format` は `table`（既定。`type` / `concept_id` / `title` を、全角を幅 2・結合文字を幅 0 として桁揃え）・`path`・`detail`・`json`・
 `jsonl`・`count`（`matched=<絞った数> [shown=<出した数>] total=<全部>`。`shown` は `--limit` で切ったときだけ）。
 `--json` は `--format json` と同じ。`table` と `detail` は同じ件数の 1 行を標準エラーにも出す。0 件でも終了コードは 0 で、
