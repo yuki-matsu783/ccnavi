@@ -264,7 +264,7 @@ def _close_parent(
     if phase.chat_only(root, conf, found.ticket, venues):
         stdout.write(
             f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
-            f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、統合先のブランチへ戻してください。"
+            f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、統合先のブランチに取り込んでください。"
             "このチケットにはマージリクエストで見るフェーズが無いので、"
             "Draft を外す手順は無い。途中の作業は既定のブランチに残さない\n"
         )
