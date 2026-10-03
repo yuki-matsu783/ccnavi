@@ -1,7 +1,7 @@
 ---
 title: md の frontmatter の決まり
 type: guide
-description: md の頭に付ける frontmatter のキーと type の値。ccnavi --docs の索引はこれを引く
+description: md の頭に付ける frontmatter のキーと type の値。ccnavi --docs はこれを索引にして検索する
 tags: [frontmatter, docs-search]
 keywords: [frontmatter, type, tags, keywords, index.jsonl, ccnavi --docs, 索引, 検索, タグ, kebab-case]
 ---
