@@ -28,10 +28,14 @@ def arguments(rules_path: str = RULES) -> list[str]:
     """`python -m ccnavi` に渡す引数。
 
     全件テスト（tests/core/test_check_rules.py）も同じものを使う。
+
+    `--root` は区切りを `/` に揃えて渡す。見本の `/repo` は `--root` の綴りにそのまま
+    置き換わるので、Windows の `\\` が残ると Bash の見本でエスケープとして読まれる。
+    ccnavi の側はルートを realpath と normcase で解いてから使うので、`C:/...` でも同じ場所になる。
     """
     return [
         "--root",
-        ROOT,
+        ROOT.replace("\\", "/"),
         "--rules",
         rules_path,
         # 見るのはルールだけ。承認済みチケットと控えは外し、記録も残さない。
