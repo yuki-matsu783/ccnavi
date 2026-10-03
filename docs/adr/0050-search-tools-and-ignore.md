@@ -12,7 +12,7 @@ keywords: [Grep, Glob, credentials, .gitignore, 3層, ファイル, 守り]
 
 ## 状況
 
-共通層の `credentials` ルールの `match` は `Bash|Read|Write|Edit|NotebookEdit` で、`Grep` と `Glob` が
+共通レイヤーの `credentials` ルールの `match` は `Bash|Read|Write|Edit|NotebookEdit` で、`Grep` と `Glob` が
 入っていない。組み込みの既定（`builtin-credentials`）も `Bash|Read|Write|Edit` で同じ。
 
 一方、`Grep` の対象は探し始める場所のパスで、探した先で読まれたファイルは判定に届かない（ADR-0048）。

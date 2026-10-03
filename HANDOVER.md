@@ -28,15 +28,15 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 ## いま動くもの
 
 hook の 7 イベントの全部、実行前のルール照合、実行後の監視、コアファイルの自己防衛、チケット制御、
-複数のリポジトリ（層の和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
+複数のリポジトリ（レイヤーの和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
 VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理・フェーズ管理）。
 このリポジトリ自身には dry-run で仕掛けてある。
 
-チケットの流れは ADR-0055、層の和は設計 11.2〜11.4.2、共通層の置き場は ADR-0052、
+チケットの流れは ADR-0055、レイヤーの和は設計 11.2〜11.4.2、共通レイヤーの置き場は ADR-0052、
 設定と記録の置き場は ADR-0042。ファイルの構成と開発用 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh`
 `test-ext.sh`）は README の「構成」「開発」。
 
-リスク管理画面は共通層の 1 本だけを開く（設計 11.11）。ルール設定画面とフェーズ管理画面は層に追従する。
+リスク管理画面は共通レイヤーの 1 本だけを開く（設計 11.11）。ルール設定画面とフェーズ管理画面はレイヤーに追従する。
 
 確認コマンド。
 
@@ -86,12 +86,12 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 3. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと列挙から外れ、その中のパスがワークスペースルートとして
    判定される（プロジェクトの `deny` が外れる）。判定は変えず `--lint` と `--explain` が名指しする方針だが、まだ言わない
 4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` の綴りがある」を warn で言うようにする
-5. 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
+5. レイヤーが無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
 
 ### ccnavi 自身の設計の穴
 
 1. **保護済みファイル（`.ccnavi/scripts/`、`.claude/hooks/`、`rules.yml`）を直すチケットは `implement` では承認されない。**
-   `staging` 種別（自身の層の `phases.yml`、`scope: [wip/design/*, tests/*]`）のフェーズで完成品を
+   `staging` 種別（自身のレイヤーの `phases.yml`、`scope: [wip/design/*, tests/*]`）のフェーズで完成品を
    `wip/design/scripts/` に全文で置き、人が写してコミットする。写す順は `ccnavi-common.sh` が先
    （3 本が起動時に読む）。`phases.yml` は人が持つ設定で、エージェントは足せない
 2. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。** コマンドに `.ccnavi` が

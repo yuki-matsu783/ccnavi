@@ -1,12 +1,12 @@
 ---
 type: adr
-title: 共通層の設定は .ccnavi/common/ に
+title: 共通レイヤーの設定は .ccnavi/common/ に
 description: 共通設定を .ccnavi/common/ に集約し、記録と控えは logs ディレクトリに配置する構成
 tags: [config, records]
-keywords: [共通層, .ccnavi, 設定, logs, 記録, 共有]
+keywords: [共通レイヤー, .ccnavi, 設定, logs, 記録, 共有]
 ---
 
-# ADR-0042: 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く
+# ADR-0042: 共通レイヤーの設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く
 
 状態: 採用
 
@@ -16,38 +16,38 @@ ccnavi の置き場が `.claude/` と `.ccnavi/` の 2 か所に分かれてい�
 
 | 何 | 置き場 |
 |---|---|
-| 共通層のルール・フェーズの種類・リスクの配点、見本 | `.claude/ccnavi/` |
-| 共通層の配点スクリプト | `.claude/ccnavi/` か `.claude/scripts/` |
+| 共通レイヤーのルール・フェーズの種類・リスクの配点、見本 | `.claude/ccnavi/` |
+| 共通レイヤーの配点スクリプト | `.claude/ccnavi/` か `.claude/scripts/` |
 | 記録、控え、セッションの状態 | `.claude/ccnavi/` |
-| 自身の層・プロジェクトの層、承認済みチケット、HITL ポイントの sh、実行ファイル | `.ccnavi/` |
+| 自身のレイヤー・プロジェクトのレイヤー、承認済みチケット、HITL ポイントの sh、実行ファイル | `.ccnavi/` |
 
-設計 11.2 は「共通層は今の `.claude/ccnavi/` のまま」としていた。ccnavi ディレクトリを作ったとき、既存の置き場を
-動かす理由が無かったからで、層の構造から決まったものではない。`.claude/` は Claude Code 自身の置き場
+設計 11.2 は「共通レイヤーは今の `.claude/ccnavi/` のまま」としていた。ccnavi ディレクトリを作ったとき、既存の置き場を
+動かす理由が無かったからで、レイヤーの構造から決まったものではない。`.claude/` は Claude Code 自身の置き場
 （settings.json・hooks・skills・worktrees）で、そこに ccnavi の設定と実行時の記録が混ざっていた。
 
 ## 決定
 
 | 何 | 前 | 後 |
 |---|---|---|
-| 共通層の 3 本（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` の既定）と見本 | `.claude/ccnavi/` | `.ccnavi/common/` |
-| 共通層の配点スクリプト | `.claude/ccnavi/`・`.claude/scripts/` | `.ccnavi/common/scripts/` |
+| 共通レイヤーの 3 本（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` の既定）と見本 | `.claude/ccnavi/` | `.ccnavi/common/` |
+| 共通レイヤーの配点スクリプト | `.claude/ccnavi/`・`.claude/scripts/` | `.ccnavi/common/scripts/` |
 | 判定の記録（`CCNAVI_LOG`） | `.claude/ccnavi/log.jsonl` | `logs/log.jsonl` |
 | 控え（`CCNAVI_STATE`） | `.claude/ccnavi/state` | `logs/state` |
 
-3 層の構造は変えない。共通層はどのツリーにも適用され、自身の層（`.ccnavi/config/`）はワークスペースの
-ツリーだけに適用される。共通層を `.ccnavi/config/` に混ぜないのは、混ぜるとプロジェクトに共通層の deny が
+3 つのレイヤーの構造は変えない。共通レイヤーはどのツリーにも適用され、自身のレイヤー（`.ccnavi/config/`）はワークスペースの
+ツリーだけに適用される。共通レイヤーを `.ccnavi/config/` に混ぜないのは、混ぜるとプロジェクトに共通レイヤーの deny が
 適用されなくなるから。`.ccnavi/` 直下（`.ccnavi/rules.yml`）にしないのは、プロジェクトの `.ccnavi/` にも
-同じ名前が置けて、共通層と見分けにくくなるから。
+同じ名前が置けて、共通レイヤーと見分けにくくなるから。
 
-共通層の置き場は `CCNAVI_PROJECT_HOME`（ccnavi ディレクトリの名前）に付いて動かない。ccnavi ディレクトリの名前は各層の綴りで、
-共通層を動かすなら `CCNAVI_RULES` などで動かす。
+共通レイヤーの置き場は `CCNAVI_PROJECT_HOME`（ccnavi ディレクトリの名前）に付いて動かない。ccnavi ディレクトリの名前は各レイヤーの綴りで、
+共通レイヤーを動かすなら `CCNAVI_RULES` などで動かす。
 
 移し替えは導入スクリプトが受け持つ。前の置き場にあって新しい置き場に無いものを移し、`env` が前の既定の
 綴りと一字一句同じなら書き換える。`--lint` は、前の置き場に読まれない設定が残っていれば warn で言う。
 
 ## 理由
 
-ccnavi のものが 1 つのディレクトリの下にまとまり、`.claude/` には Claude Code 自身のものだけが残る。共通層も
+ccnavi のものが 1 つのディレクトリの下にまとまり、`.claude/` には Claude Code 自身のものだけが残る。共通レイヤーも
 ccnavi ディレクトリを守る組み込みルール（`*/.ccnavi/*`）で名指しのツールから守られる。前は `rules.yml` の 1 行に
 任せていたので、ルールを書き換えれば外せた。
 
@@ -56,7 +56,7 @@ ccnavi ディレクトリを守る組み込みルール（`*/.ccnavi/*`）で名
 
 ## 失うもの
 
-- エージェントが共通層の yml を直接書けなくなる。 ccnavi ディレクトリを守る組み込みのルールはルールファイルから外せない。
+- エージェントが共通レイヤーの yml を直接書けなくなる。 ccnavi ディレクトリを守る組み込みのルールはルールファイルから外せない。
   見本（`rule-samples.yml`）も同じで、前は「見本を足すのはエージェントの仕事」としていた。見本の下書きは
   scratchpad に置き、ルールの下書きと一緒に利用者に渡す
 - `logs/` を守る綴りが増える。 前は `.claude/ccnavi/` を守る綴りの中に記録と控えが入っていた。

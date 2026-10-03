@@ -14,7 +14,7 @@ keywords: [監視, 副命令, 書き込み, チケット, 内容, 姿, deny]
 実行後の監視は、保護領域をルールファイルの `deny` と `ask` から導く（ADR-0017）。そこから
 外れるのは記録と控えの置き場（`CCNAVI_LOG`、`CCNAVI_STATE`）だけだった。
 
-承認済みチケットの置き場（`.ccnavi/approved/`）は、このリポジトリの共通層が
+承認済みチケットの置き場（`.ccnavi/approved/`）は、このリポジトリの共通レイヤーが
 `deny`（`guard-approved-tickets`）と宣言している。ワークスペースルートなら `main-tree` も
 同じ場所に当たる。そこへ書くのは、人の承認だけではない。**`ccnavi-ticket.sh` の
 `start` / `done` / `cancel` と、`ccnavi-review.sh` の `request` / `check` / `ready` が書く。**
