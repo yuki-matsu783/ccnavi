@@ -388,7 +388,9 @@ sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で�
 
 配った組み立ての置き場は、配布先が git のリポジトリなら `.gitignore` にも足す（入れると履歴から消すのが難しい）。
 置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/index.jsonl` も
-別の見出しで足す（「ドキュメントの索引」。`**/index.jsonl` か `index.jsonl` の行が既にあれば足さない）。
+別の見出しで足す（「ドキュメントの索引」。`**/index.jsonl` か `index.jsonl` の行が既にあれば足さない。行は CRLF の `\r` と
+行末の空白を落として比べる。`!**/index.jsonl` や `!docs/index.jsonl` のように `index.jsonl` を否定する行があれば、利用者が
+除外しているとみなして足さず、`--check` でもそう言う）。
 
 ```
 # ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
