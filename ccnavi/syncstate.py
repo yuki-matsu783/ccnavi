@@ -566,7 +566,8 @@ def guidance(root: str, st: Standing) -> list[str]:
     record = st.record
     if record is not None and record.broken:
         return [
-            f"控え（{record.path}）の中身を人が確かめ、壊れていれば人が '{sync} --forget {name}' で"
+            f"控え（{record.path}）の中身をユーザが確かめてください。"
+            f"壊れていれば人が '{sync} --forget {name}' で"
             f"消してから、オンラインで '{sync} {name}' を打ち直してください",
         ]
     if record is not None and record.state == STATE_GONE:

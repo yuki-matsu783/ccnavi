@@ -1417,7 +1417,7 @@ def report(outcomes: list[Outcome]) -> str:
         # 用件を渡す。ルールが読めない間の書き込みは、どれだけ緩めたかを誰も判定していない。
         lines.append(
             "読めなかった共通層のルールファイルへの修復は戻していません。"
-            "直した中身が意図どおりかを、利用者に確かめてもらってください。"
+            "直した中身が意図どおりかを、ユーザが確かめてください。"
         )
     if any(outcome.action != ACTION_LEFT for outcome in outcomes):
         lines.append(

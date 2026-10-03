@@ -1295,7 +1295,7 @@ def ready(
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
     )
     if wrapped:
-        text.append(f"（利用者が締めた: {wrapped.get('reason', '')}）")
+        text.append(f"（ユーザが締めた: {wrapped.get('reason', '')}）")
     path = os.path.join(conf.state, READY_FILE.format(parent=parent.ticket))
     failed = _write_text(path, "\n".join(text) + "\n")
     if failed:
@@ -1593,7 +1593,7 @@ def _close_early_drafts(
         return failed
     note = [
         MARKER_CLOSE_EARLY,
-        f"利用者が締めた（{stamp}）: {reason.strip()}",
+        f"ユーザが締めた（{stamp}）: {reason.strip()}",
         f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
         f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
         "残りは別の issue に写す。親が片付けて ready を打てば Draft が外れる。"

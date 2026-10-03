@@ -1014,7 +1014,7 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket)
             f"[ccnavi] {CODE_CHANGED}: 着手後にフローが書き換わった。子チケット "
             f"{clean(child.ticket)} のフロー {clean(path)} が、着手のとき（{_describe(before)}）と"
             f"違う（いま {_describe(now)}）。担当のサブエージェントが読んだ手順と、人が渡した"
-            "手順が食い違っているかもしれない。誰が書き換えたかを人が確かめる"
+            "手順が食い違っているかもしれない。誰が書き換えたかをユーザが確かめてください"
             "（ロックは Write / Edit を止めるが、シェルから行き先を追えない形で書くと止まらない）"
         )
     except Exception:  # noqa: BLE001  知らせのために hook を落とさない
@@ -1353,7 +1353,7 @@ def briefing(
     ]
     data, why = load(path, base)
     if data is None:
-        lines.append(f"    フローを読めない: {why}。人に確かめてください")
+        lines.append(f"    フローを読めない: {why}。ユーザが確かめてください")
         return lines
     room = max(0, min(budget, CHILD_TEXT_LIMIT))
     if room == 0:

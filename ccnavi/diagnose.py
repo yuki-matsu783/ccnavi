@@ -667,7 +667,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
         wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
         if wrapped:
-            stdout.write(f"  {parent.ticket} は人が締めた: {wrapped.get('reason', '')}\n")
+            stdout.write(f"  {parent.ticket} はユーザが締めた: {wrapped.get('reason', '')}\n")
         if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
             stdout.write(
                 f"  {parent.ticket} のマージリクエストの Draft を外した。マージは利用者が行う\n"

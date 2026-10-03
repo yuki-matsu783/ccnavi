@@ -1174,7 +1174,7 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
         approval.PARENT_MARK_CLOSE_EARLY,
     ):
         # 人が締めた。残りは別の issue に写してあるので、閉じられる。
-        return "閉じられる（利用者が締めた）"
+        return "閉じられる（ユーザが締めた）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
     open_phases = [p for p in phases if not p.ended]
     if dag and open_phases and open_phases[0].number <= len(parent.plan):

@@ -667,7 +667,10 @@ def carry_flow(
         return []
     raw, why = flow.read_bytes(source, source_root)
     if raw is None:
-        return [f"{proposal.ticket} のフロー {source} を運ばなかった: {why}。人が確かめて置き直す"]
+        return [
+            f"{proposal.ticket} のフロー {source} を運ばなかった: {why}。"
+            "ユーザが確かめて置き直してください"
+        ]
     if fsio.lexists(target):
         held, _ = flow.read_bytes(target)
         if held != raw:
