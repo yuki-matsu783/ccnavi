@@ -2917,8 +2917,8 @@ def blocking_problems(
 def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:
     """判定が読む承認済みチケットに、信頼できない理由の印を付ける（ADR-0058）。
 
-    印を読むのは `phase.scope_verdict` で、実行前の判定・実行後の監視・サブエージェント
-    終了時の検査の 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
+    印を読むのは `phase.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
+    終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
 
     **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。

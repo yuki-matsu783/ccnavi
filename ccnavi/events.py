@@ -1,7 +1,7 @@
 """hook のイベントごとの手順。1 回の起動で何が起きるかは、ここを上から読めば分かる。
 
-実行前の判定は judge、サブエージェントの始まりと終わりは subagent、実行後の
-監視は post に本体があり、ここはイベント名からそれらへ振り分け、記録と応答を
+実行前チェックは judge、サブエージェントの始まりと終わりは subagent、実行後
+チェックは post に本体があり、ここはイベント名からそれらへ振り分け、記録と応答を
 繋ぐだけ。イベントが増えるたびに 1 本の関数が長くならないように、イベント 1 つに
 つき関数 1 つ。
 """
@@ -93,7 +93,7 @@ def watch_context(
 ) -> tuple[list[post.Watched], post.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
-    保護領域も範囲も、実行前の判定と同じ経路で解く。別に書くと、実行前に
+    保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
     通った書き込みがターンの終わりに咎められる（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
     """
@@ -111,7 +111,7 @@ def watched_for(
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
-    ルールの引き方は実行前の判定と同じで、共通層にそのツリーの層を足した和。
+    ルールの引き方は実行前チェックと同じで、共通層にそのツリーの層を足した和。
     別に書くと、実行前に通った書き込みがターンの終わりに咎められる。
     """
     ws = tree.main_tree(root)
@@ -254,7 +254,7 @@ def decide_at_stop(
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
     if nudge:
-        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後の監視と同じ言い方）。
+        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後チェックと同じ言い方）。
         told = f"[ccnavi dry-run] {modes.ENABLE} would have blocked this stop:\n{nudge}"
         report = f"{report}\n\n{told}" if report else told
     if report:
@@ -417,7 +417,7 @@ def decide_at_start(
 def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
     """記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。
 
-    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前の判定に置くと、呼び出しの
+    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前チェックに置くと、呼び出しの
     たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
     動かしたものの数は記録の `detail` に残す（消したことも記録に残る）。
     """
@@ -447,7 +447,7 @@ def decide_after(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """実行後の監視を 1 回動かし、言うことがあれば返す。
+    """実行後チェックを 1 回動かし、言うことがあれば返す。
 
     期限を渡していない。実行前の期限は、遅い判定が気づかないうちに許可と同じ扱いになるのを
     防ぐためのもので、止められるイベントでしか意味を持たない。ここは
@@ -469,10 +469,10 @@ def decide_after(
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:
         record.tree, record.project = watched[-1].tree.name, watched[-1].tree.project
-    # 既定に戻ったことをこのイベントでは言わない。実行前の判定が呼び出しごとに
+    # 既定に戻ったことをこのイベントでは言わない。実行前チェックが呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 範囲は実行前の判定と同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
+    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
     scope = scope_guard(conf, root)
 
     text = post.check(
@@ -492,7 +492,7 @@ def decide_after(
         places=(conf.tickets, conf.approved),
         synced=synced,
     )
-    # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
+    # 設定ファイルについて言うことは、実行後チェックの報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
     if guard:
         text = f"{guard}\n\n{text}" if text else guard

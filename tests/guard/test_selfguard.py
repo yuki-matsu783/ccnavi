@@ -193,7 +193,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ルールを空にされても保護は消えない(self):
         # ルール由来の保護は、保護領域をルールファイルから導く。deny を空に
-        # されるとその一覧ごと消えるので、実行後の監視は何も検知しない。
+        # されるとその一覧ごと消えるので、実行後チェックは何も検知しない。
         # この仕組みはルールを読まずに対象を決めるので、そこで止まらない。
         self.run_hook("PreToolUse")
         write(self.rules, json.dumps({"version": 1, "deny": [], "ask": [], "allow": []}))
@@ -752,7 +752,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_セッション開始では設定ファイルも控える(self):
         # 実行前の控えが始まるのは最初のツール呼び出しから。それより前に
-        # 設定ファイルを消されると、控えを持たないまま実行後の監視に入る。
+        # 設定ファイルを消されると、控えを持たないまま実行後チェックに入る。
         self.run_hook("SessionStart")
 
         saved = os.path.join(self.state, "selfguard", "s1", "rules")
