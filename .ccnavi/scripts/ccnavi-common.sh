@@ -187,7 +187,7 @@ ccnavi_compat_skew() {
 		ccnavi_cs_fix="ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi
 	if [ -z "$ccnavi_cs_have" ]; then
-		printf '実行ファイル %s は --version に互換の版を答えません（古い版）。%s。\n' "$2" "$ccnavi_cs_fix"
+		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"
 		return 1
 	fi
 	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
@@ -559,7 +559,7 @@ ccnavi_lock_describe() {
 		fi
 		[ -n "$ccnavi_lds_at" ] || ccnavi_lds_at="$ccnavi_lds_started"
 	fi
-	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人が終了させてから打ち直す（ロックは持ち主が消えれば次の実行が片付ける）\n' \
+	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人が終了させてから打ち直す（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
 		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
 }
 
@@ -677,7 +677,7 @@ ccnavi_git_refusal() {
 		/^[^ \t]/ { f = 0 }
 		f && /^[ \t]+[^ \t]/ { sub(/^[ \t]+/, ""); printf "%s%s", sep, $0; sep = " " }' "$1" 2>/dev/null)
 	if [ -n "$ccnavi_gr_paths" ]; then
-		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直す' "$ccnavi_gr_paths"
+		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
 		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、落ちた残りなら人が消す'
 	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
@@ -792,7 +792,7 @@ ccnavi_c1_family() {
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルが C1 の問い（c1 family）に答えない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。家族の控えがあるので、書かずに止める。実行ファイルを新しくする"
+		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。家族の控えがあるので、書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_c1_target=$(sed -n 's/^target //p' "$ccnavi_c1_tmp/family" | head -n 1)
@@ -816,7 +816,7 @@ ccnavi_c1_family() {
 	no | stop) ;;
 	*)
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルの答え（target）を読めない"
+		ccnavi_c1_why="実行ファイルの出力（target）を読めない"
 		;;
 	esac
 	log_debug C1 の対象を決めた -- "family=$ccnavi_c1_family_id" "target=$ccnavi_c1_target"
@@ -861,7 +861,7 @@ ccnavi_c1_begin() {
 	case "$ccnavi_cb_rc" in
 	0) ;;
 	2)
-		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪いかけて戻せなかった。人が中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
+		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。人が中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
 		return 1
 		;;
 	*)
@@ -869,7 +869,7 @@ ccnavi_c1_begin() {
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
 			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id は他の操作がロックを持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直す"
+			ccnavi_c1_say "家族 $ccnavi_c1_family_id は他の操作がロックを持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
 		fi
 		return 1
 		;;
@@ -918,7 +918,7 @@ ccnavi_c1_prepare() {
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "人の判断が未送信" \
 			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
-			"置き場に ccnavi の知らない変更がある" "。人に確かめる。何も書いていない" || return 1
+			"置き場に ccnavi の知らない変更がある" "。人に確かめてください。何も書いていない" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
@@ -931,10 +931,10 @@ ccnavi_c1_prepare() {
 		if [ "$ccnavi_cp_rc" -ne 0 ]; then
 			# 3 と 4 の間に hook が書いた（merge が書きかけと重なった）なら、3 から 1 回だけやり直す。
 			if [ "$ccnavi_cp_try" -eq 1 ] && grep -q '書きかけの' "$ccnavi_c1_tmp/sync" 2>/dev/null; then
-				ccnavi_c1_say "取り込みが書きかけと重なった。見分けからもう 1 回だけやり直す"
+				ccnavi_c1_say "取り込みが書きかけと重なった。変更の見分けからもう 1 回だけやり直す"
 				continue
 			fi
-			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も書いていない。接続と上の理由を直してから打ち直す"
+			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も書いていない。接続と、上に出た原因を直してから打ち直してください"
 			return 1
 		fi
 		ccnavi_cp_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
@@ -948,7 +948,7 @@ ccnavi_c1_prepare() {
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信の人の判断のコミットがある" \
 			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
 			"置き場に ccnavi の知らない未送信のコミットがある" \
-			"。人に確かめる。前の状態の操作が送る前に強制終了された跡なら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、人がそのコミットを取り除く。何も書いていない" || return 1
+			"。人に確かめてください。前の状態の操作が送る前に強制終了された跡なら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、人がそのコミットを取り除く。何も書いていない" || return 1
 		return 0
 	done
 }
@@ -1027,7 +1027,7 @@ ccnavi_c1_restore_written() {
 		grep -F -x -q -- "$ccnavi_cr_path" "$ccnavi_c1_tmp/keep" 2>/dev/null && continue
 		if git -C "$ccnavi_c1_tree" cat-file -e "$2:$ccnavi_cr_path" 2>/dev/null; then
 			git -C "$ccnavi_c1_tree" restore --worktree --source="$2" -- ":(literal)$ccnavi_cr_path" 2>/dev/null ||
-				ccnavi_c1_say "$ccnavi_cr_path を書く前に戻せなかった"
+				ccnavi_c1_say "$ccnavi_cr_path を書く前の状態に戻せなかった"
 		else
 			rm -f "$ccnavi_c1_tree/$ccnavi_cr_path" 2>/dev/null ||
 				ccnavi_c1_say "$ccnavi_cr_path を消せなかった"
@@ -1124,7 +1124,7 @@ ccnavi_c1_write() {
 		fi
 		rm -f "$ccnavi_cw_list"
 		if [ "$ccnavi_cw_try" -ge 2 ]; then
-			ccnavi_c1_say "2 回目も送れなかった。書いたものは戻した。オンラインで sh $ccnavi_c1_sh/ccnavi-sync.sh $ccnavi_c1_family_id を打って取り込んでから、打ち直す"
+			ccnavi_c1_say "2 回目も送れなかった。書いたものは戻した。オンラインで sh $ccnavi_c1_sh/ccnavi-sync.sh $ccnavi_c1_family_id を打って取り込んでから、打ち直してください"
 			log_info C1 で送れなかった -- "family=$ccnavi_c1_family_id" "reason=c1-push"
 			return 1
 		fi

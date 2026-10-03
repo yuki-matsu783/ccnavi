@@ -38,7 +38,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel> <識別子> [--reason 
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
-               ワークツリー .claude/worktrees/<識別子> が要る。置き場は動かない
+               ワークツリー .claude/worktrees/<識別子> が要る。承認済みチケットは置き場を移らない
   finish       doing/ -> wip/proposals/review/（フェーズがレビュー要）か .ccnavi/approved/done/（不要）。
                完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
   cancel       doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい

@@ -66,13 +66,13 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
-  ready                                           閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
+  ready                                           閉じられ、wip を片付けて push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   chat         <N>                                chat で見るフェーズを人がこのセッションで見終えた（人が端末で打つ。ccnavi --reviewed <N> --chat）
   config-synced <親>                              着手で上書きした設定を人が端末で見た（人が端末で打つ。ccnavi --config-synced <親>）
   fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の綴り）
-  merged                                          いまのブランチの MR がマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
+  merged                                          いまのブランチのマージリクエストがマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が要る。
 USAGE
@@ -169,7 +169,7 @@ chat | config-synced) needs_host=no ;;
 esac
 if [ "$needs_host" = yes ]; then
 	origin=$(git remote get-url origin 2>/dev/null || :)
-	[ -z "$origin" ] && fail no-origin "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
+	[ -z "$origin" ] && fail no-origin "origin が無い。レビューは実際のマージリクエストに結び付けるので、リモートが要る。"
 	# 伏せた綴りを、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
 	# 生の $origin を文面に入れる綴りを 1 つも残さないことで、次に fail を足す人が
 	# 気づかずに生の綴りを使わないようにする。URL に資格情報を埋める使い方は普通にあり、
@@ -365,7 +365,7 @@ find_mr() {
 	else
 		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない。ADR-0093 の 11.9.1 の 6）。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない。11.9.3 の 6）
-		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。MR がこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の綴りを見直す）。"
+		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の綴りを見直してください）。"
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
 		printf '%s' "$mrs" |
@@ -764,7 +764,7 @@ confirm)
 	# 印に残すアカウントはここがホストに聞く。呼び手が渡したもの（--actor）は受けない
 	for a in "$@"; do
 		case "$a" in
-		--actor | --actor=*) fail confirm-actor "confirm は --actor を受けない。印のアカウントはトークンの持ち主をホストに聞いて入れる。" 2 ;;
+		--actor | --actor=*) fail confirm-actor "confirm は --actor を受けない。マーカーに記すアカウントは、トークンの持ち主をホストに問い合わせて入れる。" 2 ;;
 		esac
 	done
 	# 印に残すアカウント。ロックを取る前に引く（引けなくても止めない。前と同じ印になる）
@@ -803,11 +803,11 @@ request)
 	done
 	# 置き場は wip/eli5/ の下（ADR-0095・ADR-0097）。マージリクエストの差分に載せ、人が crit push で行に指摘を送れる
 	# ようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
-	eli5_how="依頼の前に、変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML（外部の読み込み無し）を、このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html。名前は英数字と . _ / - だけ）に普通のファイルとして書いてコミットし、push してから --eli5 <パス> で渡す。"
+	eli5_how="依頼の前に、変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML（外部の読み込み無し）を、このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html。名前は英数字と . _ / - だけ）に普通のファイルとして書いてコミットし、push してから --eli5 <パス> で渡してください。"
 	[ -n "$eli5" ] || fail explainer-missing "request には --eli5 <HTML> が要る。${eli5_how}" 2
 	case "$eli5" in
 	*.[Hh][Tt][Mm][Ll] | *.[Hh][Tt][Mm]) ;;
-	*) fail explainer-not-html "--eli5 には拡張子が .html か .htm のファイルを渡す ($eli5)。${eli5_how}" 2 ;;
+	*) fail explainer-not-html "--eli5 には拡張子が .html か .htm のファイルを渡してください ($eli5)。${eli5_how}" 2 ;;
 	esac
 	# 相対パスは --body-file と同じく、スクリプトを打った場所（実行ファイルに渡す --cwd）から。
 	case "$eli5" in
@@ -867,7 +867,7 @@ request)
   - HEAD に無い（未追跡か、まだコミットしていない）"
 			elif [ "$eli5_mode" != 100644 ]; then
 				eli5_unmet="${eli5_unmet}
-  - HEAD で普通のファイルでない（モード ${eli5_mode}。シンボリックリンクや実行の印付きは使わない）"
+  - HEAD で普通のファイルでない（モード ${eli5_mode}。シンボリックリンクや実行権限付きは使わない）"
 			elif ! git -C "$eli5_top" diff --quiet HEAD -- "$eli5_rel" 2>/dev/null; then
 				eli5_unmet="${eli5_unmet}
   - HEAD から変わっている（未コミットの変更がある）"
@@ -909,7 +909,7 @@ ${eli5_how}"
 		eli5_posted="$state/review-request-eli5-$$.md"
 		{
 			cat "$file"
-			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送る（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
+			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送ってください（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
 				"$eli5_rel" "$eli5_rel" "$number" "$eli5_rel"
 		} >"$eli5_posted"
 		posted=$(comment "$number" "$url" "$eli5_posted")
@@ -994,7 +994,7 @@ decide)
 		fail decide-preview-conflict "decide の --preview と --choices / --digest は一緒に使えない。" 2
 	fi
 	if [ -n "$choices" ] || [ -n "$digest" ]; then
-		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡す。" 2
+		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡してください。" 2
 	fi
 	# 印に残すアカウント（ADR-0093 の 8.9。段階 5）。confirm と同じくトークンの持ち主をホストに聞き、
 	# ロックを取る前に引く。引けなければ渡さず、印も跡も前と同じ。見るだけの --preview は引かない。
@@ -1146,7 +1146,7 @@ close-early)
 	fi
 	# 取り込み済みの家族なら、締めの印（人の判断）を運ぶ処理で送る（D27）。
 	carry_human "$branch" || exit 1
-	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせる。マージは利用者が行う\n' "$url"
+	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージは利用者が行う\n' "$url"
 	;;
 chat)
 	# 人が端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。

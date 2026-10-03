@@ -100,12 +100,12 @@ fi
 if [ -e "$target/.git" ]; then
 	if changes=$(git -C "$target" status --porcelain 2>/dev/null); then
 		if [ -n "$changes" ]; then
-			printf 'ccnavi-clean: %s に未コミットの変更があるので、何も消しません。別のセッションが作業している見込みが高いです。\n' "$name" >&2
+			printf 'ccnavi-clean: %s に未コミットの変更があるので、何も消しません。別のセッションが作業している可能性が高いです。\n' "$name" >&2
 			printf '%s\n' "$changes" | head -n 10 >&2
 			exit 1
 		fi
 	else
-		printf 'ccnavi-clean: %s は git の登録が残っていない、消しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
+		printf 'ccnavi-clean: %s は git の登録が残っていないので、消しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
 	fi
 fi
 
@@ -129,7 +129,7 @@ clean_with_sh() {
 			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache \) -prune \
 			-o -name "*${cw_nl}*" -print 2>/dev/null || :
 	}) || {
-		printf 'ccnavi-clean: %s に入れません。\n' "$cw_top" >&2
+		printf 'ccnavi-clean: %s に移動できません。\n' "$cw_top" >&2
 		return 1
 	}
 	if [ -n "$cw_odd" ]; then

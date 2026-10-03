@@ -142,7 +142,7 @@ ccnavi_fetch_or_note() {
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
 	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
 	if [ "$ccnavi_fn_rc" -eq 5 ]; then
-		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh か、もう一度セッションを始める\n' \
+		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh を打つか、もう一度セッションを始めてください\n' \
 			"$(basename "$1")" "$budget" "$2" "$root"
 		return 1
 	fi
@@ -151,7 +151,7 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は認証を尋ねない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
 	return 1
 }
 
@@ -257,11 +257,11 @@ ccnavi_fetch_forward() {
 	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
 	ccnavi_fetch_or_note "$1" "$2" \
 		"${2}: リモートを取ってこられなかった。手元の版で判定する" \
-		"${2}: 親のブランチをリモートから取ってこられなかった（リモートに無い）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめる" ||
+		"${2}: 親のブランチをリモートから取ってこられなかった（リモートに無い）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
 		return 0
 	ccnavi_fw_now=$(date +%s)
 	if [ "$((ccnavi_fw_now - started))" -ge "$budget" ]; then
-		printf '%s: 時間の枠（%s 秒）を過ぎたので早送りを飛ばした。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込む\n' \
+		printf '%s: 時間の枠（%s 秒）を過ぎたので早送りを飛ばした。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込んでください\n' \
 			"$2" "$budget" "$root" "$2"
 		return 0
 	fi
@@ -276,7 +276,7 @@ ccnavi_fetch_forward() {
 	fi
 	# ロックは 1 回だけ試す（待たない）。取れなければ他の操作の最中なので早送りしない。
 	if ! ccnavi_lock_take "$root" "$ccnavi_fw_key" "$2" 0; then
-		printf '%s: 他の操作の最中なので進めなかった。終わってから sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込む\n' "$2" "$root" "$2"
+		printf '%s: 他の操作の最中なので進めなかった。終わってから sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込んでください\n' "$2" "$root" "$2"
 		return 0
 	fi
 	ccnavi_fw_behind=$(git -C "$1" rev-list --count "$ccnavi_fw_local..$ccnavi_fw_remote" 2>/dev/null || echo '?')
@@ -335,14 +335,14 @@ report=$(
 
 		dirty=$(git -C "$tree" status --porcelain --untracked-files=no 2>/dev/null || :)
 		if [ -n "$dirty" ]; then
-			printf '%s: リモートが %s 件先に居るが、未コミットの変更があるので進めない\n' \
+			printf '%s: リモートが %s 件先に進んでいるが、未コミットの変更があるので進めない\n' \
 				"$name" "$behind"
 			continue
 		fi
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
 			printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
 		else
-			printf '%s: リモートと分岐しているので進めない。人が合流させること（%s）\n' \
+			printf '%s: リモートと分岐しているので進めない。人に合流させてもらってください（%s）\n' \
 				"$name" "$branch"
 		fi
 	done
@@ -363,7 +363,7 @@ report=$(
 
 		ccnavi_fetch_or_note "$repo" "$default" \
 			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" \
-			"${name}: ワークツリーの起点になる ${default}（統合先）がリモートに無い。CCNAVI_INTEGRATION_BRANCH を確かめる" ||
+			"${name}: ワークツリーの起点になる ${default}（統合先）がリモートに無い。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
 			continue
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)
@@ -380,7 +380,7 @@ report=$(
 		[ "$behind" = "0" ] && continue
 		ahead=$(git -C "$repo" rev-list --count "$ref..refs/heads/$default" 2>/dev/null || echo 0)
 		if [ "$ahead" != "0" ]; then
-			printf '%s: ワークツリーの起点になる %s がリモートと分岐している。人が合流させること\n' \
+			printf '%s: ワークツリーの起点になる %s がリモートと分岐している。人に合流させてもらってください\n' \
 				"$name" "$default"
 			continue
 		fi
@@ -393,13 +393,13 @@ report=$(
 				continue
 			fi
 			git -C "$here" merge --ff-only --quiet "$ref" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。人が合流させること\n' \
+				printf '%s: ワークツリーの起点になる %s を進められなかった。人に合流させてもらってください\n' \
 					"$name" "$default"
 				continue
 			}
 		else
 			git -C "$repo" update-ref -m ccnavi-fetch "refs/heads/$default" "$ref" "$old" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。人が合流させること\n' \
+				printf '%s: ワークツリーの起点になる %s を進められなかった。人に合流させてもらってください\n' \
 					"$name" "$default"
 				continue
 			}
@@ -409,6 +409,6 @@ report=$(
 )
 
 [ -n "$report" ] || exit 0
-printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに乗って届き、ワークツリーの起点はデフォルトブランチになる。セッションの頭で取ってきた結果:\n'
+printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに含まれて届き、ワークツリーの起点はデフォルトブランチになる。セッションの開始時に取ってきた結果:\n'
 printf '%s\n' "$report"
 exit 0

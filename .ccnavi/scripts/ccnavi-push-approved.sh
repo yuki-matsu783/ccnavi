@@ -140,13 +140,13 @@ carry_family() {
 			printf 'ccnavi-push-approved: %s のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。%s\n' \
 				"$cf_p" "$(ccnavi_lock_describe "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p")" >&2
 		else
-			printf 'ccnavi-push-approved: %s は他の操作がロックを持っている。終わってから打ち直す。\n' "$cf_p" >&2
+			printf 'ccnavi-push-approved: %s は他の操作がロックを持っている。終わってから打ち直してください。\n' "$cf_p" >&2
 		fi
 		return 1
 	fi
 	cf_busy=$(ccnavi_c1_busy "$cf_tree")
 	if [ -n "$cf_busy" ]; then
-		printf 'ccnavi-push-approved: %s の親のワークツリーに途中の操作（%s）がある。済ませてから打ち直す。\n' "$cf_p" "$cf_busy" >&2
+		printf 'ccnavi-push-approved: %s の親のワークツリーに途中の操作（%s）がある。済ませてから打ち直してください。\n' "$cf_p" "$cf_busy" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -156,7 +156,7 @@ carry_family() {
 	sed 's/^/  /' "$ccnavi_c1_tmp/sync" >&2
 	cf_record=$(ccnavi_family_record "$root" "$ccnavi_c1_repo" "$cf_p")
 	if [ "$cf_rc" -ne 0 ] || [ "$(ccnavi_record_get "$cf_record" state)" != present ]; then
-		printf 'ccnavi-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。人の判断はまだ送っていない。直してから打ち直す。\n' "$cf_p" >&2
+		printf 'ccnavi-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。人の判断はまだ送っていない。直してから打ち直してください。\n' "$cf_p" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -199,7 +199,7 @@ carry_family() {
 		return 0
 	fi
 	# 落ちてもコミットは残す（人が打ち直せる）。C1 は未送信を見つけて止まり、これを打ち直すよう言う。
-	printf 'ccnavi-push-approved: %s の push が通らなかった（%s）。コミットは残した。接続を戻して sh %s/ccnavi-push-approved.sh %s を打ち直す。\n' \
+	printf 'ccnavi-push-approved: %s の push が通らなかった（%s）。コミットは残した。接続を戻して sh %s/ccnavi-push-approved.sh %s を打ち直してください。\n' \
 		"$cf_p" "$(head -n 1 "$ccnavi_c1_tmp/push-err" 2>/dev/null)" "$(dirname "$0")" "$cf_p" >&2
 	ccnavi_lock_drop
 	return 1

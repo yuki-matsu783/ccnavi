@@ -213,7 +213,7 @@ has() {
 # コールバックは `<コールバック> opt <-x か --name> <値>`・`pos <語>`・`end`（`--` を見た）で呼ぶ。
 # 止める判定はコールバックが持つ（一覧に入れた上で、名前を見て reject する）。
 ow_reject() {
-	reject option-not-allowed "$sub の $1 は通しません。通すオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した綴りは、git が止めているオプションに読み替えることがあります）。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
+	reject option-not-allowed "$sub の $1 は通しません。通すオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した綴りを、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
 }
 opt_walk() {
 	ow_cb="$1"
@@ -470,7 +470,7 @@ branch)
 			reject branch-delete-unmerged "branch -D は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
 			;;
 		-M | -C | -c | --move | --copy)
-			reject branch-force-move "branch $2 はブランチを改名するか複製し、同じ名前の既存のブランチを上書きしえます。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューが引けなくなります。必要な理由を利用者に伝えてください。"
+			reject branch-force-move "branch $2 はブランチを改名するか複製し、同じ名前の既存のブランチを上書きすることがあります。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューのときに名前からチケットを引けなくなります。必要な理由を利用者に伝えてください。"
 			;;
 		--force | --set-upstream-to | --unset-upstream | --edit-description)
 			reject branch-force "branch $2 はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
@@ -731,7 +731,7 @@ restore)
 		pos)
 			case "$2" in
 			. | :/ | "*" | ":/*" | "./")
-				reject restore-whole-tree "restore にツリー全体 ($2) を渡すと、作業中の変更が黙って消えます。戻したいファイルを 1 つずつ名指ししてください。"
+				reject restore-whole-tree "restore にツリー全体 ($2) を渡すと、作業中の変更が気づかないうちに消えます。戻したいファイルを 1 つずつ名指ししてください。"
 				;;
 			esac
 			store_hit "$2"
@@ -767,7 +767,7 @@ merge)
 		[ "$1" = opt ] || return 0
 		case "$2:${3:-}" in
 		--strategy:ours | --strategy:theirs | -s:ours | -s:theirs | --strategy-option:ours | --strategy-option:theirs | -X:ours | -X:theirs)
-			reject merge-discard-side "$2 $3 は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
+			reject merge-discard-side "$2 $3 を使うと、衝突の片側が気づかないうちに捨てられます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
 			;;
 		--no-verify:*)
 			reject merge-no-verify "$2 はマージ前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
@@ -870,7 +870,7 @@ checkout | switch)
 		pos)
 			case "$2" in
 			. | :/)
-				reject checkout-whole-tree "$sub にツリー全体 ($2) を渡すと、作業中の変更が黙って消えます。$SELF restore <パス> を名指しで使ってください。"
+				reject checkout-whole-tree "$sub にツリー全体 ($2) を渡すと、作業中の変更が気づかないうちに消えます。$SELF restore <パス> を名指しで使ってください。"
 				;;
 			esac
 			co_words=$((co_words + 1))
@@ -892,7 +892,7 @@ checkout | switch)
 				reject checkout-discard "$2 は作業中の変更を捨てます。退避は $SELF stash push -u です。"
 				;;
 			checkout:-B | switch:-C | switch:--force-create)
-				reject checkout-force-branch "$sub $2 は、同じ名前の既存のブランチを別のコミットへ付け替えます。そのブランチにしか無いコミットが黙って外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。リモートに合わせるなら、親のブランチは $SYNC <P>、ほかのブランチは $SELF merge <リモート>/<ブランチ> です。分かれていて進めないなら利用者に伝えてください。新しいブランチは -b（switch は --create）で切ります。"
+				reject checkout-force-branch "$sub $2 は、同じ名前の既存のブランチを別のコミットへ付け替えます。そのブランチにしか無いコミットが気づかないうちに外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。リモートに合わせるなら、親のブランチは $SYNC <P>、ほかのブランチは $SELF merge <リモート>/<ブランチ> です。分かれていて進めないなら利用者に伝えてください。新しいブランチは -b（switch は --create）で切ります。"
 				;;
 			checkout:--pathspec-from-file)
 				reject checkout-store "$sub の $2 は、どのパスを戻すかをここで読めないので通しません。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
@@ -930,7 +930,7 @@ checkout | switch)
 			case "$co_to" in
 			'' | "$co_name" | HEAD) ;;
 			*)
-				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移りません。親のブランチの名前は識別子で、変えると家族が止まります（ADR-0093 の 3.6）。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
+				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移れません。親のブランチの名前は識別子で、変えると家族が止まります（ADR-0093 の 3.6）。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
 				;;
 			esac
 		fi
@@ -1105,7 +1105,7 @@ clone | submodule | lfs)
 	reject import "$sub は外から中身を持ち込みます。通しません。利用者に依頼してください。"
 	;;
 *)
-	reject not-allowed "$sub はホワイトリストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
+	reject not-allowed "$sub は許可リストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
 	;;
 esac
 
@@ -1256,7 +1256,7 @@ else
 	# サブシェルの中で cd してから打っても防げず、ここで pwd を見ても親の cwd は分からないので、
 	# 起きたときに直し方を言う。
 	if [ "$sub" = worktree ] && [ "${action:-}" = remove ] && body | grep -q 'Permission denied'; then
-		printf '案内: ワークツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直します。中にファイルが残っているなら消さずに利用者に報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
+		printf '案内: ワークツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直してください。中にファイルが残っているなら消さずに利用者に報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
 	fi
 fi
 
