@@ -30,7 +30,7 @@ test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、ye
     "ab12",
     "--json",
   ]);
-  // ターミナルに `--agree` を送る経路は消した。y/N を端末で押す形には戻さない。
+  // ターミナルに `--agree` を送る経路は消した。y/N をターミナルで押す形には戻さない。
   assert.equal((commands as Record<string, unknown>).approveCommand, undefined);
 });
 

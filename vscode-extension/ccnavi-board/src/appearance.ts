@@ -26,7 +26,7 @@ export function onDidChangeAppearance(listener: (appearance: Appearance) => void
  * いまの見た目を画面へ送る。**画面に中身を渡す段取り（`ScreenHost`）を通す。**
  * 届いたら真、組み上がっていない画面と捨てられた画面には送らないので偽。
  *
- * 落ちたぶんは持ち越さない。入れ物ごと入れ直す経路では組む側が HTML に埋め（`bodyTag`）、
+ * 届かなかったぶんは持ち越さない。入れ物ごと入れ直す経路では組む側が HTML に埋め（`bodyTag`）、
  * 画面が組み上がったところで呼ぶ側が送り直すので、どちらの経路でもいまの値が後から渡る。
  */
 export function postAppearance(host: AppearanceSink): boolean {

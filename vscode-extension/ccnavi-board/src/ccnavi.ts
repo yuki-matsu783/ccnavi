@@ -189,7 +189,7 @@ interface Ran {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
-  /** 期限で打ち切った（execFile が殺した）。標準エラーには何も残らないので、呼び手が文面を作る */
+  /** 期限で打ち切った（execFile が強制終了した）。標準エラーには何も残らないので、呼び手が文面を作る */
   readonly killed: boolean;
 }
 
@@ -307,7 +307,7 @@ export async function runApproveYes(
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
   // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（agree.py の for cand in batch）ので、
-  // 途中で殺されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
+  // 途中で強制終了されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
   // ここで拾わないと何が起きたのか伝わらない。
   if (ran.killed) {
     return {

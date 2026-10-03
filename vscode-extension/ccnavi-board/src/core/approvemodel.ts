@@ -35,7 +35,7 @@ export interface ApprovePreview {
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
-  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに写る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
+  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに入る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
   readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
@@ -47,7 +47,7 @@ export interface ApproveResult {
   readonly version: number;
   readonly approved: readonly string[];
   readonly copies: readonly string[];
-  /** 端末なら標準出力に出ていた行 */
+  /** ターミナルなら標準出力に出ていた行 */
   readonly lines: readonly string[];
   /** Claude Code に渡す文。hook が次のプロンプトで渡す文と同じ */
   readonly prompt: string;
@@ -85,14 +85,14 @@ export interface ApprovePartial {
   readonly ticket: string;
   /** 止まった理由（実行ファイルの文面そのまま） */
   readonly reason: string;
-  /** 止まるまでに出た行（マーカーを消した、改版した）。端末なら標準出力に出ていたぶん */
+  /** 止まるまでに出た行（マーカーを消した、改版した）。ターミナルなら標準出力に出ていたぶん */
   readonly lines: readonly string[];
 }
 
 /**
  * 途中で止まったことをユーザに伝える文。何が残っているかを言い切る。
  * `placed` に止まった識別子自身が入るのは、書けたあとの後始末（マーカーを置く）で
- * 落ちたとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
+ * 失敗したとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
  */
 export function partialMessage(partial: ApprovePartial): string {
   const { placed, ticket, reason, lines } = partial;

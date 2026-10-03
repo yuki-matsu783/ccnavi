@@ -54,7 +54,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.ok(body.startsWith("チケットの承認リクエスト"));
     assert.ok(body.includes("編集対象としているが"));
     assert.ok(body.includes("超えている"));
-    // 対象にしないのは形の壊れた子（計画に無い番号）。
+    // 対象にしないのは形の正しくない子（計画に無い番号）。
     assert.deepEqual(texts(page, ".approval h3"), ["承認の対象にしない提案"]);
     assert.ok(text(page, ".approval-rejected").includes("i0001-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画に無い"));
@@ -227,7 +227,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
-    // 運ぶ sh を端末に送ったときだけ、そう言う。
+    // 運ぶ sh をターミナルに送ったときだけ、そう言う。
     assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
   } finally {
     await page.close();
@@ -324,7 +324,7 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
   // 絞り込みの select は最長の選択肢の幅に広がらず、ページを横に流さない
   assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: 320px;/);
-  // カードの不備の小さい字はツールバーの「不備 N 件」に効かせない
+  // カードの不備の小さい字の指定は、ツールバーの「不備 N 件」には当てない
   assert.doesNotMatch(css(), /(^|\})\s*\.issues \{/);
   assert.match(css(), /\.card \.issues \{/);
 });
@@ -813,7 +813,7 @@ test("CB-T162 読み直せなかった画面にも承認のオーバーレイが
   } finally {
     await withApproval.close();
   }
-  // 文に何が入っていても画面を壊さない
+  // 文に何が入っていても画面の構造を崩さない
   const escaped = await openPage({ kind: "error", error: "<b>", approval: { kind: "error", error: "<script>" } });
   try {
     assert.equal(text(escaped, "pre.load-error"), "<b>");
@@ -897,7 +897,7 @@ test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新�
       "承認（承認待ち → 作業中）",
     ]);
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
-    // cli は「sh から来た」までしか言えない（ユーザが端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
+    // cli は「sh から来た」までしか言えない（ユーザがターミナルで同じ sh を打っても cli）ので、誰が打ったかは言わない
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
     assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
       "フェーズ 2: マーカーを消した（子が足された）",

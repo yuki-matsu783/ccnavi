@@ -6,8 +6,8 @@
  * ライトのテーマからダークを選んだとき（またはその逆）にテーマの意味の色が地と合わなくなるため。
  * 青系の強調（charts-blue / editorInfo / focusBorder / textLink）だけ橙に寄せる。文字に使う色（前景・説明・意味の色・リンク）は
  * 地（editor / editorWidget / list-hover のどれ）に対しても 4.5:1 以上、焦点の枠は 3:1 以上。ボタンの地の橙は文字ではない。
- * ハイコントラストのテーマ（body に vscode-high-contrast* が付く）では効かせない。純黒・純白の地と焦点の色を
- * 置き換えると HC の意図が壊れるため。
+ * ハイコントラストのテーマ（body に vscode-high-contrast* が付く）では適用しない。純黒・純白の地と焦点の色を
+ * 置き換えると、HC が意図した見え方にならないため。
  */
 body.ccnavi-claude-dark:not(.vscode-high-contrast):not(.vscode-high-contrast-light) {
   --vscode-editor-background: #262624; --vscode-editor-foreground: #E8E6DF; --vscode-foreground: #E8E6DF; --vscode-descriptionForeground: #A8A69E;
