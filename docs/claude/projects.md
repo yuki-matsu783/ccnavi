@@ -37,11 +37,11 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 
 子のフローは、エージェントが書かない（シェルからも書かない）。書くのは人で（ボードのフロー編集画面）、コミットとpushも人が行う
 （`ccnavi-push-approved.sh`）。着手中は人も書き換えられない。着手のあとにフローが変わると、`NOTICE_TICKET_FLOW_CHANGED`で
-人に知らされる。親のツリーから起動されたときは、自分が担当する子のフローだけに従う（ADR-0085）。
+人に知らされる。親のツリーから起動されたときは、自分が担当する子のフローだけに従う。
 
 チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち）→`.ccnavi/approved/doing/`（人が承認）→
 `wip/proposals/review/`（`ticket finish`。レビューが要るとき）→`.ccnavi/approved/done/`（人がレビュー）の順に
-移る（ADR-0055）。`.ccnavi/approved/`へ移すのは人で、`wip/proposals/`へ移すのはエージェント
+移る。`.ccnavi/approved/`へ移すのは人で、`wip/proposals/`へ移すのはエージェント
 （`ccnavi-ticket.sh`を使う）。レビューで残った指摘は、人が`decide`（ボードの「決める」か端末）で指摘ごとに扱いを決める。
 選べるのは「対応しない」「このフェーズで直す」（続きの子チケットを`doing/`に作る）「issueに回す」の3つ。
 

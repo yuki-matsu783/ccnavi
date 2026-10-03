@@ -478,7 +478,7 @@ push)
 	# 2 つとも実際のパス（symlink を畳んだもの）にそろえてから比べる。WS は論理の pwd から、
 	# push_top は git の実際のパスから作られるので、ワークスペースを symlink 越しに開くと
 	# （macOS の /tmp → /private/tmp など）case に当たらず、検査が丸ごと飛ぶ。
-	# 同じ検査を hook も持つ（ADR-0077）。こちらは 2 重目。
+	# 止める・通すの判定は hook が持ち、同じ検査を hook が先に当てる。こちらは 2 重目。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	[ -z "$push_top" ] || push_top=$(cd "$push_top" 2>/dev/null && { pwd -P -W 2>/dev/null || pwd -P; }) || :
 	push_root=$(cd "$WS" 2>/dev/null && { pwd -P -W 2>/dev/null || pwd -P; }) || push_root="$WS"

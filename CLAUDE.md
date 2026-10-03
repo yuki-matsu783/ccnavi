@@ -30,7 +30,7 @@
 | 下書きや使い捨てのファイルを置く | `docs/claude/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `docs/claude/projects.md` |
 | 提案を書く、相談が要るか迷う、サブエージェントに任せる | `docs/claude/decisions.md` |
-| sh やスクリプトを書く、用語（ワークスペースルート・統合先ブランチ など）を確かめる | `docs/claude/environment.md` |
+| sh やスクリプトを書く、用語（ワークスペースルート・統合先ブランチ など）を確かめる、文書・コメント・利用者に見える文言で ADR に触れたくなった | `docs/claude/environment.md` |
 | ccnavi の実行ファイル（`ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
 | 振り返りの文が届いた、`.claude/skills/` を直したくなった、フィードバック計画を書く | `docs/claude/skill-review.md` |
