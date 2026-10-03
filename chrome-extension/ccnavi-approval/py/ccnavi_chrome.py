@@ -962,7 +962,7 @@ def _compat(snap: dict) -> dict:
     elif theirs is None:
         message = (
             f"統合先の {COMPAT_FILE} に互換の版（CCNAVI_COMPAT）が書かれていない。"
-            f"拡張は互換 {ours}。表示だけにする"
+            f"拡張は互換 {ours}"
         )
     else:
         hint = "拡張を更新する" if theirs > ours else "リポジトリの ccnavi の更新を待つ"
