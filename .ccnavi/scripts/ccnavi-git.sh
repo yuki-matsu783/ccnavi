@@ -625,7 +625,7 @@ worktree)
 		wt_leaf="${wt_abs##*/}"
 		if [ -n "$wt_new" ]; then
 			if [ "$wt_new" != "$wt_leaf" ]; then
-				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします（親のブランチなら親の識別子。変えると家族が止まります）。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。"
+				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします。親のブランチを識別子と違う名前のワークツリーに出すと、リモートの承認を取り込む処理（ccnavi-sync.sh とセッション開始時の早送り）がそのワークツリーを親のワークツリーとして見つけられず、取り込み済みの家族では親と子の承認・状態の操作・実行前の判定が止まります（ADR-0093 の 3.3・4.2）。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。"
 			fi
 		elif [ -n "$wt_base" ] && [ "$wt_base" = "$wt_leaf" ] &&
 			! git show-ref --verify --quiet "refs/heads/$wt_base" &&
@@ -911,8 +911,9 @@ checkout | switch)
 	opt_walk checkout_cb ${1+"$@"}
 	# 親のワークツリー（.claude/worktrees/<P> で、親の写しか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない（3.1 の 10）。
-	# 親のブランチの名前は識別子で、ワークツリーが別のブランチの上に居ると、着手・取り込み・
-	# push の守りが家族を引けなくなる。
+	# ccnavi は親のワークツリーを「名前が識別子で、HEAD が同じ名前のブランチを指すもの」として探す
+	# （ccnavi_parent_tree と、ccnavi-sync.sh・ccnavi-fetch.sh・syncstate.home_tree の名前とブランチの一致）。
+	# 別のブランチに移ると取り込みがこのツリーを飛ばし、取り込み済みの家族の承認・状態の操作・判定が止まる。
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
 	case "$co_top" in
 	"$WS_P"/.claude/worktrees/*)
@@ -930,7 +931,7 @@ checkout | switch)
 			case "$co_to" in
 			'' | "$co_name" | HEAD) ;;
 			*)
-				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移れません。親のブランチの名前は識別子で、変えると家族が止まります（ADR-0093 の 3.6）。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
+				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移れません。親のワークツリーが別のブランチに移ると、リモートの承認を取り込む処理（ccnavi-sync.sh とセッション開始時の早送り）がこのワークツリーを飛ばし、取り込み済みの家族では親と子の承認・状態の操作・実行前の判定が止まります（ADR-0093 の 3.3・4.2）。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
 				;;
 			esac
 		fi

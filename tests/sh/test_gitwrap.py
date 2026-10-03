@@ -962,6 +962,8 @@ class WorktreeNameTest(GitWrapperTest):
         stderr = self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "b").stderr
         self.assertIn("-b b", stderr)
         self.assertIn("worktree add .claude/worktrees/b -b b", stderr)
+        # 名前を変えると何が止まるのかを言う。
+        self.assertIn("取り込み済みの家族", stderr)
 
     def test_matching_forms_pass(self):
         git(self.dir, "branch", "c")
@@ -981,7 +983,8 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
     """親のワークツリーでは別のブランチへ移らない（ADR-0093 の 3.1 の 10。段階 2b）。
 
     親のワークツリーは .claude/worktrees/<P> で、親の写しか提案（`ticket: <P>`、`parent:` なし）が
-    あるもの。親のブランチの名前は識別子で、ワークツリーが別のブランチの上に居ると家族を引けなくなる。
+    あるもの。別のブランチに移ると取り込み（ccnavi-sync.sh・セッション開始時の早送り）がこのツリーを飛ばし、
+    取り込み済みの家族では承認・状態の操作・実行前の判定が止まる。拒否文はその中身を言う。
     """
 
     def setUp(self):
@@ -1015,7 +1018,8 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
                 result = run_in(self.parent, *args)
                 self.assertEqual(2, result.returncode, result.stdout + result.stderr)
                 self.assertIn("親のワークツリー", result.stderr)
-                self.assertIn("識別子", result.stderr)
+                self.assertIn("ccnavi-sync.sh", result.stderr)
+                self.assertIn("取り込み済みの家族", result.stderr)
         self.assertEqual(before, git_out(self.parent, "rev-parse", "--abbrev-ref", "HEAD"))
         self.assertEqual([], logs_of(self.dir), "拒否したのに git が走って記録が残っている")
 
