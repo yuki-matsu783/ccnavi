@@ -24,7 +24,7 @@ class TranslateTest(unittest.TestCase):
         self.assertFalse(self.hit("git push", "cd /repo && git push"))
         self.assertTrue(self.hit("*git push*", "cd /repo && git push"))
 
-    def test_区切り文字はどちらの綴りにも当たる(self):
+    def test_区切り文字はどちらの書き方にも当たる(self):
         # ルールは 1 回書いて、どの機械でも同じ意味でなければならない。
         for subject in ("/repo/secrets/token.txt", "C:\\repo\\secrets\\token.txt"):
             with self.subTest(subject=subject):

@@ -568,7 +568,7 @@ class MovedTest(unittest.TestCase):
             }
         )
 
-    def test_書かれた綴りは動かさない(self):
+    def test_書かれた表記は動かさない(self):
         # ここが要。ルールは書き方に固定して書かれているので、書かれた側に継ぎ足すと
         # いま当たっているものが外れる（サブエージェントの禁止の `…ccnavi-ticket.sh start`、
         # コマンドの頭に固定した組み込みの守り）。
@@ -601,7 +601,7 @@ class MovedTest(unittest.TestCase):
             with self.subTest(src=src):
                 self.assertEqual(self.moved(src), [])
 
-    def test_上に戻る綴りは畳む(self):
+    def test_上に戻る書き方は畳む(self):
         self.assert_moved(
             {
                 "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh": (
@@ -828,7 +828,7 @@ class SubstTest(unittest.TestCase):
                 self.assertTrue(result.degraded)
                 self.assertEqual(result.reason, shellread.REASON_AMBIGUOUS_SUBST)
 
-    def test_切り出さない綴りは文字のまま(self):
+    def test_切り出さない書き方は文字のまま(self):
         # 文字として書く方法（単一引用、$'…'、\$(、\`、引用付き heredoc）を必ず残す。
         for src in [
             "grep -n '$(git push)' f",

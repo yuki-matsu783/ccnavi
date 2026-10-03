@@ -320,7 +320,7 @@ class HeredocTest(unittest.TestCase):
 
 
 class PathTest(unittest.TestCase):
-    def test_迂回した綴りでも保護領域に届く判定になる(self):
+    def test_迂回したパスの書き方でも保護領域に届く判定になる(self):
         # 守る対象は名前ではなく場所。同じ場所を指す別の書き方で
         # ルールを外せてはいけない。
         for path in [

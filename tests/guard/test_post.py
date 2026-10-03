@@ -448,7 +448,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
-    def test_HEADを持たない控えは基準なしとして扱う(self):
+    def test_HEADを持たない状態ファイルは基準なしとして扱う(self):
         # heads の無い状態ファイルは、状態ファイルが無いときと同じ。コミットのぶんを数えられない
         # 基準で報告すると、このターンに入ったコミットを黙って落とす。
         self.run_hook(event="UserPromptSubmit")
@@ -669,7 +669,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("ワークツリー wt1 では、今回のターンでこの確認ができませんでした", message)
         self.assertIn("uncounted", self.records()[-1].get("detail", ""))
 
-    def test_戻さなかった1件は控えに入りターンの終わりに人へ出る(self):
+    def test_戻さなかった1件は状態ファイルに入りターンの終わりに人へ出る(self):
         # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
         # 呼び出しの数だけ積まれるので、報告はセッションで 1 度きりにする。
         # 人が見るのはターンの終わりの報告（Stop）。
@@ -893,7 +893,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
 
-    def test_同じ姿が2つ動くときは移動として外さない(self):
+    def test_同じ内容が2つ動くときは移動として外さない(self):
         # 正規の移動 1 件に、同じ内容のチケットのただの削除が一緒に通ってはいけない。
         # 内容が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
         write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET)
@@ -913,7 +913,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn("i0002", result.stderr)
 
-    def test_行き先に同じ姿が2つあるときも外さない(self):
+    def test_行き先に同じ内容が2つあるときも外さない(self):
         # 正規の移動に、行き先へ直接置いた偽物が一緒に通る形。
         self.run_hook(command="ls")
         os.remove(self.path(DOING))

@@ -146,7 +146,7 @@ class FallbackTest(unittest.TestCase):
         # 止めた先に別の方法が無いと、拒否されたまま進めなくなる。
         self.assertIn("Write", out["permissionDecisionReason"])
 
-    def test_既定でもシェルからの書き込みは綴りを変えても止まる(self):
+    def test_既定でもシェルからの書き込みは表記を変えても止まる(self):
         for command in [
             "echo x >> .claude/hooks/lint-py.sh",
             "sed -i s/deny/allow/ .ccnavi/common/rules.yml",

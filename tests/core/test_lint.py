@@ -122,7 +122,7 @@ class LintTest(unittest.TestCase):
         # テストが走った機械にあるファイルを報告することになる。
         self.root = directory.name
 
-    def test_不備が無ければ何も咎めずに0で終わる(self):
+    def test_不備が無ければ何も指摘せずに0で終わる(self):
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -148,7 +148,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(counts(result.stdout)[0], 1)
 
-    def test_承認の門にdry_runと書いたらerrorになる(self):
+    def test_承認の切り替えの環境変数にdry_runと書いたらerrorになる(self):
         # この切り替えの環境変数は enable か disable しか取らない。dry-run と書いた人は止まらない
         # つもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
         # だけでは、その食い違いがどこにも現れない。
@@ -169,7 +169,7 @@ class LintTest(unittest.TestCase):
         # 実際の値も言う。言わないと、止まっているのか通っているのかが分からない。
         self.assertIn("enable として動いている", result.stdout)
 
-    def test_確認できない側の門を切ったらwarnで言う(self):
+    def test_確認できない側の切り替えの環境変数を切ったらwarnで言う(self):
         # 切ってあること自体は設定として正しいので error にはしない。それでも
         # 言うのは、切れている状態が外から見て「ルールが揃っている状態」と
         # 区別が付かないため。
@@ -221,7 +221,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_GUARD_CORE_FILES=dry-run", result.stdout)
         self.assertIn("CCNAVI_RESTORE_IF_DENY=dry-run", result.stdout)
 
-    def test_切った門はJSONのproblemsにも出る(self):
+    def test_切った切り替えの環境変数はJSONのproblemsにも出る(self):
         # 読み手は CI と VS Code の拡張。人向けの本文しか持たない苦情は、
         # そこからは無いのと同じ。
         result = ccnavi(
@@ -249,12 +249,12 @@ class LintTest(unittest.TestCase):
         self.assertNotIn("CCNAVI_RESTORE_IF_DENY", result.stdout)
         self.assertIn("error 0 件、warn 0 件", result.stdout)
 
-    def test_確認できない側の門は既定でenableと出る(self):
+    def test_確認できない側の切り替えの環境変数は既定でenableと出る(self):
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertIn("確認できる者が居ないモードで守る: enable", result.stdout)
 
-    def test_承認の門にenableと書いてもerrorにならない(self):
+    def test_承認の切り替えの環境変数にenableと書いてもerrorにならない(self):
         result = ccnavi(
             self.root,
             "--lint",
@@ -343,7 +343,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("i0001 が複数の場所にある", result.stdout)
         self.assertIn("(ワークスペースルート):review", result.stdout)
 
-    def test_doneに1つだけ在るのは咎めない(self):
+    def test_doneに1つだけ在るのは指摘しない(self):
         # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても何も言わないまま。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done"),
@@ -517,7 +517,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("id が重複", result.stdout)
         self.assertIn("Task", result.stdout)
 
-    def test_権限ルールの名前で書いたmatchは咎めない(self):
+    def test_権限ルールの名前で書いたmatchは指摘しない(self):
         # Claude Code の権限ルール `ToolName(指定子)` の括弧の中を除いた名前は、
         # 判定が対象を取り出せる。PowerShell はコマンド、Grep / Glob は探す場所、
         # Skill はスキル名、WebFetch は URL。lint の probe がその欄を渡し損ねると、

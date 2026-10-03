@@ -22,7 +22,7 @@ class FullPathTest(unittest.TestCase):
                 os.path.join(base, "secrets", "key.pem"),
             )
 
-    def test_上に戻る綴りは畳まれる(self):
+    def test_上に戻る書き方は畳まれる(self):
         # `..` を挟めば、secrets を通らないパスで secrets の中に届く。
         with tempfile.TemporaryDirectory() as base:
             base = os.path.realpath(base)
@@ -31,7 +31,7 @@ class FullPathTest(unittest.TestCase):
                 os.path.join(base, "secrets", "key.pem"),
             )
 
-    def test_同じ場所を指す綴りは同じ答えになる(self):
+    def test_同じ場所を指す書き方は同じ答えになる(self):
         with tempfile.TemporaryDirectory() as base:
             base = os.path.realpath(base)
             spellings = [
@@ -60,7 +60,7 @@ class FullPathTest(unittest.TestCase):
 class RuleReachTest(unittest.TestCase):
     """正規化したパスに、ルールが実際に届くかどうか。"""
 
-    def test_迂回した綴りでも保護領域のルールに当たる(self):
+    def test_迂回したパスの書き方でも保護領域のルールに当たる(self):
         import re
 
         from ccnavi.globmatch import translate

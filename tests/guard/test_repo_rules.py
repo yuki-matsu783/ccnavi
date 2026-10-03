@@ -474,13 +474,13 @@ class MovedJudgeTest(LauncherJudgeTest):
             with self.subTest(subject=subject):
                 self.assert_denied_by(subject, SETTING_FILES)
 
-    def test_文面は移った先から見た綴りを示す(self):
+    def test_文面は移った先から見た表記を示す(self):
         body = self.judge("cd .claude && echo x > settings.json")
 
         self.assertIn("`cd` で移った先から見ると", body["response"])
         self.assertIn(".claude/settings.json", body["response"])
 
-    def test_移った先から見た綴りに_allow_は当てない(self):
+    def test_移った先から見た表記に_allow_は当てない(self):
         # 中で実行されるコマンドと同じ線引き（W3）。当てると、`cd` を 1 つ挟むだけで
         # 読み取りの allow が付いて通る形ができる。
         body = self.judge("cd .ccnavi && cat common/rules.yml")
@@ -488,7 +488,7 @@ class MovedJudgeTest(LauncherJudgeTest):
         self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
         self.assertNotEqual(body["verdict"], "allow", body["response"])
 
-    def test_書かれた綴りの当たり方は変わらない(self):
+    def test_書かれた表記の当たり方は変わらない(self):
         # `cd` した先で打つラッパースクリプトは、今までどおり allow に当たる。
         # 書かれた文字列に継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
         for subject in [
@@ -721,7 +721,7 @@ class SubstRepoRulesTest(unittest.TestCase):
             ]
         )
 
-    def test_回避策の綴りは止まらない(self):
+    def test_回避策の書き方は止まらない(self):
         self.check(
             [
                 (

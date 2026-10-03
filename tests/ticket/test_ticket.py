@@ -2954,7 +2954,7 @@ class ScriptShapeTest(unittest.TestCase):
     def started(self, extra: str) -> str:
         return self.body.replace("---\n本文", extra + "---\n本文")
 
-    def test_スクリプトの欄を足しても姿は変わらない(self):
+    def test_スクリプトの欄を足しても正規化した内容は変わらない(self):
         after = self.started('started_at: "2026-09-22T00:00:00Z"\nbase_sha: "abc"\n')
 
         self.assertEqual(
@@ -2968,29 +2968,29 @@ class ScriptShapeTest(unittest.TestCase):
 
         self.assertEqual(ticket.script_shape(after), ticket.script_shape(self.body))
 
-    def test_範囲が変われば別の姿になる(self):
+    def test_範囲が変われば正規化した内容も変わる(self):
         wider = self.body.replace('glob: "src/*"', 'glob: "*"')
 
         self.assertNotEqual(ticket.script_shape(wider), ticket.script_shape(self.body))
 
-    def test_本文が変われば別の姿になる(self):
+    def test_本文が変われば正規化した内容も変わる(self):
         self.assertNotEqual(
             ticket.script_shape(self.body.replace("本文", "別の本文")),
             ticket.script_shape(self.body),
         )
 
-    def test_同じ綴りの欄でも字下げされていれば落とさない(self):
+    def test_同じ表記の欄でも字下げされていれば落とさない(self):
         # 範囲の中に `started_at:` と書いても、欄ではないので正規化した内容に残る。
         nested = self.body.replace('    glob: "src/*"', '    glob: "src/*"\n    started_at: "x"')
 
         self.assertNotEqual(ticket.script_shape(nested), ticket.script_shape(self.body))
 
-    def test_前置きが無いものは姿を持たない(self):
+    def test_前置きが無いものは正規化した内容を持たない(self):
         # マーカーと記録がこれ。範囲を宣言しないので、内容からは見分けられない。
         self.assertIsNone(ticket.script_shape('{"phase": 1}\n'))
         self.assertIsNone(ticket.script_shape(""))
 
-    def test_閉じの無い前置きは姿を持たない(self):
+    def test_閉じの無い前置きは正規化した内容を持たない(self):
         self.assertIsNone(ticket.script_shape("---\nid: i0001\n本文\n"))
 
 
