@@ -1148,7 +1148,7 @@ def _summary(node: dict, flows: dict) -> str:
     if kind == "prompt":
         return _line(data.get("prompt"))
     if kind == "subAgent":
-        head = data.get("description") or data.get("agentDefinition")
+        head = data.get("description")
         prompt = _line(data.get("prompt"))
         text = _line(head)
         if prompt:
@@ -1180,7 +1180,7 @@ def _summary(node: dict, flows: dict) -> str:
     if kind == "codex":
         return f"Codex: {_line(data.get('prompt'))}"
     if kind in ("branchSession", "start", "end"):
-        return _line(data.get("label") or data.get("workDescription"))
+        return _line(data.get("label"))
     return ""
 
 
