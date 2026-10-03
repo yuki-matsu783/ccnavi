@@ -4,10 +4,10 @@
 
 1. 種類の `order` と `after` の読み方（循環、指す先、層の合わせ方）
 2. `dag` では祖先でないフェーズを待たずに承認できる。一直線では待つ
-3. 待ち方は承認のときに親へ写し、あとで phases.yml を直しても進行中の親には効かない
-4. 計画が同じ改版で、直した phases.yml を進行中の親に効かせられる
+3. 待ち方は承認のときに親へ写し、あとで phases.yml を直しても進行中の親には反映されない
+4. 計画が同じ改版で、直した phases.yml を進行中の親に反映できる
 5. 計画の検査（並び、終端、延期の引き受け手）
-6. 受け入れはそのフェーズと、それを待つ番号にだけ効く
+6. 受け入れはそのフェーズと、それを待つ番号にだけ当てはまる
 """
 
 from __future__ import annotations
@@ -210,7 +210,7 @@ class AcceptedScopeTest(unittest.TestCase):
         self.assertEqual(approval.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
         # 番号を渡さなければ親全体。
         self.assertEqual(approval.accepted_threads(home, "i0001"), {"t-2", "t-all"})
-        # 並行した 3 で同じスレッドを受け入れ直せば、3 でも効く
+        # 並行した 3 で同じスレッドを受け入れ直せば、3 でも有効
         self.assertEqual(approval.remember_accepted(home, "i0001", ["t-2"], 3), "")
         self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
         # 親全体で受け入れたものは、番号付きで受け入れ直しても狭まらない

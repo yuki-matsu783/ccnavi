@@ -33,7 +33,7 @@ export type PhaseOrder = (typeof ORDERS)[number];
 /** 待ち方の説明。select のラベル */
 export const ORDER_LABELS: Readonly<Record<PhaseOrder, string>> = {
   sequential: "sequential（既定。全体計画は一直線で、前の番号を全部待つ）",
-  dag: "dag（after を辺にしたワークフロー。祖先に当たる種類だけを待ち、他は並行して進む）",
+  dag: "dag（after でつないだ流れ。after をたどった先にある種類だけを待ち、他は並行して進む）",
 };
 
 /** 画面で編集する種類 1 件。`origin` は読み込んだときの位置で、新しい種類は null */
@@ -140,7 +140,7 @@ export type PhasesMessage =
   /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  /** 共通層のファイルが無いときの案内から、自身の層を開く（プロジェクト管理画面の入口と同じ道） */
+  /** 共通層のファイルが無いときの案内から、自身の層を開く（プロジェクト管理画面の入口と同じ経路） */
   | { readonly type: "openSelf" }
   | { readonly type: "save"; readonly form: PhasesForm }
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */

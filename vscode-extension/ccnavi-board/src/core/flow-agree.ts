@@ -235,14 +235,14 @@ export function openDisagreementText(found: FlowDisagreement): string {
   return (
     `画面の読みと実行ファイルの読みが食い違う（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
     "このまま画面で直して保存すると値の意味が変わるので開かない。エディタで引用符を付けるなどして、" +
-    "実行ファイルが意図した値に読むように直す"
+    "実行ファイルが意図どおりの値として読むように直してください"
   );
 }
 
 /** 保存の前に食い違ったときの文面 */
 export function saveDisagreementText(found: FlowDisagreement): string {
   return (
-    `書き出す本文を実行ファイルが別の中身に読む（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
+    `書き出す本文を、実行ファイルが画面とは違う値として読む（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
     "保存すると値の意味が変わるので書かない"
   );
 }

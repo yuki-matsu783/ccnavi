@@ -112,7 +112,7 @@ class CompatSkewTest(unittest.TestCase):
         self.put_bin(STUB.format(compat=sh_compat() + 1))
         result = self.run_ticket()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("build.py を回して組み立て直して", result.stderr)
+        self.assertIn("build.py を実行して組み立て直して", result.stderr)
         self.assertNotIn("ccnavi-setup.sh", result.stderr)
 
     def test_v4_an_executable_that_does_not_know_version_is_called_old(self):

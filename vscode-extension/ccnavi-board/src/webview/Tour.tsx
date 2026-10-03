@@ -46,7 +46,7 @@ export function TourButton({ onClick }: { readonly onClick: () => void }): JSX.E
  * - `request`: 拡張ホストの `tour`（初回）を受けたときに呼ぶ。**指す先が出る（`ready`）まで待って始める。**
  *   読み込み中やエラーの画面には指す先が無い
  * - `start`: 「?」を押したとき。指す先が出ていればすぐ始め、出ていなければ（ボードの承認のオーバーレイの
- *   最中など）`request` と同じく出るまで待つ。押した道だけ待たないと、オーバーレイの上に案内が被さる
+ *   最中など）`request` と同じく出るまで待つ。押した経路だけ待たないと、オーバーレイの上に案内が被さる
  * - `end`: 吹き出しを閉じたとき。`onEnd` を呼ぶ（画面はそこで様子を戻し、`tourDone` を返す）
  *
  * `onStart` は始める直前に呼ぶ。案内が画面の様子（タブなど）を動かすなら、ここで控えを取る。
@@ -59,7 +59,7 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
 } {
   const [touring, setTouring] = useState(false);
   const [pending, setPending] = useState(false);
-  // 受け口は描くたびに作り直さないので、呼ぶ先はいまのものを写しておく
+  // 受け取る側は描くたびに作り直さないので、呼ぶ先はいまのものを写しておく
   const latest = useRef(hooks);
   latest.current = hooks;
   const touringRef = useRef(touring);
@@ -139,10 +139,10 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
       if (el === null) {
         setSpot(undefined);
       } else {
-        // 段に入って最初の 1 回だけ、指す先を見える場所へ動かす（測り直しのたびに動かすと、人のスクロールと取り合う）
+        // 段に入って最初の 1 回だけ、指す先を見える場所へ動かす（測り直しのたびに動かすと、人のスクロールを邪魔する）
         if (!scrolled) {
           scrolled = true;
-          // 画面より高い要素（長い一覧）は頭を見せる。中ほどに寄せると、何を指しているのかが見えない
+          // 画面より高い要素（長い一覧）は頭を見せる。中ほどに置くと、何を指しているのかが見えない
           const tall = el.getBoundingClientRect().height > window.innerHeight * 0.6;
           el.scrollIntoView?.({ block: tall ? "start" : "center" });
         }
@@ -181,7 +181,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [index, measured]);
   useEffect(() => () => focusBefore?.focus?.(), [focusBefore]);
 
-  // Esc でやめる。Tab は吹き出しのボタンの中だけを巡る（裏の画面の「保存」などへ焦点を逃がさない）
+  // Esc でやめる。Tab は吹き出しのボタンの中だけを巡る（裏の画面の「保存」などへ焦点を移さない）
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {

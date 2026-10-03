@@ -48,7 +48,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
   if (hidden) {
     classes.push("hidden");
   }
-  // ボタンとリンク（マージリクエスト）と畳める履歴の上では提案を開かない
+  // ボタンとリンク（マージリクエスト）と折りたためる履歴の上では提案を開かない
   const open = (target: EventTarget | null): void => {
     if (target instanceof Element && target.closest(NOT_OPENING) !== null) {
       return;
@@ -82,7 +82,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
         <span className="where">{where}</span>
       </div>
       {moved !== undefined ? (
-        <div className="moved-mark" title="前回の更新から列が変わりました。次に何かが動くまで残ります">
+        <div className="moved-mark" title="前回の更新から列が変わりました。この印は、次にどれかのカードの列が変わるまで残ります">
           {movedLabel(moved)}
         </div>
       ) : null}
@@ -110,11 +110,11 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
   );
 }
 
-/** カードの上で押しても提案を開かない場所。ボタン・リンク・畳める履歴 */
+/** カードの上で押しても提案を開かない場所。ボタン・リンク・折りたためる履歴 */
 const NOT_OPENING = "button, a, details";
 
 /**
- * 状態が動いた跡（ADR-0086）。既定で畳み、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
+ * 状態が動いた跡（ADR-0086）。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
  * （状態の正は置き場。実行ファイルが渡した新しい側だけを並べる）
  */
 function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
@@ -149,7 +149,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (card.gateClosed) {
     badges.push(<Badge key="hold" kind="hold" text={holdLabel(card)} />);
   }
-  // 承認済みチケット自体が信じられない（ADR-0058）。理由の全文は不備の行に出る（`board.cardOf`）ので、
+  // 承認済みチケット自体が信頼できない（ADR-0058）。理由の全文は不備の行に出る（`board.cardOf`）ので、
   // ここは一目で分かる短い言葉に留める。
   if (card.blocked !== "") {
     badges.push(<Badge key="blocked" kind="blocked" text="書き込み停止中" title={card.blocked} />);

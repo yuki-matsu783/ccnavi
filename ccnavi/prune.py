@@ -146,7 +146,7 @@ def run(
 ) -> Report:
     """ローテートと削除を 1 度ずつ行う。dry_run なら何も動かさず、動かすはずのものを返す。
 
-    途中の失敗は problems に積んで先へ進む。1 つ消せないことが、残りの後始末を止めない。
+    途中の失敗は problems に積んで先へ進む。1 つ消せなくても、残りの後始末は続ける。
     """
     now = time.time() if now is None else now
     rotate_mb, log_days, state_days, problems = limits()
@@ -439,7 +439,7 @@ def _session_entries(
 
 
 def _touched(path: str) -> float:
-    """最後に書かれた時刻。ディレクトリなら中身も見る（名前が増えないと親は動かない）。"""
+    """最後に書かれた時刻。ディレクトリなら中身も見る（名前が増えないと親の時刻は変わらない）。"""
     newest = 0.0
     entries = [path]
     if os.path.isdir(path):

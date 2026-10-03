@@ -48,7 +48,7 @@ test("CB-T192b 置き場所が同じかを見る（同じなら印を作り直�
   const { "i0001-05": _gone, ...fewer } = before;
   assert.equal(samePlacement(before, fewer), false, "減っても違う");
   assert.equal(samePlacement(fewer, before), false, "増えても違う");
-  // 件数が同じで中身が違う（1 枚消えて 1 枚増えた）のも違う。数だけで畳まない
+  // 件数が同じで中身が違う（1 枚消えて 1 枚増えた）のも違う。数だけで同じと見なさない
   assert.equal(samePlacement(before, { ...fewer, i0002: "done" }), false);
 });
 
@@ -91,8 +91,8 @@ test("CB-T192c 1 枚目は印を付けず、列が動かない読み直しでは
   const approved = movedStep(first, moveTo(board, "i0001-03", "doing"));
   assert.deepEqual(approved.moved, [{ id: "i0001-03", from: "todo", to: "doing" }]);
 
-  // 同じ列のまま渡り直った（承認のオーバーレイの出し入れ、何も変わらなかった「更新」）。
-  // **ここで作り直すと、承認の文を閉じた瞬間に印が消える**
+  // 同じ列のまま渡し直された（承認のオーバーレイの出し入れ、何も変わらなかった「更新」）。
+  // **ここで作り直すと、承認の文を閉じた時点で印が消える**
   const again = movedStep(approved, moveTo(board, "i0001-03", "doing"));
   assert.equal(again, approved, "何も変わらないなら、同じ状態をそのまま返す");
   assert.deepEqual(again.moved, [{ id: "i0001-03", from: "todo", to: "doing" }]);

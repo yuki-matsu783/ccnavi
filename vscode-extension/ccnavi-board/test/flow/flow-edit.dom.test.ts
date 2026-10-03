@@ -16,7 +16,7 @@ import { openFlow, savedDoc } from "../helpers/flow.js";
 const CTRL = { ctrlKey: true } as const;
 const CTRL_SHIFT = { ctrlKey: true, shiftKey: true } as const;
 
-/** 鍵を放す（keyup）。放さないと React Flow は押したままと読み、Shift での選び足しが効かない */
+/** 鍵を放す（keyup）。放さないと React Flow は押したままと読み、Shift での選び足しができない */
 function release(dom: DomPage, name: string): void {
   const Keyboard = (dom.window as unknown as { KeyboardEvent: new (type: string, init: unknown) => unknown }).KeyboardEvent;
   (dom.document as unknown as { dispatchEvent: (event: unknown) => boolean }).dispatchEvent(new Keyboard("keyup", { key: name, bubbles: true }));
@@ -363,8 +363,8 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     await dom.settle();
     await waitCheck(dom);
     const again = checksAsked(dom);
-    await dom.send({ type: "checked", seq: again[again.length - 1].seq, error: "実行ファイル（--lint --flow）が読めないと言った: …" });
-    assert.match(dom.one("#flow-preview-error").textContent ?? "", /読めないと言った/);
+    await dom.send({ type: "checked", seq: again[again.length - 1].seq, error: "実行ファイル（--lint --flow）がフローを読めないと返した: …" });
+    assert.match(dom.one("#flow-preview-error").textContent ?? "", /読めないと返した/);
     assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
   } finally {
     await dom.close();
@@ -374,12 +374,12 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
 test("CB-D132 答えの無いフロー（まだ無いファイル）は開いてすぐ確かめを頼む。古い実行ファイル（rendered が無い）ならそう言う", async () => {
   const dom = await openFlow({ exists: false });
   try {
-    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルに確かめていない/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確かめていない/);
     await waitCheck(dom);
     const asked = checksAsked(dom);
     assert.equal(asked.length, 1);
     await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [] } });
-    assert.match(dom.one("#flow-preview").textContent ?? "", /実行ファイルが古いので、渡る手順を出せない/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /実行ファイルが古いので、担当に渡る手順を表示できない/);
     // 答えが届いても、開始が 2 つあることは画面が言う（実行ファイルは言わない）
     dom.click(dom.one('[data-action="add-node"][data-type="start"]'));
     await dom.settle();

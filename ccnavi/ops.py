@@ -49,7 +49,7 @@ def start(
         stderr.write(
             f"ccnavi: {ticket_id} は承認済みの作業中ではない（いまは {found.state}/）。"
             + (
-                "先に利用者が 'ccnavi --approve' を通すこと"
+                "先に利用者に 'ccnavi --approve' を通してもらってください"
                 if found.state == ticket_mod.TODO
                 else ""
             )
@@ -65,7 +65,7 @@ def start(
         return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
-    # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
+    # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。
     owner = tree.project_root(conf.projects, found.project) or root
     worktree = tree.worktree_path(root, ticket_id)
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
@@ -73,10 +73,10 @@ def start(
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "元リポジトリが承認済みチケットの project"
-            f"（{found.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
+            f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ綴りであること）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
             f'worktree add "{worktree}" '
-            f"-b {ticket_id}' で作ること\n"
+            f"-b {ticket_id}' で作ってください\n"
         )
         return 1
     sha = _head(worktree)
@@ -148,7 +148,8 @@ def _sync_config(
             f"ccnavi: {found.ticket} の設定を共通層から写せない: "
             + (
                 why
-                or f"未コミットの変更がある（{', '.join(busy)}）。人の書きかけを踏まないので止める"
+                or f"未コミットの変更がある（{', '.join(busy)}）。"
+                "人の書きかけを上書きしないよう、ここで止める"
             )
             + "\n"
         )
@@ -175,7 +176,8 @@ def _sync_config(
     mark = approval.parent_mark_path(where, found.ticket, configsync.MARK)
     lines.append(
         f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
-        f" '{git_sh} add' してコミットすること。印 {mark} も、それを持つツリーでコミットする"
+        f" '{git_sh} add' してコミットしてください。"
+        f"印 {mark} も、それを持つツリーでコミットしてください"
     )
     return lines
 
@@ -193,7 +195,8 @@ def finish(
     if not found.started_at:
         stderr.write(
             f"ccnavi: {ticket_id} は未着手。先に "
-            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start {ticket_id}' を通す\n"
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start {ticket_id}' "
+            "を通してください\n"
         )
         return 1
     if _parent_still_busy(stderr, root, conf, found):
@@ -261,7 +264,7 @@ def _close_parent(
     if phase.chat_only(root, conf, found.ticket, venues):
         stdout.write(
             f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
-            f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、統合先のブランチへ戻す。"
+            f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、統合先のブランチへ戻してください。"
             "このチケットにはマージリクエストで見るフェーズが無いので、"
             "Draft を外す手順は無い。途中の作業は既定のブランチに残さない\n"
         )
@@ -273,7 +276,7 @@ def _close_parent(
     stdout.write(
         f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
         f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
-        f"push してから '{review_sh} ready' で Draft を外す"
+        f"push してから '{review_sh} ready' で Draft を外してください"
         "（「マージに進んでよい」の合図）。途中の作業は既定のブランチに残さない。"
         "マージは利用者が squash で行う\n"
     )
@@ -445,7 +448,7 @@ def _score_child(
             "  問いと差分の要約を渡してサブエージェントに判断させ、報告を "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} record-risk {found.ticket} "
             "<項目> yes|no "
-            "--reason <根拠>' で記録してから閉じ直すこと\n"
+            "--reason <根拠>' で記録してから閉じ直してください\n"
         )
         if where:
             stderr.write(f"  問い: {where}\n")
@@ -475,7 +478,7 @@ def _places(
 ) -> tuple[list[ticket_mod.Ticket], list[str], list[ticket_mod.Problem]]:
     """この識別子のチケットが在る置き場を全部引く。読めなかった理由と提案の不備も返す。
 
-    権威のあるツリーの側だけを読む（approval.scan / ticket.scan の畳み）。
+    権威のあるツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
     """
     hits: list[ticket_mod.Ticket] = []
     copies, notes = approval.scan(conf, root)
@@ -504,7 +507,7 @@ def _undecided(
     root: str = "",
     conf: settings.Settings | None = None,
 ) -> None:
-    """どれが本物か決まらないときの文面。次の一手まで書く。
+    """どれが本物か決まらないときの文面。次にすることまで書く。
 
     「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
     できることが読めない。権威の決まり方（親のツリー → 元ツリー）と、この場面で
@@ -524,7 +527,7 @@ def _undecided(
         if not st.stop:
             stderr.write(
                 "  親のワークツリーの外の写しは、親のブランチへ運んでから消すか、"
-                "残ったワークツリーを畳んでから打ち直すこと\n"
+                "残ったワークツリーを片付けてから打ち直してください\n"
             )
         return
     stderr.write(
@@ -532,8 +535,8 @@ def _undecided(
         "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）の写し\n"
     )
     stderr.write(
-        "  どちらにも無いか、元ツリーより先の置き場に在る写しがあると決まらない。"
-        "先に進んだ側を合流させるか、残ったワークツリーを畳んでから打ち直すこと\n"
+        "  どちらにも無いか、元ツリーより先の置き場に在る写しがあると、どれが本物か決まらない。"
+        "先に進んだ側を合流させるか、残ったワークツリーを片付けてから打ち直してください\n"
     )
 
 
@@ -569,7 +572,7 @@ def family_stopped(
     """取り込み済みの家族が決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
 
     その家族の状態の操作（着手・終了・取り消し・記録・レビューの印）は止める。引いた写しが
-    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信じない写しを
+    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信頼しない写しを
     動かさないように止める。控えの無い家族は何も言わない（今の動きのまま。D11）。
     """
     st = approval.family_standing(conf, root, found)
@@ -598,7 +601,7 @@ def _parent_not_started(
     """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 9.6、REQ-TKT-48）。
 
     親の `start` を飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。壊れない
-    ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる瞬間
+    ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる時点
     （最初の子の着手）で止めれば、いちばん早い場所で言える。
 
     親は別の置き場に在ることもある（未承認、閉じた）。どれも子に着手してよい状態では
@@ -622,18 +625,19 @@ def _parent_not_started(
     parent = hits[0]
     if parent.state == ticket_mod.TODO:
         stderr.write(
-            head + "がまだ承認されていない（todo/）。先に利用者が 'ccnavi --approve' を通し、"
-            f"'{ticket_sh} start {found.parent}' で着手すること\n"
+            head
+            + "がまだ承認されていない（todo/）。先に利用者に 'ccnavi --approve' を通してもらい、"
+            f"'{ticket_sh} start {found.parent}' で着手してください\n"
         )
         return True
     if parent.state != ticket_mod.DOING:
-        # 置き場だけを言う。`review/` に親が居るのは壊れたデータのときだけだが、そこで
+        # 置き場だけを言う。`review/` に親があるのは壊れたデータのときだけだが、そこで
         # 「閉じた」と言うと、文面が事実と違う。
         stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。子を足す相手ではない\n")
         return True
     if not parent.started_at:
         stderr.write(
-            head + f"が未着手（{parent.state}/）。子より先に親に着手すること。\n"
+            head + f"が未着手（{parent.state}/）。子より先に親に着手してください。\n"
             f"  '{ticket_sh} start {found.parent}'\n"
         )
         return True
@@ -661,18 +665,18 @@ def _predecessors_unmet(
         stderr.write(f"  - 先行 {p.ticket}: {p.label}\n")
     if any(p.waiting for p in unmet):
         stderr.write(
-            f"  先行を先に閉じる（作業中なら '{ticket_sh} finish <先行>'。"
+            f"  先行を先に閉じてください（作業中なら '{ticket_sh} finish <先行>'。"
             "レビューが要るなら人のレビューが済んで done/ に入るまで待つ）\n"
         )
     if any(not p.waiting for p in unmet):
         stderr.write(
             "  取り消した・どこにも無い・自分自身や自分の親・輪になった先行は、待っても満たせない。"
-            "複数の場所にある先行は、先に 1 つに決める\n"
+            "複数の場所にある先行は、先に 1 つに決めてください\n"
         )
     stderr.write(
         "  先行が要らないなら、利用者に承認済みチケットの predecessors から外してもらうか、"
         f"'{ticket_sh} cancel {found.ticket} --reason <理由>' で取り消し、"
-        "先行を外した提案を出し直して承認を受ける\n"
+        "先行を外した提案を出し直して承認を受けてください\n"
     )
     return True
 
@@ -704,7 +708,8 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     open_children = [t.ticket for t in copies if t.parent == parent_id]
     if open_children:
         return [
-            f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
+            f"{parent_id} には開いている子がある（{', '.join(open_children)}）。"
+            "子を先に閉じてください"
         ]
     # 着手で共通層を写した親は、それを人に知らせるまで閉じず、Draft も外させない（設計 11.12）。
     # 知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、締めた）は
@@ -715,7 +720,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
             f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
             "（レビューを通っていない）。閉じる前に、利用者に端末で "
             f"'{settings.script_command(root, 'ccnavi-review.sh')} config-synced {parent_id}' を"
-            "打って見てもらうこと"
+            "打って見てもらってください"
         ]
     if approval.read_parent_mark(
         approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_CLOSE_EARLY
@@ -750,7 +755,7 @@ def _deliverables_missing(
     """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 9.8）。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
-    「調査したことにする」は塞げる。
+    「調査したことにする」は防げる。
     """
     if not found.is_child or found.phase is None:
         return False
@@ -783,7 +788,7 @@ def _deliverables_missing(
         return False
     stderr.write(
         f"ccnavi: フェーズ {found.phase}（{pt.title}）の成果物が無い: {', '.join(missing)}。"
-        "親か子のワークツリーに置いて追跡（git add）してから閉じること\n"
+        "親か子のワークツリーに置いて追跡（git add）してから閉じてください\n"
     )
     return True
 
@@ -853,14 +858,14 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
 
     - 作業中（`doing/`）で着手済み。終わっても取り消されてもいない（`in_progress`）
-    - 信じられない印（`blocked`）が無い。範囲が効いていないチケットに終わりを勧めない
+    - 信頼できない印（`blocked`）が無い。範囲が判定に使われていないチケットに終わりを勧めない
     - 基準点（`base_sha`）を持つ
     - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
       フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
     - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
     - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
 
-    git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり黙って通す。
+    git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり何も出さずに通す。
     """
     here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if here is None or here.is_main:

@@ -40,7 +40,7 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 
 段階 5 から、プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）
 も読む。Snapshot に `project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの
-統合先の中身。共通層・自身の層・`.claude/settings.json`・互換の印）が付く。仮のツリーは
+統合先の中身。共通層・自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは
 手元と同じ形で組む: ワークスペースルートにワークスペースの統合先、`projects/<名前>/` に
 プロジェクトの統合先（`done/` と、D28 の計算の層）、家族は `projects/<名前>` のワークツリー
 として `.claude/worktrees/<P>` に置く。控えは `sync/self/` と `sync/<名前>/` に分けて組む。
@@ -162,7 +162,7 @@ def _placement(settings_text: str | None) -> dict:
         # 家族のブランチから読むもの。
         "branch_paths": [approved, tickets],
         # プロジェクトのリポジトリ（段階 5）。ワークスペースの統合先から読むもの（共通層・自身の層・
-        # 設定・互換の印）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
+        # 設定・互換のマーカー）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
         "workspace_paths": sorted({COMMON_LAYER, own_layer}),
         "workspace_files": [SETTINGS_FILE, COMPAT_FILE],
         "project_paths": sorted({f"{approved}/{ticket_mod.DONE}", own_layer}),
@@ -195,7 +195,7 @@ def _snapshot(req: dict) -> dict:
         if not isinstance(project, str) or not ticket_mod.is_valid_id(project):
             raise Refused(f"プロジェクト名が読めない: {project!r}")
         if settings.is_reserved_layer_name(project):
-            raise Refused(f"プロジェクト名 {project} は層の名札に予約してある（common・self）")
+            raise Refused(f"プロジェクト名 {project} は層の名前として予約してある（common・self）")
         ws = snap.get("workspace")
         if not isinstance(ws, dict) or not isinstance(ws.get("integration"), dict):
             raise Refused("プロジェクトのリポジトリにはワークスペースの統合先（workspace）が要る")
@@ -221,7 +221,7 @@ def _project(snap: dict) -> str:
 
 
 def _workspace_files(snap: dict) -> dict[str, str]:
-    """ワークスペースの統合先の中身（共通層・設定・互換の印）。ワークスペース自身なら統合先。"""
+    """ワークスペースの統合先の中身（共通層・設定・互換のマーカー）。ワークスペース自身なら統合先。"""
     if _project(snap):
         return snap["workspace"]["files"]
     return _files(snap, snap["integration"]["name"])
@@ -630,7 +630,10 @@ def _write_refusal(snap: dict, family: str) -> str:
     """
     compat = _compat(snap)
     if not compat["same"]:
-        return f"{compat['message']}。承認と取り下げは出さない（ADR-0093 の 7.3）"
+        return (
+            f"{compat['message']}。表示だけにして、承認と取り下げのボタンは出さない"
+            "（ADR-0093 の 7.3）"
+        )
     folded = family.casefold()
     if (
         folded in ticket_mod.RESERVED_BRANCH_IDS
@@ -940,7 +943,7 @@ def _reviewable(root: str, place: dict, family: str) -> list[dict]:
         return core.reviewable(core.read_fs(conf, root), family)
 
 
-# ---- 互換の印（7.3） --------------------------------------------------------------------
+# ---- 互換のマーカー（7.3） --------------------------------------------------------------------
 
 
 def _op_compat(req: dict, root: str) -> dict:
@@ -948,7 +951,8 @@ def _op_compat(req: dict, root: str) -> dict:
 
 
 def _compat(snap: dict) -> dict:
-    # 互換の印はワークスペースの統合先にある（プロジェクトのリポジトリはワークスペースのものを読む）
+    # 互換のマーカーはワークスペースの統合先にある
+    # （プロジェクトのリポジトリはワークスペースのものを読む）
     text = _workspace_files(snap).get(COMPAT_FILE)
     ours = version.COMPAT
     found = lint._SH_COMPAT.search(text) if text else None
@@ -957,8 +961,7 @@ def _compat(snap: dict) -> dict:
         message = ""
     elif theirs is None:
         message = (
-            f"統合先の {COMPAT_FILE} が互換の版（CCNAVI_COMPAT）を名乗らない。"
-            f"拡張は互換 {ours}。表示だけにする"
+            f"統合先の {COMPAT_FILE} に互換の版（CCNAVI_COMPAT）が書かれていない。拡張は互換 {ours}"
         )
     else:
         hint = "拡張を更新する" if theirs > ours else "リポジトリの ccnavi の更新を待つ"

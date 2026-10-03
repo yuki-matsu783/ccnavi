@@ -287,7 +287,7 @@ class RecordTreeTest(AuthorityHarness):
             "--approve", "--yes", "i0001-02", "--digest", preview["digest"], "--json"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("置き場の外に書いた", result.stderr)
+        self.assertIn("置き場の外に書き込みがあった", result.stderr)
         self.assertIn("wip/proposals/todo/i0001-02.md", listed)
         self.assertIn(f"{APPROVED}/doing/i0001-02.md", listed)
 
@@ -324,7 +324,7 @@ class HumanEntryGuardTest(AuthorityHarness):
                 ),
             )
             self.assertEqual("deny", self.decision(result), command + result.stdout)
-        # 依頼・確認・Draft 外しはエージェントの道のまま（止めない）。
+        # 依頼・確認・Draft 外しはエージェントの経路のまま（止めない）。
         allowed = self.ccnavi(
             "--guard-ticket-approval",
             "enable",

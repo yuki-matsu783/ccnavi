@@ -3,7 +3,7 @@
 見るのは 2 つ。
 
 1. そのツリーがチェックアウトしているブランチを upstream まで ff で進める（承認済みチケットと
-   マーカーが届く道。設計 9.2）
+   マーカーが届く経路。設計 9.2）
 2. ワークツリーの起点になるデフォルトブランチを、チェックアウトされていなくても ff で進める
    （ADR-0060）
 
@@ -472,7 +472,7 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(before, self.sha(tree, "HEAD"))
         self.assertIn("未コミットの変更", done.stdout)
 
-    # ---- 黙るとき
+    # ---- 何も出さないとき
 
     def test_quiet_when_nothing_moves(self):
         done = self.fetch()

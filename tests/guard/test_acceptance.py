@@ -109,7 +109,7 @@ class VerdictTest(unittest.TestCase):
         self.assertIn("git push", out["additionalContext"])
 
     def test_disableは何も判定しない(self):
-        # disable は起動した人の環境からしか効かない。フラグからは効かない。
+        # disable は起動した人の環境からしか反映されない。フラグからは反映されない。
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_MODE"] = "disable"
         result = run_ccnavi(
@@ -126,7 +126,7 @@ class VerdictTest(unittest.TestCase):
 def reasons(case, result):
     """1 回の応答に入った理由を、件ごとに切り分けて返す。
 
-    件と件は空行で割れている。受け取った側が 1 件だけを切り出して読めることが
+    件と件は空行で分かれている。受け取った側が 1 件だけを切り出して読めることが
     要求そのものなので、テストもまず切り分けてから 1 件ずつ見る。
     """
     text = verdict(case, result)["permissionDecisionReason"]
@@ -138,7 +138,7 @@ class ReasonTest(unittest.TestCase):
 
     def test_理由は対象と理由コードと出所を名指しする(self):
         # 文面だけでは、受け取った側は自分の呼び出しのどこが引っかかったのかを
-        # 辿れない。信じるか無視するかしか残らず、直しにも行けない。
+        # 辿れない。信頼するか無視するかしか残らず、直しにも行けない。
         got = reasons(self, run(payload=pre_tool_use("Bash", "command", "git push origin main")))
 
         self.assertEqual(len(got), 1)
@@ -153,7 +153,7 @@ class ReasonTest(unittest.TestCase):
 
     def test_ファイルの理由は行き着く先を対象として名指しする(self):
         # 当てたのは来たままの綴りではなく解いた先なので、対象もそちらを言う。
-        # 来たままの綴りを見せると、当たった理由と対象がずれて読めなくなる。
+        # 来たままの綴りを見せると、当たった理由と対象が食い違って読めなくなる。
         got = reasons(self, run(payload=pre_tool_use("Read", "file_path", "docs/../.env")))
 
         self.assertEqual(len(got), 1)
@@ -164,7 +164,7 @@ class ReasonTest(unittest.TestCase):
     def test_複数返った理由は一件ずつ単独で読んで成立する(self):
         # 同じ出来事に複数の判定が同時に当たるとき、そのうちどれが利用者の目に
         # 入るかは決まらない。上の 1 行を下の全部が参照する形は、1 件だけが
-        # 切り出されて見えた瞬間に意味を失う。
+        # 切り出されて見えた時点で意味を失う。
         got = reasons(self, run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env")))
 
         self.assertEqual(len(got), 2, "2 つのルールに当たったはず")
@@ -190,7 +190,7 @@ class ReasonTest(unittest.TestCase):
                 self.assertIn("raw text", part, "読めたときと同じ文面になっている")
 
     def test_理由は他の判定の結果に言及しない(self):
-        # 「上の」「下の」で他の件を指した瞬間、1 件だけ読んだ人には
+        # 「上の」「下の」で他の件を指した時点で、1 件だけ読んだ人には
         # 指した先が無い文になる。
         text = verdict(self, run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env")))[
             "permissionDecisionReason"
@@ -269,8 +269,8 @@ class ReadingTest(unittest.TestCase):
 class HeredocTest(unittest.TestCase):
     def test_ヒアドキュメントは止まる(self):
         # ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も
-        # 編集後の検査も通らない。中身をファイルに落とす経路がそこだけ素通しに
-        # なるので、書き出す形も、プログラムへ渡す形も同じように止める。
+        # 編集後の検査も通らない。中身をファイルに落とす経路がそこだけ止められずに
+        # 通るので、書き出す形も、プログラムへ渡す形も同じように止める。
         for command in [
             "cat <<'EOF' > notes.md\nhello\nEOF",
             "cat <<EOF >> config.yml\na: 1\nEOF",
@@ -309,13 +309,13 @@ class HeredocTest(unittest.TestCase):
         # トークンに出たら、閉じない本文として縮退させ、ヒアドキュメントに見えて止まる。
         # 直す対象ではなく、許容すると決めた誤検知として設計に書いてある
         # （ccnavi.md 6.3、12.2）。このテストは、次に来た人が
-        # 黙って直して別のところを壊さないように、決めた側を固定する。
+        # 何も言わずに直して別のところを壊さないように、決めた側を固定する。
         out = verdict(self, run(payload=pre_tool_use("Bash", "command", 'grep -n "<<" README.md')))
 
         self.assertEqual(out.get("permissionDecision"), "deny")
-        # 止まる側になるだけでなく、本来の禁止と混ざらない文面であること。
+        # 止まる側になるだけでなく、本来の禁止と区別できる文面であること。
         # 誤検知を許容できるのは、返る文面が読み手に次の一手を残すからで、
-        # そこが崩れると許容の前提が消える。
+        # そこが成り立たないと許容の前提が無くなる。
         self.assertIn("raw text", out["permissionDecisionReason"])
 
 
@@ -368,7 +368,7 @@ class RecordTest(unittest.TestCase):
             # セッション開始は判定を持つイベントになった。大きい対象の控えを
             # ここで 1 度だけ取る。
             ("allow", None),
-            # 判定を持たないイベントは、誤りではなく素通り（REQ-HKS-03）。
+            # 判定を持たないイベントは、誤りではなく、そのまま通す（REQ-HKS-03）。
             ("skip", "event-not-checked"),
         ]
         for i, (decision, reason) in enumerate(want):

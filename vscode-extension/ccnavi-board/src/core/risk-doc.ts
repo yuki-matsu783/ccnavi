@@ -82,7 +82,7 @@ export function readRisk(text: string): RiskDocument {
   if (version === undefined || version === null) {
     problems.push(`version がありません。保存すると version: ${RISK_VERSION} を先頭に足します`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${RISK_VERSION}）。組み込みの配点に落ちます`);
+    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${RISK_VERSION}）。組み込みの配点を使います`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
@@ -243,7 +243,7 @@ function adoptLeadingComment(seq: YAMLSeq, first: YAMLMap | undefined): YAMLMap 
 
 /**
  * 項目の前の空行は、項目ではなく「並びの何番目か」に付いていたものとして揃える。
- * 先頭に来た項目が空行を連れてくると `factors:` の直後に空白だけの行が出るため。
+ * 先頭に来た項目と一緒に空行も移ると `factors:` の直後に空白だけの行が出るため。
  */
 function keepSpacing(before: readonly unknown[], after: readonly YAMLMap[]): void {
   const slots = before.map((n) => isNode(n) && n.spaceBefore === true);

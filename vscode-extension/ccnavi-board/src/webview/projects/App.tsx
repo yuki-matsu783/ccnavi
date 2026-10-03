@@ -31,7 +31,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
-  // 受け口（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので写しておく
+  // 受け取る側（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので写しておく
   const cloneRef = useRef<CloneState>(clone);
   cloneRef.current = clone;
 
@@ -48,7 +48,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         // 開いていたメニューの持ち主が一覧から消えていたら閉じる。残すと、同じ名前で
         // 戻ってきたときに押していないメニューが開いた状態で出る。
         // 一致は `menuId` が組んだ綴りそのもので見る（前方一致だと、`:` を含む名前の
-        // メニューを、その接頭辞になっている別のプロジェクトが自分のものだと言い出す）
+        // メニューを、その接頭辞になっている別のプロジェクトのものと取り違える）
         const rows = message.data.kind === "page" ? message.data.page.rows : [];
         const alive = new Set(rows.flatMap((r) => MENU_KINDS.map((kind) => menuId(r.name, kind))));
         setOpenMenu((now) => (now !== undefined && !alive.has(now) ? undefined : now));
@@ -314,7 +314,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
               type="button"
               className="action small"
               data-action="create-self-rules"
-              title="共通の設定の rules.yml をワークスペースの設定にコピーします。文面の sh のパスは {root} 付きに置き換えます"
+              title="共通の設定の rules.yml をワークスペースの設定にコピーします。ルールの文面にある sh のパスは、先頭に {root} を付けた形に置き換えます"
               onClick={() => post({ type: "createSelfRules" })}
             >
               共通の設定からコピー
@@ -326,7 +326,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           className="action small"
           data-action="open-self-rules"
           disabled={!page.selfRulesExists}
-          title="ワークスペース（プロジェクト外）のツリーへの書き込みと、全ツリーの Bash に足してヒットするルールを編集し、判定を試します"
+          title="ワークスペースの設定のルールを編集し、判定を試します。このルールは、ワークスペース（プロジェクト外）のツリーへの書き込みと、全ツリーの Bash に、共通の設定に足してヒットします"
           onClick={() => post({ type: "openSelfRules" })}
         >
           ルール設定
@@ -339,7 +339,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
             type="button"
             className="action small"
             data-action="open-self-phases"
-            title="プロジェクト外のチケット（project: が空）の計画に、共通の設定に足して使う種類を編集します。無ければ画面から作れます"
+            title="プロジェクト外のチケット（project: が空）の計画で、共通の設定の種類に足して使う種類を編集します。ファイルが無ければ画面から作れます"
             onClick={() => post({ type: "openSelfPhases" })}
           >
             フェーズ管理

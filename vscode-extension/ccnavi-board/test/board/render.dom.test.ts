@@ -1,9 +1,9 @@
 /**
  * ボード画面が何を描くか。React の画面を happy-dom で動かし、出来上がった DOM を見る。
- * 操作の続き（畳む・絞り込み・承認の送り先）は board.dom.test.ts。
+ * 操作の続き（折りたたむ・絞り込み・承認の送り先）は board.dom.test.ts。
  *
  * CSS は束ねた 1 本が `<style nonce>` に入っているので、規則そのものを見たいところは
- * `flatStyle()`（1 行に潰した CSS）を見る。
+ * `flatStyle()`（1 行にまとめた CSS）を見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -21,7 +21,7 @@ function html(): string {
   return boardPage({ kind: "board", board: buildBoard(fixture()) });
 }
 
-/** 見本のボードの CSS（1 行に潰したもの）。規則そのものを見るときに使う */
+/** 見本のボードの CSS（1 行にまとめたもの）。規則そのものを見るときに使う */
 function css(): string {
   return flatStyle(html());
 }
@@ -153,13 +153,13 @@ test("CB-D73 説明の付く見出しは次の行をツールチップに畳み�
   try {
     const heads = page.all(".approval-head");
     const labels = heads.map((head) => head.textContent);
-    // 説明のある見出しだけが畳まれる。「エージェントが書いた理由」の下は本文なので畳まない。
+    // 説明のある見出しだけが折りたたまれる。「エージェントが書いた理由」の下は本文なので折りたたまない。
     assert.ok(labels.includes("■ このチケットで編集可能な範囲"), labels.join(" / "));
     assert.ok(labels.includes("■ チケットで編集対象としているが、書き込めない場所"), labels.join(" / "));
     assert.ok(!labels.includes("■ エージェントが書いた理由"), labels.join(" / "));
     const scope = heads.find((head) => head.textContent === "■ このチケットで編集可能な範囲");
     assert.match(scope?.getAttribute("title") ?? "", /allow は無確認で編集できる場所/);
-    // 畳んだ説明は目には出さないが、読み上げに渡すので DOM には残る。
+    // 折りたたんだ説明は目には出さないが、読み上げに渡すので DOM には残る。
     const hints = texts(page, ".approval-hint").join(" ");
     assert.ok(hints.includes("allow は無確認で編集できる場所"), hints);
     // 本文そのものは削らない。理由の中身は見出しの下にそのまま出る。
@@ -177,7 +177,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
   });
   try {
     assert.equal(text(empty, "#approval-title"), "承認待ちのチケットなし");
-    // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは別物。
+    // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは違うもの。
     assert.equal(text(empty, "pre.approval-text"), "承認待ちのチケットは無い。");
     assert.equal(empty.all('button[data-action="approve-confirm"]').length, 0);
   } finally {
@@ -314,7 +314,7 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   } finally {
     await page.close();
   }
-  // ドラッグで付けたインラインの width より畳んだ状態を優先する
+  // ドラッグで付けたインラインの width より折りたたんだ状態を優先する
   assert.match(css(), /\.column\.folded \{[^}]*width: auto !important/);
 });
 
@@ -470,7 +470,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
   assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
   // 止めているフェーズ行はフェーズ名も右の状態も赤
   assert.match(css(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
-  // 止めているカードの左線は承認待ちの左線より後に書き、勝つ
+  // 止めているカードの左線は承認待ちの左線より後に書き、こちらが採られる
   assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
 });
 
@@ -620,7 +620,7 @@ test("CB-T16 本文の文字列で表示を壊さない", async () => {
   const page = await openBoard({ ...base, tickets: [evil, ...base.tickets.slice(1)] });
   try {
     assert.equal(text(page, `.card[data-id="${evil.ticket}"] .title`), `<script>alert("x")</script>`);
-    // 画面の中に script は 1 本（束ねた画面）だけ。中身から生えない
+    // 画面の中に script は 1 本（束ねた画面）だけ。中身から増えない
     assert.equal(page.all(".card script").length, 0);
   } finally {
     await page.close();
@@ -688,7 +688,7 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
     const inPhase = page.one(".phase a.mr-link");
     assert.equal(inPhase.getAttribute("href"), "https://example.com/o/r/pull/18#issuecomment-5");
     assert.equal(inPhase.getAttribute("title"), "フェーズ 2（設計） のレビューの依頼を開く");
-    assert.equal(inPhase.textContent, "MR #18");
+    assert.equal(inPhase.textContent, "マージリクエスト #18");
     const inCard = page.one(".card-head + .facts a.mr-link, .facts a.mr-link");
     assert.equal(inCard.getAttribute("href"), "https://example.com/o/r/pull/18");
     assert.equal(inCard.getAttribute("title"), "マージリクエストを開く");
@@ -708,7 +708,7 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
   try {
     assert.equal(spiked.all("a.mr-link").length, 0);
     const fact = spiked.one("span.fact.mr");
-    assert.equal(fact.textContent, "MR #18");
+    assert.equal(fact.textContent, "マージリクエスト #18");
     assert.equal(fact.getAttribute("title"), "javascript:alert(1)");
   } finally {
     await spiked.close();
@@ -773,7 +773,7 @@ test("CB-T162 読み直せなかった画面にも承認のオーバーレイが
   try {
     assert.equal(text(withApproval, "#approval-title"), "2 件を承認しました");
     assert.equal(text(withApproval, "pre.approval-text"), "i0001-03 を承認した");
-    // ボタンが効く（画面の骨組みが載っている）
+    // ボタンが使える（画面の骨組みが載っている）
     withApproval.click(withApproval.one('button[data-action="prompt-copy"]'));
     await withApproval.settle();
     assert.deepEqual(withApproval.posted.at(-1), { type: "promptCopy" });

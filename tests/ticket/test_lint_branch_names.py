@@ -292,8 +292,8 @@ class LintBranchNamesTest(unittest.TestCase):
         self.place("done", "abc-01")
         lines = self.lint()
         self.assertEqual(1, len(lines), lines)
-        self.assertIn("abc-01 は親なのに識別子が子の形", lines[0])
-        self.assertIn("abc の子と読まれる", lines[0])
+        self.assertIn("abc-01 は親なのに、識別子が子の形", lines[0])
+        self.assertIn("abc の子として扱われる", lines[0])
 
     def test_real_children_are_not_named(self):
         self.place("doing", "abc")

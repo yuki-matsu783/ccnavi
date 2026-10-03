@@ -134,7 +134,7 @@ def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
                     rules.SEVERITY_ERROR,
                     parent.ticket,
                     f"最後の項 `{last.type}` が {', '.join(f'`{t}`' for t in dict.fromkeys(loose))}"
-                    " を待たない。終端は 1 つにする（合流の種類を最後に置く）",
+                    " を待たない。終端は 1 つにしてください（合流の種類を最後に置く）",
                 )
             )
     for n, item in enumerate(items, start=1):

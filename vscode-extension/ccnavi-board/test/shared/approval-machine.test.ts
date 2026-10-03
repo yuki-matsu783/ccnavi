@@ -2,7 +2,7 @@
  * 承認のオーバーレイの遷移（`src/core/approval-machine.ts`）。どの状態で何を受け、何を返すか。
  *
  * 後半は**変異テスト**。見張りを 1 つずつ消したソースをその場で組み立てて、
- * 「見張りが効いていること」を確かめる関数が落ちることまで見る。見張りを足したら `GUARDS` にも足す。
+ * 「見張りが有効であること」を確かめる関数が落ちることまで見る。見張りを足したら `GUARDS` にも足す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -25,7 +25,7 @@ import type { DecidePreview } from "../../src/core/decidemodel.js";
 
 type Step = (state: ApprovalState, input: ApprovalInput) => ApprovalStep;
 
-/** 効いたことの並び。中身まで見ない確かめは、この形で比べる */
+/** 出た効果の並び。中身まで見ない確かめは、この形で比べる */
 function kinds(effects: readonly ApprovalEffect[]): string[] {
   return effects.map((e) => e.kind);
 }
@@ -115,7 +115,7 @@ function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: r
 
 /**
  * 名前で状態を作る。**見張りの確かめは「守る状態を全部」回す。**
- * 1 つの状態でしか押さないと、見張りから状態を 1 つ抜いた（消すのではなく弱めた）ときに素通しする
+ * 1 つの状態でしか押さないと、見張りから状態を 1 つ抜いた（消すのではなく弱めた）ときに落ちずに通る
  */
 function named(step: Step, kind: string): ApprovalState {
   switch (kind) {
@@ -215,9 +215,9 @@ interface Guard {
   readonly what: string;
   /** 消すために置き換えるソースの 1 行（ちょうど 1 か所に出ること） */
   readonly find: string;
-  /** 置き換えた後（見張りが効かなくなる形） */
+  /** 置き換えた後（見張りが有効でなくなる形） */
   readonly into: string;
-  /** 効いていることの確かめ。**見張りを消したらここが落ちる**（または、そこで投げる） */
+  /** 有効であることの確かめ。**見張りを消したらここが落ちる**（または、そこで投げる） */
   readonly check: (step: Step) => void;
 }
 
@@ -232,7 +232,7 @@ const GUARDS: readonly Guard[] = [
       assert.equal(after.state.overlay?.kind, "approving");
       assert.equal(after.redraw, false);
       assert.deepEqual(kinds(after.effects), []);
-      // 逆向きも見る。ここを「どの状態でも閉じない」に広げられたら、閉じる道が消える
+      // 逆向きも見る。ここを「どの状態でも閉じない」に広げられたら、閉じる方法が消える
       const closable = ["loading", "preview", "done", "error", "prompt", "decideLoading", "decidePreview"];
       assertNamed(step, closable);
       for (const kind of closable) {
@@ -362,7 +362,7 @@ const GUARDS: readonly Guard[] = [
       const after = step(approving, { kind: "confirm", tickets: ["i0001"] });
       assert.equal(after.state, approving, "承認中に押し直しても、打つのは 1 本きり");
       assert.deepEqual(kinds(after.effects), []);
-      // 残りの状態も全部。1 つだけ見ると、そこ以外を見張りから抜かれたときに素通しする
+      // 残りの状態も全部。1 つだけ見ると、そこ以外を見張りから抜かれたときに落ちずに通る
       assertNamed(step, ["closed", "loading", "done", "error", "prompt"]);
       for (const kind of ["closed", "loading", "done", "error", "prompt"]) {
         const state = named(step, kind);
@@ -375,7 +375,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (kind === "loading" || kind === "preview" || kind === "approving") {',
     into: "if (false) {",
     check(step) {
-      // **3 つとも回す。** 1 つだけ見ると、見張りからその 1 つ以外を抜かれたときに素通しする
+      // **3 つとも回す。** 1 つだけ見ると、見張りからその 1 つ以外を抜かれたときに落ちずに通る
       assertNamed(step, ["loading", "preview", "approving"]);
       for (const kind of ["loading", "preview", "approving"]) {
         const state = named(step, kind);
@@ -481,7 +481,7 @@ const GUARDS: readonly Guard[] = [
       const after = step(decided, { kind: "decide", parent: "i0001", phase: 1, tree: TREE, chip: chipOf() });
       assert.equal(after.state, decided);
       assert.deepEqual(kinds(after.effects), []);
-      // 連絡の文（keep でない prompt）の上には開ける。ここまで塞ぐと、決める道が消える
+      // 連絡の文（keep でない prompt）の上には開ける。ここまで制限すると、決める方法が消える
       const prompt = toPrompt(step);
       assert.equal(step(prompt, { kind: "decide", parent: "i0001", phase: 1, tree: TREE, chip: chipOf() }).state.overlay?.kind, "decideLoading");
     },
@@ -661,7 +661,7 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
   const noTree = approvalStep(CLOSED, { ...input, tree: undefined });
   assert.equal(noTree.state.overlay, undefined);
   assert.deepEqual(noTree.effects, [
-    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 が無いので、レビュー済みの連絡を組めません" },
+    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 が無いので、レビュー済みの連絡文を作れません" },
   ]);
 
   // 人のレビュー待ちでなければ、ボタンの前提が無い。言って読み直す
@@ -806,7 +806,7 @@ function load(source: string): { readonly approvalStep: Step } {
 test("CB-T181 見張りを 1 つ消すと、それを確かめるテストが落ちる（変異テスト）", () => {
   const source = fs.readFileSync(SOURCE, "utf8");
 
-  // 組み立て直したものが、読み込んだものと同じに動くこと。ここが崩れていると、以下は何も見ていない
+  // 組み立て直したものが、読み込んだものと同じに動くこと。ここが成り立たないと、以下は何も見ていない
   const same = load(source);
   for (const guard of GUARDS) {
     guard.check(same.approvalStep);

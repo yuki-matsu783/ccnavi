@@ -108,7 +108,7 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01"])
         self.assertTrue(board["write"]["allowed"], board["write"])
         self.assertEqual(board["rejected"], [])
-        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーの綴りは畳む）
+        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーの綴りは出さない）
         self.assertNotIn(os.path.join(self.tmp, "memfs"), board["text"])
 
     def test_approving_a_project_family_writes_only_its_branch(self):

@@ -57,7 +57,7 @@ export function expiryNotice(host: string, meta: TokenMeta | undefined, now: Dat
       expiresAt: "",
       source,
       daysLeft: null,
-      text: `${host} の PAT の期限が分からない（ホストの応答から読めず、登録のときにも入れていない）。設定画面で期限を入れる`,
+      text: `${host} の PAT の期限が分からない（ホストの応答から読めず、登録のときにも入れていない）。設定画面で期限を入れてください`,
     };
   }
   // 残りはミリ秒で比べる（切り捨てた日数で比べると 7 日と数時間前から知らせてしまう。レビューの 7）。
@@ -66,10 +66,10 @@ export function expiryNotice(host: string, meta: TokenMeta | undefined, now: Dat
   const left = ms > 0 ? Math.ceil(ms / DAY) : Math.floor(ms / DAY);
   const day = expiresAt.slice(0, 10);
   if (ms <= 0) {
-    return { level: "expired", expiresAt, source, daysLeft: left, text: `${host} の PAT は期限（${day}）が切れている。作り直して設定画面で差し替える` };
+    return { level: "expired", expiresAt, source, daysLeft: left, text: `${host} の PAT は期限（${day}）が切れている。PAT を作り直し、設定画面で差し替えてください` };
   }
   if (ms <= WARN_DAYS * DAY) {
-    return { level: "soon", expiresAt, source, daysLeft: left, text: `${host} の PAT はあと ${left} 日で切れる（${day}）。作り直して設定画面で差し替える` };
+    return { level: "soon", expiresAt, source, daysLeft: left, text: `${host} の PAT はあと ${left} 日で切れる（${day}）。PAT を作り直し、設定画面で差し替えてください` };
   }
   return { level: "ok", expiresAt, source, daysLeft: left, text: `${host} の PAT の期限は ${day}` };
 }

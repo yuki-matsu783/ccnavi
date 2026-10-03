@@ -148,9 +148,9 @@ test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そ�
 
 test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
   const refused: [string, RegExp][] = [
-    ["nodes: [", /画面の YAML の読み手で読めないので描けない/],
-    ["a: 1\na: 2\n", /画面の YAML の読み手で読めないので描けない/],
-    ["nodes: []\n---\nnodes: []\n", /画面の YAML の読み手で読めないので描けない/],
+    ["nodes: [", /画面の YAML パーサーで読めないので図にできない/],
+    ["a: 1\na: 2\n", /画面の YAML パーサーで読めないので図にできない/],
+    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読めないので図にできない/],
     ["", /描けない/],
     ["- 1\n", /描けない/],
     ["name: x\n", /描けない/],
@@ -340,7 +340,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(doc, "c").parentId, undefined);
   // 線はそのまま。グループは注意に「欄を持たない種類」として出ない。出入口も無い
   assert.deepEqual(doc.connections, three().connections);
-  assert.deepEqual(flowNotices(doc).filter((n) => /欄を持たない/.test(n)), []);
+  assert.deepEqual(flowNotices(doc).filter((n) => /入力欄が無い/.test(n)), []);
   assert.deepEqual(portsOf(byId(doc, "group-1"), connectionsOf(doc)), { inputs: [], outputs: [] });
   // グループへは線を繋がない
   assert.equal(connect(doc, "c", "output", "group-1", "input"), doc);
@@ -355,7 +355,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(again.doc, "a").parentId, "group-1");
   assert.deepEqual(absolutePosition(again.doc, "b"), { x: 400, y: 200 });
   assert.deepEqual(again.doc.nodes.map((n) => n.id), ["group-1", "a", "group-2", "b", "c"]);
-  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに黙って入らない）
+  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに気づかないうちに入らない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 700, y: 500 }, parentId: "group-1" }, ...three().nodes] };
   const fresh = groupNodes(stray, ["a", "b"]);
   assert.ok(fresh !== undefined);
@@ -414,7 +414,7 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
   assert.equal(byId(into, "a").parentId, "g");
   assert.deepEqual(byId(into, "a").position, { x: 50, y: 50 });
   assert.deepEqual(into.nodes.map((n) => n.id), ["g", "a", "b", "c"]);
-  // 指す先の無い parentId は効かせない（位置は図の上の位置として読み、書き換えない）
+  // 指す先の無い parentId は反映しない（位置は図の上の位置として読み、書き換えない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 5, y: 5 }, parentId: "missing" }] };
   assert.equal(groupOf(stray, byId(stray, "x")), undefined);
   assert.deepEqual(absolutePosition(stray, "x"), { x: 5, y: 5 });

@@ -1,15 +1,15 @@
 """ccnavi の設定を解決する。
 
 設定は環境変数で運ぶ。プロジェクトはそれを Claude Code の設定ファイルの env
-ブロックに書く。エージェント側の設定スキーマが独自キーを拒むため、そこが唯一
-開いている場所になる。
+ブロックに書く。エージェント側の設定スキーマが独自キーを拒むため、そこが独自の値を書ける
+唯一の場所になる。
 
-値はプロセスの環境から読み、設定ファイルからは読まない。この違いが効く。
+値はプロセスの環境から読み、設定ファイルからは読まない。この違いに意味がある。
 hook が受け取る環境はセッション開始時に固定されるので、あとから設定ファイルを
-直してもセッションを開き直すまで届かない。その古さは不便だが、同時に、
+直してもセッションを開き直すまで反映されない。その古さは不便だが、同時に、
 エージェントが自分を見張るものを緩めるのを防いでいる唯一の仕組みでもある。
 設定ファイルは作業ツリーの中にあってエージェントが書けるので、そこから読んだ
-値は次のツール呼び出しから効いてしまう。
+値は次のツール呼び出しから反映されてしまう。
 
 例外は ccnavi 自身を開発しているときだけ。own_source_tree を参照。
 """
@@ -28,8 +28,8 @@ from typing import NamedTuple
 #
 # 共通層の 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
 # `.ccnavi/common/` に固定で、env では動かない。3 層のうち共通層だけが別の決まり方を
-# していた非対称を無くしたもの（ADR-0052）。診断のためにここを動かす道は `--rules` /
-# `--phases` / `--risk` のフラグが持つ。hook は引数を渡さずに起動するので、
+# していた非対称を無くしたもの（ADR-0052）。診断のためにここを動かすには `--rules` /
+# `--phases` / `--risk` のフラグを使う。hook は引数を渡さずに起動するので、
 # 判定の入口は固定される。
 MODE_ENV = "CCNAVI_MODE"
 LOG_ENV = "CCNAVI_LOG"
@@ -52,7 +52,7 @@ GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # 付けた呼び出しを止め、この 3 つのフラグは標準入力が端末でなければ拒む。
 # テストは disable にする。
 #
-# 守る手段（CLI から打つ形）ではなく守る対象で名乗る。切りたい人が何を切ることになるのかを、
+# 守る手段（CLI から打つ形）ではなく守る対象で名前を付ける。切りたい人が何を切ることになるのかを、
 # 名前から読めるようにする。
 GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # GUARD_UNWATCHED_ENV は、人にも classifier にも確認できないモード
@@ -90,18 +90,18 @@ APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
 # PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 11.2）。各 git プロジェクトルートからの相対で、
 # その下の `config/{rules,phases,risks}.yml` が層の 3 本になる。自身の層
-# （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が効く。
+# （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が使われる。
 # 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
-# 添えるか（repeat）。既定は 3。判定は変わらず、文面と人への報告が変わるだけ。
+# つけるか（repeat）。既定は 3。判定は変わらず、文面と人への報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 # INTEGRATION_ENV は統合先の名前（ADR-0093 の D30）。`done/` と層と置き場の綴りを読むブランチで、
 # 親のブランチはここから切る。**ccnavi はこの環境変数を読まない。** 読むのは sh
 # （`ccnavi-sync.sh`）で、sh が環境変数か `.claude/settings.local.json` の `env` から決め、
 # 要る所へ `--integration-branch` で渡す。settings.local.json の `env` は Claude Code が
-# 起こしたプロセスにしか効かないので、人が端末で打つ sh のために、その値だけを
+# 起こしたプロセスにしか渡らないので、人が端末で打つ sh のために、その値だけを
 # `sync paths` が読んで返す（integration_local）。
 INTEGRATION_ENV = "CCNAVI_INTEGRATION_BRANCH"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
@@ -127,11 +127,11 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
 DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
-# 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
+# 控えはセッションごとの一時的な状態なので、記録とは分けてまとめておく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join("logs", "state")
 # 提案は各作業ツリーの `wip/proposals/` に置く。人が読み、人が承認するものなので、
-# ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
+# ガードの設定をまとめてある場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
@@ -151,9 +151,10 @@ DEFAULT_RISK = os.path.join(".ccnavi", "common", "risks.yml")
 DEFAULT_PROJECTS = "projects"
 # ccnavi ディレクトリ。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
 # 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
-# `--lint` が迷い子として拾う）。`config/` でもなく `.ccnavi/` にするのは、3 本と
-# スクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
-# 済ませるため（設計 11.2）。
+# `--lint` が「ワークツリーでもワークスペースルートでもないのに `.claude/` を持つ」と
+# 警告する）。`config/` でもなく `.ccnavi/` にするのは、3 本とスクリプトを 1 つの
+# ディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため
+# （設計 11.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
 # 引用せずにシェルへ渡せる綴り。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
@@ -166,9 +167,9 @@ def script_command(root: str, name: str) -> str:
 
     スクリプトはワークスペースにしか無く、プロジェクトから切ったワークツリーでは相対の
     `sh .ccnavi/scripts/...` が届かない。綴りはルールの `{root}`（rules.root_glob）と揃え、
-    区切りは `/` に寄せる（Git Bash は `C:/...` を読める）。
+    区切りは `/` にそろえる（Git Bash は `C:/...` を読める）。
 
-    空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に割り、止めている間の例外と
+    空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に分け、止めている間の例外と
     サブエージェントの禁止（`\\S*ccnavi-...`）にも当たらない。引用すれば shellread が中の空白を
     区切りと別の目印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
     まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符にする。
@@ -190,7 +191,7 @@ def bin_command(bin_path: str) -> str:
     """文面で案内する ccnavi 自身の綴り。設定（CCNAVI_BIN_PATH）が指すものを打てる形にする。
 
     案内した綴りをそのまま打てないと、案内は「そういうものが在るらしい」で終わる。
-    hook が起動しているのと同じものを名乗るのが、いちばん確かめようがある。
+    hook が起動しているのと同じ綴りを案内するのが、いちばん確かめようがある。
 
     設定が無ければ `ccnavi`。PATH に置いた人はそれで打てるし、置いていない人には
     綴りを尋ねる手掛かりになる。`.sh` は `sh` を頭に付ける（起動役はシェルの
@@ -218,18 +219,18 @@ LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RIS
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
 LAYER_SELF = "self"
-# 層の名札に予約してある綴り。プロジェクトはこの名前を名乗れない。
+# 層の名札に予約してある綴り。プロジェクトはこの名前を使えない。
 RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
-# 予約名のプロジェクトの控えの key に添える前置き。名札の側（`rules:self`）と
+# 予約名のプロジェクトの控えの key につける前置き。名札の側（`rules:self`）と
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
 
 # 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 11.4）。
 #
-# 名札の綴りでは種別を決められない。`projects/common/` は `common` を名乗るが
-# 共通層ではないし、`projects/self/` は `self` を名乗るがワークスペース自身の層
+# 名札の綴りでは種別を決められない。`projects/common/` の名札は `common` だが
+# 共通層ではないし、`projects/self/` の名札は `self` だがワークスペース自身の層
 # ではない。`layer == LAYER_COMMON` のような文字列比較で種別を決めると、
-# プロジェクトが名前を 1 つ選ぶだけで、共通層と同じ扱いに滑り込める。
+# プロジェクトが名前を 1 つ選ぶだけで、共通層と同じ扱いを受けられてしまう。
 ORIGIN_COMMON = "common-layer"
 ORIGIN_SELF = "self-layer"
 ORIGIN_PROJECT = "project-layer"
@@ -240,7 +241,7 @@ class LayerFile(NamedTuple):
 
     `origin` は層の種別（ORIGIN_*）、`layer` は名札（`common` / `self` /
     プロジェクトの名前）、`kind` は rules / phases / risk、`path` はその綴り。
-    種別を添えるのは、受け取る側が名札の文字列比較をしなくて済むようにするため。
+    種別をつけるのは、受け取る側が名札の文字列比較をしなくて済むようにするため。
     """
 
     origin: str
@@ -254,8 +255,8 @@ def is_reserved_layer_name(name: str) -> bool:
 
     予約の判断はここ 1 か所だけで持つ。ruleload（層を数える・行き先の層を引く）、
     lint（名指しする）、approval（`project:` を承認しない）、phase / risk
-    （層の phases / risk を足さない）が同じ答えを引く。片側にしか予約が
-    掛かっていないと、数えない層の名前で別の層の判定を引ける。
+    （層の phases / risk を足さない）が同じ答えを引く。片側でしか予約を
+    見ていないと、数えない層の名前で別の層の判定を引ける。
 
     綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
     `Self:schema` になり、記録を読む人が `self:schema`（ワークスペース自身の層）と
@@ -301,7 +302,7 @@ class Settings:
     mode_from_environment: str = ""
 
     # live_files は上書き設定を読んだことを示す。
-    # ccnavi 自身のソースツリーでしか立たない。
+    # ccnavi 自身のソースツリーでしか真にならない。
     live_files: bool = False
 
     log: str = ""
@@ -360,7 +361,7 @@ class Settings:
     risk: str = ""
     # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、ワークスペース
     # 自身だけで動く。project_home は ccnavi ディレクトリ（git プロジェクトルートからの相対、
-    # "/" 区切り）。自身の層とプロジェクトの層の両方に効く。
+    # "/" 区切り）。自身の層とプロジェクトの層の両方に使われる。
     projects: str = ""
     project_home: str = ""
     # project_rules_files は、名前で指したプロジェクトのルールファイルの差し替え
@@ -379,7 +380,7 @@ class Settings:
 
     @property
     def tickets_enabled(self) -> bool:
-        """チケット制御が効いているか。
+        """チケット制御が有効か。
 
         判定・監視・診断はこれで分岐する。approved の真偽で分岐しない。
         解決前（空）は enable と同じに読む。読めない値は解決で enable になるので、
@@ -448,9 +449,9 @@ def load(root: str) -> tuple[Settings, list[str]]:
         return settings, []
 
     # ccnavi 自身を触っている場合。ここでファイルを読むと、編集が次のセッション
-    # ではなく次のツール呼び出しから効く。道具を自分自身に当てて試すには
-    # これが要る。開発のための便宜であって境界ではない。効くのはここだけで、
-    # off には手が届かないままにしてある。
+    # ではなく次のツール呼び出しから反映される。道具を自分自身に当てて試すには
+    # これが要る。開発のための便宜であって境界ではない。反映されるのはここだけで、
+    # このファイルに `disable` と書いてもモードの解決で無視され、判定は止まらない。
     conf, problems = _read_local(root)
     if conf is None:
         return settings, problems
@@ -483,7 +484,7 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
     rules だけの経路を別に持たない。
 
     `--project-rules-file` / `--project-phases-file` で名前が差し替えられていれば、rules / phases に
-    限ってそのパス。差し替えは診断のためのもので、risk には効かない。守る対象（selfguard）は
+    限ってそのパス。差し替えは診断のためのもので、risk には当てはまらない。守る対象（selfguard）は
     差し替えを見ない `layer_real_path` を使う。
     """
     swaps = {KIND_RULES: conf.project_rules_files, KIND_PHASES: conf.project_phases_files}.get(kind)
@@ -518,13 +519,13 @@ def _relative(root: str, path: str) -> str:
 
 def own_source_tree(root: str) -> bool:
     """root が ccnavi を開発しているチェックアウトかどうかを、
-    そこにあるプロジェクト定義が名乗る名前で判断する。
+    そこにあるプロジェクト定義に書かれた名前で判断する。
 
     これは安全性の検査ではない。1 つのリポジトリを「道具を作っている場所」として
     目印を付け、ルールを試す人がセッションを開き直さずに変更を見られるようにする
     だけのもの。他のプロジェクトは環境変数だけが設定の出所のままなので、
     そこでエージェントが設定ファイルを書き換えても、人がセッションを開き直すまで
-    ガードには届かない。
+    ガードには反映されない。
     """
     try:
         with open(os.path.join(root, "pyproject.toml"), "rb") as f:
@@ -569,14 +570,14 @@ def _resolve(root: str, path: str) -> str:
 
 
 def _resolve_bin(root: str, path: str) -> str:
-    """実行ファイルの綴りを、この環境に在る形へ寄せる。
+    """実行ファイルの綴りを、この環境に在る形へ直す。
 
     書かれたとおりに在れば、それを使う。`.exe` まで書いてある設定が Windows で
     そのまま通るのはこの経路になる。無いときだけ、付くかもしれない拡張子を
     継ぎ足して探す。hook の登録に書いた `dist/ccnavi/ccnavi` の 1 行が、
     Windows では `ccnavi.exe` に、Linux ではそのまま当たる。PyInstaller が
     Windows でだけ `.exe` を付けるので、3 つの環境で同じ 1 行を使うと、
-    設定の綴りとファイルの綴りがここでずれる。
+    設定の綴りとファイルの綴りがここで食い違う。
 
     プラットフォームで分けない。WSL から Windows 側の置き場を指す形があり、
     そこでも守れるほうがよい。継ぎ足した綴りは在るものだけを採るので、
@@ -599,7 +600,7 @@ def integration_local(root: str) -> str:
     """`.claude/settings.local.json` の `env` に書かれた統合先の名前（ADR-0093 の D30）。
 
     環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。人が端末で打つ sh には
-    settings.local.json の `env` が効かないので、JSON を読む役（D33）をここが持つ。
+    settings.local.json の `env` が渡らないので、JSON を読む役（D33）をここが持つ。
     ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先に落ちる）。
     """
     try:

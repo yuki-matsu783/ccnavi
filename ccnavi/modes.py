@@ -5,7 +5,7 @@ enable / dry-run / disable の 3 値はここが持つ。判定のモード（CC
 取るので、定義は 1 か所にして selfguard はここから借りる。
 
 フラグ・環境・設定ファイルのどれから来た値がモードになるか（resolve_mode）、
-モードを掛けたあとに戻す働きがどう効くか（effective_setting）、判定に達せな
+モードを掛けたあとに戻す働きがどうなるか（effective_setting）、判定に達せな
 かったときにどう終わるか（fail_closed）。どれも判定の中身には触れない。
 """
 
@@ -32,7 +32,7 @@ EXIT_ANSWER_NO = 3
 # enable なら実際に起きたことと一致する。
 #
 # 名前はガードそのものの状態を言う。判定に deny と ask の 2 つがある以上、
-# 名前が「止める」だけを言うと、確認で済む回に嘘をつくことになる。
+# 名前が「止める」だけを言うと、確認で済む回には名前が事実と合わなくなる。
 # 弱いほうから強いほうへ並ぶのは lint の深刻度と同じ。
 DISABLE = "disable"  # 判定しない
 
@@ -45,8 +45,8 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
     """設定された値をモードにする。
 
     設定ファイルが決められるのは enable と dry-run だけで、その編集は次のツール
-    呼び出しから効く。disable を言えるのは環境だけ。設定ファイルは作業ツリーの中に
-    あってエージェントが書けるので、そこに書かれた disable を効かせると、
+    呼び出しから反映される。disable を言えるのは環境だけ。設定ファイルは作業ツリーの中に
+    あってエージェントが書けるので、そこに書かれた disable を有効にすると、
     見張られている側が見張りを止められてしまう。
 
     フラグは両方より強い。テストが、たまたま走った環境に依存せずモードを
@@ -67,7 +67,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
         # disable の経路は 1 本だけ。セッションを起動した人の環境から来て、
         # かつ作業ツリーの中の何もそれを求めていないとき。設定ファイルもフラグも
         # エージェントが書ける場所から来るし、そこでの編集は次のツール呼び出しから
-        # 効くので、どちらの off を認めても、見張られている側が見張りを
+        # 反映されるので、どちらの off を認めても、見張られている側が見張りを
         # 止められることになる。
         from_file = conf.mode_declared_in_file.lower()
         from_env = conf.mode_from_environment.lower()
@@ -84,7 +84,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
         return ENABLE
 
     # 解釈できない値も最も強いモードになるが、それを言うことに意味がある。
-    # 名前を変えた設定や打ち間違いが、黙っていると意図した選択に見えてしまい、
+    # 名前を変えた設定や打ち間違いが、何も言わないと意図した選択に見えてしまい、
     # 誰にも見えない理由でガードが締まることになる。
     stderr.write(
         f"ccnavi: {source}={value!r} is not a mode; using {ENABLE}. "
@@ -94,7 +94,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
 
 
 def effective_setting(mode: str, declared: str) -> str:
-    """CCNAVI_MODE を掛けたあとの、実際に効く設定。
+    """CCNAVI_MODE を掛けたあとの、実際に使われる設定。
 
     判定を適用しないモードでは、戻す側もファイルに触らない。dry-run は
     「呼び出しにも作業ツリーにも手を出さない」ことがモードの約束で、

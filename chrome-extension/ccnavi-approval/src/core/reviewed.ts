@@ -17,7 +17,7 @@ import { py } from "./py.js";
 import type { ReviewCopy } from "./github.js";
 import { localStamp } from "./stamp.js";
 
-/** service worker へ頼む口（`owner`・`repo` は呼び手が前に付ける） */
+/** service worker へ頼む関数（`owner`・`repo` は呼び手が前に付ける） */
 export type Ask = (op: string, args: readonly unknown[]) => Promise<unknown>;
 
 export interface ConfirmInput {
@@ -87,7 +87,7 @@ export async function reviewPanels(
   for (const r of reviewable) {
     const panel = { phase: r.phase, mr: r.mr, host: r.host, children: r.children };
     if (r.host !== "github" && r.host !== "gitlab") {
-      out.push({ ...panel, copy: null, problems: [], error: `依頼したホストが ${r.host || "（記録なし）"}。Chrome のレビュー済みは GitHub と GitLab だけ` });
+      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホストが ${r.host || "（記録なし）"}。Chrome 拡張からレビュー済みにできるのは GitHub と GitLab だけ` });
       continue;
     }
     if (copy === null) {
@@ -96,7 +96,7 @@ export async function reviewPanels(
     }
     if (copy.host !== r.host) {
       // 依頼を記録したホストと、このリポジトリのホストが違う（別のホストの MR で依頼した）
-      out.push({ ...panel, copy: null, problems: [], error: `依頼したホスト（${r.host}）とこのリポジトリのホスト（${copy.host}）が違う。依頼し直す` });
+      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホスト（${r.host}）とこのリポジトリのホスト（${copy.host}）が違う。レビューを依頼し直してください` });
       continue;
     }
     try {

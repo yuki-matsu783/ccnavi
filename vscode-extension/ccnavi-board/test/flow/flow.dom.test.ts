@@ -70,7 +70,7 @@ test("CB-D108 ファイルが無ければ雛形を見せ、そのまま保存で
   const dom = await openFlow({ exists: false });
   try {
     assert.equal(dom.all(".react-flow__node").length, 2);
-    assert.match(dom.one(".toolbar").textContent ?? "", /まだ無い。保存すると作る/);
+    assert.match(dom.one(".toolbar").textContent ?? "", /ファイルはまだ無い。保存すると作られる/);
     const save = dom.one<HTMLButtonElement>("#save");
     assert.ok(!save.disabled);
     assert.ok(dom.one<HTMLButtonElement>('[data-action="open-flow"]').disabled, "無いファイルはエディタで開けない");
@@ -131,7 +131,7 @@ test("CB-D110 部品箱で足して欄で直して保存すると、知らない
     assert.equal(mcp.getAttribute("data-type"), "other");
     dom.click(dom.one('.react-flow__node[data-id="mcp-1"]'));
     await dom.settle();
-    assert.match(dom.one("#inspector").textContent ?? "", /この画面で欄を持たない種類/);
+    assert.match(dom.one("#inspector").textContent ?? "", /この画面に入力欄が無い種類/);
     assert.match(dom.one("#inspector pre.flow-raw").textContent ?? "", /serverId: srv\ntoolName: t\n/);
     // 足して、欄で直す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));

@@ -249,7 +249,7 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
     assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（開いたまま 2）");
     assert.equal(dom.one('[data-count="ask"]').textContent, "1 / 1");
-    // 畳んだタイプの中のルールが当たれば、タイプが開いて矢印もそれに合う
+    // 折りたたんだタイプの中のルールが当たれば、タイプが開いて矢印もそれに合う
     dom.type(dom.one("#find"), "");
     await dom.settle();
     dom.click(dom.one('button[data-action="fold-section"][data-section="ask"]'));
@@ -271,7 +271,7 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
 test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッジも変わり、保存はその文字を送る", async () => {
   const dom = await openRules();
   try {
-    // 読んだ刻みは畳んだままでも見える。刻みが無い行はバッジを出さない（枠だけ置く）
+    // 読んだ刻みは折りたたんだままでも見える。刻みが無い行はバッジを出さない（枠だけ置く）
     assert.equal(dom.one(`${rowSelector("no-rm")} .sum .sum-every`).textContent, "4 回ごと");
     assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "");
     // 刻みだけを直す。欄は「コンテキストの追加」の中にあり、刻みがあれば最初から開いている
@@ -419,7 +419,7 @@ test("CB-D72 読み直せなかった画面から中身が届いたあとも、i
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload").map((message) => message.dirty), [false]);
     assert.ok(dom.one<HTMLButtonElement>('button[data-action="reload"]').disabled, "押した時点で止める");
-    // 中身が届いて一覧が出る。控えの受け口（id の確定）は、ここで張られていないと二度と張られない
+    // 中身が届いて一覧が出る。控えを受け取る側（id の確定）は、ここで張られていないと二度と張られない
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     dom.click(dom.one(`${rowSelector("deps")} .row-head`));
     await dom.settle();

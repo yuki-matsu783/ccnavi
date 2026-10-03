@@ -6,7 +6,7 @@
  *
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ。D30）。設定したブランチが無ければ止める
  * 2. 統合先の `.claude/settings.json` を読み、置き場の綴りを Python に出させる
- * 3. 統合先の `done/`・共通層・自身の層・互換の印を読む。互換の比べは Python（7.3）
+ * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python（7.3）
  * 4. 直近 N 日と利用者の指定のブランチ（表示用）の置き場を読み、家族を Python に見分けさせる
  * 5. 家族ごとに、参照の閉包（3.3 の 5）の足りないブランチを読み足し、Python に承認待ちを出させる。
  *    判定の入力は統合先・`P`・閉包の `P_X` だけ（D2）。表示用のブランチは入れない
@@ -21,7 +21,7 @@ import { py, type BoardResult, type Branch, type Compat, type Family, type Place
 import { reviewPanels, type ReviewPanel } from "./reviewed.js";
 import type { RepoConfig } from "./settings.js";
 
-/** service worker へ頼む口。`owner`・`repo` はここで前に付ける */
+/** service worker へ頼む関数。`owner`・`repo` はここで前に付ける */
 export type HostCall = (op: string, args: readonly unknown[]) => Promise<unknown>;
 
 export interface BlobCache {
@@ -44,7 +44,7 @@ export interface Deps {
   /** 呼んだ回数を数える（service worker が返す数を足す） */
   readonly stats: Stats;
   /**
-   * プロジェクトのリポジトリのワークスペース（段階 5）。登録したワークスペースのリポジトリと、そのホストへ頼む口。
+   * プロジェクトのリポジトリのワークスペース（段階 5）。登録したワークスペースのリポジトリと、そのホストへ頼む関数。
    * プロジェクトのリポジトリを読むときに要る（無ければ止める）
    */
   readonly workspace?: { readonly repo: RepoConfig; readonly call: HostCall };
@@ -192,12 +192,12 @@ async function integrationOf(repo: RepoConfig, reader: Reader, what: string): Pr
   const source = repo.integration ? "setting" : "default";
   const head = await reader.head(name);
   if (head === null) {
-    throw new Error(`${what}統合先 ${name} がリモートに無い。設定を直す`);
+    throw new Error(`${what}統合先 ${name} がリモートに無い。設定を直してください`);
   }
   return { name, source, head } as const;
 }
 
-/** 1〜3: 統合先を決め、置き場の綴り・統合先の中身・互換の印を読む。統合先が無ければ投げる */
+/** 1〜3: 統合先を決め、置き場の綴り・統合先の中身・互換のマーカーを読む。統合先が無ければ投げる */
 export async function readIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   if (repo.project) return await readProjectIntegration(repo, reader, deps);
   const integration = await integrationOf(repo, reader, "");
@@ -211,7 +211,7 @@ export async function readIntegration(repo: RepoConfig, reader: Reader, deps: De
 }
 
 /**
- * プロジェクトのリポジトリ（段階 5。3.3 の 7）: 置き場の綴り・共通層・互換の印はワークスペースの統合先から、
+ * プロジェクトのリポジトリ（段階 5。3.3 の 7）: 置き場の綴り・共通層・互換のマーカーはワークスペースの統合先から、
  * 閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先から読む。プロジェクトの層の計算（D28）は Python
  */
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
@@ -239,7 +239,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
   const reader = new Reader(repo, deps);
   let integration: Snapshot["integration"] | null = null;
   try {
-    // 1〜3. 統合先、置き場の綴り、統合先の中身、互換の印
+    // 1〜3. 統合先、置き場の綴り、統合先の中身、互換のマーカー
     const base = await readIntegration(repo, reader, deps);
     integration = base.integration;
     const { settings, place, compat } = base;
@@ -341,7 +341,7 @@ async function withdrawableHere(board: BoardResult, reader: Reader, place: Place
       continue;
     }
     const prior = await findPrior((op, args) => reader.call(op, ...args), place, head, w.ticket);
-    out.push(prior === null ? { ...w, problems: ["承認コミット（この写しを足した、親のブランチの first-parent の鎖の上のコミット）を引けないか、その親に提案が無い"] } : w);
+    out.push(prior === null ? { ...w, problems: ["承認コミット（親のブランチの first-parent の履歴で、この承認済みチケットを足したコミット）が見つからないか、そのコミットの親に提案が無い"] } : w);
   }
   return { ...board, withdrawable: out };
 }

@@ -26,8 +26,8 @@ export function onDidChangeAppearance(listener: (appearance: Appearance) => void
  * いまの見た目を画面へ送る。**画面に中身を渡す段取り（`ScreenHost`）を通す。**
  * 届いたら真、組み上がっていない画面と捨てられた画面には送らないので偽。
  *
- * 落ちたぶんは持ち越さない。入れ物ごと入れ直す道では組む側が HTML に埋め（`bodyTag`）、
- * 画面が組み上がったところで呼ぶ側が送り直すので、どちらの道でもいまの値が後から渡る。
+ * 落ちたぶんは持ち越さない。入れ物ごと入れ直す経路では組む側が HTML に埋め（`bodyTag`）、
+ * 画面が組み上がったところで呼ぶ側が送り直すので、どちらの経路でもいまの値が後から渡る。
  */
 export function postAppearance(host: AppearanceSink): boolean {
   return sendAppearance(host, readAppearance());
@@ -55,7 +55,7 @@ export function followAppearance(panel: vscode.WebviewPanel, host: AppearanceSin
 /**
  * サイドパネルのタイトルバーの歯車とコマンドパレットから。今の値に印を付けた 3 択を出し、選んだ値を設定に書く。
  * 書く先は、いま値が定義されている置き場（フォルダ → ワークスペース → 利用者）。利用者の設定に書いても
- * ワークスペースの設定が勝って何も変わらない、ということが起きないように。
+ * ワークスペースの設定のほうが採られて何も変わらない、ということが起きないように。
  */
 export async function pickAppearance(): Promise<void> {
   const now = readAppearance();
