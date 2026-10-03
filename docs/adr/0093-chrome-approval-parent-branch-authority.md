@@ -449,7 +449,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
     pid を確かめられないので時刻だけで判断する（**10 分**。`owner` が無ければ `find <ロック> -maxdepth 0 -mmin +10` で見る）
   - 数は先頭の 0 を落としてから比べる（`$(( ))` が 8 進に読まない）
   - pid の再利用で、落ちたセッションのロックが生きた別のプロセスの pid と重なると取れなくなる。受け入れて、人がロックを確かめて消す
-  - Git Bash の `$$` は MSYS の番号で、`kill -0` はロックを取る側も見る側も sh なので通る見込み（確信中。段階 2d の試験で確かめ、駄目なら Git Bash では時刻だけにする）
+  - Git Bash の `$$` は MSYS の番号で、`kill -0` はロックを取る側も見る側も sh なので通る見込み（確度は中程度。段階 2d の試験で確かめ、駄目なら Git Bash では時刻だけにする）
 - **奪い方**（段階 2b のレビューで直した）:
   1. 奪う操作を門 `<ロック>.steal`（`mkdir`）で 1 つにする。門が取れなければ奪わずに待ちに戻る。10 分を過ぎた門は落ちた奪い手の残りとして外す
   2. 門の中で、古いと判断したときに読んだ `owner` の行と今の行を比べる。違えば（持ち主が替わった）奪わない。行が空なら、ロックの年齢（`-mmin +10`）をもう一度確かめる
@@ -696,7 +696,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 
 - 既定は 90 日。登録画面でホストの作成画面へのリンクと、選ぶ権限の一覧を出す
 - 期限の正はホストの PAT の期限。GitHub は応答ヘッダ `github-authentication-token-expiration`、GitLab は `GET /personal_access_tokens/self` の `expires_at`
-- GitHub のヘッダは、`host_permissions` を持つ拡張の fetch が CORS の制限を受けないので読めるはず（確信中）。**段階 3 で確かめる**。
+- GitHub のヘッダは、`host_permissions` を持つ拡張の fetch が CORS の制限を受けないので読めるはず（確度は中程度）。**段階 3 で確かめる**。
   読めなければ登録時に利用者が期限の日付を入れる（入れなければ「期限不明」と出し続ける）
 - 切れる 7 日前から、service worker が `chrome.alarms` で 1 日 1 回比べ、バッジとボードの帯で出す。401 が返ったら差し替えを促す
 
@@ -844,7 +844,7 @@ Chrome は ccnavi の .pyc を同梱するので、手元の ccnavi と版がず
 
 - **blob は sha で引き、IndexedDB に控える**（sha が同じなら中身は同じなので、失効が要らない）。ボードを開くたびに読むのは tree だけになる
 - **まとめて取る**: GitHub は GraphQL の別名（`f1: object(expression: "P:path") { ... on Blob { text } }` を並べる）で、控えに無い blob を 1 回に最大 50 件ほど取る。
-  GitLab は GraphQL の `repository { blobs(paths: [...], ref:) }` を使う見込み（確信中。段階 5 は確かめられなかったので、REST の `repository/blobs/:sha` を 1 件ずつ引いて IndexedDB に控える。11.9）
+  GitLab は GraphQL の `repository { blobs(paths: [...], ref:) }` を使う見込み（確度は中程度。段階 5 は確かめられなかったので、REST の `repository/blobs/:sha` を 1 件ずつ引いて IndexedDB に控える。11.9）
 - **統合先の `done/`**: 今の `predecessor_pool` は `scan(closed=True)` で `done/` を全部読む（`approval.py:688-694`）。
   MEMFS で今のコードを動かす間（段階 1〜2a）は `done/` の blob を全部取る。コアに移ってからは、判定が要るもの（閉包の先行、同じ識別子の検査で当たったもの）だけを取り、
   取らなかったものは `NOT_FETCHED`（6.2）にする
@@ -887,7 +887,7 @@ GitHub の上限（REST 5,000 回/時、GraphQL 5,000 点/時）に対して十�
   - **2 段目（確認事項 2 が取れたら。段階 5b）: 印ファイル `phases/<P>/seq` を足す**。ccnavi の全コミット（Chrome の承認・取り下げ・レビュー済み、C1、運ぶ処理）が
     GitLab のリポジトリでだけ必ず更新する家族ごとの小さなファイル（中身は通し番号と最後の操作）。
     Chrome は書く直前に `GET repository/commits?path=phases/<P>/seq&ref_name=P&per_page=1` で「`seq` を最後に変えたコミット」の sha を引き、
-    `seq` の `update` の action に `last_commit_id = <その sha>` を付ける。`last_commit_id` は「そのファイルを最後に変えたコミット」と比べる見込み（確信中〜高）なので、
+    `seq` の `update` の action に `last_commit_id = <その sha>` を付ける。`last_commit_id` は「そのファイルを最後に変えたコミット」と比べる見込み（確度は中〜高）なので、
     ccnavi の書き込みどうしは後の方が落ち、疑似的な比較つき書き込みになる。コードだけのコミットは `seq` を変えないので落ちない（状態には関係しない）。
     引いてから書くまでの間の書き込み（TOCTOU）とコードのコミットは捕まえられないので、1 段目の事後確認は安全網として残す
   - 代案（一時ブランチ + マージリクエストの fast-forward マージ）は、確認で前提が崩れたときの予備の案
@@ -902,7 +902,7 @@ GitHub の上限（REST 5,000 回/時、GraphQL 5,000 点/時）に対して十�
 | GitHub（fine-grained、リポジトリを限る） | Contents: Read and write、Metadata: Read、Pull requests: Read | 同じ | 同じ + Issues: Read |
 | GitLab | `api`（Commits API は `write_repository` では書けない） | 同じ | 同じ |
 
-GitLab のトークンの種類: project access token（リポジトリを限れる）を勧めるが、**GitLab.com の無料版では使えない見込み**（確信中。10.2 の確認事項 3）。
+GitLab のトークンの種類: project access token（リポジトリを限れる）を勧めるが、**GitLab.com の無料版では使えない見込み**（確度は中程度。10.2 の確認事項 3）。
 使えなければ `api` スコープの個人の PAT になり、リポジトリを限れない点を受け入れる危険に入れる（5.5）。
 
 保護されたブランチ（`main` など）と統合先へは書かない（`ccnavi-push-approved.sh:174-175` と同じ一覧 + 統合先の名前）。
@@ -973,7 +973,7 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
 - メリット: 押し間違いを、エージェントが動く前なら跡付きで元のバイト列に戻せる。条件が狭く、判定は緩まない
 - デメリット: 着手後・改版・followup・子のある親・承認コミットの引けない承認は取り下げられない。取り下げのたびに履歴の API を数回引く
 
-### 8.9 レビュー済みの印を Chrome から付ける
+### 8.9 レビュー済みのマーカーを Chrome から付ける
 
 開発者と承認者が別の前提では、マージリクエストを見てスレッドを片付けるのは承認者側です。Chrome に「レビュー済み」を置きます（D15）。
 `ccnavi-review.sh confirm` は手元用に残し、両方とも同じコアの `confirm` と `reviewed_mark` を使います。
@@ -1130,13 +1130,13 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 ### 10.2 確認事項（事実の確認だけが残るもの）
 
 1. GitHub の stale の外しにパスの除外があるか、GitLab の Code Owners の設定で `.ccnavi/approved/` を外せるか（8.10）
-2. GitLab の Commits API: `update` の `last_commit_id` が「そのファイルを最後に変えたコミット」と比べるか（`seq` の前提。確信中〜高）、
+2. GitLab の Commits API: `update` の `last_commit_id` が「そのファイルを最後に変えたコミット」と比べるか（`seq` の前提。確度は中〜高）、
    `repository/commits?path=<seq>&ref_name=P&per_page=1` の先頭がその sha と一致するか（merge コミットの扱いを含む）、
    `refs/merge-requests/<N>/head` がブランチ消去後も残るか、GraphQL の `blobs(paths:)` で束で取れるか（8.2・8.4）。段階 5 の 2 段目の前
-3. GitLab.com の無料版で project access token が使えるか（使えない見込み、確信中）。project access token で `GET /personal_access_tokens/self` が期限を返すか（5.5・8.5）
+3. GitLab.com の無料版で project access token が使えるか（使えない見込み、確度は中程度）。project access token で `GET /personal_access_tokens/self` が期限を返すか（5.5・8.5）
 4. Pyodide が MV3 の CSP（`'wasm-unsafe-eval'` だけ）で動くか。`EM_ASM`/`EM_JS` の `eval` で落ちないか（7.2。段階 1）
    → 動いた（2026-09-29、Pyodide 314.0.7・Chromium 141 の headless=new）。拡張のページのモジュール Worker で起動し、ccnavi を import して承認待ちを出すまで CSP の違反は無い。sandbox ページは要らない（11.2）
-5. GitHub の `github-authentication-token-expiration` を拡張の fetch で読めるか。`host_permissions` を持つ拡張の fetch は CORS を受けないので読めるはず（確信中。5.5。段階 3）
+5. GitHub の `github-authentication-token-expiration` を拡張の fetch で読めるか。`host_permissions` を持つ拡張の fetch は CORS を受けないので読めるはず（確度は中程度。5.5。段階 3）
    → 模擬のホストでは読めた（2026-09-30、Chromium 141 の headless=new。127.0.0.1 を `host_permissions` に持つ service worker の fetch が、
    `Access-Control-Expose-Headers` に載せていないヘッダを読んだ）。本物の GitHub では確かめていない（11.7）
 6. Git Bash で、別の sh が取ったロックの pid に `kill -0` が通じるか（D32。段階 2d）
@@ -1745,7 +1745,7 @@ Chrome で「レビュー済み」（8.9）。GitHub・ワークスペースの�
 | アカウントの引き当て（4.5・D17） | `ccnavi-review.sh` の `account`・`confirm` | `GET /user`（gh・glab・curl のどれでも）の GitHub は `login`、GitLab は `username`。落ちる・形が違う（英数字と `_ . -` の 1〜100 字でない）なら空で、止めずに渡さない。ロックを取る前に引く。呼び手が `--actor` を渡せば断る（マーカーのアカウントを偽らせない） |
 | 依頼の後に動いたか（8.9 の表の 2 行目） | `review.moved_since` | 手元の `_moved_since_request` から git を読む所を外した関数。手元は `git diff --name-only --no-renames <依頼時>..HEAD`、Chrome は compare API の一覧を渡す。一覧が無い（読めない・打ち切られた）なら「動いた」 |
 | Chrome の confirm（8.9） | `py/ccnavi_chrome.py` の `_op_confirm`、`core.requested_head`・`moved_on_host`・`reviewable` | 依頼時の先頭は Python がマーカーから読み、読んだ `P` の先頭と違えば `need_compare`（`{base, head}`）で返す。拡張が compare API で読んで呼び直す（閉包の `need` と同じ形）。`compare` の 2 つがマーカーの先頭と読んだ先頭でなければ使わない。前の `changed`（文字列を TS が渡す形）はやめた。ボードの答えに `reviewable`（依頼済みでまだレビュー済みでないフェーズ）を足した |
-| スレッドとレビューの写し（8.9） | `src/core/github.ts` の `openPull`・`reviewThreads`・`pullReviews`・`reviewCopy`、`protocol.ts` の `reviewCopy` | `ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と同じ問い合わせ・同じページの切り方（スレッドは GraphQL の cursor で 21 ページ目、レビューは REST の `page` で 20 ページを超えたら止める）・同じ欄の落とし方（jq の `//`）で、`{host, mr, threads, reviews, fetched_at}` を組む。読むだけ |
+| スレッドとレビューの写し（8.9） | `src/core/github.ts` の `openPull`・`reviewThreads`・`pullReviews`・`reviewCopy`、`protocol.ts` の `reviewCopy` | `ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と同じ問い合わせ・同じページの切り方（スレッドは GraphQL の cursor で 21 ページ目、レビューは REST の `page` で 20 ページを超えたら止める）で、欄が無いか null のときは同じ既定値（空文字・0 など。jq の `//`）を入れて、`{host, mr, threads, reviews, fetched_at}` を組む。読むだけ |
 | 依頼の後の変更の一覧 | `github.compareFiles`、`protocol.ts` の `compareFiles` | `GET /compare/<base>...<head>`。改名は元と先の両方。`status` が `ahead`・`identical` でない、404、一覧が 300 件（打ち切り）なら `files: null` |
 | ボード（8.9・5.5） | `src/core/reviewed.ts`・`snapshot.ts`・`render.ts` | 候補のフェーズごとに写しを読み、Python の `confirm`（書かない）で通るかを聞く。スレッドは未解決を先に、本文は承認の画面と同じサニタイズ（`md.markdown`）で描く。リンクは `http(s)`・`mailto` だけ。通らなければ理由（手元の confirm の標準エラーと同じ文面）を出し、通って書ける家族にだけ「フェーズ N をレビュー済みにする」を出す。依頼したホストが GitHub でなければ「段階 5」と出す |
 | 書く流れ（8.3・8.4） | `write.ts` の `confirmPhase`、ボードの `review` | 押すと 8.10 の注意を添えて確かめ、毎周、家族とスレッド・レビューを読み直して Python の `confirm` に通させ、Changes を `createCommitOnBranch` の 1 コミットにする（承認と同じ競合の扱い・書いた後の確かめ）。見出しは「ccnavi: <P> のフェーズ N のレビュー済みを置いた（Chrome 拡張 <版>）」。拡張の版を 0.3.0 に上げた |
@@ -1812,7 +1812,7 @@ ADR に無かった判断:
 | 5 | `GET /user` に時間の上限が無い。gh・glab の標準エラーが応答に混ざる | 引き当ては 15 秒（`CCNAVI_REVIEW_ACCOUNT_TIMEOUT`）で切る（curl は `--max-time`、gh・glab は見張り）。ほかの curl にも `--connect-timeout 15 --max-time 120` を足した。`api` の gh・glab は標準エラーを別に受け、落ちたときだけ本文と一緒に見せる（前からの穴で、更新の知らせなどが混ざると JSON を読めなかった） |
 | 6 | 読み取りの受け口 `reviewCopy`・`compareFiles` が登録の無いリポジトリも読んだ | 書く頼みと同じく、設定画面で登録したリポジトリだけ受ける |
 | 7 | `actor` の意味が書かれていなかった | 「押した人でなくトークンの持ち主」「マージリクエストの作者本人でも通る（自己レビューは防がない）」を 8.9・README・要件に書いた |
-| 8 | 8.9 の「印の host・mr でマージリクエストを直接引く」と実装（親のブランチの開いたマージリクエストを引いて番号を照合）が食い違う。依頼の記録に `mr`・`host` が無いと照合を飛ばした | ADR を実装に合わせた（判断: 直接引く形は、依頼したマージリクエストが閉じて同じブランチに別のマージリクエストが開いたときに古いマージリクエストのスレッドで通りうる。ブランチから引いて番号を照合する今の形の方が締まる）。記録に `host` か `mr` が無ければ「依頼し直すこと」で止める（`review.matching_problems`。手元の confirm・decide と Chrome） |
+| 8 | 前の 8.9 の「依頼の記録の host・mr でマージリクエストを直接引く」と実装（親のブランチの開いたマージリクエストを引いて番号を照合）が食い違う。依頼の記録に `mr`・`host` が無いと照合を飛ばした | ADR を実装に合わせた（判断: 直接引く形は、依頼したマージリクエストが閉じて同じブランチに別のマージリクエストが開いたときに古いマージリクエストのスレッドで通りうる。ブランチから引いて番号を照合する今の形の方が締まる）。記録に `host` か `mr` が無ければ「依頼し直すこと」で止める（`review.matching_problems`。手元の confirm・decide と Chrome） |
 | 9 | ボードが依頼済みのフェーズごとにマージリクエスト・スレッド・レビューを読み直した | 家族に 1 度だけ読んで全部のフェーズに使う（compare はフェーズごと） |
 | 10 | C1 の突き合わせが通る場面だけだった | 止まる場面（未解決・変更要求・変更要求の後のコメント・書きかけ・レビュー済みへの重ね打ち）で、Chrome の理由が C1 で回した手元の標準エラーにそのまま出て、何も送らないことを見る。Chrome の一覧は GitHub の compare と拡張の `compareFiles` と同じ規則（改名は元と先の両方）で組む。直打ちの断りは文面まで見る |
 | 11 | sh の `actor` の gh・glab の経路が試されていなかった | gh（標準エラーの雑音、遅い答えを切る）・glab（`username`）の経路を試す |
@@ -1865,7 +1865,7 @@ GitLab（8.4 の 1 段目まで）、プロジェクトのリポジトリ（3.3 
 | 別のリポジトリの課題（3.1 の 8・8.7） | `ticket._issue_ref`・`issue_label`、`review.mr_draft`、`approval` | `issue: owner/repo#N`（GitLab の入れ子のグループも）を読み、マージリクエストの本文は `Closes owner/repo#N`、承認の画面は `■ 課題: owner/repo#N`。改版で課題のリポジトリを変えるのは課題番号と同じく断る（締める向き） |
 | decide のマーカーの `actor`・`via`（8.9） | `ccnavi-review.sh` の `decide`、`cli` の `--actor`・`--via`、`review.apply_decision`、`history.set_actor` | sh は confirm と同じく `GET /user` でトークンの持ち主を引き（ロックの前、見るだけの `--preview` では引かない）、`--actor=<名前> --via=board`（ボードの選択）か `--via=terminal`（端末で選ぶ形）を渡す。実行ファイルは書く形の decide だけで受け、マーカーに `actor`・`via`、跡に `actor` を書く。無ければマーカーも跡も前と同じ。呼び手の `--actor` は前から断る |
 | GitLab の読み書き（8.2・8.4・8.8・8.9・8.10・D25） | `chrome-extension/ccnavi-approval/src/core/gitlab.ts` | GitHub と同じ名前の操作を REST（v4）で組む。tree は `repository/tree`（コミットとパス、再帰、100 件ずつ 50 ページまで）、blob は `repository/blobs/:sha` を 1 件ずつ（NUL か UTF-8 で読めなければバイナリ。大きさが合わなければ止める）、承認コミットは `repository/commits?ref_name=&path=` と `first_parent=true` の鎖、マージリクエストの Approve は `approvals`、変更の一覧は `merge_base`（祖先でなければ null）と `compare`（時間切れ・1000 件で null）、PAT の持ち主は `GET /user` の `username`、期限は `GET /personal_access_tokens/self` を 1 日 1 回。認証は `PRIVATE-TOKEN` |
-| スレッドとレビューの写し（8.9） | `gitlab.reviewCopy` | `ccnavi-review.sh` の GitLab の枝（`find_mr`・`threads`・`reviews`）と同じ問い合わせ・ページの切り方・欄の落とし方（jq の `//`・`tostring`・`ascii_upcase`）。スレッドは最初のノートの書き手（`author`）を持ち、Python が依頼の記録の `poster` と比べて ccnavi の依頼のスレッドを除く（11.8.1 の決定 C） |
+| スレッドとレビューの写し（8.9） | `gitlab.reviewCopy` | `ccnavi-review.sh` の GitLab の枝（`find_mr`・`threads`・`reviews`）と同じ問い合わせ・ページの切り方で、欄の値も同じに整える（無いか null の欄に既定値を入れる jq の `//`、文字列にする `tostring`、大文字にする `ascii_upcase`）。スレッドは最初のノートの書き手（`author`）を持ち、Python が依頼の記録の `poster` と比べて ccnavi の依頼のスレッドを除く（11.8.1 の決定 C） |
 | GitLab の書き込み（8.4 の 1 段目・D21） | `gitlab.createCommit`、`protocol.ts` の `commit`、`write.ts` の `writeLoop`・`settleRace`・`revert` | service worker は書く直前に先頭を読み、読んだ先頭と違えば書かない（409）。Commits API の `actions`（作る・書き換える・消すは Python の Changes のとおり。GitLab が断れば 409）で 1 コミット書き、答えのコミットの親を返す。書く流れは、親が読んだ先頭と違えば（間に書き込みが入った）自分の書き込みの直前の姿で判定し直し、書くもの（パス・種類・バイト列）が同じなら残す。違えば、今の先頭で自分の書いたパスがまだ書いたとおりのときだけ、直前の中身に戻す打ち消しのコミットを積み、読み直して周を回す（指紋が変わっていれば見直しを求める）。打ち消しを積めない・打ち消しの間にも同じパスが変わった・2 回とも書けないときは止めて人に回す（`attention`）。ボードは家族を「要確認」で出し、人が「確かめた」を押すまで控える（`chrome.storage.local`）。GitHub は `expectedHeadOid` のまま（答えの親は読んだ先頭） |
 | プロジェクトのリポジトリ（3.3 の 7・D28・10.3 の 1） | 設定画面、`settings.ts`、`snapshot.readProjectIntegration`、`py/ccnavi_chrome.py` の `_build`・`project_layer`・`records` | 設定画面でプロジェクト名（`projects/<名前>` の名前。`common`・`self` は不可）と、先に登録したワークスペースのリポジトリを選ぶ（ホストが違ってよい）。置き場の綴り・共通層・自身の層・互換のマーカーはワークスペースの統合先から、`done/` とプロジェクトの層はプロジェクトの統合先から読む。仮のツリーは手元と同じ形（ワークスペースルート、`projects/<名前>/`、そのワークツリーとしての `.claude/worktrees/<P>`）で、層は D28 の計算（共通層にあるファイルを `configsync.projected` で写し、無いファイルはプロジェクトの統合先のもの）。控えは `sync/self/` と `sync/<名前>/`。service worker の書く守りも置き場の綴りをワークスペースの統合先から自分で引く |
 | 「始める」（8.6・D19） | `src/core/start.ts`、`ccnavi_chrome._op_start`、`protocol.ts` の `issues`・`createBranch`、ボード | ボードの「issue を読む」で開いた issue を新しい順に 50 件（GitHub はマージリクエストを除く）読み、「始める」を押すと、統合先を読み直して Python に識別子と始められない理由（統合先の `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版が違う）を聞き、無ければ service worker が統合先の今の先頭からブランチを作る（GitHub は `POST /git/refs`、GitLab は `POST repository/branches`）。service worker も、ボードからだけ・登録したリポジトリだけ・issue から決める形の名前（プロジェクトなら `<名前>-i<番号>`）だけ・保護された名前と統合先の名前は作らない・渡された sha が統合先の今の先頭・既に無い、を自分で確かめる。マージリクエストは作らない |

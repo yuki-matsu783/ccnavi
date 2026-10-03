@@ -81,7 +81,7 @@ keywords: [フェーズ, グラフ, DAG, requires, overlap, 置き場所, id]
 読ませると `localResourceRoots` を空にしておけない）なので、この増分はそのまま 1 枚の HTML に入る。
 フェーズ管理は対象ごとに 1 枚ずつ開けるので、3 枚開けば 3 倍持つ。
 
-**テストの仕組みに 2 つ手を入れた。**
+**テストの仕組みに 3 つ手を入れた。**
 
 - `test/shared/style.test.ts` の `importsOf` に node_modules の解決を教えた。
   教えないと CB-T166 は落ちるのではなく `readFileSync` の ENOENT で**例外を投げて止まる**（`@import` の綴りを

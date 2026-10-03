@@ -104,7 +104,7 @@ ADR-0067 のあとは、その hook の command から動かす手段も閉じ�
   閉じたので、残るのはシンボリックリンクだけ）
 - 配布済みの `settings.json` に `CCNAVI_RULES` を書いて既定の外を指していた利用者が
   居た場合、更新後は何も知らせずに `.ccnavi/common/rules.yml` を読む。値が無視されたことは
-  どこにも出ない。`--lint` に「効かない env が書かれている」と言わせるかは決めていない
+  どこにも出ない。効かなくなった env が `settings.json` に残っていることを `--lint` で知らせるかは決めていない
 - `tests/sh/test_setup.py` の `REQUIRED_ENV` が 1 本減り、配る `settings.json` に
   その行が在ることの検査が無くなる
 
