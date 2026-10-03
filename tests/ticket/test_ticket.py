@@ -13,7 +13,7 @@
 5. 変更要求のレビューは人の端末からも通せないこと
 6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
 7. 置き場を動かすだけで承認になること、承認のときにしか当たらなかった構造の検査が
-   判定の側でも当たること（ADR-0058）
+   判定の側でも当たること（承認の権威は置き場）
 """
 
 from __future__ import annotations
@@ -127,7 +127,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
@@ -487,7 +487,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
 
-    # ---- 2b. 置き場を動かすだけの承認（ADR-0058）
+    # ---- 2b. 置き場を動かすだけの承認（承認の権威は置き場で、記録の欄は必須にしない）
 
     def hand_move(self, name, text=""):
         """人が GitHub の画面でやることと同じ。提案を承認済みの置き場へ動かすだけ。
@@ -543,7 +543,8 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("DENY_TICKET_SCOPE", reason)
 
     def test_a_moved_ticket_whose_project_does_not_match_its_place_cannot_write(self):
-        # `project:` は宣言ではなく照合（ADR-0038）。承認が突き合わせていた食い違いを、
+        # `project:` は宣言ではなく照合で、プロジェクトは置き場が決める。
+        # 承認が突き合わせていた食い違いを、
         # 置き場を動かすだけの運びでは判定が突き合わせる。
         self.propose("i0001", allow=("src/*",))
         source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
@@ -593,7 +594,7 @@ class TicketTest(unittest.TestCase):
         判定が `parent` を引く索引は作業中のものだけ。親を閉じると引けなくなり、
         `scope_verdict` は子の宣言だけで範囲を決める。印を付ける側だけが閉じた親も
         引ける池を使っていたので、印は付かず範囲も切り詰められない、という抜けが
-        あった。親を引けない子は止める側を採る（ADR-0058）。
+        あった。親を引けない子は止める側を採る。
         """
         # 子は親（src/*）に無い範囲を宣言する。承認は警告で通す。
         self.propose("i0001", allow=("src/*",))
@@ -754,7 +755,7 @@ class TicketTest(unittest.TestCase):
         """レビュー要の子を閉じると、承認済みチケットは doing/ から wip/proposals/review/ へ動く。
 
         動かすのはエージェント（承認は要らない）。範囲が消える向きなので危険は増えない。
-        レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる（ADR-0055）。
+        レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる。
         """
         self.family()
         result = self.ccnavi("ticket", "finish", "i0001-01")
@@ -833,7 +834,7 @@ class TicketTest(unittest.TestCase):
         self.family_without_starting()
         closed = os.path.join(self.approved, "done")
         os.makedirs(closed, exist_ok=True)
-        # 人が手で閉じた形（置き場を動かすのは人。ADR-0055）。
+        # 人が手で閉じた形（.ccnavi/approved/ の中で置き場を動かすのは人）。
         os.replace(
             os.path.join(self.approved, "doing", "i0001.md"), os.path.join(closed, "i0001.md")
         )
@@ -844,7 +845,8 @@ class TicketTest(unittest.TestCase):
     def test_a_parent_that_is_still_a_proposal_asks_for_approval_first(self):
         """親が承認前なら、案内は承認から始めること。
 
-        人が子だけ置き場を動かすと起きる（ADR-0058 の運び。承認画面なら落ちる）。`start` は
+        人が子だけ置き場を動かすと起きる（置き場を動かすだけで承認になる運び。承認画面なら
+        落ちる）。`start` は
         `doing/` の承認済みチケットにしか通らないので、`todo/` の親にそのまま `start` を
         勧めると、案内のとおりに打っても通らない。
         """
@@ -885,7 +887,7 @@ class TicketTest(unittest.TestCase):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("フェーズ 1 が終わりました", self.reason(said))
         self.assertIn("request", self.reason(said))
-        # ELI5 の置き場を名指しする（ADR-0095）
+        # ELI5 の置き場を名指しする
         self.assertIn("--eli5 wip/eli5/phase-1.html", self.reason(said))
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
@@ -1238,7 +1240,7 @@ class TicketTest(unittest.TestCase):
     def test_review_moves_the_children_to_done_and_accept_can_raise_a_followup(self):
         """レビューが済むと review/ の子は done/ へ動く。指摘が残れば人が続きの子を起こせる。
 
-        ADR-0055。続きの子は .ccnavi/approved/doing/ に直に置かれ、承認は人が選んだことで済む。
+        続きの子は .ccnavi/approved/doing/ に直に置かれ、承認は人が選んだことで済む。
         """
         self.family()
         self.close_phase()
@@ -1342,7 +1344,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
 
     def test_a_crit_push_thread_on_the_eli5_blocks_and_leaves_with_wip(self):
-        """ELI5 の HTML を wip/ にコミットし、人が crit push で行に指摘を送った形（ADR-0095）。
+        """ELI5 の HTML を wip/ にコミットし、人が crit push で行に指摘を送った形。
 
         crit push はマージリクエストの行のスレッド（GitHub はレビューのコメント、GitLab は差分の
         discussion）を立てる。目印で始まらない人の投稿なので、confirm は未解決として数えて止め、
@@ -1397,7 +1399,7 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(git(self.parent_tree, "ls-files", "--", "wip").strip(), "")
 
     def test_an_eli5_only_commit_does_not_move_the_request(self):
-        """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない（ADR-0096）。
+        """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない。
 
         confirm は止まらず、request の打ち直しも要らない（依頼済みと答える）。ただし push は求める
         （差分に無い ELI5 には crit push が届かない）。ELI5 とほかのファイルを一緒に変えたコミットは
@@ -1453,7 +1455,7 @@ class TicketTest(unittest.TestCase):
         """ready の前提は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も止める。
 
         大文字小文字を区別しない FS では範囲の除外が `WIP/eli5/` を通しうるので、ready の側で
-        区別せずに拾う（ADR-0097）。
+        区別せずに拾う。
         """
         self.family()
         self.close_phase()
@@ -1537,7 +1539,7 @@ class TicketTest(unittest.TestCase):
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
         self.assertFalse(os.path.exists(stale))
-        # レビュー済みのフェーズに confirm を重ねない（ADR-0093 の 11.8.1 の決定 B）
+        # レビュー済みのフェーズに confirm を重ねない。重ねるとマーカーと跡が書き直される
         again = self.confirm(fixture)
         self.assertEqual(again.returncode, 1)
         self.assertIn("フェーズ 1 はレビュー済み", again.stderr)
@@ -1636,7 +1638,7 @@ class TicketTest(unittest.TestCase):
 
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("複数の場所にある", done.stderr)
-        # 権威が元ツリーなので、置き場の移動も元ツリーに書かれる（ADR-0073 の代償）。
+        # 権威が元ツリーなので、置き場の移動も元ツリーに書かれる。
         moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-02.md")
         self.assertTrue(os.path.exists(moved), moved)
         lint = self.ccnavi("--lint", "--mode", "enable")
@@ -1895,7 +1897,7 @@ class TicketTest(unittest.TestCase):
         for cwd in (self.root, self.worktree("research-abc", "main")):
             result = self.hook("SubagentStart", "", cwd, agent_id="sub-r")
             self.assertEqual(result.returncode, 0, result.stderr)
-            # 子の一覧は渡らない。どの起動にも付く「スキル候補」の 1 行（ADR-0090）だけ。
+            # 子の一覧は渡らない。どの起動にも付く「スキル候補」の 1 行だけ。
             self.assertEqual(self.reason(result), CANDIDATE_NOTE, cwd)
         # 子のワークツリーからは、その子だけ。
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
@@ -2657,7 +2659,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
         # 受け入れでレビュー済みになった。印を外して確かめ直しても、受け入れた分は数えない
-        # （レビュー済みのフェーズには confirm を重ねない。ADR-0093 の 11.8.1 の決定 B）
+        # （レビュー済みのフェーズには confirm を重ねない）
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
 
@@ -2690,7 +2692,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("u1", read_json(kept)["threads"])
 
         # check が通るとマーカーは書き換わるが、控えは残る（レビュー済みには重ねないので、印を外して
-        # から確かめる。ADR-0093 の 11.8.1 の決定 B）。
+        # から確かめる）。
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
         self.assertIn("u1", read_json(kept)["threads"])

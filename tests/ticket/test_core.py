@@ -1,9 +1,12 @@
-"""判定のコアと差し口（ADR-0093 の 6 章、段階 2a）の受入テスト。
+"""判定のコアと差し口の受入テスト。
+
+判定のコアは入出力を持たない関数にし、ファイルシステム・git・API は差し口に分ける。
+Chrome（Pyodide）と手元が同じコアで判定するため。
 
 見るのは 6 つ。
 
 1. 時計（Clock の差し口）: `fsio.clock` で固定した時刻を、承認の記録と跡が同じに書く
-2. D22: 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
+2. 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
    前の形（絶対パス・ツリーの名前）の写しも同じに読み、判定の答えは変わらない
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
    書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの運び・フィードバック計画）
@@ -11,7 +14,7 @@
    （新規・マーカーの消去・改版・フィードバック計画・多段の先行と落ちる提案・取り下げ・レビュー済み）。
    同じ要求と答えを拡張の試験の見本（`chrome-extension/ccnavi-approval/test/fixtures/core-scenarios.json`）
    に置き、拡張の試験が Pyodide でも同じ答えになることを見る
-5. 承認の取り下げ（8.8）の条件
+5. 承認の取り下げの条件
 6. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
 
 見本の形を変えたら `CCNAVI_CHROME_FIXTURE=1` を付けてこのテストを走らせ、見本を書き直す。
@@ -174,7 +177,7 @@ class CoreHarness(PhaseHarness):
             **extra,
         }
         if op != "confirm":
-            # レビュー済み（段階 4）は手元の CLI の confirm と比べる。控えがあると手元は C1 の
+            # レビュー済みは手元の CLI の confirm と比べる。控えがあると手元は C1 の
             # 対象の家族として sh を通さない書き込みを断るので、控えは Chrome の側だけに組む。
             self.mirror_records(chrome, request)
         return request
@@ -182,7 +185,7 @@ class CoreHarness(PhaseHarness):
     def mirror_records(self, chrome, request):
         """Chrome の入口が仮のツリーに組む取り込みの控え相当を、手元の控えの置き場にも書く。
 
-        手元も同じ控えで判定する（取り込み済みの家族として読む。ADR-0093 の 3.3）ので、
+        手元も同じ控えで判定する（取り込み済みの家族として読む）ので、
         画面の本文と指紋（判定が読んだ中身。控えを含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
@@ -217,7 +220,7 @@ class ClockTest(unittest.TestCase):
 
 
 class SourcePathTest(CoreHarness):
-    """D22: 承認の記録の出所は、リポジトリからの相対パスとブランチ名。"""
+    """承認の記録の出所は、リポジトリからの相対パスとブランチ名。"""
 
     def test_the_copy_records_a_relative_path_and_the_branch(self):
         text = parent_text("i0001", ["research"])
@@ -260,7 +263,7 @@ class SourcePathTest(CoreHarness):
         a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
         for key in ("batch", "text", "rejected", "problems"):
             self.assertEqual(a[key], b[key], key)
-        # 指紋は判定が読んだ中身（read_set。ADR-0093 の段階 2c）で作るので、読んだ写しの
+        # 指紋は判定が読んだ中身（read_set）で作るので、読んだ写しの
         # バイト列が変われば変わる（見せたあとに写しが書き換わった承認を通さない）。
         self.assertNotEqual(a["digest"], b["digest"])
         self.assertEqual(verify_new.returncode, verify_old.returncode)
@@ -565,7 +568,7 @@ class WriterFailureTest(CoreHarness):
         return [e for e in events if e["kind"] == history.KIND_PHASE_REOPENED]
 
     def test_a_reviewed_mark_that_cannot_be_removed_stops(self):
-        """決定 A: reviewed を消せなければ止める。ほかの種類には手を付けない。"""
+        """reviewed を消せなければ止める。ほかの種類には手を付けない。"""
         marks = self.reopened()
         changes = self.planned()
         with self.failing("unlink", lambda path: path.endswith("1.reviewed")):
@@ -661,10 +664,10 @@ def _flat(lines):
 
 
 class CoreChromeTest(CoreHarness):
-    """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す（6.2 の同じ答え）。
+    """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す。
 
     比べるのは、Changes（経路の欄だけを落として）、見せる行、止まったか、問題点の文面、
-    画面の本文と指紋。取り下げは手元の CLI が無い（段階 3 の Chrome だけの操作）ので、
+    画面の本文と指紋。取り下げは手元の CLI が無い（Chrome だけの操作）ので、
     手元のコアを通して書いたものと比べる。
     """
 
@@ -683,7 +686,7 @@ class CoreChromeTest(CoreHarness):
         clock.__enter__()
         self.addCleanup(clock.__exit__, None, None, None)
         super().setUp()
-        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）。
+        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない）。
         write(
             os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
             f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
@@ -787,8 +790,8 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent("reviewed")
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
-        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む（控えの無い家族。
-        # D11）ので、残すと手元だけが子のツリーの古い写しを読み、判定が読んだ中身（read_set）
+        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む（控えの無い家族）
+        # ので、残すと手元だけが子のツリーの古い写しを読み、判定が読んだ中身（read_set）
         # で作る指紋が Chrome（統合先と P だけを読む）と食い違う。
         git(
             self.root,
@@ -945,7 +948,7 @@ class CoreChromeTest(CoreHarness):
         self.assertIn(("create", ".ccnavi/approved/done/i0001-01.md"), paths)
         self.assertIn(("delete", "wip/proposals/review/i0001-01.md"), paths)
         mark = next(r for r in answer["changes"]["i0001"] if r["path"].endswith("1.reviewed"))
-        # Chrome の印は経路（chrome）を持つ。アカウントは要求に無いので書かない（8.9）。
+        # Chrome の印は経路（chrome）を持つ。アカウントは要求に無いので書かない。
         self.assertEqual(
             json.loads(mark["content"]), {"mr": 7, "accepted": [], "via": "chrome", "at": STAMP}
         )
@@ -978,7 +981,7 @@ SCENARIO_NAMES = (
 
 
 class WithdrawTest(CoreHarness):
-    """取り下げの条件（8.8）。どれか 1 つでも当たれば何も並べない。"""
+    """取り下げの条件。どれか 1 つでも当たれば何も並べない。"""
 
     def approved_parent(self):
         text = parent_text("i0001", ["research"])

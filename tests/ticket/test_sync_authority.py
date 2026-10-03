@@ -1,8 +1,8 @@
-"""取り込み済みの家族の権威（ADR-0093 の 3.3〜3.6。段階 2c）。
+"""取り込み済みの家族の権威。
 
 家族の控え（`<控えの置き場>/sync/<リポジトリ>/families/<P>`）がある家族は、権威を親のブランチ
 （`.claude/worktrees/<P>` で HEAD が `<P>` を指すツリー）に固定し、決まらなければ承認も状態の操作も
-実行前チェックも止める。控えの無い家族は前と同じ答え（D11）。
+実行前チェックも止める。控えの無い家族は前と同じ答え。
 
 控えは sh（`ccnavi-sync.sh`）が書くものを、ここでは手で置く。判定は git もネットワークも使わない。
 """
@@ -189,7 +189,7 @@ class AuthorityHarness(PhaseHarness):
 
 
 class NoRecordTest(AuthorityHarness):
-    """控えの無い家族は前と同じ答え（D11）。`sync/` があっても、その家族の控えが無ければ同じ。"""
+    """控えの無い家族は前と同じ答え。`sync/` があっても、その家族の控えが無ければ同じ。"""
 
     def stable_board(self):
         # 生成の時刻は秒で変わるので外す（秒の境目で比べがぶれない）。
@@ -249,7 +249,8 @@ class PresentTest(AuthorityHarness):
         raise AssertionError(f"{ticket} が板に無い")
 
     def test_a_copy_only_outside_the_parent_tree_is_not_trusted(self):
-        # 元ツリー（ワークスペースルート）に未コミットで残った写し（ADR-0073 の形）。
+        # 元ツリー（ワークスペースルート）に未コミットで残った写し。
+        # 権威のツリーが無いときに元ツリーを採る形。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
         stray = os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001-02.md")
         with open(
@@ -281,7 +282,7 @@ class PresentTest(AuthorityHarness):
         lines = check.stdout.splitlines()
         self.assertEqual("check 1", lines[0])
         self.assertTrue(lines[1].startswith("error "), check.stdout)
-        # 人が運ぶ手順も言う（3.5）。
+        # 人が運ぶ手順も言う。
         self.assertIn("運んでコミットと push", check.stdout)
 
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
@@ -307,7 +308,7 @@ class PresentTest(AuthorityHarness):
         self.assertIn("切り直して", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
-        # 子の写しが親のワークツリーから消え、元ツリーにだけ残った形（ADR-0073 の形）。
+        # 子の写しが親のワークツリーから消え、元ツリーにだけ残った形。
         inside = os.path.join(self.approved, "doing", "i0001-01.md")
         with open(inside, encoding="utf-8") as f:
             text = f.read()
@@ -402,7 +403,7 @@ class UndecidedTest(AuthorityHarness):
 class TombstoneTest(AuthorityHarness):
     """家族の控えは墓標として残り、親のワークツリーを片付けても止めが外れない。
 
-    レビューの決定 A。
+    消すと、決まらないで止めていた親子のチケットが控えの無い扱いに戻り、止めが外れる。
     """
 
     def test_folding_the_parent_tree_does_not_lift_the_stop(self):
@@ -530,8 +531,6 @@ class MarkTest(AuthorityHarness):
     def test_a_same_named_tree_in_another_repository_is_not_guessed(self):
         """控えが 1 つでも、同じ名前の親のワークツリーが別のリポジトリにあれば決めない。
 
-        11.9.3 の 13。
-
         ワークスペースの人の付けた名前 `web-i0012` と、プロジェクト web の issue 12 の家族が並ぶ形。
         """
         from ccnavi import tree
@@ -584,8 +583,8 @@ class IntegrationDoneTest(AuthorityHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         self.assertIn("i0001-02", [b["ticket"] for b in self.preview()["batch"]])
-        # 家族の控えが無くても、取り込んだ跡のあるリポジトリなら統合先の done/ で確かめる
-        # （3.3 の 4）。
+        # 家族の控えが無くても、取り込んだ跡のあるリポジトリなら統合先の done/ で確かめる。
+        # 古い統合先から切ったブランチで、識別子の再利用を新規として通さないため。
         self.integration_done("i0001-02")
         preview = self.preview()
         self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
@@ -688,7 +687,7 @@ class ReadyTest(AuthorityHarness):
 
 
 class DigestTest(AuthorityHarness):
-    """承認の指紋は判定が読んだ中身（read_set）で作る（ADR-0093 の 6.2。段階 2c）。"""
+    """承認の指紋は判定が読んだ中身（read_set）で作る。"""
 
     def judged(self):
         conf = self.conf()

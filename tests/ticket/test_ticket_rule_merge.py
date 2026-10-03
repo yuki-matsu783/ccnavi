@@ -151,7 +151,7 @@ class Workspace(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "decisions.jsonl")
@@ -668,7 +668,7 @@ class ScratchPlace(Workspace):
 
 
 class Eli5Place(Workspace):
-    """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない（ADR-0096）。
+    """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない。
 
     `scratchpad/` と違って追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
     サブエージェント終了時チェックも外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
@@ -687,8 +687,8 @@ class Eli5Place(Workspace):
         ("docs/wip/eli5/a.html", False, "ルートの直下の wip/ だけ"),
         ("WIP/eli5/a.html", False, "綴りは区別する。依頼の検査と ready も区別する"),
     )
-    # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える
-    # （ADR-0097）
+    # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える。
+    # 置き場の判定は `\` を `/` に読み替えない
     BACKSLASHED = (
         "wip\\eli5\\evil.py",
         "wip/eli5\\evil.py",
