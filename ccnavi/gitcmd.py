@@ -17,6 +17,13 @@ from dataclasses import dataclass
 
 # 渡されなかったときの期限。
 TIMEOUT_SECONDS = 5.0
+# pathspec の読み方を変える環境変数。
+PATHSPEC_ENV = (
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+)
 
 
 def _env() -> dict[str, str]:
@@ -59,13 +66,20 @@ def run(
     timeout: float = TIMEOUT_SECONDS,
     raw_paths: bool = False,
     input: str | None = None,
+    plain_pathspecs: bool = False,
 ) -> Done:
     """git を起こす。
 
     raw_paths は `core.quotePath=false` を掛ける。既定の出力は非 ASCII を含む
     パスを引用して 8 進に逃がすので、パスをそのまま突き合わせる側はこれを立てる。
     input は標準入力に渡す文字列（`check-ignore --stdin` など）。無ければ何も渡さない。
+    plain_pathspecs は利用者の環境の pathspec の読み方（`GIT_LITERAL_PATHSPECS` など）を外し、
+    git の既定の読み方に戻す。`check-ignore` はそれらの magic を受けず 128 で止まる。
     """
+    env = _env()
+    if plain_pathspecs:
+        for name in PATHSPEC_ENV:
+            env.pop(name, None)
     command = ["git"]
     if raw_paths:
         command += ["-c", "core.quotePath=false"]
@@ -78,7 +92,7 @@ def run(
             text=True,
             encoding="utf-8",
             errors="replace",
-            env=_env(),
+            env=env,
             timeout=timeout,
             input=input,
         )

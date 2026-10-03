@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import errno
 import io
 import json
 import os
@@ -51,6 +52,11 @@ def write(path: str, text: str, mtime: float | None = None) -> str:
     if mtime is not None:
         os.utime(path, (mtime, mtime))
     return path
+
+
+def read(path: str) -> str:
+    with open(path, encoding="utf-8", newline="") as f:
+        return f.read()
 
 
 def doc(**front) -> str:
@@ -731,14 +737,14 @@ class RobustTest(Repo):
     def test_one_broken_directory_does_not_stop_the_others(self):
         self.put("bad/a.md", doc(type="guide"))
         self.put("good/b.md", doc(type="adr"))
-        real = docsearch._rows_of
+        real = docsearch._scan
 
-        def broken(base, directory, *args):
+        def broken(base, base_real, directory, *args):
             if directory == "bad":
                 raise RuntimeError("boom")
-            return real(base, directory, *args)
+            return real(base, base_real, directory, *args)
 
-        with mock.patch.object(docsearch, "_rows_of", broken):
+        with mock.patch.object(docsearch, "_scan", broken):
             built = docsearch.build(self.root)
         self.assertEqual([r["concept_id"] for r in built.rows], ["good/b"])
         self.assertIn("bad/ を読めない", built.problems[0])
@@ -750,38 +756,114 @@ class RobustTest(Repo):
             nested = [nested]
         row = {"concept_id": "a", "directory": ".", "frontmatter": {"n": nested}, "mtime": "x"}
         write(self.index_of(""), json.dumps(row) + "\n")
-        done = run_ccnavi(
-            ["--root", self.root, "--log", "", "--docs", "--no-refresh", "--text", "deep"],
-            env=clean_env(),
-        )
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertIn("a", done.stdout)
+        # 字下げの JSON に書けない深さの行は ccnavi の行とみなさない（foreign）。md は読み直す。
+        for fmt in ("table", "json"):
+            with self.subTest(fmt=fmt):
+                done = run_ccnavi(
+                    ["--root", self.root, "--log", "", "--docs", "--no-refresh", "--format", fmt],
+                    env=clean_env(),
+                )
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertIn("ccnavi の索引ではない", done.stderr)
+                self.assertIn('"a"' if fmt == "json" else "guide", done.stdout)
 
 
 class DeadlineTest(Repo):
-    """D: 期限は md 1 本ごとに見て、途中のディレクトリは書かない。"""
+    """D: 期限は md 1 本ごとに見る。打ち切ったディレクトリも読めた分は書き、回を重ねれば埋まる。"""
 
-    def test_rows_of_stops_between_files(self):
+    def test_parse_stops_between_files_and_keeps_the_rest_waiting(self):
         self.put("a.md", doc(type="guide"))
-        with self.assertRaises(docsearch._TimeUp):
-            docsearch._rows_of(
-                self.root, "", ["a.md"], {}, True, time.monotonic() - 1, docsearch.Built()
-            )
+        one = docsearch._Dir("", "index.jsonl", self.index_of(""), True, docsearch.ABSENT, {}, None)
+        one.order = ["a"]
+        one.pending = [("a.md", "a", "2026-01-01T00:00:00")]
+        built = docsearch.Built()
+        docsearch._parse_pending(self.root, [one], time.monotonic() - 1, built)
+        self.assertTrue(built.timed_out)
+        self.assertEqual(built.parsed, 0)
+        self.assertEqual(len(one.pending), 1)
 
-    def test_a_directory_cut_short_is_not_written(self):
+    def test_a_directory_cut_short_is_written_up_to_where_it_got(self):
+        """読めた md の新しい行と、読めなかった md の既存の行で書く。"""
         self.put("a.md", doc(type="guide"))
         self.put("b.md", doc(type="guide"))
-        ticks = iter([0.0, 0.0, 0.0, 0.0, 99.0, 99.0, 99.0, 99.0])
-        with mock.patch.object(docsearch.time, "monotonic", lambda: next(ticks, 99.0)):
-            built = docsearch.build(self.root, deadline=50.0)
-        self.assertTrue(built.timed_out)
-        self.assertFalse(os.path.exists(self.index_of("")))
+        old_b = {"concept_id": "b", "directory": ".", "frontmatter": None, "mtime": "x"}
+        write(self.index_of(""), json.dumps(old_b) + "\n")
+        real = docsearch._read_head
+        reads = []
 
-    def test_session_start_keeps_to_the_hook_deadline(self):
+        def once(path):
+            # 1 本読んだら期限が切れたことにする。
+            reads.append(path)
+            return real(path)
+
+        with (
+            mock.patch.object(docsearch, "_read_head", once),
+            mock.patch.object(docsearch, "_past", lambda deadline: bool(reads)),
+        ):
+            built = docsearch.build(self.root, deadline=time.monotonic() + 600)
+        self.assertTrue(built.timed_out)
+        self.assertEqual(built.written, ["index.jsonl"])
+        rows = {r["concept_id"]: r for r in map(json.loads, read(self.index_of("")).splitlines())}
+        self.assertEqual(rows["a"]["frontmatter"], {"type": "guide"})
+        self.assertEqual(rows["b"], old_b)
+
+        # 次の回に残りを読む。
+        built = docsearch.build(self.root)
+        self.assertFalse(built.timed_out)
+        rows = {r["concept_id"]: r for r in map(json.loads, read(self.index_of("")).splitlines())}
+        self.assertEqual(rows["b"]["frontmatter"], {"type": "guide"})
+
+    def test_a_big_directory_fills_up_over_runs_and_does_not_starve_the_rest(self):
+        """大きなディレクトリが毎回打ち切られても、回を重ねれば埋まり、後ろのディレクトリも読む。"""
+        for i in range(30):
+            self.put(f"docs/d{i:03}.md", doc(type="guide"))
+        self.put("zz/late.md", doc(type="adr"))
+        budget = {"left": 0}
+        real = docsearch._read_head
+
+        def counted(path):
+            budget["left"] -= 1
+            return real(path)
+
+        def past(deadline):
+            return deadline is not None and budget["left"] <= 0
+
+        seen = []
+        with (
+            mock.patch.object(docsearch, "_read_head", counted),
+            mock.patch.object(docsearch, "_past", past),
+        ):
+            for _ in range(3):
+                budget["left"] = 12  # 1 回に読めるのは 12 本まで
+                built = docsearch.build(self.root, deadline=time.monotonic() + 600)
+                seen.append(len(built.rows))
+                self.assertIn("zz/late", [r["concept_id"] for r in built.rows])
+        # 1 回目は zz/late と docs の 11 本、2 回目は docs の続き 12 本、3 回目で残りの 7 本。
+        self.assertEqual(seen, [12, 24, 31])
+        built = docsearch.build(self.root)
+        self.assertFalse(built.timed_out)
+        self.assertEqual(built.parsed, 0)
+
+    def test_session_start_without_time_does_not_refresh_but_still_guides(self):
+        """期限が切れていれば新しくしないが、既存の索引と md があれば案内は出す。"""
         self.put("a.md", doc(type="guide"))
         conf = settings.load(self.root)[0]
-        self.assertEqual(docsearch.at_start(conf, self.root, time.monotonic() - 1), "")
+        said = docsearch.at_start(conf, self.root, time.monotonic() - 1)
+        self.assertIn("--docs", said)
         self.assertFalse(os.path.exists(self.index_of("")))
+
+        docsearch.build(self.root)
+        before = read(self.index_of(""))
+        self.put("a.md", doc(type="adr"))
+        os.utime(self.root + "/a.md", (time.time() + 5, time.time() + 5))
+        said = docsearch.at_start(conf, self.root, time.monotonic() - 1)
+        self.assertIn("--docs", said)
+        self.assertEqual(read(self.index_of("")), before)
+
+    def test_session_start_without_time_and_without_md_says_nothing(self):
+        self.put("docs/x.txt", "x")
+        conf = settings.load(self.root)[0]
+        self.assertEqual(docsearch.at_start(conf, self.root, time.monotonic() - 1), "")
 
     def test_read_head_stops_early_without_front_matter(self):
         path = self.put("big.md", "x" * 20000)
@@ -899,6 +981,165 @@ class DedupeAndProjectsTest(Repo):
         self.assertIn("プロジェクト plain は .git を持たないので引かない", done.stderr)
         conf = settings.load(self.root)[0]
         self.assertNotIn("plain", docsearch.at_start(conf, self.root))
+
+
+# --- 敵対的レビューの指摘 -------------------------------------------------------------------
+
+
+class LineSeparatorTest(Repo):
+    """自分の index.jsonl を、値の中の U+2028・U+2029・U+0085 で割って foreign にしない。"""
+
+    def test_a_line_separator_in_a_value_keeps_the_index_ours(self):
+        for escape, char in (("\\L", " "), ("\\P", " "), ("\\N", "\u0085")):
+            with self.subTest(char=hex(ord(char))):
+                self.put("a.md", f'---\ntype: guide\ntitle: "x{escape}y"\n---\n')
+                docsearch.build(self.root)
+                self.assertIn(char, read(self.index_of("")))
+                built = docsearch.build(self.root)
+                self.assertEqual(built.foreign, [])
+                self.assertEqual(built.reused, 1)
+                self.assertEqual(built.rows[0]["frontmatter"]["title"], f"x{char}y")
+                os.remove(self.index_of(""))
+
+    def test_crlf_lines_are_still_read(self):
+        self.put("a.md", doc(type="guide"))
+        docsearch.build(self.root)
+        text = read(self.index_of(""))
+        with open(self.index_of(""), "w", encoding="utf-8", newline="") as f:
+            f.write(text.replace("\n", "\r\n"))
+        built = docsearch.build(self.root)
+        self.assertEqual(built.foreign, [])
+        self.assertEqual(built.reused, 1)
+
+
+class CrossDeviceTest(Repo):
+    """`.git` が別のファイルシステムでも、作業ツリーの側の一時ファイルで書く。"""
+
+    def exdev(self):
+        real = os.replace
+        git_dir = os.path.join(self.root, ".git") + os.sep
+
+        def replace(src, dst):
+            if str(src).startswith(git_dir):
+                raise OSError(errno.EXDEV, "Invalid cross-device link")
+            return real(src, dst)
+
+        return mock.patch.object(docsearch.os, "replace", replace)
+
+    def leftovers(self, rel_dir: str) -> list[str]:
+        where = os.path.join(self.root, *[p for p in rel_dir.split("/") if p])
+        return [n for n in os.listdir(where) if n.startswith(docsearch.LOCAL_TMP_PREFIX)]
+
+    def test_writes_through_a_temporary_beside_the_index(self):
+        self.put("docs/a.md", doc(type="guide"))
+        self.put("b.md", doc(type="adr"))
+        with self.exdev():
+            built = docsearch.build(self.root)
+        self.assertEqual(built.problems, [])
+        self.assertEqual(sorted(built.written), ["docs/index.jsonl", "index.jsonl"])
+        self.assertEqual(self.rows_of("docs")[0]["frontmatter"], {"type": "guide"})
+        self.assertEqual(self.leftovers("docs"), [])
+        self.assertEqual(self.leftovers(""), [])
+        status = git(self.root, "status", "--porcelain", "--untracked-files=all")
+        self.assertNotIn("index.jsonl", status)
+        self.assertNotIn(docsearch.LOCAL_TMP_PREFIX, status)
+
+    def test_does_not_write_when_the_temporary_would_not_be_ignored(self):
+        write(os.path.join(self.root, ".gitignore"), "/docs/index.jsonl\n")
+        self.put("docs/a.md", doc(type="guide"))
+        with self.exdev():
+            built = docsearch.build(self.root)
+        self.assertEqual(built.written, [])
+        self.assertIn("git に無視されない", " ".join(built.problems))
+        self.assertFalse(os.path.exists(self.index_of("docs")))
+        self.assertEqual(self.leftovers("docs"), [])
+        self.assertEqual([r["concept_id"] for r in built.rows], ["docs/a"])
+
+    def test_sweeps_only_its_own_stale_leftovers(self):
+        self.put("docs/a.md", doc(type="guide"))
+        old = time.time() - docsearch.TMP_STALE_SECONDS - 60
+        mine = write(os.path.join(self.root, "docs", ".ccnavi-tmp-1-1", "index.jsonl"), "x")
+        theirs = write(os.path.join(self.root, "docs", ".ccnavi-tmp-2-2", "notes.txt"), "keep")
+        fresh = write(os.path.join(self.root, "docs", ".ccnavi-tmp-3-3", "index.jsonl"), "x")
+        for path in (mine, theirs):
+            os.utime(os.path.dirname(path), (old, old))
+        with self.exdev():
+            docsearch.build(self.root)
+        self.assertFalse(os.path.exists(os.path.dirname(mine)))
+        self.assertTrue(os.path.exists(theirs))
+        self.assertTrue(os.path.exists(fresh))
+
+    def test_a_different_device_goes_beside_from_the_start(self):
+        self.put("a.md", doc(type="guide"))
+        real = os.stat
+        git_dir = os.path.join(self.root, ".git")
+
+        class Other:
+            def __init__(self, info):
+                self.info = info
+
+            def __getattr__(self, name):
+                return self.info.st_dev + 1 if name == "st_dev" else getattr(self.info, name)
+
+        def stat(path, *args, **kwargs):
+            info = real(path, *args, **kwargs)
+            return Other(info) if os.fspath(path) == git_dir else info
+
+        writer = None
+        with mock.patch.object(docsearch.os, "stat", stat):
+            writer = docsearch._Writer(self.root, git_dir, None)
+        self.assertTrue(writer.beside)
+
+
+class PathspecMagicTest(Repo):
+    """パスや利用者の環境を pathspec の magic として読ませない。"""
+
+    def test_check_ignore_takes_a_path_that_looks_like_magic(self):
+        paths = [":(exclude)x/index.jsonl", ":!y/index.jsonl", "*/index.jsonl"]
+        self.assertEqual(docsearch._ignored(self.root, paths), set(paths))
+
+    @unittest.skipIf(os.name == "nt", "Windows では `:` を名前に使えない")
+    def test_a_directory_named_like_magic_is_indexed(self):
+        self.put(":(exclude)x/a.md", doc(type="guide"))
+        built = docsearch.build(self.root)
+        self.assertEqual(built.written, [":(exclude)x/index.jsonl"])
+
+    def test_pathspec_environment_of_the_user_does_not_break_the_index(self):
+        self.put("docs/a.md", doc(type="guide"))
+        for name in ("GIT_LITERAL_PATHSPECS", "GIT_ICASE_PATHSPECS", "GIT_GLOB_PATHSPECS"):
+            with self.subTest(name=name), mock.patch.dict(os.environ, {name: "1"}):
+                built = docsearch.build(self.root)
+                self.assertEqual([r["concept_id"] for r in built.rows], ["docs/a"])
+
+
+class JsonOutputTest(Repo):
+    """どの出力の形でも落ちず、正しい JSON を出す。"""
+
+    def test_deep_front_matter_is_null_and_json_output_works(self):
+        nested = "[" * 40 + "]" * 40
+        self.put("a.md", f"---\ntype: guide\nn: {nested}\n---\n")
+        done = run_ccnavi(
+            ["--root", self.root, "--log", "", "--docs", "--format", "json"], env=clean_env()
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIsNone(json.loads(done.stdout)[0]["frontmatter"])
+
+    def test_nan_and_infinity_rows_are_foreign(self):
+        self.put("a.md", doc(type="guide"))
+        for bad in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(bad=bad):
+                front = f'"frontmatter":{{"n":{bad}}}'
+                text = f'{{"concept_id":"a","directory":".",{front},"mtime":"x"}}\n'
+                write(self.index_of(""), text)
+                args = ["--root", self.root, "--log", "", "--docs", "--no-refresh"]
+                done = run_ccnavi([*args, "--format", "json"], env=clean_env())
+                self.assertEqual(done.returncode, 0, done.stderr)
+
+                def refuse(constant):
+                    raise ValueError(constant)
+
+                rows = json.loads(done.stdout, parse_constant=refuse)
+                self.assertEqual(rows[0]["frontmatter"], {"type": "guide"})
 
 
 if __name__ == "__main__":
