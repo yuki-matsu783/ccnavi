@@ -50,7 +50,7 @@ GitLab の印ファイル `seq`（8.4 の 2 段目）は持たない（段階 5b
 | `src/options/` | 設定画面。リポジトリ（統合先の名前・直近の日数・指定のブランチ）と PAT |
 | `src/worker/` | Pyodide を動かす Web Worker |
 | `src/core/` | 画面に依らない部品（通信先と manifest、GitHub の読み書き（`github.ts`）、GitLab の読み書き（`gitlab.ts`）、「始める」（`start.ts`）、画面と service worker の約束、読み取りの流れ、レビュー済みの材料の読み（`reviewed.ts`）、承認・取り下げ・レビュー済みの流れ（`write.ts`）、PAT の期限、Markdown の消毒、描画） |
-| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーと取り込みの控え相当を組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
+| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーと取り込みの控え相当を組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
 | `hosts.json` | 焼き込む通信先（D24）。組織ごとのビルドはこれを替える |
 
 ## 組み立て
