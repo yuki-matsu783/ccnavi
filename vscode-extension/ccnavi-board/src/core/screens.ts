@@ -30,7 +30,7 @@ export interface Screens {
   readonly phases: (target: PhasesTarget) => Promise<void>;
   readonly projects: () => Promise<void>;
   /**
-   * 子チケット 1 枚のフロー編集画面（ADR-0085）。ボードのカードの「フロー」からだけ開く。
+   * 子チケット 1 枚のフロー編集画面。ボードのカードの「フロー」からだけ開く。
    * タブは子ごとに 1 枚で、同じ子をもう 1 度開けば前面に出す
    */
   readonly flow: (ticket: string) => Promise<void>;

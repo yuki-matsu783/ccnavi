@@ -40,7 +40,7 @@ export function postAppearance(host: AppearanceSink): boolean {
  * 表に戻ったときの送り直しもここでは持たない。保持しない画面（ボード・プロジェクト管理）は
  * 表に戻ると入れ物から作り直され、`ready` で呼ぶ側が送り直す。保持する画面（ルール設定・
  * リスク管理・フェーズ管理）は、裏にいる間の `lock` と `changed` を送り直すのと同じところで
- * 一緒に送り直す（ADR-0062）。**送り直す場所は画面の種類ごとに 1 か所**で、ここが別に持つと
+ * 一緒に送り直す。**送り直す場所は画面の種類ごとに 1 か所**で、ここが別に持つと
  * 同じことを 2 か所でやることになる。
  */
 export function followAppearance(panel: vscode.WebviewPanel, host: AppearanceSink): void {

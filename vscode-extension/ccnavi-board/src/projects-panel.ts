@@ -567,7 +567,7 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
     fail(current, `${targetRel} は既にあるので、上書きしません`);
     return;
   }
-  // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かない（ADR-0052）。
+  // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_RULES` など）では動かせない。
   const sourceRel = DEFAULT_RULES;
   const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
   if (source === undefined) {

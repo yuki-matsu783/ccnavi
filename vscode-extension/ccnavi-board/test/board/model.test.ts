@@ -74,7 +74,7 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
       version: BOARD_VERSION,
       tickets: [
         { ticket: "x", copy: { status: "weird" }, proposal: { state: "nope" } },
-        // 旧の置き場の状態（doing / done / cancelled）は提案の状態としては読まない（ADR-0055）
+        // 提案の状態は todo / review だけ。旧の状態（doing / done / cancelled）は読まない
         { ticket: "y", copy: { status: "review" }, proposal: { state: "doing" } },
       ],
       parents: [{ ticket: "x", phases: [{ number: 1, marks: { requested: "not an object" } }] }],

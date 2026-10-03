@@ -1,6 +1,6 @@
 /**
  * フロー編集画面の入口。最初の中身は HTML に埋まっている（`<script type="application/json">`）。
- * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は入れ直されない（ADR-0062）。
+ * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は入れ直されない（入れ直すと打ちかけの編集が消える）。
  */
 import { createRoot } from "react-dom/client";
 

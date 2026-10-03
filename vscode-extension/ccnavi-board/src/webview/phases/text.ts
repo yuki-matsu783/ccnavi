@@ -1,7 +1,7 @@
 /**
  * フェーズ管理画面に出す言葉。要約に出す範囲の文、絞り込みが当てる文字列、id の重なりの文面。
  *
- * 種類の意味は判定しない（ADR-0035）。ここが作るのは並べて読めるようにした文だけ。
+ * 種類の意味は判定しない。ここが作るのは並べて読めるようにした文だけ。
  */
 import type { PhasesGraph } from "../../core/phases-graph.js";
 import type { PhaseForm, PhasesForm } from "../../core/phases-view.js";
@@ -64,7 +64,7 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
  * **線が落ちた理由は言わない。** 綴り違いかもしれないし、ほかの設定の種類かもしれない。
  * 決めるのは実行ファイルで、`phasetypes.py` の `reference_problems` が合成した集合で
  * 確かめ、無ければ error を出す。画面がその手前で「ほかの設定の種類だ」と言うと、保存したときに
- * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にしていない」までしか言わない。
+ * 実行ファイルが逆のことを言う。ここは「線にしていない」までしか言わない。
  */
 export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolean): readonly string[] {
   const out: string[] = [];
