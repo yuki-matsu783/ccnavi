@@ -190,7 +190,8 @@ sh .ccnavi/scripts/ccnavi-push-approved.sh   # 承認済みの領域（flows/ �
 | clone を止める条件 | URL が https / ssh / `git@host:path` のどの形でもない、資格情報（`user:token@`）が入っている、名前が英数字と `. _ -` 以外を含む（先頭は英数字）、既存のツリー名と衝突する（大文字小文字だけ違う名前も）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` を落とした `host/path` で比べる）、clone 先が既にあって空でない |
 | プロジェクトのフォルダが無い | 画面は帯を出さない。一覧が 0 件になり「プロジェクトがありません。…」が出るだけ。`git clone` が親のディレクトリを作るので、フォルダが無いままでも clone はできる。手で作る手段は画面に持たない |
 | `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットは人が行う |
-| ルールの保存先 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（実行ファイルが `CCNAVI_PROJECT_HOME` を読んで解く。既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは設定の対象にならないので、保存先もボタンも出ない |
+| `projects/` がワークスペースの git に載っている | ワークスペース自身のソースに `projects/` がある（ぶつかり）か、`.gitignore` に入れる前に `git add` して入れ子のリポジトリが索引に載った（載せ忘れ）とき、`--lint` の苦情を上部にバナーで出す。直し方（ぶつかりなら `projects/` を別の名前に移す、載せ忘れなら索引から外して `.gitignore` に足す）はバナーの文が言い、端末で人が打つ。このときは「.gitignore に追加」のボタンと「無視されていない」の警告を出さない（`.gitignore` に足すだけでは直らない） |
+| ルールの保存先 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。組み方を実行ファイルとずらさないため。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは設定の対象にならないので、保存先もボタンも出ない |
 | ルールが無い | 行に「共通の設定からコピー」のボタンが出る。`.ccnavi/common/rules.yml` をプロジェクトの設定のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` は `sh {root}/.ccnavi/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通の設定に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |
 | ワークスペースの設定 | 「ワークスペース（プロジェクト外）」の枠に、ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）の有無と「ルール設定」「共通の設定からコピー」が出る。無いのは正常なので warn の色にしない。「ワークスペースの設定のフェーズの種類」の行はチケット制御が disable なら出ない |
 | `.claude/` を持つ | 行に warn として出す。拡張は消さない |
@@ -357,8 +358,8 @@ YAML として読めないファイルは画面から直せない（エディタ
   ワークツリーの登録（`.git/worktrees/`、`projects/*/.git/worktrees/`）を監視し、変化から 120 ミリ秒
   静まったら自動で読み直す。オーバーレイの状態は拡張側が持つので、読み直しで HTML が作り直されても消えない
 - 承認の後も、承認済みチケットが `.ccnavi/approved/doing/` に置かれたことで読み直す
-- それとは別に、承認の側からも読み直す（`approval-machine.ts` の `refresh`）。監視は `CCNAVI_TICKETS_APPROVED` を
-  読まない（`core/watch.ts` の監視するパスは固定）ので、承認済みチケットのフォルダを変えたときや `files.watcherExclude` で外したときも動く。
+- それとは別に、承認の側からも読み直す（`approval-machine.ts` の `refresh`）。承認済みチケットの置き場は
+  固定で、`core/watch.ts` の監視するパスとずれない。この読み直しは `files.watcherExclude` で置き場を外したときも動く。
   重なった読み直しは 1 回に畳まれる（`board-panel.ts` の `again`）
 - 対象はワークスペースの最初のフォルダだけ。`projects/` 配下のプロジェクト向けチケットも
   同じボードに出る（`project` バッジ）
@@ -387,9 +388,9 @@ YAML として読めないファイルは画面から直せない（エディタ
 | `ccnaviBoard.flowSaveReview` | フロー編集画面で保存の前に変更の一覧を出すか。既定は出す |
 
 ルールファイルの場所は `.ccnavi/common/rules.yml` 固定。
-プロジェクトのフォルダは `env.CCNAVI_PROJECTS`、無ければ `projects`。ワークスペースの設定とプロジェクトの設定のルールファイルは
-拡張が組まず、`--explain --json` の `layers[]` のパスを使う（実行ファイルが `env.CCNAVI_PROJECT_HOME` を読んで解く。
-既定は git プロジェクトルートからの `.ccnavi/config/rules.yml`）。
+プロジェクトのフォルダは `projects/` 固定。ワークスペースの設定とプロジェクトの設定のルールファイルは
+拡張が組まず、`--explain --json` の `layers[]` のパスを使う（組み方を実行ファイルとずらさないため。
+場所は git プロジェクトルートからの `.ccnavi/config/rules.yml`）。
 
 ## 組み立てと導入
 

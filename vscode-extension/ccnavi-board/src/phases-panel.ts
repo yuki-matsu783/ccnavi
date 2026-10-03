@@ -264,7 +264,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
-    // 設定ファイルの場所は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
+    // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方がずれたときに
     // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
