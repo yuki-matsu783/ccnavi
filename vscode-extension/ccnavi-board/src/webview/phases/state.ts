@@ -42,14 +42,14 @@ export function formOf(draft: Draft): PhasesForm {
 
 /**
  * 新しい種類。既定の範囲は inherit（`scope: []` の種類を、glob を埋め忘れただけで作らないため）。
- * レビューは mr（足した種類が黙ってレビュー無しにならないように）。
+ * レビューは mr（足した種類が気づかないうちにレビュー無しにならないように）。
  */
 export function emptyPhase(): PhaseForm {
   return { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "" };
 }
 
 /**
- * 同じ id の種類。実行ファイルは後ろで黙って上書きするので、画面で止める。
+ * 同じ id の種類。実行ファイルは後ろで何も出さずに上書きするので、画面で止める。
  * 前後の空白は落として見る（`--lint` が見るのと同じ形）。
  */
 export function duplicates(draft: Draft): ReadonlySet<string> {

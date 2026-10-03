@@ -98,9 +98,9 @@ export function phaseStatusBriefItems(p: PhaseChip): string[] {
   return notes;
 }
 
-/** マージリクエストのバッジの文字。番号が読めなければ「MR」だけ */
+/** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
 export function mrText(number: number | null): string {
-  return number === null ? "MR" : `MR #${number}`;
+  return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
 }
 
 /** 依頼のマーカーが持つ URL は中身を確かめずに写してあるので、http(s) のときだけリンクにする */
@@ -112,8 +112,8 @@ export function isHttpUrl(url: string): boolean {
  * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ綴り
  * （`ccnavi/approval.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
- * **畳むのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
- * 向こうの文面が変わったときに、本文の中身が黙って隠れるより、畳まれないほうが軽いため
+ * **まとめるのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
+ * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
  * （「エージェントが書いた理由」の本文を隠してはいけない）。
  */
 const EXPLAINED_HEADS = new Set([
@@ -124,18 +124,18 @@ const EXPLAINED_HEADS = new Set([
   "■ 判定に効かない記述",
 ]);
 
-const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 依存している他チケット: "];
+const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 先行: "];
 
-/** 承認画面の本文の 1 行と、その行に畳んだ説明 */
+/** 承認画面の本文の 1 行と、その行にまとめた説明 */
 export interface BodyLine {
   readonly line: string;
-  /** 見出しに畳んだ説明。畳んでいなければ空 */
+  /** 見出しにまとめた説明。まとめていなければ空 */
   readonly note: string;
 }
 
 /**
- * 本文を行に切り、説明の付く見出しには次の行を畳んで返す。端末には両方の行がそのまま出るが、
- * 画面では説明を見出しのツールチップに寄せて、本文を短く保つ。
+ * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。端末には両方の行がそのまま出るが、
+ * 画面では説明を見出しのツールチップにまとめて、本文を短く保つ。
  */
 export function approvalBody(text: string): BodyLine[] {
   const lines = text.split("\n");
@@ -238,7 +238,7 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       text: `先行が未完了（${ids}）`,
       lead: "先行が未完了",
       ids: list,
-      title: `着手済みです。先行が done/ に無いか取り消し済みで、満たしていません（作業と finish は止まりません）\n${detail}`,
+      title: `着手済みです。先行が done/ に無いか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";
@@ -246,6 +246,6 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
     text: `先行待ち（${ids}）`,
     lead: "先行待ち",
     ids: list,
-    title: `先行が done/ に入る（取り消しでない）まで、${what}止まります\n${detail}`,
+    title: `先行が取り消されずに done/ に入るまで、${what}止まります\n${detail}`,
   };
 }

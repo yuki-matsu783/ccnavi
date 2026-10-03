@@ -78,8 +78,8 @@ export function parseVersionJson(text: string): ParsedVersion {
  */
 export function rebuildHint(fromSource: boolean): string {
   return fromSource
-    ? "build.py を回して組み立て直してください（uv run --with pyinstaller python build.py）"
-    : "ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> --force で配り直してください";
+    ? "build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
+    : "ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で配り直してください";
 }
 
 /** 拡張を新しくする直し方 */
@@ -98,7 +98,7 @@ function named(info: VersionInfo): string {
  */
 export function skewMessage(probe: VersionProbe, fromSource: boolean): string | undefined {
   if (probe.kind === "old") {
-    return `ccnavi の実行ファイルが古い版です（--version を知りません）。${rebuildHint(fromSource)}`;
+    return `ccnavi の実行ファイルが古い版です（--version に対応していません）。${rebuildHint(fromSource)}`;
   }
   if (probe.kind === "failed") {
     return undefined;
@@ -115,18 +115,18 @@ export function skewMessage(probe: VersionProbe, fromSource: boolean): string | 
 
 /**
  * フラグを使う前に、実行ファイルが知っているかを見る。知っていれば undefined、知らなければ理由。
- * `what` は使おうとしたもの（`ccnavi --lint --json --flow`）。確かめられないものは進めない側に倒す
+ * `what` は使おうとしたもの（`ccnavi --lint --json --flow`）。確かめられないものは進めない扱いにする
  */
 export function missingFlags(probe: VersionProbe, flags: readonly string[], what: string, fromSource: boolean): string | undefined {
   if (probe.kind === "failed") {
     return `実行ファイルの版を確かめられないので ${what} を使いません: ${probe.error}`;
   }
   if (probe.kind === "old") {
-    return `実行ファイルが古い版です（--version を知りません）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+    return `実行ファイルが古い版です（--version に対応していません）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
   }
   const missing = flags.filter((flag) => !probe.info.flags.includes(flag));
   if (missing.length === 0) {
     return undefined;
   }
-  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} を知りません（古い版です）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} に対応していません（古い版です）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
 }

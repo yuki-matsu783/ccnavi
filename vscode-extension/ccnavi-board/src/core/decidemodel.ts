@@ -137,7 +137,7 @@ export function choicesProblem(
   for (const key of keys) {
     const choice = choices[key];
     if (!DECIDE_CHOICES.includes(choice as DecideChoice)) {
-      return `知らない対応方針です: ${String(choice)}`;
+      return `不明な対応方針です: ${String(choice)}`;
     }
     if (choice === "issue" && !preview.can_issue) {
       return "issue に回せるのは、フィードバック計画が承認されたあとです";

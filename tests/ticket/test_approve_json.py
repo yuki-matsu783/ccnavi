@@ -168,16 +168,16 @@ class ApproveJsonTest(PhaseHarness):
         # 親だけに絞って見せる。
         body = self.preview("i0001")
         self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001"])
-        # 同じ絞りを添えて承認する。子は承認されない。
+        # 同じ絞りをつけて承認する。子は承認されない。
         result = self.yes(["i0001"], "i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.copy_exists("i0001"))
         self.assertFalse(self.copy_exists("i0001-01"))
-        # 絞りを添えずに同じことを頼めば、絞らない一覧と比べて食い違いになる。
+        # 絞りをつけずに同じことを頼めば、絞らない一覧と比べて食い違いになる。
         self.assertEqual(self.preview()["batch"][0]["ticket"], "i0001-01")
 
     def test_yes_without_the_filter_compares_against_the_whole_batch(self):
-        """絞りを添えない `--yes` は、絞らない一覧と比べる。部分だけを黙って通さない。"""
+        """絞りをつけない `--yes` は、絞らない一覧と比べる。部分だけを何も言わずに通さない。"""
         self.pending_parent_and_child()
         result = self.yes(["i0001"])
         self.assertEqual(result.returncode, 1)
@@ -500,7 +500,8 @@ class ApproveJsonTest(PhaseHarness):
         self._check_fixture("approve-mismatch.json", json.loads(result.stdout))
 
     def test_yes_that_stops_partway_says_what_it_placed(self):
-        """途中で書けなくなっても、置いたぶんを黙って捨てない（README「承認の JSON」の partial）。
+        """途中で書けなくなっても、置いたぶんを何も言わずに捨てない
+        （README「承認の JSON」の partial）。
 
         置き場に同じ名前のディレクトリを作って、子の承認済みチケットだけ書けなくする。
         束は親 → 子の順なので、親は置かれたあとに止まる。

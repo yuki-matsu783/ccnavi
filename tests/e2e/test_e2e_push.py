@@ -2,7 +2,7 @@
 
 本物の sh（`.ccnavi/scripts/`）と組み立て済みの実行ファイル（`dist/ccnavi`）を、使い捨ての
 ワークスペースと bare のリモートの上で順に呼ぶ。筋書きは次のとおりで、段ごとに前の段の
-結果に乗る。
+結果を前提にする。
 
 1. ワークツリーを `ccnavi-git.sh worktree add` で切り、提案（`wip/proposals/todo/`）を書いて
    `ccnavi-git.sh` でコミットする。実行ファイルの `--approve --preview --json` が承認待ちに数える
@@ -85,7 +85,7 @@ def out(cwd, *args):
 
 @unittest.skipIf(SKIP, SKIP)
 class ApproveAndPushTest(unittest.TestCase):
-    """段は 1 本のテストの中で順に踏む。前の段が残したものを次の段が使うので、分けない。"""
+    """段は 1 本のテストの中で順に進める。前の段が残したものを次の段が使うので、分けない。"""
 
     def setUp(self):
         print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)

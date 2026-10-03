@@ -1,6 +1,6 @@
 /**
  * 「hook」のタブ。`.claude/settings.json`（と `settings.local.json`）に登録された hook を並べる。
- * **** 利用者ごとの設定（`~/.claude/settings.json`）は拡張ホストが読まない。
+ * 利用者ごとの設定（`~/.claude/settings.json`）は拡張ホストが読まない。
  */
 import type { JSX } from "react";
 

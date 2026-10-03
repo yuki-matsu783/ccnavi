@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+from unittest import mock
 
 from ccnavi import configsync, ops, phase, risk, settings
 from tests.config.test_config_union import (
@@ -264,7 +265,7 @@ COUNT_SH = "printf '{\"points\": 1}'\n"
 
 
 class ConfigSyncBoundaryTest(ConfigSyncTest):
-    """レビューで見つかった穴を塞いだことを見る。"""
+    """レビューで見つかった穴を直したことを見る。"""
 
     def test_a_mark_of_another_project_does_not_exempt(self):
         """印はその親のもの。lib で写したあとでも、app のワークツリーの書き込みは外さない。"""
@@ -359,8 +360,31 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertEqual(read(config_of(tree, "rules")), before)
         self.assertIsNone(self.mark())
 
+    def test_a_common_file_that_vanishes_after_listing_stops_the_plan(self):
+        """一覧に載せたあとで消えた共通層は、空として写さずに止める。"""
+        conf = self.settings()
+        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree(self.lib, "i0001")
+        before = read(config_of(tree, "rules"))
+        real = configsync._read_strict
+
+        def vanished(path):
+            # isfile で見えたあとに消えた競合。_read_strict は「無い」を (None, "") で返す。
+            if path == conf.rules:
+                return None, ""
+            return real(path)
+
+        with mock.patch.object(configsync, "_read_strict", vanished):
+            copied, why = configsync.plan(conf, self.ws, tree)
+
+        self.assertEqual(copied, [])
+        self.assertIn("を読めない (無い)", why)
+        self.assertIn(os.path.basename(conf.rules), why)
+        self.assertEqual(read(config_of(tree, "rules")), before)
+
     def test_uncommitted_edits_stop_the_start(self):
-        """写す先に未コミットの変更があれば、人の書きかけを踏まないよう止める。"""
+        """写す先に未コミットの変更があれば、人の書きかけを上書きしないよう止める。"""
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
@@ -446,7 +470,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
 
 
 class ConfigSyncSecondReviewTest(ConfigSyncTest):
-    """2 回目の敵対的レビューで見つかった穴を塞いだことを見る。"""
+    """2 回目の敵対的レビューで見つかった穴を直したことを見る。"""
 
     def test_a_worktree_without_an_approved_parent_is_not_exempt(self):
         """承認済みの親チケットの無いワークツリーは、印を自作しても外さない。"""
@@ -480,7 +504,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         """リンクを張る。Windows で権限が無いなど、張れない環境ではテストを飛ばす。
 
         飛ばすのは権限が無いとき（Windows の 1314）と、未対応の環境だけ。ほかの失敗
-        （リンク先がすでに在るなど）は準備の崩れなので、飛ばさずに落とす。
+        （リンク先がすでに在るなど）は準備の失敗なので、飛ばさずに落とす。
         """
         try:
             os.symlink(source, link)

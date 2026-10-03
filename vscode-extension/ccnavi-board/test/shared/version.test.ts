@@ -49,11 +49,11 @@ test("CB-T269 起動のときの知らせ。揃っていれば言わず、古い
   assert.equal(skewMessage({ kind: "failed", error: "x" }, false), undefined);
 
   const old = skewMessage({ kind: "old" }, false) ?? "";
-  assert.match(old, /--version を知りません/);
+  assert.match(old, /--version に対応していません/);
   assert.match(old, /scripts\/ccnavi-setup\.sh/);
   // ccnavi のリポジトリ（build.py とソースがある）では組み立て直し
   const oldHere = skewMessage({ kind: "old" }, true) ?? "";
-  assert.match(oldHere, /build\.py を回して組み立て直して/);
+  assert.match(oldHere, /build\.py を実行して組み立て直して/);
   assert.doesNotMatch(oldHere, /ccnavi-setup/);
 
   const exeOld = skewMessage(ok({ compat: EXTENSION_COMPAT - 1 }), true) ?? "";
@@ -72,13 +72,13 @@ test("CB-T270 使うフラグを実行ファイルが知っているかを版の
   assert.equal(missingFlags(ok(), ["--flow"], what, false), undefined);
 
   const missing = missingFlags(ok({ flags: ["--lint", "--version"] }), ["--flow"], what, false) ?? "";
-  assert.match(missing, /--flow を知りません（古い版です）/);
+  assert.match(missing, /--flow に対応していません（古い版です）/);
   assert.match(missing, /ccnavi --lint --json --flow で確かめられない/);
   assert.match(missing, /ccnavi-setup\.sh/);
 
   // `--version` を知らない実行ファイルは、`--flow` を知っていても確かめられないとして止める
   const old = missingFlags({ kind: "old" }, ["--flow"], what, true) ?? "";
-  assert.match(old, /--version を知りません/);
+  assert.match(old, /--version に対応していません/);
   assert.match(old, /組み立て直して/);
 
   const failed = missingFlags({ kind: "failed", error: "打ち切った" }, ["--flow"], what, false) ?? "";

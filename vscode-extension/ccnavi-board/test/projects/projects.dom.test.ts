@@ -114,7 +114,7 @@ test("CB-D33 開いていたメニューは、その行が一覧から消えた�
   }
 
   // 名前は置き場のディレクトリ名そのままで、clone の欄が通す綴りとは限らない。
-  // `a` が `a:x` のメニューを自分のものだと言い出さないこと（前方一致だと言い出す）
+  // `a:x` のメニューが `a` のものと見なされないこと（前方一致だと見なされる）
   const colon = await openProjects([row({ name: "a", rel: "projects/a" }), row({ name: "a:x", rel: "projects/a:x" })]);
   try {
     colon.click(colon.one(`${cardSelector("a:x")} details.menu summary`));
@@ -192,7 +192,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
       row({
         hasClaudeDir: true,
         problems: [
-          problem("warn", ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに見える"),
+          problem("warn", ".claude/ を持つ。Claude Code がそこのスキルを読み込み、そこへ cd するだけで別のルートのように見える"),
           problem("warn", ".claude/settings.json を読めない: 壊れている"),
           problem("error", "文面が無い", "(projects/lib) x"),
         ],

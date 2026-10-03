@@ -60,7 +60,7 @@ class ReadTest(_Readable, unittest.TestCase):
                 self.assertNotIn("git push", self.readable(src))
 
     def test_リダイレクトは演算子として残る(self):
-        # 書き込み先を見るルールが立つ土台。空白の有無で形が変わらないこと。
+        # 書き込み先を見るルールの前提。空白の有無で形が変わらないこと。
         cases = {
             "echo x > f": "echo x > f",
             "echo x>f": "echo x > f",
@@ -73,7 +73,7 @@ class ReadTest(_Readable, unittest.TestCase):
 
     def test_語の中の演算子は演算子として読まれない(self):
         # ルールの regex を grep で引く作業が、いちばんリダイレクトの形に触れる。
-        # 引用の中の ">" は文字であって、書き込み先を連れてこない。
+        # 引用の中の ">" は文字であって、書き込み先にはならない。
         cases = [
             ("""grep -n "regex: '(>" rules.yml""", "> rules.yml"),
             ('grep -n "x>y" notes.md', "x>y"),
@@ -245,7 +245,7 @@ class UnwrappedTest(unittest.TestCase):
             "a+=1 rm x": ["rm x"],
             "a[1]=x rm x": ["rm x"],
             "a=1 b+=2 rm x": ["rm x"],
-            # 区切りの前の道筋や拡張子が付いた名前
+            # 区切りの前のディレクトリや拡張子が付いた名前
             "/usr/bin/git push": ["git push"],
             "git.exe status": ["git status"],
             # 実行役のコマンドと、飛ばすオプション・値・位置引数
@@ -322,7 +322,7 @@ class UnwrappedTest(unittest.TestCase):
             "/usr/bin/env rm x": ["env rm x", "rm x"],
             "nohup env rm x": ["env rm x", "rm x"],
             "sudo -u me sh -c 'rm x'": ["sh -c rm x", "rm x"],
-            # 前に置いたリダイレクトは外す。外さないと実行役のコマンドが先頭に立たない。
+            # 前に置いたリダイレクトは外す。外さないと実行役のコマンドが先頭に来ない。
             ">/dev/null env rm x": ["env rm x", "rm x"],
             "2>&1 env rm x": ["env rm x", "rm x"],
         }
@@ -383,7 +383,7 @@ class UnwrappedTest(unittest.TestCase):
                 self.assertEqual(self.layers(src), want)
 
     def test_閉じない引用とヒアドキュメントでは層を作らない(self):
-        # U3。トークンに割れないので、層も推測しない。
+        # U3。トークンに分けられないので、層も推測しない。
         for src in [
             "env rm 'x",
             "sh -c 'rm x",
@@ -397,7 +397,7 @@ class UnwrappedTest(unittest.TestCase):
                 self.assertEqual(getattr(result, "unwrapped", None), "")
 
 
-# 切り出した中身が、コマンドの先頭に立ったかどうか。
+# 切り出した中身が、コマンドの先頭に来たかどうか。
 SUBST_MARK = re.compile(r"(^|\x00)zzmark($|[ \x00])")
 
 # wip/design/shellread-subst.md 4.1。M を「呼ばれたら記録を残す関数」に置き換えて
@@ -405,7 +405,7 @@ SUBST_MARK = re.compile(r"(^|\x00)zzmark($|[ \x00])")
 #   中     shell が実行し、引用の中から切り出す（bare に残らない）
 #   外     shell が実行し、引用の外から切り出す（bare にも残る）
 #   -      shell が実行せず、切り出さない
-#   割れる  bash 3.2 と zsh で答えが割れる。縮退か切り出すか（どちらも厳しい側）
+#   割れる  bash 3.2 と zsh で答えが分かれる。縮退か切り出すか（どちらも厳しい側）
 #   それ以外は縮退の理由
 SHELL_CASES = [
     ("01", 'echo "$(M)"', "中"),
@@ -608,7 +608,7 @@ class MovedTest(unittest.TestCase):
                     "echo .claude/worktrees/w/x > .claude/scripts/ccnavi-git.sh"
                 ),
                 "cd a/b && rm ./x": "rm a/b/x",
-                # 起点より上に出る `..` は畳まずに残す。
+                # 起点より上に出る `..` は取り除かずに残す。
                 "cd a && rm ../../x": "rm ../x",
                 # 絶対パスはそのまま。そこから先の行き先になる。
                 "cd /tmp && rm x": "rm /tmp/x",
@@ -665,7 +665,7 @@ class MovedTest(unittest.TestCase):
         )
 
     def test_実行役のコマンドの中で実行されるコマンドにも継ぎ足す(self):
-        # 名前がどの語に立つかは `_peel` と同じ読み方で出す。名前には継ぎ足さない。
+        # 名前がどの語に来るかは `_peel` と同じ読み方で出す。名前には継ぎ足さない。
         self.assert_moved(
             {
                 "cd .claude && env rm settings.json": "env rm .claude/settings.json",
@@ -753,7 +753,7 @@ class MovedTest(unittest.TestCase):
         self.assertEqual(self.moved("cd - && cd /tmp && rm x"), ["rm /tmp/x"])
 
     def test_居場所の長さと語数には上限がある(self):
-        # `cd a` を並べると居場所の綴りが伸びる。畳み直す値段が長さに比例するので、
+        # `cd a` を並べると居場所の綴りが伸びる。綴りを整え直す手間が長さに比例するので、
         # 上限が無いと全体が二乗になり、判定の期限（judge の 3 秒）の外で時間を使える
         # （敵対的レビュー）。
         chain = "cd a " + "&& cd a " * 4000 + "&& rm x"
@@ -829,7 +829,7 @@ class SubstTest(unittest.TestCase):
                 self.assertEqual(result.reason, shellread.REASON_AMBIGUOUS_SUBST)
 
     def test_切り出さない綴りは文字のまま(self):
-        # 文字として書く道（単一引用、$'…'、\$(、\`、引用付き heredoc）を必ず残す。
+        # 文字として書く方法（単一引用、$'…'、\$(、\`、引用付き heredoc）を必ず残す。
         for src in [
             "grep -n '$(git push)' f",
             "echo $'$(git push)'",
@@ -861,7 +861,7 @@ class SubstTest(unittest.TestCase):
 class BraceTest(unittest.TestCase):
     """引用の外のブレース展開を並べる（ADR-0046）。展開はしない。
 
-    期待は bash 3.2 と zsh で実測した結果。どちらかのシェルが広げる形を並べる。
+    期待は bash 3.2 と zsh で実際に確かめた結果。どちらかのシェルが広げる形を並べる。
     """
 
     def test_どちらかのシェルが広げる形を並べる(self):
@@ -887,7 +887,7 @@ class BraceTest(unittest.TestCase):
             "echo {x{a,b}": ["{a,b}"],
             "echo a{b,c}d{e,f}": ["{b,c}", "{e,f}"],
             "echo {,}": ["{,}"],
-            # 生の CR は語を割らない。bash は広げて `git` に `<CR>push origin main` を渡す
+            # 生の CR は語を分けない。bash は広げて `git` に `<CR>push origin main` を渡す
             # （敵対的レビュー）。
             "{git,\rpush,origin,main}": ["{git,\rpush,origin,main}"],
             # シェルは代入の右辺、case のパターン、[[ ]] の中を広げないが、並べる

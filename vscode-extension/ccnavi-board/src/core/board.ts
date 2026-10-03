@@ -132,7 +132,7 @@ export interface Card {
   readonly flow: FlowJson | null;
   /**
    * 状態が動いた跡の新しい側（古い順。ADR-0086）。補助の記録で、列やバッジはここから組まない。
-   * カードの畳める「履歴」に並べるだけ
+   * カードの折りたためる「履歴」に並べるだけ
    */
   readonly history: readonly HistoryEntryJson[];
   /**
@@ -215,7 +215,7 @@ function toCard(
 ): Card {
   const issues: string[] = [];
   // 止まっていることは不備として挙げる。バッジは一目で分かる短い言葉しか出せないので、
-  // 理由の全文はここに置く（`attention` もこれで立つ）。
+  // 理由の全文はここに置く（`attention` もこれで真になる）。
   if (t.blocked !== "") {
     issues.push(`書き込みが止まっています: ${t.blocked}`);
   }

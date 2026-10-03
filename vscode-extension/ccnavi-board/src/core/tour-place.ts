@@ -18,7 +18,7 @@ const EDGE = 8;
 /**
  * 吹き出しの置き場所。**吹き出しの実寸で決め、画面の外には出さない。**
  * 指す先の下に収まれば下、上に収まれば上。どちらにも収まらなければ（指す先が画面より大きい）、
- * 画面の下端に寄せて指す先に重ねる。前は高さを決め打ちしていて、長い一覧を指すと吹き出しが
+ * 画面の下端にそろえて指す先に重ねる。前は高さを決め打ちしていて、長い一覧を指すと吹き出しが
  * 画面の外に出て「次へ」が押せなくなった。
  */
 export function placeBubble(spot: Rect, bubble: { readonly width: number; readonly height: number }, view: { readonly width: number; readonly height: number }): { top: number; left: number } {

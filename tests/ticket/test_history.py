@@ -153,7 +153,7 @@ class HistoryTest(TicketTest):
         self.assertEqual(reopened[0]["cleared"], ["skipped"])
 
     def test_a_failed_write_does_not_stop_the_move_and_warns(self):
-        """跡が書けなくても（置き場がファイルで塞がっている）、状態は動き、警告が出る。"""
+        """跡が書けなくても（置き場の位置にファイルがある）、状態は動き、警告が出る。"""
         self.family()
         events = os.path.join(self.approved, "events")
         for name in os.listdir(events):

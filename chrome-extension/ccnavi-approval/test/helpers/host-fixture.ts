@@ -60,7 +60,7 @@ export function missingFields(query: string, fields: readonly string[]): string[
   return fields.filter((f) => !new RegExp(`(?<![A-Za-z0-9_])${f}(?![A-Za-z0-9_])`).test(query));
 }
 
-/** 見本に当たる要求なら答え、当たらなければ null（呼び手のほかの道へ） */
+/** 見本に当たる要求なら答え、当たらなければ null（呼び手のほかの経路へ） */
 export function sceneAnswer(scene: Scene, method: string, u: URL, body: string): { status: number; json: unknown } | null {
   const base = `/repos/${scene.owner}/${scene.repo}`;
   const p = u.pathname.replace(/^\/api\/v3/, "");

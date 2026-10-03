@@ -2,11 +2,11 @@
  * ルール設定画面に出す言葉。行の要約、絞り込みが当てる文字列、件数の出し方。
  *
  * 判定はしない（当たる・当たらないは実行ファイルの `--test` が言う）。ここが作るのは
- * 「このルールは何を止めるか」を畳んだままでも読める形に縮めた文だけ。
+ * 「このルールは何を止めるか」を折りたたんだままでも読める形に縮めた文だけ。
  */
 import type { RuleForm, Section } from "../../core/rules-view.js";
 
-/** 1 行に縮める。空白を畳んで、長ければ後ろを落とす */
+/** 1 行に縮める。空白をまとめて、長ければ後ろを落とす */
 function excerpt(text: string, max: number): string {
   const one = text.replace(/\s+/g, " ").trim();
   return one.length > max ? `${one.slice(0, max)}…` : one;
@@ -23,7 +23,7 @@ export function summaryMatch(rule: RuleForm): string {
 }
 
 /**
- * 要約に添える文。deny は拒否の文面、ask と allow は渡す文（message はどこにも届かないため）。
+ * 要約につける文。deny は拒否の文面、ask と allow は渡す文（message はどこにも届かないため）。
  */
 export function summaryNote(section: Section, rule: RuleForm): string {
   const shown = section === "deny" ? rule.message : rule.additionalContext || rule.additionalContextOnce;

@@ -8,8 +8,8 @@ env を渡しても共通層は既定の置き場のままになる。
 確かめるテストが自分の一時ディレクトリを指せなくなる（`ConfigUnionHarness`）。
 hook は引数を渡さずに起動するので、hook からの判定の入口は固定される。
 
-フラグの効く範囲は ADR-0067 が診断の経路に限った。ここで見るのは env が効かないことと、
-その門が効いていることの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
+フラグが有効な範囲は ADR-0067 が診断の経路に限った。ここで見るのは env が使われないことと、
+その門が有効なことの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
 
 起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
 読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
@@ -178,7 +178,7 @@ class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
                 self.assertEqual(layer[field]["path"], self.other(kind))
 
     def test_the_flag_wins_over_the_env(self):
-        """env を渡してもフラグが勝つ。env は読まれないので当然そうなる。"""
+        """env を渡してもフラグのほうを採る。env は読まれないので当然そうなる。"""
         layer = self.common(
             env={"CCNAVI_RULES": os.path.join(self.ws, "elsewhere", "nowhere.yml")},
             flags=("--rules", self.other_rules),
@@ -189,13 +189,13 @@ class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
 class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
     """診断の外では、フラグも共通層を動かさない（ADR-0067、issue #65）。
 
-    `--project-rules-file` / `--project-phases-file` と揃える。効くのは `--lint` /
+    `--project-rules-file` / `--project-phases-file` と揃える。有効なのは `--lint` /
     `--test` / `--test-samples` / `--explain` だけで、hook からの判定と
     `ticket` / `review` の副命令では落ちる。落としたことは標準エラーに出す。
 
-    上の `FlagsStillMoveTheCommonLayerTest` と対で読む。あちらは診断では効くことを、
-    ここは診断の外では効かないことを見る。片方だけだと、フラグを消しても
-    フラグを素通しにしてもテストは通り続ける。
+    上の `FlagsStillMoveTheCommonLayerTest` と対で読む。あちらは診断では有効なことを、
+    ここは診断の外では有効でないことを見る。片方だけだと、フラグを消しても
+    フラグをそのまま通してもテストは通り続ける。
     """
 
     def target(self):
@@ -249,7 +249,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
         self.assertNotIn("--rules", result.stderr)
 
     def test_the_flags_still_work_for_the_diagnosis_that_judges(self):
-        """判定を通す診断（`--test`）では効く。落とす先を間違えていないことの裏。"""
+        """判定を通す診断（`--test`）では有効。落とす先を間違えていないことの裏。"""
         done = self.bare(
             "--test", "Read", self.target(), "--json", flags=("--rules", self.other_rules)
         )

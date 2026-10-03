@@ -1,4 +1,4 @@
-"""判定に添える文面と理由コード。
+"""判定につける文面と理由コード。
 
 止めた・聞いた・渡した、のそれぞれについて、それだけで読んで成立する 1 件の文を
 組む。判定の流れは judge にあり、ここは文面だけを持つ。文面は利用者とモデルが
@@ -16,8 +16,8 @@ from .modes import DRY_RUN
 #
 # 付録 B のコードは「どの検査がその根拠を作ったか」の名前であって、ルール 1 件を
 # 指す名前ではない。今のビルドが持つ検査は 1 つ（外から注入したルール集合を
-# 正規化済みの対象に当てる）で、当てる先がコマンドかパスかで 2 つに割れる。
-# だからコードはその割れ方に対応させ、どのルールだったかは出所が名指しする。
+# 正規化済みの対象に当てる）で、当てる先がコマンドかパスかで 2 つに分かれる。
+# だからコードはその分かれ方に対応させ、どのルールだったかは出所が名指しする。
 # ルール 1 件ごとにコードを持たせれば付録 B の粒度（ヒアドキュメントなら
 # DENY_REDIRECT、DB 破壊なら DENY_DB_DESTRUCTIVE）に届くが、それはルール
 # ファイルに欄を 1 つ足すことなので書式の版が上がる。この要件が求めるのは
@@ -57,9 +57,9 @@ CODE_TICKET_ASK = "TICKET_ASK"
 # ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 
-# 承認済みチケット自体が信じられない（親が引けない、置き場と `project:` が違う、など）。
+# 承認済みチケット自体が信頼できない（親が引けない、置き場と `project:` が違う、など）。
 # 範囲の外に書いたのではないので、CODE_TICKET_SCOPE とは分ける。受け取った側の次の一手も
-# 違う。範囲外なら範囲の中で済ませる道があるが、こちらは人がチケットを直すまで
+# 違う。範囲外なら範囲の中で済ませる方法があるが、こちらは人がチケットを直すまで
 # どこにも書けない（ADR-0058）。
 CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 
@@ -84,7 +84,7 @@ SUBJECT_LIMIT = 200
 
 
 def code_for(tool: str, degraded: str) -> str:
-    """拒否の根拠コード。対象がコマンドかパスかで割れる。"""
+    """拒否の根拠コード。対象がコマンドかパスかで分かれる。"""
     if degraded:
         return CODE_UNCERTAIN
     return CODE_COMMAND if tool == "Bash" else CODE_PATH
@@ -93,12 +93,12 @@ def code_for(tool: str, degraded: str) -> str:
 def fallen_back(rules_path: str) -> str:
     """ルールファイルを読めずに組み込みの既定に戻ったことを伝える文。
 
-    通した回にも返す。ここを黙ると、ガードが立っているように見えて実際には
+    通した回にも返す。ここで何も言わないと、ガードが働いているように見えて実際には
     プロジェクトのルールを 1 件も見ていない、という状態が続く。それは
     ガードが止まっていることより悪い。止まっていれば誰かが気づくから。
 
     直し方に Write / Edit を名指しするのは、既定の側がシェルからこの場所への
-    書き込みを止めているため。止めた先に道が無いと、拒否は行き止まりになる。
+    書き込みを止めているため。止めた先に代わりの方法が無いと、拒否されたあと先へ進めなくなる。
     """
     return (
         "[ccnavi] the rule file at "
@@ -127,9 +127,7 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
     「言えば通るかもしれない」だが、聞けないなら「言っても通らない」ので、
     先に設定を直すか、人が居るセッションでやり直すしかない。
     """
-    shown = " ".join(subject.split())
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(subject) - SUBJECT_LIMIT})"
+    shown = _shorten(subject)
 
     lines = [
         f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {rules_path})",
@@ -178,25 +176,22 @@ def reason_for(
     載せるのは 3 つ。何に当たったか（対象）、どういう筋の根拠か（理由コード）、
     それを言っているのはどの設定か（出所）。どれが欠けても、受け取った側は
     自分の呼び出しのどこが引っかかったのかを自分では辿れず、
-    文面を信じるか無視するかの二択になる。
+    文面を信頼するか無視するかの二択になる。
 
     quoted は、このルールが引用の中から切り出したコマンドにだけ当たったこと
     （judge が bare に当て直して決める）。そのときは断りを 1 文足す。
 
     件ごとに閉じた形にするのは、1 回の応答に複数の理由が入り、そのうちどれが
     利用者の目に入るかが決まらないため。「上に書いた事情が下の全部に掛かる」形は、
-    1 件だけが切り出されて見えた瞬間に意味を失う。読めなかったという断りが
-    件ごとに繰り返されるのはその代金で、繰り返しのほうが誤読より安い。
+    1 件だけが切り出されて見えた時点で意味を失う。読めなかったという断りが
+    件ごとに繰り返されるのはそのための手間で、繰り返しのほうが誤読より害が小さい。
 
     inner は、ルールに当たったのが実行役のコマンド（runner）が中で実行するコマンドだった
     ときの、そのコマンド。元の形で当たったときは空。
     """
-    shown = subject
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(subject) - SUBJECT_LIMIT})"
-    # 改行を含む対象は 1 行に畳む。理由の骨格が対象の中身で割られると、
+    # 改行を含む対象は 1 行にまとめる。理由の文が対象の中の改行で分断されると、
     # どこまでが対象でどこからが言い分なのかが読めなくなる。
-    shown = " ".join(shown.split())
+    shown = _shorten(subject)
 
     # コードはルールが置かれていたタイプから決まる。拒否と確認で同じコードを
     # 返すと、受け取った側は「止まった」のか「聞かれている」のかを文面から
@@ -207,10 +202,10 @@ def reason_for(
     if inner:
         degraded = ""
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
-    # 出所はルールの id で名乗る。プロジェクトのルールの id には `lib:git-push` の形で
+    # 出所はルールの id で示す。プロジェクトのルールの id には `lib:git-push` の形で
     # プロジェクトの名前が付く（REQ-MLT-07）ので、id だけでどのファイルを見に行けばよいかが
     # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無い綴りが
-    # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを名乗る。
+    # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
     if rule.id == phase.TICKET_APPROVAL_RULE_ID:
         # 組み込み。ルールファイルには無いので、そこを探させない。
@@ -240,25 +235,37 @@ def ran_by(runner: str, inner: str) -> str:
     当たったルールの名前が出てこない。どこへ書こうとしているかを綴りで示す。
     """
     if runner == shellread.MOVED:
-        return f"`cd` で移った先から見ると `{_one_line(inner)}` で、そこにヒットしました。"
-    return f"`{_one_line(runner)}` が実行する `{_one_line(inner)}` にヒットしました。"
+        return (
+            f"`cd` で移った先から見ると `{_one_line(inner)}` になり、"
+            "ルールはこの形にヒットしました。"
+        )
+    return f"ルールは `{_one_line(runner)}` が実行する `{_one_line(inner)}` にヒットしました。"
 
 
 def _one_line(text: str) -> str:
-    """コマンドを文面に載せる形にする。目印を空白に戻し、1 行に畳んで上限で切る。"""
-    shown = " ".join(text.replace(shellread.SEP, " ").replace(shellread.WORD_SEP, " ").split())
+    """コマンドを文面に載せる形にする。目印を空白に戻し、1 行にまとめて上限で切る。"""
+    return _shorten(text.replace(shellread.SEP, " ").replace(shellread.WORD_SEP, " "))
+
+
+def _shorten(text: str) -> str:
+    """文面に載せる対象を 1 行にまとめ、上限で切って切った字数をつける。
+
+    順は「まとめる → 切る → まとめた後の長さで残りを数える」。まとめる前の長さで数えると、
+    改行や空白の続きまで残りに入り、見えていない字数を多く言う。
+    """
+    shown = " ".join(text.split())
     if len(shown) > SUBJECT_LIMIT:
         shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
     return shown
 
 
 def inside_quotes() -> str:
-    """引用の中から切り出したコマンドにルールが当たったときに添える断り。
+    """引用の中から切り出したコマンドにルールが当たったときにつける断り。
 
     書いた側は、二重引用や引用しないヒアドキュメントの中の `$( )` とバッククォートを、
     文字を書いただけのつもりでいる。実際にはシェルが実行するので止めるのは正しいが、
-    文字として渡す道を知らなければ、同じ形を書き直しては止まる。道はあるので名指しする。
-    git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 手になる。
+    文字として渡す方法を知らなければ、同じ形を書き直しては止まる。方法はあるので名指しする。
+    git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 つの手順になる。
     """
     return (
         "note: this rule matched a command inside double quotes or an unquoted heredoc. The "
@@ -270,7 +277,7 @@ def inside_quotes() -> str:
 
 
 def unreadable(reason: str) -> str:
-    """コマンドを読めないまま出した 1 件に添える断り。
+    """コマンドを読めないまま出した 1 件につける断り。
 
     2 つの違う失敗に同じ文を使わせないために要る。「禁止されたコマンドを実行した」と
     「読めない文字列のどこかにその語がある」では次にやることが違うし、
@@ -293,7 +300,7 @@ def unreadable(reason: str) -> str:
 
 def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
     """サブエージェントに許さない操作を止めた文。inner は reason_for と同じ。"""
-    shown = " ".join(subject.split())[:SUBJECT_LIMIT]
+    shown = _shorten(subject)
     return "\n".join(
         [
             f"[ccnavi] {phase.CODE_SUBAGENT}",
@@ -301,15 +308,15 @@ def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
             *([ran_by(runner, inner)] if inner else []),
             "チケットの状態を動かす操作、レビューの依頼・確認、リモートへの push は、"
             "親（メインエージェント）だけが行います。サブエージェントは自分のチケットの"
-            "範囲で作業を終えたら、コミットまでして結果を報告して終わってください。"
-            "合流と push と閉じるのは親の仕事です。",
+            "範囲で作業を終えたら、コミットまで済ませ、結果を報告して終えてください。"
+            "合流、push、チケットを閉じることは親の仕事です。",
         ]
     )
 
 
 def builtin_refusal(code: str, subject: str, text: str) -> str:
-    """組み込みの判定で止めた文。ルールに当たったのではないので、ルールの id は名乗らない。"""
-    shown = " ".join(subject.split())[:SUBJECT_LIMIT]
+    """組み込みの判定で止めた文。ルールに当たったのではないので、ルールの id は出さない。"""
+    shown = _shorten(subject)
     return "\n".join([f"[ccnavi] {code}", f"subject: {shown}", text])
 
 
@@ -322,11 +329,9 @@ def rewrite(subject: str, form: str, found: list[str]) -> str:
     """書き直しを求める形を止めた文。形ごとに 1 件。
 
     ルールに当たったのではないので、禁止された操作をしたとは言わない。止めたのは読みの
-    決めごとで、書き直す道は必ずある。道を名指ししないと、同じ形を書き直しては止まる。
+    決めごとで、書き直す方法は必ずある。方法を名指ししないと、同じ形を書き直しては止まる。
     """
-    shown = " ".join(subject.split())
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
+    shown = _shorten(subject)
     listed = ", ".join(f"`{_one_line(text)}`" for text in found[:_REWRITES_SHOWN])
     if len(found) > _REWRITES_SHOWN:
         listed += f" (+{len(found) - _REWRITES_SHOWN})"
@@ -383,8 +388,8 @@ _REWRITE_TEXT = {
 def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     """セッションの頭で渡す、直接作業とチケット作業の使い分け。
 
-    チケット制御が効いているワークスペースで、モデルが「この作業にチケットは要るか」を
-    自分で決められるようにする。判定はこの線引きを担保しない。チケットの無いワークツリーと
+    チケット制御が有効なワークスペースで、モデルが「この作業にチケットは要るか」を
+    自分で決められるようにする。判定はこの線引きを保証しない。チケットの無いワークツリーと
     ワークスペースルート直下は全体ルールだけで判定されるので、直接作業はそのまま通る。
 
     言うのは線引きと入口だけにする。この文はセッションの開始（起動・再開・compact・clear）
@@ -404,14 +409,14 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
         "- 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。",
         "- チケット作業（設計に触れる・複数のフェーズに分かれる・人のレビューが要る）: "
         f"{conf.tickets}/todo/ に提案を書いて承認を受ける。"
-        f"承認されると {conf.approved}/doing/ へ動く。"
+        f"承認されると提案は {conf.approved}/doing/ へ動く。"
         f"以後の操作は {ticket_sh} を通す（使い方は --help）。",
-        "どちらで進めるか迷ったら、利用者に聞く。",
+        "どちらで進めるか迷ったら、利用者に聞いてください。",
     ]
     if mode == DRY_RUN:
         lines.append(
             f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny にヒットしても止まらない。"
-            "通ったことを許可と読まず、出た案内に次から従う）"
+            "通ったことを許可と読まず、表示された案内に次からは従う）"
         )
     return "\n".join(lines)
 

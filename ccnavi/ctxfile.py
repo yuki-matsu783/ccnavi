@@ -6,13 +6,13 @@
 文脈はセッションと、サブエージェントならその 1 回の起動で分ける。
 
 `additionalContextFile` と `additionalContextOnceFile` は、文の代わりに（または文に
-続けて）ファイルの本文をモデルへ渡す。長い案内を rules.yml に抱えず、既にある md を
+続けて）ファイルの本文をモデルへ渡す。長い案内を rules.yml に書かず、既にある md を
 そのまま指すためのもの。
 
-読むのはワークスペースの中だけ。ルールから任意のファイルをモデルに流し込める形に
+読むのはワークスペースの中だけ。ルールから任意のファイルをモデルに渡せる形に
 しない。絶対パスと `..` で上に出るパスは lint が止め、実行時も読まない。
 
-読む長さは固定の上限で切る。切ったときはそのことを本文の末尾に添える。黙って切ると、
+読む長さは固定の上限で切る。切ったときはそのことを本文の末尾につける。何も言わずに切ると、
 モデルは途中で終わる文を「全部」だと思って読む。続きはファイルを読めば手に入るので、
 そう言う。
 """
@@ -54,7 +54,7 @@ def locate(bases: list[str], rel: str) -> str:
 
 
 def load(stderr: TextIO, bases: list[str], rel: str) -> str:
-    """ファイルの本文。無ければ空。上限を超えたら先頭だけを返し、切ったことを末尾に添える。"""
+    """ファイルの本文。無ければ空。上限を超えたら先頭だけを返し、切ったことを末尾につける。"""
     full = locate(bases, rel)
     if not full:
         return ""
@@ -69,7 +69,7 @@ def load(stderr: TextIO, bases: list[str], rel: str) -> str:
     return (
         head[:MAX_CHARS].rstrip()
         + f"\n\n(ccnavi: {rel} は {MAX_CHARS} 文字を超えるので先頭だけを載せた。"
-        "続きはこのファイルを読むこと)"
+        "続きはこのファイルを読んでください)"
     )
 
 
@@ -96,7 +96,7 @@ def for_rules(
     unsure_speaks: bool = True,
     counts_path: str = "",
 ) -> str:
-    """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で割る。
+    """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で区切る。
 
     渡るかどうかは「渡す回」で決まる。`every: N` はその刻みで、当たった回数が N の
     倍数になった回だけが渡す回になる。`every` を書かなければ刻みは 1 で、当たるたびが
@@ -117,7 +117,7 @@ def for_rules(
     数える。
 
     控えを置く場所が無いとき（`--state ""`）は刻まず、once の文も毎回渡す。覚えられない
-    なら黙るのではなく言うほうを採る。届かない文は書いていないのと同じになるから。
+    なら何も言わないのではなく言うほうを採る。届かない文は書いていないのと同じになるから。
 
     `unsure_speaks=False` はその逆で、覚えられない回（控えの置き場が無い・読めない）には
     刻みを持つルールも once を持つルールも渡さない。渡すことが Stop を止めることになる呼び手
@@ -145,12 +145,12 @@ def for_rules(
             if counted is None:
                 # 読めなかったときは、覚えていないものとして渡し、書き戻さない。
                 # `--state ""` と同じ「覚えられないなら言う」側だが、上書きだけは
-                # しない。ここで書くと、読めなかっただけの控えを空で潰すことになる。
+                # しない。ここで書くと、読めなかっただけの控えを空の中身で置き換えることになる。
                 delivering, first = True, True
             else:
                 # id が無いと、match/glob が同じで every だけ違う 2 本が同じ鍵を共有し、
-                # 互いの回数を食い合う（rules.Rule.key() は every を区別鍵に含めるのに、
-                # ここが含めないとその区別が数えに届かない）。every を鍵に足して分ける。
+                # 1 つの回数を 2 本で数えることになる（rules.Rule.key() は every を区別鍵に
+                # 含めるのに、ここが含めないと数えでは区別されない）。every を鍵に足して分ける。
                 key = rule.id or f"{rule.match} {rule.glob or rule.regex} {rule.every}"
                 hits = counted.get(key, 0) + 1
                 counted[key] = hits
@@ -198,7 +198,7 @@ def bases(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[
 
     行き先（Bash なら cwd）がワークツリーの中なら、まずそのワークツリー。そこに無ければ
     その元リポジトリ、最後にワークスペースルート。ワークツリーで直している最中の
-    案内文がそのまま効くように、ワークツリーを先に見る。
+    案内文がそのまま使われるように、ワークツリーを先に見る。
     """
     bases: list[str] = []
     if target is not None and not target.is_main:
@@ -241,7 +241,7 @@ def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
     data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: 渡した回の控えを読めない: {failed}\n")
+            stderr.write(f"ccnavi: 渡した回数の控えを読めない: {failed}\n")
             return None
         return {}
     given = data.get("given") if isinstance(data, dict) else None
@@ -257,7 +257,7 @@ def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
     # なる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
-        stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 渡した回数の控えを書けない: {failed}\n")
     return not failed
 
 

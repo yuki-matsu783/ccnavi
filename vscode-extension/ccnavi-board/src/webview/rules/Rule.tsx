@@ -1,5 +1,5 @@
 /**
- * ルール 1 件の行。畳んだときは要約 1 行、開くと欄が出る。
+ * ルール 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
  * ツールの欄（`match`）は押すと選択肢が出る。`message` は deny だけの欄で、ask と allow に
@@ -24,7 +24,7 @@ export interface RuleProps {
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
-  /** 直前の判定で当たった行。畳んだままでも分かるように縁を付ける */
+  /** 直前の判定で当たった行。折りたたんだままでも分かるように縁を付ける */
   readonly hit: boolean;
   /** ツールの選択肢が開いているか。開くのは画面ぜんたいで 1 つだけ */
   readonly pickerOpen: boolean;
@@ -84,7 +84,7 @@ export function Rule(props: RuleProps): JSX.Element {
       <div
         className="row-head"
         onClick={() => {
-          // 文字を選んだだけのときは開閉しない（要約をコピーする操作を奪わない）
+          // 文字を選んだだけのときは開閉しない（要約をコピーする操作を妨げない）
           if (window.getSelection !== undefined && String(window.getSelection()) !== "") {
             return;
           }
@@ -106,7 +106,7 @@ export function Rule(props: RuleProps): JSX.Element {
             {rule.pattern === "" ? <span className="dim">（{rule.kind} 未設定）</span> : <code>{rule.pattern}</code>}
             {summaryNote(section, rule) !== "" && <span className="sum-note">{summaryNote(section, rule)}</span>}
           </span>
-          {/* 刻みは畳んだままでも見える。見えないと「毎回渡る」と思ったまま渡す文を直すことになる */}
+          {/* 刻みは折りたたんだままでも見える。見えないと「毎回渡る」と思ったまま渡す文を直すことになる */}
           {rule.every === "" ? (
             <span className="sum-every" />
           ) : (
@@ -159,7 +159,7 @@ export function Rule(props: RuleProps): JSX.Element {
             </p>
           )
         )}
-        {/* コンテキストの 4 欄は出番が少ないので見出し 1 行に畳む。値があるルールだけ最初から開く */}
+        {/* コンテキストの 4 欄は出番が少ないので見出し 1 行に折りたたむ。値があるルールだけ最初から開く */}
         <details className="more" open={props.moreOpen} onToggle={(event) => props.onToggleMore(event.currentTarget.open)}>
           <summary>
             <b>コンテキストの追加</b>
@@ -200,7 +200,7 @@ export function Rule(props: RuleProps): JSX.Element {
 
 /**
  * ツールの選択肢。`match` はツール名を `|` で並べたもので、判定は名前をそのまま突き合わせるので
- * 打ち間違えると黙って当たらなくなる。書かせずに選ばせる。**ファイルに書いてある知らない名前
+ * 打ち間違えると気づかないうちに当たらなくなる。書かせずに選ばせる。**ファイルに書いてある知らない名前
  * （MCP のツールなど）も、消さずにそのまま選択肢にして出す**（開いただけで消えたように見えないように）。
  */
 function Picker({

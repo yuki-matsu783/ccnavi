@@ -7,7 +7,7 @@
 **このファイルは実装より先に書いてある。** 実装が入るまで落ちるのが正しい。
 落ち方が「機能が無い」であって「テストが壊れている」ではないことだけを見ること。
 
-内部の構造には触れない。見るのは外から観測できるものだけ:
+内部の構造には触れない。見るのは外から観測できるものだけ。
 
   - `rules.load` が返すルール集合と苦情（Problem）
   - 組み立てた式が当たるか当たらないか
@@ -46,15 +46,15 @@ def absolute(path: str) -> str:
     変わるのは**絶対かどうか**で、`rules.real_root` が呼ぶ `os.path.realpath` は、
     相対のパスなら頭に cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
     `<cwd>/C:\Users\...` になってしまい、「中」のはずのパスが全部「外」になり、長さの境界も
-    cwd のぶんだけずれる。設計 2.3 の表は Windows の綴りのまま残して、頭だけを機械に
+    cwd のぶんだけ変わる。設計 2.3 の表は Windows の綴りのまま残して、頭だけを機械に
     合わせる（docs/claude/environment.md「実行環境」: 4 つのどれでも動くように書く）。
 
     `\` は POSIX でも普通の 1 文字として残る（`realpath` が切るのは `/` だけ）。
     展開した式は `\` と `/` のどちらも区切りとして当てるので、そこは直さなくてよい。
 
     `C:` 以外のドライブ（`D:`）は `/drive-d/` に替える。ドライブごとに別の綴りにするのは、
-    「別々の 2 つのドライブは互いに外」を後から足したときに、黙って同じ絶対パスへ
-    潰れないようにするため。**POSIX の絶対パスはどれも `/` で始まるので、最外段
+    「別々の 2 つのドライブは互いに外」を後から足したときに、気づかないうちに同じ絶対パスに
+    なってしまわないようにするため。**POSIX の絶対パスはどれも `/` で始まるので、最外段
     （ルートの 1 文字目）の「違う」だけは、ここでは試せない。** その段を縛れるのは
     Windows で回したときの `D:` だけで、Linux だけで回していると穴に気づけない。
     """
@@ -78,7 +78,7 @@ def rules_file(directory: str, *rule: dict, section: str = "deny") -> str:
     """ルールファイルを 1 枚書いて綴りを返す。
 
     置くのは共通層の既定の場所。hook として呼ぶ側は `--rules` を渡せない
-    （診断でだけ効く。ADR-0067）ので、ワークスペースルートの下の既定の綴りに要る。
+    （診断でだけ有効。ADR-0067）ので、ワークスペースルートの下の既定の綴りに要る。
     直に `rules.load` に渡すだけのテストは、どこに在っても同じ。
     """
     return write(
@@ -152,7 +152,7 @@ class NotRootExpansionTest(unittest.TestCase):
         """ルートの末尾の区切りを落とさないと、ルート直下まで「外」になる。
 
         Windows では `os.path.realpath('/')` が `C:\\` を返すので、
-        ドライブ直下をワークスペースにした環境は必ずここを踏む。
+        ドライブ直下をワークスペースにした環境は必ずこの形になる。
         既存の `rules.root_pattern` は同じ `rstrip` を既に持っている。
         """
         ccnavi = absolute(r"C:\Users\u\Desktop\git\ccnavi")
@@ -315,7 +315,7 @@ class NotRootLimitTest(unittest.TestCase):
         """ちょうどその長さのルートの綴り。実在しなくてよい。
 
         末尾が区切りにならないようにする。区切りで終わると `rstrip` で 1 字縮み、
-        測りたい境界からずれる（設計 2.0）。
+        測りたい境界から外れる（設計 2.0）。
         """
         body = ("d" * 9 + "\\") * (length // 10 + 2)
         root = (absolute("C:\\") + body)[:length]
@@ -347,7 +347,7 @@ class NotRootLimitTest(unittest.TestCase):
         """しきい値より遥かに長いルートでも、未処理例外にならず苦情になる。
 
         **このテストは `except RecursionError` の側を実行しない。** `_expand_not_root` が
-        256 字で先に弾くので、`re.compile` まで届かない。組み立てが落ちるのは 493 字で、
+        256 字で先に止めるので、`re.compile` まで届かない。組み立てが落ちるのは 493 字で、
         256〜493 の範囲は事前の検査で全部止まる（変異テストで、`except RecursionError` を
         丸ごと消してもこのテストが落ちないことを確認済み）。
 
@@ -369,7 +369,7 @@ class NotRootLimitTest(unittest.TestCase):
     def test_deny_falls_closed(self):
         """組み立てられない `deny` は、`match` の全部を止める。設計 4.3。
 
-        捨てると「守りが消える」ほうに落ちる。ここが素通りになると、
+        捨てると「守りが消える」ほうに落ちる。ここで止まらずに通ると、
         このチケットで作ったものが丸ごと意味を失う。
         """
         path = rules_file(self.dir.name, outside_rule())
@@ -412,7 +412,7 @@ class NotRootLimitTest(unittest.TestCase):
     def test_allow_falls_the_other_way(self):
         """組み立てられない `allow` は、どれにも当たらない。設計 4.3。
 
-        当たる扱いにすると ccnavi が黙る範囲が広がる。deny とは逆の側を採る。
+        当たる扱いにすると ccnavi が何も言わずに通す範囲が広がる。deny とは逆の側を採る。
         """
         path = rules_file(
             self.dir.name,
@@ -472,7 +472,7 @@ class NotRootWritingTest(unittest.TestCase):
     def test_a_structural_suffix_is_only_a_warning(self):
         """`^{!root}[\\\\/]foo` は壊れてはいないが、まず勘違い。設計 3.3。
 
-        展開結果が食い終わる位置がパスの区切りである保証は無い。
+        展開結果が一致し終わる位置がパスの区切りである保証は無い。
         止めるほどではないので warn。
         """
         said = self.problems_for(outside_rule(NOT_ROOT + r"[\\/]foo"))

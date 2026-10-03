@@ -3,7 +3,7 @@
 ## 宣言ではなく実績を測る
 
 計画のときに「軽い」と思った作業が、やってみたら大きな変更になることがある。
-宣言（チケットの範囲や `human_review.required: false`）だけを信じると、それが
+宣言（チケットの範囲や `human_review.required: false`）だけを信頼すると、それが
 レビューを通らずに進む。だから点は、子を閉じるときにその子のワークツリーで
 `base_sha..HEAD` の差分を数えて付ける。宣言の広さで数える点は持たない。
 宣言の広さは、親がチケットを書くときに `human_review.reason` で言えばよい。
@@ -24,7 +24,7 @@
   `ccnavi-ticket.sh record-risk` で yes / no を記録する。判定が揃うまで子は閉じられない
 
 測れなかった項目（スクリプトの失敗、読めない出力）は重いほうとして扱い、その項目の点を加える。
-「測れないから 0」にすると、壊れたスクリプトがリスクを消す。
+「測れないから 0」にすると、スクリプトが壊れただけでその項目の点が消える。
 
 ## 書式
 
@@ -129,7 +129,7 @@ class Factor:
 class Definition:
     # levels は**書かれた鍵だけ**。書かれていない鍵は DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていない層」が
-    # 共通層の緩めた境目の点を黙って戻すことになる（設計 11.4.2）。
+    # 共通層の緩めた境目の点を気づかないうちに戻すことになる（設計 11.4.2）。
     levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
@@ -255,7 +255,7 @@ def parse(
             )
         ]
     # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていない層」が
-    # 共通層の緩めた境目の点を黙って戻す（設計 11.4.2）。順を見るときだけ既定で補う。
+    # 共通層の緩めた境目の点を気づかないうちに戻す（設計 11.4.2）。順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
     raw_levels = data.get("levels")
     if raw_levels is not None:
@@ -292,7 +292,7 @@ def parse(
 
 
 def effective_levels(levels: dict[str, int]) -> dict[str, int]:
-    """書かれた鍵に既定を足した、実際に効く境目の点。"""
+    """書かれた鍵に既定を足した、実際に使われる境目の点。"""
     return {**DEFAULT_LEVELS, **levels}
 
 
@@ -314,7 +314,7 @@ def _factors(
             continue
         ident = str(item.get("id") or "").strip()
         if ID_SEPARATOR in ident:
-            # 層の名前を添えた形（`lib:schema`）と見分けが付かない。共通層に書けば
+            # 層の名前をつけた形（`lib:schema`）と見分けが付かない。共通層に書けば
             # lib の配点に見え、記録を読んだ人がどのファイルを直すのか決められない。
             problems.append(
                 Problem(
@@ -343,7 +343,7 @@ def _factors(
                 Problem(
                     SEVERITY_ERROR,
                     ident,
-                    "加点条件は 1 つ（" + " / ".join(KINDS) + "）を書く",
+                    "加点条件は（" + " / ".join(KINDS) + "）のうち 1 つだけ書く",
                 )
             )
             continue
@@ -412,7 +412,7 @@ def _factors(
 
 
 def mark_layer(definition: Definition, layer: str, home: str) -> None:
-    """この定義の項目に、層の名前と `script:` を解く基準ディレクトリを名乗らせる。"""
+    """この定義の項目に、層の名前と `script:` を解く基準ディレクトリを持たせる。"""
     for f in definition.factors:
         f.source = layer
         f.home = home
@@ -423,11 +423,11 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
 
     `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
     中身が違えば両方を数え、後ろの層の項目を `<層>:<id>` と名乗らせる（warn）。
-    `levels` は書かれた鍵だけが参加し、キーごとに小さいほうを採る。どの層も書いて
+    `levels` は書かれた鍵だけを合わせ、キーごとに小さいほうを採る。どの層も書いて
     いない鍵は既定（`DEFAULT_LEVELS`）。
 
     同 `id` の衝突で層を空にしないのは、空にすると点が小さくなる側になるから。
-    両方を数えれば、衝突は加点を増やす側にしか働かない（ルールの同 `id` と同じ扱い）。
+    両方を数えれば、衝突は点を増やす向きにしか影響しない（ルールの同 `id` と同じ扱い）。
     裸の `id` にコロンは書けないので、名乗り直した `id` が他の項目と重なることは無い。
 
     合成後の `levels` の順が崩れる error のときは、その層を空として扱い、共通層だけを返す。
@@ -455,7 +455,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
                     f.id,
                     f"`{f.id}` が前の層と同じ id で中身が違う。両方を数え、{layer} の側は"
                     f" `{qualified}` と名乗る（記録と record-risk もこの名前）。"
-                    "同じ項目のつもりなら全欄を揃え、別の項目なら id を変える",
+                    "同じ項目のつもりなら全欄を揃え、別の項目なら id を変えてください",
                 )
             )
             f = replace(f, id=qualified)
@@ -513,7 +513,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
                     SEVERITY_ERROR,
                     f.id,
                     f"`script` の `{f.value}` が {f.home or '(基準なし)'} に無い。"
-                    "ワークツリーの中のものは読まないので、元リポジトリに置く",
+                    "ワークツリーの中のものは読まないので、元リポジトリに置いてください",
                 )
             )
     return problems
@@ -525,7 +525,7 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
     （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
-    配点を書ける側が層を選べると、自分のリスクを自分で下げる道になる。
+    配点を書ける側が層を選べると、自分のリスクを自分で下げる方法になる。
     """
     if settings.is_reserved_layer_name(project):
         return ""
@@ -637,28 +637,33 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
             i += 2
         path = path.replace("\\", "/")
         changes[path] = Change(path=path, added=added, deleted=deleted)
+    # 消したファイルの数は name-status から数える。読めなければ測れなかったとして止める
+    # （0 件と数えると軽い側へ倒れる）。
     rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
-    if rc == 0:
-        parts = out.split("\0")
-        i = 0
-        while i < len(parts):
-            status = parts[i]
+    if rc != 0:
+        return None, "基準点からの変更の種類を読めない"
+    parts = out.split("\0")
+    i = 0
+    while i < len(parts):
+        status = parts[i]
+        i += 1
+        if not status:
+            continue
+        if status.startswith(("R", "C")) and i + 1 < len(parts):
+            path = parts[i + 1].replace("\\", "/")
+            i += 2
+        elif i < len(parts):
+            path = parts[i].replace("\\", "/")
             i += 1
-            if not status:
-                continue
-            if status.startswith(("R", "C")) and i + 1 < len(parts):
-                path = parts[i + 1].replace("\\", "/")
-                i += 2
-            elif i < len(parts):
-                path = parts[i].replace("\\", "/")
-                i += 1
-            else:
-                break
-            if path in changes:
-                changes[path].status = status[:1]
-            else:
-                changes[path] = Change(path=path, status=status[:1])
+        else:
+            break
+        if path in changes:
+            changes[path].status = status[:1]
+        else:
+            changes[path] = Change(path=path, status=status[:1])
     rc, sha = _git(worktree, ["rev-parse", head])
+    if rc != 0 or not sha.strip():
+        return None, "測った先のコミットを読めない"
     return Diff(changes=list(changes.values()), base=base, head=sha.strip()), ""
 
 
@@ -817,7 +822,7 @@ def judge_prompt(
         f"親: {parent}。ワークツリー: {worktree}。差分: `{diff.base[:12]}..{diff.head[:12]}`"
         f"（{diff.summary()}）。",
         "",
-        "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書く。",
+        "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書いてください。",
         "判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} record-risk {child} <項目> yes|no "
         "--reason <根拠>' "

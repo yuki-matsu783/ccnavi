@@ -224,7 +224,7 @@ test("CX-T136 service worker の読み取り（スレッドの写し・変更の
   assert.ok(!JSON.stringify(answers).includes(TOKEN));
   const none = await dispatch({ kind: "host", host: "github.com", op: "reviewCopy", args: ["acme", "widgets", "feature-x"] }, BOARD, d);
   assert.equal(none.ok, false);
-  assert.match((none as { error: string }).error, /開いた MR が無い/);
+  assert.match((none as { error: string }).error, /開いているマージリクエストが無い/);
 });
 
 test("CX-T137 レビュー済みで Python に投げた要求（board・confirm）すべてに、Pyodide と手元の CPython が同じ答えを返す", { skip: native === null ? "uv が無い" : false }, async () => {

@@ -1,6 +1,7 @@
 """取り込みの控えを読む（ADR-0093 の 3.3・3.6。段階 2c）。
 
-控えは `ccnavi-sync.sh`（と `ccnavi-git.sh push` の移り目）が書き、判定はここで読むだけ。
+控えは `ccnavi-sync.sh` と、親のブランチを最初に push したときの `ccnavi-git.sh push` が書き、
+判定はここで読むだけ。
 判定は git もネットワークも起こさない（`tree.py` の前提）ので、統合先と親のブランチの
 リモートの姿は、sh が控えに書き出したものしか知らない。
 
@@ -28,7 +29,7 @@
 
 `sync/<リポジトリ>/` が無ければ、そのリポジトリは一度も取り込んでいない（`integration` は None で、
 今どおり作業ツリーを読む）。在るのに統合先の控えが無い・`head` が無い・壊れている・入れ替えが
-終わらないときは `broken` に理由を入れて返す。呼び手は `done/` の検査を黙って通さない
+終わらないときは `broken` に理由を入れて返す。呼び手は `done/` の検査を何も出さずに通すことはしない
 （識別子の再利用を確かめられないので「決まらない」として止める）。
 
 ## リンクは辿らない
@@ -292,7 +293,7 @@ def _swapping(base: str, directory: str) -> bool:
 def done_ids(integ: Integration | None, approved_rel: str) -> tuple[set[str], str]:
     """統合先の `done/` にある識別子（ファイル名から。閉じた・取り消し済みの両方）と、読めない理由。
 
-    控えが無ければ（None）空で理由も空。壊れていれば空と理由（呼び手は黙って通さない）。
+    控えが無ければ（None）空で理由も空。壊れていれば空と理由（呼び手は何も出さずに通すことはしない）。
     """
     if integ is None:
         return set(), ""
@@ -482,17 +483,19 @@ class Families:
             if busy:
                 stop = (
                     f"親のワークツリー（{where}）に途中の操作（{busy}）がある。"
-                    "済ませるか取りやめるまで、取り込み済みの家族の権威が決まらない"
+                    "済ませるか取りやめるまで、取り込み済みの家族でどの写しを本物とするかが"
+                    "決まらない"
                 )
             elif named is not None:
                 stop = (
                     f"親のワークツリー（{where}）の HEAD がブランチ {family_id} を指していない。"
-                    "取り込み済みの家族の権威が決まらない"
+                    "取り込み済みの家族でどの写しを本物とするかが決まらない"
                 )
             else:
                 stop = (
-                    f"親のワークツリー（{where}）が無い。取り込み済みの家族の権威が決まらない"
-                    "（家族の控えは墓標として残る）"
+                    f"親のワークツリー（{where}）が無い。"
+                    "取り込み済みの家族でどの写しを本物とするかが決まらない"
+                    "（家族の控えは、親のワークツリーを片付けても残る）"
                 )
         else:
             stop = ""
@@ -563,32 +566,37 @@ def guidance(root: str, st: Standing) -> list[str]:
     record = st.record
     if record is not None and record.broken:
         return [
-            f"控え（{record.path}）の中身を人が確かめ、壊れていれば人が '{sync} --forget {name}' で"
-            f"消してから、オンラインで '{sync} {name}' を打ち直す",
+            f"控え（{record.path}）の中身をユーザが確かめてください。"
+            f"壊れていれば人が '{sync} --forget {name}' で"
+            f"消してから、オンラインで '{sync} {name}' を打ち直してください",
         ]
     if record is not None and record.state == STATE_GONE:
         return [
             f"オンラインで '{sync} {name}' を打つと戻し方が出る。改名・消し間違いなら利用者に"
-            f"元の名前 {name} でブランチを戻してもらい、オンラインで '{sync} {name}' を打ち直す",
+            f"元の名前 {name} でブランチを戻してもらい、オンラインで '{sync} {name}' を"
+            "打ち直してください",
             f"家族を捨てたなら、親のワークツリーを片付けて（'{git} worktree remove "
-            f".claude/worktrees/{name}'）、人が '{sync} --forget {name}' で家族の控えを消す"
+            f".claude/worktrees/{name}'）、人に '{sync} --forget {name}' で家族の控えを"
+            "消してもらってください"
             "（エージェントは打たない）",
         ]
     if record is not None and record.state == STATE_BLOCKED:
         return [
-            f"理由を直してから、オンラインで '{sync} {name}' を打ち直す"
+            f"理由を直してから、オンラインで '{sync} {name}' を打ち直してください"
             "（検査し直して通れば present に戻る）"
         ]
     if st.home is None and "途中の操作" in st.stop:
         return [
-            "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから打ち直す"
+            "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから"
+            "打ち直してください"
         ]
     return [
-        f"親のワークツリーを切り直す（'{git} fetch origin {name}' のあと "
+        f"親のワークツリーを切り直してください（'{git} fetch origin {name}' のあと "
         f"'{git} worktree add .claude/worktrees/{name} -b {name} origin/{name}'）。"
-        f"別のブランチに居るなら {name} に戻す。閉じた家族なら、オンラインで '{sync}' を打って"
-        "統合先を取り込み直す。捨てた家族なら、人が "
-        f"'{sync} --forget {name}' で家族の控えを消す",
+        f"別のブランチに居るなら {name} に戻してください。"
+        f"閉じた家族なら、オンラインで '{sync}' を打って"
+        "統合先を取り込み直してください。捨てた家族なら、人に "
+        f"'{sync} --forget {name}' で家族の控えを消してもらってください",
     ]
 
 
@@ -603,7 +611,7 @@ def _names(directory: str) -> list[str]:
 
 
 def _parts(rel: str) -> tuple[tuple[str, ...], str]:
-    """相対の綴り（"/" 区切り）を部品に分ける。`.`・`..` と空は断る。"""
+    """相対の綴り（"/" 区切り）を部品に分ける。`.`・`..` と空は受け付けない。"""
     parts = tuple(p for p in rel.split("/") if p)
     if not parts or any(p in (".", "..") for p in parts):
         return (), f"読めない綴り（{rel}）"

@@ -8,7 +8,7 @@
    SubagentStart と SubagentStop が知らせる（止めない）。案内は「書けない」と言わない
 4. M-4 親のツリーからの起動では手順を並べず、各子のフローのパスと「自分の担当だけ」を言う
 5. M-3 承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす
-6. L-a〜L-c 名乗りの真似・置き場の綴り・大文字小文字の畳み方
+6. L-a〜L-c 名乗りの真似・置き場の綴り・大文字小文字のそろえ方
 7. lint は承認済みの領域のファイルを「ワークツリーにしかない」と言わない（利用者の決定）
 """
 
@@ -114,10 +114,10 @@ class FlowFileKindTest(unittest.TestCase):
 
 
 class FlowSpellingTest(unittest.TestCase):
-    """置き場の綴りを畳み、大文字小文字を長さを変えずに畳む（L-b・L-c）。"""
+    """置き場の綴りを整え、大文字小文字を長さを変えずにそろえる（L-b・L-c）。"""
 
     def test_the_approved_place_is_normalized(self):
-        """`./`・`//`・`x/..`・末尾の `/.` を畳んだ置き場で、畳んだ綴りに当てる（L-b）。"""
+        """`./`・`//`・`x/..`・末尾の `/.` を取り除いた置き場で、整えた綴りに当てる（L-b）。"""
         root = scratch(self)
         for approved in (
             ".ccnavi/approved",
@@ -142,7 +142,7 @@ class FlowSpellingTest(unittest.TestCase):
         self.assertEqual(found, ("i0001-01.yml", flow.ANY_PROJECT))
 
     def test_windows_aliases_of_the_name_are_folded(self):
-        """末尾の `.` と空白、代替データストリームは同じファイルに届く（止める向きに畳む）。"""
+        """末尾の `.` と空白、代替データストリームは同じファイルに届く（止める向きにそろえる）。"""
         root = scratch(self)
         conf = conf_with()
         base = os.path.join(root, ".ccnavi", "approved", "flows")
@@ -254,7 +254,7 @@ class FlowReadPlaceTest(FlowHarness):
         child_tree = self.run_child(CHILD)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
         self.assertIn("人が持つもの。エージェントは編集しない", text)
-        self.assertIn("書き換わったらccnavi が知らせる", text)
+        self.assertIn("書き換わったら ccnavi が知らせる", text)
         self.assertNotIn("エージェントは書けない", text)
 
 
@@ -389,7 +389,8 @@ class FlowParentBriefingTest(PhaseHarness):
         for path in paths:
             self.assertIn(f"フロー: {path}", text)
         self.assertIn(
-            "自分の担当の子チケットのフローだけを読んで従う。他の子のフローには従わない", text
+            "自分の担当の子チケットのフローだけを読んで従ってください。他の子のフローには従わない",
+            text,
         )
         child_tree = self.run_child("i0001-01")
         own = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-2"))

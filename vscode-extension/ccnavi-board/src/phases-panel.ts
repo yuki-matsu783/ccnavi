@@ -55,7 +55,7 @@ const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
-/** 自分の保存で監視が鳴るのを、この間だけ「ファイルの変更を検知しました」と言わない */
+/** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 /** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
@@ -178,7 +178,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
   }
 
   // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間、押しても何も起きないように見えないように。
-  // `state` を先に立てるので、読んでいる間に押し直しても上の `reveal` に入る。
+  // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviPhases", titleOf(target), vscode.ViewColumn.One, {
     enableScripts: true,
@@ -264,8 +264,8 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
-    // 設定ファイルの場所は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
-    // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 11.2）。
+    // 設定ファイルの場所は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方が食い違ったときに
+    // この画面で保存した種類が承認と着手に反映されなくなる。答えは元リポジトリの版（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
@@ -444,7 +444,7 @@ function scheduleLock(current: PanelState): void {
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
  * 共通の設定の種類はどのツリーの承認・着手・閉じるときにも読まれるので、どのツリーの doing でも止める。
- * ワークスペースの設定も同じに止める（プロジェクト外のチケットだけに効くが、絞らずに止める側にする）。
+ * ワークスペースの設定も同じに止める（プロジェクト外のチケットだけに影響するが、絞らずに止める側にする）。
  * プロジェクトの設定は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトの doing だけを見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
@@ -508,7 +508,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * フェーズ管理の画面に渡す口。VS Code のパネルを `retainedHost` の形に合わせる。
+ * フェーズ管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
  * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
@@ -575,7 +575,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, "更新したので、この保存は取りやめました。いまの種類で編集し直してください");
+  fail(current, "画面を更新したので、この保存は取りやめました。更新後の種類で編集し直してください");
   return true;
 }
 
@@ -596,7 +596,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
     current.dirty = false;
     // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す道
+    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す経路
     // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
     current.host.ready();
     redraw(current);
@@ -613,7 +613,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     return;
   }
   // 読み直せていない画面では、種類に当たる操作はどれも行き先が無い（「更新」は
-  // 押せるが、その道は `reload` が読み直しからやり直す）
+  // 押せるが、その経路は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
   }
@@ -734,11 +734,11 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+      fail(current, "フェーズの種類のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られています。更新してから編集し直してください（上書きしません）");
+    fail(current, "フェーズの種類のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
     return;
   }
 

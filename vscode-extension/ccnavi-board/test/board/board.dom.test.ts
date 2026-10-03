@@ -1,5 +1,5 @@
 /**
- * ボード画面の操作。React の画面を happy-dom で動かし、列の畳み・絞り込み・承認の送り先を見る。
+ * ボード画面の操作。React の画面を happy-dom で動かし、列の折りたたみ・絞り込み・承認の送り先を見る。
  * 何を描くかは render.dom.test.ts。
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
@@ -64,7 +64,7 @@ test("CB-D41 親で絞り込むと他の家族のカードが隠れ、列の件�
 });
 
 test("CB-D46 書き込みが止まっているカードは「要対応のみ」でも残る", async () => {
-  // 印は不備として積まれ、`attention` が立つ（board.ts）。素の版では i0001-02 は隠れる
+  // 印は不備として積まれ、`attention` が真になる（board.ts）。素の版では i0001-02 は隠れる
   // （CB-D42）ので、印を付けたときだけ残ることが確かめられる。
   const base = fixture();
   const stopped = base.tickets.map((t) =>
@@ -250,7 +250,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
   } finally {
     await page.close();
   }
-  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース（プロジェクト外）」も効かせない
+  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース（プロジェクト外）」も反映しない
   // （解除する手立てが画面に無いまま「絞り込み中」になってしまう）
   const without = await openBoard(fixture(), { state: { project: "" } });
   try {
@@ -357,7 +357,7 @@ test("CB-D51 列の幅は取っ手のドラッグで決まって覚え、押し�
   } finally {
     await page.close();
   }
-  // 覚えていた幅は、読み直した画面でも効く
+  // 覚えていた幅は、読み直した画面でも反映される
   const again = await openBoard(fixture(), { state: { widths: { done: 280 } } });
   try {
     const column = again.one('.column[data-state="done"]');
@@ -375,7 +375,7 @@ test("CB-D52 ドラッグの途中で列が消えても、掴んだままの印�
     page.one('.resizer[data-resize="done"]').dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true, button: 0, clientX: 0, pointerId: 1 }));
     await page.settle();
     assert.ok(page.document.body.classList.contains("resizing"));
-    // 読み直せずエラーの画面に替わると列ごと消え、pointerup を受ける相手が居なくなる。
+    // 読み直せずエラーの画面に替わると列ごと消え、pointerup を受ける要素が無くなる。
     // 印が残ると、カーソルが col-resize のまま文字も選べなくなる
     await page.send({ type: "data", data: { kind: "error", error: "読めない" } });
     assert.equal(page.all(".column").length, 0);

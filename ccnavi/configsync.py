@@ -11,13 +11,13 @@ clone した人からは見えない。そこで親チケットに着手する�
   層から共通層のスクリプトは指せない（11.4.2）ので、直さずに写すとプロジェクトの配点が壊れる
 - 写す前に、プロジェクトの層として読めるかを確かめる。読めなければ何も写さず、着手しない
 - 上書きで消える識別子と、中身の変わる識別子を名指しする
-- 写す先に未コミットの変更があれば、人の書きかけを踏まないよう何も写さない
+- 写す先に未コミットの変更があれば、人の書きかけを上書きしないよう何も写さない
 - 写したことは親の印 `config-sync.json` に残し、最初のレビューで知らせる。レビューが無いまま
   親を閉じようとしたら止め、人が端末で見たことを残すまで閉じさせない
 
 写したファイルは、実行後の監視と控えと復元（どちらも `.ccnavi/` を守る）から見れば
 エージェントの書き込みと区別が付かない。区別は内容で付ける（`is_synced_write`）。
-誰が書いたかの台帳は持たない（ADR-0075 と同じ理由。印は git に乗って届く）。
+誰が書いたかの台帳は持たない（ADR-0075 と同じ理由。印は git を通じて届く）。
 """
 
 from __future__ import annotations
@@ -109,15 +109,18 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Copie
     scripts: list[tuple[str, str]] = []
     for kind, common in common_files(conf).items():
         raw, why = _read_strict(common)
-        if why:
-            return [], f"共通層の {os.path.basename(common)} を読めない ({why})"
-        content = projected(conf, kind, raw or b"")
+        # 一覧を作ったあとに消えたもの（raw が None）も読めないとして止める。空として
+        # 写すと、プロジェクトの層を中身の無い設定で上書きする。
+        if why or raw is None:
+            name = os.path.basename(common)
+            return [], f"共通層の {name} を読めない ({why or '無い'})"
+        content = projected(conf, kind, raw)
         why = _unreadable_as_layer(conf, kind, content)
         if why:
             name = os.path.basename(common)
             return [], f"共通層の {name} をプロジェクトの層として読めない: {why}"
         if kind == settings.KIND_RISK:
-            scripts = _scripts_of(conf, root, raw or b"")
+            scripts = _scripts_of(conf, root, raw)
         copied, why = _compare(
             kind, tree_root, settings.layer_real_path(conf, tree_root, kind), content
         )

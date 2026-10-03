@@ -11,10 +11,10 @@
   紛れないように名前を変えた）は承認の対象と画面と指紋を、`withdraw` と `confirm` は通らない
   理由を返す
 - **Changes**: 書き込みを値として並べたもの（`plan`）。書くときの落ち方（止める・言って続ける）
-  も添えてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
+  もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
   1 コミットにする（段階 3）
 - **Writer(FS)**: `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
-  （`fsio.recording`）がそのまま効く
+  （`fsio.recording`）がそのまま使われる
 - **Clock**: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
   記録と跡に同じ時刻を書く
 
@@ -33,7 +33,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, fsio, history, modes, phase, review, rules, settings, tree
+from . import approval, fsio, history, modes, phase, review, settings, tree
 from . import ticket as ticket_mod
 
 # ---- 入力 -----------------------------------------------------------------------------------
@@ -224,7 +224,7 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> appro
     - `FAIL_STOP`: `undo` を消し、`ccnavi: <識別子>: <理由>` を言って止める。置いたものは戻さない
     - `FAIL_WARN`: 同じ形で言って続ける
     - `FAIL_LINE`: 行を出し、同じ組の残り（続く書き込みと行）を飛ばす
-    - `FAIL_QUIET`: 黙って続ける
+    - `FAIL_QUIET`: 何も出さずに続ける
     - `FAIL_HISTORY`: 跡の書けなかった知らせに溜める（入口が警告で出す）
 
     並べる段で止まっていたら（`planned.stopped`）、並べた分を書いてから同じ形で言って止める。
@@ -305,7 +305,7 @@ def _write_op(op: fsio.Op) -> str:
 
 # ---- 手元の入口（`--approve`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #
-# 前は approval.py に居た。コアを通す入口なので、コアより下の段（approval）には置かない
+# 前は approval.py にあった。コアを通す入口なので、コアより下の段（approval）には置かない
 # （approval → core → approval の循環になる。tests/core/test_module_layers.py）。
 
 
@@ -314,13 +314,12 @@ def approve(
     stdout: TextIO,
     stderr: TextIO,
     conf: settings.Settings,
-    rule_set: rules.RuleSet,
     root: str,
     only: list[str] | None = None,
 ) -> int:
     """未承認の提案をまとめて人に見せ、承認されたら承認済みチケットを置く。
 
-    エージェントではなく人が端末から打つ経路。提案を書き直す道は用意しない。
+    エージェントではなく人が端末から打つ経路。提案を書き直す方法は用意しない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
     承認した人が承認したものの作者になる。
 
@@ -332,7 +331,7 @@ def approve(
 
     `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
     ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
-    落ちるものを通してはいけない。だから、承認待ちに無い識別子が混じっていたら
+    落ちるものを通してはいけない。だから、承認待ちに無い識別子が入っていたら
     何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の
     改版が承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
     絞った対象に入らない親を持つ子は「親が承認されていない」で落ちる。
@@ -368,7 +367,7 @@ def approve(
         # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
         stderr.write(
             f"ccnavi: {len(gathered.rejected)} 件は承認の対象にしなかった。"
-            "直して出し直すこと（通ったぶんの承認済みチケットは置いた）\n"
+            "直して出し直してください（通ったぶんの承認済みチケットは置いた）\n"
         )
         return 1
     return code
@@ -434,10 +433,10 @@ def verify(
     「確かめは『いいえ』なのに承認は通る」という食い違いになる。
 
     - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
-      書けない場所が残るのは伝える値打ちがあるから、その行に添えて見せる
+      書けない場所が残るのは伝える値打ちがあるから、その行につけて見せる
     - 読めない提案（`problems`）。走査は絞る前の全ツリーを見るので、他のセッションの
-      書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。黙らせはせず、
-      件数と綴りを本文に出す（自分が書いた 1 本かもしれないので）
+      書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。
+      出さずに済ませることはせず、件数と綴りを本文に出す（自分が書いた 1 本かもしれないので）
 
     返すのは「はい」（0）か「いいえ」（`modes.EXIT_ANSWER_NO`）。使い方と設定の誤りで返す
     1 とは分ける。同じ値にすると、打ち方を間違えた回と提案が落ちる回が読む側から
@@ -470,14 +469,14 @@ def approve_yes(
 
     端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
-    ものを承認する道を塞ぐため。識別子に加えて、見せた承認画面の本文・判定が読んだ中身・
+    ものを承認する経路を使えなくするため。識別子に加えて、見せた承認画面の本文・判定が読んだ中身・
     承認済みチケットに写る中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
     画面に出ない欄（`issue` など）が書き換われば承認しない。
     指紋が無ければ承認しない。
 
     引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
     「そのとき掛けていた絞り」（`--approve --preview` に渡したものと同じ）。分けないと検査が
-    素通りする。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
+    必ず通る。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
     絞りは preview と同じものを通し、比べるのは「その絞りで今できる一覧」と「見せた識別子」。
     """
     wanted = sorted({s.strip() for s in expected if s.strip()})
@@ -489,7 +488,7 @@ def approve_yes(
             "承認済みチケットに写る中身の指紋）が要る\n"
         )
         return 1
-    # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
+    # 絞りが通らなかった（承認待ちに無い識別子が入っている、親の改版を外した）ときは、
     # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる（`judge_approval` が比べる）。
     snapshot = read_fs(conf, root)
     verdict = judge_approval(snapshot, narrowed, shown_ids=wanted, shown_digest=digest)
@@ -504,13 +503,13 @@ def approve_yes(
             stderr.write(
                 "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
                 f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
-                "見直してから承認する\n"
+                "見直してから承認してください\n"
             )
         else:
             stderr.write(
                 "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身が、"
                 "今のものと違う（識別子は同じで、提案か、判定が読んだ承認済みチケット・マーカーなどの"
-                "中身が変わった）。見直してから承認する\n"
+                "中身が変わった）。見直してから承認してください\n"
             )
         return 1
     if not gathered.batch:
@@ -520,8 +519,8 @@ def approve_yes(
     lines = io.StringIO()
     applied = write_fs(lines, stderr, plan(snapshot, verdict).planned)
     if applied.code != 0:
-        # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。黙って失敗を
-        # 返すと、人は「何も起きていない」と読む（README「承認の JSON」の `partial`）。
+        # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。それを言わずに
+        # 失敗を返すと、人は「何も起きていない」と読む（README「承認の JSON」の `partial`）。
         if as_json:
             body = {
                 "version": approval.APPROVE_VERSION,
@@ -611,7 +610,7 @@ def confirm(
         return Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
-        return Checked(["ccnavi: 依頼の記録が無い。先に request すること"], None)
+        return Checked(["ccnavi: 依頼の記録が無い。先に request してください"], None)
     if changed_since_request:
         return Checked(
             [
@@ -670,7 +669,7 @@ def confirm_local(
 
     検査と書くものの並べ方はコア（`confirm`、ADR-0093 の 8.9）。ここは手元の入力
     （cwd の親、git の差分、`--result` の写し）を読んで渡し、並べたものを書く（Writer(FS)）。
-    Chrome の「レビュー済み」も同じコアを通る。前は review.py に居た（コアより下の段に
+    Chrome の「レビュー済み」も同じコアを通る。前は review.py にあった（コアより下の段に
     置くと review → core → review の循環になる）。
 
     `actor` は `ccnavi-review.sh` がトークンの持ち主を引いて `--actor` で渡すアカウント（8.9。
@@ -899,7 +898,7 @@ def _withdraw_problems(
     if copy.started_at:
         found.append(
             "着手済み。取りやめるなら "
-            f"`ccnavi-ticket.sh cancel {ident} --reason <理由>` をエージェントに頼む"
+            f"`ccnavi-ticket.sh cancel {ident} --reason <理由>` をエージェントに頼んでください"
             "（done/ に取り消しの記録が残る）"
         )
     if not copy.is_child:

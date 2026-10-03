@@ -33,7 +33,7 @@ export interface Integration {
   readonly head: string;
 }
 
-/** プロジェクトのリポジトリのワークスペースの統合先の中身（段階 5。共通層・自身の層・設定・互換の印） */
+/** プロジェクトのリポジトリのワークスペースの統合先の中身（段階 5。共通層・自身の層・設定・互換のマーカー） */
 export interface Workspace {
   readonly integration: Integration;
   readonly files: Record<string, string>;
@@ -171,7 +171,7 @@ export interface Actor {
   readonly version: string;
 }
 
-/** Python を呼ぶ口。Worker でも、試験の Node の Pyodide でも同じ形 */
+/** Python を呼ぶ関数。Worker でも、試験の Node の Pyodide でも同じ形 */
 export type PyCall = (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
 export class PyError extends Error {}
@@ -182,7 +182,7 @@ async function ask<T>(call: PyCall, op: string, body: Record<string, unknown>, k
     throw new PyError(res.error);
   }
   if (res.schema !== PY_SCHEMA) {
-    throw new PyError(`Python の答えの形の版が違う（${String(res.schema)}）`);
+    throw new PyError(`Python の応答の形の版が合わない（${String(res.schema)}）`);
   }
   return (key === "" ? res : res[key]) as T;
 }

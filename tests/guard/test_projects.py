@@ -16,7 +16,7 @@
 5. `projects/` を数えない設定では、この機能が入る前と同じに動く
 
 層の和そのもの（重複の排除、同 id、`--explain`）は tests/config/test_config_union.py が見る。
-ここが見るのは、置き場とツリーの結び付きが今までどおり噛み合っていること。
+ここが見るのは、置き場とツリーの結び付きが今までどおり合っていること。
 """
 
 from __future__ import annotations
@@ -27,7 +27,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
+from ccnavi import tree
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -146,7 +148,7 @@ class ProjectsTest(unittest.TestCase):
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
         self.rules = write(common_path(self.ws, "rules"), json.dumps(WS_RULES))
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
@@ -186,7 +188,7 @@ class ProjectsTest(unittest.TestCase):
     def ccnavi(self, *args, stdin="", env=None):
         """実行ファイルを 1 回起動する。
 
-        `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ効く
+        `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ有効な
         （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
         数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
         """
@@ -260,7 +262,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["tree"], "app")
         self.assertEqual(record["rules"], ["app:schema"])
 
-        # lib に schema の deny は無い。app の deny は lib には届かない。
+        # lib に schema の deny は無い。app の deny は lib には当たらない。
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
@@ -278,7 +280,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["rules"], ["ws-src"])
         self.assertNotIn("project", record)
 
-        # ワークスペースの schema/ は誰も守っていない。app の deny は漏れない。
+        # ワークスペースの schema/ は誰も守っていない。app の deny は当たらない。
         passed = self.hook("Write", self.app, file_path=os.path.join(self.ws, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
@@ -317,7 +319,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("app", record["detail"])
         self.assertNotIn("built-in defaults", self.reason(passed))
 
-        # 共通層の deny は壊れた層の上でも効いたまま。
+        # 共通層の deny は壊れた層の上でも当たったまま。
         guarded = os.path.join(self.app, ".ccnavi", "approved", "x")
         denied = self.hook("Write", self.ws, file_path=guarded)
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
@@ -369,6 +371,27 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("DENY", self.reason(allowed))
         outside = self.hook("Write", self.ws, file_path=os.path.join(right, "docs", "a.md"))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
+    def test_wrong_project_is_refused_even_when_the_worktree_name_differs_in_case(self):
+        """区別しない機械では、綴り違いに切ったワークツリーでも取り違えを止める。
+
+        範囲の判定（ticket_verdict）は綴りの違いを吸収して引く。取り違えの検査だけ厳密に
+        引くと、範囲の中への書き込みは別のプロジェクトのツリーでも通ってしまう。
+        区別する機械でも走るように、区別しない機械の引き方へ差し替えて確かめる。
+        """
+        write(
+            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+
+        wrong = self.worktree(self.app, "I0007")
+        with mock.patch.object(tree, "CASE_INSENSITIVE", True):
+            denied = self.hook("Write", self.ws, file_path=os.path.join(wrong, "src", "a.py"))
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("DENY_TICKET_PROJECT_MISMATCH", self.reason(denied))
+        self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
 
     def test_project_skills_are_written_only_under_the_ticket_rules(self):
         """docs/skills/（ADR-0091）は守りの外のふつうの場所。チケットの範囲の中でだけ書ける。
@@ -434,7 +457,7 @@ class ProjectsTest(unittest.TestCase):
         result = self.ccnavi("--approve", stdin="y\n")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場（ワークスペース）と違う", result.stderr)
-        self.assertIn("wip/proposals/ に置く", result.stderr)
+        self.assertIn("wip/proposals/ に置いて", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007.md")))
 
     def test_a_child_placed_apart_from_its_parent_is_not_approved(self):
@@ -450,14 +473,14 @@ class ProjectsTest(unittest.TestCase):
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
         # 1 で終わる（REQ-MLT-31）。
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("子は親と同じ置き場に置く", result.stderr)
+        self.assertIn("子は親と同じ置き場に置いて", result.stderr)
         self.assertTrue(os.path.exists(self.approved_path("doing", "i0007.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007-01.md")))
 
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/proposals/ に置く。プロジェクトのワークツリーの中も普通の置き場で、
         # 承認をプロジェクトの git で運ぶために、そこに置く（設計 9.4、REQ-MLT-14）。
-        # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録した道から
+        # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録したパスから
         # 引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
         write(
@@ -498,7 +521,7 @@ class ProjectsTest(unittest.TestCase):
         # 名前が projects/ に在っても、ワークスペースの wip/<名前>/proposals/ は走査されない。
         # 提案はそのプロジェクトの側 projects/<名前>/wip/proposals/ に置く
         # （設計 11.5、REQ-MLT-14）。
-        # 黙ると提案が消えたように見えるので、正しい置き場を添えて名指しする
+        # 何も言わないと提案が消えたように見えるので、正しい置き場をつけて名指しする
         write(
             os.path.join(self.ws, "wip", "lib", "proposals", "todo", "i0011.md"),
             ticket_text("i0011", allow=("src/*",)),
@@ -541,7 +564,7 @@ class ProjectsTest(unittest.TestCase):
         target = os.path.join(tree, "src", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
-        # ワークスペースの控えに同じ名前があっても、プロジェクトの家族には効かない。
+        # ワークスペースの控えに同じ名前があっても、プロジェクトの家族には当たらない。
         record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
         write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
         write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")
@@ -579,7 +602,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
         self.assertEqual(record["rules"], ["app:schema"])
 
-        # ターンの終わりは全部のツリーを見て、ツリーの名前を添えて人に言う。
+        # ターンの終わりは全部のツリーを見て、ツリーの名前をつけて人に言う。
         stopped = self.hook("", self.ws, event="Stop")
         self.assertEqual(stopped.returncode, 0, stopped.stderr)
         self.assertIn("app: schema/x.sql", self.system_message(stopped))
@@ -688,7 +711,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(any(w.startswith("(projects/lib)") for w in wheres), linted.stdout)
         self.assertFalse(any(w.startswith("(projects/app)") for w in wheres), linted.stdout)
 
-        # hook からの判定は差し替えを見ない。保存していないルールが判定に効く道を持たない。
+        # hook からの判定は差し替えを見ない。保存していないルールが判定に使われる経路を持たない。
         ignored = self.ccnavi(
             "--mode",
             "enable",

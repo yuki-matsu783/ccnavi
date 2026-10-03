@@ -231,8 +231,8 @@ class SpeedTest(unittest.TestCase):
     """長い入力でも伏せる手間が長さにほぼ比例すること。
 
     記録は実行前の判定の期限の中で書く。名前の形（`_ASSIGN`）の頭が長さを限らずに
-    食うと、`-` や `_` が続くだけの 1.5 万字で 10 秒を超え、期限を過ぎた hook の拒否が
-    捨てられる（素通り）。
+    文字を読み進めると、`-` や `_` が続くだけの 1.5 万字で 10 秒を超え、期限を過ぎた hook の拒否が
+    捨てられる（止められずに通る）。
     """
 
     LIMIT_SECONDS = 0.5
@@ -293,7 +293,8 @@ class RecordTest(unittest.TestCase):
         self.assertIn(LONG, record.subject)
 
     def test_redact_runs_before_the_length_limit(self):
-        # 上限の手前で値が始まり、上限をまたいで続く形。切ってから伏せると形が崩れて残る。
+        # 上限の手前で値が始まり、上限をまたいで続く形。切ってから伏せると形が途中で切れて
+        # 伏せられずに残る。
         pad = "x" * (audit.SUBJECT_LIMIT - 20)
         record = audit.Record(decision=audit.ALLOW, subject=f"{pad} --token {LONG}{LONG}")
         audit.Log(self.log).write(record)
