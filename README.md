@@ -1365,7 +1365,9 @@ ccnavi --agree --preview --verify i0002 i0002-01   # 承認できる状態かを
 
 - ワークスペース、`projects/*`、`.claude/worktrees/*` のツリーごとに、変更があれば置き場（`CCNAVI_TICKETS_APPROVED`）だけをコミットし、そのブランチへ push する
 - シンボリックリンクは辿らず、名指しして飛ばす
-- `main` / `master` / `develop` / `release` / `release/*` と、ブランチをチェックアウトしていないツリーは push せず、コミットまでで止める
+- `main` / `master` / `develop` / `release` / `release/*` と、そのリポジトリの統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
+  `ccnavi-sync.sh` の控え、無ければ `origin/HEAD`・`origin/main`・`origin/master`。決まらなければ固定の並びだけ）、
+  ブランチをチェックアウトしていないツリーは push せず、コミットまでで止める
 - 運ぶものが無ければ `運ぶ承認済みチケットは無い。` と 1 行出す
 - エージェントが打つ形は組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）が止める
 
