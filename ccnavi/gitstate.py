@@ -178,7 +178,7 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
     数えるのは**このツリーが積んだコミットだけ**（`--first-parent --no-merges`）。
     二点の差分（`base..HEAD`）にすると、統合先を取り込んだマージが持ち込んだ
     コミットまで「このターンでコミットに入った」ことになる。ワークツリーを切って
-    作業し、`merge <統合先>` で取り込んでから戻すのがこのリポジトリの手順なので、
+    作業し、`merge <統合先>` を打ってから統合先へ取り込むのがこのリポジトリの手順なので、
     それを打つたびに、人が統合先で直した保護領域が毎回報告に並ぶ。
 
     `--no-renames` と `--ignore-submodules=none` は phase.scope_findings と同じ理由。
