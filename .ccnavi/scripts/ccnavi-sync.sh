@@ -6,12 +6,12 @@
 #
 # 人が打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
 # ccnavi-fetch.sh は早送りしかしないので、分かれた家族を取り込むのと、親のブランチが
-# リモートから消えたかを確かめるのはここだけ（D12・D13）。
+# リモートから消えたかを確かめるのはここだけ（セッションの頭を待たせず、merge の書きかけも残さないため）。
 #
 # <P> は親のブランチ名（= 親の識別子 = .claude/worktrees/<P>）。省けば、.claude/worktrees/ の下の
 # 親のワークツリー（ディレクトリ名 = ブランチ名で、親の写しか提案がある）を全部。
 #
-# 家族の控えは墓標として残す（段階 2c のレビューの決定 A）。親のワークツリーを片付けても消さない。
+# 家族の控えは墓標として残す。親のワークツリーを片付けても消さない。
 # 消すと、決まらないで止めていた家族（gone など）が控えの無い家族に戻り、止めが外れるため。
 # 消すのは人が打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
 # エージェントからは組み込みの deny（builtin-guard-ticket-approval）が止める。
@@ -22,17 +22,17 @@
 #   2. 統合先の名前を決める。CCNAVI_INTEGRATION_BRANCH（環境変数、無ければ
 #      .claude/settings.local.json の env）、空ならホストのデフォルトブランチ（`ls-remote --symref
 #      origin HEAD`、読めなければ origin/HEAD・main・master）。設定した名前がリモートに無ければ、
-#      既定に落とさずに止める（D30）
+#      既定に落とさずに止める
 #   3. 統合先を fetch し、家族ごとの取り込みの後、判定に要るもの（done/・共通層・自身の層・
 #      .claude/settings.json）を統合先の控え sync/<リポジトリ>/integration/ へ同じ並びで写し、head に
-#      remote・branch・source・sha・fetched_at を書く（D26）。統合先の先頭が前と同じなら写さない
+#      remote・branch・source・sha・fetched_at を書く。統合先の先頭が前と同じなら写さない
 #
-# 家族ごとに次を行う（ロックを待って取る。D32）。
+# 家族ごとに次を行う（ロックを待って取る）。
 #
 #   - 途中の操作（merge・cherry-pick・revert・rebase）があれば何もせず止める（利用者の途中の
 #     merge を取りやめない）
 #   - P がリモートにある: fetch して、早送りできれば早送り、分かれていれば merge。merge は
-#     索引が HEAD と同じときだけ（D35）で、衝突したら、この sh が始めた merge だけを取りやめて
+#     索引が HEAD と同じときだけで、衝突したら、この sh が始めた merge だけを取りやめて
 #     人に回す。家族の控えを present で書く
 #   - P がリモートに無い: まず統合先の done/ にこの家族の親の写し（識別子と承認の時刻が同じ）が
 #     あれば閉じた家族（closed）。無く、送った跡（控え・origin/<P>・追跡の設定）も無ければ、
@@ -43,9 +43,9 @@
 #     （控えが無ければ gone は書かずに止める）
 #
 # 統合先の控えを書いた後、present の家族ごとに実行ファイルの `ccnavi sync check <P> <リポジトリ>` で
-# 判定し直す（権威の検査と、承認済みチケットの判定し直し。4.2 の 4）。error があれば家族の控えを
+# 判定し直す（権威の検査と、承認済みチケットの判定し直し）。error があれば家族の控えを
 # blocked にして、理由を reason に書いて止める。判定（hook・承認・状態の操作）は blocked の家族を
-# 止める（2c）。解き方は、理由を直してから同じ P でこの sh をオンラインで打ち直すこと（取り込みで
+# 止める。解き方は、理由を直してから同じ P でこの sh をオンラインで打ち直すこと（取り込みで
 # present に書き直してから検査し直すので、通れば present に戻る）。書く前にロックを取り直し、控えが
 # まだ present かを確かめる（並行する sync が書いた gone・closed を上書きしない）。ロックが取れない・
 # 書けないときは 3 回まで試し、それでも書けなければ終了コード 3 で終わる（止めるべき家族が止まって
@@ -215,7 +215,7 @@ git_path() {
 	esac
 }
 
-# ---- 置き場の綴りと、settings.local.json の統合先。実行ファイルに聞く（D33）。
+# ---- 置き場の綴りと、settings.local.json の統合先。実行ファイルに聞く（JSON は sh で読まない）。
 
 sync_info=""
 info_from=""
@@ -252,7 +252,7 @@ home="${home%/}"
 projects="${CCNAVI_PROJECTS:-projects}"
 projects="${projects%/}"
 
-# ---- 統合先の名前（D30）
+# ---- 統合先の名前
 
 if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
 	integration_want="$CCNAVI_INTEGRATION_BRANCH"
@@ -567,7 +567,7 @@ sync_present() {
 		fi
 	else
 		# 分かれている。非 ff の merge は、重ならないステージ済みの変更があっても拒む（git 2.43）ので、
-		# 先に見て言う（D35）。
+		# 先に見て言う。
 		if ! git -C "$tree" diff --cached --quiet 2>/dev/null; then
 			printf '%s: リモートと分かれていて merge が要るが、ステージ済みの変更がある。コミットするか sh %s/ccnavi-git.sh restore --staged <パス> で外してから打ち直してください\n' \
 				"$P" "$here_sh"
@@ -627,7 +627,7 @@ closed_in_integration() {
 	[ "$(printf '%s\n' "$ci_body" | approved_at_of)" = "$ci_mine" ]
 }
 
-# P がリモートに無い。閉じたか、消えたか（3.6）。
+# P がリモートに無い。閉じたか、消えたか。
 sync_absent() {
 	kept_sha=$(ccnavi_record_get "$record" sha)
 	trace=no
@@ -692,7 +692,7 @@ sync_absent() {
 	return 0
 }
 
-# ---- 取り込みの後の検査（4.2 の 4。段階 2c）
+# ---- 取り込みの後の検査
 
 # 実行ファイルを起こす。`sync paths` を答えたのと同じもの。<引数>...
 run_ccnavi() {
@@ -719,7 +719,7 @@ check_family() {
 	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
 	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
 		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、落ちた）。検査の error ではない
-		# ので家族は止めない。前（段階 2b）と同じ動き。
+		# ので家族は止めない。この検査が入る前と同じ動き。
 		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。家族は止めていない。実行ファイルを新しくして打ち直してください\n' \
 			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"
 		log_warn 取り込みの後の検査を実行できなかった -- "family=$1" "rc=$cf_rc"

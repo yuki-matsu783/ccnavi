@@ -42,11 +42,13 @@
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）では、状態を書く
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
-# （Chrome 拡張から見える家族に未 push の状態を溜めないため）。
+# （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook の印と跡を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
 # 人の判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
-# 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る（D27）。それ以外の家族は今のまま。
+# 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る。
+# 人の判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、運ぶ処理の打ち直しを案内する。
+# それ以外は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
@@ -365,7 +367,7 @@ find_mr() {
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url}'
 	else
 		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
-		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない。11.9.3 の 6）
+		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない）
 		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の綴りを見直してください）。"
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
@@ -691,7 +693,7 @@ c1_ccnavi() {
 	fi
 }
 
-# 人の判断を運ぶ（D27）。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
+# 人の判断を運ぶ。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
 carry_human() {
 	ccnavi_c1_family "$1"
 	case "$ccnavi_c1_target" in
@@ -745,7 +747,7 @@ merged)
 			printf 'unknown\n'
 			exit 3
 		}
-		# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない。11.9.3 の 6）
+		# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない）
 		answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
 			printf 'unknown\n'
 			exit 3
@@ -898,7 +900,7 @@ ${eli5_how}"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや C1 の
-	# やり直しで依頼を二重にしない。段階 2d のレビューの決定 D）。
+	# やり直しで依頼を二重にしない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
 		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
@@ -1010,7 +1012,7 @@ decide)
 		fi
 	fi
 	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
-	# 済ませる（ロックを持ったまま人を待たない。段階 2d のレビューの決定 A）ので、ここでは始めない。
+	# 済ませる（ロックを持ったまま人を待たない）ので、ここでは始めない。
 	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$branch"
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
@@ -1145,13 +1147,13 @@ close-early)
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	# 取り込み済みの家族なら、締めの印（人の判断）を運ぶ処理で送る（D27）。
+	# 取り込み済みの家族なら、締めの印（人の判断）を運ぶ処理で送る。
 	carry_human "$branch" || exit 1
 	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージは利用者が行う\n' "$url"
 	;;
 chat)
 	# 人が端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る。
 	n="${1:-}"
 	case "$n" in
 	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
@@ -1162,7 +1164,7 @@ chat)
 	;;
 config-synced)
 	# 人が端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る。
 	parent="${1:-}"
 	case "$parent" in
 	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;

@@ -21,7 +21,7 @@
 # ソースツリーの `python -m ccnavi`。
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の start・finish・cancel は
-# C1 で回す。Chrome 拡張から見える家族に未 push の状態を溜めないため、次を 1 操作にする。
+# C1 で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook の印と跡を先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
@@ -107,7 +107,7 @@ start | finish | cancel)
 	trap 'ccnavi_c1_end' EXIT
 	trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 	# 識別子は実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語
-	# （`start -- <親>` で C1 を経ずに通らないようにする。段階 2d のレビュー）。
+	# （`start -- <親>` で C1 を経ずに通らないようにする）。
 	c1_id=""
 	c1_skip=""
 	c1_first=yes

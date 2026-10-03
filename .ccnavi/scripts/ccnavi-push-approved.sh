@@ -6,7 +6,8 @@
 #
 # 承認はしない。承認済みチケットは置かれただけでは他の機械に届かない（設計 9.2）ので、置いたあとに
 # 運ぶ（コミットして push する）のがこの sh。端末の承認は ccnavi-approve.sh が、ボードの承認とフローの保存は端末に送った 1 行が、
-# 人の判断の入口（ccnavi-review.sh chat・config-synced・close-early）が、それぞれ最後にこの sh を呼ぶ（D27）。
+# 人の判断の入口（ccnavi-review.sh chat・config-synced・close-early）が、それぞれ最後にこの sh を呼ぶ。
+# 人の判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の親のワークツリーは、
@@ -168,7 +169,7 @@ carry_family() {
 			git -C "$cf_tree" add -A -- ":(literal)$cf_path" 2>/dev/null || :
 		done <"$ccnavi_c1_tmp/carry"
 		sed 's/^/:(literal)/' "$ccnavi_c1_tmp/carry" | tr '\n' '\000' >"$ccnavi_c1_tmp/pathspec"
-		# C1 と同じく、利用者の hook は実行せず、署名などで止まらないよう見張りの時間で切る（決定 C）。
+		# C1 と同じく、利用者の hook は実行せず、署名などで止まらないよう見張りの時間で切る。
 		if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$cf_tree" \
 			commit --quiet --only --no-verify -m "ccnavi: 承認済みチケットを更新" \
 			--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
