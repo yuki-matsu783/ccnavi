@@ -32,7 +32,7 @@ deny:
     why: .claude/ の下も worktrees/ 以外は main では触らない
   - tool: Write
     subject: "/repo/projects/lib/docs/skills/deploy/SKILL.md"
-    why: プロジェクトのスキル（ADR-0091）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
+    why: プロジェクトのスキル（docs/skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
     why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
@@ -106,8 +106,8 @@ deny:
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/rule-samples.yml"
     why: >-
-      共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
-      （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す
+      共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める。
+      見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す
   - tool: Edit
     subject: "/repo/.ccnavi/common/risks.yml"
     why: リスクの配点も同じ。自分の作業の重さを自分で決められる
@@ -265,7 +265,7 @@ allow:
     why: >-
       コマンドの名前も区別しない（同じ綴りには同じ判定）。区別しない機械では `cat` そのものなので、
       小文字なら通る呼び出しを綴りだけで別扱いにしない。代償として、区別する機械で `CAT` という
-      別の実行ファイルが在れば、この allow がそれにも掛かる（ADR-0051）
+      別の実行ファイルが在れば、この allow がそれにも掛かる
   - tool: Bash
     subject: "FIND /etc -name x"
     why: 同上。prefer-glob も綴りを問わず当てる
@@ -347,9 +347,9 @@ allow:
     subject: "(stop)"
     why: >-
       ターンの終わり。skill-review-every-10 が使われ、10 回に 1 度止めて振り返りの手順を渡す
-      （ADR-0090）。every が無い・プロジェクトの層にしか無いルールでは判定に入らない
+      every が無い・プロジェクトの層にしか無いルールでは判定に入らない
   - tool: Write
     subject: "/repo/.claude/worktrees/lib1/docs/skills/deploy/SKILL.md"
     why: >-
-      プロジェクトから切ったワークツリーの docs/skills/（ADR-0091）。守りの外のふつうの場所で、
+      プロジェクトから切ったワークツリーの docs/skills/（プロジェクトのスキルの置き場）。守りの外のふつうの場所で、
       worktrees の allow に当たる。チケットがあればその範囲でさらに絞られる
