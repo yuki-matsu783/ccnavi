@@ -456,7 +456,7 @@ class SyncTest(unittest.TestCase):
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("閉じた家族", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
@@ -466,7 +466,7 @@ class SyncTest(unittest.TestCase):
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("閉じた家族", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
         self.assertNotIn("まだ送っていない", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
@@ -503,7 +503,7 @@ class SyncTest(unittest.TestCase):
         self.assertIn("戻し方 1", done.stdout)
         self.assertIn(f"git push origin {kept}:refs/heads/{PARENT}", done.stdout)
         self.assertIn("戻し方 2", done.stdout)
-        self.assertIn("--forget i0001 を打つと家族の控えが消える", done.stdout)
+        self.assertIn("--forget i0001 を打つと親子のチケットの控えが消える", done.stdout)
         record = fields(self.record)
         self.assertEqual("gone", record["state"])
         self.assertEqual(kept, record["sha"])

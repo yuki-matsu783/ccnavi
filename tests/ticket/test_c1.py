@@ -84,7 +84,7 @@ class ChatOnlyFamilyTest(AuthorityHarness):
         result = self.ccnavi("c1", "family", "i0001")
         answer = lines(result.stdout)
         self.assertEqual(answer["target"], "no")
-        self.assertIn("chat だけの家族", answer["why"])
+        self.assertIn("chat だけの親子のチケット", answer["why"])
 
 
 class SortTest(AuthorityHarness):

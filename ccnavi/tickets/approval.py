@@ -277,21 +277,21 @@ def mark_imported(
     kept: list[ticket_mod.Ticket],
     fams: syncstate.Families | None = None,
 ) -> None:
-    """取り込み済みの家族の写しに、信頼できない理由の印を付ける。
+    """取り込み済みの親子のチケットの写しに、信頼できない理由の印を付ける。
 
-    取り込み済みの家族は、家族の控えがある家族。
+    取り込み済みの親子のチケットとは、控えのある親子のチケットのこと。
 
     権威は親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
     写しだけ。次の写しは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
 
-    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、`present` なのに親のワークツリーが
-      無い）
-    - 家族が閉じている（統合先の `done/` が権威）
+    - 親子のチケットが決まらない（控えが `gone`・`blocked`・壊れている、`present` なのに
+      親のワークツリーが無い）
+    - 親子のチケットが閉じている（統合先の `done/` が権威）
     - 親のワークツリーの外にしか無い写し（元ツリーに未コミットで残った写しなど）
 
     **写しの並びは変えない（落とさない）。** 落とすと「在る」ことで止まっていたもの（承認待ちの
-    重複、開いた子のある親を閉じない）が通るようになる。印を足すだけなので、控えの無い家族と、
-    控えがあっても親のワークツリーの写しだけの家族では、答えは前と同じ。すでに印（`mark_blocked`）が
+    重複、開いた子のある親を閉じない）が通るようになる。印を足すだけなので、控えの無い親子のチケットと、
+    控えがあっても親のワークツリーの写しだけの親子のチケットでは、答えは前と同じ。すでに印（`mark_blocked`）が
     あれば、理由を連ねる（前の理由を消さない）。
     """
     fams = fams or syncstate.Families(conf, root)
@@ -313,7 +313,7 @@ def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
     return (
         f"親のブランチ {st.family} のワークツリーの外"
         f"（{t.tree or 'ワークスペースルート'}）にしか無い写し。"
-        "取り込み済みの家族では親のブランチの写しだけが本物。ユーザがその写しを親のワークツリー"
+        "取り込み済みの親子のチケットでは親のブランチの写しだけが本物。ユーザがその写しを親のワークツリー"
         f"（.claude/worktrees/{st.family}）の同じ置き場へ運んでコミットと push をし、"
         "元の写しを消す"
     )
@@ -325,7 +325,10 @@ def family_standing(
     t: ticket_mod.Ticket,
     fams: syncstate.Families | None = None,
 ) -> syncstate.Standing:
-    """このチケットの家族の立ち位置（`syncstate.Families.standing`）。家族は `parent` か自分。"""
+    """このチケットが属する親子のチケットの立ち位置（`syncstate.Families.standing`）。
+
+    親子のチケットは `parent`（無ければ自分）の識別子で引く。
+    """
     fams = fams or syncstate.Families(conf, root)
     return fams.standing(t.parent or t.ticket, t.project or "")
 
@@ -336,11 +339,11 @@ def family_problems(
     t: ticket_mod.Ticket,
     fams: syncstate.Families | None = None,
 ) -> list[rules.Problem]:
-    """取り込み済みの家族の提案を承認しない理由。
+    """取り込み済みの親子のチケットの提案を承認しない理由。
 
-    家族が決まらない・閉じているなら承認しない。提案は親のブランチの上で書き、push してから
-    承認を頼む決まりなので、
-    親のワークツリーの外にある提案も承認しない。控えの無い家族は何も言わない。
+    親子のチケットが決まらない・閉じているなら承認しない。提案は親のブランチの上で書き、
+    push してから承認を頼む決まりなので、
+    親のワークツリーの外にある提案も承認しない。控えの無い親子のチケットは何も言わない。
     """
     fams = fams or syncstate.Families(conf, root)
     if not fams.active:
@@ -357,7 +360,8 @@ def family_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"提案が親のブランチ {st.family} のワークツリーの外"
-                f"（{t.tree or 'ワークスペースルート'}）にある。取り込み済みの家族の提案は"
+                f"（{t.tree or 'ワークスペースルート'}）にある。"
+                "取り込み済みの親子のチケットの提案は"
                 f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
                 "承認を頼んでください",
             )
@@ -373,10 +377,10 @@ def integration_problems(
 ) -> list[rules.Problem]:
     """新規の提案の識別子を統合先の `done/` と比べる。
 
-    開いた家族でも統合先の `done/` は常に一緒に読む。古い統合先から切った `P` で、閉じた
-    識別子の再利用が新規の承認として通らないように。統合先の `done/` は控え（最後に取り込んだ
-    `origin/<統合先>` から書き出したもの）から、家族の控えの有無に依らず、取り込んだ跡のある
-    リポジトリ（`sync/<リポジトリ>/`）の全提案に当てる。
+    開いた親子のチケットでも統合先の `done/` は常に一緒に読む。古い統合先から切った `P` で、
+    閉じた識別子の再利用が新規の承認として通らないように。統合先の `done/` は控え（最後に
+    取り込んだ `origin/<統合先>` から書き出したもの）から、親子のチケットの控えの有無に依らず、
+    取り込んだ跡のあるリポジトリ（`sync/<リポジトリ>/`）の全提案に当てる。
     控えが壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
     承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
     （今のまま）。
@@ -518,9 +522,9 @@ def home_dir(
     取り込みの控えのあるリポジトリを全部探す（同じ識別子が 2 つのリポジトリにあれば決めない）。
     """
     home = parent or ticket_id
-    # 取り込み済みの家族は親のブランチ（親のワークツリー）だけに書く。権威のツリーが無いときに
-    # 元ツリーに未コミットで書く形は、取り込み済みならやめる。決まらない家族は、ここへ来る前に
-    # 状態の操作と承認が止める。
+    # 取り込み済みの親子のチケットは親のブランチ（親のワークツリー）だけに書く。権威のツリーが
+    # 無いときに元ツリーに未コミットで書く形は、取り込み済みならやめる。決まらない親子のチケットは、
+    # ここへ来る前に状態の操作と承認が止める。
     st = syncstate.standing_any(conf, root, home, project)
     if st.imported and st.home is not None and not st.stop:
         return settings.approved_dir(conf, st.home.root)
@@ -857,7 +861,7 @@ PRED_SCATTERED = "scattered"
 PRED_SELF = "self"  # 自分自身
 PRED_ANCESTOR = "ancestor"  # 自分の親（子は親の中の作業で、親は子より先に閉じない）
 PRED_CYCLE = "cycle"  # 先行を辿ると自分に戻る
-# 取り込み済みの家族の先行で、その家族が決まらない・親のブランチの写しに無い。
+# 取り込み済みの親子のチケットの先行で、その親子のチケットが決まらない・親のブランチの写しに無い。
 PRED_UNDECIDED = "undecided"
 # 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
 PRED_WAITING = (ticket_mod.TODO, ticket_mod.DOING, ticket_mod.REVIEW)
@@ -871,7 +875,7 @@ PRED_LABELS = {
     PRED_SELF: "自分自身",
     PRED_ANCESTOR: "自分の親",
     PRED_CYCLE: "先行を辿ると自分に戻る",
-    PRED_UNDECIDED: "家族が決まらない",
+    PRED_UNDECIDED: "親子のチケットが決まらない",
 }
 
 
@@ -931,19 +935,20 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
 def align_imported(
     conf: settings.Settings, root: str, pool: dict[str, list[ticket_mod.Ticket]]
 ) -> None:
-    """取り込み済みの家族の先行を、その家族の親のブランチの写しで読み直す。
+    """取り込み済みの親子のチケットの先行を、その親子のチケットの親のブランチの写しで読み直す。
 
-    Chrome は先行を、参照の閉包の家族の `P` から引く。手元もそれに揃える。ただし**通る向きには
-    読み替えない**（締める向きだけ）。
+    Chrome は先行を、参照の閉包にある親子のチケットの `P` から引く。手元もそれに揃える。
+    ただし**通る向きには読み替えない**（締める向きだけ）。
 
-    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、親のワークツリーが無い）:
-      「家族が決まらない」にする（切り直しを案内する）
-    - 親のワークツリーにその識別子の写しが無い: 同じく「家族が決まらない」（親のブランチの外に
-      しか無い）
+    - 親子のチケットが決まらない（控えが `gone`・`blocked`・壊れている、親のワークツリーが無い）:
+      「親子のチケットが決まらない」にする（切り直しを案内する）
+    - 親のワークツリーにその識別子の写しが無い: 同じく「親子のチケットが決まらない」
+      （親のブランチの外にしか無い）
     - 親のワークツリーの写しが 1 つで、閉じていない（作業中・レビュー待ち・承認待ち）: それを採る
     - 親のワークツリーの写しで閉じている、写しが 2 つ以上: 前の池のまま（手元の全ツリーから
       引いた答え。前の池で満たしていなければ満たさないまま）
-    - 閉じた家族（統合先の `done/` に親の写しがある）と控えの無い家族: 前の池のまま
+    - 閉じた親子のチケット（統合先の `done/` に親の写しがある）と、控えの無い親子のチケット:
+      前の池のまま
     """
     fams = syncstate.Families(conf, root)
     if not fams.active:
@@ -975,7 +980,7 @@ def align_imported(
 
 
 def _undecided(sample: ticket_mod.Ticket, why: str) -> ticket_mod.Ticket:
-    """先行の池に置く「家族が決まらない」の印。理由は `blocked` に入れて運ぶ。"""
+    """先行の池に置く「親子のチケットが決まらない」の印。理由は `blocked` に入れて運ぶ。"""
     return replace(sample, state=PRED_UNDECIDED, blocked=why)
 
 
@@ -1097,7 +1102,8 @@ def predecessor_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"先行 {p.ticket} の家族が決まらない（{p.where}）。取り込み済みの家族の先行は"
+                    f"先行 {p.ticket} が属する親子のチケットが決まらない（{p.where}）。"
+                    "取り込み済みの親子のチケットの先行は"
                     "その親のブランチの写しで確かめる。親のワークツリーを切り直すか、"
                     "'ccnavi-sync.sh' で取り込み直してから出し直してください",
                 )

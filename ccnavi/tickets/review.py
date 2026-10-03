@@ -1255,7 +1255,8 @@ def ready(
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
     # 親の写しが done/ に無いまま Draft を外すと、そのままマージされたときに done/ に親が無いまま
-    # 親のブランチが消え、家族の判定が「決まらない」になる。それを防ぐ（判定を締める向き）。
+    # 親のブランチが消え、親子のチケットの判定が「決まらない」になる。それを防ぐ
+    # （判定を締める向き）。
     if parent.state != ticket_mod.DONE:
         problems.append(
             f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
@@ -1877,7 +1878,8 @@ def _parent(
     if parent is None:
         stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
         return None
-    # 取り込み済みの家族が決まらない・閉じているなら、依頼・確認・行き先・締めの印も置かない。
+    # 取り込み済みの親子のチケットが決まらない・閉じているなら、依頼・確認・行き先・締めの印も
+    # 置かない。
     if ops.family_stopped(stderr, root, conf, parent):
         return None
     return parent

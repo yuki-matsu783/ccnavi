@@ -842,7 +842,7 @@ class C1ChatOnlyTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
         family = self.exe("c1", "family", PARENT)
         self.assertIn("target no", family.stdout)
-        self.assertIn("chat だけの家族", family.stdout)
+        self.assertIn("chat だけの親子のチケット", family.stdout)
 
 
 class PhaseOne:
@@ -1442,7 +1442,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         # 手元を直に打つと C1 に断られる（だから C1 の手順で回す）。文面まで見る
         direct = self.exe("--cwd", self.tree, "review", "confirm", "--phase", "1", "--result", body)
         self.assertNotEqual(direct.returncode, 0)
-        self.assertIn(f"家族 {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
+        self.assertIn(f"親子のチケット {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
         self.assertIn("何も書かずに止めた", direct.stderr)
 
         before = self.sha(self.tree, "HEAD")

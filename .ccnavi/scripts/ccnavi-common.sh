@@ -306,7 +306,7 @@ ccnavi_mask_url() {
 # （JSON は実行ファイルが読んで、sh には 1 行で返す）。
 # 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
 #
-#   sync/<リポジトリ>/families/<P>   家族の控え（remote branch sha fetched_at state reason）
+#   sync/<リポジトリ>/families/<P>   親子のチケットの控え（remote branch sha fetched_at state reason）
 #   sync/<リポジトリ>/integration/   統合先の控え（統合先の done/・層・置き場の綴りの設定の写しと head）
 #   locks/<リポジトリ>/<P>/          ロック。中の owner に持ち主を 1 行で書く
 #
@@ -331,7 +331,7 @@ ccnavi_repo_key() {
 	fi
 }
 
-# 家族の控えのパス。<ワークスペースルート> <リポジトリ> <P>
+# 親子のチケットの控えのパス。<ワークスペースルート> <リポジトリ> <P>
 ccnavi_family_record() {
 	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
 }
@@ -366,11 +366,11 @@ ccnavi_record_write() {
 	}
 }
 
-# そのツリーが、名前の家族の親のワークツリーか。<ツリー> <名前>
+# そのツリーが、名前の親子のチケットの親のワークツリーか。<ツリー> <名前>
 #
 # 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親の写しか提案が
 # あれば 0（SessionStart で早送りする対象の条件の 1 つ）。子の写し（`parent:` を持つ）は
-# 数えない。置き場の綴りが絶対パス（リポジトリの外）なら家族として扱わない（ブランチに乗らないので、親のブランチで運べない）。
+# 数えない。置き場の綴りが絶対パス（リポジトリの外）なら親子のチケットとして扱わない（ブランチに乗らないので、親のブランチで運べない）。
 ccnavi_parent_tree() {
 	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
@@ -410,7 +410,7 @@ ccnavi_parent_tree() {
 # - 奪い方: 奪う操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
 #   owner の行と今の owner の行が同じなら `mv` で退避して、退避した中の owner がまだ同じなら消して取り直す。
 #   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
-# - 入れ子: CCNAVI_LOCK_HELD が同じ家族を指し、その印がロックの owner の印と同じなら、取ったものとして
+# - 入れ子: CCNAVI_LOCK_HELD が同じ親子のチケットを指し、その印がロックの owner の印と同じなら、取ったものとして
 #   進み、外さない（印の合わない値は偽物として無視する）
 ccnavi_lock_dir=""
 ccnavi_lock_mark=""
@@ -612,7 +612,7 @@ ccnavi_lock_drop() {
 	fi
 	if [ -n "$ccnavi_lock_set_held" ]; then
 		# 入れ子の中で別のロック（統合先の控えのロックなど）を取ったときは、外側から渡された値に戻す。
-		# 消したままにすると、外側（C1）が持つ家族のロックを、この sh の後の段が入れ子と読めない。
+		# 消したままにすると、外側（C1）が持つ親子のチケットのロックを、この sh の後の段が入れ子と読めない。
 		if [ -n "$ccnavi_lock_prev_set" ]; then
 			CCNAVI_LOCK_HELD="$ccnavi_lock_prev_held"
 			export CCNAVI_LOCK_HELD
@@ -694,10 +694,10 @@ ccnavi_git_refusal() {
 
 # ---- C1
 #
-# 取り込み済みの家族（origin があり、家族の控えが present。chat だけの家族を除く）で、状態を書く
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの控えが present。chat だけのものを除く）で、状態を書く
 # 操作を 1 操作にする。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に打つ。
 #
-#   ccnavi_c1_family <識別子>   家族と、C1 の対象か（ccnavi_c1_target に yes / no / stop）
+#   ccnavi_c1_family <識別子>   親子のチケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
 #   ccnavi_c1_write <文> -- <実行ファイルの引数>...
 #                               6 元の先頭 7 書く 8 コミット 9 push 10 届いたか 11 戻して 1 回だけやり直す
@@ -755,17 +755,17 @@ ccnavi_c1_number() {
 	esac
 }
 
-# 家族と、C1 の対象か。<識別子>
+# 親子のチケットと、C1 の対象か。<識別子>
 #
 # ccnavi_c1_target: yes（C1 で回す）/ no（今の手元の動きのまま）/ stop（取り込み済みだが止める理由がある）。
-# 実行ファイルが答えなかった（古い・落ちた）ときは、家族の控えがあれば stop、無ければ no。
+# 実行ファイルが答えなかった（古い・落ちた）ときは、親子のチケットの控えがあれば stop、無ければ no。
 ccnavi_c1_family() {
 	ccnavi_c1_target=no
 	ccnavi_c1_why=""
 	ccnavi_c1_family_id=""
 	ccnavi_c1_repo=""
 	ccnavi_c1_tree=""
-	# 家族の控えが 1 つも無ければ、実行ファイルに聞かずに対象外（一時ディレクトリも要らない）。
+	# 親子のチケットの控えが 1 つも無ければ、実行ファイルに聞かずに対象外（一時ディレクトリも要らない）。
 	ccnavi_cf_state=$(ccnavi_state "$ccnavi_c1_root")
 	ccnavi_cf_p="$1"
 	case "$ccnavi_cf_p" in
@@ -780,7 +780,7 @@ ccnavi_c1_family() {
 	done
 	if [ "$ccnavi_cf_any" = no ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
-		ccnavi_c1_why="家族の控えが無い（取り込み済みでない。今の手元の動きのまま）"
+		ccnavi_c1_why="親子のチケットの控えが無い（取り込み済みでない。今の手元の動きのまま）"
 		return 0
 	fi
 	ccnavi_c1_scratch || {
@@ -794,7 +794,7 @@ ccnavi_c1_family() {
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。家族の控えがあるので、書かずに止める。実行ファイルを新しくしてください"
+		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。親子のチケットの控えがあるので、書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_c1_target=$(sed -n 's/^target //p' "$ccnavi_c1_tmp/family" | head -n 1)
@@ -827,7 +827,7 @@ ccnavi_c1_family() {
 
 # 止めたときの文面（ccnavi_c1_target が stop）。
 ccnavi_c1_refuse() {
-	ccnavi_c1_say "家族 ${ccnavi_c1_family_id:-?} の状態を書かずに止めた。${ccnavi_c1_why}"
+	ccnavi_c1_say "親子のチケット ${ccnavi_c1_family_id:-?} の状態を書かずに止めた。${ccnavi_c1_why}"
 	while IFS= read -r ccnavi_rf_hint; do
 		[ -n "$ccnavi_rf_hint" ] && printf '  %s\n' "$ccnavi_rf_hint" >&2
 	done <"$ccnavi_c1_tmp/hints"
@@ -863,15 +863,15 @@ ccnavi_c1_begin() {
 	case "$ccnavi_cb_rc" in
 	0) ;;
 	2)
-		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
+		ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
 		return 1
 		;;
 	*)
 		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/$ccnavi_c1_family_id"
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
+			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
+			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
 		fi
 		return 1
 		;;
@@ -942,7 +942,7 @@ ccnavi_c1_prepare() {
 		ccnavi_cp_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 		ccnavi_cp_state=$(ccnavi_record_get "$ccnavi_cp_record" state)
 		if [ "$ccnavi_cp_state" != present ]; then
-			ccnavi_c1_say "取り込みの後、家族の控えが ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
+			ccnavi_c1_say "取り込みの後、親子のチケットの控えが ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
@@ -1163,15 +1163,15 @@ ccnavi_c1_undo() {
 	return 0
 }
 
-# 送れた。家族の控えの sha を書き換える（state はそのまま present）。<送った先頭>
+# 送れた。親子のチケットの控えの sha を書き換える（state はそのまま present）。<送った先頭>
 ccnavi_c1_sent() {
 	ccnavi_cn_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 	if [ "$(ccnavi_record_get "$ccnavi_cn_record" state)" = present ]; then
 		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_family_id" sha "$1" \
 			fetched_at "$(ccnavi_record_get "$ccnavi_cn_record" fetched_at)" state present reason "" ||
-			ccnavi_c1_say "家族の控え（${ccnavi_cn_record}）を書けなかった"
+			ccnavi_c1_say "親子のチケットの控え（${ccnavi_cn_record}）を書けなかった"
 	fi
-	ccnavi_c1_say "家族 $ccnavi_c1_family_id の状態を送った（$(printf '%.12s' "$1")）"
+	ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id の状態を送った（$(printf '%.12s' "$1")）"
 	log_info C1 で送った -- "family=$ccnavi_c1_family_id"
 }
 

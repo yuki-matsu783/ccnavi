@@ -103,7 +103,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
-                   リモートから消えた (家族の控えが gone の) 親のブランチへは送れない)
+                   リモートから消えた (親子のチケットの控えが gone の) 親のブランチへは送れない)
 
 通さないもの (代わりの手段):
   reset clean   sh .ccnavi/scripts/ccnavi-git.sh stash push -u で退避する。消さない
@@ -914,7 +914,7 @@ checkout | switch)
 	# 親の写しか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
-	# このツリーへ取り込まなくなる。家族の控えがある親（親のブランチを一度でも origin へ push したか、
+	# このツリーへ取り込まなくなる。親子のチケットの控えがある親（親のブランチを一度でも origin へ push したか、
 	# ccnavi-sync.sh で取り込んだ親）では、実行ファイル（syncstate.standing）が親のワークツリーを決められず、
 	# 親と子のチケットの承認・状態の操作・実行前の判定を止める。
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
@@ -1052,14 +1052,14 @@ push)
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
-	# リモートから消えた親のブランチ（家族の控えが gone）へは送らない。
-	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた家族）を確かめないまま家族が
+	# リモートから消えた親のブランチ（親子のチケットの控えが gone）へは送らない。
+	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
 	# 動き出す。毎回の ls-remote はせず、控えを読むだけにする。ユーザが戻した後は ccnavi-sync.sh が
 	# present に書き直して、この拒否が解ける。
 	push_key=$(ccnavi_repo_key "${push_top:-.}" "$WS")
 	push_record=$(ccnavi_family_record "$WS" "$push_key" "$push_branch")
 	if [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
-		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（家族の控えが gone）。普通の push で作り直すと、消えた理由を確かめないまま家族が動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。家族を捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_branch で家族の控えを消します（エージェントは打ちません）。"
+		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（親子のチケットの控えが gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_branch で親子のチケットの控えを消します（エージェントは打ちません）。"
 	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do
@@ -1113,7 +1113,7 @@ clone | submodule | lfs)
 	;;
 esac
 
-# push が通ったら、親のブランチなら家族の控えを作る。最初の push からその親子のチケットを C1 の
+# push が通ったら、親のブランチなら親子のチケットの控えを作る。最初の push からその親子のチケットを C1 の
 # 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
 #
 # 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親の写しか提案が
@@ -1154,14 +1154,14 @@ push_record_family() {
 	pr_dirty=$(git -C "$push_top" status --porcelain --untracked-files=all -- \
 		"${pr_approved%/}" "${pr_proposals%/}/review" 2>/dev/null | cut -c4- | tr '\n' ' ' | sed 's/ *$//')
 	if [ -n "$pr_dirty" ]; then
-		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この家族は取り込み（%s %s）の対象になる\n' \
+		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この親子のチケットは取り込み（%s %s）の対象になる\n' \
 			"$pr_dirty" "$SYNC" "$push_branch"
 		return 0
 	fi
 	if ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
 		fetched_at "$(date +%s)" state present reason ""; then
-		log_info 家族の控えを作った -- "branch=$push_branch" "repo=$push_key"
-		printf '案内: %s の家族の控えを作った。以後、リモートでの承認は %s %s で取り込む\n' \
+		log_info 親子のチケットの控えを作った -- "branch=$push_branch" "repo=$push_key"
+		printf '案内: %s の親子のチケットの控えを作った。以後、リモートでの承認は %s %s で取り込む\n' \
 			"$push_branch" "$SYNC" "$push_branch"
 	fi
 	return 0

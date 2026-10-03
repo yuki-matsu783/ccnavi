@@ -498,7 +498,7 @@ def _undecided(
 
     「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
     できることが読めない。権威の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの家族は権威が親のブランチに決まって
+    それが決まらない理由を名指しする。取り込み済みの親子のチケットは権威が親のブランチに決まって
     いるので、控えから引いた解き方（`syncstate.guidance`）を出す。
     """
     home = hits[0].parent or hits[0].ticket
@@ -507,7 +507,7 @@ def _undecided(
     if st is not None and st.imported:
         stderr.write(
             f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）の写しだけ"
-            "（取り込み済みの家族）。ほかのツリーの写しは読まない\n"
+            "（取り込み済みの親子のチケット）。ほかのツリーの写しは読まない\n"
         )
         for line in syncstate.guidance(root, st) if st.stop else []:
             stderr.write(f"  {line}\n")
@@ -556,25 +556,25 @@ def _find(
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """取り込み済みの家族が決まらない・閉じているなら、言って True。
+    """取り込み済みの親子のチケットが決まらない・閉じているなら、言って True。
 
-    その家族の状態の操作（着手・終了・取り消し・記録・レビューの印）は止める。引いた写しが
+    その親子のチケットの状態の操作（着手・終了・取り消し・記録・レビューの印）は止める。引いた写しが
     親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信頼しない写しを
-    動かさないように止める。控えの無い家族は何も言わない（今の動きのまま）。
+    動かさないように止める。控えの無い親子のチケットは何も言わない（今の動きのまま）。
     """
     st = approval.family_standing(conf, root, found)
     if not st.imported:
         return False
     if st.stop:
-        stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この家族の状態は動かさない\n")
+        stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この親子のチケットの状態は動かさない\n")
         for line in syncstate.guidance(root, st):
             stderr.write(f"  {line}\n")
         return True
     if st.home is not None and not syncstate.same_tree(found.tree_root, st.home.root):
         stderr.write(
             f"ccnavi: {found.ticket}: 写しが親のブランチ {st.family} のワークツリーの外"
-            f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの家族では"
-            "親のブランチの写しだけが本物なので、この写しは動かさない\n"
+            f"（{found.tree or 'ワークスペースルート'}）にしか無い。"
+            "取り込み済みの親子のチケットでは親のブランチの写しだけが本物なので、この写しは動かさない\n"
             f"  ユーザがその写しを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
             "コミットと push をしてから打ち直す\n"
         )

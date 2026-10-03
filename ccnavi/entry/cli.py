@@ -901,7 +901,7 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）が綴りを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 取り込みの後の検査（権威と層の食い違い）。error があれば sh が家族を止める。
+    # 取り込みの後の検査（権威と層の食い違い）。error があれば sh が親子のチケットを止める。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None
         code = sync_check(stdout, stderr, root, conf, args.command[2], repo)
@@ -1202,7 +1202,7 @@ def operate(
     bypass = _c1_bypass(root, conf, args, cwd)
     if bypass:
         stderr.write(
-            f"ccnavi: 家族 {bypass} は取り込み済み（C1 の対象）。状態の操作は "
+            f"ccnavi: 親子のチケット {bypass} は取り込み済み（C1 の対象）。状態の操作は "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' か "
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' から打ってください。"
             "C1 を通らない書き込みは親のブランチへ送られないので、何も書かずに止めた\n"
@@ -1319,11 +1319,13 @@ def operate(
 
 
 def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd) -> str:
-    """C1 を通らずに、取り込み済みの家族の状態を書こうとしているなら、その家族。無ければ空。
+    """C1 を通らずに、取り込み済みの親子のチケットの状態を書こうとしているなら、その親の識別子。
+    無ければ空。
 
     状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
-    行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の家族では sh が `--record-tree` を
-    付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を通っていない。
+    行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の親子のチケットでは sh が
+    `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
+    C1 を通っていない。
     ユーザの判断の操作（`--reviewed --chat`・`--config-synced`・`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
     """
@@ -1405,7 +1407,7 @@ _REVISION = re.compile(r"[0-9a-f]{7,64}|refs/remotes/origin/[A-Za-z0-9][A-Za-z0-
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
-# 知らない副命令を断った、など）と読み、家族を止めない（検査の error と分ける）。
+# 知らない副命令を断った、など）と読み、親子のチケットを止めない（検査の error と分ける）。
 SYNC_CHECK_HEAD = "check 1"
 
 
@@ -1419,7 +1421,7 @@ def sync_check(
 ) -> int:
     """`ccnavi-sync.sh` が取り込みの後に打つ検査。頭に `check 1`、続けて 1 行 1 件。
 
-    error が 1 つでもあれば 1。sh は最初の error の中身を家族の控えの `reason` に書いて
+    error が 1 つでもあれば 1。sh は最初の error の中身を親子のチケットの控えの `reason` に書いて
     `blocked` にする。`repo` は控えの名前（`self` かプロジェクト名）。
     ネットワークにも git にも触らない。
     """
