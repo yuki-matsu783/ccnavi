@@ -2,8 +2,9 @@ import re
 import time
 import unittest
 
-from ccnavi import phase, shellread
-from ccnavi.shellread import REASON_TAKEN_AS_CODE, REASON_UNTERMINATED, SEP, read
+from ccnavi.infra import shellread
+from ccnavi.infra.shellread import REASON_TAKEN_AS_CODE, REASON_UNTERMINATED, SEP, read
+from ccnavi.tickets import phase
 
 # 語の中の切れ目の目印。コマンドの区切り（SEP）と別の文字になる予定で、
 # 実装が入るまでは無い。無い間は、それを前提にしたテストを skip する。
@@ -314,9 +315,9 @@ class UnwrappedTest(unittest.TestCase):
     def test_途中の層も並ぶ(self):
         # U1。承認のルールの `script` の枝は `sh …approve.sh` の層に当たる。外側から内側へ並ぶ。
         cases = {
-            "env sh .ccnavi/scripts/ccnavi-approve.sh": [
-                "sh .ccnavi/scripts/ccnavi-approve.sh",
-                ".ccnavi/scripts/ccnavi-approve.sh",
+            "env sh .ccnavi/scripts/ccnavi-agree.sh": [
+                "sh .ccnavi/scripts/ccnavi-agree.sh",
+                ".ccnavi/scripts/ccnavi-agree.sh",
             ],
             "/bin/sh x.sh": ["sh x.sh", "x.sh"],
             "/usr/bin/env rm x": ["env rm x", "rm x"],

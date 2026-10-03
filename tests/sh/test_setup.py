@@ -100,7 +100,7 @@ DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
     "ccnavi-common.sh",
     "ccnavi-push-approved.sh",
-    "ccnavi-approve.sh",
+    "ccnavi-agree.sh",
     "ccnavi-fetch.sh",
     "ccnavi-sync.sh",
     "ccnavi-clean.sh",

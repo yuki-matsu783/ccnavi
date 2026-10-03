@@ -22,7 +22,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi import lint, version
+from ccnavi.entry import lint, version
 from tests.ticket.test_core import STAMP, _chrome
 from tests.ticket.test_phases import PHASES, child_text, parent_text
 

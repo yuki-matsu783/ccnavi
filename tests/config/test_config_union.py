@@ -467,7 +467,7 @@ class ConfigUnionHarness(unittest.TestCase):
         return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), **options)
 
     def approve(self):
-        return self.ccnavi("--approve", stdin="y\n")
+        return self.ccnavi("--agree", stdin="y\n")
 
     def lint_json(self, *args, **options):
         result = self.ccnavi("--lint", "--json", *args, **options)

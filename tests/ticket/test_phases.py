@@ -202,9 +202,9 @@ class PhaseHarness(unittest.TestCase):
         """承認して、写しを親のブランチに乗せる。
 
         写しは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
-        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順でたどる。
+        本番で `ccnavi-agree.sh` がやることを、テストでも同じ順でたどる。
         """
-        result = self.ccnavi("--approve", stdin="y\n")
+        result = self.ccnavi("--agree", stdin="y\n")
         if os.path.isdir(self.approved):
             git(self.parent_tree, "add", "-A")
             git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
@@ -323,7 +323,7 @@ class PhaseHarness(unittest.TestCase):
 
 
 class ApproveOnlyTest(PhaseHarness):
-    """`--approve <識別子>...` で承認の対象を絞っても、絞らないときに落ちるものは通らない。"""
+    """`--agree <識別子>...` で承認の対象を絞っても、絞らないときに落ちるものは通らない。"""
 
     def test_child_cannot_be_approved_without_the_parents_pending_revision(self):
         self.family(plan=("acceptance", "implement"))
@@ -333,12 +333,12 @@ class ApproveOnlyTest(PhaseHarness):
         self.commit_parent()
         # 絞らないときは、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
         # 「編集対象としているが」として出る（設計 approve-carry 3.2）。n で何も適用しない
-        whole = self.ccnavi("--approve", stdin="n\n")
+        whole = self.ccnavi("--agree", stdin="n\n")
         self.assertIn("編集対象としているが", whole.stdout)
         self.assertIn("超えている", whole.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
         # 改版を外して子だけ並べても、旧計画で通してはいけない
-        only = self.ccnavi("--approve", "i0001-02", stdin="y\n")
+        only = self.ccnavi("--agree", "i0001-02", stdin="y\n")
         self.assertEqual(only.returncode, 1, only.stdout + only.stderr)
         self.assertIn("改版", only.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
@@ -362,7 +362,7 @@ class PhaseTest(PhaseHarness):
     # ---- 1. 種類の定義
 
     def test_phase_types_must_be_unique_and_well_formed(self):
-        from ccnavi import phasetypes
+        from ccnavi.tickets import phasetypes
 
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: 同じ, kind: work}\n  b: {title: 同じ, kind: work}\n"

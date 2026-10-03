@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import sys
 
-from ccnavi import cli, hookio
+from ccnavi.entry import cli
+from ccnavi.infra import hookio
 
 
 def main() -> int:

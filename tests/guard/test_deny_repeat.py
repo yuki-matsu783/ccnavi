@@ -12,7 +12,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi import audit, repeat
+from ccnavi.records import audit, repeat
 from tests import fixture_workspace
 from tests.inproc import run_ccnavi
 

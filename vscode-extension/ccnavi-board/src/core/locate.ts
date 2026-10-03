@@ -13,7 +13,7 @@
  * `bin/<os>-<arch>/` に並ぶ（`.ccnavi/scripts/` の sh なら `.ccnavi/bin/<os>-<arch>/`）。
  * 拡張は sh を通さずその実体を探し、sh そのものは返さない。Windows では sh を直接起動
  * できないので、sh を返すと起動に失敗する。実体が無ければ次の候補へ進む。
- * それ以外の綴りは、綴りそのものを探す。語は ccnavi/platformtag.py と揃える。
+ * それ以外の綴りは、綴りそのものを探す。語は ccnavi/infra/platformtag.py と揃える。
  *
  * ファイルの有無は呼び手が渡す（テストで実際のファイルシステムを要らなくするため）。
  */
@@ -37,7 +37,7 @@ export const DEFAULT_BINS = [
   "dist/ccnavi/ccnavi",
   ".ccnavi/scripts/ccnavi-launcher.sh",
 ] as const;
-/** 振り分けの sh の名前。ccnavi/platformtag.py の LAUNCHER_NAME と揃える */
+/** 振り分けの sh の名前。ccnavi/infra/platformtag.py の LAUNCHER_NAME と揃える */
 export const LAUNCHER_NAME = "ccnavi-launcher.sh";
 export const SOURCE_MARKER = "ccnavi/__main__.py";
 const SUFFIXES = ["", ".exe"] as const;

@@ -104,12 +104,12 @@ export type ApprovalInput =
       readonly filtered: boolean;
       readonly pending: readonly string[];
     }
-  /** 一覧（`--approve --preview --json`）が返った */
+  /** 一覧（`--agree --preview --json`）が返った */
   | { readonly kind: "previewed"; readonly result: PreviewParse }
   /** 「この N 件を承認する」を押した */
   | { readonly kind: "confirm"; readonly tickets: readonly string[] }
   /**
-   * 承認（`--approve --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
+   * 承認（`--agree --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
    * `carrier` は承認済みチケットを運ぶ sh が置いてあるか（呼ぶ側が見て渡す）
    */
   | { readonly kind: "approved"; readonly outcome: ApproveOutcome; readonly carrier: boolean }
@@ -148,9 +148,9 @@ export type ApprovalInput =
 
 /** 外へ出る仕事。**行うのは呼ぶ側**（`board-panel.ts`） */
 export type ApprovalEffect =
-  /** 承認待ちの一覧を読む（`--approve --preview --json`）。返ったら `previewed` で戻す */
+  /** 承認待ちの一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
-  /** 承認を打つ（`--approve --yes … --digest …`）。返ったら `approved` で戻す */
+  /** 承認を打つ（`--agree --yes … --digest …`）。返ったら `approved` で戻す */
   | {
       readonly kind: "approve";
       readonly tickets: readonly string[];

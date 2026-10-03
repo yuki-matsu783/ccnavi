@@ -18,7 +18,7 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi import version
+from ccnavi.entry import version
 from tests import ROOT
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -146,7 +146,10 @@ class CompatSkewTest(unittest.TestCase):
 
 class CompatAgreesTest(unittest.TestCase):
     def test_v6_the_executable_the_sh_and_the_extension_declare_the_same_compat(self):
-        """V6 互換の版は 3 か所に書く。上げるときは揃えて上げる（ccnavi/version.py の説明）。"""
+        """V6 互換の版は 3 か所に書く。上げるときは揃えて上げる。
+
+        上げ方は ccnavi/entry/version.py の説明のとおり。
+        """
         self.assertEqual(sh_compat(), version.COMPAT)
         self.assertEqual(extension_compat(), version.COMPAT)
 
@@ -157,6 +160,13 @@ class CompatAgreesTest(unittest.TestCase):
         古い sh（互換 1）と組み合わせると、食い違いとして知らせる。
         """
         self.assertGreaterEqual(version.COMPAT, 2)
+
+    def test_v8_renaming_the_approve_flag_to_agree_raised_the_compat_to_3(self):
+        """V8 `--approve` を `--agree` に改名したので 3 以上。
+
+        改名の前の sh（互換 2）は `--approve` を渡して落ちるので、食い違いとして知らせる。
+        """
+        self.assertGreaterEqual(version.COMPAT, 3)
 
 
 if __name__ == "__main__":

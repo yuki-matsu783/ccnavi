@@ -21,7 +21,8 @@ import json
 import os
 from unittest import mock
 
-from ccnavi import configsync, ops, phase, risk, settings
+from ccnavi.infra import settings
+from ccnavi.tickets import configsync, ops, phase, risk
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,

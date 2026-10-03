@@ -180,9 +180,9 @@ class C1Harness(unittest.TestCase):
         )
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "propose")
-        preview = self.exe("--approve", "--preview", "--json")
+        preview = self.exe("--agree", "--preview", "--json")
         digest = json.loads(preview.stdout)["digest"]
-        done = self.exe("--approve", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
+        done = self.exe("--agree", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve")

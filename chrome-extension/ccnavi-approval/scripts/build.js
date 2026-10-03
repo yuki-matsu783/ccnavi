@@ -56,8 +56,8 @@ export async function build({ hostsFile = path.join(HERE, "hosts.json"), out = p
   const hosts = parseHosts(fs.readFileSync(hostsFile, "utf8"));
   const version = JSON.parse(fs.readFileSync(path.join(HERE, "package.json"), "utf8")).version;
   // 同梱の ccnavi の互換の版（service worker が「始める」の前に統合先の CCNAVI_COMPAT と比べる）
-  const compatMatch = /^COMPAT = (\d+)$/m.exec(fs.readFileSync(path.join(HERE, "..", "..", "ccnavi", "version.py"), "utf8"));
-  if (!compatMatch) throw new Error("ccnavi/version.py の COMPAT を読めない");
+  const compatMatch = /^COMPAT = (\d+)$/m.exec(fs.readFileSync(path.join(HERE, "..", "..", "ccnavi", "entry", "version.py"), "utf8"));
+  if (!compatMatch) throw new Error("ccnavi/entry/version.py の COMPAT を読めない");
   const compat = Number(compatMatch[1]);
 
   fs.rmSync(out, { recursive: true, force: true });

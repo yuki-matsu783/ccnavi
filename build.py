@@ -27,7 +27,8 @@ import time
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from ccnavi import platformtag, version  # noqa: E402
+from ccnavi.entry import version  # noqa: E402
+from ccnavi.infra import platformtag  # noqa: E402
 
 # 組み立ての出力。導入スクリプトはここから配り、代わりに通る sh は env が無いときここを探す。
 DIST = os.path.join(ROOT, "dist")
@@ -50,7 +51,7 @@ def build_target() -> str:
     """組み立てた実行ファイルが動く機械の `<os>-<arch>`。
 
     PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。
-    導入スクリプトはこの語を配布先のディレクトリ名にする（ccnavi/platformtag.py）。
+    導入スクリプトはこの語を配布先のディレクトリ名にする（ccnavi/infra/platformtag.py）。
     """
     return platformtag.host_target()
 

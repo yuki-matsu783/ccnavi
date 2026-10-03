@@ -7,7 +7,7 @@ GitLab で ccnavi の書き込みどうしの競合を捕まえる印ファイ�
 ## 何をするか
 
 - 統合先（設定の名前か、ホストのデフォルトブランチ）と、直近 N 日・指定のブランチ（表示用）の置き場を GitHub・GitLab の API で読む
-- 家族（親のブランチ）ごとに、統合先・`P`・先行の閉包の `P_X` だけを入力にして、同梱の ccnavi の `--approve --preview --json` を
+- 家族（親のブランチ）ごとに、統合先・`P`・先行の閉包の `P_X` だけを入力にして、同梱の ccnavi の `--agree --preview --json` を
   Pyodide の上で動かし、承認待ちと承認の対象にしない提案を並べる。直近 N 日・指定のブランチは提案を見つけるのに使うだけで、判定には入れない。
   判定は Python が出し、TS は並べるだけ（TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため）
 - 統合先の `CCNAVI_COMPAT` と同梱の互換の版が違えば、どちらを更新するかを出し、承認と取り下げを出さない
@@ -51,7 +51,7 @@ GitLab で ccnavi の書き込みどうしの競合を捕まえる印ファイ�
 | `src/options/` | 設定画面。リポジトリ（統合先の名前・直近の日数・指定のブランチ）と PAT |
 | `src/worker/` | Pyodide を動かす Web Worker |
 | `src/core/` | 画面に依らない部品（通信先と manifest、GitHub の読み書き（`github.ts`）、GitLab の読み書き（`gitlab.ts`）、「始める」（`start.ts`）、画面と service worker の約束、読み取りの流れ、レビュー済みの材料の読み（`reviewed.ts`）、承認・取り下げ・レビュー済みの流れ（`write.ts`）、PAT の期限、Markdown の消毒、描画） |
-| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーと取り込みの控え相当を組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
+| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーと取り込みの控え相当を組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
 | `hosts.json` | 焼き込む通信先。組織ごとのビルドはこれを替える |
 
 ## 組み立て

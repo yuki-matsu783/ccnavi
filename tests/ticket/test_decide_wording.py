@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from ccnavi import review
+from ccnavi.tickets import review
 
 
 def decision(unresolved=()):

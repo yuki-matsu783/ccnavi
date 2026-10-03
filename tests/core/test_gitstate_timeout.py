@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import gitcmd, gitstate
+from ccnavi.infra import gitcmd, gitstate
 
 
 class TimeoutTest(unittest.TestCase):

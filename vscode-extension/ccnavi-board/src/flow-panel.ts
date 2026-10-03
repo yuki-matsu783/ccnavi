@@ -12,10 +12,10 @@
  * 着手中かを `started_at` から組み直さない。拡張が組み直すと、判定と 2 か所で答えが分かれうるため。フローが正しいか（読めるか・形）も実行ファイルに聞く。
  * 開くときは読んだ本文を、保存の前は書き出す本文を一時ファイルに書いて `--lint --json --flow` に掛け
  * （`core/flow-lint.ts`）、error があれば理由を出して開かない・保存しない。開くときは、画面の読みと実行ファイルが
- * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-agree.ts`）。保存は次を全部満たすときだけ書く。
+ * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-match.ts`）。保存は次を全部満たすときだけ書く。
  *
  * 1. 実行ファイルの `--lint --flow` が書き出す本文に error を言わず、その本文を読んだ中身（`flow.data`）が
- *    画面が書こうとした中身と同じ（`core/flow-agree.ts`。PyYAML で意味が変わる本文を書かない）
+ *    画面が書こうとした中身と同じ（`core/flow-match.ts`。PyYAML で意味が変わる本文を書かない）
  * 2. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
  * 3. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
  * 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
@@ -44,7 +44,7 @@ import * as vscode from "vscode";
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runC1Target, runFlowLint } from "./ccnavi.js";
 import { PUSH_APPROVED_SCRIPT, pushApprovedCommand } from "./core/commands.js";
-import { flowDisagreement, openDisagreementText, saveDisagreementText } from "./core/flow-agree.js";
+import { flowMismatch, openMismatchText, saveMismatchText } from "./core/flow-match.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
 import { renderFlowPage } from "./core/flow-render.js";
@@ -286,10 +286,10 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     throw refuse(value.error);
   }
   // 画面の読み（YAML 1.2）が実行ファイルの読み（PyYAML）と同じときだけ開く。違えば、画面で保存しただけで
-  // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-agree.ts）
-  const disagreement = flowDisagreement(value.value, verdict.data);
-  if (disagreement !== undefined) {
-    throw new Error(`フローのファイルを開きません（${shown}）: ${openDisagreementText(disagreement)}。直したら再読込してください`);
+  // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
+  const mismatch = flowMismatch(value.value, verdict.data);
+  if (mismatch !== undefined) {
+    throw new Error(`フローのファイルを開きません（${shown}）: ${openMismatchText(mismatch)}。直したら再読込してください`);
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
@@ -664,10 +664,10 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     fail(current, `保存しません: ${verdict.error}`);
     return;
   }
-  // 書き出す本文を実行ファイルが、画面が書こうとした中身と同じに読むときだけ書く（core/flow-agree.ts）
-  const disagreement = flowDisagreement(doc, verdict.data);
-  if (disagreement !== undefined) {
-    fail(current, `保存しません: ${saveDisagreementText(disagreement)}`);
+  // 書き出す本文を実行ファイルが、画面が書こうとした中身と同じに読むときだけ書く（core/flow-match.ts）
+  const mismatch = flowMismatch(doc, verdict.data);
+  if (mismatch !== undefined) {
+    fail(current, `保存しません: ${saveMismatchText(mismatch)}`);
     return;
   }
   // 2. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）

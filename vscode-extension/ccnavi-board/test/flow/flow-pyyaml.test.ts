@@ -1,7 +1,7 @@
 /**
- * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`ccnavi/flow.py` の `parse`）で実際に読み戻す。
+ * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`ccnavi/tickets/flow.py` の `parse`）で実際に読み戻す。
  * 読み戻した中身（`flow.as_json`。`--lint --json --flow` の `flow.data` と同じ形）が画面の中身と同じかを
- * `flow-agree.ts` の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
+ * `flow-match.ts` の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
  *
  * 実行ファイルの読み手を起こすのは、リポジトリのルートで `uv run python`（無ければ `python3`）。どちらも起こせない
  * 環境では飛ばす（理由を出す）。
@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
-import { flowDisagreement } from "../../src/core/flow-agree.js";
+import { flowMismatch } from "../../src/core/flow-match.js";
 import { parseFlowValue, serializeFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 
 /** リポジトリのルート（`out/test/flow/` から 5 段上） */
@@ -19,7 +19,7 @@ const REPO_ROOT = path.join(__dirname, "..", "..", "..", "..", "..");
 
 const SCRIPT = `
 import base64, json, sys
-from ccnavi import flow
+from ccnavi.tickets import flow
 out = []
 for item in json.load(sys.stdin):
     data, why = flow.parse(base64.b64decode(item))
@@ -118,7 +118,7 @@ test("CB-T248 PyYAML が裸や `|` では読めない・別の文字に読む文
   const reads = readBack(docs);
   reads.forEach((read, i) => {
     assert.equal(read.why, "", `${JSON.stringify(values[i])}: ${read.why}\n${serializeFlow(docs[i] as unknown as FlowDoc)}`);
-    assert.equal(flowDisagreement(docs[i], read.data), undefined, `${JSON.stringify(values[i])}\n${serializeFlow(docs[i] as unknown as FlowDoc)}`);
+    assert.equal(flowMismatch(docs[i], read.data), undefined, `${JSON.stringify(values[i])}\n${serializeFlow(docs[i] as unknown as FlowDoc)}`);
   });
   // 1 行の文字列のタブは裸で書かない（JSON のときからの退行）
   assert.match(serializeFlow({ nodes: [node("a", { prompt: "a\tb" })] }), /prompt: "a\\tb"/);
@@ -220,12 +220,12 @@ test("CB-T249 乱数の中身（固定の種、400 本）を書き出して PyYA
   reads.forEach((read, i) => {
     const shown = serializeFlow(docs[i] as unknown as FlowDoc);
     assert.equal(read.why, "", `${i}: ${read.why}\n${shown}`);
-    const found = flowDisagreement(docs[i], read.data);
+    const found = flowMismatch(docs[i], read.data);
     assert.equal(found, undefined, `${i}: ${JSON.stringify(found)}\n${shown}`);
     // 画面の読み手でも同じ中身に読める（書いたものを画面が開き直せる）
     const again = parseFlowValue(shown);
     assert.ok(again.ok, `${i}`);
-    assert.equal(flowDisagreement(again.value, read.data), undefined, `${i} を画面で読み直すと食い違う\n${shown}`);
+    assert.equal(flowMismatch(again.value, read.data), undefined, `${i} を画面で読み直すと食い違う\n${shown}`);
   });
 });
 
@@ -241,16 +241,16 @@ test("CB-T250 画面の読み（YAML 1.2）と PyYAML の読みが違う綴り�
     assert.equal(reads[i].why, "", t);
     const screen = parseFlowValue(t);
     assert.ok(screen.ok, t);
-    const found = flowDisagreement(screen.value, reads[i].data);
+    const found = flowMismatch(screen.value, reads[i].data);
     assert.notEqual(found, undefined, t);
   });
   // 場所はノードの id と欄のパスで言う
   const first = parseFlowValue(texts[0]);
   assert.ok(first.ok);
-  assert.deepEqual(flowDisagreement(first.value, reads[0].data), { where: 'ノード "a" の data.v', screen: "整数 755", executable: "整数 493" });
+  assert.deepEqual(flowMismatch(first.value, reads[0].data), { where: 'ノード "a" の data.v', screen: "整数 755", executable: "整数 493" });
   quoted.forEach((t, i) => {
     const screen = parseFlowValue(t);
     assert.ok(screen.ok, t);
-    assert.equal(flowDisagreement(screen.value, reads[texts.length + i].data), undefined, t);
+    assert.equal(flowMismatch(screen.value, reads[texts.length + i].data), undefined, t);
   });
 });

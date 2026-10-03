@@ -259,7 +259,7 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertIn(NOTE, allowed.stdout)
 
     def test_file_body_follows_the_text_and_is_cut_at_the_limit(self):
-        from ccnavi import ctxfile
+        from ccnavi.policy import ctxfile
 
         write(os.path.join(self.root, "docs", "guide.md"), "# 決まり\n\nテストは tests/ に置く。\n")
         write(os.path.join(self.root, "docs", "long.md"), "あ" * (ctxfile.MAX_CHARS + 50))
@@ -310,7 +310,7 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertEqual(outside.get("additionalContext"), "ルートの案内")
 
     def test_once_file_is_delivered_once_and_lint_checks_the_path(self):
-        from ccnavi import ctxfile
+        from ccnavi.policy import ctxfile
 
         state = os.path.join(self.root, "state")
         write(os.path.join(self.root, "docs", "once.md"), "最初に 1 度だけ")

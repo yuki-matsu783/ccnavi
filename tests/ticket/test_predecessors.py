@@ -23,7 +23,7 @@ import os
 import shutil
 import unittest
 
-from ccnavi import modes, settings
+from ccnavi.infra import modes, settings
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
 
 
@@ -164,13 +164,13 @@ class PredecessorTest(TicketTest):
     def test_the_board_preview_and_verify_show_why(self):
         self.family()
         self.propose_after("i0001-03", "i0001-01")
-        shown = self.ccnavi("--approve", "--preview", "--json")
+        shown = self.ccnavi("--agree", "--preview", "--json")
         self.assertEqual(shown.returncode, 0, shown.stderr)
         body = json.loads(shown.stdout)
         self.assertEqual(body["batch"], [])
         rejected = {r["ticket"]: r["problems"] for r in body["rejected"]}
         self.assertTrue(any("先行 i0001-01 が閉じていない" in p for p in rejected["i0001-03"]))
-        verified = self.ccnavi("--approve", "--preview", "--verify")
+        verified = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verified.returncode, modes.EXIT_ANSWER_NO, verified.stdout)
         self.assertIn("落ちる", verified.stdout)
         self.assertIn("先行 i0001-01", verified.stdout)
@@ -349,13 +349,13 @@ class PredecessorTest(TicketTest):
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))
         self.assertEqual(bash(sed, "bypassPermissions"), "deny")
-        # 承認を自分で出す経路（端末の外からの --approve / --yes）も止まる。
+        # 承認を自分で出す経路（端末の外からの --agree / --yes）も止まる。
         approve = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             guard_ticket_approval="enable",
-            command="ccnavi --approve --yes i0001-03",
+            command="ccnavi --agree --yes i0001-03",
         )
         self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(approve))
         # サブエージェントは着手そのものを打てない。
