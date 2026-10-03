@@ -86,13 +86,13 @@ export function checkRemote(raw: string): RemoteCheck {
   return { ok: true, remote: { url, key: `${host}/${cleaned.toLowerCase()}`, name } };
 }
 
-/** origin の URL から比べる鍵を出す。読めない綴り（ローカルパスなど）なら空 */
+/** origin の URL から比べる鍵を出す。読めない表記（ローカルパスなど）なら空 */
 export function remoteKeyOf(url: string): string {
   const checked = checkRemote(url);
   return checked.ok ? checked.remote.key : "";
 }
 
-/** `projects/<名前>` に使える綴り。英数字で始まり、英数字と `. _ -` だけ */
+/** `projects/<名前>` に使える表記。英数字で始まり、英数字と `. _ -` だけ */
 export const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export type NameCheck = { readonly ok: true; readonly name: string } | { readonly ok: false; readonly error: string };
@@ -216,16 +216,16 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
 }
 
 /**
- * 共通の設定のルールをプロジェクトかワークスペースの設定のルールファイルに写すときの加工。
+ * 共通の設定のルールをプロジェクトかワークスペースの設定のルールファイルにコピーするときの加工。
  * 先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` を `sh {root}/.ccnavi/scripts/` にする。
  * プロジェクトの中に cwd があるエージェントには `.ccnavi/scripts/` が届かず、`{root}` はルールを
  * 読むときにワークスペースルートの絶対パスへ置き換わる（設計 11.8）。置換は 1 種類だけ。
  */
 export function rewriteRulesForProject(text: string, sourceRel: string, layer: string, date: string): string {
   const header = [
-    `# ${layer} のルール。共通層の ${sourceRel} を ${date} に写した（ccnavi ボード）。`,
+    `# ${layer} のルール。共通層の ${sourceRel} を ${date} にコピーした（ccnavi ボード）。`,
     "# このファイルは共通層に足してヒットする（上書きはしない）。共通層と全欄が同じ行は重複として捨てられ、--lint が info で言う。",
-    "# 文面の sh の綴りは {root}/.ccnavi/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
+    "# 文面の sh のパスは {root}/.ccnavi/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
     "# 置き換えた行は共通層の行と中身が違う扱いになり、両方効く（--lint が warn で言う）。要らない行は消す。",
     "",
   ].join("\n");

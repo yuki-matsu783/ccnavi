@@ -368,14 +368,14 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
   }
 });
 
-test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
+test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は目印を付けて出す", async () => {
   const base = readPhases(SAMPLE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
   const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });
   try {
     dom.click(dom.one(`${rowSelector("p3")} .row-head`));
     await dom.settle();
-    // 前後の空白は落として読み、空は出さない。自分自身は外せるように印を付けて出す
+    // 前後の空白は落として読み、空は出さない。自分自身は外せるように目印を付けて出す
     const checked = dom.all<HTMLOptionElement>(`${rowSelector("p3")} .f-overlap option`).filter((option) => option.selected);
     assert.deepEqual(checked.map((option) => option.value), ["design", "acceptance"]);
     assert.ok(dom.one(`${rowSelector("p3")} .f-overlap .id-option.foreign`).textContent?.includes("acceptance"));
@@ -446,7 +446,7 @@ test("CB-D86 図を見ているときに種類を足すと、一覧へ移って�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（図・絞り込み・開いた行）に戻り、途中の切り替えは控えに書かない", async () => {
+test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（図・絞り込み・開いた行）に戻り、途中の切り替えは state に書かない", async () => {
   const dom = await openPhases({}, { view: "graph" });
   try {
     assert.ok(dom.one("#phases").classList.contains("hidden"), "図で始まっていない");
@@ -466,7 +466,7 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
       }
     }
     assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ", "案内"]);
-    // 途中の一覧と図の切り替えは控えに書かない（途中でタブを閉じても、次は元の図で開く）
+    // 途中の一覧と図の切り替えは state に書かない（途中でタブを閉じても、次は元の図で開く）
     assert.equal((dom.state() as { view?: string }).view, "graph");
     // 最後の段は「完了」だけ（同じ働きのボタンを 2 つ並べない）
     assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");

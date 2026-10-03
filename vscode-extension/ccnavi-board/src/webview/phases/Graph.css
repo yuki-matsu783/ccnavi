@@ -1,7 +1,7 @@
 /*
  * フェーズの関係の図（`Graph.tsx`）。
  *
- * React Flow の CSS（`@xyflow/react/dist/style.css`。束ねの入口 `style.css` が `@import` する）は
+ * React Flow の CSS（`@xyflow/react/dist/style.css`。バンドルの入口 `style.css` が `@import` する）は
  * 色を `--xy-*-default` の変数で持っている。**打ち消すのではなく、変数を置き換える。**
  * 置き換え先は VS Code のテーマ変数（`--vscode-*`）で、画面の他のところと同じ出どころになる。
  * `!important` も、部品ごとの上書きも要らない。

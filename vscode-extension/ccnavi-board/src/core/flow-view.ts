@@ -5,7 +5,7 @@
  * （`FlowData`）だけで、画面が返すのはユーザが押した操作（`FlowMessage`）だけ。
  *
  * **着手中かどうかを画面は決めない**（ADR-0035・ADR-0085）。錠は実行ファイルの `--explain --json` の
- * `tickets[].flow.locked` をそのまま写す（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
+ * `tickets[].flow.locked` をそのまま使う（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
  * `started_at` などから組み直さない。保存の直前にも拡張ホストが実行ファイルに聞き直す。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
@@ -59,7 +59,7 @@ export interface FlowTarget {
 export type FlowTargetResult = { readonly ok: true; readonly target: FlowTarget } | { readonly ok: false; readonly error: string };
 
 /**
- * ボードの JSON から子のフローを引く。錠は `flow.locked` の写し。無い子・親・フローの欄が無いものは引けない。
+ * ボードの JSON から子のフローを引く。錠は `flow.locked` をそのまま使う。無い子・親・フローの欄が無いものは引けない。
  */
 export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult {
   const found = board.tickets.find((t) => t.ticket === ticket);
@@ -91,7 +91,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
   };
 }
 
-/** カードの「フロー」ボタンの言葉。在るか・着手中かで変わる（どちらも実行ファイルの答えの写し） */
+/** カードの「フロー」ボタンの言葉。在るか・着手中かで変わる（どちらも実行ファイルの答えのまま） */
 export function flowButtonLabel(flow: FlowJson): string {
   if (flow.locked) {
     return "フロー: 閲覧（着手中）";
@@ -105,7 +105,7 @@ export function flowButtonLabel(flow: FlowJson): string {
  * 実行ファイル（`--lint --json --flow`）がフローについて言ったこと。画面は判定し直さず、そのまま見せる。
  */
 export interface FlowChecks {
-  /** `(flow)` の warn（線の構造・名前の綴り）。一時ファイルのパスは対象のファイルの綴りに直してある */
+  /** `(flow)` の warn（線の構造・名前の表記）。一時ファイルのパスは対象のファイルのパスに直してある */
   readonly warns: readonly string[];
   /**
    * `SubagentStart` で担当に渡る手順の行。null は並べられなかった。無ければ実行ファイルが古くて答えに欄が無い
@@ -134,7 +134,7 @@ export interface FlowPage {
    */
   readonly reviewSave?: boolean;
   /**
-   * 未保存のまま閉じた画面から戻す編集中の写し。あれば画面は `doc` の代わりにこれを開き、
+   * 未保存のまま閉じた画面から戻す編集中のコピー。あれば画面は `doc` の代わりにこれを開き、
    * `doc`（読み込んだ中身）と比べて未保存にする
    */
   readonly draft?: FlowDoc;
@@ -167,11 +167,11 @@ export type FlowMessage =
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
   | { readonly type: "save"; readonly doc: FlowDoc }
-  /** 編集中の写し。未保存のまま閉じられたときに戻すため、拡張ホストが控える。未保存でなくなったら null */
+  /** 編集中のコピー。未保存のまま閉じられたときに戻すため、拡張ホストが覚えておく。未保存でなくなったら null */
   | { readonly type: "draft"; readonly doc: FlowDoc | null }
   /** 保存の前に差分を確かめるか（設定に書く） */
   | { readonly type: "reviewSave"; readonly value: boolean }
-  /** 編集中の写しを実行ファイルに確かめさせる（渡る手順・warn・候補を取り直す）。書きはしない */
+  /** 編集中のコピーを実行ファイルに確かめさせる（渡る手順・warn・候補を取り直す）。書きはしない */
   | { readonly type: "check"; readonly seq: number; readonly doc: FlowDoc }
   | { readonly type: "tourDone" };
 
@@ -216,7 +216,7 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
 
 /**
  * ボードの「フロー」ボタンの中身（`{type: "flow", ticket}`）の識別子。形が違えば undefined。
- * 識別子に使えない綴り（空・空白・パスの区切り）は受けない。開く先は拡張ホストがボードの答えから引き直す。
+ * 識別子に使えない表記（空・空白・パスの区切り）は受けない。開く先は拡張ホストがボードの答えから引き直す。
  */
 export function flowTicketOf(message: { readonly ticket?: unknown }): string | undefined {
   const ticket = message.ticket;

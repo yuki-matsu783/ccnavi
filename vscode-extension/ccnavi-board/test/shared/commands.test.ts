@@ -92,7 +92,7 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
   );
-  // 家族を並べると、その家族だけを運ぶ（ADR-0093 の 4.6。フローの保存の後）。
+  // 親のブランチを並べると、その親のブランチのチケットだけを運ぶ（ADR-0093 の 4.6。フローの保存の後）。
   assert.equal(
     pushApprovedCommand("/ws", ["i0001"]),
     "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",
@@ -106,7 +106,7 @@ test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 �
   assert.equal(c1TargetOf("c1 1\nfamily i0001\n"), "");
 });
 
-test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と同じ引用の規則。空白や記号があるときだけ引用する（root を解くのは呼び手）", () => {
+test("CB-T19c 文面の sh のパスは実行ファイルの script_command と同じ引用の規則。空白や記号があるときだけ引用する（root を解くのは呼び手）", () => {
   assert.equal(scriptCommand("/ws", "ccnavi-review.sh"), "sh /ws/.ccnavi/scripts/ccnavi-review.sh");
   assert.equal(scriptCommand("C:\\Users\\me\\ws\\", "ccnavi-review.sh"), "sh C:/Users/me/ws/.ccnavi/scripts/ccnavi-review.sh");
   assert.equal(scriptCommand("/my ws", "ccnavi-review.sh"), 'sh "/my ws/.ccnavi/scripts/ccnavi-review.sh"');

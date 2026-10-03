@@ -19,9 +19,9 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
 .card.review-hold { border-left: 3px solid var(--vscode-editorError-foreground); }
 /* 前の読み直しから列が変わった（承認された、レビュー不要で閉じた、レビューが済んだ、取り消された）
-   カードと、新しく現れたカード。着手（`ticket start`）は列を動かさないので印は出ない。
+   カードと、新しく現れたカード。着手（`ticket start`）は列を動かさないので動いた表示は出ない。
    **時間では消さない。** 承認の直後は渡す文のオーバーレイがボードを覆っていて、動く瞬間そのものを
-   ユーザが見られないので、次に何かが動くまで印を残す（`core/board-moved.ts`）。
+   ユーザが見られないので、次に何かが動くまで動いた表示を残す（`core/board-moved.ts`）。
    左の縁は不備・承認待ち・レビュー待ちが使っているので、こちらは輪（box-shadow）で出して上書きしない。
    HC のテーマでは輪を contrast の色に振り替える（他のテーマでは緑のまま）。
    色だけに頼らず、どこからどこへ動いたかは帯（`.moved-mark`）の文で言う */
@@ -102,7 +102,7 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 /* カードが狭いと 2 つ目のボタンは次の行へ回す。1 つでも幅に収まらなければボタンの中で折り返す */
 .card-actions > button.action { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-/* 状態が動いた跡（ADR-0086）。既定で畳む。開くと新しい順に 1 行ずつ。時刻と経路は薄く */
+/* 状態の履歴（ADR-0086）。既定で畳む。開くと新しい順に 1 行ずつ。時刻と経路は薄く */
 .history { margin-top: 6px; font-size: .82em; color: var(--vscode-descriptionForeground); }
 .history summary { cursor: pointer; width: fit-content; }
 .history summary:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
