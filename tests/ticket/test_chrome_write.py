@@ -126,11 +126,11 @@ class WriteGuardTest(ChromeWriteHarness):
         self.assertEqual([e["ticket"] for e in board["batch"]], ["i0001"])
         shown = {"ids": first["identifiers"], "digest": first["digest"]}
         refused = self.answer(self.chrome_request("plan", "i0001", shown=shown))
-        self.assertIn("7.3", refused["error"])
+        self.assertIn("互換", refused["error"])
         withdraw = self.answer(
             self.chrome_request("withdraw", "i0001", ids=["i0001"], prior={"i0001": "x"})
         )
-        self.assertIn("7.3", withdraw["error"])
+        self.assertIn("互換", withdraw["error"])
 
     def test_a_different_digest_writes_nothing(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
@@ -267,7 +267,7 @@ class EntryDetailTest(ChromeWriteHarness):
             ("confirm", {"phase": 1, "result": {"host": "h", "mr": {"number": 1, "url": "u"}}}),
         ):
             body = self.answer(self.chrome_request(op, "i0001", **extra))
-            self.assertIn("7.3", body.get("error", ""), op)
+            self.assertIn("互換", body.get("error", ""), op)
 
 
 class WithdrawableTest(ChromeWriteHarness):

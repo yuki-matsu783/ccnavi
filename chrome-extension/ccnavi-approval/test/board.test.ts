@@ -1,5 +1,5 @@
 /**
- * 読み取り専用ボードの組み立て（ADR-0093 段階 1）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * 読み取り専用ボードの組み立て。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -110,7 +110,7 @@ test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）
   const second = await run(fixture(), {}, cache);
   assert.equal(second.board.stats.blobsFetched, 0);
   assert.ok(second.board.stats.graphql < first.board.stats.graphql);
-  // 読み取りの回数は ADR の見積もりの桁（承認 1 回で 40 回ほど）に収まる
+  // 読み取りの回数は見積もりの桁（承認 1 回で 40 回ほど）に収まる
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 

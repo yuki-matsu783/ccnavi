@@ -1,5 +1,5 @@
 /**
- * Chrome の「レビュー済み」（ADR-0093 の 8.9。段階 4）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome の「レビュー済み」。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
  * - 録ったホストの応答の見本（test/fixtures/host/github/）から TS が組む写しが、sh が組んだ期待値と同じ
  * - 依頼の後の変更の一覧（compare API）は、打ち切り・祖先でない・無い、のどれでも null（動いたと数える）
@@ -108,10 +108,10 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
   for (const [scene, button, why] of [
     ["resolved", 1, null],
     ["full-page", 1, null],
-    // GitHub では目印で始まるスレッドも数える（11.8.1 の決定 C）
+    // GitHub では目印で始まるスレッドも数える（目印は誰でも書ける）
     ["paged", 0, /未解決のスレッドが 4 件残っている/],
     ["changes-requested", 0, /変更要求のレビューが立っている/],
-    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない（決定 A）
+    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない
     ["cr-commented", 0, /変更要求のレビューが立っている/],
     ["pending", 0, /変更要求のレビューが立っている/],
   ] as const) {

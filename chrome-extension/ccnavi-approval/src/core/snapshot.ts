@@ -1,19 +1,19 @@
 /**
- * リポジトリ 1 つのボードを組む（ADR-0093 の 8.1・8.2）。書く流れ（`write.ts`）も同じ読み方で、
+ * リポジトリ 1 つのボードを組む。書く流れ（`write.ts`）も同じ読み方で、
  * 家族 1 つぶんの判定の入力を組み直す（`readFamily`）。
  *
  * 流れ:
  *
- * 1. 統合先を決める（設定か、ホストのデフォルトブランチ。D30）。設定したブランチが無ければ止める
+ * 1. 統合先を決める（設定か、ホストのデフォルトブランチ）。設定したブランチが無ければ止める
  * 2. 統合先の `.claude/settings.json` を読み、置き場の綴りを Python に出させる
- * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python（7.3）
+ * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python
  * 4. 直近 N 日と利用者の指定のブランチ（表示用）の置き場を読み、家族を Python に見分けさせる
- * 5. 家族ごとに、参照の閉包（3.3 の 5）の足りないブランチを読み足し、Python に承認待ちを出させる。
- *    判定の入力は統合先・`P`・閉包の `P_X` だけ（D2）。表示用のブランチは入れない
+ * 5. 家族ごとに、参照の閉包の足りないブランチを読み足し、Python に承認待ちを出させる。
+ *    判定の入力は統合先・`P`・閉包の `P_X` だけ。表示用のブランチは入れない
  * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、Python の
- *    `confirm` に通るかを聞く（段階 4。書かない）
+ *    `confirm` に通るかを聞く（書かない）
  *
- * blob は sha で引き、控え（IndexedDB）にあれば読まない（8.2）。判定はここでは出さない。
+ * blob は sha で引き、控え（IndexedDB）にあれば読まない。判定はここでは出さない。
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
 import { BLOB_BATCH, LINK_MODE, type ApprovalCommit } from "./github.js";
@@ -44,7 +44,7 @@ export interface Deps {
   /** 呼んだ回数を数える（service worker が返す数を足す） */
   readonly stats: Stats;
   /**
-   * プロジェクトのリポジトリのワークスペース（段階 5）。登録したワークスペースのリポジトリと、そのホストへ頼む関数。
+   * プロジェクトのリポジトリのワークスペース。登録したワークスペースのリポジトリと、そのホストへ頼む関数。
    * プロジェクトのリポジトリを読むときに要る（無ければ止める）
    */
   readonly workspace?: { readonly repo: RepoConfig; readonly call: HostCall };
@@ -54,7 +54,7 @@ export interface FamilyBoard {
   readonly family: Family;
   readonly result: BoardResult | null;
   readonly error: string;
-  /** レビュー済みの候補のフェーズと、通るか（段階 4） */
+  /** レビュー済みの候補のフェーズと、通るか */
   readonly reviews?: readonly ReviewPanel[];
 }
 
@@ -67,17 +67,17 @@ export interface RepoBoard {
   readonly families: readonly FamilyBoard[];
   readonly error: string;
   readonly stats: Stats;
-  /** 読んだブランチ（統合先と表示用のブランチ）。「始める」が開いた家族を見分けるのに使う（段階 5） */
+  /** 読んだブランチ（統合先と表示用のブランチ）。「始める」が開いた家族を見分けるのに使う */
   readonly seen?: Snapshot | null;
 }
 
-/** 読んでいる間にブランチの先頭が動いた。書く流れは読み直して周を回す（レビューの 13） */
+/** 読んでいる間にブランチの先頭が動いた。書く流れは読み直して周を回す */
 export class MovedError extends Error {}
 
 export class Reader {
   readonly branches: Record<string, Branch> = {};
   readonly absent: string[] = [];
-  /** プロジェクトのリポジトリなら、その名前とワークスペースの統合先の中身（段階 5） */
+  /** プロジェクトのリポジトリなら、その名前とワークスペースの統合先の中身 */
   project = "";
   workspace: Workspace | undefined = undefined;
 
@@ -185,7 +185,7 @@ export interface IntegrationRead {
   readonly compat: Compat;
 }
 
-/** 統合先の名前と先頭（設定か、ホストのデフォルトブランチ。D30）。無ければ投げる */
+/** 統合先の名前と先頭（設定か、ホストのデフォルトブランチ）。無ければ投げる */
 async function integrationOf(repo: RepoConfig, reader: Reader, what: string): Promise<Snapshot["integration"]> {
   const info = await reader.call<{ defaultBranch: string }>("repoInfo");
   const name = repo.integration || info.defaultBranch;
@@ -211,8 +211,8 @@ export async function readIntegration(repo: RepoConfig, reader: Reader, deps: De
 }
 
 /**
- * プロジェクトのリポジトリ（段階 5。3.3 の 7）: 置き場の綴り・共通層・互換のマーカーはワークスペースの統合先から、
- * 閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先から読む。プロジェクトの層の計算（D28）は Python
+ * プロジェクトのリポジトリ: 置き場の綴り・共通層・互換のマーカーはワークスペースの統合先から、
+ * 閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先から読む。プロジェクトの層の計算は Python
  */
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   const ws = deps.workspace;
@@ -275,7 +275,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
   }
 }
 
-/** 閉包の足りない家族を読み足し、判定の入力を統合先・P・閉包だけに絞る（D2） */
+/** 閉包の足りない家族を読み足し、判定の入力を統合先・P・閉包だけに絞る */
 async function closureInput(
   family: string,
   reader: Reader,
@@ -293,7 +293,7 @@ async function closureInput(
       if (sha !== null) await reader.read(n, sha, place.branch_paths);
     }
   }
-  // 判定の入力は統合先・P・閉包だけ（D2）。表示用のブランチを混ぜないよう、ここで絞る
+  // 判定の入力は統合先・P・閉包だけ。表示用のブランチを混ぜないよう、ここで絞る
   const all = reader.snapshot(integration);
   const closure = await py.closure(deps.py, settings, all, family);
   const keep = new Set([integration.name, ...closure.families]);
@@ -328,7 +328,7 @@ async function familyBoard(
 }
 
 /**
- * 取り下げを出すのは、承認コミットを引けて、その親に提案が読めるときだけ（8.8。レビューの 8。締める向き）。
+ * 取り下げを出すのは、承認コミットを引けて、その親に提案が読めるときだけ（締める向き）。
  * Python が理由を返さなかった写しでも、引けなければ理由を足す。
  */
 async function withdrawableHere(board: BoardResult, reader: Reader, place: Placement, family: string): Promise<BoardResult> {
@@ -348,7 +348,7 @@ async function withdrawableHere(board: BoardResult, reader: Reader, place: Place
 
 type Ask = (op: string, args: readonly unknown[]) => Promise<unknown>;
 
-/** 承認コミットの親にあった提案の本文（8.8 の 2）。引けなければ null */
+/** 承認コミットの親にあった提案の本文。引けなければ null */
 export async function findPrior(ask: Ask, place: Placement, head: string, ident: string): Promise<string | null> {
   const doing = `${place.approved}/doing/${ident}.md`;
   const todo = `${place.tickets}/todo/${ident}.md`;
@@ -365,13 +365,13 @@ export async function findPrior(ask: Ask, place: Placement, head: string, ident:
 export interface FamilyRead extends IntegrationRead {
   /** 判定の入力（統合先・P・閉包の P_X） */
   readonly input: Snapshot;
-  /** 読んだときの P の先頭。書く条件（`expectedHeadOid`）にする（8.3） */
+  /** 読んだときの P の先頭。書く条件（`expectedHeadOid`）にする */
   readonly head: string;
 }
 
 /**
- * 書く流れのために、家族 1 つぶんを新しく読み直す（8.3 の 2・4。毎回 Snapshot を組み直す）。
- * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の姿を読み直す。8.4）
+ * 書く流れのために、家族 1 つぶんを新しく読み直す（毎回 Snapshot を組み直す）。
+ * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の姿を読み直す）
  */
 export async function readFamily(repo: RepoConfig, family: string, deps: Deps, at?: string): Promise<FamilyRead> {
   const reader = new Reader(repo, deps);

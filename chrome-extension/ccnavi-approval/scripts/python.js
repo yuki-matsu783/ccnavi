@@ -1,4 +1,4 @@
-// 同梱する Python を 1 本の zip に組む（ADR-0093 の 7.2）。`build.js` と試験が呼ぶ。
+// 同梱する Python を 1 本の zip に組む。`build.js` と試験が呼ぶ。
 //
 // 中身は 3 つ。
 //
@@ -8,7 +8,7 @@
 //   ccnavi_chrome.py 拡張の入口（py/）
 //
 // 組むのは Node の上の Pyodide（同梱するのと同じ版）で、.pyc を unchecked-hash で作って一緒に入れる
-// （import が速くなる。ADR の 7.2 の「.pyc 同梱で import 0.43 秒」）。組んだ後に入口を import して、
+// （import が速くなる。Node で測って 0.43 秒）。組んだ後に入口を import して、
 // 読めない形なら組み立てを止める。
 //
 // 取ってくるのは PyYAML の sdist だけ。置き場は .cache/（追跡しない）。プロキシの内側では
