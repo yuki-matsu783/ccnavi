@@ -38,7 +38,7 @@ export function lockFromBoard(board: BoardJson, project?: string): Lock {
   };
 }
 
-/** ボードが読めなかったとき。確かめられないなら閉じる側にする */
+/** ボードが読めなかったとき。確かめられないなら保存できない扱いにする */
 export function lockFromError(error: string): Lock {
   return {
     locked: true,

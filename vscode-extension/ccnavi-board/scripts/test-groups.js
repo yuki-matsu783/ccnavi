@@ -4,10 +4,10 @@
 // 1 つのグループだけ回したいときに `tsc` を 1 回で済ませるため。package.json に
 // グループごとの行を並べていたときは、2 グループ回すとコンパイルも 2 回走った。
 // コンパイルは約 6 秒、テストの実行は全部で約 5 秒なので、2 回目のコンパイルは
-// テスト全部を回すより高い。
+// テスト全部を回すより時間がかかる。
 //
 // どのグループがどのファイルを読むかは表で持たない。テストの import を辿って
-// そのつど数える。表は、ファイルを増やしたときに黙って古くなる。
+// そのつど数える。表は、ファイルを増やしたときに気づかないうちに古くなる。
 //
 //   node scripts/test-groups.js --all                    全部
 //   node scripts/test-groups.js rules shared             名指し
@@ -37,7 +37,7 @@ const NOT_READY = 3;
 
 // 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では辿れないので、
 // 画面とテストの結び付きだけは綴りの約束で決める。**表では持たない**（表は、画面を足したときに
-// 黙って古くなる。このファイルがグループの表を持たないのと同じ理由）。
+// 気づかないうちに古くなる。このファイルがグループの表を持たないのと同じ理由）。
 //
 //   画面      `src/webview/<名前>/main.tsx` があるもの（`scripts/bundle-webview.js` と同じ見つけ方）
 //   CSS       同じ置き場の `src/webview/<名前>/style.css`（部品の CSS を `@import` で束ねる入口）
@@ -102,7 +102,7 @@ function resolveImport(from, spec) {
 
 // `from "..."` と、`from` の無い副作用だけの `import "..."` の両方を拾う。引用符は
 // どちらでもよい（このリポジトリは二重引用符で揃えているが、揃っていることを
-// 見張るものが無いので、片方だけ拾うと黙って取りこぼす）。
+// 見張るものが無いので、片方だけ拾うと気づかないうちに取りこぼす）。
 const IMPORT = /(?:^|\s)(?:import|export)\b[^;]*?from\s*["']([^"']+)["']/g;
 const SIDE_EFFECT_IMPORT = /(?:^|\s)import\s*["']([^"']+)["']/g;
 // CSS の `@import "./Card.css";`。画面の CSS は、これだけで束ねに入る
@@ -178,7 +178,7 @@ function screenFiles(screen) {
 /** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
 function closureOf(group) {
   // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
-  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが黙って回らない。
+  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが気づかないうちに回らなくなる。
   return closureFrom(filesUnder(path.join(TEST_DIR, group), (name) => name.endsWith(".ts") || name.endsWith(".tsx")));
 }
 
@@ -194,9 +194,9 @@ function closures() {
  *
  * `rel`（触ったファイル）を渡すと、**その画面の束ねに入るファイルか** を閉包で見て絞る。
  * 置き場の綴り（`src/webview/<名前>/` で始まるか）では決めない。画面をまたぐ import が
- * 1 本でも入ると、直したのに回らない側（回すものが減る側）に外れるため。
+ * 1 本でも入ると、直したのに回らない側（回すものが減る側）に判断がずれるため。
  *
- * どの画面の閉包にも入らないもの（`src/webview/vscode.ts` のような共通の部品）は全部に効くと見る。
+ * どの画面の閉包にも入らないもの（`src/webview/vscode.ts` のような共通の部品）は全部のグループに関わると見る。
  */
 function webviewGroups(map, rel) {
   const all = screens();
@@ -205,7 +205,7 @@ function webviewGroups(map, rel) {
   const wanted = matched.length === 0 ? all : matched;
   const groups = groupsFor(wanted, map);
   // 絞った先にグループが 1 つも無い（グループも入口も無い置き方をされている）。どれが読むか
-  // 決められないので、束ねを読むグループを全部返す。決められないときは多い側へ外す
+  // 決められないので、束ねを読むグループを全部返す。決められないときは、回すものが多くなるほうを選ぶ
   if (groups.length === 0 && wanted !== all) {
     return groupsFor(all, map);
   }
@@ -222,7 +222,7 @@ function groupsFor(wanted, map) {
     }
     // 画面と同じ名前のグループは、テストの入口の綴りが約束と違っても必ず回す。
     // ここが無いと、画面を足して `test/helpers/<名前>.ts` を作り忘れたときに、
-    // その画面のテストだけが黙って回らなくなる
+    // その画面のテストだけが気づかないうちに回らなくなる
     if (map.has(screen.name)) groups.add(screen.name);
   }
   return [...groups].sort();
@@ -242,7 +242,7 @@ function relativeToExtension(given) {
   if (at < 0 && path.isAbsolute(slashed)) return null;
   // `./src/x.ts` や `src/../src/x.ts` を `src/x.ts` に直す。直さないまま
   // `startsWith("src/webview/")` のような綴りの比較に渡すと、`./` が付いただけで
-  // 別のファイルとして扱われ、回すものが減る側に外れる。
+  // 別のファイルとして扱われ、回すものが減る側に判断がずれる。
   const normalized = path.posix.normalize(inside);
   if (normalized.startsWith("../")) return null;
   if (at >= 0) return normalized;
@@ -278,7 +278,7 @@ function callFor(rel, map) {
     return { groups: all, compile: true, webview: false };
   }
 
-  // 固定データは import ではなく実行時に名前で開くので、辿れない。全部に効くと見る。
+  // 固定データは import ではなく実行時に名前で開くので、辿れない。全部のグループに関わると見る。
   if (rel.startsWith("test/fixtures/")) return { groups: all, compile: true, webview: false };
 
   const absolute = path.join(ROOT, rel);
@@ -353,7 +353,7 @@ function testFiles(groups, domOnly) {
   for (const group of groups) {
     const dir = path.join(ROOT, "out", "test", group);
     if (!fs.existsSync(dir)) continue;
-    // 下の段も見る。closureOf と同じ理由で、1 段しか見ないと黙って回らない。
+    // 下の段も見る。closureOf と同じ理由で、1 段しか見ないと気づかないうちに回らなくなる。
     for (const full of filesUnder(dir, (name) => name.endsWith(".test.js"))) {
       if (domOnly && !full.endsWith(".dom.test.js")) continue;
       files.push(path.relative(ROOT, full));
@@ -430,7 +430,7 @@ function main(argv) {
     return 0;
   }
   console.log(`ccnavi-board: ${plan.groups.join(" ")}（${files.length} ファイル）`);
-  // spec レポータにするのは、落ちたものが末尾にまとまるから。node は端末でないときは
+  // spec レポータにするのは、落ちたものが末尾にまとまるから。node は出力先がターミナルでないときは
   // 既定で TAP を出し、そこでは `not ok` が落ちたファイルの位置に出る。ターンの終わりの
   // hook がモデルへ渡せるのは末尾 40 行だけなので、TAP だと「落ちた」とだけ伝わって
   // 何が落ちたかが入らない。

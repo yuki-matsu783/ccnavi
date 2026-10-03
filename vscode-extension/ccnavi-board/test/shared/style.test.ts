@@ -117,7 +117,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.match(style, /\.toolbar \{ display: flex;/);
     assert.match(style, /\.banner\.warn \{ border-color:/);
     assert.match(style, /input\[type=text\], input\[type=search\], textarea, select \{ background:/);
-    // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
+    // 骨組みの定義は 1 度だけ（画面ごとの複製を残さない）
     assert.equal((style.match(/\.toolbar \{ display: flex;/g) ?? []).length, 1);
     // 見た目を指定しなければ素の body。Claude の配色の CSS は常に持つ
     assert.ok(html.includes("\n<body>\n"));

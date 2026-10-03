@@ -31,7 +31,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
-  // 受け取る側（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので写しておく
+  // 受け取る側（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので ref へ入れておく
   const cloneRef = useRef<CloneState>(clone);
   cloneRef.current = clone;
 
@@ -252,7 +252,7 @@ const TOUR_STEPS: readonly TourStep[] = [
 ];
 
 /**
- * 上部の帯。置き場が無効なら他の苦情は読む意味が無いので、そこで切る。
+ * 上部の帯。置き場が無効なら他の指摘は読む意味が無いので、そこで切る。
  * `.gitignore` の帯（直すボタン付き）と同じ事象は 2 度出さない。
  */
 function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {

@@ -5,7 +5,7 @@
  * （`FlowData`）だけで、画面が返すのは人が押した操作（`FlowMessage`）だけ。
  *
  * **着手中かどうかを画面は決めない**（ADR-0035・ADR-0085）。錠は実行ファイルの `--explain --json` の
- * `tickets[].flow.locked` をそのまま写す（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
+ * `tickets[].flow.locked` をそのまま使う（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
  * `started_at` などから組み直さない。保存の直前にも拡張ホストが実行ファイルに聞き直す。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
@@ -41,7 +41,7 @@ export function linkedReason(rel: string): string {
   return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み書きしません。リンク先は承認済みの領域の外かもしれません。リンクを外してから開き直してください`;
 }
 
-/** 確かめられなかったとき。閉じる側にする */
+/** 確かめられなかったとき。書けない扱いにする */
 export function lockFromFailure(error: string): FlowLock {
   return { locked: true, reason: `着手中かどうかを確かめられないため、書き込みません: ${error}` };
 }

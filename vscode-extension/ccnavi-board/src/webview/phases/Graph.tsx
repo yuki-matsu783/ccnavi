@@ -333,7 +333,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
         ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
         minZoom={0.3}
         maxZoom={1.6}
-        // 図は読むだけなので、消す・繋ぐの鍵は受けない
+        // 図は読むだけなので、消す・繋ぐためのキーは受けない
         deleteKeyCode={null}
       >
         <Background />
