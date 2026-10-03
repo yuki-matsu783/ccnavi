@@ -514,7 +514,7 @@ class MovedJudgeTest(LauncherJudgeTest):
     def test_行き先を読めない_cd_は読みを変えない(self):
         # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
         # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた綴りで今は
-        # 止まっている形**が止まらなくなる（敵対的レビュー 2026-09-20）。
+        # 止まっている形**が止まらなくなる（敵対的レビュー）。
         for subject in [
             'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
             "cd - && cp /tmp/x .ccnavi/common/rules.yml",
