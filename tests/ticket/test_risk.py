@@ -16,6 +16,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from ccnavi import risk
 from tests import common_path
@@ -178,6 +179,34 @@ class RiskTest(PhaseHarness):
         self.assertEqual(mark["by"], "chat")
         self.assertEqual(mark["recommended"], "mr")
         self.assertIn(mark["risk"], ("HIGH", "CRITICAL"))
+
+    def test_unreadable_name_status_or_head_refuses_to_close(self):
+        """変更の種類か先のコミットを読めなければ、0 件と数えずに閉じない（重いほうに倒す）。"""
+        self.one_child()
+        real = risk._git
+        for failing, said in (
+            ("--name-status", "変更の種類を読めない"),
+            ("rev-parse", "コミットを読めない"),
+        ):
+            with self.subTest(failing=failing):
+
+                def broken(cwd, args, failing=failing):
+                    if failing in args:
+                        return 128, ""
+                    return real(cwd, args)
+
+                with mock.patch.object(risk, "_git", broken):
+                    closed = self.close_child("i0001-01")
+                self.assertNotEqual(closed.returncode, 0)
+                self.assertIn("のリスクを測れない", closed.stderr)
+                self.assertIn(said, closed.stderr)
+                self.assertFalse(
+                    os.path.exists(
+                        os.path.join(self.approved, "phases", "i0001", "i0001-01.risk.json")
+                    )
+                )
+        # 読めるようになれば閉じられる。
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
 
     # ---- 3. スクリプト
 
