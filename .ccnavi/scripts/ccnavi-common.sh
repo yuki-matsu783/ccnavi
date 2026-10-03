@@ -17,8 +17,8 @@
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #
-# 取り込みの控えとロック（ADR-0093 の段階 2b）の関数は、下の「取り込みの控えとロック」にまとめてある。
-# C1（段階 2d）の関数は、その下の「C1」にまとめてある。
+# 取り込みの控えとロックの関数は、下の「取り込みの控えとロック」にまとめてある。
+# C1 の関数は、その下の「C1」にまとめてある。
 #
 # ほかに診断ログの 4 つ（log_debug / log_info / log_warn / log_error）がある。こちらは
 # 標準出力にも標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
@@ -300,7 +300,7 @@ ccnavi_mask_url() {
 		-e 's#^[^/:@]*:[^/@]*@#<伏せた>@#'
 }
 
-# ---- 取り込みの控えとロック（ADR-0093 の 3.6・4.2・4.3。段階 2b）
+# ---- 取り込みの控えとロック
 #
 # 控えは 1 行 1 項目の `<鍵> <値>`（D33）。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない。
 # 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
@@ -368,8 +368,8 @@ ccnavi_record_write() {
 # そのツリーが、名前の家族の親のワークツリーか。<ツリー> <名前>
 #
 # 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親の写しか提案が
-# あれば 0（ADR-0093 の 4.2「SessionStart の早送り」の対象の条件）。子の写し（`parent:` を持つ）は
-# 数えない。置き場の綴りが絶対パス（リポジトリの外）なら家族として扱わない（3.1 の 12）。
+# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。子の写し（`parent:` を持つ）は
+# 数えない。置き場の綴りが絶対パス（リポジトリの外）なら家族として扱わない（ブランチに乗らないので、親のブランチで運べない）。
 ccnavi_parent_tree() {
 	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
@@ -691,7 +691,7 @@ ccnavi_git_refusal() {
 	fi
 }
 
-# ---- C1（ADR-0093 の 4.3・4.4。段階 2d）
+# ---- C1
 #
 # 取り込み済みの家族（origin があり、家族の控えが present。chat だけの家族を除く。D11）で、状態を書く
 # 操作を 1 操作にする。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に打つ。

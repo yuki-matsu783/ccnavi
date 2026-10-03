@@ -9,7 +9,7 @@
 # record-risk は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は finish で閉じられない。
 #
-# 状態は置き場で表す（ADR-0055）。承認待ちは wip/proposals/todo/、承認済みの作業中は
+# 状態は置き場で表し、チケットは 1 本のファイルが置き場を動く。承認待ちは wip/proposals/todo/、承認済みの作業中は
 # .ccnavi/approved/doing/、レビュー待ちは wip/proposals/review/、閉じたものは
 # .ccnavi/approved/done/。人が動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
 # wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
@@ -21,7 +21,8 @@
 # ソースツリーの `python -m ccnavi`。
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の start・finish・cancel は
-# C1 で回す（ADR-0093 の 4.3。段階 2d）: ロック → 途中の操作の確認 → hook の印と跡を先にコミット →
+# C1 で回す。Chrome 拡張から見える家族に未 push の状態を溜めないため、次を 1 操作にする。
+# ロック → 途中の操作の確認 → hook の印と跡を先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
 # それ以外の家族は今のまま（書くだけ。コミットと push はエージェント）。
