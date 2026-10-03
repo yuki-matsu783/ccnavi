@@ -85,7 +85,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
    `tree.projects()` が空なら先に返る。clone する前が一番確かめたい時点
 3. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと列挙から外れ、その中のパスがワークスペースルートとして
    判定される（プロジェクトの `deny` が外れる）。判定は変えず `--lint` と `--explain` が名指しする方針だが、まだ言わない
-4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` の綴りがある」を warn で言うようにする
+4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` の表記がある」を warn で言うようにする
 5. 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
 
 ### ccnavi 自身の設計の穴
@@ -105,7 +105,7 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 ### 複数のリポジトリで確かめること
 
-- プロジェクトの数に対する `ms`。5 本で期限の半分を超えるなら、ルールの読み込みに mtime の控えを足す
+- プロジェクトの数に対する `ms`。5 本で期限の半分を超えるなら、ルールの読み込みに mtime を見るキャッシュを足す
 - `projects/` をワークスペースの `.gitignore` に入れたとき、Claude Code がプロジェクトの中の CLAUDE.md を読むか
 - `cwd` がプロジェクトの中にあるとき、hook の `${CLAUDE_PROJECT_DIR}` がワークスペースルートのままか
 
@@ -145,10 +145,10 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 ### 未了: 別件
 
 - `build.py` の置き換えが `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
-- ワークスペースの `.git` の commit-graph の控えの一覧が欠けた控えを指している。`git commit-graph write --reachable --split=replace` で直る
+- ワークスペースの `.git` の commit-graph の分割ファイルの一覧が、欠けたファイルを指している。`git commit-graph write --reachable --split=replace` で直る
 - 承認済みチケットの書き込みが原子的でない。途中で機械が落ちると中身が NUL で埋まる
 - Windows で `tests.guard.test_fallback` が 1 件落ちる。テストが絶対パスを引用せずに埋め込んでおり、bash が `\` を落とす。
-  ガードの判定は正しく、テストの綴りを直す
+  ガードの判定は正しく、テストの書き方を直す
 - 未解決の一覧で、位置の無いスレッドが ` :0 ` と出る
 
 ## 実測で分かった落とし穴
@@ -173,7 +173,7 @@ Claude Code の振る舞いについて測った前提は設計書の付録 C。
 - **Python の識別子に空白は入らない。** `def test_warn は…` のように英字と日本語の間に空白を入れると構文エラー
 - **Windows のコンソール経由で日本語を引数に渡すと CP932 になり、`jq --arg` が UTF-8 でない JSON を作る。** 本文はファイルで渡す。
   `jq` の実体は `C:\Program Files\jq\jq` で、`"$JQ"` と引用しないと空白で分かれる
-- **Windows の `gitdir:` の綴り**（git 2.39.2、Git Bash と PowerShell）。絶対パス、区切りは `/`、ドライブレターは大文字、
+- **Windows の `gitdir:` の表記**（git 2.39.2、Git Bash と PowerShell）。絶対パス、区切りは `/`、ドライブレターは大文字、
   `gitdir:` の後ろは半角空白 1 個。`ccnavi_project`（sh）と `tree.py` がこれを前提にしている
 - **Docker Desktop を起動すると `restart=unless-stopped` の GitLab が勝手に上がり、2GB の VM では engine ごと落ちる。**
   GitLab CE には 4GB 要る

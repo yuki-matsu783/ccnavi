@@ -41,7 +41,7 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
   `ccnavi.settings.local.json`（ccnavi 自身を開発するときだけ読む上書き設定）で共有
   されているので、そちらからも動かせなくなる**
 - 導入スクリプトは配る `env` に 3 本を書かない（`--all` の一覧にも入れない）
-- VS Code 拡張の 4 画面は既定の綴りを直に使う
+- VS Code 拡張の 4 画面は既定のパスを直に使う
 
 **フラグ `--rules` / `--phases` / `--risk` は残す。** 層の合成を確かめるテストが自分の
 一時ディレクトリを指すのに要る（`tests/config/` の全テスト）。hook は引数を渡さずに
@@ -74,7 +74,7 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
 ## 残したもの
 
 `selfguard.common_shell_clause` は**消さなかった。** これは「共通層が既定の外にあるとき、
-その綴りをシェルの書き込みの禁止に足す」働きで、当初は「固定になれば `_PLACES` の
+そのパスをシェルの書き込みの禁止に足す」働きで、当初は「固定になれば `_PLACES` の
 `\.ccnavi` が丸ごと拾う」として削除する計画だった。
 
 実際に消したところ、`tests/guard/test_fallback.py` が落ちた。フラグを残した以上、置き場は
@@ -94,7 +94,7 @@ Write で書く  -> deny（builtin-guard-common-layer。conf が指す場所を�
 
 ADR-0067 のあとは、その hook の command から動かす手段も閉じた。それでも `common_shell_clause` は
 残してある。診断（`--test`）が判定と同じ関数を通るので、そこで動かした先を守らないと
-同じ食い違いが診断の側に残るため。見張りは `tests/config/test_config_union_guard.py`。
+同じ食い違いが診断の側に残るため。確かめるテストは `tests/config/test_config_union_guard.py`。
 
 ## 代償
 

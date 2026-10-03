@@ -11,15 +11,15 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 ## 基本
 
 - git は `ccnavi-git.sh` を通す。通る形はそのスクリプトの `--help` に出る
-- `.ccnavi/scripts/` はワークスペースにしか無いので、sh の綴りは cwd で変わる
+- `.ccnavi/scripts/` はワークスペースにしか無いので、sh のパスは cwd で変わる
 
-  | cwd | 綴り |
+  | cwd | パス |
   |---|---|
   | ワークスペースルート | `sh .ccnavi/scripts/ccnavi-git.sh ...` |
   | ワークツリーの中 | `sh ../../../.ccnavi/scripts/ccnavi-git.sh ...` |
   | `projects/<名前>` の中 | `sh ../../.ccnavi/scripts/ccnavi-git.sh ...` |
 
-  拒否の文面が案内する綴りは `{root}` から始まる絶対パスで、そのまま打てばどこからでも通る
+  拒否の文面が案内するパスは `{root}` から始まる絶対パスで、そのまま打てばどこからでも通る
 
 ## 他セッションの作業を踏まないために
 
@@ -36,7 +36,7 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 - `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で作る。末尾を省くと今いるブランチが起点になるので、
   `<統合先>` が `main` のときも省かない
 - `<行き先>` は cwd から解かれる。ワークスペースルートからなら `.claude/worktrees/<名前>`、
-  `projects/<名前>` の中からなら `../../.claude/worktrees/<名前>`。間違えると止まり、文面が正しい綴りを出す
+  `projects/<名前>` の中からなら `../../.claude/worktrees/<名前>`。間違えると止まり、文面が正しいパスを出す
 - `worktree add` に渡せるオプションは決まっている（`-b` `--reason` `--track` など）。
   一覧に無いものは通らない。要るものが出たら利用者に足してもらう
 - 行き先の名前とブランチ名は揃える（`-b <行き先の名前>`）。`-B`・`--detach`・`--force` は通らない。
@@ -47,7 +47,7 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 - プロジェクトのワークツリーは `cd projects/<名前>` してから切る。`<統合先>` はそのプロジェクトのブランチで、
   ワークスペースの `main` ではない
 - `<統合先>` がリモートにしか無いときは、先に `ccnavi-git.sh fetch <リモート> <統合先>` をする（プロジェクトの中で）
-- 起点はリモートの最新の統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` が控えに書いた名前、
+- 起点はリモートの最新の統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` が状態ディレクトリに保存した名前、
   無ければデフォルトブランチ＝`origin/HEAD` が指すもの）。セッションの頭の `ccnavi-fetch.sh` が
   ff で進める（ADR-0060）。進められなかったときは「ワークツリーの起点になる ... 」で始まる行が頭に出ているので、
   切る前に理由を片付ける（分岐なら人に合流させてもらう、未コミットならそのツリーの持ち主に聞く）。

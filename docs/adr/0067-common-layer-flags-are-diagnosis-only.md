@@ -44,7 +44,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh done <子> --risk scratchpad/my-risk.yml
 hook は引数を渡さずに実行ファイルを起動するので、**hook からの判定の入口は前から固定**
 だった。穴が開くのは、エージェントが 2 本の sh を直接打つ経路だけ。
 
-**同じ経路には、フラグ 5 本の表に載らない穴がもう 1 つあった。** sh は自分の綴りを先に
+**同じ経路には、フラグ 5 本の表に載らない穴がもう 1 つあった。** sh は自分が決めた引数を先に
 置き、エージェントの引数を後ろに繋ぐ（`exec "$bin" --root "$root" ticket "$@"`、
 `ccnavi-review.sh` は `--cwd "$here"` も渡す）。argparse は同じオプションを後勝ちで読むので、
 **後ろに `--root` を 1 本足すだけで sh が渡した本物を上書きできた。** `settings.load` は
@@ -95,13 +95,13 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
   5 本を「渡されなかった」値に戻す。渡されたかどうかの読み方は `_override` と揃える
   （`--rules ""` は指定と数えず、`--risk ""` は数える）
 - テストのハーネスは 3 本をフラグで渡すのをやめ、`--root` の下の既定の置き場
-  （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。綴りは `tests.common_path` が
+  （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。パスは `tests.common_path` が
   実行ファイルの既定から引く
 - 受入テスト（`tests/guard/test_acceptance.py`、`tests/core/test_entry.py`、
   `tests/guard/test_permission_mode.py`）は、見本のルールを共通層に据えた一時の
   ワークスペース（`tests.fixture_workspace`）を `--root` に渡す
 
-**あわせて、sh が計算して渡す綴り（`--root` / `--cwd`）は 2 度渡せないことにする。**
+**あわせて、sh が計算して渡すパス（`--root` / `--cwd`）は 2 度渡せないことにする。**
 2 本目が在ったら止める（`_one_wrapper_flag_each`）。数えるのは argparse に任せる
 （`action="append"`）。argv を自分で数えると、別のオプションの**値**に書いた `--root`
 という語まで数えてしまう。
@@ -128,7 +128,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 側なら、sh が何本あっても、将来もう 1 本足しても、同じところで止まる。
 
 **テストのハーネスは、既定の置き場を使えば何も失わない。** ハーネスはもともと自分の
-一時ディレクトリを `--root` に渡している。設定をその下の既定の綴りに置けば、フラグは
+一時ディレクトリを `--root` に渡している。設定をその下の既定のパスに置けば、フラグは
 要らない。むしろ受入テストは、これまでリポジトリ自身をワークスペースルートにして
 動いていた。今回の変更で、実行した機械の `.ccnavi/common/rules.yml` が判定に混ざらなくなる。
 
@@ -147,11 +147,11 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
   env を廃したあとも「hook の command にフラグを書き足す」手段が残ると書いていた。
   その手段も無くなる。複数のワークスペースで 1 本の `rules.yml` を共有したい人は
   シンボリックリンクに頼ることになる
-- `selfguard.common_shell_clause`（共通層が既定の外にあるとき、その綴りをシェルの
+- `selfguard.common_shell_clause`（共通層が既定の外にあるとき、そのパスをシェルの
   書き込みの禁止に足す働き）は、**判定の経路では当たらなくなる。** 消さなかったのは、
   診断（`--test`）が判定と同じ関数を通るため、そこで動かした先を守らないと
   「`Write` では止まってシェルでは通る」食い違いが残るから（ADR-0051 と同じ判断）。
-  見張りは `tests/config/test_config_union_guard.py` が `--test` で持つ
+  確かめるテストは `tests/config/test_config_union_guard.py` が `--test` で持つ
 - **「`projects/` を数えない」をフラグでは言えなくなる。** テストは
   `CCNAVI_PROJECTS=""` を渡す形に直した。人が `settings.json` に書く経路がそれなので、
   むしろ実運用に近づく
@@ -182,7 +182,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
   「副命令かどうか」になり、`--project-rules-file` と揃わない。テストのハーネスが
   副命令を打つ箇所（46 か所以上）は結局動くので、手当ての量もあまり減らない
 - **穴は閉じず、差し替えを記録に残すだけにする。** `.risk.json` の `source` と
-  フェーズのマーカーに、実際に読んだファイルの綴りを残す。差分は最小だが、気付くのは
+  フェーズのマーカーに、実際に読んだファイルのパスを残す。差分は最小だが、気付くのは
   事後で、しかも記録を見た人だけ
 
 ## 関連

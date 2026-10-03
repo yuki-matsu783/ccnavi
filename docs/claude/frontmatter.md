@@ -34,9 +34,9 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 - md は UTF-8 で書き、frontmatter はファイルの頭の 64 KiB の中で閉じる。それより後ろで閉じるものと、UTF-8 でないものは読めず、
   frontmatter が無い扱い（`null`）になる
-- 値は 1 行で書く。`tags` と `keywords` は並び（`[a, b]`）で書く。スカラーで書いても 1 要素として読むが、揃えておく
+- 値は 1 行で書く。`tags` と `keywords` はリスト（`[a, b]`）で書く。スカラーで書いても 1 要素として読むが、揃えておく
 - YAML の別名（`*名前`）は使わない。使うと frontmatter 全体が読まれず `null` になる
-- 既存の語彙は `ccnavi --docs --format jsonl` の `frontmatter.tags` で見られる。同じ意味の別の綴りを増やさない
+- 既存の語彙は `ccnavi --docs --format jsonl` の `frontmatter.tags` で見られる。同じ意味の別の表記を増やさない
 
 ## tags の使い分け
 
