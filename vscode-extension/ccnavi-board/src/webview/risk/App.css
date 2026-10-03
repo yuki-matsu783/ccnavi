@@ -3,7 +3,8 @@
  */
 button.action.small { margin-left: auto; }
 .block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-.block h2 { display: flex; gap: 8px; align-items: center; }
+/* 見出しの横の説明は長いので、入らなければ次の行へ回す（回さないと見出しが 2〜3 文字ずつ折れる） */
+.block h2 { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; }
 .levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
 .levels .field { display: flex; flex-direction: row; gap: 6px; align-items: center; }
 .levels .field > .cap { text-align: left; }

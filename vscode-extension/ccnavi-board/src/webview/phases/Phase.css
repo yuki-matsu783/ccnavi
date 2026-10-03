@@ -4,8 +4,14 @@
  */
 /* 1 行 = 開閉、id、title、kind、review、scope */
 .phase .row-head { grid-template-columns: 18px minmax(110px, 160px) minmax(90px, 160px) max-content max-content minmax(0, 1fr); }
+/* 狭いときは 3 段。1 段目 = 開閉、id、kind、review。2 段目 = title。3 段目 = scope */
+@media (max-width: 520px) {
+  .phase .row-head { grid-template-columns: 18px minmax(0, 1fr) max-content max-content; }
+  .phase .sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }
+  .phase .sum > .clip.mono { grid-row: 3; grid-column: 2 / -1; }
+}
 .sum .tag.work { color: var(--vscode-descriptionForeground); }
-.sum .tag.feedback { color: var(--vscode-editorInfo-foreground); }
+.sum .tag.feedback { color: var(--info-text); }
 /* 関係の欄（IdPicker）。ほかの種類の id をチェックで選び、候補に無い id は右の欄に打つ */
 .field > .ids { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; min-width: 0; }
 .ids .id-select { flex: 0 1 260px; min-width: 140px; padding: 2px 0; font-family: var(--vscode-editor-font-family); }

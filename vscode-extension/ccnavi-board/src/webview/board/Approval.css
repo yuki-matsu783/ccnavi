@@ -16,8 +16,9 @@
 .approval h2 { margin: 0 0 8px; font-size: 1.1em; }
 .approval h3 { margin: 12px 0 4px; font-size: .95em; color: var(--vscode-descriptionForeground); }
 .approval-batch { border-collapse: collapse; width: 100%; font-size: .9em; margin-bottom: 8px; }
-.approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; }
-.approval-id { font-family: var(--vscode-editor-font-family); }
+/* 狭い幅では題名や場所の長い語を折り、表を枠の幅に収める（伸びると右の「場所」の列が隠れる）。識別子だけは折らない */
+.approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; overflow-wrap: anywhere; }
+.approval-id { font-family: var(--vscode-editor-font-family); white-space: nowrap; }
 .approval-text {
   position: relative;
   margin: 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
@@ -31,12 +32,12 @@
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
-.approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: .88em; color: var(--vscode-editorWarning-foreground); }
+.approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: .88em; color: var(--board-warn-text); }
 .approval-rejected li, .approval-problems li { overflow-wrap: anywhere; }
 .approval-note { margin: 4px 0 8px; }
-.approval-note.warn { color: var(--vscode-editorWarning-foreground); }
-.approval-note.error { color: var(--vscode-editorError-foreground); white-space: pre-wrap; overflow-wrap: anywhere; }
-.approval-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+.approval-note.warn { color: var(--board-warn-text); }
+.approval-note.error { color: var(--board-error-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.approval-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: flex-end; }
 
 /* 残った指摘の行き先（`Decide.tsx`）。指摘 1 件ずつに場所・要旨・行き先の選択を並べる */
 .decide-threads { margin: 0; padding-left: 22px; }

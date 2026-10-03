@@ -95,7 +95,10 @@ export function Rule(props: RuleProps): JSX.Element {
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
-          <span className={rule.id === "" ? "sum-id dim" : "sum-id"}>{summaryId(rule)}</span>
+          {/* id は長いと列の幅で切れるので、全体は title で見せる */}
+          <span className={rule.id === "" ? "sum-id dim" : "sum-id"} title={summaryId(rule)}>
+            {summaryId(rule)}
+          </span>
           <span className="dim mono clip" title={rule.match}>
             {summaryMatch(rule)}
           </span>

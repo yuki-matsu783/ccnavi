@@ -15,6 +15,16 @@ body {
   color: var(--vscode-editor-foreground);
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
+  /* 意味の色（警告・情報・成功・エラー）を文字に使うときの色。VS Code Light の警告色（#BF8803）や情報色
+     （#1A85FF）は地に対して 2.8〜3.2:1 しかないので、前景色へ混ぜて 4.5:1 以上にする。割合は Light Modern と
+     Dark Modern、Claude の配色の 2 つで、地・開いた行の地・ホバーの地のどれに対しても 4.5:1 を超える値。
+     テーマの色そのものは枠・縁・記号にそのまま使う（文字より太く見えるので 3:1 で足りる）。
+     body で決めるのは、Claude の配色が body の上でテーマ変数を上書きするから（:root で決めると上書き前の色で固まる） */
+  --warn-text: color-mix(in srgb, var(--vscode-editorWarning-foreground) 55%, var(--vscode-foreground));
+  --doing-text: color-mix(in srgb, var(--vscode-charts-yellow) 55%, var(--vscode-foreground));
+  --info-text: color-mix(in srgb, var(--vscode-editorInfo-foreground) 65%, var(--vscode-foreground));
+  --ok-text: color-mix(in srgb, var(--vscode-charts-green) 75%, var(--vscode-foreground));
+  --error-text: color-mix(in srgb, var(--vscode-editorError-foreground) 70%, var(--vscode-foreground));
 }
 code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
 .hidden { display: none !important; }
@@ -28,27 +38,27 @@ code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
 .toolbar, .foot { position: sticky; z-index: 4; background: var(--vscode-editor-background); }
 .toolbar { top: 0; padding-top: 6px; }
 .summary { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
-.summary .warn { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
+.summary .warn { color: var(--warn-text); font-weight: 600; }
 .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
-.dirty { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
+.dirty { color: var(--warn-text); font-weight: 600; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
 .banner {
   margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
   border: 1px solid var(--vscode-panel-border);
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
 }
-.banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
-.banner.error { border-color: var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground); }
+.banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--warn-text); }
+.banner.error { border-color: var(--vscode-editorError-foreground); color: var(--error-text); }
 .banner.missing { border-color: var(--vscode-editorInfo-foreground); }
 .banner.missing > span { flex: 1 1 320px; }
 .lock {
   margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-  border: 1px solid var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground);
+  border: 1px solid var(--vscode-editorError-foreground); color: var(--error-text);
 }
 .problems {
   margin: 0 0 12px; padding: 8px 8px 8px 24px;
   border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
-  color: var(--vscode-editorWarning-foreground);
+  color: var(--warn-text);
 }
 h2 { margin: 0 0 8px; font-size: 1em; }
 .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
@@ -69,7 +79,7 @@ input[type=text]:focus, input[type=search]:focus, textarea:focus, select:focus {
 select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
 input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .foot { bottom: 0; margin-top: 12px; padding: 4px 0; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
-.foot.error { color: var(--vscode-editorError-foreground); }
+.foot.error { color: var(--error-text); }
 pre.load-error { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 12px; }
 /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
    無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは効かない */
