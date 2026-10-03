@@ -3,7 +3,7 @@ type: guide
 title: 下書きと使い捨ての置き場
 description: 本番に入れない下書きや使い捨てファイルの置き場とその扱い
 tags: [state, records]
-keywords: [scratchpad, 下書き, 使い捨て, gitignore, ワークツリー, セッション]
+keywords: [scratchpad, スクラッチパッド, 下書き, 使い捨て, 一時ファイル, gitignore, ワークツリー, セッション]
 ---
 
 # 下書きと使い捨ての置き場

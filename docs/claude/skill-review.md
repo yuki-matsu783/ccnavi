@@ -1,3 +1,11 @@
+---
+type: guide
+title: スキルの振り返り
+description: ccnavi が振り返りを求めたときに拾うもの・拾わないもの・スキルのどこに足すか
+tags: [skills, feedback]
+keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正]
+---
+
 # スキルの振り返り
 
 この文が届いたら（ターンの終わりに ccnavi が止めたとき、提案を書くとき）、ここまでの作業を 1 度だけ振り返る。

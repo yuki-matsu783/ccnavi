@@ -3,7 +3,7 @@ type: guide
 title: ワークツリーで作業する
 description: ワークツリーの作成、他セッションの変更への対応、統合先へのマージ方法
 tags: [git, worktree]
-keywords: [ワークツリー, git, ccnavi-git.sh, 統合先, マージリクエスト, fast-forward]
+keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション]
 ---
 
 # ワークツリーで作業する
