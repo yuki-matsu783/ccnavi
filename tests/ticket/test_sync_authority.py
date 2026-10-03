@@ -611,7 +611,8 @@ class IntegrationDoneTest(AuthorityHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         base = os.path.join(self.state, "sync", "self")
-        # 取り込んだ跡（家族の控え）はあるのに統合先の控えが無い（push の移り目の直後など）。
+        # 取り込んだ跡（家族の控え）はあるのに統合先の控えが無い
+        # （最初の push で家族の控えができた直後など）。
         self.record("present")
         preview = self.preview()
         self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
