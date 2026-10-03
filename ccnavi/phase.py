@@ -54,7 +54,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。
 EXEMPT_NOTE = (
-    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を"
+    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を "
     "sh で単独で打つ形だけです。cd や | tail などを前後に付けると、その 1 本も止まります。"
 )
 
@@ -257,8 +257,8 @@ def board_form_message(found: str) -> str:
     """ボードの経路の形で止めた文。"""
     return (
         f"ボードの経路の形（{found}）を、コマンド行に書いています。この形は人がボードの"
-        "オーバーレイで押したものを拡張が打つためのもので、端末の確かめが無いぶん、エージェントが"
-        "打つ道はここで止めます。承認と残った指摘の対応方針は、利用者がボードか端末で決めます。"
+        "オーバーレイで押したものを拡張が打つためのもので、端末での確かめが無いので、エージェントが"
+        "打った場合はここで止めます。承認と残った指摘の対応方針は、利用者がボードか端末で決めます。"
         "綴りを探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
@@ -414,7 +414,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "残った指摘の対応方針は利用者がボードか端末で決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
-            "家族の控えを消す"
+            "家族の控えを消す "
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、人の判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / config-synced / "
             "close-early'）も人が打ちます。"

@@ -236,7 +236,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     if name != expected:
         return [
             f"識別子が `issue: {t.issue}` から決まる `{expected}` と違う。"
-            "issue から決める形の識別子は番号と置き場（プロジェクト）に合わせる"
+            "issue から決める形の識別子は番号と置き場（プロジェクト）に合わせてください"
         ]
     return []
 
@@ -779,7 +779,9 @@ def _read_review(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
     if not ticket.review_required and not ticket.review_reason:
         problems.append(
             Problem(
-                SEVERITY_WARN, name, "人間レビューを省くなら `human_review.reason` に理由を書く"
+                SEVERITY_WARN,
+                name,
+                "人間レビューを省くなら `human_review.reason` に理由を書いてください",
             )
         )
     return False
@@ -823,7 +825,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
                 SEVERITY_ERROR,
                 name,
                 f"範囲が {len(entries)} 件ある（上限 {MAX_SCOPE_ENTRIES} 件）。"
-                "作業を分けるか、範囲をまとめること",
+                "作業を分けるか、範囲をまとめてください",
             )
         )
         return True
@@ -883,7 +885,10 @@ def regex_overflow_detail(regex: str) -> str:
 
     同じ文にしておけば、承認の画面で 2 度並べずにまとめられる。
     """
-    return f"子の範囲に regex `{regex}` は書けない。親と種類の上限に入るかを判定のときに当てる"
+    return (
+        f"子の範囲に regex `{regex}` は書けない。"
+        "親と種類の上限に収まるかは、判定のときに当てて確かめる"
+    )
 
 
 def combine(child: str, parent: str) -> str:
@@ -1581,7 +1586,7 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
         if lines and lines[0].lstrip(BOM).strip() == FENCE:
             detail = (
                 f"先頭に BOM (U+FEFF) が付いていて `{FENCE}` で始まっていない。"
-                "BOM 無しの UTF-8 で保存し直す"
+                "BOM 無しの UTF-8 で保存し直してください"
             )
         else:
             detail = f"先頭が `{FENCE}` で始まっていない"

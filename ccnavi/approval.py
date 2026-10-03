@@ -353,7 +353,7 @@ def family_problems(
                 f"提案が親のブランチ {st.family} のワークツリーの外"
                 f"（{t.tree or 'ワークスペースルート'}）にある。取り込み済みの家族の提案は"
                 f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
-                "承認を頼む",
+                "承認を頼んでください",
             )
         ]
     return []
@@ -390,7 +390,7 @@ def integration_problems(
                 t.ticket,
                 f"統合先の控え（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
                 "再利用を確かめられないので決まらない。承認しない。オンラインで"
-                f" '{sync}' を打って統合先を取り込み直す",
+                f" '{sync}' を打って統合先を取り込み直してください",
             )
         ]
     if t.ticket in ids:
@@ -399,7 +399,7 @@ def integration_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"{t.ticket} は統合先（{integ.branch or '?'}）の done/ で閉じている。"
-                "閉じた識別子を新規に承認しない。識別子を変えて出し直す",
+                "閉じた識別子を新規に承認しない。識別子を変えて出し直してください",
             )
         ]
     return []
@@ -1061,7 +1061,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} は{p.label}。取り消した先行は満たせないので承認しない。"
-                    "predecessors から外して出し直す",
+                    "predecessors から外して出し直してください",
                 )
             )
         elif p.state in (PRED_SELF, PRED_ANCESTOR, PRED_CYCLE):
@@ -1077,7 +1077,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} は{PRED_LABELS[p.state]}。{why}。"
-                    "predecessors から外して出し直す",
+                    "predecessors から外して出し直してください",
                 )
             )
         elif p.state == PRED_UNDECIDED:
@@ -1087,7 +1087,7 @@ def predecessor_problems(
                     t.ticket,
                     f"先行 {p.ticket} の家族が決まらない（{p.where}）。取り込み済みの家族の先行は"
                     "その親のブランチの写しで確かめる。親のワークツリーを切り直すか、"
-                    "'ccnavi-sync.sh' で取り込み直してから出し直す",
+                    "'ccnavi-sync.sh' で取り込み直してから出し直してください",
                 )
             )
         elif p.state == PRED_MISSING:
@@ -1096,7 +1096,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} がどの置き場（todo/・doing/・review/・done/）にも無い。"
-                    "綴りを直すか、predecessors から外して出し直す",
+                    "綴りを直すか、predecessors から外して出し直してください",
                 )
             )
         else:
@@ -1105,7 +1105,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} が{p.label}。どれが本物か決まらないので満たしたとみなさない。"
-                    "先に 1 つに決める（先へ進んだ側を合流させるか、残ったワークツリーを畳む）",
+                    "先に 1 つに決める（先へ進んだ側を合流させるか、残ったワークツリーを片付ける）",
                 )
             )
     return problems
@@ -1514,7 +1514,7 @@ def gather(
         if not wanted or unknown:
             lines = [
                 f"承認待ちに無い: {', '.join(unknown) or '(空の識別子)'}",
-                "何も承認しない。ボードを更新して承認待ちを確かめる",
+                "何も承認しない。ボードを更新して承認待ちを確かめてください",
             ]
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
@@ -1527,7 +1527,7 @@ def gather(
             lines = [
                 f"{t.ticket}: 親 {t.parent} の改版が承認待ちなのに承認の対象に無い" for t in blocked
             ]
-            lines.append("何も承認しない。親も並べる")
+            lines.append("何も承認しない。親の改版も承認の対象に入れてください")
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
             return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
@@ -1591,7 +1591,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
     if gathered.nothing_pending:
         text = (
-            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置く"
+            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
             "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
         )
         return Verdict(False, VERIFY_NOTHING, head + text + unreadable)
@@ -1621,7 +1621,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         reason = VERIFY_REJECTED
         tail = (
             f"\n{len(gathered.rejected)} 件が承認の対象にならない。"
-            "提案を直してから、利用者に承認を依頼すること。\n"
+            "提案を直してから、利用者に承認を依頼してください。\n"
         )
     else:
         reason = VERIFY_OK
@@ -1645,7 +1645,7 @@ def _unreadable(gathered: Gathered) -> str:
         "（提案か承認済みチケット。提案なら承認待ちに並ばない）。\n"
     ]
     lines += [_note_line(problem) for problem in gathered.problems]
-    lines.append("        いま書いた提案が混じっていないか確かめること。\n")
+    lines.append("        いま書いた提案が混じっていないか確かめてください。\n")
     return "".join(lines)
 
 
@@ -2646,9 +2646,9 @@ def revision_problems(
             # 残りの切り出し先は運び方で違う。マージリクエストがあれば issue に切り出せるが、
             # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
             elsewhere = (
-                "残りは新しい親チケットの提案として wip/proposals/todo/ に書く"
+                "残りは新しい親チケットの提案として wip/proposals/todo/ に書いてください"
                 if phase.chat_only(root, conf, current.ticket)
-                else "残りは別 issue に回す（ccnavi-review.sh decide）"
+                else "残りは別 issue に回してください（ccnavi-review.sh decide）"
             )
             problems.append(
                 rules.Problem(
@@ -2738,8 +2738,8 @@ def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
             t.ticket,
             f"`project: {t.project}` は層の名札に予約してある綴り（{reserved}）。"
             "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
-            "ワークスペース自身の提案は `wip/proposals/` に置く。プロジェクトの提案なら、"
-            "そのプロジェクトの名前を変えてから置く",
+            "ワークスペース自身の提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"
+            "そのプロジェクトの名前を変えてから置いてください",
         )
     ]
 
@@ -2780,7 +2780,7 @@ def project_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"置き場（{t.project or 'ワークスペース'}）が親 {parent.ticket} の"
-                f"{parent.project or 'ワークスペース'}と違う。子は親と同じ置き場に置く",
+                f"置き場（{parent.project or 'ワークスペース'}）と違う。子は親と同じ置き場に置く",
             )
         ]
     # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それは層では

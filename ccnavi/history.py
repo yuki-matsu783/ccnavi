@@ -184,13 +184,13 @@ def note(
     if not target:
         failed = "識別子の形ではないので、ファイルの名前に使わない"
         _state["failures"].append(
-            f"{ticket_id!r} の履歴（{kind}）を書かない（{failed}）。状態は動いた。"
-            "正は置き場で、履歴は補助"
+            f"{ticket_id!r} の履歴（{kind}）を書かない（{failed}）。状態は動いた"
+            "（状態の正は置き場で、履歴は補助）"
         )
         return failed
     template = (
         f"{ticket_id} の履歴（{kind}）を {target} に書けない"
-        "（{reason}）。状態は動いた。正は置き場で、履歴は補助"
+        "（{reason}）。状態は動いた（状態の正は置き場で、履歴は補助）"
     )
     try:
         # 知らない型が混ざっても落とさず、綴りにして残す。

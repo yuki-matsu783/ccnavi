@@ -497,7 +497,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
                 "",
                 f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
                 f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、探すものは `glob` か `regex`。"
-                "`glob` は fnmatch の glob で文字列全体にヒットするので、"
+                "`glob` は fnmatch の glob で、文字列全体と一致したときだけヒットするので、"
                 "部分一致が要るなら前後に `*` を書く",
             )
         )
@@ -574,8 +574,9 @@ def _build(
             name,
             f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みの守りの名前で、"
             "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
-            "別の名前にすること。"
-            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）でその守りごと切る",
+            "別の名前にしてください。"
+            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
+            "その守りごと切ってください",
         )
     if not rule.message and section in _NEEDS_MESSAGE:
         return None, Problem(
@@ -605,7 +606,7 @@ def _build(
             SEVERITY_ERROR,
             name,
             f"`{NOT_ROOT_PLACEHOLDER}` は `glob` には書けない。"
-            f"`regex: '^{NOT_ROOT_PLACEHOLDER}'` と書くこと",
+            f"`regex: '^{NOT_ROOT_PLACEHOLDER}'` と書いてください",
         )
 
     note: Problem | None = None
@@ -706,7 +707,7 @@ def _not_root_suffix(expression: str) -> str:
     return (
         f"`{NOT_ROOT_PLACEHOLDER}` の直後に `{rest[:16]}` が続いている。"
         "展開結果が読み終える位置はパスの区切りとは限らないので、区切りを前提にした"
-        "綴りは意図どおりに動かない。任意の位置から続けるなら `.*` で受けること"
+        "綴りは意図どおりに動かない。任意の位置から続けるなら `.*` で受けてください"
     )
 
 

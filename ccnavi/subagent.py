@@ -32,8 +32,9 @@ from .modes import EXIT_BLOCK, EXIT_OK
 # サブエージェントには Stop の振り返り（ADR-0090）が届かないので、始まりに 1 行だけ渡す。
 # メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
 CANDIDATE_NOTE = (
-    "[ccnavi] 作業中に手順の落とし穴やスキルの誤りに気づいたら、最後の報告に「スキル候補」の節を"
-    "足して書く（対象のスキル・何を直すか・根拠）。スキルのファイルは自分では書かない。"
+    "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に"
+    "「スキル候補」の節を足して書いてください（対象のスキル・何を直すか・根拠）。"
+    "スキルのファイルは自分では書かない。"
 )
 
 
@@ -223,7 +224,7 @@ def _limit_note(child: ticket_mod.Ticket, found: phase.ScopeVerdict) -> str:
     戻せと言われても戻し先が分からない。
     """
     if found.limit == phase.LIMIT_BLOCKED:
-        return f"（チケットが信じられない: {child.blocked}）"
+        return f"（チケットを信頼できない: {child.blocked}）"
     if found.limit == phase.LIMIT_TYPE and found.type is not None:
         return f"（種類 {found.type.title} の上限の外）"
     if found.limit == phase.LIMIT_PARENT:

@@ -307,7 +307,7 @@ def conflict_problems(pool: dict[str, PhaseType]) -> list[Problem]:
                         SEVERITY_ERROR,
                         pt.id,
                         f"`{name}` を after と overlap の両方に挙げている。"
-                        "待つか並行かを 1 つにする",
+                        "待つか並行かを 1 つにしてください",
                     )
                 )
     return problems
@@ -403,7 +403,7 @@ def merge(
                         ident,
                         f"`{ident}` は前の層（{prior.source or 'common'}）と同じ id で中身が違う。"
                         f"{layer} の層は空として扱う。どちらの `review:` が効いているかを"
-                        "人が読めないので、片方を黙って採らない",
+                        "人が読み取れないので、断りなく片方を採ることはしない",
                     )
                 )
             continue
@@ -491,7 +491,9 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         if ".." in glob or os.path.isabs(glob):
             problems.append(
                 Problem(
-                    SEVERITY_ERROR, ident, f"`deliverables` の `{glob}` はワークツリーの中で書く"
+                    SEVERITY_ERROR,
+                    ident,
+                    f"`deliverables` の `{glob}` はワークツリーの中を指す形で書く",
                 )
             )
             return None, problems
@@ -519,7 +521,11 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
         glob = item.strip()
         if ".." in glob or "~" in glob or "$" in glob or os.path.isabs(glob):
             problems.append(
-                Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` の `{glob}` はワークツリーの中で書く")
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    f"`{key}[{i}]` の `{glob}` はワークツリーの中を指す形で書く",
+                )
             )
             continue
         glob = glob.replace("\\", "/").strip("/")

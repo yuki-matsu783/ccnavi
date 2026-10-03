@@ -368,7 +368,7 @@ def approve(
         # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
         stderr.write(
             f"ccnavi: {len(gathered.rejected)} 件は承認の対象にしなかった。"
-            "直して出し直すこと（通ったぶんの承認済みチケットは置いた）\n"
+            "直して出し直してください（通ったぶんの承認済みチケットは置いた）\n"
         )
         return 1
     return code
@@ -504,13 +504,13 @@ def approve_yes(
             stderr.write(
                 "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
                 f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
-                "見直してから承認する\n"
+                "見直してから承認してください\n"
             )
         else:
             stderr.write(
                 "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身が、"
                 "今のものと違う（識別子は同じで、提案か、判定が読んだ承認済みチケット・マーカーなどの"
-                "中身が変わった）。見直してから承認する\n"
+                "中身が変わった）。見直してから承認してください\n"
             )
         return 1
     if not gathered.batch:
@@ -611,7 +611,7 @@ def confirm(
         return Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
-        return Checked(["ccnavi: 依頼の記録が無い。先に request すること"], None)
+        return Checked(["ccnavi: 依頼の記録が無い。先に request してください"], None)
     if changed_since_request:
         return Checked(
             [
@@ -899,7 +899,7 @@ def _withdraw_problems(
     if copy.started_at:
         found.append(
             "着手済み。取りやめるなら "
-            f"`ccnavi-ticket.sh cancel {ident} --reason <理由>` をエージェントに頼む"
+            f"`ccnavi-ticket.sh cancel {ident} --reason <理由>` をエージェントに頼んでください"
             "（done/ に取り消しの記録が残る）"
         )
     if not copy.is_child:

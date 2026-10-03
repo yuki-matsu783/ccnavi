@@ -1012,7 +1012,7 @@ def after(
                 Outcome(
                     target,
                     ACTION_LEFT,
-                    "ルールファイルが読めない間に名指しのツールで直したので、戻さなかった",
+                    "ルールファイルが読めない間に Write / Edit で直したので、戻さなかった",
                 )
             )
             continue
@@ -1031,7 +1031,7 @@ def after(
                         target,
                         ACTION_MISSING,
                         "無かったところに設定ファイルが現れた。"
-                        "hook の登録が増えているかもしれないので、中身を人が見ること",
+                        "hook の登録が増えているかもしれないので、中身を人に見てもらってください",
                     )
                 )
                 continue
@@ -1041,7 +1041,7 @@ def after(
 
         if setting != ENABLE:
             outcomes.append(
-                Outcome(target, ACTION_WOULD, "控えから戻すはずだった（今回は触っていない）")
+                Outcome(target, ACTION_WOULD, "本来なら控えから戻す（今回は触っていない）")
             )
             continue
 
@@ -1124,7 +1124,7 @@ def at_start(
                     Outcome(
                         target,
                         ACTION_MISSING,
-                        "実行ファイルが見つからない。CCNAVI_BIN_PATH の綴りを確かめること",
+                        "実行ファイルが見つからない。CCNAVI_BIN_PATH の綴りを確かめてください",
                     )
                 )
                 continue
@@ -1301,14 +1301,15 @@ def _check_heavy(setting: str, state_dir: str, session: str, target: Target) -> 
     if _same_shape(target.path, size, mtime):
         return None
     if setting != ENABLE:
-        return Outcome(target, ACTION_WOULD, "控えから戻すはずだった（今回は触っていない）")
+        return Outcome(target, ACTION_WOULD, "本来なら控えから戻す（今回は触っていない）")
 
     entry = _store_path(state_dir, digest)
     if not os.path.exists(entry):
         return Outcome(
             target,
             ACTION_FAILED,
-            "控えの実体が見つからないので戻せない。ccnavi を作り直して、セッションを開き直すこと",
+            "控えの実体が見つからないので戻せない。"
+            "ccnavi を作り直して、セッションを開き直してください",
         )
     failed = _place(entry, target.path)
     if failed:
@@ -1397,9 +1398,9 @@ def report(outcomes: list[Outcome]) -> str:
     if not outcomes:
         return ""
     lines = [
-        "[ccnavi] ccnavi 自身の設定ファイルに手が入りました。"
-        "ここはルールファイルの外で守られている場所で、判定と hook の登録が"
-        "そのまま懸かっています。",
+        "[ccnavi] ccnavi 自身の設定ファイルが変更されました。"
+        "ここはルールファイルの外で守っている場所で、判定と hook の登録は"
+        "このファイルで決まります。",
     ]
     for outcome in outcomes:
         lines.append(f"  {outcome.target.label}: {outcome.action} — {outcome.detail}")
@@ -1433,7 +1434,7 @@ def _recover_missing(setting: str, root: str, target: Target, saved: bytes | Non
     「最後にコミットされた内容」。消えたものを戻すなら、近いほうから戻す。
     """
     if setting != ENABLE:
-        return Outcome(target, ACTION_WOULD, "対象が無い。戻すはずだった")
+        return Outcome(target, ACTION_WOULD, "対象が無い。本来なら戻す")
     if saved is not None:
         failed = _write(target.path, saved)
         if failed:
@@ -1467,7 +1468,7 @@ def _fall_back_to_git(setting: str, root: str, target: Target, now: bytes | None
         return Outcome(target, ACTION_KEPT, "控えは無いが、コミット済みの内容と同じ")
 
     if setting != ENABLE:
-        return Outcome(target, ACTION_WOULD, "控えが無い。git から戻すはずだった")
+        return Outcome(target, ACTION_WOULD, "控えが無い。本来なら git から戻す")
 
     failed = gitstate.restore_committed(top, _relative(top, target.path).replace(os.sep, "/"))
     if failed:

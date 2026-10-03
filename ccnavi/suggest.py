@@ -330,7 +330,7 @@ def _rule_candidates(
                 {
                     "tool": tool,
                     "subject": _placeholder(s, root),
-                    "why": f"記録で、どのルールも言及せず権限モードへ渡った形（{spelled}）",
+                    "why": f"記録で、どのルールにも当たらず権限モードへ渡った形（{spelled}）",
                 }
                 for s in subjects[:SAMPLE_LIMIT]
             ]
@@ -354,7 +354,7 @@ def _rule_candidates(
                     summary=(
                         f"ルールを足す候補: {tool} の {spelled} が {count} 回、"
                         "どのルールにも当たらず権限モードへ渡った。"
-                        "止めるべきなら deny に移して message を書く"
+                        "止めるべきなら deny に移して message を書いてください"
                     ),
                     rule=rule,
                     layer=ruleload.LAYER_COMMON,
@@ -415,7 +415,8 @@ def _message_candidates(
                 count=count,
                 summary=(
                     f"message を見直す候補: {rule_id} が同じ呼び出しを繰り返し止めた"
-                    f"（{count} 回）。文面から次の一手が読めていない疑い"
+                    f"（{count} 回）。エージェントが文面から次に何をすればよいかを"
+                    "読み取れていない疑い"
                 ),
                 rule=written,
                 layer=view.name,

@@ -878,7 +878,8 @@ def ticket_verdict(
                 f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の種類 `{missing}` が"
                 "読めないので、種類の上限では切り詰めていない（親 "
                 f"{parent.ticket} の範囲では切り詰めている）。phases.yml が壊れているか、"
-                "種類が消えている。利用者に伝えて直してもらう（'ccnavi --lint' が箇所を言う）。"
+                "種類が消えている。利用者に伝えて直してもらってください"
+                "（'ccnavi --lint' が箇所を言う）。"
             )
     found = phase.scope_verdict(ticket, parent, pt, rel)
     if found.verdict == rules.ALLOW:

@@ -245,7 +245,7 @@ def prepare(
     if ph.deferred:
         unmet.append(
             f"フェーズ {ph.label} のレビューは {ph.review_at} 番目と一緒に見る計画。"
-            f"--phase {ph.review_at} で依頼する"
+            f"--phase {ph.review_at} で依頼してください"
         )
     if unmet:
         stderr.write(f"ccnavi: 依頼の前提が {len(unmet)} 件満たされていない\n")
@@ -404,7 +404,7 @@ def requested(
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"
-        f"{phase.TURN_DEFINED}を終えて利用者を待つこと\n"
+        f"{phase.TURN_DEFINED}を終えて利用者を待ってください\n"
     )
     return 0
 
@@ -458,7 +458,7 @@ def review_problems(
     if changes:
         return [
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "レビュアーの approve / dismiss を待つこと",
+            "レビュアーの approve / dismiss を待ってください",
             *[f"  - {r.url}" for r in changes],
         ]
     unresolved = _unresolved(
@@ -663,7 +663,7 @@ def _decision(
     parent, ph = found
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
+        stderr.write("ccnavi: 依頼の記録が無い。先に request してください\n")
         return None
     tree_root = tree.worktree_path(root, parent.ticket)
     moved = _moved_since_request(tree_root, conf, requested_mark)
@@ -676,7 +676,7 @@ def _decision(
     if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "レビュアーの approve / dismiss を待つこと\n"
+            "レビュアーの approve / dismiss を待ってください\n"
         )
         return None
     unresolved = _unresolved(
@@ -744,7 +744,7 @@ def reviewed(
         return _reviewed_in_chat(stdin, stdout, stderr, conf, root, parent, ph, accept_unresolved)
     if not accept_unresolved:
         stderr.write(
-            "ccnavi: 未解決を受け入れるなら --accept-unresolved を付ける。"
+            "ccnavi: 未解決を受け入れるなら --accept-unresolved を付けてください。"
             "受け入れないなら "
             f"'{settings.script_command(root, 'ccnavi-review.sh')} confirm' で足りる\n"
         )
@@ -1142,7 +1142,7 @@ def _reviewed_in_chat(
     if accept_unresolved:
         stderr.write(
             "ccnavi: --chat に未解決スレッドは無い（ホストへ出ていない）。"
-            "--accept-unresolved は外すこと\n"
+            "--accept-unresolved は外してください\n"
         )
         return 1
     review_sh = settings.script_command(root, "ccnavi-review.sh")
@@ -1223,7 +1223,7 @@ def _reviewed_in_chat(
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
     # 残した指摘があれば、続きの子を起こす。ホストに写しが無いので、指摘は人が打つ。
     stdout.write(
-        "残した指摘があれば、続きの子チケットを起こす。指摘を 1 行ずつ入れ、空行で終える"
+        "残した指摘があれば、続きの子チケットを起こす。指摘を 1 行ずつ入れ、空行で終えてください"
         "（何も入れなければ起こさない）:\n"
     )
     stdout.flush()
@@ -1265,7 +1265,7 @@ def ready(
             f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
             f"（いまは {parent.state}/）。先に "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish {parent.ticket}' で"
-            "親を閉じ、コミットして push してから打ち直す"
+            "親を閉じ、コミットして push してから打ち直してください"
         )
     problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
@@ -1273,7 +1273,7 @@ def ready(
         for p in problems:
             stderr.write(f"  - {p}\n")
         stderr.write(
-            "全部片付けてから打ち直す。まだ残るものを承知で締めるなら、利用者が端末で "
+            "全部片付けてから打ち直してください。まだ残るものを承知で締めるなら、利用者が端末で "
             f"'{settings.script_command(root, 'ccnavi-review.sh')} close-early --reason <理由>' "
             "を打つ\n"
         )
@@ -1354,7 +1354,7 @@ def close_early(
     if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。端末からも通せない。"
-            "レビュアーの approve / dismiss を待つこと\n"
+            "レビュアーの approve / dismiss を待ってください\n"
         )
         return 1
     phases = phase.phases_of(root, conf, parent.ticket)
@@ -1366,7 +1366,8 @@ def close_early(
     ]
     if doing:
         stderr.write(
-            f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
+            f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。"
+            "閉じるか取り消してから締めてください\n"
         )
         return 1
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
@@ -1751,7 +1752,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
         problems.append(
             f"`{wip}/` に追跡されているファイルが {len(names)} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"{removes} で消してコミットする"
+            f"{removes} で消してコミットしてください"
         )
     if _dirty(tree_root, conf):
         problems.append("親のワークツリーに未コミットの変更がある")
@@ -1864,7 +1865,10 @@ def transport_problem(url: str) -> str:
         return ""
     token = GITHUB_TOKEN if kind == "github" else GITLAB_TOKEN
     if shutil.which("curl") is None:
-        return f"{cli} も curl も無い。MCP などで人がリモートを読む形にするか、どちらかを入れる"
+        return (
+            f"{cli} も curl も無い。MCP などで人がリモートを読む形にするか、"
+            "どちらかを入れてください"
+        )
     if not os.environ.get(token, ""):
         return f"{cli} が無く、curl に付ける {token} も無い"
     return ""
@@ -2160,7 +2164,7 @@ def _redo_request(root: str, phase_no: int) -> str:
     return (
         f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文> "
         f"--eli5 wip/eli5/phase-{phase_no}.html' で"
-        "依頼を出し直すこと"
+        "依頼を出し直してください"
     )
 
 

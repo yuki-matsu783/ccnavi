@@ -474,13 +474,13 @@ def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
         trees = f"ワークツリー {len(names)} 本（{shown}）"
     turn = phase.TURN_DEFINED if define else "ターン"
     return (
-        f"[ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護対象のファイルを"
+        f"[ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護領域のファイルを"
         "変更していないかを確認します。"
         f"{trees}では、今回のターンでこの確認ができませんでした。"
         "ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。"
         "ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。"
         "このツリーでコミットしていなければ対応は不要です。"
-        "コミットした場合は、保護対象のファイルを変更していないか `git log` で確認してください。"
+        "コミットした場合は、保護領域のファイルを変更していないか `git log` で確認してください。"
     )
 
 

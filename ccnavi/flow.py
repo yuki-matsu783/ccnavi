@@ -479,7 +479,10 @@ class _Loader(yaml.SafeLoader):
         return super().compose_node(parent, index)
 
 
-ALIASED = "YAML の別名（`*名前`）があるので読まない。同じ部分木を何度も辿らせて膨らませられる"
+ALIASED = (
+    "YAML の別名（`*名前`）があるので読まない。"
+    "別名を使うと、同じ部分木を何度も辿らせて中身を膨らませられる"
+)
 
 
 def _yaml_problem(exc: yaml.YAMLError) -> str:
@@ -932,7 +935,7 @@ def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
         hint = f"。大文字小文字が違う（{_line(near[0])}）" if near else ""
         out.append(
             f"ノード {_named(node)} の{what} {_line(value)} が候補に無い"
-            "（組み込みと .claude/ の下に無い。綴りの誤りか、"
+            "（組み込みと .claude/ の下に無い。綴りの誤りかもしれない。"
             f"利用者・プラグインのものなら気にしなくてよい）{hint}"
         )
     return out

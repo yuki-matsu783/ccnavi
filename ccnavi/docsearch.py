@@ -704,13 +704,13 @@ def problems_of(query: Query) -> list[str]:
     """使い方の誤り。空なら引ける。"""
     found = []
     if query.sort not in SORTS:
-        found.append(f"--sort は {' / '.join(SORTS)} のどれか（{query.sort!r} は読めない）")
+        found.append(f"--sort は {' / '.join(SORTS)} のどれか（{query.sort!r} は使えない）")
     if query.format not in FORMATS:
-        found.append(f"--format は {' / '.join(FORMATS)} のどれか（{query.format!r} は読めない）")
+        found.append(f"--format は {' / '.join(FORMATS)} のどれか（{query.format!r} は使えない）")
     for flag, value in (("--since", query.since), ("--until", query.until)):
         if value and not _valid_when(value):
             found.append(
-                f"{flag} は在る日時を YYYY-MM-DD[THH[:MM[:SS]]] で書く（{value!r} は読めない）"
+                f"{flag} には日時を YYYY-MM-DD[THH[:MM[:SS]]] の形で書く（{value!r} は読めない）"
             )
     return found
 
@@ -977,14 +977,15 @@ def notice(conf: settings.Settings, root: str, found: Collected) -> str:
     command = _command(conf, root)
     lines = [
         f"[ccnavi] ドキュメント（*.md）を探すときは、grep・Glob より先に '{command} --docs' で"
-        " frontmatter の索引を引く（ワークスペースとプロジェクトを横断。パスはワークスペースルート"
-        "から）。grep は本文中の文字列を探すときか、0 件だったときに使う。",
+        " frontmatter の索引を引いてください（ワークスペースとプロジェクトを横断。パスは"
+        "ワークスペースルートから）。grep は本文中の文字列を探すときか、0 件だったときに"
+        "使ってください。",
         "  絞り込み: --type / --tag / --keyword <値>（完全一致）、--path <部分>（パス）、"
         "--text <部分>（パス・更新日時・frontmatter の値）、--since / --until <YYYY-MM-DD>。"
         "同じものの繰り返しは OR、違うものどうしは AND。大文字小文字は区別しない",
         "  並べ方と形: --sort path|mtime|type|title、-r（逆順）、--limit <N>、"
         "--format table|path|detail|json|jsonl|count",
-        "  md を書くときは頭に frontmatter を付ける。type は必須、title・description・"
+        "  md を書くときは頭に frontmatter を付けてください。type は必須、title・description・"
         "tags（kebab-case で 2〜4 個）・keywords は推奨。",
     ]
     if os.path.isfile(os.path.join(root, *CONVENTION_DOC.split("/"))):

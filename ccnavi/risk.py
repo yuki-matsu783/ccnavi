@@ -343,7 +343,7 @@ def _factors(
                 Problem(
                     SEVERITY_ERROR,
                     ident,
-                    "加点条件は 1 つ（" + " / ".join(KINDS) + "）を書く",
+                    "加点条件は（" + " / ".join(KINDS) + "）のうち 1 つだけ書く",
                 )
             )
             continue
@@ -455,7 +455,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
                     f.id,
                     f"`{f.id}` が前の層と同じ id で中身が違う。両方を数え、{layer} の側は"
                     f" `{qualified}` と名乗る（記録と record-risk もこの名前）。"
-                    "同じ項目のつもりなら全欄を揃え、別の項目なら id を変える",
+                    "同じ項目のつもりなら全欄を揃え、別の項目なら id を変えてください",
                 )
             )
             f = replace(f, id=qualified)
@@ -513,7 +513,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
                     SEVERITY_ERROR,
                     f.id,
                     f"`script` の `{f.value}` が {f.home or '(基準なし)'} に無い。"
-                    "ワークツリーの中のものは読まないので、元リポジトリに置く",
+                    "ワークツリーの中のものは読まないので、元リポジトリに置いてください",
                 )
             )
     return problems
@@ -817,7 +817,7 @@ def judge_prompt(
         f"親: {parent}。ワークツリー: {worktree}。差分: `{diff.base[:12]}..{diff.head[:12]}`"
         f"（{diff.summary()}）。",
         "",
-        "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書く。",
+        "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書いてください。",
         "判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} record-risk {child} <項目> yes|no "
         "--reason <根拠>' "

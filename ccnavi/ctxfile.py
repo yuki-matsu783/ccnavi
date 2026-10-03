@@ -241,7 +241,7 @@ def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
     data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: 渡した回の控えを読めない: {failed}\n")
+            stderr.write(f"ccnavi: 渡した回数の控えを読めない: {failed}\n")
             return None
         return {}
     given = data.get("given") if isinstance(data, dict) else None
@@ -257,7 +257,7 @@ def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
     # なる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
-        stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 渡した回数の控えを書けない: {failed}\n")
     return not failed
 
 

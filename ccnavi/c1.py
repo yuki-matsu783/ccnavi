@@ -95,7 +95,7 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
     if not st.imported:
         return TARGET_NO, "家族の控えが無い（取り込み済みでない。今の手元の動きのまま）", st
     if _chat_only(conf, root, parent):
-        return TARGET_NO, "chat だけの家族（MR を持たない。今の手元の動きのまま）", st
+        return TARGET_NO, "chat だけの家族（マージリクエストを持たない。今の手元の動きのまま）", st
     if st.stop or st.home is None:
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
     origin = gitcmd.run(st.home.root, ["config", "--get", "remote.origin.url"], _TIMEOUT)

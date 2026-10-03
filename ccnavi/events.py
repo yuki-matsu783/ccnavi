@@ -340,7 +340,7 @@ def _finish_nudge(
         return ""
     failed = ops.remember_nudge(conf.state, payload.session_id, found)
     if failed:
-        stderr.write(f"ccnavi: finish の促しを控えられないので、促さない: {failed}\n")
+        stderr.write(f"ccnavi: finish を促した記録を控えられないので、促さない: {failed}\n")
         return ""
     record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
