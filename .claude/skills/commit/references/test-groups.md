@@ -70,7 +70,7 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 - 表のどの行にも当たらないファイルを変えた
 - `.ccnavi/scripts/ccnavi-common.sh`、`.ccnavi/common/`、`.ccnavi/config/`、`tests/__init__.py`、`tests/inproc.py`、
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
-- 統合先へ戻す前、MR に出す前
+- 統合先に取り込む前、MR に出す前
 - どの行に当たるか迷った
 
 `ccnavi/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
