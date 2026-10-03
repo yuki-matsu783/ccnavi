@@ -168,6 +168,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
 | [0096](0096-eli5-place-is-unscoped-and-does-not-move-the-request.md) | `wip/eli5/` はチケットの範囲を当てず、そこだけを変えたコミットは依頼の後に動いたと数えない（除外の綴りの読み方は置き換え（ADR-0097）） |
 | [0097](0097-harden-the-eli5-place-and-request.md) | ELI5 の置き場と依頼の検査を厳しくする（綴りの `\` と大文字小文字、名前の字、モード、互換の版） |
+| [0100](0100-agent-drafts-child-flow-user-imports.md) | エージェントは子のフローの下書きを提案の置き場に書き、ユーザがフロー編集画面で取り込む（提案。実装は親チケット `child-flow-proposal`） |
 
 ### 複数のリポジトリと VS Code 拡張
 
