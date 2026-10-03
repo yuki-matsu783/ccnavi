@@ -5,7 +5,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （人が端末で打つ）
-#   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた写しを見る）
+#   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （人が端末で打つ。chat のフェーズのレビュー済み）
 #   sh .ccnavi/scripts/ccnavi-review.sh config-synced <親>    （人が端末で打つ。着手で上書きした設定を見た）
@@ -70,7 +70,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   chat         <N>                                chat で見るフェーズを人がこのセッションで見終えた（人が端末で打つ。ccnavi --reviewed <N> --chat）
   config-synced <親>                              着手で上書きした設定を人が端末で見た（人が端末で打つ。ccnavi --config-synced <親>）
-  fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
+  fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の綴り）
   merged                                          いまのブランチのマージリクエストがマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
 
@@ -325,7 +325,7 @@ api_failed() {
 	case "$2" in
 	graphql)
 		printf 'ccnavi-review: %s\n' \
-			"GraphQL が塞がれている環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。写しの形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
+			"GraphQL が塞がれている環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。渡す JSON の形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
 		;;
 	esac
 }
@@ -627,7 +627,7 @@ account() {
 	printf '%s' "$who"
 }
 
-# ---- 写し。exe に渡す JSON。
+# ---- 取ってきた時点の状態。exe に渡す JSON。
 
 fetch_all() {
 	mr=$(find_mr)
@@ -645,8 +645,8 @@ log_debug 判定の材料 -- "sub=$sub" "kind=${kind:-}" "host=${host:-}" "branc
 
 mkdir -p "$state"
 result="$state/review-result-$$.json"
-# 抜けるときに写しを消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
-# rm が失敗しても（写しの名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
+# 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
+# rm が失敗しても（JSON の置き場の名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
 # 元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
 eli5_posted=""
 trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
