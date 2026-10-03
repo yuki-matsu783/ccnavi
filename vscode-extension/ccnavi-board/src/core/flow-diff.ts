@@ -5,6 +5,9 @@
  * - `diffFlows` は足した・消した・変えたノードと線。ノードは `id` で、線は両端と出入口
  *   （`from` `fromPort` `to` `toPort`）で突き合わせる（ユーザが書いた線は `id` が無いことも重なることもある）。
  *   同じ両端と出入口の線が何本もあれば、並びの順に突き合わせる
+ * - `textDiff` は同じ突き合わせで、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる。エージェントの
+ *   下書きを取り込む前に見せる（ADR-0100）。フローの文は担当のサブエージェントへの案内文になるので、ユーザが
+ *   中身を読めるように、足したもの・消したものは全部の欄を、変えたものは変わった欄の前と後を出す
  *
  * **良し悪しは言わない。** 保存を止めるかは拡張ホストと実行ファイルが決める。
  *
@@ -133,22 +136,30 @@ const NODE_SKIP: ReadonlySet<string> = new Set(["id"]);
 const CONNECTION_SKIP: ReadonlySet<string> = new Set(["from", "to", "fromPort", "toPort"]);
 const META_SKIP: ReadonlySet<string> = new Set(["nodes", "connections"]);
 
-/** `before`（読み込んだ時点）から `after`（いま）への差分 */
-export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
-  const meta = changedFields(before, after, META_SKIP);
+/** 突き合わせた結果。変えたものは（前, 後） */
+interface Paired {
+  readonly addedNodes: readonly FlowNode[];
+  readonly removedNodes: readonly FlowNode[];
+  readonly changedNodes: readonly (readonly [FlowNode, FlowNode])[];
+  readonly addedConnections: readonly FlowConnection[];
+  readonly removedConnections: readonly FlowConnection[];
+  readonly changedConnections: readonly (readonly [FlowConnection, FlowConnection])[];
+}
+
+function pair(before: FlowDoc, after: FlowDoc): Paired {
   const beforeNodes = new Map(before.nodes.map((node) => [node.id, node]));
   const afterNodes = new Map(after.nodes.map((node) => [node.id, node]));
-  const addedNodes: NodeChange[] = [];
-  const changedNodes: NodeChange[] = [];
+  const addedNodes: FlowNode[] = [];
+  const changedNodes: (readonly [FlowNode, FlowNode])[] = [];
   for (const node of after.nodes) {
     const old = beforeNodes.get(node.id);
     if (old === undefined) {
-      addedNodes.push({ id: node.id, label: nodeLabel(node), fields: [] });
+      addedNodes.push(node);
     } else if (!sameValue(old, node)) {
-      changedNodes.push({ id: node.id, label: nodeLabel(node), fields: changedFields(old, node, NODE_SKIP) });
+      changedNodes.push([old, node]);
     }
   }
-  const removedNodes = before.nodes.filter((node) => !afterNodes.has(node.id)).map((node) => ({ id: node.id, label: nodeLabel(node), fields: [] }));
+  const removedNodes = before.nodes.filter((node) => !afterNodes.has(node.id));
 
   // 線は両端と出入口で突き合わせる。同じものが何本もあれば並びの順に
   const pool = new Map<string, FlowConnection[]>();
@@ -156,18 +167,139 @@ export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
     const key = connectionKey(c);
     pool.set(key, [...(pool.get(key) ?? []), c]);
   }
-  const addedConnections: ConnectionChange[] = [];
-  const changedConnections: ConnectionChange[] = [];
+  const addedConnections: FlowConnection[] = [];
+  const changedConnections: (readonly [FlowConnection, FlowConnection])[] = [];
   for (const c of connectionsOf(after)) {
     const key = connectionKey(c);
     const matches = pool.get(key) ?? [];
     const old = matches.shift();
     if (old === undefined) {
-      addedConnections.push({ label: connectionLabelOf(after, c), fields: [] });
+      addedConnections.push(c);
     } else if (!sameValue(old, c)) {
-      changedConnections.push({ label: connectionLabelOf(after, c), fields: changedFields(old, c, CONNECTION_SKIP) });
+      changedConnections.push([old, c]);
     }
   }
-  const removedConnections = [...pool.values()].flat().map((c) => ({ label: connectionLabelOf(before, c), fields: [] }));
-  return { meta, addedNodes, removedNodes, changedNodes, addedConnections, removedConnections, changedConnections };
+  const removedConnections = [...pool.values()].flat();
+  return { addedNodes, removedNodes, changedNodes, addedConnections, removedConnections, changedConnections };
+}
+
+/** `before`（読み込んだ時点）から `after`（いま）への差分 */
+export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
+  const paired = pair(before, after);
+  const node = (n: FlowNode): NodeChange => ({ id: n.id, label: nodeLabel(n), fields: [] });
+  return {
+    meta: changedFields(before, after, META_SKIP),
+    addedNodes: paired.addedNodes.map(node),
+    removedNodes: paired.removedNodes.map(node),
+    changedNodes: paired.changedNodes.map(([old, n]) => ({ id: n.id, label: nodeLabel(n), fields: changedFields(old, n, NODE_SKIP) })),
+    addedConnections: paired.addedConnections.map((c) => ({ label: connectionLabelOf(after, c), fields: [] })),
+    removedConnections: paired.removedConnections.map((c) => ({ label: connectionLabelOf(before, c), fields: [] })),
+    changedConnections: paired.changedConnections.map(([old, c]) => ({ label: connectionLabelOf(after, c), fields: changedFields(old, c, CONNECTION_SKIP) })),
+  };
+}
+
+// ---- 値の前後まで見せる差分（下書きの取り込み。ADR-0100）
+
+/** 欄 1 つの前後。足した欄は `before` が無く、消した欄は `after` が無い */
+export interface FieldText {
+  /** 欄の綴り（`中身.prompt`・`中身.options[0].label` の形。頭の欄だけ呼び名にする） */
+  readonly field: string;
+  readonly before?: string;
+  readonly after?: string;
+}
+
+export interface TextChange {
+  /** 何が変わったか（`added-node` など。`FlowDiff` の欄の名前に揃える） */
+  readonly kind: "meta" | "added-node" | "removed-node" | "changed-node" | "added-connection" | "removed-connection" | "changed-connection";
+  /** ノードは `名前（id） 種類`、線は `開始 → 終了（branch-0）`、フロー自体は空 */
+  readonly label: string;
+  readonly texts: readonly FieldText[];
+}
+
+/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の綴り */
+function shown(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value === undefined) {
+    return "";
+  }
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** 値を葉まで開く。辞書と並びは中へ下りる（並びは `[番号]`）。空の辞書・並びは葉として扱う */
+function leaves(value: unknown, at: string, out: Map<string, string>): void {
+  if (isRecord(value) && Object.keys(value).length > 0) {
+    for (const [key, inner] of Object.entries(value)) {
+      if (inner !== undefined) {
+        leaves(inner, at === "" ? fieldLabel(key) : `${at}.${key}`, out);
+      }
+    }
+    return;
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    value.forEach((inner, index) => leaves(inner, `${at}[${index}]`, out));
+    return;
+  }
+  out.set(at, shown(value));
+}
+
+function leavesOf(value: Readonly<Record<string, unknown>>, skip: ReadonlySet<string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [key, inner] of Object.entries(value)) {
+    if (!skip.has(key) && inner !== undefined) {
+      leaves(inner, fieldLabel(key), out);
+    }
+  }
+  return out;
+}
+
+/** 2 つの値の、違う葉の前後。片方にしか無い葉は、もう片方を空にする */
+function fieldTexts(a: Readonly<Record<string, unknown>> | undefined, b: Readonly<Record<string, unknown>> | undefined, skip: ReadonlySet<string>): FieldText[] {
+  const before = a === undefined ? new Map<string, string>() : leavesOf(a, skip);
+  const after = b === undefined ? new Map<string, string>() : leavesOf(b, skip);
+  const fields = [...new Set([...before.keys(), ...after.keys()])];
+  const out: FieldText[] = [];
+  for (const field of fields) {
+    const was = before.get(field);
+    const now = after.get(field);
+    if (was === now) {
+      continue;
+    }
+    out.push({ field, ...(was === undefined ? {} : { before: was }), ...(now === undefined ? {} : { after: now }) });
+  }
+  return out;
+}
+
+/** `before`（いまのフロー）から `after`（下書き）への差分を、値の前後まで */
+export function textDiff(before: FlowDoc, after: FlowDoc): readonly TextChange[] {
+  const paired = pair(before, after);
+  const out: TextChange[] = [];
+  const meta = fieldTexts(before, after, META_SKIP);
+  if (meta.length > 0) {
+    out.push({ kind: "meta", label: "", texts: meta });
+  }
+  for (const n of paired.addedNodes) {
+    out.push({ kind: "added-node", label: nodeLabel(n), texts: fieldTexts(undefined, n, NODE_SKIP) });
+  }
+  for (const n of paired.removedNodes) {
+    out.push({ kind: "removed-node", label: nodeLabel(n), texts: fieldTexts(n, undefined, NODE_SKIP) });
+  }
+  for (const [old, n] of paired.changedNodes) {
+    out.push({ kind: "changed-node", label: nodeLabel(n), texts: fieldTexts(old, n, NODE_SKIP) });
+  }
+  for (const c of paired.addedConnections) {
+    out.push({ kind: "added-connection", label: connectionLabelOf(after, c), texts: fieldTexts(undefined, c, CONNECTION_SKIP) });
+  }
+  for (const c of paired.removedConnections) {
+    out.push({ kind: "removed-connection", label: connectionLabelOf(before, c), texts: fieldTexts(c, undefined, CONNECTION_SKIP) });
+  }
+  for (const [old, c] of paired.changedConnections) {
+    out.push({ kind: "changed-connection", label: connectionLabelOf(after, c), texts: fieldTexts(old, c, CONNECTION_SKIP) });
+  }
+  return out;
 }

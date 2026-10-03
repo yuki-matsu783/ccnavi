@@ -72,6 +72,19 @@ export interface FlowJson {
   /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
   readonly linked: boolean;
   readonly locked: boolean;
+  /** エージェントが書く下書き（ADR-0100）。置き場はフローと同じツリーの提案の置き場。この欄を出さない古い実行ファイルでは null */
+  readonly draft: FlowDraftJson | null;
+}
+
+/** 子のフローの下書き（ADR-0100）。効力は無く、ユーザがフロー編集画面で取り込んだものだけが効く */
+export interface FlowDraftJson {
+  /** 絶対パス（既定 `<ツリー>/wip/proposals/flows/<子>.yml`） */
+  readonly path: string;
+  /** ツリーのルートからの相対 */
+  readonly rel: string;
+  readonly exists: boolean;
+  /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
+  readonly linked: boolean;
 }
 
 /**
@@ -357,7 +370,17 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     linked: raw.linked !== false,
     // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
+    draft: isRecord(raw.draft) ? flowDraft(raw.draft) : null,
   };
+}
+
+function flowDraft(raw: Record<string, unknown>): FlowDraftJson | null {
+  const path = str(raw.path);
+  if (path === "") {
+    return null;
+  }
+  // 欄が欠けていたらリンクの扱いにする（読まない）
+  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked !== false };
 }
 
 function seenIn(value: unknown): readonly SeenInJson[] {

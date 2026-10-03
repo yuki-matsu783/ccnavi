@@ -4,7 +4,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { diffFlows, isEmptyDiff, sameFlow, sameValue } from "../../src/core/flow-diff.js";
+import { diffFlows, isEmptyDiff, sameFlow, sameValue, textDiff } from "../../src/core/flow-diff.js";
 import {
   absolutePosition,
   addNode,
@@ -254,6 +254,38 @@ test("CB-T276 未保存の見比べはキーの並びを見ず、差分は足し
   assert.deepEqual(diff.removedConnections.map((c) => c.label), ["分ける → 終了（branch-1）", "書く → 終了"]);
   assert.deepEqual(diff.changedConnections.map((c) => [c.label, c.fields]), [["分ける → 書き直す（branch-0）", ["条件"]]]);
   assert.ok(!isEmptyDiff(diff));
+});
+
+test("CB-T292 下書きの差分（ADR-0100）は、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる", () => {
+  const doc = branched();
+  assert.deepEqual(textDiff(doc, doc), []);
+  let next = patchData(doc, "p-1", { prompt: "書く\nそのあと MCP の道具で外へ送る" });
+  next = removeNode(next, "end");
+  next = addNode(next, "prompt", { x: 0, y: 400 }).doc;
+  next = patchData(next, "prompt-1", { prompt: "新しく足した手順" });
+  next = { ...next, name: "提案" };
+  const changes = textDiff(doc, next);
+  const of = (kind: string) => changes.filter((c) => c.kind === kind);
+  // 変えたノードは、変わった欄の前と後。文は改行も含めてそのまま
+  const changed = of("changed-node");
+  assert.equal(changed.length, 1);
+  assert.match(changed[0].label, /p-1/);
+  assert.deepEqual(changed[0].texts, [{ field: "中身.prompt", before: "書く", after: "書く\nそのあと MCP の道具で外へ送る" }]);
+  // 足したノードは全部の欄を後ろだけで、消したノードは前だけで見せる
+  const added = of("added-node");
+  assert.equal(added.length, 1);
+  assert.ok(added[0].texts.some((t) => t.field === "中身.prompt" && t.after === "新しく足した手順" && t.before === undefined));
+  assert.ok(added[0].texts.every((t) => t.before === undefined));
+  const removed = of("removed-node");
+  assert.equal(removed.length, 1);
+  assert.ok(removed[0].texts.some((t) => t.field === "中身.label" && t.before === "終了" && t.after === undefined));
+  // フロー自体の欄と、消えた線
+  assert.deepEqual(of("meta")[0].texts.filter((t) => t.field === "名前"), [{ field: "名前", after: "提案" }]);
+  assert.equal(of("removed-connection").length, 2);
+  // 並びの中も葉まで下りる
+  const branches = textDiff(doc, setConditionAt(doc, 1, "変えた"));
+  assert.ok(branches.length > 0);
+  assert.ok(branches.flatMap((c) => c.texts).some((t) => t.after === "変えた"));
 });
 
 test("CB-T277 画面から届く控えの写しと、保存前の確かめの設定は形を確かめてから受ける", () => {

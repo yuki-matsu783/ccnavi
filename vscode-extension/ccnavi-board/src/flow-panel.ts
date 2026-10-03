@@ -34,6 +34,13 @@
  * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身の指紋が
  * 変わっていなければ写しを未保存のまま戻し、変わっていれば戻さずに写しを名前の無い YAML のエディタで開く
  * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
+ *
+ * **エージェントの下書き（ADR-0100）。** 置き場は実行ファイルに聞く（`tickets[].flow.draft`）。下書きが在り、中身が
+ * いまのフローと違えば（`sameFlow` が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
+ * 掛け、error なら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
+ * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときの指紋と同じときだけ消し
+ * （`core/flow-write.ts` の `removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
+ * 依頼の文を組み、ボードと同じ「コピー / 新しいセッションで開く」（`prompt-handover.ts`）で渡す。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -43,20 +50,24 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runC1Target, runFlowLint } from "./ccnavi.js";
-import { PUSH_APPROVED_SCRIPT, pushApprovedCommand } from "./core/commands.js";
+import { PUSH_APPROVED_SCRIPT, pushApprovedCommand, scriptCommand, shellQuote, toPosixPath } from "./core/commands.js";
+import { sameFlow } from "./core/flow-diff.js";
 import { flowMismatch, openMismatchText, saveMismatchText } from "./core/flow-match.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
 import { renderFlowPage } from "./core/flow-render.js";
-import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.js";
+import { decodeFlowBytes, readFlowFile, removeDraftFile, writeFlowFile } from "./core/flow-write.js";
 import {
   asFlowMessage,
+  flowRequestPrompt,
   flowTargetOf,
   lockFromFailure,
+  requestLabel,
   type FlowChecks,
   type FlowData,
   type FlowLock,
   type FlowMessage,
+  type FlowOffer,
   type FlowTarget,
   type ToFlow,
 } from "./core/flow-view.js";
@@ -65,6 +76,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
+import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { runInTerminal } from "./terminal.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
@@ -88,6 +100,8 @@ interface Loaded {
   readonly shown: string;
   /** 開くときに実行ファイルが言ったこと（warn・渡る手順・候補）。ファイルが無ければ無い */
   readonly checks?: FlowChecks;
+  /** 「提案あり」。下書きが無いか、いまのフローと同じなら無い */
+  offer?: FlowOffer;
 }
 
 /** 未保存のまま閉じた画面から戻す写し。読み込んだときのファイルの様子が今と同じときだけ戻す */
@@ -130,6 +144,11 @@ interface PanelState {
   /** 画面に渡している、戻した写し（次に読み直すまで） */
   shownDraft?: FlowDoc;
   seq: number;
+  /** 画面に渡した下書きの指紋。保存のときに届いた `imported` がこの中にあるときだけ、下書きを消しに行く */
+  offered: Set<string>;
+  /** 画面に見せている依頼の文（コピー / 新しいセッションで開く はこれを渡す） */
+  requestPrompt?: string;
+  offerTimer?: NodeJS.Timeout;
 }
 
 /** 開いているパネル。子の識別子ごとに 1 枚 */
@@ -217,6 +236,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     dirty: false,
     restore,
     seq: 0,
+    offered: new Set(),
   };
   panels.set(ticket, current);
   followAppearance(panel, current.host);
@@ -267,7 +287,8 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   }
   if (read === undefined) {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
-    return { target, exists: false, mtimeMs: 0, hash: "", doc: templateFlow(ticket, target.title), shown };
+    const doc = templateFlow(ticket, target.title);
+    return { target, exists: false, mtimeMs: 0, hash: "", doc, shown, offer: readOffer(root, target, doc) };
   }
   const { bytes, mtimeMs } = read;
   const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから再読込してください`);
@@ -295,7 +316,57 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   if (doc === undefined) {
     throw refuse("ノードの並び（id が文字列のノード）を取り出せないため、図を描けません");
   }
-  return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks };
+  return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks, offer: readOffer(root, target, doc) };
+}
+
+/**
+ * 「提案あり」を出すか。下書きが在り、中身がいまのフロー（`current`）と違えば出す。読めない（リンク・ハードリンク・
+ * 大きすぎる・YAML として読めない）ときも出し、開いたときに理由を言う。ここでは実行ファイルに掛けない（開いたときに掛ける）
+ */
+function readOffer(root: string, target: FlowTarget, current: FlowDoc): FlowOffer | undefined {
+  const draft = target.flow.draft;
+  if (draft === null) {
+    return undefined;
+  }
+  const draftPath = shownPath(root, draft.path);
+  let read: { readonly bytes: Uint8Array } | undefined;
+  try {
+    read = readFlowFile(target.flow.tree, draft.path);
+  } catch (error) {
+    return { draftPath, problem: (error as Error).message };
+  }
+  if (read === undefined) {
+    return undefined;
+  }
+  const decoded = decodeFlowBytes(read.bytes);
+  const value = decoded.ok ? parseFlowValue(decoded.text) : undefined;
+  const doc = value?.ok === true ? asFlowDoc(value.value) : undefined;
+  if (doc !== undefined && sameFlow(doc, current)) {
+    return undefined;
+  }
+  return { draftPath };
+}
+
+/** 下書きが在るか（リンクでも在るとする）。依頼のボタンの言葉に使う */
+function draftExists(target: FlowTarget): boolean {
+  const draft = target.flow.draft;
+  if (draft === null) {
+    return false;
+  }
+  try {
+    fs.lstatSync(draft.path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 依頼のボタンの言葉。下書きの置き場を答えない古い実行ファイルなら出さない */
+function requestOf(target: FlowTarget, lock: FlowLock, flowExists: boolean): string | undefined {
+  if (target.flow.draft === null) {
+    return undefined;
+  }
+  return requestLabel({ beforeStart: target.beforeStart, locked: lock.locked, flowExists, draftExists: draftExists(target) });
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -316,7 +387,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
   panel.onDidDispose(() => {
     askRestore(current);
-    for (const timer of [current.timer, current.lockTimer]) {
+    for (const timer of [current.timer, current.lockTimer, current.offerTimer]) {
       if (timer !== undefined) {
         clearTimeout(timer);
       }
@@ -395,6 +466,18 @@ function watchFile(current: PanelState): void {
   watcher.onDidChange(changed);
   watcher.onDidDelete(changed);
   current.fileWatchers.push(watcher);
+  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す（編集は捨てない）
+  const draft = loaded.target.flow.draft;
+  if (draft !== null) {
+    const drafts = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(vscode.Uri.file(path.dirname(draft.path)), path.basename(draft.path)),
+    );
+    const moved = () => scheduleOffer(current);
+    drafts.onDidCreate(moved);
+    drafts.onDidChange(moved);
+    drafts.onDidDelete(moved);
+    current.fileWatchers.push(drafts);
+  }
 }
 
 function scheduleChanged(current: PanelState): void {
@@ -440,6 +523,11 @@ async function refreshLock(current: PanelState): Promise<{ readonly lock: FlowLo
   if (alive(current)) {
     current.lock = lock;
     current.host.post({ type: "lock", lock } satisfies ToFlow);
+    // 着手・終わり・取り消しで、依頼のボタンを出すかが変わる
+    if (target !== undefined && current.loaded !== undefined) {
+      const request = requestOf({ ...current.loaded.target, beforeStart: target.beforeStart }, lock, current.loaded.exists);
+      current.host.post({ type: "offer", ...(request === undefined ? {} : { request }), ...(current.loaded.offer === undefined ? {} : { offer: current.loaded.offer }) } satisfies ToFlow);
+    }
   }
   return { lock, target };
 }
@@ -468,8 +556,35 @@ function show(current: PanelState): void {
       reviewSave: reviewSetting(),
       ...(loaded.checks === undefined ? {} : { checks: loaded.checks }),
       ...(current.shownDraft === undefined ? {} : { draft: current.shownDraft }),
+      ...requestAndOffer(current, loaded),
     },
   });
+}
+
+/** 画面に渡す依頼のボタンの言葉と「提案あり」。無いものは欄ごと省く */
+function requestAndOffer(current: PanelState, loaded: Loaded): { request?: string; offer?: FlowOffer } {
+  const request = requestOf(loaded.target, current.lock, loaded.exists);
+  return { ...(request === undefined ? {} : { request }), ...(loaded.offer === undefined ? {} : { offer: loaded.offer }) };
+}
+
+/** 下書きか錠が動いた。読み込んだフローと比べ直して、依頼のボタンと「提案あり」を出し直す（編集は捨てない） */
+function postOffer(current: PanelState): void {
+  const loaded = current.loaded;
+  if (loaded === undefined || !alive(current)) {
+    return;
+  }
+  loaded.offer = readOffer(current.folder.uri.fsPath, loaded.target, loaded.doc);
+  current.host.post({ type: "offer", ...requestAndOffer(current, loaded) } satisfies ToFlow);
+}
+
+function scheduleOffer(current: PanelState): void {
+  if (current.offerTimer !== undefined) {
+    clearTimeout(current.offerTimer);
+  }
+  current.offerTimer = setTimeout(() => {
+    current.offerTimer = undefined;
+    postOffer(current);
+  }, DEBOUNCE_MS);
 }
 
 function showError(current: PanelState, error: string): void {
@@ -620,7 +735,23 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       return;
     }
     case "save":
-      await save(current, message.doc);
+      await save(current, message.doc, message.imported);
+      return;
+    case "openProposal":
+      await openProposal(current);
+      return;
+    case "request":
+      request(current);
+      return;
+    case "requestCopy":
+      if (current.requestPrompt !== undefined) {
+        await copyPrompt(current.requestPrompt, "フローの依頼の文");
+      }
+      return;
+    case "requestOpen":
+      if (current.requestPrompt !== undefined) {
+        await openPromptInSession(current.requestPrompt);
+      }
       return;
     case "check":
       await check(current, message.seq, message.doc);
@@ -649,7 +780,113 @@ async function check(current: PanelState, seq: number, doc: FlowDoc): Promise<vo
   current.host.post((verdict.ok ? { type: "checked", seq, checks: verdict.checks } : { type: "checked", seq, error: verdict.error }) satisfies ToFlow);
 }
 
-async function save(current: PanelState, doc: FlowDoc): Promise<void> {
+/**
+ * 「提案あり」を開く。下書きを読んだバイトのまま実行ファイルに確かめさせ（`--lint --json --flow`。SubagentStart と同じ読み）、
+ * error なら取り込めないと言う。通れば画面の読みと実行ファイルの読みを見比べ（開くときと同じ）、中身と指紋を返す
+ */
+async function openProposal(current: PanelState): Promise<void> {
+  const loaded = current.loaded;
+  const draft = loaded?.target.flow.draft ?? null;
+  if (loaded === undefined || draft === null) {
+    return;
+  }
+  const root = current.folder.uri.fsPath;
+  const shown = shownPath(root, draft.path);
+  const answer = (message: ToFlow): void => {
+    if (alive(current) && current.loaded === loaded) {
+      current.host.post(message);
+    }
+  };
+  const refuse = (why: string): void => answer({ type: "proposal", error: `下書きを取り込めません（${shown}）: ${why}` });
+  let read: { readonly bytes: Uint8Array } | undefined;
+  try {
+    read = readFlowFile(loaded.target.flow.tree, draft.path);
+  } catch (error) {
+    refuse((error as Error).message);
+    return;
+  }
+  if (read === undefined) {
+    refuse("下書きはもうありません");
+    postOffer(current);
+    return;
+  }
+  const bytes = read.bytes;
+  const verdict = await lintText(root, current.tmpDir, bytes, shown);
+  if (!verdict.ok) {
+    refuse(verdict.error);
+    return;
+  }
+  const decoded = decodeFlowBytes(bytes);
+  if (!decoded.ok) {
+    refuse(decoded.error);
+    return;
+  }
+  const value = parseFlowValue(decoded.text);
+  if (!value.ok) {
+    refuse(value.error);
+    return;
+  }
+  const mismatch = flowMismatch(value.value, verdict.data);
+  if (mismatch !== undefined) {
+    refuse(openMismatchText(mismatch));
+    return;
+  }
+  const doc = asFlowDoc(value.value);
+  if (doc === undefined) {
+    refuse("ノードの並び（id が文字列のノード）を取り出せないため、図を描けません");
+    return;
+  }
+  const hash = hashOf(bytes);
+  current.offered.add(hash);
+  answer({ type: "proposal", proposal: { doc, hash, draftPath: shown } });
+}
+
+/** 綴りがそのままシェルに渡せなければ引用する */
+function shellWord(text: string): string {
+  return /^[^\s'"\\$`!*?\[\]{}()<>|&;#~]+$/.test(text) ? text : shellQuote(text);
+}
+
+/** 依頼の文を組んで画面に渡す。出すかは画面のボタンと同じ条件で、ここでも確かめる */
+function request(current: PanelState): void {
+  const loaded = current.loaded;
+  const draft = loaded?.target.flow.draft ?? null;
+  if (loaded === undefined || draft === null || requestOf(loaded.target, current.lock, loaded.exists) === undefined) {
+    fail(current, "いまはエージェントにフローを頼めません（着手の前の子だけで頼めます）");
+    return;
+  }
+  const root = current.folder.uri.fsPath;
+  const draftPath = toPosixPath(draft.path);
+  const prompt = flowRequestPrompt({
+    ticket: loaded.target.ticket,
+    title: loaded.target.title,
+    parent: loaded.target.parent,
+    draftPath,
+    ...(loaded.exists ? { flowPath: toPosixPath(loaded.target.flow.path) } : {}),
+    redo: draftExists(loaded.target),
+    lintCommand: `${scriptCommand(root, "ccnavi-launcher.sh")} --lint --flow ${shellWord(draftPath)}`,
+  });
+  current.requestPrompt = prompt;
+  current.host.post({ type: "requestText", prompt } satisfies ToFlow);
+}
+
+/**
+ * 取り込んだ下書きを消す（保存が成功したあとだけ呼ぶ）。消した・消さなかったことを、保存のあとの知らせに足す文で返す。
+ * 取り込んでいなければ空
+ */
+function removeImported(current: PanelState, target: FlowTarget, imported: string | undefined): string {
+  const draft = target.flow.draft;
+  if (imported === undefined || draft === null || !current.offered.has(imported)) {
+    return "";
+  }
+  const shown = shownPath(current.folder.uri.fsPath, draft.path);
+  const removed = removeDraftFile(target.flow.tree, draft.path, imported);
+  if (!removed.ok) {
+    return `取り込んだ下書き ${shown} は消していません（${removed.error}）。`;
+  }
+  return removed.removed ? `取り込んだ下書き ${shown} を消しました（削除もコミットに入ります）。` : "";
+}
+
+async function save(current: PanelState, doc: FlowDoc, imported?: string): Promise<void> {
   const loaded = current.loaded;
   if (loaded === undefined) {
     return;
@@ -694,6 +931,8 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     fail(current, written.error);
     return;
   }
+  // 取り込んだ下書きは、保存が成功したこの時点で消す（取り込んだときと同じ中身のときだけ）
+  const drafted = removeImported(current, target, imported);
   await reload(current);
   // 取り込み済みの家族（C1 の対象）だけ、運ぶ処理を送る（ADR-0093 の 4.6）。ターミナルは対話中のことがあるので、
   // 勝手に打ち込まず、ユーザがボタンを押したときだけ送る（段階 2d のレビューの決定 E）。それ以外の家族は今どおり
@@ -705,13 +944,13 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     (await runC1Target(root, binSetting(), target.parent)) === "yes";
   if (!carrier) {
     vscode.window.showInformationMessage(
-      `${loaded.shown} に保存しました。コミットは、承認済みチケットと同じくユーザが行います（sh ${PUSH_APPROVED_SCRIPT}）`,
+      `${loaded.shown} に保存しました。${drafted}コミットは、承認済みチケットと同じくユーザが行います（sh ${PUSH_APPROVED_SCRIPT}）`,
     );
     return;
   }
   const send = "ターミナルで送る";
   const picked = await vscode.window.showInformationMessage(
-    `${loaded.shown} に保存しました。親 ${target.parent} とその子は取り込み済みのため、コミットと push は、「${send}」を押すと ${PUSH_APPROVED_SCRIPT} ${target.parent} で送れます`,
+    `${loaded.shown} に保存しました。${drafted}親 ${target.parent} とその子は取り込み済みのため、コミットと push は、「${send}」を押すと ${PUSH_APPROVED_SCRIPT} ${target.parent} で送れます`,
     send,
   );
   if (picked === send) {
