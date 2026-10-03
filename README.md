@@ -2444,7 +2444,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `ccnavi/infra/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての目印と、振り分けの sh が起動する実体の探し方 |
 | `ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否の数え |
 | `ccnavi/records/audit.py` | 1 行 1 件の追記記録 |
-| `ccnavi/policy/` | ルール。読み込み・照合・組み込み・層の合成・自己防衛・文脈ファイル |
+| `ccnavi/policy/` | ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル |
 | `ccnavi/policy/rules.py` | ルールファイルの読み込みと検証 |
 | `ccnavi/policy/builtin.py` | ルールファイルを読めないときの組み込み既定 |
 | `ccnavi/policy/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
