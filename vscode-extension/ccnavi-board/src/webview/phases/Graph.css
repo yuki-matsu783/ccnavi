@@ -107,7 +107,7 @@
   border-color: var(--vscode-focusBorder);
 }
 
-/* 人が見る種類（HITL）。縁を太くし、札を添える。色だけに頼らない */
+/* ユーザが見る種類（HITL）。縁を太くし、札を添える。色だけに頼らない */
 .phase-node:not([data-review="none"]) {
   border-width: 2px;
   border-color: var(--vscode-focusBorder);

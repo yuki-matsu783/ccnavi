@@ -3,7 +3,7 @@
  * 依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。
  * GitLab とプロジェクトのリポジトリも読み、「始める」（issue から親のブランチを作る）を出す。
  * GitLab へ書いて打ち消しが収まらなかった家族は「要確認」を控え（`chrome.storage.local` の `attention`）、
- * 人が確かめて外すまで出す。
+ * ユーザが確かめて外すまで出す。
  *
  * PAT はこのページに来ない。ホストの API は service worker に名前で頼む。
  */
@@ -90,7 +90,7 @@ async function readAttention(): Promise<Attention> {
   return v && typeof v === "object" ? (v as Attention) : {};
 }
 
-/** 要確認の家族を控える（打ち消しが収まらない・書いたか確かめられない など。人が確かめて外すまでボードに出す） */
+/** 要確認の家族を控える（打ち消しが収まらない・書いたか確かめられない など。ユーザが確かめて外すまでボードに出す） */
 async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
   if (outcome.kind !== "attention") return;
   const all = await readAttention();

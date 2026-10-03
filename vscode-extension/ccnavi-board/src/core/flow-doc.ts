@@ -19,7 +19,7 @@
  * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はその写しの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
- * 書き出しは中身から組み直す（コメントや書き方は残らない。人が保存したときだけ書く）。
+ * 書き出しは中身から組み直す（コメントや書き方は残らない。ユーザが保存したときだけ書く）。
  *
  * **判定はしない。** 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`）、
  * 着手中に書けるかは実行ファイルが `flow.locked` で言う。
@@ -68,7 +68,7 @@ export const TYPE_LABELS: Readonly<Record<string, string>> = {
   end: "終了",
   prompt: "プロンプト",
   subAgent: "サブエージェント",
-  askUserQuestion: "利用者に聞く",
+  askUserQuestion: "ユーザに聞く",
   ifElse: "分岐（if / else）",
   switch: "分岐（switch）",
   branch: "分岐",
@@ -197,7 +197,7 @@ export function parseFlow(text: string): FlowRead {
     return read;
   }
   const doc = asFlowDoc(read.value);
-  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）が取れないので描けない" } : { ok: true, doc };
+  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）を取り出せないため、図を描けません" } : { ok: true, doc };
 }
 
 /**
@@ -210,11 +210,11 @@ export function parseFlowValue(text: string): { readonly ok: true; readonly valu
     const doc = parseDocument(text.replace(/^\uFEFF/, ""));
     const problem = doc.errors[0];
     if (problem !== undefined) {
-      return { ok: false, error: `画面の YAML パーサーで読めないので図にできない（${firstLine(problem.message)}）` };
+      return { ok: false, error: `画面の YAML パーサーで読めないため、図にできません（${firstLine(problem.message)}）` };
     }
     return { ok: true, value: doc.toJS() };
   } catch (error) {
-    return { ok: false, error: `画面の YAML パーサーで読めないので図にできない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
+    return { ok: false, error: `画面の YAML パーサーで読めないため、図にできません（${firstLine(error instanceof Error ? error.message : String(error))}）` };
   }
 }
 
@@ -479,7 +479,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は**並びの位置で指す**（人が書いたフローの線は id が無いことも重なることもある）。
+ * 線を消す。線は**並びの位置で指す**（ユーザが書いたフローの線は id が無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -962,7 +962,7 @@ export interface Ports {
 }
 
 /**
- * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（人が書いたフローが別の綴りを
+ * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（ユーザが書いたフローが別の綴りを
  * 使っていても、線を落とさずに描くため）。
  */
 export function portsOf(node: FlowNode, connections: readonly FlowConnection[]): Ports {
@@ -1101,28 +1101,28 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
   const { depth, cyclic } = nesting(doc);
   if (depth > NEST_ALLOWED) {
     out.push(
-      `入れ子のサブエージェントが子の下に ${depth} 段重なる。既定の上限はメインの下 ${SPAWN_LIMIT} 段で、子（1 段目）の下は ${NEST_ALLOWED} 段まで。` +
-        "上限に当たった段では Agent ツールが渡らず、そのノードで止まってメインへ戻る",
+      `入れ子のサブエージェントが、子の下に ${depth} 段重なっています。既定の上限はメインの下 ${SPAWN_LIMIT} 段で、子（1 段目）の下は ${NEST_ALLOWED} 段までです。` +
+        "上限に達した段では Agent ツールが渡らず、そのノードで止まってメインへ戻ります",
     );
   }
   if (cyclic) {
-    out.push("サブフローが自分を呼んでいる（subAgentFlowId が巡っている）。段の数を数えられない");
+    out.push("サブフローの呼び出しが循環しています（subAgentFlowId が輪になっています）。段の数を数えられません");
   }
   const starts = doc.nodes.filter((node) => nodeType(node) === "start").length;
   if (starts === 0) {
     if (options.exe !== true) {
-      out.push("開始（start）のノードが無い。担当のサブエージェントは先頭のノードから読む");
+      out.push("開始（start）のノードがありません。担当のサブエージェントは先頭のノードから読みます");
     }
   } else if (starts > 1) {
-    out.push(`開始（start）のノードが ${starts} つある。案内はどの開始からも辿って並べる`);
+    out.push(`開始（start）のノードが ${starts} つあります。案内は、どの開始からもたどって並べます`);
   }
   const unknown = [...new Set(doc.nodes.map(nodeType).filter((type) => !isEditableType(type) && type !== GROUP_TYPE))];
   if (unknown.length > 0) {
-    out.push(`この画面に入力欄が無い種類がある（${unknown.map((t) => t || "(種類なし)").join(", ")}）。名前と位置だけ変えられ、中身は保存してもそのまま残る`);
+    out.push(`この画面に入力欄が無い種類があります（${unknown.map((t) => t || "(種類なし)").join(", ")}）。名前と位置だけを変えられ、中身は保存してもそのまま残ります`);
   }
   const flows = subFlows(doc).size;
   if (flows > 0) {
-    out.push(`サブフロー（subAgentFlows）が ${flows} 本ある。この画面では中身を描かない。保存してもそのまま残る`);
+    out.push(`サブフロー（subAgentFlows）が ${flows} 本あります。この画面では中身を描きません。保存してもそのまま残ります`);
   }
   return out;
 }

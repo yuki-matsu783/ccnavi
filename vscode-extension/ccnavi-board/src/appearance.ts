@@ -1,6 +1,6 @@
 /**
  * 見た目の設定（`ccnaviBoard.appearance`）の読み書きと、変わったときの通知。
- * 切り替えはサイドパネルのタイトルバーの歯車とコマンドパレットから。値は利用者の設定（グローバル）に書く。
+ * 切り替えはサイドパネルのタイトルバーの配色のアイコンとコマンドパレットから。値はユーザの設定（グローバル）に書く。
  * VS Code の API に触れるので単体テストの対象外。
  */
 import * as vscode from "vscode";
@@ -53,15 +53,15 @@ export function followAppearance(panel: vscode.WebviewPanel, host: AppearanceSin
 }
 
 /**
- * サイドパネルのタイトルバーの歯車とコマンドパレットから。今の値に印を付けた 3 択を出し、選んだ値を設定に書く。
- * 書く先は、いま値が定義されている置き場（フォルダ → ワークスペース → 利用者）。利用者の設定に書いても
+ * サイドパネルのタイトルバーの配色のアイコンとコマンドパレットから。今の値に印を付けた 3 択を出し、選んだ値を設定に書く。
+ * 書く先は、いま値が定義されている置き場（フォルダ → ワークスペース → ユーザ）。ユーザの設定に書いても
  * ワークスペースの設定のほうが採られて何も変わらない、ということが起きないように。
  */
 export async function pickAppearance(): Promise<void> {
   const now = readAppearance();
   const picked = await vscode.window.showQuickPick(
     APPEARANCES.map((value) => ({ label: APPEARANCE_LABELS[value], picked: value === now, value })),
-    { placeHolder: "ccnavi の画面の見た目", title: "ccnavi ボード: 見た目" },
+    { placeHolder: "ccnavi の画面の見た目を選んでください", title: "ccnavi ボード: 見た目" },
   );
   if (picked === undefined || picked.value === now) {
     return;
@@ -70,7 +70,7 @@ export async function pickAppearance(): Promise<void> {
   await config.update(KEY, picked.value, targetOf(config.inspect<string>(KEY)));
 }
 
-/** 値が定義されている置き場。無ければ利用者の設定 */
+/** 値が定義されている置き場。無ければユーザの設定 */
 function targetOf(found: { workspaceFolderValue?: unknown; workspaceValue?: unknown } | undefined): vscode.ConfigurationTarget {
   if (found?.workspaceFolderValue !== undefined) {
     return vscode.ConfigurationTarget.WorkspaceFolder;

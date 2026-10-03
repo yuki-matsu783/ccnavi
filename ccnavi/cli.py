@@ -383,7 +383,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
     状態の跡（history）の経路はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
-    人の判断の経路（端末・ボード）と hook は枝の中で差し替える。跡を書けなかった知らせは、
+    ユーザの判断の経路（端末・ボード）と hook は枝の中で差し替える。跡を書けなかった知らせは、
     起動を抜けるときに標準エラーへ出す（跡は補助で状態の正は置き場なので、状態の操作は止めない）。
     """
     with history.session(history.VIA_CLI, stderr):
@@ -413,9 +413,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
     # 承認できる状態かを確かめるだけ（`--preview` と一緒に使う）。承認済みチケットは置かず、
-    # 通るかどうかを終了コードで返す。エージェントが人に承認を頼む前に打つ。
+    # 通るかどうかを終了コードで返す。エージェントがユーザに承認を頼む前に打つ。
     parser.add_argument("--verify", action="store_true")
-    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
+    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身の指紋
     # （preview の `digest`）。`--yes` と一緒に渡す。
@@ -424,7 +424,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
-    # 記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。人が端末から打つ。
+    # 記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。ユーザが端末から打つ。
     parser.add_argument("--prune", action="store_true")
     # 記録からルールの候補を作る（suggest）。読むだけで、何も書かない。
     parser.add_argument("--suggest", action="store_true")
@@ -460,7 +460,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--format", default=None)
     parser.add_argument("--no-refresh", action="store_true")
-    # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
+    # チケットの状態とレビューの操作。ユーザか、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
@@ -469,9 +469,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("--chat", action="store_true")
-    # 人が端末で打つ締め。`--approve` / `--reviewed` と同じく、人の判断はフラグで受ける。
+    # ユーザが端末で打つ締め。`--approve` / `--reviewed` と同じく、ユーザの判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
-    # 人が端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 11.12）。
+    # ユーザが端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 11.12）。
     parser.add_argument("--config-synced", default="")
     parser.add_argument("-h", "--help", action="store_true")
     # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
@@ -483,14 +483,15 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 置き場の外に書いたら error（例外は `start` の中で configsync が写したプロジェクトの層だけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択と指紋をこのファイルに書くだけで、何も置かない（控えの置き場の
-    # 下だけ）。人が選ぶのを C1 のロックの外で済ませ、ロックを持ったまま人を待たないため。
+    # 下だけ）。ユーザが選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たないため。
     parser.add_argument("--choose-out", default="")
     # 統合先の名前。リポジトリには置かず、手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
     # ホストのデフォルトブランチ）で決まる。実行ファイルは環境変数を読まず、sh が決めて渡す。
     # いまは `--lint` の識別子の予約（統合先と同じ名前の識別子を使わせない）が読む。
     parser.add_argument("--integration-branch", default="")
-    # レビュー済みの印に入れるアカウント（押した人ではなくトークンの持ち主）。ccnavi-review.sh が
-    # トークンの持ち主をホストに聞いて渡す（実行ファイルはネットワークに出ない）。
+    # レビュー済みの印に入れるアカウント（押したユーザではなくトークンの持ち主）。
+    # ccnavi-review.sh がトークンの持ち主をホストに聞いて渡す（実行ファイルは
+    # ネットワークに出ない）。
     # `review confirm` と、書く形の decide（`--reviewed N --accept-unresolved`）が読む。
     parser.add_argument("--actor", default="")
     # decide の印の経路（`terminal`・`board`）。`--actor` と一緒にだけ受ける
@@ -815,7 +816,7 @@ def _parsed(
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
-    # 人が端末から打って「このルールは何に当たるのか」を確かめるための場所で、
+    # ユーザが端末から打って「このルールは何に当たるのか」を確かめるための場所で、
     # 判定そのものは実運用と同じ関数を通る（REQ-DIA-03）。
     if args.test is not None:
         if args.json:
@@ -834,7 +835,7 @@ def _parsed(
     if args.prune:
         return _prune(stdin, stdout, stderr, conf, root, args.preview)
 
-    # 承認の経路。人が端末から打つもので、payload を読まないのでここで分かれる。
+    # 承認の経路。ユーザが端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
     # 判断ではなく、これから判定に使われる範囲についての合意になる。
     if args.approve:
@@ -860,7 +861,7 @@ def _parsed(
         if args.preview:
             code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
-        # 拡張のオーバーレイで人が押した承認。端末の確認の代わりに、見せた一覧と今の一覧が
+        # 拡張のオーバーレイでユーザが押した承認。端末の確認の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase.ticket_approval_rule）が止める。
         if args.yes:
@@ -885,7 +886,8 @@ def _parsed(
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
-    # 着手で上書きした設定を、人が端末で見たと残す。レビューの代わりなので、人の判断と同じ門。
+    # 着手で上書きした設定を、ユーザが端末で見たと残す。
+    # レビューの代わりなので、ユーザの判断と同じ門。
     if args.config_synced:
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
@@ -962,7 +964,7 @@ def _parsed(
     try:
         payload = hookio.decode(stdin)
     except hookio.NoPayload:
-        # hook ではなく端末の前の人。何も判定していないので何も記録しない。
+        # hook ではなく端末の前のユーザ。何も判定していないので何も記録しない。
         stderr.write(USAGE)
         return EXIT_ERROR
     except hookio.Unusable as exc:
@@ -1022,7 +1024,7 @@ DOCS_FLAGS = (
 )
 DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
 # `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。何も出さずに無視すると、
-# 打った人は反映されたと思う。
+# 打ったユーザは反映されたと思う。
 _NOT_WITH_DOCS = (
     "--lint",
     "--test",
@@ -1156,9 +1158,9 @@ def _prune(
 
 
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
-    """人の判断の経路が、端末の前の人から打たれているか。
+    """ユーザの判断の経路が、端末の前のユーザから打たれているか。
 
-    `--approve` と `--reviewed` と `--close-early` は人の合意そのもの。エージェントが
+    `--approve` と `--reviewed` と `--close-early` はユーザの合意そのもの。エージェントが
     Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん手間の少ない証拠になる。
     CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
@@ -1171,10 +1173,10 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     except (AttributeError, ValueError):
         pass
     # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
-    # 人の判断を自分で出す方法を教えることになる。切り方は README の設定の表にある。
+    # ユーザの判断を自分で出す方法を教えることになる。切り方は README の設定の表にある。
     stderr.write(
         f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない。"
-        "利用者に端末で打ってもらってください\n"
+        "ユーザに端末で打ってもらってください\n"
     )
     return False
 
@@ -1190,7 +1192,7 @@ def operate(
     """チケットの状態とレビューの操作を振り分ける。
 
     `ticket start|finish|cancel <識別子>` と `review prepare|requested|confirm`、それに
-    人が打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
+    ユーザが打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
     リモートの写しは `--result <json>` で受け取る。exe はネットワークに出ない。
     """
     if not conf.tickets_enabled:
@@ -1210,7 +1212,7 @@ def operate(
         if not args.result:
             stderr.write("ccnavi: --close-early には --reason <理由> と --result <json> が要る\n")
             return EXIT_ERROR
-        # 人の判断。`--approve` / `--reviewed` と同じく端末を求める。
+        # ユーザの判断。`--approve` / `--reviewed` と同じく端末を求める。
         if not _from_terminal(stdin, conf, stderr, "--close-early"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
@@ -1243,7 +1245,7 @@ def operate(
             )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.choose_out:
-        # 対話の decide の前半（ロックを持ったまま人を待たないため分ける）。人が端末で選び、
+        # 対話の decide の前半（ロックを持ったままユーザを待たないため分ける）。ユーザが端末で選び、
         # 選択と指紋を控えの置き場に書くだけ。置くのは sh が C1 の中で
         # `--yes <選択> --digest <指紋>` で打つ。
         if not _inside(_real(os.path.abspath(args.choose_out)), _real(conf.state)):
@@ -1322,7 +1324,7 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
     状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
     行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の家族では sh が `--record-tree` を
     付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を通っていない。
-    人の判断の操作（`--reviewed --chat`・`--config-synced`・`--close-early`）と、
+    ユーザの判断の操作（`--reviewed --chat`・`--config-synced`・`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
     """
     if args.record_tree:

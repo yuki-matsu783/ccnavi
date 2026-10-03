@@ -11,7 +11,7 @@
 #
 # 状態は置き場で表し、チケットは 1 本のファイルが置き場を動く。承認待ちは wip/proposals/todo/、承認済みの作業中は
 # .ccnavi/approved/doing/、レビュー待ちは wip/proposals/review/、閉じたものは
-# .ccnavi/approved/done/。人が動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
+# .ccnavi/approved/done/。ユーザが動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
 # wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
 # 作ったり動かしたりするのは ccnavi が止める。
 # サブエージェントからの呼び出しも ccnavi が止める（agent_id が付いていたら拒む）。
@@ -45,7 +45,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <
   cancel       doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい
   record-risk  定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
 
-  レビュー待ち（review/）から done/ へ動かすのは人（ccnavi-review.sh confirm / decide、
+  レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm / decide、
   ccnavi --reviewed）。
 
   提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通層の

@@ -2,9 +2,9 @@
 # ccnavi-sync 親のブランチをリモートから取り込み、家族の控えと統合先の控えを書く。
 #
 #   sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
-#   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （人が打つ。家族の控えを消す）
+#   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （ユーザが打つ。家族の控えを消す）
 #
-# 人が打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
+# ユーザが打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
 # ccnavi-fetch.sh は早送りしかしないので、分かれた家族を取り込むのと、親のブランチが
 # リモートから消えたかを確かめるのはここだけ（セッションの頭を待たせず、merge の書きかけも残さないため）。
 #
@@ -13,7 +13,7 @@
 #
 # 家族の控えは墓標として残す。親のワークツリーを片付けても消さない。
 # 消すと、決まらないで止めていた家族（gone など）が控えの無い家族に戻り、止めが外れるため。
-# 消すのは人が打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
+# 消すのはユーザが打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
 # エージェントからは組み込みの deny（builtin-guard-ticket-approval）が止める。
 #
 # リポジトリ（ワークスペース自身と、家族の元のプロジェクト）ごとに 1 回、次の順に行う。
@@ -29,11 +29,11 @@
 #
 # 家族ごとに次を行う（ロックを待って取る）。
 #
-#   - 途中の操作（merge・cherry-pick・revert・rebase）があれば何もせず止める（利用者の途中の
+#   - 途中の操作（merge・cherry-pick・revert・rebase）があれば何もせず止める（ユーザの途中の
 #     merge を取りやめない）
 #   - P がリモートにある: fetch して、早送りできれば早送り、分かれていれば merge。merge は
 #     索引が HEAD と同じときだけで、衝突したら、この sh が始めた merge だけを取りやめて
-#     人に回す。家族の控えを present で書く
+#     ユーザに回す。家族の控えを present で書く
 #   - P がリモートに無い: まず統合先の done/ にこの家族の親の写し（識別子と承認の時刻が同じ）が
 #     あれば閉じた家族（closed）。無く、送った跡（控え・origin/<P>・追跡の設定）も無ければ、
 #     一度も送っていない家族で今のまま。送った跡があれば観測ずれを疑い、統合先を取り直して
@@ -73,12 +73,12 @@ sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
 sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
 
   親のブランチ <P>（省けば .claude/worktrees/ の下の親のワークツリー全部）をリモートから取り込み、
-  家族の控えと統合先の控えを書く。分かれていれば merge し、衝突したら取りやめて人に回す。
+  家族の控えと統合先の控えを書く。分かれていれば merge し、衝突したら取りやめてユーザに回す。
   リモートから消えた親のブランチは、統合先の done/ を見て「閉じた」か「消えた」かを決める。
   取り込んだ後、家族を判定し直し、止める理由があれば家族の控えを blocked にする。
   家族の控えは親のワークツリーを片付けても消えない（墓標）。
 
-  --forget <P>...  人が打つ。捨てた家族の控えを消す（親のワークツリーを片付けた後だけ）。
+  --forget <P>...  ユーザが打つ。捨てた家族の控えを消す（親のワークツリーを片付けた後だけ）。
                    消すと、その名前で切り直した家族は控えの無い家族として扱われる。
 
   統合先: CCNAVI_INTEGRATION_BRANCH（環境変数か .claude/settings.local.json の env）、
@@ -160,7 +160,7 @@ trap 'cleanup; exit 130' INT TERM HUP
 
 log_info 受け付けた -- "args=$#" "forget=$forget"
 
-# ---- 人が打つ --forget（家族の控えを消す）。ネットワークも実行ファイルも使わない。
+# ---- ユーザが打つ --forget（家族の控えを消す）。ネットワークも実行ファイルも使わない。
 
 if [ "$forget" = yes ]; then
 	forget_rc=0
@@ -177,7 +177,7 @@ if [ "$forget" = yes ]; then
 			fg_key="${fg_record%/families/*}"
 			fg_key="${fg_key##*/}"
 			if [ -L "$state/sync/$fg_key" ] || [ -L "$state/sync/$fg_key/families" ]; then
-				printf '%s: 控えの置き場（sync/%s）がシンボリックリンク。辿らないので消さない。人が中身を確かめる\n' "$want" "$fg_key"
+				printf '%s: 控えの置き場（sync/%s）がシンボリックリンク。辿らないので消さない。ユーザが中身を確かめる\n' "$want" "$fg_key"
 				forget_rc=1
 				continue
 			fi
@@ -513,7 +513,7 @@ sync_family() {
 	case "$lock_rc" in
 	0) ;;
 	2)
-		printf '%s: 古いロック（%s/locks/%s/%s）を奪う途中で止まり、元に戻せなかった。人が中身を見て片付ける\n' "$P" "$state" "$key" "$P"
+		printf '%s: 古いロック（%s/locks/%s/%s）を奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$P" "$state" "$key" "$P"
 		fail_note
 		return 0
 		;;
@@ -584,7 +584,7 @@ sync_present() {
 					git -C "$tree" merge --abort >/dev/null 2>&1 || :
 				fi
 				if [ -n "$conflicted" ]; then
-					printf '%s: リモートと分かれていて merge が衝突した（%s）。取り込みをやめた（merge --abort）。どちらを採るかは人が決める\n' \
+					printf '%s: リモートと分かれていて merge が衝突した（%s）。取り込みをやめた（merge --abort）。どちらを採るかはユーザが決める\n' \
 						"$P" "$conflicted"
 				else
 					cat "$scratch/out" >>"$scratch/err"
@@ -686,7 +686,7 @@ sync_absent() {
 	fi
 	printf '  戻し方 1（改名・消し間違い）: 元の名前 %s でブランチを作り直す。端末なら git push origin %s:refs/heads/%s（控えにある、最後に取り込んだか送った %s の先頭）、GitHub ならマージリクエストの画面の「Restore branch」、GitLab ならマージリクエストの refs/merge-requests/<番号>/head から %s を作る。戻したら sh %s/ccnavi-sync.sh %s を打ち直す\n' \
 		"$P" "${kept_sha:-<最後に取り込んだ sha>}" "$P" "$P" "$P" "$here_sh" "$P"
-	printf '  戻し方 2（家族を捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、人が sh %s/ccnavi-sync.sh --forget %s を打つと家族の控えが消える（同じ名前で切り直せる。エージェントは打たない）\n' \
+	printf '  戻し方 2（家族を捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、ユーザが sh %s/ccnavi-sync.sh --forget %s を打つと家族の控えが消える（同じ名前で切り直せる。エージェントは打たない）\n' \
 		"$here_sh" "$P" "$here_sh" "$P"
 	fail_note
 	return 0

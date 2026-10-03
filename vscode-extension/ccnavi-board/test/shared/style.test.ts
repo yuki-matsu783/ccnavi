@@ -155,7 +155,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
 test("CB-T193 動いたカードの印は、光らせない設定を尊び、色だけに頼らない", () => {
   const html = flatStyle(board());
   // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
-  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌う人に 2 秒の脈動が出る
+  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌うユーザに 2 秒の脈動が出る
   assert.match(html, /@media \(prefers-reduced-motion: reduce\) \{ \.card\.moved \{ animation: none; \} \}/);
   // どこからどこへ動いたかは帯の文で言う（色が見分けられなくても読める）。中身は Card.tsx の movedLabel
   assert.match(html, /\.moved-mark \{[^}]*color: var\(--vscode-charts-green\);/);

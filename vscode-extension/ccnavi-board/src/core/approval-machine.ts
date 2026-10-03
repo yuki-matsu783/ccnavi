@@ -6,7 +6,7 @@
  * 書き落とさないことが要る。**散らばっていると書き落とす**ので、見張りをこの 1 ファイルに集めた。
  *
  * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・端末に送る・クリップボードに
- * 入れる・新しいセッションで開く・人に言う）は `ApprovalEffect` として返すだけで、**実際に行うのは
+ * 入れる・新しいセッションで開く・ユーザに言う）は `ApprovalEffect` として返すだけで、**実際に行うのは
  * 呼ぶ側**（`board-panel.ts`）。`core/screen-host.ts` の `Surface` と同じ形で、単体で試せる。
  *
  * 呼ぶ側の段取りは 3 行で、順を変えない。
@@ -36,17 +36,17 @@
  *
  * | 見張り | 消すとどうなる |
  * |---|---|
- * | `approving` の間は閉じない | 承認を打っている最中に閉じられ、結果を人が見ないまま次へ進む |
+ * | `approving` の間は閉じない | 承認を打っている最中に閉じられ、結果をユーザが見ないまま次へ進む |
  * | 承認を打つのは `preview` のときだけ | 二重に打てる。実行ファイルが承認のときに読み直した中身の指紋と照合するので 2 本目は止まるが、止まる前提で連打させない |
  * | 承認の途中（`loading`・`preview`・`approving`）は二重に開かない | 見せている一覧が、読み直しの途中の別の一覧になってしまう |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 文を渡せるのは `done` と `prompt` のときだけ | 文の無い状態で「コピー」が通る |
  * | `done` の上にレビュー済みの連絡を被せない | 承認の文が、渡す前に消える |
  * | 絞り込みで見えている承認待ちが、いまのボードでも承認待ちか | 古いボードの識別子で承認が通る |
- * | `deciding` の間は閉じない | 行き先を置いている最中に閉じられ、続きの子が起きたことを人が見ない |
+ * | `deciding` の間は閉じない | 行き先を置いている最中に閉じられ、続きの子が起きたことをユーザが見ない |
  * | 行き先を置くのは `decidePreview` のときだけ | 二重に置ける。続きの子が 2 本起きる |
  * | 行き先が見せた指摘の全部に 1 つずつ付いているか | 古い画面から届いた選択で、見せていない指摘の扱いが決まる |
- * | 残った指摘を読むのは、人のレビュー待ちのフェーズだけ | 依頼していないフェーズで、実行ファイルの前提の誤りを人が読むことになる |
+ * | 残った指摘を読むのは、ユーザのレビュー待ちのフェーズだけ | 依頼していないフェーズで、実行ファイルの前提の誤りをユーザが読むことになる |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ（残った指摘も同じ） | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
@@ -91,7 +91,7 @@ export interface ApprovalState {
 /** 閉じている状態 */
 export const CLOSED: ApprovalState = { only: [] };
 
-/** 人が押したことと、外から返ってきたこと。どちらも「入力」として同じ関数から入れる */
+/** ユーザが押したことと、外から返ってきたこと。どちらも「入力」として同じ関数から入れる */
 export type ApprovalInput =
   /**
    * 「承認」を押した。`filtered` はボードが絞り込まれているか、`tickets` はそのとき見えている
@@ -173,7 +173,7 @@ export type ApprovalEffect =
   | { readonly kind: "copy"; readonly prompt: string; readonly what: string }
   /** 文を埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
-  /** 人に言う（警告） */
+  /** ユーザに言う（警告） */
   | { readonly kind: "warn"; readonly text: string }
   /** ボードを読み直す */
   | { readonly kind: "refresh" };
@@ -308,7 +308,7 @@ function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalSt
 
 /**
  * 承認の結果。**ここには「この状態でなければ受けない」を置かない。**
- * 承認済みチケットは既に置かれていることがあり、受けずに捨てると人に届かない
+ * 承認済みチケットは既に置かれていることがあり、受けずに捨てるとユーザに届かない
  */
 function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolean): ApprovalStep {
   if (outcome.ok) {
@@ -392,13 +392,13 @@ function reviewed(
       text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、レビュー済みの連絡文を作れません`,
     });
   }
-  // ボタンが出る条件（人のレビュー待ち）を受け側でも持つ。待ちでなければ confirm の前提（依頼のマーカー）が無い
+  // ボタンが出る条件（ユーザのレビュー待ち）を受け側でも持つ。待ちでなければ confirm の前提（依頼のマーカー）が無い
   if (!chip.reviewWaiting) {
     return stay(
       state,
       {
         kind: "warn",
-        text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理画面を更新しました`,
+        text: `親 ${parent} のフェーズ ${chip.label} はユーザのレビュー待ちではありません。チケット管理画面を更新しました`,
       },
       { kind: "refresh" },
     );
@@ -477,11 +477,11 @@ function decideOpened(
       text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、未解決（Unresolved）の指摘を読めません`,
     });
   }
-  // 残った指摘を決めるのは、依頼を出してから人が見ている間だけ。待ちでなければ依頼の記録が無い
+  // 残った指摘を決めるのは、依頼を出してからユーザが見ている間だけ。待ちでなければ依頼の記録が無い
   if (chip.reviewWaiting !== true) {
     return stay(
       state,
-      { kind: "warn", text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理画面を更新しました` },
+      { kind: "warn", text: `親 ${parent} のフェーズ ${chip.label} はユーザのレビュー待ちではありません。チケット管理画面を更新しました` },
       { kind: "refresh" },
     );
   }
@@ -536,7 +536,7 @@ function decideConfirmed(state: ApprovalState, choices: Readonly<Record<string, 
 
 /**
  * 置いた結果。**承認の結果と同じく「この状態でなければ受けない」を置かない。** 置かれたものは
- * 戻らないので、受けずに捨てると人に届かない
+ * 戻らないので、受けずに捨てるとユーザに届かない
  */
 function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
   if (outcome.ok) {

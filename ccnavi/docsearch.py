@@ -174,7 +174,7 @@ def _listed(base: str, timeout: float = GIT_TIMEOUT_SECONDS) -> list[str]:
     """基準のディレクトリの下の、git が挙げる md（基準からの相対、`/` 区切り）。"""
     if not os.path.exists(os.path.join(base, ".git")):
         raise NotARepository(base)
-    # pathspec（`*.md`）は渡さず、ここで `.md` を選ぶ。利用者の環境に `GIT_LITERAL_PATHSPECS`
+    # pathspec（`*.md`）は渡さず、ここで `.md` を選ぶ。ユーザの環境に `GIT_LITERAL_PATHSPECS`
     # などがあると `*.md` の読み方が変わる。
     done = gitcmd.run(
         base,

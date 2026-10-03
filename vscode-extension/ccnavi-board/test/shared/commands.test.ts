@@ -118,7 +118,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   const text = reviewedPrompt("/ws", "i0001", 2, "2（設計）", "/ws/.claude/worktrees/i0001", "https://example.com/pull/18#issuecomment-5");
   assert.ok(
     text.startsWith(
-      "[ccnavi] 利用者が親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n親（メインエージェント）が、親のワークツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 2' を打ち、",
+      "[ccnavi] ユーザが親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n親（メインエージェント）が、親のワークツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 2' を打ち、",
     ),
     text,
   );
@@ -127,7 +127,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で打つ（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で打つ）"));
   assert.ok(text.includes("サブエージェントには渡さない"));
   assert.ok(!text.includes("&&"));
-  // 人の判断（--reviewed / decide）を代行させず、confirm が返す方法を先取りしない
+  // ユーザの判断（--reviewed / decide）を代行させず、confirm が返す方法を先取りしない
   assert.ok(!text.includes("--reviewed"));
   assert.ok(!text.includes("decide"));
   assert.ok(!text.includes("依頼し直す"));

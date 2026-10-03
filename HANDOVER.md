@@ -34,7 +34,7 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 
 チケットは 1 本のファイルで、提案の置き場（`wip/proposals/`）と承認済みチケットの置き場
 （`.ccnavi/approved/`）を行き来し、どこに在るかが状態を表す（設計 9.2・9.6）。層の和は設計 11.2〜11.4.2。
-共通層は `.ccnavi/common/` に固定で、環境変数では動かない。人が持つ設定は ccnavi ディレクトリの下、
+共通層は `.ccnavi/common/` に固定で、環境変数では動かない。ユーザが持つ設定は ccnavi ディレクトリの下、
 記録と控えは `logs/` に置く（設計 11.2）。ファイルの構成と開発用 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh`
 `test-ext.sh`）は README の「構成」「開発」。
 
@@ -94,16 +94,16 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 1. **保護済みファイル（`.ccnavi/scripts/`、`.claude/hooks/`、`rules.yml`）を直すチケットは `implement` では承認されない。**
    `staging` 種別（自身の層の `phases.yml`、`scope: [wip/design/*, tests/*]`）のフェーズで完成品を
-   `wip/design/scripts/` に全文で置き、人が写してコミットする。写す順は `ccnavi-common.sh` が先
-   （3 本が起動時に読む）。`phases.yml` は人が持つ設定で、エージェントは足せない
+   `wip/design/scripts/` に全文で置き、ユーザが写してコミットする。写す順は `ccnavi-common.sh` が先
+   （3 本が起動時に読む）。`phases.yml` はユーザが持つ設定で、エージェントは足せない
 2. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。** コマンドに `.ccnavi` が
    含まれるだけで当たる。受入テストは Python の中で写すので通るが、手で確かめるときには当たる
 
-### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（人が直す）
+### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（ユーザが直す）
 
 usage の `confirm` の説明が「依頼より後の未解決スレッドが無ければ」のままで、挙動（時刻で絞らず未解決の全部を
 数える）と違う。冒頭のコメントの一覧にも `ready` `close-early` `origin` が無い。
-`.ccnavi/scripts/` は `deny` なので、人が直すか `staging` のフェーズで写す版を作る。
+`.ccnavi/scripts/` は `deny` なので、ユーザが直すか `staging` のフェーズで写す版を作る。
 
 ### 複数のリポジトリで確かめること
 
@@ -128,7 +128,7 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 ### 決めていないもの
 
-- 人が子を再開しても、そのフェーズの `reviewed` は残り、再び `finish` しても止まらず告知も出ない（設計 9.6）。
+- ユーザが子を再開しても、そのフェーズの `reviewed` は残り、再び `finish` しても止まらず告知も出ない（設計 9.6）。
   再開の手順でマーカーも消すか、機構が消すかは決めていない
 
 ### 記録で実測すること
@@ -185,7 +185,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 | 分かったこと | どうしたか |
 |---|---|
 | 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
-| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh は利用者の情報を落として伏せる。実行ファイルの `remote_kind` も読み飛ばす |
+| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を落として伏せる。実行ファイルの `remote_kind` も読み飛ばす |
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とすので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tools/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |

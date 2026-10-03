@@ -11,8 +11,8 @@
  * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
  * そのルールファイルの場所は layers（層）の答えを使い、`CCNAVI_PROJECT_HOME` から自分で組まない。
  *
- * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこで人が行い、完了は `projects/<名前>/.git`
- * の出現を監視して拾う。書くのは、人がボタンを押したときの `.gitignore`、置き場のディレクトリ、
+ * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
+ * の出現を監視して拾う。書くのは、ユーザがボタンを押したときの `.gitignore`、置き場のディレクトリ、
  * プロジェクトかワークスペースの設定のルールファイル（無いときだけ）の 3 つ。
  */
 import * as crypto from "node:crypto";
@@ -352,7 +352,7 @@ function showError(current: PanelState, error: string): void {
  * 画面が組み上がった（`ready`）ところでここから渡し直す。
  *
  * **読み直せなかったことも渡し直す。** ここで落とすと、入れてある HTML（古い一覧）が出たまま
- * 失敗が人に届かず、`page` が無いので以後のボタンも使えない。
+ * 失敗がユーザに届かず、`page` が無いので以後のボタンも使えない。
  */
 function redraw(current: PanelState): void {
   if (current.page !== undefined) {
@@ -428,7 +428,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     markTourSeen(SCREEN);
     return;
   }
-  // 「更新」は一覧が無くても通す。読み直せなかったところから人が抜け出す方法がこれしかない
+  // 「更新」は一覧が無くても通す。読み直せなかったところからユーザが抜け出す方法がこれしかない
   if (message.type === "refresh") {
     void update();
     return;
@@ -523,7 +523,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
   if (page.projectsRel === "") {
-    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、足す行がありません");
+    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、.gitignore に足す行がありません");
     return;
   }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");

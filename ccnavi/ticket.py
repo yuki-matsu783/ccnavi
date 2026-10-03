@@ -6,7 +6,7 @@
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の範囲を広げられる。
 止められた側が止め方を書き換えられるなら、止めたことにならない。
 
-判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、人に見せて
+判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、ユーザに見せて
 承認を求めるためのもので、承認されるまで判定には使われない。承認されたあとに
 提案を書き換えても、判定に使われているのは承認済みチケットの側なので範囲は広がらない。
 
@@ -51,11 +51,11 @@
 
 状態は frontmatter ではなく置き場が表す。チケットは 1 本のファイルで、
 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）を
-行き来する。人が動かす向きは承認済みの側へ、エージェントが動かす向きは提案の側へ。
+行き来する。ユーザが動かす向きは承認済みの側へ、エージェントが動かす向きは提案の側へ。
 
     wip/proposals/todo      承認待ち。エージェントが書く
     .ccnavi/approved/doing  承認済み。判定が範囲を読むのはここだけ
-    wip/proposals/review    作業が終わり、人のレビューを待つ
+    wip/proposals/review    作業が終わり、ユーザのレビューを待つ
     .ccnavi/approved/done   閉じた（取り消しは cancelled_at を持ってここに入る）
 
 `ls` で見え、コミットに残り、閉じたつもりの食い違いが起きない。
@@ -102,7 +102,7 @@ GUARDED_STATES = (REVIEW,)
 # 範囲の項として判定に使われるツール。これ以外を match に書いた項は使われない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 範囲の件数の上限。設計 9.3。大量に並べて人がレビューしきれない
+# 範囲の件数の上限。設計 9.3。大量に並べてユーザがレビューしきれない
 # ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
@@ -166,7 +166,7 @@ def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
     `issue:` があるときだけ、統合先や保護されたブランチの名前を使わない、issue の無い親は
     `-<2 桁>` で終わらない（子の識別子と紛れる）。
 
-    見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのは人に見せる文で、
+    見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのはユーザに見せる文で、
     深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子と、
     子の形に当たる親の識別子は、他のチケットと並べて見るので `lint` の側で数える。
 
@@ -201,8 +201,9 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     """issue から決める形（`i<番号>`・`<プロジェクト名>-i<番号>`）の識別子が、`issue:` と
     置き場に合っているか。
 
-    形に当たらない識別子（人が付けた名前）は見ない。`issue:` を持っていても人が付けた名前でよい
-    （既に同じ識別子が閉じていて、その issue からは始められないときのフォールバック）。
+    形に当たらない識別子（ユーザが付けた名前）は見ない。`issue:` を持っていても
+    ユーザが付けた名前でよい（既に同じ識別子が閉じていて、
+    その issue からは始められないときのフォールバック）。
     """
     name = t.ticket
     project_form = _PROJECT_ISSUE_ID.match(name)
@@ -215,7 +216,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
         expected = "" if t.issue_repo else issue_identifier(t.issue, t.project)
     elif project_form:
         if t.issue is None:
-            # 人が付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
+            # ユーザが付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
             # 重なりだけを言う（`fix-i2` のような名前をプロジェクトの外で咎めない）
             if t.project and project_form.group("project").casefold() == t.project.casefold():
                 return [
@@ -230,7 +231,8 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     if t.issue_repo:
         return [
             f"`issue: {issue_label(t)}` は別のリポジトリの課題。識別子は issue から決める形"
-            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、人が付ける"
+            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、"
+            "ユーザが付ける"
         ]
     if not expected:
         return [
@@ -245,7 +247,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     return []
 
 
-# スクリプトだけが書く欄。人もエージェントも書かない。承認済みチケットの側で
+# スクリプトだけが書く欄。ユーザもエージェントも書かない。承認済みチケットの側で
 # 行単位に書き換える（`set_fields`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
@@ -364,7 +366,7 @@ class Entry:
             # 名前のファイルも `src/` の下も中。そこだけ外になるのは驚きでしかない。
             # 大文字小文字は揃えてから比べる。機械によって区別の有無が変わると、
             # 同じチケットと同じ綴りで止まる場所が Windows と Linux で食い違う。
-            # 範囲は人が宣言する意図なので、機械の都合ではなく綴りの意味で読む。
+            # 範囲はユーザが宣言する意図なので、機械の都合ではなく綴りの意味で読む。
             here, there = _fold(rel), _fold(self.glob)
             return here == there or here.startswith(there + "/")
         return self.compiled.match(rel) is not None
@@ -469,14 +471,14 @@ class Ticket:
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
     # issue_repo は、課題が別のリポジトリにあるときのその綴り（`issue: owner/repo#N` の
-    # `owner/repo`）。同じリポジトリの課題なら空。識別子は issue から決めず人が付ける。
+    # `owner/repo`）。同じリポジトリの課題なら空。識別子は issue から決めずユーザが付ける。
     issue_repo: str = ""
     # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
     # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
     # 並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
     project: str = ""
-    # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
+    # declared_project は frontmatter にユーザが書いた `project:`。宣言ではなく照合に使う。
     # 置き場と違えば承認しない（approval.project_problems）。`scan` を通さずに読んだとき
     # （`load` を直に呼ぶ経路）は project と同じ値になる。
     declared_project: str = ""
@@ -506,7 +508,7 @@ class Ticket:
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 承認済みチケットにだけある。`ccnavi_approved` を持たない（人が置き場を動かしただけの）
+    # 承認済みチケットにだけある。`ccnavi_approved` を持たない（ユーザが置き場を動かしただけの）
     # チケットでは空になる。承認の権威は置き場で、この欄は記録（設計 9.2）。
     approved_at: str = ""
     source_tree: str = ""
@@ -943,10 +945,10 @@ def _under(rel: str, place_rel: str) -> bool:
 
 
 def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """チケットが `finish` / `cancel` / 人のレビューで出ていく元（作業中とレビュー待ち）か。
+    """チケットが `finish` / `cancel` / ユーザのレビューで出ていく元（作業中とレビュー待ち）か。
 
     移動の組を数えるとき、消えた側がここに居たことを求める。求めないと、承認待ちの提案
-    （`todo/`）を `review/` に置き直す形が移動として外れる。これは、人の承認を通っていない
+    （`todo/`）を `review/` に置き直す形が移動として外れる。これは、ユーザの承認を通っていない
     ものをレビュー待ちに見せる形になる。
     """
     return _under(rel, f"{approved_rel}/{DOING}") or _under(rel, f"{tickets_rel}/{REVIEW}")
@@ -1157,12 +1159,12 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
     権威にしてよい根拠は「他の写しは合流の結果で、同じか手前の状態」であって、合流
     していないワークツリーで先に進んだ写し（親のツリーで閉じ、子のツリーが取り込んだ形）
     があるときは成り立たない。そこで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
-    記録を別の差分で書き直す。決めずに残し、人に合流させる。
+    記録を別の差分で書き直す。決めずに残し、ユーザに合流させる。
 
     どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
     決まらない（検証が「複数の場所にある」と言う状態）。
 
-    リポジトリをまたいだ衝突はまとめない。識別子は人が選ぶ短い連番なので、プロジェクトが
+    リポジトリをまたいだ衝突はまとめない。識別子はユーザが選ぶ短い連番なので、プロジェクトが
     独立に振ればぶつかる（設計 11）。それは写しではなく違うチケットなので、どちらかを権威に
     すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
     """
@@ -1314,7 +1316,7 @@ def propose_notice(
 ) -> str:
     """提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。空なら渡さない。
 
-    承認できない提案のまま人に承認を頼むと、落ちたことを知るのが端末に座った人になり、
+    承認できない提案のままユーザに承認を頼むと、落ちたことを知るのが端末に座ったユーザになり、
     往復が 1 回増える。確かめる手立て（`--approve --preview --verify`）は在るので、
     書いた直後に、要る場所で言う。
 
@@ -1369,7 +1371,7 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
         additional_context_once=(
             f"チケットの提案を書こうとしています（{tickets_rel}/todo/ は承認待ちの置き場で、"
             "ここに書いただけでは判定には効きません）。"
-            "利用者に承認を依頼する前に、"
+            "ユーザに承認を依頼する前に、"
             f"'{settings.bin_command(bin_path)} --approve --preview --verify <識別子>' で"
             "承認できる状態かを確かめてください。承認済みチケットは置きません。"
             "終了コードが答えです。0 なら依頼してよく、3 なら承認の対象に入らない理由が出ます"
@@ -1384,8 +1386,8 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
 def set_fields(text: str, fields: dict[str, str]) -> str:
     """提案の frontmatter の、スクリプトが書く欄だけを行単位で書き換える。
 
-    読み直して書き出す（render）と、人が書いたコメントや `|` のブロックが
-    消えて、親のブランチの diff に余計な変更が出る。提案は人も読むものなので、
+    読み直して書き出す（render）と、ユーザが書いたコメントや `|` のブロックが
+    消えて、親のブランチの diff に余計な変更が出る。提案はユーザも読むものなので、
     触るのは欄の行だけにする。無い欄は閉じの `---` の前に足す。
     """
     lines = text.splitlines()
@@ -1475,10 +1477,10 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
 
 
 def insert_front(text: str, key: str, value) -> str:
-    """frontmatter の閉じの `---` の前に、欄を 1 つ足す。人の書いた行は保つ。
+    """frontmatter の閉じの `---` の前に、欄を 1 つ足す。ユーザの書いた行は保つ。
 
     承認のときに `ccnavi_approved` を足すのに使う。読み直して書き出す（render）と、
-    人が書いたコメントや `|` のブロックが消える。同じ鍵の行が既にあれば消してから足す
+    ユーザが書いたコメントや `|` のブロックが消える。同じ鍵の行が既にあれば消してから足す
     （最上位の鍵だけ。字下げされた行はその欄の続きとして一緒に消す）。
     """
     lines = text.splitlines()

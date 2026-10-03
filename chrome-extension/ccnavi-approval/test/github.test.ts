@@ -54,7 +54,7 @@ test("CX-T023 truncated の tree と、本文が大きさと合わない blob �
   assert.deepEqual(bin[oid], { text: null, binary: true });
 });
 
-test("CX-T024 GraphQL の文に利用者の値を継ぎ足さない（変数で渡す）", async () => {
+test("CX-T024 GraphQL の文にユーザの値を継ぎ足さない（変数で渡す）", async () => {
   const bodies: string[] = [];
   const m = new MockGitHub(fixture());
   const spy: gh.Fetch = async (url, init) => {

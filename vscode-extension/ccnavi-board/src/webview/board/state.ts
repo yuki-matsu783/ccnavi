@@ -29,7 +29,7 @@ export function loadState(): ViewState {
 }
 
 /**
- * 覚える。呼ぶのは人が動かしたときだけで、描くたびには書かない。
+ * 覚える。呼ぶのはユーザが動かしたときだけで、描くたびには書かない。
  * 読み直せなかった画面には絞り込みの部品が無く、そこで書くと覚えていた絞り込みが既定で上書きされる。
  */
 export function saveState(state: ViewState): void {

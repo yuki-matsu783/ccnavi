@@ -9,12 +9,12 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
 1. `ccnavi c1 family <識別子>`: 家族（子なら親）と、C1 の対象か。控えの無い家族・chat だけの家族は
    対象外、決まらない家族は stop
 2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（ccnavi が書いたと内容で分かるもの・
-   人が運ぶもの・見分けられないもの、数えない一時ファイル、
+   ユーザが運ぶもの・見分けられないもの、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
    （一覧は書く。着手で configsync が写した層は例外で、tests/config/test_configsync.py が見る）
-4. 人の判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）はエージェントから
-   止める
+4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）は
+   エージェントから止める
 """
 
 from __future__ import annotations
@@ -174,7 +174,8 @@ class SortTest(AuthorityHarness):
         self.assertEqual(self.sort(), [("b", self.events())])
 
     def test_moves_written_by_a_human_decision_are_c(self):
-        """人のレビュー（review/ から done/）と締め（doing/ から done/）、マーカーの消去は (c)。"""
+        """ユーザのレビュー（review/ から done/）と締め（doing/ から done/）、
+        マーカーの消去は (c)。"""
         review = "wip/proposals/review/i0001-01.md"
         self.put(review, child_text("i0001-01", "i0001", 1, ["wip/research/*"]))
         mark = f"{APPROVED}/phases/i0001/1.pending"

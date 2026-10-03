@@ -356,7 +356,7 @@ def write_json_atomic(path: str, data: Any, indent: int | None = None) -> str:
 
 
 def read_line(stream: Any) -> str:
-    """人の答えを 1 行読む。読めなければ空文字（端末が閉じている、など）。"""
+    """ユーザの答えを 1 行読む。読めなければ空文字（端末が閉じている、など）。"""
     try:
         return stream.readline()
     except (OSError, ValueError):
@@ -756,7 +756,7 @@ STREAM_ERR = "stderr"
 
 @dataclass
 class Line:
-    """人に見せる 1 行。書き込みと同じ並びに置き、同じ組が落ちたら出さない。"""
+    """ユーザに見せる 1 行。書き込みと同じ並びに置き、同じ組が落ちたら出さない。"""
 
     text: str
     group: int = 0

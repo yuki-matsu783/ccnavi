@@ -52,10 +52,10 @@ GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # 付けた呼び出しを止め、この 3 つのフラグは標準入力が端末でなければ拒む。
 # テストは disable にする。
 #
-# 守る手段（CLI から打つ形）ではなく守る対象で名前を付ける。切りたい人が何を切ることになるのかを、
-# 名前から読めるようにする。
+# 守る手段（CLI から打つ形）ではなく守る対象で名前を付ける。
+# 切りたいユーザが何を切ることになるのかを、名前から読めるようにする。
 GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
-# GUARD_UNWATCHED_ENV は、人にも classifier にも確認できないモード
+# GUARD_UNWATCHED_ENV は、ユーザにも classifier にも確認できないモード
 # （dontAsk・bypassPermissions）で、ルールがどこも言及しない呼び出しを止めるか。
 # enable（既定）/ disable の 2 値。
 #
@@ -95,13 +95,13 @@ APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
-# つけるか（repeat）。既定は 3。判定は変わらず、文面と人への報告が変わるだけ。
+# つけるか（repeat）。既定は 3。判定は変わらず、文面とユーザへの報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 # INTEGRATION_ENV は統合先の名前。リポジトリには置かず、未設定ならホストのデフォルトブランチ。
 # `done/` と層と置き場の綴りを読むブランチで、親のブランチはここから切る。
 # **ccnavi はこの環境変数を読まない。** 読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
 # `.claude/settings.local.json` の `env` から決め、要る所へ `--integration-branch` で渡す。
-# settings.local.json の `env` は Claude Code が起こしたプロセスにしか渡らないので、人が端末で
+# settings.local.json の `env` は Claude Code が起こしたプロセスにしか渡らないので、ユーザが端末で
 # 打つ sh のために、その値だけを `sync paths` が読んで返す（integration_local）。
 INTEGRATION_ENV = "CCNAVI_INTEGRATION_BRANCH"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
@@ -117,9 +117,9 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 
 # 既定の置き場。ワークスペースルートからの相対。
 #
-# 人が持つ設定（共通層の 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、実行のたびに書かれる
-# 記録と控えは `logs/` に置く。`.claude/` には Claude Code 自身のもの
-# （settings.json・hooks・skills・worktrees）だけを残す。
+# ユーザが持つ設定（共通層の 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、
+# 実行のたびに書かれる記録と控えは `logs/` に置く。
+# `.claude/` には Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを残す。
 #
 # 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
 # ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
@@ -130,20 +130,20 @@ DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けてまとめておく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join("logs", "state")
-# 提案は各作業ツリーの `wip/proposals/` に置く。人が読み、人が承認するものなので、
+# 提案は各作業ツリーの `wip/proposals/` に置く。ユーザが読み、ユーザが承認するものなので、
 # ガードの設定をまとめてある場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
-# 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
+# 承認をプロジェクトの git で運ぶため。承認したユーザの機械にだけ在る形だと、A が承認して
 # B の機械で作業する流れが成り立たない（設計 9.2）。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ。
 DEFAULT_APPROVED = ".ccnavi/approved"
-# フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
+# フェーズの種類はユーザが持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
-# リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
+# リスクの配点もユーザが持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
 DEFAULT_RISK = os.path.join(".ccnavi", "common", "risks.yml")
 # プロジェクトの置き場。ワークスペースの直下に固定するのは、列挙が速いことと、
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
@@ -193,7 +193,7 @@ def bin_command(bin_path: str) -> str:
     案内した綴りをそのまま打てないと、案内は「そういうものが在るらしい」で終わる。
     hook が起動しているのと同じ綴りを案内するのが、いちばん確かめようがある。
 
-    設定が無ければ `ccnavi`。PATH に置いた人はそれで打てるし、置いていない人には
+    設定が無ければ `ccnavi`。PATH に置いたユーザはそれで打てるし、置いていないユーザには
     綴りを尋ねる手掛かりになる。`.sh` は `sh` を頭に付ける（起動役はシェルの
     スクリプト。ccnavi-launcher.sh がこれにあたる）。
     """
@@ -259,7 +259,7 @@ def is_reserved_layer_name(name: str) -> bool:
     見ていないと、数えない層の名前で別の層の判定を引ける。
 
     綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
-    `Self:schema` になり、記録を読む人が `self:schema`（ワークスペース自身の層）と
+    `Self:schema` になり、記録を読むユーザが `self:schema`（ワークスペース自身の層）と
     取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも
     大文字小文字を区別せずに扱う。`--lint` が error で名指しする（lint._projects）。
     """
@@ -297,7 +297,7 @@ class Settings:
     # mode_declared_in_file は設定ファイルが求めたモード、
     # mode_from_environment はプロセスが渡されたモード。
     # 2 つを分けて持つことで、呼び手が「作業ツリーの中に書かれた値」と
-    # 「セッションを起動した人が渡した値」を見分けられる。
+    # 「セッションを起動したユーザが渡した値」を見分けられる。
     mode_declared_in_file: str = ""
     mode_from_environment: str = ""
 
@@ -325,10 +325,10 @@ class Settings:
     # guard_ticket_approval はチケットの承認の経路（承認・レビュー済みの受け入れ・
     # 状態の移動）をエージェントの手から守るか。enable / disable の 2 つだけを取る。
     #
-    # guard_ticket_approval_declared は、解決する前に人が書いた綴り。判定はこれを
+    # guard_ticket_approval_declared は、解決する前にユーザが書いた綴り。判定はこれを
     # 読まない。読むのは --lint で、dry-run のように「書けるつもりで書かれたが
     # この門には無い値」を名指しするために要る。解決した値だけを持っていると、
-    # 書いた人の思い違いが enable として扱われた時点で消える。
+    # 書いたユーザの思い違いが enable として扱われた時点で消える。
     guard_ticket_approval: str = ""
     guard_ticket_approval_declared: str = ""
 
@@ -344,7 +344,7 @@ class Settings:
 
     # ticket_control はチケット制御を使うか。enable / disable の 2 つだけを取る。
     # 解決は cli が selfguard.resolve で行い、読めない値は enable として扱う。
-    # ticket_control_declared は解決する前に人が書いた綴りで、--lint がそれを名指しする。
+    # ticket_control_declared は解決する前にユーザが書いた綴りで、--lint がそれを名指しする。
     ticket_control: str = ""
     ticket_control_declared: str = ""
 
@@ -464,7 +464,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         if isinstance(conf.get(name), str):
             setattr(settings, name, conf[name])
     # 書かれた綴りをそのまま控える。上書き設定ファイルは ccnavi 自身を開発している
-    # ときだけ読むものだが、そこに dry-run と書いた人にも --lint から同じことを言う。
+    # ときだけ読むものだが、そこに dry-run と書いたユーザにも --lint から同じことを言う。
     for name in ("guard_ticket_approval", "ticket_control"):
         if isinstance(conf.get(name), str):
             setattr(settings, f"{name}_declared", conf[name])
@@ -522,9 +522,9 @@ def own_source_tree(root: str) -> bool:
     そこにあるプロジェクト定義に書かれた名前で判断する。
 
     これは安全性の検査ではない。1 つのリポジトリを「道具を作っている場所」として
-    目印を付け、ルールを試す人がセッションを開き直さずに変更を見られるようにする
+    目印を付け、ルールを試すユーザがセッションを開き直さずに変更を見られるようにする
     だけのもの。他のプロジェクトは環境変数だけが設定の出所のままなので、
-    そこでエージェントが設定ファイルを書き換えても、人がセッションを開き直すまで
+    そこでエージェントが設定ファイルを書き換えても、ユーザがセッションを開き直すまで
     ガードには反映されない。
     """
     try:
@@ -599,7 +599,7 @@ def _resolve_bin(root: str, path: str) -> str:
 def integration_local(root: str) -> str:
     """`.claude/settings.local.json` の `env` に書かれた統合先の名前。
 
-    環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。人が端末で打つ sh には
+    環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。ユーザが端末で打つ sh には
     settings.local.json の `env` が渡らないので、JSON を読む役をここが持つ（sh は jq を使わない）。
     ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先に落ちる）。
     """

@@ -44,7 +44,7 @@ DEADLINE_SECONDS = 3.0
 # 「下した判定を適用するか」、こちらは「そもそも誰が判断するか」を決める。
 #
 # ルールが言及していない呼び出しについて、ccnavi は判定を持たない。持っていない
-# 判定を ask として返すと、判断できる相手が居るモードでも必ず人の確認で止まる。だから
+# 判定を ask として返すと、判断できる相手が居るモードでも必ずユーザの確認で止まる。だから
 # 返さず、Claude Code の権限モードに従う。
 # ルールに書いていないものは、ルールに書いていないものとして渡す。
 #
@@ -55,7 +55,7 @@ DEADLINE_SECONDS = 3.0
 # それが確認なしに通るのではなく確認になるように。
 PERMISSION_JUDGED = ("auto", "default", "acceptEdits", "plan")
 
-# 人にも classifier にも確認できないモード。ここで ask を返すと「誰も答えないまま
+# ユーザにも classifier にも確認できないモード。ここで ask を返すと「誰も答えないまま
 # 通る」になってしまうので、許可としない（REQ-PRE-08）。
 PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
 
@@ -186,7 +186,7 @@ def decide_before(
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
-        # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
+        # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
             rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
@@ -263,7 +263,7 @@ def decide_before(
                 conf=conf,
             )
 
-    # 人の判断の経路のうち、hook のほかに守りが無い形（端末要求を切る形、ボードの経路の形）は
+    # ユーザの判断の経路のうち、hook のほかに守りが無い形（端末要求を切る形、ボードの経路の形）は
     # 止める。実行ファイルを呼ぶ綴りは追い切れないので、呼び方ではなく綴りの組で見る
     # （phase.human_path_form）。
     if (
@@ -473,10 +473,10 @@ def decide_before(
 
     # ルールの判定とチケットの判定を合わせ、強い側を採る（設計 9.5）。同じ強さならルール。
     # ルールの deny はどう書いても最も強いので、そのときはチケットを見ない。
-    # チケットが当てはまるのは閉じる向きだけ（範囲の外・deny・ask）。人が書いたルールの allow を
+    # チケットが当てはまるのは閉じる向きだけ（範囲の外・deny・ask）。ユーザが書いたルールの allow を
     # 作業 1 本のあいだ狭めることはあっても、ルールの deny や ask を緩めることは無い。
-    # チケットが判定に使われるのは人が承認したあとだけで、承認画面が「ルールの allow も範囲の外では
-    # 止まる」と言う。
+    # チケットが判定に使われるのはユーザが承認したあとだけで、承認画面が
+    # 「ルールの allow も範囲の外では止まる」と言う。
     ticket_reason = ""
     ticket_code = ""
     if verdict != rules.DENY:
@@ -499,7 +499,7 @@ def decide_before(
     context = ctxfile.for_rules(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
-    # このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）は、
+    # このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）は、
     # 判定がどれでも 1 度だけつける。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）にまとめる。
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
@@ -566,7 +566,7 @@ def decide_before(
         ]
         record.code = reasons.CODE_RULE_ASK
     elif verdict == rules.ASK:
-        # チケットが ask と書いた場所。人が 1 度見る場所として宣言されている。
+        # チケットが ask と書いた場所。ユーザが 1 度見る場所として宣言されている。
         # ルールは何も言わないか、allow に当たっている。
         texts = [ticket_reason]
         record.code = reasons.CODE_TICKET_ASK
@@ -584,7 +584,7 @@ def decide_before(
     if verdict == HANDOVER:
         # 判定は渡した。ここで残せるのは記録だけで、それがこの分担の要点になる。
         # ルールが言及していない場所は log の handover を数えれば分かり、その数は
-        # 人に聞いた回とも、classifier が通した回とも区別できる。
+        # ユーザに聞いた回とも、classifier が通した回とも区別できる。
         #
         # 文面は返さない。呼び出しごとに「ルールが言及していない」と言うと、
         # 渡した先が判断するだけの回に毎度コンテキストを 1 段積むことになる。
@@ -882,7 +882,7 @@ def ticket_verdict(
                 f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の種類 `{missing}` が"
                 "読めないので、種類の上限では切り詰めていない（親 "
                 f"{parent.ticket} の範囲では切り詰めている）。phases.yml が壊れているか、"
-                "種類が消えている。利用者に伝えて直してもらってください"
+                "種類が消えている。ユーザに伝えて直してもらってください"
                 "（'ccnavi --lint' が箇所を言う）。"
             )
     found = phase.scope_verdict(ticket, parent, pt, rel)

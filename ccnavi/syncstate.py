@@ -17,7 +17,7 @@
 （`ccnavi-sync.sh` が入る前に送った、origin が無い、一度も push していない）は今の動きのまま
 （Chrome はリモートにある `P` しか見ないので、二重状態は起きない）。
 
-家族の控えは墓標として残る（親のワークツリーを片付けても消えない。消すのは人が打つ
+家族の控えは墓標として残る（親のワークツリーを片付けても消えない。消すのはユーザが打つ
 `ccnavi-sync.sh --forget <P>` だけ）。控えと統合先の控えから、家族の立ち位置（`Standing`）を決める。
 
 - 閉じた: 統合先の控えの `done/` に親の写しがある（親のワークツリーが無いか、あれば親の写しの
@@ -422,7 +422,7 @@ class Families:
         if not hits:
             return Standing(family_id, SELF)
         # 控えは 1 つでも、同じ名前の親のワークツリーが別のリポジトリにもあれば、
-        # どちらの家族か決めない（ワークスペースの人の付けた名前 `web-i0012` と、
+        # どちらの家族か決めない（ワークスペースのユーザの付けた名前 `web-i0012` と、
         # プロジェクト web の issue 12 の家族など）
         other = sorted(
             {repo_key(w.project) for w in self.worktrees() if w.name == family_id}
@@ -569,16 +569,16 @@ def guidance(root: str, st: Standing) -> list[str]:
     if record is not None and record.broken:
         return [
             f"控え（{record.path}）の中身をユーザが確かめてください。"
-            f"壊れていれば人が '{sync} --forget {name}' で"
+            f"壊れていればユーザが '{sync} --forget {name}' で"
             f"消してから、オンラインで '{sync} {name}' を打ち直してください",
         ]
     if record is not None and record.state == STATE_GONE:
         return [
-            f"オンラインで '{sync} {name}' を打つと戻し方が出る。改名・消し間違いなら利用者に"
+            f"オンラインで '{sync} {name}' を打つと戻し方が出る。改名・消し間違いならユーザに"
             f"元の名前 {name} でブランチを戻してもらい、オンラインで '{sync} {name}' を"
             "打ち直してください",
             f"家族を捨てたなら、親のワークツリーを片付けて（'{git} worktree remove "
-            f".claude/worktrees/{name}'）、人に '{sync} --forget {name}' で家族の控えを"
+            f".claude/worktrees/{name}'）、ユーザに '{sync} --forget {name}' で家族の控えを"
             "消してもらってください"
             "（エージェントは打たない）",
         ]
@@ -597,7 +597,7 @@ def guidance(root: str, st: Standing) -> list[str]:
         f"'{git} worktree add .claude/worktrees/{name} -b {name} origin/{name}'）。"
         f"別のブランチに居るなら {name} に戻してください。"
         f"閉じた家族なら、オンラインで '{sync}' を打って"
-        "統合先を取り込み直してください。捨てた家族なら、人に "
+        "統合先を取り込み直してください。捨てた家族なら、ユーザに "
         f"'{sync} --forget {name}' で家族の控えを消してもらってください",
     ]
 

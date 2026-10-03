@@ -120,7 +120,7 @@ def at_start(
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
         # 子のフロー（設計 9.12）。在ればファイルを名指しし、手順を並べる。
-        # フローは人が書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
+        # フローはユーザが書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
         scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
         try:
             brief = flow.briefing(conf, root, t, scope, budget, full=full)

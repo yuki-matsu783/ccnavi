@@ -1,7 +1,7 @@
 /**
  * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース（プロジェクト外）。
  *
- * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、人が触って決めるもの
+ * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、ユーザが触って決めるもの
  * （clone の欄、どのメニューを開いているか、直前の操作の一言）だけ。clone も書き込みも画面はしない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
@@ -22,7 +22,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
    * 直前の操作の一言。生きている画面にしか届かないので、持ち越さない（拡張ホストも覚えない）。
    *
    * 消える条件は 2 つ。**失敗（`failed`）は次の一覧が届いたら消す。** 一覧が新しくなった後も
-   * 「プロジェクト X が一覧に無い」が赤く残ると、人はいまも失敗していると読む。
+   * 「プロジェクト X が一覧に無い」が赤く残ると、ユーザはいまも失敗していると読む。
    * 案内（`info`）は残す。clone を送った直後は `.git` の出現で必ず読み直しが走るので、
    * ここで消すと案内が一瞬で消える
    */
@@ -128,7 +128,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             className="action"
             data-action="open-rules"
             data-name=""
-            title="共通の設定のルール（どのツリーにも効きます。既定 .ccnavi/common/rules.yml）を編集し、判定を試します"
+            title="共通の設定のルール（どのツリーにも適用されます。既定は .ccnavi/common/rules.yml）を編集し、判定を試します"
             onClick={() => post({ type: "openRules", name: "" })}
           >
             ルール設定
@@ -242,7 +242,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '.toolbar [data-action="open-rules"]',
     title: "共通の設定のルール",
-    body: "どのツリーにも効く共通の設定のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
+    body: "どのツリーにも適用される共通の設定のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
   },
   {
     target: '[data-action="tour"]',
@@ -326,7 +326,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           className="action small"
           data-action="open-self-rules"
           disabled={!page.selfRulesExists}
-          title="ワークスペースの設定のルールを編集し、判定を試します。このルールは、ワークスペース（プロジェクト外）のツリーへの書き込みと、全ツリーの Bash に、共通の設定に足してヒットします"
+          title="ワークスペースの設定のルールを編集し、判定を試します。このルールは共通の設定のルールに足され、ワークスペース（プロジェクト外）のツリーへの書き込みと、すべてのツリーの Bash でヒットします"
           onClick={() => post({ type: "openSelfRules" })}
         >
           ルール設定

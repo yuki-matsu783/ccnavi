@@ -65,7 +65,12 @@ class EveryTest(unittest.TestCase):
         body = {
             "version": 1,
             "deny": [
-                {"id": "push", "match": "Bash", "glob": "*git push*", "message": "push は人が行う"}
+                {
+                    "id": "push",
+                    "match": "Bash",
+                    "glob": "*git push*",
+                    "message": "push はユーザが行う",
+                }
             ],
             "allow": list(allow),
         }

@@ -35,7 +35,7 @@ export const COLUMNS: readonly ColumnDef[] = [
 ];
 
 /**
- * 人が押せる操作。承認と受け入れは実行ファイルか端末へ、レビュー済みの連絡は Claude Code に渡す文を組む
+ * ユーザが押せる操作。承認と受け入れは実行ファイルか端末へ、レビュー済みの連絡は Claude Code に渡す文を組む
  * （判定は動かさない。`confirm` を打つのはその文を受けたエージェント）。
  */
 export type Action =
@@ -50,7 +50,7 @@ export interface PhaseChip {
   readonly state: PhaseJson["state"];
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
-  /** 依頼を出したのに止まったまま（人のレビュー待ち）。JSON の `review_waiting` の写し */
+  /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。JSON の `review_waiting` の写し */
   readonly reviewWaiting: boolean;
   readonly reviewRequired: boolean;
   /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
@@ -99,7 +99,7 @@ export interface Card {
   /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
-  /** 子なら自分のフェーズが人のレビュー待ちか、親なら false */
+  /** 子なら自分のフェーズがユーザのレビュー待ちか、親なら false */
   readonly reviewWaiting: boolean;
   readonly pendingApproval: boolean;
   /** 親だけ */
@@ -119,7 +119,7 @@ export interface Card {
   readonly mrUrl: string;
   readonly mrNumber: number | null;
   /**
-   * 人が動く必要があるか。「要対応のみ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
+   * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
    * 親の改版。バッジの「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
    * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらない写り、不備、
    * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
@@ -127,7 +127,7 @@ export interface Card {
   readonly attention: boolean;
   /**
    * 子のフロー。親は null。在るか・着手中で書けないかは実行ファイルの答えの写しで、
-   * カードの「フロー」ボタンの言葉だけに使う。人が動く必要（`attention`）には数えない
+   * カードの「フロー」ボタンの言葉だけに使う。ユーザが動く必要（`attention`）には数えない
    */
   readonly flow: FlowJson | null;
   /**
@@ -352,7 +352,7 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
   const actions: Action[] = [];
-  // 残った指摘を決められるのは、人のレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
+  // 残った指摘を決められるのは、ユーザのレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
   // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済み」・「対応方針を決める」の操作はみな
   // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {

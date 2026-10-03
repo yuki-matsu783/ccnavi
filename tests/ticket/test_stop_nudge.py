@@ -123,7 +123,7 @@ class StopNudgeTest(TicketTest):
         self.assert_quiet(self.stop(self.parent_tree))
 
     def test_a_parent_held_for_review_is_not_asked(self):
-        """レビュー準備中の親は、既存の Stop の案内（利用者を待つ）と食い違わないよう促さない。"""
+        """レビュー準備中の親は、既存の Stop の案内（ユーザを待つ）と食い違わないよう促さない。"""
         self.family(review=(True, True))
         for child in ("i0001-01", "i0001-02"):
             self.assertEqual(self.ccnavi("ticket", "finish", child).returncode, 0)

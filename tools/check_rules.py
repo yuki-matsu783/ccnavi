@@ -1,6 +1,6 @@
 """見本をぜんぶ判定に掛けて、期待と食い違ったものを並べる。
 
-`/ccnavi-config` スキルが呼ぶ。人が直接打ってもよい。
+`/ccnavi-config` スキルが呼ぶ。ユーザが直接打ってもよい。
 
     uv run python tools/check_rules.py [ルールファイル]
 
@@ -51,7 +51,7 @@ def arguments(rules_path: str = RULES) -> list[str]:
 
 
 def environment() -> dict[str, str]:
-    """`CCNAVI_*` を外した環境。走らせた人の dry-run や設定の差し替えを判定に入れない。"""
+    """`CCNAVI_*` を外した環境。走らせたユーザの dry-run や設定の差し替えを判定に入れない。"""
     return {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
 
 

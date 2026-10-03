@@ -135,7 +135,7 @@ test("CB-T09 依頼済みで止まったフェーズに decide、締めた親に
     { kind: "reviewed", parent: "i0001", phase: 2 },
   ]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
-  // 人のレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
+  // ユーザのレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
   // 子のカードには自分のフェーズのマーカーと、止まっているかとレビュー待ちが写る。親は false
@@ -262,7 +262,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
   assert.equal(card.seenIn.length, 2);
 });
 
-/** フェーズ 2 を「依頼済みで止まったまま（人のレビュー待ち）」にし、依頼のマーカーにマージリクエストを持たせる */
+/** フェーズ 2 を「依頼済みで止まったまま（ユーザのレビュー待ち）」にし、依頼のマーカーにマージリクエストを持たせる */
 function waitingWithMr(url: string): BoardJson {
   const base = fixture();
   const parent: ParentJson = {
@@ -341,7 +341,7 @@ test("CB-T132 要対応は承認待ち・バッジ・不備・フェーズ行の
   assert.equal(reviewNoTree.get("i0001-04")!.attention, true);
   const doingNoTree = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-02" ? { ...t, worktree: { exists: false, path: "" } } : t)) }));
   assert.equal(doingNoTree.get("i0001-02")!.attention, true);
-  // 人のレビュー待ちのフェーズがあれば、その子（レビュー待ち）も親（フェーズ行の要約）も要対応
+  // ユーザのレビュー待ちのフェーズがあれば、その子（レビュー待ち）も親（フェーズ行の要約）も要対応
   const waiting = cardsOf(buildBoard(waitingWithMr("u")));
   assert.equal(waiting.get("i0001")!.attention, true);
   assert.equal(waiting.get("i0001-02")!.attention, true);

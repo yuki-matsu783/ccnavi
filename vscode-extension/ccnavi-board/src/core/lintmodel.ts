@@ -14,7 +14,7 @@ export type Severity = "error" | "warn";
 
 export interface LintProblem {
   readonly severity: Severity;
-  /** 人向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` など。ファイル全体への苦情なら空 */
+  /** ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` など。ファイル全体への苦情なら空 */
   readonly where: string;
   readonly detail: string;
 }

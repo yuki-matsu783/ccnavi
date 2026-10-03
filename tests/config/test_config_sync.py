@@ -387,7 +387,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertEqual(read(config_of(tree, "rules")), before)
 
     def test_uncommitted_edits_stop_the_start(self):
-        """写す先に未コミットの変更があれば、人の書きかけを上書きしないよう止める。"""
+        """写す先に未コミットの変更があれば、ユーザの書きかけを上書きしないよう止める。"""
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
@@ -440,7 +440,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertIn("中身が変わった識別子: credentials", started.stdout)
 
     def test_a_parent_without_review_cannot_close_until_a_human_saw_it(self):
-        """レビューの無い親は、人が端末で見たと残すまで閉じられない。"""
+        """レビューの無い親は、ユーザが端末で見たと残すまで閉じられない。"""
         self.start_parent()
 
         refused = self.ccnavi("ticket", "finish", "i0001")
@@ -456,7 +456,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
 
     def test_config_synced_is_denied_to_the_agent(self):
-        """エージェントが Bash で打つ形は、人の判断の経路と同じ組み込みの deny が止める。"""
+        """エージェントが Bash で打つ形は、ユーザの判断の経路と同じ組み込みの deny が止める。"""
         rule = phase.ticket_approval_rule("", self.ws)
         self.assertIsNotNone(rule.compiled.search("ccnavi --config-synced i0001"))
 
@@ -547,7 +547,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertTrue(os.path.islink(target))
 
     def test_writing_back_after_a_human_fix_is_not_exempt(self):
-        """写した分をコミットしたあと人が直したら、共通層の中身へ戻す書き込みは外さない。"""
+        """写した分をコミットしたあとユーザが直したら、共通層の中身へ戻す書き込みは外さない。"""
         conf = self.settings()
         tree, _ = self.start_parent()
         target = config_of(tree, "rules")

@@ -4,7 +4,7 @@
 
 - **ルールを足す候補**。どのルールも言及せず（UNDECLARED）権限モードへ渡った呼び出しが、
   同じ形で何度も来ているもの。`ask` のルールの下書きにする。ルールが薄い場所は
-  handover の数で分かる（audit.HANDOVER の説明）が、数えるのは人の手では手間が大きい
+  handover の数で分かる（audit.HANDOVER の説明）が、数えるのはユーザの手では手間が大きい
 - **文面を見直す候補**。同じルールが、同じ呼び出しを繰り返し止めているもの。止められた側が
   文面から次の一手を読めず、言い換えて打ち直している疑いがある（repeat と同じ数え方）。
   いまのルールをそのまま、繰り返し止めた呼び出しを見本につけて出す。直すのは `message`
@@ -17,7 +17,7 @@
 タイプにならなかったものは落とす（落とした数は出す）。ルールを足す候補は、共通層の
 ルールファイルの写しに 1 件足した一時ファイルで試す。本物のファイルには書かない。
 
-形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのは人
+形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのはユーザ
 （`/ccnavi-config` の手順）。
 
 実行ファイルはネットワークに出ない。読むのは記録と設定だけ。
@@ -47,12 +47,12 @@ SUGGEST_VERSION = 1
 KIND_RULE = "rule"
 KIND_MESSAGE = "message"
 
-# ルールを足す候補にする、渡った回数の下限。数回ならルールを書くより人が見たほうが早い。
+# ルールを足す候補にする、渡った回数の下限。数回ならルールを書くよりユーザが見たほうが早い。
 HANDOVER_MIN = 5
 # 種類ごとに出す候補の上限と、候補 1 件につける見本の上限。
 CANDIDATE_LIMIT = 10
 SAMPLE_LIMIT = 3
-# 候補の id の前置き。人が名前を付け直す前提の仮の名前であることを綴りで言う。
+# 候補の id の前置き。ユーザが名前を付け直す前提の仮の名前であることを綴りで言う。
 ID_PREFIX = "suggest-"
 
 # 記録の subject が上限で切られた印（audit._limited）。切れた綴りは見本にできない。
@@ -461,7 +461,7 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
     stdout.write(
         f"# 記録 {len(logs)} 本・{body['records']} 行から起こした候補 {len(body['candidates'])} 件"
         f"（検証を通らず落としたもの {body['dropped']} 件）。\n"
-        "# どれも下書き。置くのは人で、置く前に /ccnavi-config の手順で確かめる。\n"
+        "# どれも下書き。置くのはユーザで、置く前に /ccnavi-config の手順で確かめる。\n"
     )
     for c in body["candidates"]:
         stdout.write("---\n")

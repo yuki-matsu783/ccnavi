@@ -21,8 +21,8 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
    プロジェクトの層へ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
-8. hook の書きかけ（pending・skipped・跡の追記）は運び、人の判断（c）と知らない変更（d）は止める
-9. 人の判断の入口（ccnavi-review.sh chat など）は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ
+8. hook の書きかけ（pending・skipped・跡の追記）は運び、ユーザの判断（c）と知らない変更（d）は止める
+9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ
 10. 控えの無い家族・origin の無いリポジトリ・chat だけの家族は今のまま
     （コミットも push もしない）
 11. 運ぶ処理（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
@@ -343,7 +343,7 @@ class C1TicketTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{CHILD}.md", self.committed())
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    # ---- 8. hook の書きかけ（b）は先に運ぶ。人の判断（c）と知らない変更（d）は止める
+    # ---- 8. hook の書きかけ（b）は先に運ぶ。ユーザの判断（c）と知らない変更（d）は止める
 
     def test_hook_marks_and_events_are_committed_before_the_take_in(self):
         pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
@@ -369,7 +369,7 @@ class C1TicketTest(C1Harness):
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertIn("ユーザの判断が未送信", result.stderr)
         self.assertIn(f"ccnavi-push-approved.sh {PARENT}", result.stderr)
         self.assertEqual(self.read(self.copy(PARENT)), copy)
         self.assertEqual(self.sha(self.tree, "HEAD"), head)
@@ -387,7 +387,7 @@ class C1TicketTest(C1Harness):
         self.mark(1, "skipped", {"by": "agent", "at": "t"})
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertIn("ユーザの判断が未送信", result.stderr)
 
     def test_an_unsent_commit_in_the_place_stops(self):
         """未送信の置き場のコミットが (b) でなければ止める（REQ-APV-11 の補足）。"""
@@ -697,7 +697,7 @@ class C1TicketTest(C1Harness):
             f.write(json.dumps({"at": "t", "ticket": PARENT, "kind": "approved"}) + "\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertIn("ユーザの判断が未送信", result.stderr)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
 
     # ---- ロック（同じ機械で持ち主が生きていれば、10 分を過ぎても奪わない）
@@ -729,7 +729,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(old))
         self.assertIn(f"持ち主は pid {os.getpid()}・ホスト {host}・開始 {at}", result.stderr)
-        self.assertIn("人に終了させてもらってから打ち直して", result.stderr)
+        self.assertIn("ユーザに終了させてもらってから打ち直して", result.stderr)
         self.assertTrue(os.path.isdir(self.lock_dir()))
 
     # ---- 基点のリンク
@@ -862,7 +862,7 @@ class PhaseOne:
 
 
 class C1HumanTest(PhaseOne, C1Harness):
-    """9. 人の判断の入口は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ。11. 運ぶ処理。"""
+    """9. ユーザの判断の入口は、取り込み済みの家族なら運ぶ処理を自動で呼ぶ。11. 運ぶ処理。"""
 
     plan = ("chores", "design")
 
@@ -883,7 +883,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(typed.returncode, 0, typed.stdout + typed.stderr)
         stopped = self.ticket("finish", CHILD)
         self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
-        self.assertIn("人の判断が未送信", stopped.stderr)
+        self.assertIn("ユーザの判断が未送信", stopped.stderr)
         self.assertNotIn("知らない変更", stopped.stderr)
         carried = self.sh("ccnavi-push-approved.sh", PARENT)
         self.assertEqual(carried.returncode, 0, carried.stdout + carried.stderr)
@@ -924,11 +924,11 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("コミットは残した", result.stderr)
         self.assertIn(rel, self.committed())
-        # 次の C1 は未送信の人の判断を見つけて止まり、運ぶ処理を打ち直すよう言う。
+        # 次の C1 は未送信のユーザの判断を見つけて止まり、運ぶ処理を打ち直すよう言う。
         os.remove(os.path.join(self.remote, "hooks", "pre-receive"))
         stopped = self.ticket("start", PARENT)
         self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
-        self.assertIn("未送信の人の判断", stopped.stderr)
+        self.assertIn("未送信のユーザの判断", stopped.stderr)
         again = self.sh("ccnavi-push-approved.sh", PARENT)
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
@@ -944,7 +944,7 @@ class C1HumanTest(PhaseOne, C1Harness):
 
 
 class C1NotImportedHumanTest(PhaseOne, C1Harness):
-    """10. 控えの無い家族では、人の判断の入口は置くだけで運ばない（今のまま）。"""
+    """10. 控えの無い家族では、ユーザの判断の入口は置くだけで運ばない（今のまま）。"""
 
     plan = ("chores", "design")
     imported = False
@@ -1207,7 +1207,7 @@ class C1HostTest(C1Harness):
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
         self.assertEqual(len(Host.notes), 1)
         # 依頼文は ELI5 の在りか（差分の中の相対パス）と crit push の送り先を言う。
-        # 指摘は人が crit push で行のスレッドとして送る
+        # 指摘はユーザが crit push で行のスレッドとして送る
         self.assertIn(f"`crit review {ELI5}`", Host.notes[0]["body"])
         self.assertIn("`crit push 1`", Host.notes[0]["body"])
         confirmed = self.review("confirm", "--phase", "1")

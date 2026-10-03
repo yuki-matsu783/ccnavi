@@ -5,8 +5,8 @@
 1. 手元の `review confirm --actor <アカウント>` は、印に `actor` と `via: cli` を書き、
    跡にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）印も跡も前と同じ中身
 2. `--actor` の形と、`review confirm` の外で渡されたときは断る
-3. 依頼の後に人が見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）で決める。
-   Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
+3. 依頼の後にユーザが見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）
+   で決める。Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
 4. Chrome のレビュー済みの印は、手元の `--actor` つきの印と経路（`via`）と時刻のほかは同じ
 """
 
@@ -218,7 +218,7 @@ class ReviewableTest(ActorHarness):
 class ReviewRuleTest(ActorHarness):
     """Chrome のレビュー済みを入れた後のレビューで決めたこと。どれも締める向き。
 
-    人ごとの最新のレビューは Approve・変更要求・dismiss だけで選ぶ。レビュー済みのフェーズに
+    ユーザごとの最新のレビューは Approve・変更要求・dismiss だけで選ぶ。レビュー済みのフェーズに
     confirm を重ねない。ccnavi の投稿のスレッドを未解決から除くのは、GitLab で依頼を投稿した
     アカウントが書いたときだけ。マージリクエストは親のブランチから引き、依頼の記録の番号と照合する。
     """
@@ -249,7 +249,7 @@ class ReviewRuleTest(ActorHarness):
     def test_a_crit_push_thread_is_counted_even_from_the_poster(self):
         """crit push の行のスレッドは目印で始まらないので、依頼を投稿したアカウントからでも数える。
 
-        人が依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める。
+        ユーザが依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める。
         """
         crit = review.Thread(
             id="d1", body="ここは X ではなく Y では", author="bot", path="wip/eli5/phase-1.html"

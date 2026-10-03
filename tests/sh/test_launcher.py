@@ -4,7 +4,7 @@ sh は `.ccnavi/scripts/` に、実体は `.ccnavi/bin/<os>-<arch>/` に並ぶ�
 隣ではなく `../bin/` を探す。語を読む場所は 3 つ（sh、platformtag、ccnavi-setup.sh）あり、
 どれかだけ変わると配った場所と探す場所が食い違う。ここでは sh を外から動かし、選んだ置き場を見る。
 
-sh の原本は環境変数 `CCNAVI_TEST_LAUNCHER` で差し替えられる。人が写す前に
+sh の原本は環境変数 `CCNAVI_TEST_LAUNCHER` で差し替えられる。ユーザが写す前に
 `wip/design/scripts/ccnavi-launcher.sh` を名指しで確かめるため（相対ならリポジトリの
 ルートから読む）。
 

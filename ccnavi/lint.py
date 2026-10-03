@@ -12,7 +12,7 @@
 
 * error はガードが働かない、あるいは働きすぎて全部を止める記述。放っておくと
   防御が消えるか、セッションで何もできなくなる。CI が落とす対象はここだけでよい
-* warn は判定そのものは動くが、書いた人が意図した防御が働いていない記述。
+* warn は判定そのものは動くが、書いたユーザが意図した防御が働いていない記述。
   直さなくても今のところ困ることは起きないが、守っているつもりの穴が開いている
 
 ## 設計からの読み替え
@@ -99,7 +99,7 @@ def report(
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
     as_json なら README「lint の JSON」の形で 1 つの JSON を書く。VS Code 拡張が
-    プロジェクトごとの warn を拾うための形で、人向けの文面は書き換えてよいが、
+    プロジェクトごとの warn を拾うための形で、ユーザ向けの文面は書き換えてよいが、
     この JSON の形は拡張との契約になる。
 
     書き先は標準出力にしてある。この経路は hook の payload を読まないので、
@@ -149,7 +149,7 @@ def report(
         Problem(SEVERITY_WARN, "(unwatched)", line.removeprefix("ccnavi: "))
         for line in unwatched_said.getvalue().splitlines()
     ]
-    # この門に dry-run は無い。書いた人は「止めずに報告する」つもりでいるのに、
+    # この門に dry-run は無い。書いたユーザは「止めずに報告する」つもりでいるのに、
     # 実際は enable と同じに止める。設定ファイルを読んだだけでは、その食い違いが
     # どこにも現れない。warn ではなく error にするのは、直すまで意味が変わらない、
     # つまり直さないと設定ファイルの書き方と実際の動きが食い違ったままになるため。
@@ -166,7 +166,7 @@ def report(
             )
         )
     # チケット制御も同じ 2 値。切ったつもりの綴り違いは enable として動いているので、
-    # 書いた人が「切れている」と思い続けないよう error にする。
+    # 書いたユーザが「切れている」と思い続けないよう error にする。
     declared = (conf.ticket_control_declared or "").strip().lower()
     if declared and declared not in selfguard.GATE_SETTINGS:
         problems.append(
@@ -200,7 +200,7 @@ def report(
                 "承認・レビュー済みの受け入れ・状態の移動を行える",
             )
         )
-    # 戻す働きの 2 つも同じ扱いにする。人向けの本文には値が 1 行ずつ出ているが、
+    # 戻す働きの 2 つも同じ扱いにする。ユーザ向けの本文には値が 1 行ずつ出ているが、
     # `problems` に入らないと `--json` を読む側（CI と VS Code の拡張）からは
     # 「揃っている」と見える。切ってあること自体は設定として正しく、それでも言う
     # 理由は上の 2 つと同じ（外から見て、守られている状態と区別が付かない）。
@@ -210,7 +210,7 @@ def report(
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
     # info は数えるが、終了コードには影響しない。層をまたいだ重複のように「そう
-    # 書いてあるとおりに働いているが、書いた人が知りたいはずのこと」が入る。
+    # 書いてあるとおりに働いているが、書いたユーザが知りたいはずのこと」が入る。
     infos = sum(1 for p in problems if p.severity == SEVERITY_INFO)
     if as_json:
         payload = {
@@ -287,10 +287,10 @@ _RESTORE_VOICE = {
 
 
 def _shown(declared: str, mode: str) -> str:
-    """人向けの本文に出す値。モードによって変わるなら、そのことも書く。
+    """ユーザ向けの本文に出す値。モードによって変わるなら、そのことも書く。
 
     書かれた値だけを出すと、`CCNAVI_MODE=dry-run` のもとで `enable` と出る。
-    読んだ人は守られていると思い、実行時は戻らない。
+    読んだユーザは守られていると思い、実行時は戻らない。
     """
     effective = modes.effective_setting(mode, declared)
     if effective == declared:
@@ -332,7 +332,7 @@ def check(
     problems: list[Problem] = []
 
     # 上書き設定を読み飛ばしても、値は既定に戻ってガードは弱まらない。
-    # ただし人が設定したつもりの値がどこにも使われていない状態にはなる。
+    # ただしユーザが設定したつもりの値がどこにも使われていない状態にはなる。
     for note in notes:
         problems.append(Problem(SEVERITY_WARN, "(settings)", note))
 
@@ -578,7 +578,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
 
     判定に使われるのは承認済みチケットの側だけなので、ここで問うのは「使われている範囲は何か」と
     「ワークツリーと提案がそれと一致しているか」。一致していない状態は誤りでは
-    ないが、書いた人は書いたとおりに使われていると思っている。
+    ないが、書いたユーザは書いたとおりに使われていると思っている。
     検証はその思い違いを名指しする場所になる。
     """
     problems: list[Problem] = []
@@ -605,7 +605,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
     # 閉じた承認済みチケットの苦情も拾う。判定は閉じたものを読まないが、読めないファイルが
-    # 置き場に残っていること自体は書いた人の思い違いで、言わないと他の機械へそのまま届く。
+    # 置き場に残っていること自体は書いたユーザの思い違いで、言わないと他の機械へそのまま届く。
     closed, notes = approval.scan(conf, root, closed=True)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
@@ -713,7 +713,7 @@ def _approval_problems(
     closed: list,
     review: list,
 ) -> list[Problem]:
-    """承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
+    """承認で落ちるものを、承認の前に名指しする。ユーザが端末で初めて知るより早く。
 
     **承認と同じ関数を通す**（`approval.candidates`）。ここだけ `approval.validate` を
     当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・計画に無い番号・
@@ -783,8 +783,8 @@ def _proposal_problems(
     常に非ゼロで終わる。捕まえたいのは 1 つのツリーの中で 2 つの状態に在る形だけ。
 
     **リポジトリをまたいだら、状態が何であれ咎める。** プロジェクトは自分の git を持つので
-    （設計 11）、そこに同じ識別子が在るのは写しではなく違うチケットどうしの衝突。識別子は人が選ぶ
-    短い連番で、プロジェクトが独立に振れば重なる。コミットの遅れでは説明が付かないから、
+    （設計 11）、そこに同じ識別子が在るのは写しではなく違うチケットどうしの衝突。
+    識別子はユーザが選ぶ短い連番で、プロジェクトが独立に振れば重なる。コミットの遅れでは説明が付かないから、
     ツリーごとの免除を当ててはいけない。
     """
     problems: list[Problem] = []
@@ -834,7 +834,8 @@ def _proposal_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は閉じたかレビュー待ちなのに todo/ にも在る。"
-                    "todo/ の側は承認の対象にならない。再開するには、人が承認済みチケットを戻す",
+                    "todo/ の側は承認の対象にならない。再開するには、"
+                    "ユーザが承認済みチケットを戻す",
                 )
             )
             continue
@@ -863,7 +864,7 @@ def _proposal_problems(
                 )
     for ticket_id, places in seen.items():
         # 別のリポジトリに同じ識別子が在るのは、写しではなく**違うチケットどうしの衝突**。識別子は
-        # 人が選ぶ短い連番なので、プロジェクトが独立に振れば普通に重なる。コミットの遅れでは
+        # ユーザが選ぶ短い連番なので、プロジェクトが独立に振れば普通に重なる。コミットの遅れでは
         # 説明できないので、状態が何であれ咎める。
         repos = sorted({repo for repo, _, _ in places})
         if len(repos) > 1:
@@ -1093,7 +1094,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
     判定が読むのは元リポジトリに checkout されている版だけ（REQ-MLT-04）。
     ワークツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで使われない。
-    使われないものを書いた人は、書いたとおりに使われていると思ったまま進む。統合の前に
+    使われないものを書いたユーザは、書いたとおりに使われていると思ったまま進む。統合の前に
     気づけるように、ここで名前を挙げる。
 
     足したファイルを咎めているのではない。設定を書き進める場所はワークツリーでよく、
@@ -1102,7 +1103,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
     中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
     差分が拾う。ここが拾うのは、元リポジトリに無くて差分にも出ない新しい綴りのほう。
 
-    承認済みの領域（承認済みチケット・マーカー・子の記録・フロー）は数えない（利用者の決定）。
+    承認済みの領域（承認済みチケット・マーカー・子の記録・フロー）は数えない（ユーザの決定）。
     承認済みチケットは親のワークツリーに置かれ、判定もフローの案内もそのツリーの版を読む
     （設計 9.2・9.3.1）。「統合されるまで使われない」は当てはまらず、言えば誤った案内になる。
     """
@@ -1439,7 +1440,7 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
 
     **この警告で穴が無くなるわけではない。** 根拠が崩れた場合は、実行後チェックと
     サブエージェント終了時チェックが `scratchpad/` の変更を範囲外として報告する（`is_unscoped` の
-    説明）。ここが言うのは、その報告が出はじめる前に人が気づけるようにするため。
+    説明）。ここが言うのは、その報告が出はじめる前にユーザが気づけるようにするため。
 
     問うのは 2 つ。**追跡されているファイルが既にあるか**（`git ls-files`）と、これから
     書くものが追跡されるか（`git check-ignore`）。前者だけでは、まだ何も置いていない
@@ -1744,7 +1745,7 @@ def _registered(root: str, event: str = hookio.POST_TOOL_USE) -> bool | None:
     呼び出し方もプロジェクトごとに違うので、綴りを決め打ちにはできない。
 
     無いときに「登録されていない」と言い切らないのは、hook をここ以外
-    （利用者ごとの設定）に書くことができ、そちらはこの検証から見えないため。
+    （ユーザごとの設定）に書くことができ、そちらはこの検証から見えないため。
     見えないものを「無い」と報告すると、正しい設定に苦情を出すことになる。
     """
     try:
@@ -1772,7 +1773,7 @@ def _project_settings(root: str) -> list[Problem]:
 
     このファイルは作業ツリーの中にあり、エージェントが書き換えられ、書いた値は
     次のセッションから使われる。ccnavi は環境変数しか読まないので、ここに書かれた
-    off が「人がセッションを起動するときに渡した off」と見分けのつかない形で届く。
+    off が「ユーザがセッションを起動するときに渡した off」と見分けのつかない形で届く。
     判定の側にはその 2 つを見分ける手段が無いから、書かれていることを
     見つけられる場所はここしかない。
     """
@@ -1825,7 +1826,7 @@ def _project_settings(root: str) -> list[Problem]:
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 #
 # 守りと判定の働きを変える値（戻す働き・ccnavi 自身の設定の守り・確かめられないモードの止め・
-# 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、人が端末で打つ sh と
+# 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
 # 他の機械で同じ家族の守りが別になる。入れないのは、判定の答えを変えない次の値だけ。
 # 実行ファイルの綴り（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
 # 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、見張りと待ちの秒（`CCNAVI_*_TIMEOUT`・
@@ -1852,7 +1853,7 @@ def _local_settings(root: str) -> list[Problem]:
 
     承認と判定は、置き場の綴りなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
-    人が端末で打つ sh には使われないので、同じ家族を別の綴りで読むことになる。
+    ユーザが端末で打つ sh には使われないので、同じ家族を別の綴りで読むことになる。
     例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前はリポジトリに置かず、手元では環境変数で
     持つと決めた）。
     """
@@ -1890,7 +1891,7 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
     （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"`）だから。
 
     - 指す先が在るのに実行できなければ error。hook は sh を直に起動するので 126 で起動せず、
-      判定そのものが動いていない。無いときは言わない。組み立ての前や、利用者ごとの設定で
+      判定そのものが動いていない。無いときは言わない。組み立ての前や、ユーザごとの設定で
       別の綴りを渡している形があり、無いことは selfguard が missing と言う。
       Windows では実行ビットを持たないので見ない
     """
@@ -1996,11 +1997,13 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     problems.extend(_stop_problems(rule, name, project))
 
     if rule.message and rule.decision != rules.DENY:
-        # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
-        # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
+        # ask の文面はユーザの確認ダイアログにしか出ず、allow の文面はどこにも出ない。
+        # 書いたユーザは「モデルに届く」と思って書くので、届かない欄を残さない。
         # ルールは働いているので判定は変わらない。直すまで CI が落ちるだけ。
         where = (
-            "人の確認ダイアログにしか出ない" if rule.decision == rules.ASK else "どこにも届かない"
+            "ユーザの確認ダイアログにしか出ない"
+            if rule.decision == rules.ASK
+            else "どこにも届かない"
         )
         problems.append(
             Problem(
@@ -2130,7 +2133,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
 def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
     """`every`（渡す回の刻み）の値と、刻んだ先に渡すものがあるか。
 
-    読めない値は error。判定は 1（毎回渡す）として扱って通すので、何も言わないと、書いた人は
+    読めない値は error。判定は 1（毎回渡す）として扱って通すので、何も言わないと、書いたユーザは
     刻んだつもりでいるのに、実際は毎回渡ることになる。`every: 1` は既定値を明示しただけなので
     何も言わない。
     """

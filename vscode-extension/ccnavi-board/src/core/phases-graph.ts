@@ -19,7 +19,7 @@
  * `after` の深さ（根からの最長の段数）で列を分け、列の中は id の順。`requires` / `overlap` は置き場所に
  * 影響しない。保存のたびに `model` が丸ごと届き直すので、線を 1 本直すたびに絵が組み替わると
  * 関係を直しながら確かめる作業の妨げになる。それを `after` についてだけ受け入れる（深さで並べないと、
- * 合流と分岐が交差した線に埋もれる）。人がドラッグで置いた点は動かない（`state.ts`）。
+ * 合流と分岐が交差した線に埋もれる）。ユーザがドラッグで置いた点は動かない（`state.ts`）。
  *
  * **work と feedback は分けて置く。** work の種類は上の決まりで並べ、feedback の種類はその右に 1 列で
  * 縦に並べる（`FEEDBACK_GAP` だけ離す）。feedback の種類は全体計画（`plan:`）には入らず、レビューの
@@ -31,7 +31,7 @@
  */
 import type { PhaseKind, PhaseOrder, PhasesForm, Review } from "./phases-view.js";
 
-/** 点 1 つ。`x` と `y` は図の座標で、`phases.yml` には書かない（人が持つ設定に座標は入れない） */
+/** 点 1 つ。`x` と `y` は図の座標で、`phases.yml` には書かない（ユーザが持つ設定に座標は入れない） */
 export interface GraphNode {
   readonly id: string;
   readonly title: string;
@@ -220,7 +220,7 @@ function byDepth(first: ReadonlyMap<string, PhasesForm["phases"][number]>, ids: 
   return out;
 }
 
-// ---- 人がドラッグで動かした位置（画面の控え。`phases.yml` には書かない）
+// ---- ユーザがドラッグで動かした位置（画面の控え。`phases.yml` には書かない）
 
 /** 点の置き場所の控え。鍵は種類の id */
 export type Spots = Record<string, { readonly x: number; readonly y: number }>;

@@ -49,7 +49,7 @@ def start(
         stderr.write(
             f"ccnavi: {ticket_id} は承認済みの作業中ではない（いまは {found.state}/）。"
             + (
-                "先に利用者に 'ccnavi --approve' を通してもらってください"
+                "先にユーザに 'ccnavi --approve' を通してもらってください"
                 if found.state == ticket_mod.TODO
                 else ""
             )
@@ -115,7 +115,7 @@ def start(
             )
         else:
             stdout.write(
-                f"フローの指紋を {where} に控えた。承認済みチケットと同じく人がコミットする\n"
+                f"フローの指紋を {where} に控えた。承認済みチケットと同じくユーザがコミットする\n"
             )
     for line in synced:
         stdout.write(line + "\n")
@@ -149,7 +149,7 @@ def _sync_config(
             + (
                 why
                 or f"未コミットの変更がある（{', '.join(busy)}）。"
-                "人の書きかけを上書きしないよう、ここで止める"
+                "ユーザの書きかけを上書きしないよう、ここで止める"
             )
             + "\n"
         )
@@ -162,7 +162,7 @@ def _sync_config(
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
         f"共通層とプロジェクト {found.project} の設定が違っていたので、共通層で上書きした。"
-        "最初のレビューで知らせる（レビューが無ければ、親を閉じる前に利用者が端末で見る）:"
+        "最初のレビューで知らせる（レビューが無ければ、親を閉じる前にユーザが端末で見る）:"
     ]
     for c in copied:
         line = f"  - {c.rel}（{'上書き' if c.existed else '新しく置いた'}）"
@@ -219,10 +219,10 @@ def finish(
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_mod.Ticket) -> bool:
-    """この子を閉じたとき、人が見る対象になるか（設計 9.8）。親は見ない。
+    """この子を閉じたとき、ユーザが見る対象になるか（設計 9.8）。親は見ない。
 
     フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
-    レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、人が見るまでは
+    レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、ユーザが見るまでは
     見られていない。実績のリスクは `_score_child` が記録した直後なので、ここで数え直すと
     宣言に関わらず上がった分も入る。
     """
@@ -270,7 +270,7 @@ def _close_parent(
         )
         return
     if approval.read_parent_mark(where, found.ticket, approval.PARENT_MARK_READY):
-        stdout.write("Draft は外してある。マージは利用者が行う\n")
+        stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     stdout.write(
@@ -278,7 +278,7 @@ def _close_parent(
         f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
         f"push してから '{review_sh} ready' で Draft を外してください"
         "（「マージに進んでよい」の合図）。途中の作業は既定のブランチに残さない。"
-        "マージは利用者が squash で行う\n"
+        "マージはユーザが squash で行う\n"
     )
 
 
@@ -386,7 +386,7 @@ def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) ->
     """このチケットの層を決める `project:`（設計 11.4.1、11.4.2）。
 
     権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
-    書いてある値は人が承認していないので、判定の根拠にしない。
+    書いてある値はユーザが承認していないので、判定の根拠にしない。
     """
     if not found.is_child:
         return found.project
@@ -457,7 +457,7 @@ def _score_child(
     record["summary"] = diff.summary()
     if definition.dropped:
         # 空として扱った層の名前を残す（設計 11.2）。共通層だけで測ったことが、
-        # あとから記録を読んだ人に分かる。
+        # あとから記録を読んだユーザに分かる。
         record["fallback"] = ",".join(definition.dropped)
     failed = approval.write_child_record(
         where, found.parent, found.ticket, approval.CHILD_RECORD_RISK, record
@@ -587,7 +587,7 @@ def family_stopped(
             f"ccnavi: {found.ticket}: 写しが親のブランチ {st.family} のワークツリーの外"
             f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの家族では"
             "親のブランチの写しだけが本物なので、この写しは動かさない\n"
-            f"  人がその写しを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
+            f"  ユーザがその写しを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
             "コミットと push をしてから打ち直す\n"
         )
         return True
@@ -625,7 +625,7 @@ def _parent_not_started(
     if parent.state == ticket_mod.TODO:
         stderr.write(
             head
-            + "がまだ承認されていない（todo/）。先に利用者に 'ccnavi --approve' を通してもらい、"
+            + "がまだ承認されていない（todo/）。先にユーザに 'ccnavi --approve' を通してもらい、"
             f"'{ticket_sh} start {found.parent}' で着手してください\n"
         )
         return True
@@ -648,7 +648,7 @@ def _predecessors_unmet(
 ) -> bool:
     """子の先行が全部 `done/` に在って取り消しでないか。欠けていれば止めて言う。
 
-    承認でも同じ検査を当てるが、承認のあとに先行が動くこと（人が `done/` から戻す）と、置き場を
+    承認でも同じ検査を当てるが、承認のあとに先行が動くこと（ユーザが `done/` から戻す）と、置き場を
     手で動かして承認する運びがあるので、着手の手前でもう一度見る。どの先行が何の
     状態か、どうすればよいかを 1 本ずつ言う。
     """
@@ -665,7 +665,7 @@ def _predecessors_unmet(
     if any(p.waiting for p in unmet):
         stderr.write(
             f"  先行を先に閉じてください（作業中なら '{ticket_sh} finish <先行>'。"
-            "レビューが要るなら人のレビューが済んで done/ に入るまで待つ）\n"
+            "レビューが要るならユーザのレビューが済んで done/ に入るまで待つ）\n"
         )
     if any(not p.waiting for p in unmet):
         stderr.write(
@@ -673,7 +673,7 @@ def _predecessors_unmet(
             "複数の場所にある先行は、先に 1 つに決めてください\n"
         )
     stderr.write(
-        "  先行が要らないなら、利用者に承認済みチケットの predecessors から外してもらうか、"
+        "  先行が要らないなら、ユーザに承認済みチケットの predecessors から外してもらうか、"
         f"'{ticket_sh} cancel {found.ticket} --reason <理由>' で取り消し、"
         "先行を外した提案を出し直して承認を受けてください\n"
     )
@@ -700,8 +700,8 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     """親を閉じられない理由の一覧。空なら閉じてよい。
 
     `review ready`（Draft を外す）も同じ条件を見る。閉じてよい状態と、マージに
-    進んでよい状態は同じもの。人が close-early で締めていれば、開いている子以外は問わない。
-    人が締めたあとに残っているものは、締めたときに別の issue へ写してある。
+    進んでよい状態は同じもの。ユーザが close-early で締めていれば、開いている子以外は問わない。
+    ユーザが締めたあとに残っているものは、締めたときに別の issue へ写してある。
     """
     copies, _ = approval.scan(conf, root)
     open_children = [t.ticket for t in copies if t.parent == parent_id]
@@ -710,14 +710,14 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。"
             "子を先に閉じてください"
         ]
-    # 着手で共通層を写した親は、それを人に知らせるまで閉じず、Draft も外させない（設計 11.12）。
+    # 着手で共通層を写した親は、それをユーザに知らせるまで閉じず、Draft も外させない（設計 11.12）。
     # 知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、締めた）は
-    # そこを通らないので、人が端末で見たことを残させる。締めた親でも問うので、
+    # そこを通らないので、ユーザが端末で見たことを残させる。締めた親でも問うので、
     # この下の早い return より前に置く。
     if configsync.pending(approval.home_dir(conf, root, parent_id, ""), parent_id):
         return [
-            f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
-            "（レビューを通っていない）。閉じる前に、利用者に端末で "
+            f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだユーザに知らせていない"
+            "（レビューを通っていない）。閉じる前に、ユーザに端末で "
             f"'{settings.script_command(root, 'ccnavi-review.sh')} config-synced {parent_id}' を"
             "打って見てもらってください"
         ]
@@ -835,7 +835,8 @@ def _move(
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
     if state == ticket_mod.REVIEW:
         stdout.write(
-            "人のレビューを待つ。レビューが済むと利用者の操作（confirm / decide / --reviewed）で "
+            "ユーザのレビューを待つ。"
+            "レビューが済むとユーザの操作（confirm / decide / --reviewed）で "
             f"{conf.approved}/{ticket_mod.DONE}/ へ動く\n"
         )
     return 0
@@ -957,7 +958,7 @@ def finish_nudge(root: str, found: Unfinished) -> str:
             f"{found.worktree} に未コミットの変更が無く、基準点 {t.base_sha[:12]} より先に"
             f"コミットが {found.ahead} 件あります。",
             f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
-            "まだ続けるなら、続ける理由（何が残っているか）を利用者に向けて書いてから終えてください。"
+            "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
             "この案内は同じ HEAD では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
         ]
     )

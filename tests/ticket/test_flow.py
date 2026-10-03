@@ -3,7 +3,7 @@
 見るのは 8 つ。
 
 1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は warn で読み飛ばす
-2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。人が保存したフローを
+2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。ユーザが保存したフローを
    実行後チェックが範囲外の変更として咎めない（H1）
 3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
    別名（アンカーとエイリアス）は読まない
@@ -33,7 +33,7 @@ from tests.ticket.test_ticket import git, write
 
 CHILD = "i0001-01"
 
-# 見本のフロー。人がボードのフロー編集画面で書く YAML の形。
+# 見本のフロー。ユーザがボードのフロー編集画面で書く YAML の形。
 WORKFLOW_YAML = """\
 id: wf-1
 name: 調査の手順
@@ -461,7 +461,7 @@ class FlowRenderTest(unittest.TestCase):
         running.tree_root = root
         text = "\n".join(flow.briefing(conf, root, running, "wip/research/*"))
         self.assertIn("着手中なので、終わるまで書き換えられない", text)
-        # 手順は人が書いたデータとして囲って渡す。
+        # 手順はユーザが書いたデータとして囲って渡す。
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn(flow.FENCE_CLOSE, text)
         # 文の上限を使い切っていたら並べない。
@@ -538,7 +538,7 @@ class FlowInfoTest(unittest.TestCase):
 class FlowHarness(PhaseHarness):
     """親 1 本（research）と、フローを持つ子 1 本。親の範囲に承認済みの領域は入らない。
 
-    フローは人が承認のあとに親のツリーの `.ccnavi/approved/flows/<子>.yml` に保存して
+    フローはユーザが承認のあとに親のツリーの `.ccnavi/approved/flows/<子>.yml` に保存して
     コミットする（ボードと `ccnavi-push-approved.sh` の運び方）。
     """
 
@@ -590,7 +590,7 @@ class FlowHarness(PhaseHarness):
 
 
 class FlowGuardTest(FlowHarness):
-    """エージェントはどのツリーの置き場にも書けない。人の保存は咎めない。"""
+    """エージェントはどのツリーの置き場にも書けない。ユーザの保存は咎めない。"""
 
     def test_agent_writes_are_denied_in_every_tree(self):
         """組み込みの守り（builtin-guard-project-home）が、承認済みの領域の `flows/` を
@@ -631,7 +631,7 @@ class FlowGuardTest(FlowHarness):
                 self.assertIn("builtin-guard-setting-files", out["permissionDecisionReason"])
 
     def test_a_flow_saved_by_a_person_is_not_blamed_on_the_agent(self):
-        """人がボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
+        """ユーザがボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
         実行後チェックが範囲外の変更として咎めない（H1）。未コミットでも、コミットしても。"""
         other = CHILD.replace("01", "02")
         ok = write(os.path.join(self.parent_tree, "wip", "a.md"), "a\n")
@@ -808,7 +808,7 @@ class FlowLockTest(FlowHarness):
 
 
 class NestedBounceTest(PhaseHarness):
-    """入れ子のサブエージェントが差し戻しを無視して終わったら、人にも見せる（G4）。"""
+    """入れ子のサブエージェントが差し戻しを無視して終わったら、ユーザにも見せる（G4）。"""
 
     def test_nested_ignored_bounce_is_also_a_system_message(self):
         self.propose("i0001", parent_text("i0001", ["research"]))

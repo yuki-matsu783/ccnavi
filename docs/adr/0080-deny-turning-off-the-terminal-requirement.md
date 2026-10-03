@@ -12,7 +12,7 @@ keywords: [端末, 要求, コマンド行, 変数, エージェント, block, d
 
 ## 状況
 
-2026-09-23、敵対的レビューで次の抜け道が見つかった。人の判断の経路（`--approve` / `--reviewed` /
+2026-09-23、敵対的レビューで次の抜け道が見つかった。ユーザの判断の経路（`--approve` / `--reviewed` /
 `--close-early`）は 2 段で守っている。
 
 1. hook の組み込み `builtin-guard-ticket-approval` が、実行ファイルをこれらの付きで打つ形を止める
@@ -21,7 +21,7 @@ keywords: [端末, 要求, コマンド行, 変数, エージェント, block, d
 1 段目は実行ファイルの綴り（`ccnavi`、設定の実行ファイルのパス、`python -m ccnavi`）で呼び出しを
 見分けるので、`uv run -m ccnavi`・`python -m ccnavi.__main__`・名前を変えた写しでは当たらない。
 2 段目は `CCNAVI_GUARD_TICKET_APPROVAL=disable` か `--guard-ticket-approval disable` で外れる
-（テストと CI が端末を持たずに回すため）。両方を組み合わせると、エージェントが人の判断を自分で出せた。
+（テストと CI が端末を持たずに回すため）。両方を組み合わせると、エージェントがユーザの判断を自分で出せた。
 
 ## 決定
 

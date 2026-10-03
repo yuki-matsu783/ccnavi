@@ -172,7 +172,7 @@ test("CX-T133 未解決・変更要求が残れば書かない。ボードを開
   assert.equal(mock.commitCalls.length, 0);
 });
 
-test("CX-T134 依頼の後に人が見るもの（置き場の外）が動いたら書かない。置き場だけの変更なら書く", async () => {
+test("CX-T134 依頼の後にユーザが見るもの（置き場の外）が動いたら書かない。置き場だけの変更なら書く", async () => {
   const mock = reviewing("resolved");
   mock.push(FAMILY, { "src/late.py": "print(1)\n" }, "依頼の後のコード");
   const out = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));

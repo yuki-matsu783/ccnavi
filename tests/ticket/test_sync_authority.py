@@ -282,7 +282,7 @@ class PresentTest(AuthorityHarness):
         lines = check.stdout.splitlines()
         self.assertEqual("check 1", lines[0])
         self.assertTrue(lines[1].startswith("error "), check.stdout)
-        # 人が運ぶ手順も言う。
+        # ユーザが運ぶ手順も言う。
         self.assertIn("運んでコミットと push", check.stdout)
 
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
@@ -531,7 +531,8 @@ class MarkTest(AuthorityHarness):
     def test_a_same_named_tree_in_another_repository_is_not_guessed(self):
         """控えが 1 つでも、同じ名前の親のワークツリーが別のリポジトリにあれば決めない。
 
-        ワークスペースの人の付けた名前 `web-i0012` と、プロジェクト web の issue 12 の家族が並ぶ形。
+        ワークスペースのユーザの付けた名前 `web-i0012` と、プロジェクト web の issue 12
+        の家族が並ぶ形。
         """
         from ccnavi import tree
 

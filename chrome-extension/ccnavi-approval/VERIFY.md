@@ -45,7 +45,7 @@
 
 4. 置かれたもの（`.claude/settings.json`・`.ccnavi/common/`・`.ccnavi/config/`・`.ccnavi/scripts/`・`.gitignore`・`.vscode/settings.json`）を
    コミットして `main` へ push します。`.ccnavi/bin/` は `.gitignore` に入るので送りません。
-   **統合先（`main`）への commit と push は人が素の `git` で打ちます。** ccnavi のラッパー（`ccnavi-git.sh`）は `main` へ直接は送らず、
+   **統合先（`main`）への commit と push はユーザが素の `git` で打ちます。** ccnavi のラッパー（`ccnavi-git.sh`）は `main` へ直接は送らず、
    エージェントにも打たせません。
    拡張は統合先の `.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT` と `.claude/settings.json` を読むので、この 2 つが統合先に要ります。
 5. 統合先は `main`（デフォルトブランチ）のままにします。別の名前を試すときだけ、手元は `.claude/settings.local.json` の env に
@@ -161,7 +161,7 @@
 | # | 操作 | 期待する結果 | 控えるもの |
 |---|---|---|---|
 | A1 | 「承認する」を押す | `i0001` に 1 コミット（見出し「ccnavi: <識別子> を承認（Chrome 拡張 <版>）」）で、`doing/` の写しと提案の削除が乗る。CI が `[skip ci]` 無しで走る | コミットの sha と変更の一覧 |
-| A2 | 2 つのブラウザ（またはタブ）で同じボードを開き、ほぼ同時に承認を押す | 片方が書き、もう片方は読み直して判定し直す。同じ指紋なら重ねて書かず、違えば見直しを求める。3 周で書けなければ人に回す | 両方の画面の文面、`createCommitOnBranch` の競合の応答（`errors` の中身） |
+| A2 | 2 つのブラウザ（またはタブ）で同じボードを開き、ほぼ同時に承認を押す | 片方が書き、もう片方は読み直して判定し直す。同じ指紋なら重ねて書かず、違えば見直しを求める。3 周で書けなければユーザに回す | 両方の画面の文面、`createCommitOnBranch` の競合の応答（`errors` の中身） |
 | A3 | 承認のボタンを押す直前に、手元から同じ親のブランチへ別のコミットを push する | 先頭が動いたことを捕まえ、新しい先頭で判定し直して書く（置き場の外の変更なら指紋は同じ） | 画面の文面、GraphQL の応答 |
 | A4 | 承認の後、手元で `sh .ccnavi/scripts/ccnavi-sync.sh i0001` | 取り込まれ、家族が `blocked` にならない（終了コード 0） | sync の出力、`logs/state/sync/` の家族の控え |
 | A5 | 承認コミットを見た後、エージェントに `start` させる | C1 で着手が `i0001` に届く | コミット |
@@ -178,15 +178,15 @@
 
 ### 4.4 レビュー済み（GitHub）
 
-人のレビューの要る子を `finish` させ、エージェントに `ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 wip/eli5/phase-<N>.html`（ELI5 の HTML はコミットして push 済み）を打たせて Draft の PR と依頼を作らせてから試します。
+ユーザのレビューの要る子を `finish` させ、エージェントに `ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 wip/eli5/phase-<N>.html`（ELI5 の HTML はコミットして push 済み）を打たせて Draft の PR と依頼を作らせてから試します。
 Approve の付いた PR を試すには、PR の作者と別のアカウントが要ります（自分の PR に Approve は付けられません）。
 
 | # | 操作 | 期待する結果 | 控えるもの |
 |---|---|---|---|
 | V1 | 未解決のスレッドがある間にボードを開く | 「レビュー済みにする」が出ず、解決するか `decide` で受け入れると出る。ccnavi の依頼のスレッドは数えない | 画面の文面、`reviewThreads` の応答（`pageInfo`・`isResolved`・`path`・`line`・最初のコメントの `url`） |
-| V2 | 変更要求のレビューを出し、その後に同じ人がコメントだけのレビューを出す | 変更要求が残り、通らない | `GET /pulls/<N>/reviews` の応答（`state`・`submitted_at`・`user.id`） |
+| V2 | 変更要求のレビューを出し、その後に同じユーザがコメントだけのレビューを出す | 変更要求が残り、通らない | `GET /pulls/<N>/reviews` の応答（`state`・`submitted_at`・`user.id`） |
 | V3 | スレッドを解決し、変更要求を Approve に変えてから「フェーズ N をレビュー済みにする」を押す | 1 コミットで子が `done/` へ動き、`phases/<親>/<N>.reviewed` に `actor`（PAT の持ち主）と `via: chrome` が入る | コミット、印の中身、GraphQL の `viewer` の応答 |
-| V4 | 依頼の後に置き場の外を変えるコミットを push してから開く | compare の変更の一覧で「動いた」かを判定する。人が見るものが動いていれば通らない | `GET /compare/<base>...<head>` の応答（`status`・`files` の件数・改名の `previous_filename`） |
+| V4 | 依頼の後に置き場の外を変えるコミットを push してから開く | compare の変更の一覧で「動いた」かを判定する。ユーザが見るものが動いていれば通らない | `GET /compare/<base>...<head>` の応答（`status`・`files` の件数・改名の `previous_filename`） |
 | V5 | PR に Approve が付いた状態で「レビュー済み」か承認を押す | 確認の文に「このコミットで MR の Approve が外れることがある」が出る。保護ありの設定で Approve が実際に外れる | 確認の文、PR の Approve の有無 |
 | V6 | 書きかけ（PENDING）のレビューを別のアカウントで残す | 結論が変わらない | `reviews` の応答に PENDING が出るか |
 | V7 | 手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を（別の家族で）打つ | 印に `actor`（`gh`・`glab`・curl のどれでもトークンの持ち主）が入る | 印の中身 |
@@ -199,7 +199,7 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 | # | 操作 | 期待する結果 | 控えるもの |
 |---|---|---|---|
 | L1 | 承認を押す | `POST repository/commits` で 1 コミット。答えの `parent_ids[0]` が読んだ先頭 | 応答の `parent_ids` |
-| L2 | 本体の書き込みで同じファイルを競合させる（下の「同じファイルを競合させる手順」の A か B。対象は承認で書き換わる `events/<識別子>.ndjson` など update になるファイル） | `last_commit_id` が合わず 400 になり書かない。拡張は読み直して周を回し、3 周で書けなければ人に回す | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
+| L2 | 本体の書き込みで同じファイルを競合させる（下の「同じファイルを競合させる手順」の A か B。対象は承認で書き換わる `events/<識別子>.ndjson` など update になるファイル） | `last_commit_id` が合わず 400 になり書かない。拡張は読み直して周を回し、3 周で書けなければユーザに回す | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
 | L3 | 打ち消しで同じファイルを競合させる（L11 で打ち消しの `POST repository/commits` が出るときに、下の手順 A で止めて、同じファイルへ手元から push する） | 打ち消しは自分のコミットを `last_commit_id` に付けるので 400 になり、他人の変更を消さない。家族が「要確認」で出て、「確かめた」を押すまでそのブラウザから書かない | 400 の応答本文、push したコミットが残っていること |
 | L11 | 別のファイルへの書き込みが間に入るよう、2 つのブラウザで別の子の承認と取り下げを同時に押す | 事後確認で判定し直し、書くものが違えば打ち消しのコミットが積まれる。収まらなければ家族が「要確認」で出る | 両方の画面の文面、積まれたコミットの並び |
 | L12 | MR を出したブランチを消した後に `GET projects/:id/repository/commits/refs/merge-requests/<N>/head`（または `git ls-remote origin 'refs/merge-requests/*'`）を見る | ブランチ消去後も残るか（どちらでも拡張の答えは変わらない。`seq` の前提の確認） | 応答 |

@@ -17,7 +17,7 @@
 # 進める）では `main` に届かない。
 #
 # 進めるのは fast-forward だけ。マージも rebase もしない。作業ツリーに未コミットの
-# 変更があるツリーは触らない。そこに居るのは人か別のセッションの書きかけで、
+# 変更があるツリーは触らない。そこに居るのはユーザか別のセッションの書きかけで、
 # セッションの頭に走る hook が動かしてよいものではない（docs/claude/worktree.md の「他セッションの
 # 作業を踏まないために」）。進められなかったツリーは理由を 1 行で言う。
 #
@@ -29,7 +29,7 @@
 # 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
 #
 # **認証で落ちたときは、そう言う。** 尋ねないので、資格情報が無いか切れていると毎回落ちる。
-# オフラインと同じ 1 行では、人は理由を調べることになる。認証は人が端末で打つ git（承認の
+# オフラインと同じ 1 行では、ユーザは理由を調べることになる。認証はユーザが端末で打つ git（承認の
 # sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
 # git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
 # 「取ってこられなかった」に戻るだけ。
@@ -150,7 +150,7 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。ユーザに端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
 	return 1
 }
 
@@ -341,7 +341,7 @@ report=$(
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
 			printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
 		else
-			printf '%s: リモートと分岐しているので進めない。人に合流させてもらってください（%s）\n' \
+			printf '%s: リモートと分岐しているので進めない。ユーザに合流させてもらってください（%s）\n' \
 				"$name" "$branch"
 		fi
 	done
@@ -379,7 +379,7 @@ report=$(
 		[ "$behind" = "0" ] && continue
 		ahead=$(git -C "$repo" rev-list --count "$ref..refs/heads/$default" 2>/dev/null || echo 0)
 		if [ "$ahead" != "0" ]; then
-			printf '%s: ワークツリーの起点になる %s がリモートと分岐している。人に合流させてもらってください\n' \
+			printf '%s: ワークツリーの起点になる %s がリモートと分岐している。ユーザに合流させてもらってください\n' \
 				"$name" "$default"
 			continue
 		fi
@@ -392,13 +392,13 @@ report=$(
 				continue
 			fi
 			git -C "$here" merge --ff-only --quiet "$ref" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。人に合流させてもらってください\n' \
+				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
 					"$name" "$default"
 				continue
 			}
 		else
 			git -C "$repo" update-ref -m ccnavi-fetch "refs/heads/$default" "$ref" "$old" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。人に合流させてもらってください\n' \
+				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
 					"$name" "$default"
 				continue
 			}

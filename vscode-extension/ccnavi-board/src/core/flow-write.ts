@@ -1,12 +1,12 @@
 /**
  * フローのファイルを書く（設計 9.3.1）。フロー編集画面の保存の、ファイルに触る部分だけ。
  *
- * 置き場は承認済みの領域（既定 `.ccnavi/approved/flows/<子>.yml`）で、人が持つ（エージェントの Write / Edit は判定が止める）。書くのは人が
+ * 置き場は承認済みの領域（既定 `.ccnavi/approved/flows/<子>.yml`）で、ユーザが持つ（エージェントの Write / Edit は判定が止める）。書くのはユーザが
  * ボードで保存したときだけ。ここはその 1 回を、リンクを辿らずに、途中で落ちても半端なファイルを残さずに書く。
  *
  * - **リンクは辿らない。** ツリーのルートからファイルまでの途中（ファイルそのものを含む）に 1 つでも
  *   シンボリックリンクがあれば書かない。辿ると、承認済みの領域の外（エージェントが書ける場所）に書いたり、
- *   外のファイルを人の手順書として置いたりすることになる。足りないディレクトリも 1 段ずつ作り、作ったものが
+ *   外のファイルをユーザの手順書として置いたりすることになる。足りないディレクトリも 1 段ずつ作り、作ったものが
  *   リンクでないことを確かめる
  * - **書き込みは入れ替え。** 同じディレクトリに一時ファイルを `wx`（在れば落ちる。リンクも辿らない）で書き、
  *   `rename` で置き換える。`rename` は行き先がリンクでもリンクそのものを置き換え、指す先には書かない
@@ -17,7 +17,7 @@
  * - **一時ファイルを残さない。** 落ちても消す。消せずに残った `.*.tmp` は `ccnavi-push-approved.sh` が運ばない
  *
  * 残る隙間（TOCTOU）: 確かめてから `rename` までの間に、誰かが途中のディレクトリをリンクに差し替えれば
- * その先に書きうる。差し替えられるのは承認済みの領域を書ける者（人）だけで、エージェントの書き込みは判定が
+ * その先に書きうる。差し替えられるのは承認済みの領域を書ける者（ユーザ）だけで、エージェントの書き込みは判定が
  * 止める。`rename` の直前にもう一度確かめて、隙間を狭めてある。
  *
  * VS Code の API は使わない（単体テストで確かめる）。
@@ -89,7 +89,7 @@ export function linkedSegment(tree: string, file: string): string | undefined {
 function makeDirs(tree: string, dir: string): string | undefined {
   const parts = segments(tree, dir);
   if (parts === undefined) {
-    return `ツリーの外には書かない（${dir}）`;
+    return `ツリーの外には書き込みません（${dir}）`;
   }
   let current = tree;
   for (const part of parts) {
@@ -98,19 +98,19 @@ function makeDirs(tree: string, dir: string): string | undefined {
       fs.mkdirSync(current);
     } catch (error) {
       if (code(error) !== "EEXIST") {
-        return `ディレクトリを作れない（${current}）: ${(error as Error).message}`;
+        return `ディレクトリを作れません（${current}）: ${(error as Error).message}`;
       }
     }
     const stat = fs.lstatSync(current);
     if (stat.isSymbolicLink() || !stat.isDirectory()) {
-      return `${current} がシンボリックリンクかディレクトリでないので書かない`;
+      return `${current} がシンボリックリンクか、ディレクトリではないため、書き込みません`;
     }
   }
   return undefined;
 }
 
 function linkedError(where: string): string {
-  return `${where} がシンボリックリンクなので書かない（リンクの先は承認済みの領域の外かもしれない）。リンクを外してから保存してください`;
+  return `${where} がシンボリックリンクのため、書き込みません（リンク先は承認済みの領域の外かもしれません）。リンクを外してから保存してください`;
 }
 
 /**
@@ -118,7 +118,7 @@ function linkedError(where: string): string {
  */
 export function writeFlowFile(tree: string, file: string, text: string, expect: FlowExpect): FlowWriteResult {
   if (segments(tree, file) === undefined) {
-    return { ok: false, error: `ツリーの外には書かない（${file}）` };
+    return { ok: false, error: `ツリーの外には書き込みません（${file}）` };
   }
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
@@ -135,7 +135,7 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
   }
   const size = Buffer.byteLength(text, "utf8");
   if (size > FLOW_FILE_LIMIT) {
-    return { ok: false, error: `フローが大きすぎるので書かない（${size} バイト、上限 ${FLOW_FILE_LIMIT}）。実行ファイルはこれより大きいフローを読まない` };
+    return { ok: false, error: `フローが大きすぎるため、書き込みません（${size} バイト、上限 ${FLOW_FILE_LIMIT}）。実行ファイルはこれより大きいフローを読みません` };
   }
   const temp = path.join(dir, `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`);
   let renamed = false;
@@ -143,7 +143,7 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
     try {
       fs.writeFileSync(temp, text, { encoding: "utf8", flag: "wx" });
     } catch (error) {
-      return { ok: false, error: `フローのファイルに書けない: ${(error as Error).message}` };
+      return { ok: false, error: `フローのファイルに書けません: ${(error as Error).message}` };
     }
     // 入れ替えの直前にもう一度確かめる（確かめてから入れ替えるまでの隙間を狭める）
     const relinked = linkedSegment(tree, file);
@@ -155,7 +155,7 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
       fs.renameSync(temp, file);
       renamed = true;
     } catch (error) {
-      return { ok: false, error: `フローのファイルに書けない: ${(error as Error).message}` };
+      return { ok: false, error: `フローのファイルに書けません: ${(error as Error).message}` };
     }
     return { ok: true };
   } finally {
@@ -177,23 +177,23 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
     stat = fs.lstatSync(file);
   } catch (error) {
     if (code(error) !== "ENOENT") {
-      return `フローのファイルを確かめられない: ${(error as Error).message}`;
+      return `フローのファイルを確かめられません: ${(error as Error).message}`;
     }
   }
   if (!expect.exists) {
-    return stat === undefined ? undefined : "フローのファイルは、読み込んだあとに画面の外で作られている。再読込してから編集し直してください（上書きしない）";
+    return stat === undefined ? undefined : "フローのファイルは、読み込んだあとに画面の外で作られています。再読込してから編集し直してください（上書きしません）";
   }
   if (stat === undefined) {
-    return "フローのファイルは、読み込んだあとに画面の外で消されている。再読込してから編集し直してください";
+    return "フローのファイルは、読み込んだあとに画面の外で消されています。再読込してから編集し直してください";
   }
   if (stat.isSymbolicLink() || !stat.isFile()) {
-    return `${file} がシンボリックリンクかファイルでないので書かない`;
+    return `${file} がシンボリックリンクか、ファイルではないため、書き込みません`;
   }
   if (stat.nlink > 1) {
-    return hardLinkedError(file, "書かない");
+    return hardLinkedError(file, "書き込みません");
   }
   if (stat.mtimeMs !== expect.mtimeMs) {
-    return "フローのファイルは、読み込んだあとに画面の外で変更されている。再読込してから編集し直してください（この変更は上書きしない）";
+    return "フローのファイルは、読み込んだあとに画面の外で変更されています。再読込してから編集し直してください（この変更は上書きしません）";
   }
   return undefined;
 }
@@ -207,7 +207,7 @@ export function decodeFlowBytes(bytes: Uint8Array): { readonly ok: true; readonl
   try {
     return { ok: true, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
   } catch {
-    return { ok: false, error: "UTF-8 として読めない" };
+    return { ok: false, error: "UTF-8 として読めません" };
   }
 }
 
@@ -217,11 +217,11 @@ export function decodeFlowBytes(bytes: Uint8Array): { readonly ok: true; readonl
  */
 export function readFlowFile(tree: string, file: string): { readonly bytes: Uint8Array; readonly mtimeMs: number } | undefined {
   if (segments(tree, file) === undefined) {
-    throw new Error(`ツリーの外は読まない（${file}）`);
+    throw new Error(`ツリーの外のファイルは読みません（${file}）`);
   }
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
-    throw new Error(`${linked} がシンボリックリンクなので読まない（書きもしない）`);
+    throw new Error(`${linked} がシンボリックリンクのため、読み書きしません`);
   }
   let stat: fs.Stats;
   try {
@@ -233,23 +233,23 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
     throw error;
   }
   if (!stat.isFile()) {
-    throw new Error(`${file} がふつうのファイルでない（名前付きパイプ・デバイスなど）ので読まない`);
+    throw new Error(`${file} はふつうのファイルではない（名前付きパイプやデバイスなど）ため、読みません`);
   }
   if (stat.nlink > 1) {
-    throw new Error(hardLinkedError(file, "読まない（書きもしない）"));
+    throw new Error(hardLinkedError(file, "読み書きしません"));
   }
   if (stat.size > FLOW_FILE_LIMIT) {
-    throw new Error(`${file} が大きすぎるので読まない（${stat.size} バイト、上限 ${FLOW_FILE_LIMIT}）`);
+    throw new Error(`${file} が大きすぎるため、読みません（${stat.size} バイト、上限 ${FLOW_FILE_LIMIT}）`);
   }
   // 確かめてから開くまでに差し替えられても、開いたものを確かめ直す。名前付きパイプでも待たない
   const fd = fs.openSync(file, fs.constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
   try {
     const opened = fs.fstatSync(fd);
     if (!opened.isFile() || opened.ino !== stat.ino || opened.dev !== stat.dev) {
-      throw new Error(`${file} を開いているあいだに別のファイルに差し替わったので読まない`);
+      throw new Error(`${file} を開いている間に別のファイルに差し替わったため、読みません`);
     }
     if (opened.nlink > 1) {
-      throw new Error(hardLinkedError(file, "読まない（書きもしない）"));
+      throw new Error(hardLinkedError(file, "読み書きしません"));
     }
     const buffer = Buffer.alloc(FLOW_FILE_LIMIT + 1);
     let length = 0;
@@ -261,7 +261,7 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
       length += got;
     }
     if (length > FLOW_FILE_LIMIT) {
-      throw new Error(`${file} が大きすぎるので読まない（上限 ${FLOW_FILE_LIMIT} バイト）`);
+      throw new Error(`${file} が大きすぎるため、読みません（上限 ${FLOW_FILE_LIMIT} バイト）`);
     }
     return { bytes: Uint8Array.from(buffer.subarray(0, length)), mtimeMs: opened.mtimeMs };
   } finally {
@@ -270,5 +270,5 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
 }
 
 function hardLinkedError(file: string, what: string): string {
-  return `${file} はハードリンク（ほかのパスからも同じ中身を開ける）なので${what}。承認済みの領域の外のパスから書き換えられる可能性がある。リンクを外してから開き直してください`;
+  return `${file} はハードリンク（ほかのパスからも同じ中身を開ける）のため、${what}。承認済みの領域の外のパスから書き換えられる可能性があります。リンクを外してから開き直してください`;
 }

@@ -5,7 +5,7 @@
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
  * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の種類（`.ccnavi/common/phases.yml`。場所は固定）、
  * ワークスペースの設定の種類（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの設定の種類
@@ -275,7 +275,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
@@ -302,7 +302,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   if (target.kind === "common" && !exists) {
     notices.push(
-      "種類はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた種類は全プロジェクトに効き、ワークスペースやプロジェクトの設定に同じ id で中身の違う種類があるとその設定が空として扱われます",
+      "種類はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた種類は、すべてのプロジェクトに適用されます。ワークスペースやプロジェクトの設定に、同じ id で中身の違う種類があると、その設定は空として扱われます",
     );
   }
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。
@@ -458,7 +458,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
  * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
@@ -563,7 +563,7 @@ async function reload(current: PanelState): Promise<void> {
 /**
  * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
  */

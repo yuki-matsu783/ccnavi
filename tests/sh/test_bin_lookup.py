@@ -1,6 +1,6 @@
 """保護済み sh が起動する実行ファイルを探す順（.ccnavi/scripts/ccnavi-common.sh の ccnavi_bin）。
 
-人が端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
+ユーザが端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
 CCNAVI_BIN_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
 `.ccnavi/bin/<os>-<arch>/` にしか無い。そこを見ないと、配布先では必ず
 「実行ファイルが無い」で止まる。
