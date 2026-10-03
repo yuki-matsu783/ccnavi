@@ -213,9 +213,9 @@ def decide_before(
     notices = [text for text in (guard, fallback) if text]
 
     # 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼ぶ形は、ルールより
-    # 先に止める。`CCNAVI_TICKETS_APPROVED=/x sh …ccnavi-git.sh push` は、sh の中の子の push
-    # の検査を外す。hook は settings.json の env で起動するので、この代入の影響を受けない
-    # （ADR-0077）。読むのは元のコマンド。`cd` を追うには区切りの残った形が要る。
+    # 先に止める。`CCNAVI_WORKSPACE=<子のワークツリー> sh …ccnavi-git.sh push` は、sh の中の
+    # 子の push の検査を外す。hook は settings.json の env で起動するので、この代入の影響を
+    # 受けない（ADR-0077）。読むのは元のコマンド。`cd` を追うには区切りの残った形が要る。
     if payload.tool_name == "Bash" and (
         modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):

@@ -165,7 +165,7 @@ class FallbackTest(unittest.TestCase):
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_既定のシェルの守りは設定で動かした置き場にも当たる(self):
-        # 実行ファイルは設定で動く（ccnavi ディレクトリと共通層は固定。ADR-0052・ADR-0092）。
+        # 実行ファイルは設定で動く（ccnavi ディレクトリと共通層は固定。共通層は ADR-0052）。
         # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
         # 壊れたときにだけそこへの書き込みが止まらない（issue #14）。
         # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは

@@ -188,7 +188,8 @@ class ProjectsTest(unittest.TestCase):
 
         `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ効く
         （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
-        数えない」は `projects/` を作らないワークスペースで言う（ADR-0092。空文字の口は無い）。
+        数えない」は `projects/` を作らないワークスペースで言う（置き場は固定で、空文字の口は
+        無い）。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -591,7 +592,7 @@ class ProjectsTest(unittest.TestCase):
         os.makedirs(os.path.join(self.lib, ".claude"))
         # `projects/` を無視しない。追跡はしない: ここで `git add -A` すると、入れ子の
         # リポジトリが `projects/app` の名前で索引に載り、「追跡されている」の側の
-        # 知らせ（ADR-0092）に切り替わって、「無視されていない」を確かめられなくなる。
+        # 知らせ（置き場は固定）に切り替わって、「無視されていない」を確かめられなくなる。
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
 
         result = self.ccnavi("--lint")
@@ -627,7 +628,7 @@ class ProjectsTest(unittest.TestCase):
     # ---- 7. projects/ を数えない設定では前と同じ
 
     def test_without_a_projects_dir_everything_is_judged_by_the_workspace_rules(self):
-        # 「数えない」を言う口は、`projects/` を作らないこと（ADR-0092）。
+        # 「数えない」を言う口は、`projects/` を作らないこと（置き場は固定）。
         # 消さずに `projects/` の外へ動かす（Windows は .git の中の読み取り専用を消せない）。
         # 動かした先の app は入れ子の git のまま。`projects/` の外なら、その中でも
         # ワークスペースのルールで判定される。
@@ -645,7 +646,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("DENY", self.reason(passed))
 
     def test_an_empty_projects_env_still_counts_the_projects(self):
-        # A3（ADR-0092）。`CCNAVI_PROJECTS=""` は「プロジェクトを数えない」と読まれていた。
+        # A3（置き場の固定）。`CCNAVI_PROJECTS=""` は「プロジェクトを数えない」と読まれていた。
         # 6 つの env を廃止したので、空文字を入れても `projects/` の下は数えられる。
         # 実装前は赤。赤の理由は、まだ `CCNAVI_PROJECTS` の空文字を読んでいること。
         env = {"CCNAVI_PROJECTS": ""}

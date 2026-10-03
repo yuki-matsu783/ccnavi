@@ -277,7 +277,7 @@ async function trackedBanners(detail: string, ignored: boolean): Promise<{ banne
   }
 }
 
-test("CB-D125 A10 置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignore のボタンと「無視されていない」の帯を出さない", async () => {
+test("CB-D139 A10 置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignore のボタンと「無視されていない」の帯を出さない", async () => {
   const { banners, fixButtons } = await trackedBanners(COLLISION, false);
   assert.equal(fixButtons, 0);
   assert.ok(banners.includes(`warn: ${COLLISION}`), banners.join(" / "));
@@ -287,7 +287,7 @@ test("CB-D125 A10 置き場がワークスペースのソースとぶつかっ�
   assert.ok(banners.includes("warn: 別の指摘"), banners.join(" / "));
 });
 
-test("CB-D126 A10b 載せ忘れ（入れ子のリポジトリが索引に載った）でも同じ。.gitignore に /projects/ が既にあっても苦情の帯は出たまま", async () => {
+test("CB-D140 A10b 載せ忘れ（入れ子のリポジトリが索引に載った）でも同じ。.gitignore に /projects/ が既にあっても苦情の帯は出たまま", async () => {
   for (const ignored of [false, true]) {
     const { banners, fixButtons } = await trackedBanners(ADDED_BY_MISTAKE, ignored);
     assert.equal(fixButtons, 0, `ignored=${ignored}`);

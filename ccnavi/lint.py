@@ -683,7 +683,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     ここで見るのは、置き場が本当に ccnavi ディレクトリの下にあるか。外に向けると、
     その 1 本が当たらず、エージェントが承認済みチケットを書けて承認の意味が無くなる。
 
-    置き場は既定に固定（ADR-0084）なので、外に向くのは診断のフラグ（`--approved` /
+    置き場は既定に固定なので、外に向くのは診断のフラグ（`--approved` /
     `--project-home`）で動かしたときだけ。フラグが残る間は見ておく。
     """
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
@@ -1572,7 +1572,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
 def _projects_rel(conf: settings.Settings, root: str) -> str:
     """プロジェクトの置き場の、ワークスペースルートからの相対（"/" 区切り）。
 
-    置き場は既定の `projects` に固定（ADR-0084）。診断のフラグで空やワークスペースの外を
+    置き場は既定の `projects` に固定。診断のフラグで空やワークスペースの外を
     指されたときは空を返し、索引は見ない（ワークスペースの git の話ではなくなる）。
     """
     if not conf.projects:
