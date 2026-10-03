@@ -4,7 +4,7 @@
 
 1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は warn で読み飛ばす
 2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。人が保存したフローを
-   実行後の監視が範囲外の変更として咎めない（H1）
+   実行後チェックが範囲外の変更として咎めない（H1）
 3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
    別名（アンカーとエイリアス）は読まない
 4. 壊れた・大きい・リンクのフローで落ちない。文の量に上限がある。ccnavi の名乗りを真似させない
@@ -141,7 +141,7 @@ class FlowPlaceTest(unittest.TestCase):
         self.assertEqual(outside, ("i0001-01.yml", None))
 
     def test_every_copy_counts_for_the_lock(self):
-        """識別子で畳む前の並びを見る。1 本でも着手中なら止める（L1）。"""
+        """識別子でまとめる前の並びを見る。1 本でも着手中なら止める（L1）。"""
         idle, running = child_ticket(), child_ticket(started=True)
         self.assertIs(flow.lock_hit([idle, running], "", "i0001-01.yml"), running)
         self.assertIsNone(flow.lock_hit([idle], "", "i0001-01.yml"))
@@ -320,7 +320,7 @@ class FlowRenderTest(unittest.TestCase):
         lines, _ = flow.render(fan)
         self.assertIn(f"…ほか {3000 - flow.ITEM_LIMIT} 件", lines[0])
         self.assertLessEqual(sum(len(x) for x in lines[:-1]), flow.CHILD_TEXT_LIMIT)
-        self.assertIn("続きはファイルを読む", lines[-1])
+        self.assertIn("続きはファイルを読んで", lines[-1])
 
     def test_long_chains_are_fast(self):
         n = 20_000
@@ -632,7 +632,7 @@ class FlowGuardTest(FlowHarness):
 
     def test_a_flow_saved_by_a_person_is_not_blamed_on_the_agent(self):
         """人がボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
-        実行後の監視が範囲外の変更として咎めない（H1）。未コミットでも、コミットしても。"""
+        実行後チェックが範囲外の変更として咎めない（H1）。未コミットでも、コミットしても。"""
         other = CHILD.replace("01", "02")
         ok = write(os.path.join(self.parent_tree, "wip", "a.md"), "a\n")
         first = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok, content="a")
@@ -653,7 +653,7 @@ class FlowGuardTest(FlowHarness):
         self.assertNotIn("POST_TICKET_SCOPE", said)
         self.assertNotIn("POST_VIOLATION", said)
         self.assertNotIn("flows/", said.replace("\\", "/"))
-        # 監視は効いている。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
+        # 実行後チェックは有効。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
         write(os.path.join(self.parent_tree, "references", CHILD, "flow.json"), "{}")
         ok4 = write(os.path.join(self.parent_tree, "wip", "d.md"), "d\n")
         fourth = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok4, content="d")
@@ -750,13 +750,13 @@ class FlowLockTest(FlowHarness):
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         text = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertIn(self.flow_path, text)
-        self.assertIn("読み直す", text)
+        self.assertIn("読み直して", text)
         self.assertIn("着手中なので", text)
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn("3. [askUserQuestion] 方針", text)
         self.assertIn("[fancyNewNode] 未来の種類", text)
         # askUserQuestion: 止まってメインに返す。
-        self.assertIn("問いと選択肢を添えてメインに返す", text)
+        self.assertIn("問いと選択肢を添えてメインに返して", text)
         # subAgent: 入れ子で起こし、担当の子・ワークツリー・範囲を必ず書く。Agent が無ければ返す。
         self.assertIn(f"担当の子チケット {CHILD}", text)
         self.assertIn(child_tree, text)

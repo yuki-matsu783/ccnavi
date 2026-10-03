@@ -1,9 +1,9 @@
-"""実行後の監視の受入テスト。
+"""実行後チェックの受入テスト。
 
 道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、そこを
 汚してから payload を渡し、返ってきた文と終了コードと記録だけを読む。
-作業ツリーの実物を見るのがこの監視の要点なので、git を差し替えると、
-テストが通ることと監視が動くことが別の話になる。
+作業ツリーの実物を見るのがこのチェックの要点なので、git を差し替えると、
+テストが通ることとチェックが動くことが別の話になる。
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ RULES = {
         },
     ],
     # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
-    # （post._restorable）。文面は書かない――ask に message を書くと lint が error。
+    # （post._restorable）。文面は書かない。ask に message を書くと lint が error。
     "ask": [
         {
             "id": "watched",
@@ -59,8 +59,8 @@ RULES = {
             "glob": "*/watched/*",
         }
     ],
-    # 実行後の監視を見るテストなので、実行前の判定で確認を出させない。
-    # 出すと、監視が何を言ったかを見たいテストが ask の話になる。
+    # 実行後チェックを見るテストなので、実行前チェックで確認を出させない。
+    # 出すと、チェックが何を言ったかを見たいテストが ask の話になる。
     "allow": [
         {
             "id": "anything-else",
@@ -163,7 +163,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")
@@ -198,7 +198,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         result = self.run_hook(command="python build.py")
 
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stderr, "", "守ると宣言していない場所の変更は監視の対象ではない")
+        self.assertEqual(result.stderr, "", "守ると宣言していない場所の変更は対象外")
 
     # 検知したとき
 
@@ -448,6 +448,22 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
+    def test_HEADを持たない控えは基準なしとして扱う(self):
+        # heads の無い控えは、控えが無いときと同じ。コミットのぶんを数えられない
+        # 基準で報告すると、このターンに入ったコミットを黙って落とす。
+        self.run_hook(event="UserPromptSubmit")
+        turn = os.path.join(self.state, "s1.turn.json")
+        with open(turn, encoding="utf-8") as f:
+            data = json.load(f)
+        del data["heads"]
+        write(turn, json.dumps(data))
+        self.dirty()
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
+
     def test_ターンの終わりの報告は一度伝えた変更も含む(self):
         # 呼び出しごとの報告は控えを見て繰り返さないが、人はまだ 1 度も
         # 見ていないことがある。宛先が違うので、控えを共有しない。
@@ -526,7 +542,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("restored: ccnavi", result.stderr)
         # 戻していないので、戻す手順は載せたままにする。
         self.assertIn('git restore --staged --worktree -- "watched/deps.txt"', result.stderr)
-        # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由を添える。
+        # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
         self.assertIn("`ask`, not `deny`", result.stderr)
 
@@ -642,7 +658,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     def test_基準を持たないツリーは数えていないと言う(self):
         # ターンの途中で切ったワークツリーは、プロンプトのときに無いので基準を
-        # 持たない。黙って飛ばすと、そのツリーで何も起きなかったのと見分けが付かない。
+        # 持たない。何も言わずに飛ばすと、そのツリーで何も起きなかったのと見分けが付かない。
         self.run_hook(event="UserPromptSubmit")
         later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
         git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
@@ -727,7 +743,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
     ここは ccnavi の副命令（`ticket start` / `finish`、`review request` / `confirm` / `ready`）が
     書く場所で、同時にプロジェクトが `deny` と宣言した場所でもある。外さないと、自分の
     手順を自分で違反として報告し、戻す設定では自分で戻して手順が進まなくなる。外しすぎると、
-    承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる道ができる。
+    承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる経路ができる。
     """
 
     def setUp(self):
@@ -843,7 +859,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 0, self.said(result))
 
     def test_基準点の書き換えは言う(self):
-        # `base_sha` はサブエージェント終了時の検査と実績リスクの基準点。書き換えられると
+        # `base_sha` はサブエージェント終了時チェックと実績リスクの基準点。書き換えられると
         # コミット済みの範囲外の変更が検査から消えるので、姿から落としてはいけない。
         self.use(ticket_repo(text=STARTED))
         write(self.path(DOING), STARTED.replace("1111111111111111", "2222222222222222"))
@@ -878,7 +894,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_同じ姿が2つ動くときは移動として外さない(self):
-        # 正規の移動 1 件に、同じ姿のチケットのただの削除が相乗りできてはいけない。
+        # 正規の移動 1 件に、同じ姿のチケットのただの削除が一緒に通ってはいけない。
         # 姿が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
         write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET)
         git(self.repo, "add", "--", ".ccnavi/approved/doing/i0002.md")
@@ -898,7 +914,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("i0002", result.stderr)
 
     def test_行き先に同じ姿が2つあるときも外さない(self):
-        # 正規の移動に、行き先へ直接置いた偽物が相乗りする形。
+        # 正規の移動に、行き先へ直接置いた偽物が一緒に通る形。
         self.run_hook(command="ls")
         os.remove(self.path(DOING))
         moved = TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody')

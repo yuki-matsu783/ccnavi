@@ -13,7 +13,7 @@ keywords: [引き継ぎ, 実装状況, 未実装, 次の作業, ADR, テスト, 
 ## この道具は何か
 
 Claude Code の hook から呼ばれ、危ないツール呼び出しを止め、代わりに何をすればよいかを名指しで返す。
-拒否は目的を諦めさせるのではなく、別の道へ向け直さないと効かない（エージェントは絶対パスで打ち直す）。
+拒否は目的を諦めさせるのではなく、別の道へ向け直さないと役に立たない（エージェントは絶対パスで打ち直す）。
 
 | 文書 | 中身 |
 |---|---|
@@ -27,7 +27,7 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 ## いま動くもの
 
-hook の 7 イベントの全部、実行前のルール照合、実行後の監視、コアファイルの自己防衛、チケット制御、
+hook の 7 イベントの全部、実行前のルール照合、実行後チェック、コアファイルの自己防衛、チケット制御、
 複数のリポジトリ（層の和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
 VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理・フェーズ管理）。
 このリポジトリ自身には dry-run で仕掛けてある。
@@ -59,7 +59,7 @@ uv run --with pyinstaller python build.py
 - 記憶の消去（REQ-DIA-05）
 - 期限（REQ-CMN-08）はループの中で見ているだけで、実測していない
 - GitHub の実物に対する `request` と `confirm` は実測していない。GitLab は実物（CE 18.5）で 1 周を確かめてある。
-  自動テストは写し（`--result`）を渡す形で通す
+  自動テストはJSON（`--result`）を渡す形で通す
 - REQ-TKT-35 の後半。`SubagentStart` は親の局面を名指ししない（フェーズの番号と種類までは渡す）
 
 ## 次にやること
@@ -70,7 +70,7 @@ uv run --with pyinstaller python build.py
 uv run python -m unittest tests.e2e.test_e2e_sh -v
 ```
 
-走り出しに出る `sh =` がワークスペースルート側を指していることを確かめる。効くのはワークスペース側の 1 本だけ。
+実行の最初に出る `sh =` がワークスペースルート側を指していることを確かめる。実際に使われるのはワークスペース側の 1 本だけ。
 写す前の版を測るときは `CCNAVI_SH_DIR=<場所>` で差し替える。組み立て済みの実行ファイルを試すので、
 `ccnavi/` を直したら組み立て直してから回す（無ければ skip）。モード B（`projects/` を使う形）に触ったら回す。
 
@@ -95,7 +95,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
    `wip/design/scripts/` に全文で置き、人が写してコミットする。写す順は `ccnavi-common.sh` が先
    （3 本が起動時に読む）。`phases.yml` は人が持つ設定で、エージェントは足せない
 2. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。** コマンドに `.ccnavi` が
-   含まれるだけで当たる。受入テストは Python の中で写すので通るが、手で確かめるときに踏む
+   含まれるだけで当たる。受入テストは Python の中で写すので通るが、手で確かめるときには当たる
 
 ### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（人が直す）
 
@@ -112,14 +112,15 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 ### VS Code 拡張
 
 - プロジェクト管理画面（0.3.0）・リスク管理画面（0.4.0）・フェーズ管理画面（0.5.0）は拡張開発ホストで通していない。
-  拡張の README の手動確認の表 25〜44 を 1 度踏む
-- フェーズ管理画面とリスク管理画面の既知の限界。`rules.yml` が壊れている間は保存できない。YAML の構文が壊れた
+  拡張の README の手動確認の表 25〜44 を 1 度通して確かめる
+- フェーズ管理画面とリスク管理画面の既知の限界。`rules.yml` が不正な間は保存できない。YAML の構文に誤りがある
   ファイルは画面から直せない。保存はアトミックではなく、競合の検出は更新時刻だけ。CRLF と BOM は保存で落ちる
 
 ### 並行するチケット（REQ-TKT、設計 9）で実測が要るもの
 
 - `SubagentStart` の `additionalContext` がサブエージェントに届くか。届かなければ最初の `PreToolUse` で渡す（設計 9.12）
-- `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`（親を cwd で引くので、そこが割れる）
+- `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`。レビュー準備中・レビュー待ちで止めるかは cwd の
+  ワークツリーから親を引いて決めるので、届く cwd が親のワークツリーか `isolation` が作った別のワークツリーかで、止まるかどうかが分かれる
 - GitHub の実物に `request` / `confirm` を当てる。GraphQL の `reviewThreads` は文書どおりに書いただけ。
   GitLab の `request_changes` は EE でしか当てられない
 
@@ -132,13 +133,13 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 - **権限モードへの委譲。** `code` が `UNDECLARED` の行を数え、`tool` と `subject` の傾向を見る。同じ場所が繰り返すなら
   `allow` に 1 行足す、毎回違うなら `allow` の粒度が細かすぎる。`RULE_ASK` との比も見る
-- **実行後の監視。** `event` が `PostToolUse` で `deny` の回を見る。`worktree-unreadable` が出ていないか、`detail` の
+- **実行後チェック。** `event` が `PostToolUse` で `deny` の回を見る。`worktree-unreadable` が出ていないか、`detail` の
   `preexisting` が毎セッション大量に出ていないか、`paths` に同じ場所が繰り返し出ていないか。`ms` を `PreToolUse` と比べる
 - **誤検知。** `degraded` の割合を数える（`echo "git push"` の類が止まっていないことも）。大きければ縮退の条件が広すぎる
 
 ### 残っている誤検知と取りこぼし
 
-- 空白を含まないパターンは引用の中でも当たる（`echo ".env"` が `.env` のルールに当たる）。塞ぐならルール書式の版が上がる（ADR-0010）
+- 空白を含まないパターンは引用の中でも当たる（`echo ".env"` が `.env` のルールに当たる）。直すならルール書式の版が上がる（ADR-0010）
 - `git -C /repo push` は `*git push*` に当たらない。knowledge にグローバルオプションの飛ばし方がある
 
 ### 未了: 別件
@@ -167,11 +168,11 @@ Claude Code の振る舞いについて測った前提は設計書の付録 C。
 - **`shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。** `shellread.py` は先に原文を走査してから語の分割だけを
   shlex に任せる。走査か shlex のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
   引用された `<<` による縮退は許容する誤検知（ccnavi.md 6.3、12.2）
-- **`$( )` の中の `case` は bash 3.2 と zsh で読みが割れる。** `case` が現れたら縮退させている（許容した誤検知）
+- **`$( )` の中の `case` は bash 3.2 と zsh で読みが分かれる。** `case` が現れたら縮退させている（許容した誤検知）
 - **複合コマンドは 1 つの区間が読めなければ全体が縮退する。** 安全側なのでそのまま
 - **Python の識別子に空白は入らない。** `def test_warn は…` のように英字と日本語の間に空白を入れると構文エラー
 - **Windows のコンソール経由で日本語を引数に渡すと CP932 になり、`jq --arg` が UTF-8 でない JSON を作る。** 本文はファイルで渡す。
-  `jq` の実体は `C:\Program Files\jq\jq` で、`"$JQ"` と引用しないと割れる
+  `jq` の実体は `C:\Program Files\jq\jq` で、`"$JQ"` と引用しないと空白で分かれる
 - **Windows の `gitdir:` の綴り**（git 2.39.2、Git Bash と PowerShell）。絶対パス、区切りは `/`、ドライブレターは大文字、
   `gitdir:` の後ろは半角空白 1 個。`ccnavi_project`（sh）と `tree.py` がこれを前提にしている
 - **Docker Desktop を起動すると `restart=unless-stopped` の GitLab が勝手に上がり、2GB の VM では engine ごと落ちる。**
@@ -183,7 +184,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 |---|---|
 | 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
 | URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh は利用者の情報を落として伏せる。実行ファイルの `remote_kind` も読み飛ばす |
-| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とすので、環境変数で credential helper を差し替えても効かない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
+| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とすので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tools/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |
 

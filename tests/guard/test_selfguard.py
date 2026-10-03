@@ -4,8 +4,8 @@
 payload で控えを取らせ、設定ファイルを壊してから実行後の payload を渡し、
 ファイルが実際にどうなったかを読む。
 
-ここで確かめたいのは 1 つに尽きる。ルールファイルを壊す道と、壊れたことに
-気づく道が、同じファイルに乗っていないこと。ルール由来の保護は、ルールを
+ここで確かめたいのは 1 つに尽きる。ルールファイルを壊す経路と、壊れたことに
+気づく経路が、同じファイルに依存していないこと。ルール由来の保護は、ルールを
 空にされると保護領域ごと消える。この仕組みはそこを埋めるために在る。
 """
 
@@ -18,8 +18,9 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest import mock
 
-from ccnavi import platformtag, selfguard, settings, shellread
+from ccnavi import platformtag, rules, selfguard, settings, shellread
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -189,7 +190,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ルールを空にされても保護は消えない(self):
         # ルール由来の保護は、保護領域をルールファイルから導く。deny を空に
-        # されるとその一覧ごと消えるので、実行後の監視は何も検知しない。
+        # されるとその一覧ごと消えるので、実行後チェックは何も検知しない。
         # この仕組みはルールを読まずに対象を決めるので、そこで止まらない。
         self.run_hook("PreToolUse")
         write(self.rules, json.dumps({"version": 1, "deny": [], "ask": [], "allow": []}))
@@ -270,7 +271,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ワークツリーの中の設定ファイルも戻る(self):
         # その場では誰も読まないファイルだが、統合すれば main の hook の
-        # 登録になる。止める側も気づく側も無い道なので、ここで戻す。
+        # 登録になる。止める側も気づく側も無い経路なので、ここで戻す。
         work = self.worktree()
         copy = self.copy_in(work, "settings.json")
         self.run_hook("PreToolUse")
@@ -368,7 +369,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_root_の外を指すルールファイルにはワークツリー側が無い(self):
         # 置き場がワークスペースルートの外にあるなら、ワークツリーの中に対応する
-        # ワークツリー側には無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
+        # ワークツリー側には無い。無い場所を守りに行っても、報告に役に立たない 1 行が増えるだけ。
         self.worktree()
         outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")
 
@@ -422,7 +423,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_設定ファイルを読むだけなら通る(self):
         # 場所の名前が出たかどうかでは止めない。ここは読むほうが普通の場所で、
-        # 名前で止めると、いちばんガードを直したいときにいちばん強く効く。
+        # 名前で止めると、いちばんガードを直したいときにいちばん強く止まる。
         result = self.run_hook("PreToolUse", command="cat .ccnavi/common/rules.yml")
 
         self.assertNotIn("deny", result.stdout)
@@ -492,15 +493,15 @@ class SelfGuardTest(unittest.TestCase):
         self.assertNotIn("builtin-guard-records", result.stdout)
 
     def test_git_ラッパースクリプトの記録は止めない(self):
-        # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
+        # 消しても判定に影響しない。logs/ を丸ごと守ると片付けまで止まる。
         result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
     # 引用に空白を含む形（wip/design/shellread-sep.md 3）。shellread が語の中の
     # 切れ目をコマンドの区切りと別の目印で渡すようになると、`[^\x00]*` が引用の
-    # 空白をまたいで行き先まで届く。止める側はそれで穴が塞がり、リダイレクトの
-    # 行き先の式は語の中の目印を食わないように直す。
+    # 空白をまたいで行き先まで届く。止める側はそれで穴が無くなり、リダイレクトの
+    # 行き先の式は語の中の目印まで一致しないように直す。
 
     def rules_in_shell(self):
         """シェルに書く綴りのルールファイル。引用の外に置くので区切りは `/`。"""
@@ -508,7 +509,7 @@ class SelfGuardTest(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_引用の中に書いたリダイレクトの行き先は書き込みではない(self):
-        # `> 場所` が引用の中にある。grep の引数であって、書き込み先を連れてこない。
+        # `> 場所` が引用の中にある。grep の引数であって、書き込み先にはならない。
         # 語の中の目印がリダイレクトの行き先として読まれると、ここが止まる。
         result = self.run_hook("PreToolUse", command=f'grep -n "> {self.rules_in_shell()}" f')
 
@@ -572,7 +573,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_セッション開始を通らなければ実行ファイルは黙って通る(self):
         # 控えが無い状態。セッション開始のイベントに登録していないか、
-        # 実行ファイルを指していない設定がこれで、事件ではない。
+        # 実行ファイルを指していない設定がこれで、異常ではない。
         path = self.binary()
         write(path, "MZ replaced\n")
 
@@ -590,7 +591,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_拡張子を書かない綴りでも実行ファイルに当たる(self):
         # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
-        # だけ `.exe` を付けるので、設定に書いた綴りと在るファイルの綴りがずれる。
+        # だけ `.exe` を付けるので、設定に書いた綴りと在るファイルの綴りが食い違う。
         # 書いた側を直させるのではなく、在るほうを選ぶ。
         path = self.binary()
         spelled = os.path.join(self.repo, "dist", "ccnavi", "ccnavi")
@@ -650,7 +651,7 @@ class SelfGuardTest(unittest.TestCase):
         # 先に名指しされるのはそちら。ccnavi ディレクトリの名前は動かせない（置き場は固定）ので、
         # 残った実行ファイル由来の守りが止めていることは、`.ccnavi/` の外に置いた
         # 振り分け（`tools/`）で確かめる（REQ-SLF-07 を ccnavi ディレクトリの守りに
-        # 寄りかからせない）。
+        # 頼らせない）。
         spelled, _, exe = self.scripts_layout()
         bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
 
@@ -749,7 +750,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_セッション開始では設定ファイルも控える(self):
         # 実行前の控えが始まるのは最初のツール呼び出しから。それより前に
-        # 設定ファイルを消されると、控えを持たないまま実行後の監視に入る。
+        # 設定ファイルを消されると、控えを持たないまま実行後チェックに入る。
         self.run_hook("SessionStart")
 
         saved = os.path.join(self.state, "selfguard", "s1", "rules")
@@ -776,7 +777,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_動いているセッションの控えは巻き添えにしない(self):
         # 実行前の控えは呼び出しのたびに書き直される。日付で切るのは
-        # そこに乗るため。並行しているセッションの戻す先を消さない。
+        # それを前提にするため。並行しているセッションの戻す先を消さない。
         self.run_hook("PreToolUse", session="other")
 
         self.run_hook("SessionStart", session="s1")
@@ -856,6 +857,42 @@ class SelfGuardTest(unittest.TestCase):
         line = self.records()[-1]
         self.assertIn("guarded", line)
         self.assertIn("rules:restored", line["guarded"])
+
+
+class InsertTest(unittest.TestCase):
+    """組み込みの守りを組み立てられないときの扱い。"""
+
+    BROKEN = {
+        "id": selfguard.RECORDS_RULE_ID,
+        "match": "Write|Edit|NotebookEdit",
+        "regex": "(",
+        "message": selfguard.RECORDS_MESSAGE,
+    }
+
+    def test_組み立てられない守りは判定を止めずに外し診断ログに残す(self):
+        for root, expected in (("/ws", "/ws"), ("", None)):
+            with self.subTest(root=root):
+                rule_set = rules.RuleSet(version=rules.VERSION)
+                with mock.patch.object(selfguard.diaglog, "get") as get:
+                    selfguard._insert(rule_set, dict(self.BROKEN), root)
+                self.assertEqual(rule_set.deny, [])
+                # root が無ければ省いた扱い（CLAUDE_PROJECT_DIR）。出どころは実行ファイルと同じ。
+                get.assert_called_once_with("ccnavi", expected)
+                warned = get.return_value.warn
+                warned.assert_called_once()
+                fields = warned.call_args.kwargs
+                self.assertEqual(fields["rule"], selfguard.RECORDS_RULE_ID)
+                self.assertGreaterEqual(fields["problems"], 1)
+                # 綴り（守る先のパス）は渡さない。
+                self.assertEqual(set(fields), {"rule", "problems"})
+
+    def test_組み立てられる守りは先頭に挿し診断ログに書かない(self):
+        rule_set = rules.RuleSet(version=rules.VERSION)
+        good = dict(self.BROKEN, regex="x$")
+        with mock.patch.object(selfguard.diaglog, "get") as get:
+            selfguard._insert(rule_set, good, "/ws")
+        self.assertEqual([r.id for r in rule_set.deny], [selfguard.RECORDS_RULE_ID])
+        get.assert_not_called()
 
 
 if __name__ == "__main__":

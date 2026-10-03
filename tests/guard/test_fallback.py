@@ -21,7 +21,7 @@ BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 def run(root, payload, log="", env=None):
     """道具を 1 回動かす。ワークスペースルートを呼び出しごとに変えられる。
 
-    ルールは `--rules` では渡さない。あれは診断でだけ効き、hook の判定には
+    ルールは `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には
     届かない（ADR-0067）。読めないルールは `--root` の下の共通層に置く。
 
     コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
@@ -80,12 +80,12 @@ class FallbackTest(unittest.TestCase):
         self.without_rules = empty.name
 
     def test_壊れたルールでもセッションは死なない(self):
-        # ここが要件の核。拒否にすると、壊れたファイルを直すための呼び出しまで
+        # ここが要件の中心。拒否にすると、壊れたファイルを直すための呼び出しまで
         # 止まって回復できなくなる。既定モードが block なので、ルールを置く前に
-        # hook を登録しただけでセッションが死ぬ。
+        # hook を登録しただけでセッションが何もできなくなる。
         #
         # 既定にはプロジェクトの allow が無いので、無害な呼び出しも権限モードへの委譲に
-        # なる。人が答えれば進むので、道は塞がっていない。塞がるのは deny だけ。
+        # なる。人が答えれば進むので、先へ進む方法は残っている。進めなくなるのは deny だけ。
         for root, why in ((self.root, "broken"), (self.without_rules, "missing")):
             with self.subTest(rules=why):
                 result = run(root, pre_tool_use("Bash", "command", "cat README.md"))
@@ -97,7 +97,7 @@ class FallbackTest(unittest.TestCase):
                 )
 
     def test_既定に戻ったことは呼び出しごとに伝える(self):
-        # 黙って既定に戻ると、ガードが立っているように見えて実際は何も見ていない
+        # 何も言わずに既定に戻ると、ガードが働いているように見えて実際は何も見ていない
         # 状態が続く。止まっているより悪い。止まっていれば誰かが気づく。
         out = out_of(self, run(self.root, pre_tool_use("Bash", "command", "cat README.md")))
         said = out.get("permissionDecisionReason", "") + out.get("additionalContext", "")
@@ -113,7 +113,7 @@ class FallbackTest(unittest.TestCase):
         self.assertNotIn("permissionDecision", out_of(self, result))
 
     def test_既定でも取り返しの付かない操作は止まる(self):
-        # 戻った先が素通しでは、壊すだけでガードを外せることになる。
+        # 戻った先が何でも通す設定では、壊すだけでガードを外せることになる。
         for command in ["rm -rf /tmp/x", "git push origin main", "git reset --hard HEAD~1"]:
             with self.subTest(command=command):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
@@ -121,7 +121,7 @@ class FallbackTest(unittest.TestCase):
 
     def test_既定は設定の修復を妨げない(self):
         # REQ-PRE-06 が「読み取りと設定自身の修復を妨げない」と書いている意味。
-        # ここを止めると直す道が 1 本も残らない。
+        # ここを止めると直す方法が 1 つも残らない。
         #
         # Write / Edit は Claude Code の権限モードに従う。妨げてはいないが、ガードが落ちている
         # あいだにガードの設定を書き換える操作なので、人が 1 度見る側に置く。
@@ -135,7 +135,7 @@ class FallbackTest(unittest.TestCase):
                 )
 
     def test_既定はシェルから設定を書き換えさせない(self):
-        # 上と対になっている。ここを開けると、シェルでルールを壊し、壊れた結果
+        # 上と対になっている。ここを通すと、シェルでルールを壊し、壊れた結果
         # 緩んだ既定に戻る、という順路ができる。壊す側と直す側で経路を分ける。
         out = out_of(
             self,
@@ -143,7 +143,7 @@ class FallbackTest(unittest.TestCase):
         )
 
         self.assertEqual(out.get("permissionDecision"), "deny")
-        # 止めた先に道が無いと、拒否は行き止まりになる。
+        # 止めた先に別の方法が無いと、拒否されたまま進めなくなる。
         self.assertIn("Write", out["permissionDecisionReason"])
 
     def test_既定でもシェルからの書き込みは綴りを変えても止まる(self):
@@ -154,7 +154,7 @@ class FallbackTest(unittest.TestCase):
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
             # `cd` で入ってから書く形（issue #61、ADR-0069）。行き先の綴りから場所の
-            # 名前が消えるので、移った先から見た綴りにも当てないと素通りする。
+            # 名前が消えるので、移った先から見た綴りにも当てないと止められずに通る。
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",

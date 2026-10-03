@@ -44,7 +44,7 @@ test("CB-T239 共通層のファイルが無いときは雛形を作らせず、
     assert.match(common.one("#phases .empty").textContent, /種類はワークスペースかプロジェクトの設定に置いてください/);
     assert.equal(common.all(".banner.warn:not(#changed)").length, 0);
     // 自身の層を開くボタンは、拡張ホストへ openSelf だけを送る（ファイルは作らない）
-    assert.equal(common.one('button[data-action="open-self"]').textContent, "自身の層を開く");
+    assert.equal(common.one('button[data-action="open-self"]').textContent, "ワークスペースの設定を開く");
     common.click(common.one('button[data-action="open-self"]'));
     await common.settle();
     assert.deepEqual(

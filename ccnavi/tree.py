@@ -20,9 +20,9 @@
 ## 最長一致
 
 ワークツリーはワークスペースルートの中にあるので、短い側（ワークスペースルート）に
-先に畳むと、`.claude/worktrees/x/src/a` がワークスペースルートの
+先に割り当てると、`.claude/worktrees/x/src/a` がワークスペースルートの
 `.claude/worktrees/x/src/a` として判定され、
-x のチケットが効かなくなる。候補のうち最も長く一致したものを採る。
+x のチケットが判定に使われなくなる。候補のうち最も長く一致したものを採る。
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
 
     元リポジトリはワークスペースでもプロジェクトでもよい。
 
-    読むのはファイルシステムだけで、git は起こさない。実行前の判定の中で
+    読むのはファイルシステムだけで、git は起こさない。実行前チェックの中で
     呼ばれるので、外部プロセスを起こす場所にはできない。
     """
     base = os.path.join(root, WORKTREES_DIR)

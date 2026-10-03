@@ -19,7 +19,7 @@ function notices(f: PhasesForm, layer = false): readonly string[] {
 
 test("CB-T212 注意は当てはまるときだけ。sequential の after は、線にならない（ほかの層を指す）ものでも言う", () => {
   assert.deepEqual(notices({ order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] }), []);
-  // 行き先がこのファイルに無い after だけでも、sequential では効かないと言う
+  // 行き先がこのファイルに無い after だけでも、sequential では判定に使われないと言う
   const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外の層の種類"] })] }, true);
   assert.ok(seq.some((line) => /sequential なので、after は判定に効きません/.test(line)));
   assert.ok(seq.some((line) => /共通の設定の種類を指しているならそのままで構いません/.test(line)));

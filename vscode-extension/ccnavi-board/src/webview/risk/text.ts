@@ -45,7 +45,7 @@ export function describe(factor: FactorForm): readonly Part[] {
     case "glob":
       return [code(value), dim(` に当てはまるファイルを 1 つ変更するごとに加点${factor.max === "" ? "" : `（上限 ${factor.max} 点）`}`)];
     case "script":
-      return [dim("スクリプト "), code(value), dim(` が返した点を加点（点を取れなかったときは ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
+      return [dim("スクリプト "), code(value), dim(` が返した点を加点（点を読み取れなかったときは ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
     case "judge":
       return [dim("質問「"), code(value), dim("」の答えが yes なら加点")];
   }

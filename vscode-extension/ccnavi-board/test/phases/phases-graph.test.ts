@@ -4,7 +4,7 @@
  * 見るところは 4 つ。**線に向きが無いこと**（`requires` は一緒に置く条件で、順序ではない）、
  * **判定をしないこと**（循環も到達不能も見つけない。ADR-0035）、**置き場所が id だけで
  * 決まること**（保存のたびに中身が届き直すので、関係を直して絵が飛ぶと使いものにならない）、
- * そして**線が黙って消えないこと**（id にハイフンが使えるので、名前の作り方を誤ると潰れる）。
+ * そして**線が気づかないうちに消えないこと**（id にハイフンが使えるので、名前の作り方を誤ると別の線と同じ名前になる）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -55,7 +55,7 @@ test("CB-T186 図は判定をしない（循環も、行き先の無い参照も
   // 図の形に「循環」「不正」を名指しする欄は無い
   assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 
-  // このファイルに無い種類への参照は、黙って線にならない（綴り違いか他の層かは、画面は言わない）
+  // このファイルに無い種類への参照は、何も言わずに線にしない（綴り違いか他の層かは、画面は言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["外の種類"] }))), []);
   // 自分自身への参照も線にしない（--lint が警告する。画面は何も言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["a"], overlap: ["a"] }))), []);
@@ -104,7 +104,7 @@ test("CB-T189 点は id・題・区分・レビューを持ち、前後の空白
 
 test("CB-T190b id にハイフンが入っていても、線が別の線に潰されない", () => {
   // id はハイフンを含められる（phasetypes.py の _ID は [A-Za-z0-9._-]）。線の名前を
-  // `関係:a--b` と繋げると、この 2 組が同じ文字列になり、片方が黙って消える
+  // `関係:a--b` と繋げると、この 2 組が同じ文字列になり、片方が気づかないうちに消える
   const graph = graphOf(form(phase("x", { requires: ["y--z"] }), phase("y--z"), phase("x--y", { requires: ["z"] }), phase("z")));
   assert.equal(graph.edges.length, 2, "ハイフンを含む id で線が消えている");
   assert.deepEqual(
@@ -155,7 +155,7 @@ test("CB-T196 dag なら after の深さで列を分け、sequential なら id �
   assert.equal(dag.acceptance, "210,0");
   assert.equal(dag.implement, "210,120");
   assert.equal(dag.docs, "420,0");
-  // sequential は after を置き場所に使わない（判定にも効かない）
+  // sequential は after を置き場所に使わない（判定にも使われない）
   assert.deepEqual(spots(form(...phases)), spots(form(...phases.map((p) => ({ ...p, after: [] })))));
   // requires / overlap を足しても dag の列は変わらない
   const linked = phases.map((p) => (p.id === "docs" ? { ...p, requires: ["design"], overlap: ["design"] } : p));

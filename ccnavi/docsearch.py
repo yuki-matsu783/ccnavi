@@ -1,6 +1,6 @@
 """md の frontmatter の索引を組み、それを引く（`ccnavi --docs`）。
 
-ドキュメントを探すエージェントは、ふだん grep や Glob で本文を舐める。当たるのは行で、
+ドキュメントを探すエージェントは、ふだん grep や Glob で本文を端から探す。当たるのは行で、
 そのファイルが何の文書かは開くまで分からず、よそからの言及も同じ重みで混ざる。
 頭の frontmatter（`type` `title` `description` `tags` `keywords`）を索引にしておけば、
 「何の文書か」で引ける。形は参考にした運用（`参考/MR-driven-workflow` の
@@ -28,7 +28,7 @@
   （git に無視されることを確かめてから）に作る
 - 期限（SessionStart）を過ぎたら md を読むのをやめるが、どのディレクトリも読めた分までは書く
 - **書くのは、git がそこの `index.jsonl` を無視しているときだけ。** 作業ツリーに追跡されて
-  いないファイルを撒くと、`git status`・実行後の監視・`worktree remove` のどれにも出る。
+  いないファイルを置くと、`git status`・実行後チェック・`worktree remove` のどれにも出る。
   md を持つディレクトリのどれでも無視されていないツリーは、索引の対象外にして引かない
   （案内と標準エラーで名指しする。`.gitignore` は書き換えない）。一部のディレクトリだけが
   無視されていないなら（追跡されている index.jsonl など）、そこは書かずに行だけを組む
@@ -100,7 +100,8 @@ ROOT_DIRECTORY = "."
 
 SORTS = ("path", "mtime", "type", "title")
 FORMATS = ("table", "path", "detail", "json", "jsonl", "count")
-# `--since` / `--until` に受ける形と、その形の読み方。綴りを誤った値が黙って 0 件になるのを避ける。
+# `--since` / `--until` に受ける形と、その形の読み方。綴りを誤った値が気づかないうちに
+# 0 件になるのを避ける。
 _WHEN_FORMATS = {
     10: "%Y-%m-%d",
     13: "%Y-%m-%dT%H",
@@ -819,7 +820,10 @@ def collect(
     deadline: float | None = None,
     parse: bool = True,
 ) -> Collected:
-    """ワークスペースとプロジェクトの索引を新しくして集める。`.git` の無いツリーは黙って飛ばす。"""
+    """ワークスペースとプロジェクトの索引を新しくして集める。
+
+    `.git` の無いツリーは何も出さずに飛ばす。
+    """
     result = Collected()
     seen: set[str] = set()
     for place in places(conf, root):
@@ -892,13 +896,13 @@ def problems_of(query: Query) -> list[str]:
     """使い方の誤り。空なら引ける。"""
     found = []
     if query.sort not in SORTS:
-        found.append(f"--sort は {' / '.join(SORTS)} のどれか（{query.sort!r} は読めない）")
+        found.append(f"--sort は {' / '.join(SORTS)} のどれか（{query.sort!r} は使えない）")
     if query.format not in FORMATS:
-        found.append(f"--format は {' / '.join(FORMATS)} のどれか（{query.format!r} は読めない）")
+        found.append(f"--format は {' / '.join(FORMATS)} のどれか（{query.format!r} は使えない）")
     for flag, value in (("--since", query.since), ("--until", query.until)):
         if value and not _valid_when(value):
             found.append(
-                f"{flag} は在る日時を YYYY-MM-DD[THH[:MM[:SS]]] で書く（{value!r} は読めない）"
+                f"{flag} には日時を YYYY-MM-DD[THH[:MM[:SS]]] の形で書く（{value!r} は読めない）"
             )
     return found
 
@@ -1027,7 +1031,7 @@ def _pad(text: str, width: int) -> str:
 
 
 def _one_line(text: str) -> str:
-    """表と詳しい形に出す値を 1 行に畳む（改行で行が割れないように）。"""
+    """表と詳しい形に出す値を 1 行にまとめる（改行で行が分かれないように）。"""
     return " ".join(text.split()) if ("\n" in text or "\r" in text) else text
 
 
@@ -1079,7 +1083,7 @@ def render(out: TextIO, hits: list[dict], matched: int, total: int, fmt: str) ->
 
 # SessionStart で索引を新しくするのに使ってよい時間（秒）の上限。実際には hook の判定の
 # 期限（events.decide が持つ deadline）の残りと小さいほう。過ぎたら残りは次の回に回す。
-# 使い回しが効いていれば数百本の md でも 1 秒に届かない。初めての大きなプロジェクトだけが
+# 使い回せていれば数百本の md でも 1 秒に届かない。初めての大きなプロジェクトだけが
 # ここに当たり、書けたディレクトリの分は次のセッションで使い回される。
 START_SECONDS = 3.0
 # 残りがこれに満たなければ新しくしない（既存の index.jsonl だけで案内する）。
@@ -1137,8 +1141,8 @@ def at_start(conf: settings.Settings, root: str, deadline: float | None = None) 
     使う時間は START_SECONDS と、渡された期限（hook の判定の期限）の残りの小さいほう。
     残りが MIN_REFRESH_SECONDS に満たない（期限が既に切れているときも）なら新しくせず、
     md を読まず書かずに既存の index.jsonl の行だけを集めて案内する（git には STALE_SECONDS
-    だけ与える）。何が起きても開始は止めない。md が 1 本も無い・何かが壊れたときは黙る
-    （空を返す）。索引の対象外にしたツリーと、触らなかった index.jsonl があれば短く添える。
+    だけ与える）。何が起きても開始は止めない。md が 1 本も無い・何かが壊れたときは何も出さない
+    （空を返す）。索引の対象外にしたツリーと、触らなかった index.jsonl があれば短くつける。
     git への問い合わせに失敗したツリーは何も言わない（対象外と取り違えさせない）。
     """
     try:
@@ -1190,14 +1194,15 @@ def notice(conf: settings.Settings, root: str, found: Collected) -> str:
     command = _command(conf, root)
     lines = [
         f"[ccnavi] ドキュメント（*.md）を探すときは、grep・Glob より先に '{command} --docs' で"
-        " frontmatter の索引を引く（ワークスペースとプロジェクトを横断。パスはワークスペースルート"
-        "から）。grep は本文中の文字列を探すときか、0 件だったときに使う。",
+        " frontmatter の索引を引いてください（ワークスペースとプロジェクトを横断。パスは"
+        "ワークスペースルートから）。grep は本文中の文字列を探すときか、0 件だったときに"
+        "使ってください。",
         "  絞り込み: --type / --tag / --keyword <値>（完全一致）、--path <部分>（パス）、"
         "--text <部分>（パス・更新日時・frontmatter の値）、--since / --until <YYYY-MM-DD>。"
         "同じものの繰り返しは OR、違うものどうしは AND。大文字小文字は区別しない",
         "  並べ方と形: --sort path|mtime|type|title、-r（逆順）、--limit <N>、"
         "--format table|path|detail|json|jsonl|count",
-        "  md を書くときは頭に frontmatter を付ける。type は必須、title・description・"
+        "  md を書くときは頭に frontmatter を付けてください。type は必須、title・description・"
         "tags（kebab-case で 2〜4 個）・keywords は推奨。",
     ]
     if os.path.isfile(os.path.join(root, *CONVENTION_DOC.split("/"))):

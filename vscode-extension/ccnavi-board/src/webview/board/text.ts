@@ -57,6 +57,11 @@ export function worktreeName(path: string): string {
 
 /** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …` */
 export function phaseStatusFull(p: PhaseChip): string {
+  return phaseStatusFullItems(p).join(" · ");
+}
+
+/** 全文の項目の並び。画面は項目ごとに区切って、項目の途中では折り返さない */
+export function phaseStatusFullItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push(holdLabel(p));
@@ -70,7 +75,7 @@ export function phaseStatusFull(p: PhaseChip): string {
   if (p.riskLine !== "") {
     notes.push(p.riskLine);
   }
-  return [PHASE_STATE_LABELS[p.state], ...notes].join(" · ");
+  return [PHASE_STATE_LABELS[p.state], ...notes];
 }
 
 /**
@@ -78,6 +83,11 @@ export function phaseStatusFull(p: PhaseChip): string {
  * 止めている間は段の名前を 1 つだけ出す。
  */
 export function phaseStatusBrief(p: PhaseChip): string {
+  return phaseStatusBriefItems(p).join(" · ");
+}
+
+/** 要約の項目の並び。無ければ空 */
+export function phaseStatusBriefItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push(holdLabel(p));
@@ -85,12 +95,12 @@ export function phaseStatusBrief(p: PhaseChip): string {
   if (isHighRisk(p.riskLevel)) {
     notes.push(`リスク ${p.riskLevel}`);
   }
-  return notes.join(" · ");
+  return notes;
 }
 
-/** マージリクエストのバッジの文字。番号が読めなければ「MR」だけ */
+/** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
 export function mrText(number: number | null): string {
-  return number === null ? "MR" : `MR #${number}`;
+  return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
 }
 
 /** 依頼のマーカーが持つ URL は中身を確かめずに写してあるので、http(s) のときだけリンクにする */
@@ -102,8 +112,8 @@ export function isHttpUrl(url: string): boolean {
  * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ綴り
  * （`ccnavi/approval.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
- * **畳むのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
- * 向こうの文面が変わったときに、本文の中身が黙って隠れるより、畳まれないほうが軽いため
+ * **まとめるのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
+ * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
  * （「エージェントが書いた理由」の本文を隠してはいけない）。
  */
 const EXPLAINED_HEADS = new Set([
@@ -114,18 +124,18 @@ const EXPLAINED_HEADS = new Set([
   "■ 判定に効かない記述",
 ]);
 
-const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 依存している他チケット: "];
+const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 先行: "];
 
-/** 承認画面の本文の 1 行と、その行に畳んだ説明 */
+/** 承認画面の本文の 1 行と、その行にまとめた説明 */
 export interface BodyLine {
   readonly line: string;
-  /** 見出しに畳んだ説明。畳んでいなければ空 */
+  /** 見出しにまとめた説明。まとめていなければ空 */
   readonly note: string;
 }
 
 /**
- * 本文を行に切り、説明の付く見出しには次の行を畳んで返す。端末には両方の行がそのまま出るが、
- * 画面では説明を見出しのツールチップに寄せて、本文を短く保つ。
+ * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。端末には両方の行がそのまま出るが、
+ * 画面では説明を見出しのツールチップにまとめて、本文を短く保つ。
  */
 export function approvalBody(text: string): BodyLine[] {
   const lines = text.split("\n");
@@ -215,21 +225,27 @@ export function historyAt(at: string): string {
 
 /**
  * 先行を満たしていないカードのバッジ（ADR-0088）。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
- * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す
+ * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
+ * `lead` と `ids` は `text` を分けたもので、画面が識別子の途中で折り返さないために使う
  */
-export function predecessorsBadge(card: Card): { readonly text: string; readonly title: string } {
-  const ids = card.predecessorsUnmet.map((p) => p.ticket).join(", ");
+export function predecessorsBadge(card: Card): { readonly text: string; readonly lead: string; readonly ids: readonly string[]; readonly title: string } {
+  const list = card.predecessorsUnmet.map((p) => p.ticket);
+  const ids = list.join(", ");
   const detail = card.predecessorsUnmet.map((p) => `${p.ticket}: ${p.label}`).join("\n");
   const started = card.startedAt !== "" || card.copyStatus === "review";
   if (started) {
     return {
       text: `先行が未完了（${ids}）`,
-      title: `着手済みです。先行が done/ に無いか取り消し済みで、満たしていません（作業と finish は止まりません）\n${detail}`,
+      lead: "先行が未完了",
+      ids: list,
+      title: `着手済みです。先行が done/ に無いか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";
   return {
     text: `先行待ち（${ids}）`,
-    title: `先行が done/ に入る（取り消しでない）まで、${what}止まります\n${detail}`,
+    lead: "先行待ち",
+    ids: list,
+    title: `先行が取り消されずに done/ に入るまで、${what}止まります\n${detail}`,
   };
 }

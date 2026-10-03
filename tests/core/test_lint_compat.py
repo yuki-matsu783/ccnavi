@@ -81,7 +81,7 @@ class LintShCompatTest(unittest.TestCase):
         write(os.path.join(self.root, "ccnavi", "__main__.py"), "")
         said = self.said()
         self.assertEqual(len(said), 1, said)
-        self.assertIn("build.py を回して組み立て直す", said[0]["detail"])
+        self.assertIn("build.py を実行して組み立て直して", said[0]["detail"])
         self.assertNotIn("ccnavi-setup.sh", said[0]["detail"])
 
     def test_v25_this_repository_is_in_step(self):

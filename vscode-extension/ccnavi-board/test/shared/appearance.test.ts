@@ -39,7 +39,7 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
   assert.equal(bodyTag("vscode"), "<body>");
   assert.equal(bodyTag("claude-light"), '<body class="ccnavi-claude-light">');
   assert.equal(appearanceClass("claude-dark"), "ccnavi-claude-dark");
-  // HC では効かせない書き方
+  // HC では当てない書き方
   assert.match(APPEARANCE_STYLE, /body\.ccnavi-claude-dark:not\(\.vscode-high-contrast\):not\(\.vscode-high-contrast-light\) \{\s*--vscode-editor-background: #262624;/);
   assert.match(APPEARANCE_STYLE, /body\.ccnavi-claude-light:not\(\.vscode-high-contrast\):not\(\.vscode-high-contrast-light\) \{\s*--vscode-editor-background: #FAF9F5;/);
   // 意味の色は両方で地に合わせて置き換える（ライトのテーマからダークを選んでも読める）
@@ -58,7 +58,7 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
   }
 });
 
-/** 段取りの下に置く Webview の代わり。何が飛んだかだけを見る */
+/** 段取りの下に置く Webview の代わり。何が送られたかだけを見る */
 function surface(visible = true): Surface & { visible: boolean; readonly pages: string[]; readonly posted: unknown[] } {
   const pages: string[] = [];
   const posted: unknown[] = [];
@@ -79,11 +79,11 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
 
-  // 1 枚も入れていない。入れ物を入れる道はまだ通っていないので送り先が無い
+  // 1 枚も入れていない。入れ物を入れる経路はまだ通っていないので送り先が無い
   assert.equal(sendAppearance(host, "claude-dark"), false);
   assert.deepEqual(spy.posted, []);
 
-  // 入れ物は入ったが、まだ組み上がっていない（受け口が無い）
+  // 入れ物は入ったが、まだ組み上がっていない（受け取る側が無い）
   host.send("あ");
   assert.equal(sendAppearance(host, "claude-dark"), false);
   assert.deepEqual(spy.posted, [], "落ちるものを送ると、送ったつもりの切り替えが残る");
@@ -106,7 +106,7 @@ test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んで
   const host = retainedHost<string>(spy, (data) => data);
 
   host.send("あ");
-  // 入れ物を入れてから組み上がるまでは受け口が無い
+  // 入れ物を入れてから組み上がるまでは受け取る側が無い
   assert.equal(sendAppearance(host, "claude-light"), false);
   host.ready();
   assert.equal(sendAppearance(host, "claude-light"), true);
@@ -128,7 +128,7 @@ test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んで
  * 退行そのもの（`followAppearance` が `webview.postMessage` を直に呼ぶ、送り直しを落とす）は
  * `src/appearance.ts` と 5 つのパネルで起きるが、**そこは `vscode` を import するので単体では
  * 動かせない**。上の 2 本（CB-T182 / CB-T182b）が見ているのは段取りの側で、配線を戻してもテストは通ったまま。
- * 名前で見るだけなので綴りを変えて呼ぶ道までは塞げないが、うっかり落とすのは止まる。
+ * 名前で見るだけなので綴りを変えて呼ぶ方法までは防げないが、うっかり落とすのは止まる。
  */
 const EXT_SRC = path.join(WEBVIEW_SRC, "..");
 
@@ -180,9 +180,9 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
  * 見た目のメッセージが、5 画面すべての契約（`To*`）に入っていること。**tsc が見る。**
  *
  * 旧いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
- * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` に寄せたときに
+ * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` にそろえたときに
  * その検査が消えた（`ScreenHost<D>.post` は `unknown` を取るので、契約から外しても通ってしまう）。
- * ここで 1 か所にまとめて縛り直す。6 画面目を足す人は、この並びに 1 行足せば同じ検査が効く。
+ * ここで 1 か所にまとめて確かめ直す。6 画面目を足す人は、この並びに 1 行足せば同じ検査が有効になる。
  */
 const APPEARANCE: AppearanceMessage = { type: "appearance", value: "claude-dark" };
 const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases] = [

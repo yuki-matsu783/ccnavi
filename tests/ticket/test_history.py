@@ -6,7 +6,7 @@
 2. マーカーの跡は親に残ること（依頼・レビュー済み・終わりの告知・開き直し）
 3. 書けなくても状態は動き、書けなかったことは警告として出ること
 4. ボードの JSON に新しい側が載ること
-5. 跡のファイルを、実行後の監視が「エージェントの書き込み」として咎めないこと
+5. 跡のファイルを、実行後チェックが「エージェントの書き込み」として咎めないこと
 
 道具は並行するチケットの受入テスト（test_ticket.TicketTest）のものを借りる。借りるだけで、
 あちらのテストはここでは走らせない（`load_tests`）。
@@ -153,7 +153,7 @@ class HistoryTest(TicketTest):
         self.assertEqual(reopened[0]["cleared"], ["skipped"])
 
     def test_a_failed_write_does_not_stop_the_move_and_warns(self):
-        """跡が書けなくても（置き場がファイルで塞がっている）、状態は動き、警告が出る。"""
+        """跡が書けなくても（置き場の位置にファイルがある）、状態は動き、警告が出る。"""
         self.family()
         events = os.path.join(self.approved, "events")
         for name in os.listdir(events):
@@ -184,7 +184,7 @@ class HistoryTest(TicketTest):
         self.assertTrue(any("i0001-01 の履歴" in p for p in board["problems"]), board["problems"])
 
     def test_the_post_monitor_does_not_report_the_history_it_wrote(self):
-        """`ticket start` が足した跡は、実行後の監視が保護領域の変更として咎めない（ADR-0075）。"""
+        """`ticket start` の跡は、実行後チェックが保護領域の変更として咎めない（ADR-0075）。"""
         self.family_without_starting()
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         after = self.hook(

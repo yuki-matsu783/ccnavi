@@ -42,7 +42,7 @@ export function screenStyle(name: string): string {
 export const WEBVIEW_SRC = path.join(__dirname, "..", "..", "..", "src", "webview");
 
 /**
- * 1 枚の HTML の `<style nonce>` の中身を、1 行に潰して返す。
+ * 1 枚の HTML の `<style nonce>` の中身を、1 行にまとめて返す。
  *
  * 束ねた CSS は esbuild が並べ直すので（1 宣言 1 行、選択子も 1 つ 1 行）、規則そのものを
  * 文字列で見たいテストは、この形（`.card { a: 1; b: 2; }`）で読む。並べ方が変わっても、
@@ -59,7 +59,7 @@ export function flatStyle(html: string): string {
 /**
  * 画面の名前。`src/webview/<名前>/main.tsx` があるものが画面で、`scripts/bundle-webview.js` と
  * `scripts/test-groups.js` が同じ見つけ方をする。**テストも表で持たない**（表にすると、
- * 画面を足したときに黙って検査から漏れる）。
+ * 画面を足したときに気づかないうちに検査から漏れる）。
  */
 export function screenNames(): string[] {
   return fs

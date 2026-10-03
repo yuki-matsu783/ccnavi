@@ -201,7 +201,7 @@ class StopRulesTest(unittest.TestCase):
         self.stop()
         reason = self.blocked(self.stop())
         self.assertTrue(reason.startswith(f"{CODE}: これはタスクの続きではない。"), reason)
-        self.assertIn("問いを最後にもう一度書く", reason)
+        self.assertIn("問いを最後にもう一度書いて", reason)
         self.assertIn("「振り返り: 無し」", reason)
         self.assertLess(reason.index("振り返り: 無し"), reason.index(NUDGE))
 
@@ -323,7 +323,7 @@ class StopRulesTest(unittest.TestCase):
         for name in ("stop-deny", "stop-ask"):
             self.assertTrue(
                 any(
-                    s.startswith("warn:") and "allow の別のルールに分けて置く" in s
+                    s.startswith("warn:") and "allow の別のルールに分けて置いて" in s
                     for s in self.said(out, name)
                 ),
                 f"{name} に warn が無い:\n{out}",

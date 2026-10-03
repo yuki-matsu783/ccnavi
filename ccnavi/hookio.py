@@ -12,8 +12,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, TextIO
 
-# イベント名。payload が自分で名乗るので、登録を間違えても黙って別の判定が
-# 走ることはない。
+# イベント名。payload に自分のイベント名が入っているので、登録を間違えても
+# 気づかないうちに別の判定が走ることはない。
 PRE_TOOL_USE = "PreToolUse"
 POST_TOOL_USE = "PostToolUse"
 SESSION_START = "SessionStart"
@@ -118,7 +118,7 @@ def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "")
     通すときは理由が要らないので何も書かない。
 
     context はルールの `additionalContext`。判定と一緒に `additionalContext` として
-    載せる。deny でも ask でも、理由と一緒にモデルへ届くことは実測で確かめた
+    載せる。deny でも ask でも、理由と一緒にモデルへ届くことは実際に確かめた
     （2026-09、Claude Code 2.1）。空なら鍵ごと出さない。
     """
     payload: dict[str, Any] = {
@@ -156,7 +156,7 @@ def write_system_message(stream: TextIO, text: str) -> None:
     `additionalContext` との違いは宛先。あちらはモデルが読み、これは
     トランスクリプトに出て人が読む。ターンの終わりに「宣言した保護領域が
     こう変わっている」と言う相手は、次の一手を打つエージェントではなく、
-    それを見ている人になる。エージェントには実行後の監視が呼び出しごとに
+    それを見ている人になる。エージェントには実行後チェックが呼び出しごとに
     返しているので、同じことを 2 度モデルへ送らない。
 
     このキーは hookSpecificOutput の中ではなく、応答の一番外に置く。
@@ -196,7 +196,7 @@ def rebind_streams() -> None:
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if stream is None:
             continue
-        # 再設定できない差し替え済みのストリームは黙って飛ばす。
+        # 再設定できない差し替え済みのストリームは何も出さずに飛ばす。
         # テストが渡してくる文字列バッファがこれにあたる。
         with contextlib.suppress(AttributeError, ValueError):
             if stream is sys.stdin:

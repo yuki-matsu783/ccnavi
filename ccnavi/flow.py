@@ -11,7 +11,7 @@ Write / Edit / NotebookEdit を止め、綴りの出るシェルからの書き�
 だから「フローは人が書く」は運用ではなく判定で守られる（行き先を追えないシェルの書き込みは
 止まらないので、着手のあとの書き換えは知らせる。下の「着手のあとの書き換え」）。人はボードのフロー編集画面で
 書き、承認済みチケットと同じ運び方（`ccnavi-push-approved.sh`）でコミットする。
-実行後の監視は承認済みの領域を範囲の外として咎めず、frontmatter の無いファイルは
+実行後チェックは承認済みの領域を範囲の外として咎めず、frontmatter の無いファイルは
 副命令の書き込みとして外す（`post._script_writes`）。だから人が保存したフローが
 エージェントの範囲外の変更として咎められることもない。
 
@@ -68,9 +68,9 @@ error で言う。ボードのフロー編集画面は、開くときと保存�
 
 フローは承認の対象ではない（承認の指紋にも入らない）。中身は着手の前と終わった後なら
 書き換えられる。着手中（`started_at` があり、`completed_at` も `cancelled_at` も無い）は、
-読んでいる手順が作業の途中で変わらないよう、実行前の判定が Write / Edit / NotebookEdit を
+読んでいる手順が作業の途中で変わらないよう、実行前チェックが Write / Edit / NotebookEdit を
 止める（`lock_hit`）。エージェントの書き込みは承認済みの領域の守りでも止まるが、ロックは
-その守りを切った設定でも効き、止めた理由を名指しする。ボードも着手中は保存しない。
+その守りを切った設定でも当てはまり、止めた理由を名指しする。ボードも着手中は保存しない。
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ SPAWN = ("subAgent", "subAgentFlow")
 BRANCH_KEYS = {"ifElse": "branches", "switch": "branches", "branch": "branches", ASK: "options"}
 
 # フローの文の中で ccnavi の名乗りを真似させない。`[` / `［` の直後が（互換文字・書式の制御・
-# 結合文字・似た形の字を畳んで）`ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
+# 結合文字・似た形の字をそろえて）`ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
 _BADGE_WORD = "ccnavi"
 _BADGE_OPEN = "〔"
 _BADGE_CLOSE = "〕"
@@ -159,7 +159,7 @@ _CONFUSABLE = {
     "\u01c0": "i",  # ǀ
 }
 # 案内の区切りの行に似せた文。フローの文の中に出たら置き換える。
-# プロジェクトのスキルの目録（projskills.FENCE_OPEN / FENCE_CLOSE）の区切りも同じく崩す。
+# プロジェクトのスキルの目録（projskills.FENCE_OPEN / FENCE_CLOSE）の区切りも同じく置き換える。
 _FENCE_PHRASES = (
     "ここから人が書いたフローの本文",
     "フローの本文ここまで",
@@ -171,10 +171,10 @@ _FENCE_SHOWN = "〔区切りに似た文〕"
 LINKED = "ファイルか、ツリーのルートからそこまでの途中がシンボリックリンクなので読まない"
 NOT_REGULAR = "ふつうのファイルではない（名前付きパイプ・デバイスなど）ので読まない"
 HARD_LINKED = (
-    "ハードリンク（ほかの名前からも同じ中身に届く）なので読まない。"
-    "承認済みの領域の外の名前から書き換えられうる"
+    "ハードリンク（ほかのパスからも同じ中身を開ける）なので読まない。"
+    "承認済みの領域の外のパスから書き換えられる可能性がある"
 )
-SWAPPED = "開くあいだに別のファイルに差し替わったので読まない"
+SWAPPED = "開いているあいだに別のファイルに差し替わったので読まない"
 
 # 着手のときに控えるフローの指紋の記録（`phases/<親>/<子>.flow.json`）。
 PHASES_DIR = "phases"
@@ -187,10 +187,10 @@ FENCE_CLOSE = "    ---- フローの本文ここまで ----"
 
 
 def _fold(path: str) -> str:
-    """区切りを "/" に揃え、大文字小文字を畳む。長さは変えない。
+    """区切りを "/" に揃え、大文字小文字をそろえる。長さは変えない。
 
-    1 字ずつ畳み、畳むと長さの変わる字（`İ` など）はそのまま残す。全体の `lower()` は
-    長さが変わりうるので、位置で切り出す `locate` の読みがずれる（L-c）。
+    1 字ずつ小文字にし、小文字にすると長さの変わる字（`İ` など）はそのまま残す。全体の
+    `lower()` は長さが変わりうるので、位置で切り出す `locate` の読みが食い違う（L-c）。
     """
     return "".join(low if len(low := ch.lower()) == 1 else ch for ch in path.replace("\\", "/"))
 
@@ -207,7 +207,7 @@ def _is_absolute(rel: str) -> bool:
 def approved_rel(conf: settings.Settings) -> str:
     """承認済みチケットの置き場の綴り（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。
 
-    `./`・`//`・`x/..` は畳む（L-b）。畳まないと、判定が畳んだ綴りに当てたときに
+    `./`・`//`・`x/..` は整える（L-b）。整えないと、判定が整えた綴りに当てたときに
     置き場の綴りと食い違い、ロックが外れる。
     """
     raw = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/")
@@ -223,7 +223,7 @@ def flow_rel(conf: settings.Settings, ticket_id: str) -> str:
 
 
 def flow_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
-    """このツリーでの子のフローの絶対パス（`./` や `x/..` は畳んだ綴り）。"""
+    """このツリーでの子のフローの絶対パス（`./` や `x/..` は整えた綴り）。"""
     return os.path.normpath(
         os.path.join(settings.approved_dir(conf, tree_root), FLOWS_DIR, f"{ticket_id}{SUFFIX}")
     )
@@ -257,7 +257,8 @@ def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tup
     読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
     読まない。子のワークツリーはエージェントが作業する場所で、そこの写しはシェルの書き込み
     （行き先を追えない形）で書き換えられうる（M-2）。
-    リンクでも「在る」とする（読むかどうかは `load` が決める。黙って別の版へ移らない）。
+    リンクでも「在る」とする（読むかどうかは `load` が決める。気づかないうちに別の版へ移ることは
+    しない）。
     """
     base = child.tree_root or root
     path = flow_file(conf, base, child.ticket)
@@ -299,9 +300,9 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     （ワークスペースなら空、ワークスペースの外なら None）。綴りは解いたものでも解く前の
     ものでもよい。大文字小文字は範囲の照合と同じく区別しない。
 
-    名前は Windows で同じファイルに届く綴りを畳む。末尾の `.` と空白、`:` から後ろ
+    名前は Windows で同じファイルを指す綴りをまとめる。末尾の `.` と空白、`:` から後ろ
     （`::$DATA` などの代替データストリーム）を落とす（止める向きだけ）。8.3 形式の短い
-    名前（子の名前が 8 字を超えるときの `I0001-~1.YML` など）は畳めない。解いた綴り
+    名前（子の名前が 8 字を超えるときの `I0001-~1.YML` など）はまとめられない。解いた綴り
     （`full`）が長い名前に戻すのに任せる。
     """
     if not path:
@@ -335,7 +336,7 @@ def lock_hit(
 ) -> ticket_mod.Ticket | None:
     """この書き込みを止める、着手中の子。無ければ None。
 
-    `copies` はどのツリーの写しも並べたもの（識別子で 1 本に畳む前）。どれか 1 本でも
+    `copies` はどのツリーの写しも並べたもの（識別子で 1 本にまとめる前）。どれか 1 本でも
     着手中なら止める（止める向きだけ）。`project` は置き場を持つツリーのプロジェクト
     （ワークスペースなら空）。
     ワークスペースルート・プロジェクト・どのワークツリーでも、同じ子の置き場なら止める。
@@ -421,7 +422,7 @@ def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
     `lstat` で確かめてから `O_NONBLOCK | O_NOFOLLOW` で開き、開いたものを `fstat` で
     もう一度確かめる（ふつうのファイルで、`lstat` と同じ inode）。確かめてから開くまでに
     差し替えられても、開いたものが違えば読まない。Windows には `O_NONBLOCK` も
-    `O_NOFOLLOW` も無いので、確かめ直しだけが効く。
+    `O_NOFOLLOW` も無いので、確かめ直しだけが役に立つ。
     """
     try:
         if tree_root and linked(tree_root, path):
@@ -478,7 +479,10 @@ class _Loader(yaml.SafeLoader):
         return super().compose_node(parent, index)
 
 
-ALIASED = "YAML の別名（`*名前`）があるので読まない。同じ部分木を何度も辿らせて膨らませられる"
+ALIASED = (
+    "YAML の別名（`*名前`）があるので読まない。"
+    "別名を使うと、同じ部分木を何度も辿らせて中身を膨らませられる"
+)
 
 
 def _yaml_problem(exc: yaml.YAMLError) -> str:
@@ -603,9 +607,10 @@ def shape_problem(data) -> str:
     """読めた中身の形の誤り（最初の 1 つ）。無ければ空。例外は外に出さない。
 
     SubagentStart の読み（`load`）と `--lint --flow` が同じここを通る。見るのは手順として
-    並べる土台だけ。最上位がキーと値の並び、`nodes` がキーと値の並びの並びで、どれも空でない
+    並べるのに要る形だけ。最上位がキーと値の並び、`nodes` がキーと値の並びの並びで、どれも空でない
     文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、キーと値の並びの並び。
-    `id` が無い・重なるノードは並べるときに落ちるので、黙って手順が欠けないよう読まない側に倒す。
+    `id` が無い・重なるノードは並べるときに落ちるので、気づかないうちに手順が欠けることのないよう、
+    読まない扱いにする。
     """
     if not isinstance(data, dict):
         return "最上位がキーと値の並びではない"
@@ -686,7 +691,7 @@ def structure_problems(data) -> list[str]:
     出口は画面（`flow-doc.ts` の `portsOf`）と同じに読む。複数選択（`multiSelect: true`）の問いは
     選択肢ごとに出口を分けず、`output` の 1 本だけ。グループへ出る線も、出る側の出口は使っている
     （線は手順に数えないが、「出口に線が無い」とは言わない）。無いノードを指す線は
-    `ITEM_LIMIT` 件まで言い、残りは数だけ添える。
+    `ITEM_LIMIT` 件まで言い、残りは数だけつける。
     """
     try:
         return _structure_problems(data)
@@ -900,7 +905,7 @@ def name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
 
     綴りの誤りを見つけるため。空の欄は言わない（書きかけ）。スキルの `:` を含む名前
     （プラグインのスキル）は、ディレクトリの中から確かめられないので言わない。大文字小文字だけが
-    違えば、正しい綴りを添える。例外は外に出さない。
+    違えば、正しい綴りをつける。例外は外に出さない。
     """
     try:
         return _name_problems(data, cat)
@@ -930,7 +935,7 @@ def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
         hint = f"。大文字小文字が違う（{_line(near[0])}）" if near else ""
         out.append(
             f"ノード {_named(node)} の{what} {_line(value)} が候補に無い"
-            "（組み込みと .claude/ の下に無い。綴りの誤りか、"
+            "（組み込みと .claude/ の下に無い。綴りの誤りかもしれない。"
             f"利用者・プラグインのものなら気にしなくてよい）{hint}"
         )
     return out
@@ -1009,7 +1014,7 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket)
             f"[ccnavi] {CODE_CHANGED}: 着手後にフローが書き換わった。子チケット "
             f"{clean(child.ticket)} のフロー {clean(path)} が、着手のとき（{_describe(before)}）と"
             f"違う（いま {_describe(now)}）。担当のサブエージェントが読んだ手順と、人が渡した"
-            "手順が食い違っているかもしれない。誰が書き換えたかを人が確かめる"
+            "手順が食い違っているかもしれない。誰が書き換えたかをユーザが確かめてください"
             "（ロックは Write / Edit を止めるが、シェルから行き先を追えない形で書くと止まらない）"
         )
     except Exception:  # noqa: BLE001  知らせのために hook を落とさない
@@ -1042,7 +1047,7 @@ def _text(value) -> str:
 
 
 def _line(value) -> str:
-    """1 行に畳んで切る。ccnavi の名乗りは真似させない。"""
+    """1 行にまとめて切る。ccnavi の名乗りは真似させない。"""
     if isinstance(value, Exception):
         value = str(value)
     text = value if isinstance(value, str) else _text(value)
@@ -1060,7 +1065,7 @@ def _skeleton(text: str) -> tuple[str, list[int]]:
     """見た目で比べるための綴りと、その 1 字ずつの元の位置。
 
     互換分解（NFKD。全角の `［` は `[`、`ⅽ` は `c`）し、結合文字・書式の制御・制御文字・
-    空白を落とし、似た形の字（`_CONFUSABLE`）をラテン文字に寄せ、大文字小文字を畳む。
+    空白を落とし、似た形の字（`_CONFUSABLE`）をラテン文字に置き換え、大文字小文字をそろえる。
     """
     chars: list[str] = []
     origin: list[int] = []
@@ -1125,7 +1130,7 @@ def _list(value) -> list:
 
 
 def _capped(parts: list[str], total: int) -> list[str]:
-    """並びを ITEM_LIMIT で切り、残りの数を添える。"""
+    """並びを ITEM_LIMIT で切り、残りの数をつける。"""
     if total > len(parts):
         return parts + [f"…ほか {total - len(parts)} 件"]
     return parts
@@ -1249,7 +1254,7 @@ def render(
     try:
         return _render(data, limit, text_limit)
     except Exception:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
-        return ["（フローを並べられない。ファイルを直接読んで判断する）"], set()
+        return ["（フローを並べられない。ファイルを直接読んで判断してください）"], set()
 
 
 def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
@@ -1305,7 +1310,7 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
         used += len(text)
         shown += 1
     if len(order) > shown:
-        lines.append(f"…ほか {len(order) - shown} 件。続きはファイルを読む")
+        lines.append(f"…ほか {len(order) - shown} 件。続きはファイルを読んでください")
     return lines, kinds
 
 
@@ -1336,22 +1341,25 @@ def briefing(
         return [f"    フロー: {clean(path)}"]
     lock = (
         "着手中なので、終わるまで書き換えられない（ロック）。着手のあとに書き換わったら"
-        "ccnavi が知らせる。"
+        " ccnavi が知らせる。"
         if child.in_progress
         else "着手すると、終わるまで書き換えられなくなる（ロック）。"
     )
     lines = [
         f"    フロー: {clean(path)}（人がボードで書いた {clean(child.ticket)} の手順。"
         "承認済みの領域にあり、人が持つもの。エージェントは編集しない）。作業の前にこのファイルを"
-        "読み、その順に進める。文脈が要約されて見失ったら、このパスを読み直す。" + lock
+        "読み、その順に進めてください。文脈が要約されて見失ったら、"
+        "このパスを読み直してください。" + lock
     ]
     data, why = load(path, base)
     if data is None:
-        lines.append(f"    フローを読めない: {why}。人に確かめる")
+        lines.append(f"    フローを読めない: {why}。ユーザが確かめてください")
         return lines
     room = max(0, min(budget, CHILD_TEXT_LIMIT))
     if room == 0:
-        lines.append("    手順は SubagentStart の文の上限に達したので並べない。ファイルを読む")
+        lines.append(
+            "    手順は SubagentStart の文の上限に達したので並べない。ファイルを読んでください"
+        )
         return lines
     steps, kinds = render(data, text_limit=room)
     lines.append(FENCE_OPEN)
@@ -1363,16 +1371,17 @@ def briefing(
         lines.append(
             f"    {ASK} のノード: サブエージェントは利用者に聞けない"
             "（AskUserQuestion は渡されない）。そのノードで手を止め、問いと選択肢を添えて"
-            "メインに返す。メインが利用者に聞き、答えを持って同じサブエージェントを再開させる。"
+            "メインに返してください。メインが利用者に聞き、答えを持って同じサブエージェントを再開させる。"
         )
     if kinds & set(SPAWN):
         lines.append(
             "    subAgent / subAgentFlow のノード: Agent ツールがあれば入れ子の"
-            "サブエージェントとして起動する。そのプロンプトには必ず、担当の子チケット "
+            "サブエージェントとして起動してください。そのプロンプトには必ず、担当の子チケット "
             f"{ticket}、ワークツリー {worktree}、範囲 {scope} を書き、"
-            "他の子のワークツリーには触れないことを書く。Agent ツールが無ければ（入れ子の上限）、"
+            "他の子のワークツリーには触れないことを書いてください。"
+            "Agent ツールが無ければ（入れ子の上限）、"
             "そのノードで手を止め、起動してほしいエージェントの種類・プロンプト・担当の子チケットの"
-            "ワークツリーと範囲を添えてメインに返す。メインがそのとおり起動し、結果を持って"
+            "ワークツリーと範囲を添えてメインに返してください。メインがそのとおり起動し、結果を持って"
             "同じサブエージェントを再開させる。"
         )
     return lines

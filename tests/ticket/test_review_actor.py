@@ -27,7 +27,7 @@ RESULT = {"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "
 class ActorHarness(CoreHarness):
     def setUp(self):
         super().setUp()
-        # 統合先の互換の印（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）
+        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）
         write(
             os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
             f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
@@ -150,7 +150,7 @@ class MovedSinceTest(ActorHarness):
         chrome = self.chrome_confirm(compare)
         local = self.confirm_as(fixture)
         self.assertEqual(local.returncode, 1)
-        # 手元の案内はワークスペースルートからの絶対パス、Chrome は仮のツリーを畳んだ相対パス
+        # 手元の案内はワークスペースルートからの絶対パス、Chrome は仮のツリーの部分を除いた相対パス
         said = local.stderr.replace(self.root + os.sep, "").splitlines()
         self.assertEqual(chrome["problems"], said)
         self.assertIn("依頼の後に親の HEAD が動いている", chrome["problems"][0])
@@ -255,7 +255,7 @@ class ReviewRuleTest(ActorHarness):
     def test_a_request_record_without_host_or_mr_is_not_matched(self):
         result = review.Result(host="github", mr=review.MergeRequest(7, "u"))
         for mark in ({"mr": 7}, {"host": "github"}, {}):
-            self.assertIn("依頼し直すこと", review.matching_problems(result, mark)[0], mark)
+            self.assertIn("依頼し直してください", review.matching_problems(result, mark)[0], mark)
         self.assertEqual(review.matching_problems(result, {"host": "github", "mr": 7}), [])
         self.assertTrue(review.matching_problems(result, {"host": "github", "mr": 8}))
 
@@ -374,7 +374,7 @@ class DecideActorTest(ActorHarness):
         fixture = self.ready()
         for extra, word in (
             (["--via=board"], "--via は decide の --actor"),
-            (["--actor=octo", "--via=chrome"], "--via は terminal か board"),
+            (["--actor=octo", "--via=chrome"], "--via に渡せるのは terminal か board"),
         ):
             with self.subTest(extra=extra):
                 done = self.decide(fixture, *extra)

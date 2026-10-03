@@ -4,11 +4,11 @@
 
 見るのは 5 つ。
 
-1. 実行前の判定。ルール（deny / ask / allow / 何も言わない）とチケット（deny / ask / allow /
+1. 実行前チェック。ルール（deny / ask / allow / 何も言わない）とチケット（deny / ask / allow /
    範囲の外 / チケットが無い）の全組み合わせで、判定・理由コード・どちらの文面か・記録の欄
-2. 実行後の監視。シェルが書いたあとに報告するか、どのコードか
+2. 実行後チェック。シェルが書いたあとに報告するか、どのコードか
 3. チケットの置き場を範囲の外から外すこと。実行前・実行後・サブエージェント終了時で同じ答え
-4. チケットが効かない場面と、ルールより先に見る点検
+4. チケットが当たらない場面と、ルールより先に見る点検
 5. 診断の出力
 
 ルールはワークツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
@@ -44,13 +44,14 @@ TICKET_ASK = "src/ask/x.py"
 TICKET_ALLOW = "src/ok/x.py"
 TICKET_OUTSIDE = "docs/x.md"
 
-# 承認画面と `--explain` が添える文面。
+# 承認画面と `--explain` がつける文面。
 APPROVAL_NOTE = (
-    "ルールの allow で開けてある場所も、この範囲の外では止まる。"
+    "ルールの allow で許可してある場所も、この範囲の外では止まる。"
     "ルールの deny はこの範囲の中でも止まる"
 )
 EXPLAIN_NOTE = (
-    "ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。範囲の外は止まる"
+    "ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より優先される。"
+    "範囲の外は止まる"
 )
 
 # ルールが何も言わない列に置くルール。Write には当たらない。
@@ -150,7 +151,7 @@ class Workspace(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0067）。
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
         self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "decisions.jsonl")
@@ -224,7 +225,7 @@ class Workspace(unittest.TestCase):
         )
 
     def write_hook(self, tree, rel, **kw):
-        """Write の実行前の判定。"""
+        """Write の実行前チェック。"""
         return self.hook(
             "PreToolUse", "Write", tree, file_path=os.path.join(tree, *rel.split("/")), **kw
         )
@@ -304,7 +305,7 @@ class Workspace(unittest.TestCase):
 
 
 class PreToolUseTable(Workspace):
-    """実行前の判定。"""
+    """実行前チェック。"""
 
     # (チケットの列の名前, 書き込み先のワークツリーを選ぶ鍵, 相対パス)
     COLUMNS = (
@@ -425,7 +426,7 @@ class PreToolUseTable(Workspace):
 
 
 class PostToolUseTable(Workspace):
-    """実行後の監視。ワークツリーでシェルが書いたあと。"""
+    """実行後チェック。ワークツリーでシェルが書いたあと。"""
 
     # (ルールのタイプ, チケットの列, 相対パスの接頭, 報告のコード。None は報告しない)
     CASES = (
@@ -558,7 +559,7 @@ class TicketPlaces(Workspace):
         self.assertNotIn("restored: ccnavi", result.stderr)
         self.assertNotIn("moved this file to", result.stderr)
         self.assertTrue(os.path.exists(full), "範囲外のファイルを動かさない")
-        # 手順だけだと「自分で消せ」としか読めない。戻さなかった理由を添える。
+        # 手順だけだと「自分で消せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
 
     def test_subagent_stop_leaves_the_proposals_alone(self):
@@ -586,12 +587,12 @@ class TicketPlacesElsewhere(TicketPlaces):
 
 
 class ScratchPlace(Workspace):
-    """下書きの置き場（`scratchpad/`）を、実行前の判定だけが範囲の外でも咎めない。
+    """下書きの置き場（`scratchpad/`）を、実行前チェックだけが範囲の外でも咎めない。
 
     外してよい根拠は「そのツリーの git が追跡しないので統合先へ乗らない」ことの 1 つだけ。
-    だから外すのは実行前の 1 か所に限り、実行後の監視とサブエージェント終了時の検査は
+    だから外すのは実行前の 1 か所に限り、実行後チェックとサブエージェント終了時チェックは
     外さない。あの 2 つの入力（`git status` と `base_sha..HEAD` の差分）に `scratchpad/` が
-    現れるのは追跡されているときだけで、それは根拠が崩れている証拠になる。
+    現れるのは追跡されているときだけで、それは根拠が成り立たない証拠になる。
 
     ルールはワークツリーを allow で開ける。
     """
@@ -628,11 +629,11 @@ class ScratchPlace(Workspace):
         self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
 
     def test_post_tool_use_reports_a_tracked_scratch_place(self):
-        """実行後の監視は下書きの置き場を外さない。
+        """実行後チェックは下書きの置き場を外さない。
 
         この土台の `.gitignore` は `scratchpad/` を無視しないので、ここに置いたものは
         追跡される。追跡されるということは、外してよい根拠（統合先へ乗らない）が
-        崩れているということなので、黙らせずに言う。追跡から外れているリポジトリでは
+        成り立たないということなので、省かずに言う。追跡から外れているリポジトリでは
         そもそも `git status` に現れないので、この報告は出ない。
         """
         result = self.after_shell(self.child, "scratchpad/draft.yml", session="s-tracked")
@@ -669,8 +670,8 @@ class ScratchPlace(Workspace):
 class Eli5Place(Workspace):
     """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない（ADR-0096）。
 
-    `scratchpad/` と違って追跡される置き場なので、実行前の判定だけでなく、実行後の監視と
-    サブエージェント終了時の検査も外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
+    `scratchpad/` と違って追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
+    サブエージェント終了時チェックも外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
     紛らわしい名前は今までどおり範囲の外として止まる。親のツリーでも子のツリーでも同じ。
 
     ルールはワークツリーを allow で開ける。
@@ -757,7 +758,7 @@ class Eli5Place(Workspace):
 
 
 class Boundaries(Workspace):
-    """チケットが効かない場面と、ルールより先に見る点検。
+    """チケットが当たらない場面と、ルールより先に見る点検。
 
     ルールはワークツリーを allow で開ける。
     """
@@ -838,7 +839,7 @@ class Boundaries(Workspace):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_child_approval_screen_gets_no_new_note(self):
-        """子の画面の「この子チケットで編集可能な範囲」には注記を添えない。注記は親の画面だけ。"""
+        """子の画面の「この子チケットで編集可能な範囲」には注記をつけない。注記は親の画面だけ。"""
         self.propose("i0001", allow=("src/*",))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.ccnavi("--approve", "--preview")

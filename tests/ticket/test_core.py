@@ -267,7 +267,7 @@ class SourcePathTest(CoreHarness):
         self.assertEqual(verify_new.stdout, verify_old.stdout)
         # 板の違いは、出所をそのまま見せる欄（copy.source_tree）だけ。ここは同じ値。
         self.assertEqual(board_new["parents"], board_old["parents"])
-        # 実行前の判定も同じ（子の範囲で書ける・範囲の外は止まる）。
+        # 実行前チェックも同じ（子の範囲で書ける・範囲の外は止まる）。
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree("i0001-01", "i0001")
         self.start_parent()
@@ -488,7 +488,7 @@ class PlanWriterTest(CoreHarness):
         snapshot = self.snapshot()
         verdict = core.judge_approval(snapshot)
         changes = core.plan(snapshot, verdict)
-        # 並べた後に行き先を塞ぐ（書く前に別の誰かが置いた形）。
+        # 並べた後で行き先にファイルを置く（書く前に別の誰かが置いた形）。
         write(os.path.join(self.approved, "flows", "i0001-01.yml"), "other\n")
         applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
@@ -683,7 +683,7 @@ class CoreChromeTest(CoreHarness):
         clock.__enter__()
         self.addCleanup(clock.__exit__, None, None, None)
         super().setUp()
-        # 統合先の互換の印（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）。
+        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）。
         write(
             os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
             f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
@@ -787,9 +787,9 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent("reviewed")
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
-        # 合流した子のワークツリーを畳む。手元の判定は全ツリーの写しを読む（控えの無い家族。
+        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む（控えの無い家族。
         # D11）ので、残すと手元だけが子のツリーの古い写しを読み、判定が読んだ中身（read_set）
-        # で作る指紋が Chrome（統合先と P だけを読む）と割れる。
+        # で作る指紋が Chrome（統合先と P だけを読む）と食い違う。
         git(
             self.root,
             "worktree",
@@ -1190,7 +1190,7 @@ class RecordWritesTest(CoreHarness):
         )
         # 素の書き込みを許す所と理由。
         allowed = {
-            # 実行後の監視が範囲の外の変更を脇へ退ける（`gitstate.restore`）。状態の操作では
+            # 実行後チェックが範囲の外の変更を脇へ退ける（`gitstate.restore`）。状態の操作では
             # なく、C1 の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }

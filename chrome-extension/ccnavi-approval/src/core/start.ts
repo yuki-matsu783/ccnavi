@@ -36,7 +36,7 @@ export async function startIssue(repo: RepoConfig, issue: number, seen: Snapshot
       branches: { ...(seen?.branches ?? {}), ...fresh.branches },
       absent: [],
     };
-    // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字を畳んだ重なりを見る（11.9.1 の 7）
+    // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る（11.9.1 の 7）
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
     const res = await py.start(deps.py, { settings: base.settings, snapshot, issue, taken: [...new Set([...taken, ...all])] });
     if (res.problems.length > 0) return { kind: "refused", message: res.problems.join("\n") };

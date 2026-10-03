@@ -14,9 +14,9 @@ button.action.small { margin-left: auto; }
 .rule-section { margin-bottom: 14px; }
 .rule-section h2 { margin: 0 0 4px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
 .section-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; font-size: .85em; font-family: var(--vscode-editor-font-family); }
-.section-name.deny { color: var(--vscode-editorError-foreground); }
-.section-name.ask { color: var(--vscode-editorWarning-foreground); }
-.section-name.allow { color: var(--vscode-charts-green); }
+.section-name.deny { color: var(--error-text); }
+.section-name.ask { color: var(--warn-text); }
+.section-name.allow { color: var(--ok-text); }
 .section-label, .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
 .rule-section.folded .list { display: none; }
 /* 絞り込み中は畳んだタイプの中も見せる（矢印も開いた向きにする） */
@@ -26,10 +26,18 @@ button.action.small { margin-left: auto; }
 .judge-form .grow { flex: 1 1 320px; }
 .judge-form .grow input { flex: 1; }
 table { border-collapse: collapse; width: 100%; font-size: .95em; }
+/* 表は入れ物の中で横へ送る。狭い画面でも表の外（ページ全体）は横に流れない */
+.table-scroll { overflow-x: auto; }
+/* 表の幅の下限。これより狭い画面では入れ物の中で横へ送る（縮めると日本語の列が 1 文字ずつ折れる） */
+.table-scroll > table { min-width: 32em; }
 th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; }
+/* 値（パス・matcher・コマンド・正規表現）はどこでも折る。折ると 1 文字幅の縦書きになるので、値の列は幅を取る */
+td code { overflow-wrap: anywhere; }
+td:has(> code) { min-width: 6em; }
 th { color: var(--vscode-descriptionForeground); font-weight: 600; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
-td.cmd { overflow-wrap: anywhere; }
-tr.ng td { color: var(--vscode-editorError-foreground); }
-tr.skipped td { color: var(--vscode-editorWarning-foreground); }
+td.cmd { min-width: 12em; }
+td.why { min-width: 10em; }
+tr.ng td { color: var(--error-text); }
+tr.skipped td { color: var(--warn-text); }
 .samples-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }

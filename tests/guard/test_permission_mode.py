@@ -98,7 +98,7 @@ class HandoverTest(unittest.TestCase):
 
 class AskTest(unittest.TestCase):
     def test_an_unknown_mode_asks(self):
-        """知らないモードは確認にする。名前が 1 つ増えても素通りにしない。"""
+        """知らないモードは確認にする。名前が 1 つ増えてもそのまま通さない。"""
         result, _ = run("someFutureMode")
         self.assertEqual("ask", decision_of(self, result))
 
@@ -154,7 +154,7 @@ class NoJudgeTest(unittest.TestCase):
 
 
 class RulesStillWinTest(unittest.TestCase):
-    """権限モードが効くのは、ルールが何も言わなかったときだけ。"""
+    """権限モードが判定に使われるのは、ルールが何も言わなかったときだけ。"""
 
     def test_deny_holds_in_every_mode(self):
         for permission_mode in ("auto", "default", "bypassPermissions", "dontAsk"):

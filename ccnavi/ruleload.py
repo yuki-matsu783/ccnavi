@@ -6,7 +6,7 @@
 
 ## 層は 3 種
 
-- 共通層: `.ccnavi/common/rules.yml`。どのツリーにも効く。置き場は固定で、env では動かない
+- 共通層: `.ccnavi/common/rules.yml`。どのツリーにも当てはまる。置き場は固定で、env では動かない
 - 自身の層: ワークスペースルートの `.ccnavi/config/rules.yml`
 - プロジェクトの層: `projects/<名前>/.ccnavi/config/rules.yml`
 
@@ -36,9 +36,9 @@ from typing import TextIO
 from . import audit, builtin, hookio, rules, settings, tree
 from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 
-# 層の名前。共通層と自身の層は固定で、プロジェクトの層はその名前を名乗る。
+# 層の名前。共通層と自身の層は固定で、プロジェクトの層はプロジェクトの名前を使う。
 # 実体は settings が持つ（phase / risk も同じ綴りが要るが、そこは ruleload を
-# import できない）。ここは読み手のための別名。予約の判断は settings に寄せてある
+# import できない）。ここは読み手のための別名。予約の判断は settings にまとめてある
 # （`settings.is_reserved_layer_name`）。
 LAYER_COMMON = settings.LAYER_COMMON
 LAYER_SELF = settings.LAYER_SELF
@@ -64,11 +64,11 @@ def load_rules(
     読めなければ組み込みの既定に戻る。「設定が読めない」は「判断できない」
     ではなく「設定が壊れている」。拒否にすると、壊れたファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
-    ファイルを置く前に hook を登録しただけでセッションが死ぬ（REQ-PRE-06）。
+    ファイルを置く前に hook を登録しただけでセッションの呼び出しが全部止まる（REQ-PRE-06）。
     既定は設定を丸ごと受け取る。守る場所の綴りは設定で動くので（builtin.rule_data）。
 
     出所は、いま当てているルールがどこから来たか。既定を使っているなら
-    読めなかったファイルではない。そのファイルを名乗ると、見に行った人が
+    読めなかったファイルではない。そのファイルを出所として出すと、見に行った人が
     当たったルールを見つけられない。
     """
     rules_path = conf.rules
@@ -95,12 +95,12 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
     予約名のプロジェクト（`projects/common/` と `projects/self/`）は数えない。
     `common:id` / `self:id` と区別が付かないので、名前を 2 つ予約するほうが、
-    接頭辞の綴りを別にするより安い（設計 11.4）。綴り違い（`projects/Self/`）も
+    接頭辞の綴りを別にするより手間が少ない（設計 11.4）。綴り違い（`projects/Self/`）も
     同じに扱う（`settings.is_reserved_layer_name`）。`--lint` が error で言う。
 
     数えないことは、そのプロジェクトが緩く扱われるという意味ではない。行き先の
     層を引く側（layer_for）も同じ予約を見て「層無し」を返すので、共通層だけで
-    判定する。片側にしか予約が掛かっていないと、数えない名前で別の層の判定を
+    判定する。片側でしか予約を見ていないと、数えない名前で別の層の判定を
     引けてしまう。
     """
     found = [
@@ -157,7 +157,7 @@ def rules_for(
 
     パスを持たないツール（Bash / PowerShell / WebFetch / Skill / Agent）は全部の和。呼び出しが
     どのプロジェクトのものかは当てない。Bash で当てる仕掛け（cwd、cd の追跡、引数の語の走査）は
-    「どのルールファイルを引くか」にしか効かず、副作用は結局実行後の監視が拾う。WebFetch・Skill・
+    「どのルールファイルを引くか」にしか影響せず、副作用は結局実行後チェックが拾う。WebFetch・Skill・
     Agent は当てる材料を持たない。和なら deny と ask は増える側になり、緩むのは allow の共有だけに
     なる（REQ-MLT-05）。読めない層は和から外し、外したことを記録に残す（REQ-MLT-06）。
     """
@@ -168,7 +168,7 @@ def rules_for(
     rule_set, source = load_rules(stderr, conf, record, root)
     if record.fallback == builtin.FALLBACK:
         # 共通層が壊れている。層は足さない。壊れた共通層の上に層を足しても、
-        # 何が効いているのかを人が読めない。
+        # 何が判定に使われているのかを人が読めない。
         return rule_set, source, target
 
     if payload.tool_name in PATH_TOOLS:
@@ -218,7 +218,7 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
     みなして後ろを捨てる（info）。見本を写して始めたプロジェクトが共通層と同じ行を
     持つのは普通の形で、それを衝突と呼ぶと本当の衝突が埋もれる。
 
-    中身が違えば両方効かせる（warn）。rules は足すだけの設定なので、`deny` と `ask` は
+    中身が違えば両方判定に使う（warn）。rules は足すだけの設定なので、`deny` と `ask` は
     増えるほうになる。`allow` は広がる側だが、書き込み系では行き先の 1 層にしか
     足さないので、広がる範囲はそのツリーの中に閉じる。
     """
@@ -254,7 +254,7 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
 
 @dataclass
 class LayerView:
-    """診断が見る層 1 つ。判定に効いているものと、効かなかった理由。"""
+    """診断が見る層 1 つ。判定に使われているものと、使われなかった理由。"""
 
     name: str
     path: str
@@ -271,10 +271,10 @@ class LayerView:
 def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView]:
     """共通層と各層を、判定と同じ順・同じ読み方で読む。診断（`--explain` / `--lint`）用。
 
-    返すのは層ごとの「実際に効いているルール」。重複で捨てた定義は入らないので、
+    返すのは層ごとの「実際に判定に使われているルール」。重複で捨てた定義は入らないので、
     ここを並べたものが、Bash の和に入っているものと一致する。判定の側は
     `rules_for` を通る。読み方を 2 つ持たないために、重ね方はどちらも
-    `merge_rules` の 1 本に寄せてある。
+    `merge_rules` の 1 本にまとめてある。
     """
     record = audit.Record()
     common, _ = load_rules(stderr, conf, record, root)
@@ -317,14 +317,14 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     自身の層とプロジェクトの層は 3 本とも返す。差し替え（`--project-rules-file`）は
     見ない。あれは診断のためのもので、守る対象は本来の置き場のほうになる。
 
-    種別（`settings.ORIGIN_*`）を添える。受け取る側は控えの key と、戻す先の git を
-    ここから決める。名札の綴りでは決められない。`projects/common/` は `common` を
-    名乗るので、名札で比べると共通層と同じ key になり、重複の排除でその層の 3 本が
+    種別（`settings.ORIGIN_*`）をつける。受け取る側は控えの key と、戻す先の git を
+    ここから決める。名札の綴りでは決められない。`projects/common/` の名札は
+    `common` なので、名札で比べると共通層と同じ key になり、重複の排除でその層の 3 本が
     控えと復元の対象から丸ごと落ちる。
 
     予約名のプロジェクトも並べる。判定の層としては数えない（layers）が、ファイルは
     守る。`--lint` が名前を変えるよう言っているあいだも、そこに置いてある 3 本は
-    ccnavi の設定ファイルで、書き換えられたら戻すほうが筋が通る。判定に効かない
+    ccnavi の設定ファイルで、書き換えられたら戻すほうが筋が通る。判定に使われない
     ものを守るだけなので、緩む側にはならない。
 
     在るかどうかは見ない。無いファイルは selfguard が対象から外す（REQ-SLF-03）ので、
@@ -348,13 +348,13 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
 
 
 def mark_source(rule_set: rules.RuleSet, layer: str) -> None:
-    """この集合のルールが、どの層から来たかを名乗らせる。記録の `source` になる。"""
+    """この集合のルールに、どの層から来たかを記す。記録の `source` になる。"""
     for rule in rule_set.all():
         rule.source = layer
 
 
 def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
-    """層のルールの id に層の名前を添える。`self:docs` / `lib:source` の形（REQ-MLT-07）。
+    """層のルールの id に層の名前をつける。`self:docs` / `lib:source` の形（REQ-MLT-07）。
 
     層どうしで同じ id があっても記録の上では衝突せず、読んだ人がどのファイルを
     見に行けばよいかが id だけで分かる。共通層のルールは裸の id のまま。

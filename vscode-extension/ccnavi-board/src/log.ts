@@ -6,17 +6,17 @@
  *
  *     2026-09-27T10:15:03+09:00 ERROR ccnavi-board[4242] 画面の前提が崩れている screen=rules
  *
- * **画面にも console にも何も出さない。** 書けないときは黙って捨て、例外を外へ出さない。
- * 利用者に見せる通知（showErrorMessage など）とは別物で、そちらはこのモジュールと関係なく書く。
+ * **画面にも console にも何も出さない。** 書けないときは何も出さずに捨て、例外を外へ出さない。
+ * 利用者に見せる通知（showErrorMessage など）とは分けてあり、そちらはこのモジュールと関係なく書く。
  *
- * 伏せるのは URL と scp 形に埋まった資格情報だけ（maskUserinfo。sh と Python と同じ読みで `***`）。
+ * 伏せるのは URL と scp 形式に埋まった資格情報だけ（maskUserinfo。sh と Python と同じ規則で `***` にする）。
  * ほかの秘密の形は伏せない。秘密の値・ファイルの中身・環境変数の値を渡さないのが決まり。
  *
- * **リンクは辿らない。** `logs`・`logs/diag`・書き先のどれかがシンボリックリンクなら書かずに捨てる
- * （lstat で見て、書き先は O_NOFOLLOW のある OS ではそれでも開く）。ファイルは 0600 で作る。
+ * **シンボリックリンクはたどらない。** `logs`・`logs/diag`・書き込み先のどれかがシンボリックリンクなら書かずに捨てる
+ * （lstat で見て、書き込み先は O_NOFOLLOW のある OS ではそれでも開く）。ファイルは 0600 で作る。
  * 出どころの名前が `[A-Za-z0-9_-]` 以外を含むときも書かない。
  *
- * node の型を剥がすだけで動く書き方にしてある（enum も引数のプロパティも使わない）。
+ * node の型を取り除くだけで動く書き方にしてある（enum も引数のプロパティも使わない）。
  * Python のテスト（tests/core/test_diaglog.py）が `node` で直に読み、3 つの言語の行を比べる。
  */
 import * as fs from "node:fs";
@@ -154,12 +154,12 @@ export function text(value: Value): string {
   return String(value);
 }
 
-/** 改行（CR LF・CR・LF）を `\n` の 2 字に畳む */
+/** 改行（CR LF・CR・LF）を `\n` の 2 字に置き換える */
 export function fold(value: string): string {
   return value.replace(/\r\n|\r|\n/g, "\\n");
 }
 
-/** logfmt の値。空白・タブ・`"`・`=`・改行を含めば囲み、`\` と `"` を逃がす */
+/** logfmt の値。空白・タブ・`"`・`=`・改行を含めば囲み、`\` と `"` の前に `\` をつける */
 export function quote(value: string): string {
   if (!/[ \t"=\r\n]/.test(value)) {
     return value;
@@ -187,7 +187,7 @@ function isLink(target: string): boolean {
 
 /**
  * 1 行を O_APPEND で 1 度に書く。置き場が無ければ作る。
- * `logs`・`logs/diag`・書き先のどれかがリンクなら書かない。新しいファイルは 0600
+ * `logs`・`logs/diag`・書き込み先のどれかがリンクなら書かない。新しいファイルは 0600
  */
 function append(file: string, line: string): void {
   const dir = path.dirname(file);

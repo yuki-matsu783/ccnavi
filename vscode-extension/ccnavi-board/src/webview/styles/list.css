@@ -43,14 +43,14 @@
 .row-body .wide { grid-column: 1 / -1; }
 .row-body textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; }
 .field { display: contents; }
-.field > .cap { color: var(--vscode-descriptionForeground); text-align: right; font-size: .95em; }
+.field > .cap { color: var(--vscode-descriptionForeground); text-align: right; font-size: .95em; overflow-wrap: anywhere; }
 .field > input, .field > select, .field > textarea, .field > .inline, .field > .picker, .field > .with-button { width: 100%; box-sizing: border-box; margin: 0; min-width: 0; }
 .field > input.narrow, .field > select.narrow { max-width: 260px; }
 /* 選択欄は一番長い選択肢の幅に合わせ、欄の幅を超えない。3 画面で同じ決め方にして、説明付きの長い選択肢も切らない */
 .field > select { width: auto; max-width: 100%; justify-self: start; }
 .field > input.num { max-width: 90px; }
-.inline { display: flex; gap: 6px; align-items: center; }
-.inline > input { flex: 1; min-width: 120px; }
+.inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inline > input { flex: 1; min-width: 80px; }
 .inline > input.num { flex: 0 0 90px; min-width: 0; }
 .inline > .cap { color: var(--vscode-descriptionForeground); }
 details.more { grid-column: 1 / -1; }
@@ -63,3 +63,13 @@ details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr)
 .find { display: flex; gap: 12px; align-items: center; margin: 0 0 10px; flex-wrap: wrap; }
 .find input { width: 320px; max-width: 100%; }
 .find .hint { margin: 0; }
+/*
+ * 狭い幅（パネルを細くしたとき）。欄名を欄の上に置いて 1 列にし、左の余白も詰める。行の見出しは 2 段にして、
+ * パターンや条件の列が 0 幅に潰れないようにする（2 段目へ回す列は画面ごとの CSS が決める）
+ */
+@media (max-width: 520px) {
+  .row-body { padding-left: 14px; grid-template-columns: minmax(0, 1fr); gap: 2px 12px; }
+  details.more > .sub { grid-template-columns: minmax(0, 1fr); gap: 2px 12px; }
+  .field > .cap { text-align: left; margin-top: 4px; }
+  .row-head { row-gap: 2px; }
+}

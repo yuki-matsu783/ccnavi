@@ -8,7 +8,7 @@
  * ときだけ（人が「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ（ADR-0062）。
  *
- * **id の重なりだけは画面で止める。** 同じ id が 2 つあると実行ファイルは後ろで黙って上書きする。
+ * **id の重なりだけは画面で止める。** 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
  * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す（ADR-0035）。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -50,7 +50,7 @@ interface Editing {
   readonly open: ReadonlySet<string>;
   /**
    * 「ほかの種類との関係・補足」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとは人の開閉で動く。**
-   * 描くたびに値の有無で決め直すと、最後の値を消した瞬間に、打っている欄ごと畳まれる
+   * 描くたびに値の有無で決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly more: ReadonlyMap<string, boolean>;
 }
@@ -130,7 +130,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     return () => window.removeEventListener("message", onMessage);
   }, [nextKey]);
 
-  // 足した行の id へ焦点を移す。畳んだままでは何を足したか分からないので、行は開いて出してある
+  // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
     if (focusKey === undefined) {
       return;
@@ -142,7 +142,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   /**
    * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
-   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で黙って消えるため。
+   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
    * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
   /**
@@ -383,7 +383,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
     showView("list");
     setFind("");
-    // 足した種類は関係も補足も空なので、「ほかの種類との関係・補足」は畳んで出す
+    // 足した種類は関係も補足も空なので、「ほかの種類との関係・補足」は折りたたんで出す
     setEditing((now) => ({ ...now, more: new Map(now.more).set(row.key, false) }));
     setFocusKey(row.key);
   };
@@ -520,7 +520,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <code>feedback:</code> に <code>feedback</code> の種類を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
             <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
-            辺の書き漏れはそのまま並行として通るので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効きません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効きません。
+            after の書き漏れがあると、その種類は並行してよいものとして扱われるので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効きません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効きません。
             関係の欄はこのファイルのほかの種類から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の種類の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
@@ -575,7 +575,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 /**
  * ファイルが無いときの帯。ワークスペースとプロジェクトの設定は欄を触れ、最初の保存でファイルを作る。
  * どの設定にも雛形は置かない。雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる。
- * 共通の設定は画面から作らせず、種類を置くワークスペースの設定を開く道だけを出す。
+ * 共通の設定は画面から作らせず、種類を置くワークスペースの設定を開く方法だけを出す。
  */
 function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readonly busy: boolean; readonly onOpenSelf: () => void }): JSX.Element {
   if (page.layer === true) {
@@ -593,7 +593,7 @@ function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readon
         共通の設定に種類はありません（{page.phasesPath} がありません）。種類はワークスペースかプロジェクトの設定に置いてください。プロジェクト管理画面の「フェーズ管理」から開けます。
       </span>
       <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
-        自身の層を開く
+        ワークスペースの設定を開く
       </button>
     </div>
   );

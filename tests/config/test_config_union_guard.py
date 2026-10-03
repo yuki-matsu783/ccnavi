@@ -6,8 +6,8 @@ Write / Edit の拒否、シェルからの書き込みの拒否、控えと復�
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
-実装は入っている。ここが落ちたら、設定ファイルの守りか導入スクリプトが設計 11.6 / 11.9 から
-ずれたということ。
+実装は入っている。ここが落ちたら、設定ファイルの守りか導入スクリプトが設計 11.6 / 11.9 と
+食い違ったということ。
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ class GuardHarness(ConfigUnionHarness):
         return before, read(path), result
 
     def said(self, result, note=""):
-        """落ちたときに何が起きたかを添える。標準エラーを見ないと理由が出ない。"""
+        """落ちたときに何が起きたかをつける。標準エラーを見ないと理由が出ない。"""
         head = f"{note}\n" if note else ""
         return f"{head}stdout: {result.stdout}\nstderr: {result.stderr}"
 
@@ -137,7 +137,7 @@ class RestoreTest(GuardHarness):
         """11.6: ワークスペースから切ったワークツリー側の、共通層の設定も対象（既存の穴）。
 
         共通層の 3 本はワークスペースの git が追跡しているので、ワークツリー側の設定もできる。
-        塞ぐ前は、そこがルールの allow `worktrees` に当たって書けてしまい、戻りもしなかった。
+        直す前は、そこがルールの allow `worktrees` に当たって書けてしまい、戻りもしなかった。
         """
         tree = self.worktree(self.ws, "w3")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
@@ -197,7 +197,7 @@ class RestoreTest(GuardHarness):
     def test_breaking_a_readable_common_rules_file_is_still_restored(self):
         """実行前に読めていたなら、名指しのツールで壊した結果は戻す。
 
-        実行後の中身で決めると、壊すことが戻されない道になる。
+        実行後の中身で決めると、壊すことが戻されない経路になる。
         """
         before = read(self.rules)
         self.guarded_hook("Edit", self.ws, file_path=self.rules)
@@ -233,7 +233,7 @@ class DenyTest(GuardHarness):
     def test_a_rule_named_like_a_builtin_does_not_replace_it(self):
         """組み込みの名前（`builtin-guard-`）のルールは読み込まず、組み込みは常に足す。
 
-        以前は何にも当たらない 1 本をこの名前で書くだけで、共通層の守りが黙って消えた。
+        以前は何にも当たらない 1 本をこの名前で書くだけで、共通層の守りが気づかないうちに消えた。
         """
         decoy = dict(
             OPEN_RULES,
@@ -375,7 +375,7 @@ class DenyTest(GuardHarness):
     def judged(self, command, *flags, guard="enable"):
         """`--test --json` で 1 本判定し、当たったルールの id を返す。
 
-        hook の payload では共通層を動かせない（`--rules` は診断でだけ効く。ADR-0067）。
+        hook の payload では共通層を動かせない（`--rules` は診断でだけ有効。ADR-0067）。
         試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を守りが
         追うかどうかは、こちらで見る（REQ-DIA-03）。
         """
@@ -390,14 +390,15 @@ class DenyTest(GuardHarness):
         """11.6: 共通層が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
 
         置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけ
-        （env は効かない。ADR-0052、ADR-0067）。それでも動かせる以上、
+        （env は使われない。ADR-0052、ADR-0067）。それでも動かせる以上、
         守りは動かした先を追う（`common_shell_clause`）。名指しのツールは
         `common_layer_regex` が同じ先を追うので、こちらを外すと、同じファイルが
         `Write` では止まってシェルでは通る形になる。
 
         末尾の 2 本が境界を見る。前と後ろの両方が要る。`otherpolicy/rules.yml` は
         前の境界（`(?:^|[^\\w.-])`）だけを、`policy/rules.yml.bak` は後ろの境界
-        （`_TERM`）だけを落とす。片方しか置かないと、置かなかったほうの境界を消す変異がテストをすり抜ける。
+        （`_TERM`）だけを落とす。片方しか置かないと、置かなかったほうの境界を消す変異があっても
+        テストが通る。
         """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         moved = ("--rules", policy)

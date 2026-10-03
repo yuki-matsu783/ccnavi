@@ -4,7 +4,7 @@
  * 承認と残った指摘の行き先は、ボードのオーバーレイで人が押したものを、拡張が子プロセスで打つ
  * （`--approve --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。端末の壁は無く、
  * 代わりに「見せたものと今のものが同じ」ことを実行ファイルが指紋で求める。エージェントが Bash で
- * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。`close-early` は端末（tty）から打つもので、
+ * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` は端末（tty）から打つもので、
  * ボードには置かない。
  *
  * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
@@ -20,7 +20,7 @@ export type Launcher =
   | { readonly kind: "exe"; readonly path: string }
   | { readonly kind: "uv"; readonly root: string };
 
-/** bash の単引用符で囲む。中の単引用符は '\'' に割る */
+/** bash の単引用符で囲む。中の単引用符は '\'' に置き換える */
 export function shellQuote(text: string): string {
   return `'${text.replace(/'/g, `'\\''`)}'`;
 }
@@ -82,7 +82,7 @@ export function decideArgs(
 /**
  * 文面で案内する `.ccnavi/scripts/` の sh の綴り。実行ファイルの `settings.script_command` と同じ引用の規則で、
  * ワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する。引用しないと
- * sh が単語に割り、止めている間の例外（`\S*ccnavi-...`）にも当たらない。まず `"..."`、`"` の中でも意味を持つ
+ * sh が単語に分け、止めている間の例外（`\S*ccnavi-...`）にも当たらない。まず `"..."`、`"` の中でも意味を持つ
  * 文字があるときだけ単引用符にする。
  * 実行ファイルは root を realpath で解いてから組む。ここは渡された綴りをそのまま使うので、実行ファイルの
  * 案内と同じ綴りにしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
@@ -105,8 +105,8 @@ export function scriptCommand(root: string, name: string): string {
  * `confirm` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親のワークツリーで打つ。
  * そこは止まっているので、通るのは `sh …ccnavi-review.sh …` の形を連結せずに単体で打ったときだけ
  * （設計 9.8。`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される（9.12）。文はその 2 つを言う。
- * 未解決が残っていれば `confirm` が一覧と次の道（解決してもらう・同じフェーズに子を足す・人が decide で決める）を
- * 返すので、文はそれに従うことだけを言い、道を先取りしない。
+ * 未解決が残っていれば `confirm` が一覧と次の方法（解決してもらう・同じフェーズに子を足す・人が decide で決める）を
+ * 返すので、文はそれに従うことだけを言い、方法を先取りしない。
  */
 export function reviewedPrompt(
   root: string,

@@ -247,7 +247,7 @@ allow:
     s.allow.map((r) => r.every),
     ["5", "x", ""],
   );
-  // 読めない値（every: x）は画面が黙って直さない。直すと --lint の苦情だけが宙に浮く。
+  // 読めない値（every: x）は画面で何も言わずに直さない。直すと --lint の苦情だけが宙に浮く。
   assert.equal(doc.apply(s), text);
   // 画面から来た並びも同じ。every を持たない古い画面の形は空として受け取る。
   const posted = asSections(JSON.parse(JSON.stringify({ ...s, allow: s.allow })));

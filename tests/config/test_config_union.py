@@ -16,7 +16,7 @@ lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空
 ワークツリー側の設定ができ、設計 11.6 が名指しした穴（ワークツリー側の設定が書けて戻らない）を
 再現できる。
 
-実装は入っている。ここが落ちたら、rules の合成が設計 11 からずれたということ。
+実装は入っている。ここが落ちたら、rules の合成が設計 11 と食い違ったということ。
 phases / risk の合成は test_config_union_phases_risk.py、selfguard と導入スクリプトは
 test_config_union_guard.py。
 """
@@ -34,7 +34,7 @@ import unittest
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-# 共通層。どのツリーにも効いてほしい deny と、ワークスペースの allow。
+# 共通層。どのツリーにも当てたい deny と、ワークスペースの allow。
 COMMON_RULES = {
     "version": 1,
     "deny": [
@@ -63,7 +63,7 @@ COMMON_RULES = {
     ],
 }
 
-# ワークスペース自身の層。ワークスペースのツリーにだけ効く。
+# ワークスペース自身の層。ワークスペースのツリーにだけ当たる。
 OWN_RULES = {
     "version": 1,
     "deny": [
@@ -83,7 +83,7 @@ OWN_RULES = {
     "allow": [{"id": "docs", "match": "Write|Edit", "glob": "*/docs/*"}],
 }
 
-# lib の層。lib のツリーにだけ効く。
+# lib の層。lib のツリーにだけ当たる。
 LIB_RULES = {
     "version": 1,
     "deny": [
@@ -297,7 +297,7 @@ KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
 # ワークスペースの git が無視するもの。実物の .gitignore と同じ 3 つだけ。
 # `/.ccnavi/` を丸ごと無視すると共通層の 3 本が追跡されず、ワークツリー側の設定ができない。
 # それができないと、設計 11.6 が名指しした穴（共通層のワークツリー側の設定が書けて
-# 戻らない）を一度も踏めない。
+# 戻らない）を一度も再現できない。
 GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 
 # 雛形のワークスペース。1 度だけ組んで、以後は写しを配る。
@@ -305,7 +305,7 @@ GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 # 組み直す形だと 1 件あたり git が 9 回（ワークスペースと 2 つのプロジェクトの
 # init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。写しなら
 # git は雛形の 9 回だけで済む。テストごとに別のディレクトリを配るのは変わらないので、
-# テストどうしが状態を共有することもない（`setUpClass` に寄せる形との違いはここ）。
+# テストどうしが状態を共有することもない（`setUpClass` にまとめる形との違いはここ）。
 _TEMPLATE = ""
 
 
@@ -421,7 +421,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
         層の置き場はフラグで渡さない。共通層の 3 本（`--rules` / `--phases` / `--risk`）も、
         層を探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
-        `--explain`）でだけ効き、hook の判定とチケットの副命令では落ちる（ADR-0067）。
+        `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる（ADR-0067）。
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
@@ -529,7 +529,7 @@ class WriteUnionTest(ConfigUnionHarness):
     """Write / Edit は共通層 + 行き先の層の和（11.4、REQ-MLT-03 の変更）。"""
 
     def test_each_layer_deny_applies_to_its_own_files(self):
-        """11.4: 3 種の層の deny は、それぞれ効く先のファイルで当たる。
+        """11.4: 3 種の層の deny は、それぞれの層が対象とするファイルで当たる。
 
         id は共通層なら裸、プロジェクトの層なら `lib:`、自身の層なら `self:` が付く。
         記録の `source` はその層、`project` は行き先のプロジェクトで、ワークスペースの
@@ -552,7 +552,7 @@ class WriteUnionTest(ConfigUnionHarness):
                     self.assertNotIn("project", record)
 
     def test_a_layer_deny_does_not_reach_other_trees(self):
-        """11.4: 層の deny は効く先の外には届かない。
+        """11.4: 層の deny は対象の外には当たらない。
 
         プロジェクトの層は他のプロジェクトにもワークスペースにも、自身の層はプロジェクトにも足さない。
         """
@@ -593,7 +593,7 @@ class WriteUnionTest(ConfigUnionHarness):
         allowed = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "docs", "a.md"))
         self.assertEqual(self.last_record()["decision"], "allow")
         self.assertEqual(self.last_record()["rules"], ["self:docs"])
-        # lib の docs/ に self:docs は効かない。どのルールも言及しない。
+        # lib の docs/ に self:docs は当たらない。どのルールも言及しない。
         self.hook("Write", self.ws, file_path=os.path.join(self.lib, "docs", "a.md"))
         self.assertNotIn("self:docs", self.last_record().get("rules", []))
 
@@ -612,7 +612,7 @@ class WriteUnionTest(ConfigUnionHarness):
         self.assertEqual(record["rules"], ["lib:notebook"])
         self.assertEqual(record.get("source"), "lib")
 
-        # 共通層の guard-approved も NotebookEdit を持つ。プロジェクトのツリーでも効く。
+        # 共通層の guard-approved も NotebookEdit を持つ。プロジェクトのツリーでも当たる。
         common = self.hook(
             "NotebookEdit",
             self.ws,
@@ -660,7 +660,7 @@ class ToolLayerTest(ConfigUnionHarness):
         self.assert_denied(self.hook("Glob", self.ws, pattern="*", path=secrets), "lib:secrets")
         # 探す場所を省くと cwd。
         self.assert_denied(self.hook("Grep", secrets, pattern="token"), "lib:secrets")
-        # 行き先の層だけなので、app の secrets には lib のルールは効かない。
+        # 行き先の層だけなので、app の secrets には lib のルールは当たらない。
         self.assert_not_denied(
             self.hook("Grep", self.ws, pattern="token", path=os.path.join(self.app, "secrets"))
         )
@@ -711,7 +711,7 @@ class ToolLayerTest(ConfigUnionHarness):
     def test_a_layer_allow_now_reaches_grep_and_tools_without_a_path(self):
         """ADR-0048 の代償。
 
-        行き先の層の allow が Grep に、層の allow がパスを持たないツールに効く。
+        行き先の層の allow が Grep に当たり、層の allow がパスを持たないツールに当たる。
         """
         allow = [
             *LIB_RULES["allow"],
@@ -725,7 +725,7 @@ class ToolLayerTest(ConfigUnionHarness):
         self.assertEqual(record["decision"], "allow", record)
         self.assertEqual(record["rules"], ["lib:grep-src"], record)
 
-        # lib の層の allow は、app に居る WebFetch にも効く（パスを持たないツールは全部の和）。
+        # lib の層の allow は、app に居る WebFetch にも当たる（パスを持たないツールは全部の和）。
         self.hook("WebFetch", self.app, url="https://docs.example.com/a", prompt="read")
         record = self.last_record()
         self.assertEqual(record["decision"], "allow", record)
@@ -837,7 +837,7 @@ class DuplicateTest(ConfigUnionHarness):
         self.assertFalse(any("credentials" in p["detail"] for p in warns), warns)
 
     def test_same_id_with_different_content_keeps_both(self):
-        """11.4: 同 id で中身が違う rules は両方効く。記録に両方が並び、--lint は warn。"""
+        """11.4: 同 id で中身が違う rules は両方当たる。記録に両方が並び、--lint は warn。"""
         differs = dict(LIB_RULES)
         differs["deny"] = [
             dict(COMMON_RULES["deny"][0], glob="*/secrets/*"),
@@ -890,7 +890,7 @@ class LayerFailureTest(ConfigUnionHarness):
         self.assertNotIn("built-in defaults", self.reason(passed))
 
     def test_broken_layer_keeps_the_common_deny(self):
-        """11.2: 壊れた層の上でも共通層の deny は効いたまま。"""
+        """11.2: 壊れた層の上でも共通層の deny は当たったまま。"""
         write(layer_path(self.lib, "rules"), BROKEN)
 
         denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, ".env"))
@@ -953,7 +953,7 @@ class ProblemsSaidOnceTest(ConfigUnionHarness):
 
 
 class PostMonitoringUnionTest(ConfigUnionHarness):
-    """実行後の監視も「共通層 + そのツリーの層」の和（11.7）。
+    """実行後チェックも「共通層 + そのツリーの層」の和（11.7）。
 
     行き先の層 1 本のままの実装では、共通層の deny の場所が保護領域に数えられない。
     プロジェクトのツリー（共通層）と、ワークスペースのワークツリー（自身の層）の両方で見る。

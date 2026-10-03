@@ -1,4 +1,4 @@
-# ccnavi-common — 保護済み sh が共有する部分。単体では動かない。
+# ccnavi-common 保護済み sh が共有する部分。単体では動かない。
 #
 #   . "$(dirname "$0")/ccnavi-common.sh"
 #
@@ -44,7 +44,7 @@ ccnavi_abs() {
 		(cd "$1" 2>/dev/null && pwd -W 2>/dev/null || pwd) || return 1
 		return 0
 	fi
-	# 在るところまで cd して綴りを揃え、残りは文字で継ぐ。
+	# 在るところまで cd して綴りを揃え、残りは文字列としてつなぐ。
 	ccnavi_abs_dir=$(dirname "$1")
 	ccnavi_abs_base=$(basename "$1")
 	if ccnavi_abs_head=$(cd "$ccnavi_abs_dir" 2>/dev/null && { pwd -W 2>/dev/null || pwd; }); then
@@ -60,7 +60,7 @@ ccnavi_abs() {
 	/* | [A-Za-z]:[\\/]*) ccnavi_abs_joined="$1" ;;
 	*) ccnavi_abs_joined="$(pwd -W 2>/dev/null || pwd)/$1" ;;
 	esac
-	# `\` を `/` に寄せ、`.` と `..` を畳む。
+	# `\` を `/` にそろえ、`.` と `..` を取り除く。
 	ccnavi_abs_joined=$(printf '%s' "$ccnavi_abs_joined" | tr '\\' '/')
 	ccnavi_abs_out=""
 	ccnavi_abs_rest="$ccnavi_abs_joined"
@@ -94,13 +94,13 @@ ccnavi_abs() {
 #
 # git の `rev-parse --show-toplevel` はリンクを解いた綴りを返すので、ワークスペースルート（cwd から
 # 論理の綴りで決まる）と比べるときは両辺をこれで揃える。揃えないと、リンクを経た作業場で
-# 「.claude/worktrees/ の下か」の比較が外れ、守りが効かない。Windows は pwd -W の綴り。
+# 「.claude/worktrees/ の下か」の比較が外れ、守りが当てはまらない。Windows は pwd -W の綴り。
 ccnavi_phys() {
 	[ -n "${1:-}" ] || return 0
 	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; }) || printf '%s\n' "$1"
 }
 
-# ワークスペースルート。道具（hook の登録・実行ファイル・保護済みスクリプト）の置き場。
+# ワークスペースルート。hook の登録・実行ファイル・保護済みスクリプトの置き場。
 #
 # **git に聞かない。** git のトップは git の用途にだけ使う。モード B では
 # `cwd` がプロジェクトの中にあると git はプロジェクトを答える。それは git として
@@ -112,21 +112,21 @@ ccnavi_phys() {
 # `.git` は駄目（プロジェクトも持つ）。`.claude/` だけも駄目（Claude Code が作る場合が
 # あり、プロジェクト側にできたものに当たる）。
 #
-# **ワークツリーは飛ばし、最初に当たったものを返す。**
+# **ワークツリーは候補にせず、最初に当たったものを返す。**
 #
 # `.ccnavi/scripts/` は git で追跡されているので、どのワークツリーにも写しがある。
 # 単純に「最初に当たったもの」にすると、ワークツリーの中から打ったときワークツリー自身が
 # 根になる。ところが `logs/state/`（控え）は追跡外でワークツリーには無く、承認済みチケットも
-# ワークスペースルートに置かれたばかりのものはワークツリーに届いていないので、どちらも見つからなくなる。道具のうち
-# git が運ぶものと運ばないものがあり、根は運ばれないほうに合わせる必要がある。
+# ワークスペースルートに置かれたばかりのものはワークツリーに届いていないので、どちらも見つからなくなる。ccnavi が使うもののうち
+# git でワークツリーに届くものと届かないものがあり、根は届かないほうに合わせる必要がある。
 #
 # だから `.claude/worktrees/` の下にあるものは候補にしない。最初に当たった
 # 「ワークツリーでない」ディレクトリが根になる。
 #
 # 最外を取る形にはしない。ワークスペースが利用者のホームの下にあり、そこに
-# `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを掴む。近いほうから決める。
+# `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを選ぶ。近いほうから決める。
 #
-# `cd` は使わない。`set -e` の下で戻り忘れが事故になる。パスを削って登る。
+# `cd` は使わない。`set -e` の下で戻り忘れが問題になる。パスを削って登る。
 ccnavi_workspace() {
 	if [ -n "${CCNAVI_WORKSPACE:-}" ]; then
 		ccnavi_ws_named=$(ccnavi_abs "$CCNAVI_WORKSPACE") || return 1
@@ -153,7 +153,7 @@ ccnavi_workspace() {
 
 # 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。
 #
-# 人が端末から打つ場面では settings.json の env が効かないので、CCNAVI_BIN_PATH が
+# 人が端末から打つ場面では settings.json の env が反映されないので、CCNAVI_BIN_PATH が
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
 # hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
@@ -182,12 +182,12 @@ ccnavi_compat_skew() {
 	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
 	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
 	if [ -f "$1/build.py" ] && [ -f "$1/ccnavi/__main__.py" ]; then
-		ccnavi_cs_fix="build.py を回して組み立て直してください（uv run --with pyinstaller python build.py）"
+		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
-		ccnavi_cs_fix="ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
+		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi
 	if [ -z "$ccnavi_cs_have" ]; then
-		printf '実行ファイル %s は --version に互換の版を答えません（古い版）。%s。\n' "$2" "$ccnavi_cs_fix"
+		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"
 		return 1
 	fi
 	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
@@ -213,7 +213,7 @@ ccnavi_bin_try() {
 #   <ws>/.claude/worktrees/<id>/...   -> 元リポジトリがプロジェクトならその名前
 #   それ以外                           -> 空
 #
-# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。綴りは実測で確定して
+# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。綴りは実際に確かめて確定して
 # いる（git 2.39.2、Git Bash と PowerShell の両方）。絶対パス、区切りは `/` のみ、
 # ドライブレターは大文字、`gitdir:` の後ろは半角空白 1 個。
 #
@@ -289,9 +289,9 @@ ccnavi_project() {
 #
 # `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。
 #
-# 綴りの要点が 3 つ。
+# 書き方の要点が 3 つ。
 #   - `[^/]*@` で**最後の `@` まで**消す。解析側（authority の ${##*@}）が最後まで
-#     見ているので、伏せ字も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
+#     見ているので、伏せる範囲も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
 #   - scheme は大文字も `git+ssh` も拾う
 #   - scheme の無い `git@host:path` の形も伏せる
 ccnavi_mask_url() {
@@ -344,7 +344,7 @@ ccnavi_record_get() {
 # 控えを書き直す。<ファイル> <鍵> <値> [<鍵> <値>...]
 #
 # 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
-# 値の改行は空白に畳む（1 行 1 項目の契約）。書けなければ 1。
+# 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。
 ccnavi_record_write() {
 	ccnavi_rw_file="$1"
 	shift
@@ -407,7 +407,7 @@ ccnavi_parent_tree() {
 #   られない（別のホスト・別の OS・/mnt/ の下・pid が読めない）ときだけ、10 分を過ぎたら時刻で古い
 #   とする（WSL と Git Bash は同じホスト名で pid が通じない）。owner が読めなければ `find -mmin +10`
 # - 奪い方: 奪う操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
-#   owner の行と今の owner の行が同じなら `mv` で脇へ退け、退けた中の owner がまだ同じなら消して取り直す。
+#   owner の行と今の owner の行が同じなら `mv` で退避して、退避した中の owner がまだ同じなら消して取り直す。
 #   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
 # - 入れ子: CCNAVI_LOCK_HELD が同じ家族を指し、その印がロックの owner の印と同じなら、取ったものとして
 #   進み、外さない（印の合わない値は偽物として無視する）
@@ -559,7 +559,7 @@ ccnavi_lock_describe() {
 		fi
 		[ -n "$ccnavi_lds_at" ] || ccnavi_lds_at="$ccnavi_lds_started"
 	fi
-	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人が終了させてから打ち直す（ロックは持ち主が消えれば次の実行が片付ける）\n' \
+	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人に終了させてもらってから打ち直してください（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
 		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
 }
 
@@ -653,7 +653,7 @@ ccnavi_git_timed() {
 			</dev/null 2>"$ccnavi_gt_err" &
 	fi
 	ccnavi_gt_pid=$!
-	# 見張りの中で標準入出力を先に閉じる（呼ぶ側のパイプを握ったまま残らないように）。
+	# 見張りの中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
 	(
 		exec </dev/null >/dev/null 2>&1
 		sleep "$ccnavi_gt_limit"
@@ -677,7 +677,7 @@ ccnavi_git_refusal() {
 		/^[^ \t]/ { f = 0 }
 		f && /^[ \t]+[^ \t]/ { sub(/^[ \t]+/, ""); printf "%s%s", sep, $0; sep = " " }' "$1" 2>/dev/null)
 	if [ -n "$ccnavi_gr_paths" ]; then
-		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直す' "$ccnavi_gr_paths"
+		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
 		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、落ちた残りなら人が消す'
 	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
@@ -702,7 +702,7 @@ ccnavi_git_refusal() {
 #                               6 元の先頭 7 書く 8 コミット 9 push 10 届いたか 11 戻して 1 回だけやり直す
 #   ccnavi_c1_end               ロックを外す（trap の EXIT・INT・TERM・HUP にも置く）
 #
-# 呼ぶ側が先に決めるもの:
+# 呼ぶ側が先に決めるもの。
 #   ccnavi_c1_root   ワークスペースルート
 #   ccnavi_c1_label  文面の頭（ccnavi-ticket など）
 #   ccnavi_c1_exe    関数。実行ファイルを `--root <ルート>` つきで起こし、引数を渡す
@@ -718,7 +718,7 @@ ccnavi_git_refusal() {
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
 #   見張りの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回の見張りの秒、既定 60）
 #
-# コミットは `--no-verify` で利用者の hook（pre-commit・commit-msg）を飛ばす。運ぶのは状態のファイル
+# コミットは `--no-verify` で利用者の hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
 # だけで、コードの検査の対象ではないため（段階 2d のレビューの決定 C）。署名は利用者の設定に従うが、
 # 見張りの時間を付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
@@ -792,7 +792,7 @@ ccnavi_c1_family() {
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルが C1 の問い（c1 family）に答えない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。家族の控えがあるので、書かずに止める。実行ファイルを新しくする"
+		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。家族の控えがあるので、書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_c1_target=$(sed -n 's/^target //p' "$ccnavi_c1_tmp/family" | head -n 1)
@@ -816,7 +816,7 @@ ccnavi_c1_family() {
 	no | stop) ;;
 	*)
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルの答え（target）を読めない"
+		ccnavi_c1_why="実行ファイルの出力（target）を読めない"
 		;;
 	esac
 	log_debug C1 の対象を決めた -- "family=$ccnavi_c1_family_id" "target=$ccnavi_c1_target"
@@ -861,22 +861,22 @@ ccnavi_c1_begin() {
 	case "$ccnavi_cb_rc" in
 	0) ;;
 	2)
-		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪いかけて戻せなかった。人が中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
+		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。人が中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
 		return 1
 		;;
 	*)
 		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/$ccnavi_c1_family_id"
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
+			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id は他の操作がロックを持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直す"
+			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
 		fi
 		return 1
 		;;
 	esac
 	ccnavi_cb_busy=$(ccnavi_c1_busy "$ccnavi_c1_tree")
 	if [ -n "$ccnavi_cb_busy" ]; then
-		ccnavi_c1_say "親のワークツリーに途中の操作（${ccnavi_cb_busy}）がある。済ませるか取りやめてから打ち直す（何も書いていない）"
+		ccnavi_c1_say "親のワークツリーに途中の操作（${ccnavi_cb_busy}）がある。済ませるか取りやめてから打ち直してください（何も書いていない）"
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -918,7 +918,7 @@ ccnavi_c1_prepare() {
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "人の判断が未送信" \
 			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
-			"置き場に ccnavi の知らない変更がある" "。人に確かめる。何も書いていない" || return 1
+			"置き場に ccnavi の知らない変更がある" "。ユーザが確かめてください。何も書いていない" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
@@ -931,10 +931,10 @@ ccnavi_c1_prepare() {
 		if [ "$ccnavi_cp_rc" -ne 0 ]; then
 			# 3 と 4 の間に hook が書いた（merge が書きかけと重なった）なら、3 から 1 回だけやり直す。
 			if [ "$ccnavi_cp_try" -eq 1 ] && grep -q '書きかけの' "$ccnavi_c1_tmp/sync" 2>/dev/null; then
-				ccnavi_c1_say "取り込みが書きかけと重なった。見分けからもう 1 回だけやり直す"
+				ccnavi_c1_say "取り込みが書きかけと重なった。変更の見分けからもう 1 回だけやり直す"
 				continue
 			fi
-			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も書いていない。接続と上の理由を直してから打ち直す"
+			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も書いていない。接続と、上に出た原因を直してから打ち直してください"
 			return 1
 		fi
 		ccnavi_cp_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
@@ -948,7 +948,7 @@ ccnavi_c1_prepare() {
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信の人の判断のコミットがある" \
 			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
 			"置き場に ccnavi の知らない未送信のコミットがある" \
-			"。人に確かめる。前の状態の操作が送る前に強制終了された跡なら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、人がそのコミットを取り除く。何も書いていない" || return 1
+			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了された跡なら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、人がそのコミットを取り除く。何も書いていない" || return 1
 		return 0
 	done
 }
@@ -993,12 +993,12 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# 利用者の hook は飛ばす。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
+	# 利用者の hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
 		cat "$ccnavi_c1_tmp/out" >>"$ccnavi_c1_tmp/err"
-		ccnavi_c1_say "コミットできなかった（見張りで切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_c1_tmp/err")"
+		ccnavi_c1_say "コミットできなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_c1_tmp/err")"
 		ccnavi_c1_unstage "$ccnavi_c1_tmp/added" "$ccnavi_cc_base"
 		return 1
 	fi
@@ -1027,7 +1027,7 @@ ccnavi_c1_restore_written() {
 		grep -F -x -q -- "$ccnavi_cr_path" "$ccnavi_c1_tmp/keep" 2>/dev/null && continue
 		if git -C "$ccnavi_c1_tree" cat-file -e "$2:$ccnavi_cr_path" 2>/dev/null; then
 			git -C "$ccnavi_c1_tree" restore --worktree --source="$2" -- ":(literal)$ccnavi_cr_path" 2>/dev/null ||
-				ccnavi_c1_say "$ccnavi_cr_path を書く前に戻せなかった"
+				ccnavi_c1_say "$ccnavi_cr_path を書く前の状態に戻せなかった"
 		else
 			rm -f "$ccnavi_c1_tree/$ccnavi_cr_path" 2>/dev/null ||
 				ccnavi_c1_say "$ccnavi_cr_path を消せなかった"
@@ -1068,7 +1068,7 @@ ccnavi_c1_write() {
 		ccnavi_cw_rc=0
 		ccnavi_c1_run "$ccnavi_cw_list" "$@" || ccnavi_cw_rc=$?
 		if [ ! -f "$ccnavi_cw_list" ]; then
-			ccnavi_c1_say "実行ファイルが書いたパスの一覧を出さなかった。書いたものが分からないのでコミットしない。親のワークツリー（${ccnavi_c1_tree}）を人が確かめる"
+			ccnavi_c1_say "実行ファイルが書いたパスの一覧を出さなかった。書いたものが分からないのでコミットしない。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
 			return 1
 		fi
 		if [ "$ccnavi_cw_rc" -ne 0 ]; then
@@ -1124,7 +1124,7 @@ ccnavi_c1_write() {
 		fi
 		rm -f "$ccnavi_cw_list"
 		if [ "$ccnavi_cw_try" -ge 2 ]; then
-			ccnavi_c1_say "2 回目も送れなかった。書いたものは戻した。オンラインで sh $ccnavi_c1_sh/ccnavi-sync.sh $ccnavi_c1_family_id を打って取り込んでから、打ち直す"
+			ccnavi_c1_say "2 回目も送れなかった。書いたものは戻した。オンラインで sh $ccnavi_c1_sh/ccnavi-sync.sh $ccnavi_c1_family_id を打って取り込んでから、打ち直してください"
 			log_info C1 で送れなかった -- "family=$ccnavi_c1_family_id" "reason=c1-push"
 			return 1
 		fi
@@ -1145,13 +1145,13 @@ ccnavi_c1_write() {
 ccnavi_c1_undo() {
 	ccnavi_cu_now=$(git -C "$ccnavi_c1_tree" rev-parse HEAD 2>/dev/null || :)
 	if [ "$ccnavi_cu_now" != "$1" ]; then
-		ccnavi_c1_say "先頭が自分のコミット（$1）でなくなっていた（${ccnavi_cu_now}）。戻さずに止めた。人が確かめる"
+		ccnavi_c1_say "先頭が自分のコミット（$1）でなくなっていた（${ccnavi_cu_now}）。戻さずに止めた。ユーザが確かめてください"
 		return 1
 	fi
 	git -C "$ccnavi_c1_tree" diff-tree --no-commit-id --name-only -r -z "$1" 2>/dev/null |
 		tr '\000' '\n' >"$ccnavi_c1_tmp/in-commit"
 	if ! git -C "$ccnavi_c1_tree" update-ref "refs/heads/$ccnavi_c1_family_id" "$2" "$1" 2>"$ccnavi_c1_tmp/err"; then
-		ccnavi_c1_say "コミットを戻せなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）。人が確かめる"
+		ccnavi_c1_say "コミットを戻せなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）。ユーザが確かめてください"
 		return 1
 	fi
 	ccnavi_c1_unstage "$ccnavi_c1_tmp/in-commit" "$2"
@@ -1204,38 +1204,39 @@ ccnavi_c1_end() {
 #   log_info <本文の語>... [-- <キー>=<値>...]
 #
 # 本文の語はスペースでつなぐ。`--` の後ろは 1 つずつ `キー=値` として logfmt で並べる。
-# 出る行（Python の ccnavi/diaglog.py、拡張の src/log.ts と同じ形）:
+# 出る行の形は次のとおり（Python の ccnavi/diaglog.py、拡張の src/log.ts と同じ）。
 #
-#   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] push を拒否した reason=unapproved
+#   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] 拒否した sub=push reason=unapproved
 #
 # 置き場はワークスペースルートの `logs/diag/<出どころ>.log`。ルートは呼ぶ側が
 # ccnavi_log_root に入れておけばそれを使い、空なら ccnavi_workspace で探す。出どころは
-# `$0` の名前から拡張子を落としたもので、CCNAVI_LOG_NAME で上書きできる。出どころに
-# `[A-Za-z0-9_-]` 以外の字があれば書かない（パスの区切りや `..` を名前に入れさせない）。
+# `$0` の名前から拡張子を除いたもので、CCNAVI_LOG_NAME で上書きできる。出どころに
+# `[A-Za-z0-9_-]` 以外の文字があれば書かない（パスの区切りや `..` を名前に入れさせない）。
 #
-# **リンクは辿らない。** `logs`・`logs/diag`・書き先のファイルのどれかがシンボリックリンクなら
-# 書かずに捨てる。リンクの先へ追記すると、置き場の外のファイル（判定の記録など）を書き換える。
+# **シンボリックリンクはたどらない。** `logs`・`logs/diag`・書き込み先のファイルのどれかが
+# シンボリックリンクなら書かずに捨てる。リンク先へ追記すると、置き場の外のファイル（判定の記録など）を書き換えてしまう。
 # ファイルを新しく作るときは umask 077 のサブシェルで作り、持ち主だけが読める 0600 にする。
 #
 # **標準出力と標準エラーには何も出さず、何があっても 0 を返す。** 書けない（置き場が
-# 作れない・権限・容量）ときは黙って捨てる。`set -eu` の下で呼んでも、呼ぶ側を止めない。
-# 契約の文面（reject / fail の標準エラー、ok / fail の 1 行目）とは別物で、そちらは変えない。
+# 作れない・権限・容量）ときは何も出さずに捨てる。`set -eu` の下で呼んでも、呼ぶ側を止めない。
+# 契約として決まっている出力（reject / fail の標準エラー、ok / fail の 1 行目）とは分けてあり、
+# そちらは変えない。
 #
-# 本文と値の中の、URL と scp 形に埋まった資格情報を `***` に伏せる（ccnavi_log_mask）。
+# 本文と値の中の、URL と scp 形式に埋まった資格情報を `***` に伏せる（ccnavi_log_mask）。
 #
-# 出さないレベルでは、date を起こさず、文字列も組み立てない（ccnavi_log_on で先に見る）。
-# 1 行を書くときに起こす外部コマンドは date と、置き場が無いときの mkdir だけ。ほかに、
+# 出さないレベルでは、date を起動せず、文字列も組み立てない（ccnavi_log_on で先に見る）。
+# 1 行を書くときに起動する外部コマンドは date と、置き場が無いときの mkdir だけ。ほかに、
 # 新しくファイルを作るときの umask のサブシェルと、ccnavi_log_root が空のときに 1 度だけ
-# 走る ccnavi_workspace（dirname などを起こす）がある。残りはシェルの展開で済ませる。
+# 走る ccnavi_workspace（dirname などを起動する）がある。残りはシェルの展開で済ませる。
 
 ccnavi_log_min=""
 ccnavi_log_file=""
 ccnavi_log_name=""
-# 呼ぶ側が解いたワークスペースルート。入れておくと ccnavi_workspace で探し直さない。
+# 呼ぶ側が求めたワークスペースルート。入れておくと ccnavi_workspace で探し直さない。
 ccnavi_log_root=""
 # CR は printf でしか作れない。読み込むときに 1 度だけ作る。
 ccnavi_log_cr=$(printf '\r')
-# 語の切れ目（空白・タブ・LF・CR）。伏せ字で語を切り出すのに使う。
+# 語の切れ目（空白・タブ・LF・CR）。資格情報を伏せるときに語を切り出すのに使う。
 ccnavi_log_space=" 	
 $ccnavi_log_cr"
 
@@ -1273,7 +1274,7 @@ log_error() {
 	return 0
 }
 
-# 書き先。1 度解いたら覚える。出どころが使えない字を含むか、ワークスペースルートが
+# 書き込み先。1 度求めたら覚える。出どころが使えない字を含むか、ワークスペースルートが
 # 見つからなければ 1 を返す（捨てる）。
 ccnavi_log_target() {
 	[ -z "$ccnavi_log_file" ] || return 0
@@ -1343,7 +1344,7 @@ ccnavi_log_emit() {
 
 	ccnavi_le_line="$ccnavi_le_now $ccnavi_le_level ${ccnavi_log_name}[$$] $ccnavi_le_msg$ccnavi_le_fields"
 	ccnavi_le_dir="${ccnavi_log_file%/*}"
-	# リンクは辿らない。logs・logs/diag・書き先のどれかがリンクなら捨てる。
+	# シンボリックリンクはたどらない。logs・logs/diag・書き込み先のどれかがリンクなら捨てる。
 	if [ -L "${ccnavi_le_dir%/*}" ] || [ -L "$ccnavi_le_dir" ] || [ -L "$ccnavi_log_file" ]; then
 		return 0
 	fi
@@ -1351,7 +1352,7 @@ ccnavi_log_emit() {
 		mkdir -p "$ccnavi_le_dir" >/dev/null 2>&1 || return 0
 	fi
 	# `>>` は O_APPEND で開く。printf は 1 行を 1 度の write で出す。
-	# 無いファイルは umask 077 のサブシェルで作り、0600 にする。在ればサブシェルを起こさない。
+	# 無いファイルは umask 077 のサブシェルで作り、0600 にする。在ればサブシェルを起動しない。
 	if [ -e "$ccnavi_log_file" ]; then
 		{ printf '%s\n' "$ccnavi_le_line" >>"$ccnavi_log_file"; } >/dev/null 2>&1 || :
 	else
@@ -1384,7 +1385,7 @@ ccnavi_log_replace() {
 	done
 }
 
-# 改行（CR LF・CR・LF）を `\n` の 2 字に畳む。結果は ccnavi_log_out。
+# 改行（CR LF・CR・LF）を `\n` の 2 字に置き換える。結果は ccnavi_log_out。
 ccnavi_log_fold() {
 	ccnavi_log_out="$1"
 	ccnavi_lf_nl='
@@ -1399,7 +1400,7 @@ ccnavi_log_fold() {
 }
 
 # logfmt の値。資格情報を伏せ、空白・タブ・`"`・`=`・改行を含めば
-# `"` で囲んで `\` と `"` を逃がす。結果は ccnavi_log_out。
+# `"` で囲んで `\` と `"` をエスケープする。結果は ccnavi_log_out。
 ccnavi_log_value() {
 	ccnavi_log_mask "$1"
 	ccnavi_lv_v="$ccnavi_log_out"
@@ -1417,15 +1418,15 @@ ccnavi_log_value() {
 }
 
 # 埋まった資格情報を `***` に伏せる。Python の diaglog.mask_userinfo と拡張の maskUserinfo と
-# 同じ読みで、3 つが 1 字まで同じ結果を出す（tests/sh/test_diaglog_sh.py）。結果は ccnavi_log_out。
+# 同じ規則で伏せ、3 つの結果は 1 文字も違わない（tests/sh/test_diaglog_sh.py）。結果は ccnavi_log_out。
 #
 # 空白・タブ・LF・CR で切った語ごとに見る。
 #   - `://` を含む語: `://` の後ろから次の `/` までを authority とし、`@` があれば最後の `@` より
 #     前を `***` にする（`https://user:tok@host/x` → `https://***@host/x`）
 #   - `://` を含まない語: 最初の `/` より前に `@` があり、最後の `@` より前に `:` があれば、そこを
-#     `***` にする（scp 形 `user:tok@host:path` → `***@host:path`）。`git@host:path` は伏せない
+#     `***` にする（scp 形式 `user:tok@host:path` → `***@host:path`）。`git@host:path` は伏せない
 # `@` の無い文字列は語に切らずにそのまま返す（ほとんどの行はこれで済む）。
-# 利用者向けの ccnavi_mask_url（`<伏せた>@host`）とは綴りが違う。そちらは契約の文面なので変えない。
+# 利用者向けの ccnavi_mask_url（`<伏せた>@host`）とは表記が違う。そちらは契約として決まっている出力なので変えない。
 ccnavi_log_mask() {
 	ccnavi_log_out="$1"
 	case "$1" in

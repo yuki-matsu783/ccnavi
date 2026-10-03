@@ -3,12 +3,12 @@
 ## チケットは提案であって権威ではない
 
 チケットはエージェントが書く。だからチケットの中身をそのまま判定に使うと、
-範囲の外で止められたエージェントが、チケットに 1 行足して自分の首輪を伸ばせる。
-止められた側が止め方を書き換えられる仕組みは、止めていない。
+範囲の外で止められたエージェントが、チケットに 1 行足して自分の範囲を広げられる。
+止められた側が止め方を書き換えられるなら、止めたことにならない。
 
 判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、人に見せて
-承認を求めるためのもので、承認されるまで判定には効かない。承認されたあとに
-提案を書き換えても、効いているのは承認済みチケットの側なので範囲は広がらない。
+承認を求めるためのもので、承認されるまで判定には使われない。承認されたあとに
+提案を書き換えても、判定に使われているのは承認済みチケットの側なので範囲は広がらない。
 
 ## 絞ることしかできない
 
@@ -16,15 +16,16 @@
 判定はルールの判定とチケットの判定の厳しい側を採る（設計 1）。チケットが足すのは
 「宣言した範囲の外は止める」「deny と書いた場所は止める」「ask と書いた場所は聞く」だけで、
 ルールの allow を狭めることはあっても、ルールの deny や ask を緩めることは無い。
-例外は 2 つ（`is_unscoped`）。チケットの置き場は、次の提案を書く道を残すために範囲を当てない。
+例外は 2 つ（`is_unscoped`）。チケットの置き場は、次の提案を書けるようにしておくために
+範囲を当てない。
 下書きの置き場（`scratchpad/`）は、git が追跡しないので範囲を当てない。
-子は親の部分集合で、親子は厳しい側が勝つ。どう書いてもチケットが無いときより
+子は親の部分集合で、親子は厳しい側を採る。どう書いてもチケットが無いときより
 緩くはならない。
 
 ## 書式
 
 `wip/proposals/<状態>/<識別子>.md` の先頭の frontmatter。設計 9.3。
-タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
+タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今判定に使われるのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
     ---
@@ -98,11 +99,11 @@ FINISHED = (REVIEW, DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
 GUARDED_STATES = (REVIEW,)
 
-# 範囲の項として効くツール。これ以外を match に書いた項は効かない。
+# 範囲の項として判定に使われるツール。これ以外を match に書いた項は使われない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 範囲の件数の上限。設計 9.3。大量に並べて人のレビューを
-# 潰し、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
+# 範囲の件数の上限。設計 9.3。大量に並べて人がレビューしきれない
+# ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
 # 範囲のパスに書けない綴り。`..` は範囲の外へ出る綴り、絶対パスと `~` は
@@ -128,10 +129,10 @@ def child_pattern() -> re.Pattern:
 
 
 # 親のブランチ名は親の識別子そのもの（ADR-0093 の 3.1）。識別子を、ブランチ名として安全で、
-# 統合先や issue の番号と紛れない形に寄せる。いまは `--lint` の warn だけで、承認は止めない。
+# 統合先や issue の番号と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。
 #
 # 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じ並び）。
-# 大文字小文字を畳んで比べる。`release/*` は識別子に `/` を書けないので、
+# 大文字小文字を区別せずに比べる。`release/*` は識別子に `/` を書けないので、
 # ここでは `release` と `release-*` だけを見る。
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 # issue から決める識別子の形（`i` + 番号）。`issue:` を持つ提案だけが使う。
@@ -165,7 +166,7 @@ def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
     子の形に当たる親の識別子は、他のチケットと並べて見るので `lint` の側で数える。
 
     `integration` はその時点の統合先の名前（D30。段階 2b）。環境変数からは読まず、呼び手が
-    渡したときだけ予約に足す。固定の並び（main など）と同じく大文字小文字を畳んで比べる。
+    渡したときだけ予約に足す。固定の並び（main など）と同じく大文字小文字を区別せずに比べる。
     """
     name = t.ticket
     folded = name.casefold()
@@ -235,7 +236,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     if name != expected:
         return [
             f"識別子が `issue: {t.issue}` から決まる `{expected}` と違う。"
-            "issue から決める形の識別子は番号と置き場（プロジェクト）に合わせる"
+            "issue から決める形の識別子は番号と置き場（プロジェクト）に合わせてください"
         ]
     return []
 
@@ -249,7 +250,7 @@ APPROVAL_KEY = "ccnavi_approved"
 
 # 以前の、子のフローを指す欄（設計 9.3.1、ADR-0085）。今は読まない。フローの置き場は承認済みの
 # 領域の `flows/<子>.yml` に固定（flow.py）。書いてあるチケットは warn で知らせて読み進める
-# （error にすると承認済みチケットが読めなくなり、範囲ごと効かなくなる）。
+# （error にすると承認済みチケットが読めなくなり、範囲ごと判定に使われなくなる）。
 FLOW_KEY = "flow"
 
 # glob のワイルドカード。これより前が字義どおりの前置。
@@ -612,7 +613,7 @@ def load(path: str) -> tuple[Ticket | None, list[Problem]]:
 def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     """読み込み済みの文面からチケットを組み立てる。
 
-    ファイルを開く部分と分けてあるのは、テストと承認の画面が同じ道を通るため。
+    ファイルを開く部分と分けてあるのは、テストと承認の画面が同じ処理を通るため。
 
     欄は種類ごとに読み手を分けてある。どれかが「これ以上読めない」と言えば
     そこで止め、それまでの苦情を全部返す。苦情の並びは欄の並びのまま。
@@ -693,7 +694,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
 
     if front.get(FLOW_KEY) is not None:
         # 以前の欄。置き場は承認済みの領域に固定したので読まない。error にすると承認済み
-        # チケットが読めなくなり、範囲ごと効かなくなる（緩む）ので warn で知らせるだけ。
+        # チケットが読めなくなり、範囲ごと判定に使われなくなる（緩む）ので warn で知らせるだけ。
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -778,14 +779,16 @@ def _read_review(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
     if not ticket.review_required and not ticket.review_reason:
         problems.append(
             Problem(
-                SEVERITY_WARN, name, "人間レビューを省くなら `human_review.reason` に理由を書く"
+                SEVERITY_WARN,
+                name,
+                "人間レビューを省くなら `human_review.reason` に理由を書いてください",
             )
         )
     return False
 
 
 def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
-    """効かない欄への注意、スクリプトの欄、範囲の項。範囲が成り立たなければ True。"""
+    """判定に使われない欄への注意、スクリプトの欄、範囲の項。範囲が成り立たなければ True。"""
     name = ticket.ticket
     for key in ("tools", "deny_commands", "target_directories"):
         if key in front:
@@ -822,7 +825,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
                 SEVERITY_ERROR,
                 name,
                 f"範囲が {len(entries)} 件ある（上限 {MAX_SCOPE_ENTRIES} 件）。"
-                "作業を分けるか、範囲をまとめること",
+                "作業を分けるか、範囲をまとめてください",
             )
         )
         return True
@@ -880,13 +883,16 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
 def regex_overflow_detail(regex: str) -> str:
     """子の範囲の regex を名指しする文。親の検査と種類の検査の両方が同じ文を使う。
 
-    同じ文にしておけば、承認の画面で 2 度並べずに畳める。
+    同じ文にしておけば、承認の画面で 2 度並べずにまとめられる。
     """
-    return f"子の範囲に regex `{regex}` は書けない。親と種類の上限に入るかを判定のときに当てる"
+    return (
+        f"子の範囲に regex `{regex}` は書けない。"
+        "親と種類の上限に収まるかは、判定のときに当てて確かめる"
+    )
 
 
 def combine(child: str, parent: str) -> str:
-    """親子の判定を、厳しい側が勝つ形で合わせる。"""
+    """親子の判定を、厳しい側を採る形で合わせる。"""
     order = {rules.DENY: 3, rules.ASK: 2, rules.ALLOW: 1, OUTSIDE: 4}
     return child if order[child] >= order[parent] else parent
 
@@ -897,7 +903,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     置き場は提案の置き場（`wip/proposals/`）と承認済みチケットの置き場
     （`.ccnavi/approved/`）。どちらも固定で、env では動かない。
     ここはチケットの範囲の外でも咎めない。咎めると、親が自分のワークツリーに次の子を
-    提案する道と、承認がブランチに乗る道が塞がる。
+    提案する経路と、承認がブランチに乗る経路が使えなくなる。
 
     外して開くのは提案の `todo/` だけ。`review/` は `guard_rules`、承認済みチケットは
     自己防衛の組み込みが deny で止め、ルールの deny はチケットより強い。
@@ -905,12 +911,12 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
 
-    実行前の判定は `is_unscoped` を通ってここへ来る。実行後の監視とサブエージェント終了時の
-    検査は直に呼ぶ（`post._script_writes` / `post._committed_findings` / `post.ScopeGuard.finding`、
-    `phase.scope_findings`）。
+    実行前チェックは `is_unscoped` を通ってここへ来る。実行後チェックとサブエージェント終了時
+    チェックは直に呼ぶ（`post._script_writes` / `post._committed_findings` /
+    `post.ScopeGuard.finding`、`phase.scope_findings`）。
 
-    **実行後の監視から呼ぶときは、後ろに組み込みは控えていない。** 組み込みを足すのは
-    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの監視は、置き場を
+    **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
+    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの実行後チェックは、置き場を
     そのまま外さずに、内容で外すぶんを決める（`script_shape`、`post._script_writes`）。
     """
     return any(_under(rel, place) for place in (tickets_rel, approved_rel))
@@ -925,7 +931,8 @@ def _under(rel: str, place_rel: str) -> bool:
     `rel` の `\\` は `/` に直さない。呼び手が渡すのは `tree.relative`
     （`os.sep` を `/` に直した綴り）か
     git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\proposals\\todo\\x.py` という
-    名前のファイル 1 個が置き場の中に見え、範囲を逃れる。置き場の綴り（設定の値）だけは直す。
+    名前のファイル 1 個が置き場の中に見え、範囲の判定から外れる。置き場の綴り（設定の値）
+    だけは直す。
     """
     base = _fold(place_rel.replace("\\", "/").strip("/"))
     return bool(base) and _fold(rel).startswith(base + "/")
@@ -935,8 +942,8 @@ def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """チケットが `finish` / `cancel` / 人のレビューで出ていく元（作業中とレビュー待ち）か。
 
     移動の組を数えるとき、消えた側がここに居たことを求める。求めないと、承認待ちの提案
-    （`todo/`）を `review/` に置き直す形——人の承認を通っていないものを、レビュー待ちに
-    見せる形——が移動として外れる。
+    （`todo/`）を `review/` に置き直す形が移動として外れる。これは、人の承認を通っていない
+    ものをレビュー待ちに見せる形になる。
     """
     return _under(rel, f"{approved_rel}/{DOING}") or _under(rel, f"{tickets_rel}/{REVIEW}")
 
@@ -944,9 +951,9 @@ def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """`finish` と `cancel` がチケットを動かす先（レビュー待ちと閉じた置き場）か。
 
-    実行後の監視が、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
+    実行後チェックが、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
     行き先をこの 2 つに絞るのは、`doing/` から出したチケットを `todo/` に置き直す形が
-    「承認済みチケットを消す」のと同じ効き目を持つから。承認済みチケットが 1 本も無い
+    「承認済みチケットを消す」のと同じ結果になるから。承認済みチケットが 1 本も無い
     ワークツリーは範囲を持たず、範囲を持たないツリーはチケットの側から何も言われない。
     """
     return _under(rel, f"{tickets_rel}/{REVIEW}") or _under(rel, f"{approved_rel}/{DONE}")
@@ -971,7 +978,7 @@ def is_scratch_place(rel: str) -> bool:
     **綴りの大文字小文字は区別する。範囲の照合（`_fold`）とは逆にしてある。** 外してよい
     理由が「追跡されない」ことにあり、追跡から外しているのは `.gitignore` の `/scratchpad/` で、
     その照合は Linux では区別するため。区別せずに外すと、Linux の `SCRATCHPAD/` が「追跡される
-    のに範囲を当てない場所」になり、承認した範囲の外の変更が統合先へ乗る道ができる。
+    のに範囲を当てない場所」になり、承認した範囲の外の変更が統合先へ乗る経路ができる。
     区別する側を採れば、どの機械でも除外は追跡から外れる範囲より狭いままで、狭いぶんは
     範囲の判定が止めるだけで済む。
 
@@ -985,7 +992,7 @@ def is_scratch_place(rel: str) -> bool:
     return rel.startswith(SCRATCH + "/")
 
 
-# ELI5 の HTML の置き場（ADR-0095・ADR-0096）。依頼に添える、変更をやさしく説明した HTML を置く。
+# ELI5 の HTML の置き場（ADR-0095・ADR-0096）。依頼につける、変更をやさしく説明した HTML を置く。
 # 名前は固定。設定で動かさない（動かせると、その値をソースの置き場に向けるだけで範囲を迂回できる）。
 ELI5 = "wip/eli5"
 
@@ -993,13 +1000,13 @@ ELI5 = "wip/eli5"
 def is_eli5_place(rel: str) -> bool:
     """ツリーのルートからの相対パスが、ELI5 の HTML の置き場（`wip/eli5/`）の下にあるか。
 
-    チケットの範囲を当てない（ADR-0096）。ELI5 はレビューの依頼に必ず添える材料で、親の範囲に
+    チケットの範囲を当てない（ADR-0096）。ELI5 はレビューの依頼に必ずつける材料で、親の範囲に
     毎回 `wip/eli5/*` を書かせると、書き忘れた親は依頼の手前で止まる。ここは `wip/` の下なので
     `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
     `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
 
-    `scratchpad/` と違って git が追跡する置き場なので、実行後の監視（`post.ScopeGuard.finding`）と
-    サブエージェント終了時の検査（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
+    `scratchpad/` と違って git が追跡する置き場なので、実行後チェック（`post.ScopeGuard.finding`）と
+    サブエージェント終了時チェック（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
     実行前に通った書き込みがコミットのあとで範囲の外として咎められる。
 
     綴りの大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
@@ -1008,19 +1015,19 @@ def is_eli5_place(rel: str) -> bool:
     `\\` は `/` に直さない。呼び手の綴りは `tree.relative`（`os.sep` を `/` に直したもの）か
     git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
     名前のファイル 1 個が置き場に
-    見え、範囲を逃れ、しかも `ready` の片付け（`git ls-files -- wip`）にも掛からない。
+    見え、範囲の判定から外れ、しかも `ready` の片付け（`git ls-files -- wip`）の対象にもならない。
     """
     return rel.startswith(ELI5 + "/")
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """チケットの範囲を当てない場所か。**実行前の判定（`judge`）だけが使う。**
+    """チケットの範囲を当てない場所か。**実行前チェック（`judge`）だけが使う。**
 
     実行前は、これから書かれる 1 つのパスを見る。下書きの置き場を外すのはここだけで
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
 
-    実行後の監視（`post`）とサブエージェント終了時の検査（`phase.scope_findings`）は
-    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの監視は
+    実行後チェック（`post`）とサブエージェント終了時チェック（`phase.scope_findings`）は
+    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの実行後チェックは
     内容で決める（`post._script_writes`）。外し方を揃えないのは、
     **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
     （`--ignored` を付けない）と `base_sha..HEAD` の差分（追跡ファイルだけ）で、
@@ -1029,13 +1036,13 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
     答えが変わるのは `scratchpad/` が追跡されているとき、すなわち外してよい根拠
     （追跡されないので統合先のブランチへ乗らない）が既に崩れているときだけ。
-    そこで外すと、根拠が崩れたことを知らせる唯一の経路を自分で塞ぐことになる。
+    そこで外すと、根拠が崩れたことを知らせる唯一の経路を自分でなくすことになる。
     だから外さない。実行前に通ったものが実行後に咎められる形は残るが、咎められる
     のは「そのリポジトリで `scratchpad/` が追跡されている」ときだけで、それは本当に
     知らせるべきことになる。
 
-    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後の監視と
-    サブエージェント終了時の検査も同じく外す（ADR-0096）。
+    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後チェックと
+    サブエージェント終了時チェックも同じく外す（ADR-0096）。
     """
     return (
         is_ticket_place(rel, tickets_rel, approved_rel)
@@ -1045,7 +1052,7 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
 
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
-    """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場を添える。
+    """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場をつける。
 
     集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
     承認済みチケットが動いてきたもので、`ccnavi_approved` を持つ（approval.scan_review）。
@@ -1061,10 +1068,10 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
 def scan_all(
     root: str, tickets_rel: str, projects_dir: str = ""
 ) -> tuple[list[Ticket], list[Problem]]:
-    """ワークスペースルートと全ワークツリーの提案を、重複を畳まずに集める。
+    """ワークスペースルートと全ワークツリーの提案を、重複をまとめずに集める。
 
     ボード（`--explain --json`）が「どのツリーに写っているか」を見せるために使う。
-    判定と承認は `scan` の畳んだ側を読む。
+    判定と承認は `scan` のまとめた側を読む。
     """
     found: list[Ticket] = []
     problems: list[Problem] = []
@@ -1130,15 +1137,15 @@ def scan_all(
 
 
 def fold(hits: list[Ticket]) -> list[Ticket]:
-    """同じ識別子の写りを、権威のあるツリーで畳む。
+    """同じ識別子の写りを、権威のあるツリーの側にまとめる。
 
     子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
     写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
     あればそれが本物で、残りは写し。
 
     親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
-    そのプロジェクト）の側を採る。ワークツリーは畳めば消えるが、元ツリーは消えない。
-    親のワークツリーを作る前と、合流して畳んだ後がこの形で、ここで行き先を決めないと、
+    そのプロジェクト）の側を採る。ワークツリーは片付ければ消えるが、元ツリーは消えない。
+    親のワークツリーを作る前と、合流して片付けた後がこの形で、ここで行き先を決めないと、
     片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。
 
     **ただし、元ツリーより先の置き場に在る写しが 1 つでもあれば採らない。** 元ツリーを
@@ -1150,9 +1157,9 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
     どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
     決まらない（検証が「複数の場所にある」と言う状態）。
 
-    リポジトリをまたいだ衝突は畳まない。識別子は人が選ぶ短い連番なので、プロジェクトが
-    独立に振ればぶつかる（設計 11）。それは写しではなく別物なので、どちらかを権威に
-    すると、もう片方が黙って消えて `--lint` の「複数のリポジトリにある」も出なくなる。
+    リポジトリをまたいだ衝突はまとめない。識別子は人が選ぶ短い連番なので、プロジェクトが
+    独立に振ればぶつかる（設計 11）。それは写しではなく違うチケットなので、どちらかを権威に
+    すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
     """
     if len({t.project for t in hits}) > 1:
         return hits
@@ -1211,10 +1218,10 @@ def collided_states(states: list[str]) -> list[str]:
 def collisions(hits: list[Ticket]) -> list[Ticket]:
     """どれが本物か決まらない写りの全部。決まっていれば空。
 
-    畳んで 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
+    まとめて 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
     状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
     同じ条件（`lint._proposal_problems` も同じ関数を通る）。写りがあること自体は
-    普通なので、畳んで 1 つに決まる写りは数えない。
+    普通なので、まとめて 1 つに決まる写りは数えない。
     """
     folded = fold(hits)
     if len(folded) > 1 and collided_states([t.state for t in folded]):
@@ -1307,7 +1314,7 @@ def propose_notice(
     書いた直後に、要る場所で言う。
 
     **判定には足さない。** これは文であって判定ではないので、ルールの表（`rule_set`）には
-    入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形は
+    入れず、承認の知らせ（`approval.news`）と同じ経路で渡す。表に allow を 1 本足す形は
     採らない。次の 3 つを一緒に引き受けることになるため。
 
     - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの扱い
@@ -1324,8 +1331,8 @@ def propose_notice(
 
     1 つの文脈（セッション、サブエージェントなら 1 回の起動）で最初の 1 回だけ渡る。
     数えは `ctxfile` の控えを、ルールと同じ形で使う（この 1 本は表に入れないので、
-    判定には一切現れない）。2 本目からは黙る。提案を 1 本書くたびに同じ文を積むと、
-    長いセッションではそれだけでコンテキストを食う。
+    判定には一切現れない）。2 本目からは何も渡さない。提案を 1 本書くたびに同じ文を積むと、
+    長いセッションではそれだけでコンテキストを使ってしまう。
     """
     if payload.tool_name not in WRITE_TOOLS or not subject:
         return ""
@@ -1339,9 +1346,10 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
 
     `guard_rules` は前を問わない形（`(^|[\\/])`）で当てるが、あれは deny なので、余分に
     当たるぶんは止めすぎる側へ外れるだけ。文を渡す側を同じ形で当てると、ワークスペースの
-    外に `wip/proposals/todo/` という並びを掘っただけの場所でも「提案を書いた」と読む。
+    外に `wip/proposals/todo/` という並びのディレクトリを作っただけの場所でも
+    「提案を書いた」と読む。
     ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下（設計 11)
-    なので、ルートで留めれば正しい置き場は全部入り、外は入らない。
+    なので、ルートの下に限れば正しい置き場は全部入り、外は入らない。
 
     大文字小文字は区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。
     """
@@ -1372,7 +1380,7 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
     """提案の frontmatter の、スクリプトが書く欄だけを行単位で書き換える。
 
     読み直して書き出す（render）と、人が書いたコメントや `|` のブロックが
-    消えて、親のブランチの diff が汚れる。提案は人も読むものなので、
+    消えて、親のブランチの diff に余計な変更が出る。提案は人も読むものなので、
     触るのは欄の行だけにする。無い欄は閉じの `---` の前に足す。
     """
     lines = text.splitlines()
@@ -1398,12 +1406,12 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     姿を突き合わせる側が「落としてよい欄」を決めるのに使う（`post._script_writes`）。
     **落としてよいのは、コミット済みの版がまだ持っていない欄だけ。** 副命令はどれも
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
-    それは副命令の仕業ではない。
+    それは副命令が書いたものではない。
 
-    とくに `base_sha` は、サブエージェント終了時の検査（`phase.scope_findings` の
+    とくに `base_sha` は、サブエージェント終了時チェック（`phase.scope_findings` の
     `base_sha..HEAD`）と実績リスク（`risk.measure`）の基準点。ここを書き換えられると、
     コミット済みの範囲外の変更が検査から消える。落とす欄を「いつでも」にすると、その
-    書き換えが実行後の監視からも消える。
+    書き換えが実行後チェックからも消える。
     """
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
@@ -1424,7 +1432,7 @@ def script_fields_set(text: str) -> tuple[str, ...]:
 def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None:
     """frontmatter を持つチケットなら、`drop` の欄を落とした姿を返す。無ければ None。
 
-    実行後の監視が「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
+    実行後チェックが「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
     答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
     ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
     clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。
@@ -1433,7 +1441,7 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
     `SCRIPT_FIELDS` の部分集合で、決めるのは呼ぶ側（`script_fields_set` を引いて、
     コミット済みの版がまだ持っていない欄だけを渡す）。範囲
     （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
-    そこが 1 文字でも変われば別の姿になり、監視は今までどおり報告する。
+    そこが 1 文字でも変われば別の姿になり、チェックは今までどおり報告する。
 
     切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
     落とす。揃えないと、スクリプトが書いた直後の姿が「スクリプトが書いていない形」に見える。
@@ -1578,7 +1586,7 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
         if lines and lines[0].lstrip(BOM).strip() == FENCE:
             detail = (
                 f"先頭に BOM (U+FEFF) が付いていて `{FENCE}` で始まっていない。"
-                "BOM 無しの UTF-8 で保存し直す"
+                "BOM 無しの UTF-8 で保存し直してください"
             )
         else:
             detail = f"先頭が `{FENCE}` で始まっていない"

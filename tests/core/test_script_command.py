@@ -28,7 +28,7 @@ class ScriptCommandTest(unittest.TestCase):
             )
 
     def test_quoted_only_when_needed(self):
-        """空白を含むルートは引用する。引用しないと sh が単語に割る。"""
+        """空白を含むルートは引用する。引用しないと sh が単語に分ける。"""
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.join(tmp, "My Projects", "ws")
             os.makedirs(root)
@@ -61,7 +61,7 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase.forbidden(finish.text), finish.text)
 
     def test_separator_is_slash(self):
-        """Windows の `\\` は `/` に寄せる。Git Bash は `C:/...` を読める。"""
+        """Windows の `\\` は `/` にそろえる。Git Bash は `C:/...` を読める。"""
         spelled = settings.script_command("C:\\Users\\me\\ws", "ccnavi-review.sh")
         self.assertNotIn("\\", spelled)
         self.assertTrue(spelled.endswith("/ws/.ccnavi/scripts/ccnavi-review.sh"), spelled)

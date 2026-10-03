@@ -27,7 +27,7 @@ export const SECTIONS = ["deny", "ask", "allow"] as const;
 export type Section = (typeof SECTIONS)[number];
 export type PatternKind = "glob" | "regex";
 
-/** タイプの言い換え。画面の見出しで `deny` などの綴りに添える */
+/** タイプの言い換え。画面の見出しで `deny` などの綴りにつける */
 export const SECTION_LABELS: Readonly<Record<Section, string>> = {
   deny: "拒否する",
   ask: "人に確認する",
@@ -74,8 +74,8 @@ export interface RuleForm {
    *
    * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
    * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
-   * 刻みを外す操作も、読めない値を画面から直す道も書けない。読めない値は書いたまま
-   * 書き戻し、咎めるのは保存前の `ccnavi --lint`。画面が黙って直すと、lint が名指し
+   * 刻みを外す操作も、読めない値を画面から直す方法も書けない。読めない値は書いたまま
+   * 書き戻し、咎めるのは保存前の `ccnavi --lint`。気づかないうちに画面で直されると、lint が名指し
    * している対象が消えて苦情の出どころが分からなくなる
    */
   readonly every: string;

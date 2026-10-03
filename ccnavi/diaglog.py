@@ -8,17 +8,17 @@ sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と拡張（`src/log.ts`）�
 持ち込まないためと、3 つの言語で行の形を 1 字まで揃えるため。
 
 **標準出力にも標準エラーにも何も出さない。** 書けない（置き場が作れない・権限・容量）ときは
-黙って捨て、例外を外へ出さない。ログの成否で本体の判定・出力・終了コードは変わらない。
-利用者やモデルに見せる文面（`ccnavi: …` の標準エラー、hook の JSON）とは別物で、そちらは
-このモジュールと関係なく今のまま書く。
+何も出さずに捨て、例外を外へ出さない。ログの成否で本体の判定・出力・終了コードは変わらない。
+利用者やモデルに見せる文面（`ccnavi: …` の標準エラー、hook の JSON）は契約として決まっている出力で、
+診断ログとは分けてある。そちらはこのモジュールと関係なく今のまま書く。
 
-本文と値は書く前に、まず mask_userinfo（URL と scp 形の資格情報を `***` に。sh と拡張と
-同じ読み）を、次に redact を通す。秘密の形を伏せる最後の網で、秘密の値をそもそも
+本文と値は書く前に、まず mask_userinfo（URL と scp 形式の資格情報を `***` に伏せる。sh と拡張と
+同じ規則）を、次に redact を通す。秘密の形を伏せる最後の安全網で、秘密の値をそもそも
 渡さないのが先（規約）。
 
-**リンクは辿らない。** `logs`・`logs/diag`・書き先のファイルのどれかがシンボリックリンクなら
-書かずに捨てる（書き先は O_NOFOLLOW で開く。無い OS では lstat で見る）。ファイルは 0600 で作る。
-出どころの名前が `[A-Za-z0-9_-]` 以外を含むときも書かない。
+**シンボリックリンクはたどらない。** `logs`・`logs/diag`・書き込み先のファイルのどれかが
+シンボリックリンクなら書かずに捨てる（書き込み先は O_NOFOLLOW で開く。無い OS では lstat で
+見る）。ファイルは 0600 で作る。出どころの名前が `[A-Za-z0-9_-]` 以外を含むときも書かない。
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ _BY_WORD = {"DEBUG": DEBUG, "INFO": INFO, "WARN": WARN, "ERROR": ERROR}
 
 # 出どころに使える名前。これ以外の字（区切り・`.`・空白）を含む名前では書かない。
 _NAME = re.compile(r"[A-Za-z0-9_-]+")
-# 伏せ字で語を切る字（sh の ccnavi_log_space と同じ）。
+# 資格情報を伏せるときに語を切る文字（sh の ccnavi_log_space と同じ）。
 _SPACE = re.compile(r"([ \t\n\r]+)")
 MASK = "***"
 
@@ -161,12 +161,12 @@ def _mask_word(word: str) -> str:
 
 
 def fold(value: str) -> str:
-    """改行（CR LF・CR・LF）を `\\n` の 2 字に畳む。"""
+    """改行（CR LF・CR・LF）を `\\n` の 2 字に置き換える。"""
     return value.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\\n")
 
 
 def quote(value: str) -> str:
-    """logfmt の値。空白・タブ・`"`・`=`・改行を含めば囲み、`\\` と `"` を逃がす。"""
+    """logfmt の値。空白・タブ・`"`・`=`・改行を含めば囲み、`\\` と `"` の前に `\\` をつける。"""
     if not any(ch in value for ch in _NEEDS_QUOTE):
         return value
     return '"' + fold(value.replace("\\", "\\\\").replace('"', '\\"')) + '"'
@@ -183,7 +183,7 @@ def format_line(
 def append(path: str, line: str) -> None:
     """1 行を O_APPEND で 1 度に書く。並行するプロセスの行と混ざらない。
 
-    `logs`・`logs/diag`・書き先のどれかがリンクなら書かない。書き先は O_NOFOLLOW で開き
+    `logs`・`logs/diag`・書き込み先のどれかがリンクなら書かない。書き込み先は O_NOFOLLOW で開き
     （リンクなら開けずに OSError）、それが無い OS では lstat で先に見る。新しいファイルは 0600。
     """
     directory = os.path.dirname(path)

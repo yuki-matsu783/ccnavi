@@ -4,14 +4,14 @@
 
 ルールを 1 件書いたとき、それが何に当たるのかは走らせるまで分からない。
 `glob` は正規表現に翻訳されるし、Bash のコマンドは実行される部分まで
-絞られてから当たる。書いた人の頭の中の当たり方と、実際の当たり方がずれても、
-ずれたことに気づく手立てが無かった。気づかないルールは、足したつもりで
+絞られてから当たる。書いた人の頭の中の当たり方と、実際の当たり方が食い違っても、
+食い違ったことに気づく手立てが無かった。食い違いに気づかれないルールは、足したつもりで
 何も止めていない 1 行になる。
 
-## 判定と同じ道を通る
+## 判定と同じ経路を通る
 
 ここは判定を作り直さない。payload を組み立てて `judge.decide_before` を
-そのまま呼び、返った応答と記録を読んで人に見せる。別の道で判定すると、
+そのまま呼び、返った応答と記録を読んで人に見せる。別の経路で判定すると、
 試験で通ったものが実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
 
 モードは常に enable で動かす。試験は「止まるかどうか」を問うものなので、
@@ -73,7 +73,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     """1 件を判定して、結果とすべての理由を 1 つの辞書にする。
 
     文字で出す `test` と JSON で出す `test_json` の両方がここを読む。読み手ごとに
-    判定を呼び直すと、端末で見た答えと画面で見た答えが別物になりうる。
+    判定を呼び直すと、端末で見た答えと画面で見た答えが違うものになりうる。
 
     鍵は README「試験の JSON」に書いてある。`known` が偽なら、そのツールは
     判定が対象を取り出せないもので、他の鍵は空のまま。
@@ -118,7 +118,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
 
     # 応答は捨てずに拾う。判定が返す文面そのものを見せたいので、
     # ここで文を組み直さない。組み直すと、試験で読んだ文と
-    # エージェントに届く文が別物になる。
+    # エージェントに届く文が違うものになる。
     captured = io.StringIO()
     judge.decide_before(
         captured,
@@ -227,7 +227,7 @@ def test(
         for hit in out["rules"]:
             if hit["source"] == "outside":
                 # チケットの範囲のように、ルールファイルの中に無い根拠。
-                stdout.write(f"  {hit['id']}（ルールファイルの外から来た根拠）\n")
+                stdout.write(f"  {hit['id']}（ルールファイルの外にある根拠）\n")
                 continue
             stdout.write(f"  {hit['section']}:{hit['id']}  {hit['kind']} {hit['written']!r}\n")
             stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
@@ -268,7 +268,7 @@ def _rules_hit(
     """当たったルールを、タイプと翻訳後の式まで返す。
 
     翻訳後の式を出すのがこの試験の要。`glob` は正規表現に変わるので、
-    書いたものと当たるものの間に見えない層が 1 枚ある。その層を開けないと、
+    書いたものと当たるものの間に見えない変換が 1 つ挟まる。その変換を見せないと、
     当たらなかった理由を人が自分で辿れない。
 
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
@@ -308,7 +308,7 @@ def _response_text(written: str) -> str:
 
     止めるだけでは足りない、というのがこの道具の目的なので、試験でも
     「何が返るか」まで見せる。文面の無い拒否は、受け取った側に
-    次の一手が無い。
+    次にすることが分からない。
     """
     if not written.strip():
         return ""
@@ -353,7 +353,7 @@ def load_samples(path: str, root: str) -> list[dict]:
 def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -> dict:
     """見本をぜんぶ判定に掛けて、期待と突き合わせた結果を 1 つの辞書にする。
 
-    判定は `judge` を通す。ここで判定を作り直さないのが肝で、別の道で確かめると、
+    判定は `judge` を通す。ここで判定を作り直さないのが肝で、別の経路で確かめると、
     見本が通ったのに実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
 
     `ok` は期待どおりか。`skipped` は allow の見本が判定に入らずに通ったもので、
@@ -554,7 +554,7 @@ def _explain_risk(
         for v in views
     ]
     common, _ = risk.load(conf.risk)
-    # 共通層の境目の点。層の `levels` はキーごとに小さいほうが勝つので、実際に効く値は
+    # 共通層の境目の点。層の `levels` はキーごとに小さいほうを採るので、実際に使われる値は
     # チケットの層で決まる（設計 11.4.2）。ここに出すのは共通層の側の既定。
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
@@ -572,18 +572,18 @@ def _explain_risk(
 
 
 def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
-    """いま効いている宣言を、判定を行わずに一覧する（REQ-DIA-01）。
+    """いま有効な宣言を、判定を行わずに一覧する（REQ-DIA-01）。
 
     どこが守られているかではなく、何がどう宣言されているかを見せる。
     実効権限をパスごとに数え上げるには、宣言済み領域という概念が要る。
     それはまだ無いので、ここで言えるのは「どのルールがどのタイプにあるか」と
-    「チケットの範囲が効いているか」まで。言えないことは言わない。
+    「チケットの範囲が有効か」まで。言えないことは言わない。
     """
     views = ruleload.survey(stderr, conf, root)
     source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
     stdout.write(
-        "  パスを持つツールは 共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
+        "  パスを持つツールは共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
         "（設計 11.4）\n"
     )
 
@@ -607,7 +607,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     _explain_risk(stdout, conf, root, views)
 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
-    stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
+    stdout.write("  ccnavi は判定を下さず、Claude Code の権限モードに従う\n")
     stdout.write(
         "    auto                          classifier（auto モードで呼び出しを通すかを決める、"
         "Claude Code の判定役のモデル）が判断する\n"
@@ -617,14 +617,15 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
     if (conf.guard_unwatched or "").strip().lower() == selfguard.DISABLE:
         stdout.write(
-            f"    dontAsk / bypassPermissions   委ねる（{settings.GUARD_UNWATCHED_ENV}=disable）\n"
+            "    dontAsk / bypassPermissions   そのモードに委ねる"
+            f"（{settings.GUARD_UNWATCHED_ENV}=disable）\n"
         )
     else:
         stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(
-        "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。"
+        "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より優先される。"
         "範囲の外は止まる\n"
     )
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
@@ -666,9 +667,11 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
         wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
         if wrapped:
-            stdout.write(f"  {parent.ticket} は利用者が締めた: {wrapped.get('reason', '')}\n")
+            stdout.write(f"  {parent.ticket} はユーザが締めた: {wrapped.get('reason', '')}\n")
         if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
-            stdout.write(f"  {parent.ticket} は Draft を外した。マージは利用者が行う\n")
+            stdout.write(
+                f"  {parent.ticket} のマージリクエストの Draft を外した。マージは利用者が行う\n"
+            )
         for ph in phase.phases_of(root, conf, parent.ticket):
             marks = ", ".join(sorted(ph.marks)) or "マーカーなし"
             if not ph.tickets:
@@ -704,7 +707,7 @@ def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: 
 
     読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・マーカーを自分で解釈せず、ここが
     出した形をそのまま並べる。「レビューで止まっているか」「承認待ちは何か」の答えを
-    2 か所で出さないための口で、判定と同じ関数（phase / approval）で組む。
+    2 か所で出さないためのもので、判定と同じ関数（phase / approval）で組む。
     ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 3 P11）。
     """
     stdout.write(json.dumps(board(conf, root, stderr), ensure_ascii=True, indent=1))
@@ -746,7 +749,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     # 写りの一覧（`seen_in` / `scattered`）は、承認済みチケットの置き場に在るものも数える。
     # チケットは 1 本のファイルで、どの置き場に在っても子のワークツリーに写る（ADR-0055）。
     # `review/` は提案の置き場でもあり承認済みチケットでもあるので、2 つの走査が同じ
-    # ファイルを拾う。同じ実体を 2 つと数えると「複数の場所にある」になるので、パスで畳む。
+    # ファイルを拾う。同じ実体を 2 つと数えると「複数の場所にある」になるので、パスでまとめる。
     everything = _one_per_file(everything + approval._everything(conf, root))
     open_copies, notes = approval.scan(conf, root)
     problems.extend(notes)
@@ -900,12 +903,12 @@ def _where(t: ticket_mod.Ticket) -> dict:
 
 
 def _one_per_file(found: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """同じツリーで同じファイルを 2 度読んだぶんを畳む。並びは見つけた順で、先を残す。
+    """同じツリーで同じファイルを 2 度読んだぶんをまとめる。並びは見つけた順で、先を残す。
 
-    鍵にツリーを入れるのは、畳むのを「1 つの走査の重なり」に限るため。2 つのツリーが
+    鍵にツリーを入れるのは、まとめるのを「1 つの走査の重なり」に限るため。2 つのツリーが
     同じ実体を指す形（`projects/<名前>` がワークスペース自身への symlink など）は
-    写りが 2 つ在るのと同じで、判定の側（`approval._authoritative`）も畳まない。
-    ここだけ畳むと、板が黙っているのに操作が止まる。
+    写りが 2 つ在るのと同じで、判定の側（`approval._authoritative`）もまとめない。
+    ここだけまとめると、ボードに何も出ていないのに操作が止まる。
     """
     kept: list[ticket_mod.Ticket] = []
     seen: set[tuple[str, str]] = set()
@@ -974,7 +977,7 @@ def _ticket_record(
             if proposal is not None
             else None
         ),
-        # blocked は「読めるが信じられない」理由（ADR-0058）。判定はこのチケットの
+        # blocked は「読めるが信頼できない」理由（ADR-0058）。判定はこのチケットの
         # ワークツリーへの書き込みを全部止めるので、ボードが素の open として見せると、
         # 止まっていること自体が人に届かない。
         "blocked": (open_index[ticket_id].blocked if ticket_id in open_index else ""),

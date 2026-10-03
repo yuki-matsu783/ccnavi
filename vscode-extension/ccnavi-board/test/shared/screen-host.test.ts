@@ -1,4 +1,4 @@
-/** 画面に中身を渡す段取り。どの状態で何が飛ぶか（拡張ホスト側。VS Code は要らない） */
+/** 画面に中身を渡す段取り。どの状態で何が送られるか（拡張ホスト側。VS Code は要らない） */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { retainedHost, screenHost, type Surface } from "../../src/core/screen-host.js";
@@ -31,7 +31,7 @@ test("CB-T143 1 枚目は入れ物ごと入れる。組み上がる前に渡し�
   assert.equal(host.send("あ"), "rebuilt");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);
   assert.deepEqual(spy.posted, []);
-  // 作り直している最中。受け口がまだ無いので送らない（いま読み込んでいるものも捨てない）
+  // 作り直している最中。受け取る側がまだ無いので送らない（いま読み込んでいるものも捨てない）
   assert.equal(host.live, false);
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);
@@ -125,7 +125,7 @@ test("CB-T149 裏に回ったと教えられたら、そのあいだ何も呼ば
   host.ready();
   assert.equal(host.live, true);
   // 裏へ回って表へ戻るまでの間、この段取りは 1 度も呼ばれない（実機の onDidChangeViewState がその形）。
-  // 教えてもらっていなければ、表裏を自分で読んでも行って戻ったことに気づけない
+  // 知らされていなければ、表裏を自分で読んでも行って戻ったことに気づけない
   spy.visible = false;
   host.hidden();
   spy.visible = true;
@@ -142,7 +142,7 @@ test("CB-T150 教えてもらえなくても、表裏が変わっていれば気
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 裏に回ったことを誰も教えてくれない場合。裏にいる間に 1 度でも触れば、そこで気づく
+  // 裏に回ったことが知らされない場合。裏にいる間に 1 度でも触れば、そこで気づく
   spy.visible = false;
   assert.equal(host.post({ type: "filter" }), false, "裏の画面には届かない");
   spy.visible = true;
@@ -158,7 +158,7 @@ test("CB-T151 保持する画面は入れ物を 1 度しか入れない。2 枚�
   const host = retainedHost<string>(spy, (data) => `<html>${data}</html>`);
   assert.equal(host.send("あ"), "rebuilt");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);
-  // 組み上がるまでは受け口が無い。入れ直しもしない（読み込んでいるものを捨てない）
+  // 組み上がるまでは受け取る側が無い。入れ直しもしない（読み込んでいるものを捨てない）
   assert.equal(host.live, false);
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);

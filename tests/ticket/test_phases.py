@@ -131,7 +131,7 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
         # 共通層は `--root` の下の既定の置き場に置く。`--rules` / `--phases` は診断
-        # （`--lint` / `--test` / `--explain`）でだけ効くので、hook の判定と `--reviewed`
+        # （`--lint` / `--test` / `--explain`）でだけ有効なので、hook の判定と `--reviewed`
         # には渡せない（ADR-0067）。差し替えたいテストはこのファイルに書き直す。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.phases = write(common_path(self.root, "phases"), PHASES)
@@ -202,7 +202,7 @@ class PhaseHarness(unittest.TestCase):
         """承認して、写しを親のブランチに乗せる。
 
         写しは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
-        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
+        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順でたどる。
         """
         result = self.ccnavi("--approve", stdin="y\n")
         if os.path.isdir(self.approved):
@@ -368,7 +368,7 @@ class PhaseTest(PhaseHarness):
             "version: 1\nphases:\n  a: {title: 同じ, kind: work}\n  b: {title: 同じ, kind: work}\n"
         )
         self.assertTrue(any("表示名" in p.detail for p in problems), problems)
-        # フィードバック対応は人が見ない道を作らない。見る場所は chat でも mr でもよい。
+        # フィードバック対応は人が見ない経路を作らない。見る場所は chat でも mr でもよい。
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: none}\n"
         )
@@ -966,7 +966,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("今期はここまで", issue)
         # 締めたので、フィードバック計画が無くても親を閉じられる。
         explained = self.ccnavi("--explain")
-        self.assertIn("利用者が締めた", explained.stdout)
+        self.assertIn("ユーザが締めた", explained.stdout)
         closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         # Draft はまだ外れていない。片付けて push してから ready で外す。
@@ -1101,7 +1101,7 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
 class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
     """`ticket` の副命令に `--phases` を足しても、種類は共通層のまま（ADR-0067、issue #65）。
 
-    `.ccnavi/scripts/ccnavi-ticket.sh` が引数を素通しするので、この形はエージェントが
+    `.ccnavi/scripts/ccnavi-ticket.sh` が引数をそのまま渡すので、この形はエージェントが
     Bash で打てる。通していた頃は、`review: mr` の種類を `review: none` と名乗る
     ファイルに差し替えて、レビュー待ちを飛ばせた。
     """
@@ -1248,7 +1248,7 @@ class ChatReviewTest(PhaseHarness):
     def test_a_chat_phase_that_covers_a_deferred_merge_request_phase_is_seen_in_the_merge_request(
         self,
     ):
-        """厳しい側が勝つ。延期を引き受けた側が、引き受けた分より緩い場所で見ない。"""
+        """厳しい側を採る。延期を引き受けた側が、引き受けた分より緩い場所で見ない。"""
         self.family(plan=[("design", "defer"), "chores"])
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"], review=False))
         self.commit_parent()
@@ -1279,7 +1279,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertIn("レビュー要: マージリクエスト", result.stdout)
 
     def test_chat_and_accept_unresolved_together_are_refused(self):
-        """chat に未解決スレッドは無い。取り違えを黙って通さない。"""
+        """chat に未解決スレッドは無い。取り違えを何も言わずに通さない。"""
         self.chat_phase(plan=["chores"])
         refused = self.ccnavi(
             "--cwd",
@@ -1319,7 +1319,7 @@ class ChatReviewTest(PhaseHarness):
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("マージリクエスト", refused.stderr)
-        # 止まったままになる。読めないことでレビューが消える道は作らない。
+        # 止まったままになる。読めないことでレビューが消える経路は作らない。
         payload = {
             "hook_event_name": "PreToolUse",
             "tool_name": "Agent",
@@ -1331,7 +1331,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     def test_a_feedback_phase_can_be_seen_in_the_session_too(self):
-        """フィードバック対応も chat で回せる。人が見ない道にはなっていない。"""
+        """フィードバック対応も chat で回せる。人が見ない経路にはなっていない。"""
         self.chat_phase(plan=["chores"])
         self.assertEqual(
             self.ccnavi(
@@ -1344,7 +1344,7 @@ class ChatReviewTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["chores"], feedback=["chores-feedback"]))
         self.assertEqual(self.approve().returncode, 0)
         # 親を着手にすると、次の hook が承認済みチケットへ started_at を写す。写した跡を
-        # 残したまま先へ進むと、実行後の監視がそれを報告して告知が読めなくなる。
+        # 残したまま先へ進むと、実行後チェックがそれを報告して告知が読めなくなる。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.commit_parent("フィードバック計画")
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/b*"], review=False))
@@ -1352,8 +1352,8 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(self.approve().returncode, 0)
         self.run_child("i0001-02", [("src/b1.py", "y\n")])
         self.assertEqual(self.close_child("i0001-02").returncode, 0)
-        # 承認済みチケットの更新まで入れて commit する。残すと実行後の監視がそちらを報告し、
-        # フェーズの告知が読めない（実行後の監視は stderr、告知は stdout の JSON）。
+        # 承認済みチケットの更新まで入れて commit する。残すと実行後チェックがそちらを報告し、
+        # フェーズの告知が読めない（実行後チェックは stderr、告知は stdout の JSON）。
         self.commit_parent("close 02")
         self.merge("i0001-02")
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
@@ -1504,7 +1504,7 @@ class ScopeLimitTest(PhaseHarness):
         asked = self.write_to(tree, "wip/research/b/x.md")
         self.assertEqual(self.decision(asked), "ask", asked.stdout)
         self.assertIn("TICKET_ASK", self.reason(asked))
-        # 種類は allow か外しか言わない。ask と書いた場所でも種類の外なら外が勝つ。
+        # 種類は allow か外しか言わない。ask と書いた場所でも種類の外なら外を採る。
         beyond = self.write_to(tree, "src/b/x.py")
         self.assertEqual(self.decision(beyond), "deny", beyond.stdout)
         self.assertIn("limit: phase type", self.reason(beyond))
@@ -1588,7 +1588,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("種類の上限では切り詰めていない", self.reason(result))
 
     def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
-        """7. 同じ状態で、Bash の実行前の判定（止めるかどうかの経路）も例外で終わらない。"""
+        """7. 同じ状態で、Bash の実行前チェック（止めるかどうかの経路）も例外で終わらない。"""
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
@@ -1654,7 +1654,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_regex_child_can_keep_the_distinction_with_an_inline_flag(self):
         """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた綴りのとおりに当たる。
 
-        ルールの側（tests/config/test_config_union_holes.py）と同じ逃げ道が、
+        ルールの側（tests/config/test_config_union_holes.py）と同じ書き方が、
         チケットの範囲でも書けることを見る。
         """
         tree = self.approved_child(
@@ -1670,7 +1670,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
-        """15. 実行後の監視: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
+        """15. 実行後チェック: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )

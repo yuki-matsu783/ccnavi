@@ -1,8 +1,8 @@
 """hook のイベントごとの手順。1 回の起動で何が起きるかは、ここを上から読めば分かる。
 
-実行前の判定は judge、サブエージェントの始まりと終わりは subagent、実行後の
-監視は post に本体があり、ここはイベント名からそれらへ振り分け、記録と応答を
-繋ぐだけ。イベントが増えるたびに 1 本の関数が伸びないように、イベント 1 つに
+実行前チェックは judge、サブエージェントの始まりと終わりは subagent、実行後
+チェックは post に本体があり、ここはイベント名からそれらへ振り分け、記録と応答を
+繋ぐだけ。イベントが増えるたびに 1 本の関数が長くならないように、イベント 1 つに
 つき関数 1 つ。
 """
 
@@ -44,9 +44,9 @@ CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
 # `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文（ADR-0090）。ルールの文や
 # 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
 STOP_PREFACE = (
-    "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めない。"
-    "このターンが利用者への問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書く。"
-    "振り返って何も無ければ「振り返り: 無し」とだけ答える。"
+    "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めないでください。"
+    "このターンが利用者への問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書いてください。"
+    "振り返って何も無ければ「振り返り: 無し」とだけ答えてください。"
 )
 
 
@@ -62,7 +62,7 @@ def decide(
 ) -> int:
     """イベントごとの処理に振り分ける。
 
-    振り分けだけをここに置く。イベントが増えるたびに 1 本の関数が伸びると、
+    振り分けだけをここに置く。イベントが増えるたびに 1 本の関数が長くなると、
     どのイベントで何が起きるのかを読むのに全部を読むことになる。
     """
     if mode == modes.DISABLE:
@@ -93,7 +93,7 @@ def watch_context(
 ) -> tuple[list[post.Watched], post.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
-    保護領域も範囲も、実行前の判定と同じ経路で解く。別に書くと、実行前に
+    保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
     通った書き込みがターンの終わりに咎められる（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
     """
@@ -111,7 +111,7 @@ def watched_for(
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
-    ルールの引き方は実行前の判定と同じで、共通層にそのツリーの層を足した和。
+    ルールの引き方は実行前チェックと同じで、共通層にそのツリーの層を足した和。
     別に書くと、実行前に通った書き込みがターンの終わりに咎められる。
     """
     ws = tree.main_tree(root)
@@ -172,7 +172,7 @@ def decide_at_prompt(
     """利用者が何か言ったとき。ターンの基準をここで取る。
 
     原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
-    まだ何も起きていない時点で 1 段積むことになる。ここでやるのは、
+    まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
 
     例外は、このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）。
@@ -218,7 +218,7 @@ def decide_at_stop(
     報告はモードを見ない。dry-run でも報告する。ここは呼び出しにも作業ツリーにも手を
     出さず、見えたことを言うだけなので、モードが約束しているものを何ひとつ破らない。
     むしろ dry-run は「まだ何も適用していないが何が起きているか」を見るためのモードなので、
-    ここが黙ると見る手立てが減る。
+    ここが何も言わないと見る手立てが減る。
 
     止めるのは 1 つだけ。cwd のワークツリーのチケットが、作業を終えたように見えるのに
     `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
@@ -254,7 +254,7 @@ def decide_at_stop(
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
     if nudge:
-        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後の監視と同じ言い方）。
+        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後チェックと同じ言い方）。
         told = f"[ccnavi dry-run] {modes.ENABLE} would have blocked this stop:\n{nudge}"
         report = f"{report}\n\n{told}" if report else told
     if report:
@@ -284,9 +284,9 @@ def stop_rules_nudge(
     止めない回:
 
     - `stop_hook_active` が真（Stop の hook が続けさせた連鎖の 2 回目以降）。数えもしない
-    - サブエージェント（`agent_id` がある）。候補は報告に添えてメインに返す決まり
+    - サブエージェント（`agent_id` がある）。候補は報告につけてメインに返す決まり
     - 数えを覚えられない（`--state ""`、控えを読めない・書けない）。覚えられないまま止めると
-      ターンの終わりのたびに止まるので、黙る側を採る（ADR-0087 と同じ）
+      ターンの終わりのたびに止まるので、何も言わない側を採る（ADR-0087 と同じ）
 
     数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
     `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、利用者への問いで終わった
@@ -330,7 +330,7 @@ def _finish_nudge(
     `nudged-<セッション>.json`）。コミットを足して HEAD が進めば、また促してよい。加えて
     `stop_hook_active` が真なら（Stop の hook が続けさせた結果なら。ほかの hook が止めた分も含む）
     何もしない。控えの置き場が無い（`--state ""`）か、控えを書けないときは促さない。覚えられないまま
-    止めると、ターンの終わりのたびに止まるので、黙る側を採る。チケット制御が disable なら
+    止めると、ターンの終わりのたびに止まるので、何も言わない側を採る。チケット制御が disable なら
     何もしない。
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
@@ -340,7 +340,7 @@ def _finish_nudge(
         return ""
     failed = ops.remember_nudge(conf.state, payload.session_id, found)
     if failed:
-        stderr.write(f"ccnavi: finish の促しを控えられないので、促さない: {failed}\n")
+        stderr.write(f"ccnavi: finish を促した記録を控えられないので、促さない: {failed}\n")
         return ""
     record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
@@ -367,7 +367,7 @@ def decide_at_start(
     このイベントは 1 セッションに 1 回しか来ないので、重い仕事を置く先になる。
 
     判定は返さない。何も起きていない時点なので、言うことは 2 つだけ。控えを
-    取れなかったこと（あれば）と、チケット制御が効いているときの作業の進め方。
+    取れなかったこと（あれば）と、チケット制御が有効なときの作業の進め方。
     後者は起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
     改めて届かないと、compact のあとのモデルは進め方を知らないまま続ける。
     サブエージェントには出さない（SubagentStart は別の手順で、チケットを起こす
@@ -403,7 +403,8 @@ def decide_at_start(
     if skills:
         texts.append(skills)
     # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
-    # サブエージェントには出さない。壊れても黙る（docsearch.at_start が例外を外に出さない）。
+    # サブエージェントには出さない。壊れても何も出さない
+    # （docsearch.at_start が例外を外に出さない）。
     if not payload.agent_id:
         docs = docsearch.at_start(conf, root, deadline)
         if docs:
@@ -416,7 +417,7 @@ def decide_at_start(
 def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
     """記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。
 
-    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前の判定に置くと、呼び出しの
+    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前チェックに置くと、呼び出しの
     たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
     動かしたものの数は記録の `detail` に残す（消したことも記録に残る）。
     """
@@ -446,9 +447,9 @@ def decide_after(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """実行後の監視を 1 回動かし、言うことがあれば返す。
+    """実行後チェックを 1 回動かし、言うことがあれば返す。
 
-    期限を渡していない。実行前の期限は、遅い判定が黙った許可になってしまうのを
+    期限を渡していない。実行前の期限は、遅い判定が気づかないうちに許可と同じ扱いになるのを
     防ぐためのもので、止められるイベントでしか意味を持たない。ここは
     何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
     自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
@@ -468,10 +469,10 @@ def decide_after(
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:
         record.tree, record.project = watched[-1].tree.name, watched[-1].tree.project
-    # 既定に戻ったことをこのイベントでは言わない。実行前の判定が呼び出しごとに
+    # 既定に戻ったことをこのイベントでは言わない。実行前チェックが呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 範囲は実行前の判定と同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
+    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
     scope = scope_guard(conf, root)
 
     text = post.check(
@@ -491,7 +492,7 @@ def decide_after(
         places=(conf.tickets, conf.approved),
         synced=synced,
     )
-    # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
+    # 設定ファイルについて言うことは、実行後チェックの報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
@@ -503,7 +504,7 @@ def decide_after(
         if said:
             text = f"{text}\n\n{said}" if text else said
         # サブエージェントが差し戻しを無視して終わったなら、親にそれを言う。
-        # 差し戻しは 1 回きりなので、2 度目の終了は黙って通っている。
+        # 差し戻しは 1 回きりなので、2 度目の終了は何も言われずに通っている。
         bounced = subagent.ignored_bounce(conf.state, payload)
         if bounced:
             text = f"{text}\n\n{bounced}" if text else bounced

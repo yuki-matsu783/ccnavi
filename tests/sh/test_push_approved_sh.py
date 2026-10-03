@@ -614,7 +614,7 @@ class ApproveCarriesTest(Workspace):
                 self.assertIn("<識別子>", result.stdout)
 
     def test_approve_help_next_to_ids_is_an_id(self):
-        """使い方を出すのは語が 1 つのときだけ。識別子と並んだ `help` を黙って捨てない。"""
+        """使い方を出すのは語が 1 つのときだけ。識別子と並んだ `help` を何も言わずに捨てない。"""
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
         result = self.approve("help", "i0002-01", STUB_ARGS=args)

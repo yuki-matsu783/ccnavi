@@ -31,7 +31,7 @@ export type FlowWriteResult = { readonly ok: true } | { readonly ok: false; read
 /** 読み書きするファイルの大きさの上限（バイト）。実行ファイル（`flow.FILE_LIMIT`）と同じ 256KB */
 export const FLOW_FILE_LIMIT = 256 * 1024;
 
-// Windows には無い。無ければ 0（確かめ直しだけが効く）
+// Windows には無い。無ければ 0（確かめ直しだけが有効）
 const O_NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
 const O_NONBLOCK = fs.constants.O_NONBLOCK ?? 0;
 
@@ -110,7 +110,7 @@ function makeDirs(tree: string, dir: string): string | undefined {
 }
 
 function linkedError(where: string): string {
-  return `${where} がシンボリックリンクなので書かない（リンクの先は承認済みの領域の外かもしれない）。リンクを外してから保存する`;
+  return `${where} がシンボリックリンクなので書かない（リンクの先は承認済みの領域の外かもしれない）。リンクを外してから保存してください`;
 }
 
 /**
@@ -181,10 +181,10 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
     }
   }
   if (!expect.exists) {
-    return stat === undefined ? undefined : "フローのファイルが読み込んだあとに外で作られている。再読込してから編集し直す（上書きしない）";
+    return stat === undefined ? undefined : "フローのファイルは、読み込んだあとに画面の外で作られている。再読込してから編集し直してください（上書きしない）";
   }
   if (stat === undefined) {
-    return "フローのファイルが読み込んだあとに外で消されている。再読込してから編集し直す";
+    return "フローのファイルは、読み込んだあとに画面の外で消されている。再読込してから編集し直してください";
   }
   if (stat.isSymbolicLink() || !stat.isFile()) {
     return `${file} がシンボリックリンクかファイルでないので書かない`;
@@ -193,7 +193,7 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
     return hardLinkedError(file, "書かない");
   }
   if (stat.mtimeMs !== expect.mtimeMs) {
-    return "フローのファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）";
+    return "フローのファイルは、読み込んだあとに画面の外で変更されている。再読込してから編集し直してください（この変更は上書きしない）";
   }
   return undefined;
 }
@@ -246,7 +246,7 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
   try {
     const opened = fs.fstatSync(fd);
     if (!opened.isFile() || opened.ino !== stat.ino || opened.dev !== stat.dev) {
-      throw new Error(`${file} が開くあいだに別のファイルに差し替わったので読まない`);
+      throw new Error(`${file} を開いているあいだに別のファイルに差し替わったので読まない`);
     }
     if (opened.nlink > 1) {
       throw new Error(hardLinkedError(file, "読まない（書きもしない）"));
@@ -270,5 +270,5 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
 }
 
 function hardLinkedError(file: string, what: string): string {
-  return `${file} はハードリンク（ほかの名前からも同じ中身に届く）なので${what}。承認済みの領域の外の名前から書き換えられうる。リンクを外してから開き直す`;
+  return `${file} はハードリンク（ほかのパスからも同じ中身を開ける）なので${what}。承認済みの領域の外のパスから書き換えられる可能性がある。リンクを外してから開き直してください`;
 }

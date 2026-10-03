@@ -87,20 +87,20 @@ test("CX-T043 先行の家族のブランチが無いときは、今の ccnavi �
 
 test("CX-T044 統合先の名前: 設定したブランチが無ければ止めて名前を出す。設定どおりなら「設定」と出す", async () => {
   const missing = await run(fixture(), { integration: "develop" });
-  assert.equal(missing.board.error, "統合先 develop がリモートに無い。設定を直す");
+  assert.equal(missing.board.error, "統合先 develop がリモートに無い。設定を直してください");
   assert.equal(missing.board.families.length, 0);
   const set = await run(fixture(), { integration: "main" });
   assert.equal(set.board.integration?.source, "setting");
 });
 
-test("CX-T045 互換の印が違えば、どちらを更新するかを言う（7.3）", async () => {
+test("CX-T045 互換のマーカーが違えば、どちらを更新するかを言う（7.3）", async () => {
   const newer = await run(fixture(COMPAT + 1));
   assert.equal(newer.board.compat?.same, false);
   assert.equal(newer.board.compat?.message, `拡張は互換 ${COMPAT}、リポジトリは互換 ${COMPAT + 1}。拡張を更新する`);
   const b = fixture();
   b.main.files[".ccnavi/scripts/ccnavi-common.sh"] = "#!/bin/sh\n";
   const none = await run(b);
-  assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）を名乗らない/);
+  assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）が書かれていない/);
 });
 
 test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）", async () => {

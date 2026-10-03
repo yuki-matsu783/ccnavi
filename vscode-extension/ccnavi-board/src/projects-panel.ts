@@ -84,7 +84,7 @@ export async function openProjects(): Promise<void> {
     return;
   }
   if (state !== undefined) {
-    // `reveal` の前に表へ出たことにする。立てずに出すと、下の `update()` と
+    // `reveal` の前に表へ出たことにする。`wasVisible` を真にせずに出すと、下の `update()` と
     // `onDidChangeViewState` の `becameVisible` からの `update()` で、実行ファイルを 2 度起こす
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
@@ -102,7 +102,7 @@ export async function openProjects(): Promise<void> {
   }
 
   // タブは読む前に作る。実行ファイルの答えを待ってから作ると、押しても何も起きないように見え、
-  // 押し直した分だけタブが増える（`state` を先に立てるので、2 度目の押下は上の `reveal` に入る）。
+  // 押し直した分だけタブが増える（`state` を先に設定するので、2 度目の押下は上の `reveal` に入る）。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`update` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviProjects", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
@@ -352,7 +352,7 @@ function showError(current: PanelState, error: string): void {
  * 画面が組み上がった（`ready`）ところでここから渡し直す。
  *
  * **読み直せなかったことも渡し直す。** ここで落とすと、入れてある HTML（古い一覧）が出たまま
- * 失敗が人に届かず、`page` が無いので以後のボタンも効かない。
+ * 失敗が人に届かず、`page` が無いので以後のボタンも使えない。
  */
 function redraw(current: PanelState): void {
   if (current.page !== undefined) {
@@ -365,7 +365,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * プロジェクト管理の画面に渡す口。VS Code のパネルを `screenHost` の形に合わせる。
+ * プロジェクト管理の画面に渡す手段。VS Code のパネルを `screenHost` の形に合わせる。
  * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
  */
 function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
@@ -428,7 +428,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     markTourSeen(SCREEN);
     return;
   }
-  // 「更新」は一覧が無くても通す。読み直せなかったところから人が抜け出す道がこれしかない
+  // 「更新」は一覧が無くても通す。読み直せなかったところから人が抜け出す方法がこれしかない
   if (message.type === "refresh") {
     void update();
     return;

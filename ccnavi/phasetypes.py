@@ -155,7 +155,7 @@ class PhaseType:
         return ticket_mod.OUTSIDE
 
     def overlaps(self, other: PhaseType) -> bool:
-        """並行してよい組か。どちらかが相手を挙げていれば対称に効く。"""
+        """並行してよい組か。どちらかが相手を挙げていれば対称に当てはまる。"""
         return other.id in self.overlap or self.id in other.overlap
 
 
@@ -164,7 +164,7 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
 
     `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。層の
     ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 11.4.1）、
-    その相手はファイルの中に居ないので、1 本だけで確かめると必ず落ちる。確かめる
+    その相手はファイルの中に無いので、1 本だけで確かめると必ず落ちる。確かめる
     のは合成したあと（`merge`）。
     """
     try:
@@ -176,8 +176,8 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
         # ファイルとして苦情付きで返す。上げると、判定（実行前・レビューで止めるところ・
-        # 実行後の監視）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う道に
-        # 届かない。
+        # 実行後チェック）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う処理まで
+        # 進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     # 承認の指紋（read_set）に入れる。種類は待ち方と止め方を決める判定の入力。
     fsio.note_read(path, text)
@@ -204,7 +204,7 @@ def parse(
         ]
     raw = data.get("phases")
     if not isinstance(raw, dict) or not raw:
-        return None, [Problem(SEVERITY_ERROR, where, "`phases` が辞書として無い")]
+        return None, [Problem(SEVERITY_ERROR, where, "`phases` が無いか空か、辞書ではない")]
     order = str(data.get("order") or ORDER_SEQUENTIAL).strip()
     if order not in ORDERS:
         return None, [Problem(SEVERITY_ERROR, where, f"`order` は {' か '.join(ORDERS)}")]
@@ -214,7 +214,7 @@ def parse(
     for key, body in raw.items():
         ident = str(key).strip()
         if rules.ID_SEPARATOR in ident:
-            # 層の名前を添えた形（`lib:build`）と見分けが付かない。共通層に書けば
+            # 層の名前をつけた形（`lib:build`）と見分けが付かない。共通層に書けば
             # lib の定義に見え、記録を読んだ人がどのファイルを直すのか決められない。
             problems.append(
                 Problem(
@@ -257,11 +257,11 @@ def parse(
 
 
 def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
-    """`overlap` / `requires` / `after` が指す先が、その集合の中に居るか。
+    """`overlap` / `requires` / `after` が指す先が、その集合の中にあるか。
 
     `after` の先は `kind: work` の種類でなければならない。
 
-    見るのは `checked` の側だけで、居てよい先は `pool` 全部。層の種類が共通層の
+    見るのは `checked` の側だけで、あってよい先は `pool` 全部。層の種類が共通層の
     種類を指す形（設計 11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
     """
     problems: list[Problem] = []
@@ -294,7 +294,7 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
 def conflict_problems(pool: dict[str, PhaseType]) -> list[Problem]:
     """同じ組を `after`（待つ）と `overlap`（並行してよい）の両方に挙げていないか。
 
-    両方あると、待ち方の計算は `overlap` を採って待たず、書いた依存が黙って消える。
+    両方あると、待ち方の計算は `overlap` を採って待たず、書いた依存が気づかないうちに消える。
     どちらのつもりかを人に決めさせる。
     """
     problems: list[Problem] = []
@@ -307,7 +307,7 @@ def conflict_problems(pool: dict[str, PhaseType]) -> list[Problem]:
                         SEVERITY_ERROR,
                         pt.id,
                         f"`{name}` を after と overlap の両方に挙げている。"
-                        "待つか並行かを 1 つにする",
+                        "待つか並行かを 1 つにしてください",
                     )
                 )
     return problems
@@ -347,7 +347,7 @@ def cycle_problems(pool: dict[str, PhaseType]) -> list[Problem]:
 
 
 def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
-    """この集合の種類が、どの層から来たかを名乗らせる。記録の `source` になる。"""
+    """この集合の種類に、どの層から来たかを持たせる。記録の `source` になる。"""
     for pt in (types or {}).values():
         pt.source = layer
 
@@ -370,7 +370,7 @@ def merge(
     層をまたいで error（人は表示名で見るので、承認画面で見分けられない）。
 
     error があるとき、その層は空として扱い、共通層の種類だけを返す。衝突した片方を
-    黙って採ると、どちらの `review:` が効いているかを人が読めない。止まる側を採る。
+    何も言わずに採ると、どちらの `review:` が使われているかを人が読めない。止まる側を採る。
 
     `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。層から共通層の種類を
     指すのは正しい形なので、層 1 本の中では確かめられない。
@@ -403,7 +403,7 @@ def merge(
                         ident,
                         f"`{ident}` は前の層（{prior.source or 'common'}）と同じ id で中身が違う。"
                         f"{layer} の層は空として扱う。どちらの `review:` が効いているかを"
-                        "人が読めないので、片方を黙って採らない",
+                        "人が読み取れないので、断りなく片方を採ることはしない",
                     )
                 )
             continue
@@ -454,7 +454,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         return None, problems
     pt.review = review
     if kind == KIND_FEEDBACK and review == REVIEW_NONE:
-        # フィードバック対応の結果を人が見ない道は作らない。見る場所は chat でも mr でもよい。
+        # フィードバック対応の結果を人が見ない経路は作らない。見る場所は chat でも mr でもよい。
         problems.append(
             Problem(
                 SEVERITY_ERROR,
@@ -491,7 +491,9 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         if ".." in glob or os.path.isabs(glob):
             problems.append(
                 Problem(
-                    SEVERITY_ERROR, ident, f"`deliverables` の `{glob}` はワークツリーの中で書く"
+                    SEVERITY_ERROR,
+                    ident,
+                    f"`deliverables` の `{glob}` はワークツリーの中を指す形で書く",
                 )
             )
             return None, problems
@@ -519,7 +521,11 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
         glob = item.strip()
         if ".." in glob or "~" in glob or "$" in glob or os.path.isabs(glob):
             problems.append(
-                Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` の `{glob}` はワークツリーの中で書く")
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    f"`{key}[{i}]` の `{glob}` はワークツリーの中を指す形で書く",
+                )
             )
             continue
         glob = glob.replace("\\", "/").strip("/")

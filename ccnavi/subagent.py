@@ -32,8 +32,9 @@ from .modes import EXIT_BLOCK, EXIT_OK
 # サブエージェントには Stop の振り返り（ADR-0090）が届かないので、始まりに 1 行だけ渡す。
 # メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
 CANDIDATE_NOTE = (
-    "[ccnavi] 作業中に手順の落とし穴やスキルの誤りに気づいたら、最後の報告に「スキル候補」の節を"
-    "足して書く（対象のスキル・何を直すか・根拠）。スキルのファイルは自分では書かない。"
+    "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に"
+    "「スキル候補」の節を足して書いてください（対象のスキル・何を直すか・根拠）。"
+    "スキルのファイルは自分では書かない。"
 )
 
 
@@ -54,7 +55,7 @@ def at_start(
     渡すのは cwd で決める。親のワークツリーならその親の開いている子、子のワークツリーなら
     その子自身。ワークスペースルートと、チケットの無いワークツリーからの起動には何も渡さない。
     全部の子を渡すと、別のセッションがワークスペースルートで調査を委譲したときにも無関係な
-    子の範囲を案内し、調査役が自分の居場所を迷う（SubagentStop と同じ絞り方）。
+    子の範囲を案内し、調査役がどこで作業すればよいか分からなくなる（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（ADR-0091）。
@@ -88,7 +89,7 @@ def at_start(
         "書き込みは行き先のワークツリーのチケットで判定される。"
     ]
     types = phase.load_types(conf, root, bound.project) or {}
-    # フローの文に使える残り（文字）。子が多くても SubagentStart の文が膨らみすぎないように。
+    # フローの文に使える残り（文字）。子が多くても SubagentStart の文が長くなりすぎないように。
     budget = flow.TOTAL_TEXT_LIMIT
     # 手順を並べるのは、cwd がその子のワークツリーで子が 1 本に決まるときだけ（M-4）。
     # 親のツリーからの起動（入れ子の孫も）では、どの子の担当かが hook から決められない。
@@ -123,7 +124,7 @@ def at_start(
         try:
             brief = flow.briefing(conf, root, t, scope, budget, full=full)
         except Exception as exc:  # noqa: BLE001  壊れたフローで SubagentStart を落とさない
-            brief = [f"    フローを読めない（{type(exc).__name__}）。人に確かめる"]
+            brief = [f"    フローを読めない（{type(exc).__name__}）。ユーザが確かめてください"]
         budget -= sum(len(line) for line in brief)
         listed = listed or bool(brief)
         lines.extend(brief)
@@ -132,8 +133,8 @@ def at_start(
             changed.append(notice)
     if listed and not full:
         lines.append(
-            "  フロー: 自分の担当の子チケットのフローだけを読んで従う。他の子のフローには従わない。"
-            "担当が分からなければ、読まずにメインに聞く"
+            "  フロー: 自分の担当の子チケットのフローだけを読んで従ってください。"
+            "他の子のフローには従わないでください。担当が分からなければ、読まずにメインに聞いてください"
         )
     lines.extend(changed)
     text = "\n".join(lines)
@@ -163,8 +164,8 @@ def at_stop(
 
     見るのは、cwd が子のワークツリーならその子、親のワークツリーならその親の開いている
     子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
-    範囲は実行前の判定と同じく親の範囲と種類の上限で切り詰め、子の範囲の中でも
-    上限の外なら、どの上限かをパスの後ろに添える。
+    範囲は実行前チェックと同じく親の範囲と種類の上限で切り詰め、子の範囲の中でも
+    上限の外なら、どの上限かをパスの後ろにつける。
     """
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.tickets_enabled:
@@ -217,13 +218,13 @@ def at_stop(
 
 
 def _limit_note(child: ticket_mod.Ticket, found: phase.ScopeVerdict) -> str:
-    """子の範囲の中なのに外とされたパスに添える、止めた上限の名指し。子の範囲の外なら空。
+    """子の範囲の中なのに外とされたパスにつける、止めた上限の名指し。子の範囲の外なら空。
 
-    添えないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ
+    つけないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ
     戻せと言われても戻し先が分からない。
     """
     if found.limit == phase.LIMIT_BLOCKED:
-        return f"（チケットが信じられない: {child.blocked}）"
+        return f"（チケットを信頼できない: {child.blocked}）"
     if found.limit == phase.LIMIT_TYPE and found.type is not None:
         return f"（種類 {found.type.title} の上限の外）"
     if found.limit == phase.LIMIT_PARENT:
@@ -252,10 +253,10 @@ def _bounce_path(state_dir: str, session: str, who: str) -> str:
     セッションを鍵に入れるのは、控えの置き場がワークスペースに 1 つしか無いから。
     入れないと、別のセッションが置いた印を読んで、一度も差し戻していない相手を
     「差し戻し済み」として通す。印が消えるのは、親の PostToolUse が `agentId` を
-    持って通ったときだけなので、残った 1 つは次の日のセッションまで効く。
+    持って通ったときだけなので、残った 1 つは次の日のセッションでも有効なままになる。
 
     `who` は `agent_id`。持たない payload では、そのワークツリーの名前を使う。
-    1 つの綴り（`unknown`）に全員を寄せると、最初の 1 体が差し戻されたあと、
+    1 つの綴り（`unknown`）に全員をまとめると、最初の 1 体が差し戻されたあと、
     同じ置き場を見る他のサブエージェントが誰も差し戻されなくなる。しかも
     `agent_id` を持たない相手の印は `ignored_bounce` が消せないので、消えない。
     ツリーの名前なら、少なくとも別の子で作業する相手は巻き込まない。

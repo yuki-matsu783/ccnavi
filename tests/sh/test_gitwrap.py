@@ -242,7 +242,7 @@ class RejectTest(GitWrapperTest):
 class PassTest(GitWrapperTest):
     def test_rm_removes_a_tracked_file(self):
         # rules.yml が rm -rf の代わりに名指しで勧める経路。勧めた先が
-        # 通らないと、案内は行き止まりになる。
+        # 通らないと、案内どおりに進めなくなる。
         result = self.run_wrapper("rm", "tracked.txt")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.dir, "tracked.txt")))
@@ -398,7 +398,7 @@ class MergeFileTest(GitWrapperTest):
     """merge-file は結果を標準出力に出す形 (-p / --stdout) だけ通す。
 
     付けないと git は 1 つめのファイルを直に書き換える。ファイルを書くのは Edit / Write に
-    寄せ、hook が行き先を見られるようにする。
+    任せ、hook が行き先を見られるようにする。
     """
 
     def write_versions(self):
@@ -530,7 +530,7 @@ class OutputTest(GitWrapperTest):
 
 
 class EnvironmentTest(GitWrapperTest):
-    # 引数で `-c` を弾いても、環境変数から同じ設定を差し込めるなら穴は開いたまま。
+    # 引数で `-c` を拒んでも、環境変数から同じ設定を差し込めるなら穴は開いたまま。
     INJECT = {
         "GIT_CONFIG_COUNT": "1",
         "GIT_CONFIG_KEY_0": "status.showUntrackedFiles",
@@ -538,7 +538,7 @@ class EnvironmentTest(GitWrapperTest):
     }
 
     def test_the_injection_works_on_plain_git(self):
-        """見本が効くことを先に確かめる。効かない見本では次のテストが空振りする。"""
+        """見本が有効なことを先に確かめる。有効でない見本では次のテストが何も確かめられない。"""
         environment = dict(os.environ)
         environment.update(self.INJECT)
         result = subprocess.run(
@@ -564,7 +564,7 @@ def hint_lines(stdout):
 class WorktreeRemoveHintTest(GitWrapperTest):
     """worktree remove が Permission denied で止まったときだけ、立て直し方を案内する。
 
-    Windows では、プロセスの cwd がそのディレクトリを掴む。Bash ツールの cwd は呼び出しを
+    Windows では、プロセスの cwd がそのディレクトリを使用中にする。Bash ツールの cwd は呼び出しを
     またいで残る親のシェルのものなので、ワークツリーの中へ cd したまま remove すると、
     最後のディレクトリで Permission denied になり、空のディレクトリが残る。
     """
@@ -625,8 +625,8 @@ class ResetGuidanceTest(GitWrapperTest):
     """reset は通さず、リモートに合わせたいときは ccnavi-sync.sh を案内する（ADR-0093 の 2b。D36）。
 
     前は `checkout -B <ブランチ> <リモート>/<ブランチ>` を案内していた。付け替えはブランチにしか無い
-    コミットを黙って外し、親のブランチなら承認済みチケットの置き場ごと中身を変えるので、
-    ccnavi-sync.sh（早送りか merge、衝突したら取りやめる）ができた段階 2b で塞ぎ、案内を移した。
+    コミットを何も言わずに外し、親のブランチなら承認済みチケットの置き場ごと中身を変えるので、
+    ccnavi-sync.sh（早送りか merge、衝突したら取りやめる）ができた段階 2b で止め、案内を移した。
     """
 
     def diverge(self):
@@ -793,7 +793,7 @@ class StoreRewindTest(GitWrapperTest):
     """承認済みチケットの置き場を過去の中身に戻す形を止める（ADR-0093 の段階 0）。
 
     `checkout <ref> <パス>` と `restore --source <ref>` は置き場を別のコミットの中身に戻し、
-    `restore --ours / --theirs` は置き場の衝突を片側に寄せる。どれも承認が無かったことにも、
+    `restore --ours / --theirs` は置き場の衝突を片側にそろえる。どれも承認が無かったことにも、
     取り下げた承認が戻ったことにもなる。置き場に当たらないパスは今までどおり通す。
     """
 
@@ -908,7 +908,7 @@ class StoreRewindTest(GitWrapperTest):
         self.assertTrue(self.read("tracked.txt").startswith("line 0\n"))
 
     def test_moving_between_branches_still_passes(self):
-        # 行き先だけの形と、-b / -c の値と起点は、パスと読まない（-B / -C は段階 2b で塞いだ）。
+        # 行き先だけの形と、-b / -c の値と起点は、パスと読まない（-B / -C は段階 2b で止めた）。
         for args in (
             ("checkout", "-b", "topic", "HEAD~1"),
             ("switch", "--create", "topic2", "HEAD"),
@@ -1135,8 +1135,8 @@ class AllowListTest(GitWrapperTest):
     """オプションは許可リストで読む（ADR-0093 の段階 2b のレビュー。利用者の決定 A）。
 
     git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
-    名前を並べるやり方では抜ける。束ねた短いオプション（`-qbnew`）は 1 字ずつ読み、値を取る字の
-    後ろは値として扱う。
+    名前を並べるやり方では止められずに通る。束ねた短いオプション（`-qbnew`）は 1 字ずつ読み、
+    値を取る字の後ろは値として扱う。
     """
 
     def setUp(self):
@@ -1282,7 +1282,7 @@ class WorktreeDetachTest(GitWrapperTest):
 
 
 class SymlinkedWorkspaceTest(GitWrapperTest):
-    """リンクを経た作業場でも守りが効く（git の綴りとワークスペースの綴りを揃える。中 12）。"""
+    """リンクを経た作業場でも守りが有効（git の綴りとワークスペースの綴りを揃える。中 12）。"""
 
     def setUp(self):
         super().setUp()

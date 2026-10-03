@@ -77,6 +77,6 @@ chrome.action.onClicked.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) void refreshBadge();
 });
-// 起き直すたびに作り直さない（周期が数え直しになる）。無いときだけ作る
+// 起動し直すたびに作り直さない（周期が数え直しになる）。無いときだけ作る
 void ensureDailyAlarm(chrome.alarms);
 void refreshBadge();

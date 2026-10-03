@@ -233,7 +233,7 @@ test("CB-T250 画面の読み（YAML 1.2）と PyYAML の読みが違う綴り�
   assert.ok(reader.ok);
   const spelled = ["0755", "yes", "on", "1:30", "0o17", "1e3", "1_000", "1.", "2026-01-01", "!!float 1", "!!binary aGk=", ".inf", "123456789012345678901", "{1: a}"];
   const texts = spelled.map((v) => `nodes:\n  - id: a\n    data:\n      v: ${v}\n`);
-  // 別名を使わないマージキー。PyYAML は畳み、画面の読み手は畳まない
+  // 別名を使わないマージキー。PyYAML は中身を取り込み、画面の読み手は取り込まない
   texts.push("nodes: [{<<: {id: a}}]\n");
   const quoted = spelled.map((v) => `nodes:\n  - id: a\n    data:\n      v: "${v}"\n`);
   const reads = reader.read([...texts, ...quoted].map((t) => Buffer.from(t, "utf8")));

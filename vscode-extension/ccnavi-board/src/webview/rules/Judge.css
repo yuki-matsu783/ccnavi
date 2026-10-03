@@ -4,13 +4,13 @@
  */
 .result { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; }
 .verdict { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
-.verdict.deny { color: var(--vscode-editorError-foreground); }
-.verdict.ask { color: var(--vscode-editorWarning-foreground); }
-.verdict.allow { color: var(--vscode-charts-green); }
+.verdict.deny { color: var(--error-text); }
+.verdict.ask { color: var(--warn-text); }
+.verdict.allow { color: var(--ok-text); }
 .verdict.skip, .verdict.none { color: var(--vscode-descriptionForeground); }
 .kv { margin: 4px 0; display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; }
 .kv dt { color: var(--vscode-descriptionForeground); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 pre.response { margin: 4px 0 0; padding: 6px 8px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--vscode-textCodeBlock-background); border-radius: 4px; }
-.counts { display: flex; gap: 14px; margin-bottom: 6px; }
-.counts .ng { color: var(--vscode-editorError-foreground); font-weight: 600; }
+.counts { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-bottom: 6px; }
+.counts .ng { color: var(--error-text); font-weight: 600; }

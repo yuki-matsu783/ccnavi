@@ -29,7 +29,7 @@ pre.flow-raw {
 .flow-preview { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 10px; }
 .flow-preview summary { cursor: pointer; font-weight: 600; }
 .flow-preview p { margin: 4px 0; }
-.flow-preview .error { color: var(--vscode-editorError-foreground); white-space: pre-wrap; overflow-wrap: anywhere; }
+.flow-preview .error { color: var(--error-text); white-space: pre-wrap; overflow-wrap: anywhere; }
 pre.flow-rendered {
   margin: 6px 0 0; padding: 6px; max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   font-family: var(--vscode-editor-font-family); font-size: .85em;
@@ -37,4 +37,4 @@ pre.flow-rendered {
 }
 /* 候補の名前の出どころ（組み込み・プロジェクト・候補に無い） */
 .inspector .candidate-source { font-size: .85em; color: var(--vscode-descriptionForeground); }
-.inspector .candidate-source.missing { color: var(--vscode-editorWarning-foreground); }
+.inspector .candidate-source.missing { color: var(--warn-text); }
