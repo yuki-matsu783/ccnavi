@@ -49,7 +49,7 @@ unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJ
 # 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
 # 止まるので、案内に `git stash push -u` と書くと、案内された先でもう 1 度拒否される。
 # 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
-# $0 は呼ばれたときの綴りそのままなので、ワークツリーの中から相対で呼ばれても合う。
+# $0 は呼ばれたときのパスそのままなので、ワークツリーの中から相対で呼ばれても合う。
 SELF="sh $0"
 
 reject() {
@@ -161,7 +161,7 @@ status | log | show | diff | blame | shortlog | describe | rev-parse | rev-list 
 	;;
 
 branch)
-	# 短いオプションは束ねられる (-rd は -r -d と同じ) ので、1 文字ずつ見る。
+	# 短いオプションはまとめて書ける (-rd は -r -d と同じ) ので、1 文字ずつ見る。
 	# 見るのはダッシュ 1 個で始まる語だけ。長いオプションまで 1 文字で見ると、
 	# `--contains=feature/dev` のような値の中の f と d に当たって誤検知する。
 	for arg in ${1+"$@"}; do
@@ -214,7 +214,7 @@ worktree)
 		# できる。プロジェクトに .claude/ ができて --lint が error になり、
 		# tree_of の探す場所からも外れる（設計 4.1）。
 		#
-		# 書き換えずに止める。打った綴りと起きたことがずれると、記録を読んだ
+		# 書き換えずに止める。打ったパスと起きたことがずれると、記録を読んだ
 		# ユーザが追えなくなる。
 		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと飛ばす。
 		# 知らないオプションは通さない。通すと行き先を取り違え、検査そのものが
@@ -262,7 +262,7 @@ worktree)
 			;;
 		esac
 		if [ "$wt_ok" = no ]; then
-			# 案内は cwd に合わせた綴りで出す。絶対パスだけを出すと、受け取った側が
+			# 案内は cwd に合わせたパスで出す。絶対パスだけを出すと、受け取った側が
 			# そのまま打てはするが、次に別の場所から打つときに応用が効かない。
 			wt_name=$(basename "$wt_dest")
 			wt_here=$(ccnavi_abs .)
@@ -456,7 +456,7 @@ push)
 	#
 	# 通さないのは「戻せなくなる形」と「ユーザの判断を飛び越す形」の 2 つ。
 	# 履歴を書き換える force、消す delete、まとめて送る all/mirror/tags、
-	# 別の綴りへ送る refspec（`HEAD:main` が書ける）、そして統合先そのものへの直接の push。
+	# 別の名前へ送る refspec（`HEAD:main` が書ける）、そして統合先そのものへの直接の push。
 	# 統合はユーザがマージリクエストで行う。
 	push_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
@@ -611,7 +611,7 @@ logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 status=0
 git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
 
-# 記録の綴り。エージェントがそのまま sed -n で開ける形で返す。
+# 記録のパス。エージェントがそのまま sed -n で開ける形で返す。
 #
 # 基準はワークスペースルート。モード B ではエージェントの cwd がプロジェクトの中に
 # あるので、git のトップからの相対を返すと届かない。ワークスペースの中に居るときは
@@ -620,8 +620,8 @@ case "$logfile" in
 "$WS"/*) logrel="${logfile#"$WS"/}" ;;
 *) logrel="$logfile" ;;
 esac
-# cwd から相対で開けないなら、絶対の綴りをそのまま返す。2 つ並べない。
-# 並べると、受け取った側がどちらを開くか迷い、綴りの切り出しも要る。
+# cwd から相対で開けないなら、絶対パスをそのまま返す。2 つ並べない。
+# 並べると、受け取った側がどちらを開くか迷い、パスの切り出しも要る。
 if [ ! -f "$logrel" ]; then
 	logrel="$logfile"
 fi

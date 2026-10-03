@@ -4,7 +4,7 @@ sh は `.ccnavi/scripts/` に、実体は `.ccnavi/bin/<os>-<arch>/` に並ぶ�
 隣ではなく `../bin/` を探す。語を読む場所は 3 つ（sh、platformtag、ccnavi-setup.sh）あり、
 どれかだけ変わると配った場所と探す場所が食い違う。ここでは sh を外から動かし、選んだ置き場を見る。
 
-sh の原本は環境変数 `CCNAVI_TEST_LAUNCHER` で差し替えられる。ユーザが写す前に
+sh の原本は環境変数 `CCNAVI_TEST_LAUNCHER` で差し替えられる。ユーザがコピーする前に
 `wip/design/scripts/ccnavi-launcher.sh` を名指しで確かめるため（相対ならリポジトリの
 ルートから読む）。
 
@@ -83,7 +83,7 @@ class LaunchedFromScriptsTest(unittest.TestCase):
     """L5: 名前が `ccnavi-launcher.sh` なら `../bin/` を探す。それ以外は探さない。
 
     切り替えの条件は名前だけ（3.3 節）。`binary_clause` と同じ条件で、どちらかだけ
-    条件を足すと、守る場所と控える場所が食い違う。
+    条件を足すと、守る場所とバックアップする場所が食い違う。
     """
 
     def setUp(self):
@@ -121,7 +121,7 @@ class LaunchedFromScriptsTest(unittest.TestCase):
         )
 
     def test_launcher_named_as_such_does_not_look_next_to_itself(self):
-        """L3 と揃える。sh が起動しない置き場を、控える場所として返さない。"""
+        """L3 と揃える。sh が起動しない置き場を、バックアップする場所として返さない。"""
         launcher = os.path.join(self.scripts, self.launcher_name())
         write(launcher, "#!/bin/sh\n")
         write(os.path.join(self.scripts, "linux-x86_64", "ccnavi"), "elf\n")
@@ -146,7 +146,7 @@ class LauncherTest(unittest.TestCase):
         if not os.path.isfile(LAUNCHER):
             self.fail(
                 f"振り分けの sh が無い: {LAUNCHER}"
-                "（写す前は CCNAVI_TEST_LAUNCHER で原本を名指しする）"
+                "（コピーする前は CCNAVI_TEST_LAUNCHER で原本を名指しする）"
             )
         self.dir = tempfile.mkdtemp(prefix="ccnavi-launcher-")
         self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
@@ -284,7 +284,7 @@ class LauncherTest(unittest.TestCase):
     # L3
 
     def test_does_not_start_a_build_placed_next_to_itself(self):
-        """隣（`.ccnavi/scripts/<os>-<arch>/`）は配る場所ではない。自己防衛の綴りが当たらない。"""
+        """隣（`.ccnavi/scripts/<os>-<arch>/`）は配る場所ではない。自己防衛のパスが当たらない。"""
         self.pretend("Linux x86_64")
         self.build("linux-x86_64", place=self.scripts)
         result = self.run_launcher()
