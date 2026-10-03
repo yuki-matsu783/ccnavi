@@ -1,12 +1,12 @@
-"""組み立ての出力を hook が起動する置き場へ写す（build.py の install）。
+"""組み立ての出力を hook が起動する置き場へコピーする（build.py の install）。
 
-`build.py` は PyInstaller の出力 `dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へ写す
+`build.py` は PyInstaller の出力 `dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする
 （設計 5 節の 4）。振り分けの sh（`.ccnavi/scripts/ccnavi-launcher.sh`）が起動するのは
-こちらなので、写し損ねると hook は古い実行ファイルを起動し続ける。onedir の `_internal/` は
+こちらなので、コピーし損ねると hook は古い実行ファイルを起動し続ける。onedir の `_internal/` は
 前後の版で中身が変わるので、前の版にだけあったファイルが残ると混ざった版が動く。
 
 PyInstaller は動かさない。偽の `dist/ccnavi/` を作って `install(dist_dir, root, target)` に渡す。
-`dist_dir` は写す元のフォルダ（`dist/ccnavi/` そのもの）として渡す。
+`dist_dir` はコピー元のフォルダ（`dist/ccnavi/` そのもの）として渡す。
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def read(path):
 
 
 def tree(top):
-    """`top` の下のファイルを、`/` でつないだ相対の綴りの集合で返す。"""
+    """`top` の下のファイルを、`/` でつないだ相対パスの集合で返す。"""
     found = set()
     for here, _dirs, files in os.walk(top):
         for name in files:
@@ -80,7 +80,7 @@ class InstallTest(unittest.TestCase):
                 )
 
     def test_leaves_the_build_output_in_place(self):
-        """写すのであって移すのではない。`dist/` は代わりに通る sh の既定の探し先でもある。"""
+        """コピーするのであって移すのではない。`dist/` は代わりに通る sh の既定の探し先でもある。"""
         self.fake_build("v1")
         self.install()
         self.assertEqual(
@@ -107,7 +107,7 @@ class InstallTest(unittest.TestCase):
         self.assertIn("v2", read(os.path.join(self.live, "ccnavi")))
 
     def test_leaves_builds_for_other_machines_and_no_leftovers(self):
-        """他の機械の組み立ては写す先ではない。入れ替えの途中の置き場も残さない。"""
+        """他の機械の組み立てはコピー先ではない。入れ替えの途中の置き場も残さない。"""
         other = os.path.join(self.bin, "darwin-arm64", "ccnavi")
         write(other, "arm\n", mode=0o755)
         write(os.path.join(self.live, "ccnavi"), "old\n", mode=0o755)

@@ -5,10 +5,10 @@ ADR-0055 で、承認済みチケットは 1 本のファイルとして doing/ 
 止まる。見るのは 4 つ。
 
 1. 同じファイルシステムの中では rename で動き、中身が変わらない
-2. またぐとき（rename が通らない）は写して消す。消せなければ写した側を消して戻す
+2. またぐとき（rename が通らない）はコピーして消す。消せなければコピーした側を消して戻す
 3. 行き先に同じ名前が既に在れば動かさず、どちらにも触らない
-4. rename が EXDEV 以外で失敗したとき（元が無い、など）は写して消す処理に回さない。回すと、
-   写せずに戻す手が、その間に別のプロセスが置いた行き先を消す
+4. rename が EXDEV 以外で失敗したとき（元が無い、など）はコピーして消す処理に回さない。回すと、
+   コピーできずに戻す手が、その間に別のプロセスが置いた行き先を消す
 """
 
 from __future__ import annotations
@@ -52,12 +52,12 @@ class MoveFileTest(unittest.TestCase):
         self.assertEqual(self.read(self.target), TEXT)
 
     def test_rolls_back_the_copy_when_the_source_cannot_be_removed(self):
-        # 写せたが消せない（Windows で開かれている、権限が無い）。写した側を消して戻す。
+        # コピーできたが消せない（Windows で開かれている、権限が無い）。コピーした側を消して戻す。
         # 両方に残すと、以後どの操作も「複数の場所にある」で止まる。
         real_remove = os.remove
 
         def remove(path):
-            # 消せないのは元のファイルだけ。巻き戻しで写した側を消す手は通す。
+            # 消せないのは元のファイルだけ。巻き戻しでコピーした側を消す手は通す。
             if os.path.abspath(path) == os.path.abspath(self.source):
                 raise PermissionError(errno.EACCES, "busy")
             real_remove(path)
@@ -82,7 +82,7 @@ class MoveFileTest(unittest.TestCase):
 
     def test_does_not_remove_a_target_another_process_placed(self):
         # 2 つのプロセスが同じ移動を打った形。先に通った側が rename で行き先を置き、
-        # 後の側の rename は元が無くて失敗する。ここで写して消す処理に回すと、写せずに
+        # 後の側の rename は元が無くて失敗する。ここでコピーして消す処理に回すと、コピーできずに
         # 戻す手が、先に通った側の行き先を消して、どちらにも無くなる。
         def rename(src, dst):
             os.makedirs(os.path.dirname(dst), exist_ok=True)
