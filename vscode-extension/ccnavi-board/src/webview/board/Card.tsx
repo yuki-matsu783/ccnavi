@@ -21,8 +21,9 @@ import {
   isHttpUrl,
   movedLabel,
   mrText,
-  phaseStatusBrief,
+  phaseStatusBriefItems,
   phaseStatusFull,
+  phaseStatusFullItems,
   riskText,
   worktreeName,
 } from "./text.js";
@@ -156,8 +157,20 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   }
   // 先行を満たしていない（ADR-0088）。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
   if (card.predecessorsUnmet.length > 0) {
+    // 識別子（`i0001-02`）の途中では折り返さない。折り返すのは識別子の間の空白か、見出しと括弧の間だけ
     const badge = predecessorsBadge(card);
-    badges.push(<Badge key="preds" kind="preds" text={badge.text} title={badge.title} />);
+    badges.push(
+      <span key="preds" className="badge preds" title={badge.title}>
+        {badge.lead}（
+        {badge.ids.map((id, i) => (
+          <span key={id}>
+            <span className="badge-id">{id}</span>
+            {i < badge.ids.length - 1 ? ", " : ""}
+          </span>
+        ))}
+        ）
+      </span>,
+    );
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(<Badge key="worktree" kind="worktree none" text="ワークツリーなし" />);
@@ -225,6 +238,8 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
  * 親カードのフェーズ一覧。1 フェーズ 1 行で、左の丸がフェーズ。右の状態は要約（狭い列）と全文（広げたとき）を
  * 両方持ち、どちらを見せるかは CSS が幅で決める。要約は見た目だけのもの（aria-hidden）で、
  * 全文は狭いときも読み上げには渡す。狭いままマウスで読むときのために、全文は行の tooltip にも置く。
+ * 依頼へのリンクとボタンは状態の列に入れず、行の 2 段目（`.phase-actions`）に左寄せで並べる。
+ * 状態の列に入れると、55% で止めた列の中でボタンが縦に積まれて行が高くなるため。
  */
 function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Element {
   return (
@@ -240,19 +255,43 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
             </span>
             <span className="phase-status">
               <span className="phase-brief" aria-hidden="true">
-                {phaseStatusBrief(p)}
+                <StatusItems items={phaseStatusBriefItems(p)} />
               </span>
-              <span className="phase-full">{full}</span>
-              {/* 依頼の投稿へのリンク。依頼のマーカーがあるときだけ（レビューが済んだ後も経緯として残す） */}
-              {p.mrUrl !== "" ? <MrLink url={p.mrUrl} number={p.mrNumber} title={`フェーズ ${p.label} のレビューの依頼を開く`} /> : null}
-              {p.actions.map((action, i) => (
-                <ActionButton key={i} action={action} id={`${p.parent}:${p.number}`} />
-              ))}
+              <span className="phase-full">
+                <StatusItems items={phaseStatusFullItems(p)} />
+              </span>
             </span>
+            {p.mrUrl !== "" || p.actions.length > 0 ? (
+              <span className="phase-actions">
+                {/* 依頼の投稿へのリンク。依頼のマーカーがあるときだけ（レビューが済んだ後も経緯として残す） */}
+                {p.mrUrl !== "" ? <MrLink url={p.mrUrl} number={p.mrNumber} title={`フェーズ ${p.label} のレビューの依頼を開く`} /> : null}
+                {p.actions.map((action, i) => (
+                  <ActionButton key={i} action={action} id={`${p.parent}:${p.number}`} />
+                ))}
+              </span>
+            ) : null}
           </li>
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * 状態の項目を 1 つずつ折り返さない塊（`.phase-item`）にして並べる。区切りの「·」は前の項目の末尾に付け、
+ * 折り返すのは項目の間の空白だけにする（「リスク / HIGH」のように項目の途中で割れない）。
+ * 文字としては `phaseStatusFull` と同じ `a · b` になる
+ */
+function StatusItems({ items }: { readonly items: readonly string[] }): JSX.Element {
+  return (
+    <>
+      {items.map((item, i) => (
+        <span key={i}>
+          <span className="phase-item">{i < items.length - 1 ? `${item} ·` : item}</span>
+          {i < items.length - 1 ? " " : ""}
+        </span>
+      ))}
+    </>
   );
 }
 
