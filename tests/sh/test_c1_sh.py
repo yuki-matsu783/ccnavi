@@ -928,6 +928,35 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
 
+    def test_push_approved_carries_a_removed_draft_with_the_flow(self):
+        """取り込んで消えた下書き（ADR-0100）は、フローと一緒に運ぶ。書き直された下書きと
+        追跡していない下書きには触れない。"""
+        drafts = "wip/proposals/flows"
+        taken = f"{drafts}/{CHILD}.yml"
+        rewritten = f"{drafts}/{PARENT}-02.yml"
+        untracked = f"{drafts}/{PARENT}-03.yml"
+        for rel in (taken, rewritten):
+            write(os.path.join(self.tree, rel), "nodes: []\n")
+        git(self.tree, "add", "--", taken, rewritten)
+        git(self.tree, "commit", "-q", "-m", "drafts")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        flow_rel = f"{APPROVED}/flows/{CHILD}.yml"
+        write(os.path.join(self.tree, flow_rel), "nodes: []\n")
+        os.remove(os.path.join(self.tree, taken))
+        write(os.path.join(self.tree, rewritten), "nodes: [x]\n")
+        write(os.path.join(self.tree, untracked), "nodes: []\n")
+        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 同じ中身なので、名前の付け替えとして読まずに 2 つのパスで見る。
+        out = git(self.tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([flow_rel, taken]))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        left = self.dirty()
+        self.assertIn(rewritten, left)
+        self.assertIn(untracked, left)
+        self.assertNotIn(taken, left)
+        self.assertEqual(git(self.tree, "diff", "--cached", "--name-only").stdout, "")
+
     def test_push_approved_without_names_carries_the_family_through_c1(self):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
