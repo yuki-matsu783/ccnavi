@@ -51,7 +51,12 @@ class RepoSamplesTest(unittest.TestCase):
         # （CLAUDE_PROJECT_DIR）を判定に入れない。tests/guard/test_repo_rules.py と同じ外し方。
         environment = tool.environment()
         environment.pop("CLAUDE_PROJECT_DIR", None)
-        done = run_ccnavi([*tool.arguments(), "--json"], cwd=ROOT, env=environment)
+        # 見本の /repo は --root の綴りにそのまま置き換わる。Windows の `\` は Bash の見本で
+        # エスケープとして読まれるので、tests/guard/test_repo_rules.py と同じく `/` に揃えて渡す。
+        arguments = tool.arguments()
+        at = arguments.index("--root") + 1
+        arguments[at] = arguments[at].replace("\\", "/")
+        done = run_ccnavi([*arguments, "--json"], cwd=ROOT, env=environment)
         self.assertEqual(done.returncode, 0, done.stderr)
         body = json.loads(done.stdout)
         self.assertGreater(len(body["samples"]), 0, "見本が 1 件も読めていない")
