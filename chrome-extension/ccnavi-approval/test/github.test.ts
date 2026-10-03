@@ -1,5 +1,5 @@
 /**
- * GitHub の読み取り（ADR-0093 の 8.2）。模擬の GitHub で形を確かめる。
+ * GitHub の読み取り。模擬の GitHub で形を確かめる。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

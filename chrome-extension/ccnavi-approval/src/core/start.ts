@@ -1,8 +1,8 @@
 /**
- * 「始める」（ADR-0093 の 8.6・D19。段階 5）。issue から親のブランチを統合先の今の先頭に作る。PR/MR は作らない
+ * 「始める」。issue から親のブランチを統合先の今の先頭に作る。PR/MR は作らない
  * （差分 0 のブランチからは作れないので、最初の push の後に `ccnavi-review.sh request` が作る）。
  *
- * 識別子（= ブランチ名）は Python（`ticket.issue_identifier`。3.1 の 11）が決め、始められない理由（統合先の
+ * 識別子（= ブランチ名）は Python（`ticket.issue_identifier`）が決め、始められない理由（統合先の
  * `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版の違い）も
  * Python が出す。ここは issue を読み、Python に聞き、ブランチを作る頼みを service worker に送るだけ。
  * service worker も名前の形・保護された名前・統合先の先頭を自分で確かめる（二重の守り）。
@@ -36,7 +36,7 @@ export async function startIssue(repo: RepoConfig, issue: number, seen: Snapshot
       branches: { ...(seen?.branches ?? {}), ...fresh.branches },
       absent: [],
     };
-    // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る（11.9.1 の 7）
+    // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
     const res = await py.start(deps.py, { settings: base.settings, snapshot, issue, taken: [...new Set([...taken, ...all])] });
     if (res.problems.length > 0) return { kind: "refused", message: res.problems.join("\n") };

@@ -261,7 +261,7 @@ class StartTest(unittest.TestCase):
 
     def test_a_different_compat_is_refused(self):
         body = self.start(12, compat=version.COMPAT + 1)
-        self.assertTrue(any("7.3" in p for p in body["problems"]), body)
+        self.assertTrue(any("互換" in p for p in body["problems"]), body)
 
     def test_bad_numbers_are_refused(self):
         for bad in (0, -3, True, "12", None):
