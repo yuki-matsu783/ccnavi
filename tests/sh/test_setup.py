@@ -149,7 +149,7 @@ def clean_env(**extra):
     """テストを走らせているセッションの CCNAVI_* を持ち込まない。
 
     テストを回すのは ccnavi が入ったセッションで、その env には CCNAVI_* が並んでいる。
-    持ち込むと、テストが「コードのこと」ではなく「走らせたユーザのセッション」を報告しうる。
+    持ち込むと、テストが「コードのこと」ではなく「走らせた人のセッション」を報告しうる。
     """
     env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     env.update(extra)
