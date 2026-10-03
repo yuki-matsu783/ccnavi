@@ -202,9 +202,9 @@ class PhaseHarness(unittest.TestCase):
         """承認して、写しを親のブランチに乗せる。
 
         写しは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
-        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順でたどる。
+        本番で `ccnavi-agree.sh` がやることを、テストでも同じ順でたどる。
         """
-        result = self.ccnavi("--approve", stdin="y\n")
+        result = self.ccnavi("--agree", stdin="y\n")
         if os.path.isdir(self.approved):
             git(self.parent_tree, "add", "-A")
             git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
@@ -323,7 +323,7 @@ class PhaseHarness(unittest.TestCase):
 
 
 class ApproveOnlyTest(PhaseHarness):
-    """`--approve <識別子>...` で承認の対象を絞っても、絞らないときに落ちるものは通らない。"""
+    """`--agree <識別子>...` で承認の対象を絞っても、絞らないときに落ちるものは通らない。"""
 
     def test_child_cannot_be_approved_without_the_parents_pending_revision(self):
         self.family(plan=("acceptance", "implement"))
@@ -333,12 +333,12 @@ class ApproveOnlyTest(PhaseHarness):
         self.commit_parent()
         # 絞らないときは、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
         # 「編集対象としているが」として出る（設計 approve-carry 3.2）。n で何も適用しない
-        whole = self.ccnavi("--approve", stdin="n\n")
+        whole = self.ccnavi("--agree", stdin="n\n")
         self.assertIn("編集対象としているが", whole.stdout)
         self.assertIn("超えている", whole.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
         # 改版を外して子だけ並べても、旧計画で通してはいけない
-        only = self.ccnavi("--approve", "i0001-02", stdin="y\n")
+        only = self.ccnavi("--agree", "i0001-02", stdin="y\n")
         self.assertEqual(only.returncode, 1, only.stdout + only.stderr)
         self.assertIn("改版", only.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
@@ -362,13 +362,13 @@ class PhaseTest(PhaseHarness):
     # ---- 1. 種類の定義
 
     def test_phase_types_must_be_unique_and_well_formed(self):
-        from ccnavi import phasetypes
+        from ccnavi.tickets import phasetypes
 
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: 同じ, kind: work}\n  b: {title: 同じ, kind: work}\n"
         )
         self.assertTrue(any("表示名" in p.detail for p in problems), problems)
-        # フィードバック対応は人が見ない経路を作らない。見る場所は chat でも mr でもよい。
+        # フィードバック対応はユーザが見ない経路を作らない。見る場所は chat でも mr でもよい。
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: none}\n"
         )
@@ -467,7 +467,7 @@ class PhaseTest(PhaseHarness):
         """種類の範囲の上限は、子チケットの範囲と同じく大文字小文字を区別しない。
 
         機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
-        承認を拒まれ、Windows では通る。範囲は人が宣言する意図なので、綴りの
+        承認を拒まれ、Windows では通る。範囲はユーザが宣言する意図なので、綴りの
         意味で読む（子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える）。
         """
         self.family(plan=["research", "design"])
@@ -643,7 +643,7 @@ class PhaseTest(PhaseHarness):
 
         承認済みチケットを置くのと、そのフェーズのマーカーを消すのは、置けたときだけ両方起きる。
         置けなかったのにマーカーだけ消えると、子は 1 枚も増えていないのにレビュー準備中へ戻り、
-        サブエージェントの起動が止まる（DENY_PHASE_REVIEW）。人は何が起きたか分からない。
+        サブエージェントの起動が止まる（DENY_PHASE_REVIEW）。ユーザは何が起きたか分からない。
         """
         self.family(plan=["design"])
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
@@ -768,7 +768,7 @@ class PhaseTest(PhaseHarness):
         data = read_json(fixture)
         data["threads"].append({"id": "t1", "resolved": False, "url": "u/7#t1", "body": "まだ"})
         write(fixture, json.dumps(data))
-        # フィードバック計画が承認済みなので、人は残りを issue に回せる。
+        # フィードバック計画が承認済みなので、ユーザは残りを issue に回せる。
         shown = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -831,7 +831,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(again.returncode, 1)
         self.assertIn("フェーズ 2 はレビュー済み", again.stderr)
 
-    # ---- 7. Draft を外す（ready）と、人が締める（close-early）
+    # ---- 7. Draft を外す（ready）と、ユーザが締める（close-early）
 
     def ready(self, fixture):
         return self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
@@ -908,7 +908,8 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(again.returncode, 0, again.stderr)
 
     def test_close_early_closes_early_and_files_the_rest(self):
-        """人が「キリの良いところ」と締める。残りは取り消し・省略・受け入れになり、issue に写る。"""
+        """ユーザが「キリの良いところ」と締める。残りは取り消し・省略・受け入れになり、
+        issue に写る。"""
         self.family(plan=["research", "design", "acceptance", "implement"])
         self.propose(
             "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
@@ -1185,7 +1186,7 @@ class ChatReviewTest(PhaseHarness):
 
     def test_chat_review_moves_the_child_to_done_and_can_raise_a_followup(self):
         """このセッションで見たフェーズも、レビュー済みで review/ の子は done/ へ動き、
-        人が指摘を打てば続きの子が doing/ に起きる（ADR-0055）。"""
+        ユーザが指摘を打てば続きの子が doing/ に起きる（ADR-0055）。"""
         self.chat_phase()
         review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
         self.assertTrue(os.path.exists(review))
@@ -1273,7 +1274,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertIn("マージリクエスト", refused.stderr)
 
     def test_the_approval_screen_says_where_each_phase_is_seen(self):
-        """承認の時点で、どのフェーズをどこで見るかが人に見える。"""
+        """承認の時点で、どのフェーズをどこで見るかがユーザに見える。"""
         result = self.family(plan=["chores", "design"])
         self.assertIn("レビュー要: このセッションで", result.stdout)
         self.assertIn("レビュー要: マージリクエスト", result.stdout)
@@ -1314,7 +1315,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(self.close_child("i0001-02").returncode, 0)
         self.commit_parent("close 02")
         self.merge("i0001-02")
-        # 承認のあとで種類が読めなくなる（人が phases.yml を触っている最中、層の切り替え）。
+        # 承認のあとで種類が読めなくなる（ユーザが phases.yml を触っている最中、層の切り替え）。
         write(self.phases, "version: 1\nphases: {}\n")
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
@@ -1331,7 +1332,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     def test_a_feedback_phase_can_be_seen_in_the_session_too(self):
-        """フィードバック対応も chat で回せる。人が見ない経路にはなっていない。"""
+        """フィードバック対応も chat で回せる。ユーザが見ない経路にはなっていない。"""
         self.chat_phase(plan=["chores"])
         self.assertEqual(
             self.ccnavi(
@@ -1641,7 +1642,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_regex_child_ignores_case_like_the_glob_child(self):
         """14. regex の子: 範囲の綴りは glob の子と同じく大文字小文字を区別しない。
 
-        範囲は人が宣言する意図なので、`regex` で書いても同じ場所を指す（設計 9.3）。
+        範囲はユーザが宣言する意図なので、`regex` で書いても同じ場所を指す（設計 9.3）。
         区別が要るなら `(?-i:...)` で囲む。
         """
         tree = self.approved_child(

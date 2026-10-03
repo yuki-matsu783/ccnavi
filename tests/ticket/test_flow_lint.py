@@ -21,7 +21,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi import flow
+from ccnavi.tickets import flow
 from tests.inproc import run_ccnavi
 from tests.ticket.test_flow import WORKFLOW_YAML
 from tests.ticket.test_ticket import write
@@ -58,7 +58,7 @@ class FlowLintTest(unittest.TestCase):
 
     def test_a_readable_flow_has_no_flow_problem(self):
         self.assertEqual(self.flow_problems(self.file(WORKFLOW_YAML)), [])
-        # 人向けの本文も、確かめたフローを名乗る。
+        # ユーザ向けの本文も、確かめたフローを名乗る。
         path = self.file(WORKFLOW_YAML)
         text = run_ccnavi(["--root", self.root, "--lint", "--flow", path])
         self.assertIn(f"フロー: {path}", text.stdout)

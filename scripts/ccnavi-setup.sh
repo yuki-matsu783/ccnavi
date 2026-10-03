@@ -1,6 +1,6 @@
 #!/bin/sh
 # ccnavi-setup は、対象プロジェクトの .claude/settings.json に、ccnavi が前提とする
-# env と hook を登録する。ccnavi を新しいプロジェクトへ入れるときに、人が 1 回実行する。
+# env と hook を登録する。ccnavi を新しいプロジェクトへ入れるときに、ユーザが 1 回実行する。
 #
 #   sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 #
@@ -31,12 +31,12 @@
 #
 # 配布元は、既定ではこのスクリプト自身の置き場から決める。設定だけが書かれて実行ファイルが
 # 無いと、hook が 7 つ登録されているのに何も起動しない。これが一番分かりにくい不具合の
-# 出方になる。既定で配布物まで置けば、実行した人が `--deploy` を知っているかどうかで結果が
+# 出方になる。既定で配布物まで置けば、実行したユーザが `--deploy` を知っているかどうかで結果が
 # 変わらない。よそから配りたいときだけ、`--deploy` で配布元を指定する。
 #
 # 既定の配布元が使えないとき（組み立てていない、配布先が ccnavi 自身）は、配布をやめて
 # 理由を 1 行出し、settings.json は書く。指定された `--deploy` が使えないときだけ 2 で止める。
-# 人が指定したものが無いのは、環境の誤りとして扱う。
+# ユーザが指定したものが無いのは、環境の誤りとして扱う。
 #
 # 置き場は 2 つに分けて固定する（ADR-0044）。CCNAVI_BIN_PATH が指すのは
 # .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh。代わりに通る sh と同じ置き場）で、
@@ -105,9 +105,9 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分。配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。ccnavi-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-approve.sh は端末から承認するための sh。承認の案内（phase.py）がこの綴りを表示するので、
+# ccnavi-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこの綴りを表示するので、
 # 配らないと、案内どおりに実行しても動かない。
-# ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh は人が実行する
+# ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、控えの書き出し。ADR-0093 の 4.2）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
@@ -115,17 +115,17 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
-# 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、人がこの実行で
+# 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で
 # 指定した値だけ。既定で埋めただけの値まで置き換えると、`--all` を足すための実行し直しが、
 # そのとき指定していない CCNAVI_MODE を既定の dry-run に戻す。
 mode_given=no
 # チケット制御。プロジェクトで「全体ルールだけ」を使うか「チケットまで」使うかを、導入の
 # ときに決めてもらう。既定は enable で、書かなくても同じように動くが、常に書く。
-# 切りたい人が、README ではなく設定ファイルの中でこの設定項目を見つけられるようにするため。
+# 切りたいユーザが、README ではなく設定ファイルの中でこの設定項目を見つけられるようにするため。
 ticket_control="enable"
 ticket_control_given=no
 all=no
@@ -135,7 +135,7 @@ vscode=yes
 fetch=yes
 target=""
 # 配布元。指定されたかどうかを別の変数で持つ。既定で埋めただけの配布元が使えないのは
-# 「組み立てていない」で済むが、人が指定したものが使えないのは誤り。
+# 「組み立てていない」で済むが、ユーザが指定したものが使えないのは誤り。
 # 同じ変数で持つと、この 2 つを最後まで区別できない。
 deploy=""
 deploy_given=no
@@ -270,7 +270,7 @@ command -v jq >/dev/null 2>&1 || die "jq が必要です。"
 [ -n "$target" ] || target="."
 [ -d "$target" ] || die "$target というディレクトリがありません。"
 # 表示のために絶対パスにする。Git Bash では pwd -W が Windows 形式のパスを返すので、
-# 人が設定ファイルを開くときにそのまま使える綴りになる。
+# ユーザが設定ファイルを開くときにそのまま使える綴りになる。
 root=$(cd "$target" && { pwd -W 2>/dev/null || pwd; })
 settings="$root/$SETTINGS_REL"
 claude_dir=$(dirname "$settings")
@@ -303,7 +303,7 @@ if [ -n "$deploy" ]; then
 	if [ "$source_root" = "$root" ]; then
 		# 既定の配布元ではよく起きる。ccnavi のリポジトリ自身に対して実行すると、配布元と
 		# 配布先が同じ場所になる。そこは配る先ではないので、設定だけ書いて配布はやめる。
-		# 指定された配布元でこうなるなら、実行した人の思い違い。
+		# 指定された配布元でこうなるなら、実行したユーザの思い違い。
 		[ "$deploy_given" = no ] ||
 			die "--deploy の配布元と配布先が同じです。自分自身へは配れません。"
 		deploy_skipped="配布元と配布先が同じなので配っていません。"
@@ -312,7 +312,7 @@ if [ -n "$deploy" ]; then
 	fi
 fi
 # 組み立てていない配布元のまま、何も言わずに先へ進まない。ここを報告だけにすると、
-# 「配ったはずなのに実行ファイルが無い」ことが最後の一覧にしか出ず、実行した人は
+# 「配ったはずなのに実行ファイルが無い」ことが最後の一覧にしか出ず、実行したユーザは
 # 配布できたものとして先へ進む。--deploy を指定した以上、実行ファイルが無いことは
 # 環境の誤りとして 2 で止める。既定の配布元なら組み立てていないだけなので、配布を
 # やめた理由を出して settings.json は書く。
@@ -356,7 +356,7 @@ host_target() {
 runnable_targets() {
 	# $1 この機械。この機械で動く組み立ての名前を、優先する順に空白区切りで並べる。
 	# arm64 の macOS と Windows は x86_64 の実行ファイルを変換して動かす（Rosetta 2 /
-	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と ccnavi/platformtag.py と揃える。
+	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と ccnavi/infra/platformtag.py と揃える。
 	case "$1" in
 	darwin-arm64) printf '%s' "$1 darwin-x86_64" ;;
 	windows-arm64) printf '%s' "$1 windows-x86_64" ;;
@@ -606,7 +606,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # 2 値の門（CCNAVI_GUARD_TICKET_APPROVAL と CCNAVI_GUARD_UNWATCHED）は、モードに合わせず
 # enable で書く。どちらも enable か disable しか取らず、dry-run と書くと ccnavi の --lint が
 # 指摘する。承認の経路の門（CCNAVI_GUARD_TICKET_APPROVAL）は、通ればそれで済んでしまい、
-# 済んだことは報告しても戻らない。そのため「止めずに報告する」段を持てない。確認できる人が
+# 済んだことは報告しても戻らない。そのため「止めずに報告する」段を持てない。確認できるユーザが
 # いないモードの門（CCNAVI_GUARD_UNWATCHED）は、止めずに報告する段を CCNAVI_MODE=dry-run が
 # 受け持つので、こちらには要らない。
 #
@@ -624,7 +624,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 	CCNAVI_TICKET_CONTROL: $ticket_control
 }')
 # --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
-# 書く利点は、あとで値を変えたくなった人が、設定項目の一覧を README ではなく
+# 書く利点は、あとで値を変えたくなったユーザが、設定項目の一覧を README ではなく
 # 設定ファイルの中で見つけられること。
 #
 # 共通層の 3 本（rules / phases / risk）は、ここにも書かない。置き場は `.ccnavi/common/`
@@ -641,7 +641,7 @@ fi
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 既定でない CCNAVI_BIN_PATH（人が決めた綴り）は書き換えず、その綴りを挙げた 1 行を出す。
+# 既定でない CCNAVI_BIN_PATH（ユーザが決めた綴り）は書き換えず、その綴りを挙げた 1 行を出す。
 # 導入は止めず、終了コードも変えない（--check では「揃っていない」に数える）。
 current_bin=$(printf '%s' "$current" | jq -r '(.env // {}).CCNAVI_BIN_PATH // "" | if type == "string" then . else "" end')
 bin_custom=""
@@ -649,7 +649,7 @@ if [ -n "$current_bin" ] && [ "$current_bin" != "$BIN_PATH" ]; then
 	bin_custom="CCNAVI_BIN_PATH は既定と違う値（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください。"
 fi
 
-# --force で置き換えてよいキー。人がこの実行で指定した 2 つだけ。
+# --force で置き換えてよいキー。ユーザがこの実行で指定した 2 つだけ。
 forced=""
 if [ "$force" = yes ]; then
 	if [ "$mode_given" = yes ]; then
@@ -666,7 +666,7 @@ forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length 
 # 入っているプロジェクトでは、そのイベントが「登録済み」に見えたまま、いつまでも登録されない。
 #
 # そこで 3 通りに分ける。同じ綴りで登録されている（exact）、ccnavi らしい別の綴りで
-# 登録されている（other）、登録が無い（none）。足すのは none だけ。other は足さずに人へ知らせる。
+# 登録されている（other）、登録が無い（none）。足すのは none だけ。other は足さずにユーザへ知らせる。
 # 綴りはプロジェクトごとに違うので、どちらが正しいかをここでは決められない。
 # 知らせずに足すと判定が 2 回走り、知らせずに飛ばすとそのイベントは登録されないままになる。
 # セッション開始時の取り込み（ccnavi-fetch.sh）は本体ではないので、other に数えない。数えると、
@@ -806,12 +806,12 @@ copy_file() {
 	cp "$1" "$2"
 }
 
-# .vscode/settings.json。ここは ccnavi の判定には関わらず、人がエディタから
+# .vscode/settings.json。ここは ccnavi の判定には関わらず、ユーザがエディタから
 # worktree を見られるかどうかだけに関わる。
 #
 # 読めない内容（VS Code の設定ファイルにはコメントや末尾のカンマを書ける）でも
 # die しない。die すると、ccnavi と関係のない書き方のせいで、肝心の .claude/settings.json まで
-# 書けなくなる。このファイルには触らずに人へ任せ、残りの処理は進める。
+# 書けなくなる。このファイルには触らずにユーザへ任せ、残りの処理は進める。
 vscode_settings="$root/$VSCODE_REL"
 vscode_current="{}"
 missing_vscode=""
@@ -839,7 +839,7 @@ if [ "$vscode" = yes ] && [ -z "$vscode_blocked" ]; then
 		. as $cur | $want | keys_unsorted[] | select($cur[.] == null)
 	')
 	# 値が違うものは変えない。`false` と書いてある設定を true に戻すのは、このスクリプトの
-	# 仕事ではない。そう書いた人の判断を消すことになる。
+	# 仕事ではない。そう書いたユーザの判断を消すことになる。
 	differing_vscode=$(printf '%s' "$vscode_current" | jq -r --argjson want "$VSCODE_KEYS" '
 		. as $cur | $want | to_entries[]
 		| select($cur[.key] != null and $cur[.key] != .value)
@@ -1042,7 +1042,7 @@ write_json() {
 	else
 		tmp="$1.tmp.$$"
 		# 途中で止まったときに書きかけを残さない。設定ファイルの隣に見慣れない
-		# ファイルがあると、それが設定なのか残骸なのかを人が判断できない。
+		# ファイルがあると、それが設定なのか残骸なのかをユーザが判断できない。
 		trap 'rm -f "$tmp"' EXIT INT TERM
 		printf '%s\n' "$2" >"$tmp"
 		mv "$tmp" "$1"
@@ -1162,7 +1162,7 @@ if [ "$deploy_work" = yes ]; then
 		fi
 	fi
 	# .gitignore には足すだけ。既にある行は書かず、ccnavi と関係のない行にも
-	# 触らない。見出しは、その塊が何なのかを、あとで開いた人に伝えるためだけの
+	# 触らない。見出しは、その塊が何なのかを、あとで開いたユーザに伝えるためだけの
 	# もの。既に同じ見出しがあれば重ねない。
 	append_ignore() {
 		# $1 見出し、$2 足す行（改行で終わる）。空なら何もしない。
@@ -1232,14 +1232,14 @@ for name in $DEPLOY_SCRIPTS; do
 		ccnavi-push-approved.sh)
 			why="承認のあとにボードが端末で実行する、承認済みチケットのコミットと push"
 			;;
-		ccnavi-approve.sh)
+		ccnavi-agree.sh)
 			why="端末から承認するための sh"
 			;;
 		ccnavi-fetch.sh)
 			why="セッション開始時の取り込み"
 			;;
 		ccnavi-sync.sh)
-			why="人が実行する取り込みと、親のブランチが消えたかの確認"
+			why="ユーザが実行する取り込みと、親のブランチが消えたかの確認"
 			;;
 		ccnavi-clean.sh | ccnavi-clean.js)
 			why="ワークツリーを片付ける前に生成物を消す"
@@ -1253,7 +1253,7 @@ for name in $DEPLOY_SCRIPTS; do
 done
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
-	# 配布をやめた理由は report_deploy が既に出している。ここで足すのは、人が自分で
+	# 配布をやめた理由は report_deploy が既に出している。ここで足すのは、ユーザが自分で
 	# 配布を切ったときだけ。理由を二重に出すと、どちらが今回の話か分からなくなる。
 	if [ "$deploy_off" = yes ]; then
 		# 書式の引数には置かない。`--` で始まる文字列は、printf がオプションとして

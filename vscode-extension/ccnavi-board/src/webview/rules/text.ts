@@ -53,7 +53,7 @@ export function contextSummary(rule: RuleForm): string {
 
 /** ask と allow に message が残っているときに出す断り。lint が error にする */
 export function staleMessage(section: Section): string {
-  const where = section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない";
+  const where = section === "ask" ? "ユーザの確認ダイアログにしか出ない" : "どこにも届かない";
   return `${section} の message は${where}ので、lint が error にします。モデルに渡すプロンプトは additionalContext に移してください: `;
 }
 

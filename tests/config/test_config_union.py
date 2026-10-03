@@ -185,7 +185,7 @@ ASK_VENDOR = {
     "id": "ask-vendor",
     "match": "Write|Edit",
     "glob": "*/vendor/*",
-    "message": "vendor は人に確かめてから触る。",
+    "message": "vendor はユーザに確かめてから触る。",
 }
 
 # NotebookEdit を実際の `tool_name` として通すためのルール。欄は notebook_path。
@@ -193,7 +193,7 @@ NOTEBOOK_RULE = {
     "id": "notebook",
     "match": "NotebookEdit",
     "glob": "*/notebooks/*",
-    "message": "ノートは人が回す。",
+    "message": "ノートはユーザが回す。",
 }
 
 # `{root}` を含む定義。共通層と層の両方に同じものを置いて、置換後の全欄一致を見る（11.8）。
@@ -426,7 +426,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
         「`projects/` を数えない」を言いたいテストは `env={"CCNAVI_PROJECTS": ""}`
-        を渡す。人が `settings.json` に書く経路がそれで、フラグではない。
+        を渡す。ユーザが `settings.json` に書く経路がそれで、フラグではない。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -467,7 +467,7 @@ class ConfigUnionHarness(unittest.TestCase):
         return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), **options)
 
     def approve(self):
-        return self.ccnavi("--approve", stdin="y\n")
+        return self.ccnavi("--agree", stdin="y\n")
 
     def lint_json(self, *args, **options):
         result = self.ccnavi("--lint", "--json", *args, **options)
@@ -674,8 +674,13 @@ class ToolLayerTest(ConfigUnionHarness):
             "message": "社内のページは取りに行かない。",
         }
         write_layer(self.ws, rules=dict(OWN_RULES, deny=[*OWN_RULES["deny"], own]))
-        skill = {"id": "release", "match": "Skill", "glob": "release*", "message": "人が回す。"}
-        agent = {"id": "migrate", "match": "Agent", "glob": "*migrate*", "message": "人が回す。"}
+        skill = {"id": "release", "match": "Skill", "glob": "release*", "message": "ユーザが回す。"}
+        agent = {
+            "id": "migrate",
+            "match": "Agent",
+            "glob": "*migrate*",
+            "message": "ユーザが回す。",
+        }
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], skill, agent]))
 
         for cwd in (self.ws, self.lib, self.app):
@@ -696,7 +701,7 @@ class ToolLayerTest(ConfigUnionHarness):
             "id": "ps-psql",
             "match": "PowerShell",
             "glob": "*psql*",
-            "message": "人が回す。",
+            "message": "ユーザが回す。",
         }
         deny = [*LIB_RULES["deny"], self.SECRETS, powershell]
         write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))

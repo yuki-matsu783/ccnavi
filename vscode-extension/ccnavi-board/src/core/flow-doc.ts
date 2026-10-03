@@ -1,7 +1,7 @@
 /**
  * 子チケットのフロー（設計 9.3.1、ADR-0085）の読み書き。フロー編集画面と拡張ホストが分け合う。
  *
- * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`ccnavi/flow.py`）が読むもの。
+ * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`ccnavi/tickets/flow.py`）が読むもの。
  *
  *     id, name, description?, version
  *     nodes:          [node, ...]
@@ -19,7 +19,7 @@
  * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はその写しの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
- * 書き出しは中身から組み直す（コメントや書き方は残らない。人が保存したときだけ書く）。
+ * 書き出しは中身から組み直す（コメントや書き方は残らない。ユーザが保存したときだけ書く）。
  *
  * **判定はしない。** 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`、ADR-0035）、
  * 着手中に書けるかは実行ファイルが `flow.locked` で言う（ADR-0085）。
@@ -68,7 +68,7 @@ export const TYPE_LABELS: Readonly<Record<string, string>> = {
   end: "終了",
   prompt: "プロンプト",
   subAgent: "サブエージェント",
-  askUserQuestion: "利用者に聞く",
+  askUserQuestion: "ユーザに聞く",
   ifElse: "分岐（if / else）",
   switch: "分岐（switch）",
   branch: "分岐",
@@ -202,7 +202,7 @@ export function parseFlow(text: string): FlowRead {
 
 /**
  * YAML の本文を `yaml` の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
- * （`flow-agree.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
+ * （`flow-match.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
  * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。**例外は外に出さない。**
  */
 export function parseFlowValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
@@ -244,7 +244,7 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
  * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
  *
  * 書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に実行ファイルに読ませて見比べる
- * （`flow-agree.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
+ * （`flow-match.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
  */
 export function serializeFlow(doc: FlowDoc): string {
   return yamlText(doc);
@@ -479,7 +479,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は**並びの位置で指す**（人が書いたフローの線は id が無いことも重なることもある）。
+ * 線を消す。線は**並びの位置で指す**（ユーザが書いたフローの線は id が無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -962,7 +962,7 @@ export interface Ports {
 }
 
 /**
- * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（人が書いたフローが別の綴りを
+ * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（ユーザが書いたフローが別の綴りを
  * 使っていても、線を落とさずに描くため）。
  */
 export function portsOf(node: FlowNode, connections: readonly FlowConnection[]): Ports {

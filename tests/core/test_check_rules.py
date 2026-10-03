@@ -47,7 +47,7 @@ class RepoSamplesTest(unittest.TestCase):
 
     def test_the_repo_samples_match_the_rules(self):
         tool = _load_check_rules()
-        # 走らせた人の dry-run や設定の差し替え（CCNAVI_*）と、hook のルート
+        # 走らせたユーザの dry-run や設定の差し替え（CCNAVI_*）と、hook のルート
         # （CLAUDE_PROJECT_DIR）を判定に入れない。tests/guard/test_repo_rules.py と同じ外し方。
         environment = tool.environment()
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -71,7 +71,7 @@ class RepoSamplesTest(unittest.TestCase):
         self.assertEqual(
             body["mismatches"],
             0,
-            "見本と判定が食い違った（見本とルールのどちらを直すかは人が決める。/ccnavi-config）:\n"
+            "見本と判定が食い違った（見本とルールのどちらを直すかはユーザが決める。/ccnavi-config）:\n"
             + "\n".join(wrong),
         )
 

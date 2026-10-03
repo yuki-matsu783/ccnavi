@@ -13,8 +13,9 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from ccnavi import approval, review, settings
-from ccnavi import ticket as ticket_mod
+from ccnavi.infra import settings
+from ccnavi.tickets import agree, review
+from ccnavi.tickets import ticket as ticket_mod
 
 
 def parent_text(issue):
@@ -71,8 +72,8 @@ class IssueRefTest(unittest.TestCase):
         revised, _ = self.parse("acme/other#12")
         conf, _ = settings.load("/nonexistent-ccnavi-root")
         # 計画の検査（種類の定義を読む）はここでは見ない
-        with mock.patch.object(approval, "plan_problems", return_value=[]):
-            found = approval.revision_problems(
+        with mock.patch.object(agree, "plan_problems", return_value=[]):
+            found = agree.revision_problems(
                 "/nonexistent-ccnavi-root", conf, revised, current, None
             )
         self.assertTrue(any("課題番号" in p.detail for p in found), found)

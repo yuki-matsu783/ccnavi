@@ -20,7 +20,8 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import platformtag, rules, selfguard, settings, shellread
+from ccnavi.infra import platformtag, settings, shellread
+from ccnavi.policy import rules, selfguard
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -215,7 +216,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(self.settings))["hooks"], SETTINGS["hooks"])
 
     def test_直前の断面に戻すのでコミットしていない編集は残る(self):
-        # git から戻すとコミット済みの内容まで巻き戻り、人の書きかけが消える。
+        # git から戻すとコミット済みの内容まで巻き戻り、ユーザの書きかけが消える。
         # 控えから戻せば、戻る先はこのツール呼び出しの直前になる。
         edited = json.dumps(
             RULES
@@ -267,7 +268,7 @@ class SelfGuardTest(unittest.TestCase):
 
         result = self.run_hook("PostToolUse")
 
-        self.assertTrue(os.path.exists(local), "人が置くこともあるファイルを消さない")
+        self.assertTrue(os.path.exists(local), "ユーザが置くこともあるファイルを消さない")
         self.assertIn("settings.local.json", result.stdout)
 
     # ワークツリー側の設定
@@ -298,7 +299,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ワークツリーでないディレクトリは守らない(self):
         # `.claude/worktrees/` の下に在るだけのディレクトリ。参考実装の写しを
-        # 置いた形がこれで、守りに行くと人のファイルを勝手に戻すことになる。
+        # 置いた形がこれで、守りに行くとユーザのファイルを勝手に戻すことになる。
         fake = os.path.join(self.repo, ".claude", "worktrees", "not-a-tree")
         copy = self.copy_in(fake, "settings.json")
         write(copy, "{}\n")

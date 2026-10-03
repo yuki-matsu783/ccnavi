@@ -2,8 +2,8 @@
  * `.claude/settings.json` と `.claude/settings.local.json` の hooks を読み、
  * 「このツール名でどの hook が走るか」を答える。
  *
- * 読むだけで書かない。利用者ごとの設定（~/.claude/settings.json）は見ない。
- * ワークスペースの外を読む手段にしないため。利用者ごとの設定が載らないことは画面に書く。
+ * 読むだけで書かない。ユーザごとの設定（~/.claude/settings.json）は見ない。
+ * ワークスペースの外を読む手段にしないため。ユーザごとの設定が載らないことは画面に書く。
  *
  * matcher の意味は Claude Code のもので、ccnavi の判定ではない。空か `*` なら全部、
  * それ以外はツール名に対する正規表現（`Write|Edit` のように書ける）。正規表現として

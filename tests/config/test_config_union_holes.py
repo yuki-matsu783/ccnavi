@@ -29,7 +29,7 @@ import json
 import os
 import unittest
 
-from ccnavi import settings
+from ccnavi.infra import settings
 from tests.config.test_config_union import (
     COMMON_RISK,
     HOME,
@@ -46,7 +46,7 @@ from tests.config.test_config_union_guard import GuardHarness
 # A-2 の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
 # `glob` も `regex` も組み込みの守りも、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
 # 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
-# 区別が要るときだけ、書いた人が `(?-i:...)` で囲む。
+# 区別が要るときだけ、書いたユーザが `(?-i:...)` で囲む。
 CASE_RULES = {
     "version": 1,
     "deny": [
@@ -54,13 +54,13 @@ CASE_RULES = {
             "id": "glob-secret",
             "match": "Write|Edit",
             "glob": "*/secret/*",
-            "message": "secret は人が置く。",
+            "message": "secret はユーザが置く。",
         },
         {
             "id": "regex-token",
             "match": "Write|Edit",
             "regex": r"[\\/]token[\\/]",
-            "message": "token は人が置く。",
+            "message": "token はユーザが置く。",
         },
         {
             "id": "regex-exact",
@@ -80,7 +80,7 @@ COLON_RULES = {
             "id": "lib:custom",
             "match": "Write|Edit",
             "glob": "*/custom/*",
-            "message": "custom は人が置く。",
+            "message": "custom はユーザが置く。",
         }
     ],
     "allow": [{"id": "anything-read", "match": "Read", "regex": "."}],
@@ -110,7 +110,7 @@ SELF_PROJECT_RULES = {
             "id": "kube",
             "match": "Bash",
             "glob": "*kubectl*",
-            "message": "kubectl は人が打つ。",
+            "message": "kubectl はユーザが打つ。",
         }
     ],
 }
@@ -140,7 +140,7 @@ RESERVED_PROJECT_RULES = {
             "id": "secret",
             "match": "Write|Edit",
             "glob": "*/secret/*",
-            "message": "secret は人が置く。",
+            "message": "secret はユーザが置く。",
         }
     ],
 }
@@ -495,7 +495,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
                 )
 
     def test_a_ticket_cannot_name_a_reserved_layer_name(self):
-        """11.4: `project: self` / `project: common` のチケットは `--approve` で通らない。"""
+        """11.4: `project: self` / `project: common` のチケットは `--agree` で通らない。"""
         for name in settings.RESERVED_LAYER_NAMES:
             self.project(name, rules=RESERVED_PROJECT_RULES)
         # 前提。同じ本文で `project: lib` なら通る。止まる理由が予約名であることを固定する。

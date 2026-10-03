@@ -11,7 +11,7 @@ description: >-
 # commit
 
 変更を分析して Conventional Commits の prefix + 日本語 1 行のメッセージを作り、確認を挟まずコミットまで進める。
-利用者が `/commit` と打った場合も、エージェントが作業の締めに自分でコミットする場合も、この手順に従う。
+ユーザが `/commit` と打った場合も、エージェントが作業の締めに自分でコミットする場合も、この手順に従う。
 
 ## 絶対ルール
 
@@ -104,7 +104,7 @@ git commit -m "<prefix>: <日本語の説明>"
 ```
 コミット1: feat: PreToolUse のルール照合と判定の記録を追加
   - main.py
-  - ccnavi/rules.py
+  - ccnavi/policy/rules.py
 コミット2: docs: モードの呼び名を判定しない・警告・ブロックに統一
   - requirements.md
 ```

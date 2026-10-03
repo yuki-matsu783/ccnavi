@@ -2,7 +2,7 @@
  * ボード画面の本体。列とカード、絞り込み、承認のオーバーレイ。
  *
  * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いたカードの印も、
- * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、人が触って
+ * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
  * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -24,7 +24,7 @@ const MIN_WIDTH = 220;
 /**
  * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース（プロジェクト外）」（空）と各プロジェクト。
  * プロジェクトが無いボードでは欄を出さないので、候補も「すべて」だけ。覚えていた値がここに無ければ使わない
- * （欄が無いまま「絞り込み中」になると、人には解除する手立てが無い）
+ * （欄が無いまま「絞り込み中」になると、ユーザには解除する手立てが無い）
  */
 function projectOptions(board: Board | undefined): readonly string[] {
   return board === undefined || board.projects.length === 0 ? [EMPTY.project] : [EMPTY.project, "", ...board.projects];
@@ -105,7 +105,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 
   /**
    * 覚える。落とした後の値（候補に無い絞り込みは「すべて」）で書くので、消えた親の絞り込みは
-   * ここで正規化される。人が触ったときだけでなく、拡張ホストから絞り込みを渡されたときも通る。
+   * ここで正規化される。ユーザが触ったときだけでなく、拡張ホストから絞り込みを渡されたときも通る。
    *
    * 読み直せなかった画面（絞り込みの部品が無い）では書かない。書くと、覚えていた絞り込みが
    * 既定で上書きされる。
@@ -180,7 +180,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              <label className="filter attention" title="人が対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
+              <label className="filter attention" title="ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
                 <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応のみ
               </label>
               <button
@@ -268,7 +268,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".filter.attention",
     title: "絞り込み",
-    body: "プロジェクトと親チケットで絞り込めます（プロジェクトや親があるときだけ欄が出ます）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、人が対応する必要があるカードだけを表示します。",
+    body: "プロジェクトと親チケットで絞り込めます（プロジェクトや親があるときだけ欄が出ます）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、ユーザが対応する必要があるカードだけを表示します。",
   },
   {
     target: ".board",
@@ -278,7 +278,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".column:not(.folded) .card:not(.hidden)",
     title: "カード",
-    body: "1 枚が 1 チケットです。カードには、親か子か、フェーズの進み具合、人が対応する必要がある状態を示すバッジが出ます。押すとチケットのファイルを開きます。承認やレビュー済みの連絡のボタンは、要るときだけカードに出ます。",
+    body: "1 枚が 1 チケットです。カードには、親か子か、フェーズの進み具合、ユーザが対応する必要がある状態を示すバッジが出ます。押すとチケットのファイルを開きます。承認やレビュー済みの連絡のボタンは、要るときだけカードに出ます。",
   },
   {
     target: '[data-action="approve"]',

@@ -1,4 +1,5 @@
-"""同じ理由で同じ呼び出しを繰り返し止めたとき、文面と人への報告で名指しすること（issue #149 の 3）。
+"""同じ理由で同じ呼び出しを繰り返し止めたとき、文面とユーザへの報告で名指しすること
+（issue #149 の 3）。
 
 外から道具を動かし、読み返すのは応答の JSON だけ。判定そのもの（deny）は変わらず、
 N 回目から拒否の文面の末尾に「言い換えずに相談する」一文が足されることを見る。
@@ -11,7 +12,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi import audit, repeat
+from ccnavi.records import audit, repeat
 from tests import fixture_workspace
 from tests.inproc import run_ccnavi
 
@@ -106,7 +107,7 @@ class DenyMessageTest(unittest.TestCase):
             self.assertNotIn(NOTE, reason)
 
     def test_turn_end_reports_once(self):
-        """ターンの終わりに人へ 1 度言う。同じ回数のまま次のターンでは繰り返さない。"""
+        """ターンの終わりにユーザへ 1 度言う。同じ回数のまま次のターンでは繰り返さない。"""
         for _ in range(3):
             _bash(self.state, "git push origin main")
         stop = {"hook_event_name": "Stop"}

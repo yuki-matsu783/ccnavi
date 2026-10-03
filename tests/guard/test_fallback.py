@@ -85,7 +85,7 @@ class FallbackTest(unittest.TestCase):
         # hook を登録しただけでセッションが何もできなくなる。
         #
         # 既定にはプロジェクトの allow が無いので、無害な呼び出しも権限モードへの委譲に
-        # なる。人が答えれば進むので、先へ進む方法は残っている。進めなくなるのは deny だけ。
+        # なる。ユーザが答えれば進むので、先へ進む方法は残っている。進めなくなるのは deny だけ。
         for root, why in ((self.root, "broken"), (self.without_rules, "missing")):
             with self.subTest(rules=why):
                 result = run(root, pre_tool_use("Bash", "command", "cat README.md"))
@@ -124,7 +124,7 @@ class FallbackTest(unittest.TestCase):
         # ここを止めると直す方法が 1 つも残らない。
         #
         # Write / Edit は Claude Code の権限モードに従う。妨げてはいないが、ガードが落ちている
-        # あいだにガードの設定を書き換える操作なので、人が 1 度見る側に置く。
+        # あいだにガードの設定を書き換える操作なので、ユーザが 1 度見る側に置く。
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
                 result = run(self.root, pre_tool_use(tool, "file_path", ".ccnavi/common/rules.yml"))

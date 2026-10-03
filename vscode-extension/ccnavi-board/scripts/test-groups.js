@@ -32,7 +32,7 @@ const TEST_DIR = path.join(ROOT, "test");
 const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 
 // 「環境が足りないので回せなかった」の終了コード。テストが落ちた（1）とは分ける。
-// ターンの終わりの hook は、これを差し戻しに数えず人へ言う。
+// ターンの終わりの hook は、これを差し戻しに数えずユーザへ言う。
 const NOT_READY = 3;
 
 // 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では辿れないので、

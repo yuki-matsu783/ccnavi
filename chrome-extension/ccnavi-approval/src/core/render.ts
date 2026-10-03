@@ -35,7 +35,7 @@ export interface Actions {
   loadIssues?(repo: RepoBoard): void;
   /** issue から親のブランチを作る（段階 5。8.6） */
   start?(repo: RepoBoard, issue: Issue): void;
-  /** 「要確認」を外す（人が確かめた。8.4） */
+  /** 「要確認」を外す（ユーザが確かめた。8.4） */
   dismiss?(repo: RepoBoard, family: string): void;
 }
 
@@ -81,7 +81,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
   }
   for (const f of board.families) {
     const why = extras.attention?.[f.family.name];
-    // 「要確認」の家族には、このブラウザでは書くボタンを出さない（人が確かめて外すまで。11.9.1 の決定 B）
+    // 「要確認」の家族には、このブラウザでは書くボタンを出さない（ユーザが確かめて外すまで。11.9.1 の決定 B）
     const box = renderFamily(
       doc,
       md,
@@ -112,7 +112,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
   return section;
 }
 
-/** 打ち消しが収まらなかった家族（8.4）。人がホストの履歴を確かめたら外す */
+/** 打ち消しが収まらなかった家族（8.4）。ユーザがホストの履歴を確かめたら外す */
 function attention(doc: Document, text: string, onDismiss?: () => void): HTMLElement {
   const box = el(doc, "div", "attention");
   box.dataset.testid = "attention";
@@ -306,7 +306,7 @@ export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, wr
     box.append(notice(doc, "error", panel.error));
     return box;
   }
-  // 並べるのは写しのとおり。GitHub では目印で始まるスレッドも人のものとして数え、GitLab で依頼を投稿したアカウントの
+  // 並べるのは写しのとおり。GitHub では目印で始まるスレッドもユーザのものとして数え、GitLab で依頼を投稿したアカウントの
   // ccnavi の依頼のスレッドを数えないのは Python（11.8.1 の決定 C）。ここは未解決の件数を写しのとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;

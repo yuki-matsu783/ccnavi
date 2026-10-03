@@ -34,7 +34,7 @@ export function movedLabel(moved: Moved): string {
 
 /**
  * レビューが済むまで止めている間の呼び名。依頼を出す前はエージェントの番（合流・push・依頼）で
- * 「レビュー準備中」、出した後は人の番で「レビュー待ち」。実行ファイルの `phase.review_label` と
+ * 「レビュー準備中」、出した後はユーザの番で「レビュー待ち」。実行ファイルの `phase.review_label` と
  * 同じ分け方で、判定した 2 つの真偽値（`gate_closed` / `review_waiting`）を言い換えるだけ。
  */
 export function holdLabel(x: { readonly gateClosed: boolean; readonly reviewWaiting: boolean }): string {
@@ -79,7 +79,7 @@ export function phaseStatusFullItems(p: PhaseChip): string[] {
 }
 
 /**
- * フェーズ行の状態の要約。人が動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
+ * フェーズ行の状態の要約。ユーザが動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
  * 止めている間は段の名前を 1 つだけ出す。
  */
 export function phaseStatusBrief(p: PhaseChip): string {
@@ -110,7 +110,7 @@ export function isHttpUrl(url: string): boolean {
 
 /**
  * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ綴り
- * （`ccnavi/approval.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
+ * （`ccnavi/tickets/agree.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
  * **まとめるのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
@@ -183,7 +183,7 @@ const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
- * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（人がターミナルで同じ sh を打っても `cli`）ので、
+ * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザがターミナルで同じ sh を打っても `cli`）ので、
  * 誰が打ったかは断定しない
  */
 export const VIA_LABELS: Readonly<Record<string, string>> = {

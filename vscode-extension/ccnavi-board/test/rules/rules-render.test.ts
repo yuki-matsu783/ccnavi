@@ -13,7 +13,7 @@ deny:
   - id: git-push
     match: Bash
     glob: "*git push*"
-    message: "<b>push</b> は人が行う"
+    message: "<b>push</b> はユーザが行う"
 allow: []
 `;
 

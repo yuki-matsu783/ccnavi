@@ -93,7 +93,7 @@ test("CB-T147 裏にいる画面からの ready は、捨てられた画面の�
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
-  // 画面が ready を送った直後に人がタブを裏へ回すと、裏に回ったことが先に届くことがある。
+  // 画面が ready を送った直後にユーザがタブを裏へ回すと、裏に回ったことが先に届くことがある。
   // これを真に受けると、表に戻ったとき「組み上がっている」と誤って送ってしまう
   spy.visible = false;
   host.ready();

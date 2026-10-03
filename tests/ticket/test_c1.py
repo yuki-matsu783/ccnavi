@@ -8,8 +8,8 @@
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
    （一覧は書く。D34 の configsync の写しは例外で、tests/config/test_configsync.py が見る）
-4. 人の判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）はエージェントから
-   止める
+4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）は
+   エージェントから止める
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi import c1
+from ccnavi.hook import c1
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_sync_authority import AuthorityHarness
 from tests.ticket.test_ticket import git, read_json, write
@@ -169,7 +169,8 @@ class SortTest(AuthorityHarness):
         self.assertEqual(self.sort(), [("b", self.events())])
 
     def test_moves_written_by_a_human_decision_are_c(self):
-        """人のレビュー（review/ から done/）と締め（doing/ から done/）、マーカーの消去は (c)。"""
+        """ユーザのレビュー（review/ から done/）と締め（doing/ から done/）、
+        マーカーの消去は (c)。"""
         review = "wip/proposals/review/i0001-01.md"
         self.put(review, child_text("i0001-01", "i0001", 1, ["wip/research/*"]))
         mark = f"{APPROVED}/phases/i0001/1.pending"
@@ -282,9 +283,9 @@ class RecordTreeTest(AuthorityHarness):
         # 承認は提案（wip/proposals/todo/）を消す。C1 の置き場の外なので error。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent("propose")
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         result, listed = self.run_recorded(
-            "--approve", "--yes", "i0001-02", "--digest", preview["digest"], "--json"
+            "--agree", "--yes", "i0001-02", "--digest", preview["digest"], "--json"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場の外に書き込みがあった", result.stderr)

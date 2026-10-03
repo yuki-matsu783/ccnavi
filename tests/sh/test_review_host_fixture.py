@@ -26,7 +26,8 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi import review, version
+from ccnavi.entry import version
+from ccnavi.tickets import review
 from tests import ROOT
 from tests.sh import github_host, gitlab_host
 
@@ -165,7 +166,7 @@ class HostFixtureTest(unittest.TestCase):
         self.assertEqual(said("full-page"), {"changes_requested": [], "unresolved": []})
         paged = said("paged")
         self.assertEqual(paged["changes_requested"], [])
-        # GitHub では目印で始まるスレッドも人のものとして数える（11.8.1 の決定 C）
+        # GitHub では目印で始まるスレッドもユーザのものとして数える（11.8.1 の決定 C）
         self.assertEqual(len(paged["unresolved"]), 4)
         self.assertIn("PRRT_kwDOAbCdEs5P2003", paged["unresolved"])
         for scene in ("changes-requested", "cr-commented", "pending"):
@@ -630,7 +631,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 self.assertFalse(os.path.exists(state))
 
     def test_request_points_to_crit_push_and_keeps_eli5_from_the_exe(self):
-        """投稿が済んだら、人が打つ crit review <相対> と crit push <番号> を出す（ADR-0095）。
+        """投稿が済んだら、ユーザが打つ crit review <相対> と crit push <番号> を出す（ADR-0095）。
 
         相対は打った場所から解く。--eli5 は実行ファイルには渡さない。crit・glab が PATH に
         無くても止めない。
@@ -700,7 +701,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         said = [line for line in done.stdout.splitlines() if line.startswith("ELI5 を見る: ")]
         self.assertEqual(len(said), 1, done.stdout)
         word = said[0].split("cd ", 1)[1].split(" してから ", 1)[0]
-        # 打った人のシェルがその 1 語を読んだ結果が、元の絶対パスと同じで、何も実行されない
+        # 打ったユーザのシェルがその 1 語を読んだ結果が、元の絶対パスと同じで、何も実行されない
         echoed = subprocess.run(
             [SHELL, "-c", f"printf '%s' {word}"],
             cwd=self._tmp.name,

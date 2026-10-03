@@ -321,7 +321,7 @@ test("CB-D64 往復の間は、帯の再読込も止める。やめたと返れ�
   }
 });
 
-test("CB-D65 再読込を押した時点で欄を止め、人がやめたら戻す", async () => {
+test("CB-D65 再読込を押した時点で欄を止め、ユーザがやめたら戻す", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one('header button[data-action="reload"]'));

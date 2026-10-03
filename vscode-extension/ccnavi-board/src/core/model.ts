@@ -15,7 +15,7 @@ export const BOARD_VERSION = 1;
 export type ProposalState = "todo" | "doing" | "done" | "cancelled";
 /**
  * 承認済みチケットの今。`open` は `.ccnavi/approved/doing/`、`review` は `wip/proposals/review/`（承認済みのまま
- * 人のレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は
+ * ユーザのレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は
  * 承認待ちの提案だけ
  */
 export type CopyStatus = "open" | "review" | "closed" | "none";
@@ -105,7 +105,7 @@ export interface PredecessorUnmetJson {
   readonly ticket: string;
   /** `todo` / `doing` / `review`（閉じれば満たす）、`cancelled` / `missing` / `scattered`（待っても満たさない） */
   readonly state: string;
-  /** 人向けの言葉（「作業中（doing/）」など）。実行ファイルが付ける */
+  /** ユーザ向けの言葉（「作業中（doing/）」など）。実行ファイルが付ける */
   readonly label: string;
 }
 
@@ -156,7 +156,7 @@ export interface PhaseJson {
   readonly marks: Readonly<Record<string, Record<string, unknown>>>;
   readonly review_required: boolean;
   readonly gate_closed: boolean;
-  /** 依頼を出したのに止まったまま（人のレビュー待ち）。判定が出した値で、拡張は組み直さない */
+  /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。判定が出した値で、拡張は組み直さない */
   readonly review_waiting: boolean;
   readonly deferred: boolean;
   readonly review_at: number | null;

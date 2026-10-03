@@ -376,7 +376,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       dispatch(current, { kind: "handOver", how: message.type });
       return;
     case "decide":
-      // 残った指摘の行き先を決めるオーバーレイを開く。sh が指摘を取ってきて、人が指摘ごとに選ぶ。
+      // 残った指摘の行き先を決めるオーバーレイを開く。sh が指摘を取ってきて、ユーザが指摘ごとに選ぶ。
       // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める
       dispatch(current, {
         kind: "decide",
@@ -432,7 +432,7 @@ function realRoot(root: string): string {
 
 /**
  * いまの状態で描き直す（オーバーレイの出し入れ）。読み直せていないときはエラー画面のほうに
- * 載せ替える。ボードが無いことを理由にここで捨てると、承認した文が人に届かない。
+ * 載せ替える。ボードが無いことを理由にここで捨てると、承認した文がユーザに届かない。
  */
 function redraw(current: PanelState): void {
   if (current.board !== undefined) {
@@ -499,7 +499,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       vscode.window.setStatusBarMessage(`${effect.what}をコピーしました。Claude Code に貼って送ってください`, 5000);
       return;
     case "openSession":
-      // 走っているセッションに送る公開の API は無いので、文を埋めて新しいセッションを開く（送信は人が Enter）
+      // 走っているセッションに送る公開の API は無いので、文を埋めて新しいセッションを開く（送信はユーザが Enter）
       await vscode.env.openExternal(
         vscode.Uri.parse(`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(effect.prompt)}`),
       );

@@ -65,7 +65,7 @@ test("CB-T218 YAML を読んで書くだけなら、知らない欄も知らな�
   assert.doesNotMatch(text, /^\s*\{/m);
 });
 
-test("CB-T253 書き出しは人が読める形で、実行ファイル（YAML 1.1）が別の型に読む綴りは引用符で囲む", () => {
+test("CB-T253 書き出しはユーザが読める形で、実行ファイル（YAML 1.1）が別の型に読む綴りは引用符で囲む", () => {
   // 同じ中身を 2 か所で持っても別名にしない（実行ファイルは別名を読まない）
   const shared = { x: 1, y: 2 };
   const doc: FlowDoc = {
@@ -282,7 +282,7 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う綴りを足
   // 開始に入口は無く、終了に出口は無い
   assert.deepEqual(portsOf(doc.nodes[0], []).inputs, []);
   assert.deepEqual(portsOf(doc.nodes[3], []).outputs, []);
-  // 人が書いた線が別の綴りの出口を使っていれば、その出口も描く
+  // ユーザが書いた線が別の綴りの出口を使っていれば、その出口も描く
   const odd = connect(doc, "mcp-1", "success", "end-1", "in-2");
   const mcpPorts = portsOf(odd.nodes[2], connectionsOf(odd));
   assert.deepEqual(

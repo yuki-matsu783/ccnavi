@@ -15,7 +15,7 @@ keywords: [message, additionalContext, deny, ask, allow, ルール説明]
 `permissionDecisionReason` として返る。ask と allow に書いた文面がどこに届くかは
 公式文書の読み方が分かれていたので、Claude Code 2.1.235 で実測した。
 
-- ask の文面は人の確認ダイアログに出るが、Yes を押した後もモデルには届かない。No のときは
+- ask の文面はユーザの確認ダイアログに出るが、Yes を押した後もモデルには届かない。No のときは
   拒否の定型文だけがモデルに届いてターンが終わる
 - allow の文面はどこにも出ない
 - `additionalContext` は deny / ask / allow のどれでもモデルに届く。deny と ask では
@@ -31,7 +31,7 @@ keywords: [message, additionalContext, deny, ask, allow, ルール説明]
 
 ## 理由
 
-書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。「通すが、これを踏まえて
+書いたユーザは「モデルに届く」と思って書くので、届かない欄を残さない。「通すが、これを踏まえて
 進めろ」を言う手段が無いと、それを言いたい場所を deny にして 1 往復させるか、CLAUDE.md に
 書いて全体に適用するかしかなくなる（REQ-PRE-11）。dry-run でも届けるのは、`enable` に
 切り替えて初めて読まれる文を残さないため。once を compact で忘れるのは、文脈が新しくなるたびに
