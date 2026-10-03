@@ -193,7 +193,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,approve,fetch,sync,clean,launcher}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
-| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/index.jsonl` の 1 行（別の見出し。`index.jsonl` の行が既にあれば足さない）。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトには足さない |
+| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/index.jsonl` の 1 行（別の見出し。`index.jsonl` の行が既にあれば足さない。`index.jsonl` を否定する行があれば利用者の除外として足さない）。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトには足さない |
 
 置き場は 2 つに分けて固定する（ADR-0044）。
 
@@ -2018,7 +2018,7 @@ compact の前後の hook でフローを入れ直すことはしない（理由
 | `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-samples.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-samples` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通層の写しに足した一時ファイルで試す）。`allow` は出さない。何も書かない | 常に 0 |
 | `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（README「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
-| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは対象外にして名指しする（`.gitignore` は書き換えない。ワークスペースの 1 行は導入スクリプトが配るときに足す）。ccnavi の形でない `index.jsonl` は上書きも削除もせず、実体がツリーの外に出るディレクトリは読まない。一時ファイルは `.git/` の中に作る。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
+| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは対象外にして名指しする（`.gitignore` は書き換えない。ワークスペースの 1 行は導入スクリプトが配るときに足す）。ccnavi の形でない `index.jsonl` は上書きも削除もせず、実体がツリーの外に出るディレクトリは読まない。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
 **層の置き場を動かすフラグは 7 本あり、どれも診断でだけ有効になる**（ADR-0067）。共通層の中身は
 `--rules` / `--phases` / `--risk`、層を探す先は `--projects`（プロジェクトの層の置き場）と

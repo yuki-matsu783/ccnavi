@@ -2,7 +2,7 @@
 type: adr
 title: 設計書を実装に合わせて書き直す
 description: 設計書を実装の変化に追従させることの重要性と手順
-tags: [design-doc]
+tags: [design-doc, records]
 keywords: [設計書, 実装, 追従, 更新, ドキュメント, 同期]
 ---
 

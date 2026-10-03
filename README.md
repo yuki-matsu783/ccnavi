@@ -388,7 +388,9 @@ sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で�
 
 配った組み立ての置き場は、配布先が git のリポジトリなら `.gitignore` にも足す（入れると履歴から消すのが難しい）。
 置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/index.jsonl` も
-別の見出しで足す（「ドキュメントの索引」。`**/index.jsonl` か `index.jsonl` の行が既にあれば足さない）。
+別の見出しで足す（「ドキュメントの索引」。`**/index.jsonl` か `index.jsonl` の行が既にあれば足さない。行は CRLF の `\r` と
+行末の空白を落として比べる。`!**/index.jsonl` や `!docs/index.jsonl` のように `index.jsonl` を否定する行があれば、利用者が
+除外しているとみなして足さず、`--check` でもそう言う）。
 
 ```
 # ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
@@ -2285,7 +2287,7 @@ ccnavi --version --json
 ## ドキュメントの索引
 
 ```sh
-ccnavi --docs --text コンフリクト --format detail     # 話題で当たりを付ける
+ccnavi --docs --text マージ --format detail           # 話題で当たりを付ける
 ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
 ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
 ccnavi --docs --path docs/claude --format count         # 件数だけ
@@ -2315,18 +2317,28 @@ frontmatter の無い md は頭の 4 KiB だけで止める。
 `scripts/ccnavi-setup.sh` が配るときに足す。プロジェクトには足さない）。一部のディレクトリだけが無視されていない（追跡されている
   `index.jsonl` がある）なら、そこは書かずに行だけを組む
 - **ccnavi の形でない `index.jsonl` は上書きも削除もしない。** 空か、空でない行が全部下の 4 つの鍵を持つ行として読めるときだけを
-  ccnavi のものとみなす。それ以外（よその道具のファイル、壊れた行、リンク、16 MiB を超えるもの）は触らず、行だけを組んで引き、
-  `--docs` は標準エラーで、`SessionStart` は 1 行で名指しする
+  ccnavi のものとみなす。それ以外（よその道具のファイル、壊れた行、リンク、16 MiB を超えるもの、入れ子が 32 段より深い行、
+  `NaN`・`Infinity` を持つ行）は触らず、行だけを組んで引き、`--docs` は標準エラーで、`SessionStart` は 1 行で名指しする。
+  行は `\n` だけで割る（値の中の U+2028・U+2029・U+0085 では割らない。行末の `\r` は落とす）
 - 書くときは git のディレクトリ（`.git/`、submodule なら指す先）に一時ファイルを排他で作り、置き換える。作業ツリーの
-  `git status` には出ない。打ち切りで残った一時ファイル（`ccnavi-index-*.tmp`）は、10 分より古ければ次の回に消す
+  `git status` には出ない。打ち切りで残った一時ファイル（`ccnavi-index-*.tmp`）は、10 分より古ければ次の回に消す。
+  `.git` が作業ツリーと別のファイルシステムにある（置き換えが EXDEV で落ちる）ときは、そのディレクトリの下に
+  `.ccnavi-tmp-<番号>/index.jsonl` を作って置き換え、ディレクトリごと消す。この綴りが git に無視される（`**/index.jsonl` で当たる）
+  ことを先に確かめ、無視されなければ書かない。残骸は 10 分より古く、中身が `index.jsonl` だけのものに限って消す
 - git への問い合わせの失敗（git が無い・期限切れ・壊れたリポジトリ）は、`.git` が無いのとも無視されていないのとも別に扱う。
-  `--docs` は「git への問い合わせに失敗したので引かない」とそのツリーを名指しし、`SessionStart` は何も出さない
+  `--docs` は「git への問い合わせに失敗したので引かない」とそのツリーを名指しし、`SessionStart` は何も出さない。
+  git には利用者の環境の pathspec の読み方（`GIT_LITERAL_PATHSPECS` など）を外して聞き、`:(exclude)` のような名前の
+  ディレクトリも字どおりに扱う
 
 `SessionStart` はサブエージェントでなければ、ワークスペースとプロジェクトの索引を同じ手順で新しくし、引き方と frontmatter の
-決まりの要点を `additionalContext` に添える。対象外にしたツリーと書き換えなかった `index.jsonl` があれば短く名指しする。
+決まりの要点を `additionalContext` につける。対象外にしたツリーと書き換えなかった `index.jsonl` があれば短く名指しする。
 md が 1 本も無い・git の外なら何も出さない。新しくするのに使うのは 3 秒（`docsearch.START_SECONDS`）と hook の判定の期限の
-残りの小さいほうまでで、期限は md 1 本ごとに見る。過ぎたら途中のディレクトリは書かずに次の回に回す（書けたディレクトリの分は
-次に使い回す。`--docs` は引く前に期限なしで新しくする）。何が起きてもセッションの開始は止めない。
+残りの小さいほうまで。まず全部のディレクトリで使い回せる行を見て、読み直しの要る md を、待つ本数の少ないディレクトリから
+1 本ずつ期限を見ながら読む。過ぎたら読むのをやめ、どのディレクトリも「読めた md の新しい行と、読めなかった md の既存の行」で
+書く（読めなかった md は次の回に読む）。大きなディレクトリも回を重ねれば埋まり、小さなディレクトリはその後ろで待たない。
+残りが 0.5 秒（`MIN_REFRESH_SECONDS`）に満たない（期限が既に切れている）ときは新しくせず、md を読まず書かずに既存の
+`index.jsonl` の行だけで案内する（git には 1 秒だけ与える。それも間に合わなければ、ワークスペースルートに md があれば
+引き方だけを出す）。`--docs` は引く前に期限なしで新しくする。何が起きてもセッションの開始は止めない。
 
 | オプション | 対象 | 一致 |
 |---|---|---|
@@ -2347,7 +2359,10 @@ md が 1 本も無い・git の外なら何も出さない。新しくするの�
 
 絞り込みのフラグ（`--type` から `--no-refresh` まで）を `--docs` の外で渡すと、その旨を出して 1 で終わる（このフラグが無かったころに
 argparse が止めていた打ち間違いを、知らせずに通さないため）。`--docs` にほかの経路のフラグ（`--lint` `--yes` `--preview` `--result`
-`--tickets` `--flow` など）を添えたときも、無視せずに 1 で終わる。
+`--tickets` `--flow` など）と、判定やチケットの経路の設定・sh が渡す綴り（`--cwd` `--mode` `--approved` `--rules` `--phases`
+`--risk` `--projects` `--project-home` `--ticket-control` `--guard-core-files` `--guard-ticket-approval` `--restore-if-deny`
+`--integration-branch` `--record-writes` `--choose-out` `--actor` `--via` など）を付けたときも、無視せずに 1 で終わる。
+使われるのは引く場所の `--root` と、記録の置き場の `--log` / `--state`（`--docs` は何も記録しないので結果は変わらない）だけ。
 
 `index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
 

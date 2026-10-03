@@ -703,6 +703,13 @@ def _parsed(
         return version.report(stdout, parser, args.json)
     if not _one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
+    # `--docs` に添えたほかの経路のフラグは、黙って無視せずに止める。層の置き場の差し替えは
+    # この後で落とされ、`--ticket-control` などは設定に重ねられるので、その前に見る。
+    if args.docs:
+        refused = _not_with_docs(args)
+        if refused:
+            stderr.write(f"ccnavi: --docs は {refused} と一緒に使えない\n")
+            return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
@@ -1043,12 +1050,51 @@ _NOT_WITH_DOCS = (
     "--flow",
     "--project-rules-file",
     "--project-phases-file",
+    # 判定・チケット・レビューの経路の設定と、sh が渡す綴り。`--docs` は読まない。
+    # 層の置き場（`--rules` から `--project-home`）は診断の外では落として先へ進むが、
+    # `--docs` で落とすと「そのプロジェクトの置き場で引いた」と読まれるので止める。
+    # `--root` は引く場所そのもの、`--log` / `--state` は記録の置き場で `--docs` は何も記録
+    # しないので、受けて効かせる（結果は変わらない）。
+    "--mode",
+    "--rules",
+    "--restore-if-deny",
+    "--guard-core-files",
+    "--guard-ticket-approval",
+    "--ticket-control",
+    "--approved",
+    "--phases",
+    "--risk",
+    "--projects",
+    "--project-home",
+    "--cwd",
+    "--record-writes",
+    "--record-tree",
+    "--choose-out",
+    "--integration-branch",
+    "--actor",
+    "--via",
 )
+# 空文字も「渡した」と数えるフラグ（既定が None で、空に意味があるもの）。
+_EMPTY_COUNTS = ("approved", "phases", "risk", "projects")
 
 
 def _docs_flags_given(args: argparse.Namespace) -> list[str]:
     """渡された `--docs` 用のフラグ。"""
     return [flag for flag, name, absent in DOCS_FLAGS if getattr(args, name) != absent]
+
+
+def _not_with_docs(args: argparse.Namespace) -> str:
+    """`--docs` に添えられた、ほかの経路のフラグ（最初の 1 つ）。無ければ空。"""
+    for flag in _NOT_WITH_DOCS:
+        name = flag[2:].replace("-", "_")
+        value = getattr(args, name)
+        # `is` で比べる。`--reviewed 0` の 0 は False と等しいので、`in` だと見落とす。
+        if value is None or value is False:
+            continue
+        if value == "" and name not in _EMPTY_COUNTS:
+            continue
+        return flag
+    return ""
 
 
 def _docs(
@@ -1058,14 +1104,10 @@ def _docs(
     root: str,
     args: argparse.Namespace,
 ) -> int:
-    """`--docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。"""
-    for flag in _NOT_WITH_DOCS:
-        value = getattr(args, flag[2:].replace("-", "_"))
-        # `is` で比べる。`--reviewed 0` の 0 は False と等しいので、`in` だと見落とす。
-        if value is None or value is False or value == "":
-            continue
-        stderr.write(f"ccnavi: --docs は {flag} と一緒に使えない\n")
-        return EXIT_ERROR
+    """`--docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。
+
+    ほかの経路のフラグは `_run` が設定を読む前に断っている（`_not_with_docs`）。
+    """
     if args.command:
         stderr.write(
             f"ccnavi: --docs にはフラグ以外の語を付けられない（{' '.join(args.command)}）\n"

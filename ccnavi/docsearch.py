@@ -23,7 +23,10 @@
   `directory` は `.`
 - `concept_id` と `mtime` が既存の行と同じなら、その行を使い回す（読み直さない）。
   書くのは一時ファイルに書いて置き換える形で、中身が同じなら書かない。一時ファイルは
-  git のディレクトリ（`.git/`）の中に排他で作る（作業ツリーの `git status` に出さない）
+  git のディレクトリ（`.git/`）の中に排他で作る（作業ツリーの `git status` に出さない）。
+  `.git` が別のファイルシステムなら、そのディレクトリの下の `.ccnavi-tmp-*/index.jsonl`
+  （git に無視されることを確かめてから）に作る
+- 期限（SessionStart）を過ぎたら md を読むのをやめるが、どのディレクトリも読めた分までは書く
 - **書くのは、git がそこの `index.jsonl` を無視しているときだけ。** 作業ツリーに追跡されて
   いないファイルを置くと、`git status`・実行後の監視・`worktree remove` のどれにも出る。
   md を持つディレクトリのどれでも無視されていないツリーは、索引の対象外にして引かない
@@ -55,6 +58,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import errno
 import itertools
 import json
 import math
@@ -83,6 +87,12 @@ GIT_TIMEOUT_SECONDS = 10.0
 TMP_PREFIX = "ccnavi-index-"
 TMP_SUFFIX = ".tmp"
 TMP_STALE_SECONDS = 10 * 60
+# 作業ツリーの側に置く一時ファイルのディレクトリの名前（`.git` が別のファイルシステムのとき）。
+# 中の `index.jsonl` は `**/index.jsonl` で無視される。
+LOCAL_TMP_PREFIX = ".ccnavi-tmp-"
+# frontmatter と索引の行の入れ子の深さの上限。`--format json` の字下げは再帰で書くので、
+# これより深いものは書けないものとして扱う。
+MAX_DEPTH = 32
 # 索引の 1 行が持つ鍵。
 ROW_KEYS = ("concept_id", "directory", "frontmatter", "mtime")
 # ルート直下のファイルの `directory`（参考と同じ）。
@@ -128,7 +138,9 @@ class Built:
     problems: list[str] = field(default_factory=list)
     # md を持つディレクトリの index.jsonl がどれも無視されていない（索引の対象外）。
     unignored: bool = False
-    # 期限を過ぎて、残りのディレクトリを見なかった。
+    # md を持ち、索引の対象になるツリーだった（打ち切りで rows が空でも、引けば当たるもの）。
+    indexable: bool = False
+    # 期限を過ぎて、読み直しの要る md を読み残した。
     timed_out: bool = False
 
 
@@ -162,10 +174,13 @@ def _listed(base: str, timeout: float = GIT_TIMEOUT_SECONDS) -> list[str]:
     """基準のディレクトリの下の、git が挙げる md（基準からの相対、`/` 区切り）。"""
     if not os.path.exists(os.path.join(base, ".git")):
         raise NotARepository(base)
+    # pathspec（`*.md`）は渡さず、ここで `.md` を選ぶ。利用者の環境に `GIT_LITERAL_PATHSPECS`
+    # などがあると `*.md` の読み方が変わる。
     done = gitcmd.run(
         base,
-        ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+        ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         timeout=timeout,
+        plain_pathspecs=True,
     )
     if not done.ok:
         raise GitFailed(_failure(done))
@@ -183,16 +198,20 @@ def _ignored(base: str, paths: list[str], timeout: float = GIT_TIMEOUT_SECONDS) 
     """git が無視する相対パス。問い合わせに失敗したら `GitFailed`。"""
     if not paths:
         return set()
+    # check-ignore は渡したパスを pathspec として読み、`:` で始まるもの（`:(exclude)x/` という
+    # 名前のディレクトリなど）を magic として 128 で止まる。`--literal-pathspecs` も受けないので、
+    # 頭に `./` を付けて magic と読ませない。出てくる綴りも `./` 付きなので外して返す。
     done = gitcmd.run(
         base,
         ["check-ignore", "-z", "--stdin"],
         timeout=timeout,
-        input="\0".join(paths) + "\0",
+        input="".join(f"./{p}\0" for p in paths),
+        plain_pathspecs=True,
     )
     # 0 は 1 つ以上が無視、1 はどれも無視されない。それ以外は問い合わせの失敗。
     if done.failure or done.code not in (0, 1):
         raise GitFailed(_failure(done))
-    return {p for p in done.out.split("\0") if p}
+    return {p.removeprefix("./") for p in done.out.split("\0") if p}
 
 
 def _git_dir(base: str) -> str:
@@ -269,7 +288,7 @@ def front_matter(raw: bytes) -> dict | None:
         if not isinstance(data, dict):
             return None
         data = _jsonable(data)
-        _dumps(data)  # 書けるかを試す（桁の多すぎる整数・深すぎる入れ子など）
+        _check_json(data)  # 書けるかを試す（桁の多すぎる整数・深すぎる入れ子など）
         return data
     except Exception:  # noqa: BLE001 - 壊れた frontmatter は null にして索引づくりを止めない
         return None
@@ -308,16 +327,50 @@ def _dumps(row: Any) -> str:
     return json.dumps(row, ensure_ascii=False, separators=(",", ":"))
 
 
+def _deep(value: Any) -> bool:
+    """入れ子が MAX_DEPTH より深いか。再帰しない。"""
+    stack = [(value, 1)]
+    while stack:
+        item, depth = stack.pop()
+        if isinstance(item, dict):
+            children = list(item.values())
+        elif isinstance(item, list):
+            children = item
+        else:
+            continue
+        if depth > MAX_DEPTH:
+            return True
+        stack.extend((child, depth + 1) for child in children)
+    return False
+
+
+def _check_json(value: Any) -> None:
+    """どの出力の形（`--format json` の字下げを含む）でも書けるか。書けなければ ValueError。
+
+    字下げのある `json.dumps` は C の速い経路を使わず再帰するので、詰めた形で書けた行でも
+    深い入れ子で RecursionError になる。NaN・Infinity は JSON に無い綴りを出すので弾く。
+    """
+    if _deep(value):
+        raise ValueError("入れ子が深すぎる")
+    json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
 def _valid_row(row: Any) -> bool:
     """ccnavi が書いた形の 1 行か。"""
-    return (
+    if not (
         isinstance(row, dict)
         and all(key in row for key in ROW_KEYS)
         and isinstance(row["concept_id"], str)
         and isinstance(row["directory"], str)
         and isinstance(row["mtime"], str)
         and (row["frontmatter"] is None or isinstance(row["frontmatter"], dict))
-    )
+    ):
+        return False
+    try:
+        _check_json(row)
+    except (ValueError, RecursionError):
+        return False
+    return True
 
 
 ABSENT, OURS, FOREIGN = "absent", "ours", "foreign"
@@ -343,7 +396,10 @@ def _read_index(path: str) -> tuple[dict[str, dict], str | None, str]:
     except (OSError, ValueError):
         return {}, None, FOREIGN
     rows: dict[str, dict] = {}
-    for line in text.splitlines():
+    # 割るのは `\n` だけ。`splitlines` は U+2028・U+2029・U+0085 でも割るが、JSON の文字列は
+    # それらを生のまま持てる（ensure_ascii=False で書く）ので、自分の行を途中で割ってしまう。
+    for line in text.split("\n"):
+        line = line.removesuffix("\r")
         if not line.strip():
             continue
         try:
@@ -356,9 +412,8 @@ def _read_index(path: str) -> tuple[dict[str, dict], str | None, str]:
     return rows, text, OURS
 
 
-def _write_atomic(path: str, text: str, tmp_dir: str) -> None:
-    """tmp_dir に排他で一時ファイルを作って書き、path へ置き換える。"""
-    temporary = os.path.join(tmp_dir, f"{TMP_PREFIX}{os.getpid()}-{next(_counter)}{TMP_SUFFIX}")
+def _write_atomic(path: str, text: str, temporary: str) -> None:
+    """temporary に排他で一時ファイルを作って書き、path へ置き換える。"""
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     flags |= getattr(os, "O_BINARY", 0)
     fd = os.open(temporary, flags, 0o644)
@@ -372,6 +427,85 @@ def _write_atomic(path: str, text: str, tmp_dir: str) -> None:
                 os.remove(temporary)
 
 
+def _sweep_beside(parent: str) -> None:
+    """作業ツリーの側に残った古い一時ディレクトリを消す。
+
+    消すのは名前が LOCAL_TMP_PREFIX で始まり、リンクでないディレクトリで、古く、中身が
+    ふつうのファイルの `index.jsonl` だけ（か空）のものに限る。ほかのものは他人のものとして残す。
+    """
+    try:
+        names = os.listdir(parent)
+    except OSError:
+        return
+    now = time.time()
+    for name in names:
+        if not name.startswith(LOCAL_TMP_PREFIX):
+            continue
+        holder = os.path.join(parent, name)
+        with contextlib.suppress(OSError):
+            info = os.lstat(holder)
+            if not stat.S_ISDIR(info.st_mode) or now - info.st_mtime <= TMP_STALE_SECONDS:
+                continue
+            inside = os.listdir(holder)
+            if any(entry != INDEX_NAME for entry in inside):
+                continue
+            if inside:
+                left = os.path.join(holder, INDEX_NAME)
+                if not stat.S_ISREG(os.lstat(left).st_mode):
+                    continue
+                os.remove(left)
+            os.rmdir(holder)
+
+
+class _Writer:
+    """index.jsonl を置き換える。一時ファイルはふだん git のディレクトリに作る。
+
+    `.git` が作業ツリーと別のファイルシステムにあると `os.replace` が EXDEV で落ちるので、
+    そのときは作業ツリーの同じディレクトリの下に `.ccnavi-tmp-*/index.jsonl` を作って置き換える。
+    その綴りが git に無視されることを先に確かめ、`git status` を汚さない。
+    """
+
+    def __init__(self, base: str, tmp_dir: str, deadline: float | None) -> None:
+        self.base = base
+        self.tmp_dir = tmp_dir
+        self.deadline = deadline
+        self.beside = False
+        with contextlib.suppress(OSError):
+            self.beside = os.stat(tmp_dir).st_dev != os.stat(base).st_dev
+
+    def write(self, index_path: str, index_rel: str, text: str) -> None:
+        if not self.beside:
+            name = f"{TMP_PREFIX}{os.getpid()}-{next(_counter)}{TMP_SUFFIX}"
+            try:
+                _write_atomic(index_path, text, os.path.join(self.tmp_dir, name))
+                return
+            except OSError as exc:
+                if exc.errno != errno.EXDEV:
+                    raise
+                self.beside = True
+        self._write_beside(index_path, index_rel, text)
+
+    def _write_beside(self, index_path: str, index_rel: str, text: str) -> None:
+        parent = os.path.dirname(index_path)
+        _sweep_beside(parent)
+        name = f"{LOCAL_TMP_PREFIX}{os.getpid()}-{next(_counter)}"
+        directory = index_rel.rpartition("/")[0]
+        probe = f"{directory}/{name}/{INDEX_NAME}" if directory else f"{name}/{INDEX_NAME}"
+        try:
+            ignored = probe in _ignored(self.base, [probe], _left(self.deadline))
+        except GitFailed as exc:
+            raise OSError(f"一時ファイルの置き場を git に確かめられない: {exc}") from exc
+        if not ignored:
+            raise OSError(f"一時ファイルの置き場 {probe} が git に無視されないので書かない")
+        holder = os.path.join(parent, name)
+        os.mkdir(holder, 0o700)  # 在れば落ちる（排他）
+        try:
+            _write_atomic(index_path, text, os.path.join(holder, INDEX_NAME))
+        finally:
+            with contextlib.suppress(OSError):
+                os.rmdir(holder)
+
+
 def _under(path: str, base_real: str) -> bool:
     """path の実体が base_real 自身かその下か。"""
     try:
@@ -381,20 +515,48 @@ def _under(path: str, base_real: str) -> bool:
         return False
 
 
+def _past(deadline: float | None) -> bool:
+    return deadline is not None and time.monotonic() > deadline
+
+
+@dataclass
+class _Dir:
+    """1 つのディレクトリの途中の姿。"""
+
+    directory: str
+    index_rel: str
+    index_path: str
+    writable: bool
+    owner: str
+    old_rows: dict[str, dict]
+    old_text: str | None
+    # md の concept_id を、名前の順に。
+    order: list[str] = field(default_factory=list)
+    # 決まった行（使い回し・読み直し）。
+    rows: dict[str, dict] = field(default_factory=dict)
+    # 読み直しを待つ md（相対パス, concept_id, mtime）。mtime が None は見る前に打ち切ったもの。
+    pending: list[tuple[str, str, str | None]] = field(default_factory=list)
+
+
 def build(
     base: str,
     excluded_dirs: tuple[str, ...] = (),
     refresh: bool = True,
     deadline: float | None = None,
+    parse: bool = True,
 ) -> Built:
     """1 つの git の作業ツリー（base）の md の索引を組み、無視されている index.jsonl を差分で書く。
 
     md を持つディレクトリの `index.jsonl` がどれも無視されていなければ、そのツリーは索引の
     対象外（`unignored`）で、行を返さない。一部だけ無視されていないディレクトリと、ccnavi の
     ものでない index.jsonl があるディレクトリは、行を組むが書かない。refresh が偽なら mtime を
-    見ずに既存の行をそのまま使い、何も書かない（行の無い md は読む）。deadline
-    （`time.monotonic` の値）を過ぎたら、途中のディレクトリを書かずに `timed_out` で返す。
-    書けたディレクトリの分は次の回に使い回せる。
+    見ずに既存の行をそのまま使い、何も書かない（行の無い md は parse が真なら読む）。
+
+    順は 3 段。まず全部のディレクトリで既存の行を使い回せるかを見（lstat だけ）、次に
+    読み直しの要る md を、待つ数の少ないディレクトリから読み、最後にディレクトリごとに書く。
+    deadline（`time.monotonic` の値）を過ぎたら読むのをやめて `timed_out` にするが、そこまでに
+    読めた分は書く。読めなかった md は既存の行があればそれを残す（次の回に mtime の違いで読み
+    直す）。大きなディレクトリも回を重ねれば埋まり、小さなディレクトリはその後ろに並ばない。
     `.git` が無ければ `NotARepository`、git に聞けなければ `GitFailed`。
     """
     result = Built()
@@ -409,127 +571,150 @@ def build(
     if not writable:
         result.unignored = True
         return result
+    result.indexable = True
     tmp_dir = _git_dir(base) if refresh else ""
     if refresh and not tmp_dir:
         result.problems.append("git のディレクトリが見つからないので索引を書かない")
     if tmp_dir:
         _sweep(tmp_dir)
+    writer = _Writer(base, tmp_dir, deadline) if tmp_dir else None
     base_real = os.path.normcase(os.path.realpath(base))
 
+    dirs: list[_Dir] = []
     for directory in sorted(by_dir):
-        if deadline is not None and time.monotonic() > deadline:
+        if _past(deadline):
             result.timed_out = True
             break
         try:
-            _one_directory(
+            scanned = _scan(
                 base,
                 base_real,
                 directory,
                 by_dir[directory],
                 index_rel[directory],
-                index_rel[directory] in writable and bool(tmp_dir),
-                tmp_dir,
+                index_rel[directory] in writable and writer is not None,
                 refresh,
                 deadline,
                 result,
             )
-        except _TimeUp:
-            result.timed_out = True
-            break
         except Exception as exc:  # noqa: BLE001 - 1 つのディレクトリの壊れで全体を止めない
             result.problems.append(f"{directory or ROOT_DIRECTORY}/ を読めない: {exc!r}")
+            continue
+        if scanned is not None:
+            dirs.append(scanned)
+    if parse and not result.timed_out:
+        _parse_pending(base, dirs, deadline, result)
+    for one in dirs:
+        try:
+            _settle(one, refresh, writer, result)
+        except Exception as exc:  # noqa: BLE001 - 1 つのディレクトリの壊れで全体を止めない
+            result.problems.append(f"{one.directory or ROOT_DIRECTORY}/ を読めない: {exc!r}")
     result.rows.sort(key=lambda r: str(r.get("concept_id", "")))
     return result
 
 
-def _one_directory(
+def _scan(
     base: str,
     base_real: str,
     directory: str,
     names: list[str],
     index_rel: str,
     writable: bool,
-    tmp_dir: str,
     refresh: bool,
     deadline: float | None,
     result: Built,
-) -> None:
+) -> _Dir | None:
+    """既存の index.jsonl を読み、使い回せる行と読み直しの要る md に分ける。"""
     full_dir = os.path.join(base, *directory.split("/")) if directory else base
     if not _under(full_dir, base_real):
         result.problems.append(f"{directory}/ の実体がツリーの外にあるので読まない")
-        return
+        return None
     index_path = os.path.join(base, *index_rel.split("/"))
     old_rows, old_text, owner = _read_index(index_path)
     if owner == FOREIGN:
         result.foreign.append(index_rel)
         result.problems.append(f"{index_rel} は ccnavi の索引ではないので書き換えない")
         writable = False
-    rows = _rows_of(base, directory, names, old_rows, refresh, deadline, result)
-    result.rows.extend(rows)
-    if not refresh or not writable:
-        return
-    try:
-        if not rows:
-            # md が全部消えたディレクトリ。ccnavi の索引で、無視されているものだけを消す。
-            if owner == OURS:
-                os.remove(index_path)
-                result.removed.append(index_rel)
-            return
-        text = "".join(_dumps(r) + "\n" for r in rows)
-        if text == old_text:
-            return
-        _write_atomic(index_path, text, tmp_dir)
-        result.written.append(index_rel)
-    except OSError as exc:
-        result.problems.append(f"{index_rel} を書けない: {exc}")
-
-
-def _rows_of(
-    base: str,
-    directory: str,
-    names: list[str],
-    old_rows: dict[str, dict],
-    refresh: bool,
-    deadline: float | None,
-    result: Built,
-) -> list[dict]:
-    """1 つのディレクトリの行。mtime が既存の行と同じなら使い回す。期限を過ぎたら `_TimeUp`。"""
+    one = _Dir(directory, index_rel, index_path, writable, owner, old_rows, old_text)
     shown_dir = directory or ROOT_DIRECTORY
-    rows = []
     for rel in sorted(names):
-        if deadline is not None and time.monotonic() > deadline:
-            raise _TimeUp
-        full = os.path.join(base, *rel.split("/"))
         concept_id = rel[: -len(".md")]
+        one.order.append(concept_id)
+        if result.timed_out or _past(deadline):
+            result.timed_out = True
+            one.pending.append((rel, concept_id, None))
+            continue
         old = old_rows.get(concept_id)
         if not refresh and old is not None:
-            rows.append(old)
+            one.rows[concept_id] = old
             result.reused += 1
             continue
         try:
-            info = os.lstat(full)
+            info = os.lstat(os.path.join(base, *rel.split("/")))
         except OSError:
             continue  # 消したがまだステージしていない
         if not stat.S_ISREG(info.st_mode):
             continue
         mtime = _mtime(info.st_mtime)
         if old is not None and old["mtime"] == mtime and old["directory"] == shown_dir:
-            rows.append(old)
+            one.rows[concept_id] = old
             result.reused += 1
             continue
-        raw = _read_head(full)
-        if raw is None:
-            continue
-        result.parsed += 1
-        rows.append(
-            {
+        one.pending.append((rel, concept_id, mtime))
+    return one
+
+
+def _parse_pending(base: str, dirs: list[_Dir], deadline: float | None, result: Built) -> None:
+    """読み直しの要る md を読む。待つ数の少ないディレクトリから。期限を過ぎたらやめる。"""
+    for one in sorted(dirs, key=lambda d: (len(d.pending), d.directory)):
+        for at, (rel, concept_id, mtime) in enumerate(one.pending):
+            if mtime is None:
+                continue
+            if _past(deadline):
+                result.timed_out = True
+                one.pending = one.pending[at:]
+                return
+            raw = _read_head(os.path.join(base, *rel.split("/")))
+            if raw is None:
+                continue
+            result.parsed += 1
+            one.rows[concept_id] = {
                 "concept_id": concept_id,
-                "directory": shown_dir,
+                "directory": one.directory or ROOT_DIRECTORY,
                 "frontmatter": front_matter(raw),
                 "mtime": mtime,
             }
-        )
-    return rows
+        one.pending = [p for p in one.pending if p[2] is None]
+
+
+def _settle(one: _Dir, refresh: bool, writer: _Writer | None, result: Built) -> None:
+    """1 つのディレクトリの行を決め、書けるなら書く（打ち切ったディレクトリも読めた分まで）。"""
+    waiting = {concept_id for _, concept_id, _ in one.pending}
+    rows = []
+    for concept_id in one.order:
+        row = one.rows.get(concept_id)
+        if row is None and concept_id in waiting:
+            row = one.old_rows.get(concept_id)
+        if row is not None:
+            rows.append(row)
+    result.rows.extend(rows)
+    if not refresh or not one.writable or writer is None:
+        return
+    try:
+        if not rows:
+            # md が全部消えたディレクトリ。ccnavi の索引で、無視されているものだけを消す。
+            # 打ち切りで行が空のときは消さない。
+            if one.owner == OURS and not waiting:
+                os.remove(one.index_path)
+                result.removed.append(one.index_rel)
+            return
+        text = "".join(_dumps(r) + "\n" for r in rows)
+        if text == one.old_text:
+            return
+        writer.write(one.index_path, one.index_rel, text)
+        result.written.append(one.index_rel)
+    except OSError as exc:
+        result.problems.append(f"{one.index_rel} を書けない: {exc}")
 
 
 def _left(deadline: float | None) -> float:
@@ -623,6 +808,8 @@ class Collected:
     # ccnavi のものでないので触らなかった index.jsonl（ワークスペースルートから）。
     foreign: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
+    # どれかのツリーが md を持ち、索引の対象だった。
+    indexable: bool = False
     timed_out: bool = False
 
 
@@ -631,6 +818,7 @@ def collect(
     root: str,
     refresh: bool = True,
     deadline: float | None = None,
+    parse: bool = True,
 ) -> Collected:
     """ワークスペースとプロジェクトの索引を新しくして集める。
 
@@ -643,15 +831,19 @@ def collect(
             result.timed_out = True
             break
         try:
-            built = build(place.base, place.excluded, refresh=refresh, deadline=deadline)
+            built = build(
+                place.base, place.excluded, refresh=refresh, deadline=deadline, parse=parse
+            )
         except NotARepository:
             continue
         except GitFailed as exc:
             result.failed.append(f"{place.name}: {exc}")
+            result.timed_out = result.timed_out or _past(deadline)
             continue
         if built.unignored:
             result.unignored.append(place.name)
         result.timed_out = result.timed_out or built.timed_out
+        result.indexable = result.indexable or built.indexable
 
         def at(rel: str, place: Place = place) -> str:
             return f"{place.prefix}/{rel}" if place.prefix else rel
@@ -894,6 +1086,10 @@ def render(out: TextIO, hits: list[dict], matched: int, total: int, fmt: str) ->
 # 使い回せていれば数百本の md でも 1 秒に届かない。初めての大きなプロジェクトだけが
 # ここに当たり、書けたディレクトリの分は次のセッションで使い回される。
 START_SECONDS = 3.0
+# 残りがこれに満たなければ新しくしない（既存の index.jsonl だけで案内する）。
+MIN_REFRESH_SECONDS = 0.5
+# 新しくしないときに git に与える時間（ls-files と check-ignore）。
+STALE_SECONDS = 1.0
 
 
 def run(
@@ -943,18 +1139,34 @@ def at_start(conf: settings.Settings, root: str, deadline: float | None = None) 
     """SessionStart。ワークスペースとプロジェクトの索引を差分で新しくし、引き方の案内を返す。
 
     使う時間は START_SECONDS と、渡された期限（hook の判定の期限）の残りの小さいほう。
-    何が起きても開始は止めない。md が 1 本も無い・何かが壊れたときは何も出さない（空を返す）。
-    索引の対象外にしたツリーと、触らなかった index.jsonl があれば短くつける。git への
-    問い合わせに失敗したツリーは何も言わない（対象外と取り違えさせない）。
+    残りが MIN_REFRESH_SECONDS に満たない（期限が既に切れているときも）なら新しくせず、
+    md を読まず書かずに既存の index.jsonl の行だけを集めて案内する（git には STALE_SECONDS
+    だけ与える）。何が起きても開始は止めない。md が 1 本も無い・何かが壊れたときは何も出さない
+    （空を返す）。索引の対象外にしたツリーと、触らなかった index.jsonl があれば短くつける。
+    git への問い合わせに失敗したツリーは何も言わない（対象外と取り違えさせない）。
     """
     try:
-        limit = time.monotonic() + START_SECONDS
+        now = time.monotonic()
+        limit = now + START_SECONDS
         if deadline is not None:
             limit = min(limit, deadline)
-        found = collect(conf, root, deadline=limit)
+        if limit - now >= MIN_REFRESH_SECONDS:
+            found = collect(conf, root, deadline=limit)
+        else:
+            found = collect(conf, root, refresh=False, parse=False, deadline=now + STALE_SECONDS)
+            found.timed_out = True
         return notice(conf, root, found)
     except Exception:  # noqa: BLE001 - 索引は案内の足しで、セッションの開始を止めない
         return ""
+
+
+def _has_md(root: str) -> bool:
+    """ワークスペースルートの直下に md があるか（git に聞けないときの目安）。"""
+    try:
+        with os.scandir(root) as entries:
+            return any(e.name.endswith(".md") and e.is_file() for e in entries)
+    except OSError:
+        return False
 
 
 # 案内で名指しする、触らなかった index.jsonl の数の上限。
@@ -972,7 +1184,12 @@ def notice(conf: settings.Settings, root: str, found: Collected) -> str:
         rest = len(found.foreign) - FOREIGN_SHOWN
         more = f" ほか {rest} 本" if rest > 0 else ""
         extra.append(f"ccnavi の索引ではないので書き換えなかった: {names}{more}")
-    if not found.rows:
+    # 行が無くても、索引の対象のツリーに md がある（打ち切りで読めなかった）か、時間切れで
+    # git に聞けなかったがワークスペースに md があるなら、引き方の案内は出す。
+    guide = bool(found.rows) or found.indexable
+    if not guide and found.timed_out and not found.unignored:
+        guide = _has_md(root)
+    if not guide:
         return "\n".join(f"[ccnavi] md の索引（--docs）: {e}" for e in extra)
     command = _command(conf, root)
     lines = [

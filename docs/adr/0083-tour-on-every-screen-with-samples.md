@@ -2,7 +2,7 @@
 type: adr
 title: 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す
 description: 初回の吹き出し案内を全画面に出し、空の画面では案内中に見本を表示する
-tags: [extension, board, design]
+tags: [extension, board, design-doc]
 keywords: [吹き出し, 案内, ツアー, 見本, 画面, 空, ガイド]
 ---
 # ADR-0083: 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す
