@@ -259,7 +259,12 @@ _COPY_PLACES = (
 )
 
 
-def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
+def shell_write_regex(
+    bin_path: str = "",
+    *extra_clauses: str,
+    write_only: tuple[str, ...] = (),
+    copy_only: tuple[str, ...] = (),
+) -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルの綴りは設定で動くので、
     ここで組み立てる。
 
@@ -271,6 +276,11 @@ def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
     共通層の 3 本（common_shell_clause）が来る。既定の名前は _PLACES に書いてあるので、
     ここで足すのは動かしてある場合の綴りになる。層の設定は行き先の判定に使うので、
     書けるとエージェントが自分のルールを緩められる。
+
+    write_only と copy_only は、書き込む側と写す側で終わりの形を変えたい綴り。
+    共通層の 3 本は 1 本のファイルなので、写す側では行き先（最後の引数）にだけ当てる。
+    両方に同じ形を足すと、`cp <共通層の 1 本> /tmp/x` のようにコピー元に書いただけの
+    読みまで止まる。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
@@ -278,6 +288,8 @@ def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
         if clause:
             places.append(clause)
             copy_places.append(clause)
+    places.extend(clause for clause in write_only if clause)
+    copy_places.extend(clause for clause in copy_only if clause)
     where = _folded("(" + "|".join(places) + ")")
     copy_where = _folded("(" + "|".join(copy_places) + ")")
     return rf"{_WRITE_VERBS}{where}|{_COPY_VERBS}{copy_where}[^ \x00]*($|\x00)"
@@ -382,9 +394,14 @@ def guard_shell_regex(
     動かしたワークスペースでは、ルールファイルが壊れたときだけ動かした先への書き込みが
     止まらなくなる。2 か所で組むと、片方だけが弱い側になる。
     """
-    clauses = [project_home_clause(project_home)]
-    clauses.extend(common_shell_clause(root, path) for path in common_files)
-    return shell_write_regex(bin_path, *clauses)
+    write_only = tuple(common_shell_clause(root, path) for path in common_files)
+    copy_only = tuple(common_shell_clause(root, path, term="") for path in common_files)
+    return shell_write_regex(
+        bin_path,
+        project_home_clause(project_home),
+        write_only=write_only,
+        copy_only=copy_only,
+    )
 
 
 def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
@@ -392,7 +409,7 @@ def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
     return (conf.rules, conf.phases, conf.risk)
 
 
-def common_shell_clause(root: str, path: str) -> str:
+def common_shell_clause(root: str, path: str, term: str = _TERM) -> str:
     """共通層の 1 本を、シェルの書き込みに当てる形に直す。
 
     既定の置き場（`.ccnavi/common/`）は _PLACES が持っているが、`--rules` / `--phases` /
@@ -409,6 +426,12 @@ def common_shell_clause(root: str, path: str) -> str:
     `myrules.yml` への書き込みまで止めないため。ルールの regex は後読みを受けない
     （rules._UNSUPPORTED）ので、前の 1 文字も含めて当てる形で書く。行き先の前には必ず 1 文字ある。
     shellread がリダイレクトを `> 行き先` にそろえ、コマンドの語は空白で区切られている。
+
+    term は名前の終わりの形。書き込む側は `_TERM`（空白も終わりに数える）で閉じる。
+    写す側（cp / ln / install）には空の term を渡す。後ろに `[^ \x00]*($|\x00)` が続くので、
+    空白の手前で終わるコピー元には当たらず、コマンドの終わりか切れ目で終わる行き先にだけ当たる。
+    `_COPY_TERM`（`$`）で閉じると、`cp x <共通層の 1 本> && echo` のように後ろに
+    コマンドが続く形が通る。
     """
     if not path:
         return ""
@@ -417,7 +440,7 @@ def common_shell_clause(root: str, path: str) -> str:
     spelled = [_spelled(name) for name in names if name]
     if not spelled:
         return ""
-    return r"(?:^|[^\w.-])(?:" + "|".join(spelled) + ")" + _TERM
+    return r"(?:^|[^\w.-])(?:" + "|".join(spelled) + ")" + term
 
 
 def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
