@@ -26,7 +26,7 @@ frontmatterの書き方しだいで、文書の探しやすさがそのまま決
 ---
 title: ワークツリーで作業する
 type: guide
-description: ワークツリーの切り方・統合先へ戻し方・片付け方と、他セッションの変更の扱い
+description: ワークツリーの切り方・統合先への取り込み方・片付け方と、他セッションの変更の扱い
 tags: [worktree, git]
 keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forward, 片付け, 他セッション]
 ---

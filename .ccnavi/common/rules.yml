@@ -44,7 +44,7 @@ deny:
     message: >-
       チェックアウトしたブランチ直下では編集しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add
       .claude/worktrees/<名前> -b <名前>' でワークツリーを切り、その中で編集して、
-      ff-only で統合先に戻してください。
+      ff-only で統合先に取り込んでください。
 
   # PowerShell はまとめて止め、Bash に寄せる。
   - id: no-powershell
