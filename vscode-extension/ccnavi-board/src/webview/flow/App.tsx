@@ -1,7 +1,7 @@
 /**
  * フロー編集画面の本体。帯・ツールバー・部品箱・図・右の欄。
  *
- * 見せる中身は拡張ホストが渡す（`FlowData`）。画面が持つのは、人が触って決めるもの（編集中のフロー、
+ * 見せる中身は拡張ホストが渡す（`FlowData`）。画面が持つのは、ユーザが触って決めるもの（編集中のフロー、
  * 選んでいるもの、直前の操作の一言、元に戻す履歴、写したノード）だけ。
  *
  * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）の写しで、
@@ -135,7 +135,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#flow-palette",
     title: "部品箱",
-    body: "押すと、ノードが図に足されます。利用者に聞く（askUserQuestion）ノードでは、担当のサブエージェントが手を止めてメインに返します。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に達したらメインに返します。",
+    body: "押すと、ノードが図に足されます。ユーザに聞く（askUserQuestion）ノードでは、担当のサブエージェントが手を止めてメインに返します。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に達したらメインに返します。",
   },
   {
     target: "#flow-graph",
@@ -546,7 +546,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <span className="flow-ticket">
             <strong>{page.ticket}</strong> {page.title}
           </span>
-          <span className="path" title={`${page.flowRel}（承認済みの領域です。書き込むのもコミットするのも人だけです）`}>
+          <span className="path" title={`${page.flowRel}（承認済みの領域です。書き込むのもコミットするのもユーザだけです）`}>
             {page.flowPath}
           </span>
           {!page.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}

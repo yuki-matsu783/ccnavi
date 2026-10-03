@@ -6,7 +6,7 @@
  * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--approve --preview --json`（承認待ちの一覧を見る）、
- * `--approve --yes … --json`（見せた一覧を承認する。人がオーバーレイで押したときだけ）、
+ * `--approve --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール設定画面が読む。記録を読むので `--log ""` は付けない）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
@@ -327,7 +327,7 @@ export async function runApproveYes(
   if ("mismatch" in parsed) {
     return parsed;
   }
-  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで何も言わないと人は
+  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで何も言わないとユーザは
   // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
   if ("partial" in parsed) {
     return { ok: false, error: partialMessage(parsed.partial) };
@@ -365,7 +365,7 @@ export async function runDecidePreview(
 }
 
 /**
- * 人が選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`）。
+ * ユーザが選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`）。
  * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
  */
 export async function runDecideYes(
@@ -591,7 +591,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
   if (parsed.ok) {
     return { ok: true, value: parsed.value };
   }
-  // 設定の不備などで実行ファイルが JSON ではなく人向けの文面を出したときは、JSON.parse の苦情より
+  // 設定の不備などで実行ファイルが JSON ではなくユーザ向けの文面を出したときは、JSON.parse の苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);
   return { ok: false, error: said === "" ? `${what} の出力を読めません（${parsed.error}）` : `${what} の出力: ${said}` };

@@ -485,7 +485,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
 
 // ---- 書き込み（8.4 の 1 段目） -----------------------------------------------------------------
 
-/** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。打ち消しなら人に回す */
+/** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。打ち消しならユーザに回す */
 export const HOST_REFUSED = 409;
 /** 送る前の確認で先頭が読んだものと違った（何も送っていない）。読み直して試し直してよい */
 export const HOST_MOVED = 412;

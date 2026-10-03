@@ -1,7 +1,7 @@
 /**
  * カードの行末のメニュー（「開く ▾」「git ▾」）。`<details>` 1 つで、開いているのは画面ぜんたいで 1 つだけ。
  *
- * 開閉は App が持つ（どれが開いているか）。人が summary を押すと `<details>` が自分で開くので、
+ * 開閉は App が持つ（どれが開いているか）。ユーザが summary を押すと `<details>` が自分で開くので、
  * その `toggle` を受けて App に伝え、App は他のメニューを閉じる。外を押したときと Esc は App が拾う。
  */
 import type { JSX, ReactNode } from "react";
@@ -15,7 +15,7 @@ export type MenuKind = (typeof MENU_KINDS)[number];
  *
  * **組み立ても読み取りも、この関数と `MENU_KINDS` を通す。** プロジェクトの名前は置き場の
  * ディレクトリ名そのままで、画面の clone の欄が通す綴り（英数字と `. _ -`）とは限らない。
- * 人が `projects/app:staging/` を置けば `:` が名前に入る。前方一致で持ち主を探すと、
+ * ユーザが `projects/app:staging/` を置けば `:` が名前に入る。前方一致で持ち主を探すと、
  * `app:staging` のメニューを `app` のものと取り違える
  */
 export function menuId(name: string, kind: MenuKind): string {

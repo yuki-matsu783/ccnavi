@@ -30,7 +30,7 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
 
-# 案内が名指しするもの。どれが欠けても、読んだ人は次に何をすればよいか分からない。
+# 案内が名指しするもの。どれが欠けても、読んだユーザは次に何をすればよいか分からない。
 MUST_NAME = (
     "ccnavi review confirm",
     "--result",

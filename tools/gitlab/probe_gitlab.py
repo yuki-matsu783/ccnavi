@@ -1,4 +1,5 @@
-"""実物の GitLab に sh 3 本と exe を当てて 1 周する。人が手で走らせる道具で、自動テストは呼ばない。
+"""実物の GitLab に sh 3 本と exe を当てて 1 周する。ユーザが手で走らせる道具で、
+自動テストは呼ばない。
 
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、使い捨てのプロジェクトを
 GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` を本物に通す。
@@ -85,7 +86,7 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.ccnavi/*",
-            "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
+            "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
         }
     ],
 }
@@ -264,7 +265,7 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
         'base_sha: ""',
         "---",
         "",
-        "本文（人が読む説明）",
+        "本文（ユーザが読む説明）",
         "",
     ]
     return "\n".join(lines)
@@ -329,7 +330,7 @@ def main() -> int:
         return finish()
     reviewer_id = int(me["id"])
 
-    # ---- 0. 人が用意するもの: プロジェクト、メンバー、課題、main
+    # ---- 0. ユーザが用意するもの: プロジェクト、メンバー、課題、main
     project_path = f"ccnavi-probe-{STAMP}"
     status, project = api(
         "POST",
@@ -681,7 +682,7 @@ def main() -> int:
     )
     record("ready の note が MR にある", has_marker(notes_of(pid, iid), "<!-- ccnavi:ready -->"))
 
-    # ---- 5. 別の親を人が締める（close-early）
+    # ---- 5. 別の親をユーザが締める（close-early）
     parent2 = worktree("i0002", "main")
     propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で締める親")
     propose(
@@ -704,7 +705,7 @@ def main() -> int:
         {"source_branch": "i0002", "target_branch": "main", "title": "Draft: 途中で締める親"},
         tag="mr-create-i0002",
     )
-    record("人が i0002 の MR を作る", status == 201)
+    record("ユーザが i0002 の MR を作る", status == 201)
     if status == 201:
         api(
             "POST",

@@ -27,7 +27,7 @@ SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
 def _launcher_source():
     """偽の配布元に置く振り分けの sh の中身。
 
-    原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。人が写す前の
+    原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。ユーザが写す前の
     ツリーにはまだ無いので、`test_launcher.py` と同じく環境変数 `CCNAVI_TEST_LAUNCHER` で
     名指しできる（相対ならリポジトリのルートから）。名指しが無ければ前の原本
     `scripts/ccnavi-launcher.sh` を読む。
@@ -76,7 +76,7 @@ EVENTS = (
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
 # 書かなければ enable で動くので、dry-run で導入したときにここだけ実際に動くと、
-# 様子を見ている人の手元でファイルが勝手に戻る。
+# 様子を見ているユーザの手元でファイルが勝手に戻る。
 GUARD_ENV = ("CCNAVI_RESTORE_IF_DENY", "CCNAVI_GUARD_CORE_FILES")
 # チケットの承認の経路。enable か disable しか取らないので、モードには合わせない。
 TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
@@ -349,7 +349,7 @@ class WritesTheExpectedShape(SetupTest):
 
         書かなければ 2 つとも enable で動く。dry-run で導入したつもりの
         プロジェクトで、判定は止めないのに戻す働きだけが実際に動く形になり、
-        様子を見ている人の手元でファイルが勝手に戻る。
+        様子を見ているユーザの手元でファイルが勝手に戻る。
         """
         self.run_setup()
         env = self.read_settings()["env"]
@@ -367,7 +367,7 @@ class WritesTheExpectedShape(SetupTest):
         """承認の門は dry-run で導入しても enable で書く。
 
         この門は enable か disable しか取らない。dry-run と書くと、ccnavi の
-        `--lint` が error にするし、書いた人は止まらないつもりでいるのに
+        `--lint` が error にするし、書いたユーザは止まらないつもりでいるのに
         実際は止まる。導入スクリプトがその食い違いを作らない。
         """
         self.run_setup()
@@ -422,7 +422,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 
     def test_says_what_is_still_missing(self):
-        """登録しただけでは動かないので、人が置くものを挙げる（S12）。
+        """登録しただけでは動かないので、ユーザが置くものを挙げる（S12）。
 
         振り分けの sh は代わりに通る sh と同じ並びに出る。
         """
@@ -580,7 +580,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         self.assertEqual(self.commands_of(self.read_settings(), "PreToolUse"), ["bin/CCNAVI"])
 
     def test_says_so_when_the_registration_is_spelled_differently(self):
-        """別の綴りで登録されているイベントは、足さずに人へ見せる。
+        """別の綴りで登録されているイベントは、足さずにユーザへ見せる。
 
         どちらが正しいかをここで決められない。何も言わずに足すと判定が 2 回走り、
         何も言わずに飛ばすとそのイベントが落ちたままになる。
@@ -737,7 +737,7 @@ class WritesWithoutLeavingTraces(SetupTest):
     def test_leaves_no_temporary_file(self):
         """設定ファイルの隣に残骸を置かない。
 
-        見慣れないファイルがあると、それが設定なのか残骸なのかを人が
+        見慣れないファイルがあると、それが設定なのか残骸なのかをユーザが
         判断できない。
         """
         self.run_setup()
@@ -900,7 +900,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_says_nothing_is_missing_after_it_copied(self):
         """配ったあとは「まだ無いもの」が出ない。
 
-        ここが出たままだと、配ったのか配れなかったのかを人が読み取れない。
+        ここが出たままだと、配ったのか配れなかったのかをユーザが読み取れない。
         """
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
@@ -967,7 +967,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """15. 配布元に ccnavi-push-approved.sh が無ければ、最後の「まだ無いもの」に挙げる。
 
         ボードは承認のあとこの sh を端末に送る。配れなかったことが最後の一覧に出ないと、
-        配布先で運べない理由を人が読み取れない。
+        配布先で運べない理由をユーザが読み取れない。
         """
         src = self.make_source()
         os.remove(os.path.join(src, ".ccnavi", "scripts", "ccnavi-push-approved.sh"))
@@ -1002,7 +1002,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """配布元を名指ししなくても配る。既定はスクリプト自身の置き場の 1 つ上。
 
         設定だけ書かれて実行ファイルが無い形は、hook が 7 つ登録されているのに
-        何も起動しない、という一番分かりにくい壊れ方になる。そこが、打った人が
+        何も起動しない、という一番分かりにくい壊れ方になる。そこが、打ったユーザが
         `--deploy` を知っているかどうかで分かれない。
         """
         src = self.make_source()
@@ -1020,7 +1020,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_writes_the_settings_when_the_default_source_is_not_built(self):
         """既定の配布元が組み立てられていなくても、設定は書く。
 
-        名指しされていない配布元が空なのは、打った人の誤りではない。ここで
+        名指しされていない配布元が空なのは、打ったユーザの誤りではない。ここで
         断ると、組み立てていない機械では設定すら書けなくなる。
         """
         src = self.make_source(built=False)
@@ -1097,7 +1097,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """組み立てていない配布元では、何も言わずに進まない。
 
         報告だけにすると「配ったはずなのに実行ファイルが無い」が最後の一覧に
-        しか出ず、打った人は配れたものとして先へ進む。
+        しか出ず、打ったユーザは配れたものとして先へ進む。
         """
         src = self.make_source(built=False)
         result = self.run_setup("--deploy", src)
@@ -1416,7 +1416,7 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
                 self.assertNotIn(INDEX_HEADER, written)
 
     def test_does_not_undo_a_negation_of_the_user(self):
-        """利用者が index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
+        """ユーザが index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
         for negation in ("!**/index.jsonl", "!index.jsonl", "!docs/index.jsonl", "!*.jsonl"):
             with self.subTest(negation=negation):
                 before = f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n"
@@ -1496,12 +1496,12 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
 
 
 class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
-    """既定でない CCNAVI_BIN_PATH（人が決めた綴り）は書き換えず、名指しする。"""
+    """既定でない CCNAVI_BIN_PATH（ユーザが決めた綴り）は書き換えず、名指しする。"""
 
     def test_leaves_a_path_it_did_not_write_and_names_it(self):
         """既定でない綴りは書き換えず、名指しで 1 行出す。終了コードは 0（S10）。
 
-        人が決めた綴りの先で何が使われているかを、このスクリプトは決められない。
+        ユーザが決めた綴りの先で何が使われているかを、このスクリプトは決められない。
         案内は settings.json の値の直し方。
         """
         custom = "dist/ccnavi/ccnavi"
@@ -1564,7 +1564,7 @@ class WritesTheVscodeSettings(SetupTest):
         self.assertFalse(os.path.exists(self.vscode_path() + ".bak"))
 
     def test_keeps_a_value_the_person_wrote(self):
-        """`false` と書いた人の判断を消さない。並べて見せるだけ。"""
+        """`false` と書いたユーザの判断を消さない。並べて見せるだけ。"""
         self.write_vscode({"git.detectWorktrees": False})
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1578,7 +1578,7 @@ class WritesTheVscodeSettings(SetupTest):
         """VS Code の設定ファイルはコメントを書ける（JSONC）。jq は読めない。
 
         ここで止まると、ccnavi と関係のない書き方のせいで .claude/settings.json
-        まで書けなくなる。触らずに人へ渡して、残りは進める。
+        まで書けなくなる。触らずにユーザへ渡して、残りは進める。
         """
         jsonc = '{\n  // worktree は見せない\n  "git.detectWorktrees": false\n}\n'
         self.write_vscode(jsonc)

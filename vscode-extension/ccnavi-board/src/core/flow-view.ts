@@ -2,7 +2,7 @@
  * フロー編集画面の、拡張ホストと Webview の間の契約。フェーズ管理（`phases-view.ts`）と同じ作り。
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR-0064）。渡すのは「いま何を見せるか」
- * （`FlowData`）だけで、画面が返すのは人が押した操作（`FlowMessage`）だけ。
+ * （`FlowData`）だけで、画面が返すのはユーザが押した操作（`FlowMessage`）だけ。
  *
  * **着手中かどうかを画面は決めない**（ADR-0035・ADR-0085）。錠は実行ファイルの `--explain --json` の
  * `tickets[].flow.locked` をそのまま写す（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
@@ -153,7 +153,7 @@ export type ToFlow =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: FlowLock }
   | { readonly type: "changed" }
-  /** 頼んだ往復が起きなかった（人が確認をやめた）。画面は欄を戻す */
+  /** 頼んだ往復が起きなかった（ユーザが確認をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   | { readonly type: "tour" }
   /** 頼まれた確かめ（`check`）の答え。`seq` は頼んだときの番号。確かめられなければ `error` */

@@ -1,14 +1,14 @@
 /**
- * 人の判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の並び。
+ * ユーザの判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の並び。
  *
- * 承認と残った指摘の行き先は、ボードのオーバーレイで人が押したものを、拡張が子プロセスで打つ
+ * 承認と残った指摘の行き先は、ボードのオーバーレイでユーザが押したものを、拡張が子プロセスで打つ
  * （`--approve --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。端末の壁は無く、
  * 代わりに「見せたものと今のものが同じ」ことを実行ファイルが指紋で求める。エージェントが Bash で
  * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` は端末（tty）から打つもので、
  * ボードには置かない。
  *
  * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
- * ターミナルに Enter まで送る。承認と同時に端末で走り、人は端末でその結果を見る。
+ * ターミナルに Enter まで送る。承認と同時に端末で走り、ユーザは端末でその結果を見る。
  */
 import * as path from "node:path";
 
@@ -67,7 +67,7 @@ export function decidePreviewArgs(phase: number): readonly string[] {
 }
 
 /**
- * `ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`。人がオーバーレイで選んだ行き先を置く。
+ * `ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`。ユーザがオーバーレイで選んだ行き先を置く。
  * 指紋は見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
  * エージェントがこの形を打つと、組み込みの deny（builtin-guard-ticket-approval）が止める
  */
@@ -100,12 +100,12 @@ export function scriptCommand(root: string, name: string): string {
 }
 
 /**
- * 人がレビューを終えたことを Claude Code に伝える文。ボードの「レビュー済み連絡」が組み、
+ * ユーザがレビューを終えたことを Claude Code に伝える文。ボードの「レビュー済み連絡」が組み、
  * 承認の文と同じ 2 ボタン（コピー / 新しいセッションで開く）で渡す。判定は動かさず、マーカーも置かない。
  * `confirm` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親のワークツリーで打つ。
  * そこは止まっているので、通るのは `sh …ccnavi-review.sh …` の形を連結せずに単体で打ったときだけ
  * （設計 9.8。`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される（9.12）。文はその 2 つを言う。
- * 未解決が残っていれば `confirm` が一覧と次の方法（解決してもらう・同じフェーズに子を足す・人が decide で決める）を
+ * 未解決が残っていれば `confirm` が一覧と次の方法（解決してもらう・同じフェーズに子を足す・ユーザが decide で決める）を
  * 返すので、文はそれに従うことだけを言い、方法を先取りしない。
  */
 export function reviewedPrompt(
@@ -116,7 +116,7 @@ export function reviewedPrompt(
   parentTree: string,
   mrUrl: string,
 ): string {
-  const lines = [`[ccnavi] 利用者が親 ${parent} のフェーズ ${label || String(phase)} のレビューを終えた。`];
+  const lines = [`[ccnavi] ユーザが親 ${parent} のフェーズ ${label || String(phase)} のレビューを終えた。`];
   if (mrUrl !== "") {
     lines.push(`- マージリクエスト: ${mrUrl}`);
   }
@@ -135,7 +135,7 @@ export function reviewedPrompt(
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
  * `parents` を渡すとその家族だけを運ぶ（ADR-0093 の 4.6。取り込み済みの家族だけが送られ、
- * そうでない家族は今どおり人がコミットする）。
+ * そうでない家族は今どおりユーザがコミットする）。
  */
 export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {
   const names = parents.map((p) => ` ${shellQuote(p)}`).join("");

@@ -45,7 +45,7 @@ CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
 # 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
 STOP_PREFACE = (
     "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めないでください。"
-    "このターンが利用者への問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書いてください。"
+    "このターンがユーザへの問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書いてください。"
     "振り返って何も無ければ「振り返り: 無し」とだけ答えてください。"
 )
 
@@ -169,14 +169,14 @@ def decide_at_prompt(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """利用者が何か言ったとき。ターンの基準をここで取る。
+    """ユーザが何か言ったとき。ターンの基準をここで取る。
 
     原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
 
-    例外は、このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）。
-    それは 1 度だけ伝える。伝えないと、人が「承認した」とチャットで打つまで
+    例外は、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）。
+    それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
     モデルは後工程に入れない。
     """
     watched, scope = watch_context(stderr, conf, root, record)
@@ -206,11 +206,11 @@ def decide_at_stop(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """ターンが終わったとき。宣言した保護領域の今の状態を人へ報告する。
+    """ターンが終わったとき。宣言した保護領域の今の状態をユーザへ報告する。
 
-    宛先が人なので `systemMessage` で返す。呼び出しごとの報告はモデルへ届く
+    宛先がユーザなので `systemMessage` で返す。呼び出しごとの報告はモデルへ届く
     経路に載せてあり、そこは既に足りている。足りていないのは、ターンが終わった
-    あとに人が「結局どこが変わったのか」を 1 度で見る場所のほう。
+    あとにユーザが「結局どこが変わったのか」を 1 度で見る場所のほう。
 
     報告のためには止めない。このイベントで止めることはターンを続けさせる意味になり、
     報告のために作業を終わらせない形になる。報告は言うだけにする。
@@ -241,7 +241,7 @@ def decide_at_stop(
         functools.partial(configsync.is_synced_write, conf, root),
     )
     # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
-    # 言い換えで回っているかもしれないことを人にも 1 度言う。止めはしない。
+    # 言い換えで回っているかもしれないことをユーザにも 1 度言う。止めはしない。
     repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
@@ -254,7 +254,8 @@ def decide_at_stop(
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
     if nudge:
-        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後チェックと同じ言い方）。
+        # dry-run は止めない。止めたはずのことをユーザへの報告に載せる
+        # （実行後チェックと同じ言い方）。
         told = f"[ccnavi dry-run] {modes.ENABLE} would have blocked this stop:\n{nudge}"
         report = f"{report}\n\n{told}" if report else told
     if report:
@@ -289,7 +290,7 @@ def stop_rules_nudge(
       ターンの終わりのたびに止まるので、何も言わない側を採る（ADR-0087 と同じ）
 
     数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
-    `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、利用者への問いで終わった
+    `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、ユーザへの問いで終わった
     ターンの問いが消えないように。記録の `rules` には、実際に渡したルールだけを残す。
     """
     if payload.stop_hook_active or payload.agent_id or not conf.state:
@@ -530,7 +531,7 @@ def decide_after(
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
     # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
-    # 届かない。人にも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
+    # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
     # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
     system = bounced if payload.agent_id else ""
     hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)

@@ -57,7 +57,9 @@ EXPLAIN_NOTE = (
 # ルールが何も言わない列に置くルール。Write には当たらない。
 SILENT = {
     "version": 1,
-    "deny": [{"id": "push", "match": "Bash", "glob": "*git push*", "message": "push は人が行う"}],
+    "deny": [
+        {"id": "push", "match": "Bash", "glob": "*git push*", "message": "push はユーザが行う"}
+    ],
 }
 
 

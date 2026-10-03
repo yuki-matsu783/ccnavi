@@ -26,7 +26,7 @@ deny:
   - id: git-push
     match: Bash
     glob: "*git push*"
-    message: push しません。利用者に頼んでください。
+    message: push しません。ユーザに頼んでください。
 allow:
   - id: listing
     match: Bash
@@ -136,7 +136,7 @@ class SuggestTest(unittest.TestCase):
         self.assertEqual(
             ("message", "deny", "git-push"), (found["kind"], found["section"], found["id"])
         )
-        self.assertEqual("push しません。利用者に頼んでください。", found["rule"]["message"])
+        self.assertEqual("push しません。ユーザに頼んでください。", found["rule"]["message"])
         self.assertEqual(["git push origin main"], [s["subject"] for s in found["samples"]])
 
     def test_denies_from_outside_the_rules_are_not_candidates(self):
