@@ -3,7 +3,7 @@ type: guide
 title: プロジェクトを置いて作業する
 description: ワークスペースに複数のリポジトリを置いて管理する方法。置き場、チケット、設定の関連
 tags: [projects, ticket]
-keywords: [プロジェクト, projects, リポジトリ, clone, チケット, マーカー, 記録, ワークツリー, 層, message]
+keywords: [プロジェクト, projects, リポジトリ, clone, チケット, マーカー, 記録, ワークツリー, レイヤー, message]
 ---
 
 # プロジェクトを置いて作業する
@@ -27,8 +27,8 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 状態の跡（いつ・どの経路で置き場が動いたか。追記だけの補助で、正は置き場） | 承認済みチケットと同じツリーの `.ccnavi/approved/events/<識別子>.ndjson`（1 行 1 JSON。マーカーの跡は親のファイル） |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの `.ccnavi/approved/flows/<子>.yml`（固定。中身は YAML。チケットの欄では指さない） |
 | 下書きと使い捨て | そのワークツリーの `scratchpad/`（追跡しない）。ワークツリーが無いときは、ワークスペースの外にあるセッションのスクラッチパッド |
-| ワークスペースのルール | `.ccnavi/common/rules.yml`（共通層。リスクの配点も同じ場所）。フェーズの種類は自身の層 `.ccnavi/config/phases.yml` |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risks.yml`）。正本はここ。親の着手のときに、共通層にあるファイルはその中身で上書きされる（設計 11.12） |
+| ワークスペースのルール | `.ccnavi/common/rules.yml`（共通レイヤー。リスクの配点も同じ場所）。フェーズの種類は自身のレイヤー `.ccnavi/config/phases.yml` |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risks.yml`）。正本はここ。親の着手のときに、共通レイヤーにあるファイルはその中身で上書きされる（設計 11.12） |
 
 プロジェクトのリポジトリ（git）に入るのは、提案・承認済みチケットとマーカー・プロジェクトの設定の 3 つ。
 承認とフェーズの進みは親チケットのブランチに乗って他の機械へ届き、clone すれば続きができる（設計 9.2、REQ-MLT-14）。

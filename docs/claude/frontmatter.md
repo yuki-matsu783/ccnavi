@@ -46,7 +46,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 |---|---|---|
 | `design-doc` | 設計の書き下し（`ccnavi.md`・`requirements.md`・`wip/design/**`）と ADR の書き方・置き場の話、作りの設計（画面の組み立て・状態の遷移など）を決めた ADR | `design` は使わない（`design-doc` に統合した） |
 | `settings` | Claude Code の `settings.json`（hook の登録・`env`・`permissions`）と、そこで渡す環境変数 | ccnavi 自身の設定ファイル |
-| `config` | ccnavi の設定ファイル（`.ccnavi/common/rules.yml`・`phases.yml`・`risks.yml`）の形・読み方・層 | `settings.json` と環境変数 |
+| `config` | ccnavi の設定ファイル（`.ccnavi/common/rules.yml`・`phases.yml`・`risks.yml`）の形・読み方・レイヤー | `settings.json` と環境変数 |
 
 `settings.json` の `env` で ccnavi の設定ファイルの置き場を渡す話のように両方に跨るときだけ、両方を付ける。
 
