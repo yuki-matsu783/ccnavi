@@ -331,12 +331,8 @@ class ShAgreesTest(unittest.TestCase):
             ticket("i0001-01", "i0001"),
         )
         result = self.run_sh(os.path.join(link, ".claude", "worktrees", "i0001-01"), "push")
+        # 本物の sh も両辺をリンクを解いた綴りで比べる（ADR-0093 の段階 2b のレビューの中 12）。
         stopped = "子チケットのワークツリー" in result.stderr
-        if self.SH_DIR == self.ORIGINAL:
-            # 直した sh は wip/design/scripts/ にあり、人が写すまで本物は外れたまま。
-            # 写したらここが落ちるので、この分岐を消して下の assert だけにする。
-            self.assertFalse(stopped, "写したなら、この分岐を消す")
-            return
         self.assertTrue(stopped, result.stderr)
 
 

@@ -161,6 +161,7 @@ const HISTORY_KIND_LABELS: Readonly<Record<string, string>> = {
   finished: "作業を終えた",
   cancelled: "取り消し",
   settled: "レビュー済みで閉じた",
+  withdrawn: "承認の取り下げ",
   "phase-reopened": "マーカーを消した（子が足された）",
 };
 
@@ -180,6 +181,7 @@ export const VIA_LABELS: Readonly<Record<string, string>> = {
   terminal: "端末",
   board: "ボード",
   hook: "hook",
+  chrome: "Chrome 拡張",
 };
 
 /**

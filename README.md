@@ -388,7 +388,9 @@ sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で�
 
 配った組み立ての置き場は、配布先が git のリポジトリなら `.gitignore` にも足す（入れると履歴から消すのが難しい）。
 置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/index.jsonl` も
-別の見出しで足す（「ドキュメントの索引」。`**/index.jsonl` か `index.jsonl` の行が既にあれば足さない）。
+別の見出しで足す（「ドキュメントの索引」。`**/index.jsonl` か `index.jsonl` の行が既にあれば足さない。行は CRLF の `\r` と
+行末の空白を落として比べる。`!**/index.jsonl` や `!docs/index.jsonl` のように `index.jsonl` を否定する行があれば、利用者が
+除外しているとみなして足さず、`--check` でもそう言う）。
 
 ```
 # ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
@@ -1380,6 +1382,20 @@ ccnavi --approve --preview --verify i0002 i0002-01   # 承認できる状態か�
 リモートに届かないときも止めず、手元の版で判定する。認証は尋ねず、fetch 1 回を `CCNAVI_FETCH_TIMEOUT` 秒（既定 15）で切る。
 認証で落ちたときはそう 1 行添えるので、人が端末で一度 `git fetch origin` を打って資格情報を保存すれば、次のセッションから通る。
 
+親のワークツリーのうち家族の控え（`logs/state/sync/<リポジトリ>/families/<P>`）があるものは、未コミットの変更があっても
+早送りを試し、書きかけと重なれば重なったパスを言う。分かれていれば「取り込みが要る」と 1 行言うだけで merge はしない。
+取り込み（merge）と、親のブランチがリモートから消えたかの確かめは、人が打つ `.ccnavi/scripts/ccnavi-sync.sh [<P>...]` がする（ADR-0093 の 4.2・3.6）。
+統合先は環境変数 `CCNAVI_INTEGRATION_BRANCH`（`.claude/settings.local.json` の `env` でもよい）、空ならホストのデフォルトブランチで、
+使った名前を出力の頭に出す。家族の控えは、親のブランチへの push が `ccnavi-git.sh` で通ったときに作られる。
+取り込んだ後は家族を判定し直し、error があれば家族の控えを `blocked` にして止める（直してからオンラインで打ち直せば戻る。
+止める理由があるのに控えを書けなければ 3 回試し、それでも駄目なら終了コード 3）。
+控えのある家族（取り込み済みの家族）は、親のブランチの写しだけを本物とし、控えが `gone`・`blocked`・壊れている、
+親のワークツリーが無いなどで決まらなければ、その家族の承認・状態の操作・実行前の判定を止める（ADR-0093 の段階 2c。ccnavi.md 9.2）。
+家族の控えは親のワークツリーを片付けても消えない（墓標）。捨てた家族の控えは、片付けた後に人が
+`.ccnavi/scripts/ccnavi-sync.sh --forget <P>` で消す（エージェントからは組み込みの deny が止める）。
+取り込んだ跡のあるリポジトリでは、新規の提案の識別子を統合先の控えの `done/` と比べ、閉じた識別子と、
+控えが無い・壊れていて確かめられないものは承認しない（理由を承認の画面に出す）。
+
 順序は「承認 → 承認済みチケットをコミット → 子のワークツリーを作る → `start`」。コミットの前にワークツリーを作ると、その子には範囲が効かない。
 
 **承認を頼む前に、エージェントが自分で確かめる。** `--approve --preview --verify [<識別子>...]` は、置かずに「いま `--approve` を打てば
@@ -1425,6 +1441,11 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
 - 下書きの置き場（ワークツリーのルートの直下 1 段の `scratchpad/`。大文字小文字を区別する）。**実行前の判定だけ**で、実行後の監視と
   サブエージェント終了時の検査は外さない。そこに現れるのは `scratchpad/` が追跡されているときなので、範囲外として報告する
+- ELI5 の HTML の置き場（ワークツリーのルートからの `wip/eli5/` の下。大文字小文字を区別する。ADR-0096）。追跡される置き場なので、
+  実行前の判定・実行後の監視・サブエージェント終了時の検査のどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
+  チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に効く（ADR-0097）
+- どの置き場も `\` を `/` に直さずに見る。`wip\eli5\x.py` や `wip\proposals\todo\x.py` という名前の 1 ファイル（Linux / macOS で作れる）は
+  置き場ではなく、範囲を当てる（ADR-0097）
 
 シェルが書いたものは実行後の監視が `POST_TICKET_SCOPE` で言う（ルールの `allow` に当たる場所でも同じ）。子のワークツリーは、
 サブエージェントの終了時に基準点（`base_sha`）からのコミット済みの差分と未コミットの両方を見て、範囲外が残っていれば 1 回だけ差し戻す。
@@ -1450,7 +1471,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 |---|---|---|---|
 | 返す文 | 合流と push を済ませ、`request` でレビューを頼み、ターンを終えて利用者を待て | 合流して利用者に差分を見てもらい、ターンを終えて待て | レビューを省略して次のフェーズへ進める |
 | HITL ポイント | 来る。レビュー済みのマーカーまで止まる | 来る。レビュー済みのマーカーまで止まる | 来ない。省略のマーカーを残す |
-| 先へ進める者 | `ccnavi-review.sh confirm` / `decide` | 人が端末で `ccnavi --reviewed <N> --chat` | — |
+| 先へ進める者 | `ccnavi-review.sh confirm` / `decide` | 人が親のワークツリーの端末で `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`） | — |
 | `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | 同じ | `finish` の時点で `done/` へ |
 
 `chat` はホストへ出ないので、マージリクエストもトークンも要らない。`--chat` は種類が `chat` と宣言したフェーズにしか当たらず、
@@ -1548,12 +1569,29 @@ phases:
 ### レビューの依頼と確認
 
 ```sh
-sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md
+sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md --eli5 wip/eli5/phase-2.html
 sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
 sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 ```
 
 設計は [ccnavi.md](ccnavi.md) の 9.10 と 9.11。
+
+- `request` には ELI5 の HTML（`--eli5`）が必須（ADR-0094・ADR-0095・ADR-0097）。変更の目的・何が変わるか・リスクを専門用語なしで書いた
+  1 枚の HTML で、外部の読み込み（CSS・JS・画像の URL）は使わない。親のワークツリーの `wip/eli5/` の下（既定の名前は
+  `wip/eli5/phase-<N>.html`。名前は英数字と `. _ / -` だけ）に普通のファイルとして置いてコミットし、push しておく。マージリクエストの差分に載せるため。
+  拡張子が `.html` / `.htm` でないか `--eli5` が無いなら 2、ファイルが無い・空・`wip/eli5/` の外・使えない字・HEAD に無い（未追跡・未コミット）・
+  HEAD でモードが 100644 でない（シンボリックリンク・実行の印付き）・HEAD と中身が違う、なら全部を挙げて 1 で止まる。追跡しない `wip/tmp/` に置く前の形は止まる。`wip/eli5/` の下はチケットの
+  範囲を当てないので、親チケットの範囲に書き足さなくてよい（ADR-0096）
+- 投稿が済むと `ELI5 を見る: 人が端末で cd <ルート> してから crit review <相対パス> を打ち、… crit push <番号> で …` が出る。
+  人はその手順を手元の端末で打つ（sh は crit を起動しない。crit・gh・glab が無い環境でも依頼は通る）。依頼の本文にも同じ手順を 1 行載せる
+- 人は `crit review <相対パス>` で HTML のソースの行に指摘を付け、`crit push <番号>` でマージリクエストの行のスレッドとして送る
+  （GitHub は `gh`、GitLab は `glab` が要る。GitLab での crit push は未確認）。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは送られない。
+  手元のチェックアウトがマージリクエストの先頭より古いと行の番号がずれるので、先に合わせる。差分の外の行がホストに拒まれるかは未確認。
+  送った指摘は人のスレッドなので、`confirm` が未解決として数えて止め、`decide` で 1 件ずつ行き先を選べる
+- 依頼の後に `wip/eli5/` の下だけを直したコミットは、動いたと数えない（ADR-0096）。push すれば `confirm` は止まらず、打ち直しも要らない。
+  直した ELI5 を人が見直す保証は無く、直す前の行のスレッドは残るので人が resolve する。ほかのファイルと一緒に変えたコミットは今までどおり
+  打ち直しが要る。`wip/` は `ready` の前に丸ごと消すので、squash した成果物に HTML は残らない。`ready` の前提は大文字小文字を区別せず
+  （`WIP/` も）、名前が `wip\` で始まる 1 ファイルも残りとして止める
 
 - `request` は前提（フェーズが終わっている・レビューが延期されていない・子ブランチが親に取り込まれている・未コミット無し・push 済み・未依頼）を
   確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿し、マーカーを残す。マージリクエストが無ければ Draft で作る
@@ -1584,7 +1622,7 @@ JSON で渡す（`--result <path>`）。
 | `request` | `review prepare`（前提を確かめ、マーカー付きの本文を控えの置き場に書き出す）→ sh が投稿 → `review requested`（マーカーを置く） |
 | `confirm` | sh がスレッドとレビューを取ってくる → `review confirm`（判定してマーカーを置き、`review/` の子を `done/` へ動かす） |
 | `decide N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せ、指摘ごとに対応方針を選ばせる）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `decide N --preview`（`--preview --json`。一覧と指紋）と `decide N --choices <JSON> --digest <指紋>`（`--yes <JSON> --digest <指紋> --json`）で同じ道を通る |
-| （`chat` のフェーズ） | sh は動かない。人が端末で `ccnavi --reviewed <N> --chat --cwd <親のワークツリー>` を打つ。依頼も写しも無い |
+| （`chat` のフェーズ） | 人が親のワークツリーの端末で `ccnavi-review.sh chat <N>` を打つ（中身は `ccnavi --reviewed <N> --chat`。取り込み済みの家族なら最後に運ぶ処理を呼ぶ）。依頼も写しも無い |
 | `comment` | sh が投稿する。実行ファイルは関わらない |
 | `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置く）→ sh が Draft を外してコメントを投稿する。親が打つ。マージは人 |
 | `close-early --reason <理由> [--no-issue]` | まだ残っているが「キリの良いところまでやった」と締める。人が端末で打つ。`--close-early`（残りを見せて y/N、未着手の子を取り消し、マーカーを置く）→ sh が残りを issue に写し、コメントを投稿する。Draft は親が片付けてから `ready` で外す |
@@ -1601,7 +1639,8 @@ JSON で渡す（`--result <path>`）。
 - `--result` を実行ファイルに直接渡せるのは人の手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。エージェントはスクリプト 2 本を通す
 
 **Draft を外すのは親、マージは人。** `ready` は、親を閉じられる状態（全フェーズが終わり、フィードバック計画が承認され、レビューが済んでいる）
-に加えて、`wip/` が追跡から消えていて、未コミットが無く、push 済みであることを求める。取り込みは squash（GitLab ではマージリクエストに
+に加えて、親の承認済みチケットが `done/` にあること（閉じる前に Draft を外してマージされると、親の記録の無いまま親のブランチが消え、
+家族が決まらなくなる。ADR-0093 の 3.6）と、`wip/` が追跡から消えていて、未コミットが無く、push 済みであることを求める。取り込みは squash（GitLab ではマージリクエストに
 `squash` を立てる）。順は「親を `finish` で閉じる → `rm -r wip` をコミット → push → `ready` → マーカー `ready.json` をコミットして push →
 ワークツリーを片付ける」。ワークツリーの片付けはマージを待たない。
 
@@ -1962,6 +2001,20 @@ error 2 件、warn 2 件、info 0 件
 | warn | ワークツリーでもワークスペースルートでもないのに `.claude/` を持つディレクトリがある |
 | warn | 下書きの置き場（`scratchpad/`）に追跡されているファイルがある、または `scratchpad/` が git で無視されていない（ワークスペースと各プロジェクトのそれぞれ。追跡されていると、実行後の監視が下書きを範囲外として報告しはじめる） |
 
+**取り込みと権威**（ADR-0093 の段階 2c。取り込みの控え `logs/state/sync/` があるときだけ。1 行目と 2 行目は控えが無くても見る）
+
+| 深刻度 | 拾うもの |
+|---|---|
+| error | `.claude/settings.local.json` の `env` に承認と判定に効く値（置き場の綴り・プロジェクトの置き場・ccnavi ディレクトリ・控えの置き場・記録の置き場・チケット制御・承認の守り・ccnavi 自身の設定の守り・戻す働き・確かめられないモードの止め・同じ理由の拒否の数え方・モード）がある。置けるのは `CCNAVI_INTEGRATION_BRANCH` だけ（`CCNAVI_BIN_PATH`・診断ログ・見張りの秒は答えを変えないので咎めない） |
+| warn | 名前が親の識別子の親のワークツリーが、別のブランチの上に居る（取り込みと権威は名前の同じブランチだけを見る） |
+| error | 取り込み済みの家族（家族の控えがある）が決まらない: 控えが `gone`・`blocked`・壊れている（途中のリンクを含む）、`present` なのに親のワークツリーが無いか HEAD が別のブランチ。承認・状態の操作・実行前の判定がその家族を止める。解き方を添える |
+| error | 取り込み済みの家族の承認済みチケットが、親のワークツリーの外にしか無い（元ツリーに未コミットで残った写しなど。信じないので止まる） |
+| info | 閉じた家族（統合先の控えの `done/` に親の写しがあるか、控えが `closed`）で、親のワークツリーが残っている（片付けてよい）。片付いた閉じた家族の控え（墓標）は言わない |
+| error | 統合先の控えが無い・壊れている・読めない・入れ替えが終わらない（途中のリンクを含む）。閉じた識別子の再利用を確かめられないので、そのリポジトリの新規の提案は承認しない |
+| warn | 作業ツリーの層（共通層・自身の層）が統合先の控えの層と違う（統合先に入るまで、他の機械と Chrome の判定には効かない） |
+| warn | 親のブランチの上のプロジェクトの層が、プロジェクトの統合先の層に共通層を写して計算した層と違う（判定は親のブランチの上の層を読まない。D28） |
+| warn | 新規の提案の識別子が、統合先の控えの `done/` で閉じている（家族の控えの有無に依らない。承認はしない） |
+
 **プロジェクト**（`projects/` があるときだけ）
 
 | 深刻度 | 拾うもの |
@@ -2145,8 +2198,10 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 
 - `--yes` は端末を求めない代わりに、見せた一覧と今の一覧が同じで、`--digest` の値（大文字小文字は問わない）が承認のときに読み直した中身の指紋と
   合うことを求める。`--digest` が無ければ承認せず、終了コードは 1
-- 指紋が覆うのは承認画面の本文と、束のチケットごとに書き出す中身（新規は提案の frontmatter と本文、改版は計画を差し替えた承認済みチケット。
-  `ccnavi_approved` は除く）
+- 指紋が覆うのは承認画面の本文と、判定が読んだ中身（`read_set`。承認済みチケット・提案・マーカー・フェーズの種類・取り込みの控えの、
+  ブランチ名とツリーからの相対パスごとの中身の指紋。無かったファイルも「無い」として入る）と、束のチケットごとに書き出す中身（新規は提案の
+  frontmatter と本文、改版は計画を差し替えた承認済みチケット。`ccnavi_approved` は除く）。見せたあとに判定が読んだものが 1 つでも変われば、
+  画面が同じでも指紋は変わる（ADR-0093 の 6.2。段階 2c）
 - エージェントが Bash や PowerShell で `--yes` を打つ道は、組み込みの deny（`builtin-guard-ticket-approval`）が塞ぐ。`--preview` は通す
 - 後ろの `<絞り>` は `ccnavi --approve <識別子>...` と同じで、承認の対象を狭める。`--yes` の値（人が見た識別子）とは別に渡す。
   比べるのは「その絞りで今できる一覧」と「見た識別子」
@@ -2189,7 +2244,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 1` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 2` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -2232,7 +2287,7 @@ ccnavi --version --json
 ## ドキュメントの索引
 
 ```sh
-ccnavi --docs --text コンフリクト --format detail     # 話題で当たりを付ける
+ccnavi --docs --text マージ --format detail           # 話題で当たりを付ける
 ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
 ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
 ccnavi --docs --path docs/claude --format count         # 件数だけ
@@ -2262,18 +2317,28 @@ frontmatter の無い md は頭の 4 KiB だけで止める。
 `scripts/ccnavi-setup.sh` が配るときに足す。プロジェクトには足さない）。一部のディレクトリだけが無視されていない（追跡されている
   `index.jsonl` がある）なら、そこは書かずに行だけを組む
 - **ccnavi の形でない `index.jsonl` は上書きも削除もしない。** 空か、空でない行が全部下の 4 つの鍵を持つ行として読めるときだけを
-  ccnavi のものとみなす。それ以外（よその道具のファイル、壊れた行、リンク、16 MiB を超えるもの）は触らず、行だけを組んで引き、
-  `--docs` は標準エラーで、`SessionStart` は 1 行で名指しする
+  ccnavi のものとみなす。それ以外（よその道具のファイル、壊れた行、リンク、16 MiB を超えるもの、入れ子が 32 段より深い行、
+  `NaN`・`Infinity` を持つ行）は触らず、行だけを組んで引き、`--docs` は標準エラーで、`SessionStart` は 1 行で名指しする。
+  行は `\n` だけで割る（値の中の U+2028・U+2029・U+0085 では割らない。行末の `\r` は落とす）
 - 書くときは git のディレクトリ（`.git/`、submodule なら指す先）に一時ファイルを排他で作り、置き換える。作業ツリーの
-  `git status` には出ない。打ち切りで残った一時ファイル（`ccnavi-index-*.tmp`）は、10 分より古ければ次の回に消す
+  `git status` には出ない。打ち切りで残った一時ファイル（`ccnavi-index-*.tmp`）は、10 分より古ければ次の回に消す。
+  `.git` が作業ツリーと別のファイルシステムにある（置き換えが EXDEV で落ちる）ときは、そのディレクトリの下に
+  `.ccnavi-tmp-<番号>/index.jsonl` を作って置き換え、ディレクトリごと消す。この綴りが git に無視される（`**/index.jsonl` で当たる）
+  ことを先に確かめ、無視されなければ書かない。残骸は 10 分より古く、中身が `index.jsonl` だけのものに限って消す
 - git への問い合わせの失敗（git が無い・期限切れ・壊れたリポジトリ）は、`.git` が無いのとも無視されていないのとも別に扱う。
-  `--docs` は「git への問い合わせに失敗したので引かない」とそのツリーを名指しし、`SessionStart` は何も言わない
+  `--docs` は「git への問い合わせに失敗したので引かない」とそのツリーを名指しし、`SessionStart` は何も言わない。
+  git には利用者の環境の pathspec の読み方（`GIT_LITERAL_PATHSPECS` など）を外して聞き、`:(exclude)` のような名前の
+  ディレクトリも字どおりに扱う
 
 `SessionStart` はサブエージェントでなければ、ワークスペースとプロジェクトの索引を同じ手順で新しくし、引き方と frontmatter の
 決まりの要点を `additionalContext` に添える。対象外にしたツリーと書き換えなかった `index.jsonl` があれば短く名指しする。
 md が 1 本も無い・git の外なら何も言わない。新しくするのに使うのは 3 秒（`docsearch.START_SECONDS`）と hook の判定の期限の
-残りの小さいほうまでで、期限は md 1 本ごとに見る。過ぎたら途中のディレクトリは書かずに次の回に回す（書けたディレクトリの分は
-次に使い回す。`--docs` は引く前に期限なしで新しくする）。何が起きてもセッションの開始は止めない。
+残りの小さいほうまで。まず全部のディレクトリで使い回せる行を見て、読み直しの要る md を、待つ本数の少ないディレクトリから
+1 本ずつ期限を見ながら読む。過ぎたら読むのをやめ、どのディレクトリも「読めた md の新しい行と、読めなかった md の既存の行」で
+書く（読めなかった md は次の回に読む）。大きなディレクトリも回を重ねれば埋まり、小さなディレクトリはその後ろで待たない。
+残りが 0.5 秒（`MIN_REFRESH_SECONDS`）に満たない（期限が既に切れている）ときは新しくせず、md を読まず書かずに既存の
+`index.jsonl` の行だけで案内する（git には 1 秒だけ与える。それも間に合わなければ、ワークスペースルートに md があれば
+引き方だけを出す）。`--docs` は引く前に期限なしで新しくする。何が起きてもセッションの開始は止めない。
 
 | オプション | 対象 | 一致 |
 |---|---|---|
@@ -2294,7 +2359,10 @@ md が 1 本も無い・git の外なら何も言わない。新しくするの�
 
 絞り込みのフラグ（`--type` から `--no-refresh` まで）を `--docs` の外で渡すと、言って 1 で終わる（このフラグが無かったころに
 argparse が止めていた打ち間違いを、黙って通さないため）。`--docs` にほかの経路のフラグ（`--lint` `--yes` `--preview` `--result`
-`--tickets` `--flow` など）を添えたときも、無視せずに 1 で終わる。
+`--tickets` `--flow` など）と、判定やチケットの経路の設定・sh が渡す綴り（`--cwd` `--mode` `--approved` `--rules` `--phases`
+`--risk` `--projects` `--project-home` `--ticket-control` `--guard-core-files` `--guard-ticket-approval` `--restore-if-deny`
+`--integration-branch` `--record-writes` `--choose-out` `--actor` `--via` など）を添えたときも、無視せずに 1 で終わる。
+効かせるのは引く場所の `--root` と、記録の置き場の `--log` / `--state`（`--docs` は何も記録しないので結果は変わらない）だけ。
 
 `index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
 
@@ -2344,6 +2412,11 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
   取り返しがつかない形も、サブコマンドの中で止める
 - `push` は**居るブランチを、そのままの名前で送る形だけ**通す。`--force`・`--force-with-lease`・`--delete`・`--all`・`--mirror`・`--tags`、
   別の綴りへ送る refspec（`HEAD:main` など）は通さない。`main` `master` `develop` `release` `release/*` へ直接は送れない。マージは人の側に残す
+- `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。
+  `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない（ADR-0093）
+- 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
+  `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
+  衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる（ADR-0093）
 - 送るのは親だけ。子チケットのワークツリーからの push はラッパースクリプトが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）
 - サブコマンドより前のオプション（`git -c ...` など）は 1 つも受け取らない。`GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す
 
@@ -2397,11 +2470,12 @@ hook の文字列一致は外れる。そこまで塞ぐなら `permissions.deny
 | `.claude/skills/ccnavi-config/` / `commit/` | 設定 3 本を足す・確かめるスキルと、コミットの手順 |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じ綴り。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
-| `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
-| `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
+| `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket`。取り込み済みの家族では C1（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない。ADR-0093 の段階 2d） |
+| `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書く副命令は取り込み済みの家族で C1。人の判断の入口 `chat <N>`・`config-synced <親>`・`close-early` は人が打ち、取り込み済みの家族なら最後に運ぶ |
 | `.ccnavi/scripts/ccnavi-approve.sh` | 承認し、`ccnavi-push-approved.sh` で運ぶ。人が端末で打つ。本体は `ccnavi --approve` |
-| `.ccnavi/scripts/ccnavi-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。人が打つ（エージェントからは止まる）。端末の `ccnavi-approve.sh` とボードの承認のあとに呼ばれる |
+| `.ccnavi/scripts/ccnavi-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。人が打つ（エージェントからは止まる）。端末の `ccnavi-approve.sh`・ボードの承認とフローの保存・人の判断の入口のあとに呼ばれる。`[<親>...]` で家族を限る。取り込み済みの家族はロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチと、ワークツリーの起点になるデフォルトブランチを取ってくる。進めるのは fast-forward だけ（ADR-0060） |
+| `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめて人に回す）。リモートから消えた親のブランチを閉じた・消えたに分け、家族の控えと統合先の控えを書く（ADR-0093 の段階 2b） |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |

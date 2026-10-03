@@ -3,7 +3,7 @@ type: guide
 title: ワークツリーで作業する
 description: ワークツリーの作成、他セッションの変更への対応、統合先へのマージ方法
 tags: [git, worktree]
-keywords: [ワークツリー, git, ccnavi-git.sh, 統合先, マージリクエスト, fast-forward]
+keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション]
 ---
 
 # ワークツリーで作業する
@@ -37,12 +37,18 @@ keywords: [ワークツリー, git, ccnavi-git.sh, 統合先, マージリクエ
   `<統合先>` が `main` のときも省かない
 - `<行き先>` は cwd から解かれる。ワークスペースルートからなら `.claude/worktrees/<名前>`、
   `projects/<名前>` の中からなら `../../.claude/worktrees/<名前>`。間違えると止まり、文面が正しい綴りを出す
-- `worktree add` に渡せるオプションは決まっている（`-b` `-B` `--reason` `--detach` `--force` など）。
+- `worktree add` に渡せるオプションは決まっている（`-b` `--reason` `--track` など）。
   一覧に無いものは通らない。要るものが出たら利用者に足してもらう
+- 行き先の名前とブランチ名は揃える（`-b <行き先の名前>`）。`-B`・`--detach`・`--force` は通らない。
+  `-b` を付けずに 2 つ目の語を渡すなら、行き先と同じ名前の手元のブランチか `origin/<名前>` だけ（タグ・sha は通らない）。
+  親のワークツリーでは別のブランチへ `checkout` / `switch` できない（ADR-0093 の段階 2b）
+- `branch` `checkout` `switch` `fetch` `pull` `merge` `commit` `rm` `restore` のオプションは許可リストで読む。
+  長いオプションは略さずに書く（`--force-c` のような略は通らない）
 - プロジェクトのワークツリーは `cd projects/<名前>` してから切る。`<統合先>` はそのプロジェクトのブランチで、
   ワークスペースの `main` ではない
 - `<統合先>` がリモートにしか無いときは、先に `ccnavi-git.sh fetch <リモート> <統合先>` をする（プロジェクトの中で）
-- 起点はリモートの最新のデフォルトブランチ（`origin/HEAD` が指すもの）。セッションの頭の `ccnavi-fetch.sh` が
+- 起点はリモートの最新の統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` が控えに書いた名前、
+  無ければデフォルトブランチ＝`origin/HEAD` が指すもの）。セッションの頭の `ccnavi-fetch.sh` が
   ff で進める（ADR-0060）。進められなかったときは「ワークツリーの起点になる ... 」で始まる行が頭に出ているので、
   切る前に理由を片付ける（分岐なら人に合流させてもらう、未コミットならそのツリーの持ち主に聞く）。
   セッション中にリモートが進んだときは `ccnavi-git.sh fetch origin <統合先>` を打ち直す

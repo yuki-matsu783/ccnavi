@@ -170,7 +170,7 @@ class RiskTest(PhaseHarness):
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
         self.assertIn("実績のリスクが高い", said)
         self.assertIn("マージリクエストで見てもらうことを勧めます", said)
-        self.assertIn("--reviewed 1 --chat", said)
+        self.assertIn("ccnavi-review.sh chat 1", said)
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertIn("マージリクエストで見ることを勧める", passed.stdout)

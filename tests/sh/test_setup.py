@@ -114,6 +114,7 @@ DEPLOY_SCRIPTS = (
     "ccnavi-push-approved.sh",
     "ccnavi-approve.sh",
     "ccnavi-fetch.sh",
+    "ccnavi-sync.sh",
     "ccnavi-clean.sh",
     "ccnavi-clean.js",
 )
@@ -1793,6 +1794,43 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
                 self.assertTrue(written.startswith(f"node_modules/\n{existing}\n"), written)
                 self.assertEqual(written.count("index.jsonl"), 1, written)
                 self.assertNotIn(INDEX_HEADER, written)
+
+    def test_does_not_undo_a_negation_of_the_user(self):
+        """利用者が index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
+        for negation in ("!**/index.jsonl", "!index.jsonl", "!docs/index.jsonl", "!*.jsonl"):
+            with self.subTest(negation=negation):
+                before = f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n"
+                self.write_gitignore(before)
+                self.make_git()
+                src = self.make_source()
+                self.run_setup("--deploy", src)  # 配布だけを済ませる
+                self.write_gitignore(before)
+
+                checked = self.run_setup("--deploy", src, "--check")
+                self.assertIn("利用者が除外しているので", checked.stdout)
+                self.assertIn(negation, checked.stdout)
+                self.assertNotIn(INDEX_LINE, section(checked.stdout, ".gitignore に足す"))
+                self.assertEqual(self.gitignore(), before)
+
+                result = self.run_setup("--deploy", src)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("利用者が除外しているので", result.stdout)
+                self.assertEqual(self.gitignore(), before)
+
+    def test_compares_lines_without_cr_and_trailing_spaces(self):
+        """CRLF の .gitignore や行末に空白のある行も、同じ行として数える。"""
+        for line in (f"{INDEX_LINE}\r", f"{INDEX_LINE}  ", "index.jsonl\t"):
+            with self.subTest(line=line):
+                before = f"node_modules/\r\n{line}\n/.ccnavi/bin/{THIS_MACHINE}/\r\n"
+                self.write_gitignore(before)
+                self.make_git()
+                self.run_setup("--deploy", self.make_source())
+                path = os.path.join(self.dir, ".gitignore")
+                with open(path, encoding="utf-8", newline="") as f:
+                    written = f.read()
+                self.assertEqual(written, before)
+                self.assertNotIn(INDEX_HEADER, written)
+                self.assertNotIn("# ccnavi が配る実行ファイル", written)
 
     def test_adds_only_the_index_when_the_build_is_already_ignored(self):
         """実行ファイルの塊だけがある配布先（前の版で入れたもの）には、索引の塊だけを足す。"""

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 6100,
+    "node_id": "PRR_kwDOAbCdEs600006100",
+    "user": {
+      "login": "octo-reviewer",
+      "id": 9001,
+      "type": "User"
+    },
+    "body": "直った",
+    "state": "APPROVED",
+    "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-6100",
+    "pull_request_url": "https://api.github.com/repos/acme/widgets/pulls/42",
+    "submitted_at": "2026-09-29T04:00:00Z",
+    "commit_id": "1111111111111111111111111111111111111111"
+  },
+  {
+    "id": 6101,
+    "node_id": "PRR_kwDOAbCdEs600006101",
+    "user": {
+      "login": "strict-one",
+      "id": 9002,
+      "type": "User"
+    },
+    "body": "取り下げ",
+    "state": "DISMISSED",
+    "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-6101",
+    "pull_request_url": "https://api.github.com/repos/acme/widgets/pulls/42",
+    "submitted_at": "2026-09-29T04:10:00Z",
+    "commit_id": "1111111111111111111111111111111111111111"
+  }
+]

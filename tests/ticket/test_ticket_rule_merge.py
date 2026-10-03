@@ -666,6 +666,96 @@ class ScratchPlace(Workspace):
         self.assertIn(".gitignore", result.stderr)
 
 
+class Eli5Place(Workspace):
+    """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない（ADR-0096）。
+
+    `scratchpad/` と違って追跡される置き場なので、実行前の判定だけでなく、実行後の監視と
+    サブエージェント終了時の検査も外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
+    紛らわしい名前は今までどおり範囲の外として止まる。親のツリーでも子のツリーでも同じ。
+
+    ルールはワークツリーを allow で開ける。
+    """
+
+    # (相対パス, 外すか, なぜ)
+    CASES = (
+        ("wip/eli5/phase-1.html", True, "ELI5 の置き場そのもの"),
+        ("wip/eli5/old/phase-1.html", True, "その下も置き場"),
+        ("wip/eli5x/phase-1.html", False, "前置に続けただけの場所は置き場ではない"),
+        ("wip/design/plan.md", False, "wip/ のほかの場所には広げない"),
+        ("wip/tmp/eli5.html", False, "旧方式の置き場は外さない"),
+        ("docs/wip/eli5/a.html", False, "ルートの直下の wip/ だけ"),
+        ("WIP/eli5/a.html", False, "綴りは区別する。依頼の検査と ready も区別する"),
+    )
+    # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える
+    # （ADR-0097）
+    BACKSLASHED = (
+        "wip\\eli5\\evil.py",
+        "wip/eli5\\evil.py",
+        "wip\\proposals\\todo\\evil.py",
+        "scratchpad\\evil.py",
+    )
+
+    def setUp(self):
+        super().setUp()
+        self.family(parent={"allow": ("src/*",)}, child={"allow": ("src/*",)})
+        self.use_rules(rules_with("allow"))
+
+    def test_pre_tool_use_exempts_the_eli5_place_in_parent_and_child(self):
+        for name, tree in (("親", self.parent_tree), ("子", self.child)):
+            for rel, exempt, why in self.CASES:
+                with self.subTest(tree=name, path=rel, why=why):
+                    result = self.write_hook(tree, rel)
+                    want = "allow" if exempt else "deny"
+                    code = "" if exempt else "DENY_TICKET_SCOPE"
+                    self.assertEqual(self.decision(result), want, self.reason(result))
+                    self.assertEqual(self.last_record().get("code", ""), code)
+
+    @unittest.skipIf(os.name == "nt", "名前に \\ を含むファイルは Windows では作れない")
+    def test_a_backslashed_name_is_not_a_place_anywhere(self):
+        """`wip\\eli5\\evil.py` のような名前は、どの置き場にも見なさない。"""
+        for rel in self.BACKSLASHED:
+            for name, tree in (("親", self.parent_tree), ("子", self.child)):
+                with self.subTest(tree=name, path=rel):
+                    result = self.write_hook(tree, rel)
+                    self.assertEqual(self.decision(result), "deny", self.reason(result))
+                    self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
+        reported = self.after_shell(self.child, "wip\\eli5\\evil.py", session="e-bs")
+        self.assertIn("POST_TICKET_SCOPE", reported.stderr)
+        for rel in self.BACKSLASHED:
+            write(os.path.join(self.child, rel), "x\n")
+        bounced = self.hook("SubagentStop", "", self.child, agent_id="sub-e3")
+        self.assertEqual(bounced.returncode, 2, bounced.stdout + bounced.stderr)
+        for rel in self.BACKSLASHED:
+            self.assertIn(rel, bounced.stderr)
+
+    def test_a_file_named_like_the_place_is_not_the_place(self):
+        result = self.write_hook(self.child, "wip/eli5")
+        self.assertEqual(self.decision(result), "deny", self.reason(result))
+
+    def test_post_tool_use_does_not_report_the_eli5_place(self):
+        exempt = self.after_shell(self.child, "wip/eli5/phase-1.html", session="e-in")
+        self.assertNotIn("POST_TICKET_SCOPE", exempt.stderr, exempt.stderr)
+        other = self.after_shell(self.child, "wip/eli5x/phase-1.html", session="e-out")
+        self.assertIn("POST_TICKET_SCOPE", other.stderr)
+        self.assertIn("wip/eli5x/phase-1.html", other.stderr)
+
+    def test_subagent_stop_leaves_a_committed_eli5_alone(self):
+        rel = "wip/eli5/phase-1.html"
+        write(os.path.join(self.child, *rel.split("/")), "<p>x</p>\n")
+        git(self.child, "add", "--", rel)
+        git(self.child, "commit", "--quiet", "-m", "docs: ELI5")
+        result = self.hook("SubagentStop", "", self.child, agent_id="sub-e1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("POST_TICKET_SCOPE", result.stderr)
+
+    def test_subagent_stop_bounces_a_lookalike_of_the_eli5_place(self):
+        rel = "wip/eli5x/phase-1.html"
+        write(os.path.join(self.child, *rel.split("/")), "<p>x</p>\n")
+        result = self.hook("SubagentStop", "", self.child, agent_id="sub-e2")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn(rel, result.stderr)
+
+
 class Boundaries(Workspace):
     """チケットが効かない場面と、ルールより先に見る点検。
 

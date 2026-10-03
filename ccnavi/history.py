@@ -36,10 +36,10 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import time
 from collections.abc import Iterator
 from typing import TextIO
 
+from . import fsio
 from . import ticket as ticket_mod
 
 # 承認済みの領域の下の置き場と、ファイルの拡張子。
@@ -62,6 +62,8 @@ VIA_CLI = "cli"
 VIA_TERMINAL = "terminal"
 VIA_BOARD = "board"
 VIA_HOOK = "hook"
+#   chrome    Chrome 拡張から押した判断（承認の取り下げなど。ADR-0093 の 8.8）
+VIA_CHROME = "chrome"
 
 # 種類。チケットの置き場が動いたもの。
 KIND_APPROVED = "approved"  # todo → doing（承認）
@@ -71,25 +73,30 @@ KIND_STARTED = "started"  # doing → doing（着手の欄）
 KIND_FINISHED = "finished"  # doing → review か done
 KIND_CANCELLED = "cancelled"  # doing → done（取り消しの欄）
 KIND_SETTLED = "settled"  # review → done（人のレビューが済んだ）
+KIND_WITHDRAWN = "withdrawn"  # doing → todo（承認の取り下げ。ADR-0093 の 8.8）
 # マーカー。親の跡に残す。`from` / `to` は null で、`phase` と `mark` を持つ。
 # フェーズのマーカーを置いた（pending / requested / reviewed / skipped）
 KIND_PHASE_MARK = "phase-mark"
 KIND_PHASE_REOPENED = "phase-reopened"  # フェーズのマーカーを消した（同じ番号に子が足された）
 KIND_PARENT_MARK = "parent-mark"  # 親のマーカーを置いた（ready / close-early / closed）
 
-_state: dict = {"via": VIA_CLI, "failures": []}
+_state: dict = {"via": VIA_CLI, "failures": [], "extra": {}}
 
 
 @contextlib.contextmanager
-def session(via: str, stderr: TextIO | None) -> Iterator[None]:
+def session(via: str, stderr: TextIO | None, actor: str = "", version: str = "") -> Iterator[None]:
     """1 回の起動の間、動かした経路を覚え、抜けるときに書けなかった分を警告として出す。
 
     入れ子になっても外側の経路と溜まりに戻す。テストは同じプロセスで何度も起動するので、
     前の起動の経路や溜まりが次へ漏れないようにする。
+
+    `actor`・`version` は、この間に書く跡の行に足す欄（ADR-0093 の 7.3・8.8。Chrome の
+    承認は、ホストのアカウントと拡張の版を跡に残す）。空なら足さない（手元の跡は前のまま）。
     """
     before = dict(_state)
     _state["via"] = via
     _state["failures"] = []
+    _state["extra"] = {k: v for k, v in (("actor", actor), ("version", version)) if v}
     try:
         yield
     finally:
@@ -103,6 +110,20 @@ def session(via: str, stderr: TextIO | None) -> Iterator[None]:
 def set_via(via: str) -> None:
     """いまの起動の経路を差し替える。`session` の中で、経路が後から分かったときに使う。"""
     _state["via"] = via
+
+
+def set_actor(actor: str) -> None:
+    """いまの起動の間に書く跡の行に、アカウントの欄を足す（ADR-0093 の 8.9。段階 5 の decide）。
+
+    空なら何もしない（跡は前のまま）。`session` を抜けるときに前の値へ戻る。
+    """
+    if actor:
+        _state["extra"] = {**_state["extra"], "actor": actor}
+
+
+def extra() -> dict:
+    """いまの起動の間に跡の行へ足す欄（`actor`・`version`）の写し。"""
+    return dict(_state["extra"])
 
 
 def via() -> str:
@@ -125,8 +146,11 @@ def path(approved_dir: str, ticket_id: str) -> str:
 
 
 def stamp() -> str:
-    """跡に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。機械をまたいでも並べて読める。"""
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    """跡に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。機械をまたいでも並べて読める。
+
+    時計は fsio の差し口（`fsio.clock`）を通る。承認の plan は承認の記録と同じ時刻を書く。
+    """
+    return fsio.utc_stamp()
 
 
 def note(
@@ -150,6 +174,8 @@ def note(
         "to": target,
         "via": via(),
     }
+    # 起動の間の欄（`session` の actor・version）。呼び手が同じ欄を渡せばそちらを採る。
+    entry.update(_state.get("extra") or {})
     for key, value in extra.items():
         if value is None or value == "" or value == [] or value == {}:
             continue
@@ -162,47 +188,39 @@ def note(
             "正は置き場で、履歴は補助"
         )
         return failed
+    template = (
+        f"{ticket_id} の履歴（{kind}）を {target} に書けない"
+        "（{reason}）。状態は動いた。正は置き場で、履歴は補助"
+    )
     try:
         # 知らない型が混ざっても落とさず、綴りにして残す。
         line = json.dumps(entry, ensure_ascii=False, default=str)
     except (TypeError, ValueError) as exc:
         line, failed = "", f"JSON にできない ({exc})"
     else:
-        failed = _append(target, line)
+        # 承認の plan（fsio の控える段）では書けなかったときの枝が走らないので、
+        # 同じ知らせを Writer(FS) が溜められるように添えておく。
+        with fsio.policy(
+            on_fail=fsio.FAIL_HISTORY, message=template, prefix="", undo=(), places=""
+        ):
+            failed = _append(target, line)
     if failed:
-        _state["failures"].append(
-            f"{ticket_id} の履歴（{kind}）を {target} に書けない"
-            f"（{failed}）。状態は動いた。正は置き場で、履歴は補助"
-        )
+        _state["failures"].append(template.replace("{reason}", failed))
     return failed
 
 
+def failed_to_write(message: str) -> None:
+    """跡を書けなかった知らせを溜める（Writer(FS) が、控えた追記を書けなかったときに呼ぶ）。"""
+    _state["failures"].append(message)
+
+
 def _append(target: str, line: str) -> str:
-    """1 行を追記する。書けたら空文字、駄目なら理由。リンクは辿らない。"""
+    """1 行を追記する。書けたら空文字、駄目なら理由。リンクは辿らない（fsio.append）。"""
     # サロゲート（不正な UTF-8 から来た文字）は `\udcff` の形で書く。JSON のエスケープなので、
     # 読めば元の文字列に戻り、何も落とさない。書く前に作るので、書けない理由がここで出ることは無い。
+    # 1 行 1 JSON の区切りは `\n` だけ（fsio.append は改行を書き換えない）。
     data = (line + "\n").encode("utf-8", errors="backslashreplace")
-    try:
-        if os.path.islink(target):
-            return "シンボリックリンクなので書かない"
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        flags = (
-            os.O_APPEND
-            | os.O_CREAT
-            | os.O_WRONLY
-            | getattr(os, "O_NOFOLLOW", 0)
-            # Windows で改行を書き換えさせない（1 行 1 JSON の区切りは `\n` だけ）。
-            | getattr(os, "O_BINARY", 0)
-        )
-        fd = os.open(target, flags, 0o644)
-        try:
-            os.write(fd, data)
-        finally:
-            os.close(fd)
-    except (OSError, ValueError) as exc:
-        # ValueError は綴りに NUL が混ざったときなど。どれも「書けない」として状態は止めない。
-        return str(exc)
-    return ""
+    return fsio.append(target, data)
 
 
 def read(approved_dir: str, ticket_id: str, limit: int = BOARD_LIMIT) -> tuple[list[dict], str]:

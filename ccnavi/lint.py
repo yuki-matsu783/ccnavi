@@ -43,14 +43,18 @@ import io
 import json
 import os
 import re
+from dataclasses import replace
 from typing import TextIO
 
 from . import (
     approval,
+    configsync,
     ctxfile,
     flow,
+    fsio,
     gitcmd,
     gitstate,
+    history,
     hookio,
     judge,
     modes,
@@ -62,6 +66,7 @@ from . import (
     rules,
     selfguard,
     settings,
+    syncstate,
     tree,
     version,
 )
@@ -362,6 +367,8 @@ def check(
     problems.extend(_layer_configs(conf, root))
     problems.extend(_worktree_layers(conf, root))
     problems.extend(_ticket_places(conf, root))
+    problems.extend(_local_settings(root))
+    problems.extend(_sync(conf, root))
     return problems
 
 
@@ -627,7 +634,20 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    approval.align_imported(conf, root, preds)
+    # 統合先の done/ で閉じた識別子（取り込み済みの家族。ADR-0093 の 3.3 の 4）も閉じたものに
+    # 数える。承認の対象から外れる（`approval.waiting`）ので、黙らずに名指しする。
+    done |= approval.integration_closed(conf, root, proposals)
     problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
+    problems.extend(
+        _branch_name_problems(
+            proposals,
+            copies,
+            closed,
+            review,
+            conf.integration_branch or settings.integration_recorded(conf.state),
+        )
+    )
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -706,7 +726,11 @@ def _approval_problems(
     （`approval.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
     """
     pending, revisions = approval.waiting(
-        proposals, copies, closed, review, approval.types_resolver(conf, root, copies)
+        proposals,
+        copies,
+        closed,
+        review,
+        approval.types_resolver(conf, root, copies),
     )
     if not pending and not revisions:
         return []
@@ -867,6 +891,67 @@ def _proposal_problems(
         )
         problems.append(
             Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
+        )
+    return problems
+
+
+def _branch_name_problems(
+    proposals: list, copies: list, closed: list, review: list, integration: str = ""
+) -> list[Problem]:
+    """識別子を親のブランチ名にできるか（ADR-0093 の 3.1。段階 0 なので warn だけ）。
+
+    親のブランチ名は親の識別子そのものにする。そのために次を名指しする。
+
+    - 新規の提案（`todo/` にあって、承認済みでも閉じてもいないもの）の識別子の形
+      （`ticket.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
+    - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
+      ブランチもワークツリーも同じ名前になる
+    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。家族を引くとき、別の親の子と読まれる
+
+    承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
+    `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
+    控えに書いた名前（段階 2b）。どちらも無ければ固定の並びだけを見る。
+    """
+    problems: list[Problem] = []
+    everyone = list(copies) + list(closed) + list(review) + list(proposals)
+    settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
+    said: set[str] = set()
+    for t in proposals:
+        if t.state != ticket_mod.TODO or t.ticket in settled or t.ticket in said:
+            continue
+        said.add(t.ticket)
+        for text in ticket_mod.branch_name_problems(t, integration):
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（ADR-0093）"))
+
+    spellings: dict[str, set[str]] = {}
+    for t in everyone:
+        spellings.setdefault(t.ticket.casefold(), set()).add(t.ticket)
+    for names in spellings.values():
+        if len(names) > 1:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{' と '.join(sorted(names))} は大文字小文字だけが違う。"
+                    "大文字小文字を区別しないファイルシステムでは、ブランチとワークツリーの"
+                    "名前がぶつかる（ADR-0093）",
+                )
+            )
+
+    child = ticket_mod.child_pattern()
+    parents = sorted({t.ticket for t in everyone if not t.is_child})
+    for name in parents:
+        matched = child.match(name)
+        if matched is None:
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{name} は親なのに識別子が子の形（`<親>-<2 桁>`）に当たる。"
+                f"家族を引くとき {matched.group('parent')} の子と読まれる。"
+                "親の識別子の末尾を `-<2 桁>` にしない（ADR-0093）",
+            )
         )
     return problems
 
@@ -1036,6 +1121,285 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
                 )
             )
     return problems
+
+
+def _sync(conf: settings.Settings, root: str) -> list[Problem]:
+    """取り込みの控えと、取り込み済みの家族の権威（ADR-0093 の 3.3・3.5・3.6。段階 2c）。
+
+    - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査 3.5 の 1）
+    - 家族の控えが壊れている・gone・blocked、`present` なのに親のワークツリーが無い: error
+      （その家族は決まらないので、承認も状態の操作も止まる）。閉じた家族は、親のワークツリーが
+      残っていれば info（片付けてよい）、片付いていれば何も言わない（墓標）
+    - 統合先の控えが壊れている・無い・読めない: error（識別子の再利用を確かめられない）
+    - 作業ツリーの層と統合先の控えの層が違う: warn
+    - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn（D28）
+
+    親のワークツリーの外にしか無い写し（移行の検査）は、写しの `blocked` として
+    `_copy_problems` が error で言う。控えの無い家族は、最初の 1 つのほかは何も言わない。
+    """
+    problems = _parent_trees_off_branch(conf, root)
+    fams = syncstate.Families(conf, root)
+    if not fams.active:
+        return problems
+    for repo, name in syncstate.family_names(conf.state):
+        st = fams.standing(name, syncstate.project_of_key(repo))
+        if not st.imported:
+            continue
+        where = f"(sync/{repo}/{name})"
+        hint = " / ".join(syncstate.guidance(root, st))
+        if st.closed:
+            if st.home is not None:
+                problems.append(Problem(SEVERITY_INFO, where, f"{st.stop}。{hint}"))
+        elif st.stop:
+            problems.append(Problem(SEVERITY_ERROR, where, f"{st.stop}。{hint}"))
+        elif st.repo != syncstate.SELF and st.home is not None:
+            problems.extend(_projected_layer_problems(conf, st, where))
+    for repo in syncstate.repos(conf.state):
+        integ = fams.integration(repo)
+        if integ is None:
+            continue
+        where = f"(sync/{repo}/integration)"
+        if integ.broken:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    where,
+                    f"統合先の控えを読めない（{integ.broken}）。閉じた識別子の再利用を確かめられない"
+                    "ので、このリポジトリの新規の提案は承認しない。オンラインで"
+                    f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を打ち直す",
+                )
+            )
+            continue
+        home = root if repo == syncstate.SELF else tree.project_root(conf.projects, repo)
+        if home and os.path.isdir(home):
+            problems.extend(_layer_drift(conf, integ, home, where))
+    return problems
+
+
+def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem]:
+    """名前が親の識別子なのに、HEAD が別のブランチを指す親のワークツリー（3.5 の 1）。"""
+    problems: list[Problem] = []
+    for work in tree.worktrees(root, conf.projects):
+        if not _holds_parent(conf, work):
+            continue
+        branch = tree.branch_of(work.root)
+        if branch == work.name:
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
+                f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
+                f"親のブランチの名前は識別子（{work.name}）で、取り込み（ccnavi-sync.sh）と"
+                "権威は名前の同じブランチだけを見る。閉じるのを待ってから切り替える",
+            )
+        )
+    return problems
+
+
+def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
+    """そのツリーに `ticket: <ツリーの名前>` の親の写しか提案があるか。
+
+    sh の `ccnavi_parent_tree` と同じ見方。
+    """
+    approved = settings.approved_dir(conf, work.root)
+    proposals = os.path.join(work.root, conf.tickets.replace("/", os.sep))
+    for path in (
+        approval.copy_path(approved, work.name),
+        approval.closed_path(approved, work.name),
+        os.path.join(proposals, ticket_mod.TODO, f"{work.name}.md"),
+        os.path.join(proposals, ticket_mod.REVIEW, f"{work.name}.md"),
+    ):
+        if not os.path.isfile(path):
+            continue
+        t, _ = ticket_mod.load(path)
+        if t is not None and t.ticket == work.name and not t.parent:
+            return True
+    return False
+
+
+def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]]:
+    """比べる層のファイル（種類, ツリーからの相対 "/" 区切り）。共通層と自身の層。"""
+    config = f"{home_rel}/{settings.LAYER_CONFIG_DIR}"
+    out = []
+    for kind in settings.LAYER_KINDS:
+        name = settings.LAYER_FILE_NAMES[kind]
+        out.append((kind, f"{config}/{name}"))
+    return out
+
+
+def _common_rel(kind: str) -> str:
+    return f".ccnavi/common/{settings.LAYER_FILE_NAMES[kind]}"
+
+
+def _same_text(a: bytes | None, b: bytes | None) -> bool:
+    if a is None or b is None:
+        return a is b
+    return a.replace(b"\r\n", b"\n") == b.replace(b"\r\n", b"\n")
+
+
+def _read_plain(path: str) -> bytes | None:
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def _layer_drift(
+    conf: settings.Settings, integ: syncstate.Integration, home: str, where: str
+) -> list[Problem]:
+    """作業ツリーの層と、統合先の控えの層（同じ綴り）が違うか（ADR-0093 の 3.4）。
+
+    判定はまだ作業ツリーの層を読む（段階 2c では統合先の控えへ切り替えない）。違いは、統合先に
+    入るまで他の機械と Chrome の判定に効かないという知らせ。
+    """
+    home_rel = fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
+    rels = [rel for _, rel in _layer_files(conf, home_rel)]
+    if integ.repo == syncstate.SELF:
+        rels = [_common_rel(kind) for kind in settings.LAYER_KINDS] + rels
+    problems: list[Problem] = []
+    for rel in rels:
+        snapshot, why = integ.file(rel)
+        if why:
+            problems.append(Problem(SEVERITY_ERROR, where, f"統合先の控えを読めない（{why}）"))
+            continue
+        local = _read_plain(os.path.join(home, *rel.split("/")))
+        if _same_text(local, snapshot):
+            continue
+        if local is None:
+            how = "作業ツリーに無い"
+        elif snapshot is None:
+            how = "統合先に無い"
+        else:
+            how = "中身が違う"
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                where,
+                f"作業ツリーの {rel} が統合先（{integ.branch or '?'}）の控えと違う"
+                f"（{how}）。"
+                "統合先に入るまで、他の機械と Chrome の判定には効かない",
+            )
+        )
+    return problems
+
+
+def _projected_layer_problems(
+    conf: settings.Settings, st: syncstate.Standing, where: str
+) -> list[Problem]:
+    """`P` の上のプロジェクトの層が、統合先から計算した層と違うか（ADR-0093 の D28）。
+
+    計算した層は「プロジェクトの統合先の層（控え）に、ワークスペースの統合先の共通層（控え）を
+    `configsync.projected` で写したもの」。着手のときの configsync と同じく、共通層にある
+    ファイルだけを写し、無いファイルはプロジェクトの側を残す。
+    """
+    selfinteg = syncstate.integration(conf.state, syncstate.SELF)
+    projinteg = syncstate.integration(conf.state, st.repo)
+    if selfinteg is None or projinteg is None or selfinteg.broken or projinteg.broken:
+        return []
+    home_rel = fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
+    problems: list[Problem] = []
+    for kind, rel in _layer_files(conf, home_rel):
+        common, why = selfinteg.file(_common_rel(kind))
+        if why:
+            continue
+        if common is not None:
+            expected: bytes | None = configsync.projected(conf, kind, common)
+        else:
+            expected, why = projinteg.file(rel)
+            if why:
+                continue
+        actual = _read_plain(os.path.join(st.home.root, *rel.split("/")))
+        if _same_text(actual, expected):
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                where,
+                f"親のブランチ {st.family} の上のプロジェクトの層（{rel}）が、統合先の層と"
+                "共通層から計算した層と違う。"
+                "判定は親のブランチの上の層を読まない（ADR-0093 の D28）。"
+                "統合先で直すか、着手で写し直す",
+            )
+        )
+    return problems
+
+
+def family_check(
+    conf: settings.Settings, root: str, family: str, repo: str | None = None
+) -> list[Problem]:
+    """取り込みの後の検査（ADR-0093 の 4.2 の 4。`ccnavi sync check <P> [<リポジトリ>]`）。
+
+    この家族の承認済みチケットを判定し直し（C3）、権威の検査（親のワークツリーの外の写し・
+    決まらない）とあわせて、止める理由（error）を返す。層の食い違い（D28）は warn で返す。
+    error があれば sh が家族の控えを `blocked` にする。`repo` は控えの名前（`self` か
+    プロジェクト名）で、sh が渡す。無ければ控えのあるリポジトリを全部探す。
+    """
+    fams = syncstate.Families(conf, root)
+    project = None if repo is None else syncstate.project_of_key(repo)
+    st = fams.standing_any(family, project)
+    copies, _ = approval.scan(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True)
+    review, _ = approval.scan_review(conf, root)
+
+    def ours(t: ticket_mod.Ticket) -> bool:
+        return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo
+
+    mine = [t for t in copies if ours(t)]
+    index = approval.by_id(copies)
+    problems: list[Problem] = []
+    for t in mine:
+        # 写しごとに判定し直し、error がどの写しのものかを構造で持つ（文面の書式に頼らない）
+        found = [
+            p
+            for p in _copy_problems(root, conf, [t], index, closed)
+            if p.severity == SEVERITY_ERROR
+        ]
+        written = _written_by_chrome(conf, t) if found else None
+        if written is not None:
+            found = [
+                replace(
+                    p, detail=f"Chrome {written} と手元 {version.VERSION} で判定が違う: {p.detail}"
+                )
+                for p in found
+            ]
+        problems.extend(found)
+    # 親のワークツリーの中の読めない写しも止める理由（読めない写しは並びに入らないので、
+    # 判定し直しの対象から黙って落ちる）。
+    if st.home is not None:
+        for _, message in approval.unreadable_copies(conf, st.home.root):
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", message))
+    for t in review:
+        if ours(t) and t.blocked:
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
+    where = f"(sync/{st.repo}/{family})"
+    if st.imported and st.stop and not st.closed:
+        problems.append(Problem(SEVERITY_ERROR, where, st.stop))
+    if st.imported and not st.stop and st.repo != syncstate.SELF and st.home is not None:
+        problems.extend(_projected_layer_problems(conf, st, where))
+    return problems
+
+
+def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | None:
+    """この写しを最後に書いたのが Chrome 拡張なら、その拡張の版（7.3）。そうでなければ None。
+
+    跡の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
+    その後に手元の
+    操作（着手・マーカーなど）の跡があれば、違いが手元の操作から来ることもあるので名指ししない。
+    互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として版を名指しする
+    （止めるかどうかは変えない。家族の控えを `blocked` にするのは sh）。
+    """
+    events, _ = history.read(settings.approved_dir(conf, t.tree_root), t.ticket)
+    if not events:
+        return None
+    last = events[-1]
+    if last.get("via") != history.VIA_CHROME or last.get("kind") not in (
+        history.KIND_APPROVED,
+        history.KIND_REVISED,
+    ):
+        return None
+    return str(last.get("version") or "?")
 
 
 def _files_under(base: str) -> list[str]:
@@ -1585,6 +1949,69 @@ def _project_settings(root: str) -> list[Problem]:
             )
     problems.extend(_bin_path(root, env.get(settings.BIN_ENV)))
     return problems
+
+
+# `.claude/settings.local.json` に置かせない、承認と判定に効く値（ADR-0093 の 3.3 の 6）。
+# 置き場の綴り・プロジェクトの置き場・ccnavi ディレクトリ・控えの置き場（取り込みの控えを読む先）・
+# チケット制御と承認の守りの切り替え・動作モード。例外は統合先の名前（D30 で置き場に決めた）だけ。
+LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
+#
+# 守りと判定の働きを変える値（戻す働き・ccnavi 自身の設定の守り・確かめられないモードの止め・
+# 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、人が端末で打つ sh と
+# 他の機械で同じ家族の守りが別になる。入れないのは、判定の答えを変えない値だけ:
+# 実行ファイルの綴り（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
+# 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、見張りと待ちの秒（`CCNAVI_*_TIMEOUT`・
+# `CCNAVI_LOCK_WAIT`）。
+_LOCAL_FORBIDDEN = (
+    # 置き場の env はもう読まない（置き場は既定に固定）が、置かれたら効いていると
+    # 思い込まないよう、今までどおり知らせる。
+    "CCNAVI_TICKETS_PROPOSAL",
+    "CCNAVI_TICKETS_APPROVED",
+    "CCNAVI_PROJECTS",
+    "CCNAVI_PROJECT_HOME",
+    "CCNAVI_STATE",
+    "CCNAVI_LOG",
+    settings.TICKET_CONTROL_ENV,
+    settings.GUARD_TICKET_APPROVAL_ENV,
+    settings.GUARD_CORE_FILES_ENV,
+    settings.GUARD_UNWATCHED_ENV,
+    settings.RESTORE_IF_DENY_ENV,
+    settings.DENY_REPEAT_ENV,
+    settings.MODE_ENV,
+)
+
+
+def _local_settings(root: str) -> list[Problem]:
+    """`.claude/settings.local.json` の env に、承認に効く値が無いかを見る（ADR-0093 の 3.3 の 6）。
+
+    承認と判定は、置き場の綴りなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
+    手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ効き、Chrome と
+    人が端末で打つ sh には効かないので、同じ家族を別の綴りで読むことになる。
+    例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前の置き場として決めた。D30）。
+    """
+    path = os.path.join(root, LOCAL_SETTINGS)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError) as exc:
+        return [Problem(SEVERITY_WARN, "(project)", f"{LOCAL_SETTINGS} を読めない: {exc}")]
+    env = data.get("env") if isinstance(data, dict) else None
+    if not isinstance(env, dict):
+        return []
+    return [
+        Problem(
+            SEVERITY_ERROR,
+            "(project)",
+            f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
+            "ファイルに置かない（Chrome と端末の sh には効かず、同じ家族を別の綴りで読む）。"
+            f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から渡す。"
+            f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",
+        )
+        for name in _LOCAL_FORBIDDEN
+        if name in env
+    ]
 
 
 def _bin_path(root: str, declared: object) -> list[Problem]:

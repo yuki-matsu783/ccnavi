@@ -69,7 +69,7 @@ from typing import TextIO
 
 import yaml
 
-from . import ctxfile, globmatch, hookio, rules, selfguard, settings, tree
+from . import ctxfile, fsio, globmatch, hookio, rules, selfguard, settings, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
@@ -127,6 +127,119 @@ def child_pattern() -> re.Pattern:
     return _CHILD
 
 
+# 親のブランチ名は親の識別子そのもの（ADR-0093 の 3.1）。識別子を、ブランチ名として安全で、
+# 統合先や issue の番号と紛れない形に寄せる。いまは `--lint` の warn だけで、承認は止めない。
+#
+# 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じ並び）。
+# 大文字小文字を畳んで比べる。`release/*` は識別子に `/` を書けないので、
+# ここでは `release` と `release-*` だけを見る。
+RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
+# issue から決める識別子の形（`i` + 番号）。`issue:` を持つ提案だけが使う。
+_ISSUE_ID = re.compile(r"^i\d+$", re.IGNORECASE)
+# プロジェクトの issue から決める識別子の形（`<プロジェクト名>-i<番号>`。3.1 の 7。段階 5）。
+_PROJECT_ISSUE_ID = re.compile(r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i\d+$", re.IGNORECASE)
+
+
+def issue_identifier(number: int, project: str = "") -> str:
+    """issue の番号から親の識別子を決める（ADR-0093 の 3.1 の 4・7・11）。
+
+    `i` + 4 桁の 0 埋め（5 桁以上はそのまま）。プロジェクトの issue なら頭に
+    `<プロジェクト名>-` を付ける（`web-i0012`）。「issue → 識別子」はこの 1 つだけで、
+    Chrome 拡張も Pyodide の上でこれを呼ぶ。番号が正の整数でなければ ValueError。
+    """
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        raise ValueError(f"issue の番号は正の整数: {number!r}")
+    base = f"i{number:04d}"
+    if not project:
+        return base
+    if not _ID.match(project):
+        raise ValueError(f"プロジェクト名が識別子の形でない: {project!r}")
+    return f"{project}-{base}"
+
+
+def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
+    """新規の提案の識別子が、親のブランチ名の規則に合わないところ（ADR-0093 の 3.1 の 2・5・6）。
+
+    見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのは人に見せる文で、
+    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子（3.1 の 3）と、
+    子の形に当たる親の識別子は、他のチケットと並べて見るので `lint` の側で数える。
+
+    `integration` はその時点の統合先の名前（D30。段階 2b）。環境変数からは読まず、呼び手が
+    渡したときだけ予約に足す。固定の並び（main など）と同じく大文字小文字を畳んで比べる。
+    """
+    name = t.ticket
+    folded = name.casefold()
+    found: list[str] = []
+    if ".." in name:
+        found.append("識別子に `..` を含む。git のブランチ名に使えない")
+    if folded.endswith(".lock"):
+        found.append("識別子が `.lock` で終わる。git のブランチ名に使えない")
+    elif name.endswith("."):
+        found.append("識別子が `.` で終わる。git のブランチ名に使えない")
+    if t.is_child:
+        return found
+    if folded in RESERVED_BRANCH_IDS or folded.startswith("release-"):
+        found.append(
+            "識別子が統合先や保護されたブランチの名前（main・master・develop・release・release-*）"
+            "に当たる。親のブランチ名が統合先と同じになる"
+        )
+    elif integration and folded == integration.casefold():
+        found.append(
+            f"識別子が統合先の名前（{integration}）に当たる。親のブランチ名が統合先と同じになる"
+        )
+    found.extend(_issue_form_problems(t))
+    return found
+
+
+def _issue_form_problems(t: Ticket) -> list[str]:
+    """issue から決める形（`i<番号>`・`<プロジェクト名>-i<番号>`）の識別子が、`issue:` と
+    置き場に合っているか（3.1 の 4・5・7。段階 5 で `<名前>-i<番号>` と番号の一致を足した）。
+
+    形に当たらない識別子（人が付けた名前）は見ない。`issue:` を持っていても人が付けた名前でよい
+    （既に同じ識別子が閉じていて、その issue からは始められないときのフォールバック。8.6）。
+    """
+    name = t.ticket
+    project_form = _PROJECT_ISSUE_ID.match(name)
+    if _ISSUE_ID.match(name):
+        if t.issue is None:
+            return [
+                "`i<番号>` の形は issue から決める識別子なので、`issue:` の無い提案では使わない。"
+                "issue の番号と紛れる"
+            ]
+        expected = "" if t.issue_repo else issue_identifier(t.issue, t.project)
+    elif project_form:
+        if t.issue is None:
+            # 人が付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
+            # 重なりだけを言う
+            # （`fix-i2` のような名前をプロジェクトの外で咎めない。11.9.1 の 17）
+            if t.project and project_form.group("project").casefold() == t.project.casefold():
+                return [
+                    f"`{t.project}-i<番号>` の形はこのプロジェクトの issue から決める識別子と"
+                    "重なるので、"
+                    "`issue:` の無い提案では使わない"
+                ]
+            return []
+        expected = issue_identifier(t.issue, t.project) if t.project and not t.issue_repo else ""
+    else:
+        return []
+    if t.issue_repo:
+        return [
+            f"`issue: {issue_label(t)}` は別のリポジトリの課題。識別子は issue から決める形"
+            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、人が付ける（ADR-0093 の 3.1 の 8）"
+        ]
+    if not expected:
+        return [
+            "`<プロジェクト名>-i<番号>` の形はプロジェクトの issue から決める識別子なので、"
+            "ワークスペースの提案では使わない"
+        ]
+    if name != expected:
+        return [
+            f"識別子が `issue: {t.issue}` から決まる `{expected}` と違う。"
+            "issue から決める形の識別子は番号と置き場（プロジェクト）に合わせる"
+        ]
+    return []
+
+
 # スクリプトだけが書く欄。人もエージェントも書かない。承認済みチケットの側で
 # 行単位に書き換える（`set_fields`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
@@ -181,6 +294,30 @@ def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem
         )
         return None, problems
     return items, problems
+
+
+# 別のリポジトリの課題の綴り（`owner/repo#12`。GitLab の入れ子のグループ `group/sub/proj#12` も）。
+_ISSUE_REF = re.compile(r"^(?P<repo>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)#(?P<number>\d+)$")
+
+
+def _issue_ref(raw) -> tuple[str, int | None]:
+    """課題の綴り。答えは (別のリポジトリの `owner/repo` か空, 番号か None)。"""
+    if isinstance(raw, str):
+        m = _ISSUE_REF.match(raw.strip())
+        if m:
+            repo = m.group("repo")
+            if any(part in (".", "..") for part in repo.split("/")):
+                return "", None
+            number = int(m.group("number"))
+            return repo, (number if number > 0 else None)
+    return "", _issue_number(raw)
+
+
+def issue_label(t: Ticket) -> str:
+    """課題の綴り（`#12`・`owner/repo#12`）。MR の `Closes` と承認の画面が使う。無ければ空。"""
+    if t.issue is None:
+        return ""
+    return f"{t.issue_repo}#{t.issue}"
 
 
 def _issue_number(raw) -> int | None:
@@ -326,6 +463,9 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
+    # issue_repo は、課題が別のリポジトリにあるときのその綴り（`issue: owner/repo#N` の
+    # `owner/repo`。ADR-0093 の 3.1 の 8）。同じリポジトリの課題なら空。
+    issue_repo: str = ""
     # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
     # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
@@ -456,8 +596,9 @@ class Ticket:
 def load(path: str) -> tuple[Ticket | None, list[Problem]]:
     """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
+        # fsio を通す。承認の plan（控える段）の中では、同じ承認で動かしたチケットを動かした後の
+        # 姿で読む（ADR-0093 の 6.2）。
+        text = fsio.load_text(path)
     except FileNotFoundError:
         return None, []
     except OSError as exc:
@@ -595,16 +736,22 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
 
     raw_issue = front.get("issue")
     if raw_issue is not None:
-        number = _issue_number(raw_issue)
+        repo, number = _issue_ref(raw_issue)
         if number is None:
             problems.append(
-                Problem(SEVERITY_ERROR, name, "`issue` は課題の番号（正の整数）で書く。`#12` も可")
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    "`issue` は課題の番号（正の整数）で書く。`#12` も可。"
+                    "別のリポジトリの課題は `owner/repo#12`",
+                )
             )
             return True
         if ticket.is_child:
             problems.append(Problem(SEVERITY_WARN, name, "`issue` は親だけの欄。子では読まない"))
         else:
             ticket.issue = number
+            ticket.issue_repo = repo
     return False
 
 
@@ -774,9 +921,14 @@ def _under(rel: str, place_rel: str) -> bool:
 
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
+
+    `rel` の `\\` は `/` に直さない。呼び手が渡すのは `tree.relative`
+    （`os.sep` を `/` に直した綴り）か
+    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\proposals\\todo\\x.py` という
+    名前のファイル 1 個が置き場の中に見え、範囲を逃れる。置き場の綴り（設定の値）だけは直す。
     """
     base = _fold(place_rel.replace("\\", "/").strip("/"))
-    return bool(base) and _fold(rel.replace("\\", "/")).startswith(base + "/")
+    return bool(base) and _fold(rel).startswith(base + "/")
 
 
 def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -827,8 +979,38 @@ def is_scratch_place(rel: str) -> bool:
     （`/scratchpad/` の先頭の `/` はツリーのルートに掛かる）。`scratchpad` という名前の
     ファイルも置き場ではない（末尾の `/` はディレクトリにしか当たらない）。
     `scratchpadX/` も置き場ではない。
+
+    `\\` は `/` に直さない（`_under` と同じ理由。`scratchpad\\x.py` は置き場ではない）。
     """
-    return rel.replace("\\", "/").startswith(SCRATCH + "/")
+    return rel.startswith(SCRATCH + "/")
+
+
+# ELI5 の HTML の置き場（ADR-0095・ADR-0096）。依頼に添える、変更をやさしく説明した HTML を置く。
+# 名前は固定。設定で動かさない（動かせると、その値をソースの置き場に向けるだけで範囲を迂回できる）。
+ELI5 = "wip/eli5"
+
+
+def is_eli5_place(rel: str) -> bool:
+    """ツリーのルートからの相対パスが、ELI5 の HTML の置き場（`wip/eli5/`）の下にあるか。
+
+    チケットの範囲を当てない（ADR-0096）。ELI5 はレビューの依頼に必ず添える材料で、親の範囲に
+    毎回 `wip/eli5/*` を書かせると、書き忘れた親は依頼の手前で止まる。ここは `wip/` の下なので
+    `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
+    `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
+
+    `scratchpad/` と違って git が追跡する置き場なので、実行後の監視（`post.ScopeGuard.finding`）と
+    サブエージェント終了時の検査（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
+    実行前に通った書き込みがコミットのあとで範囲の外として咎められる。
+
+    綴りの大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
+    （`git ls-files -- wip`）も区別して `wip/` を見るので、区別しない側に広げない。
+
+    `\\` は `/` に直さない。呼び手の綴りは `tree.relative`（`os.sep` を `/` に直したもの）か
+    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
+    名前のファイル 1 個が置き場に
+    見え、範囲を逃れ、しかも `ready` の片付け（`git ls-files -- wip`）にも掛からない。
+    """
+    return rel.startswith(ELI5 + "/")
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -851,8 +1033,15 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     だから外さない。実行前に通ったものが実行後に咎められる形は残るが、咎められる
     のは「そのリポジトリで `scratchpad/` が追跡されている」ときだけで、それは本当に
     知らせるべきことになる。
+
+    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後の監視と
+    サブエージェント終了時の検査も同じく外す（ADR-0096）。
     """
-    return is_ticket_place(rel, tickets_rel, approved_rel) or is_scratch_place(rel)
+    return (
+        is_ticket_place(rel, tickets_rel, approved_rel)
+        or is_scratch_place(rel)
+        or is_eli5_place(rel)
+    )
 
 
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:

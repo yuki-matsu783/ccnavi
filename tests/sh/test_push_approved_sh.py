@@ -530,10 +530,19 @@ class PushApprovedTest(Workspace):
 
     # ---- 1.2・1.3 引数と置き場
 
-    def test_takes_no_arguments_and_needs_the_workspace(self):
+    def test_takes_only_parent_ids_and_needs_the_workspace(self):
         self.assertEqual(self.push("--help").returncode, 0)
-        wrong = self.push("i0001")
-        self.assertEqual(wrong.returncode, 2, wrong.stdout + wrong.stderr)
+        for word in ("-x", "../i0001", "a/b", ""):
+            wrong = self.push(word)
+            self.assertEqual(wrong.returncode, 2, word + wrong.stdout + wrong.stderr)
+        # 取り込み済みでない家族の名指しは運ばない（今のまま、人がコミットする）。
+        tree = self.worktree("i0001")
+        self.place(tree)
+        named = self.push("i0001")
+        self.assertEqual(named.returncode, 0, named.stdout + named.stderr)
+        self.assertIn("取り込み済みの家族でない", named.stdout)
+        self.assertTrue(self.dirty(tree, APPROVED))
+        self.assertEqual(self.remote_head("i0001"), "")
         outside = os.path.join(self._tmp.name, "elsewhere")
         os.makedirs(outside)
         lost = self.push(cwd=outside)

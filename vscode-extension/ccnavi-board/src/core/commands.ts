@@ -40,7 +40,7 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 
 /**
  * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
- * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文と承認済みチケットに写る中身。preview の `digest`）、
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身。preview の `digest`）、
  * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
  * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
@@ -134,7 +134,23 @@ export function reviewedPrompt(
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
+ * `parents` を渡すとその家族だけを運ぶ（ADR-0093 の 4.6。取り込み済みの家族だけが送られ、
+ * そうでない家族は今どおり人がコミットする）。
  */
-export function pushApprovedCommand(root: string): string {
-  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}`;
+export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {
+  const names = parents.map((p) => ` ${shellQuote(p)}`).join("");
+  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}${names}`;
+}
+
+/**
+ * `ccnavi c1 family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `c1 1` が無ければ
+ * 空文字（古い実行ファイル）。行末の CR は落とす
+ */
+export function c1TargetOf(stdout: string): string {
+  const lines = stdout.split("\n").map((line) => line.replace(/\r$/, ""));
+  if (lines[0] !== "c1 1") {
+    return "";
+  }
+  const found = lines.find((line) => line.startsWith("target "));
+  return found === undefined ? "" : found.slice("target ".length).trim();
 }

@@ -3,7 +3,7 @@ type: guide
 title: 診断ログを書く
 description: sh、Python、TypeScript で診断ログを書くときの決まり。形式、置き場、レベル
 tags: [records, state]
-keywords: [診断ログ, logger, sh, Python, TypeScript, logfmt, ccnavi-common.sh, diaglog]
+keywords: [診断ログ, ログ, logger, sh, Python, TypeScript, logfmt, ccnavi-common.sh, diaglog]
 ---
 
 # 診断ログを書く

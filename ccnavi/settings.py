@@ -84,6 +84,15 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # 添えるか（repeat）。既定は 3。判定は変わらず、文面と人への報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
+# INTEGRATION_ENV は統合先の名前（ADR-0093 の D30）。`done/` と層と置き場の綴りを読むブランチで、
+# 親のブランチはここから切る。**ccnavi はこの環境変数を読まない。** 読むのは sh
+# （`ccnavi-sync.sh`）で、sh が環境変数か `.claude/settings.local.json` の `env` から決め、
+# 要る所へ `--integration-branch` で渡す。settings.local.json の `env` は Claude Code が
+# 起こしたプロセスにしか効かないので、人が端末で打つ sh のために、その値だけを
+# `sync paths` が読んで返す（integration_local）。
+INTEGRATION_ENV = "CCNAVI_INTEGRATION_BRANCH"
+# 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
+LOCAL_CLAUDE_SETTINGS = os.path.join(".claude", "settings.local.json")
 
 # own_project は ccnavi 自身のソースツリーを見分ける目印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -352,6 +361,9 @@ class Settings:
     # 共通層の種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
     # 編集中の層の種類を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
+    # integration_branch は統合先の名前（ADR-0093 の D30）。環境変数からは読まず、
+    # `--integration-branch` で渡されたときだけ入る。いまは識別子の予約（3.1 の 5）の検査が読む。
+    integration_branch: str = ""
 
     @property
     def tickets_enabled(self) -> bool:
@@ -543,3 +555,48 @@ def _resolve_bin(root: str, path: str) -> str:
         if not full.endswith(suffix) and os.path.exists(full + suffix):
             return full + suffix
     return full
+
+
+def integration_local(root: str) -> str:
+    """`.claude/settings.local.json` の `env` に書かれた統合先の名前（ADR-0093 の D30）。
+
+    環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。人が端末で打つ sh には
+    settings.local.json の `env` が効かないので、JSON を読む役（D33）をここが持つ。
+    ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先に落ちる）。
+    """
+    try:
+        with open(os.path.join(root, LOCAL_CLAUDE_SETTINGS), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return ""
+    env = data.get("env") if isinstance(data, dict) else None
+    value = env.get(INTEGRATION_ENV) if isinstance(env, dict) else None
+    if not isinstance(value, str):
+        return ""
+    # 1 行で返す契約（D33）。改行を含む値は使えないので空に落とす。
+    return "" if ("\n" in value or "\r" in value) else value.strip()
+
+
+def integration_recorded(state: str) -> str:
+    """`ccnavi-sync.sh` が統合先の控えに書いた統合先の名前（ADR-0093 の D30。段階 2b のレビュー）。
+
+    `<控えの置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目。D33）。控えが無い・
+    読めない・途中にシンボリックリンクがあるときは空（既定の予約だけになる）。環境変数は読まない。
+    控えの中のリンクは辿らない（写すときに落としてあり、読む側でも辿らない決まり）。
+    """
+    if not state:
+        return ""
+    path = state
+    for part in ("sync", "self", "integration", "head"):
+        path = os.path.join(path, part)
+        if os.path.islink(path):
+            return ""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                key, _, value = line.rstrip("\r\n").partition(" ")
+                if key == "branch":
+                    return value.strip()
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return ""

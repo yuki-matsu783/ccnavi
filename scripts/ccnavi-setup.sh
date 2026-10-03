@@ -111,13 +111,15 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
 # ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
 # 配らないと案内どおりに打っても届かない。
-# ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。
+# ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh は人が打つ取り込み
+# （分かれた親のブランチの merge、消えた親のブランチの確かめ、控えの書き出し。ADR-0093 の 4.2）。
+# ccnavi-git.sh の拒否の文面がこれを案内するので、配らないと案内どおりに打っても届かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを畳む前に生成物を消す 1 本。Windows では
 # node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して渡す。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # 追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順でも最後に置く。途中で落ちたときに、
 # hook が起動するものだけが在って代わりに通る sh が無い形を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -169,7 +171,8 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
 .ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
---docs の索引（**/index.jsonl）は、配布先の .gitignore に足す。
+--docs の索引（**/index.jsonl）は、配布先の .gitignore に足す（index.jsonl を否定する
+行があれば足さない）。
 
 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）は既定に
 固定で、env では動かない（ADR-0084）。既存の env に CCNAVI_PROJECTS・CCNAVI_PROJECT_HOME・
@@ -761,6 +764,9 @@ fi
 # 配布先では索引が作られない。実行ファイルと同じ回に `**/index.jsonl` も足す。見出しは
 # 実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが読めなくなる。
 # `/` を含まない `index.jsonl` もどの深さにも当たるので、それが既にあれば足さない。
+# `index.jsonl` を否定する行（`!**/index.jsonl`、`!docs/index.jsonl` など）があれば、利用者が
+# 索引を追跡すると決めている。後ろに足すと git は後の行を勝たせるので、その否定を打ち消して
+# しまう。足さずに、そう言う（揃っていない、には数えない）。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_LINE="**/index.jsonl"
@@ -768,10 +774,19 @@ INDEX_IGNORE_LINE="**/index.jsonl"
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
+# 利用者が index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
+ignore_index_negated=""
+# .gitignore の行を、比べる形で出す。CRLF の `\r` と行末の空白を落とす（git も行末の空白は
+# 読まない）。無ければ何も出さない。
+gitignore_lines() {
+	if [ -f "$root/.gitignore" ]; then
+		sed 's/[[:space:]]*$//' "$root/.gitignore"
+	fi
+}
 if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 	ignored_already() {
 		for spelling in "$@"; do
-			if [ -f "$root/.gitignore" ] && grep -qxF "$spelling" "$root/.gitignore"; then
+			if gitignore_lines | grep -qxF "$spelling"; then
 				return 0
 			fi
 		done
@@ -781,7 +796,11 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_bin_todo="/$BUILD_ROOT/$built/
 "
 	fi
-	if ! ignored_already "$INDEX_IGNORE_LINE" "index.jsonl"; then
+	negated=$(gitignore_lines | grep -E '^!.*(index|\*)\.jsonl$' || true)
+	if [ -n "$negated" ]; then
+		ignore_index_negated="$negated
+"
+	elif ! ignored_already "$INDEX_IGNORE_LINE" "index.jsonl"; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
@@ -916,6 +935,10 @@ report_deploy() {
 	if [ -n "$ignore_todo" ]; then
 		printf '%s:\n' "$3"
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
+	fi
+	if [ -n "$ignore_index_negated" ]; then
+		printf '.gitignore に index.jsonl を否定する行があり、利用者が除外しているので %s は足さない:\n' "$INDEX_IGNORE_LINE"
+		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
 		printf '%s:\n' "$4"
@@ -1319,7 +1342,7 @@ if [ "$deploy_work" = yes ]; then
 				# もとから在る行と、ここで足す塊を、空行 1 つで分ける。
 				printf '\n'
 			fi
-			if ! { [ -f "$root/.gitignore" ] && grep -qxF "$1" "$root/.gitignore"; }; then
+			if ! gitignore_lines | grep -qxF "$1"; then
 				printf '%s\n' "$1"
 			fi
 			printf '%s' "$2"
@@ -1379,6 +1402,9 @@ for name in $DEPLOY_SCRIPTS; do
 			;;
 		ccnavi-fetch.sh)
 			why="セッションの頭の取り込み"
+			;;
+		ccnavi-sync.sh)
+			why="人が打つ取り込みと、親のブランチが消えたかの確かめ"
 			;;
 		ccnavi-clean.sh | ccnavi-clean.js)
 			why="ワークツリーを畳む前に生成物を消す"

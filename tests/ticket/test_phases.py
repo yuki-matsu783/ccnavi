@@ -826,7 +826,10 @@ class PhaseTest(PhaseHarness):
         self.assertTrue(text.startswith("レビューで残った指摘（i0001 のフェーズ 2）\n\n"))
         self.assertIn("u/7#t1", text)
         self.assertNotIn("u/7#t0", text)
-        self.assertEqual(self.confirm(fixture, 2).returncode, 0)
+        # レビュー済みのフェーズに confirm を重ねない（ADR-0093 の 11.8.1 の決定 B）
+        again = self.confirm(fixture, 2)
+        self.assertEqual(again.returncode, 1)
+        self.assertIn("フェーズ 2 はレビュー済み", again.stderr)
 
     # ---- 7. Draft を外す（ready）と、人が締める（close-early）
 
@@ -1153,13 +1156,13 @@ class ChatReviewTest(PhaseHarness):
         said = self.chat_phase()
         # 告知は push も request も言わない。言うのは「見てもらって待て」と開け方。
         self.assertIn("差分を見てもらって", said)
-        self.assertIn("--reviewed 1 --chat", said)
+        self.assertIn("ccnavi-review.sh chat 1", said)
         self.assertNotIn("request --phase", said)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
         # レビューが要るフェーズなので、mr のときと同じに止まる。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
-        self.assertIn("--reviewed 1 --chat", self.reason(spawn))
+        self.assertIn("ccnavi-review.sh chat 1", self.reason(spawn))
         # n と答えればマーカーは置かれない。
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="n\n")
         self.assertNotEqual(refused.returncode, 0)
@@ -1354,7 +1357,7 @@ class ChatReviewTest(PhaseHarness):
         self.commit_parent("close 02")
         self.merge("i0001-02")
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
-        self.assertIn("--reviewed 2 --chat", said)
+        self.assertIn("ccnavi-review.sh chat 2", said)
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "2.reviewed"))

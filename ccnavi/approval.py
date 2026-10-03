@@ -38,16 +38,13 @@
 
 from __future__ import annotations
 
-import errno
 import hashlib
-import io
 import json
 import os
-import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import flow, fsio, history, modes, phasetypes, rules, settings, tree, workflow
+from . import flow, fsio, history, phasetypes, rules, settings, syncstate, tree, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -92,27 +89,52 @@ def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Tic
 def _load_dir(
     directory: str, require_record: bool = False
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
+    found, unread = _load_dir_detail(directory, require_record)
+    return found, [message for _, message in unread]
+
+
+def _load_dir_detail(
+    directory: str, require_record: bool = False
+) -> tuple[list[ticket_mod.Ticket], list[tuple[str, str]]]:
+    """`_load_dir` の中身。読めなかったものを (パス, 説明) で返す（置き場ごとならパスは置き場）。"""
     try:
-        names = sorted(os.listdir(directory))
+        # fsio を通す。承認の plan（控える段）の中では、同じ承認で動かした後の置き場を読む。
+        names = sorted(fsio.listdir(directory))
     except FileNotFoundError:
         return [], []
     except OSError as exc:
-        return [], [f"承認済みチケットの置き場を読めない ({exc})"]
-    found, notes = [], []
+        return [], [(directory, f"承認済みチケットの置き場を読めない ({exc})")]
+    found: list[ticket_mod.Ticket] = []
+    unread: list[tuple[str, str]] = []
     for name in names:
         if not name.endswith(".md"):
             continue
         path = os.path.join(directory, name)
         ticket, reason = load_copy(path, require_record)
         if ticket is None:
-            notes.append(f"承認済みチケット {path} を読めない（{reason}）")
+            unread.append((path, f"承認済みチケット {path} を読めない（{reason}）"))
             continue
         if ticket.ticket != name[:-3]:
-            notes.append(f"承認済みチケット {path} の識別子 {ticket.ticket} がファイル名と違う")
+            unread.append(
+                (path, f"承認済みチケット {path} の識別子 {ticket.ticket} がファイル名と違う")
+            )
             continue
         ticket.state = state_of(directory, ticket)
         found.append(ticket)
-    return found, notes
+    return found, unread
+
+
+def unreadable_copies(conf: settings.Settings, tree_root: str) -> list[tuple[str, str]]:
+    """そのツリーの読めない承認済みチケット（作業中・閉じた・レビュー待ち）を (パス, 説明) で。"""
+    approved = settings.approved_dir(conf, tree_root)
+    out: list[tuple[str, str]] = []
+    for directory, require in (
+        (os.path.join(approved, DOING_DIR), False),
+        (os.path.join(approved, DONE_DIR), False),
+        (os.path.join(tree_root, conf.tickets.replace("/", os.sep), ticket_mod.REVIEW), True),
+    ):
+        out.extend(_load_dir_detail(directory, require)[1])
+    return out
 
 
 def state_of(directory: str, ticket: ticket_mod.Ticket) -> str:
@@ -232,13 +254,168 @@ def scan(
     if not closed:
         # 判定が読むのは作業中の側だけ。閉じたものに印は要らない。
         mark_blocked(conf, kept)
+        mark_imported(conf, root, kept)
     return kept, notes
 
 
 def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """レビュー待ちのチケット。権威のあるツリーの側だけを残す（`scan` と同じ規則）。"""
     found, notes = review_all(conf, root)
-    return _authoritative(found, _everything(conf, root, review=found)), notes
+    kept = _authoritative(found, _everything(conf, root, review=found))
+    mark_imported(conf, root, kept)
+    return kept, notes
+
+
+def mark_imported(
+    conf: settings.Settings,
+    root: str,
+    kept: list[ticket_mod.Ticket],
+    fams: syncstate.Families | None = None,
+) -> None:
+    """取り込み済みの家族の写しに、信じられない理由の印を付ける（ADR-0093 の 3.3）。
+
+    取り込み済みの家族は、家族の控えがある家族。
+
+    権威は親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
+    写しだけ。次の写しは読むが信じない（`blocked`。判定は範囲を効かせず止める）。
+
+    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、`present` なのに親のワークツリーが
+      無い）
+    - 家族が閉じている（統合先の `done/` が権威）
+    - 親のワークツリーの外にしか無い写し（元ツリーに未コミットで残った写しなど。3.5）
+
+    **写しの並びは変えない（落とさない）。** 落とすと「在る」ことで止まっていたもの（承認待ちの
+    重複、開いた子のある親を閉じない）が通るようになる。印を足すだけなので、控えの無い家族と、
+    控えがあっても親のワークツリーの写しだけの家族では、答えは前と同じ。すでに印（`mark_blocked`）が
+    あれば、理由を連ねる（前の理由を消さない）。
+    """
+    fams = fams or syncstate.Families(conf, root)
+    if not fams.active:
+        return
+    for t in kept:
+        st = family_standing(conf, root, t, fams)
+        if not st.imported:
+            continue
+        why = st.stop
+        if not why and st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
+            why = outside_reason(st, t)
+        if why and why not in t.blocked:
+            t.blocked = f"{t.blocked} / {why}" if t.blocked else why
+
+
+def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
+    """親のワークツリーの外にしか無い写しを信じない理由と、人が運ぶ手順（ADR-0093 の 3.5）。"""
+    return (
+        f"親のブランチ {st.family} のワークツリーの外"
+        f"（{t.tree or 'ワークスペースルート'}）にしか無い写し。"
+        "取り込み済みの家族では親のブランチの写しだけが本物。人がその写しを親のワークツリー"
+        f"（.claude/worktrees/{st.family}）の同じ置き場へ運んでコミットと push をし、"
+        "元の写しを消す"
+    )
+
+
+def family_standing(
+    conf: settings.Settings,
+    root: str,
+    t: ticket_mod.Ticket,
+    fams: syncstate.Families | None = None,
+) -> syncstate.Standing:
+    """このチケットの家族の立ち位置（`syncstate.Families.standing`）。家族は `parent` か自分。"""
+    fams = fams or syncstate.Families(conf, root)
+    return fams.standing(t.parent or t.ticket, t.project or "")
+
+
+def family_problems(
+    conf: settings.Settings,
+    root: str,
+    t: ticket_mod.Ticket,
+    fams: syncstate.Families | None = None,
+) -> list[rules.Problem]:
+    """取り込み済みの家族の提案を承認しない理由（ADR-0093 の 3.3・3.6・8.4）。
+
+    家族が決まらない・閉じているなら承認しない。提案は親のブランチの上で書く（3.2）ので、
+    親のワークツリーの外にある提案も承認しない。控えの無い家族は何も言わない。
+    """
+    fams = fams or syncstate.Families(conf, root)
+    if not fams.active:
+        return []
+    st = family_standing(conf, root, t, fams)
+    if not st.imported:
+        return []
+    if st.stop:
+        hint = " / ".join(syncstate.guidance(root, st))
+        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"{st.stop}。承認しない。{hint}")]
+    if st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"提案が親のブランチ {st.family} のワークツリーの外"
+                f"（{t.tree or 'ワークスペースルート'}）にある。取り込み済みの家族の提案は"
+                f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
+                "承認を頼む",
+            )
+        ]
+    return []
+
+
+def integration_problems(
+    conf: settings.Settings,
+    root: str,
+    t: ticket_mod.Ticket,
+    fams: syncstate.Families | None = None,
+) -> list[rules.Problem]:
+    """新規の提案の識別子を統合先の `done/` と比べる（ADR-0093 の 3.3 の 4）。
+
+    開いた家族でも統合先の `done/` は常に一緒に読む。古い統合先から切った `P` で、閉じた
+    識別子の再利用が新規の承認として通らないように。統合先の `done/` は控え（D26）から、
+    家族の控えの有無に依らず、取り込んだ跡のあるリポジトリ（`sync/<リポジトリ>/`）の全提案に当てる。
+    控えが壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
+    承認しない（黙って通さない）。一度も取り込んでいないリポジトリは何も言わない（今のまま）。
+    """
+    fams = fams or syncstate.Families(conf, root)
+    if not fams.active:
+        return []
+    repo = syncstate.repo_key(t.project)
+    integ = fams.integration(repo)
+    if integ is None:
+        return []
+    sync = settings.script_command(root, "ccnavi-sync.sh")
+    ids, why = fams.done(repo)
+    if why:
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"統合先の控え（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
+                "再利用を確かめられないので決まらない。承認しない。オンラインで"
+                f" '{sync}' を打って統合先を取り込み直す",
+            )
+        ]
+    if t.ticket in ids:
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"{t.ticket} は統合先（{integ.branch or '?'}）の done/ で閉じている。"
+                "閉じた識別子を新規に承認しない。識別子を変えて出し直す",
+            )
+        ]
+    return []
+
+
+def integration_closed(
+    conf: settings.Settings, root: str, proposals: list[ticket_mod.Ticket]
+) -> set[str]:
+    """統合先の控えの `done/` に同じ識別子がある新規の提案（3.3 の 4）。"""
+    fams = syncstate.Families(conf, root)
+    if not fams.active:
+        return set()
+    return {
+        t.ticket
+        for t in proposals
+        if t.state == ticket_mod.TODO and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
+    }
 
 
 def _everything(
@@ -311,7 +488,12 @@ def _by_id(found: list[ticket_mod.Ticket]) -> dict[str, list[ticket_mod.Ticket]]
 
 
 def home_dir(
-    conf: settings.Settings, root: str, ticket_id: str, parent: str, fallback_root: str = ""
+    conf: settings.Settings,
+    root: str,
+    ticket_id: str,
+    parent: str,
+    fallback_root: str = "",
+    project: str | None = None,
 ) -> str:
     """この識別子の承認済みチケットを置くツリーの置き場。
 
@@ -323,8 +505,17 @@ def home_dir(
     ワークスペースルート。すでに在る側を先に見るのは、マーカーと記録を承認済みチケットと
     同じ場所に置くため。親のワークツリーは承認のあとに作られることがあり、そこを
     先に見ると、承認済みチケットとマーカーが別のツリーに分かれる。
+
+    `project` はチケットのリポジトリ（ワークスペース自身なら空）。分からなければ None で、
+    取り込みの控えのあるリポジトリを全部探す（同じ識別子が 2 つのリポジトリにあれば決めない）。
     """
     home = parent or ticket_id
+    # 取り込み済みの家族は親のブランチ（親のワークツリー）だけに書く（ADR-0093 の 3.4）。
+    # 元ツリーに未コミットで書く形（ADR-0073）はやめる。決まらない家族は、ここへ来る前に
+    # 状態の操作と承認が止める。
+    st = syncstate.standing_any(conf, root, home, project)
+    if st.imported and st.home is not None and not st.stop:
+        return settings.approved_dir(conf, st.home.root)
     named = ""
     holders: list[tuple[tree.Tree, str]] = []
     for t in trees(conf, root):
@@ -332,9 +523,9 @@ def home_dir(
         if t.name == home:
             named = where
         if (
-            os.path.exists(copy_path(where, ticket_id))
-            or os.path.exists(closed_path(where, ticket_id))
-            or os.path.exists(review_path(t.root, conf.tickets, ticket_id))
+            fsio.exists(copy_path(where, ticket_id))
+            or fsio.exists(closed_path(where, ticket_id))
+            or fsio.exists(review_path(t.root, conf.tickets, ticket_id))
         ):
             holders.append((t, where))
     for wanted in (lambda t: t.name == home, lambda t: t.is_main, lambda t: True):
@@ -344,6 +535,32 @@ def home_dir(
     if named:
         return named
     return settings.approved_dir(conf, fallback_root or tree.main_tree(root).root)
+
+
+def source_path(t: ticket_mod.Ticket) -> str:
+    """提案の、そのリポジトリ（ツリー）からの相対パス。区切りは "/"（ADR-0093 の D22）。
+
+    ツリーの外にある（ツリーが分からない）ときだけ、綴りをそのまま返す。
+    """
+    if t.tree_root and t.path:
+        try:
+            rel = tree.relative(tree.Tree(t.tree, t.tree_root), t.path)
+        except ValueError:
+            # Windows で別のドライブ（relpath が相対を作れない）。綴りのまま返す。
+            return t.path
+        if rel and not rel.startswith("../") and rel != "..":
+            return rel
+    return t.path
+
+
+def source_branch(t: ticket_mod.Ticket) -> str:
+    """提案が乗っていたブランチの名前（ADR-0093 の D22）。
+
+    HEAD がブランチを指していなければ（切り離した・壊れた・読めない）ツリーの名前
+    （ワークスペースルートなら空）。Changes の `per_branch` の名前と同じ決め方。
+    """
+    found = tree.branch_of(t.tree_root) if t.tree_root else None
+    return found or t.tree
 
 
 def admit(
@@ -357,18 +574,22 @@ def admit(
 
     承認の記録（`ccnavi_approved`）を足して書き、元の提案を消す。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
+
+    `source_tree` は提案が乗っていたブランチの名前、`source_path` はそのリポジトリからの
+    相対パス（ADR-0093 の D22）。手元と Chrome で写しの中身を同じにするため。前は
+    ツリーの名前と絶対パスを書いていた。読む側（`load_copy`）はどちらの形も読み、判定は
+    この 2 つを読まない（`diagnose` が見せるだけ）。
     """
     meta = {
         "approved_at": approved_at,
         "source_tree": source_tree,
-        "source_path": ticket.path,
+        "source_path": source_path(ticket),
     }
     target = copy_path(approved_dir, ticket.ticket)
     # 人の書いた行（コメント、`|` のブロック）を保つ。読み直して書き出さず、承認の記録の
     # 欄と、置き場から決まった `project:`（frontmatter に無ければ）だけを足す。
     try:
-        with open(ticket.path, encoding="utf-8") as f:
-            text = f.read()
+        text = fsio.load_text(ticket.path)
     except OSError as exc:
         return f"提案を読めない ({exc})"
     if ticket.project and not ticket.declared_project:
@@ -378,11 +599,15 @@ def admit(
     failed = _write(target, ticket_mod.insert_front(text, ticket_mod.APPROVAL_KEY, meta))
     if failed:
         return failed
-    try:
-        os.remove(ticket.path)
-    except OSError as exc:
+    # 消せなければ書いた側を消して戻す。承認の plan では落ちたときの枝が走らないので、
+    # 同じ戻し方を Writer(FS) へ添える。置けたと数えるのは消せたとき。
+    with fsio.policy(
+        message="提案を todo/ から動かせない ({reason})", undo=(target,), places=ticket.ticket
+    ):
+        failed = fsio.unlink(ticket.path)
+    if failed:
         fsio.remove(target)
-        return f"提案を todo/ から動かせない ({exc})"
+        return f"提案を todo/ から動かせない ({failed})"
     history.note(
         approved_dir,
         ticket.ticket,
@@ -433,7 +658,7 @@ def carry_flow(
         os.path.join(approved_dir, flow.FLOWS_DIR, f"{proposal.ticket}{flow.SUFFIX}")
     )
     try:
-        if not os.path.lexists(source):
+        if not fsio.lexists(source):
             return []
         if os.path.normcase(os.path.realpath(source)) == os.path.normcase(os.path.realpath(target)):
             return []
@@ -442,7 +667,7 @@ def carry_flow(
     raw, why = flow.read_bytes(source, source_root)
     if raw is None:
         return [f"{proposal.ticket} のフロー {source} を運ばなかった: {why}。人が確かめて置き直す"]
-    if os.path.lexists(target):
+    if fsio.lexists(target):
         held, _ = flow.read_bytes(target)
         if held != raw:
             return [
@@ -451,18 +676,19 @@ def carry_flow(
             ]
         fsio.remove(source)
         return []
-    try:
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        with open(target, "xb") as f:
-            f.write(raw)
-    except OSError as exc:
-        return [f"{proposal.ticket} のフローを {target} へ運べない ({exc})。{source} に残っている"]
-    try:
-        os.remove(source)
-    except OSError as exc:
-        return [
-            f"{proposal.ticket} のフローを {target} へ写した。元の {source} は消せなかった ({exc})"
-        ]
+    # 落ちたときの行は承認の plan でも同じものを出せるよう、書き込みに添える（`FAIL_LINE`）。
+    cannot = f"{proposal.ticket} のフローを {target} へ運べない ({{reason}})。{source} に残っている"
+    with fsio.policy(message=cannot):
+        failed = fsio.write_new(target, raw)
+    if failed:
+        return [cannot.replace("{reason}", failed)]
+    kept = (
+        f"{proposal.ticket} のフローを {target} へ写した。元の {source} は消せなかった ({{reason}})"
+    )
+    with fsio.policy(message=kept):
+        failed = fsio.unlink(source)
+    if failed:
+        return [kept.replace("{reason}", failed)]
     return [f"{proposal.ticket} のフローを {source} から {target} へ動かした"]
 
 
@@ -479,26 +705,12 @@ def move_file(source: str, target: str) -> str:
     写して消す側へ流すのは EXDEV に限る。rename が他の理由（元が無い、など）で失敗した
     ときまで流すと、写せずに戻す手が、その間に別のプロセスが置いた行き先を消す。
     """
-    if os.path.exists(target):
+    if fsio.exists(target):
         return f"チケットを動かせない ({source} → {target}: 行き先に既に在る)"
-    try:
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        os.rename(source, target)
-        return ""
-    except OSError as exc:
-        if exc.errno != errno.EXDEV:
-            return f"チケットを動かせない ({source} → {target}: {exc})"
-    try:
-        shutil.copy2(source, target)
-    except OSError as exc:
-        fsio.remove(target)
-        return f"チケットを動かせない ({source} → {target}: {exc})"
-    try:
-        os.remove(source)
-    except OSError as exc:
-        fsio.remove(target)
-        return f"チケットを動かせない ({source} → {target}: {exc})"
-    return ""
+    message = f"チケットを動かせない ({source} → {target}: " + "{reason})"
+    with fsio.policy(message=message):
+        failed = fsio.move(source, target)
+    return message.replace("{reason}", failed) if failed else ""
 
 
 def settle_review(
@@ -514,7 +726,7 @@ def settle_review(
     for t in sorted(review, key=lambda x: x.ticket):
         if t.parent != parent_id or t.phase not in numbers:
             continue
-        where = home_dir(conf, root, t.ticket, parent_id)
+        where = home_dir(conf, root, t.ticket, parent_id, project=t.project)
         failed = move_file(t.path, closed_path(where, t.ticket))
         if failed:
             return moved, failed
@@ -553,7 +765,7 @@ def followup(
     本文には指摘を写す。返すのは識別子と、起こせなかった理由。
     """
     ident = next_child_id(conf, root, parent.ticket)
-    where = home_dir(conf, root, parent.ticket, "")
+    where = home_dir(conf, root, parent.ticket, "", project=parent.project)
     front: dict = {
         "version": ticket_mod.VERSION,
         "ticket": ident,
@@ -609,7 +821,11 @@ def followup(
         phase=phase_no,
         followup_of=[c.ticket for c in children],
     )
-    clear_marks(where, parent.ticket, phase_no)
+    cleared = clear_marks(where, parent.ticket, phase_no)
+    for warning in cleared.warnings:
+        history.failed_to_write(warning)
+    if cleared.failed:
+        return ident, cleared.failed
     return ident, ""
 
 
@@ -628,6 +844,9 @@ PRED_SCATTERED = "scattered"
 PRED_SELF = "self"  # 自分自身
 PRED_ANCESTOR = "ancestor"  # 自分の親（子は親の中の作業で、親は子より先に閉じない）
 PRED_CYCLE = "cycle"  # 先行を辿ると自分に戻る
+# 取り込み済みの家族の先行で、その家族が決まらない・親のブランチの写しに無い
+# （ADR-0093 の 3.3 の 5）。
+PRED_UNDECIDED = "undecided"
 # 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
 PRED_WAITING = (ticket_mod.TODO, ticket_mod.DOING, ticket_mod.REVIEW)
 PRED_LABELS = {
@@ -640,6 +859,7 @@ PRED_LABELS = {
     PRED_SELF: "自分自身",
     PRED_ANCESTOR: "自分の親",
     PRED_CYCLE: "先行を辿ると自分に戻る",
+    PRED_UNDECIDED: "家族が決まらない",
 }
 
 
@@ -691,7 +911,60 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
     review, _ = scan_review(conf, root)
     closed, _ = scan(conf, root, closed=True)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    return predecessor_pool_of(open_copies, review, closed, proposals)
+    pool = predecessor_pool_of(open_copies, review, closed, proposals)
+    align_imported(conf, root, pool)
+    return pool
+
+
+def align_imported(
+    conf: settings.Settings, root: str, pool: dict[str, list[ticket_mod.Ticket]]
+) -> None:
+    """取り込み済みの家族の先行を、その家族の親のブランチの写しで読み直す（ADR-0093 の 3.3 の 5）。
+
+    Chrome は先行を、参照の閉包の家族の `P` から引く。手元もそれに揃える。ただし**通る向きには
+    読み替えない**（段階 2c は締める向きだけ）。
+
+    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、親のワークツリーが無い）:
+      「家族が決まらない」にする（切り直しを案内する）
+    - 親のワークツリーにその識別子の写しが無い: 同じく「家族が決まらない」（親のブランチの外に
+      しか無い）
+    - 親のワークツリーの写しが 1 つで、閉じていない（作業中・レビュー待ち・承認待ち）: それを採る
+    - 親のワークツリーの写しで閉じている、写しが 2 つ以上: 前の池のまま（手元の全ツリーから
+      引いた答え。前の池で満たしていなければ満たさないまま）
+    - 閉じた家族（統合先の `done/` に親の写しがある）と控えの無い家族: 前の池のまま
+    """
+    fams = syncstate.Families(conf, root)
+    if not fams.active:
+        return
+    for ident, hits in list(pool.items()):
+        if not hits:
+            continue
+        st = family_standing(conf, root, hits[0], fams)
+        if not st.imported or st.closed:
+            continue
+        if st.stop:
+            pool[ident] = [_undecided(hits[0], st.stop)]
+            continue
+        mine = [
+            h
+            for h in hits
+            if st.home is not None and syncstate.same_tree(h.tree_root, st.home.root)
+        ]
+        if not mine:
+            pool[ident] = [
+                _undecided(
+                    hits[0],
+                    f"親のブランチ {st.family} のワークツリーに {ident} の写しが無い"
+                    f"（{', '.join(h.tree or '(ワークスペースルート)' for h in hits)} にしか無い）",
+                )
+            ]
+        elif len(mine) == 1 and mine[0].state != PRED_DONE:
+            pool[ident] = mine
+
+
+def _undecided(sample: ticket_mod.Ticket, why: str) -> ticket_mod.Ticket:
+    """先行の池に置く「家族が決まらない」の印。理由は `blocked` に入れて運ぶ。"""
+    return replace(sample, state=PRED_UNDECIDED, blocked=why)
 
 
 def predecessor_states(
@@ -714,6 +987,8 @@ def predecessor_states(
                 continue
         if not hits:
             out.append(Predecessor(ident, PRED_MISSING))
+        elif len(hits) == 1 and hits[0].state == PRED_UNDECIDED:
+            out.append(Predecessor(ident, PRED_UNDECIDED, hits[0].blocked))
         elif len(hits) > 1:
             where = ", ".join(f"{h.tree or '(ワークスペースルート)'}:{h.state}" for h in hits)
             out.append(Predecessor(ident, PRED_SCATTERED, where))
@@ -804,6 +1079,16 @@ def predecessor_problems(
                     "predecessors から外して出し直す",
                 )
             )
+        elif p.state == PRED_UNDECIDED:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"先行 {p.ticket} の家族が決まらない（{p.where}）。取り込み済みの家族の先行は"
+                    "その親のブランチの写しで確かめる。親のワークツリーを切り直すか、"
+                    "'ccnavi-sync.sh' で取り込み直してから出し直す",
+                )
+            )
         elif p.state == PRED_MISSING:
             problems.append(
                 rules.Problem(
@@ -850,27 +1135,121 @@ def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict
     return failed
 
 
-def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
-    """このフェーズのマーカーを全部消す。消せた種類を返す。"""
-    cleared = []
-    for kind in MARKS:
+@dataclass
+class Cleared:
+    """`clear_marks` の答え。`kinds` は消せた種類（控える段では消す種類）。
+
+    `failed` は reviewed を消せなかった理由（空でなければ呼び手は止める）。`warnings` は
+    ほかの種類を消せなかった知らせ（残っていて効く）。
+    """
+
+    kinds: list[str]
+    failed: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
+# 消す順。reviewed を先に消す。消せなければ止めるので、ほかの種類に手を付ける前に決める。
+_CLEAR_ORDER = (MARK_REVIEWED,) + tuple(k for k in MARKS if k != MARK_REVIEWED)
+
+
+def clear_marks(
+    approved_dir: str,
+    parent: str,
+    phase: int,
+    announce=None,
+) -> Cleared:
+    """このフェーズのマーカーを全部消す（同じ番号に子を足した。REQ-TKT-21）。
+
+    reviewed を消せなければ止める（`failed`）。残ればフェーズは済んだまま読まれ、足した子を
+    見ないまま先へ進めてしまう（判定を締める向き。ADR-0093 の 11.3）。ほかの種類は
+    消せなくても止めず、残っていて効くと言う（`warnings`）。跡（phase-reopened の
+    `cleared`）には実際に消せた種類だけを書く。
+
+    控える段（承認の plan）では、消す書き込みに同じ扱いを添え、跡と見せる行は Writer(FS) が
+    書けた種類で書く（`fsio.Call`）。`announce` は消せた種類から見せる行を作る関数。
+    """
+    stage = fsio.current_stage()
+    present = [k for k in _CLEAR_ORDER if fsio.lexists(mark_path(approved_dir, parent, phase, k))]
+    if stage is not None:
+        group = stage.new_group()
+        for kind in present:
+            path = mark_path(approved_dir, parent, phase, kind)
+            with fsio.policy(group=group, tag=kind, **_clear_policy(path, phase, kind)):
+                fsio.unlink(path)
+        kinds = [k for k in MARKS if k in present]
+        if kinds:
+            # 見え方（Changes）には全部消えた後の跡を載せる。ディスクへは Call が書く。
+            with fsio.view_only():
+                _note_reopened(approved_dir, parent, phase, kinds)
+
+        # 跡の時刻と経路は並べたときのもの（書く時に時計を読み直すと、Changes と食い違う）。
+        at, via = fsio.stamp(), history.via()
+
+        def run(done: set[str]) -> list[str]:
+            cleared = [k for k in MARKS if k in done]
+            if cleared:
+                before = history.via()
+                history.set_via(via)
+                try:
+                    with fsio.clock(at):
+                        _note_reopened(approved_dir, parent, phase, cleared)
+                finally:
+                    history.set_via(before)
+            return announce(cleared) if announce is not None and cleared else []
+
+        planned = announce(kinds) if announce is not None and kinds else []
+        stage.items.append(fsio.Call(run, group, planned))
+        return Cleared(kinds)
+    cleared: list[str] = []
+    warnings: list[str] = []
+    failed = ""
+    for kind in present:
         path = mark_path(approved_dir, parent, phase, kind)
-        try:
-            os.remove(path)
+        reason = fsio.unlink(path)
+        if not reason:
             cleared.append(kind)
-        except OSError:
             continue
+        text = fsio.failure_text(fsio.Policy(**_clear_policy(path, phase, kind)), reason)
+        if kind == MARK_REVIEWED:
+            failed = text
+            break
+        warnings.append(text)
+    cleared = [k for k in MARKS if k in cleared]
     if cleared:
-        history.note(
-            approved_dir,
-            parent,
-            history.KIND_PHASE_REOPENED,
-            None,
-            None,
-            phase=phase,
-            cleared=cleared,
-        )
-    return cleared
+        _note_reopened(approved_dir, parent, phase, cleared)
+    return Cleared(cleared, failed, warnings)
+
+
+def _clear_policy(path: str, phase: int, kind: str) -> dict:
+    if kind == MARK_REVIEWED:
+        return {
+            "on_fail": fsio.FAIL_STOP,
+            "prefix": "",
+            "message": (
+                f"フェーズ {phase} のレビュー済みのマーカー {path} を消せない（{{reason}}）。"
+                "残るとフェーズは済んだまま読まれるので、ここで止める。人がマーカーを消す"
+            ),
+        }
+    return {
+        "on_fail": fsio.FAIL_WARN,
+        "prefix": "",
+        "message": (
+            f"フェーズ {phase} のマーカー {path} を消せなかった（{{reason}}）。"
+            f"{kind} は残っていて効く"
+        ),
+    }
+
+
+def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str]) -> None:
+    history.note(
+        approved_dir,
+        parent,
+        history.KIND_PHASE_REOPENED,
+        None,
+        None,
+        phase=phase,
+        cleared=cleared,
+    )
 
 
 # 親ごとのマーカー。フェーズの番号に付かないもの。
@@ -1052,66 +1431,6 @@ class Candidate:
         )
 
 
-def approve(
-    stdin: TextIO,
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    rule_set: rules.RuleSet,
-    root: str,
-    only: list[str] | None = None,
-) -> int:
-    """未承認の提案をまとめて人に見せ、承認されたら承認済みチケットを置く。
-
-    エージェントではなく人が端末から打つ経路。提案を書き直す道は用意しない。
-    チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
-    承認した人が承認したものの作者になる。
-
-    承認の対象は「いま承認待ちのもの全部」。親が 1 本、その下の子が複数、という形が普通。
-    子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
-
-    親の改版（計画の変更）も一緒に承認の対象に入る。承認済みチケットは動かないのが原則で、改版はその
-    唯一の例外（設計 9.7）。変えられるのは `plan` と `feedback` だけ。
-
-    `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
-    ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
-    落ちるものを通してはいけない。だから、承認待ちに無い識別子が混じっていたら
-    何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の
-    改版が承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
-    絞った対象に入らない親を持つ子は「親が承認されていない」で落ちる。
-    """
-    gathered = gather(stderr, conf, root, only)
-    if gathered.refused:
-        return 1
-    if gathered.nothing_pending:
-        stdout.write("承認待ちのチケットは無い。\n")
-        # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
-        # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
-        return 1 if gathered.broken else 0
-    if not gathered.batch:
-        return 1
-
-    if gathered.note:
-        stdout.write(gathered.note + "\n\n")
-    stdout.write(gathered.text + "\n\n")
-    stdout.write(f"この {len(gathered.batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
-    stdout.flush()
-    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
-        stderr.write("ccnavi: 承認しなかった\n")
-        return 1
-    code = _apply(stdout, stderr, root, conf, gathered.batch, now()).code
-    if code == 0 and gathered.rejected:
-        # 承認の対象の一部が落ちたときは、通ったぶんを置いてから失敗で終わる。置いたので
-        # 繰り返してよく、落ちたものは上で名指ししてある。成功で終わると、
-        # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
-        stderr.write(
-            f"ccnavi: {len(gathered.rejected)} 件は承認の対象にしなかった。"
-            "直して出し直すこと（通ったぶんの承認済みチケットは置いた）\n"
-        )
-        return 1
-    return code
-
-
 # 承認の JSON の版。`--approve --preview --json` と `--approve --yes … --json` が名乗る。
 # VS Code のボード拡張が読み、知らない番号なら読まずに版の違いを言う。
 APPROVE_VERSION = 1
@@ -1226,33 +1545,7 @@ def gather(
     return Gathered(batch, rejected, texts, pool, False, broken, "", note)
 
 
-def preview(
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    root: str,
-    as_json: bool,
-    only: list[str] | None = None,
-) -> int:
-    """`--approve --preview`。一覧を見せるだけで、承認済みチケットは置かない。端末の壁は要らない。
-
-    JSON の形は README「承認の JSON」。一覧が空でも 0 で返す。拡張は `batch` が空なら
-    「承認待ちは無い」と出す。`only` はボードの絞り込みで見えている分（`--approve` と
-    同じ意味）。見せる一覧と承認する対象が同じ絞りを通るようにする。
-    """
-    gathered = gather(stderr, conf, root, only)
-    if gathered.refused:
-        return 1
-    if not as_json:
-        if gathered.note:
-            stdout.write(gathered.note + "\n\n")
-        stdout.write(gathered.text + "\n")
-        return 0
-    stdout.write(json.dumps(_preview_body(root, gathered), ensure_ascii=False) + "\n")
-    return 0
-
-
-def _preview_body(root: str, gathered: Gathered) -> dict:
+def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
     """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。"""
     return {
         "version": APPROVE_VERSION,
@@ -1260,7 +1553,7 @@ def _preview_body(root: str, gathered: Gathered) -> dict:
         "generated_at": now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
-        "digest": approval_digest(gathered.text, gathered.batch),
+        "digest": digest,
         "rejected": [
             {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
             for t, complaints in gathered.rejected
@@ -1285,57 +1578,7 @@ class Verdict:
     text: str
 
 
-def verify(
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    root: str,
-    as_json: bool,
-    only: list[str] | None = None,
-) -> int:
-    """`--approve --preview --verify`。いま `--approve` を打てば通るかを、置かずに返す。
-
-    エージェントが提案を書いたあと、人に承認を頼む前に自分で確かめるための枝
-    （REQ-APV-13）。置かないところも端末を求めないところも `--preview` と同じで、
-    違うのは「通るかどうか」を終了コードと本文で言うこと。
-
-    答えを `--preview` 自身に持たせない理由。読む側（VS Code のボード拡張）は 0 以外を
-    失敗として扱うので、承認の対象にしない提案が 1 件あるだけで一覧を出せなくなる。
-    見せる枝と確かめる枝を分け、判定そのものは `gather` の 1 か所に置く。
-
-    通る = 指定したもの（指定が無ければ承認待ち全部）が、そのまま承認の対象に入る。
-    次のどれかがあれば通らない。
-
-    - 絞りが通らない（承認待ちに無い識別子、親の改版を外した子）
-    - 承認待ちが 1 件も無い。承認を頼む前の確認としては失敗で、
-      提案の置き場を間違えた回がここに出る
-    - 承認の対象にしない提案がある（`rejected`）
-
-    落とさないものが 2 つある。どちらも `--approve` が落とさないもので、ここで落とすと
-    「確かめは『いいえ』なのに承認は通る」という食い違いになる。
-
-    - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
-      書けない場所が残るのは伝える値打ちがあるから、その行に添えて見せる
-    - 読めない提案（`problems`）。走査は絞る前の全ツリーを見るので、他のセッションの
-      書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。黙らせはせず、
-      件数と綴りを本文に出す（自分が書いた 1 本かもしれないので）
-
-    返すのは「はい」（0）か「いいえ」（`modes.EXIT_ANSWER_NO`）。使い方と設定の誤りで返す
-    1 とは分ける。同じ値にすると、打ち方を間違えた回と提案が落ちる回が読む側から
-    区別できず、直すものが無いのに提案を直しに行くことになる。
-    """
-    gathered = gather(stderr, conf, root, only)
-    verdict = _verdict(gathered, conf.tickets)
-    if as_json:
-        body = _preview_body(root, gathered)
-        body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
-        stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-    else:
-        stdout.write(verdict.text)
-    return modes.EXIT_OK if verdict.ok else modes.EXIT_ANSWER_NO
-
-
-def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
+def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは読み替えるだけ。"""
     head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
     # 読めなかったものは、落ちた枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
@@ -1411,26 +1654,140 @@ def _note_line(note: str) -> str:
     return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
 
 
-def approval_digest(text: str, batch: list[Candidate]) -> str:
-    """承認の指紋。承認画面の本文と承認済みチケットに写る中身の SHA-256 の 16 進（小文字）。
+def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | None = None) -> str:
+    """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに写る中身の
+    SHA-256 の 16 進（小文字）。
 
     ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
     見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
     本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
-    本文、知らない frontmatter の欄）は見せたあとに書き換えられる。だから、本文に続けて
-    束のチケットを順に書き出した中身も覆う。
+    本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
 
-    書き出した中身は承認のときに書くもの（`_apply` の `write_copy` / `revise_copy`）と
-    同じ組み立てで、承認の記録の欄（`ccnavi_approved`）だけを除く。記録は承認した時刻を
-    持つので、入れると呼ぶたびに指紋が変わる。本文も呼ぶたびに変わる中身を持たない。
+    **判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）で覆う。** 提案だけでなく、
+    判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の控えのどれかが見せたあとに
+    変われば、指紋が変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
+    入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
+    （`<ブランチ>:<相対パス>` → 中身の指紋）。
+
+    束のチケットの写る中身（`_carried`）も残して覆う。読んだ中身から決まるものだが、読みの
+    記録（`fsio.reading`）を通らない読みが紛れても、写る中身の変化は取りこぼさないように。
 
     部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
     区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
     本文は生の制御文字（`\\x00` も）を素通しするので、どの文字も「中身に出ない」とは言えない。
+    読んだ中身の部分は `<鍵>\\n<中身の指紋>`（指紋は 16 進の固定長なので、最後の改行で切れる）。
     """
     parts = [text] + [_carried(cand) for cand in batch]
+    if read is not None:
+        parts += [f"{key}\n{digest}" for key, digest in sorted(read.items())]
     lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[str, str]:
+    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す（ADR-0093 の 6.2）。
+
+    鍵は `<リポジトリ>:<ブランチ>:<ツリーからの相対パス>`（"/" 区切り）。リポジトリは
+    ワークスペース自身なら `self`、プロジェクトならその名前（控えの名前と同じ。ブランチ名が
+    リポジトリをまたいで重なっても鍵がぶつからない。git の ref に `:` は使えない）。
+    ブランチはそのツリーの HEAD が指すブランチ名（読めなければツリーの名前。ワークスペースルートの
+    名前は空）で、`Changes.per_branch` と同じ決め方。ツリーは承認済みチケットを持ちうるもの全部
+    （`trees`）で、最長一致。鍵に使ったツリーの HEAD の中身も `<リポジトリ>:<ブランチ>:(HEAD)` で
+    入れる（切り離した HEAD の sha が変わればツリーの名前の鍵は同じでも指紋が変わる）。
+    控えの置き場の下は、取り込みの控え（`sync/`）だけを `(控え):<相対パス>` で
+    入れ、ほかの控え（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
+    変わりうる）。ワークスペースの外は絶対パスのまま。
+    """
+    # 読みの控えの綴りは行き着く先（`fsio.note_read`）なので、比べる側も行き着く先に揃えてから
+    # 大文字小文字を畳む（macOS の /tmp のようなリンクを経たルート、Windows の綴りの揺れ）。
+    held = sorted(
+        ((_real(t.root), t) for t in trees(conf, root)), key=lambda x: len(x[0]), reverse=True
+    )
+    folded_roots = [(_folded(real), real, t) for real, t in held]
+    state_real = _real(conf.state) if conf.state else ""
+    state = _folded(state_real) if state_real else ""
+    names: dict[str, str] = {}
+    out: dict[str, str] = {}
+    for path, digest in seen.items():
+        folded = _folded(path)
+        if state and (folded == state or folded.startswith(state + os.sep)):
+            rel = os.path.relpath(path, state_real).replace(os.sep, "/")
+            if rel.split("/", 1)[0] == syncstate.SYNC_DIR:
+                out[f"(控え):{rel}"] = digest
+            continue
+        owner = next(
+            (
+                (real, t)
+                for key, real, t in folded_roots
+                if folded == key or folded.startswith(key + os.sep)
+            ),
+            None,
+        )
+        if owner is None:
+            out[f"(外):{fsio.slashed(path)}"] = digest
+            continue
+        real, t = owner
+        if real not in names:
+            prefix = f"{syncstate.repo_key(t.project)}:{tree.branch_of(t.root) or t.name}"
+            names[real] = prefix
+            head = tree.head_text(t.root)
+            out[f"{prefix}:(HEAD)"] = fsio.content_digest(head) if head is not None else "-"
+        rel = os.path.relpath(path, real).replace(os.sep, "/")
+        out[f"{names[real]}:{rel}"] = digest
+    return out
+
+
+# 判定の置き場と働きを決める設定（`settings.load` と Claude Code の設定）の読み先。
+_SETTINGS_FILES = (
+    "pyproject.toml",
+    settings.LOCAL_FILE,
+    os.path.join(".claude", "settings.json"),
+    settings.LOCAL_CLAUDE_SETTINGS,
+)
+# 承認の判定に効く設定の値（環境変数からも来るので、ファイルの中身とは別に値そのものを入れる）。
+# 置き場の綴りとチケット制御だけ。控えの置き場（`state`）は入れない（取り込みの控えは中身で
+# `(控え):` に入る。置き場の綴りだけが違う起動で見せ直しにならないように）。モードと承認の守りは
+# 承認の答えを変えない（端末を求めるかどうか）ので入れない。
+_SETTINGS_VALUES = ("tickets", "approved", "projects", "project_home")
+
+
+def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
+    """判定が読んだ設定（ADR-0093 の 6.2 の read_set に足す）。
+
+    `settings.load` が読むファイル（`pyproject.toml`・`ccnavi.settings.local.json`）と
+    Claude Code の設定（`.claude/settings.json`・`.claude/settings.local.json`）の中身を
+    `(設定):<相対パス>` で、判定に効く値（置き場の綴り・チケット制御など。環境変数から来るもの）を
+    `(設定値):<名前>` で入れる。
+    見せたあとに置き場の綴りや設定が変われば、同じ画面でも指紋が変わる。
+    """
+    out: dict[str, str] = {}
+    for rel in _SETTINGS_FILES:
+        try:
+            with open(os.path.join(root, rel), "rb") as f:
+                out[f"(設定):{rel.replace(os.sep, '/')}"] = fsio.content_digest(f.read())
+        except OSError:
+            out[f"(設定):{rel.replace(os.sep, '/')}"] = fsio.READ_ABSENT
+    for name in _SETTINGS_VALUES:
+        value = str(getattr(conf, name, "") or "")
+        if value and os.path.isabs(value):
+            inside = os.path.relpath(value, root)
+            if not inside.startswith(".."):
+                value = inside.replace(os.sep, "/")
+        out[f"(設定値):{name}"] = fsio.content_digest(value)
+    # チケット制御は綴り（空・enable）ではなく効いているかで入れる。
+    out["(設定値):ticket_control"] = fsio.content_digest(str(conf.tickets_enabled))
+    return out
+
+
+def _real(path: str) -> str:
+    try:
+        return os.path.realpath(path)
+    except OSError:
+        return os.path.abspath(path)
+
+
+def _folded(path: str) -> str:
+    return os.path.normcase(os.path.normpath(path))
 
 
 def _carried(cand: Candidate) -> str:
@@ -1465,114 +1822,7 @@ def _batch_entry(cand: Candidate) -> dict:
     }
 
 
-def approve_yes(
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    root: str,
-    expected: list[str],
-    as_json: bool,
-    only: list[str] | None = None,
-    digest: str = "",
-) -> int:
-    """`--approve --yes <識別子,…> --digest <指紋> [<絞り>...]`。拡張のオーバーレイで押した承認。
-
-    端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
-    拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
-    ものを承認する道を塞ぐため。識別子に加えて、見せた承認画面の本文と承認済みチケットに
-    写る中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
-    画面に出ない欄（`issue` など）が書き換われば承認しない。
-    指紋が無ければ承認しない。
-
-    引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
-    「そのとき掛けていた絞り」（`--approve --preview` に渡したものと同じ）。分けないと検査が
-    素通りする。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
-    絞りは preview と同じものを通し、比べるのは「その絞りで今できる一覧」と「見せた識別子」。
-    """
-    wanted = sorted({s.strip() for s in expected if s.strip()})
-    narrowed = [s.strip() for s in (only or []) if s.strip()]
-    shown = digest.strip()
-    if not shown:
-        stderr.write(
-            "ccnavi: --yes には --digest（見せた承認画面の本文と承認済みチケットに写る中身の"
-            "指紋）が要る\n"
-        )
-        return 1
-    gathered = gather(stderr, conf, root, narrowed)
-    # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
-    # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる。
-    now_shown = gather(stderr, conf, root) if gathered.refused else gathered
-    current = now_shown.identifiers
-    current_digest = approval_digest(now_shown.text, now_shown.batch)
-    if wanted != current or shown.lower() != current_digest:
-        if as_json:
-            body = {
-                "version": APPROVE_VERSION,
-                "mismatch": {
-                    "expected": wanted,
-                    "current": current,
-                    "digest": {"expected": digest, "current": current_digest},
-                },
-            }
-            stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-        if wanted != current:
-            stderr.write(
-                "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
-                f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
-                "見直してから承認する\n"
-            )
-        else:
-            stderr.write(
-                "ccnavi: 見せた承認画面の本文と承認済みチケットに写る中身が、今のものと違う"
-                "（識別子は同じで、提案の中身が変わった）。見直してから承認する\n"
-            )
-        return 1
-    if not gathered.batch:
-        stderr.write("ccnavi: 承認するものが無い\n")
-        return 1
-
-    lines = io.StringIO()
-    applied = _apply(lines, stderr, root, conf, gathered.batch, now())
-    if applied.code != 0:
-        # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。黙って失敗を
-        # 返すと、人は「何も起きていない」と読む（README「承認の JSON」の `partial`）。
-        if as_json:
-            body = {
-                "version": APPROVE_VERSION,
-                "partial": {
-                    "placed": applied.placed,
-                    "ticket": applied.stopped_at,
-                    "reason": applied.reason,
-                    # 止まるまでに出た行（マーカーを消した、改版した）。端末は stdout で見えるが、
-                    # 拡張はこの JSON しか見ないので、同じものを渡す。
-                    "lines": [line for line in lines.getvalue().splitlines() if line.strip()],
-                },
-            }
-            stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-        else:
-            stdout.write(lines.getvalue())
-        return applied.code
-    tickets = [c.ticket for c in gathered.batch]
-    revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = _approved_text(tickets, revisions, root)
-    if not as_json:
-        stdout.write(lines.getvalue())
-        return 0
-    body = {
-        "version": APPROVE_VERSION,
-        "approved": [t.ticket for t in tickets],
-        "copies": [
-            copy_path(home_dir(conf, root, t.ticket, t.parent, t.tree_root), t.ticket)
-            for t in tickets
-        ],
-        "lines": [line for line in lines.getvalue().splitlines() if line.strip()],
-        "prompt": prompt,
-    }
-    stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-    return 0
-
-
-def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
+def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
     from . import reasons
 
     return reasons.approved(tickets, revisions, root)
@@ -1691,7 +1941,7 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     # 消えた承認済みチケットの分も残す。1 回読めなかっただけで「知らない」に戻すと、
     # 次の回に同じ承認をもう一度伝えることになる。
     _write_known(stderr, path, {**known, **marks})
-    return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
+    return approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
 def candidates(
@@ -1722,6 +1972,8 @@ def candidates(
     cache: dict[str, dict | None] = {}
     # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
+    # 家族の立ち位置と統合先の控え（ADR-0093 の 3.3）。1 回の承認で 1 度ずつだけ読む。
+    fams = syncstate.Families(conf, root)
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
         name = project_of(t, pool)
@@ -1733,6 +1985,7 @@ def candidates(
         current = open_index[t.ticket]
         types = types_for(t)
         complaints = _workflow_field(t) + revision_problems(root, conf, t, current, types)
+        complaints += family_problems(conf, root, t, fams)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -1756,6 +2009,8 @@ def candidates(
         complaints, overflow = validate(t, pool, types)
         complaints += _workflow_field(t)
         complaints += project_problems(t, pool, conf)
+        complaints += family_problems(conf, root, t, fams)
+        complaints += integration_problems(conf, root, t, fams)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
             if parent is not None:
@@ -1818,92 +2073,146 @@ class Applied:
     reason: str = ""
 
 
-def _apply(
-    stdout: TextIO,
-    stderr: TextIO,
+def _reopened_line(parent: str, phase: int):
+    def announce(kinds: list[str]) -> list[str]:
+        return [
+            f"  {parent} のフェーズ {phase} のマーカー（{', '.join(kinds)}）を消した。"
+            "全部閉じたらレビューをもう一度頼むことになる"
+        ]
+
+    return announce
+
+
+@dataclass
+class Planned:
+    """承認の書き込みを並べたもの。`stopped` は途中で止まった（識別子, 理由）。止まらなければ None。
+
+    止まったときも、そこまでに並べた分は書く（前と同じく、置いたものは戻さない）。
+    """
+
+    stage: fsio.Stage
+    stopped: tuple[str, str] | None
+
+
+def plan_batch(root: str, conf: settings.Settings, batch: list[Candidate], stamp: str) -> Planned:
+    """承認の書き込みを、ディスクに書かずに並べる。時刻は `stamp` に固定する。
+
+    書き込みを並べる（ここ、ADR-0093 の 6.2 の plan）と、並べたものを書く
+    （`core.write_fs`、Writer(FS)）の 2 段。Chrome は同じ plan の結果を 1 コミットにする。
+    承認の対象の順に、改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。
+    """
+    with fsio.staging() as stage, fsio.clock(stamp):
+        stopped = _apply_steps(stage, root, conf, batch, stamp)
+    return Planned(stage, stopped)
+
+
+def _apply_steps(
+    stage: fsio.Stage,
     root: str,
     conf: settings.Settings,
     batch: list[Candidate],
     stamp: str,
-) -> Applied:
-    """承認された対象を承認済みチケットに書く。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
+) -> tuple[str, str] | None:
+    """`plan_batch` の中身。書き込みは fsio の控える段に積み、見せる行も同じ並びに積む。
+
+    書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
+    控える段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
+    """
     from . import phase
 
-    placed: list[str] = []
     for cand in batch:
         t = cand.ticket
-        if cand.is_revision and cand.current is not None:
-            where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
-            failed = revise_copy(where, cand.current, t, stamp, cand.plans_feedback, cand.types)
+        with fsio.policy(
+            on_fail=fsio.FAIL_STOP,
+            ticket=t.ticket,
+            message="{reason}",
+            prefix="",
+            undo=(),
+            places="",
+            group=0,
+        ):
+            if cand.is_revision and cand.current is not None:
+                where = home_dir(conf, root, t.ticket, t.parent, t.tree_root, project=t.project)
+                with fsio.policy(places=t.ticket):
+                    failed = revise_copy(
+                        where, cand.current, t, stamp, cand.plans_feedback, cand.types
+                    )
+                if failed:
+                    return t.ticket, failed
+                removing = "改版の提案を todo/ から消せない ({reason})"
+                with fsio.policy(on_fail=fsio.FAIL_WARN, message=removing):
+                    failed = fsio.unlink(t.path)
+                if failed:
+                    stage.line(
+                        f"ccnavi: {t.ticket}: {removing.replace('{reason}', failed)}",
+                        stream=fsio.STREAM_ERR,
+                    )
+                what = "フィードバック計画" if cand.plans_feedback else "全体計画"
+                stage.line(f"  {t.ticket} の{what}を改版した")
+                if cand.plans_feedback:
+                    # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
+                    with fsio.policy(prefix="マーカーを置けない: "):
+                        failed = phase.settle_last_review(where, t, stamp)
+                    if failed:
+                        return t.ticket, f"マーカーを置けない: {failed}"
+                    # 全体計画の子でレビュー待ちに残っているものは、見たうえでの計画なので閉じる。
+                    moved, failed = settle_review(
+                        conf, root, t.ticket, list(range(1, len(t.plan) + 1))
+                    )
+                    if failed:
+                        return t.ticket, failed
+                    if moved:
+                        stage.line(f"  レビュー待ちの子を閉じた: {', '.join(moved)}")
+                    stage.line(
+                        "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
+                        "フィードバック作業フェーズの confirm が数える"
+                    )
+                continue
+            where = home_dir(conf, root, t.ticket, t.parent, t.tree_root, project=t.project)
+            wf = workflow.compute(t, cand.types) if t.has_plan and not t.is_child else None
+            failed = admit(where, t, source_branch(t), stamp, wf)
             if failed:
-                stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-                return Applied(1, placed, t.ticket, failed)
-            placed.append(t.ticket)
-            try:
-                os.remove(t.path)
-            except OSError as exc:
-                stderr.write(f"ccnavi: {t.ticket}: 改版の提案を todo/ から消せない ({exc})\n")
-            what = "フィードバック計画" if cand.plans_feedback else "全体計画"
-            stdout.write(f"  {t.ticket} の{what}を改版した\n")
-            if cand.plans_feedback:
-                # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
-                failed = phase.settle_last_review(where, t, stamp)
-                if failed:
-                    stderr.write(f"ccnavi: {t.ticket}: マーカーを置けない: {failed}\n")
-                    return Applied(1, placed, t.ticket, f"マーカーを置けない: {failed}")
-                # 全体計画の子でレビュー待ちに残っているものは、見たうえでの計画なので閉じる。
-                moved, failed = settle_review(conf, root, t.ticket, list(range(1, len(t.plan) + 1)))
-                if failed:
-                    stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-                    return Applied(1, placed, t.ticket, failed)
-                if moved:
-                    stdout.write(f"  レビュー待ちの子を閉じた: {', '.join(moved)}\n")
-                stdout.write(
-                    "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
-                    "フィードバック作業フェーズの confirm が数える\n"
-                )
-            continue
-        where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
-        wf = workflow.compute(t, cand.types) if t.has_plan and not t.is_child else None
-        failed = admit(where, t, t.tree, stamp, wf)
-        if failed:
-            stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-            return Applied(1, placed, t.ticket, failed)
-        placed.append(t.ticket)
-        if t.is_child:
-            for line in carry_flow(conf, root, t, where):
-                stdout.write(f"  {line}\n")
-        # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
-        # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
-        # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）
-        # ときに、子は 1 枚も増えていないのに済んでいたレビューが巻き戻る
-        # （test_a_failed_copy_does_not_clear_the_marks_of_a_reviewed_phase）。
-        # 置いた直後に落ちる（打ち切られる・電源が切れる）と「子は増えたのにマーカーは残る」
-        # ＝見られていない子がいるのに止まらなくなるが、そちらは窓がファイル 1 つぶんで、
-        # 頻度が桁違いに低い。順番の入れ替えでは直らない（両方の穴を塞ぐなら、マーカーの時刻と
-        # 子の承認時刻を比べて止めるかどうかを決める作りが要る）。
-        if t.is_child and t.phase is not None:
-            cleared = clear_marks(home_dir(conf, root, t.parent, ""), t.parent, t.phase)
-            if cleared:
-                kinds = ", ".join(cleared)
-                stdout.write(
-                    f"  {t.parent} のフェーズ {t.phase} のマーカー（{kinds}）を消した。"
-                    "全部閉じたらレビューをもう一度頼むことになる\n"
+                return t.ticket, failed
+            if t.is_child:
+                group = stage.new_group()
+                with fsio.policy(on_fail=fsio.FAIL_LINE, group=group):
+                    carried = carry_flow(conf, root, t, where)
+                for line in carried:
+                    stage.line(f"  {line}", group=group)
+            # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
+            # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
+            # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）
+            # ときに、子は 1 枚も増えていないのに済んでいたレビューが巻き戻る
+            # （test_a_failed_copy_does_not_clear_the_marks_of_a_reviewed_phase）。
+            # Writer(FS) は並べた順に書き、止まったらその先を書かないので、この順が保たれる。
+            # 置いた直後に落ちる（打ち切られる・電源が切れる）と「子は増えたのにマーカーは残る」
+            # ＝見られていない子がいるのに止まらなくなるが、そちらは窓がファイル 1 つぶんで、
+            # 頻度が桁違いに低い。順番の入れ替えでは直らない（両方の穴を塞ぐなら、マーカーの時刻と
+            # 子の承認時刻を比べて止めるかどうかを決める作りが要る）。
+            # マーカーを消せたかは書くときに分かるので、行は Writer(FS) が消せた種類で出す。
+            # reviewed を消せなければそこで止める（`clear_marks`）。
+            if t.is_child and t.phase is not None:
+                clear_marks(
+                    home_dir(conf, root, t.parent, "", project=t.project),
+                    t.parent,
+                    t.phase,
+                    announce=_reopened_line(t.parent, t.phase),
                 )
 
-    stdout.write(f"\n承認した。{conf.approved}/{DOING_DIR}/ へ動かした。\n")
-    return Applied(0, placed)
+    stage.line(f"\n承認した。{conf.approved}/{DOING_DIR}/ へ動かした。")
+    return None
 
 
 def _origin_line(t: ticket_mod.Ticket) -> str:
     """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
 
     プロジェクトは提案を置いた場所が決める。人はここで、書き込みが向かうリポジトリを
-    見て承認する。
+    見て承認する。提案はそのツリーからの相対パスで見せる（ADR-0093 の D22）。絶対パスは
+    機械ごとに違い、承認の指紋（画面の本文を覆う）が Chrome と手元で揃わない。
     """
     return (
         f"■ プロジェクト: {t.project or 'ワークスペース'}"
-        f"  ワークツリー: {t.tree or 'ワークスペースルート'}  提案: {t.path}"
+        f"  ワークツリー: {t.tree or 'ワークスペースルート'}  提案: {source_path(t)}"
     )
 
 
@@ -2011,7 +2320,7 @@ def screen(
                 lines.append("■ フィードバック計画")
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
         if not t.is_child and t.issue is not None:
-            lines.append(f"■ 課題: #{t.issue}")
+            lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
             lines.append(
                 "    この親のマージリクエストの本文に Closes として書く番号。"
                 "マージされると、この課題も閉じる"
@@ -2120,6 +2429,8 @@ def waiting(
     （`phases.yml` を直した結果を進行中の親に効かせる道。設計 9.7）。`types_for` は
     チケットに効く種類を引く関数（`types_resolver`）。
     `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
+    統合先の控えの `done/` にある識別子（ADR-0093 の 3.3 の 4）はここでは外さず、`candidates` が
+    理由を添えて承認しない側に回す（黙って消さない）。
     """
     known = by_id(approved + closed + review)
     open_index = by_id(approved)
@@ -2167,7 +2478,9 @@ def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bo
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
     """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
-    accepted = accepted_threads(home_dir(conf, root, parent.ticket, ""), parent.ticket)
+    accepted = accepted_threads(
+        home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
+    )
     notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
     if not parent.feedback:
         notes.append("対応なし。見たうえで対応しない、という記録になる")
@@ -2276,7 +2589,11 @@ def revision_problems(
                 "改版で変えられるのは plan と feedback だけ。範囲が承認済みチケットと違う",
             )
         )
-    if revised.title != current.title or revised.issue != current.issue:
+    if (
+        revised.title != current.title
+        or revised.issue != current.issue
+        or revised.issue_repo != current.issue_repo
+    ):
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,
@@ -2612,5 +2929,6 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None
 
 
 def _write(path: str, text: str) -> str:
-    failed = fsio.write_text(path, text)
+    with fsio.policy(message="書けない ({reason})"):
+        failed = fsio.write_text(path, text)
     return f"書けない ({failed})" if failed else ""

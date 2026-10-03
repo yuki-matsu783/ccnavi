@@ -194,6 +194,80 @@ def relative(tree: Tree, full: str) -> str:
     return os.path.relpath(_resolved(full), tree.root).replace(os.sep, "/")
 
 
+def git_dir(tree_root: str) -> str | None:
+    """このツリーの git ディレクトリ。分からなければ None。ファイルだけを読む（git は起こさない）。
+
+    `.git` がディレクトリならそれ、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその場所。
+    """
+    dotgit = os.path.join(tree_root, ".git")
+    if not os.path.isfile(dotgit):
+        return dotgit if os.path.isdir(dotgit) else None
+    try:
+        with open(dotgit, encoding="utf-8") as f:
+            line = f.read().strip()
+    except (OSError, ValueError):
+        return None
+    if not line.startswith("gitdir:"):
+        return None
+    gitdir = line[len("gitdir:") :].strip()
+    if not os.path.isabs(gitdir):
+        gitdir = os.path.join(tree_root, gitdir)
+    return gitdir
+
+
+def head_text(tree_root: str) -> str | None:
+    """このツリーの `HEAD` の中身（前後の空白を落とす）。読めなければ None。"""
+    gitdir = git_dir(tree_root)
+    if gitdir is None:
+        return None
+    try:
+        with open(os.path.join(gitdir, "HEAD"), encoding="utf-8") as f:
+            return f.read().strip()
+    except (OSError, ValueError):
+        return None
+
+
+# 途中の操作の印（git ディレクトリの中の名前）。
+BUSY_MARKS = (
+    "MERGE_HEAD",
+    "CHERRY_PICK_HEAD",
+    "REVERT_HEAD",
+    "rebase-merge",
+    "rebase-apply",
+    "sequencer",
+)
+
+
+def busy_of(tree_root: str) -> str:
+    """このツリーで途中の操作（merge・cherry-pick・revert・rebase）があればその印の名前。無ければ空。
+
+    ファイルだけを見る（git は起こさない）。
+    """
+    gitdir = git_dir(tree_root)
+    if gitdir is None:
+        return ""
+    for name in BUSY_MARKS:
+        if os.path.lexists(os.path.join(gitdir, name)):
+            return name
+    return ""
+
+
+def branch_of(tree_root: str) -> str | None:
+    """このツリーの作業ツリーが今いるブランチの名前。分からなければ None。
+
+    読むのはファイルだけで、git は起こさない（判定の中から呼ばれうる）。`.git` が
+    ディレクトリならその `HEAD`、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその
+    場所の `HEAD`。`ref: refs/heads/<名前>` の形だけを名前として読み、切り離した HEAD
+    （sha）・空・壊れた中身・読めないものは None（呼び手はツリーの名前で代える）。
+    """
+    head = head_text(tree_root)
+    if head is None:
+        return None
+    prefix = "ref: refs/heads/"
+    name = head[len(prefix) :].strip() if head.startswith(prefix) else ""
+    return name or None
+
+
 def worktree_path(root: str, name: str) -> str:
     """この名前のワークツリーが置かれるはずの場所。在るかどうかは見ない。"""
     return os.path.join(root, WORKTREES_DIR, name)

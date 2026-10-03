@@ -1,0 +1,68 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpHOAAAAaA=="
+          },
+          "nodes": [
+            {
+              "id": "PRRT_kwDOAbCdEs5P2000",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r3000",
+                    "path": "README.md",
+                    "line": 1,
+                    "body": "済み",
+                    "createdAt": "2026-09-29T03:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P2001",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r3001",
+                    "path": "src/old.py",
+                    "line": null,
+                    "body": "古い行への指摘（outdated）",
+                    "createdAt": "2026-09-29T03:01:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P2002",
+              "isResolved": false,
+              "comments": {
+                "nodes": []
+              }
+            },
+            {
+              "id": "PRRT_kwDOAbCdEs5P2003",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "url": "https://github.com/acme/widgets/pull/42#discussion_r3003",
+                    "path": "",
+                    "line": null,
+                    "body": "<!-- ccnavi:request i0001:1 key=k1 -->\nレビューをお願いします",
+                    "createdAt": "2026-09-29T03:02:00Z"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "owner": "acme",
+  "repo": "widgets",
+  "branch": "i0001",
+  "about": "変更要求の後に、同じ人の書きかけのレビュー（PENDING。submitted_at が無い）がある。変更要求は残る。通らない"
+}

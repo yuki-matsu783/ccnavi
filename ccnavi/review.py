@@ -46,7 +46,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, configsync, fsio, gitcmd, ops, phase, phasetypes, settings, tree
+from . import (
+    approval,
+    configsync,
+    fsio,
+    gitcmd,
+    history,
+    ops,
+    phase,
+    phasetypes,
+    settings,
+    tree,
+)
 from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
@@ -85,6 +96,8 @@ class Thread:
     line: int = 0
     body: str = ""
     created_at: str = ""
+    # 最初のコメントを書いたアカウント。GitLab の写しだけが持つ（ccnavi の投稿を見分けるため）
+    author: str = ""
 
 
 @dataclass
@@ -100,12 +113,22 @@ class Review:
 # 変更要求の状態。GitHub の CHANGES_REQUESTED と、GitLab の requested_changes をここに寄せる。
 CHANGES_REQUESTED = "CHANGES_REQUESTED"
 DISMISSED = "DISMISSED"
+APPROVED = "APPROVED"
+# 人ごとの最新を選ぶ対象。コメントだけのレビュー（COMMENTED）と、書きかけ（PENDING）は判断を
+# 変えないので飛ばす（ADR-0093 の 11.8.1 の決定 A）。変更要求は同じ人の Approve か dismiss まで残る
+_DECIDING = (APPROVED, CHANGES_REQUESTED, DISMISSED)
 
 
 def effective(reviews: list[Review]) -> list[Review]:
-    """レビュアーごとに最新の 1 件。取り下げられたものは無い扱い。"""
+    """レビュアーごとに、判断を示した最新の 1 件。取り下げられたものは無い扱い。
+
+    判断を示したレビューは Approve・変更要求・取り下げ（dismiss）だけ。コメントだけのレビューや
+    書きかけは数えない（前は数えたので、変更要求の後に同じ人がコメントするだけで変更要求が消えた）。
+    """
     latest: dict[str, Review] = {}
     for r in reviews:
+        if r.state.upper() not in _DECIDING:
+            continue
         key = r.author or r.url or id(r)
         current = latest.get(key)
         if current is None or _epoch(r.submitted_at) >= _epoch(current.submitted_at):
@@ -133,6 +156,8 @@ class Result:
     reviews: list[Review] = field(default_factory=list)
     url: str = ""
     created_at: str = ""
+    # 投稿したアカウント（`requested` の結果だけ。ccnavi の投稿を見分けるため依頼の記録に残す）
+    author: str = ""
     error: str = ""
 
     @classmethod
@@ -142,6 +167,11 @@ class Result:
             return cls(error=f"結果を読めない ({failed})")
         if failed is not None:
             return cls(error=f"結果が JSON として読めない ({failed})")
+        return cls.from_data(data)
+
+    @classmethod
+    def from_data(cls, data: object) -> Result:
+        """読んだ JSON の値から組む。Chrome は sh と同じ形の写しを組んで渡す（ADR-0093 の 8.9）。"""
         if not isinstance(data, dict):
             return cls(error="結果の最上位が辞書ではない")
         if data.get("error"):
@@ -162,6 +192,7 @@ class Result:
                     line=int(t.get("line") or 0),
                     body=str(t.get("body") or ""),
                     created_at=str(t.get("created_at") or ""),
+                    author=str(t.get("author") or ""),
                 )
                 for t in data.get("threads") or []
                 if isinstance(t, dict)
@@ -178,6 +209,7 @@ class Result:
             ],
             url=str(data.get("url") or ""),
             created_at=str(data.get("created_at") or ""),
+            author=str(data.get("author") or ""),
         )
 
 
@@ -219,16 +251,23 @@ def prepare(
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
-    marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} -->\n"
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # 人が読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
     # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
     # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が印に残す。
-    home = approval.home_dir(conf, root, parent.ticket, "")
+    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     synced = configsync.pending(home, parent.ticket)
     if synced:
         body = configsync.notice(synced) + body
+    # 目印に、本文と親のブランチの先頭から作った鍵を入れる。sh は同じ目印の投稿が MR に
+    # 既にあれば投稿し直さない（打ち直し・C1 のやり直しで依頼を二重にしない。段階 2d の
+    # レビューの決定 D）。子を足してやり直した依頼は先頭が違うので、別の鍵になる。
+    head = gitcmd.run(tree_root, ["rev-parse", "HEAD"])
+    key = hashlib.sha256(
+        (body + "\n" + (head.out.strip() if head.ok else "")).encode("utf-8")
+    ).hexdigest()[:16]
+    marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
     draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
     failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(
@@ -282,7 +321,8 @@ def mr_draft(parent: ticket_mod.Ticket) -> str:
     title = parent.title.strip() or parent.ticket
     lines = [f"Draft: {title}", ""]
     if parent.issue:
-        lines += [f"Closes #{parent.issue}", ""]
+        # 別のリポジトリの課題は `Closes owner/repo#N`（ADR-0093 の 3.1 の 8・8.7）
+        lines += [f"Closes {ticket_mod.issue_label(parent)}", ""]
     lines += [
         f"チケット `{parent.ticket}`。ワークツリーは `.claude/worktrees/{parent.ticket}`。",
         "",
@@ -339,7 +379,7 @@ def requested(
     # 落ちて黙って除かれる。
     if not _mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         phase_no,
         approval.MARK_REQUESTED,
@@ -349,6 +389,9 @@ def requested(
             "url": result.url,
             "host": result.host,
             "since": result.created_at,
+            # 依頼を投稿したアカウント。GitLab で ccnavi の投稿のスレッドを見分けるのに使う
+            # （分からなければ書かず、見分けずに数える。`_unresolved`）
+            **({"poster": result.author} if result.author else {}),
         },
     ):
         return 1
@@ -365,85 +408,126 @@ def requested(
     return 0
 
 
-def confirm(
-    stdout: TextIO,
-    stderr: TextIO,
-    root: str,
-    conf: settings.Settings,
-    cwd: str,
-    phase_no: int,
-    result_path: str,
-) -> int:
-    """依頼の後を見る。通ればマーカーを置いて先へ進めるようになる。"""
-    found = _parent_phase(stderr, root, conf, cwd, phase_no)
-    if found is None:
-        return 1
-    parent, ph = found
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
-    if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
-        return 1
-    tree_root = tree.worktree_path(root, parent.ticket)
-    moved = _moved_since_request(tree_root, conf, requested_mark)
-    if moved:
-        stderr.write(
-            f"ccnavi: {moved}。人が見たものと今の HEAD が違う。{_redo_request(root, phase_no)}\n"
-        )
-        return 1
-    result = _matching(stderr, result_path, requested_mark)
-    if result is None:
-        return 1
+def reviewed_mark(
+    mr: int, accepted: list[str], account: str = "", via: str = "", stamp: str = ""
+) -> dict:
+    """レビュー済みの印の中身（`phases/<親>/<N>.reviewed`。ADR-0093 の 8.9）。
+
+    `confirm`（コア）と `decide` が使う。欄の並びは 8.9 の `{mr, accepted, actor, via, at}`。
+    `actor` は付けた人（アカウント）が分かるときだけ、`via` は経路が分かるときだけ書く
+    （Chrome は `via: chrome`。段階 2a の手元の経路はどちらも渡さず、印は前と同じバイト列。
+    手元の `actor` と `via: cli` は `--actor` を入れる段で書く）。`stamp` が空なら `at` を
+    書かず、`approval.write_mark` が今の時刻を入れる。
+    """
+    mark: dict = {"mr": mr, "accepted": list(accepted)}
+    if account:
+        mark["actor"] = account
+    if via:
+        mark["via"] = via
+    if stamp:
+        mark["at"] = stamp
+    return mark
+
+
+def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
+    """依頼したのと同じマージリクエストの写しか。違えばその説明（標準エラーの行）。"""
+    if result is None or result.mr is None:
+        return ["ccnavi: 結果にマージリクエストが無い"]
+    if not requested_mark.get("host") or not requested_mark.get("mr"):
+        # 照合できない依頼の記録で通すと、別の MR のスレッドでレビュー済みにできる（11.8.1 の 8）
+        return ["ccnavi: 依頼の記録にホストかマージリクエストの番号が無い。依頼し直すこと"]
+    if result.host != requested_mark.get("host"):
+        return [
+            f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"
+            f"結果のホスト（{result.host}）が違う"
+        ]
+    if str(requested_mark["mr"]) != str(result.mr.number):
+        return [
+            f"ccnavi: 依頼したマージリクエスト（{requested_mark['mr']}）と"
+            f"結果のもの（{result.mr.number}）が違う"
+        ]
+    return []
+
+
+def review_problems(
+    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, phase_no: int, result: Result
+) -> list[str]:
+    """レビュー済みにできない理由（変更要求のレビュー、未解決のスレッド）。標準エラーの行。"""
     changes = [r for r in effective(result.reviews) if r.state.upper() == CHANGES_REQUESTED]
     if changes:
-        stderr.write(
+        return [
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "レビュアーの approve / dismiss を待つこと\n"
-        )
-        for r in changes:
-            stderr.write(f"  - {r.url}\n")
-        return 1
+            "レビュアーの approve / dismiss を待つこと",
+            *[f"  - {r.url}" for r in changes],
+        ]
     unresolved = _unresolved(
         result.threads,
         approval.accepted_threads(
-            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+            approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+            parent.ticket,
+            phase_no,
+            parent,
         ),
+        result.host,
+        _poster(parent, phase_no, root, conf),
     )
-    if unresolved:
-        stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
-        for t in unresolved:
-            stderr.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
-        review_sh = settings.script_command(root, "ccnavi-review.sh")
-        if _is_last_feedback_review(parent, phase_no):
-            # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
-            stderr.write(
-                "フィードバック対応の最後のレビューです。道は 2 つ。\n"
-                f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
-                f"  - 利用者が '{review_sh} decide {phase_no}'（ボードの「決める」）で"
-                "残りを受け入れるか、別の issue に回す\n"
-                "新しいフィードバック作業フェーズは足せません。\n"
-            )
-        else:
-            stderr.write(
-                "解決してもらって再実行するか、利用者が端末で "
-                f"'{review_sh} decide {phase_no}'（ボードの「決める」）で、指摘ごとに"
-                "受け入れて進むか、続きの子チケットで直すかを選ぶ\n"
-            )
-        return 1
-    assert result.mr is not None
-    if not _settle_children(stdout, stderr, root, conf, parent, ph):
-        return 1
-    if not _mark(
-        stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
-        parent.ticket,
-        phase_no,
-        approval.MARK_REVIEWED,
-        {"mr": result.mr.number, "accepted": []},
+    if not unresolved:
+        return []
+    lines = [f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている"]
+    lines += [f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in unresolved]
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    if _is_last_feedback_review(parent, phase_no):
+        # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
+        # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
+        lines += [
+            "フィードバック対応の最後のレビューです。道は 2 つ。",
+            f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）",
+            f"  - 利用者が '{review_sh} decide {phase_no}'（ボードの「決める」）で"
+            "残りを受け入れるか、別の issue に回す",
+            "新しいフィードバック作業フェーズは足せません。",
+        ]
+    else:
+        lines.append(
+            "解決してもらって再実行するか、利用者が端末で "
+            f"'{review_sh} decide {phase_no}'（ボードの「決める」）で、指摘ごとに"
+            "受け入れて進むか、続きの子チケットで直すかを選ぶ"
+        )
+    return lines
+
+
+def settle_and_mark(
+    stage,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    ph: phase.Phase,
+    mark: dict,
+) -> tuple[str, str] | None:
+    """レビュー済みで書くもの（子を `done/` へ、レビュー済みの印）を fsio の控える段に並べる。
+
+    順は `_settle_children` → `_mark` と同じ（子を先に動かす。理由は `_settle_children`）。
+    止まったら（"", 理由）。Writer(FS) は `ccnavi: <理由>` と言って止まる（前と同じ文面）。
+    """
+    with fsio.policy(
+        on_fail=fsio.FAIL_STOP, ticket="", message="{reason}", prefix="", undo=(), places=""
     ):
-        return 1
-    stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。先へ進める\n")
-    return 0
+        moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
+        if failed:
+            return "", failed
+        if moved:
+            stage.line(
+                f"レビュー待ちの子を {conf.approved}/{ticket_mod.DONE}/ へ動かした: "
+                f"{', '.join(moved)}"
+            )
+        home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+        with fsio.policy(prefix="マーカーを置けない: "):
+            failed = approval.write_mark(
+                home, parent.ticket, ph.number, approval.MARK_REVIEWED, mark
+            )
+        if failed:
+            return "", f"マーカーを置けない: {failed}"
+    stage.line(f"OK: フェーズ {ph.number} はレビュー済み。先へ進める")
+    return None
 
 
 def _settle_children(
@@ -597,8 +681,13 @@ def _decision(
     unresolved = _unresolved(
         result.threads,
         approval.accepted_threads(
-            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+            approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+            parent.ticket,
+            phase_no,
+            parent,
         ),
+        result.host,
+        str(requested_mark.get("poster") or ""),
     )
     can_issue = parent.has_plan and parent.feedback is not None
     return Decision(parent, ph, result, unresolved, can_issue)
@@ -673,6 +762,61 @@ def reviewed(
         f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘: "
         f"{len(d.unresolved)} 件\n"
     )
+    choices = _ask_choices(stdin, stdout, stderr, d)
+    if choices is None:
+        return 1
+    summary = apply_decision(stdout, stderr, root, conf, d, choices)
+    return 0 if summary is not None else 1
+
+
+def choose(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    result_path: str,
+    out_path: str,
+) -> int:
+    """対話の decide の前半（`--reviewed N --accept-unresolved --choose-out <ファイル>`）。
+
+    残った指摘を見せて 1 件ずつ選ばせ、選択と指紋を `{"choices": …, "digest": …}` で書くだけ。
+    何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ
+    （ADR-0093 の段階 2d のレビューの決定 A。選ぶのを C1 のロックの外で済ませる）。
+    """
+    d = _decision(stderr, root, conf, cwd, phase_no, result_path)
+    if d is None:
+        return 1
+    choices: dict[str, str] = {}
+    if d.unresolved:
+        stdout.write(
+            f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘: "
+            f"{len(d.unresolved)} 件\n"
+        )
+        picked_all = _ask_choices(stdin, stdout, stderr, d)
+        if picked_all is None:
+            return 1
+        choices = picked_all
+    else:
+        stdout.write(
+            f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘なし\n"
+        )
+    failed = fsio.write_text(
+        out_path,
+        json.dumps({"choices": choices, "digest": decision_digest(d)}, ensure_ascii=False) + "\n",
+    )
+    if failed:
+        stderr.write(f"ccnavi: 選んだものを {out_path} に書けない（{failed}）\n")
+        return 1
+    return 0
+
+
+def _ask_choices(
+    stdin: TextIO, stdout: TextIO, stderr: TextIO, d: Decision
+) -> dict[str, str] | None:
+    """残った指摘の行き先を 1 件ずつ端末で選ばせる。決めなければ None。"""
     keys = "k / f / i" if d.can_issue else "k / f"
     stdout.write(
         "未解決（Unresolved）の指摘の対応方針を 1 件ずつ選びます。"
@@ -692,10 +836,9 @@ def reviewed(
         picked = _CHOICE_KEYS.get(fsio.read_line(stdin).strip().lower(), "")
         if not picked or (picked == CHOICE_ISSUE and not d.can_issue):
             stderr.write("ccnavi: 決めなかった。何も置いていない\n")
-            return 1
+            return None
         choices[thread_key(t)] = picked
-    summary = apply_decision(stdout, stderr, root, conf, d, choices)
-    return 0 if summary is not None else 1
+    return choices
 
 
 def decide_preview(
@@ -784,6 +927,17 @@ def decide_yes(
     return 0
 
 
+def _decide_actor() -> tuple[str, str]:
+    """decide の印に入れる (アカウント, 経路)（ADR-0093 の 8.9。段階 5）。
+
+    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（跡の行の
+    `actor`）。経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
+    どちらも書かない（confirm と同じく、引けなければ印は前と同じバイト列）。
+    """
+    account = str(history.extra().get("actor") or "")
+    return (account, history.via()) if account else ("", "")
+
+
 def apply_decision(
     stdout: TextIO,
     stderr: TextIO,
@@ -804,7 +958,7 @@ def apply_decision(
     assert d.result.mr is not None
     parent, ph = d.parent, d.ph
     stamp = approval.now()
-    home = approval.home_dir(conf, root, parent.ticket, "")
+    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     picked = {c: [t for t in d.unresolved if choices.get(thread_key(t)) == c] for c in CHOICES}
     accepted = [thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
     fix = picked[CHOICE_FIX]
@@ -819,7 +973,7 @@ def apply_decision(
         for name in (DECIDE_FILE, DECIDE_ISSUE_FILE):
             stale = os.path.join(conf.state, name.format(parent=parent.ticket, phase=ph.number))
             if os.path.exists(stale):
-                os.remove(stale)
+                fsio.remove(stale)
     # 受け入れはマーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
     if accepted:
@@ -842,7 +996,7 @@ def apply_decision(
         parent.ticket,
         ph.number,
         approval.MARK_REVIEWED,
-        {"mr": d.result.mr.number, "accepted": accepted},
+        reviewed_mark(d.result.mr.number, accepted, *_decide_actor()),
     ):
         return None
     issue_draft = ""
@@ -996,7 +1150,8 @@ def _reviewed_in_chat(
             stderr.write(
                 f"ccnavi: フェーズ {ph.label} はマージリクエストで見るフェーズ。"
                 "--chat では通せない。"
-                f"'{review_sh} request --phase {ph.number} --body-file <依頼文>' から\n"
+                f"'{review_sh} request --phase {ph.number} --body-file <依頼文> "
+                f"--eli5 wip/eli5/phase-{ph.number}.html' から\n"
             )
         else:
             stderr.write(
@@ -1021,7 +1176,9 @@ def _reviewed_in_chat(
     if approval.MARK_REVIEWED in ph.marks:
         stdout.write(f"OK: フェーズ {ph.number} はすでにレビュー済み\n")
         return 0
-    synced = configsync.pending(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket)
+    synced = configsync.pending(
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
+    )
     if synced:
         stdout.write(configsync.notice(synced))
     stdout.write(f"フェーズ {ph.label}（親 {parent.ticket}）の子:\n")
@@ -1052,7 +1209,7 @@ def _reviewed_in_chat(
         return 1
     if not _mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         ph.number,
         approval.MARK_REVIEWED,
@@ -1090,8 +1247,8 @@ def ready(
 ) -> int:
     """Draft を外してよいかを確かめ、マーカーとコメントの下書きを置く。外すのは sh。
 
-    条件は「親を閉じられる」と同じ（ops.close_problems）。閉じてよい状態と、
-    マージに進んでよい状態は同じもの。親を閉じたあとでも打てる（閉じた承認済みチケットも引く）。
+    条件は「親を閉じられる」と同じ（ops.close_problems）に、「親の承認済みチケットが `done/` に
+    ある」（ADR-0093 の 3.6）を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものは人が行う。
     """
@@ -1099,6 +1256,15 @@ def ready(
     if parent is None:
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
+    # 親の写しが done/ に無いまま Draft を外すと、そのままマージされたときに done/ に親が無いまま
+    # 親のブランチが消え、家族が「決まらない」に落ちる（ADR-0093 の 3.6。締める向き）。
+    if parent.state != ticket_mod.DONE:
+        problems.append(
+            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
+            f"（いまは {parent.state}/）。先に "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish {parent.ticket}' で"
+            "親を閉じ、コミットして push してから打ち直す"
+        )
     problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
         stderr.write("ccnavi: まだ Draft を外せない:\n")
@@ -1117,7 +1283,7 @@ def ready(
         stderr.write("ccnavi: 控えの置き場が空。コメントの下書きを置く場所が無い\n")
         return 1
     wrapped = approval.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval.PARENT_MARK_CLOSE_EARLY,
     )
@@ -1135,7 +1301,7 @@ def ready(
         return 1
     if not _parent_mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval.PARENT_MARK_READY,
         {"mr": result.mr.number, "url": result.mr.url},
@@ -1200,7 +1366,7 @@ def close_early(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
         )
         return 1
-    home = approval.home_dir(conf, root, parent.ticket, "")
+    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     left = _leftovers(home, parent, phases, result)
     # 着手で共通層を写したことをまだ知らせていなければ、締める前にここで見せる。y で締めたら
     # 見たものとして残す。見せないと、締めたあとの finish でもう 1 度端末を求めることになる。
@@ -1225,14 +1391,16 @@ def close_early(
     cancelled, skipped, reviewed_now = settled
     accepted = [thread_key(t) for t in left.unresolved]
     failed = approval.remember_accepted(
-        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+        parent.ticket,
+        accepted,
     )
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
     if not _parent_mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval.PARENT_MARK_CLOSE_EARLY,
         {
@@ -1359,7 +1527,7 @@ def _settle(
                 continue
             if not _mark(
                 stderr,
-                approval.home_dir(conf, root, parent.ticket, ""),
+                approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
                 parent.ticket,
                 ph.number,
                 approval.MARK_SKIPPED,
@@ -1372,7 +1540,7 @@ def _settle(
                 return None
             if not _mark(
                 stderr,
-                approval.home_dir(conf, root, parent.ticket, ""),
+                approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
                 parent.ticket,
                 ph.number,
                 approval.MARK_REVIEWED,
@@ -1455,6 +1623,22 @@ def _is_own_place(conf: settings.Settings, path: str) -> bool:
     return any(path.startswith(place + "/") for place in _own_places(conf))
 
 
+def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
+    """依頼の後に変わっても「人が見るものが動いた」に数えない場所か。
+
+    ccnavi 自身の置き場と、ELI5 の HTML の置き場（`wip/eli5/`。ADR-0096）。ELI5 は依頼に添える
+    説明で、成果物ではない（`ready` の前に消える）。直すたびに依頼し直させると、指摘を受けて
+    説明を直すたびに依頼のコメントが増え、レビュー済みが遠のく。代わりに、直した ELI5 を人が
+    見直す保証は無くなる。
+
+    未コミットの検査（`_dirty`）と push の検査（`_unpushed`）はこれを使わない。ELI5 の未コミットは
+    sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
+    （crit push が届かない）。
+    """
+    # git の `-z` の綴りをそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
+    return _is_own_place(conf, path) or path.startswith(ticket_mod.ELI5 + "/")
+
+
 # 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
 _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 
@@ -1469,7 +1653,9 @@ def _is_sha(value: str) -> bool:
     return bool(_SHA.match(value))
 
 
-def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tuple[list[str], str]:
+def _outside_approved(
+    tree_root: str, conf: settings.Settings, ref: str, eli5: bool = False
+) -> tuple[list[str], str]:
     """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
 
     NUL 区切りで読む理由は phase.scope_findings と同じ。既定の出力は非 ASCII を
@@ -1482,7 +1668,16 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
     置き場の中のパスになってしまい、除外の側に入る。
+
+    `eli5` なら ELI5 の置き場も外す（`_unseen_by_review`。依頼済みの見分けだけが使う）。
     """
+    paths, failed = _diff_paths(tree_root, ref)
+    keep = _unseen_by_review if eli5 else _is_own_place
+    return [p for p in paths if not keep(conf, p)], failed
+
+
+def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
+    """`ref..HEAD` で変わったパス（置き場で絞らない）。2 つめは読めなかった理由。"""
     if not ref:
         return [], "比べる相手が無い"
     rc, out = _git(
@@ -1491,11 +1686,7 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     )
     if rc != 0:
         return [], f"{ref[:12]} からの差分を読めない"
-    changed = []
-    for path in out.split("\0"):
-        if path and not _is_own_place(conf, path):
-            changed.append(path)
-    return changed, ""
+    return [path for path in out.split("\0") if path], ""
 
 
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
@@ -1521,6 +1712,12 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     return False
 
 
+def _in_wip(path: str) -> bool:
+    """git の綴りが、途中の作業の置き場（`wip`）の下か。大文字小文字と `\\` の区切りを問わない。"""
+    folded = path.lower()
+    return folded == WIP_ROOT or folded.startswith((WIP_ROOT + "/", WIP_ROOT + "\\"))
+
+
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
     """マージに進む前にワークツリーの側で満たしていること。root は文面の sh の綴りに使う。
 
@@ -1531,13 +1728,25 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
     if not os.path.isdir(tree_root):
         return [f"親のワークツリーが無い ({tree_root})"]
     wip = WIP_ROOT
-    rc, tracked = _git(tree_root, ["ls-files", "--", wip])
-    if rc == 0 and tracked.strip():
-        n = len(tracked.strip().splitlines())
+    # 大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
+    # （`tree.relative` は書いた綴りを返す）は `wip/eli5/` として通すのに、
+    # git には `WIP/...` で入る。
+    # 区別して見ると、それが既定のブランチまで残る。名前に `\` を含む 1 ファイル（`wip\eli5\x`。
+    # Linux / macOS では作れる）も `wip` の下と見なして止める（ADR-0097）。pathspec の `:(icase)` に
+    # 頼らず全部を `-z` で読んで絞るのは、`\` の名前を pathspec で拾えないのと、
+    # git の版に依らないため。
+    rc, tracked = _git(tree_root, ["ls-files", "-z"])
+    names = [p for p in tracked.split("\0") if p and _in_wip(p)] if rc == 0 else []
+    if rc != 0:
+        problems.append(f"`{wip}/` が追跡されているかを読めない")
+    elif names:
+        tops = sorted({p.split("/", 1)[0] for p in names})
+        git_sh = settings.script_command(root, "ccnavi-git.sh")
+        removes = " と ".join(f"'{git_sh} rm -r {top}'" for top in tops)
         problems.append(
-            f"`{wip}/` に追跡されているファイルが {n} 件ある。"
+            f"`{wip}/` に追跡されているファイルが {len(names)} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"'{settings.script_command(root, 'ccnavi-git.sh')} rm -r {wip}' で消してコミットする"
+            f"{removes} で消してコミットする"
         )
     if _dirty(tree_root, conf):
         problems.append("親のワークツリーに未コミットの変更がある")
@@ -1557,13 +1766,13 @@ def _parent_any(
     """cwd の親。閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す道のため）。"""
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
-        return parent
+        return None if ops.family_stopped(stderr, root, conf, parent) else parent
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
         closed, _ = approval.scan(conf, root, closed=True)
         found = tree.lookup(approval.by_id(closed), t.name)
         if found is not None and not found.is_child:
-            return found
+            return None if ops.family_stopped(stderr, root, conf, found) else found
     stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
     return None
 
@@ -1665,6 +1874,11 @@ def _parent(
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is None:
         stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
+        return None
+    # 取り込み済みの家族が決まらない・閉じているなら、依頼・確認・行き先・締めの印も置かない
+    # （ADR-0093 の 3.3・3.6）。
+    if ops.family_stopped(stderr, root, conf, parent):
+        return None
     return parent
 
 
@@ -1785,25 +1999,15 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
     result = _result(stderr, path)
     if result is None:
         return None
-    if result.mr is None:
-        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
-        return None
-    if requested_mark.get("host") and result.host != requested_mark.get("host"):
-        stderr.write(
-            f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"
-            f"結果のホスト（{result.host}）が違う\n"
-        )
-        return None
-    if requested_mark.get("mr") and int(requested_mark["mr"]) != result.mr.number:
-        stderr.write(
-            f"ccnavi: 依頼したマージリクエスト（{requested_mark['mr']}）と"
-            f"結果のもの（{result.mr.number}）が違う\n"
-        )
-        return None
-    return result
+    problems = matching_problems(result, requested_mark)
+    for line in problems:
+        stderr.write(line + "\n")
+    return None if problems else result
 
 
-def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:
+def _unresolved(
+    threads: list[Thread], accepted: set[str], host: str = "", poster: str = ""
+) -> list[Thread]:
     """まだ解決されていない指摘。
 
     付いた時刻では絞らない。依頼より後のものだけを数えると、
@@ -1812,15 +2016,33 @@ def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:
 
     数えないのは 2 つだけ。機構自身が置いた投稿と、人が「未解決のまま進める」と
     受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。
+
+    機構自身の投稿と見るのは、GitLab の写しで、本文が目印で始まり、書いたのが依頼を投稿した
+    アカウント（`poster`）のときだけ（ADR-0093 の 11.8.1 の決定 C）。GitHub の依頼は MR のコメントで
+    スレッドにならないので、目印で始まるスレッドは人が書いたものとして数える。投稿者が分からなければ
+    見分けずに数える（誰でも目印を書けるので、本文だけで除くと未解決を隠せる）。
     """
     return [
         t
         for t in threads
         if not t.resolved
-        and not t.body.startswith(MARKER_PREFIX)
+        and not _ccnavi_post(t, host, poster)
         and t.url not in accepted
         and t.id not in accepted
     ]
+
+
+def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:
+    """ccnavi 自身が投稿したスレッドか（`_unresolved`）。"""
+    mine = host == "gitlab" and bool(poster) and t.author == poster
+    return mine and t.body.startswith(MARKER_PREFIX)
+
+
+def _poster(parent: ticket_mod.Ticket, phase_no: int, root: str, conf: settings.Settings) -> str:
+    """そのフェーズの依頼を投稿したアカウント（依頼の記録の `poster`）。無ければ空。"""
+    ph = _phase(root, conf, parent, phase_no)
+    mark = ph.marks.get(approval.MARK_REQUESTED) if ph is not None else None
+    return str((mark or {}).get("poster") or "")
 
 
 def _branch(tree_root: str) -> str:
@@ -1850,21 +2072,44 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     if rc != 0:
         return "親の HEAD を読めない"
     recorded = str(requested_mark.get("head") or "")
+    paths: list[str] | None = None
+    if recorded and head != recorded and _is_sha(recorded):
+        found, failed = _diff_paths(tree_root, recorded)
+        paths = None if failed else found
+    moved = moved_since(conf, requested_mark, head, paths)
+    if moved:
+        return moved
+    branch = _branch(tree_root)
+    if not branch or _unpushed(tree_root, conf, branch):
+        return "親ブランチの HEAD が push されていない"
+    return ""
+
+
+def moved_since(
+    conf: settings.Settings, requested_mark: dict, head: str, changed: list[str] | None
+) -> str:
+    """依頼の後に、人が見るものが動いたか（`_moved_since_request` の読みを除いた判定）。
+
+    手元の confirm と Chrome のレビュー済み（ADR-0093 の 8.9）が同じこの関数で決める。
+    `head` は親のブランチの今の先頭。`changed` は依頼時の先頭（マーカーの `head`）から `head` までに
+    変わったパスで、置き場で絞る前のもの。読めなかった（差分を取れない、ホストの一覧が
+    打ち切られた、依頼時のコミットが祖先でない）なら None で、動いたと数える。
+    手元は git の差分、Chrome は compare API の変更の一覧から作る。
+    """
+    recorded = str(requested_mark.get("head") or "")
     if not recorded:
         # 記録が無ければ照合できない。素通りさせると、依頼の後のコミットが全部
         # 「人が見たもの」になる。出し直しで書き直させる。
         return "依頼時の親の HEAD が記録されていない"
-    if head != recorded:
-        moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
-        # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
-        if not _is_sha(recorded):
-            return moved
-        changed, failed = _outside_approved(tree_root, conf, recorded)
-        if failed or changed:
-            return moved
-    branch = _branch(tree_root)
-    if not branch or _unpushed(tree_root, conf, branch):
-        return "親ブランチの HEAD が push されていない"
+    if head == recorded:
+        return ""
+    moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
+    # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
+    if not _is_sha(recorded) or changed is None:
+        return moved
+    # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、人が見るものを動かさない（ADR-0096）。
+    if any(not _unseen_by_review(conf, path) for path in changed):
+        return moved
     return ""
 
 
@@ -1897,7 +2142,7 @@ def _already_requested(
     if rc == 0 and head.strip() != recorded:
         if not _is_sha(recorded):
             return ""
-        changed, failed = _outside_approved(tree_root, conf, recorded)
+        changed, failed = _outside_approved(tree_root, conf, recorded, eli5=True)
         if failed or changed:
             return ""
     return f"フェーズ {phase_no} は依頼済み（人が見るものは依頼時のまま）"
@@ -1907,7 +2152,8 @@ def _redo_request(root: str, phase_no: int) -> str:
     """HEAD が動いたときの案内。push 済みの今の HEAD で依頼を出し直す。"""
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     return (
-        f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文>' で"
+        f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文> "
+        f"--eli5 wip/eli5/phase-{phase_no}.html' で"
         "依頼を出し直すこと"
     )
 

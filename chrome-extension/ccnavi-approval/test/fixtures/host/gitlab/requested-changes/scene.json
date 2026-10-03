@@ -1,0 +1,7 @@
+{
+  "namespace": "acme",
+  "project": "widgets",
+  "branch": "i0001",
+  "poster": "201",
+  "about": "レビュアーが requested_changes（CHANGES_REQUESTED に寄せる）。reviewed と unreviewed は数えない（11.8.1 の決定 A）。止まる"
+}
