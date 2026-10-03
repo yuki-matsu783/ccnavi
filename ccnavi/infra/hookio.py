@@ -119,7 +119,7 @@ def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "")
 
     context はルールの `additionalContext`。判定と一緒に `additionalContext` として
     載せる。deny でも ask でも、理由と一緒にモデルへ届くことは実際に確かめた
-    （2026-09、Claude Code 2.1）。空なら鍵ごと出さない。
+    （Claude Code 2.1）。空なら鍵ごと出さない。
     """
     payload: dict[str, Any] = {
         "hookEventName": PRE_TOOL_USE,
