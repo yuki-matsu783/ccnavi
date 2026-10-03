@@ -21,7 +21,7 @@
 - sh は Windows (Git Bash / WSL)・Linux・macOS のどれでも動くように書く
 - 編集する前にワークツリーを切る。置き場はワークスペースの `.claude/worktrees/<名前>` にする
 - git は直接呼ばず `ccnavi-git.sh` を通す。拒否されたときの出力に、コマンドが案内されるため、その内容に従う。
-- 下書きはワークツリーの `scratchpad/`（無ければセッションのスクラッチパッド）に置く
+- 下書きはワークツリーの `scratchpad/` に置く。無ければセッションのスクラッチパッドに置く
 - `projects/<名前>/` 配下を編集するときは、そのプロジェクトに `cd` してから作業する
 - 実装・調査・テストは作業内容に適したモデルのサブエージェントでバックグラウンド実行する
 - 権限が緩む変更、ユーザとのIFが変わる変更、元に戻せない変更、影響範囲を読み切れない変更は、実装する前にユーザと合意する
@@ -34,7 +34,7 @@
 | 下書きや使い捨てのファイルを置く | `docs/claude/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `docs/claude/projects.md` |
 | 提案を書く、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `docs/claude/decisions.md` |
-| sh やスクリプトを書く、用語（ワークスペースルート・統合先ブランチ など）を確かめる | `docs/claude/environment.md` |
+| sh やスクリプトを書く、ワークスペースルート・統合先ブランチなどの用語を確かめる | `docs/claude/environment.md` |
 | ccnavi の実行ファイル（`ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
 | フィードバックメッセージが届いた、`.claude/skills/` を直したくなった、フィードバック計画を書く | `docs/claude/skill-review.md` |

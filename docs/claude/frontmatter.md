@@ -44,7 +44,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 | tag | 付けるもの | 付けないもの |
 |---|---|---|
-| `design-doc` | 設計文書（`ccnavi.md`・`requirements.md`・`wip/design/**`）、ADRの書き方や置き場についての文書、画面の構成や状態遷移などの設計を決めたADR | `design`は使わない（`design-doc`に統合した） |
+| `design-doc` | 設計文書（`ccnavi.md`・`requirements.md`・`wip/design/**`）、ADRの書き方や置き場についての文書、画面の構成や状態遷移などの設計を決めたADR | `design`は使わない。`design-doc`に統合した |
 | `settings` | Claude Codeの`settings.json`（hookの登録・`env`・`permissions`）と、そこで渡す環境変数 | ccnavi自身の設定ファイル |
 | `config` | ccnaviの設定ファイル（`.ccnavi/common/rules.yml`・`phases.yml`・`risks.yml`）の形・読み方・層 | `settings.json`と環境変数 |
 
@@ -53,22 +53,22 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 ## keywordsの注意
 
 `--keyword`は完全一致で検索する。大文字と小文字の違いと、NFC正規化の違いは無視する。`構造化ログ`だけを入れた文書は`--keyword ログ`では見つからない。
-複合語を入れるときは、検索する人が打ちそうな短い語（`ログ`、`承認`、`レビュー`など）も別の要素として加える。
+複合語を入れるときは、`ログ`、`承認`、`レビュー`など、検索する人が打ちそうな短い語も別の要素として加える。
 
 ## typeの値
 
 | type | 対象 | 現状 |
 |---|---|---|
-| `guide` | 使い方と作業の手引き。`docs/claude/*.md`、`docs/adr/README.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`vscode-extension/**`、`chrome-extension/**`）には付けていない（理由は表の下） |
-| `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない（理由は表の下）。`--type rule`では何も出ない |
+| `guide` | 使い方と作業の手引き。`docs/claude/*.md`、`docs/adr/README.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`vscode-extension/**`、`chrome-extension/**`）には付けていない。理由は表の下 |
+| `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない。理由は表の下。`--type rule`では何も出ない |
 | `design` | 現在の実装の説明。`ccnavi.md`、`wip/design/**`の設計メモ | `ccnavi.md`に付いている |
 | `requirements` | 外から観測できる約束。`requirements.md` | 付いている |
 | `glossary` | 用語集。`CONTEXT.md` | 付いている |
 | `handover` | 引き継ぎ。`HANDOVER.md` | 付いている |
 | `adr` | 設計判断の記録。`docs/adr/NNNN-*.md` | 付いている |
-| `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`docs/skills/*/SKILL.md` | 付けていない（理由は表の下）。`name`・`description`だけを持つ。`--type skill`では何も出ない |
+| `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`docs/skills/*/SKILL.md` | 付けていない。理由は表の下。`name`・`description`だけを持つ。`--type skill`では何も出ない |
 | `skill-reference` | スキルから切り出した資料。`.claude/skills/*/references/*.md` | 付いている |
-| `report` | 調査結果や作業報告。置き場はその都度決める（`wip/`の下など） | 書いたときに付ける |
+| `report` | 調査結果や作業報告。`wip/`の下など、置き場はその都度決める | 書いたときに付ける |
 
 表に無い種類の文書を足すときは、この表に行を足してから使う。
 
@@ -83,7 +83,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 ## プロジェクト
 
 `projects/<名前>/`のmdも同じ決まりで書く。`ccnavi --docs`はワークスペースとプロジェクトをまとめて検索し、プロジェクトのmdは
-`projects/<名前>/…`のパスで表示する。プロジェクト固有の置き場にある文書（`docs/spec/`など）には、上の表で近い値を使うか、表に行を足す。
+`projects/<名前>/…`のパスで表示する。`docs/spec/`のような、プロジェクト固有の置き場にある文書には、上の表で近い値を使うか、表に行を足す。
 索引に載るのは、そのリポジトリの`.gitignore`に`**/index.jsonl`があるプロジェクトだけ。無いプロジェクトは、SessionStartの
 案内に名前が出る。`.gitignore`への追記は、そのプロジェクトのチケットの中で行う。ccnaviはプロジェクトの`.gitignore`を書き換えず、
 導入スクリプト`scripts/ccnavi-setup.sh`が追記するのもワークスペースの`.gitignore`だけ。
@@ -94,8 +94,8 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
   使っている場合、ccnaviはそのファイルを上書きせず、案内にそのパスを出す
 - 初回の実行（`--docs`かSessionStart）ではmdをすべて読むので、mdが数千本あると数秒かかる。SessionStartでは短い制限時間で
   打ち切り、読めた分だけを索引に書いて、残りは次回に回す。2回目からは、更新日時が変わったmdだけを読む
-- mdを消しても`index.jsonl`が残ることがある（gitで追跡していないmdしか無いディレクトリや、ディレクトリごと消したときなど）。
-  残った`index.jsonl`は読まれないので、結果は変わらない。気になるなら消してよい（gitの無視対象なので差分は出ない）
+- mdを消しても`index.jsonl`が残ることがある。gitで追跡していないmdしか無いディレクトリや、ディレクトリごと消したときなどである。
+  残った`index.jsonl`は読まれないので、結果は変わらない。気になるなら消してよい。gitの無視対象なので差分は出ない
 
 ## 対象外
 
