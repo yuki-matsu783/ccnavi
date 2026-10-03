@@ -1148,14 +1148,12 @@ def _summary(node: dict, flows: dict) -> str:
     if kind == "prompt":
         return _line(data.get("prompt"))
     if kind == "subAgent":
-        head = data.get("description")
-        prompt = _line(data.get("prompt"))
-        text = _line(head)
-        if prompt:
-            text += f" / プロンプト: {prompt}"
+        parts = [_line(data.get("description"))]
+        if _line(data.get("prompt")):
+            parts.append(f"プロンプト: {_line(data.get('prompt'))}")
         if _line(data.get("builtInType")):
-            text += f" / 種類: {_line(data.get('builtInType'))}"
-        return text
+            parts.append(f"種類: {_line(data.get('builtInType'))}")
+        return " / ".join(p for p in parts if p)
     if kind == ASK:
         options = " | ".join(_labels(data.get("options"), "label"))
         multi = "（複数選択）" if data.get("multiSelect") is True else ""

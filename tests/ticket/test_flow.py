@@ -163,6 +163,18 @@ class FlowRenderTest(unittest.TestCase):
         self.assertIn("[end] 終了", lines[5])
         self.assertIn("fancyNewNode", kinds)
 
+    def test_sub_agent_summary_has_no_leading_separator(self):
+        # 見出しが空でも区切りから始めない。CC Workflow Studio の別名（agentDefinition・
+        # workDescription）は読まない
+        node = {
+            "type": "subAgent",
+            "data": {"description": "", "agentDefinition": "旧", "prompt": "p"},
+        }
+        self.assertEqual("プロンプト: p", flow._summary(node, {}))
+        self.assertEqual(
+            "", flow._summary({"type": "start", "data": {"workDescription": "旧"}}, {})
+        )
+
     def test_groups_are_not_listed_but_their_members_are(self):
         data = {
             "nodes": [
