@@ -507,7 +507,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
         return EXIT_ERROR
     if args.actor and not _ACTOR.fullmatch(args.actor):
-        stderr.write("ccnavi: --actor はホストのアカウント名（英数字と _ . - の 1〜100 字）\n")
+        stderr.write(
+            "ccnavi: --actor にはホストのアカウント名（英数字と _ . - の 1〜100 字）を渡す\n"
+        )
         return EXIT_ERROR
     if args.actor and list(args.command[:2]) != ["review", "confirm"] and not _decide_writes(args):
         stderr.write(
@@ -524,7 +526,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
     # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
     if args.via == history.VIA_BOARD and not args.yes:
-        stderr.write("ccnavi: --via board は --yes（ボードの押した選択）と一緒に使う\n")
+        stderr.write("ccnavi: --via board は --yes（ボードで押した選択）と一緒に使う\n")
         return EXIT_ERROR
     if args.record_writes and not args.version:
         return _recorded_run(stdin, stdout, stderr, parser, args)
@@ -647,7 +649,7 @@ def _record_place_problem(place: str, target: str, given: str) -> str:
     if os.path.lexists(place) and os.path.islink(place):
         return "c1 がシンボリックリンク"
     if not _inside(target, place) or _same(target, place):
-        return f"{given} は外"
+        return f"{given} は置き場の外"
     if os.path.islink(target):
         return f"{given} はシンボリックリンク"
     return ""
@@ -1065,11 +1067,13 @@ def _docs(
         stderr.write(f"ccnavi: --docs は {flag} と一緒に使えない\n")
         return EXIT_ERROR
     if args.command:
-        stderr.write(f"ccnavi: --docs は語を取らない（{' '.join(args.command)}）\n")
+        stderr.write(
+            f"ccnavi: --docs にはフラグ以外の語を付けられない（{' '.join(args.command)}）\n"
+        )
         return EXIT_ERROR
     fmt = args.format or ("json" if args.json else "table")
     if args.json and fmt != "json":
-        stderr.write("ccnavi: --json と --format は食い違う形を同時に指せない\n")
+        stderr.write("ccnavi: --json と、json 以外の --format は同時に指定できない\n")
         return EXIT_ERROR
     query = docsearch.Query(
         types=args.type or [],
@@ -1129,7 +1133,8 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
     # 人の判断を自分で出す方法を教えることになる。切り方は README の設定の表にある。
     stderr.write(
-        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない。利用者に端末で打ってもらう\n"
+        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない。"
+        "利用者に端末で打ってもらってください\n"
     )
     return False
 
@@ -1157,7 +1162,7 @@ def operate(
         stderr.write(
             f"ccnavi: 家族 {bypass} は取り込み済み（C1 の対象）。状態の操作は "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' か "
-            f"'{settings.script_command(root, 'ccnavi-review.sh')}' から打つ。"
+            f"'{settings.script_command(root, 'ccnavi-review.sh')}' から打ってください。"
             "C1 を通らない書き込みは親のブランチへ送られないので、何も書かずに止めた"
             "（ADR-0093 の 4.3）\n"
         )

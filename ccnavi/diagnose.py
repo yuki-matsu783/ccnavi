@@ -227,7 +227,7 @@ def test(
         for hit in out["rules"]:
             if hit["source"] == "outside":
                 # チケットの範囲のように、ルールファイルの中に無い根拠。
-                stdout.write(f"  {hit['id']}（ルールファイルの外から来た根拠）\n")
+                stdout.write(f"  {hit['id']}（ルールファイルの外にある根拠）\n")
                 continue
             stdout.write(f"  {hit['section']}:{hit['id']}  {hit['kind']} {hit['written']!r}\n")
             stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
@@ -583,7 +583,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
     stdout.write(
-        "  パスを持つツールは 共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
+        "  パスを持つツールは共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
         "（設計 11.4）\n"
     )
 
@@ -607,7 +607,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     _explain_risk(stdout, conf, root, views)
 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
-    stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
+    stdout.write("  ccnavi は判定を下さず、Claude Code の権限モードに従う\n")
     stdout.write(
         "    auto                          classifier（auto モードで呼び出しを通すかを決める、"
         "Claude Code の判定役のモデル）が判断する\n"
@@ -617,7 +617,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
     if (conf.guard_unwatched or "").strip().lower() == selfguard.DISABLE:
         stdout.write(
-            f"    dontAsk / bypassPermissions   委ねる（{settings.GUARD_UNWATCHED_ENV}=disable）\n"
+            "    dontAsk / bypassPermissions   そのモードに委ねる"
+            f"（{settings.GUARD_UNWATCHED_ENV}=disable）\n"
         )
     else:
         stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")

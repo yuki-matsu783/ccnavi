@@ -240,8 +240,11 @@ def ran_by(runner: str, inner: str) -> str:
     当たったルールの名前が出てこない。どこへ書こうとしているかを綴りで示す。
     """
     if runner == shellread.MOVED:
-        return f"`cd` で移った先から見ると `{_one_line(inner)}` で、そこにヒットしました。"
-    return f"`{_one_line(runner)}` が実行する `{_one_line(inner)}` にヒットしました。"
+        return (
+            f"`cd` で移った先から見ると `{_one_line(inner)}` になり、"
+            "ルールはこの形にヒットしました。"
+        )
+    return f"ルールは `{_one_line(runner)}` が実行する `{_one_line(inner)}` にヒットしました。"
 
 
 def _one_line(text: str) -> str:
@@ -301,8 +304,8 @@ def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
             *([ran_by(runner, inner)] if inner else []),
             "チケットの状態を動かす操作、レビューの依頼・確認、リモートへの push は、"
             "親（メインエージェント）だけが行います。サブエージェントは自分のチケットの"
-            "範囲で作業を終えたら、コミットまでして結果を報告して終わってください。"
-            "合流と push と閉じるのは親の仕事です。",
+            "範囲で作業を終えたら、コミットまで済ませ、結果を報告して終えてください。"
+            "合流、push、チケットを閉じることは親の仕事です。",
         ]
     )
 
@@ -404,9 +407,9 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
         "- 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。",
         "- チケット作業（設計に触れる・複数のフェーズに分かれる・人のレビューが要る）: "
         f"{conf.tickets}/todo/ に提案を書いて承認を受ける。"
-        f"承認されると {conf.approved}/doing/ へ動く。"
+        f"承認されると提案は {conf.approved}/doing/ へ動く。"
         f"以後の操作は {ticket_sh} を通す（使い方は --help）。",
-        "どちらで進めるか迷ったら、利用者に聞く。",
+        "どちらで進めるか迷ったら、利用者に聞いてください。",
     ]
     if mode == DRY_RUN:
         lines.append(

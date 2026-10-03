@@ -159,9 +159,9 @@ def report(
             Problem(
                 SEVERITY_ERROR,
                 "(ticket)",
-                f"{settings.GUARD_TICKET_APPROVAL_ENV}={declared}。この門は "
-                f"{' か '.join(selfguard.GATE_SETTINGS)} しか取らない"
-                "（承認は通れば済んでしまうので、止めずに報告する段が無い）。"
+                f"{settings.GUARD_TICKET_APPROVAL_ENV}={declared}。この設定は "
+                f"{' か '.join(selfguard.GATE_SETTINGS)} しか受け付けない"
+                "（承認は一度通れば済んでしまうので、止めずに報告するだけの値が無い）。"
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
@@ -174,7 +174,7 @@ def report(
                 SEVERITY_ERROR,
                 "(ticket)",
                 f"{settings.TICKET_CONTROL_ENV}={declared}。"
-                f"{' か '.join(selfguard.GATE_SETTINGS)} しか取らない。"
+                f"{' か '.join(selfguard.GATE_SETTINGS)} しか受け付けない。"
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
@@ -186,8 +186,8 @@ def report(
                 SEVERITY_WARN,
                 "(unwatched)",
                 f"{settings.GUARD_UNWATCHED_ENV}=disable。"
-                f"{' と '.join(judge.PERMISSION_NO_JUDGE)} では、"
-                "ルールがどこも言及しない呼び出しを止めない",
+                f"{' と '.join(judge.PERMISSION_NO_JUDGE)} のモードでは、"
+                "どのルールも言及しない呼び出しを止めない",
             )
         )
     if conf.tickets_enabled and conf.guard_ticket_approval == selfguard.DISABLE:
@@ -268,19 +268,20 @@ def report(
 _CORE_FILES_VOICE = {
     selfguard.DISABLE: (
         "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
-        "プロジェクトの層の 3 本）を控えず、書き換えられても戻さない。"
-        "実行前に足していた組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通層の 3 本）も"
-        "足さないので、ワークツリー側の層の設定はルールファイルが名指ししていなければ書ける"
+        "プロジェクトの層それぞれの設定 3 本）の控えを取らず、書き換えられても戻さない。"
+        "ふだん実行前に足している組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通層の"
+        " 3 本）も足さないので、ワークツリー側の層の設定は、ルールファイルが名指ししていなければ"
+        "書き込める"
     ),
     selfguard.DRY_RUN: (
-        "ccnavi 自身の設定ファイルが書き換えられても戻さない（戻すはずだったと言うだけ）。"
-        "実行前の deny は足したままなので、止める側は効いている"
+        "ccnavi 自身の設定ファイルが書き換えられても戻さない（戻すはずだったことを報告するだけ）。"
+        "実行前の deny は足したままなので、実行前に止める働きは効いている"
     ),
 }
 _RESTORE_VOICE = {
     selfguard.DISABLE: "`deny` と宣言した場所が副作用で変わっても戻さない",
     selfguard.DRY_RUN: (
-        "`deny` と宣言した場所が副作用で変わっても戻さない（戻すはずだったと言うだけ）"
+        "`deny` と宣言した場所が副作用で変わっても戻さない（戻すはずだったことを報告するだけ）"
     ),
 }
 
@@ -662,7 +663,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{stray} はワークツリーでもワークスペースルートでもないのに .claude/ を持つ。"
-                "cd 1 回で別のワークスペースルートに見える",
+                "そこへ cd するだけで、別のワークスペースルートのように見える",
             )
         )
     return problems
@@ -691,9 +692,10 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
         Problem(
             SEVERITY_ERROR,
             "(ticket)",
-            f"承認済みチケットの置き場（{settings.APPROVED_ENV}={conf.approved}）が"
+            f"承認済みチケットの置き場（{settings.APPROVED_ENV}={conf.approved}）が "
             f"ccnavi ディレクトリ（{settings.PROJECT_HOME_ENV}={conf.project_home}）の外にある。"
-            "組み込みが守らないので、エージェントが承認済みチケットを書けて承認の意味が無い",
+            "組み込みの守りが及ばないので、エージェントが承認済みチケットを書き換えられ、"
+            "承認が意味を持たない",
         )
     ]
 
@@ -817,7 +819,7 @@ def _proposal_problems(
                     "(ticket)",
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
                     f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る。"
-                    "計画の改版でなければ todo/ の側を消す",
+                    "計画の改版でなければ todo/ の側を消してください",
                 )
             )
             continue
@@ -827,7 +829,7 @@ def _proposal_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は閉じたかレビュー待ちなのに todo/ にも在る。"
-                    "承認の対象にならない。再開は人が承認済みチケットを戻す",
+                    "todo/ の側は承認の対象にならない。再開するには、人が承認済みチケットを戻す",
                 )
             )
             continue
@@ -872,7 +874,7 @@ def _proposal_problems(
                     SEVERITY_ERROR,
                     "(ticket)",
                     f"{ticket_id} が複数のリポジトリにある: {where}。"
-                    "識別子はリポジトリごとに一意にする",
+                    "識別子はリポジトリごとに一意にしてください",
                 )
             )
             continue
@@ -981,7 +983,7 @@ def _worktree_problems(
                         f"ワークツリー {t.name} の元リポジトリ（{t.project or 'ワークスペース'}）が"
                         "承認済みチケットの "
                         f"project（{owner or 'ワークスペース'}）と違う。そこへの書き込みは止まる。"
-                        "承認済みチケットが指すリポジトリから切り直す",
+                        "承認済みチケットが指すリポジトリから切り直してください",
                     )
                 )
     names = {t.name for t in worktrees}
@@ -992,7 +994,8 @@ def _worktree_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は承認済みだがワークツリー "
-                    f"{tree.worktree_path(root, t.ticket)} が無い。作るまで効かない",
+                    f"{tree.worktree_path(root, t.ticket)} が無い。"
+                    "ワークツリーを作るまで範囲は効かない",
                 )
             )
     return problems
@@ -1163,7 +1166,7 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
                     where,
                     f"統合先の控えを読めない（{integ.broken}）。閉じた識別子の再利用を確かめられない"
                     "ので、このリポジトリの新規の提案は承認しない。オンラインで"
-                    f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を打ち直す",
+                    f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を打ち直してください",
                 )
             )
             continue
@@ -1187,8 +1190,9 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
                 SEVERITY_WARN,
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                 f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
-                f"親のブランチの名前は識別子（{work.name}）で、取り込み（ccnavi-sync.sh）と"
-                "権威は名前の同じブランチだけを見る。閉じるのを待ってから切り替える",
+                f"親のブランチの名前は識別子（{work.name}）と同じで、取り込み（ccnavi-sync.sh）と"
+                "権威の検査は同じ名前のブランチだけを見る。"
+                "親が閉じるのを待ってから、ブランチを切り替えてください",
             )
         )
     return problems
@@ -1276,7 +1280,7 @@ def _layer_drift(
                 where,
                 f"作業ツリーの {rel} が統合先（{integ.branch or '?'}）の控えと違う"
                 f"（{how}）。"
-                "統合先に入るまで、他の機械と Chrome の判定には効かない",
+                "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない",
             )
         )
     return problems
@@ -1317,7 +1321,7 @@ def _projected_layer_problems(
                 f"親のブランチ {st.family} の上のプロジェクトの層（{rel}）が、統合先の層と"
                 "共通層から計算した層と違う。"
                 "判定は親のブランチの上の層を読まない（ADR-0093 の D28）。"
-                "統合先で直すか、着手で写し直す",
+                "統合先で直すか、着手のときにもう一度写してください",
             )
         )
     return problems
@@ -1466,13 +1470,13 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
                 SEVERITY_WARN,
                 name,
                 f"{why}。実行前の判定はチケットの範囲をここに当てないので、追跡されて"
-                "いると、承認した範囲の外のものがコミットに乗りうる。そうなったぶんは"
+                "いると、承認した範囲の外のファイルがコミットに入りうる。入ったぶんは"
                 "実行後の監視とサブエージェント終了時の検査が範囲外として報告するので、"
-                "下書きがそのたびに咎められることになる。"
+                "下書きのたびに範囲外と報告される。"
                 f"このリポジトリの `.gitignore` に `/{place}/` を足して追跡から外すか"
                 "（プロジェクトのリポジトリに運用の痕跡を残したくないなら"
-                f"`.git/info/exclude` でもよい）、`{place}/` を使わずにチケットの範囲の"
-                "中で作業する",
+                f" `.git/info/exclude` でもよい）、`{place}/` を使わずにチケットの範囲の"
+                "中で作業してください",
             )
         )
     return problems
@@ -1510,7 +1514,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 SEVERITY_WARN,
                 "(projects)",
                 f"{rel}/ がワークスペースの git で無視されていない。プロジェクトは自分の git を"
-                "持つので、ワークスペースの `.gitignore` に入れる",
+                "持つので、ワークスペースの `.gitignore` に入れてください",
             )
         )
     for p in found:
@@ -1523,11 +1527,11 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     where,
                     f"{reserved} は層の名札に予約してある（`{settings.LAYER_COMMON}` は共通層、"
                     f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
-                    f"層として数えていない（id の `{p.name}:` がどちらの層の話か決まらない。"
-                    "綴りの大文字小文字は問わない）。ここに置いた宣言は 1 件も効いておらず、"
+                    f"層として数えていない（id の `{p.name}:` がどちらの層を指すか決まらないため。"
+                    "大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も効いておらず、"
                     "このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / "
                     "Edit / NotebookEdit）は共通層だけで判定している。"
-                    "別の名前に変える",
+                    "プロジェクトを別の名前に変えてください",
                 )
             )
         if os.path.isdir(os.path.join(p.root, ".claude")):
@@ -1575,7 +1579,7 @@ def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
         rel = "/".join([head, name, *tail])
         if name in known:
             proper = "/".join([where, name, *parts])
-            why = f"プロジェクト向けの提案はそのプロジェクトの側 {proper}/ に置く"
+            why = f"プロジェクト向けの提案はそのプロジェクトの側 {proper}/ に置いてください"
         else:
             why = (
                 f"{name} が {where} のプロジェクトとして数えられていない"
@@ -1784,7 +1788,7 @@ def _project_settings(root: str) -> list[Problem]:
                     f"{PROJECT_SETTINGS} の env が {settings.MODE_ENV}={modes.DISABLE} を"
                     "宣言している。"
                     "監視される側が書けるファイルから監視を止めている。"
-                    "止めるならセッションを起動する側の環境から渡す",
+                    "止めるならセッションを起動する側の環境から渡してください",
                 )
             )
         elif normalized not in (modes.DRY_RUN, modes.ENABLE):
@@ -1853,8 +1857,10 @@ def _local_settings(root: str) -> list[Problem]:
             SEVERITY_ERROR,
             "(project)",
             f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
-            "ファイルに置かない（Chrome と端末の sh には効かず、同じ家族を別の綴りで読む）。"
-            f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から渡す。"
+            "ファイルに置かない（Chrome と端末の sh には使われないので、同じ家族をプロセスごとに"
+            "別の綴りで読むことになる）。"
+            f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
+            "渡してください。"
             f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",
         )
         for name in _LOCAL_FORBIDDEN
@@ -1884,7 +1890,7 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
                 "(project)",
                 f"{PROJECT_SETTINGS} の env の {settings.BIN_ENV}={declared} は在るが実行できない。"
                 "hook が起動しないので何も判定していない。実行ビットを付ける"
-                f"（chmod +x {declared}）か、scripts/ccnavi-setup.sh を打ち直す",
+                f"（chmod +x {declared}）か、scripts/ccnavi-setup.sh を打ち直してください",
             )
         )
     return problems
@@ -1925,8 +1931,8 @@ def _rules(
             Problem(
                 SEVERITY_ERROR,
                 "(rules)",
-                "`deny` が空。何も止めないガードは、入っていないガードと"
-                "同じでありながら、入っているように見える",
+                "`deny` が空。何も止めないガードは、入れていないのと"
+                "同じなのに、入っているように見える",
             )
         )
 
@@ -1949,12 +1955,14 @@ def _rules(
         name = rule.id or f"(id 無し: {rule.decision} {rule.match} {rule.glob or rule.regex})"
         if not rule.id:
             problems.append(
-                Problem(SEVERITY_WARN, name, "id が無い。記録も報告もこのルールを名指しできない")
+                Problem(SEVERITY_WARN, name, "id が無い。記録や報告でこのルールを名指しできない")
             )
         elif rule.id in seen:
             problems.append(
                 Problem(
-                    SEVERITY_WARN, name, "id が重複している。記録からどちらがヒットしたか辿れない"
+                    SEVERITY_WARN,
+                    name,
+                    "id が重複している。どちらのルールがヒットしたかを記録から辿れない",
                 )
             )
         seen.add(rule.id)
@@ -1984,7 +1992,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                 SEVERITY_ERROR,
                 name,
                 f"{rule.decision} に message がある。{where}ので、モデルに渡す文は "
-                "additionalContext に書き、message は消す",
+                "additionalContext に書き、message は消してください",
             )
         )
 
@@ -2015,7 +2023,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                     SEVERITY_WARN,
                     name,
                     f"{key} の {rel} は {ctxfile.MAX_CHARS} 文字を超える。"
-                    "先頭だけが届き、切ったことを末尾に添える",
+                    "先頭だけが渡り、切り詰めたことを末尾に書き足す",
                 )
             )
 
@@ -2036,7 +2044,8 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                     SEVERITY_WARN,
                     name,
                     f"広い allow に additionalContext がある（{why}）。"
-                    "ヒットするたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
+                    "ヒットするたびに同じ文がコンテキストに積まれる。"
+                    "狭いルールに分けて書いてください",
                 )
             )
     return problems
@@ -2075,7 +2084,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
                 name,
                 f"プロジェクトの層の {rules.STOP_MATCH} のルールは使われない。ターンの終わりには"
                 "共通層と自身の層しか読まない"
-                "（外のリポジトリの 1 行でメインのターンを止めさせない）",
+                "（外のリポジトリの 1 行でメインのターンを止めさせないため）",
             )
         ]
     problems: list[Problem] = []
@@ -2084,9 +2093,10 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"{rules.STOP_MATCH} には当てる文字列が無い"
-                f"（固定の {rules.STOP_SUBJECT} に当てる）。"
-                'この glob / regex では当たらないので何も起きない。glob: "*" と書く',
+                f"{rules.STOP_MATCH} のルールは呼び出しの文字列ではなく、"
+                f"固定の {rules.STOP_SUBJECT} に当てる。"
+                "この glob / regex はそれに当たらないので何も起きない。"
+                'glob: "*" と書いてください',
             )
         )
     if rule.every < 2:
@@ -2094,9 +2104,9 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"{rules.STOP_MATCH} のルールに every が無い（1）ので使われない。"
-                "使うと渡す回ごとにターンの終わりを止めるので、"
-                "every: 10 のように刻む",
+                f"{rules.STOP_MATCH} のルールに every が無い（1 として扱う）ので使われない。"
+                "使えばターンが終わるたびに止めることになるので、"
+                "every: 10 のように間隔を空けてください",
             )
         )
     return problems
@@ -2116,8 +2126,8 @@ def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
             Problem(
                 SEVERITY_ERROR,
                 name,
-                f"every の {rule.every_written!r} は刻みとして読めない。"
-                "1 以上の整数で書く。このまま置くと刻まず毎回渡る",
+                f"every の {rule.every_written!r} は間隔として読めない。"
+                "1 以上の整数で書いてください。このままだと間隔を空けず、毎回渡る",
             )
         ]
     # 刻むのは渡す回で、渡すものが無ければ刻んでも何も起きない。文が無くても
@@ -2132,9 +2142,9 @@ def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 name,
-                "every があるのに渡すものが無い。刻んでも何も渡らない。"
+                "every があるのに渡すものが無いので、間隔を空けても何も渡らない。"
                 "additionalContext（または additionalContextOnce・…File）を書くか、"
-                "every を消す",
+                "every を消してください",
             )
         ]
     return []
