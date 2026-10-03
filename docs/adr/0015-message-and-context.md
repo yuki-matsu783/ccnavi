@@ -1,11 +1,11 @@
 ---
 type: adr
-title: "`message` は `deny` だけの欄にし、モデルへの一言は `additionalContext` に分ける"
-description: "message を deny のみの欄にし、ask と allow ではモデルへの説明を additionalContext で渡す"
+title: "`message` は `deny` だけのキーにし、モデルへの一言は `additionalContext` に分ける"
+description: "message を deny のみのキーにし、ask と allow ではモデルへの説明を additionalContext で渡す"
 tags: [rules, config]
 keywords: [message, additionalContext, deny, ask, allow, ルール説明]
 ---
-# ADR-0015: `message` は `deny` だけの欄にし、モデルへの一言は `additionalContext` に分ける
+# ADR-0015: `message` は `deny` だけのキーにし、モデルへの一言は `additionalContext` に分ける
 
 状態: 採用
 
@@ -24,14 +24,14 @@ keywords: [message, additionalContext, deny, ask, allow, ルール説明]
 
 ## 決定
 
-`message` は `deny` だけの欄（必須）。`ask` と `allow` に書くと `--lint` が error にする。
+`message` は `deny` だけのキー（必須）。`ask` と `allow` に書くと `--lint` が error にする。
 モデルに伝えたいことはタイプによらず `additionalContext`（毎回）と `additionalContextOnce`
 （文脈ごとに 1 度）に書き、本文をファイルで渡す `additionalContextFile` / `additionalContextOnceFile`
 も持つ。once の記憶はセッションの開始（起動・再開・compact の後）で捨てる。dry-run でも届ける。
 
 ## 理由
 
-書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。「通すが、これを踏まえて
+書いた人は「モデルに届く」と思って書くので、届かないキーを残さない。「通すが、これを踏まえて
 進めろ」を言う手段が無いと、それを言いたい場所を deny にして 1 往復させるか、CLAUDE.md に
 書いて全体に適用するかしかなくなる（REQ-PRE-11）。dry-run でも届けるのは、`enable` に
 切り替えて初めて読まれる文を残さないため。once を compact で忘れるのは、文脈が新しくなるたびに
@@ -53,5 +53,5 @@ keywords: [message, additionalContext, deny, ask, allow, ルール説明]
 
 ## 採らなかった案
 
-- `message` を全タイプに残す。届かない欄が残る
+- `message` を全タイプに残す。届かないキーが残る
 - 案内を CLAUDE.md に書く。全体に適用されてしまい、当たった場所でだけ言えない

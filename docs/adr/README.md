@@ -94,7 +94,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0012](0012-builtin-fallback.md) | ルールが読めないときは組み込みの既定を使う |
 | [0013](0013-heredoc.md) | ヒアドキュメントを既定のルールで止める |
 | [0014](0014-resolved-path.md) | ファイルのパスは行き着く先で見る |
-| [0015](0015-message-and-context.md) | `message` は `deny` だけの欄にし、モデルへの一言は `additionalContext` に分ける |
+| [0015](0015-message-and-context.md) | `message` は `deny` だけのキーにし、モデルへの一言は `additionalContext` に分ける |
 | [0016](0016-test-same-path.md) | 判定を実行せずに試す道を、判定と同じ関数で作る |
 | [0032](0032-main-tree.md) | ワークスペースルート直下の編集をルールで止める |
 | [0034](0034-all-reasons-claude-only.md) | 該当した理由を全部 1 回で返し、対象は Claude Code に絞る |
@@ -150,7 +150,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
-| [0058](0058-approval-is-the-place.md) | 承認の権威は置き場。記録の欄は必須にせず、承認の検査を判定でも当てる |
+| [0058](0058-approval-is-the-place.md) | 承認の権威は置き場。記録のキーは必須にせず、承認の検査を判定でも当てる |
 | [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
 | [0073](0073-origin-tree-is-the-fallback-home.md) | 権威のツリーが無ければ元ツリーを採る |

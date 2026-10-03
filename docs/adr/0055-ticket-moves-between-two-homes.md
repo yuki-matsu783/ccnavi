@@ -64,7 +64,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 | 承認済みチケットの置き場 | `.ccnavi/tickets/`（開は直下、閉は `closed/`） | `.ccnavi/approved/`（`doing/` / `done/`） |
 | 承認 | 承認済みチケットを書く。提案は `todo/` に残る | `todo/` から `approved/doing/` へ動かす（`ccnavi_approved` を足す） |
 | 改版（計画の変更） | `todo/` の提案を書き換えて承認 | 同じ識別子の提案を `todo/` に書く。承認で `doing/` の側の計画だけ差し替え、`todo/` の側は消す |
-| `ticket start` | `todo/` → `doing/`、着手の欄を書く | 置き場は動かさず、`approved/doing/` の欄（`started_at` / `base_sha`）だけを書く |
+| `ticket start` | `todo/` → `doing/`、着手のキーを書く | 置き場は動かさず、`approved/doing/` のキー（`started_at` / `base_sha`）だけを書く |
 | `ticket done`（子） | `doing/` → `done/`。承認済みチケットは `closed/` へ | フェーズがレビュー要（延期を含む）なら `wip/proposals/review/` へ、不要なら `approved/done/` へ |
 | `ticket done`（親） | 同上 | `approved/done/` へ |
 | `ticket cancel` | `todo/` か `doing/` → `cancelled/` | `approved/doing/` → `approved/done/`（`cancelled_at` / `cancel_reason` を書く）。未承認の提案は消せばよい |
@@ -99,7 +99,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 
 - 得たもの: チケット 1 本につきファイル 1 本。`ls wip/proposals/review` で「人が見るべきもの」が並ぶ
 - 得たもの: レビューの残りを続きの子に写す往復が 1 回減る
-- 得たもの: `phase.sync`（提案の欄を写しに写す・閉じたら `closed/` へ動かす）が要らなくなる
+- 得たもの: `phase.sync`（提案のキーを写しに写す・閉じたら `closed/` へ動かす）が要らなくなる
 - 失ったもの: **承認済みチケットと提案の diff が取れない。** 承認したあとに何を書き足したかは、
   git の履歴で見ることになる（提案は承認で `todo/` から消え、その削除がコミットに入る）
 - 失ったもの: **既定のまま使っていたツリーは移行が要る。** `.ccnavi/tickets/` を
@@ -120,6 +120,6 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 - **続きの子を自動で起こす（`check` が未解決を見つけたら）。** 人の判断を挟まないので、
   「受け入れて閉じる」との選び分けができない。起こすかどうかは人が決める
 - **`cancelled/` を残す。** 4 つの置き場に揃えるため、取り消しは `done/` に `cancelled_at` を
-  持って入る。ボードは `cancelled_at` の欄で「取り消し」の列に分ける。ボードの列は今までどおり
+  持って入る。ボードは `cancelled_at` のキーで「取り消し」の列に分ける。ボードの列は今までどおり
   未着手・作業中・完了・取り消しの 4 つで、`doing/` と `review/` はどちらも作業中の列に入る
   （レビュー待ちはカードの属性で示す）
