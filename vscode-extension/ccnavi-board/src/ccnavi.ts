@@ -247,7 +247,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
     const why = ran.killed
-      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒で返らないので打ち切りました`
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒たっても応答が無いため打ち切りました`
       : ran.stderr;
     return { ok: false, launcher, error: `ccnavi --explain --json が失敗しました: ${why}` };
   }
@@ -314,7 +314,7 @@ export async function runApproveYes(
       ok: false,
       error:
         `${cutOff("ccnavi --approve --yes", APPROVE_TIMEOUT_MS)}。` +
-        "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットと push は送っていません" +
+        "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットと push はターミナルに送っていません" +
         "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確かめてください",
     };
   }

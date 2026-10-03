@@ -275,7 +275,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
@@ -302,7 +302,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   if (target.kind === "common" && !exists) {
     notices.push(
-      "種類はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた種類は全プロジェクトに効き、ワークスペースやプロジェクトの設定に同じ id で中身の違う種類があるとその設定が空として扱われます",
+      "種類はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた種類は、すべてのプロジェクトに適用されます。ワークスペースやプロジェクトの設定に、同じ id で中身の違う種類があると、その設定は空として扱われます",
     );
   }
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。

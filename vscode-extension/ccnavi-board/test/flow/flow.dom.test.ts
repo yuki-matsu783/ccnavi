@@ -70,7 +70,7 @@ test("CB-D108 ファイルが無ければ雛形を見せ、そのまま保存で
   const dom = await openFlow({ exists: false });
   try {
     assert.equal(dom.all(".react-flow__node").length, 2);
-    assert.match(dom.one(".toolbar").textContent ?? "", /ファイルはまだ無い。保存すると作られる/);
+    assert.match(dom.one(".toolbar").textContent ?? "", /ファイルはまだありません。保存すると作られます/);
     const save = dom.one<HTMLButtonElement>("#save");
     assert.ok(!save.disabled);
     assert.ok(dom.one<HTMLButtonElement>('[data-action="open-flow"]').disabled, "無いファイルはエディタで開けない");
@@ -93,8 +93,8 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
   const dom = await openFlow({ ticket: "i0001-02", doc: marked(), lock, exists: false });
   try {
     const banner = dom.one("#lock").textContent ?? "";
-    assert.match(banner, /着手中なので、フローは書き換えられない/);
-    assert.match(banner, /finish で終わるか cancel で取り消されると外れる/);
+    assert.match(banner, /着手中のため、フローを書き換えられません/);
+    assert.match(banner, /finish で終わるか cancel で取り消されると外れます/);
     for (const button of dom.all<HTMLButtonElement>('[data-action="add-node"]')) {
       assert.ok(button.disabled);
     }
@@ -191,7 +191,7 @@ test("CB-D111 入れ子が子の下 2 段を超えるときだけ注意を出す
   const dom = await openFlow({ doc: deep });
   try {
     const notices = dom.all("#flow-notices li").map((li) => li.textContent ?? "");
-    assert.ok(notices.some((n) => /子の下に 3 段重なる/.test(n)), notices.join("\n"));
+    assert.ok(notices.some((n) => /子の下に 3 段重なっています/.test(n)), notices.join("\n"));
     assert.ok(notices.some((n) => /サブフロー（subAgentFlows）が 2 本/.test(n)));
     // サブフローのノードにも入れ子の印
     assert.equal(dom.one('.react-flow__node[data-id="outer"]').querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");

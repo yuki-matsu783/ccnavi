@@ -197,6 +197,14 @@ test("CB-D53 項目を足すと開いて出し、並べ替えと削除が保存�
     const added = dom.all("#factors > li.factor").pop();
     assert.ok(added !== undefined && added.classList.contains("open"), "足した項目は開いて出す");
     assert.equal(added.getAttribute("data-key"), "f5");
+    // 空の欄の代わりに出す断り（未設定）は書いてある値ではないので、絞り込みでは当たらない
+    assert.equal(dom.one(`${rowSelector("f5")} .sum-points`).textContent, "（未設定）");
+    dom.type(dom.one("#find"), "未設定");
+    await dom.settle();
+    assert.ok(dom.one(rowSelector("f5")).classList.contains("hidden-by-find"));
+    assert.equal(dom.one("#factor-count").textContent, "0 / 5（開いたまま 1）");
+    dom.type(dom.one("#find"), "");
+    await dom.settle();
     dom.type(dom.one(`${rowSelector("f5")} input.f-id`), "new");
     await dom.settle();
     // 1 つ上げて、1 件目を消す

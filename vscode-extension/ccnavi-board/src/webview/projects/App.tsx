@@ -128,7 +128,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             className="action"
             data-action="open-rules"
             data-name=""
-            title="共通の設定のルール（どのツリーにも効きます。既定 .ccnavi/common/rules.yml）を編集し、判定を試します"
+            title="共通の設定のルール（どのツリーにも適用されます。既定は .ccnavi/common/rules.yml）を編集し、判定を試します"
             onClick={() => post({ type: "openRules", name: "" })}
           >
             ルール設定
@@ -242,7 +242,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '.toolbar [data-action="open-rules"]',
     title: "共通の設定のルール",
-    body: "どのツリーにも効く共通の設定のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
+    body: "どのツリーにも適用される共通の設定のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
   },
   {
     target: '[data-action="tour"]',
@@ -326,7 +326,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           className="action small"
           data-action="open-self-rules"
           disabled={!page.selfRulesExists}
-          title="ワークスペースの設定のルールを編集し、判定を試します。このルールは、ワークスペース（プロジェクト外）のツリーへの書き込みと、全ツリーの Bash に、共通の設定に足してヒットします"
+          title="ワークスペースの設定のルールを編集し、判定を試します。このルールは共通の設定のルールに足され、ワークスペース（プロジェクト外）のツリーへの書き込みと、すべてのツリーの Bash でヒットします"
           onClick={() => post({ type: "openSelfRules" })}
         >
           ルール設定

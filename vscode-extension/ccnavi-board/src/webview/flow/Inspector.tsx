@@ -87,7 +87,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
     if (connection !== undefined) {
       const name = (id: string): string => {
         const node = doc.nodes.find((n) => n.id === id);
-        return node === undefined ? `${id}（無い）` : nodeName(node) || id;
+        return node === undefined ? `${id}（見つかりません）` : nodeName(node) || id;
       };
       return (
         <aside className="inspector" id="inspector" data-selected="edge" onBlur={onSeal}>
@@ -102,7 +102,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
               type="text"
               className="f-condition"
               value={str(connection.condition)}
-              placeholder="空なら出口の名前を条件として読む"
+              placeholder="空なら出口の名前を条件として使います"
               disabled={readOnly}
               onChange={(event) => onChange(setConditionAt(doc, selected.index, event.target.value), `edge:${selected.index}:condition`)}
             />
@@ -136,7 +136,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         <span title="description">説明</span>
         <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }), "flow:description")} />
       </label>
-      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線にポインタを載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。Ctrl+Z で元に戻し、Ctrl+C・Ctrl+V・Ctrl+D で選んだノードを写す・貼る・複製する。</p>
+      <p className="hint">ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を書けます。ノードや線にポインタを載せると × が出て、押すと消せます。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Z で元に戻せます。選んだノードは Ctrl+C でコピー、Ctrl+V で貼り付け、Ctrl+D で複製できます。</p>
     </aside>
   );
 }
@@ -183,7 +183,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
         )}
         {list !== undefined && value !== "" && (
           <span className={found === undefined ? "candidate-source missing" : "candidate-source"} data-source={found?.source ?? "missing"}>
-            {found === undefined ? "候補に無い（利用者・プラグインのものなら気にしなくてよい）" : sourceLabel(found.source)}
+            {found === undefined ? "候補にありません（利用者やプラグインのものなら気にしなくてかまいません）" : sourceLabel(found.source)}
           </span>
         )}
       </label>
@@ -236,17 +236,17 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
         </>
       )}
       {known && branchKey(type) !== undefined && <Branches doc={doc} node={node} readOnly={readOnly} onChange={onChange} />}
-      {host !== undefined && <p className="dim small">グループ「{nodeName(host) || host.id}」の中。枠の外へ引くとグループから出る。</p>}
+      {host !== undefined && <p className="dim small">グループ「{nodeName(host) || host.id}」の中にあります。枠の外へドラッグすると、グループから出ます。</p>}
       {group && (
         <>
-          <p className="hint">図の上の枠。手順には入らない（線は繋がない）。中のノードは {members} 個。枠の中へ引いたノードは枠に入り、外へ引くと出る。選ぶと縁を引いて大きさを変えられる。</p>
+          <p className="hint">図の上の枠です。手順には入りません（線はつなぎません）。中のノードは {members} 個です。枠の中へドラッグしたノードは枠に入り、外へドラッグすると出ます。枠を選ぶと、縁をドラッグして大きさを変えられます。</p>
           <div className="buttons">
             <button
               type="button"
               className="action"
               data-action="ungroup"
               disabled={readOnly}
-              title="枠だけ消して、中のノードはその場に残す"
+              title="枠だけ消して、中のノードはその場に残します"
               onClick={() => {
                 onChange(ungroup(doc, node.id));
                 onSelect(undefined);
@@ -259,7 +259,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       )}
       {!known && !group && (
         <>
-          <p className="hint">この画面に入力欄が無い種類。名前と位置だけ変えられ、中身（data）は保存してもそのまま残る。</p>
+          <p className="hint">この画面に入力欄が無い種類です。名前と位置だけを変えられ、中身（data）は保存してもそのまま残ります。</p>
           <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
         </>
       )}
@@ -311,7 +311,7 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
             onChange={(event) => onChange(patchBranch(doc, node.id, index, { [second]: event.target.value }), `node:${node.id}:branch:${index}:${second}`)}
           />
           {!fixed && (
-            <button type="button" className="action small" data-action="remove-branch" disabled={readOnly || items.length <= 1} title="この出口と、そこから出る線を消す" onClick={() => onChange(removeBranch(doc, node.id, index))}>
+            <button type="button" className="action small" data-action="remove-branch" disabled={readOnly || items.length <= 1} title="この出口と、そこから出る線を消します" onClick={() => onChange(removeBranch(doc, node.id, index))}>
               消す
             </button>
           )}
