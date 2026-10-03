@@ -13,7 +13,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 `projects/` が無いか空なら、以下はすべてワークスペース自身の作業として読む。
 
 - プロジェクトの作業は `cd projects/<名前>` してから `ccnavi-git.sh` を打つ。git の操作はそのリポジトリに対して行われる
-- チケットは `project:` を持つ。値は `projects/` の名前で、決めるのは人の承認。エージェントが申告した値は判定に使われない
+- チケットは `project:` を持つ。値は `projects/` の名前で、決めるのはユーザの承認。エージェントが申告した値は判定に使われない
 
 ## 何がどこに置かれるか
 
@@ -35,14 +35,14 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 別の機械で続きをするのに要るもの（依頼時の HEAD、リスクの点、受け入れた指摘、Draft を外した印）は
 全部 `.ccnavi/approved/phases/<親>/` にある。記録と控え（`logs/`）とワークツリーはワークスペース側で、git には入れない。
 
-子のフローはエージェントが書かない（シェルからも）。書くのは人（ボードのフロー編集画面）で、コミットと push も人
-（`ccnavi-push-approved.sh`）。着手中は人も書き換えられず、着手のあとに変わると `NOTICE_TICKET_FLOW_CHANGED` で
-人に知らされる。親のツリーから起動されたら、自分の担当の子のフローだけに従う（ADR-0085）。
+子のフローはエージェントが書かない（シェルからも）。書くのはユーザ（ボードのフロー編集画面）で、コミットと push もユーザ
+（`ccnavi-push-approved.sh`）。着手中はユーザも書き換えられず、着手のあとに変わると `NOTICE_TICKET_FLOW_CHANGED` で
+ユーザに知らされる。親のツリーから起動されたら、自分の担当の子のフローだけに従う（ADR-0085）。
 
-チケットは 1 本のファイルで、`wip/proposals/todo/`（承認待ち）→ `.ccnavi/approved/doing/`（人が承認）→
-`wip/proposals/review/`（`ticket finish`。レビュー要のとき）→ `.ccnavi/approved/done/`（人がレビュー）と
-動く（ADR-0055）。`.ccnavi/approved/` へ動かすのは人、`wip/proposals/` へ動かすのはエージェント
-（`ccnavi-ticket.sh` 経由）。レビューで残った指摘は、人が `decide`（ボードの「決める」か端末）で、指摘ごとに
+チケットは 1 本のファイルで、`wip/proposals/todo/`（承認待ち）→ `.ccnavi/approved/doing/`（ユーザが承認）→
+`wip/proposals/review/`（`ticket finish`。レビュー要のとき）→ `.ccnavi/approved/done/`（ユーザがレビュー）と
+動く（ADR-0055）。`.ccnavi/approved/` へ動かすのはユーザ、`wip/proposals/` へ動かすのはエージェント
+（`ccnavi-ticket.sh` 経由）。レビューで残った指摘は、ユーザが `decide`（ボードの「決める」か端末）で、指摘ごとに
 「対応しない」「このフェーズで直す（続きの子チケットを `doing/` に起こす）」「issue に回す」を選ぶ。
 
 ラッパースクリプトが返す記録の綴りは cwd から開ける形で出る。そのまま `sed -n` などで開けばよい。
