@@ -2,10 +2,10 @@
  * フロー編集画面の本体。帯・ツールバー・部品箱・図・右の欄。
  *
  * 見せる中身は拡張ホストが渡す（`FlowData`）。画面が持つのは、ユーザが触って決めるもの（編集中のフロー、
- * 選んでいるもの、直前の操作の一言、元に戻す履歴、写したノード）だけ。
+ * 選んでいるもの、直前の操作の一言、元に戻す履歴、コピーしたノード）だけ。
  *
- * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）の写しで、
- * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼る が止まる）。
+ * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）をそのまま反映したもので、
+ * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼り付け が止まる）。
  * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く。
  *
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
@@ -121,7 +121,7 @@ function now(): number {
   return typeof clock === "function" ? Number((clock as () => number)()) : Date.now();
 }
 
-/** 押した鍵が欄の中か（欄の中の Ctrl+Z や Ctrl+C は欄に任せる） */
+/** キーを押した先が欄の中か（欄の中の Ctrl+Z や Ctrl+C は欄に任せる） */
 function inField(target: EventTarget | null): boolean {
   const element = target as { tagName?: unknown; isContentEditable?: unknown } | null;
   if (element === null || typeof element.tagName !== "string") {
@@ -169,16 +169,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [changed, setChanged] = useState(false);
   const [selected, setSelected] = useState<Selection | undefined>(undefined);
   const [picked, setPicked] = useState<readonly string[]>([]);
-  // 図の外で選んだノード（部品箱で足した・グループ化で作った・貼った）。図はこれが替わったときだけ、それを選び直す
+  // 図の外で選んだノード（部品箱で足した・グループ化で作った・貼り付けた）。図はこれが替わったときだけ、それを選び直す
   const [focus, setFocus] = useState<{ readonly ids: readonly string[] } | undefined>(undefined);
   const [minimap, setMinimap] = useState(minimapShown);
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
-  // 写したノード（画面の中の控え）と、同じ控えを何回貼ったか（貼るたびに少しずつずらす）
+  // コピーしたノード（画面の中の控え）と、同じ控えを何回貼り付けたか（貼り付けるたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
   // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指す写し、`pendingDoc` は頼んで答えを待っている写し、
-  // `checkSeq` は最後に頼んだ確かめの番号。写しが替わるたびに番号を進め、待っていた答えは捨てる
+  // `checkSeq` は最後に頼んだ確認の番号。写しが替わるたびに番号を進め、待っていた答えは捨てる
   // （答えを待つ間に直すと、古い写しの答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
@@ -211,7 +211,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         setReview(undefined);
         setReviewSave(page?.reviewSave === true);
         setLock(page?.lock ?? NO_LOCK);
-        // 頼んでいた確かめの答えは捨てる（番号を進める）
+        // 頼んでいた確認の答えは捨てる（番号を進める）
         checkSeq.current += 1;
         checkedDoc.current = page?.checks === undefined ? undefined : page.doc;
         pendingDoc.current = undefined;
@@ -291,11 +291,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   }, [doc, dirty]);
 
   // 図で選んでいるノードが変わった。**毎回同じ関数を渡す**（React Flow は onSelectionChange が替わるたびに
-  // その時の選びで呼び直すので、描くたびに作り直すと、押した直後の古い選びで呼ばれる）
+  // その時の選択で呼び直すので、描くたびに作り直すと、押した直後の古い選択で呼ばれる）
   const pick = useCallback((ids: readonly string[]): void => {
     setPicked((now) => (sameIds(now, ids) ? now : ids));
-    // Shift を押しながら選んでいたノードを押すと、React Flow はそれを選びから外す。右の欄がそのノードの
-    // ままにならないよう、残った選びの最後のノード（残っていなければ何も無い）に替える
+    // Shift を押しながら選んでいたノードを押すと、React Flow はそれを選択から外す。右の欄がそのノードの
+    // ままにならないよう、選択に残ったノードの最後（残っていなければ何も無い）に替える
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
 
@@ -324,7 +324,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
   const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc, { exe: checks !== undefined })), [doc, checks]);
 
-  // 鍵を受け取る側は 1 度だけ張り、中身は描くたびに最新へ差し替える
+  // キー入力を受け取る側は 1 度だけ張り、中身は描くたびに最新へ差し替える
   const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
     const listener = (event: KeyboardEvent): void => onKey.current(event);
@@ -368,7 +368,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setDoc(next);
   };
 
-  /** 戻した・やり直した写しに無いものを選んでいたら外す（線は並びの位置で指すので、線の選びは外す） */
+  /** 戻した・やり直した写しに無いものを選んでいたら外す（線は並びの位置で指すので、線の選択は外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
     if (moved === undefined || readOnly) {
       return;
@@ -395,10 +395,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setFocus({ ids: [added.id] });
   };
 
-  /** 消したものを選んでいたら、選ぶのをやめる（線は並びの位置で指すので、線を消したら線の選びは外す） */
+  /** 消したものを選んでいたら、選ぶのをやめる（線は並びの位置で指すので、線を消したら線の選択は外す） */
   const removeNodeAt = (id: string): void => {
     edit(removeNode(doc, id));
-    // ノードと一緒に線も消えて並びの位置がずれるので、線の選びも外す
+    // ノードと一緒に線も消えて並びの位置がずれるので、線の選択も外す
     if ((selected?.kind === "node" && selected.id === id) || selected?.kind === "edge") {
       setSelected(undefined);
     }
@@ -422,11 +422,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setFocus({ ids: [grouped.id] });
   };
 
-  // 写す・複製するのは、図で選んでいるノード（無ければ右の欄に出しているノード）
+  // コピー・複製するのは、図で選んでいるノード（無ければ右の欄に出しているノード）
   const chosen = picked.length > 0 ? picked : selected?.kind === "node" ? [selected.id] : [];
   const copyable = copyNodes(doc, chosen) !== undefined;
 
-  /** 貼った・複製したノードを選ぶ。右の欄は最後のノード */
+  /** 貼り付けた・複製したノードを選ぶ。右の欄は最後のノード */
   const choose = (ids: readonly string[]): void => {
     setFocus({ ids });
     setSelected(ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] });

@@ -656,8 +656,7 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 
 当たったルールの `additionalContext`（渡す回のたび）と `additionalContextOnce`（文脈で渡す回の最初の 1 回）を、判定とは別の経路で届ける。
 文脈は `session_id` と `agent_id` の組で、サブエージェントはその起動ごとに別に数える。記憶は
-`state/once-<セッション>-<エージェント>.json` に「鍵 → 当たった回数」で置き（鍵はルールの `id`、無ければ `match` と綴りの組。
-古い形の鍵の配列も読める）、`SessionStart`（起動・再開・compact の後）で捨てる。
+`state/once-<セッション>-<エージェント>.json` に「鍵 → 当たった回数」で置き（鍵はルールの `id`、無ければ `match` と綴りの組）、`SessionStart`（起動・再開・compact の後）で捨てる。
 
 | 何が起きたか | どうなるか |
 |---|---|
@@ -1106,7 +1105,7 @@ base_sha: ""
   `finish` と HITL ポイントは見ない。書き込みの範囲は承認済みチケットの置き場が決める
 - `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）
-- フロー（次の節）はチケットの欄では指さない。欄 `flow` は廃止。書いてあれば warn で名指しして読み飛ばす
+- フロー（次の節）はチケットの欄では指さない。欄 `flow` は廃止。書いてあっても読まない（warn も出さない）
 
 #### 9.3.1 子のフロー
 
@@ -1162,9 +1161,9 @@ subAgentFlows:             # 無くてよい
 
 | `type` | 読む `data` |
 |---|---|
-| `start` / `end` / `branchSession` | `label`（`workDescription`） |
+| `start` / `end` / `branchSession` | `label` |
 | `prompt` | `prompt` |
-| `subAgent` | `description`（無ければ `agentDefinition`）・`prompt`・`builtInType` |
+| `subAgent` | `description`・`prompt`・`builtInType` |
 | `askUserQuestion` | `questionText`・`options[].label`・`multiSelect` |
 | `ifElse` / `switch` / `branch` | `evaluationTarget`・`branches[].label` / `condition` |
 | `skill` | `name`・`description` |

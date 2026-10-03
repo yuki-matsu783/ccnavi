@@ -271,7 +271,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   }
   const { bytes, mtimeMs } = read;
   const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから再読込してください`);
-  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として壊れているかも
+  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として不正かどうかも
   // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
   if (!verdict.ok) {
@@ -696,8 +696,8 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   }
   await reload(current);
   // 取り込み済みの親子のチケット（C1 の対象）だけ、運ぶ処理を送る。フローはユーザの書いたものなので C1 は運ばず、
-  // ユーザの操作の最後に送る。端末は対話中のことがあるので勝手に打ち込まず、ユーザがボタンを押したときだけ送る。
-  // C1 の対象でない親子のチケットは今どおりユーザがコミットする。
+  // ユーザの操作の最後に送る。ターミナルは対話中のことがあるので、勝手に打ち込まず、ユーザがボタンを押したときだけ送る。
+  // それ以外の親子のチケットは今どおりユーザがコミットする。
   const root = current.folder.uri.fsPath;
   const carrier =
     target.parent !== "" &&

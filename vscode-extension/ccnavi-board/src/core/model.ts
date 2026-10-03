@@ -59,7 +59,7 @@ export interface SeenInJson {
 /**
  * 子チケットのフロー（設計 9.3.1）。親は null。
  * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
- * 拡張は写すだけで、`started_at` などから組み直さない。
+ * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
   /** 読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り） */
@@ -99,7 +99,7 @@ export interface HistoryEntryJson {
 
 /**
  * 満たしていない先行 1 本。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
- * 求める。その答えを実行ファイルが出し、拡張は写すだけ（先行の置き場から組み直さない）。
+ * 求める。その答えを実行ファイルが出し、拡張はそのまま受け取るだけ（先行の置き場から組み直さない）。
  */
 export interface PredecessorUnmetJson {
   readonly ticket: string;
@@ -353,9 +353,9 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     rel: str(raw.rel),
     tree: str(raw.tree),
     exists: raw.exists === true,
-    // 欄が欠けていたら書かない側にする（リンクかを確かめられない）
+    // 欄が欠けていたら書かない扱いにする（リンクかを確かめられない）
     linked: raw.linked !== false,
-    // 欄が欠けていたら閉じる側にする（止まっているかを確かめられないので、書かせない）
+    // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
   };
 }

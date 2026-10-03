@@ -328,7 +328,7 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
 }
 
 /**
- * 子のフローを開くボタン。言葉は在るか・着手中か（実行ファイルの答えの写し）で変わる。
+ * 子のフローを開くボタン。言葉は在るか・着手中か（実行ファイルの答えをそのまま反映したもの）で変わる。
  * 着手中でも押せる（読むだけの画面が開く）。押したら拡張ホストへ返すだけ
  */
 function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string }): JSX.Element {

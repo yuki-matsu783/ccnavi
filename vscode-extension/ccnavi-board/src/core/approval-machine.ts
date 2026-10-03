@@ -1,11 +1,11 @@
 /**
  * 承認のオーバーレイの遷移。**「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけ**をここに置く。
  *
- * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push が端末に送られる）。
+ * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push がターミナルに送られる）。
  * 連打・承認中の再入・古いボードからの承認は現実に起きるので、「この状態ではこれを受けない」を
  * 書き落とさないことが要る。**散らばっていると書き落とす**ので、見張りをこの 1 ファイルに集めた。
  *
- * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・端末に送る・クリップボードに
+ * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・ターミナルに送る・クリップボードに
  * 入れる・新しいセッションで開く・ユーザに言う）は `ApprovalEffect` として返すだけで、**実際に行うのは
  * 呼ぶ側**（`board-panel.ts`）。`core/screen-host.ts` の `Surface` と同じ形で、単体で試せる。
  *
@@ -32,7 +32,7 @@
  * | `decidePreview` | 残った指摘を見せた。押されるまで何も置かない |
  * | `deciding` | 選んだ行き先を置いている。**ここでは閉じない** |
  *
- * ## 見張り（消すと承認が壊れる順）
+ * ## 見張り（消すと承認が正しく動かなくなる順）
  *
  * | 見張り | 消すとどうなる |
  * |---|---|
@@ -157,7 +157,7 @@ export type ApprovalEffect =
       readonly digest: string;
       readonly only: readonly string[];
     }
-  /** 承認済みチケットを運ぶ sh を端末に送る */
+  /** 承認済みチケットを運ぶ sh をターミナルに送る */
   | { readonly kind: "carry" }
   /** 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す */
   | { readonly kind: "loadDecide"; readonly tree: string; readonly phase: number }
@@ -313,7 +313,7 @@ function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalSt
 function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolean): ApprovalStep {
   if (outcome.ok) {
     const count = outcome.value.approved.length;
-    // 運ぶ 1 行は、文を渡すのを待たずに端末へ出す。承認と同じ時点で出しておく
+    // 運ぶ 1 行は、文を渡すのを待たずにターミナルへ出す。承認と同じ時点で出しておく
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って

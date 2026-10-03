@@ -103,7 +103,7 @@ export function mrText(number: number | null): string {
   return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
 }
 
-/** 依頼のマーカーが持つ URL は中身を確かめずに写してあるので、http(s) のときだけリンクにする */
+/** 依頼のマーカーが持つ URL は中身を確かめずにそのまま取り込んであるので、http(s) のときだけリンクにする */
 export function isHttpUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
@@ -134,7 +134,7 @@ export interface BodyLine {
 }
 
 /**
- * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。端末には両方の行がそのまま出るが、
+ * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。ターミナルには両方の行がそのまま出るが、
  * 画面では説明を見出しのツールチップにまとめて、本文を短く保つ。
  */
 export function approvalBody(text: string): BodyLine[] {
@@ -183,7 +183,7 @@ const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
- * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザが端末で同じ sh を打っても `cli`）ので、
+ * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザがターミナルで同じ sh を打っても `cli`）ので、
  * 誰が打ったかは断定しない
  */
 export const VIA_LABELS: Readonly<Record<string, string>> = {

@@ -4,8 +4,8 @@
  *
  * 拡張は hook が受け取るプロセスの環境を見られないので、設定ファイルの本文から読む。
  * シェルから渡された値は拾えない（README に「設定ファイルに書く」と決めてある）。
- * 読めない値は enable として扱う。ccnavi の解決（selfguard.resolve）と同じ向きで、
- * 綴りを誤った設定でボードが消えると、切れたと思い込む。
+ * 読めない値は enable として扱う。ccnavi の解決（selfguard.resolve）と同じ扱いにする。
+ * 綴りを誤った設定でボードが消えると、人はチケット制御が切れたと思い込むため。
  */
 import { envFromSettingsJson } from "./hooks.js";
 

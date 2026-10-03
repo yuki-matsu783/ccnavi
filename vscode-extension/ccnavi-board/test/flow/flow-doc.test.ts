@@ -355,7 +355,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(again.doc, "a").parentId, "group-1");
   assert.deepEqual(absolutePosition(again.doc, "b"), { x: 400, y: 200 });
   assert.deepEqual(again.doc.nodes.map((n) => n.id), ["group-1", "a", "group-2", "b", "c"]);
-  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに気づかないうちに入らない）
+  // 指す先の無い parentId が指す id は使わない（そのノードが気づかないうちに新しいグループに入ることはない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 700, y: 500 }, parentId: "group-1" }, ...three().nodes] };
   const fresh = groupNodes(stray, ["a", "b"]);
   assert.ok(fresh !== undefined);
@@ -399,7 +399,7 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
   const moved = placeNode(doc, "a", { x: 80, y: 60 });
   assert.equal(byId(moved, "a").parentId, "group-1");
   assert.deepEqual(byId(moved, "a").position, { x: 4, y: 12 });
-  // 動かしていなければ同じ写し（押しただけで未保存にしない）
+  // 動かしていなければ同じものを返す（押しただけで未保存にしない）
   assert.equal(placeNode(doc, "a", { x: 100, y: 100 }), doc);
   assert.equal(placeNode(doc, "group-1", { x: 76, y: 48 }), doc);
   assert.equal(placeNode(doc, "nothing", { x: 0, y: 0 }), doc);
@@ -436,7 +436,7 @@ test("CB-T257 まとめて動かしたときは React Flow の位置（枠から
   const inner = placeNodes(grouped.doc, [{ id: "a", position: { x: 30, y: 60 } }]);
   assert.deepEqual(byId(inner, "a").position, { x: 30, y: 60 });
   assert.equal(byId(inner, "a").parentId, "group-1");
-  // 何も動いていなければ同じ写し
+  // 何も動いていなければ同じものを返す
   assert.equal(placeNodes(grouped.doc, [{ id: "a", position: { x: 24, y: 52 } }]), grouped.doc);
 });
 
@@ -454,7 +454,7 @@ test("CB-T258 グループの大きさを変える。左や上の辺を動かし
   assert.deepEqual(absolutePosition(grown, "a"), { x: 100, y: 100 });
   // 下限
   assert.deepEqual(byId(resizeGroup(doc, "group-1", { width: 10, height: 10 }), "group-1").style, { width: 120, height: 80 });
-  // 変わらなければ同じ写し。グループでないものは変えない
+  // 変わらなければ同じものを返す。グループでないものは変えない
   assert.equal(resizeGroup(doc, "group-1", { width: 238, height: 166 }, { x: 76, y: 48 }), doc);
   assert.equal(resizeGroup(doc, "a", { width: 500, height: 500 }), doc);
 });
