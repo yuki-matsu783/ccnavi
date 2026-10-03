@@ -18,11 +18,11 @@
 - **Clock**: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
   記録と跡に同じ時刻を書く
 
-判定そのもの（`approval.gather` / `candidates` / `waiting`、`review` の検査）は今のコードを
+判定そのもの（`agree.gather` / `candidates` / `waiting`、`review` の検査）は今のコードを
 そのまま通る。ここは入口と出口の形を揃えるだけで、判定は変えない。
 
 手元の入口（`--approve` の 4 つの枝と `review confirm`）もここに置く。コアを通す入口を
-コアより下の段（approval・review）に置くと、import が循環する（tests/core/test_module_layers.py）。
+コアより下の段（agree・review）に置くと、import が循環する（tests/core/test_module_layers.py）。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, fsio, history, modes, phase, review, settings, tree
+from . import agree, approval, fsio, history, modes, phase, review, settings, tree
 from . import ticket as ticket_mod
 
 # ---- 入力 -----------------------------------------------------------------------------------
@@ -78,7 +78,7 @@ class Verdict:
     見せたものを渡さなければ None。
     """
 
-    gathered: approval.Gathered
+    gathered: agree.Gathered
     screen_text: str
     digest: str
     messages: str
@@ -87,7 +87,7 @@ class Verdict:
     read_set: dict[str, str] = field(default_factory=dict)
 
     @property
-    def batch(self) -> list[approval.Candidate]:
+    def batch(self) -> list[agree.Candidate]:
         return self.gathered.batch
 
     @property
@@ -117,14 +117,14 @@ def judge_approval(
     err = io.StringIO()
     # 判定が読んだ中身（read_set）を控え、指紋に入れる（ADR-0093 の 6.2。段階 2c）。
     with fsio.reading() as seen:
-        gathered = approval.gather(err, snapshot.conf, snapshot.root, only)
+        gathered = agree.gather(err, snapshot.conf, snapshot.root, only)
         shown = gathered
         if shown_ids is not None and gathered.refused:
-            shown = approval.gather(err, snapshot.conf, snapshot.root)
-    read = approval.read_set(snapshot.conf, snapshot.root, seen)
-    read.update(approval.settings_read_set(snapshot.conf, snapshot.root))
+            shown = agree.gather(err, snapshot.conf, snapshot.root)
+    read = agree.read_set(snapshot.conf, snapshot.root, seen)
+    read.update(agree.settings_read_set(snapshot.conf, snapshot.root))
     text = shown.text
-    digest = approval.approval_digest(text, shown.batch, read)
+    digest = agree.approval_digest(text, shown.batch, read)
     mismatch = None
     if shown_ids is not None:
         wanted = sorted({s.strip() for s in shown_ids if s.strip()})
@@ -154,7 +154,7 @@ class Changes:
     ところ（止まるまでの分は書く）。`per_branch` はブランチごとのファイルの増減。
     """
 
-    planned: approval.Planned
+    planned: agree.Planned
     root: str
     conf: settings.Settings
 
@@ -211,14 +211,14 @@ def _owner(trees: list[tree.Tree], path: str) -> tree.Tree | None:
 def plan(snapshot: Snapshot, verdict: Verdict) -> Changes:
     """承認の書き込みを並べる。書かない（fsio の控える段）。"""
     stamp = snapshot.stamp or fsio.stamp()
-    planned = approval.plan_batch(snapshot.root, snapshot.conf, verdict.batch, stamp)
+    planned = agree.plan_batch(snapshot.root, snapshot.conf, verdict.batch, stamp)
     return Changes(planned, snapshot.root, snapshot.conf)
 
 
 # ---- Writer(FS) -----------------------------------------------------------------------------
 
 
-def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> approval.Applied:
+def write_fs(stdout: TextIO, stderr: TextIO, planned: agree.Planned) -> agree.Applied:
     """並べた書き込みをディスクに書く（Writer(FS)）。前の `_apply` と同じ落ち方をする。
 
     - `FAIL_STOP`: `undo` を消し、`ccnavi: <識別子>: <理由>` を言って止める。置いたものは戻さない
@@ -261,7 +261,7 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> appro
             for path in rule.undo:
                 fsio.remove(path)
             stderr.write(head + message + "\n")
-            return approval.Applied(1, placed, rule.ticket, message)
+            return agree.Applied(1, placed, rule.ticket, message)
         if rule.on_fail == fsio.FAIL_WARN:
             stderr.write(head + message + "\n")
         elif rule.on_fail == fsio.FAIL_LINE:
@@ -272,8 +272,8 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> appro
     if planned.stopped is not None:
         ticket_id, reason = planned.stopped
         stderr.write((f"ccnavi: {ticket_id}: " if ticket_id else "ccnavi: ") + reason + "\n")
-        return approval.Applied(1, placed, ticket_id, reason)
-    return approval.Applied(0, placed)
+        return agree.Applied(1, placed, ticket_id, reason)
+    return agree.Applied(0, placed)
 
 
 def _write_op(op: fsio.Op) -> str:
@@ -305,8 +305,8 @@ def _write_op(op: fsio.Op) -> str:
 
 # ---- 手元の入口（`--approve`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #
-# 前は approval.py にあった。コアを通す入口なので、コアより下の段（approval）には置かない
-# （approval → core → approval の循環になる。tests/core/test_module_layers.py）。
+# 前は approval.py にあった。コアを通す入口なので、コアより下の段（agree）には置かない
+# （agree → core → agree の循環になる。tests/core/test_module_layers.py）。
 
 
 def approve(
@@ -398,7 +398,7 @@ def preview(
         stdout.write(gathered.text + "\n")
         return 0
     stdout.write(
-        json.dumps(approval.preview_body(root, gathered, verdict.digest), ensure_ascii=False) + "\n"
+        json.dumps(agree.preview_body(root, gathered, verdict.digest), ensure_ascii=False) + "\n"
     )
     return 0
 
@@ -445,9 +445,9 @@ def verify(
     judged = judge_approval(read_fs(conf, root), only)
     stderr.write(judged.messages)
     gathered = judged.gathered
-    verdict = approval.verify_verdict(gathered, conf.tickets)
+    verdict = agree.verify_verdict(gathered, conf.tickets)
     if as_json:
-        body = approval.preview_body(root, gathered, judged.digest)
+        body = agree.preview_body(root, gathered, judged.digest)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
     else:
@@ -497,7 +497,7 @@ def approve_yes(
     if verdict.mismatch is not None:
         current = verdict.mismatch["current"]
         if as_json:
-            body = {"version": approval.APPROVE_VERSION, "mismatch": verdict.mismatch}
+            body = {"version": agree.APPROVE_VERSION, "mismatch": verdict.mismatch}
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
         if wanted != current:
             stderr.write(
@@ -523,7 +523,7 @@ def approve_yes(
         # 失敗を返すと、人は「何も起きていない」と読む（README「承認の JSON」の `partial`）。
         if as_json:
             body = {
-                "version": approval.APPROVE_VERSION,
+                "version": agree.APPROVE_VERSION,
                 "partial": {
                     "placed": applied.placed,
                     "ticket": applied.stopped_at,
@@ -539,12 +539,12 @@ def approve_yes(
         return applied.code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = approval.approved_text(tickets, revisions, root)
+    prompt = agree.approved_text(tickets, revisions, root)
     if not as_json:
         stdout.write(lines.getvalue())
         return 0
     body = {
-        "version": approval.APPROVE_VERSION,
+        "version": agree.APPROVE_VERSION,
         "approved": [t.ticket for t in tickets],
         "copies": [
             approval.copy_path(
@@ -640,7 +640,7 @@ def confirm(
         )
     if notes.getvalue():
         return Checked(_unwritten(notes.getvalue()), None)
-    return Checked([], Changes(approval.Planned(stage, stopped), root, conf))
+    return Checked([], Changes(agree.Planned(stage, stopped), root, conf))
 
 
 def _unwritten(text: str) -> list[str]:
@@ -844,7 +844,7 @@ def withdraw(
             stage.line(f"  {ident} の承認を取り下げた（doing/ → todo/）")
     if notes.getvalue():
         return Checked(_unwritten(notes.getvalue()), None)
-    return Checked([], Changes(approval.Planned(stage, stopped), root, conf))
+    return Checked([], Changes(agree.Planned(stage, stopped), root, conf))
 
 
 def withdrawable(snapshot: Snapshot, family: str) -> list[tuple[str, str, list[str]]]:

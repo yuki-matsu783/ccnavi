@@ -280,7 +280,7 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
     for name in os.listdir(state_dir):
         if not name.endswith(".json"):
             continue
-        # 承認を伝えた控え（approval.news）は同じ場所に置く。こちらはセッションの
+        # 承認を伝えた控え（agree.news）は同じ場所に置く。こちらはセッションの
         # 再開で捨てず、古いものだけ一緒に掃く。
         stale = name.startswith("approved-")
         if not stale and not name.startswith("once-"):

@@ -80,7 +80,7 @@ _SESSION_ONLY = (
 # 名前だけでは切れ目が決まらない。既に分かっているセッションの綴りに当てて決める。
 _SESSION_AND_KEY = (
     ("once-", ".json"),  # ctxfile._once_path
-    ("approved-", ".json"),  # approval._news_path
+    ("approved-", ".json"),  # agree._news_path
     ("subagent-", ".bounced"),  # subagent._bounce_path
 )
 # `<セッション>.json`（post._seen_path）。Claude Code のセッションは UUID なので、その形に

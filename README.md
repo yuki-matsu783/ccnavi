@@ -2440,7 +2440,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `ccnavi/post.py` | 実行後の監視。保護領域の変更の検知、差し戻しの文、復元 |
 | `ccnavi/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
 | `ccnavi/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
-| `ccnavi/approval.py` | 承認済みチケット、フェーズのマーカー、子ごとの記録、承認の画面 |
+| `ccnavi/approval.py` | 承認済みチケット、フェーズのマーカー、子ごとの記録の置き場 |
+| `ccnavi/agree.py` | 合意（承認）の手続き。承認の対象を組む、承認の画面、置き場へ動かす |
 | `ccnavi/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `ccnavi/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
 | `ccnavi/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |

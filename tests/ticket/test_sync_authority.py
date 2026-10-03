@@ -16,7 +16,7 @@ import threading
 import time
 import unittest
 
-from ccnavi import approval, core, fsio, settings, syncstate
+from ccnavi import agree, approval, core, fsio, settings, syncstate
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -719,7 +719,7 @@ class DigestTest(AuthorityHarness):
         with fsio.reading() as seen:
             fsio.note_read(once, "a")
             fsio.note_read(record, "b")
-        keys = approval.read_set(self.conf(), self.root, seen)
+        keys = agree.read_set(self.conf(), self.root, seen)
         self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
 
     def test_keys_do_not_depend_on_a_linked_root(self):
@@ -732,7 +732,7 @@ class DigestTest(AuthorityHarness):
         target = os.path.join(linked, ".claude", "worktrees", "i0001", "x.md")
         with fsio.reading() as seen:
             fsio.note_read(target, "x")
-        keys = approval.read_set(self.conf(), linked, seen)
+        keys = agree.read_set(self.conf(), linked, seen)
         self.assertIn("self:i0001:x.md", keys)
         self.assertFalse([k for k in keys if k.startswith("(外)")], keys)
 
@@ -753,7 +753,7 @@ class DigestTest(AuthorityHarness):
             fsio.note_read(os.path.join(project, "x.md"), "b")
         conf = self.conf()
         conf.projects = os.path.join(self.root, "projects")
-        keys = approval.read_set(conf, self.root, seen)
+        keys = agree.read_set(conf, self.root, seen)
         self.assertIn("self:main:x.md", keys)
         self.assertIn("web:main:x.md", keys)
         self.assertNotEqual(keys["self:main:x.md"], keys["web:main:x.md"])

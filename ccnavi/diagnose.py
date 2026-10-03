@@ -31,6 +31,7 @@ from typing import TextIO
 import yaml
 
 from . import (
+    agree,
     approval,
     audit,
     builtin,
@@ -758,12 +759,12 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     review_copies, notes = approval.scan_review(conf, root)
     problems.extend(notes)
 
-    pending, revisions = approval.waiting(
+    pending, revisions = agree.waiting(
         proposals,
         open_copies,
         closed_copies,
         review_copies,
-        approval.types_resolver(conf, root, open_copies),
+        agree.types_resolver(conf, root, open_copies),
     )
     # 先行を引く池。承認と着手が使うのと同じ集め方（ADR-0088）。
     preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)

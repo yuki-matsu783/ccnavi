@@ -397,8 +397,8 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     レビューの sh の綴りがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
     人がどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
     フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の綴りが
-    承認のときの検査（`approval.py`）、後工程の進め方が承認済みチケットが置かれたとき
-    （`approved`）。
+    承認のときの検査（`agree.py`）、後工程の進め方が承認済みチケットが置かれたとき
+    （`agree.approved_text`）。
 
     dry-run の注記は「止まらない」だけで終えない。止まらないことだけを伝えると、通った
     ことが許可の証拠として読まれる。案内に従うところまでを 1 行に入れる。
@@ -418,41 +418,4 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
             f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny にヒットしても止まらない。"
             "通ったことを許可と読まず、表示された案内に次からは従う）"
         )
-    return "\n".join(lines)
-
-
-def approved(tickets, revisions: set[str], root: str) -> str:
-    """チケットが承認されたことをモデルに伝える文。
-
-    `--approve --yes` の `prompt`（拡張が Claude Code に渡す）と、hook が次の
-    UserPromptSubmit / PreToolUse で渡す `additionalContext` の両方がここから出る。
-    2 か所で文を持つと、人が貼った文と hook が渡した文が食い違う。
-
-    tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
-    revisions は親の改版だった識別子。root はワークスペースルートで、sh の綴りに使う。
-    """
-    lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
-    for t in tickets:
-        if t.ticket in revisions:
-            where = "親の改版。計画が新しくなった"
-        elif t.is_child:
-            where = f"親 {t.parent}、フェーズ {t.phase}"
-        else:
-            where = "親"
-        title = f": {t.title}" if t.title else ""
-        lines.append(f"- {t.ticket}{title}（{where}）")
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    # 子の着手は親の着手を前提にする（設計 9.6、REQ-TKT-48）。順をここで言わないと、
-    # 最初の子の着手で止まってから読むことになる。ただし勧めるのは、この回に承認された
-    # 親が居るときだけ。改版と子だけの回で `start <親>` を勧めると、親は着手済みなので
-    # 案内どおりに打つと「着手済み」で終わる。
-    guide = "後工程を進める。"
-    if any(not t.is_child and t.ticket not in revisions for t in tickets):
-        guide += f"親は自分のワークツリーで '{ticket_sh} start <親>' を先に打つ。"
-    if any(t.is_child for t in tickets):
-        guide += (
-            "子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-            f"'{ticket_sh} start <識別子>' で着手する（親が未着手だと止まる）。"
-        )
-    lines.append(guide)
     return "\n".join(lines)

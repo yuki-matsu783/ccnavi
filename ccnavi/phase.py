@@ -752,7 +752,7 @@ def phases_of(
     # 状態は置き場そのもの（ADR-0055）。閉じた（`done/`）、レビュー待ち（`review/`）、
     # 作業中（`doing/`）の順に読み、同じ識別子が 2 つの置き場に在れば閉じた側を採る。
     # 閉じたかどうかを決めるのは承認済みチケットの側で、エージェントが書ける `todo/` に同じ識別子を
-    # 書いてもフェーズは開き直らない（そちらは承認待ちにもならない。approval.waiting）。
+    # 書いてもフェーズは開き直らない（そちらは承認待ちにもならない。agree.waiting）。
     review_copies, _ = approval.scan_review(conf, root)
     seen: set[str] = set()
     for pool in (closed_copies, review_copies, open_copies):

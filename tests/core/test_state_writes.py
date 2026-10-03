@@ -19,7 +19,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import approval, ctxfile, fsio, hookio, post, rules
+from ccnavi import agree, ctxfile, fsio, hookio, post, rules
 
 
 def _payload(session: str = "s1", agent: str = "") -> hookio.Input:
@@ -64,7 +64,7 @@ class WiringTest(unittest.TestCase):
 
     def test_approval_known_state(self):
         path = os.path.join(self.state, "approved-s1.json")
-        self._assert_atomic(lambda: approval._write_known(self.err, path, {"i0001": "1"}))
+        self._assert_atomic(lambda: agree._write_known(self.err, path, {"i0001": "1"}))
 
 
 class UnreadableStateTest(unittest.TestCase):

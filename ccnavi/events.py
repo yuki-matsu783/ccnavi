@@ -13,6 +13,7 @@ import io
 from typing import TextIO
 
 from . import (
+    agree,
     approval,
     audit,
     builtin,
@@ -191,7 +192,7 @@ def decide_at_prompt(
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
     )
-    told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
@@ -389,7 +390,7 @@ def decide_at_start(
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
-    approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
+    agree.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
     record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []

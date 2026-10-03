@@ -18,9 +18,7 @@
 1. どのモジュールも段をちょうど 1 つ持つ。モジュールを足したら、どの段かを決めさせる
 2. `ccnavi/` の下にサブパッケージを作らない。作ると 1・3・4 の検査の対象から外れる
 3. import の行き先は、同じ段か下の段。上を向いた import を名指しする
-4. 循環は `KNOWN_KNOTS` に書いた組だけ。**増えても減っても落とす。**
-   解消したら一覧から消す、が要るようにしてある。消し忘れた一覧は、次に同じ
-   場所で循環ができたときに何も言わなくなる
+4. 循環を 1 つも許さない。既知として通す一覧も持たない
 5. import の行き先が、import 文に残らない書き方をしていない
 
 同じ段どうしの import は止めない。段は「どちらを先に読めるか」の順序であって、
@@ -108,7 +106,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "work",
         "承認済みチケットとフェーズと、それに添える文面",
-        frozenset({"approval", "configsync", "phase", "reasons"}),
+        frozenset({"agree", "approval", "configsync", "phase", "reasons"}),
     ),
     (
         "decide",
@@ -122,20 +120,6 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {"cli", "diagnose", "events", "lint", "subagent", "suggest", "version", "__main__"}
         ),
     ),
-)
-
-# 残っている循環。いまは既知として通す。
-#
-# - approval ↔ phase
-#   承認済みチケットの走査（approval）と、フェーズの状態（phase）が互いを直に読む。
-#   これが循環の中心。文面（reasons）は approval から読まれて phase を読むので、
-#   同じ組に入る
-#
-# 組は「どのモジュールが入っているか」で持つ。循環の向きや本数は見ない。
-KNOWN_KNOTS: frozenset[tuple[str, ...]] = frozenset(
-    {
-        ("approval", "phase", "reasons"),
-    }
 )
 
 TIER_ORDER = {name: i for i, (name, _, _) in enumerate(TIERS)}
@@ -308,26 +292,15 @@ class ModuleTiersTest(unittest.TestCase):
             "下の段へ出す。段そのものを組み替えるなら TIERS を先に直す",
         )
 
-    def test_only_the_known_knots_are_cyclic(self):
-        """循環は KNOWN_KNOTS に書いた組だけ。増えても減っても落とす。"""
-        found = knots(self.edges)
-
-        fresh = sorted(" ↔ ".join(group) for group in found - KNOWN_KNOTS)
+    def test_no_module_sits_in_a_cycle(self):
+        """循環を 1 つも許さない。"""
+        found = sorted(" ↔ ".join(group) for group in knots(self.edges))
         self.assertEqual(
             [],
-            fresh,
-            "KNOWN_KNOTS に無い循環がある。新しくできたか、既知の循環に入る"
-            "モジュールが変わったか。片方向に直す（関数の中へ import を移すのは"
-            "隠すだけで、ここは同じに数える）",
-        )
-
-        gone = sorted(" ↔ ".join(group) for group in KNOWN_KNOTS - found)
-        self.assertEqual(
-            [],
-            gone,
-            "KNOWN_KNOTS に書いた循環が見つからない。解消したか、入るモジュールが"
-            "変わったか。一覧を直す（残すと、次に同じ場所で循環ができたときに"
-            "何も言わなくなる）",
+            found,
+            "import が循環している。片方向に直す（関数の中へ import を移すのは"
+            "隠すだけで、ここは同じに数える）。共通の部分を下の段へ出すか、呼ぶ側から"
+            "材料を渡す",
         )
 
     def test_no_module_hides_where_it_is_going(self):

@@ -561,7 +561,7 @@ def load_text(path: str) -> str:
 # 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
 # 読んだファイルの中身の指紋を控える。無かった・読めなかったファイルも「無い」として控える
 # （後から現れれば判定が変わりうる）。控える段（`staging`）から読んだ分は数えない（判定の
-# 入力ではなく、plan の途中の姿）。承認の指紋（`approval.approval_digest`）がこれを使う。
+# 入力ではなく、plan の途中の姿）。承認の指紋（`agree.approval_digest`）がこれを使う。
 #
 # 中身は改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。機械の
 # 改行で指紋が変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
@@ -669,7 +669,7 @@ def _recorded(path: str, failed: str) -> str:
 #
 # `staging` の中では、書き込みの関数はディスクに書かずに `Op` を控え、読みの関数
 # （`read_text`・`read_bytes`・`read_json`・`exists`・`lexists`・`listdir`・`load_text`）は
-# 控えた中身を先に見る。承認の書き込みの手順（`approval.plan_batch`）をこの中で
+# 控えた中身を先に見る。承認の書き込みの手順（`agree.plan_batch`）をこの中で
 # 動かすと、何をどの順に書くか（`Changes`）が値として出る。手元の Writer(FS) はそれを
 # ディスクに書き、Chrome は同じ値を 1 コミットにする。
 #

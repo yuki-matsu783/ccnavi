@@ -1374,7 +1374,7 @@ warn、チケットで編集対象としているが書き込めない場所（�
 `rules.KIND_NOT_YET`）は `--lint` では warn。
 
 提案を `todo/` に書いた回に、この確認を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket.propose_notice`）。
-判定には足さず、承認の知らせ（`approval.news`）と同じ経路で渡す。
+判定には足さず、承認の知らせ（`agree.news`）と同じ経路で渡す。
 
 `CCNAVI_MODE=dry-run` の間は deny が止めないので、エージェントは `--yes` を打てる。承認の経路だけを
 例外にはしない。

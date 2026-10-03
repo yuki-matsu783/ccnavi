@@ -631,7 +631,7 @@ def thread_key(t: Thread) -> str:
 def decision_digest(d: Decision) -> str:
     """見せた指摘の指紋。見せてから押すまでに指摘が増えた・変わったら、適用を止める。
 
-    承認の指紋（`approval.approval_digest`）と同じ組み方。部分ごとの SHA-256 を件数と一緒に
+    承認の指紋（`agree.approval_digest`）と同じ組み方。部分ごとの SHA-256 を件数と一緒に
     並べ、その全体の SHA-256。区切りでつなぐと、本文に区切りを書いてつなぎ目をずらせる。
     """
     assert d.result.mr is not None

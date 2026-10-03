@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import TextIO
 
 from . import (
+    agree,
     approval,
     audit,
     builtin,
@@ -500,7 +501,7 @@ def decide_before(
     # このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）は、
     # 判定がどれでも 1 度だけつける。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）にまとめる。
-    told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
     # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ経路で渡す。
     if conf.tickets_enabled:
