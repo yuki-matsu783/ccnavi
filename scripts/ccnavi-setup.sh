@@ -105,7 +105,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分。配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。ccnavi-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-approve.sh は端末から承認するための sh。承認の案内（phase.py）がこの綴りを表示するので、
+# ccnavi-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこの綴りを表示するので、
 # 配らないと、案内どおりに実行しても動かない。
 # ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、控えの書き出し。ADR-0093 の 4.2）。
@@ -115,7 +115,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -356,7 +356,7 @@ host_target() {
 runnable_targets() {
 	# $1 この機械。この機械で動く組み立ての名前を、優先する順に空白区切りで並べる。
 	# arm64 の macOS と Windows は x86_64 の実行ファイルを変換して動かす（Rosetta 2 /
-	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と ccnavi/platformtag.py と揃える。
+	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と ccnavi/infra/platformtag.py と揃える。
 	case "$1" in
 	darwin-arm64) printf '%s' "$1 darwin-x86_64" ;;
 	windows-arm64) printf '%s' "$1 windows-x86_64" ;;
@@ -1232,7 +1232,7 @@ for name in $DEPLOY_SCRIPTS; do
 		ccnavi-push-approved.sh)
 			why="承認のあとにボードが端末で実行する、承認済みチケットのコミットと push"
 			;;
-		ccnavi-approve.sh)
+		ccnavi-agree.sh)
 			why="端末から承認するための sh"
 			;;
 		ccnavi-fetch.sh)

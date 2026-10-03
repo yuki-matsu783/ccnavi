@@ -14,7 +14,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi import review
+from ccnavi.tickets import review
 
 NO_MR = "ccnavi: 結果にマージリクエストが無い\n"
 

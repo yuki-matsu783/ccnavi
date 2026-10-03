@@ -19,7 +19,8 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import prune, selfguard
+from ccnavi.policy import selfguard
+from ccnavi.records import prune
 from tests.inproc import run_ccnavi
 
 DAY = 86400

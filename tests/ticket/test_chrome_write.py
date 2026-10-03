@@ -19,7 +19,9 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi import history, lint, settings, version
+from ccnavi.entry import lint, version
+from ccnavi.infra import settings
+from ccnavi.tickets import history
 from tests.ticket.test_core import CoreHarness, _chrome
 from tests.ticket.test_phases import child_text, parent_text
 from tests.ticket.test_ticket import git, write
@@ -193,7 +195,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         self.apply(body["changes"]["i0001"], self.parent_tree)
         # 手元の控えは Chrome と同じ（取り込み済みの家族）。判定し直し（C3）で error が出ない
         self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual(preview["batch"], [])
         explained = self.ccnavi("--lint", "--json")
         errors = [p for p in json.loads(explained.stdout)["problems"] if p["severity"] == "error"]

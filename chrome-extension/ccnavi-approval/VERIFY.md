@@ -135,7 +135,7 @@
 
 1. issue を 1 つ作り（例 #1）、拡張の「始める」（S1）かホストの画面で親のブランチ `i0001` を `main` の先頭から作ります。
 2. エージェントに、親のワークツリーで提案（`issue: 1`、子を 1〜2 本、子の 1 本は `human_review.required: true`）を書かせ、
-   `ccnavi --approve --preview --verify <識別子>` で確かめてから、コミットして `i0001` を push させます。
+   `ccnavi --agree --preview --verify <識別子>` で確かめてから、コミットして `i0001` を push させます。
 3. 「始める」を使わない家族（フォールバック。例 `verify-a`）も 1 つ用意します。名前は `^i\d+$` と `-\d{2}$` の形を避けます。
 
 詳しい流れ（着手・終了・依頼）はエージェントが SessionStart で受ける案内と、`ccnavi-ticket.sh`・`ccnavi-review.sh` の `--help` のとおりです。

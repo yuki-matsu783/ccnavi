@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import sys
 
-from . import cli, hookio
+from .entry import cli
+from .infra import hookio
 
 
 def main() -> int:

@@ -9,6 +9,12 @@ requires-python = ">=3.12"
 # load は、エージェントが書けるファイルに向けては使わない。
 dependencies = ["pyyaml>=6.0"]
 
+[build-system]
+# 標準の経路（`uv pip install -e .` / `pip install -e .`）で入れられるようにする。
+# hatchling は設定が最小で済み、ビルド時にだけ使う（実行時の依存は増えない）。
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [dependency-groups]
 # 開発時だけの道具。配布物には入らない。
 dev = ["pyinstaller>=6.10", "ruff>=0.6"]
@@ -29,6 +35,13 @@ dev = ["pyinstaller>=6.10", "ruff>=0.6"]
 # 代償は数 MB の重複と、初回の作成が少し遅いことだけ。自分のテストが走っている間に
 # 自分のワークツリーを消せないのは変わらない（そこは順番を守る話）。
 link-mode = "copy"
+
+[tool.hatch.build.targets.wheel]
+# 配るのは ccnavi パッケージだけ。tests/・tools/・chrome-extension/・main.py・build.py は入れない。
+packages = ["ccnavi"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/ccnavi"]
 
 [tool.ruff]
 line-length = 100

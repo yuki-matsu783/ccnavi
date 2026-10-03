@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import platformtag
+from ccnavi.infra import platformtag
 from tests import ROOT
 
 SHELL = shutil.which("sh") or shutil.which("bash")
