@@ -999,19 +999,19 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
 | 依頼のマーカーがある | `P` の `phases/<親>/<N>.requested` | 同じファイルを API で読む | できる |
 | 依頼の後に人が見るものが動いていない（`_moved_since_request`） | 手元の git の差分 | compare API の変更パスをコアに渡す。打ち切られたら（GitHub は 300 件）動いたと数える | できる |
 | push 済みか（`_unpushed`） | 手元と `origin/P` の差 | 不要 | 手元だけに残す |
-| 同じマージリクエストか（`_matching`） | `ccnavi-review.sh fetch` の写し | 親のブランチの開いたマージリクエストを引き、依頼の記録の `host`・`mr` と照合する（手元と同じ。11.8.1 の 8） | できる |
-| 変更要求のレビューが無い（`effective`） | 写しの `reviews` | GitHub `GET /pulls/{n}/reviews`、GitLab は approvals と discussions | できる |
-| 未解決スレッドが無い | 写しの `threads` と `accepted.json` | GitHub GraphQL の `reviewThreads.isResolved`、GitLab `discussions` の `resolved` | できる |
+| 同じマージリクエストか（`_matching`） | `ccnavi-review.sh fetch` の JSON | 親のブランチの開いたマージリクエストを引き、依頼の記録の `host`・`mr` と照合する（手元と同じ。11.8.1 の 8） | できる |
+| 変更要求のレビューが無い（`effective`） | JSON の `reviews` | GitHub `GET /pulls/{n}/reviews`、GitLab は approvals と discussions | できる |
+| 未解決スレッドが無い | JSON の `threads` と `accepted.json` | GitHub GraphQL の `reviewThreads.isResolved`、GitLab `discussions` の `resolved` | できる |
 | レビュー待ちの子を `done/` へ | ファイルの移動 | 同じ移動を `Changes` にして同じコミットに入れる | できる |
 
-ホストの写しは `ccnavi-review.sh` が組む JSON（`{host, mr, threads, reviews, fetched_at}`）と同じ形にして `Result.load` に渡します。
+ホストから取得した内容は、`ccnavi-review.sh` が組む JSON（`{host, mr, threads, reviews, fetched_at}`）と同じ形にして `Result.load` に渡します。
 未解決が残るときは Chrome では通さず、「解決するか、`decide`（端末・VS Code のボード）で受け入れる」と出します。
 
 **sh と TS の二重実装の見本と更新手順**（段階 4）:
 
 - 本物のホストの応答の形に合わせて手で組んだ見本を拡張の試験の置き場 `chrome-extension/ccnavi-approval/test/fixtures/host/<github|gitlab>/<場面>/` に置く
   （ページングの 2 ページ目、解決済みと未解決の混在、変更要求の後の承認など。段階 4 の決定 2 で置き場を拡張の側にした。段階 4 は github だけ）
-- 期待値は「その見本から sh が組んだ写しの JSON」1 つで、sh の試験と TS の試験の両方がそれと突き合わせる
+- 期待値は「その見本から sh が組んだ JSON」1 つで、sh の試験と TS の試験の両方がそれと突き合わせる
 - 更新の手順（手で行う。段階 4 の決定 2）: (1) ホストの応答の形が変わったら、本物のマージリクエストから取り直すか形の変わった欄を手で直す、(2) sh の試験を
   `CCNAVI_HOST_FIXTURE=1` で回して期待値の JSON を作り直す、(3) TS の試験を回し、落ちたら TS を直す、(4) 見本・期待値・sh・TS の変更を
   **同じコミット**に入れる。片方だけの変更は試験で落ちる。手順の詳細は拡張の README の「ホストの応答の見本」
@@ -1261,7 +1261,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | 判定のコアと差し口（6.2） | `ccnavi/core.py` | `Snapshot`（Reader(FS)）→ `judge_approval` → `plan` → `Changes` → `write_fs`（Writer(FS)）。`judge_approval` は 6.2 の `judge`（実行前の判定のモジュール `ccnavi.judge` と紛れないように名前を変えた）で、見せた識別子と指紋を今のものと比べる（前の `--yes` の検査）。`Changes` は書き込みと見せる行の並びと、ブランチごとの create / update / delete（`per_branch`、ツリーからの相対パス。中身の改行は LF に固定） |
 | 書けなかったときの扱い | `fsio.policy`・`core.write_fs` | 並べる段では書き込みが落ちないので、止める・言って続ける・行を出して同じ組を飛ばす・何も言わない・跡の知らせに溜める、のどれかを書き込みに添え、Writer(FS) が前と同じ文面と順で落ちる（置けた分は残す。マーカーは置けた後だけ消す。フローが運べなければ行で言い、元を残す） |
 | 手元の `--approve` | `core.approve`・`approve_yes`・`preview`・`verify` | どれも `core.judge_approval` を通る。書くのは `core.plan` → `core.write_fs`。前の `_apply` は並べる手順（`approval.plan_batch`）になり、書き込みの手順のコードは 1 つ。入口は approval から core へ移した（approval に置くと import が循環する） |
-| `confirm`（8.9） | `core.confirm`・`core.confirm_local` | 検査（依頼の記録・動いたか・同じマージリクエストか・変更要求・未解決）と書くもの（レビュー待ちの子を `done/` へ・レビュー済みのマーカー）をコアへ。手元（`confirm_local`、前の `review.confirm`）は cwd の親・git の差分・`--result` の写しを前と同じ順で読んで渡す。跡の経路は Snapshot の経路（Chrome なら `chrome`） |
+| `confirm`（8.9） | `core.confirm`・`core.confirm_local` | 検査（依頼の記録・動いたか・同じマージリクエストか・変更要求・未解決）と書くもの（レビュー待ちの子を `done/` へ・レビュー済みのマーカー）をコアへ。手元（`confirm_local`、前の `review.confirm`）は cwd の親・git の差分・`--result` の JSON を前と同じ順で読んで渡す。跡の経路は Snapshot の経路（Chrome なら `chrome`） |
 | `reviewed_mark`（8.9） | `core.reviewed_mark`・`review.reviewed_mark` | `confirm` と `decide` が使う。欄は 8.9 の並び（`mr`・`accepted`・`actor`・`via`・`at`）で、`actor` はアカウントが分かるときだけ、`via` は経路が分かるときだけ書く（Chrome は `via: chrome`）。段階 2a の手元はどちらも渡さないので、手元のマーカーは前と同じバイト列 |
 | `withdraw`（8.8） | `core.withdraw` | 条件（新規・followup でない・未着手・子もマーカーも無い・戻す先が空いている・承認コミットの親の提案がある）と書くもの（`doing/` を消し、`todo/` に元のバイト列、跡）。呼ぶのは Chrome の入口の試験だけ（画面は段階 3）。跡の種類 `withdrawn` と経路 `chrome` を `history` に足した（コアの書くものに要るため） |
 | 時計（Clock） | `fsio.clock`・`stamp`・`utc_stamp`、`history.stamp` | 固定した 1 つの時刻から、承認の記録（オフセット付き）と跡（UTC）を出す。plan の間は `Snapshot.stamp`（空なら今）に固定する |
@@ -1735,7 +1735,7 @@ Chrome で「レビュー済み」（8.9）。GitHub・ワークスペースの�
 1. `confirm --actor` を入れる。手元は `ccnavi-review.sh` が `gh` か API（`GITHUB_TOKEN`/`GITLAB_TOKEN` と curl）でトークンの持ち主を引いて
    `--actor` で渡す。引けなければ渡さず、マーカーは前と同じ（8.9 の「git の `user.name`」をやめた）。Chrome は PAT の持ち主。欄は `actor`（`by` は経路名のまま）
 2. ホストの応答の見本は拡張の試験の fixtures に置き、ホストの API が変わったら手で更新する（手順は拡張の README）。confirm の検査は Python の同じ関数で、
-   スレッドを取ってくる処理（sh と TS）が同じ見本で同じ写しを組むことを試験で見る
+   スレッドを取ってくる処理（sh と TS）が同じ見本で同じ JSON を組むことを試験で見る
 3. Chrome と手元の confirm の突き合わせは、手元の CLI を直に打つと C1 に断られるので、試験の中で C1 と同じ手順（C1 のハーネス）で手元を回して比べる
 4. スレッドの本文は承認の画面と同じ規則で描く（隠れる書き方を通さない、HTML コメントは見える文字、DOMPurify、CSP を緩めない）
 
@@ -1745,19 +1745,19 @@ Chrome で「レビュー済み」（8.9）。GitHub・ワークスペースの�
 | アカウントの引き当て（4.5・D17） | `ccnavi-review.sh` の `account`・`confirm` | `GET /user`（gh・glab・curl のどれでも）の GitHub は `login`、GitLab は `username`。落ちる・形が違う（英数字と `_ . -` の 1〜100 字でない）なら空で、止めずに渡さない。ロックを取る前に引く。呼び手が `--actor` を渡せば断る（マーカーのアカウントを偽らせない） |
 | 依頼の後に動いたか（8.9 の表の 2 行目） | `review.moved_since` | 手元の `_moved_since_request` から git を読む所を外した関数。手元は `git diff --name-only --no-renames <依頼時>..HEAD`、Chrome は compare API の一覧を渡す。一覧が無い（読めない・打ち切られた）なら「動いた」 |
 | Chrome の confirm（8.9） | `py/ccnavi_chrome.py` の `_op_confirm`、`core.requested_head`・`moved_on_host`・`reviewable` | 依頼時の先頭は Python がマーカーから読み、読んだ `P` の先頭と違えば `need_compare`（`{base, head}`）で返す。拡張が compare API で読んで呼び直す（閉包の `need` と同じ形）。`compare` の 2 つがマーカーの先頭と読んだ先頭でなければ使わない。前の `changed`（文字列を TS が渡す形）はやめた。ボードの答えに `reviewable`（依頼済みでまだレビュー済みでないフェーズ）を足した |
-| スレッドとレビューの写し（8.9） | `src/core/github.ts` の `openPull`・`reviewThreads`・`pullReviews`・`reviewCopy`、`protocol.ts` の `reviewCopy` | `ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と同じ問い合わせ・同じページの切り方（スレッドは GraphQL の cursor で 21 ページ目、レビューは REST の `page` で 20 ページを超えたら止める）で、欄が無いか null のときは同じ既定値（空文字・0 など。jq の `//`）を入れて、`{host, mr, threads, reviews, fetched_at}` を組む。読むだけ |
+| スレッドとレビューの JSON（8.9） | `src/core/github.ts` の `openPull`・`reviewThreads`・`pullReviews`・`reviewCopy`、`protocol.ts` の `reviewCopy` | `ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と同じ問い合わせ・同じページの切り方（スレッドは GraphQL の cursor で 21 ページ目、レビューは REST の `page` で 20 ページを超えたら止める）で、欄が無いか null のときは同じ既定値（空文字・0 など。jq の `//`）を入れて、`{host, mr, threads, reviews, fetched_at}` を組む。読むだけ |
 | 依頼の後の変更の一覧 | `github.compareFiles`、`protocol.ts` の `compareFiles` | `GET /compare/<base>...<head>`。改名は元と先の両方。`status` が `ahead`・`identical` でない、404、一覧が 300 件（打ち切り）なら `files: null` |
-| ボード（8.9・5.5） | `src/core/reviewed.ts`・`snapshot.ts`・`render.ts` | 候補のフェーズごとに写しを読み、Python の `confirm`（書かない）で通るかを聞く。スレッドは未解決を先に、本文は承認の画面と同じサニタイズ（`md.markdown`）で描く。リンクは `http(s)`・`mailto` だけ。通らなければ理由（手元の confirm の標準エラーと同じ文面）を出し、通って書ける家族にだけ「フェーズ N をレビュー済みにする」を出す。依頼したホストが GitHub でなければ「段階 5」と出す |
+| ボード（8.9・5.5） | `src/core/reviewed.ts`・`snapshot.ts`・`render.ts` | 候補のフェーズごとに JSON を読み、Python の `confirm`（書かない）で通るかを聞く。スレッドは未解決を先に、本文は承認の画面と同じサニタイズ（`md.markdown`）で描く。リンクは `http(s)`・`mailto` だけ。通らなければ理由（手元の confirm の標準エラーと同じ文面）を出し、通って書ける家族にだけ「フェーズ N をレビュー済みにする」を出す。依頼したホストが GitHub でなければ「段階 5」と出す |
 | 書く流れ（8.3・8.4） | `write.ts` の `confirmPhase`、ボードの `review` | 押すと 8.10 の注意を添えて確かめ、毎周、家族とスレッド・レビューを読み直して Python の `confirm` に通させ、Changes を `createCommitOnBranch` の 1 コミットにする（承認と同じ競合の扱い・書いた後の確かめ）。見出しは「ccnavi: <P> のフェーズ N のレビュー済みを置いた（Chrome 拡張 <版>）」。拡張の版を 0.3.0 に上げた |
-| 見本（決定 2） | `chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`、`tests/sh/github_host.py`、`test/helpers/host-fixture.ts` | 4 場面（`resolved`・`paged`・`changes-requested`・`hostile`）。代役は sh 用と TS 用の 2 つで、同じ規則で見本を返す。期待値は sh が組んだ写し（`expected.json`）と結論（`conclusion.json`） |
+| 見本（決定 2） | `chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`、`tests/sh/github_host.py`、`test/helpers/host-fixture.ts` | 4 場面（`resolved`・`paged`・`changes-requested`・`hostile`）。代役は sh 用と TS 用の 2 つで、同じ規則で見本を返す。期待値は sh が組んだ JSON（`expected.json`）と結論（`conclusion.json`） |
 | 要件 | `requirements.md` | REQ-APV-18（Chrome のレビュー済み）と、手元のレビューの確認のマーカーのアカウントの補足を足した |
 
 試験: Python は `tests/ticket/test_review_actor.py`（マーカーの `actor` と引けないときに前と同じバイト列、`--actor` の形、`moved_since` の規則、依頼の後の
 コードの変更で Chrome と手元が同じ文面で止める、compare の打ち切り・不一致、Chrome と手元のマーカーが経路と時刻のほかは同じ、ボードの候補）、
-`tests/sh/test_review_host_fixture.py`（見本ごとに sh の写しが期待値と同じ、結論、`--actor` の引き当てと失敗と形の違い、呼び手の `--actor` を断る）、
+`tests/sh/test_review_host_fixture.py`（見本ごとに sh が組んだ JSON が期待値と同じ、結論、`--actor` の引き当てと失敗と形の違い、呼び手の `--actor` を断る）、
 `tests/sh/test_c1_sh.py` の `C1ChromeConfirmTest`（C1 の手順で依頼と confirm を回し、同じ状態からの Chrome の書くものと、C1 が書いて送ったものが
 経路・時刻・拡張の版のほかは同じ）、判定のコアの見本（CX-T061 の `confirm`。compare を渡す形に作り直した）。拡張は `test/reviewed.test.ts` の
-CX-T129〜137（見本ごとに TS の写しが期待値と同じ、compare、ボードの出し分け、書く流れとマーカーの中身、未解決・変更要求・後から増えた未解決で書かない、
+CX-T129〜137（見本ごとに TS が組んだ JSON が期待値と同じ、compare、ボードの出し分け、書く流れとマーカーの中身、未解決・変更要求・後から増えた未解決で書かない、
 依頼の後のコードの変更で書かない、悪意のある本文の描画、PAT が答えに入らない、Pyodide と CPython の一致）と、Chromium の実機の CX-T138
 （悪意のある本文を描いても何も動かず隠れない、解決したらボードから書く、PAT が画面に渡らない）。
 
@@ -1799,7 +1799,7 @@ ADR に無かった判断:
   コメントだけのレビューを出すと変更要求が消えた）。手元と Chrome の両方に当てはまる。GitLab の `reviewed`・`unreviewed` も数えない
 - **B（レビュー済みに重ねない）**: `core.confirm` はフェーズがレビュー済みなら「フェーズ N はレビュー済み」で止める。手元の 2 度打ちも
   Chrome も止まる（前はマーカーと跡を書き直した）。ボードは押した時点で読み直して判定するので、開いた後にほかで付いたマーカーでも止まる
-- **C（ccnavi の投稿のスレッド）**: 目印（`<!-- ccnavi:`）で始まるスレッドを未解決から除くのは、GitLab の写しで、書いたのが依頼を
+- **C（ccnavi の投稿のスレッド）**: 目印（`<!-- ccnavi:`）で始まるスレッドを未解決から除くのは、GitLab の JSON で、書いたのが依頼を
   投稿したアカウントのときだけ。GitHub では除かない（依頼はマージリクエストのコメントでスレッドにならない。目印は誰でも書ける）。
   依頼の記録に投稿したアカウント（`poster`）を残す（sh が投稿の答えから渡す）。記録に無ければ除かない
 
@@ -1852,7 +1852,7 @@ GitLab（8.4 の 1 段目まで）、プロジェクトのリポジトリ（3.3 
 1. decide のマーカーにも `actor` と `via`（confirm と同じ形）。手元は sh がアカウントを引いて `--actor=` で渡し、引けなければ前と同じバイト列。
    Chrome からの decide は ADR の範囲に無い（「採らなかった案」）ので入れない
 2. GitLab の読み取り（tree・blob・マージリクエスト・discussions・approvals・compare・user）と書き込み（Commits API の `actions` で 1 コミット）を TS に足し、
-   手で組んだ応答の見本を fixtures に置く。sh と TS が同じ見本で同じ写し・同じ結論になることを試験で見る。依頼の記録の `poster` も含む
+   手で組んだ応答の見本を fixtures に置く。sh と TS が同じ見本で同じ JSON・同じ結論になることを試験で見る。依頼の記録の `poster` も含む
 3. プロジェクトの識別子は 10.3 の 1 のとおり（決定済みに移した）。プロジェクトのリポジトリも Chrome の設定に登録して読む
 4. GitLab の比較つき書き込みは事後確認と打ち消しだけで出す。`seq` は本物で確かめてから（段階 5b）
 5. 「始める」の権限は Issues の読み取りとブランチを作るための Contents の書き込み（GitHub）、`api`（GitLab）。マージリクエストは作らない。統合先の `done/` にある識別子は拒否
@@ -1865,7 +1865,7 @@ GitLab（8.4 の 1 段目まで）、プロジェクトのリポジトリ（3.3 
 | 別のリポジトリの課題（3.1 の 8・8.7） | `ticket._issue_ref`・`issue_label`、`review.mr_draft`、`approval` | `issue: owner/repo#N`（GitLab の入れ子のグループも）を読み、マージリクエストの本文は `Closes owner/repo#N`、承認の画面は `■ 課題: owner/repo#N`。改版で課題のリポジトリを変えるのは課題番号と同じく断る（締める向き） |
 | decide のマーカーの `actor`・`via`（8.9） | `ccnavi-review.sh` の `decide`、`cli` の `--actor`・`--via`、`review.apply_decision`、`history.set_actor` | sh は confirm と同じく `GET /user` でトークンの持ち主を引き（ロックの前、見るだけの `--preview` では引かない）、`--actor=<名前> --via=board`（ボードの選択）か `--via=terminal`（端末で選ぶ形）を渡す。実行ファイルは書く形の decide だけで受け、マーカーに `actor`・`via`、跡に `actor` を書く。無ければマーカーも跡も前と同じ。呼び手の `--actor` は前から断る |
 | GitLab の読み書き（8.2・8.4・8.8・8.9・8.10・D25） | `chrome-extension/ccnavi-approval/src/core/gitlab.ts` | GitHub と同じ名前の操作を REST（v4）で組む。tree は `repository/tree`（コミットとパス、再帰、100 件ずつ 50 ページまで）、blob は `repository/blobs/:sha` を 1 件ずつ（NUL か UTF-8 で読めなければバイナリ。大きさが合わなければ止める）、承認コミットは `repository/commits?ref_name=&path=` と `first_parent=true` の鎖、マージリクエストの Approve は `approvals`、変更の一覧は `merge_base`（祖先でなければ null）と `compare`（時間切れ・1000 件で null）、PAT の持ち主は `GET /user` の `username`、期限は `GET /personal_access_tokens/self` を 1 日 1 回。認証は `PRIVATE-TOKEN` |
-| スレッドとレビューの写し（8.9） | `gitlab.reviewCopy` | `ccnavi-review.sh` の GitLab の枝（`find_mr`・`threads`・`reviews`）と同じ問い合わせ・ページの切り方で、欄の値も同じに整える（無いか null の欄に既定値を入れる jq の `//`、文字列にする `tostring`、大文字にする `ascii_upcase`）。スレッドは最初のノートの書き手（`author`）を持ち、Python が依頼の記録の `poster` と比べて ccnavi の依頼のスレッドを除く（11.8.1 の決定 C） |
+| スレッドとレビューの JSON（8.9） | `gitlab.reviewCopy` | `ccnavi-review.sh` の GitLab の枝（`find_mr`・`threads`・`reviews`）と同じ問い合わせ・ページの切り方で、欄の値も同じに整える（無いか null の欄に既定値を入れる jq の `//`、文字列にする `tostring`、大文字にする `ascii_upcase`）。スレッドは最初のノートの書き手（`author`）を持ち、Python が依頼の記録の `poster` と比べて ccnavi の依頼のスレッドを除く（11.8.1 の決定 C） |
 | GitLab の書き込み（8.4 の 1 段目・D21） | `gitlab.createCommit`、`protocol.ts` の `commit`、`write.ts` の `writeLoop`・`settleRace`・`revert` | service worker は書く直前に先頭を読み、読んだ先頭と違えば書かない（409）。Commits API の `actions`（作る・書き換える・消すは Python の Changes のとおり。GitLab が断れば 409）で 1 コミット書き、答えのコミットの親を返す。書く流れは、親が読んだ先頭と違えば（間に書き込みが入った）自分の書き込みの直前の姿で判定し直し、書くもの（パス・種類・バイト列）が同じなら残す。違えば、今の先頭で自分の書いたパスがまだ書いたとおりのときだけ、直前の中身に戻す打ち消しのコミットを積み、読み直して周を回す（指紋が変わっていれば見直しを求める）。打ち消しを積めない・打ち消しの間にも同じパスが変わった・2 回とも書けないときは止めて人に回す（`attention`）。ボードは家族を「要確認」で出し、人が「確かめた」を押すまで控える（`chrome.storage.local`）。GitHub は `expectedHeadOid` のまま（答えの親は読んだ先頭） |
 | プロジェクトのリポジトリ（3.3 の 7・D28・10.3 の 1） | 設定画面、`settings.ts`、`snapshot.readProjectIntegration`、`py/ccnavi_chrome.py` の `_build`・`project_layer`・`records` | 設定画面でプロジェクト名（`projects/<名前>` の名前。`common`・`self` は不可）と、先に登録したワークスペースのリポジトリを選ぶ（ホストが違ってよい）。置き場の綴り・共通層・自身の層・互換のマーカーはワークスペースの統合先から、`done/` とプロジェクトの層はプロジェクトの統合先から読む。仮のツリーは手元と同じ形（ワークスペースルート、`projects/<名前>/`、そのワークツリーとしての `.claude/worktrees/<P>`）で、層は D28 の計算（共通層にあるファイルを `configsync.projected` で写し、無いファイルはプロジェクトの統合先のもの）。控えは `sync/self/` と `sync/<名前>/`。service worker の書く守りも置き場の綴りをワークスペースの統合先から自分で引く |
 | 「始める」（8.6・D19） | `src/core/start.ts`、`ccnavi_chrome._op_start`、`protocol.ts` の `issues`・`createBranch`、ボード | ボードの「issue を読む」で開いた issue を新しい順に 50 件（GitHub はマージリクエストを除く）読み、「始める」を押すと、統合先を読み直して Python に識別子と始められない理由（統合先の `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版が違う）を聞き、無ければ service worker が統合先の今の先頭からブランチを作る（GitHub は `POST /git/refs`、GitLab は `POST repository/branches`）。service worker も、ボードからだけ・登録したリポジトリだけ・issue から決める形の名前（プロジェクトなら `<名前>-i<番号>`）だけ・保護された名前と統合先の名前は作らない・渡された sha が統合先の今の先頭・既に無い、を自分で確かめる。マージリクエストは作らない |
@@ -1877,8 +1877,8 @@ GitLab（8.4 の 1 段目まで）、プロジェクトのリポジトリ（3.3 
 `tests/ticket/test_issue_ref.py`（`owner/repo#N` の読み・`Closes`・改版）、`tests/ticket/test_review_actor.py` の `DecideActorTest`（decide のマーカーの
 `actor`・`via` と跡、無ければ前と同じ、`--via` の断り）、`tests/ticket/test_chrome_project.py`（プロジェクトの家族の判定と書くもの、D28 の層、
 控えの分け方、予約の名前、互換の版、「始める」の識別子と拒否）、`tests/sh/test_review_host_fixture.py`（decide の `--actor`・`--via` の受け渡し、
-GitLab の見本ごとの sh の写しと結論、GitLab での依頼の投稿者の記録と二重に投稿しないこと）。拡張は `test/gitlab.test.ts` の CX-T144〜156・158
-（見本ごとに TS の写しが sh の期待値と同じ、GitHub と同じボード、Commits API の承認と取り下げ、関係の無い割り込みは残す、判定の変わる割り込みは
+GitLab の見本ごとの sh が組んだ JSON と結論、GitLab での依頼の投稿者の記録と二重に投稿しないこと）。拡張は `test/gitlab.test.ts` の CX-T144〜156・158
+（見本ごとに TS が組んだ JSON が sh の期待値と同じ、GitHub と同じボード、Commits API の承認と取り下げ、関係の無い割り込みは残す、判定の変わる割り込みは
 打ち消して見直しを求める、連鎖競合と後からの書き換えで人に回す、「始める」とその拒否、service worker の「始める」の守り、GitLab のレビュー済みと
 依頼のスレッドの見分け、スレッドの悪意のある本文、プロジェクトのリポジトリ、Pyodide と CPython の一致、PAT の期限、「始める」と「要確認」の描画）、
 `test/hosts.test.ts` の CX-T157（セルフホストの GitLab を足したビルド）、Chromium の実機の CX-T159・160（セルフホストの GitLab で登録・ボード・
@@ -1947,7 +1947,7 @@ ADR に無かった判断:
 | 12 | jq と TS で欄の型の読み方が違った（行番号・時刻・本文・`ascii_upcase`） | TS も jq と同じく型をそのまま写し、`state` が文字列でなければ止める。見本に型の違う場面（`odd-types`）を足した |
 | 13 | 打ち消しで BOM が消えた | GitLab の blob を BOM を残したまま読み、打ち消しの中身はバイト列（base64）で戻し、送る前と戻した後に blob の sha で確かめる |
 | 14 | GitLab の要求が転送を追いえた | GitHub と GitLab の要求に `redirect: "error"` |
-| 15 | GitLab のスレッドの書き手と依頼の投稿者を名前で比べていた | sh と TS とも `author.id` で写し、依頼の記録の `poster` も id で残す（前の記録の名前とは合わないので、ccnavi の依頼のスレッドも数える。締める向き） |
+| 15 | GitLab のスレッドの書き手と依頼の投稿者を名前で比べていた | sh と TS とも `author.id` を入れ、依頼の記録の `poster` も id で残す（前の記録の名前とは合わないので、ccnavi の依頼のスレッドも数える。締める向き） |
 | 16 | GitLab のパスで引くとシンボリックリンクを blob として読んだ | tree の mode 120000 を `link` とし、読まずに「決まらない」にする |
 | 17 | lint の `<名前>-i<番号>` の warn が人の付けた名前にも当たった | `issue:` があるときだけ形の食い違いを言い、無いときはそのプロジェクトの issue から決まる名前と重なるときだけ言う |
 | 18 | 「確かめた」が確認なしに外れた | 確認を挟む（決定 B） |
