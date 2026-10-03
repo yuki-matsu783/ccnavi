@@ -81,7 +81,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 | D28 | ADR-0084 を改訂し、Chrome の判定は `P` の上のプロジェクトの層を読まず、「プロジェクトの統合先の現在の層に、共通層を写したもの」を計算して使う。手元はワークスペースルートと作業ツリーの層を読み、違いは lint の warn（段階 2c のレビューの後の決定 B1） | `P` の上の写しを読む / 着手時の写しに固定 / 手元も統合先の層に切り替える | 3.3 の 6 |
 | D29 | 取り込みと Chrome での書き手の表示をやめる。Chrome 側・手元側とも表示も警報も出さない | 書き手と merge の中身を表示する | 5.3 |
 | D30 | 統合先を設定にする。リポジトリには置かず、Chrome 拡張の設定（リポジトリごと）と手元の環境変数 `CCNAVI_INTEGRATION_BRANCH` にそれぞれ持たせる。未設定ならホストのデフォルトブランチ。設定したブランチがリモートに無ければ止め、使った名前を控えと画面に出す | デフォルトブランチに固定 / ホストのデフォルトブランチの `.claude/settings.json` に置く | 3.3 |
-| D31 | Chrome は統合先の互換の印（`CCNAVI_COMPAT`）と同梱の版が合わなければ承認しない（表示だけ） | 版を問わず承認する | 7.3 |
+| D31 | Chrome は統合先の互換のマーカー（`CCNAVI_COMPAT`）と同梱の版が合わなければ承認しない（表示だけ） | 版を問わず承認する | 7.3 |
 | D32 | ロックは `mkdir` で取り、ホスト名・pid・開始時刻を書く。古いロックは `mv` で奪う。同じ機械で持ち主が生きていれば時刻に関わらず奪わず、時刻（10 分）で古いとみなすのは pid を確かめられないときだけ（段階 2d のレビューの決定 B）。持ち主の印を環境変数で子に渡して入れ子を許す | `flock` / 印なしの `mkdir` / 生きた持ち主からも 10 分で奪う | 4.3 |
 | D33 | 控えは 1 行 1 項目のテキストにし、sh は jq を使わない。JSON を読むのは Python だけ | 控えを JSON にして sh で jq を使う | 4.5 |
 | D34 | configsync が写したプロジェクトの層は `start` の C1 で運ぶ。記録層の「置き場の外は error」に例外を 1 つ置く | 未コミットで残す | 4.3 |
@@ -856,7 +856,7 @@ Chrome は ccnavi の .pyc を同梱するので、手元の ccnavi と版がず
 
 | 場面 | REST | GraphQL | 備考 |
 |---|---|---|---|
-| ボードを開く（初回） | 約 11（リポジトリ 1、tree 各ブランチ 2 × 4、互換の印 1、統合先の有無 1） | 約 8（refs 1、blob の束 7） | blob 約 320 件（家族 120 + `done/` 200） |
+| ボードを開く（初回） | 約 11（リポジトリ 1、tree 各ブランチ 2 × 4、互換のマーカー 1、統合先の有無 1） | 約 8（refs 1、blob の束 7） | blob 約 320 件（家族 120 + `done/` 200） |
 | ボードを開く（2 回目以降、変更なし） | 約 11 | 1 | blob は控えから |
 | 承認 1 回（読み直し + 書き込み） | 約 4 | 2 | 指紋の比較と `createCommitOnBranch` |
 
@@ -1119,7 +1119,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | D28 | Chrome はプロジェクトの層を統合先の現在の層 + 共通層の写しから計算（手元は作業ツリーの層のまま。B1） | `P` の上の層を書き換えても Chrome の判定に効かない。手元の判定が統合先の変更で緩まない | 開いている家族の Chrome の判定の基準が統合先の変更で動く。手元と Chrome で層が食い違いうる（lint の warn で知らせるだけ） |
 | D29 | 書き手の表示をやめる | 取り込みと画面が軽くなり、表示の実装と API の読み取りが要らない | 偽の承認を目で見付ける手掛かりが無くなる |
 | D30 | 統合先の名前は Chrome の設定と手元の環境変数に持たせる（未設定ならデフォルトブランチ） | develop 運用などで `done/` と層を正しいブランチから読め、リポジトリの設定を増やさない | 人ごと・機械ごとに値がずれうる（無いブランチは止める・使った名前を出す程度の緩和だけ） |
-| D31 | 互換の印が合わなければ Chrome は承認しない | 互換の違う判定がリモートに乗らない | 版が揃うまで Chrome で承認できない |
+| D31 | 互換のマーカーが合わなければ Chrome は承認しない | 互換の違う判定がリモートに乗らない | 版が揃うまで Chrome で承認できない |
 | D32 | ロックに持ち主を書き、`mv` で奪い、入れ子を許す。生きた持ち主からは奪わない | 落ちたセッションのロックで止まり続けず、運ぶ処理を C1 の中から呼べる。長い操作を奪って二重に書かせない | ホストをまたぐと時刻だけの判断になり、最長 10 分待つことがある。同じ機械で持ち主が止まったまま生きていれば、人が確かめるまで取れない |
 | D33 | 控えは行テキスト、sh は jq を使わない | `ccnavi-git.sh` と SessionStart に依存を足さない | 控えの形が JSON と別になり、Python と sh の両方で読み書きを揃える |
 | D34 | configsync の写しは `start` の C1 で運ぶ | プロジェクトの家族で `start` が止まらず、写しが ADR-0084 どおり配られる | 記録層の「置き場の外は error」に例外ができる |
@@ -1191,7 +1191,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | 段階 | 内容 | 手元の変更 | 判定への影響 |
 |---|---|---|---|
 | 0 | 安く塞ぐ抜け（5.2 の段階 0 の行）: `branch` の `*M*`、`fetch`・`pull` の refspec、置き場に当たる `checkout`・`restore`。名前の規則（3.1 の 2・3・5・6）と `_CHILD` に当たる親の識別子を lint の warn で入れる（ハードな拒否ではない） | sh・lint | 締まる向き |
-| 1 | 読み取り専用ボード（設定画面に統合先の名前の欄）: MV3 の拡張のページの Worker で Pyodide を起こし、純 Python の PyYAML で今の `waiting` を動かす（MEMFS、`done/` は全部取る）。CSP で落ちれば sandbox ページ + `postMessage`（確認事項 4）。DOMPurify と CSP、悪意のある Markdown の試験。ホストの一覧から `host_permissions` と `connect-src` を生成するビルド。互換の印の比較（7.3） | 無し | 無し |
+| 1 | 読み取り専用ボード（設定画面に統合先の名前の欄）: MV3 の拡張のページの Worker で Pyodide を起こし、純 Python の PyYAML で今の `waiting` を動かす（MEMFS、`done/` は全部取る）。CSP で落ちれば sandbox ページ + `postMessage`（確認事項 4）。DOMPurify と CSP、悪意のある Markdown の試験。ホストの一覧から `host_permissions` と `connect-src` を生成するビルド。互換のマーカーの比較（7.3） | 無し | 無し |
 | 2a | コアと差し口（`judge`・`plan`・`withdraw`・`confirm`・`reviewed_mark`）。見本をバイト比較・閉包を含む複数の場面に広げ、手元の `--approve` と `confirm` をコア経由に。`source_path` の相対化。fsio の記録層と、fsio を通らない書き込みを揃える | Python | 無し（試験で保証） |
 | 2b | 取り込みと控え: `ccnavi-sync.sh`（消えたと閉じたの区別、観測ずれ、控えの書き出し）、統合先の名前の読みと、無いブランチで止める・使った名前を出す（D30）、`ccnavi-fetch.sh` の早送りだけへの縮小とロックを試すだけの動き、`ccnavi-git.sh push` の控えの作成と `gone` の拒否、`worktree add`・`checkout -B` などの拒否と `:99`・`:607` の文面の書き換え（D36）。この段では控えを書くだけで、判定はまだ読まない | sh・Python（環境変数の読み） | 締まる向き |
 | 2c | 権威（3.3〜3.4）と `P` の消失（3.6）: 閉じた家族、決まらないときは止める、参照の閉包と手元の池の揃え、統合先の控えからの層（ADR-0084 の改訂）。`ready` の前提。移行の検査を error に上げてから旧経路を消す。2b の控えに依る | Python | 締まる向き |
@@ -1230,12 +1230,12 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 |---|---|---|
 | MV3 の拡張（ボード・設定画面・service worker・Worker） | `src/` | ボードは拡張のページ（タブ）。Pyodide はそのページのモジュール Worker で動かす（8.1）。sandbox ページは使わない（10.2 の 4） |
 | 判定の入口 | `py/ccnavi_chrome.py` | MEMFS に統合先をワークスペースルート、家族をワークツリー（相互参照の `gitdir` つき）として組み、今の `--approve --preview --json` を呼ぶ。家族の見分け・参照の閉包（上限 16 家族）・互換の比べも Python。TS は並べるだけ |
-| 判定の入力（D2） | `src/core/snapshot.ts` | 直近 N 日（既定 3）と指定のブランチは家族を見つけるのに使うだけ。家族ごとに統合先・`P`・閉包の `P_X` だけを渡す。統合先から読むのは `done/`・共通層・自身の層・置き場の綴り（`.claude/settings.json` の `env`）・互換の印 |
+| 判定の入力（D2） | `src/core/snapshot.ts` | 直近 N 日（既定 3）と指定のブランチは家族を見つけるのに使うだけ。家族ごとに統合先・`P`・閉包の `P_X` だけを渡す。統合先から読むのは `done/`・共通層・自身の層・置き場の綴り（`.claude/settings.json` の `env`）・互換のマーカー |
 | 読み取り（8.2） | `src/core/github.ts` | 置き場のパスの tree を GraphQL で引いて REST の `?recursive=1` で読み、blob は sha で 50 件ずつ GraphQL で取る。`truncated` と、本文が大きさと合わない blob は止める。blob は IndexedDB に控える。GitHub だけ（GitLab は段階 5） |
 | PAT（5.5） | `src/core/protocol.ts`・`src/background/` | `chrome.storage.local` に平文。読むのは service worker だけ。画面は名前で限った読み取りの操作を頼む。書く・消すは設定画面からだけ受ける。`externally_connectable` は宣言しない |
 | 描画（5.5 の 2） | `src/core/sanitize.ts` | Markdown は marked で HTML にし、DOMPurify で消毒した DOM の断片で入れる。リンクは `http:`・`https:`・`mailto:` だけ。画像・SVG・MathML・フォーム・style も落とす（画像は外への通信になるため。ADR より締めた） |
 | 通信先の焼き込み（D24） | `hosts.json`・`scripts/build.js` | 一覧から `host_permissions` と CSP の `connect-src` を組む。CSP は `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' <API のオリジン>` |
-| 互換の印（7.3） | `py/ccnavi_chrome.py` | 統合先の `CCNAVI_COMPAT` と同梱の `version.COMPAT` を比べ、違えば帯に出す（段階 1 は表示だけ） |
+| 互換のマーカー（7.3） | `py/ccnavi_chrome.py` | 統合先の `CCNAVI_COMPAT` と同梱の `version.COMPAT` を比べ、違えば帯に出す（段階 1 は表示だけ） |
 | 同梱物 | `scripts/build.js`・`scripts/python.js` | Pyodide は npm の版を固定し、写した物のハッシュを突き合わせる。PyYAML は純 Python 版を `uv.lock` の sdist とハッシュで取る。ccnavi と入口は .pyc（unchecked-hash）付きの zip。リポジトリには入れない |
 
 試験: 単体（通信先と manifest、service worker の約束、GitHub の読み取り、悪意のある Markdown）、Node の上の Pyodide でのボードの組み立て、
@@ -1720,7 +1720,7 @@ ADR に無かった判断:
 
 直さなかったもの:
 
-- 置き場の外の名指しのファイル（`.claude/settings.json`・互換の印）がシンボリックリンクのとき: パスで引く GraphQL は mode を返さないので見分けていない。
+- 置き場の外の名指しのファイル（`.claude/settings.json`・互換のマーカー）がシンボリックリンクのとき: パスで引く GraphQL は mode を返さないので見分けていない。
   置き場の下（`done/`・層・提案・承認済み）は tree の mode で見分ける
 - 読んでいる間に先頭が動く例外（`MovedError`）は、家族 1 つぶんの読み直しでは同じブランチを 2 度違う先頭で読まないので起きにくく、試験は周を回す枝を直に見ていない
 
@@ -1867,7 +1867,7 @@ GitLab（8.4 の 1 段目まで）、プロジェクトのリポジトリ（3.3 
 | GitLab の読み書き（8.2・8.4・8.8・8.9・8.10・D25） | `chrome-extension/ccnavi-approval/src/core/gitlab.ts` | GitHub と同じ名前の操作を REST（v4）で組む。tree は `repository/tree`（コミットとパス、再帰、100 件ずつ 50 ページまで）、blob は `repository/blobs/:sha` を 1 件ずつ（NUL か UTF-8 で読めなければバイナリ。大きさが合わなければ止める）、承認コミットは `repository/commits?ref_name=&path=` と `first_parent=true` の鎖、MR の Approve は `approvals`、変更の一覧は `merge_base`（祖先でなければ null）と `compare`（時間切れ・1000 件で null）、PAT の持ち主は `GET /user` の `username`、期限は `GET /personal_access_tokens/self` を 1 日 1 回。認証は `PRIVATE-TOKEN` |
 | スレッドとレビューの写し（8.9） | `gitlab.reviewCopy` | `ccnavi-review.sh` の GitLab の枝（`find_mr`・`threads`・`reviews`）と同じ問い合わせ・ページの切り方・欄の落とし方（jq の `//`・`tostring`・`ascii_upcase`）。スレッドは最初のノートの書き手（`author`）を持ち、Python が依頼の記録の `poster` と比べて ccnavi の依頼のスレッドを除く（11.8.1 の決定 C） |
 | GitLab の書き込み（8.4 の 1 段目・D21） | `gitlab.createCommit`、`protocol.ts` の `commit`、`write.ts` の `writeLoop`・`settleRace`・`revert` | service worker は書く直前に先頭を読み、読んだ先頭と違えば書かない（409）。Commits API の `actions`（作る・書き換える・消すは Python の Changes のとおり。GitLab が断れば 409）で 1 コミット書き、答えのコミットの親を返す。書く流れは、親が読んだ先頭と違えば（間に書き込みが入った）自分の書き込みの直前の姿で判定し直し、書くもの（パス・種類・バイト列）が同じなら残す。違えば、今の先頭で自分の書いたパスがまだ書いたとおりのときだけ、直前の中身に戻す打ち消しのコミットを積み、読み直して周を回す（指紋が変わっていれば見直しを求める）。打ち消しを積めない・打ち消しの間にも同じパスが変わった・2 回とも書けないときは止めて人に回す（`attention`）。ボードは家族を「要確認」で出し、人が「確かめた」を押すまで控える（`chrome.storage.local`）。GitHub は `expectedHeadOid` のまま（答えの親は読んだ先頭） |
-| プロジェクトのリポジトリ（3.3 の 7・D28・10.3 の 1） | 設定画面、`settings.ts`、`snapshot.readProjectIntegration`、`py/ccnavi_chrome.py` の `_build`・`project_layer`・`records` | 設定画面でプロジェクト名（`projects/<名前>` の名前。`common`・`self` は不可）と、先に登録したワークスペースのリポジトリを選ぶ（ホストが違ってよい）。置き場の綴り・共通層・自身の層・互換の印はワークスペースの統合先から、`done/` とプロジェクトの層はプロジェクトの統合先から読む。仮のツリーは手元と同じ形（ワークスペースルート、`projects/<名前>/`、そのワークツリーとしての `.claude/worktrees/<P>`）で、層は D28 の計算（共通層にあるファイルを `configsync.projected` で写し、無いファイルはプロジェクトの統合先のもの）。控えは `sync/self/` と `sync/<名前>/`。service worker の書く守りも置き場の綴りをワークスペースの統合先から自分で引く |
+| プロジェクトのリポジトリ（3.3 の 7・D28・10.3 の 1） | 設定画面、`settings.ts`、`snapshot.readProjectIntegration`、`py/ccnavi_chrome.py` の `_build`・`project_layer`・`records` | 設定画面でプロジェクト名（`projects/<名前>` の名前。`common`・`self` は不可）と、先に登録したワークスペースのリポジトリを選ぶ（ホストが違ってよい）。置き場の綴り・共通層・自身の層・互換のマーカーはワークスペースの統合先から、`done/` とプロジェクトの層はプロジェクトの統合先から読む。仮のツリーは手元と同じ形（ワークスペースルート、`projects/<名前>/`、そのワークツリーとしての `.claude/worktrees/<P>`）で、層は D28 の計算（共通層にあるファイルを `configsync.projected` で写し、無いファイルはプロジェクトの統合先のもの）。控えは `sync/self/` と `sync/<名前>/`。service worker の書く守りも置き場の綴りをワークスペースの統合先から自分で引く |
 | 「始める」（8.6・D19） | `src/core/start.ts`、`ccnavi_chrome._op_start`、`protocol.ts` の `issues`・`createBranch`、ボード | ボードの「issue を読む」で開いた issue を新しい順に 50 件（GitHub は PR を除く）読み、「始める」を押すと、統合先を読み直して Python に識別子と始められない理由（統合先の `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版が違う）を聞き、無ければ service worker が統合先の今の先頭からブランチを作る（GitHub は `POST /git/refs`、GitLab は `POST repository/branches`）。service worker も、ボードからだけ・登録したリポジトリだけ・issue から決める形の名前（プロジェクトなら `<名前>-i<番号>`）だけ・保護された名前と統合先の名前は作らない・渡された sha が統合先の今の先頭・既に無い、を自分で確かめる。PR/MR は作らない |
 | ボードと設定画面 | `render.ts`・`board/main.ts`・`options/main.ts`・`static/options.html` | GitLab の MR は `!番号`。プロジェクトのリポジトリは見出しにプロジェクト名。「始める」の欄（issue の題は素の文字列、リンクは http(s) だけ）と「要確認」。設定画面にプロジェクト名とワークスペースの欄、段階 5 の権限（GitHub は Issues: Read を足す。GitLab は `api`）。拡張の版を 0.4.0 に上げた |
 | 通信先の焼き込み（D24） | `hosts.json`（既定は変えない）、`test/fixtures/hosts.e2e.json` | 既定のビルドは `api.github.com` と `gitlab.com`。実機の試験はセルフホストの GitLab（模擬。127.0.0.1:18788）を足したビルドで回し、`host_permissions` と `connect-src` がその一覧だけになることを見る。GitLab の `graphql` 欄は読まない（REST だけ） |

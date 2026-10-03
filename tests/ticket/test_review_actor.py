@@ -27,7 +27,7 @@ RESULT = {"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "
 class ActorHarness(CoreHarness):
     def setUp(self):
         super().setUp()
-        # 統合先の互換の印（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）
+        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）
         write(
             os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
             f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",

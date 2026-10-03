@@ -40,7 +40,7 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 
 段階 5 から、プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）
 も読む。Snapshot に `project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの
-統合先の中身。共通層・自身の層・`.claude/settings.json`・互換の印）が付く。仮のツリーは
+統合先の中身。共通層・自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは
 手元と同じ形で組む: ワークスペースルートにワークスペースの統合先、`projects/<名前>/` に
 プロジェクトの統合先（`done/` と、D28 の計算の層）、家族は `projects/<名前>` のワークツリー
 として `.claude/worktrees/<P>` に置く。控えは `sync/self/` と `sync/<名前>/` に分けて組む。
@@ -162,7 +162,7 @@ def _placement(settings_text: str | None) -> dict:
         # 家族のブランチから読むもの。
         "branch_paths": [approved, tickets],
         # プロジェクトのリポジトリ（段階 5）。ワークスペースの統合先から読むもの（共通層・自身の層・
-        # 設定・互換の印）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
+        # 設定・互換のマーカー）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
         "workspace_paths": sorted({COMMON_LAYER, own_layer}),
         "workspace_files": [SETTINGS_FILE, COMPAT_FILE],
         "project_paths": sorted({f"{approved}/{ticket_mod.DONE}", own_layer}),
@@ -221,7 +221,7 @@ def _project(snap: dict) -> str:
 
 
 def _workspace_files(snap: dict) -> dict[str, str]:
-    """ワークスペースの統合先の中身（共通層・設定・互換の印）。ワークスペース自身なら統合先。"""
+    """ワークスペースの統合先の中身（共通層・設定・互換のマーカー）。ワークスペース自身なら統合先。"""
     if _project(snap):
         return snap["workspace"]["files"]
     return _files(snap, snap["integration"]["name"])
@@ -943,7 +943,7 @@ def _reviewable(root: str, place: dict, family: str) -> list[dict]:
         return core.reviewable(core.read_fs(conf, root), family)
 
 
-# ---- 互換の印（7.3） --------------------------------------------------------------------
+# ---- 互換のマーカー（7.3） --------------------------------------------------------------------
 
 
 def _op_compat(req: dict, root: str) -> dict:
@@ -951,7 +951,8 @@ def _op_compat(req: dict, root: str) -> dict:
 
 
 def _compat(snap: dict) -> dict:
-    # 互換の印はワークスペースの統合先にある（プロジェクトのリポジトリはワークスペースのものを読む）
+    # 互換のマーカーはワークスペースの統合先にある
+    # （プロジェクトのリポジトリはワークスペースのものを読む）
     text = _workspace_files(snap).get(COMPAT_FILE)
     ours = version.COMPAT
     found = lint._SH_COMPAT.search(text) if text else None

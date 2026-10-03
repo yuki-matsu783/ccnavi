@@ -33,7 +33,7 @@ export interface Integration {
   readonly head: string;
 }
 
-/** プロジェクトのリポジトリのワークスペースの統合先の中身（段階 5。共通層・自身の層・設定・互換の印） */
+/** プロジェクトのリポジトリのワークスペースの統合先の中身（段階 5。共通層・自身の層・設定・互換のマーカー） */
 export interface Workspace {
   readonly integration: Integration;
   readonly files: Record<string, string>;

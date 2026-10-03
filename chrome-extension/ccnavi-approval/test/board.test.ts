@@ -93,7 +93,7 @@ test("CX-T044 統合先の名前: 設定したブランチが無ければ止め�
   assert.equal(set.board.integration?.source, "setting");
 });
 
-test("CX-T045 互換の印が違えば、どちらを更新するかを言う（7.3）", async () => {
+test("CX-T045 互換のマーカーが違えば、どちらを更新するかを言う（7.3）", async () => {
   const newer = await run(fixture(COMPAT + 1));
   assert.equal(newer.board.compat?.same, false);
   assert.equal(newer.board.compat?.message, `拡張は互換 ${COMPAT}、リポジトリは互換 ${COMPAT + 1}。拡張を更新する`);

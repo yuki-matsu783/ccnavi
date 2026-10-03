@@ -323,7 +323,7 @@ function fold(text: string): string {
   return text.normalize("NFKC").toLowerCase();
 }
 
-/** 互換の印の綴り（`ccnavi_chrome.COMPAT_FILE`） */
+/** 互換のマーカーの綴り（`ccnavi_chrome.COMPAT_FILE`） */
 const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
 
 /**
