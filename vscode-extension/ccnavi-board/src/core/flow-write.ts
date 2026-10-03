@@ -110,7 +110,7 @@ function makeDirs(tree: string, dir: string): string | undefined {
 }
 
 function linkedError(where: string): string {
-  return `${where} がシンボリックリンクなので書かない（リンクの先は承認済みの領域の外かもしれない）。リンクを外してから保存する`;
+  return `${where} がシンボリックリンクなので書かない（リンクの先は承認済みの領域の外かもしれない）。リンクを外してから保存してください`;
 }
 
 /**
@@ -181,10 +181,10 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
     }
   }
   if (!expect.exists) {
-    return stat === undefined ? undefined : "フローのファイルが読み込んだあとに外で作られている。再読込してから編集し直す（上書きしない）";
+    return stat === undefined ? undefined : "フローのファイルは、読み込んだあとに画面の外で作られている。再読込してから編集し直してください（上書きしない）";
   }
   if (stat === undefined) {
-    return "フローのファイルが読み込んだあとに外で消されている。再読込してから編集し直す";
+    return "フローのファイルは、読み込んだあとに画面の外で消されている。再読込してから編集し直してください";
   }
   if (stat.isSymbolicLink() || !stat.isFile()) {
     return `${file} がシンボリックリンクかファイルでないので書かない`;
@@ -193,7 +193,7 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
     return hardLinkedError(file, "書かない");
   }
   if (stat.mtimeMs !== expect.mtimeMs) {
-    return "フローのファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）";
+    return "フローのファイルは、読み込んだあとに画面の外で変更されている。再読込してから編集し直してください（この変更は上書きしない）";
   }
   return undefined;
 }
@@ -270,5 +270,5 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
 }
 
 function hardLinkedError(file: string, what: string): string {
-  return `${file} はハードリンク（ほかの名前からも同じ中身に届く）なので${what}。承認済みの領域の外の名前から書き換えられうる。リンクを外してから開き直す`;
+  return `${file} はハードリンク（ほかの名前からも同じ中身に届く）なので${what}。承認済みの領域の外の名前から書き換えられうる。リンクを外してから開き直してください`;
 }

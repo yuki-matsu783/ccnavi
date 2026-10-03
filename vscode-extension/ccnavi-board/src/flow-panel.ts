@@ -183,7 +183,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
       // 既に開いている画面の編集を何も言わずに差し替えない。戻せなかったと言い、写しは YAML で見せる
-      void vscode.window.showWarningMessage(`${ticket} のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は名前の無い YAML で開きます。`);
+      void vscode.window.showWarningMessage(`${ticket} のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の YAML ファイルとして開きます。`);
       void openDraftAsYaml(restore.draft);
     }
     return;
@@ -270,7 +270,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     return { target, exists: false, mtimeMs: 0, hash: "", doc: templateFlow(ticket, target.title), shown };
   }
   const { bytes, mtimeMs } = read;
-  const refuse = (why: string): Error => new Error(`フローのファイルを開かない（${shown}）: ${why}。エディタで直してから再読込する`);
+  const refuse = (why: string): Error => new Error(`フローのファイルを開かない（${shown}）: ${why}。エディタで直してから再読込してください`);
   // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として壊れているかも
   // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
@@ -289,7 +289,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-agree.ts）
   const disagreement = flowDisagreement(value.value, verdict.data);
   if (disagreement !== undefined) {
-    throw new Error(`フローのファイルを開かない（${shown}）: ${openDisagreementText(disagreement)}。直したら再読込する`);
+    throw new Error(`フローのファイルを開かない（${shown}）: ${openDisagreementText(disagreement)}。直したら再読込してください`);
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
@@ -543,7 +543,7 @@ async function reload(current: PanelState): Promise<void> {
       current.shownDraft = restore.draft;
     } else {
       // 閉じた後にファイルが変わった。写しを戻すと、変わった中身を気づかないうちに上書きしうる。写しは YAML で見せる
-      void vscode.window.showWarningMessage(`${current.ticket} のフローは閉じた後に変わったので、編集を戻しませんでした。閉じる前の編集は名前の無い YAML で開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket} のフローは閉じた後に変わったので、編集を戻しませんでした。閉じる前の編集は、無題の YAML ファイルとして開きます。`);
       void openDraftAsYaml(restore.draft);
     }
   }
@@ -560,7 +560,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "読み直したので、この保存は捨てた。いまのフローで編集し直す");
+  fail(current, "読み直したので、この保存は取りやめた。読み直したフローで編集し直してください");
   return true;
 }
 
@@ -682,7 +682,7 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（権威のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
-    fail(current, `フローの置き場が変わった（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直す`);
+    fail(current, `フローの置き場が変わった（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直してください`);
     return;
   }
   // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
@@ -705,13 +705,13 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     (await runC1Target(root, binSetting(), target.parent)) === "yes";
   if (!carrier) {
     vscode.window.showInformationMessage(
-      `${loaded.shown} に保存した。承認済みチケットと同じく人がコミットする（sh ${PUSH_APPROVED_SCRIPT}）`,
+      `${loaded.shown} に保存した。コミットは、承認済みチケットと同じく人が行う（sh ${PUSH_APPROVED_SCRIPT}）`,
     );
     return;
   }
   const send = "端末で送る";
   const picked = await vscode.window.showInformationMessage(
-    `${loaded.shown} に保存した。家族 ${target.parent} は取り込み済みなので、運ぶ処理（${PUSH_APPROVED_SCRIPT} ${target.parent}）で送る`,
+    `${loaded.shown} に保存した。親 ${target.parent} とその子は取り込み済みなので、コミットと push は ${PUSH_APPROVED_SCRIPT} ${target.parent} で送る`,
     send,
   );
   if (picked === send) {

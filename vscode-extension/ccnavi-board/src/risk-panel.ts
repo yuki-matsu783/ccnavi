@@ -402,7 +402,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "更新したので、この保存は取りやめました。いまの配点で編集し直してください");
+  fail(current, "画面を更新したので、この保存は取りやめました。更新後の配点で編集し直してください");
   return true;
 }
 
@@ -562,7 +562,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "配点のファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+    fail(current, "配点のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
     return;
   }
 

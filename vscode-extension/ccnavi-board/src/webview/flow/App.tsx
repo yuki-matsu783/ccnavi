@@ -135,20 +135,20 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#flow-palette",
     title: "部品箱",
-    body: "押すとノードが図に足される。利用者に聞く（askUserQuestion）ノードでは、担当のサブエージェントは手を止めてメインに返す。サブエージェントのノードは入れ子で起こし、上限ならメインに返す。",
+    body: "押すとノードが図に足される。利用者に聞く（askUserQuestion）ノードでは、担当のサブエージェントは手を止めてメインに返す。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に当たったらメインに返す。",
   },
   {
     target: "#flow-graph",
     title: "図",
     body:
-      "ノードの右の点から次のノードの左の点へ引くと線が繋がる（開始へ入る線と、終了から出る線は引けない）。ノードや線を押すと、右の欄で中身を直せる。ノードや線に載せると出る × で消せる。" +
+      "ノードの右の点から次のノードの左の点へ引くと線が繋がる（開始へ入る線と、終了から出る線は引けない）。ノードや線を押すと、右の欄で中身を直せる。ノードや線にポインタを載せると出る × で消せる。" +
       "Shift を押しながらノードを押す（何も無いところを引いて囲む）といくつも選べ、「グループ化」で枠にまとめられる。枠の中へ引いたノードは枠に入り、外へ引くと出る。" +
       "Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直す。選んだノードは Ctrl+C で写して Ctrl+V で貼り、Ctrl+D で複製する（開始は写さない）。",
   },
   {
     target: "#inspector",
     title: "欄",
-    body: "選んだノードの中身（プロンプト・問いと選択肢・分岐の条件など）を直す。画面が知らない種類は、名前だけ直せて中身はそのまま残る。",
+    body: "選んだノードの中身（プロンプト・問いと選択肢・分岐の条件など）を直す。この画面に入力欄が無い種類は、名前だけ直せて中身はそのまま残る。",
   },
   {
     target: "#save",
@@ -344,7 +344,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     onKey.current = () => undefined;
     return (
       <>
-        <p className="empty">フロー編集画面を読み直せなかった。原因を直してから「再読込」を押す。</p>
+        <p className="empty">フロー編集画面を読み込み直せなかった。原因を直してから「再読込」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           再読込
@@ -532,7 +532,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     <>
       {lock.locked && (
         <div id="lock" className="lock" role="status">
-          {lock.reason === "" ? "着手中かを確かめられないので、読むだけにしている。" : lock.reason}
+          {lock.reason === "" ? "着手中かどうかを確かめられないので、読み取り専用で開いている。" : lock.reason}
         </div>
       )}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>

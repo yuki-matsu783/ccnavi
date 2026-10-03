@@ -273,7 +273,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".board",
     title: "列",
-    body: "チケットは 未着手 → 作業中 → 完了（または取り消し）と動きます。見出しを押すと列を畳み、右端をドラッグすると幅を変えられます（ダブルクリックで元に戻ります）。",
+    body: "チケットは「未着手 → 作業中 → 完了（または取り消し）」の順に列を移ります。見出しを押すと列を畳み、右端をドラッグすると幅を変えられます（ダブルクリックで元に戻ります）。",
   },
   {
     target: ".column:not(.folded) .card:not(.hidden)",
@@ -283,7 +283,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '[data-action="approve"]',
     title: "承認",
-    body: "絞り込みで見えている承認待ちをまとめて承認します。押すと承認する内容がオーバーレイに出るので、確かめてから承認してください。承認した文は Claude Code に渡します。",
+    body: "絞り込みで見えている承認待ちをまとめて承認します。押すと承認する内容がオーバーレイに出るので、確かめてから承認してください。承認のあと、Claude Code に伝える文を渡せます。",
   },
   {
     target: '[data-action="refresh"]',

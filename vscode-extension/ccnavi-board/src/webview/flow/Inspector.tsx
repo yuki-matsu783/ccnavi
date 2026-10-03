@@ -102,7 +102,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
               type="text"
               className="f-condition"
               value={str(connection.condition)}
-              placeholder="空なら出口の名前で読む"
+              placeholder="空なら出口の名前を条件として読む"
               disabled={readOnly}
               onChange={(event) => onChange(setConditionAt(doc, selected.index, event.target.value), `edge:${selected.index}:condition`)}
             />
@@ -136,7 +136,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         <span title="description">説明</span>
         <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }), "flow:description")} />
       </label>
-      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線に載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。Ctrl+Z で元に戻し、Ctrl+C・Ctrl+V・Ctrl+D で選んだノードを写す・貼る・複製する。</p>
+      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線にポインタを載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。Ctrl+Z で元に戻し、Ctrl+C・Ctrl+V・Ctrl+D で選んだノードを写す・貼る・複製する。</p>
     </aside>
   );
 }

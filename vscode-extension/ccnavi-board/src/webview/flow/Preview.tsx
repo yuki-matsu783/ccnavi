@@ -22,7 +22,7 @@ function body(checks: FlowChecks | undefined): JSX.Element {
     return <p className="dim small">まだ実行ファイルに確かめていない。</p>;
   }
   if (checks.rendered === undefined) {
-    return <p className="dim small">実行ファイルが古いので、渡る手順を出せない（lint の答えに rendered が無い）。実行ファイルを新しくする。</p>;
+    return <p className="dim small">実行ファイルが古いので、渡る手順を出せない（lint の答えに rendered が無い）。実行ファイルを更新してください。</p>;
   }
   if (checks.rendered === null) {
     return <p className="dim small">実行ファイルがこのフローを手順に並べられなかった（中身を読めない）。担当にはフローの手順が渡らない。</p>;
@@ -36,7 +36,7 @@ export function Preview({ checks, checking, error }: PreviewProps): JSX.Element 
       <summary title="SubagentStart で担当のサブエージェントに渡る手順。実行ファイル（ccnavi --lint --flow）が並べたもの">担当に渡る手順</summary>
       {checking && (
         <p className="dim small" id="flow-preview-checking">
-          確かめ直している…（出しているのは前の答え）
+          確かめ直している…（表示しているのは前回の結果）
         </p>
       )}
       {error !== undefined && <p className="error small" id="flow-preview-error">{error}</p>}

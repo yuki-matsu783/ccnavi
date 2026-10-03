@@ -565,7 +565,7 @@ function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, `更新したので、${what}は取りやめました。いまのルールでやり直してください`);
+  fail(current, `画面を更新したので、${what}は取りやめました。更新後のルールでやり直してください`);
   return true;
 }
 
@@ -809,7 +809,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "ルールファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+    fail(current, "ルールファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
     return;
   }
 

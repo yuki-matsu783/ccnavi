@@ -33,7 +33,7 @@ export type PhaseOrder = (typeof ORDERS)[number];
 /** 待ち方の説明。select のラベル */
 export const ORDER_LABELS: Readonly<Record<PhaseOrder, string>> = {
   sequential: "sequential（既定。全体計画は一直線で、前の番号を全部待つ）",
-  dag: "dag（after を辺にしたワークフロー。祖先に当たる種類だけを待ち、他は並行して進む）",
+  dag: "dag（after でつないだ流れ。after をたどった先にある種類だけを待ち、他は並行して進む）",
 };
 
 /** 画面で編集する種類 1 件。`origin` は読み込んだときの位置で、新しい種類は null */

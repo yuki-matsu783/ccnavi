@@ -82,7 +82,7 @@ export function readRisk(text: string): RiskDocument {
   if (version === undefined || version === null) {
     problems.push(`version がありません。保存すると version: ${RISK_VERSION} を先頭に足します`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${RISK_VERSION}）。組み込みの配点に落ちます`);
+    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${RISK_VERSION}）。組み込みの配点を使います`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;

@@ -481,7 +481,7 @@ export async function runSuggest(root: string, setting: string): Promise<RunResu
   }
   if (ran.code !== 0) {
     if (unknownOption(ran.stderr, "--suggest")) {
-      return { ok: false, error: "実行ファイルが --suggest を知りません（古い版です）。実行ファイルを新しくしてください" };
+      return { ok: false, error: "実行ファイルが --suggest に対応していません（古い版です）。実行ファイルを更新してください" };
     }
     return { ok: false, error: `ccnavi --suggest --json が失敗しました: ${firstLine(ran.stderr)}` };
   }

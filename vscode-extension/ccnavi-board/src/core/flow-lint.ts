@@ -78,7 +78,7 @@ export async function lintFlowText(
     if (flow === undefined || flow.data === null || flow.data === undefined) {
       return {
         ok: false,
-        error: "実行ファイル（--lint --flow）が読んだ中身（flow）を返さない（古い）。確かめられないので進めない。実行ファイルを新しくする",
+        error: "実行ファイル（--lint --flow）が読んだ中身（flow）を返さない（古い）。確かめられないので進めない。実行ファイルを更新してください",
       };
     }
     const checks: FlowChecks = {

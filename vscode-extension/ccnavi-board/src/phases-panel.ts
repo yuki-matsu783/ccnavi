@@ -575,7 +575,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, "更新したので、この保存は取りやめました。いまの種類で編集し直してください");
+  fail(current, "画面を更新したので、この保存は取りやめました。更新後の種類で編集し直してください");
   return true;
 }
 
@@ -734,11 +734,11 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+      fail(current, "フェーズの種類のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られています。更新してから編集し直してください（上書きしません）");
+    fail(current, "フェーズの種類のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
     return;
   }
 

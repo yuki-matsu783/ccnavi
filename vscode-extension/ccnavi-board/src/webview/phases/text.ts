@@ -13,7 +13,7 @@ export function hasRelations(phase: PhaseForm): boolean {
 
 /** 「ほかの種類との関係・補足」の見出しにつける一言 */
 export function relationsNote(phase: PhaseForm): string {
-  return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に必要な種類・先に済ませる種類・案内するエージェント・使う場面";
+  return hasRelations(phase) ? "（設定あり）" : "（未設定）。並行できる種類・一緒に必要な種類・先に済ませる種類・案内するエージェント・使う場面";
 }
 
 /** 要約に出す範囲。inherit ならその綴り、glob が無ければ未設定と言う */
@@ -80,8 +80,8 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
   if (graph.dropped > 0) {
     out.push(
       layer
-        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（共通の設定の種類を指しているならそのままで構いません。入力ミスなら保存のときの検証が知らせます）。共通の設定の種類を待つ種類は、図では根に見えます`
-        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（入力ミスなら保存のときの検証が知らせます）`,
+        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（共通の設定の種類を指しているならそのままで構いません。入力ミスなら保存のときの検証で分かります）。共通の設定の種類を待つ種類は、図では根として表示されます`
+        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（入力ミスなら保存のときの検証で分かります）`,
     );
   }
   if (graph.unnamed > 0) {
@@ -97,5 +97,5 @@ export function emptyNote(exists: boolean, editable: boolean): string {
   }
   return editable
     ? "ファイルがありません（無ければこの設定は空で、共通の設定の種類だけが使われます）。種類を足して保存すると、ファイルが作られます"
-    : "ファイルがありません。種類はワークスペースかプロジェクトの設定に置いてください。上の案内からワークスペースの設定を開くか、プロジェクト管理画面から開けます";
+    : "ファイルがありません。種類はワークスペースかプロジェクトの設定に置いてください。ワークスペースの設定は上の案内のボタンから、プロジェクトの設定はプロジェクト管理画面から開けます";
 }

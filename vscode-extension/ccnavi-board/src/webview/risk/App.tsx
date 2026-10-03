@@ -242,7 +242,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       {page !== undefined && !exists && (
         <div className="banner missing">
-          <span>{page.riskPath} がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。直すにはまずファイルを作ってください。</span>
+          <span>{page.riskPath} がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。配点を直すには、まずファイルを作ってください。</span>
           <button
             type="button"
             className="action primary"
@@ -260,7 +260,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルの基準点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが 1 段上がります。HIGH 以上の場合は、次フェーズに進む前に人間レビューが必須になります
+          リスクレベルの境目の点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが 1 段上がります。HIGH 以上の場合は、次フェーズに進む前に人間レビューが必須になります
           </span>
         </h2>
         <details className="help">
@@ -309,7 +309,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <summary>この欄の説明</summary>
           <p className="hint">
             子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1 件につき加点条件は 1 つです。
-            <code>script</code> が失敗したときと出力が読めないときは安全側を採って points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられません。
+            <code>script</code> が失敗したときと出力を読めないときは、安全を優先して points をそのまま加点します。<code>judge</code> の項目があると、判定が揃うまで子を閉じられません。
           </p>
         </details>
         <ul className="list" id="factors">
@@ -343,7 +343,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
 const MISSING_STEP: TourStep = {
   target: '[data-action="create"]',
   title: "まずファイルを作る",
-  body: "配点のファイルがまだありません。実行ファイルは組み込みの配点で数えています。直すには、ここで組み込みの配点からファイルを作ってください。",
+  body: "配点のファイルがまだありません。実行ファイルは組み込みの配点で数えています。配点を直すには、ここで組み込みの配点からファイルを作ってください。",
 };
 
 /** リスク管理画面の案内。画面の様子は動かさないので、閉じても戻すものは無い */

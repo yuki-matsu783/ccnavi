@@ -1106,7 +1106,7 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
     );
   }
   if (cyclic) {
-    out.push("サブフローが自分を呼んでいる（subAgentFlowId が巡っている）。段の数は数えきれない");
+    out.push("サブフローが自分を呼んでいる（subAgentFlowId が巡っている）。段の数を数えられない");
   }
   const starts = doc.nodes.filter((node) => nodeType(node) === "start").length;
   if (starts === 0) {

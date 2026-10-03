@@ -224,12 +224,12 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
   if (started) {
     return {
       text: `先行が未完了（${ids}）`,
-      title: `着手済みです。先行が done/ に無いか取り消し済みで、満たしていません（作業と finish は止まりません）\n${detail}`,
+      title: `着手済みです。先行が done/ に無いか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";
   return {
     text: `先行待ち（${ids}）`,
-    title: `先行が done/ に入る（取り消しでない）まで、${what}止まります\n${detail}`,
+    title: `先行が取り消されずに done/ に入るまで、${what}止まります\n${detail}`,
   };
 }

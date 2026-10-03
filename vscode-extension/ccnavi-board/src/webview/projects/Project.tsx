@@ -113,7 +113,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
               data-action="open-phases"
               data-name={row.name}
               disabled={row.rulesRel === ""}
-              title="このプロジェクトのチケットの計画に、共通の設定に足して使うフェーズの種類を編集します。無ければ画面から作れます"
+              title="このプロジェクトのチケットの計画で、共通の設定の種類に足して使うフェーズの種類を編集します。ファイルが無ければ画面から作れます"
               onClick={() => send({ type: "openPhases", name: row.name })}
             >
               フェーズ管理
@@ -179,7 +179,7 @@ function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
         className="action small"
         data-action="create-rules"
         data-name={row.name}
-        title="共通の設定の rules.yml をこのプロジェクトの設定にコピーします。文面の sh のパスは {root} 付きに置き換えます"
+        title="共通の設定の rules.yml をこのプロジェクトの設定にコピーします。ルールの文面にある sh のパスは、先頭に {root} を付けた形に置き換えます"
         onClick={() => post({ type: "createRules", name: row.name })}
       >
         共通の設定からコピー

@@ -82,7 +82,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
         <span className="where">{where}</span>
       </div>
       {moved !== undefined ? (
-        <div className="moved-mark" title="前回の更新から列が変わりました。次に何かが動くまで残ります">
+        <div className="moved-mark" title="前回の更新から列が変わりました。この印は、次にどれかのカードの列が変わるまで残ります">
           {movedLabel(moved)}
         </div>
       ) : null}

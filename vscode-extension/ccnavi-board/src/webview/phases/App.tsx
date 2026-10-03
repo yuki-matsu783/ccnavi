@@ -520,7 +520,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <code>feedback:</code> に <code>feedback</code> の種類を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
             <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
-            辺の書き漏れはそのまま並行として通るので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効きません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効きません。
+            after の書き漏れがあると、その種類は並行してよいものとして扱われるので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効きません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効きません。
             関係の欄はこのファイルのほかの種類から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の種類の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
