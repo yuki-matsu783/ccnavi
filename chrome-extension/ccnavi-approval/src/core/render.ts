@@ -118,7 +118,7 @@ function attention(doc: Document, text: string, onDismiss?: () => void): HTMLEle
   box.dataset.testid = "attention";
   box.append(notice(doc, "error", `要確認: ${text}`));
   box.append(
-    el(doc, "p", "note", "この印はこのブラウザにだけ控えている（ほかの承認者には見えない）。ホストの履歴を確かめて直すまで、この家族にはここから書かない"),
+    el(doc, "p", "note", "この要確認はこのブラウザにだけ記録している（ほかの承認者には見えない）。ホストの履歴を確かめて直すまで、このブラウザからはこの家族に書かない"),
   );
   if (onDismiss) box.append(button(doc, "確かめた（要確認を外す）", "dismiss", onDismiss));
   return box;
@@ -128,7 +128,7 @@ function attention(doc: Document, text: string, onDismiss?: () => void): HTMLEle
 function renderStart(doc: Document, board: RepoBoard, actions: Actions, issues?: Extras["issues"]): HTMLElement {
   const box = el(doc, "section", "start");
   box.dataset.testid = "start";
-  box.append(el(doc, "h3", "", "issue から始める（親のブランチを統合先の先頭から作る。PR/MR は最初の push の後に作られる）"));
+  box.append(el(doc, "h3", "", "issue から始める（親のブランチを統合先の先頭から作る。マージリクエストは最初の push の後に作られる）"));
   if (!issues) {
     box.append(button(doc, "issue を読む", "issues", () => actions.loadIssues?.(board)));
     return box;
@@ -138,7 +138,7 @@ function renderStart(doc: Document, board: RepoBoard, actions: Actions, issues?:
     return box;
   }
   const list = issues.list ?? [];
-  if (list.length === 0) box.append(el(doc, "p", "empty", "開いた issue は無い"));
+  if (list.length === 0) box.append(el(doc, "p", "empty", "開いている issue は無い"));
   const ul = el(doc, "ul", "issues");
   for (const issue of list) {
     const li = el(doc, "li", "issue");
@@ -187,7 +187,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   }
   const others = r.closure.families.filter((n) => n !== f.family.name);
   if (others.length > 0) {
-    box.append(el(doc, "p", "closure", `判定に入れた家族（先行の閉包）: ${others.join(", ")}`));
+    box.append(el(doc, "p", "closure", `判定に入れたほかの家族（先行をたどって行き着くもの）: ${others.join(", ")}`));
   }
   if (r.closure.absent.length > 0) {
     box.append(notice(doc, "warn", `先行の家族のブランチがリモートに無い: ${r.closure.absent.join(", ")}`));
@@ -231,7 +231,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   const write = r.write ?? { allowed: false, reason: "" };
   if (batch.length > 0 && r.digest) {
     if (!write.allowed) {
-      box.append(notice(doc, "warn", write.reason || "この家族は書けない"));
+      box.append(notice(doc, "warn", write.reason || "この家族には書けない"));
     } else if (actions) {
       const bar = el(doc, "div", "actions");
       bar.append(button(doc, `承認する（${batch.map((e) => e.ticket).join(", ")}）`, "approve", actions.approve));

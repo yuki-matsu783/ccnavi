@@ -94,7 +94,7 @@ export function manifest(hosts: readonly Host[], version: string): Record<string
   return {
     manifest_version: 3,
     name: "ccnavi 承認ボード",
-    description: "リモートのブランチの承認待ちを見せ、承認・取り下げ・レビュー済みを親のブランチへ書き、issue から親のブランチを始める（ADR-0093 段階 5。GitHub と GitLab）",
+    description: "リモートのブランチにある承認待ちを表示し、承認・取り下げ・レビュー済みを親のブランチへ書く。issue から親のブランチを作ることもできる（ADR-0093 段階 5。GitHub と GitLab）",
     version,
     minimum_chrome_version: "116",
     permissions: ["storage", "alarms"],

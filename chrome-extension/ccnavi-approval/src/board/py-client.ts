@@ -20,7 +20,7 @@ export function startWorker(): PyWorker {
     else w.reject(new Error(e.data.error ?? "Worker が失敗した"));
   });
   worker.addEventListener("error", (e) => {
-    for (const w of waiting.values()) w.reject(new Error(`Worker が落ちた: ${e.message}`));
+    for (const w of waiting.values()) w.reject(new Error(`Worker が異常終了した: ${e.message}`));
     waiting.clear();
   });
   const send = (body: Record<string, unknown>) =>

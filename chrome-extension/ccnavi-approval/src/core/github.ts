@@ -45,14 +45,14 @@ const BRANCH = /^(?!\/)(?!.*\/\/)(?!.*\.\.)(?!.*[\s~^:?*[\\])(?!.*@\{)[^\x00-\x1
 
 export function checkName(value: unknown, what: string): string {
   if (typeof value !== "string" || !NAME.test(value) || value === "." || value === "..") {
-    throw new HostError(`${what} が読めない: ${String(value)}`);
+    throw new HostError(`${what} の形が正しくない: ${String(value)}`);
   }
   return value;
 }
 
 export function checkBranch(value: unknown): string {
   if (typeof value !== "string" || !BRANCH.test(value) || value.endsWith(".lock")) {
-    throw new HostError(`ブランチ名が読めない: ${String(value)}`);
+    throw new HostError(`ブランチ名の形が正しくない: ${String(value)}`);
   }
   return value;
 }
@@ -120,7 +120,7 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
   const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `。回復は ${new Date(reset * 1000).toISOString()}` : "";
   const kind = after !== "" ? "二次のレート制限" : "レート制限";
   return {
-    text: `GitHub の${kind}に当たった（${res.status}${seconds !== null ? `、${seconds} 秒待つよう言われた` : ""}${when}）。少し待ってからボードを更新する`,
+    text: `GitHub の${kind}にかかった（${res.status}${seconds !== null ? `、${seconds} 秒待つよう求められた` : ""}${when}）。少し待ってからボードを更新してください`,
     wait: seconds !== null && seconds <= RETRY_LIMIT_SECONDS ? seconds : null,
   };
 }
@@ -134,7 +134,7 @@ export async function fetchNoRedirect(client: Pick<Client, "fetch">, url: string
     return await client.fetch(url, { ...init, redirect: "error" });
   } catch (err) {
     throw new HostError(
-      `${what} が届かなかった（通信が落ちたか、別の場所へ転送された。転送は追わない）。通信先と、設定画面に登録した owner/repo（改名・移動していないか）を見直す: ${(err as Error).message ?? String(err)}`,
+      `${what} が届かなかった（通信が切れたか、別の場所へ転送された。転送先へは送らない）。通信先と、設定画面に登録した owner/repo（改名・移動していないか）を見直してください: ${(err as Error).message ?? String(err)}`,
     );
   }
 }
@@ -154,7 +154,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
     const res = await fetchNoRedirect(client, url, init, what);
     note(client, res);
     if (res.status === 401) {
-      throw new HostError("PAT が通らない（401）。設定画面で差し替える", 401);
+      throw new HostError("PAT で認証できない（401）。設定画面で差し替えてください", 401);
     }
     const limited = rateLimit(res);
     if (limited) {
@@ -165,7 +165,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
       throw new HostError(limited.text, res.status);
     }
     if (res.status === 403) {
-      throw new HostError(`GitHub が断った（403）: ${what}。PAT の権限（リポジトリ・Contents など）を見直す`, 403);
+      throw new HostError(`GitHub が断った（403）: ${what}。PAT の権限（リポジトリ・Contents など）を見直してください`, 403);
     }
     return res;
   }
@@ -224,7 +224,7 @@ async function graphql(client: Client, query: string, variables: Record<string, 
         await pause(client, seconds);
         continue;
       }
-      throw new HostError("GitHub の GraphQL のレート制限に当たった（RATE_LIMITED）。少し待ってからボードを更新する", 429);
+      throw new HostError("GitHub の GraphQL のレート制限にかかった（RATE_LIMITED）。少し待ってからボードを更新してください", 429);
     }
     if (errors.length > 0) {
       throw new HostError(`GitHub の GraphQL が失敗した: ${errors.map((e) => e.message ?? "?").join(" / ")}`);
@@ -241,7 +241,7 @@ function repoPath(owner: string, repo: string): string {
 export async function repoInfo(client: Client, owner: string, repo: string): Promise<{ defaultBranch: string }> {
   const { status, body } = await rest(client, repoPath(owner, repo));
   if (status === 404) {
-    throw new HostError(`リポジトリ ${owner}/${repo} が見えない（無いか、PAT の権限の外）`, 404);
+    throw new HostError(`リポジトリ ${owner}/${repo} が見つからない（存在しないか、PAT の権限が及ばない）`, 404);
   }
   return { defaultBranch: checkBranch((body as { default_branch?: unknown }).default_branch) };
 }
@@ -625,7 +625,7 @@ export async function openPull(client: Client, owner: string, repo: string, bran
   const first = status === 404 || !Array.isArray(body) ? undefined : (body[0] as { number?: unknown; html_url?: unknown } | undefined);
   if (!first) return null;
   if (typeof first.number !== "number" || !Number.isInteger(first.number)) {
-    throw new HostError("MR の番号を読めない");
+    throw new HostError("マージリクエストの番号を読めない");
   }
   return { number: first.number, url: String(alt(first.html_url, "")) };
 }
@@ -651,7 +651,7 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
     const data = await graphql(client, THREADS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), number, after });
     const threads = (data.repository as { pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: ThreadNode[] } } | null } | null)
       ?.pullRequest?.reviewThreads;
-    if (!threads) throw new HostError(`MR #${number} のスレッドを読めない`);
+    if (!threads) throw new HostError(`マージリクエスト #${number} のスレッドを読めない`);
     for (const t of threads.nodes) {
       const c = t.comments?.nodes?.[0] ?? {};
       out.push({
@@ -676,8 +676,8 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
   for (let page = 1; ; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
     // 404 や並びでない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
-    if (status === 404) throw new HostError(`MR #${number} のレビューを読めない（404）`, 404);
-    if (!Array.isArray(body)) throw new HostError(`MR #${number} のレビューの答えが並びでない`);
+    if (status === 404) throw new HostError(`マージリクエスト #${number} のレビューを読めない（404）`, 404);
+    if (!Array.isArray(body)) throw new HostError(`マージリクエスト #${number} のレビューの応答が並びでない`);
     const chunk = body as Record<string, unknown>[];
     for (const r of chunk) {
       const user = (r.user ?? null) as { id?: unknown; login?: unknown } | null;
@@ -739,7 +739,7 @@ export const BRANCH_PAGES = 50;
 /** 全部のブランチの名前（「始める」が大文字小文字をそろえて重なりを見る。直近 N 日の上限を掛けない） */
 export async function branchNames(client: Client, owner: string, repo: string): Promise<string[]> {
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/branches?per_page=100`, BRANCH_PAGES);
-  if (more) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行う");
+  if (more) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行ってください");
   return (items as { name?: unknown }[]).map((b) => b.name).filter((n): n is string => typeof n === "string");
 }
 
@@ -774,6 +774,6 @@ export async function createBranch(client: Client, owner: string, repo: string, 
   );
   if (!res.ok) throw new HostError(`GitHub がブランチを作らなかった（${res.status}。同じ名前のブランチが既にあるか、権限が無い）`, res.status);
   const made = (await res.json()) as { ref?: unknown; object?: { sha?: unknown } };
-  if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が違う");
+  if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が、頼んだ名前と違う");
   return checkOid(made.object?.sha);
 }

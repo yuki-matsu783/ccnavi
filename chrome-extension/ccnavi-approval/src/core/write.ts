@@ -263,14 +263,14 @@ async function commitOnce(
     if ((await verifyWritten(deps, repo, now, rows)).length === 0) {
       return {
         kind: "attention",
-        message: `${family} へ書いた応答が落ち、書いた中身は先頭に在るが、自分の書き込みを見分けられなかった（${text}）。ホストの履歴を人が確かめる`,
+        message: `${family} への書き込みの応答が返ってこなかった。書いた中身は先頭にあるが、この拡張が書いたコミットかどうかを見分けられなかった（${text}）。ホストの履歴を確かめてください`,
       };
     }
     return { kind: "moved" };
   } catch (err) {
     return {
       kind: "attention",
-      message: `${family} へ書いた応答が落ち（${text}）、書いたかもしれないが確認できなかった（${(err as Error).message ?? String(err)}）。ホストの履歴を人が確かめる`,
+      message: `${family} への書き込みの応答が返ってこず（${text}）、書いたかもしれないが確認できなかった（${(err as Error).message ?? String(err)}）。ホストの履歴を確かめてください`,
     };
   }
 }
@@ -283,11 +283,11 @@ async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: read
   } catch (err) {
     return {
       kind: "attention",
-      message: `書いた（${oid.slice(0, 7)}）が、書いた後の中身を確認できなかった（${(err as Error).message ?? String(err)}）。ホストの履歴を人が確かめる`,
+      message: `書いた（${oid.slice(0, 7)}）が、書いた後の中身を確認できなかった（${(err as Error).message ?? String(err)}）。ホストの履歴を確かめてください`,
     };
   }
   if (wrong.length > 0) {
-    return { kind: "attention", message: `書いた後の中身が書いたものと違う（${oid.slice(0, 7)}: ${wrong.join(", ")}）。ホストの履歴を人が確かめる` };
+    return { kind: "attention", message: `書いた後の中身が書いたものと違う（${oid.slice(0, 7)}: ${wrong.join(", ")}）。ホストの履歴を確かめてください` };
   }
   return { kind: "written", oid, rounds, lines };
 }
@@ -363,7 +363,7 @@ export const REVERT_TRIES = 2;
 function attention(family: string, done: Committed, why: string): Outcome {
   return {
     kind: "attention",
-    message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、書いたものを確かめ切れないか打ち消せなかった（${why}）。ホストの履歴を人が確かめる（ADR-0093 の 8.4）`,
+    message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、書いたものを確かめ切れなかったか、打ち消せなかった（${why}）。ホストの履歴を確かめてください（ADR-0093 の 8.4）`,
   };
 }
 
@@ -458,7 +458,7 @@ async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what
       if (settled.kind === "kept") return await finish(deps, repo, done.oid, planned.rows, round, planned.lines);
       if (settled.kind === "stop") return settled.outcome;
     }
-    return { kind: "conflict", message: `書く間に ${family} が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新して${what}` };
+    return { kind: "conflict", message: `書いている間に ${family} の先頭が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新して${what}` };
   } catch (err) {
     return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
   }
@@ -472,7 +472,7 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
   } catch (err) {
     return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
-  return await writeLoop(repo, family, deps, "承認し直す", async (read, stamp) => {
+  return await writeLoop(repo, family, deps, "承認し直してください", async (read, stamp) => {
     const res = await py.plan(deps.py, {
       settings: read.settings,
       snapshot: read.input,
@@ -482,7 +482,7 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
       stamp,
       actor,
     });
-    if (res.mismatch) return { kind: "stop", outcome: { kind: "changed", message: "見せた後に承認待ちの中身が変わった。見直してから承認し直す" } };
+    if (res.mismatch) return { kind: "stop", outcome: { kind: "changed", message: "ボードに表示した後で承認待ちの中身が変わった。中身を見直してから承認し直してください" } };
     if (!res.changes) return { kind: "stop", outcome: { kind: "refused", message: why(res) } };
     const rows = rowsOf(res, family, read);
     if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
@@ -508,7 +508,7 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
   } catch (err) {
     return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
-  return await writeLoop(repo, family, deps, "取り下げ直す", async (read, stamp) => {
+  return await writeLoop(repo, family, deps, "取り下げ直してください", async (read, stamp) => {
     const prior = await findPrior((op, args) => deps.call(op, [repo.owner, repo.repo, ...args]), read.place, read.head, ident);
     const res = await py.withdraw(deps.py, {
       settings: read.settings,
@@ -542,7 +542,7 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
     return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
   const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
-  return await writeLoop(repo, family, deps, "レビュー済みにし直す", async (read, stamp) => {
+  return await writeLoop(repo, family, deps, "レビュー済みにし直してください", async (read, stamp) => {
     const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
     const res = await askConfirm(deps.py, ask, {
       settings: read.settings,

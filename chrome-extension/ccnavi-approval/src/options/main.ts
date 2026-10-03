@@ -95,7 +95,7 @@ $<HTMLFormElement>("repo-form").addEventListener("submit", async (e) => {
     const repo = normalizeRepo(Object.fromEntries(form.entries()) as Record<string, unknown>, HOSTS);
     const rest = (await loadRepos()).filter((o) => repoKey(o) !== repoKey(repo));
     if (repo.project && !rest.some((o) => repoKey(o) === repo.workspace && !o.project)) {
-      throw new Error(`ワークスペースのリポジトリ ${repo.workspace} を先に登録する`);
+      throw new Error(`ワークスペースのリポジトリ ${repo.workspace} を先に登録してください`);
     }
     await chrome.storage.local.set({ repos: [...rest, repo] });
     say("repo-msg", `${repoKey(repo)} を登録した`, true);
@@ -114,14 +114,14 @@ $<HTMLFormElement>("token-form").addEventListener("submit", async (e) => {
   const res = await ask({ kind: "token.set", host, token: input.value.trim(), expires: expires.value });
   input.value = "";
   expires.value = "";
-  say("token-msg", res.ok ? `${host} の PAT を登録した。差し替えたなら古いトークンをホストで失効させる` : res.error, res.ok);
+  say("token-msg", res.ok ? `${host} の PAT を登録した。差し替えた場合は、古いトークンをホスト側で失効させてください` : res.error, res.ok);
   await drawTokens();
 });
 
 $<HTMLButtonElement>("token-clear").addEventListener("click", async () => {
   const host = $<HTMLSelectElement>("token-host").value;
   const res = await ask({ kind: "token.clear", host });
-  say("token-msg", res.ok ? `${host} の PAT を消した。ホストでも失効させる` : res.error, res.ok);
+  say("token-msg", res.ok ? `${host} の PAT を消した。ホスト側でも失効させてください` : res.error, res.ok);
   await drawTokens();
 });
 

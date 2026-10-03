@@ -39,7 +39,7 @@ export function repoKey(r: Pick<RepoConfig, "host" | "owner" | "repo">): string 
 export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host[]): RepoConfig {
   const host = hosts.find((h) => h.id === raw.host);
   if (!host) {
-    throw new Error(`ホストを選ぶ（${hosts.map((h) => h.id).join(" / ")}）`);
+    throw new Error(`ホストを選んでください（${hosts.map((h) => h.id).join(" / ")}）`);
   }
   // GitLab の owner は入れ子のグループ（`group/sub`）もある
   const owner = host.kind === "gitlab" ? checkNamespace(String(raw.owner ?? "").trim()) : checkName(String(raw.owner ?? "").trim(), "owner");
@@ -48,7 +48,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   const integration = integ === "" ? "" : checkBranch(integ);
   const days = Number(raw.recentDays ?? DEFAULT_RECENT_DAYS);
   if (!Number.isInteger(days) || days < 0 || days > MAX_RECENT_DAYS) {
-    throw new Error(`直近の日数は 0〜${MAX_RECENT_DAYS} の整数`);
+    throw new Error(`直近の日数は 0〜${MAX_RECENT_DAYS} の整数で入れてください`);
   }
   const extras = Array.isArray(raw.extraBranches)
     ? raw.extraBranches
@@ -62,7 +62,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   }
   const workspace = project === "" ? "" : String(raw.workspace ?? "").trim();
   if (project !== "" && workspace === "") {
-    throw new Error("プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>/<owner>/<リポジトリ>）を選ぶ");
+    throw new Error("プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>/<owner>/<リポジトリ>）を選んでください");
   }
   return { host: host.id, owner, repo, integration, recentDays: days, extraBranches, project, workspace };
 }

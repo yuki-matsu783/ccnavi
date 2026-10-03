@@ -341,7 +341,7 @@ async function withdrawableHere(board: BoardResult, reader: Reader, place: Place
       continue;
     }
     const prior = await findPrior((op, args) => reader.call(op, ...args), place, head, w.ticket);
-    out.push(prior === null ? { ...w, problems: ["承認コミット（この写しを足した、親のブランチの first-parent の鎖の上のコミット）を引けないか、その親に提案が無い"] } : w);
+    out.push(prior === null ? { ...w, problems: ["承認コミット（親のブランチの first-parent の履歴で、この承認済みチケットを足したコミット）が見つからないか、そのコミットの親に提案が無い"] } : w);
   }
   return { ...board, withdrawable: out };
 }

@@ -125,7 +125,7 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 function hostOf(deps: Deps, id: unknown): Host {
   const host = deps.hosts.find((h) => h.id === id);
   if (!host) {
-    throw new github.HostError(`焼き込んだ通信先に無いホスト: ${String(id)}`);
+    throw new github.HostError(`ビルドで組み込んだ通信先に無いホスト: ${String(id)}`);
   }
   return host;
 }
@@ -135,23 +135,23 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
   try {
     const msg = message as Request;
     if (!msg || typeof msg !== "object" || typeof msg.kind !== "string") {
-      return { ok: false, error: "頼みの形が違う" };
+      return { ok: false, error: "要求の形が正しくない" };
     }
     if (!trustedSender(sender, deps.extensionId, deps.base, msg.kind === "token.set" || msg.kind === "token.clear")) {
-      return { ok: false, error: "送り手を受けない" };
+      return { ok: false, error: "この送り手からの要求は受け付けない" };
     }
     if (msg.kind === "host" && (msg.op === "commit" || msg.op === "createBranch") && !fromBoard(sender)) {
-      return { ok: false, error: "書く頼みはボードからだけ受ける" };
+      return { ok: false, error: "書く要求はボードからだけ受け付ける" };
     }
     const host = hostOf(deps, msg.host);
     switch (msg.kind) {
       case "token.set": {
         if (typeof msg.token !== "string" || !TOKEN.test(msg.token)) {
-          return { ok: false, error: "PAT の形が違う（英数字と _ - . の 8〜255 字）" };
+          return { ok: false, error: "PAT の形が正しくない（英数字と _ - . で 8〜255 字）" };
         }
         const manual = msg.expires === undefined || msg.expires === "" ? "" : parseManual(msg.expires);
         if (msg.expires !== undefined && msg.expires !== "" && !manual) {
-          return { ok: false, error: "期限は YYYY-MM-DD の日付" };
+          return { ok: false, error: "期限は YYYY-MM-DD の形の日付で入れてください" };
         }
         await deps.setToken(host.id, msg.token);
         // 差し替えたら、前のトークンの期限は捨てる（ホストの応答で読み直す）
@@ -170,7 +170,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
       case "host":
         return await hostCall(host, msg.op, msg.args, deps);
       default:
-        return { ok: false, error: "知らない頼み" };
+        return { ok: false, error: "知らない種類の要求" };
     }
   } catch (err) {
     const e = err as { message?: string; status?: number };
@@ -184,7 +184,7 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
   }
   const token = await deps.getToken(host.id);
   if (!token) {
-    return { ok: false, error: `${host.id} の PAT が無い。設定画面で登録する`, status: 401 };
+    return { ok: false, error: `${host.id} の PAT が登録されていない。設定画面で登録してください`, status: 401 };
   }
   const counter: github.Counter = { rest: 0, graphql: 0 };
   const seen = { expiration: "" };
@@ -503,7 +503,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
-      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が読んだものと違う。ボードを更新してから始め直す`);
+      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が読んだものと違う。ボードを更新してから始め直してください`);
       // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない。11.9.1 の 7）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
