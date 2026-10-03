@@ -176,7 +176,7 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
         # ファイルとして苦情付きで返す。上げると、判定（実行前・レビューで止めるところ・
-        # 実行後の監視）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う処理まで
+        # 実行後チェック）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う処理まで
         # 進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     # 承認の指紋（read_set）に入れる。種類は待ち方と止め方を決める判定の入力。

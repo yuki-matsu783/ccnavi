@@ -1426,11 +1426,11 @@ def _layer_home(conf: settings.Settings, root: str, name: str) -> str:
 def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
     """下書きの置き場が、そのリポジトリの git に追跡されていないか（REQ-TKT-44）。
 
-    実行前の判定はチケットの範囲を `scratchpad/` に当てない（`ticket.is_scratch_place`）。外して
+    実行前チェックはチケットの範囲を `scratchpad/` に当てない（`ticket.is_scratch_place`）。外して
     よい根拠は「git が追跡しないので統合先のブランチに乗らない」ことの 1 つだけ。
 
-    **この警告で穴が無くなるわけではない。** 根拠が崩れた場合は、実行後の監視と
-    サブエージェント終了時の検査が `scratchpad/` の変更を範囲外として報告する（`is_unscoped` の
+    **この警告で穴が無くなるわけではない。** 根拠が崩れた場合は、実行後チェックと
+    サブエージェント終了時チェックが `scratchpad/` の変更を範囲外として報告する（`is_unscoped` の
     説明）。ここが言うのは、その報告が出はじめる前に人が気づけるようにするため。
 
     問うのは 2 つ。**追跡されているファイルが既にあるか**（`git ls-files`）と、これから
@@ -1473,9 +1473,9 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"{why}。実行前の判定はチケットの範囲をここに当てないので、追跡されて"
+                f"{why}。実行前チェックはチケットの範囲をここに当てないので、追跡されて"
                 "いると、承認した範囲の外のファイルがコミットに入りうる。入ったぶんは"
-                "実行後の監視とサブエージェント終了時の検査が範囲外として報告するので、"
+                "実行後チェックとサブエージェント終了時チェックが範囲外として報告するので、"
                 "下書きのたびに範囲外と報告される。"
                 f"このリポジトリの `.gitignore` に `/{place}/` を足して追跡から外すか"
                 "（プロジェクトのリポジトリに運用の痕跡を残したくないなら"
@@ -1684,9 +1684,9 @@ def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
 
 
 def _after(root: str) -> list[Problem]:
-    """実行後の監視が実際に動く形になっているかを見る。
+    """実行後チェックが実際に動く形になっているかを見る。
 
-    どちらも error にしない。実行前の判定は動いているので、防御が消えている
+    どちらも error にしない。実行前チェックは動いているので、防御が消えている
     わけではない。それでも言う。宣言した保護領域が、引数に現れない書き込みに
     対しては 1 つも守られていない状態は、外から見ると守られている状態と
     区別が付かない。
@@ -1709,7 +1709,7 @@ def _after(root: str) -> list[Problem]:
                 SEVERITY_WARN,
                 "(project)",
                 f"{PROJECT_SETTINGS} の PostToolUse に ccnavi が登録されていない。"
-                "実行後の監視は走らないので、ビルドの副作用やスクリプトが内部で開いた"
+                "実行後チェックは走らないので、ビルドの副作用やスクリプトが内部で開いた"
                 "ファイルによる保護領域の変更は誰も見ていない",
             )
         ]
@@ -1722,8 +1722,8 @@ def _after(root: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(project)",
-                f"作業ツリーを読めない（{unreadable}）ので実行後の監視は何も検知しない。"
-                "実行前の判定はこれまでどおり動く",
+                f"作業ツリーを読めない（{unreadable}）ので実行後チェックは何も検知しない。"
+                "実行前チェックはこれまでどおり動く",
             )
         )
     return problems

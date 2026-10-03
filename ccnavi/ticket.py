@@ -911,11 +911,11 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
 
-    実行前の判定は `is_unscoped` を通ってここへ来る。実行後の監視とサブエージェント終了時の
+    実行前チェックは `is_unscoped` を通ってここへ来る。実行後チェックとサブエージェント終了時の
     検査は直に呼ぶ（`post._script_writes` / `post._committed_findings` / `post.ScopeGuard.finding`、
     `phase.scope_findings`）。
 
-    **実行後の監視から呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
+    **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
     `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの監視は、置き場を
     そのまま外さずに、内容で外すぶんを決める（`script_shape`、`post._script_writes`）。
     """
@@ -951,7 +951,7 @@ def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """`finish` と `cancel` がチケットを動かす先（レビュー待ちと閉じた置き場）か。
 
-    実行後の監視が、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
+    実行後チェックが、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
     行き先をこの 2 つに絞るのは、`doing/` から出したチケットを `todo/` に置き直す形が
     「承認済みチケットを消す」のと同じ結果になるから。承認済みチケットが 1 本も無い
     ワークツリーは範囲を持たず、範囲を持たないツリーはチケットの側から何も言われない。
@@ -1005,8 +1005,8 @@ def is_eli5_place(rel: str) -> bool:
     `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
     `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
 
-    `scratchpad/` と違って git が追跡する置き場なので、実行後の監視（`post.ScopeGuard.finding`）と
-    サブエージェント終了時の検査（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
+    `scratchpad/` と違って git が追跡する置き場なので、実行後チェック（`post.ScopeGuard.finding`）と
+    サブエージェント終了時チェック（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
     実行前に通った書き込みがコミットのあとで範囲の外として咎められる。
 
     綴りの大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
@@ -1021,12 +1021,12 @@ def is_eli5_place(rel: str) -> bool:
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """チケットの範囲を当てない場所か。**実行前の判定（`judge`）だけが使う。**
+    """チケットの範囲を当てない場所か。**実行前チェック（`judge`）だけが使う。**
 
     実行前は、これから書かれる 1 つのパスを見る。下書きの置き場を外すのはここだけで
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
 
-    実行後の監視（`post`）とサブエージェント終了時の検査（`phase.scope_findings`）は
+    実行後チェック（`post`）とサブエージェント終了時チェック（`phase.scope_findings`）は
     下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの監視は
     内容で決める（`post._script_writes`）。外し方を揃えないのは、
     **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
@@ -1041,8 +1041,8 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     のは「そのリポジトリで `scratchpad/` が追跡されている」ときだけで、それは本当に
     知らせるべきことになる。
 
-    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後の監視と
-    サブエージェント終了時の検査も同じく外す（ADR-0096）。
+    ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後チェックと
+    サブエージェント終了時チェックも同じく外す（ADR-0096）。
     """
     return (
         is_ticket_place(rel, tickets_rel, approved_rel)
@@ -1408,10 +1408,10 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
 
-    とくに `base_sha` は、サブエージェント終了時の検査（`phase.scope_findings` の
+    とくに `base_sha` は、サブエージェント終了時チェック（`phase.scope_findings` の
     `base_sha..HEAD`）と実績リスク（`risk.measure`）の基準点。ここを書き換えられると、
     コミット済みの範囲外の変更が検査から消える。落とす欄を「いつでも」にすると、その
-    書き換えが実行後の監視からも消える。
+    書き換えが実行後チェックからも消える。
     """
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
@@ -1432,7 +1432,7 @@ def script_fields_set(text: str) -> tuple[str, ...]:
 def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None:
     """frontmatter を持つチケットなら、`drop` の欄を落とした姿を返す。無ければ None。
 
-    実行後の監視が「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
+    実行後チェックが「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
     答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
     ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
     clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。

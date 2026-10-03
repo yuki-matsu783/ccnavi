@@ -953,7 +953,7 @@ class ProblemsSaidOnceTest(ConfigUnionHarness):
 
 
 class PostMonitoringUnionTest(ConfigUnionHarness):
-    """実行後の監視も「共通層 + そのツリーの層」の和（11.7）。
+    """実行後チェックも「共通層 + そのツリーの層」の和（11.7）。
 
     行き先の層 1 本のままの実装では、共通層の deny の場所が保護領域に数えられない。
     プロジェクトのツリー（共通層）と、ワークスペースのワークツリー（自身の層）の両方で見る。

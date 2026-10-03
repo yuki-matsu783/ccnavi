@@ -1,4 +1,4 @@
-"""実行後の監視の受入テスト。
+"""実行後チェックの受入テスト。
 
 道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、そこを
 汚してから payload を渡し、返ってきた文と終了コードと記録だけを読む。
@@ -59,7 +59,7 @@ RULES = {
             "glob": "*/watched/*",
         }
     ],
-    # 実行後の監視を見るテストなので、実行前の判定で確認を出させない。
+    # 実行後チェックを見るテストなので、実行前チェックで確認を出させない。
     # 出すと、監視が何を言ったかを見たいテストが ask の話になる。
     "allow": [
         {
@@ -859,7 +859,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 0, self.said(result))
 
     def test_基準点の書き換えは言う(self):
-        # `base_sha` はサブエージェント終了時の検査と実績リスクの基準点。書き換えられると
+        # `base_sha` はサブエージェント終了時チェックと実績リスクの基準点。書き換えられると
         # コミット済みの範囲外の変更が検査から消えるので、姿から落としてはいけない。
         self.use(ticket_repo(text=STARTED))
         write(self.path(DOING), STARTED.replace("1111111111111111", "2222222222222222"))
