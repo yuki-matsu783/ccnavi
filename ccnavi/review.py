@@ -1802,8 +1802,8 @@ def _covered_header(
     for p in phase.phases_of(root, conf, parent.ticket):
         if p.number in numbers:
             labels.append(p.label)
-            if p.risk_line:
-                risks.append(f"{p.label}: {p.risk_line}" if len(numbers) > 1 else p.risk_line)
+            if p.risk_body:
+                risks.append(f"{p.label}: {p.risk_body}" if len(numbers) > 1 else p.risk_body)
     head = ""
     if parent.has_plan:
         if len(labels) <= 1 and not ph.covers:

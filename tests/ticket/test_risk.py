@@ -150,7 +150,7 @@ class RiskTest(PhaseHarness):
         fixture = self.remote()
         requested = self.request(fixture, 1)
         self.assertEqual(requested.returncode, 0, requested.stderr)
-        self.assertIn("このレビューのリスク: リスク: 95 (CRITICAL)", self.last_request_body)
+        self.assertIn("このレビューのリスク: 95 (CRITICAL)", self.last_request_body)
         self.assertIn("行数が多い", self.last_request_body)
 
     def test_escalated_phase_is_seen_in_the_session_and_only_recommends_a_merge_request(self):

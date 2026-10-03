@@ -482,11 +482,17 @@ class Phase:
     @property
     def risk_line(self) -> str:
         """人向けの 1 行。`リスク: 58 (HIGH) — 行数が多い（…）、…`。無ければ空。"""
+        body = self.risk_body
+        return f"リスク: {body}" if body else ""
+
+    @property
+    def risk_body(self) -> str:
+        """`risk_line` から頭の `リスク: ` を除いたもの。見出しを自分で付ける側が使う。"""
         record = self.risk
         if record is None:
             return ""
         hits = [str(h.get("detail") or "") for h in record.get("hits") or [] if isinstance(h, dict)]
-        text = f"リスク: {record.get('points', 0)} ({record.get('level', '')})"
+        text = f"{record.get('points', 0)} ({record.get('level', '')})"
         return text + (" — " + "、".join(hits) if hits else "")
 
     @property
