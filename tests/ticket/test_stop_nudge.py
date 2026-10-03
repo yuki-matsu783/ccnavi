@@ -13,7 +13,7 @@ import json
 import os
 import unittest
 
-from ccnavi import settings
+from ccnavi.infra import settings
 from tests.ticket.test_ticket import TicketTest, git, write
 
 

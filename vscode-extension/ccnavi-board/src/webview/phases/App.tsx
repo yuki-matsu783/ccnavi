@@ -516,7 +516,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         {helpOpen && (
           <div className="help-panel" id="help">
             <p className="hint">
-            親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になります。レビューのあとは{" "}
+            親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--agree</code> が通ることが合意になります。レビューのあとは{" "}
             <code>feedback:</code> に <code>feedback</code> の種類を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
             <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。

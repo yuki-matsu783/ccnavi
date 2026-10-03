@@ -7,8 +7,9 @@
    標準出力にも標準エラーにも何も出さないこと。出さないレベルでは date を起動しないこと。
    リンク（logs・logs/diag・書き込み先）をたどらないこと、使えない字の出どころでは書かないこと、
    新しいファイルが 0600 になること
-2. 同じ入力から、sh・Python（ccnavi/diaglog.py）・拡張（src/log.ts を node が型を取り除いて読む）が
-   同じ行を出すこと。時刻と pid は除いて比べ、時刻は 3 つとも同じ形であることだけを見る
+2. 同じ入力から、sh・Python（ccnavi/records/diaglog.py）・拡張（src/log.ts を node が型を
+   取り除いて読む）が同じ行を出すこと。時刻と pid は除いて比べ、時刻は 3 つとも同じ形である
+   ことだけを見る
 3. ccnavi-git.sh の reject と ccnavi-review.sh の fail が、拒否の文面ではなく識別子だけを
    診断ログに残すこと（文面は標準エラーの契約で、そちらは変わらない）
 
@@ -26,7 +27,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import diaglog
+from ccnavi.records import diaglog
 from tests import ROOT
 
 SHELL = shutil.which("sh") or shutil.which("bash")

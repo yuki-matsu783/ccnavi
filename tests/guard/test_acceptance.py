@@ -12,7 +12,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi import shellread
+from ccnavi.infra import shellread
 from tests import ROOT, common_path, fixture_workspace
 from tests.inproc import run_ccnavi
 
