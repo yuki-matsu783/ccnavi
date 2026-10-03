@@ -160,7 +160,7 @@ class Changes:
 
     @property
     def lines(self) -> list[str]:
-        """人に見せる行（標準出力の分）。書き込みが落ちたときの行は入らない。"""
+        """ユーザに見せる行（標準出力の分）。書き込みが落ちたときの行は入らない。"""
         out: list[str] = []
         for item in self.planned.stage.items:
             if isinstance(item, fsio.Line) and item.stream == fsio.STREAM_OUT:
@@ -317,11 +317,11 @@ def approve(
     root: str,
     only: list[str] | None = None,
 ) -> int:
-    """未承認の提案をまとめて人に見せ、承認されたら承認済みチケットを置く。
+    """未承認の提案をまとめてユーザに見せ、承認されたら承認済みチケットを置く。
 
-    エージェントではなく人が端末から打つ経路。提案を書き直す方法は用意しない。
+    エージェントではなくユーザが端末から打つ経路。提案を書き直す方法は用意しない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
-    承認した人が承認したものの作者になる。
+    承認したユーザが承認したものの作者になる。
 
     承認の対象は「いま承認待ちのもの全部」。親が 1 本、その下の子が複数、という形が普通。
     子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
@@ -413,7 +413,7 @@ def verify(
 ) -> int:
     """`--approve --preview --verify`。いま `--approve` を打てば通るかを、置かずに返す。
 
-    エージェントが提案を書いたあと、人に承認を頼む前に自分で確かめるための枝
+    エージェントが提案を書いたあと、ユーザに承認を頼む前に自分で確かめるための枝
     （REQ-APV-13）。置かないところも端末を求めないところも `--preview` と同じで、
     違うのは「通るかどうか」を終了コードと本文で言うこと。
 
@@ -520,7 +520,7 @@ def approve_yes(
     applied = write_fs(lines, stderr, plan(snapshot, verdict).planned)
     if applied.code != 0:
         # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。それを言わずに
-        # 失敗を返すと、人は「何も起きていない」と読む（README「承認の JSON」の `partial`）。
+        # 失敗を返すと、ユーザは「何も起きていない」と読む（README「承認の JSON」の `partial`）。
         if as_json:
             body = {
                 "version": approval.APPROVE_VERSION,
@@ -593,7 +593,7 @@ def confirm(
 
     `result` はホストの写し（`review.Result`、`ccnavi-review.sh` が組む形）。読めなかった
     ときの扱い（`--result` が無い、読めない）は読む側（手元は `confirm_local`）が持つ。
-    `changed_since_request` は依頼の後に人が見るものが動いたかの説明（空なら動いていない）。
+    `changed_since_request` は依頼の後にユーザが見るものが動いたかの説明（空なら動いていない）。
     手元は git の差分、Chrome は compare API から作る（8.9）。
     """
     conf, root = snapshot.conf, snapshot.root
@@ -614,7 +614,7 @@ def confirm(
     if changed_since_request:
         return Checked(
             [
-                f"ccnavi: {changed_since_request}。人が見たものと今の HEAD が違う。"
+                f"ccnavi: {changed_since_request}。ユーザが見たものと今の HEAD が違う。"
                 f"{review._redo_request(root, phase_no)}"
             ],
             None,
@@ -750,7 +750,7 @@ def requested_head(snapshot: Snapshot, parent_id: str, phase_no: int) -> str | N
 def moved_on_host(
     snapshot: Snapshot, parent_id: str, phase_no: int, head: str, changed: list[str] | None
 ) -> str:
-    """ホストで読んだ親の先頭 `head` と変更の一覧から、依頼の後に人が見るものが動いたかを言う。
+    """ホストで読んだ親の先頭 `head` と変更の一覧から、依頼の後にユーザが見るものが動いたかを言う。
 
     手元の confirm と同じ関数（`review.moved_since`）で決める。依頼の記録が無ければ空を返し、
     `confirm` が「依頼の記録が無い」で止める。

@@ -1,13 +1,13 @@
 /**
  * ルール設定画面の本体。ルールの一覧・判定を試す・hook の 3 タブ。
  *
- * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、人が触って決めるもの
+ * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
  * **判定はしない。** 「判定」も「サンプルを一括で判定」も、編集中の内容を拡張ホストへ渡し、
  * 実行ファイルが返した結果を出すだけ（ADR-0035）。
  *
  * **中身（`data`）が届いたら、編集中のルールはその中身で置き換える。** 届くのは編集を捨ててよい
- * ときだけ（人が「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
+ * ときだけ（ユーザが「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ（ADR-0062）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
@@ -50,7 +50,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** 人が開いた行の鍵。控え（state）に入るのはこちらだけ */
+  /** ユーザが開いた行の鍵。控え（state）に入るのはこちらだけ */
   readonly open: ReadonlySet<string>;
 }
 
@@ -70,13 +70,13 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [data, setData] = useState<RulesData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
   /**
-   * 判定で当たってその場だけ開いた行。**控えには入れない**（判定を繰り返しても、人が決めた
+   * 判定で当たってその場だけ開いた行。**控えには入れない**（判定を繰り返しても、ユーザが決めた
    * 既定の折りたたみが崩れない）。次の判定で入れ替わる。
    */
   const [transient, setTransient] = useState<ReadonlySet<string>>(new Set());
   /** 直前の判定で当たったルールの id。折りたたんだままでも分かるように縁を付ける */
   const [hits, setHits] = useState<ReadonlySet<string>>(new Set());
-  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後は人の操作を鍵で覚える */
+  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作を鍵で覚える */
   const [moreOpen, setMoreOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [folded, setFolded] = useState<ReadonlySet<Section>>(new Set());
   const [dirty, setDirty] = useState(false);
@@ -84,7 +84,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
-  /** ファイルが外で変わった。破棄して読み直すかは人が決める */
+  /** ファイルが外で変わった。破棄して読み直すかはユーザが決める */
   const [changed, setChanged] = useState(false);
   const [find, setFind] = useState("");
   const [tab, setTab] = useState<TabName>(() => loadTab());
@@ -296,7 +296,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   /**
    * 読み直しを頼む。**押した時点でボタンを止める。** 拡張ホストは実行ファイルに聞いてから中身を
-   * 返すことがあり（設定ファイルの場所を解く）、その間に押し直せると往復が重なる。人が
+   * 返すことがあり（設定ファイルの場所を解く）、その間に押し直せると往復が重なる。ユーザが
    * 「破棄して読み直す？」をやめたときは `cancelled` が返り、ボタンが戻る。
    */
   const reload = (): void => {
@@ -340,7 +340,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   const toggle = (key: string): void => {
     const next = new Set(open);
-    // その場だけ開いていた行も「開いている」。人が押したらそこから閉じる
+    // その場だけ開いていた行も「開いている」。ユーザが押したらそこから閉じる
     if (isOpen(key)) {
       next.delete(key);
     } else {

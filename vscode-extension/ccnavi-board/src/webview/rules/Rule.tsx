@@ -35,7 +35,7 @@ export interface RuleProps {
   readonly onRemove: () => void;
   readonly onOpenPicker: () => void;
   readonly onPickFile: (field: FileField) => void;
-  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後は人の操作を覚える */
+  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作を覚える */
   readonly moreOpen: boolean;
   readonly onToggleMore: (open: boolean) => void;
 }

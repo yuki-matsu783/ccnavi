@@ -25,7 +25,7 @@
  * （既定 `.ccnavi/approved/flows/<子>.yml`）で、エージェントは判定に止められて書けない。
  *
  * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
- * 着手は人か親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
+ * 着手はユーザか親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
  * 1 回の中（実行ファイルを 1 度起こすぶん）。防ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
  *
  * **未保存のまま閉じたとき。** VS Code の Webview パネルには、閉じるのを止める手段（保存・破棄・取り消しを聞いてから
@@ -150,7 +150,7 @@ function reviewSetting(): boolean {
 
 /**
  * 保存前の確かめの設定を書く。いま有効な範囲に書く（フォルダの設定があればそこ、次にワークスペースの設定、
- * どちらも無ければ利用者の設定）。上の範囲に値があると、下に書いても反映されないため
+ * どちらも無ければユーザの設定）。上の範囲に値があると、下に書いても反映されないため
  */
 async function updateReviewSetting(folder: vscode.WorkspaceFolder, value: boolean): Promise<void> {
   const config = vscode.workspace.getConfiguration("ccnaviBoard", folder.uri);
@@ -696,8 +696,8 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   }
   await reload(current);
   // 取り込み済みの家族（C1 の対象）だけ、運ぶ処理を送る（ADR-0093 の 4.6）。端末は対話中のことがあるので、
-  // 勝手に打ち込まず、人がボタンを押したときだけ送る（段階 2d のレビューの決定 E）。それ以外の家族は今どおり
-  // 人がコミットする。
+  // 勝手に打ち込まず、ユーザがボタンを押したときだけ送る（段階 2d のレビューの決定 E）。それ以外の家族は今どおり
+  // ユーザがコミットする。
   const root = current.folder.uri.fsPath;
   const carrier =
     target.parent !== "" &&
@@ -705,7 +705,7 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     (await runC1Target(root, binSetting(), target.parent)) === "yes";
   if (!carrier) {
     vscode.window.showInformationMessage(
-      `${loaded.shown} に保存した。コミットは、承認済みチケットと同じく人が行う（sh ${PUSH_APPROVED_SCRIPT}）`,
+      `${loaded.shown} に保存した。コミットは、承認済みチケットと同じくユーザが行う（sh ${PUSH_APPROVED_SCRIPT}）`,
     );
     return;
   }

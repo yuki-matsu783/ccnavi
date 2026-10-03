@@ -2,7 +2,7 @@
  * フェーズ管理画面の、拡張ホストと Webview の間の契約。リスク管理（`risk-view.ts`）と同じ作り。
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR-0064）。渡すのは「いま何を見せるか」
- * （`PhasesData`）だけで、画面が返すのは人が押した操作（`PhasesMessage`）だけ。画面は種類の意味を
+ * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は種類の意味を
  * 判定しない（子の範囲が上限に収まるか、レビューが要るかは実行ファイルが出す。ADR-0035）。
  *
  * **種類の形（`PHASE_KINDS`・`PhaseForm` など）もここに置く。** 読み書き（`phases-doc.ts`）の側に
@@ -126,7 +126,7 @@ export type ToPhases =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
-  /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
+  /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   /** この画面の案内をまだ見ていない（拡張ホストの `globalState`）。画面は吹き出しの案内を出す */
   | { readonly type: "tour" }

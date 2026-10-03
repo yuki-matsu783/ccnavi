@@ -18,8 +18,8 @@ export function badgeOf(type: string): Badge | undefined {
   if (type === "askUserQuestion") {
     return {
       kind: "ask",
-      text: "メインに戻る（利用者に聞く）",
-      title: "サブエージェントは利用者に聞けない（AskUserQuestion は渡されない）。このノードで手を止め、問いと選択肢を添えてメインに返す。メインが聞いて、答えを持って同じサブエージェントを再開させる",
+      text: "メインに戻る（ユーザに聞く）",
+      title: "サブエージェントはユーザに聞けない（AskUserQuestion は渡されない）。このノードで手を止め、問いと選択肢を添えてメインに返す。メインが聞いて、答えを持って同じサブエージェントを再開させる",
     };
   }
   if (type === "subAgent" || type === "subAgentFlow") {

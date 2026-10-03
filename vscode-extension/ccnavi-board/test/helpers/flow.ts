@@ -86,8 +86,8 @@ export function sampleData(): Record<string, unknown> {
   };
 }
 
-/** 人が手で書いた形の見本の本文（YAML。コメント・流れ形式・引用符が混じる）。読むと `sampleData()` になる */
-export const SAMPLE = `# 調べてから利用者に聞くフロー
+/** ユーザが手で書いた形の見本の本文（YAML。コメント・流れ形式・引用符が混じる）。読むと `sampleData()` になる */
+export const SAMPLE = `# 調べてからユーザに聞くフロー
 id: wf-1
 name: 調べて聞く
 version: 1.0.0

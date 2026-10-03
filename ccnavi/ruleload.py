@@ -66,7 +66,7 @@ def load_rules(
     既定は設定を丸ごと受け取る。守る場所の綴りは設定で動くので（builtin.rule_data）。
 
     出所は、いま当てているルールがどこから来たか。既定を使っているなら
-    読めなかったファイルではない。そのファイルを出所として出すと、見に行った人が
+    読めなかったファイルではない。そのファイルを出所として出すと、見に行ったユーザが
     当たったルールを見つけられない。
     """
     rules_path = conf.rules
@@ -130,7 +130,7 @@ def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> l
     ワークスペース自身の層の名札と一致するので、**そのプロジェクトへの Write / Edit が
     プロジェクト自身の deny を一度も読まずに、ワークスペースの層のルールで判定される**。
     ワークスペースの層に広い `allow` があればそれで通る。層無しなら共通層だけで
-    判定するので、緩む側にはならない。`--lint` が error で名指しし、人が名前を変える
+    判定するので、緩む側にはならない。`--lint` が error で名指しし、ユーザが名前を変える
     までのあいだも、この 1 行が判定のすり替えを止める。
     """
     if target is None:
@@ -166,7 +166,7 @@ def rules_for(
     rule_set, source = load_rules(stderr, conf, record, root)
     if record.fallback == builtin.FALLBACK:
         # 共通層が壊れている。層は足さない。壊れた共通層の上に層を足しても、
-        # 何が判定に使われているのかを人が読めない。
+        # 何が判定に使われているのかをユーザが読めない。
         return rule_set, source, target
 
     if payload.tool_name in PATH_TOOLS:
@@ -241,7 +241,7 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
                         SEVERITY_WARN,
                         rule.id,
                         f"`{rule.bare_id}` は前の層と同じ id で中身が違う。両方が判定に効く。"
-                        "同じ名前で違うものを指していると、記録を読んだ人がどちらの話か決められない",
+                        "同じ名前で違うものを指していると、記録を読んだユーザがどちらの話か決められない",
                     )
                 )
             keys.add(rule.key())
@@ -354,7 +354,7 @@ def mark_source(rule_set: rules.RuleSet, layer: str) -> None:
 def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
     """層のルールの id に層の名前をつける。`self:docs` / `lib:source` の形（REQ-MLT-07）。
 
-    層どうしで同じ id があっても記録の上では衝突せず、読んだ人がどのファイルを
+    層どうしで同じ id があっても記録の上では衝突せず、読んだユーザがどのファイルを
     見に行けばよいかが id だけで分かる。共通層のルールは裸の id のまま。
     """
     mark_source(rule_set, layer)

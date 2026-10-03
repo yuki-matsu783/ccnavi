@@ -425,10 +425,10 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   assert.doesNotMatch(css(), /\.phase-full \{ display: none/);
 });
 
-test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジは人が動く状態だけで、属性は枠無しの行に出す", async () => {
+test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジはユーザが動く状態だけで、属性は枠無しの行に出す", async () => {
   const page = await openBoard();
   try {
-    // 人が動く状態は枠付きのバッジ
+    // ユーザが動く状態は枠付きのバッジ
     assert.equal(text(page, ".badge.copy.copy-none"), "未承認");
     assert.equal(text(page, ".badge.worktree.none"), "ワークツリーなし");
     // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
@@ -576,7 +576,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
     await stillClosed.close();
   }
   // 終了の印（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
-  // 省略はレビュー済と同じく、閉じた後も人のレビューを通ったかの区別として残す
+  // 省略はレビュー済と同じく、閉じた後もユーザのレビューを通ったかの区別として残す
   const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
   try {
     assert.equal(ended.all(".fact.mark-pending").length, 0);
@@ -677,7 +677,7 @@ test("CB-T118 本物が決まらない写りだけをバッジにし、場所を
   }
 });
 
-/** フェーズ 2 を人のレビュー待ちにし、依頼のマーカーにマージリクエストを持たせる */
+/** フェーズ 2 をユーザのレビュー待ちにし、依頼のマーカーにマージリクエストを持たせる */
 function waitingWithMr(url: string) {
   const base = fixture();
   const parent: ParentJson = {
@@ -772,7 +772,7 @@ test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要�
     const label = page.one("label.filter.attention");
     assert.equal(
       label.getAttribute("title"),
-      "人が動く必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
+      "ユーザが動く必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
     );
     assert.equal(label.textContent.trim(), "要対応のみ");
     assert.equal(page.one('.card[data-id="i0001-03"]').getAttribute("data-attention"), "1");
@@ -897,7 +897,7 @@ test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新�
       "承認（承認待ち → 作業中）",
     ]);
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
-    // cli は「sh から来た」までしか言えない（人が端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
+    // cli は「sh から来た」までしか言えない（ユーザが端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
     assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
       "フェーズ 2: マーカーを消した（子が足された）",

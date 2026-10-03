@@ -16,7 +16,7 @@ export interface Host {
   readonly api: string;
   /** GitHub の GraphQL。GitLab は使わない（REST だけ。段階 5） */
   readonly graphql: string;
-  /** 人が開く画面の根。PAT の作成画面へのリンクに使う */
+  /** ユーザが開く画面の根。PAT の作成画面へのリンクに使う */
   readonly web: string;
 }
 

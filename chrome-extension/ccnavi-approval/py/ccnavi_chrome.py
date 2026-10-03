@@ -878,10 +878,11 @@ def _op_confirm(req: dict, root: str) -> dict:
     """レビュー済みで書くもの（8.9。段階 4）。書かない。
 
     `result` は `ccnavi-review.sh` が組むのと同じ形の写し（`{host, mr, threads, reviews}`）。
-    依頼の後に人が見るものが動いたかは、手元の confirm と同じ関数（`review.moved_since`）で決める。
-    材料は読んだ `P` の先頭と、依頼時の先頭からの変更の一覧（`compare`）。依頼時の先頭は Python が
-    マーカーから読み、一覧が要るのに無ければ `need_compare`（`{base, head}`）で返す。拡張は
-    compare API で読んでから呼び直す（閉包の `need` と同じ形）。
+    依頼の後にユーザが見るものが動いたかは、手元の confirm と同じ関数（`review.moved_since`）
+    で決める。材料は読んだ `P` の先頭と、依頼時の先頭からの変更の一覧（`compare`）。
+    依頼時の先頭は Python がマーカーから読み、一覧が要るのに無ければ
+    `need_compare`（`{base, head}`）で返す。拡張は compare API で読んでから
+    呼び直す（閉包の `need` と同じ形）。
     """
     snap, place, family, _ = _family_tree(req, root)
     _writable(snap, family)
@@ -1021,7 +1022,7 @@ def _op_start(req: dict, root: str) -> dict:
         problems.append(f"{compat['message']}（ADR-0093 の 7.3）")
     if problems:
         problems.append(
-            "この issue からは始められない。識別子を人が付けて（フォールバック）始める"
+            "この issue からは始められない。識別子をユーザが付けて（フォールバック）始める"
             "（ADR-0093 の 3.2・8.6）"
         )
     return {"identifier": ident, "integration": integ, "problems": problems}

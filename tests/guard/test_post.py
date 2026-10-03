@@ -34,7 +34,7 @@ RULES = {
             "message": "git push is not run by the agent.",
         },
         {
-            # 承認済みチケットの置き場。人が承認してコミットする場所でもあるので、
+            # 承認済みチケットの置き場。ユーザが承認してコミットする場所でもあるので、
             # コミット済みのぶんは報告から外れる（post._committed_findings）。
             "id": "approved",
             "match": "Write|Edit",
@@ -408,7 +408,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     # ターンの終わり
 
-    def test_ターンの終わりに保護領域の変更を人へ報告する(self):
+    def test_ターンの終わりに保護領域の変更をユーザへ報告する(self):
         self.run_hook(event="UserPromptSubmit")
         self.dirty()
 
@@ -429,7 +429,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.stdout, "")
 
     def test_ターンが始まる前から在った変更は報告しない(self):
-        # 利用者の書きかけ、他のセッションが置いたもの、前のターンで片付け
+        # ユーザの書きかけ、他のセッションが置いたもの、前のターンで片付け
         # なかったもの。全部このターンの成果として並べると、次から読まれなくなる。
         self.dirty()
         self.run_hook(event="UserPromptSubmit")
@@ -465,7 +465,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
     def test_ターンの終わりの報告は一度伝えた変更も含む(self):
-        # 呼び出しごとの報告は控えを見て繰り返さないが、人はまだ 1 度も
+        # 呼び出しごとの報告は控えを見て繰り返さないが、ユーザはまだ 1 度も
         # 見ていないことがある。宛先が違うので、控えを共有しない。
         self.run_hook(event="UserPromptSubmit")
         self.run_hook(command="ls")
@@ -528,8 +528,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
     # 戻す対象は deny だけ
 
     def test_askと宣言した場所は報告するが戻さない(self):
-        # `ask` は「人が 1 度見る場所」の宣言で、「書くな」ではない。戻すと、
-        # 人が確認に「はい」と答えた編集をあとから無かったことにする。
+        # `ask` は「ユーザが 1 度見る場所」の宣言で、「書くな」ではない。戻すと、
+        # ユーザが確認に「はい」と答えた編集をあとから無かったことにする。
         self.run_hook(command="ls")
         write(os.path.join(self.repo, "watched", "deps.txt"), "changed by a build\n")
 
@@ -600,7 +600,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("protected/keep.txt", message, "前のターンのコミットは並べない")
 
     def test_承認のコミットはターンの報告に並べない(self):
-        # 承認は人が提案を .ccnavi/approved/ へ動かしてコミットする運び。
+        # 承認はユーザが提案を .ccnavi/approved/ へ動かしてコミットする運び。
         # そこは deny でもあるので、外さないと承認のたびに違反として並ぶ。
         self.run_hook(event="UserPromptSubmit")
         write(os.path.join(self.repo, ".ccnavi", "approved", "doing", "i0001.md"), "x\n")
@@ -617,7 +617,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     def test_統合先を取り込んだマージの持ち込みは並べない(self):
         # ワークツリーを切って作業し、`merge <統合先>` で取り込んでから戻すのが
-        # このリポジトリの手順。二点の差分で数えると、人が統合先で直した保護領域が
+        # このリポジトリの手順。二点の差分で数えると、ユーザが統合先で直した保護領域が
         # 打つたびに並ぶ。数えるのはこのツリーが積んだコミットだけ。
         git(self.repo, "checkout", "--quiet", "-b", "feature")
         self.run_hook(event="UserPromptSubmit")
@@ -625,7 +625,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         git(self.repo, "add", "--", "src/app.py")
         git(self.repo, "commit", "--quiet", "-m", "自分の作業")
         git(self.repo, "checkout", "--quiet", "master")
-        self.dirty("人が統合先で直した\n")
+        self.dirty("ユーザが統合先で直した\n")
         git(self.repo, "add", "--", "protected/keep.txt")
         git(self.repo, "commit", "--quiet", "-m", "統合先の変更")
         git(self.repo, "checkout", "--quiet", "feature")
@@ -669,10 +669,10 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("ワークツリー wt1 では、今回のターンでこの確認ができませんでした", message)
         self.assertIn("uncounted", self.records()[-1].get("detail", ""))
 
-    def test_戻さなかった1件は控えに入りターンの終わりに人へ出る(self):
+    def test_戻さなかった1件は控えに入りターンの終わりにユーザへ出る(self):
         # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
         # 呼び出しの数だけ積まれるので、報告はセッションで 1 度きりにする。
-        # 人が見るのはターンの終わりの報告（Stop）。
+        # ユーザが見るのはターンの終わりの報告（Stop）。
         # 控え（セッション）とターンの基準の両方を、汚す前に置く。
         self.run_hook(command="ls")
         self.run_hook(event="UserPromptSubmit")
@@ -685,7 +685,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
         self.assertEqual(again.stderr, "", "同じ汚れを呼び出しごとには言わない")
         self.assertIn("known", self.records()[-1].get("detail", ""))
-        # ターンの終わりには出る。人はここで「結局どこが変わったのか」を 1 度で見る。
+        # ターンの終わりには出る。ユーザはここで「結局どこが変わったのか」を 1 度で見る。
         stop = self.run_hook(event="Stop", restore="enable")
         self.assertIn("watched/deps.txt", json.loads(stop.stdout)["systemMessage"])
 
@@ -716,7 +716,7 @@ allow:
 body
 """
 
-# 着手済みの版。`ticket start` が書いたあと、人がコミットして親のブランチに乗った姿。
+# 着手済みの版。`ticket start` が書いたあと、ユーザがコミットして親のブランチに乗った姿。
 STARTED = TICKET.replace(
     "---\nbody", 'started_at: "2026-09-21T00:00:00Z"\nbase_sha: "1111111111111111"\n---\nbody'
 )
@@ -879,7 +879,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_承認待ちからレビュー待ちへの移動は言う(self):
-        # 人の承認を通っていない提案を、レビュー待ちに見せる形。移動の元は
+        # ユーザの承認を通っていない提案を、レビュー待ちに見せる形。移動の元は
         # 作業中かレビュー待ちに限る。
         write(self.path("wip/proposals/todo/i0009.md"), TICKET.replace("i0001", "i0009"))
         git(self.repo, "add", "--", "wip/proposals/todo/i0009.md")

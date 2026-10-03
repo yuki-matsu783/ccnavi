@@ -5,7 +5,7 @@ import { SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { PhaseForm } from "../../src/core/phases-view.js";
 
 /** このリポジトリの phases.yml と同じ形。コメントの置き場と flow の並びを持つ */
-const SAMPLE = `# フェーズの種類。人が持つ設定で、エージェントは書き換えない。
+const SAMPLE = `# フェーズの種類。ユーザが持つ設定で、エージェントは書き換えない。
 #
 # id と title はどちらも一意。
 version: 1
@@ -226,7 +226,7 @@ test("CB-T102 先頭を動かしても空白だけの行は出ず、先頭を消
   const [research, design, ...rest] = doc.model.form.phases;
   const swapped = doc.apply({ order: "sequential", phases: [design, research, ...rest] });
   assert.ok(!/\n {2,}\n/.test(swapped), "空白だけの行が無い");
-  assert.match(swapped, /^# フェーズの種類。人が持つ設定で、エージェントは書き換えない。\n#\n# id と title はどちらも一意。\nversion: 1\n\nphases:\n  # 触る場所が多いとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n\n  # 分からないときだけ\n  research:\n    kind: work\n/);
+  assert.match(swapped, /^# フェーズの種類。ユーザが持つ設定で、エージェントは書き換えない。\n#\n# id と title はどちらも一意。\nversion: 1\n\nphases:\n  # 触る場所が多いとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n\n  # 分からないときだけ\n  research:\n    kind: work\n/);
   const dropped = doc.apply({ order: "sequential", phases: [design, ...rest] });
   assert.match(dropped, /\nphases:\n  # 分からないときだけ\n  # 触る場所が多いとき\n  design:\n/);
   assert.ok(!dropped.includes("  research:"));

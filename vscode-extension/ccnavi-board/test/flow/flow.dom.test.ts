@@ -41,7 +41,7 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
       assert.notEqual((node as unknown as { style: { visibility: string } }).style.visibility, "hidden", "測れていない点がある");
     }
     const ask = dom.one('.react-flow__node[data-id="askUserQuestion-1"]');
-    assert.equal(ask.querySelector(".flow-badge.ask")?.textContent, "メインに戻る（利用者に聞く）");
+    assert.equal(ask.querySelector(".flow-badge.ask")?.textContent, "メインに戻る（ユーザに聞く）");
     const sub = dom.one('.react-flow__node[data-id="subAgent-1"]');
     assert.equal(sub.querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");
     assert.equal(sub.querySelector(".flow-node-summary")?.textContent, "資料を深掘りする");

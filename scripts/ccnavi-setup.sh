@@ -1,6 +1,6 @@
 #!/bin/sh
 # ccnavi-setup — 対象プロジェクトの .claude/settings.json に、ccnavi が想定する
-# env と hook を登録する。ccnavi を新しいプロジェクトへ入れるときに人が 1 回打つ。
+# env と hook を登録する。ccnavi を新しいプロジェクトへ入れるときにユーザが 1 回打つ。
 #
 #   sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 #
@@ -31,12 +31,12 @@
 #
 # 配布元は既定でこのスクリプト自身の置き場から取る。設定だけ書かれて実行ファイルが
 # 無い形は、hook が 7 つ登録されているのに何も起動しない、という一番分かりにくい
-# 壊れ方になる。既定で配布物まで置けば、打った人が `--deploy` を知っているかどうかで
+# 壊れ方になる。既定で配布物まで置けば、打ったユーザが `--deploy` を知っているかどうかで
 # そこが分かれない。よそから配りたいときだけ `--deploy` で配布元を名指しする。
 #
 # 既定の配布元が使えないとき（組み立てていない、配布先が ccnavi 自身）は、配るのを
 # 諦めて理由を 1 行出し、settings.json は書く。名指しされた `--deploy` が使えない
-# ときだけ 2 で断る。人が名指ししたものが無いのは、環境の誤りとして扱う。
+# ときだけ 2 で断る。ユーザが名指ししたものが無いのは、環境の誤りとして扱う。
 #
 # 置き場は 2 つに分けて固定する（ADR-0044）。CCNAVI_BIN_PATH が指すのは
 # .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh。代わりに通る sh と同じ置き場）で、
@@ -107,7 +107,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
 # ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
 # 配らないと案内どおりに打っても届かない。
-# ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh は人が打つ取り込み
+# ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが打つ取り込み
 # （分かれた親のブランチの merge、消えた親のブランチの確かめ、控えの書き出し。ADR-0093 の 4.2）。
 # ccnavi-git.sh の拒否の文面がこれを案内するので、配らないと案内どおりに打っても届かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを畳む前に生成物を消す 1 本。Windows では
@@ -119,13 +119,13 @@ DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
-# 明示されたかどうかを分けて持つ。--force が置き換えてよいのは、人がこの実行で
+# 明示されたかどうかを分けて持つ。--force が置き換えてよいのは、ユーザがこの実行で
 # 名指しした値だけ。既定で埋めただけの値まで置き換えると、`--all` を足しに来た
 # 打ち直しが、その場で指定していない CCNAVI_MODE を既定の dry-run に戻す。
 mode_given=no
 # チケット制御。プロジェクトが「全体ルールだけ」か「チケットまで」かを、導入の
 # ときに決めてもらう場所。既定は enable で、書かなくても同じに動くが、常に書く。
-# 切りたい人が README ではなく設定ファイルの中でつまみを見つけられるように。
+# 切りたいユーザが README ではなく設定ファイルの中でつまみを見つけられるように。
 ticket_control="enable"
 ticket_control_given=no
 all=no
@@ -135,7 +135,7 @@ vscode=yes
 fetch=yes
 target=""
 # 配布元。名指しされたかどうかを分けて持つ。既定で埋めただけの配布元が使えない
-# のは「組み立てていない」で済むが、人が名指ししたものが使えないのは誤り。
+# のは「組み立てていない」で済むが、ユーザが名指ししたものが使えないのは誤り。
 # 同じ変数で持つと、その 2 つを最後まで区別できない。
 deploy=""
 deploy_given=no
@@ -270,7 +270,7 @@ command -v jq >/dev/null 2>&1 || die "jq が要ります。"
 [ -n "$target" ] || target="."
 [ -d "$target" ] || die "$target というディレクトリがありません。"
 # 表示のために絶対化する。Git Bash では pwd -W が Windows 形式を返すので、
-# 人が設定ファイルを開くときにそのまま使える綴りになる。
+# ユーザが設定ファイルを開くときにそのまま使える綴りになる。
 root=$(cd "$target" && { pwd -W 2>/dev/null || pwd; })
 settings="$root/$SETTINGS_REL"
 claude_dir=$(dirname "$settings")
@@ -303,7 +303,7 @@ if [ -n "$deploy" ]; then
 	if [ "$source_root" = "$root" ]; then
 		# 既定の配布元では普通に起きる。ccnavi のリポジトリ自身に打つと、
 		# 配布元と配布先が同じ場所になる。そこは配る先ではないので、
-		# 設定だけ書いて配るのは諦める。名指しなら、打った人の思い違い。
+		# 設定だけ書いて配るのは諦める。名指しなら、打ったユーザの思い違い。
 		[ "$deploy_given" = no ] ||
 			die "--deploy の配布元と配布先が同じです。自分自身へは配れません。"
 		deploy_skipped="配布元と配布先が同じなので配っていません。"
@@ -313,7 +313,7 @@ if [ -n "$deploy" ]; then
 fi
 # 組み立てていない配布元で黙って進まない。ここを報告だけにすると、
 # 「配ったはずなのに実行ファイルが無い」が最後の一覧にしか現れず、
-# 打った人は配れたものとして先へ進む。--deploy を名指しした以上、実行ファイルが
+# 打ったユーザは配れたものとして先へ進む。--deploy を名指しした以上、実行ファイルが
 # 無いことは環境の誤りとして 2 で断る。既定の配布元なら、組み立てていないだけ
 # なので、諦めた理由を出して settings.json は書く。
 if [ -n "$deploy" ] && [ ! -d "$source_root/$DEPLOY_BIN_DIR" ]; then
@@ -621,7 +621,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 	CCNAVI_TICKET_CONTROL: $ticket_control
 }')
 # --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
-# 書く利点は、あとで値を変えたくなった人が、つまみの一覧を README ではなく
+# 書く利点は、あとで値を変えたくなったユーザが、つまみの一覧を README ではなく
 # 設定ファイルの中で見つけられること。
 #
 # 共通層の 3 本（rules / phases / risk）はここにも書かない。置き場は `.ccnavi/common/`
@@ -638,7 +638,7 @@ fi
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 既定でない CCNAVI_BIN_PATH（人が決めた綴り）は書き換えず、名指しで 1 行出す。
+# 既定でない CCNAVI_BIN_PATH（ユーザが決めた綴り）は書き換えず、名指しで 1 行出す。
 # 導入は止めず、終了コードも変えない（--check では「揃っていない」に数える）。
 current_bin=$(printf '%s' "$current" | jq -r '(.env // {}).CCNAVI_BIN_PATH // "" | if type == "string" then . else "" end')
 bin_custom=""
@@ -646,7 +646,7 @@ if [ -n "$current_bin" ] && [ "$current_bin" != "$BIN_PATH" ]; then
 	bin_custom="CCNAVI_BIN_PATH は既定でない綴り（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください。"
 fi
 
-# --force が置き換えてよいキー。人がこの実行で名指しした 2 つだけ。
+# --force が置き換えてよいキー。ユーザがこの実行で名指しした 2 つだけ。
 forced=""
 if [ "$force" = yes ]; then
 	if [ "$mode_given" = yes ]; then
@@ -663,7 +663,7 @@ forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length 
 # いるプロジェクトで、そのイベントが「登録済み」に見えたまま永久に登録されない。
 #
 # そこで 3 つに分ける。同じ綴りで在る（exact）、ccnavi らしき別の綴りが在る
-# （other）、無い（none）。足すのは none だけ。other は足さずに人へ見せる。
+# （other）、無い（none）。足すのは none だけ。other は足さずにユーザへ見せる。
 # セッションの頭の取り込み（ccnavi-fetch.sh）は本体ではないので、other に数えない。数えると、
 # 取り込みだけが登録された設定で、本体の SessionStart が「別の綴りが在る」として足されない。
 # 取り込みのほうは、綴りを問わず ccnavi-fetch を含む command が在れば登録済みとする（fetching）。
@@ -739,7 +739,7 @@ fi
 # 配布先では索引が作られない。実行ファイルと同じ回に `**/index.jsonl` も足す。見出しは
 # 実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが読めなくなる。
 # `/` を含まない `index.jsonl` もどの深さにも当たるので、それが既にあれば足さない。
-# `index.jsonl` を否定する行（`!**/index.jsonl`、`!docs/index.jsonl` など）があれば、利用者が
+# `index.jsonl` を否定する行（`!**/index.jsonl`、`!docs/index.jsonl` など）があれば、ユーザが
 # 索引を追跡すると決めている。後ろに足すと git は後の行を勝たせるので、その否定を打ち消して
 # しまう。足さずに、そう言う（揃っていない、には数えない）。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
@@ -749,7 +749,7 @@ INDEX_IGNORE_LINE="**/index.jsonl"
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
-# 利用者が index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
+# ユーザが index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
 ignore_index_negated=""
 # .gitignore の行を、比べる形で出す。CRLF の `\r` と行末の空白を落とす（git も行末の空白は
 # 読まない）。無ければ何も出さない。
@@ -803,12 +803,12 @@ copy_file() {
 	cp "$1" "$2"
 }
 
-# .vscode/settings.json。ここは ccnavi の判定には関わらない。人がエディタから
+# .vscode/settings.json。ここは ccnavi の判定には関わらない。ユーザがエディタから
 # worktree を見られるかどうかだけを決める。
 #
 # 読めない形（VS Code の設定ファイルはコメントや末尾のカンマを書ける）に当たっても
 # die しない。ccnavi と関係のない書き方のせいで、肝心の .claude/settings.json まで
-# 書けなくなる。触らずに人へ渡して、残りは進める。
+# 書けなくなる。触らずにユーザへ渡して、残りは進める。
 vscode_settings="$root/$VSCODE_REL"
 vscode_current="{}"
 missing_vscode=""
@@ -836,7 +836,7 @@ if [ "$vscode" = yes ] && [ -z "$vscode_blocked" ]; then
 		. as $cur | $want | keys_unsorted[] | select($cur[.] == null)
 	')
 	# 値が違うものは変えない。`false` と書いてある設定を true に戻すのは、
-	# このスクリプトの仕事ではなく、そう書いた人の判断を消すことになる。
+	# このスクリプトの仕事ではなく、そう書いたユーザの判断を消すことになる。
 	differing_vscode=$(printf '%s' "$vscode_current" | jq -r --argjson want "$VSCODE_KEYS" '
 		. as $cur | $want | to_entries[]
 		| select($cur[.key] != null and $cur[.key] != .value)
@@ -912,7 +912,7 @@ report_deploy() {
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
 	fi
 	if [ -n "$ignore_index_negated" ]; then
-		printf '.gitignore に index.jsonl を否定する行があり、利用者が除外しているので %s は足さない:\n' "$INDEX_IGNORE_LINE"
+		printf '.gitignore に index.jsonl を否定する行があり、ユーザが除外しているので %s は足さない:\n' "$INDEX_IGNORE_LINE"
 		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
@@ -1037,7 +1037,7 @@ write_json() {
 	else
 		tmp="$1.tmp.$$"
 		# 途中で落ちたときに書きかけを残さない。設定ファイルの隣に見慣れない
-		# ファイルがあると、それが設定なのか残骸なのかを人が判断できない。
+		# ファイルがあると、それが設定なのか残骸なのかをユーザが判断できない。
 		trap 'rm -f "$tmp"' EXIT INT TERM
 		printf '%s\n' "$2" >"$tmp"
 		mv "$tmp" "$1"
@@ -1157,7 +1157,7 @@ if [ "$deploy_work" = yes ]; then
 		fi
 	fi
 	# .gitignore は足すだけ。既にある行は書かないし、ccnavi と関係のない行にも
-	# 触らない。見出しは、その塊が何なのかを、あとで開いた人に伝えるためだけの
+	# 触らない。見出しは、その塊が何なのかを、あとで開いたユーザに伝えるためだけの
 	# もの。既に同じ見出しがあれば重ねない。
 	append_ignore() {
 		# $1 見出し、$2 足す行（改行で終わる）。空なら何もしない。
@@ -1234,7 +1234,7 @@ for name in $DEPLOY_SCRIPTS; do
 			why="セッションの頭の取り込み"
 			;;
 		ccnavi-sync.sh)
-			why="人が打つ取り込みと、親のブランチが消えたかの確かめ"
+			why="ユーザが打つ取り込みと、親のブランチが消えたかの確かめ"
 			;;
 		ccnavi-clean.sh | ccnavi-clean.js)
 			why="ワークツリーを畳む前に生成物を消す"
@@ -1248,7 +1248,7 @@ for name in $DEPLOY_SCRIPTS; do
 done
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
-	# 諦めた理由は report_deploy が既に出している。ここで足すのは、人が自分で
+	# 諦めた理由は report_deploy が既に出している。ここで足すのは、ユーザが自分で
 	# 配るのを切ったときだけ。理由を二重に出すと、どちらが今の話か分からなくなる。
 	if [ "$deploy_off" = yes ]; then
 		# 書式の側に置かない。`--` で始まる文字列は、printf がオプションとして

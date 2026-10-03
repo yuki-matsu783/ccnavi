@@ -4,11 +4,11 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 <HTML>
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
-#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （人が端末で打つ）
+#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
-#   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （人が端末で打つ。chat のフェーズのレビュー済み）
-#   sh .ccnavi/scripts/ccnavi-review.sh config-synced <親>    （人が端末で打つ。着手で上書きした設定を見た）
+#   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （ユーザが端末で打つ。chat のフェーズのレビュー済み）
+#   sh .ccnavi/scripts/ccnavi-review.sh config-synced <親>    （ユーザが端末で打つ。着手で上書きした設定を見た）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
@@ -17,21 +17,21 @@
 #   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
 #            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
 #            → `ccnavi review requested` がマーカーを置く
-#            人はレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。題から Draft を
-#            外してマージするのは人の手に残す。
+#            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。題から Draft を
+#            外してマージするのはユーザの手に残す。
 #            --eli5 <HTML> は必須（ADR-0094・ADR-0095）。変更をやさしく説明した 1 枚の HTML で、
 #            このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html）にコミットしておく。
 #            HEAD に入って push されていれば、マージリクエストの差分に載る。ここは拡張子・在ること・
 #            中身があること・wip/eli5/ の下にあること・名前の字・HEAD で普通のファイル（100644）として
 #            HEAD と同じ中身でコミット済みであることを確かめ（ADR-0097）、
-#            実行ファイルには渡さない。crit は起動しない（待ち続けるため）。投稿が済んだら、人が打つ
+#            実行ファイルには渡さない。crit は起動しない（待ち続けるため）。投稿が済んだら、ユーザが打つ
 #            `crit review <パス>` と `crit push <番号>` を標準出力に出す。crit push で送られた指摘は
 #            マージリクエストの行のスレッドになり、confirm が未解決として数え、decide で選べる。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
 #            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、印に残す
 #            （ADR-0093 の 8.9。段階 4）。引けなければ渡さず、印は前と同じ
-#   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、指摘ごとに
+#   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに
 #            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
 #            → issue に回す分があればここが issue を作り、決めた内容をコメントに写す
 #            ボードは同じ経路を --preview（一覧を読む）と --choices --digest（押した選択を置く）で通る
@@ -44,7 +44,7 @@
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す（ADR-0093 の 4.3。段階 2d）。
 # ロック → 途中の操作の確認 → hook の印と跡を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
-# 人の判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
+# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
 # 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る（D27）。それ以外の家族は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
@@ -61,15 +61,15 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
                                                   --eli5 は必須。変更の目的・何が変わるか・リスクを専門用語なしで書いた
                                                   1 枚の HTML（.html / .htm）。このワークツリーの wip/eli5/ の下（既定の名前は
                                                   wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
-                                                  差分に載せる）。相対パスは打った場所から。投稿が済むと、人が打つ
+                                                  差分に載せる）。相対パスは打った場所から。投稿が済むと、ユーザが打つ
                                                   crit review <パス> と crit push <番号> を出す
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
-  decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
-  ready                                           閉じられ、wip を片付けて push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
-  close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
-  chat         <N>                                chat で見るフェーズを人がこのセッションで見終えた（人が端末で打つ。ccnavi --reviewed <N> --chat）
-  config-synced <親>                              着手で上書きした設定を人が端末で見た（人が端末で打つ。ccnavi --config-synced <親>）
+  decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で打つ。--preview は一覧を JSON で見るだけ）
+  ready                                           閉じられ、wip を片付けて push 済みなら Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
+  close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（ユーザが端末で打つ）。残りを issue に写す。Draft は親が ready で外す
+  chat         <N>                                chat で見るフェーズをユーザがこのセッションで見終えた（ユーザが端末で打つ。ccnavi --reviewed <N> --chat）
+  config-synced <親>                              着手で上書きした設定をユーザが端末で見た（ユーザが端末で打つ。ccnavi --config-synced <親>）
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の綴り）
   merged                                          いまのブランチのマージリクエストがマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
@@ -162,7 +162,7 @@ exe_knows() {
 }
 
 # ---- リモート。origin の URL でホストを見分ける。
-# 人の判断の入口（chat・config-synced）はホストに触らないので、origin も道具も要らない。
+# ユーザの判断の入口（chat・config-synced）はホストに触らないので、origin も道具も要らない。
 needs_host=yes
 case "$sub" in
 chat | config-synced) needs_host=no ;;
@@ -256,7 +256,7 @@ if [ "$needs_host" = yes ]; then
 		elif [ -n "$CURL" ]; then
 			fail no-transport-token "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
 		else
-			fail no-transport "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' を人が打つ形にしてください。" 2
+			fail no-transport "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' をユーザが打つ形にしてください。" 2
 		fi
 	fi
 fi
@@ -521,7 +521,7 @@ undraft() {
 			return 0
 		fi
 		# squash も有効にする。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
-		# （マージのときに人が選ぶ）ので、コメントに書くだけ。
+		# （マージのときにユーザが選ぶ）ので、コメントに書くだけ。
 		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')
 		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" | "$JQ" -r '.draft // .work_in_progress // false'
 	fi
@@ -652,7 +652,7 @@ eli5_posted=""
 trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- C1（ADR-0093 の 4.3。段階 2d）と人の判断を運ぶ処理（4.6・D27）
+# ---- C1（ADR-0093 の 4.3。段階 2d）とユーザの判断を運ぶ処理（4.6・D27）
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
 ccnavi_c1_sh="$(dirname "$0")"
@@ -690,13 +690,13 @@ c1_ccnavi() {
 	fi
 }
 
-# 人の判断を運ぶ（D27）。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
+# ユーザの判断を運ぶ（D27）。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
 carry_human() {
 	ccnavi_c1_family "$1"
 	case "$ccnavi_c1_target" in
 	yes)
 		sh "$ccnavi_c1_sh/ccnavi-push-approved.sh" "$ccnavi_c1_family_id" || {
-			printf 'ccnavi-review: 人の判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s を人が打ち直す（送るまで、この家族の状態の操作は止まる）\n' \
+			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが打ち直す（送るまで、この家族の状態の操作は止まる）\n' \
 				"$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
 			return 1
 		}
@@ -801,7 +801,7 @@ request)
 		*) set -- "$@" "$eli5_a" ;;
 		esac
 	done
-	# 置き場は wip/eli5/ の下（ADR-0095・ADR-0097）。マージリクエストの差分に載せ、人が crit push で行に指摘を送れる
+	# 置き場は wip/eli5/ の下（ADR-0095・ADR-0097）。マージリクエストの差分に載せ、ユーザが crit push で行に指摘を送れる
 	# ようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
 	eli5_how="依頼の前に、変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML（外部の読み込み無し）を、このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html。名前は英数字と . _ / - だけ）に普通のファイルとして書いてコミットし、push してから --eli5 <パス> で渡してください。"
 	[ -n "$eli5" ] || fail explainer-missing "request には --eli5 <HTML> が要る。${eli5_how}" 2
@@ -839,8 +839,8 @@ request)
   - このワークツリーの外にある（マージリクエストの差分に載らない）"
 	else
 		eli5_rel="${eli5_prefix}${eli5_path##*/}"
-		# 名前に使える字を絞る（ADR-0097）。相対パスは依頼文と人が打つ crit の行にそのまま入るので、
-		# `'`・`$`・バッククォート・空白・改行・日本語などを通すと、打った人のシェルで別のコマンドになる
+		# 名前に使える字を絞る（ADR-0097）。相対パスは依頼文とユーザが打つ crit の行にそのまま入るので、
+		# `'`・`$`・バッククォート・空白・改行・日本語などを通すと、打ったユーザのシェルで別のコマンドになる
 		# 綴りを置ける。C ロケールで、許す字を消して印（:）だけが残るかで見る（改行も 1 字として残る）。
 		eli5_rest=$(printf '%s:' "$eli5_rel" | LC_ALL=C tr -d 'A-Za-z0-9._/-')
 		eli5_safe=yes
@@ -885,8 +885,8 @@ ${eli5_how}"
 	prepared=$(ccnavi review prepare "$@") || exit $?
 	file=$(printf '%s\n' "$prepared" | sed -n 1p)
 	draft=$(printf '%s\n' "$prepared" | sed -n 2p)
-	# 段 1.5: マージリクエストが無ければ作る。人はレビューをここで行うので、
-	# 「見る場所が無い」で止めない。統合するのは人なので下書きで作る。
+	# 段 1.5: マージリクエストが無ければ作る。ユーザはレビューをここで行うので、
+	# 「見る場所が無い」で止めない。統合するのはユーザなので下書きで作る。
 	mr=$(find_mr)
 	if [ -z "$mr" ]; then
 		[ -n "$draft" ] && [ -f "$draft" ] || fail no-draft "マージリクエストの下書きを読めない ($draft)。"
@@ -919,20 +919,20 @@ ${eli5_how}"
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
 	c1_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
-	# 段 4: crit の案内（ADR-0095）。crit は人の手元で打つ道具で、ここからは起動しない（待ち続けるため）。
+	# 段 4: crit の案内（ADR-0095）。crit はユーザの手元で打つ道具で、ここからは起動しない（待ち続けるため）。
 	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
 	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
-	# ツリーの絶対パスは利用者の置き場なので字を絞れない。いつも '…' で包み、中の ' は '\'' に置き換える
-	# （打った人のシェルで 1 語のまま、展開されない）。相対パスは上で字を絞ってあるので包まない。
+	# ツリーの絶対パスはユーザの置き場なので字を絞れない。いつも '…' で包み、中の ' は '\'' に置き換える
+	# （打ったユーザのシェルで 1 語のまま、展開されない）。相対パスは上で字を絞ってあるので包まない。
 	eli5_shown="'$(printf '%s' "$eli5_top" | sed "s/'/'\\\\''/g")'"
 	eli5_rel_shown="$eli5_rel"
-	printf 'ELI5 を見る: 人が端末で cd %s してから crit review %s を打ち、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない。このスクリプトは crit を起動しない）\n' \
+	printf 'ELI5 を見る: ユーザが端末で cd %s してから crit review %s を打ち、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない。このスクリプトは crit を起動しない）\n' \
 		"$eli5_shown" "$eli5_rel_shown" "$number" "$eli5_rel_shown"
 	command -v crit >/dev/null 2>&1 ||
-		printf '（この環境の PATH に crit は無い。人の手元の端末で打つ）\n'
+		printf '（この環境の PATH に crit は無い。ユーザの手元の端末で打つ）\n'
 	if [ "$kind" = github ]; then eli5_forge=gh; else eli5_forge=glab; fi
 	command -v "$eli5_forge" >/dev/null 2>&1 ||
-		printf '（この環境の PATH に %s は無い。crit push は人の手元で認証済みの %s を使う）\n' "$eli5_forge" "$eli5_forge"
+		printf '（この環境の PATH に %s は無い。crit push はユーザの手元で認証済みの %s を使う）\n' "$eli5_forge" "$eli5_forge"
 	;;
 comment)
 	body=""
@@ -960,10 +960,10 @@ comment)
 	printf 'OK: 記録した（%s）\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	;;
 decide)
-	# 残った指摘の行き先を、人が指摘ごとに決める。形は 3 つ。
-	#   decide <N>                                   端末で 1 件ずつ選ぶ（人が打つ）
+	# 残った指摘の行き先を、ユーザが指摘ごとに決める。形は 3 つ。
+	#   decide <N>                                   端末で 1 件ずつ選ぶ（ユーザが打つ）
 	#   decide <N> --preview                         見せる一覧を JSON で返す。何も置かない（ボードが読む）
-	#   decide <N> --choices <JSON> --digest <指紋>  ボードで人が押した選択を置く
+	#   decide <N> --choices <JSON> --digest <指紋>  ボードでユーザが押した選択を置く
 	# 最後の形は、エージェントが打つと組み込みの deny（builtin-guard-ticket-approval）が止める。
 	n="${1:-}"
 	case "$n" in
@@ -1009,7 +1009,7 @@ decide)
 		fi
 	fi
 	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
-	# 済ませる（ロックを持ったまま人を待たない。段階 2d のレビューの決定 A）ので、ここでは始めない。
+	# 済ませる（ロックを持ったままユーザを待たない。段階 2d のレビューの決定 A）ので、ここでは始めない。
 	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$branch"
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
@@ -1043,7 +1043,7 @@ decide)
 		exit 1
 		;;
 	yes)
-		# 1. 人が端末で選ぶ（何も置かない。選択と指紋を控えの置き場に書くだけ）。
+		# 1. ユーザが端末で選ぶ（何も置かない。選択と指紋を控えの置き場に書くだけ）。
 		chosen="$state/review-choose-$$.json"
 		ccnavi --reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
 			rm -f "$chosen"
@@ -1084,7 +1084,7 @@ decide)
 	;;
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
-	# ここが外してコメントを投稿する。マージは人。
+	# ここが外してコメントを投稿する。マージはユーザ。
 	c1_start "$branch"
 	fetch_all >"$result"
 	tell_skew
@@ -1102,10 +1102,10 @@ ready)
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	printf 'OK: Draft を外した（%s）。マージは利用者が行う\n' "$url"
+	printf 'OK: Draft を外した（%s）。マージはユーザが行う\n' "$url"
 	;;
 close-early)
-	# 人が端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
+	# ユーザが端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
 	# ここが残りを issue に写し、コメントを投稿する。Draft を外すのは、親が片付けて
 	# push したあとの ready（外す経路は 1 本）。
 	reason=""
@@ -1125,7 +1125,7 @@ close-early)
 	done
 	[ -n "$reason" ] || fail close-early-no-reason "close-early には --reason <理由> が要る。" 2
 	fetch_all >"$result"
-	# exe は人に残りを見せて y/N を取るので、標準出力は端末のまま。下書きは控えの
+	# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは控えの
 	# 置き場の決まった名前で拾う（親の識別子 = ブランチ名）。
 	ccnavi --close-early --reason "$reason" --result "$result" || exit $?
 	issue_draft="$state/review-close-early-issue-$branch.md"
@@ -1144,12 +1144,12 @@ close-early)
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	# 取り込み済みの家族なら、締めの印（人の判断）を運ぶ処理で送る（D27）。
+	# 取り込み済みの家族なら、締めの印（ユーザの判断）を運ぶ処理で送る（D27）。
 	carry_human "$branch" || exit 1
-	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージは利用者が行う\n' "$url"
+	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
 	;;
 chat)
-	# 人が端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
+	# ユーザが端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
 	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
 	n="${1:-}"
 	case "$n" in
@@ -1160,7 +1160,7 @@ chat)
 	carry_human "$branch" || exit 1
 	;;
 config-synced)
-	# 人が端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
+	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
 	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
 	parent="${1:-}"
 	case "$parent" in

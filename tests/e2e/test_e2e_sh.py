@@ -18,7 +18,7 @@ git init と worktree add を何度も行い、実行ファイルを写すが、
     uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 `CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。実装フェーズの成果物は
-`wip/design/scripts/` に置かれ、人が写すまで `.ccnavi/scripts/` には入らない。
+`wip/design/scripts/` に置かれ、ユーザが写すまで `.ccnavi/scripts/` には入らない。
 写す前に新しい sh を測るときは、そこを指す。
 
     CCNAVI_SH_DIR=wip/design/scripts uv run python -m unittest tests.e2e.test_e2e_sh

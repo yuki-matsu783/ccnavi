@@ -1128,7 +1128,7 @@ class CrossDeviceTest(Repo):
 
 
 class PathspecMagicTest(Repo):
-    """パスや利用者の環境を pathspec の magic として読ませない。"""
+    """パスやユーザの環境を pathspec の magic として読ませない。"""
 
     def test_check_ignore_takes_a_path_that_looks_like_magic(self):
         paths = [":(exclude)x/index.jsonl", ":!y/index.jsonl", "*/index.jsonl"]

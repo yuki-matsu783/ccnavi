@@ -1,6 +1,6 @@
 """記録と控えの後始末。記録を大きさでローテートし、古い記録と終わったセッションの控えを消す。
 
-走るのはセッションの開始（events.decide_at_start）と、人が端末から打つ `ccnavi --prune`
+走るのはセッションの開始（events.decide_at_start）と、ユーザが端末から打つ `ccnavi --prune`
 だけ。実行前の判定（PreToolUse）では走らせない。ツール呼び出しのたびに置き場を数えると、
 判定を待たせる（ADR-0003 と同じ理由で、重い仕事はセッションに 1 度の場所へ置く）。
 
@@ -22,7 +22,7 @@
 
 セッションを名前に持たないもの（レビューの下書き `review-*.md`、リスクの判定の下書き
 `risk-judge-*.md`、戻したときに退避したファイル `aside/`、自己防衛の実体 `selfguard/store/`）は
-消さない。チケットやレビューの寿命で使われるか、利用者のファイルそのものなので、セッションの
+消さない。チケットやレビューの寿命で使われるか、ユーザのファイルそのものなので、セッションの
 日付では決められない。
 
 しきい値は環境変数で動かせる（LIMITS）。0 はその段を止める。読めない値・有限でない値
@@ -170,7 +170,7 @@ def summary(report: Report) -> str:
 
 
 def lines(report: Report, dry_run: bool) -> list[str]:
-    """人に見せる行。"""
+    """ユーザに見せる行。"""
     rotate, remove = ("ローテートする", "消す") if dry_run else ("ローテートした", "消した")
     out = [f"{rotate}  {src} → {dst}" for src, dst in report.rotated]
     out += [f"{remove}  {path}" for path in report.logs + report.state]

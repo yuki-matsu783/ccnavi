@@ -2,7 +2,7 @@
  * PAT の期限の知らせ（ADR-0093 の 5.5・D25）。
  *
  * 期限の正はホストの PAT の期限。GitHub は応答ヘッダ `github-authentication-token-expiration` で
- * 返すので、service worker がホストを呼ぶたびに読んで控える。読めなければ、登録のときに利用者が
+ * 返すので、service worker がホストを呼ぶたびに読んで控える。読めなければ、登録のときにユーザが
  * 入れた日付を使う。どちらも無ければ「期限不明」と出し続ける。
  * 切れる 7 日前から、service worker が 1 日 1 回比べてバッジに出し、ボードは帯で出す。
  */
@@ -15,7 +15,7 @@ export const WARN_DAYS = 7;
 export interface TokenMeta {
   /** ホストの応答から読んだ期限（ISO）。読めなければ空 */
   readonly host?: string;
-  /** 登録のときに利用者が入れた期限（YYYY-MM-DD）。空なら入れていない */
+  /** 登録のときにユーザが入れた期限（YYYY-MM-DD）。空なら入れていない */
   readonly manual?: string;
   /** GitLab で期限を最後に聞いた時刻（ISO。`GET /personal_access_tokens/self`。1 日 1 回まで。段階 5） */
   readonly checked?: string;
@@ -37,7 +37,7 @@ export interface Notice {
 const DAY = 24 * 3600 * 1000;
 
 /**
- * 利用者が入れた日付（YYYY-MM-DD）を読む。読めなければ空。
+ * ユーザが入れた日付（YYYY-MM-DD）を読む。読めなければ空。
  * 期限はその日の終わり（UTC の 23:59:59）とみなす。GitHub の作成画面の期限も日付で、その日のうちは使える
  */
 export function parseManual(value: unknown): string {

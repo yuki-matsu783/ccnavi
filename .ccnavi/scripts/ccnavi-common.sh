@@ -123,7 +123,7 @@ ccnavi_phys() {
 # だから `.claude/worktrees/` の下にあるものは候補にしない。最初に当たった
 # 「ワークツリーでない」ディレクトリが根になる。
 #
-# 最外を取る形にはしない。ワークスペースが利用者のホームの下にあり、そこに
+# 最外を取る形にはしない。ワークスペースがユーザのホームの下にあり、そこに
 # `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを選ぶ。近いほうから決める。
 #
 # `cd` は使わない。`set -e` の下で戻り忘れが問題になる。パスを削って登る。
@@ -153,7 +153,7 @@ ccnavi_workspace() {
 
 # 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。
 #
-# 人が端末から打つ場面では settings.json の env が反映されないので、CCNAVI_BIN_PATH が
+# ユーザが端末から打つ場面では settings.json の env が反映されないので、CCNAVI_BIN_PATH が
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
 # hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
@@ -394,7 +394,7 @@ ccnavi_parent_tree() {
 
 # ロック（D32）。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
-# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（人に回す）。
+# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（ユーザに回す）。
 # 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<印>" を子に渡す。
 # 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT・INT・TERM・HUP にも置く）。
 #
@@ -559,7 +559,7 @@ ccnavi_lock_describe() {
 		fi
 		[ -n "$ccnavi_lds_at" ] || ccnavi_lds_at="$ccnavi_lds_started"
 	fi
-	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人に終了させてもらってから打ち直してください（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
+	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、ユーザに終了させてもらってから打ち直してください（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
 		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
 }
 
@@ -630,7 +630,7 @@ ccnavi_lock_drop() {
 #   ccnavi_git_timed <秒> <標準エラーの書き先> <リポジトリ> <git の引数>...
 #
 # 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
-# ssh の BatchMode は、利用者が GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
+# ssh の BatchMode は、ユーザが GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
 # 見張りの出力は捨てる（つないだままだと、見張りの sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
 # 戻り値は git のもの（切ったときは 0 でない）。標準出力は捨てないので、呼ぶ側がリダイレクトする。
 ccnavi_git_timed() {
@@ -670,7 +670,7 @@ ccnavi_git_timed() {
 # git が拒んだ理由を 1 行にする（ccnavi-fetch.sh と ccnavi-sync.sh の文面）。<標準エラーを書いたファイル>
 #
 # 書きかけとの重なり（「would be overwritten」の後に git が字下げして並べるパス）、索引のロック、
-# コミットする人の名前が無い、署名の失敗、hook、それ以外は git の 1 行目。理由どおりに言い、
+# コミットするユーザの名前が無い、署名の失敗、hook、それ以外は git の 1 行目。理由どおりに言い、
 # 重なっていないのに「重なる」とは言わない。
 ccnavi_git_refusal() {
 	ccnavi_gr_paths=$(awk '/would be overwritten/ { f = 1; next }
@@ -679,9 +679,9 @@ ccnavi_git_refusal() {
 	if [ -n "$ccnavi_gr_paths" ]; then
 		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
-		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、落ちた残りなら人が消す'
+		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、落ちた残りならユーザが消す'
 	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
-		printf 'コミットする人の名前（user.name・user.email）が決まっていない'
+		printf 'コミットするユーザの名前（user.name・user.email）が決まっていない'
 	elif grep -qi 'gpg\|signing' "$1" 2>/dev/null; then
 		printf 'コミットの署名に失敗した'
 	elif grep -qi 'hook' "$1" 2>/dev/null; then
@@ -718,8 +718,8 @@ ccnavi_git_refusal() {
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
 #   見張りの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回の見張りの秒、既定 60）
 #
-# コミットは `--no-verify` で利用者の hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
-# だけで、コードの検査の対象ではないため（段階 2d のレビューの決定 C）。署名は利用者の設定に従うが、
+# コミットは `--no-verify` でユーザの hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
+# だけで、コードの検査の対象ではないため（段階 2d のレビューの決定 C）。署名はユーザの設定に従うが、
 # 見張りの時間を付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
 # 途中で INT・TERM・HUP が来たら、送る前の自分のコミットを戻す（ccnavi_c1_end）。強制終了（KILL）で
@@ -861,7 +861,7 @@ ccnavi_c1_begin() {
 	case "$ccnavi_cb_rc" in
 	0) ;;
 	2)
-		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。人が中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
+		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
 		return 1
 		;;
 	*)
@@ -916,8 +916,8 @@ ccnavi_c1_prepare() {
 		ccnavi_cp_try=$((ccnavi_cp_try + 1))
 		# 3. C1 の外の変更を見分け、(b) を取り込みの前にコミットする。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
-		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "人の判断が未送信" \
-			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
+		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "ユーザの判断が未送信" \
+			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
 			"置き場に ccnavi の知らない変更がある" "。ユーザが確かめてください。何も書いていない" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
@@ -945,10 +945,10 @@ ccnavi_c1_prepare() {
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_family_id" || return 1
-		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信の人の判断のコミットがある" \
-			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）を人が打つ。何も書いていない" \
+		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
+			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
 			"置き場に ccnavi の知らない未送信のコミットがある" \
-			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了された跡なら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、人がそのコミットを取り除く。何も書いていない" || return 1
+			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了された跡なら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も書いていない" || return 1
 		return 0
 	done
 }
@@ -993,7 +993,7 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# 利用者の hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
+	# ユーザの hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
@@ -1425,7 +1425,7 @@ ccnavi_log_value() {
 #   - `://` を含まない語: 最初の `/` より前に `@` があり、最後の `@` より前に `:` があれば、そこを
 #     `***` にする（scp 形 `user:tok@host:path` → `***@host:path`）。`git@host:path` は伏せない
 # `@` の無い文字列は語に切らずにそのまま返す（ほとんどの行はこれで済む）。
-# 利用者向けの ccnavi_mask_url（`<伏せた>@host`）とは綴りが違う。そちらは契約の文面なので変えない。
+# ユーザ向けの ccnavi_mask_url（`<伏せた>@host`）とは綴りが違う。そちらは契約の文面なので変えない。
 ccnavi_log_mask() {
 	ccnavi_log_out="$1"
 	case "$1" in
