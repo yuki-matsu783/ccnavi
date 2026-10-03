@@ -10,7 +10,8 @@ import os
 import tempfile
 import unittest
 
-from ccnavi import phase, settings, shellread
+from ccnavi.infra import settings, shellread
+from ccnavi.tickets import phase
 
 
 class ScriptCommandTest(unittest.TestCase):

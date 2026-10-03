@@ -26,7 +26,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import diaglog
+from ccnavi.records import diaglog
 from tests import ROOT
 
 SHELL = shutil.which("sh") or shutil.which("bash")

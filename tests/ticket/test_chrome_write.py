@@ -19,7 +19,9 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi import history, lint, settings, version
+from ccnavi.entry import lint, version
+from ccnavi.infra import settings
+from ccnavi.tickets import history
 from tests.ticket.test_core import CoreHarness, _chrome
 from tests.ticket.test_phases import child_text, parent_text
 from tests.ticket.test_ticket import git, write

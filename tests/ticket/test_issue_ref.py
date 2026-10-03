@@ -13,8 +13,9 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from ccnavi import agree, review, settings
-from ccnavi import ticket as ticket_mod
+from ccnavi.infra import settings
+from ccnavi.tickets import agree, review
+from ccnavi.tickets import ticket as ticket_mod
 
 
 def parent_text(issue):

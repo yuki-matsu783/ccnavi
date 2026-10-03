@@ -20,7 +20,8 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import platformtag, rules, selfguard, settings, shellread
+from ccnavi.infra import platformtag, settings, shellread
+from ccnavi.policy import rules, selfguard
 from tests import ROOT
 from tests.inproc import run_ccnavi
 

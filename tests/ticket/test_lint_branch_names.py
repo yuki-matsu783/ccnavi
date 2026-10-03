@@ -20,7 +20,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import ticket as ticket_mod
+from ccnavi.tickets import ticket as ticket_mod
 from tests.inproc import run_ccnavi
 
 ADR = "（ADR-0093）"

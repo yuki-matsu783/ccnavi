@@ -22,7 +22,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import gitcmd
+from ccnavi.infra import gitcmd
 from tests import GIT_ENV
 from tests.inproc import run_ccnavi
 
@@ -95,7 +95,7 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
             seen.update(os.environ)
             return 0
 
-        with mock.patch("ccnavi.cli.run", record):
+        with mock.patch("ccnavi.entry.cli.run", record):
             run_ccnavi(["--help"], env={})
         for name, value in GIT_ENV.items():
             self.assertEqual(value, seen.get(name), f"{name} が空の環境で落ちている")
@@ -108,7 +108,7 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
             seen.update(os.environ)
             return 0
 
-        with mock.patch("ccnavi.cli.run", record):
+        with mock.patch("ccnavi.entry.cli.run", record):
             run_ccnavi(["--help"], env={"GIT_CONFIG_GLOBAL": "/nowhere"})
         self.assertEqual("/nowhere", seen.get("GIT_CONFIG_GLOBAL"))
 
@@ -127,7 +127,7 @@ class OptionalLocksAreOffTest(unittest.TestCase):
             seen.append(kwargs.get("env"))
             return subprocess.CompletedProcess(args, 0, "x\n", "")
 
-        with mock.patch("ccnavi.gitcmd.subprocess.run", record):
+        with mock.patch("ccnavi.infra.gitcmd.subprocess.run", record):
             call()
         self.assertTrue(seen, "git が起こされていない")
         return seen

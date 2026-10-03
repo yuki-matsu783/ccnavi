@@ -29,9 +29,10 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi import phase as phase_mod
-from ccnavi import review, settings, shellread, ticket
-from ccnavi.subagent import CANDIDATE_NOTE
+from ccnavi.hook.subagent import CANDIDATE_NOTE
+from ccnavi.infra import settings, shellread
+from ccnavi.tickets import phase as phase_mod
+from ccnavi.tickets import review, ticket
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -2033,7 +2034,7 @@ class TicketTest(unittest.TestCase):
             "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
             "--digest Y\")}'",
             "perl -e 'system(\"ccnavi --reviewed 3 --accept-unresolved --yes X --digest Y\")'",
-            'python3 -c "import ccnavi.cli as c; '
+            'python3 -c "import ccnavi.entry.cli as c; '
             "c.run(0, 0, 0, ['--reviewed', '1', '--yes', '{}'])\"",
             "S=decide; sh .ccnavi/scripts/ccnavi-review.sh $S 1 --choices x --digest y",
             "cp .ccnavi/scripts/ccnavi-review.sh /tmp/r.sh; "

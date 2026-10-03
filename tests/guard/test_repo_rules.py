@@ -21,7 +21,7 @@ import os
 import re
 import unittest
 
-from ccnavi import shellread
+from ccnavi.infra import shellread
 from tests import ROOT
 from tests.inproc import run_ccnavi
 

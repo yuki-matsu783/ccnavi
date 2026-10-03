@@ -5,7 +5,7 @@ import os
 import shutil as _shutil
 import tempfile as _tempfile
 
-from ccnavi import settings as _settings
+from ccnavi.infra import settings as _settings
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

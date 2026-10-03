@@ -29,7 +29,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import tree
+from ccnavi.infra import tree
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 

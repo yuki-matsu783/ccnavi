@@ -178,7 +178,7 @@ class ApprovalNewsTest(PhaseHarness):
 
     def test_a_copy_closed_before_the_next_hook_is_still_told(self):
         """承認の直後に子が閉じても、その承認は 1 度伝える。"""
-        from ccnavi import approval
+        from ccnavi.tickets import approval
 
         self.parent_only()
         self.approve_yes(["i0001"])

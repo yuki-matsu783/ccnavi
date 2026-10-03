@@ -27,7 +27,8 @@ import time
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from ccnavi import platformtag, version  # noqa: E402
+from ccnavi.entry import version  # noqa: E402
+from ccnavi.infra import platformtag  # noqa: E402
 
 # 組み立ての出力。導入スクリプトはここから配り、代わりに通る sh は env が無いときここを探す。
 DIST = os.path.join(ROOT, "dist")

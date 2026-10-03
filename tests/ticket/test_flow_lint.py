@@ -21,7 +21,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi import flow
+from ccnavi.tickets import flow
 from tests.inproc import run_ccnavi
 from tests.ticket.test_flow import WORKFLOW_YAML
 from tests.ticket.test_ticket import write

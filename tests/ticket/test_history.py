@@ -19,7 +19,7 @@ import os
 import re
 import unittest
 
-from ccnavi import history
+from ccnavi.tickets import history
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
 

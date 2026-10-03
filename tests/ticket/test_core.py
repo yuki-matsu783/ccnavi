@@ -28,8 +28,11 @@ import subprocess
 import unittest
 from unittest import mock
 
-from ccnavi import approval, core, fsio, history, lint, settings, version
-from ccnavi import tree as tree_mod
+from ccnavi.entry import lint, version
+from ccnavi.hook import core
+from ccnavi.infra import fsio, settings
+from ccnavi.infra import tree as tree_mod
+from ccnavi.tickets import approval, history
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 
@@ -317,7 +320,7 @@ class BranchOfTest(unittest.TestCase):
         return tree_root
 
     def test_forms(self):
-        from ccnavi import tree
+        from ccnavi.infra import tree
 
         self.assertEqual(tree.branch_of(self.repo("ref: refs/heads/main\n")), "main")
         self.assertIsNone(tree.branch_of(self.repo("0123456789abcdef0123456789abcdef01234567\n")))
@@ -327,7 +330,7 @@ class BranchOfTest(unittest.TestCase):
         self.assertIsNone(tree.branch_of(os.path.join(self.base, "none")))
 
     def test_a_relative_gitdir_is_read_from_the_tree(self):
-        from ccnavi import tree
+        from ccnavi.infra import tree
 
         root = self.repo("ref: refs/heads/i0001\n", gitfile="gitdir: meta\n")
         self.assertEqual(tree.branch_of(root), "i0001")
@@ -621,7 +624,7 @@ class WriterFailureTest(CoreHarness):
         self.merge("i0001-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        from ccnavi import review
+        from ccnavi.tickets import review
 
         result = review.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
         checked = core.confirm(self.snapshot(), "i0001", 1, result, "")
@@ -1194,10 +1197,12 @@ class RecordWritesTest(CoreHarness):
             # なく、C1 の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }
-        names = ("approval", "history", "configsync", "ops", "flow", "risk", "core")
-        names += ("review", "phase", "ticket", "gitstate")
-        for name in names:
-            path = os.path.join(ROOT, "ccnavi", name + ".py")
+        names = ("tickets.approval", "tickets.agree", "tickets.history", "tickets.configsync")
+        names += ("tickets.ops", "tickets.flow", "tickets.risk", "hook.core", "tickets.review")
+        names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
+        for dotted in names:
+            package, name = dotted.split(".")
+            path = os.path.join(ROOT, "ccnavi", package, name + ".py")
             with open(path, encoding="utf-8") as f:
                 lines = f.read().splitlines()
             hits = [

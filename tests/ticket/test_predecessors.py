@@ -23,7 +23,7 @@ import os
 import shutil
 import unittest
 
-from ccnavi import modes, settings
+from ccnavi.infra import modes, settings
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
 
 

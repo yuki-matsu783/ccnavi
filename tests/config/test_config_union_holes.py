@@ -29,7 +29,7 @@ import json
 import os
 import unittest
 
-from ccnavi import settings
+from ccnavi.infra import settings
 from tests.config.test_config_union import (
     COMMON_RISK,
     HOME,

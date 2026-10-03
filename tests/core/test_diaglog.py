@@ -29,7 +29,7 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import diaglog, prune
+from ccnavi.records import diaglog, prune
 
 # 時刻・レベル・出どころ[pid] の頭。
 HEAD = re.compile(

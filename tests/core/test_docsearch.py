@@ -28,7 +28,8 @@ import unicodedata
 import unittest
 from unittest import mock
 
-from ccnavi import docsearch, settings
+from ccnavi.hook import docsearch
+from ccnavi.infra import settings
 from tests.inproc import run_ccnavi
 
 

@@ -19,7 +19,7 @@ const REPO_ROOT = path.join(__dirname, "..", "..", "..", "..", "..");
 
 const SCRIPT = `
 import base64, json, sys
-from ccnavi import flow
+from ccnavi.tickets import flow
 out = []
 for item in json.load(sys.stdin):
     data, why = flow.parse(base64.b64decode(item))

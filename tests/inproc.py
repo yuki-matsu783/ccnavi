@@ -32,7 +32,7 @@ import subprocess
 from collections.abc import Mapping, Sequence
 from unittest import mock
 
-from ccnavi import cli
+from ccnavi.entry import cli
 from tests import GIT_ENV
 
 

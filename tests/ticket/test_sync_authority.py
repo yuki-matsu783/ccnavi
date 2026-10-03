@@ -16,7 +16,9 @@ import threading
 import time
 import unittest
 
-from ccnavi import agree, approval, core, fsio, settings, syncstate
+from ccnavi.hook import core
+from ccnavi.infra import fsio, settings
+from ccnavi.tickets import agree, approval, syncstate
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -509,7 +511,7 @@ class MarkTest(AuthorityHarness):
     def test_config_synced_stops_for_an_undecided_family(self):
         import io
 
-        from ccnavi import configsync
+        from ccnavi.tickets import configsync
 
         self.record("gone")
         err = io.StringIO()
@@ -534,7 +536,7 @@ class MarkTest(AuthorityHarness):
 
         ワークスペースの人の付けた名前 `web-i0012` と、プロジェクト web の issue 12 の家族が並ぶ形。
         """
-        from ccnavi import tree
+        from ccnavi.infra import tree
 
         self.record("present")
         fams = syncstate.Families(self.conf(), self.root)
@@ -829,7 +831,7 @@ class LintTest(AuthorityHarness):
         self.assertIn("phases.yml", drift[0]["detail"])
 
     def test_the_projected_layer_on_the_parent_branch_is_compared(self):
-        from ccnavi import lint
+        from ccnavi.entry import lint
 
         conf = self.conf()
         self_base = os.path.join(self.state, "sync", "self", "integration")

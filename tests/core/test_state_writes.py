@@ -19,7 +19,10 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import agree, ctxfile, fsio, hookio, post, rules
+from ccnavi.hook import post
+from ccnavi.infra import fsio, hookio
+from ccnavi.policy import ctxfile, rules
+from ccnavi.tickets import agree
 
 
 def _payload(session: str = "s1", agent: str = "") -> hookio.Input:

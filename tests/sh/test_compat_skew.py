@@ -18,7 +18,7 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi import version
+from ccnavi.entry import version
 from tests import ROOT
 
 SHELL = shutil.which("sh") or shutil.which("bash")

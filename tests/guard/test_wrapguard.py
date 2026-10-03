@@ -17,7 +17,8 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import shellread, wrapguard
+from ccnavi.hook import wrapguard
+from ccnavi.infra import shellread
 from tests import GIT_ENV, ROOT, common_path
 from tests.inproc import run_ccnavi
 

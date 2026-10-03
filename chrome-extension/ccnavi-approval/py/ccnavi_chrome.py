@@ -5,7 +5,7 @@
 そのまま動かす（ADR-0093 の 8.1）。承認待ちの一覧も、家族の見分けも、参照の閉包も、
 互換の比べも Python が出し、拡張（TS）は並べるだけ（ADR-0035）。
 
-段階 2a から、判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` も呼べる
+段階 2a から、判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` も呼べる
 （`plan`・`withdraw`・`confirm` の操作）。どれも書くもの（Changes）を値で返すだけで、
 ホストにもディスクにも書かない（fsio の控える段）。段階 3 から、拡張は `plan`（承認）と
 `withdraw`（取り下げ）の答えを親のブランチへの 1 コミットにして書く（8.3・8.4）。
@@ -65,8 +65,11 @@ import re
 import shutil
 import sys
 
-from ccnavi import cli, configsync, core, fsio, history, lint, review, settings, syncstate, version
-from ccnavi import ticket as ticket_mod
+from ccnavi.entry import cli, lint, version
+from ccnavi.hook import core
+from ccnavi.infra import fsio, settings
+from ccnavi.tickets import configsync, history, review, syncstate
+from ccnavi.tickets import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
 SCHEMA = 1
@@ -761,7 +764,7 @@ def _stamp(req: dict) -> str:
 
 
 def _core_snapshot(req: dict, root: str) -> core.Snapshot:
-    """`ccnavi.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
+    """`ccnavi.hook.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
     actor = req.get("actor") if isinstance(req.get("actor"), dict) else {}
     conf, _ = settings.load(root)
     return core.read_fs(

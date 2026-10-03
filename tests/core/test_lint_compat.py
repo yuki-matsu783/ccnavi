@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import version
+from ccnavi.entry import version
 from tests import ROOT
 from tests.inproc import run_ccnavi
 

@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import platformtag
+from ccnavi.infra import platformtag
 from tests import ROOT
 from tests.config.test_config_union import (
     COMMON_PHASES,

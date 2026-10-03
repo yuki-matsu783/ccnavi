@@ -2,8 +2,9 @@ import re
 import time
 import unittest
 
-from ccnavi import phase, shellread
-from ccnavi.shellread import REASON_TAKEN_AS_CODE, REASON_UNTERMINATED, SEP, read
+from ccnavi.infra import shellread
+from ccnavi.infra.shellread import REASON_TAKEN_AS_CODE, REASON_UNTERMINATED, SEP, read
+from ccnavi.tickets import phase
 
 # 語の中の切れ目の目印。コマンドの区切り（SEP）と別の文字になる予定で、
 # 実装が入るまでは無い。無い間は、それを前提にしたテストを skip する。
