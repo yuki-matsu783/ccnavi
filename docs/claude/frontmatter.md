@@ -59,14 +59,14 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 | type | 対象 | 現状 |
 |---|---|---|
-| `guide` | 使い方と作業の手引き。`docs/claude/*.md`、`docs/adr/README.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`vscode-extension/**`、`chrome-extension/**`）には付けていない。理由は表の下 |
-| `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない。理由は表の下。`--type rule`では何も出ない |
+| `guide` | 使い方と作業の手引き。`docs/claude/*.md`、`docs/adr/README.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`vscode-extension/**`、`chrome-extension/**`）には付けていない（理由は表の下） |
+| `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない（理由は表の下）。`--type rule`では何も出ない |
 | `design` | 現在の実装の説明。`ccnavi.md`、`wip/design/**`の設計メモ | `ccnavi.md`に付いている |
 | `requirements` | 外から観測できる約束。`requirements.md` | 付いている |
 | `glossary` | 用語集。`CONTEXT.md` | 付いている |
 | `handover` | 引き継ぎ。`HANDOVER.md` | 付いている |
 | `adr` | 設計判断の記録。`docs/adr/NNNN-*.md` | 付いている |
-| `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`docs/skills/*/SKILL.md` | 付けていない。理由は表の下。`name`・`description`だけを持つ。`--type skill`では何も出ない |
+| `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`docs/skills/*/SKILL.md` | 付けていない（理由は表の下）。`name`・`description`だけを持つ。`--type skill`では何も出ない |
 | `skill-reference` | スキルから切り出した資料。`.claude/skills/*/references/*.md` | 付いている |
 | `report` | 調査結果や作業報告。`wip/`の下など、置き場はその都度決める | 書いたときに付ける |
 
