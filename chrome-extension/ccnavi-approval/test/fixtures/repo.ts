@@ -1,13 +1,13 @@
 /**
  * 見本のリポジトリ。模擬の GitHub（test/helpers/mock-github.ts）がこれを API で返す。
  *
- * - `main`（統合先）: 共通層、互換のマーカー、閉じた家族 i0005 の `done/`
- * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01（開いた家族。直近の外なので閉包で読む）と
+ * - `main`（統合先）: 共通層、互換のマーカー、閉じた親のブランチ i0005 の `done/`
+ * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01（開いた親のブランチ。直近の外なので閉包で読む）と
  *   i0005-01（統合先で閉じている。そこで止まる）
  * - `i0002`（直近）: 悪意のある Markdown を本文に持つ親の提案と、範囲が親の外に出る子（承認の対象にしない）。
- *   子の先行 i0007-01 の家族のブランチは無い
+ *   子の先行 i0007-01 の親のブランチは無い
  * - `i0003`（古い）: 親と子の提案。表示用のブランチには入らない
- * - `feature-x`（直近）: コードだけのブランチ（家族ではない）
+ * - `feature-x`（直近）: コードだけのブランチ（親のブランチではない）
  */
 
 import { COMPAT } from "../helpers/compat.js";
@@ -201,7 +201,7 @@ export function fixture(compat = COMPAT): Record<string, FixtureBranch> {
   };
 }
 
-/** 承認済みの写し（作業中の親、レビュー待ちの子）。段階 4 のレビュー済みの見本 */
+/** 承認済みのチケット（作業中の親、レビュー待ちの子）。段階 4 のレビュー済みの見本 */
 function approvedCopy(id: string, parentId: string | null, lines: string[], phases = 1, phase = 1): string {
   return [
     "---",
@@ -231,7 +231,7 @@ function approvedCopy(id: string, parentId: string | null, lines: string[], phas
 }
 
 /**
- * レビューを依頼したフェーズを持つ家族（段階 4）。親は作業中（計画は MR で見る design の 1 フェーズ）、
+ * レビューを依頼したフェーズを持つ親のブランチ（段階 4）。親は作業中（計画は MR で見る design の 1 フェーズ）、
  * 子はレビュー待ち。依頼のマーカーは `requested`（`head` は依頼時の先頭。見本を積んでから書く）
  */
 export function reviewFamilyFiles(id: string, phases = 1): Record<string, string> {
@@ -255,8 +255,8 @@ export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" =
 /**
  * プロジェクトのリポジトリ（段階 5。手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
  *
- * - `main`（プロジェクトの統合先）: 閉じた家族 web-i0003 の `done/` とプロジェクトの層（rules.yml だけ）。
- *   共通層・置き場の綴り・互換のマーカーはワークスペース（`fixture()` の `main`）から読む
+ * - `main`（プロジェクトの統合先）: 閉じた親のブランチ web-i0003 の `done/` とプロジェクトの層（rules.yml だけ）。
+ *   共通層・置き場のパス・互換のマーカーはワークスペース（`fixture()` の `main`）から読む
  * - `web-i0012`（直近）: issue #12 から始めた親と子の提案
  * - `web-i0012` の上の `.ccnavi/config/phases.yml` は読まない（置き場の外。3.3 の 6）
  */

@@ -1,5 +1,5 @@
 /**
- * service worker の `dispatch` を、模擬の GitHub と控えの無い PAT の置き場で組む。
+ * service worker の `dispatch` を、模擬の GitHub と記録の無い PAT の置き場で組む。
  */
 import type { TokenMeta } from "../../src/core/expiry.js";
 import type { RepoConfig } from "../../src/core/settings.js";
