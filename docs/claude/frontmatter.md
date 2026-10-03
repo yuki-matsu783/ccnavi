@@ -32,8 +32,8 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 ---
 ```
 
-- md は UTF-8 で書き、frontmatter はファイルの先頭から 64 KiB 以内で閉じる。64 KiB より後ろで閉じる frontmatter と UTF-8 でない md は
-  読めず、frontmatter が無いもの（`null`）として扱う
+- md は UTF-8 で書く。frontmatter を閉じる `---` は、ファイルの先頭から 64 KiB 以内に置く。閉じる `---` がそれより後ろにある md と、
+  UTF-8 でない md は frontmatter を読めないので、frontmatter が無いもの（`null`）として扱う
 - 値は 1 行で書く。`tags` と `keywords` は `[a, b]` の形で書く。`tags: a` のように括弧なしで書いても 1 要素として読めるが、`[a]` と書いて揃える
 - YAML のエイリアス（`*名前`）は使わない。使うと frontmatter 全体を読めず `null` になる
 - すでに使われている tags は `ccnavi --docs --format jsonl` の `frontmatter.tags` で確かめられる。同じ意味で綴りだけ違う語を増やさない
@@ -90,8 +90,8 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 ## 索引のファイル
 
-- `index.jsonl` は md のあるディレクトリごとに ccnavi が書く生成物。手で直さない。別のツールが同じ名前のファイルを
-  置いている場合、ccnavi はそのファイルを書き換えず、案内で知らせる
+- `index.jsonl` は md のあるディレクトリごとに ccnavi が書く生成物。手で直さない。同じ名前のファイルを別のツールが
+  使っている場合、ccnavi はそのファイルを上書きせず、案内にそのパスを出す
 - 初回の実行（`--docs` か SessionStart）では md をすべて読むので、md が数千本あると数秒かかる。SessionStart では短い制限時間で
   打ち切り、読めた分だけを索引に書いて、残りは次回に回す。2 回目からは、更新日時が変わった md だけを読む
 - md を消しても `index.jsonl` が残ることがある（git で追跡していない md しか無いディレクトリや、ディレクトリごと消したときなど）。
