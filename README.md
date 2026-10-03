@@ -2287,7 +2287,7 @@ ccnavi --version --json
 ## ドキュメントの索引
 
 ```sh
-ccnavi --docs --text コンフリクト --format detail     # 話題で当たりを付ける
+ccnavi --docs --text マージ --format detail           # 話題で当たりを付ける
 ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
 ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
 ccnavi --docs --path docs/claude --format count         # 件数だけ
