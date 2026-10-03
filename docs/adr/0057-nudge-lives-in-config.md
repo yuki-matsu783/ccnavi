@@ -94,7 +94,7 @@ keywords: [勧告, しきい値, 設定, ルール, every, additionalContext, �
 - **頻度をキー名で表す（`additionalContextEvery` / `additionalContextEveryNth`）。** N 回ごとの頻度がどの文に適用されるかが
   キー名で分かるので、決まりを覚えなくてよい。採らなかったのは、同じ系統のキー名がさらに長くなり、
   `additionalContextOnceFile` と並べたときの読みにくさが増すため
-- **`Stop` で数える。** ターンの終わりに 1 回だけ数える。対象と現状がズレない。採らなかったのは、
+- **`Stop` で数える。** ターンの終わりに 1 回だけ数える。書きかけの途中には届かないので、見てもらう変更と今の状態がずれない。採らなかったのは、
   ルールの条件ではなく hook の話になり、`rules.yml` から外れるため
 - **`exit 2` で差し戻す。** 勧告に留めた。止めるほどの確度が無く、`additionalContext` は
   hook エラーにならない

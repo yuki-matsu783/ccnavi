@@ -356,7 +356,7 @@ SessionStart は「`P` を取ってこられなかった。`ccnavi-sync.sh <P>` 
 
 - 対象は次を全部満たすツリーだけ（他セッションのワークツリーを動かさないため）:
   - `.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名
-  - その中に `ticket: <その名前>` の**親の写しか提案**がある（子の写しが無いだけでは足りない）
+  - その中に `ticket: <その名前>` の**親の写しか提案**がある（`parent:` を持つ子の写しがあるだけでは足りない）
   - 家族の控えがある
 - ロック（4.3）を 1 回だけ試し、取れなければ「`<P>` は他の操作の最中なので進めなかった」と言って飛ばす
 - 手元の `P` が `origin/P` の祖先なら `merge --ff-only` する。書きかけとの重なりは git に任せ、拒まれたら
@@ -538,7 +538,7 @@ C1 の 3（と 5）で、置き場（`.ccnavi/approved/`・`wip/proposals/review
 
 **(b) が安全な根拠**: (b) は hook が書く、その家族の `pending`・`skipped` の 2 種と、そのマーカーの跡の追記だけです。`reviewed` のマーカーは入れません。
 エージェントがシェルから偽の `skipped` を書いて (b) として運ばれても、レビューで止める判定（`phase.gate_closed`、`phase.py:590`）は
-`review_required` を種類から独立に計算し直し、`reviewed` のマーカーが無ければ止めたままにします。この前提（止める判定が `skipped` を見ない）が崩れる変更をしたら、(b) の範囲を見直します。
+`review_required` をマーカーとは関係なく、フェーズの種類などから計算し直し、`reviewed` のマーカーが無ければ止めたままにします。この前提（止める判定が `skipped` を見ない）が崩れる変更をしたら、(b) の範囲を見直します。
 ただし `phase.plan_finished`（`phase.py:1086-1087`）は最後のフェーズで `requested`・`reviewed`・`skipped` のどれか（asked）があれば「計画を終えた」と数えるので、
 偽の `skipped` が計画の終わりの判断を左右する余地は残ります。受け入れる危険に数えます（5.1）。
 
@@ -552,7 +552,7 @@ C1 の 3（と 5）で、置き場（`.ccnavi/approved/`・`wip/proposals/review
 | 仕事 | 置き場 |
 |---|---|
 | `ls-remote`・fetch・早送り・merge・`git cat-file` での `done/` の確かめ・控えの書き出し | `ccnavi-sync.sh`（新規）と C1。SessionStart の `ccnavi-fetch.sh` は fetch と早送りだけ |
-| ロック・コミット・push・届いたかの確かめ・戻し | `ccnavi-ticket.sh`・`ccnavi-review.sh`・運ぶ処理（共通の関数は `ccnavi-common.sh`） |
+| ロック・コミット・push・失敗したときに届いたかの確認・戻し | `ccnavi-ticket.sh`・`ccnavi-review.sh`・運ぶ処理（共通の関数は `ccnavi-common.sh`） |
 | マージリクエストのマージ済みの確認、`confirm` のマーカーに入れるアカウントの引き当て（GitHub `GET /user` の `login`、GitLab `GET /user` の `username`） | `ccnavi-review.sh`。結果は `--actor <名前>` と `--result` で Python に渡す |
 | 置き場の綴り、書いたパスの一覧、C1 の外の変更の見分け、判定、lint | Python（ローカルの git とファイルだけ） |
 
@@ -575,7 +575,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 取り込みをせず、ロックも取らず、push に失敗してもコミットを残します。これを次のように改めます。
 
 - **引数で家族を受け取る**: `ccnavi-push-approved.sh [<P>...]`。省けば今どおり変更のある全ツリー。人のコマンドから自動で呼ぶときは、その家族の `P` を渡す
-- **対象の家族なら C1 と同じ手順**: ロック（入れ子を許す）→ 途中の操作の確認 → 取り込み（4.2）→ 置き場の変更のコミット → push → 届いたかの確かめ。
+- **対象の家族なら C1 と同じ手順**: ロック（入れ子を許す）→ 途中の操作の確認 → 取り込み（4.2）→ 置き場の変更のコミット → push → 失敗したら届いたかの確認。
   取り込んでから送るので、Chrome の承認と重なっても push が拒まれにくい。衝突したら `merge --abort` して止め、人に回す
 - **コミットは `commit --only -- <パス>`**（D35）。今の `commit -- <パス>` も git の既定で `--only` と同じ働きだが、明示する。置き場を丸ごと `add` するのは変えない（人の判断のパスを 1 つずつ数えない）
 - GitLab のリポジトリなら `seq` を同じコミットで更新する（8.4 の 2 段目から）
@@ -764,7 +764,7 @@ reviewed_mark(mr, accepted, actor, stamp) -> dict                               
 同じ答えを出すことの確かめ方:
 
 - 今の見本は新規の承認 1 件だけで、比較は差分のパスの一覧だけ（`pyodide-trial/run.mjs:161`）。中身のバイト比較に変える
-- 見本を足す: 改版、マーカーの消去、フローの運び、`settle_review`、多段の先行（閉包と手元の揃えた池）、通らない提案（問題点の文面まで）、取り下げ、レビュー済み
+- 見本を足す: 改版、マーカーの消去、フローの運び、`settle_review`、多段の先行（閉包で集めた池と、手元で閉包に揃えた池で答えが同じになること）、通らない提案（問題点の文面まで）、取り下げ、レビュー済み
 - 手元と Pyodide の両方の Python の版で回す。MV3 の拡張のページの Worker での起動と一致は段階 1 で確かめる
 
 - メリット: 実行場所に依存しない。書くファイルの一覧が値として出るので 1 コミットに組みやすい
@@ -1012,7 +1012,7 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
 - 本物のホストの応答の形に合わせて手で組んだ見本を拡張の試験の置き場 `chrome-extension/ccnavi-approval/test/fixtures/host/<github|gitlab>/<場面>/` に置く
   （ページングの 2 ページ目、解決済みと未解決の混在、変更要求の後の承認など。段階 4 の決定 2 で置き場を拡張の側にした。段階 4 は github だけ）
 - 期待値は「その見本から sh が組んだ JSON」1 つで、sh の試験と TS の試験の両方がそれと突き合わせる
-- 更新の手順（手で行う。段階 4 の決定 2）: (1) ホストの応答の形が変わったら、本物のマージリクエストから取り直すか形の変わったキーを手で直す、(2) sh の試験を
+- 更新の手順（手で行う。段階 4 の決定 2）: (1) ホストの応答の形が変わったら、本物のマージリクエストから取り直すか、見本のうち形の変わったキーだけを手で直す、(2) sh の試験を
   `CCNAVI_HOST_FIXTURE=1` で回して期待値の JSON を作り直す、(3) TS の試験を回し、落ちたら TS を直す、(4) 見本・期待値・sh・TS の変更を
   **同じコミット**に入れる。片方だけの変更は試験で落ちる。手順の詳細は拡張の README の「ホストの応答の見本」
 - メリット: レビューした本人がその場でマーカーを付けられ、マーカーに誰が付けたかが残る
@@ -1067,9 +1067,9 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | コード | `ticket.py` | ref 制約、大文字小文字の一意性、`i` と `<名前>-i\d+` の予約、`main`・`master`・`develop`・`release*` の予約、`owner/repo#N` |
 | コード | `lint.py` | 移行の検査、`settings.local.json` の検査（承認の判定を変える値を置かせない。`CCNAVI_INTEGRATION_BRANCH` だけ例外）、作業ツリーと控えの層の食い違い、`P` の上のプロジェクトの層の食い違い、置き場の綴りが絶対パス（info）、`_CHILD` に当たる親の識別子 |
 | sh | 新規 `ccnavi-sync.sh` | 4.2・3.6。`ls-remote`・fetch・早送り・merge・`done/` の確かめ・観測ずれ・マージリクエストの確認・控えの書き出し |
-| sh | `ccnavi-common.sh` | 取り込み・ロック（D32）・C1 のコミットと push と届いたかの確かめと戻しの共通の関数 |
+| sh | `ccnavi-common.sh` | 取り込み・ロック（D32）・C1 のコミット・push・失敗したときに届いたかの確認・戻しの共通の関数 |
 | sh | `ccnavi-ticket.sh`・`ccnavi-review.sh` | 対象の家族で C1 を回す。`confirm` の `--actor`。人の入口 `chat`・`config-synced`・`close-early` と最後の運ぶ処理 |
-| sh | `ccnavi-push-approved.sh` | 4.6: 家族を引数で取る、ロック（入れ子を許す）、取り込んでから送る、`commit --only`、GitLab の `seq`、届いたかの確かめ |
+| sh | `ccnavi-push-approved.sh` | 4.6: 家族を引数で取る、ロック（入れ子を許す）、取り込んでから送る、`commit --only`、GitLab の `seq`、push が失敗したときに届いたかの確認 |
 | sh | `ccnavi-git.sh` | 段階 0: `branch` の `*M*` の漏れ（と使い方の文との食い違い）、`fetch`・`pull` の refspec（`:`・`+`）、置き場に当たる `checkout <ref> <パス>`・`restore --source`・`--ours/--theirs`。段階 2b: `worktree add` の名前、`--detach/-f/-B`・`checkout -B`/`switch -C` の拒否と `:99`・`:607` の文面、控えが `gone` の `P` への push の拒否、push が通ったら家族の控えを作る |
 | sh | `ccnavi-fetch.sh` | 早送りだけ（対象の見分け、ロックを試すだけ、45 秒の枠）。「ref が無い」で落ちた fetch を `failed` に入れない。merge・消えたかの確かめ・控えは持たない |
 | sh | `ccnavi-approve.sh` | 端末の人の承認を消すなら削除。deny（`phase.py:105-113`）の対象から外す。残す間は改修した運ぶ処理を呼ぶ |
@@ -1195,7 +1195,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | 2a | コアと差し口（`judge`・`plan`・`withdraw`・`confirm`・`reviewed_mark`）。見本をバイト比較・閉包を含む複数の場面に広げ、手元の `--approve` と `confirm` をコア経由にする。`source_path` の相対化。fsio の記録層と、fsio を通らない書き込みを揃える | Python | 無し（試験で保証） |
 | 2b | 取り込みと控え: `ccnavi-sync.sh`（消えたと閉じたの区別、観測ずれ、控えの書き出し）、統合先の名前の読みと、無いブランチで止める・使った名前を出す（D30）、`ccnavi-fetch.sh` の早送りだけへの縮小とロックを試すだけの動き、`ccnavi-git.sh push` の控えの作成と `gone` の拒否、`worktree add`・`checkout -B` などの拒否と `:99`・`:607` の文面の書き換え（D36）。この段では控えを書くだけで、判定はまだ読まない | sh・Python（環境変数の読み） | 締まる向き |
 | 2c | 権威（3.3〜3.4）と `P` の消失（3.6）: 閉じた家族、決まらないときは止める、参照の閉包と手元の池の揃え、統合先の控えからの層（ADR-0084 の改訂）。`ready` の前提。移行の検査を error に上げてから旧経路を消す。2b の控えに依る | Python | 締まる向き |
-| 2d | C1（ロック、途中の操作、(b) を先にコミット、取り込み、未送信の確かめ、書いたパスだけ、`commit --only`、届いたかの確かめ、比較つきの戻し、最初の push、configsync の例外）と運ぶ処理の改修（4.6）と人の入口の sh。`history` の `withdrawn`・`chrome`・`actor`・`version` | Python・sh・VS Code のボード | 締まる向き。ただし REQ-APV-11 の文の補足を含む |
+| 2d | C1（ロック、途中の操作、(b) を先にコミット、取り込み、未送信の確かめ、書いたパスだけ、`commit --only`、push が失敗したときに届いたかの確認、比較つきの戻し、最初の push、configsync の例外）と運ぶ処理の改修（4.6）と人の入口の sh。`history` の `withdrawn`・`chrome`・`actor`・`version` | Python・sh・VS Code のボード | 締まる向き。ただし REQ-APV-11 の文の補足を含む |
 | 3 | Chrome で承認と取り下げ: GitHub・ワークスペースのリポジトリだけ。`createCommitOnBranch`、家族ごと。Approve が外れうることの注意、PAT の期限の知らせと期限ヘッダの確認（確認事項 5）。**REQ-APV-07 の改訂が適用され始める**。2b〜2d が前提 | VS Code のボードの呼び名 | **判定が緩む**（リモートの置き場をホストの権限でのみ守り、書き手も表示しない） |
 | 4 | Chrome で「レビュー済み」: スレッドとレビューの読み取り、手で組んだホストの応答の見本での sh と TS の一致試験と見本の更新手順（8.9）、スレッド本文の描画試験 | 無し | 経路が 1 つ増える（同じコード） |
 | 5 | GitLab を 2 段で: まず事後確認と打ち消しだけで出し、確認事項 2 が取れたら `seq`（C1 と運ぶ処理の側も同時）。プロジェクトのリポジトリ（10.3 の 1 の後）、「始める」 | `ccnavi-review.sh` の `Closes`、GitLab の `seq` | 無し |
@@ -1232,7 +1232,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | 判定の入口 | `py/ccnavi_chrome.py` | MEMFS に統合先をワークスペースルート、家族をワークツリー（相互参照の `gitdir` つき）として組み、今の `--approve --preview --json` を呼ぶ。家族の見分け・参照の閉包（上限 16 家族）・互換の比較も Python で行う。TS は並べるだけ |
 | 判定の入力（D2） | `src/core/snapshot.ts` | 直近 N 日（既定 3）と指定のブランチは家族を見つけるのに使うだけ。家族ごとに統合先・`P`・閉包の `P_X` だけを渡す。統合先から読むのは `done/`・共通層・自身の層・置き場の綴り（`.claude/settings.json` の `env`）・互換のマーカー |
 | 読み取り（8.2） | `src/core/github.ts` | 置き場のパスの tree を GraphQL で引いて REST の `?recursive=1` で読み、blob は sha で 50 件ずつ GraphQL で取る。`truncated` が付いたときと、本文が大きさと合わない blob のときは止める。blob は IndexedDB に控える。GitHub だけ（GitLab は段階 5） |
-| PAT（5.5） | `src/core/protocol.ts`・`src/background/` | `chrome.storage.local` に平文。読むのは service worker だけ。画面は名前で限った読み取りの操作を頼む。書く・消すは設定画面からだけ受ける。`externally_connectable` は宣言しない |
+| PAT（5.5） | `src/core/protocol.ts`・`src/background/` | `chrome.storage.local` に平文。読むのは service worker だけ。画面は PAT を受け取らず、名前で決めた読み取りの操作だけを service worker に頼む。PAT を書く・消す頼みは設定画面からだけ受ける。`externally_connectable` は宣言しない |
 | 描画（5.5 の 2） | `src/core/sanitize.ts` | Markdown は marked で HTML にし、DOMPurify でサニタイズした DOM の断片で入れる。リンクは `http:`・`https:`・`mailto:` だけ。画像・SVG・MathML・フォーム・style も除く（画像は外への通信になるため。ADR より締めた） |
 | 通信先の埋め込み（D24） | `hosts.json`・`scripts/build.js` | 一覧から `host_permissions` と CSP の `connect-src` を組む。CSP は `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' <API のオリジン>` |
 | 互換のマーカー（7.3） | `py/ccnavi_chrome.py` | 統合先の `CCNAVI_COMPAT` と同梱の `version.COMPAT` を比べ、違えば帯に出す（段階 1 は表示だけ） |
@@ -1511,7 +1511,7 @@ C1（4.3・4.4）、運ぶ処理の改修（4.6）、人の判断の入口の sh
 | record-risk の記録を finish で運ぶ | `ops`・`fsio.note_input` | finish が読んだ `<子>.judge.json` を、書いたものと同じく一覧に載せる |
 | C1 の手順（4.3 の 1〜11） | `ccnavi-common.sh` の `ccnavi_c1_family`・`begin`・`write`・`end` | 1 ロック（待つ。`CCNAVI_LOCK_WAIT`）2 途中の操作（`MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`rebase-merge`・`rebase-apply`・`sequencer`・`index.lock`）3 見分け → (c)・(d) があれば止め、(b) を `commit --only` 4 取り込み（`ccnavi-sync.sh <P>` を入れ子のロックで起こす。統合先の控えも同じ回で書く）→ 家族の控えが `present` のままか確かめる 5 `origin/<P>..HEAD` の置き場の変更が (b) だけか 6 元の先頭 7 実行ファイルを `--record-writes`・`--record-tree` つきで起こす 8 一覧のパスだけ `commit --only`（新しいファイルは先に `add`）9 `push origin P`（`--force` なし）10 落ちたら `ls-remote` の完全一致で届いたかを見る 11 届いていなければ先頭が自分のコミットのときだけ `update-ref` で戻し、索引と書いたパスの中身を元に戻して、3 から 1 回だけやり直す |
 | C1 を回す入口 | `ccnavi-ticket.sh` の start・finish・cancel、`ccnavi-review.sh` の request（マーカー）・confirm・decide（`--preview` を除く）・ready | 対象でなければ前と同じ（実行ファイルに渡すだけ）。`stop` なら書かずに止め、2c の解き方を出す |
-| 運ぶ処理（4.6） | `ccnavi-push-approved.sh [<親>...]` | 取り込み済みの家族の親のワークツリーは、ロック（入れ子を許す）→ 途中の操作 → 取り込み → 置き場（承認済み、`review/`、消えた `todo/` の提案）を `commit --only` → push → 届いたかの確かめ。落ちてもコミットは残す。`<親>` を並べるとその家族だけで、取り込み済みでない家族は運ばない（今のまま人がコミットする）。省けば前どおり変更のある全ツリーで、取り込み済みの家族だけ上の手順 |
+| 運ぶ処理（4.6） | `ccnavi-push-approved.sh [<親>...]` | 取り込み済みの家族の親のワークツリーは、ロック（入れ子を許す）→ 途中の操作 → 取り込み → 置き場（承認済み、`review/`、消えた `todo/` の提案）を `commit --only` → push → 失敗したら届いたかの確認。落ちてもコミットは残す。`<親>` を並べるとその家族だけで、取り込み済みでない家族は運ばない（今のまま人がコミットする）。省けば前どおり変更のある全ツリーで、取り込み済みの家族だけ上の手順 |
 | 人の判断の入口（D27） | `ccnavi-review.sh chat <N>`・`config-synced <親>`・`close-early` | 実行ファイル（`--reviewed <N> --chat`・`--config-synced`・`--close-early`）が書いた後、取り込み済みの家族なら `ccnavi-push-approved.sh <親>` を呼ぶ。送れなければ 1 で終わり、打ち直しを言う。chat と config-synced はホストに触らないので origin も jq も要らない |
 | エージェントから止める | `phase.ticket_approval_rule`・`_FORBIDDEN_COMMAND` | `ccnavi-review.sh chat / config-synced / close-early` を組み込みの deny とサブエージェントの禁止に足した（締める向き） |
 | ボード | `vscode-extension/ccnavi-board` | フローを保存したら `ccnavi-push-approved.sh <親>` を端末に送る。跡の呼び名に `withdrawn`（承認の取り下げ）と `chrome`（Chrome 拡張）を足した |
@@ -1521,7 +1521,7 @@ C1（4.3・4.4）、運ぶ処理の改修（4.6）、人の判断の入口の sh
 `CCNAVI_LOCK_HELD` を消していた。C1 から起こした `ccnavi-sync.sh` が、その後の取り込みの後の検査で家族のロックを
 入れ子と読めず、`blocked` を書けなかった（試験で見つけた）。取る前の値を控え、外すときに戻す。
 
-`history` の `actor`・`version` キーは段階 2a の `history.note` の追加のキーで書ける（取り下げが書く）。2d で足したのは
+`history` の `actor`・`version` キーは、段階 2a の時点で `history.note` に追加のキーとして渡せば書けた（取り下げはそうして書いている）。2d で足したのは
 ボードの呼び名だけ。
 
 後方互換（このワークスペース。家族の控えは無い）: 6437196 の時点と変更後で `--explain --json`・`--lint --json`・
@@ -1561,7 +1561,7 @@ ADR に無かった判断:
 
 段階 2d の後の敵対的レビューの指摘を、利用者の承認を得て直した。判定の変更は締める向きだけで、緩めた所は無い。
 
-前回の相談点と、レビューの後の決定（利用者）:
+前回の相談点と、レビューの後に利用者が決めたこと:
 
 - **A（対話の decide）**: 選択は C1 の外で先に取る。`ccnavi --reviewed N --accept-unresolved --choose-out <控えの置き場のファイル>` が
   人に選ばせて選択と指紋を書くだけ（置き場には何も置かない）。sh はその後で C1 を始め、C1 の中では `--yes <選択> --digest <指紋>` で書く。
@@ -1630,7 +1630,7 @@ ADR に無かった判断:
 
 Chrome で承認と取り下げ（GitHub・ワークスペースのリポジトリだけ）。**REQ-APV-07 の改訂が適用され始める**（リモートの置き場は
 ホストの権限でのみ守り、書き手を表示しない。5.1）。利用者が「段階 3 に進む」と承認した。それ以外に判定を緩めた所は無く、
-手元の判定（Python）の変更は締める向きか、跡と文面にキーを足すだけ。
+手元の判定（Python）の変更は、締める向きのものか、跡にキー（`actor`・`version`）を足すか、理由の文面の頭に判定の違いを足すものだけ。
 
 | 何 | 場所 | 形 |
 |---|---|---|
@@ -1688,7 +1688,7 @@ ADR に無かった判断:
 
 段階 3 の後の敵対的レビューの指摘を、利用者の承認を得て直した。判定の変更は締める向きだけで、緩めた所は無い。
 
-レビューの後の決定（利用者）:
+レビューの後に利用者が決めたこと:
 
 - **A（承認の画面）**: ccnavi の画面の本文（範囲・リスク・計画など）を、家族の中の最初に、開いた状態で出し、承認のボタンはその下に置く
   （REQ-APV-01 の「範囲を最初に」。閉じた details には入れない）。Markdown の本文では、内容を隠す書き方を通さない（`hidden`・`class`・`style`・
@@ -1792,7 +1792,7 @@ ADR に無かった判断:
 
 段階 4 の後の敵対的レビューの指摘を、利用者の承認を得て直した。判定の変更は締める向きだけで、緩めた所は無い。
 
-レビューの後の決定（利用者）:
+レビューの後に利用者が決めたこと:
 
 - **A（人ごとの最新のレビュー）**: `review.effective` が人ごとの最新を選ぶ対象を APPROVED・CHANGES_REQUESTED・DISMISSED に限り、
   COMMENTED と PENDING（書きかけ）は飛ばす。変更要求は同じ人の Approve か dismiss まで残る（前は、変更要求の後に同じ人が
@@ -1920,13 +1920,13 @@ ADR に無かった判断:
 - 17 は lint の warn を**緩めた**。`issue:` の無い提案の `<名前>-i<番号>` は、前は名前の形だけで warn だったが、その提案のプロジェクトの issue から決まる名前と重なるときだけにした。ワークスペースの提案の `web-i0012` は warn しなくなった（warn なので判定は止めない）。ワークスペースの家族とプロジェクト web の issue 12 の家族が同じ名前になったときは、lint の「複数のリポジトリにある」（error）と、家族の控えを名前で引く処理（`syncstate.standing_any`）が止める（11.9.3 の 13）
 - 15 は移行の段差がある。GitLab の依頼の記録の `poster` を名前から id に変えたので、前の版で記録した依頼（`poster` が名前）は ccnavi の依頼のスレッドと見分けられず、依頼の投稿が解決できるスレッド（`resolvable`。確認事項 9）なら未解決として数える。そのため、実行中の依頼（依頼済みで、まだレビュー済みでないフェーズ）は、依頼し直すか `decide` で受け入れるまで confirm・Chrome のレビュー済みが通らない（止まる向き）
 
-レビューの後の決定（利用者）:
+レビューの後に利用者が決めたこと:
 
 - **A（GitLab のファイル単位の比較）**: 書き込み（本体と打ち消しの両方）の update・delete に `last_commit_id` を付ける。本体は読んだ先頭の上で
   そのファイルを最後に変えたコミット（service worker が `repository/files/:path?ref=` で引く）、打ち消しは自分のコミット。他人が同じファイルを
   変えていれば GitLab が断る（400）。本体は書かずに読み直して周を回し（GitHub の `expectedHeadOid` の競合と同じ扱い。3 周で人に回す）、
   打ち消しは人に回す（要確認）。`seq`（段階 5b）は本物で確かめてからのまま。8.4・D21 に書いた
-- **B（要確認の家族）**: そのブラウザでは承認・レビュー済み・取り下げのボタンを出さず、押す前にも見て書かない。画面に「このブラウザにだけ控えている
+- **B（要確認の家族）**: そのブラウザでは承認・レビュー済み・取り下げのボタンを出さない。操作を受けたときも、書く前に要確認の控えを見て、要確認なら書かない。画面に「このブラウザにだけ控えている
   （ほかの承認者には見えない）」と出す。マージリクエストへのコメントは書かない。「確かめた」は確認を挟む
 - **C（古い実行ファイル）**: sh は実行ファイルの `--version --json` の flags を見て、知っているときだけ `--actor`・`--via` を渡す（decide は両方を
   知っているときだけ。confirm の `--actor` も同じ）。無ければ前と同じバイト列。COMPAT は上げない
@@ -2040,7 +2040,7 @@ ADR に無かった判断:
 - **C1 で「取り込み → 書く → コミット」の順**: hook の書きかけと merge がぶつかって止まり続ける。見分けとコミットを取り込みの前に置いた
 - **SessionStart で merge・観測ずれの再試行・マージリクエストの確認をする**: hook の時間の枠で途中の merge が残り、ロックなしで他の操作とぶつかる
 - **消えた `P` を fetch 失敗の一覧に入れる**: 統合先の取り込みまで飛ばされ、閉じた家族を「決まらない」にする
-- **`ccnavi-git.sh push` の毎回の `ls-remote`**: push のたびにネットワークを往復する。控えの印で足りる（届いたかの確かめは落ちたときだけ）
+- **`ccnavi-git.sh push` の毎回の `ls-remote`**: push のたびにネットワークを往復する。控えの印で足りる（届いたかの確認は push が落ちたときだけ）
 - **書き手を表示する・merge コミットを分解して見せる・署名の検証を表示する**: 利用者の判断でやめた（D29）
 - **コミットの目印を残す**: 表示をやめた後は機械的に読む所が無く、読めば偽装の余地になる（D37）
 - **(c) の偽物を防ぐ台帳**: 利用者の判断で作らない。受け入れる危険に数えた
