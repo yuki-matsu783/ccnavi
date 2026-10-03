@@ -146,7 +146,7 @@ function named(step: Step, kind: string): ApprovalState {
   }
 }
 
-/** 名前で作った状態が、狙ったものになっているか（作り方が壊れていたら、確かめは何も見ていない） */
+/** 名前で作った状態が、狙ったものになっているか（作り方が誤っていたら、確かめは何も見ていない） */
 function assertNamed(step: Step, kinds_: readonly string[]): void {
   for (const kind of kinds_) {
     const state = named(step, kind);

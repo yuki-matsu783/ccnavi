@@ -35,7 +35,7 @@ export const COLUMNS: readonly ColumnDef[] = [
 ];
 
 /**
- * 人が押せる操作。承認と受け入れは実行ファイルか端末へ、レビュー済みの連絡は Claude Code に渡す文を組む
+ * 人が押せる操作。承認と受け入れは実行ファイルかターミナルへ、レビュー済みの連絡は Claude Code に渡す文を組む
  * （判定は動かさない。`confirm` を打つのはその文を受けたエージェント）。
  */
 export type Action =
@@ -359,7 +359,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     actions.push({ kind: "decide", parent: parent.ticket, phase: p.number });
     actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
   }
-  // 依頼のマーカー `{head, mr, url, host, since}`（設計 9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ。
+  // 依頼のマーカー `{head, mr, url, host, since}`（設計 9.10）。URL は依頼の投稿を指す。中身を解釈せずそのまま渡すだけ。
   // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
   const requested = p.marks.requested ?? {};
   return {

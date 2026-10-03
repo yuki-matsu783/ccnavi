@@ -82,6 +82,6 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .foot.error { color: var(--error-text); }
 pre.load-error { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 12px; }
 /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
-   無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは効かない */
+   無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは当たらない */
 button.action:hover:not(:disabled):not(:focus-visible) { outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
 button.action:disabled { border-color: var(--vscode-contrastBorder, transparent); border-style: dashed; }

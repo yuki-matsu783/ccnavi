@@ -35,7 +35,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   // 本文の指紋。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
   // フィクスチャでは伏せてある。
   assert.equal(preview.digest, "<digest>");
-  // 対象にしないのは形の壊れた子（計画に無い番号）だけ。
+  // 対象にしないのは形の正しくない子（計画に無い番号）だけ。
   assert.equal(preview.rejected.length, 1);
   assert.equal(preview.rejected[0].ticket, "i0001-05");
   assert.ok(preview.rejected[0].problems[0].includes("計画に無い"));
