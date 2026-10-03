@@ -148,7 +148,7 @@ class ProjectsTest(unittest.TestCase):
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = write(common_path(self.ws, "rules"), json.dumps(WS_RULES))
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
@@ -189,7 +189,7 @@ class ProjectsTest(unittest.TestCase):
         """実行ファイルを 1 回起動する。
 
         `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ有効な
-        （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
+        ので、置き場は `--root` の下の既定のまま。「`projects/` を
         数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -394,7 +394,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
 
     def test_project_skills_are_written_only_under_the_ticket_rules(self):
-        """docs/skills/（ADR-0091）は守りの外のふつうの場所。チケットの範囲の中でだけ書ける。
+        """docs/skills/ は守りの外のふつうの場所。チケットの範囲の中でだけ書ける。
 
         置き場を ccnavi ディレクトリの外にしたのは、組み込みの守りを緩めずに済ませるため。
         範囲に入れた子のワークツリーでは通り、範囲の外とチケットの無いワークツリーでは、

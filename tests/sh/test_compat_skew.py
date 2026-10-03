@@ -151,7 +151,8 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertEqual(extension_compat(), version.COMPAT)
 
     def test_v7_the_eli5_request_change_raised_the_compat_to_2(self):
-        """V7 ELI5 の依頼の形（ADR-0094〜0097）で sh と実行ファイルの契約が変わったので 2 以上。
+        """V7 ELI5 の依頼の形（`request` の `--eli5` と、wip/eli5/ のコミット済みの HTML）で
+        sh と実行ファイルの契約が変わったので 2 以上。
 
         古い sh（互換 1）と組み合わせると、食い違いとして知らせる。
         """

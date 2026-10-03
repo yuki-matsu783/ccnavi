@@ -5,7 +5,7 @@
 
 層は 3 種。
 
-- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。ADR-0052）
+- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。env では動かさない）
 - ワークスペース自身の層: `<ワークスペースルート>/.ccnavi/config/`
 - プロジェクトの層: `projects/<名前>/.ccnavi/config/`
 
@@ -421,7 +421,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
         層の置き場はフラグで渡さない。共通層の 3 本（`--rules` / `--phases` / `--risk`）も、
         層を探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
-        `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる（ADR-0067）。
+        `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる。
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
@@ -709,7 +709,7 @@ class ToolLayerTest(ConfigUnionHarness):
                 self.assert_denied(self.hook("PowerShell", cwd, command="psql"), "lib:ps-psql")
 
     def test_a_layer_allow_now_reaches_grep_and_tools_without_a_path(self):
-        """ADR-0048 の代償。
+        """層をツールの種類で選ぶ形の代償。パスを持つツールは行き先の層、持たないツールは全部の層の和を足す。
 
         行き先の層の allow が Grep に当たり、層の allow がパスを持たないツールに当たる。
         """

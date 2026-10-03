@@ -1,14 +1,14 @@
-"""Chrome の入口のプロジェクトのリポジトリと「始める」（ADR-0093 の段階 5）の受入テスト。
+"""Chrome の入口のプロジェクトのリポジトリと「始める」の受入テスト。
 
 見るのは 5 つ。
 
-1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）の家族を、
+1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）の家族を、
    手元と同じ形の仮のツリー（ワークスペースルート + `projects/<名前>` + そのワークツリー）で判定し、
    承認で書くもの（Changes）はその家族の親のブランチだけ
-2. プロジェクトの層は D28 の計算（プロジェクトの統合先の層に、ワークスペースの共通層を
+2. プロジェクトの層は計算で決める（プロジェクトの統合先の層に、ワークスペースの共通層を
    `configsync.projected` で写したもの）。親のブランチの上の層は読まない
 3. 控えはワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
-4. 「始める」（8.6）: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
+4. 「始める」: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
    `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・互換の版が違う、
    のどれでも始められない
 5. プロジェクト名が予約の名前（`common`・`self`）や識別子の形でなければ受けない
@@ -66,7 +66,8 @@ def family_files(ident="web-i0012", issue=12):
         f"wip/proposals/todo/{ident}-01.md": child_text(
             f"{ident}-01", ident, 1, ["wip/research/*"], False
         ),
-        # 親のブランチの上の層は読まない（置き場の外なので拡張はそもそも読まない。3.3 の 6）
+        # 親のブランチの上の層は読まない（置き場の外なので拡張はそもそも読まない。
+        # 親のブランチの上で書き換えて承認やレビューを不要にさせない）
     }
 
 
@@ -199,7 +200,10 @@ class ChromeProjectTest(unittest.TestCase):
 
 
 class StartTest(unittest.TestCase):
-    """「始める」（8.6）。識別子は ticket.issue_identifier の 1 つだけから決める（3.1 の 11）。"""
+    """「始める」。識別子は ticket.issue_identifier の 1 つだけから決める。
+
+    Python と Pyodide が同じ関数を使い、名前が食い違わないようにする。
+    """
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="ccnavi-chrome-start-")

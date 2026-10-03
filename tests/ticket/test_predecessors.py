@@ -1,4 +1,4 @@
-"""先行（`predecessors`）を承認と着手で求める（ADR-0088）の受入テスト。道具を外から呼んで応答だけを見る。
+"""先行（`predecessors`）を承認と着手で求める受入テスト。道具を外から呼んで応答だけを見る。
 
 見るのは 6 つ。
 
@@ -191,7 +191,10 @@ class PredecessorTest(TicketTest):
     # ---- 3. 着手
 
     def test_start_refuses_a_hand_moved_child_whose_predecessor_is_open(self):
-        """置き場を手で動かして承認した子（ADR-0058）は承認の検査を通らない。着手が同じ検査で止める。"""
+        """置き場を手で動かして承認した子は承認の検査を通らない。着手が同じ検査で止める。
+
+        承認の権威は置き場なので、`doing/` へ手で動かしただけでも承認済みになる。
+        """
         self.family(review=(False, False))
         self.propose(
             "i0001-03", parent="i0001", phase=1, allow=("src/c/*",), predecessors=("i0001-01",)
@@ -342,7 +345,7 @@ class PredecessorTest(TicketTest):
         # 書き込み先を読めないコマンド（sed -i）は何も言われずに通ることはない。
         # 聞ける者が居る権限モードでは Claude Code が利用者に聞き（ccnavi は判定を出さない）、
         # 居なければ ccnavi が断る（judge.undeclared_verdict）。
-        # 書かれても実行後チェックが書き換えとして言う（ADR-0075）。
+        # 書かれても実行後チェックが書き換えとして言う。副命令が書く欄のほかが変わった姿になるため。
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))
         self.assertEqual(bash(sed, "bypassPermissions"), "deny")
