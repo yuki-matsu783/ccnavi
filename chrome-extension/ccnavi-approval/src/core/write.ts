@@ -9,7 +9,7 @@
  *    違えば書かずに「見直す」（preview からやり直し）
  * 3. `plan` の変更を `createCommitOnBranch` の 1 コミットで書く。条件は `expectedHeadOid` = 読んだ `P` の先頭
  * 4. 先頭が動いていたら（D20）、新しい先頭で Snapshot を組み直して判定と plan を必ずやり直す。
- *    指紋が同じなら新しい plan を書く（見せ直さない）。違えば「見直す」。3 周しても書けなければ人に回す
+ *    指紋が同じなら新しい plan を書く（見せ直さない）。違えば「見直す」。3 周しても書けなければユーザに回す
  * 5. 書いた後、新しい先頭の中身が書いたとおりか確かめる（blob の sha を突き合わせる）
  *
  * 取り下げも同じ流れで書く。見せた指紋は無いが、毎周 Python が条件（8.8）を見直す。
@@ -19,7 +19,7 @@
  * 段階 5 から GitLab にも書く。GitLab の Commits API には比較つきの書き込みが無い（8.4）ので、1 段目は事後確認と
  * 打ち消しだけ（D21）: 書いた答えのコミットの親が読んだ先頭と違えば（間に別の書き込みが入った）、自分の書き込みの
  * 直前の姿で判定し直す。同じ書くものになれば、そのまま残す。違えば（結論が変わった）打ち消しのコミットを積み、
- * 新しい先頭から読み直して周を回す。打ち消しもさらに競合して 2 回で収まらなければ、止めて人に回す（`attention`）。
+ * 新しい先頭から読み直して周を回す。打ち消しもさらに競合して 2 回で収まらなければ、止めてユーザに回す（`attention`）。
  * `seq`（2 段目）は書かない。この段では、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に残りうる（8.4）。
  */
 import { py, PyError, type Actor, type ChangeRow, type PlanResult, type Written } from "./py.js";
@@ -50,7 +50,7 @@ const HEADLINE_IDS = 3;
 
 /** service worker が書く頼みを形や守りで断ったときの status（protocol.ts の REFUSED と同じ） */
 const REFUSED = 400;
-/** GitLab が書き込みを断ったとき（`last_commit_id` が違う＝同じファイルを他人が変えた・無い）の status（`gitlab.HOST_REFUSED`）。人に回す */
+/** GitLab が書き込みを断ったとき（`last_commit_id` が違う＝同じファイルを他人が変えた・無い）の status（`gitlab.HOST_REFUSED`）。ユーザに回す */
 const HOST_REFUSED = 409;
 /** GitLab へ送る前の確認で先頭が動いていたときの status（`gitlab.HOST_MOVED`）。何も送っていないので読み直して試し直す */
 const HOST_MOVED = 412;
@@ -70,7 +70,7 @@ export type Outcome =
   | { readonly kind: "refused"; readonly message: string }
   | { readonly kind: "conflict"; readonly message: string }
   | { readonly kind: "failed"; readonly message: string }
-  /** 人に回す（打ち消しが収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは家族を「要確認」で出す（8.4） */
+  /** ユーザに回す（打ち消しが収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは家族を「要確認」で出す（8.4） */
   | { readonly kind: "attention"; readonly message: string };
 
 export interface Shown {
@@ -230,8 +230,8 @@ async function findWritten(deps: WriteDeps, repo: RepoConfig, now: string, read:
  * 1 コミットで書く。service worker が形や守りで断ったら（400）、原因を言って失敗にする。GitLab で書く前の確認で先頭が
  * 動いていたら（412。何も送っていない）「動いた」。ほかの失敗では先頭を読み直し、動いていなければ失敗。動いていれば、
  * 応答だけが落ちた自分の書き込みを探し（`findWritten`）、見つかれば書けたとする。見つからず、今の先頭に書いた中身が
- * 在るなら（書いたか見分けられない）人に回す。無ければ「動いた」（読み直して周を回す）。
- * 応答が落ちた後の確かめそのものが落ちたら（429・5xx など）、書いたかもしれないが確認できないので人に回す（11.9.3 の 1）
+ * 在るなら（書いたか見分けられない）ユーザに回す。無ければ「動いた」（読み直して周を回す）。
+ * 応答が落ちた後の確かめそのものが落ちたら（429・5xx など）、書いたかもしれないが確認できないのでユーザに回す（11.9.3 の 1）
  */
 async function commitOnce(
   deps: WriteDeps,
@@ -275,7 +275,7 @@ async function commitOnce(
   }
 }
 
-/** 書いた後の確かめ。合わない・確かめが落ちたら、書いたものが残っているので人に回す（failed にしない。11.9.3 の 1） */
+/** 書いた後の確かめ。合わない・確かめが落ちたら、書いたものが残っているのでユーザに回す（failed にしない。11.9.3 の 1） */
 async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: readonly ChangeRow[], rounds: number, lines: readonly string[]): Promise<Outcome> {
   let wrong: string[];
   try {
@@ -355,11 +355,11 @@ async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows:
   return out;
 }
 
-/** 打ち消しを積む回数の上限（8.4 の「2 回で収まらなければ人に回す」） */
+/** 打ち消しを積む回数の上限（8.4 の「2 回で収まらなければユーザに回す」） */
 export const REVERT_TRIES = 2;
 
 
-/** 書いたが確かめ切れなかった・打ち消せなかったときの答え（人に回す。8.4） */
+/** 書いたが確かめ切れなかった・打ち消せなかったときの答え（ユーザに回す。8.4） */
 function attention(family: string, done: Committed, why: string): Outcome {
   return {
     kind: "attention",
@@ -371,7 +371,7 @@ function attention(family: string, done: Committed, why: string): Outcome {
  * 自分の書き込み（`done`）を打ち消す。今の先頭で、書いた各パスがまだ自分の書いたとおりのときだけ積み、各ファイルに
  * 「最後に変えたのは自分のコミット」を付ける（GitLab が他人の変更の上に書かないよう断る。決定 A）。
  * 送った応答が落ちたら、届いたか（今の先頭の親が送った先で、中身が戻したとおり）を見る。打ち消しがさらに競合して
- * 同じパスが変わっていれば、人に回す。
+ * 同じパスが変わっていれば、ユーザに回す。
  */
 async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: Committed, rows: readonly ChangeRow[]): Promise<{ kind: "reverted" } | { kind: "stop"; outcome: Outcome }> {
   const human = (why: string): { kind: "stop"; outcome: Outcome } => ({ kind: "stop", outcome: attention(family, done, why) });
@@ -414,7 +414,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
 /**
  * 事後確認（8.4 の 1 段目）。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の姿で、
  * 同じ時刻で判定し直す。同じ書くものなら残す（`kept`）。違えば打ち消す（`reverted` で周を回す）。
- * 途中でホストや Python が落ちたら（429・5xx・MR が消えた など）、書いたものを確かめ切れないので人に回す
+ * 途中でホストや Python が落ちたら（429・5xx・MR が消えた など）、書いたものを確かめ切れないのでユーザに回す
  */
 async function settleRace(
   deps: WriteDeps,

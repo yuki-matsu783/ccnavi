@@ -62,6 +62,10 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   } finally {
     await page.close();
   }
+  // 狭い幅でも表は枠に収め（識別子だけは折らない）、ボタンの行は折り返す
+  assert.match(css(), /\.approval-batch th, \.approval-batch td \{[^}]*overflow-wrap: anywhere; \}/);
+  assert.match(css(), /\.approval-id \{[^}]*white-space: nowrap; \}/);
+  assert.match(css(), /\.approval-actions \{ display: flex; flex-wrap: wrap;/);
   // 本文に何が書かれていても、文字として出すだけ。
   const spiked = await openBoard(fixture(), { approval: { kind: "preview", preview: { ...preview, text: "<script>alert(1)</script>" } } });
   try {
@@ -316,6 +320,13 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   }
   // ドラッグで付けたインラインの width より折りたたんだ状態を優先する
   assert.match(css(), /\.column\.folded \{[^}]*width: auto !important/);
+  // 最後の列の取っ手は内側に置き、ボードを常に横へ流さない
+  assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
+  // 絞り込みの select は最長の選択肢の幅に広がらず、ページを横に流さない
+  assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: 320px;/);
+  // カードの不備の小さい字はツールバーの「不備 N 件」に効かせない
+  assert.doesNotMatch(css(), /(^|\})\s*\.issues \{/);
+  assert.match(css(), /\.card \.issues \{/);
 });
 
 test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、その識別子を送る。上部の集計は絞らない", async () => {
@@ -367,6 +378,18 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
     assert.equal(rows[1].querySelector(".phase-brief")?.textContent, "レビュー待ち");
     assert.equal(rows[1].querySelector(".phase-full")?.textContent, "終了 · レビュー待ち · レビュー依頼済み · レビュー要");
     assert.equal(rows[1].querySelectorAll('button[data-action="decide"]').length, 1);
+    // 状態は項目ごとの塊で、区切りの「·」は前の項目の末尾に付く。ボタンは状態の列ではなく 2 段目
+    assert.deepEqual(
+      [...rows[0].querySelectorAll(".phase-brief .phase-item")].map((item) => item.textContent),
+      ["リスク HIGH"],
+    );
+    assert.deepEqual(
+      [...rows[1].querySelectorAll(".phase-full .phase-item")].map((item) => item.textContent),
+      ["終了 ·", "レビュー待ち ·", "レビュー依頼済み ·", "レビュー要"],
+    );
+    assert.equal(rows[1].querySelectorAll(".phase-status button").length, 0);
+    assert.equal(rows[1].querySelectorAll('.phase-actions button[data-action="decide"]').length, 1);
+    assert.equal(rows[0].querySelectorAll(".phase-actions").length, 0, "リンクもボタンも無い行には 2 段目を出さない");
   } finally {
     await page.close();
   }
@@ -402,10 +425,10 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   assert.doesNotMatch(css(), /\.phase-full \{ display: none/);
 });
 
-test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジは人が動く状態だけで、属性は枠無しの行に出す", async () => {
+test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジはユーザが動く状態だけで、属性は枠無しの行に出す", async () => {
   const page = await openBoard();
   try {
-    // 人が動く状態は枠付きのバッジ
+    // ユーザが動く状態は枠付きのバッジ
     assert.equal(text(page, ".badge.copy.copy-none"), "未承認");
     assert.equal(text(page, ".badge.worktree.none"), "ワークツリーなし");
     // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
@@ -463,13 +486,23 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
   assert.match(css(), /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\);/);
   assert.match(css(), /\.phase-name \{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
   assert.doesNotMatch(css(), /\.phase \{[^}]*minmax\(0, auto\)/);
+  // 状態は項目の途中で割らない（anywhere で「リスク / HIGH」と割れていた）。丸は 1 行目に合わせる。
+  // リンクとボタンは 2 段目に左寄せで折り返す。300px 以下では名前と状態を縦 2 段にする
+  assert.doesNotMatch(css(), /\.phase-status \{[^}]*overflow-wrap: anywhere/);
+  assert.match(css(), /\.phase-item \{ display: inline-block; max-width: 100%;/);
+  assert.match(css(), /\.phase-dot \{[^}]*align-self: start;/);
+  assert.match(css(), /\.phase-actions \{ grid-column: 2 \/ -1; display: flex; flex-wrap: wrap;/);
+  const narrow = css().match(/@container \(max-width: 300px\) \{[^@]*?\} \}/);
+  assert.ok(narrow, "狭いときの @container の塊がある");
+  assert.match(narrow[0], /\.phase \{ grid-template-columns: 12px minmax\(0, 1fr\); \}/);
+  assert.match(narrow[0], /\.phase-status \{ grid-column: 2;/);
   // 狭いときは要約だけを見せ、480px 以上で全文に替わる
   const wide = css().match(/@container \(min-width: 480px\) \{[^@]*?\} \}/);
   assert.ok(wide, "@container の塊がある");
   assert.match(wide[0], /\.phase-brief \{ display: none; \}/);
   assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
-  // 止めているフェーズ行はフェーズ名も右の状態も赤
-  assert.match(css(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
+  // 止めているフェーズ行はフェーズ名も右の状態も赤（文字用に前景色へ寄せた赤）
+  assert.match(css(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--board-error-text\); \}/);
   // 止めているカードの左線は承認待ちの左線より後に書き、こちらが採られる
   assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
 });
@@ -543,7 +576,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
     await stillClosed.close();
   }
   // 終了の印（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
-  // 省略はレビュー済と同じく、閉じた後も人のレビューを通ったかの区別として残す
+  // 省略はレビュー済と同じく、閉じた後もユーザのレビューを通ったかの区別として残す
   const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
   try {
     assert.equal(ended.all(".fact.mark-pending").length, 0);
@@ -644,7 +677,7 @@ test("CB-T118 本物が決まらない写りだけをバッジにし、場所を
   }
 });
 
-/** フェーズ 2 を人のレビュー待ちにし、依頼のマーカーにマージリクエストを持たせる */
+/** フェーズ 2 をユーザのレビュー待ちにし、依頼のマーカーにマージリクエストを持たせる */
 function waitingWithMr(url: string) {
   const base = fixture();
   const parent: ParentJson = {
@@ -739,7 +772,7 @@ test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要�
     const label = page.one("label.filter.attention");
     assert.equal(
       label.getAttribute("title"),
-      "人が動く必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
+      "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
     );
     assert.equal(label.textContent.trim(), "要対応のみ");
     assert.equal(page.one('.card[data-id="i0001-03"]').getAttribute("data-attention"), "1");
@@ -864,13 +897,14 @@ test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新�
       "承認（承認待ち → 作業中）",
     ]);
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
-    // cli は「sh から来た」までしか言えない（人が端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
+    // cli は「sh から来た」までしか言えない（ユーザが端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
     assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
       "フェーズ 2: マーカーを消した（子が足された）",
       "Draft を外した",
       "フェーズ 1: エージェントに終了を通知済み",
     ]);
+    assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-via'), ["ターミナル", "sh（ccnavi-ticket.sh など）", "hook"]);
   } finally {
     await page.close();
   }
@@ -891,6 +925,10 @@ test("CB-T264 先行を満たしていないカードに「先行待ち（先行
   const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-03" ? { ...t, predecessors_unmet: unmet } : t)) });
   try {
     assert.equal(text(page, '.card[data-id="i0001-03"] .badge.preds'), "先行待ち（i0001-02, i0001-09）");
+    // 識別子は 1 つずつ折り返さない塊（`i0001-` と `02` に割れない）
+    assert.deepEqual(texts(page, '.card[data-id="i0001-03"] .badge.preds .badge-id'), ["i0001-02", "i0001-09"]);
+    assert.match(css(), /\.badge-id \{ white-space: nowrap; \}/);
+    assert.doesNotMatch(css(), /\.badge \{[^}]*border-radius: 999px/);
     const title = page.one('.card[data-id="i0001-03"] .badge.preds').getAttribute("title") ?? "";
     assert.match(title, /承認も着手も止まります/);
     assert.match(title, /i0001-02: 作業中（doing\/）/);

@@ -155,7 +155,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
 test("CB-T193 動いたカードの印は、光らせない設定を尊び、色だけに頼らない", () => {
   const html = flatStyle(board());
   // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
-  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌う人に 2 秒の脈動が出る
+  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌うユーザに 2 秒の脈動が出る
   assert.match(html, /@media \(prefers-reduced-motion: reduce\) \{ \.card\.moved \{ animation: none; \} \}/);
   // どこからどこへ動いたかは帯の文で言う（色が見分けられなくても読める）。中身は Card.tsx の movedLabel
   assert.match(html, /\.moved-mark \{[^}]*color: var\(--vscode-charts-green\);/);
@@ -207,4 +207,61 @@ test("CB-T216 案内の ? は 5 画面ともヘッダの右上に同じ形で固
     assert.match(style, /\.toolbar > \.tour-button \{[^}]*position: absolute;[^}]*top: 8px;[^}]*right: 4px;[^}]*width: 22px;/, `${name} の ? が右上に固定されていない`);
     assert.match(style, /\.toolbar \{ padding-right: 34px; \}/, `${name} のツールバーが ? の幅を空けていない`);
   }
+});
+
+/** WCAG の相対輝度によるコントラスト比（0〜255 の 3 つ組どうし） */
+function contrastRatio(a: readonly number[], b: readonly number[]): number {
+  const lum = (rgb: readonly number[]): number => {
+    const c = rgb.map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function rgb(hex: string): number[] {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+}
+
+test("CB-T290 意味の色を文字に使うときは前景色へ混ぜ、Light Modern と Dark Modern のどの地にも 4.5:1 を超える", () => {
+  const style = flatStyle(rulesOnly());
+  // VS Code の既定のテーマ。地は本文・開いた行（editorWidget）・ホバーの 3 つ
+  const themes: Record<string, { fg: string; bgs: string[]; colors: Record<string, string> }> = {
+    light: { fg: "#3b3b3b", bgs: ["#ffffff", "#f8f8f8", "#f2f2f2"], colors: { editorWarning: "#bf8803", "charts-yellow": "#bf8803", editorInfo: "#1a85ff", "charts-green": "#388a34", editorError: "#e51400" } },
+    dark: { fg: "#cccccc", bgs: ["#1f1f1f", "#202020", "#2a2d2e"], colors: { editorWarning: "#cca700", "charts-yellow": "#cca700", editorInfo: "#3794ff", "charts-green": "#89d185", editorError: "#f14c4c" } },
+  };
+  const defs = [...style.matchAll(/--([a-z]+-text): color-mix\(in srgb, var\(--vscode-([A-Za-z-]+?)(?:-foreground)?\) (\d+)%, var\(--vscode-foreground\)\);/g)];
+  assert.deepEqual(defs.map((d) => d[1]).sort(), ["doing-text", "error-text", "info-text", "ok-text", "warn-text"]);
+  for (const [, name, color, percent] of defs) {
+    for (const [theme, t] of Object.entries(themes)) {
+      const base = rgb(t.colors[color]);
+      const fg = rgb(t.fg);
+      const mixed = base.map((v, i) => (v * Number(percent) + fg[i] * (100 - Number(percent))) / 100);
+      for (const bg of t.bgs) {
+        const ratio = contrastRatio(mixed, rgb(bg));
+        assert.ok(ratio >= 4.5, `${theme} の --${name} が ${bg} に対して ${ratio.toFixed(2)}`);
+      }
+    }
+  }
+  // ボード以外の画面の CSS は、意味の色を文字の色に直接使わない（枠・縁・記号には使ってよい）。
+  // ボード（board/）と配色（appearance.css）・ボタン（button.css）はここでは見ない
+  const skip = new Set([path.join(WEBVIEW_SRC, "styles", "appearance.css"), path.join(WEBVIEW_SRC, "styles", "button.css")]);
+  for (const file of cssFiles().filter((f) => !f.startsWith(path.join(WEBVIEW_SRC, "board")) && !skip.has(f))) {
+    const text = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.doesNotMatch(text, /(?:^|[\s;{])color: var\(--vscode-(?:editorWarning-foreground|editorInfo-foreground|editorError-foreground|charts-green|charts-yellow)/m, file);
+  }
+});
+
+test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行の見出しを段に分け、ルール設定の表は入れ物の中で横に送る", () => {
+  const rules = flatStyle(rulesOnly());
+  assert.match(rules, /@media \(max-width: 520px\) \{ \.row-body \{ padding-left: 14px; grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(rules, /\.rule \.sum > \.clip:not\(\.mono\) \{ grid-row: 2; grid-column: 2 \/ -1; \}/);
+  assert.match(rules, /\.table-scroll \{ overflow-x: auto; \}/);
+  assert.match(rules, /td\.cmd \{ min-width: 12em; \}/);
+  const risk = flatStyle(riskHtml({ kind: "page", page: riskPage() }));
+  assert.match(risk, /\.factor \.sum > \.clip \{ grid-row: 2; grid-column: 2 \/ -1; \}/);
+  assert.match(risk, /\.block h2 \{ display: flex; flex-wrap: wrap;/);
+  const phases = flatStyle(phasesHtml({ kind: "page", page: phasesPage() }));
+  assert.match(phases, /\.phase \.sum > \.clip\.mono \{ grid-row: 3; grid-column: 2 \/ -1; \}/);
+  assert.match(phases, /\.order select \{ max-width: 100%; \}/);
 });

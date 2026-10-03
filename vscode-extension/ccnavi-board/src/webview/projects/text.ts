@@ -15,7 +15,7 @@ export function settingsDir(row: ProjectRow): string {
 
 /**
  * カードに出す苦情。`.claude/` があることは説明付きの 1 行で言い、lint の同じ指摘
- * （ccnavi/lint.py の文面「.claude/ を持つ。…」）は重ねない。
+ * （ccnavi/entry/lint.py の文面「.claude/ を持つ。…」）は重ねない。
  * 「.claude/settings.json を読めない」のような別の指摘まで消さないよう、文面の先頭で当てる。
  */
 export function problemsOf(row: ProjectRow): readonly LintProblem[] {
@@ -25,7 +25,7 @@ export function problemsOf(row: ProjectRow): readonly LintProblem[] {
           {
             severity: "warn" as const,
             where: "",
-            detail: `.claude/ があります。Claude Code はそこにあるスキルを読み込み、cd すると、そこを別のワークスペースルートとして扱います。プロジェクトの設定は ${settingsDir(row)}/ に置いてください`,
+            detail: `.claude/ があります。Claude Code はそこにあるスキルを読み込み、このフォルダに cd すると、ここを別のワークスペースルートとして扱います。プロジェクトの設定は ${settingsDir(row)}/ に置いてください`,
           },
         ]
       : []),

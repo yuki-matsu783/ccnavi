@@ -35,7 +35,7 @@ export interface RuleProps {
   readonly onRemove: () => void;
   readonly onOpenPicker: () => void;
   readonly onPickFile: (field: FileField) => void;
-  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後は人の操作を覚える */
+  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作を覚える */
   readonly moreOpen: boolean;
   readonly onToggleMore: (open: boolean) => void;
 }
@@ -95,7 +95,10 @@ export function Rule(props: RuleProps): JSX.Element {
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
-          <span className={rule.id === "" ? "sum-id dim" : "sum-id"}>{summaryId(rule)}</span>
+          {/* id は長いと列の幅で切れるので、全体は title で見せる */}
+          <span className={rule.id === "" ? "sum-id dim" : "sum-id"} title={summaryId(rule)}>
+            {summaryId(rule)}
+          </span>
           <span className="dim mono clip" title={rule.match}>
             {summaryMatch(rule)}
           </span>

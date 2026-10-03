@@ -19,7 +19,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import approval
+from ccnavi.tickets import approval
 
 TEXT = "---\nticket: i0001\n---\nbody\n"
 

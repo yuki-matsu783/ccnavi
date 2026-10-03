@@ -123,7 +123,7 @@ export function checkName(raw: string, existing: readonly string[]): NameCheck {
 
 // ---- ターミナルへ送るコマンド行
 
-/** `git clone -- <url> <置き場>/<名前>` をワークスペースルートで。生の git を人が打つ形 */
+/** `git clone -- <url> <置き場>/<名前>` をワークスペースルートで。生の git をユーザが打つ形 */
 export function cloneCommand(root: string, projectsDir: string, url: string, name: string): string {
   const target = `${toPosixPath(projectsDir)}/${name}`;
   return `cd ${shellQuote(toPosixPath(root))} && git clone -- ${shellQuote(url)} ${shellQuote(target)}`;

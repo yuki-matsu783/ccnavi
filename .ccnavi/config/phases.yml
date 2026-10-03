@@ -1,11 +1,11 @@
-# フェーズの種類（設計 9.7）。人が持つ設定で、エージェントは書き換えない。
+# フェーズの種類（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
 #
 # ここは自身の層（ワークスペース自身の層）。`scope` の綴りはこのワークスペースの
 # レイアウトに付いているので、共通層（.ccnavi/common/phases.yml）ではなくこちらに置く。
 # 共通層に置くと、projects/ の下のプロジェクトにも同じ scope が効いてしまう。
 #
 # 親チケットの `plan:` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
-# `ccnavi --approve` が通ることが合意になる。レビューを受けたあとは `feedback:` に
+# `ccnavi --agree` が通ることが合意になる。レビューを受けたあとは `feedback:` に
 # `kind: feedback` の種類を並べて改版を出す（対応が無くても `[]` で出す）。
 #
 # `id`（キー）と `title` はどちらも一意。層をまたいで重なれば --lint が error で止める。
@@ -50,7 +50,7 @@ phases:
     review: mr
     scope: ["wip/design/*", "tests/*"]
     requires: [acceptance]
-    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を直すとき。エージェントはそこに書けないので、完成品を wip/design/scripts/ に全文で置き、人が写す
+    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を直すとき。エージェントはそこに書けないので、完成品を wip/design/scripts/ に全文で置き、ユーザが写す
 
   docs:
     kind: work

@@ -34,7 +34,7 @@ export function movedLabel(moved: Moved): string {
 
 /**
  * レビューが済むまで止めている間の呼び名。依頼を出す前はエージェントの番（合流・push・依頼）で
- * 「レビュー準備中」、出した後は人の番で「レビュー待ち」。実行ファイルの `phase.review_label` と
+ * 「レビュー準備中」、出した後はユーザの番で「レビュー待ち」。実行ファイルの `phase.review_label` と
  * 同じ分け方で、判定した 2 つの真偽値（`gate_closed` / `review_waiting`）を言い換えるだけ。
  */
 export function holdLabel(x: { readonly gateClosed: boolean; readonly reviewWaiting: boolean }): string {
@@ -57,6 +57,11 @@ export function worktreeName(path: string): string {
 
 /** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …` */
 export function phaseStatusFull(p: PhaseChip): string {
+  return phaseStatusFullItems(p).join(" · ");
+}
+
+/** 全文の項目の並び。画面は項目ごとに区切って、項目の途中では折り返さない */
+export function phaseStatusFullItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push(holdLabel(p));
@@ -70,14 +75,19 @@ export function phaseStatusFull(p: PhaseChip): string {
   if (p.riskLine !== "") {
     notes.push(p.riskLine);
   }
-  return [PHASE_STATE_LABELS[p.state], ...notes].join(" · ");
+  return [PHASE_STATE_LABELS[p.state], ...notes];
 }
 
 /**
- * フェーズ行の状態の要約。人が動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
+ * フェーズ行の状態の要約。ユーザが動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
  * 止めている間は段の名前を 1 つだけ出す。
  */
 export function phaseStatusBrief(p: PhaseChip): string {
+  return phaseStatusBriefItems(p).join(" · ");
+}
+
+/** 要約の項目の並び。無ければ空 */
+export function phaseStatusBriefItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push(holdLabel(p));
@@ -85,7 +95,7 @@ export function phaseStatusBrief(p: PhaseChip): string {
   if (isHighRisk(p.riskLevel)) {
     notes.push(`リスク ${p.riskLevel}`);
   }
-  return notes.join(" · ");
+  return notes;
 }
 
 /** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
@@ -100,7 +110,7 @@ export function isHttpUrl(url: string): boolean {
 
 /**
  * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ綴り
- * （`ccnavi/approval.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
+ * （`ccnavi/tickets/agree.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
  * **まとめるのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
@@ -173,12 +183,12 @@ const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
- * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（人が端末で同じ sh を打っても `cli`）ので、
+ * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザが端末で同じ sh を打っても `cli`）ので、
  * 誰が打ったかは断定しない
  */
 export const VIA_LABELS: Readonly<Record<string, string>> = {
   cli: "sh（ccnavi-ticket.sh など）",
-  terminal: "端末",
+  terminal: "ターミナル",
   board: "ボード",
   hook: "hook",
   chrome: "Chrome 拡張",
@@ -215,21 +225,27 @@ export function historyAt(at: string): string {
 
 /**
  * 先行を満たしていないカードのバッジ（ADR-0088）。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
- * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す
+ * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
+ * `lead` と `ids` は `text` を分けたもので、画面が識別子の途中で折り返さないために使う
  */
-export function predecessorsBadge(card: Card): { readonly text: string; readonly title: string } {
-  const ids = card.predecessorsUnmet.map((p) => p.ticket).join(", ");
+export function predecessorsBadge(card: Card): { readonly text: string; readonly lead: string; readonly ids: readonly string[]; readonly title: string } {
+  const list = card.predecessorsUnmet.map((p) => p.ticket);
+  const ids = list.join(", ");
   const detail = card.predecessorsUnmet.map((p) => `${p.ticket}: ${p.label}`).join("\n");
   const started = card.startedAt !== "" || card.copyStatus === "review";
   if (started) {
     return {
       text: `先行が未完了（${ids}）`,
+      lead: "先行が未完了",
+      ids: list,
       title: `着手済みです。先行が done/ に無いか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";
   return {
     text: `先行待ち（${ids}）`,
+    lead: "先行待ち",
+    ids: list,
     title: `先行が取り消されずに done/ に入るまで、${what}止まります\n${detail}`,
   };
 }

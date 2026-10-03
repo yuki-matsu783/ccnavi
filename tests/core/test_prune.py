@@ -19,7 +19,8 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import prune, selfguard
+from ccnavi.policy import selfguard
+from ccnavi.records import prune
 from tests.inproc import run_ccnavi
 
 DAY = 86400
@@ -408,7 +409,7 @@ class EntryTest(_Base):
 
 
 class HookTest(_Base):
-    """エージェントが Bash から `ccnavi --prune` を打つ形は、実行前の判定で止まること。
+    """エージェントが Bash から `ccnavi --prune` を打つ形は、実行前チェックで止まること。
 
     実行ファイルの端末要求は、擬似端末（`script -qc`）でも、チケット制御を切った
     ワークスペースで端末要求を切る変数を並べても抜けられる。チケット制御に依らず止める。

@@ -1,12 +1,12 @@
 # ルールが何を止めて何を通すかの見本。`/ccnavi-config` スキルがこれを回す。
 #
 # ルールを 1 件足したり直したりしたら、ここにも 1 行足す。足さないと、
-# あとから読んだ人に「そのルールが何のために在るのか」を伝える手立てが
+# あとから読んだユーザに「そのルールが何のために在るのか」を伝える手立てが
 # ルールの文面しか無くなる。文面は止められた側に向けた言葉で、
 # 何に当たるかは書いていない。
 #
 # タイプの名前が期待する判定になる。deny なら止まるはず、allow なら通るはず、
-# ask なら人に確認が出るはず。実際の判定と食い違ったものをスキルが報告する。
+# ask ならユーザに確認が出るはず。実際の判定と食い違ったものをスキルが報告する。
 # どのルールも言及しない呼び出し（UNDECLARED）は権限モードへ渡り、端末からの
 # 試験では ask として出る。deny に当たってほしくないが allow にも無いものは、
 # ask に置いて「当たらないこと」を見本にする。
@@ -99,15 +99,15 @@ deny:
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/rules.yml"
     why: >-
       ワークツリー側の設定も止める（guard-ccnavi-config）。統合すればそのまま main の
-      ルールになる。直したい形は下書きを検証して利用者に渡す
+      ルールになる。直したい形は下書きを検証してユーザに渡す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/phases.yml"
-    why: フェーズの種類は人が持つ。エージェントが書けるとレビュー不要の種類を作ってから使える
+    why: フェーズの種類はユーザが持つ。エージェントが書けるとレビュー不要の種類を作ってから使える
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/rule-samples.yml"
     why: >-
       共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
-      （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す
+      （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒にユーザに渡す
   - tool: Edit
     subject: "/repo/.ccnavi/common/risks.yml"
     why: リスクの配点も同じ。自分の作業の重さを自分で決められる
@@ -189,7 +189,7 @@ ask:
     subject: "curl https://example.com"
     why: >-
       外から取ってくるコマンド。止めはしないが、調査で一度きりなら WebFetch、
-      何度も叩くなら sh に固める。人が通せば取ってきた文字列はそのまま
+      何度も叩くなら sh に固める。ユーザが通せば取ってきた文字列はそのまま
       コンテキストに載るので、そのことも文面で断る
   - tool: Bash
     subject: "cat /repo/urls.txt | wget -i -"

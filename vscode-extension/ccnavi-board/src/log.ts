@@ -1,19 +1,19 @@
 /**
  * 診断ログ。ワークスペースルートの `logs/diag/<出どころ>.log` に 1 行ずつ足す（docs/claude/logging.md）。
  *
- * sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と実行ファイル（`ccnavi/diaglog.py`）と
+ * sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と実行ファイル（`ccnavi/records/diaglog.py`）と
  * 同じ形の行を出す。
  *
  *     2026-09-27T10:15:03+09:00 ERROR ccnavi-board[4242] 画面の前提が崩れている screen=rules
  *
  * **画面にも console にも何も出さない。** 書けないときは何も出さずに捨て、例外を外へ出さない。
- * 利用者に見せる通知（showErrorMessage など）とは違うもので、そちらはこのモジュールと関係なく書く。
+ * ユーザに見せる通知（showErrorMessage など）とは分けてあり、そちらはこのモジュールと関係なく書く。
  *
- * 伏せるのは URL と scp 形に埋まった資格情報だけ（maskUserinfo。sh と Python と同じ読みで `***`）。
+ * 伏せるのは URL と scp 形式に埋まった資格情報だけ（maskUserinfo。sh と Python と同じ規則で `***` にする）。
  * ほかの秘密の形は伏せない。秘密の値・ファイルの中身・環境変数の値を渡さないのが決まり。
  *
- * **リンクは辿らない。** `logs`・`logs/diag`・書き先のどれかがシンボリックリンクなら書かずに捨てる
- * （lstat で見て、書き先は O_NOFOLLOW のある OS ではそれでも開く）。ファイルは 0600 で作る。
+ * **シンボリックリンクはたどらない。** `logs`・`logs/diag`・書き込み先のどれかがシンボリックリンクなら書かずに捨てる
+ * （lstat で見て、書き込み先は O_NOFOLLOW のある OS ではそれでも開く）。ファイルは 0600 で作る。
  * 出どころの名前が `[A-Za-z0-9_-]` 以外を含むときも書かない。
  *
  * node の型を取り除くだけで動く書き方にしてある（enum も引数のプロパティも使わない）。
@@ -187,7 +187,7 @@ function isLink(target: string): boolean {
 
 /**
  * 1 行を O_APPEND で 1 度に書く。置き場が無ければ作る。
- * `logs`・`logs/diag`・書き先のどれかがリンクなら書かない。新しいファイルは 0600
+ * `logs`・`logs/diag`・書き込み先のどれかがリンクなら書かない。新しいファイルは 0600
  */
 function append(file: string, line: string): void {
   const dir = path.dirname(file);

@@ -1,11 +1,11 @@
 """Chrome 拡張（ADR-0093 段階 1）が Pyodide の上で呼ぶ入口。
 
 拡張はホストの API でブランチの置き場を読み、その中身（Snapshot）をここへ渡す。ここは
-ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--approve --preview --json`）を
+ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--agree --preview --json`）を
 そのまま動かす（ADR-0093 の 8.1）。承認待ちの一覧も、家族の見分けも、参照の閉包も、
 互換の比べも Python が出し、拡張（TS）は並べるだけ（ADR-0035）。
 
-段階 2a から、判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` も呼べる
+段階 2a から、判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` も呼べる
 （`plan`・`withdraw`・`confirm` の操作）。どれも書くもの（Changes）を値で返すだけで、
 ホストにもディスクにも書かない（fsio の控える段）。段階 3 から、拡張は `plan`（承認）と
 `withdraw`（取り下げ）の答えを親のブランチへの 1 コミットにして書く（8.3・8.4）。
@@ -65,8 +65,11 @@ import re
 import shutil
 import sys
 
-from ccnavi import cli, configsync, core, fsio, history, lint, review, settings, syncstate, version
-from ccnavi import ticket as ticket_mod
+from ccnavi.entry import cli, lint, version
+from ccnavi.hook import core
+from ccnavi.infra import fsio, settings
+from ccnavi.tickets import configsync, history, review, syncstate
+from ccnavi.tickets import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
 SCHEMA = 1
@@ -353,7 +356,7 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
         "message": (
             f"先行を辿ると {FAMILY_LIMIT} を超える家族に広がった（{', '.join(families)}）。"
             "Chrome では判定できない。計画を分けて先行を減らすか、手元で "
-            "`--approve --preview --verify` を打って確かめる"
+            "`--agree --preview --verify` を打って確かめる"
             if over
             else ""
         ),
@@ -532,7 +535,7 @@ def _preview(root: str, env: dict[str, str], only: list[str]) -> tuple[int, dict
     out, err = io.StringIO(), io.StringIO()
     with _environ(env):
         code = cli.run(
-            io.StringIO(""), out, err, ["--root", root, "--approve", "--preview", "--json", *only]
+            io.StringIO(""), out, err, ["--root", root, "--agree", "--preview", "--json", *only]
         )
     try:
         body = json.loads(out.getvalue()) if code == 0 else None
@@ -583,7 +586,7 @@ def _op_board(req: dict, root: str) -> dict:
         "reviewable": _reviewable(root, place, family),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出す（D22）ので、手を加えずに返す。
-        # 指紋はこの本文と写しの中身を覆い、手元の `--approve --preview` と同じ値になる。
+        # 指紋はこの本文と写しの中身を覆い、手元の `--agree --preview` と同じ値になる。
         "text": body["text"] if batch else "",
         "digest": body["digest"] if batch else "",
         # 承認するときに `plan` へ渡す絞り（この指紋を出したときの絞り。絞らなければ null）
@@ -623,7 +626,7 @@ def _unreadable(snap: dict, closure: dict) -> str:
         return ""
     return (
         f"判定の入力に本文を読めないファイルがある（{', '.join(found)}）。"
-        "この家族は決まらない。手元で `--approve --preview --verify` を打って確かめる"
+        "この家族は決まらない。手元で `--agree --preview --verify` を打って確かめる"
     )
 
 
@@ -662,7 +665,7 @@ def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
 
 
 def _refused(root: str, code: int, err: str) -> str:
-    """`--approve --preview` が承認待ちを出せなかった理由（標準エラーの文面）。"""
+    """`--agree --preview` が承認待ちを出せなかった理由（標準エラーの文面）。"""
     return _relative(root, err.strip()) or f"終了 {code}"
 
 
@@ -766,7 +769,7 @@ def _stamp(req: dict) -> str:
 
 
 def _core_snapshot(req: dict, root: str) -> core.Snapshot:
-    """`ccnavi.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
+    """`ccnavi.hook.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
     actor = req.get("actor") if isinstance(req.get("actor"), dict) else {}
     conf, _ = settings.load(root)
     return core.read_fs(
@@ -883,10 +886,11 @@ def _op_confirm(req: dict, root: str) -> dict:
     """レビュー済みで書くもの（8.9。段階 4）。書かない。
 
     `result` は `ccnavi-review.sh` が組むのと同じ形の写し（`{host, mr, threads, reviews}`）。
-    依頼の後に人が見るものが動いたかは、手元の confirm と同じ関数（`review.moved_since`）で決める。
-    材料は読んだ `P` の先頭と、依頼時の先頭からの変更の一覧（`compare`）。依頼時の先頭は Python が
-    マーカーから読み、一覧が要るのに無ければ `need_compare`（`{base, head}`）で返す。拡張は
-    compare API で読んでから呼び直す（閉包の `need` と同じ形）。
+    依頼の後にユーザが見るものが動いたかは、手元の confirm と同じ関数（`review.moved_since`）
+    で決める。材料は読んだ `P` の先頭と、依頼時の先頭からの変更の一覧（`compare`）。
+    依頼時の先頭は Python がマーカーから読み、一覧が要るのに無ければ
+    `need_compare`（`{base, head}`）で返す。拡張は compare API で読んでから
+    呼び直す（閉包の `need` と同じ形）。
     """
     snap, place, family, _ = _family_tree(req, root)
     _writable(snap, family)
@@ -1026,7 +1030,7 @@ def _op_start(req: dict, root: str) -> dict:
         problems.append(f"{compat['message']}（ADR-0093 の 7.3）")
     if problems:
         problems.append(
-            "この issue からは始められない。識別子を人が付けて（フォールバック）始める"
+            "この issue からは始められない。識別子をユーザが付けて（フォールバック）始める"
             "（ADR-0093 の 3.2・8.6）"
         )
     return {"identifier": ident, "integration": integ, "problems": problems}

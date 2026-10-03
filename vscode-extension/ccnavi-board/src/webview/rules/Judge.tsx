@@ -4,7 +4,7 @@
  *
  * **ここは判定しない。** 出すのは実行ファイル（`--test --json` / `--test-samples --json` /
  * `--suggest --json`）が返した形をそのまま読んだものだけで、当たる・当たらないの理屈は持たない。
- * 候補もルールに足さない。下書きを見せるだけで、置くのは人。
+ * 候補もルールに足さない。下書きを見せるだけで、置くのはユーザ。
  */
 import { Fragment, type JSX } from "react";
 
@@ -39,26 +39,28 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
     return <p className="empty">どのルールにもヒットしませんでした</p>;
   }
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>タイプ</th>
-          <th>id</th>
-          <th>書いたパターン</th>
-          <th>正規表現に直した形</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rules.map((rule, index) => (
-          <tr key={index}>
-            <td>{rule.section !== "" && <span className={`verdict ${rule.section}`}>{rule.section}</span>}</td>
-            <td>{rule.id + (rule.source === "outside" ? "（ルールファイル外の根拠）" : "")}</td>
-            <td>{rule.kind !== "" && <code>{`${rule.kind} ${rule.written}`}</code>}</td>
-            <td>{rule.pattern !== "" && <code>{rule.pattern}</code>}</td>
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>タイプ</th>
+            <th>id</th>
+            <th>書いたパターン</th>
+            <th>正規表現に直した形</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rules.map((rule, index) => (
+            <tr key={index}>
+              <td>{rule.section !== "" && <span className={`verdict ${rule.section}`}>{rule.section}</span>}</td>
+              <td>{rule.id + (rule.source === "outside" ? "（ルールファイル外の根拠）" : "")}</td>
+              <td>{rule.kind !== "" && <code>{`${rule.kind} ${rule.written}`}</code>}</td>
+              <td>{rule.pattern !== "" && <code>{rule.pattern}</code>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -68,28 +70,30 @@ function RunningHooks({ hooks }: { readonly hooks: readonly HookEntry[] }): JSX.
     return <p className="empty">実行される hook はありません</p>;
   }
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>イベント</th>
-          <th>matcher</th>
-          <th>コマンド</th>
-        </tr>
-      </thead>
-      <tbody>
-        {hooks.map((hook, index) => (
-          <tr key={index}>
-            <td>{hook.event}</td>
-            <td>
-              <code>{hook.matcher === "" ? "（全部）" : hook.matcher}</code>
-            </td>
-            <td className="cmd">
-              <code>{hook.command}</code>
-            </td>
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>イベント</th>
+            <th>matcher</th>
+            <th>コマンド</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {hooks.map((hook, index) => (
+            <tr key={index}>
+              <td>{hook.event}</td>
+              <td>
+                <code>{hook.matcher === "" ? "（全部）" : hook.matcher}</code>
+              </td>
+              <td className="cmd">
+                <code>{hook.command}</code>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -149,41 +153,43 @@ export function SamplesResult({ result }: { readonly result: SamplesJson }): JSX
         <span className={result.mismatches > 0 ? "ng" : ""}>不一致 {result.mismatches} 件</span>
         <span>判定の対象外 {result.skipped} 件</span>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>期待</th>
-            <th>判定</th>
-            <th>ツール</th>
-            <th>対象</th>
-            <th>ヒットしたルール</th>
-            <th>理由</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.samples.map((sample, index) => (
-            <tr key={index} className={sample.ok ? (sample.skipped ? "skipped" : "") : "ng"}>
-              <td>
-                <span className={`verdict ${sample.expected}`}>{sample.expected}</span>
-              </td>
-              <td>
-                <Verdict verdict={sample.known ? sample.verdict : ""} />
-              </td>
-              <td>{sample.tool}</td>
-              <td className="cmd">
-                <code>{sample.subject}</code>
-              </td>
-              <td>
-                {sample.rules
-                  .filter((rule) => rule.source === "file")
-                  .map((rule) => `${rule.section}:${rule.id}`)
-                  .join(", ")}
-              </td>
-              <td>{sample.why}</td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>期待</th>
+              <th>判定</th>
+              <th>ツール</th>
+              <th>対象</th>
+              <th>ヒットしたルール</th>
+              <th>理由</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {result.samples.map((sample, index) => (
+              <tr key={index} className={sample.ok ? (sample.skipped ? "skipped" : "") : "ng"}>
+                <td>
+                  <span className={`verdict ${sample.expected}`}>{sample.expected}</span>
+                </td>
+                <td>
+                  <Verdict verdict={sample.known ? sample.verdict : ""} />
+                </td>
+                <td>{sample.tool}</td>
+                <td className="cmd">
+                  <code>{sample.subject}</code>
+                </td>
+                <td>
+                  {sample.rules
+                    .filter((rule) => rule.source === "file")
+                    .map((rule) => `${rule.section}:${rule.id}`)
+                    .join(", ")}
+                </td>
+                <td className="why">{sample.why}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -199,7 +205,7 @@ export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX
     <div id="suggest-result" className="result">
       <p>
         記録 {result.logs.length} 本・{result.records} 行から、候補 {result.candidates.length} 件
-        （検証を通らず落としたもの {result.dropped} 件）。どれも下書きで、置くのは人です。
+        （検証を通らず落としたもの {result.dropped} 件）。どれも下書きで、置くのはユーザです。
       </p>
       {result.candidates.length === 0 ? (
         <p className="empty">候補はありません</p>

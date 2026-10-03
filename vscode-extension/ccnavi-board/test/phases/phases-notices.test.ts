@@ -21,7 +21,7 @@ test("CB-T212 注意は当てはまるときだけ。sequential の after は、
   assert.deepEqual(notices({ order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] }), []);
   // 行き先がこのファイルに無い after だけでも、sequential では判定に使われないと言う
   const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外のレイヤーの種類"] })] }, true);
-  assert.ok(seq.some((line) => /sequential なので、after は判定に効きません/.test(line)));
+  assert.ok(seq.some((line) => /sequential なので、after は判定に使われません/.test(line)));
   assert.ok(seq.some((line) => /共通の設定の種類を指しているならそのままで構いません/.test(line)));
 });
 

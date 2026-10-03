@@ -1,6 +1,6 @@
 /**
  * 「hook」のタブ。`.claude/settings.json`（と `settings.local.json`）に登録された hook を並べる。
- * 利用者ごとの設定（`~/.claude/settings.json`）は拡張ホストが読まない。
+ * ユーザごとの設定（`~/.claude/settings.json`）は拡張ホストが読まない。
  */
 import type { JSX } from "react";
 
@@ -22,7 +22,7 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
             <code>.claude/settings.local.json</code>
           </>
         )}{" "}
-        の hooks です。利用者ごとの設定（<code>~/.claude/settings.json</code>）は対象外です。
+        の hooks です。ユーザごとの設定（<code>~/.claude/settings.json</code>）は対象外です。
       </p>
       <Table hooks={hooks} files={files} />
     </>
@@ -38,32 +38,34 @@ function Table({ hooks, files }: HooksProps): JSX.Element {
   }
   return (
     <>
-      <table className="hooks">
-        <thead>
-          <tr>
-            <th>イベント</th>
-            <th>matcher</th>
-            <th>コマンド</th>
-            <th>timeout</th>
-            <th>定義元</th>
-          </tr>
-        </thead>
-        <tbody>
-          {hooks.map((hook, index) => (
-            <tr key={index}>
-              <td>{hook.event}</td>
-              <td>
-                <code>{hook.matcher === "" ? "（全部）" : hook.matcher}</code>
-              </td>
-              <td className="cmd">
-                <code>{hook.command}</code>
-              </td>
-              <td className="num">{hook.timeout === null ? "" : String(hook.timeout)}</td>
-              <td>{hook.source === "settings" ? "settings.json" : "settings.local.json"}</td>
+      <div className="table-scroll">
+        <table className="hooks">
+          <thead>
+            <tr>
+              <th>イベント</th>
+              <th>matcher</th>
+              <th>コマンド</th>
+              <th>timeout</th>
+              <th>定義元</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {hooks.map((hook, index) => (
+              <tr key={index}>
+                <td>{hook.event}</td>
+                <td>
+                  <code>{hook.matcher === "" ? "（全部）" : hook.matcher}</code>
+                </td>
+                <td className="cmd">
+                  <code>{hook.command}</code>
+                </td>
+                <td className="num">{hook.timeout === null ? "" : String(hook.timeout)}</td>
+                <td>{hook.source === "settings" ? "settings.json" : "settings.local.json"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <p className="hint">
         「判定を試す」でツールを選ぶと、そのツールで実行される hook だけをここから絞り込んで出します。matcher の意味は Claude Code のものです（空か <code>*</code> で全部、それ以外はツール名への正規表現）。
       </p>

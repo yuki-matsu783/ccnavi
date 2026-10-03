@@ -2,9 +2,9 @@
  * 段階 5 のレビューで直したもの（ADR-0093 の 11.9.1）。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
  * - 応答が落ちた書き込みの受け直し（PROBE-2・3）: 自分のコミットを「書いた中身と親の組」で見分けたときだけ受け直す。
- *   見分けられなければ人に回す
+ *   見分けられなければユーザに回す
  * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは打ち消さない）
- * - 事後確認と打ち消しの途中でホストが落ちたら、書いたが確認できなかったとして人に回す
+ * - 事後確認と打ち消しの途中でホストが落ちたら、書いたが確認できなかったとしてユーザに回す
  * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭で閉じた識別子と互換の版を確かめ直す
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
@@ -12,7 +12,7 @@
  * - 「要確認」の家族には、そのブラウザで書くボタンを出さない
  *
  * 最新のレビュー（11.9.3）で足したもの: 確かめが落ちたら要確認、打ち消しの前の 412 で打ち消し直す、別の線に付け替わったら
- * 人に回す、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
+ * ユーザに回す、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -125,7 +125,7 @@ test("CX-T162 GitHub で応答が落ち、その上に無関係な書き込み�
   assert.equal(mock.commitCalls.length, 1);
 });
 
-test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、人に回す", async () => {
+test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、ユーザに回す", async () => {
   const mock = new MockGitLab(parentOnly());
   mock.branch("side", "main");
   mock.push("side", { "src/side.py": "s\n" }, "別の枝");
@@ -154,7 +154,7 @@ test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時
   assert.equal(mock.glCommits.length, 1);
 });
 
-test("CX-T165 事後確認の途中でホストが落ちたら、書いたが確認できなかったとして人に回す（失敗とは文面を分ける）", async () => {
+test("CX-T165 事後確認の途中でホストが落ちたら、書いたが確認できなかったとしてユーザに回す（失敗とは文面を分ける）", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
@@ -336,7 +336,7 @@ test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何
   assert.ok(!(DOING in files) && TODO in files && "src/zzz.py" in files);
 });
 
-test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らず人に回す", async () => {
+test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らずユーザに回す", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   const read = mock.head("i0001") as string;

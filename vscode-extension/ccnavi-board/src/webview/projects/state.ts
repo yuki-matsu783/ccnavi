@@ -1,5 +1,5 @@
 /**
- * 画面が覚えておくもの。clone の欄に打ちかけた URL と名前、名前を人が触ったか。
+ * 画面が覚えておくもの。clone の欄に打ちかけた URL と名前、名前をユーザが触ったか。
  *
  * 置き場は Webview の state で、拡張が HTML を作り直しても（裏に回って作り直されても）残る。
  */
@@ -8,7 +8,7 @@ import { getState, setState } from "../vscode.js";
 export interface CloneState {
   readonly url: string;
   readonly name: string;
-  /** 名前を人が打った。真なら URL から自動で埋め直さない */
+  /** 名前をユーザが打った。真なら URL から自動で埋め直さない */
   readonly nameTouched: boolean;
 }
 

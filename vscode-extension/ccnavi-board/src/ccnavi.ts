@@ -5,8 +5,8 @@
  * 走らせるのは 9 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
- * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--approve --preview --json`（承認待ちの一覧を見る）、
- * `--approve --yes … --json`（見せた一覧を承認する。人がオーバーレイで押したときだけ）、
+ * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
+ * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール設定画面が読む。記録を読むので `--log ""` は付けない）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
@@ -247,7 +247,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
     const why = ran.killed
-      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒で返らないので打ち切りました`
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒たっても応答が無いため打ち切りました`
       : ran.stderr;
     return { ok: false, launcher, error: `ccnavi --explain --json が失敗しました: ${why}` };
   }
@@ -262,7 +262,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
 export type { ApproveOutcome };
 
 /**
- * 承認待ちの一覧を見る（`--approve --preview --json`）。承認済みチケットは置かれない。
+ * 承認待ちの一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
  * 記録と控えは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(
@@ -278,20 +278,20 @@ export async function runApprovePreview(
   if (ran.killed) {
     return {
       ok: false,
-      error: `${cutOff("ccnavi --approve --preview --json", APPROVE_TIMEOUT_MS)}。何も承認していません`,
+      error: `${cutOff("ccnavi --agree --preview --json", APPROVE_TIMEOUT_MS)}。何も承認していません`,
     };
   }
   if (ran.code !== 0) {
     // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
     // 読めない提案の行より後ろに出るので、1 行目だけでは伝わらない。
-    return { ok: false, error: `ccnavi --approve --preview --json が失敗しました:\n${ran.stderr.trim()}` };
+    return { ok: false, error: `ccnavi --agree --preview --json が失敗しました:\n${ran.stderr.trim()}` };
   }
   const parsed = parseApprovePreview(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
 /**
- * 見せた一覧をそのまま承認する（`--approve --yes <識別子,…> --digest <指紋> --json`）。
+ * 見せた一覧をそのまま承認する（`--agree --yes <識別子,…> --digest <指紋> --json`）。
  * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
  */
 export async function runApproveYes(
@@ -306,15 +306,15 @@ export async function runApproveYes(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
-  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（approval.py の for cand in batch）ので、
+  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（agree.py の for cand in batch）ので、
   // 途中で殺されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
   // ここで拾わないと何が起きたのか伝わらない。
   if (ran.killed) {
     return {
       ok: false,
       error:
-        `${cutOff("ccnavi --approve --yes", APPROVE_TIMEOUT_MS)}。` +
-        "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットと push は送っていません" +
+        `${cutOff("ccnavi --agree --yes", APPROVE_TIMEOUT_MS)}。` +
+        "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットと push はターミナルに送っていません" +
         "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確かめてください",
     };
   }
@@ -322,18 +322,18 @@ export async function runApproveYes(
   if (parsed.ok) {
     return ran.code === 0
       ? parsed
-      : { ok: false, error: `ccnavi --approve --yes が失敗しました: ${firstLine(ran.stderr)}` };
+      : { ok: false, error: `ccnavi --agree --yes が失敗しました: ${firstLine(ran.stderr)}` };
   }
   if ("mismatch" in parsed) {
     return parsed;
   }
-  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで何も言わないと人は
+  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで何も言わないとユーザは
   // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
   if ("partial" in parsed) {
     return { ok: false, error: partialMessage(parsed.partial) };
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
-  return { ok: false, error: said === "" ? `ccnavi --approve --yes の出力を読み取れません（${parsed.error}）` : said };
+  return { ok: false, error: said === "" ? `ccnavi --agree --yes の出力を読み取れません（${parsed.error}）` : said };
 }
 
 /**
@@ -365,7 +365,7 @@ export async function runDecidePreview(
 }
 
 /**
- * 人が選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`）。
+ * ユーザが選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`）。
  * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
  */
 export async function runDecideYes(
@@ -591,7 +591,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
   if (parsed.ok) {
     return { ok: true, value: parsed.value };
   }
-  // 設定の不備などで実行ファイルが JSON ではなく人向けの文面を出したときは、JSON.parse の苦情より
+  // 設定の不備などで実行ファイルが JSON ではなくユーザ向けの文面を出したときは、JSON.parse の苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);
   return { ok: false, error: said === "" ? `${what} の出力を読めません（${parsed.error}）` : `${what} の出力: ${said}` };

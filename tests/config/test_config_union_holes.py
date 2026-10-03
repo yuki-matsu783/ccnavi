@@ -29,7 +29,7 @@ import json
 import os
 import unittest
 
-from ccnavi import settings
+from ccnavi.infra import settings
 from tests.config.test_config_union import (
     COMMON_RISK,
     HOME,
@@ -46,7 +46,7 @@ from tests.config.test_config_union_guard import GuardHarness
 # A-2 の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
 # `glob` も `regex` も組み込みの守りも、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
 # 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
-# 区別が要るときだけ、書いた人が `(?-i:...)` で囲む。
+# 区別が要るときだけ、書いたユーザが `(?-i:...)` で囲む。
 CASE_RULES = {
     "version": 1,
     "deny": [
@@ -54,13 +54,13 @@ CASE_RULES = {
             "id": "glob-secret",
             "match": "Write|Edit",
             "glob": "*/secret/*",
-            "message": "secret は人が置く。",
+            "message": "secret はユーザが置く。",
         },
         {
             "id": "regex-token",
             "match": "Write|Edit",
             "regex": r"[\\/]token[\\/]",
-            "message": "token は人が置く。",
+            "message": "token はユーザが置く。",
         },
         {
             "id": "regex-exact",
@@ -80,7 +80,7 @@ COLON_RULES = {
             "id": "lib:custom",
             "match": "Write|Edit",
             "glob": "*/custom/*",
-            "message": "custom は人が置く。",
+            "message": "custom はユーザが置く。",
         }
     ],
     "allow": [{"id": "anything-read", "match": "Read", "regex": "."}],
@@ -110,7 +110,7 @@ SELF_PROJECT_RULES = {
             "id": "kube",
             "match": "Bash",
             "glob": "*kubectl*",
-            "message": "kubectl は人が打つ。",
+            "message": "kubectl はユーザが打つ。",
         }
     ],
 }
@@ -140,7 +140,7 @@ RESERVED_PROJECT_RULES = {
             "id": "secret",
             "match": "Write|Edit",
             "glob": "*/secret/*",
-            "message": "secret は人が置く。",
+            "message": "secret はユーザが置く。",
         }
     ],
 }
@@ -285,6 +285,37 @@ class ShellPlaceTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
+
+    def test_copying_out_of_a_common_layer_file_is_not_denied(self):
+        """11.6: 共通層の 1 本をコピー元に書いただけの読みは通る。
+
+        共通層の節を写す側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
+        数えるのでコピー元に当たり、`cp .ccnavi/common/rules.yml /tmp/x` が止まっていた。
+        """
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
+            for command in (
+                f"cp .ccnavi/common/{name} /tmp/x",
+                f"cp {self.ws}/.ccnavi/common/{name} /tmp/x",
+                f"ln -s .ccnavi/common/{name} /tmp/x",
+                f"install .ccnavi/common/{name} /tmp/x",
+            ):
+                with self.subTest(command=command):
+                    self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
+
+    def test_copying_into_a_common_layer_file_is_still_denied(self):
+        """11.6: 共通層の 1 本が行き先なら、後ろにコマンドが続いても止まる。書き込みも止まる。"""
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
+            for command in (
+                f"cp /tmp/x .ccnavi/common/{name}",
+                f"cp /tmp/x {self.ws}/.ccnavi/common/{name}",
+                f"cp /tmp/x .ccnavi/common/{name} && echo done",
+                f"ln -sf /tmp/x .ccnavi/common/{name}",
+                f"echo x > .ccnavi/common/{name}",
+                f"rm .ccnavi/common/{name}",
+            ):
+                with self.subTest(command=command):
+                    result = self.guarded_hook("Bash", self.ws, command=command)
+                    self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_the_moved_umbrella_is_closed_the_same_way(self):
         """11.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わる綴りで止まる。"""
@@ -464,7 +495,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
                 )
 
     def test_a_ticket_cannot_name_a_reserved_layer_name(self):
-        """11.4: `project: self` / `project: common` のチケットは `--approve` で通らない。"""
+        """11.4: `project: self` / `project: common` のチケットは `--agree` で通らない。"""
         for name in settings.RESERVED_LAYER_NAMES:
             self.project(name, rules=RESERVED_PROJECT_RULES)
         # 前提。同じ本文で `project: lib` なら通る。止まる理由が予約名であることを固定する。

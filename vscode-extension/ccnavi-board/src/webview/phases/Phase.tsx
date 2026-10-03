@@ -25,7 +25,7 @@ export interface PhaseProps {
   readonly open: boolean;
   /**
    * 「ほかの種類との関係・補足」を開いているか。**決めるのは呼ぶ側**（行ごとに 1 度だけ値の有無で決め、あとは
-   * 人の開閉で動く）。ここで値の有無から決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
+   * ユーザの開閉で動く）。ここで値の有無から決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly moreOpen: boolean;
   /** このファイルの種類の id と区分（並び順）。関係の欄の候補にする */
@@ -110,7 +110,9 @@ export function Phase(props: PhaseProps): JSX.Element {
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
-          <span className={phase.id === "" ? "sum-id dim" : "sum-id"}>{phase.id === "" ? "（id 未設定）" : phase.id}</span>
+          <span className={phase.id === "" ? "sum-id dim" : "sum-id"} title={phase.id === "" ? "（id 未設定）" : phase.id}>
+            {phase.id === "" ? "（id 未設定）" : phase.id}
+          </span>
           <span className="clip" title={phase.title}>
             {phase.title}
           </span>
