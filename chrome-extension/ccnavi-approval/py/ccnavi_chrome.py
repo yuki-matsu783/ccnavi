@@ -195,7 +195,7 @@ def _snapshot(req: dict) -> dict:
         if not isinstance(project, str) or not ticket_mod.is_valid_id(project):
             raise Refused(f"プロジェクト名が読めない: {project!r}")
         if settings.is_reserved_layer_name(project):
-            raise Refused(f"プロジェクト名 {project} は層の名札に予約してある（common・self）")
+            raise Refused(f"プロジェクト名 {project} は層の名前として予約してある（common・self）")
         ws = snap.get("workspace")
         if not isinstance(ws, dict) or not isinstance(ws.get("integration"), dict):
             raise Refused("プロジェクトのリポジトリにはワークスペースの統合先（workspace）が要る")
@@ -957,7 +957,7 @@ def _compat(snap: dict) -> dict:
         message = ""
     elif theirs is None:
         message = (
-            f"統合先の {COMPAT_FILE} が互換の版（CCNAVI_COMPAT）を名乗らない。"
+            f"統合先の {COMPAT_FILE} に互換の版（CCNAVI_COMPAT）が書かれていない。"
             f"拡張は互換 {ours}。表示だけにする"
         )
     else:

@@ -192,7 +192,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
       row({
         hasClaudeDir: true,
         problems: [
-          problem("warn", ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに見える"),
+          problem("warn", ".claude/ を持つ。Claude Code がそこのスキルを読み込み、そこへ cd するだけで別のルートのように見える"),
           problem("warn", ".claude/settings.json を読めない: 壊れている"),
           problem("error", "文面が無い", "(projects/lib) x"),
         ],

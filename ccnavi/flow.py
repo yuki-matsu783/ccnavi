@@ -1254,7 +1254,7 @@ def render(
     try:
         return _render(data, limit, text_limit)
     except Exception:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
-        return ["（フローを並べられない。ファイルを直接読んで判断する）"], set()
+        return ["（フローを並べられない。ファイルを直接読んで判断してください）"], set()
 
 
 def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
@@ -1310,7 +1310,7 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
         used += len(text)
         shown += 1
     if len(order) > shown:
-        lines.append(f"…ほか {len(order) - shown} 件。続きはファイルを読む")
+        lines.append(f"…ほか {len(order) - shown} 件。続きはファイルを読んでください")
     return lines, kinds
 
 
@@ -1341,22 +1341,25 @@ def briefing(
         return [f"    フロー: {clean(path)}"]
     lock = (
         "着手中なので、終わるまで書き換えられない（ロック）。着手のあとに書き換わったら"
-        "ccnavi が知らせる。"
+        " ccnavi が知らせる。"
         if child.in_progress
         else "着手すると、終わるまで書き換えられなくなる（ロック）。"
     )
     lines = [
         f"    フロー: {clean(path)}（人がボードで書いた {clean(child.ticket)} の手順。"
         "承認済みの領域にあり、人が持つもの。エージェントは編集しない）。作業の前にこのファイルを"
-        "読み、その順に進める。文脈が要約されて見失ったら、このパスを読み直す。" + lock
+        "読み、その順に進めてください。文脈が要約されて見失ったら、"
+        "このパスを読み直してください。" + lock
     ]
     data, why = load(path, base)
     if data is None:
-        lines.append(f"    フローを読めない: {why}。人に確かめる")
+        lines.append(f"    フローを読めない: {why}。人に確かめてください")
         return lines
     room = max(0, min(budget, CHILD_TEXT_LIMIT))
     if room == 0:
-        lines.append("    手順は SubagentStart の文の上限に達したので並べない。ファイルを読む")
+        lines.append(
+            "    手順は SubagentStart の文の上限に達したので並べない。ファイルを読んでください"
+        )
         return lines
     steps, kinds = render(data, text_limit=room)
     lines.append(FENCE_OPEN)
@@ -1368,16 +1371,17 @@ def briefing(
         lines.append(
             f"    {ASK} のノード: サブエージェントは利用者に聞けない"
             "（AskUserQuestion は渡されない）。そのノードで手を止め、問いと選択肢を添えて"
-            "メインに返す。メインが利用者に聞き、答えを持って同じサブエージェントを再開させる。"
+            "メインに返してください。メインが利用者に聞き、答えを持って同じサブエージェントを再開させる。"
         )
     if kinds & set(SPAWN):
         lines.append(
             "    subAgent / subAgentFlow のノード: Agent ツールがあれば入れ子の"
-            "サブエージェントとして起動する。そのプロンプトには必ず、担当の子チケット "
+            "サブエージェントとして起動してください。そのプロンプトには必ず、担当の子チケット "
             f"{ticket}、ワークツリー {worktree}、範囲 {scope} を書き、"
-            "他の子のワークツリーには触れないことを書く。Agent ツールが無ければ（入れ子の上限）、"
+            "他の子のワークツリーには触れないことを書いてください。"
+            "Agent ツールが無ければ（入れ子の上限）、"
             "そのノードで手を止め、起動してほしいエージェントの種類・プロンプト・担当の子チケットの"
-            "ワークツリーと範囲を添えてメインに返す。メインがそのとおり起動し、結果を持って"
+            "ワークツリーと範囲を添えてメインに返してください。メインがそのとおり起動し、結果を持って"
             "同じサブエージェントを再開させる。"
         )
     return lines

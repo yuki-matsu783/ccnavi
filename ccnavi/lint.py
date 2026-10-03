@@ -349,7 +349,9 @@ def check(
         # ガードが働いている状態と区別が付かない。
         problems.append(
             Problem(
-                SEVERITY_WARN, "(mode)", f"{modes.DRY_RUN} なので判定しても呼び出しに手を出さない"
+                SEVERITY_WARN,
+                "(mode)",
+                f"{modes.DRY_RUN} なので判定はしても、呼び出しには何もしない",
             )
         )
 
@@ -385,10 +387,12 @@ def compat_fix(root: str) -> str:
     if os.path.isfile(os.path.join(root, "build.py")) and os.path.isfile(
         os.path.join(root, "ccnavi", "__main__.py")
     ):
-        return "build.py を回して組み立て直す（uv run --with pyinstaller python build.py）"
+        return (
+            "build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
+        )
     return (
-        "ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> "
-        "--force で実行ファイルと sh を配り直す"
+        "ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> "
+        "--force で実行ファイルと sh を配り直してください"
     )
 
 
@@ -413,8 +417,8 @@ def _sh_compat(root: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(version)",
-                f"{path} が互換の版（CCNAVI_COMPAT）を名乗らない。実行ファイル（互換 "
-                f"{version.COMPAT}）より古い sh。{compat_fix(root)}",
+                f"{path} に互換の版（CCNAVI_COMPAT）が書かれていない。実行ファイル（互換 "
+                f"{version.COMPAT}）より古い sh である。{compat_fix(root)}",
             )
         ]
     declared = int(found.group(1))
@@ -947,9 +951,9 @@ def _branch_name_problems(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{name} は親なのに識別子が子の形（`<親>-<2 桁>`）に当たる。"
-                f"家族を引くとき {matched.group('parent')} の子と読まれる。"
-                "親の識別子の末尾を `-<2 桁>` にしない（ADR-0093）",
+                f"{name} は親なのに、識別子が子の形（`<親>-<2 桁>`）と一致する。"
+                f"家族をまとめるとき {matched.group('parent')} の子として扱われる。"
+                "親の識別子の末尾を `-<2 桁>` にしないでください（ADR-0093）",
             )
         )
     return problems
@@ -1525,7 +1529,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"{reserved} は層の名札に予約してある（`{settings.LAYER_COMMON}` は共通層、"
+                    f"{reserved} は層の名前として予約してある（`{settings.LAYER_COMMON}` は共通層、"
                     f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
                     f"層として数えていない（id の `{p.name}:` がどちらの層を指すか決まらないため。"
                     "大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も効いておらず、"
@@ -1541,8 +1545,9 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     where,
-                    ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに"
-                    f"見える。プロジェクトの設定は {conf.project_home}/ に置く",
+                    ".claude/ を持つ。Claude Code がそこのスキルを読み込み、そこへ cd するだけで"
+                    "別のルートのように見える。"
+                    f"プロジェクトの設定は {conf.project_home}/ に置いてください",
                 )
             )
     return problems
@@ -2074,7 +2079,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
                 name,
                 f"{rule.decision} の match に {rules.STOP_MATCH} がある。ターンの終わりに見るのは "
                 f"allow のルールだけなので、{rules.STOP_MATCH} の部分は何も起きない{rest}。"
-                f"{rules.STOP_MATCH} は allow の別のルールに分けて置く",
+                f"{rules.STOP_MATCH} は allow の別のルールに分けて置いてください",
             )
         ]
     if project:

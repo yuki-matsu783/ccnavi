@@ -137,10 +137,10 @@ carry_family() {
 	ccnavi_lock_take "$root" "$ccnavi_c1_repo" "$cf_p" "$(ccnavi_c1_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
 		if ccnavi_lock_long "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p"; then
-			printf 'ccnavi-push-approved: %s のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。%s\n' \
+			printf 'ccnavi-push-approved: %s のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、人に持ち主を確かめてもらってください。%s\n' \
 				"$cf_p" "$(ccnavi_lock_describe "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p")" >&2
 		else
-			printf 'ccnavi-push-approved: %s は他の操作がロックを持っている。終わってから打ち直してください。\n' "$cf_p" >&2
+			printf 'ccnavi-push-approved: %s のロックを他の操作が持っている。終わってから打ち直してください。\n' "$cf_p" >&2
 		fi
 		return 1
 	fi
@@ -194,7 +194,7 @@ carry_family() {
 			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_p" "$ccnavi_c1_tmp/ls"; }; then
 		ccnavi_record_write "$cf_record" remote origin branch "$cf_p" sha "$cf_head" \
 			fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state present reason "" || :
-		printf '承認済みチケットを %s へ送った（取り込んでから送った）。\n' "$cf_p"
+		printf '承認済みチケットを、取り込んでから %s へ送った。\n' "$cf_p"
 		ccnavi_lock_drop
 		return 0
 	fi

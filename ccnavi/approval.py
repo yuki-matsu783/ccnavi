@@ -1051,7 +1051,7 @@ def predecessor_problems(
                     f"先行 {p.ticket} が閉じていない（いまは {p.label}）。{p.ticket} が "
                     f"{approved_rel}/{ticket_mod.DONE}/ に入る（作業を終え、レビューが要るなら"
                     "人のレビューが済む）まで承認しない。先行が要らないなら predecessors から外して"
-                    "出し直す",
+                    "出し直してください",
                     rules.KIND_NOT_YET,
                 )
             )
@@ -1105,7 +1105,8 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} が{p.label}。どれが本物か決まらないので満たしたとみなさない。"
-                    "先に 1 つに決める（先へ進んだ側を合流させるか、残ったワークツリーを片付ける）",
+                    "先に 1 つに決めてください"
+                    "（先へ進んだ側を合流させるか、残ったワークツリーを片付ける）",
                 )
             )
     return problems
@@ -2260,7 +2261,7 @@ def screen(
             lines.append("■ この子チケットで編集可能な範囲")
             lines.append(
                 "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
-                "親に無い場所がここで新しく開くことはない"
+                "親の範囲に無い場所がここで新しく編集できるようになることはない"
             )
             head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
@@ -2281,7 +2282,7 @@ def screen(
             # チケットの範囲はルールの allow より強い（設計 7）。承認する人は「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
-                "    ルールの allow で開けてある場所も、この範囲の外では止まる。"
+                "    ルールの allow で許可してある場所も、この範囲の外では止まる。"
                 "ルールの deny はこの範囲の中でも止まる"
             )
         for name in rules.SECTIONS:
@@ -2307,7 +2308,7 @@ def screen(
             if t.review_reason:
                 lines.append(f"    理由: {t.review_reason}")
             if t.predecessors:
-                lines.append(f"■ 依存している他チケット: {', '.join(t.predecessors)}")
+                lines.append(f"■ 先行: {', '.join(t.predecessors)}")
                 lines.append(
                     "    どれも done/ に在って取り消しでないこと。"
                     "満たしていなければ、承認も着手も止まる"
@@ -2736,7 +2737,7 @@ def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"`project: {t.project}` は層の名札に予約してある綴り（{reserved}）。"
+            f"`project: {t.project}` は層の名前として予約してある綴り（{reserved}）。"
             "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
             "ワークスペース自身の提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"
             "そのプロジェクトの名前を変えてから置いてください",
@@ -2765,7 +2766,7 @@ def project_problems(
                 t.ticket,
                 f"`project: {t.declared_project}` が置き場"
                 f"（{t.project or 'ワークスペース'}）と違う。"
-                f"{t.declared_project} の提案はワークスペースの {where}/ に置く",
+                f"{t.declared_project} の提案はワークスペースの {where}/ に置いてください",
             )
         ]
     reserved = _reserved_project(t)
@@ -2780,7 +2781,8 @@ def project_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"置き場（{t.project or 'ワークスペース'}）が親 {parent.ticket} の"
-                f"置き場（{parent.project or 'ワークスペース'}）と違う。子は親と同じ置き場に置く",
+                f"置き場（{parent.project or 'ワークスペース'}）と違う。"
+                "子は親と同じ置き場に置いてください",
             )
         ]
     # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それは層では

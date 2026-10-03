@@ -304,7 +304,7 @@ class PresentTest(AuthorityHarness):
         started = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(0, started.returncode)
         self.assertIn("HEAD がブランチ i0001 を指していない", started.stderr)
-        self.assertIn("切り直す", started.stderr)
+        self.assertIn("切り直して", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
         # 子の写しが親のワークツリーから消え、元ツリーにだけ残った形（ADR-0073 の形）。
@@ -364,7 +364,7 @@ class UndecidedTest(AuthorityHarness):
         finished = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("手元と判定が違う", finished.stderr)
-        self.assertIn("打ち直す", finished.stderr)
+        self.assertIn("打ち直して", finished.stderr)
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         self.assertTrue(
             any(
@@ -432,7 +432,7 @@ class TombstoneTest(AuthorityHarness):
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.stop and not st.closed, st)
-        self.assertIn("墓標", st.stop)
+        self.assertIn("片付けても残る", st.stop)
         # 統合先の控えの done/ に親の写しがあれば、家族の控えに頼らず閉じた家族
         # （墓標は何も言わない）。
         base = os.path.join(self.state, "sync", "self", "integration")

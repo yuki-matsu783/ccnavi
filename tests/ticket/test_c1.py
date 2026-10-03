@@ -287,7 +287,7 @@ class RecordTreeTest(AuthorityHarness):
             "--approve", "--yes", "i0001-02", "--digest", preview["digest"], "--json"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("置き場の外に書いた", result.stderr)
+        self.assertIn("置き場の外に書き込みがあった", result.stderr)
         self.assertIn("wip/proposals/todo/i0001-02.md", listed)
         self.assertIn(f"{APPROVED}/doing/i0001-02.md", listed)
 

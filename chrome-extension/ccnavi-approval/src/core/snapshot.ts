@@ -192,7 +192,7 @@ async function integrationOf(repo: RepoConfig, reader: Reader, what: string): Pr
   const source = repo.integration ? "setting" : "default";
   const head = await reader.head(name);
   if (head === null) {
-    throw new Error(`${what}統合先 ${name} がリモートに無い。設定を直す`);
+    throw new Error(`${what}統合先 ${name} がリモートに無い。設定を直してください`);
   }
   return { name, source, head } as const;
 }

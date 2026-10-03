@@ -2116,7 +2116,7 @@ class TicketTest(unittest.TestCase):
                 guard_ticket_approval="enable",
             )
             self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-            self.assertIn("端末要求を切る形", self.reason(result), command)
+            self.assertIn("端末からの入力を求めないようにする形", self.reason(result), command)
         # 読むだけの形と、守る側の値は止めない。
         for command in (
             "echo $CCNAVI_GUARD_TICKET_APPROVAL",

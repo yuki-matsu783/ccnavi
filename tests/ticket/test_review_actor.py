@@ -255,7 +255,7 @@ class ReviewRuleTest(ActorHarness):
     def test_a_request_record_without_host_or_mr_is_not_matched(self):
         result = review.Result(host="github", mr=review.MergeRequest(7, "u"))
         for mark in ({"mr": 7}, {"host": "github"}, {}):
-            self.assertIn("依頼し直すこと", review.matching_problems(result, mark)[0], mark)
+            self.assertIn("依頼し直してください", review.matching_problems(result, mark)[0], mark)
         self.assertEqual(review.matching_problems(result, {"host": "github", "mr": 7}), [])
         self.assertTrue(review.matching_problems(result, {"host": "github", "mr": 8}))
 
@@ -374,7 +374,7 @@ class DecideActorTest(ActorHarness):
         fixture = self.ready()
         for extra, word in (
             (["--via=board"], "--via は decide の --actor"),
-            (["--actor=octo", "--via=chrome"], "--via は terminal か board"),
+            (["--actor=octo", "--via=chrome"], "--via に渡せるのは terminal か board"),
         ):
             with self.subTest(extra=extra):
                 done = self.decide(fixture, *extra)

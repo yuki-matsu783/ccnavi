@@ -436,7 +436,7 @@ def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
         return ["ccnavi: 結果にマージリクエストが無い"]
     if not requested_mark.get("host") or not requested_mark.get("mr"):
         # 照合できない依頼の記録で通すと、別の MR のスレッドでレビュー済みにできる（11.8.1 の 8）
-        return ["ccnavi: 依頼の記録にホストかマージリクエストの番号が無い。依頼し直すこと"]
+        return ["ccnavi: 依頼の記録にホストかマージリクエストの番号が無い。依頼し直してください"]
     if result.host != requested_mark.get("host"):
         return [
             f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"

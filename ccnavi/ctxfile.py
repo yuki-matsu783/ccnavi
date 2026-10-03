@@ -69,7 +69,7 @@ def load(stderr: TextIO, bases: list[str], rel: str) -> str:
     return (
         head[:MAX_CHARS].rstrip()
         + f"\n\n(ccnavi: {rel} は {MAX_CHARS} 文字を超えるので先頭だけを載せた。"
-        "続きはこのファイルを読むこと)"
+        "続きはこのファイルを読んでください)"
     )
 
 

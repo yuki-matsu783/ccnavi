@@ -254,7 +254,7 @@ class FlowReadPlaceTest(FlowHarness):
         child_tree = self.run_child(CHILD)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
         self.assertIn("人が持つもの。エージェントは編集しない", text)
-        self.assertIn("書き換わったらccnavi が知らせる", text)
+        self.assertIn("書き換わったら ccnavi が知らせる", text)
         self.assertNotIn("エージェントは書けない", text)
 
 
@@ -389,7 +389,8 @@ class FlowParentBriefingTest(PhaseHarness):
         for path in paths:
             self.assertIn(f"フロー: {path}", text)
         self.assertIn(
-            "自分の担当の子チケットのフローだけを読んで従う。他の子のフローには従わない", text
+            "自分の担当の子チケットのフローだけを読んで従ってください。他の子のフローには従わない",
+            text,
         )
         child_tree = self.run_child("i0001-01")
         own = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-2"))

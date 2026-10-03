@@ -232,7 +232,7 @@ fi
 sync_info=$(printf '%s\n' "$sync_info" | tr -d '\r')
 case "$info_from" in
 failed:*)
-	printf 'ccnavi-sync: 実行ファイル（%s）が置き場の綴りと統合先の設定を答えなかった（%s）。統合先を取り違えないよう止めた。\n' \
+	printf 'ccnavi-sync: 実行ファイル（%s）が置き場の綴りと統合先の設定を返さなかった（%s）。統合先を取り違えないよう止めた。\n' \
 		"${info_from#failed:}" "$(head -n 1 "$scratch/info" 2>/dev/null)" >&2
 	exit 2
 	;;
@@ -528,7 +528,7 @@ sync_family() {
 
 	busy=$(busy_state "$tree")
 	if [ -n "$busy" ]; then
-		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直す（この sh は触らない）\n' "$P" "$busy"
+		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直してください（この sh は触らない）\n' "$P" "$busy"
 		fail_note
 	elif has_head "$heads" "$P"; then
 		sync_present
@@ -756,7 +756,7 @@ check_family() {
 	if [ -n "$cf_done" ]; then
 		printf '%s: 取り込みの後の検査で家族を止めた（家族の控えを blocked にした）。%s\n' "$1" "$cf_reason"
 		sed -n 's/^error /  - /p' "$scratch/check"
-		printf '  直してから、オンラインで sh %s/ccnavi-sync.sh %s を打ち直す（検査し直して通れば present に戻る）\n' "$here_sh" "$1"
+		printf '  直してから、オンラインで sh %s/ccnavi-sync.sh %s を打ち直してください（検査し直して通れば present に戻る）\n' "$here_sh" "$1"
 		fail_note
 	else
 		printf '%s: 取り込みの後の検査で止める理由があったが、ロックが取れないか家族の控え（%s）を書けず、3 回試しても止められなかった（%s）。家族はまだ止まっていない。打ち直してください\n' \
@@ -797,7 +797,7 @@ while IFS= read -r key <&4; do
 	fi
 	if [ -n "$integration_want" ]; then
 		if ! has_head "$heads" "$integration_want"; then
-			printf '%s統合先 %s（%s）がリモートに無い。設定を直す。取り込みを止めた\n' "$label" \
+			printf '%s統合先 %s（%s）がリモートに無い。設定を直してください。取り込みを止めた\n' "$label" \
 				"$integration_want" "$(source_words "$integration_source")"
 			repo_fail
 			continue

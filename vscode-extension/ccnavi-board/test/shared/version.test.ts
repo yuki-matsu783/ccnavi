@@ -53,7 +53,7 @@ test("CB-T269 起動のときの知らせ。揃っていれば言わず、古い
   assert.match(old, /scripts\/ccnavi-setup\.sh/);
   // ccnavi のリポジトリ（build.py とソースがある）では組み立て直し
   const oldHere = skewMessage({ kind: "old" }, true) ?? "";
-  assert.match(oldHere, /build\.py を回して組み立て直して/);
+  assert.match(oldHere, /build\.py を実行して組み立て直して/);
   assert.doesNotMatch(oldHere, /ccnavi-setup/);
 
   const exeOld = skewMessage(ok({ compat: EXTENSION_COMPAT - 1 }), true) ?? "";

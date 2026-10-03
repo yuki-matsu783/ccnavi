@@ -521,7 +521,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         stderr.write("ccnavi: --via は decide の --actor と一緒に使う\n")
         return EXIT_ERROR
     if args.via and args.via not in (history.VIA_TERMINAL, history.VIA_BOARD):
-        stderr.write(f"ccnavi: --via は {history.VIA_TERMINAL} か {history.VIA_BOARD}\n")
+        stderr.write(f"ccnavi: --via に渡せるのは {history.VIA_TERMINAL} か {history.VIA_BOARD}\n")
         return EXIT_ERROR
     # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
     # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
@@ -605,7 +605,7 @@ def _recorded_run(
         outside = _outside_places(root, args, base, reals)
         if outside:
             stderr.write(
-                "ccnavi: C1 は状態だけを運ぶ。置き場の外に書いた（"
+                "ccnavi: C1 が運ぶのは状態だけで、置き場の外に書き込みがあった（"
                 + ", ".join(outside)
                 + "）。コミットしない\n"
             )

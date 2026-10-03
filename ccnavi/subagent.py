@@ -124,7 +124,7 @@ def at_start(
         try:
             brief = flow.briefing(conf, root, t, scope, budget, full=full)
         except Exception as exc:  # noqa: BLE001  壊れたフローで SubagentStart を落とさない
-            brief = [f"    フローを読めない（{type(exc).__name__}）。人に確かめる"]
+            brief = [f"    フローを読めない（{type(exc).__name__}）。人に確かめてください"]
         budget -= sum(len(line) for line in brief)
         listed = listed or bool(brief)
         lines.extend(brief)
@@ -133,8 +133,8 @@ def at_start(
             changed.append(notice)
     if listed and not full:
         lines.append(
-            "  フロー: 自分の担当の子チケットのフローだけを読んで従う。他の子のフローには従わない。"
-            "担当が分からなければ、読まずにメインに聞く"
+            "  フロー: 自分の担当の子チケットのフローだけを読んで従ってください。"
+            "他の子のフローには従わないでください。担当が分からなければ、読まずにメインに聞いてください"
         )
     lines.extend(changed)
     text = "\n".join(lines)

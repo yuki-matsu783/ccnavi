@@ -138,8 +138,8 @@ def index(conf: settings.Settings, root: str, cwd: str) -> str:
         return ""
     head = (
         f"[ccnavi] プロジェクト {project} のスキル（{home} からの相対）。"
-        "作業が当てはまるものは本文を Read で開き、参考に読む。"
-        "CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う。"
+        "作業が当てはまるものは本文を Read で開き、参考に読んでください。"
+        "CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従ってください。"
     )
     lines = [head, FENCE_OPEN]
     size = len(head)

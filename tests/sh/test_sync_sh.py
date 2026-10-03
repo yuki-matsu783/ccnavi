@@ -339,7 +339,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("blocked", record["state"])
         self.assertIn("ワークツリーの外", record["reason"])
         self.assertIn("blocked にした", done.stdout)
-        self.assertIn("打ち直す", done.stdout)
+        self.assertIn("打ち直して", done.stdout)
         # 理由を片付けて打ち直せば、検査し直して present に戻る。
         os.remove(stray)
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
@@ -718,7 +718,7 @@ class SyncTest(unittest.TestCase):
         launcher = self.launcher("#!/bin/sh\necho broken >&2\nexit 1\n")
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
-        self.assertIn("答えなかった", done.stderr)
+        self.assertIn("返さなかった", done.stderr)
         self.assertFalse(os.path.exists(self.mirror))
 
     def test_the_host_default_branch_is_read_from_the_remote(self):

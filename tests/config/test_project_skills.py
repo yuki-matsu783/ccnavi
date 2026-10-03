@@ -175,8 +175,8 @@ class ProjectSkillsTest(unittest.TestCase):
     def test_the_heading_says_it_is_reference_only(self):
         self.put("deploy", skill("deploy", "本番へ出す手順"))
         said = self.context("SessionStart", self.lib)
-        self.assertIn("参考に読む", said)
-        self.assertIn("CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う", said)
+        self.assertIn("参考に読んで", said)
+        self.assertIn("CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従って", said)
 
     # --- 7. cd で入った最初の呼び出しで 1 度 ----------------------------------------------
 

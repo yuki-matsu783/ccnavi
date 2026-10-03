@@ -966,7 +966,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("今期はここまで", issue)
         # 締めたので、フィードバック計画が無くても親を閉じられる。
         explained = self.ccnavi("--explain")
-        self.assertIn("利用者が締めた", explained.stdout)
+        self.assertIn("人が締めた", explained.stdout)
         closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         # Draft はまだ外れていない。片付けて push してから ready で外す。

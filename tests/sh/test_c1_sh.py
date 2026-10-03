@@ -408,7 +408,7 @@ class C1TicketTest(C1Harness):
         )
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("ロックを持っている", result.stderr)
+        self.assertIn("ロックを他の操作が持っている", result.stderr)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
         self.assertTrue(os.path.isdir(self.lock_dir()))
 
@@ -643,7 +643,7 @@ class C1TicketTest(C1Harness):
         git(self.ws, "config", "gpg.program", signer)
         result = self.ticket("start", PARENT, CCNAVI_C1_COMMIT_TIMEOUT="2")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("見張り", result.stderr)
+        self.assertIn("制限時間", result.stderr)
         self.assertEqual(self.dirty(), "")
 
     def test_the_users_commit_hooks_are_skipped(self):
@@ -708,7 +708,7 @@ class C1TicketTest(C1Harness):
         )
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("ロックが長い", result.stderr)
+        self.assertIn("10 分を超えて取られたまま", result.stderr)
         self.assertTrue(os.path.isdir(self.lock_dir()))
 
     def test_a_long_lock_names_its_owner_and_how_to_stop_it(self):
@@ -724,7 +724,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(old))
         self.assertIn(f"持ち主は pid {os.getpid()}・ホスト {host}・開始 {at}", result.stderr)
-        self.assertIn("人が終了させてから打ち直す", result.stderr)
+        self.assertIn("人に終了させてもらってから打ち直して", result.stderr)
         self.assertTrue(os.path.isdir(self.lock_dir()))
 
     # ---- 基点のリンク
@@ -893,7 +893,9 @@ class C1HumanTest(PhaseOne, C1Harness):
         result = self.sh("ccnavi-push-approved.sh")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子のワークツリー", result.stderr)
-        self.assertEqual(result.stdout.count("取り込んでから送った"), 1, result.stdout)
+        self.assertEqual(
+            result.stdout.count("承認済みチケットを、取り込んでから"), 1, result.stdout
+        )
         self.assertIn(rel, self.committed())
         self.assertEqual(self.remote_sha(CHILD), "")
 
@@ -932,7 +934,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.remote_commit("src/remote.py", "y = 2\n")
         result = self.sh("ccnavi-push-approved.sh")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("取り込んでから送った", result.stdout)
+        self.assertIn("承認済みチケットを、取り込んでから", result.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
 

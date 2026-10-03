@@ -88,4 +88,4 @@ class TicketControlTest(unittest.TestCase):
         self.assertTrue(last.startswith("（現状: CCNAVI_MODE=dry-run"), text)
         # 止まらないことだけで終えない。通ったことを許可と読ませない。
         self.assertIn("許可と読まず", last)
-        self.assertIn("次から従う", last)
+        self.assertIn("次からは従う", last)

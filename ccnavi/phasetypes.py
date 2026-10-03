@@ -204,7 +204,7 @@ def parse(
         ]
     raw = data.get("phases")
     if not isinstance(raw, dict) or not raw:
-        return None, [Problem(SEVERITY_ERROR, where, "`phases` が辞書として無い")]
+        return None, [Problem(SEVERITY_ERROR, where, "`phases` が無いか空か、辞書ではない")]
     order = str(data.get("order") or ORDER_SEQUENTIAL).strip()
     if order not in ORDERS:
         return None, [Problem(SEVERITY_ERROR, where, f"`order` は {' か '.join(ORDERS)}")]

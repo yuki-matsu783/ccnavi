@@ -548,7 +548,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
-        self.assertIn("dry-run なので判定しても呼び出しに手を出さない", result.stdout)
+        self.assertIn("dry-run なので判定はしても、呼び出しには何もしない", result.stdout)
         # 戻す働きの 2 つは、書かれた値が enable でもモードに合わせて dry-run になる。
         # 実効値で見るので、そのぶんも言う（門の名前と、モードに合わせたことの両方）。
         self.assertEqual(warns, 3, result.stdout)

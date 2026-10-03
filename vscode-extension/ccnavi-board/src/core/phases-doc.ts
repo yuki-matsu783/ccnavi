@@ -74,7 +74,7 @@ export function readPhases(text: string): PhasesDocument {
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
-    problems.push("phases がありません。実行ファイルは「`phases` が辞書として無い」と報告します。種類を 1 つ以上足して保存してください");
+    problems.push("phases がありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します。種類を 1 つ以上足して保存してください");
   } else if (!isMap(raw)) {
     problems.push("phases がマップ（キーと値の組の集まり）ではありません。種類は画面に出しません。保存すると中身を捨てて空のマップから始めます");
   } else {
@@ -87,7 +87,7 @@ export function readPhases(text: string): PhasesDocument {
       phases.push(formOf(index, id, pair.value, problems));
     });
     if (phases.length === 0 && problems.length === 0) {
-      problems.push("種類が 1 つもありません。実行ファイルは「`phases` が辞書として無い」と報告します");
+      problems.push("種類が 1 つもありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します");
     }
   }
 

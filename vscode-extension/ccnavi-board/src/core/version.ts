@@ -78,8 +78,8 @@ export function parseVersionJson(text: string): ParsedVersion {
  */
 export function rebuildHint(fromSource: boolean): string {
   return fromSource
-    ? "build.py を回して組み立て直してください（uv run --with pyinstaller python build.py）"
-    : "ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> --force で配り直してください";
+    ? "build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
+    : "ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で配り直してください";
 }
 
 /** 拡張を新しくする直し方 */

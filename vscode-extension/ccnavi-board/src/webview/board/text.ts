@@ -114,7 +114,7 @@ const EXPLAINED_HEADS = new Set([
   "■ 判定に効かない記述",
 ]);
 
-const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 依存している他チケット: "];
+const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 先行: "];
 
 /** 承認画面の本文の 1 行と、その行にまとめた説明 */
 export interface BodyLine {

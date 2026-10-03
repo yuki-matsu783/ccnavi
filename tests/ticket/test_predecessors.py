@@ -119,7 +119,7 @@ class PredecessorTest(TicketTest):
         self.propose_after("i0001-03", "i0001-01")
         refused = self.approve()
         self.assertIn("先行 i0001-01 が複数の場所にある", refused.stderr)
-        self.assertIn("1 つに決める", refused.stderr)
+        self.assertIn("1 つに決めて", refused.stderr)
         self.assertFalse(self.placed("i0001-03"))
 
     def test_self_parent_and_loops_are_errors_that_name_the_cause(self):

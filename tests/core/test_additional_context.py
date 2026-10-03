@@ -275,7 +275,7 @@ class AdditionalContextTest(unittest.TestCase):
         cut = self.judge("Write", os.path.join(self.root, "docs", "x.md"))["additionalContext"]
         self.assertTrue(cut.startswith("あ" * ctxfile.MAX_CHARS + "\n\n(ccnavi: docs/long.md は"))
         self.assertNotIn("あ" * (ctxfile.MAX_CHARS + 1), cut)
-        self.assertIn("続きはこのファイルを読む", cut)
+        self.assertIn("続きはこのファイルを読んで", cut)
         # 無いファイルは何も足さない。
         self.assertEqual(self.judge("Write", os.path.join(self.root, "etc", "a")), {})
         # 試験にも本文が出る。

@@ -182,9 +182,9 @@ ccnavi_compat_skew() {
 	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
 	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
 	if [ -f "$1/build.py" ] && [ -f "$1/ccnavi/__main__.py" ]; then
-		ccnavi_cs_fix="build.py を回して組み立て直してください（uv run --with pyinstaller python build.py）"
+		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
-		ccnavi_cs_fix="ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
+		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi
 	if [ -z "$ccnavi_cs_have" ]; then
 		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"
@@ -559,7 +559,7 @@ ccnavi_lock_describe() {
 		fi
 		[ -n "$ccnavi_lds_at" ] || ccnavi_lds_at="$ccnavi_lds_started"
 	fi
-	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人が終了させてから打ち直す（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
+	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、人に終了させてもらってから打ち直してください（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
 		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
 }
 
@@ -867,16 +867,16 @@ ccnavi_c1_begin() {
 	*)
 		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/$ccnavi_c1_family_id"
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが長い（10 分を超えて持たれている）。持ち主はまだ動いているので奪わない。終わるのを待つか、人が持ち主を確かめる。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
+			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、人に持ち主を確かめてもらってください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id は他の操作がロックを持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
+			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
 		fi
 		return 1
 		;;
 	esac
 	ccnavi_cb_busy=$(ccnavi_c1_busy "$ccnavi_c1_tree")
 	if [ -n "$ccnavi_cb_busy" ]; then
-		ccnavi_c1_say "親のワークツリーに途中の操作（${ccnavi_cb_busy}）がある。済ませるか取りやめてから打ち直す（何も書いていない）"
+		ccnavi_c1_say "親のワークツリーに途中の操作（${ccnavi_cb_busy}）がある。済ませるか取りやめてから打ち直してください（何も書いていない）"
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -998,7 +998,7 @@ ccnavi_c1_commit() {
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
 		cat "$ccnavi_c1_tmp/out" >>"$ccnavi_c1_tmp/err"
-		ccnavi_c1_say "コミットできなかった（見張りで切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_c1_tmp/err")"
+		ccnavi_c1_say "コミットできなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_c1_tmp/err")"
 		ccnavi_c1_unstage "$ccnavi_c1_tmp/added" "$ccnavi_cc_base"
 		return 1
 	fi

@@ -320,7 +320,7 @@ class FlowRenderTest(unittest.TestCase):
         lines, _ = flow.render(fan)
         self.assertIn(f"…ほか {3000 - flow.ITEM_LIMIT} 件", lines[0])
         self.assertLessEqual(sum(len(x) for x in lines[:-1]), flow.CHILD_TEXT_LIMIT)
-        self.assertIn("続きはファイルを読む", lines[-1])
+        self.assertIn("続きはファイルを読んで", lines[-1])
 
     def test_long_chains_are_fast(self):
         n = 20_000
@@ -750,13 +750,13 @@ class FlowLockTest(FlowHarness):
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         text = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertIn(self.flow_path, text)
-        self.assertIn("読み直す", text)
+        self.assertIn("読み直して", text)
         self.assertIn("着手中なので", text)
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn("3. [askUserQuestion] 方針", text)
         self.assertIn("[fancyNewNode] 未来の種類", text)
         # askUserQuestion: 止まってメインに返す。
-        self.assertIn("問いと選択肢を添えてメインに返す", text)
+        self.assertIn("問いと選択肢を添えてメインに返して", text)
         # subAgent: 入れ子で起こし、担当の子・ワークツリー・範囲を必ず書く。Agent が無ければ返す。
         self.assertIn(f"担当の子チケット {CHILD}", text)
         self.assertIn(child_tree, text)

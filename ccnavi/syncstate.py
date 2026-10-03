@@ -495,7 +495,7 @@ class Families:
                 stop = (
                     f"親のワークツリー（{where}）が無い。"
                     "取り込み済みの家族でどの写しを本物とするかが決まらない"
-                    "（家族の控えは墓標として残る）"
+                    "（家族の控えは、親のワークツリーを片付けても残る）"
                 )
         else:
             stop = ""
@@ -567,31 +567,35 @@ def guidance(root: str, st: Standing) -> list[str]:
     if record is not None and record.broken:
         return [
             f"控え（{record.path}）の中身を人が確かめ、壊れていれば人が '{sync} --forget {name}' で"
-            f"消してから、オンラインで '{sync} {name}' を打ち直す",
+            f"消してから、オンラインで '{sync} {name}' を打ち直してください",
         ]
     if record is not None and record.state == STATE_GONE:
         return [
             f"オンラインで '{sync} {name}' を打つと戻し方が出る。改名・消し間違いなら利用者に"
-            f"元の名前 {name} でブランチを戻してもらい、オンラインで '{sync} {name}' を打ち直す",
+            f"元の名前 {name} でブランチを戻してもらい、オンラインで '{sync} {name}' を"
+            "打ち直してください",
             f"家族を捨てたなら、親のワークツリーを片付けて（'{git} worktree remove "
-            f".claude/worktrees/{name}'）、人が '{sync} --forget {name}' で家族の控えを消す"
+            f".claude/worktrees/{name}'）、人に '{sync} --forget {name}' で家族の控えを"
+            "消してもらってください"
             "（エージェントは打たない）",
         ]
     if record is not None and record.state == STATE_BLOCKED:
         return [
-            f"理由を直してから、オンラインで '{sync} {name}' を打ち直す"
+            f"理由を直してから、オンラインで '{sync} {name}' を打ち直してください"
             "（検査し直して通れば present に戻る）"
         ]
     if st.home is None and "途中の操作" in st.stop:
         return [
-            "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから打ち直す"
+            "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから"
+            "打ち直してください"
         ]
     return [
-        f"親のワークツリーを切り直す（'{git} fetch origin {name}' のあと "
+        f"親のワークツリーを切り直してください（'{git} fetch origin {name}' のあと "
         f"'{git} worktree add .claude/worktrees/{name} -b {name} origin/{name}'）。"
-        f"別のブランチに居るなら {name} に戻す。閉じた家族なら、オンラインで '{sync}' を打って"
-        "統合先を取り込み直す。捨てた家族なら、人が "
-        f"'{sync} --forget {name}' で家族の控えを消す",
+        f"別のブランチに居るなら {name} に戻してください。"
+        f"閉じた家族なら、オンラインで '{sync}' を打って"
+        "統合先を取り込み直してください。捨てた家族なら、人に "
+        f"'{sync} --forget {name}' で家族の控えを消してもらってください",
     ]
 
 

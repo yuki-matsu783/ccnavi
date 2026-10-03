@@ -625,7 +625,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(
-        "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。"
+        "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より優先される。"
         "範囲の外は止まる\n"
     )
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
@@ -667,9 +667,11 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
         wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
         if wrapped:
-            stdout.write(f"  {parent.ticket} は利用者が締めた: {wrapped.get('reason', '')}\n")
+            stdout.write(f"  {parent.ticket} は人が締めた: {wrapped.get('reason', '')}\n")
         if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
-            stdout.write(f"  {parent.ticket} は Draft を外した。マージは利用者が行う\n")
+            stdout.write(
+                f"  {parent.ticket} のマージリクエストの Draft を外した。マージは利用者が行う\n"
+            )
         for ph in phase.phases_of(root, conf, parent.ticket):
             marks = ", ".join(sorted(ph.marks)) or "マーカーなし"
             if not ph.tickets:

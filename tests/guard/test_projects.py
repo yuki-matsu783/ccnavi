@@ -434,7 +434,7 @@ class ProjectsTest(unittest.TestCase):
         result = self.ccnavi("--approve", stdin="y\n")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場（ワークスペース）と違う", result.stderr)
-        self.assertIn("wip/proposals/ に置く", result.stderr)
+        self.assertIn("wip/proposals/ に置いて", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007.md")))
 
     def test_a_child_placed_apart_from_its_parent_is_not_approved(self):
@@ -450,7 +450,7 @@ class ProjectsTest(unittest.TestCase):
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
         # 1 で終わる（REQ-MLT-31）。
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("子は親と同じ置き場に置く", result.stderr)
+        self.assertIn("子は親と同じ置き場に置いて", result.stderr)
         self.assertTrue(os.path.exists(self.approved_path("doing", "i0007.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007-01.md")))
 
