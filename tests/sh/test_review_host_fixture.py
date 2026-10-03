@@ -27,7 +27,8 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi import review, version
+from ccnavi.entry import version
+from ccnavi.tickets import review
 from tests import ROOT
 from tests.sh import github_host, gitlab_host
 

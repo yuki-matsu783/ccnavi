@@ -3,7 +3,7 @@
  *
  * 見るところは 4 つ。**線に向きが無いこと**（`requires` は一緒に置く条件で、順序ではない）、
  * **判定をしないこと**（循環も到達不能も見つけない。ADR-0035）、**置き場所が id だけで
- * 決まること**（保存のたびに中身が届き直すので、関係を直して絵が飛ぶと使いものにならない）、
+ * 決まること**（保存のたびに中身が届き直すので、関係を直すたびに点の配置が変わると使いものにならない）、
  * そして**線が気づかないうちに消えないこと**（id にハイフンが使えるので、名前の作り方を誤ると別の線と同じ名前になる）。
  */
 import { test } from "node:test";
@@ -73,7 +73,7 @@ test("CB-T187 置き場所は id だけで決まる。関係を直しても、�
   const linked = base.map((p) => (p.id === "docs" ? { ...p, requires: ["design"] } : p));
   assert.deepEqual(spots(form(...linked)), before, "関係を足したら点が動いた");
 
-  // 表記を間違えて線が落ちても動かない
+  // 表記を間違えて線にならなくても、点は動かない
   const typo = base.map((p) => (p.id === "staging" ? { ...p, requires: ["acceptence"] } : p));
   assert.deepEqual(spots(form(...typo)), before, "行き先の無い参照で点が動いた");
 

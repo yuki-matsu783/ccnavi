@@ -12,7 +12,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi import rules
+from ccnavi.policy import rules
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -98,7 +98,7 @@ class RootPlaceholderTest(unittest.TestCase):
     def test_main_is_denied_and_worktrees_are_allowed(self):
         denied = [
             os.path.join(self.root, "README.md"),
-            os.path.join(self.root, "ccnavi", "cli.py"),
+            os.path.join(self.root, "ccnavi", "entry", "cli.py"),
             os.path.join(self.root, ".gitignore"),
             os.path.join(self.root, ".ccnavi", "common", "rules.yml"),
             os.path.join(self.root, ".claude", "settings.json"),
@@ -111,7 +111,7 @@ class RootPlaceholderTest(unittest.TestCase):
                 self.assertIn("main-tree", out.get("permissionDecisionReason", ""))
         allowed = [
             os.path.join(self.root, ".claude", "worktrees", "x", "README.md"),
-            os.path.join(self.root, ".claude", "worktrees", "x", "ccnavi", "cli.py"),
+            os.path.join(self.root, ".claude", "worktrees", "x", "ccnavi", "entry", "cli.py"),
             os.path.join(self.root, ".claude", "worktrees", "x", ".ccnavi", "common", "rules.yml"),
         ]
         for path in allowed:

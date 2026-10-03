@@ -70,7 +70,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     const notes = dom.all(".graph-note").map((note) => note.textContent ?? "");
     assert.deepEqual(notes.length, 1);
     assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていません/);
-    // 線が落ちた理由は断定しない（表記違いかもしれない。ADR-0035）。良し悪しも言わない
+    // 線にならなかった理由は断定しない（表記違いかもしれない。ADR-0035）。良し悪しも言わない
     assert.doesNotMatch(notes[0], /他の層の種類を指す/);
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
     // sequential でも after が無ければ、判定に使われないという注意は出さない
@@ -224,7 +224,7 @@ test("CB-D89 見本の図は after の矢印で流れを描き、work と feedba
     assert.match(dom.one('.phase-group[data-kind="work"]').textContent ?? "", /作業（plan:）/);
     assert.match(dom.one('.phase-group[data-kind="feedback"]').textContent ?? "", /フィードバック対応（feedback:）/);
     assert.match(dom.one(".phase-group-arrow").textContent ?? "", /レビュー後/);
-    // 見本は dag で、落ちた線も id の空の種類も無いので、注意は 1 つも出ない
+    // 見本は dag で、線にならなかった参照も id の空の種類も無いので、注意は 1 つも出ない
     assert.equal(dom.all(".graph-note").length, 0);
   } finally {
     await dom.close();

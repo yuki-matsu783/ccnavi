@@ -181,7 +181,7 @@ test("CB-D126 選んだノードを Ctrl+C でコピーして Ctrl+V で貼る�
     assert.equal(dom.all(".react-flow__edge").length, 3);
     assert.deepEqual(dom.all(".react-flow__node.selected").map((n) => n.getAttribute("data-id")).sort(), ["end-1", "prompt-2"]);
     assert.ok(dirty(dom));
-    // 複製（ボタン）。いま選んでいる貼ったものが増える
+    // 複製（ボタン）。いま選んでいる貼り付けたものが増える
     dom.click(button(dom, "duplicate-nodes"));
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 7);
@@ -190,7 +190,7 @@ test("CB-D126 選んだノードを Ctrl+C でコピーして Ctrl+V で貼る�
     dom.key("d", undefined, CTRL);
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 9);
-    // 貼るのも複製も 1 回で元に戻す 1 件
+    // 貼り付けも複製も 1 回で元に戻す 1 件
     dom.key("z", undefined, CTRL);
     await dom.settle();
     dom.key("z", undefined, CTRL);
@@ -337,7 +337,7 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     assert.ok(!items.some((li) => /開始（start）のノードがありません/.test(li.textContent ?? "")), "画面の注意と二重に出さない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. [prompt] プロンプト\n2. [end] 終了");
     assert.equal(dom.all("#flow-preview-checking").length, 0);
-    // 開いたままでは確かめ直さない（答えが指すコピーのまま）
+    // 開いたままでは確かめ直さない（答えが指す中身のまま）
     await waitCheck(dom);
     assert.deepEqual(checksAsked(dom), []);
     // 直すと、止まってから確かめ直しを頼む。その間は前の答えを出したまま、そう言う
@@ -455,7 +455,7 @@ test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた
     assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確かめ終わったことにしない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
     assert.doesNotMatch(dom.one("body").textContent ?? "", /古いコピーの答え/);
-    // 今のコピーの答えは使う
+    // 今の中身に対する答えは使う
     await waitCheck(dom);
     const second = checksAsked(dom);
     assert.equal(second.length, 2);

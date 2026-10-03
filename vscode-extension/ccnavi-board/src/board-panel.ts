@@ -337,7 +337,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       current.host.ready();
       redraw(current);
       // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
+      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
       postAppearance(current.host);
       // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
       // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
@@ -410,7 +410,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     default: {
       // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
-      // 画面のボタンだけ足して受け側を忘れる、を止める
+      // 画面のボタンだけ足して受け側を書き忘れるのを防ぐ
       const unhandled: never = message;
       void unhandled;
       return;
@@ -463,7 +463,7 @@ function dispatch(current: PanelState, input: ApprovalInput): void {
 }
 
 /**
- * 遷移が返した「やること」を行う。外へ出るのはここだけ（実行ファイル・端末・クリップボード・
+ * 遷移が返した「やること」を行う。外へ出るのはここだけ（実行ファイル・ターミナル・クリップボード・
  * 新しいセッション・通知）。返事が要るもの（一覧と承認の結果）は、返ってきたらまた `dispatch` に入れる。
  *
  * **返事を入れる前に、パネルがまだ同じかを見る。** 開き直された後のパネルに、前のパネルの
@@ -481,7 +481,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     }
     case "approve": {
       // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
-      // 見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに書き出される中身）も渡す。識別子が同じでも、
+      // 見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに書き込まれる中身）も渡す。識別子が同じでも、
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       if (state === current) {
@@ -624,7 +624,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "promptOpen":
       return { type: m.type };
     case "approve":
-      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きになる。
+      // 形が崩れていたら捨てる。「全部承認」として扱うと、検証に失敗したときに承認の範囲が広がってしまう。
       return Array.isArray(m.tickets) &&
         m.tickets.every((t) => typeof t === "string") &&
         typeof m.filtered === "boolean"

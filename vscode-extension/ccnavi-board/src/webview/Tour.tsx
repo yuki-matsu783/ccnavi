@@ -59,7 +59,7 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
 } {
   const [touring, setTouring] = useState(false);
   const [pending, setPending] = useState(false);
-  // 受け取る側は描くたびに作り直さないので、呼ぶ先はいまのものを覚えておく
+  // 受け取る側は描くたびに作り直さないので、呼ぶ先はいまのものを ref へ入れておく
   const latest = useRef(hooks);
   latest.current = hooks;
   const touringRef = useRef(touring);

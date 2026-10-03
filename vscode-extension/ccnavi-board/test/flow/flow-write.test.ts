@@ -194,6 +194,6 @@ test("CB-T245 読んだバイトは UTF-8 として壊れていれば文字に�
   // 実行ファイル（utf-8-sig）と同じく、先頭の BOM は 1 つだけ外す
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFFnodes: []\n", "utf8")), { ok: true, text: "nodes: []\n" });
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFF\uFEFFx", "utf8")), { ok: true, text: "\uFEFFx" });
-  // 途中で切れた多バイト文字も壊れている
+  // 途中で切れた多バイト文字も UTF-8 として読めない
   assert.equal(decodeFlowBytes(Buffer.from("あ", "utf8").subarray(0, 2)).ok, false);
 });

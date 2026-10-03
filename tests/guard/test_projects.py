@@ -29,7 +29,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import tree
+from ccnavi.infra import tree
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -354,7 +354,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0008.md"),
             ticket_text("i0008", allow=("src/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
         wrong = self.worktree(self.app, "i0007")
@@ -383,7 +383,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
         wrong = self.worktree(self.app, "I0007")
@@ -404,7 +404,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0009.md"),
             ticket_text("i0009", allow=("docs/skills/deploy/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.worktree(self.lib, "i0009")
         skill = os.path.join(tree, "docs", "skills", "deploy", "SKILL.md")
@@ -439,7 +439,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(found, {"i0007": "lib", "i0007-01": "lib"})
         self.assertEqual(board["pending_approval"], ["i0007", "i0007-01"])
 
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる（REQ-MLT-11）
         self.assertIn("■ プロジェクト: lib", approved.stdout)
@@ -454,7 +454,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.ws, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", project="lib", allow=("src/*",)),
         )
-        result = self.ccnavi("--approve", stdin="y\n")
+        result = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場（ワークスペース）と違う", result.stderr)
         self.assertIn("wip/proposals/ に置いて", result.stderr)
@@ -469,7 +469,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.app, "wip", "proposals", "todo", "i0007-01.md"),
             ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
         )
-        result = self.ccnavi("--approve", stdin="y\n")
+        result = self.ccnavi("--agree", stdin="y\n")
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
         # 1 で終わる（REQ-MLT-31）。
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -487,7 +487,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(tree, "wip", "proposals", "todo", "i0010.md"),
             ticket_text("i0010", allow=("src/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertNotIn("の中に提案がある", approved.stderr)
         self.assertIn("■ プロジェクト: lib", approved.stdout)
@@ -540,7 +540,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
+        self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
         # 承認はプロジェクトの todo/ からプロジェクトの doing/ へ動かす。取り消すと done/ へ。
         # 置き場はプロジェクトの git が持つ（設計 11.5）。
         lib_approved = os.path.join(self.lib, ".ccnavi", "approved")
@@ -559,7 +559,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
+        self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "--quiet", "-m", "approve")
         tree = self.worktree(self.lib, "i0007")

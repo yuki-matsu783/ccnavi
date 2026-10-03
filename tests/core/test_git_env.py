@@ -5,7 +5,7 @@
 
 1. 締め出しを外す（`tests/__init__.py` から消える、環境変数の名前が変わる）
 2. `tests/inproc.py` が環境を空にするときに巻き添えで落とす。ccnavi は判定の中で
-   git を起こす（`ccnavi/gitcmd.py`）ので、この経路だけがホストの設定を読み直す
+   git を起こす（`ccnavi/infra/gitcmd.py`）ので、この経路だけがホストの設定を読み直す
 3. 検査対象の sh が環境を消毒するときに巻き添えで落とす。`ccnavi-git.sh` は
    `GIT_CONFIG_COUNT` などを unset していて、そこに名前が足されると気づかないうちに外れる
 
@@ -22,7 +22,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import gitcmd
+from ccnavi.infra import gitcmd
 from tests import GIT_ENV
 from tests.inproc import run_ccnavi
 
@@ -95,7 +95,7 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
             seen.update(os.environ)
             return 0
 
-        with mock.patch("ccnavi.cli.run", record):
+        with mock.patch("ccnavi.entry.cli.run", record):
             run_ccnavi(["--help"], env={})
         for name, value in GIT_ENV.items():
             self.assertEqual(value, seen.get(name), f"{name} が空の環境で落ちている")
@@ -108,7 +108,7 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
             seen.update(os.environ)
             return 0
 
-        with mock.patch("ccnavi.cli.run", record):
+        with mock.patch("ccnavi.entry.cli.run", record):
             run_ccnavi(["--help"], env={"GIT_CONFIG_GLOBAL": "/nowhere"})
         self.assertEqual("/nowhere", seen.get("GIT_CONFIG_GLOBAL"))
 
@@ -127,7 +127,7 @@ class OptionalLocksAreOffTest(unittest.TestCase):
             seen.append(kwargs.get("env"))
             return subprocess.CompletedProcess(args, 0, "x\n", "")
 
-        with mock.patch("ccnavi.gitcmd.subprocess.run", record):
+        with mock.patch("ccnavi.infra.gitcmd.subprocess.run", record):
             call()
         self.assertTrue(seen, "git が起こされていない")
         return seen

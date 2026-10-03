@@ -93,7 +93,7 @@ test("CB-T272 コピーして貼ると id を振り直し、選んだノード�
   const clip = copyNodes(doc, ["if-1", "p-1", "end"]);
   assert.ok(clip !== undefined);
   assert.deepEqual(clip.nodes.map((n) => n.id), ["if-1", "p-1", "end"]);
-  // 片方しかコピーしていない線（開始 → 分岐）はコピーしない
+  // 片方の端しかコピーしていない線（開始 → 分岐）はコピーしない
   assert.deepEqual(clip.connections.map((c) => c.id), ["c2", "c3", "c4"]);
   const pasted = pasteNodes(doc, clip);
   assert.deepEqual(pasted.ids, ["ifElse-1", "prompt-1", "end-1"]);
@@ -108,7 +108,7 @@ test("CB-T272 コピーして貼ると id を振り直し、選んだノード�
     { id: "c-ifElse-1-end-1", from: "ifElse-1", to: "end-1", fromPort: "branch-1", toPort: "input" },
     { id: "c-prompt-1-end-1", from: "prompt-1", to: "end-1", fromPort: "output", toPort: "input" },
   ]);
-  // 中身と知らない欄は深いコピー（元を触っても貼ったものは変わらない）
+  // 中身と知らない欄はディープコピー（元を触っても貼り付けたものは変わらない）
   assert.deepEqual(byId(next, "prompt-1").extra, { keep: true });
   assert.deepEqual(byId(next, "ifElse-1").data, byId(doc, "if-1").data);
   assert.notEqual(byId(next, "ifElse-1").data, byId(doc, "if-1").data);
@@ -120,7 +120,7 @@ test("CB-T272 コピーして貼ると id を振り直し、選んだノード�
   // 終了はコピーできる。外に置いて 40 ずらす
   assert.equal(byId(next, "end-1").parentId, undefined);
   assert.deepEqual(byId(next, "end-1").position, { x: 490, y: 240 });
-  // 同じものをもう 1 度貼ると、また別の id
+  // 同じものをもう 1 度貼り付けると、また別の id
   const again = pasteNodes(next, clip, { x: 80, y: 80 });
   assert.deepEqual(again.ids, ["ifElse-2", "prompt-2", "end-2"]);
 });

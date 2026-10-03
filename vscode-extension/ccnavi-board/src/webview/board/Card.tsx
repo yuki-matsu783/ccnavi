@@ -328,7 +328,7 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
 }
 
 /**
- * 子のフロー（ADR-0085）を開くボタン。言葉は在るか・着手中か（実行ファイルの答えのまま）で変わる。
+ * 子のフロー（ADR-0085）を開くボタン。言葉は在るか・着手中か（実行ファイルの答えをそのまま反映したもの）で変わる。
  * 着手中でも押せる（読むだけの画面が開く）。押したら拡張ホストへ返すだけ
  */
 function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string }): JSX.Element {
@@ -352,14 +352,14 @@ function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string
 function ActionButton({ action, id }: { readonly action: Action; readonly id: string }): JSX.Element {
   switch (action.kind) {
     case "approve":
-      // このカードだけを承認の対象にする（`--approve --preview --json <識別子>`）。同じ親の承認待ちが他にあっても巻き込まない。
+      // このカードだけを承認の対象にする（`--agree --preview --json <識別子>`）。同じ親の承認待ちが他にあっても巻き込まない。
       return (
         <button
           type="button"
           className="action"
           data-action="approve-one"
           data-ticket={id}
-          title={`このチケットだけを承認します（ccnavi --approve ${id}）。まとめて承認するなら上部のボタンを使ってください`}
+          title={`このチケットだけを承認します（ccnavi --agree ${id}）。まとめて承認するなら上部のボタンを使ってください`}
           onClick={() => post({ type: "approve", tickets: [id], filtered: true })}
         >
           この 1 件を承認

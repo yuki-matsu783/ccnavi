@@ -21,7 +21,7 @@ import os
 import re
 import unittest
 
-from ccnavi import shellread
+from ccnavi.infra import shellread
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -41,7 +41,7 @@ BACKQUOTE = "(backquote)"
 AMBIGUOUS = "(ambiguous-form)"
 TICKET_STATE = "builtin-ticket-state-shell"
 # 承認の形の末尾。
-YES = " --approve --yes x"
+YES = " --agree --yes x"
 
 
 def judge(tool: str, subject: str, bin_path: str = "") -> dict:
@@ -163,10 +163,10 @@ class RepoRulesTest(unittest.TestCase):
 
     def test_引用の中の_preview_は承認の免除にならない(self):
         # phase.py の `_NOT_PREVIEW` は同じ語の中まで見ない。見ると、引数の値に
-        # `--preview` を書くだけで `--approve` の枝が免除される。
+        # `--preview` を書くだけで `--agree` の枝が免除される。
         for subject in [
-            'uv run python -m ccnavi --approve i0001 "a --preview"',
-            'ccnavi --approve "i0001 --preview"',
+            'uv run python -m ccnavi --agree i0001 "a --preview"',
+            'ccnavi --agree "i0001 --preview"',
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
@@ -176,25 +176,25 @@ class RepoRulesTest(unittest.TestCase):
 
         別のフラグの**値**に書いた `--preview` で免除が成立していた。argparse は
         `--reason=--preview` を値として読み取るので `--preview` はフラグにならず、実行ファイルは
-        本物の `--approve` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
+        本物の `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
         そこで食い違う（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
         """
         for subject in [
-            "ccnavi --approve --reason=--preview",
-            "ccnavi --approve --digest=--preview",
-            "ccnavi --approve --preview=x",
-            "ccnavi --approve x--preview",
-            "uv run python -m ccnavi --approve --reason=--preview i0001",
+            "ccnavi --agree --reason=--preview",
+            "ccnavi --agree --digest=--preview",
+            "ccnavi --agree --preview=x",
+            "ccnavi --agree x--preview",
+            "uv run python -m ccnavi --agree --reason=--preview i0001",
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
 
     def test_確かめる枝は今までどおり免除の側(self):
-        """`--approve --preview --verify` は免除の側。厳しくしたことで巻き添えにしない。"""
+        """`--agree --preview --verify` は免除の側。厳しくしたことで巻き添えにしない。"""
         for subject in [
-            "ccnavi --approve --preview --verify",
-            "ccnavi --approve --preview --verify i0001",
-            "ccnavi --approve --preview --verify --json i0001",
+            "ccnavi --agree --preview --verify",
+            "ccnavi --agree --preview --verify i0001",
+            "ccnavi --agree --preview --verify --json i0001",
         ]:
             with self.subTest(subject=subject):
                 body = judge("Bash", subject)
@@ -274,16 +274,16 @@ class TicketApprovalPathTest(LauncherJudgeTest):
     def test_承認でない形は承認のルールに当たらない(self):
         # A3。止めすぎの候補。中で実行されるコマンドを見ても、ここは広がらない。
         for subject in [
-            LAUNCHER + " --approve --preview x",
-            "sh " + LAUNCHER + " --approve --preview x",
+            LAUNCHER + " --agree --preview x",
+            "sh " + LAUNCHER + " --agree --preview x",
             "cat " + LAUNCHER,
-            "grep -n 'ccnavi --approve --yes' README.md",
+            "grep -n 'ccnavi --agree --yes' README.md",
             "sed -n 1,20p " + LAUNCHER,
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md",
             "echo " + LAUNCHER,
             # 引用しない形。`echo` や `grep` は実行役のコマンドではないので、中を見ない。
-            "echo ccnavi --approve --yes x",
+            "echo ccnavi --agree --yes x",
             "grep -rn ccnavi --yes docs",
             "git log --grep ccnavi --yes",
         ]:
@@ -293,15 +293,15 @@ class TicketApprovalPathTest(LauncherJudgeTest):
 
     def test_コミットの文面に書いた承認の形は_raw_git_だけに当たる(self):
         # A3 の続き。git を直に打ったことでは止まるが、承認のルールには当たらない。
-        body = self.judge("git commit -m 'docs: ccnavi --approve --yes の説明'")
+        body = self.judge("git commit -m 'docs: ccnavi --agree --yes の説明'")
         self.assertIn("raw-git", hit(body), body["rules"])
         self.assertNotIn(APPROVAL, hit(body), body["rules"])
 
     def test_sudo_の_sh_c_と_find_exec_の中の承認も止まる(self):
         # A4。実行役のコマンドの並びを正規表現に持たせる案（B）で残っていた 2 形。
         for subject in [
-            "sudo -u me sh -c 'ccnavi --approve --yes x'",
-            "find . -name x -exec ccnavi --approve --yes {} \\;",
+            "sudo -u me sh -c 'ccnavi --agree --yes x'",
+            "find . -name x -exec ccnavi --agree --yes {} \\;",
         ]:
             with self.subTest(subject=subject):
                 self.assert_denied_by(subject, APPROVAL)
@@ -338,10 +338,10 @@ GUARDED = [
     ("cp /tmp/rules.yml .ccnavi/common/rules.yml", SETTING_FILES),
     ("truncate -s 0 .claude/settings.json", SETTING_FILES),
     ("mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md", TICKET_STATE),
-    ("ccnavi --approve --yes x", APPROVAL),
-    ("sh .ccnavi/scripts/ccnavi-approve.sh", APPROVAL),
+    ("ccnavi --agree --yes x", APPROVAL),
+    ("sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL),
     # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。
-    ("sh .ccnavi/scripts/ccnavi-approve.sh i0002-03 i0002-04", APPROVAL),
+    ("sh .ccnavi/scripts/ccnavi-agree.sh i0002-03 i0002-04", APPROVAL),
 ]
 
 
@@ -365,7 +365,7 @@ class RunnerTest(LauncherJudgeTest):
     def test_env_越しの承認のスクリプトは途中の層で止まる(self):
         # W1 の続き。`sh …approve.sh` は `env` を外した途中の層で、
         # そこに承認の `script` の枝が当たる。
-        self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-approve.sh", APPROVAL)
+        self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL)
 
     def test_先頭に固定したユーザのルールも実行役のコマンドの中で当たる(self):
         # W2。
@@ -403,7 +403,7 @@ class RunnerTest(LauncherJudgeTest):
             # 代わりに通る sh 3 形。承認のスクリプトは元の形から止まっている。
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x": set(),
             "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md": set(),
-            "sh .ccnavi/scripts/ccnavi-approve.sh": {APPROVAL},
+            "sh .ccnavi/scripts/ccnavi-agree.sh": {APPROVAL},
             "exec zsh": set(),
             "time git log --oneline": {"raw-git"},
             "find . -name '*.pyc' -exec rm {} +": set(),
@@ -423,9 +423,9 @@ class RunnerTest(LauncherJudgeTest):
         for subject, runner, layer in [
             ("env rm -f .ccnavi/common/rules.yml", "env", "rm -f .ccnavi/common/rules.yml"),
             (
-                "env sh .ccnavi/scripts/ccnavi-approve.sh",
+                "env sh .ccnavi/scripts/ccnavi-agree.sh",
                 "env",
-                "sh .ccnavi/scripts/ccnavi-approve.sh",
+                "sh .ccnavi/scripts/ccnavi-agree.sh",
             ),
         ]:
             with self.subTest(subject=subject):
@@ -622,8 +622,8 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_組み込みの保護も中身に当たる(self):
         self.check(
             [
-                ('echo "$(ccnavi --approve x)"', "deny", "builtin-guard-ticket-approval", ""),
-                ("ls\nccnavi --approve x", "deny", "builtin-guard-ticket-approval", ""),
+                ('echo "$(ccnavi --agree x)"', "deny", "builtin-guard-ticket-approval", ""),
+                ("ls\nccnavi --agree x", "deny", "builtin-guard-ticket-approval", ""),
                 (
                     'echo "$(tee /repo/.ccnavi/common/rules.yml < /tmp/x)"',
                     "deny",

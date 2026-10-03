@@ -16,7 +16,7 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import audit, redact
+from ccnavi.records import audit, redact
 from tests.inproc import run_ccnavi
 
 # 形だけを持つ見本。本物のトークンではない。

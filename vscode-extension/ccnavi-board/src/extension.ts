@@ -16,7 +16,7 @@ import { warnVersionSkew } from "./version-check.js";
 export function activate(context: vscode.ExtensionContext): void {
   // 画面ごとの初回の案内を見たかどうかの置き場（`globalState`）
   initTours(context);
-  // 画面の入口はここに集める。画面どうしは互いを import せず、この帳面を通して開き合う。
+  // 画面の入口はここに集める。画面どうしは互いを import せず、ここで登録した一覧を通して互いを開く。
   registerScreens({
     board: openBoard,
     rules: openRules,

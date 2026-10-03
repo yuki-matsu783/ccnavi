@@ -137,7 +137,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   /**
    * id を打っている途中はstate を書き直さない（打ちかけの id が state に入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
-   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` に入れる
+   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ入れる
    * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
    */
   const latest = useRef<Editing>(editing);
@@ -407,7 +407,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   return (
     <>
       {page !== undefined && page.mode !== "enable" && page.mode !== "" && (
-        // 未設定は実行ファイルが enable として扱う（ccnavi/modes.py「どこにも値が無ければ enable」）ので帯は出さない
+        // 未設定は実行ファイルが enable として扱う（ccnavi/infra/modes.py「どこにも値が無ければ enable」）ので帯は出さない
         <div className="banner warn">
           現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（判定と記録のみ。deny や ask にヒットしても実行は止まりません）
         </div>

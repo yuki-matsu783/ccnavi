@@ -14,7 +14,7 @@ loggerは言語ごとに1つずつあり、どれも同じ形式の行を同じ�
 | 言語 | logger | 呼び方 |
 |---|---|---|
 | sh（`.ccnavi/scripts/`） | `ccnavi-common.sh`の`log_debug` `log_info` `log_warn` `log_error` | `log_info "本文" -- key=value` |
-| Python（`ccnavi/`） | `ccnavi/diaglog.py` | `diaglog.get("<出どころ>", root).info("本文", key=value)` |
+| Python（`ccnavi/`） | `ccnavi/records/diaglog.py` | `diaglog.get("<出どころ>", root).info("本文", key=value)` |
 | TypeScript（拡張） | `vscode-extension/ccnavi-board/src/log.ts` | `diaglog.get("ccnavi-board", root).error("本文", { key: value })` |
 
 ## 契約として決まっている出力とは分ける
@@ -70,7 +70,7 @@ loggerとは関係なく今のまま出し、loggerに置き換えない。文�
   TSは`openSync`のmodeで指定する。既にあるファイルの権限は変えない
 - 出力するレベルは`CCNAVI_LOG_LEVEL`に`DEBUG`/`INFO`/`WARN`/`ERROR`で指定する。大文字小文字は問わない。
   空のときと解釈できない値のときは`INFO`になる
-- 古いログの片付けは`ccnavi/prune.py`の`_prune_diag`が行い、セッションの開始時と`ccnavi --prune`の実行時に動く。
+- 古いログの片付けは`ccnavi/records/prune.py`の`_prune_diag`が行い、セッションの開始時と`ccnavi --prune`の実行時に動く。
   しきい値は判定の記録と同じものを使う。`CCNAVI_LOG_ROTATE_MB`を超えたファイルは`<出どころ>.<日時>.log`に
   名前を変え、`CCNAVI_LOG_KEEP_DAYS`の日数のあいだ更新されていない`*.log`は消す。その回に名前を変えたファイルは、
   その回には消さない。`--prune --preview`も同じ結果を表示する
@@ -110,7 +110,7 @@ log_debug 判定の材料 -- "sub=$sub" "top=$root" "cwd=$PWD"
   契約として決まっている出力なので変えない
 - loggerが伏せるのは最後の安全網にすぎない。まず秘密の値をloggerに渡さないことで守る
 
-伏せ方には、3つのloggerで揃っていない部分もある。Pythonはさらに`ccnavi/redact.py`の`redact`を通し、
+伏せ方には、3つのloggerで揃っていない部分もある。Pythonはさらに`ccnavi/records/redact.py`の`redact`を通し、
 トークンの形（`ghp_…`・`glpat-…`・`sk-…`など）、`名前=値`（`GITHUB_TOKEN=…`）、Authorizationヘッダ、`--password`などを
 `ghp_ab***6789`や`***`に伏せる。shとTSにはこの処理が無く、上の2つの形式だけを伏せる。
 shで`redact`を再現すると、正規表現の解釈が環境ごとに違ううえに処理も重くなる。TSには秘密を扱う場面が無い。

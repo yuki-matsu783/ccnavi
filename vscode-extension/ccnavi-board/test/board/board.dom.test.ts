@@ -238,7 +238,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     await page.send({ type: "filter", project: "無い名前" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
     assert.equal((page.state() as { project: string }).project, "app");
-    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に落ちない
+    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に戻らない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");

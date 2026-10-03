@@ -19,7 +19,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi import ticket
+from ccnavi.tickets import ticket
 
 TICKET = """---
 version: 1

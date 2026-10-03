@@ -14,7 +14,7 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi import review
+from ccnavi.tickets import review
 from tests import ROOT
 
 SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-review.sh")

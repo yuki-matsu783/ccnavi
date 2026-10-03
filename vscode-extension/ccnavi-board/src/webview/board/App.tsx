@@ -41,11 +41,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   });
   // 「更新」は押した時点で非活性にして回り記号を出す。活性に戻すのは、拡張ホストが読み直しを終えて
   // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す経路は要らない。
-  // 実行ファイルが返らない場合は期限（ccnavi.ts）が切る。
+  // 実行ファイルが返らない場合は期限（ccnavi.ts）で打ち切る。
   const [refreshing, setRefreshing] = useState(false);
 
   const board = data.kind === "board" ? data.board : undefined;
-  // 受け取る側（メッセージ）はいまのボードを知らないので、描くたびに覚えておく
+  // 受け取る側（メッセージ）はいまのボードを知らないので、描くたびに ref へ入れておく
   const boardRef = useRef<Board | undefined>(board);
   boardRef.current = board;
   // 初回の案内はボードが出てから始める。承認のオーバーレイが出ている間は、その下を指しても見えないので待つ

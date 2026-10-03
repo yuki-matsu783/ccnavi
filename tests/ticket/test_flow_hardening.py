@@ -23,7 +23,8 @@ import unittest
 
 import yaml
 
-from ccnavi import approval, flow, settings
+from ccnavi.infra import settings
+from ccnavi.tickets import approval, flow
 from tests.ticket.test_flow import (
     CHILD,
     WORKFLOW,

@@ -148,7 +148,7 @@ export async function loadPageJsdom(html: string, initialState?: unknown): Promi
     },
     async drag(element, dx, dy) {
       element.dispatchEvent(mouse("mousedown", 10, 10));
-      // d3-drag は動きを見てから掴みにかかる。1 回では「押しただけ」になることがあるので 2 回流す
+      // d3-drag は動きを確かめてからドラッグを始める。1 回では「押しただけ」になることがあるので 2 回流す
       window.dispatchEvent(mouse("mousemove", 10 + Math.round(dx / 2), 10 + Math.round(dy / 2)));
       window.dispatchEvent(mouse("mousemove", 10 + dx, 10 + dy));
       window.dispatchEvent(mouse("mouseup", 10 + dx, 10 + dy));

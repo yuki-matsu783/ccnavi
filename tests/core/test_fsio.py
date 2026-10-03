@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import fsio
+from ccnavi.infra import fsio
 
 
 class _FlakyOpen:
@@ -38,7 +38,7 @@ class WriteRetryTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-fsio-")
         self.path = os.path.join(self.dir, "nested", "backup")
-        self.sleep = mock.patch("ccnavi.fsio.time.sleep")
+        self.sleep = mock.patch("ccnavi.infra.fsio.time.sleep")
         self.sleep.start()
         self.addCleanup(self.sleep.stop)
 

@@ -19,7 +19,9 @@ import json
 import os
 import shutil
 
-from ccnavi import history, lint, review, settings, version
+from ccnavi.entry import lint, version
+from ccnavi.infra import settings
+from ccnavi.tickets import history, review
 from tests.ticket.test_core import STAMP, CoreHarness
 from tests.ticket.test_phases import child_text
 from tests.ticket.test_ticket import git, read_json, write

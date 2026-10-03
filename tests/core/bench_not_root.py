@@ -19,7 +19,7 @@ import re
 import sys
 import time
 
-from ccnavi.rules import MAX_ROOT_LEN, not_root_pattern, real_root
+from ccnavi.policy.rules import MAX_ROOT_LEN, not_root_pattern, real_root
 
 FLAGS = re.IGNORECASE
 ROOT = r"C:\Users\taniyama\Desktop\git\ccnavi"

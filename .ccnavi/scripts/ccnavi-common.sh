@@ -24,10 +24,10 @@
 # 標準出力にも標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
 # 決まりは docs/claude/logging.md。
 
-# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの ccnavi/version.py の COMPAT、
+# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときだけ。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=2
+CCNAVI_COMPAT=3
 
 # 相対パスを絶対に直す。
 #
@@ -1205,7 +1205,7 @@ ccnavi_c1_end() {
 #   log_info <本文の語>... [-- <キー>=<値>...]
 #
 # 本文の語はスペースでつなぐ。`--` の後ろは 1 つずつ `キー=値` として logfmt で並べる。
-# 出る行の形は次のとおり（Python の ccnavi/diaglog.py、拡張の src/log.ts と同じ）。
+# 出る行の形は次のとおり（Python の ccnavi/records/diaglog.py、拡張の src/log.ts と同じ）。
 #
 #   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] 拒否した sub=push reason=unapproved
 #

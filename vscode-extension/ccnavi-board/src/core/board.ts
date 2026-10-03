@@ -35,7 +35,7 @@ export const COLUMNS: readonly ColumnDef[] = [
 ];
 
 /**
- * ユーザが押せる操作。承認と受け入れは実行ファイルか端末へ、レビュー済みの連絡は Claude Code に渡す文を組む
+ * ユーザが押せる操作。承認と受け入れは実行ファイルかターミナルへ、レビュー済みの連絡は Claude Code に渡す文を組む
  * （判定は動かさない。`confirm` を打つのはその文を受けたエージェント）。
  */
 export type Action =

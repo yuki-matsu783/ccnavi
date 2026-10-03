@@ -1,7 +1,7 @@
 /**
  * 子チケットのフロー（設計 9.3.1、ADR-0085）の読み書き。フロー編集画面と拡張ホストが分け合う。
  *
- * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`ccnavi/flow.py`）が読むもの。
+ * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`ccnavi/tickets/flow.py`）が読むもの。
  *
  *     id, name, description?, version
  *     nodes:          [node, ...]
@@ -202,7 +202,7 @@ export function parseFlow(text: string): FlowRead {
 
 /**
  * YAML の本文を `yaml` の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
- * （`flow-agree.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
+ * （`flow-match.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
  * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。**例外は外に出さない。**
  */
 export function parseFlowValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
@@ -244,7 +244,7 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
  * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
  *
  * 書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に実行ファイルに読ませて見比べる
- * （`flow-agree.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
+ * （`flow-match.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
  */
 export function serializeFlow(doc: FlowDoc): string {
   return yamlText(doc);
@@ -839,7 +839,7 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
  * - `nodes` は元の並びの順（グループは中のノードより前）。`parentId` は元の id のまま持つ
  * - `absolute` はコピーした時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
  *   コピーした）は、この位置で外に置く
- * - `connections` はコピーしたノード同士の線だけ（片方しかコピーしていない線はコピーしない）
+ * - `connections` はコピーしたノード同士の線だけ（片方しかコピーしていない線は含めない）
  */
 export interface FlowClip {
   readonly nodes: readonly FlowNode[];
@@ -899,7 +899,7 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
  * - グループは貼らず、元のグループが貼る先にまだあるなら、同じグループの中で `offset` だけずらす
  * - 元のグループが貼る先に無ければ、コピーした時点の図の上の位置から `offset` だけずらして外に置く
  *
- * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（コピーの並びのまま）。
+ * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（コピーしたときの並びのまま）。
  */
 export function pasteNodes(doc: FlowDoc, clip: FlowClip, offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } {
   const renamed = new Map<string, string>();

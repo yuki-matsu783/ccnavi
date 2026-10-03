@@ -41,7 +41,7 @@ export function linkedReason(rel: string): string {
   return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み書きしません。リンク先は承認済みの領域の外かもしれません。リンクを外してから開き直してください`;
 }
 
-/** 確かめられなかったとき。閉じる側にする */
+/** 確かめられなかったとき。書けない扱いにする */
 export function lockFromFailure(error: string): FlowLock {
   return { locked: true, reason: `着手中かどうかを確かめられないため、書き込みません: ${error}` };
 }

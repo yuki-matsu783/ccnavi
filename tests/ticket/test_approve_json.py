@@ -1,4 +1,4 @@
-"""`--approve --preview --json` と `--approve --yes <識別子,…> --json`（承認の JSON）の受入テスト。
+"""`--agree --preview --json` と `--agree --yes <識別子,…> --json`（承認の JSON）の受入テスト。
 
 VS Code のボード拡張がオーバーレイで承認するための経路。設計 wip/design/approve-popup.md 2。
 見るのは 6 つ。
@@ -10,7 +10,7 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
 3. `--yes` に一覧と同じ識別子を渡すと承認済みチケットが置かれ、
    `prompt`（Claude Code に渡す文）が返る
 4. `--yes` の識別子が一覧と違えば承認済みチケットを置かず、`mismatch` で exit 1
-5. `--yes` は端末の壁を通らない。素の `--approve` は今までどおり壁で止まる
+5. `--yes` は端末の壁を通らない。素の `--agree` は今までどおり壁で止まる
 6. 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/approve-*.json）と同じ形
 
 形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。
@@ -33,12 +33,12 @@ APPROVE_VERSION = 1
 
 class ApproveJsonTest(PhaseHarness):
     def preview(self, *extra):
-        result = self.ccnavi("--approve", "--preview", "--json", *extra)
+        result = self.ccnavi("--agree", "--preview", "--json", *extra)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
     def yes(self, tickets, *extra, digest=None):
-        """`--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。extra は絞りかフラグ。
+        """`--agree --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。extra は絞りかフラグ。
 
         拡張と同じく、直前に同じ extra でプレビューして、見せた本文の指紋（`digest`）を渡す。
         digest を名指しすると、その値をそのまま渡す（見せたあとに提案が変わった形）。
@@ -46,7 +46,7 @@ class ApproveJsonTest(PhaseHarness):
         if digest is None:
             digest = self.preview(*extra)["digest"]
         return self.ccnavi(
-            "--approve", "--yes", ",".join(tickets), "--digest", digest, "--json", *extra
+            "--agree", "--yes", ",".join(tickets), "--digest", digest, "--json", *extra
         )
 
     def copy_exists(self, name):
@@ -194,14 +194,14 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_and_preview_together_is_a_usage_error(self):
         self.pending_parent_and_child()
-        result = self.ccnavi("--approve", "--preview", "--yes", "i0001", "--json")
+        result = self.ccnavi("--agree", "--preview", "--yes", "i0001", "--json")
         self.assertEqual(result.returncode, 1)
         self.assertFalse(self.copy_exists("i0001"))
 
     def test_yes_without_json_prints_the_human_lines(self):
         self.pending_parent_and_child()
         digest = self.preview()["digest"]
-        result = self.ccnavi("--approve", "--yes", "i0001,i0001-01", "--digest", digest)
+        result = self.ccnavi("--agree", "--yes", "i0001,i0001-01", "--digest", digest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
@@ -272,8 +272,8 @@ class ApproveJsonTest(PhaseHarness):
         """4. `--yes` に `--digest` が無ければ承認しない。誤りとして言う。"""
         self.pending_parent_and_child()
         for args in (
-            ("--approve", "--yes", "i0001,i0001-01", "--json"),
-            ("--approve", "--yes", "i0001,i0001-01"),
+            ("--agree", "--yes", "i0001,i0001-01", "--json"),
+            ("--agree", "--yes", "i0001,i0001-01"),
         ):
             with self.subTest(" ".join(args)):
                 result = self.ccnavi(*args)
@@ -460,7 +460,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_does_not_need_a_terminal_but_plain_approve_still_does(self):
         self.pending_parent_and_child()
         # 壁を有効にしたまま。テストの標準入力は端末ではない。
-        refused = self.ccnavi("--approve", "--guard-ticket-approval", "enable", stdin="y\n")
+        refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("端末", refused.stderr)
         self.assertFalse(self.copy_exists("i0001"))

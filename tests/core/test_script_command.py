@@ -10,7 +10,8 @@ import os
 import tempfile
 import unittest
 
-from ccnavi import phase, settings, shellread
+from ccnavi.infra import settings, shellread
+from ccnavi.tickets import phase
 
 
 class ScriptCommandTest(unittest.TestCase):
@@ -80,7 +81,7 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase.forbidden(f"{review} ready"))
             self.assertTrue(phase.forbidden(f"{ticket} finish i0001-01"))
             rule = phase.ticket_approval_rule("", root)
-            approve = settings.script_command(root, "ccnavi-approve.sh")
+            approve = settings.script_command(root, "ccnavi-agree.sh")
             self.assertIsNotNone(rule.compiled.search(approve))
             self.assertIn(approve, rule.message)
             self.assertNotIn("sh .ccnavi/scripts/", rule.message)

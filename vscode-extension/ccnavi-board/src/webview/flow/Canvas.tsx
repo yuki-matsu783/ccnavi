@@ -15,7 +15,7 @@
  *
  * ノードと線には × のボタンを付ける（ノードは右上、線は真ん中。載せた・選んだときだけ見える）。
  * 押すと呼び手に返すだけで、消すのはコピーの側。読むだけのときは出さない。
- * Shift を押しながら押す・囲むと、いくつも選べる。選んだノードの id は `onPick` で返す（グループ化・コピー・複製に使う）。
+ * Shift を押しながら押す・ドラッグして囲むと、いくつも選べる。選んだノードの id は `onPick` で返す（グループ化・コピー・複製に使う）。
  *
  * 線を引いている最中に、引けない先（開始へ入る・終了から出る・グループ・自分）は `canConnect` で断る
  * （放しても線はできない）。右下のミニマップは `minimap` が真のときだけ出す。
@@ -333,8 +333,8 @@ export interface CanvasProps {
   /** 図で選んでいるノードの id が変わった（Shift で選び足したものも含む） */
   readonly onPick: (ids: readonly string[]) => void;
   /**
-   * 図の外で選んだノード（部品箱で足したもの・貼ったものなど）。これが替わったときだけ、そのノードを選び直す
-   * （空なら選びを全部外す。中身を読み直したとき）。
+   * 図の外で選んだノード（部品箱で足したもの・貼り付けたものなど）。これが替わったときだけ、そのノードを選び直す
+   * （空なら選択を全部外す。中身を読み直したとき）。
    * 図で押したノードは React Flow が選ぶ（Shift での選び足し・外しもそのまま）ので、ここには来ない
    */
   readonly focus?: { readonly ids: readonly string[] } | undefined;
@@ -395,7 +395,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   }, [base, focus]);
 
   const onNodesChange = useCallback((changes: NodeChange<FlowNodeView>[]) => {
-    // 消す・足すはコピーの側でしかしない（Delete の鍵も受けない）。ここで受けるのは大きさ・位置・選択
+    // 消す・足すはコピーの側でしかしない（Delete キーも受けない）。ここで受けるのは大きさ・位置・選択
     setNodes((now) => applyNodeChanges(changes.filter((change) => change.type !== "remove" && change.type !== "add"), now));
   }, []);
 
@@ -450,10 +450,10 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
           ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
           minZoom={0.2}
           maxZoom={1.8}
-          // Shift を押しながら押すと選び足し、Shift を押しながら何も無いところを引くと囲んで選ぶ
+          // Shift を押しながら押すと選び足し、Shift を押しながら何も無いところからドラッグして囲むと、囲んだものを選ぶ
           selectionKeyCode="Shift"
           multiSelectionKeyCode={["Shift", "Meta", "Control"]}
-          // 消すのは × のボタンと右の欄のボタンだけ。Delete の鍵で消えると、読むだけのときにも消えたように見える
+          // 消すのは × のボタンと右の欄のボタンだけ。Delete キーで消えると、読むだけのときにも消えたように見える
           deleteKeyCode={null}
         >
           <Background />

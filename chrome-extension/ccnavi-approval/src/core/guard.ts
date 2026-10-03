@@ -9,7 +9,7 @@
 /** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
 export const PROTECTED = /^(?:main|master|develop|release|release[-/].*)$/i;
 
-/** 置き場のパスの既定（`ccnavi/settings.py` の DEFAULT_TICKETS・DEFAULT_APPROVED と同じ） */
+/** 置き場のパスの既定（`ccnavi/infra/settings.py` の DEFAULT_TICKETS・DEFAULT_APPROVED と同じ） */
 export const DEFAULT_TICKETS = "wip/proposals";
 export const DEFAULT_APPROVED = ".ccnavi/approved";
 const TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL";

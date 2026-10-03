@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unittest
 
-from ccnavi import reasons
+from ccnavi.hook import reasons
 
 LIMIT = reasons.SUBJECT_LIMIT
 

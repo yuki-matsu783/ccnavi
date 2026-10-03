@@ -1,5 +1,5 @@
 /**
- * チケット制御の値をワークスペースから読み、VS Code の context key に設定する。
+ * チケット制御の値をワークスペースから読み、VS Code の context key に反映する。
  * サイドパネルの「チケット管理」「リスク管理」「フェーズ管理」の有無と、コマンドパレットの
  * `when` がこの鍵を見る。画面を開く側は `requireTickets` でもう一度見る。
  * VS Code の API に触れるので単体テストの対象外。読み方は core/ticket-control.ts。

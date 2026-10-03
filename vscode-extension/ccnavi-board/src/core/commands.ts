@@ -2,13 +2,13 @@
  * ユーザの判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の並び。
  *
  * 承認と残った指摘の行き先は、ボードのオーバーレイでユーザが押したものを、拡張が子プロセスで打つ
- * （`--approve --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。端末の壁は無く、
+ * （`--agree --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。ターミナルの壁は無く、
  * 代わりに「見せたものと今のものが同じ」ことを実行ファイルが指紋で求める。エージェントが Bash で
- * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` は端末（tty）から打つもので、
+ * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` はターミナル（tty）から打つもので、
  * ボードには置かない。
  *
  * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
- * ターミナルに Enter まで送る。承認と同時に端末で走り、ユーザは端末でその結果を見る。
+ * ターミナルに Enter まで送る。承認と同時にターミナルで走り、ユーザはターミナルでその結果を見る。
  */
 import * as path from "node:path";
 
@@ -31,16 +31,16 @@ export function toPosixPath(filePath: string): string {
 }
 
 /**
- * `--approve --preview --json [<識別子>...]`。一覧を見るだけで承認済みチケットは置かない（子プロセスの引数）。
+ * `--agree --preview --json [<識別子>...]`。一覧を見るだけで承認済みチケットは置かない（子プロセスの引数）。
  * 識別子を並べればその分だけが対象、空なら承認待ち全部が対象。ボードは絞り込みで見えている分を渡す。
  */
 export function previewArgs(tickets: readonly string[] = []): readonly string[] {
-  return ["--approve", "--preview", "--json", ...tickets];
+  return ["--agree", "--preview", "--json", ...tickets];
 }
 
 /**
- * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
- * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに書き出される中身。preview の `digest`）、
+ * `--agree --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに入る中身。preview の `digest`）、
  * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
  * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
@@ -50,7 +50,7 @@ export function approveArgs(
   digest: string,
   only: readonly string[] = [],
 ): readonly string[] {
-  return ["--approve", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
+  return ["--agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
 /** レビューの sh の、ワークスペースルートからのパス */

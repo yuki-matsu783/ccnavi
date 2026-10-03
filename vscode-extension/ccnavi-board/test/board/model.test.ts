@@ -57,7 +57,7 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   assert.equal(board.layers[1].rules.unreadable, "");
   assert.equal(board.layers[1].phasesFile.path, "<root>/.ccnavi/config/phases.yml");
   assert.equal(board.layers[0].phasesFile.path, "<root>/phases.yml");
-  // 実行ファイルは常に layers を出す。欠けていれば（壊れた JSON）CB-T04 と同じく既定値の空で補う
+  // 実行ファイルは常に layers を出す。欠けていれば（不正な JSON）CB-T04 と同じく既定値の空で補う
   const missing = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
   assert.ok(missing.ok);
   assert.deepEqual(missing.board.layers, []);

@@ -7,7 +7,7 @@ GitLab の seq ファイル（8.4 の 2 段目）は持たない（段階 5b）�
 ## 何をするか
 
 - 統合先（設定の名前か、ホストのデフォルトブランチ）と、直近 N 日・指定のブランチ（表示用）の置き場を GitHub・GitLab の API で読む
-- 親のブランチごとに、統合先・`P`・先行の閉包の `P_X` だけを入力にして、同梱の ccnavi の `--approve --preview --json` を
+- 親のブランチごとに、統合先・`P`・先行の閉包の `P_X` だけを入力にして、同梱の ccnavi の `--agree --preview --json` を
   Pyodide の上で動かし、承認待ちと承認の対象にしない提案を並べる（ADR-0093 の D2・8.1）。判定は Python が出し、TS は並べるだけ（ADR-0035）
 - 統合先の `CCNAVI_COMPAT` と同梱の互換の版が違えば、どちらを更新するかを出し、承認と取り下げを出さない（7.3）
 - 承認（8.3・8.4）: 押すと親のブランチ 1 つぶんを読み直し、Python に見せた一覧と指紋を比べさせ、Python が返した書くもの（Changes）を
@@ -50,7 +50,7 @@ GitLab の seq ファイル（8.4 の 2 段目）は持たない（段階 5b）�
 | `src/options/` | 設定画面。リポジトリ（統合先の名前・直近の日数・指定のブランチ）と PAT |
 | `src/worker/` | Pyodide を動かす Web Worker |
 | `src/core/` | 画面に依らない部品（通信先と manifest、GitHub の読み書き（`github.ts`）、GitLab の読み書き（`gitlab.ts`）、「始める」（`start.ts`）、画面と service worker の約束、読み取りの流れ、レビュー済みの材料の読み（`reviewed.ts`）、承認・取り下げ・レビュー済みの流れ（`write.ts`）、PAT の期限、Markdown の消毒、描画） |
-| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーと取り込み状態に当たるものを組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
+| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーと取り込み状態に当たるものを組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
 | `hosts.json` | 焼き込む通信先（D24）。組織ごとのビルドはこれを替える |
 
 ## 組み立て
