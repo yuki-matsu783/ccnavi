@@ -310,6 +310,9 @@ ccnavi_mask_url() {
 #   locks/<リポジトリ>/<P>/          ロック（D32）。中の owner に持ち主を 1 行で書く
 #
 # <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。
+#
+# 統合先の名前を決める ccnavi_integration（と、その最後の手の ccnavi_default_branch）も、
+# 統合先の控えを読むのでここに置く。
 
 # 控えの置き場の絶対パス。
 ccnavi_state() {
@@ -363,6 +366,51 @@ ccnavi_record_write() {
 		rm -f "$ccnavi_rw_tmp"
 		return 1
 	}
+}
+
+# そのリポジトリのデフォルトブランチの名前。分からなければ 1。<リポジトリ>
+#
+# `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
+# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
+# どちらも無ければ「分からない」。当てずっぽうで別のブランチを名乗らない。
+# ネットワークには出ない（手元の ref だけを読む）。
+ccnavi_default_branch() {
+	ccnavi_db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
+	case "$ccnavi_db_head" in
+	origin/?*)
+		printf '%s\n' "${ccnavi_db_head#origin/}"
+		return 0
+		;;
+	esac
+	for ccnavi_db_try in main master; do
+		if git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$ccnavi_db_try" >/dev/null 2>&1; then
+			printf '%s\n' "$ccnavi_db_try"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# そのツリーが属するリポジトリの統合先の名前（ADR-0093 の D30）。分からなければ 1。
+# <ツリー> <ワークスペースルート>
+#
+# 環境変数 CCNAVI_INTEGRATION_BRANCH、無ければ ccnavi-sync.sh が控え
+# （sync/<リポジトリ>/integration/head の branch）に書いた名前、無ければデフォルトブランチ
+# （ccnavi_default_branch）。ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への
+# push の拒否）・ccnavi-review.sh（マージリクエストの宛先）が同じ順で読むよう、ここに 1 つだけ置く。
+# ワークツリーは元リポジトリの控えを読む（ccnavi_repo_key）。
+ccnavi_integration() {
+	if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
+		printf '%s\n' "$CCNAVI_INTEGRATION_BRANCH"
+		return 0
+	fi
+	ccnavi_ig_key=$(ccnavi_repo_key "$1" "$2")
+	ccnavi_ig_name=$(ccnavi_record_get "$(ccnavi_state "$2")/sync/$ccnavi_ig_key/integration/head" branch)
+	if [ -n "$ccnavi_ig_name" ]; then
+		printf '%s\n' "$ccnavi_ig_name"
+		return 0
+	fi
+	ccnavi_default_branch "$1"
 }
 
 # そのツリーが、名前の家族の親のワークツリーか。<ツリー> <名前>

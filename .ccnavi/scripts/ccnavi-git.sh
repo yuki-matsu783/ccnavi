@@ -101,7 +101,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
                    : や + を含む引数 (refspec・URL) は不可。手元の ref は ccnavi-sync.sh が進める)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
-                   main master develop release へ直接は送れない。
+                   main master develop release と統合先 (CCNAVI_INTEGRATION_BRANCH、無ければ
+                   ccnavi-sync.sh の控え、無ければ origin/HEAD) へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
                    リモートから消えた (家族の控えが gone の) 親のブランチへは送れない)
 
@@ -1052,6 +1053,15 @@ push)
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
+	# 固定の並びに無い名前の統合先（develop-v1.0.0 など）も止める。名前は ccnavi-fetch.sh が
+	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の控え →
+	# origin/HEAD → origin/main・master）で、このツリーが属するリポジトリ（プロジェクトならその
+	# プロジェクト）について決める。決まらなければ上の固定の並びだけで判定する。
+	push_integ=$(ccnavi_integration "${push_top:-.}" "$WS") || push_integ=""
+	log_debug push の統合先 -- "integration=$push_integ"
+	if [ -n "$push_integ" ] && [ "$push_branch" = "$push_integ" ]; then
+		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
+	fi
 	# リモートから消えた親のブランチ（家族の控えが gone）へは送らない（ADR-0093 の 3.6。段階 2b）。
 	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた家族）を確かめないまま家族が
 	# 動き出す。毎回の ls-remote はせず、控えを読むだけにする。ユーザが戻した後は ccnavi-sync.sh が

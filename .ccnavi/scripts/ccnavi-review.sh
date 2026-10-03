@@ -386,10 +386,12 @@ project_id() {
 # ---- マージリクエストを作る。下書きの 1 行目が題、3 行目からが本文。
 
 default_branch() {
-	# 統合先。clone が置いた origin/HEAD を見る。無ければ main。
-	head=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || :)
-	head="${head#origin/}"
-	[ -n "$head" ] && printf '%s' "$head" || printf 'main'
+	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH →
+	# ccnavi-sync.sh の控え → origin/HEAD → origin/main・master。ccnavi-common.sh の ccnavi_integration）で、
+	# cwd のツリーが属するリポジトリについて決める。どれも決まらなければ main。
+	db_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	db_name=$(ccnavi_integration "${db_tree:-.}" "$root") || db_name=""
+	[ -n "$db_name" ] && printf '%s' "$db_name" || printf 'main'
 }
 
 create_mr() {

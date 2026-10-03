@@ -158,45 +158,15 @@ ccnavi_fetch_or_note() {
 # 報せを組み立てる `$( )` の中に `case` は書けない（macOS の bash 3.2 が `)` を読み違える。
 # tests/core/test_sh_portability.py）。`case` の要るものはここで関数にしておく。
 
-# そのリポジトリのデフォルトブランチの名前。分からなければ 1 を返す。
-#
-# `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
-# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
-# どちらも無ければ「分からない」。当てずっぽうで別のブランチを進めない。
-ccnavi_fetch_default() {
-	ccnavi_fd_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
-	case "$ccnavi_fd_head" in
-	origin/?*)
-		printf '%s\n' "${ccnavi_fd_head#origin/}"
-		return 0
-		;;
-	esac
-	for ccnavi_fd_try in main master; do
-		if git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$ccnavi_fd_try" >/dev/null 2>&1; then
-			printf '%s\n' "$ccnavi_fd_try"
-			return 0
-		fi
-	done
-	return 1
-}
-
 # ワークツリーの起点にするブランチ（統合先。ADR-0093 の D30。段階 2b のレビューの決定 B6）。
 #
 # 環境変数 CCNAVI_INTEGRATION_BRANCH（SessionStart には settings.local.json の env も渡る）、
 # 無ければ ccnavi-sync.sh が控え（sync/<リポジトリ>/integration/head）に書いた名前、
-# 無ければホストのデフォルトブランチ（ccnavi_fetch_default）。
+# 無ければホストのデフォルトブランチ（`origin/HEAD`、無ければ `origin/main`・`origin/master`）。
+# 決め方は ccnavi-git.sh の push の拒否・ccnavi-review.sh のマージリクエストの宛先と揃えるため、
+# ccnavi-common.sh の ccnavi_integration に 1 つだけ置いてある。
 ccnavi_fetch_integration() {
-	if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
-		printf '%s\n' "$CCNAVI_INTEGRATION_BRANCH"
-		return 0
-	fi
-	ccnavi_fi_key=$(ccnavi_repo_key "$1" "$root")
-	ccnavi_fi_name=$(ccnavi_record_get "$(ccnavi_state "$root")/sync/$ccnavi_fi_key/integration/head" branch)
-	if [ -n "$ccnavi_fi_name" ]; then
-		printf '%s\n' "$ccnavi_fi_name"
-		return 0
-	fi
-	ccnavi_fetch_default "$1"
+	ccnavi_integration "$1" "$root"
 }
 
 # そのブランチをチェックアウトしているツリーの綴り。どこにも無ければ空。
