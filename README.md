@@ -1626,7 +1626,7 @@ JSON で渡す（`--result <path>`）。
 | `comment` | sh が投稿する。実行ファイルは関わらない |
 | `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置く）→ sh が Draft を外してコメントを投稿する。親が打つ。マージは人 |
 | `close-early --reason <理由> [--no-issue]` | まだ残っているが「キリの良いところまでやった」と締める。人が端末で打つ。`--close-early`（残りを見せて y/N、未着手の子を取り消し、マーカーを置く）→ sh が残りを issue に写し、コメントを投稿する。Draft は親が片付けてから `ready` で外す |
-| `fetch` | 取ってきた写しを標準出力へ。デバッグ用 |
+| `fetch` | 取得した JSON を標準出力へ。デバッグ用 |
 | `origin` | origin をどう読んだか（ホスト・scheme・API の綴り・使う道具）。origin の読み方が合わないときに確かめる |
 
 - 道具は `gh` / `glab` があればそれ、無ければ `curl` と `GITHUB_TOKEN` / `GITLAB_TOKEN`。どちらも無ければ止まる。`jq` が要る。
@@ -2208,7 +2208,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 
 ## 残った指摘の JSON
 
-ボードの「決める」が読み書きする形。拡張は sh（`ccnavi-review.sh decide`）を子プロセスで打ち、sh が取ってきた写しを実行ファイルに渡す。
+ボードの「決める」が読み書きする形。拡張は sh（`ccnavi-review.sh decide`）を子プロセスで打ち、sh が取得した JSON を実行ファイルに渡す。
 版は `version`（今は 1）で、承認の JSON と別に数える。
 
 `decide <N> --preview`（実行ファイルは `--reviewed N --accept-unresolved --preview --json`）は何も置かない。
@@ -2444,7 +2444,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `ccnavi/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `ccnavi/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
 | `ccnavi/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
-| `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
+| `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す JSON の判定。ネットワークには出ない |
 | `ccnavi/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `ccnavi/audit.py` | 1 行 1 件の追記記録 |
 | `ccnavi/lint.py` | 設定とルールの検証。判定を行わない |

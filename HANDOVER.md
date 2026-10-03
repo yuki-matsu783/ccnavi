@@ -59,7 +59,7 @@ uv run --with pyinstaller python build.py
 - 記憶の消去（REQ-DIA-05）
 - 期限（REQ-CMN-08）はループの中で見ているだけで、実測していない
 - GitHub の実物に対する `request` と `confirm` は実測していない。GitLab は実物（CE 18.5）で 1 周を確かめてある。
-  自動テストは写し（`--result`）を渡す形で通す
+  自動テストはJSON（`--result`）を渡す形で通す
 - REQ-TKT-35 の後半。`SubagentStart` は親の局面を名指ししない（フェーズの番号と種類までは渡す）
 
 ## 次にやること
