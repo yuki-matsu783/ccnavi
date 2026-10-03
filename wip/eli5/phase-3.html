@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 3 の追加分</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1f2328; --muted: #5b6370; --card: #ffffff; --line: #d8dbe0;
+    --old: #c0392b; --old-bg: #fdecea; --new: #1e7a46; --new-bg: #e8f5ee; --accent: #2f5fb3; --accent-bg: #eaf0fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c; --fg: #e6e8eb; --muted: #a3a9b3; --card: #1f2227; --line: #3a3f47;
+      --old: #ff8a7a; --old-bg: #3a2220; --new: #6fd39a; --new-bg: #1c3226; --accent: #8db0ff; --accent-bg: #1f2a40;
+    }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif; line-height: 1.7; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 56px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 40px 0 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  p { margin: 8px 0; }
+  .lead { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 560px) { .pair { grid-template-columns: 1fr; } }
+  .old, .new { border-radius: 8px; padding: 10px 12px; font-size: .95rem; }
+  .old { background: var(--old-bg); border: 1px solid var(--old); }
+  .new { background: var(--new-bg); border: 1px solid var(--new); }
+  .tag { font-size: .8rem; font-weight: bold; display: block; margin-bottom: 4px; }
+  .old .tag { color: var(--old); } .new .tag { color: var(--new); }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--accent-bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: inherit; fill: var(--fg); }
+  .big { font-size: 1.05rem; font-weight: bold; }
+  ul { padding-left: 1.3em; margin: 8px 0; }
+  .note { border-left: 4px solid var(--accent); padding: 6px 12px; background: var(--accent-bg); border-radius: 0 8px 8px 0; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>フェーズ 3 の追加分: 「84 番を見よ」の付箋をはがす</h1>
+<p class="lead">親チケット i0064（置き場を既定に固定する）のフェーズ 3 に、子 i0064-09 を 1 つ足しました。
+動きは何も変えていません。変えたのは、説明の文と、テストの名札だけです。</p>
+
+<h2>1. なぜやるのか</h2>
+<p>i0064 で決めたこと（「置き場は固定」）は、決定の記録の冊子にまとめてあります。冊子には通し番号が付きます。
+コードの説明の文には「くわしくは 84 番」と番号を書いていました。</p>
+<div class="card">
+<svg viewBox="0 0 640 210" role="img" aria-label="番号が 84、92、93 と動き、そのたびに付箋を貼り替える図">
+  <rect x="10" y="20" width="110" height="70" rx="8" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--old)"/>
+  <text x="65" y="52" text-anchor="middle" font-size="20" font-weight="bold">84 番</text>
+  <text x="65" y="76" text-anchor="middle" font-size="12">本流が先に使った</text>
+  <path d="M125 55 L175 55" stroke="currentColor" stroke-width="2" style="color:var(--muted)" marker-end="url(#a)"/>
+  <rect x="180" y="20" width="110" height="70" rx="8" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--old)"/>
+  <text x="235" y="52" text-anchor="middle" font-size="20" font-weight="bold">92 番</text>
+  <text x="235" y="76" text-anchor="middle" font-size="12">また先に使われた</text>
+  <path d="M295 55 L345 55" stroke="currentColor" stroke-width="2" style="color:var(--muted)" marker-end="url(#a)"/>
+  <rect x="350" y="20" width="110" height="70" rx="8" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--old)"/>
+  <text x="405" y="52" text-anchor="middle" font-size="20" font-weight="bold">93 番</text>
+  <text x="405" y="76" text-anchor="middle" font-size="12">これも使われた</text>
+  <path d="M465 55 L515 55" stroke="currentColor" stroke-width="2" style="color:var(--muted)" marker-end="url(#a)"/>
+  <text x="575" y="62" text-anchor="middle" font-size="28" font-weight="bold">?</text>
+  <text x="320" y="135" text-anchor="middle" font-size="15">番号が動くたびに、コードのあちこちの「84 番を見よ」を全部書き直す羽目になる</text>
+  <g style="color:var(--old)">
+    <rect x="150" y="155" width="70" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="240" y="155" width="70" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="330" y="155" width="70" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="420" y="155" width="70" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  </g>
+  <text x="185" y="178" text-anchor="middle" font-size="12">84 番を見よ</text>
+  <text x="275" y="178" text-anchor="middle" font-size="12">84 番を見よ</text>
+  <text x="365" y="178" text-anchor="middle" font-size="12">92 番を見よ</text>
+  <text x="455" y="178" text-anchor="middle" font-size="12">84 番を見よ</text>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="currentColor" style="color:var(--muted)"/></marker></defs>
+</svg>
+</div>
+<p>統合する前に、本流（main）が同じ番号を 2 度続けて先に使いました。そこで利用者と次のように決めました。</p>
+<ul>
+  <li>番号は本流の側で先に押さえる（別の PR で出す）</li>
+  <li><b>コードやテストの説明には番号を書かない。</b>「置き場は固定」と中身で書く。番号は文書の中だけで振り直す</li>
+</ul>
+
+<h2>2. 何が変わるのか（4 つ）</h2>
+
+<div class="card">
+<p class="big">① 説明の文から番号を外す</p>
+<p>コード・テスト・導入スクリプトのコメントにあった、i0064 の「84 番」「92 番」を消しました。</p>
+<div class="pair">
+  <div class="old"><span class="tag">前</span>env では動かない（ADR-0084）</div>
+  <div class="new"><span class="tag">後</span>env では動かない</div>
+</div>
+<p>本流の別の決定を指している「84 番」「92 番」（共通層を配る話・記録の改名の話）は、番号が動かないので残しました。</p>
+</div>
+
+<div class="card">
+<p class="big">② 導入スクリプトが画面に出す文からも番号を外す</p>
+<p>ここだけは利用者の画面に出る文が変わります。設定を入れた人が見る 1 行です。</p>
+<div class="pair">
+  <div class="old"><span class="tag">前</span>…置き場は既定の logs/state に固定されています（ADR-0084）。</div>
+  <div class="new"><span class="tag">後</span>…置き場は既定の logs/state に固定されています。</div>
+</div>
+<p>配った先には決定の冊子が無いので、番号を見せても辿れません。この文を確かめるテストも、番号ではなく「に固定されています」を見るように直しました。</p>
+</div>
+
+<div class="card">
+<p class="big">③ 古い説明を今の仕組みに合わせる</p>
+<p>i0064 で、置き場を動かす設定（env）は読まれなくなりました。なのに説明の中に、もう効かない設定が例として残っていました。</p>
+<div class="pair">
+  <div class="old"><span class="tag">前</span>守りの説明の例: <code>CCNAVI_TICKETS_APPROVED=/x</code> を付けて呼ぶと検査をすり抜ける</div>
+  <div class="new"><span class="tag">後</span>例を、今も読まれる <code>CCNAVI_WORKSPACE=&lt;子のワークツリー&gt;</code> に替えた</div>
+</div>
+<p>VS Code 拡張の説明書からも、もう無い設定の名前を消し、「<code>projects/</code> は固定」と書きました。あわせて、
+<code>projects/</code> が誤って git に載っているときに出る警告の帯のことを説明書に書き足しました（帯の動きはフェーズ 3 の本体で入ったもの）。</p>
+</div>
+
+<div class="card">
+<p class="big">④ テストの名札の重複を直す</p>
+<svg viewBox="0 0 640 150" role="img" aria-label="同じ名札 CB-D125 と CB-D126 が 2 つずつあり、i0064 側を CB-D139 と CB-D140 に変えた図">
+  <text x="160" y="22" text-anchor="middle" font-size="13" style="fill:var(--muted)">本流のテスト（そのまま）</text>
+  <text x="480" y="22" text-anchor="middle" font-size="13" style="fill:var(--muted)">i0064 のテスト</text>
+  <rect x="80" y="35" width="160" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--line)"/>
+  <text x="160" y="60" text-anchor="middle" font-size="15">CB-D125・D126</text>
+  <rect x="330" y="35" width="120" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--old)"/>
+  <text x="390" y="60" text-anchor="middle" font-size="15" text-decoration="line-through">D125・D126</text>
+  <path d="M455 55 L505 55" stroke="currentColor" stroke-width="2" style="color:var(--muted)" marker-end="url(#b)"/>
+  <rect x="510" y="35" width="120" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--new)"/>
+  <text x="570" y="60" text-anchor="middle" font-size="15" font-weight="bold">D139・D140</text>
+  <text x="320" y="110" text-anchor="middle" font-size="14">同じ名札が 2 つあると、名札の検査のテストが落ちる。</text>
+  <text x="320" y="132" text-anchor="middle" font-size="14">本流の側は他から引かれているかもしれないので動かさず、i0064 の側を空いている番号へ。</text>
+  <defs><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="currentColor" style="color:var(--muted)"/></marker></defs>
+</svg>
+<p>テストの中身は変えていません。名前の中の「A10」「A10b」（受入テストの名前）も残しています。</p>
+</div>
+
+<h2>3. 変わらないもの</h2>
+<div class="note">
+<p>判定・止める条件・読む設定・ファイルの置き場は、1 行も変えていません。差分 27 ファイル（+62 −59）は、
+コメント・説明書・画面の文の番号・テストの名札 2 つ・それに合わせたテストの期待値 1 行だけです。</p>
+</div>
+
+<h2>4. 気にしてほしいこと（リスク）</h2>
+<ul>
+  <li><b>コメントから決定の記録へ辿りにくくなる。</b>番号が無いので、読む人は「置き場」「固定」で一覧を探すことになります。
+    代わりに、番号がまた動いても、コードや保護済みの sh を書き直さずに済みます。</li>
+  <li><b>導入スクリプトの画面の文が変わる。</b>番号が消えるだけで、何を外し、どこに固定したかは今までどおり言います。
+    i0064 はまだ本流に入っていないので、番号つきの文を見た利用者はいません。</li>
+  <li><b>例に挙げた <code>CCNAVI_WORKSPACE</code> が正しいか。</b>説明の例を、今も sh が読む設定に替えました。守りの動き自体は変えていません。</li>
+  <li><b>まだ残っている所。</b>保護済みの sh（<code>.ccnavi/scripts/</code>）は本流の取り込みで古い版に戻っており、次のフェーズ（i0064-10）で写し直します。
+    実行ファイルの 2 行と本流の同期まわりは i0064-11 で扱います。</li>
+</ul>
+
+</main>
+</body>
+</html>
