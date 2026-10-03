@@ -407,7 +407,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   return (
     <>
       {page !== undefined && page.mode !== "enable" && page.mode !== "" && (
-        // 未設定は実行ファイルが enable として扱う（ccnavi/modes.py「どこにも値が無ければ enable」）ので帯は出さない
+        // 未設定は実行ファイルが enable として扱う（ccnavi/infra/modes.py「どこにも値が無ければ enable」）ので帯は出さない
         <div className="banner warn">
           現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（判定と記録のみ。deny や ask にヒットしても実行は止まりません）
         </div>

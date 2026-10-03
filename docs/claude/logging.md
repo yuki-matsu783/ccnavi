@@ -14,7 +14,7 @@ logger は 3 つの言語に 1 つずつあり、どれも同じ形の行を同�
 | 言語 | logger | 呼び方 |
 |---|---|---|
 | sh（`.ccnavi/scripts/`） | `ccnavi-common.sh` の `log_debug` `log_info` `log_warn` `log_error` | `set -eu` の直後に共通部を読む（既にどの sh も読んでいる） |
-| Python（`ccnavi/`） | `ccnavi/diaglog.py` | `diaglog.get("<出どころ>", root).info("本文", key=value)` |
+| Python（`ccnavi/`） | `ccnavi/records/diaglog.py` | `diaglog.get("<出どころ>", root).info("本文", key=value)` |
 | TypeScript（拡張） | `vscode-extension/ccnavi-board/src/log.ts` | `diaglog.get("ccnavi-board", root).error("本文", { key: value })` |
 
 ## 契約の文面とは別物
@@ -68,7 +68,7 @@ logger とは関係なく今のまま書く。logger に置き換えない。文
 - 新しいファイルは持ち主だけが読める 0600 で作る（sh は umask 077 のサブシェル、Python は `os.open` の
   mode、TS は `openSync` の mode）。既にあるファイルの権限は変えない
 - `CCNAVI_LOG_LEVEL` = `DEBUG` / `INFO` / `WARN` / `ERROR`（大文字小文字は問わない）。空と読めない値は `INFO`
-- 片付けは `ccnavi/prune.py` の `_prune_diag`。判定の記録と同じしきい値を使い、`CCNAVI_LOG_ROTATE_MB` を
+- 片付けは `ccnavi/records/prune.py` の `_prune_diag`。判定の記録と同じしきい値を使い、`CCNAVI_LOG_ROTATE_MB` を
   超えた 1 本を `<出どころ>.<日時>.log` へ名前を変え、`CCNAVI_LOG_KEEP_DAYS` のあいだ書かれていない
   `*.log` を消す。その回にローテートした 1 本はその回には消さない（`--prune --preview` も同じ結果を示す）。
   走るのはセッションの開始と `ccnavi --prune`
@@ -103,7 +103,7 @@ log_debug 判定の材料 -- "sub=$sub" "top=$root" "cwd=$PWD"
 
 - `@` を含まない文字列はそのまま（sh は語に切らずに返す）
 - 綴りは 3 つで 1 字まで同じ（`tests/sh/test_diaglog_sh.py` の突き合わせに URL と scp 形を入れてある）
-- **揃っていないところ:** Python はこのあとに `ccnavi/redact.py` の `redact` も通すので、トークンの形
+- **揃っていないところ:** Python はこのあとに `ccnavi/records/redact.py` の `redact` も通すので、トークンの形
   （`ghp_…`・`glpat-…`・`sk-…` など）・`名前=値`（`GITHUB_TOKEN=…`）・Authorization ヘッダ・`--password` などを
   `ghp_ab***6789` や `***` に伏せる。sh と TS はこれを持たず、上の 2 つの形だけを伏せる。sh で `redact` を
   写すと正規表現の読みが割れて重く、TS は秘密を扱う場面が無いため

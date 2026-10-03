@@ -2267,7 +2267,7 @@ ccnavi --version --json
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。層のファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
 
-**互換の版**は 3 か所に同じ値で書く。実行ファイル（`ccnavi/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
+**互換の版**は 3 か所に同じ値で書く。実行ファイル（`ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`src/core/version.ts` の `EXTENSION_COMPAT`）。sh や拡張が頼るフラグや出力の形を、
 呼ぶ側を直さないと動かない形に変えたときだけ上げる。フラグや欄を足すだけなら上げない（拡張は使う前に `flags` を見る）。
 層のファイルは頭の `version:` が書式の版を示し、読めない版は `--lint` が既に error を出すので、層に別の版は足さない。
@@ -2430,40 +2430,47 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | 場所 | 中身 |
 |---|---|
 | `main.py` | 配布物の入口。PyInstaller が渡すスクリプト |
-| `ccnavi/hookio.py` | stdin の payload の解釈と、stdout に返す応答の組み立て |
-| `ccnavi/rules.py` | ルールファイルの読み込みと検証 |
-| `ccnavi/builtin.py` | ルールファイルを読めないときの組み込み既定 |
-| `ccnavi/globmatch.py` | glob から正規表現への翻訳 |
-| `ccnavi/shellread.py` | コマンド文字列のうち実際に実行される部分の切り出し |
-| `ccnavi/settings.py` | 環境と設定ファイルからの設定解決 |
-| `ccnavi/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
-| `ccnavi/post.py` | 実行後の監視。保護領域の変更の検知、差し戻しの文、復元 |
-| `ccnavi/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
-| `ccnavi/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
-| `ccnavi/approval.py` | 承認済みチケット、フェーズのマーカー、子ごとの記録の置き場 |
-| `ccnavi/agree.py` | 合意（承認）の手続き。承認の対象を組む、承認の画面、置き場へ動かす |
-| `ccnavi/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
-| `ccnavi/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
-| `ccnavi/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
-| `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
-| `ccnavi/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
-| `ccnavi/audit.py` | 1 行 1 件の追記記録 |
-| `ccnavi/lint.py` | 設定とルールの検証。判定を行わない |
-| `ccnavi/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
-| `ccnavi/cli.py` | 引数の解釈と振り分け。`ticket` / `review` の副命令を ops / review へ渡す |
-| `ccnavi/events.py` | hook のイベントごとの手順。1 回の起動で何が起きるかはここを上から読む |
-| `ccnavi/judge.py` | 実行前の判定。通す・聞く・止めるを決める |
-| `ccnavi/reasons.py` | 判定に添える文面と理由コード |
-| `ccnavi/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
-| `ccnavi/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
-| `ccnavi/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の控え |
-| `ccnavi/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
-| `ccnavi/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルの控えと復元 |
-| `ccnavi/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
-| `ccnavi/gitcmd.py` | git を 1 回起動する |
-| `ccnavi/fsio.py` | ファイルの読み書きの型。控え・マーカー・承認済みチケット・下書きが全部これを通る |
+| `ccnavi/__main__.py` | `python -m ccnavi` の入口。サブパッケージは役割ごとに 6 つで、読む向きは infra < records < policy < tickets < hook < entry（`tests/core/test_module_layers.py` が見る） |
+| `ccnavi/infra/` | 土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー。どのサブパッケージも読まない |
+| `ccnavi/infra/hookio.py` | stdin の payload の解釈と、stdout に返す応答の組み立て |
+| `ccnavi/infra/globmatch.py` | glob から正規表現への翻訳 |
+| `ccnavi/infra/shellread.py` | コマンド文字列のうち実際に実行される部分の切り出し |
+| `ccnavi/infra/settings.py` | 環境と設定ファイルからの設定解決 |
+| `ccnavi/infra/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
+| `ccnavi/infra/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
+| `ccnavi/infra/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
+| `ccnavi/infra/gitcmd.py` | git を 1 回起動する |
+| `ccnavi/infra/fsio.py` | ファイルの読み書きの型。控え・マーカー・承認済みチケット・下書きが全部これを通る |
+| `ccnavi/infra/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての目印と、振り分けの sh が起動する実体の探し方 |
+| `ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否の数え |
+| `ccnavi/records/audit.py` | 1 行 1 件の追記記録 |
+| `ccnavi/policy/` | ルール。読み込み・照合・組み込み・層の合成・自己防衛・文脈ファイル |
+| `ccnavi/policy/rules.py` | ルールファイルの読み込みと検証 |
+| `ccnavi/policy/builtin.py` | ルールファイルを読めないときの組み込み既定 |
+| `ccnavi/policy/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
+| `ccnavi/policy/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の控え |
+| `ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルの控えと復元 |
+| `ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、リスク、操作 |
+| `ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
+| `ccnavi/tickets/approval.py` | 承認済みチケット、フェーズのマーカー、子ごとの記録の置き場 |
+| `ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を組む、承認の画面、置き場へ動かす |
+| `ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
+| `ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
+| `ccnavi/tickets/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
+| `ccnavi/tickets/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
+| `ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
+| `ccnavi/hook/` | hook の判定。実行前の判定・文面・実行後の監視・イベント・サブエージェント |
+| `ccnavi/hook/post.py` | 実行後の監視。保護領域の変更の検知、差し戻しの文、復元 |
+| `ccnavi/hook/events.py` | hook のイベントごとの手順。1 回の起動で何が起きるかはここを上から読む |
+| `ccnavi/hook/judge.py` | 実行前の判定。通す・聞く・止めるを決める |
+| `ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
+| `ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
+| `ccnavi/hook/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
+| `ccnavi/entry/` | 入口。CLI・診断・lint・提案・版。どのサブパッケージからも読まれない |
+| `ccnavi/entry/lint.py` | 設定とルールの検証。判定を行わない |
+| `ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
+| `ccnavi/entry/cli.py` | 引数の解釈と振り分け。`ticket` / `review` の副命令を ops / review へ渡す |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へ写す |
-| `ccnavi/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての目印と、振り分けの sh が起動する実体の探し方 |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |

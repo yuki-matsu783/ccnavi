@@ -1,8 +1,8 @@
 """`--lint` が `.ccnavi/scripts/` の sh の互換の版の食い違いを言うこと。
 
 sh は `ccnavi-common.sh` の `CCNAVI_COMPAT=<数>` で互換の版を名乗る。実行ファイルの
-`ccnavi/version.py` の COMPAT と違えば `(version)` の warn で言い、直し方（ccnavi のリポジトリなら
-組み立て直し、配布先なら配り直し）を名指しする。sh の無いワークスペースでは言わない。
+`ccnavi/entry/version.py` の COMPAT と違えば `(version)` の warn で言い、直し方（ccnavi の
+リポジトリなら組み立て直し、配布先なら配り直し）を名指しする。sh の無いワークスペースでは言わない。
 """
 
 from __future__ import annotations

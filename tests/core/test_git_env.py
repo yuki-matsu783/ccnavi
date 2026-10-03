@@ -5,7 +5,7 @@
 
 1. 締め出しを外す（`tests/__init__.py` から消える、環境変数の名前が変わる）
 2. `tests/inproc.py` が環境を空にするときに巻き添えで落とす。ccnavi は判定の中で
-   git を起こす（`ccnavi/gitcmd.py`）ので、この経路だけがホストの設定を読み直す
+   git を起こす（`ccnavi/infra/gitcmd.py`）ので、この経路だけがホストの設定を読み直す
 3. 検査対象の sh が環境を消毒するときに巻き添えで落とす。`ccnavi-git.sh` は
    `GIT_CONFIG_COUNT` などを unset していて、そこに名前が足されると気づかないうちに外れる
 

@@ -51,7 +51,7 @@ def build_target() -> str:
     """組み立てた実行ファイルが動く機械の `<os>-<arch>`。
 
     PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。
-    導入スクリプトはこの語を配布先のディレクトリ名にする（ccnavi/platformtag.py）。
+    導入スクリプトはこの語を配布先のディレクトリ名にする（ccnavi/infra/platformtag.py）。
     """
     return platformtag.host_target()
 

@@ -321,7 +321,7 @@ class PushApprovedTest(Workspace):
     def test_carries_the_place_named_by_ccnavi_approved(self):
         """12. `CCNAVI_TICKETS_APPROVED` を既定と違う綴りにすると、その置き場を運ぶ。
 
-        既定の置き場（`.ccnavi/approved`）は運ばない。環境変数の名前は `ccnavi/settings.py` の
+        既定の置き場（`.ccnavi/approved`）は運ばない。環境変数の名前は `ccnavi/infra/settings.py` の
         `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
         """
         other = "approved/tickets"

@@ -146,7 +146,10 @@ class CompatSkewTest(unittest.TestCase):
 
 class CompatAgreesTest(unittest.TestCase):
     def test_v6_the_executable_the_sh_and_the_extension_declare_the_same_compat(self):
-        """V6 互換の版は 3 か所に書く。上げるときは揃えて上げる（ccnavi/version.py の説明）。"""
+        """V6 互換の版は 3 か所に書く。上げるときは揃えて上げる。
+
+        上げ方は ccnavi/entry/version.py の説明のとおり。
+        """
         self.assertEqual(sh_compat(), version.COMPAT)
         self.assertEqual(extension_compat(), version.COMPAT)
 

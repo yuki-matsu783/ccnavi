@@ -51,7 +51,7 @@ def run_ccnavi(
     with contextlib.ExitStack() as stack:
         if env is not None:
             # 走った機械の git の設定を締め出す分（tests.GIT_ENV）は、環境を空にしても
-            # 残す。ccnavi は判定の中で git を起こす（ccnavi/gitcmd.py）ので、ここで
+            # 残す。ccnavi は判定の中で git を起こす（ccnavi/infra/gitcmd.py）ので、ここで
             # 落とすと、この経路だけがホストの `~/.gitconfig` を読み直す。
             # 呼び手が同じ名前を渡したときは呼び手を優先する。締め出し方そのものを
             # 試すテストが、ここでの締め出しに上書きされないようにするため。

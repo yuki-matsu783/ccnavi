@@ -1,4 +1,4 @@
-"""診断ログ（ccnavi/diaglog.py）と、その後始末（prune._prune_diag）。
+"""診断ログ（ccnavi/records/diaglog.py）と、その後始末（prune._prune_diag）。
 
 見るのは 6 つ。
 

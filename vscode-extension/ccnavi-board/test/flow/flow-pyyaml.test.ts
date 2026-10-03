@@ -1,5 +1,5 @@
 /**
- * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`ccnavi/flow.py` の `parse`）で実際に読み戻す。
+ * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`ccnavi/tickets/flow.py` の `parse`）で実際に読み戻す。
  * 読み戻した中身（`flow.as_json`。`--lint --json --flow` の `flow.data` と同じ形）が画面の中身と同じかを
  * `flow-match.ts` の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
  *
