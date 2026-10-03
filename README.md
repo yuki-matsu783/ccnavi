@@ -1221,7 +1221,7 @@ payload の `stop_hook_active` が真なとき、控えを置けないとき、�
 | 見えない | なぜ |
 |---|---|
 | `.gitignore` に入っているファイル | `git status` に出ない |
-| git の作業ツリーの外 | 監視はリポジトリの中だけを見る |
+| git の作業ツリーの外 | 実行後チェックはリポジトリの中だけを見る |
 | この呼び出しが触っていないツリー | 呼び出しごとに見るのはワークスペースルートと、この呼び出しの行き先（Bash は cwd）が属するツリーだけ。ターンの区切り（`UserPromptSubmit` と `Stop`）では全部のツリーを見る |
 | 失敗したツール呼び出しの副作用 | `PostToolUse` は成功した呼び出しの後にしか走らない |
 | `Read` `Grep` `Glob` `WebFetch` `WebSearch` の直後 | 見に行かない。次の書きうるツールの直後に見える（遅れであって見落としではない） |
@@ -1975,7 +1975,7 @@ error 2 件、warn 2 件、info 0 件
 | 深刻度 | 拾うもの |
 |---|---|
 | warn | `PostToolUse` / `SubagentStart` / `SubagentStop` に ccnavi が登録されていない |
-| warn | 登録はされているが git の作業ツリーではない（監視が何も検知しない） |
+| warn | 登録はされているが git の作業ツリーではない（実行後チェックが何も検知しない） |
 | warn | `.ccnavi/scripts/ccnavi-{ticket,review,git}.sh` が無い |
 | warn | `.ccnavi/scripts/ccnavi-common.sh` の互換の版（`CCNAVI_COMPAT`）が実行ファイルと違うか、書かれていない（場所は `(version)`。直し方は「版の JSON」） |
 

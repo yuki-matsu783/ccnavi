@@ -66,7 +66,7 @@ TIMEOUT_SECONDS = 2.0
 # add や commit が止まる。1 回が hook の期限（.claude/settings.json の 10 秒）に収まる長さにする。
 WRITE_TIMEOUT_SECONDS = 5.0
 
-# 読めなかった理由。記録に入れるので、監視が動いていない期間を後から数えられる。
+# 読めなかった理由。記録に入れるので、実行後チェックが動いていない期間を後から数えられる。
 REASON_NO_WORKTREE = "not-a-git-worktree"
 REASON_NO_GIT = "git-not-found"
 REASON_FAILED = "git-failed"

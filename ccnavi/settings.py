@@ -382,7 +382,7 @@ class Settings:
     def tickets_enabled(self) -> bool:
         """チケット制御が有効か。
 
-        判定・監視・診断はこれで分岐する。approved の真偽で分岐しない。
+        判定・実行後チェック・診断はこれで分岐する。approved の真偽で分岐しない。
         解決前（空）は enable と同じに読む。読めない値は解決で enable になるので、
         ここで disable と読めるのは disable と書かれたときだけになる。
         """

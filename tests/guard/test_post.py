@@ -2,8 +2,8 @@
 
 道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、そこを
 汚してから payload を渡し、返ってきた文と終了コードと記録だけを読む。
-作業ツリーの実物を見るのがこの監視の要点なので、git を差し替えると、
-テストが通ることと監視が動くことが別の話になる。
+作業ツリーの実物を見るのがこのチェックの要点なので、git を差し替えると、
+テストが通ることとチェックが動くことが別の話になる。
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ RULES = {
         }
     ],
     # 実行後チェックを見るテストなので、実行前チェックで確認を出させない。
-    # 出すと、監視が何を言ったかを見たいテストが ask の話になる。
+    # 出すと、チェックが何を言ったかを見たいテストが ask の話になる。
     "allow": [
         {
             "id": "anything-else",
@@ -198,7 +198,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         result = self.run_hook(command="python build.py")
 
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stderr, "", "守ると宣言していない場所の変更は監視の対象ではない")
+        self.assertEqual(result.stderr, "", "守ると宣言していない場所の変更は対象外")
 
     # 検知したとき
 

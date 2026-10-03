@@ -653,7 +653,7 @@ class FlowGuardTest(FlowHarness):
         self.assertNotIn("POST_TICKET_SCOPE", said)
         self.assertNotIn("POST_VIOLATION", said)
         self.assertNotIn("flows/", said.replace("\\", "/"))
-        # 監視は有効。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
+        # 実行後チェックは有効。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
         write(os.path.join(self.parent_tree, "references", CHILD, "flow.json"), "{}")
         ok4 = write(os.path.join(self.parent_tree, "wip", "d.md"), "d\n")
         fourth = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok4, content="d")

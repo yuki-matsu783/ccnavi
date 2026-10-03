@@ -916,7 +916,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     `phase.scope_findings`）。
 
     **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
-    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの監視は、置き場を
+    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとのチェックは、置き場を
     そのまま外さずに、内容で外すぶんを決める（`script_shape`、`post._script_writes`）。
     """
     return any(_under(rel, place) for place in (tickets_rel, approved_rel))
@@ -1027,7 +1027,7 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
 
     実行後チェック（`post`）とサブエージェント終了時チェック（`phase.scope_findings`）は
-    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの監視は
+    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとのチェックは
     内容で決める（`post._script_writes`）。外し方を揃えないのは、
     **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
     （`--ignored` を付けない）と `base_sha..HEAD` の差分（追跡ファイルだけ）で、
@@ -1441,7 +1441,7 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
     `SCRIPT_FIELDS` の部分集合で、決めるのは呼ぶ側（`script_fields_set` を引いて、
     コミット済みの版がまだ持っていない欄だけを渡す）。範囲
     （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
-    そこが 1 文字でも変われば別の姿になり、監視は今までどおり報告する。
+    そこが 1 文字でも変われば別の姿になり、チェックは今までどおり報告する。
 
     切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
     落とす。揃えないと、スクリプトが書いた直後の姿が「スクリプトが書いていない形」に見える。

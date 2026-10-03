@@ -1697,12 +1697,12 @@ def _after(root: str) -> list[Problem]:
     registered = _registered(root)
     if registered is None:
         # 設定ファイルが無い、あるいは読めない。どこに登録されているかを
-        # 言えないので、登録についても、その監視が見る先についても何も言わない。
+        # 言えないので、登録についても、そのチェックが見る先についても何も言わない。
         # 読めないこと自体は _project_settings が言う。
         return []
 
     if not registered:
-        # 登録されていないなら、見る先の話はしない。走らない監視に対して
+        # 登録されていないなら、見る先の話はしない。走らないチェックに対して
         # 「見えない」と言っても、直す先が 2 つあるように読めるだけになる。
         return [
             Problem(
