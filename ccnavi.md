@@ -851,7 +851,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
-| `builtin-guard-setting-files` | 常に | Bash で、書き込みの表記（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と状態ディレクトリの `logs/decisions.jsonl` `logs/state`）の組 |
+| `builtin-guard-setting-files` | 常に | Bash で、書き込みの表記（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と状態ディレクトリの `logs/decisions.jsonl` `logs/state`）の組 |
 | `builtin-guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
 | `builtin-guard-project-home` | ccnavi ディレクトリの表記（`CCNAVI_PROJECT_HOME`）が決まっているとき | 同上 |
 | `builtin-guard-common-layer` | 共通層の 3 本の置き場が決まっているとき（11.6） | 同上 |
@@ -988,6 +988,9 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 `review/` への直接の作成・移動は、`Write` でもシェルでも、誰がやっても組み込みが止める
 （`Write` 系は `builtin-ticket-state`、シェルは `builtin-ticket-state-shell`）。`.ccnavi/approved/` は
 ccnavi ディレクトリの守り（`builtin-guard-project-home`）が止める。`todo/` への作成と編集は自由。
+シェルの `cp` `ln` `install` は、組み込みの守り（11.6）と同じ部品で行き先を読む（`-t <dir>` の値か、選択肢でない
+最後の引数）。`cp -t wip/proposals/review <提案>` も、行き先のあとに選択肢を回した形も止まり、置き場から外へ写すだけの形は止めない。
+提案の置き場そのものを行き先にして、元の名前が状態の名前（`review`）か名前の決まらない形（`cp -r /tmp/review wip/proposals/`）も止める。
 置き場の表記が状態名と大文字小文字まで一致しないディレクトリは読まない。
 
 ワークスペースルート直下はチケットを持たない。
@@ -2309,6 +2312,18 @@ ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match:
 動かした ccnavi ディレクトリ・共通層の 3 本・実行ファイルの表記は、書き込み用・最後の引数用・`-t` の値用に分けて足す
 （`selfguard.shell_write_regex`）。共通層の 3 本はファイルなので、ディレクトリを取る `-t` の値には足さない。
 当て方は組み込みのルールの regex 1 本のまま（`rules._build` を通る）で、語の割り方が 1 通りに決まる形に書いてある。
+
+行き先を、守るものが入っているディレクトリにした形（`cp /tmp/decisions.jsonl logs/`・`mv /tmp/decisions.jsonl logs/`・
+`cp -t logs /tmp/decisions.jsonl`）は、行き先の表記に守る名前が出ないので、元の名前で見る（`selfguard.holder_regex`。`mv` も含める）。
+止めるのは、元の側に守る名前の語（後ろの区切りは問わない）か、名前の決まらない語（グロブ・`$`・逆引用・ブレース、
+`.` と `..` で終わる元）があるか、`-T` / `--no-target-directory` があるときだけ。`cp /tmp/notes.txt logs/` のように別の名前を
+置くだけの形は止めない（`logs/` の下の git のラッパースクリプトの記録は守らない）。組を作る先は、`logs/` の中の記録と状態ディレクトリ、
+実行ファイルの末尾 2 要素（振り分けの sh なら組み立ての置き場の `bin/` とその親も）、動かした ccnavi ディレクトリと
+ワークスペースルートの下に置いた共通層の 3 本（ルートからの相対の各段）、ルートの外に置いた共通層の 3 本（すぐ上のディレクトリ）、
+そしてワークスペースルート（`.` とルートの絶対パスを行き先に、`.ccnavi` `.claude` `logs` と上で足したいちばん上の名前）。
+`.claude/` `.ccnavi/` `logs/state/` そのものを行き先にした形は、名前を問わずに上の場所の表記で止まる。
+元の語は並びのどこにあってもよいので、最初に見つかった元の語で決め打ちし（後戻りしない括り `(?>...)`）、
+当たらない長い並びでも照合の手数が語の数に比例する範囲に収める。
 `mv` `rm` `tee` `dd` `truncate` `patch` `shred` `sed -i` とリダイレクトは名指ししたところを書くので、元と行き先を分けずに当てる。
 
 deny なので、実行後の監視が保護領域に数え、`CCNAVI_RESTORE_IF_DENY` が git の変更一覧に出た差分を戻す。`.ccnavi/scripts/` の

@@ -587,6 +587,36 @@ class DenyTest(GuardHarness):
             with self.subTest(command=command):
                 self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved_flags))
 
+    def test_a_directory_holding_a_moved_common_layer_is_guarded_by_name(self):
+        """11.6: 動かした共通層の入っているディレクトリを行き先にした形（`_moved_holders`）。
+
+        行き先の表記に共通層の名前が出ないので、元の名前で見る。同じ名前を置く形と、名前の
+        決まらない形は止め、別の名前を置くだけの形は止めない。
+        """
+        policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
+        moved = ("--rules", policy)
+        absolute = os.path.dirname(policy).replace(os.sep, "/")
+        for command in (
+            "cp /tmp/rules.yml policy/",
+            "cp /tmp/rules.yml policy",
+            "mv /tmp/rules.yml policy/",
+            "cp -t policy /tmp/rules.yml",
+            f"cp /tmp/rules.yml {absolute}/",
+            "cp /tmp/*.yml policy/",
+            "cd policy && cp /tmp/rules.yml .",
+            "cp -r /tmp/policy .",
+        ):
+            with self.subTest(command=command):
+                self.assertIn("builtin-guard-setting-files", self.judged(command, *moved))
+        for command in (
+            "cp /tmp/notes.txt policy/",
+            "cp -t policy /tmp/notes.txt",
+            "cp policy/rules.yml /tmp/",
+            "cp /tmp/rules.yml otherpolicy/",
+        ):
+            with self.subTest(command=command):
+                self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved))
+
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """11.6: ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""
         tree = self.worktree(self.lib, "w1")

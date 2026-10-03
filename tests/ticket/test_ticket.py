@@ -669,6 +669,46 @@ class TicketTest(unittest.TestCase):
         free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
         self.assertNotIn("builtin-ticket-state", self.reason(free))
 
+    def test_copies_into_the_state_directory_are_read_by_their_destination(self):
+        """写す動詞の行き先は、組み込みの守りと同じ部品で読む（`-t` の値か最後の引数）。
+
+        `-t` で行き先を前に出した形、行き先のあとに選択肢を回した形、状態の置き場が入っている
+        ディレクトリ（提案の置き場）を行き先にして元の名前を状態の名前にした形も止める。
+        置き場から外へ写すだけの形と、todo/ へ写す形は止めない。
+        """
+        self.family()
+        for command in (
+            "cp -t wip/proposals/review/ .ccnavi/approved/doing/i0001-01.md",
+            "cp -t wip/proposals/review .ccnavi/approved/doing/i0001-01.md",
+            "cp -vt wip/proposals/review /tmp/i0001-01.md",
+            "cp --target-directory=wip/proposals/review /tmp/i0001-01.md",
+            "ln -st wip/proposals/review /tmp/i0001-01.md",
+            "install -t wip/proposals/review /tmp/i0001-01.md",
+            "sudo cp -t wip/proposals/review /tmp/i0001-01.md",
+            "cp /tmp/i0001-01.md wip/proposals/review",
+            "cp /tmp/i0001-01.md wip/proposals/review/",
+            "cp /tmp/i0001-01.md wip/proposals/review -f",
+            "cp /tmp/i0001-01.md wip/proposals/review/i0001-01.md 2>/dev/null",
+            "cp -r /tmp/review wip/proposals/",
+            "cp -r /tmp/review wip/proposals",
+            "mv /tmp/review wip/proposals/",
+            "cd wip/proposals && cp /tmp/i0001-01.md review",
+            "cd wip/proposals/review && cp /tmp/i0001-01.md .",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
+                self.assertIn("builtin-ticket-state", self.reason(result))
+        for command in (
+            "cp wip/proposals/review/i0001-01.md /tmp/x",
+            "cp -t /tmp/out wip/proposals/review/i0001-01.md",
+            "cp /tmp/i0001-03.md wip/proposals/todo/",
+            "cp -t wip/proposals/todo /tmp/i0001-03.md",
+            "cp /tmp/i0001-03.md wip/proposals/",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
+                self.assertNotIn("builtin-ticket-state", self.reason(result))
+
     def test_subagent_cannot_move_state(self):
         self.family()
         result = self.hook(

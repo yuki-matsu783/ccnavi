@@ -1285,10 +1285,20 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無い表記
     # （`mv x wip/proposals/done`）でも当てる。
     states = "|".join(GUARDED_STATES)
-    loose = _place(tickets_rel) + rf"[\\/]({states})([\\/]|\s|$)"
-    # 写す動詞は行き先が最後の引数。置き場から外へ写す読み向きの cp は止めない。
-    last = _place(tickets_rel) + rf"[\\/]({states})([\\/][^ \x00]*)?($|\x00)"
-    shell = rf"{selfguard._WRITE_VERBS}{loose}|{selfguard._COPY_VERBS}{last}"
+    review = _place(tickets_rel) + rf"[\\/]({states})"
+    loose = review + r"([\\/]|\s|$)"
+    # 写す動詞は行き先だけで当てる。置き場から外へ写す読み向きの cp は止めない。行き先の読み方
+    # （`-t` の値か、選択肢でない最後の引数）は組み込みの守りと同じ部品を使う。ここで別に書くと、
+    # `cp -t <置き場> <提案>` のように片方だけが読む書き方が通る。
+    # 状態の置き場が入っているディレクトリ（提案の置き場）を行き先にして、元の名前を状態の名前に
+    # した形（`cp -r /tmp/review wip/proposals/`）も同じ部品で止める。
+    shell = "|".join(
+        (
+            rf"{selfguard._WRITE_VERBS}{loose}",
+            selfguard.copy_destination_regex(selfguard.copy_last_place(review), loose),
+            selfguard.holder_regex(selfguard.under(_place(tickets_rel)), states),
+        )
+    )
     shell_rule = rules.Rule(
         id=STATE_RULE_ID + "-shell",
         match="Bash|PowerShell",

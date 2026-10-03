@@ -308,6 +308,89 @@ _COPY_TERM = _COPY_OPTIONS + _COPY_STOP
 _COPY_TAIL = r"[^ \x00]*" + _COPY_TERM
 _COPY_END = r"(?:[\\/]" + _COPY_TAIL + r"|" + _COPY_TERM + r")"
 
+# 行き先を、守るものが入っているディレクトリにした形（`cp /tmp/decisions.jsonl logs/`）。
+# 行き先の表記に守るファイルの名前が出ないので、上の場所の表記では当たらない。
+#
+# 止めるのは、元の側に「そこへ置くと守るものと同じ名前になる」語があるときだけ
+# （holder_regex）。行き先がディレクトリというだけで止めると、`cp /tmp/notes.txt logs/` のように
+# 守らないファイルを置く操作まで止まる。元の名前は表記からは決まらないことがあるので、
+# 決まらない語も同じ名前として数える（止まる側に倒す）。
+#
+#   - 名前が守る名前の語（`/tmp/decisions.jsonl`、後ろの区切りは何個でも）
+#   - 名前が決まらない語。グロブ（`*` `?` `[`）、変数と置換（`$` と逆引用。shellread は
+#     `$` を残す）、ブレース（`{`）。ブレース展開は書き直しを求める形として先に止まるが、
+#     表記だけでも数える
+#   - 中身をそのまま置く語。`.` と `..` で終わる元（`cp -r /tmp/d/. logs/`）は、d の中身が
+#     行き先の直下に並ぶ
+#   - 行き先をディレクトリと見ない選択肢（`-T` / `--no-target-directory`）。`cp -rT /tmp/d logs` は
+#     d の中身を logs の直下に置く
+#
+# 動詞には mv も入れる。mv は書き込みの側で名指ししたところに当てるが、行き先がディレクトリ
+# だけの形は名指ししないので、ここで拾う。
+#
+# 語の並びの読み方は _COPY_LAST / _COPY_TARGET と同じ。元の語は並びのどこにあってもよいので、
+# 割り方は「どの語を元の語と見るか」の数だけある。当たらない長い並びで照合の手数がその数だけ
+# 増えないように、最初に見つかった元の語で決め打ちする（`(?>...)`、後戻りしない括り）。
+# 後ろの語で当たるなら、前の語から読んでも同じ並びを通って当たるので、決め打ちで外す形は無い。
+# 元の語の終わり（空白）も括りの中に入れる。入れないと `decisions.jsonl.bak` の頭だけで決め打ちし、
+# 後ろに並べた本物の名前を見落とす。
+_HOLD_NAME = r"(^|\x00)(cp|ln|install|mv)\b"
+_ARG = rf"(?:{_VALUED} {_DIR_WORD}|{_NOT_DIR})"
+_TARGET_FLAG = rf"(?:-(?-i:{_FLAGS}*t)|--(?-i:t)[a-z-]*)[= ]?"
+_NO_TARGET_FLAG = (
+    rf"(?:-(?-i:{_FLAGS}*T{_FLAGS}*)(?:[^a-zA-Z \x00][^ \x00]*)?|--(?-i:no-t)[^ \x00]*)"
+)
+_HEAD = r"(?:[^- \x00][^ \x00]*[\\/]|[\\/])?"
+_UNKNOWN = rf"(?:[^- \x00][^ \x00]*)?[*?\[{{$`][^ \x00]*|{_HEAD}\.\.?[\\/]*"
+# 行き先のディレクトリの後ろ。区切りと `/.` は何個続いても同じディレクトリ。
+_DIR_TAIL = r"(?:[\\/]\.?)*"
+
+
+def under(directory: str) -> str:
+    """ディレクトリの表記を、語の頭からでも置き場の下からでも当たる行き先の形にする。
+
+    `logs` なら `logs`・`./logs`・`/abs/logs` に当たり、`mylogs` には当たらない。
+    """
+    return r"(?:[^ \x00]*[\\/])?" + directory
+
+
+def holder_regex(directory: str, names: str) -> str:
+    """守るものが入っているディレクトリを行き先にした cp / ln / install / mv に当たる式。
+
+    directory は行き先の語全体に当てる表記（under で組むか、`\\.` のように語そのもの）、
+    names は守るものの名前（区切りを含まない）。元の側に names の語か、名前の決まらない語が
+    あるときだけ当たる（上の _HOLD_NAME の説明）。行き先は _COPY_LAST / _COPY_TARGET と同じく、
+    `-t` の値か、選択肢でない最後の引数。
+    """
+    source = rf"(?:{_HEAD}(?:{names})[\\/]*|{_UNKNOWN})"
+    dest = directory + _DIR_TAIL
+    # 最後の引数が行き先。元の語は `--` の手前（選択肢として読む並び）にも、後ろにもありうる。
+    before = (
+        rf"(?>(?: {_ARG})*? (?:{source}|{_NO_TARGET_FLAG}) )"
+        rf"(?:{_ARG} )*(?:--(?: [^ \x00]*)* )?{dest}{_COPY_TERM}"
+    )
+    after = rf"(?: {_ARG})* --(?>(?: [^ \x00]*)*? {source} )(?:[^ \x00]* )*{dest}{_COPY_TERM}"
+    # `-t` の値が行き先。元の語は `-t` の前にも後ろにもありうる。
+    target_after = rf"(?>[^\x00]*? {source} )(?:[^\x00]* )?{_TARGET_FLAG}{dest}(?:[ \x00]|$)"
+    target_before = rf"(?>[^\x00]*? {_TARGET_FLAG}{dest} )(?:[^\x00]* )?{source}(?:[ \x00]|$)"
+    forms = "|".join((before, after, target_after, target_before))
+    return _folded(rf"{_HOLD_NAME}(?:{forms})")
+
+
+def copy_destination_regex(last_place: str, target_place: str) -> str:
+    """cp / ln / install の行き先に当たる式。
+
+    last_place は最後の引数の語の頭から当てる表記（copy_last_place で組む）、target_place は
+    `-t` の値に当てる表記で、値の語の中のどこから当ててもよい。
+    """
+    return rf"{_COPY_LAST}{last_place}|{_COPY_TARGET}{target_place}"
+
+
+def copy_last_place(clause: str) -> str:
+    """場所の表記を、最後の引数の語として当てる形にする。名前がそこで終わる形も、下も当たる。"""
+    return _IN_WORD + clause + _COPY_END
+
+
 # `.ccnavi/` は ccnavi ディレクトリの既定の表記（設計 11.2）。その下には各層の設定 3 本と、
 # 配点が呼ぶスクリプトが入る。どちらも判定の中身そのものなので、ccnavi ディレクトリごと止める。
 # 既定の表記をここに書いておくのは、ccnavi ディレクトリの名前を動かしていないワークスペースが、
@@ -339,9 +422,24 @@ _COPY_PLACES = (
     _IN_WORD + r"logs[\\/](decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _COPY_END,
     _IN_WORD + r"ccnavi-git\.sh" + _COPY_TAIL,
 )
+# 守るものが入っているディレクトリと、その中の守る名前（holder_regex）。既定の表記のぶん。
+# `logs/` の中の記録と状態ディレクトリ。`logs/` の下の git のラッパースクリプトの記録は
+# 守らないので、名前で絞る。`.claude/` と `.ccnavi/` と `logs/state/` は、行き先がその
+# ディレクトリなら名前を問わずに止まる（上の場所の表記）ので、ここには無い。
+#
+# ROOT_NAMES はワークスペースルートの直下に置く、守るものを含む名前。`cp -r /tmp/.ccnavi .` は
+# ccnavi ディレクトリを丸ごと置き換える。行き先はルートを指す表記（`.` と、ルートの絶対パス）
+# だけで見る（_moved_holders がルートの表記と組む）。`.` は居場所がルートでなくても当たるが、
+# そこへ `.ccnavi` や `.claude` を写す用事は無い。
+_HOLDERS = ((under(r"logs"), r"decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state"),)
+ROOT_NAMES = (r"\.ccnavi", r"\.claude", r"logs")
 
 
-def shell_write_regex(bin_path: str = "", *extra_clauses: tuple[str, str, str]) -> str:
+def shell_write_regex(
+    bin_path: str = "",
+    *extra_clauses: tuple[str, str, str],
+    holders: tuple[tuple[str, str], ...] = (),
+) -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルの表記は設定で動くので、
     ここで組み立てる。
 
@@ -362,7 +460,12 @@ def shell_write_regex(bin_path: str = "", *extra_clauses: tuple[str, str, str]) 
     - `-t` の値は後ろに元の引数が続くので、書き込み用の閉じ方を使う。ただし値の 1 語の中で
       当たる表記に限る。共通層の 3 本の表記は前の 1 文字（空白でもよい）から当てるので、
       `-t /tmp/out <共通層の 1 本>` の元の側に当たってしまう。`-t` の値はディレクトリなので、
-      ファイルを指す共通層の表記は `-t` の側には足さない
+      ファイルを指す共通層の表記は `-t` の側には足さない。`-t <共通層の入っているディレクトリ>` は
+      holders の側で、元の名前と組で止める
+
+    holders は行き先を守るものが入っているディレクトリにした形（holder_regex に渡す組）。
+    既定の表記のぶん（_HOLDERS）と実行ファイルのぶん（binary_holders）はここで足すので、
+    渡すのは設定で動く場所のぶん（guard_shell_regex）。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
@@ -379,7 +482,9 @@ def shell_write_regex(bin_path: str = "", *extra_clauses: tuple[str, str, str]) 
     where = _folded("(" + "|".join(places) + ")")
     copy_where = _folded("(" + "|".join(copy_places) + ")")
     target_where = _folded("(" + "|".join(target_places) + ")")
-    return rf"{_WRITE_VERBS}{where}|{_COPY_LAST}{copy_where}|{_COPY_TARGET}{target_where}"
+    held = [holder_regex(d, n) for d, n in (*_HOLDERS, *binary_holders(bin_path), *holders)]
+    copies = copy_destination_regex(copy_where, target_where)
+    return "|".join((rf"{_WRITE_VERBS}{where}", copies, *held))
 
 
 def _folded(clause: str) -> str:
@@ -479,6 +584,25 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     return _IN_WORD + plain + _COPY_TAIL if copy else plain
 
 
+def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
+    """実行ファイルが入っているディレクトリと、その中の名前（holder_regex に渡す組）。
+
+    binary_clause と同じ末尾 2 要素で読む。`cp /tmp/ccnavi dist/` のように、行き先を
+    実行ファイルの入っているディレクトリにした形を止める。振り分けの sh なら、sh の入っている
+    ディレクトリと、組み立ての置き場（`<親>/bin/` の下の `<os>-<arch>`、`<親>` の下の `bin`）。
+    ディレクトリの表記が無い名前だけの表記（`ccnavi`）は、入っている場所が決まらないので足さない。
+    """
+    parts = [p for p in re.split(r"[\\/]", bin_path or "") if p and p not in (".", "..")]
+    if len(parts) < 2:
+        return ()
+    found = [(under(re.escape(parts[-2])), re.escape(parts[-1]))]
+    if parts[-1] == platformtag.LAUNCHER_NAME and len(parts) >= 3:
+        home = re.escape(parts[-3])
+        found.append((under(home + r"[\\/]bin"), _BUILD_DIR))
+        found.append((under(home), "bin|" + re.escape(parts[-2])))
+    return tuple(found)
+
+
 # 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
@@ -499,7 +623,57 @@ def guard_shell_regex(
         (common_shell_clause(root, path), common_shell_clause(root, path, copy=True), "")
         for path in common_files
     )
-    return shell_write_regex(bin_path, *clauses)
+    return shell_write_regex(
+        bin_path, *clauses, holders=_moved_holders(root, project_home, common_files)
+    )
+
+
+def _moved_holders(
+    root: str, project_home: str, common_files: tuple[str, ...]
+) -> tuple[tuple[str, str], ...]:
+    """設定で動く場所の、入っているディレクトリと名前の組（holder_regex に渡す）。
+
+    - ccnavi ディレクトリと、ワークスペースルートの下に置いた共通層の 3 本。ルートからの相対の
+      各段で、入っているディレクトリと名前の組を作る（`conf/x/rules.yml` なら `conf/x` と
+      `rules.yml`、`conf` と `x`）。いちばん上の名前はワークスペースルートに置く名前に足す
+    - ワークスペースルートの外に置いた共通層の 3 本。書かれた表記と行き着く先の、すぐ上の
+      ディレクトリと名前の組だけ（その上は守る場所の外まで広がる）
+    - ワークスペースルート。ROOT_NAMES と上で足した名前を、ルートを指す行き先で組む
+    """
+    found: list[tuple[str, str]] = []
+    top = [*ROOT_NAMES]
+    ranked = [_home_name(project_home)]
+    for path in common_files:
+        if not path:
+            continue
+        rel = _inside(root, path) if root else ""
+        if rel:
+            ranked.append(rel)
+            continue
+        for name in sorted({path, os.path.realpath(path)}):
+            directory, base = os.path.split(name)
+            if directory and base:
+                found.append((under(_spelled(directory)), re.escape(base)))
+    # ccnavi ディレクトリの下は、行き先がそこなら名前を問わずに止まる（場所の表記）ので、
+    # そこに置いた共通層の 3 本の組は作らない。いちばん上の名前だけ足す。
+    homes = {_home_name(project_home).lower(), ".ccnavi"} - {""}
+    for rel in ranked:
+        parts = [p for p in re.split(r"[\\/]", rel) if p]
+        if not parts:
+            continue
+        top.append(re.escape(parts[0]))
+        if any("/".join(parts).lower().startswith(h + "/") for h in homes):
+            continue
+        found.extend(
+            (under(r"[\\/]".join(re.escape(p) for p in parts[:k])), re.escape(parts[k]))
+            for k in range(1, len(parts))
+        )
+    # ルートを指す行き先。`.` と、ルートの絶対パス（書かれた表記と行き着く先）。
+    bases = sorted({os.path.realpath(root), os.path.abspath(root)}) if root else []
+    where = "(?:" + "|".join([r"\.", *(_spelled(b) for b in bases)]) + ")"
+    found.append((where, "|".join(dict.fromkeys(top))))
+    # 共通層の 3 本は同じディレクトリに並ぶことが多い。同じ組は 1 つにする。
+    return tuple(dict.fromkeys(found))
 
 
 def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:

@@ -640,6 +640,55 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_実行ファイルの入っているディレクトリを行き先にしても止まる(self):
+        # 行き先をディレクトリだけで書くと、行き先の表記に実行ファイルの名前が出ない
+        # （binary_holders）。元の名前が実行ファイルの名前か、決まらない名前なら止める。
+        path = self.binary()
+
+        for command in (
+            "cp /tmp/x/ccnavi.exe dist/ccnavi/",
+            "cp /tmp/x/ccnavi.exe dist/ccnavi",
+            "mv /tmp/x/ccnavi.exe dist/ccnavi/",
+            "cp -t dist/ccnavi /tmp/x/ccnavi.exe",
+            "cp /tmp/x/* dist/ccnavi/",
+            "cd dist/ccnavi && cp /tmp/x/ccnavi.exe .",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=path, command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+        # 別の名前を置くだけなら守りでは止めない。
+        for command in ("cp /tmp/notes.txt dist/ccnavi/", "cp -t dist/ccnavi /tmp/notes.txt"):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=path, command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_振り分けの置き場をディレクトリで行き先にしても止まる(self):
+        # sh の入っているディレクトリ、組み立ての置き場の親（`bin/`）、その親。
+        spelled, _, _ = self.scripts_layout(("tools",))
+        target = platformtag.host_target()
+
+        for command in (
+            f"cp /tmp/{LAUNCHER_NAME} tools/scripts/",
+            f"cp -r /tmp/{target} tools/bin/",
+            "cp -r /tmp/bin tools/",
+            "cp -r /tmp/scripts tools",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=spelled, command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+        for command in ("cp /tmp/other.sh tools/scripts/", "cp -r /tmp/docs tools/"):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=spelled, command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
     def test_セッション開始でバックアップを取り実行後に戻す(self):
         path = self.binary()
         self.run_hook("SessionStart", bin=path)

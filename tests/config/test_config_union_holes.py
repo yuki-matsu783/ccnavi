@@ -330,6 +330,34 @@ class ShellPlaceTest(GuardHarness):
                     "builtin-guard-setting-files", self.reason(self.moved_hook(command))
                 )
 
+    def test_the_directory_holding_a_moved_umbrella_is_guarded_by_name(self):
+        """11.6: 名前を動かした ccnavi ディレクトリの入っているディレクトリを行き先にした形。
+
+        行き先の表記に ccnavi ディレクトリの名前が出ないので、元の名前で見る（`_moved_holders`）。
+        いちばん上の名前は、ワークスペースルートを行き先にした形で見る。
+        """
+
+        def nested(command):
+            return self.hook(
+                "Bash",
+                self.ws,
+                guard="enable",
+                env={"CCNAVI_PROJECT_HOME": "cfg/navi"},
+                command=command,
+            )
+
+        for command in (
+            "cp -r /tmp/navi cfg/",
+            "mv /tmp/navi cfg",
+            "cp -rt cfg /tmp/navi",
+            "cp -r /tmp/cfg .",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(nested(command), "builtin-guard-setting-files")
+        for command in ("cp -r /tmp/docs cfg/", "cp -r cfg/navi /tmp/keep"):
+            with self.subTest(command=command):
+                self.assertNotIn("builtin-guard-setting-files", self.reason(nested(command)))
+
     def test_copying_into_a_moved_umbrella_is_denied(self):
         """11.6: 行き先が動かした ccnavi ディレクトリかその下なら、cp / ln / install は止まる。
 
@@ -557,6 +585,149 @@ class CopyDestinationTest(GuardHarness):
                 start = time.monotonic()
                 regex.search(text)
                 self.assertLess(time.monotonic() - start, 1.0)
+
+
+class HolderDestinationTest(GuardHarness):
+    """11.6: 守るものが入っているディレクトリを行き先にした形（`selfguard.holder_regex`）。
+
+    行き先の表記に守るファイルの名前が出ないので、場所の表記では当たらない。元の側に
+    守る名前の語か、名前の決まらない語があるときだけ止め、別の名前を置くだけの形は止めない。
+    """
+
+    def assert_guarded(self, command):
+        self.assert_denied(
+            self.guarded_hook("Bash", self.ws, command=command), "builtin-guard-setting-files"
+        )
+
+    def assert_not_guarded(self, command):
+        result = self.guarded_hook("Bash", self.ws, command=command)
+        self.assertNotIn("builtin-guard-setting-files", result.stdout + result.stderr)
+
+    def test_the_forms_of_the_report_are_denied(self):
+        """報告の 2 形。cp と mv で、行き先を `logs/` だけで書く。"""
+        for command in (
+            "cp /tmp/decisions.jsonl logs/",
+            "mv /tmp/decisions.jsonl logs/",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_every_spelling_of_a_directory_destination_is_denied(self):
+        """行き先の書き方、元の名前の書き方、つなぎ方、実行役のコマンド、`cd` で移った先。"""
+        for command in (
+            "cp /tmp/decisions.jsonl logs",
+            "cp /tmp/decisions.jsonl ./logs/",
+            "cp /tmp/decisions.jsonl logs/.",
+            "cp /tmp/decisions.jsonl /repo/logs//",
+            "cp /tmp/decisions.20260101.jsonl logs/",
+            "cp -r /tmp/state logs/",
+            "cp -r /tmp/state/ logs",
+            "mv /tmp/state logs/",
+            "ln -s /tmp/decisions.jsonl logs/",
+            "install -m 644 /tmp/decisions.jsonl logs/",
+            "cp /tmp/notes.txt /tmp/decisions.jsonl logs/",
+            "cp /tmp/decisions.jsonl.bak /tmp/decisions.jsonl logs/",
+            "cp decisions.jsonl logs/",
+            "cp /tmp/decisions.jsonl logs/ -f",
+            "cp /tmp/decisions.jsonl logs/ 2>/dev/null",
+            "cp -- /tmp/decisions.jsonl logs/",
+            "cp -- /tmp/decisions.jsonl -t logs/",
+            "cp -S -t /tmp/decisions.jsonl logs/",
+            "cp -t logs /tmp/decisions.jsonl",
+            "cp -t logs/ /tmp/notes.txt /tmp/decisions.jsonl",
+            "cp -vt logs /tmp/decisions.jsonl",
+            "cp -tlogs /tmp/decisions.jsonl",
+            "cp --target-directory=logs /tmp/decisions.jsonl",
+            "cp --target logs /tmp/decisions.jsonl",
+            "cp /tmp/decisions.jsonl -t logs",
+            "mv -t logs /tmp/decisions.jsonl",
+            "CP /tmp/DECISIONS.JSONL LOGS/",
+            'cp "/tmp/decisions.jsonl" "logs/"',
+            "cp '/tmp\\decisions.jsonl' 'logs\\'",
+            "echo go && cp /tmp/decisions.jsonl logs/",
+            "true; mv /tmp/decisions.jsonl logs/",
+            "cp /tmp/decisions.jsonl logs/ | cat",
+            "sudo cp /tmp/decisions.jsonl logs/",
+            "env A=1 mv /tmp/decisions.jsonl logs/",
+            "cd logs && cp /tmp/decisions.jsonl .",
+            "cd logs && mv /tmp/decisions.jsonl ./",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_sources_whose_name_is_not_fixed_are_denied(self):
+        """名前が表記から決まらない元、中身をそのまま置く元、`-T` は止まる側に数える。"""
+        for command in (
+            "cp /tmp/* logs/",
+            "cp /tmp/dec?sions.jsonl logs/",
+            "cp /tmp/[d]ecisions.jsonl logs/",
+            'cp "$F" logs/',
+            "cp $(ls /tmp/x) logs/",
+            "cp -r /tmp/d/. logs/",
+            "cp -r . logs/",
+            "cp -rT /tmp/d logs",
+            "cp -r --no-target-directory /tmp/d logs",
+            "cp -t logs /tmp/*",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_the_workspace_root_as_a_destination_is_denied(self):
+        """ルート直下の守る名前（`.ccnavi` `.claude` `logs`）を、ルートへ写す形。"""
+        root = self.ws.replace(os.sep, "/")
+        for command in (
+            "cp -r /tmp/.ccnavi .",
+            "cp -r /tmp/.claude ./",
+            "cp -r /tmp/logs .",
+            "mv /tmp/.ccnavi .",
+            "cp -rt . /tmp/.ccnavi",
+            f"cp -r /tmp/.ccnavi {root}",
+            f"cp -r /tmp/.ccnavi {root}/",
+            "cd sub && cp -r /tmp/.ccnavi ..",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_other_names_and_reading_copies_pass_through_the_guard(self):
+        """別の名前を置くだけの形と、守る場所から外へ写すだけの形は守りでは止めない。"""
+        for command in (
+            "cp /tmp/notes.txt logs/",
+            "mv /tmp/notes.txt logs/",
+            "cp -t logs /tmp/notes.txt",
+            "cp /tmp/decisions.jsonl.bak logs/",
+            "cp /tmp/mydecisions.jsonl logs/",
+            "cp /tmp/statement logs/",
+            "cp /tmp/decisions.jsonl backlogs/",
+            "cp /tmp/decisions.jsonl logs/old/",
+            "cp /tmp/decisions.jsonl /tmp/logs.d/",
+            "cp logs/decisions.jsonl /tmp/",
+            "cp -r logs/state /tmp/out/",
+            "cp -t /tmp/out logs/decisions.jsonl",
+            "cp logs/a.log logs/b.log",
+            "cp -r .ccnavi /tmp/keep",
+            "cp -r /tmp/src .",
+            "cp -r /tmp/.ccnavi /tmp/keep/",
+        ):
+            with self.subTest(command=command):
+                self.assert_not_guarded(command)
+
+    def test_scanning_many_sources_does_not_blow_up(self):
+        """元の語は最初に見つかったもので決め打ちする。当たらない長い並びでもすぐ返る。"""
+        regex = re.compile(selfguard.guard_shell_regex(self.ws), re.IGNORECASE)
+        for tail in (
+            " /tmp/decisions.jsonl" * 300,
+            " $x" * 300,
+            " -T" * 300,
+            " -t logs" * 300,
+            " -- /tmp/decisions.jsonl" * 200,
+            " -S -t" * 300,
+        ):
+            for verb in ("cp", "mv"):
+                text = shellread.read(f"{verb} /tmp/x{tail} /tmp/y").text
+                with self.subTest(verb=verb, tail=tail[:12]):
+                    start = time.monotonic()
+                    regex.search(text)
+                    self.assertLess(time.monotonic() - start, 1.0)
 
 
 class ColonIdTest(ConfigUnionHarness):
