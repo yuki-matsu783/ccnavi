@@ -302,10 +302,13 @@ class FetchTest(unittest.TestCase):
         self.assertIn("取ってこられなかった", done.stdout)
         self.assertEqual("", done.stderr.strip())
 
-    # ---- 取り込み済みの家族（SessionStart は親のワークツリーを早送りするだけで、merge はしない）
+    # ---- 取り込み済みの親子のチケット
+    # SessionStart は親のワークツリーを早送りするだけで、merge はしない。
 
     def family(self, name="i0001", record=True):
-        """親のワークツリー .claude/worktrees/<name>（親の写しを送ってある）と家族の控え。"""
+        """親のワークツリー .claude/worktrees/<name>（親の写しを送ってある）と、
+        親子のチケットの控え。
+        """
         self.leave_main()
         tree = os.path.join(self.ws, ".claude", "worktrees", name)
         git(self.ws, "worktree", "add", "-q", tree, "-b", name, "main")
@@ -322,7 +325,7 @@ class FetchTest(unittest.TestCase):
         return tree
 
     def test_a_family_is_fast_forwarded_past_unrelated_work_in_progress(self):
-        # 前は未コミットの変更があるだけで進めなかった。家族は重なりを git に任せる。
+        # 前は未コミットの変更があるだけで進めなかった。親子のチケットでは重なりを git に任せる。
         tree = self.family()
         head = self.advance(self.remote, "i0001")
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
@@ -462,7 +465,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("nope（統合先）がリモートに無い", done.stdout)
 
     def test_a_worktree_without_a_record_keeps_the_old_rule(self):
-        # 控えの無い（取り込み済みでない）家族は今までどおり。書きかけがあれば進めない。
+        # 控えの無い（取り込み済みでない）親子のチケットは今までどおり。書きかけがあれば進めない。
         tree = self.family(record=False)
         before = self.sha(tree, "HEAD")
         self.advance(self.remote, "i0001")

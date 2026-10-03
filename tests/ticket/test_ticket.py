@@ -1629,7 +1629,7 @@ class TicketTest(unittest.TestCase):
 
         承認済みチケットは親のブランチに乗り、合流すると元ツリーにも写る。親のツリーが
         消えたあとに行き先を決めないと、残った子のツリーの写しと並んで「どれが本物か
-        決まらない」になり、片付けただけの家族の `start` / `finish` が全部止まる。
+        決まらない」になり、片付けただけの親子のチケットの `start` / `finish` が全部止まる。
         """
         self.family()
         git(self.root, "merge", "--quiet", "--no-edit", "i0001")

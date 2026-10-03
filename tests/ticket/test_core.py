@@ -181,14 +181,15 @@ class CoreHarness(PhaseHarness):
         }
         if op != "confirm":
             # レビュー済みは手元の CLI の confirm と比べる。控えがあると手元は C1 の
-            # 対象の家族として sh を通さない書き込みを断るので、控えは Chrome の側だけに組む。
+            # 対象の親子のチケットとして sh を通さない書き込みを断るので、控えは
+            # Chrome の側だけに組む。
             self.mirror_records(chrome, request)
         return request
 
     def mirror_records(self, chrome, request):
         """Chrome の入口が仮のツリーに組む取り込みの控え相当を、手元の控えの置き場にも書く。
 
-        手元も同じ控えで判定する（取り込み済みの家族として読む）ので、
+        手元も同じ控えで判定する（取り込み済みの親子のチケットとして読む）ので、
         画面の本文と指紋（判定が読んだ中身。控えを含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
@@ -793,9 +794,9 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent("reviewed")
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
-        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む（控えの無い家族）
-        # ので、残すと手元だけが子のツリーの古い写しを読み、判定が読んだ中身（read_set）
-        # で作る指紋が Chrome（統合先と P だけを読む）と食い違う。
+        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む
+        # （控えの無い親子のチケット）ので、残すと手元だけが子のツリーの古い写しを読み、
+        # 判定が読んだ中身（read_set）で作る指紋が Chrome（統合先と P だけを読む）と食い違う。
         git(
             self.root,
             "worktree",

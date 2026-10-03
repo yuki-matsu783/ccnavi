@@ -1,6 +1,7 @@
 """ccnavi-review.sh merged の約束。
 
-ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、家族の控えに gone を書く。
+ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、親子のチケットの
+控えに gone を書く。
 API が落ちた・答えを読めなかったときは `unknown`（終了コード 3）、道具やトークンが無ければ
 `none` を出さずに止まる。ホストへの道具（curl）は PATH の先頭に置いた代役に差し替える。
 """
