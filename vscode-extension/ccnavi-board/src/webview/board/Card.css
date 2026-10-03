@@ -19,9 +19,9 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
 .card.review-hold { border-left: 3px solid var(--vscode-editorError-foreground); }
 /* 前の読み直しから列が変わった（承認された、レビュー不要で閉じた、レビューが済んだ、取り消された）
-   カードと、新しく現れたカード。着手（`ticket start`）は列を動かさないので印は出ない。
+   カードと、新しく現れたカード。着手（`ticket start`）は列を動かさないので強調表示は出ない。
    **時間では消さない。** 承認の直後は渡す文のオーバーレイがボードを覆っていて、動く瞬間そのものを
-   人が見られないので、次に何かが動くまで印を残す（`core/board-moved.ts`）。
+   人が見られないので、次に何かが動くまで強調表示を残す（`core/board-moved.ts`）。
    左の縁は不備・承認待ち・レビュー待ちが使っているので、こちらは輪（box-shadow）で出して上書きしない。
    HC のテーマでは輪を contrast の色に振り替える（他のテーマでは緑のまま）。
    色だけに頼らず、どこからどこへ動いたかは帯（`.moved-mark`）の文で言う */

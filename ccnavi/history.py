@@ -122,7 +122,7 @@ def set_actor(actor: str) -> None:
 
 
 def extra() -> dict:
-    """いまの起動の間に履歴の行へ足す欄（`actor`・`version`）の写し。"""
+    """いまの起動の間に履歴の行へ足す欄（`actor`・`version`）のコピー。"""
     return dict(_state["extra"])
 
 
@@ -136,7 +136,7 @@ def pending_failures() -> list[str]:
 
 
 def path(approved_dir: str, ticket_id: str) -> str:
-    """状態の履歴のファイルの綴り。識別子の形でなければ空文字（置き場の外を指させない）。
+    """状態の履歴のファイルのパス。識別子の形でなければ空文字（置き場の外を指させない）。
 
     呼び手は識別子を検査済みのチケットから渡すが、ここでも同じ検査を当てる（多重の守り）。
     """
@@ -148,7 +148,7 @@ def path(approved_dir: str, ticket_id: str) -> str:
 def stamp() -> str:
     """状態の履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。機械をまたいでも並べて読める。
 
-    時計は fsio の差し口（`fsio.clock`）を通る。承認の plan は承認の記録と同じ時刻を書く。
+    時計は fsio の差し替え点（`fsio.clock`）を通る。承認の plan は承認の記録と同じ時刻を書く。
     """
     return fsio.utc_stamp()
 
@@ -193,12 +193,12 @@ def note(
         "（{reason}）。状態は動いた（状態は置き場で決まり、履歴は補助）"
     )
     try:
-        # 知らない型が混ざっても落とさず、綴りにして残す。
+        # 知らない型が混ざっても落とさず、文字列にして残す。
         line = json.dumps(entry, ensure_ascii=False, default=str)
     except (TypeError, ValueError) as exc:
         line, failed = "", f"JSON にできない ({exc})"
     else:
-        # 承認の plan（fsio の控える段）では書けなかったときの枝が走らないので、
+        # 承認の plan（fsio の書き込みを溜める段）では書けなかったときの枝が走らないので、
         # 同じ知らせを Writer(FS) が溜められるようにつけておく。
         with fsio.policy(
             on_fail=fsio.FAIL_HISTORY, message=template, prefix="", undo=(), places=""
@@ -212,7 +212,7 @@ def note(
 def failed_to_write(message: str) -> None:
     """状態の履歴を書けなかった知らせを溜める。
 
-    Writer(FS) が、控えた追記を書けなかったときに呼ぶ。
+    Writer(FS) が、溜めた追記を書けなかったときに呼ぶ。
     """
     _state["failures"].append(message)
 

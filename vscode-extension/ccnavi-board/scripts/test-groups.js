@@ -15,7 +15,7 @@
 //   node scripts/test-groups.js --plan --for <パス>...    何を回すかだけ出す（走らせない）
 //   node scripts/test-groups.js --dom --all              画面（*.dom.test.js）だけ
 //
-// `--plan` は node_modules が無くても動く。読むのはソースの綴りだけで、
+// `--plan` は node_modules が無くても動く。読むのはソースの文字列だけで、
 // コンパイルも実行もしないため。ターンの終わりの hook（.claude/hooks/test-ext.sh）は
 // これを使って「回すものが無いターン」を見分ける。
 "use strict";
@@ -36,7 +36,7 @@ const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 const NOT_READY = 3;
 
 // 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では辿れないので、
-// 画面とテストの結び付きだけは綴りの約束で決める。**表では持たない**（表は、画面を足したときに
+// 画面とテストの結び付きだけはパスの書き方の約束で決める。**表では持たない**（表は、画面を足したときに
 // 黙って古くなる。このファイルがグループの表を持たないのと同じ理由）。
 //
 //   画面      `src/webview/<名前>/main.tsx` があるもの（`scripts/bundle-webview.js` と同じ見つけ方）
@@ -71,9 +71,9 @@ function groupNames() {
 }
 
 /**
- * import の綴りを、このリポジトリの中のファイルに解く。
+ * import のパスを、このリポジトリの中のファイルに解く。
  *
- * テストは `../../src/core/hooks.js` と書く（module: Node16 なので出力側の綴り）。
+ * テストは `../../src/core/hooks.js` と書く（module: Node16 なので出力側のパス）。
  * 解く先は `.ts` か `.tsx`。`node:fs` や `happy-dom` のような外のものは null。
  */
 function resolveImport(from, spec) {
@@ -83,7 +83,7 @@ function resolveImport(from, spec) {
   if (base.endsWith(".js")) {
     candidates.push(base.slice(0, -3) + ".ts", base.slice(0, -3) + ".tsx");
   }
-  // CSS は綴りのまま（`@import "./Card.css"`）。拡張子を落とした形は書かない
+  // CSS は書いたままのパス（`@import "./Card.css"`）。拡張子を落とした形は書かない
   if (base.endsWith(".css")) {
     candidates.push(base);
   }
@@ -193,7 +193,7 @@ function closures() {
  * 束ねた画面を読むグループ。
  *
  * `rel`（触ったファイル）を渡すと、**その画面の束ねに入るファイルか** を閉包で見て絞る。
- * 置き場の綴り（`src/webview/<名前>/` で始まるか）では決めない。画面をまたぐ import が
+ * 置き場のパス（`src/webview/<名前>/` で始まるか）では決めない。画面をまたぐ import が
  * 1 本でも入ると、直したのに回らない側（回すものが減る側）に外れるため。
  *
  * どの画面の閉包にも入らないもの（`src/webview/vscode.ts` のような共通の部品）は全部に効くと見る。
@@ -212,7 +212,7 @@ function webviewGroups(map, rel) {
   return groups;
 }
 
-/** 画面の並びを、それを読むグループの並びにする。 */
+/** 画面の配列を、それを読むグループの配列にする。 */
 function groupsFor(wanted, map) {
   const groups = new Set();
   for (const screen of wanted) {
@@ -220,7 +220,7 @@ function groupsFor(wanted, map) {
     for (const [group, files] of map) {
       if (files.has(screen.helper)) groups.add(group);
     }
-    // 画面と同じ名前のグループは、テストの入口の綴りが約束と違っても必ず回す。
+    // 画面と同じ名前のグループは、テストの入口のパスが約束と違っても必ず回す。
     // ここが無いと、画面を足して `test/helpers/<名前>.ts` を作り忘れたときに、
     // その画面のテストだけが黙って回らなくなる
     if (map.has(screen.name)) groups.add(screen.name);
@@ -241,7 +241,7 @@ function relativeToExtension(given) {
   const inside = at >= 0 ? slashed.slice(at + marker.length) : slashed;
   if (at < 0 && path.isAbsolute(slashed)) return null;
   // `./src/x.ts` や `src/../src/x.ts` を `src/x.ts` に直す。直さないまま
-  // `startsWith("src/webview/")` のような綴りの比較に渡すと、`./` が付いただけで
+  // `startsWith("src/webview/")` のような文字列の比較に渡すと、`./` が付いただけで
   // 別のファイルとして扱われ、回すものが減る側に外れる。
   const normalized = path.posix.normalize(inside);
   if (normalized.startsWith("../")) return null;
@@ -343,7 +343,7 @@ function run(command, args) {
   return result.status === null ? 1 : result.status;
 }
 
-/** ローカルに入れた実行ファイル。pnpm を通さずに呼ぶので、hook からも同じ綴りで動く。 */
+/** ローカルに入れた実行ファイル。pnpm を通さずに呼ぶので、hook からも同じパスで動く。 */
 function localBin(relative) {
   return path.join(ROOT, "node_modules", relative);
 }

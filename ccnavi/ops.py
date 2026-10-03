@@ -73,7 +73,7 @@ def start(
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "元リポジトリが承認済みチケットの project"
-            f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ綴りであること）。"
+            f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ表記であること）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
             f'worktree add "{worktree}" '
             f"-b {ticket_id}' で作ってください\n"
@@ -104,18 +104,19 @@ def start(
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
     if found.is_child:
-        # 着手のときのフローの指紋を控える。SubagentStart / SubagentStop が、着手のあとに
+        # 着手のときのフローのダイジェストを保存する。SubagentStart / SubagentStop が、着手のあとに
         # 書き換わったら知らせる（設計 9.3.1、ADR-0085。止めない）。
         started = replace(found, started_at=fields["started_at"])
         where, failed = flow.record_digest(conf, root, started)
         if failed:
             stderr.write(
-                f"ccnavi: {ticket_id} のフローの指紋を控えられない（{failed}）。"
+                f"ccnavi: {ticket_id} のフローのダイジェストを保存できない（{failed}）。"
                 "着手のあとの書き換えは知らせられない\n"
             )
         else:
             stdout.write(
-                f"フローの指紋を {where} に控えた。承認済みチケットと同じく人がコミットする\n"
+                f"フローのダイジェストを {where} に保存した。"
+                "承認済みチケットと同じく人がコミットする\n"
             )
     for line in synced:
         stdout.write(line + "\n")
@@ -177,7 +178,7 @@ def _sync_config(
     lines.append(
         f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
         f" '{git_sh} add' してコミットしてください。"
-        f"印 {mark} も、それを持つツリーでコミットしてください"
+        f"マーカー {mark} も、それを持つツリーでコミットしてください"
     )
     return lines
 
@@ -509,9 +510,10 @@ def _undecided(
 ) -> None:
     """どれを優先するか決まらないときの文面。次にすることまで書く。
 
-    「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
+    「1 つにしてから」だけだと、承認済みチケットのファイルはどれも追跡されたファイルなので、
+    受け取った側に
     できることが読めない。優先するツリーの決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの家族は優先するツリーが親のブランチに決まって
+    それが決まらない理由を名指しする。取り込み済みの親子チケットは優先するツリーが親のブランチに決まって
     いるので、3.6 の案内（ADR-0093）を出す。
     """
     home = hits[0].parent or hits[0].ticket
@@ -521,13 +523,14 @@ def _undecided(
         stderr.write(
             f"  優先するのは、親のブランチ {home} のワークツリー"
             f"（.claude/worktrees/{home}）にある承認済みチケットだけ"
-            "（取り込み済みの家族）。ほかのツリーのものは読まない\n"
+            "（取り込み済みの親子チケット）。ほかのツリーのものは読まない\n"
         )
         for line in syncstate.guidance(root, st) if st.stop else []:
             stderr.write(f"  {line}\n")
         if not st.stop:
             stderr.write(
-                "  親のワークツリーの外の写しは、親のブランチにコミットしてから消すか、"
+                "  親のワークツリーの外にある承認済みチケットは、"
+                "親のブランチにコミットしてから消すか、"
                 "残ったワークツリーを片付けてから打ち直してください\n"
             )
         return
@@ -536,7 +539,8 @@ def _undecided(
         "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）のもの\n"
     )
     stderr.write(
-        "  どちらにも無いか、元ツリーより先の置き場に在る写しがあると、どれを優先するか決まらない。"
+        "  どちらにも無いか、元ツリーより先の置き場に在る承認済みチケットがあると、"
+        "どれを優先するか決まらない。"
         "先に進んだ側を合流させるか、残ったワークツリーを片付けてから打ち直してください\n"
     )
 
@@ -570,26 +574,27 @@ def _find(
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """取り込み済みの家族が決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
+    """取り込み済みの親子チケットが決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
 
-    その家族の状態の操作（着手・終了・取り消し・記録・レビューの印）は止める。引いた写しが
-    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信頼しない写しを
-    動かさないように止める。控えの無い家族は何も言わない（今の動きのまま。D11）。
+    その親子チケットの状態の操作（着手・終了・取り消し・記録・レビューのマーカー）は止める。
+    引いた承認済みチケットが親のワークツリーの外にしか無いとき（元ツリーに未コミットで残ったものなど）も、
+    信頼しない承認済みチケットを動かさないように止める。同期状態の無い親子チケットは何も言わない
+    （今の動きのまま。D11）。
     """
     st = approval.family_standing(conf, root, found)
     if not st.imported:
         return False
     if st.stop:
-        stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この家族の状態は動かさない\n")
+        stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この親子チケットの状態は動かさない\n")
         for line in syncstate.guidance(root, st):
             stderr.write(f"  {line}\n")
         return True
     if st.home is not None and not syncstate.same_tree(found.tree_root, st.home.root):
         stderr.write(
-            f"ccnavi: {found.ticket}: 写しが親のブランチ {st.family} のワークツリーの外"
-            f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの家族では"
-            "親のブランチにある承認済みチケットだけを優先するので、この写しは動かさない\n"
-            f"  人がその写しを親のワークツリー（.claude/worktrees/{st.family}）へ移して"
+            f"ccnavi: {found.ticket}: 承認済みチケットが親のブランチ {st.family} のワークツリーの外"
+            f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの親子チケットでは"
+            "親のブランチにある承認済みチケットだけを優先するので、このファイルは動かさない\n"
+            f"  人がそのファイルを親のワークツリー（.claude/worktrees/{st.family}）へ移して"
             "コミットと push をしてから打ち直す\n"
         )
         return True
@@ -859,7 +864,8 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
 
     - 作業中（`doing/`）で着手済み。終わっても取り消されてもいない（`in_progress`）
-    - 信頼できない印（`blocked`）が無い。範囲が判定に使われていないチケットに終わりを勧めない
+    - 信頼できないことを示すフラグ（`blocked`）が無い。
+      範囲が判定に使われていないチケットに終わりを勧めない
     - 基準点（`base_sha`）を持つ
     - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
       フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
@@ -928,7 +934,7 @@ def _own_commits(worktree: str, t: ticket_mod.Ticket) -> int:
 
 
 def _nudge_path(state_dir: str, session: str) -> str:
-    """促した (チケット, HEAD) の控え。セッションごとに置く（差し戻しの印と同じ）。"""
+    """促した (チケット, HEAD) の状態ファイル。セッションごとに置く（差し戻しのフラグと同じ）。"""
     where = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"nudged-{where}.json")
 
@@ -940,7 +946,7 @@ def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
 
 
 def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
-    """促した (チケット, HEAD) を控える。書けなければ理由。
+    """促した (チケット, HEAD) を保存する。書けなければ理由。
     git で共有する状態の履歴（history）には入れない。
     """
     path = _nudge_path(state_dir, session)
@@ -950,7 +956,7 @@ def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
 
 
 def finish_nudge(root: str, found: Unfinished) -> str:
-    """Stop を止めて渡す文。打つ sh の綴りと、続けるならどうするかを言う。"""
+    """Stop を止めて渡す文。打つ sh の書き方と、続けるならどうするかを言う。"""
     t = found.ticket
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     kind = "子チケット" if t.is_child else "親チケット"

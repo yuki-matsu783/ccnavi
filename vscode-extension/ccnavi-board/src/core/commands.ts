@@ -1,9 +1,9 @@
 /**
- * 人の判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の並び。
+ * 人の判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の配列。
  *
  * 承認と残った指摘の行き先は、ボードのオーバーレイで人が押したものを、拡張が子プロセスで打つ
  * （`--approve --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。端末の壁は無く、
- * 代わりに「見せたものと今のものが同じ」ことを実行ファイルが指紋で求める。エージェントが Bash で
+ * 代わりに「見せたものと今のものが同じ」ことを実行ファイルがダイジェストで求める。エージェントが Bash で
  * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` は端末（tty）から打つもので、
  * ボードには置かない。
  *
@@ -39,11 +39,11 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 }
 
 /**
- * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
- * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身。preview の `digest`）、
+ * `--approve --yes <識別子,…> --digest <ダイジェスト> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身。preview の `digest`）、
  * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
- * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
+ * 絞り込み中の承認がいつも食い違いになる。ダイジェストを渡さないと、実行ファイルは承認しない。
  */
 export function approveArgs(
   tickets: readonly string[],
@@ -53,11 +53,11 @@ export function approveArgs(
   return ["--approve", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
-/** レビューの sh の、ワークスペースルートからの綴り */
+/** レビューの sh の、ワークスペースルートからのパス */
 export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
 
 /**
- * `ccnavi-review.sh decide <N> --preview`。残った指摘と指紋を JSON で見る（何も置かない）。
+ * `ccnavi-review.sh decide <N> --preview`。残った指摘とダイジェストを JSON で見る（何も置かない）。
  * sh は実行した場所を親のワークツリーとして実行ファイルに渡すので、子プロセスの cwd を親のワークツリーにする。
  * `.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから切ったワークツリーには届かないので、
  * sh はワークスペースルートから綴る（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
@@ -67,8 +67,8 @@ export function decidePreviewArgs(phase: number): readonly string[] {
 }
 
 /**
- * `ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`。人がオーバーレイで選んだ行き先を置く。
- * 指紋は見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
+ * `ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`。人がオーバーレイで選んだ行き先を置く。
+ * ダイジェストは見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
  * エージェントがこの形を打つと、組み込みの deny（builtin-guard-ticket-approval）が止める
  */
 export function decideArgs(
@@ -80,12 +80,12 @@ export function decideArgs(
 }
 
 /**
- * 文面で案内する `.ccnavi/scripts/` の sh の綴り。実行ファイルの `settings.script_command` と同じ引用の規則で、
+ * 文面で案内する `.ccnavi/scripts/` の sh のパス。実行ファイルの `settings.script_command` と同じ引用の規則で、
  * ワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する。引用しないと
  * sh が単語に分け、止めている間の例外（`\S*ccnavi-...`）にも当たらない。まず `"..."`、`"` の中でも意味を持つ
  * 文字があるときだけ単引用符にする。
- * 実行ファイルは root を realpath で解いてから組む。ここは渡された綴りをそのまま使うので、実行ファイルの
- * 案内と同じ綴りにしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
+ * 実行ファイルは root を realpath で解いてから組む。ここは渡されたパスをそのまま使うので、実行ファイルの
+ * 案内と同じ表記にしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
  */
 export function scriptCommand(root: string, name: string): string {
   const base = toPosixPath(root).replace(/\/+$/, "");

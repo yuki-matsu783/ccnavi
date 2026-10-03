@@ -13,7 +13,7 @@
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（ワークスペースかプロジェクトの設定の種類なら `--project-phases-file <名前>=<パス>`）で
  * 差し替えられる（リスク管理画面・フェーズ管理画面）。
- * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと控えは外し、記録も残さない
+ * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと状態ディレクトリは外し、記録も残さない
  * （試し打ちで記録を汚さない）。
  */
 import { execFile } from "node:child_process";
@@ -104,14 +104,14 @@ function cutOff(what: string, ms: number): string {
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つかりません（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれもありません）。設定 ccnaviBoard.binPath で指定できます";
 
-/** 見るのはルールだけ。チケット制御と控えは外し、記録も残さない */
+/** 見るのはルールだけ。チケット制御と状態ディレクトリは外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
 
 /**
  * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは `--rules` で、
  * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
- * ワークスペースの設定は同じオプションに名札 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
- * `self` を名乗るプロジェクトはプロジェクトの設定として数えないので取り違えない。
+ * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
+ * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
  * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
@@ -263,7 +263,7 @@ export type { ApproveOutcome };
 
 /**
  * 承認待ちの一覧を見る（`--approve --preview --json`）。承認済みチケットは置かれない。
- * 記録と控えは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
+ * 記録と状態ディレクトリは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(
   root: string,
@@ -291,7 +291,7 @@ export async function runApprovePreview(
 }
 
 /**
- * 見せた一覧をそのまま承認する（`--approve --yes <識別子,…> --digest <指紋> --json`）。
+ * 見せた一覧をそのまま承認する（`--approve --yes <識別子,…> --digest <ダイジェスト> --json`）。
  * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
  */
 export async function runApproveYes(
@@ -343,7 +343,7 @@ export async function runApproveYes(
 const DECIDE_TIMEOUT_MS = 120_000;
 
 /**
- * 残った指摘と指紋を見る（`ccnavi-review.sh decide <N> --preview`）。何も置かない。
+ * 残った指摘とダイジェストを見る（`ccnavi-review.sh decide <N> --preview`）。何も置かない。
  * ホストを読むのは sh（実行ファイルはネットワークに出ない）なので、実行ファイルではなく sh を走らせる。
  * cwd は親のワークツリー（sh はそこを親として実行ファイルに渡す）
  */
@@ -365,7 +365,7 @@ export async function runDecidePreview(
 }
 
 /**
- * 人が選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`）。
+ * 人が選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`）。
  * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
  */
 export async function runDecideYes(
@@ -394,7 +394,7 @@ export async function runDecideYes(
 }
 
 /**
- * sh のスクリプト（`.ccnavi/scripts/` の下）を子プロセスで走らせる。綴りは `/` 区切りにする
+ * sh のスクリプト（`.ccnavi/scripts/` の下）を子プロセスで走らせる。パスは `/` 区切りにする
  * （Windows の Git Bash は `C:/…` を読める）
  */
 function runScript(
@@ -468,7 +468,7 @@ export async function runSamples(
 /**
  * 記録からルールの候補を起こす（`--suggest --json`、README「候補の JSON」）。読むのは保存済みの
  * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と見本の判定で確かめたものだけ。
- * 記録を読むので `--log ""` は付けない（控えは実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
+ * 記録を読むので `--log ""` は付けない（状態ディレクトリは実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
  */
 export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {
   const launcher = findLauncher(root, setting);
@@ -598,7 +598,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 }
 
 /**
- * 家族が C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * 親子チケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
  * フローの保存の後、承認の push を送るかを決めるのに使う（ADR-0093 の 4.6）。
  */
 export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {

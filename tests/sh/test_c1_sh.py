@@ -9,7 +9,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 
 1. 順序: hook のマーカーと状態の履歴を先にコミット → 取り込み → 書く →
    書いたパスだけ commit --only → push。
-   統合先の控えも同じ回で書く
+   統合先の同期状態も同じ回で書く
 2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・承認の push は入れ子で通る
 3. 競合: リモートが進んでいれば取り込んでから書く。衝突したら取りやめて何も書かない
 4. 途中の操作（merge など）があれば始めない
@@ -17,12 +17,13 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    1 回だけやり直す
 6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error
-   （D34 の configsync の写しは例外。
+   （D34 の configsync のコピーは例外。
    tests/ticket/test_core.py と tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
    人の判断（c）と知らない変更（d）は止める
-9. 人の判断の入口（ccnavi-review.sh chat など）は、取り込み済みの家族なら承認の push を自動で呼ぶ
-10. D11: 控えの無い家族・origin の無いリポジトリ・chat だけの家族は今のまま
+9. 人の判断の入口（ccnavi-review.sh chat など）は、
+   取り込み済みの親子チケットなら承認の push を自動で呼ぶ
+10. D11: 同期状態の無い親子チケット・origin の無いリポジトリ・chat だけの親子チケットは今のまま
     （コミットも push もしない）
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
 12. Chrome のレビュー済み（段階 4）: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
@@ -116,7 +117,7 @@ class C1Harness(unittest.TestCase):
     """ワークスペース（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。
 
     親は承認済み（計画は mr で見る 1 フェーズ、子 1 つ）で、送ってあり、取り込み済み
-    （控えが present）。
+    （同期状態が present）。
     """
 
     plan = ("design",)
@@ -318,7 +319,7 @@ class C1TicketTest(C1Harness):
         record = fields(self.record)
         self.assertEqual(record["state"], "present")
         self.assertEqual(record["sha"], head)
-        # 統合先の控えも同じ回で書く（2c の相談: 送った直後に控えが無く承認が止まる件）。
+        # 統合先の同期状態も同じ回で書く（2c の相談: 送った直後に同期状態が無く承認が止まる件）。
         head_file = os.path.join(self.state, "sync", "self", "integration", "head")
         self.assertTrue(os.path.isfile(head_file))
         self.assertFalse(os.path.exists(self.lock_dir()))
@@ -378,7 +379,7 @@ class C1TicketTest(C1Harness):
 
     def test_an_unknown_change_in_the_place_stops(self):
         write(os.path.join(self.tree, *APPROVED.split("/"), "notes.txt"), "x\n")
-        # 形は hook の印でも、変更前が在る（書き換え）なら hook のものとは読まない。
+        # 形は hook のマーカーでも、変更前が在る（書き換え）なら hook のものとは読まない。
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("ccnavi の知らない変更", result.stderr)
@@ -430,7 +431,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
     def test_a_take_in_that_blocks_the_family_writes_nothing(self):
-        """取り込みの後の検査で家族が止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
+        """取り込みの後の検査で親子チケットが止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
         rel = f"{APPROVED}/doing/i0001-02.md"
         self.remote_commit(rel, "---\nticket: i0001-02\n---\n")
         result = self.ticket("start", PARENT)
@@ -760,7 +761,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 
-    # ---- 止める家族
+    # ---- 止める親子チケット
 
     def test_a_gone_family_is_refused_before_any_network(self):
         with open(self.record, encoding="utf-8") as f:
@@ -794,7 +795,7 @@ class C1TicketTest(C1Harness):
 
 
 class C1NotImportedTest(C1Harness):
-    """10. D11: 控えの無い家族は今のまま（書くだけ。コミットも push もしない）。"""
+    """10. D11: 同期状態の無い親子チケットは今のまま（書くだけ。コミットも push もしない）。"""
 
     imported = False
 
@@ -833,7 +834,8 @@ class C1NotImportedTest(C1Harness):
 
 
 class C1ChatOnlyTest(C1Harness):
-    """10. D11: chat だけの家族（マージリクエストを持たない）は、取り込み済みでも C1 にしない。"""
+    """10. D11: chat だけの親子チケット（マージリクエストを持たない）は、
+    取り込み済みでも C1 にしない。"""
 
     plan = ("chores",)
 
@@ -845,7 +847,7 @@ class C1ChatOnlyTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
         family = self.exe("c1", "family", PARENT)
         self.assertIn("target no", family.stdout)
-        self.assertIn("chat だけの家族", family.stdout)
+        self.assertIn("chat だけの親子チケット", family.stdout)
 
 
 class PhaseOne:
@@ -865,7 +867,7 @@ class PhaseOne:
 
 
 class C1HumanTest(PhaseOne, C1Harness):
-    """9. 人の判断の入口は、取り込み済みの家族なら承認の push を自動で呼ぶ（D27）。
+    """9. 人の判断の入口は、取り込み済みの親子チケットなら承認の push を自動で呼ぶ（D27）。
     11. 承認の push。
     """
 
@@ -951,7 +953,8 @@ class C1HumanTest(PhaseOne, C1Harness):
 
 
 class C1NotImportedHumanTest(PhaseOne, C1Harness):
-    """10. D11: 控えの無い家族では、人の判断の入口は置くだけでコミットしない（今のまま）。"""
+    """10. D11: 同期状態の無い親子チケットでは、人の判断の入口は置くだけでコミットしない
+    （今のまま）。"""
 
     plan = ("chores", "design")
     imported = False
@@ -970,7 +973,8 @@ class C1NotImportedHumanTest(PhaseOne, C1Harness):
 
 
 # 実行ファイルの半分の代役。残った指摘の行き先（`--reviewed ... --yes`）だけを代わりに書き
-# （親のワークツリーにレビュー済みの印を置き、書いたパスの一覧を出し、答えの JSON と下書きを書く）、
+# （親のワークツリーにレビュー済みのマーカーを置き、書いたパスの一覧を出し、
+# 答えの JSON と下書きを書く）、
 # 残り（`c1 family`・`c1 sort`・`sync paths` など）は本物に渡す。
 HALF = """#!/bin/sh
 case " $* " in
@@ -1078,7 +1082,7 @@ class C1ReviewTest(C1Harness):
 
 
 # 実行ファイルの代役（ホストに触る副命令の試験用）。状態を書く副命令だけを代わりに書き
-# （親のワークツリーに印を置き、書いたパスの一覧を出す）、`c1`・`sync` などは本物に渡す。
+# （親のワークツリーにマーカーを置き、書いたパスの一覧を出す）、`c1`・`sync` などは本物に渡す。
 # HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ落とす（打ち直しの試験）。
 HOST_HALF = """#!/bin/sh
 list=""; tree="${{HALF_TREE:-}}"; root=""
@@ -1283,7 +1287,8 @@ class C1HostTest(C1Harness):
 class C1ChromeConfirmTest(PhaseOne, C1Harness):
     """Chrome のレビュー済みと手元の confirm の突き合わせ（ADR-0093 の 8.9。段階 4 の決定 3）。
 
-    取り込み済みの家族では、手元の CLI を直に打つと C1 に断られる（`--record-tree` が無い）。そこで
+    取り込み済みの親子チケットでは、手元の CLI を直に打つと C1 に断られる
+    （`--record-tree` が無い）。そこで
     C1 と同じ手順（`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
     回し、同じ状態から Chrome の入口が出す書くものと、C1 が親のブランチへ書いて送ったものを比べる。
     違ってよいのは経路（`via`）と時刻（`at`）と拡張の版だけ。アカウント（`actor`）は、手元は sh が
@@ -1349,7 +1354,8 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         return files
 
     def chrome_request(self, scene=None):
-        """拡張が組むのと同じ要求（統合先 main、家族 i0001、見本の写し、依頼の後の変更の一覧）。"""
+        """拡張が組むのと同じ要求（統合先 main、親子チケット i0001、見本のコピー、
+        依頼の後の変更の一覧）。"""
         from tests.ticket.test_core import _chrome
 
         chrome = _chrome()
@@ -1448,7 +1454,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         # 手元を直に打つと C1 に断られる（だから C1 の手順で回す）。文面まで見る
         direct = self.exe("--cwd", self.tree, "review", "confirm", "--phase", "1", "--result", body)
         self.assertNotEqual(direct.returncode, 0)
-        self.assertIn(f"家族 {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
+        self.assertIn(f"親子チケット {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
         self.assertIn("何も書かずに止めた", direct.stderr)
 
         before = self.sha(self.tree, "HEAD")

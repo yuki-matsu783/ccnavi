@@ -14,7 +14,7 @@ import unittest
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
-# YAML として壊れている。閉じていない並び 1 つ。書き損じの典型。
+# YAML として壊れている。閉じていないリスト 1 つ。書き損じの典型。
 BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 
 
@@ -24,9 +24,9 @@ def run(root, payload, log="", env=None):
     ルールは `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には
     届かない（ADR-0067）。読めないルールは `--root` の下の共通層に置く。
 
-    コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
-    `logs/state` の控えが書き戻される。組み込みの既定はこの設定に依らず入るので、
+    `logs/state` のバックアップが書き戻される。組み込みの既定はこの設定に依らず入るので、
     見たいものは変わらない。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -153,8 +153,8 @@ class FallbackTest(unittest.TestCase):
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
-            # `cd` で入ってから書く形（issue #61、ADR-0069）。行き先の綴りから場所の
-            # 名前が消えるので、移った先から見た綴りにも当てないと止められずに通る。
+            # `cd` で入ってから書く形（issue #61、ADR-0069）。行き先のパスから場所の
+            # 名前が消えるので、移った先から見たパスにも当てないと止められずに通る。
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",
@@ -168,7 +168,7 @@ class FallbackTest(unittest.TestCase):
         # 実行ファイル・ccnavi ディレクトリ・共通層は設定で動く。既定の側だけ空の設定で
         # 組んでいると、動かしたワークスペースではルールファイルが壊れたときにだけ
         # そこへの書き込みが止まらない（issue #14）。
-        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
+        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の書き方のままでは
         # そのコマンドは設定ファイルに書かない。
         for env, command in [
             ({"CCNAVI_PROJECT_HOME": ".navi"}, "echo x > projects/lib/.navi/config/rules.yml"),

@@ -1,6 +1,6 @@
 /**
  * 模擬の GitHub。見本のリポジトリ（test/fixtures/repo.ts）を、拡張が使う REST と GraphQL の形で返す。
- * sha は git と同じ作り方（blob は `blob <大きさ>\0<中身>` の sha1）で、tree は中身の並びから作る。
+ * sha は git と同じ作り方（blob は `blob <大きさ>\0<中身>` の sha1）で、tree は中身のリストから作る。
  *
  * 段階 3 から書ける: `createCommitOnBranch`（`expectedHeadOid` が先頭と違えば断る）でコミットを積み、
  * コミットの履歴（`GET /commits?sha=&path=`・`GET /commits/<sha>`）、開いた MR と Approve、
@@ -247,7 +247,7 @@ export class MockGitHub {
     return out.sort((a, b) => (a.filename < b.filename ? -1 : 1)).slice(0, this.filesLimit);
   }
 
-  /** 並びを per_page・page で切り、続きがあれば Link を付ける */
+  /** 配列を per_page・page で切り、続きがあれば Link を付ける */
   protected paged(u: URL, items: unknown[]): { status: number; json: unknown; headers?: Record<string, string> } {
     const per = Number(u.searchParams.get("per_page") ?? "30");
     const page = Number(u.searchParams.get("page") ?? "1");

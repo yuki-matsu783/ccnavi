@@ -10,13 +10,13 @@ from ccnavi import settings as _settings
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 共通層の 3 本の既定の綴り。ハーネスはここへ設定を置き、`--rules` / `--phases` /
+# 共通層の 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
 # hook の判定とチケット・レビューの副命令には届かない（ADR-0067）。
 #
-# 綴りは実行ファイルから引く。テスト側にもう 1 つ綴りを持つと、既定が動いたときに
-# 2 つが気づかないうちに食い違う。既定の綴りそのものは tests/config/test_common_layer_place.py が
-# 直に書いて見張る。
+# パスは実行ファイルから引く。テスト側にもう 1 つパスを持つと、既定が動いたときに
+# 2 つが気づかないうちに食い違う。既定のパスそのものは tests/config/test_common_layer_place.py が
+# 直に書いて確かめる。
 _COMMON_FILES = {
     "rules": _settings.DEFAULT_RULES,
     "phases": _settings.DEFAULT_PHASES,
@@ -77,12 +77,12 @@ _FIXTURE_WORKSPACES: dict[str, str] = {}
 
 
 def common_relpath(kind: str) -> str:
-    """共通層のファイル（rules / phases / risk）の、ワークスペースルートからの相対の綴り。"""
+    """共通層のファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。"""
     return _COMMON_FILES[kind]
 
 
 def common_path(root: str, kind: str) -> str:
-    """そのワークスペースルートの共通層のファイル（rules / phases / risk）の綴り。"""
+    """そのワークスペースルートの共通層のファイル（rules / phases / risk）のパス。"""
     return os.path.join(root, common_relpath(kind))
 
 

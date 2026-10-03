@@ -4,11 +4,11 @@
 
 1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は warn で読み飛ばす
 2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。人が保存したフローを
-   実行後の監視が範囲外の変更として咎めない（H1）
+   実行後の監視が範囲外の変更として報告しない（H1）
 3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
    別名（アンカーとエイリアス）は読まない
-4. 壊れた・大きい・リンクのフローで落ちない。文の量に上限がある。ccnavi の名乗りを真似させない
-5. 着手中の子のフローへの書き込みを止める。解いた綴りと解く前の綴りの両方で。着手の前と、
+4. 壊れた・大きい・リンクのフローで落ちない。文の量に上限がある。ccnavi の接頭辞を真似させない
+5. 着手中の子のフローへの書き込みを止める。解いたパスと解く前のパスの両方で。着手の前と、
    終わった後は止めない
 6. SubagentStart がフローのファイルを名指しし、手順と、askUserQuestion / subAgent の
    ノードでの動き方を渡す。フローが壊れていても残りの文は渡す
@@ -141,7 +141,7 @@ class FlowPlaceTest(unittest.TestCase):
         self.assertEqual(outside, ("i0001-01.yml", None))
 
     def test_every_copy_counts_for_the_lock(self):
-        """識別子でまとめる前の並びを見る。1 本でも着手中なら止める（L1）。"""
+        """識別子でまとめる前のリストを見る。1 本でも着手中なら止める（L1）。"""
         idle, running = child_ticket(), child_ticket(started=True)
         self.assertIs(flow.lock_hit([idle, running], "", "i0001-01.yml"), running)
         self.assertIsNone(flow.lock_hit([idle], "", "i0001-01.yml"))
@@ -268,7 +268,7 @@ class FlowRenderTest(unittest.TestCase):
         # 出口が項目の id とちょうど同じなら、その項目。
         data["connections"][1]["fromPort"] = "b"
         self.assertIn("3（NO）", flow.render(data)[0][1])
-        # 数字の綴りは ASCII だけ。`²` を 2 と読まない。
+        # 数字の表記は ASCII だけ。`²` を 2 と読まない。
         self.assertEqual(flow._port_label(node, "branch-²"), "")
         self.assertEqual(flow._port_label(node, "xbranch-1"), "")
 
@@ -334,7 +334,7 @@ class FlowRenderTest(unittest.TestCase):
     def test_flow_text_cannot_pose_as_ccnavi(self):
         """フローの文に `[ccnavi]` や改行・制御文字を入れても ccnavi の行に見せられない（M3・L6）。
 
-        名乗りは亀甲括弧に置き換え、改行と制御文字は落とす。
+        接頭辞は亀甲括弧に置き換え、改行と制御文字は落とす。
         """
         data = {
             "nodes": [
@@ -404,16 +404,16 @@ class FlowRenderTest(unittest.TestCase):
         self.assertIn("行", why)
 
     def test_yaml_does_not_build_objects_or_non_mappings(self):
-        """読み手は SafeLoader。タグで Python の値を作らない。最上位が並びでなければ読まない。"""
+        """読み手は SafeLoader。タグで Python の値を作らない。最上位がマッピングのときだけ読む。"""
         text = "nodes: !!python/object/apply:os.system ['echo x']\n"
         data, why = flow.load(self.file(text))
         self.assertIsNone(data)
         self.assertTrue(why.startswith("YAML として読めない"), why)
         for text, why in (
-            ("", "最上位がキーと値の並びではない"),
-            ("- 1\n- 2\n", "最上位がキーと値の並びではない"),
-            ("nodes: 3\n", "`nodes` の並びが無い"),
-            ("just text\n", "最上位がキーと値の並びではない"),
+            ("", "最上位がマッピングではない"),
+            ("- 1\n- 2\n", "最上位がマッピングではない"),
+            ("nodes: 3\n", "`nodes` のリストが無い"),
+            ("just text\n", "最上位がマッピングではない"),
         ):
             with self.subTest(text=text):
                 self.assertEqual(flow.load(self.file(text)), (None, why))
@@ -590,7 +590,7 @@ class FlowHarness(PhaseHarness):
 
 
 class FlowGuardTest(FlowHarness):
-    """エージェントはどのツリーの置き場にも書けない。人の保存は咎めない。"""
+    """エージェントはどのツリーの置き場にも書けない。人の保存は報告しない。"""
 
     def test_agent_writes_are_denied_in_every_tree(self):
         """組み込みの守り（builtin-guard-project-home）が、承認済みの領域の `flows/` を
@@ -632,7 +632,7 @@ class FlowGuardTest(FlowHarness):
 
     def test_a_flow_saved_by_a_person_is_not_blamed_on_the_agent(self):
         """人がボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
-        実行後の監視が範囲外の変更として咎めない（H1）。未コミットでも、コミットしても。"""
+        実行後の監視が範囲外の変更として報告しない（H1）。未コミットでも、コミットしても。"""
         other = CHILD.replace("01", "02")
         ok = write(os.path.join(self.parent_tree, "wip", "a.md"), "a\n")
         first = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok, content="a")
@@ -653,7 +653,7 @@ class FlowGuardTest(FlowHarness):
         self.assertNotIn("POST_TICKET_SCOPE", said)
         self.assertNotIn("POST_VIOLATION", said)
         self.assertNotIn("flows/", said.replace("\\", "/"))
-        # 監視は有効。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
+        # 監視は有効。範囲の外の変更（以前の置き場 references/ も）はそのまま報告する。
         write(os.path.join(self.parent_tree, "references", CHILD, "flow.json"), "{}")
         ok4 = write(os.path.join(self.parent_tree, "wip", "d.md"), "d\n")
         fourth = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok4, content="d")
@@ -691,7 +691,7 @@ class FlowLockTest(FlowHarness):
         # 誰が書いても同じ（サブエージェントでも）。大文字小文字も問わない。
         upper = os.path.join(self.parent_tree, ".ccnavi", "Approved", "FLOWS", "I0001-01.YML")
         self.assert_locked(self.write_to(upper, agent_id="sub-1"))
-        # 相対の綴り・`..` を挟んだ綴り・NotebookEdit。
+        # 相対パス・`..` を挟んだパス・NotebookEdit。
         rel = os.path.join(".ccnavi", "approved", "flows", f"{CHILD}.yml")
         self.assert_locked(self.write_to(rel, cwd=self.parent_tree))
         dotted = os.path.join(self.parent_tree, ".ccnavi", "approved", ".", "x", "..", "flows")
@@ -702,7 +702,7 @@ class FlowLockTest(FlowHarness):
         self.assert_not_locked(self.write_to(self.flow_in(self.parent_tree, "i0001-09")))
 
     def test_links_do_not_get_around_the_lock(self):
-        """置き場を指すリンク越しの綴りも、リンクに差し替えたフローの綴りも止める（H2）。"""
+        """置き場を指すリンク越しのパスも、リンクに差し替えたフローのパスも止める（H2）。"""
         real = write(os.path.join(self.parent_tree, "wip", "flow-real.yml"), WORKFLOW_YAML)
         os.remove(self.flow_path)
         os.symlink(real, self.flow_path)
@@ -793,7 +793,7 @@ class FlowLockTest(FlowHarness):
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.reason(result)
         self.assertIn("allow: wip/research/*", text)
-        self.assertIn("フローを読めない: `connections` が並びではない", text)
+        self.assertIn("フローを読めない: `connections` がリストではない", text)
         self.assertNotIn("1. [start]", text)
 
     def test_a_crash_in_the_briefing_is_one_line(self):

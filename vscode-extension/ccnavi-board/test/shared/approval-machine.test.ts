@@ -1,8 +1,8 @@
 /**
  * 承認のオーバーレイの遷移（`src/core/approval-machine.ts`）。どの状態で何を受け、何を返すか。
  *
- * 後半は**変異テスト**。見張りを 1 つずつ消したソースをその場で組み立てて、
- * 「見張りが有効であること」を確かめる関数が落ちることまで見る。見張りを足したら `GUARDS` にも足す。
+ * 後半は**変異テスト**。ガードを 1 つずつ消したソースをその場で組み立てて、
+ * 「ガードが有効であること」を確かめる関数が落ちることまで見る。ガードを足したら `GUARDS` にも足す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -25,7 +25,7 @@ import type { DecidePreview } from "../../src/core/decidemodel.js";
 
 type Step = (state: ApprovalState, input: ApprovalInput) => ApprovalStep;
 
-/** 出た効果の並び。中身まで見ない確かめは、この形で比べる */
+/** 出た効果の配列。中身まで見ない確かめは、この形で比べる */
 function kinds(effects: readonly ApprovalEffect[]): string[] {
   return effects.map((e) => e.kind);
 }
@@ -114,8 +114,8 @@ function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: r
 }
 
 /**
- * 名前で状態を作る。**見張りの確かめは「守る状態を全部」回す。**
- * 1 つの状態でしか押さないと、見張りから状態を 1 つ抜いた（消すのではなく弱めた）ときに落ちずに通る
+ * 名前で状態を作る。**ガードの確かめは「守る状態を全部」回す。**
+ * 1 つの状態でしか押さないと、ガードから状態を 1 つ抜いた（消すのではなく弱めた）ときに落ちずに通る
  */
 function named(step: Step, kind: string): ApprovalState {
   switch (kind) {
@@ -208,16 +208,16 @@ function toDone(step: Step): ApprovalState {
   }).state;
 }
 
-// --- 見張り。表の 1 行が 1 つの `confirm`。変異テストが同じ関数を使う ---
+// --- ガード。表の 1 行が 1 つの `confirm`。変異テストが同じ関数を使う ---
 
 interface Guard {
   /** 何を守っているか */
   readonly what: string;
   /** 消すために置き換えるソースの 1 行（ちょうど 1 か所に出ること） */
   readonly find: string;
-  /** 置き換えた後（見張りが有効でなくなる形） */
+  /** 置き換えた後（ガードが有効でなくなる形） */
   readonly into: string;
-  /** 有効であることの確かめ。**見張りを消したらここが落ちる**（または、そこで投げる） */
+  /** 有効であることの確かめ。**ガードを消したらここが落ちる**（または、そこで投げる） */
   readonly check: (step: Step) => void;
 }
 
@@ -312,7 +312,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "decideLoading") {',
     into: "if (false) {",
     check(step) {
-      // 閉じている状態は最後（見張りを外すと、無い持ち物を読んで投げる）
+      // 閉じている状態は最後（ガードを外すと、無い持ち物を読んで投げる）
       const kinds_ = ["decidePreview", "deciding", "preview", "prompt", "error", "closed"];
       assertNamed(step, kinds_);
       for (const kind of kinds_) {
@@ -356,13 +356,13 @@ const GUARDS: readonly Guard[] = [
     find: 'if (state.overlay?.kind !== "preview" || tickets.length === 0) {',
     into: "if (tickets.length === 0) {",
     check(step) {
-      // `approving` は `preview` を持っているので、見張りを弱めても投げずに 2 本目が出る。
+      // `approving` は `preview` を持っているので、ガードを弱めても投げずに 2 本目が出る。
       // そのぶん、落ちるのが確かめのほうになる
       const approving = toApproving(step);
       const after = step(approving, { kind: "confirm", tickets: ["i0001"] });
       assert.equal(after.state, approving, "承認中に押し直しても、打つのは 1 本きり");
       assert.deepEqual(kinds(after.effects), []);
-      // 残りの状態も全部。1 つだけ見ると、そこ以外を見張りから抜かれたときに落ちずに通る
+      // 残りの状態も全部。1 つだけ見ると、そこ以外をガードから抜かれたときに落ちずに通る
       assertNamed(step, ["closed", "loading", "done", "error", "prompt"]);
       for (const kind of ["closed", "loading", "done", "error", "prompt"]) {
         const state = named(step, kind);
@@ -375,7 +375,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (kind === "loading" || kind === "preview" || kind === "approving") {',
     into: "if (false) {",
     check(step) {
-      // **3 つとも回す。** 1 つだけ見ると、見張りからその 1 つ以外を抜かれたときに落ちずに通る
+      // **3 つとも回す。** 1 つだけ見ると、ガードからその 1 つ以外を抜かれたときに落ちずに通る
       assertNamed(step, ["loading", "preview", "approving"]);
       for (const kind of ["loading", "preview", "approving"]) {
         const state = named(step, kind);
@@ -405,7 +405,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {',
     into: "if (false) {",
     check(step) {
-      // **閉じている状態は最後。** 見張りを外すと、そこは無い持ち物を読んで投げるので、
+      // **閉じている状態は最後。** ガードを外すと、そこは無い持ち物を読んで投げるので、
       // 先に置くと変異テストが「確かめが落ちた」ではなく「投げた」を見ることになる
       assertNamed(step, ["loading", "preview", "approving", "error", "closed"]);
       for (const kind of ["loading", "preview", "approving", "error", "closed"]) {
@@ -523,7 +523,7 @@ test("CB-T171 一覧が返ったら見せる。読めなければ、そう見せ
   assert.deepEqual(failed.state.overlay, { kind: "error", error: "読めない" });
 });
 
-test("CB-T172 「この N 件を承認する」は、見せた指紋と絞りをそのまま渡す", () => {
+test("CB-T172 「この N 件を承認する」は、見せたダイジェストと絞りをそのまま渡す", () => {
   const preview = toPreview(approvalStep, ["i0001", "i0002"], ["i0001", "i0002"]);
   const after = approvalStep(preview, { kind: "confirm", tickets: ["i0001", "i0002"] });
   assert.equal(after.state.overlay?.kind, "approving");
@@ -734,7 +734,7 @@ test("CB-T202 「決める」で残った指摘を読み、返ったら見せる
   assert.deepEqual(kinds(stale.effects), ["warn"]);
 });
 
-test("CB-T203 「この行き先で決める」は、選んだ行き先と見せた指紋をそのまま渡す", () => {
+test("CB-T203 「この行き先で決める」は、選んだ行き先と見せたダイジェストをそのまま渡す", () => {
   const shown = toDecidePreview(approvalStep);
   const after = approvalStep(shown, { kind: "decideConfirm", choices: { u1: "keep", u2: "fix" } });
   assert.equal(after.state.overlay?.kind, "deciding");
@@ -774,11 +774,11 @@ test("CB-T204 置けたら渡す文を見せて読み直す。投稿の警告は
   assert.deepEqual(kinds(failed.effects), ["refresh"]);
 });
 
-test("CB-T180 見張りは全部効いている（表の 1 行ずつ）", () => {
+test("CB-T180 ガードは全部効いている（表の 1 行ずつ）", () => {
   for (const guard of GUARDS) {
     guard.check(approvalStep);
   }
-  assert.equal(GUARDS.length, 16, "見張りを足したら GUARDS にも足す");
+  assert.equal(GUARDS.length, 16, "ガードを足したら GUARDS にも足す");
 });
 
 // --- 変異テスト ---
@@ -790,7 +790,7 @@ const CORE_OUT = path.join(__dirname, "..", "..", "src", "core");
 
 /**
  * TypeScript の文字列を、その場で組み立てて読み込む。型は見ない（`transpileModule`）ので、
- * 見張りを消して届かなくなった行が残っていても通る。
+ * ガードを消して届かなくなった行が残っていても通る。
  */
 function load(source: string): { readonly approvalStep: Step } {
   const js = ts.transpileModule(source, {
@@ -803,7 +803,7 @@ function load(source: string): { readonly approvalStep: Step } {
   return box.exports as unknown as { readonly approvalStep: Step };
 }
 
-test("CB-T181 見張りを 1 つ消すと、それを確かめるテストが落ちる（変異テスト）", () => {
+test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落ちる（変異テスト）", () => {
   const source = fs.readFileSync(SOURCE, "utf8");
 
   // 組み立て直したものが、読み込んだものと同じに動くこと。ここが成り立たないと、以下は何も見ていない
@@ -817,11 +817,11 @@ test("CB-T181 見張りを 1 つ消すと、それを確かめるテストが落
     assert.equal(at, 1, `変異させる 1 行が見つからない（${guard.what}）。ソースを直したら find も直す`);
     const mutated = load(source.replace(guard.find, guard.into));
     // **`assert.AssertionError` に限る。** 無い持ち物を読んだ `TypeError` で偶然「落ちた」ことに
-    // しない（確かめる状態は、見張りを外しても投げない側を選んである）
+    // しない（確かめる状態は、ガードを外しても投げない側を選んである）
     assert.throws(
       () => guard.check(mutated.approvalStep),
       assert.AssertionError,
-      `見張りを消しても確かめが通った（か、確かめの外で投げた）: ${guard.what}`,
+      `ガードを消しても確かめが通った（か、確かめの外で投げた）: ${guard.what}`,
     );
   }
 });

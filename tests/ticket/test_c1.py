@@ -2,12 +2,13 @@
 
 見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は tests/sh/test_c1_sh.py が見る。
 
-1. `ccnavi c1 family <識別子>`: 家族（子なら親）と、C1 の対象か。控えの無い家族・chat だけの家族は
-   対象外（D11）、決まらない家族は stop
+1. `ccnavi c1 family <識別子>`: 親子チケット（子なら親）と、C1 の対象か。
+同期状態の無い親子チケット・chat だけの親子チケットは
+   対象外（D11）、決まらない親子チケットは stop
 2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（4.4 の (b)・(c)・(d)、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
-   （一覧は書く。D34 の configsync の写しは例外で、tests/config/test_configsync.py が見る）
+   （一覧は書く。D34 の configsync のコピーは例外で、tests/config/test_configsync.py が見る）
 4. 人の判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）はエージェントから
    止める
 """
@@ -42,7 +43,7 @@ class FamilyTest(AuthorityHarness):
         answer = self.ask("i0001-01")
         self.assertEqual(answer["family"], "i0001")
         self.assertEqual(answer["target"], "no")
-        self.assertIn("控えが無い", answer["why"])
+        self.assertIn("同期状態が無い", answer["why"])
         self.assertNotIn("tree", answer)
 
     def test_a_present_family_is_a_target_with_its_tree(self):
@@ -79,7 +80,7 @@ class ChatOnlyFamilyTest(AuthorityHarness):
         result = self.ccnavi("c1", "family", "i0001")
         answer = lines(result.stdout)
         self.assertEqual(answer["target"], "no")
-        self.assertIn("chat だけの家族", answer["why"])
+        self.assertIn("chat だけの親子チケット", answer["why"])
 
 
 class SortTest(AuthorityHarness):
@@ -346,7 +347,7 @@ class HumanEntryGuardTest(AuthorityHarness):
 class RecordTreeReviewTest(PhaseHarness):
     """本物の実行ファイルで、`--record-tree` 付きの依頼・行き先・Draft 外しが置き場だけを書く。
 
-    PhaseHarness は控えの置き場を `--state` で動かしている（上書きした置き場）。下書きはそこへ
+    PhaseHarness は状態ディレクトリを `--state` で動かしている（上書きした置き場）。下書きはそこへ
     書かれ、一覧にも置き場の外にも数えない（段階 2d のレビューの 7）。
     """
 
@@ -462,7 +463,7 @@ class ChooseTest(PhaseHarness):
 
 
 class BypassTest(AuthorityHarness):
-    """C1 の対象の家族（取り込み済みで origin がある）では、C1 を通らない状態の操作を断る。"""
+    """C1 の対象の親子チケット（取り込み済みで origin がある）は、C1 を通らない状態の操作を断る。"""
 
     def setUp(self):
         super().setUp()

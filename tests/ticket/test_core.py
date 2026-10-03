@@ -1,10 +1,10 @@
-"""判定のコアと差し口（ADR-0093 の 6 章、段階 2a）の受入テスト。
+"""判定のコアと差し替え点（ADR-0093 の 6 章、段階 2a）の受入テスト。
 
 見るのは 6 つ。
 
-1. 時計（Clock の差し口）: `fsio.clock` で固定した時刻を、承認の記録と状態の履歴が同じに書く
+1. 時計（Clock の差し替え点）: `fsio.clock` で固定した時刻を、承認の記録と状態の履歴が同じに書く
 2. D22: 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
-   前の形（絶対パス・ツリーの名前）の写しも同じに読み、判定の答えは変わらない
+   前の形（絶対パス・ツリーの名前）の承認済みチケットも同じに読み、判定の答えは変わらない
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
    書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
 4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
@@ -138,7 +138,8 @@ class CoreHarness(PhaseHarness):
     def chrome_request(self, op, family, heads=None, **extra):
         """手元のツリーから、拡張が組むのと同じ形の要求を作る（統合先は main）。
 
-        ブランチの先頭は既定で `0` の並び。`heads` で名前ごとに本物の先頭を渡せる（レビュー済みは
+        ブランチの先頭は既定で `0` を並べたもの。
+        `heads` で名前ごとに本物の先頭を渡せる（レビュー済みは
         依頼時の先頭と比べるので、親のブランチの本物の先頭が要る）。
         """
         chrome = _chrome()
@@ -174,16 +175,18 @@ class CoreHarness(PhaseHarness):
             **extra,
         }
         if op != "confirm":
-            # レビュー済み（段階 4）は手元の CLI の confirm と比べる。控えがあると手元は C1 の
-            # 対象の家族として sh を通さない書き込みを断るので、控えは Chrome の側だけに組む。
+            # レビュー済み（段階 4）は手元の CLI の confirm と比べる。同期状態があると手元は C1 の
+            # 対象の親子チケットとして sh を通さない書き込みを断るので、
+            # 同期状態は Chrome の側だけに組む。
             self.mirror_records(chrome, request)
         return request
 
     def mirror_records(self, chrome, request):
-        """Chrome の入口が仮のツリーに組む取り込みの控え相当を、手元の控えの置き場にも書く。
+        """Chrome の入口が仮のツリーに組む取り込みの同期状態に当たるものを、
+        手元の状態ディレクトリにも書く。
 
-        手元も同じ控えで判定する（取り込み済みの家族として読む。ADR-0093 の 3.3）ので、
-        画面の本文と指紋（判定が読んだ中身。控えを含む）が Chrome と同じになる。
+        手元も同じ同期状態で判定する（取り込み済みの親子チケットとして読む。ADR-0093 の 3.3）ので、
+        画面の本文とダイジェスト（判定が読んだ中身。同期状態を含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
         place = chrome._placement(None)
@@ -232,7 +235,7 @@ class SourcePathTest(CoreHarness):
         self.assertEqual(copy.source_tree, "i0001")
 
     def test_a_copy_written_in_the_old_form_reads_the_same(self):
-        """前の形（絶対パス・ツリーの名前）の写しと今の形の写しで、判定の答えが同じ。"""
+        """前の形（絶対パス・ツリーの名前）の承認済みチケットと今の形の承認済みチケットで、判定の答えが同じ。"""
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
@@ -246,7 +249,7 @@ class SourcePathTest(CoreHarness):
             text = f.read()
         old = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
         # 前の形: 絶対パス。`source_tree` はツリーの名前で、
-        # 親のワークツリーではブランチ名と同じ綴り。
+        # 親のワークツリーではブランチ名と同じ名前。
         legacy = text.replace(
             "source_path: wip/proposals/todo/i0001.md", f"source_path: {json.dumps(old)}"
         )
@@ -260,8 +263,9 @@ class SourcePathTest(CoreHarness):
         a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
         for key in ("batch", "text", "rejected", "problems"):
             self.assertEqual(a[key], b[key], key)
-        # 指紋は判定が読んだ中身（read_set。ADR-0093 の段階 2c）で作るので、読んだ写しの
-        # バイト列が変われば変わる（見せたあとに写しが書き換わった承認を通さない）。
+        # ダイジェストは判定が読んだ中身（read_set。ADR-0093 の段階 2c）で作るので、
+        # 読んだ承認済みチケットの
+        # バイト列が変われば変わる（見せたあとに承認済みチケットが書き換わった承認を通さない）。
         self.assertNotEqual(a["digest"], b["digest"])
         self.assertEqual(verify_new.returncode, verify_old.returncode)
         self.assertEqual(verify_new.stdout, verify_old.stdout)
@@ -599,7 +603,7 @@ class WriterFailureTest(CoreHarness):
         self.assertEqual([e["cleared"] for e in self.reopened_events()], [["reviewed"]])
 
     def test_a_mark_that_is_a_link_is_removed_as_a_link(self):
-        """控える段の消去はリンクを辿らない（行き先を消さない）。"""
+        """溜める段の消去はリンクを辿らない（行き先を消さない）。"""
         marks = self.reopened()
         outside = write(os.path.join(self.root, "outside.json"), "{}")
         os.remove(os.path.join(marks, "1.requested"))
@@ -664,7 +668,7 @@ class CoreChromeTest(CoreHarness):
     """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す（6.2 の同じ答え）。
 
     比べるのは、Changes（経路の欄だけを落として）、見せる行、止まったか、問題点の文面、
-    画面の本文と指紋。取り下げは手元の CLI が無い（段階 3 の Chrome だけの操作）ので、
+    画面の本文とダイジェスト。取り下げは手元の CLI が無い（段階 3 の Chrome だけの操作）ので、
     手元のコアを通して書いたものと比べる。
     """
 
@@ -703,7 +707,7 @@ class CoreChromeTest(CoreHarness):
         write(SCENARIOS, body + "\n")
 
     def keep_scenario(self, name, request, answer):
-        """拡張の試験の見本と突き合わせる（書き直すときは控える）。場面ごとにその場で比べる。"""
+        """拡張の試験の見本と突き合わせる（書き直すときは保存する）。場面ごとにその場で比べる。"""
         CoreChromeTest.collected[name] = {"request": request, "answer": answer}
         if os.environ.get("CCNAVI_CHROME_FIXTURE"):
             return
@@ -788,9 +792,11 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent("reviewed")
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
-        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む（控えの無い家族。
-        # D11）ので、残すと手元だけが子のツリーの古い写しを読み、判定が読んだ中身（read_set）
-        # で作る指紋が Chrome（統合先と P だけを読む）と食い違う。
+        # 合流した子のワークツリーを片付ける。
+        # 手元の判定は全ツリーの承認済みチケットを読む（同期状態の無い親子チケット。
+        # D11）ので、残すと手元だけが子のツリーの古い承認済みチケットを読み、
+        # 判定が読んだ中身（read_set）
+        # で作るダイジェストが Chrome（統合先と P だけを読む）と食い違う。
         git(
             self.root,
             "worktree",
@@ -902,7 +908,7 @@ class CoreChromeTest(CoreHarness):
         )
 
     def test_confirm(self):
-        """レビュー済み: レビュー待ちの子を done/ へ動かし（settle_review）、印を置く。"""
+        """レビュー済み: レビュー待ちの子を done/ へ動かし（settle_review）、マーカーを置く。"""
         fixture = self.reviewed_phase_one()
         self.commit_parent("requested")
         result = {
@@ -946,7 +952,7 @@ class CoreChromeTest(CoreHarness):
         self.assertIn(("create", ".ccnavi/approved/done/i0001-01.md"), paths)
         self.assertIn(("delete", "wip/proposals/review/i0001-01.md"), paths)
         mark = next(r for r in answer["changes"]["i0001"] if r["path"].endswith("1.reviewed"))
-        # Chrome の印は経路（chrome）を持つ。アカウントは要求に無いので書かない（8.9）。
+        # Chrome のマーカーは経路（chrome）を持つ。アカウントは要求に無いので書かない（8.9）。
         self.assertEqual(
             json.loads(mark["content"]), {"mr": 7, "accepted": [], "via": "chrome", "at": STAMP}
         )
@@ -1110,7 +1116,7 @@ class RecordWritesTest(CoreHarness):
         outside = os.path.join(self.root, "wip", "list.txt")
         self.refused(outside)
         self.assertFalse(os.path.exists(outside))
-        # `..` で出る綴り。
+        # `..` で出るパス。
         climbing = os.path.join(self.place(), "..", "..", "..", "wip", "list.txt")
         self.refused(climbing)
         self.assertFalse(os.path.exists(outside))

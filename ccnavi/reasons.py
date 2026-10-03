@@ -204,7 +204,7 @@ def reason_for(
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
     # 出所はルールの id で示す。プロジェクトのルールの id には `lib:git-push` の形で
     # プロジェクトの名前が付く（REQ-MLT-07）ので、id だけでどのファイルを見に行けばよいかが
-    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無い綴りが
+    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無い文字列が
     # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
     if rule.id == phase.TICKET_APPROVAL_RULE_ID:
@@ -231,8 +231,8 @@ def ran_by(runner: str, inner: str) -> str:
     元の形（`env rm -f …`）だけを見た読み手には、ルールのどこが当たったのかが分からない。
     ルールは `rm` について書かれていて、`env` については何も言っていないので。
 
-    `cd` で移った先から見た綴りに当たったときも同じで、書いた綴り（`rm settings.json`）には
-    当たったルールの名前が出てこない。どこへ書こうとしているかを綴りで示す。
+    `cd` で移った先から見たパスに当たったときも同じで、書いた表記（`rm settings.json`）には
+    当たったルールの名前が出てこない。どこへ書こうとしているかを書き直した表記で示す。
     """
     if runner == shellread.MOVED:
         return (
@@ -341,7 +341,7 @@ def rewrite(subject: str, form: str, found: list[str]) -> str:
     )
 
 
-# 止めた文に並べる綴りの数。1 つ直せば残りも同じ直し方になる。
+# 止めた文に並べる書き直しの数。1 つ直せば残りも同じ直し方になる。
 _REWRITES_SHOWN = 5
 
 # 形ごとの（見つけたものの呼び名, 書き直し方）。
@@ -394,9 +394,9 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
 
     言うのは線引きと入口だけにする。この文はセッションの開始（起動・再開・compact・clear）
     のたびに届くので、後から必要な場所で改めて届くものを頭では言わない。名指しするのは、
-    レビューの sh の綴りがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
+    レビューの sh の書き方がフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
     人がどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
-    フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の綴りが
+    フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の書き方が
     承認のときの検査（`approval.py`）、後工程の進め方が承認済みチケットが置かれたとき
     （`approved`）。
 
@@ -429,7 +429,7 @@ def approved(tickets, revisions: set[str], root: str) -> str:
     2 か所で文を持つと、人が貼った文と hook が渡した文が食い違う。
 
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
-    revisions は親の改版だった識別子。root はワークスペースルートで、sh の綴りに使う。
+    revisions は親の改版だった識別子。root はワークスペースルートで、sh の表記に使う。
     """
     lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:

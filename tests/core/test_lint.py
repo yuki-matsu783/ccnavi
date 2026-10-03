@@ -43,7 +43,7 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     """ルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
 
     書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
-    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の綴りの
+    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の書き方の
     話に付き合わずに済む。
     """
     body: dict = {"version": version, "deny": list(rules)}
@@ -270,7 +270,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 0)
 
     def test_チケット制御に読めない値を書いたらerrorになる(self):
-        # 切ったつもりの綴り違いは enable として動く。守りは消えないが、
+        # 切ったつもりの書き違いは enable として動く。守りは消えないが、
         # 書いた人は切れていると思い続けるので、直すまで error で名指しする。
         result = ccnavi(
             self.root,
@@ -450,7 +450,7 @@ class LintTest(unittest.TestCase):
         ):
             # 名前にはタイプが付く。同じ id が別のタイプに居ることがあるので、
             # どちらの話なのかを名前が言えないと直しに行く先が決まらない。
-            self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を咎めていない")
+            self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を報告していない")
 
     def test_askとallowのmessageはerrorになりルールは効いたまま(self):
         # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない（実際に確かめた）。
@@ -471,8 +471,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("error: mig: ask に message がある", result.stdout)
         self.assertIn("error: anything: allow に message がある", result.stdout)
-        self.assertNotIn("quiet", result.stdout, "文面の無い ask は咎めない")
-        # 咎めたルールも読み込まれている（--explain に載る）。
+        self.assertNotIn("quiet", result.stdout, "文面の無い ask は報告しない")
+        # 報告したルールも読み込まれている（--explain に載る）。
         shown = ccnavi(self.root, "--explain", "--rules", path, "--mode", "enable").stdout
         self.assertIn("mig", shown)
         self.assertIn("quiet", shown)
@@ -511,7 +511,7 @@ class LintTest(unittest.TestCase):
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
         # id 無しが 1 件、重複が 1 件、当たらない match が 1 件。重複は 2 件目だけを
-        # 咎める。1 件目は、他に同じ id が無ければそのままで正しいルールだから。
+        # 報告する。1 件目は、他に同じ id が無ければそのままで正しいルールだから。
         self.assertEqual(warns, 3, result.stdout)
         self.assertIn("id が無い", result.stdout)
         self.assertIn("id が重複", result.stdout)
@@ -521,7 +521,7 @@ class LintTest(unittest.TestCase):
         # Claude Code の権限ルール `ToolName(指定子)` の括弧の中を除いた名前は、
         # 判定が対象を取り出せる。PowerShell はコマンド、Grep / Glob は探す場所、
         # Skill はスキル名、WebFetch は URL。lint の probe がその欄を渡し損ねると、
-        # 正しいルールを咎める。
+        # 正しいルールを報告する。
         result = lint(
             self.root,
             rules_file(
@@ -537,7 +537,7 @@ class LintTest(unittest.TestCase):
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
         # WebSearch は指定子を持たず、Task は今の Claude Code に無い。
-        # どちらも対象を取り出せないので、この 2 つだけを名前ごとに咎める。
+        # どちらも対象を取り出せないので、この 2 つだけを名前ごとに報告する。
         self.assertEqual(warns, 2, result.stdout)
         self.assertIn("WebSearch", result.stdout)
         self.assertIn("Task", result.stdout)

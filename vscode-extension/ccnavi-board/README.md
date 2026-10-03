@@ -629,14 +629,14 @@ src/
     phases-view.ts    フェーズ管理の拡張ホストと画面の契約（種類の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
     phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）
-    phases-graph.ts   フェーズの図の点・線・置き場所を種類の並びから組む。VS Code に触れないので単体で試せる
+    phases-graph.ts   フェーズの図の点・線・置き場所を種類のリストから組む。VS Code に触れないので単体で試せる
     phases-route.ts   図の線の経路（点を横切らない折れ線）。VS Code に触れないので単体で試せる
     flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を落とさない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
     flow-view.ts      フロー編集の拡張ホストと画面の契約（見せる形 FlowPage / FlowData、押した操作 FlowMessage とその形の確認、錠を実行ファイルの答えから引く flowTargetOf、カードのボタンの言葉）
     flow-render.ts    フロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     flow-lint.ts      フローの本文を呼ぶたびに別の名前の一時ファイルに書いて実行ファイル（--lint --json --flow）に確かめさせ、(flow) の error を理由にする。通れば実行ファイルが読んだ中身（flow.data）と、(flow) の warn（綴りを直したもの）・渡る手順（rendered）・候補（candidates）を返す
     flow-agree.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
-    flow-history.ts   フロー編集の元に戻す・やり直すの履歴（直す前の写しを積む。同じ欄への打ち込みをまとめる。上限 100）
+    flow-history.ts   フロー編集の元に戻す・やり直すの履歴（直す前のコピーを積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-sample.ts    案内の間だけ出す見本（ボードのカード、プロジェクトの行）。チケットやプロジェクトがまだ無いワークスペースで、案内が指す先を作る
@@ -646,7 +646,7 @@ src/
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
     lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）
-    commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の並び
+    commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
     screens.ts        画面の入口の帳面（Root）。どの画面をどう開くかを 1 か所に集める。画面どうしは互いを import せず、ここへ要求を出す
     watch.ts          4 つの画面が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob
@@ -692,7 +692,7 @@ src/
     risk/main.tsx     リスク管理画面の入口。埋め込みの JSON を読んでマウントする
     risk/App.tsx      帯・ツールバー・リスクレベルの基準点・項目の一覧と、拡張ホストからのメッセージの受け
     risk/Factor.tsx   項目 1 件の行（要約と、開いたときの欄）
-    risk/state.ts     編集中の配点（行ごとの鍵）と、開いている行（id で控える）の読み書き
+    risk/state.ts     編集中の配点（行ごとの鍵）と、開いている行（id で覚える）の読み書き
     risk/text.ts      要約の文・欄の名前・絞り込みが当てる文字列
     phases/style.css  フェーズ管理画面の CSS の入口
     phases/App.css    App.tsx の CSS（枠と見出し）
@@ -703,10 +703,10 @@ src/
     phases/App.tsx    注意の帯・ツールバー・種類の一覧と、拡張ホストからのメッセージの受け
     phases/Graph.tsx  図（点・線・区分の枠・凡例）
     phases/Phase.tsx  種類 1 件の行（要約と、開いたときの欄。scope と成果物は , 区切り、関係は複数選択のセレクトボックスで選ぶ）
-    phases/state.ts   編集中の種類（行ごとの鍵）・開いている行（id で控える）・id の重なり
+    phases/state.ts   編集中の種類（行ごとの鍵）・開いている行（id で覚える）・id の重なり
     phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
     flow/style.css    フロー編集画面の CSS の入口（先頭で React Flow の CSS を @import する）
-    flow/App.css      App.tsx の CSS（部品箱・図・欄の並びと印）
+    flow/App.css      App.tsx の CSS（部品箱・図・欄の配置とバッジ）
     flow/Canvas.css   Canvas.tsx の CSS（図・ノード・出口）
     flow/Inspector.css Inspector.tsx の CSS（右の欄）
     flow/SaveReview.css SaveReview.tsx の CSS（保存前の差分の一覧）
@@ -717,7 +717,7 @@ src/
     flow/Inspector.tsx 右の欄（ノード・線・フローの中身）
     flow/SaveReview.tsx 保存前の差分の一覧（保存する・やめる・次から確かめない）
     flow/Preview.tsx  担当に渡る手順のプレビュー（実行ファイルが並べた行をそのまま出す）
-    flow/text.ts      ノードの印（メインに戻る・入れ子）と 1 行の要約
+    flow/text.ts      ノードのバッジ（メインに戻る・入れ子）と 1 行の要約
     rules/style.css   ルール設定画面の CSS の入口
     rules/App.css     App.tsx の CSS（タブ・節・判定の欄・判定を試す・hook の 2 つのタブが共有する表）
     rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの選択肢）
@@ -728,17 +728,17 @@ src/
     rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄）
     rules/Judge.tsx   判定の結果とサンプルの一括判定の表。ここは判定せず、実行ファイルが返した判定を読むだけ
     rules/Hooks.tsx   hook の一覧（表示するだけで書き換えない）
-    rules/state.ts    編集中のルール（行ごとの鍵）・開いている行（id で控える）・開いているタブ
+    rules/state.ts    編集中のルール（行ごとの鍵）・開いている行（id で覚える）・開いているタブ
     rules/text.ts     要約の文・絞り込みが当てる文字列・件数の出し方
 media/
   icon.svg            アクティビティバーのアイコン
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/ticket/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/core/test_test_json.py が書き出す
-  fixtures/suggest.json             --suggest --json の実例。tests/guard/test_suggest.py が鍵の並びを突き合わせる
+  fixtures/suggest.json             --suggest --json の実例。tests/guard/test_suggest.py が鍵の集合を突き合わせる
   fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/ticket/test_approve_json.py が書き出す
   helpers/fixture.ts  board.json を読む
-  helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を控える
+  helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を保存する
   helpers/board.ts    ボード画面（React）を束ねたものごと happy-dom で開く
   helpers/projects.ts プロジェクト管理画面（React）を束ねたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）を束ねたものごと happy-dom で開く

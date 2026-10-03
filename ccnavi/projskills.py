@@ -41,7 +41,7 @@ FENCE_CLOSE = "  ---- 目録ここまで ----"
 # 目録に載せるスキルのディレクトリ名。これ以外（改行・空白・括弧・区切りに似た文など）を持つ
 # 名前は読まない。パスは文にそのまま出るので、名前で文を組み立てさせない。
 NAME = re.compile(r"^[A-Za-z0-9._-]+$")
-# 1 度だけ渡す文の数えの鍵（`ctxfile` の控え）。プロジェクトごとに分ける。
+# 1 度だけ渡す文の数えの鍵（`ctxfile` の状態ファイル）。プロジェクトごとに分ける。
 ONCE_ID = "builtin-project-skills"
 
 
@@ -67,7 +67,7 @@ def _front(raw: bytes) -> dict:
 
 
 def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str, str, str]], int]:
-    """(名前, 説明, 相対パス) の並びと、上限で落とした数。名前の順。"""
+    """(名前, 説明, 相対パス) のリストと、上限で落とした数。名前の順。"""
     base = skills_dir(project_root)
     try:
         names = sorted(os.listdir(base))
@@ -111,8 +111,8 @@ def notice(
 
     `SessionStart` と `SubagentStart`（`at_start`）に加え、cwd がプロジェクトの中にある最初の
     `PreToolUse` でも呼ぶ。セッションはワークスペースルートで始まり、あとから `cd` で入るのが
-    ふつうなので、開始だけでは届かない。数えは `additionalContextOnce` と同じ控えに置き、
-    `SessionStart`（compact の後を含む）で忘れる。控えの置き場が無いときは、開始では渡し、
+    ふつうなので、開始だけでは届かない。数えは `additionalContextOnce` と同じ状態ファイルに置き、
+    `SessionStart`（compact の後を含む）で忘れる。状態ディレクトリが無いときは、開始では渡し、
     `PreToolUse` では渡さない（呼び出しのたびに目録を重ねて渡さない）。
     """
     project = project_of(conf, root, payload.cwd)

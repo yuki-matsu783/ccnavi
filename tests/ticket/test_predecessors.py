@@ -103,7 +103,7 @@ class PredecessorTest(TicketTest):
         self.propose_after("i0001-03", "i0001-99")
         refused = self.approve()
         self.assertIn("先行 i0001-99 がどの置き場", refused.stderr)
-        self.assertIn("綴りを直すか", refused.stderr)
+        self.assertIn("書き方を直すか", refused.stderr)
         self.assertFalse(self.placed("i0001-03"))
 
     def test_a_predecessor_in_two_places_is_not_taken_as_done(self):

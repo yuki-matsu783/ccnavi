@@ -449,7 +449,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
     def test_HEADを持たない控えは基準なしとして扱う(self):
-        # heads の無い控えは、控えが無いときと同じ。コミットのぶんを数えられない
+        # heads の無い状態ファイルは、状態ファイルが無いときと同じ。コミットのぶんを数えられない
         # 基準で報告すると、このターンに入ったコミットを黙って落とす。
         self.run_hook(event="UserPromptSubmit")
         turn = os.path.join(self.state, "s1.turn.json")
@@ -465,8 +465,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
     def test_ターンの終わりの報告は一度伝えた変更も含む(self):
-        # 呼び出しごとの報告は控えを見て繰り返さないが、人はまだ 1 度も
-        # 見ていないことがある。宛先が違うので、控えを共有しない。
+        # 呼び出しごとの報告は状態ファイルを見て繰り返さないが、人はまだ 1 度も
+        # 見ていないことがある。宛先が違うので、状態ファイルを共有しない。
         self.run_hook(event="UserPromptSubmit")
         self.run_hook(command="ls")
         self.dirty()
@@ -514,7 +514,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(line["detail"], "not-a-git-worktree")
 
     def test_自分が書く場所は自分の違反にしない(self):
-        # 記録と控えを保護領域の中に置く。置き場を設定でルールが守る場所の中へ
+        # 記録と状態ディレクトリを保護領域の中に置く。置き場を設定でルールが守る場所の中へ
         # 指したときの形。
         self.state = os.path.join(self.repo, "protected", "state")
         self.log = os.path.join(self.repo, "protected", "decisions.jsonl")
@@ -581,7 +581,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     def test_ターンが始まる前のコミットは言わない(self):
         # 前のターンや他のセッションが積んだコミットを、このターンの成果として
-        # 並べない。基準はターンの始まりに控えた HEAD。
+        # 並べない。基準はターンの始まりに保存した HEAD。
         #
         # 「何も出ない」だけを見ると、コミットを一切見ない実装でも通ってしまう。
         # 同じターンで 1 件だけ積んで、そちらは出ることも一緒に見る。
@@ -673,7 +673,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
         # 呼び出しの数だけ積まれるので、報告はセッションで 1 度きりにする。
         # 人が見るのはターンの終わりの報告（Stop）。
-        # 控え（セッション）とターンの基準の両方を、汚す前に置く。
+        # 状態ファイル（セッション）とターンの基準の両方を、汚す前に置く。
         self.run_hook(command="ls")
         self.run_hook(event="UserPromptSubmit")
         write(os.path.join(self.repo, "watched", "deps.txt"), "first\n")

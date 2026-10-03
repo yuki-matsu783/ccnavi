@@ -426,7 +426,7 @@ class MergeFileTest(GitWrapperTest):
             ("merge-file", "-L", "-p", current, base, other),
             # `--` の後ろはファイル名。
             ("merge-file", "--union", "--", "-p", base, other),
-            # 打ち消しと略記は git が受け取るので、知らない綴りとして止める。
+            # 打ち消しと略記は git が受け取るので、知らない書き方として止める。
             ("merge-file", "-p", "--no-stdout", current, base, other),
             ("merge-file", "--std", current, base, other),
             ("merge-file", "-pq", current, base, other),
@@ -879,7 +879,7 @@ class StoreRewindTest(GitWrapperTest):
         self.assertUntouched()
 
     def test_a_moved_store_is_followed(self):
-        # 置き場の綴りを設定で動かしても、その綴りで止める。
+        # 置き場のパスを設定で動かしても、そのパスで止める。
         result = self.run_wrapper(
             "restore",
             "--source",
@@ -980,8 +980,9 @@ class WorktreeNameTest(GitWrapperTest):
 class ParentWorktreeSwitchTest(GitWrapperTest):
     """親のワークツリーでは別のブランチへ移らない（ADR-0093 の 3.1 の 10。段階 2b）。
 
-    親のワークツリーは .claude/worktrees/<P> で、親の写しか提案（`ticket: <P>`、`parent:` なし）が
-    あるもの。親のブランチの名前は識別子で、ワークツリーが別のブランチの上に居ると家族を引けなくなる。
+    親のワークツリーは .claude/worktrees/<P> で、親の承認済みチケットか提案（`ticket: <P>`、
+    `parent:` なし）が
+    あるもの。親のブランチの名前は識別子で、ワークツリーが別のブランチの上に居ると親子チケットを引けなくなる。
     """
 
     def setUp(self):
@@ -1041,9 +1042,10 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
 
 
 class FamilyRecordPushTest(GitWrapperTest):
-    """push が通ったら親のブランチの家族の控えを作り、控えが gone なら送らない（ADR-0093 の 4.3）。
+    """push が通ったら親のブランチの親子チケットの同期状態を作り、
+    同期状態が gone なら送らない（ADR-0093 の 4.3）。
 
-    控えは ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
+    同期状態は ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
     """
 
     def setUp(self):
@@ -1081,7 +1083,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         self.assertEqual("origin", fields["remote"])
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), fields["sha"])
         self.assertTrue(fields["fetched_at"].isdigit())
-        self.assertIn("家族の控えを作った", result.stdout)
+        self.assertIn("親子チケットの同期状態を作った", result.stdout)
         self.assertIn("ccnavi-sync.sh i0001", result.stdout)
 
     def test_uncommitted_store_changes_keep_the_family_out(self):
@@ -1101,7 +1103,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         result = self.push()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.fields()["sha"])
-        self.assertNotIn("家族の控えを作った", result.stdout)
+        self.assertNotIn("親子チケットの同期状態を作った", result.stdout)
 
     def test_a_gone_family_is_not_pushed(self):
         write_text(
@@ -1220,7 +1222,7 @@ class AllowListTest(GitWrapperTest):
 
 
 class ParentWorktreeValueBundleTest(ParentWorktreeSwitchTest):
-    """親のワークツリーでは、値を束ねた綴り（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
+    """親のワークツリーでは、値を束ねた書き方（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
 
     def test_moving_away_from_the_parent_branch_is_rejected(self):
         for args in (
@@ -1278,7 +1280,7 @@ class WorktreeDetachTest(GitWrapperTest):
 
 
 class SymlinkedWorkspaceTest(GitWrapperTest):
-    """リンクを経た作業場でも守りが有効（git の綴りとワークスペースの綴りを揃える。中 12）。"""
+    """リンクを経た作業場でも守りが有効（git のパスとワークスペースのパスを揃える。中 12）。"""
 
     def setUp(self):
         super().setUp()
@@ -1308,11 +1310,11 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
     def test_the_family_record_is_written_through_the_link(self):
         result = run_in(self.via_link, "push", "-u", "origin", "i0001")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("家族の控えを作った", result.stdout)
+        self.assertIn("親子チケットの同期状態を作った", result.stdout)
 
 
 class PushRemoteResolutionTest(FamilyRecordPushTest):
-    """送り先は git と同じ順で解き、origin 以外へ送ったら控えを作らない（軽 18）。"""
+    """送り先は git と同じ順で解き、origin 以外へ送ったら同期状態を作らない（軽 18）。"""
 
     def test_a_push_remote_other_than_origin_writes_no_record(self):
         other = self.make_bare()

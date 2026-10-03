@@ -36,7 +36,7 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。束ねる入出力のパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
@@ -69,7 +69,7 @@ interface PanelState {
   /**
    * 前の読み直しから動いたカード。**画面ではなくここが持つ。** 画面は裏に回ると捨てられ、
    * 表に戻ると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
-   * 承認の文を渡してボードに戻った時点で印が消える。決めるのは `core/board-moved.ts`
+   * 承認の文を渡してボードに戻った時点で強調表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
 }
@@ -254,8 +254,8 @@ async function update(): Promise<void> {
  * ボードを見せる。中身を渡すのは `send`。
  *
  * **読めたボードはここを必ず通る**ので、動いたカードもここで数え直す。同じボードを渡し直すだけの
- * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の印を
- * そのまま返すので、承認の文を閉じた拍子に印が消えることはない。
+ * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の強調表示を
+ * そのまま返すので、承認の文を閉じた拍子に強調表示が消えることはない。
  */
 function show(current: PanelState, board: Board): void {
   current.moved = movedStep(current.moved, board);
@@ -340,7 +340,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
       postAppearance(current.host);
       // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-      // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+      // 閉じずにタブを閉じたら見たというフラグは残らないので、次に開いたときにもう 1 度出る
       if (!tourSeen(SCREEN)) {
         current.host.post({ type: "tour" } satisfies ToBoard);
       }
@@ -419,8 +419,8 @@ function handleMessage(message: BoardMessage | undefined): void {
 }
 
 /**
- * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）は realpath で解いた綴りを出すので、
- * 同じ綴りにする（macOS の /tmp → /private/tmp など）。解けなければ渡された綴りのまま
+ * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）は realpath で解いたパスを出すので、
+ * 同じ表記にする（macOS の /tmp → /private/tmp など）。解けなければ渡されたパスのまま
  */
 function realRoot(root: string): string {
   try {
@@ -481,7 +481,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     }
     case "approve": {
       // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
-      // 見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身）も渡す。識別子が同じでも、
+      // 見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身）も渡す。識別子が同じでも、
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       if (state === current) {

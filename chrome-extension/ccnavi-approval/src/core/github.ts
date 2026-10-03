@@ -82,7 +82,7 @@ export interface Client {
   readonly token: string;
   readonly fetch: Fetch;
   readonly counter: Counter;
-  /** 応答から読んだもの（PAT の期限。読めなければ空）。呼び手が控える */
+  /** 応答から読んだもの（PAT の期限。読めなければ空）。呼び手が保存する */
   readonly seen?: { expiration: string };
   /** 待つ（レート制限の Retry-After）。試験は差し替える */
   readonly sleep?: (ms: number) => Promise<void>;
@@ -190,7 +190,7 @@ function nextPage(client: Client, link: string): string {
   return m[1].slice(client.host.api.length);
 }
 
-/** 並びを返す REST をページごとに読み、`pages` まで足す。答えと、まだ続きがあるか */
+/** 配列を返す REST をページごとに読み、`pages` まで足す。答えと、まだ続きがあるか */
 async function restPages(client: Client, path: string, pages: number): Promise<{ items: unknown[]; more: boolean }> {
   const items: unknown[] = [];
   let next = path;
@@ -354,7 +354,7 @@ export interface TreeEntry {
   readonly mode: string;
 }
 
-/** シンボリックリンクの mode。中身は指す先の綴りなので、ファイルとして読まない（12） */
+/** シンボリックリンクの mode。中身は指す先のパスなので、ファイルとして読まない（12） */
 export const LINK_MODE = "120000";
 
 /** tree を再帰で読む。`truncated` なら取り切れないので止める（8.2） */
@@ -425,7 +425,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
 
 // ---- 段階 3: 書き込みと、取り下げのための履歴・MR の Approve・PAT の期限 ----------------------
 
-/** 期限のヘッダの綴り（`2026-12-31 00:00:00 UTC`・`2026-12-31 09:00:00 +0900`）を ISO にする。読めなければ空 */
+/** 期限のヘッダの表記（`2026-12-31 00:00:00 UTC`・`2026-12-31 09:00:00 +0900`）を ISO にする。読めなければ空 */
 export function parseExpiration(text: string): string {
   const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)\s*(UTC|Z|[+-]\d{2}:?\d{2})?$/.exec(text.trim());
   if (!m) return "";
@@ -529,7 +529,7 @@ export async function firstParentChain(client: Client, owner: string, repo: stri
  * あるときだけ、そのコミットと親を返す（決定 B）。どれかを確かめられなければ null（取り下げを出さない）。
  *
  * 「足した」はコミットの変更の一覧（`files` の `status`）に頼らない。GitHub は承認コミット（提案の削除と
- * 写しの追加）を `renamed` と返すことがあり、一覧は 300 件で切れるため。両方の木で `path` を引いて比べる。
+ * 承認済みチケットの追加）を `renamed` と返すことがあり、一覧は 300 件で切れるため。両方の木で `path` を引いて比べる。
  * 一覧（`GET /commits?path=`）は `git log -- path` の簡略化で、merge や別の枝のコミットも出うる。
  */
 export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
@@ -576,7 +576,7 @@ export async function pullApprovals(client: Client, owner: string, repo: string,
   return out;
 }
 
-// ---- 段階 4: レビュー済み（8.9）。MR のスレッドとレビューの写しと、依頼の後の変更の一覧 --------------
+// ---- 段階 4: レビュー済み（8.9）。MR のスレッドとレビューのコピーと、依頼の後の変更の一覧 --------------
 
 /** スレッド 1 つ（`ccnavi-review.sh` の `threads` と同じ形） */
 export interface ReviewThread {
@@ -587,7 +587,7 @@ export interface ReviewThread {
   readonly line: number;
   readonly body: string;
   readonly created_at: string;
-  /** 最初のコメントを書いたアカウント（GitLab の写しだけ。ccnavi の依頼のスレッドを見分ける。11.8.1 の決定 C） */
+  /** 最初のコメントを書いたアカウント（GitLab のコピーだけ。ccnavi の依頼のスレッドを見分ける。11.8.1 の決定 C） */
   readonly author?: string;
 }
 
@@ -599,7 +599,7 @@ export interface PullReview {
   readonly author: string;
 }
 
-/** ホストの写し（`ccnavi-review.sh fetch` と同じ形。Python の `review.Result` が読む） */
+/** ホストのデータのコピー（`ccnavi-review.sh fetch` と同じ形。Python の `review.Result` が読む） */
 export interface ReviewCopy {
   readonly host: "github" | "gitlab";
   readonly mr: { readonly number: number; readonly url: string };
@@ -675,9 +675,9 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
   const out: PullReview[] = [];
   for (let page = 1; ; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
-    // 404 や並びでない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
+    // 404 や配列でない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
     if (status === 404) throw new HostError(`マージリクエスト #${number} のレビューを読めない（404）`, 404);
-    if (!Array.isArray(body)) throw new HostError(`マージリクエスト #${number} のレビューの応答が並びでない`);
+    if (!Array.isArray(body)) throw new HostError(`マージリクエスト #${number} のレビューの応答が配列でない`);
     const chunk = body as Record<string, unknown>[];
     for (const r of chunk) {
       const user = (r.user ?? null) as { id?: unknown; login?: unknown } | null;
@@ -694,8 +694,8 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
 }
 
 /**
- * 親のブランチの MR のスレッドとレビューの写し（8.9）。`ccnavi-review.sh fetch` と同じ形で、
- * 同じ見本（test/fixtures/host/github/）から同じ写しになることを試験が見る。MR が無ければ投げる。
+ * 親のブランチの MR のスレッドとレビューのコピー（8.9）。`ccnavi-review.sh fetch` と同じ形で、
+ * 同じ見本（test/fixtures/host/github/）から同じコピーになることを試験が見る。MR が無ければ投げる。
  */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
   const mr = await openPull(client, owner, repo, branch);
@@ -719,7 +719,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   const { status, body } = await rest(client, `${repoPath(owner, repo)}/compare/${b}...${h}`);
   const res = (body ?? {}) as { status?: unknown; files?: { filename?: unknown; previous_filename?: unknown }[] };
   if (status === 404 || (res.status !== "ahead" && res.status !== "identical")) return { base: b, head: h, files: null };
-  // 一覧が無い・並びでない答えは「変わっていない」と読まない（動いたと数える）
+  // 一覧が無い・配列でない答えは「変わっていない」と読まない（動いたと数える）
   if (!Array.isArray(res.files)) return { base: b, head: h, files: null };
   const list = res.files;
   if (list.length >= COMPARE_FILES_LIMIT) return { base: b, head: h, files: null };

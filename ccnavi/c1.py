@@ -5,16 +5,17 @@
 `ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（D17・4.5）。
 ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。D33）。
 
-- `ccnavi c1 family <識別子>`: その識別子の家族と、C1 の対象か
-  - 対象は、置き場の綴りが相対で、家族の控えがあり（取り込み済み）、chat だけの家族でなく、
-    止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い家族（D11）
-  - 止める理由のある取り込み済みの家族は `target stop`。sh は何も書かずに止める
+- `ccnavi c1 family <識別子>`: その識別子の親子チケットと、C1 の対象か
+  - 対象は、置き場の表記が相対で、親子チケットの同期状態があり（取り込み済み）、
+    chat だけの親子チケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い など）
+    の無い親子チケット（D11）
+  - 止める理由のある取り込み済みの親子チケットは `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
 - `ccnavi c1 sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
   `wip/proposals/review/`）の変更を 4.4 の (b)・(c)・(d) に分ける
   - 版が無ければ未コミットの変更（C1 の 3）、版があれば `<版>..HEAD` でコミットに入った
     変更（C1 の 5）
-  - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その家族の
+  - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子チケットの
     `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの状態の履歴（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
   - (c) 人がコミットするもの（人の判断）。C1 はコミットせずに止める。人の判断が一緒に書く移動
@@ -61,8 +62,8 @@ _EVENT_FIELDS = ("at", "ticket", "kind")
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
 # configsync の `*.ccnavi-sync`）。
 _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$")
-# 人の判断が書くもの（4.4 の表）。フローの本文、reviewed・close-early の印、設定を見た印、
-# 受け入れたスレッド、人の承認で置かれた写し。
+# 人の判断が書くもの（4.4 の表）。フローの本文、reviewed・close-early のマーカー、
+# 設定を見たマーカー、受け入れたスレッド、人の承認で置かれた承認済みチケット。
 _HUMAN_MARK_NAMES = (
     f"{approval.PARENT_MARK_CLOSE_EARLY}.json",
     "config-sync.json",
@@ -72,13 +73,16 @@ _TIMEOUT = 20.0
 
 
 def family_of(ident: str) -> str:
-    """識別子の家族の親（3.3 の 5）。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
+    """識別子が属する親子チケットの親（3.3 の 5）。
+
+    子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。
+    """
     matched = ticket_mod.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
 
 
 def _relative_places(conf: settings.Settings) -> tuple[str, str] | None:
-    """置き場の綴り（承認済み、レビュー待ち）。どちらかが絶対パスなら None（3.1 の 12）。"""
+    """置き場の表記（承認済み、レビュー待ち）。どちらかが絶対パスなら None（3.1 の 12）。"""
     approved = fsio.slashed(conf.approved or settings.DEFAULT_APPROVED).strip("/")
     tickets = fsio.slashed(conf.tickets or settings.DEFAULT_TICKETS).rstrip("/")
     raw = (conf.approved or "", conf.tickets or "")
@@ -91,11 +95,19 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
     """C1 の対象か（`TARGET_YES` / `TARGET_NO` / `TARGET_STOP`）と、その理由と立ち位置。"""
     st = syncstate.standing_any(conf, root, parent)
     if _relative_places(conf) is None:
-        return TARGET_NO, "置き場の綴りが絶対パス（C1 と Chrome の対象外）", st
+        return TARGET_NO, "置き場の表記が絶対パス（C1 と Chrome の対象外）", st
     if not st.imported:
-        return TARGET_NO, "家族の控えが無い（取り込み済みでない。今の手元の動きのまま）", st
+        return (
+            TARGET_NO,
+            "親子チケットの同期状態が無い（取り込み済みでない。今の手元の動きのまま）",
+            st,
+        )
     if _chat_only(conf, root, parent):
-        return TARGET_NO, "chat だけの家族（マージリクエストを持たない。今の手元の動きのまま）", st
+        return (
+            TARGET_NO,
+            "chat だけの親子チケット（マージリクエストを持たない。今の手元の動きのまま）",
+            st,
+        )
     if st.stop or st.home is None:
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
     origin = gitcmd.run(st.home.root, ["config", "--get", "remote.origin.url"], _TIMEOUT)
@@ -107,7 +119,7 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
 
 
 def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
-    """`ccnavi c1 family <識別子>`。家族と、C1 の対象か。"""
+    """`ccnavi c1 family <識別子>`。親子チケットと、C1 の対象か。"""
     parent = family_of(ident)
     lines = [("family", parent)]
     places = _relative_places(conf)
@@ -151,7 +163,7 @@ def sort(
     places = _relative_places(conf)
     st = syncstate.standing_any(conf, root, parent)
     if places is None or st.home is None:
-        stderr.write(f"ccnavi: c1 sort: 家族 {parent} の親のワークツリーが決まらない\n")
+        stderr.write(f"ccnavi: c1 sort: 親子チケット {parent} の親のワークツリーが決まらない\n")
         return 1
     tree_root = st.home.root
     changed, why = _changed(tree_root, places, since)
@@ -201,7 +213,7 @@ def classify_all(
     changed: list[str],
     since: str = "",
 ) -> list[tuple[str, str, str]]:
-    """変更の並びを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
+    """変更のリストを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
     HEAD）、あれば HEAD と `since`。人の判断が一緒に書く移動は、組の両側を見て (c) にする。
     """
     approved_rel, review_rel = places
@@ -280,7 +292,9 @@ def _lf(data: bytes) -> bytes:
 
 
 def _hook_mark(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:
-    """その家族の `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、中身が hook の欄だけ。"""
+    """その親子チケットの `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、
+    中身が hook の欄だけ。
+    """
     if len(parts) != 3 or parts[0] != approval.PHASES_DIR or parts[1] != parent:
         return False
     if before is not None or now is None:
@@ -359,16 +373,17 @@ def _judge_record(parts: list[str]) -> bool:
 def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool:
     """人の判断が書くものの形（4.4 の表）。形だけで見る（(c) も (d) も C1 は止める）。
 
-    フローの本文、人の承認で置かれた写し、reviewed・(b) でない skipped・close-early・設定を見た印・
-    受け入れたスレッド、人の判断が消したマーカー、人の判断が一緒に書く移動（review/ から done/、
-    doing/ から done/）、状態の履歴の追記（読める行だけ）。
+    フローの本文、人の承認で置かれた承認済みチケット、reviewed・(b) でない skipped・
+    close-early・設定を見たマーカー・受け入れたスレッド、人の判断が消したマーカー、
+    人の判断が一緒に書く移動（review/ から done/、doing/ から done/）、
+    状態の履歴の追記（読める行だけ）。
     """
     rel = f"{approved_rel}/{'/'.join(parts)}"
     if len(parts) == 2 and parts[0] == "flows" and parts[1].endswith((".yml", ".yaml")):
         return True
     if len(parts) == 2 and parts[0] == ticket_mod.DOING:
         if added(rel):
-            return True  # 人の承認で置かれた写し
+            return True  # 人の承認で置かれた承認済みチケット
         # 締め（close-early）の取り消しで done/ へ動いた
         return removed(rel) and added(f"{approved_rel}/{ticket_mod.DONE}/{parts[1]}")
     if len(parts) == 2 and parts[0] == ticket_mod.DONE and added(rel):

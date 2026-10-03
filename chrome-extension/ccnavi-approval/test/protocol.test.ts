@@ -113,7 +113,7 @@ test("CX-T112 書く頼み（commit）はボードからだけ、登録したリ
   assert.equal(m.files("i0001")["wip/proposals/todo/x.md"], "x\n");
 });
 
-test("CX-T117 置き場の綴りは service worker が統合先の .claude/settings.json から自分で引く", async () => {
+test("CX-T117 置き場のパスは service worker が統合先の .claude/settings.json から自分で引く", async () => {
   const f = fixture();
   f.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets" } });
   const m = new MockGitHub(f);

@@ -50,7 +50,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** 人が開いた行の鍵。控え（state）に入るのはこちらだけ */
+  /** 人が開いた行の鍵。state に保存するのはこちらだけ */
   readonly open: ReadonlySet<string>;
 }
 
@@ -70,7 +70,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [data, setData] = useState<RulesData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
   /**
-   * 判定で当たってその場だけ開いた行。**控えには入れない**（判定を繰り返しても、人が決めた
+   * 判定で当たってその場だけ開いた行。**state には入れない**（判定を繰り返しても、人が決めた
    * 既定の折りたたみが崩れない）。次の判定で入れ替わる。
    */
   const [transient, setTransient] = useState<ReadonlySet<string>>(new Set());
@@ -102,8 +102,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const page = pageOf(data);
 
   /**
-   * 案内はタブを切り替えて中を指すので、始める前のタブを控え、閉じたら戻す。**案内の間の切り替えは
-   * 控え（`saveTab`）に書かない**（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
+   * 案内はタブを切り替えて中を指すので、始める前のタブを保存し、閉じたら戻す。**案内の間の切り替えは
+   * state（`saveTab`）に書かない**（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
    */
   const tabBeforeTour = useRef<TabName | undefined>(undefined);
   const tour = useTour(data.kind === "page", {
@@ -135,7 +135,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, [dirty]);
 
   /**
-   * id を打っている途中は控えを書き直さない（打ちかけの id が控えに入る）。書くのは欄を
+   * id を打っている途中は state を書き直さない（打ちかけの id が state に入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
    * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ写す
    * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
@@ -251,7 +251,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   /**
    * 判定で当たった行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
-   * タイプの折りたたみも外す。**控えには入れない**ので、次の判定で元の折りたたみに戻る。
+   * タイプの折りたたみも外す。**state には入れない**ので、次の判定で元の折りたたみに戻る。
    */
   const unfoldHits = (ids: readonly string[]): void => {
     const wanted = new Set(ids);
@@ -629,7 +629,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 }
 
 /**
- * ルール設定画面の案内。`peek` は案内の間だけのタブの切り替え（控えに書かない）、`before` は始める前のタブ。
+ * ルール設定画面の案内。`peek` は案内の間だけのタブの切り替え（state に書かない）、`before` は始める前のタブ。
  * 最後の段に入る前に始める前のタブへ戻す（ヘッダ右上の ? はどのタブにも出ている）
  */
 function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonly TourStep[] {

@@ -8,11 +8,11 @@
  *
  * 一時ファイルは画面ごとの一時ディレクトリ（`os.tmpdir()` の下の `ccnavi-flow-*`）に、**呼ぶたびに別の名前**
  * （`flow-<番号>-<乱数>.yml`）で `wx` で書き、確かめ終わったら消す。同じ画面で開くときと保存が重なっても
- * 互いの本文を読み違えない。苦情は一時ファイルのパスを名乗るので、画面に出すときは対象のファイルの綴りに直す。
+ * 互いの本文を読み違えない。苦情には一時ファイルのパスが出るので、画面に出すときは対象のファイルのパスに直す。
  *
  * 通ったときは、実行ファイルが読んだ中身（`flow.data`）を返す。画面はそれを自分の中身と見比べる
  * （`flow-agree.ts`）。あわせて、実行ファイルがそのフローについて言ったこと（`(flow)` の warn、担当に渡る手順
- * `rendered`、選べる名前 `candidates`）を `FlowChecks` にまとめて返す。warn も一時ファイルのパスを名乗るので綴りを直す。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
+ * `rendered`、選べる名前 `candidates`）を `FlowChecks` にまとめて返す。warn にも一時ファイルのパスが出るのでパスを直す。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
  * （`--flow` を知らない古い実行ファイルと同じ扱い）。
  *
  * VS Code の API は使わない（単体テストで確かめる。実行ファイルの答えは偽物を渡す）。
@@ -66,7 +66,7 @@ export async function lintFlowText(
     if (!ran.ok) {
       return { ok: false, error: ran.error };
     }
-    // 苦情は渡した一時ファイルのパスを名乗るので、対象のファイルの綴りに直す
+    // 苦情には渡した一時ファイルのパスが出るので、対象のファイルのパスに直す
     const rename = (detail: string): string => detail.split(tmp).join(shown);
     const problems = problemsOfFlow(ran.value);
     const errors = problems.filter((p) => p.severity === "error");

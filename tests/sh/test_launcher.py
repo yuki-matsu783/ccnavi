@@ -83,7 +83,7 @@ class LaunchedFromScriptsTest(unittest.TestCase):
     """L5: 名前が `ccnavi-launcher.sh` なら `../bin/` を探す。それ以外は探さない。
 
     切り替えの条件は名前だけ（3.3 節）。`binary_clause` と同じ条件で、どちらかだけ
-    条件を足すと、守る場所と控える場所が食い違う。
+    条件を足すと、守る場所とバックアップを取る場所が食い違う。
     """
 
     def setUp(self):
@@ -121,7 +121,7 @@ class LaunchedFromScriptsTest(unittest.TestCase):
         )
 
     def test_launcher_named_as_such_does_not_look_next_to_itself(self):
-        """L3 と揃える。sh が起動しない置き場を、控える場所として返さない。"""
+        """L3 と揃える。sh が起動しない置き場を、バックアップを取る場所として返さない。"""
         launcher = os.path.join(self.scripts, self.launcher_name())
         write(launcher, "#!/bin/sh\n")
         write(os.path.join(self.scripts, "linux-x86_64", "ccnavi"), "elf\n")
@@ -284,7 +284,7 @@ class LauncherTest(unittest.TestCase):
     # L3
 
     def test_does_not_start_a_build_placed_next_to_itself(self):
-        """隣（`.ccnavi/scripts/<os>-<arch>/`）は配る場所ではない。自己防衛の綴りが当たらない。"""
+        """隣（`.ccnavi/scripts/<os>-<arch>/`）は配る場所ではない。自己防衛のパスの指定が当たらない。"""
         self.pretend("Linux x86_64")
         self.build("linux-x86_64", place=self.scripts)
         result = self.run_launcher()

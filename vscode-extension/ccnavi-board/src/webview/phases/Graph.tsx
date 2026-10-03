@@ -7,7 +7,7 @@
  * 図が判定をしないのも同じところに書いてある。ここは `graphOf` が組んだものを描くだけで、
  * 何が正しいかは言わない。
  *
- * **編集はしない。** 点をドラッグで動かせるが、動かした先は画面の控え（`state.ts` の spots）に入るだけで、
+ * **編集はしない。** 点をドラッグで動かせるが、動かした先は画面の state（`state.ts` の spots）に入るだけで、
  * `phases.yml` には書かない。人が持つ設定に座標は入れない。関係そのものを直すのは一覧のほう。
  *
  * 点を押すと一覧へ戻り、その種類の行が開く（`onPick`）。
@@ -220,8 +220,8 @@ function nodesOf(graph: PhasesGraph, spots: Spots): PhaseNode[] {
  * 線を React Flow に渡す形にする。引き方は `routeOf`（`phases-route.ts`）、同じ組の線は関係ごとにずらす（`SHIFT`）。
  *
  * `after` は向きを持つ（待たれる側 a → 待つ側 b）。引き方の都合で出る点が b になったときは、
- * 矢印を始点の側に付ける（React Flow の印は始点では向きが反転するので、b を指す）。
- * 向きの無い線には端の印を付けない。**線にラベルも付けない**（同じ組の 2 本はラベルどうしが
+ * 矢印を始点の側に付ける（React Flow の矢じりは始点では向きが反転するので、b を指す）。
+ * 向きの無い線には端の矢じりを付けない。**線にラベルも付けない**（同じ組の 2 本はラベルどうしが
  * 重なって片方が読めなくなる）。線の読み方は図の下の凡例（`Legend`）が言う。
  */
 function edgesOf(graph: PhasesGraph, at: ReadonlyMap<string, { x: number; y: number }>): RelationEdge[] {
@@ -284,7 +284,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
   const edges = useMemo(() => edgesOf(graph, new Map(nodes.map((node) => [node.id, node.position]))), [graph, nodes]);
 
   /**
-   * 控えの書き込みは、**state を更新する関数の中でやらない**。更新関数は呼ばれる回数を
+   * state への書き込みは、**state を更新する関数の中でやらない**。更新関数は呼ばれる回数を
    * 約束しない（StrictMode や並行描画で 2 度呼ばれる）ので、そこに外への書き込みを置くと
    * 二重に書く。`spots` が変わったあとに 1 度だけ書く。
    */
@@ -298,7 +298,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
     saveSpots(spots);
   }, [spots]);
 
-  // 図に出なくなった種類の控えは落とす（id を打ち替えるたびに溜まるため）
+  // 図に出なくなった種類の位置は落とす（id を打ち替えるたびに溜まるため）
   const known = useRef<string>("");
   useEffect(() => {
     const ids = graph.nodes.map((node) => node.id).join("\u0000");

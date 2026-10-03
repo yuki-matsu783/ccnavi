@@ -58,7 +58,7 @@ function segments(tree: string, file: string): readonly string[] | undefined {
 }
 
 /**
- * tree から file までの途中（file 自身を含む）で最初に見つかったシンボリックリンクの綴り。無ければ undefined。
+ * tree から file までの途中（file 自身を含む）で最初に見つかったシンボリックリンクのパス。無ければ undefined。
  * 無い段から先は見ない（まだ無いものはリンクではない）。file が tree の下に無ければ file 自身を返す（書かない側）。
  */
 export function linkedSegment(tree: string, file: string): string | undefined {

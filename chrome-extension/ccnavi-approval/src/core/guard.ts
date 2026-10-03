@@ -9,7 +9,7 @@
 /** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
 export const PROTECTED = /^(?:main|master|develop|release|release[-/].*)$/i;
 
-/** 置き場の綴りの既定（`ccnavi/settings.py` の DEFAULT_TICKETS・DEFAULT_APPROVED と同じ） */
+/** 置き場のパスの既定（`ccnavi/settings.py` の DEFAULT_TICKETS・DEFAULT_APPROVED と同じ） */
 export const DEFAULT_TICKETS = "wip/proposals";
 export const DEFAULT_APPROVED = ".ccnavi/approved";
 const TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL";
@@ -23,16 +23,16 @@ export interface Places {
 function place(value: unknown, fallback: string, what: string): string {
   if (value === undefined || value === null || value === "") return fallback;
   if (typeof value !== "string" || /^(?:[/\\~]|[A-Za-z]:)/.test(value)) {
-    throw new Error(`${what}の置き場の綴りを読めない（リポジトリの外を指すか、文字列でない）`);
+    throw new Error(`${what}の置き場のパスを読めない（リポジトリの外を指すか、文字列でない）`);
   }
   const clean = value.replace(/^\/+|\/+$/g, "");
   if (clean === "" || clean.split("/").some((p) => p === "" || p === "." || p === "..") || clean.includes("\\")) {
-    throw new Error(`${what}の置き場の綴りを読めない: ${value}`);
+    throw new Error(`${what}の置き場のパスを読めない: ${value}`);
   }
   return clean;
 }
 
-/** 統合先の `.claude/settings.json` の `env` から置き場の綴りを読む（無ければ既定） */
+/** 統合先の `.claude/settings.json` の `env` から置き場のパスを読む（無ければ既定） */
 export function placesFromSettings(text: string | null): Places {
   let env: Record<string, unknown> = {};
   if (text !== null) {

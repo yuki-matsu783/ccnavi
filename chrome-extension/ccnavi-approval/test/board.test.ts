@@ -41,7 +41,7 @@ async function run(
 
 const family = (b: RepoBoard, name: string) => b.families.find((f) => f.family.name === name);
 
-test("CX-T040 直近のブランチから家族を見分ける。コードだけのブランチと統合先は家族にしない", async () => {
+test("CX-T040 直近のブランチから親子チケットを見分ける。コードだけのブランチと統合先は親子チケットにしない", async () => {
   const { board } = await run();
   assert.equal(board.error, "");
   assert.deepEqual(board.integration && { name: board.integration.name, source: board.integration.source }, { name: "main", source: "default" });
@@ -50,12 +50,12 @@ test("CX-T040 直近のブランチから家族を見分ける。コードだけ
   assert.equal(board.compat?.same, true);
 });
 
-test("CX-T041 先行の閉包の家族（直近の外）を読み足し、統合先で閉じた家族は読まない", async () => {
+test("CX-T041 先行の閉包の親子チケット（直近の外）を読み足し、統合先で閉じた親子チケットは読まない", async () => {
   const { board, mock } = await run();
   const f = family(board, "i0001");
   assert.deepEqual(f?.result?.closure.families, ["i0001", "i0003"]);
   assert.ok(mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0003"));
-  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた家族は読まない");
+  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた親子チケットは読まない");
   // 今の ccnavi の答え: 先行 i0003-01 が閉じていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
   assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01");
@@ -77,7 +77,7 @@ test("CX-T042 判定の入力は統合先・P・閉包だけ。表示用のブ�
   assert.deepEqual({ ...b, schema: 0 }, { ...a, schema: 0 });
 });
 
-test("CX-T043 先行の家族のブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
+test("CX-T043 先行の親子チケットのブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
   const { board } = await run();
   const f = family(board, "i0002");
   assert.deepEqual(f?.result?.closure.absent, ["i0007"]);
@@ -103,7 +103,7 @@ test("CX-T045 互換のマーカーが違えば、どちらを更新するかを
   assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）が書かれていない/);
 });
 
-test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）", async () => {
+test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読む（8.2）", async () => {
   const cache = memoryCache();
   const first = await run(fixture(), {}, cache);
   assert.ok(first.board.stats.blobsFetched > 0);
@@ -114,7 +114,7 @@ test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 
-test("CX-T047 置き場の綴りは統合先の .claude/settings.json から読む", async () => {
+test("CX-T047 置き場のパスは統合先の .claude/settings.json から読む", async () => {
   const b = fixture();
   b.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets" } });
   const moved = b.i0001.files;
@@ -136,7 +136,7 @@ test("CX-T048 置き場がリポジトリの外を指すワークスペースは
   assert.match(board.error, /リポジトリの外を指している/);
 });
 
-test("CX-T049 先行の閉包が 16 家族を超えたら決まらないで止める（3.3 の 5）", async () => {
+test("CX-T049 先行の閉包が 16 親子チケットを超えたら決まらないで止める（3.3 の 5）", async () => {
   const b = fixture();
   const base = b.main.files;
   const chain = Array.from({ length: 17 }, (_, i) => `c${String(i + 1).padStart(2, "0")}x`);
@@ -149,7 +149,7 @@ test("CX-T049 先行の閉包が 16 家族を超えたら決まらないで止�
   const { board } = await run(b);
   const r = family(board, "i0001")?.result;
   assert.equal(r?.closure.over_limit, true);
-  assert.match(r?.undecided ?? "", /16 を超える家族/);
+  assert.match(r?.undecided ?? "", /16 を超える親子チケット/);
 });
 
 test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意のある本文は消毒して描く", async () => {

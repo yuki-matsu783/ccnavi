@@ -47,10 +47,11 @@ YES = " --approve --yes x"
 def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     """1 件を本物のルールで判定して、試験の JSON を返す。
 
-    写しと控えは外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
+    承認済みチケットと状態ディレクトリは外し、記録も残さない。
+    組み込みの selfguard（設定ファイルの保護）は
     既定のまま有効にする。4 の表はそれを含めた判定なので。
 
-    `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルの綴りから
+    `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルのパスから
     当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -202,7 +203,7 @@ class RepoRulesTest(unittest.TestCase):
 
     def test_設定の場所の名前は語の中の目印でも終わる(self):
         # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
-        # 数えないと、分ける前に止まっていた綴りが通るようになる。
+        # 数えないと、分ける前に止まっていた書き方が通るようになる。
         for subject in [
             'rm ".ccnavi x"',
             'rm ".claude x"',
@@ -298,7 +299,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
         self.assertNotIn(APPROVAL, hit(body), body["rules"])
 
     def test_sudo_の_sh_c_と_find_exec_の中の承認も止まる(self):
-        # A4。実行役のコマンドの並びを正規表現に持たせる案（B）で残っていた 2 形。
+        # A4。実行役のコマンドの並べ方を正規表現に持たせる案（B）で残っていた 2 形。
         for subject in [
             "sudo -u me sh -c 'ccnavi --approve --yes x'",
             "find . -name x -exec ccnavi --approve --yes {} \\;",
@@ -452,10 +453,10 @@ class RunnerTest(LauncherJudgeTest):
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
 class MovedJudgeTest(LauncherJudgeTest):
-    """`cd` で移った先から見た綴りに、止める側のルールを当てる（ADR-0069、issue #61）。"""
+    """`cd` で移った先から見たパスに、止める側のルールを当てる（ADR-0069、issue #61）。"""
 
     def test_守られた場所へ入ってから書く形は止まる(self):
-        # issue #61 の表。どれも綴りからディレクトリの名前が消えて止められずに通っていた。
+        # issue #61 の表。どれも書き方からディレクトリの名前が消えて止められずに通っていた。
         for subject in [
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .ccnavi && echo x > common/rules.yml",
@@ -467,7 +468,7 @@ class MovedJudgeTest(LauncherJudgeTest):
             "cd .claude && cp /tmp/x settings.json",
             "cd .ccnavi && sed -i s/deny/allow/ common/rules.yml",
             "cd .ccnavi/scripts && mv ccnavi-git.sh /tmp/x",
-            # 元から止まっていた形（行き先の綴りに名前が残る）も、そのまま止まる。
+            # 元から止まっていた形（行き先のパスに名前が残る）も、そのまま止まる。
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
         ]:
             with self.subTest(subject=subject):
@@ -489,7 +490,7 @@ class MovedJudgeTest(LauncherJudgeTest):
 
     def test_書かれた綴りの当たり方は変わらない(self):
         # `cd` した先で打つラッパースクリプトは、今までどおり allow に当たる。
-        # 書かれた綴りに継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
+        # 書かれた文字列に継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
         for subject in [
             "cd projects/lib && sh ../../.ccnavi/scripts/ccnavi-git.sh status",
             "sh .ccnavi/scripts/ccnavi-git.sh status",
@@ -513,7 +514,7 @@ class MovedJudgeTest(LauncherJudgeTest):
 
     def test_行き先を読めない_cd_は読みを変えない(self):
         # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
-        # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた綴りで今は
+        # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれたままの形で今は
         # 止まっている形**が止まらなくなる（敵対的レビュー 2026-09-20）。
         for subject in [
             'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
@@ -796,7 +797,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("coproc NAME { find . -delete; }", "deny", AMBIGUOUS, code),
                 ("coproc NAME find . -delete", "deny", AMBIGUOUS, code),
                 ("select x in a b; do echo $x; done", "deny", AMBIGUOUS, code),
-                # 引数に書いた同じ綴りは予約語ではない。
+                # 引数に書いた同じ文字列は予約語ではない。
                 ("echo coproc", "ask", "", "UNDECLARED"),
                 ("echo select", "ask", "", "UNDECLARED"),
                 ("for select in a b; do echo $select; done", "ask", "", "UNDECLARED"),
@@ -815,7 +816,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ('gh issue create --title t --body "use `git push` here"', "deny", BACKQUOTE, code),
                 ('gh issue create --title t --body "odd ` backtick"', "deny", BACKQUOTE, code),
                 ('echo "$(echo `id`)"', "deny", BACKQUOTE, code),
-                # 文字として渡す綴りは止まらない。
+                # 文字として渡す書き方は止まらない。
                 ('grep -n "\\`git push\\`" f', "allow", "prefer-read-grep", ""),
                 ("grep -n '`git push`' f", "allow", "prefer-read-grep", ""),
             ]

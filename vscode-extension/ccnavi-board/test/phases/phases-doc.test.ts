@@ -4,7 +4,7 @@ import { asPhasesForm, readPhases } from "../../src/core/phases-doc.js";
 import { SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { PhaseForm } from "../../src/core/phases-view.js";
 
-/** このリポジトリの phases.yml と同じ形。コメントの置き場と flow の並びを持つ */
+/** このリポジトリの phases.yml と同じ形。コメントの置き場と flow のリストを持つ */
 const SAMPLE = `# フェーズの種類。人が持つ設定で、エージェントは書き換えない。
 #
 # id と title はどちらも一意。
@@ -65,7 +65,7 @@ function phase(id: string, over: Partial<PhaseForm> = {}): PhaseForm {
   };
 }
 
-test("CB-T86 phases.yml を種類ごとに読む。kind と review は無ければ既定、scope は inherit か並び", () => {
+test("CB-T86 phases.yml を種類ごとに読む。kind と review は無ければ既定、scope は inherit かリスト", () => {
   const doc = readPhases(SAMPLE);
   assert.equal(doc.model.version, 1);
   assert.deepEqual(doc.model.problems, []);
@@ -129,17 +129,17 @@ test("CB-T89 並べ替えと改名で、種類の前のコメントが一緒に�
   assert.ok(!out.includes("  research:"));
 });
 
-test("CB-T90 足す・消す・空の並びは欄ごと消す・scope の inherit と並びを行き来する", () => {
+test("CB-T90 足す・消す・空のリストは欄ごと消す・scope の inherit とリストを行き来する", () => {
   const doc = readPhases(SAMPLE);
   const phases = doc.model.form.phases
     .filter((p) => p.id !== "acceptance")
     .map((p) => {
       if (p.id === "implement") {
-        // requires を空にすれば欄ごと消え、scope を inherit にすれば綴りで書く
+        // requires を空にすれば欄ごと消え、scope を inherit にすれば `inherit` と書く
         return { ...p, requires: [], inherit: true };
       }
       if (p.id === "implement-feedback") {
-        // inherit から並びへ。glob は二重引用符で囲む
+        // inherit からリストへ。glob は二重引用符で囲む
         return { ...p, inherit: false, scope: ["*.md", "docs/*"] };
       }
       return p;
@@ -193,7 +193,7 @@ test("CB-T93 phases が無い、種類が無い、空のファイルは苦情に
   assert.equal(out, 'version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装\n    review: mr\n    scope: ["src/*"]\n');
 });
 
-test("CB-T94 画面から来た内容は形だけ確かめる。並びに文字以外が混ざれば受け取らない", () => {
+test("CB-T94 画面から来た内容は形だけ確かめる。リストに文字以外が混ざれば受け取らない", () => {
   const ok = asPhasesForm({
     order: "dag",
     phases: [{ origin: 0, id: "a", title: 1, kind: "work", review: "mr", inherit: true, scope: ["x"], after: ["b"], when: "w" }],
@@ -204,7 +204,7 @@ test("CB-T94 画面から来た内容は形だけ確かめる。並びに文字�
   assert.deepEqual(ok.phases[0].deliverables, []);
   assert.equal(ok.order, "dag");
   assert.deepEqual(ok.phases[0].after, ["b"]);
-  // 待ち方は必ず持つ。知らない綴りも受け取らない
+  // 待ち方は必ず持つ。知らない表記も受け取らない
   assert.equal(asPhasesForm({ phases: [] }), undefined);
   assert.equal(asPhasesForm({ order: "graph", phases: [] }), undefined);
   assert.equal(asPhasesForm({ order: "dag", phases: [{ id: "a", kind: "work", review: "mr", after: [1] }] }), undefined);
@@ -262,7 +262,7 @@ test("CB-T198 order と after を読み、書き戻す。sequential は元から
   const again = readPhases(out);
   assert.equal(again.model.form.order, "dag");
   assert.deepEqual(again.model.form.phases.find((p) => p.id === "implement")?.after, ["design"]);
-  // dag から sequential に戻すと、欄は綴りで残る（書いた意図を消さない）
+  // dag から sequential に戻すと、欄は `order: sequential` と書いたまま残る（書いた意図を消さない）
   assert.match(again.apply({ ...again.model.form, order: "sequential" }), /^order: sequential$/m);
 });
 
@@ -270,7 +270,7 @@ test("CB-T199 知らない order は苦情にし、画面は sequential とし�
   const doc = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: graph\n"));
   assert.equal(doc.model.form.order, "sequential");
   assert.ok(doc.model.problems.some((p) => p.includes("order が")), doc.model.problems.join("\n"));
-  // 並びで書かれた order は、保存で同じ鍵を 2 つにしない
+  // リストで書かれた order は、保存で同じ鍵を 2 つにしない
   const listed = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: [dag]\n"));
   const out = listed.apply({ ...listed.model.form, order: "dag" });
   assert.equal(out.match(/^order:/gm)?.length, 1);

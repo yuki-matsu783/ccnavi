@@ -32,7 +32,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.ok(preview.batch[2].overflow[0].includes("超えている"));
   assert.ok(preview.text.startsWith("チケットの承認リクエスト: 3 件"));
   assert.ok(preview.text.includes("編集対象としているが"));
-  // 本文の指紋。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
+  // 本文のダイジェスト。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
   // フィクスチャでは伏せてある。
   assert.equal(preview.digest, "<digest>");
   // 対象にしないのは形の壊れた子（計画に無い番号）だけ。
@@ -42,7 +42,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.deepEqual(preview.problems, []);
 });
 
-test("CB-T104b 超過の欄が無い古い答えは、空の並びとして読む", () => {
+test("CB-T104b 超過の欄が無い古い答えは、空の配列として読む", () => {
   const parsed = parseApprovePreview(
     JSON.stringify({
       version: APPROVE_VERSION,

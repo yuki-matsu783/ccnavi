@@ -331,7 +331,7 @@ class ShAgreesTest(unittest.TestCase):
             ticket("i0001-01", "i0001"),
         )
         result = self.run_sh(os.path.join(link, ".claude", "worktrees", "i0001-01"), "push")
-        # 本物の sh も両辺をリンクを解いた綴りで比べる（ADR-0093 の段階 2b のレビューの中 12）。
+        # 本物の sh も両辺をリンクを解いたパスで比べる（ADR-0093 の段階 2b のレビューの中 12）。
         stopped = "子チケットのワークツリー" in result.stderr
         self.assertTrue(stopped, result.stderr)
 

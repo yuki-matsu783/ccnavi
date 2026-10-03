@@ -26,7 +26,7 @@ export interface ColumnDef {
   readonly label: string;
 }
 
-/** 列の並び。該当が 0 件でも落とさない */
+/** 列の順序。該当が 0 件でも落とさない */
 export const COLUMNS: readonly ColumnDef[] = [
   { state: "todo", label: "未着手" },
   { state: "doing", label: "作業中" },
@@ -50,7 +50,7 @@ export interface PhaseChip {
   readonly state: PhaseJson["state"];
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
-  /** 依頼を出したのに止まったまま（人のレビュー待ち）。JSON の `review_waiting` の写し */
+  /** 依頼を出したのに止まったまま（人のレビュー待ち）。JSON の `review_waiting` のまま */
   readonly reviewWaiting: boolean;
   readonly reviewRequired: boolean;
   /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
@@ -94,7 +94,7 @@ export interface Card {
   readonly riskLevel: string;
   readonly riskPoints: number | null;
   readonly seenIn: readonly SeenInJson[];
-  /** どれを優先するか決まらない写りの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
+  /** どれを優先するか決まらない在りかの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
   readonly scattered: readonly SeenInJson[];
   /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
@@ -121,12 +121,12 @@ export interface Card {
   /**
    * 人が動く必要があるか。「要対応のみ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
    * 親の改版。バッジの「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
-   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、どれを優先するか決まらない写り、不備、
+   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、どれを優先するか決まらない在りか、不備、
    * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
   /**
-   * 子のフロー（ADR-0085）。親は null。在るか・着手中で書けないかは実行ファイルの答えの写しで、
+   * 子のフロー（ADR-0085）。親は null。在るか・着手中で書けないかは実行ファイルの答えのままで、
    * カードの「フロー」ボタンの言葉だけに使う。人が動く必要（`attention`）には数えない
    */
   readonly flow: FlowJson | null;
@@ -136,7 +136,7 @@ export interface Card {
    */
   readonly history: readonly HistoryEntryJson[];
   /**
-   * 満たしていない先行（ADR-0088）。空でなければ、承認も着手も止まる。実行ファイルの答えの写しで、
+   * 満たしていない先行（ADR-0088）。空でなければ、承認も着手も止まる。実行ファイルの答えのままで、
    * カードの「先行待ち」のバッジに使う
    */
   readonly predecessorsUnmet: readonly PredecessorUnmetJson[];

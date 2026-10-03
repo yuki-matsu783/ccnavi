@@ -1,6 +1,6 @@
 """ファイルのパスを当てる先に直す部分のテスト。
 
-守る対象は名前ではなく場所なので、同じ場所を指す別の綴りが同じ判定に
+守る対象は名前ではなく場所なので、同じ場所を指す別の書き方が同じ判定に
 行き着かなければならない。
 """
 
@@ -23,7 +23,7 @@ class FullPathTest(unittest.TestCase):
             )
 
     def test_上に戻る綴りは畳まれる(self):
-        # `..` を挟めば、secrets を通らない綴りで secrets の中に届く。
+        # `..` を挟めば、secrets を通らないパスで secrets の中に届く。
         with tempfile.TemporaryDirectory() as base:
             base = os.path.realpath(base)
             self.assertEqual(
@@ -42,7 +42,7 @@ class FullPathTest(unittest.TestCase):
                 os.path.join(base, "secrets", "key.pem"),
             ]
             answers = {full_path(s, base) for s in spellings}
-            self.assertEqual(len(answers), 1, f"綴りごとに違う答えになった: {answers}")
+            self.assertEqual(len(answers), 1, f"書き方ごとに違う答えになった: {answers}")
 
     def test_まだ無いファイルでも絶対パスになる(self):
         # 書き込みは、まだ存在しない先に向かうほうが普通。
@@ -70,7 +70,7 @@ class RuleReachTest(unittest.TestCase):
             base = os.path.realpath(base)
             sneaky = full_path("docs/../secrets/key.pem", base)
             self.assertIsNotNone(
-                pattern.match(sneaky), f"迂回した綴りがルールをすり抜けた: {sneaky}"
+                pattern.match(sneaky), f"迂回したパスがルールをすり抜けた: {sneaky}"
             )
 
 

@@ -18,15 +18,15 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 
 // ---- 種類の形（画面と読み書きで分け合う）
 
-/** 種類の区分。ccnavi の phasetypes.KINDS と同じ並び */
+/** 種類の区分。ccnavi の phasetypes.KINDS と同じ順 */
 export const PHASE_KINDS = ["work", "feedback"] as const;
 export type PhaseKind = (typeof PHASE_KINDS)[number];
 
-/** レビューの既定。phasetypes.REVIEWS と同じ並び */
+/** レビューの既定。phasetypes.REVIEWS と同じ順 */
 export const REVIEWS = ["none", "mr"] as const;
 export type Review = (typeof REVIEWS)[number];
 
-/** 全体計画の待ち方。phasetypes.ORDERS と同じ並び。sequential が既定（ファイルに書かない） */
+/** 全体計画の待ち方。phasetypes.ORDERS と同じ順。sequential が既定（ファイルに書かない） */
 export const ORDERS = ["sequential", "dag"] as const;
 export type PhaseOrder = (typeof ORDERS)[number];
 
@@ -45,7 +45,7 @@ export interface PhaseForm {
   readonly title: string;
   readonly kind: PhaseKind;
   readonly review: Review;
-  /** 真なら `scope: inherit`（親の範囲そのまま）。偽なら `scope` の glob の並び */
+  /** 真なら `scope: inherit`（親の範囲そのまま）。偽なら `scope` の glob のリスト */
   readonly inherit: boolean;
   /** 子の範囲の上限。inherit なら使わない */
   readonly scope: readonly string[];

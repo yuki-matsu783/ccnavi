@@ -2,7 +2,7 @@
  * フロー編集画面（React）を happy-dom で動かす。`test/helpers/phases.ts` と同じ役割。
  *
  * 画面は束ねた 1 本（`out/webview/flow.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * この入口の綴り（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
+ * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
  *
  * 図を描くので、大きさの偽物（`measure`）を入れて読ませる。入れないと React Flow は点を隠したまま
  * 線を 1 本も描かない（`test/helpers/dom.ts` の頭）。

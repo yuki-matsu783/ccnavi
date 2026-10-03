@@ -135,7 +135,7 @@ export interface TicketJson {
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly seen_in: readonly SeenInJson[];
-  /** どれを優先するか決まらない写りの全部。決まっていれば空 */
+  /** どれを優先するか決まらない在りかの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
@@ -210,7 +210,7 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 並びは 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
+  /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];

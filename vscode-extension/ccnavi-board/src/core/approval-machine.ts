@@ -3,7 +3,7 @@
  *
  * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push が端末に送られる）。
  * 連打・承認中の再入・古いボードからの承認は現実に起きるので、「この状態ではこれを受けない」を
- * 書き落とさないことが要る。**散らばっていると書き落とす**ので、見張りをこの 1 ファイルに集めた
+ * 書き落とさないことが要る。**散らばっていると書き落とす**ので、ガードをこの 1 ファイルに集めた
  * （ADR-0068）。
  *
  * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・端末に送る・クリップボードに
@@ -33,12 +33,12 @@
  * | `decidePreview` | 残った指摘を見せた。押されるまで何も置かない |
  * | `deciding` | 選んだ行き先を置いている。**ここでは閉じない** |
  *
- * ## 見張り（消すと承認が壊れる順）
+ * ## ガード（消すと承認が壊れる順）
  *
- * | 見張り | 消すとどうなる |
+ * | ガード | 消すとどうなる |
  * |---|---|
  * | `approving` の間は閉じない | 承認を打っている最中に閉じられ、結果を人が見ないまま次へ進む |
- * | 承認を打つのは `preview` のときだけ | 二重に打てる。実行ファイルの指紋の照合（ADR-0043）は 2 本目を止めるが、止まる前提で連打させない |
+ * | 承認を打つのは `preview` のときだけ | 二重に打てる。実行ファイルのダイジェストの照合（ADR-0043）は 2 本目を止めるが、止まる前提で連打させない |
  * | 承認の途中（`loading`・`preview`・`approving`）は二重に開かない | 見せている一覧が、読み直しの途中の別の一覧になってしまう |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 文を渡せるのは `done` と `prompt` のときだけ | 文の無い状態で「コピー」が通る |
@@ -53,7 +53,7 @@
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
  *
  * これらは `test/shared/approval-machine.test.ts` が見る。**同じファイルの変異テストが、
- * 見張りを 1 つ消したらテストが落ちることまで見る**ので、見張りを足したらそちらにも足す。
+ * ガードを 1 つ消したらテストが落ちることまで見る**ので、ガードを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
 import type { ApproveOutcome, PreviewParse } from "./approvemodel.js";
@@ -62,7 +62,7 @@ import type { PhaseChip } from "./board.js";
 import { PUSH_APPROVED_SCRIPT, reviewedPrompt } from "./commands.js";
 
 /**
- * 承認のオーバーレイの持ち物。`overlay` が画面へ渡るぶんで、残りは拡張ホストの中だけの控え。
+ * 承認のオーバーレイの持ち物。`overlay` が画面へ渡るぶんで、残りは拡張ホストの中だけで持つ状態。
  *
  * 画面の中に持たないのは、監視の更新でボードが入れ替わってもオーバーレイが消えないようにするため
  * （`board-view.ts` の `ApprovalOverlay`）。
@@ -291,7 +291,7 @@ function previewed(state: ApprovalState, result: PreviewParse): ApprovalStep {
 }
 
 /**
- * 「この N 件を承認する」。見せた識別子と指紋をそのまま渡す。実行ファイルが一覧と本文の一致を
+ * 「この N 件を承認する」。見せた識別子とダイジェストをそのまま渡す。実行ファイルが一覧と本文の一致を
  * 確かめ、違えば何も置かずに `mismatch` を返す（ADR-0043）
  */
 function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalStep {
@@ -318,8 +318,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
-    // 読み直る。拾えないのは、その置き場が監視の綴りと違うとき（`CCNAVI_TICKETS_APPROVED` が
-    // 既定と違う。監視の綴りは `core/watch.ts` に固定してあり、この env を読まない）、
+    // 読み直る。拾えないのは、その置き場が監視するパスと違うとき（`CCNAVI_TICKETS_APPROVED` が
+    // 既定と違う。監視するパスは `core/watch.ts` に固定してあり、この env を読まない）、
     // `files.watcherExclude` でそこを外したとき、監視が使えないファイルシステムのとき。
     // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回にまとめる（`board-panel.ts` の `again`）ので、
     // 監視と重なっても画面はちらつかない。**1 件も置かれていないなら読み直さない**（何も動いていない）。
@@ -516,7 +516,7 @@ function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): Appr
 
 /**
  * 「この行き先で決める」。見せた指摘の全部に行き先が 1 つずつ付いているときだけ送る。
- * 指紋は見せた一覧のもの。実行ファイルが今の指摘と比べ、違えば何も置かない
+ * ダイジェストは見せた一覧のもの。実行ファイルが今の指摘と比べ、違えば何も置かない
  */
 function decideConfirmed(state: ApprovalState, choices: Readonly<Record<string, string>>): ApprovalStep {
   const overlay = state.overlay;

@@ -86,7 +86,7 @@ def path_without_node(shim):
                 continue
             dest = os.path.join(shim, os.path.basename(found))
             if os.path.lexists(dest):
-                continue  # 先に外した場所のものが採られる。PATH の並びと同じ
+                continue  # 先に外した場所のものが採られる。PATH の順序と同じ
             try:
                 os.symlink(found, dest)
             except OSError:

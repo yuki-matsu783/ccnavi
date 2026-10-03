@@ -41,7 +41,7 @@ class BlocksTheHostConfigTest(unittest.TestCase):
         """指し先が無いと git は何も出さずに「設定なし」として進み、締め出せたように見える。
 
         見えるだけで、名前を間違えたときも同じ見え方になる。実在を確かめておくと、
-        綴りを取り違えた回に気づける。
+        書き方を取り違えた回に気づける。
         """
         self.assertTrue(os.path.isfile(GIT_ENV["GIT_CONFIG_GLOBAL"]))
         self.assertTrue(os.path.isfile(GIT_ENV["GIT_CONFIG_SYSTEM"]))
@@ -85,7 +85,7 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
     """`run_ccnavi(env=...)` が環境を空にしても、締め出しだけは残る。
 
     ccnavi は判定の中で git を起こすので、ここで落ちるとその経路だけがホストの
-    `~/.gitconfig` を読み直す。落ちても大半のテストは通ってしまうので、見張りが要る。
+    `~/.gitconfig` を読み直す。落ちても大半のテストは通ってしまうので、それを確かめるテストが要る。
     """
 
     def test_the_block_is_still_there_with_an_empty_env(self):

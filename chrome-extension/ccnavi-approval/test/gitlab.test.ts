@@ -1,8 +1,8 @@
 /**
  * GitLab・プロジェクトのリポジトリ・「始める」（ADR-0093 の段階 5）。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
- * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組む写しは、sh が組んだ期待値と同じ
- * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ家族・承認待ち・指紋を出す（読み取りの一致）
+ * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組むコピーは、sh が組んだ期待値と同じ
+ * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子チケット・承認待ち・ダイジェストを出す（読み取りの一致）
  * - GitLab への書き込みは Commits API の 1 コミット。事後確認（8.4 の 1 段目）: 書いたコミットの親が読んだ先頭と
  *   違えば、直前の状態で判定し直し、同じなら残し、違えば打ち消して読み直す。打ち消しも収まらなければ人の対応に切り替える
  * - 「始める」（8.6）: issue から `i<番号>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
@@ -81,7 +81,7 @@ const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
 
-test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む写しは sh が組んだ期待値（expected.json）と同じ", async () => {
+test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組むコピーは sh が組んだ期待値（expected.json）と同じ", async () => {
   assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "requested-changes", "resolved"]);
   for (const name of gitlabSceneNames()) {
     const scene = loadGitLabScene(name);
@@ -94,7 +94,7 @@ test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む�
   }
 });
 
-test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ家族・承認待ち・指紋・取り下げの可否を出す", async () => {
+test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子チケット・承認待ち・ダイジェスト・取り下げの可否を出す", async () => {
   const hub = await collectRepo(GH_REPO, glDeps(new MockGitHub(fixture()), "github.com"));
   const lab = await collectRepo(GITLAB_REPO, glDeps(new MockGitLab(fixture())));
   assert.equal(lab.error, "", lab.error);
@@ -202,7 +202,7 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
   assert.ok(!(DOING in same.files("i0001")));
 });
 
-test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変わると、止めて人に回す（要確認）。他人の変更は消さない（PROBE-1）", async () => {
+test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変わると、止めて人の対応に切り替える（要確認）。他人の変更は消さない（PROBE-1）", async () => {
   const CHILD = "wip/proposals/todo/i0001-01.md";
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
@@ -241,7 +241,7 @@ test("CX-T150 「始める」: issue から i<番号> のブランチを統合�
     [new MockGitHub(fixture()), GH_REPO, "github.com"],
     [new MockGitLab(fixture()), GITLAB_REPO, "gitlab.com"],
   ] as const) {
-    mock.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた家族と重なる" }, { number: 1, title: "開いた家族と重なる" }, { number: 30, title: "PR", pull: true });
+    mock.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた親子チケットと重なる" }, { number: 1, title: "開いた親子チケットと重なる" }, { number: 30, title: "PR", pull: true });
     const d = glDeps(mock, host);
     const list = await listIssues(repo, d);
     assert.deepEqual(
@@ -465,7 +465,7 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   const hostile = '<img src=x onerror="window.__pwned=\'issue\'">題';
   const html = renderRepo(dom.window.document, md, b, actions, {
     issues: { list: [{ number: 12, title: hostile, url: "javascript:window.__pwned='url'" }], error: "" },
-    attention: { i0001: "打ち消せなかった", gone: "見えない家族" },
+    attention: { i0001: "打ち消せなかった", gone: "見えない親子チケット" },
   });
   dom.window.document.body.append(html);
   const item = html.querySelector("[data-testid=start] li[data-issue='12']") as HTMLElement;

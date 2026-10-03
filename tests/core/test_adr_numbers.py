@@ -62,7 +62,7 @@ def read(name: str) -> str:
 class AdrNumbersTest(unittest.TestCase):
     def setUp(self):
         self.sheets = sheets()
-        # 綴りが変わったことに気づかずに「重複なし」と言わないため。
+        # 書き方が変わったことに気づかずに「重複なし」と言わないため。
         self.assertGreater(len(self.sheets), 50, f"ADR を数えられていない（{ADR_DIR}）")
 
     def test_numbers_are_unique(self):

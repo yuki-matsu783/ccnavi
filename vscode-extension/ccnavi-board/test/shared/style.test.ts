@@ -45,7 +45,7 @@ function rulesOnly(): string {
   return reactPages()[4][1];
 }
 
-/** `src/webview/` の下の CSS 全部（リポジトリのルートからの綴り） */
+/** `src/webview/` の下の CSS 全部（リポジトリのルートからのパス） */
 function cssFiles(dir: string = WEBVIEW_SRC): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
@@ -62,7 +62,7 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
  *
  * 外から来る CSS を入れているのは図の 1 本だけ（ADR-0070）。ここで解けないと、このテストは
  * 落ちるのではなく **`readFileSync` の ENOENT で例外になる**ので、行き先を間違えたのか置き忘れたのかが
- * 読めなくなる。解けない綴りは名指しで落とす。
+ * 読めなくなる。解けないパスは名指しで落とす。
  */
 function importsOf(file: string): string[] {
   const text = fs.readFileSync(file, "utf8");
@@ -93,7 +93,7 @@ function reachable(entries: string[]): Set<string> {
 }
 
 /**
- * その CSS が最初に当てる選択子。束ねに入っているかを、綴りではなく中身で見る。
+ * その CSS が最初に当てる選択子。束ねに入っているかを、パスではなく中身で見る。
  * `@import` を並べるだけの入口（`style.css`）は当てるものを持たないので undefined
  */
 function firstSelector(file: string): string | undefined {
@@ -117,7 +117,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.match(style, /\.toolbar \{ display: flex;/);
     assert.match(style, /\.banner\.warn \{ border-color:/);
     assert.match(style, /input\[type=text\], input\[type=search\], textarea, select \{ background:/);
-    // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
+    // 骨組みの定義は 1 度だけ（画面ごとのコピーを残さない）
     assert.equal((style.match(/\.toolbar \{ display: flex;/g) ?? []).length, 1);
     // 見た目を指定しなければ素の body。Claude の配色の CSS は常に持つ
     assert.ok(html.includes("\n<body>\n"));
@@ -144,7 +144,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   assert.match(rules, /\.row-head:hover \{ background: var\(--vscode-list-hoverBackground\); outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   // 行末のボタンは、見出しの「＋ 追加」向けの margin-left: auto を打ち消す。詳細度で採られるようにしてあるので、
-  // 束ねの並び（@import の順）が変わっても入れ替わらない
+  // 束ねる順序（@import の順）が変わっても入れ替わらない
   assert.match(rules, /\.row-body \.buttons button\.action \{ margin-left: 0; \}/);
   // 動いたカードの輪も contrast の変数を使い、他のテーマでは緑のまま。左の縁（不備・承認待ち・
   // レビュー待ち）は上書きしない（別の channel）
@@ -152,7 +152,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   assert.doesNotMatch(html, /\.card\.moved \{[^}]*border-left/);
 });
 
-test("CB-T193 動いたカードの印は、光らせない設定を尊び、色だけに頼らない", () => {
+test("CB-T193 動いたカードの強調表示は、光らせない設定を尊び、色だけに頼らない", () => {
   const html = flatStyle(board());
   // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
   // 回り記号と同じ書き方）。ここを落とすと、動きを嫌う人に 2 秒の脈動が出る
@@ -173,7 +173,7 @@ test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ず�
     .filter((file) => !found.has(file))
     .map((file) => path.relative(WEBVIEW_SRC, file).split(path.sep).join("/"));
   assert.deepEqual(orphans, [], "どの画面の束ねにも入らない CSS がある。画面の style.css に @import を足す");
-  // 綴りだけでなく、束ねた 1 本に中身が入っていることも見る
+  // パスだけでなく、束ねた 1 本に中身が入っていることも見る
   const skipped: string[] = [];
   for (const name of names) {
     const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);

@@ -16,7 +16,7 @@ export function relationsNote(phase: PhaseForm): string {
   return hasRelations(phase) ? "（設定あり）" : "（未設定）。並行できる種類・一緒に必要な種類・先に済ませる種類・案内するエージェント・使う場面";
 }
 
-/** 要約に出す範囲。inherit ならその綴り、glob が無ければ未設定と言う */
+/** 要約に出す範囲。inherit ならその表記、glob が無ければ未設定と言う */
 export function scopeText(phase: PhaseForm): string {
   if (phase.inherit) {
     return "inherit";
@@ -29,7 +29,7 @@ export function scopeTitle(phase: PhaseForm): string {
   return phase.inherit ? "親の範囲そのまま" : phase.scope.join(", ");
 }
 
-/** 並びの欄は 1 つの欄に "," 区切りで出し、打つたびに並びへ戻す */
+/** リストの欄は 1 つの欄に "," 区切りで出し、打つたびにリストへ戻す */
 export function splitList(text: string): readonly string[] {
   return text
     .split(",")
@@ -58,10 +58,10 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
 
 /**
  * 図の下に出す注意。**当てはまるときだけ出す。** 線の読み方は凡例（`Graph.tsx` の `Legend`）が持ち、
- * 細かい説明（「人が見る」の意味、待ち方が決まる時点）は札のツールチップとヘルプに置く。
+ * 細かい説明（「人が見る」の意味、待ち方が決まる時点）はバッジのツールチップとヘルプに置く。
  * 毎回 6 文を並べていたときは、要る注意がほかの文に埋もれていた。
  *
- * **線が落ちた理由は言わない。** 綴り違いかもしれないし、ほかの設定の種類かもしれない。
+ * **線が落ちた理由は言わない。** 書き間違いかもしれないし、ほかの設定の種類かもしれない。
  * 決めるのは実行ファイルで、`phasetypes.py` の `reference_problems` が合成した集合で
  * 確かめ、無ければ error を出す。画面がその手前で「ほかの設定の種類だ」と言うと、保存したときに
  * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にしていない」までしか言わない。

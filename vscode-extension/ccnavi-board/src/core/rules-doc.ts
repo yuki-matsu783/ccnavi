@@ -3,7 +3,7 @@
  *
  * rules.yml は先頭に使い方の説明、タイプやルールの前に理由のコメントを持つ。素直に
  * 読んで dump し直すとそれが全部消えるので、`yaml` の Document を保ち、変えるところ
- * だけを差し替える。ルールの入れ替え・タイプの移動は、元のノードをそのまま別の並びへ
+ * だけを差し替える。ルールの入れ替え・タイプの移動は、元のノードをそのまま別のリストへ
  * 移すので、そのルールに付いていたコメントも一緒に動く。
  *
  * ここはルールの意味（当たる・当たらない）には触れない。判定は実行ファイルの仕事。
@@ -23,7 +23,7 @@ const BLOCK_KEYS = ["message", "additionalContext", "additionalContextOnce"] as 
 
 export interface RulesDocument {
   readonly model: RulesModel;
-  /** 編集した並びで書き戻す。元のノードを使い回してコメントを残す */
+  /** 編集したリストで書き戻す。元のノードを使い回してコメントを残す */
   readonly apply: (sections: Sections) => string;
 }
 
@@ -84,7 +84,7 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
   };
 }
 
-/** 刻みとして読める文字なら、その刻み。読めない文字と空なら null（咎めるのは lint） */
+/** 刻みとして読める文字なら、その刻み。読めない文字と空なら null（報告するのは lint） */
 function everyOf(written: string): number | null {
   const text = written.trim();
   if (!/^\d+$/.test(text)) {
@@ -102,7 +102,7 @@ function scalarText(map: YAMLMap, key: string): string {
   return typeof value === "string" ? value : String(value);
 }
 
-/** 変えていないブロック（`>-` / `|-`）の文を、元の折り返しのまま戻すための控え */
+/** 変えていないブロック（`>-` / `|-`）の文を、元の折り返しのまま戻すために保存したもの */
 interface BlockKeep {
   readonly node: YAMLMap;
   readonly key: (typeof BLOCK_KEYS)[number];
@@ -111,7 +111,7 @@ interface BlockKeep {
 }
 
 function applyTo(doc: Document, text: string, edited: Sections): string {
-  // 元のノードを先に全部拾っておく。タイプをまたいで移すので、並びを書き換える前に取る。
+  // 元のノードを先に全部拾っておく。タイプをまたいで移すので、リストを書き換える前に取る。
   const originals = {} as Record<Section, YAMLMap[]>;
   const keeps: BlockKeep[] = [];
   for (const section of SECTIONS) {
@@ -137,8 +137,8 @@ function applyTo(doc: Document, text: string, edited: Sections): string {
     });
     const existing = doc.get(section, true);
     if (isSeq(existing)) {
-      // タイプのコメントは並びのノードに付いているので、並びは残して中身だけ替える。
-      // 空になったら `[]`、1 件でも入ったらブロックの並びに戻す。
+      // タイプのコメントはリストのノードに付いているので、リストは残して中身だけ替える。
+      // 空になったら `[]`、1 件でも入ったらブロックのリストに戻す。
       existing.items = nodes;
       existing.flow = nodes.length === 0;
     } else if (nodes.length > 0) {
@@ -151,7 +151,7 @@ function applyTo(doc: Document, text: string, edited: Sections): string {
 }
 
 /**
- * 並びの先頭のルールの前にあるコメントは、読み込みでは並びのほうに付く。
+ * リストの先頭のルールの前にあるコメントは、読み込みではリストのほうに付く。
  * そのままだと先頭のルールを移したときにコメントが置き去りになるので、ルールに付け直す。
  */
 function adoptLeadingComment(seq: YAMLSeq, first: YAMLMap | undefined): void {
@@ -322,7 +322,7 @@ function setText(
   }
 }
 
-/** 画面が送ってきた並びを、形だけ確かめて受け取る */
+/** 画面が送ってきた配列を、形だけ確かめて受け取る */
 export function asSections(raw: unknown): Sections | undefined {
   if (typeof raw !== "object" || raw === null) {
     return undefined;

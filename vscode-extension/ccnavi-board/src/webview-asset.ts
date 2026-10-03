@@ -4,11 +4,11 @@
  *
  * ファイルとして Webview に読ませないのは、`localResourceRoots` を空のままにして
  * 「外部資源に依存しない 1 枚の HTML」を保つため。読むのは 1 度だけで、あとは覚えておく。
- * VS Code の API には触れないが、置き場（`out/`）の綴りを知っているのでここに置く。
+ * VS Code の API には触れないが、置き場（`out/`）のパスを知っているのでここに置く。
  *
  * CSS がここに来るのは、Webview の CSP が nonce を持つ `<style>` しか通さないため。nonce は
  * 入れ物の HTML を組む側（拡張ホスト）が作るので、挿すのもそちら。CSS の中身は画面の側
- * （`src/webview/<名前>/*.css`）にあり、ここが知っているのは束ねた出口の綴りだけ（ADR-0066）。
+ * （`src/webview/<名前>/*.css`）にあり、ここが知っているのは束ねた出力のパスだけ（ADR-0066）。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";

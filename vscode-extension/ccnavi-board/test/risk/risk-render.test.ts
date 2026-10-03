@@ -29,7 +29,7 @@ test("CB-T80 リスク管理画面は外部資源を読まず、nonce で自分�
   const rendered = html();
   assert.match(rendered, /default-src 'none'/);
   assert.match(rendered, /style-src 'nonce-N0NCE'; script-src 'nonce-N0NCE'/);
-  // 外の資源を指す参照が無い（束ねた画面の中の文字列は、読みに行く綴りではないので除く）
+  // 外の資源を指す参照が無い（束ねた画面の中の文字列は、読みに行くパスではないので除く）
   assert.doesNotMatch(shell(rendered), /https?:\/\//);
   assert.doesNotMatch(shell(rendered), /<(?:script|img|iframe)[^>]*\ssrc=|<link\s/);
   assert.match(rendered, /<script type="application\/json" id="ccnavi-risk-data">/);

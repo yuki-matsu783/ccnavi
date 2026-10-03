@@ -32,7 +32,7 @@ def read(path):
 
 
 def tree(top):
-    """`top` の下のファイルを、`/` でつないだ相対の綴りの集合で返す。"""
+    """`top` の下のファイルを、`/` でつないだ相対パスの集合で返す。"""
     found = set()
     for here, _dirs, files in os.walk(top):
         for name in files:

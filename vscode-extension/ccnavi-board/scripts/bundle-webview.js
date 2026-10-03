@@ -92,7 +92,7 @@ esbuild
       // （esbuild の minify は JS と CSS の両方に掛かる）と、画面のスクリプトが CSS を持ち回らない
       // ようにするため（CSS を挿すのは入れ物を組む側で、画面は nonce を知らない）。
       entryPoints: found.map((screen) => ({ in: screen.style, out: screen.name })),
-      // `@import` の外の綴り（url() など）は無い。あれば esbuild が名指しで落とす
+      // `@import` 以外で外を指す書き方（url() など）は無い。あれば esbuild が名指しで落とす
       minify: false,
     }),
   )

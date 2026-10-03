@@ -2,13 +2,13 @@
 #
 #   . "$(dirname "$0")/ccnavi-common.sh"
 #
-# 呼ぶ側の `set -eu` の直後に置く。`$0` は呼ばれたときの綴りそのままなので、
+# 呼ぶ側の `set -eu` の直後に置く。`$0` は呼ばれたときの表記そのままなので、
 # `sh .ccnavi/scripts/ccnavi-git.sh` でも `sh ../../../.ccnavi/scripts/ccnavi-git.sh` でも
 # 同じディレクトリを指す。**この読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない**（下の ccnavi_workspace の但し書き）。
 #
 # ここにあるのは 6 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
-# 失敗したときの文面は呼ぶ側が決める（reject と fail で綴りが違うため）。
+# 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
 #   ccnavi_workspace           ワークスペースルートの絶対パス
@@ -17,7 +17,7 @@
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #
-# 取り込みの控えとロック（ADR-0093 の段階 2b）の関数は、下の「取り込みの控えとロック」にまとめてある。
+# 取り込みの同期状態とロック（ADR-0093 の段階 2b）の関数は、下の「取り込みの同期状態とロック」にまとめてある。
 # C1（段階 2d）の関数は、その下の「C1」にまとめてある。
 #
 # ほかに診断ログの 4 つ（log_debug / log_info / log_warn / log_error）がある。こちらは
@@ -32,7 +32,7 @@ CCNAVI_COMPAT=2
 # 相対パスを絶対に直す。
 #
 # realpath も readlink -f も使わない。Git Bash・WSL・Linux の 3 つで在ったり
-# 無かったり、綴りも揃わない。cd してから pwd を読むのが一番揃う。
+# 無かったり、表記も揃わない。cd してから pwd を読むのが一番揃う。
 # サブシェルの中で cd するので、呼ぶ側の cwd は動かない。
 ccnavi_abs() {
 	case "$1" in
@@ -44,7 +44,7 @@ ccnavi_abs() {
 		(cd "$1" 2>/dev/null && pwd -W 2>/dev/null || pwd) || return 1
 		return 0
 	fi
-	# 在るところまで cd して綴りを揃え、残りは文字列としてつなぐ。
+	# 在るところまで cd して表記を揃え、残りは文字列としてつなぐ。
 	ccnavi_abs_dir=$(dirname "$1")
 	ccnavi_abs_base=$(basename "$1")
 	if ccnavi_abs_head=$(cd "$ccnavi_abs_dir" 2>/dev/null && { pwd -W 2>/dev/null || pwd; }); then
@@ -83,18 +83,18 @@ ccnavi_abs() {
 		*) ccnavi_abs_out="$ccnavi_abs_out/$ccnavi_abs_part" ;;
 		esac
 	done
-	# 先頭に付いた `/` を、元の綴りの頭（ドライブ文字か `/`）に直す。
+	# 先頭に付いた `/` を、元の表記の頭（ドライブ文字か `/`）に直す。
 	case "$ccnavi_abs_joined" in
 	[A-Za-z]:/*) printf '%s\n' "${ccnavi_abs_out#/}" ;;
 	*) printf '%s\n' "$ccnavi_abs_out" ;;
 	esac
 }
 
-# 実在するディレクトリの、リンクを解いた綴り。無ければ受けた綴りをそのまま返す。
+# 実在するディレクトリの、リンクを解いたパス。無ければ受けたパスをそのまま返す。
 #
-# git の `rev-parse --show-toplevel` はリンクを解いた綴りを返すので、ワークスペースルート（cwd から
-# 論理の綴りで決まる）と比べるときは両辺をこれで揃える。揃えないと、リンクを経た作業場で
-# 「.claude/worktrees/ の下か」の比較が外れ、守りが当てはまらない。Windows は pwd -W の綴り。
+# git の `rev-parse --show-toplevel` はリンクを解いたパスを返すので、ワークスペースルート（cwd から
+# 論理のパスで決まる）と比べるときは両辺をこれで揃える。揃えないと、リンクを経た作業場で
+# 「.claude/worktrees/ の下か」の比較が外れ、守りが当てはまらない。Windows は pwd -W の表記。
 ccnavi_phys() {
 	[ -n "${1:-}" ] || return 0
 	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; }) || printf '%s\n' "$1"
@@ -108,15 +108,15 @@ ccnavi_phys() {
 #
 # 目印は `.ccnavi/scripts/ccnavi-common.sh`。自分自身なので、無ければそもそも sh が呼べていない。
 # ディレクトリの `.ccnavi/scripts/` だけでは足りない。ccnavi ディレクトリの下には配点が呼ぶスクリプトの
-# 置き場として同じ綴りがあり、プロジェクトの中から打つとそのプロジェクトを根と取り違える。
+# 置き場として同じ名前のディレクトリがあり、プロジェクトの中から打つとそのプロジェクトを根と取り違える。
 # `.git` は駄目（プロジェクトも持つ）。`.claude/` だけも駄目（Claude Code が作る場合が
 # あり、プロジェクト側にできたものに当たる）。
 #
 # **ワークツリーは候補にせず、最初に当たったものを返す。**
 #
-# `.ccnavi/scripts/` は git で追跡されているので、どのワークツリーにも写しがある。
+# `.ccnavi/scripts/` は git で追跡されているので、どのワークツリーにもコピーがある。
 # 単純に「最初に当たったもの」にすると、ワークツリーの中から打ったときワークツリー自身が
-# 根になる。ところが `logs/state/`（控え）は追跡外でワークツリーには無く、承認済みチケットも
+# 根になる。ところが `logs/state/`（状態ディレクトリ）は追跡外でワークツリーには無く、承認済みチケットも
 # ワークスペースルートに置かれたばかりのものはワークツリーに届いていないので、どちらも見つからなくなる。ccnavi が使うもののうち
 # git でワークツリーに届くものと届かないものがあり、根は届かないほうに合わせる必要がある。
 #
@@ -138,7 +138,7 @@ ccnavi_workspace() {
 	while :; do
 		if [ -f "$ccnavi_ws_here/.ccnavi/scripts/ccnavi-common.sh" ]; then
 			case "$ccnavi_ws_here" in
-			*/.claude/worktrees/*) ;; # ワークツリーの中の写し。根ではない
+			*/.claude/worktrees/*) ;; # ワークツリーの中のコピー。根ではない
 			*)
 				printf '%s\n' "$ccnavi_ws_here"
 				return 0
@@ -159,7 +159,7 @@ ccnavi_workspace() {
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
 # 「実行ファイルが無い」で止まる。
 #
-# それぞれ `.exe` を付けた綴りも見る（Windows の組み立て）。
+# それぞれ `.exe` を付けた名前も見る（Windows の組み立て）。
 ccnavi_bin() {
 	case "${CCNAVI_BIN_PATH:-}" in
 	'')
@@ -213,7 +213,7 @@ ccnavi_bin_try() {
 #   <ws>/.claude/worktrees/<id>/...   -> 元リポジトリがプロジェクトならその名前
 #   それ以外                           -> 空
 #
-# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。綴りは実際に確かめて確定して
+# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。書き方は実際に確かめて確定して
 # いる（git 2.39.2、Git Bash と PowerShell の両方）。絶対パス、区切りは `/` のみ、
 # ドライブレターは大文字、`gitdir:` の後ろは半角空白 1 個。
 #
@@ -228,7 +228,7 @@ ccnavi_project() {
 		ccnavi_pj_ws=$(ccnavi_workspace) || return 0
 	fi
 	ccnavi_pj_places="${CCNAVI_PROJECTS:-projects}"
-	# リンクを解いた綴りで揃える（git が返す綴りはリンクを解いている）。
+	# リンクを解いたパスで揃える（git が返すパスはリンクを解いている）。
 	ccnavi_pj_dir=$(ccnavi_phys "$ccnavi_pj_dir")
 	ccnavi_pj_ws=$(ccnavi_phys "$ccnavi_pj_ws")
 
@@ -289,7 +289,7 @@ ccnavi_project() {
 #
 # `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。
 #
-# 綴りの要点が 3 つ。
+# 書き方の要点が 3 つ。
 #   - `[^/]*@` で**最後の `@` まで**消す。解析側（authority の ${##*@}）が最後まで
 #     見ているので、伏せ字も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
 #   - scheme は大文字も `git+ssh` も拾う
@@ -300,18 +300,18 @@ ccnavi_mask_url() {
 		-e 's#^[^/:@]*:[^/@]*@#<伏せた>@#'
 }
 
-# ---- 取り込みの控えとロック（ADR-0093 の 3.6・4.2・4.3。段階 2b）
+# ---- 取り込みの同期状態とロック（ADR-0093 の 3.6・4.2・4.3。段階 2b）
 #
-# 控えは 1 行 1 項目の `<鍵> <値>`（D33）。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない。
+# 同期状態のファイルは 1 行 1 項目の `<鍵> <値>`（D33）。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない。
 # 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
 #
-#   sync/<リポジトリ>/families/<P>   家族の控え（remote branch sha fetched_at state reason）
-#   sync/<リポジトリ>/integration/   統合先の控え（統合先の done/・層・置き場の綴りの設定の写しと head）
+#   sync/<リポジトリ>/families/<P>   親子チケットの同期状態（remote branch sha fetched_at state reason）
+#   sync/<リポジトリ>/integration/   統合先の同期状態（統合先の done/・層・置き場のパスの設定のコピーと head）
 #   locks/<リポジトリ>/<P>/          ロック（D32）。中の owner に持ち主を 1 行で書く
 #
 # <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。
 
-# 控えの置き場の絶対パス。
+# 状態ディレクトリの絶対パス。
 ccnavi_state() {
 	case "${CCNAVI_STATE:-}" in
 	'') printf '%s\n' "$1/logs/state" ;;
@@ -320,7 +320,7 @@ ccnavi_state() {
 	esac
 }
 
-# そのツリーの控えを分ける名前。<ツリー> <ワークスペースルート>
+# そのツリーの同期状態を分ける名前。<ツリー> <ワークスペースルート>
 ccnavi_repo_key() {
 	ccnavi_rk_name=$(ccnavi_project "$1" "$2")
 	if [ -n "$ccnavi_rk_name" ]; then
@@ -330,18 +330,18 @@ ccnavi_repo_key() {
 	fi
 }
 
-# 家族の控えのパス。<ワークスペースルート> <リポジトリ> <P>
+# 親子チケットの同期状態のパス。<ワークスペースルート> <リポジトリ> <P>
 ccnavi_family_record() {
 	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
 }
 
-# 控えから 1 項目を読む。無ければ空。<ファイル> <鍵>
+# 状態ファイルから 1 項目を読む。無ければ空。<ファイル> <鍵>
 ccnavi_record_get() {
 	[ -f "$1" ] || return 0
 	sed -n "s/^$2 //p" "$1" 2>/dev/null | head -n 1
 }
 
-# 控えを書き直す。<ファイル> <鍵> <値> [<鍵> <値>...]
+# 状態ファイルを書き直す。<ファイル> <鍵> <値> [<鍵> <値>...]
 #
 # 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
 # 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。
@@ -365,11 +365,11 @@ ccnavi_record_write() {
 	}
 }
 
-# そのツリーが、名前の家族の親のワークツリーか。<ツリー> <名前>
+# そのツリーが、名前の親子チケットの親のワークツリーか。<ツリー> <名前>
 #
-# 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親の写しか提案が
-# あれば 0（ADR-0093 の 4.2「SessionStart の早送り」の対象の条件）。子の写し（`parent:` を持つ）は
-# 数えない。置き場の綴りが絶対パス（リポジトリの外）なら家族として扱わない（3.1 の 12）。
+# 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親の承認済みチケットか提案が
+# あれば 0（ADR-0093 の 4.2「SessionStart の早送り」の対象の条件）。子の承認済みチケット（`parent:` を持つ）は
+# 数えない。置き場が絶対パス（リポジトリの外）なら親子チケットとして扱わない（3.1 の 12）。
 ccnavi_parent_tree() {
 	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
@@ -394,23 +394,24 @@ ccnavi_parent_tree() {
 
 # ロック（D32）。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
-# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（人に回す）。
-# 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<印>" を子に渡す。
+# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを強制取得しかけて元に戻せなかった
+# （人の対応に切り替える）。
+# 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<所有者 ID>" を子に渡す。
 # 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT・INT・TERM・HUP にも置く）。
 #
 # - `mkdir` の原子性で取る。`flock` は macOS に無い
-# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <印> <OS>`、印は `<pid>-<開始時刻>`。
+# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <所有者 ID> <OS>`、所有者 ID は `<pid>-<開始時刻>`。
 #   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
 # - 古い（段階 2d のレビューの決定 B）: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
-#   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても奪わない
-#   （長い操作を奪って二重に書かせない。待ちで取れなければ「長い」と言って落とす）。pid を確かめ
+#   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても強制取得しない
+#   （長い操作からロックを取り上げて二重に書かせない。待ちで取れなければ「長い」と言って落とす）。pid を確かめ
 #   られない（別のホスト・別の OS・/mnt/ の下・pid が読めない）ときだけ、10 分を過ぎたら時刻で古い
 #   とする（WSL と Git Bash は同じホスト名で pid が通じない）。owner が読めなければ `find -mmin +10`
-# - 奪い方: 奪う操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
+# - 強制取得の仕方: 強制取得の操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
 #   owner の行と今の owner の行が同じなら `mv` で退避して、退避した中の owner がまだ同じなら消して取り直す。
 #   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
-# - 入れ子: CCNAVI_LOCK_HELD が同じ家族を指し、その印がロックの owner の印と同じなら、取ったものとして
-#   進み、外さない（印の合わない値は偽物として無視する）
+# - 入れ子: CCNAVI_LOCK_HELD が同じ親子チケットを指し、その所有者 ID がロックの owner の所有者 ID と
+#   同じなら、取ったものとして進み、外さない（所有者 ID の合わない値は偽物として無視する）
 ccnavi_lock_dir=""
 ccnavi_lock_mark=""
 ccnavi_lock_set_held=""
@@ -431,7 +432,7 @@ ccnavi_lock_take() {
 		if [ -n "$ccnavi_lk_held" ] && [ "$ccnavi_lk_fields" = "$ccnavi_lk_held" ]; then
 			return 0
 		fi
-		log_warn 入れ子の印がロックの持ち主と合わない -- "lock=$ccnavi_lk_key"
+		log_warn 入れ子の所有者 ID がロックの持ち主と合わない -- "lock=$ccnavi_lk_key"
 		;;
 	esac
 	mkdir -p "${ccnavi_lk_dir%/*}" 2>/dev/null || return 1
@@ -440,13 +441,13 @@ ccnavi_lock_take() {
 	ccnavi_lk_start=$(date +%s)
 	while :; do
 		if mkdir "$ccnavi_lk_dir" 2>/dev/null; then
-			# 作った直後に控える。owner を書く前に切られても（INT・TERM）、trap の drop が外せるように。
+			# 作った直後に保存する。owner を書く前に切られても（INT・TERM）、trap の drop が外せるように。
 			ccnavi_lock_dir="$ccnavi_lk_dir"
 			ccnavi_lock_mark=""
 			ccnavi_lk_now=$(date +%s)
 			ccnavi_lk_mark="$$-$ccnavi_lk_now"
 			ccnavi_lk_want="$ccnavi_lk_host $$ $ccnavi_lk_now $ccnavi_lk_mark $ccnavi_lk_os"
-			# 書く前に印を控える（書いた直後に切られても、drop が自分の owner と分かるように）。
+			# 書く前に所有者 ID を保存する（書いた直後に切られても、drop が自分の owner と分かるように）。
 			ccnavi_lock_mark="$ccnavi_lk_mark"
 			if printf '%s\n' "$ccnavi_lk_want" >"$ccnavi_lk_dir/owner" 2>/dev/null &&
 				[ "$(ccnavi_lock_owner "$ccnavi_lk_dir")" = "$ccnavi_lk_want" ]; then
@@ -465,7 +466,7 @@ ccnavi_lock_take() {
 				log_debug ロックを取った -- "lock=$ccnavi_lk_key"
 				return 0
 			fi
-			# 取った直後に奪われた（owner を書けない・別の中身）。取れていないとして待ちに戻る。
+			# 取った直後に強制取得された（owner を書けない・別の中身）。取れていないとして待ちに戻る。
 			ccnavi_lock_dir=""
 			ccnavi_lock_mark=""
 			log_warn 取ったロックの持ち主を書けなかった -- "lock=$ccnavi_lk_key"
@@ -511,7 +512,7 @@ ccnavi_lock_stale() {
 	# shellcheck disable=SC2086
 	set -- "$1" "$2" "$3" $4
 	set +f
-	# $4 ホスト名 $5 pid $6 開始時刻 $7 印 $8 OS
+	# $4 ホスト名 $5 pid $6 開始時刻 $7 所有者 ID $8 OS
 	ccnavi_ls_started=$(ccnavi_lock_num "${6:-}")
 	if [ -z "$ccnavi_ls_started" ]; then
 		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
@@ -535,7 +536,7 @@ ccnavi_lock_stale() {
 	[ "$ccnavi_ls_old" = yes ]
 }
 
-# そのロックが 10 分を超えて持たれているか（持ち主が生きていて奪わないときの文面に使う）。<ロック>
+# そのロックが 10 分を超えて持たれているか（持ち主が生きていて強制取得しないときの文面に使う）。<ロック>
 ccnavi_lock_long() {
 	ccnavi_ll_started=$(ccnavi_lock_num "$(ccnavi_lock_owner "$1" | awk '{ print $3 }')")
 	[ -n "$ccnavi_ll_started" ] || return 1
@@ -563,12 +564,12 @@ ccnavi_lock_describe() {
 		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
 }
 
-# 古いロックを奪う。<ロック> <古いと判断したときに読んだ owner の行>
-# 0 奪えた（取り直す）/ 1 奪わなかった（待ちに戻る）/ 2 退けたものを戻せなかった
+# 古いロックを強制取得する。<ロック> <古いと判断したときに読んだ owner の行>
+# 0 強制取得できた（取り直す）/ 1 強制取得しなかった（待ちに戻る）/ 2 退けたものを戻せなかった
 ccnavi_lock_steal() {
 	ccnavi_st_gate="$1.steal"
 	if ! mkdir "$ccnavi_st_gate" 2>/dev/null; then
-		# 別の誰かが奪っている最中。10 分を過ぎた取得用のロック（.steal）は、途中で落ちた取得の残りなので外す。
+		# 別の誰かが強制取得している最中。10 分を過ぎた取得用のロック（.steal）は、途中で落ちた取得の残りなので外す。
 		if [ -n "$(find "$ccnavi_st_gate" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
 			rmdir "$ccnavi_st_gate" 2>/dev/null || :
 		fi
@@ -581,12 +582,12 @@ ccnavi_lock_steal() {
 		mv "$1" "$ccnavi_st_aside" 2>/dev/null; then
 		if [ "$(ccnavi_lock_owner "$ccnavi_st_aside")" = "$2" ]; then
 			rm -rf "$ccnavi_st_aside" 2>/dev/null || :
-			log_info 古いロックを奪った -- "lock=$1"
+			log_info 古いロックを強制取得した -- "lock=$1"
 			ccnavi_st_rc=0
 		elif [ ! -e "$1" ] && mv "$ccnavi_st_aside" "$1" 2>/dev/null; then
 			ccnavi_st_rc=1
 		else
-			log_warn 奪いかけたロックを戻せなかった -- "lock=$1"
+			log_warn 強制取得しかけたロックを戻せなかった -- "lock=$1"
 			ccnavi_st_rc=2
 		fi
 	fi
@@ -595,7 +596,7 @@ ccnavi_lock_steal() {
 }
 
 # 自分が取ったロックを外す。入れ子で取ったもの（ccnavi_lock_dir が空）は外さない。
-# owner の印が自分のものでなければ（奪われた後）触らない。自分が渡した CCNAVI_LOCK_HELD も消す。
+# owner の所有者 ID が自分のものでなければ（強制取得された後）触らない。自分が渡した CCNAVI_LOCK_HELD も消す。
 ccnavi_lock_drop() {
 	if [ -n "$ccnavi_lock_dir" ]; then
 		ccnavi_ld_line=$(ccnavi_lock_owner "$ccnavi_lock_dir")
@@ -610,8 +611,8 @@ ccnavi_lock_drop() {
 		ccnavi_lock_dir=""
 	fi
 	if [ -n "$ccnavi_lock_set_held" ]; then
-		# 入れ子の中で別のロック（統合先の控えのロックなど）を取ったときは、外側から渡された値に戻す。
-		# 消したままにすると、外側（C1）が持つ家族のロックを、この sh の後の段が入れ子と読めない。
+		# 入れ子の中で別のロック（統合先の同期状態のロックなど）を取ったときは、外側から渡された値に戻す。
+		# 消したままにすると、外側（C1）が持つ親子チケットのロックを、この sh の後の段が入れ子と読めない。
 		if [ -n "$ccnavi_lock_prev_set" ]; then
 			CCNAVI_LOCK_HELD="$ccnavi_lock_prev_held"
 			export CCNAVI_LOCK_HELD
@@ -625,13 +626,13 @@ ccnavi_lock_drop() {
 	return 0
 }
 
-# ---- 見張りつきの git（取ってくる操作。ccnavi-fetch.sh と ccnavi-sync.sh が使う）
+# ---- タイムアウト監視つきの git（取ってくる操作。ccnavi-fetch.sh と ccnavi-sync.sh が使う）
 #
 #   ccnavi_git_timed <秒> <標準エラーの書き先> <リポジトリ> <git の引数>...
 #
 # 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
 # ssh の BatchMode は、利用者が GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
-# 見張りの出力は捨てる（つないだままだと、見張りの sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
+# タイムアウト監視の出力は捨てる（つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
 # 戻り値は git のもの（切ったときは 0 でない）。標準出力は捨てないので、呼ぶ側がリダイレクトする。
 ccnavi_git_timed() {
 	ccnavi_gt_limit="$1"
@@ -653,7 +654,7 @@ ccnavi_git_timed() {
 			</dev/null 2>"$ccnavi_gt_err" &
 	fi
 	ccnavi_gt_pid=$!
-	# 見張りの中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
+	# タイムアウト監視の中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
 	(
 		exec </dev/null >/dev/null 2>&1
 		sleep "$ccnavi_gt_limit"
@@ -693,10 +694,10 @@ ccnavi_git_refusal() {
 
 # ---- C1（ADR-0093 の 4.3・4.4。段階 2d）
 #
-# 取り込み済みの家族（origin があり、家族の控えが present。chat だけの家族を除く。D11）で、状態を書く
+# 取り込み済みの親子チケット（origin があり、同期状態が present。chat だけの親子チケットを除く。D11）で、状態を書く
 # 操作を 1 操作にする。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に打つ。
 #
-#   ccnavi_c1_family <識別子>   家族と、C1 の対象か（ccnavi_c1_target に yes / no / stop）
+#   ccnavi_c1_family <識別子>   親子チケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
 #   ccnavi_c1_write <文> -- <実行ファイルの引数>...
 #                               6 元の先頭 7 書く 8 コミット 9 push 10 届いたか 11 戻して 1 回だけやり直す
@@ -716,11 +717,11 @@ ccnavi_git_refusal() {
 # 使わない）はここが持つ。git はエージェントの入口の ccnavi-git.sh を通らずに直に呼ぶ（4.3 の戻し）。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
-#   見張りの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回の見張りの秒、既定 60）
+#   タイムアウトの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回のタイムアウトの秒、既定 60）
 #
 # コミットは `--no-verify` で利用者の hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
 # だけで、コードの検査の対象ではないため（段階 2d のレビューの決定 C）。署名は利用者の設定に従うが、
-# 見張りの時間を付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
+# タイムアウトを付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
 # 途中で INT・TERM・HUP が来たら、送る前の自分のコミットを戻す（ccnavi_c1_end）。強制終了（KILL）で
 # 残ったコミットは、次の C1 の 5 が「未送信」で止まり、戻し方を言う。
@@ -753,17 +754,17 @@ ccnavi_c1_number() {
 	esac
 }
 
-# 家族と、C1 の対象か。<識別子>
+# 親子チケットと、C1 の対象か。<識別子>
 #
 # ccnavi_c1_target: yes（C1 で回す）/ no（今の手元の動きのまま）/ stop（取り込み済みだが止める理由がある）。
-# 実行ファイルが答えなかった（古い・落ちた）ときは、家族の控えがあれば stop、無ければ no。
+# 実行ファイルが答えなかった（古い・落ちた）ときは、親子チケットの同期状態があれば stop、無ければ no。
 ccnavi_c1_family() {
 	ccnavi_c1_target=no
 	ccnavi_c1_why=""
 	ccnavi_c1_family_id=""
 	ccnavi_c1_repo=""
 	ccnavi_c1_tree=""
-	# 家族の控えが 1 つも無ければ、実行ファイルに聞かずに対象外（D11。一時ディレクトリも要らない）。
+	# 親子チケットの同期状態が 1 つも無ければ、実行ファイルに聞かずに対象外（D11。一時ディレクトリも要らない）。
 	ccnavi_cf_state=$(ccnavi_state "$ccnavi_c1_root")
 	ccnavi_cf_p="$1"
 	case "$ccnavi_cf_p" in
@@ -778,7 +779,7 @@ ccnavi_c1_family() {
 	done
 	if [ "$ccnavi_cf_any" = no ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
-		ccnavi_c1_why="家族の控えが無い（取り込み済みでない。今の手元の動きのまま）"
+		ccnavi_c1_why="親子チケットの同期状態が無い（取り込み済みでない。今の手元の動きのまま）"
 		return 0
 	fi
 	ccnavi_c1_scratch || {
@@ -792,7 +793,7 @@ ccnavi_c1_family() {
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。家族の控えがあるので、書かずに止める。実行ファイルを新しくしてください"
+		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。親子チケットの同期状態があるので、書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_c1_target=$(sed -n 's/^target //p' "$ccnavi_c1_tmp/family" | head -n 1)
@@ -825,14 +826,14 @@ ccnavi_c1_family() {
 
 # 止めたときの文面（ccnavi_c1_target が stop）。
 ccnavi_c1_refuse() {
-	ccnavi_c1_say "家族 ${ccnavi_c1_family_id:-?} の状態を書かずに止めた。${ccnavi_c1_why}"
+	ccnavi_c1_say "親子チケット ${ccnavi_c1_family_id:-?} の状態を書かずに止めた。${ccnavi_c1_why}"
 	while IFS= read -r ccnavi_rf_hint; do
 		[ -n "$ccnavi_rf_hint" ] && printf '  %s\n' "$ccnavi_rf_hint" >&2
 	done <"$ccnavi_c1_tmp/hints"
 	log_info C1 で止めた -- "family=$ccnavi_c1_family_id" "reason=c1-stop"
 }
 
-# `git rev-parse --git-path <名前>` をツリーからの綴りにする。<ツリー> <名前>
+# `git rev-parse --git-path <名前>` をツリーからのパスにする。<ツリー> <名前>
 ccnavi_c1_git_path() {
 	ccnavi_gp_rel=$(git -C "$1" rev-parse --git-path "$2" 2>/dev/null || :)
 	case "$ccnavi_gp_rel" in
@@ -861,15 +862,15 @@ ccnavi_c1_begin() {
 	case "$ccnavi_cb_rc" in
 	0) ;;
 	2)
-		ccnavi_c1_say "家族 $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。人が中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
+		ccnavi_c1_say "親子チケット $ccnavi_c1_family_id の古いロックを強制取得する途中で止まり、元に戻せなかった。人が中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
 		return 1
 		;;
 	*)
 		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/$ccnavi_c1_family_id"
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
+			ccnavi_c1_say "親子チケット $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので強制取得しない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
-			ccnavi_c1_say "家族 $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
+			ccnavi_c1_say "親子チケット $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
 		fi
 		return 1
 		;;
@@ -924,7 +925,7 @@ ccnavi_c1_prepare() {
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
 			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hook のマーカーと状態の履歴をコミットする" || return 1
 		fi
-		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。統合先の控えも同じ回で書く。
+		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。統合先の同期状態も同じ回で書く。
 		ccnavi_cp_rc=0
 		sh "$ccnavi_c1_sh/ccnavi-sync.sh" "$ccnavi_c1_family_id" </dev/null >"$ccnavi_c1_tmp/sync" 2>&1 || ccnavi_cp_rc=$?
 		sed "s/^/  /" "$ccnavi_c1_tmp/sync" >&2
@@ -940,7 +941,7 @@ ccnavi_c1_prepare() {
 		ccnavi_cp_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 		ccnavi_cp_state=$(ccnavi_record_get "$ccnavi_cp_record" state)
 		if [ "$ccnavi_cp_state" != present ]; then
-			ccnavi_c1_say "取り込みの後、家族の控えが ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
+			ccnavi_c1_say "取り込みの後、親子チケットの同期状態が ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
@@ -993,7 +994,7 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# 利用者の hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
+	# 利用者の hook は実行しない。署名などで尋ねて止まらないよう、タイムアウトで切る（決定 C）。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
@@ -1084,7 +1085,7 @@ ccnavi_c1_write() {
 			return 1
 		fi
 		ccnavi_cw_c="$ccnavi_c1_committed"
-		# 送る前に切られたら戻せるように控える（ccnavi_c1_end）。
+		# 送る前に切られたら戻せるように保存する（ccnavi_c1_end）。
 		if [ -n "$ccnavi_cw_c" ]; then
 			ccnavi_c1_inflight="$ccnavi_cw_c"
 			ccnavi_c1_inflight_h0="$ccnavi_cw_h0"
@@ -1161,15 +1162,15 @@ ccnavi_c1_undo() {
 	return 0
 }
 
-# 送れた。家族の控えの sha を書き換える（state はそのまま present）。<送った先頭>
+# 送れた。親子チケットの同期状態の sha を書き換える（state はそのまま present）。<送った先頭>
 ccnavi_c1_sent() {
 	ccnavi_cn_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 	if [ "$(ccnavi_record_get "$ccnavi_cn_record" state)" = present ]; then
 		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_family_id" sha "$1" \
 			fetched_at "$(ccnavi_record_get "$ccnavi_cn_record" fetched_at)" state present reason "" ||
-			ccnavi_c1_say "家族の控え（${ccnavi_cn_record}）を書けなかった"
+			ccnavi_c1_say "親子チケットの同期状態（${ccnavi_cn_record}）を書けなかった"
 	fi
-	ccnavi_c1_say "家族 $ccnavi_c1_family_id の状態を送った（$(printf '%.12s' "$1")）"
+	ccnavi_c1_say "親子チケット $ccnavi_c1_family_id の状態を送った（$(printf '%.12s' "$1")）"
 	log_info C1 で送った -- "family=$ccnavi_c1_family_id"
 }
 
@@ -1178,7 +1179,7 @@ ccnavi_c1_inflight=""
 ccnavi_c1_inflight_h0=""
 ccnavi_c1_inflight_list=""
 ccnavi_c1_end() {
-	# 見張りの途中で切られたら、見張りも止める（後で別のプロセスを kill しないように）。
+	# タイムアウト監視の途中で切られたら、監視も止める（後で別のプロセスを kill しないように）。
 	if [ -n "${ccnavi_gt_dog:-}" ]; then
 		kill "$ccnavi_gt_dog" 2>/dev/null || :
 		ccnavi_gt_dog=""
@@ -1425,7 +1426,7 @@ ccnavi_log_value() {
 #   - `://` を含まない語: 最初の `/` より前に `@` があり、最後の `@` より前に `:` があれば、そこを
 #     `***` にする（scp 形 `user:tok@host:path` → `***@host:path`）。`git@host:path` は伏せない
 # `@` の無い文字列は語に切らずにそのまま返す（ほとんどの行はこれで済む）。
-# 利用者向けの ccnavi_mask_url（`<伏せた>@host`）とは綴りが違う。そちらは契約の文面なので変えない。
+# 利用者向けの ccnavi_mask_url（`<伏せた>@host`）とは書き方が違う。そちらは契約の文面なので変えない。
 ccnavi_log_mask() {
 	ccnavi_log_out="$1"
 	case "$1" in

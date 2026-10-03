@@ -85,12 +85,13 @@ class BoardTest(PhaseHarness):
         self.assertEqual(parent["copy"]["status"], "open")
 
     def test_scattered_is_empty_while_the_home_tree_holds_one_copy(self):
-        """写りがあること自体は普通。優先するツリーに 1 つあれば散在ではない。"""
+        """複数のツリーに現れること自体は普通。優先するツリーに 1 つあれば散在ではない。"""
         self.scene()
         for t in self.board()["tickets"]:
             self.assertEqual(t["scattered"], [], t["ticket"])
-        # 正常な場面でも、写りは複数あるし状態も食い違う（ワークツリーはブランチを
-        # 切った時点の写しを持つ。承認済みチケットの置き場に在るものも写る）。
+        # 正常な場面でも、現れる場所（seen_in の項目）
+        # は複数あるし状態も食い違う（ワークツリーはブランチを
+        # 切った時点の承認済みチケットを持つ。承認済みチケットの置き場に在るものも数える）。
         # 数や状態の違いを食い違いに数えない。
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(len(by_id["i0001-01"]["seen_in"]), 3)
@@ -110,14 +111,14 @@ class BoardTest(PhaseHarness):
         """親のツリーが無ければ元ツリーを優先する。片付けただけの形を散在に数えない。
 
         親のワークツリーは合流したら片付ける。そこを行き先の無いまま数えると、片付けた
-        家族のカードが全部「複数の場所にある」になり、状態の操作も止まる。
+        親子チケットのカードが全部「複数の場所にある」になり、状態の操作も止まる。
         """
         self.scene()
         self.move("i0001-03", self.parent_tree, self.root)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(by_id["i0001-03"]["scattered"], [])
-        # 写り自体は残る。決まらなさだけを scattered が言う。
+        # seen_in の項目自体は残る。決まらなさだけを scattered が言う。
         self.assertEqual(
             [(s["tree"], s["state"]) for s in by_id["i0001-03"]["seen_in"]],
             [("", "todo"), ("i0001-02", "todo")],
@@ -167,7 +168,7 @@ class BoardTest(PhaseHarness):
         waiting = by_id["i0001-02"]
         self.assertEqual(waiting["copy"]["status"], "review")
         self.assertEqual(waiting["scattered"], [])
-        # 同じファイルを 2 つの走査が拾っても、写りは 1 ツリーに 1 つ。
+        # 同じファイルを 2 つの走査が拾っても、seen_in の項目は 1 ツリーに 1 つ。
         self.assertEqual(
             len({(s["tree"], s["state"]) for s in waiting["seen_in"]}), len(waiting["seen_in"])
         )
@@ -227,15 +228,15 @@ class BoardTest(PhaseHarness):
 
 
 def _portable(value, root: str):
-    """絶対パスと時刻を、機械に依らない綴りに置き換える。フィクスチャに書く分だけ。"""
+    """絶対パスと時刻を、機械に依らない文字列に置き換える。フィクスチャに書く分だけ。"""
     if isinstance(value, dict):
         return {k: _portable(v, root) for k, v in value.items()}
     if isinstance(value, list):
         return [_portable(v, root) for v in value]
     if isinstance(value, str):
-        # ワークツリーの根は normcase 済み（Windows では小文字）で出るので、綴りを問わず置き換える。
-        # ccnavi は根を行き着く先まで解いた綴りで出す（macOS の /var → /private/var）。
-        # 解いた綴りを先に置き換える。後にすると、中に含まれる元の綴りだけが先に
+        # ワークツリーの根は normcase 済み（Windows では小文字）で出るので、表記を問わず置き換える。
+        # ccnavi は根を行き着く先まで解いたパスで出す（macOS の /var → /private/var）。
+        # 解いたパスを先に置き換える。後にすると、中に含まれる元のパスだけが先に
         # 置き換わって `/private<root>` が残る。
         text = value.replace("\\", "/")
         for spelling in dict.fromkeys((os.path.realpath(root), root)):

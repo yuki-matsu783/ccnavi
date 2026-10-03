@@ -16,7 +16,7 @@
  * （React Flow の決まり）。グループは中のノードより前に並べる（React Flow は親を先に読む）。
  * グループの中にグループは置かない。
  *
- * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はその写しの
+ * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はそのコピーの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
  * 書き出しは中身から組み直す（コメントや書き方は残らない。人が保存したときだけ書く）。
@@ -43,7 +43,7 @@ export interface FlowConnection {
   readonly [key: string]: unknown;
 }
 
-/** フロー 1 本。`nodes` だけは必ず並び。ほかの欄は読んだまま */
+/** フロー 1 本。`nodes` だけは必ずリスト。ほかの欄は読んだまま */
 export interface FlowDoc {
   readonly nodes: readonly FlowNode[];
   readonly [key: string]: unknown;
@@ -58,7 +58,7 @@ export type FlowRead = { readonly ok: true; readonly doc: FlowDoc } | { readonly
 
 // ---- 種類
 
-/** 画面の部品箱に並べる種類。並びもこの順 */
+/** 画面の部品箱に並べる種類。並べる順もこの順 */
 export const PALETTE = ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "skill"] as const;
 export type PaletteType = (typeof PALETTE)[number];
 
@@ -85,7 +85,7 @@ export function isEditableType(type: string): type is PaletteType {
   return (PALETTE as readonly string[]).includes(type);
 }
 
-/** 分岐の出口を持つ種類。出口は `data` の並び（`branches` か `options`）の 1 件ずつ */
+/** 分岐の出口を持つ種類。出口は `data` のリスト（`branches` か `options`）の 1 件ずつ */
 export function branchKey(type: string): "branches" | "options" | undefined {
   if (type === "ifElse" || type === "switch" || type === "branch") {
     return "branches";
@@ -96,7 +96,7 @@ export function branchKey(type: string): "branches" | "options" | undefined {
   return undefined;
 }
 
-/** 出入口の綴り。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow._port_label` も同じ綴りで読む） */
+/** 出入口の表記。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow._port_label` も同じ表記で読む） */
 export const INPUT_PORT = "input";
 export const OUTPUT_PORT = "output";
 export function branchPort(index: number): string {
@@ -170,7 +170,7 @@ export function dataText(node: FlowNode, key: string): string {
   return str(nodeData(node)[key]);
 }
 
-/** 分岐の出口の並び（`branches` / `options`）。1 件は `{label, condition?, description?, ...}` */
+/** 分岐の出口のリスト（`branches` / `options`）。1 件は `{label, condition?, description?, ...}` */
 export function branchItems(node: FlowNode): readonly Readonly<Record<string, unknown>>[] {
   const key = branchKey(nodeType(node));
   if (key === undefined) {
@@ -188,8 +188,8 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
  * 画面はそれを通ったものだけを開く（ADR-0035）。読み手はルール設定の画面（`rules-doc.ts`）と同じ `yaml` の既定。
  *
  * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
- * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードの並び（`id` が文字列の
- * キーと値の並び）が取れないとき。**例外は外に出さない。**
+ * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードのリスト（`id` が文字列の
+ * マッピング）が取れないとき。**例外は外に出さない。**
  */
 export function parseFlow(text: string): FlowRead {
   const read = parseFlowValue(text);
@@ -197,7 +197,7 @@ export function parseFlow(text: string): FlowRead {
     return read;
   }
   const doc = asFlowDoc(read.value);
-  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）が取れないので描けない" } : { ok: true, doc };
+  return doc === undefined ? { ok: false, error: "ノードのリスト（id が文字列のノード）が取れないので描けない" } : { ok: true, doc };
 }
 
 /**
@@ -223,7 +223,7 @@ function firstLine(text: string): string {
 }
 
 /**
- * 描ける形か。最上位がキーと値の並びで、`nodes` が「文字列の `id` を持つキーと値の並び」の並び。
+ * 描ける形か。最上位がマッピングで、`nodes` が「文字列の `id` を持つマッピング」のリスト。
  * 画面から届いた保存の中身もここで受ける（崩れていたら書かない。正しいかは保存の前に実行ファイルが言う）。
  */
 export function asFlowDoc(raw: unknown): FlowDoc | undefined {
@@ -239,7 +239,7 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
 /**
  * 書き出す本文。字下げ 2 のブロック形式で、長い行を折らない。複数行の文は `|` の形で書く。
  * 同じ中身が 2 度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
- * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む綴り（`yes` `0755` `2026-01-01` など）と、
+ * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む表記（`yes` `0755` `2026-01-01` など）と、
  * 裸や `|` では PyYAML が読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
  * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
  *
@@ -330,7 +330,7 @@ export function templateFlow(ticket: string, title: string): FlowDoc {
   };
 }
 
-// ---- 編集（どれも新しい写しを返す。触ったところ以外は元のまま）
+// ---- 編集（どれも新しいコピーを返す。触ったところ以外は元のまま）
 
 /** 新しいノードの `data`。画面が欄を持つものだけ */
 export function defaultData(type: PaletteType): Record<string, unknown> {
@@ -479,7 +479,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は**並びの位置で指す**（人が書いたフローの線は id が無いことも重なることもある）。
+ * 線を消す。線は**リストの位置で指す**（人が書いたフローの線は id が無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -767,7 +767,7 @@ export function resizeGroup(doc: FlowDoc, id: string, size: FlowSize, position?:
  * - ほかのノードは、真ん中がグループの枠の中に落ちればそのグループに入り、どの枠にも落ちなければ
  *   グループから出る。枠が重なっていれば、後ろに並ぶ（図で上に描かれる）グループに入る
  *
- * 位置もグループも変わらなければ、同じ写しをそのまま返す（押しただけで未保存にしない）。
+ * 位置もグループも変わらなければ、同じ値をそのまま返す（押しただけで未保存にしない）。
  */
 export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDoc {
   const index = doc.nodes.findIndex((n) => n.id === id);
@@ -812,8 +812,8 @@ export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDo
 
 /**
  * ドラッグで動いた点をまとめて置く。位置は React Flow の決まり（グループの中のノードはグループからの位置）で、
- * 写しの今のグループに対して読む。グループを先に置き、そのあとほかのノードを置く（一緒に動いた
- * グループの新しい位置から読むため）。何も変わらなければ同じ写しを返す。
+ * コピーの今のグループに対して読む。グループを先に置き、そのあとほかのノードを置く（一緒に動いた
+ * グループの新しい位置から読むため）。何も変わらなければ同じ値を返す。
  */
 export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; readonly position: FlowPoint }[]): FlowDoc {
   const typeOf = new Map(doc.nodes.map((node) => [node.id, isGroup(node)]));
@@ -834,9 +834,9 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
 // ---- 写す・貼る・複製する
 
 /**
- * 写したノードと線（画面の中の控え）。元のフローから切り離した深い写しで、貼るたびに id を振り直す。
+ * 写したノードと線（画面の中のクリップボード）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
  *
- * - `nodes` は元の並びの順（グループは中のノードより前）。`parentId` は元の id のまま持つ
+ * - `nodes` は元のリストの順（グループは中のノードより前）。`parentId` は元の id のまま持つ
  * - `absolute` は写した時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
  *   写した）は、この位置で外に置く
  * - `connections` は写したノード同士の線だけ（片方しか写していない線は写さない）
@@ -891,15 +891,15 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
 
 /**
  * 写したものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
- * `parentId` を新しい id に付け替える。出口の綴り（`branch-<番号>`）と `data` はそのまま（分岐の出口の並びも
- * 一緒に写しているので、同じ出口に付く）。
+ * `parentId` を新しい id に付け替える。出口の表記（`branch-<番号>`）と `data` はそのまま（分岐の出口のリストも
+ * 一緒にコピーしているので、同じ出口に付く）。
  *
  * 置き場所は、グループの外のノードは `offset` だけずらす。グループの中のノードは、
  * - グループも一緒に貼るなら、新しいグループの中で元と同じ相対位置
  * - グループは貼らず、元のグループが貼る先にまだあるなら、同じグループの中で `offset` だけずらす
  * - 元のグループが貼る先に無ければ、写した時点の図の上の位置から `offset` だけずらして外に置く
  *
- * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（写しの並びのまま）。
+ * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（コピーしたときの順のまま）。
  */
 export function pasteNodes(doc: FlowDoc, clip: FlowClip, offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } {
   const renamed = new Map<string, string>();
@@ -962,7 +962,7 @@ export interface Ports {
 }
 
 /**
- * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（人が書いたフローが別の綴りを
+ * ノードの出入口。種類ごとの既定に、読んだ線が使っている表記を足す（人が書いたフローが別の表記を
  * 使っていても、線を落とさずに描くため）。
  */
 export function portsOf(node: FlowNode, connections: readonly FlowConnection[]): Ports {
@@ -995,7 +995,7 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
 
 /** 線につける言葉。`condition` があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
 /**
- * 線の言葉に使う値の綴り。実行ファイルの `flow._text` と同じ読み方にする。真偽値は空、数は整数ならその綴り
+ * 線の言葉に使う値の表記。実行ファイルの `flow._text` と同じ読み方にする。真偽値は空、数は整数ならその表記
  * （`1.0` は `1`）、文字列はそのまま、ほかは空
  */
 function labelText(value: unknown): string {

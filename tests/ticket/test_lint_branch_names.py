@@ -97,7 +97,7 @@ class BranchNameRulesTest(unittest.TestCase):
         found = ticket_mod.branch_name_problems(ticket, "trunk")
         self.assertEqual(1, len(found), found)
         self.assertIn("統合先の名前（trunk）", found[0])
-        # 固定の並びに当たるものは 1 行だけ。
+        # 固定のリストに当たるものは 1 行だけ。
         self.assertEqual(
             1, len(ticket_mod.branch_name_problems(ticket_mod.Ticket(ticket="main"), "main"))
         )
@@ -246,7 +246,7 @@ class LintBranchNamesTest(unittest.TestCase):
         self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
     def test_the_name_ccnavi_sync_recorded_is_reserved(self):
-        # --integration-branch が無ければ、ccnavi-sync.sh が控えに書いた名前を読む（決定 B3）。
+        # --integration-branch が無ければ、ccnavi-sync.sh が同期状態に書いた名前を読む（決定 B3）。
         self.propose("trunk")
         write(
             os.path.join(self.ws, "state", "sync", "self", "integration", "head"),

@@ -7,7 +7,7 @@
 #   .ccnavi/bin/linux-x86_64/ccnavi
 #   .ccnavi/bin/windows-x86_64/ccnavi.exe
 #
-# ccnavi のリポジトリでも配布先でも同じ綴りで置く。ccnavi のリポジトリでは build.py が、
+# ccnavi のリポジトリでも配布先でも同じパスに置く。ccnavi のリポジトリでは build.py が、
 # 配布先では scripts/ccnavi-setup.sh が、実行ファイルを .ccnavi/bin/<os>-<arch>/ に置く。
 #
 # hook の command は 1 行しか書けず、settings.json は Windows・WSL・Linux・macOS で

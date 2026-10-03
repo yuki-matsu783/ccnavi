@@ -137,7 +137,7 @@ class PhaseHarness(unittest.TestCase):
         self.phases = write(common_path(self.root, "phases"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 9.2）。
+        # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
 
     # ---- 道具
@@ -199,9 +199,9 @@ class PhaseHarness(unittest.TestCase):
         return write(os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md"), text)
 
     def approve(self):
-        """承認して、写しを親のブランチに乗せる。
+        """承認して、承認済みチケットを親のブランチに乗せる。
 
-        写しは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
+        承認済みチケットは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
         本番で `ccnavi-approve.sh` がやることを、テストでも同じ順でたどる。
         """
         result = self.ccnavi("--approve", stdin="y\n")
@@ -467,11 +467,11 @@ class PhaseTest(PhaseHarness):
         """種類の範囲の上限は、子チケットの範囲と同じく大文字小文字を区別しない。
 
         機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
-        承認を拒まれ、Windows では通る。範囲は人が宣言する意図なので、綴りの
+        承認を拒まれ、Windows では通る。範囲は人が宣言する意図なので、表記の
         意味で読む（子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える）。
         """
         self.family(plan=["research", "design"])
-        # 種類は `wip/research/*`。子は綴りだけ違う `WIP/Research/*` を宣言する。
+        # 種類は `wip/research/*`。子は表記だけ違う `WIP/Research/*` を宣言する。
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["WIP/Research/*"]))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -784,7 +784,7 @@ class PhaseTest(PhaseHarness):
         preview = json.loads(shown.stdout)
         self.assertTrue(preview["can_issue"])
         choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
-        # 控えの置き場が無ければ、issue に回す下書きを置けないので、何も置く前に断る
+        # 状態ディレクトリが無ければ、issue に回す下書きを置けないので、何も置く前に断る
         homeless = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -802,7 +802,7 @@ class PhaseTest(PhaseHarness):
             fixture,
         )
         self.assertNotEqual(homeless.returncode, 0)
-        self.assertIn("控えの置き場が空", homeless.stderr)
+        self.assertIn("状態ディレクトリが空", homeless.stderr)
         self.assertNotEqual(self.confirm(fixture, 2).returncode, 0)
         done = self.ccnavi(
             "--cwd",
@@ -1077,7 +1077,7 @@ phases:
 
 
 class WrapperFlagsComeOnceTest(PhaseHarness):
-    """sh が計算して渡す綴り（`--root` / `--cwd`）は 2 度渡せない（ADR-0067、issue #65）。
+    """sh が計算して渡すパス（`--root` / `--cwd`）は 2 度渡せない（ADR-0067、issue #65）。
 
     `ccnavi-review.sh` は `"$bin" --root "$root" --cwd "$here" "$@"` の形で呼ぶ。
     どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。後ろに
@@ -1170,7 +1170,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
-        # y でマーカーが置かれ、止まっていたのが解ける。写しも依頼の記録も要らない。
+        # y でマーカーが置かれ、止まっていたのが解ける。承認済みチケットも依頼の記録も要らない。
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
@@ -1639,7 +1639,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("limit: parent i0001", self.reason(beyond_parent))
 
     def test_regex_child_ignores_case_like_the_glob_child(self):
-        """14. regex の子: 範囲の綴りは glob の子と同じく大文字小文字を区別しない。
+        """14. regex の子: 範囲の表記は glob の子と同じく大文字小文字を区別しない。
 
         範囲は人が宣言する意図なので、`regex` で書いても同じ場所を指す（設計 9.3）。
         区別が要るなら `(?-i:...)` で囲む。
@@ -1652,7 +1652,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
 
     def test_regex_child_can_keep_the_distinction_with_an_inline_flag(self):
-        """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた綴りのとおりに当たる。
+        """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた表記のとおりに当たる。
 
         ルールの側（tests/config/test_config_union_holes.py）と同じ書き方が、
         チケットの範囲でも書けることを見る。
@@ -1664,7 +1664,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
 
-        # 種類の上限（glob）には当たる綴りだが、子の範囲が区別するので止まる。
+        # 種類の上限（glob）には当たる表記だが、子の範囲が区別するので止まる。
         outside = self.write_to(tree, "wip/Research/x.md")
         self.assertEqual(self.decision(outside), "deny", outside.stdout)
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))

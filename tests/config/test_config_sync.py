@@ -5,10 +5,10 @@ rules / phases / risks の 3 本を持ち、lib はそれぞれ別の中身を�
 
 見るのは 4 つ。
 
-1. 親の `ticket start` が、共通層にあるファイルだけを親のワークツリーへ写し、印を置く
+1. 親の `ticket start` が、共通層にあるファイルだけを親のワークツリーへ写し、マーカーを置く
 2. 子の着手とワークスペース自身の作業では写さない
 3. 最初のレビューの依頼の頭に載り、2 回目からは載らない
-4. 写した書き込みを、実行後の監視と控えと復元が戻さず、報告もしない。写した後に
+4. 写した書き込みを、実行後の監視とバックアップと復元が戻さず、報告もしない。写した後に
    手を入れたものは今までどおり扱う
 """
 
@@ -81,11 +81,12 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertEqual(mark["notified"], "")
 
     def test_the_start_c1_carries_the_synced_layer(self):
-        """D34: C1 の書いたパスの一覧（基点は親のワークツリー）で、着手の写しは外でも通す。"""
+        """D34: C1 の書いたパスの一覧（基点は親のワークツリー）で、着手のコピーは外でも通す。"""
         write(self.risk, COMMON_SCRIPT_RISK)
         write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
-        # 取り込み済みの家族（控えがある）の写しは親のワークツリーに在る（2c）。提案を親の
-        # ワークツリーに書いて承認し、それから控えを置く。
+        # 取り込み済みの親子チケット（同期状態がある）
+        # の承認済みチケットは親のワークツリーに在る（2c）。提案を親の
+        # ワークツリーに書いて承認し、それから同期状態を置く。
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         text = ticket_text("i0001", project="lib", allow=SCOPE)
         write(os.path.join(tree, "wip", "proposals", "todo", "i0001.md"), text)
@@ -134,7 +135,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertFalse(any(f["existed"] for f in self.mark(project="app")["files"]))
 
     def test_identical_layers_are_not_touched(self):
-        """1: 中身が同じなら何も書かず、印も置かない。改行の違いは見ない。"""
+        """1: 中身が同じなら何も書かず、マーカーも置かない。改行の違いは見ない。"""
         for kind, text in (
             ("rules", json.dumps(COMMON_RULES)),
             ("phases", COMMON_PHASES.replace("\n", "\r\n")),
@@ -182,7 +183,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertNotEqual(read(config_of(child, "phases")), COMMON_PHASES)
 
     def test_the_first_review_carries_the_notice_once(self):
-        """3: 最初の依頼の頭に載り、知らせたことを印に残すと、以後は載らない。"""
+        """3: 最初の依頼の頭に載り、知らせたことをマーカーに残すと、以後は載らない。"""
         self.start_parent()
         home = self.approved_dir_of("lib")
 
@@ -206,7 +207,8 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertNotIn(".ccnavi/config", said.stdout + said.stderr)
 
     def test_post_monitor_reports_an_edit_after_the_sync(self):
-        """4: 写した後に手を入れたものは、印の指紋と合わないので今までどおり報告する。"""
+        """4: 写した後に手を入れたものは、
+        マーカーに書いたハッシュと合わないので今までどおり報告する。"""
         tree, _ = self.start_parent()
         write(
             config_of(tree, "risk"),
@@ -218,13 +220,13 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertIn("risks.yml", said.stdout + said.stderr)
 
     def test_is_synced_write_needs_both_the_content_and_the_mark(self):
-        """4: 共通層と同じ中身でも、印が名指ししていなければ外さない。"""
+        """4: 共通層と同じ中身でも、マーカーが名指ししていなければ外さない。"""
         conf = self.settings()
         tree, _ = self.start_parent()
         target = config_of(tree, "rules")
         self.assertTrue(configsync.is_synced_write(conf, self.ws, target))
 
-        # 元リポジトリの設定は判定が読む版なので、同じ中身と印が揃っても外さない。
+        # 元リポジトリの設定は判定が読む版なので、同じ中身とマーカーが揃っても外さない。
         main = config_of(self.lib, "rules")
         write(main, read(target))
         self.assertFalse(configsync.is_synced_write(conf, self.ws, main))
@@ -233,7 +235,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
 
     def test_core_file_guard_keeps_the_synced_files(self):
-        """4: 控えと復元は、写した分を戻さない。写した後の書き換えは戻す。"""
+        """4: バックアップと復元は、写した分を戻さない。写した後の書き換えは戻す。"""
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -268,7 +270,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
     """レビューで見つかった穴を直したことを見る。"""
 
     def test_a_mark_of_another_project_does_not_exempt(self):
-        """印はその親のもの。lib で写したあとでも、app のワークツリーの書き込みは外さない。"""
+        """マーカーはその親のもの。lib で写したあとでも、app のワークツリーの書き込みは外さない。"""
         conf = self.settings()
         self.start_parent()
         self.propose("i0002", ticket_text("i0002", project="app", allow=SCOPE), project="app")
@@ -329,7 +331,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertNotIn(".ccnavi/config", self.system_message(stopped))
 
     def test_scripts_the_risk_points_at_are_copied_too(self):
-        """配点が指す共通層のスクリプトも写し、指す先をプロジェクトの層の綴りに直す。"""
+        """配点が指す共通層のスクリプトも写し、指す先をプロジェクトの層のパスに直す。"""
         conf = self.settings()
         write(self.risk, COMMON_SCRIPT_RISK)
         write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
@@ -398,7 +400,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertIsNone(self.mark())
 
     def test_a_failed_write_puts_everything_back(self):
-        """1 本でも書けなければ、書いた分と印を元に戻す。"""
+        """1 本でも書けなければ、書いた分とマーカーを元に戻す。"""
         conf = self.settings()
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         self.assertEqual(self.approve().returncode, 0)
@@ -473,7 +475,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
     """2 回目の敵対的レビューで見つかった穴を直したことを見る。"""
 
     def test_a_worktree_without_an_approved_parent_is_not_exempt(self):
-        """承認済みの親チケットの無いワークツリーは、印を自作しても外さない。"""
+        """承認済みの親チケットの無いワークツリーは、マーカーを自作しても外さない。"""
         conf = self.settings()
         tree = self.worktree(self.lib, "scratchy")
         target = config_of(tree, "rules")
@@ -515,7 +517,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
             self.skipTest(f"シンボリックリンクが作れない: {error}")
 
     def test_a_symlink_is_not_exempt(self):
-        """設定を別の写しへのシンボリックリンクに差し替えても外さない。"""
+        """設定を別のコピーへのシンボリックリンクに差し替えても外さない。"""
         conf = self.settings()
         tree, _ = self.start_parent()
         target = config_of(tree, "rules")
@@ -591,7 +593,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertFalse([p for p in problems if p.severity == "warn"], problems)
 
     def test_projected_rewrites_only_script_values(self):
-        """指す先を直すのは `script:` の値だけ。`glob` や `message` の同じ綴りは触らない。"""
+        """指す先を直すのは `script:` の値だけ。`glob` や `message` の同じ文字列は触らない。"""
         text = (
             b"version: 1\nfactors:\n"
             b"  - {id: a, points: 1, script: .ccnavi/common/scripts/a.sh, message: m}\n"

@@ -61,7 +61,7 @@ test("CB-D31 帯と行のボタンはそれぞれの型で送る。clone は欄�
       { type: "openBoard", name: "lib" },
       { type: "clone", url: "https://gitlab.example.com/g/tool.git", name: "tool" },
     ]);
-    // 打ちかけは Webview の state に控える。作り直されても残る
+    // 打ちかけは Webview の state に保存する。作り直されても残る
     assert.deepEqual(dom.state(), { url: "https://gitlab.example.com/g/tool.git", name: "tool", nameTouched: false });
     await dom.send({ type: "cloned", message: "clone を送った" });
     assert.equal(dom.one<HTMLInputElement>("#url").value, "");
@@ -113,7 +113,7 @@ test("CB-D33 開いていたメニューは、その行が一覧から消えた�
     await dom.close();
   }
 
-  // 名前は置き場のディレクトリ名そのままで、clone の欄が通す綴りとは限らない。
+  // 名前は置き場のディレクトリ名そのままで、clone の欄が通す表記とは限らない。
   // `a:x` のメニューが `a` のものと見なされないこと（前方一致だと見なされる）
   const colon = await openProjects([row({ name: "a", rel: "projects/a" }), row({ name: "a:x", rel: "projects/a:x" })]);
   try {

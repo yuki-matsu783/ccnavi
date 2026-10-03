@@ -1,7 +1,8 @@
 """設定 3 本の和の受入テスト。設定ファイルの守り（設計 11.6）と導入スクリプト（11.9 末尾）。
 
 selfguard のコアに、各層の `.ccnavi/config/` の 3 本と共通層の phases / risk が入る。
-Write / Edit の拒否、シェルからの書き込みの拒否、控えと復元の 3 つとも、共通層の rules.yml に
+Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、
+共通層の rules.yml に
 掛けているものをそのまま掛ける。元リポジトリから切ったワークツリー側の設定も対象。
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
@@ -64,11 +65,11 @@ class GuardHarness(ConfigUnionHarness):
         return self.hook(tool, cwd, event=event, guard="enable", **tool_input)
 
     def run_hook(self, event, command="ls"):
-        """Bash 1 回。実行前で控えを取り、実行後で戻す。"""
+        """Bash 1 回。実行前でバックアップを取り、実行後で戻す。"""
         return self.guarded_hook("Bash", self.ws, event=event, command=command)
 
     def break_and_restore(self, path, broken="version: 1\ndeny: []\n"):
-        """控えを取らせ、壊し、実行後に戻ったかを返す。"""
+        """バックアップを取らせ、壊し、実行後に戻ったかを返す。"""
         before = read(path)
         self.run_hook("PreToolUse")
         write(path, broken)
@@ -82,10 +83,10 @@ class GuardHarness(ConfigUnionHarness):
 
 
 class RestoreTest(GuardHarness):
-    """控えと復元（11.6、REQ-MLT-08 の変更）。"""
+    """バックアップと復元（11.6、REQ-MLT-08 の変更）。"""
 
     def test_project_layer_files_are_restored(self):
-        """11.6: プロジェクトの層の 3 本が控えと復元の対象。"""
+        """11.6: プロジェクトの層の 3 本がバックアップと復元の対象。"""
         for kind in ("rules", "phases", "risk"):
             with self.subTest(kind=kind):
                 path = layer_path(self.lib, kind)
@@ -153,7 +154,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn("統合すれば", result.stdout, self.said(result, name))
 
     def test_deleted_layer_file_comes_back_from_the_project_git(self):
-        """11.6 / REQ-SLF: 控えが無ければ、その層の git（プロジェクト自身）から戻る。"""
+        """11.6 / REQ-SLF: バックアップが無ければ、その層の git（プロジェクト自身）から戻る。"""
         path = layer_path(self.lib, "rules")
         expected = read(path)
         os.remove(path)
@@ -285,7 +286,7 @@ class DenyTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-project-home")
 
     def test_project_home_deny_follows_the_env(self):
-        """11.6: 綴りは `CCNAVI_PROJECT_HOME` の値で組む。"""
+        """11.6: パスは `CCNAVI_PROJECT_HOME` の値で組む。"""
         moved = os.path.join(self.lib, ".navi", "config", "rules.yml")
         result = self.hook(
             "Write", self.ws, guard="enable", env={"CCNAVI_PROJECT_HOME": ".navi"}, file_path=moved
@@ -426,7 +427,7 @@ class DenyTest(GuardHarness):
         """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         moved = ("--rules", policy)
-        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
+        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の書き方のままでは
         # そのコマンドは設定ファイルに書かない。
         for command in (
             "echo x > policy/rules.yml",

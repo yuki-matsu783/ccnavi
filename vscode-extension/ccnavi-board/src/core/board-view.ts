@@ -75,7 +75,7 @@ export type BoardData =
       readonly approval?: ApprovalOverlay;
       /**
        * 前の読み直しから動いたカード（`board-moved.ts`）。**決めるのも覚えるのも拡張ホスト**で、
-       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に印を出すだけ
+       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に強調表示を出すだけ
        */
       readonly moved?: readonly Moved[];
       /**

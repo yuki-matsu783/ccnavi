@@ -21,7 +21,7 @@ function previewJson(extra: Record<string, unknown> = {}): string {
   });
 }
 
-test("CB-T206 残った指摘の一覧を読む。版・指紋が合わなければ読まない", () => {
+test("CB-T206 残った指摘の一覧を読む。版・ダイジェストが合わなければ読まない", () => {
   const parsed = parseDecidePreview(previewJson());
   assert.ok(parsed.ok);
   assert.equal(parsed.ok && parsed.value.threads[0].key, "u1");

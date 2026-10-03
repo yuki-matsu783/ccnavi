@@ -443,7 +443,7 @@ allow:
   - id: source
     match: Write|Edit
     glob: "*/src/*"
-    additionalContext: src の下は自由に直してよい。ただし公開 API の綴りを変えたら docs/api.md も直すこと。
+    additionalContext: src の下は自由に直してよい。ただし公開 API の名前を変えたら docs/api.md も直すこと。
 ```
 
 `glob` と `regex` は必ず引用符で囲む。囲まないと YAML が先に解釈する
@@ -539,7 +539,7 @@ allow:
     glob: "*/src/*"
     additionalContext: src の下を直したら docs/api.md も見直すこと。
     additionalContextOnce: >-
-      src の下は自由に直してよい。公開 API の綴りを変えたら docs/api.md も直し、
+      src の下は自由に直してよい。公開 API の名前を変えたら docs/api.md も直し、
       テストは tests/ に同じ名前で置く。CHANGELOG は締めるときにまとめて書く。
 ```
 
@@ -1426,7 +1426,7 @@ Write / Edit の対象を解いた先が `.claude/worktrees/<名前>/` の中な
 | 何も言わない | ワークツリーにチケットが無い | 権限モードに従う（`UNDECLARED`） |
 
 チケットの判定がルールの判定より強かった回は、文面の頭に `rule: <id> (allow) lets this through, but the ticket for this worktree narrows it` が載り、
-チケットの `deny` の項に当たったなら `ticket entry: deny <綴り>` も載る。記録では `rules` が `(ticket-scope)` とルールの id のリストになり、`source` は空になる。
+チケットの `deny` の項に当たったなら `ticket entry: deny <書かれた glob か regex>` も載る。記録では `rules` が `(ticket-scope)` とルールの id のリストになり、`source` は空になる。
 
 ```sh
 jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subject' logs/decisions.jsonl
@@ -1814,7 +1814,7 @@ response:
 
 ```sh
 ccnavi --test-samples .ccnavi/common/rule-samples.yml
-uv run python tools/check_rules.py     # 同じことを、控えと記録を外して回す
+uv run python tools/check_rules.py     # 同じことを、状態ディレクトリと記録を外して回す
 ```
 
 見本をすべて判定に掛け、期待と食い違ったものを名指しする（1 件でもあれば終了コード 1）。見本は `deny` `ask` `allow` のタイプに置き、
@@ -2072,7 +2072,7 @@ ccnavi --lint --json --flow /tmp/flow.yml
 | 浮動小数 | `{"$ccnavi": "float", "value": <数>}`。JSON では 1 と 1.0 の区別が消えるので包む。有限でなければ `"text"` に `inf` / `-inf` / `nan` |
 | キーが全部文字列の辞書 | オブジェクト。キーに `$ccnavi` があれば下の `map` |
 | キーが文字列でない辞書 | `{"$ccnavi": "map", "items": [[キー, 値], ...]}` |
-| 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs`） | `{"$ccnavi": "date" \| "datetime" \| "bytes" \| "set" \| "tuple", "text": <綴り>}`。ほかは `"other"` |
+| 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs`） | `{"$ccnavi": "date" \| "datetime" \| "bytes" \| "set" \| "tuple", "text": <文字列>}`。ほかは `"other"` |
 
 フロー編集画面は、開くときに自分の読み手（`yaml`、YAML 1.2）で読んだ中身とこれを見比べ、食い違えば開かない。
 保存の前には、書き出す本文をこれに掛けて、画面が書こうとした中身と同じに読まれるときだけ書く。値の意味を
@@ -2225,7 +2225,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 - `can_issue` は issue に回せるか（フィードバック計画が承認されたあとだけ真）
 - `digest` は見せた指摘のダイジェスト。親・フェーズ・マージリクエストの番号・`can_issue`・各指摘の鍵と場所と本文から組む
 
-`decide <N> --choices <JSON> --digest <指紋>`（実行ファイルは `--yes <JSON> --digest <指紋> --json`）は
+`decide <N> --choices <JSON> --digest <ダイジェスト>`（実行ファイルは `--yes <JSON> --digest <ダイジェスト> --json`）は
 `{"<key>": "keep" | "fix" | "issue", …}` を受け、見せた指摘の全部に 1 つずつ付いていることを求める。
 
 ```json

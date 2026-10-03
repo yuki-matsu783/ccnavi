@@ -17,7 +17,7 @@ sh と同じ道具を使わないほうが、片方の壊れがもう片方に�
 
 ## 認証画面を出さない
 
-push は URL にトークンを埋めない（埋めると origin の綴りに混ざる）。git のラッパースクリプトは
+push は URL にトークンを埋めない（埋めると origin の URL に混ざる）。git のラッパースクリプトは
 `GIT_CONFIG_COUNT` を落とすので環境変数でも差し替えられない。一時リポジトリの
 `credential.helper` を空文字で一度リセットしてから（system / global の GCM を外す）、
 トークンを返す helper を足す。

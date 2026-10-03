@@ -191,10 +191,10 @@ class AdditionalContextTest(unittest.TestCase):
         # セッションの開始（compact の後も含む）で忘れる。
         hit("s1", event="SessionStart")
         self.assertEqual(hit("s1").get("additionalContext"), NOTE)
-        # 控えの置き場が無ければ毎回届く。
+        # 状態ディレクトリが無ければ毎回届く。
         self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
         self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
-        # 試験は控えを消費しない。
+        # 試験は状態ファイルを消費しない。
         self.run_ccnavi("--state", state, "--test", "Write", target)
         self.assertEqual(hit("s3").get("additionalContext"), NOTE)
 

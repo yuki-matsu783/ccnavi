@@ -133,7 +133,7 @@ test("CB-T259 history は実行ファイルが渡す状態の履歴を写す。�
   const [approved, mark] = parsed.board.tickets[0].history;
   assert.equal(parsed.board.tickets[0].history.length, 2);
   assert.deepEqual(approved, { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" });
-  // 置き場が動かないもの（マーカー）は from / to が null。空の綴りにして、フェーズとマーカーの種類を持つ
+  // 置き場が動かないもの（マーカー）は from / to が null。空の文字列にして、フェーズとマーカーの種類を持つ
   assert.equal(mark.from, "");
   assert.equal(mark.to, "");
   assert.equal(mark.phase, 1);

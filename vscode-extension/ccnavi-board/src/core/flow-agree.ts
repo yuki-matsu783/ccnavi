@@ -2,7 +2,7 @@
  * 画面が持つフローの中身と、実行ファイルが読んだ中身（`--lint --json --flow` の `flow.data`）を見比べる
  * （ADR-0035・ADR-0085）。フロー編集画面の、開くときと保存の前。
  *
- * 画面の読み手（`yaml`、YAML 1.2）と実行ファイルの読み手（PyYAML、YAML 1.1）は、同じ綴りを別の値に読むことがある
+ * 画面の読み手（`yaml`、YAML 1.2）と実行ファイルの読み手（PyYAML、YAML 1.1）は、同じ表記を別の値に読むことがある
  * （`0755` `yes` `1:30` `0o17` `1e3` `1_000` `1.` 日付 `!!float 1` `!!binary` マージキー など）。画面が自分の
  * 読みのまま書き直すと、ノードを動かして保存しただけで PyYAML での意味が変わる。**値の意味の答えは実行ファイルが
  * 持つ**ので、画面は自分の読みが実行ファイルの読みと同じときだけ開き、書く本文を実行ファイルが同じ中身に
@@ -12,14 +12,14 @@
  * - 実行ファイルの整数（JSON の数）は、画面の整数（`Number.isInteger`）で同じ値
  * - 実行ファイルの浮動小数（`{"$ccnavi": "float", "value"}`）は、画面の整数でない数で同じ値。整数の値を持つ
  *   浮動小数（`1.0`）は、画面が整数として持つ（書けば `1` になる）ので食い違い。有限でないものも食い違い
- * - 並びは長さと各項目。キーと値の並びは、キーの組と各値（画面の側で値が `undefined` のキーは無いものとして読む）
- * - ほかの印（範囲の外の整数・キーが文字列でない辞書・日付・バイト列・集合 など）は画面が同じ値を持てないので
+ * - リストは長さと各項目。マッピングは、キーの組と各値（画面の側で値が `undefined` のキーは無いものとして読む）
+ * - ほかのタグ付きの値（範囲の外の整数・キーが文字列でない辞書・日付・バイト列・集合 など）は画面が同じ値を持てないので
  *   食い違い
  *
  * VS Code の API も node も使わない。
  */
 
-/** 実行ファイル（`flow.as_json`）の印の鍵 */
+/** 実行ファイル（`flow.as_json`）がタグ付きの値に使うキー */
 export const JSON_MARK = "$ccnavi";
 
 export interface FlowDisagreement {
@@ -37,7 +37,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** 素のキーと値の並び（`Buffer` や `Date` のような作りの違う値は除く） */
+/** 素のマッピング（`Buffer` や `Date` のような作りの違う値は除く） */
 function isPlain(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value)) {
     return false;
@@ -115,7 +115,7 @@ function differ(screen: unknown, exec: unknown, at: readonly Segment[]): Found |
   return here();
 }
 
-/** 場所の綴り。`nodes` の中はノードの id で言う（実行ファイルの読みの id。無ければ並びの位置） */
+/** 場所の表記。`nodes` の中はノードの id で言う（実行ファイルの読みの id。無ければリストの位置） */
 function whereOf(at: readonly Segment[], executable: unknown): string {
   if (at.length === 0) {
     return "最上位";
@@ -170,10 +170,10 @@ export function describeScreen(value: unknown): string {
     return Number.isInteger(value) ? `整数 ${value}` : `数 ${value}`;
   }
   if (Array.isArray(value)) {
-    return `並び（${value.length} 件）`;
+    return `リスト（${value.length} 件）`;
   }
   if (isPlain(value)) {
-    return "キーと値の並び";
+    return "マッピング";
   }
   if (isRecord(value)) {
     return `${(value as object).constructor?.name ?? "値"}（JSON にできない値）`;
@@ -196,7 +196,7 @@ export function describeExecutable(value: unknown): string {
     return `整数 ${value}`;
   }
   if (Array.isArray(value)) {
-    return `並び（${value.length} 件）`;
+    return `リスト（${value.length} 件）`;
   }
   if (isMark(value)) {
     const text = typeof value.text === "string" ? quoted(value.text).slice(1, -1) : "";
@@ -209,7 +209,7 @@ export function describeExecutable(value: unknown): string {
       case "int":
         return `整数 ${text}（画面の数では正確に持てない）`;
       case "map":
-        return "キーが文字列でないキーと値の並び";
+        return "キーが文字列でないマッピング";
       case "date":
         return `日付 ${text}`;
       case "datetime":
@@ -225,7 +225,7 @@ export function describeExecutable(value: unknown): string {
     }
   }
   if (isRecord(value)) {
-    return "キーと値の並び";
+    return "マッピング";
   }
   return typeof value;
 }

@@ -385,7 +385,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 `PreToolUse` の 1 回で、上から順に見る。
 
 ```
-コアファイルの控えを取る（8 章）
+コアファイルのバックアップを取る（8 章）
   │
 対象を取り出す（5.4）── 取り出せない → skip（no-subject）
   │
@@ -1068,7 +1068,7 @@ human_review:
   reason: 設定の読み込み経路を変えるため
 plan: [research, implement]      # 親だけ。全体計画（9.7）
 feedback: [implement-feedback]   # 親だけ。フィードバック計画
-workflow: {order: dag, ...}      # 親だけ。--approve が書く待ち方の写し（9.7）。人もエージェントも書かない
+workflow: {order: dag, ...}      # 親だけ。--approve が書く待ち方のコピー（9.7）。人もエージェントも書かない
 title: 設定画面の分割
 rationale: |
   Settings 配下のコンポーネント分割。
@@ -1426,7 +1426,7 @@ warn、チケットで編集対象としているが書き込めない場所（�
 
 ```
 rule: <id> (<allow|ask>) lets this through, but the ticket for this worktree narrows it
-ticket entry: deny <書かれた綴り>
+ticket entry: deny <書かれた glob か regex>
 ```
 
 ルールの `additionalContext` は、どちらが判定を決めても載せる。承認済みチケットの走査は 1 回の判定で 1 度だけで、
@@ -1881,7 +1881,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 手順は次のとおり。
 
 1. エージェントは依頼の前に ELI5 の HTML を書き、親のワークツリーの `wip/eli5/` の下（既定の名前は `wip/eli5/phase-<N>.html`。
-   名前は英数字と `. _ / -` だけ。依頼文と人が打つ行にそのまま入るため）に普通のファイル（シンボリックリンクや実行の印は付けない）として置いて
+   名前は英数字と `. _ / -` だけ。依頼文と人が打つ行にそのまま入るため）に普通のファイル（シンボリックリンクや実行ビットは付けない）として置いて
    コミットし、push する。相対パスは `--body-file` と同じく打った場所から。`wip/eli5/` の下はチケットの範囲を当てないので
    （9.5、ADR-0096）、親チケットの範囲に書き足さなくてよい
 2. 中身の目安: 変更の目的・何が変わるか・リスクを専門用語なしで書く。1 枚で完結させ、外部の読み込み（CSS・JS・画像・フォントの URL）を

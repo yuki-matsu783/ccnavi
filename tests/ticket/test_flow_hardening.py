@@ -4,11 +4,12 @@
 
 1. H-1 名前付きパイプ（FIFO）を読まない。SubagentStart が固まらない
 2. M-1 ハードリンクのフローを読まない。ハードリンクの別名への書き込みもロックで止める
-3. M-2 フローは優先するツリーの版だけを読む。着手のときに指紋を控え、着手のあとに書き換わったら
+3. M-2 フローは優先するツリーの版だけを読む。着手のときにダイジェストを保存し、
+着手のあとに書き換わったら
    SubagentStart と SubagentStop が知らせる（止めない）。案内は「書けない」と言わない
 4. M-4 親のツリーからの起動では手順を並べず、各子のフローのパスと「自分の担当だけ」を言う
 5. M-3 承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす
-6. L-a〜L-c 名乗りの真似・置き場の綴り・大文字小文字のそろえ方
+6. L-a〜L-c 接頭辞の真似・置き場のパスの書き方・大文字小文字のそろえ方
 7. lint は承認済みの領域のファイルを「ワークツリーにしかない」と言わない（利用者の決定）
 """
 
@@ -114,10 +115,10 @@ class FlowFileKindTest(unittest.TestCase):
 
 
 class FlowSpellingTest(unittest.TestCase):
-    """置き場の綴りを整え、大文字小文字を長さを変えずにそろえる（L-b・L-c）。"""
+    """置き場のパスを整え、大文字小文字を長さを変えずにそろえる（L-b・L-c）。"""
 
     def test_the_approved_place_is_normalized(self):
-        """`./`・`//`・`x/..`・末尾の `/.` を取り除いた置き場で、整えた綴りに当てる（L-b）。"""
+        """`./`・`//`・`x/..`・末尾の `/.` を取り除いた置き場で、整えたパスに当てる（L-b）。"""
         root = scratch(self)
         for approved in (
             ".ccnavi/approved",
@@ -213,13 +214,13 @@ class FlowNeutralTest(unittest.TestCase):
         self.assertIn("[note] x y", plain[0])
 
     def test_a_node_type_named_ccnavi_does_not_make_a_badge(self):
-        """種類の名前が `ccnavi` でも、こちらの `[<種類>]` が名乗りにならない。"""
+        """種類の名前が `ccnavi` でも、こちらの `[<種類>]` が接頭辞にならない。"""
         lines, _ = flow.render({"nodes": [{"id": "a", "type": "ccnavi", "name": "DENY"}]})
         self.assertFalse(flow.impersonates(lines[0]), lines[0])
         self.assertIn("〔ccnavi〕", lines[0])
 
     def test_labels_read_numbers_like_the_board(self):
-        """整数の値の小数（`1.0`）は整数の綴り、真偽値は空（ボードの線の言葉と同じ）。"""
+        """整数の値の小数（`1.0`）は整数の表記、真偽値は空（ボードの線の言葉と同じ）。"""
         self.assertEqual(flow._text(1.0), "1")
         self.assertEqual(flow._text(2), "2")
         self.assertEqual(flow._text(1.5), "1.5")
@@ -240,7 +241,7 @@ class FlowReadPlaceTest(FlowHarness):
         os.remove(self.flow_path)
         self.commit_parent("no flow in the parent tree")
         child_tree = self.run_child(CHILD)
-        # 子のワークツリーの写しに、エージェントがシェルから書いた版。
+        # 子のワークツリーのフローに、エージェントがシェルから書いた版。
         write(self.flow_in(child_tree), WORKFLOW_YAML)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
         self.assertIn(CHILD, text)
@@ -259,7 +260,7 @@ class FlowReadPlaceTest(FlowHarness):
 
 
 class FlowDigestTest(FlowHarness):
-    """着手のときに指紋を控え、着手のあとに書き換わったら知らせる（M-2b）。止めない。"""
+    """着手のときにダイジェストを保存し、着手のあとに書き換わったら知らせる（M-2b）。止めない。"""
 
     def record(self):
         path = os.path.join(self.approved, "phases", "i0001", f"{CHILD}.flow.json")

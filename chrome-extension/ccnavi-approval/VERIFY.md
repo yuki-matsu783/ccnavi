@@ -209,7 +209,7 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 | L6 | 置き場に大きな差分（多数のファイル・多数の行）を入れて依頼の後に push する | compare の `collapsed`・`too_large`・`compare_timeout`・450 件以上のどれかで「動いた」と数え、通らない | `repository/compare` の応答の該当の欄。インスタンスの `diff_max_files`・`diff_max_lines`（管理者の Settings → General → Diff limits。GitLab.com は公開の設定値）を書いておく |
 | L7 | フォークから同じ `source_branch` の MR を出す | `source_project_id` で外れ、元の MR だけを見る | 画面の文面、`merge_requests` の応答 |
 | L8 | PAT の期限 | `GET /personal_access_tokens/self` の `expires_at` が読める（個人の PAT と、作れたなら project access token の両方） | 応答の `expires_at` |
-| L9 | 入れ子のグループのリポジトリを登録して開く | `projects/<符号化した綴り>` で引ける | 画面の文面 |
+| L9 | 入れ子のグループのリポジトリを登録して開く | `projects/<符号化した表記>` で引ける | 画面の文面 |
 | L10 | `repository/tree` と `repository/blobs/:sha` | ページングで取り切れる。`encoding: base64` と `size` が合う | 応答 |
 
 同じファイルを競合させる手順（L2・L3）。**使い捨てのリポジトリに限ります。**
@@ -223,8 +223,8 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 
   ```sh
   curl -sS -X POST -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H 'Content-Type: application/json' \
-    "https://gitlab.com/api/v4/projects/<符号化した綴り>/repository/commits" \
-    -d '{"branch":"i0001","commit_message":"verify","actions":[{"action":"update","file_path":"<パス>","content":"x","last_commit_id":"<控えた古い値>"}]}'
+    "https://gitlab.com/api/v4/projects/<符号化した表記>/repository/commits" \
+    -d '{"branch":"i0001","commit_message":"verify","actions":[{"action":"update","file_path":"<パス>","content":"x","last_commit_id":"<保存した古い値>"}]}'
   ```
 
   400 で書かれないことを確かめます（書かれたら L2 は「ずれた」。その親のブランチは捨てます）
@@ -274,7 +274,7 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
    確認事項 5: 通った（ヘッダの値: 2026-11-01 00:00:00 UTC）
    確認事項 7: ずれた — merge コミットが一覧に入った（応答の抜粋: ...）
    A2: 通った
-   L3: ずれた — 画面「...」、コミットの並び: abc1234 → def5678
+   L3: ずれた — 画面「...」、コミットの順序: abc1234 → def5678
    ```
 
    - 4 章の番号（R1・A2 など）ごとに「通った」か「ずれた」を書きます。ADR の確認事項（10.2）との対応は、1 が X10、2 が L2・L4・L12・L13、

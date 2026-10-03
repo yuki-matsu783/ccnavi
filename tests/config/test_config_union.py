@@ -11,7 +11,7 @@
 
 lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空）。
 
-`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と控えの
+`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と状態ディレクトリの
 `logs/`）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切ったワークツリーに
 ワークツリー側の設定ができ、設計 11.6 が名指しした穴（ワークツリー側の設定が書けて戻らない）を
 再現できる。
@@ -172,7 +172,7 @@ APP_RULES = {
     ],
 }
 
-# lib 側の、app の `deploy` と同じ呼び出しに当たる deny。並びが名前順かを見る。
+# lib 側の、app の `deploy` と同じ呼び出しに当たる deny。名前順に並ぶかを見る。
 LIB_DEPLOY = {
     "id": "deploy-any",
     "match": "Bash",
@@ -204,7 +204,7 @@ ROOT_RULE = {
     "message": "secret.txt は置かない。",
 }
 
-# YAML として壊れている。閉じていない並び。
+# YAML として壊れている。閉じていないリスト。
 BROKEN = "version: 1\ndeny: [\n"
 
 # ccnavi ディレクトリの既定の名前（設計 11.2、`CCNAVI_PROJECT_HOME` の既定）。
@@ -241,7 +241,7 @@ FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
 
 
 def layer_path(root, kind, home=HOME):
-    """その git プロジェクトルートの層のファイル（rules / phases / risk）の綴り。"""
+    """その git プロジェクトルートの層のファイル（rules / phases / risk）のパス。"""
     return os.path.join(root, home, "config", FILE_NAMES[kind])
 
 
@@ -300,10 +300,10 @@ KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
 # 戻らない）を一度も再現できない。
 GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 
-# 雛形のワークスペース。1 度だけ組んで、以後は写しを配る。
+# 雛形のワークスペース。1 度だけ組んで、以後はコピーを配る。
 #
 # 組み直す形だと 1 件あたり git が 9 回（ワークスペースと 2 つのプロジェクトの
-# init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。写しなら
+# init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。コピーなら
 # git は雛形の 9 回だけで済む。テストごとに別のディレクトリを配るのは変わらないので、
 # テストどうしが状態を共有することもない（`setUpClass` にまとめる形との違いはここ）。
 _TEMPLATE = ""
@@ -743,7 +743,7 @@ class RootPlaceholderUnionTest(ConfigUnionHarness):
                 "id": "root-vendor",
                 "match": "Write|Edit",
                 "glob": "{root}/projects/lib/vendor/*",
-                "message": "vendor はワークスペースルートから数えた綴りで止める。",
+                "message": "vendor はワークスペースルートから数えたパスで止める。",
             },
         ]
         write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
@@ -798,7 +798,7 @@ class BashUnionTest(ConfigUnionHarness):
         self.assertEqual(self.last_record().get("source"), "lib")
 
     def test_two_non_empty_project_layers_take_part_in_name_order(self):
-        """11.4: 非空のプロジェクトの層が 2 つでも両方が和に入り、並びは名前順。"""
+        """11.4: 非空のプロジェクトの層が 2 つでも両方が和に入り、順序は名前順。"""
         write_layer(self.app, rules=APP_RULES)
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], LIB_DEPLOY]))
 
@@ -960,7 +960,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
     """
 
     def start_turn(self, cwd):
-        """ターンを起こし、そのツリーの控えを取らせる。初回の実行後は控えるだけ。"""
+        """ターンを起こし、そのツリーの状態を保存させる。初回の実行後は保存するだけ。"""
         started = self.hook("", self.ws, event="UserPromptSubmit")
         self.assertEqual(started.returncode, 0, started.stderr)
         first = self.hook("Bash", cwd, event="PostToolUse", command="python gen.py")
@@ -1107,7 +1107,7 @@ class ExplainTest(ConfigUnionHarness):
     def test_explain_json_carries_every_layer(self):
         """11.9: `--explain --json` に層ごとの rules 全件と phases / risk の定義と出どころが出る。
 
-        形は README「ボードの JSON」に足す。ここでは `layers` の並びに `name`（common / self /
+        形は README「ボードの JSON」に足す。ここでは `layers` のリストに `name`（common / self /
         プロジェクト名）と `rules` / `phases` / `risk` が在ることまでを固定する。
         """
         result = self.ccnavi("--explain", "--json")

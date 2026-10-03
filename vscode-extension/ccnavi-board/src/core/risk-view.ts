@@ -20,7 +20,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 
 // ---- 配点の形（画面と読み書きで分け合う）
 
-/** 加点条件。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
+/** 加点条件。1 件につき 1 つ。ccnavi の risk.KINDS と同じ順 */
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 

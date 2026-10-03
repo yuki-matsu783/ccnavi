@@ -56,7 +56,7 @@ BOARD_VERSION = 1
 
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
 # 試したい人には「当たらない」ではなく「そもそも見ていない」と言う。
-# 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ並び。
+# 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ順序。
 KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
 
@@ -78,8 +78,8 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     鍵は README「試験の JSON」に書いてある。`known` が偽なら、そのツールは
     判定が対象を取り出せないもので、他の鍵は空のまま。
     """
-    # 試験は控えを持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の
-    # 1 回で届かなくなる。置き場を外すと selfguard も控えを取らないが、試験は
+    # 試験は状態ファイルを持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の
+    # 1 回で届かなくなる。置き場を外すと selfguard もバックアップを取らないが、試験は
     # 実行しないのでそもそも戻すものが無い。
     conf = dataclasses.replace(conf, state="")
 
@@ -134,7 +134,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["verdict"] = record.decision or audit.ALLOW
     out["code"] = record.code or ""
     # ファイルのパスは行き着く先まで解いてから当てる。解いた先を見せないと、
-    # 当たらなかった理由が「綴りが違う」なのかどうかを人が言えない。
+    # 当たらなかった理由が「書き方が違う」なのかどうかを人が言えない。
     out["resolved"] = record.subject if record.subject and record.subject != subject else ""
     out["reason"] = record.reason or ""
     out["degraded"] = record.degraded or ""
@@ -144,7 +144,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["rules"] = _rules_hit(stderr, conf, root, record)
     out["response"] = _response_text(captured.getvalue())
     # 引用の中から切り出したコマンドにだけヒットしたルールの id。記録と同じく、
-    # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の並びを、
+    # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の一覧を、
     # この場合が無い呼び出しで変えないため。
     if record.quoted:
         out["quoted"] = list(record.quoted)
@@ -156,7 +156,7 @@ def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
 
     ターンの終わりに当てるのは、共通層と自身の層の `allow` で、`every` が 2 以上のものだけ
     （`ruleload.stop_rules`）。使われるものがあれば `allow`、無ければ判定に入らない（`skip`）。
-    `deny` / `ask` にはならない。数えは見ない（試しで控えを進めない）。
+    `deny` / `ask` にはならない。数えは見ない（試しで保存した回数を進めない）。
     """
     picked = ruleload.stop_rules(conf, root)
     out["verdict"] = audit.ALLOW if picked else audit.SKIP
@@ -273,7 +273,7 @@ def _rules_hit(
 
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
     ルールファイルの外から来た根拠）。層のルールは `self:docs` / `lib:source` の形の
-    id で当たるので（REQ-MLT-07）、同じ綴りで引けるように層ごと並べる。
+    id で当たるので（REQ-MLT-07）、同じ表記で引けるように層ごと並べる。
     """
     if not record.rules:
         return []
@@ -323,7 +323,7 @@ def _response_text(written: str) -> str:
 
 
 def load_samples(path: str, root: str) -> list[dict]:
-    """見本を読んで、タイプの順に平らな並びにする。
+    """見本を読んで、タイプの順に平らなリストにする。
 
     タイプの名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず。
     `subject` の合言葉 `/repo` は走らせた場所に読み替える。
@@ -452,8 +452,8 @@ def test_samples(
     return 1 if body["mismatches"] else 0
 
 
-# 層の見出し。共通層と自身の層だけ日本語で名乗る。プロジェクトは名前そのもので、
-# それが id の前置き（`lib:schema`）と同じ綴りになる。
+# 層の見出し。共通層と自身の層だけ日本語の見出しにする。プロジェクトは名前そのもので、
+# それが id の前置き（`lib:schema`）と同じ表記になる。
 LAYER_LABELS = {ruleload.LAYER_COMMON: "共通層", ruleload.LAYER_SELF: "自身の層"}
 
 
@@ -462,7 +462,7 @@ def layer_label(name: str) -> str:
 
 
 def _shown(root: str, path: str) -> str:
-    """綴りをワークスペースルートからの相対で出す。外に在るなら書かれたまま。"""
+    """パスをワークスペースルートからの相対で出す。外に在るなら書かれたまま。"""
     if not path:
         return "(無し)"
     try:
@@ -480,14 +480,17 @@ def layer_home(conf: settings.Settings, root: str, name: str) -> str:
 
 
 def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> str:
-    """その層の phases / risk の綴り。共通層は `.ccnavi/common/` 固定で、設定が持つ既定そのもの。"""
+    """その層の phases / risk のパスの表記。
+
+    共通層は `.ccnavi/common/` 固定で、設定が持つ既定そのもの。
+    """
     if name == ruleload.LAYER_COMMON:
         return conf.phases if kind == settings.KIND_PHASES else conf.risk
     return settings.layer_path(conf, layer_home(conf, root, name), kind, name)
 
 
 def _written(entry) -> str:
-    """範囲の 1 件を、書かれた綴りで出す。翻訳後の式ではなく、人が書いたほう。"""
+    """範囲の 1 件を、書かれた表記で出す。翻訳後の式ではなく、人が書いたほう。"""
     return entry.glob or entry.regex
 
 
@@ -510,7 +513,7 @@ def layer_phase_types(path: str) -> tuple[list, str]:
 def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
     """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みには戻さない）。
 
-    `script:` に書ける綴りは層ごとに違う（設計 11.4.2）ので、読み方も層ごとに分ける。
+    `script:` に書ける書き方は層ごとに違う（設計 11.4.2）ので、読み方も層ごとに分ける。
     """
     if not path or not os.path.isfile(path):
         return [], ""
@@ -746,7 +749,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     problems.extend(str(p) for p in scan_problems)
     proposals = ticket_mod.dedupe(everything)
-    # 写りの一覧（`seen_in` / `scattered`）は、承認済みチケットの置き場に在るものも数える。
+    # 同じチケットが在る場所の一覧（`seen_in` / `scattered`）は、承認済みチケットの置き場に
+    # 在るものも数える。
     # チケットは 1 本のファイルで、どの置き場に在っても子のワークツリーに写る（ADR-0055）。
     # `review/` は提案の置き場でもあり承認済みチケットでもあるので、2 つの走査が同じ
     # ファイルを拾う。同じ実体を 2 つと数えると「複数の場所にある」になるので、パスでまとめる。
@@ -779,7 +783,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     open_index = approval.by_id(open_copies + review_copies)
     closed_index = approval.by_id(closed_copies)
     # 同じ識別子が写っている場所の全部。優先するツリーの側は proposal に、残りは seen_in に出す。
-    # 写りがあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
+    # 複数の場所に在ること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
     # 食い違いを意味しない。どれを優先するか決まらないぶんだけを scattered に出す。数え方は
     # `ticket.collisions` に置いてあり、--lint と同じ関数を通る（同じ答えを 2 か所で出さない）。
     grouped = ticket_mod.by_ticket(everything)
@@ -814,7 +818,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
 
 
 def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
-    """層ごとの宣言（設計 11.9）。並びは 共通層 → 自身の層 → プロジェクト（名前順）。
+    """層ごとの宣言（設計 11.9）。順序は 共通層 → 自身の層 → プロジェクト（名前順）。
 
     rules は重複を捨てたあとの、その層から実際に判定へ入ったぶん。phases と risk は
     その層のファイルに書いてあるぶんで、合成はしない（合成の結果は親のフェーズの
@@ -851,7 +855,7 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
 
 
 def _rule_record(rule: rules.Rule) -> dict:
-    """ルール 1 件。id は層の名前付き、書いた綴りと翻訳後の式の両方を出す。"""
+    """ルール 1 件。id は層の名前付き、書いた表記と翻訳後の式の両方を出す。"""
     return {
         "id": rule.id,
         "section": rule.decision,
@@ -863,7 +867,7 @@ def _rule_record(rule: rules.Rule) -> dict:
 
 
 def _rule_form(rule: rules.Rule) -> dict:
-    """ルールの書き方。書いた綴りと、翻訳後の式。"""
+    """ルールの書き方。書いた表記と、翻訳後の式。"""
     return {
         "kind": "glob" if rule.glob else "regex",
         "written": rule.glob or rule.regex,
@@ -879,7 +883,7 @@ def _phase_type_record(layer: str, pt) -> dict:
         "kind": pt.kind,
         "title": pt.title,
         "review": pt.review,
-        # scope は `inherit`（親の範囲を継ぐ）のとき None。空の並びと区別が付くように、
+        # scope は `inherit`（親の範囲を継ぐ）のとき None。空のリストと区別が付くように、
         # 継ぐことは `inherit` の 1 語で出す。
         "scope": [_written(e) for e in pt.scope] if pt.scope else ["inherit"],
     }
@@ -898,16 +902,16 @@ def _factor_record(layer: str, factor) -> dict:
 
 
 def _where(t: ticket_mod.Ticket) -> dict:
-    """写りが 1 つ。どのツリーの、どの置き場の、どのファイルか。"""
+    """チケットが在る場所 1 つ。どのツリーの、どの置き場の、どのファイルか。"""
     return {"tree": t.tree, "state": t.state, "path": t.path}
 
 
 def _one_per_file(found: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """同じツリーで同じファイルを 2 度読んだぶんをまとめる。並びは見つけた順で、先を残す。
+    """同じツリーで同じファイルを 2 度読んだぶんをまとめる。順序は見つけた順で、先を残す。
 
     鍵にツリーを入れるのは、まとめるのを「1 つの走査の重なり」に限るため。2 つのツリーが
     同じ実体を指す形（`projects/<名前>` がワークスペース自身への symlink など）は
-    写りが 2 つ在るのと同じで、判定の側（`approval._authoritative`）もまとめない。
+    同じチケットが 2 か所に在るのと同じで、判定の側（`approval._authoritative`）もまとめない。
     ここだけまとめると、ボードに何も出ていないのに操作が止まる。
     """
     kept: list[ticket_mod.Ticket] = []
@@ -1061,7 +1065,7 @@ def _phase_record(ph: phase.Phase) -> dict:
 def _parent_record(
     conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
 ) -> dict:
-    """親 1 件。局面、計画、親のマーカー、フェーズの並び。"""
+    """親 1 件。局面、計画、親のマーカー、フェーズのリスト。"""
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     closed = parent.ticket in closed_index
     return {

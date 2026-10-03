@@ -4,7 +4,7 @@
 
 17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットはコミットしない
 18. コミットするものが無ければ 0 で `コミットして push する承認済みチケットは無い。`
-19. `main` の上のツリーはコミットして push しない（0、標準エラーに綴り）
+19. `main` の上のツリーはコミットして push しない（0、標準エラーにブランチ名）
 20. push が落ちると 1、コミットは残る
 21. detached のツリーは飛ばす
 22. `ccnavi-approve.sh` が承認のあとコミットして push する
@@ -321,7 +321,7 @@ class PushApprovedTest(Workspace):
         self.assertNotIn(NOTHING, result.stdout)
 
     def test_carries_the_place_named_by_ccnavi_approved(self):
-        """12. `CCNAVI_TICKETS_APPROVED` を既定と違う綴りにすると、その置き場をコミットする。
+        """12. `CCNAVI_TICKETS_APPROVED` を既定と違うパスにすると、その置き場をコミットする。
 
         既定の置き場（`.ccnavi/approved`）はコミットしない。環境変数の名前は `ccnavi/settings.py` の
         `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
@@ -341,7 +341,7 @@ class PushApprovedTest(Workspace):
     # ---- チケット approve-carry-05 の 7・8
 
     def said(self, result, name):
-        """sh 自身が標準エラーに name を名指ししたか。git のエラー文に紛れた綴りは数えない。"""
+        """sh 自身が標準エラーに name を名指ししたか。git のエラー文に紛れた名前は数えない。"""
         return any(
             line.startswith("ccnavi-push-approved:") and name in line
             for line in result.stderr.splitlines()
@@ -521,12 +521,12 @@ class PushApprovedTest(Workspace):
         for word in ("-x", "../i0001", "a/b", ""):
             wrong = self.push(word)
             self.assertEqual(wrong.returncode, 2, word + wrong.stdout + wrong.stderr)
-        # 取り込み済みでない家族の名指しはコミットしない（今のまま、人がコミットする）。
+        # 取り込み済みでない親子チケットの名指しはコミットしない（今のまま、人がコミットする）。
         tree = self.worktree("i0001")
         self.place(tree)
         named = self.push("i0001")
         self.assertEqual(named.returncode, 0, named.stdout + named.stderr)
-        self.assertIn("取り込み済みの家族でない", named.stdout)
+        self.assertIn("取り込み済みの親子チケットでない", named.stdout)
         self.assertTrue(self.dirty(tree, APPROVED))
         self.assertEqual(self.remote_head("i0001"), "")
         outside = os.path.join(self._tmp.name, "elsewhere")

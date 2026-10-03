@@ -36,7 +36,7 @@ test("CB-T225 画面から届くメッセージは形を確かめ、崩れたも
   assert.equal(asFlowMessage(null), undefined);
 });
 
-test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に使える綴りだけ受ける", () => {
+test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に使える文字列だけ受ける", () => {
   assert.equal(flowTicketOf({ ticket: "i0001-01" }), "i0001-01");
   assert.equal(flowTicketOf({ ticket: "web.i0002-03" }), "web.i0002-03");
   for (const bad of ["", " i0001-01", "../i0001-01", "i0001/01", "i0001\\01", "-x"]) {
@@ -55,7 +55,7 @@ test("CB-T227 カードのボタンの言葉は、在るか・着手中か（実
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: true }), "フロー: 閲覧（着手中）");
 });
 
-test("CB-T228 錠は実行ファイルの flow.locked の写し。親・無い子・欄の無い子は引けない", () => {
+test("CB-T228 錠は実行ファイルの flow.locked のまま。親・無い子・欄の無い子は引けない", () => {
   const board = fixture();
   // 見本の i0001-02 は着手中（DENY_TICKET_FLOW_LOCKED で止まる）、i0001-01 は閉じていてファイルが在る
   const locked = flowTargetOf(board, "i0001-02");
@@ -108,7 +108,7 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   const parsed = parseBoardJson(JSON.stringify(raw));
   assert.ok(parsed.ok);
   assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.locked === true));
-  // カードにも写り、親のカードには無い。ボタンの開く先は子のカードだけ
+  // カードにも出て、親のカードには無い。ボタンの開く先は子のカードだけ
   const built = buildBoard(board);
   assert.ok(flowCardOf(built, "i0001-01") !== undefined);
   assert.equal(flowCardOf(built, "i0001"), undefined);

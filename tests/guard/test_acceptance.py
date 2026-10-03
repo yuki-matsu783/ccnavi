@@ -24,8 +24,8 @@ def run(mode="enable", payload="", log=""):
     仕掛けているので、テストを走らせるセッションが既にモードを持っている。
     それを読むテストは、コードではなく走った機械のことを報告してしまう。
 
-    コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
-    切らないと、作業ツリーで消した設定ファイルが `logs/state` の控えから書き戻される。
+    コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    切らないと、作業ツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
@@ -148,12 +148,12 @@ class ReasonTest(unittest.TestCase):
         self.assertNotIn(
             common_path(fixture_workspace(), "rules"),
             got[0],
-            "ルールファイルの綴りは要らない（id で辿れる）",
+            "ルールファイルのパスは要らない（id で辿れる）",
         )
 
     def test_ファイルの理由は行き着く先を対象として名指しする(self):
-        # 当てたのは来たままの綴りではなく解いた先なので、対象もそちらを言う。
-        # 来たままの綴りを見せると、当たった理由と対象が食い違って読めなくなる。
+        # 当てたのは来たままのパスではなく解いた先なので、対象もそちらを言う。
+        # 来たままのパスを見せると、当たった理由と対象が食い違って読めなくなる。
         got = reasons(self, run(payload=pre_tool_use("Read", "file_path", "docs/../.env")))
 
         self.assertEqual(len(got), 1)
@@ -285,7 +285,7 @@ class HeredocTest(unittest.TestCase):
 
     def test_代わりの手段は名指しされる(self):
         # 止めるだけでは足りない。ここで Write を名指ししないと、
-        # 同じことを別の綴りで書き直すだけになる。
+        # 同じことを別の書き方で書き直すだけになる。
         reason = verdict(
             self, run(payload=pre_tool_use("Bash", "command", "cat <<'EOF' > f\nx\nEOF"))
         )["permissionDecisionReason"]
@@ -321,7 +321,7 @@ class HeredocTest(unittest.TestCase):
 
 class PathTest(unittest.TestCase):
     def test_迂回した綴りでも保護領域に届く判定になる(self):
-        # 守る対象は名前ではなく場所。同じ場所を指す別の綴りで
+        # 守る対象は名前ではなく場所。同じ場所を指す別の書き方で
         # ルールを外せてはいけない。
         for path in [
             ".env",
@@ -365,7 +365,7 @@ class RecordTest(unittest.TestCase):
             ("deny", None),
             ("allow", None),
             ("skip", "no-subject"),
-            # セッション開始は判定を持つイベントになった。大きい対象の控えを
+            # セッション開始は判定を持つイベントになった。大きい対象のバックアップを
             # ここで 1 度だけ取る。
             ("allow", None),
             # 判定を持たないイベントは、誤りではなく、そのまま通す（REQ-HKS-03）。

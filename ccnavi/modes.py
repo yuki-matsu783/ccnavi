@@ -47,7 +47,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
     設定ファイルが決められるのは enable と dry-run だけで、その編集は次のツール
     呼び出しから反映される。disable を言えるのは環境だけ。設定ファイルは作業ツリーの中に
     あってエージェントが書けるので、そこに書かれた disable を有効にすると、
-    見張られている側が見張りを止められてしまう。
+    監視される側が監視を止められてしまう。
 
     フラグは両方より強い。テストが、たまたま走った環境に依存せずモードを
     固定できるように。
@@ -67,7 +67,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
         # disable の経路は 1 本だけ。セッションを起動した人の環境から来て、
         # かつ作業ツリーの中の何もそれを求めていないとき。設定ファイルもフラグも
         # エージェントが書ける場所から来るし、そこでの編集は次のツール呼び出しから
-        # 反映されるので、どちらの off を認めても、見張られている側が見張りを
+        # 反映されるので、どちらの off を認めても、監視される側が監視を
         # 止められることになる。
         from_file = conf.mode_declared_in_file.lower()
         from_env = conf.mode_from_environment.lower()

@@ -47,7 +47,7 @@ from . import (
 from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
-# コマンドの位置で `sh` から呼ぶ形だけ。綴りがどこかに含まれるだけでは通さない。
+# コマンドの位置で `sh` から呼ぶ形だけ。その文字列がどこかに含まれるだけでは通さない。
 # 連結されたコマンドが 1 つでもこの形でなければ止める。
 _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
 # 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
@@ -58,7 +58,7 @@ EXEMPT_NOTE = (
     "sh で単独で打つ形だけです。cd や | tail などを前後に付けると、その 1 本も止まります。"
 )
 
-# 利用者とモデルに見せる文で「ターン」を初めて使うところに置く綴り。LLM の用語で、
+# 利用者とモデルに見せる文で「ターン」を初めて使うところに置く表記。LLM の用語で、
 # 利用者には定義を添えないと通じない。1 通の中では最初の 1 回だけに使う。
 TURN_DEFINED = "ターン（利用者が指示を出してから Claude が応答を終えるまで）"
 
@@ -116,7 +116,7 @@ TICKET_APPROVAL_RULE_ID = "builtin-guard-ticket-approval"
 
 
 def commands(subject: str) -> list[str]:
-    """shellread が切ったコマンドの並び。読めなかった生の文字列なら 1 本。"""
+    """shellread が切ったコマンドのリスト。読めなかった生の文字列なら 1 本。"""
     return [c.strip() for c in subject.split("\x00") if c.strip()]
 
 
@@ -147,9 +147,11 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 # 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の守りになる。
 #    `--approve` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組
 #
-# 実行ファイルを呼ぶ綴りは追い切れない（`uv run -m ccnavi`、名前を変えた写し、`awk` の `system()`、
+# 実行ファイルを呼ぶ書き方は追い切れない（`uv run -m ccnavi`、名前を変えたコピー、
+# `awk` の `system()`、
 # `python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、**コマンド行の生の文字列の
-# 全体**から、引用符と `\` を落としてから綴りを探す（`--y""es`・`"--yes"`・`--x\=y` を同じに読む）。
+# 全体**から、引用符と `\` を落としてから文字列を探す（`--y""es`・`"--yes"`・`--x\=y` を同じに読む）
+# 。
 # 外すのは、並んだコマンドが全部、表示・検索・閲覧の道具（名前の完全一致）のときだけ。
 # 外す道具を並べ損ねても、止める側になるだけ。
 _GUARD_NAME = "CCNAVI_GUARD_TICKET_APPROVAL"
@@ -181,7 +183,7 @@ _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 
 
 def _dequoted(subject: str) -> str:
-    """引用符とバックスラッシュを落とした綴り。分け書き（`--y""es`）と引用を同じに読む。"""
+    """引用符とバックスラッシュを落とした文字列。分け書き（`--y""es`）と引用を同じに読む。"""
     return re.sub(
         r"['\"`\\]", "", subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
     )
@@ -207,7 +209,7 @@ def _only_readers(text: str) -> bool:
 def _commit_messages(subject: str) -> list[str]:
     """コミットの文面（`git commit` / `ccnavi-git.sh commit` の `-m` / `--message` の値）。
 
-    文面は実行されないので、綴りを探す対象から外す。値の中にコマンド置換があれば実行されるので
+    文面は実行されないので、文字列を探す対象から外す。値の中にコマンド置換があれば実行されるので
     外さない。読み切れないコマンド行なら空（外さない側にする）。
     """
     found: list[str] = []
@@ -230,7 +232,7 @@ def _commit_messages(subject: str) -> list[str]:
 
 
 def human_path_form(subject: str) -> tuple[str, str]:
-    """hook のほかに守りが無い人の判断の形があれば（種類, 見つけた綴り）。無ければ空の組。
+    """hook のほかに守りが無い人の判断の形があれば（種類, 見つけた文字列）。無ければ空の組。
 
     種類は `guard-off`（端末要求を切る）か `board`（ボードの経路）。
     """
@@ -259,7 +261,7 @@ def board_form_message(found: str) -> str:
         f"ボードの経路の形（{found}）を、コマンド行に書いています。この形は人がボードの"
         "オーバーレイで押したものを拡張が打つためのもので、端末での確かめが無いので、エージェントが"
         "打った場合はここで止めます。承認と残った指摘の対応方針は、利用者がボードか端末で決めます。"
-        "綴りを探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
+        "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
 
@@ -269,19 +271,20 @@ def guard_off_message(found: str) -> str:
         f"人の判断の経路（承認・レビュー済み・締め）で、端末からの入力を求めないようにする形（{found}）を、"
         "コマンド行に書いています。この変数とフラグは、テストや CI が端末を持たずに実行ファイルを"
         "回すためのもので、エージェントが置くものではありません。承認・レビュー済み・締めは利用者が"
-        "端末かボードで行います。この綴りを探したいだけなら、シェルの grep ではなく Grep ツールを"
+        "端末かボードで行います。この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを"
         "使ってください。"
     )
 
 
-# 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）。チケット制御と端末要求を切る設定に
+# 記録と状態ファイルを消す `ccnavi --prune`（`--preview` の無い形）。
+# チケット制御と端末要求を切る設定に
 # 依らず、組み込みの deny（`DENY_RECORDS_PRUNE`）で止める（ADR-0089）。実行ファイルの側の
 # 端末要求は、擬似端末（`script -qc '…' /dev/null`）でも、チケット制御を切ったワークスペースで
 # 端末要求を切る変数を前に並べても抜けられる。しきい値の環境変数を 0 に近づけて並べれば、
 # 自分の呼び出しの記録を消せる。
 #
 # 見るのは human_path_form と同じく、引用符と `\` を落としたコマンド行の生の文字列。実行役の
-# コマンド越し（`script -qc`・`bash -c`・`env`）でも同じ綴りが残る。コマンドの切れ目
+# コマンド越し（`script -qc`・`bash -c`・`env`）でも同じ文字列が残る。コマンドの切れ目
 # （`;` `&` `|` 改行）の中に ccnavi の名前と、単独の語の `--prune` が並べば止める。
 # `git fetch --prune` や `ccnavi-git.sh fetch --prune` は ccnavi の名前（`ccnavi` と
 # `ccnavi.exe` と実行ファイルの名前が、語の終わりで閉じた形）を持たないので当たらない。
@@ -299,7 +302,7 @@ RECORDS_PRUNE_RULE_ID = "builtin-guard-records-prune"
 
 
 def _unquoted_marks(subject: str) -> tuple[str, set[int]]:
-    """引用符とバックスラッシュを落とした綴りと、落とした場所（落とした後の位置）の組。"""
+    """引用符とバックスラッシュを落とした文字列と、落とした場所（落とした後の位置）の組。"""
     text = subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
     out: list[str] = []
     cuts: set[int] = set()
@@ -321,7 +324,7 @@ def _prune_names(bin_path: str) -> re.Pattern[str]:
 
 
 def prune_form(subject: str, bin_path: str = "") -> str:
-    """記録を消す `ccnavi --prune`（`--preview` の無い形）があれば、見つけた綴り。無ければ空。"""
+    """記録を消す `ccnavi --prune`（`--preview` の無い形）があれば、見つけた文字列。無ければ空。"""
     text, cuts = _unquoted_marks(subject)
     if "--prune" not in text or _only_readers(text):
         return ""
@@ -351,7 +354,7 @@ def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
 def prune_message() -> str:
     """`--prune` で止めた文。"""
     return (
-        "記録と控えを消す 'ccnavi --prune' は、人が端末から打つものです。記録は"
+        "記録と状態ファイルを消す 'ccnavi --prune' は、人が端末から打つものです。記録は"
         "「ccnavi が何を判定したか」を後から確かめる元なので、エージェントからは消しません。"
         "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
         "消す必要があれば、理由を添えて利用者に依頼してください。"
@@ -362,18 +365,19 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 
     承認のスクリプト（`ccnavi-approve.sh`）も同じ形で止める。中身は `--approve` の
-    呼び出しと写しの push で、打つのは端末に座っている人。実行ファイルの側は標準入力が
-    端末であることを求めるので、hook から呼んでも通らないが、綴りで止めておけば
+    呼び出しと承認済みチケットの push で、打つのは端末に座っている人。実行ファイルの側は標準入力が
+    端末であることを求めるので、hook から呼んでも通らないが、文字列で止めておけば
     「なぜ通らないのか」が当たったルールの id で分かる。
 
     承認の push（`ccnavi-push-approved.sh`）も止める。コミットして push することは
     合意そのものではないが、push は外へ出す操作で、その時機を決めるのは人。
 
-    取り込みの家族の控えを消す `ccnavi-sync.sh --forget` も止める。控え（墓標）を消すと、
-    決まらないで止めていた家族（gone など）が控えの無い家族に戻って動けるようになる。
+    親子チケットの同期状態を消す `ccnavi-sync.sh --forget` も止める。削除せずに残した同期状態を
+    消すと、決まらないで止めていた親子チケット（gone など）が同期状態の無い親子チケットに戻って
+    動けるようになる。
 
     ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
-    ここではなく `human_path_form` が止める。実行ファイルの綴りに頼らず見るため。
+    ここではなく `human_path_form` が止める。実行ファイルの書き方に頼らず見るため。
     """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
@@ -383,17 +387,18 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     script = (
         # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る（段階 2d のレビュー）。
         r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(approve|push-approved)\.sh\b"
-        # 家族の控え（墓標）を消す、人が打つスクリプト（ADR-0093 の 11.5.1 の決定 A）。
-        # 消すと、止めていた家族が控えの無い家族として今の手元の動きに戻るので、打つのは人。
+        # 親子チケットの同期状態（削除せずに残したもの）を消す、人が打つスクリプト
+        # （ADR-0093 の 11.5.1 の決定 A）。消すと、止めていた親子チケットが同期状態の無い
+        # 親子チケットとして今の手元の動きに戻るので、打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
         # 人の判断に使うスクリプト（ADR-0093 の 4.6。段階 2d）。中で `--reviewed --chat`・
         # `--config-synced`・`--close-early` を起こし、最後に承認の push を呼ぶ。打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
         r"(chat|config-synced|close-early)\b"
     )
-    # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
+    # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは文字の大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
-    # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
+    # 同じものが走る。区別すると大小を変えるだけで外せる。引数の形（_CLI_FORMS）まで
     # 広がるが、実行ファイルの引数は大小を区別するので、広がるのは止める側だけ
     # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
     expression = (
@@ -414,7 +419,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "残った指摘の対応方針は利用者がボードか端末で決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
-            "家族の控えを消す "
+            "親子チケットの同期状態を消す "
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、人の判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / config-synced / "
             "close-early'）も人が打ちます。"
@@ -607,8 +612,8 @@ class Phase:
     def gate_closed(self) -> bool:
         """レビューが済むまで止めているか。
 
-        欄の名前は JSON の綴り（`gate_closed`）に合わせてある。人に見せる名前は
-        `review_label` が出す「レビュー準備中」「レビュー待ち」で、この綴りは
+        欄の名前は JSON のキー（`gate_closed`）に合わせてある。人に見せる名前は
+        `review_label` が出す「レビュー準備中」「レビュー待ち」で、このキーは
         判定とボードの間の契約としてだけ残っている（設計 9.8）。
         """
         return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
@@ -622,9 +627,11 @@ class Phase:
 
         これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは普段 `request` を
         打たないので False のまま。ボードの「受け入れ」（未解決スレッドを受け入れて進む）が
-        この欄で出し分けられており、写しの無い chat のフェーズに出すと打てない操作を
+        この欄で出し分けられており、
+        ホストにマージリクエストの無い chat のフェーズに出すと打てない操作を
         見せることになる。
-        打ったときは（実績のリスクが高いときに勧める向き。設計 9.10）ホストに写しがあるので、
+        打ったときは（実績のリスクが高いときに勧める向き。設計 9.10）
+        ホストにマージリクエストがあるので、
         `mr` と同じに True でよい。このセッションで見る待ちは `review_kind` と `gate_closed`
         で読む（設計 9.8）。
         """
@@ -646,7 +653,7 @@ class Phase:
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
 
-    予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
+    予約名（`common` / `self`）のプロジェクトは層として数えないので、層の名前を持たない
     （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名前と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
     """
@@ -763,7 +770,7 @@ def phases_of(
             phase = by_number.setdefault(t.phase, Phase(parent_id, t.phase))
             phase.tickets.append(t)
             phase.states[t.ticket] = t.state
-    # マーカーと記録は親のツリーに置く。子のワークツリーにも写しは checkout されるが、
+    # マーカーと記録は親のツリーに置く。子のワークツリーにも承認済みチケットは checkout されるが、
     # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに分かれて置かれる。
     where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
@@ -996,7 +1003,7 @@ def _next_hint(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> s
 
 
 def is_dag(parent: ticket_mod.Ticket) -> bool:
-    """親の待ち方の写しが `dag` か。"""
+    """親の待ち方（`workflow`）が `dag` か。"""
     return parent.workflow is not None and parent.workflow.order == ticket_mod.WORKFLOW_DAG
 
 
@@ -1029,11 +1036,11 @@ def order_problems(
 ) -> list[rules.Problem]:
     """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 9.7）。
 
-    待つ番号は親の待ち方の写し（`workflow`）が決める。一直線なら前の全部、`dag` なら
-    種類の祖先に当たる前の番号。`overlap` の組は写しを作るときに待ちから外してある。
+    待つ番号は親の待ち方（`workflow`）が決める。一直線なら前の全部、`dag` なら
+    種類の祖先に当たる前の番号。`overlap` の組は `workflow` を書くときに待ちから外してある。
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
-    前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの印を見て
+    前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの種類を見て
     warn にする（`lint._approval_problems`）。
 
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
@@ -1376,7 +1383,7 @@ def scope_findings(
     pt = type_for(conf, root, child, parent)
     outside = []
     for rel in sorted(paths):
-        # git の `-z` の綴りをそのまま使う。git はどの OS でも区切りを `/` で返すので、
+        # git の `-z` の表記をそのまま使う。git はどの OS でも区切りを `/` で返すので、
         # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
         # 名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、範囲外として報告されない
         # （実行前の判定は直さない。ADR-0097）。

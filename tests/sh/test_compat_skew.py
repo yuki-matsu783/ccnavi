@@ -24,7 +24,7 @@ from tests import ROOT
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
 
-# `--version` には {compat} を名乗り、それ以外は受け取った引数を 1 行で出す。
+# `--version` には {compat} を返し、それ以外は受け取った引数を 1 行で出す。
 STUB = """#!/bin/sh
 if [ "$1" = --version ]; then
 	printf 'ccnavi 9.9.9\\ncommit: abc\\ncompat: {compat}\\n'

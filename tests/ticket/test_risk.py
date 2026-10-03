@@ -87,7 +87,7 @@ class RiskTest(PhaseHarness):
     def setUp(self):
         super().setUp()
         # 配点と種類は共通層の既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
-        # `ticket` の副命令には届かない（ADR-0067）。差し替えるテストはこの綴りに書き直す。
+        # `ticket` の副命令には届かない（ADR-0067）。差し替えるテストはこの書き方に書き直す。
         self.risk = write(common_path(self.root, "risk"), RISK)
         # 範囲の上限が無く、レビュー不要の種類。宣言では「レビュー不要」な作業を実績で上書きする。
         write(

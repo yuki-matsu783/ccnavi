@@ -1,10 +1,10 @@
 /**
  * 読み込んだフローと編集中のフローの見比べ。「未保存」の判定と、保存の前に見せる差分の一覧に使う。
  *
- * - `sameFlow` は中身が同じか（キーの並びは見ない）。元に戻して読み込んだときと同じ中身になれば、未保存を消す
+ * - `sameFlow` は中身が同じか（キーの順序は見ない）。元に戻して読み込んだときと同じ中身になれば、未保存を消す
  * - `diffFlows` は足した・消した・変えたノードと線。ノードは `id` で、線は両端と出入口
  *   （`from` `fromPort` `to` `toPort`）で突き合わせる（人が書いた線は `id` が無いことも重なることもある）。
- *   同じ両端と出入口の線が何本もあれば、並びの順に突き合わせる
+ *   同じ両端と出入口の線が何本もあれば、配列の順に突き合わせる
  *
  * **良し悪しは言わない。** 保存を止めるかは拡張ホストと実行ファイルが決める。
  *
@@ -28,7 +28,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** 値が同じか。辞書はキーの並びを見ない。並びは順も見る */
+/** 値が同じか。辞書はキーの順序を見ない。配列は順も見る */
 export function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) {
     return true;
@@ -49,7 +49,7 @@ export function sameFlow(a: FlowDoc, b: FlowDoc): boolean {
   return a === b || sameValue(a, b);
 }
 
-/** 変わった欄の呼び名。知らない欄は綴りのまま */
+/** 変わった欄の呼び名。知らない欄はキーの表記のまま */
 const FIELD_LABELS: Readonly<Record<string, string>> = {
   name: "名前",
   type: "種類",
@@ -150,7 +150,7 @@ export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
   }
   const removedNodes = before.nodes.filter((node) => !afterNodes.has(node.id)).map((node) => ({ id: node.id, label: nodeLabel(node), fields: [] }));
 
-  // 線は両端と出入口で突き合わせる。同じものが何本もあれば並びの順に
+  // 線は両端と出入口で突き合わせる。同じものが何本もあれば配列の順に
   const pool = new Map<string, FlowConnection[]>();
   for (const c of connectionsOf(before)) {
     const key = connectionKey(c);

@@ -4,14 +4,14 @@
  * 見せる中身は拡張ホストが渡す（`FlowData`）。画面が持つのは、人が触って決めるもの（編集中のフロー、
  * 選んでいるもの、直前の操作の一言、元に戻す履歴、写したノード）だけ。
  *
- * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）の写しで、
+ * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）のままで、
  * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼る が止まる）。
  * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く（ADR-0085）。
  *
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
  * だけ（再読込・保存が通った）。履歴もそこで空にする。
  *
- * **写しを替えるのは `edit()` だけ。** 直す前の写しを履歴（`core/flow-history.ts`）に積んでから替える。
+ * **編集中の内容を替えるのは `edit()` だけ。** 直す前の内容を履歴（`core/flow-history.ts`）に積んでから替える。
  * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts` の `sameFlow`）ので、
  * 元に戻して読み込んだときと同じ中身になれば消える。
  *
@@ -58,7 +58,7 @@ import { badgeOf } from "./text.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: FlowLock = { locked: true, reason: "" };
-/** 編集中の写しを拡張ホストへ控えさせるまでの間（打つたびに送らない） */
+/** 編集中の内容を拡張ホストへ保存させるまでの間（打つたびに送らない） */
 const DRAFT_MS = 300;
 /** 編集が止まってから実行ファイルに確かめ直させるまでの間 */
 const CHECK_MS = 800;
@@ -107,7 +107,7 @@ function nextSpot(doc: FlowDoc): { x: number; y: number } {
   return { x: low.x, y: low.bottom + 50 };
 }
 
-/** 並びが同じか（選んだノードの id を毎回作り直さないため） */
+/** 配列が同じか（選んだノードの id を毎回作り直さないため） */
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
@@ -159,7 +159,7 @@ const TOUR_STEPS: readonly TourStep[] = [
 
 export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [data, setData] = useState<FlowData>(initial);
-  // 読み込んだ中身（未保存の見比べと、保存前の差分の元）と、編集中の写し
+  // 読み込んだ中身（未保存の見比べと、保存前の差分の元）と、編集中の内容
   const [base, setBase] = useState<FlowDoc | undefined>(() => pageOf(initial)?.doc);
   const [doc, setDoc] = useState<FlowDoc | undefined>(() => pageOf(initial)?.draft ?? pageOf(initial)?.doc);
   const [history, setHistory] = useState<FlowHistory>(emptyHistory);
@@ -174,12 +174,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [minimap, setMinimap] = useState(minimapShown);
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
-  // 写したノード（画面の中の控え）と、同じ控えを何回貼ったか（貼るたびに少しずつずらす）
+  // 写したノード（画面の中のクリップボード）と、同じものを何回貼ったか（貼るたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
-  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指す写し、`pendingDoc` は頼んで答えを待っている写し、
-  // `checkSeq` は最後に頼んだ確かめの番号。写しが替わるたびに番号を進め、待っていた答えは捨てる
-  // （答えを待つ間に直すと、古い写しの答えを今の答えと取り違えるため）
+  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指す内容、`pendingDoc` は頼んで答えを待っている内容、
+  // `checkSeq` は最後に頼んだ確かめの番号。内容が替わるたびに番号を進め、待っていた答えは捨てる
+  // （答えを待つ間に直すと、古い内容の答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | undefined>(undefined);
@@ -270,8 +270,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
   }, [dirty]);
 
-  // 未保存の写しを拡張ホストに控えさせる（未保存のまま閉じられたら、開き直して戻せるように）。
-  // 打つたびには送らず、止まってから送る。未保存でなくなったら控えを消させる
+  // 未保存の内容を拡張ホストに保存させる（未保存のまま閉じられたら、開き直して戻せるように）。
+  // 打つたびには送らず、止まってから送る。未保存でなくなったら保存したものを消させる
   const sentDraft = useRef(false);
   useEffect(() => {
     if (!dirty) {
@@ -299,16 +299,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
 
-  // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指す写しと同じなら頼まない
+  // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指す内容と同じなら頼まない
   useEffect(() => {
     if (doc === undefined || pendingDoc.current === doc) {
       return;
     }
-    // 写しが替わった。待っていた答えは古い写しのものなので捨てる（番号を進める）
+    // 内容が替わった。待っていた答えは古い内容のものなので捨てる（番号を進める）
     checkSeq.current += 1;
     pendingDoc.current = undefined;
     if (checkedDoc.current === doc) {
-      // 答えが指す写しに戻った（元に戻すなど）。確かめ直さない
+      // 答えが指す内容に戻った（元に戻すなど）。確かめ直さない
       setChecking(false);
       return;
     }
@@ -356,7 +356,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const readOnly = lock.locked || busy;
 
   /**
-   * 写しを替える唯一の入り口。直す前の写しを履歴に積む。`typing` は欄に打った文字のときの欄の名前で、
+   * 編集中の内容を替える唯一の入り口。直す前の内容を履歴に積む。`typing` は欄に打った文字のときの欄の名前で、
    * 同じ欄に続けて打ったものは 1 件にまとめる
    */
   const edit = (next: FlowDoc, typing?: string): void => {
@@ -368,7 +368,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setDoc(next);
   };
 
-  /** 戻した・やり直した写しに無いものを選んでいたら外す（線は並びの位置で指すので、線の選びは外す） */
+  /** 戻した・やり直した内容に無いものを選んでいたら外す（線はリストの位置で指すので、線の選びは外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
     if (moved === undefined || readOnly) {
       return;
@@ -395,10 +395,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setFocus({ ids: [added.id] });
   };
 
-  /** 消したものを選んでいたら、選ぶのをやめる（線は並びの位置で指すので、線を消したら線の選びは外す） */
+  /** 消したものを選んでいたら、選ぶのをやめる（線はリストの位置で指すので、線を消したら線の選びは外す） */
   const removeNodeAt = (id: string): void => {
     edit(removeNode(doc, id));
-    // ノードと一緒に線も消えて並びの位置がずれるので、線の選びも外す
+    // ノードと一緒に線も消えてリストの位置がずれるので、線の選びも外す
     if ((selected?.kind === "node" && selected.id === id) || selected?.kind === "edge") {
       setSelected(undefined);
     }
@@ -483,7 +483,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const save = (): void => {
-    // 未保存なら、差分が空（並びだけ変わった）でも一覧を出す（一覧がそう言う）
+    // 未保存なら、差分が空（順序だけ変わった）でも一覧を出す（一覧がそう言う）
     if (reviewSave && dirty) {
       setReview(diffFlows(base, doc));
       return;
@@ -631,7 +631,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           minimap={minimap}
           onPick={pick}
           onMove={(moves) => {
-            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じ写しを返す）
+            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じ値を返す）
             const next = placeNodes(doc, moves);
             if (next !== doc) {
               edit(next);
@@ -641,7 +641,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           onRemoveNode={removeNodeAt}
           onRemoveEdge={removeEdgeAt}
           onResizeGroup={(id, size, position) => {
-            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じ写しを返す）
+            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じ値を返す）
             const next = resizeGroup(doc, id, size, position);
             if (next !== doc) {
               edit(next);

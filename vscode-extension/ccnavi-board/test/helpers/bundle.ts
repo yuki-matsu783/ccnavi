@@ -36,7 +36,7 @@ export function screenStyle(name: string): string {
 }
 
 /**
- * 画面の CSS の置き場（`src/webview/`）。束ねる前の綴りを見るテストが使う。
+ * 画面の CSS の置き場（`src/webview/`）。束ねる前のパスを見るテストが使う。
  * このファイルは `out/test/helpers/` から走るので、3 つ上がリポジトリのルート。
  */
 export const WEBVIEW_SRC = path.join(__dirname, "..", "..", "..", "src", "webview");

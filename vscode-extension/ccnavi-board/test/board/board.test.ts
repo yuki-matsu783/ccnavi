@@ -135,7 +135,7 @@ test("CB-T09 依頼済みで止まったフェーズに decide、締めた親に
     { kind: "reviewed", parent: "i0001", phase: 2 },
   ]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
-  // 人のレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
+  // 人のレビュー待ちは JSON の review_waiting のまま。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
   // 子のカードには自分のフェーズのマーカーと、止まっているかとレビュー待ちが写る。親は false
@@ -225,11 +225,11 @@ test("CB-T11 親のワークツリーを引ける", () => {
   assert.equal(parentTreeOf(board, "nope"), undefined);
 });
 
-test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り自体は数えない", () => {
+test("CB-T117 散在は実行ファイルの答えをそのまま載せ、在りか自体は数えない", () => {
   const base = fixture();
   const cards = cardsOf(buildBoard(base));
   // 正常な場面。提案の側にあるもの（承認待ち・レビュー待ち）が親と兄弟のワークツリーに写っていても、
-  // 実行ファイルが「優先する承認済みチケットは決まっている」と言うので散在ではない。承認済みチケットの側にあるものは提案が無いので写りも無い
+  // 実行ファイルが「優先する承認済みチケットは決まっている」と言うので散在ではない。承認済みチケットの側にあるものは提案が無いので在りかも無い
   for (const id of ["i0001", "i0001-01", "i0001-02", "i0001-03", "i0001-04", "i0001-05"]) {
     assert.deepEqual(cards.get(id)!.scattered, [], id);
   }
@@ -258,7 +258,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
     card.scattered.map((s) => `${s.tree}:${s.state}`),
     [":todo", "i0001-02:todo"],
   );
-  // 写り自体は残す。開いたファイルからカードを引き当てるのに使う。
+  // 在りか自体は残す。開いたファイルからカードを引き当てるのに使う。
   assert.equal(card.seenIn.length, 2);
 });
 

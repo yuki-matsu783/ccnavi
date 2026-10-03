@@ -373,9 +373,9 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_wrong_project_is_refused_even_when_the_worktree_name_differs_in_case(self):
-        """区別しない機械では、綴り違いに切ったワークツリーでも取り違えを止める。
+        """区別しない機械では、表記違いで切ったワークツリーでも取り違えを止める。
 
-        範囲の判定（ticket_verdict）は綴りの違いを吸収して引く。取り違えの検査だけ厳密に
+        範囲の判定（ticket_verdict）は表記の違いを吸収して引く。取り違えの検査だけ厳密に
         引くと、範囲の中への書き込みは別のプロジェクトのツリーでも通ってしまう。
         区別する機械でも走るように、区別しない機械の引き方へ差し替えて確かめる。
         """
@@ -552,7 +552,8 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
     def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
-        """取り込み済みのプロジェクトの家族（控えは sync/<プロジェクト>/）も止まる（2c）。"""
+        """取り込み済みのプロジェクトの親子チケット（同期状態は sync/<プロジェクト>/）も止まる（2c）
+        。"""
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
@@ -564,7 +565,7 @@ class ProjectsTest(unittest.TestCase):
         target = os.path.join(tree, "src", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
-        # ワークスペースの控えに同じ名前があっても、プロジェクトの家族には当たらない。
+        # ワークスペースの同期状態に同じ名前があっても、プロジェクトの親子チケットには当たらない。
         record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
         write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
         write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")
@@ -582,7 +583,7 @@ class ProjectsTest(unittest.TestCase):
     def test_post_monitoring_reads_the_project_tree_the_call_touched(self):
         started = self.hook("", self.ws, event="UserPromptSubmit")
         self.assertEqual(started.returncode, 0, started.stderr)
-        # 初回の実行後は控えを取るだけ。そのあとで app の schema/ をシェルが汚す。
+        # 初回の実行後は状態を保存するだけ。そのあとで app の schema/ をシェルが汚す。
         first = self.hook("Bash", self.app, event="PostToolUse", command="python gen.py")
         self.assertEqual(first.returncode, 0, first.stderr)
         write(os.path.join(self.app, "schema", "x.sql"), "dirty\n")

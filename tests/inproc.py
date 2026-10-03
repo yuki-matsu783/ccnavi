@@ -8,7 +8,7 @@ cli.run の入口と出口そのものなので、プロセスを起こさなく
 判定そのものは 0.05 秒に満たない。全件で 700 回起動するので、プロセスを
 起こすとそこがテスト時間の半分以上を占める。
 
-subprocess.run と同じ形（引数の並び、input、env、cwd）を受け、CompletedProcess を
+subprocess.run と同じ形（引数のリスト、input、env、cwd）を受け、CompletedProcess を
 返す。呼び手の assert は subprocess のときと同じ書き方で通る。
 
 - env は「その起動に見える環境そのもの」として扱う。subprocess.run(env=...) と同じで、

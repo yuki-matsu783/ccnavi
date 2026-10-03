@@ -64,7 +64,7 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
     def bare(self, *args, env=None, guard="disable", flags=(), stdin=""):
         """共通層の 3 本をフラグで渡さずに 1 回動かす。
 
-        `flags` を渡したときだけ、その綴りを足す（フラグが残っていることを確かめる側）。
+        `flags` を渡したときだけ、そのフラグを足す（フラグが残っていることを確かめる側）。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -168,7 +168,7 @@ class EnvDoesNotMoveTheCommonLayerTest(CommonLayerPlaceHarness):
 
 
 class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
-    """診断のためのフラグは残る。消しすぎの見張り。"""
+    """診断のためのフラグは残る。消しすぎを見つけるための確認。"""
 
     def test_each_flag_still_moves_the_common_layer(self):
         """`--rules` / `--phases` / `--risk` は、診断（`--explain`）ではそれぞれの 1 本を動かす。"""

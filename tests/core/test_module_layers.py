@@ -30,7 +30,7 @@
 **5 が要るのは、1 から 4 が import 文しか読まないから。**
 `importlib.import_module("ccnavi.judge")` と、ドットの無い `import ccnavi` に
 続く `ccnavi.judge.…` は、行き先が import 文に残らないので 1 つも見つからない。
-どちらも `ccnavi/` では 1 度も使っていないので、綴りごと止めるほうが安い。
+どちらも `ccnavi/` では 1 度も使っていないので、書き方ごと止めるほうが安い。
 **回避できないわけではない。** `getattr` や `exec` で組み立てれば、いまでも
 隠せる。そこまで防ぐには import を実行時に捕まえるしかなく、この速さを手放す。
 
@@ -131,7 +131,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
 #   これが循環の中心。文面（reasons）は approval から読まれて phase を読むので、
 #   同じ組に入る
 # - ops ↔ review
-#   `ops` が `review` の置き場の綴りを関数の中で引き、`review` が
+#   `ops` が `review` の置き場のパスを関数の中で引き、`review` が
 #   `ops.close_problems` と `ops.cancel` を呼ぶ
 #
 # 組は「どのモジュールが入っているか」で持つ。循環の向きや本数は見ない。
@@ -196,7 +196,7 @@ def imports_of(module: str, known: set[str]) -> set[str]:
 
 
 def hiding_in(module: str) -> list[str]:
-    """そのモジュールで使われている、行き先を import 文から隠す綴り。
+    """そのモジュールで使われている、行き先を import 文から隠す書き方。
 
     - `import ccnavi`（ドット無し）。`import ccnavi.judge` と違い、行き先が
       import 文に出ない。使うときは `ccnavi.judge.…` という属性の参照になる
@@ -265,7 +265,7 @@ def knots(edges: dict[str, set[str]]) -> set[tuple[str, ...]]:
 class ModuleTiersTest(unittest.TestCase):
     def setUp(self):
         self.modules = modules()
-        # 綴りが変わったことに気づかずに「逆流なし」と言わないため。
+        # 書き方が変わったことに気づかずに「逆流なし」と言わないため。
         self.assertGreater(len(self.modules), 20, f"モジュールを数えられていない（{PACKAGE}）")
         self.edges = graph()
 
@@ -335,13 +335,13 @@ class ModuleTiersTest(unittest.TestCase):
         )
 
     def test_no_module_hides_where_it_is_going(self):
-        """行き先を import 文から隠す綴りを使わない。"""
+        """行き先を import 文から隠す書き方を使わない。"""
         hidden = [spell for mod in self.modules for spell in hiding_in(mod)]
         self.assertEqual(
             [],
             hidden,
             "import の行き先が import 文に残らない書き方をしている。1 から 4 は"
-            "この形を 1 つも見つけられないので、綴りのほうを止める。どうしても"
+            "この形を 1 つも見つけられないので、書き方のほうを止める。どうしても"
             "要るなら、なぜ要るかを添えてここに例外を書く",
         )
 

@@ -6,8 +6,8 @@
 // 2. 通信先の一覧（既定 hosts.json）から manifest.json を組む。`host_permissions` と CSP の
 //    `connect-src` は一覧の API のオリジンだけ（D24）。組織ごとのビルドは --hosts で一覧を替える
 // 3. esbuild で 4 本（background・board・options・worker）を束ねる
-// 4. 同梱の Pyodide を node_modules から写し、scripts/pyodide-files.json のハッシュと突き合わせる
-//    （npm の lockfile の integrity とは別に、写した物そのものを確かめる）
+// 4. 同梱の Pyodide を node_modules からコピーし、scripts/pyodide-files.json のハッシュと突き合わせる
+//    （npm の lockfile の integrity とは別に、コピーした物そのものを確かめる）
 // 5. 同梱の Python（PyYAML・ccnavi・入口）を zip に組む（scripts/python.js）
 //
 // Pyodide（約 14MB）はリポジトリに入れない。取ってくるのは pnpm install と PyYAML の sdist だけ。

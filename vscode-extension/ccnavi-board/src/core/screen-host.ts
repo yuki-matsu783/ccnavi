@@ -55,7 +55,7 @@ export interface Surface {
 
 /**
  * 保持する画面（`retainedHost`）が使う窓口。**表裏（`visible`）は要らない。** 裏でも生きていて、
- * 読まないものを実装させると、写して作った次の画面にも使われないゲッターが付いて回る
+ * 読まないものを実装させると、コピーして作った次の画面にも使われないゲッターが付いて回る
  */
 export type RetainedSurface = Omit<Surface, "visible">;
 

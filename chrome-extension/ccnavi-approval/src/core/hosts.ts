@@ -65,7 +65,7 @@ export function parseHosts(text: string): Host[] {
   });
 }
 
-/** 通信先のオリジン（重なりを除き、並びを保つ） */
+/** 通信先のオリジン（重なりを除き、順序を保つ） */
 export function origins(hosts: readonly Host[]): string[] {
   const out: string[] = [];
   for (const h of hosts) {

@@ -45,7 +45,7 @@
 # 同じものを開くので、1 行の command から機械ごとに違う実体を起動するには、そこで選ぶしかない。
 # 置き場が動かないので、置き場を名指しするオプションは持たない。
 #
-# CCNAVI_BIN_PATH が既定でない綴りなら書き換えず、名指しするだけにする。
+# CCNAVI_BIN_PATH が既定でないパスなら書き換えず、名指しするだけにする。
 #
 # 配布先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
 # ルールファイルも代わりに通る sh も、入れた先で直されている前提のもの。黙って上書き
@@ -75,13 +75,13 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart 
 # セッションの頭に、承認済みチケットとマーカー（親ブランチに乗って届く）と、ワークツリーの
 # 起点になるデフォルトブランチを取ってくる sh。本体とは別の 1 行で SessionStart に登録する。
 # 取ってこないと、別の機械で承認したものが効かず、古い main から枝を切る（ADR-0060）。
-# 通信するので、要らないプロジェクトは --no-fetch で外す。上限は sh の中の見張り（1 回 15 秒）が
+# 通信するので、要らないプロジェクトは --no-fetch で外す。上限は sh の中のタイムアウト監視（1 回 15 秒）が
 # 重なっても収まる長さ。
 FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 FETCH_TIMEOUT=60
 
 DEFAULT_MODE="dry-run"
-# CCNAVI_BIN_PATH に書く綴り。hook が起動する振り分けの sh。固定。
+# CCNAVI_BIN_PATH に書くパス。hook が起動する振り分けの sh。固定。
 # ccnavi ディレクトリ（.ccnavi/）の下に置けば、ccnavi ディレクトリを守るルールが
 # そのまま sh にも実行ファイルにも効く。
 BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh"
@@ -96,7 +96,7 @@ DEPLOY_BIN_DIR="dist/ccnavi"
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/common/rules.yml"
 # 設定 3 本のひな形。rules と risk は汎用なので共通層（.ccnavi/common/）へ、
-# phases はワークスペースのレイアウト（scope の綴り）に付くので自身の層
+# phases はワークスペースのレイアウト（scope のパスの書き方）に付くので自身の層
 # （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
 # projects/ の下のプロジェクトにも効いてしまう（設計 11.2）。
 DEPLOY_RISK=".ccnavi/common/risks.yml"
@@ -105,10 +105,10 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
 # 起動時に落ちる。ccnavi-push-approved.sh はボードが承認のあと端末に送る 1 行の中身。
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
+# ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこのパスを出すので、
 # 配らないと案内どおりに打っても届かない。
 # ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh は人が打つ取り込み
-# （分かれた親のブランチの merge、消えた親のブランチの確かめ、控えの書き出し。ADR-0093 の 4.2）。
+# （分かれた親のブランチの merge、消えた親のブランチの確かめ、同期状態の書き出し。ADR-0093 の 4.2）。
 # ccnavi-git.sh の拒否の文面がこれを案内するので、配らないと案内どおりに打っても届かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを畳む前に生成物を消す 1 本。Windows では
 # node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して渡す。
@@ -270,12 +270,12 @@ command -v jq >/dev/null 2>&1 || die "jq が要ります。"
 [ -n "$target" ] || target="."
 [ -d "$target" ] || die "$target というディレクトリがありません。"
 # 表示のために絶対化する。Git Bash では pwd -W が Windows 形式を返すので、
-# 人が設定ファイルを開くときにそのまま使える綴りになる。
+# 人が設定ファイルを開くときにそのまま使える書き方になる。
 root=$(cd "$target" && { pwd -W 2>/dev/null || pwd; })
 settings="$root/$SETTINGS_REL"
 claude_dir=$(dirname "$settings")
 
-# 配布元。対象の根を決めたあとで見る。同じ綴りの取り方で絶対化してから
+# 配布元。対象の根を決めたあとで見る。同じパスの取り方で絶対化してから
 # 突き合わせないと、配布元と配布先が同じかどうかを判定できない。
 #
 # 名指しが無ければ、このスクリプトの置き場の 1 つ上を配布元にする。scripts/ の
@@ -365,7 +365,7 @@ runnable_targets() {
 }
 
 runs_here() {
-	# $1 目印の値 / $2 runnable_targets の並び
+	# $1 目印の値 / $2 runnable_targets のリスト
 	case " $2 " in
 	*" $1 "*) return 0 ;;
 	esac
@@ -440,7 +440,7 @@ verdict() {
 }
 
 note_deploy() {
-	# $1 verdict / $2 配布先の綴り / $3 配布元の綴り
+	# $1 verdict / $2 配布先のパス / $3 配布元のパス
 	case "$1" in
 	copy)
 		deploy_new="$deploy_new$2
@@ -462,10 +462,10 @@ note_deploy() {
 }
 
 # 振り分けの sh の行き先も、組み立ての置き場も固定。sh は自分の 1 つ上の bin/ を探すので、
-# 2 つの置き場が決まっていれば、設定に書く綴りと実体を置く場所は割れない。
+# 2 つの置き場が決まっていれば、設定に書くパスと実体を置く場所は割れない。
 if [ -n "$deploy" ]; then
 	build_dir_rel="$BUILD_ROOT/$built"
-	# 在るかどうかは 2 つの綴りで見る。PyInstaller が Windows でだけ .exe を付ける。
+	# 在るかどうかは 2 つのファイル名で見る。PyInstaller が Windows でだけ .exe を付ける。
 	if [ -f "$root/$build_dir_rel/ccnavi" ] || [ -f "$root/$build_dir_rel/ccnavi.exe" ]; then
 		bin_there=yes
 	else
@@ -602,10 +602,10 @@ shape=$(printf '%s' "$current" | jq -r '
 # 忘れると、この 2 つも dry-run のまま残る。--mode enable で打ち直すか、
 # 設定ファイルの 3 行を書き換えるまで、守りは弱いまま。
 #
-# 2 値の門は、モードに合わせず enable で書く。どちらも enable か disable しか取らず、
+# 2 値の切り替えの環境変数は、モードに合わせず enable で書く。どちらも enable か disable しか取らず、
 # dry-run と書くと ccnavi の --lint が言う。承認の経路は、通れば済んでしまい、済んだものは
-# 報告では戻らないので「止めずに報告する」段を持てない。確認できる者が居ないモードの門は、
-# 止めずに報告する段を CCNAVI_MODE=dry-run が持つので、こちらには要らない。
+# 報告では戻らないので「止めずに報告する」段を持てない。確認できる者が居ないモードの
+# 切り替えの環境変数は、止めずに報告する段を CCNAVI_MODE=dry-run が持つので、こちらには要らない。
 #
 # 値は --arg で 1 つずつ渡す。行に組んでから割ると、値に混ざった改行がそのまま
 # 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を別の値を経由して
@@ -638,12 +638,12 @@ fi
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 既定でない CCNAVI_BIN_PATH（人が決めた綴り）は書き換えず、名指しで 1 行出す。
+# 既定でない CCNAVI_BIN_PATH（人が決めたパス）は書き換えず、名指しで 1 行出す。
 # 導入は止めず、終了コードも変えない（--check では「揃っていない」に数える）。
 current_bin=$(printf '%s' "$current" | jq -r '(.env // {}).CCNAVI_BIN_PATH // "" | if type == "string" then . else "" end')
 bin_custom=""
 if [ -n "$current_bin" ] && [ "$current_bin" != "$BIN_PATH" ]; then
-	bin_custom="CCNAVI_BIN_PATH は既定でない綴り（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください。"
+	bin_custom="CCNAVI_BIN_PATH は既定でないパス（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください。"
 fi
 
 # --force が置き換えてよいキー。人がこの実行で名指しした 2 つだけ。
@@ -662,12 +662,12 @@ forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length 
 # 含まれるかどうかだけで見るが、それだけだと無関係な hook のパスに名前が入って
 # いるプロジェクトで、そのイベントが「登録済み」に見えたまま永久に登録されない。
 #
-# そこで 3 つに分ける。同じ綴りで在る（exact）、ccnavi らしき別の綴りが在る
+# そこで 3 つに分ける。同じ書き方で在る（exact）、ccnavi らしき別の書き方が在る
 # （other）、無い（none）。足すのは none だけ。other は足さずに人へ見せる。
 # セッションの頭の取り込み（ccnavi-fetch.sh）は本体ではないので、other に数えない。数えると、
-# 取り込みだけが登録された設定で、本体の SessionStart が「別の綴りが在る」として足されない。
-# 取り込みのほうは、綴りを問わず ccnavi-fetch を含む command が在れば登録済みとする（fetching）。
-# 綴りはプロジェクトごとに違うので、どちらが正しいかをここで決められない。
+# 取り込みだけが登録された設定で、本体の SessionStart が「別の書き方が在る」として足されない。
+# 取り込みのほうは、書き方を問わず ccnavi-fetch を含む command が在れば登録済みとする（fetching）。
+# 書き方はプロジェクトごとに違うので、どちらが正しいかをここで決められない。
 # 黙って足すと判定が 2 回走り、黙って飛ばすとそのイベントが落ちたままになる。
 REGISTERED='def commands($ev): [ (.hooks[$ev] // [])[] | (.hooks // [])[] | .command // "" ];
 	def exact($ev; $cmd): [ commands($ev)[] | select(. == $cmd) ] | length > 0;
@@ -687,7 +687,7 @@ replacing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" --argjs
 	| select(.key as $k | $forced | index($k) != null)
 	| "\(.key): \($cur[.key]) -> \(.value)"
 ')
-# CCNAVI_BIN_PATH は、既定でない綴りのときに専用の 1 行で言う。ここに並べると、
+# CCNAVI_BIN_PATH は、既定でないパスのときに専用の 1 行で言う。ここに並べると、
 # --force で置き換えられるかのような見出しの下に出る。
 bin_named=no
 if [ -n "$bin_custom" ]; then
@@ -729,7 +729,7 @@ fi
 # 置き場ごと（.ccnavi/ や .ccnavi/bin/）は無視しない。同じ .ccnavi/ の下に rules.yml が
 # あり、丸ごと無視すると、そのプロジェクトが何を止めるかまで git から消える。
 #
-# 綴りは配った組み立ての置き場（`.ccnavi/bin/<os>-<arch>/`）だけ。振り分けの sh は
+# 無視するのは配った組み立ての置き場（`.ccnavi/bin/<os>-<arch>/`）だけ。振り分けの sh は
 # 代わりに通る sh と同じく追跡する側に置く。無視すると、clone した先に sh が届かず hook が
 # 起動しない。置き場は配った機械のぶんだけ足す。別の機械で打ち直せば、その機械のぶんが
 # 足される。
@@ -868,7 +868,7 @@ report() {
 		printf '%s\n' "$differing_env" | sed 's/^/  /'
 	fi
 	if [ -n "$other_hooks" ]; then
-		printf 'ccnavi らしき別の綴りが登録されている hook（二重に走らせないため足していません。綴りを確かめてください）:\n'
+		printf 'ccnavi らしき別の書き方で登録されている hook（二重に走らせないため足していません。書き方を確かめてください）:\n'
 		printf '%s\n' "$other_hooks" | sed 's/^/  /'
 	fi
 	if [ -n "$missing_vscode" ]; then
@@ -936,7 +936,7 @@ report_deploy_plan() {
 	report_deploy '配る' '入れ替える' '.gitignore に足す' '実行ビットを付ける'
 }
 
-# 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
+# 揃っているか。値の違いと、別の書き方の登録も「揃っていない」に数える。
 # ここを不足の 2 つだけで決めると、CCNAVI_MODE=disable が書かれた設定に
 # --check を打って「揃っています」と言うことになる。
 settled=yes
@@ -946,14 +946,14 @@ if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] |
 	settled=no
 fi
 # 配布物も「揃っていない」に数える。配布元に無いものも数える。実行ファイルが
-# 欠けたまま「揃っています」と言うと、--check を門にしている手順がそこを通す。
+# 欠けたまま「揃っています」と言うと、--check を確認の段階にしている手順がそこを通す。
 # .gitignore の不足も数える。足りないまま通すと、次のコミットで実行ファイルが
 # 履歴に入る。
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ] ||
 	[ -n "$ignore_todo" ] || [ -n "$launcher_mode_todo" ]; then
 	settled=no
 fi
-# 既定でない綴りも数える。
+# 既定でないパスも数える。
 if [ -n "$bin_custom" ]; then
 	settled=no
 fi
@@ -973,7 +973,7 @@ if [ "$check" = yes ]; then
 	exit 1
 fi
 
-# 手を動かすものがあるか。値が違うだけで名指しされていないもの、別の綴りの
+# 手を動かすものがあるか。値が違うだけで名指しされていないもの、別の書き方の
 # 登録は、このスクリプトが触らないので数えない。ただし黙って終わらせない。
 settings_work=no
 if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] ||
@@ -999,14 +999,14 @@ if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no
 	exit 0
 fi
 
-# 設定ファイルへの書き込みを 1 か所にする。控えは最初の 1 回だけ、リンクは
+# 設定ファイルへの書き込みを 1 か所にする。バックアップは最初の 1 回だけ、リンクは
 # 切らない、という約束を 2 か所に書き写すと、片方だけ直したときにどちらが
 # 壊れるかが打つたびに変わる。
 #
-# 結果は backed_up と linked に置く。呼んだ側が、その綴りで報告する。
+# 結果は backed_up と linked に置く。呼んだ側が、その値を見て報告する。
 write_json() {
-	# 導入前の姿を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
-	# 打ち直した数だけ控えが新しくなり、戻れるのは 1 手前まで――そこには既に
+	# 導入前の内容を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
+	# 打ち直した数だけバックアップが新しくなり、戻れるのは 1 手前まで――そこには既に
 	# ccnavi が入っている――になって、入れる前の設定へ戻す手立てが消える。
 	mkdir -p "$(dirname "$1")"
 	backed_up=no
@@ -1096,13 +1096,13 @@ fi
 
 report '足した' 'ccnavi を登録した' '置き換えた' '登録した'
 if [ "$settings_backed_up" = yes ]; then
-	printf '書き換える前の内容は %s.bak にあります（控えは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
+	printf '書き換える前の内容は %s.bak にあります（バックアップは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
 fi
 if [ "$settings_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$SETTINGS_REL"
 fi
 if [ "$vscode_backed_up" = yes ]; then
-	printf '書き換える前の内容は %s.bak にあります（控えは最初の 1 回だけ取ります）。\n' "$VSCODE_REL"
+	printf '書き換える前の内容は %s.bak にあります（バックアップは最初の 1 回だけ取ります）。\n' "$VSCODE_REL"
 fi
 if [ "$vscode_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$VSCODE_REL"
@@ -1165,7 +1165,7 @@ if [ "$deploy_work" = yes ]; then
 		{
 			if [ -s "$root/.gitignore" ]; then
 				# 末尾に改行が無いファイルへ足すと、最後の行と繋がって別の
-				# 綴りになる。無視のつもりの行が、誰も意図しない 1 行になってしまう。
+				# 行になる。無視のつもりの行が、誰も意図しない 1 行になってしまう。
 				if [ -n "$(tail -c 1 "$root/.gitignore")" ]; then
 					printf '\n'
 				fi
@@ -1188,7 +1188,7 @@ if [ -n "$launcher_mode_failed" ]; then
 	printf '%s' "$launcher_mode_failed" | sed 's/^/  /'
 fi
 
-# 登録しただけでは動かない。配り終えたあとの姿をそのまま見て、まだ無いものを
+# 登録しただけでは動かない。配り終えたあとの状態をそのまま見て、まだ無いものを
 # 挙げる。配布が通っていれば普通はここで何も出ない。出たときは、配るのを切ったか、
 # 配布元に無かったか、配布先に別のものが既にあって配っていないか、のどれか。
 #

@@ -30,7 +30,7 @@ import {
 
 /**
  * `moved` は、前の読み直しからこのカードが動いたこと（`core/board-moved.ts`）。動いていなければ
- * 渡らない。何が動いたかを決めるのは画面（`App.tsx`）で、ここは受け取った分に印を出すだけ。
+ * 渡らない。何が動いたかを決めるのは画面（`App.tsx`）で、ここは受け取った分に強調表示を出すだけ。
  */
 export function CardItem({ card, hidden, moved }: { readonly card: Card; readonly hidden: boolean; readonly moved?: Moved }): JSX.Element {
   const classes = ["card", card.isParent ? "parent" : "child"];
@@ -83,7 +83,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
         <span className="where">{where}</span>
       </div>
       {moved !== undefined ? (
-        <div className="moved-mark" title="前回の更新から列が変わりました。この印は、次にどれかのカードの列が変わるまで残ります">
+        <div className="moved-mark" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります">
           {movedLabel(moved)}
         </div>
       ) : null}
@@ -138,7 +138,7 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 /**
  * 枠付きのバッジは、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
  * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
- * どれを優先するか決まらない写り。出すバッジが無ければ行ごと出さない。
+ * どれを優先するか決まらない在りか。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   const badges: JSX.Element[] = [];
@@ -178,7 +178,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (isHighRisk(card.riskLevel)) {
     badges.push(<Badge key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
   }
-  // 写りがあること自体は普通なので数では出さない。どれを優先するか決まらないときだけ言う。
+  // 在りかが複数あること自体は普通なので数では出さない。どれを優先するか決まらないときだけ言う。
   if (card.scattered.length > 0) {
     const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
     badges.push(<Badge key="seen" kind="seen" text={`複数の場所にある（${card.scattered.length} か所）`} title={where} />);
@@ -193,7 +193,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
  * 列やバッジと同じことは重ねて書かない。完了・取り消しの列にいる閉じたカードには、クローズと人間レビューの要否を
  * 出さない（閉じたことは列で分かり、レビューが済むかは省略／レビュー済で分かる）。提案が残っていて未着手・作業中の
  * 列にいる閉じたカードには、列と食い違うことの手がかりとしてクローズを出す。
- * 終了の印（pending）は、止まっている間はバッジの「レビュー準備中」が言い、済んだ後は経過でしかない。
+ * 終了のマーカー（pending）は、止まっている間はバッジの「レビュー準備中」が言い、済んだ後は経過でしかない。
  * 依頼済はレビュー待ちのバッジが言う。どちらもフェーズ行の全文には残る。
  */
 function Facts({ card }: { readonly card: Card }): JSX.Element {
@@ -328,7 +328,7 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
 }
 
 /**
- * 子のフロー（ADR-0085）を開くボタン。言葉は在るか・着手中か（実行ファイルの答えの写し）で変わる。
+ * 子のフロー（ADR-0085）を開くボタン。言葉は在るか・着手中か（実行ファイルの答えのまま）で変わる。
  * 着手中でも押せる（読むだけの画面が開く）。押したら拡張ホストへ返すだけ
  */
 function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string }): JSX.Element {

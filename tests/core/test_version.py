@@ -82,7 +82,7 @@ class VersionFlagTest(unittest.TestCase):
         self.assertEqual(missing.returncode, 0, missing.stderr)
 
     def test_v13_flags_come_from_the_argument_definition(self):
-        """V13 定義に足したフラグは、何も書き足さずに並ぶ。短い綴りと位置引数は並べない。"""
+        """V13 定義に足したフラグは、何も書き足さずに並ぶ。短い書き方と位置引数は並べない。"""
         parser = argparse.ArgumentParser(add_help=False)
         parser.add_argument("--zeta", action="store_true")
         parser.add_argument("-a", "--alpha", default="")

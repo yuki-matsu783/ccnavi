@@ -85,7 +85,7 @@ class FetchTest(unittest.TestCase):
     # ---- 道具
 
     def repository(self, path):
-        """git のリポジトリと、その bare のリモートを作る。リモートの綴りを返す。"""
+        """git のリポジトリと、その bare のリモートを作る。リモートのパスを返す。"""
         git(self._tmp.name, "init", "-q", "-b", "main", path)
         for key, value in CONFIG:
             git(path, "config", key, value)
@@ -297,15 +297,16 @@ class FetchTest(unittest.TestCase):
         path = os.pathsep.join([helpers, os.environ.get("PATH", "")])
         started = time.monotonic()
         done = self.fetch(PATH=path, CCNAVI_FETCH_TIMEOUT="2")
-        self.assertLess(time.monotonic() - started, 20, "見張りが切っていない")
+        self.assertLess(time.monotonic() - started, 20, "タイムアウト監視が切っていない")
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertIn("取ってこられなかった", done.stdout)
         self.assertEqual("", done.stderr.strip())
 
-    # ---- 取り込み済みの家族（ADR-0093 の 4.2。段階 2b）
+    # ---- 取り込み済みの親子チケット（ADR-0093 の 4.2。段階 2b）
 
     def family(self, name="i0001", record=True):
-        """親のワークツリー .claude/worktrees/<name>（親の写しを送ってある）と家族の控え。"""
+        """親のワークツリー .claude/worktrees/<name>（親の承認済みチケットを送ってある）
+        と親子チケットの同期状態。"""
         self.leave_main()
         tree = os.path.join(self.ws, ".claude", "worktrees", name)
         git(self.ws, "worktree", "add", "-q", tree, "-b", name, "main")
@@ -322,7 +323,7 @@ class FetchTest(unittest.TestCase):
         return tree
 
     def test_a_family_is_fast_forwarded_past_unrelated_work_in_progress(self):
-        # 前は未コミットの変更があるだけで進めなかった。家族は重なりを git に任せる。
+        # 前は未コミットの変更があるだけで進めなかった。親子チケットは重なりを git に任せる。
         tree = self.family()
         head = self.advance(self.remote, "i0001")
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
@@ -423,7 +424,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("と重なる", done.stdout)
 
     def test_a_family_in_a_single_branch_clone_is_forwarded(self):
-        # origin の fetch の並びが main だけでも origin/P を進める（レビューの中 13）。
+        # origin の fetch の refspec が main だけでも origin/P を進める（レビューの中 13）。
         tree = self.family()
         git(self.ws, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
         head = self.advance(self.remote, "i0001")
@@ -462,7 +463,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("nope（統合先）がリモートに無い", done.stdout)
 
     def test_a_worktree_without_a_record_keeps_the_old_rule(self):
-        # 控えの無い（取り込み済みでない）家族は今までどおり。書きかけがあれば進めない。
+        # 同期状態の無い（取り込み済みでない）親子チケットは今までどおり。書きかけがあれば進めない。
         tree = self.family(record=False)
         before = self.sha(tree, "HEAD")
         self.advance(self.remote, "i0001")

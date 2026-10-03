@@ -1,6 +1,6 @@
 /**
- * blob の控え（ADR-0093 の 8.2）。sha が同じなら中身は同じなので、失効を持たない。
- * IndexedDB が使えなければ控えずに読む（毎回取る）。
+ * blob のキャッシュ（ADR-0093 の 8.2）。sha が同じなら中身は同じなので、失効を持たない。
+ * IndexedDB が使えなければキャッシュせずに読む（毎回取る）。
  */
 import type { BlobCache } from "../core/snapshot.js";
 

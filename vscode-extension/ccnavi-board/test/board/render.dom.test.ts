@@ -336,7 +336,7 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
     assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
-    // 識別子と「絞り込み中か」を別々に送る。空の並びを「全部」に読ませない
+    // 識別子と「絞り込み中か」を別々に送る。空の配列を「全部」に読ませない
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: false });
     // 絞り込んでも上部の集計はボード全体の数のまま（変わるのはボタンの数だけ）
     page.click(page.one("#attention-filter"));
@@ -456,7 +456,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     // 承認済みとレビューの要否はバッジにしない
     assert.equal(page.all(".badge.copy.copy-open").length, 0);
     assert.equal(page.all(".badge.review").length, 0);
-    // 写りは子のワークツリーに普通に入るので、正常な場面ではバッジを出さない
+    // 在りかは子のワークツリーにも普通にあるので、正常な場面ではバッジを出さない
     assert.equal(page.all(".badge.seen").length, 0);
     assert.ok(texts(page, ".card .where").includes("子 · 親 i0001 / フェーズ 2"));
     // 親のフェーズは 1 フェーズ 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
@@ -575,7 +575,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   } finally {
     await stillClosed.close();
   }
-  // 終了の印（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
+  // 終了のマーカー（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
   // 省略はレビュー済と同じく、閉じた後も人のレビューを通ったかの区別として残す
   const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
   try {
@@ -602,7 +602,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   }
 });
 
-test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", async () => {
+test("CB-T13b 親の絞り込みを出し、カードに親子チケットを付ける", async () => {
   const page = await openBoard();
   try {
     assert.equal(page.all("#parent-filter").length, 1);
@@ -660,7 +660,7 @@ test("CB-T16 本文の文字列で表示を壊さない", async () => {
   }
 });
 
-test("CB-T118 どれを優先するか決まらない写りだけをバッジにし、場所を tooltip に出す", async () => {
+test("CB-T118 どれを優先するか決まらない在りかだけをバッジにし、場所を tooltip に出す", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
   const where = [

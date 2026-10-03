@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面の図。種類の並び（`PhasesForm`）から、点と線と置き場所を組む純関数。
+ * フェーズ管理画面の図。種類のリスト（`PhasesForm`）から、点と線と置き場所を組む純関数。
  *
  * **向きを持つのは `after` の線だけ（ADR-0078）。** `after` は `order: dag` のときの依存で、
  * 待たれる側 → 待つ側に矢印を描く。`requires` は「計画にこの種類を置くなら一緒に置くべき種類」で、
@@ -8,7 +8,7 @@
  *
  * **判定はしない（ADR-0035）。** 循環も、到達不能も、孤立も、ここは見つけない。
  * 行き先がこのファイルに無い参照は**何も言わずに線にしないだけ**で、なぜ無いのかは言わない。
- * 綴り違いなのかほかの設定の種類なのかを決めるのは実行ファイルで、`phasetypes.py` の
+ * 書き間違いなのかほかの設定の種類なのかを決めるのは実行ファイルで、`phasetypes.py` の
  * `reference_problems` が合成した集合で確かめ、無ければ error を出す。画面がその手前で
  * 別の答えを出すと、2 か所が違うことを言う。
  *
@@ -60,7 +60,7 @@ export interface PhasesGraph {
   readonly unnamed: number;
   /**
    * 線にしなかった参照の数（このファイルに無い id を指す overlap / requires / after）。
-   * 綴り違いかほかの設定の種類かは言わない（頭のコメント）。数だけを図の下の注意に出す
+   * 書き間違いかほかの設定の種類かは言わない（頭のコメント）。数だけを図の下の注意に出す
    */
   readonly dropped: number;
 }
@@ -220,13 +220,13 @@ function byDepth(first: ReadonlyMap<string, PhasesForm["phases"][number]>, ids: 
   return out;
 }
 
-// ---- 人がドラッグで動かした位置（画面の控え。`phases.yml` には書かない）
+// ---- 人がドラッグで動かした位置（画面の状態に保存する。`phases.yml` には書かない）
 
-/** 点の置き場所の控え。鍵は種類の id */
+/** 保存した点の置き場所。鍵は種類の id */
 export type Spots = Record<string, { readonly x: number; readonly y: number }>;
 
 /**
- * ドラッグで動かした先を控えに入れる。px は丸める（控えを読みやすく保つ）。
+ * ドラッグで動かした先を保存する。px は丸める（保存した値を読みやすく保つ）。
  *
  * ここ（`core/`）に置いてあるのは、`state.ts` が `acquireVsCodeApi` を読み、node のテストから
  * import できないため。単体で試せる形にしておく（CB-T191）。
@@ -238,7 +238,7 @@ export function withSpot(spots: Spots, id: string, x: number, y: number): Spots 
   return { ...spots, [id]: { x: Math.round(x), y: Math.round(y) } };
 }
 
-/** 図に出ている種類の控えだけを残す。変わらなければ元のものをそのまま返す（描き直しを起こさない） */
+/** 図に出ている種類の置き場所だけを残す。変わらなければ元のものをそのまま返す（描き直しを起こさない） */
 export function keepSpots(spots: Spots, ids: readonly string[]): Spots {
   const next: Spots = {};
   for (const id of ids) {

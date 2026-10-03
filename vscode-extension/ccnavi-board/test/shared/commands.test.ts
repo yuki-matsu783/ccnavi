@@ -67,7 +67,7 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
 });
 
-test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON と見せた指紋で渡す", () => {
+test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON と見せたダイジェストで渡す", () => {
   assert.deepEqual(decidePreviewArgs(2), ["decide", "2", "--preview"]);
   assert.deepEqual(decideArgs(1, { u1: "keep", "https://x/y#z": "fix" }, "d0"), [
     "decide",
@@ -106,7 +106,7 @@ test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 �
   assert.equal(c1TargetOf("c1 1\nfamily i0001\n"), "");
 });
 
-test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と同じ引用の規則。空白や記号があるときだけ引用する（root を解くのは呼び手）", () => {
+test("CB-T19c 文面の sh のパスは実行ファイルの script_command と同じ引用の規則。空白や記号があるときだけ引用する（root を解くのは呼び手）", () => {
   assert.equal(scriptCommand("/ws", "ccnavi-review.sh"), "sh /ws/.ccnavi/scripts/ccnavi-review.sh");
   assert.equal(scriptCommand("C:\\Users\\me\\ws\\", "ccnavi-review.sh"), "sh C:/Users/me/ws/.ccnavi/scripts/ccnavi-review.sh");
   assert.equal(scriptCommand("/my ws", "ccnavi-review.sh"), 'sh "/my ws/.ccnavi/scripts/ccnavi-review.sh"');

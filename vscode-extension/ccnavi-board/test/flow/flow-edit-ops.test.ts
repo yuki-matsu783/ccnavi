@@ -88,7 +88,7 @@ test("CB-T271 開始へ入る線・終了から出る線・グループ・自分
   assert.equal(connectionsOf(connect(templateFlow("x", ""), "start", "output", "end", "input")).length, 1, "同じ線は足さない");
 });
 
-test("CB-T272 写して貼ると id を振り直し、選んだノード同士の線だけ新しい id に付け替える。出口の綴りと知らない欄は元のまま", () => {
+test("CB-T272 写して貼ると id を振り直し、選んだノード同士の線だけ新しい id に付け替える。出口の表記と知らない欄は元のまま", () => {
   const doc = branched();
   const clip = copyNodes(doc, ["if-1", "p-1", "end"]);
   assert.ok(clip !== undefined);
@@ -102,13 +102,13 @@ test("CB-T272 写して貼ると id を振り直し、選んだノード同士�
   // 元のノードと線はそのまま
   assert.deepEqual(next.nodes.slice(0, doc.nodes.length), doc.nodes);
   assert.deepEqual(connectionsOf(next).slice(0, 4), connectionsOf(doc));
-  // 新しい線。出口の綴り（branch-0 / branch-1）と条件はそのまま、両端は新しい id
+  // 新しい線。出口の表記（branch-0 / branch-1）と条件はそのまま、両端は新しい id
   assert.deepEqual(connectionsOf(next).slice(4), [
     { id: "c-ifElse-1-prompt-1", from: "ifElse-1", to: "prompt-1", fromPort: "branch-0", toPort: "input", condition: "真なら" },
     { id: "c-ifElse-1-end-1", from: "ifElse-1", to: "end-1", fromPort: "branch-1", toPort: "input" },
     { id: "c-prompt-1-end-1", from: "prompt-1", to: "end-1", fromPort: "output", toPort: "input" },
   ]);
-  // 中身と知らない欄は深い写し（元を触っても貼ったものは変わらない）
+  // 中身と知らない欄は深いコピー（元を触っても貼ったものは変わらない）
   assert.deepEqual(byId(next, "prompt-1").extra, { keep: true });
   assert.deepEqual(byId(next, "ifElse-1").data, byId(doc, "if-1").data);
   assert.notEqual(byId(next, "ifElse-1").data, byId(doc, "if-1").data);
@@ -120,7 +120,7 @@ test("CB-T272 写して貼ると id を振り直し、選んだノード同士�
   // 終了は写せる。外に置いて 40 ずらす
   assert.equal(byId(next, "end-1").parentId, undefined);
   assert.deepEqual(byId(next, "end-1").position, { x: 490, y: 240 });
-  // 同じ控えをもう 1 度貼ると、また別の id
+  // 同じものをもう 1 度貼ると、また別の id
   const again = pasteNodes(next, clip, { x: 80, y: 80 });
   assert.deepEqual(again.ids, ["ifElse-2", "prompt-2", "end-2"]);
 });
@@ -161,7 +161,7 @@ test("CB-T273 開始は写さない。グループを写すと中のノードも
   assert.deepEqual(placed.position, { x: absolutePosition(doc, "p-1").x + 40, y: absolutePosition(doc, "p-1").y + 40 });
 });
 
-test("CB-T274 履歴は直す前の写しを積み、戻す・やり直すで行き来する。戻してから直すとやり直しは消える。上限を超えたら古いほうから捨てる", () => {
+test("CB-T274 履歴は直す前の内容を積み、戻す・やり直すで行き来する。戻してから直すとやり直しは消える。上限を超えたら古いほうから捨てる", () => {
   const a = templateFlow("x", "");
   const b = addNode(a, "prompt", { x: 0, y: 0 }).doc;
   const c = renameNode(b, "prompt-1", "書く");
@@ -179,7 +179,7 @@ test("CB-T274 履歴は直す前の写しを積み、戻す・やり直すで行
   const forward = redo(back2.history, a);
   assert.ok(forward !== undefined);
   assert.equal(forward.doc, b);
-  // 戻してから別の操作をすると、やり直しの並びは消える
+  // 戻してから別の操作をすると、やり直しのリストは消える
   const branched = record(forward.history, b);
   assert.ok(!canRedo(branched));
   assert.equal(redo(branched, b), undefined);
@@ -200,7 +200,7 @@ test("CB-T275 同じ欄に続けて打った字は 1 件にまとめる。間が
   history = record(history, typed("a"), { key: "node:start:label", now: 1200 });
   history = record(history, typed("ab"), { key: "node:start:label", now: 1400 });
   assert.equal(history.past.length, 1, "続けて打った 3 字で 1 件");
-  assert.equal(history.past[0], a, "残るのは打つ前の写し");
+  assert.equal(history.past[0], a, "残るのは打つ前の内容");
   // 間が空いた
   history = record(history, typed("abc"), { key: "node:start:label", now: 1400 + MERGE_MS + 1 });
   assert.equal(history.past.length, 2);
@@ -225,7 +225,7 @@ test("CB-T275 同じ欄に続けて打った字は 1 件にまとめる。間が
   assert.equal(after.past.length, back.history.past.length + 1);
 });
 
-test("CB-T276 未保存の見比べはキーの並びを見ず、差分は足した・消した・変えたノードと線と、フローの欄を言う", () => {
+test("CB-T276 未保存の見比べはキーの順序を見ず、差分は足した・消した・変えたノードと線と、フローの欄を言う", () => {
   const doc = branched();
   assert.ok(sameFlow(doc, JSON.parse(JSON.stringify(doc)) as FlowDoc));
   assert.ok(sameValue({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 }));
@@ -256,7 +256,7 @@ test("CB-T276 未保存の見比べはキーの並びを見ず、差分は足し
   assert.ok(!isEmptyDiff(diff));
 });
 
-test("CB-T277 画面から届く控えの写しと、保存前の確かめの設定は形を確かめてから受ける", () => {
+test("CB-T277 画面から届く保存用の編集中の内容と、保存前の確かめの設定は形を確かめてから受ける", () => {
   const doc = templateFlow("i0001-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "draft", doc }), { type: "draft", doc });
   assert.deepEqual(asFlowMessage({ type: "draft", doc: null }), { type: "draft", doc: null });
@@ -266,7 +266,7 @@ test("CB-T277 画面から届く控えの写しと、保存前の確かめの設
   assert.equal(asFlowMessage({ type: "reviewSave", value: "no" }), undefined);
 });
 
-test("CB-T279 確かめ直しの頼みは番号と読める写しがあるときだけ受ける。実行ファイルの答えがあれば、開始が無いという画面の注意は出さない", () => {
+test("CB-T279 確かめ直しの頼みは番号と読める内容があるときだけ受ける。実行ファイルの答えがあれば、開始が無いという画面の注意は出さない", () => {
   const doc = templateFlow("i0001-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "check", seq: 3, doc }), { type: "check", seq: 3, doc });
   assert.equal(asFlowMessage({ type: "check", seq: "3", doc }), undefined);

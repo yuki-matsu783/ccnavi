@@ -2,7 +2,7 @@
  * 束ねた画面（React）と、その CSS が、外へ出る手段を持っていないこと。
  *
  * 入れ物の HTML は CSP（`default-src 'none'`）で守られていて、各画面のテストが「外の資源を
- * 指す綴りが無い」ことを見る。**束ねたものはその検査から外してある**（React の本番ビルドが
+ * 指す表記が無い」ことを見る。**束ねたものはその検査から外してある**（React の本番ビルドが
  * 自分の説明ページの URL を文字列で持っているため）。外した代わりに、ここで「本当に外へ出る
  * 呼び出し」だけを名前で見る。拡張の画面は実行ファイルの答えを見せるだけで、自分で外を見に
  * 行かない（docs/claude/exe-boundary.md、ADR-0035）。
@@ -17,7 +17,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { screenNames, screenScript, screenStyle } from "../helpers/bundle.js";
 
-/** 外へ出る手段。名前で見るだけなので、綴りを変えて呼ぶ方法までは防げない */
+/** 外へ出る手段。名前で見るだけなので、書き方を変えて呼ぶ方法までは防げない */
 const OUTSIDE = [/\bfetch\s*\(/, /XMLHttpRequest/, /\bWebSocket\b/, /sendBeacon/, /\bimportScripts\b/, /EventSource/, /new\s+Image\s*\(/];
 
 test("CB-T157 束ねた画面は、外へ出る呼び出しを持たない", () => {
@@ -38,7 +38,7 @@ test("CB-T167 束ねた CSS は、外の資源を読まない（url() と残っ�
     assert.doesNotMatch(style, /url\s*\(/, `${name} の CSS が url() を持っている`);
     // 束ねに入らなかった @import は、配ったあとに外へ読みに行く（CSP が止めるが、見た目は抜ける）
     assert.doesNotMatch(style, /@import/, `${name} の CSS に束ねられなかった @import が残っている`);
-    assert.doesNotMatch(style, /https?:\/\//, `${name} の CSS が外の綴りを持っている`);
+    assert.doesNotMatch(style, /https?:\/\//, `${name} の CSS が外を指す表記を持っている`);
   }
 });
 
@@ -56,9 +56,9 @@ test("CB-T167 束ねた CSS は、外の資源を読まない（url() と残っ�
  *
  * 見るのは `style` 属性を付けるやり方だけ。`el.style.cssText = …` は**通る**（Chromium で実際に確かめた。
  * CSSOM なので属性の禁止に当たらない）ので、ここでは見ない。`dangerouslySetInnerHTML` も見ない。
- * react-dom が属性の対応表に綴りを持っているだけで、5 画面とも当たってしまう。
+ * react-dom が属性の対応表に属性名の文字列を持っているだけで、5 画面とも当たってしまう。
  *
- * 属性名を実行時に組み立てる書き方（`el.setAttribute(name, value)`）は、綴りでは見つけられない。
+ * 属性名を実行時に組み立てる書き方（`el.setAttribute(name, value)`）は、文字列の検索では見つけられない。
  * 名前で見るだけの検査で、そこまでは防げない。
  */
 const CSP_BLOCKED = [/setAttribute\(\s*["']style["']/];

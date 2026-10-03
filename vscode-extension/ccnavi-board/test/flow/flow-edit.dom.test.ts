@@ -288,7 +288,7 @@ test("CB-D129 「次から確かめずに保存する」を付けて保存する
   }
 });
 
-test("CB-D130 閉じる前の編集（draft）が渡れば、それを開いて未保存を立て、未保存の間は写しを拡張ホストに控えさせる", async () => {
+test("CB-D130 閉じる前の編集（draft）が渡れば、それを開いて未保存を立て、未保存の間は編集中の内容を拡張ホストに保存させる", async () => {
   const draft = renameNode(three(), "prompt-1", "閉じる前の編集");
   const dom = await openFlow({ doc: three(), draft });
   try {
@@ -300,7 +300,7 @@ test("CB-D130 閉じる前の編集（draft）が渡れば、それを開いて�
     const drafts = dom.posted.filter((m) => m.type === "draft");
     assert.ok(drafts.length >= 1);
     assert.deepEqual(drafts[drafts.length - 1].doc, draft);
-    // 戻す先（読み込んだ中身）は draft ではなく doc。名前を元に戻せば未保存が消え、控えも消させる
+    // 戻す先（読み込んだ中身）は draft ではなく doc。名前を元に戻せば未保存が消え、保存したものも消させる
     dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
     await dom.settle();
     dom.type(dom.one<HTMLInputElement>("#inspector input.f-name"), "プロンプト");
@@ -337,7 +337,7 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     assert.ok(!items.some((li) => /開始（start）のノードが無い/.test(li.textContent ?? "")), "画面の注意と二重に出さない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. [prompt] プロンプト\n2. [end] 終了");
     assert.equal(dom.all("#flow-preview-checking").length, 0);
-    // 開いたままでは確かめ直さない（答えが指す写しのまま）
+    // 開いたままでは確かめ直さない（答えが指す内容のまま）
     await waitCheck(dom);
     assert.deepEqual(checksAsked(dom), []);
     // 直すと、止まってから確かめ直しを頼む。その間は前の答えを出したまま、そう言う
@@ -451,11 +451,11 @@ test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた
     // 答えを待つ間に、もう 1 つ直す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
-    await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古い写しの答え"], rendered: ["1. 古い"] } });
+    await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古い内容の答え"], rendered: ["1. 古い"] } });
     assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確かめ終わったことにしない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
-    assert.doesNotMatch(dom.one("body").textContent ?? "", /古い写しの答え/);
-    // 今の写しの答えは使う
+    assert.doesNotMatch(dom.one("body").textContent ?? "", /古い内容の答え/);
+    // 今の内容の答えは使う
     await waitCheck(dom);
     const second = checksAsked(dom);
     assert.equal(second.length, 2);
@@ -485,7 +485,7 @@ test("CB-D135 外で変わった知らせは最初の 1 回だけ履歴を空に
   }
 });
 
-test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を出し、並びだけ変わったと言う。時計を進めれば打ち込みは別の 1 件", async () => {
+test("CB-D136 順序だけ変わって未保存のときも保存前の一覧を出し、順序だけ変わったと言う。時計を進めれば打ち込みは別の 1 件", async () => {
   const doc = three();
   const reordered: FlowDoc = { ...doc, nodes: [...doc.nodes].reverse() };
   const dom = await openFlow({ doc, draft: reordered, reviewSave: true });
@@ -493,7 +493,7 @@ test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を
     assert.ok(dirty(dom));
     dom.click(button(dom, "save"));
     await dom.settle();
-    assert.match(dom.one("#review-order-only").textContent ?? "", /並びだけ変わった/);
+    assert.match(dom.one("#review-order-only").textContent ?? "", /順序だけ変わった/);
     assert.equal(dom.posted.filter((m) => m.type === "save").length, 0);
     dom.click(button(dom, "cancel-save"));
     await dom.settle();
