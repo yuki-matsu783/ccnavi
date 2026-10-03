@@ -26,7 +26,7 @@
 
 | 読むとき | 開くファイル |
 |---|---|
-| ワークツリーを切る・`<統合先>` へ戻す・片付ける、他セッションの変更の影響を受けた | `docs/claude/worktree.md` |
+| ワークツリーを切る・`<統合先>` に取り込む・片付ける、他セッションの変更の影響を受けた | `docs/claude/worktree.md` |
 | 下書きや使い捨てのファイルを置く | `docs/claude/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `docs/claude/projects.md` |
 | 提案を書く、相談が要るか迷う、サブエージェントに任せる | `docs/claude/decisions.md` |
