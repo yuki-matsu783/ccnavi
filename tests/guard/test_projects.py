@@ -27,7 +27,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
+from ccnavi import tree
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -369,6 +371,27 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("DENY", self.reason(allowed))
         outside = self.hook("Write", self.ws, file_path=os.path.join(right, "docs", "a.md"))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
+    def test_wrong_project_is_refused_even_when_the_worktree_name_differs_in_case(self):
+        """区別しない機械では、綴り違いに切ったワークツリーでも取り違えを止める。
+
+        範囲の判定（ticket_verdict）は綴りの違いを吸収して引く。取り違えの検査だけ厳密に
+        引くと、範囲の中への書き込みは別のプロジェクトのツリーでも通ってしまう。
+        区別する機械でも走るように、区別しない機械の引き方へ差し替えて確かめる。
+        """
+        write(
+            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+
+        wrong = self.worktree(self.app, "I0007")
+        with mock.patch.object(tree, "CASE_INSENSITIVE", True):
+            denied = self.hook("Write", self.ws, file_path=os.path.join(wrong, "src", "a.py"))
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("DENY_TICKET_PROJECT_MISMATCH", self.reason(denied))
+        self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
 
     def test_project_skills_are_written_only_under_the_ticket_rules(self):
         """docs/skills/（ADR-0091）は守りの外のふつうの場所。チケットの範囲の中でだけ書ける。
