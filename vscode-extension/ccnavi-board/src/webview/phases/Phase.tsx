@@ -193,7 +193,7 @@ export function Phase(props: PhaseProps): JSX.Element {
             </Captioned>
             <Captioned name="先に済ませる種類" yamlKey="after">
               {phase.kind === "feedback" && phase.after.length === 0 ? (
-                <span className="f-after dim">feedback の種類は持てません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
+                <span className="f-after dim">feedback の種類には設定できません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
               ) : (
                 ids("after", "先に済ませる種類", "f-after", "待ち方が dag のとき、この種類より先に閉じてレビューを終えておく work の種類")
               )}

@@ -688,7 +688,7 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
     const inPhase = page.one(".phase a.mr-link");
     assert.equal(inPhase.getAttribute("href"), "https://example.com/o/r/pull/18#issuecomment-5");
     assert.equal(inPhase.getAttribute("title"), "フェーズ 2（設計） のレビューの依頼を開く");
-    assert.equal(inPhase.textContent, "MR #18");
+    assert.equal(inPhase.textContent, "マージリクエスト #18");
     const inCard = page.one(".card-head + .facts a.mr-link, .facts a.mr-link");
     assert.equal(inCard.getAttribute("href"), "https://example.com/o/r/pull/18");
     assert.equal(inCard.getAttribute("title"), "マージリクエストを開く");
@@ -708,7 +708,7 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
   try {
     assert.equal(spiked.all("a.mr-link").length, 0);
     const fact = spiked.one("span.fact.mr");
-    assert.equal(fact.textContent, "MR #18");
+    assert.equal(fact.textContent, "マージリクエスト #18");
     assert.equal(fact.getAttribute("title"), "javascript:alert(1)");
   } finally {
     await spiked.close();

@@ -661,7 +661,7 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
   const noTree = approvalStep(CLOSED, { ...input, tree: undefined });
   assert.equal(noTree.state.overlay, undefined);
   assert.deepEqual(noTree.effects, [
-    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 が無いので、レビュー済みの連絡を組めません" },
+    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 が無いので、レビュー済みの連絡文を作れません" },
   ]);
 
   // 人のレビュー待ちでなければ、ボタンの前提が無い。言って読み直す

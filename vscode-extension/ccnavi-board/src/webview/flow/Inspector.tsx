@@ -259,7 +259,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       )}
       {!known && !group && (
         <>
-          <p className="hint">この画面で欄を持たない種類。名前と位置だけ変えられ、中身（data）は保存してもそのまま残る。</p>
+          <p className="hint">この画面に入力欄が無い種類。名前と位置だけ変えられ、中身（data）は保存してもそのまま残る。</p>
           <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
         </>
       )}

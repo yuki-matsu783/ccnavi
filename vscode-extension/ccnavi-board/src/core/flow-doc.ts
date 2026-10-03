@@ -210,11 +210,11 @@ export function parseFlowValue(text: string): { readonly ok: true; readonly valu
     const doc = parseDocument(text.replace(/^\uFEFF/, ""));
     const problem = doc.errors[0];
     if (problem !== undefined) {
-      return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(problem.message)}）` };
+      return { ok: false, error: `画面の YAML パーサーで読めないので図にできない（${firstLine(problem.message)}）` };
     }
     return { ok: true, value: doc.toJS() };
   } catch (error) {
-    return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
+    return { ok: false, error: `画面の YAML パーサーで読めないので図にできない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
   }
 }
 
@@ -1118,7 +1118,7 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
   }
   const unknown = [...new Set(doc.nodes.map(nodeType).filter((type) => !isEditableType(type) && type !== GROUP_TYPE))];
   if (unknown.length > 0) {
-    out.push(`この画面で欄を持たない種類がある（${unknown.map((t) => t || "(種類なし)").join(", ")}）。名前と位置だけ変えられ、中身は保存してもそのまま残る`);
+    out.push(`この画面に入力欄が無い種類がある（${unknown.map((t) => t || "(種類なし)").join(", ")}）。名前と位置だけ変えられ、中身は保存してもそのまま残る`);
   }
   const flows = subFlows(doc).size;
   if (flows > 0) {

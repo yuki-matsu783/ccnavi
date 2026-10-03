@@ -150,7 +150,7 @@ function StepView({ id, data }: NodeProps<StepNode>): JSX.Element {
   const actions = useContext(Actions);
   const many = data.outputs.length > 1 || data.outputs.some((port) => port.label !== "");
   return (
-    <div className="flow-node" data-type={cssType(data.type, data.known)} title={data.known ? undefined : `この画面で欄を持たない種類（${data.type || "種類なし"}）。中身は保存してもそのまま残る`}>
+    <div className="flow-node" data-type={cssType(data.type, data.known)} title={data.known ? undefined : `この画面に入力欄が無い種類（${data.type || "種類なし"}）。中身は保存してもそのまま残る`}>
       {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このノードを消す" onRemove={() => actions.removeNode(id)} />}
       {data.inputs.map((port, index) => (
         <Handle

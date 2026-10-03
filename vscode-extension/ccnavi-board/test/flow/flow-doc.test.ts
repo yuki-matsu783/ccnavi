@@ -148,9 +148,9 @@ test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そ�
 
 test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
   const refused: [string, RegExp][] = [
-    ["nodes: [", /画面の YAML の読み手で読めないので描けない/],
-    ["a: 1\na: 2\n", /画面の YAML の読み手で読めないので描けない/],
-    ["nodes: []\n---\nnodes: []\n", /画面の YAML の読み手で読めないので描けない/],
+    ["nodes: [", /画面の YAML パーサーで読めないので図にできない/],
+    ["a: 1\na: 2\n", /画面の YAML パーサーで読めないので図にできない/],
+    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読めないので図にできない/],
     ["", /描けない/],
     ["- 1\n", /描けない/],
     ["name: x\n", /描けない/],
@@ -340,7 +340,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(doc, "c").parentId, undefined);
   // 線はそのまま。グループは注意に「欄を持たない種類」として出ない。出入口も無い
   assert.deepEqual(doc.connections, three().connections);
-  assert.deepEqual(flowNotices(doc).filter((n) => /欄を持たない/.test(n)), []);
+  assert.deepEqual(flowNotices(doc).filter((n) => /入力欄が無い/.test(n)), []);
   assert.deepEqual(portsOf(byId(doc, "group-1"), connectionsOf(doc)), { inputs: [], outputs: [] });
   // グループへは線を繋がない
   assert.equal(connect(doc, "c", "output", "group-1", "input"), doc);

@@ -19,10 +19,10 @@ export interface PreviewProps {
 
 function body(checks: FlowChecks | undefined): JSX.Element {
   if (checks === undefined) {
-    return <p className="dim small">まだ実行ファイルに確かめていない。</p>;
+    return <p className="dim small">まだ実行ファイルで確かめていない。</p>;
   }
   if (checks.rendered === undefined) {
-    return <p className="dim small">実行ファイルが古いので、渡る手順を出せない（lint の答えに rendered が無い）。実行ファイルを更新してください。</p>;
+    return <p className="dim small">実行ファイルが古いので、担当に渡る手順を表示できない（lint の答えに rendered が無い）。実行ファイルを更新してください。</p>;
   }
   if (checks.rendered === null) {
     return <p className="dim small">実行ファイルがこのフローを手順に並べられなかった（中身を読めない）。担当にはフローの手順が渡らない。</p>;

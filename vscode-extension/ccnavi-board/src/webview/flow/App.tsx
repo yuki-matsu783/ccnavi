@@ -549,7 +549,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <span className="path" title={`${page.flowRel}（承認済みの領域。書くのは人だけで、コミットも人がする）`}>
             {page.flowPath}
           </span>
-          {!page.exists && <span className="dim">（まだ無い。保存すると作る）</span>}
+          {!page.exists && <span className="dim">（ファイルはまだ無い。保存すると作られる）</span>}
           <span id="dirty" className={dirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>

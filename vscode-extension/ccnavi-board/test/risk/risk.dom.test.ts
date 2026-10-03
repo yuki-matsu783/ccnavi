@@ -21,7 +21,7 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
     assert.equal(dom.one(`${rowSelector("f1")} .sum .clip`).textContent, "変更した行数（追加＋削除）が 300 行を超えると加点行数が多い");
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** に当てはまるファイルを 1 つ変更するごとに加点（上限 35 点）CI に触った");
     // script は「返した点を加点」で、points は測れなかったときの保険。judge は yes で加点
-    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/common/scripts/risk.sh が返した点を加点（点を取れなかったときは 10 点）");
+    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/common/scripts/risk.sh が返した点を加点（点を読み取れなかったときは 10 点）");
     assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "質問「テストの無い変更を含むか」の答えが yes なら加点");
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
@@ -353,7 +353,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["リスクレベルの基準点", "項目", "保存", "案内"]);
+    assert.deepEqual(titles, ["リスクレベルの境目の点", "項目", "保存", "案内"]);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
   } finally {
     await dom.close();

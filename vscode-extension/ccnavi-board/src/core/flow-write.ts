@@ -246,7 +246,7 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
   try {
     const opened = fs.fstatSync(fd);
     if (!opened.isFile() || opened.ino !== stat.ino || opened.dev !== stat.dev) {
-      throw new Error(`${file} が開くあいだに別のファイルに差し替わったので読まない`);
+      throw new Error(`${file} を開いているあいだに別のファイルに差し替わったので読まない`);
     }
     if (opened.nlink > 1) {
       throw new Error(hardLinkedError(file, "読まない（書きもしない）"));
@@ -270,5 +270,5 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
 }
 
 function hardLinkedError(file: string, what: string): string {
-  return `${file} はハードリンク（ほかの名前からも同じ中身に届く）なので${what}。承認済みの領域の外の名前から書き換えられうる。リンクを外してから開き直してください`;
+  return `${file} はハードリンク（ほかのパスからも同じ中身を開ける）なので${what}。承認済みの領域の外のパスから書き換えられる可能性がある。リンクを外してから開き直してください`;
 }

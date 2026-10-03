@@ -390,7 +390,7 @@ function reviewed(
   if (tree === undefined || chip === undefined) {
     return stay(state, {
       kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、レビュー済みの連絡を組めません`,
+      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、レビュー済みの連絡文を作れません`,
     });
   }
   // ボタンが出る条件（人のレビュー待ち）を受け側でも持つ。待ちでなければ confirm の前提（依頼のマーカー）が無い

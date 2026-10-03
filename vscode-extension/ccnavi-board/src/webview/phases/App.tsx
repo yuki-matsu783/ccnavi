@@ -593,7 +593,7 @@ function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readon
         共通の設定に種類はありません（{page.phasesPath} がありません）。種類はワークスペースかプロジェクトの設定に置いてください。プロジェクト管理画面の「フェーズ管理」から開けます。
       </span>
       <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
-        自身の層を開く
+        ワークスペースの設定を開く
       </button>
     </div>
   );

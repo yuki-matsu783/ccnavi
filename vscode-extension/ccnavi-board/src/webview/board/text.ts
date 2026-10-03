@@ -88,9 +88,9 @@ export function phaseStatusBrief(p: PhaseChip): string {
   return notes.join(" · ");
 }
 
-/** マージリクエストのバッジの文字。番号が読めなければ「MR」だけ */
+/** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
 export function mrText(number: number | null): string {
-  return number === null ? "MR" : `MR #${number}`;
+  return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
 }
 
 /** 依頼のマーカーが持つ URL は中身を確かめずに写してあるので、http(s) のときだけリンクにする */
