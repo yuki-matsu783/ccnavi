@@ -104,7 +104,7 @@ git commit -m "<prefix>: <日本語の説明>"
 ```
 コミット1: feat: PreToolUse のルール照合と判定の記録を追加
   - main.py
-  - ccnavi/rules.py
+  - ccnavi/policy/rules.py
 コミット2: docs: モードの呼び名を判定しない・警告・ブロックに統一
   - requirements.md
 ```

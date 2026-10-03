@@ -27,7 +27,8 @@ from unittest import mock
 
 import yaml
 
-from ccnavi import flow, settings, ticket
+from ccnavi.infra import settings
+from ccnavi.tickets import flow, ticket
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -799,7 +800,7 @@ class FlowLockTest(FlowHarness):
     def test_a_crash_in_the_briefing_is_one_line(self):
         """フローの案内が万一例外を出しても、1 行の知らせにして残りを渡す（H3）。"""
         child_tree = self.run_child(CHILD)
-        with mock.patch("ccnavi.flow.briefing", side_effect=RecursionError("deep")):
+        with mock.patch("ccnavi.tickets.flow.briefing", side_effect=RecursionError("deep")):
             result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.reason(result)

@@ -8,7 +8,7 @@ keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ル�
 
 # 足す・直す
 
-書式の細部で迷ったら `ccnavi/rules.py` `ccnavi/phasetypes.py` `ccnavi/risk.py` の冒頭の docstring を読む。
+書式の細部で迷ったら `ccnavi/policy/rules.py` `ccnavi/tickets/phasetypes.py` `ccnavi/tickets/risk.py` の冒頭の docstring を読む。
 
 ## 手順
 

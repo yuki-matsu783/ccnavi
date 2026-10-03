@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import platformtag
+from ccnavi.infra import platformtag
 from tests import ROOT
 from tests.config.test_config_union import (
     COMMON_PHASES,
@@ -498,7 +498,7 @@ class SetupTest(unittest.TestCase):
             "ccnavi-git.sh",
             "ccnavi-common.sh",
             "ccnavi-push-approved.sh",
-            "ccnavi-approve.sh",
+            "ccnavi-agree.sh",
             "ccnavi-fetch.sh",
             "ccnavi-sync.sh",
             "ccnavi-clean.sh",

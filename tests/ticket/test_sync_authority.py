@@ -16,7 +16,9 @@ import threading
 import time
 import unittest
 
-from ccnavi import approval, core, fsio, settings, syncstate
+from ccnavi.hook import core
+from ccnavi.infra import fsio, settings
+from ccnavi.tickets import agree, approval, syncstate
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -290,7 +292,7 @@ class PresentTest(AuthorityHarness):
             os.path.join(self.root, "wip", "proposals", "todo", "i0001-02.md"),
             child_text("i0001-02", "i0001", 1, ["wip/research/*"]),
         )
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual([], preview["batch"])
         self.assertTrue(
             any("ワークツリーの外" in " ".join(r["problems"]) for r in preview["rejected"]),
@@ -355,7 +357,7 @@ class UndecidedTest(AuthorityHarness):
         self.assertIn("ccnavi-sync.sh", finished.stderr)
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual([], preview["batch"])
         self.assertTrue(any("gone" in " ".join(r["problems"]) for r in preview["rejected"]))
 
@@ -509,7 +511,7 @@ class MarkTest(AuthorityHarness):
     def test_config_synced_stops_for_an_undecided_family(self):
         import io
 
-        from ccnavi import configsync
+        from ccnavi.tickets import configsync
 
         self.record("gone")
         err = io.StringIO()
@@ -535,7 +537,7 @@ class MarkTest(AuthorityHarness):
         ワークスペースのユーザの付けた名前 `web-i0012` と、プロジェクト web の issue 12
         の家族が並ぶ形。
         """
-        from ccnavi import tree
+        from ccnavi.infra import tree
 
         self.record("present")
         fams = syncstate.Families(self.conf(), self.root)
@@ -574,7 +576,7 @@ class IntegrationDoneTest(AuthorityHarness):
         )
 
     def preview(self):
-        return json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        return json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
 
     def rejected_with(self, preview, ticket, words):
         return any(
@@ -650,10 +652,10 @@ class PredecessorTest(AuthorityHarness):
         )
         self.propose("i0001-02", text)
         self.commit_parent()
-        before = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertIn("i0001-02", [b["ticket"] for b in before["batch"]], before)
         self.record("present", name="i0002")
-        after = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertNotIn("i0001-02", [b["ticket"] for b in after["batch"]])
         self.assertTrue(
             any("家族が決まらない" in " ".join(r["problems"]) for r in after["rejected"]), after
@@ -720,7 +722,7 @@ class DigestTest(AuthorityHarness):
         with fsio.reading() as seen:
             fsio.note_read(once, "a")
             fsio.note_read(record, "b")
-        keys = approval.read_set(self.conf(), self.root, seen)
+        keys = agree.read_set(self.conf(), self.root, seen)
         self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
 
     def test_keys_do_not_depend_on_a_linked_root(self):
@@ -733,7 +735,7 @@ class DigestTest(AuthorityHarness):
         target = os.path.join(linked, ".claude", "worktrees", "i0001", "x.md")
         with fsio.reading() as seen:
             fsio.note_read(target, "x")
-        keys = approval.read_set(self.conf(), linked, seen)
+        keys = agree.read_set(self.conf(), linked, seen)
         self.assertIn("self:i0001:x.md", keys)
         self.assertFalse([k for k in keys if k.startswith("(外)")], keys)
 
@@ -754,7 +756,7 @@ class DigestTest(AuthorityHarness):
             fsio.note_read(os.path.join(project, "x.md"), "b")
         conf = self.conf()
         conf.projects = os.path.join(self.root, "projects")
-        keys = approval.read_set(conf, self.root, seen)
+        keys = agree.read_set(conf, self.root, seen)
         self.assertIn("self:main:x.md", keys)
         self.assertIn("web:main:x.md", keys)
         self.assertNotEqual(keys["self:main:x.md"], keys["web:main:x.md"])
@@ -830,7 +832,7 @@ class LintTest(AuthorityHarness):
         self.assertIn("phases.yml", drift[0]["detail"])
 
     def test_the_projected_layer_on_the_parent_branch_is_compared(self):
-        from ccnavi import lint
+        from ccnavi.entry import lint
 
         conf = self.conf()
         self_base = os.path.join(self.state, "sync", "self", "integration")

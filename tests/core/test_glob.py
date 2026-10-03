@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import unittest
 
-from ccnavi.globmatch import translate
+from ccnavi.infra.globmatch import translate
 
 
 class TranslateTest(unittest.TestCase):

@@ -419,10 +419,8 @@ def main() -> int:
         title="b を書く",
     )
     commit_all(parent_tree, "tickets")
-    approved = exe("--approve", stdin="y\n")
-    record(
-        "--approve（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200]
-    )
+    approved = exe("--agree", stdin="y\n")
+    record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
 
     for child in ("i0001-01", "i0001-02"):
         tree = worktree(child, "i0001")
@@ -695,8 +693,8 @@ def main() -> int:
         title="c を書く",
     )
     commit_all(parent2, "tickets")
-    approved = exe("--approve", stdin="y\n")
-    record("--approve（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
+    approved = exe("--agree", stdin="y\n")
+    record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
     record("i0002 の push", sh(GIT_SH, parent2, "push", "-u", "origin", "i0002").returncode == 0)
     status, mr2 = api(
         "POST",

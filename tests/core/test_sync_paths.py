@@ -12,7 +12,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi import settings
+from ccnavi.infra import settings
 from tests.inproc import run_ccnavi
 
 

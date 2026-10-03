@@ -26,7 +26,7 @@ import re
 import tempfile
 import unittest
 
-from ccnavi import rules
+from ccnavi.policy import rules
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
