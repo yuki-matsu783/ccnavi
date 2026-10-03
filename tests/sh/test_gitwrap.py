@@ -962,8 +962,10 @@ class WorktreeNameTest(GitWrapperTest):
         stderr = self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "b").stderr
         self.assertIn("-b b", stderr)
         self.assertIn("worktree add .claude/worktrees/b -b b", stderr)
-        # 名前を変えると何が止まるのかを言う。
-        self.assertIn("取り込み済みの家族", stderr)
+        # 名前を変えると何が止まるのかを、ADR の番号に頼らず中身で言う。
+        self.assertIn("同じ名前のブランチをチェックアウトしているものとして探します", stderr)
+        self.assertIn("一度でも push したか ccnavi-sync.sh で取り込んだことがある", stderr)
+        self.assertNotIn("ADR", stderr)
 
     def test_matching_forms_pass(self):
         git(self.dir, "branch", "c")
@@ -983,8 +985,10 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
     """親のワークツリーでは別のブランチへ移らない（ADR-0093 の 3.1 の 10。段階 2b）。
 
     親のワークツリーは .claude/worktrees/<P> で、親の写しか提案（`ticket: <P>`、`parent:` なし）が
-    あるもの。別のブランチに移ると取り込み（ccnavi-sync.sh・セッション開始時の早送り）がこのツリーを飛ばし、
-    取り込み済みの家族では承認・状態の操作・実行前の判定が止まる。拒否文はその中身を言う。
+    あるもの。別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh が
+    リモートでの承認をこのツリーへ取り込まなくなる。親のブランチを一度でも push したか
+    ccnavi-sync.sh で取り込んだ親（家族の控えがある親）では、親と子のチケットの承認・
+    状態の操作・実行前の判定も止まる。拒否文はその中身を言う。
     """
 
     def setUp(self):
@@ -1019,7 +1023,10 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
                 self.assertEqual(2, result.returncode, result.stdout + result.stderr)
                 self.assertIn("親のワークツリー", result.stderr)
                 self.assertIn("ccnavi-sync.sh", result.stderr)
-                self.assertIn("取り込み済みの家族", result.stderr)
+                self.assertIn(
+                    "一度でも push したか ccnavi-sync.sh で取り込んだことがある", result.stderr
+                )
+                self.assertNotIn("ADR", result.stderr)
         self.assertEqual(before, git_out(self.parent, "rev-parse", "--abbrev-ref", "HEAD"))
         self.assertEqual([], logs_of(self.dir), "拒否したのに git が走って記録が残っている")
 
