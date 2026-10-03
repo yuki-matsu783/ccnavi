@@ -43,7 +43,7 @@ uv run python -m unittest discover -s tests/<グループ> -t .
 ```
 
 回すグループは、変えたファイルを [references/test-groups.md](references/test-groups.md) の表に当てて決める。
-表に当たらない変更や、統合先へ戻す前・MR に出す前は全件（`discover -s tests -t .`）を回す。
+表に当たらない変更や、統合先に取り込む前・MR に出す前は全件（`discover -s tests -t .`）を回す。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
 拡張（`vscode-extension/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
@@ -52,7 +52,7 @@ worktree で作業しているときは、そのツリーの中で実行する�
 cd vscode-extension/ccnavi-board
 pnpm install --frozen-lockfile                        # node_modules が無いときだけ
 pnpm test:for src/core/rules-doc.ts src/webview/board/App.tsx   # 変えたファイルをまとめて渡す
-pnpm test                                             # 統合先へ戻す前・MR に出す前
+pnpm test                                             # 統合先に取り込む前・MR に出す前
 ```
 
 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査を走らせていても、コミット前に明示的に実行してよい。
