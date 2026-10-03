@@ -41,7 +41,7 @@ VERSION = "0.1.0"
 COMPAT = 2
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
-# 組み立ての元のコミットが分からないときの綴り。
+# 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"
 # build.py が組み立てのときに書く部品の名前。パッケージの外に置くので、ソースで動かしている
 # ときに前の組み立ての値を読み違えることが無い。
@@ -50,7 +50,7 @@ BUILDINFO_MODULE = "ccnavi_buildinfo"
 
 def commit() -> str:
     """組み立ての元になったコミット。埋めていなければ `unknown`。"""
-    # 綴りは BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller がまとめる。
+    # 名前は BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller がまとめる。
     try:
         import ccnavi_buildinfo  # type: ignore[import-not-found]
     except ImportError:

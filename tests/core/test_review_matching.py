@@ -1,7 +1,7 @@
-"""`_matching` が結果の写しを拒むときの文面。
+"""`_matching` が取得した結果を拒むときの文面。
 
-写しを読めなかったとき（`--result` が空、ファイルが読めない）は、その理由の 1 行だけを
-出す。「結果にマージリクエストが無い」は、読めた写しに `mr` が無いときだけの文。
+取得した結果を読めなかったとき（`--result` が空、ファイルが読めない）は、その理由の 1 行だけを
+出す。「結果にマージリクエストが無い」は、読めた結果に `mr` が無いときだけの文。
 読めなかったときにまで出すと、読めない理由の後ろに誤った 2 行目が付く。
 """
 
@@ -38,7 +38,9 @@ class MatchingTest(unittest.TestCase):
     def test_empty_path_says_only_that_result_is_needed(self):
         got, err = self._run("")
         self.assertIsNone(got)
-        self.assertEqual(err, "ccnavi: --result <json> が要る。リモートの写しは sh が渡す\n")
+        self.assertEqual(
+            err, "ccnavi: --result <json> が要る。リモートから取得した結果は sh が渡す\n"
+        )
 
     def test_unreadable_file_says_only_why(self):
         got, err = self._run(os.path.join(self.dir, "missing.json"))

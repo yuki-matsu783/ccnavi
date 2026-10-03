@@ -34,7 +34,7 @@ class BoardTest(PhaseHarness):
 
     def scene(self):
         """親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、
-        同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子のワークツリーにも写っている。"""
+        同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子のワークツリーにも入っている。"""
         self.family(plan=("research", "design"))
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
@@ -85,12 +85,12 @@ class BoardTest(PhaseHarness):
         self.assertEqual(parent["copy"]["status"], "open")
 
     def test_scattered_is_empty_while_the_home_tree_holds_one_copy(self):
-        """写りがあること自体は普通。権威のツリーに 1 つあれば散在ではない。"""
+        """複数のツリーにあること自体は普通。本物とするツリーに 1 つあれば散在ではない。"""
         self.scene()
         for t in self.board()["tickets"]:
             self.assertEqual(t["scattered"], [], t["ticket"])
-        # 正常な場面でも、写りは複数あるし状態も食い違う（ワークツリーはブランチを
-        # 切った時点の写しを持つ。承認済みチケットの置き場に在るものも写る）。
+        # 正常な場面でも、複数のツリーにあるし状態も食い違う（ワークツリーはブランチを
+        # 切った時点のコピーを持つ。承認済みチケットの置き場に在るものも入る）。
         # 数や状態の違いを食い違いに数えない。
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(len(by_id["i0001-01"]["seen_in"]), 3)
@@ -99,7 +99,7 @@ class BoardTest(PhaseHarness):
         )
 
     def move(self, ticket_id, source_tree, target_tree, state="todo"):
-        """提案を 1 つ、ツリーからツリーへ手で動かす。権威のツリーを作り変えるため。"""
+        """提案を 1 つ、ツリーからツリーへ手で動かす。本物とするツリーを作り変えるため。"""
         source = os.path.join(source_tree, "wip", "proposals", state, ticket_id + ".md")
         with open(source, encoding="utf-8") as f:
             text = f.read()
@@ -107,17 +107,17 @@ class BoardTest(PhaseHarness):
         return write(os.path.join(target_tree, "wip", "proposals", state, ticket_id + ".md"), text)
 
     def test_scattered_is_empty_when_the_home_tree_is_gone_but_the_origin_holds_one(self):
-        """親のツリーが無ければ元ツリーが権威。片付けただけの形を散在に数えない。
+        """親のツリーが無ければ元ツリーを本物とする。片付けただけの形を散在に数えない。
 
         親のワークツリーは合流したら片付ける。そこを行き先の無いまま数えると、片付けた
-        家族のカードが全部「複数の場所にある」になり、状態の操作も止まる。
+        親のブランチのカードが全部「複数の場所にある」になり、状態の操作も止まる。
         """
         self.scene()
         self.move("i0001-03", self.parent_tree, self.root)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(by_id["i0001-03"]["scattered"], [])
-        # 写り自体は残る。決まらなさだけを scattered が言う。
+        # 複数のツリーにあること自体は残る。決まらなさだけを scattered が言う。
         self.assertEqual(
             [(s["tree"], s["state"]) for s in by_id["i0001-03"]["seen_in"]],
             [("", "todo"), ("i0001-02", "todo")],
@@ -138,7 +138,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(by_id["i0001-02"]["scattered"], [])
 
     def test_scattered_says_the_same_tree_holding_two_places(self):
-        """動かす途中で止まった跡は、権威のツリーの中でも言う（`--lint` と同じ数え方）。"""
+        """動かす途中で止まった形跡は、本物とするツリーの中でも言う（`--lint` と同じ数え方）。"""
         self.scene()
         doing = os.path.join(self.approved, "doing", "i0001-02.md")
         with open(doing, encoding="utf-8") as f:
@@ -165,7 +165,7 @@ class BoardTest(PhaseHarness):
         waiting = by_id["i0001-02"]
         self.assertEqual(waiting["copy"]["status"], "review")
         self.assertEqual(waiting["scattered"], [])
-        # 同じファイルを 2 つの走査が拾っても、写りは 1 ツリーに 1 つ。
+        # 同じファイルを 2 つの走査が拾っても、チケットは 1 ツリーに 1 つ。
         self.assertEqual(
             len({(s["tree"], s["state"]) for s in waiting["seen_in"]}), len(waiting["seen_in"])
         )
@@ -225,15 +225,15 @@ class BoardTest(PhaseHarness):
 
 
 def _portable(value, root: str):
-    """絶対パスと時刻を、機械に依らない綴りに置き換える。フィクスチャに書く分だけ。"""
+    """絶対パスと時刻を、機械に依らない表記に置き換える。フィクスチャに書く分だけ。"""
     if isinstance(value, dict):
         return {k: _portable(v, root) for k, v in value.items()}
     if isinstance(value, list):
         return [_portable(v, root) for v in value]
     if isinstance(value, str):
-        # ワークツリーの根は normcase 済み（Windows では小文字）で出るので、綴りを問わず置き換える。
-        # ccnavi は根を行き着く先まで解いた綴りで出す（macOS の /var → /private/var）。
-        # 解いた綴りを先に置き換える。後にすると、中に含まれる元の綴りだけが先に
+        # ワークツリーの根は normcase 済み（Windows では小文字）で出るので、表記を問わず置き換える。
+        # ccnavi は根を行き着く先まで解いたパスで出す（macOS の /var → /private/var）。
+        # 解いたパスを先に置き換える。後にすると、中に含まれる元のパスだけが先に
         # 置き換わって `/private<root>` が残る。
         text = value.replace("\\", "/")
         for spelling in dict.fromkeys((os.path.realpath(root), root)):

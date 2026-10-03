@@ -1,4 +1,4 @@
-"""ファイルの読み書きの型。控え、マーカー、承認済みチケット、下書きが全部これを通る。
+"""ファイルの読み書きの型。記録、マーカー、承認済みチケット、下書きが全部これを通る。
 
 読めなければ None、書けなければ理由の文、という形に揃えてある。hook の中で
 読み書きの失敗が例外のまま上へ抜けると、判定に達しないまま終わる。ここで
@@ -34,7 +34,7 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 # ---- 時計（Clock の差し口。ADR-0093 の 6.2）
 #
 # 時刻はこの 2 つの関数だけが読む。`clock` で固定すると、その間の `stamp` と `utc_stamp` は
-# 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と跡（`at`）に同じ時刻を
+# 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と履歴（`at`）に同じ時刻を
 # 書き、Chrome（Pyodide）と手元が同じ入力から同じバイト列を出すため。
 _CLOCK: dict = {"fixed": ""}
 _STAMP_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
@@ -66,7 +66,7 @@ def stamp() -> str:
 
 
 def utc_stamp() -> str:
-    """跡に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。固定した時刻があればそれを直す。"""
+    """履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。固定した時刻があればそれを直す。"""
     fixed = _CLOCK["fixed"]
     if fixed:
         return _parse_stamp(fixed).astimezone(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -79,19 +79,19 @@ def slashed(path: str) -> str:
 
 
 def full_path(path: str, cwd: str) -> str:
-    """ファイルのパスを、行き着く先が 1 つに決まる綴りに直す。
+    """ファイルのパスを、行き着く先が 1 つに決まるパスに直す。
 
-    来たままの文字列に当てると、同じ場所を別の綴りで書くだけでルールを外せる。
+    来たままの文字列に当てると、同じ場所を別の表記で書くだけでルールを外せる。
     相対パスは呼び出し側の作業ディレクトリ次第で意味が変わるし、`..` を挟めば
-    `secrets/` を通らない綴りで `secrets/` の中に届く。シンボリックリンクなら
+    `secrets/` を通らないパスで `secrets/` の中に届く。シンボリックリンクなら
     名前を 1 つ増やすだけで済む。守る対象は名前ではなく場所なので、
     場所まで解いてから当てる。
 
     解けなかったときも、絶対パスにして `..` を取り除くところまではやる。
     まだ存在しないファイルへの書き込みがこれにあたる。
 
-    実行前チェック（judge）と実行後チェック（gitstate）が同じ綴りに直す。別々に持つと、
-    同じ場所が 2 通りの綴りで当たり、実行前に通った書き込みが実行後に咎められる。
+    実行前チェック（judge）と実行後チェック（gitstate）が同じパスに直す。別々に持つと、
+    同じ場所が 2 通りのパスで当たり、実行前に通った書き込みが実行後に咎められる。
     """
     if not path:
         return ""
@@ -104,9 +104,9 @@ def full_path(path: str, cwd: str) -> str:
 
 
 def spelled_path(path: str, cwd: str) -> str:
-    """ファイルのパスを、リンクを解かずに絶対の綴りに直す。`..` は取り除く。
+    """ファイルのパスを、リンクを解かずに絶対パスに直す。`..` は取り除く。
 
-    `full_path` は行き着く先に直すので、リンクそのものの綴りが消える。置き場の綴りに当てる
+    `full_path` は行き着く先に直すので、リンクそのもののパスが消える。置き場のパスに当てる
     止める向きの検査（フローのロック）は、解いた先と解く前の両方に当てるためにこちらも使う。
     """
     if not path:
@@ -116,7 +116,7 @@ def spelled_path(path: str, cwd: str) -> str:
 
 
 def parent_resolved(path: str) -> str:
-    """ディレクトリだけを行き着く先に直し、最後の名前は綴りのまま残す。空なら空。"""
+    """ディレクトリだけを行き着く先に直し、最後の名前は書かれたまま残す。空なら空。"""
     if not path:
         return ""
     head, name = os.path.split(path)
@@ -149,8 +149,8 @@ def read_text(path: str, errors: str = "strict") -> str | None:
 def read_bytes(path: str) -> bytes | None:
     """中身をそのまま読む。読めなければ None。
 
-    バイト列で扱う。改行を変換すると、控えから戻したファイルが元と 1 バイト
-    違うものになる。Windows と Linux で同じ控えを取るために、ここは解釈しない。
+    バイト列で扱う。改行を変換すると、バックアップから戻したファイルが元と 1 バイト
+    違うものになる。Windows と Linux で同じバックアップを取るために、ここは解釈しない。
     """
     staged, content = _staged(path)
     if staged:
@@ -166,7 +166,7 @@ def read_bytes(path: str) -> bytes | None:
 
 
 # 同じ名前への書き込みが一時的に失敗する errno。同じイベントの hook は並列に走り、
-# 同じセッションの控えを同じ名前に書くので、片方が置き換え・削除している最中に
+# 同じセッションの記録を同じ名前に書くので、片方が置き換え・削除している最中に
 # もう片方が開くことがある。Windows はそれを ERROR_DELETE_PENDING や共有違反で返し、
 # Python はそれぞれ EINVAL（表に無い Win32 エラーの既定）と EACCES にして投げる。
 # どちらも待てば通る失敗なので、数回だけ打ち直す。表に無い理由（ENOSPC など）は
@@ -211,8 +211,8 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
 
     `write_text` の `open(path, "w")` は、開いた時点で中身を捨てる。書き終える
     までのあいだファイルは空で、そこを誰かに読まれれば「空だった」ことになるし、
-    途中で落ちれば空のまま残る。取り合いになる控えと、途中で落ちたものを次の
-    起動に拾わせたくない控えは、こちらで書く。
+    途中で落ちれば空のまま残る。取り合いになる記録と、途中で落ちたものを次の
+    起動に拾わせたくない記録は、こちらで書く。
 
     同じ場所に一時ファイルを作って書き切り、`os.replace` で差し替える。読む側が
     見るのは差し替えの前の中身か後の中身のどちらかだけになる。**差し替えが一瞬で
@@ -230,7 +230,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     **守るのは「同時に読む側」までで、電源断は守らない。** 差し替えの前に
     `fsync` をしていないので、ディスクへ実際に届く順はファイルシステム任せ。
     電源断の直後に「新しいほうに差し替わっているが中身が古い／空」になる
-    余地は残る。控えは失っても取り直せるものなので、そこまでの手間はかけない。
+    余地は残る。記録は失っても取り直せるものなので、そこまでの手間はかけない。
 
     **名前が伸びる。** 一時ファイルの名前は元より 20 文字ほど長い。Windows の
     260 文字の上限ぎりぎりの行き先では、`write_text` なら書けたものがここでは
@@ -248,7 +248,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
         handle, part = tempfile.mkstemp(dir=directory, prefix=f"{stem}.", suffix=f".part{suffix}")
         try:
             # mkstemp は必ず 0600 で作る。os.replace は inode ごと差し替えるので、
-            # そのままだと行き先の権限が気づかないうちに 0600 に締まる（POSIX で実際に確かめた）。
+            # そのままだと行き先の権限が気づかないうちに 0600 に狭まる（POSIX で実際に確かめた）。
             # 素の open(path, "w") と同じ見え方に戻す。既に在るファイルを
             # 上書きするなら、その権限を引き継ぐ。
             os.chmod(part, _mode_for(path))
@@ -307,7 +307,7 @@ def read_json(path: str) -> tuple[Any, Exception | None]:
 
     一時的に開けないだけなら数回打ち直す。`write_text_atomic` の差し替えは
     中身を壊さないが、Windows ではその一瞬に開こうとした側が共有違反
-    （EACCES）で開けない。打ち直さないと、控えを読む側はそれを「読めなかった」
+    （EACCES）で開けない。打ち直さないと、記録を読む側はそれを「読めなかった」
     ＝「まだ何も無い」と読み、数えが 0 に戻る。書き込み側が同じ errno を
     打ち直しているのと対で、片方だけでは並んで走る hook に対応できない。
     """
@@ -392,8 +392,8 @@ def unlink(path: str) -> str:
 def move(source: str, target: str) -> str:
     """ファイルを動かす。動かせたら空文字、駄目なら理由。行き先の有無は呼び手が見る。
 
-    同じファイルシステムの中なら rename 1 回で済む。またぐとき（EXDEV）だけ写して消し、
-    消せなければ写した側を消して戻す（両方に残さない）。写して消す処理に回すのは EXDEV に
+    同じファイルシステムの中なら rename 1 回で済む。またぐとき（EXDEV）だけコピーして消し、
+    消せなければコピーした側を消して戻す（両方に残さない）。コピーして消す処理に回すのは EXDEV に
     限る。rename が他の理由で落ちたときまで回すと、その間に別のプロセスが置いた行き先を消す。
     """
     if _STAGE["current"] is not None:
@@ -474,7 +474,7 @@ def append(path: str, data: bytes) -> str:
         finally:
             os.close(fd)
     except (OSError, ValueError) as exc:
-        # ValueError は綴りに NUL が混ざったときなど。
+        # ValueError はパスに NUL が混ざったときなど。
         return str(exc)
     _record(path)
     return ""
@@ -503,7 +503,7 @@ def replace_bytes(path: str, content: bytes, temp_suffix: str) -> str:
 
 
 def exists(path: str) -> bool:
-    """在るか（リンクは辿る）。控える段があれば、そこで書いた・消した分を先に見る。"""
+    """在るか（リンクは辿る）。溜める段があれば、そこで書いた・消した分を先に見る。"""
     staged, content = _staged(path)
     if staged:
         return content is not None
@@ -511,7 +511,7 @@ def exists(path: str) -> bool:
 
 
 def lexists(path: str) -> bool:
-    """在るか（リンクそのものも数える）。控える段は `exists` と同じに見る。"""
+    """在るか（リンクそのものも数える）。溜める段は `exists` と同じに見る。"""
     staged, content = _staged(path)
     if staged:
         return content is not None
@@ -521,7 +521,7 @@ def lexists(path: str) -> bool:
 def listdir(directory: str) -> list[str]:
     """ディレクトリの名前の一覧（並びは決めない）。無ければ `os.listdir` と同じ例外。
 
-    控える段があれば、そこで足した名前を足し、消した名前を落とす。
+    溜める段があれば、そこで足した名前を足し、消した名前を落とす。
     """
     stage = _STAGE["current"]
     if stage is None:
@@ -559,14 +559,14 @@ def load_text(path: str) -> str:
 # ---- 判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）
 #
 # 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
-# 読んだファイルの中身の指紋を控える。無かった・読めなかったファイルも「無い」として控える
-# （後から現れれば判定が変わりうる）。控える段（`staging`）から読んだ分は数えない（判定の
+# 読んだファイルの中身の指紋を記録する。無かった・読めなかったファイルも「無い」として記録する
+# （後から現れれば判定が変わりうる）。溜める段（`staging`）から読んだ分は数えない（判定の
 # 入力ではなく、plan の途中の姿）。承認の指紋（`approval.approval_digest`）がこれを使う。
 #
 # 中身は改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。機械の
 # 改行で指紋が変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
 
-# 無い・読めないファイルの印。
+# 無い・読めないファイルを表す値。
 READ_ABSENT = "-"
 _READERS: list[dict[str, str]] = []
 
@@ -582,7 +582,7 @@ def reading() -> Iterator[dict[str, str]]:
     try:
         yield seen
     finally:
-        # 同一性で外す（`list.remove` は等価で比べるので、中身の同じ別の控えを外しうる。
+        # 同一性で外す（`list.remove` は等価で比べるので、中身の同じ別の記録を外しうる。
         # 入れ子の内と外がどちらも空のときなど）。
         for i in range(len(_READERS) - 1, -1, -1):
             if _READERS[i] is seen:
@@ -591,7 +591,7 @@ def reading() -> Iterator[dict[str, str]]:
 
 
 def note_read(path: str, content: str | bytes | None) -> None:
-    """読んだ中身を控える（`reading` の外では何もしない）。fsio を通らない読みもこれを呼ぶ。"""
+    """読んだ中身を記録する（`reading` の外では何もしない）。fsio を通らない読みもこれを呼ぶ。"""
     if not _READERS:
         return
     key = os.path.normpath(parent_resolved(os.path.abspath(path)))
@@ -615,7 +615,7 @@ def content_digest(content: str | bytes) -> str:
 #
 # 書き込みの関数（`write_text`・`write_text_atomic`・`write_bytes`・`write_json_atomic`・
 # `remove`・`unlink`・`move`・`write_new`・`append`・`replace_bytes`）は、書けたときに
-# 行き先を控える。控えるのは `recording` の中だけ。C1（段階 2d）は sh から
+# 行き先を記録する。記録するのは `recording` の中だけ。C1（段階 2d）は sh から
 # `--record-writes <ファイル>` を渡し、この一覧のパスだけをコミットする。
 # 一覧に漏れがあると、書いたのにコミットされない状態が残るので、置き場を書くコードは
 # ここの関数だけを通す（素の `open`・`os.remove` を使わない）。
@@ -642,7 +642,7 @@ def recording() -> Iterator[list[str]]:
 def _record(path: str) -> None:
     if not _RECORDERS:
         return
-    # 行き着く先の綴りで控える（ディレクトリのリンクを解く。macOS の /var → /private/var など）。
+    # 行き着く先のパスで記録する（ディレクトリのリンクを解く。macOS の /var → /private/var など）。
     # 最後の名前は解かない（消したファイル・リンクそのものを書いた場合も、その名前で数える）。
     key = os.path.normpath(parent_resolved(os.path.abspath(path)))
     for seen in _RECORDERS:
@@ -665,15 +665,15 @@ def _recorded(path: str, failed: str) -> str:
     return failed
 
 
-# ---- 書かずに控える段（承認の plan。ADR-0093 の 6.2）
+# ---- 書かずに溜める段（承認の plan。ADR-0093 の 6.2）
 #
-# `staging` の中では、書き込みの関数はディスクに書かずに `Op` を控え、読みの関数
+# `staging` の中では、書き込みの関数はディスクに書かずに `Op` を溜め、読みの関数
 # （`read_text`・`read_bytes`・`read_json`・`exists`・`lexists`・`listdir`・`load_text`）は
-# 控えた中身を先に見る。承認の書き込みの手順（`approval.plan_batch`）をこの中で
+# 溜めた内容を先に見る。承認の書き込みの手順（`approval.plan_batch`）をこの中で
 # 動かすと、何をどの順に書くか（`Changes`）が値として出る。手元の Writer(FS) はそれを
 # ディスクに書き、Chrome は同じ値を 1 コミットにする。
 #
-# 書けなかったときの扱いは、書く側のコードが `policy` でつける（控える段では書き込みが
+# 書けなかったときの扱いは、書く側のコードが `policy` でつける（溜める段では書き込みが
 # 落ちないので、落ちたときの枝のコードは走らない）。
 
 OP_TEXT = "text"  # write_text
@@ -691,7 +691,7 @@ FAIL_STOP = "stop"  # そこで止め、理由を呼び手へ返す
 FAIL_WARN = "warn"  # 標準エラーに言って続ける
 FAIL_LINE = "line"  # 知らせる行を標準出力に出し、同じ組の残りを飛ばす
 FAIL_QUIET = "quiet"  # 何も出さずに続ける
-FAIL_HISTORY = "history"  # 跡の書けなかった知らせに溜めて続ける（history.py）
+FAIL_HISTORY = "history"  # 履歴の書けなかった知らせに溜めて続ける（history.py）
 
 
 @dataclass(frozen=True)
@@ -702,7 +702,7 @@ class Policy:
     書けたらその識別子を「置いた」と数える。`group` が同じ行と書き込みは 1 つの組で、
     `FAIL_LINE` で落ちたら残りを飛ばす。`ticket` は知らせの頭に付ける識別子。
     `prefix` は `message` の前に付ける語（呼び手の用件。「マーカーを置けない: 」など）。
-    `tag` は書けたときに組ごとに控える名札で、`Call` が「実際に書けたもの」を知るのに使う。
+    `tag` は書けたときに組ごとに記録する名札で、`Call` が「実際に書けたもの」を知るのに使う。
     """
 
     on_fail: str = FAIL_STOP
@@ -716,13 +716,13 @@ class Policy:
 
 
 def failure_text(policy: Policy, reason: str) -> str:
-    """書けなかった知らせの本文。`{reason}` だけを差し込む（綴りの `{` `}` は解釈しない）。"""
+    """書けなかった知らせの本文。`{reason}` だけを差し込む（文面の `{` `}` は解釈しない）。"""
     return policy.prefix + policy.message.replace("{reason}", reason)
 
 
 @dataclass
 class Op:
-    """控えた書き込み 1 つ。`content` は書いた後の中身（消したものは None）。"""
+    """溜めた書き込み 1 つ。`content` は書いた後の中身（消したものは None）。"""
 
     kind: str
     path: str
@@ -733,7 +733,7 @@ class Op:
     data: bytes = b""
     temp_suffix: str = ""
     policy: Policy = field(default_factory=Policy)
-    # 見え方（Changes）にだけ載せ、Writer(FS) は書かない。同じ中身を `Call` が書く（跡）。
+    # 見え方（Changes）にだけ載せ、Writer(FS) は書かない。同じ中身を `Call` が書く（履歴）。
     view_only: bool = False
 
 
@@ -742,7 +742,7 @@ class Call:
     """Writer(FS) が、同じ組の書き込みを済ませた後に呼ぶ手順。
 
     `run` は組の中で書けた `tag` の集まりを受け、見せる行を返す。書けたものに合わせて
-    行と跡を書く所（マーカーの消去）で使う。控える段では呼ばない。
+    行と履歴を書く所（マーカーの消去）で使う。溜める段では呼ばない。
     """
 
     run: Callable[[set[str]], list[str]]
@@ -765,12 +765,12 @@ class Line:
 
 
 class Stage:
-    """控えた書き込みの並びと、控えた後の中身の見え方。"""
+    """溜めた書き込みの並びと、溜めた後の中身の見え方。"""
 
     def __init__(self) -> None:
         self.items: list[Op | Line | Call] = []
         self._view: dict[str, tuple[str, bytes | None]] = {}
-        # 最初に控えたときに、ディスクに在ったか（create と update を分けるため）。
+        # 最初に溜めたときに、ディスクに在ったか（create と update を分けるため）。
         self._before: dict[str, bool] = {}
         self._groups = 0
 
@@ -792,7 +792,7 @@ class Stage:
         self._view[key] = (os.path.normpath(os.path.abspath(path)), content)
 
     def names_in(self, directory: str) -> tuple[list[str], set[str]]:
-        """このディレクトリの直下で、控えた書き込みが足した名前と消した名前。"""
+        """このディレクトリの直下で、溜めた書き込みが足した名前と消した名前。"""
         base = _key(directory)
         added: list[str] = []
         dropped: set[str] = set()
@@ -807,7 +807,7 @@ class Stage:
         return added, dropped
 
     def touched(self) -> list[tuple[str, bytes | None, bool]]:
-        """控えた後の中身（書いた順）。消したものは None。3 つめは控える前にディスクに在ったか。"""
+        """溜めた後の中身（書いた順）。消したものは None。3 つめは溜める前にディスクに在ったか。"""
         return [
             (spelled, content, self._before[key]) for key, (spelled, content) in self._view.items()
         ]
@@ -818,9 +818,9 @@ _STAGE: dict = {"current": None, "policy": Policy(), "view_only": False}
 
 @contextlib.contextmanager
 def staging() -> Iterator[Stage]:
-    """この間の書き込みをディスクに書かずに控える。入れ子にはしない。"""
+    """この間の書き込みをディスクに書かずに溜める。入れ子にはしない。"""
     if _STAGE["current"] is not None:
-        raise RuntimeError("控える段は入れ子にしない")
+        raise RuntimeError("溜める段は入れ子にしない")
     stage = Stage()
     _STAGE["current"] = stage
     try:
@@ -835,7 +835,7 @@ def current_stage() -> Stage | None:
 
 @contextlib.contextmanager
 def policy(**changes: Any) -> Iterator[None]:
-    """この間に控える書き込みの、書けなかったときの扱い。外側の扱いを上書きする。"""
+    """この間に溜める書き込みの、書けなかったときの扱い。外側の扱いを上書きする。"""
     before = _STAGE["policy"]
     _STAGE["policy"] = Policy(**{**before.__dict__, **changes})
     try:
@@ -846,7 +846,7 @@ def policy(**changes: Any) -> Iterator[None]:
 
 @contextlib.contextmanager
 def view_only() -> Iterator[None]:
-    """この間に控える書き込みは見え方（Changes）にだけ載せ、Writer(FS) は書かない。"""
+    """この間に溜める書き込みは見え方（Changes）にだけ載せ、Writer(FS) は書かない。"""
     before = _STAGE["view_only"]
     _STAGE["view_only"] = True
     try:
@@ -892,7 +892,7 @@ def _missing(path: str) -> FileNotFoundError:
 
 
 def _encode(text: str, newline: str | None) -> bytes:
-    """控える中身のバイト列。改行は `newline` を明示したときだけ書き換える。
+    """溜める中身のバイト列。改行は `newline` を明示したときだけ書き換える。
 
     `newline=None`（`open` の既定）はディスクでは機械の改行（Windows は CRLF）になるが、
     Changes の中身は LF に固定する。Chrome のコミットと手元の plan が機械に依らず同じ

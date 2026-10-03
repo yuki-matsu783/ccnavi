@@ -11,8 +11,8 @@ onedir で作る。onefile は起動のたびにランタイムを一時ディ�
 `ccnavi_buildinfo.py` を書き、PyInstaller に一緒に入れさせる。git に聞くのはここだけで、
 実行ファイルは聞かない。作業ツリーに未コミットの変更があれば `-dirty` を付ける。
 
-組み立てた `dist/ccnavi/` は `.ccnavi/bin/<os>-<arch>/` へ写す。hook が起動する振り分けの sh
-（`.ccnavi/scripts/ccnavi-launcher.sh`）は `../bin/` のこちらを探すので、写すまで hook は
+組み立てた `dist/ccnavi/` は `.ccnavi/bin/<os>-<arch>/` へコピーする。hook が起動する振り分けの sh
+（`.ccnavi/scripts/ccnavi-launcher.sh`）は `../bin/` のこちらを探すので、コピーするまで hook は
 新しい実行ファイルを起動しない。
 """
 
@@ -33,7 +33,7 @@ from ccnavi import platformtag, version  # noqa: E402
 DIST = os.path.join(ROOT, "dist")
 NAME = "ccnavi"
 # どの機械向けに組み立てたかの目印。scripts/ccnavi-setup.sh が配る前に読む。
-# dist/ccnavi/ の外に置く。中に置くと、配布が実行ファイルと一緒に配布先へ写す。
+# dist/ccnavi/ の外に置く。中に置くと、配布が実行ファイルと一緒に配布先へコピーする。
 TARGET = os.path.join(DIST, NAME + ".target")
 # 振り分けの sh が起動する実行ファイルの置き場（ワークスペースルートからの相対）。
 # <os>-<arch>/ はこの下に並ぶ。
@@ -140,7 +140,7 @@ def build() -> int:
         live = install(os.path.join(DIST, NAME), ROOT, target)
     except OSError as e:
         where = os.path.join(BIN_ROOT, target)
-        print(f"{where} へ写せなかった: {e}", file=sys.stderr)
+        print(f"{where} へコピーできなかった: {e}", file=sys.stderr)
         print(f"dist/ は新しい。{where}{os.sep} は前のまま", file=sys.stderr)
         return 1
     print(f"installed {live}")
@@ -148,23 +148,24 @@ def build() -> int:
 
 
 def install(dist_dir: str, root: str, target: str) -> str:
-    """組み立ての出力 `dist_dir`（`dist/ccnavi/` そのもの）を `.ccnavi/bin/<target>/` へ写す。
+    """組み立ての出力 `dist_dir`（`dist/ccnavi/` そのもの）を `.ccnavi/bin/<target>/` へコピーする。
 
     `.ccnavi/bin/` は `root` の下に取る。
 
-    写すのであって移すのではない。`dist/` は導入スクリプトの配布元で、代わりに通る sh の既定の
-    探し先でもある。起動中の置き場へ上書きで写すと、onedir の `_internal/` が前後の版で
-    混ざるので、隣の `<target>.new` に写し切ってから `_swap` で入れ替える。前の版にだけ
+    コピーするのであって移すのではない。`dist/` は導入スクリプトの配布元で、代わりに通る sh の既定の
+    探し先でもある。起動中の置き場へ上書きでコピーすると、onedir の `_internal/` が前後の版で
+    混ざるので、隣の `<target>.new` にコピーし切ってから `_swap` で入れ替える。前の版にだけ
     あったファイルは、入れ替えで退避した側ごと消える。
 
-    落ちたら OSError をそのまま投げる。置き場は前のままで、写しかけの `<target>.new` は消す。
-    写した先のパスを返す。
+    落ちたら OSError をそのまま投げる。置き場は前のままで、コピーしかけの `<target>.new` は消す。
+    コピーした先のパスを返す。
     """
     live = os.path.join(root, BIN_ROOT, target)
     new = live + ".new"
     shutil.rmtree(new, ignore_errors=True)
     try:
-        # PyInstaller の出力にはシンボリックリンクが入ることがある（macOS）。辿らずにそのまま写す。
+        # PyInstaller の出力にはシンボリックリンクが入ることがある（macOS）。
+        # 辿らずにそのままコピーする。
         shutil.copytree(dist_dir, new, symlinks=True)
         _swap(new, live)
     finally:

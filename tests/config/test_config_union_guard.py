@@ -1,12 +1,13 @@
-"""設定 3 本の和の受入テスト。設定ファイルの守り（設計 11.6）と導入スクリプト（11.9 末尾）。
+"""設定 3 本の和の受入テスト。設定ファイルの保護（設計 11.6）と導入スクリプト（11.9 末尾）。
 
 selfguard のコアに、各層の `.ccnavi/config/` の 3 本と共通層の phases / risk が入る。
-Write / Edit の拒否、シェルからの書き込みの拒否、控えと復元の 3 つとも、共通層の rules.yml に
-掛けているものをそのまま掛ける。元リポジトリから切ったワークツリー側の設定も対象。
+Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、
+共通層の rules.yml に掛けているものをそのまま掛ける。
+元リポジトリから切ったワークツリー側の設定も対象。
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
-実装は入っている。ここが落ちたら、設定ファイルの守りか導入スクリプトが設計 11.6 / 11.9 と
+実装は入っている。ここが落ちたら、設定ファイルの保護か導入スクリプトが設計 11.6 / 11.9 と
 食い違ったということ。
 """
 
@@ -33,7 +34,7 @@ from tests.config.test_config_union import (
 )
 
 SETUP = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
-# 振り分けの sh の原本。写す前は CCNAVI_TEST_LAUNCHER で名指しできる
+# 振り分けの sh の原本。コピーする前は CCNAVI_TEST_LAUNCHER で名指しできる
 # （tests/sh/test_launcher.py と同じ）。
 LAUNCHER = os.path.join(
     ROOT,
@@ -54,7 +55,7 @@ BROKEN_RULES = "version: 1\ndeny: [\n"
 
 
 class GuardHarness(ConfigUnionHarness):
-    """設定ファイルの守りを enable にして動かす道具。"""
+    """設定ファイルの保護を enable にして動かす道具。"""
 
     def setUp(self):
         super().setUp()
@@ -64,11 +65,11 @@ class GuardHarness(ConfigUnionHarness):
         return self.hook(tool, cwd, event=event, guard="enable", **tool_input)
 
     def run_hook(self, event, command="ls"):
-        """Bash 1 回。実行前で控えを取り、実行後で戻す。"""
+        """Bash 1 回。実行前でバックアップを取り、実行後で戻す。"""
         return self.guarded_hook("Bash", self.ws, event=event, command=command)
 
     def break_and_restore(self, path, broken="version: 1\ndeny: []\n"):
-        """控えを取らせ、壊し、実行後に戻ったかを返す。"""
+        """バックアップを取らせ、壊し、実行後に戻ったかを返す。"""
         before = read(path)
         self.run_hook("PreToolUse")
         write(path, broken)
@@ -82,10 +83,10 @@ class GuardHarness(ConfigUnionHarness):
 
 
 class RestoreTest(GuardHarness):
-    """控えと復元（11.6、REQ-MLT-08 の変更）。"""
+    """バックアップと復元（11.6、REQ-MLT-08 の変更）。"""
 
     def test_project_layer_files_are_restored(self):
-        """11.6: プロジェクトの層の 3 本が控えと復元の対象。"""
+        """11.6: プロジェクトの層の 3 本がバックアップと復元の対象。"""
         for kind in ("rules", "phases", "risk"):
             with self.subTest(kind=kind):
                 path = layer_path(self.lib, kind)
@@ -153,7 +154,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn("統合すれば", result.stdout, self.said(result, name))
 
     def test_deleted_layer_file_comes_back_from_the_project_git(self):
-        """11.6 / REQ-SLF: 控えが無ければ、その層の git（プロジェクト自身）から戻る。"""
+        """11.6 / REQ-SLF: バックアップが無ければ、その層の git（プロジェクト自身）から戻る。"""
         path = layer_path(self.lib, "rules")
         expected = read(path)
         os.remove(path)
@@ -233,7 +234,7 @@ class DenyTest(GuardHarness):
     def test_a_rule_named_like_a_builtin_does_not_replace_it(self):
         """組み込みの名前（`builtin-guard-`）のルールは読み込まず、組み込みは常に足す。
 
-        以前は何にも当たらない 1 本をこの名前で書くだけで、共通層の守りが気づかないうちに消えた。
+        以前は何にも当たらない 1 本をこの名前で書くだけで、共通層の保護が気づかないうちに消えた。
         """
         decoy = dict(
             OPEN_RULES,
@@ -285,7 +286,7 @@ class DenyTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-project-home")
 
     def test_project_home_deny_follows_the_env(self):
-        """11.6: 綴りは `CCNAVI_PROJECT_HOME` の値で組む。"""
+        """11.6: パスは `CCNAVI_PROJECT_HOME` の値で組む。"""
         moved = os.path.join(self.lib, ".navi", "config", "rules.yml")
         result = self.hook(
             "Write", self.ws, guard="enable", env={"CCNAVI_PROJECT_HOME": ".navi"}, file_path=moved
@@ -318,7 +319,7 @@ class DenyTest(GuardHarness):
         )
 
     def test_disable_does_not_add_the_deny(self):
-        """11.6: 設定ファイルの守りを disable にすれば組み込みの deny も足さない。"""
+        """11.6: 設定ファイルの保護を disable にすれば組み込みの deny も足さない。"""
         result = self.hook("Write", self.ws, file_path=layer_path(self.lib, "rules"))
         self.assertNotIn("builtin-guard-project-home", self.reason(result))
         result = self.hook("Write", self.ws, file_path=self.phases)
@@ -400,7 +401,7 @@ class DenyTest(GuardHarness):
         """`--test --json` で 1 本判定し、当たったルールの id を返す。
 
         hook の payload では共通層を動かせない（`--rules` は診断でだけ有効。ADR-0067）。
-        試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を守りが
+        試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を保護が
         追うかどうかは、こちらで見る（REQ-DIA-03）。
         """
         done = self.ccnavi(*flags, "--test", "--json", "Bash", command, guard=guard)
@@ -415,7 +416,7 @@ class DenyTest(GuardHarness):
 
         置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけ
         （env は使われない。ADR-0052、ADR-0067）。それでも動かせる以上、
-        守りは動かした先を追う（`common_shell_clause`）。名指しのツールは
+        保護は動かした先を追う（`common_shell_clause`）。名指しのツールは
         `common_layer_regex` が同じ先を追うので、こちらを外すと、同じファイルが
         `Write` では止まってシェルでは通る形になる。
 
@@ -426,7 +427,7 @@ class DenyTest(GuardHarness):
         """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         moved = ("--rules", policy)
-        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
+        # 絶対パスは `/` で書く。bash は引用されない `\` を落とすので、`\` の表記のままでは
         # そのコマンドは設定ファイルに書かない。
         for command in (
             "echo x > policy/rules.yml",
