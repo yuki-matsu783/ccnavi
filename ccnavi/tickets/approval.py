@@ -410,26 +410,36 @@ def revision_elsewhere_text(
     where: str,
     fams: syncstate.Families | None = None,
 ) -> str:
-    """権威のツリーの外に在る計画の違う版の案内。ファイルの場所と、改版を書くツリーを名指しする。
+    """権威のツリーの外に在る計画の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
 
-    `--lint` と `--agree`（`--verify` も）が同じ文面を出す。取り込み済みの家族では、承認の
-    手前で言っていた案内（`family_problems`）と同じく、親のワークツリーで書いて push する。
+    場所はどちらもワークスペースルートからのパスで出す（ツリーの名前ではなく、
+    `.claude/worktrees/<親>` や `projects/<名前>`）。`--lint` と `--agree`（`--verify` も）が
+    同じ文面を出す。取り込み済みの家族では、権威のツリーが親のワークツリー（`family_problems` が
+    言う書く場所と同じ）なので、場所は繰り返さず push してから頼むことだけを足す。
     """
-    place = where or "(ワークスペースルート)"
     rel = os.path.relpath(t.path, root).replace(os.sep, "/")
+    place = tree_path(conf, root, where, t.project)
+    todo = f"{conf.tickets}/{ticket_mod.TODO}/"
     text = (
         f"{t.ticket} の計画の違う提案が {rel} に在るが、権威のツリー（{place}）の外なので"
-        f"承認の対象にならない。改版なら {place} の todo/ に書き、古い版なら消してください"
+        f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら消してください"
     )
     fams = fams or syncstate.Families(conf, root)
     if fams.active:
         st = family_standing(conf, root, t, fams)
         if st.imported and st.home is not None:
-            text += (
-                f"。取り込み済みの家族の提案は親のワークツリー（.claude/worktrees/{st.family}）で"
-                "書いて push してから承認を頼んでください"
-            )
+            text += "。取り込み済みの家族なので、書いたら push してから承認を頼んでください"
     return text
+
+
+def tree_path(conf: settings.Settings, root: str, name: str, project: str = "") -> str:
+    """ツリーの名前を、ワークスペースルートからのパスに直す。ルート自身は「ワークスペースルート」。"""
+    found = [t for t in trees(conf, root) if t.name == name]
+    pick = next((t for t in found if t.project == project), found[0] if found else None)
+    if pick is None:
+        return name or "ワークスペースルート"
+    rel = os.path.relpath(pick.root, root).replace(os.sep, "/")
+    return "ワークスペースルート" if rel == "." else rel
 
 
 def mark_imported(

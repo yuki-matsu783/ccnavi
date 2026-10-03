@@ -63,7 +63,7 @@ class StaleProposalTest(PhaseHarness):
             any(
                 "計画の違う提案" in line
                 and ".claude/worktrees/i0001-07/wip/proposals/todo/i0001.md" in line
-                and "i0001 の todo/ に書き" in line
+                and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
             ),
             lines,
@@ -101,7 +101,7 @@ class StaleProposalTest(PhaseHarness):
             any(
                 "計画の違う提案" in line
                 and "wip/proposals/todo/i0001.md" in line
-                and "改版なら i0001 の todo/ に書き" in line
+                and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
             ),
             lines,
@@ -147,7 +147,7 @@ class StaleProposalTest(PhaseHarness):
             any(
                 "計画の違う提案" in line
                 and ".claude/worktrees/i0001/wip/proposals/todo/i0001.md" in line
-                and "改版なら (ワークスペースルート) の todo/ に書き" in line
+                and "改版なら ワークスペースルート の wip/proposals/todo/ に書き" in line
                 for line in lines
             ),
             lines,
@@ -179,11 +179,15 @@ class StaleProposalTest(PhaseHarness):
         self.assertNotEqual(verify.returncode, 0)
         self.assertIn("承認待ちに入らない改版がある", verify.stdout)
         self.assertIn(place_rel, verify.stdout)
-        self.assertIn("改版なら i0001 の todo/ に書き", verify.stdout)
+        self.assertIn(
+            "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
+        )
         agree = self.ccnavi("--agree", stdin="y\n")
         self.assertIn("承認待ちのチケットは無い", agree.stdout)
         self.assertIn(place_rel, agree.stderr)
-        self.assertIn("改版なら i0001 の todo/ に書き", agree.stderr)
+        self.assertIn(
+            "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", agree.stderr
+        )
 
     def test_agree_names_a_revision_written_in_the_workspace_root(self):
         """権威でないツリー（ワークスペースルート）の改版は承認待ちに入れず、--agree と --verify が
