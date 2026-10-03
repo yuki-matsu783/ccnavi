@@ -604,7 +604,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             className="action"
             data-action="suggest"
             disabled={busy}
-            title="ccnavi --suggest --json。保存済みのルールと判定の記録から、deny / ask の下書きを起こす"
+            title="ccnavi --suggest --json を実行し、保存済みのルールと判定の記録から deny / ask の下書きを起こします"
             onClick={() => {
               setBusy(true);
               setStatus({ text: "記録から候補を起こしています…", error: false });
@@ -637,7 +637,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: ".tabs",
       title: "3 つのタブ",
-      body: "「ルール」で deny・ask・allow のルールを確認・修正、「判定を試す」で編集中ルールの判定結果をテスト、「hook」で登録内容を確認できます。",
+      body: "「ルール」タブでは deny・ask・allow のルールを確かめて直せます。「判定を試す」タブでは、編集中のルールで判定を試せます。「hook」タブでは登録内容を確かめられます。",
       before: () => peek("rules"),
     },
     {

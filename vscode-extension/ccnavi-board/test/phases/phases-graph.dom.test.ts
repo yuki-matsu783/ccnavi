@@ -84,7 +84,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
   // sequential なのに after がある。矢印が判定に使われないことを言う
   const seq = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n  b:\n    kind: work\n    review: mr\n    after: [a]\n") });
   try {
-    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に効きません/);
+    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に使われません/);
   } finally {
     await seq.close();
   }

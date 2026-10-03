@@ -180,7 +180,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              <label className="filter attention" title="人が動く必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
+              <label className="filter attention" title="人が対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
                 <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応のみ
               </label>
               <button
@@ -268,7 +268,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".filter.attention",
     title: "絞り込み",
-    body: "プロジェクトと親チケットで絞り込めます（プロジェクトや親があるときだけ欄が出ます）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、人が動く必要があるカードだけを表示します。",
+    body: "プロジェクトと親チケットで絞り込めます（プロジェクトや親があるときだけ欄が出ます）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、人が対応する必要があるカードだけを表示します。",
   },
   {
     target: ".board",
@@ -278,7 +278,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".column:not(.folded) .card:not(.hidden)",
     title: "カード",
-    body: "1 枚が 1 チケットです。親か子か、フェーズの進み、人が動く必要がある状態のバッジが出ます。押すとチケットのファイルを開きます。承認やレビュー済みの連絡のボタンは、要るときだけカードに出ます。",
+    body: "1 枚が 1 チケットです。カードには、親か子か、フェーズの進み具合、人が対応する必要がある状態を示すバッジが出ます。押すとチケットのファイルを開きます。承認やレビュー済みの連絡のボタンは、要るときだけカードに出ます。",
   },
   {
     target: '[data-action="approve"]',

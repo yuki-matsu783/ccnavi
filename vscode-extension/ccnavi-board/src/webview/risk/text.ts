@@ -58,7 +58,7 @@ export function summaryId(factor: FactorForm): string {
 
 /** 要約の点。未設定なら横棒 */
 export function summaryPoints(factor: FactorForm): string {
-  return factor.points === "" ? "—" : `${factor.points} 点`;
+  return factor.points === "" ? "（未設定）" : `${factor.points} 点`;
 }
 
 /** 加点条件と値をツールチップに出す文 */

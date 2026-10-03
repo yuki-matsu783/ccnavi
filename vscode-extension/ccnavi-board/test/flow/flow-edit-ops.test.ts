@@ -274,9 +274,9 @@ test("CB-T279 確かめ直しの頼みは番号と読める写しがあるとき
   assert.equal(asFlowMessage({ type: "check", seq: 1, doc: { nodes: 1 } }), undefined);
   // 開始が無い: 画面だけなら画面が言い、実行ファイルの答えがあれば（実行ファイルが「start が無い」と言う）言わない
   const noStart = removeNode(doc, "start");
-  assert.ok(flowNotices(noStart).some((n) => /開始（start）のノードが無い/.test(n)));
-  assert.ok(!flowNotices(noStart, { exe: true }).some((n) => /開始（start）のノードが無い/.test(n)));
+  assert.ok(flowNotices(noStart).some((n) => /開始（start）のノードがありません/.test(n)));
+  assert.ok(!flowNotices(noStart, { exe: true }).some((n) => /開始（start）のノードがありません/.test(n)));
   // 開始が 2 つは実行ファイルが言わないので、答えがあっても画面が言う
   const twoStarts = addNode(doc, "start", { x: 0, y: 400 }).doc;
-  assert.ok(flowNotices(twoStarts, { exe: true }).some((n) => /開始（start）のノードが 2 つある/.test(n)));
+  assert.ok(flowNotices(twoStarts, { exe: true }).some((n) => /開始（start）のノードが 2 つあります/.test(n)));
 });

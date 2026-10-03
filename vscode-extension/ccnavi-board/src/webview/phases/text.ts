@@ -71,11 +71,11 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
   // after を 1 つでも書いていれば言う（線にならない、ほかの設定を指す after も使われないのは同じ）
   const hasAfter = form.phases.some((phase) => phase.after.some((id) => id.trim() !== ""));
   if (form.order === "sequential" && hasAfter) {
-    out.push("待ち方が sequential なので、after は判定に効きません。全体計画は plan: に並べた順に一つずつ進みます");
+    out.push("待ち方が sequential なので、after は判定に使われません。全体計画は plan: に並べた順に一つずつ進みます");
   }
   // ワークスペースとプロジェクトの設定の dag は、合成に入るほかの設定が全部 dag のときだけ有効になる（`phasetypes.py` の `merged_order`）
   if (layer && form.order === "dag") {
-    out.push("共通の設定が sequential なら、合わせたときの判定は sequential で待ちます（このファイルの after は効きません）");
+    out.push("共通の設定が sequential なら、合わせたときの判定は sequential で待ちます（このファイルの after は判定に使われません）");
   }
   if (graph.dropped > 0) {
     out.push(
