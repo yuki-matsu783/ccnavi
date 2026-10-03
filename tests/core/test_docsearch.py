@@ -495,6 +495,41 @@ class CliTest(Repo):
                 self.assertEqual(done.returncode, 1, done.stdout)
                 self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
 
+    def test_settings_and_wrapper_flags_stop_docs_too(self):
+        """設定や sh の綴りを差し替えるフラグも、黙って無視せずに止める。"""
+        self.put("a.md", doc(type="guide"))
+        for args in (
+            ("--cwd", self.root),
+            ("--approved", "x"),
+            ("--approved", ""),
+            ("--mode", "enable"),
+            ("--projects", "elsewhere"),
+            ("--projects", ""),
+            ("--project-home", ".other"),
+            ("--rules", "r.yml"),
+            ("--phases", "p.yml"),
+            ("--risk", "k.yml"),
+            ("--ticket-control", "disable"),
+            ("--guard-core-files", "disable"),
+            ("--guard-ticket-approval", "enable"),
+            ("--restore-if-deny", "x"),
+            ("--integration-branch", "main"),
+            ("--choose-out", "x"),
+        ):
+            with self.subTest(args=args):
+                done = self.ccnavi("--docs", *args)
+                self.assertEqual(done.returncode, 1, done.stdout)
+                self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
+                self.assertEqual(done.stdout, "")
+                # 層の置き場の「診断でだけ効く」の文で先へ進まない。
+                self.assertNotIn("診断", done.stderr)
+
+    def test_root_log_and_state_are_accepted(self):
+        self.put("a.md", doc(type="guide"))
+        done = self.ccnavi("--docs", "--state", "", "--format", "path")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout, "a\n")
+
     def test_impossible_dates_are_refused(self):
         for value in ("2026-13-45", "2026-02-30", "2026-08-05T25", "2026-08-05T10:61"):
             with self.subTest(value=value):
