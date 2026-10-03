@@ -4,8 +4,8 @@
 #   sh scripts/ccnavi-build-install.sh
 #
 # ワークツリーの外（チェックアウトしたブランチ直下）で実行したときは、ビルドの前に
-# いまのブランチの上流を fast-forward だけで取り込む。古いソースをビルドしてインストールしないため。
-# 上流が無いとき（detached HEAD や上流が未設定のとき）は飛ばす。fast-forward できなければ止まる。
+# いまのブランチが追跡しているリモートブランチから、fast-forward だけで取り込む。古いソースをビルドしてインストールしないため。
+# 追跡するリモートブランチが無いとき（detached HEAD や未設定のとき）は飛ばす。fast-forward できなければ止まる。
 # ワークツリーの中で実行したときは、そのブランチのソースをそのままビルドするので取り込まない。
 #
 # ccnavi は、build.py がビルドと .ccnavi/bin/<os>-<arch>/ への配置を両方行う
@@ -65,28 +65,29 @@ main() {
   # 拡張機能のソースがあるディレクトリ。
   EXT_DIR="$ROOT/vscode-extension/ccnavi-board"
 
-  # ワークツリーでは .git がファイル、チェックアウトした本体ではディレクトリになる。
+  # .git がディレクトリなら、ワークツリーではなく本体で実行している。そのときだけリモートから取り込む。
+  # （ワークツリーでは .git はファイルになる）
   if [ -d "$ROOT/.git" ]; then
-    echo "== リモートの最新を取り込む =="
-    # 上流が設定されているかを確かめる。設定されていなければ rev-parse が失敗する。
+    echo "== リモートから最新を取り込み =="
+    # 追跡するリモートブランチが設定されているかを確かめる。設定されていなければ rev-parse が失敗する。
     if git -C "$ROOT" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
       # ブランチが分岐していて fast-forward できないときは、マージせずに止める。
       if ! git -C "$ROOT" pull --ff-only; then
-        echo "fast-forward で取り込めませんでした。ブランチを揃えてからやり直してください" >&2
+        echo "fast-forward で取り込めませんでした。手元のブランチをリモートとそろえてから、もう一度実行してください。" >&2
         exit 1
       fi
     else
-      echo "上流のブランチが無いので、取り込みは飛ばします"
+      echo "追跡するリモートブランチが設定されていないため、取り込みをスキップします。"
     fi
     echo ""
   fi
 
-  echo "== ccnavi (Python) をビルドする =="
+  echo "== ccnavi (Python) のビルド =="
   # PyInstaller は uv で一時的に追加して使う。
   (cd "$ROOT" && uv run --with pyinstaller python build.py)
 
   echo ""
-  echo "== ccnavi-board (VS Code 拡張機能) をビルドする =="
+  echo "== ccnavi-board (VS Code 拡張機能) のビルド =="
   # ここから先は拡張機能のディレクトリで作業する。
   cd "$EXT_DIR"
 
@@ -100,7 +101,7 @@ main() {
     installed_version=$("$code_cmd" --list-extensions --show-versions 2>/dev/null | grep -i '^local\.ccnavi-board@' | sed 's/.*@//')
   else
     installed_version=""
-    echo "code コマンドが見つからないので、インストール済みバージョンとの比較は飛ばします（場所は環境変数 CODE で渡せます）"
+    echo "code コマンドが見つからないため、インストール済みのバージョンとの比較をスキップします。code の場所は環境変数 CODE で指定できます。"
   fi
 
   # インストール済みのバージョンが package.json のバージョン以上なら、そのパッチを 1 つ上げた番号を出力する。
@@ -123,31 +124,31 @@ console.log(i[0] + "." + i[1] + "." + ((i[2] || 0) + 1));
 ' "$pkg_version" "$installed_version")
 
   if [ -n "${next_version}" ]; then
-    echo "インストール済みのバージョン（${installed_version}）が package.json のバージョン（${pkg_version}）以上なので、${next_version} に上げます"
+    echo "インストール済みのバージョン（${installed_version}）が package.json のバージョン（${pkg_version}）以上のため、バージョンを ${next_version} に上げます。"
     # package.json のバージョンを書き換える。--no-git-tag-version で、コミットとタグは作らない。
     pnpm version "${next_version}" --no-git-tag-version
     pkg_version="${next_version}"
   fi
 
-  echo "バージョン ${pkg_version} をビルドします"
+  echo "バージョン ${pkg_version} でビルドします。"
   # vsix を作る。出力先はリポジトリ直下の dist/。
   pnpm run package
 
   # 期待したファイル名で vsix ができているかを確かめる。
   vsix="$ROOT/dist/ccnavi-board-${pkg_version}.vsix"
   if [ ! -f "$vsix" ]; then
-    echo "ビルドしたはずの vsix が見つかりません: ${vsix}" >&2
+    echo "ビルド後の vsix が見つかりません: ${vsix}" >&2
     exit 1
   fi
 
   # code があればそのままインストールし、無ければ手でインストールするためのコマンドを表示する。
   if [ -n "${code_cmd}" ]; then
     echo ""
-    echo "== 拡張機能をインストールする =="
+    echo "== 拡張機能のインストール =="
     "$code_cmd" --install-extension "$vsix"
   else
     echo ""
-    echo "code コマンドが無いので、インストールは飛ばします。インストールするには次のコマンドを実行してください。"
+    echo "code コマンドが見つからないため、インストールをスキップします。次のコマンドで手動でインストールしてください。"
     echo "  code --install-extension \"${vsix}\""
   fi
 }
