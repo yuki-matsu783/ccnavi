@@ -21,7 +21,7 @@ from typing import TextIO
 
 from ..hook import c1, core, docsearch, events, judge
 from ..infra import fsio, hookio, modes, settings
-from ..infra.modes import EXIT_ERROR, EXIT_OK
+from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog, prune
 from ..tickets import configsync, history, ops, phase, review
@@ -371,7 +371,25 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return _run(stdin, stdout, stderr, argv)
 
 
+# 前の綴り。ADR-0099 で `--agree` に改名した。別名にはしない（これで承認が動くことは無い）。
+# argparse に登録しないので、ヘルプにも `--version` の flags 一覧にも出ない。
+RENAMED_APPROVE = "--approve"
+RENAMED_APPROVE_NOTICE = (
+    "ccnavi: --approve は --agree に改名しました（ADR-0099）。"
+    "sh なら ccnavi-agree.sh を使ってください。\n"
+)
+
+
+def _asks_renamed_approve(argv: list[str]) -> bool:
+    """前の綴り `--approve`（`--approve=x` の形も）が渡されているか。"""
+    return any(word == RENAMED_APPROVE or word.startswith(RENAMED_APPROVE + "=") for word in argv)
+
+
 def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
+    # 何も読まず何も動かさずに終える。承認の経路にも判定にも入れない。
+    if _asks_renamed_approve(argv):
+        stderr.write(RENAMED_APPROVE_NOTICE)
+        return EXIT_BLOCK  # 2。使い方の誤り（1）と分け、案内だけで終える
     # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
     # 走り、全部綴った形しか見ない組み込みの deny（`phase._CLI_FORMS`）に止められない。
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
