@@ -127,9 +127,7 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
     「言えば通るかもしれない」だが、聞けないなら「言っても通らない」ので、
     先に設定を直すか、人が居るセッションでやり直すしかない。
     """
-    shown = " ".join(subject.split())
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(subject) - SUBJECT_LIMIT})"
+    shown = _shorten(subject)
 
     lines = [
         f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {rules_path})",
@@ -191,12 +189,9 @@ def reason_for(
     inner は、ルールに当たったのが実行役のコマンド（runner）が中で実行するコマンドだった
     ときの、そのコマンド。元の形で当たったときは空。
     """
-    shown = subject
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(subject) - SUBJECT_LIMIT})"
     # 改行を含む対象は 1 行に畳む。理由の骨格が対象の中身で割られると、
     # どこまでが対象でどこからが言い分なのかが読めなくなる。
-    shown = " ".join(shown.split())
+    shown = _shorten(subject)
 
     # コードはルールが置かれていたタイプから決まる。拒否と確認で同じコードを
     # 返すと、受け取った側は「止まった」のか「聞かれている」のかを文面から
@@ -246,7 +241,16 @@ def ran_by(runner: str, inner: str) -> str:
 
 def _one_line(text: str) -> str:
     """コマンドを文面に載せる形にする。目印を空白に戻し、1 行に畳んで上限で切る。"""
-    shown = " ".join(text.replace(shellread.SEP, " ").replace(shellread.WORD_SEP, " ").split())
+    return _shorten(text.replace(shellread.SEP, " ").replace(shellread.WORD_SEP, " "))
+
+
+def _shorten(text: str) -> str:
+    """文面に載せる対象を 1 行に畳み、上限で切って切った字数を添える。
+
+    順は「畳む → 切る → 畳んだ後の長さで残りを数える」。畳む前の長さで数えると、
+    改行や空白の続きまで残りに入り、見えていない字数を多く言う。
+    """
+    shown = " ".join(text.split())
     if len(shown) > SUBJECT_LIMIT:
         shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
     return shown
@@ -293,7 +297,7 @@ def unreadable(reason: str) -> str:
 
 def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
     """サブエージェントに許さない操作を止めた文。inner は reason_for と同じ。"""
-    shown = " ".join(subject.split())[:SUBJECT_LIMIT]
+    shown = _shorten(subject)
     return "\n".join(
         [
             f"[ccnavi] {phase.CODE_SUBAGENT}",
@@ -309,7 +313,7 @@ def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
 
 def builtin_refusal(code: str, subject: str, text: str) -> str:
     """組み込みの判定で止めた文。ルールに当たったのではないので、ルールの id は名乗らない。"""
-    shown = " ".join(subject.split())[:SUBJECT_LIMIT]
+    shown = _shorten(subject)
     return "\n".join([f"[ccnavi] {code}", f"subject: {shown}", text])
 
 
@@ -324,9 +328,7 @@ def rewrite(subject: str, form: str, found: list[str]) -> str:
     ルールに当たったのではないので、禁止された操作をしたとは言わない。止めたのは読みの
     決めごとで、書き直す道は必ずある。道を名指ししないと、同じ形を書き直しては止まる。
     """
-    shown = " ".join(subject.split())
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
+    shown = _shorten(subject)
     listed = ", ".join(f"`{_one_line(text)}`" for text in found[:_REWRITES_SHOWN])
     if len(found) > _REWRITES_SHOWN:
         listed += f" (+{len(found) - _REWRITES_SHOWN})"
