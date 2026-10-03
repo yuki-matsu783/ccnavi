@@ -125,7 +125,7 @@ def gather(
     `project:` が決める（設計 11.4.1）ので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` に持たせる。画面は候補が持つ種類を使う。
     """
-    proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
+    proposals, problems = approval.scan_proposals(conf, root)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 

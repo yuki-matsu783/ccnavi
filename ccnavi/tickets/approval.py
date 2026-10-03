@@ -270,6 +270,68 @@ def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tic
     return kept, notes
 
 
+def scan_proposals(
+    conf: settings.Settings,
+    root: str,
+    everything: list[ticket_mod.Ticket] | None = None,
+) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Problem]]:
+    """提案（`todo/` と `review/`）を、承認済みチケットの写りと合わせてまとめる。
+
+    承認済みの識別子の提案は、承認済みチケットの写りと合わせて権威のツリー（親のツリー →
+    元ツリー → 決まらない。`ticket.fold`）を決め、そのツリーに在るものだけを残す。
+    承認で権威のツリーの `todo/` が消えても、承認の前に切ったワークツリーには `todo/` の写しが
+    残る。提案だけでまとめると、その古い写しが承認待ちや改版（巻き戻し）として読まれる。
+    承認済みチケットの側（`_authoritative`）は「権威に無ければ落とす」なので、それと揃える。
+
+    `everything` は承認済みチケットの写りの全部（`_everything` の形）。呼び手が読んであれば
+    渡す。取り込み済みの家族（ADR-0093）も権威は親のブランチ `P` のワークツリー（名前 `P`）
+    なので、同じ規則で決まる（印を付けるのは `mark_imported` と `family_problems`）。
+    """
+    if everything is None:
+        everything = _everything(conf, root)
+    return ticket_mod.scan(root, conf.tickets, conf.projects, approved=everything)
+
+
+def stale_proposals(
+    found: list[ticket_mod.Ticket],
+    kept: list[ticket_mod.Ticket],
+    everything: list[ticket_mod.Ticket],
+) -> list[tuple[ticket_mod.Ticket, str]]:
+    """承認済みの識別子の提案のうち、権威のツリーの外に在るので読まなかった古い写し。
+
+    (写し, 権威のツリーの名前) の並び。`found` はまとめる前の提案、`kept` は
+    `scan_proposals` が残した側。権威のツリーに同じ置き場・同じ中身の提案（か承認済みチケット）が
+    在る写りは、子のワークツリーに写っているだけなので入れない。`--lint` が名指しするために使う。
+    """
+    kept_ids = {id(t) for t in kept}
+    settled = _by_id(everything)
+    out: list[tuple[ticket_mod.Ticket, str]] = []
+    for ticket_id, hits in _by_id(found).items():
+        copies = settled.get(ticket_id)
+        if not copies:
+            continue
+        where = ticket_mod.authority([*copies, *hits])
+        if where is None:
+            continue
+        there = [t for t in [*copies, *hits] if t.tree == where]
+        for t in hits:
+            if id(t) in kept_ids or t.tree == where:
+                continue
+            if any(_same_copy(t, u) for u in there):
+                continue
+            out.append((t, where))
+    return out
+
+
+def _same_copy(t: ticket_mod.Ticket, u: ticket_mod.Ticket) -> bool:
+    """同じ置き場に在る、同じ中身の写りか。`todo/` は計画まで比べる。"""
+    if (t.state or ticket_mod.DOING) != (u.state or ticket_mod.DOING):
+        return False
+    if t.state != ticket_mod.TODO:
+        return True
+    return t.plan == u.plan and t.feedback == u.feedback and t.raw == u.raw
+
+
 def mark_imported(
     conf: settings.Settings,
     root: str,

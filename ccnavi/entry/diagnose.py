@@ -731,12 +731,16 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
 
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     problems.extend(str(p) for p in scan_problems)
-    proposals = ticket_mod.dedupe(everything)
+    # 承認済みの識別子の提案は、承認済みチケットの写りと合わせて権威のツリーを決める
+    # （`approval.scan_proposals` と同じまとめ方）。権威のツリーの外に残った古い写しを
+    # 承認待ちや作業中として出さないため。
+    settled = approval._everything(conf, root)
+    proposals = ticket_mod.dedupe(everything, settled)
     # 写りの一覧（`seen_in` / `scattered`）は、承認済みチケットの置き場に在るものも数える。
     # チケットは 1 本のファイルで、どの置き場に在っても子のワークツリーに写る（ADR-0055）。
     # `review/` は提案の置き場でもあり承認済みチケットでもあるので、2 つの走査が同じ
     # ファイルを拾う。同じ実体を 2 つと数えると「複数の場所にある」になるので、パスでまとめる。
-    everything = _one_per_file(everything + approval._everything(conf, root))
+    everything = _one_per_file(everything + settled)
     open_copies, notes = approval.scan(conf, root)
     problems.extend(notes)
     closed_copies, notes = approval.scan(conf, root, closed=True)

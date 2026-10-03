@@ -607,8 +607,15 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     index = approval.by_id(copies)
     done = {t.ticket for t in closed + review}
 
-    proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
+    # 承認済みの識別子の提案は、承認済みチケットの写りと合わせて権威のツリーを決める
+    # （`approval.scan_proposals` と同じまとめ方）。外に残った古い写しは別に名指しする。
+    found, complaints = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     problems.extend(complaints)
+    settled = approval._everything(conf, root)
+    proposals = ticket_mod.dedupe(found, settled)
+    problems.extend(
+        _stale_problems(root, approval.stale_proposals(found, proposals, settled), index)
+    )
 
     problems.extend(_copy_problems(root, conf, copies, index, closed))
 
@@ -635,7 +642,9 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     # 統合先の done/ で閉じた識別子（取り込み済みの家族。ADR-0093 の 3.3 の 4）も閉じたものに
     # 数える。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず名指しする。
     done |= approval.integration_closed(conf, root, proposals)
-    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
+    problems.extend(
+        _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
+    )
     problems.extend(
         _branch_name_problems(
             proposals,
@@ -754,6 +763,7 @@ def _proposal_problems(
     done: set[str],
     repo_of: dict[str, str],
     preds: dict | None = None,
+    root: str = "",
 ) -> list[Problem]:
     """提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。
 
@@ -814,7 +824,8 @@ def _proposal_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
-                    f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る。"
+                    f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る"
+                    f"（{_rel(root, t.path)}）。"
                     "計画の改版でなければ todo/ の側を消してください",
                 )
             )
@@ -824,7 +835,8 @@ def _proposal_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"{t.ticket} は閉じたかレビュー待ちなのに todo/ にも在る。"
+                    f"{t.ticket} は閉じたかレビュー待ちなのに todo/ にも在る"
+                    f"（{_rel(root, t.path)}）。"
                     "todo/ の側は承認の対象にならない。再開するには、"
                     "ユーザが承認済みチケットを戻す",
                 )
@@ -888,6 +900,56 @@ def _proposal_problems(
         problems.append(
             Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
         )
+    return problems
+
+
+def _rel(root: str, path: str) -> str:
+    """名指しに使う、ワークスペースルートからの相対パス（`/` 区切り）。"""
+    if not root or not path:
+        return path
+    return os.path.relpath(path, root).replace(os.sep, "/")
+
+
+def _stale_problems(root: str, stale: list, index: dict) -> list[Problem]:
+    """権威のツリーの外に残った、承認済みの識別子の提案の写し（`approval.stale_proposals`）。
+
+    承認の対象にもボードにも入らない（権威のツリーの側だけを読む）。黙って読まないままに
+    せず、どこに在るかを名指しする。計画の違う `todo/` は、権威でないツリーに書いた改版か、
+    改版の前に切ったワークツリーに残った古い版。どちらも承認の対象にならないので、書く場所を
+    案内する（改版は権威のツリーの `todo/` に置く。ADR-0055）。
+    """
+    problems: list[Problem] = []
+    for t, where in stale:
+        place = where or "(ワークスペースルート)"
+        rel = _rel(root, t.path)
+        current = index.get(t.ticket)
+        if t.state == ticket_mod.REVIEW:
+            text = (
+                f"{t.ticket} の review/ の古い写しが {rel} に在る（本物は {place} の側）。"
+                "ボードと承認はこの写しを読まない。消すか、そのツリーに取り込んで揃えてください"
+            )
+        elif (
+            current is not None
+            and not t.is_child
+            and t.has_plan
+            and agree._plan_differs(t, current)
+        ):
+            text = (
+                f"{t.ticket} の計画の違う提案が {rel} に在るが、権威のツリー（{place}）の外なので"
+                f"承認の対象にならない。改版なら {place} の todo/ に書き、古い版なら消してください"
+            )
+        elif current is not None:
+            text = (
+                f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
+                f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る（{rel}）。"
+                "権威のツリーの外の古い写しなので消してください"
+            )
+        else:
+            text = (
+                f"{t.ticket} は閉じたかレビュー待ちなのに todo/ にも在る（{rel}）。"
+                "権威のツリーの外の古い写しなので消してください"
+            )
+        problems.append(Problem(SEVERITY_WARN, "(ticket)", text))
     return problems
 
 

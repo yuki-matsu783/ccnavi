@@ -788,7 +788,7 @@ def withdraw(
     approved, _ = approval.scan(conf, root)
     closed, _ = approval.scan(conf, root, closed=True)
     review_waiting, _ = approval.scan_review(conf, root)
-    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    proposals, _ = approval.scan_proposals(conf, root)
     open_index = approval.by_id(approved)
     problems: list[str] = []
     wanted = [i for i in dict.fromkeys(ids) if i]
@@ -860,7 +860,7 @@ def withdrawable(snapshot: Snapshot, family: str) -> list[tuple[str, str, list[s
     approved, _ = approval.scan(conf, root)
     closed, _ = approval.scan(conf, root, closed=True)
     review_waiting, _ = approval.scan_review(conf, root)
-    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    proposals, _ = approval.scan_proposals(conf, root)
     everything = approved + closed + review_waiting
     out = []
     for copy in sorted(approved, key=lambda t: t.ticket):
