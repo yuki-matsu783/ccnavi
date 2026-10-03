@@ -1,6 +1,5 @@
 #!/bin/sh
-# ccnavi-sync 親のブランチをリモートから取り込み、家族の控えと統合先の控えを書く
-# （ADR-0093 の 4.2・3.6。段階 2b）。
+# ccnavi-sync 親のブランチをリモートから取り込み、家族の控えと統合先の控えを書く。
 #
 #   sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
 #   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （人が打つ。家族の控えを消す）

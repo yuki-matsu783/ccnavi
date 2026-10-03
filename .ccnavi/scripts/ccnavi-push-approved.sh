@@ -10,9 +10,9 @@
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）の親のワークツリーは、
-# C1 と同じ手順で運ぶ（ADR-0093 の 4.6。段階 2d）: ロック（C1 の中からの入れ子を許す）→ 途中の操作の
-# 確認 → 取り込み（ccnavi-sync.sh）→ 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた
-# todo/ の提案）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
+# C1 と同じ手順で運ぶ。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
+# 手順は、ロック（C1 の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
+# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
 # push が落ちてもコミットは残す（人が打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
 # 答えない実行ファイルで家族の控えがあれば、運ばずに止める。
 #
@@ -21,7 +21,7 @@
 #
 # 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
 # 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
-# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かすので（ADR-0055）、
+# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（写しは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）は運ばない。
 #
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけを運ばない
@@ -101,7 +101,7 @@ state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {
 trap 'rm -f "$state"; ccnavi_c1_end' EXIT
 trap 'rm -f "$state"; ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- 取り込み済みの家族（ADR-0093 の 4.6）
+# ---- 取り込み済みの家族は C1 と同じ手順で運ぶ
 ccnavi_log_root="$root"
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-push-approved

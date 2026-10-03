@@ -19,18 +19,18 @@
 #            → `ccnavi review requested` がマーカーを置く
 #            人はレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
-#            --eli5 <HTML> は必須（ADR-0094・ADR-0095）。変更をやさしく説明した 1 枚の HTML で、
+#            --eli5 <HTML> は必須（付け忘れを後回しにさせない）。変更をやさしく説明した 1 枚の HTML で、
 #            このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html）にコミットしておく。
 #            HEAD に入って push されていれば、マージリクエストの差分に載る。ここは拡張子・在ること・
 #            中身があること・wip/eli5/ の下にあること・名前の字・HEAD で普通のファイル（100644）として
-#            HEAD と同じ中身でコミット済みであることを確かめ（ADR-0097）、
+#            HEAD と同じ中身でコミット済みであることを確かめ、
 #            実行ファイルには渡さない。crit は起動しない（待ち続けるため）。投稿が済んだら、人が打つ
 #            `crit review <パス>` と `crit push <番号>` を標準出力に出す。crit push で送られた指摘は
 #            マージリクエストの行のスレッドになり、confirm が未解決として数え、decide で選べる。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
-#            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、印に残す
-#            （ADR-0093 の 8.9。段階 4）。引けなければ渡さず、印は前と同じ
+#            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、印に残す。
+#            actor は記録で、判定には使わない。引けなければ渡さず、印は前と同じ
 #   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、指摘ごとに
 #            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
 #            → issue に回す分があればここが issue を作り、決めた内容をコメントに写す
@@ -41,7 +41,8 @@
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
 # 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）では、状態を書く
-# request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す（ADR-0093 の 4.3。段階 2d）。
+# request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
+# （Chrome 拡張から見える家族に未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook の印と跡を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
 # 人の判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
@@ -145,7 +146,7 @@ elif [ "$sub" != merged ]; then
 	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
 
-# 実行ファイルがそのフラグを知っているか（`--version --json` の flags。ADR-0093 の 11.9.1 の決定 C）。
+# 実行ファイルがそのフラグを知っているか（`--version --json` の flags で見る）。
 # 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで落ちる。印は前と同じ中身になる）。
 # 答えは 1 度だけ引いて控える。`$( )` の中から呼ぶと控えが親に残らないので、親で呼ぶ。
 exe_flags=""
@@ -363,7 +364,7 @@ find_mr() {
 		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url}'
 	else
-		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない。ADR-0093 の 11.9.1 の 6）。
+		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない。11.9.3 の 6）
 		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の綴りを見直してください）。"
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
@@ -576,7 +577,7 @@ post_decision() {
 	fi
 }
 
-# ---- トークンの持ち主（レビュー済みの印の actor。ADR-0093 の 8.9）。引けなければ空で、止めない。
+# ---- トークンの持ち主（レビュー済みの印の actor。記録だけで、判定には使わない）。引けなければ空で、止めない。
 #
 # gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
 # GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
@@ -652,7 +653,7 @@ eli5_posted=""
 trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- C1（ADR-0093 の 4.3。段階 2d）と人の判断を運ぶ処理（4.6・D27）
+# ---- C1 と人の判断を運ぶ処理
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
 ccnavi_c1_sh="$(dirname "$0")"
@@ -722,7 +723,7 @@ fetch)
 	printf '\n'
 	;;
 merged)
-	# いまのブランチ（親のブランチ）の MR がマージ済みか（ADR-0093 の 3.6 の 5）。ccnavi-sync.sh が、
+	# いまのブランチ（親のブランチ）の MR がマージ済みか。ccnavi-sync.sh が、
 	# 親のブランチがリモートから消えて統合先の done/ にも見えないときに、観測ずれかを確かめるために聞く。
 	# 読むだけで、何も書かない。答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
 	#   merged <番号>  終了コード 0
@@ -777,7 +778,7 @@ confirm)
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
 	;;
 request)
-	# 段 -1: ELI5 の HTML（ADR-0094）。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
+	# 段 -1: ELI5 の HTML。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
 	# --eli5 を知らない）。ロックを取る前に確かめ、欠けていれば何も書かずに止める。
 	eli5=""
 	eli5_n=$#
@@ -801,8 +802,8 @@ request)
 		*) set -- "$@" "$eli5_a" ;;
 		esac
 	done
-	# 置き場は wip/eli5/ の下（ADR-0095・ADR-0097）。マージリクエストの差分に載せ、人が crit push で行に指摘を送れる
-	# ようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
+	# 置き場は wip/eli5/ の下で、wip/ のほかの場所は ELI5 にさせない。マージリクエストの差分に載せ、
+	# 人が crit push で行に指摘を送れるようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
 	eli5_how="依頼の前に、変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML（外部の読み込み無し）を、このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html。名前は英数字と . _ / - だけ）に普通のファイルとして書いてコミットし、push してから --eli5 <パス> で渡してください。"
 	[ -n "$eli5" ] || fail explainer-missing "request には --eli5 <HTML> が要る。${eli5_how}" 2
 	case "$eli5" in
@@ -839,7 +840,7 @@ request)
   - このワークツリーの外にある（マージリクエストの差分に載らない）"
 	else
 		eli5_rel="${eli5_prefix}${eli5_path##*/}"
-		# 名前に使える字を絞る（ADR-0097）。相対パスは依頼文と人が打つ crit の行にそのまま入るので、
+		# 名前に使える字を絞る。相対パスは依頼文と人が打つ crit の行にそのまま入るので、
 		# `'`・`$`・バッククォート・空白・改行・日本語などを通すと、打った人のシェルで別のコマンドになる
 		# 綴りを置ける。C ロケールで、許す字を消して印（:）だけが残るかで見る（改行も 1 字として残る）。
 		eli5_rest=$(printf '%s:' "$eli5_rel" | LC_ALL=C tr -d 'A-Za-z0-9._/-')
@@ -904,7 +905,7 @@ ${eli5_how}"
 	if [ -n "$posted" ]; then
 		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	else
-		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す（ADR-0095）。HTML の中身は
+		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す。HTML の中身は
 		# 載せない（マージリクエストの差分にある）。目印は 1 行目なので、足しても二重投稿の見分けは変わらない。
 		eli5_posted="$state/review-request-eli5-$$.md"
 		{
@@ -919,7 +920,7 @@ ${eli5_how}"
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
 	c1_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
-	# 段 4: crit の案内（ADR-0095）。crit は人の手元で打つ道具で、ここからは起動しない（待ち続けるため）。
+	# 段 4: crit の案内。crit は人の手元で打つ道具で、ここからは起動しない（待ち続けるため）。
 	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
 	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
 	# ツリーの絶対パスは利用者の置き場なので字を絞れない。いつも '…' で包み、中の ' は '\'' に置き換える
@@ -996,7 +997,7 @@ decide)
 	if [ -n "$choices" ] || [ -n "$digest" ]; then
 		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡してください。" 2
 	fi
-	# 印に残すアカウント（ADR-0093 の 8.9。段階 5）。confirm と同じくトークンの持ち主をホストに聞き、
+	# 印に残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
 	# ロックを取る前に引く。引けなければ渡さず、印も跡も前と同じ。見るだけの --preview は引かない。
 	# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
 	decide_who=""
