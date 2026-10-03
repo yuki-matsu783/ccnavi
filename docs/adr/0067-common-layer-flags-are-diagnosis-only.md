@@ -1,3 +1,11 @@
+---
+type: adr
+title: 層の置き場を動かすフラグを診断の経路に限る
+description: 共通層・プロジェクト層の置き場を変更するフラグを診断コマンド（--lint、--test など）だけに限定
+tags: [config, rules]
+keywords: [フラグ, 診断, 層, 置き場, --rules, --phases, --risk, --projects]
+---
+
 # ADR-0067: 層の置き場を動かすフラグを診断の経路に限る
 
 状態: 採用

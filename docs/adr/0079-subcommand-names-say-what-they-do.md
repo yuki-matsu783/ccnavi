@@ -1,3 +1,11 @@
+---
+type: adr
+title: 副命令の名前は動きを言い、人の判断はフラグで受ける
+description: 副命令の名前を動作から明確にし、人の判断の入力方法をフラグで統一する
+tags: [cli, approval]
+keywords: [副命令, 名前, フラグ, done, judge, check, 判定, review]
+---
+
 # ADR-0079: 副命令の名前は動きを言い、人の判断はフラグで受ける
 
 状態: 採用

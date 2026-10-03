@@ -22,6 +22,7 @@ from . import (
     configsync,
     diaglog,
     diagnose,
+    docsearch,
     events,
     fsio,
     history,
@@ -86,6 +87,30 @@ the same checks that SubagentStart uses (--lint only; the VS Code extension
 hands the edited flow in before it opens or saves one):
 
     ccnavi --lint --json --flow /tmp/flow.yml
+
+To find a markdown document by what it is rather than by a line in its body,
+search the frontmatter index of the workspace and its projects (paths are
+from the workspace root, e.g. projects/lib/docs/x):
+
+    ccnavi --docs [--type T] [--tag T] [--keyword K] [--path SUB] [--text SUB]
+                  [--since DATE] [--until DATE] [--sort path|mtime|type|title]
+                  [-r] [--limit N] [--format table|path|detail|json|jsonl|count]
+                  [--no-refresh]
+
+The same filter given twice is OR, different filters are AND, and case is
+ignored. --type, --tag and --keyword match whole values; --path matches part
+of the path without .md; --text matches part of the path, the mtime or any
+frontmatter value; strings are compared in NFC. --since and --until take
+YYYY-MM-DD[THH[:MM[:SS]]] and --until runs to the end of what it names (a date
+to 23:59:59, THH to :59:59, THH:MM to :59). No match is still exit 0. Before
+searching it brings the per-directory index.jsonl up to date (it writes only
+where git ignores index.jsonl and the file is ccnavi's own; a tree that
+ignores none is left out and named on stderr). The first run reads the head
+of every markdown file; later runs read only those whose mtime moved.
+--no-refresh reuses what is there. --json is --format json. The rows are
+documented in README.md ("ドキュメントの索引"). These filters are for --docs
+only; anywhere else they stop the run with exit 1, and flags that belong to
+other runs stop --docs the same way.
 
 The common layer's own three files are moved by --rules, --phases and --risk,
 and where the layers are looked for by --projects and --project-home. All five
@@ -403,6 +428,21 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 子チケットのフロー 1 本を、SubagentStart と同じ読みで確かめる（`--lint` だけ）。
     # VS Code 拡張のフロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルで渡す。
     parser.add_argument("--flow", default="")
+    # md の frontmatter の索引を引く（docsearch）。読むのと、無視された索引を書くだけ。
+    # 絞り込みと出力の形のフラグは `--docs` でだけ効く（DOCS_FLAGS）。
+    parser.add_argument("--docs", action="store_true")
+    parser.add_argument("--type", action="append", default=None)
+    parser.add_argument("--tag", action="append", default=None)
+    parser.add_argument("--keyword", action="append", default=None)
+    parser.add_argument("--path", action="append", default=None)
+    parser.add_argument("--text", action="append", default=None)
+    parser.add_argument("--since", default=None)
+    parser.add_argument("--until", default=None)
+    parser.add_argument("--sort", default=None)
+    parser.add_argument("-r", "--reverse", action="store_true")
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--format", default=None)
+    parser.add_argument("--no-refresh", action="store_true")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -474,6 +514,20 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         settings.TICKET_CONTROL_ENV,
         selfguard.GATE_SETTINGS,
     )
+
+    # ドキュメントの索引を引く経路。payload を読まず、判定も記録もしない。
+    # 絞り込みのフラグは `--docs` でだけ読む。ほかの経路で渡されたら止める。このフラグが
+    # 無かったころは argparse が知らないフラグとして止めていたので、落として先へ進めると
+    # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
+    # 差し替えで、落としても何も動かないので落とすだけにしている）。
+    if not args.docs:
+        stray = _docs_flags_given(args)
+        if stray:
+            for flag in stray:
+                stderr.write(DOCS_ONLY.format(flag=flag))
+            return EXIT_ERROR
+    else:
+        return _docs(stdout, stderr, conf, root, args)
 
     # 1 つの層だけを差し替える形。効く経路は共通層の 3 本と同じ。
     for flag, value, swaps in (
@@ -685,6 +739,95 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         exit=code,
     )
     return code
+
+
+# `--docs` でだけ読むフラグと、渡されなかったときの値。
+DOCS_FLAGS = (
+    ("--type", "type", None),
+    ("--tag", "tag", None),
+    ("--keyword", "keyword", None),
+    ("--path", "path", None),
+    ("--text", "text", None),
+    ("--since", "since", None),
+    ("--until", "until", None),
+    ("--sort", "sort", None),
+    ("--reverse", "reverse", False),
+    ("--limit", "limit", None),
+    ("--format", "format", None),
+    ("--no-refresh", "no_refresh", False),
+)
+DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
+# `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。黙って無視すると、
+# 打った人は効いたと思う。
+_NOT_WITH_DOCS = (
+    "--lint",
+    "--test",
+    "--test-samples",
+    "--explain",
+    "--suggest",
+    "--prune",
+    "--approve",
+    "--reviewed",
+    "--close-early",
+    "--config-synced",
+    "--yes",
+    "--preview",
+    "--verify",
+    "--digest",
+    "--result",
+    "--tickets",
+    "--phase",
+    "--body-file",
+    "--reason",
+    "--accept-unresolved",
+    "--chat",
+    "--flow",
+    "--project-rules-file",
+    "--project-phases-file",
+)
+
+
+def _docs_flags_given(args: argparse.Namespace) -> list[str]:
+    """渡された `--docs` 用のフラグ。"""
+    return [flag for flag, name, absent in DOCS_FLAGS if getattr(args, name) != absent]
+
+
+def _docs(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    args: argparse.Namespace,
+) -> int:
+    """`--docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。"""
+    for flag in _NOT_WITH_DOCS:
+        value = getattr(args, flag[2:].replace("-", "_"))
+        # `is` で比べる。`--reviewed 0` の 0 は False と等しいので、`in` だと見落とす。
+        if value is None or value is False or value == "":
+            continue
+        stderr.write(f"ccnavi: --docs は {flag} と一緒に使えない\n")
+        return EXIT_ERROR
+    if args.command:
+        stderr.write(f"ccnavi: --docs は語を取らない（{' '.join(args.command)}）\n")
+        return EXIT_ERROR
+    fmt = args.format or ("json" if args.json else "table")
+    if args.json and fmt != "json":
+        stderr.write("ccnavi: --json と --format は食い違う形を同時に指せない\n")
+        return EXIT_ERROR
+    query = docsearch.Query(
+        types=args.type or [],
+        tags=args.tag or [],
+        keywords=args.keyword or [],
+        paths=args.path or [],
+        texts=args.text or [],
+        since=args.since or "",
+        until=args.until or "",
+        sort=args.sort or "path",
+        reverse=args.reverse,
+        limit=args.limit or 0,
+        format=fmt,
+    )
+    return docsearch.run(stdout, stderr, conf, root, query, refresh=not args.no_refresh)
 
 
 def _prune(

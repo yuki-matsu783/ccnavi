@@ -1,3 +1,11 @@
+---
+type: adr
+title: 振り分けの sh は .ccnavi/scripts/ に
+description: launcher 振り分けシェルスクリプトを .ccnavi/scripts/ に配置する標準位置
+tags: [launcher, sh-scripts]
+keywords: [launcher, sh, .ccnavi/scripts, 振り分け, 配置]
+---
+
 # ADR-0044: 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する
 
 状態: 採用

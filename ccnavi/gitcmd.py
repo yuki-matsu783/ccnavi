@@ -49,12 +49,17 @@ class Done:
 
 
 def run(
-    cwd: str, args: list[str], timeout: float = TIMEOUT_SECONDS, raw_paths: bool = False
+    cwd: str,
+    args: list[str],
+    timeout: float = TIMEOUT_SECONDS,
+    raw_paths: bool = False,
+    input: str | None = None,
 ) -> Done:
     """git を起こす。
 
     raw_paths は `core.quotePath=false` を掛ける。既定の出力は非 ASCII を含む
     パスを引用して 8 進に逃がすので、パスをそのまま突き合わせる側はこれを立てる。
+    input は標準入力に渡す文字列（`check-ignore --stdin` など）。無ければ何も渡さない。
     """
     command = ["git"]
     if raw_paths:
@@ -70,6 +75,7 @@ def run(
             errors="replace",
             env=_env(),
             timeout=timeout,
+            input=input,
         )
     except FileNotFoundError as exc:
         return Done(failure=f"{exc}", missing=True)

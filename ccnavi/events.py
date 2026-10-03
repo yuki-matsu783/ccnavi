@@ -18,6 +18,7 @@ from . import (
     builtin,
     configsync,
     ctxfile,
+    docsearch,
     fsio,
     hookio,
     judge,
@@ -72,7 +73,7 @@ def decide(
     if payload.event == hookio.POST_TOOL_USE:
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SESSION_START:
-        return decide_at_start(stdout, stderr, mode, conf, root, payload, record)
+        return decide_at_start(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.USER_PROMPT_SUBMIT:
         return decide_at_prompt(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.STOP:
@@ -355,8 +356,12 @@ def decide_at_start(
     root: str,
     payload: hookio.Input,
     record: audit.Record,
+    deadline: float | None = None,
 ) -> int:
     """セッションが始まったとき。大きい対象の控えをここで 1 度だけ取る。
+
+    deadline は hook の判定の期限（`judge.DEADLINE_SECONDS`）。md の索引を新しくするのは
+    その残りまでに収める（hook の timeout を超えない）。
 
     ここで取るのは実行ファイルで、ツール呼び出しのたびに写すには大きすぎる。
     このイベントは 1 セッションに 1 回しか来ないので、重い仕事を置く先になる。
@@ -397,6 +402,12 @@ def decide_at_start(
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
+    # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
+    # サブエージェントには出さない。壊れても黙る（docsearch.at_start が例外を外に出さない）。
+    if not payload.agent_id:
+        docs = docsearch.at_start(conf, root, deadline)
+        if docs:
+            texts.append(docs)
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK

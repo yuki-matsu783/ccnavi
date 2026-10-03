@@ -1,3 +1,11 @@
+---
+type: adr
+title: フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く
+description: フェーズの種類に `after` の依存を追加し、ワークフローを DAG で表現する
+tags: [phase, review]
+keywords: [DAG, フェーズ, 依存, after, requires, overlap, ワークフロー]
+---
+
 # ADR-0078: フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く
 
 状態: 採用（ADR-0026 の「順序は承認で止める」と、ADR-0070 の「線に向きは付けない」の一部を改める。図の下に常に出す注記は ADR-0082 が改める）

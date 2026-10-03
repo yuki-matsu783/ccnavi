@@ -1,3 +1,11 @@
+---
+type: adr
+title: 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする
+description: 残った指摘を 1 件ずつボード上で処理し、行き先を選択できるようにする
+tags: [review, approval, board]
+keywords: [指摘, 行き先, ボード, keep, fix, issue, decide, レビュー]
+---
+
 # ADR-0081: 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする
 
 状態: 採用

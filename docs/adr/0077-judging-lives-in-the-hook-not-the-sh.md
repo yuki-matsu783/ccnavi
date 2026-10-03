@@ -1,3 +1,11 @@
+---
+type: adr
+title: 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする
+description: "止める・通すの判定を hook に集中させ、sh の検査は 2 重目の守りにする"
+tags: [judging, hook, sh-scripts, exe-boundary]
+keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
+---
+
 # ADR-0077: 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする
 
 状態: 採用

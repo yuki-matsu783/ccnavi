@@ -1,3 +1,11 @@
+---
+type: adr
+title: テストは編集ごとの hook ではなくターンの終わりに回す
+description: テスト実行を編集時 hook ではなくターン終了時に集約する方針
+tags: [testing, hook]
+keywords: [テスト, hook, ターン終了, タイミング, 実行, 集約]
+---
+
 # ADR-0036: テストは編集ごとの hook ではなくターンの終わりに回す
 
 状態: 採用

@@ -1,3 +1,10 @@
+---
+type: adr
+title: 報告するのは deny と ask と範囲外、戻すのは deny だけ
+description: 戻す処理は deny のルールに制限し、報告は deny と ask と範囲外をすべて含める
+tags: [git, state, ticket]
+keywords: [deny, ask, restore, 保護領域, ルール, 報告, チケット]
+---
 # ADR-0071: 報告するのは deny と ask と範囲外、戻すのは deny だけ
 
 状態: 採用

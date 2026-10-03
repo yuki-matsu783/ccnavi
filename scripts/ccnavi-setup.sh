@@ -168,8 +168,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
 .ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・代わりに通る sh と振り分けの sh
-（.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場は、配布先の
-.gitignore に足す。
+（.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
+--docs の索引（**/index.jsonl）は、配布先の .gitignore に足す。
 
 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）は既定に
 固定で、env では動かない（ADR-0084）。既存の env に CCNAVI_PROJECTS・CCNAVI_PROJECT_HOME・
@@ -755,20 +755,37 @@ fi
 # 代わりに通る sh と同じく追跡する側に置く。無視すると、clone した先に sh が届かず hook が
 # 起動しない。置き場は配った機械のぶんだけ足す。別の機械で打ち直せば、その機械のぶんが
 # 足される。
+#
+# 配った実行ファイルの `--docs` は、md のあるディレクトリごとに index.jsonl を書く。書くのは
+# git がそれを無視しているときだけなので（README「ドキュメントの索引」）、無視の 1 行が無い
+# 配布先では索引が作られない。実行ファイルと同じ回に `**/index.jsonl` も足す。見出しは
+# 実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが読めなくなる。
+# `/` を含まない `index.jsonl` もどの深さにも当たるので、それが既にあれば足さない。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
+INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
+INDEX_IGNORE_LINE="**/index.jsonl"
+# ignore_todo は表示と「揃っているか」に使う全部。書くときは塊ごとに分けて持つ。
 ignore_todo=""
-ignore_kept=""
+ignore_bin_todo=""
+ignore_index_todo=""
 if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
-	note_ignore() {
-		if [ -f "$root/.gitignore" ] && grep -qxF "$1" "$root/.gitignore"; then
-			ignore_kept="$ignore_kept$1
-"
-		else
-			ignore_todo="$ignore_todo$1
-"
-		fi
+	ignored_already() {
+		for spelling in "$@"; do
+			if [ -f "$root/.gitignore" ] && grep -qxF "$spelling" "$root/.gitignore"; then
+				return 0
+			fi
+		done
+		return 1
 	}
-	note_ignore "/$BUILD_ROOT/$built/"
+	if ! ignored_already "/$BUILD_ROOT/$built/"; then
+		ignore_bin_todo="/$BUILD_ROOT/$built/
+"
+	fi
+	if ! ignored_already "$INDEX_IGNORE_LINE" "index.jsonl"; then
+		ignore_index_todo="$INDEX_IGNORE_LINE
+"
+	fi
+	ignore_todo="$ignore_bin_todo$ignore_index_todo"
 fi
 
 copy_tree() {
@@ -1287,9 +1304,11 @@ if [ "$deploy_work" = yes ]; then
 		fi
 	fi
 	# .gitignore は足すだけ。既にある行は書かないし、ccnavi と関係のない行にも
-	# 触らない。見出しは、この 3 行が何なのかを、あとで開いた人に伝えるためだけの
+	# 触らない。見出しは、その塊が何なのかを、あとで開いた人に伝えるためだけの
 	# もの。既に同じ見出しがあれば重ねない。
-	if [ -n "$ignore_todo" ]; then
+	append_ignore() {
+		# $1 見出し、$2 足す行（改行で終わる）。空なら何もしない。
+		[ -n "$2" ] || return 0
 		{
 			if [ -s "$root/.gitignore" ]; then
 				# 末尾に改行が無いファイルへ足すと、最後の行と繋がって別の
@@ -1300,12 +1319,14 @@ if [ "$deploy_work" = yes ]; then
 				# もとから在る行と、ここで足す塊を、空行 1 つで分ける。
 				printf '\n'
 			fi
-			if ! { [ -f "$root/.gitignore" ] && grep -qxF "$IGNORE_HEADER" "$root/.gitignore"; }; then
-				printf '%s\n' "$IGNORE_HEADER"
+			if ! { [ -f "$root/.gitignore" ] && grep -qxF "$1" "$root/.gitignore"; }; then
+				printf '%s\n' "$1"
 			fi
-			printf '%s' "$ignore_todo"
+			printf '%s' "$2"
 		} >>"$root/.gitignore"
-	fi
+	}
+	append_ignore "$IGNORE_HEADER" "$ignore_bin_todo"
+	append_ignore "$INDEX_IGNORE_HEADER" "$ignore_index_todo"
 fi
 
 report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'

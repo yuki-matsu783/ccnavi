@@ -1,3 +1,11 @@
+---
+type: adr
+title: 共通層の設定は .ccnavi/common/ に
+description: 共通設定を .ccnavi/common/ に集約し、記録と控えは logs ディレクトリに配置する構成
+tags: [config, records]
+keywords: [共通層, .ccnavi, 設定, logs, 記録, 共有]
+---
+
 # ADR-0042: 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く
 
 状態: 採用

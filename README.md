@@ -387,12 +387,18 @@ sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で�
 落ちた sh を揃っていないものに数え、`--lint` は error で言う（「設定の検証」）。
 
 配った組み立ての置き場は、配布先が git のリポジトリなら `.gitignore` にも足す（入れると履歴から消すのが難しい）。
-置き場は配った機械のぶんだけ足す。
+置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/index.jsonl` も
+別の見出しで足す（「ドキュメントの索引」。`**/index.jsonl` か `index.jsonl` の行が既にあれば足さない）。
 
 ```
 # ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
 /.ccnavi/bin/darwin-arm64/
+
+# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）
+**/index.jsonl
 ```
+
+足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない（そのプロジェクトのチケットの範囲で足す）。
 
 足すのは `/.ccnavi/bin/<os>-<arch>/` だけ。振り分けの sh は追跡し、`.ccnavi/` を丸ごと無視もしない
 （sh と `rules.yml` が git から消える）。
@@ -2223,6 +2229,92 @@ ccnavi --version --json
 配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース> --force` で実行ファイルと sh を配り直す。
 拡張のほうが古ければ拡張を入れ直す。`--version` を知らない実行ファイルは、この仕組みより前の古い版として扱う。
 
+## ドキュメントの索引
+
+```sh
+ccnavi --docs --text コンフリクト --format detail     # 話題で当たりを付ける
+ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
+ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
+ccnavi --docs --path docs/claude --format count         # 件数だけ
+```
+
+md を本文ではなく頭の frontmatter で引く。grep は当たった行を返すので、そのファイルが何の文書かは開くまで分からず、
+よそからの言及も同じ重みで混ざる。frontmatter の書き方は [docs/claude/frontmatter.md](docs/claude/frontmatter.md)。
+
+引くのはワークスペースと、プロジェクトの置き場の直下の各プロジェクト（それぞれ別の git）を合わせたもの。どこから打っても同じで、
+パス（`concept_id`）はワークスペースルートから書く（`projects/lib/docs/x`）。`--path projects/lib` で 1 つのプロジェクトに絞れる。
+どのツリーもルートに `.git` を持つものだけで、`.git` の無い `projects/<名前>/` は `--docs` が標準エラーで名指しする。
+それぞれの `git ls-files --cached --others --exclude-standard` のうち `*.md` を載せ、実体の無いもの（消してまだステージしていないもの）、
+シンボリックリンク、ccnavi ディレクトリ（`.ccnavi/`）の下は載せない。ワークスペースの一覧からはプロジェクトの置き場を外す。
+実体のパスがそのツリーの外に出るディレクトリ（ジャンクションやシンボリックリンク越し）は読みも書きもしない。
+同じ `concept_id`（NFC で揃えて同じもの）は 1 本にまとめる。
+
+frontmatter は md の頭の 64 KiB までを UTF-8 として読む（それより後ろで閉じる frontmatter と、UTF-8 でない md は読めない）。
+frontmatter の無い md は頭の 4 KiB だけで止める。
+
+引く前に、md が直下にあるディレクトリごとの `index.jsonl` を新しくする（`--no-refresh` で省く）。`concept_id` と `mtime` が
+同じ行は読み直さずに使い回し、中身が変わらなければ書かない。**初めての回は md を全部読む**ので、md が数千本あるツリーでは
+数秒かかる。2 回目からは `mtime` の変わった md だけを読む。
+
+- **書くのは git がそこの `index.jsonl` を無視しているときだけ。** md を持つディレクトリのどれでも無視されていないツリー
+  （ワークスペースかプロジェクト）は索引の対象外にし、引かずに標準エラーで名指しする。使うには、そのリポジトリの `.gitignore` に
+  `**/index.jsonl` を足す（実行ファイルの `ccnavi` は `.gitignore` を書き換えない。ワークスペースには導入スクリプト
+`scripts/ccnavi-setup.sh` が配るときに足す。プロジェクトには足さない）。一部のディレクトリだけが無視されていない（追跡されている
+  `index.jsonl` がある）なら、そこは書かずに行だけを組む
+- **ccnavi の形でない `index.jsonl` は上書きも削除もしない。** 空か、空でない行が全部下の 4 つの鍵を持つ行として読めるときだけを
+  ccnavi のものとみなす。それ以外（よその道具のファイル、壊れた行、リンク、16 MiB を超えるもの）は触らず、行だけを組んで引き、
+  `--docs` は標準エラーで、`SessionStart` は 1 行で名指しする
+- 書くときは git のディレクトリ（`.git/`、submodule なら指す先）に一時ファイルを排他で作り、置き換える。作業ツリーの
+  `git status` には出ない。打ち切りで残った一時ファイル（`ccnavi-index-*.tmp`）は、10 分より古ければ次の回に消す
+- git への問い合わせの失敗（git が無い・期限切れ・壊れたリポジトリ）は、`.git` が無いのとも無視されていないのとも別に扱う。
+  `--docs` は「git への問い合わせに失敗したので引かない」とそのツリーを名指しし、`SessionStart` は何も言わない
+
+`SessionStart` はサブエージェントでなければ、ワークスペースとプロジェクトの索引を同じ手順で新しくし、引き方と frontmatter の
+決まりの要点を `additionalContext` に添える。対象外にしたツリーと書き換えなかった `index.jsonl` があれば短く名指しする。
+md が 1 本も無い・git の外なら何も言わない。新しくするのに使うのは 3 秒（`docsearch.START_SECONDS`）と hook の判定の期限の
+残りの小さいほうまでで、期限は md 1 本ごとに見る。過ぎたら途中のディレクトリは書かずに次の回に回す（書けたディレクトリの分は
+次に使い回す。`--docs` は引く前に期限なしで新しくする）。何が起きてもセッションの開始は止めない。
+
+| オプション | 対象 | 一致 |
+|---|---|---|
+| `--type <値>` | `frontmatter.type` | 完全一致 |
+| `--tag <値>` | `frontmatter.tags` の要素（スカラーでも 1 要素の並びとして扱う） | 完全一致 |
+| `--keyword <値>` | `frontmatter.keywords` の要素 | 完全一致 |
+| `--path <部分>` | `concept_id` | 部分一致 |
+| `--text <部分>` | `concept_id`・`mtime`・frontmatter のすべてのスカラーの値（キー名は含まない） | 部分一致 |
+| `--since <日時>` / `--until <日時>` | `mtime`（`YYYY-MM-DD[THH[:MM[:SS]]]`。在る日時だけ受ける）。`--until` は書いた桁の終わりまで（日付だけなら `T23:59:59`、`THH` なら `:59:59`、`THH:MM` なら `:59`） | 以上 / 以下 |
+
+同じオプションの繰り返しは OR、違うオプションどうしは AND。大文字小文字は区別せず、文字列は NFC に揃えてから比べる。
+並べ方は `--sort path|mtime|type|title`（既定 `path`。`type` と `title` は大文字小文字を区別しない。第 2 キーは `concept_id`）、
+`-r` / `--reverse` で逆、`--limit <N>` で並べた後の先頭 N 件（0 以下は全部）。
+`--format` は `table`（既定。`type` / `concept_id` / `title` を、全角を幅 2・結合文字を幅 0 として桁揃え）・`path`・`detail`・`json`・
+`jsonl`・`count`（`matched=<絞った数> [shown=<出した数>] total=<全部>`。`shown` は `--limit` で切ったときだけ）。
+`--json` は `--format json` と同じ。`table` と `detail` は同じ件数の 1 行を標準エラーにも出す。0 件でも終了コードは 0 で、
+使い方の誤りだけが 1。値が `-` で始まるときは `--text=-A` のように `=` で繋ぐ。
+
+絞り込みのフラグ（`--type` から `--no-refresh` まで）を `--docs` の外で渡すと、言って 1 で終わる（このフラグが無かったころに
+argparse が止めていた打ち間違いを、黙って通さないため）。`--docs` にほかの経路のフラグ（`--lint` `--yes` `--preview` `--result`
+`--tickets` `--flow` など）を添えたときも、無視せずに 1 で終わる。
+
+`index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
+
+```json
+{"concept_id":"docs/claude/worktree","directory":"docs/claude","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
+```
+
+| 鍵 | 何 |
+|---|---|
+| `concept_id` | 引いた結果ではワークスペースルートからの相対パス（`/` 区切り）から `.md` を落としたもの。`index.jsonl` に書く行は、そのリポジトリのルートから（プロジェクトの頭の `projects/<名前>/` が無い） |
+| `directory` | そのファイルがあるディレクトリ（`concept_id` と同じ基準。リポジトリのルート直下は `.`、プロジェクトのルート直下は `projects/<名前>`） |
+| `frontmatter` | 頭の `---` から `---`（か `...`）までを YAML（SafeLoader、別名は拒む）で読んだもの。無い・読めない・キーと値の並びでない・JSON に書けない（桁の多すぎる整数など）なら `null`。日付などの JSON に無い値は文字列 |
+| `mtime` | ファイルの更新日時。ローカル時刻の `YYYY-MM-DDTHH:MM:SS` |
+
+**古い `index.jsonl` が残る条件。** md が全部消えたディレクトリの `index.jsonl` を消すのは、そこに追跡されている md が
+あった（`git ls-files --cached` に出るが実体が無い）ときだけで、しかも ccnavi の形で、git に無視されているものに限る。
+追跡されていない md だけを持っていたディレクトリ、ディレクトリごと消えたもの、`.gitignore` に入ったディレクトリ、索引の対象外に
+なったツリーの `index.jsonl` は残る。残ったものは読まない（引くのは、いま md を持つディレクトリの分だけ）ので結果は変わらない。
+`mtime` は秒で比べるので、同じ秒の中で 2 度書き換えた md は次に `mtime` が変わるまで古い行のままになる。
+
 ## 生の git は止めてラッパースクリプトへ寄せる
 
 `.ccnavi/scripts/ccnavi-git.sh` は安全な git だけを通し、出力を抑えて結果だけを返す。生の `git` はルールで拒否し、拒否の文面からここへ誘導する。
@@ -2291,6 +2383,7 @@ hook の文字列一致は外れる。そこまで塞ぐなら `permissions.deny
 | `ccnavi/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
 | `ccnavi/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
 | `ccnavi/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の控え |
+| `ccnavi/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
 | `ccnavi/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルの控えと復元 |
 | `ccnavi/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
 | `ccnavi/gitcmd.py` | git を 1 回起こす |

@@ -1,3 +1,11 @@
+---
+type: adr
+title: チケットは 2 つの置き場を行き来する 1 本のファイルにする
+description: チケットを 1 本のファイルで管理し、置き場による移動で状態と権限を表現する
+tags: [ticket, review]
+keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュー, 1本のファイル]
+---
+
 # ADR-0055: チケットは 2 つの置き場を行き来する 1 本のファイルにする
 
 状態: 採用

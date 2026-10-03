@@ -1,3 +1,11 @@
+---
+type: adr
+title: 端末要求を切る形は、実行ファイルの呼び方によらず止める
+description: "エージェントが端末要求を切るコマンド行の形式を block する"
+tags: [rules, approval, selfguard]
+keywords: [端末, 要求, コマンド行, 変数, エージェント, block, deny]
+---
+
 # ADR-0080: 端末要求を切る形は、実行ファイルの呼び方によらず止める
 
 状態: 採用

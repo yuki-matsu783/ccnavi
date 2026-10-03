@@ -1,3 +1,10 @@
+---
+type: adr
+title: 判定の記録のファイル名を `logs/decisions.jsonl` にする
+description: 判定の記録ファイル名を decisions.jsonl に変更する
+tags: [records, config, state]
+keywords: [decisions, 判定, 記録, ファイル名, log, ローテーション]
+---
 # ADR-0092: 判定の記録のファイル名を `logs/decisions.jsonl` にする
 
 状態: 採用
