@@ -166,7 +166,8 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
 .ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
---docs の索引（**/index.jsonl）は、配布先の .gitignore に足す。
+--docs の索引（**/index.jsonl）は、配布先の .gitignore に足す（index.jsonl を否定する
+行があれば足さない）。
 USAGE
 }
 
@@ -738,6 +739,9 @@ fi
 # 配布先では索引が作られない。実行ファイルと同じ回に `**/index.jsonl` も足す。見出しは
 # 実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが読めなくなる。
 # `/` を含まない `index.jsonl` もどの深さにも当たるので、それが既にあれば足さない。
+# `index.jsonl` を否定する行（`!**/index.jsonl`、`!docs/index.jsonl` など）があれば、利用者が
+# 索引を追跡すると決めている。後ろに足すと git は後の行を勝たせるので、その否定を打ち消して
+# しまう。足さずに、そう言う（揃っていない、には数えない）。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_LINE="**/index.jsonl"
@@ -745,10 +749,19 @@ INDEX_IGNORE_LINE="**/index.jsonl"
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
+# 利用者が index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
+ignore_index_negated=""
+# .gitignore の行を、比べる形で出す。CRLF の `\r` と行末の空白を落とす（git も行末の空白は
+# 読まない）。無ければ何も出さない。
+gitignore_lines() {
+	if [ -f "$root/.gitignore" ]; then
+		sed 's/[[:space:]]*$//' "$root/.gitignore"
+	fi
+}
 if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 	ignored_already() {
 		for spelling in "$@"; do
-			if [ -f "$root/.gitignore" ] && grep -qxF "$spelling" "$root/.gitignore"; then
+			if gitignore_lines | grep -qxF "$spelling"; then
 				return 0
 			fi
 		done
@@ -758,7 +771,11 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_bin_todo="/$BUILD_ROOT/$built/
 "
 	fi
-	if ! ignored_already "$INDEX_IGNORE_LINE" "index.jsonl"; then
+	negated=$(gitignore_lines | grep -E '^!.*(index|\*)\.jsonl$' || true)
+	if [ -n "$negated" ]; then
+		ignore_index_negated="$negated
+"
+	elif ! ignored_already "$INDEX_IGNORE_LINE" "index.jsonl"; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
@@ -893,6 +910,10 @@ report_deploy() {
 	if [ -n "$ignore_todo" ]; then
 		printf '%s:\n' "$3"
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
+	fi
+	if [ -n "$ignore_index_negated" ]; then
+		printf '.gitignore に index.jsonl を否定する行があり、利用者が除外しているので %s は足さない:\n' "$INDEX_IGNORE_LINE"
+		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
 		printf '%s:\n' "$4"
@@ -1151,7 +1172,7 @@ if [ "$deploy_work" = yes ]; then
 				# もとから在る行と、ここで足す塊を、空行 1 つで分ける。
 				printf '\n'
 			fi
-			if ! { [ -f "$root/.gitignore" ] && grep -qxF "$1" "$root/.gitignore"; }; then
+			if ! gitignore_lines | grep -qxF "$1"; then
 				printf '%s\n' "$1"
 			fi
 			printf '%s' "$2"
