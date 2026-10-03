@@ -712,7 +712,7 @@ restore)
 	# 別のコミットの中身で戻す形（--source）と、衝突を片側の中身で解く形（--ours / --theirs）は、
 	# 承認済みチケットの置き場に当たるパスには使わせない。
 	# 置き場を過去の中身に戻すと、承認が無かったことにも、消えた印が戻ったことにもなる。
-	# 置き場の衝突は、どちらの承認を採るかを人が決める。オプションは許可リストで読む（段階 2b）。
+	# 置き場の衝突は、どちらの承認を採るかを人が決める。オプションは許可リストで読む。
 	[ "$#" -eq 0 ] && reject restore-no-path "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	rs_source=no
 	rs_side=no
@@ -760,7 +760,7 @@ merge)
 	# 止めるのは、衝突を人が見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
 	# もう一方の変更を気づかないうちに落とす。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、落ちたことは差分にも記録にも残らない。
-	# オプションは許可リストで読む（略した --strategy-o=ours・束の -sours も同じに読む。段階 2b）。
+	# オプションは許可リストで読む（略した --strategy-o=ours・束の -sours も同じに読む）。
 	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash" \
 		"message file strategy strategy-option" "log" "qvne" "mFsX"
 	merge_cb() {
@@ -820,7 +820,7 @@ merge-file)
 commit)
 	# 通す。中身の点検は /commit スキルと ask ルールの側でやる。
 	# ここで見るのは、点検そのものを行わない形（--no-verify・-n）と、直前のコミットを書き換える
-	# --amend。オプションは許可リストで読む（略した --no-verif・束の -an も同じに読む。段階 2b）。
+	# --amend。オプションは許可リストで読む（略した --no-verif・束の -an も同じに読む）。
 	ow_spec "all quiet verbose signoff no-signoff only include allow-empty allow-empty-message dry-run short porcelain long branch null status no-status reset-author edit no-edit verify no-verify pathspec-file-nul amend" \
 		"message file author date cleanup trailer pathspec-from-file template fixup squash" "untracked-files" \
 		"aqvsoiezn" "mFt" "u"
@@ -846,11 +846,11 @@ checkout | switch)
 	# オプション（`--force-c`・`--det`・`--orph=`）は断り、束ねた短いオプションは 1 字ずつ読んで、
 	# 値を取る字（checkout の b・B、switch の c・C）の後ろは値として扱う（`-qbnew` は -q -b new）。
 	#
-	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C・--force-create）は通さない
-	# （5.2。D36）。親のブランチを付け替えると、承認済みチケットの置き場ごと別の中身になる。
+	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C・--force-create）は通さない。
+	# 親のブランチを付け替えると、承認済みチケットの置き場ごと別の中身になる。
 	#
 	# `checkout <ref> <パス>` は `--` が無くてもパスを別のコミットの中身に戻す。承認済みチケットの
-	# 置き場に当たるパスは通さない（段階 0）。オプションでない最初の語が行き先か起点で、2 つ目からがパス。
+	# 置き場に当たるパスは通さない。オプションでない最初の語が行き先か起点で、2 つ目からがパス。
 	if [ "$sub" = checkout ]; then
 		ow_spec "quiet progress no-progress detach track no-track guess no-guess merge overlay no-overlay recurse-submodules no-recurse-submodules ignore-skip-worktree-bits force ours theirs" \
 			"orphan conflict pathspec-from-file" "track recurse-submodules" "qmtlf" "bB"
@@ -910,7 +910,7 @@ checkout | switch)
 	}
 	opt_walk checkout_cb ${1+"$@"}
 	# 親のワークツリー（.claude/worktrees/<P> で、親の写しか提案があるもの）では、許す形
-	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない（3.1 の 10）。
+	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
 	# 親の写しか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
@@ -944,7 +944,7 @@ checkout | switch)
 
 fetch | pull)
 	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗になる。
-	# オプションは許可リストで読む（略した --prun・--rebas も断る。段階 2b）。
+	# オプションは許可リストで読む（略した --prun・--rebas も断る）。
 	if [ "$sub" = fetch ]; then
 		ow_spec "quiet verbose progress no-progress tags no-tags all dry-run no-recurse-submodules force prune prune-tags unshallow show-forced-updates no-show-forced-updates write-fetch-head no-write-fetch-head" \
 			"jobs depth deepen shallow-since" "" "qvntfpP" "j"
@@ -1113,8 +1113,8 @@ clone | submodule | lfs)
 	;;
 esac
 
-# push が通ったら、親のブランチなら家族の控えを作る。最初の push から家族を C1 の対象に入れ、
-# 次の取り込みまで Chrome 拡張からだけ見える間を作らない。
+# push が通ったら、親のブランチなら家族の控えを作る。最初の push からその親子のチケットを C1 の
+# 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
 #
 # 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親の写しか提案が
 # ある）で、送り先が origin のときだけ。控えがあれば（present）sha を書き直すだけで、closed・

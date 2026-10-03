@@ -302,12 +302,13 @@ ccnavi_mask_url() {
 
 # ---- 取り込みの控えとロック
 #
-# 控えは 1 行 1 項目の `<鍵> <値>`（D33）。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない。
+# 控えは 1 行 1 項目の `<鍵> <値>`。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない
+# （JSON は実行ファイルが読んで、sh には 1 行で返す）。
 # 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
 #
 #   sync/<リポジトリ>/families/<P>   家族の控え（remote branch sha fetched_at state reason）
 #   sync/<リポジトリ>/integration/   統合先の控え（統合先の done/・層・置き場の綴りの設定の写しと head）
-#   locks/<リポジトリ>/<P>/          ロック（D32）。中の owner に持ち主を 1 行で書く
+#   locks/<リポジトリ>/<P>/          ロック。中の owner に持ち主を 1 行で書く
 #
 # <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。
 
@@ -392,7 +393,7 @@ ccnavi_parent_tree() {
 	return 1
 }
 
-# ロック（D32）。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
+# ロック。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
 # 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（人に回す）。
 # 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<印>" を子に渡す。
@@ -401,7 +402,7 @@ ccnavi_parent_tree() {
 # - `mkdir` の原子性で取る。`flock` は macOS に無い
 # - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <印> <OS>`、印は `<pid>-<開始時刻>`。
 #   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
-# - 古い（段階 2d のレビューの決定 B）: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
+# - 古い: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
 #   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても奪わない
 #   （長い操作を奪って二重に書かせない。待ちで取れなければ「長い」と言って落とす）。pid を確かめ
 #   られない（別のホスト・別の OS・/mnt/ の下・pid が読めない）ときだけ、10 分を過ぎたら時刻で古い
@@ -414,7 +415,7 @@ ccnavi_parent_tree() {
 ccnavi_lock_dir=""
 ccnavi_lock_mark=""
 ccnavi_lock_set_held=""
-# 取る前の CCNAVI_LOCK_HELD（入れ子で別のロックを取ったとき、外すときに元へ戻す。段階 2d）。
+# 取る前の CCNAVI_LOCK_HELD（入れ子で別のロックを取ったとき、外すときに元へ戻す）。
 ccnavi_lock_prev_held=""
 ccnavi_lock_prev_set=""
 ccnavi_lock_os() {
@@ -693,7 +694,7 @@ ccnavi_git_refusal() {
 
 # ---- C1
 #
-# 取り込み済みの家族（origin があり、家族の控えが present。chat だけの家族を除く。D11）で、状態を書く
+# 取り込み済みの家族（origin があり、家族の控えが present。chat だけの家族を除く）で、状態を書く
 # 操作を 1 操作にする。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に打つ。
 #
 #   ccnavi_c1_family <識別子>   家族と、C1 の対象か（ccnavi_c1_target に yes / no / stop）
@@ -710,16 +711,17 @@ ccnavi_git_refusal() {
 # 文面はすべて標準エラーへ出す（ボードは標準出力の JSON を読むため）。実行ファイルの標準出力は
 # そのまま通す。ccnavi_c1_capture に書き先を入れると、そこへ書く。
 #
-# 実行ファイルはネットワークに出ずコミットもしない（D17）。見分けと書いたパスの一覧は実行ファイルが
+# 実行ファイルはネットワークに出ずコミットもしない。見分けと書いたパスの一覧は実行ファイルが
 # 出し（`c1 family`・`c1 sort`・`--record-writes`）、取り込み（ccnavi-sync.sh を入れ子のロックで起こす）・
-# コミット（`commit --only`。D35）・push・届いたかの確かめ・戻し（比較つきの update-ref。reset は
-# 使わない）はここが持つ。git はエージェントの入口の ccnavi-git.sh を通らずに直に呼ぶ（4.3 の戻し）。
+# コミット（`commit --only`。ほかのステージ済みの変更を巻き込まない）・push・届いたかの確かめ・戻し（比較つきの update-ref。reset は
+# 使わない）はここが持つ。git は ccnavi-git.sh を通らずに直に呼ぶ。ccnavi-git.sh はエージェントの入口の
+# 守りで、ここの戻し（`restore --source` など）には当てない。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
 #   見張りの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回の見張りの秒、既定 60）
 #
 # コミットは `--no-verify` で利用者の hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
-# だけで、コードの検査の対象ではないため（段階 2d のレビューの決定 C）。署名は利用者の設定に従うが、
+# だけで、コードの検査の対象ではないため。署名は利用者の設定に従うが、
 # 見張りの時間を付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
 # 途中で INT・TERM・HUP が来たら、送る前の自分のコミットを戻す（ccnavi_c1_end）。強制終了（KILL）で
@@ -763,7 +765,7 @@ ccnavi_c1_family() {
 	ccnavi_c1_family_id=""
 	ccnavi_c1_repo=""
 	ccnavi_c1_tree=""
-	# 家族の控えが 1 つも無ければ、実行ファイルに聞かずに対象外（D11。一時ディレクトリも要らない）。
+	# 家族の控えが 1 つも無ければ、実行ファイルに聞かずに対象外（一時ディレクトリも要らない）。
 	ccnavi_cf_state=$(ccnavi_state "$ccnavi_c1_root")
 	ccnavi_cf_p="$1"
 	case "$ccnavi_cf_p" in
@@ -953,7 +955,7 @@ ccnavi_c1_prepare() {
 	done
 }
 
-# 一覧のパスだけをコミットする（D35）。<一覧> <文>。新しいファイルは先に add する。
+# 一覧のパスだけをコミットする。<一覧> <文>。新しいファイルは先に add する。
 # 変わったものが 1 つも無ければコミットせずに 0（ccnavi_c1_committed は空）。
 # 落ちたら、この実行が add したパスを索引から外して 1（索引を元に戻す）。
 ccnavi_c1_committed=""
@@ -993,7 +995,7 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# 利用者の hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
+	# 利用者の hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
