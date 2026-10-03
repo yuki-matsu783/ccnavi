@@ -4,6 +4,11 @@
  */
 /* 1 行 = 開閉、id、match、パターンとメッセージ、every、コンテキストの有無 */
 .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) max-content 14px; }
+/* 狭いときは 2 段。1 段目 = 開閉、id、match、every、コンテキスト。2 段目 = パターンとメッセージ */
+@media (max-width: 520px) {
+  .rule .row-head { grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr) max-content 14px; }
+  .rule .sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }
+}
 /* 刻みのバッジ。刻みが無い行でも空の枠を置く（置かないと右端の●が 1 列ずれる） */
 .sum .sum-every { color: var(--vscode-descriptionForeground); white-space: nowrap; }
 .field > input.f-every { max-width: 110px; }
@@ -15,14 +20,16 @@ select.f-section { max-width: 120px; }
 .picker > .menu { display: none; }
 .picker.open > .menu {
   display: flex; flex-direction: column; gap: 2px; position: absolute; z-index: 5; top: 100%; left: 0; min-width: 100%;
+  /* 狭い画面でも右へはみ出さない（左は欄の左端。本文の余白と欄の字下げのぶんを引く） */
+  max-width: calc(100vw - 48px);
   background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
   border-radius: 3px; padding: 5px 7px; box-shadow: 0 2px 8px var(--vscode-widget-shadow, transparent);
 }
-.picker .tool { display: flex; gap: 5px; align-items: center; white-space: nowrap; cursor: pointer; }
+.picker .tool { display: flex; gap: 5px; align-items: center; cursor: pointer; overflow-wrap: anywhere; }
 .picker .tool input { margin: 0; }
-.with-button { display: flex; gap: 6px; align-items: center; }
-.with-button > input { flex: 1; min-width: 120px; }
+.with-button { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.with-button > input { flex: 1; min-width: 80px; }
 .with-button > button { margin-left: 0; white-space: nowrap; }
-.rule .stale { grid-column: 1 / -1; margin: 0; font-size: .9em; color: var(--vscode-editorError-foreground); overflow-wrap: anywhere; }
+.rule .stale { grid-column: 1 / -1; margin: 0; font-size: .9em; color: var(--error-text); overflow-wrap: anywhere; }
 .rule .stale code { margin: 0 6px; }
 .rule .pattern { font-family: var(--vscode-editor-font-family); }

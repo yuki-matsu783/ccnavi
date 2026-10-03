@@ -110,7 +110,9 @@ export function Phase(props: PhaseProps): JSX.Element {
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
-          <span className={phase.id === "" ? "sum-id dim" : "sum-id"}>{phase.id === "" ? "（id 未設定）" : phase.id}</span>
+          <span className={phase.id === "" ? "sum-id dim" : "sum-id"} title={phase.id === "" ? "（id 未設定）" : phase.id}>
+            {phase.id === "" ? "（id 未設定）" : phase.id}
+          </span>
           <span className="clip" title={phase.title}>
             {phase.title}
           </span>

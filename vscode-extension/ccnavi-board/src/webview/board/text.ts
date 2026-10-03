@@ -57,6 +57,11 @@ export function worktreeName(path: string): string {
 
 /** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …` */
 export function phaseStatusFull(p: PhaseChip): string {
+  return phaseStatusFullItems(p).join(" · ");
+}
+
+/** 全文の項目の並び。画面は項目ごとに区切って、項目の途中では折り返さない */
+export function phaseStatusFullItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push(holdLabel(p));
@@ -70,7 +75,7 @@ export function phaseStatusFull(p: PhaseChip): string {
   if (p.riskLine !== "") {
     notes.push(p.riskLine);
   }
-  return [PHASE_STATE_LABELS[p.state], ...notes].join(" · ");
+  return [PHASE_STATE_LABELS[p.state], ...notes];
 }
 
 /**
@@ -78,6 +83,11 @@ export function phaseStatusFull(p: PhaseChip): string {
  * 止めている間は段の名前を 1 つだけ出す。
  */
 export function phaseStatusBrief(p: PhaseChip): string {
+  return phaseStatusBriefItems(p).join(" · ");
+}
+
+/** 要約の項目の並び。無ければ空 */
+export function phaseStatusBriefItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push(holdLabel(p));
@@ -85,7 +95,7 @@ export function phaseStatusBrief(p: PhaseChip): string {
   if (isHighRisk(p.riskLevel)) {
     notes.push(`リスク ${p.riskLevel}`);
   }
-  return notes.join(" · ");
+  return notes;
 }
 
 /** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
@@ -215,21 +225,27 @@ export function historyAt(at: string): string {
 
 /**
  * 先行を満たしていないカードのバッジ（ADR-0088）。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
- * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す
+ * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
+ * `lead` と `ids` は `text` を分けたもので、画面が識別子の途中で折り返さないために使う
  */
-export function predecessorsBadge(card: Card): { readonly text: string; readonly title: string } {
-  const ids = card.predecessorsUnmet.map((p) => p.ticket).join(", ");
+export function predecessorsBadge(card: Card): { readonly text: string; readonly lead: string; readonly ids: readonly string[]; readonly title: string } {
+  const list = card.predecessorsUnmet.map((p) => p.ticket);
+  const ids = list.join(", ");
   const detail = card.predecessorsUnmet.map((p) => `${p.ticket}: ${p.label}`).join("\n");
   const started = card.startedAt !== "" || card.copyStatus === "review";
   if (started) {
     return {
       text: `先行が未完了（${ids}）`,
+      lead: "先行が未完了",
+      ids: list,
       title: `着手済みです。先行が done/ に無いか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";
   return {
     text: `先行待ち（${ids}）`,
+    lead: "先行待ち",
+    ids: list,
     title: `先行が取り消されずに done/ に入るまで、${what}止まります\n${detail}`,
   };
 }
