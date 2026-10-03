@@ -53,7 +53,8 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   ワークスペースの`main`ではない
 - `<統合先>`がリモートにしか無いときは、先にプロジェクトの中で`ccnavi-git.sh fetch <リモート> <統合先>`を実行する
 - 起点はリモートにある最新の統合先にする。統合先の名前は`CCNAVI_INTEGRATION_BRANCH`を使い、無ければ`ccnavi-sync.sh`が控えに書いた名前、
-  それも無ければデフォルトブランチ＝`origin/HEAD`が指すものを使う
+  それも無ければデフォルトブランチ＝`origin/HEAD`が指すものを使う。`ccnavi-git.sh push`はこの順で決まる統合先へも
+  （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`が作るマージリクエストの宛先もこの統合先になる
 - 手元の統合先が古いと、そこから切ったブランチも古いコミットから始まり、`<統合先>`に取り込むときにfast-forwardできなくなる。
   そのため、セッションの開始時に`ccnavi-fetch.sh`が手元の統合先をfast-forwardで進める。ワークスペースルートが別のブランチを
   チェックアウトしていても進める。統合先をチェックアウトしているツリーに未コミットの変更があるときと、
