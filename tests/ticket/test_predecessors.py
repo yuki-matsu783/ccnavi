@@ -342,7 +342,7 @@ class PredecessorTest(TicketTest):
         # 書き込み先を読めないコマンド（sed -i）は何も言われずに通ることはない。
         # 聞ける者が居る権限モードでは Claude Code が利用者に聞き（ccnavi は判定を出さない）、
         # 居なければ ccnavi が断る（judge.undeclared_verdict）。
-        # 書かれても実行後の監視が書き換えとして言う（ADR-0075）。
+        # 書かれても実行後チェックが書き換えとして言う（ADR-0075）。
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))
         self.assertEqual(bash(sed, "bypassPermissions"), "deny")

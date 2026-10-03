@@ -1238,7 +1238,7 @@ def scope_verdict(
 ) -> ScopeVerdict:
     """子の範囲を、親の範囲と種類の上限で切り詰める。
 
-    範囲を当てる 3 か所（実行前の判定、実行後の監視、SubagentStop の差し戻し）はこれを
+    範囲を当てる 3 か所（実行前チェック、実行後チェック、SubagentStop の差し戻し）はこれを
     通す。別に書くと、同じ書き込みが実行前は通って実行後に範囲外と報告される。承認は範囲の超過を
     警告で通すので、超えた分を止めるのはここだけになる。
 
@@ -1283,7 +1283,7 @@ def type_for(
 ) -> phasetypes.PhaseType | None:
     """子の番号の種類。親が計画を持たない、番号が無い、種類が引けないなら None。
 
-    `types` を渡せばそこから引き、ファイルは読まない（実行後の監視は層ごとに 1 度だけ
+    `types` を渡せばそこから引き、ファイルは読まない（実行後チェックは層ごとに 1 度だけ
     読んで持つ）。渡さなければ、親が計画を持つときだけ親の `project:` の層を読む。
     """
     item = plan_item(child, parent)
@@ -1324,7 +1324,7 @@ def scope_findings(
 
     見るのは `base_sha..HEAD` のコミット済みの差分と、未コミットの変更の両方。
     未コミットだけ見る検査では、範囲外を書いてコミットしたものが反映されない。
-    範囲は実行前の判定と同じく、親の範囲と種類の上限で切り詰める（scope_verdict）。
+    範囲は実行前チェックと同じく、親の範囲と種類の上限で切り詰める（scope_verdict）。
     """
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
@@ -1379,7 +1379,7 @@ def scope_findings(
         # git の `-z` の綴りをそのまま使う。git はどの OS でも区切りを `/` で返すので、
         # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
         # 名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、範囲外として報告されない
-        # （実行前の判定は直さない。ADR-0097）。
+        # （実行前チェックは直さない。ADR-0097）。
         # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
         # 見ているのは `base_sha..HEAD` の差分（追跡ファイルだけ）と `git status`
         # （`--ignored` を付けない）で、追跡から外れている `scratchpad/` はどちらにも現れない。
@@ -1389,7 +1389,7 @@ def scope_findings(
         # 消すことはしない。
         if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
-        # ELI5 の置き場は追跡されるので、ここでも外す（実行前の判定と揃える。ADR-0096）。
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える。ADR-0096）。
         if ticket_mod.is_eli5_place(rel):
             continue
         found = scope_verdict(child, parent, pt, rel)

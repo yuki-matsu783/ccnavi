@@ -93,7 +93,7 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
 
     元リポジトリはワークスペースでもプロジェクトでもよい。
 
-    読むのはファイルシステムだけで、git は起こさない。実行前の判定の中で
+    読むのはファイルシステムだけで、git は起こさない。実行前チェックの中で
     呼ばれるので、外部プロセスを起こす場所にはできない。
     """
     base = os.path.join(root, WORKTREES_DIR)
