@@ -669,7 +669,7 @@ class LintTest(unittest.TestCase):
         ]
         self.assertTrue(named, f"実行できない sh を error で名指ししていない: {result.stdout}")
 
-    def test_git_の作業ツリーでなければ監視が何も見ないとwarnになる(self):
+    def test_git_の作業ツリーでなければ実行後チェックが何も見ないとwarnになる(self):
         # 登録はされているのに見る先が無い状態。実行後チェックは git の差分で
         # 見るので、リポジトリでない場所では 1 件も検知しない。
         write(
