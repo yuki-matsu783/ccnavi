@@ -564,6 +564,82 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("deny", result.stdout)
 
+    def test_実行ファイルを外へ写すだけなら止まらない(self):
+        # cp / ln / install は行き先（最後の引数）だけを見る。実行ファイルが元の側に
+        # 出ただけなら読むだけで、差し替えにはならない。
+        path = self.binary()
+
+        for command in (
+            "cp dist/ccnavi/ccnavi.exe /tmp/keep.exe",
+            "ln -s dist/ccnavi/ccnavi.exe /tmp/link",
+            "install dist/ccnavi/ccnavi.exe /tmp/keep.exe",
+            "cp dist/ccnavi/ccnavi.exe /tmp/keep.exe && ls /tmp",
+            "cp -t /tmp dist/ccnavi/ccnavi.exe",
+            "cp dist/ccnavi/ccnavi.exe /tmp/keep.exe -f",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=path, command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_実行ファイルが行き先なら写す形でも止まる(self):
+        # 元の側を通すために行き先の当て方まで緩めていないことを見る。つないだコマンドの
+        # 前後、引用でつないだ語、書き込みの表記（元の側でも止まる）も含める。
+        path = self.binary()
+
+        for command in (
+            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe",
+            "ln -sf /tmp/other.exe dist/ccnavi/ccnavi.exe",
+            "install /tmp/other.exe dist/ccnavi/ccnavi.exe",
+            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe && echo done",
+            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe >/dev/null",
+            "echo go; cp /tmp/other.exe dist/ccnavi/ccnavi.exe",
+            'cp "/tmp/a b.exe" dist/ccnavi/ccnavi.exe',
+            'cp /tmp/other.exe "dist/ccnavi/ccnavi.exe"',
+            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe -f",
+            "sudo cp /tmp/other.exe dist/ccnavi/ccnavi.exe",
+            "cp -S -t /tmp/other.exe dist/ccnavi/ccnavi.exe",
+            "mv dist/ccnavi/ccnavi.exe /tmp/keep.exe",
+            "rm dist/ccnavi/ccnavi.exe",
+            "tee dist/ccnavi/ccnavi.exe < /tmp/other.exe",
+            "echo x > dist/ccnavi/ccnavi.exe",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=path, command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_振り分けの実体を外へ写すだけなら止まらず行き先なら止まる(self):
+        # 組み立ての置き場（`bin/<os>-<arch>/`）の書き込み用の表記は空白をまたぐので、
+        # 写す側には行き先だけに当てる表記を別に足す。
+        spelled, _, _ = self.scripts_layout(("tools",))
+        build = "tools/bin/" + platformtag.host_target()
+
+        for command in (
+            f"cp {build}/ccnavi /tmp/keep",
+            f"cp -r {build} /tmp/keep",
+            f"cp tools/scripts/{LAUNCHER_NAME} /tmp/keep.sh",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=spelled, command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+        for command in (
+            f"cp /tmp/other {build}/ccnavi",
+            f"cp /tmp/other {build}",
+            f"cp /tmp/other {build}/ccnavi && echo done",
+            f"cp -t {build} /tmp/ccnavi",
+            f"cp /tmp/other.sh tools/scripts/{LAUNCHER_NAME}",
+            f"mv {build}/ccnavi /tmp/keep",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=spelled, command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
     def test_セッション開始でバックアップを取り実行後に戻す(self):
         path = self.binary()
         self.run_hook("SessionStart", bin=path)
