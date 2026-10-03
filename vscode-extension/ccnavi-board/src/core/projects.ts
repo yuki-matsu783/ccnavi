@@ -223,10 +223,10 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
  */
 export function rewriteRulesForProject(text: string, sourceRel: string, layer: string, date: string): string {
   const header = [
-    `# ${layer} のルール。共通層の ${sourceRel} を ${date} に写した（ccnavi ボード）。`,
-    "# このファイルは共通層に足してヒットする（上書きはしない）。共通層と全欄が同じ行は重複として捨てられ、--lint が info で言う。",
+    `# ${layer} のルール。共通レイヤーの ${sourceRel} を ${date} に写した（ccnavi ボード）。`,
+    "# このファイルは共通レイヤーに足してヒットする（上書きはしない）。共通レイヤーと全欄が同じ行は重複として捨てられ、--lint が info で言う。",
     "# 文面の sh の綴りは {root}/.ccnavi/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
-    "# 置き換えた行は共通層の行と中身が違う扱いになり、両方効く（--lint が warn で言う）。要らない行は消す。",
+    "# 置き換えた行は共通レイヤーの行と中身が違う扱いになり、両方効く（--lint が warn で言う）。要らない行は消す。",
     "",
   ].join("\n");
   return header + text.split("sh .ccnavi/scripts/").join("sh {root}/.ccnavi/scripts/");

@@ -8,7 +8,7 @@
  * - 利用者が指定したブランチ（表示用。D2）
  * - プロジェクト名（段階 5。3.3 の 7・10.3 の 1）: このリポジトリが手元で `projects/<名前>` に clone される
  *   プロジェクトなら、その名前。空ならワークスペース自身。プロジェクトのリポジトリは、判定に要るワークスペースの
- *   統合先（共通層・設定・互換のマーカー）を読むために、登録したワークスペースのリポジトリ（`workspace`）を名指しする
+ *   統合先（共通レイヤー・設定・互換のマーカー）を読むために、登録したワークスペースのリポジトリ（`workspace`）を名指しする
  */
 import { checkBranch, checkName } from "./github.js";
 import { checkNamespace } from "./gitlab.js";
@@ -67,7 +67,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   return { host: host.id, owner, repo, integration, recentDays: days, extraBranches, project, workspace };
 }
 
-/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、層の名札に予約した名前（`settings.is_reserved_layer_name`） */
+/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、レイヤーの名札に予約した名前（`settings.is_reserved_layer_name`） */
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_LAYER = new Set(["common", "self"]);
 

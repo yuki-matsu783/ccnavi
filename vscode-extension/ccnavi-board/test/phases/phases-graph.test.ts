@@ -55,7 +55,7 @@ test("CB-T186 図は判定をしない（循環も、行き先の無い参照も
   // 図の形に「循環」「不正」を名指しする欄は無い
   assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 
-  // このファイルに無い種類への参照は、何も言わずに線にしない（綴り違いか他の層かは、画面は言わない）
+  // このファイルに無い種類への参照は、何も言わずに線にしない（綴り違いか他のレイヤーかは、画面は言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["外の種類"] }))), []);
   // 自分自身への参照も線にしない（--lint が警告する。画面は何も言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["a"], overlap: ["a"] }))), []);

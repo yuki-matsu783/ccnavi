@@ -250,7 +250,7 @@ test("CB-D68 往復の間は帯の再読込も止め、再読込を押した時�
     dom.click(dom.one('#changed button[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload"), [{ type: "reload", dirty: true }]);
-    // 層の置き場を実行ファイルに聞く間、欄は止まっている
+    // レイヤーの置き場を実行ファイルに聞く間、欄は止まっている
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
     await dom.send({ type: "cancelled" });
     assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
@@ -312,7 +312,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
     // after に挙げた id は overlap で選べない（両方に挙げると検証が止める）
     assert.ok(dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="design"]`).disabled);
     assert.ok(!dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="implement-feedback"]`).disabled);
-    // 共通層ではほかの層を指せないので、id を打つ欄は出さない
+    // 共通レイヤーではほかのレイヤーを指せないので、id を打つ欄は出さない
     assert.equal(dom.all(`${rowSelector("p4")} input.id-extra`).length, 0);
     dom.click(dom.one("#save"));
     await dom.settle();
@@ -368,7 +368,7 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
   }
 });
 
-test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
+test("CB-D87 レイヤーの画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
   const base = readPhases(SAMPLE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
   const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });

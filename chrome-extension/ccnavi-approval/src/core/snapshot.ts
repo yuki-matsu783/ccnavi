@@ -6,7 +6,7 @@
  *
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ。D30）。設定したブランチが無ければ止める
  * 2. 統合先の `.claude/settings.json` を読み、置き場の綴りを Python に出させる
- * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python（7.3）
+ * 3. 統合先の `done/`・共通レイヤー・自身のレイヤー・互換のマーカーを読む。互換の比べは Python（7.3）
  * 4. 直近 N 日と利用者の指定のブランチ（表示用）の置き場を読み、家族を Python に見分けさせる
  * 5. 家族ごとに、参照の閉包（3.3 の 5）の足りないブランチを読み足し、Python に承認待ちを出させる。
  *    判定の入力は統合先・`P`・閉包の `P_X` だけ（D2）。表示用のブランチは入れない
@@ -211,8 +211,8 @@ export async function readIntegration(repo: RepoConfig, reader: Reader, deps: De
 }
 
 /**
- * プロジェクトのリポジトリ（段階 5。3.3 の 7）: 置き場の綴り・共通層・互換のマーカーはワークスペースの統合先から、
- * 閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先から読む。プロジェクトの層の計算（D28）は Python
+ * プロジェクトのリポジトリ（段階 5。3.3 の 7）: 置き場の綴り・共通レイヤー・互換のマーカーはワークスペースの統合先から、
+ * 閉じたもの（`done/`）とプロジェクトのレイヤーはプロジェクトの統合先から読む。プロジェクトのレイヤーの計算（D28）は Python
  */
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   const ws = deps.workspace;

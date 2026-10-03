@@ -30,7 +30,7 @@ phases:
     kind: work
     title: 文書
     review: mr
-    requires: [外の層の種類]
+    requires: [外のレイヤーの種類]
 `;
 
 function model(text: string) {
@@ -71,7 +71,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     assert.deepEqual(notes.length, 1);
     assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていません/);
     // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）。良し悪しも言わない
-    assert.doesNotMatch(notes[0], /他の層の種類を指す/);
+    assert.doesNotMatch(notes[0], /他のレイヤーの種類を指す/);
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
     // sequential でも after が無ければ、判定に使われないという注意は出さない
     assert.doesNotMatch(notes.join(""), /sequential/);

@@ -13,7 +13,7 @@
 候補のフェーズで、ホストのスレッドとレビューの写しは拡張が組んで `result` で渡す。
 
 段階 3 から、仮のツリーに手元の取り込みの控え相当（`logs/state/sync/self/`。統合先の
-`done/`・層・設定の写しと、閉包の家族の控え）も組む（3.3。段階 2c の「Chrome の入口で控えを
+`done/`・レイヤー・設定の写しと、閉包の家族の控え）も組む（3.3。段階 2c の「Chrome の入口で控えを
 組む」）。手元と同じ判定のコードが、取り込み済みの家族として読む:
 
 - ホストに在る家族（`P` と閉包の `P_X`）は `present`
@@ -40,9 +40,9 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 
 段階 5 から、プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）
 も読む。Snapshot に `project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの
-統合先の中身。共通層・自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは
+統合先の中身。共通レイヤー・自身のレイヤー・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは
 手元と同じ形で組む: ワークスペースルートにワークスペースの統合先、`projects/<名前>/` に
-プロジェクトの統合先（`done/` と、D28 の計算の層）、家族は `projects/<名前>` のワークツリー
+プロジェクトの統合先（`done/` と、D28 の計算のレイヤー）、家族は `projects/<名前>` のワークツリー
 として `.claude/worktrees/<P>` に置く。控えは `sync/self/` と `sync/<名前>/` に分けて組む。
 
     "project": "<プロジェクト名>",
@@ -148,7 +148,7 @@ def _placement(settings_text: str | None) -> dict:
     tickets = conf.tickets.strip("/")
     approved = conf.approved.strip("/")
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
-    for name, value in (("提案", tickets), ("承認済み", approved), ("層", home)):
+    for name, value in (("提案", tickets), ("承認済み", approved), ("レイヤー", home)):
         if not value or ".." in value.split("/"):
             raise Refused(f"{name}の置き場の綴りを読めない: {value!r}")
     own_layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
@@ -161,8 +161,9 @@ def _placement(settings_text: str | None) -> dict:
         "integration_files": [SETTINGS_FILE, COMPAT_FILE],
         # 家族のブランチから読むもの。
         "branch_paths": [approved, tickets],
-        # プロジェクトのリポジトリ（段階 5）。ワークスペースの統合先から読むもの（共通層・自身の層・
-        # 設定・互換のマーカー）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
+        # プロジェクトのリポジトリ（段階 5）。ワークスペースの統合先から読むもの
+        # （共通レイヤー・自身のレイヤー・設定・互換のマーカー）と、
+        # プロジェクトの統合先から読むもの（閉じたもの・プロジェクトのレイヤー）
         "workspace_paths": sorted({COMMON_LAYER, own_layer}),
         "workspace_files": [SETTINGS_FILE, COMPAT_FILE],
         "project_paths": sorted({f"{approved}/{ticket_mod.DONE}", own_layer}),
@@ -195,7 +196,9 @@ def _snapshot(req: dict) -> dict:
         if not isinstance(project, str) or not ticket_mod.is_valid_id(project):
             raise Refused(f"プロジェクト名が読めない: {project!r}")
         if settings.is_reserved_layer_name(project):
-            raise Refused(f"プロジェクト名 {project} は層の名前として予約してある（common・self）")
+            raise Refused(
+                f"プロジェクト名 {project} はレイヤーの名前として予約してある（common・self）"
+            )
         ws = snap.get("workspace")
         if not isinstance(ws, dict) or not isinstance(ws.get("integration"), dict):
             raise Refused("プロジェクトのリポジトリにはワークスペースの統合先（workspace）が要る")
@@ -221,7 +224,7 @@ def _project(snap: dict) -> str:
 
 
 def _workspace_files(snap: dict) -> dict[str, str]:
-    """ワークスペースの統合先の中身（共通層・設定・互換のマーカー）。ワークスペース自身なら統合先。"""
+    """ワークスペースの統合先の中身（共通レイヤー・設定・互換のマーカー）。ワークスペース自身なら統合先。"""
     if _project(snap):
         return snap["workspace"]["files"]
     return _files(snap, snap["integration"]["name"])
@@ -416,11 +419,12 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
 
 
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
-    """プロジェクトの層（プロジェクトからの相対パス → 中身）。ADR-0093 の D28 の計算。
+    """プロジェクトのレイヤー（プロジェクトからの相対パス → 中身）。ADR-0093 の D28 の計算。
 
-    「プロジェクトの統合先の現在の層に、ワークスペースの統合先の共通層を `configsync.projected` で
-    写したもの」。共通層にあるファイルだけを写し、無いファイルはプロジェクトの側を残す（着手の
-    configsync と同じ）。`P` の上の層は読まない（3.3 の 6）。
+    「プロジェクトの統合先の現在のレイヤーに、ワークスペースの統合先の共通レイヤーを
+    `configsync.projected` で写したもの」。共通レイヤーにあるファイルだけを写し、
+    無いファイルはプロジェクトの側を残す（着手の configsync と同じ）。
+    `P` の上のレイヤーは読まない（3.3 の 6）。
     """
     ws = snap["workspace"]["files"]
     own = _files(snap, snap["integration"]["name"])
@@ -440,7 +444,7 @@ def project_layer(snap: dict, place: dict) -> dict[str, str]:
 def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
     """取り込みの控え相当（控えの置き場からの相対パス → 中身）。手元の `ccnavi-sync.sh` が書く形。
 
-    - 統合先の控え（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
+    - 統合先の控え（`sync/self/integration/`）: 統合先の `done/`・共通レイヤー・自身のレイヤー・
       `.claude/settings.json` の写しと `head`
     - 家族の控え（`sync/self/families/<P>`）: ホストに在る家族は `present`、無い家族は `gone`
 
@@ -462,7 +466,8 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
             if path.startswith(keep) or path == SETTINGS_FILE:
                 out[f"{base}/integration/{path}"] = text
     else:
-        # プロジェクトの統合先の控え（閉じたものとプロジェクトの層）と、ワークスペースの統合先の控え
+        # プロジェクトの統合先の控え（閉じたものとプロジェクトのレイヤー）と、
+        # ワークスペースの統合先の控え
         keep = tuple(p + "/" for p in place["project_paths"])
         for path, text in _files(snap, integ["name"]).items():
             if path.startswith(keep):
