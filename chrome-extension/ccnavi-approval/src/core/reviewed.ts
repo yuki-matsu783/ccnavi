@@ -64,7 +64,7 @@ export interface ReviewPanel {
 }
 
 /**
- * 候補のフェーズごとに Python に通るかを聞く（書かない）。MR・スレッド・レビューの写しは家族（親のブランチ）に
+ * 候補のフェーズごとに Python に通るかを聞く（書かない）。MR・スレッド・レビューの写しは親子のチケット（親のブランチ）に
  * 1 つなので、GitHub の候補があれば 1 度だけ読んで全部のフェーズに使う。
  */
 export async function reviewPanels(

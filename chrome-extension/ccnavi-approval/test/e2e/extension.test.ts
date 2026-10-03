@@ -123,7 +123,7 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   assert.match((await page.textContent('[data-family="i0001"] .closure')) ?? "", /i0003/);
   // 見た目を目で確かめるとき: CCNAVI_E2E_SHOT=<png のパス>
   if (process.env.CCNAVI_E2E_SHOT) await page.screenshot({ path: process.env.CCNAVI_E2E_SHOT, fullPage: true });
-  // 承認のボタンは承認待ちのある家族だけ。レビュー済みとフォームは出さない。「始める」は
+  // 承認のボタンは承認待ちのある親子のチケットだけ。レビュー済みとフォームは出さない。「始める」は
   // issue を押してから読む（ボードを開くたびには読まない）
   const actions = await page.locator("main button").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).closest<HTMLElement>("[data-family]")?.dataset.family ?? "-"}:${(e as HTMLElement).dataset.action}`));
   assert.deepEqual(actions, ["i0001:approve", "i0002:approve", "-:issues"]);
@@ -334,7 +334,7 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
 });
 
 test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（i<番号>）の親のブランチを統合先の先頭に作る。閉じた識別子の issue は作らない", async () => {
-  lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた家族と重なる" });
+  lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた親子のチケットと重なる" });
   const page = await openBoard();
   await page.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await page.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="12"]`);
@@ -352,7 +352,7 @@ test("CX-T160 「始める」: ボードで issue を読み、押すと issue �
   await again.close();
 });
 
-test("CX-T173 「要確認」: 描いた後に控えが付いた家族は、押しても書かずに「要確認のまま」と言う。外すのは確認を挟み、断れば残る", async () => {
+test("CX-T173 「要確認」: 描いた後に控えが付いた親子のチケットは、押しても書かずに「要確認のまま」と言う。外すのは確認を挟み、断れば残る", async () => {
   const key = "gitlab.e2e/acme/widgets";
   const page = await openBoard();
   const approve = `${GL_REPO} [data-family="i0002"] button[data-action=approve]`;
