@@ -8,7 +8,7 @@ keywords: [frontmatter, type, tags, keywords, index.jsonl, ccnavi --docs, 索引
 
 # md の frontmatter の決まり
 
-`ccnavi --docs` は md の本文ではなく頭の frontmatter を引く。出力の形と絞り込み方は README の「ドキュメントの索引」にある。
+`ccnavi --docs` は md の本文ではなく、頭の frontmatter を検索する。出力の形式と絞り込み方は README の「ドキュメントの索引」に書いてある。
 frontmatter が無い md も一覧には出るが、`--type` `--tag` `--keyword` には当たらず、`--text` もパスと日時にしか当たらない。
 frontmatter の書き方しだいで、文書の探しやすさがそのまま決まる。
 
@@ -18,7 +18,7 @@ frontmatter の書き方しだいで、文書の探しやすさがそのまま�
 |---|---|---|
 | `type` | 必須 | 文書の種類。下の表の値から選ぶ |
 | `title` | 推奨 | 人が読む題名。本文の見出しと揃える |
-| `description` | 推奨 | 何の文書かを 1 文で。一覧を見た人は、これを読んで開くかどうかを決める |
+| `description` | 推奨 | 何の文書かを 1 文で。一覧から開くかどうかを決める手がかりになる |
 | `tags` | 推奨 | 横断の分類。kebab-case で 2〜4 個（`worktree`、`ticket-control` など）。既にある語に揃える |
 | `keywords` | 推奨 | 本文の特徴語。3〜20 個（目安 10 個）。日本語の文書なら日本語の語も混ぜる |
 
@@ -34,7 +34,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 - md は UTF-8 で書き、frontmatter はファイルの頭の 64 KiB の中で閉じる。それより後ろで閉じるものと、UTF-8 でないものは読めず、
   frontmatter が無い扱い（`null`）になる
-- 値は 1 行で書く。`tags` と `keywords` は並び（`[a, b]`）で書く。スカラーで書いても 1 要素の並びとして読むが、並びの形に揃えておく
+- 値は 1 行で書く。`tags` と `keywords` は `[a, b]` の形で書く。`tags: a` のように括弧なしで書いても 1 要素として読めるが、`[a]` と書いて揃える
 - YAML の別名（`*名前`）は使わない。使うと frontmatter 全体が読まれず `null` になる
 - 既存の語彙は `ccnavi --docs --format jsonl` の `frontmatter.tags` で見られる。同じ意味の別の綴りを増やさない
 
@@ -75,7 +75,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 表で「付けていない」とした文書の理由と引き方は次のとおり。
 
 - `CLAUDE.md` と `README.md` 類は、中身がそのまま表示や読み込みに出る（`CLAUDE.md` は毎回モデルの文脈に入り、`README.md` は
-  ホストやエディタが頭から表示する）。頭に YAML を足すと、その YAML が毎回人の目にもモデルの文脈にも入るので付けない。
+  ホストやエディタが頭から表示する）。頭に YAML を足すと、その YAML がユーザにも見え、モデルの文脈にも毎回入るので付けない。
   これらは `--path`（`--path README`、`--path CLAUDE`）か `--text` のパスで引く
 - `SKILL.md` は Claude Code がスキルを選ぶのに読む `name`・`description` を持つ（下の「対象外」）。`type: skill` を足す
   決まりはあるが、いまのスキルにはまだ足していない。スキルは `--path .claude/skills` で引く
