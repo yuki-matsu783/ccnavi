@@ -153,7 +153,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 権威, �
 | 1 | 人 | issue を作る（ホストの画面） | ― |
 | 2 | 人 | 親のブランチ `i<番号>` を統合先の先頭から作る（Chrome 拡張の「始める」か、ホストの画面） | ― |
 | 3 | エージェント | `ccnavi-git.sh fetch origin i<番号>` → `worktree add .claude/worktrees/i<番号> -b i<番号> origin/i<番号>` → `ccnavi-sync.sh i<番号>` で家族の控えができ、C1 の対象になる | `worktree add .claude/worktrees/<id> -b <id> <統合先>`。最初の push までは今の手元の動き |
-| 4 | エージェント | 親のワークツリーで提案を書き（`issue:` 付き）、`--approve --preview --verify <id>` で確かめ、コミットして push | 同じ（`issue:` なし）。push が通ると `ccnavi-git.sh` が家族の控えを `present` で作り、C1 の対象になる（4.3 の移り目） |
+| 4 | エージェント | 親のワークツリーで提案を書き（`issue:` 付き）、`--approve --preview --verify <id>` で確かめ、コミットして push | 同じ（`issue:` なし）。push が通ると `ccnavi-git.sh` が家族の控えを `present` で作り、C1 の対象になる（4.3 の最初の push） |
 | 5 | 承認者 | Chrome 拡張で承認。写しと提案の削除が `P` に 1 コミットで乗る。着手前なら取り下げられる（8.8） | 同じ |
 | 6 | 開発者の手元 | 取り込み: `start` の C1 の中で取り込まれる。先に見たければ `ccnavi-sync.sh`（4.2） | 同じ |
 | 7 | エージェント | `start`・`finish`・マーカーは C1 で `P` へのコミットと push まで済ませる（4.3） | 同じ |
@@ -241,7 +241,7 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
 | 全ツリーの走査（`_everything`） | 子の番号や先の計画を全ツリーから引く | 残す（`next_child_id` `approval.py:528`、`_last_phase_with_children` `:2404`、`diagnose.py:749`） |
 | `phase.types_path`（`phase.py:621-633`） | ワークスペース自身の層はワークスペースルートの作業ツリー、プロジェクトの層は `projects/<名前>` の作業ツリー（`tree.project_root`、`:629-633`）から読む | 手元は変えない（決定 B1。3.3 の 6）。統合先の控えの層・D28 の計算との違いは lint の warn。Chrome は統合先の層と D28 の計算を読む |
 | `ops._undecided` と ADR-0073 の文面 | 「1 つにしてから」 | 3.6 の案内 |
-| `ccnavi-git.sh` push の守り（`:531-563`） | 全ツリーを探して子を見分ける | 子の見分けは変えない。家族の控えが `gone` の `P` への push を拒否。push が通ったら控えを作る（4.3 の移り目） |
+| `ccnavi-git.sh` push の守り（`:531-563`） | 全ツリーを探して子を見分ける | 子の見分けは変えない。家族の控えが `gone` の `P` への push を拒否。push が通ったら控えを作る（4.3 の最初の push） |
 | `review.py` / `ccnavi-review.sh` | 「識別子 = ブランチ名」を暗黙に前提 | `Closes` のリポジトリ付き、`ready` の前提（3.6）、`confirm` のコア化と `actor`（8.9）、C1（4.3） |
 
 ### 3.5 移行: 既存の写しがほかのブランチにある場合
@@ -309,7 +309,7 @@ SessionStart は「`P` を取ってこられなかった。`ccnavi-sync.sh <P>` 
 
 - 家族の控え `sync/<リポジトリ>/families/<P>` は 1 行 1 項目のテキスト（D33）: `remote`・`branch`・`sha`・`fetched_at`（`date +%s`）・`state`（`present` / `closed` / `gone` / `blocked`）・`reason`
 - **「一度も push していない `P`」と「消えた `P`」は控えの有無で分ける**。控えが無ければ手元だけの家族なので、リモートに無くても止めず、今の手元の動きのまま（C1 の対象外）
-- 控えを作る・書き直すのは `ccnavi-sync.sh`、C1 の取り込み、`ccnavi-git.sh push`（通ったとき。4.3 の移り目）の 3 か所
+- 控えを作る・書き直すのは `ccnavi-sync.sh`、C1 の取り込み、`ccnavi-git.sh push`（通ったとき。4.3 の最初の push）の 3 か所
 - **控えは墓標として残す**（段階 2c のレビューの後の決定 A）。親のワークツリーを片付けても消さない（消すと、決まらないで止めていた家族が
   控えの無い家族に戻り、止めが外れる）。消すのは人が打つ `ccnavi-sync.sh --forget <P>` だけで、親のワークツリーが残っていれば断る。
   エージェントからは組み込みの deny（`builtin-guard-ticket-approval`）が止める。閉じたかは家族の控えに頼らず統合先の控えの `done/` から引くので、
@@ -399,7 +399,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
   Chrome はリモートにある `P` しか見ないので、対象外の家族に二重状態は起きない
 - 控えの `state` が `gone` か `blocked` なら C1 の操作は止める。`closed` なら家族は閉じていて状態の操作は無い
 
-#### 移り目（最初の push で対象に入る）
+#### 最初の push で C1 の対象に入る
 
 控えを取り込みでしか作らないと、最初の push から次の取り込みまで、家族が C1 の外なのに Chrome から見えます。これを塞ぎます。
 
@@ -1054,7 +1054,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | 要件 | REQ-APV-07 | 改訂: 「リモートの置き場はホストの権限でのみ守る（書き手の表示は行わない）」。判定がさらに緩む変更として明記、段階 3 で効く（5.1） |
 | 要件 | REQ-APV-11 | 補足（4.3 のそのほかの引用文）: C1 の push は未送信のコミットをすべて送る。置き場は、書いたパスと (b) だけで、それ以外の未送信があれば止める |
 | 要件 | REQ-APV-10・12、REQ-MLT-30 | 権威の規則を書き直す。REQ-APV-14 に「push してから依頼」 |
-| 要件 | 新規 | 取り下げの条件（8.8）、印の `actor`（8.9）、`P` が無いときの扱い（3.6）、C1 の対象・移り目・戻し（4.3）、人の判断を運ぶ（4.6）、統合先（3.3）、版ずれ（7.3） |
+| 要件 | 新規 | 取り下げの条件（8.8）、印の `actor`（8.9）、`P` が無いときの扱い（3.6）、C1 の対象・最初の push・戻し（4.3）、人の判断を運ぶ（4.6）、統合先（3.3）、版ずれ（7.3） |
 | コード | `approval._authoritative` / `home_dir` / `_origin_is_current` / `predecessor_pool`、`ops._undecided` | 3.4 |
 | コード | `approval.gather` / `_apply` / `phase.phases_of`、`history.stamp` | 6 章のコアと差し口へ |
 | コード | `phase.types_path` と層の読み | 取り込み済みの家族は統合先の控え、プロジェクトの層は 3.3 の 6 |
@@ -1076,7 +1076,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | 拡張 | `vscode-extension/ccnavi-board` | 承認は未決（10.3 の 2）。呼び名に `withdrawn`・`chrome`。フローの保存の後に運ぶ処理を送る |
 | 拡張 | Chrome 拡張（新規） | 8 章。書き手の表示は持たない（D29） |
 | テスト | 承認のハーネス `approve()` を使う約 20 ファイル | コアの `judge`/`plan` を直に呼ぶ形へ |
-| テスト | 新規 | 名前の見本表、`branch -M` と refspec の回帰、バイト比較の見本（手元と Pyodide）、閉包と手元の池の一致、8.3〜8.4 の競合と GitLab の事後確認・`seq`、取り込み（早送りの対象・重なりの拒否・ステージ済みで merge しない・merge・衝突で止まる・`seq` だけの衝突・消えたと閉じたの区別・観測ずれ）、SessionStart（ロックで飛ばす・45 秒の枠）、C1（ロックの奪い方と入れ子・途中の操作で始めない・(b) を先にコミット・hook の追記と重なっての再試行・未送信の置き場の変更で止まる・書いたパスだけ・`commit --only`・届いていた push・戻しの比較つき `update-ref`・記録層と `git status` の一致）、移り目、4.4 の見分け、運ぶ処理の自動呼び出し、取り下げの条件と承認コミットの選び方、`confirm` の sh と TS の一致、版ずれ、悪意のある Markdown、sh の移植性（bash 3.2・BSD の道具） |
+| テスト | 新規 | 名前の見本表、`branch -M` と refspec の回帰、バイト比較の見本（手元と Pyodide）、閉包と手元の池の一致、8.3〜8.4 の競合と GitLab の事後確認・`seq`、取り込み（早送りの対象・重なりの拒否・ステージ済みで merge しない・merge・衝突で止まる・`seq` だけの衝突・消えたと閉じたの区別・観測ずれ）、SessionStart（ロックで飛ばす・45 秒の枠）、C1（ロックの奪い方と入れ子・途中の操作で始めない・(b) を先にコミット・hook の追記と重なっての再試行・未送信の置き場の変更で止まる・書いたパスだけ・`commit --only`・届いていた push・戻しの比較つき `update-ref`・記録層と `git status` の一致）、最初の push、4.4 の見分け、運ぶ処理の自動呼び出し、取り下げの条件と承認コミットの選び方、`confirm` の sh と TS の一致、版ずれ、悪意のある Markdown、sh の移植性（bash 3.2・BSD の道具） |
 
 `--approve --preview --verify`（`phase.py:108-112` で deny から外している）は残します。
 
@@ -1195,7 +1195,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | 2a | コアと差し口（`judge`・`plan`・`withdraw`・`confirm`・`reviewed_mark`）。見本をバイト比較・閉包を含む複数の場面に広げ、手元の `--approve` と `confirm` をコア経由に。`source_path` の相対化。fsio の記録層と、fsio を通らない書き込みを揃える | Python | 無し（試験で保証） |
 | 2b | 取り込みと控え: `ccnavi-sync.sh`（消えたと閉じたの区別、観測ずれ、控えの書き出し）、統合先の名前の読みと、無いブランチで止める・使った名前を出す（D30）、`ccnavi-fetch.sh` の早送りだけへの縮小とロックを試すだけの動き、`ccnavi-git.sh push` の控えの作成と `gone` の拒否、`worktree add`・`checkout -B` などの拒否と `:99`・`:607` の文面の書き換え（D36）。この段では控えを書くだけで、判定はまだ読まない | sh・Python（環境変数の読み） | 締まる向き |
 | 2c | 権威（3.3〜3.4）と `P` の消失（3.6）: 閉じた家族、決まらないときは止める、参照の閉包と手元の池の揃え、統合先の控えからの層（ADR-0084 の改訂）。`ready` の前提。移行の検査を error に上げてから旧経路を消す。2b の控えに依る | Python | 締まる向き |
-| 2d | C1（ロック、途中の操作、(b) を先にコミット、取り込み、未送信の確かめ、書いたパスだけ、`commit --only`、届いたかの確かめ、比較つきの戻し、移り目、configsync の例外）と運ぶ処理の改修（4.6）と人の入口の sh。`history` の `withdrawn`・`chrome`・`actor`・`version` | Python・sh・VS Code のボード | 締まる向き。ただし REQ-APV-11 の文の補足を含む |
+| 2d | C1（ロック、途中の操作、(b) を先にコミット、取り込み、未送信の確かめ、書いたパスだけ、`commit --only`、届いたかの確かめ、比較つきの戻し、最初の push、configsync の例外）と運ぶ処理の改修（4.6）と人の入口の sh。`history` の `withdrawn`・`chrome`・`actor`・`version` | Python・sh・VS Code のボード | 締まる向き。ただし REQ-APV-11 の文の補足を含む |
 | 3 | Chrome で承認と取り下げ: GitHub・ワークスペースのリポジトリだけ。`createCommitOnBranch`、家族ごと。Approve が外れうる注意、PAT の期限の知らせと期限ヘッダの確認（確認事項 5）。**REQ-APV-07 の改訂が効き始める**。2b〜2d が前提 | VS Code のボードの呼び名 | **判定が緩む**（リモートの置き場をホストの権限でのみ守り、書き手も表示しない） |
 | 4 | Chrome で「レビュー済み」: スレッドとレビューの読み取り、手で組んだホストの応答の見本での sh と TS の一致試験と見本の更新手順（8.9）、スレッド本文の描画試験 | 無し | 経路が 1 つ増える（同じコード） |
 | 5 | GitLab を 2 段で: まず事後確認と打ち消しだけで出し、確認事項 2 が取れたら `seq`（C1 と運ぶ処理の側も同時）。プロジェクトのリポジトリ（10.3 の 1 の後）、「始める」 | `ccnavi-review.sh` の `Closes`、GitLab の `seq` | 無し |
@@ -1321,7 +1321,7 @@ Chrome の画面では、MR に Approve が付いているときに「このコ�
 | ロック（D32） | `ccnavi-common.sh` の `ccnavi_lock_take` / `ccnavi_lock_drop` | `mkdir` で取り、`owner` に `<ホスト名> <pid> <開始時刻> <印>`。古いロック（同じホストで `kill -0` が落ちる・10 分を過ぎた・`owner` が読めず `find -mmin +10`）は `mv` で奪い、持ち主が替わっていたら戻す。入れ子は `CCNAVI_LOCK_HELD`。sync は `CCNAVI_LOCK_WAIT`（既定 120 秒）待ち、SessionStart は 1 回だけ試す |
 | SessionStart の早送りだけ（D12） | `ccnavi-fetch.sh` | 取り込み済みの家族（`.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある）は、ロックを 1 回だけ試し、`origin/<P>` の祖先なら `merge --ff-only`。書きかけとの重なりは git に任せ、拒まれたら重なったパスと `ccnavi-sync.sh <P>` を言う。分かれていれば「取り込みが要る」と 1 行言う（merge しない）。開始から 45 秒（`CCNAVI_FETCH_BUDGET`）を過ぎたら飛ばして名指しする。それ以外のツリーは前のまま |
 | 「ref が無い」で落ちた fetch（3.6） | `ccnavi-fetch.sh` | `couldn't find remote ref` で落ちたら、その origin を落ちたものに数えない（同じ origin の統合先の取り込みを飛ばさない）。家族なら「`ccnavi-sync.sh <P>` で確かめる」と言う |
-| push の移り目と `gone` の拒否（4.3・3.6） | `ccnavi-git.sh` の `push)` | 送る前に、控えが `gone` の `P` への push を拒否する（控えを読むだけ。`ls-remote` はしない）。通った後、送った先が親のブランチ（ディレクトリ名 = ブランチ名、親の写しか提案がある）で送り先が origin なら、控えを `present` で作る。置き場（`approved/`・`proposals/review/`。未追跡を含む）に未コミットの変更があれば作らずに言う。`present` の控えは `sha` だけ書き直し、`closed` は触らない |
+| 最初の push と `gone` の拒否（4.3・3.6） | `ccnavi-git.sh` の `push)` | 送る前に、控えが `gone` の `P` への push を拒否する（控えを読むだけ。`ls-remote` はしない）。通った後、送った先が親のブランチ（ディレクトリ名 = ブランチ名、親の写しか提案がある）で送り先が origin なら、控えを `present` で作る。置き場（`approved/`・`proposals/review/`。未追跡を含む）に未コミットの変更があれば作らずに言う。`present` の控えは `sha` だけ書き直し、`closed` は触らない |
 | 付け替えと移動の拒否（D36・5.2・3.1 の 10） | `ccnavi-git.sh` の `worktree)`・`checkout \| switch)` | `worktree add` の `-B`・`--detach`/`-d`・`-f`/`--force` を拒否し、`-b` の名前（`-b` が無ければ 2 つ目の語）が行き先の名前と違えば拒否。`checkout -B`（束ねた `-qB` も）・`switch --force-create` を拒否（`switch -C` は全引数の `-C` で前から止まる）。親のワークツリーでは、自分のブランチと `HEAD` 以外へ移る形（`checkout <別>`・`-b`・`--orphan`・`--detach`・`switch --create`・`-d`・`-`）を拒否し、「親のブランチの名前は識別子で、変えると家族が止まる」と言う |
 | 案内文の書き換え（D36・3.1 の 10） | `ccnavi-git.sh` の使い方と `reset` の拒否文、`fetch`・`pull` の refspec の拒否文 | 「リモートに合わせるなら、親のブランチは `ccnavi-sync.sh <P>`。ほかのブランチは `fetch` のあと `merge <リモート>/<ブランチ>`。分かれていて進めないなら人に回す」。refspec の文は「手元の ref は `ccnavi-sync.sh <ブランチ>` が進める」 |
 | 統合先の名前の予約（3.1 の 5） | `ticket.branch_name_problems`、`lint`、`cli` の `--integration-branch` | 渡された統合先の名前（大文字小文字を畳む）に当たる新規の親の識別子を `--lint` の warn で言う。環境変数は読まない |
@@ -1467,7 +1467,7 @@ ADR に無かった判断:
 | # | 何 | 直し方 |
 |---|---|---|
 | 1（重大） | 控えの掃除（sync の頭）で `gone` の控えが消え、止めが外れた | 決定 A。閉じたかは家族の控えに頼らず統合先の控えの `done/` から引く（親のワークツリーがあれば承認の時刻が同じときだけ。`syncstate.Families._closed_in_integration`）。片付けた後の `present` の墓標は、統合先を取り込み直せば閉じた家族として黙る |
-| 2（重大） | 統合先の控えが壊れている・読めない・`head` が無い・入れ替えが終わらないとき、`done/` の検査を黙って通していた | 取り込んだ跡（`sync/<リポジトリ>/`）があるのに読めなければ `Integration.broken` に理由を入れて返す（`integration()` が None なのは、そのリポジトリを一度も取り込んでいないときだけ）。そのリポジトリの新規の提案は「決まらない」で承認しない（error）。push の移り目の直後（家族の控えだけがあり統合先の控えがまだ無い）も同じで、`ccnavi-sync.sh` を打つまで承認しない |
+| 2（重大） | 統合先の控えが壊れている・読めない・`head` が無い・入れ替えが終わらないとき、`done/` の検査を黙って通していた | 取り込んだ跡（`sync/<リポジトリ>/`）があるのに読めなければ `Integration.broken` に理由を入れて返す（`integration()` が None なのは、そのリポジトリを一度も取り込んでいないときだけ）。そのリポジトリの新規の提案は「決まらない」で承認しない（error）。最初の pushの直後（家族の控えだけがあり統合先の控えがまだ無い）も同じで、`ccnavi-sync.sh` を打つまで承認しない |
 | 3（重大） | 検査が error なのに、ロックが取れない・控えを書けないと家族が止まらないまま終わった。並行する sync の書いた gone・closed を上書きしえた | ロックを取った後に控えがまだ `present` かを確かめ、違えば書かない。取れない・書けないときは 3 回まで試し、それでも駄目なら終了コード 3（止めるべき家族が止まっていない） |
 | 4 | 統合先 `done/` の検査が取り込み済みの家族の提案だけだった | 取り込んだ跡のあるリポジトリでは全提案に当てる（3.3 の 4）。承認待ちからは外さず、`candidates` が理由を添えて承認しない側に回す（12） |
 | 5 | read_set の鍵がリポジトリをまたいでぶつかりえた | 鍵を `<リポジトリ>:<ブランチ>:<相対パス>` にした（git の ref は `:` を含めない） |
