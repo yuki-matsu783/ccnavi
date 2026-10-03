@@ -1291,7 +1291,7 @@ def ready(
     )
     text = [MARKER_READY, f"チケット `{parent.ticket}` の作業は終わり、Draft を外した。"]
     text.append(
-        f"`{WIP_ROOT}/` は片付けてある。マージするかどうかは利用者が決める。"
+        f"`{ticket_mod.WIP_ROOT}/` は片付けてある。マージするかどうかは利用者が決める。"
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
     )
     if wrapped:
@@ -1428,7 +1428,7 @@ def close_early(
     # 控えの置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
         f"OK: {parent.ticket} を締めた。あとは親に、状態の移動をコミットし、"
-        f"'ticket finish {parent.ticket}' で閉じ、`{WIP_ROOT}/` を消して push し、"
+        f"'ticket finish {parent.ticket}' で閉じ、`{ticket_mod.WIP_ROOT}/` を消して push し、"
         "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
     return 0
@@ -1604,11 +1604,6 @@ def _close_early_drafts(
     return _write_text(note_path, "\n".join(note))
 
 
-# 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に丸ごと消す。
-# 既定のブランチに残す場所はマージリクエストと issue。綴りは設定から導かず固定する。
-WIP_ROOT = "wip"
-
-
 def _approved_rel(conf: settings.Settings) -> str:
     """ccnavi 自身の置き場（ツリーのルートからの相対）。末尾の `/` は付けない。"""
     return (conf.approved or settings.DEFAULT_APPROVED).strip("/")
@@ -1721,7 +1716,9 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
 def _in_wip(path: str) -> bool:
     """git の綴りが、途中の作業の置き場（`wip`）の下か。大文字小文字と `\\` の区切りを問わない。"""
     folded = path.lower()
-    return folded == WIP_ROOT or folded.startswith((WIP_ROOT + "/", WIP_ROOT + "\\"))
+    return folded == ticket_mod.WIP_ROOT or folded.startswith(
+        (ticket_mod.WIP_ROOT + "/", ticket_mod.WIP_ROOT + "\\")
+    )
 
 
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
@@ -1733,7 +1730,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
     problems: list[str] = []
     if not os.path.isdir(tree_root):
         return [f"親のワークツリーが無い ({tree_root})"]
-    wip = WIP_ROOT
+    wip = ticket_mod.WIP_ROOT
     # 大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
     # （`tree.relative` は書いた綴りを返す）は `wip/eli5/` として通すのに、
     # git には `WIP/...` で入る。

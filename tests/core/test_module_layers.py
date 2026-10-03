@@ -18,7 +18,7 @@
 1. どのモジュールも段をちょうど 1 つ持つ。モジュールを足したら、どの段かを決めさせる
 2. `ccnavi/` の下にサブパッケージを作らない。作ると 1・3・4 の検査の対象から外れる
 3. import の行き先は、同じ段か下の段。上を向いた import を名指しする
-4. 循環は `KNOWN_KNOTS` に書いた 2 組だけ。**増えても減っても落とす。**
+4. 循環は `KNOWN_KNOTS` に書いた組だけ。**増えても減っても落とす。**
    解消したら一覧から消す、が要るようにしてある。消し忘れた一覧は、次に同じ
    場所で循環ができたときに何も言わなくなる
 5. import の行き先が、import 文に残らない書き方をしていない
@@ -130,15 +130,11 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
 #   承認済みチケットの走査（approval）と、フェーズの状態（phase）が互いを直に読む。
 #   これが循環の中心。文面（reasons）は approval から読まれて phase を読むので、
 #   同じ組に入る
-# - ops ↔ review
-#   `ops` が `review` の置き場の綴りを関数の中で引き、`review` が
-#   `ops.close_problems` と `ops.cancel` を呼ぶ
 #
 # 組は「どのモジュールが入っているか」で持つ。循環の向きや本数は見ない。
 KNOWN_KNOTS: frozenset[tuple[str, ...]] = frozenset(
     {
         ("approval", "phase", "reasons"),
-        ("ops", "review"),
     }
 )
 
