@@ -472,7 +472,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(said("resolved"), {"changes_requested": [], "unresolved": []})
         self.assertEqual(len(said("requested-changes")["changes_requested"]), 1)
         self.assertEqual(said("requested-changes")["unresolved"], [])
-        # 目印をまねた別のユーザのスレッドと、後のノートが未解決のスレッドは数える
+        # 目印をまねた別の人のスレッドと、後のノートが未解決のスレッドは数える
         self.assertEqual(len(said("impostor")["unresolved"]), 2)
         self.assertEqual(len(said("paged")["unresolved"]), 11)
         self.assertEqual(len(said("hostile")["unresolved"]), 8)

@@ -58,7 +58,7 @@ SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
 # 診断ログにだけ残す。文面にはユーザの引数（URL など）が入るので、ログには写さない。
 reject() {
 	printf 'ccnavi-git: %s\n' "$2" >&2
-	# 診断ログ（docs/claude/logging.md）。上の文面が契約で、こちらは別に残すだけ。
+	# 診断ログ（docs/claude/logging.md）。上の文面は契約として決まっている出力で、診断ログはそれとは別に残すだけ。
 	log_info 拒否した -- "sub=${sub:-}" "reason=$1"
 	exit 2
 }

@@ -4,9 +4,9 @@
 
 見るのは 5 つ。
 
-1. 実行前の判定。ルール（deny / ask / allow / 何も言わない）とチケット（deny / ask / allow /
+1. 実行前チェック。ルール（deny / ask / allow / 何も言わない）とチケット（deny / ask / allow /
    範囲の外 / チケットが無い）の全組み合わせで、判定・理由コード・どちらの文面か・記録の欄
-2. 実行後の監視。シェルが書いたあとに報告するか、どのコードか
+2. 実行後チェック。シェルが書いたあとに報告するか、どのコードか
 3. チケットの置き場を範囲の外から外すこと。実行前・実行後・サブエージェント終了時で同じ答え
 4. チケットが当たらない場面と、ルールより先に見る点検
 5. 診断の出力
@@ -227,7 +227,7 @@ class Workspace(unittest.TestCase):
         )
 
     def write_hook(self, tree, rel, **kw):
-        """Write の実行前の判定。"""
+        """Write の実行前チェック。"""
         return self.hook(
             "PreToolUse", "Write", tree, file_path=os.path.join(tree, *rel.split("/")), **kw
         )
@@ -307,7 +307,7 @@ class Workspace(unittest.TestCase):
 
 
 class PreToolUseTable(Workspace):
-    """実行前の判定。"""
+    """実行前チェック。"""
 
     # (チケットの列の名前, 書き込み先のワークツリーを選ぶ鍵, 相対パス)
     COLUMNS = (
@@ -428,7 +428,7 @@ class PreToolUseTable(Workspace):
 
 
 class PostToolUseTable(Workspace):
-    """実行後の監視。ワークツリーでシェルが書いたあと。"""
+    """実行後チェック。ワークツリーでシェルが書いたあと。"""
 
     # (ルールのタイプ, チケットの列, 相対パスの接頭, 報告のコード。None は報告しない)
     CASES = (
@@ -589,10 +589,10 @@ class TicketPlacesElsewhere(TicketPlaces):
 
 
 class ScratchPlace(Workspace):
-    """下書きの置き場（`scratchpad/`）を、実行前の判定だけが範囲の外でも咎めない。
+    """下書きの置き場（`scratchpad/`）を、実行前チェックだけが範囲の外でも咎めない。
 
     外してよい根拠は「そのツリーの git が追跡しないので統合先へ乗らない」ことの 1 つだけ。
-    だから外すのは実行前の 1 か所に限り、実行後の監視とサブエージェント終了時の検査は
+    だから外すのは実行前の 1 か所に限り、実行後チェックとサブエージェント終了時チェックは
     外さない。あの 2 つの入力（`git status` と `base_sha..HEAD` の差分）に `scratchpad/` が
     現れるのは追跡されているときだけで、それは根拠が成り立たない証拠になる。
 
@@ -631,7 +631,7 @@ class ScratchPlace(Workspace):
         self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
 
     def test_post_tool_use_reports_a_tracked_scratch_place(self):
-        """実行後の監視は下書きの置き場を外さない。
+        """実行後チェックは下書きの置き場を外さない。
 
         この土台の `.gitignore` は `scratchpad/` を無視しないので、ここに置いたものは
         追跡される。追跡されるということは、外してよい根拠（統合先へ乗らない）が
@@ -672,8 +672,8 @@ class ScratchPlace(Workspace):
 class Eli5Place(Workspace):
     """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない（ADR-0096）。
 
-    `scratchpad/` と違って追跡される置き場なので、実行前の判定だけでなく、実行後の監視と
-    サブエージェント終了時の検査も外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
+    `scratchpad/` と違って追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
+    サブエージェント終了時チェックも外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
     紛らわしい名前は今までどおり範囲の外として止まる。親のツリーでも子のツリーでも同じ。
 
     ルールはワークツリーを allow で開ける。

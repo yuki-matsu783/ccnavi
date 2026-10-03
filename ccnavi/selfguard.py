@@ -2,10 +2,10 @@
 
 ## 守る対象をルールファイルに書かない
 
-ルールに書いた守りは、ルールを消せば一緒に消える。実行後の監視は保護領域を
+ルールに書いた守りは、ルールを消せば一緒に消える。実行後チェックは保護領域を
 ルールファイルの `deny` と `ask` から導くので、ルールファイル自身をそこで守ると、
 書き換えられた時点で「何を守るか」の一覧ごと失われる。`deny` を空にされた形も、
-壊れて組み込みの既定に戻った形も、どちらも保護領域は 0 件になり、監視は何も
+壊れて組み込みの既定に戻った形も、どちらも保護領域は 0 件になり、実行後チェックは何も
 検知しない。守りの根拠が、守られる対象の中に置いてあることが原因になる。
 
 だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 11.6）。
@@ -36,7 +36,7 @@ risks.yml がここで守られているので、新しい参照を足すこと�
 （`*/.ccnavi/*`、add_rules）とルール由来の保護に任せる。止まり、止めきれなくても戻る。
 
 コアの控えと復元まで持たせない理由はもう 1 つある。ccnavi ディレクトリの下のファイル数は定まらない。
-呼び出しのたびに全部を読んで比べることになり、実行前の判定に設けた期限に影響する。
+呼び出しのたびに全部を読んで比べることになり、実行前チェックに設けた期限に影響する。
 数が定まっているのは設定 3 本のほうで、そこがコアとコアでないものの境になる。
 
 ## ワークツリー側の設定も同じ扱い
@@ -50,7 +50,7 @@ risks.yml がここで守られているので、新しい参照を足すこと�
 それでも守るのは、ワークツリー側の設定が統合先へ入る経路があるから。ワークツリーで書き換えて
 ブランチを統合すれば、そのまま統合先の hook の登録とルールになる。実行前の `deny` は
 「今の 1 回」を止めるが、統合は別の日の別のセッションが行うので、そこには届かない。
-しかもワークスペースルートの側と違って、ワークツリーは `.gitignore` の中にあり、実行後の監視が読む
+しかもワークスペースルートの側と違って、ワークツリーは `.gitignore` の中にあり、実行後チェックが読む
 git の変更一覧にも出てこない。止める仕組みも気づく仕組みも無いまま、時間差で反映される経路になる。
 
 守る場所は増えるが、守る対象の種類は増えていない。上の一式が、それぞれの
@@ -103,7 +103,7 @@ git の変更一覧にも出てこない。止める仕組みも気づく仕組�
 ## 実行後だけでは足りない
 
 hook の登録は設定ファイルの file watcher が拾っていて、書き換えは同じセッションの
-うちに反映される。`PostToolUse` の登録を消されると、その次の呼び出しから実行後の監視は
+うちに反映される。`PostToolUse` の登録を消されると、その次の呼び出しから実行後チェックは
 動かない。実際に動かして確かめてある。だから実行前にも手を入れて、対象が消えていれば
 そこで戻す。
 
@@ -259,18 +259,28 @@ _COPY_PLACES = (
 )
 
 
-def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
+def shell_write_regex(
+    bin_path: str = "",
+    *extra_clauses: str,
+    write_only: tuple[str, ...] = (),
+    copy_only: tuple[str, ...] = (),
+) -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルの綴りは設定で動くので、
     ここで組み立てる。
 
     実行ファイルを場所の一覧に足すのは、そこが判定器の実体だから。差し替えられると
     ルールを 1 行も変えずに判定そのものを入れ替えられる。しかも置き場は
-    `.gitignore` の中にあることが多く、そうなると実行後の監視からも見えない。
+    `.gitignore` の中にあることが多く、そうなると実行後チェックからも見えない。
 
     extra_clauses は設定で動く場所の綴り。ccnavi ディレクトリ（project_home_clause）と
     共通層の 3 本（common_shell_clause）が来る。既定の名前は _PLACES に書いてあるので、
     ここで足すのは動かしてある場合の綴りになる。層の設定は行き先の判定に使うので、
     書けるとエージェントが自分のルールを緩められる。
+
+    write_only と copy_only は、書き込む側と写す側で終わりの形を変えたい綴り。
+    共通層の 3 本は 1 本のファイルなので、写す側では行き先（最後の引数）にだけ当てる。
+    両方に同じ形を足すと、`cp <共通層の 1 本> /tmp/x` のようにコピー元に書いただけの
+    読みまで止まる。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
@@ -278,6 +288,8 @@ def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
         if clause:
             places.append(clause)
             copy_places.append(clause)
+    places.extend(clause for clause in write_only if clause)
+    copy_places.extend(clause for clause in copy_only if clause)
     where = _folded("(" + "|".join(places) + ")")
     copy_where = _folded("(" + "|".join(copy_places) + ")")
     return rf"{_WRITE_VERBS}{where}|{_COPY_VERBS}{copy_where}[^ \x00]*($|\x00)"
@@ -377,14 +389,19 @@ def guard_shell_regex(
 ) -> str:
     """この設定で組んだ、シェルから書き込む形。
 
-    実行前の判定（add_rules）と組み込みの既定（builtin）の両方がここから取る。既定の
+    実行前チェック（add_rules）と組み込みの既定（builtin）の両方がここから取る。既定の
     側だけモジュールを読んだ時点の空の設定で組むと、ccnavi ディレクトリや実行ファイルを
     動かしたワークスペースでは、ルールファイルが壊れたときだけ動かした先への書き込みが
     止まらなくなる。2 か所で組むと、片方だけが弱い側になる。
     """
-    clauses = [project_home_clause(project_home)]
-    clauses.extend(common_shell_clause(root, path) for path in common_files)
-    return shell_write_regex(bin_path, *clauses)
+    write_only = tuple(common_shell_clause(root, path) for path in common_files)
+    copy_only = tuple(common_shell_clause(root, path, term="") for path in common_files)
+    return shell_write_regex(
+        bin_path,
+        project_home_clause(project_home),
+        write_only=write_only,
+        copy_only=copy_only,
+    )
 
 
 def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
@@ -392,7 +409,7 @@ def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
     return (conf.rules, conf.phases, conf.risk)
 
 
-def common_shell_clause(root: str, path: str) -> str:
+def common_shell_clause(root: str, path: str, term: str = _TERM) -> str:
     """共通層の 1 本を、シェルの書き込みに当てる形に直す。
 
     既定の置き場（`.ccnavi/common/`）は _PLACES が持っているが、`--rules` / `--phases` /
@@ -409,6 +426,12 @@ def common_shell_clause(root: str, path: str) -> str:
     `myrules.yml` への書き込みまで止めないため。ルールの regex は後読みを受けない
     （rules._UNSUPPORTED）ので、前の 1 文字も含めて当てる形で書く。行き先の前には必ず 1 文字ある。
     shellread がリダイレクトを `> 行き先` にそろえ、コマンドの語は空白で区切られている。
+
+    term は名前の終わりの形。書き込む側は `_TERM`（空白も終わりに数える）で閉じる。
+    写す側（cp / ln / install）には空の term を渡す。後ろに `[^ \x00]*($|\x00)` が続くので、
+    空白の手前で終わるコピー元には当たらず、コマンドの終わりか切れ目で終わる行き先にだけ当たる。
+    `_COPY_TERM`（`$`）で閉じると、`cp x <共通層の 1 本> && echo` のように後ろに
+    コマンドが続く形が通る。
     """
     if not path:
         return ""
@@ -417,7 +440,7 @@ def common_shell_clause(root: str, path: str) -> str:
     spelled = [_spelled(name) for name in names if name]
     if not spelled:
         return ""
-    return r"(?:^|[^\w.-])(?:" + "|".join(spelled) + ")" + _TERM
+    return r"(?:^|[^\w.-])(?:" + "|".join(spelled) + ")" + term
 
 
 def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
@@ -1110,7 +1133,7 @@ def at_start(
     同じ見た目になる。
 
     小さいほうも一緒に控える。実行前の控えが始まるのは最初のツール呼び出しからで、
-    それより前に設定ファイルを消されると、控えを持たないまま実行後の監視に入る。
+    それより前に設定ファイルを消されると、控えを持たないまま実行後チェックに入る。
     セッションの開始そのものが、いちばん早く取れる断面になる。
 
     控えるだけで、戻さない。`dry-run` でも控えるのは、控えることが誰の書きかけも
@@ -1298,8 +1321,8 @@ def _check_heavy(setting: str, state_dir: str, session: str, target: Target) -> 
 
     中身は読まない。控えた時点の大きさと更新時刻を参照に書いてあるので、
     差し替えられればどちらかが必ず動く。同じ大きさで同じ時刻に作った別物までは
-    見分けられないが、そこを見分けるには毎回全部を読むことになり、実行前の
-    判定に設けた期限を設定ファイル 1 つのために使い切ることになる。
+    見分けられないが、そこを見分けるには毎回全部を読むことになり、実行前
+    チェックに設けた期限を設定ファイル 1 つのために使い切ることになる。
 
     控えが無いときは何も出さない。セッション開始のイベントに登録していない、あるいは
     実行ファイルを指していない設定がこれで、異常ではない。登録の漏れは

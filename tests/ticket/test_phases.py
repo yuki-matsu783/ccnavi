@@ -1345,7 +1345,7 @@ class ChatReviewTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["chores"], feedback=["chores-feedback"]))
         self.assertEqual(self.approve().returncode, 0)
         # 親を着手にすると、次の hook が承認済みチケットへ started_at を写す。写した跡を
-        # 残したまま先へ進むと、実行後の監視がそれを報告して告知が読めなくなる。
+        # 残したまま先へ進むと、実行後チェックがそれを報告して告知が読めなくなる。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.commit_parent("フィードバック計画")
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/b*"], review=False))
@@ -1353,8 +1353,8 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(self.approve().returncode, 0)
         self.run_child("i0001-02", [("src/b1.py", "y\n")])
         self.assertEqual(self.close_child("i0001-02").returncode, 0)
-        # 承認済みチケットの更新まで入れて commit する。残すと実行後の監視がそちらを報告し、
-        # フェーズの告知が読めない（実行後の監視は stderr、告知は stdout の JSON）。
+        # 承認済みチケットの更新まで入れて commit する。残すと実行後チェックがそちらを報告し、
+        # フェーズの告知が読めない（実行後チェックは stderr、告知は stdout の JSON）。
         self.commit_parent("close 02")
         self.merge("i0001-02")
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
@@ -1589,7 +1589,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("種類の上限では切り詰めていない", self.reason(result))
 
     def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
-        """7. 同じ状態で、Bash の実行前の判定（止めるかどうかの経路）も例外で終わらない。"""
+        """7. 同じ状態で、Bash の実行前チェック（止めるかどうかの経路）も例外で終わらない。"""
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
@@ -1671,7 +1671,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
-        """15. 実行後の監視: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
+        """15. 実行後チェック: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )

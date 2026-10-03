@@ -286,6 +286,37 @@ class ShellPlaceTest(GuardHarness):
             with self.subTest(command=command):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
 
+    def test_copying_out_of_a_common_layer_file_is_not_denied(self):
+        """11.6: 共通層の 1 本をコピー元に書いただけの読みは通る。
+
+        共通層の節を写す側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
+        数えるのでコピー元に当たり、`cp .ccnavi/common/rules.yml /tmp/x` が止まっていた。
+        """
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
+            for command in (
+                f"cp .ccnavi/common/{name} /tmp/x",
+                f"cp {self.ws}/.ccnavi/common/{name} /tmp/x",
+                f"ln -s .ccnavi/common/{name} /tmp/x",
+                f"install .ccnavi/common/{name} /tmp/x",
+            ):
+                with self.subTest(command=command):
+                    self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
+
+    def test_copying_into_a_common_layer_file_is_still_denied(self):
+        """11.6: 共通層の 1 本が行き先なら、後ろにコマンドが続いても止まる。書き込みも止まる。"""
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
+            for command in (
+                f"cp /tmp/x .ccnavi/common/{name}",
+                f"cp /tmp/x {self.ws}/.ccnavi/common/{name}",
+                f"cp /tmp/x .ccnavi/common/{name} && echo done",
+                f"ln -sf /tmp/x .ccnavi/common/{name}",
+                f"echo x > .ccnavi/common/{name}",
+                f"rm .ccnavi/common/{name}",
+            ):
+                with self.subTest(command=command):
+                    result = self.guarded_hook("Bash", self.ws, command=command)
+                    self.assert_denied(result, "builtin-guard-setting-files")
+
     def test_the_moved_umbrella_is_closed_the_same_way(self):
         """11.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わる綴りで止まる。"""
         result = self.hook(

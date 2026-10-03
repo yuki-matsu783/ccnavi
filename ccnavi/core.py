@@ -7,7 +7,7 @@
 - **Reader**: 段階 2a では Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
   作業ツリー、Chrome は MEMFS に組んだ仮のツリー（ADR-0093 の 8.2「段階 1〜2a は MEMFS」）。
   ブランチごとの blob の表から読む形（`NOT_FETCHED`）は、権威を `P` に固定する段階 2c 以降
-- **判定**: `judge_approval`（6.2 の `judge`。実行前の判定のモジュール `ccnavi.judge` と
+- **判定**: `judge_approval`（6.2 の `judge`。実行前チェックのモジュール `ccnavi.judge` と
   紛れないように名前を変えた）は承認の対象と画面と指紋を、`withdraw` と `confirm` は通らない
   理由を返す
 - **Changes**: 書き込みを値として並べたもの（`plan`）。書くときの落ち方（止める・言って続ける）

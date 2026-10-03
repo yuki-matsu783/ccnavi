@@ -260,7 +260,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルの境目の点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが 1 段上がります。HIGH 以上の場合は、次フェーズに進む前に人間レビューが必須になります
+          リスクレベルの境目の点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが上がります。HIGH 以上の場合は、次フェーズに進む前に人間レビューが必須になります
           </span>
         </h2>
         <details className="help">
@@ -351,7 +351,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#levels",
     title: "リスクレベルの境目の点",
-    body: "子チケットのリスクの点がこの値以上になると、リスクレベルが 1 段上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。",
+    body: "子チケットのリスクの点がこの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。",
   },
   {
     target: "#factors",

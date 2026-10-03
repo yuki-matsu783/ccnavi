@@ -155,7 +155,7 @@ def rules_for(
 
     パスを持たないツール（Bash / PowerShell / WebFetch / Skill / Agent）は全部の和。呼び出しが
     どのプロジェクトのものかは当てない。Bash で当てる仕掛け（cwd、cd の追跡、引数の語の走査）は
-    「どのルールファイルを引くか」にしか影響せず、副作用は結局実行後の監視が拾う。WebFetch・Skill・
+    「どのルールファイルを引くか」にしか影響せず、副作用は結局実行後チェックが拾う。WebFetch・Skill・
     Agent は当てる材料を持たない。和なら deny と ask は増える側になり、緩むのは allow の共有だけに
     なる（REQ-MLT-05）。読めない層は和から外し、外したことを記録に残す（REQ-MLT-06）。
     """

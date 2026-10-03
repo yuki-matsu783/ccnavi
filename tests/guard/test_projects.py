@@ -578,7 +578,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
         self.assertIn("gone", cancelled.stderr)
 
-    # ---- 5. 実行後の監視はツリーごと
+    # ---- 5. 実行後チェックはツリーごと
 
     def test_post_monitoring_reads_the_project_tree_the_call_touched(self):
         started = self.hook("", self.ws, event="UserPromptSubmit")

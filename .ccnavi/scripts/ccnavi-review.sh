@@ -82,12 +82,12 @@ USAGE
 # 表す短い語で、診断ログにだけ残す。文面には origin やパスが入るので、ログには写さない。
 fail() {
 	printf 'ccnavi-review: %s\n' "$2" >&2
-	# 診断ログ（docs/claude/logging.md）。上の文面が契約で、こちらは別に残すだけ。
+	# 診断ログ（docs/claude/logging.md）。上の文面は契約として決まっている出力で、診断ログはそれとは別に残すだけ。
 	log_info 止めた -- "sub=${sub:-}" "exit=${3:-1}" "reason=$1"
 	exit "${3:-1}"
 }
 
-# 共通部分。ワークスペースルートの探し方と、URL の伏せ字はここにある。
+# 共通部分。ワークスペースルートの探し方と、URL の資格情報を伏せる処理はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
 [ "$#" -ge 1 ] || {

@@ -4,7 +4,7 @@
 
 1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は warn で読み飛ばす
 2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。ユーザが保存したフローを
-   実行後の監視が範囲外の変更として咎めない（H1）
+   実行後チェックが範囲外の変更として咎めない（H1）
 3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
    別名（アンカーとエイリアス）は読まない
 4. 壊れた・大きい・リンクのフローで落ちない。文の量に上限がある。ccnavi の名乗りを真似させない
@@ -632,7 +632,7 @@ class FlowGuardTest(FlowHarness):
 
     def test_a_flow_saved_by_a_person_is_not_blamed_on_the_agent(self):
         """ユーザがボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
-        実行後の監視が範囲外の変更として咎めない（H1）。未コミットでも、コミットしても。"""
+        実行後チェックが範囲外の変更として咎めない（H1）。未コミットでも、コミットしても。"""
         other = CHILD.replace("01", "02")
         ok = write(os.path.join(self.parent_tree, "wip", "a.md"), "a\n")
         first = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok, content="a")
@@ -653,7 +653,7 @@ class FlowGuardTest(FlowHarness):
         self.assertNotIn("POST_TICKET_SCOPE", said)
         self.assertNotIn("POST_VIOLATION", said)
         self.assertNotIn("flows/", said.replace("\\", "/"))
-        # 監視は有効。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
+        # 実行後チェックは有効。範囲の外の変更（以前の置き場 references/ も）はそのまま咎める。
         write(os.path.join(self.parent_tree, "references", CHILD, "flow.json"), "{}")
         ok4 = write(os.path.join(self.parent_tree, "wip", "d.md"), "d\n")
         fourth = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok4, content="d")

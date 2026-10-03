@@ -1,6 +1,6 @@
-"""ツール実行後の監視。走ったあとの作業ツリーを見て、保護領域が変わっていないかを問う。
+"""ツール実行後チェック。走ったあとの作業ツリーを見て、保護領域が変わっていないかを問う。
 
-## 実行前の判定と何が違うか
+## 実行前チェックと何が違うか
 
 見ている対象が違う。実行前はツール呼び出しの引数を見て「これは何をするか」を
 言い当てる。ここは作業ツリーを見て「何が起きたか」を読む。前者を厳しくしても
@@ -21,10 +21,10 @@
 気づかれないまま緩む。
 
 `ask` も保護領域に数えるのは、そこが「ユーザが 1 度見るべき場所」だから。
-実行前の判定は引数を見て確認を出すが、シェルやビルドが書いたぶんは
+実行前チェックは引数を見て確認を出すが、シェルやビルドが書いたぶんは
 引数に現れないので、誰にも確認が出ないまま通っている。あとから言う先がここしかない。
 
-当てる先は git が返したパスを解いた絶対パス。実行前の判定がファイルのパスを
+当てる先は git が返したパスを解いた絶対パス。実行前チェックがファイルのパスを
 解いてから当てるのと同じ理由で、綴りを変えただけで外せてはいけない。
 
 ## 前から在った変更を原因にしない
@@ -78,7 +78,7 @@ CODE_VIOLATION = "POST_VIOLATION"
 # 前から在った変更には別のコードを使う。同じコードで送ると、受け取った側に
 # 「直前の実行が壊したもの」と「元から汚れていたもの」を見分ける方法が無くなる。
 CODE_PREEXISTING = "POST_PREEXISTING"
-# 承認されたチケットの作業範囲の外が変わった。実行前の判定が同じことを
+# 承認されたチケットの作業範囲の外が変わった。実行前チェックが同じことを
 # DENY_TICKET_SCOPE で止めるが、そちらは Write / Edit の引数しか見ない。
 # シェルが書いたもの、ビルドの出力、スクリプトが内部で開いたファイルは、
 # 引数に現れないのでここでしか見つからない。
@@ -88,7 +88,7 @@ CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
 # 出所にこの名前をつけて、ルールファイルを探しても見つからないことを示す。
 TICKET_SCOPE_RULE = "(ticket-scope)"
 
-# 判定に至らなかった理由のうち、この監視だけが出すもの。
+# 判定に至らなかった理由のうち、このチェックだけが出すもの。
 REASON_TOOL_CANNOT_WRITE = "tool-cannot-write"
 REASON_WORKTREE_UNREADABLE = "worktree-unreadable"
 # ターンの始まりを見ていないので、このターンで起きたことを切り出せない。
@@ -127,7 +127,7 @@ def check(
 
     mine は ccnavi 自身が書く場所。記録と控えがそれで、置き場は設定で動くので、
     ルールが守る場所の中を指すこともある。自分の書き込みを自分の違反として
-    報告しはじめると、監視は 1 回目から嘘しか言わなくなる。
+    報告しはじめると、実行後チェックは 1 回目から嘘しか言わなくなる。
 
     watched は見るツリー。ワークスペースルートと、この呼び出しが触ったツリー
     （設計 11.7）。ツリーごとに git を起こし、そのツリーのルールで見る。
@@ -192,7 +192,7 @@ def check(
     # dry-run では戻さない代わりに、戻していたはずだと言う。selfguard の
     # would-restore と同じ扱いにしてある。戻しもせず何も出さないと、報告を読んだ側には
     # 戻しを切った形と見分けが付かない。予行として置いた設定が「戻しは要らない」
-    # という結論に読み替えられるし、対象がルールファイル次第で動くこの監視では、
+    # という結論に読み替えられるし、対象がルールファイル次第で動くこのチェックでは、
     # 何が戻るのかを本番の前に見せることがそのまま安全の余裕になる。
     # 予行で言うのも、本番で戻すのと同じ集合に限る。戻さない 1 件に「本番なら
     # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
@@ -329,7 +329,7 @@ def _committed_findings(
             continue
         # 着手が写した分かどうかは、コミットされた中身で答える。ディスクで答えると、
         # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
-        # 監視・控えと復元・ここの 3 つから同時に外れる。
+        # チェック・控えと復元・ここの 3 つから同時に外れる。
         judged = (
             functools.partial(_committed_synced, synced, top, base, changes) if synced else None
         )
@@ -393,7 +393,7 @@ def at_stop(
     覚えているもので、ユーザはまだ 1 度も見ていないことがある。代わりに見るのは
     ターンの始まりに取った基準で、そこに無いものだけが、このターンで起きたこと。
 
-    戻しもしない。ここで報告するのは、実行後の監視が戻さなかった、あるいは
+    戻しもしない。ここで報告するのは、実行後チェックが戻さなかった、あるいは
     戻す設定になっていなかった変更で、どうするかはユーザが決める。
     """
     baseline, known_baseline, heads = _load_turn(stderr, state_dir, payload.session_id)
@@ -416,7 +416,7 @@ def at_stop(
     ]
     # このターンでコミットに入ったぶんも足す。`git status` はコミットを見せないので、
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
-    # 同じ見た目になる（呼び出しごとの監視も同じ見落としがあるが、そちらは戻しに関わるので
+    # 同じ見た目になる（呼び出しごとの実行後チェックも同じ見落としがあるが、そちらは戻しに関わるので
     # 断面を変えない。ユーザが 1 度で見るのはこの報告）。
     committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
     found += committed
@@ -488,7 +488,7 @@ def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
 class ScopeGuard:
     """承認された作業範囲を、実行後の側から当てるための持ち物。
 
-    実行前の判定と同じ範囲・同じ当て方を使う。別に書くと、同じ書き込みが
+    実行前チェックと同じ範囲・同じ当て方を使う。別に書くと、同じ書き込みが
     実行前は通って実行後に咎められる（あるいはその逆）ことになり、
     どちらが本当の範囲なのかを誰も言えなくなる。鍵はファイルの行き先で、
     その行き先のワークツリーに結び付いた承認済みチケットの範囲を当てる。
@@ -508,9 +508,9 @@ class ScopeGuard:
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
         """この変更が範囲の外なら、咎める文面と出所を返す。中なら None。
 
-        範囲は実行前の判定と同じく、親の範囲と種類の上限で切り詰める（phase.scope_verdict）。
+        範囲は実行前チェックと同じく、親の範囲と種類の上限で切り詰める（phase.scope_verdict）。
         チケットの置き場は外でも咎めない。次のチケットを提案できなくすると、
-        いちど承認した範囲から永久に出られなくなる。外し方は実行前の判定と同じ関数。
+        いちど承認した範囲から永久に出られなくなる。外し方は実行前チェックと同じ関数。
         """
         t = tree.tree_of(self.root, full, self.projects)
         if t is None or t.is_main:
@@ -526,7 +526,7 @@ class ScopeGuard:
         # （追跡されないので統合先へ乗らない）が崩れている。そこは報告から外さずに言う。
         if ticket_mod.is_ticket_place(rel, self.tickets, self.approved):
             return None
-        # ELI5 の置き場は追跡されるので、ここでも外す（実行前の判定と揃える。ADR-0096）。
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える。ADR-0096）。
         if ticket_mod.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
@@ -618,7 +618,7 @@ class Watched:
     """実行後に見るツリー 1 つと、そこに当てるルール（設計 11.7）。
 
     ワークスペースのツリーにはワークスペースのルール、プロジェクトとそのワークツリーには
-    そのプロジェクトのルール。実行前の判定と同じ引き方でなければ、実行前に通った
+    そのプロジェクトのルール。実行前チェックと同じ引き方でなければ、実行前に通った
     書き込みが実行後に咎められる。
     """
 
@@ -633,7 +633,7 @@ def _read_all(
     """見るツリーを順に git に聞く。読めないツリーは記録して飛ばす。
 
     1 つも読めなければ判定に至らなかったことにする。見えないことを伏せずに言う。
-    記録に残せば、監視が動いていなかった期間を後から数えられる。数えられないと、
+    記録に残せば、実行後チェックが動いていなかった期間を後から数えられる。数えられないと、
     違反が無かったのか見ていなかったのかが同じ見た目になる。
     """
     out, failed = [], []
@@ -646,7 +646,7 @@ def _read_all(
         out.append((w, top, changes))
     if failed:
         note = "; ".join(failed)
-        stderr.write(f"ccnavi: 作業ツリーを読めないので実行後の監視は動かない: {note}\n")
+        stderr.write(f"ccnavi: 作業ツリーを読めないので実行後チェックは動かない: {note}\n")
         record.detail = f"{record.detail}; {note}" if record.detail else note
     if not out:
         record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
@@ -678,7 +678,7 @@ def _findings(
     範囲を広げても済まない場所だから。ここで範囲の側の文面を返すと、
     「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
 
-    ルールの allow に当たる変更も、チケットの範囲は当てる。実行前の判定がルールと
+    ルールの allow に当たる変更も、チケットの範囲は当てる。実行前チェックがルールと
     チケットの厳しい側を採るのと同じ（設計 5）。allow を理由に飛ばすと、実行前に
     止まる書き込みがシェルから入ったときに誰も言わない。
     """
@@ -816,7 +816,7 @@ def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
 
     `allow` は入れない。ルールとしては通してよいと宣言された場所なので、ルールの側から
     報告することではない。チケットの範囲は `_findings` が別に当てる。`deny` や `ask` と
-    同じ場所に当たる `allow` があっても、強いほうを採る。当てる順は実行前の判定と同じ。
+    同じ場所に当たる `allow` があっても、強いほうを採る。当てる順は実行前チェックと同じ。
     """
     return rule_set.deny + rule_set.ask
 
@@ -853,7 +853,7 @@ def _restorable(finding: Finding) -> bool:
 def _guards_writes(rule: rules.Rule, path: str) -> bool:
     """このルールがこのパスへの書き込みを禁じているか。
 
-    ルールの当て方は実行前の判定と同じ rule.matches に任せる。ここで別に
+    ルールの当て方は実行前チェックと同じ rule.matches に任せる。ここで別に
     書くと、同じルールが実行前と実行後で違う場所に当たることになり、
     どちらが正しいのかを誰も言えなくなる。
     """
@@ -1113,7 +1113,7 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     data, failed = fsio.read_json(_seen_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: 実行後の監視の控えを読めない: {failed}\n")
+            stderr.write(f"ccnavi: 実行後チェックの控えを読めない: {failed}\n")
         return set(), True
     seen = data.get("seen") if isinstance(data, dict) else None
     if not isinstance(seen, list):
@@ -1124,7 +1124,7 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
 def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> None:
     """控えを書く。書けなかったことは報告して捨てる。
 
-    ここでの失敗は監視を止めない。控えが無ければ同じ変更をもう一度報告する
+    ここでの失敗はチェックを止めない。控えが無ければ同じ変更をもう一度報告する
     ことになり、うるさいが、見落とすよりはよい。
     """
     if not state_dir:
@@ -1133,4 +1133,4 @@ def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> 
         _seen_path(state_dir, session), {"seen": sorted(seen)[:SEEN_LIMIT]}
     )
     if failed:
-        stderr.write(f"ccnavi: 実行後の監視の控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 実行後チェックの控えを書けない: {failed}\n")

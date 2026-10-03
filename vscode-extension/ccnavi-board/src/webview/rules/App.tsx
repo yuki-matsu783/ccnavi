@@ -637,7 +637,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: ".tabs",
       title: "3 つのタブ",
-      body: "「ルール」で deny・ask・allow のルールを直し、「判定を試す」で編集中の内容だとどう判定されるかを確かめ、「hook」で登録されている hook を眺めます。",
+      body: "「ルール」で deny・ask・allow のルールを確認・修正、「判定を試す」で編集中ルールの判定結果をテスト、「hook」で登録内容を確認できます。",
       before: () => peek("rules"),
     },
     {
