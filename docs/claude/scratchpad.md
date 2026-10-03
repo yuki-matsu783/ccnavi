@@ -16,7 +16,7 @@ keywords: [scratchpad, スクラッチパッド, 下書き, 使い捨て, 一時
 
 チケットが結び付いたワークツリーでも、`scratchpad/` にはそのまま書き込める。実行前チェックは `scratchpad/` への書き込みをチケットの範囲と照らし合わせないので、範囲に `scratchpad/*` を足す必要は無い。
 
-照らし合わせの対象から外れるのは、ルート直下にある `scratchpad/` という名前のディレクトリだけで、大文字と小文字も区別する。`SCRATCHPAD/`・`scratchpadX/`・`docs/scratchpad/` や、`scratchpad` という名前のファイルは普通のファイルと同じように判定され、チケットの範囲の外なら止められる。
+照らし合わせの対象から外れるのは、ルート直下にある `scratchpad/` という名前のディレクトリだけで、大文字と小文字も区別する。`SCRATCHPAD/`・`scratchpadX/`・`docs/scratchpad/` や、`scratchpad` という名前のファイルは普通の作業対象と同じように判定され、チケットの範囲の外なら止められる。
 
 ## `scratchpad/` が追跡されているとき
 

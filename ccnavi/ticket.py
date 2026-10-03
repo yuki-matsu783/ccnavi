@@ -911,12 +911,12 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
 
-    実行前チェックは `is_unscoped` を通ってここへ来る。実行後チェックとサブエージェント終了時の
-    検査は直に呼ぶ（`post._script_writes` / `post._committed_findings` / `post.ScopeGuard.finding`、
-    `phase.scope_findings`）。
+    実行前チェックは `is_unscoped` を通ってここへ来る。実行後チェックとサブエージェント終了時
+    チェックは直に呼ぶ（`post._script_writes` / `post._committed_findings` /
+    `post.ScopeGuard.finding`、`phase.scope_findings`）。
 
     **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
-    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとのチェックは、置き場を
+    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの実行後チェックは、置き場を
     そのまま外さずに、内容で外すぶんを決める（`script_shape`、`post._script_writes`）。
     """
     return any(_under(rel, place) for place in (tickets_rel, approved_rel))
@@ -1027,7 +1027,7 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
 
     実行後チェック（`post`）とサブエージェント終了時チェック（`phase.scope_findings`）は
-    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとのチェックは
+    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの実行後チェックは
     内容で決める（`post._script_writes`）。外し方を揃えないのは、
     **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
     （`--ignored` を付けない）と `base_sha..HEAD` の差分（追跡ファイルだけ）で、

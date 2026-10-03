@@ -416,7 +416,7 @@ def at_stop(
     ]
     # このターンでコミットに入ったぶんも足す。`git status` はコミットを見せないので、
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
-    # 同じ見た目になる（呼び出しごとのチェックも同じ見落としがあるが、そちらは戻しに関わるので
+    # 同じ見た目になる（呼び出しごとの実行後チェックも同じ見落としがあるが、そちらは戻しに関わるので
     # 断面を変えない。人が 1 度で見るのはこの報告）。
     committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
     found += committed
