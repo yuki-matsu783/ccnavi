@@ -397,6 +397,87 @@ class DenyTest(GuardHarness):
         )
         self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
+    def test_copying_out_of_the_common_layer_is_allowed(self):
+        """11.6: 共通層の 3 本が cp / ln / install の元の側にだけ出る形は、読むだけなので通る。
+
+        写す側は行き先（最後の引数か `-t` の値）だけを見る。元の側で当たると、
+        バックアップを取るだけの `cp` まで止まる（rule-samples.yml の見本）。
+        """
+        absolute = os.path.dirname(self.rules).replace(os.sep, "/")
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
+            for command in (
+                f"cp .ccnavi/common/{name} /tmp/backup.yml",
+                f"cp {absolute}/{name} /tmp/backup.yml",
+                f"ln -s .ccnavi/common/{name} /tmp/link.yml",
+                f"install -m 644 .ccnavi/common/{name} /tmp/x.yml",
+                f"cp .ccnavi/common/{name} /tmp/a.yml && cat /tmp/a.yml",
+                f"cp .ccnavi/common/{name} /tmp/a.yml 2>/dev/null",
+                "cp -r .ccnavi/common /tmp/out",
+            ):
+                with self.subTest(command=command):
+                    result = self.hook("Bash", self.ws, guard="enable", command=command)
+                    self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+
+    def test_copying_into_the_common_layer_is_denied(self):
+        """11.6: 行き先が共通層の 3 本（かその置き場）になる cp / ln / install は止まる。
+
+        後ろに別のコマンドをつないだ形、前につないだ形、引用でつないだ語、
+        `-t` で行き先を前に出した形も同じ。元の側に出ただけの形を通すために、
+        行き先の当て方まで緩んでいないことを見る。
+        """
+        absolute = os.path.dirname(self.rules).replace(os.sep, "/")
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
+            for command in (
+                f"cp /tmp/x .ccnavi/common/{name}",
+                f"cp /tmp/x {absolute}/{name}",
+                f"ln -sf /tmp/x .ccnavi/common/{name}",
+                f"install /tmp/x .ccnavi/common/{name}",
+                f"cp .ccnavi/common/{name} .ccnavi/common/{name}",
+                f"cp /tmp/x .ccnavi/common/{name} && echo done",
+                f"cp /tmp/x .ccnavi/common/{name}; echo done",
+                f"cp /tmp/x .ccnavi/common/{name} > /dev/null 2>&1",
+                f"echo go && cp /tmp/x .ccnavi/common/{name}",
+                f'cp "/tmp/a b" .ccnavi/common/{name}',
+                f'cp /tmp/x ".ccnavi/common/{name}"',
+                f"cd .ccnavi && cp /tmp/x common/{name}",
+            ):
+                with self.subTest(command=command):
+                    result = self.hook("Bash", self.ws, guard="enable", command=command)
+                    self.assert_denied(result, "builtin-guard-setting-files")
+        # 行き先をディレクトリにした形。
+        for command in (
+            "cp /tmp/rules.yml .ccnavi/common",
+            "cp /tmp/rules.yml .ccnavi/common/",
+            f"cp /tmp/rules.yml {absolute}",
+            "cp /tmp/rules.yml .ccnavi/common && echo done",
+            "cp -t .ccnavi/common /tmp/rules.yml",
+            "cp --target-directory=.ccnavi/common /tmp/rules.yml",
+            "install -Dt .ccnavi/common /tmp/rules.yml",
+            "ln -st .ccnavi/common /tmp/rules.yml",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, guard="enable", command=command)
+                self.assert_denied(result, "builtin-guard-setting-files")
+
+    def test_writing_from_the_common_layer_side_is_still_denied(self):
+        """11.6: 書き込みの表記は、共通層の 3 本が前に出た形でも今までどおり止まる。
+
+        元と行き先の区別をするのは cp / ln / install だけ。mv は元を消し、rm / tee /
+        sed -i / リダイレクトは名指ししたところを書く。
+        """
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
+            for command in (
+                f"mv .ccnavi/common/{name} /tmp/x",
+                f"rm .ccnavi/common/{name}",
+                f"tee .ccnavi/common/{name} < /tmp/x",
+                f"sed -i s/deny/allow/ .ccnavi/common/{name}",
+                f"echo x > .ccnavi/common/{name}",
+                f"cp .ccnavi/common/{name} /tmp/x && rm .ccnavi/common/{name}",
+            ):
+                with self.subTest(command=command):
+                    result = self.hook("Bash", self.ws, guard="enable", command=command)
+                    self.assert_denied(result, "builtin-guard-setting-files")
+
     def judged(self, command, *flags, guard="enable"):
         """`--test --json` で 1 本判定し、当たったルールの id を返す。
 
@@ -444,6 +525,67 @@ class DenyTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved))
+
+    def test_copies_of_a_moved_common_layer_look_only_at_the_destination(self):
+        """11.6: 動かした共通層の 3 本も、cp / ln / install は行き先の側だけで当てる。
+
+        動かした先の表記（`common_shell_clause`）は書き込み用とコピー用に分けて足す。
+        書き込み用（空白で閉じる）をそのまま写す側に足すと、元の側に出ただけで当たる。
+        """
+        moved_flags = []
+        moved_paths = []
+        for flag, source, name in (
+            ("--rules", self.rules, "rules.yml"),
+            ("--phases", self.phases, "phases.yml"),
+            ("--risk", self.risk, "risks.yml"),
+        ):
+            path = write(os.path.join(self.ws, "policy", name), read(source))
+            moved_flags.extend((flag, path))
+            moved_paths.append((f"policy/{name}", path.replace(os.sep, "/")))
+        for rel, absolute in moved_paths:
+            for command in (
+                f"cp {rel} /tmp/backup.yml",
+                f"cp {absolute} /tmp/backup.yml",
+                f"ln -s {rel} /tmp/link.yml",
+                f"install {rel} /tmp/x.yml",
+                f"cp {rel} /tmp/a.yml && cat /tmp/a.yml",
+                f"cp -t /tmp/out {rel}",
+                f"cp --target-directory=/tmp/out {absolute}",
+                f"cp -v {rel} /tmp/out -f",
+            ):
+                with self.subTest(command=command):
+                    self.assertNotIn(
+                        "builtin-guard-setting-files", self.judged(command, *moved_flags)
+                    )
+            for command in (
+                f"cp /tmp/x {rel}",
+                f"cp /tmp/x {absolute}",
+                f"ln -sf /tmp/x {rel}",
+                f"install /tmp/x {rel}",
+                f"cp /tmp/x {rel} && echo done",
+                f"cp /tmp/x {rel}; echo done",
+                f"cp /tmp/x {rel} -f",
+                f"cp -S -t /tmp/x {rel}",
+                f"sudo cp /tmp/x {absolute}",
+                f"echo go && cp /tmp/x {rel}",
+                f'cp "/tmp/a b" {rel}',
+                f'cp /tmp/x "{rel}"',
+                f"cd policy && cp /tmp/x {rel.split('/')[-1]}",
+                f"mv {rel} /tmp/x",
+                f"rm {rel}",
+                f"tee {rel} < /tmp/x",
+                f"sed -i s/deny/allow/ {rel}",
+                f"echo x > {rel}",
+            ):
+                with self.subTest(command=command):
+                    self.assertIn("builtin-guard-setting-files", self.judged(command, *moved_flags))
+        # 名前の途中や続きで当たったものは別のファイル。
+        for command in (
+            "cp /tmp/x otherpolicy/rules.yml",
+            "cp /tmp/x policy/rules.yml.bak",
+        ):
+            with self.subTest(command=command):
+                self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved_flags))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """11.6: ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""
