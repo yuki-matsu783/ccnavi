@@ -1643,7 +1643,8 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
-                    f".ccnavi/scripts/{name} が無い。止まっている間に通る形が無くなる",
+                    f".ccnavi/scripts/{name} が無い。レビュー済みのマーカーが置かれるまで"
+                    "シェル実行を止めている間、例外として通るはずのこの sh の操作もできなくなる",
                 )
             )
     return problems
