@@ -1075,8 +1075,9 @@ def scan(
     同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
 
     `approved` は承認済みチケット（作業中・レビュー待ち・閉じた）の写りの全部で、まとめる前のもの。
-    渡せば、承認済みの識別子の提案は承認済みチケットの写りと合わせて権威のツリーを決める
+    渡せば、承認済みの識別子の提案は承認済みチケットの写りで決めた権威のツリーの側だけを残す
     （`dedupe`）。組むのは `approval.scan_proposals`（承認済みチケットはそちらが読む）。
+    渡さないと、権威のツリーの外に残った古い写しも残る。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
     return dedupe(found, approved), problems
@@ -1179,13 +1180,20 @@ def fold(hits: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticke
     すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
 
     `approved` は同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）の写りの全部。
-    在れば、権威のツリーは提案と承認済みチケットの写りを合わせて同じ順・同じ条件で決め
-    （`authority`）、そのツリーに在る提案だけを残す。そこに提案が無ければ何も残らない。
-    承認で権威のツリーの `todo/` が消えたあと、承認の前に切ったワークツリーに残った `todo/` の
-    写しを承認待ちや改版と読まないため（承認済みチケットの側の `approval._authoritative` と
-    同じ扱い）。改版は権威のツリーの `todo/` に置く（ADR-0055）ので、改版は残る。
+    在れば、権威のツリーは**承認済みチケットの写りだけで**同じ順・同じ条件で決め
+    （`authority`。承認済みチケットの側の `approval._authoritative` と同じ関数）、そのツリーに
+    在る提案だけを残す。そこに提案が無ければ何も残らない。承認で権威のツリーの `todo/` が
+    消えたあと、承認の前に切ったワークツリーに残った `todo/` の写しを承認待ちや改版と読まない
+    ため。提案の写りで権威を決めると、承認済みチケットが元ツリーにしか無いのに親の名前の
+    ワークツリーに古い `todo/` が残る形で、古い側が権威になる。改版は権威のツリーの `todo/` に
+    置く（ADR-0055）ので、改版は残る。
+
+    **`approved` を渡さないと、承認済みの識別子でも提案の写りだけでまとめる。** 権威のツリーの
+    外に残った古い写しが残るので、承認待ち・改版・ボードの提案の欄を決める呼び手は
+    `approval.scan_proposals` を通す。
     """
-    pool = [*(approved or []), *hits]
+    if approved and len({t.project for t in [*approved, *hits]}) > 1:
+        return hits
     if not approved:
         if len({t.project for t in hits}) > 1:
             return hits
@@ -1197,27 +1205,27 @@ def fold(hits: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticke
         if not at_origin or behind(at_origin, hits):
             return hits
         return at_origin
-    where = authority(pool)
+    where = authority(approved)
     if where is None:
         return hits
     return [t for t in hits if t.tree == where]
 
 
-def authority(pool: list[Ticket]) -> str | None:
-    """同じ識別子の写り（提案と承認済みチケット）から、権威のツリーの名前を決める。
+def authority(copies: list[Ticket]) -> str | None:
+    """同じ識別子の承認済みチケットの写り（作業中・レビュー待ち・閉じた）から、権威のツリーの名前を決める。
 
-    `fold` と同じ順・同じ条件で、親のツリー → 元ツリー（先へ進んだ写しが無いときだけ）。
+    親のツリー（親自身なら自分のツリー）→ 元ツリー（先へ進んだ写しが無いときだけ）の順。
     決まらないとき（どちらにも無い、元ツリーより先の写しがある、リポジトリをまたぐ）は None。
-    親は承認済みチケットの側を先に見る（提案の `parent` は書き換えられる側なので）。
+    承認済みチケット（`approval._authoritative`）と、承認済みの識別子の提案（`fold`）が
+    この 1 つの関数で決める。
     """
-    if not pool or len({t.project for t in pool}) > 1:
+    if not copies or len({t.project for t in copies}) > 1:
         return None
-    settled = [t for t in pool if t.state != TODO] or pool
-    home = settled[0].parent or settled[0].ticket
-    if any(t.tree == home for t in pool):
-        return home
-    at_origin = [t for t in pool if t.tree == origin_tree(t)]
-    if not at_origin or behind(at_origin, pool):
+    for t in copies:
+        if t.tree == (t.parent or t.ticket):
+            return t.tree
+    at_origin = [t for t in copies if t.tree == origin_tree(t)]
+    if not at_origin or behind(at_origin, copies):
         return None
     return origin_tree(at_origin[0])
 
@@ -1289,8 +1297,10 @@ def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
 def dedupe(found: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticket]:
     """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。
 
-    `approved` は承認済みチケットの写りの全部（まとめる前）。承認済みの識別子は、その写りと
-    合わせて権威のツリーを決める（`fold`）。承認済みの無い識別子（新規の提案）は今までどおり。
+    `approved` は承認済みチケットの写りの全部（まとめる前）。承認済みの識別子は、その写りで
+    権威のツリーを決める（`fold`）。承認済みの無い識別子（新規の提案）は今までどおり。
+    渡さないと、承認済みの識別子でも提案の写りだけでまとめるので、権威のツリーの外に残った
+    古い写し（承認の前に切ったワークツリーの `todo/` など）が残る。
     """
     settled = by_ticket(approved or [])
     kept: list[Ticket] = []

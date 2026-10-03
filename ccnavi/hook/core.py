@@ -785,10 +785,11 @@ def withdraw(
     判定は緩めない。どれか 1 つでも条件に当たらなければ何も並べない。
     """
     conf, root = snapshot.conf, snapshot.root
-    approved, _ = approval.scan(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
-    review_waiting, _ = approval.scan_review(conf, root)
-    proposals, _ = approval.scan_proposals(conf, root)
+    raw = approval.read_raw(conf, root)
+    approved, _ = approval.scan(conf, root, raw=raw)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review_waiting, _ = approval.scan_review(conf, root, raw=raw)
+    proposals, _ = approval.scan_proposals(conf, root, raw.everything)
     open_index = approval.by_id(approved)
     problems: list[str] = []
     wanted = [i for i in dict.fromkeys(ids) if i]
@@ -857,10 +858,11 @@ def withdrawable(snapshot: Snapshot, family: str) -> list[tuple[str, str, list[s
     新しい Snapshot で全部を見直す。
     """
     conf, root = snapshot.conf, snapshot.root
-    approved, _ = approval.scan(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
-    review_waiting, _ = approval.scan_review(conf, root)
-    proposals, _ = approval.scan_proposals(conf, root)
+    raw = approval.read_raw(conf, root)
+    approved, _ = approval.scan(conf, root, raw=raw)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review_waiting, _ = approval.scan_review(conf, root, raw=raw)
+    proposals, _ = approval.scan_proposals(conf, root, raw.everything)
     everything = approved + closed + review_waiting
     out = []
     for copy in sorted(approved, key=lambda t: t.ticket):
