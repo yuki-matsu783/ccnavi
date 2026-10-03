@@ -195,16 +195,9 @@ class BoardTest(PhaseHarness):
             ("i0001-02", "todo"), {(s["tree"], s["state"]) for s in by_id["i0001-03"]["seen_in"]}
         )
 
+        # 計画の同じ古い写しは `--lint` も言わない（承認の前に切ったワークツリーに残る普通の形）。
         lint = self.ccnavi("--lint", "--mode", "enable")
-        lines = [line for line in lint.stdout.splitlines() if "i0001-03" in line]
-        self.assertTrue(
-            any(
-                "なのに todo/ にも在る" in line
-                and ".claude/worktrees/i0001-02/wip/proposals/todo/i0001-03.md" in line
-                for line in lines
-            ),
-            lint.stdout,
-        )
+        self.assertNotIn("i0001-02/wip/proposals/todo/i0001-03.md", lint.stdout)
 
     def test_a_stale_review_copy_left_in_a_worktree_is_not_in_progress_after_closing(self):
         """場面 B。`review/` の古い写しが残ったワークツリーがあっても、閉じたものは閉じたまま。"""
@@ -219,15 +212,9 @@ class BoardTest(PhaseHarness):
         self.assertIsNone(by_id["i0001-02"]["proposal"])
         self.assertEqual(by_id["i0001-02"]["copy"]["status"], "closed")
 
+        # review/ の古い写しは `--lint` も言わない（ボードと承認待ちからは外す）。
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertTrue(
-            any(
-                "i0001-02 の review/ の古い写し" in line
-                and ".claude/worktrees/i0001-09/wip/proposals/review/i0001-02.md" in line
-                for line in lint.stdout.splitlines()
-            ),
-            lint.stdout,
-        )
+        self.assertNotIn("i0001-09/wip/proposals/review/i0001-02.md", lint.stdout)
 
     def test_a_review_copy_in_a_worktree_matching_the_home_tree_is_not_named(self):
         """権威のツリーと同じ置き場の写しは、子のワークツリーに写っているだけ。名指ししない。"""
@@ -238,7 +225,7 @@ class BoardTest(PhaseHarness):
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(by_id["i0001-02"]["copy"]["status"], "review")
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertNotIn("古い写し", lint.stdout)
+        self.assertNotIn("i0001-09/wip/proposals/review/i0001-02.md", lint.stdout)
 
     def move_to_done(self, ticket_id):
         source = os.path.join(self.parent_tree, "wip", "proposals", "review", ticket_id + ".md")

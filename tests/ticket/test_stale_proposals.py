@@ -15,6 +15,8 @@ import json
 import os
 import unittest
 
+from ccnavi.tickets import approval
+from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness, parent_text
 from tests.ticket.test_ticket import write
 
@@ -114,6 +116,137 @@ class StaleProposalTest(PhaseHarness):
             parent_text("i0002", ["research"]),
         )
         self.assertEqual(self.pending(), ["i0002"])
+
+    def test_a_home_revision_copied_into_a_worktree_stays_waiting_and_is_not_named(self):
+        """親のツリーの改版の写しが子のワークツリーにある形。承認待ちに残り、lint も言わない。"""
+        self.family(plan=("research", "design"))
+        self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
+        self.commit_parent()
+        self.worktree("i0001-07", "i0001")  # 改版の todo/ を持ったまま切る
+        self.assertEqual(self.pending(), ["i0001"])
+        lines = self.lint_lines("i0001-07/wip/proposals/todo/i0001.md")
+        self.assertEqual(lines, [])
+
+    def test_the_approved_copies_alone_decide_the_home_tree(self):
+        """承認済みチケットが元ツリー（ワークスペースルート）にしか無いとき、親の名前のワークツリーに
+        残った承認前の `todo/` を権威と読まない（Chrome や他のセッションで承認され、手元の
+        ワークツリーに届いていない形）。読むと古い版が改版として承認待ちに入り、巻き戻る。
+        """
+        self.family(plan=("research", "design"))
+        held = os.path.join(self.approved, "doing", "i0001.md")
+        with open(held, encoding="utf-8") as f:
+            text = f.read()
+        os.remove(held)
+        write(os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001.md"), text)
+        self.propose("i0001", parent_text("i0001", ["research"]))  # 承認前の古い版
+        self.commit_parent()
+
+        self.assertEqual(self.pending(), [])
+        lines = self.lint_lines("i0001")
+        self.assertTrue(
+            any(
+                "計画の違う提案" in line
+                and ".claude/worktrees/i0001/wip/proposals/todo/i0001.md" in line
+                and "改版なら (ワークスペースルート) の todo/ に書き" in line
+                for line in lines
+            ),
+            lines,
+        )
+
+    def test_a_closed_identifier_proposed_in_another_tree_keeps_the_reopen_guidance(self):
+        """閉じた識別子を別のツリーで提案したとき、`--lint` は前と同じ再開の案内を出す。"""
+        self.family(plan=("research", "design"))
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done", "i0005.md"),
+            parent_text("i0005", ["research"]),
+        )
+        self.propose("i0005", parent_text("i0005", ["research", "design"]))
+        self.commit_parent()
+        lines = self.lint_lines("i0005")
+        self.assertTrue(
+            any(
+                "i0005 は閉じたかレビュー待ちなのに todo/ にも在る" in line
+                and "再開するには、ユーザが承認済みチケットを戻す" in line
+                for line in lines
+            ),
+            lines,
+        )
+        self.assertEqual(self.pending(), [])
+
+    def verify_names_where_to_write(self, place_rel):
+        self.assertEqual(self.pending(), [])
+        verify = self.ccnavi("--agree", "--preview", "--verify")
+        self.assertNotEqual(verify.returncode, 0)
+        self.assertIn("承認待ちに入らない改版がある", verify.stdout)
+        self.assertIn(place_rel, verify.stdout)
+        self.assertIn("改版なら i0001 の todo/ に書き", verify.stdout)
+        agree = self.ccnavi("--agree", stdin="y\n")
+        self.assertIn("承認待ちのチケットは無い", agree.stdout)
+        self.assertIn(place_rel, agree.stderr)
+        self.assertIn("改版なら i0001 の todo/ に書き", agree.stderr)
+
+    def test_agree_names_a_revision_written_in_the_workspace_root(self):
+        """権威でないツリー（ワークスペースルート）の改版は承認待ちに入れず、--agree と --verify が
+        ファイルの場所と書くツリーを名指しする。"""
+        self.family(plan=("research", "design"))
+        write(
+            os.path.join(self.root, "wip", "proposals", "todo", "i0001.md"),
+            parent_text("i0001", ["research", "design", "chores"]),
+        )
+        self.verify_names_where_to_write("wip/proposals/todo/i0001.md")
+
+    def test_agree_names_a_revision_written_in_a_child_worktree(self):
+        """子のワークツリーに書いた改版も同じく名指しする。"""
+        self.family(plan=("research", "design"))
+        child = self.worktree("i0001-01", "i0001")
+        write(
+            os.path.join(child, "wip", "proposals", "todo", "i0001.md"),
+            parent_text("i0001", ["research", "design", "chores"]),
+        )
+        self.verify_names_where_to_write(".claude/worktrees/i0001-01/wip/proposals/todo/i0001.md")
+
+
+def _t(tree, state, project="", parent="", ticket="i0001"):
+    return ticket_mod.Ticket(
+        ticket=ticket, tree=tree, state=state, project=project, parent=parent, path=f"/{tree}"
+    )
+
+
+class AuthorityTest(unittest.TestCase):
+    """権威のツリーの決め方（`ticket.authority`）。承認済みチケットと提案が同じ関数を通る。"""
+
+    def test_approved_copies_alone_decide(self):
+        approved = [_t("", "doing")]
+        stale = [_t("i0001", ticket_mod.TODO)]
+        self.assertEqual(ticket_mod.authority(approved), "")
+        self.assertEqual(ticket_mod.fold(stale, approved), [])
+        self.assertEqual([t.tree for t in approval._authoritative(approved, approved)], [""])
+
+    def test_home_tree_wins_over_the_origin(self):
+        approved = [_t("", "doing"), _t("i0001", "doing")]
+        props = [_t("i0001", ticket_mod.TODO), _t("x", ticket_mod.TODO)]
+        self.assertEqual(ticket_mod.authority(approved), "i0001")
+        self.assertEqual([t.tree for t in ticket_mod.fold(props, approved)], ["i0001"])
+
+    def test_a_cross_repository_collision_keeps_everything_as_before(self):
+        """リポジトリをまたぐ衝突はまとめない（修正前と同じ答え）。"""
+        approved = [_t("", "doing")]
+        props = [
+            _t("p1", ticket_mod.TODO, project="p1"),
+            _t("p1-wt", ticket_mod.TODO, project="p1"),
+        ]
+        self.assertEqual(ticket_mod.fold(props, approved), props)
+        self.assertEqual(ticket_mod.dedupe(props, approved), props)
+        mixed = [_t("", "doing"), _t("p1", "doing", project="p1")]
+        self.assertIsNone(ticket_mod.authority(mixed))
+        self.assertEqual(approval._authoritative(mixed, mixed), mixed)
+
+    def test_undecided_keeps_every_proposal(self):
+        """親のツリーにも元ツリーにも承認済みチケットが無ければ、提案は全部残す（今までどおり）。"""
+        approved = [_t("a", "doing"), _t("b", "done")]
+        props = [_t("a", ticket_mod.TODO), _t("c", ticket_mod.TODO)]
+        self.assertIsNone(ticket_mod.authority(approved))
+        self.assertEqual(ticket_mod.fold(props, approved), props)
 
 
 if __name__ == "__main__":

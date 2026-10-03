@@ -1020,6 +1020,26 @@ class WithdrawTest(CoreHarness):
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(any("改版" in p for p in self.problems({"i0001": text.encode()})))
 
+    def test_copies_left_in_a_worktree_do_not_change_the_answer(self):
+        """承認の前に切ったワークツリーに残った `todo/` の写しがあっても、答えは前と同じ。"""
+        text = parent_text("i0001", ["research"])
+        self.propose("i0001", text)
+        self.commit_parent()
+        other = self.worktree("i0001-05", "i0001")  # todo/i0001 を持ったまま切る
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertEqual(self.problems({"i0001": text.encode()}), [])
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
+        # 承認済みの無い子の提案は、どのツリーに在っても止める（前と同じ）。
+        write(
+            os.path.join(other, "wip", "proposals", "todo", "i0001-01.md"),
+            child_text("i0001-01", "i0001", 1, ("wip/research/*",), False),
+        )
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("子の提案" in p for p in problems), problems)
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertTrue(any("子の提案" in p for p in listed[0][2]), listed)
+
     def test_an_unreadable_marks_place_refuses(self):
         """マーカーの置き場を読めない（ディレクトリでない）なら、無いとは言わずに止める。"""
         text = self.approved_parent()
