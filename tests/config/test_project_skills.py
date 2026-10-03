@@ -1,6 +1,7 @@
-"""プロジェクトのスキルの目録（ADR-0091）の受入テスト。
+"""プロジェクトのスキルの目録の受入テスト。
 
-プロジェクトは `.claude/` を持たない（ADR-0033）ので、スキルの形の手順書は
+道具はワークスペース、設定はプロジェクトに置く分け方で、プロジェクトは `.claude/` を
+持たない。そのため、スキルの形の手順書は
 `projects/<名前>/docs/skills/<スキル>/SKILL.md` に置く。ccnavi は SessionStart と
 SubagentStart で、cwd がそのプロジェクトの中にあるときだけ、名前・説明・場所の目録を渡す。
 見るのは次のとおり。
@@ -98,7 +99,10 @@ class ProjectSkillsTest(unittest.TestCase):
     # --- 2. frontmatter ---------------------------------------------------------------
 
     def test_the_ccnavi_directory_is_no_longer_read(self):
-        """置き場は docs/skills/（ADR-0091）。.ccnavi/skills/ に置いたものは目録に載らない。"""
+        """置き場は docs/skills/。.ccnavi/skills/ に置いたものは目録に載らない。
+
+        docs/skills/ は守りの外のふつうの場所で、承認したチケットの範囲の中で書ける。
+        """
         write(
             os.path.join(self.lib, ".ccnavi", "skills", "old", "SKILL.md"),
             skill("old", "古い置き場"),
