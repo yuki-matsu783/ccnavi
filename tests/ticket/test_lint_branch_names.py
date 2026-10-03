@@ -23,7 +23,7 @@ import unittest
 from ccnavi import ticket as ticket_mod
 from tests.inproc import run_ccnavi
 
-ADR = "（ADR-0093）"
+ADR = "（親のブランチ名の規則）"
 
 
 def write(path, text):

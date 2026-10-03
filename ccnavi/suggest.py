@@ -20,7 +20,7 @@
 形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのは人
 （`/ccnavi-config` の手順）。
 
-実行ファイルはネットワークに出ない（ADR-0028）。読むのは記録と設定だけ。
+実行ファイルはネットワークに出ない。読むのは記録と設定だけ。
 """
 
 from __future__ import annotations

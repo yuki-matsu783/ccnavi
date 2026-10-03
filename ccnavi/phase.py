@@ -139,7 +139,7 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 
 
 # 人の判断の経路のうち、hook のほかに守りが無い形。組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）で、
-# 実行ファイルの呼び方によらず止める（ADR-0080、ADR-0081）。
+# 実行ファイルの呼び方によらず止める。
 #
 # 1. 端末要求を切る形。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で
 #    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
@@ -275,7 +275,7 @@ def guard_off_message(found: str) -> str:
 
 
 # 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）。チケット制御と端末要求を切る設定に
-# 依らず、組み込みの deny（`DENY_RECORDS_PRUNE`）で止める（ADR-0089）。実行ファイルの側の
+# 依らず、組み込みの deny（`DENY_RECORDS_PRUNE`）で止める。実行ファイルの側の
 # 端末要求は、擬似端末（`script -qc '…' /dev/null`）でも、チケット制御を切ったワークスペースで
 # 端末要求を切る変数を前に並べても抜けられる。しきい値の環境変数を 0 に近づけて並べれば、
 # 自分の呼び出しの記録を消せる。
@@ -381,12 +381,12 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
     script = (
-        # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る（段階 2d のレビュー）。
+        # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
         r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(approve|push-approved)\.sh\b"
-        # 家族の控え（墓標）を消す、人が打つスクリプト（ADR-0093 の 11.5.1 の決定 A）。
+        # 家族の控え（墓標）を消す、人が打つスクリプト。
         # 消すと、止めていた家族が控えの無い家族として今の手元の動きに戻るので、打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
-        # 人の判断に使うスクリプト（ADR-0093 の 4.6。段階 2d）。中で `--reviewed --chat`・
+        # 人の判断に使うスクリプト。中で `--reviewed --chat`・
         # `--config-synced`・`--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
         r"(chat|config-synced|close-early)\b"
@@ -588,7 +588,7 @@ class Phase:
         for covered in declared[1:]:
             where = phasetypes.stricter(where, covered)
         # 「要る」としか言われていないフェーズは、いちばん手間の少ない見る場所（`chat`）まで
-        # 上げる。マージリクエストを勧めるのは文の側の仕事で、強制はしない（ADR-0065）。
+        # 上げる。マージリクエストを勧めるのは文の側の仕事で、強制はしない。
         if needed and where == phasetypes.REVIEW_NONE:
             where = phasetypes.REVIEW_CHAT
         return where
@@ -749,7 +749,7 @@ def phases_of(
         # 読めなくなったことを理由に、その番号のレビューが消えてはいけない。
         for phase in by_number.values():
             phase.covered_reviews = [_covered_review(by_number.get(c)) for c in phase.covers]
-    # 状態は置き場そのもの（ADR-0055）。閉じた（`done/`）、レビュー待ち（`review/`）、
+    # 状態は置き場そのもの。閉じた（`done/`）、レビュー待ち（`review/`）、
     # 作業中（`doing/`）の順に読み、同じ識別子が 2 つの置き場に在れば閉じた側を採る。
     # 閉じたかどうかを決めるのは承認済みチケットの側で、エージェントが書ける `todo/` に同じ識別子を
     # 書いてもフェーズは開き直らない（そちらは承認待ちにもならない。approval.waiting）。
@@ -1203,7 +1203,7 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
 LIMIT_TICKET = "ticket"
 LIMIT_PARENT = "parent"
 LIMIT_TYPE = "type"
-# チケット自体が信頼できない（`Ticket.blocked`）。範囲を当てる前に止める（ADR-0058）。
+# チケット自体が信頼できない（`Ticket.blocked`）。範囲を当てる前に止める。
 LIMIT_BLOCKED = "blocked"
 
 # 範囲の外として止める判定。
@@ -1248,7 +1248,7 @@ def scope_verdict(
 
     その前に `blocked` を見る。承認のときにしか当たらなかった構造の検査に引っかかった
     チケットは、範囲を当てても意味が無い（親が引けない子は、どの範囲で切り詰めるかが
-    決まらない）。範囲の中でも外でも止める（ADR-0058）。
+    決まらない）。範囲の中でも外でも止める。
     """
     if child.blocked:
         return ScopeVerdict(rules.DENY, LIMIT_BLOCKED, pt)
@@ -1379,7 +1379,7 @@ def scope_findings(
         # git の `-z` の綴りをそのまま使う。git はどの OS でも区切りを `/` で返すので、
         # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
         # 名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、範囲外として報告されない
-        # （実行前チェックは直さない。ADR-0097）。
+        # （実行前チェックも直さない）。
         # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
         # 見ているのは `base_sha..HEAD` の差分（追跡ファイルだけ）と `git status`
         # （`--ignored` を付けない）で、追跡から外れている `scratchpad/` はどちらにも現れない。
@@ -1389,7 +1389,7 @@ def scope_findings(
         # 消すことはしない。
         if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
-        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える。ADR-0096）。
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える）。
         if ticket_mod.is_eli5_place(rel):
             continue
         found = scope_verdict(child, parent, pt, rel)

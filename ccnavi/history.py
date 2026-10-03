@@ -1,8 +1,8 @@
-"""チケットの状態が動いた跡。1 行 1 JSON を、チケットごとのファイルに追記するだけ（ADR-0086）。
+"""チケットの状態が動いた跡。1 行 1 JSON を、チケットごとのファイルに追記するだけ。
 
 ## 補助であって権威ではない
 
-状態の正は置き場（ADR-0055、ADR-0058）。ここは「いつ・どの経路で・どこからどこへ動いたか」を
+状態の正は置き場（チケットがどの置き場に在るか）。ここは「いつ・どの経路で・どこからどこへ動いたか」を
 あとから読むための跡で、判定も状態の操作もここを読まない。置き場と食い違ったら置き場を信頼する。
 人が hook の外で置き場を動かした分（手で承認する、再開する）は、跡が残らない。
 
@@ -62,7 +62,7 @@ VIA_CLI = "cli"
 VIA_TERMINAL = "terminal"
 VIA_BOARD = "board"
 VIA_HOOK = "hook"
-#   chrome    Chrome 拡張から押した判断（承認の取り下げなど。ADR-0093 の 8.8）
+#   chrome    Chrome 拡張から押した判断（承認の取り下げなど）
 VIA_CHROME = "chrome"
 
 # 種類。チケットの置き場が動いたもの。
@@ -73,7 +73,7 @@ KIND_STARTED = "started"  # doing → doing（着手の欄）
 KIND_FINISHED = "finished"  # doing → review か done
 KIND_CANCELLED = "cancelled"  # doing → done（取り消しの欄）
 KIND_SETTLED = "settled"  # review → done（人のレビューが済んだ）
-KIND_WITHDRAWN = "withdrawn"  # doing → todo（承認の取り下げ。ADR-0093 の 8.8）
+KIND_WITHDRAWN = "withdrawn"  # doing → todo（着手前の新規の承認を Chrome から取り下げた）
 # マーカー。親の跡に残す。`from` / `to` は null で、`phase` と `mark` を持つ。
 # フェーズのマーカーを置いた（pending / requested / reviewed / skipped）
 KIND_PHASE_MARK = "phase-mark"
@@ -90,8 +90,8 @@ def session(via: str, stderr: TextIO | None, actor: str = "", version: str = "")
     入れ子になっても外側の経路と溜まりに戻す。テストは同じプロセスで何度も起動するので、
     前の起動の経路や溜まりが次へ漏れないようにする。
 
-    `actor`・`version` は、この間に書く跡の行に足す欄（ADR-0093 の 7.3・8.8。Chrome の
-    承認は、ホストのアカウントと拡張の版を跡に残す）。空なら足さない（手元の跡は前のまま）。
+    `actor`・`version` は、この間に書く跡の行に足す欄（Chrome の承認は、ホストのアカウントと
+    拡張の版を跡に残す。版は、手元と判定が食い違ったときに追えるようにするため）。空なら足さない（手元の跡は前のまま）。
     """
     before = dict(_state)
     _state["via"] = via
@@ -113,7 +113,7 @@ def set_via(via: str) -> None:
 
 
 def set_actor(actor: str) -> None:
-    """いまの起動の間に書く跡の行に、アカウントの欄を足す（ADR-0093 の 8.9。段階 5 の decide）。
+    """いまの起動の間に書く跡の行に、アカウントの欄を足す（decide が使う）。
 
     空なら何もしない（跡は前のまま）。`session` を抜けるときに前の値へ戻る。
     """

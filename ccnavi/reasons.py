@@ -60,7 +60,7 @@ CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 # 承認済みチケット自体が信頼できない（親が引けない、置き場と `project:` が違う、など）。
 # 範囲の外に書いたのではないので、CODE_TICKET_SCOPE とは分ける。受け取った側の次の一手も
 # 違う。範囲外なら範囲の中で済ませる方法があるが、こちらは人がチケットを直すまで
-# どこにも書けない（ADR-0058）。
+# どこにも書けない。
 CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
@@ -69,7 +69,7 @@ TICKET_RULE = "(ticket-scope)"
 
 # 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
 # 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく括弧付きの形の名前にする
-# （rewrite_rule、ADR-0046、ADR-0047）。
+# （rewrite_rule）。
 CODE_REWRITE = {
     shellread.FORM_BRACE: "DENY_BRACE_EXPANSION",
     shellread.FORM_COMMAND_NAME: "DENY_COMMAND_NAME_EXPANSION",

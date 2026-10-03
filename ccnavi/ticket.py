@@ -49,7 +49,7 @@
     base_sha: ""
     ---
 
-状態は frontmatter ではなく置き場が表す（ADR-0055）。チケットは 1 本のファイルで、
+状態は frontmatter ではなく置き場が表す。チケットは 1 本のファイルで、
 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）を
 行き来する。人が動かす向きは承認済みの側へ、エージェントが動かす向きは提案の側へ。
 
@@ -83,7 +83,7 @@ BOM = "\ufeff"
 # このビルドが読めるチケット書式の版。
 VERSION = 1
 
-# 状態。置き場の名前そのもの（ADR-0055）。
+# 状態。置き場の名前そのもの。
 # 提案の置き場（`wip/proposals/`）に並ぶのは todo と review。
 TODO = "todo"
 REVIEW = "review"
@@ -128,7 +128,8 @@ def child_pattern() -> re.Pattern:
     return _CHILD
 
 
-# 親のブランチ名は親の識別子そのもの（ADR-0093 の 3.1）。識別子を、ブランチ名として安全で、
+# 親のブランチ名は親の識別子そのもの（名前を求める関数が恒等写像なので、Python・sh・TS で
+# 食い違わない）。識別子を、ブランチ名として安全で、
 # 統合先や issue の番号と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。
 #
 # 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じ並び）。
@@ -137,12 +138,12 @@ def child_pattern() -> re.Pattern:
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 # issue から決める識別子の形（`i` + 番号）。`issue:` を持つ提案だけが使う。
 _ISSUE_ID = re.compile(r"^i\d+$", re.IGNORECASE)
-# プロジェクトの issue から決める識別子の形（`<プロジェクト名>-i<番号>`。3.1 の 7。段階 5）。
+# プロジェクトの issue から決める識別子の形（`<プロジェクト名>-i<番号>`）。
 _PROJECT_ISSUE_ID = re.compile(r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i\d+$", re.IGNORECASE)
 
 
 def issue_identifier(number: int, project: str = "") -> str:
-    """issue の番号から親の識別子を決める（ADR-0093 の 3.1 の 4・7・11）。
+    """issue の番号から親の識別子を決める。
 
     `i` + 4 桁の 0 埋め（5 桁以上はそのまま）。プロジェクトの issue なら頭に
     `<プロジェクト名>-` を付ける（`web-i0012`）。「issue → 識別子」はこの 1 つだけで、
@@ -159,13 +160,17 @@ def issue_identifier(number: int, project: str = "") -> str:
 
 
 def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
-    """新規の提案の識別子が、親のブランチ名の規則に合わないところ（ADR-0093 の 3.1 の 2・5・6）。
+    """新規の提案の識別子が、親のブランチ名の規則に合わないところ。
+
+    規則は、ref として安全な形（`..` を含まない、`.lock` や `.` で終わらない）、`^i\\d+$` は
+    `issue:` があるときだけ、統合先や保護されたブランチの名前を使わない、issue の無い親は
+    `-<2 桁>` で終わらない（子の識別子と紛れる）。
 
     見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのは人に見せる文で、
-    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子（3.1 の 3）と、
+    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子と、
     子の形に当たる親の識別子は、他のチケットと並べて見るので `lint` の側で数える。
 
-    `integration` はその時点の統合先の名前（D30。段階 2b）。環境変数からは読まず、呼び手が
+    `integration` はその時点の統合先の名前。環境変数からは読まず、呼び手が
     渡したときだけ予約に足す。固定の並び（main など）と同じく大文字小文字を区別せずに比べる。
     """
     name = t.ticket
@@ -194,10 +199,10 @@ def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
 
 def _issue_form_problems(t: Ticket) -> list[str]:
     """issue から決める形（`i<番号>`・`<プロジェクト名>-i<番号>`）の識別子が、`issue:` と
-    置き場に合っているか（3.1 の 4・5・7。段階 5 で `<名前>-i<番号>` と番号の一致を足した）。
+    置き場に合っているか。
 
     形に当たらない識別子（人が付けた名前）は見ない。`issue:` を持っていても人が付けた名前でよい
-    （既に同じ識別子が閉じていて、その issue からは始められないときのフォールバック。8.6）。
+    （既に同じ識別子が閉じていて、その issue からは始められないときのフォールバック）。
     """
     name = t.ticket
     project_form = _PROJECT_ISSUE_ID.match(name)
@@ -211,8 +216,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     elif project_form:
         if t.issue is None:
             # 人が付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
-            # 重なりだけを言う
-            # （`fix-i2` のような名前をプロジェクトの外で咎めない。11.9.1 の 17）
+            # 重なりだけを言う（`fix-i2` のような名前をプロジェクトの外で咎めない）
             if t.project and project_form.group("project").casefold() == t.project.casefold():
                 return [
                     f"`{t.project}-i<番号>` の形はこのプロジェクトの issue から決める識別子と"
@@ -226,7 +230,7 @@ def _issue_form_problems(t: Ticket) -> list[str]:
     if t.issue_repo:
         return [
             f"`issue: {issue_label(t)}` は別のリポジトリの課題。識別子は issue から決める形"
-            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、人が付ける（ADR-0093 の 3.1 の 8）"
+            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、人が付ける"
         ]
     if not expected:
         return [
@@ -248,7 +252,7 @@ SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "canc
 # 承認済みチケットにだけある欄。承認の記録。
 APPROVAL_KEY = "ccnavi_approved"
 
-# 以前の、子のフローを指す欄（設計 9.3.1、ADR-0085）。今は読まない。フローの置き場は承認済みの
+# 以前の、子のフローを指す欄（設計 9.3.1）。今は読まない。フローの置き場は承認済みの
 # 領域の `flows/<子>.yml` に固定（flow.py）。書いてあるチケットは warn で知らせて読み進める
 # （error にすると承認済みチケットが読めなくなり、範囲ごと判定に使われなくなる）。
 FLOW_KEY = "flow"
@@ -465,7 +469,7 @@ class Ticket:
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
     # issue_repo は、課題が別のリポジトリにあるときのその綴り（`issue: owner/repo#N` の
-    # `owner/repo`。ADR-0093 の 3.1 の 8）。同じリポジトリの課題なら空。
+    # `owner/repo`）。同じリポジトリの課題なら空。識別子は issue から決めず人が付ける。
     issue_repo: str = ""
     # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
@@ -509,7 +513,7 @@ class Ticket:
     source_path: str = ""
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
-    # 判定の側でも当てるために置く（ADR-0058）。
+    # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--approve` を通らない）。
     blocked: str = ""
 
     @property
@@ -598,7 +602,7 @@ def load(path: str) -> tuple[Ticket | None, list[Problem]]:
     """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
         # fsio を通す。承認の plan（控える段）の中では、同じ承認で動かしたチケットを動かした後の
-        # 姿で読む（ADR-0093 の 6.2）。
+        # 姿で読む。
         text = fsio.load_text(path)
     except FileNotFoundError:
         return None, []
@@ -700,7 +704,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
                 SEVERITY_WARN,
                 name,
                 f"`{FLOW_KEY}` はもう読まない。フローの置き場は承認済みチケットの置き場の "
-                f"`flows/{name}.yml` に固定（ADR-0085）。この欄は消してよい",
+                f"`flows/{name}.yml` に固定。この欄は消してよい",
             )
         )
 
@@ -992,7 +996,8 @@ def is_scratch_place(rel: str) -> bool:
     return rel.startswith(SCRATCH + "/")
 
 
-# ELI5 の HTML の置き場（ADR-0095・ADR-0096）。依頼につける、変更をやさしく説明した HTML を置く。
+# ELI5 の HTML の置き場。依頼につける、変更をやさしく説明した HTML を置く。マージリクエストの
+# 差分に載るよう `wip/` の下にコミットする。
 # 名前は固定。設定で動かさない（動かせると、その値をソースの置き場に向けるだけで範囲を迂回できる）。
 ELI5 = "wip/eli5"
 
@@ -1000,7 +1005,7 @@ ELI5 = "wip/eli5"
 def is_eli5_place(rel: str) -> bool:
     """ツリーのルートからの相対パスが、ELI5 の HTML の置き場（`wip/eli5/`）の下にあるか。
 
-    チケットの範囲を当てない（ADR-0096）。ELI5 はレビューの依頼に必ずつける材料で、親の範囲に
+    チケットの範囲を当てない。ELI5 はレビューの依頼に必ずつける材料で、親の範囲に
     毎回 `wip/eli5/*` を書かせると、書き忘れた親は依頼の手前で止まる。ここは `wip/` の下なので
     `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
     `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
@@ -1042,7 +1047,7 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     知らせるべきことになる。
 
     ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後チェックと
-    サブエージェント終了時チェックも同じく外す（ADR-0096）。
+    サブエージェント終了時チェックも同じく外す。
     """
     return (
         is_ticket_place(rel, tickets_rel, approved_rel)
