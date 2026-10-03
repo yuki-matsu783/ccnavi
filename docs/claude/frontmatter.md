@@ -36,7 +36,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
   UTF-8でないmdはfrontmatterを読めないので、frontmatterが無いもの（`null`）として扱う
 - 値は1行で書く。`tags`と`keywords`は`[a, b]`の形で書く。`tags: a`のように括弧なしで書いても1要素として読めるが、`[a]`と書いて揃える
 - YAMLのエイリアス（`*名前`）は使わない。使うとfrontmatter全体を読めず`null`になる
-- すでに使われているtagsは`ccnavi --docs --format jsonl`の`frontmatter.tags`で確かめられる。同じ意味で綴りだけ違う語を増やさない
+- すでに使われているtagsは`ccnavi --docs --format jsonl`の`frontmatter.tags`で確かめられる。同じ意味で表記だけ違う語を増やさない
 
 ## tagsの使い分け
 

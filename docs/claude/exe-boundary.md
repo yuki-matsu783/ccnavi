@@ -3,7 +3,7 @@ type: guide
 title: 実行ファイルの境界
 description: ccnavi実行ファイルの責務範囲。ネットワークに出ない、gitとの連携、シェルスクリプトとの役割分担
 tags: [exe-boundary, sh-scripts]
-keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, hook, payload, レビュー, 写し]
+keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, hook, payload, レビュー, 取得した結果]
 ---
 
 # 実行ファイルの境界
