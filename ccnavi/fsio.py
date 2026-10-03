@@ -31,7 +31,7 @@ from typing import Any
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 
-# ---- 時計（Clock の差し口。ADR-0093 の 6.2）
+# ---- 時計（判定のコアの Clock の差し口）
 #
 # 時刻はこの 2 つの関数だけが読む。`clock` で固定すると、その間の `stamp` と `utc_stamp` は
 # 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と跡（`at`）に同じ時刻を
@@ -556,7 +556,7 @@ def load_text(path: str) -> str:
     return text
 
 
-# ---- 判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）
+# ---- 判定が読んだ中身（`read_set`。承認の指紋に入れる）
 #
 # 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
 # 読んだファイルの中身の指紋を控える。無かった・読めなかったファイルも「無い」として控える
@@ -611,11 +611,11 @@ def content_digest(content: str | bytes) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-# ---- この実行で書いたパスの記録（ADR-0093 の 4.3「fsio の記録層」）
+# ---- この実行で書いたパスの記録（C1 がこの一覧のパスだけをコミットする）
 #
 # 書き込みの関数（`write_text`・`write_text_atomic`・`write_bytes`・`write_json_atomic`・
 # `remove`・`unlink`・`move`・`write_new`・`append`・`replace_bytes`）は、書けたときに
-# 行き先を控える。控えるのは `recording` の中だけ。C1（段階 2d）は sh から
+# 行き先を控える。控えるのは `recording` の中だけ。C1 は sh から
 # `--record-writes <ファイル>` を渡し、この一覧のパスだけをコミットする。
 # 一覧に漏れがあると、書いたのにコミットされない状態が残るので、置き場を書くコードは
 # ここの関数だけを通す（素の `open`・`os.remove` を使わない）。
@@ -652,8 +652,7 @@ def _record(path: str) -> None:
 def note_input(path: str) -> None:
     """読んだ入力を、書いたものと同じく一覧に載せる（在るときだけ）。
 
-    record-risk の記録（`<子>.judge.json`）は自分では運ばず、それを読む `finish` の C1 が運ぶ
-    （ADR-0093 の 4.3）。
+    record-risk の記録（`<子>.judge.json`）は自分では運ばず、それを読む `finish` の C1 が運ぶ。
     """
     if _RECORDERS and os.path.lexists(path) and not os.path.islink(path):
         _record(path)
@@ -665,7 +664,7 @@ def _recorded(path: str, failed: str) -> str:
     return failed
 
 
-# ---- 書かずに控える段（承認の plan。ADR-0093 の 6.2）
+# ---- 書かずに控える段（承認の plan。書くものを値として並べる）
 #
 # `staging` の中では、書き込みの関数はディスクに書かずに `Op` を控え、読みの関数
 # （`read_text`・`read_bytes`・`read_json`・`exists`・`lexists`・`listdir`・`load_text`）は

@@ -1,11 +1,11 @@
-"""取り込みの控えを読む（ADR-0093 の 3.3・3.6。段階 2c）。
+"""取り込みの控えを読む。
 
 控えは `ccnavi-sync.sh` と、親のブランチを最初に push したときの `ccnavi-git.sh push` が書き、
 判定はここで読むだけ。
 判定は git もネットワークも起こさない（`tree.py` の前提）ので、統合先と親のブランチの
 リモートの姿は、sh が控えに書き出したものしか知らない。
 
-    <控えの置き場>/sync/<リポジトリ>/families/<P>   家族の控え（1 行 1 項目。D33）
+    <控えの置き場>/sync/<リポジトリ>/families/<P>   家族の控え（1 行 1 項目。sh は jq を使わない）
     <控えの置き場>/sync/<リポジトリ>/integration/   統合先の控え（done/・層・設定の写しと head）
 
 `<リポジトリ>` はワークスペース自身なら `self`、プロジェクトならその名前。
@@ -13,16 +13,18 @@
 ## 取り込み済みの家族
 
 家族の控えがある家族を「取り込み済みの家族」と呼び、権威を親のブランチ `P`（手元では
-`.claude/worktrees/<P>` で HEAD が `P` を指すツリー）に固定する（3.3）。控えの無い家族
-（2b より前に送った、origin が無い、一度も push していない）は今の動きのまま（D11）。
+`.claude/worktrees/<P>` で HEAD が `P` を指すツリー）に固定する。控えの無い家族
+（`ccnavi-sync.sh` が入る前に送った、origin が無い、一度も push していない）は今の動きのまま
+（Chrome はリモートにある `P` しか見ないので、二重状態は起きない）。
 
 家族の控えは墓標として残る（親のワークツリーを片付けても消えない。消すのは人が打つ
 `ccnavi-sync.sh --forget <P>` だけ）。控えと統合先の控えから、家族の立ち位置（`Standing`）を決める。
 
 - 閉じた: 統合先の控えの `done/` に親の写しがある（親のワークツリーが無いか、あれば親の写しの
-  承認の時刻が同じ）、または控えが `closed`。統合先の `done/` が権威（3.6 の正常系）
+  承認の時刻が同じ）、または控えが `closed`。統合先の `done/` が権威（マージ後にホストが `P` を
+  消した正常系）
 - `gone`・`blocked`・控えが壊れている・`present` なのに親のワークツリーが無い: **決まらない**。
-  その家族の承認も状態の操作も止める（3.3 の 3、3.6）
+  その家族の承認も状態の操作も止める
 - `present` で親のワークツリーがある: 親のブランチの写しだけが本物
 
 ## 統合先の控え
@@ -35,13 +37,13 @@
 ## リンクは辿らない
 
 控えの途中（`sync`・`<リポジトリ>`・`families`・`integration` と、その下の読むファイル）に
-シンボリックリンクがあれば読まず、「控えが壊れている」とする（段階 2b のレビューの決定 B4）。
+シンボリックリンクがあれば読まず、「控えが壊れている」とする。
 sh は写すときにリンクを落としているが、読む側でも辿らない。
 
 ## 入れ替えの一瞬
 
-統合先の控えは `mv` 2 回で入れ替わるので、その間の一瞬だけ `integration/` が無い
-（11.4.2 の 10）。入れ替えの途中（`integration.tmp.*`・`integration.old.*` が並んでいる、
+統合先の控えは `mv` 2 回で入れ替わるので、その間の一瞬だけ `integration/` が無い。
+入れ替えの途中（`integration.tmp.*`・`integration.old.*` が並んでいる、
 `integration/` はあるのに `head` が無い）と分かるときだけ、少し待って読み直す。控えを
 一度も書いていないリポジトリでは待たない（hook のたびに待つことになるため）。
 """
@@ -397,7 +399,7 @@ class Families:
         return self._done[repo]
 
     def standing(self, family_id: str, project: str = "") -> Standing:
-        """この家族の立ち位置（3.3 の権威の規則）。"""
+        """この家族の立ち位置（権威の規則）。"""
         key = (project or "", family_id)
         if key not in self._standings:
             self._standings[key] = self._standing(family_id, project or "")
@@ -421,7 +423,7 @@ class Families:
             return Standing(family_id, SELF)
         # 控えは 1 つでも、同じ名前の親のワークツリーが別のリポジトリにもあれば、
         # どちらの家族か決めない（ワークスペースの人の付けた名前 `web-i0012` と、
-        # プロジェクト web の issue 12 の家族など。11.9.3 の 13）
+        # プロジェクト web の issue 12 の家族など）
         other = sorted(
             {repo_key(w.project) for w in self.worktrees() if w.name == family_id}
             - {h.repo for h in hits}
@@ -536,7 +538,7 @@ def _home_parent_copy(
 
 
 def standing(conf: settings.Settings, root: str, family_id: str, project: str = "") -> Standing:
-    """この家族の立ち位置（3.3 の権威の規則）。1 回だけ引くときの形。"""
+    """この家族の立ち位置（権威の規則）。1 回だけ引くときの形。"""
     return Families(conf, root).standing(family_id, project)
 
 
@@ -557,7 +559,7 @@ def same_tree(a: str, b: str) -> bool:
 
 
 def guidance(root: str, st: Standing) -> list[str]:
-    """止めたときの解き方（3.6 の案内）。1 行ずつ。"""
+    """止めたときの解き方。1 行ずつ。"""
     sync = settings.script_command(root, "ccnavi-sync.sh")
     git = settings.script_command(root, "ccnavi-git.sh")
     name = st.family

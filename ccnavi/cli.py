@@ -289,7 +289,7 @@ RELATIVE_OVERRIDES = ("tickets", "project_home")
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
 # プロジェクトの層がまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
-# 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ門に載せる。
+# 閉じた。中身を差し替えるのと結果が同じなので、同じ門に載せる。
 LAYER_OVERRIDES = (
     ("--rules", "rules", ""),
     ("--phases", "phases", None),
@@ -307,7 +307,7 @@ DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）で�
 # 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
 # `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
 # 実際に試すと、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
-# 本物の置き場に「リスク 0」で閉じられた（ADR-0067）。
+# 本物の置き場に「リスク 0」で閉じられた。
 #
 # 正しい 1 本が先に在ることに頼らず、2 本目が在ること自体を断る。落として先へ進むのでは
 # なく止めるのは、この 2 つに「2 度渡す」正しい使い方が無いから。診断の 5 本と違って、
@@ -336,7 +336,8 @@ def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
 
     フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
     `phases.yml` / `risks.yml` で判定と採点が走り、層そのものも外せる。届く経路は
-    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す（ADR-0067）。
+    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す。だから層を動かす
+    フラグは診断の経路（`--lint`・`--test` など）でだけ受ける。
     """
     for flag, name, absent in LAYER_OVERRIDES:
         if getattr(args, name) == absent:
@@ -383,7 +384,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     状態の跡（history）の経路はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
     人の判断の経路（端末・ボード）と hook は枝の中で差し替える。跡を書けなかった知らせは、
-    起動を抜けるときに標準エラーへ出す（状態の操作は止めない。ADR-0086）。
+    起動を抜けるときに標準エラーへ出す（跡は補助で状態の正は置き場なので、状態の操作は止めない）。
     """
     with history.session(history.VIA_CLI, stderr):
         return _run(stdin, stdout, stderr, argv)
@@ -476,23 +477,23 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
     parser.add_argument("--version", action="store_true")
     # この実行で書いた・消したパスを、控えの置き場の下のファイルに 1 行 1 つで書き出す
-    # （ADR-0093 の 4.3「fsio の記録層」）。C1（段階 2d）の sh が渡し、
-    # 一覧のパスだけをコミットする。
+    # （fsio の記録層が控える）。C1 の sh が渡し、一覧のパスだけをコミットする。
     parser.add_argument("--record-writes", default="")
-    # 一覧の基点（C1 の親のワークツリー。段階 2d）。渡すと一覧はこのツリーからの相対になり、
-    # 置き場の外に書いたら error（D34 の例外を除く）。
+    # 一覧の基点（C1 の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
+    # 置き場の外に書いたら error（例外は `start` の中で configsync が写したプロジェクトの層だけ）。
     parser.add_argument("--record-tree", default="")
-    # 対話の decide の前半（ADR-0093 の段階 2d のレビューの決定 A）。選択と指紋をこのファイルに
-    # 書くだけで、何も置かない（控えの置き場の下だけ）。
+    # 対話の decide の前半。選択と指紋をこのファイルに書くだけで、何も置かない（控えの置き場の
+    # 下だけ）。人が選ぶのを C1 のロックの外で済ませ、ロックを持ったまま人を待たないため。
     parser.add_argument("--choose-out", default="")
-    # 統合先の名前（ADR-0093 の D30。段階 2b）。環境変数は読まず、sh が決めて渡す。
-    # いまは `--lint` の識別子の予約（3.1 の 5）が読む。
+    # 統合先の名前。リポジトリには置かず、手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
+    # ホストのデフォルトブランチ）で決まる。実行ファイルは環境変数を読まず、sh が決めて渡す。
+    # いまは `--lint` の識別子の予約（統合先と同じ名前の識別子を使わせない）が読む。
     parser.add_argument("--integration-branch", default="")
-    # レビュー済みの印に入れるアカウント（ADR-0093 の 8.9。段階 4）。ccnavi-review.sh が
+    # レビュー済みの印に入れるアカウント（押した人ではなくトークンの持ち主）。ccnavi-review.sh が
     # トークンの持ち主をホストに聞いて渡す（実行ファイルはネットワークに出ない）。
-    # `review confirm` と、書く形の decide（`--reviewed N --accept-unresolved`。段階 5）が読む。
+    # `review confirm` と、書く形の decide（`--reviewed N --accept-unresolved`）が読む。
     parser.add_argument("--actor", default="")
-    # decide の印の経路（`terminal`・`board`。8.9。段階 5）。`--actor` と一緒にだけ受ける
+    # decide の印の経路（`terminal`・`board`）。`--actor` と一緒にだけ受ける
     # （アカウントを引けなかったときは印も跡も前と同じにするため）。
     parser.add_argument("--via", default="")
     try:
@@ -551,7 +552,7 @@ def _recorded_run(
     **一覧の形**は 1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外と、
     別のドライブ（Windows）は絶対パスのまま。既定の控えの置き場の下（リポジトリに入らない）と
     一覧のファイル自身は載せない。上書きした控えの置き場への書き込みは載る（C1 が
-    「置き場の外」として止める側）。置き場の外が入っていたら止めるのは C1（段階 2d）で、
+    「置き場の外」として止める側）。置き場の外が入っていたら止めるのは C1 で、
     ここは集めて書くだけ。
 
     **終了コード**: コマンドが落ちても、そこまでに書いたパスで一覧を書く（C1 は落ちた回も
@@ -576,7 +577,7 @@ def _recorded_run(
         return EXIT_ERROR
     base = _real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
     # 上書きした控えの置き場（`--state`・`CCNAVI_STATE`）も、リポジトリに入らない書き込み
-    # （レビューの下書きなど）の置き場なので一覧から外す（ADR-0093 の段階 2d のレビュー）。
+    # （レビューの下書きなど）の置き場なので一覧から外す。
     conf_for_state, _ = settings.load(root)
     _override(conf_for_state, args)
     moved_state = _real(conf_for_state.state) if conf_for_state.state else state
@@ -613,9 +614,9 @@ def _recorded_run(
 
 
 def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[str]) -> list[str]:
-    """一覧のうち、C1 の置き場（承認済み・レビュー待ち）の外のもの（ADR-0093 の 4.3）。
+    """一覧のうち、C1 の置き場（承認済み・レビュー待ち）の外のもの。C1 は状態だけを運ぶ。
 
-    例外は 1 つだけ（D34）: `ticket start` の中で configsync が写したプロジェクトの層と、
+    例外は 1 つだけ。`ticket start` の中で configsync が写したプロジェクトの層と、
     指す先を直した配点のスクリプト（`configsync.is_synced_write` が内容で読めるもの）。
     """
     conf, _ = settings.load(root)
@@ -715,7 +716,7 @@ def _parsed(
 
     # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ使われる。
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
-    # 設定を保存せずに緩める経路になるので、そこでは無視する（ADR-0067）。
+    # 設定を保存せずに緩める経路になるので、そこでは無視する。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。
     diagnosing = (
@@ -898,12 +899,13 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）が綴りを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 取り込みの後の検査（ADR-0093 の 4.2 の 4。段階 2c）。error があれば sh が家族を止める。
+    # 取り込みの後の検査（権威と層の食い違い）。error があれば sh が家族を止める。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None
         code = sync_check(stdout, stderr, root, conf, args.command[2], repo)
         return EXIT_OK if code == 0 else EXIT_ERROR
-    # C1（ADR-0093 の 4.3・4.4。段階 2d）の sh が聞くこと。読むだけで、何も書かない。
+    # C1（取り込み済みの親子のチケットの状態の操作を、取り込み・書く・コミット・push の 1 操作に
+    # する sh）が聞くこと。読むだけで、何も書かない。
     if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
         if not _FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
             stderr.write(f"ccnavi: c1 family の {args.command[2]!r} は識別子の形ではない\n")
@@ -1201,8 +1203,7 @@ def operate(
             f"ccnavi: 家族 {bypass} は取り込み済み（C1 の対象）。状態の操作は "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' か "
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' から打ってください。"
-            "C1 を通らない書き込みは親のブランチへ送られないので、何も書かずに止めた"
-            "（ADR-0093 の 4.3）\n"
+            "C1 を通らない書き込みは親のブランチへ送られないので、何も書かずに止めた\n"
         )
         return EXIT_ERROR
     if args.close_early:
@@ -1242,8 +1243,9 @@ def operate(
             )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.choose_out:
-        # 対話の decide の前半（利用者の決定 A）。人が端末で選び、選択と指紋を控えの置き場に
-        # 書くだけ。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ。
+        # 対話の decide の前半（ロックを持ったまま人を待たないため分ける）。人が端末で選び、
+        # 選択と指紋を控えの置き場に書くだけ。置くのは sh が C1 の中で
+        # `--yes <選択> --digest <指紋>` で打つ。
         if not _inside(_real(os.path.abspath(args.choose_out)), _real(conf.state)):
             stderr.write("ccnavi: --choose-out の書き出し先は控えの置き場の下だけ\n")
             return EXIT_ERROR
@@ -1319,9 +1321,9 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
 
     状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
     行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の家族では sh が `--record-tree` を
-    付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を通っていない
-    （ADR-0093 の段階 2d のレビュー）。人の判断の操作（`--reviewed --chat`・`--config-synced`・
-    `--close-early`）と、書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
+    付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで C1 を通っていない。
+    人の判断の操作（`--reviewed --chat`・`--config-synced`・`--close-early`）と、
+    書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
     """
     if args.record_tree:
         return ""
@@ -1349,11 +1351,11 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
 
 
 def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
-    """`ccnavi-sync.sh` が要る綴りを 1 行 1 項目（`<鍵> <値>`）で返す（ADR-0093 の 4.2・D33）。
+    """`ccnavi-sync.sh` が要る綴りを 1 行 1 項目（`<鍵> <値>`）で返す。
 
     sh は jq を使わず、JSON も読まない。置き場の綴り（ツリーのルートからの相対）と、
     `.claude/settings.local.json` の `env` に書かれた統合先の名前をここが読んで渡す。
-    統合先の名前は環境変数からは読まない（sh が先に環境変数を見る。D30）。
+    統合先の名前は環境変数からは読まない（sh が先に環境変数を見る）。
     ネットワークにも git にも触らない。
     """
     lines = (
@@ -1379,7 +1381,7 @@ def _decide_writes(args) -> bool:
 
 
 def _decide_actor(args) -> None:
-    """decide の印と跡に入れるアカウントと経路（ADR-0093 の 8.9。段階 5）。
+    """decide の印と跡に入れるアカウントと経路。
 
     `--actor` があれば跡の行にアカウントを足し、`--via` があれば経路を差し替える。印の
     `actor`・`via` は `review.apply_decision` がこの起動の値から書く。無ければ印も跡も前と同じ。
@@ -1416,7 +1418,7 @@ def sync_check(
     """`ccnavi-sync.sh` が取り込みの後に打つ検査。頭に `check 1`、続けて 1 行 1 件。
 
     error が 1 つでもあれば 1。sh は最初の error の中身を家族の控えの `reason` に書いて
-    `blocked` にする（ADR-0093 の 4.2 の 4）。`repo` は控えの名前（`self` かプロジェクト名）。
+    `blocked` にする。`repo` は控えの名前（`self` かプロジェクト名）。
     ネットワークにも git にも触らない。
     """
     for name, value in (("識別子", family), ("リポジトリ", repo or "self")):

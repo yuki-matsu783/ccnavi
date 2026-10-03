@@ -29,8 +29,8 @@ from . import (
 from . import ticket as ticket_mod
 from .modes import EXIT_BLOCK, EXIT_OK
 
-# サブエージェントには Stop の振り返り（ADR-0090）が届かないので、始まりに 1 行だけ渡す。
-# メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
+# サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
+# 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
 CANDIDATE_NOTE = (
     "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に"
     "「スキル候補」の節を足して書いてください（対象のスキル・何を直すか・根拠）。"
@@ -58,10 +58,11 @@ def at_start(
     子の範囲を案内し、調査役がどこで作業すればよいか分からなくなる（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
-    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（ADR-0091）。
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（本文は要るときに
+    # 自分で開く）。
     # 子チケットの一覧が無い起動（チケット制御が無い、チケットの無いツリー）でも渡す。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
-    # 振り返りの候補は、止められないサブエージェントには報告で返してもらう（ADR-0090）。
+    # 振り返りの候補は、止められないサブエージェントには報告で返してもらう。
     skills = f"{skills}\n\n{CANDIDATE_NOTE}" if skills else CANDIDATE_NOTE
     if not conf.tickets_enabled:
         return _say(stdout, skills)
@@ -81,7 +82,7 @@ def at_start(
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ（ADR-0088）。
+    # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ。
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     approval.align_imported(conf, root, preds)
     lines = [
@@ -118,7 +119,7 @@ def at_start(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
-        # 子のフロー（設計 9.12、ADR-0085）。在ればファイルを名指しし、手順を並べる。
+        # 子のフロー（設計 9.12）。在ればファイルを名指しし、手順を並べる。
         # フローは人が書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
         scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
         try:

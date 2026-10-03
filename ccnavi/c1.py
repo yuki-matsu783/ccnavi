@@ -1,19 +1,19 @@
-"""C1（ADR-0093 の 4.3・4.4。段階 2d）で sh が聞くこと。
+"""C1 で sh が聞くこと。
 
 状態を書く操作を「ロック → 途中の操作の確認 → C1 の外の変更の見分けとコミット → 取り込み →
 未送信の確かめ → 書く → コミット → push」の 1 操作にするのは sh（`ccnavi-common.sh` の
-`ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（D17・4.5）。
-ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。D33）。
+`ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
+ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
 
 - `ccnavi c1 family <識別子>`: その識別子の家族と、C1 の対象か
   - 対象は、置き場の綴りが相対で、家族の控えがあり（取り込み済み）、chat だけの家族でなく、
-    止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い家族（D11）
+    止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い家族
   - 止める理由のある取り込み済みの家族は `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
 - `ccnavi c1 sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
-  `wip/proposals/review/`）の変更を 4.4 の (b)・(c)・(d) に分ける
-  - 版が無ければ未コミットの変更（C1 の 3）、版があれば `<版>..HEAD` でコミットに入った
-    変更（C1 の 5）
+  `wip/proposals/review/`）の変更を次の (b)・(c)・(d) に分ける
+  - 版が無ければ未コミットの変更（取り込みの前にコミットする分）、版があれば `<版>..HEAD` で
+    コミットに入った変更（取り込みの後に未送信を確かめる分）
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その家族の
     `phases/<親>/<N>.pending`・`.skipped` と、その印の跡（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
@@ -61,7 +61,7 @@ _EVENT_FIELDS = ("at", "ticket", "kind")
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
 # configsync の `*.ccnavi-sync`）。
 _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$")
-# 人の判断が書くもの（4.4 の表）。フローの本文、reviewed・close-early の印、設定を見た印、
+# 人の判断が書くもの。フローの本文、reviewed・close-early の印、設定を見た印、
 # 受け入れたスレッド、人の承認で置かれた写し。
 _HUMAN_MARK_NAMES = (
     f"{approval.PARENT_MARK_CLOSE_EARLY}.json",
@@ -72,13 +72,16 @@ _TIMEOUT = 20.0
 
 
 def family_of(ident: str) -> str:
-    """識別子の家族の親（3.3 の 5）。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
+    """識別子の家族の親。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
     matched = ticket_mod.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
 
 
 def _relative_places(conf: settings.Settings) -> tuple[str, str] | None:
-    """置き場の綴り（承認済み、レビュー待ち）。どちらかが絶対パスなら None（3.1 の 12）。"""
+    """置き場の綴り（承認済み、レビュー待ち）。どちらかが絶対パスなら None。
+
+    絶対パスの置き場はブランチに乗らないので、C1 の対象にしない。
+    """
     approved = fsio.slashed(conf.approved or settings.DEFAULT_APPROVED).strip("/")
     tickets = fsio.slashed(conf.tickets or settings.DEFAULT_TICKETS).rstrip("/")
     raw = (conf.approved or "", conf.tickets or "")
@@ -352,7 +355,7 @@ def _judge_record(parts: list[str]) -> bool:
 
 
 def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool:
-    """人の判断が書くものの形（4.4 の表）。形だけで見る（(c) も (d) も C1 は止める）。
+    """人の判断が書くものの形。形だけで見る（(c) も (d) も C1 は止める）。
 
     フローの本文、人の承認で置かれた写し、reviewed・(b) でない skipped・close-early・設定を見た印・
     受け入れたスレッド、人の判断が消したマーカー、人の判断が一緒に書く移動（review/ から done/、

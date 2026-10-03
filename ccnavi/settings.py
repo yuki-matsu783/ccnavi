@@ -28,7 +28,7 @@ from typing import NamedTuple
 #
 # 共通層の 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
 # `.ccnavi/common/` に固定で、env では動かない。3 層のうち共通層だけが別の決まり方を
-# していた非対称を無くしたもの（ADR-0052）。診断のためにここを動かすには `--rules` /
+# していた非対称を無くしたもの。診断のためにここを動かすには `--rules` /
 # `--phases` / `--risk` のフラグを使う。hook は引数を渡さずに起動するので、
 # 判定の入口は固定される。
 MODE_ENV = "CCNAVI_MODE"
@@ -97,12 +97,12 @@ PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # つけるか（repeat）。既定は 3。判定は変わらず、文面と人への報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
-# INTEGRATION_ENV は統合先の名前（ADR-0093 の D30）。`done/` と層と置き場の綴りを読むブランチで、
-# 親のブランチはここから切る。**ccnavi はこの環境変数を読まない。** 読むのは sh
-# （`ccnavi-sync.sh`）で、sh が環境変数か `.claude/settings.local.json` の `env` から決め、
-# 要る所へ `--integration-branch` で渡す。settings.local.json の `env` は Claude Code が
-# 起こしたプロセスにしか渡らないので、人が端末で打つ sh のために、その値だけを
-# `sync paths` が読んで返す（integration_local）。
+# INTEGRATION_ENV は統合先の名前。リポジトリには置かず、未設定ならホストのデフォルトブランチ。
+# `done/` と層と置き場の綴りを読むブランチで、親のブランチはここから切る。
+# **ccnavi はこの環境変数を読まない。** 読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
+# `.claude/settings.local.json` の `env` から決め、要る所へ `--integration-branch` で渡す。
+# settings.local.json の `env` は Claude Code が起こしたプロセスにしか渡らないので、人が端末で
+# 打つ sh のために、その値だけを `sync paths` が読んで返す（integration_local）。
 INTEGRATION_ENV = "CCNAVI_INTEGRATION_BRANCH"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
 LOCAL_CLAUDE_SETTINGS = os.path.join(".claude", "settings.local.json")
@@ -118,13 +118,13 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # 既定の置き場。ワークスペースルートからの相対。
 #
 # 人が持つ設定（共通層の 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、実行のたびに書かれる
-# 記録と控えは `logs/` に置く（ADR-0042）。`.claude/` には Claude Code 自身のもの
+# 記録と控えは `logs/` に置く。`.claude/` には Claude Code 自身のもの
 # （settings.json・hooks・skills・worktrees）だけを残す。
 #
 # 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
 # ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
 # 診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、
-# hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
+# hook は引数を渡さずに起動するから、判定の入口はここから動かない。
 DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けてまとめておく。
@@ -139,7 +139,7 @@ DEFAULT_TICKETS = "wip/proposals"
 # 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
 # B の機械で作業する流れが成り立たない（設計 9.2）。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
-# 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ（ADR-0055）。
+# 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ。
 DEFAULT_APPROVED = ".ccnavi/approved"
 # フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
@@ -374,8 +374,8 @@ class Settings:
     # 共通層の種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
     # 編集中の層の種類を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
-    # integration_branch は統合先の名前（ADR-0093 の D30）。環境変数からは読まず、
-    # `--integration-branch` で渡されたときだけ入る。いまは識別子の予約（3.1 の 5）の検査が読む。
+    # integration_branch は統合先の名前。環境変数からは読まず、`--integration-branch` で
+    # 渡されたときだけ入る。いまは識別子の予約（統合先と同じ名前を使わせない）の検査が読む。
     integration_branch: str = ""
 
     @property
@@ -431,7 +431,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     #
     # 共通層の 3 本（rules / phases / risk）はこの表に無い。env でも上書き設定ファイルでも
     # 動かず、既定の `.ccnavi/common/` のまま。動かせるのはフラグだけで、そちらは
-    # cli._override が重ねる（ADR-0052）。
+    # cli._override が重ねる。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
         ("project_home", PROJECT_HOME_ENV, _relative, False),
@@ -597,10 +597,10 @@ def _resolve_bin(root: str, path: str) -> str:
 
 
 def integration_local(root: str) -> str:
-    """`.claude/settings.local.json` の `env` に書かれた統合先の名前（ADR-0093 の D30）。
+    """`.claude/settings.local.json` の `env` に書かれた統合先の名前。
 
     環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。人が端末で打つ sh には
-    settings.local.json の `env` が渡らないので、JSON を読む役（D33）をここが持つ。
+    settings.local.json の `env` が渡らないので、JSON を読む役をここが持つ（sh は jq を使わない）。
     ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先に落ちる）。
     """
     try:
@@ -612,14 +612,14 @@ def integration_local(root: str) -> str:
     value = env.get(INTEGRATION_ENV) if isinstance(env, dict) else None
     if not isinstance(value, str):
         return ""
-    # 1 行で返す契約（D33）。改行を含む値は使えないので空に落とす。
+    # 1 行で返す契約（sh は jq を使わず 1 行 1 項目で読む）。改行を含む値は使えないので空に落とす。
     return "" if ("\n" in value or "\r" in value) else value.strip()
 
 
 def integration_recorded(state: str) -> str:
-    """`ccnavi-sync.sh` が統合先の控えに書いた統合先の名前（ADR-0093 の D30。段階 2b のレビュー）。
+    """`ccnavi-sync.sh` が統合先の控えに書いた統合先の名前。
 
-    `<控えの置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目。D33）。控えが無い・
+    `<控えの置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目）。控えが無い・
     読めない・途中にシンボリックリンクがあるときは空（既定の予約だけになる）。環境変数は読まない。
     控えの中のリンクは辿らない（写すときに落としてあり、読む側でも辿らない決まり）。
     """
