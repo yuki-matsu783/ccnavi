@@ -12,23 +12,23 @@
 
 ## 常に守ること
 
-- sh は Windows (Git Bash / WSL)・Linux・macOS (bash 3.2、BSD の道具) のどれでも動くように書く
+- sh は Windows (Git Bash / WSL)・Linux・macOSのどれでも動くように書く
 - 編集はワークツリーを切ってから。置き場はワークスペースの `.claude/worktrees/<名前>`
 - git は直接呼ばず `ccnavi-git.sh` を通す。拒否の文面が出す `{root}` からの綴りはそのまま打てば通る
 - 自分のワークツリーの外にある未コミットの変更は他セッションのもの。コミット・移動・`reset` をしない
-- 下書きはワークツリーの `scratchpad/`（無ければセッションのスクラッチパッド）に置き、渡すときはパスを言う
-- `projects/<名前>/` のリポジトリを直すときは、そのプロジェクトに `cd` してから始める
+- 下書きはワークツリーの `scratchpad/`（無ければセッションのスクラッチパッド）に置く
+- `projects/<名前>/` のリポジトリを直すときは、そのプロジェクトに `cd` してから作業する
 - 提案にはメリットとデメリットを両方書く
-- 判定が緩む・報告を消す・戻せない・影響範囲が読み切れない変更は、手を動かす前に相談する
+- 権限が緩む・ユーザとのIFが変わる・戻せない・影響範囲が読み切れない変更は、実装する前にユーザと合意する
 - 実装・調査・テストはサブエージェントに任せ、メインは利用者とのやり取りを受け持つ
 
 ## 詳細
 
 | 読むとき | 開くファイル |
 |---|---|
-| ワークツリーを切る・`<統合先>` へ戻す・片付ける、他セッションの変更に出会った | `docs/claude/worktree.md` |
+| ワークツリーを切る・`<統合先>` へ戻す・片付ける、他セッションの変更が影響した | `docs/claude/worktree.md` |
 | 下書きや使い捨てのファイルを置く | `docs/claude/scratchpad.md` |
-| `projects/` の下を直す、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `docs/claude/projects.md` |
+| `projects/` 配下を修正、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `docs/claude/projects.md` |
 | 提案を書く、相談が要るか迷う、サブエージェントに任せる | `docs/claude/decisions.md` |
 | sh やスクリプトを書く、用語（ワークスペースルート・統合先ブランチ など）を確かめる | `docs/claude/environment.md` |
 | ccnavi の実行ファイル（`ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
