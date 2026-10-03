@@ -1,12 +1,12 @@
-"""ccnavi-review.sh がホストから組む写しと、印のアカウント（ADR-0093 の 8.9。段階 4）の受入テスト。
+"""ccnavi-review.sh がホストの応答から組む JSON と、印のアカウント（ADR-0093 の 8.9。段階 4）の受入テスト。
 
 見るのは 3 つ。
 
 1. 録ったホストの応答の見本
-   （`chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む写し
+   （`chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む JSON
    （`fetch`。`fetched_at` を除く）が、見本の期待値（`expected.json`）と同じ。拡張の試験
-   （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ写しを組む
-2. 写しの結論（変更要求と未解決のスレッド。判定のコアの `review.effective`・`_unresolved`）が
+   （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ JSON を組む
+2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの `review.effective`・`_unresolved`）が
    見本の `conclusion.json` と同じ
 3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。引けなければ渡さない（印は前と同じ）。
    呼び手が `--actor` を渡しても受けない
@@ -57,7 +57,7 @@ def write(path, text):
 
 
 def conclusion(copy: dict, poster: str = "") -> dict:
-    """写しの結論。confirm が止める理由のうち、ホストの写しから決まるもの。
+    """JSON から出る結論。confirm が止める理由のうち、ホストから取ってきた JSON で決まるもの。
 
     GitLab は依頼を投稿したアカウント（`poster`）の ccnavi の依頼のスレッドを数えない
     （11.8.1 の決定 C）。
@@ -371,7 +371,7 @@ class HostFixtureTest(unittest.TestCase):
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
 class GitLabHostFixtureTest(unittest.TestCase):
-    """段階 5: GitLab の見本から sh が組む写しと結論。拡張も同じ期待値と比べる。"""
+    """段階 5: GitLab の見本から sh が組む JSON と結論。拡張も同じ期待値と比べる。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -494,7 +494,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(done.stdout, "")
 
     def request_stub(self, out):
-        """実行ファイルの代役。`review prepare` で本文と下書きを書き、`--result` の写しを控える。
+        """実行ファイルの代役。`review prepare` で本文と下書きを書き、`--result` の JSON を控える。
 
         受け取った引数は 1 行 1 つで `out/args.txt` に溜める。
         """
