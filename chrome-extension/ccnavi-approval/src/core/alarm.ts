@@ -1,8 +1,8 @@
 /**
- * PAT の期限を比べる 1 日 1 回の alarm（ADR-0093 の D25）。
+ * PAT の期限を比べる 1 日 1 回の alarm。切れる 7 日前から知らせる。
  *
  * service worker は止まっては起動し直すので、起動するたびに alarm を作り直すと周期が起動した時刻から
- * 数え直しになり、1 日 1 回にならない（レビューの 6）。在るときは作らない。
+ * 数え直しになり、1 日 1 回にならない。在るときは作らない。
  */
 export const ALARM = "pat-expiry";
 export const PERIOD_MINUTES = 24 * 60;

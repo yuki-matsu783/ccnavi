@@ -1,6 +1,6 @@
 /**
  * カードに出す言葉。検証の指摘は実行ファイル（`--lint --json`）が言ったもので、ここは
- * 同じ事象を 2 度出さないように間引くだけ。拡張が判定をやり直すことはしない（ADR-0035）。
+ * 同じ事象を 2 度出さないように間引くだけ。拡張が判定をやり直すことはしない。
  */
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { ProjectRow } from "../../core/projects-view.js";

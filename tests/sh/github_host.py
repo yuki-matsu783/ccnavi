@@ -1,4 +1,6 @@
-"""ホストの応答の見本を返す GitHub の代役（ADR-0093 の 8.9。段階 4）。
+"""ホストの応答の見本を返す GitHub の代役。
+
+Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。
 
 見本は `chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/` にある。拡張の試験
 （`test/helpers/host-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。

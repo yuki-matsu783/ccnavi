@@ -1,5 +1,5 @@
 /**
- * 通信先の一覧から manifest を組む（ADR-0093 の D24・5.5 の 3・5）。
+ * 通信先の一覧から manifest を組む。通信先はビルドに埋め込み、CSP に足すのは 'wasm-unsafe-eval' だけ。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

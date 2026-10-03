@@ -1,4 +1,4 @@
-"""合意の手続き。人が提案に合意する（承認する）までの手続きを持つ。
+"""合意の手続き。ユーザが提案に合意する（承認する）までの手続きを持つ。
 
 置き場は approval、合意の手続きは agree。approval は承認済みチケット・マーカー・子の記録が
 どこにどう置かれているかを読み書きするだけで、ここ（agree）を知らない。agree は approval の
@@ -11,13 +11,13 @@
 - 承認の対象を組む（`gather`・`candidates`）。提案を走査し、承認済みチケットと突き合わせ、
   載せるものと落とすものに分ける。形の検査（`validate`・`plan_problems`・`revision_problems`）は
   ここで当てる
-- 人に見せる（`screen`・`preview_body`）。見せたものと承認するものを同じ答えにするため、
+- ユーザに見せる（`screen`・`preview_body`）。見せたものと承認するものを同じ答えにするため、
   一覧を組む関数は 1 つ（`gather`）にしてある
 - 見せたものから変わっていないかを確かめる（`approval_digest`・`read_set`・`verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す
 - 承認の事実をモデルに伝える（`news`・`approved_text`）
 
-判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（ADR-0058）。置き場を手で
+判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（置き場が承認の権威）。置き場を手で
 動かす運びもあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
 """
 
@@ -302,7 +302,7 @@ def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | No
     本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
     本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
 
-    **判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）を指紋に含める。** 提案だけでなく、
+    **判定が読んだ中身（`read_set`）を指紋に含める。** 提案だけでなく、
     判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の控えのどれかが見せたあとに
     変われば、指紋が変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
     入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
@@ -324,7 +324,7 @@ def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | No
 
 
 def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[str, str]:
-    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す（ADR-0093 の 6.2）。
+    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す。
 
     鍵は `<リポジトリ>:<ブランチ>:<ツリーからの相対パス>`（"/" 区切り）。リポジトリは
     ワークスペース自身なら `self`、プロジェクトならその名前（控えの名前と同じ。ブランチ名が
@@ -394,7 +394,7 @@ _SETTINGS_VALUES = ("tickets", "approved", "projects", "project_home")
 
 
 def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
-    """判定が読んだ設定（ADR-0093 の 6.2 の read_set に足す）。
+    """判定が読んだ設定（read_set に足す）。
 
     `settings.load` が読むファイル（`pyproject.toml`・`ccnavi.settings.local.json`）と
     Claude Code の設定（`.claude/settings.json`・`.claude/settings.local.json`）の中身を
@@ -643,7 +643,7 @@ def candidates(
     cache: dict[str, dict | None] = {}
     # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
-    # 家族の立ち位置と統合先の控え（ADR-0093 の 3.3）。1 回の承認で 1 度ずつだけ読む。
+    # 親子のチケットの立ち位置と統合先の控え。1 回の承認で 1 度ずつだけ読む。
     fams = syncstate.Families(conf, root)
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
@@ -689,7 +689,7 @@ def candidates(
                     root, conf, t, parent, types, added.get(t.parent)
                 )
         if t.is_child and t.predecessors:
-            # 先行は `done/` に在って取り消しでないことを求める（ADR-0088）。同じ承認で通る
+            # 先行は `done/` に在って取り消しでないことを求める。同じ承認で通る
             # 先行も、まだ `todo/` に在るので満たさない。
             if preds is None:
                 preds = approval.predecessor_pool(conf, root)
@@ -768,7 +768,7 @@ class Planned:
 def plan_batch(root: str, conf: settings.Settings, batch: list[Candidate], stamp: str) -> Planned:
     """承認の書き込みを、ディスクに書かずに並べる。時刻は `stamp` に固定する。
 
-    書き込みを並べる（ここ、ADR-0093 の 6.2 の plan）と、並べたものを書く
+    書き込みを並べる（ここ、plan）と、並べたものを書く
     （`core.write_fs`、Writer(FS)）の 2 段。Chrome は同じ plan の結果を 1 コミットにする。
     承認の対象の順に、改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。
     """
@@ -881,7 +881,7 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
 
     プロジェクトは提案を置いた場所で決まる。ユーザはここで、書き込みが向かうリポジトリを
-    見て承認する。提案はそのツリーからの相対パスで見せる（ADR-0093 の D22）。絶対パスは
+    見て承認する。提案はそのツリーからの相対パスで見せる。絶対パスは
     機械ごとに違い、承認の指紋（画面の本文を含む）が Chrome と手元で揃わない。
     """
     return (
@@ -1103,7 +1103,7 @@ def waiting(
     （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
     チケットに使う種類を引く関数（`types_resolver`）。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
-    統合先の控えの `done/` にある識別子（ADR-0093 の 3.3 の 4）はここでは外さず、`candidates` が
+    統合先の控えの `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、`candidates` が
     理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
     """
     known = approval.by_id(approved + closed + review)
@@ -1407,7 +1407,7 @@ def validate(
     判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。
 
     形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
-    検査を当てる（`blocking_problems`、ADR-0058）ので「判定では補えない」わけではないが、
+    検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
     判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
     承認はユーザがまとめて見て決める場所なので、そこで落ちるものはそこで言う。
     """

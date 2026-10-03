@@ -221,7 +221,9 @@ def _path_of(state_dir: str, payload: hookio.Input) -> str:
 
 
 def stop_path(state_dir: str, session: str) -> str:
-    """Stop の促し（ADR-0090）の数えの控え。`once-*` と違い、compact・再開・clear では捨てない。
+    """Stop の促し（ターンの終わり N 回に 1 度）の数えの控え。
+
+    `once-*` と違い、compact・再開・clear では捨てない。
 
     捨てるのは起動（`source=startup`）の `forget` と、古いセッションの後始末（prune）だけ。
     文脈ごとに捨てると、compact が N 回より先に来る長いセッションで一度も届かない。
@@ -269,7 +271,7 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
     どちらも「この文脈で何回目か」を見ているので、文脈が変われば一緒に忘れる。
 
     Stop の促しの数え（`stop_path`）は起動（`startup`）のときだけ捨てる。compact・再開・clear では
-    残す（ADR-0090）。
+    残す。
     """
     if not state_dir or not os.path.isdir(state_dir):
         return

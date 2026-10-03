@@ -138,7 +138,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
 
 
 def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
-    """`Stop`（ターンの終わり。ADR-0090）の試し。判定ではなく、使われるルールを並べる。
+    """`Stop`（ターンの終わり）の試し。判定ではなく、使われるルールを並べる。
 
     ターンの終わりに当てるのは、共通層と自身の層の `allow` で、`every` が 2 以上のものだけ
     （`ruleload.stop_rules`）。使われるものがあれば `allow`、無ければ判定に入らない（`skip`）。
@@ -171,7 +171,7 @@ def test(
     if tool == rules.STOP_MATCH:
         stdout.write(f"verdict: {out['verdict']}\ntool: {tool}\n")
         stdout.write(
-            "note: ターンの終わり（ADR-0090）。使われるのは共通層と自身の層の allow で、"
+            "note: ターンの終わり。使われるのは共通層と自身の層の allow で、"
             "every が 2 以上のものだけ。渡す回にだけ止める\n"
         )
         if not out["rules"]:
@@ -733,7 +733,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     problems.extend(str(p) for p in scan_problems)
     proposals = ticket_mod.dedupe(everything)
     # 写りの一覧（`seen_in` / `scattered`）は、承認済みチケットの置き場に在るものも数える。
-    # チケットは 1 本のファイルで、どの置き場に在っても子のワークツリーに写る（ADR-0055）。
+    # チケットは 1 本のファイルで、どの置き場に在っても子のワークツリーに写る。
     # `review/` は提案の置き場でもあり承認済みチケットでもあるので、2 つの走査が同じ
     # ファイルを拾う。同じ実体を 2 つと数えると「複数の場所にある」になるので、パスでまとめる。
     everything = _one_per_file(everything + approval._everything(conf, root))
@@ -751,7 +751,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         review_copies,
         agree.types_resolver(conf, root, open_copies),
     )
-    # 先行を引く池。承認と着手が使うのと同じ集め方（ADR-0088）。
+    # 先行を引く池。承認と着手が使うのと同じ集め方。
     preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
     approval.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
@@ -939,7 +939,8 @@ def _ticket_record(
         "project": source.project,
         "issue": source.issue,
         "predecessors": list(source.predecessors),
-        # 満たしていない先行（ADR-0088）。承認と着手はこれが空でなければ止まる。閉じたチケットは空。
+        # 満たしていない先行（`done/` に無いか取り消しのもの）。承認と着手はこれが空でなければ
+        # 止まる。閉じたチケットは空。
         # `label` はユーザ向けの言葉で、ボードは写すだけ。
         "predecessors_unmet": (
             []
@@ -963,7 +964,7 @@ def _ticket_record(
             if proposal is not None
             else None
         ),
-        # blocked は「読めるが信頼できない」理由（ADR-0058）。判定はこのチケットの
+        # blocked は「読めるが信頼できない」理由。判定はこのチケットの
         # ワークツリーへの書き込みを全部止めるので、ボードが素の open として見せると、
         # 止まっていること自体がユーザに届かない。
         "blocked": (open_index[ticket_id].blocked if ticket_id in open_index else ""),
@@ -989,14 +990,14 @@ def _ticket_record(
         "cancel_reason": source.cancel_reason,
         "seen_in": seen_in,
         "scattered": scattered,
-        # 子のフロー（設計 9.3.1、ADR-0085）。`{path, rel, tree, exists, linked, locked}`。
-        # 親は null。
+        # 子のフロー（設計 9.3.1。着手中は書き換えを止める）。
+        # `{path, rel, tree, exists, linked, locked}`。親は null。
         # locked は判定がそのフローへの書き込みを止めているか（着手中）。読むのは承認済み
         # チケットがあればその側、無ければ提案。
         "flow": flow.info(conf, root, copy if copy is not None else source),
         "risk": None,
         "judge": None,
-        # 状態が動いた跡の新しい側（ADR-0086）。補助で、状態の正は上の置き場の欄。
+        # 状態が動いた跡の新しい側。追記するだけの補助で、状態の正は上の置き場の欄。
         "history": [],
     }
     where = approval.home_dir(conf, root, ticket_id, source.parent, project=source.project)

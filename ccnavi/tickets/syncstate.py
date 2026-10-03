@@ -1,28 +1,32 @@
-"""取り込みの控えを読む（ADR-0093 の 3.3・3.6。段階 2c）。
+"""取り込みの控えを読む。
 
 控えは `ccnavi-sync.sh` と、親のブランチを最初に push したときの `ccnavi-git.sh push` が書き、
 判定はここで読むだけ。
 判定は git もネットワークも起こさない（`tree.py` の前提）ので、統合先と親のブランチの
 リモートの姿は、sh が控えに書き出したものしか知らない。
 
-    <控えの置き場>/sync/<リポジトリ>/families/<P>   家族の控え（1 行 1 項目。D33）
+    <控えの置き場>/sync/<リポジトリ>/families/<P>   親子のチケットの控え
+        （1 行 1 項目。sh は jq を使わない）
     <控えの置き場>/sync/<リポジトリ>/integration/   統合先の控え（done/・層・設定の写しと head）
 
 `<リポジトリ>` はワークスペース自身なら `self`、プロジェクトならその名前。
 
-## 取り込み済みの家族
+## 取り込み済みの親子のチケット
 
-家族の控えがある家族を「取り込み済みの家族」と呼び、権威を親のブランチ `P`（手元では
-`.claude/worktrees/<P>` で HEAD が `P` を指すツリー）に固定する（3.3）。控えの無い家族
-（2b より前に送った、origin が無い、一度も push していない）は今の動きのまま（D11）。
+控えのある親子のチケットを「取り込み済みの親子のチケット」と呼び、権威を親のブランチ `P`（手元では
+`.claude/worktrees/<P>` で HEAD が `P` を指すツリー）に固定する。控えの無い親子のチケット
+（`ccnavi-sync.sh` が入る前に送った、origin が無い、一度も push していない）は今の動きのまま
+（Chrome はリモートにある `P` しか見ないので、二重状態は起きない）。
 
-家族の控えは墓標として残る（親のワークツリーを片付けても消えない。消すのはユーザが打つ
-`ccnavi-sync.sh --forget <P>` だけ）。控えと統合先の控えから、家族の立ち位置（`Standing`）を決める。
+親子のチケットの控えは墓標として残る（親のワークツリーを片付けても消えない。消すのはユーザが打つ
+`ccnavi-sync.sh --forget <P>` だけ）。控えと統合先の控えから、親子のチケットの立ち位置
+（`Standing`）を決める。
 
 - 閉じた: 統合先の控えの `done/` に親の写しがある（親のワークツリーが無いか、あれば親の写しの
-  承認の時刻が同じ）、または控えが `closed`。統合先の `done/` が権威（3.6 の正常系）
+  承認の時刻が同じ）、または控えが `closed`。統合先の `done/` が権威（マージ後にホストが `P` を
+  消した正常系）
 - `gone`・`blocked`・控えが壊れている・`present` なのに親のワークツリーが無い: **決まらない**。
-  その家族の承認も状態の操作も止める（3.3 の 3、3.6）
+  その親子のチケットの承認も状態の操作も止める
 - `present` で親のワークツリーがある: 親のブランチの写しだけが本物
 
 ## 統合先の控え
@@ -35,13 +39,13 @@
 ## リンクは辿らない
 
 控えの途中（`sync`・`<リポジトリ>`・`families`・`integration` と、その下の読むファイル）に
-シンボリックリンクがあれば読まず、「控えが壊れている」とする（段階 2b のレビューの決定 B4）。
+シンボリックリンクがあれば読まず、「控えが壊れている」とする。
 sh は写すときにリンクを落としているが、読む側でも辿らない。
 
 ## 入れ替えの一瞬
 
-統合先の控えは `mv` 2 回で入れ替わるので、その間の一瞬だけ `integration/` が無い
-（11.4.2 の 10）。入れ替えの途中（`integration.tmp.*`・`integration.old.*` が並んでいる、
+統合先の控えは `mv` 2 回で入れ替わるので、その間の一瞬だけ `integration/` が無い。
+入れ替えの途中（`integration.tmp.*`・`integration.old.*` が並んでいる、
 `integration/` はあるのに `head` が無い）と分かるときだけ、少し待って読み直す。控えを
 一度も書いていないリポジトリでは待たない（hook のたびに待つことになるため）。
 """
@@ -77,7 +81,7 @@ _SWAPPING = "統合先の控えの入れ替えが終わらない"
 # 入れ替えの一瞬を待つ回数と間隔（秒）。合わせて 0.25 秒ほど。
 _RETRIES = 5
 _RETRY_WAIT = 0.05
-# 控え 1 つ（家族の控え・head）の大きさの上限。超えたら切らずに「壊れている」とする。
+# 控え 1 つ（親子のチケットの控え・head）の大きさの上限。超えたら切らずに「壊れている」とする。
 _RECORD_LIMIT = 64 * 1024
 
 
@@ -101,12 +105,12 @@ def repo_seen(state_dir: str, repo: str) -> bool:
     return any_records(state_dir) and os.path.lexists(os.path.join(state_dir, SYNC_DIR, repo))
 
 
-# ---- 家族の控え
+# ---- 親子のチケットの控え
 
 
 @dataclass(frozen=True)
 class Family:
-    """家族の控え 1 つ。`broken` が空でなければ読めなかった理由（`state` は空）。"""
+    """親子のチケットの控え 1 つ。`broken` が空でなければ読めなかった理由（`state` は空）。"""
 
     name: str
     repo: str
@@ -122,7 +126,7 @@ def family_path(state_dir: str, repo: str, name: str) -> str:
 
 
 def family(state_dir: str, repo: str, name: str) -> Family | None:
-    """家族の控え。無ければ None（取り込み済みでない家族）。"""
+    """親子のチケットの控え。無ければ None（取り込み済みでない親子のチケット）。"""
     if not state_dir or not name or not any_records(state_dir):
         return None
     path = family_path(state_dir, repo, name)
@@ -148,7 +152,7 @@ def family(state_dir: str, repo: str, name: str) -> Family | None:
 
 
 def family_names(state_dir: str) -> list[tuple[str, str]]:
-    """家族の控えの (リポジトリ, 親の識別子) の並び。書きかけ（`*.tmp.*`）は数えない。"""
+    """親子のチケットの控えの (リポジトリ, 親の識別子) の並び。書きかけ（`*.tmp.*`）は数えない。"""
     base = os.path.join(state_dir, SYNC_DIR)
     out: list[tuple[str, str]] = []
     for repo in _names(base):
@@ -341,14 +345,15 @@ def _copy_fields(text: str) -> DoneCopy | None:
     )
 
 
-# ---- 家族の立ち位置
+# ---- 親子のチケットの立ち位置
 
 
 @dataclass(frozen=True)
 class Standing:
-    """家族の立ち位置。`record` が None なら取り込み済みでない（今の動きのまま）。
+    """親子のチケットの立ち位置。`record` が None なら取り込み済みでない（今の動きのまま）。
 
-    `stop` は決まらない・閉じているので止める理由（空なら止めない）。`closed` は閉じた家族。
+    `stop` は決まらない・閉じているので止める理由（空なら止めない）。`closed` は閉じた
+    親子のチケット。
     `home` は親のワークツリー（`.claude/worktrees/<P>` で HEAD が `P` を指すもの）。
     """
 
@@ -365,10 +370,10 @@ class Standing:
 
 
 class Families:
-    """1 回の判定の中で、家族の立ち位置と統合先の控えを引く窓口。
+    """1 回の判定の中で、親子のチケットの立ち位置と統合先の控えを引く窓口。
 
-    ワークツリーの一覧・家族の控え・統合先の控えは 1 度ずつだけ読む（hook のたびに
-    何度も走る `scan` の中で、家族ごとにワークツリーを並べ直さないため）。
+    ワークツリーの一覧・親子のチケットの控え・統合先の控えは 1 度ずつだけ読む（hook のたびに
+    何度も走る `scan` の中で、親子のチケットごとにワークツリーを並べ直さないため）。
     """
 
     def __init__(self, conf: settings.Settings, root: str):
@@ -397,7 +402,7 @@ class Families:
         return self._done[repo]
 
     def standing(self, family_id: str, project: str = "") -> Standing:
-        """この家族の立ち位置（3.3 の権威の規則）。"""
+        """この親子のチケットの立ち位置（権威の規則）。"""
         key = (project or "", family_id)
         if key not in self._standings:
             self._standings[key] = self._standing(family_id, project or "")
@@ -406,7 +411,7 @@ class Families:
     def standing_any(self, family_id: str, project: str | None = None) -> Standing:
         """リポジトリが分かれば `standing`。分からなければ控えのあるリポジトリを全部探す。
 
-        同じ識別子の家族が 2 つ以上のリポジトリにあれば、どれとも決めずに止める。
+        同じ識別子の親子のチケットが 2 つ以上のリポジトリにあれば、どれとも決めずに止める。
         """
         if project is not None:
             return self.standing(family_id, project)
@@ -420,8 +425,8 @@ class Families:
         if not hits:
             return Standing(family_id, SELF)
         # 控えは 1 つでも、同じ名前の親のワークツリーが別のリポジトリにもあれば、
-        # どちらの家族か決めない（ワークスペースのユーザの付けた名前 `web-i0012` と、
-        # プロジェクト web の issue 12 の家族など。11.9.3 の 13）
+        # どちらの親子のチケットか決めない（ワークスペースのユーザの付けた名前 `web-i0012` と、
+        # プロジェクト web の issue 12 の親子のチケットなど）
         other = sorted(
             {repo_key(w.project) for w in self.worktrees() if w.name == family_id}
             - {h.repo for h in hits}
@@ -433,11 +438,14 @@ class Families:
             family_id,
             hits[0].repo,
             hits[0].record,
-            stop=f"家族 {family_id} の控えが複数のリポジトリ（{where}）にある。どれか決まらない",
+            stop=(
+                f"親子のチケット {family_id} の控えが複数のリポジトリ（{where}）にある。"
+                "どれか決まらない"
+            ),
         )
 
     def home_tree(self, family_id: str, project: str) -> tree.Tree | None:
-        """親のワークツリー。名前（大文字小文字まで）が家族の識別子で、元が同じリポジトリで、
+        """親のワークツリー。名前（大文字小文字まで）が親子のチケットの識別子で、元が同じリポジトリで、
         HEAD がブランチ `<P>` を指すもの。無ければ None。ファイルだけを読む（git は起こさない）。"""
         work = self._named_tree(family_id, project)
         if work is not None and tree.branch_of(work.root) == family_id:
@@ -464,18 +472,19 @@ class Families:
                 repo,
                 record,
                 home,
-                stop=f"家族 {family_id} は閉じている（統合先の done/ に親の写しがある）",
+                stop=f"親子のチケット {family_id} は閉じている（統合先の done/ に親の写しがある）",
                 closed=True,
             )
         if record.broken:
-            stop = f"家族 {family_id} の控えが壊れている（{record.broken}）"
+            stop = f"親子のチケット {family_id} の控えが壊れている（{record.broken}）"
         elif record.state == STATE_GONE:
             stop = (
                 f"親のブランチ {family_id} がリモートに無く、統合先にも閉じた記録が無い"
-                "（家族の控えが gone）。この家族の状態を決められない"
+                "（親子のチケットの控えが gone）。この親子のチケットの状態を決められない"
             )
         elif record.state == STATE_BLOCKED:
-            stop = f"取り込みの検査で家族 {family_id} を止めた（{record.reason or '理由なし'}）"
+            why = record.reason or "理由なし"
+            stop = f"取り込みの検査で親子のチケット {family_id} を止めた（{why}）"
         elif home is None:
             named = self._named_tree(family_id, project)
             busy = tree.busy_of(named.root) if named is not None else ""
@@ -483,29 +492,31 @@ class Families:
             if busy:
                 stop = (
                     f"親のワークツリー（{where}）に途中の操作（{busy}）がある。"
-                    "済ませるか取りやめるまで、取り込み済みの家族でどの写しを本物とするかが"
+                    "済ませるか取りやめるまで、取り込み済みの親子のチケットでどの写しを本物とするかが"
                     "決まらない"
                 )
             elif named is not None:
                 stop = (
                     f"親のワークツリー（{where}）の HEAD がブランチ {family_id} を指していない。"
-                    "取り込み済みの家族でどの写しを本物とするかが決まらない"
+                    "取り込み済みの親子のチケットでどの写しを本物とするかが決まらない"
                 )
             else:
                 stop = (
                     f"親のワークツリー（{where}）が無い。"
-                    "取り込み済みの家族でどの写しを本物とするかが決まらない"
-                    "（家族の控えは、親のワークツリーを片付けても残る）"
+                    "取り込み済みの親子のチケットでどの写しを本物とするかが決まらない"
+                    "（親子のチケットの控えは、親のワークツリーを片付けても残る）"
                 )
         else:
             stop = ""
         return Standing(family_id, repo, record, home, stop=stop)
 
     def _closed_in_integration(self, repo: str, family_id: str, home: tree.Tree | None) -> bool:
-        """統合先の控えの `done/` に、この家族の親の写しがあるか（家族の控えに頼らない）。
+        """統合先の控えの `done/` に、この親子のチケットの親の写しがあるか。
+
+        親子のチケットの控えには頼らない。
 
         親のワークツリーに承認済みの親の写しがあれば、承認の時刻が同じときだけ閉じたとする
-        （同じ識別子の古い家族の写しを、この家族のものと読まない。sh の見方と同じ）。
+        （同じ識別子の古い親子のチケットの写しを、今のものと読まない。sh の見方と同じ）。
         """
         ids, why = self.done(repo)
         if why or family_id not in ids:
@@ -536,14 +547,14 @@ def _home_parent_copy(
 
 
 def standing(conf: settings.Settings, root: str, family_id: str, project: str = "") -> Standing:
-    """この家族の立ち位置（3.3 の権威の規則）。1 回だけ引くときの形。"""
+    """この親子のチケットの立ち位置（権威の規則）。1 回だけ引くときの形。"""
     return Families(conf, root).standing(family_id, project)
 
 
 def standing_any(
     conf: settings.Settings, root: str, family_id: str, project: str | None = None
 ) -> Standing:
-    """リポジトリの分からない家族の立ち位置（`Families.standing_any`）。"""
+    """リポジトリの分からない親子のチケットの立ち位置（`Families.standing_any`）。"""
     return Families(conf, root).standing_any(family_id, project)
 
 
@@ -557,12 +568,14 @@ def same_tree(a: str, b: str) -> bool:
 
 
 def guidance(root: str, st: Standing) -> list[str]:
-    """止めたときの解き方（3.6 の案内）。1 行ずつ。"""
+    """止めたときの解き方。1 行ずつ。"""
     sync = settings.script_command(root, "ccnavi-sync.sh")
     git = settings.script_command(root, "ccnavi-git.sh")
     name = st.family
     if st.closed:
-        return [f"家族 {name} は閉じている。状態の操作は無い。親のワークツリーは片付けてよい"]
+        return [
+            f"親子のチケット {name} は閉じている。状態の操作は無い。親のワークツリーは片付けてよい"
+        ]
     record = st.record
     if record is not None and record.broken:
         return [
@@ -575,9 +588,9 @@ def guidance(root: str, st: Standing) -> list[str]:
             f"オンラインで '{sync} {name}' を打つと戻し方が出る。改名・消し間違いならユーザに"
             f"元の名前 {name} でブランチを戻してもらい、オンラインで '{sync} {name}' を"
             "打ち直してください",
-            f"家族を捨てたなら、親のワークツリーを片付けて（'{git} worktree remove "
-            f".claude/worktrees/{name}'）、ユーザに '{sync} --forget {name}' で家族の控えを"
-            "消してもらってください"
+            f"親子のチケットを捨てたなら、親のワークツリーを片付けて（'{git} worktree remove "
+            f".claude/worktrees/{name}'）、ユーザに '{sync} --forget {name}' で"
+            "親子のチケットの控えを消してもらってください"
             "（エージェントは打たない）",
         ]
     if record is not None and record.state == STATE_BLOCKED:
@@ -594,9 +607,9 @@ def guidance(root: str, st: Standing) -> list[str]:
         f"親のワークツリーを切り直してください（'{git} fetch origin {name}' のあと "
         f"'{git} worktree add .claude/worktrees/{name} -b {name} origin/{name}'）。"
         f"別のブランチに居るなら {name} に戻してください。"
-        f"閉じた家族なら、オンラインで '{sync}' を打って"
-        "統合先を取り込み直してください。捨てた家族なら、ユーザに "
-        f"'{sync} --forget {name}' で家族の控えを消してもらってください",
+        f"閉じた親子のチケットなら、オンラインで '{sync}' を打って"
+        "統合先を取り込み直してください。捨てた親子のチケットなら、ユーザに "
+        f"'{sync} --forget {name}' で親子のチケットの控えを消してもらってください",
     ]
 
 

@@ -1,20 +1,20 @@
 /**
- * GitLab の読み書き（ADR-0093 の段階 5。8.2・8.4・8.8・8.9）。service worker だけが呼ぶ。PAT は引数で受け、外へ返さない。
+ * GitLab の読み書き。service worker だけが呼ぶ。PAT は引数で受け、外へ返さない。
  *
- * GitHub（`github.ts`）と同じ名前の操作を、GitLab の REST API（v4）で組む。操作は名前で限り（5.5 の 4）、
+ * GitHub（`github.ts`）と同じ名前の操作を、GitLab の REST API（v4）で組む。操作は名前で限り、
  * URL・クエリ・ヘッダはここで組む。書くのは Commits API（`POST repository/commits` の `actions`）の 1 コミットと、
  * 「始める」のブランチの作成だけ。
  *
- * GitLab の Commits API には「先頭がこの sha のときだけ」の指定が無い（8.4）。書く直前に先頭を読み、違えば書かずに
+ * GitLab の Commits API には「先頭がこの sha のときだけ」の指定が無い。書く直前に先頭を読み、違えば書かずに
  * 「動いた」（409）で返す。それでも間に入った書き込みは防げないので、答えにコミットの親（`parent_ids[0]`）を返し、
- * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、打ち消す（D21 の 1 段目）。`seq` は書かない（2 段目）。
+ * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、打ち消す。ccnavi の書き込みどうしの競合を捕まえる印ファイル `seq` は、本物で確かめるまで書かない。
  *
  * MR のスレッドとレビューの写し（`reviewCopy`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
  * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の落とし方（jq の `//`・`tostring`、型は jq と同じく
  * そのまま写す）で組む。同じ見本（test/fixtures/host/gitlab/。手で組んだもの）から同じ写しになることを試験が見る。
  *
- * レビューの後（11.9.1）: 書き込みの update・delete には `last_commit_id`（そのファイルを最後に変えたコミット）を付け、
- * 同じファイルを他人が変えていれば GitLab が断る（決定 A。ファイル単位の比較つきの書き込み）。MR は同じプロジェクトから
+ * 書き込みの update・delete には `last_commit_id`（そのファイルを最後に変えたコミット）を付け、
+ * 同じファイルを他人が変えていれば GitLab が断る（ファイル単位の比較つきの書き込み）。MR は同じプロジェクトから
  * 出たもの（`source_project_id`）だけを拾う（フォークの MR を拾わない）。転送は追わない（`redirect: "error"`）。
  */
 import type { Host } from "./hosts.js";
@@ -144,9 +144,9 @@ async function pages(client: Client, path: string, limit: number, what: string):
   }
 }
 
-// ---- 読み取り（8.2） ----------------------------------------------------------------------
+// ---- 読み取り ----------------------------------------------------------------------
 
-/** プロジェクトのデフォルトブランチ（3.3 の統合先の既定） */
+/** プロジェクトのデフォルトブランチ（統合先を設定していないときの既定） */
 export async function repoInfo(client: Client, owner: string, repo: string): Promise<{ defaultBranch: string }> {
   const { status, body } = await get(client, project(owner, repo));
   if (status === 404) throw new HostError(`プロジェクト ${owner}/${repo} が見つからない（存在しないか、PAT の権限が及ばない）`, 404);
@@ -165,7 +165,7 @@ export async function branchHead(client: Client, owner: string, repo: string, br
 /** ブランチを読むページの上限。100 × 10 本を超えるプロジェクトは残りを諦める（表示用） */
 const REF_PAGES = 10;
 
-/** `since` より後に先頭が動いたブランチ（表示用。D2）。GitLab の `repository/branches` を読む（8.2） */
+/** `since` より後に先頭が動いたブランチ（表示用）。GitLab の `repository/branches` を読む */
 export async function recentRefs(client: Client, owner: string, repo: string, since: Date): Promise<RecentRef[]> {
   const out: RecentRef[] = [];
   for (let page = 1; page <= REF_PAGES; page += 1) {
@@ -185,7 +185,7 @@ export async function recentRefs(client: Client, owner: string, repo: string, si
   return out;
 }
 
-/** tree を読むページの上限（100 × 50 = 5,000 件）。超えたら取り切れないので止める（8.2） */
+/** tree を読むページの上限（100 × 50 = 5,000 件）。超えたら取り切れないので止める */
 export const TREE_PAGES = 50;
 
 type TreeItem = { id?: unknown; name?: unknown; type?: unknown; path?: unknown; mode?: unknown };
@@ -248,7 +248,7 @@ function fromBase64(text: string): Uint8Array {
 }
 
 /**
- * blob を sha で取る（`repository/blobs/:sha`。1 件ずつ。8.2 の束の取り方は確認事項 2）。
+ * blob を sha で取る（`repository/blobs/:sha`。1 件ずつ。GraphQL で束で取れるかは本物で確かめていない）。
  * NUL を含むか UTF-8 として読めなければバイナリ。大きさが `size` と合わなければ止める
  */
 export async function blobs(client: Client, owner: string, repo: string, oids: readonly string[]): Promise<Record<string, BlobText>> {
@@ -274,7 +274,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   return out;
 }
 
-/** PAT の持ち主のアカウント名（跡と印の `actor`。8.8・8.9） */
+/** PAT の持ち主のアカウント名（跡と印の `actor`） */
 export async function viewer(client: Client): Promise<string> {
   const { status, body } = await get(client, "/user");
   const name = (body as { username?: unknown } | null)?.username;
@@ -283,8 +283,8 @@ export async function viewer(client: Client): Promise<string> {
 }
 
 /**
- * PAT の期限（D25。`GET /personal_access_tokens/self` の `expires_at`、`YYYY-MM-DD`）。その日の終わり（UTC）を ISO で返す。
- * 読めなければ空（project access token で返るかは確認事項 3）
+ * PAT の期限（`GET /personal_access_tokens/self` の `expires_at`、`YYYY-MM-DD`）。その日の終わり（UTC）を ISO で返す。
+ * 読めなければ空（project access token で返るかは本物で確かめていない）
  */
 export async function tokenExpiry(client: Client): Promise<string> {
   const { status, body } = await get(client, "/personal_access_tokens/self");
@@ -294,7 +294,7 @@ export async function tokenExpiry(client: Client): Promise<string> {
   return Number.isNaN(t) ? "" : new Date(t).toISOString();
 }
 
-// ---- 取り下げ（8.8）と書いた後の確かめ ---------------------------------------------------------
+// ---- 取り下げと書いた後の確かめ ---------------------------------------------------------
 
 const HISTORY_PAGE = 30;
 const CHAIN_DEPTH = 100;
@@ -311,7 +311,7 @@ export async function firstParentChain(client: Client, owner: string, repo: stri
 }
 
 /**
- * 承認コミット（8.8 の 2）。GitHub の `approvalCommit` と同じ規則: `sha` から遡って `path` を最後に変えたコミットが、
+ * 承認コミット。GitHub の `approvalCommit` と同じ規則: `sha` から遡って `path` を最後に変えたコミットが、
  * 親が 1 つで、親に `path` が無く自分には在り（足した）、`sha` の first-parent の鎖の上にあるときだけ返す
  */
 export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
@@ -338,7 +338,7 @@ export async function commitParents(client: Client, owner: string, repo: string,
   return Array.isArray(parents) ? parents.map((p) => checkOid(p)) : [];
 }
 
-// ---- MR（8.9・8.10） ------------------------------------------------------------------------
+// ---- MR ------------------------------------------------------------------------
 
 /** プロジェクトの数の id（MR が同じプロジェクトから出たかを見る） */
 async function projectId(client: Client, owner: string, repo: string): Promise<number> {
@@ -354,7 +354,7 @@ type MrItem = { iid?: unknown; web_url?: unknown; source_project_id?: unknown };
 async function openMrs(client: Client, owner: string, repo: string, branch: string): Promise<MrItem[]> {
   const pid = await projectId(client, owner, repo);
   // API は source_project_id で絞れないので、全ページ（20 ページまで）を読んでから絞る（1 ページ目がフォークで埋まっても
-  // 本物を外さない。sh の find_mr と同じ。11.9.3 の 6）
+  // 本物を外さない。sh の find_mr と同じ）
   const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}`, THREAD_PAGES, `${branch} のマージリクエストの一覧`);
   return (all as MrItem[]).filter((m) => m && m.source_project_id === pid);
 }
@@ -370,7 +370,7 @@ export async function openMr(client: Client, owner: string, repo: string, branch
   return { number: first.iid, url: String(alt(first.web_url, "")) };
 }
 
-/** 親のブランチの開いた MR に付いている Approve（8.10。`merge_requests/:iid/approvals` の `approved_by`） */
+/** 親のブランチの開いた MR に付いている Approve（`merge_requests/:iid/approvals` の `approved_by`） */
 export async function pullApprovals(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; approvals: number }[]> {
   const out: { number: number; approvals: number }[] = [];
   for (const mr of await openMrs(client, owner, repo, branch)) {
@@ -402,7 +402,7 @@ export async function discussions(client: Client, owner: string, repo: string, n
     if (alt(first.resolvable, false) === false) continue;
     const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
     const pos = first.position ?? null;
-    // jq と同じく、欄の型はそのまま写す（文字列の行番号を数に直さない）。書き手は username でなく id（11.9.1 の 15）
+    // jq と同じく、欄の型はそのまま写す（文字列の行番号を数に直さない）。書き手は username でなく id
     out.push({
       id: tostring(d.id),
       resolved: resolvable.every((n) => alt(n.resolved, false) !== false),
@@ -441,7 +441,7 @@ export interface GitLabReviewCopy {
   readonly fetched_at: string;
 }
 
-/** 親のブランチの MR のスレッドとレビューの写し（8.9。`ccnavi-review.sh fetch` の GitLab の枝と同じ形） */
+/** 親のブランチの MR のスレッドとレビューの写し（`ccnavi-review.sh fetch` の GitLab の枝と同じ形） */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<GitLabReviewCopy> {
   const mr = await openMr(client, owner, repo, branch);
   if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、開いているマージリクエストが無い`);
@@ -452,14 +452,13 @@ export async function reviewCopy(client: Client, owner: string, repo: string, br
 
 /**
  * compare の変更の一覧を打ち切られたとみなす件数。GitLab の差分の件数の上限（`diff_max_files`）は既定が 1000 で、
- * インスタンスの管理者が 500 まで下げられる。その最小値より下（450）から打ち切られたとみなす（11.9.3 の 3。確認事項 9 で
- * インスタンスの値を確かめる）
+ * インスタンスの管理者が 500 まで下げられる。その最小値より下の 450 件以上で、打ち切られたとみなす（本物の
+ * インスタンスの値は確かめていない）
  */
-export const COMPARE_FILES_LIMIT = 1000;
 export const COMPARE_FILES_NEAR = 450;
 
 /**
- * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス（8.9）。`base` が `head` の祖先でなければ
+ * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス。`base` が `head` の祖先でなければ
  * （`merge_base` が `base` でない）、読めない・時間切れ・打ち切りのどれでも `files` は null（動いたと数える）
  */
 export async function compareFiles(client: Client, owner: string, repo: string, base: string, head: string): Promise<{ base: string; head: string; files: string[] | null }> {
@@ -472,7 +471,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   const res = (body ?? {}) as { diffs?: unknown; compare_timeout?: unknown };
   if (status === 404 || res.compare_timeout === true || !Array.isArray(res.diffs)) return { base: b, head: h, files: null };
   if (res.diffs.length >= COMPARE_FILES_NEAR) return { base: b, head: h, files: null };
-  // 行数などで折りたたまれた・大きすぎる差分があれば、一覧が揃っていると言えない（動いたと数える。11.9.1 の 9）
+  // 行数などで折りたたまれた・大きすぎる差分があれば、一覧が揃っていると言えない（動いたと数える）
   const diffs = res.diffs as { old_path?: unknown; new_path?: unknown; collapsed?: unknown; too_large?: unknown }[];
   if (diffs.some((d) => d?.collapsed === true || d?.too_large === true)) return { base: b, head: h, files: null };
   const files: string[] = [];
@@ -483,7 +482,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   return { base: b, head: h, files };
 }
 
-// ---- 書き込み（8.4 の 1 段目） -----------------------------------------------------------------
+// ---- 書き込み -----------------------------------------------------------------
 
 /** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。打ち消しならユーザに回す */
 export const HOST_REFUSED = 409;
@@ -514,7 +513,7 @@ export interface Written {
 /**
  * 親のブランチへ 1 コミットで書く（Commits API の `actions`）。書く直前に先頭を読み、`expected` と違えば書かずに
  * 409（動いた）で返す。GitLab が断った（ファイルが既にある・無い、など 400）も 409 にする（書く流れが読み直す）。
- * `force` は付けない。答えのコミットの親を返し、書く流れが事後に確かめる（8.4 の 1 段目）。
+ * `force` は付けない。答えのコミットの親を返し、書く流れが事後に確かめる。
  */
 export async function createCommit(
   client: Client,
@@ -529,7 +528,7 @@ export async function createCommit(
   const name = checkBranch(branch);
   const now = await branchHead(client, owner, repo, name);
   if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が読んだものと違う（書く前に動いた）`, HOST_MOVED);
-  // update・delete には、そのファイルを最後に変えたコミットを付ける（決定 A）。呼び手が知っていればそれ（打ち消しは自分の
+  // update・delete には、そのファイルを最後に変えたコミットを付ける。呼び手が知っていればそれ（打ち消しは自分の
   // コミット）、無ければ読んだ先頭の上の値。その後に他人が変えていれば GitLab が断る（400。ここでは 409 にする）
   const out: Record<string, unknown>[] = [];
   for (const a of actions) {
@@ -557,7 +556,7 @@ export async function createCommit(
   return { oid: checkOid(c.id), parent: parents.length > 0 ? checkOid(parents[0]) : "" };
 }
 
-// ---- 「始める」（8.6） ----------------------------------------------------------------------
+// ---- 「始める」 ----------------------------------------------------------------------
 
 export interface Issue {
   readonly number: number;

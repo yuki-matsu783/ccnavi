@@ -1,5 +1,5 @@
 /**
- * 悪意のある Markdown の描画（ADR-0093 の 5.5 の 2・6）。jsdom の上で DOMPurify を通す。
+ * 悪意のある Markdown の描画。jsdom の上で DOMPurify を通す。
  * 実機の Chromium でも同じ見本を描く（test/e2e/）。
  */
 import { test } from "node:test";

@@ -4,7 +4,7 @@
  *
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
@@ -251,7 +251,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesRel: string;
   const notices: string[] = [];
   if (target.kind === "workspace") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
@@ -446,7 +446,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 
 /**
  * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
- * ときと、保存が通って中身が入れ替わったときだけ（ADR-0062）。
+ * ときと、保存が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;

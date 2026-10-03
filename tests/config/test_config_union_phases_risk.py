@@ -503,7 +503,7 @@ class RiskUnionTest(ConfigUnionHarness):
 
 
 class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
-    """層を探す先を動かすフラグも、診断の外では有効でない（ADR-0067、issue #65）。
+    """層を探す先を動かすフラグも、診断の外では有効でない（issue #65）。
 
     `--projects` と `--project-home` は、共通層の中身を差し替えるのと結果が同じ。
     外すとプロジェクトの層がまるごと消えるので、その層が足していた配点も
