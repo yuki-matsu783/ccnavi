@@ -3,7 +3,7 @@
  * ここで 1 度だけ呼んで配る。
  *
  * どの画面の部品からも読むので、特定の画面の契約（`BoardMessage` など）には依存しない。
- * 送り口は画面ごとに `poster<その画面のメッセージ>()` で型を付けて作る（`board/post.ts`）。
+ * 送る関数は画面ごとに `poster<その画面のメッセージ>()` で型を付けて作る（`board/post.ts`）。
  */
 
 export interface VsCodeApi {
@@ -22,17 +22,17 @@ declare function acquireVsCodeApi(): VsCodeApi;
 const api = acquireVsCodeApi();
 
 /**
- * 画面の契約で型を付けた送り口を作る。画面は自分の契約に無いものを送れない
+ * 画面の契約で型を付けた送る関数を作る。画面は自分の契約に無いものを送れない
  * （`post({ type: "打ち間違い" })` は型で止まる）。
  *
  * 既定を `never` にしてあるので、**型を渡し忘れた `poster()` は何も送れない**（呼ぶ側で型が合わない）。
- * 既定を `ScreenMessage` にすると「`type` さえあれば何でも通る」送り口が黙って出来てしまう。
+ * 既定を `ScreenMessage` にすると「`type` さえあれば何でも通る」送る関数が気づかないうちに出来てしまう。
  */
 export function poster<M extends ScreenMessage = never>(): (message: M) => void {
   return (message) => api.postMessage(message);
 }
 
-/** 画面が覚えておくもの（ボードなら絞り込み・畳んだ列・列の幅）。HTML を作り直しても残る */
+/** 画面が覚えておくもの（ボードなら絞り込み・折りたたんだ列・列の幅）。HTML を作り直しても残る */
 export function getState(): unknown {
   return api.getState();
 }

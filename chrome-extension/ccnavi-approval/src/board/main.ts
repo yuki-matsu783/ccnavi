@@ -50,7 +50,7 @@ let repos: RepoConfig[] = [];
 const boards = new Map<string, RepoBoard>();
 const issues = new Map<string, { list: Issue[] | null; error: string }>();
 
-/** プロジェクトのリポジトリのワークスペース（登録したもの）とそのホストへ頼む口（段階 5） */
+/** プロジェクトのリポジトリのワークスペース（登録したもの）とそのホストへ頼む関数（段階 5） */
 function workspaceOf(repo: RepoConfig, stats: Stats): Deps["workspace"] {
   if (!repo.project) return undefined;
   const ws = repos.find((r) => repoKey(r) === repo.workspace && !r.project);
@@ -78,7 +78,7 @@ async function blocked(repo: RepoConfig, family: string): Promise<boolean> {
   if (!why) return false;
   result.dataset.kind = "refused";
   result.className = "notice error";
-  result.textContent = `${family} は要確認のまま。ホストの履歴を確かめて「確かめた」を押すまで、ここからは書かない`;
+  result.textContent = `${family} は要確認のまま。ホストの履歴を確かめて「確かめた」を押すまで、このブラウザからは書かない`;
   return true;
 }
 
@@ -128,13 +128,13 @@ function say(outcome: Outcome, what: string): void {
   result.dataset.kind = outcome.kind;
   const head =
     outcome.kind === "written"
-      ? `${what}を書いた（${outcome.oid.slice(0, 7)}${outcome.rounds > 1 ? `、先頭が動いたので ${outcome.rounds} 周目で書いた` : ""}）。書いた後の中身も確かめた`
+      ? `${what}を書いた（${outcome.oid.slice(0, 7)}${outcome.rounds > 1 ? `。途中で親のブランチの先頭が動いたので、${outcome.rounds} 回目で書いた` : ""}）。書いた後の中身も確かめた`
       : outcome.kind === "changed"
         ? `${what}を書かなかった: ${outcome.message}`
         : outcome.kind === "conflict"
-          ? `${what}を書けなかった（人に回す）: ${outcome.message}`
+          ? `${what}を書けなかった（自動ではやり直さない）: ${outcome.message}`
           : outcome.kind === "attention"
-            ? `${what}は要確認になった（書いたかどうか・何が残ったかを、ホストの履歴で人が確かめる）: ${outcome.message}`
+            ? `${what}は要確認になった。書けたかどうかと何が残ったかを、ホストの履歴で確かめてください: ${outcome.message}`
             : `${what}を書かなかった: ${outcome.message}`;
   result.textContent = head;
   result.className = `notice ${outcome.kind === "written" ? "ok" : "error"}`;
@@ -152,11 +152,11 @@ const actions: Actions = {
       let warn = "";
       try {
         const prs = (await deps.call("pullApprovals", [repoBoard.repo.owner, repoBoard.repo.repo, family.family.name])) as { number: number }[];
-        if (prs.length > 0) warn = `\n\n注意: MR ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いている。このコミットで MR の Approve が外れることがある`;
+        if (prs.length > 0) warn = `\n\n注意: マージリクエスト ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いている。このコミットを書くと、その Approve が外れることがある`;
       } catch {
         // 読めなくても承認は止めない（注意の表示だけ）
       }
-      if (!window.confirm(`${family.family.name} に ${ids.join(", ")} の承認を書く（1 コミット）。${warn}`)) return false;
+      if (!window.confirm(`${family.family.name} に ${ids.join(", ")} の承認を 1 コミットで書く。${warn}`)) return false;
       const outcome = await approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps);
       await noteAttention(repoBoard.repo, family.family.name, outcome);
       say(outcome, "承認");
@@ -170,11 +170,11 @@ const actions: Actions = {
       let warn = "";
       try {
         const prs = (await deps.call("pullApprovals", [repoBoard.repo.owner, repoBoard.repo.repo, family.family.name])) as { number: number }[];
-        if (prs.length > 0) warn = `\n\n注意: MR ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いている。このコミットで MR の Approve が外れることがある`;
+        if (prs.length > 0) warn = `\n\n注意: マージリクエスト ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いている。このコミットを書くと、その Approve が外れることがある`;
       } catch {
         // 読めなくても止めない（注意の表示だけ。8.10）
       }
-      const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする（レビュー待ちの子を done/ へ動かし、印を 1 コミットで書く）。押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
+      const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子を done/ へ動かし、マーカーと合わせて 1 コミットで書く。書く前に、押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
       if (!window.confirm(msg)) return false;
       const outcome = await confirmPhase(repoBoard.repo, family.family.name, phase, deps);
       await noteAttention(repoBoard.repo, family.family.name, outcome);
@@ -207,7 +207,7 @@ const actions: Actions = {
   },
   start(repoBoard: RepoBoard, issue: Issue) {
     void act(async () => {
-      if (!window.confirm(`issue #${issue.number} から親のブランチを統合先 ${repoBoard.integration?.name ?? ""} の先頭に作る（PR/MR は作らない）`)) return false;
+      if (!window.confirm(`issue #${issue.number} から親のブランチを統合先 ${repoBoard.integration?.name ?? ""} の先頭に作る（マージリクエストは作らない）`)) return false;
       const deps = await writeDeps(repoBoard.repo);
       const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
       const out = await startIssue(repoBoard.repo, issue.number, repoBoard.seen ?? null, taken, deps);
@@ -215,14 +215,14 @@ const actions: Actions = {
       result.className = `notice ${out.kind === "started" ? "ok" : "error"}`;
       result.textContent =
         out.kind === "started"
-          ? `親のブランチ ${out.name} を作った（${out.head.slice(0, 7)}）。エージェントに ${out.name} で作業を始めてもらう`
+          ? `親のブランチ ${out.name} を作った（${out.head.slice(0, 7)}）。エージェントに ${out.name} で作業を始めるよう頼んでください`
           : `始めなかった: ${out.message}`;
       return true;
     });
   },
   dismiss(repoBoard: RepoBoard, family: string) {
     void (async () => {
-      if (!window.confirm(`${family} の要確認を外す。ホストの履歴を確かめ、親のブランチの置き場が正しいことを確かめたときだけ外す`)) return;
+      if (!window.confirm(`${family} の要確認を外す。ホストの履歴を見て、親のブランチの置き場が正しいと確かめられたときだけ外してください`)) return;
       const all = await readAttention();
       const key = repoKey(repoBoard.repo);
       if (all[key]) delete all[key][family];
@@ -266,11 +266,11 @@ async function refresh(clearResult = true): Promise<void> {
   const got = await chrome.storage.local.get("repos");
   repos = readRepos(got.repos, HOSTS);
   if (repos.length === 0) {
-    status.textContent = "リポジトリが登録されていない。設定画面で登録する";
+    status.textContent = "リポジトリが登録されていない。設定画面で登録してください";
     document.body.dataset.state = "done";
     return;
   }
-  status.textContent = "Python（Pyodide）を起こしている…";
+  status.textContent = "Python（Pyodide）を起動している…";
   if (worker === null) worker = startWorker();
   const t = await worker.init();
   status.textContent = `Pyodide ${t.pyodide}: 起動 ${t.boot_ms} ms・読み込み ${t.import_ms} ms`;
@@ -292,6 +292,6 @@ async function refresh(clearResult = true): Promise<void> {
 document.getElementById("refresh")?.addEventListener("click", () => void refresh());
 document.getElementById("options")?.addEventListener("click", () => void chrome.runtime.openOptionsPage());
 refresh().catch((err) => {
-  status.textContent = `読めなかった: ${(err as Error).message ?? String(err)}`;
+  status.textContent = `ボードを読み込めなかった: ${(err as Error).message ?? String(err)}`;
   document.body.dataset.state = "error";
 });

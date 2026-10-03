@@ -2,7 +2,7 @@
  * フェーズの種類の関係を図で見せる。点が種類、線が `requires` と `overlap` と `after`。
  *
  * **矢印を付けるのは `after` だけ。** `requires` は「一緒に置くべき」で、順序ではない（`phases-graph.ts` の頭）。
- * 見る場所が `none` でない種類は、点の縁を強めて「人が見る」を添える（種類の宣言。計画の延期や
+ * 見る場所が `none` でない種類は、点の縁を強めて「人が見る」を示す（種類の宣言。計画の延期や
  * 実績のリスクで変わることは図の下の一言が言う）。
  * 図が判定をしないのも同じところに書いてある。ここは `graphOf` が組んだものを描くだけで、
  * 何が正しいかは言わない。
@@ -82,7 +82,7 @@ type RelationEdge = Edge<RelationData, "relation">;
 
 /**
  * 関係ごとのずらし。同じ組が複数の関係を持つことがあり、同じ経路だと破線が実線の下に隠れる。
- * 隙間の半分（列の間の 40px の半分）より小さく抑え、隣の点に食い込ませない。
+ * 隙間の半分（列の間の 40px の半分）より小さく抑え、隣の点に重ならないようにする。
  */
 const SHIFT: Readonly<Record<Relation, number>> = { requires: -7, after: 0, overlap: 7 };
 
@@ -227,7 +227,7 @@ function nodesOf(graph: PhasesGraph, spots: Spots): PhaseNode[] {
 function edgesOf(graph: PhasesGraph, at: ReadonlyMap<string, { x: number; y: number }>): RelationEdge[] {
   return graph.edges.map((edge) => {
     const route = routeOf(edge.a, edge.b, at);
-    // 矢印の頭は線と同じ色にする（`Graph.css` の `.rel-after`）。style に入るので CSS の変数が効く
+    // 矢印の頭は線と同じ色にする（`Graph.css` の `.rel-after`）。style に入るので CSS の変数が反映される
     const arrow = { type: MarkerType.ArrowClosed, color: "var(--vscode-focusBorder)" };
     const marker = edge.relation !== "after" ? {} : route.to === edge.b ? { markerEnd: arrow } : { markerStart: arrow };
     return {

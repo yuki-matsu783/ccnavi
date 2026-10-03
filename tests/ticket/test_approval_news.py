@@ -204,7 +204,7 @@ class ApprovalNewsTest(PhaseHarness):
         self.assertIn("i0001-01", heard)
         self.assertEqual(self.prompt(), "")
 
-    # ---- 5. 控えを置けないときは黙る
+    # ---- 5. 控えを置けないときは伝えない
 
     def test_without_a_state_dir_nothing_is_told_and_nothing_is_written(self):
         self.parent_only()

@@ -3,7 +3,7 @@
  *
  * PAT は service worker に渡して置かせ、この画面では読み返さない（登録済みかと期限だけを聞く）。
  * 期限（D25）はホストの応答から読む。読めないときのために、登録のときに日付を入れられる。
- * 通信先は焼き込んだ一覧から選ぶだけで、ここで足せない（D24）。
+ * 通信先は埋め込んだ一覧から選ぶだけで、ここで足せない（D24）。
  */
 import type { Response, TokenStatus } from "../core/protocol.js";
 import { normalizeRepo, readRepos, repoKey, type RepoConfig } from "../core/settings.js";
@@ -95,7 +95,7 @@ $<HTMLFormElement>("repo-form").addEventListener("submit", async (e) => {
     const repo = normalizeRepo(Object.fromEntries(form.entries()) as Record<string, unknown>, HOSTS);
     const rest = (await loadRepos()).filter((o) => repoKey(o) !== repoKey(repo));
     if (repo.project && !rest.some((o) => repoKey(o) === repo.workspace && !o.project)) {
-      throw new Error(`ワークスペースのリポジトリ ${repo.workspace} を先に登録する`);
+      throw new Error(`ワークスペースのリポジトリ ${repo.workspace} を先に登録してください`);
     }
     await chrome.storage.local.set({ repos: [...rest, repo] });
     say("repo-msg", `${repoKey(repo)} を登録した`, true);
@@ -114,14 +114,14 @@ $<HTMLFormElement>("token-form").addEventListener("submit", async (e) => {
   const res = await ask({ kind: "token.set", host, token: input.value.trim(), expires: expires.value });
   input.value = "";
   expires.value = "";
-  say("token-msg", res.ok ? `${host} の PAT を登録した。差し替えたなら古いトークンをホストで失効させる` : res.error, res.ok);
+  say("token-msg", res.ok ? `${host} の PAT を登録した。差し替えた場合は、古いトークンをホスト側で失効させてください` : res.error, res.ok);
   await drawTokens();
 });
 
 $<HTMLButtonElement>("token-clear").addEventListener("click", async () => {
   const host = $<HTMLSelectElement>("token-host").value;
   const res = await ask({ kind: "token.clear", host });
-  say("token-msg", res.ok ? `${host} の PAT を消した。ホストでも失効させる` : res.error, res.ok);
+  say("token-msg", res.ok ? `${host} の PAT を消した。ホスト側でも失効させてください` : res.error, res.ok);
   await drawTokens();
 });
 

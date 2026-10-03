@@ -328,7 +328,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
         # 元ツリーに未コミットで残った子の写し（親のワークツリーの外）。取り込み済みの家族では
-        # 信じないので、検査が家族を止める。
+        # 信頼しないので、検査が家族を止める。
         stray = write(
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
             child_copy_text(),
@@ -339,7 +339,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("blocked", record["state"])
         self.assertIn("ワークツリーの外", record["reason"])
         self.assertIn("blocked にした", done.stdout)
-        self.assertIn("打ち直す", done.stdout)
+        self.assertIn("打ち直して", done.stdout)
         # 理由を片付けて打ち直せば、検査し直して present に戻る。
         os.remove(stray)
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
@@ -534,7 +534,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("present", fields(self.record)["state"])
 
     def test_a_merged_request_waits_instead_of_calling_it_gone(self):
-        # MR がマージ済みと分かれば観測ずれ。消えたとは言わない。
+        # MR がマージ済みと分かれば観測の食い違い。消えたとは言わない。
         self.review_says("merged 42")
         self.keep_record()
         self.delete_remote_branch(PARENT)
@@ -558,7 +558,7 @@ class SyncTest(unittest.TestCase):
     # ---- 控えの寿命（中 11）
 
     def test_records_of_removed_worktrees_are_kept_as_tombstones(self):
-        # 親のワークツリーを畳んで sync を打っても、gone の控えは消えない（決定 A）。
+        # 親のワークツリーを片付けて sync を打っても、gone の控えは消えない（決定 A）。
         self.keep_record("gone")
         git(self.ws, "worktree", "remove", "--force", self.tree)
         done = self.sync()
@@ -697,7 +697,8 @@ class SyncTest(unittest.TestCase):
         return path
 
     def test_settings_local_json_names_the_integration_branch(self):
-        # 人が端末で打つ sh には settings.local.json の env が効かない。実行ファイルが読んで渡す。
+        # 人が端末で打つ sh には settings.local.json の env が反映されない。
+        # 実行ファイルが読んで渡す。
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
         write(
             os.path.join(self.ws, ".claude", "settings.local.json"),
@@ -713,11 +714,11 @@ class SyncTest(unittest.TestCase):
         self.assertIn("統合先: main（環境変数", done.stdout)
 
     def test_a_failing_executable_stops_instead_of_using_the_default(self):
-        # 実行ファイルが在るのに答えなければ、統合先を黙って既定に戻さない（中 14）。
+        # 実行ファイルが在るのに答えなければ、統合先を何も言わずに既定に戻さない（中 14）。
         launcher = self.launcher("#!/bin/sh\necho broken >&2\nexit 1\n")
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
-        self.assertIn("答えなかった", done.stderr)
+        self.assertIn("返さなかった", done.stderr)
         self.assertFalse(os.path.exists(self.mirror))
 
     def test_the_host_default_branch_is_read_from_the_remote(self):

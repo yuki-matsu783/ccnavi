@@ -21,7 +21,7 @@ export const ALLOWED_URI = /^(?:https?|mailto):/i;
 const FORBID_TAGS = [
   "img", "picture", "source", "video", "audio", "iframe", "frame", "object", "embed", "form", "input", "button", "textarea", "select",
   "option", "style", "link", "meta", "base", "svg", "math",
-  // 中身を隠す・畳む・見た目を変える要素（決定 A）
+  // 中身を隠す・折りたたむ・見た目を変える要素（決定 A）
   "font", "details", "summary", "dialog", "template", "noscript", "marquee", "center", "blink",
 ];
 

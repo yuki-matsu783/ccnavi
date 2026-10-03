@@ -5,7 +5,7 @@
  *
  * ここで見るのは 3 つ。骨組み（`styles/page.css`）が 5 画面とも 1 か所から来ていること、
  * ハイコントラストのテーマ向けの書き方が残っていること、そして**置いた CSS が束ねから漏れて
- * いないこと**（`@import` を書き忘れると、見た目だけが黙って抜ける）。
+ * いないこと**（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -61,7 +61,7 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
  * ように `.` で始まらないものは node_modules から解く（esbuild が束ねるときと同じ解き方）。
  *
  * 外から来る CSS を入れているのは図の 1 本だけ（ADR-0070）。ここで解けないと、このテストは
- * 落ちるのではなく **`readFileSync` の ENOENT で転ぶ**ので、行き先を間違えたのか置き忘れたのかが
+ * 落ちるのではなく **`readFileSync` の ENOENT で例外になる**ので、行き先を間違えたのか置き忘れたのかが
  * 読めなくなる。解けない綴りは名指しで落とす。
  */
 function importsOf(file: string): string[] {
@@ -112,7 +112,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
   for (const [name, html] of reactPages()) {
     // 拡張が入れるのは、束ねた 1 本（`out/webview/<名前>.css`）そのもの
     assert.ok(html.includes(screenStyle(name)), name);
-    // 規則は 1 行に潰して見る（esbuild の並べ方が変わっても、当てるものと宣言が同じなら通す）
+    // 規則は 1 行にまとめて見る（esbuild の並べ方が変わっても、当てるものと宣言が同じなら通す）
     const style = flatStyle(html);
     assert.match(style, /\.toolbar \{ display: flex;/);
     assert.match(style, /\.banner\.warn \{ border-color:/);
@@ -123,7 +123,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.ok(html.includes("\n<body>\n"));
     assert.ok(style.includes("body.ccnavi-claude-light:not("));
   }
-  // 切り替えの受け口は 5 画面とも画面（React）の中にある。動かして見るのは各画面の dom のテスト
+  // 切り替えを受け取る側は 5 画面とも画面（React）の中にある。動かして見るのは各画面の dom のテスト
   // （ボードは CB-T142、プロジェクト管理は CB-D32、リスク管理は CB-D57、ルール設定は CB-D0b）
   for (const [, html] of reactPages("claude-dark")) {
     assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));
@@ -143,7 +143,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   // ホバーの点線はボタンの焦点の輪を消さない。行の見出しにも点線
   assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   assert.match(rules, /\.row-head:hover \{ background: var\(--vscode-list-hoverBackground\); outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
-  // 行末のボタンは、見出しの「＋ 追加」向けの margin-left: auto を打ち消す。詳細度で勝たせてあるので、
+  // 行末のボタンは、見出しの「＋ 追加」向けの margin-left: auto を打ち消す。詳細度で採られるようにしてあるので、
   // 束ねの並び（@import の順）が変わっても入れ替わらない
   assert.match(rules, /\.row-body \.buttons button\.action \{ margin-left: 0; \}/);
   // 動いたカードの輪も contrast の変数を使い、他のテーマでは緑のまま。左の縁（不備・承認待ち・

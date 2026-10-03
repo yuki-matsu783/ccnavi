@@ -1,6 +1,6 @@
 // 拡張を dist/ に組む（ADR-0093 段階 1）。
 //
-//   node scripts/build.js [--hosts <一覧の JSON>] [--out <出口>]
+//   node scripts/build.js [--hosts <一覧の JSON>] [--out <出力先>]
 //
 // 1. 型を見る（画面・Worker・service worker は tsconfig.json、Node で回す部品は tsconfig.node.json）
 // 2. 通信先の一覧（既定 hosts.json）から manifest.json を組む。`host_permissions` と CSP の

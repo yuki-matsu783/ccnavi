@@ -97,7 +97,7 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnavi の実行ファイルです。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、次に .ccnavi/scripts/ccnavi-launcher.sh、それも無ければ uv run python -m ccnavi の順に探します。振り分けの sh（名前が ccnavi-launcher.sh）を指していれば、sh を通さず sh のあるフォルダの親の bin/<os>-<arch>/ にあるこの OS と CPU 向けの実行ファイルを使い、無ければ次へ進みます。それ以外のパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対でも絶対でも構いません。"
+          "description": "ccnavi の実行ファイルです。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、次に .ccnavi/scripts/ccnavi-launcher.sh、それも無ければ uv run python -m ccnavi の順に探します。振り分けの sh（名前が ccnavi-launcher.sh）を指しているときは、sh を通さずに、sh のあるフォルダの親にある bin/<os>-<arch>/ から、この OS と CPU 向けの実行ファイルを使います。それが無ければ次の候補へ進みます。それ以外のパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対でも絶対でも構いません。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",
@@ -107,7 +107,7 @@
         "ccnaviBoard.samplesPath": {
           "type": "string",
           "default": ".ccnavi/common/rule-samples.yml",
-          "description": "ルール設定画面が一括で判定するサンプルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でも構いません。"
+          "description": "ルール設定画面の「サンプルを一括で判定」で使うサンプルのファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でも構いません。"
         },
         "ccnaviBoard.flowSaveReview": {
           "type": "boolean",
@@ -127,7 +127,7 @@
             "Claude の配色（ダーク）"
           ],
           "default": "vscode",
-          "description": "ccnavi の 5 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は地・枠・文字と意味の色を Claude の配色に置き換えます（ハイコントラストのテーマでは効きません）。サイドパネルのタイトルバーの歯車からも切り替えられ（今の値は見出しの横に出ます）、開いている画面にはその場で効きます。"
+          "description": "ccnavi の 5 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは効きません）。サイドパネルのタイトルバーの歯車からも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
         }
       }
     }

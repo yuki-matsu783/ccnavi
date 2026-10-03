@@ -111,7 +111,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual("new", found.sha)
 
     def test_a_swap_that_never_ends_reads_as_broken(self):
-        # 取り込んだ跡があるのに入れ替えが終わらなければ、黙って「控えが無い」にせず
+        # 取り込んだ跡があるのに入れ替えが終わらなければ、何も言わずに「控えが無い」にせず
         # 壊れているとする。
         self.put("sync/self/integration.old.9/head", "branch main\n")
         started = time.monotonic()
@@ -304,7 +304,7 @@ class PresentTest(AuthorityHarness):
         started = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(0, started.returncode)
         self.assertIn("HEAD がブランチ i0001 を指していない", started.stderr)
-        self.assertIn("切り直す", started.stderr)
+        self.assertIn("切り直して", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
         # 子の写しが親のワークツリーから消え、元ツリーにだけ残った形（ADR-0073 の形）。
@@ -364,7 +364,7 @@ class UndecidedTest(AuthorityHarness):
         finished = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("手元と判定が違う", finished.stderr)
-        self.assertIn("打ち直す", finished.stderr)
+        self.assertIn("打ち直して", finished.stderr)
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         self.assertTrue(
             any(
@@ -400,13 +400,16 @@ class UndecidedTest(AuthorityHarness):
 
 
 class TombstoneTest(AuthorityHarness):
-    """家族の控えは墓標として残り、親のワークツリーを畳んでも止めが外れない（レビューの決定 A）。"""
+    """家族の控えは墓標として残り、親のワークツリーを片付けても止めが外れない。
+
+    レビューの決定 A。
+    """
 
     def test_folding_the_parent_tree_does_not_lift_the_stop(self):
         self.record("gone")
         stray = os.path.join(self.root, ".ccnavi", "approved", "doing")
         os.makedirs(stray)
-        # 元ツリーに同じ家族の写しを残して、親のワークツリーを畳む。
+        # 元ツリーに同じ家族の写しを残して、親のワークツリーを片付ける。
         for name in ("i0001.md", "i0001-01.md"):
             with open(os.path.join(self.approved, "doing", name), encoding="utf-8") as f:
                 write(os.path.join(stray, name), f.read())
@@ -429,8 +432,9 @@ class TombstoneTest(AuthorityHarness):
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.stop and not st.closed, st)
-        self.assertIn("墓標", st.stop)
-        # 統合先の控えの done/ に親の写しがあれば、家族の控えに頼らず閉じた家族（墓標は黙る）。
+        self.assertIn("片付けても残る", st.stop)
+        # 統合先の控えの done/ に親の写しがあれば、家族の控えに頼らず閉じた家族
+        # （墓標は何も言わない）。
         base = os.path.join(self.state, "sync", "self", "integration")
         write(os.path.join(base, "head"), "branch main\nsha abc\n")
         write(
@@ -520,7 +524,7 @@ class MarkTest(AuthorityHarness):
         self.record("present", repo="web")
         st = syncstate.standing_any(self.conf(), self.root, "i0001")
         self.assertIn("複数のリポジトリ", st.stop)
-        # リポジトリを添えれば引ける。
+        # リポジトリをつければ引ける。
         self.assertEqual("", syncstate.standing_any(self.conf(), self.root, "i0001", "").stop)
 
     def test_a_same_named_tree_in_another_repository_is_not_guessed(self):
@@ -544,7 +548,7 @@ class MarkTest(AuthorityHarness):
         ]
         st = fams.standing_any("i0001")
         self.assertIn("複数のリポジトリ（self, web）", st.stop)
-        # リポジトリを添えれば引ける。
+        # リポジトリをつければ引ける。
         self.assertEqual("", fams.standing_any("i0001", "").stop)
 
 
@@ -589,7 +593,7 @@ class IntegrationDoneTest(AuthorityHarness):
         self.record("present")
         preview = self.preview()
         self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
-        # 板にも理由つきで出る（黙って消えない）。
+        # 板にも理由つきで出る（何も言わずに消えない）。
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         self.assertTrue(any("i0001-02" in p["detail"] for p in lint["problems"]))
 
@@ -607,7 +611,8 @@ class IntegrationDoneTest(AuthorityHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         base = os.path.join(self.state, "sync", "self")
-        # 取り込んだ跡（家族の控え）はあるのに統合先の控えが無い（push の移り目の直後など）。
+        # 取り込んだ跡（家族の控え）はあるのに統合先の控えが無い
+        # （最初の push で家族の控えができた直後など）。
         self.record("present")
         preview = self.preview()
         self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])

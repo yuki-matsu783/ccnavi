@@ -197,7 +197,7 @@ export class MockGitHub {
   }
 
   /**
-   * `git log <sha> -- <path>` の既定の簡略化に寄せた履歴（新しい順）。path を変えたコミットを出す。
+   * `git log <sha> -- <path>` の既定の簡略化にそろえた履歴（新しい順）。path を変えたコミットを出す。
    * merge コミットは、path がどれかの親と同じなら出さずにその親だけを辿り（別の枝に入ることもある）、
    * どの親とも違えば出して全部の親を辿る。path が無ければ最初の親の鎖を全部出す。
    */
@@ -226,7 +226,7 @@ export class MockGitHub {
     return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
-  /** コミットの変更の一覧。消えたファイルと同じ中身で足されたファイルは renamed（本物の rename 検出に寄せる） */
+  /** コミットの変更の一覧。消えたファイルと同じ中身で足されたファイルは renamed（本物の rename 検出にそろえる） */
   protected changed(c: Commit): { filename: string; status: string; previous_filename?: string }[] {
     const before = this.commits.get(c.parents[0] ?? "")?.files ?? {};
     const added = Object.keys(c.files).filter((p) => !(p in before));

@@ -7,7 +7,8 @@ risk は共通層に `big-diff`、lib の層に `schema` と `levels: {critical:
 どの層を足すかは親の承認済みチケットの `project:` で決まる。lib 向けの提案は
 `projects/lib/wip/proposals/` に置き、ワークスペース向けは `wip/proposals/` に置く（設計 11.5）。
 
-実装は入っている。ここが落ちたら、phases / risk の合成が設計 11.4.1 / 11.4.2 からずれたということ。
+実装は入っている。ここが落ちたら、phases / risk の合成が設計 11.4.1 / 11.4.2 と
+食い違ったということ。
 """
 
 from __future__ import annotations
@@ -302,7 +303,7 @@ class RiskUnionTest(ConfigUnionHarness):
         """11.4.2: 同 id で中身が違えば両方を数え、後ろの層は `<層>:<id>`。--lint は warn。
 
         層を空にすると、プロジェクトが共通層と同じ名前の項目を 1 本書くだけで、その層の
-        項目と閾値が全部消えて点が下がる。両方を数えれば、衝突は加点を増やす側にしか働かない。
+        項目と閾値が全部消えて点が下がる。両方を数えれば、衝突しても点は増える向きにしか変わらない。
         """
         write_layer(
             self.lib,
@@ -323,7 +324,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(sorted(by_id), ["big-diff", "lib:big-diff", "schema"])
         self.assertEqual(by_id["big-diff"].get("source"), "common")
         self.assertEqual(by_id["lib:big-diff"].get("source"), "lib")
-        # 25 + 5 + 30。lib の critical 50 も効いたまま。
+        # 25 + 5 + 30。lib の critical 50 も有効なまま。
         self.assertEqual(record["points"], 60)
         self.assertNotIn("fallback", record)
         self.assertIn("(CRITICAL)", closed.stdout)
@@ -502,11 +503,11 @@ class RiskUnionTest(ConfigUnionHarness):
 
 
 class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
-    """層を探す先を動かすフラグも、診断の外では効かない（ADR-0067、issue #65）。
+    """層を探す先を動かすフラグも、診断の外では有効でない（ADR-0067、issue #65）。
 
     `--projects` と `--project-home` は、共通層の中身を差し替えるのと結果が同じ。
     外すとプロジェクトの層がまるごと消えるので、その層が足していた配点も
-    フェーズの種類も落ちる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数を素通しするので、
+    フェーズの種類も落ちる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数をそのまま渡すので、
     この形はエージェントが Bash で打てる。
 
     土台の子は共通層の `big-diff`（25）と lib の `schema`（30）で 55 点、

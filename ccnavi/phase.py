@@ -14,9 +14,9 @@
 
 ## 止めるときの鍵は cwd
 
-書き込みは行き先で結ぶが、起動とシェルには行き先が無い。止めるかどうかは呼び出しの `cwd` が
-どの親のワークツリーにあるかで親を引く。`cd` 1 回で外れる鍵だが、外れた先で起動した
-サブエージェントの書き込みは行き先で止まるので、致命傷にならない。
+書き込みは書き込み先のパスで親を決めるが、起動とシェルには書き込み先が無い。止めるかどうかは
+呼び出しの `cwd` がどの親のワークツリーにあるかで親を引く。`cd` を 1 回打てば判定から外れるが、
+外れた先で起動したサブエージェントの書き込みは書き込み先で止まるので、致命傷にならない。
 
 ## 提案から承認済みチケットへ写すもの
 
@@ -48,13 +48,13 @@ from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
 # コマンドの位置で `sh` から呼ぶ形だけ。綴りがどこかに含まれるだけでは通さない。
-# 連結されたコマンドの全部がこの形でなければ、1 つでも違えば止める。
+# 連結されたコマンドが 1 つでもこの形でなければ止める。
 _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
 # 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
 # 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。
 EXEMPT_NOTE = (
-    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を"
+    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を "
     "sh で単独で打つ形だけです。cd や | tail などを前後に付けると、その 1 本も止まります。"
 )
 
@@ -66,8 +66,8 @@ TURN_DEFINED = "ターン（利用者が指示を出してから Claude が応�
 # コマンドの位置で。読むだけの `cat` や `--help` は止めない。
 # push を含めるのは、リモートに置く枝は親ブランチ 1 本で、それを送るのが親の仕事だから。
 # git のラッパースクリプトも子チケットのツリーからの push を拒むが、そちらは cwd のツリーで見る。
-# サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、素性で止める層を
-# ここに持つ。
+# サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、
+# サブエージェントかどうかで止める層をここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
     r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|chat"
@@ -95,14 +95,14 @@ HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 # 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
 # `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
 #
-# **免除の理由になるのは、単独の語として立った `--preview` だけ。** 前は生の空白（`--approve` の
+# **免除の理由になるのは、単独の語として現れた `--preview` だけ。** 前は生の空白（`--approve` の
 # 後ろに必ず 1 つある）、後ろは空白か区切りか行末。これを見ないと、別のフラグの**値**に書いた
 # `--preview` で免除が成立する。`ccnavi --approve --reason=--preview` は、argparse が
-# `--reason` の値として食うので `--preview` は立たず、実行ファイルは本物の `--approve` を
-# 走らせる。hook が見る文字列と、実行ファイルが走らせる枝がそこでズレる。
+# `--reason` の値として受け取るので `--preview` は単独の語にならず、実行ファイルは本物の
+# `--approve` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝がそこで食い違う。
 # `=` を挟む形だけでなく、`--preview=x` や `x--preview` のように語にくっついた形も免除しない。
 # 語の切れ目は生の空白だけで数える。語の中の目印（引用がつないだ空白）は数えない。
-# 数えると、引用の中に書いた `"a --preview"` が単独の語に見えて免除が戻る。
+# 数えると、引用の中に書いた `"a --preview"` が単独の語に見えて、再び免除が成立する。
 _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
@@ -171,7 +171,7 @@ _DECIDE_FORMS = (
     re.compile(r"(?<![\w-])--choices(?![\w-])", re.IGNORECASE),
     re.compile(r"(?<![\w-])--digest(?![\w-])", re.IGNORECASE),
 )
-# 表示・検索・閲覧だけをする道具。コマンドを実行する口か変数に書く口を持つもの（`sed` の `e`、
+# 表示・検索・閲覧だけをする道具。コマンドを実行する機能か変数に書く機能を持つもの（`sed` の `e`、
 # `awk` の `system()`、`git` の別名、`xargs`、`find -exec`、`printf -v`）は入れない。
 _READERS = frozenset(
     {"echo", "grep", "egrep", "fgrep", "rg", "cat", "less", "more", "head", "tail", "wc"}
@@ -257,8 +257,8 @@ def board_form_message(found: str) -> str:
     """ボードの経路の形で止めた文。"""
     return (
         f"ボードの経路の形（{found}）を、コマンド行に書いています。この形は人がボードの"
-        "オーバーレイで押したものを拡張が打つためのもので、端末の確かめが無いぶん、エージェントが"
-        "打つ道はここで止めます。承認と残った指摘の対応方針は、利用者がボードか端末で決めます。"
+        "オーバーレイで押したものを拡張が打つためのもので、端末での確かめが無いので、エージェントが"
+        "打った場合はここで止めます。承認と残った指摘の対応方針は、利用者がボードか端末で決めます。"
         "綴りを探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
@@ -266,7 +266,7 @@ def board_form_message(found: str) -> str:
 def guard_off_message(found: str) -> str:
     """端末要求を切る形で止めた文。"""
     return (
-        f"人の判断の経路（承認・レビュー済み・締め）の端末要求を切る形（{found}）を、"
+        f"人の判断の経路（承認・レビュー済み・締め）で、端末からの入力を求めないようにする形（{found}）を、"
         "コマンド行に書いています。この変数とフラグは、テストや CI が端末を持たずに実行ファイルを"
         "回すためのもので、エージェントが置くものではありません。承認・レビュー済み・締めは利用者が"
         "端末かボードで行います。この綴りを探したいだけなら、シェルの grep ではなく Grep ツールを"
@@ -289,7 +289,7 @@ def guard_off_message(found: str) -> str:
 # 免除は `--preview` が `--prune` の隣に単独の語として並んだ形だけ。間に引用符があれば
 # 免除しない。免除をコマンドの中のどこかの `--preview` にすると、
 # `bash -c "ccnavi --prune" x --preview` のように、実行役の引数に置いた `--preview` で免除が
-# 立つ。
+# 成立する。
 _PRUNE_WORD = re.compile(r"(?<!\S)--prune(?!\S)")
 _PREVIEW_AFTER = re.compile(r"[ \t]+--preview(?![^\s;&|])")
 _PREVIEW_BEFORE = re.compile(r"(?<!\S)--preview[ \t]+$")
@@ -383,11 +383,11 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     script = (
         # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る（段階 2d のレビュー）。
         r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(approve|push-approved)\.sh\b"
-        # 家族の控え（墓標）を消す人の入口（ADR-0093 の 11.5.1 の決定 A）。消すと、止めていた家族が
-        # 控えの無い家族として今の手元の動きに戻るので、打つのは人。
+        # 家族の控え（墓標）を消す、人が打つスクリプト（ADR-0093 の 11.5.1 の決定 A）。
+        # 消すと、止めていた家族が控えの無い家族として今の手元の動きに戻るので、打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
-        # 人の判断の入口（ADR-0093 の 4.6。段階 2d）。中で `--reviewed --chat`・`--config-synced`・
-        # `--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのは人。
+        # 人の判断に使うスクリプト（ADR-0093 の 4.6。段階 2d）。中で `--reviewed --chat`・
+        # `--config-synced`・`--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのは人。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
         r"(chat|config-synced|close-early)\b"
     )
@@ -414,7 +414,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "残った指摘の対応方針は利用者がボードか端末で決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
-            "家族の控えを消す"
+            "家族の控えを消す "
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、人の判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / config-synced / "
             "close-early'）も人が打ちます。"
@@ -482,11 +482,17 @@ class Phase:
     @property
     def risk_line(self) -> str:
         """人向けの 1 行。`リスク: 58 (HIGH) — 行数が多い（…）、…`。無ければ空。"""
+        body = self.risk_body
+        return f"リスク: {body}" if body else ""
+
+    @property
+    def risk_body(self) -> str:
+        """`risk_line` から頭の `リスク: ` を除いたもの。見出しを自分で付ける側が使う。"""
         record = self.risk
         if record is None:
             return ""
         hits = [str(h.get("detail") or "") for h in record.get("hits") or [] if isinstance(h, dict)]
-        text = f"リスク: {record.get('points', 0)} ({record.get('level', '')})"
+        text = f"{record.get('points', 0)} ({record.get('level', '')})"
         return text + (" — " + "、".join(hits) if hits else "")
 
     @property
@@ -554,15 +560,15 @@ class Phase:
     def review_kind(self) -> str:
         """このフェーズの終わりに人がどこで見るか。`none` / `chat` / `mr`（設計 9.8）。
 
-        見る場所を言えるのは、種類と計画の項と、引き受けた延期だけ。そのうち厳しい側が
-        勝つ。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
+        見る場所を言えるのは、種類と計画の項と、引き受けた延期だけ。そのうち厳しい側を
+        採る。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
         場所は言わないので、宣言が「見ない」だったフェーズを `chat` へ上げるにとどまる。
         どちらも止める向きにしか働かず、宣言された `mr` を `chat` に下げることはない。
 
         場所を言う者が 1 人も居なければ（計画が無い、種類が読めない）今までどおりで、
         子が「人が見る」と言うか実績が高ければ `mr`。緩い側を採ると、種類のファイルが
         読めないときにレビューの行き先が消える。延期を引き受けている番号は、覆っている分の
-        宣言が読めなくても `mr` を受け取る（`_covered_review`）ので、ここには落ちない。
+        宣言が読めなくても `mr` を受け取る（`_covered_review`）ので、この扱いにはならない。
 
         延期したフェーズは自分では見る場所を持たず、次に見るフェーズが引き受ける。
         """
@@ -581,8 +587,8 @@ class Phase:
         where = declared[0]
         for covered in declared[1:]:
             where = phasetypes.stricter(where, covered)
-        # 「要る」としか言われていないフェーズは、いちばん安い見る場所まで上げる。マージリクエストを
-        # 勧めるのは文の側の仕事で、強制はしない（ADR-0065）。
+        # 「要る」としか言われていないフェーズは、いちばん手間の少ない見る場所（`chat`）まで
+        # 上げる。マージリクエストを勧めるのは文の側の仕事で、強制はしない（ADR-0065）。
         if needed and where == phasetypes.REVIEW_NONE:
             where = phasetypes.REVIEW_CHAT
         return where
@@ -616,7 +622,8 @@ class Phase:
 
         これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは普段 `request` を
         打たないので False のまま。ボードの「受け入れ」（未解決スレッドを受け入れて進む）が
-        この欄に繋がっており、写しの無い chat のフェーズに出すと打てない操作を見せることになる。
+        この欄で出し分けられており、写しの無い chat のフェーズに出すと打てない操作を
+        見せることになる。
         打ったときは（実績のリスクが高いときに勧める向き。設計 9.10）ホストに写しがあるので、
         `mr` と同じに True でよい。このセッションで見る待ちは `review_kind` と `gate_closed`
         で読む（設計 9.8）。
@@ -641,7 +648,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
     （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
-    名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
+    名前と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
     """
     if settings.is_reserved_layer_name(project):
         return ""
@@ -716,7 +723,7 @@ def phases_of(
     `proposed` は、承認済みチケットがまだ無いときに計画を読む親。承認で同じときに通った親の
     提案を渡す（`order_problems`）。渡さないと、親と後のフェーズの子を一緒に承認したとき
     計画が読めずフェーズが 1 つも並ばず、順序の検査が何も見ないまま通る。承認済みチケットが
-    あればそちらが勝つ（改版の計画は承認されるまで効かない）。
+    あればそちらを使う（改版の計画は承認されるまで使われない）。
     """
     open_copies, _ = approval.scan(conf, root)
     closed_copies, _ = approval.scan(conf, root, closed=True)
@@ -734,7 +741,7 @@ def phases_of(
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
         # 延期を引き受けた側に、引き受けた分の「見る場所」を渡す。厳しい側を採るのは
-        # `review_kind`。ここで渡さないと、chat の計画に mr の延期が混ざったときに
+        # `review_kind`。ここで渡さないと、chat の計画に mr の延期が入っているときに
         # 引き受けた側が chat のままになり、宣言した mr が消える。
         #
         # 覆っている分の宣言が読めない番号は `mr` として扱う。延期できるのはレビューのある
@@ -743,8 +750,8 @@ def phases_of(
         for phase in by_number.values():
             phase.covered_reviews = [_covered_review(by_number.get(c)) for c in phase.covers]
     # 状態は置き場そのもの（ADR-0055）。閉じた（`done/`）、レビュー待ち（`review/`）、
-    # 作業中（`doing/`）の順に読み、同じ識別子が 2 つの置き場に在れば閉じた側が勝つ。
-    # 閉じたことの権威は承認済みチケットの側で、エージェントが書ける `todo/` に同じ識別子を
+    # 作業中（`doing/`）の順に読み、同じ識別子が 2 つの置き場に在れば閉じた側を採る。
+    # 閉じたかどうかを決めるのは承認済みチケットの側で、エージェントが書ける `todo/` に同じ識別子を
     # 書いてもフェーズは開き直らない（そちらは承認待ちにもならない。approval.waiting）。
     review_copies, _ = approval.scan_review(conf, root)
     seen: set[str] = set()
@@ -757,7 +764,7 @@ def phases_of(
             phase.tickets.append(t)
             phase.states[t.ticket] = t.state
     # マーカーと記録は親のツリーに置く。子のワークツリーにも写しは checkout されるが、
-    # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに散る。
+    # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに分かれて置かれる。
     where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
         phase.marks = approval.marks(where, parent_id, phase.number)
@@ -783,7 +790,7 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
-    # 権威のある側を読む。承認は親のワークツリーを作る前にも打てるので、そのときの
+    # 承認済みチケットの側を読む。承認は親のワークツリーを作る前にも打てるので、そのときの
     # 承認済みチケットは提案があったツリー（プロジェクトのルート）に在る。
     open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval.by_id(open_copies), t.name)
@@ -796,7 +803,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     """止めたときに返す文。いまどの段にいて、次に何をすればよいかを言う。
 
     段の名前（レビュー準備中／レビュー待ち）を見出しに置く。止まっている事実だけを
-    言っても次の一手が出ないので、段ごとにやることを書き分ける（設計 9.8）。
+    言っても次に何をすればよいかが分からないので、段ごとにやることを書き分ける（設計 9.8）。
     """
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
@@ -1123,7 +1130,7 @@ def chat_only(
     """マージリクエストに出さない運び方か。フェーズが 1 つも無ければ False。
 
     1 つでも `mr` で見るフェーズがあれば、その親にはマージリクエストが在る（レビューの依頼が作る）
-    ので、締めも Draft を外す道に乗る。`venues` は数え直しを省くための持ち込み。
+    ので、締めたあとも Draft を外す手順を通る。`venues` は数え直しを省くために呼ぶ側が渡す値。
     """
     if venues is None:
         venues = review_venues(root, conf, parent_id)
@@ -1173,7 +1180,7 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
         approval.PARENT_MARK_CLOSE_EARLY,
     ):
         # 人が締めた。残りは別の issue に写してあるので、閉じられる。
-        return "閉じられる（利用者が締めた）"
+        return "閉じられる（ユーザが締めた）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
     open_phases = [p for p in phases if not p.ended]
     if dag and open_phases and open_phases[0].number <= len(parent.plan):
@@ -1196,7 +1203,7 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
 LIMIT_TICKET = "ticket"
 LIMIT_PARENT = "parent"
 LIMIT_TYPE = "type"
-# チケット自体が信じられない（`Ticket.blocked`）。範囲を当てる前に止める（ADR-0058）。
+# チケット自体が信頼できない（`Ticket.blocked`）。範囲を当てる前に止める（ADR-0058）。
 LIMIT_BLOCKED = "blocked"
 
 # 範囲の外として止める判定。
@@ -1207,7 +1214,7 @@ _OUTSIDE = (ticket_mod.OUTSIDE, rules.DENY)
 class ScopeVerdict:
     """子のワークツリーの 1 つのパスについて、範囲の上限を合わせた判定。
 
-    上限は子自身・親・フェーズの種類の 3 つで、厳しい側が勝つ。どれが外へ出したかを
+    上限は子自身・親・フェーズの種類の 3 つで、厳しい側を採る。どれが外へ出したかを
     持つのは、文面でその上限を名指しするため。名指しが無いと、承認で見た範囲の中なのに
     止まった理由を、止められた側が読めない。
     """
@@ -1232,10 +1239,10 @@ def scope_verdict(
     """子の範囲を、親の範囲と種類の上限で切り詰める。
 
     範囲を当てる 3 か所（実行前の判定、実行後の監視、SubagentStop の差し戻し）はこれを
-    通す。別に書くと、同じ書き込みが実行前は通って実行後に咎められる。承認は範囲の超過を
+    通す。別に書くと、同じ書き込みが実行前は通って実行後に範囲外と報告される。承認は範囲の超過を
     警告で通すので、超えた分を止めるのはここだけになる。
 
-    順は 子 → 親 → 種類。厳しい側が勝つので順は判定を変えないが、`limit` は最初に
+    順は 子 → 親 → 種類。厳しい側を採るので順は判定を変えないが、`limit` は最初に
     外へ出した上限を名指しする。種類の上限は allow か外しか言わない。子が ask と書いた
     場所が種類の中なら ask のまま。
 
@@ -1316,22 +1323,23 @@ def scope_findings(
     """子のワークツリーに残っている範囲外の変更と、その判定。2 つめは読めなかった理由。
 
     見るのは `base_sha..HEAD` のコミット済みの差分と、未コミットの変更の両方。
-    未コミットだけ見る検査では、範囲外を書いてコミットしたものが映らない。
+    未コミットだけ見る検査では、範囲外を書いてコミットしたものが反映されない。
     範囲は実行前の判定と同じく、親の範囲と種類の上限で切り詰める（scope_verdict）。
     """
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
         return [], "ワークツリーが無い"
-    # NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用して 8 進に
-    # 逃がすので、そのまま当てると範囲の中の日本語のファイルが必ず範囲外になる。
+    # NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用符で囲んで 8 進で
+    # エスケープするので、そのまま照らし合わせると範囲の中の日本語のファイルが必ず範囲外になる。
     #
-    # `--no-renames` と `--ignore-submodules` は、差分から行が消える道を塞ぐ。改名を
-    # 1 行にまとめられると移動元が消え、範囲外のファイルを範囲の中へ改名したものが
-    # 素通りする。`.gitmodules` の `ignore = all` は submodule の進みを丸ごと消す
+    # `--no-renames` と `--ignore-submodules` は、変更が差分の行に出なくなるのを防ぐ。改名を
+    # 1 行にまとめられると移動元のパスが出力に出ず、範囲外のファイルを範囲の中へ改名したものが
+    # 範囲外と判定されない。`.gitmodules` の `ignore = all` は submodule の進みを差分にまったく
+    # 出さなくする
     # （`.gitmodules` は追跡されるので、外から届く）。
     #
-    # status だけ `dirty` なのは、submodule の中の汚れは親のコミットに乗らないから。
-    # 乗るのはポインタの移動で、`dirty` はそれを見せる。`none` にすると、submodule の
+    # status だけ `dirty` なのは、submodule の中の未コミットの変更は親のコミットに乗らないから。
+    # 乗るのはポインタの移動で、`dirty` ではそれが出力に出る。`none` にすると、submodule の
     # 中に置かれた生成物まで範囲外として報告することになる。
     paths: set[str] = set()
     if child.base_sha:
@@ -1370,14 +1378,15 @@ def scope_findings(
     for rel in sorted(paths):
         # git の `-z` の綴りをそのまま使う。git はどの OS でも区切りを `/` で返すので、
         # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
-        # 名前のファイル 1 個が、置き場の中や範囲の中のパスに見えて素通りする
+        # 名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、範囲外として報告されない
         # （実行前の判定は直さない。ADR-0097）。
         # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
         # 見ているのは `base_sha..HEAD` の差分（追跡ファイルだけ）と `git status`
         # （`--ignored` を付けない）で、追跡から外れている `scratchpad/` はどちらにも現れない。
         # 現れたということはそのツリーの git が `scratchpad/` を追跡しているということで、
         # 外してよい根拠（追跡されないので統合先へ乗らない）が崩れている。範囲外のものが
-        # コミットに乗って統合先へ行く道を見ているのはここだけなので、そこは黙らせない。
+        # コミットに乗って統合先へ入る経路を見ているのはここだけなので、そこは除外して報告を
+        # 消すことはしない。
         if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
         # ELI5 の置き場は追跡されるので、ここでも外す（実行前の判定と揃える。ADR-0096）。

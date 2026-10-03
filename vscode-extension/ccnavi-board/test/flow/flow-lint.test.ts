@@ -164,7 +164,7 @@ test("CB-T247 答えに読んだ中身（flow）が無ければ通さない（�
     for (const flow of [ABSENT, { path: "/x" }, { path: "/x", data: null }]) {
       const verdict = await lintFlowText("nodes: []\n", dir, SHOWN, async () => ({ ok: true, value: answer([], flow) }));
       assert.equal(verdict.ok, false, String(flow === ABSENT ? "absent" : JSON.stringify(flow)));
-      assert.match(verdict.ok ? "" : verdict.error, /flow）を返さない（古い）/);
+      assert.match(verdict.ok ? "" : verdict.error, /flow）を返さない（古い版）/);
     }
     // lint の JSON の読み手は flow を持ち越す。無ければ欄ごと無い
     assert.deepEqual(answer([], { path: "/p", data: { a: 1 } }).flow, { path: "/p", data: { a: 1 } });

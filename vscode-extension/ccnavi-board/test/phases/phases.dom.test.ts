@@ -423,7 +423,7 @@ test("CB-D88 feedback の種類は先に済ませる種類を持てないと言�
     dom.click(dom.one(`${rowSelector("p5")} .row-head`));
     await dom.settle();
     assert.equal(dom.all(`${rowSelector("p5")} .f-after .id-option`).length, 0);
-    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類は持てません/);
+    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類には設定できません/);
   } finally {
     await dom.close();
   }

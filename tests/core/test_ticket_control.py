@@ -2,7 +2,7 @@
 
 見るのは 3 つ。
 
-1. チケット制御が効いているセッションの頭で、直接作業とチケット作業の使い分けが届く
+1. チケット制御が有効なセッションの頭で、直接作業とチケット作業の使い分けが届く
 2. `CCNAVI_TICKET_CONTROL=disable` なら届かない
 3. 入口の sh の綴りと、dry-run の注記。頭では言わないもの（レビューの sh、設定ファイルの
    綴り）が載っていないこと
@@ -88,4 +88,4 @@ class TicketControlTest(unittest.TestCase):
         self.assertTrue(last.startswith("（現状: CCNAVI_MODE=dry-run"), text)
         # 止まらないことだけで終えない。通ったことを許可と読ませない。
         self.assertIn("許可と読まず", last)
-        self.assertIn("次から従う", last)
+        self.assertIn("次からは従う", last)

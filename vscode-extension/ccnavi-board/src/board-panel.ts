@@ -69,7 +69,7 @@ interface PanelState {
   /**
    * 前の読み直しから動いたカード。**画面ではなくここが持つ。** 画面は裏に回ると捨てられ、
    * 表に戻ると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
-   * 承認の文を渡してボードに戻った瞬間に印が消える。決めるのは `core/board-moved.ts`
+   * 承認の文を渡してボードに戻った時点で印が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
 }
@@ -111,7 +111,7 @@ export async function openBoard(project?: string): Promise<void> {
   }
 
   // タブは読む前に作る。実行ファイルの答えを待ってから作ると、押しても何も起きないように見え、
-  // 押し直した分だけタブが増える（`state` を先に立てるので、2 度目の押下は下の `reveal` に入る）。
+  // 押し直した分だけタブが増える（`state` を先に設定するので、2 度目の押下は下の `reveal` に入る）。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`update` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviBoard", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
@@ -276,7 +276,7 @@ function showError(current: PanelState, error: string): void {
  */
 function send(current: PanelState, data: BoardData): void {
   const filter = current.filter;
-  // 入れ物ごと入れ直す道になったときだけ、絞り込みを埋めたほうが使われる
+  // 入れ物ごと入れ直す経路になったときだけ、絞り込みを埋めたほうが使われる
   const delivery = current.host.send(data, withFilter(data, filter));
   if (delivery === "rebuilt") {
     current.filter = undefined;
@@ -298,7 +298,7 @@ function withFilter(data: BoardData, filter: string | undefined): BoardData {
 }
 
 /**
- * ボードの画面に渡す口。VS Code のパネルを `screenHost` の形に合わせる。
+ * ボードの画面に渡す手段。VS Code のパネルを `screenHost` の形に合わせる。
  * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
  */
 function boardHost(panel: vscode.WebviewPanel): ScreenHost<BoardData> {
@@ -357,7 +357,7 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "approve":
       // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを承認の対象にする。
       // カードの「この 1 件を承認」は、そのカードの識別子だけを絞りとして送ってくる。
-      // 突き合わせる相手（いまのボードの承認待ち）を添えて渡し、決めるのは遷移の側
+      // 突き合わせる相手（いまのボードの承認待ち）をつけて渡し、決めるのは遷移の側
       dispatch(current, {
         kind: "approve",
         tickets: message.tickets,
@@ -377,7 +377,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     case "decide":
       // 残った指摘の行き先を決めるオーバーレイを開く。sh が指摘を取ってきて、人が指摘ごとに選ぶ。
-      // ボードから引くもの（親のワークツリー・フェーズ）を添えて渡し、開いてよいかは遷移の側が決める
+      // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める
       dispatch(current, {
         kind: "decide",
         parent: message.parent,
@@ -392,7 +392,7 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "reviewed":
       // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、承認の文と同じ
       // オーバーレイ（コピー / 新しいセッションで開く）で渡す。confirm を打つのは文を受けたエージェント。
-      // ボードから引くもの（親のワークツリー・フェーズ）を添えて渡し、被せてよいかは遷移の側が決める
+      // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、被せてよいかは遷移の側が決める
       dispatch(current, {
         kind: "reviewed",
         parent: message.parent,
@@ -403,7 +403,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       });
       return;
     case "flow":
-      // 画面が言った識別子をそのまま信じず、いまのボードに子のカードとして在るものだけを開く
+      // 画面が言った識別子をそのまま信頼せず、いまのボードに子のカードとして在るものだけを開く
       if (current.board !== undefined && flowCardOf(current.board, message.ticket) !== undefined) {
         void screens().flow(message.ticket);
       }
@@ -580,7 +580,7 @@ async function showTicketPreview(filePath: string): Promise<void> {
 /**
  * 形を確かめる操作の一覧。**`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。**
  * `handleMessage` の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
- * 足し忘れると、画面のボタンは押せるのに、届いたものが黙って捨てられる。
+ * 足し忘れると、画面のボタンは押せるのに、届いたものが何も出さずに捨てられる。
  */
 const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   ready: true,

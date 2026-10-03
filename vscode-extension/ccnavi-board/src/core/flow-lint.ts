@@ -72,13 +72,13 @@ export async function lintFlowText(
     const errors = problems.filter((p) => p.severity === "error");
     if (errors.length > 0) {
       const said = errors.map((p) => rename(p.detail)).join("\n");
-      return { ok: false, error: `実行ファイル（--lint --flow）が読めないと言った: ${said}` };
+      return { ok: false, error: `実行ファイル（--lint --flow）がフローを読めないと返した: ${said}` };
     }
     const flow = ran.value.flow;
     if (flow === undefined || flow.data === null || flow.data === undefined) {
       return {
         ok: false,
-        error: "実行ファイル（--lint --flow）が読んだ中身（flow）を返さない（古い）。確かめられないので進めない。実行ファイルを新しくする",
+        error: "実行ファイル（--lint --flow）が読んだ中身（flow）を返さない（古い版）。確かめられないので進めない。実行ファイルを更新してください",
       };
     }
     const checks: FlowChecks = {

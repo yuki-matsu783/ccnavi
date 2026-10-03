@@ -86,7 +86,7 @@ class RiskTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        # 配点と種類は共通層の既定の置き場へ。`--risk` / `--phases` は診断でだけ効き、
+        # 配点と種類は共通層の既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
         # `ticket` の副命令には届かない（ADR-0067）。差し替えるテストはこの綴りに書き直す。
         self.risk = write(common_path(self.root, "risk"), RISK)
         # 範囲の上限が無く、レビュー不要の種類。宣言では「レビュー不要」な作業を実績で上書きする。
@@ -151,7 +151,7 @@ class RiskTest(PhaseHarness):
         fixture = self.remote()
         requested = self.request(fixture, 1)
         self.assertEqual(requested.returncode, 0, requested.stderr)
-        self.assertIn("このレビューのリスク: リスク: 95 (CRITICAL)", self.last_request_body)
+        self.assertIn("このレビューのリスク: 95 (CRITICAL)", self.last_request_body)
         self.assertIn("行数が多い", self.last_request_body)
 
     def test_escalated_phase_is_seen_in_the_session_and_only_recommends_a_merge_request(self):
@@ -300,12 +300,12 @@ class RiskTest(PhaseHarness):
         denied = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(denied))
 
-    # ---- 5. 副命令に配点を渡しても効かない（ADR-0067）
+    # ---- 5. 副命令に配点を渡しても反映されない（ADR-0067）
 
     def test_a_risk_flag_on_ticket_done_does_not_change_the_score(self):
         """`ticket finish <子> --risk <別の配点>` は採点を差し替えない。issue #65。
 
-        sh のラッパー（`.ccnavi/scripts/ccnavi-ticket.sh`）が受け取った引数を素通しするので、
+        sh のラッパー（`.ccnavi/scripts/ccnavi-ticket.sh`）が受け取った引数をそのまま渡すので、
         この形はエージェントが Bash で打てる。通していた頃は、重い変更を軽い配点で
         閉じられた。
         """
@@ -344,7 +344,7 @@ class RiskTest(PhaseHarness):
         （`exec "$bin" --root "$root" ticket "$@"`）。argparse は後勝ちなので、後ろに
         1 本足すと sh が渡した本物を上書きできた。`--root` からは共通層の 3 本も
         `projects` も `approved` も導かれるので、`--risk` を使わずに同じ差し替えができる。
-        実測では、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
+        実際に確かめると、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
         「リスク 0」で**本物の置き場に**閉じられた。
 
         ここでは偽のルートの中身を作り込まない。2 本目が在ること自体を断るので、

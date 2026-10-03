@@ -2,7 +2,7 @@
  * ルール設定画面の本体。ルールの一覧・判定を試す・hook の 3 タブ。
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、人が触って決めるもの
- * （編集中のルール、開いている行、畳んだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
+ * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
  * **判定はしない。** 「判定」も「サンプルを一括で判定」も、編集中の内容を拡張ホストへ渡し、
  * 実行ファイルが返した結果を出すだけ（ADR-0035）。
  *
@@ -71,10 +71,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
   /**
    * 判定で当たってその場だけ開いた行。**控えには入れない**（判定を繰り返しても、人が決めた
-   * 既定の畳みが崩れない）。次の判定で入れ替わる。
+   * 既定の折りたたみが崩れない）。次の判定で入れ替わる。
    */
   const [transient, setTransient] = useState<ReadonlySet<string>>(new Set());
-  /** 直前の判定で当たったルールの id。畳んだままでも分かるように縁を付ける */
+  /** 直前の判定で当たったルールの id。折りたたんだままでも分かるように縁を付ける */
   const [hits, setHits] = useState<ReadonlySet<string>>(new Set());
   /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後は人の操作を鍵で覚える */
   const [moreOpen, setMoreOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
@@ -137,7 +137,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   /**
    * id を打っている途中は控えを書き直さない（打ちかけの id が控えに入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
-   * ここは素の DOM の口で受ける。いまの編集は描き直しのたびに `latest` へ写す
+   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ写す
    * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
    */
   const latest = useRef<Editing>(editing);
@@ -145,7 +145,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     latest.current = editing;
   });
   /**
-   * 受け口は一覧そのものに張る。`useEffect` で 1 度だけ張ると、**読み直せなかった画面
+   * 受け取る側は一覧そのものに張る。`useEffect` で 1 度だけ張ると、**読み直せなかった画面
    * （`kind: "error"`）から始まったときは一覧がまだ無く、あとで中身が届いても張られない。**
    * ref のコールバックなら、一覧が出た時点で張り、消えた時点で外れる。
    */
@@ -224,7 +224,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     // 組み上がったと伝える。拡張ホストはここで中身を渡し直す
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);
-    // 受け口は 1 度だけ張る。中身は setState の更新関数で今の値から作る
+    // 受け取る側は 1 度だけ張る。中身は setState の更新関数で今の値から作る
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextKey]);
 
@@ -250,8 +250,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, []);
 
   /**
-   * 判定で当たった行を、畳んであってもその場だけ開く。見えないところで光っても分からないので、
-   * タイプの畳みも外す。**控えには入れない**ので、次の判定で元の畳みに戻る。
+   * 判定で当たった行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
+   * タイプの折りたたみも外す。**控えには入れない**ので、次の判定で元の折りたたみに戻る。
    */
   const unfoldHits = (ids: readonly string[]): void => {
     const wanted = new Set(ids);
@@ -382,7 +382,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   const add = (section: Section): void => {
     const row = { key: nextKey(), rule: emptyRule() };
-    // 足したルールは開いて出す。畳んだままでは何を足したか分からない
+    // 足したルールは開いて出す。折りたたんだままでは何を足したか分からない
     editDraft({ ...draft, [section]: [...draft[section], row] }, new Set([...open, row.key]));
     setFolded(without(folded, section));
     setFocusKey(row.key);
@@ -489,7 +489,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           });
           const shown = rows.filter((row) => !row.hidden).length;
           const kept = rows.filter((row) => row.hidden && isOpen(row.key)).length;
-          // 絞り込み中は畳んだタイプの中も見えるので、矢印も開いた向きにする
+          // 絞り込み中は折りたたんだタイプの中も見えるので、矢印も開いた向きにする
           const shownAsOpen = query !== "" || !folded.has(section);
           return (
             <section className={folded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} key={section}>
@@ -637,7 +637,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: ".tabs",
       title: "3 つのタブ",
-      body: "「ルール」で deny・ask・allow のルールを直し、「判定を試す」で編集中の内容がどう判定するかを確かめ、「hook」で登録されている hook を眺めます。",
+      body: "「ルール」で deny・ask・allow のルールを直し、「判定を試す」で編集中の内容だとどう判定されるかを確かめ、「hook」で登録されている hook を眺めます。",
       before: () => peek("rules"),
     },
     {

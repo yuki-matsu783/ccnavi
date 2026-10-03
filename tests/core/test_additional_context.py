@@ -4,7 +4,7 @@
 
 1. allow に当たったルールの文が `additionalContext` でモデルに渡る
 2. deny と ask では、理由（`permissionDecisionReason`）と一緒に `additionalContext` が付く。
-   両方が届くことは Claude Code 2.1 で実測した
+   両方が届くことは Claude Code 2.1 で実際に確かめた
 3. dry-run でも文は届く（判定の代わりの文に続く）
 4. 書いていないルールでは鍵ごと出ない
 5. `--lint` は広い allow（何にでもヒットする、選択肢が 3 つ以上）に書いた文を warn にし、
@@ -44,7 +44,7 @@ class AdditionalContextTest(unittest.TestCase):
 
     def rules(self, **sections) -> str:
         body = {"version": 1, **sections}
-        # 置くのは共通層の既定の場所。`--rules` は診断でだけ効き、hook の判定には
+        # 置くのは共通層の既定の場所。`--rules` は診断でだけ有効で、hook の判定には
         # 届かない（ADR-0067）。
         return write(common_path(self.root, "rules"), json.dumps(body))
 
@@ -275,7 +275,7 @@ class AdditionalContextTest(unittest.TestCase):
         cut = self.judge("Write", os.path.join(self.root, "docs", "x.md"))["additionalContext"]
         self.assertTrue(cut.startswith("あ" * ctxfile.MAX_CHARS + "\n\n(ccnavi: docs/long.md は"))
         self.assertNotIn("あ" * (ctxfile.MAX_CHARS + 1), cut)
-        self.assertIn("続きはこのファイルを読む", cut)
+        self.assertIn("続きはこのファイルを読んで", cut)
         # 無いファイルは何も足さない。
         self.assertEqual(self.judge("Write", os.path.join(self.root, "etc", "a")), {})
         # 試験にも本文が出る。

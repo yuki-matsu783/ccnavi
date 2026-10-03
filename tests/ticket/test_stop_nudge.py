@@ -143,7 +143,7 @@ class StopNudgeTest(TicketTest):
         self.assert_quiet(self.stop(loose))
 
     def test_a_blocked_ticket_is_not_asked(self):
-        """信じられない承認済みチケット（親が閉じている）には終わりを勧めない。"""
+        """信頼できない承認済みチケット（親が閉じている）には終わりを勧めない。"""
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)

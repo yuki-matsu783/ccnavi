@@ -138,7 +138,8 @@ class ExtTestPlanTest(unittest.TestCase):
 
     def test_a_new_screen_calls_its_own_group_even_without_a_test_helper(self):
         # 画面を足して `test/helpers/<名前>.ts` を作り忘れても、同じ名前のグループは回す。
-        # ここが無いと、その画面のテストだけが黙って回らない（pnpm test でしか気づけない）。
+        # ここが無いと、その画面のテストだけが気づかないうちに回らない
+        # （pnpm test でしか気づけない）。
         with copied_board() as root:
             screen = os.path.join(root, "src", "webview", "fakescreen")
             group = os.path.join(root, "test", "fakescreen")
@@ -185,7 +186,7 @@ class ExtTestPlanTest(unittest.TestCase):
                 self.assertTrue(os.path.isfile(helper), helper)
 
     def test_a_part_shared_by_every_screen_calls_them_all(self):
-        # どの画面にも属さない部品（acquireVsCodeApi の窓口など）は、全部の画面に効く。
+        # どの画面にも属さない部品（acquireVsCodeApi の窓口など）は、全部の画面に影響する。
         got = plan("src/webview/vscode.ts")
         for group in ("board", "projects"):
             self.assertIn(group, got["groups"])
@@ -201,7 +202,7 @@ class ExtTestPlanTest(unittest.TestCase):
                 self.assertEqual(groups_on_disk(), plan(path)["groups"])
 
     def test_fixtures_call_every_group(self):
-        # 固定データは実行時に名前で開くので import では辿れない。全部に効くと見る。
+        # 固定データは実行時に名前で開くので import では辿れない。全部に影響すると見る。
         self.assertEqual(groups_on_disk(), plan("test/fixtures/board.json")["groups"])
 
     def test_a_file_no_test_reads_is_type_checked_only(self):
@@ -375,7 +376,7 @@ class TestExtHookTest(unittest.TestCase):
         self.assertFalse(os.path.exists(marker))
 
     def test_a_path_with_spaces_arrives_as_one_argument(self):
-        # 空白で語に割れると、入口が見つからず「何も回さずに通った」になる。
+        # 空白で語に分かれると、入口が見つからず「何も回さずに通った」になる。
         # Windows の利用者名に空白は珍しくない。
         workspace, board, _ = self.workspace(tree="my dir")
         result, args = self.stop(workspace)
@@ -428,7 +429,7 @@ class TestExtHookTest(unittest.TestCase):
 
     def test_an_old_marker_is_still_read_in_the_same_session(self):
         # 1 時間の掃除が自分の印を消してしまうと、拡張を直したのに「触っていない
-        # ターン」に見えて黙って何も回らない。1 つのターンは 1 時間を超えることがある。
+        # ターン」に見えて気づかないうちに何も回らない。1 つのターンは 1 時間を超えることがある。
         workspace, _, marker = self.workspace()
         old = time.time() - 2 * 60 * 60
         os.utime(marker, (old, old))
@@ -437,7 +438,7 @@ class TestExtHookTest(unittest.TestCase):
         self.assertIsNotNone(args)
 
     def test_a_marker_that_points_nowhere_is_reported_not_passed(self):
-        # 入口が無いツリーの印だけが残った形。黙って exit 0 すると「テストが通った」と
+        # 入口が無いツリーの印だけが残った形。何も言わずに exit 0 すると「テストが通った」と
         # 区別が付かない。
         workspace, board, _ = self.workspace()
         os.remove(os.path.join(board, "scripts", "test-groups.js"))

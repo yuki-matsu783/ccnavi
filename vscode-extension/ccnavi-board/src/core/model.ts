@@ -122,7 +122,7 @@ export interface TicketJson {
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /**
-   * 空でなければ「読めるが信じられない」理由（ADR-0058）。判定はこのチケットの
+   * 空でなければ「読めるが信頼できない」理由（ADR-0058）。判定はこのチケットの
    * ワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`copy.status` は
    * `open` のままなので、止まっていることはこの欄でしか分からない。
    */

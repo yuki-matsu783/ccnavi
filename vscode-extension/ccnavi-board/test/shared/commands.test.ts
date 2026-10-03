@@ -87,7 +87,7 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
     pushApprovedCommand("C:\\Users\\x\\ws"),
     "sh 'C:/Users/x/ws/.ccnavi/scripts/ccnavi-push-approved.sh'",
   );
-  // 単引用符を含むパスは割って囲む。
+  // 単引用符を含むパスは分けて囲む。
   assert.equal(
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
@@ -127,12 +127,12 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で打つ（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で打つ）"));
   assert.ok(text.includes("サブエージェントには渡さない"));
   assert.ok(!text.includes("&&"));
-  // 人の判断（--reviewed / decide）を代行させず、confirm が返す道を先取りしない
+  // 人の判断（--reviewed / decide）を代行させず、confirm が返す方法を先取りしない
   assert.ok(!text.includes("--reviewed"));
   assert.ok(!text.includes("decide"));
   assert.ok(!text.includes("依頼し直す"));
   assert.ok(text.includes("confirm が一覧と次の道を返すので、それに従う"));
-  // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / に寄せる
+  // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / にそろえる
   const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "");
   assert.ok(!bare.includes("マージリクエスト:"));
   assert.ok(bare.includes("フェーズ 3 のレビューを終えた"));

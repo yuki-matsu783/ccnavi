@@ -8,7 +8,7 @@
 2. 承認の対象にしない提案があれば 3（いいえ）で返り、その理由が本文に出る
 3. 承認待ちが無ければ 3。提案の置き場を間違えた回がここに出る
 4. 承認待ちに無い識別子を指定すれば 3（絞りは `--approve` と同じ意味）
-5. 範囲の超過だけなら 0。承認は止まらないので通るが、書けないことは行に添える
+5. 範囲の超過だけなら 0。承認は止まらないので通るが、書けないことは行につける
 6. `--json` は `--preview --json` と同じ形に `verify` を足したもの。使い方の誤りは 1
 7. `todo/` に提案を書くと、確認の案内が 1 つの文脈で 1 度だけ届く。案内は判定の表に
    足さないので、どの権限モードでも判定は変わらない
@@ -47,8 +47,9 @@ ANSWER_NO = 3
 
 class ApproveVerifyTest(PhaseHarness):
     def verify(self, *extra):
-        """`--approve --preview --verify`。ハーネスの `confirm`（review confirm）とは別物なので、
-        名前を分ける（同じ名前で上書きすると、レビュー絡みのテストを足した回に黙って入れ替わる）。"""
+        """`--approve --preview --verify`。ハーネスの `confirm`（review confirm）とは違うもの
+        なので、名前を分ける（同じ名前で上書きすると、レビュー絡みのテストを足した回に
+        気づかないうちに入れ替わる）。"""
         return self.ccnavi("--approve", "--preview", "--verify", *extra)
 
     # ---- 1. 通る
@@ -154,7 +155,7 @@ class ApproveVerifyTest(PhaseHarness):
         """読めない提案は終了コードを動かさない。`--approve` もそこでは落ちないから。
 
         走査は絞る前の全ツリーを見るので、ここで落とすと、他のセッションの書きかけ 1 本で
-        「確かめは『いいえ』なのに承認は通る」になる。黙らせもしない
+        「確かめは『いいえ』なのに承認は通る」になる。言わずに済ませもしない
         （自分が書いた 1 本かもしれない）。
         """
         self.propose("i0001", parent_text("i0001", ["research"]))
@@ -166,13 +167,13 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("読めなかったファイル", result.stdout)
         self.assertIn("broken.md", result.stdout)
         self.assertIn("承認を依頼してよい", result.stdout)
-        # 同じ状態で本物の承認も通る。確かめと承認の答えが割れないことが要点。
+        # 同じ状態で本物の承認も通る。確かめと承認の答えが分かれないことが要点。
         approved = self.ccnavi("--approve", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_verify_needs_preview(self):
-        """`--verify` は `--preview` に相乗りする。単独ではエージェントが打てない。
+        """`--verify` は `--preview` につけて使う。単独ではエージェントが打てない。
 
         使い方の誤りは 1。答えの「いいえ」（3）とは分ける。読む側が取り違えると、
         直すものが無いのに提案を直しに行く。
@@ -188,8 +189,8 @@ class ApproveVerifyTest(PhaseHarness):
         """承認で落ちるものを数える経路は 1 本（`approval.candidates`）。
 
         以前は `--lint` だけが `approval.validate` を当てていて、順序で落ちる子・計画に
-        無い番号・`project:` の食い違い・改版の検査に無言だった。同じ事実を数える経路が
-        2 本あると、片方が黙って弱くなる。`--lint` は severity の体系で終わるので、
+        無い番号・`project:` の食い違い・改版の検査について何も言わなかった。同じ事実を数える経路が
+        2 本あると、片方が気づかないうちに弱くなる。`--lint` は severity の体系で終わるので、
         承認で落ちる提案（error）があれば非ゼロで終わる。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
@@ -208,11 +209,11 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("計画に無い", said)
 
     def test_lint_says_the_order_problem_too(self):
-        """順序で落ちる子。**寄せる前の `--lint` が無言だったのはここ**（`validate` だけを
-        当てていたので、フェーズの順序を見ていなかった）。
+        """順序で落ちる子。**1 本にそろえる前の `--lint` が何も言わなかったのはここ**
+        （`validate` だけを当てていたので、フェーズの順序を見ていなかった）。
 
-        「計画に無い番号」は寄せる前からの error なので、それだけを見るテストでは、
-        配線を旧に戻しても気づけない。この枝が新しく言えるようになった 1 件で杭を打つ。
+        「計画に無い番号」はそろえる前からの error なので、それだけを見るテストでは、
+        配線を旧に戻しても気づけない。この枝が新しく言えるようになった 1 件で確かめる。
         重さは warn（`rules.KIND_NOT_YET`）で、承認の側は落としたままであることも見る。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
@@ -260,7 +261,7 @@ class ApproveVerifyTest(PhaseHarness):
         どのタイプも言及しないときの扱い（judge.undeclared_verdict）を通らなくなる。
         確認できる者が居ないモードの deny も、知らない綴りのモードを ask として扱う既定も、
         そこだけ外れていた（ADR-0059）。**同じ場所とどのルールも言及しない場所が、
-        どの権限モードでも同じ判定になること**を杭にする。文は届いたままであることも見る。
+        どの権限モードでも同じ判定になること**を確かめる。文は届いたままであることも見る。
         """
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
         other = os.path.join(self.parent_tree, "src", "keep.py")
@@ -286,7 +287,7 @@ class ApproveVerifyTest(PhaseHarness):
     def test_the_notice_stays_inside_the_workspace(self):
         """ワークスペースの外に同じ並びを掘っても、提案を書いたことにはしない。
 
-        当てる式はワークスペースルートで留めてある。ツリー（ワークツリー・プロジェクト）は
+        当てる式はワークスペースルートに固定してある。ツリー（ワークツリー・プロジェクト）は
         どれもルートの下なので、正しい置き場は全部入り、外は入らない。
         """
         elsewhere = os.path.join(tempfile.gettempdir(), "wip", "proposals", "todo", "evil.sh")

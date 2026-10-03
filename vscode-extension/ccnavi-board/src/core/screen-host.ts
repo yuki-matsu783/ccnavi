@@ -21,7 +21,7 @@
  * | 画面の状態 | 渡し方（`Delivery`） |
  * |---|---|
  * | 組み上がっている | `posted`。`postMessage` で中身だけ渡し、画面は要るところだけ描き直す |
- * | 作り直している最中 | `deferred`。**渡さない。** 受け口（`message` のリスナ）はまだ無く、送っても落ちる |
+ * | 作り直している最中 | `deferred`。**渡さない。** 受け取る側（`message` のリスナ）はまだ無く、送っても落ちる |
  * | 裏に回っている / まだ 1 枚も入れていない | `rebuilt`。入れ物ごと入れ直す。表に戻ると VS Code はこれから作り直す |
  *
  * `deferred` になったものは捨てられる。画面が組み上がると `ready` が届くので、**受けた側がそこで
@@ -36,10 +36,10 @@
  *   気づけない（実機はその形。`onDidChangeViewState` のあいだ、この段取りは呼ばれない）
  * - 教えてもらうだけだと、教え忘れがそのまま「送ってはいけないものを送る」になる
  *
- * VS Code の API には触れない。必要な口（`Surface`）だけを受け取るので、単体で試せる。
+ * VS Code の API には触れない。必要なもの（`Surface`）だけを受け取るので、単体で試せる。
  */
 
-/** 拡張ホストが持つ Webview の口。パネルをこの形に合わせて渡す */
+/** 拡張ホストが持つ Webview の窓口。パネルをこの形に合わせて渡す */
 export interface Surface {
   /**
    * 表に出ているか。`retainContextWhenHidden` が偽の画面は、裏に回ると捨てられる。
@@ -54,8 +54,8 @@ export interface Surface {
 }
 
 /**
- * 保持する画面（`retainedHost`）が使う口。**表裏（`visible`）は要らない。** 裏でも生きていて、
- * 読まないものを実装させると、写して作った次の画面に死んだゲッターが付いて回る
+ * 保持する画面（`retainedHost`）が使う窓口。**表裏（`visible`）は要らない。** 裏でも生きていて、
+ * 読まないものを実装させると、写して作った次の画面にも使われないゲッターが付いて回る
  */
 export type RetainedSurface = Omit<Surface, "visible">;
 
@@ -71,7 +71,7 @@ export interface ScreenHost<D> {
   /**
    * いま見せるものを渡す。
    *
-   * `rebuilt` は入れ物ごと入れ直す道で、そこでだけ渡せるもの（1 度きりの指示を埋めた中身）が
+   * `rebuilt` は入れ物ごと入れ直す経路で、そこでだけ渡せるもの（1 度きりの指示を埋めた中身）が
    * あれば `rebuilt` に渡す。省けば `data` をそのまま使う
    */
   send(data: D, rebuilt?: D): Delivery;
@@ -192,7 +192,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  * - **`hidden()` は何もしない。** 教えてもらっても、捨てられていないので扱いを変えるものが無い
  *
  * 残る `deferred` は 1 枚目だけ。入れ物を入れてから画面が組み上がる（`ready`）までの間は、
- * 受け口がまだ無いので送らない。そこは `screenHost` と同じで、受けた側が `ready` で渡し直す。
+ * 受け取る側がまだ無いので送らない。そこは `screenHost` と同じで、受けた側が `ready` で渡し直す。
  *
  * **中身を渡すのは、画面の編集を捨ててよいときだけ。** 保持する画面は編集の途中を持つので、
  * 監視がファイルの変化に気づいても勝手に渡さない（`{type:"changed"}` の帯を出して人に決めさせる）。
@@ -213,7 +213,7 @@ export function retainedHost<D>(surface: RetainedSurface, render: (data: D) => s
         return "rebuilt";
       }
       if (!mounted) {
-        // 1 枚目を読み込んでいる最中。受け口がまだ無いので送らない（入れ直しもしない）
+        // 1 枚目を読み込んでいる最中。受け取る側がまだ無いので送らない（入れ直しもしない）
         return "deferred";
       }
       const message: DataMessage<D> = { type: "data", data };

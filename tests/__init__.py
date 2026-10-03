@@ -11,11 +11,11 @@ from ccnavi import settings as _settings
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 共通層の 3 本の既定の綴り。ハーネスはここへ設定を置き、`--rules` / `--phases` /
-# `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ効くので、
+# `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
 # hook の判定とチケット・レビューの副命令には届かない（ADR-0067）。
 #
 # 綴りは実行ファイルから引く。テスト側にもう 1 つ綴りを持つと、既定が動いたときに
-# 2 つが黙ってずれる。既定の綴りそのものは tests/config/test_common_layer_place.py が
+# 2 つが気づかないうちに食い違う。既定の綴りそのものは tests/config/test_common_layer_place.py が
 # 直に書いて見張る。
 _COMMON_FILES = {
     "rules": _settings.DEFAULT_RULES,
@@ -29,7 +29,7 @@ def _block_host_git_config() -> dict[str, str]:
 
     git は `~/.gitconfig` と `/etc/gitconfig` を読む。そこに何が入っているかは
     機械ごとに違うので、締め出さないとテストの結果が「誰の機械で走らせたか」で
-    変わる。実害は 2 つとも出ている。
+    変わる。2 つとも実際に問題が起きている。
 
     - `init.defaultBranch = main` を持つ機械では `tests/guard/test_post.py` が落ちる。
       あのテストは `git init`（`-b` 無し）が `master` を作る前提で `checkout master`
@@ -42,13 +42,13 @@ def _block_host_git_config() -> dict[str, str]:
     合わない。
 
     空の設定ではなく `init.defaultBranch` を書いた設定を指すのは、git 自身の
-    既定に寄りかからないため。git は既定を `master` から動かすと予告し続けており、
-    書いておかないと git を上げた日にテストの前提が黙って変わる。値は、今の
+    既定に頼らないため。git は既定を `master` から動かすと予告し続けており、
+    書いておかないと git を上げた日にテストの前提が気づかないうちに変わる。値は、今の
     テストが前提にしている `master` に固定する。
 
     `/dev/null` を指さないのは Windows に無いため。本物の空ファイルなら 4 環境で同じ。
     `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` は git 2.32 以降。読めているかは
-    `tests/core/test_git_env.py` が見張るので、古い git では黙って通らずに落ちる。
+    `tests/core/test_git_env.py` が見張るので、古い git では気づかれないまま通ることはなく落ちる。
     """
     home = _tempfile.mkdtemp(prefix="ccnavi-gitconfig-")
     _atexit.register(_shutil.rmtree, home, ignore_errors=True)
@@ -63,12 +63,12 @@ def _block_host_git_config() -> dict[str, str]:
     }
 
 
-# テストが起こす git に見せる環境。`tests/` を import した時点で効く。
+# テストが起こす git に見せる環境。`tests/` を import した時点で反映される。
 #
-# ここで `os.environ` に入れるのは、テストが git を起こす道が 1 つではないため。
+# ここで `os.environ` に入れるのは、テストが git を起こす経路が 1 つではないため。
 # 各テストの `git()` ヘルパ（13 か所ある）だけでなく、検査対象の sh
 # （`ccnavi-git.sh` など）も、ccnavi 自身（`ccnavi/gitcmd.py`）も git を起こす。
-# 引数に `-c` を足す形では、自分が直に起こす分しか塞げない。
+# 引数に `-c` を足す形では、自分が直に起こす分しか防げない。
 GIT_ENV = _block_host_git_config()
 os.environ.update(GIT_ENV)
 
@@ -89,11 +89,11 @@ def common_path(root: str, kind: str) -> str:
 def fixture_workspace(name: str = "rules.yml") -> str:
     """`tests/fixtures/<name>` を共通層のルールに据えたワークスペースルート。
 
-    `--rules` は診断でだけ効く（ADR-0067）ので、見本のルールを指すのには使わない。
+    `--rules` は診断でだけ有効な（ADR-0067）ので、見本のルールを指すのには使わない。
     `--root` にここを渡して、共通層の既定の置き場から読ませる。
 
     リポジトリ自身をルートにしないので、走った機械の `.ccnavi/common/rules.yml` が
-    判定に混ざらない。
+    判定に入り込まない。
 
     組むのは見本ごとにプロセスで 1 度。中身は読むだけなので使い回してよい。
     """

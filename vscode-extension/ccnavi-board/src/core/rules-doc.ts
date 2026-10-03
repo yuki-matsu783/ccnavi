@@ -265,8 +265,8 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
 /**
  * 刻みの欄（`every`）。書かれたままの文字を受け取り、1 以上の整数に読めれば数として、
  * 読めなければ打った文字のまま書く（止めるのは保存前の `--lint`）。空なら欄ごと消す。
- * 元に書いてある文字と同じなら何もしない。`every: "5"` のような書き方を画面が黙って
- * 直さないためで、直してしまうと lint の error が操作で消える。欄が無ければ match の直後に足す。
+ * 元に書いてある文字と同じなら何もしない。`every: "5"` のような書き方が、気づかないうちに画面で
+ * 直されないためで、直してしまうと lint の error が操作で消える。欄が無ければ match の直後に足す。
  */
 function setEvery(doc: Document, node: YAMLMap, written: string): void {
   if (written === scalarText(node, "every")) {

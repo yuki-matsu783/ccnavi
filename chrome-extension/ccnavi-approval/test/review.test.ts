@@ -100,7 +100,7 @@ test("CX-T120 レート制限: Retry-After が短ければ 1 回待ち直し、�
   mock.limits.push({ match: /^GET \/repos\/acme\/widgets$/, status: 429, headers: { "retry-after": "600" } });
   await assert.rejects(gh.repoInfo(c, "acme", "widgets"), /二次のレート制限.*600 秒/);
   mock.limits.push({ match: /^GET \/repos\/acme\/widgets$/, status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1790000000" } });
-  await assert.rejects(gh.repoInfo(c, "acme", "widgets"), /レート制限.*回復は/);
+  await assert.rejects(gh.repoInfo(c, "acme", "widgets"), /レート制限.*制限が解けるのは/);
   mock.limits.push({ match: /^POST \/graphql$/, status: 200, headers: {}, graphql: true });
   await assert.rejects(gh.viewer(c), /RATE_LIMITED/);
   mock.limits.push({ match: /^POST \/graphql$/, status: 200, headers: { "retry-after": "1" }, graphql: true });

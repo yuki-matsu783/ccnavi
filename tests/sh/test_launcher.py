@@ -2,7 +2,7 @@
 
 sh は `.ccnavi/scripts/` に、実体は `.ccnavi/bin/<os>-<arch>/` に並ぶ（ADR-0044）。sh は自分の
 隣ではなく `../bin/` を探す。語を読む場所は 3 つ（sh、platformtag、ccnavi-setup.sh）あり、
-どれかだけずれると配った場所と探す場所が食い違う。ここでは sh を外から動かし、選んだ置き場を見る。
+どれかだけ変わると配った場所と探す場所が食い違う。ここでは sh を外から動かし、選んだ置き場を見る。
 
 sh の原本は環境変数 `CCNAVI_TEST_LAUNCHER` で差し替えられる。人が写す前に
 `wip/design/scripts/ccnavi-launcher.sh` を名指しで確かめるため（相対ならリポジトリの
@@ -216,7 +216,7 @@ class LauncherTest(unittest.TestCase):
         self.assertTrue(result.stdout.startswith("bin/linux-x86_64/"), result.stdout)
 
     def test_finds_the_bin_from_relative_spellings(self):
-        """`$0` に道筋が無い（`here=.`）ときも、1 段上の `bin/` を探す。"""
+        """`$0` にディレクトリの部分が無い（`here=.`）ときも、1 段上の `bin/` を探す。"""
         self.pretend("Linux x86_64")
         self.build("linux-x86_64")
         cases = (

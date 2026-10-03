@@ -1,8 +1,8 @@
 """origin の URL の読み方。exe の `remote_kind` と、sh の `origin` の両方を見る。
 
 URL にトークンを埋めた形（`https://oauth2:<token>@host/g/p.git`）は普通にある。
-ホストにユーザ情報が混ざると API の綴りが壊れ、`origin` の出力にトークンが漏れる。
-実物の GitLab で踏んだ穴なので、両方の読み手で固定する。
+ホストにユーザ情報が入り込むと API の綴りが壊れ、`origin` の出力にトークンが漏れる。
+実物の GitLab で実際に起きた穴なので、両方の読み手で固定する。
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class RemoteKindTest(unittest.TestCase):
             # ユーザ情報に `@` が入る。git は最後の `@` で切るので、こちらもそう読む。
             "https://user:p@ss@github.com/o/r.git": "github",
             "https://oauth2:glpat-A@B@localhost:8929/root/p.git": "gitlab",
-            # パスに `@` があっても authority の外なので混ざらない。
+            # パスに `@` があっても authority の外なのでホストに入らない。
             "git@github.com:o/r@x.git": "github",
             "https://[::1]:9/g/p.git": "gitlab",
             # sh が読めない綴りは、こちらも読めない扱い。

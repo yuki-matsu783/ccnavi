@@ -1,7 +1,7 @@
 """設定検証の受入テスト。内部の関数は呼ばず、標準出力と終了コードだけを見る。
 
 見るのは 3 つ。error があれば非ゼロで終わること、error と warn が分かれていること、
-そして検証が判定と同じ読み込みを使っていること。3 つ目が崩れると、検証が通ったのに
+そして検証が判定と同じ読み込みを使っていること。3 つ目が成り立たないと、検証が通ったのに
 実運用で落ちるという、検証があるぶんかえって危ない形になる。
 """
 
@@ -325,7 +325,7 @@ class LintTest(unittest.TestCase):
 
     def test_同じ識別子がdoingとreviewの両方に在ればerrorになる(self):
         # review/ は提案の走査に入るので、これは前からの振る舞い。doing と done の側を
-        # 足したときに、数え方を変えてこちらが黙らないことを固定する。
+        # 足したときに、数え方を変えたせいでこちらが何も言わなくならないことを固定する。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "doing"),
             "i0001.md",
@@ -344,7 +344,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("(ワークスペースルート):review", result.stdout)
 
     def test_doneに1つだけ在るのは咎めない(self):
-        # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても黙ったまま。
+        # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても何も言わないまま。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done"),
             "i0001.md",
@@ -357,7 +357,7 @@ class LintTest(unittest.TestCase):
         self.assertNotIn("複数の場所にある", result.stdout)
 
     def test_BOMの付いた提案はerrorでBOMを名指しする(self):
-        # BOM は目に見えないので、`---` と書いたのに弾かれたように見える。
+        # BOM は目に見えないので、`---` と書いたのに拒まれたように見える。
         # 文面が原因を言わないと、書いた人はエディタで見えているものを疑えない。
         write(
             os.path.join(self.root, "wip", "proposals", "todo"),
@@ -374,7 +374,7 @@ class LintTest(unittest.TestCase):
     def test_BOMの付いた承認済みチケットはdoneに在ってもerrorになる(self):
         # 判定は閉じた承認済みチケットを読まないが、読めないファイルが置き場に残っている
         # こと自体は書いた人の思い違いで、承認済みチケットは親のブランチに乗って他の機械へ
-        # そのまま届く。閉じた側の苦情を捨てると、届いた先でも黙ったままになる。
+        # そのまま届く。閉じた側の苦情を捨てると、届いた先でも何も言われないままになる。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done"),
             "i0001.md",
@@ -390,7 +390,7 @@ class LintTest(unittest.TestCase):
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
         # 承認の権威は置き場（ADR-0058）。`.ccnavi/approved/` は組み込みの守りが
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
-        # 読む。端末もボードも無い人が、置き場を動かすだけで承認できる道。
+        # 読む。端末もボードも無い人が、置き場を動かすだけで承認できる方法。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "doing"),
             "i0001.md",
@@ -424,7 +424,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("版", result.stdout)
 
     def test_壊れたルールは1件ずつ名指しでerrorになる(self):
-        # 落ちたルールは黙って消える。消えた穴は誰も気づかないので、
+        # 落ちたルールは何も言われずに消える。消えた穴は誰も気づかないので、
         # 1 件ずつ id で名指しする。
         result = lint(
             self.root,
@@ -453,7 +453,7 @@ class LintTest(unittest.TestCase):
             self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を咎めていない")
 
     def test_askとallowのmessageはerrorになりルールは効いたまま(self):
-        # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない（実測）。
+        # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない（実際に確かめた）。
         # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
         # ただしルールごと落とすと、文面を書いただけで ask が外れて通るので、読み込みは通す。
         body = {
@@ -548,9 +548,9 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
-        self.assertIn("dry-run なので判定しても呼び出しに手を出さない", result.stdout)
-        # 戻す働きの 2 つは、書かれた値が enable でもモードに畳まれて dry-run になる。
-        # 実効値で見るので、そのぶんも言う（門の名前と、畳まれたことの両方）。
+        self.assertIn("dry-run なので判定はしても、呼び出しには何もしない", result.stdout)
+        # 戻す働きの 2 つは、書かれた値が enable でもモードに合わせて dry-run になる。
+        # 実効値で見るので、そのぶんも言う（門の名前と、モードに合わせたことの両方）。
         self.assertEqual(warns, 3, result.stdout)
         self.assertIn("CCNAVI_MODE=dry-run なので実際は dry-run", result.stdout)
 

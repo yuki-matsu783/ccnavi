@@ -98,7 +98,7 @@ test("CX-T112 書く頼み（commit）はボードからだけ、登録したリ
     assert.match(res.error, /保護されたブランチか統合先/, branch);
     assert.equal(res.status, 400);
   }
-  // 統合先の名前はボードの値を信じず、設定（無ければホストのデフォルトブランチ）から引く
+  // 統合先の名前はボードの値を信頼せず、設定（無ければホストのデフォルトブランチ）から引く
   const trunk = deps(m, new Map([["github.com", TOKEN]]), new Map(), () => new Date(), [{ ...REPOS[0], integration: "i0003" }]);
   assert.match((await refused(commit("I0003"), BOARD, trunk)).error, /統合先/);
   assert.match((await refused(commit("i0001"), OPTIONS)).error, /ボードからだけ/);

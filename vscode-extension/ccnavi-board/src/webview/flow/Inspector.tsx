@@ -5,8 +5,8 @@
  * 画面が欄を持たない種類は、名前だけ直せて、`data` は読むだけ（ファイルと同じ YAML の形で見せる）。
  * グループは名前だけ直せて、解く（中のノードは残して枠だけ消す）か消す（同じく中のノードは残す）。
  * サブエージェントの種類とスキルの名前は、実行ファイルが挙げた候補（`candidates`）から選べる。打って決めても
- * よく（利用者・プラグインのものは候補に無い）、候補のどれか（組み込み・プロジェクト）か、候補に無いかを添える。
- * 欄に打った字は、どの欄かを添えて返す（呼び手が同じ欄への打ち込みを元に戻す 1 件にまとめる）。フォーカスが外れたら `onSeal`。
+ * よく（利用者・プラグインのものは候補に無い）、候補のどれか（組み込み・プロジェクト）か、候補に無いかをつける。
+ * 欄に打った字は、どの欄かをつけて返す（呼び手が同じ欄への打ち込みを元に戻す 1 件にまとめる）。フォーカスが外れたら `onSeal`。
  */
 import type { JSX } from "react";
 
@@ -50,7 +50,7 @@ export interface InspectorProps {
   readonly selected: Selection | undefined;
   readonly readOnly: boolean;
   /**
-   * 直した写しを返す。欄に打った文字は `typing`（どの欄か）を添える。呼び手はそれを手がかりに、
+   * 直した写しを返す。欄に打った文字は `typing`（どの欄か）をつける。呼び手はそれを手がかりに、
    * 同じ欄に続けて打ったものを元に戻す 1 件にまとめる
    */
   readonly onChange: (doc: FlowDoc, typing?: string) => void;
@@ -102,7 +102,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
               type="text"
               className="f-condition"
               value={str(connection.condition)}
-              placeholder="空なら出口の名前で読む"
+              placeholder="空なら出口の名前を条件として読む"
               disabled={readOnly}
               onChange={(event) => onChange(setConditionAt(doc, selected.index, event.target.value), `edge:${selected.index}:condition`)}
             />
@@ -136,7 +136,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         <span title="description">説明</span>
         <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }), "flow:description")} />
       </label>
-      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線に載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。Ctrl+Z で元に戻し、Ctrl+C・Ctrl+V・Ctrl+D で選んだノードを写す・貼る・複製する。</p>
+      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線にポインタを載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。Ctrl+Z で元に戻し、Ctrl+C・Ctrl+V・Ctrl+D で選んだノードを写す・貼る・複製する。</p>
     </aside>
   );
 }
@@ -259,7 +259,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       )}
       {!known && !group && (
         <>
-          <p className="hint">この画面で欄を持たない種類。名前と位置だけ変えられ、中身（data）は保存してもそのまま残る。</p>
+          <p className="hint">この画面に入力欄が無い種類。名前と位置だけ変えられ、中身（data）は保存してもそのまま残る。</p>
           <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
         </>
       )}

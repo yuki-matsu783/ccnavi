@@ -1,8 +1,8 @@
 /**
- * 種類 1 件の行。畳んだときは要約 1 行、開くと欄が出る。
+ * 種類 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * 出番の少ない 5 欄（ほかの種類との関係と補足）は見出し 1 行に畳み、値がある種類だけ最初から開く。
+ * 出番の少ない 5 欄（ほかの種類との関係と補足）は見出し 1 行に折りたたみ、値がある種類だけ最初から開く。
  *
  * 関係の 3 欄（overlap / requires / after）は、このファイルのほかの種類の id を複数選択のセレクトボックスで選ぶ
  * （`IdPicker`）。自分の id は候補に出さない。`after` の候補は work の種類だけ（feedback の種類は
@@ -25,7 +25,7 @@ export interface PhaseProps {
   readonly open: boolean;
   /**
    * 「ほかの種類との関係・補足」を開いているか。**決めるのは呼ぶ側**（行ごとに 1 度だけ値の有無で決め、あとは
-   * 人の開閉で動く）。ここで値の有無から決め直すと、最後の値を消した瞬間に、打っている欄ごと畳まれる
+   * 人の開閉で動く）。ここで値の有無から決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly moreOpen: boolean;
   /** このファイルの種類の id と区分（並び順）。関係の欄の候補にする */
@@ -99,7 +99,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       <div
         className="row-head"
         onClick={() => {
-          // 文字を選んだだけのときは開閉しない（要約をコピーする操作を奪わない）
+          // 文字を選んだだけのときは開閉しない（要約をコピーする操作を妨げない）
           if (window.getSelection !== undefined && String(window.getSelection()) !== "") {
             return;
           }
@@ -193,7 +193,7 @@ export function Phase(props: PhaseProps): JSX.Element {
             </Captioned>
             <Captioned name="先に済ませる種類" yamlKey="after">
               {phase.kind === "feedback" && phase.after.length === 0 ? (
-                <span className="f-after dim">feedback の種類は持てません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
+                <span className="f-after dim">feedback の種類には設定できません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
               ) : (
                 ids("after", "先に済ませる種類", "f-after", "待ち方が dag のとき、この種類より先に閉じてレビューを終えておく work の種類")
               )}
@@ -229,7 +229,7 @@ export function Phase(props: PhaseProps): JSX.Element {
  * ところで `a` に縮む（区切りの直後が打てない）。
  *
  * 外から中身が入れ替わったとき（再読込・保存）は、行の鍵が配り直されてこの部品ごと作り直されるので、
- * 欄は新しい値で始まる。下の `useEffect` はその道を通らない保険で、鍵を保つ書き方に変えたときに
+ * 欄は新しい値で始まる。下の `useEffect` はその経路を通らない保険で、鍵を保つ書き方に変えたときに
  * 欄が古いまま残らないように置いてある。
  */
 function ListInput({

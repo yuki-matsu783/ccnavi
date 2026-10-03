@@ -1,6 +1,6 @@
 /**
  * チケット制御を使うかの読み取り。`.claude/settings.json` と `.claude/settings.local.json` の
- * env `CCNAVI_TICKET_CONTROL` を見る。Claude Code は両方の env を hook に渡し、local が勝つ。
+ * env `CCNAVI_TICKET_CONTROL` を見る。Claude Code は両方の env を hook に渡し、local のほうを採る。
  *
  * 拡張は hook が受け取るプロセスの環境を見られないので、設定ファイルの本文から読む。
  * シェルから渡された値は拾えない（README に「設定ファイルに書く」と決めてある）。
@@ -46,5 +46,5 @@ export function ticketControlMismatch(fromFiles: TicketControl, fromBoard: strin
   if (board === fromFiles) {
     return "";
   }
-  return `${TICKET_CONTROL_ENV} の読みが食い違っています（設定ファイル: ${fromFiles}、実行ファイル: ${board}）。セッションを開き直したか、シェルの環境から渡していないかを確かめてください`;
+  return `${TICKET_CONTROL_ENV} の値が、設定ファイルと実行ファイルで食い違っています（設定ファイル: ${fromFiles}、実行ファイル: ${board}）。セッションを開き直したか、シェルの環境から渡していないかを確かめてください`;
 }

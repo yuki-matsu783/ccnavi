@@ -265,7 +265,7 @@ COUNT_SH = "printf '{\"points\": 1}'\n"
 
 
 class ConfigSyncBoundaryTest(ConfigSyncTest):
-    """レビューで見つかった穴を塞いだことを見る。"""
+    """レビューで見つかった穴を直したことを見る。"""
 
     def test_a_mark_of_another_project_does_not_exempt(self):
         """印はその親のもの。lib で写したあとでも、app のワークツリーの書き込みは外さない。"""
@@ -384,7 +384,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertEqual(read(config_of(tree, "rules")), before)
 
     def test_uncommitted_edits_stop_the_start(self):
-        """写す先に未コミットの変更があれば、人の書きかけを踏まないよう止める。"""
+        """写す先に未コミットの変更があれば、人の書きかけを上書きしないよう止める。"""
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
@@ -470,7 +470,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
 
 
 class ConfigSyncSecondReviewTest(ConfigSyncTest):
-    """2 回目の敵対的レビューで見つかった穴を塞いだことを見る。"""
+    """2 回目の敵対的レビューで見つかった穴を直したことを見る。"""
 
     def test_a_worktree_without_an_approved_parent_is_not_exempt(self):
         """承認済みの親チケットの無いワークツリーは、印を自作しても外さない。"""
@@ -504,7 +504,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         """リンクを張る。Windows で権限が無いなど、張れない環境ではテストを飛ばす。
 
         飛ばすのは権限が無いとき（Windows の 1314）と、未対応の環境だけ。ほかの失敗
-        （リンク先がすでに在るなど）は準備の崩れなので、飛ばさずに落とす。
+        （リンク先がすでに在るなど）は準備の失敗なので、飛ばさずに落とす。
         """
         try:
             os.symlink(source, link)
