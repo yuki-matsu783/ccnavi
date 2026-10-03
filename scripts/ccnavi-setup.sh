@@ -9,7 +9,7 @@
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              配布物を置かず、settings.json だけを書く
-#   --all                    既定値を持つ env も明示して書く（今は足すものが無い。ADR-0084）
+#   --all                    既定値を持つ env も明示して書く（今は足すものが無い。置き場は固定）
 #   --force                  明示した --mode / --ticket-control で、既にある値を置き換える。
 #                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
@@ -18,7 +18,7 @@
 #
 # 何度打っても同じ形に落ち着く。既に登録されている hook は足さないし、既にある
 # env は触らない。ccnavi と関係のない hook や設定はそのまま残す。例外は廃止した置き場の
-# env 6 つで、既にあれば外す（ADR-0084）。
+# env 6 つで、既にあれば外す（置き場は固定）。
 #
 # 入れ終わったところで、ワークスペースの git の索引に projects/ の下が載っていないかを見て、
 # 載っていれば --lint と同じ文面で知らせる（止めない。索引も変えない）。
@@ -158,8 +158,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
   --deploy <ccnavi の根>    配布元。既定はこのスクリプトが入っている ccnavi の根
   --no-deploy               配布物を置かず、settings.json だけを書く
-  --all                     既定値を持つ env も明示して書く。置き場の env は廃止したので
-                            （ADR-0084）、今は足すものが無い
+  --all                     既定値を持つ env も明示して書く。置き場の env は廃止したので、
+                            今は足すものが無い
   --force                   明示した --mode / --ticket-control で、既にある値を置き換える。
                             配るときも、配布先に既にあるものを入れ替える
   --check                   書かずに、揃っていないところだけを並べる
@@ -175,7 +175,7 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 行があれば足さない）。
 
 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）は既定に
-固定で、env では動かない（ADR-0084）。既存の env に CCNAVI_PROJECTS・CCNAVI_PROJECT_HOME・
+固定で、env では動かない。既存の env に CCNAVI_PROJECTS・CCNAVI_PROJECT_HOME・
 CCNAVI_TICKETS_PROPOSAL・CCNAVI_TICKETS_APPROVED・CCNAVI_LOG・CCNAVI_STATE があれば外す。
 USAGE
 }
@@ -620,8 +620,8 @@ shape=$(printf '%s' "$current" | jq -r '
 # 書き込めてしまう。
 #
 # 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）の env は
-# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（ADR-0084。
-# 共通層の 3 本は ADR-0052）。読まれない語をつまみの一覧に混ぜると、そこを直せば置き場が
+# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通層の
+# 3 本は ADR-0052）。読まれない語をつまみの一覧に混ぜると、そこを直せば置き場が
 # 動くと読める。`--all` はその 4 つ（CCNAVI_STATE・CCNAVI_TICKETS_PROPOSAL・
 # CCNAVI_TICKETS_APPROVED・CCNAVI_PROJECT_HOME）を足すためのものだったので、今は足すものが無い。
 # 打ち慣れた手順が断られないように、オプションとしては受ける。
@@ -635,7 +635,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 	CCNAVI_TICKET_CONTROL: $ticket_control
 }')
 
-# 廃止した置き場の env と、その既定（ADR-0084、設計 wip/design/i0064-fixed-places.md §1・§5）。
+# 廃止した置き場の env と、その既定（置き場は固定。設計 wip/design/i0064-fixed-places.md §1・§5）。
 # 既に入っている settings.json の env にあれば外す。env は導入スクリプトが持つ欄なので、
 # 読まれない語を残さない。外した値が既定と違っていたら、名前と値を 1 行ずつ出す。
 # 既定と同じ値は黙って外す。導入は止めず、終了コードも変えない（--check では
@@ -658,7 +658,7 @@ leftover_places=$(printf '%s' "$current" | jq -r --argjson places "$PLACE_ENV_DE
 removed_places=$(printf '%s' "$current" | jq -r --argjson places "$PLACE_ENV_DEFAULTS" '
 	(.env // {}) as $cur | $places | to_entries[]
 	| .key as $k | select(($cur | has($k)) and $cur[$k] != .value)
-	| "\(.key) を .claude/settings.json から外しました（値: \($cur[.key])）。置き場は既定の \(.value) に固定されています（ADR-0084）。"
+	| "\(.key) を .claude/settings.json から外しました（値: \($cur[.key])）。置き場は既定の \(.value) に固定されています。"
 ')
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
@@ -990,7 +990,7 @@ fi
 # 廃止した置き場の env のうち、残っているもの。--check が書かずに並べる。
 report_places_plan() {
 	if [ -n "$leftover_places" ]; then
-		printf '外す env（置き場は既定に固定で、env では動かない。ADR-0084。打ち直すと外します）:\n'
+		printf '外す env（置き場は既定に固定で、env では動かない。打ち直すと外します）:\n'
 		printf '%s\n' "$leftover_places" | sed 's/^/  /'
 	fi
 }

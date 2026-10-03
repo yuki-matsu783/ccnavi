@@ -502,7 +502,7 @@ class RemovesThePlaceVariables(SetupTest):
             state[0],
         )
         self.assertIn("logs/state", state[0])
-        self.assertIn("ADR-0084", state[0])
+        self.assertIn("に固定されています", state[0])
         home = [line for line in lines if "CCNAVI_PROJECT_HOME" in line]
         self.assertEqual(len(home), 1, result.stdout)
         self.assertIn("値: .navi）", home[0])
