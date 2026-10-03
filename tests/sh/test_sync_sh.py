@@ -512,7 +512,7 @@ class SyncTest(unittest.TestCase):
 
     def test_a_pushed_branch_without_a_record_stops_without_writing_gone(self):
         # 送った跡（origin/P・追跡の設定）はあるが、控えの無い親子のチケット
-        # （2b より前に送ったもの）。
+        # （控えを作る仕組みが入る前に送ったもの）。
         self.review_says("none")
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)

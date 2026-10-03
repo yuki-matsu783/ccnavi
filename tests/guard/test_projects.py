@@ -553,7 +553,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
     def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
-        """取り込み済みのプロジェクトの親子のチケットも止まる（2c）。
+        """取り込み済みのプロジェクトの親子のチケットも止まる。
 
         控えは sync/<プロジェクト>/ に置く。
         """

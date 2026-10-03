@@ -88,7 +88,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         """C1 の書いたパスの一覧（基点は親のワークツリー）で、着手の写しは外でも通す。"""
         write(self.risk, COMMON_SCRIPT_RISK)
         write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
-        # 取り込み済みの親子のチケット（控えがある）の写しは親のワークツリーに在る（2c）。提案を親の
+        # 取り込み済みの親子のチケット（控えがある）の写しは親のワークツリーに在る。提案を親の
         # ワークツリーに書いて承認し、それから控えを置く。
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         text = ticket_text("i0001", project="lib", allow=SCOPE)
