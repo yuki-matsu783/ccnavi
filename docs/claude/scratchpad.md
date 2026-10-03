@@ -22,5 +22,5 @@ keywords: [scratchpad, スクラッチパッド, 下書き, 使い捨て, 一時
   報告する。そのときは下書きを消さず、そのリポジトリの `.gitignore`（または `.git/info/exclude`）に `/scratchpad/`
   があるかを見る。`ccnavi --lint` も警告で言う
 - ワークツリーがまだ無いとき（ワークスペースルートで設定の下書きを作るなど）はセッションのスクラッチパッドを使う。
-  ルート直下は `main-tree` が止めるので、そこに `scratchpad/` を作っても書けない。セッション側の綴りは
-  Environment 欄が持つ
+  ルート直下は `main-tree` が止めるので、そこに `scratchpad/` を作っても書けない。セッション側のパスは
+  システムプロンプトの Environment に書かれている
