@@ -1,9 +1,9 @@
 /**
  * ボード画面（React）を happy-dom で動かす。
  *
- * 画面は束ねた 1 本（`out/webview/board.js`）で、拡張はそれを `<script nonce>` に流し込む。
+ * 画面はバンドルした 1 本（`out/webview/board.js`）で、拡張はそれを `<script nonce>` に流し込む。
  * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
- * 束ねるのは `pnpm test` の中の `scripts/bundle-webview.js`。
+ * バンドルするのは `pnpm test` の中の `scripts/bundle-webview.js`。
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
  */

@@ -35,7 +35,7 @@ export interface ApprovePreview {
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
-  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに写る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
+  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに書き出される中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
   readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];

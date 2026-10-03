@@ -21,7 +21,7 @@ export type PhasesTarget =
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
 
-/** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集）。引数は開く側が解く（空の綴りや未登録のプロジェクトの扱いは各パネルの持ち物） */
+/** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {
   /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース（プロジェクト外）、`"*"` は全部、未指定は前回のまま） */
   readonly board: (project?: string) => Promise<void>;

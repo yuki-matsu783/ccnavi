@@ -49,7 +49,7 @@ export function sameFlow(a: FlowDoc, b: FlowDoc): boolean {
   return a === b || sameValue(a, b);
 }
 
-/** 変わった欄の呼び名。知らない欄は綴りのまま */
+/** 変わった欄の呼び名。知らない欄は表記のまま */
 const FIELD_LABELS: Readonly<Record<string, string>> = {
   name: "名前",
   type: "種類",

@@ -1,9 +1,9 @@
 /**
  * ルール設定画面（React）を happy-dom で動かす。`test/helpers/risk.ts` と同じ役割。
  *
- * 画面は束ねた 1 本（`out/webview/rules.js`）で、拡張はそれを `<script nonce>` に流し込む。
+ * 画面はバンドルした 1 本（`out/webview/rules.js`）で、拡張はそれを `<script nonce>` に流し込む。
  * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
- * この入口の綴り（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
+ * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
  */

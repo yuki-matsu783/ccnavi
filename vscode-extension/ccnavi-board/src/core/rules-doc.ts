@@ -15,7 +15,7 @@ import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）は画面との契約（`rules-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿って束ねたものに解析器が丸ごと入る。
+ * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
  */
 
 /** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
@@ -102,7 +102,7 @@ function scalarText(map: YAMLMap, key: string): string {
   return typeof value === "string" ? value : String(value);
 }
 
-/** 変えていないブロック（`>-` / `|-`）の文を、元の折り返しのまま戻すための控え */
+/** 変えていないブロック（`>-` / `|-`）の文を、元の折り返しのまま戻すための記録 */
 interface BlockKeep {
   readonly node: YAMLMap;
   readonly key: (typeof BLOCK_KEYS)[number];

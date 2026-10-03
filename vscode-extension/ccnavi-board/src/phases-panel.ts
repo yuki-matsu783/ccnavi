@@ -53,7 +53,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
@@ -74,7 +74,7 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: PhasesDocument;
   readonly phasesPath: string;
-  /** ワークスペースルートからの相対で見せる綴り */
+  /** ワークスペースルートからの相対で見せるパス */
   readonly phasesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
@@ -168,7 +168,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -602,7 +602,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     redraw(current);
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は種類の中身が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToPhases);
     }
@@ -706,7 +706,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
+    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルのパスに直す。
     fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }

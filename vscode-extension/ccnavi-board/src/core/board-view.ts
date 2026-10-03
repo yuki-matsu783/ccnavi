@@ -6,7 +6,7 @@
  * 画面が返すのはユーザが押した操作（`BoardMessage`）だけで、判定も実行ファイルの呼び出しもしない。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
- * 片方だけが持てるものを置くと束ねられなくなる。
+ * 片方だけが持てるものを置くとバンドルできなくなる。
  */
 import type { ApprovePreview } from "./approvemodel.js";
 import type { DecidePreview } from "./decidemodel.js";
@@ -75,7 +75,7 @@ export type BoardData =
       readonly approval?: ApprovalOverlay;
       /**
        * 前の読み直しから動いたカード（`board-moved.ts`）。**決めるのも覚えるのも拡張ホスト**で、
-       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に印を出すだけ
+       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に動いた表示を出すだけ
        */
       readonly moved?: readonly Moved[];
       /**

@@ -51,7 +51,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "projects";
 const TITLE = "ccnavi プロジェクト管理";
 
@@ -92,7 +92,7 @@ export async function openProjects(): Promise<void> {
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -257,7 +257,7 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * 監視を張る。置き場の綴りは実行ファイルの答えから取るので、最初に読めたときに 1 度だけ張る
+ * 監視を張る。置き場のパスは実行ファイルの答えから取るので、最初に読めたときに 1 度だけ張る
  * （読めないまま開いたタブは、「更新」で読めたところで張る）。
  */
 function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: string): void {
@@ -266,7 +266,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
   }
   const { folder } = current;
   // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
-  // 設定の綴り（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
+  // 設定のパス（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
   // ワークスペースの設定のパスが取れない（壊れた JSON）なら、設定のルールファイルの監視は張らない。
   const rel = projectsRel === "" ? "projects" : projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
@@ -418,7 +418,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToProjects);
     }
@@ -559,7 +559,7 @@ function createSelfRules(current: PanelState, page: ProjectsPage): void {
   copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");
 }
 
-/** 共通の設定のルールをワークスペースかプロジェクトの設定のルールファイル（ルートからの相対）に写す。既にあれば上書きしない */
+/** 共通の設定のルールをワークスペースかプロジェクトの設定のルールファイル（ルートからの相対）にコピーする。既にあれば上書きしない */
 function copyCommonRules(current: PanelState, targetRel: string, label: string, repo: string): void {
   const root = current.folder.uri.fsPath;
   const target = path.join(root, ...targetRel.split("/"));

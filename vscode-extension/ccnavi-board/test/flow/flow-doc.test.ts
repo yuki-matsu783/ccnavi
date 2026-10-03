@@ -65,7 +65,7 @@ test("CB-T218 YAML を読んで書くだけなら、知らない欄も知らな�
   assert.doesNotMatch(text, /^\s*\{/m);
 });
 
-test("CB-T253 書き出しはユーザが読める形で、実行ファイル（YAML 1.1）が別の型に読む綴りは引用符で囲む", () => {
+test("CB-T253 書き出しはユーザが読める形で、実行ファイル（YAML 1.1）が別の型に読む表記は引用符で囲む", () => {
   // 同じ中身を 2 か所で持っても別名にしない（実行ファイルは別名を読まない）
   const shared = { x: 1, y: 2 };
   const doc: FlowDoc = {
@@ -78,7 +78,7 @@ test("CB-T253 書き出しはユーザが読める形で、実行ファイル（
   assert.doesNotMatch(text, /[&*]\w/);
   // 複数行の文は | の形
   assert.match(text, /prompt: \|\n {8}1 行目\n {8}2 行目\n/);
-  // YAML 1.1 で真偽値・八進・日付に読まれる綴りは引用符で囲む（キーも）
+  // YAML 1.1 で真偽値・八進・日付に読まれる表記は引用符で囲む（キーも）
   assert.match(text, /name: "yes"/);
   assert.match(text, /name: "no"/);
   assert.match(text, /mode: "0755"/);
@@ -95,7 +95,7 @@ test("CB-T240 読みはルール設定の画面と同じ yaml の既定で、YAM
   // `yes` `off` は文字のまま（真偽値に差し替えない）。`y` `n` も文字。日付も文字
   assert.deepEqual(read.doc.nodes[0].position, { x: 1, y: 2 });
   assert.deepEqual(read.doc.nodes[0].data, { multiSelect: "yes", off: "n", when: "2026-01-01" });
-  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む綴りを囲む（書式の側の制約。ADR-0035）。y は囲まない
+  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む表記を囲む（書式の側の制約。ADR-0035）。y は囲まない
   const text = serializeFlow(read.doc);
   assert.match(text, /multiSelect: "yes"/);
   assert.match(text, /"off": n/);
@@ -263,7 +263,7 @@ test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え
   assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が 1 本")));
 });
 
-test("CB-T224 出入口は種類の既定に、読んだ線が使う綴りを足す。線の言葉は条件か出口の名前", () => {
+test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を足す。線の言葉は条件か出口の名前", () => {
   const doc = sample();
   const ask = doc.nodes[1];
   assert.deepEqual(portsOf(ask, connectionsOf(doc)), {
@@ -282,7 +282,7 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う綴りを足
   // 開始に入口は無く、終了に出口は無い
   assert.deepEqual(portsOf(doc.nodes[0], []).inputs, []);
   assert.deepEqual(portsOf(doc.nodes[3], []).outputs, []);
-  // ユーザが書いた線が別の綴りの出口を使っていれば、その出口も描く
+  // ユーザが書いた線が別の表記の出口を使っていれば、その出口も描く
   const odd = connect(doc, "mcp-1", "success", "end-1", "in-2");
   const mcpPorts = portsOf(odd.nodes[2], connectionsOf(odd));
   assert.deepEqual(
@@ -380,7 +380,7 @@ test("CB-T255 グループを解く・消すと、中のノードは図の上の
   assert.deepEqual(connectionsOf(removed).map((c) => c.id), ["c2"]);
 });
 
-test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグループに入り、外なら出る。グループは中身ごと動く。変わらなければ同じ写し", () => {
+test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグループに入り、外なら出る。グループは中身ごと動く。変わらなければ同じもの", () => {
   const grouped = groupNodes(three(), ["a"]);
   assert.ok(grouped !== undefined);
   const doc = grouped.doc;
@@ -399,7 +399,7 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
   const moved = placeNode(doc, "a", { x: 80, y: 60 });
   assert.equal(byId(moved, "a").parentId, "group-1");
   assert.deepEqual(byId(moved, "a").position, { x: 4, y: 12 });
-  // 動かしていなければ同じ写し（押しただけで未保存にしない）
+  // 動かしていなければ同じもの（押しただけで未保存にしない）
   assert.equal(placeNode(doc, "a", { x: 100, y: 100 }), doc);
   assert.equal(placeNode(doc, "group-1", { x: 76, y: 48 }), doc);
   assert.equal(placeNode(doc, "nothing", { x: 0, y: 0 }), doc);
@@ -436,7 +436,7 @@ test("CB-T257 まとめて動かしたときは React Flow の位置（枠から
   const inner = placeNodes(grouped.doc, [{ id: "a", position: { x: 30, y: 60 } }]);
   assert.deepEqual(byId(inner, "a").position, { x: 30, y: 60 });
   assert.equal(byId(inner, "a").parentId, "group-1");
-  // 何も動いていなければ同じ写し
+  // 何も動いていなければ同じもの
   assert.equal(placeNodes(grouped.doc, [{ id: "a", position: { x: 24, y: 52 } }]), grouped.doc);
 });
 
@@ -454,7 +454,7 @@ test("CB-T258 グループの大きさを変える。左や上の辺を動かし
   assert.deepEqual(absolutePosition(grown, "a"), { x: 100, y: 100 });
   // 下限
   assert.deepEqual(byId(resizeGroup(doc, "group-1", { width: 10, height: 10 }), "group-1").style, { width: 120, height: 80 });
-  // 変わらなければ同じ写し。グループでないものは変えない
+  // 変わらなければ同じもの。グループでないものは変えない
   assert.equal(resizeGroup(doc, "group-1", { width: 238, height: 166 }, { x: 76, y: 48 }), doc);
   assert.equal(resizeGroup(doc, "a", { width: 500, height: 500 }), doc);
 });

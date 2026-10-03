@@ -8,7 +8,7 @@ import { flowDisagreement, JSON_MARK, openDisagreementText, saveDisagreementText
 
 const float = (value: number) => ({ [JSON_MARK]: "float", value });
 
-test("CB-T251 整数と浮動小数は決め打ちで揃える。整数の値を持つ浮動小数・有限でない数・印の値は食い違い", () => {
+test("CB-T251 整数と浮動小数は決め打ちで揃える。整数の値を持つ浮動小数・有限でない数・マーカーの値は食い違い", () => {
   assert.equal(flowDisagreement({ a: 1, b: 1.5, c: "x", d: true, e: null, f: [1] }, { a: 1, b: float(1.5), c: "x", d: true, e: null, f: [1] }), undefined);
   // 実行ファイルが浮動小数で読んだ 1.0 を、画面は整数 1 で持つ（書けば 1 になる）
   assert.deepEqual(flowDisagreement({ a: 1 }, { a: float(1) }), { where: "a", screen: "整数 1", executable: "浮動小数 1.0" });

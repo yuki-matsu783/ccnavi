@@ -21,13 +21,13 @@ import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * 種類の形（`PHASE_KINDS`・`PhaseForm`・`PhasesForm` など）は画面との契約（`phases-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿って束ねたものに解析器が丸ごと入る。
+ * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
  */
 
 /** 実行ファイルが読む版（phasetypes.VERSION） */
 export const PHASES_VERSION = 1;
 
-/** 範囲が「親の範囲そのまま」であることを言う綴り（phasetypes.INHERIT） */
+/** 範囲が「親の範囲そのまま」であることを言う表記（phasetypes.INHERIT） */
 export const INHERIT = "inherit";
 
 /** 並びで持つ欄。書く順もこの順 */
@@ -324,7 +324,7 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
     setValue(doc, node, "review", form.review, Scalar.PLAIN);
   }
 
-  // scope。inherit は綴りで書く（欄が無いのも inherit だが、意図が読めるように残す）。
+  // scope。inherit は値として書く（欄が無いのも inherit だが、意図が読めるように残す）。
   if (form.inherit) {
     const current = node.get("scope", true);
     if (current instanceof Scalar) {
