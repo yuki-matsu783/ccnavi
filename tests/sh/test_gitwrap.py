@@ -1052,7 +1052,8 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
 
 
 class FamilyRecordPushTest(GitWrapperTest):
-    """push が通ったら親のブランチの取り込み状態を作り、取り込み状態が gone なら送らない（ADR-0093 の 4.3）。
+    """push が通ったら親のブランチの取り込み状態を作り、
+    取り込み状態が gone なら送らない（ADR-0093 の 4.3）。
 
     取り込み状態は ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
     """
@@ -1289,7 +1290,8 @@ class WorktreeDetachTest(GitWrapperTest):
 
 
 class SymlinkedWorkspaceTest(GitWrapperTest):
-    """リンクを経た作業場でも組み込みの保護が有効（git のパスとワークスペースのパスを揃える。中 12）。"""
+    """リンクを経た作業場でも組み込みの保護が有効
+    （git のパスとワークスペースのパスを揃える。中 12）。"""
 
     def setUp(self):
         super().setUp()

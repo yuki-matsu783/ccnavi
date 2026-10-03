@@ -7,7 +7,8 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 
 見るのは次のとおり。
 
-1. 順序: hook のマーカーと状態の履歴を先にコミット → 取り込み → 書く → 書いたパスだけ commit --only → push。
+1. 順序: hook のマーカーと状態の履歴を先にコミット → 取り込み → 書く →
+   書いたパスだけ commit --only → push。
    統合先の取り込み結果も同じ回で書く
 2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・運ぶ処理は入れ子で通る
 3. 競合: リモートが進んでいれば取り込んでから書く。衝突したら取りやめて何も書かない
@@ -17,8 +18,10 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（D34 の configsync の
    写した層は例外。tests/ticket/test_core.py と tests/config/ が見る）
-8. hook の書きかけ（pending・skipped・状態の履歴の追記）は運び、ユーザの判断（c）と知らない変更（d）は止める
-9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親のブランチなら運ぶ処理を自動で呼ぶ
+8. hook の書きかけ（pending・skipped・状態の履歴の追記）は運び、
+   ユーザの判断（c）と知らない変更（d）は止める
+9. ユーザの判断の入口（ccnavi-review.sh chat など）は、
+   取り込み済みの親のブランチなら運ぶ処理を自動で呼ぶ
 10. D11: 取り込み状態の無い親のブランチ・origin の無いリポジトリ・chat だけの親のブランチは今のまま
     （コミットも push もしない）
 11. 運ぶ処理（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
@@ -315,7 +318,8 @@ class C1TicketTest(C1Harness):
         record = fields(self.record)
         self.assertEqual(record["state"], "present")
         self.assertEqual(record["sha"], head)
-        # 統合先の取り込み結果も同じ回で書く（2c の相談: 送った直後に取り込み結果が無く承認が止まる件）。
+        # 統合先の取り込み結果も同じ回で書く
+        # （2c の相談: 送った直後に取り込み結果が無く承認が止まる件）。
         head_file = os.path.join(self.state, "sync", "self", "integration", "head")
         self.assertTrue(os.path.isfile(head_file))
         self.assertFalse(os.path.exists(self.lock_dir()))
@@ -825,7 +829,8 @@ class C1NotImportedTest(C1Harness):
 
 
 class C1ChatOnlyTest(C1Harness):
-    """10. D11: chat だけの親のブランチ（マージリクエストを持たない）は、取り込み済みでも C1 にしない。"""
+    """10. D11: chat だけの親のブランチ（マージリクエストを持たない）は、
+    取り込み済みでも C1 にしない。"""
 
     plan = ("chores",)
 
@@ -857,7 +862,8 @@ class PhaseOne:
 
 
 class C1HumanTest(PhaseOne, C1Harness):
-    """9. ユーザの判断の入口は、取り込み済みの親のブランチなら運ぶ処理を自動で呼ぶ（D27）。11. 運ぶ処理。"""
+    """9. ユーザの判断の入口は、取り込み済みの親のブランチなら運ぶ処理を自動で呼ぶ（D27）。
+    11. 運ぶ処理。"""
 
     plan = ("chores", "design")
 
@@ -939,7 +945,8 @@ class C1HumanTest(PhaseOne, C1Harness):
 
 
 class C1NotImportedHumanTest(PhaseOne, C1Harness):
-    """10. D11: 取り込み状態の無い親のブランチでは、ユーザの判断の入口は置くだけで運ばない（今のまま）。"""
+    """10. D11: 取り込み状態の無い親のブランチでは、
+    ユーザの判断の入口は置くだけで運ばない（今のまま）。"""
 
     plan = ("chores", "design")
     imported = False
@@ -958,7 +965,8 @@ class C1NotImportedHumanTest(PhaseOne, C1Harness):
 
 
 # 実行ファイルの半分の代役。残った指摘の行き先（`--reviewed ... --yes`）だけを代わりに書き
-# （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、答えの JSON と下書きを書く）、
+# （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
+# 答えの JSON と下書きを書く）、
 # 残り（`c1 family`・`c1 sort`・`sync paths` など）は本物に渡す。
 HALF = """#!/bin/sh
 case " $* " in
@@ -1271,8 +1279,9 @@ class C1HostTest(C1Harness):
 class C1ChromeConfirmTest(PhaseOne, C1Harness):
     """Chrome のレビュー済みと手元の confirm の突き合わせ（ADR-0093 の 8.9。段階 4 の決定 3）。
 
-    取り込み済みの親のブランチでは、手元の CLI を直に打つと C1 に断られる（`--record-tree` が無い）。そこで
-    C1 と同じ手順（`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
+    取り込み済みの親のブランチでは、手元の CLI を直に打つと
+    C1 に断られる（`--record-tree` が無い）。そこで C1 と同じ手順
+    （`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
     回し、同じ状態から Chrome の入口が出す書くものと、C1 が親のブランチへ書いて送ったものを比べる。
     違ってよいのは経路（`via`）と時刻（`at`）と拡張の版だけ。アカウント（`actor`）は、手元は sh が
     トークンの持ち主を引いたもの、Chrome は PAT の持ち主で、同じ見本なので同じになる。
@@ -1337,7 +1346,8 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         return files
 
     def chrome_request(self, scene=None):
-        """拡張が組むのと同じ要求（統合先 main、親のブランチ i0001、録った見本、依頼の後の変更の一覧）。"""
+        """拡張が組むのと同じ要求（統合先 main、親のブランチ i0001、録った見本、
+        依頼の後の変更の一覧）。"""
         from tests.ticket.test_core import _chrome
 
         chrome = _chrome()

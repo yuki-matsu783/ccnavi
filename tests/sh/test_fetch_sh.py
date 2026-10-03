@@ -305,7 +305,8 @@ class FetchTest(unittest.TestCase):
     # ---- 取り込み済みの親のブランチ（ADR-0093 の 4.2。段階 2b）
 
     def family(self, name="i0001", record=True):
-        """親のワークツリー .claude/worktrees/<name>（親チケットを送ってある）と親のブランチの取り込み状態。"""
+        """親のワークツリー .claude/worktrees/<name>
+        （親チケットを送ってある）と親のブランチの取り込み状態。"""
         self.leave_main()
         tree = os.path.join(self.ws, ".claude", "worktrees", name)
         git(self.ws, "worktree", "add", "-q", tree, "-b", name, "main")
@@ -322,7 +323,8 @@ class FetchTest(unittest.TestCase):
         return tree
 
     def test_a_family_is_fast_forwarded_past_unrelated_work_in_progress(self):
-        # 前は未コミットの変更があるだけで進めなかった。取り込み済みの親のブランチは重なりを git に任せる。
+        # 前は未コミットの変更があるだけで進めなかった。
+        # 取り込み済みの親のブランチは重なりを git に任せる。
         tree = self.family()
         head = self.advance(self.remote, "i0001")
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
@@ -462,7 +464,8 @@ class FetchTest(unittest.TestCase):
         self.assertIn("nope（統合先）がリモートに無い", done.stdout)
 
     def test_a_worktree_without_a_record_keeps_the_old_rule(self):
-        # 取り込み状態の無い（取り込み済みでない）親のブランチは今までどおり。書きかけがあれば進めない。
+        # 取り込み状態の無い（取り込み済みでない）親のブランチは今までどおり。
+        # 書きかけがあれば進めない。
         tree = self.family(record=False)
         before = self.sha(tree, "HEAD")
         self.advance(self.remote, "i0001")

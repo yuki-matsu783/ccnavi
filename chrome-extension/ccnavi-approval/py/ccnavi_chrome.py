@@ -7,7 +7,8 @@
 
 段階 2a から、判定のコア（`ccnavi.core`）の `plan`・`withdraw`・`confirm` も呼べる
 （`plan`・`withdraw`・`confirm` の操作）。どれも書くもの（Changes）を値で返すだけで、
-ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。段階 3 から、拡張は `plan`（承認）と
+ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。段階 3 から、
+拡張は `plan`（承認）と
 `withdraw`（取り下げ）の答えを親のブランチへの 1 コミットにして書く（8.3・8.4）。
 段階 4 から `confirm`（レビュー済み）の答えも同じく書く（8.9）。ボードの答えの `reviewable` が
 候補のフェーズで、ホストからスレッドとレビューを取得した結果は拡張が組んで `result` で渡す。
@@ -283,7 +284,8 @@ def _closed(snap: dict, place: dict) -> set[str]:
 def _op_families(req: dict, root: str) -> dict:
     """候補のブランチのうち、親のブランチであるもの。
 
-    親のブランチ = そのブランチの置き場に、ブランチ名と同じ識別子の親の提案か承認済みのチケットがある（4.2 の見分け）。
+    親のブランチ = そのブランチの置き場に、
+    ブランチ名と同じ識別子の親の提案か承認済みのチケットがある（4.2 の見分け）。
     閉じた親（`done/`）しか無いブランチは数えない。
     """
     snap = _snapshot(req)
@@ -365,7 +367,8 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
     """統合先をワークスペースルートに、親のブランチをワークツリーに置いた仮のツリーを組む。
 
     プロジェクトのリポジトリ（段階 5）は、ワークスペースの統合先をワークスペースルートに、
-    プロジェクトの統合先を `projects/<名前>/` に置き、親のブランチをそのプロジェクトのワークツリーにする。
+    プロジェクトの統合先を `projects/<名前>/` に置き、
+    親のブランチをそのプロジェクトのワークツリーにする。
     """
     shutil.rmtree(root, ignore_errors=True)
     os.makedirs(os.path.join(root, ".git", "worktrees"))
@@ -439,7 +442,8 @@ def project_layer(snap: dict, place: dict) -> dict[str, str]:
 
 
 def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
-    """取り込み状態に当たるもの（state の置き場からの相対パス → 中身）。手元の `ccnavi-sync.sh` が書く形。
+    """取り込み状態に当たるもの（state の置き場からの相対パス → 中身）。
+    手元の `ccnavi-sync.sh` が書く形。
 
     - 統合先の取り込み結果（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
       `.claude/settings.json` のコピーと `head`
@@ -464,7 +468,8 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
             if path.startswith(keep) or path == SETTINGS_FILE:
                 out[f"{base}/integration/{path}"] = text
     else:
-        # プロジェクトの統合先の取り込み結果（閉じたものとプロジェクトの層）と、ワークスペースの統合先の取り込み結果
+        # プロジェクトの統合先の取り込み結果（閉じたものとプロジェクトの層）と、
+        # ワークスペースの統合先の取り込み結果
         keep = tuple(p + "/" for p in place["project_paths"])
         for path, text in _files(snap, integ["name"]).items():
             if path.startswith(keep):
@@ -576,11 +581,13 @@ def _op_board(req: dict, root: str) -> dict:
             "reason": _write_refusal(snap, family),
         },
         "withdrawable": _withdrawable(req, root, place, family),
-        # レビュー済みを付けられる候補（段階 4）。通るかは `confirm` がホストから取得した結果で決める
+        # レビュー済みを付けられる候補（段階 4）。
+        # 通るかは `confirm` がホストから取得した結果で決める
         "reviewable": _reviewable(root, place, family),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出す（D22）ので、手を加えずに返す。
-        # 指紋はこの本文と承認済みのチケットの中身を覆い、手元の `--approve --preview` と同じ値になる。
+        # 指紋はこの本文と承認済みのチケットの中身を覆い、
+        # 手元の `--approve --preview` と同じ値になる。
         "text": body["text"] if batch else "",
         "digest": body["digest"] if batch else "",
         # 承認するときに `plan` へ渡す絞り。この指紋を出したときの絞りで、絞らなければ null
@@ -600,7 +607,8 @@ def _unreadable(snap: dict, closure: dict) -> str:
     バイナリ（`binary`）とシンボリックリンク（`links`）は読まない。シンボリックリンクの中身は指す先の
     パスの文字列で、手元でリンクを辿って読む中身とは違う。判定がそれらを読むかは分からないので、
     無いとも空とも読ませず「決まらない」として止める（6.2 の `NOT_FETCHED`）。段階 1 では知らせる
-    だけだったが、段階 3 で書き込むようになったので止めるようにした。シンボリックリンクを含む親のブランチは
+    だけだったが、段階 3 で書き込むようになったので止めるようにした。
+    シンボリックリンクを含む親のブランチは
     止まるので、リンクが指すパスへ書き込むことも無い。
     """
     names = [snap["integration"]["name"], *closure["families"]]
@@ -699,7 +707,8 @@ def _relative(root: str, text: str) -> str:
 
 
 def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
-    """親のブランチの仮のツリーを組む。答えは (snapshot, 置き場, 親のブランチ, 閉包)。時刻は組む前に確かめる。"""
+    """親のブランチの仮のツリーを組む。答えは (snapshot, 置き場, 親のブランチ, 閉包)。
+    時刻は組む前に確かめる。"""
     _stamp(req)
     snap = _snapshot(req)
     place = _placement(_text_or_none(req.get("settings")))
@@ -719,7 +728,8 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
 
 
 def _unwritten(root: str, notes: str) -> None:
-    """並べる段で状態の履歴を書けないと分かったら、書くものを出さずに止める（`core.withdraw` と揃える）。"""
+    """並べる段で状態の履歴を書けないと分かったら、
+    書くものを出さずに止める（`core.withdraw` と揃える）。"""
     lines = [
         _relative(root, line.replace("ccnavi: 警告: ", "ccnavi: ", 1))
         for line in notes.splitlines()
@@ -880,7 +890,8 @@ def _op_withdraw(req: dict, root: str) -> dict:
 def _op_confirm(req: dict, root: str) -> dict:
     """レビュー済みで書くもの（8.9。段階 4）。書かない。
 
-    `result` は `ccnavi-review.sh` が組むのと同じ形の、取得した結果（`{host, mr, threads, reviews}`）。
+    `result` は `ccnavi-review.sh` が組むのと同じ形の、
+    取得した結果（`{host, mr, threads, reviews}`）。
     依頼の後にユーザが見るものが動いたかは、手元の confirm と同じ関数（`review.moved_since`）
     で決める。材料は読んだ `P` の先頭と、依頼時の先頭からの変更の一覧（`compare`）。
     依頼時の先頭は Python がマーカーから読み、一覧が要るのに無ければ

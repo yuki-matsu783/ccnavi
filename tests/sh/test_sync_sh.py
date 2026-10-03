@@ -3,7 +3,8 @@
 使い捨てのワークスペースと bare のリモートを組み、sh を外から呼ぶ。リモートを動かすのは別に clone
 した押し手で、ワークスペースからは「他の機械が push した」「ホストがブランチを消した」ように見える。
 
-読み返すのは終了コード・標準出力と、git に残った ref、取り込み状態（logs/state/sync/...）の中身だけ。
+読み返すのは終了コード・標準出力と、git に残った ref、
+取り込み状態（logs/state/sync/...）の中身だけ。
 MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めた代役の sh に差し替える。
 """
 
@@ -37,7 +38,8 @@ COPY = f".ccnavi/approved/doing/{PARENT}.md"
 APPROVED_AT = "2026-09-01T00:00:00+0900"
 
 
-# 読める承認済みチケットにするための範囲（取り込みの後の検査は読めないチケットで親のブランチを止める）。
+# 読める承認済みチケットにするための範囲
+# （取り込みの後の検査は読めないチケットで親のブランチを止める）。
 ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
 
@@ -327,7 +329,8 @@ class SyncTest(unittest.TestCase):
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
-        # 元ツリーに未コミットで残った子チケット（親のワークツリーの外）。取り込み済みの親のブランチでは
+        # 元ツリーに未コミットで残った子チケット（親のワークツリーの外）。
+        # 取り込み済みの親のブランチでは
         # 信頼しないので、検査が親のブランチを止める。
         stray = write(
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
@@ -467,7 +470,8 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("closed", fields(self.record)["state"])
 
     def test_an_old_done_copy_of_the_same_id_is_not_this_family(self):
-        # 同じ識別子の古い親チケット（承認の時刻が違う）は、この親のブランチが閉じた記録ではない（中 6）。
+        # 同じ識別子の古い親チケット（承認の時刻が違う）は、
+        # この親のブランチが閉じた記録ではない（中 6）。
         self.review_says("none")
         self.keep_record()
         self.close_on_main(approved_at="2020-01-01T00:00:00+0900")
@@ -505,7 +509,8 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(kept, record["sha"])
 
     def test_a_pushed_branch_without_a_record_stops_without_writing_gone(self):
-        # 送った形跡（origin/P・追跡の設定）はあるが取り込み状態の無い親のブランチ（2b より前に送ったもの）。
+        # 送った形跡（origin/P・追跡の設定）はあるが取り込み状態の無い親のブランチ
+        # （2b より前に送ったもの）。
         self.review_says("none")
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
@@ -740,7 +745,8 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.record))
 
     def test_a_project_without_families_does_not_fail_the_run(self):
-        # 引数を省いた回で、親のブランチの無いプロジェクトの ls-remote が落ちても 1 にしない（軽 21）。
+        # 引数を省いた回で、親のブランチの無いプロジェクトの ls-remote が落ちても
+        # 1 にしない（軽 21）。
         project = os.path.join(self.ws, "projects", "p")
         git(self._tmp.name, "init", "-q", "-b", "main", project)
         git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))
@@ -830,7 +836,7 @@ class SyncTest(unittest.TestCase):
         self.assertTrue(os.path.isdir(lock))
 
     def test_a_forged_nesting_mark_is_not_trusted(self):
-        # CCNAVI_LOCK_HELD の持ち主の識別子がロックの持ち主と合わなければ入れ子として扱わない。
+        # CCNAVI_LOCK_HELD の持ち主の情報がロックの持ち主と合わなければ入れ子として扱わない。
         lock = self.own_lock(os.getpid(), int(time.time()))
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0", CCNAVI_LOCK_HELD=f"self/{PARENT}:1-2")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)

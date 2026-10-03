@@ -395,11 +395,11 @@ ccnavi_parent_tree() {
 # ロック（D32）。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
 # 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（ユーザに回す）。
-# 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<持ち主の識別子>" を子に渡す。
+# 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<持ち主の情報>" を子に渡す。
 # 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT・INT・TERM・HUP にも置く）。
 #
 # - `mkdir` の原子性で取る。`flock` は macOS に無い
-# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <持ち主の識別子> <OS>`、持ち主の識別子は `<pid>-<開始時刻>`。
+# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <持ち主の情報> <OS>`、持ち主の情報は `<pid>-<開始時刻>`。
 #   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
 # - 古い（段階 2d のレビューの決定 B）: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
 #   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても奪わない
@@ -431,7 +431,7 @@ ccnavi_lock_take() {
 		if [ -n "$ccnavi_lk_held" ] && [ "$ccnavi_lk_fields" = "$ccnavi_lk_held" ]; then
 			return 0
 		fi
-		log_warn 入れ子の持ち主の識別子がロックの持ち主と合わない -- "lock=$ccnavi_lk_key"
+		log_warn 入れ子の持ち主の情報がロックの持ち主と合わない -- "lock=$ccnavi_lk_key"
 		;;
 	esac
 	mkdir -p "${ccnavi_lk_dir%/*}" 2>/dev/null || return 1
@@ -446,7 +446,7 @@ ccnavi_lock_take() {
 			ccnavi_lk_now=$(date +%s)
 			ccnavi_lk_mark="$$-$ccnavi_lk_now"
 			ccnavi_lk_want="$ccnavi_lk_host $$ $ccnavi_lk_now $ccnavi_lk_mark $ccnavi_lk_os"
-			# 書く前に持ち主の識別子を覚えておく（書いた直後に切られても、drop が自分の owner と分かるように）。
+			# 書く前に持ち主の情報を覚えておく（書いた直後に切られても、drop が自分の owner と分かるように）。
 			ccnavi_lock_mark="$ccnavi_lk_mark"
 			if printf '%s\n' "$ccnavi_lk_want" >"$ccnavi_lk_dir/owner" 2>/dev/null &&
 				[ "$(ccnavi_lock_owner "$ccnavi_lk_dir")" = "$ccnavi_lk_want" ]; then
@@ -511,7 +511,7 @@ ccnavi_lock_stale() {
 	# shellcheck disable=SC2086
 	set -- "$1" "$2" "$3" $4
 	set +f
-	# $4 ホスト名 $5 pid $6 開始時刻 $7 持ち主の識別子 $8 OS
+	# $4 ホスト名 $5 pid $6 開始時刻 $7 持ち主の情報 $8 OS
 	ccnavi_ls_started=$(ccnavi_lock_num "${6:-}")
 	if [ -z "$ccnavi_ls_started" ]; then
 		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
@@ -595,7 +595,7 @@ ccnavi_lock_steal() {
 }
 
 # 自分が取ったロックを外す。入れ子で取ったもの（ccnavi_lock_dir が空）は外さない。
-# owner の持ち主の識別子が自分のものでなければ（奪われた後）触らない。自分が渡した CCNAVI_LOCK_HELD も消す。
+# owner の持ち主の情報が自分のものでなければ（奪われた後）触らない。自分が渡した CCNAVI_LOCK_HELD も消す。
 ccnavi_lock_drop() {
 	if [ -n "$ccnavi_lock_dir" ]; then
 		ccnavi_ld_line=$(ccnavi_lock_owner "$ccnavi_lock_dir")

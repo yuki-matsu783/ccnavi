@@ -857,7 +857,7 @@ request)
   - wip/eli5/ の下に無い"
 			;;
 		esac
-		# HEAD に入っていて、普通のファイル（モード 100644。リンク・実行権限付き・submodule は止める）で、
+		# HEAD に入っていて、普通のファイル（モード 100644。リンク・実行ビット付き・submodule は止める）で、
 		# 手元の中身が HEAD と同じこと。push 済みかは実行ファイルの前提が見る。
 		# ファイルが無いときは「無い」だけを言う（HEAD に無いのは言うまでもない）。
 		if [ -n "$eli5_safe" ] && [ -f "$eli5_path" ]; then
@@ -867,7 +867,7 @@ request)
   - HEAD に無い（未追跡か、まだコミットしていない）"
 			elif [ "$eli5_mode" != 100644 ]; then
 				eli5_unmet="${eli5_unmet}
-  - HEAD で普通のファイルでない（モード ${eli5_mode}。シンボリックリンクや実行権限付きは使わない）"
+  - HEAD で普通のファイルでない（モード ${eli5_mode}。シンボリックリンクや実行ビット付きは使わない）"
 			elif ! git -C "$eli5_top" diff --quiet HEAD -- "$eli5_rel" 2>/dev/null; then
 				eli5_unmet="${eli5_unmet}
   - HEAD から変わっている（未コミットの変更がある）"

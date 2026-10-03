@@ -64,8 +64,8 @@ test("CB-D41 親で絞り込むと他の親のブランチのカードが隠れ�
 });
 
 test("CB-D46 書き込みが止まっているカードは「要対応のみ」でも残る", async () => {
-  // `blocked` は不備として積まれ、`attention` が真になる（board.ts）。素の版では i0001-02 は隠れる
-  // （CB-D42）ので、`blocked` を付けたときだけ残ることが確かめられる。
+  // 信頼できない理由（`blocked`）は不備として積まれ、`attention` が真になる（board.ts）。素の版では
+  // i0001-02 は隠れる（CB-D42）ので、理由を付けたときだけ残ることが確かめられる。
   const base = fixture();
   const stopped = base.tickets.map((t) =>
     t.ticket === "i0001-02" ? { ...t, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" } : t,

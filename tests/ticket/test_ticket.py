@@ -1670,7 +1670,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(again.returncode, 0, again.stdout)
         self.assertIn("i0001-02 が複数の場所にある", again.stderr)
         self.assertIn("i0001-02:done", again.stderr)
-        # 次の一手まで言う。写しはどれも追跡されたファイルなので、「1 つにしてから」
+        # 次の一手まで言う。どの場所のチケットも追跡されたファイルなので、「1 つにしてから」
         # だけでは受け取った側にできることが読めない。
         self.assertIn("合流", again.stderr)
         lint = self.ccnavi("--lint", "--mode", "enable")
