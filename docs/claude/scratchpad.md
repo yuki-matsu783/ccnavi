@@ -14,13 +14,13 @@ keywords: [scratchpad, スクラッチパッド, 下書き, 使い捨て, 一時
 
 - `scratchpad/` は `.gitignore` に入っていて追跡されず、`git status` にも出ない。`worktree remove` は止まらずに通り、
   ワークツリーを畳めば一緒に消える
-- チケットが結び付いたワークツリーでも、そのまま書ける。実行前の判定はチケットの範囲を `scratchpad/` に当てない。
+- チケットが結び付いたワークツリーでも、そのまま書ける。実行前の判定は、チケットの範囲を `scratchpad/` には適用しない。
   範囲に `scratchpad/*` を足す必要は無い
-- 外れるのはルート直下 1 段の `scratchpad/` だけ（大文字小文字も区別）。`SCRATCHPAD/`・`scratchpadX/`・
-  `docs/scratchpad/` と、`scratchpad` という名前のファイルは普通の作業対象で、範囲の外なら止まる
+- 範囲の判定から外れるのはルート直下 1 段の `scratchpad/` だけ（大文字小文字も区別）。`SCRATCHPAD/`・`scratchpadX/`・
+  `docs/scratchpad/` と、`scratchpad` という名前のファイルは普通の作業対象で、範囲の外なら書き込みが止められる
 - `scratchpad/` が追跡されているリポジトリでは、実行後の監視とサブエージェント終了時の検査が下書きを範囲外として
   報告する。そのときは下書きを消さず、そのリポジトリの `.gitignore`（または `.git/info/exclude`）に `/scratchpad/`
-  があるかを見る。`ccnavi --lint` も警告で言う
+  があるかを見る。`ccnavi --lint` もこれを警告として出す
 - ワークツリーがまだ無いとき（ワークスペースルートで設定の下書きを作るなど）はセッションのスクラッチパッドを使う。
-  ルート直下は `main-tree` が止めるので、そこに `scratchpad/` を作っても書けない。セッション側のパスは
+  ルート直下への書き込みは `main-tree` が止めるので、そこに `scratchpad/` を作っても書けない。セッション側のパスは
   システムプロンプトの Environment に書かれている
