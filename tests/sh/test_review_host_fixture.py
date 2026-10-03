@@ -1,4 +1,4 @@
-"""ccnavi-review.sh がホストの応答から組む JSON と、印のアカウント
+"""ccnavi-review.sh がホストの応答から組む JSON と、マーカーのアカウント
 （ADR-0093 の 8.9。段階 4）の受入テスト。
 
 見るのは 3 つ。
@@ -9,7 +9,7 @@
    （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ JSON を組む
 2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの `review.effective`・`_unresolved`）が
    見本の `conclusion.json` と同じ
-3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。引けなければ渡さない（印は前と同じ）。
+3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。引けなければ渡さない（マーカーは前と同じ）。
    呼び手が `--actor` を渡しても受けない
 
 ホストの API が変わって見本を録り直したら、`CCNAVI_HOST_FIXTURE=1` を付けてこのテストを回し、
@@ -276,7 +276,7 @@ class HostFixtureTest(unittest.TestCase):
         self.assertIn("createdAt", ask(q.replace(" createdAt", ""))["errors"][0]["message"])
 
     def test_decide_passes_the_token_owner_and_the_way(self):
-        """段階 5: decide の印にも actor と via（ボードは board、端末は terminal）"""
+        """段階 5: decide のマーカーにも actor と via（ボードは board、端末は terminal）"""
         for args, via in (
             (["decide", "1", "--choices", "{}", "--digest", "d"], "board"),
             (["decide", "1"], "terminal"),
@@ -495,7 +495,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(done.stdout, "")
 
     def request_stub(self, out):
-        """実行ファイルの代役。`review prepare` で本文と下書きを書き、`--result` の JSON を控える。
+        """実行ファイルの代役。`review prepare` で本文と下書きを書き、`--result` の JSON を残しておく。
 
         受け取った引数は 1 行 1 つで `out/args.txt` に溜める。
         """
@@ -553,7 +553,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める（ADR-0097）。
 
         実行ファイルもホストも触らない。旧方式（追跡しない wip/tmp/ の HTML）も、wip/eli5/ の外の
-        wip/ も、名前に `'`・`$`・空白・日本語を含むものも、リンクや実行の印付きも止まる。
+        wip/ も、名前に `'`・`$`・空白・日本語を含むものも、リンクや実行権限付きも止まる。
         """
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
@@ -611,7 +611,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "名前に空白": (["--eli5", space], 1, bad_name),
             "名前に日本語": (["--eli5", japanese], 1, bad_name),
             "シンボリックリンク": (["--eli5", link], 1, ["普通のファイルでない（モード 120000"]),
-            "実行の印付き": (["--eli5", executable], 1, ["普通のファイルでない（モード 100755"]),
+            "実行権限付き": (["--eli5", executable], 1, ["普通のファイルでない（モード 100755"]),
         }
         for name, (flag, code, said) in cases.items():
             with self.subTest(name):

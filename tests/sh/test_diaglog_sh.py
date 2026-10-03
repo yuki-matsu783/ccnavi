@@ -169,7 +169,7 @@ class ShLoggerTest(_Workspace):
         self.assertEqual(3, len(self.lines()))
 
     def test_a_dropped_level_does_not_start_date(self):
-        # PATH の先頭に、呼ばれたら印を残す date を置く。
+        # PATH の先頭に、呼ばれたら目印を残す date を置く。
         bin_dir = os.path.join(self.ws, "fakebin")
         os.makedirs(bin_dir)
         mark = os.path.join(self.ws, "date-was-called")
