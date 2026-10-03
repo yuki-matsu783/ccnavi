@@ -6,7 +6,7 @@
 
 - **Reader**: 段階 2a では Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
   作業ツリー、Chrome は MEMFS に組んだ仮のツリー（ADR-0093 の 8.2「段階 1〜2a は MEMFS」）。
-  ブランチごとの blob の表から読む形（`NOT_FETCHED`）は、権威を `P` に固定する段階 2c 以降
+  ブランチごとの blob の表から読む形（`NOT_FETCHED`）は、本物とする側を `P` に固定する段階 2c 以降
 - **判定**: `judge_approval`（6.2 の `judge`。実行前チェックのモジュール `ccnavi.judge` と
   紛れないように名前を変えた）は承認の対象と画面と指紋を、`withdraw` と `confirm` は通らない
   理由を返す
@@ -16,7 +16,7 @@
 - **Writer(FS)**: `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
   （`fsio.recording`）がそのまま使われる
 - **Clock**: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
-  記録と跡に同じ時刻を書く
+  記録と履歴に同じ時刻を書く
 
 判定そのもの（`approval.gather` / `candidates` / `waiting`、`review` の検査）は今のコードを
 そのまま通る。ここは入口と出口の形を揃えるだけで、判定は変えない。
@@ -43,7 +43,7 @@ from . import ticket as ticket_mod
 class Actor:
     """誰がどの経路で動かしたか。`account` はホストのアカウント名か手元の git の user（8.9）。
 
-    空なら書かない（段階 2a の手元の経路は、印と跡の中身を今のままにする）。
+    空なら書かない（段階 2a の手元の経路は、マーカーと履歴の中身を今のままにする）。
     """
 
     account: str = ""
@@ -115,7 +115,7 @@ def judge_approval(
     一覧を今の一覧として比べる（ボードが古い）。識別子と指紋のどちらかが違えば `mismatch`。
     """
     err = io.StringIO()
-    # 判定が読んだ中身（read_set）を控え、指紋に入れる（ADR-0093 の 6.2。段階 2c）。
+    # 判定が読んだ中身（read_set）を記録し、指紋に入れる（ADR-0093 の 6.2。段階 2c）。
     with fsio.reading() as seen:
         gathered = approval.gather(err, snapshot.conf, snapshot.root, only)
         shown = gathered
@@ -209,7 +209,7 @@ def _owner(trees: list[tree.Tree], path: str) -> tree.Tree | None:
 
 
 def plan(snapshot: Snapshot, verdict: Verdict) -> Changes:
-    """承認の書き込みを並べる。書かない（fsio の控える段）。"""
+    """承認の書き込みを並べる。書かない（fsio の溜める段）。"""
     stamp = snapshot.stamp or fsio.stamp()
     planned = approval.plan_batch(snapshot.root, snapshot.conf, verdict.batch, stamp)
     return Changes(planned, snapshot.root, snapshot.conf)
@@ -225,11 +225,11 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> appro
     - `FAIL_WARN`: 同じ形で言って続ける
     - `FAIL_LINE`: 行を出し、同じ組の残り（続く書き込みと行）を飛ばす
     - `FAIL_QUIET`: 何も出さずに続ける
-    - `FAIL_HISTORY`: 跡の書けなかった知らせに溜める（入口が警告で出す）
+    - `FAIL_HISTORY`: 履歴の書けなかった知らせに溜める（入口が警告で出す）
 
     並べる段で止まっていたら（`planned.stopped`）、並べた分を書いてから同じ形で言って止める。
     `view_only` の書き込みは書かない。`Call` は同じ組で書けた名札（`tag`）を渡して呼び、
-    返った行を出す（マーカーの消去の行と跡は、実際に消せた種類で書く）。
+    返った行を出す（マーカーの消去の行と履歴は、実際に消せた種類で書く）。
     """
     placed: list[str] = []
     skipped: set[int] = set()
@@ -277,7 +277,7 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: approval.Planned) -> appro
 
 
 def _write_op(op: fsio.Op) -> str:
-    """控えた書き込み 1 つをディスクに書く。書けたら空文字、駄目なら理由。"""
+    """溜めた書き込み 1 つをディスクに書く。書けたら空文字、駄目なら理由。"""
     if op.kind == fsio.OP_TEXT:
         return fsio.write_text(op.path, op.text, op.newline)
     if op.kind == fsio.OP_TEXT_ATOMIC:
@@ -436,7 +436,7 @@ def verify(
       書けない場所が残るのは伝える値打ちがあるから、その行につけて見せる
     - 読めない提案（`problems`）。走査は絞る前の全ツリーを見るので、他のセッションの
       書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。
-      出さずに済ませることはせず、件数と綴りを本文に出す（自分が書いた 1 本かもしれないので）
+      出さずに済ませることはせず、件数と文面を本文に出す（自分が書いた 1 本かもしれないので）
 
     返すのは「はい」（0）か「いいえ」（`modes.EXIT_ANSWER_NO`）。使い方と設定の誤りで返す
     1 とは分ける。同じ値にすると、打ち方を間違えた回と提案が落ちる回が読む側から
@@ -470,7 +470,7 @@ def approve_yes(
     端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
     ものを承認する経路を使えなくするため。識別子に加えて、見せた承認画面の本文・判定が読んだ中身・
-    承認済みチケットに写る中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
+    承認済みチケットに書き込む中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
     画面に出ない欄（`issue` など）が書き換われば承認しない。
     指紋が無ければ承認しない。
 
@@ -485,7 +485,7 @@ def approve_yes(
     if not shown:
         stderr.write(
             "ccnavi: --yes には --digest（見せた承認画面の本文・判定が読んだ中身・"
-            "承認済みチケットに写る中身の指紋）が要る\n"
+            "承認済みチケットに書き込む中身の指紋）が要る\n"
         )
         return 1
     # 絞りが通らなかった（承認待ちに無い識別子が入っている、親の改版を外した）ときは、
@@ -507,7 +507,7 @@ def approve_yes(
             )
         else:
             stderr.write(
-                "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身が、"
+                "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身が、"
                 "今のものと違う（識別子は同じで、提案か、判定が読んだ承認済みチケット・マーカーなどの"
                 "中身が変わった）。見直してから承認してください\n"
             )
@@ -566,7 +566,7 @@ def approve_yes(
 def reviewed_mark(
     mr: int, accepted: list[str], actor: Actor | None = None, stamp: str = ""
 ) -> dict:
-    """レビュー済みの印の中身（8.9）。空の欄は書かない（`review.reviewed_mark`）。"""
+    """レビュー済みのマーカーの中身（8.9）。空の欄は書かない（`review.reviewed_mark`）。"""
     who = actor or Actor()
     return review.reviewed_mark(mr, accepted, who.account, who.via, stamp)
 
@@ -589,9 +589,10 @@ def confirm(
     result,
     changed_since_request: str,
 ) -> Checked:
-    """レビュー済みにしてよいかを見て、通れば書くもの（子を `done/` へ、レビュー済みの印）を並べる。
+    """レビュー済みにしてよいかを見て、通れば書くもの（子を `done/` へ、
+    レビュー済みのマーカー）を並べる。
 
-    `result` はホストの写し（`review.Result`、`ccnavi-review.sh` が組む形）。読めなかった
+    `result` はホストから取得した結果（`review.Result`、`ccnavi-review.sh` が組む形）。読めなかった
     ときの扱い（`--result` が無い、読めない）は読む側（手元は `confirm_local`）が持つ。
     `changed_since_request` は依頼の後にユーザが見るものが動いたかの説明（空なら動いていない）。
     手元は git の差分、Chrome は compare API から作る（8.9）。
@@ -606,7 +607,8 @@ def confirm(
     if ph is None:
         return Checked([f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"], None)
     if approval.MARK_REVIEWED in ph.marks:
-        # 重ね打ちで印と跡を書き直さない（11.8.1 の決定 B。`_already_requested` と同じ文面の形）
+        # 重ね打ちでマーカーと履歴を書き直さない（11.8.1 の決定 B。
+        # `_already_requested` と同じ文面の形）
         return Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
@@ -627,8 +629,8 @@ def confirm(
         return Checked(problems, None)
     stamp = snapshot.stamp or fsio.stamp()
     notes = io.StringIO()
-    # 跡の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形（8.9）。アカウントと
-    # 拡張の版も跡に足す（分かるときだけ。手元で引けなかったときは前と同じ中身）。
+    # 履歴の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形（8.9）。アカウントと
+    # 拡張の版も履歴に足す（分かるときだけ。手元で引けなかったときは前と同じ中身）。
     actor = snapshot.actor
     with (
         fsio.staging() as stage,
@@ -644,7 +646,7 @@ def confirm(
 
 
 def _unwritten(text: str) -> list[str]:
-    """並べる段で跡を書けないと分かった知らせ。書いても跡が残らないので、error として返す。
+    """並べる段で履歴を書けないと分かった知らせ。書いても履歴が残らないので、error として返す。
 
     手元の Writer(FS) なら警告で続ける所だが、ここで分かるのは書く前（識別子の形が違う、
     リンクになっている）なので、書かずに止めて直させる。
@@ -653,8 +655,8 @@ def _unwritten(text: str) -> list[str]:
 
 
 # `confirm_local` は前の `review.confirm` を移したもの。手元の入力の読み方（cwd の親、git の
-# 差分、`--result` の写し）は review の非公開の関数をそのまま使う。review だけが持つ読み方で、
-# 外に出す値打ちが無いので公開名にはしない。
+# 差分、`--result` で取得した結果）は review の非公開の関数をそのまま使う。
+# review だけが持つ読み方で、外に出す値打ちが無いので公開名にはしない。
 def confirm_local(
     stdout: TextIO,
     stderr: TextIO,
@@ -668,12 +670,13 @@ def confirm_local(
     """依頼の後を見る。通ればマーカーを置いて先へ進めるようになる。
 
     検査と書くものの並べ方はコア（`confirm`、ADR-0093 の 8.9）。ここは手元の入力
-    （cwd の親、git の差分、`--result` の写し）を読んで渡し、並べたものを書く（Writer(FS)）。
-    Chrome の「レビュー済み」も同じコアを通る。前は review.py にあった（コアより下の段に
-    置くと review → core → review の循環になる）。
+    （cwd の親、git の差分、`--result` で取得した結果）を読んで渡し、
+    並べたものを書く（Writer(FS)）。Chrome の「レビュー済み」も同じコアを通る。
+    前は review.py にあった（コアより下の段に置くと review → core → review の循環になる）。
 
     `actor` は `ccnavi-review.sh` がトークンの持ち主を引いて `--actor` で渡すアカウント（8.9。
-    段階 4）。あれば印に `actor` と `via: cli` を書く。空（引けなかった）なら印も跡も前と同じ。
+    段階 4）。あればマーカーに `actor` と `via: cli` を書く。空（引けなかった）
+    ならマーカーも履歴も前と同じ。
     """
     found = review._parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
@@ -682,8 +685,9 @@ def confirm_local(
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     moved = ""
     result = None
-    # 読む順は前と同じ。依頼の記録が無ければ差分も写しも見ない。動いていれば写しを読まない。
-    # レビュー済みなら差分も写しも読まない（コアが「レビュー済み」で止める。Chrome と同じ文面）
+    # 読む順は前と同じ。依頼の記録が無ければ差分も取得した結果も見ない。
+    # 動いていれば取得した結果を読まない。レビュー済みなら差分も取得した結果も読まない
+    # （コアが「レビュー済み」で止める。Chrome と同じ文面）
     if requested_mark is not None and approval.MARK_REVIEWED not in ph.marks:
         moved = review._moved_since_request(
             tree.worktree_path(root, parent.ticket), conf, requested_mark
@@ -704,7 +708,7 @@ def confirm_local(
 def reviewable(snapshot: Snapshot, parent_id: str) -> list[dict]:
     """依頼済みで、まだレビュー済みでないフェーズ（8.9）。Chrome のボードが出す候補。
 
-    並べるだけで、通るかは見ない（通るかは `confirm` がホストの写しで決める）。
+    並べるだけで、通るかは見ない（通るかは `confirm` がホストから取得した結果で決める）。
     答えは `{phase, mr, host, children}` の並び。`mr` と `host` は依頼のマーカーの値。
     """
     parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
@@ -760,7 +764,7 @@ def moved_on_host(
 
 
 def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_mod.Ticket | None:
-    """作業中の親の承認済みチケット（権威のある側）。`phase.parent_for_cwd` と同じ引き方。"""
+    """作業中の親の承認済みチケット（本物とする側）。`phase.parent_for_cwd` と同じ引き方。"""
     open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval.by_id(open_copies), parent_id)
     if found is None or found.is_child:
@@ -848,7 +852,7 @@ def withdraw(
 
 
 def withdrawable(snapshot: Snapshot, family: str) -> list[tuple[str, str, list[str]]]:
-    """家族の作業中（`doing/`）の写しごとの (識別子, 題, 取り下げられない理由)。
+    """親のブランチの作業中（`doing/`）のチケットごとの (識別子, 題, 取り下げられない理由)。
 
     Chrome のボードが「取り下げ」を出すかを決めるのに使う（8.8）。条件は `withdraw` と同じで、
     承認コミットの親の提案（`prior_proposals`）だけは引ける前提で見る（引くのはホストを読む側。
@@ -889,7 +893,8 @@ def _withdraw_problems(
     meta = meta if isinstance(meta, dict) else {}
     found: list[str] = []
     if copy.blocked:
-        # 家族が決まらない・親のブランチの外の写しなど（ADR-0093 の 3.3）。状態の操作と同じく止める
+        # 親のブランチが決まらない・親のブランチの外のチケットなど（ADR-0093 の 3.3）。
+        # 状態の操作と同じく止める
         found.append(copy.blocked)
     if meta.get("revised_at") or meta.get("feedback_at"):
         found.append("改版した承認は取り下げられない（改版で動いたものを戻せない）")

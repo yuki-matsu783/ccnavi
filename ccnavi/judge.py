@@ -51,7 +51,7 @@ DEADLINE_SECONDS = 3.0
 # 判断できる相手が居るモードは 4 つ。auto は classifier が読み、残りは Claude Code
 # 自身の権限の仕組み（settings.json の permissions と、モードごとの既定）が決める。
 # ccnavi がそこに確認を上乗せしても、判断する者が増えるわけではなく、同じ呼び出しで
-# 2 度聞かれるだけになる。ここに無い綴りは ask として扱う。名前が 1 つ増えたときに、
+# 2 度聞かれるだけになる。ここに無い名前は ask として扱う。名前が 1 つ増えたときに、
 # それが確認なしに通るのではなく確認になるように。
 PERMISSION_JUDGED = ("auto", "default", "acceptEdits", "plan")
 
@@ -60,7 +60,7 @@ PERMISSION_JUDGED = ("auto", "default", "acceptEdits", "plan")
 PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
 
 # 判定を権限モードへ渡したことを表す内部の値。タイプ名（rules.ALLOW など）と
-# 同じ変数に入るので、ルールファイルには現れない綴りにしてある。
+# 同じ変数に入るので、ルールファイルには現れない表記にしてある。
 HANDOVER = "(handover)"
 
 # 範囲の中かどうかを問うツール。作業ツリーを書き換えるものだけ。
@@ -111,7 +111,7 @@ def guard_setting_files(
     record: audit.Record,
     step: Callable[..., list[selfguard.Outcome]],
 ) -> str:
-    """ccnavi 自身の設定ファイルを控えと突き合わせる 1 回。返す文を作る。
+    """ccnavi 自身の設定ファイルをバックアップと突き合わせる 1 回。返す文を作る。
 
     実行前と実行後で違うのは呼ぶ関数だけなので、そこを引数で受け取る。
     対象の決め方も設定の解き方も 1 か所にまとまり、片方だけが別の対象を
@@ -145,7 +145,7 @@ def decide_before(
 ) -> int:
     """実行前チェックに達し、何が起きたかを record に書き込む。
     記録と応答が必ず同じ結論から作られるようにするため。"""
-    # 控えを取るのは判定より先。ここで取る断面が、この呼び出しが何かを書き換えて
+    # バックアップを取るのは判定より先。ここで取る断面が、この呼び出しが何かを書き換えて
     # しまったときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
     # 弾けなかったものだけが作業ツリーに届くので、届いた側から見れば
     # 「直前」は判定の前だから。
@@ -237,8 +237,8 @@ def decide_before(
                 conf=conf,
             )
 
-    # 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
-    # （phase.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と控えの置き場を
+    # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
+    # （phase.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の置き場を
     # シェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
     if (
         payload.tool_name in phase.SHELL_TOOLS
@@ -262,8 +262,8 @@ def decide_before(
                 conf=conf,
             )
 
-    # ユーザの判断の経路のうち、hook のほかに守りが無い形（端末要求を切る形、ボードの経路の形）は
-    # 止める。実行ファイルを呼ぶ綴りは追い切れないので、呼び方ではなく綴りの組で見る
+    # ユーザの判断の経路のうち、hook のほかに保護が無い形（端末要求を切る形、ボードの経路の形）は
+    # 止める。実行ファイルを呼ぶ表記は追い切れないので、呼び方ではなく文字列の組で見る
     # （phase.human_path_form）。
     if (
         conf.tickets_enabled
@@ -378,8 +378,8 @@ def decide_before(
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf)
 
     # 着手中の子のフローは書き換えさせない（設計 9.3.1、ADR-0085）。ルールより先に見る。
-    # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの守りでも止まる。ロックは
-    # その守りを切った設定でも当てはまり、止めた理由（着手中）を名指しする（締める向きだけ）。
+    # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの保護でも止まる。ロックは
+    # その保護を切った設定でも当てはまり、止めた理由（着手中）を名指しする（厳しくする向きだけ）。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         locked, scanned = flow_lock(conf, root, payload, record.subject, scanned)
         if index is None and scanned is not None:
@@ -450,7 +450,7 @@ def decide_before(
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
     # 判定を下したのは最初に当たったルール（設計 11.9）。その層を 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
-    # 外から足したルール（組み込みの守り、チケット）は層を持たないので空のまま。
+    # 外から足したルール（組み込みの保護、チケット）は層を持たないので空のまま。
     if group:
         record.source = group[0].source
 
@@ -683,10 +683,10 @@ def screen(
     3 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
     コマンドの層か）。読み切れないコマンドでもトークンに分けられる限り返る。Bash 以外は空。
-    `cd` で移った先から見た綴り（`shellread.Reading.moved`）も、実行役のコマンドの名前を
+    `cd` で移った先から見たパス（`shellread.Reading.moved`）も、実行役のコマンドの名前を
     `shellread.MOVED` にしてここに並ぶ。どちらも止める側のルールにだけ当てる。
 
-    4 つめは、書き直しを求める形の（形, 綴り）の並び（shellread.Reading.rewrites）。Bash 以外は空。
+    4 つめは、書き直しを求める形の（形, 表記）の並び（shellread.Reading.rewrites）。Bash 以外は空。
     """
     if tool != "Bash":
         return subject, subject, [], []
@@ -701,8 +701,8 @@ def screen(
                 strict=True,
             )
         )
-    # `cd` で移った先から見た綴りも、中で実行されるコマンドと同じ並びに足す（ADR-0069）。
-    # 書かれた綴りの当たり方は動かさず、当てる先を足すだけにする。止める側のルールにしか
+    # `cd` で移った先から見たパスも、中で実行されるコマンドと同じ並びに足す（ADR-0069）。
+    # 書かれた表記の当たり方は動かさず、当てる先を足すだけにする。止める側のルールにしか
     # 当たらないので、`cd` を読み違えても、当たるはずのものが当たらなくなることはない。
     inner += [
         (shellread.MOVED, command, False)
@@ -734,7 +734,7 @@ def project_mismatch(
     """
     if t.is_main:
         return ""
-    # 読むのは権威のある側（親のツリー）の写し。子のツリーにも checkout されているが、
+    # 読むのは本物とする側（親のツリー）のチケット。子のツリーにも checkout されているが、
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
     # チケットの範囲がいつまでも判定に使われる。
     assert index is not None
@@ -771,19 +771,19 @@ def flow_lock(
 ) -> tuple[str, list[ticket_mod.Ticket] | None]:
     """着手中の子のフローへの書き込みなら、その理由の文。と、読んだ承認済みチケットの並び。
 
-    当てるのは解いた綴り（`full`）と、解く前の綴り（payload のパスを cwd から繋いで `..` を
-    整えただけのもの）と、ディレクトリだけを解いた綴りの 3 通り。フローのファイルかその途中が
-    リンクでも、どれかの綴りが置き場に当たれば止める（止める向きだけ）。承認済みの領域の
+    当てるのは解いたパス（`full`）と、解く前のパス（payload のパスを cwd から繋いで `..` を
+    整えただけのもの）と、ディレクトリだけを解いたパスの 3 通り。フローのファイルかその途中が
+    リンクでも、どれかのパスが置き場に当たれば止める（止める向きだけ）。承認済みの領域の
     `flows/` の下でなければ承認済みチケットを読まない。並びは識別子でまとめる前のもので、
-    どのツリーの写しでも着手中なら止める。
+    どのツリー上のチケットでも着手中なら止める。
     """
     field = SUBJECT_FIELDS.get(payload.tool_name, "")
     value = payload.field_value(field) if field else ""
     if payload.tool_name == "NotebookEdit":
         value = value or payload.field_value("file_path")
     spelled = fsio.spelled_path(value, payload.cwd)
-    # 3 通り目は、ディレクトリだけを解いてファイルの名前は残した綴り。リンク越しに置き場へ届き、
-    # 置き場のファイルがまたリンクのとき、解いた先も解く前も置き場の綴りにならない。
+    # 3 通り目は、ディレクトリだけを解いてファイルの名前は残したパス。リンク越しに置き場へ届き、
+    # 置き場のファイルがまたリンクのとき、解いた先も解く前も置き場のパスにならない。
     parent = fsio.parent_resolved(spelled)
     for path in dict.fromkeys(p for p in (full, spelled, parent) if p):
         found = flow.locate(conf, root, path)
@@ -794,7 +794,7 @@ def flow_lock(
         child = flow.lock_hit(copies, found[1], found[0])
         if child is not None:
             return flow.locked_message(conf, child, path), copies
-    # ハードリンクは綴りに置き場が出ない（M-1）。書き込み先が在って名前が 2 つ以上あるときだけ、
+    # ハードリンクはパスに置き場が出ない（M-1）。書き込み先が在って名前が 2 つ以上あるときだけ、
     # 着手中の子のフローと同じ中身（inode）かを見る。
     target = full or spelled
     if target and flow.hard_linked(target):
@@ -822,7 +822,7 @@ def ticket_verdict(
 ) -> tuple[str, str, str, str]:
     """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
 
-    コードは空のことが多い。記録に残す綴りを呼び手が決められないとき（範囲の外ではなく
+    コードは空のことが多い。記録に残す文面を呼び手が決められないとき（範囲の外ではなく
     チケット自体が信頼できないとき、ADR-0058）だけ、ここが返す。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
@@ -858,7 +858,7 @@ def ticket_verdict(
     if t is None or t.is_main:
         return "", "", "", ""
     assert index is not None
-    # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後チェックと
+    # 区別しない機械では表記の違いを許す。SubagentStart / SubagentStop / 実行後チェックと
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切ったワークツリーは案内では
     # 有効と言われながら判定では権限モード任せになる。
     ticket = tree.lookup(index, t.name)

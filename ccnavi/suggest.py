@@ -15,7 +15,7 @@
 **出すのは検証を通ったものだけ。** 候補ごとに、`--lint` と同じ読み（lint._rules）で
 ルールを確かめ、`--test-samples` と同じ判定（diagnose.try_one）で見本を回し、期待した
 タイプにならなかったものは落とす（落とした数は出す）。ルールを足す候補は、共通層の
-ルールファイルの写しに 1 件足した一時ファイルで試す。本物のファイルには書かない。
+ルールファイルのコピーに 1 件足した一時ファイルで試す。本物のファイルには書かない。
 
 形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのはユーザ
 （`/ccnavi-config` の手順）。
@@ -52,10 +52,10 @@ HANDOVER_MIN = 5
 # 種類ごとに出す候補の上限と、候補 1 件につける見本の上限。
 CANDIDATE_LIMIT = 10
 SAMPLE_LIMIT = 3
-# 候補の id の前置き。ユーザが名前を付け直す前提の仮の名前であることを綴りで言う。
+# 候補の id の前置き。ユーザが名前を付け直す前提の仮の名前であることを表記で言う。
 ID_PREFIX = "suggest-"
 
-# 記録の subject が上限で切られた印（audit._limited）。切れた綴りは見本にできない。
+# 記録の subject が上限で切られた目印（audit._limited）。切れた文字列は見本にできない。
 _CUT = re.compile(r"…\(\+\d+\)$")
 _ENV_ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=\S*")
 _COMMAND = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
@@ -100,7 +100,7 @@ class Candidate:
     tool: str
     count: int
     summary: str
-    # rules.yml に置く 1 件（書いた綴りの形）と、それをどの層のファイルに置くか。
+    # rules.yml に置く 1 件（書いた表記の形）と、それをどの層のファイルに置くか。
     rule: dict
     layer: str
     rules_path: str
@@ -132,7 +132,7 @@ class Candidate:
 
 
 def _placeholder(subject: str, root: str) -> str:
-    """見本に書く綴り。ルートを `/repo` にする（diagnose.SAMPLE_PLACEHOLDER）。"""
+    """見本に書く文字列。ルートを `/repo` にする（diagnose.SAMPLE_PLACEHOLDER）。"""
     for spelled in {os.path.realpath(root), root}:
         if spelled and spelled != "/":
             subject = subject.replace(spelled, diagnose.SAMPLE_PLACEHOLDER)
@@ -190,7 +190,7 @@ def _shape(tool: str, subject: str, root: str) -> tuple[str, dict, str] | None:
 
 
 def _usable(rec: dict) -> bool:
-    """候補の材料にできる実行前チェックの行か。切れた綴りと、読み切れなかった呼び出しは使わない。"""
+    """候補の材料にできる実行前チェックの行か。切れた文字列と、読み切れなかった呼び出しは使わない。"""
     subject = rec.get("subject")
     return (
         rec.get("event") == hookio.PRE_TOOL_USE
@@ -257,7 +257,7 @@ def _repeated_denies(records: list[dict], n: int) -> list[tuple[str, str, int, l
 
 
 def _written_rule(rule: rules.Rule) -> dict:
-    """ルール 1 件を、書いた綴りの形に戻す。"""
+    """ルール 1 件を、書いた表記の形に戻す。"""
     out: dict = {"id": rule.bare_id or rule.id, "match": rule.match}
     out["glob" if rule.glob else "regex"] = rule.glob or rule.regex
     if rule.message:
@@ -305,7 +305,7 @@ def _rule_candidates(
         with open(conf.rules, encoding="utf-8") as f:
             base = yaml.safe_load(f)
     except (OSError, yaml.YAMLError):
-        # 共通層を読めなければ、足した写しで試せない。試せない候補は出さない。
+        # 共通層を読めなければ、足したコピーで試せない。試せない候補は出さない。
         return [], len(groups)
     if not isinstance(base, dict):
         return [], len(groups)
@@ -387,7 +387,7 @@ def _message_candidates(
             None,
         )
         if hit is None:
-            # ルールファイルの外から来た根拠（組み込みの守り・チケット）か、もう無いルール。
+            # ルールファイルの外から来た根拠（組み込みの保護・チケット）か、もう無いルール。
             # 文面を直せる先が無いので候補にしない。
             dropped += 1
             continue
@@ -429,7 +429,7 @@ def _message_candidates(
 
 def collect(conf: settings.Settings, root: str) -> dict:
     """候補を集めて 1 つの辞書にする。鍵は README「候補の JSON」。"""
-    # 試験と同じく控えを持たない。候補の検証で「1 度だけ渡す文」を消費しない。
+    # 試験と同じく記録を持たない。候補の検証で「1 度だけ渡す文」を消費しない。
     conf = dataclasses.replace(conf, state="")
     paths = log_files(conf.log)
     records = read_records(paths)

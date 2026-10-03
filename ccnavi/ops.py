@@ -73,7 +73,7 @@ def start(
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "元リポジトリが承認済みチケットの project"
-            f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ綴りであること）。"
+            f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ表記であること）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
             f'worktree add "{worktree}" '
             f"-b {ticket_id}' で作ってください\n"
@@ -104,18 +104,18 @@ def start(
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
     if found.is_child:
-        # 着手のときのフローの指紋を控える。SubagentStart / SubagentStop が、着手のあとに
+        # 着手のときのフローの指紋を記録する。SubagentStart / SubagentStop が、着手のあとに
         # 書き換わったら知らせる（設計 9.3.1、ADR-0085。止めない）。
         started = replace(found, started_at=fields["started_at"])
         where, failed = flow.record_digest(conf, root, started)
         if failed:
             stderr.write(
-                f"ccnavi: {ticket_id} のフローの指紋を控えられない（{failed}）。"
+                f"ccnavi: {ticket_id} のフローの指紋を記録できない（{failed}）。"
                 "着手のあとの書き換えは知らせられない\n"
             )
         else:
             stdout.write(
-                f"フローの指紋を {where} に控えた。承認済みチケットと同じくユーザがコミットする\n"
+                f"フローの指紋を {where} に記録した。承認済みチケットと同じくユーザがコミットする\n"
             )
     for line in synced:
         stdout.write(line + "\n")
@@ -131,21 +131,21 @@ def _sync_config(
 ) -> list[str] | None:
     """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 11.12）。
 
-    返すのは着手の出力に足す行。写せなければ None（着手しない）。子は親のブランチに
+    返すのは着手の出力に足す行。コピーできなければ None（着手しない）。子は親のブランチに
     乗るので比べない。ワークスペース自身の作業は、共通層と同じリポジトリにあるので比べない。
     """
     if found.is_child or not found.project:
         return []
     copied, why = configsync.plan(conf, root, worktree)
     if why:
-        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {why}\n")
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層からコピーできない: {why}\n")
         return None
     if not copied:
         return []
     busy, why = configsync.dirty(worktree, copied)
     if why or busy:
         stderr.write(
-            f"ccnavi: {found.ticket} の設定を共通層から写せない: "
+            f"ccnavi: {found.ticket} の設定を共通層からコピーできない: "
             + (
                 why
                 or f"未コミットの変更がある（{', '.join(busy)}）。"
@@ -157,7 +157,7 @@ def _sync_config(
     where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
     failed = configsync.apply(where, found.ticket, copied)
     if failed:
-        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {failed}\n")
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層からコピーできない: {failed}\n")
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
@@ -177,7 +177,7 @@ def _sync_config(
     lines.append(
         f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
         f" '{git_sh} add' してコミットしてください。"
-        f"印 {mark} も、それを持つツリーでコミットしてください"
+        f"上書きの記録 {mark} も、それを持つツリーでコミットしてください"
     )
     return lines
 
@@ -243,7 +243,7 @@ def _close_parent(
 
     記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
     統合先に取り込む前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
-    締めた事実の残る先がここしか無い（設計 9.8）。
+    閉じた事実の残る先がここしか無い（設計 9.8）。
 
     案内は運び方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
     無いなら統合先に取り込むところまで。ccnavi はどちらでもマージしない。
@@ -259,7 +259,7 @@ def _close_parent(
         {"reviews": {str(n): venues[n] for n in sorted(venues)}},
     )
     if failed:
-        stderr.write(f"ccnavi: 締めた記録を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 閉じた記録を書けない: {failed}\n")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     if phase.chat_only(root, conf, found.ticket, venues):
         stdout.write(
@@ -385,7 +385,7 @@ def record_risk(
 def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
     """このチケットの層を決める `project:`（設計 11.4.1、11.4.2）。
 
-    権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
+    本物とするのは承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値はユーザが承認していないので、判定の根拠にしない。
     """
     if not found.is_child:
@@ -478,7 +478,7 @@ def _places(
 ) -> tuple[list[ticket_mod.Ticket], list[str], list[ticket_mod.Problem]]:
     """この識別子のチケットが在る置き場を全部引く。読めなかった理由と提案の不備も返す。
 
-    権威のあるツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
+    本物とするツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
     """
     hits: list[ticket_mod.Ticket] = []
     copies, notes = approval.scan(conf, root)
@@ -509,9 +509,9 @@ def _undecided(
 ) -> None:
     """どれが本物か決まらないときの文面。次にすることまで書く。
 
-    「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
-    できることが読めない。権威の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの家族は権威が親のブランチに決まって
+    「1 つにしてから」だけだと、どのツリー上のチケットも追跡されたファイルなので、受け取った側に
+    できることが読めない。本物とする側の決まり方（親のツリー → 元ツリー）と、この場面で
+    それが決まらない理由を名指しする。取り込み済みの親のブランチでは、本物とする側が親のブランチに決まって
     いるので、3.6 の案内（ADR-0093）を出す。
     """
     home = hits[0].parent or hits[0].ticket
@@ -519,23 +519,24 @@ def _undecided(
     st = approval.family_standing(conf, root, hits[0]) if conf is not None else None
     if st is not None and st.imported:
         stderr.write(
-            f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）の写しだけ"
-            "（取り込み済みの家族）。ほかのツリーの写しは読まない\n"
+            f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
+            "上のチケットだけ"
+            "（取り込み済みの親のブランチ）。ほかのツリー上のチケットは読まない\n"
         )
         for line in syncstate.guidance(root, st) if st.stop else []:
             stderr.write(f"  {line}\n")
         if not st.stop:
             stderr.write(
-                "  親のワークツリーの外の写しは、親のブランチへ運んでから消すか、"
+                "  親のワークツリーの外のチケットは、親のブランチへ運んでから消すか、"
                 "残ったワークツリーを片付けてから打ち直してください\n"
             )
         return
     stderr.write(
-        f"  本物は、親 {home} のワークツリーの写し。無ければ元ツリー"
-        "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）の写し\n"
+        f"  本物は、親 {home} のワークツリー上のチケット。無ければ元ツリー"
+        "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）上のチケット\n"
     )
     stderr.write(
-        "  どちらにも無いか、元ツリーより先の置き場に在る写しがあると、どれが本物か決まらない。"
+        "  どちらにも無いか、元ツリーより先の置き場に在るチケットがあると、どれが本物か決まらない。"
         "先に進んだ側を合流させるか、残ったワークツリーを片付けてから打ち直してください\n"
     )
 
@@ -569,26 +570,28 @@ def _find(
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """取り込み済みの家族が決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
+    """取り込み済みの親のブランチが決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
 
-    その家族の状態の操作（着手・終了・取り消し・記録・レビューの印）は止める。引いた写しが
-    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残った写しなど）も、信頼しない写しを
-    動かさないように止める。控えの無い家族は何も言わない（今の動きのまま。D11）。
+    その親のブランチのチケットの状態の操作（着手・終了・取り消し・記録・レビューのマーカー）は止める。引いたチケットが
+    親のワークツリーの外にしか無いとき（元ツリーに未コミットで残ったチケットなど）も、信頼しないチケットを
+    動かさないように止める。取り込み状態の無い親のブランチには何も言わない（今の動きのまま。D11）。
     """
     st = approval.family_standing(conf, root, found)
     if not st.imported:
         return False
     if st.stop:
-        stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この家族の状態は動かさない\n")
+        stderr.write(
+            f"ccnavi: {found.ticket}: {st.stop}。この親のブランチのチケットの状態は動かさない\n"
+        )
         for line in syncstate.guidance(root, st):
             stderr.write(f"  {line}\n")
         return True
     if st.home is not None and not syncstate.same_tree(found.tree_root, st.home.root):
         stderr.write(
-            f"ccnavi: {found.ticket}: 写しが親のブランチ {st.family} のワークツリーの外"
-            f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの家族では"
-            "親のブランチの写しだけが本物なので、この写しは動かさない\n"
-            f"  ユーザがその写しを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
+            f"ccnavi: {found.ticket}: チケットが親のブランチ {st.family} のワークツリーの外"
+            f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの親のブランチでは"
+            "親のブランチ上のチケットだけが本物なので、このチケットは動かさない\n"
+            f"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
             "コミットと push をしてから打ち直す\n"
         )
         return True
@@ -701,8 +704,9 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     """親を閉じられない理由の一覧。空なら閉じてよい。
 
     `review ready`（Draft を外す）も同じ条件を見る。閉じてよい状態と、マージに
-    進んでよい状態は同じもの。ユーザが close-early で締めていれば、開いている子以外は問わない。
-    ユーザが締めたあとに残っているものは、締めたときに別の issue へ写してある。
+    進んでよい状態は同じもの。ユーザが close-early で早めに閉じていれば、
+    開いている子以外は問わない。ユーザが早めに閉じたあとに残っているものは、
+    閉じたときに別の issue へ書き出してある。
     """
     copies, _ = approval.scan(conf, root)
     open_children = [t.ticket for t in copies if t.parent == parent_id]
@@ -711,10 +715,10 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。"
             "子を先に閉じてください"
         ]
-    # 着手で共通層を写した親は、それをユーザに知らせるまで閉じず、Draft も外させない（設計 11.12）。
-    # 知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、締めた）は
-    # そこを通らないので、ユーザが端末で見たことを残させる。締めた親でも問うので、
-    # この下の早い return より前に置く。
+    # 着手で共通層をコピーした親は、それをユーザに知らせるまで閉じず、
+    # Draft も外させない（設計 11.12）。知らせるのは最初のレビュー。レビューの無い親（計画が無い、
+    # 全部 `review: none`、早めに閉じた）はそこを通らないので、ユーザが端末で見たことを残させる。
+    # 早めに閉じた親でも問うので、この下の早い return より前に置く。
     if configsync.pending(approval.home_dir(conf, root, parent_id, ""), parent_id):
         return [
             f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだユーザに知らせていない"
@@ -859,14 +863,14 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
 
     - 作業中（`doing/`）で着手済み。終わっても取り消されてもいない（`in_progress`）
-    - 信頼できない印（`blocked`）が無い。範囲が判定に使われていないチケットに終わりを勧めない
+    - 信頼できない理由（`blocked`）が無い。範囲が判定に使われていないチケットに終わりを勧めない
     - 基準点（`base_sha`）を持つ
     - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
       フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
     - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
     - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
 
-    git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり何も出さずに通す。
+    git を読めなければ促さない。促しは保護ではないので、読めないときは今までどおり何も出さずに通す。
     """
     here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if here is None or here.is_main:
@@ -928,7 +932,7 @@ def _own_commits(worktree: str, t: ticket_mod.Ticket) -> int:
 
 
 def _nudge_path(state_dir: str, session: str) -> str:
-    """促した (チケット, HEAD) の控え。セッションごとに置く（差し戻しの印と同じ）。"""
+    """促した (チケット, HEAD) の記録。セッションごとに置く（差し戻しの記録と同じ）。"""
     where = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"nudged-{where}.json")
 
@@ -940,7 +944,8 @@ def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
 
 
 def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
-    """促した (チケット, HEAD) を控える。書けなければ理由。git で運ぶ跡（history）には入れない。"""
+    """促した (チケット, HEAD) を記録する。書けなければ理由。
+    git で運ぶ履歴（history）には入れない。"""
     path = _nudge_path(state_dir, session)
     data = fsio.read_dict(path) or {}
     data[found.ticket.ticket] = found.head
@@ -948,7 +953,7 @@ def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
 
 
 def finish_nudge(root: str, found: Unfinished) -> str:
-    """Stop を止めて渡す文。打つ sh の綴りと、続けるならどうするかを言う。"""
+    """Stop を止めて渡す文。打つ sh のパスと、続けるならどうするかを言う。"""
     t = found.ticket
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     kind = "子チケット" if t.is_child else "親チケット"

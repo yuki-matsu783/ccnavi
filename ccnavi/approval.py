@@ -1,6 +1,6 @@
 """承認済みチケット。ユーザがチケットに合意したことの記録で、判定はここだけを読む。
 
-## なぜ承認済みチケットが権威なのか
+## なぜ承認済みチケットを本物とするのか
 
 チケットの提案はエージェントが書ける。判定が提案を直接読むと、範囲の外で
 止められたエージェントが範囲を書き足して通れる。承認のときに承認済みチケットを置き、判定は
@@ -9,15 +9,15 @@
 ## 承認済みチケットを守るのは置き場
 
 承認済みチケットは `.ccnavi/approved/` に置く。ccnavi ディレクトリの下なので、組み込みの
-守りがエージェントの書き込みを止める。
+保護がエージェントの書き込みを止める。
 
-**権威はこの置き場で、`ccnavi_approved` の欄ではない（ADR-0058）。** 欄は承認の記録で、
+**本物とするのはこの置き場で、`ccnavi_approved` の欄ではない（ADR-0058）。** 欄は承認の記録で、
 持たないチケットも承認済みとして読む。そこに置けたのは書ける権限を持つユーザだけだから。
 だから提案を手で `doing/` へ動かすことが、端末とボードに続く 3 つめの承認の経路になる。
 その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
 `blocking_problems` が判定の側で当てる。
 
-## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
+## チケットは 1 本のファイルで、コピーを持たない（ADR-0055）
 
 承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。
 エージェントが打つ `finish` は `doing/` から `wip/proposals/review/`
@@ -62,17 +62,17 @@ MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
 
 
 def copy_path(approved_dir: str, ticket_id: str) -> str:
-    """作業中の承認済みチケット（`doing/`）の綴り。判定が読むのはここだけ。"""
+    """作業中の承認済みチケット（`doing/`）のパス。判定が読むのはここだけ。"""
     return os.path.join(approved_dir, DOING_DIR, ticket_id + ".md")
 
 
 def closed_path(approved_dir: str, ticket_id: str) -> str:
-    """閉じた承認済みチケット（`done/`）の綴り。"""
+    """閉じた承認済みチケット（`done/`）のパス。"""
     return os.path.join(approved_dir, DONE_DIR, ticket_id + ".md")
 
 
 def review_path(tree_root: str, tickets_rel: str, ticket_id: str) -> str:
-    """レビュー待ちのチケット（提案の置き場の `review/`）の綴り。"""
+    """レビュー待ちのチケット（提案の置き場の `review/`）のパス。"""
     base = os.path.join(tree_root, tickets_rel.replace("/", os.sep))
     return os.path.join(base, ticket_mod.REVIEW, ticket_id + ".md")
 
@@ -98,7 +98,8 @@ def _load_dir_detail(
 ) -> tuple[list[ticket_mod.Ticket], list[tuple[str, str]]]:
     """`_load_dir` の中身。読めなかったものを (パス, 説明) で返す（置き場ごとならパスは置き場）。"""
     try:
-        # fsio を通す。承認の plan（控える段）の中では、同じ承認で動かした後の置き場を読む。
+        # fsio を通す。承認の plan（書き込みを溜める段）の中では、
+        # 同じ承認で動かした後の置き場を読む。
         names = sorted(fsio.listdir(directory))
     except FileNotFoundError:
         return [], []
@@ -152,17 +153,17 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_mod.Ticke
     「読めない」だけでは、BOM のような目に見えない原因に気づけない。
 
     `require_record` は `ccnavi_approved` の欄を必須にするか。`.ccnavi/approved/` は
-    組み込みの守りがエージェントの書き込みを止めるので、置き場だけで承認と言える
+    組み込みの保護がエージェントの書き込みを止めるので、置き場だけで承認と言える
     （ADR-0058）。`wip/proposals/review/` はエージェントが書ける側にあるので、そこは
-    欄を求め続ける（`review_all`）。守りが 1 つしか無い置き場で欄まで外すと、
+    欄を求め続ける（`review_all`）。保護が 1 つしか無い置き場で欄まで外すと、
     組み込みの deny に止められずに置かれたファイルが承認済みとして読まれる。
     """
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
         detail = problems[0].detail if problems else "チケットとして読めない"
         return None, detail
-    # `ccnavi_approved` は承認の記録であって、承認そのものではない（ADR-0058）。権威は
-    # 置き場で、`.ccnavi/approved/` は組み込みの守りがエージェントの書き込みを止める。
+    # `ccnavi_approved` は承認の記録であって、承認そのものではない（ADR-0058）。本物とするのは
+    # 置き場で、`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを止める。
     # 欄を必須にすると、端末もボードも無いユーザが置き場を動かして承認する経路が使えなくなる。
     # 欄が無いぶんの検査（親子・計画・置き場）は `blocking_problems` が判定の側で当てる。
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
@@ -173,7 +174,7 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_mod.Ticke
         ticket.source_tree = str(meta.get("source_tree") or "")
         ticket.source_path = str(meta.get("source_path") or "")
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
-    # 提案を写したか）とは違うもので、子のワークツリーの checkout では食い違う。
+    # 提案をコピーしたか）とは違うもので、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
     return ticket, ""
 
@@ -193,7 +194,7 @@ def scan_all(
     """全ツリーの承認済みチケットを、重複をまとめずに集める。
 
     承認済みチケットは親チケットのブランチに乗るので、そこから切った子のワークツリーにも
-    同じものが checkout されている。まとめないほうは、ボードが「どこに写っているか」を
+    同じものが checkout されている。まとめないほうは、ボードが「どこにコピーがあるか」を
     見せるために使う。
     """
     found: list[ticket_mod.Ticket] = []
@@ -211,8 +212,8 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tick
     """全ツリーのレビュー待ち（提案の置き場の `review/`）を、重複をまとめずに集める。
 
     ここに在るのは承認済みチケットが `finish` で動いてきたもの。`ccnavi_approved` を持たない
-    ファイルは読まない。この置き場はエージェントが書ける側にあり、守りは組み込みの
-    deny 1 つなので、欄を 2 つめの守りとして残す（ADR-0058）。
+    ファイルは読まない。この置き場はエージェントが書ける側にあり、保護は組み込みの
+    deny 1 つなので、欄を 2 つめの保護として残す（ADR-0058）。
     """
     found: list[ticket_mod.Ticket] = []
     notes: list[str] = []
@@ -230,17 +231,17 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tick
 def scan(
     conf: settings.Settings, root: str, closed: bool = False
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
-    """判定と承認が読む承認済みチケット。権威のあるツリーの側だけを残す。
+    """判定と承認が読む承認済みチケット。本物とするツリーの側だけを残す。
 
-    権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
+    本物とするのは親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
     落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
-    閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」にすると、閉じたチケットが
+    閉じたあとも開いた版が残る。「本物とする側に無ければ全部残す」にすると、閉じたチケットが
     開いたものとして復活する。親のツリーがその識別子をどの置き場（作業中・レビュー待ち・
     閉じた）にも持っていなければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
-    そのプロジェクト）の側を採り、そこにも無いときと、元ツリーより先の置き場に在る写しが
+    そのプロジェクト）の側を採り、そこにも無いときと、元ツリーより先の置き場に在るチケットが
     あるときだけ、見つかった側を全部残す（`ticket.fold` と同じ順・同じ条件）。
 
-    返す前に `mark_blocked` が「信頼できない理由」の印を付ける。承認のときにしか
+    返す前に `mark_blocked` が「信頼できない理由」を付ける。承認のときにしか
     当たらなかった構造の検査を、判定の側でも当てるため（ADR-0058）。
     """
     found, notes = scan_all(conf, root, closed)
@@ -252,14 +253,14 @@ def scan(
         everything = _everything(conf, root, open_all=found)
     kept = _authoritative(found, everything)
     if not closed:
-        # 判定が読むのは作業中の側だけ。閉じたものに印は要らない。
+        # 判定が読むのは作業中の側だけ。閉じたものに理由は要らない。
         mark_blocked(conf, kept)
         mark_imported(conf, root, kept)
     return kept, notes
 
 
 def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
-    """レビュー待ちのチケット。権威のあるツリーの側だけを残す（`scan` と同じ規則）。"""
+    """レビュー待ちのチケット。本物とするツリーの側だけを残す（`scan` と同じ規則）。"""
     found, notes = review_all(conf, root)
     kept = _authoritative(found, _everything(conf, root, review=found))
     mark_imported(conf, root, kept)
@@ -272,21 +273,21 @@ def mark_imported(
     kept: list[ticket_mod.Ticket],
     fams: syncstate.Families | None = None,
 ) -> None:
-    """取り込み済みの家族の写しに、信頼できない理由の印を付ける（ADR-0093 の 3.3）。
+    """取り込み済みの親のブランチのチケットに、信頼できない理由を付ける（ADR-0093 の 3.3）。
 
-    取り込み済みの家族は、家族の控えがある家族。
+    取り込み済みの親のブランチは、取り込み状態がある親のブランチ。
 
-    権威は親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
-    写しだけ。次の写しは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
+    本物とするのは親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
+    上のチケットだけ。次のチケットは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
 
-    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、`present` なのに親のワークツリーが
-      無い）
-    - 家族が閉じている（統合先の `done/` が権威）
-    - 親のワークツリーの外にしか無い写し（元ツリーに未コミットで残った写しなど。3.5）
+    - 親のブランチが決まらない（取り込み状態が `gone`・`blocked`・壊れている、
+      `present` なのに親のワークツリーが無い）
+    - 親のブランチが閉じている（統合先の `done/` を本物とする）
+    - 親のワークツリーの外にしか無いチケット（元ツリーに未コミットで残ったチケットなど。3.5）
 
-    **写しの並びは変えない（落とさない）。** 落とすと「在る」ことで止まっていたもの（承認待ちの
-    重複、開いた子のある親を閉じない）が通るようになる。印を足すだけなので、控えの無い家族と、
-    控えがあっても親のワークツリーの写しだけの家族では、答えは前と同じ。すでに印（`mark_blocked`）が
+    **チケットの並びは変えない（落とさない）。** 落とすと「在る」ことで止まっていたもの（承認待ちの
+    重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけなので、取り込み状態の無い親のブランチと、
+    取り込み状態があってもチケットが親のワークツリーにだけある親のブランチでは、答えは前と同じ。すでに理由（`mark_blocked`）が
     あれば、理由を連ねる（前の理由を消さない）。
     """
     fams = fams or syncstate.Families(conf, root)
@@ -304,14 +305,14 @@ def mark_imported(
 
 
 def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
-    """親のワークツリーの外にしか無い写しを信頼しない理由と、ユーザが運ぶ手順
+    """親のワークツリーの外にしか無いチケットを信頼しない理由と、ユーザが運ぶ手順
     （ADR-0093 の 3.5）。"""
     return (
         f"親のブランチ {st.family} のワークツリーの外"
-        f"（{t.tree or 'ワークスペースルート'}）にしか無い写し。"
-        "取り込み済みの家族では親のブランチの写しだけが本物。ユーザがその写しを親のワークツリー"
+        f"（{t.tree or 'ワークスペースルート'}）にしか無いチケット。"
+        "取り込み済みの親のブランチでは、親のブランチ上のチケットだけが本物。ユーザがそのチケットを親のワークツリー"
         f"（.claude/worktrees/{st.family}）の同じ置き場へ運んでコミットと push をし、"
-        "元の写しを消す"
+        "元のチケットを消す"
     )
 
 
@@ -321,7 +322,8 @@ def family_standing(
     t: ticket_mod.Ticket,
     fams: syncstate.Families | None = None,
 ) -> syncstate.Standing:
-    """このチケットの家族の立ち位置（`syncstate.Families.standing`）。家族は `parent` か自分。"""
+    """このチケットの親のブランチの立ち位置（`syncstate.Families.standing`）。
+    親は `parent` か自分。"""
     fams = fams or syncstate.Families(conf, root)
     return fams.standing(t.parent or t.ticket, t.project or "")
 
@@ -332,10 +334,10 @@ def family_problems(
     t: ticket_mod.Ticket,
     fams: syncstate.Families | None = None,
 ) -> list[rules.Problem]:
-    """取り込み済みの家族の提案を承認しない理由（ADR-0093 の 3.3・3.6・8.4）。
+    """取り込み済みの親のブランチの提案を承認しない理由（ADR-0093 の 3.3・3.6・8.4）。
 
-    家族が決まらない・閉じているなら承認しない。提案は親のブランチの上で書く（3.2）ので、
-    親のワークツリーの外にある提案も承認しない。控えの無い家族は何も言わない。
+    親のブランチが決まらない・閉じているなら承認しない。提案は親のブランチの上で書く（3.2）ので、
+    親のワークツリーの外にある提案も承認しない。取り込み状態の無い親のブランチには何も言わない。
     """
     fams = fams or syncstate.Families(conf, root)
     if not fams.active:
@@ -352,7 +354,7 @@ def family_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"提案が親のブランチ {st.family} のワークツリーの外"
-                f"（{t.tree or 'ワークスペースルート'}）にある。取り込み済みの家族の提案は"
+                f"（{t.tree or 'ワークスペースルート'}）にある。取り込み済みの親のブランチの提案は"
                 f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
                 "承認を頼んでください",
             )
@@ -368,10 +370,10 @@ def integration_problems(
 ) -> list[rules.Problem]:
     """新規の提案の識別子を統合先の `done/` と比べる（ADR-0093 の 3.3 の 4）。
 
-    開いた家族でも統合先の `done/` は常に一緒に読む。古い統合先から切った `P` で、閉じた
-    識別子の再利用が新規の承認として通らないように。統合先の `done/` は控え（D26）から、
-    家族の控えの有無に依らず、取り込んだ跡のあるリポジトリ（`sync/<リポジトリ>/`）の全提案に当てる。
-    控えが壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
+    開いた親のブランチでも統合先の `done/` は常に一緒に読む。古い統合先から切った `P` で、閉じた
+    識別子の再利用が新規の承認として通らないように。統合先の `done/` は取り込み結果（D26）から、
+    親のブランチの取り込み状態の有無に依らず、取り込んだことのあるリポジトリ（`sync/<リポジトリ>/`）の全提案に当てる。
+    取り込み結果が壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
     承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
     （今のまま）。
     """
@@ -389,7 +391,7 @@ def integration_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"統合先の控え（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
+                f"統合先の取り込み結果（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
                 "再利用を確かめられないので決まらない。承認しない。オンラインで"
                 f" '{sync}' を打って統合先を取り込み直してください",
             )
@@ -409,7 +411,7 @@ def integration_problems(
 def integration_closed(
     conf: settings.Settings, root: str, proposals: list[ticket_mod.Ticket]
 ) -> set[str]:
-    """統合先の控えの `done/` に同じ識別子がある新規の提案（3.3 の 4）。"""
+    """統合先の取り込み結果の `done/` に同じ識別子がある新規の提案（3.3 の 4）。"""
     fams = syncstate.Families(conf, root)
     if not fams.active:
         return set()
@@ -428,15 +430,17 @@ def _everything(
     closed_all: list[ticket_mod.Ticket] | None = None,
     review: list[ticket_mod.Ticket] | None = None,
 ) -> list[ticket_mod.Ticket]:
-    """作業中・レビュー待ち・閉じたの全部を、重複をまとめずに。権威のツリーを決めるために使う。
+    """作業中・レビュー待ち・閉じたの全部を、重複をまとめずに。本物とするツリーを決めるために使う。
 
-    3 つは呼び手が持ち込める。**控えではなく、同じ呼び出しの中で今しがた読んだものを
-    渡してもらう仕組み。** `scan` は `scan_all` を呼んだ直後にここを呼ぶので、渡さないと
-    同じ引数の `scan_all` が 1 つの式の中で 2 回走る。置き場のチケットは 1 本ずつ
-    YAML として解析されるので、この重複はチケットの本数にそのまま比例する。
+    3 つは呼び手が持ち込める。**読んだものを覚えておくのではなく、
+    同じ呼び出しの中で今しがた読んだものを渡してもらう仕組み。
+    ** `scan` は `scan_all` を呼んだ直後にここを呼ぶので、
+    渡さないと同じ引数の `scan_all` が 1 つの式の中で 2 回走る。
+    置き場のチケットは 1 本ずつYAML として解析されるので、
+    この重複はチケットの本数にそのまま比例する。
 
     渡すのは「自分が読んだ側」だけで、残りはここで読む。読む範囲も読む順も変わらない。
-    控えを持たないので、判定の途中でファイルが動く経路（`ticket finish` が親を締めた後、
+    読んだものを覚えておかないので、判定の途中でファイルが動く経路（`ticket finish` が親を閉じた後、
     `settle_review` が子を動かした後）でも、持ち込まなかった側は読み直される。
     """
     if open_all is None:
@@ -453,13 +457,14 @@ def _authoritative(
 ) -> list[ticket_mod.Ticket]:
     at_home = {t.ticket for t in everything if t.tree == (t.parent or t.ticket)}
     seen = _by_id(everything)
-    # 親のツリーが無いとき（作る前と、合流して片付けた後）は元ツリーが権威。ワークツリーは
+    # 親のツリーが無いとき（作る前と、合流して片付けた後）は元ツリーを本物とする。ワークツリーは
     # 片付ければ消えるが、元ツリー（ワークスペースルート。プロジェクトのチケットならその
-    # プロジェクト）は消えない。ただし元ツリーより先の置き場に在る写しがあれば採らない
+    # プロジェクト）は消えない。ただし元ツリーより先の置き場に在るチケットがあれば採らない
     # （合流していない側が新しい形）。`ticket.fold` と同じ順・同じ条件で決める。
     at_origin = {ticket_id for ticket_id, hits in seen.items() if _origin_is_current(hits)}
-    # リポジトリをまたいだ衝突はまとめない（`ticket.fold` と同じ）。違うチケットなので、権威を
-    # 決めるとどちらかが気づかないうちに消え、`--lint` の「複数のリポジトリにある」も出なくなる。
+    # リポジトリをまたいだ衝突はまとめない（`ticket.fold` と同じ）。違うチケットなので、
+    # 本物とする側を決めるとどちらかが気づかないうちに消え、
+    # `--lint` の「複数のリポジトリにある」も出なくなる。
     crossing = {ticket_id for ticket_id, hits in seen.items() if len({t.project for t in hits}) > 1}
     kept: list[ticket_mod.Ticket] = []
     for ticket_id, hits in _by_id(found).items():
@@ -476,13 +481,13 @@ def _authoritative(
 
 
 def _origin_is_current(hits: list[ticket_mod.Ticket]) -> bool:
-    """元ツリーがその識別子を持ち、かつ先へ進んだ写しが他に無いか（`ticket.fold` と同じ）。"""
+    """元ツリーがその識別子を持ち、かつ先へ進んだチケットが他に無いか（`ticket.fold` と同じ）。"""
     origin = [t for t in hits if t.tree == ticket_mod.origin_tree(t)]
     return bool(origin) and not ticket_mod.behind(origin, hits)
 
 
 def _by_id(found: list[ticket_mod.Ticket]) -> dict[str, list[ticket_mod.Ticket]]:
-    """識別子ごとの写りの全部。並びは見つけた順。"""
+    """識別子ごとのチケットの全部。並びは見つけた順。"""
     grouped: dict[str, list[ticket_mod.Ticket]] = {}
     for t in found:
         grouped.setdefault(t.ticket, []).append(t)
@@ -509,12 +514,12 @@ def home_dir(
     先に見ると、承認済みチケットとマーカーが別のツリーに分かれる。
 
     `project` はチケットのリポジトリ（ワークスペース自身なら空）。分からなければ None で、
-    取り込みの控えのあるリポジトリを全部探す（同じ識別子が 2 つのリポジトリにあれば決めない）。
+    取り込み状態のあるリポジトリを全部探す（同じ識別子が 2 つのリポジトリにあれば決めない）。
     """
     home = parent or ticket_id
-    # 取り込み済みの家族は親のブランチ（親のワークツリー）だけに書く（ADR-0093 の 3.4）。
-    # 元ツリーに未コミットで書く形（ADR-0073）はやめる。決まらない家族は、ここへ来る前に
-    # 状態の操作と承認が止める。
+    # 取り込み済みの親のブランチのチケットは、親のブランチ（親のワークツリー）
+    # だけに書く（ADR-0093 の 3.4）。元ツリーに未コミットで書く形（ADR-0073）はやめる。
+    # 決まらない親のブランチは、ここへ来る前に状態の操作と承認が止める。
     st = syncstate.standing_any(conf, root, home, project)
     if st.imported and st.home is not None and not st.stop:
         return settings.approved_dir(conf, st.home.root)
@@ -542,13 +547,13 @@ def home_dir(
 def source_path(t: ticket_mod.Ticket) -> str:
     """提案の、そのリポジトリ（ツリー）からの相対パス。区切りは "/"（ADR-0093 の D22）。
 
-    ツリーの外にある（ツリーが分からない）ときだけ、綴りをそのまま返す。
+    ツリーの外にある（ツリーが分からない）ときだけ、パスをそのまま返す。
     """
     if t.tree_root and t.path:
         try:
             rel = tree.relative(tree.Tree(t.tree, t.tree_root), t.path)
         except ValueError:
-            # Windows で別のドライブ（relpath が相対を作れない）。綴りのまま返す。
+            # Windows で別のドライブ（relpath が相対を作れない）。パスのまま返す。
             return t.path
         if rel and not rel.startswith("../") and rel != "..":
             return rel
@@ -578,7 +583,7 @@ def admit(
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
 
     `source_tree` は提案が乗っていたブランチの名前、`source_path` はそのリポジトリからの
-    相対パス（ADR-0093 の D22）。手元と Chrome で写しの中身を同じにするため。前は
+    相対パス（ADR-0093 の D22）。手元と Chrome で承認済みチケットの中身を同じにするため。前は
     ツリーの名前と絶対パスを書いていた。読む側（`load_copy`）はどちらの形も読み、判定は
     この 2 つを読まない（`diagnose` が見せるだけ）。
     """
@@ -688,7 +693,8 @@ def carry_flow(
     if failed:
         return [cannot.replace("{reason}", failed)]
     kept = (
-        f"{proposal.ticket} のフローを {target} へ写した。元の {source} は消せなかった ({{reason}})"
+        f"{proposal.ticket} のフローを {target} へコピーした。"
+        f"元の {source} は消せなかった ({{reason}})"
     )
     with fsio.policy(message=kept):
         failed = fsio.unlink(source)
@@ -703,12 +709,12 @@ def move_file(source: str, target: str) -> str:
     行き先に同じ名前が既に在れば動かさない。何も出さずに上書きすると、閉じた側の記録
     （取り消しの欄など）が消える。同じ識別子が 2 つ在るのは `--lint` が名指しする。
 
-    同じファイルシステムの中なら rename 1 回で済む。またぐとき（EXDEV）だけ写して消す。
-    消せなければ写した側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で
+    同じファイルシステムの中なら rename 1 回で済む。またぐとき（EXDEV）だけコピーして消す。
+    消せなければコピーした側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で
     止まる（`admit` と同じ）。Windows は開かれているファイルを消させないので、現実に起きる。
 
-    写して消す処理に回すのは EXDEV に限る。rename が他の理由（元が無い、など）で失敗した
-    ときまで回すと、写せずに戻す処理が、その間に別のプロセスが置いた行き先を消す。
+    コピーして消す処理に回すのは EXDEV に限る。rename が他の理由（元が無い、など）で失敗した
+    ときまで回すと、コピーできずに戻す処理が、その間に別のプロセスが置いた行き先を消す。
     """
     if fsio.exists(target):
         return f"チケットを動かせない ({source} → {target}: 行き先に既に在る)"
@@ -767,7 +773,7 @@ def followup(
 
     ユーザが端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
     そのフェーズは開き直り、マーカーは消える（REQ-TKT-21）。範囲は見た子の範囲の和。
-    本文には指摘を写す。返すのは識別子と、起こせなかった理由。
+    本文には指摘を書き写す。返すのは識別子と、起こせなかった理由。
     """
     ident = next_child_id(conf, root, parent.ticket)
     where = home_dir(conf, root, parent.ticket, "", project=parent.project)
@@ -849,7 +855,7 @@ PRED_SCATTERED = "scattered"
 PRED_SELF = "self"  # 自分自身
 PRED_ANCESTOR = "ancestor"  # 自分の親（子は親の中の作業で、親は子より先に閉じない）
 PRED_CYCLE = "cycle"  # 先行を辿ると自分に戻る
-# 取り込み済みの家族の先行で、その家族が決まらない・親のブランチの写しに無い
+# 取り込み済みの親のブランチの先行で、その親のブランチが決まらない・親のブランチ上に無い
 # （ADR-0093 の 3.3 の 5）。
 PRED_UNDECIDED = "undecided"
 # 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
@@ -864,7 +870,7 @@ PRED_LABELS = {
     PRED_SELF: "自分自身",
     PRED_ANCESTOR: "自分の親",
     PRED_CYCLE: "先行を辿ると自分に戻る",
-    PRED_UNDECIDED: "家族が決まらない",
+    PRED_UNDECIDED: "親のブランチが決まらない",
 }
 
 
@@ -897,10 +903,10 @@ def predecessor_pool_of(
     closed: list[ticket_mod.Ticket],
     proposals: list[ticket_mod.Ticket],
 ) -> dict[str, list[ticket_mod.Ticket]]:
-    """先行を引く池。識別子 → 権威のある写りの全部（`ops._places` と同じ集め方）。
+    """先行を引く池。識別子 → 本物とする側のチケットの全部（`ops._places` と同じ集め方）。
 
     承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
-    承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。写りが 2 つ以上
+    承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
     残れば、どれが本物か決まらない。
     """
     pool = _by_id(open_copies + review + closed)
@@ -924,19 +930,22 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
 def align_imported(
     conf: settings.Settings, root: str, pool: dict[str, list[ticket_mod.Ticket]]
 ) -> None:
-    """取り込み済みの家族の先行を、その家族の親のブランチの写しで読み直す（ADR-0093 の 3.3 の 5）。
+    """取り込み済みの親のブランチの先行を、その親のブランチ上のチケットで読み直す（ADR-0093 の
+    3.3 の 5）。
 
-    Chrome は先行を、参照の閉包の家族の `P` から引く。手元もそれに揃える。ただし**通る向きには
-    読み替えない**（段階 2c は締める向きだけ）。
+    Chrome は先行を、参照の閉包の親のブランチ `P` から引く。手元もそれに揃える。ただし**通る向きには
+    読み替えない**（段階 2c は厳しくする向きだけ）。
 
-    - 家族が決まらない（控えが `gone`・`blocked`・壊れている、親のワークツリーが無い）:
-      「家族が決まらない」にする（切り直しを案内する）
-    - 親のワークツリーにその識別子の写しが無い: 同じく「家族が決まらない」（親のブランチの外に
-      しか無い）
-    - 親のワークツリーの写しが 1 つで、閉じていない（作業中・レビュー待ち・承認待ち）: それを採る
-    - 親のワークツリーの写しで閉じている、写しが 2 つ以上: 前の池のまま（手元の全ツリーから
+    - 親のブランチが決まらない（取り込み状態が `gone`・`blocked`・壊れている、
+      親のワークツリーが無い）:「親のブランチが決まらない」にする（切り直しを案内する）
+    - 親のワークツリーにその識別子のチケットが無い: 同じく「親のブランチが決まらない」
+      （親のブランチの外にしか無い）
+    - 親のワークツリーのチケットが 1 つで、
+      閉じていない（作業中・レビュー待ち・承認待ち）: それを採る
+    - 親のワークツリーのチケットが閉じている、チケットが 2 つ以上: 前の池のまま（手元の全ツリーから
       引いた答え。前の池で満たしていなければ満たさないまま）
-    - 閉じた家族（統合先の `done/` に親の写しがある）と控えの無い家族: 前の池のまま
+    - 閉じた親のブランチ（統合先の `done/` に親のチケットがある）と取り込み状態の無い親のブランチ:
+      前の池のまま
     """
     fams = syncstate.Families(conf, root)
     if not fams.active:
@@ -959,7 +968,7 @@ def align_imported(
             pool[ident] = [
                 _undecided(
                     hits[0],
-                    f"親のブランチ {st.family} のワークツリーに {ident} の写しが無い"
+                    f"親のブランチ {st.family} のワークツリーに {ident} のチケットが無い"
                     f"（{', '.join(h.tree or '(ワークスペースルート)' for h in hits)} にしか無い）",
                 )
             ]
@@ -968,7 +977,7 @@ def align_imported(
 
 
 def _undecided(sample: ticket_mod.Ticket, why: str) -> ticket_mod.Ticket:
-    """先行の池に置く「家族が決まらない」の印。理由は `blocked` に入れて運ぶ。"""
+    """先行の池に置く「親のブランチが決まらない」の項目。理由は `blocked` に入れて運ぶ。"""
     return replace(sample, state=PRED_UNDECIDED, blocked=why)
 
 
@@ -1090,8 +1099,9 @@ def predecessor_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"先行 {p.ticket} の家族が決まらない（{p.where}）。取り込み済みの家族の先行は"
-                    "その親のブランチの写しで確かめる。親のワークツリーを切り直すか、"
+                    f"先行 {p.ticket} の親のブランチが決まらない（{p.where}）。"
+                    "取り込み済みの親のブランチの先行は"
+                    "その親のブランチ上のチケットで確かめる。親のワークツリーを切り直すか、"
                     "'ccnavi-sync.sh' で取り込み直してから出し直してください",
                 )
             )
@@ -1101,7 +1111,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} がどの置き場（todo/・doing/・review/・done/）にも無い。"
-                    "綴りを直すか、predecessors から外して出し直してください",
+                    "表記を直すか、predecessors から外して出し直してください",
                 )
             )
         else:
@@ -1144,7 +1154,7 @@ def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict
 
 @dataclass
 class Cleared:
-    """`clear_marks` の答え。`kinds` は消せた種類（控える段では消す種類）。
+    """`clear_marks` の答え。`kinds` は消せた種類（書き込みを溜める段では消す種類）。
 
     `failed` は reviewed を消せなかった理由（空でなければ呼び手は止める）。`warnings` は
     ほかの種類を消せなかった知らせ（残っていて判定に使われる）。
@@ -1168,12 +1178,13 @@ def clear_marks(
     """このフェーズのマーカーを全部消す（同じ番号に子を足した。REQ-TKT-21）。
 
     reviewed を消せなければ止める（`failed`）。残ればフェーズは済んだまま読まれ、足した子を
-    見ないまま先へ進めてしまう（判定を締める向き。ADR-0093 の 11.3）。ほかの種類は
+    見ないまま先へ進めてしまう（判定を厳しくする向き。ADR-0093 の 11.3）。ほかの種類は
     消せなくても止めず、残っていて判定に使われると言う（`warnings`）。
-    跡（phase-reopened の `cleared`）には実際に消せた種類だけを書く。
+    履歴（phase-reopened の `cleared`）には実際に消せた種類だけを書く。
 
-    控える段（承認の plan）では、消す書き込みに同じ扱いをつけ、跡と見せる行は Writer(FS) が
-    書けた種類で書く（`fsio.Call`）。`announce` は消せた種類から見せる行を作る関数。
+    書き込みを溜める段（承認の plan）では、消す書き込みに同じ扱いをつけ、
+    履歴と見せる行は Writer(FS) が書けた種類で書く（`fsio.Call`）。
+    `announce` は消せた種類から見せる行を作る関数。
     """
     stage = fsio.current_stage()
     present = [k for k in _CLEAR_ORDER if fsio.lexists(mark_path(approved_dir, parent, phase, k))]
@@ -1185,11 +1196,11 @@ def clear_marks(
                 fsio.unlink(path)
         kinds = [k for k in MARKS if k in present]
         if kinds:
-            # 見え方（Changes）には全部消えた後の跡を載せる。ディスクへは Call が書く。
+            # 見え方（Changes）には全部消えた後の履歴を載せる。ディスクへは Call が書く。
             with fsio.view_only():
                 _note_reopened(approved_dir, parent, phase, kinds)
 
-        # 跡の時刻と経路は並べたときのもの（書く時に時計を読み直すと、Changes と食い違う）。
+        # 履歴の時刻と経路は並べたときのもの（書く時に時計を読み直すと、Changes と食い違う）。
         at, via = fsio.stamp(), history.via()
 
         def run(done: set[str]) -> list[str]:
@@ -1261,11 +1272,11 @@ def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str
 
 # 親ごとのマーカー。フェーズの番号に付かないもの。
 #   ready.json   Draft を外した（外してよいと確かめた）。「マージに進んでよい」の合図
-#   close-early.json  ユーザが「キリの良いところまでやった」と締めた。残りは別の issue へ
+#   close-early.json  ユーザが「キリの良いところまでやった」と早めに閉じた。残りは別の issue へ
 #   closed.json  親を閉じた（`ticket finish <親>`）。どのフェーズをどこで見たかを残す
 #
 # closed.json が要るのは、提案（wip/）が統合先に取り込む前に消えるから。マージリクエストを
-# 作らない運び方（全フェーズが `review: chat`）では、締めた事実の残る先がここしか無い。
+# 作らない運び方（全フェーズが `review: chat`）では、親を閉じた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
 PARENT_MARK_CLOSE_EARLY = "close-early"
 PARENT_MARK_CLOSED = "closed"
@@ -1279,7 +1290,7 @@ def read_parent_mark(approved_dir: str, parent: str, name: str) -> dict | None:
     return fsio.read_dict(parent_mark_path(approved_dir, parent, name))
 
 
-# 親のマーカーのうち、状態の跡（history）に残すもの。締めと Draft を外した印。設定を写した印
+# 親のマーカーのうち、状態の履歴（history）に残すもの。親の閉じ方と Draft を外したこと。上書きの記録
 # （configsync）は状態ではないので残さない。
 PARENT_MARKS_IN_HISTORY = (PARENT_MARK_READY, PARENT_MARK_CLOSE_EARLY, PARENT_MARK_CLOSED)
 
@@ -1318,7 +1329,7 @@ def write_child_record(approved_dir: str, parent: str, child: str, kind: str, da
     )
 
 
-# ユーザが受け入れたスレッドの控え。フェーズのマーカーとは別の場所に、親ごとに 1 つ置く。
+# ユーザが受け入れたスレッドの記録。フェーズのマーカーとは別の場所に、親ごとに 1 つ置く。
 ACCEPTED_FILE = "accepted.json"
 
 
@@ -1335,8 +1346,8 @@ def accepted_threads(
     """この親で、ユーザが「未解決のまま進める」と受け入れたスレッドの識別。
 
     `phase` を渡すと、その番号のレビューで受け入れ済みと数えてよいものだけを返す。
-    受け入れはそのフェーズと、それを待つ番号（写しの `waits`）にだけ当てはまる（設計 9.8）。
-    並行した別の枝のレビューには当てはまらない。番号を持たない受け入れ（`close-early`）は
+    受け入れはそのフェーズと、それを待つ番号（コピーした待ち方の `waits`）にだけ当てはまる（設計
+    9.8）。並行した別の枝のレビューには当てはまらない。番号を持たない受け入れ（`close-early`）は
     親全体に当てはまる。
     """
     data = fsio.read_dict(accepted_path(approved_dir, parent))
@@ -1359,7 +1370,7 @@ def accepted_threads(
 def remember_accepted(
     approved_dir: str, parent: str, threads: list[str], phase: int | None = None
 ) -> str:
-    """受け入れたスレッドを控えに足す。失敗したら、その説明を返す。
+    """受け入れたスレッドを記録に足す。失敗したら、その説明を返す。
 
     フェーズのマーカーとは別の場所に置く。マーカーは 2 つの理由で消える。同じ番号のマーカーは
     `confirm` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
@@ -1608,7 +1619,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     names = [c.ticket.ticket for c in gathered.batch] + [t.ticket for t, _ in gathered.rejected]
     width = max((len(name) for name in names), default=0)
     rows: list[tuple[str, str, list[str]]] = []
-    # 苦情の綴りから識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
+    # 苦情の文面から識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
     # 同じものが出ている）。残すのは重さと中身。
     for cand in gathered.batch:
         notes = [f"{p.severity}: {p.detail}" for p in cand.complaints]
@@ -1642,7 +1653,7 @@ def _unreadable(gathered: Gathered) -> str:
     終了コードは動かさない。`--approve` も、承認待ちが 1 件も無いとき以外はこれで
     止まらないので、ここで落とすと「確かめは『いいえ』なのに承認は通る」になる。走査は絞る前の
     全ツリーを見るから、他のセッションの書きかけ 1 本で自分の提案が止まることにもなる。
-    出さずに済ませることもしない。自分が書いた 1 本かもしれないので、件数と綴りを本文に出す。
+    出さずに済ませることもしない。自分が書いた 1 本かもしれないので、件数と文面を本文に出す。
     """
     if not gathered.problems:
         return ""
@@ -1663,22 +1674,22 @@ def _note_line(note: str) -> str:
 
 
 def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | None = None) -> str:
-    """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに写る中身の
+    """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに書き込む中身の
     SHA-256 の 16 進（小文字）。
 
     ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
     見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
-    本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
+    本文だけを比べても、画面に出ないのに承認済みチケットへ書き込む欄（`issue`、Markdown の
     本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
 
     **判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）を指紋に含める。** 提案だけでなく、
-    判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の控えのどれかが見せたあとに
+    判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の取り込み結果のどれかが見せたあとに
     変われば、指紋が変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
     入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
     （`<ブランチ>:<相対パス>` → 中身の指紋）。
 
-    束のチケットの写る中身（`_carried`）も残して指紋に含める。読んだ中身から決まるものだが、読みの
-    記録（`fsio.reading`）を通らない読みが紛れても、写る中身の変化は取りこぼさないように。
+    一括のチケットの書き込む中身（`_carried`）も残して指紋に含める。読んだ中身から決まるものだが、読みの
+    記録（`fsio.reading`）を通らない読みが紛れても、書き込む中身の変化は取りこぼさないように。
 
     部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
     区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
@@ -1693,22 +1704,23 @@ def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | No
 
 
 def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[str, str]:
-    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す（ADR-0093 の 6.2）。
+    """判定が読んだ中身（`fsio.reading` に溜めた内容）を、
+    機械に依らない鍵に直す（ADR-0093 の 6.2）。
 
     鍵は `<リポジトリ>:<ブランチ>:<ツリーからの相対パス>`（"/" 区切り）。リポジトリは
-    ワークスペース自身なら `self`、プロジェクトならその名前（控えの名前と同じ。ブランチ名が
+    ワークスペース自身なら `self`、プロジェクトならその名前（取り込み状態の名前と同じ。ブランチ名が
     リポジトリをまたいで重なっても鍵は同じにならない。git の ref に `:` は使えない）。
     ブランチはそのツリーの HEAD が指すブランチ名（読めなければツリーの名前。ワークスペースルートの
     名前は空）で、`Changes.per_branch` と同じ決め方。ツリーは承認済みチケットを持ちうるもの全部
     （`trees`）で、最長一致。鍵に使ったツリーの HEAD の中身も `<リポジトリ>:<ブランチ>:(HEAD)` で
     入れる（切り離した HEAD の sha が変わればツリーの名前の鍵は同じでも指紋が変わる）。
-    控えの置き場の下は、取り込みの控え（`sync/`）だけを `(控え):<相対パス>` で
-    入れ、ほかの控え（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
+    state の置き場の下は、取り込み状態（`sync/`）だけを `(控え):<相対パス>` で
+    入れ、ほかの記録（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
     変わりうる）。ワークスペースの外は絶対パスのまま。
     """
-    # 読みの控えの綴りはリンクをたどった先（`fsio.note_read`）なので、比べる側も
+    # 溜めた読みのパスはリンクをたどった先（`fsio.note_read`）なので、比べる側も
     # たどった先に揃えてから大文字小文字をそろえる（macOS の /tmp のようなリンクを経たルート、
-    # Windows の綴りの揺れ）。
+    # Windows の表記の揺れ）。
     held = sorted(
         ((_real(t.root), t) for t in trees(conf, root)), key=lambda x: len(x[0]), reverse=True
     )
@@ -1754,8 +1766,8 @@ _SETTINGS_FILES = (
     settings.LOCAL_CLAUDE_SETTINGS,
 )
 # 承認の判定に影響する設定の値（環境変数からも来るので、ファイルの中身とは別に値そのものを入れる）。
-# 置き場の綴りとチケット制御だけ。控えの置き場（`state`）は入れない（取り込みの控えは中身で
-# `(控え):` に入る。置き場の綴りだけが違う起動で見せ直しにならないように）。モードと承認の守りは
+# 置き場のパスとチケット制御だけ。state の置き場（`state`）は入れない（取り込み状態は中身で
+# `(控え):` に入る。置き場のパスだけが違う起動で見せ直しにならないように）。モードと承認の保護は
 # 承認の答えを変えない（端末を求めるかどうか）ので入れない。
 _SETTINGS_VALUES = ("tickets", "approved", "projects", "project_home")
 
@@ -1765,9 +1777,9 @@ def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
 
     `settings.load` が読むファイル（`pyproject.toml`・`ccnavi.settings.local.json`）と
     Claude Code の設定（`.claude/settings.json`・`.claude/settings.local.json`）の中身を
-    `(設定):<相対パス>` で、判定に影響する値（置き場の綴り・チケット制御など。
+    `(設定):<相対パス>` で、判定に影響する値（置き場のパス・チケット制御など。
     環境変数から来るもの）を `(設定値):<名前>` で入れる。
-    見せたあとに置き場の綴りや設定が変われば、同じ画面でも指紋が変わる。
+    見せたあとに置き場のパスや設定が変われば、同じ画面でも指紋が変わる。
     """
     out: dict[str, str] = {}
     for rel in _SETTINGS_FILES:
@@ -1783,7 +1795,7 @@ def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
             if not inside.startswith(".."):
                 value = inside.replace(os.sep, "/")
         out[f"(設定値):{name}"] = fsio.content_digest(value)
-    # チケット制御は綴り（空・enable）ではなく有効かどうかで入れる。
+    # チケット制御は書かれた値（空・enable）ではなく有効かどうかで入れる。
     out["(設定値):ticket_control"] = fsio.content_digest(str(conf.tickets_enabled))
     return out
 
@@ -1800,10 +1812,10 @@ def _folded(path: str) -> str:
 
 
 def _carried(cand: Candidate) -> str:
-    """承認済みチケットに写る中身。承認の記録の欄を足す前の姿で書き出す。
+    """承認済みチケットに書き込む中身。承認の記録の欄を足す前の姿で書き出す。
 
     改版は承認済みチケットの frontmatter の計画だけを差し替え、本文は承認済みチケットの
-    ものを残す（`revise_copy`）。新規は提案をそのまま写す（`write_copy`）。
+    ものを残す（`revise_copy`）。新規は提案をそのまま書き出す（`write_copy`）。
     """
     t = cand.ticket
     if cand.is_revision and cand.current is not None:
@@ -1841,7 +1853,7 @@ def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: s
 
 
 def _news_path(state_dir: str, session: str, agent_id: str) -> str:
-    """このセッション（サブエージェントならその起動）が知っている承認済みチケットの控え。
+    """このセッション（サブエージェントならその起動）が知っている承認済みチケットの記録。
     `once-<session>-<agent>.json`（ctxfile）と同じ並びに置く。"""
     session_part = fsio.safe_name(session) or "unknown"
     agent_part = fsio.safe_name(agent_id) or "main"
@@ -1849,7 +1861,7 @@ def _news_path(state_dir: str, session: str, agent_id: str) -> str:
 
 
 def _known(path: str) -> dict[str, str] | None:
-    """控えにある「識別子 → 版」。控えが無ければ None。
+    """記録にある「識別子 → 版」。記録が無ければ None。
 
     読めるのに壊れているときは空の辞書を返す。「無い」と同じに扱うと、まだ伝えて
     いない承認ごと現状を起点にして何も伝えないことになる。何も知らないことにして、
@@ -1867,7 +1879,7 @@ def _known(path: str) -> dict[str, str] | None:
 def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
     failed = fsio.write_json_atomic(path, {"known": dict(sorted(known.items()))})
     if failed:
-        stderr.write(f"ccnavi: 承認を伝えた控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 承認を伝えた記録を書けない: {failed}\n")
 
 
 def _mark(t: ticket_mod.Ticket) -> str:
@@ -1885,7 +1897,7 @@ def _copy_marks(conf: settings.Settings, root: str) -> dict[str, ticket_mod.Tick
     """いまある承認済みチケット。開いたものと閉じたもの。
 
     閉じたものも見る。承認の直後・次の hook の前に子が閉じることがあり、開いたものだけを
-    見ると、その承認は誰にも伝わらないまま控えに入る。
+    見ると、その承認は誰にも伝わらないまま記録に入る。
     """
     found: dict[str, ticket_mod.Ticket] = {}
     for closed in (False, True):
@@ -1911,9 +1923,9 @@ def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list
 def baseline(
     stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str
 ) -> None:
-    """控えが無ければ、いまの承認済みチケットを「知っているもの」として書く。文は出さない。
+    """記録が無ければ、いまの承認済みチケットを「知っているもの」として書く。文は出さない。
 
-    SessionStart から呼ぶ。起動・再開・compact のどれでも来るが、控えがあれば
+    SessionStart から呼ぶ。起動・再開・compact のどれでも来るが、記録があれば
     触らない。compact の前に置かれた承認は、compact のあとにも 1 度は伝える。
     """
     if not conf.state or not conf.tickets_enabled:
@@ -1926,10 +1938,10 @@ def baseline(
 def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str) -> str:
     """このセッションがまだ知らない承認済みチケットがあれば、その承認を伝える文。1 度だけ。
 
-    最初の hook で控えが無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
+    最初の hook で記録が無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
     それより後に置かれた承認済みチケットと、版の変わった承認済みチケット（親の改版）が「新しい承認」になる。
-    控えを置けない（`--state ""`）ときは何も伝えない。診断の試し打ちで記録を汚さない側を採る。
-    サブエージェントは自分の控えを持つので、起動より前の承認は伝えない。
+    記録を置けない（`--state ""`）ときは何も伝えない。診断の試し打ちで記録を汚さない側を採る。
+    サブエージェントは自分の記録を持つので、起動より前の承認は伝えない。
 
     読み・判定・書きは直列化していない。同じセッションの hook が同時に走ると、同じ承認を
     2 度伝えることがある。伝えすぎる側なので受け入れる。取るべきでないのは逆で、
@@ -1981,7 +1993,8 @@ def candidates(
     cache: dict[str, dict | None] = {}
     # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
-    # 家族の立ち位置と統合先の控え（ADR-0093 の 3.3）。1 回の承認で 1 度ずつだけ読む。
+    # 親のブランチの立ち位置と統合先の取り込み結果（ADR-0093 の 3.3）。
+    # 1 回の承認で 1 度ずつだけ読む。
     fams = syncstate.Families(conf, root)
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
@@ -2043,7 +2056,7 @@ def candidates(
 
 
 def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案に待ち方の写し（`workflow:`）が書いてあれば拒む。写しを書くのは `--approve` だけ。"""
+    """提案に待ち方のコピー（`workflow:`）が書いてあれば拒む。コピーを書くのは `--approve` だけ。"""
     if ticket_mod.WORKFLOW_KEY not in t.raw:
         return []
     return [
@@ -2122,10 +2135,10 @@ def _apply_steps(
     batch: list[Candidate],
     stamp: str,
 ) -> tuple[str, str] | None:
-    """`plan_batch` の中身。書き込みは fsio の控える段に積み、見せる行も同じ並びに積む。
+    """`plan_batch` の中身。書き込みは fsio の書き込みを溜める段に積み、見せる行も同じ並びに積む。
 
     書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
-    控える段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
+    書き込みを溜める段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
     """
     from . import phase
 
@@ -2376,7 +2389,7 @@ def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
     if not found:
         return []
     return [
-        "■ 待ち方（承認すると親に写し、後から phases.yml を直しても変わらない）",
+        "■ 待ち方（承認すると親にコピーし、後から phases.yml を直しても変わらない）",
         *("    " + x for x in found),
     ]
 
@@ -2435,12 +2448,12 @@ def waiting(
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
     改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
-    計画が同じでも、いまの種類で計算した待ち方が承認済みチケットの写しと違えば改版になる
+    計画が同じでも、いまの種類で計算した待ち方が承認済みチケット上の待ち方と違えば改版になる
     （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
     チケットに使う種類を引く関数（`types_resolver`）。
     `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
-    統合先の控えの `done/` にある識別子（ADR-0093 の 3.3 の 4）はここでは外さず、`candidates` が
-    理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
+    統合先の取り込み結果の `done/` にある識別子（ADR-0093 の 3.3 の 4）はここでは外さず、
+    `candidates` が理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
     """
     known = by_id(approved + closed + review)
     open_index = by_id(approved)
@@ -2708,7 +2721,7 @@ def revise_copy(
 def revised_front(
     current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None = None
 ) -> dict:
-    """改版で書く frontmatter。承認済みチケットの frontmatter の計画と待ち方を差し替えた写し。
+    """改版で書く frontmatter。承認済みチケットの frontmatter の計画と待ち方を差し替えたコピー。
 
     `current` は書き換えない。承認の指紋（`digest`）も同じものから組むので、見せた
     中身と書く中身が食い違わない。
@@ -2734,7 +2747,7 @@ def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str
 
 
 def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """`project:` が層の名前に予約してある綴りなら error（設計 11.4）。"""
+    """`project:` が層の名前に予約してある表記なら error（設計 11.4）。"""
     if not t.project or not settings.is_reserved_layer_name(t.project):
         return []
     reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
@@ -2742,7 +2755,7 @@ def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"`project: {t.project}` は層の名前として予約してある綴り（{reserved}）。"
+            f"`project: {t.project}` は層の名前として予約してある表記（{reserved}）。"
             "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
             "ワークスペース自身の提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"
             "そのプロジェクトの名前を変えてから置いてください",
@@ -2917,14 +2930,14 @@ def blocking_problems(
 
 
 def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:
-    """判定が読む承認済みチケットに、信頼できない理由の印を付ける（ADR-0058）。
+    """判定が読む承認済みチケットに、信頼できない理由を付ける（ADR-0058）。
 
-    印を読むのは `phase.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
+    理由を読むのは `phase.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
     終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
 
     **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
-    別の池で引くと、ここでは親が見つかって印が付かないのに、判定の側では見つからず
+    別の池で引くと、ここでは親が見つかって理由が付かないのに、判定の側では見つからず
     `parent=None` のまま子の宣言だけで範囲が決まる（閉じた親やレビュー待ちの親まで
     引ける池にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
     承認していない範囲に書ける経路そのものなので、引けないなら止める側を採る。
