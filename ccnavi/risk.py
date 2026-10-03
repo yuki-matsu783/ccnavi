@@ -637,28 +637,33 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
             i += 2
         path = path.replace("\\", "/")
         changes[path] = Change(path=path, added=added, deleted=deleted)
+    # 消したファイルの数は name-status から数える。読めなければ測れなかったとして止める
+    # （0 件と数えると軽い側へ倒れる）。
     rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
-    if rc == 0:
-        parts = out.split("\0")
-        i = 0
-        while i < len(parts):
-            status = parts[i]
+    if rc != 0:
+        return None, "基準点からの変更の種類を読めない"
+    parts = out.split("\0")
+    i = 0
+    while i < len(parts):
+        status = parts[i]
+        i += 1
+        if not status:
+            continue
+        if status.startswith(("R", "C")) and i + 1 < len(parts):
+            path = parts[i + 1].replace("\\", "/")
+            i += 2
+        elif i < len(parts):
+            path = parts[i].replace("\\", "/")
             i += 1
-            if not status:
-                continue
-            if status.startswith(("R", "C")) and i + 1 < len(parts):
-                path = parts[i + 1].replace("\\", "/")
-                i += 2
-            elif i < len(parts):
-                path = parts[i].replace("\\", "/")
-                i += 1
-            else:
-                break
-            if path in changes:
-                changes[path].status = status[:1]
-            else:
-                changes[path] = Change(path=path, status=status[:1])
+        else:
+            break
+        if path in changes:
+            changes[path].status = status[:1]
+        else:
+            changes[path] = Change(path=path, status=status[:1])
     rc, sha = _git(worktree, ["rev-parse", head])
+    if rc != 0 or not sha.strip():
+        return None, "測った先のコミットを読めない"
     return Diff(changes=list(changes.values()), base=base, head=sha.strip()), ""
 
 
