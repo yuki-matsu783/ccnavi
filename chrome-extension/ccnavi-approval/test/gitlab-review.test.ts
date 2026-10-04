@@ -185,20 +185,22 @@ test("CX-T166 service worker の読み取りも、設定画面で登録したリ
 
 test("CX-T167 「始める」: service worker も統合先の先頭で閉じた識別子と互換の版を確かめ直す", async () => {
   const mock = new MockGitLab(fixture());
-  const head = mock.head("main");
-  const ask = (d: Deps, name: string) => dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args: ["acme", "widgets", name, head] }, BOARD, d);
   const d: Deps = deps(mock, TOKENS, new Map(), () => new Date(NOW), [GITLAB_REPO]);
-  const closed = await ask(d, "i0005");
-  assert.match((closed as { error: string }).error, /i0005 は統合先 main の done\/ で閉じている/);
-  const skew = await ask({ ...d, compat: COMPAT + 1 }, "i0012");
+  const closedText = mock.files("main")[".ccnavi/approved/done/i0005.md"].replaceAll("i0005", "feature-5-closed");
+  mock.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "閉じた家族");
+  const now = mock.head("main");
+  const ask = (dd: Deps, name: string) => dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args: ["acme", "widgets", name, now] }, BOARD, dd);
+  const closed = await ask(d, "feature-5-closed");
+  assert.match((closed as { error: string }).error, /feature-5-closed は統合先 main の done\/ で閉じている/);
+  const skew = await ask({ ...d, compat: COMPAT + 1 }, "feature-12-x");
   assert.match((skew as { error: string }).error, /互換の版/);
-  mock.branch("I0012", "main");
-  const folded = await ask(d, "i0012");
-  assert.match((folded as { error: string }).error, /i0012 は既にある（I0012）/);
+  mock.branch("Feature-12-X", "main");
+  const folded = await ask(d, "feature-12-x");
+  assert.match((folded as { error: string }).error, /feature-12-x は既にある（Feature-12-X）/);
   // 互換分解で同じになる名前（全角）も重なりとして拾う（11.9.3 の 14）
-  mock.branch("ｉ００１３", "main");
-  const wide = await ask(d, "i0013");
-  assert.match((wide as { error: string }).error, /i0013 は既にある（ｉ００１３）/);
+  mock.branch("ｆｅａｔｕｒｅ-13-ｘ", "main");
+  const wide = await ask(d, "feature-13-x");
+  assert.match((wide as { error: string }).error, /feature-13-x は既にある（ｆｅａｔｕｒｅ-13-ｘ）/);
   assert.equal(mock.createdBranches.length, 0);
 });
 
