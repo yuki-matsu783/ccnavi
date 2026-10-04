@@ -15,7 +15,7 @@ ADR-0095・0096 の変更に敵対的レビューが入り、次の指摘が出�
 
 | 重さ | 指摘 |
 |---|---|
-| high（再現済み） | `ticket.is_eli5_place` が `\` を `/` に読み替えてから見るので、Linux / macOS でツリーの直下に `wip\eli5\evil.py` という名前の 1 ファイルを置くと、実行前チェック・実行後チェック・SubagentStop（`phase.scope_findings` が判定の前に読み替えていた）の 3 か所で範囲を逃れる。`git ls-files -- wip` にも出ないので、`ready` の片付けにも掛からない |
+| high（再現済み） | `ticket_places.is_eli5_place` が `\` を `/` に読み替えてから見るので、Linux / macOS でツリーの直下に `wip\eli5\evil.py` という名前の 1 ファイルを置くと、実行前チェック・実行後チェック・SubagentStop（`phase.scope_findings` が判定の前に読み替えていた）の 3 か所で範囲を逃れる。`git ls-files -- wip` にも出ないので、`ready` の片付けにも掛からない |
 | medium | 標準出力の crit の行と依頼文の 1 行にシェル注入の余地。相対パスはバッククォートの中に生で入り、ツリーのパスは `'` をエスケープしていなかった |
 | medium（推測） | 大文字小文字を区別しない FS で `WIP/eli5/` を先に作ると、範囲の除外は `wip/eli5/` として通るのに、git には `WIP/...` で入り、`ready` の検査（区別する）で残る |
 | low | sh の置き場の検査が `wip/*` で、`wip/eli5/` より広い |
