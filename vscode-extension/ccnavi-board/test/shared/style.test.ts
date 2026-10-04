@@ -40,7 +40,7 @@ function board(): string {
   return reactPages()[0][1];
 }
 
-/** 一覧（設定 3 画面）の骨組みを持つ 1 枚。ルール設定画面で見る */
+/** 一覧（設定 3 画面）の骨組みを持つ 1 枚。ルール管理画面で見る */
 function rulesOnly(): string {
   return reactPages()[4][1];
 }
@@ -124,7 +124,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.ok(style.includes("body.ccnavi-claude-light:not("));
   }
   // 切り替えを受け取る側は 5 画面とも画面（React）の中にある。動かして見るのは各画面の dom のテスト
-  // （ボードは CB-T142、プロジェクト管理は CB-D32、リスク管理は CB-D57、ルール設定は CB-D0b）
+  // （ボードは CB-T142、プロジェクト管理は CB-D32、リスク管理は CB-D57、ルール管理は CB-D0b）
   for (const [, html] of reactPages("claude-dark")) {
     assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));
   }
@@ -132,7 +132,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
 
 test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使い、他のテーマでは効かない書き方になっている", () => {
   const html = flatStyle(board());
-  // 一覧（設定 3 画面）の開いた行の縁は styles/list.css にあるので、ルール設定画面で見る
+  // 一覧（設定 3 画面）の開いた行の縁は styles/list.css にあるので、ルール管理画面で見る
   const rules = flatStyle(rulesOnly());
   assert.match(rules, /\.row\.open > \.row-head, \.row\.open > \.row-body \{ box-shadow: inset 3px 0 0 var\(--vscode-contrastActiveBorder, var\(--vscode-focusBorder\)\); \}/);
   assert.match(html, /button\.action:disabled \{ border-color: var\(--vscode-contrastBorder, transparent\); border-style: dashed; \}/);
@@ -252,7 +252,7 @@ test("CB-T290 意味の色を文字に使うときは前景色へ混ぜ、Light 
   }
 });
 
-test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行の見出しを段に分け、ルール設定の表は入れ物の中で横に送る", () => {
+test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行の見出しを段に分け、ルール管理の表は入れ物の中で横に送る", () => {
   const rules = flatStyle(rulesOnly());
   assert.match(rules, /@media \(max-width: 520px\) \{ \.row-body \{ padding-left: 14px; grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(rules, /\.rule \.sum > \.clip:not\(\.mono\) \{ grid-row: 2; grid-column: 2 \/ -1; \}/);
