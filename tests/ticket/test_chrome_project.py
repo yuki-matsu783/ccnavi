@@ -130,7 +130,7 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertIn('"actor": "lab-approver"', events)
 
     def test_the_project_layer_is_computed_from_the_integration_branches(self):
-        place = self.chrome._placement(None)
+        place = self.chrome._placement()
         snap = {
             "integration": {"name": "trunk"},
             "branches": {
@@ -152,7 +152,7 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertEqual(layer[".ccnavi/config/rules.yml"], '{"version": 1, "deny": []}\n')
 
     def test_records_are_kept_apart_for_the_workspace_and_the_project(self):
-        place = self.chrome._placement(None)
+        place = self.chrome._placement()
         snap = {
             "integration": {"name": "trunk", "source": "setting", "head": HEAD},
             "branches": {

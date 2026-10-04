@@ -1079,12 +1079,14 @@ class ChromePlacementTest(CoreHarness):
     def board_request(self):
         """手元のツリーから組んだ `board` の要求と、env を入れないときの答え。"""
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         request = self.chrome_request("board", "i0001")
         plain = json.loads(_chrome().handle(json.dumps(request), os.path.join(self.root, "m1")))
         self.assertNotIn("error", plain, plain)
-        self.assertEqual([e["ticket"] for e in plain["batch"]], ["i0001", "i0001-01"], plain)
+        self.assertEqual([e["ticket"] for e in plain["batch"]], ["i0001", "i0001-01-01"], plain)
         return request, plain
 
     def test_relative_env_in_the_integration_settings_is_not_read(self):

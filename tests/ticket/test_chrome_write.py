@@ -100,9 +100,7 @@ class RecordsTest(ChromeWriteHarness):
         self.assertTrue(
             any("i0009" in p and "gone" in p for p in rejected["i0001-01-01"]), rejected
         )
-        records = _chrome().records(
-            request["snapshot"], _chrome()._placement(None), ["i0001", "i0009"]
-        )
+        records = _chrome().records(request["snapshot"], _chrome()._placement(), ["i0001", "i0009"])
         self.assertIn("state gone", records["sync/self/families/i0009"])
         self.assertIn("state present", records["sync/self/families/i0001"])
         # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
@@ -258,6 +256,16 @@ class EntryDetailTest(ChromeWriteHarness):
             "読めない: i0001:wip/ws/x.md",
         )
         self.assertEqual(chrome._relative("/ws", "'/ws/a' と a/ws/b"), "'a' と a/ws/b")
+
+    def test_host_paths_that_leave_the_tree_are_refused(self):
+        """ホストから来たパスは、根から始まるもの・区切りが `\\` のもの・`..` を含むものを断る。"""
+        chrome = _chrome()
+        self.assertEqual(
+            chrome._check_rel("wip/proposals/todo/i0001.md"), "wip/proposals/todo/i0001.md"
+        )
+        for path in ("/a", "~/a", "C:/a", "a\\b", "a/../b"):
+            with self.subTest(path=path), self.assertRaises(chrome.Refused):
+                chrome._check_rel(path)
 
     def test_a_history_that_cannot_be_written_stops_the_plan(self):
         chrome = _chrome()
