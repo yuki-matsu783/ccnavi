@@ -116,6 +116,8 @@ _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 # 含んでも（`web-i0012-05-01` の親は `web-i0012`）割り出し方は 1 通りに決まる。
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<phase>\d{2})-(?P<seq>\d{2})$")
+# 子の識別子に書けるフェーズ番号と連番の上限（どちらも 2 桁）。
+MAX_CHILD_NUMBER = 99
 # 親の識別子の末尾に置かないもの（`-<2 桁>`）。子の識別子の途中（`<親>-<フェーズ>`）と紛れる。
 _CHILD_TAIL = re.compile(r"-\d{2}$")
 
@@ -696,6 +698,17 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
         phase = front.get("phase")
         if isinstance(phase, bool) or not isinstance(phase, int) or phase < 0:
             problems.append(Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が要る"))
+            return True
+        if phase > MAX_CHILD_NUMBER:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"`phase: {phase}` は子の識別子に書けない。識別子のフェーズ番号は"
+                    f" 2 桁（0〜{MAX_CHILD_NUMBER}）なので、計画を {MAX_CHILD_NUMBER} "
+                    "フェーズまでに分ける",
+                )
+            )
             return True
         if int(matched.group("phase")) != phase:
             problems.append(
