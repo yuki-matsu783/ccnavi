@@ -117,8 +117,9 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     lines.append(("repo", st.repo))
     # 親のブランチ名（ADR-0100 の 5 章）。sh は識別子からブランチ名を組み立てず、これを使う
     # （ref・fetch・push・ls-remote・家族の控えの `branch`）。名前は承認済みの親の写しの `branch:`
-    # だけから引き（提案の `branch:` は使わない）、`ticket.branch_problem` と統合先の名前を通らなければ
-    # `branch` の行を出さずに `branch_refused` で理由を言う（sh はその家族を識別子の外へ動かさずに止める）。
+    # だけから引き（提案の `branch:` は使わない）、`ticket.branch_problem` と統合先の名前を
+    # 通らなければ `branch` の行を出さずに `branch_refused` で理由を言う（sh はその家族を
+    # 識別子の外へ動かさずに止める）。
     fams = syncstate.Families(conf, root)
     branch = st.branch or fams.branch_any(parent)
     refused = fams.branch_refusal(parent, branch, _project_guess(fams, parent, st))
