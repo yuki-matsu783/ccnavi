@@ -666,7 +666,7 @@ if [ "$force" = yes ]; then
 fi
 forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 登録済みかどうかの見方。ccnavi の設定lint（lint.py の _registered）は、command に
+# 登録済みかどうかの見方。ccnavi の設定lint（lint_project.py の _registered）は、command に
 # "ccnavi" が含まれるかどうかだけを見る。それだけだと、無関係な hook のパスに名前が
 # 入っているプロジェクトでは、そのイベントが「登録済み」に見えたまま、いつまでも登録されない。
 #
