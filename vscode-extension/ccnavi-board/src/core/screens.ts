@@ -6,10 +6,10 @@
  * パネルがどう作られていて、いま開いているかどうかは、要求する側に見せない。
  *
  * 登録するのは `extension.ts`（組み立ての場）だけ。登録前に開こうとしたら、それは
- * 組み立ての誤りなので例外で止める（利用者の操作では起こらない）。
+ * 組み立ての誤りなので例外で止める（ユーザの操作では起こらない）。
  */
 
-/** ルール設定画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
+/** ルール管理画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
 export type RulesTarget =
   | { readonly kind: "workspace" }
   | { readonly kind: "self" }
@@ -30,7 +30,7 @@ export interface Screens {
   readonly phases: (target: PhasesTarget) => Promise<void>;
   readonly projects: () => Promise<void>;
   /**
-   * 子チケット 1 枚のフロー編集画面（ADR-0085）。ボードのカードの「フロー」からだけ開く。
+   * 子チケット 1 枚のフロー編集画面。ボードのカードの「フロー」からだけ開く。
    * タブは子ごとに 1 枚で、同じ子をもう 1 度開けば前面に出す
    */
   readonly flow: (ticket: string) => Promise<void>;

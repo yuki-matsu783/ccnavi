@@ -8,10 +8,10 @@
  * | パネル | 使うもの | 裏に回ったとき |
  * |---|---|---|
  * | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost` | 画面は捨てられる。入れ物ごと入れ直す |
- * | `retainContextWhenHidden: true`（ルール設定・リスク管理・フェーズ管理） | `retainedHost` | 画面は生きている。何もしない |
+ * | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理） | `retainedHost` | 画面は生きている。何もしない |
  *
- * 取り違えると**どちらの向きでも壊れる**。保持する画面に `screenHost` を当てると、裏にいる間の
- * 入れ直しで人が打ちかけていた内容が消える。保持しない画面に `retainedHost` を当てると、
+ * 取り違えると**どちらの向きでも不具合が出る**。保持する画面に `screenHost` を当てると、裏にいる間の
+ * 入れ直しでユーザが打ちかけていた内容が消える。保持しない画面に `retainedHost` を当てると、
  * 捨てられた画面へ送り続けて中身が古いまま止まる。
  *
  * 以下は `screenHost`（保持しない画面）の話。`retainedHost` はこのファイルの下のほうにある。
@@ -34,7 +34,7 @@
  *
  * - 自分で読むだけだと、裏へ回って表へ戻るまでの間に 1 度も呼ばれなければ、行って戻ったことに
  *   気づけない（実機はその形。`onDidChangeViewState` のあいだ、この段取りは呼ばれない）
- * - 教えてもらうだけだと、教え忘れがそのまま「送ってはいけないものを送る」になる
+ * - 教えてもらうだけだと、教え忘れたときに、送ってはいけない画面へそのまま送ることになる
  *
  * VS Code の API には触れない。必要なもの（`Surface`）だけを受け取るので、単体で試せる。
  */
@@ -55,7 +55,7 @@ export interface Surface {
 
 /**
  * 保持する画面（`retainedHost`）が使う窓口。**表裏（`visible`）は要らない。** 裏でも生きていて、
- * 読まないものを実装させると、写して作った次の画面にも使われないゲッターが付いて回る
+ * 読まないものを実装させると、これをコピーして作った次の画面にも使われないゲッターが残り続ける
  */
 export type RetainedSurface = Omit<Surface, "visible">;
 
@@ -175,18 +175,18 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
 }
 
 /**
- * 保持する画面（`retainContextWhenHidden: true`）に中身を渡す段取り。ルール設定・リスク管理・
+ * 保持する画面（`retainContextWhenHidden: true`）に中身を渡す段取り。ルール管理・リスク管理・
  * フェーズ管理が使う。返る形は `screenHost` と同じなので、パネルは作るところの 1 行だけが違う。
  *
  * 保持する画面は裏に回っても捨てられない。VS Code は DOM も Webview の中の状態もそのまま持ち、
  * 表に戻しても作り直さない。だから、この段取りが `screenHost` と違うのは次の 3 つ。
  *
- * - **入れ物（HTML）は 1 度しか入れない。** 入れ直すと画面は作り直され、人が打ちかけていた
+ * - **入れ物（HTML）は 1 度しか入れない。** 入れ直すと画面は作り直され、ユーザが打ちかけていた
  *   内容が消える。2 枚目からは必ず `postMessage`（`posted`）で渡す
  * - **表裏を見ない。** 裏でも `postMessage` は届く（`postMessage` の文書が「live な画面には届く。
  *   保持する画面は裏でも live」と言う）。見て組み上がっていないものとして扱うと、裏にいる間の `lock` や `changed` の知らせが落ちる。
  *   **ただし VS Code の文書は同じ型定義の中で食い違っている**（`retainContextWhenHidden` の側は
- *   「裏に回った画面にはメッセージを送れない」と言う）。どちらが正しくても壊れないよう、呼ぶ側は
+ *   「裏に回った画面にはメッセージを送れない」と言う）。どちらが正しくても正しく動くよう、呼ぶ側は
  *   表に戻ったときに、いま出すべき知らせ（`lock`・`changed`）と見た目（`appearance`）を送り直す
  *   （rules-panel / risk-panel / phases-panel）
  * - **`hidden()` は何もしない。** 教えてもらっても、捨てられていないので扱いを変えるものが無い
@@ -195,8 +195,8 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  * 受け取る側がまだ無いので送らない。そこは `screenHost` と同じで、受けた側が `ready` で渡し直す。
  *
  * **中身を渡すのは、画面の編集を捨ててよいときだけ。** 保持する画面は編集の途中を持つので、
- * 監視がファイルの変化に気づいても勝手に渡さない（`{type:"changed"}` の帯を出して人に決めさせる）。
- * 渡すのは、人が「更新」を押したときと、保存・作成が通って中身が入れ替わったとき。
+ * 監視がファイルの変化に気づいても勝手に渡さない（`{type:"changed"}` の帯を出してユーザに決めさせる）。
+ * 渡すのは、ユーザが「更新」を押したときと、保存・作成が通って中身が入れ替わったとき。
  */
 export function retainedHost<D>(surface: RetainedSurface, render: (data: D) => string): ScreenHost<D> {
   let htmlSet = false;

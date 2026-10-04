@@ -29,14 +29,16 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 hook の 7 イベントの全部、実行前のルール照合、実行後チェック、コアファイルの自己防衛、チケット制御、
 複数のリポジトリ（層の和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
-VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理・フェーズ管理）。
+VS Code 拡張（ボード・ルール管理・リスク管理・プロジェクト管理・フェーズ管理）。
 このリポジトリ自身には dry-run で仕掛けてある。
 
-チケットの流れは ADR-0055、層の和は設計 11.2〜11.4.2、共通層の置き場は ADR-0052、
-設定と記録の置き場は ADR-0042。ファイルの構成と開発用 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh`
+チケットは 1 本のファイルで、提案の置き場（`wip/proposals/`）と承認済みチケットの置き場
+（`.ccnavi/approved/`）を行き来し、どこに在るかが状態を表す（設計 9.2・9.6）。層の和は設計 11.2〜11.4.2。
+共通層は `.ccnavi/common/` に固定で、環境変数では動かない。ユーザが持つ設定は ccnavi ディレクトリの下、
+記録と控えは `logs/` に置く（設計 11.2）。ファイルの構成と開発用 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh`
 `test-ext.sh`）は README の「構成」「開発」。
 
-リスク管理画面は共通層の 1 本だけを開く（設計 11.11）。ルール設定画面とフェーズ管理画面は層に追従する。
+リスク管理画面は共通層の 1 本だけを開く（設計 11.11）。ルール管理画面とフェーズ管理画面は層に追従する。
 
 確認コマンド。
 
@@ -53,7 +55,7 @@ uv run --with pyinstaller python build.py
 
 ## 未実装
 
-- 確認の記憶（REQ-PRE-07）。ルールが `ask` と書いた確認は対象外（ADR-0009）
+- 確認の記憶（REQ-PRE-07）。ルールが `ask` と書いた確認は対象外
 - 確認の記憶の事後無効化（REQ-PST-04）。REQ-PRE-07 と対
 - セッション開始時の提示（REQ-SES）。REQ-SES-02 / -03 はチケットがあるので書ける形
 - 記憶の消去（REQ-DIA-05）
@@ -92,16 +94,16 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 1. **保護済みファイル（`.ccnavi/scripts/`、`.claude/hooks/`、`rules.yml`）を直すチケットは `implement` では承認されない。**
    `staging` 種別（自身の層の `phases.yml`、`scope: [wip/design/*, tests/*]`）のフェーズで完成品を
-   `wip/design/scripts/` に全文で置き、人が写してコミットする。写す順は `ccnavi-common.sh` が先
-   （3 本が起動時に読む）。`phases.yml` は人が持つ設定で、エージェントは足せない
+   `wip/design/scripts/` に全文で置き、ユーザが写してコミットする。写す順は `ccnavi-common.sh` が先
+   （3 本が起動時に読む）。`phases.yml` はユーザが持つ設定で、エージェントは足せない
 2. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。** コマンドに `.ccnavi` が
    含まれるだけで当たる。受入テストは Python の中で写すので通るが、手で確かめるときには当たる
 
-### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（人が直す）
+### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（ユーザが直す）
 
 usage の `confirm` の説明が「依頼より後の未解決スレッドが無ければ」のままで、挙動（時刻で絞らず未解決の全部を
-数える。ADR-0031）と違う。冒頭のコメントの一覧にも `ready` `close-early` `origin` が無い。
-`.ccnavi/scripts/` は `deny` なので、人が直すか `staging` のフェーズで写す版を作る。
+数える）と違う。冒頭のコメントの一覧にも `ready` `close-early` `origin` が無い。
+`.ccnavi/scripts/` は `deny` なので、ユーザが直すか `staging` のフェーズで写す版を作る。
 
 ### 複数のリポジトリで確かめること
 
@@ -126,7 +128,7 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 ### 決めていないもの
 
-- 人が子を再開しても、そのフェーズの `reviewed` は残り、再び `finish` しても止まらず告知も出ない（設計 9.6）。
+- ユーザが子を再開しても、そのフェーズの `reviewed` は残り、再び `finish` しても止まらず告知も出ない（設計 9.6）。
   再開の手順でマーカーも消すか、機構が消すかは決めていない
 
 ### 記録で実測すること
@@ -139,7 +141,7 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 ### 残っている誤検知と取りこぼし
 
-- 空白を含まないパターンは引用の中でも当たる（`echo ".env"` が `.env` のルールに当たる）。直すならルール書式の版が上がる（ADR-0010）
+- 空白を含まないパターンは引用の中でも当たる（`echo ".env"` が `.env` のルールに当たる）。直すならルール書式の版が上がる
 - `git -C /repo push` は `*git push*` に当たらない。knowledge にグローバルオプションの飛ばし方がある
 
 ### 未了: 別件
@@ -183,7 +185,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 | 分かったこと | どうしたか |
 |---|---|
 | 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
-| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh は利用者の情報を落として伏せる。実行ファイルの `remote_kind` も読み飛ばす |
+| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を落として伏せる。実行ファイルの `remote_kind` も読み飛ばす |
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とすので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tools/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |

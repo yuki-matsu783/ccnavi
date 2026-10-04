@@ -76,10 +76,10 @@ test("CB-T233 読み込んでから外で作られた・変わったファイル
   fs.writeFileSync(file, "theirs");
   const created = writeFlowFile(tree, file, "mine", NEW);
   assert.equal(created.ok, false);
-  assert.match(created.ok ? "" : created.error, /外で作られている/);
+  assert.match(created.ok ? "" : created.error, /外で作られています/);
   const changed = writeFlowFile(tree, file, "mine", { exists: true, mtimeMs: 1 });
   assert.equal(changed.ok, false);
-  assert.match(changed.ok ? "" : changed.error, /外で変更されている/);
+  assert.match(changed.ok ? "" : changed.error, /外で変更されています/);
   assert.equal(fs.readFileSync(file, "utf8"), "theirs");
 });
 
@@ -131,7 +131,7 @@ test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない
   if (made.status !== 0) {
     return; // mkfifo が無い機械
   }
-  assert.throws(() => readFlowFile(tree, file), /ふつうのファイルでない/);
+  assert.throws(() => readFlowFile(tree, file), /ふつうのファイルではない/);
   const written = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
   assert.equal(written.ok, false);
 });
@@ -190,10 +190,10 @@ test("CB-T245 読んだバイトは UTF-8 として壊れていれば文字に�
   assert.ok(read !== undefined);
   // 読むのはバイトのまま（実行ファイルにこのバイトを確かめさせる）
   assert.deepEqual(Buffer.from(read.bytes), broken);
-  assert.deepEqual(decodeFlowBytes(read.bytes), { ok: false, error: "UTF-8 として読めない" });
+  assert.deepEqual(decodeFlowBytes(read.bytes), { ok: false, error: "UTF-8 として読めません" });
   // 実行ファイル（utf-8-sig）と同じく、先頭の BOM は 1 つだけ外す
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFFnodes: []\n", "utf8")), { ok: true, text: "nodes: []\n" });
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFF\uFEFFx", "utf8")), { ok: true, text: "\uFEFFx" });
-  // 途中で切れた多バイト文字も壊れている
+  // 途中で切れた多バイト文字も UTF-8 として読めない
   assert.equal(decodeFlowBytes(Buffer.from("あ", "utf8").subarray(0, 2)).ok, false);
 });

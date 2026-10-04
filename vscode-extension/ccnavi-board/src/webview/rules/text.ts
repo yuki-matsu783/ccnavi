@@ -1,5 +1,5 @@
 /**
- * ルール設定画面に出す言葉。行の要約、絞り込みが当てる文字列、件数の出し方。
+ * ルール管理画面に出す言葉。行の要約、絞り込みが当てる文字列、件数の出し方。
  *
  * 判定はしない（当たる・当たらないは実行ファイルの `--test` が言う）。ここが作るのは
  * 「このルールは何を止めるか」を折りたたんだままでも読める形に縮めた文だけ。
@@ -53,7 +53,7 @@ export function contextSummary(rule: RuleForm): string {
 
 /** ask と allow に message が残っているときに出す断り。lint が error にする */
 export function staleMessage(section: Section): string {
-  const where = section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない";
+  const where = section === "ask" ? "ユーザの確認ダイアログにしか出ない" : "どこにも届かない";
   return `${section} の message は${where}ので、lint が error にします。モデルに渡すプロンプトは additionalContext に移してください: `;
 }
 

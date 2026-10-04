@@ -3,7 +3,7 @@
  *
  * 印は**種類の性質**を言うだけで、良し悪しは言わない。止まる・戻るを決めるのは実行ファイルと、
  * サブエージェントに渡る道具（AskUserQuestion はどのサブエージェントにも渡らない。入れ子の上限では
- * Agent ツールが渡らない。付録 C、ADR-0085）。
+ * Agent ツールが渡らない。付録 C）。
  */
 import { branchItems, dataText, nodeType, type FlowNode } from "../../core/flow-doc.js";
 
@@ -18,15 +18,15 @@ export function badgeOf(type: string): Badge | undefined {
   if (type === "askUserQuestion") {
     return {
       kind: "ask",
-      text: "メインに戻る（利用者に聞く）",
-      title: "サブエージェントは利用者に聞けない（AskUserQuestion は渡されない）。このノードで手を止め、問いと選択肢を添えてメインに返す。メインが聞いて、答えを持って同じサブエージェントを再開させる",
+      text: "メインに戻る（ユーザに聞く）",
+      title: "サブエージェントはユーザに質問できません（AskUserQuestion は渡されません）。このノードで手を止め、問いと選択肢を添えてメインに返します。メインがユーザに聞き、その答えを渡して同じサブエージェントを再開させます",
     };
   }
   if (type === "subAgent" || type === "subAgentFlow") {
     return {
       kind: "nest",
       text: "入れ子（上限なら戻る）",
-      title: "Agent ツールがあれば入れ子のサブエージェントとして起動する。入れ子の上限（既定はメインの下 3 段。クラウドの環境は 1 段）に当たって Agent ツールが無ければ、このノードで止まってメインに返す",
+      title: "Agent ツールがあれば、入れ子のサブエージェントとして起動します。入れ子の上限（既定はメインの下 3 段、クラウドの環境では 1 段）に達して Agent ツールが無ければ、このノードで止まってメインに返します",
     };
   }
   return undefined;
@@ -44,7 +44,7 @@ export function summaryOf(node: FlowNode): string {
     case "codex":
       return line(dataText(node, "prompt"));
     case "subAgent":
-      return line(dataText(node, "description") || dataText(node, "agentDefinition") || dataText(node, "prompt"));
+      return line(dataText(node, "description") || dataText(node, "prompt"));
     case "askUserQuestion":
       return line(dataText(node, "questionText"));
     case "ifElse":

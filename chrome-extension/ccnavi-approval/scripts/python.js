@@ -1,14 +1,14 @@
-// 同梱する Python を 1 本の zip に組む（ADR-0093 の 7.2）。`build.js` と試験が呼ぶ。
+// 同梱する Python を 1 本の zip に組む。`build.js` と試験が呼ぶ。
 //
 // 中身は 3 つ。
 //
 //   yaml/            PyYAML の純 Python 版。版と取ってくる先とハッシュはリポジトリの uv.lock から読む
 //                    （手元の ccnavi と同じ版に揃う）。C 拡張は入れない（Pyodide では読めない）
-//   ccnavi/          リポジトリの ccnavi パッケージの .py をそのまま
+//   ccnavi/          リポジトリの ccnavi パッケージの .py をそのまま（サブパッケージの階層ごと）
 //   ccnavi_chrome.py 拡張の入口（py/）
 //
 // 組むのは Node の上の Pyodide（同梱するのと同じ版）で、.pyc を unchecked-hash で作って一緒に入れる
-// （import が速くなる。ADR の 7.2 の「.pyc 同梱で import 0.43 秒」）。組んだ後に入口を import して、
+// （import が速くなる。Node で測って 0.43 秒）。組んだ後に入口を import して、
 // 読めない形なら組み立てを止める。
 //
 // 取ってくるのは PyYAML の sdist だけ。置き場は .cache/（追跡しない）。プロキシの内側では
@@ -86,13 +86,22 @@ export function yamlSources(tgz) {
   return out;
 }
 
+/** ccnavi パッケージの .py を、パッケージからの相対パス（区切りは `/`）で集める。サブパッケージも辿る */
 function ccnaviSources() {
   const dir = path.join(REPO, "ccnavi");
   const out = new Map();
-  for (const name of fs.readdirSync(dir).sort()) {
-    if (name.endsWith(".py")) out.set(name, fs.readFileSync(path.join(dir, name)));
-  }
-  if (!out.has("cli.py")) throw new Error(`ccnavi のソースが無い: ${dir}`);
+  const walk = (sub) => {
+    for (const entry of fs.readdirSync(path.join(dir, sub), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const rel = sub === "" ? entry.name : `${sub}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (entry.name !== "__pycache__") walk(rel);
+      } else if (entry.name.endsWith(".py")) {
+        out.set(rel, fs.readFileSync(path.join(dir, ...rel.split("/"))));
+      }
+    }
+  };
+  walk("");
+  if (!out.has("entry/cli.py")) throw new Error(`ccnavi のソースが無い: ${dir}`);
   return out;
 }
 
@@ -112,7 +121,11 @@ export async function buildPythonZip(outFile) {
   py.FS.mkdirTree("/app/yaml");
   py.FS.mkdirTree("/app/ccnavi");
   for (const [n, b] of yaml) py.FS.writeFile(`/app/yaml/${n}`, b);
-  for (const [n, b] of ccnavi) py.FS.writeFile(`/app/ccnavi/${n}`, b);
+  for (const [n, b] of ccnavi) {
+    const slash = n.lastIndexOf("/");
+    if (slash >= 0) py.FS.mkdirTree(`/app/ccnavi/${n.slice(0, slash)}`);
+    py.FS.writeFile(`/app/ccnavi/${n}`, b);
+  }
   py.FS.writeFile("/app/ccnavi_chrome.py", entry);
   py.runPython(`
 import compileall, py_compile, sys, zipfile, os

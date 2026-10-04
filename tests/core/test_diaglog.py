@@ -1,4 +1,4 @@
-"""診断ログ（ccnavi/diaglog.py）と、その後始末（prune._prune_diag）。
+"""診断ログ（ccnavi/records/diaglog.py）と、その後始末（prune._prune_diag）。
 
 見るのは 6 つ。
 
@@ -30,7 +30,7 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import diaglog, prune
+from ccnavi.records import diaglog, prune
 
 # 時刻・レベル・出どころ[pid] の頭。
 HEAD = re.compile(

@@ -25,7 +25,7 @@
    "tool": "Bash",
    "subject": "cd /repo && git push",
    "resolved_subject": "cd /ws && git push",
-   "why": "push は人が行う",
+   "why": "push はユーザが行う",
    "known": true,
    "verdict": "deny",
    "code": "DENY_COMMAND_PATTERN",

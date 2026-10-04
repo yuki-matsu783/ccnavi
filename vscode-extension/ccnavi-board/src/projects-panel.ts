@@ -11,8 +11,8 @@
  * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
  * そのルールファイルの場所は layers（層）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
  *
- * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこで人が行い、完了は `projects/<名前>/.git`
- * の出現を監視して拾う。書くのは、人がボタンを押したときの `.gitignore`、置き場のディレクトリ、
+ * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
+ * の出現を監視して拾う。書くのは、ユーザがボタンを押したときの `.gitignore`、置き場のディレクトリ、
  * プロジェクトかワークスペースの設定のルールファイル（無いときだけ）の 3 つ。
  */
 import * as crypto from "node:crypto";
@@ -267,7 +267,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
   const { folder } = current;
   // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
   // 設定の綴り（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
-  // ワークスペースの設定のパスが取れない（壊れた JSON）なら、設定のルールファイルの監視は張らない。
+  // ワークスペースの設定のパスが取れない（JSON として読めない）なら、設定のルールファイルの監視は張らない。
   const rel = projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
   const patterns = [
@@ -351,8 +351,8 @@ function showError(current: PanelState, error: string): void {
  * いまの状態で描き直す。`send` が `deferred`（作り直し中）を返して捨てられたものは、
  * 画面が組み上がった（`ready`）ところでここから渡し直す。
  *
- * **読み直せなかったことも渡し直す。** ここで落とすと、入れてある HTML（古い一覧）が出たまま
- * 失敗が人に届かず、`page` が無いので以後のボタンも使えない。
+ * **読み直せなかったことも渡し直す。** ここで渡さないと、入れてある HTML（古い一覧）が出たまま
+ * 失敗がユーザに届かず、`page` が無いので以後のボタンも使えない。
  */
 function redraw(current: PanelState): void {
   if (current.page !== undefined) {
@@ -392,7 +392,7 @@ function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
 }
 
 /**
- * 操作の結果の一言。生きている画面にしか届かない（作り直している最中と裏にいる間は落ちる）。
+ * 操作の結果の一言。生きている画面にしか届かない（作り直している最中と裏にいる間は届かない）。
  * その場で言うだけのものなので、持ち越さずに捨てる。
  */
 function fail(current: PanelState, message: string): void {
@@ -415,7 +415,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     current.host.ready();
     redraw(current);
     // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-    // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
+    // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
     // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
@@ -428,7 +428,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     markTourSeen(SCREEN);
     return;
   }
-  // 「更新」は一覧が無くても通す。読み直せなかったところから人が抜け出す方法がこれしかない
+  // 「更新」は一覧が無くても通す。読み直せなかったところからユーザが抜け出す方法がこれしかない
   if (message.type === "refresh") {
     void update();
     return;
@@ -551,7 +551,7 @@ function createSelfRules(current: PanelState, page: ProjectsPage): void {
   copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");
 }
 
-/** 共通の設定のルールをワークスペースかプロジェクトの設定のルールファイル（ルートからの相対）に写す。既にあれば上書きしない */
+/** 共通の設定のルールをワークスペースかプロジェクトの設定のルールファイル（ルートからの相対）に複製する。既にあれば上書きしない */
 function copyCommonRules(current: PanelState, targetRel: string, label: string, repo: string): void {
   const root = current.folder.uri.fsPath;
   const target = path.join(root, ...targetRel.split("/"));
@@ -559,7 +559,7 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
     fail(current, `${targetRel} は既にあるので、上書きしません`);
     return;
   }
-  // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かない（ADR-0052）。
+  // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_RULES` など）では動かせない。
   const sourceRel = DEFAULT_RULES;
   const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
   if (source === undefined) {

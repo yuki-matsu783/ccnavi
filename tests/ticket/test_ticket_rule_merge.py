@@ -57,7 +57,9 @@ EXPLAIN_NOTE = (
 # ルールが何も言わない列に置くルール。Write には当たらない。
 SILENT = {
     "version": 1,
-    "deny": [{"id": "push", "match": "Bash", "glob": "*git push*", "message": "push は人が行う"}],
+    "deny": [
+        {"id": "push", "match": "Bash", "glob": "*git push*", "message": "push はユーザが行う"}
+    ],
 }
 
 
@@ -151,7 +153,7 @@ class Workspace(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "decisions.jsonl")
@@ -267,7 +269,7 @@ class Workspace(unittest.TestCase):
         )
 
     def approve(self):
-        result = self.ccnavi("--approve", stdin="y\n")
+        result = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
@@ -668,7 +670,7 @@ class ScratchPlace(Workspace):
 
 
 class Eli5Place(Workspace):
-    """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない（ADR-0096）。
+    """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない。
 
     `scratchpad/` と違って追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
     サブエージェント終了時チェックも外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
@@ -687,8 +689,8 @@ class Eli5Place(Workspace):
         ("docs/wip/eli5/a.html", False, "ルートの直下の wip/ だけ"),
         ("WIP/eli5/a.html", False, "綴りは区別する。依頼の検査と ready も区別する"),
     )
-    # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える
-    # （ADR-0097）
+    # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える。
+    # 置き場の判定は `\` を `/` に読み替えない
     BACKSLASHED = (
         "wip\\eli5\\evil.py",
         "wip/eli5\\evil.py",
@@ -842,7 +844,7 @@ class Boundaries(Workspace):
         """子の画面の「この子チケットで編集可能な範囲」には注記をつけない。注記は親の画面だけ。"""
         self.propose("i0001", allow=("src/*",))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        result = self.ccnavi("--approve", "--preview")
+        result = self.ccnavi("--agree", "--preview")
         self.assertEqual(result.returncode, 0, result.stderr)
         child = section_of(result.stdout, "== i0001-01")
         self.assertTrue(child, result.stdout)
@@ -864,7 +866,7 @@ class Diagnostics(Workspace):
 
     def test_approval_screen_says_rule_allow_stops_outside_the_area(self):
         self.propose("i0001", allow=("src/*",))
-        result = self.ccnavi("--approve", "--preview")
+        result = self.ccnavi("--agree", "--preview")
         self.assertEqual(result.returncode, 0, result.stderr)
         # 見出し「このチケットで編集可能な範囲」の節の中に出る。
         parent = section_of(result.stdout, "■ このチケットで編集可能な範囲")

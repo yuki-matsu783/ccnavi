@@ -1,4 +1,4 @@
-"""`finish` の打ち忘れを Stop で促す（ADR-0087）の受入テスト。道具を外から呼んで応答だけを見る。
+"""`finish` の打ち忘れを Stop で促す受入テスト。道具を外から呼んで応答だけを見る。
 
 促すのは、cwd のワークツリーのチケットが着手済みで、未コミットの変更が無く、基準点より先に
 コミットがあるときだけ。1 回の連鎖に 1 回（`stop_hook_active`）。何を除くかをここで固定する。
@@ -13,7 +13,7 @@ import json
 import os
 import unittest
 
-from ccnavi import settings
+from ccnavi.infra import settings
 from tests.ticket.test_ticket import TicketTest, git, write
 
 
@@ -123,7 +123,7 @@ class StopNudgeTest(TicketTest):
         self.assert_quiet(self.stop(self.parent_tree))
 
     def test_a_parent_held_for_review_is_not_asked(self):
-        """レビュー準備中の親は、既存の Stop の案内（利用者を待つ）と食い違わないよう促さない。"""
+        """レビュー準備中の親は、既存の Stop の案内（ユーザを待つ）と食い違わないよう促さない。"""
         self.family(review=(True, True))
         for child in ("i0001-01", "i0001-02"):
             self.assertEqual(self.ccnavi("ticket", "finish", child).returncode, 0)
@@ -245,7 +245,7 @@ class StopNudgeTest(TicketTest):
         git(self.parent_tree, "branch", "-m", "i0001", "renamed")
         self.assert_quiet(self.stop(tree))
 
-    # ---- `match: Stop` のルール（ADR-0090）と重なったとき
+    # ---- `match: Stop` のルールと重なったとき（1 回の Stop で止める理由は 1 つにする）
 
     def test_the_finish_nudge_goes_first_and_the_stop_rule_is_not_counted(self):
         """同じ Stop で両方が止めたいとき、`finish` の促しだけを出し、ルールの数えは進めない。"""

@@ -377,7 +377,7 @@ class TestExtHookTest(unittest.TestCase):
 
     def test_a_path_with_spaces_arrives_as_one_argument(self):
         # 空白で語に分かれると、入口が見つからず「何も回さずに通った」になる。
-        # Windows の利用者名に空白は珍しくない。
+        # Windows のユーザ名に空白は珍しくない。
         workspace, board, _ = self.workspace(tree="my dir")
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode, result.stderr)

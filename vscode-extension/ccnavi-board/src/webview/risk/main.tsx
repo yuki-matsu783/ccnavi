@@ -1,6 +1,6 @@
 /**
  * リスク管理画面の入口。最初の中身は HTML に埋まっている（`<script type="application/json">`）。
- * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は拡張ホストからは入れ直されない（ADR-0062）
+ * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は拡張ホストからは入れ直されない
  * ので、ここが走るのはパネルを開いたとき。VS Code が画面を作り直す経路（`Developer: Reload Webviews`、
  * 別ウィンドウへ移す）では同じ HTML からもう 1 度走るが、`ready` を送れば今の中身が届く。
  */

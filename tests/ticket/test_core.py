@@ -1,9 +1,12 @@
-"""判定のコアと差し口（ADR-0093 の 6 章、段階 2a）の受入テスト。
+"""判定のコアと差し口の受入テスト。
+
+判定のコアは入出力を持たない関数にし、ファイルシステム・git・API は差し口に分ける。
+Chrome（Pyodide）と手元が同じコアで判定するため。
 
 見るのは 6 つ。
 
 1. 時計（Clock の差し口）: `fsio.clock` で固定した時刻を、承認の記録と跡が同じに書く
-2. D22: 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
+2. 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
    前の形（絶対パス・ツリーの名前）の写しも同じに読み、判定の答えは変わらない
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
    書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの運び・フィードバック計画）
@@ -11,7 +14,7 @@
    （新規・マーカーの消去・改版・フィードバック計画・多段の先行と落ちる提案・取り下げ・レビュー済み）。
    同じ要求と答えを拡張の試験の見本（`chrome-extension/ccnavi-approval/test/fixtures/core-scenarios.json`）
    に置き、拡張の試験が Pyodide でも同じ答えになることを見る
-5. 承認の取り下げ（8.8）の条件
+5. 承認の取り下げの条件
 6. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
 
 見本の形を変えたら `CCNAVI_CHROME_FIXTURE=1` を付けてこのテストを走らせ、見本を書き直す。
@@ -28,8 +31,11 @@ import subprocess
 import unittest
 from unittest import mock
 
-from ccnavi import approval, core, fsio, history, lint, settings, version
-from ccnavi import tree as tree_mod
+from ccnavi.entry import lint, version
+from ccnavi.hook import core
+from ccnavi.infra import fsio, settings
+from ccnavi.infra import tree as tree_mod
+from ccnavi.tickets import approval, history
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 
@@ -174,15 +180,16 @@ class CoreHarness(PhaseHarness):
             **extra,
         }
         if op != "confirm":
-            # レビュー済み（段階 4）は手元の CLI の confirm と比べる。控えがあると手元は C1 の
-            # 対象の家族として sh を通さない書き込みを断るので、控えは Chrome の側だけに組む。
+            # レビュー済みは手元の CLI の confirm と比べる。控えがあると手元は C1 の
+            # 対象の親子のチケットとして sh を通さない書き込みを断るので、控えは
+            # Chrome の側だけに組む。
             self.mirror_records(chrome, request)
         return request
 
     def mirror_records(self, chrome, request):
         """Chrome の入口が仮のツリーに組む取り込みの控え相当を、手元の控えの置き場にも書く。
 
-        手元も同じ控えで判定する（取り込み済みの家族として読む。ADR-0093 の 3.3）ので、
+        手元も同じ控えで判定する（取り込み済みの親子のチケットとして読む）ので、
         画面の本文と指紋（判定が読んだ中身。控えを含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
@@ -217,13 +224,13 @@ class ClockTest(unittest.TestCase):
 
 
 class SourcePathTest(CoreHarness):
-    """D22: 承認の記録の出所は、リポジトリからの相対パスとブランチ名。"""
+    """承認の記録の出所は、リポジトリからの相対パスとブランチ名。"""
 
     def test_the_copy_records_a_relative_path_and_the_branch(self):
         text = parent_text("i0001", ["research"])
         self.propose("i0001", text)
         self.commit_parent()
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertIn("提案: wip/proposals/todo/i0001.md", preview["text"])
         self.assertNotIn(self.root, preview["text"])
         self.assertEqual(self.approve().returncode, 0)
@@ -238,8 +245,8 @@ class SourcePathTest(CoreHarness):
         self.assertEqual(self.approve().returncode, 0)
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
-        new_form = self.ccnavi("--approve", "--preview", "--json")
-        verify_new = self.ccnavi("--approve", "--preview", "--verify")
+        new_form = self.ccnavi("--agree", "--preview", "--json")
+        verify_new = self.ccnavi("--agree", "--preview", "--verify")
         board_new = json.loads(self.ccnavi("--explain", "--json").stdout)
         path = os.path.join(self.approved, "doing", "i0001.md")
         with open(path, encoding="utf-8") as f:
@@ -254,13 +261,13 @@ class SourcePathTest(CoreHarness):
         write(path, legacy)
         copy, _ = approval.load_copy(path)
         self.assertEqual(copy.source_path, old)
-        old_form = self.ccnavi("--approve", "--preview", "--json")
-        verify_old = self.ccnavi("--approve", "--preview", "--verify")
+        old_form = self.ccnavi("--agree", "--preview", "--json")
+        verify_old = self.ccnavi("--agree", "--preview", "--verify")
         board_old = json.loads(self.ccnavi("--explain", "--json").stdout)
         a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
         for key in ("batch", "text", "rejected", "problems"):
             self.assertEqual(a[key], b[key], key)
-        # 指紋は判定が読んだ中身（read_set。ADR-0093 の段階 2c）で作るので、読んだ写しの
+        # 指紋は判定が読んだ中身（read_set）で作るので、読んだ写しの
         # バイト列が変われば変わる（見せたあとに写しが書き換わった承認を通さない）。
         self.assertNotEqual(a["digest"], b["digest"])
         self.assertEqual(verify_new.returncode, verify_old.returncode)
@@ -317,7 +324,7 @@ class BranchOfTest(unittest.TestCase):
         return tree_root
 
     def test_forms(self):
-        from ccnavi import tree
+        from ccnavi.infra import tree
 
         self.assertEqual(tree.branch_of(self.repo("ref: refs/heads/main\n")), "main")
         self.assertIsNone(tree.branch_of(self.repo("0123456789abcdef0123456789abcdef01234567\n")))
@@ -327,7 +334,7 @@ class BranchOfTest(unittest.TestCase):
         self.assertIsNone(tree.branch_of(os.path.join(self.base, "none")))
 
     def test_a_relative_gitdir_is_read_from_the_tree(self):
-        from ccnavi import tree
+        from ccnavi.infra import tree
 
         root = self.repo("ref: refs/heads/i0001\n", gitfile="gitdir: meta\n")
         self.assertEqual(tree.branch_of(root), "i0001")
@@ -565,7 +572,7 @@ class WriterFailureTest(CoreHarness):
         return [e for e in events if e["kind"] == history.KIND_PHASE_REOPENED]
 
     def test_a_reviewed_mark_that_cannot_be_removed_stops(self):
-        """決定 A: reviewed を消せなければ止める。ほかの種類には手を付けない。"""
+        """reviewed を消せなければ止める。ほかの種類には手を付けない。"""
         marks = self.reopened()
         changes = self.planned()
         with self.failing("unlink", lambda path: path.endswith("1.reviewed")):
@@ -621,7 +628,7 @@ class WriterFailureTest(CoreHarness):
         self.merge("i0001-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        from ccnavi import review
+        from ccnavi.tickets import review
 
         result = review.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
         checked = core.confirm(self.snapshot(), "i0001", 1, result, "")
@@ -661,10 +668,10 @@ def _flat(lines):
 
 
 class CoreChromeTest(CoreHarness):
-    """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す（6.2 の同じ答え）。
+    """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す。
 
     比べるのは、Changes（経路の欄だけを落として）、見せる行、止まったか、問題点の文面、
-    画面の本文と指紋。取り下げは手元の CLI が無い（段階 3 の Chrome だけの操作）ので、
+    画面の本文と指紋。取り下げは手元の CLI が無い（Chrome だけの操作）ので、
     手元のコアを通して書いたものと比べる。
     """
 
@@ -683,7 +690,7 @@ class CoreChromeTest(CoreHarness):
         clock.__enter__()
         self.addCleanup(clock.__exit__, None, None, None)
         super().setUp()
-        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）。
+        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない）。
         write(
             os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
             f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
@@ -726,14 +733,14 @@ class CoreChromeTest(CoreHarness):
         """同じ状態で、Chrome の plan と手元の CLI（preview → --yes）を比べる。"""
         request = self.chrome_request("plan", family, **({"only": only} if only else {}))
         answer = self.ask_chrome(request)
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json", *(only or [])).stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json", *(only or [])).stdout)
         self.assertEqual(answer["text"], preview["text"])
         self.assertEqual(answer["digest"], preview["digest"])
         self.assertEqual(answer["identifiers"], sorted(b["ticket"] for b in preview["batch"]))
         self.assertEqual(answer["rejected"], preview["rejected"])
         before = self.disk()
         result = self.ccnavi(
-            "--approve",
+            "--agree",
             "--yes",
             ",".join(answer["identifiers"]),
             "--digest",
@@ -787,9 +794,9 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent("reviewed")
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
-        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む（控えの無い家族。
-        # D11）ので、残すと手元だけが子のツリーの古い写しを読み、判定が読んだ中身（read_set）
-        # で作る指紋が Chrome（統合先と P だけを読む）と食い違う。
+        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの写しを読む
+        # （控えの無い親子のチケット）ので、残すと手元だけが子のツリーの古い写しを読み、
+        # 判定が読んだ中身（read_set）で作る指紋が Chrome（統合先と P だけを読む）と食い違う。
         git(
             self.root,
             "worktree",
@@ -945,7 +952,7 @@ class CoreChromeTest(CoreHarness):
         self.assertIn(("create", ".ccnavi/approved/done/i0001-01.md"), paths)
         self.assertIn(("delete", "wip/proposals/review/i0001-01.md"), paths)
         mark = next(r for r in answer["changes"]["i0001"] if r["path"].endswith("1.reviewed"))
-        # Chrome の印は経路（chrome）を持つ。アカウントは要求に無いので書かない（8.9）。
+        # Chrome の印は経路（chrome）を持つ。アカウントは要求に無いので書かない。
         self.assertEqual(
             json.loads(mark["content"]), {"mr": 7, "accepted": [], "via": "chrome", "at": STAMP}
         )
@@ -978,7 +985,7 @@ SCENARIO_NAMES = (
 
 
 class WithdrawTest(CoreHarness):
-    """取り下げの条件（8.8）。どれか 1 つでも当たれば何も並べない。"""
+    """取り下げの条件。どれか 1 つでも当たれば何も並べない。"""
 
     def approved_parent(self):
         text = parent_text("i0001", ["research"])
@@ -1016,6 +1023,26 @@ class WithdrawTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(any("改版" in p for p in self.problems({"i0001": text.encode()})))
+
+    def test_copies_left_in_a_worktree_do_not_change_the_answer(self):
+        """承認の前に切ったワークツリーに残った `todo/` の写しがあっても、答えは前と同じ。"""
+        text = parent_text("i0001", ["research"])
+        self.propose("i0001", text)
+        self.commit_parent()
+        other = self.worktree("i0001-05", "i0001")  # todo/i0001 を持ったまま切る
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertEqual(self.problems({"i0001": text.encode()}), [])
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
+        # 承認済みの無い子の提案は、どのツリーに在っても止める（前と同じ）。
+        write(
+            os.path.join(other, "wip", "proposals", "todo", "i0001-01.md"),
+            child_text("i0001-01", "i0001", 1, ("wip/research/*",), False),
+        )
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("子の提案" in p for p in problems), problems)
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertTrue(any("子の提案" in p for p in listed[0][2]), listed)
 
     def test_an_unreadable_marks_place_refuses(self):
         """マーカーの置き場を読めない（ディレクトリでない）なら、無いとは言わずに止める。"""
@@ -1062,9 +1089,9 @@ class RecordWritesTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
-        digest = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)["digest"]
+        digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         steps = [
-            ("--approve", "--yes", "i0001,i0001-01", "--digest", digest, "--json"),
+            ("--agree", "--yes", "i0001,i0001-01", "--digest", digest, "--json"),
             ("ticket", "start", "i0001"),
         ]
         for args in steps:
@@ -1095,7 +1122,7 @@ class RecordWritesTest(CoreHarness):
     def test_an_unwritable_list_ends_with_one(self):
         target = os.path.join(self.place(), "self", "busy")
         os.makedirs(os.path.join(target, "inside"))
-        result, _ = self.record("--approve", "--preview", "--json", target=target)
+        result, _ = self.record("--agree", "--preview", "--json", target=target)
         self.assertEqual(result.returncode, 1)
         self.assertIn("書いたパスの一覧を", result.stderr)
 
@@ -1142,7 +1169,7 @@ class RecordWritesTest(CoreHarness):
         self.addCleanup(os.remove, linked)
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
-        digest = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)["digest"]
+        digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         target = os.path.join(linked, "logs", "state", "c1", "self", "l.writes")
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -1164,7 +1191,7 @@ class RecordWritesTest(CoreHarness):
                 "disable",
                 "--record-writes",
                 target,
-                "--approve",
+                "--agree",
                 "--yes",
                 "i0001",
                 "--digest",
@@ -1194,10 +1221,12 @@ class RecordWritesTest(CoreHarness):
             # なく、C1 の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }
-        names = ("approval", "history", "configsync", "ops", "flow", "risk", "core")
-        names += ("review", "phase", "ticket", "gitstate")
-        for name in names:
-            path = os.path.join(ROOT, "ccnavi", name + ".py")
+        names = ("tickets.approval", "tickets.agree", "tickets.history", "tickets.configsync")
+        names += ("tickets.ops", "tickets.flow", "tickets.risk", "hook.core", "tickets.review")
+        names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
+        for dotted in names:
+            package, name = dotted.split(".")
+            path = os.path.join(ROOT, "ccnavi", package, name + ".py")
             with open(path, encoding="utf-8") as f:
                 lines = f.read().splitlines()
             hits = [

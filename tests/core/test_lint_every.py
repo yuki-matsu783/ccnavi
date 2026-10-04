@@ -3,14 +3,14 @@
 見るのは 2 つ。
 
 1. `every` の値が 1 以上の整数か。`0` と `-1` と `"x"` は error。刻みとして読めない値を
-   何も言わずに無視すると、書いた人は刻んだつもりのまま毎回渡ることになる
+   何も言わずに無視すると、書いたユーザは刻んだつもりのまま毎回渡ることになる
 2. 渡すものを 1 つも持たない `every` は warning。刻んでも渡す文が無ければ何も起きない。
    `additionalContextOnce` だけ、`additionalContextFile` だけの `every` は渡すものが
    あるので咎めない
 
 `every: 1` は `every` 無しと同じ意味になるだけで誤りではないので、何も言わない。
 
-実装は入っている（ADR-0057、`lint._every_problems`）。ここが落ちたら、`--lint` の言うことが
+実装は入っている（`lint._every_problems`）。ここが落ちたら、`--lint` の言うことが
 上の 2 つと食い違ったということ。
 渡す回の刻みそのものは tests/config/test_rule_every.py。
 """
@@ -51,7 +51,12 @@ class LintEveryTest(unittest.TestCase):
         body = {
             "version": 1,
             "deny": [
-                {"id": "push", "match": "Bash", "glob": "*git push*", "message": "push は人が行う"}
+                {
+                    "id": "push",
+                    "match": "Bash",
+                    "glob": "*git push*",
+                    "message": "push はユーザが行う",
+                }
             ],
             "allow": list(allow),
         }

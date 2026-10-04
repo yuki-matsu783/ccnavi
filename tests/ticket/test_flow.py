@@ -1,9 +1,9 @@
-"""子チケットのフロー（設計 9.3.1・9.12、ADR-0085）の受入テスト。
+"""子チケットのフロー（設計 9.3.1・9.12）の受入テスト。
 
 見るのは 8 つ。
 
-1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は warn で読み飛ばす
-2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。人が保存したフローを
+1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は何も言わず無視する
+2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。ユーザが保存したフローを
    実行後チェックが範囲外の変更として咎めない（H1）
 3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
    別名（アンカーとエイリアス）は読まない
@@ -27,13 +27,14 @@ from unittest import mock
 
 import yaml
 
-from ccnavi import flow, settings, ticket
+from ccnavi.infra import settings
+from ccnavi.tickets import flow, ticket
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
 CHILD = "i0001-01"
 
-# 見本のフロー。人がボードのフロー編集画面で書く YAML の形。
+# 見本のフロー。ユーザがボードのフロー編集画面で書く YAML の形。
 WORKFLOW_YAML = """\
 id: wf-1
 name: 調査の手順
@@ -114,14 +115,12 @@ class FlowPlaceTest(unittest.TestCase):
             os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01.yml"),
         )
 
-    def test_the_old_flow_field_is_warned_and_ignored(self):
+    def test_the_old_flow_field_is_silently_ignored(self):
         text = child_text(CHILD, "i0001", 1, ("wip/research/*",))
         for value in ("references/i0001-01/flow.json", "../../etc/passwd", "[1, 2]"):
             t, problems = ticket.parse(text.replace("\nphase:", f"\nflow: {value}\nphase:", 1))
             self.assertIsNotNone(t, problems)
-            details = [p.detail for p in problems]
-            self.assertTrue(any("`flow`" in d and "flows/i0001-01.yml" in d for d in details))
-            self.assertTrue(all(p.severity == ticket.SEVERITY_WARN for p in problems), details)
+            self.assertEqual(problems, [])
             self.assertFalse(hasattr(t, "flow"))
 
     def test_locate_reads_both_spellings_and_folds_case(self):
@@ -164,6 +163,18 @@ class FlowRenderTest(unittest.TestCase):
         self.assertIn("[fancyNewNode] 未来の種類", lines[4])
         self.assertIn("[end] 終了", lines[5])
         self.assertIn("fancyNewNode", kinds)
+
+    def test_sub_agent_summary_has_no_leading_separator(self):
+        # 見出しが空でも区切りから始めない。CC Workflow Studio の別名（agentDefinition・
+        # workDescription）は読まない
+        node = {
+            "type": "subAgent",
+            "data": {"description": "", "agentDefinition": "旧", "prompt": "p"},
+        }
+        self.assertEqual("プロンプト: p", flow._summary(node, {}))
+        self.assertEqual(
+            "", flow._summary({"type": "start", "data": {"workDescription": "旧"}}, {})
+        )
 
     def test_groups_are_not_listed_but_their_members_are(self):
         data = {
@@ -461,7 +472,7 @@ class FlowRenderTest(unittest.TestCase):
         running.tree_root = root
         text = "\n".join(flow.briefing(conf, root, running, "wip/research/*"))
         self.assertIn("着手中なので、終わるまで書き換えられない", text)
-        # 手順は人が書いたデータとして囲って渡す。
+        # 手順はユーザが書いたデータとして囲って渡す。
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn(flow.FENCE_CLOSE, text)
         # 文の上限を使い切っていたら並べない。
@@ -538,7 +549,7 @@ class FlowInfoTest(unittest.TestCase):
 class FlowHarness(PhaseHarness):
     """親 1 本（research）と、フローを持つ子 1 本。親の範囲に承認済みの領域は入らない。
 
-    フローは人が承認のあとに親のツリーの `.ccnavi/approved/flows/<子>.yml` に保存して
+    フローはユーザが承認のあとに親のツリーの `.ccnavi/approved/flows/<子>.yml` に保存して
     コミットする（ボードと `ccnavi-push-approved.sh` の運び方）。
     """
 
@@ -590,7 +601,7 @@ class FlowHarness(PhaseHarness):
 
 
 class FlowGuardTest(FlowHarness):
-    """エージェントはどのツリーの置き場にも書けない。人の保存は咎めない。"""
+    """エージェントはどのツリーの置き場にも書けない。ユーザの保存は咎めない。"""
 
     def test_agent_writes_are_denied_in_every_tree(self):
         """組み込みの守り（builtin-guard-project-home）が、承認済みの領域の `flows/` を
@@ -631,7 +642,7 @@ class FlowGuardTest(FlowHarness):
                 self.assertIn("builtin-guard-setting-files", out["permissionDecisionReason"])
 
     def test_a_flow_saved_by_a_person_is_not_blamed_on_the_agent(self):
-        """人がボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
+        """ユーザがボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
         実行後チェックが範囲外の変更として咎めない（H1）。未コミットでも、コミットしても。"""
         other = CHILD.replace("01", "02")
         ok = write(os.path.join(self.parent_tree, "wip", "a.md"), "a\n")
@@ -799,7 +810,7 @@ class FlowLockTest(FlowHarness):
     def test_a_crash_in_the_briefing_is_one_line(self):
         """フローの案内が万一例外を出しても、1 行の知らせにして残りを渡す（H3）。"""
         child_tree = self.run_child(CHILD)
-        with mock.patch("ccnavi.flow.briefing", side_effect=RecursionError("deep")):
+        with mock.patch("ccnavi.tickets.flow.briefing", side_effect=RecursionError("deep")):
             result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.reason(result)
@@ -808,7 +819,7 @@ class FlowLockTest(FlowHarness):
 
 
 class NestedBounceTest(PhaseHarness):
-    """入れ子のサブエージェントが差し戻しを無視して終わったら、人にも見せる（G4）。"""
+    """入れ子のサブエージェントが差し戻しを無視して終わったら、ユーザにも見せる（G4）。"""
 
     def test_nested_ignored_bounce_is_also_a_system_message(self):
         self.propose("i0001", parent_text("i0001", ["research"]))

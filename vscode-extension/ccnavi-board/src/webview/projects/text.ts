@@ -1,6 +1,6 @@
 /**
- * カードに出す言葉。検証の苦情は実行ファイル（`--lint --json`）が言ったもので、ここは
- * 同じ事象を 2 度出さないように間引くだけ。拡張が判定をやり直すことはしない（ADR-0035）。
+ * カードに出す言葉。検証の指摘は実行ファイル（`--lint --json`）が言ったもので、ここは
+ * 同じ事象を 2 度出さないように間引くだけ。拡張が判定をやり直すことはしない。
  */
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { ProjectRow } from "../../core/projects-view.js";
@@ -10,7 +10,7 @@ import type { ProjectRow } from "../../core/projects-view.js";
  *
  * 実行ファイルは、ワークスペース自身のソースに `projects/` がある（ぶつかり）ときも、
  * `.gitignore` に入れる前に `git add -A` して入れ子のリポジトリが gitlink で載った（載せ忘れ）ときも、
- * 同じ先頭の句で言う（ccnavi/lint.py の `_TRACKED_LEAD`。設計 wip/design/i0064-fixed-places.md §4.2）。
+ * 同じ先頭の句で言う（ccnavi/entry/lint.py の `_TRACKED_LEAD`。設計 wip/design/i0064-fixed-places.md §4.2）。
  * どちらでも `.gitignore` に `/projects/` を足すだけでは直らない（ぶつかりなら誤り、載せ忘れなら半分）ので、
  * 画面は `.gitignore` に追加のボタンと「無視されていない」の帯を出さず、苦情の帯だけを出す（§4.5 の分岐 1 の案 A）。
  * 2 つを見分ける句（`（入れ子のリポジトリとして`）には頼らない。文面を変えるなら lint.py と揃える。
@@ -28,8 +28,8 @@ export function settingsDir(row: ProjectRow): string {
 }
 
 /**
- * カードに出す苦情。`.claude/` があることは説明付きの 1 行で言い、lint の同じ指摘
- * （ccnavi/lint.py の文面「.claude/ を持つ。…」）は重ねない。
+ * カードに出す指摘。`.claude/` があることは説明付きの 1 行で言い、lint の同じ指摘
+ * （ccnavi/entry/lint.py の文面「.claude/ を持つ。…」）は重ねない。
  * 「.claude/settings.json を読めない」のような別の指摘まで消さないよう、文面の先頭で当てる。
  */
 export function problemsOf(row: ProjectRow): readonly LintProblem[] {
@@ -39,7 +39,7 @@ export function problemsOf(row: ProjectRow): readonly LintProblem[] {
           {
             severity: "warn" as const,
             where: "",
-            detail: `.claude/ があります。Claude Code はそこにあるスキルを読み込み、cd すると、そこを別のワークスペースルートとして扱います。プロジェクトの設定は ${settingsDir(row)}/ に置いてください`,
+            detail: `.claude/ があります。Claude Code はそこにあるスキルを読み込み、このフォルダに cd すると、ここを別のワークスペースルートとして扱います。プロジェクトの設定は ${settingsDir(row)}/ に置いてください`,
           },
         ]
       : []),

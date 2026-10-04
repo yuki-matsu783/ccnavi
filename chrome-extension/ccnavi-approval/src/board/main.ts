@@ -1,11 +1,11 @@
 /**
- * ボード（ADR-0093 段階 3・4・5）。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
- * 段階 4 から、依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。
- * 段階 5 から、GitLab とプロジェクトのリポジトリも読み、「始める」（issue から親のブランチを作る。8.6）を出す。
- * GitLab へ書いて打ち消しが収まらなかった家族は「要確認」を控え（`chrome.storage.local` の `attention`）、
- * 人が確かめて外すまで出す（8.4）。
+ * ボード。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
+ * 依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。
+ * GitLab とプロジェクトのリポジトリも読み、「始める」（issue から親のブランチを作る）を出す。
+ * GitLab へ書いて打ち消しが収まらなかった親子のチケットは「要確認」を控え（`chrome.storage.local` の `attention`）、
+ * ユーザが確かめて外すまで出す。
  *
- * PAT はこのページに来ない。ホストの API は service worker に名前で頼む（5.5 の 4）。
+ * PAT はこのページに来ない。ホストの API は service worker に名前で頼む。
  */
 import type { TokenStatus, Response } from "../core/protocol.js";
 import type { Issue } from "../core/github.js";
@@ -50,7 +50,7 @@ let repos: RepoConfig[] = [];
 const boards = new Map<string, RepoBoard>();
 const issues = new Map<string, { list: Issue[] | null; error: string }>();
 
-/** プロジェクトのリポジトリのワークスペース（登録したもの）とそのホストへ頼む関数（段階 5） */
+/** プロジェクトのリポジトリのワークスペース（登録したもの）とそのホストへ頼む関数 */
 function workspaceOf(repo: RepoConfig, stats: Stats): Deps["workspace"] {
   if (!repo.project) return undefined;
   const ws = repos.find((r) => repoKey(r) === repo.workspace && !r.project);
@@ -72,7 +72,7 @@ async function writeDeps(repo: RepoConfig): Promise<WriteDeps> {
   };
 }
 
-/** 「要確認」の家族へは、このブラウザから書かない（11.9.1 の決定 B。ボタンを出さないのに加えて、押す前にも見る） */
+/** 「要確認」の親子のチケットへは、このブラウザから書かない（ボタンを出さないのに加えて、押す前にも見る） */
 async function blocked(repo: RepoConfig, family: string): Promise<boolean> {
   const why = (await readAttention())[repoKey(repo)]?.[family];
   if (!why) return false;
@@ -90,7 +90,7 @@ async function readAttention(): Promise<Attention> {
   return v && typeof v === "object" ? (v as Attention) : {};
 }
 
-/** 要確認の家族を控える（打ち消しが収まらない・書いたか確かめられない など。8.4。人が確かめて外すまでボードに出す） */
+/** 要確認の親子のチケットを控える（打ち消しが収まらない・書いたか確かめられない など。ユーザが確かめて外すまでボードに出す） */
 async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
   if (outcome.kind !== "attention") return;
   const all = await readAttention();
@@ -109,7 +109,7 @@ function drawRepo(board: RepoBoard, attention: Attention): HTMLElement {
   return node;
 }
 
-/** PAT の期限の帯（D25）。PAT の無いホストは出さない */
+/** PAT の期限の帯。PAT の無いホストは出さない */
 async function drawBanner(repos: readonly RepoConfig[]): Promise<void> {
   banner.replaceChildren();
   for (const host of new Set(repos.map((r) => r.host))) {
@@ -148,7 +148,7 @@ const actions: Actions = {
       if (!r?.digest || !r.batch) return false;
       const deps = await writeDeps(repoBoard.repo);
       const ids = r.batch.map((e) => e.ticket);
-      // ホストの Approve が外れうることを出す（8.10。止めはしない）
+      // ホストの Approve が外れうることを出す（止めはしない。ccnavi はホストの Approve を読まないので、外れても流れは止まらない）
       let warn = "";
       try {
         const prs = (await deps.call("pullApprovals", [repoBoard.repo.owner, repoBoard.repo.repo, family.family.name])) as { number: number }[];
@@ -172,7 +172,7 @@ const actions: Actions = {
         const prs = (await deps.call("pullApprovals", [repoBoard.repo.owner, repoBoard.repo.repo, family.family.name])) as { number: number }[];
         if (prs.length > 0) warn = `\n\n注意: マージリクエスト ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いている。このコミットを書くと、その Approve が外れることがある`;
       } catch {
-        // 読めなくても止めない（注意の表示だけ。8.10）
+        // 読めなくても止めない（注意の表示だけ）
       }
       const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子を done/ へ動かし、マーカーと合わせて 1 コミットで書く。書く前に、押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
       if (!window.confirm(msg)) return false;

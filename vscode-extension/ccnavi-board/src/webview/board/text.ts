@@ -1,6 +1,6 @@
 /**
  * カードとフェーズ行に出す言葉。判定は実行ファイルがやっていて、ここは JSON が言ったことを
- * 言い換えるだけ。マーカーや済みから状態を組み直さない（ADR-0035）。
+ * 言い換えるだけ。マーカーや済みから状態を組み直さない。
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -34,7 +34,7 @@ export function movedLabel(moved: Moved): string {
 
 /**
  * レビューが済むまで止めている間の呼び名。依頼を出す前はエージェントの番（合流・push・依頼）で
- * 「レビュー準備中」、出した後は人の番で「レビュー待ち」。実行ファイルの `phase.review_label` と
+ * 「レビュー準備中」、出した後はユーザの番で「レビュー待ち」。実行ファイルの `phase.review_label` と
  * 同じ分け方で、判定した 2 つの真偽値（`gate_closed` / `review_waiting`）を言い換えるだけ。
  */
 export function holdLabel(x: { readonly gateClosed: boolean; readonly reviewWaiting: boolean }): string {
@@ -79,7 +79,7 @@ export function phaseStatusFullItems(p: PhaseChip): string[] {
 }
 
 /**
- * フェーズ行の状態の要約。人が動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
+ * フェーズ行の状態の要約。ユーザが動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
  * 止めている間は段の名前を 1 つだけ出す。
  */
 export function phaseStatusBrief(p: PhaseChip): string {
@@ -103,14 +103,14 @@ export function mrText(number: number | null): string {
   return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
 }
 
-/** 依頼のマーカーが持つ URL は中身を確かめずに写してあるので、http(s) のときだけリンクにする */
+/** 依頼のマーカーが持つ URL は中身を確かめずにそのまま取り込んであるので、http(s) のときだけリンクにする */
 export function isHttpUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
 /**
  * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ綴り
- * （`ccnavi/approval.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
+ * （`ccnavi/tickets/agree.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
  * **まとめるのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
@@ -134,7 +134,7 @@ export interface BodyLine {
 }
 
 /**
- * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。端末には両方の行がそのまま出るが、
+ * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。ターミナルには両方の行がそのまま出るが、
  * 画面では説明を見出しのツールチップにまとめて、本文を短く保つ。
  */
 export function approvalBody(text: string): BodyLine[] {
@@ -154,7 +154,7 @@ export function approvalBody(text: string): BodyLine[] {
   return out;
 }
 
-/** 履歴（ADR-0086）の置き場の呼び名。列の名前ではなく置き場の名前で言う（`review` は作業中の列にいる） */
+/** 履歴の置き場の呼び名。列の名前ではなく置き場の名前で言う（`review` は作業中の列にいる） */
 const PLACE_LABELS: Readonly<Record<string, string>> = {
   todo: "承認待ち",
   doing: "作業中",
@@ -183,12 +183,12 @@ const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
- * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（人が端末で同じ sh を打っても `cli`）ので、
+ * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザがターミナルで同じ sh を打っても `cli`）ので、
  * 誰が打ったかは断定しない
  */
 export const VIA_LABELS: Readonly<Record<string, string>> = {
   cli: "sh（ccnavi-ticket.sh など）",
-  terminal: "端末",
+  terminal: "ターミナル",
   board: "ボード",
   hook: "hook",
   chrome: "Chrome 拡張",
@@ -224,7 +224,7 @@ export function historyAt(at: string): string {
 }
 
 /**
- * 先行を満たしていないカードのバッジ（ADR-0088）。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
+ * 先行を満たしていないカードのバッジ。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
  * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
  * `lead` と `ids` は `text` を分けたもので、画面が識別子の途中で折り返さないために使う
  */

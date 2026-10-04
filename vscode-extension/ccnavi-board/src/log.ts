@@ -1,13 +1,13 @@
 /**
  * 診断ログ。ワークスペースルートの `logs/diag/<出どころ>.log` に 1 行ずつ足す（docs/claude/logging.md）。
  *
- * sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と実行ファイル（`ccnavi/diaglog.py`）と
+ * sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と実行ファイル（`ccnavi/records/diaglog.py`）と
  * 同じ形の行を出す。
  *
  *     2026-09-27T10:15:03+09:00 ERROR ccnavi-board[4242] 画面の前提が崩れている screen=rules
  *
  * **画面にも console にも何も出さない。** 書けないときは何も出さずに捨て、例外を外へ出さない。
- * 利用者に見せる通知（showErrorMessage など）とは分けてあり、そちらはこのモジュールと関係なく書く。
+ * ユーザに見せる通知（showErrorMessage など）とは分けてあり、そちらはこのモジュールと関係なく書く。
  *
  * 伏せるのは URL と scp 形式に埋まった資格情報だけ（maskUserinfo。sh と Python と同じ規則で `***` にする）。
  * ほかの秘密の形は伏せない。秘密の値・ファイルの中身・環境変数の値を渡さないのが決まり。

@@ -10,15 +10,14 @@
 # 2 つめは**ワークツリーの起点になる統合先**（CCNAVI_INTEGRATION_BRANCH、無ければ ccnavi-sync.sh が
 # 控えに書いた名前、無ければデフォルトブランチ＝`origin/HEAD` が指すもの。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
 # 切り、起点は `<統合先>` の HEAD になる。手元の `main` が古いと、そこから切るブランチも古いコミットから
-# 始まる。戻すときに fast-forward が通らず、承認済みチケットも古い版で判定することになる
-# （ADR-0060）。
+# 始まる。統合先に取り込むときに fast-forward が通らず、承認済みチケットも古い版で判定することになる。
 #
 # **デフォルトブランチは、チェックアウトされていなくても進める。** ワークスペースルートが
 # `main` 以外に居るセッションでは、上の 1 つめ（そのツリーがチェックアウトしているブランチを
 # 進める）では `main` に届かない。
 #
 # 進めるのは fast-forward だけ。マージも rebase もしない。作業ツリーに未コミットの
-# 変更があるツリーは触らない。そこに居るのは人か別のセッションの書きかけで、
+# 変更があるツリーは触らない。そこに居るのはユーザか別のセッションの書きかけで、
 # セッションの頭に走る hook が動かしてよいものではない（docs/claude/worktree.md の「他セッションの
 # 作業を踏まないために」）。進められなかったツリーは理由を 1 行で言う。
 #
@@ -30,13 +29,13 @@
 # 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
 #
 # **認証で落ちたときは、そう言う。** 尋ねないので、資格情報が無いか切れていると毎回落ちる。
-# オフラインと同じ 1 行では、人は理由を調べることになる。認証は人が端末で打つ git（承認の
+# オフラインと同じ 1 行では、ユーザは理由を調べることになる。認証はユーザが端末で打つ git（承認の
 # sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
 # git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
 # 「取ってこられなかった」に戻るだけ。
 #
-# **取り込み済みの家族は早送りだけ**（ADR-0093 の 4.2。段階 2b）。親のワークツリー（`.claude/worktrees/<P>`
-# で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある）は、ロックを 1 回だけ試し
+# **取り込み済みの親子のチケットは早送りだけ**。親のワークツリー（`.claude/worktrees/<P>`
+# で、ディレクトリ名 = ブランチ名、親の写しか提案があり、親子のチケットの控えがある）は、ロックを 1 回だけ試し
 # （取れなければ早送りしない。待たない）、`origin/<P>` の祖先なら `merge --ff-only` する。書きかけとの重なりは
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
 # 取り込み（merge）・消えたかの確かめ・控えの書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
@@ -151,7 +150,7 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。ユーザに端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
 	return 1
 }
 
@@ -180,7 +179,7 @@ ccnavi_fetch_default() {
 	return 1
 }
 
-# ワークツリーの起点にするブランチ（統合先。ADR-0093 の D30。段階 2b のレビューの決定 B6）。
+# ワークツリーの起点にするブランチ（統合先）。
 #
 # 環境変数 CCNAVI_INTEGRATION_BRANCH（SessionStart には settings.local.json の env も渡る）、
 # 無ければ ccnavi-sync.sh が控え（sync/<リポジトリ>/integration/head）に書いた名前、
@@ -231,9 +230,9 @@ ccnavi_fetch_seen() {
 	return 0
 }
 
-# そのツリーが、取り込み済みの家族の親のワークツリーか（ADR-0093 の 4.2）。<ツリー> <名前> <ブランチ>
+# そのツリーが、取り込み済みの親子のチケットの親のワークツリーか。<ツリー> <名前> <ブランチ>
 #
-# `.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある。
+# `.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、親子のチケットの控えがある。
 # 当たらないツリーは今までどおり（未コミットがあれば進めない）。他セッションのワークツリーを動かさないため、
 # 条件は全部満たすときだけ。
 ccnavi_fetch_family() {
@@ -249,7 +248,7 @@ ccnavi_fetch_family() {
 	return 0
 }
 
-# 取り込み済みの家族を早送りする（ADR-0093 の 4.2「SessionStart の早送り」）。<ツリー> <P>
+# 取り込み済みの親子のチケットを早送りする。<ツリー> <P>
 #
 # merge はしない。書きかけとの重なりは git に任せる（拒まれたら重なったパスを言う）。途中の状態
 # （MERGE_HEAD）を残さないのが早送りだけにした理由で、hook の時間の枠で切られても書きかけが残らない。
@@ -303,7 +302,7 @@ done
 # ワークツリーは数えない。元リポジトリと ref を共有しているので、元で進めれば届く。
 #
 # **`.ccnavi/approved/` は問わない。** 第 1 周が見るのは「承認済みチケットを持つツリー」だが、
-# ここで欲しいのは「これから切るワークツリーの起点」で、いま何を持っているかとは別（ADR-0060）。
+# ここで欲しいのは「これから切るワークツリーの起点」で、いま何を持っているかとは別。
 repos="$root"
 for dir in "$root/$projects"/*; do
 	[ -e "$dir/.git" ] || continue
@@ -319,7 +318,7 @@ report=$(
 		branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 		[ -n "$branch" ] && [ "$branch" != "HEAD" ] || continue
 		name=$(basename "$tree")
-		# 取り込み済みの家族は早送りだけ（upstream の設定に依らず origin/<P> を見る）。
+		# 取り込み済みの親子のチケットは早送りだけ（upstream の設定に依らず origin/<P> を見る）。
 		if ccnavi_fetch_family "$tree" "$name" "$branch"; then
 			ccnavi_fetch_forward "$tree" "$name"
 			continue
@@ -342,7 +341,7 @@ report=$(
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
 			printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
 		else
-			printf '%s: リモートと分岐しているので進めない。人に合流させてもらってください（%s）\n' \
+			printf '%s: リモートと分岐しているので進めない。ユーザに合流させてもらってください（%s）\n' \
 				"$name" "$branch"
 		fi
 	done
@@ -380,7 +379,7 @@ report=$(
 		[ "$behind" = "0" ] && continue
 		ahead=$(git -C "$repo" rev-list --count "$ref..refs/heads/$default" 2>/dev/null || echo 0)
 		if [ "$ahead" != "0" ]; then
-			printf '%s: ワークツリーの起点になる %s がリモートと分岐している。人に合流させてもらってください\n' \
+			printf '%s: ワークツリーの起点になる %s がリモートと分岐している。ユーザに合流させてもらってください\n' \
 				"$name" "$default"
 			continue
 		fi
@@ -393,13 +392,13 @@ report=$(
 				continue
 			fi
 			git -C "$here" merge --ff-only --quiet "$ref" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。人に合流させてもらってください\n' \
+				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
 					"$name" "$default"
 				continue
 			}
 		else
 			git -C "$repo" update-ref -m ccnavi-fetch "refs/heads/$default" "$ref" "$old" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。人に合流させてもらってください\n' \
+				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
 					"$name" "$default"
 				continue
 			}

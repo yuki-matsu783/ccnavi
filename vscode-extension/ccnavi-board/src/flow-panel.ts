@@ -2,20 +2,20 @@
  * フロー編集画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 子チケット 1 枚のフロー（設計 9.3.1、ADR-0085）を図で直す。開くのはボードのカードの「フロー」だけで、
+ * 子チケット 1 枚のフロー（設計 9.3.1）を図で直す。開くのはボードのカードの「フロー」だけで、
  * **タブは子ごとに 1 枚**（同じ子をもう 1 度開けば前面に出す）。
  *
  * 画面は React（`src/webview/flow/`）で、ここが渡すのは「いま何を見せるか」（`FlowData`）だけ。
- * 渡し方はフェーズ管理と同じ `retainedHost`（編集の途中を持つ。ADR-0062）。
+ * 渡し方はフェーズ管理と同じ `retainedHost`（編集の途中を持つので、入れ物を入れ直さない）。
  *
  * 置き場と錠は実行ファイルに聞く（`--explain --json` の `tickets[].flow`）。拡張は置き場を組まず、
- * 着手中かを `started_at` から組み直さない（ADR-0035）。フローが正しいか（読めるか・形）も実行ファイルに聞く。
+ * 着手中かを `started_at` から組み直さない。拡張が組み直すと、判定と 2 か所で答えが分かれうるため。フローが正しいか（読めるか・形）も実行ファイルに聞く。
  * 開くときは読んだ本文を、保存の前は書き出す本文を一時ファイルに書いて `--lint --json --flow` に掛け
  * （`core/flow-lint.ts`）、error があれば理由を出して開かない・保存しない。開くときは、画面の読みと実行ファイルが
- * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-agree.ts`）。保存は次を全部満たすときだけ書く。
+ * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-match.ts`）。保存は次を全部満たすときだけ書く。
  *
  * 1. 実行ファイルの `--lint --flow` が書き出す本文に error を言わず、その本文を読んだ中身（`flow.data`）が
- *    画面が書こうとした中身と同じ（`core/flow-agree.ts`。PyYAML で意味が変わる本文を書かない）
+ *    画面が書こうとした中身と同じ（`core/flow-match.ts`。PyYAML で意味が変わる本文を書かない）
  * 2. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
  * 3. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
  * 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
@@ -25,7 +25,7 @@
  * （既定 `.ccnavi/approved/flows/<子>.yml`）で、エージェントは判定に止められて書けない。
  *
  * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
- * 着手は人か親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
+ * 着手はユーザか親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
  * 1 回の中（実行ファイルを 1 度起こすぶん）。防ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
  *
  * **未保存のまま閉じたとき。** VS Code の Webview パネルには、閉じるのを止める手段（保存・破棄・取り消しを聞いてから
@@ -44,7 +44,7 @@ import * as vscode from "vscode";
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runC1Target, runFlowLint } from "./ccnavi.js";
 import { PUSH_APPROVED_SCRIPT, pushApprovedCommand } from "./core/commands.js";
-import { flowDisagreement, openDisagreementText, saveDisagreementText } from "./core/flow-agree.js";
+import { flowMismatch, openMismatchText, saveMismatchText } from "./core/flow-match.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
 import { renderFlowPage } from "./core/flow-render.js";
@@ -150,7 +150,7 @@ function reviewSetting(): boolean {
 
 /**
  * 保存前の確かめの設定を書く。いま有効な範囲に書く（フォルダの設定があればそこ、次にワークスペースの設定、
- * どちらも無ければ利用者の設定）。上の範囲に値があると、下に書いても反映されないため
+ * どちらも無ければユーザの設定）。上の範囲に値があると、下に書いても反映されないため
  */
 async function updateReviewSetting(folder: vscode.WorkspaceFolder, value: boolean): Promise<void> {
   const config = vscode.workspace.getConfiguration("ccnaviBoard", folder.uri);
@@ -175,7 +175,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
   }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フロー編集画面を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フロー編集画面を表示できません");
     return;
   }
   const open = panels.get(ticket);
@@ -192,7 +192,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`フロー編集画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`フロー編集画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
   const panel = vscode.window.createWebviewPanel("ccnaviFlow", titleOf(ticket), vscode.ViewColumn.One, {
@@ -240,7 +240,7 @@ function shownPath(root: string, filePath: string): string {
 async function lookUp(root: string, ticket: string): Promise<FlowTarget> {
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
-    throw new Error(`フローの置き場を実行ファイルから取得できない: ${board.error}`);
+    throw new Error(`フローの置き場を実行ファイルから取得できません: ${board.error}`);
   }
   const found = flowTargetOf(board.board, ticket);
   if (!found.ok) {
@@ -263,15 +263,15 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     // リンクは辿らない（ツリーのルートからファイルまでの途中も）。読まないし書かない
     read = readFlowFile(target.flow.tree, filePath);
   } catch (error) {
-    throw new Error(`フローのファイルを読めない（${shown}）: ${(error as Error).message}`);
+    throw new Error(`フローのファイルを読めません（${shown}）: ${(error as Error).message}`);
   }
   if (read === undefined) {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
     return { target, exists: false, mtimeMs: 0, hash: "", doc: templateFlow(ticket, target.title), shown };
   }
   const { bytes, mtimeMs } = read;
-  const refuse = (why: string): Error => new Error(`フローのファイルを開かない（${shown}）: ${why}。エディタで直してから再読込してください`);
-  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として壊れているかも
+  const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから再読込してください`);
+  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として不正かどうかも
   // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
   if (!verdict.ok) {
@@ -286,14 +286,14 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     throw refuse(value.error);
   }
   // 画面の読み（YAML 1.2）が実行ファイルの読み（PyYAML）と同じときだけ開く。違えば、画面で保存しただけで
-  // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-agree.ts）
-  const disagreement = flowDisagreement(value.value, verdict.data);
-  if (disagreement !== undefined) {
-    throw new Error(`フローのファイルを開かない（${shown}）: ${openDisagreementText(disagreement)}。直したら再読込してください`);
+  // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
+  const mismatch = flowMismatch(value.value, verdict.data);
+  if (mismatch !== undefined) {
+    throw new Error(`フローのファイルを開きません（${shown}）: ${openMismatchText(mismatch)}。直したら再読込してください`);
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
-    throw refuse("ノードの並び（id が文字列のノード）が取れないので描けない");
+    throw refuse("ノードの並び（id が文字列のノード）を取り出せないため、図を描けません");
   }
   return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks };
 }
@@ -560,7 +560,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "読み直したので、この保存は取りやめた。読み直したフローで編集し直してください");
+  fail(current, "フローを読み直したため、この保存は取りやめました。読み直したフローで編集し直してください");
   return true;
 }
 
@@ -598,7 +598,7 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       return;
     case "reload": {
       if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage("未保存の変更がある。破棄して読み直す？", { modal: true }, "読み直す");
+        const choice = await vscode.window.showWarningMessage("未保存の変更があります。破棄して読み直しますか？", { modal: true }, "読み直す");
         if (choice !== "読み直す") {
           current.host.post({ type: "cancelled" } satisfies ToFlow);
           return;
@@ -615,7 +615,7 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       const target = loaded.target.flow.path;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けなかった: ${target}`),
+        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
       );
       return;
     }
@@ -661,13 +661,13 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     return;
   }
   if (!verdict.ok) {
-    fail(current, `保存しない: ${verdict.error}`);
+    fail(current, `保存しません: ${verdict.error}`);
     return;
   }
-  // 書き出す本文を実行ファイルが、画面が書こうとした中身と同じに読むときだけ書く（core/flow-agree.ts）
-  const disagreement = flowDisagreement(doc, verdict.data);
-  if (disagreement !== undefined) {
-    fail(current, `保存しない: ${saveDisagreementText(disagreement)}`);
+  // 書き出す本文を実行ファイルが、画面が書こうとした中身と同じに読むときだけ書く（core/flow-match.ts）
+  const mismatch = flowMismatch(doc, verdict.data);
+  if (mismatch !== undefined) {
+    fail(current, `保存しません: ${saveMismatchText(mismatch)}`);
     return;
   }
   // 2. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）
@@ -682,7 +682,7 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（権威のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
-    fail(current, `フローの置き場が変わった（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直してください`);
+    fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直してください`);
     return;
   }
   // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
@@ -695,9 +695,9 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     return;
   }
   await reload(current);
-  // 取り込み済みの家族（C1 の対象）だけ、運ぶ処理を送る（ADR-0093 の 4.6）。端末は対話中のことがあるので、
-  // 勝手に打ち込まず、人がボタンを押したときだけ送る（段階 2d のレビューの決定 E）。それ以外の家族は今どおり
-  // 人がコミットする。
+  // 取り込み済みの親子のチケット（C1 の対象）だけ、運ぶ処理を送る。フローはユーザの書いたものなので C1 は運ばず、
+  // ユーザの操作の最後に送る。ターミナルは対話中のことがあるので、勝手に打ち込まず、ユーザがボタンを押したときだけ送る。
+  // それ以外の親子のチケットは今どおりユーザがコミットする。
   const root = current.folder.uri.fsPath;
   const carrier =
     target.parent !== "" &&
@@ -705,13 +705,13 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     (await runC1Target(root, binSetting(), target.parent)) === "yes";
   if (!carrier) {
     vscode.window.showInformationMessage(
-      `${loaded.shown} に保存した。コミットは、承認済みチケットと同じく人が行う（sh ${PUSH_APPROVED_SCRIPT}）`,
+      `${loaded.shown} に保存しました。コミットは、承認済みチケットと同じくユーザが行います（sh ${PUSH_APPROVED_SCRIPT}）`,
     );
     return;
   }
-  const send = "端末で送る";
+  const send = "ターミナルで送る";
   const picked = await vscode.window.showInformationMessage(
-    `${loaded.shown} に保存した。親 ${target.parent} とその子は取り込み済みなので、コミットと push は ${PUSH_APPROVED_SCRIPT} ${target.parent} で送る`,
+    `${loaded.shown} に保存しました。親 ${target.parent} とその子は取り込み済みのため、コミットと push は、「${send}」を押すと ${PUSH_APPROVED_SCRIPT} ${target.parent} で送れます`,
     send,
   );
   if (picked === send) {

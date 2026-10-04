@@ -123,7 +123,7 @@ export function checkName(raw: string, existing: readonly string[]): NameCheck {
 
 // ---- ターミナルへ送るコマンド行
 
-/** `git clone -- <url> <置き場>/<名前>` をワークスペースルートで。生の git を人が打つ形 */
+/** `git clone -- <url> <置き場>/<名前>` をワークスペースルートで。生の git をユーザが打つ形 */
 export function cloneCommand(root: string, projectsDir: string, url: string, name: string): string {
   const target = `${toPosixPath(projectsDir)}/${name}`;
   return `cd ${shellQuote(toPosixPath(root))} && git clone -- ${shellQuote(url)} ${shellQuote(target)}`;
@@ -216,7 +216,7 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
 }
 
 /**
- * 共通の設定のルールをプロジェクトかワークスペースの設定のルールファイルに写すときの加工。
+ * 共通の設定のルールをプロジェクトかワークスペースの設定のルールファイルへ複製するときの加工。
  * 先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` を `sh {root}/.ccnavi/scripts/` にする。
  * プロジェクトの中に cwd があるエージェントには `.ccnavi/scripts/` が届かず、`{root}` はルールを
  * 読むときにワークスペースルートの絶対パスへ置き換わる（設計 11.8）。置換は 1 種類だけ。

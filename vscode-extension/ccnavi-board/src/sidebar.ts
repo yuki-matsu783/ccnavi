@@ -5,7 +5,7 @@
  * 計画と子の範囲にしか読まれないので、disable の間はどちらも何も動かさない。使われない設定の
  * 入口を残すと、直したのに反映されていない、という読み違いの元になる。
  *
- * 見た目の切り替えは並びに混ぜず、パネルのタイトルバーの歯車に置く（`package.json` の `view/title`）。
+ * 見た目の切り替えは並びに混ぜず、パネルのタイトルバーの配色のアイコンに置く（`package.json` の `view/title`）。
  * 押すと画面が開く行と、押すと設定が変わる行が 1 列に並ぶと、押す前に何が起きるか読めない。
  * 今どれを選んでいるかは、行の代わりにビューの見出しの横（`view.description`）に出す。
  * VS Code の API に触れるので単体テストの対象外。
@@ -34,8 +34,8 @@ const ENTRIES: readonly Entry[] = [
     needsTickets: false,
   },
   {
-    label: "ルール設定",
-    description: "ルールの編集と保存、判定の試行、hook の確認",
+    label: "ルール管理",
+    description: "ルールの編集と保存、判定を試す、hook の確認",
     command: "ccnaviBoard.openRules",
     icon: "shield",
     needsTickets: false,

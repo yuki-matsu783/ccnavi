@@ -59,7 +59,7 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
 } {
   const [touring, setTouring] = useState(false);
   const [pending, setPending] = useState(false);
-  // 受け取る側は描くたびに作り直さないので、呼ぶ先はいまのものを写しておく
+  // 受け取る側は描くたびに作り直さないので、呼ぶ先はいまのものを ref へ入れておく
   const latest = useRef(hooks);
   latest.current = hooks;
   const touringRef = useRef(touring);
@@ -86,7 +86,7 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
 
   // 案内の最中に指す先が消えた（読み直せずエラーになった、別の対象へ切り替わって読み込み中になった、
   // 承認のオーバーレイが出た）。吹き出しは描かれなくなるので、ここで閉じたことにする。閉じずに残すと、
-  // 中身が戻ったときに人が始めていない案内が 1 段目から出直す
+  // 中身が戻ったときにユーザが始めていない案内が 1 段目から出直す
   useEffect(() => {
     if (touring && !ready) {
       touringRef.current = false;
@@ -139,7 +139,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
       if (el === null) {
         setSpot(undefined);
       } else {
-        // 段に入って最初の 1 回だけ、指す先を見える場所へ動かす（測り直しのたびに動かすと、人のスクロールを邪魔する）
+        // 段に入って最初の 1 回だけ、指す先を見える場所へ動かす（測り直しのたびに動かすと、ユーザのスクロールを邪魔する）
         if (!scrolled) {
           scrolled = true;
           // 画面より高い要素（長い一覧）は頭を見せる。中ほどに置くと、何を指しているのかが見えない

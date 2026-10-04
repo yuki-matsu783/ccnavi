@@ -1,7 +1,7 @@
 /**
  * 5 つの画面の CSS。置き場は画面（React）と同じ `src/webview/<名前>/` で、部品 1 つに CSS 1 本。
  * 束ねる（`scripts/bundle-webview.js`）と画面 1 つにつき 1 本になり、拡張がそれを `<style nonce>` に
- * 流し込む（ADR-0066）。
+ * 流し込む。
  *
  * ここで見るのは 3 つ。骨組み（`styles/page.css`）が 5 画面とも 1 か所から来ていること、
  * ハイコントラストのテーマ向けの書き方が残っていること、そして**置いた CSS が束ねから漏れて
@@ -40,7 +40,7 @@ function board(): string {
   return reactPages()[0][1];
 }
 
-/** 一覧（設定 3 画面）の骨組みを持つ 1 枚。ルール設定画面で見る */
+/** 一覧（設定 3 画面）の骨組みを持つ 1 枚。ルール管理画面で見る */
 function rulesOnly(): string {
   return reactPages()[4][1];
 }
@@ -60,7 +60,7 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
  * `@import` の行き先。`"./x.css"` はそのファイルからの相対で、`"@xyflow/react/dist/style.css"` の
  * ように `.` で始まらないものは node_modules から解く（esbuild が束ねるときと同じ解き方）。
  *
- * 外から来る CSS を入れているのは図の 1 本だけ（ADR-0070）。ここで解けないと、このテストは
+ * 外から来る CSS を入れているのは図の 1 本だけ（React Flow の CSS）。ここで解けないと、このテストは
  * 落ちるのではなく **`readFileSync` の ENOENT で例外になる**ので、行き先を間違えたのか置き忘れたのかが
  * 読めなくなる。解けない綴りは名指しで落とす。
  */
@@ -117,14 +117,14 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.match(style, /\.toolbar \{ display: flex;/);
     assert.match(style, /\.banner\.warn \{ border-color:/);
     assert.match(style, /input\[type=text\], input\[type=search\], textarea, select \{ background:/);
-    // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
+    // 骨組みの定義は 1 度だけ（画面ごとの複製を残さない）
     assert.equal((style.match(/\.toolbar \{ display: flex;/g) ?? []).length, 1);
     // 見た目を指定しなければ素の body。Claude の配色の CSS は常に持つ
     assert.ok(html.includes("\n<body>\n"));
     assert.ok(style.includes("body.ccnavi-claude-light:not("));
   }
   // 切り替えを受け取る側は 5 画面とも画面（React）の中にある。動かして見るのは各画面の dom のテスト
-  // （ボードは CB-T142、プロジェクト管理は CB-D32、リスク管理は CB-D57、ルール設定は CB-D0b）
+  // （ボードは CB-T142、プロジェクト管理は CB-D32、リスク管理は CB-D57、ルール管理は CB-D0b）
   for (const [, html] of reactPages("claude-dark")) {
     assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));
   }
@@ -132,7 +132,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
 
 test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使い、他のテーマでは効かない書き方になっている", () => {
   const html = flatStyle(board());
-  // 一覧（設定 3 画面）の開いた行の縁は styles/list.css にあるので、ルール設定画面で見る
+  // 一覧（設定 3 画面）の開いた行の縁は styles/list.css にあるので、ルール管理画面で見る
   const rules = flatStyle(rulesOnly());
   assert.match(rules, /\.row\.open > \.row-head, \.row\.open > \.row-body \{ box-shadow: inset 3px 0 0 var\(--vscode-contrastActiveBorder, var\(--vscode-focusBorder\)\); \}/);
   assert.match(html, /button\.action:disabled \{ border-color: var\(--vscode-contrastBorder, transparent\); border-style: dashed; \}/);
@@ -155,7 +155,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
 test("CB-T193 動いたカードの印は、光らせない設定を尊び、色だけに頼らない", () => {
   const html = flatStyle(board());
   // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
-  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌う人に 2 秒の脈動が出る
+  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌うユーザに 2 秒の脈動が出る
   assert.match(html, /@media \(prefers-reduced-motion: reduce\) \{ \.card\.moved \{ animation: none; \} \}/);
   // どこからどこへ動いたかは帯の文で言う（色が見分けられなくても読める）。中身は Card.tsx の movedLabel
   assert.match(html, /\.moved-mark \{[^}]*color: var\(--vscode-charts-green\);/);
@@ -252,7 +252,7 @@ test("CB-T290 意味の色を文字に使うときは前景色へ混ぜ、Light 
   }
 });
 
-test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行の見出しを段に分け、ルール設定の表は入れ物の中で横に送る", () => {
+test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行の見出しを段に分け、ルール管理の表は入れ物の中で横に送る", () => {
   const rules = flatStyle(rulesOnly());
   assert.match(rules, /@media \(max-width: 520px\) \{ \.row-body \{ padding-left: 14px; grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(rules, /\.rule \.sum > \.clip:not\(\.mono\) \{ grid-row: 2; grid-column: 2 \/ -1; \}/);

@@ -1,6 +1,6 @@
-"""識別子を親のブランチ名にできるかを `--lint` が warn で言う（ADR-0093 の段階 0）。
+"""識別子を親のブランチ名にできるかを `--lint` が warn で言う。
 
-親のブランチ名は親の識別子そのものにする。段階 0 では承認も判定も変えず、
+親のブランチ名は親の識別子そのものにする。ここでは承認も判定も変えず、
 `--lint` の warn だけを足す。
 見るのは 4 つ。
 
@@ -20,10 +20,10 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import ticket as ticket_mod
+from ccnavi.tickets import ticket as ticket_mod
 from tests.inproc import run_ccnavi
 
-ADR = "（ADR-0093）"
+ADR = "（親のブランチ名の規則）"
 
 
 def write(path, text):
@@ -91,7 +91,7 @@ class BranchNameRulesTest(unittest.TestCase):
                 self.assertIn("統合先", found[0])
 
     def test_the_integration_branch_is_reserved_when_given(self):
-        # その時点の統合先の名前（D30。段階 2b）。環境変数は読まず、渡されたときだけ見る。
+        # その時点の統合先の名前。環境変数は読まず、渡されたときだけ見る。
         ticket = ticket_mod.Ticket(ticket="Trunk")
         self.assertEqual([], ticket_mod.branch_name_problems(ticket))
         found = ticket_mod.branch_name_problems(ticket, "trunk")
@@ -114,7 +114,10 @@ class BranchNameRulesTest(unittest.TestCase):
         self.assertEqual([], self.problems("i0131", issue=131))
 
     def test_issue_shaped_names_must_match_the_issue(self):
-        """段階 5: issue から決める形の識別子は番号と置き場に合わせる（3.1 の 4・7）。"""
+        """issue から決める形の識別子は番号と置き場に合わせる。
+
+        ワークスペースなら `i<番号>`、プロジェクトなら `<名前>-i<番号>`。
+        """
         for name, issue, project in (
             ("I0131", 131, ""),
             ("i7", 7, ""),
@@ -132,9 +135,9 @@ class BranchNameRulesTest(unittest.TestCase):
         self.assertEqual([], self.problems("web-i12345", issue=12345, project="web"))
 
     def test_project_shaped_names_are_reserved(self):
-        """段階 5: `<名前>-i<番号>` は issue の無い提案とワークスペースの提案では使わない。"""
-        # 人が付けた名前（issue が無い）は、そのプロジェクトの issue から決まる名前と
-        # 重なるときだけ言う（11.9.1 の 17）
+        """`<名前>-i<番号>` は issue の無い提案とワークスペースの提案では使わない。"""
+        # ユーザが付けた名前（issue が無い）は、そのプロジェクトの issue から決まる名前と
+        # 重なるときだけ言う
         self.assertEqual([], self.problems("web-i0012"))
         self.assertEqual([], self.problems("fix-i2", project="web"))
         found = self.problems("web-i0012", project="web")
@@ -144,12 +147,15 @@ class BranchNameRulesTest(unittest.TestCase):
         found = self.problems("web-i0012", issue=12)
         self.assertEqual(1, len(found), found)
         self.assertIn("ワークスペースの提案", found[0])
-        # 形に当たらない名前は、issue があっても人が付けた名前でよい（フォールバック。8.6）
+        # 形に当たらない名前は、issue があってもユーザが付けた名前でよい（フォールバック。8.6）
         self.assertEqual([], self.problems("fix-i18n"))
         self.assertEqual([], self.problems("login", issue=12, project="web"))
 
     def test_an_issue_in_another_repository_needs_a_human_name(self):
-        """段階 5: `owner/repo#N` の課題は、識別子を issue から決める形にしない（3.1 の 8）。"""
+        """`owner/repo#N` の課題は、識別子を issue から決める形にしない。
+
+        識別子はユーザが付ける。
+        """
         for name, project in (("i0012", ""), ("web-i0012", "web")):
             with self.subTest(name=name):
                 found = self.problems(name, issue=12, issue_repo="acme/other", project=project)
@@ -239,14 +245,14 @@ class LintBranchNamesTest(unittest.TestCase):
     def test_the_integration_branch_flag_reserves_its_name(self):
         self.propose("trunk")
         self.assertEqual([], self.lint())
-        # 環境変数は読まない（sh が決めて --integration-branch で渡す。D30）。
+        # 環境変数は読まない（sh が決めて --integration-branch で渡す）。
         self.assertEqual([], self.lint(env={"CCNAVI_INTEGRATION_BRANCH": "trunk"}))
         lines = self.lint("--integration-branch", "trunk")
         self.assertEqual(1, len(lines), lines)
         self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
     def test_the_name_ccnavi_sync_recorded_is_reserved(self):
-        # --integration-branch が無ければ、ccnavi-sync.sh が控えに書いた名前を読む（決定 B3）。
+        # --integration-branch が無ければ、ccnavi-sync.sh が控えに書いた名前を読む。
         self.propose("trunk")
         write(
             os.path.join(self.ws, "state", "sync", "self", "integration", "head"),

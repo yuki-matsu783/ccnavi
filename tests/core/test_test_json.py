@@ -1,6 +1,6 @@
 """`--test --json` と `--test-samples`（試験の JSON）の受入テスト。
 
-VS Code 拡張のルール設定画面が読む形を、`--test` と同じ判定で組んでいることを
+VS Code 拡張のルール管理画面が読む形を、`--test` と同じ判定で組んでいることを
 確かめる。内部の関数は呼ばず、標準出力と終了コードだけを見る。見るのは 4 つ。
 
 1. `--test --json` が判定・根拠・当たったルール・返る文面を 1 つの JSON で出す
@@ -33,7 +33,7 @@ RULES = {
             "id": "git-push",
             "match": "Bash",
             "glob": "*git push*",
-            "message": "push は人が行う。ラッパに依頼する。",
+            "message": "push はユーザが行う。ラッパに依頼する。",
         }
     ],
     "ask": [
@@ -53,7 +53,7 @@ SAMPLES = """\
 deny:
   - tool: Bash
     subject: "cd /repo && git push"
-    why: push は人が行う
+    why: push はユーザが行う
 ask:
   - tool: Read
     subject: "/repo/secrets/token"
@@ -174,7 +174,7 @@ class TestJsonTest(unittest.TestCase):
         )
         self.assertEqual(hit["written"], "*git push*")
         self.assertNotEqual(hit["pattern"], "")
-        self.assertIn("push は人が行う", body["response"])
+        self.assertIn("push はユーザが行う", body["response"])
 
         # 文字の出力と同じ判定であること。
         plain = ccnavi(self.root, self.rules_path, "--test", "Bash", "cd /repo && git push")
@@ -222,7 +222,7 @@ class TestJsonTest(unittest.TestCase):
                             "id": "skill",
                             "match": "Skill",
                             "glob": "deploy*",
-                            "message": "配布は人が行う",
+                            "message": "配布はユーザが行う",
                         },
                         {
                             "id": "fetch",

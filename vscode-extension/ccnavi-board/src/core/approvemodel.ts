@@ -1,7 +1,7 @@
 /**
  * 承認の JSON の形（実行ファイルとの契約）と読み取り。README「承認の JSON」。
  *
- * `--approve --preview --json` が承認待ちの一覧を見せ、`--approve --yes <識別子,…> --json` が承認する。
+ * `--agree --preview --json` が承認待ちの一覧を見せ、`--agree --yes <識別子,…> --json` が承認する。
  * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
  * 承認の対象を自分で組み直したり、提案を読んだりはしない。
  */
@@ -31,11 +31,11 @@ export interface ApprovePreview {
   readonly version: number;
   readonly root: string;
   readonly generated_at: string;
-  /** `--approve` が承認する対象。空なら承認待ちが無い */
+  /** `--agree` が承認する対象。空なら承認待ちが無い */
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
-  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに写る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
+  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに入る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
   readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
@@ -47,7 +47,7 @@ export interface ApproveResult {
   readonly version: number;
   readonly approved: readonly string[];
   readonly copies: readonly string[];
-  /** 端末なら標準出力に出ていた行 */
+  /** ターミナルなら標準出力に出ていた行 */
   readonly lines: readonly string[];
   /** Claude Code に渡す文。hook が次のプロンプトで渡す文と同じ */
   readonly prompt: string;
@@ -61,7 +61,7 @@ export interface ApproveMismatch {
 }
 
 /**
- * `--approve --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は
+ * `--agree --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は
  * 文面にしてから `error` に入るので、ここには出てこない（`ccnavi.ts` の `runApproveYes`）。
  * 承認のオーバーレイの遷移（`approval-machine.ts`）が入力として受けるので、契約の側に置く
  */
@@ -76,7 +76,7 @@ export type PreviewParse =
 
 /**
  * 途中で止まった承認（README「承認の JSON」の `partial`）。置いたものは戻らないので、
- * どこまで置いたかをそのまま受け取って人に伝える。
+ * どこまで置いたかをそのまま受け取ってユーザに伝える。
  */
 export interface ApprovePartial {
   /** 承認済みチケットに入ったぶん（新規は置いた、改版は書き換えた） */
@@ -85,14 +85,14 @@ export interface ApprovePartial {
   readonly ticket: string;
   /** 止まった理由（実行ファイルの文面そのまま） */
   readonly reason: string;
-  /** 止まるまでに出た行（マーカーを消した、改版した）。端末なら標準出力に出ていたぶん */
+  /** 止まるまでに出た行（マーカーを消した、改版した）。ターミナルなら標準出力に出ていたぶん */
   readonly lines: readonly string[];
 }
 
 /**
- * 途中で止まったことを人に伝える文。何が残っているかを言い切る。
+ * 途中で止まったことをユーザに伝える文。何が残っているかを言い切る。
  * `placed` に止まった識別子自身が入るのは、書けたあとの後始末（マーカーを置く）で
- * 落ちたとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
+ * 失敗したとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
  */
 export function partialMessage(partial: ApprovePartial): string {
   const { placed, ticket, reason, lines } = partial;
@@ -101,9 +101,9 @@ export function partialMessage(partial: ApprovePartial): string {
     placed.length === 0
       ? "承認済みになったチケットはありません"
       : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っています。` +
-        "コミットと push は送っていません（送るのは承認できたときだけです）。チケット管理画面を更新して確かめてください";
+        "コミットと push はターミナルに送っていません（送るのは承認できたときだけです）。チケット管理画面を更新して確かめてください";
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
-  return `ccnavi --approve --yes が${where === "" ? "" : ` ${where}`}止まりました: ${reason}。${what}${done}`;
+  return `ccnavi --agree --yes が${where === "" ? "" : ` ${where}`}止まりました: ${reason}。${what}${done}`;
 }
 
 export type ResultParse =

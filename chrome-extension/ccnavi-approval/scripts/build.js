@@ -1,10 +1,10 @@
-// 拡張を dist/ に組む（ADR-0093 段階 1）。
+// 拡張を dist/ に組む。
 //
 //   node scripts/build.js [--hosts <一覧の JSON>] [--out <出力先>]
 //
 // 1. 型を見る（画面・Worker・service worker は tsconfig.json、Node で回す部品は tsconfig.node.json）
 // 2. 通信先の一覧（既定 hosts.json）から manifest.json を組む。`host_permissions` と CSP の
-//    `connect-src` は一覧の API のオリジンだけ（D24）。組織ごとのビルドは --hosts で一覧を替える
+//    `connect-src` は一覧の API のオリジンだけ。組織ごとのビルドは --hosts で一覧を替える
 // 3. esbuild で 4 本（background・board・options・worker）を束ねる
 // 4. 同梱の Pyodide を node_modules から写し、scripts/pyodide-files.json のハッシュと突き合わせる
 //    （npm の lockfile の integrity とは別に、写した物そのものを確かめる）
@@ -56,8 +56,8 @@ export async function build({ hostsFile = path.join(HERE, "hosts.json"), out = p
   const hosts = parseHosts(fs.readFileSync(hostsFile, "utf8"));
   const version = JSON.parse(fs.readFileSync(path.join(HERE, "package.json"), "utf8")).version;
   // 同梱の ccnavi の互換の版（service worker が「始める」の前に統合先の CCNAVI_COMPAT と比べる）
-  const compatMatch = /^COMPAT = (\d+)$/m.exec(fs.readFileSync(path.join(HERE, "..", "..", "ccnavi", "version.py"), "utf8"));
-  if (!compatMatch) throw new Error("ccnavi/version.py の COMPAT を読めない");
+  const compatMatch = /^COMPAT = (\d+)$/m.exec(fs.readFileSync(path.join(HERE, "..", "..", "ccnavi", "entry", "version.py"), "utf8"));
+  if (!compatMatch) throw new Error("ccnavi/entry/version.py の COMPAT を読めない");
   const compat = Number(compatMatch[1]);
 
   fs.rmSync(out, { recursive: true, force: true });

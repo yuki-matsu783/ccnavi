@@ -35,7 +35,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 
 重複させてしまったら、引かれている数が少ないほうを空き番号へ動かし、下の「動かした N 枚」の表に
 旧番号を残す。数がほぼ同じときは、保護された場所（`.ccnavi/scripts/`・`.ccnavi/common/`）から
-引かれている側を残す。そちらを動かすと、書き換えに人の手が要る。「後から置いたほう」を動かす
+引かれている側を残す。そちらを動かすと、書き換えにユーザの手が要る。「後から置いたほう」を動かす
 （テストの ID で採った決め方、issue #88）のと逆にしたのは、後から置いた側が本文と実装から
 何十か所も引かれていることがあるため。数え方は「追跡されているファイルのうち、その枚自身を
 除いて `ADR-00NN` と書かれている行」。
@@ -82,6 +82,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
 | [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの控えをセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
+| [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する |
 
 ### ルールと判定
 
@@ -142,7 +143,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0027](0027-risk-by-result.md) | リスクは宣言ではなく実績で測る |
 | [0028](0028-exe-boundary.md) | 実行ファイルの境界は自分のディレクトリの中 |
 | [0029](0029-approval-path.md) | チケットの承認の経路を守る |
-| [0030](0030-three-human-touches.md) | push とマージリクエストの作成を親に渡し、人の手を 3 回にする |
+| [0030](0030-three-human-touches.md) | push とマージリクエストの作成を親に渡し、ユーザの手を 3 回にする |
 | [0031](0031-unresolved-not-by-time.md) | 未解決の指摘は時刻で絞らず、いま残っている全部を数える |
 | [0039](0039-approve-narrowing.md) | 承認の対象は識別子で狭められる（狭めるだけ） |
 | [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える |
@@ -156,7 +157,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
 | [0073](0073-origin-tree-is-the-fallback-home.md) | 権威のツリーが無ければ元ツリーを採る |
 | [0076](0076-drop-the-legacy-place-notice.md) | 旧の置き場への移行案内を畳む |
-| [0079](0079-subcommand-names-say-what-they-do.md) | 副命令の名前は動きを言い、人の判断はフラグで受ける |
+| [0079](0079-subcommand-names-say-what-they-do.md) | 副命令の名前は動きを言い、ユーザの判断はフラグで受ける |
 | [0080](0080-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
 | [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
 | [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める |
@@ -164,8 +165,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
 | [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ |
 | [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、写しの権威は親のブランチ 1 枚に固定する（提案。段階 0 だけ実装） |
-| [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、人は crit で見る（置き場と指摘の写し方は置き換え（ADR-0095）） |
-| [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘は人が crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
+| [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の写し方は置き換え（ADR-0095）） |
+| [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
 | [0096](0096-eli5-place-is-unscoped-and-does-not-move-the-request.md) | `wip/eli5/` はチケットの範囲を当てず、そこだけを変えたコミットは依頼の後に動いたと数えない（除外の綴りの読み方は置き換え（ADR-0097）） |
 | [0097](0097-harden-the-eli5-place-and-request.md) | ELI5 の置き場と依頼の検査を厳しくする（綴りの `\` と大文字小文字、名前の字、モード、互換の版） |
 

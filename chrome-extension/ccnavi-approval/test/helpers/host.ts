@@ -50,7 +50,7 @@ export function deps(
 /** 設定画面で登録したリポジトリ（模擬の GitHub の acme/widgets） */
 export const REPOS: RepoConfig[] = [{ host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" }];
 
-/** 設定画面で登録した GitLab のリポジトリ（模擬の GitLab の acme/widgets。段階 5） */
+/** 設定画面で登録した GitLab のリポジトリ（模擬の GitLab の acme/widgets） */
 export const GITLAB_REPO: RepoConfig = { host: "gitlab.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 
 export function hostCall(d: Deps, stats: Stats, host = "github.com"): HostCall {

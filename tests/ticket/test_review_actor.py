@@ -1,12 +1,12 @@
-"""レビュー済みの印の `actor` と、依頼の後に動いたかの判定（ADR-0093 の 8.9。段階 4）の受入テスト。
+"""レビュー済みの印の `actor` と、依頼の後に動いたかの判定の受入テスト。
 
 見るのは 4 つ。
 
 1. 手元の `review confirm --actor <アカウント>` は、印に `actor` と `via: cli` を書き、
    跡にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）印も跡も前と同じ中身
 2. `--actor` の形と、`review confirm` の外で渡されたときは断る
-3. 依頼の後に人が見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）で決める。
-   Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
+3. 依頼の後にユーザが見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）
+   で決める。Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
 4. Chrome のレビュー済みの印は、手元の `--actor` つきの印と経路（`via`）と時刻のほかは同じ
 """
 
@@ -16,7 +16,9 @@ import json
 import os
 import shutil
 
-from ccnavi import history, lint, review, settings, version
+from ccnavi.entry import lint, version
+from ccnavi.infra import settings
+from ccnavi.tickets import history, review
 from tests.ticket.test_core import STAMP, CoreHarness
 from tests.ticket.test_phases import child_text
 from tests.ticket.test_ticket import git, read_json, write
@@ -27,7 +29,7 @@ RESULT = {"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "
 class ActorHarness(CoreHarness):
     def setUp(self):
         super().setUp()
-        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない。ADR-0093 の 7.3）
+        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない）
         write(
             os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
             f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
@@ -216,7 +218,12 @@ class ReviewableTest(ActorHarness):
 
 
 class ReviewRuleTest(ActorHarness):
-    """段階 4 のレビューの後の決定（ADR-0093 の 11.8.1 の A・B・C と 8）。どれも締める向き。"""
+    """Chrome のレビュー済みを入れた後のレビューで決めたこと。どれも締める向き。
+
+    ユーザごとの最新のレビューは Approve・変更要求・dismiss だけで選ぶ。レビュー済みのフェーズに
+    confirm を重ねない。ccnavi の投稿のスレッドを未解決から除くのは、GitLab で依頼を投稿した
+    アカウントが書いたときだけ。マージリクエストは親のブランチから引き、依頼の記録の番号と照合する。
+    """
 
     @staticmethod
     def review(state, at, author="9001"):
@@ -244,7 +251,7 @@ class ReviewRuleTest(ActorHarness):
     def test_a_crit_push_thread_is_counted_even_from_the_poster(self):
         """crit push の行のスレッドは目印で始まらないので、依頼を投稿したアカウントからでも数える。
 
-        人が依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める（ADR-0095）。
+        ユーザが依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める。
         """
         crit = review.Thread(
             id="d1", body="ここは X ではなく Y では", author="bot", path="wip/eli5/phase-1.html"
@@ -309,7 +316,7 @@ class ReviewRuleTest(ActorHarness):
 
 
 class DecideActorTest(ActorHarness):
-    """段階 5: decide の印にも `actor` と `via`（confirm と同じ形。8.9）。"""
+    """decide の印にも `actor` と `via`（confirm と同じ形）。"""
 
     def decide(self, fixture, *extra):
         preview = self.ccnavi(
@@ -397,7 +404,7 @@ class DecideActorTest(ActorHarness):
         self.assertIn("--actor", preview.stderr)
 
     def test_board_is_refused_for_the_way_that_picks_one_by_one(self):
-        """11.9.1 の 11: 端末で 1 件ずつ選ぶ形（--yes 無し）に --via board は受けない。"""
+        """端末で 1 件ずつ選ぶ形（--yes 無し）に --via board は受けない。"""
         fixture = self.ready()
         done = self.ccnavi(
             "--cwd",

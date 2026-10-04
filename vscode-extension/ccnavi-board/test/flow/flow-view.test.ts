@@ -1,6 +1,6 @@
 /**
  * フロー編集画面の契約（`core/flow-view.ts`）と、ボードの JSON の `flow` の欄の読み方。
- * 画面から届くメッセージの形の確かめ、錠を実行ファイルの答えから写すこと、カードのボタンの言葉を見る。
+ * 画面から届くメッセージの形の確かめ、錠を実行ファイルの答えから取り込むこと、カードのボタンの言葉を見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -62,7 +62,7 @@ test("CB-T228 錠は実行ファイルの flow.locked の写し。親・無い�
   assert.ok(locked.ok);
   assert.equal(locked.target.lock.locked, true);
   assert.match(locked.target.lock.reason, /DENY_TICKET_FLOW_LOCKED/);
-  assert.match(locked.target.lock.reason, /finish で終わるか cancel で取り消されると外れる/);
+  assert.match(locked.target.lock.reason, /finish で終わるか cancel で取り消されると外れます/);
   assert.equal(locked.target.parent, "i0001");
   assert.match(locked.target.flow.rel, /^\.ccnavi\/approved\/flows\/i0001-02\.yml$/);
   const open = flowTargetOf(board, "i0001-01");
@@ -98,7 +98,7 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   assert.equal(board.tickets.find((t) => t.ticket === "i0001-05")?.flow, null);
   assert.equal(child.linked, false);
   assert.equal(child.tree, "<root>/.claude/worktrees/i0001");
-  // locked の欠けた答え（古い実行ファイルか壊れた出力）は、止まっているものとして読む
+  // locked の欠けた答え（古い実行ファイルか不正な出力）は、止まっているものとして読む
   const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
   for (const t of raw.tickets) {
     if (t.flow !== null) {
@@ -108,7 +108,7 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   const parsed = parseBoardJson(JSON.stringify(raw));
   assert.ok(parsed.ok);
   assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.locked === true));
-  // カードにも写り、親のカードには無い。ボタンの開く先は子のカードだけ
+  // カードにも反映され、親のカードには無い。ボタンの開く先は子のカードだけ
   const built = buildBoard(board);
   assert.ok(flowCardOf(built, "i0001-01") !== undefined);
   assert.equal(flowCardOf(built, "i0001"), undefined);

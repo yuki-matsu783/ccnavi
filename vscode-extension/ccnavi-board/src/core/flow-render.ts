@@ -3,8 +3,8 @@
  * React（`src/webview/flow/`）で、ここが作るのはその入れ物だけ。フェーズ管理（`phases-render.ts`）と同じ作り。
  *
  * 束ねた画面のスクリプトと CSS は `<script nonce>` / `<style nonce>` に文字列として流し込み、
- * ファイルとしては読ませない（`localResourceRoots` は空のまま。ADR-0066）。
- * **この入れ物は 1 度しか入らない**（`retainedHost`、ADR-0062）。
+ * ファイルとしては読ませない（`localResourceRoots` は空のまま）。
+ * **この入れ物は 1 度しか入らない**（`retainedHost`）。画面は編集の途中を持つので、入れ直すと打ちかけの内容が消える。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
 import { DATA_ID, embedData, type FlowData } from "./flow-view.js";

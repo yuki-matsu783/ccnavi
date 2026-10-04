@@ -34,7 +34,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.equal(parent.worktreeExists, true);
   assert.match(parent.stage, /作業中/);
   assert.equal(parent.phases.length, 2);
-  // 締める（close-early）は拡張からは出さない。端末で打つ
+  // 締める（close-early）は拡張からは出さない。ターミナルで打つ
   assert.deepEqual(parent.actions, []);
   assert.equal(parent.family, "i0001");
 
@@ -135,10 +135,10 @@ test("CB-T09 依頼済みで止まったフェーズに decide、締めた親に
     { kind: "reviewed", parent: "i0001", phase: 2 },
   ]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
-  // 人のレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
+  // ユーザのレビュー待ちは JSON の review_waiting をそのまま使う。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
-  // 子のカードには自分のフェーズのマーカーと、止まっているかとレビュー待ちが写る。親は false
+  // 子のカードには自分のフェーズのマーカーと、止まっているかとレビュー待ちが反映される。親は false
   assert.equal(cards.get("i0001-02")!.gateClosed, true);
   assert.deepEqual(cards.get("i0001-02")!.marks, ["requested"]);
   assert.equal(cards.get("i0001-02")!.reviewWaiting, true);
@@ -182,14 +182,14 @@ test("CB-T09c 親カードは、自分の番号のフェーズがレビュー待
         : p,
     ),
   };
-  // 親のチケットに phase が入っていても（判定は入れないが）、親は子の項目を写さない
+  // 親のチケットに phase が入っていても（判定は入れないが）、親は子の項目を反映しない
   const tickets = base.tickets.map((t) => (t.ticket === "i0001" ? { ...t, phase: 1 } : t));
   const cards = cardsOf(buildBoard({ ...base, tickets, parents: [parent] }));
   const card = cards.get("i0001")!;
   assert.equal(card.reviewWaiting, false);
   assert.equal(card.gateClosed, false);
   assert.deepEqual(card.marks, []);
-  // フェーズ行と子のカードには写る
+  // フェーズ行と子のカードには反映される
   assert.equal(card.phases[0].reviewWaiting, true);
   assert.equal(cards.get("i0001-01")!.reviewWaiting, true);
 });
@@ -262,7 +262,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
   assert.equal(card.seenIn.length, 2);
 });
 
-/** フェーズ 2 を「依頼済みで止まったまま（人のレビュー待ち）」にし、依頼のマーカーにマージリクエストを持たせる */
+/** フェーズ 2 を「依頼済みで止まったまま（ユーザのレビュー待ち）」にし、依頼のマーカーにマージリクエストを持たせる */
 function waitingWithMr(url: string): BoardJson {
   const base = fixture();
   const parent: ParentJson = {
@@ -341,7 +341,7 @@ test("CB-T132 要対応は承認待ち・バッジ・不備・フェーズ行の
   assert.equal(reviewNoTree.get("i0001-04")!.attention, true);
   const doingNoTree = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-02" ? { ...t, worktree: { exists: false, path: "" } } : t)) }));
   assert.equal(doingNoTree.get("i0001-02")!.attention, true);
-  // 人のレビュー待ちのフェーズがあれば、その子（レビュー待ち）も親（フェーズ行の要約）も要対応
+  // ユーザのレビュー待ちのフェーズがあれば、その子（レビュー待ち）も親（フェーズ行の要約）も要対応
   const waiting = cardsOf(buildBoard(waitingWithMr("u")));
   assert.equal(waiting.get("i0001")!.attention, true);
   assert.equal(waiting.get("i0001-02")!.attention, true);
@@ -358,7 +358,7 @@ test("CB-T132 要対応は承認待ち・バッジ・不備・フェーズ行の
 
 test("CB-T138 止まっているチケットは、不備の行に理由が出て注意を要する扱いになる", () => {
   // 判定はこのチケットのワークツリーへの書き込みを全部止めるが、`copy.status` は `open` の
-  // ままなので、列からも承認済みのバッジからも分からない（ADR-0058）。
+  // ままなので、列からも承認済みのバッジからも分からない。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const stopped: TicketJson = { ...child, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" };
@@ -397,7 +397,7 @@ test("CB-T215 案内の見本のボードは、承認待ち・作業中・完了
 });
 
 test("CB-T260 履歴はカードへそのまま渡り、列・注意・バッジの材料にはならない", () => {
-  // 履歴は補助の記録で、状態の正は置き場（ADR-0086）。跡が「取り消し」と言っていても、列は置き場で決まる。
+  // 履歴は補助の記録で、状態の正は置き場。跡が「取り消し」と言っていても、列は置き場で決まる。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const history = [

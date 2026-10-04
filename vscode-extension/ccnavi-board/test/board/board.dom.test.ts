@@ -33,7 +33,7 @@ test("CB-D40 列の見出しを押すと畳み、state に列名が入る。読�
   }
 });
 
-test("CB-D41 親で絞り込むと他の家族のカードが隠れ、列の件数と承認ボタンは見えている数になる。承認は見えている承認待ちだけを送る", async () => {
+test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠れ、列の件数と承認ボタンは見えている数になる。承認は見えている承認待ちだけを送る", async () => {
   const base = fixture();
   // 先頭は親 i0001。同じ形でもう 1 つ親（承認待ち）を足す
   const other = { ...base.tickets[0], ticket: "i0002", title: "別の親", pending_approval: true };
@@ -81,7 +81,7 @@ test("CB-D46 書き込みが止まっているカードは「要対応のみ」�
   }
 });
 
-test("CB-D42 「要対応のみ」で人が動く必要の無いカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
+test("CB-D42 「要対応のみ」でユーザが動く必要の無いカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
   const page = await openBoard();
   try {
     const box = page.one<HTMLInputElement>("#attention-filter");
@@ -229,7 +229,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     // 指定されたプロジェクトのカードだけが残る
     assert.ok(!page.one('.card[data-id="i0002"]').classList.contains("hidden"));
     assert.ok(page.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    // 人が触らなくても覚える。裏に回って作り直されたときに絞りが戻ってしまわないように
+    // ユーザが触らなくても覚える。裏に回って作り直されたときに絞りが戻ってしまわないように
     assert.equal((page.state() as { project: string }).project, "lib");
     await page.send({ type: "filter", project: "app" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
@@ -238,7 +238,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     await page.send({ type: "filter", project: "無い名前" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
     assert.equal((page.state() as { project: string }).project, "app");
-    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に落ちない
+    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に戻らない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");
@@ -579,7 +579,7 @@ test("CB-D105 案内の最中にボードが読み直せなくなったら案内
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
     await dom.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
     await dom.settle();
-    assert.equal(dom.all(".tour").length, 0, "人が始めていない案内が出直した");
+    assert.equal(dom.all(".tour").length, 0, "ユーザが始めていない案内が出直した");
   } finally {
     await dom.close();
   }

@@ -45,7 +45,7 @@ class AdditionalContextTest(unittest.TestCase):
     def rules(self, **sections) -> str:
         body = {"version": 1, **sections}
         # 置くのは共通層の既定の場所。`--rules` は診断でだけ有効で、hook の判定には
-        # 届かない（ADR-0067）。
+        # 届かない。
         return write(common_path(self.root, "rules"), json.dumps(body))
 
     def run_ccnavi(self, *args: str, payload: str = "") -> subprocess.CompletedProcess:
@@ -97,29 +97,37 @@ class AdditionalContextTest(unittest.TestCase):
     def test_deny_and_ask_carry_reason_and_context_together(self):
         self.rules(
             deny=[
-                rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
+                rule(
+                    "push", "Bash", "push はユーザが行う", glob="*git push*", additionalContext=NOTE
+                )
             ],
             ask=[
                 rule(
-                    "mig", "Write", "移行は人が見る", glob="*/migrations/*", additionalContext=NOTE
+                    "mig",
+                    "Write",
+                    "移行はユーザが見る",
+                    glob="*/migrations/*",
+                    additionalContext=NOTE,
                 )
             ],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
         denied = self.judge("Bash", "git push origin main")
         self.assertEqual(denied.get("permissionDecision"), "deny")
-        self.assertIn("push は人が行う", denied["permissionDecisionReason"])
+        self.assertIn("push はユーザが行う", denied["permissionDecisionReason"])
         self.assertEqual(denied.get("additionalContext"), NOTE)
 
         asked = self.judge("Write", os.path.join(self.root, "migrations", "001.sql"))
         self.assertEqual(asked.get("permissionDecision"), "ask")
-        self.assertIn("移行は人が見る", asked["permissionDecisionReason"])
+        self.assertIn("移行はユーザが見る", asked["permissionDecisionReason"])
         self.assertEqual(asked.get("additionalContext"), NOTE)
 
     def test_dry_run_still_delivers_the_text(self):
         self.rules(
             deny=[
-                rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
+                rule(
+                    "push", "Bash", "push はユーザが行う", glob="*git push*", additionalContext=NOTE
+                )
             ],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
@@ -130,7 +138,7 @@ class AdditionalContextTest(unittest.TestCase):
 
     def test_rules_without_the_field_add_nothing(self):
         self.rules(
-            deny=[rule("push", "Bash", "push は人が行う", glob="*git push*")],
+            deny=[rule("push", "Bash", "push はユーザが行う", glob="*git push*")],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
         self.assertNotIn("additionalContext", self.judge("Bash", "git push"))
@@ -236,20 +244,22 @@ class AdditionalContextTest(unittest.TestCase):
     def test_test_shows_reason_and_context(self):
         self.rules(
             deny=[
-                rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
+                rule(
+                    "push", "Bash", "push はユーザが行う", glob="*git push*", additionalContext=NOTE
+                )
             ],
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContext=NOTE)],
         )
         done = self.run_ccnavi("--test", "Bash", "git push", "--json")
         body = json.loads(done.stdout)
-        self.assertIn("push は人が行う", body["response"])
+        self.assertIn("push はユーザが行う", body["response"])
         self.assertIn(NOTE, body["response"])
         allowed = self.run_ccnavi("--test", "Write", os.path.join(self.root, "src", "a.py"))
         self.assertIn("verdict: allow", allowed.stdout)
         self.assertIn(NOTE, allowed.stdout)
 
     def test_file_body_follows_the_text_and_is_cut_at_the_limit(self):
-        from ccnavi import ctxfile
+        from ccnavi.policy import ctxfile
 
         write(os.path.join(self.root, "docs", "guide.md"), "# 決まり\n\nテストは tests/ に置く。\n")
         write(os.path.join(self.root, "docs", "long.md"), "あ" * (ctxfile.MAX_CHARS + 50))
@@ -300,7 +310,7 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertEqual(outside.get("additionalContext"), "ルートの案内")
 
     def test_once_file_is_delivered_once_and_lint_checks_the_path(self):
-        from ccnavi import ctxfile
+        from ccnavi.policy import ctxfile
 
         state = os.path.join(self.root, "state")
         write(os.path.join(self.root, "docs", "once.md"), "最初に 1 度だけ")

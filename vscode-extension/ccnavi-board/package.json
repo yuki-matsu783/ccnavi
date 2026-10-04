@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
-  "description": "ccnavi のチケットとその持ち物（提案・承認済みチケット・マーカー・ワークツリー）をカンバンで表示し、承認内容をオーバーレイで見せて人の承認を受け付け、承認の文とレビュー済みの連絡を Claude Code に渡します。ルールと hook を画面で眺め、ルールを直し、判定を試せます。実績で測るリスクの配点とフェーズの種類を画面で直せます。projects/ のプロジェクトを一覧し、clone をターミナルへ送ります",
+  "description": "ccnavi のチケットと、その持ち物（提案・承認済みチケット・マーカー・ワークツリー）をカンバンで表示します。承認する内容をオーバーレイで確かめて承認でき、承認の文とレビュー済みの連絡を Claude Code に渡せます。ルールと hook を画面で確かめ、ルールを直して判定を試せます。実績で測るリスクの配点とフェーズの種類も画面で直せます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。",
   "version": "0.11.15",
   "publisher": "local",
   "private": true,
@@ -44,7 +44,7 @@
       },
       {
         "command": "ccnaviBoard.openRules",
-        "title": "ccnavi ボード: ルール設定を開く"
+        "title": "ccnavi ボード: ルール管理を開く"
       },
       {
         "command": "ccnaviBoard.openProjects",
@@ -97,7 +97,7 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnavi の実行ファイルです。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、次に .ccnavi/scripts/ccnavi-launcher.sh、それも無ければ uv run python -m ccnavi の順に探します。振り分けの sh（名前が ccnavi-launcher.sh）を指しているときは、sh を通さずに、sh のあるフォルダの親にある bin/<os>-<arch>/ から、この OS と CPU 向けの実行ファイルを使います。それが無ければ次の候補へ進みます。それ以外のパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対でも絶対でも構いません。"
+          "description": "ccnavi の実行ファイルのパスです。空のときは .claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh の順に探し、どれも無く、ccnavi/__main__.py があれば uv run python -m ccnavi を使います。振り分けの sh（ccnavi-launcher.sh）を指定したときは、sh を通さず、sh のあるフォルダの親の bin/<os>-<arch>/ にある、この OS と CPU 向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",
@@ -107,12 +107,12 @@
         "ccnaviBoard.samplesPath": {
           "type": "string",
           "default": ".ccnavi/common/rule-samples.yml",
-          "description": "ルール設定画面の「サンプルを一括で判定」で使うサンプルのファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でも構いません。"
+          "description": "ルール管理画面の「サンプルを一括で判定」で使うサンプルのファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.flowSaveReview": {
           "type": "boolean",
           "default": true,
-          "description": "フロー編集画面で「保存」を押したとき、読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で見せ、確かめてから保存します。外すと確かめずに保存します。一覧の「次から確かめずに保存する」でも外れます。"
+          "description": "フロー編集画面で「保存」を押したとき、読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で表示し、確かめてから保存します。チェックを外すと、確かめずに保存します。一覧の「次から確かめずに保存する」にチェックを付けて保存しても外れます。"
         },
         "ccnaviBoard.appearance": {
           "type": "string",
@@ -127,7 +127,7 @@
             "Claude の配色（ダーク）"
           ],
           "default": "vscode",
-          "description": "ccnavi の 5 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは効きません）。サイドパネルのタイトルバーの歯車からも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
+          "description": "ccnavi の 5 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
         }
       }
     }

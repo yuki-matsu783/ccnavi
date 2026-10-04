@@ -1,5 +1,5 @@
 /**
- * フロー編集画面（React）の編集の道具を happy-dom で動かす。元に戻す・やり直す、写す・貼る・複製、
+ * フロー編集画面（React）の編集の道具を happy-dom で動かす。元に戻す・やり直す、コピー・貼り付け・複製、
  * ミニマップ、保存前の差分の一覧、未保存のまま閉じた編集を戻して開くこと、実行ファイルの答え（渡る手順・warn・候補）を見る。
  *
  * 線を引く途中の断り（`isValidConnection`）はドラッグが要るので、ここでは見ない（規則は `flow-edit-ops.test.ts`
@@ -155,7 +155,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
   try {
     assert.ok(button(dom, "copy-nodes").disabled);
     assert.ok(button(dom, "paste-nodes").disabled);
-    // 開始だけでは写せない
+    // 開始だけではコピーできない
     dom.click(dom.one('.react-flow__node[data-id="start"]'));
     await dom.settle();
     assert.ok(button(dom, "copy-nodes").disabled);
@@ -163,8 +163,8 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     dom.key("c", undefined, CTRL);
     release(dom, "c");
     await dom.settle();
-    assert.match(dom.one("#status").textContent ?? "", /開始は写さない/);
-    // プロンプトと終了を選んで写す
+    assert.match(dom.one("#status").textContent ?? "", /開始はコピーしません/);
+    // プロンプトと終了を選んでコピーする
     dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
     await dom.settle();
     dom.key("Shift");
@@ -173,7 +173,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     await dom.settle();
     dom.key("c", undefined, CTRL);
     await dom.settle();
-    assert.match(dom.one("#status").textContent ?? "", /ノードを 2 個、線を 1 本写した/);
+    assert.match(dom.one("#status").textContent ?? "", /ノードを 2 個、線を 1 本コピーしました/);
     assert.ok(!dirty(dom), "写しただけでは未保存にしない");
     dom.key("v", undefined, CTRL);
     await dom.settle();
@@ -181,7 +181,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     assert.equal(dom.all(".react-flow__edge").length, 3);
     assert.deepEqual(dom.all(".react-flow__node.selected").map((n) => n.getAttribute("data-id")).sort(), ["end-1", "prompt-2"]);
     assert.ok(dirty(dom));
-    // 複製（ボタン）。いま選んでいる貼ったものが増える
+    // 複製（ボタン）。いま選んでいる貼り付けたものが増える
     dom.click(button(dom, "duplicate-nodes"));
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 7);
@@ -190,7 +190,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     dom.key("d", undefined, CTRL);
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 9);
-    // 貼るのも複製も 1 回で元に戻す 1 件
+    // 貼り付けも複製も 1 回で元に戻す 1 件
     dom.key("z", undefined, CTRL);
     await dom.settle();
     dom.key("z", undefined, CTRL);
@@ -334,10 +334,10 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
   try {
     const items = dom.all("#flow-notices li");
     assert.deepEqual(items.filter((li) => li.getAttribute("data-source") === "exe").map((li) => li.textContent), checks.warns);
-    assert.ok(!items.some((li) => /開始（start）のノードが無い/.test(li.textContent ?? "")), "画面の注意と二重に出さない");
+    assert.ok(!items.some((li) => /開始（start）のノードがありません/.test(li.textContent ?? "")), "画面の注意と二重に出さない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. [prompt] プロンプト\n2. [end] 終了");
     assert.equal(dom.all("#flow-preview-checking").length, 0);
-    // 開いたままでは確かめ直さない（答えが指す写しのまま）
+    // 開いたままでは確かめ直さない（答えが指す中身のまま）
     await waitCheck(dom);
     assert.deepEqual(checksAsked(dom), []);
     // 直すと、止まってから確かめ直しを頼む。その間は前の答えを出したまま、そう言う
@@ -357,14 +357,14 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     assert.equal(dom.all("#flow-preview-checking").length, 0);
     assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
     assert.equal(dom.all("#flow-preview pre.flow-rendered").length, 0);
-    assert.match(dom.one("#flow-preview").textContent ?? "", /並べられなかった/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /並べられませんでした/);
     // 確かめられなければ理由を出し、前の答えは残す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
     await waitCheck(dom);
     const again = checksAsked(dom);
-    await dom.send({ type: "checked", seq: again[again.length - 1].seq, error: "実行ファイル（--lint --flow）がフローを読めないと返した: …" });
-    assert.match(dom.one("#flow-preview-error").textContent ?? "", /読めないと返した/);
+    await dom.send({ type: "checked", seq: again[again.length - 1].seq, error: "実行ファイル（--lint --flow）が、フローを読めないと返しました: …" });
+    assert.match(dom.one("#flow-preview-error").textContent ?? "", /読めないと返しました/);
     assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
   } finally {
     await dom.close();
@@ -374,16 +374,16 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
 test("CB-D132 答えの無いフロー（まだ無いファイル）は開いてすぐ確かめを頼む。古い実行ファイル（rendered が無い）ならそう言う", async () => {
   const dom = await openFlow({ exists: false });
   try {
-    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確かめていない/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確かめていません/);
     await waitCheck(dom);
     const asked = checksAsked(dom);
     assert.equal(asked.length, 1);
     await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [] } });
-    assert.match(dom.one("#flow-preview").textContent ?? "", /実行ファイルが古いので、担当に渡る手順を表示できない/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /実行ファイルが古いため、担当に渡る手順を表示できません/);
     // 答えが届いても、開始が 2 つあることは画面が言う（実行ファイルは言わない）
     dom.click(dom.one('[data-action="add-node"][data-type="start"]'));
     await dom.settle();
-    assert.match(dom.one("#flow-notices").textContent ?? "", /開始（start）のノードが 2 つある/);
+    assert.match(dom.one("#flow-notices").textContent ?? "", /開始（start）のノードが 2 つあります/);
   } finally {
     await dom.close();
   }
@@ -418,7 +418,7 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
     // 自由入力も残す。候補に無ければそう言う（止めはしない）
     dom.type(field(), "my-agent");
     await dom.settle();
-    assert.match(dom.one("#inspector .candidate-source.missing").textContent ?? "", /候補に無い/);
+    assert.match(dom.one("#inspector .candidate-source.missing").textContent ?? "", /候補にありません/);
     assert.equal(field().value, "my-agent");
     // スキル
     dom.click(dom.one('.react-flow__node[data-id="skill-1"]'));
@@ -455,7 +455,7 @@ test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた
     assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確かめ終わったことにしない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
     assert.doesNotMatch(dom.one("body").textContent ?? "", /古い写しの答え/);
-    // 今の写しの答えは使う
+    // 今の中身に対する答えは使う
     await waitCheck(dom);
     const second = checksAsked(dom);
     assert.equal(second.length, 2);
@@ -493,7 +493,7 @@ test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を
     assert.ok(dirty(dom));
     dom.click(button(dom, "save"));
     await dom.settle();
-    assert.match(dom.one("#review-order-only").textContent ?? "", /並びだけ変わった/);
+    assert.match(dom.one("#review-order-only").textContent ?? "", /並び順だけが変わりました/);
     assert.equal(dom.posted.filter((m) => m.type === "save").length, 0);
     dom.click(button(dom, "cancel-save"));
     await dom.settle();

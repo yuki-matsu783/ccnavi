@@ -4,9 +4,9 @@
  *
  * 画面は React（`src/webview/risk/`）で、ここが渡すのは「いま何を見せるか」（`RiskData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存や作成が通った）。
- * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通った）。
+ * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
  * 対象は共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）の 1 本だけ。ワークスペースの設定とプロジェクトの設定も
  * 配点を持ち、判定は共通の設定と親の `project:` の設定の和で行う（設計 11.4.2）が、この画面ではそれらを開かない
@@ -137,7 +137,7 @@ export async function openRisk(): Promise<void> {
 }
 
 function readPage(root: string): Loaded {
-  // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
+  // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_RISK` など）では動かせない。
   const riskRel = DEFAULT_RISK;
   const riskPath = resolveIn(root, riskRel);
   let text: string;
@@ -172,10 +172,10 @@ function registerPanelHandlers(current: PanelState): void {
 
   // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
   // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが届いていなかったらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -304,8 +304,8 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
- * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
+ * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;
@@ -394,7 +394,7 @@ function riskHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RiskData
 /**
  * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
  */
@@ -406,7 +406,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToRisk);
 }

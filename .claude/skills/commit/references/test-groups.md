@@ -14,7 +14,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 
 | グループ | 主題 | 時間 |
 |---|---|---|
-| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・`build.py` の形・sh の書き方など） | 約 5 秒 |
+| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・`build.py` の形・sh の書き方、リポジトリの見本 `rule-samples.yml` といまのルールの突き合わせなど） | 約 6 秒 |
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
 | `config` | 設定の層の合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
@@ -45,10 +45,10 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 | 変えたもの | 足すグループ |
 |---|---|
 | `tests/<グループ>/` の中 | そのグループ |
-| `ccnavi/*.py`・`main.py` | `guard` `config` `ticket` |
-| `ccnavi/platformtag.py` | 上に加えて `sh` |
+| `ccnavi/**/*.py`・`main.py` | `guard` `config` `ticket` |
+| `ccnavi/infra/platformtag.py` | 上に加えて `sh` |
 | `build.py` | `guard` `sh` `e2e` |
-| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-approve.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
@@ -70,15 +70,15 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 - 表のどの行にも当たらないファイルを変えた
 - `.ccnavi/scripts/ccnavi-common.sh`、`.ccnavi/common/`、`.ccnavi/config/`、`tests/__init__.py`、`tests/inproc.py`、
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
-- 統合先へ戻す前、MR に出す前
+- 統合先に取り込む前、MR に出す前
 - どの行に当たるか迷った
 
-`ccnavi/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
+`ccnavi/**/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
 
 ## 拡張（`vscode-extension/ccnavi-board`）のグループ
 
 拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / shared）。
-こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る（ADR-0061）。
+こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る。
 
 ```sh
 cd vscode-extension/ccnavi-board

@@ -22,7 +22,7 @@ def run(root, payload, log="", env=None):
     """道具を 1 回動かす。ワークスペースルートを呼び出しごとに変えられる。
 
     ルールは `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には
-    届かない（ADR-0067）。読めないルールは `--root` の下の共通層に置く。
+    届かない。読めないルールは `--root` の下の共通層に置く。
 
     コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
@@ -85,7 +85,7 @@ class FallbackTest(unittest.TestCase):
         # hook を登録しただけでセッションが何もできなくなる。
         #
         # 既定にはプロジェクトの allow が無いので、無害な呼び出しも権限モードへの委譲に
-        # なる。人が答えれば進むので、先へ進む方法は残っている。進めなくなるのは deny だけ。
+        # なる。ユーザが答えれば進むので、先へ進む方法は残っている。進めなくなるのは deny だけ。
         for root, why in ((self.root, "broken"), (self.without_rules, "missing")):
             with self.subTest(rules=why):
                 result = run(root, pre_tool_use("Bash", "command", "cat README.md"))
@@ -124,7 +124,7 @@ class FallbackTest(unittest.TestCase):
         # ここを止めると直す方法が 1 つも残らない。
         #
         # Write / Edit は Claude Code の権限モードに従う。妨げてはいないが、ガードが落ちている
-        # あいだにガードの設定を書き換える操作なので、人が 1 度見る側に置く。
+        # あいだにガードの設定を書き換える操作なので、ユーザが 1 度見る側に置く。
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
                 result = run(self.root, pre_tool_use(tool, "file_path", ".ccnavi/common/rules.yml"))
@@ -153,7 +153,7 @@ class FallbackTest(unittest.TestCase):
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
-            # `cd` で入ってから書く形（issue #61、ADR-0069）。行き先の綴りから場所の
+            # `cd` で入ってから書く形（issue #61）。行き先の綴りから場所の
             # 名前が消えるので、移った先から見た綴りにも当てないと止められずに通る。
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .claude && echo x > settings.json",
@@ -165,7 +165,7 @@ class FallbackTest(unittest.TestCase):
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_既定のシェルの守りは設定で動かした置き場にも当たる(self):
-        # 実行ファイルは設定で動く（ccnavi ディレクトリと共通層は固定。共通層は ADR-0052）。
+        # 実行ファイルは設定で動く（ccnavi ディレクトリと共通層は固定）。
         # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
         # 壊れたときにだけそこへの書き込みが止まらない（issue #14）。
         # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
