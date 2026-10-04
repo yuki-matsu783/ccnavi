@@ -807,7 +807,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 `CCNAVI_RESTORE_IF_DENY` が `enable`（既定）のとき、新しく現れた違反のうち、ルールが `deny` と
 宣言した場所のものだけを戻す。`ask` と承認済みチケットの範囲外は、報告はするが戻さない
-（報告する範囲 `post._guarding` より戻す範囲 `post._restorable` が狭い）。中身が変わった・
+（報告する範囲 `post_findings._guarding` より戻す範囲 `post._restorable` が狭い）。中身が変わった・
 消えたものは `git restore --staged --worktree`、現れたものは消さずに
 `state/aside/<日時>/<path>` へ退避して退避先を報告に載せる（索引にあれば先に `git rm --cached`）。
 `dry-run` は戻さず、報告に `would-restore` の行を足す。`disable` は戻さず、その行も出さない。
@@ -1159,7 +1159,7 @@ base_sha: ""
 効力のあるフロー（承認済みの領域）はエージェントに書かせない（エージェントが書けるのは下の下書きだけ）。承認済みの領域は、どのツリーでも `builtin-guard-project-home`（`Write` / `Edit` /
 `NotebookEdit`）と `builtin-guard-setting-files`（シェル）が止める。承認済みチケットと同じ保護。ユーザが保存した
 フローは実行後チェックでも違反として報告しない（範囲の検査は承認済みの領域を外し、呼び出しごとの実行後チェックは frontmatter の無い
-ファイルを副命令の書き込みとして外す。`post._script_writes`）。コミットと push は `ccnavi-push-approved.sh` が
+ファイルを副命令の書き込みとして外す。`post_findings._script_writes`）。コミットと push は `ccnavi-push-approved.sh` が
 置き場ごとまとめて行う。
 
 **エージェントの下書き。** エージェントは頼まれたときに、効力の無い下書きを提案の置き場の
@@ -1551,7 +1551,7 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 範囲の外として扱わない（次のチケットを提案する手段を残す。提案は承認されるまで判定に何も反映されない）。状態の置き場と
 承認済みチケットは組み込みの `deny`（9.2、8.2）が先に止めるが、組み込みが入るのは実行前のルール集合だけ。
 外し方は、実行前チェック・サブエージェント終了時チェック・ターンの終わりのコミット済みのぶんは置き場ごと
-（`ticket_places.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post._script_writes`、7.2）。
+（`ticket_places.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post_findings._script_writes`、7.2）。
 ワークツリーのルートからの相対パスを `/` の境で見て大文字小文字を区別しない。
 
 下書きの置き場（ワークツリーのルートの直下の `scratchpad/`）も、**実行前チェックだけ**範囲の外として扱わない
@@ -1567,7 +1567,7 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 
 ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket_places.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
 `scratchpad/` と違って追跡される置き場なので、実行前チェック（`ticket_places.is_unscoped`）に加えて、実行後チェック
-（`post.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
+（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
 外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
 大文字小文字は区別し、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
 `tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
