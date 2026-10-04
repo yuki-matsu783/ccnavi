@@ -181,11 +181,21 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [index, measured]);
   useEffect(() => () => focusBefore?.focus?.(), [focusBefore]);
 
-  // Esc でやめる。Tab は吹き出しのボタンの中だけを巡る（裏の画面の「保存」などへ焦点を移さない）
+  // Esc でやめる。→ で次へ、← で戻る（端の段ではどちらも何もしない。→ で最後の段を閉じると、読み終える前に消えてしまう）。
+  // Tab は吹き出しのボタンの中だけを巡る（裏の画面の「保存」などへ焦点を移さない）
+  const count = steps.length;
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+      if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        // 裏の画面（一覧の選択や図のスクロール）へは渡さない
+        event.preventDefault();
+        event.stopPropagation();
+        const step = event.key === "ArrowRight" ? 1 : -1;
+        setIndex((at) => Math.min(count - 1, Math.max(0, at + step)));
         return;
       }
       if (event.key !== "Tab" || bubble.current === null) {
@@ -202,7 +212,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, count]);
 
   const last = index === steps.length - 1;
   const width = Math.min(BUBBLE_WIDTH, window.innerWidth - 24);
@@ -223,6 +233,9 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         tabIndex={-1}
         style={{ ...(place ?? {}), width, visibility: measured && (spot === undefined || place !== undefined) ? "visible" : "hidden" }}
       >
+        <button type="button" className="tour-close" data-action="tour-skip" title="案内を閉じる" aria-label="案内を閉じる" onClick={onClose}>
+          ×
+        </button>
         <p className="tour-count">
           {index + 1} / {steps.length}
         </p>
@@ -231,11 +244,6 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
           {step.body}
         </p>
         <div className="tour-buttons">
-          {!last && (
-            <button type="button" className="action small" data-action="tour-skip" onClick={onClose}>
-              スキップ
-            </button>
-          )}
           {index > 0 && (
             <button type="button" className="action small" data-action="tour-back" onClick={() => setIndex(index - 1)}>
               戻る

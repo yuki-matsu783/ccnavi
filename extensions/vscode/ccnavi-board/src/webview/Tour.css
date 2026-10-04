@@ -32,9 +32,31 @@
 
 .tour-bubble h3 { margin: 0 0 6px; font-size: 1.05em; }
 
-.tour-count { margin: 0 0 2px; color: var(--vscode-descriptionForeground); font-size: .85em; }
+.tour-count { margin: 0 24px 2px 0; color: var(--vscode-descriptionForeground); font-size: .85em; }
 
 .tour-body { margin: 0 0 10px; line-height: 1.6; }
+
+/* やめる ×。どの段でも吹き出しの右上の同じ位置に出す */
+.tour-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-size: 1.1em;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.tour-close:hover { color: var(--vscode-foreground); background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+
+.tour-close:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
 
 .tour-buttons { display: flex; gap: 6px; justify-content: flex-end; }
 
