@@ -123,11 +123,11 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   assert.match((await page.textContent('[data-family="i0001"] .closure')) ?? "", /i0003/);
   // 見た目を目で確かめるとき: CCNAVI_E2E_SHOT=<png のパス>
   if (process.env.CCNAVI_E2E_SHOT) await page.screenshot({ path: process.env.CCNAVI_E2E_SHOT, fullPage: true });
-  // 承認のボタンは承認待ちのある親子のチケットだけ。レビュー済みとフォームは出さない。「始める」は
+  // 承認のボタンは承認待ちのある親子のチケットだけ。レビュー済みとフォームは出さない（直近の日数のフォームと「始める」の issue のボタンだけは出す）。「始める」は
   // issue を押してから読む（ボードを開くたびには読まない）
   const actions = await page.locator("main button").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).closest<HTMLElement>("[data-family]")?.dataset.family ?? "-"}:${(e as HTMLElement).dataset.action}`));
   assert.deepEqual(actions, ["-:recent-days", "i0001:approve", "i0002:approve", "-:issues"]);
-  assert.equal(await page.locator("main form").count(), 0);
+  assert.equal(await page.locator("main form:not([data-testid=recent-days])").count(), 0);
   // 承認の画面の本文は開いた形でボタンの上に見えている
   assert.ok(await page.locator('[data-family="i0001"] [data-testid=screen] pre').isVisible());
   const above = await page.evaluate(() => {
