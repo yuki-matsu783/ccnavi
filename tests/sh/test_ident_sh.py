@@ -60,7 +60,7 @@ BAD = [
 def is_ident(shell, value, locale):
     env = {**os.environ, "LC_ALL": locale}
     done = subprocess.run(
-        [shell, "-c", '. "$1"; ccnavi_is_ident "$2"', "x", COMMON, value],
+        [shell, "-c", '. "$0"; ccnavi_is_ident "$1"', COMMON, value],
         env=env,
         capture_output=True,
     )
@@ -141,7 +141,7 @@ BRANCH_BAD = [
 def is_branch(shell, value, locale):
     env = {**os.environ, "LC_ALL": locale}
     done = subprocess.run(
-        [shell, "-c", '. "$1"; ccnavi_is_branch "$2"', "x", COMMON, value],
+        [shell, "-c", '. "$0"; ccnavi_is_branch "$1"', COMMON, value],
         env=env,
         capture_output=True,
     )

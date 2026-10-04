@@ -27,7 +27,7 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, SRC
+from tests import ROOT, SRC, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
@@ -126,7 +126,7 @@ class BranchesShTest(unittest.TestCase):
         write(os.path.join(self.ws, ".gitignore"), "logs/\n.ccnavi/\nprojects/\n")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-branches.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-branches.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.exe = write(
             os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)

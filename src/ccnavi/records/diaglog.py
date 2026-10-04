@@ -1,6 +1,6 @@
 """診断ログ。`logs/diag/<出どころ>.log` に 1 行ずつ足す（docs/claude/logging.md）。
 
-sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と拡張（`src/log.ts`）と同じ形の行を出す。
+sh（`.ccnavi/scripts/ccnavi-common-log.sh` の log_*）と拡張（`src/log.ts`）と同じ形の行を出す。
 
     2026-09-27T10:15:03+09:00 DEBUG ccnavi[4242] hook を判定した event=PreToolUse decision=deny
 

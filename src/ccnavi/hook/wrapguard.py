@@ -1,7 +1,8 @@
 """保護済みの sh（`.ccnavi/scripts/ccnavi-*.sh`）を呼ぶ形のうち、実行前に止めるもの 2 つ。
 
 1. **sh の検査の材料を変える環境変数を、同じコマンド行で置く形。** sh はワークスペースルート・
-   承認済みチケットの置き場・実行ファイルを環境変数から読む（`ccnavi-common.sh`）。
+   承認済みチケットの置き場・実行ファイルを環境変数から読む（`ccnavi-common.sh` とその部品の
+   `ccnavi-common-*.sh`）。
    `CCNAVI_TICKETS_APPROVED=/x sh …ccnavi-git.sh push` は、存在しない置き場を見て子の push を
    通す。拒否されたエージェントが言い換えて再試行する形そのもので、2.1 の「逸れていく LLM」の
    範囲に入る。hook は `settings.json` の env で起動するので、ここで見る代入の影響を受けない。

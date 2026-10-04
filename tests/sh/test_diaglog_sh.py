@@ -1,4 +1,4 @@
-"""sh の診断ログ（ccnavi-common.sh の log_*）と、3 つの言語で行が揃うこと。
+"""sh の診断ログ（ccnavi-common-log.sh の log_*）と、3 つの言語で行が揃うこと。
 
 見るのは 2 組。
 
@@ -13,7 +13,7 @@
 3. ccnavi-git.sh の reject と ccnavi-review.sh の fail が、拒否の文面ではなく識別子だけを
    診断ログに残すこと（文面は標準エラーの契約で、そちらは変わらない）
 
-使い捨てのワークスペースに ccnavi-common.sh を置き、それを読む sh を書いて走らせる。
+使い捨てのワークスペースに共通部（ccnavi-common*.sh）を置き、それを読む sh を書いて走らせる。
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import tempfile
 import unittest
 
 from ccnavi.records import diaglog
-from tests import ROOT
+from tests import ROOT, SH_SCRIPTS, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NODE = shutil.which("node")
@@ -81,17 +81,22 @@ class _Workspace(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        shutil.copy(COMMON, scripts)
+        for name in common_sh():
+            shutil.copy(os.path.join(SH_SCRIPTS, name), scripts)
 
     def run_sh(self, calls: str, name: str = "probe.sh", **env: str):
-        """ccnavi-common.sh を読み、calls を走らせる sh を書いて起動する。"""
-        path = os.path.join(self.ws, name)
+        """ccnavi-common.sh を読み、calls を走らせる sh を書いて起動する。
+
+        sh は保護済み sh と同じく `.ccnavi/scripts/` に置き、同じ書き方で共通部を読む。
+        共通部の部品は `$0` のディレクトリから読まれるため。
+        """
+        path = os.path.join(self.ws, ".ccnavi", "scripts", name)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write('set -eu\n. "$(dirname "$0")/.ccnavi/scripts/ccnavi-common.sh"\n')
+            f.write('set -eu\n. "$(dirname "$0")/ccnavi-common.sh"\n')
             f.write(calls)
             f.write("\nprintf 'done\\n'\n")
         return subprocess.run(
-            [SHELL, name],
+            [SHELL, os.path.join(".ccnavi", "scripts", name)],
             cwd=self.ws,
             capture_output=True,
             text=True,
@@ -143,9 +148,9 @@ class ShLoggerTest(_Workspace):
     def test_the_workspace_is_found_from_a_subdirectory(self):
         sub = os.path.join(self.ws, "a", "b")
         os.makedirs(sub)
-        script = os.path.join(self.ws, "probe.sh")
+        script = os.path.join(self.ws, ".ccnavi", "scripts", "probe.sh")
         with open(script, "w", encoding="utf-8", newline="\n") as f:
-            f.write(f". {shlex.quote(COMMON)}\nlog_info x\n")
+            f.write('. "$(dirname "$0")/ccnavi-common.sh"\nlog_info x\n')
         subprocess.run(
             [SHELL, script],
             cwd=sub,
@@ -195,11 +200,15 @@ class ShLoggerTest(_Workspace):
 
     def test_no_workspace_is_dropped(self):
         os.remove(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-common.sh"))
-        script = os.path.join(self.ws, "probe.sh")
-        with open(script, "w", encoding="utf-8", newline="\n") as f:
-            f.write(f"set -eu\n. {shlex.quote(COMMON)}\nlog_error x\nprintf 'done\\n'\n")
+        # このリポジトリの共通部を読む。`$0` に入口のパスを渡す
+        # （部品は `$0` のディレクトリから読む）。
+        script = "set -eu\n. \"$0\"\nlog_error x\nprintf 'done\\n'\n"
         result = subprocess.run(
-            [SHELL, script], cwd=self.ws, env=base_env(), capture_output=True, text=True
+            [SHELL, "-c", script, COMMON],
+            cwd=self.ws,
+            env=base_env(),
+            capture_output=True,
+            text=True,
         )
         self.assertEqual((0, "done\n", ""), (result.returncode, result.stdout, result.stderr))
         self.assertFalse(os.path.exists(os.path.join(self.ws, "logs")))
@@ -273,8 +282,8 @@ class ShLoggerTest(_Workspace):
             [
                 SHELL,
                 "-c",
-                f". {shlex.quote(COMMON)}; ccnavi_log_replace abc '' x;"
-                " printf '%s' \"$ccnavi_log_out\"",
+                ". \"$0\"; ccnavi_log_replace abc '' x; printf '%s' \"$ccnavi_log_out\"",
+                COMMON,
             ],
             capture_output=True,
             text=True,
