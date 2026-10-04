@@ -90,5 +90,64 @@ class IsIdentTest(unittest.TestCase):
                 self.assertTrue(ticket_mod.is_valid_id(value))
 
 
+# 親のブランチ名（`ccnavi_is_branch`。ADR-0100 の 5 章）。
+# 識別子の字に段の区切りの `/` を足したもの。
+BRANCH_GOOD = ["feature/123-login", "hotfix/45", "user/x_y.z", "feature-1-x", "a/日本語"]
+BRANCH_BAD = [
+    "",
+    "-x",
+    ".x",
+    "/x",
+    "x/",
+    "x.",
+    "a..b",
+    "a//b",
+    "a/.b",
+    "x.lock",
+    "x.lock/y",
+    "a b",
+    "a\nb",
+    "ab\n",
+    "a$b",
+    "a;b",
+    "a\\b",
+    "a:b",
+    "a~b",
+    "a@{1}",
+    "統合/x",
+]
+
+
+def is_branch(shell, value, locale):
+    env = {**os.environ, "LC_ALL": locale}
+    done = subprocess.run(
+        [shell, "-c", '. "$1"; ccnavi_is_branch "$2"', "x", COMMON, value],
+        env=env,
+        capture_output=True,
+    )
+    return done.returncode == 0
+
+
+@unittest.skipUnless(SHELLS, "sh が無い")
+class IsBranchTest(unittest.TestCase):
+    def test_the_answers(self):
+        for shell in SHELLS:
+            for locale in ("C", "C.UTF-8"):
+                for value in BRANCH_GOOD:
+                    with self.subTest(shell=shell, locale=locale, value=value):
+                        self.assertTrue(is_branch(shell, value, locale))
+                for value in BRANCH_BAD:
+                    with self.subTest(shell=shell, locale=locale, value=value):
+                        self.assertFalse(is_branch(shell, value, locale))
+
+    def test_the_executable_agrees(self):
+        for value in BRANCH_GOOD:
+            with self.subTest(value=value):
+                self.assertEqual(ticket_mod.branch_problem(value), "")
+        for value in BRANCH_BAD:
+            with self.subTest(value=value):
+                self.assertNotEqual(ticket_mod.branch_problem(value), "")
+
+
 if __name__ == "__main__":
     unittest.main()
