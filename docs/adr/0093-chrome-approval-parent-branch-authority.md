@@ -617,7 +617,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 
 ## 5. 受け入れる危険
 
-リモートで承認する形では、今の「承認済みの置き場にエージェントが書けない」（REQ-APV-07、`requirements.md:313`）が成り立ちません。
+リモートで承認する形では、今の「承認済みの置き場にエージェントが書けない」（要件 REQ-APV-07）が成り立ちません。
 ユーザの判断で、エージェントの自己承認の対策は頑張りすぎず、手間をかけずに防げる抜けだけ防ぎ、残りは危険として受け入れます。
 
 ### 5.1 残る穴（エージェントによる自己承認）と REQ-APV-07 の改訂
@@ -1534,7 +1534,7 @@ C1（4.3・4.4）、承認の pushの改修（4.6）、ユーザの判断の入�
 | ユーザの判断の入口（D27） | `ccnavi-review.sh chat <N>`・`config-synced <親>`・`close-early` | 実行ファイル（`--reviewed <N> --chat`・`--config-synced`・`--close-early`）が書いた後、取り込み済みの親子のチケットなら `ccnavi-push-approved.sh <親>` を呼ぶ。送れなければ 1 で終わり、打ち直しを言う。chat と config-synced はホストに触らないので origin も jq も要らない |
 | エージェントから止める | `phase.ticket_approval_rule`・`_FORBIDDEN_COMMAND` | `ccnavi-review.sh chat / config-synced / close-early` を組み込みの deny とサブエージェントの禁止に足した（厳しくする変更） |
 | ボード | `vscode-extension/ccnavi-board` | フローを保存したら `ccnavi-push-approved.sh <親>` を端末に送る。状態の履歴の呼び名に `withdrawn`（承認の取り下げ）と `chrome`（Chrome 拡張）を足した |
-| REQ-APV-11 の補足 | `requirements.md` | 4.3 のそのほかの引用文のとおり |
+| REQ-APV-11 の補足 | `docs/requirements/approval.md` | 4.3 のそのほかの引用文のとおり |
 
 直したもの（段階 2b の関数）: 入れ子で起こされた sh が別のロック（統合先の取り込み結果のロック）を取って外すと、
 `CCNAVI_LOCK_HELD` を消していた。C1 から起こした `ccnavi-sync.sh` が、その後の取り込みの後の検査で親子のチケットのロックを
@@ -1664,7 +1664,7 @@ Chrome で承認と取り下げ（GitHub・ワークスペースのリポジト�
 | service worker（5.5 の 4・8.5・D25） | `src/core/protocol.ts`・`src/background/main.ts` | 書く頼み `commit` はボードからだけ受け、保護された名前と統合先の名前を断る（Python と二重）。応答ヘッダの期限を `tokenMeta:<ホスト>` に保存し、`token.status` は期限の知らせだけを返す（PAT は返さない）。`chrome.alarms` で 1 日 1 回と保存したときに期限を比べ、切れる 7 日前からバッジに出す。manifest の権限に `alarms` を足した |
 | 承認と取り下げの流れ（8.3） | `src/core/write.ts` | 押すたびに親子のチケット 1 本ぶんを読み直して Snapshot を組み、Python の `plan`（見せた一覧とダイジェストつき）か `withdraw` の答えを 1 コミットにして書く。`expectedHeadOid` は読み直した `P` の先頭。落ちたら先頭を読み直し、動いていれば新しい Snapshot で判定と plan をやり直す（ダイジェストが同じなら見せ直さずに書く、違えば書かずに見直させる）。3 回でユーザの対応に切り替える。書いた後、新しい先頭の各パスの blob の sha が書いたとおりかを確かめる |
 | ボードと設定画面 | `src/core/render.ts`・`src/board/main.ts`・`src/options/main.ts`・`static/` | 承認のボタン（確認に 8.10 の注意を添える）、作業中の承認済みチケットと取り下げのボタン（理由は任意で入れる）、結果の行、PAT の期限の帯。設定画面に期限の日付の入力欄と、段階 3 の権限（Contents: Read and write・Metadata・Pull requests: Read）と 90 日の案内 |
-| 要件と ADR | `requirements.md`、ADR-0035・ADR-0086 | REQ-APV-07 を 5.1 の文に改訂し、判定が緩む変更と書いた。REQ-APV-15（Chrome の承認）・16（取り下げ）・17（版ずれと書く先）を足した。ADR-0035 に「同じコードの答え」と版ずれ、ADR-0086 に `withdrawn`・`chrome`・`actor`・`version` を書いた |
+| 要件と ADR | `docs/requirements/approval.md`、ADR-0035・ADR-0086 | REQ-APV-07 を 5.1 の文に改訂し、判定が緩む変更と書いた。REQ-APV-15（Chrome の承認）・16（取り下げ）・17（版ずれと書く先）を足した。ADR-0035 に「同じコードの答え」と版ずれ、ADR-0086 に `withdrawn`・`chrome`・`actor`・`version` を書いた |
 
 試験: Python は `tests/ticket/test_chrome_write.py`（取り込み状態の `gone` と決まらないチケット、読めない入力、版ずれ、ダイジェストの不一致、書く先、状態の履歴のキー、
 手元が Chrome の書いた承認済みチケットを判定し直しても error が無いこと、違えば版を名指しすること、取り下げの可否）。判定のコアの見本
@@ -1770,7 +1770,7 @@ Chrome で「レビュー済み」（8.9）。GitHub・ワークスペースの�
 | ボード（8.9・5.5） | `src/core/reviewed.ts`・`snapshot.ts`・`render.ts` | 候補のフェーズごとに JSON を読み、Python の `confirm`（書かない）で通るかを聞く。スレッドは未解決を先に、本文は承認の画面と同じサニタイズ（`md.markdown`）で描く。リンクは `http(s)`・`mailto` だけ。通らなければ理由（手元の confirm の標準エラーと同じ文面）を出し、通って書ける親子のチケットにだけ「フェーズ N をレビュー済みにする」を出す。依頼したホストが GitHub でなければ「段階 5」と出す |
 | 書く流れ（8.3・8.4） | `write.ts` の `confirmPhase`、ボードの `review` | 押すと 8.10 の注意を添えて確かめ、毎周、親子のチケットとスレッド・レビューを読み直して Python の `confirm` に通させ、Changes を `createCommitOnBranch` の 1 コミットにする（承認と同じ競合の扱い・書いた後の確かめ）。見出しは「ccnavi: <P> のフェーズ N のレビュー済みを置いた（Chrome 拡張 <版>）」。拡張の版を 0.3.0 に上げた |
 | 見本（決定 2） | `chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`、`tests/sh/github_host.py`、`test/helpers/host-fixture.ts` | 4 場面（`resolved`・`paged`・`changes-requested`・`hostile`）。代役は sh 用と TS 用の 2 つで、同じ規則で見本を返す。期待値は sh が組んだ JSON（`expected.json`）と結論（`conclusion.json`） |
-| 要件 | `requirements.md` | REQ-APV-18（Chrome のレビュー済み）と、手元のレビューの確認で置くマーカーのアカウントについての補足を足した |
+| 要件 | `docs/requirements/approval.md` | REQ-APV-18（Chrome のレビュー済み）と、手元のレビューの確認で置くマーカーのアカウントについての補足を足した |
 
 試験: Python は `tests/ticket/test_review_actor.py`（マーカーの `actor` と引けないときに前と同じバイト列、`--actor` の形、`moved_since` の規則、依頼の後の
 コードの変更で Chrome と手元が同じ文面で止める、compare の打ち切り・不一致、Chrome と手元のマーカーが経路と時刻のほかは同じ、ボードの候補）、
@@ -1891,7 +1891,7 @@ GitLab（8.4 の 1 段目まで）、プロジェクトのリポジトリ（3.3 
 | 「始める」（8.6・D19） | `src/core/start.ts`、`ccnavi_chrome._op_start`、`protocol.ts` の `issues`・`createBranch`、ボード | ボードの「issue を読む」で開いた issue を新しい順に 50 件（GitHub はマージリクエストを除く）読み、「始める」を押すと、統合先を読み直して Python に識別子と始められない理由（統合先の `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版が違う）を聞き、無ければ service worker が統合先の今の先頭からブランチを作る（GitHub は `POST /git/refs`、GitLab は `POST repository/branches`）。service worker も、ボードからだけ・登録したリポジトリだけ・issue から決める形の名前（プロジェクトなら `<名前>-i<番号>`）だけ・保護された名前と統合先の名前は作らない・渡された sha が統合先の今の先頭・既に無い、を自分で確かめる。マージリクエストは作らない |
 | ボードと設定画面 | `render.ts`・`board/main.ts`・`options/main.ts`・`static/options.html` | GitLab のマージリクエストは `!番号`。プロジェクトのリポジトリは見出しにプロジェクト名。「始める」の項目（issue の題は素の文字列、リンクは http(s) だけ）と「要確認」。設定画面にプロジェクト名とワークスペースの入力欄、段階 5 の権限（GitHub は Issues: Read を足す。GitLab は `api`）。拡張の版を 0.4.0 に上げた |
 | 通信先の埋め込み（D24） | `hosts.json`（既定は変えない）、`test/fixtures/hosts.e2e.json` | 既定のビルドは `api.github.com` と `gitlab.com`。実機の試験はセルフホストの GitLab（模擬。127.0.0.1:18788）を足したビルドで回し、`host_permissions` と `connect-src` がその一覧だけになることを見る。GitLab の `graphql` キーは読まない（REST だけ） |
-| 要件 | `requirements.md` | REQ-APV-15 の補足に GitLab の事後確認、REQ-APV-18 の補足に decide のマーカー、REQ-APV-19（「始める」）を足した |
+| 要件 | `docs/requirements/approval.md` | REQ-APV-15 の補足に GitLab の事後確認、REQ-APV-18 の補足に decide のマーカー、REQ-APV-19（「始める」）を足した |
 
 試験: Python は `tests/ticket/test_lint_branch_names.py`（issue から決める形・`<名前>-i<番号>`・別のリポジトリの課題・`issue_identifier`）、
 `tests/ticket/test_issue_ref.py`（`owner/repo#N` の読み・`Closes`・改版）、`tests/ticket/test_review_actor.py` の `DecideActorTest`（decide のマーカーの

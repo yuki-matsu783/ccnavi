@@ -556,7 +556,7 @@ allow:
 
 ルールファイルは 3 種の層に置ける。当たるのは共通層 + そのツリーの層の和で、
 足すだけ、上書き無し、厳しいほうが採られる。設計は [ccnavi.md](docs/ccnavi.md) の 11.4、要求は
-[requirements.md](docs/requirements.md) の REQ-MLT。
+[要件 REQ-MLT](docs/requirements/multi-repo.md)。
 
 | 層 | 置き場 | 何を置くか |
 |---|---|---|
@@ -1251,7 +1251,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 `CCNAVI_RESTORE_IF_DENY=enable`（既定）のとき、ccnavi 自身が戻す。`dry-run` では戻さず、報告に `would-restore` の行を足す。
 `disable` では戻さず、その行も出さない。`CCNAVI_MODE=dry-run` のときは、こちらが `enable` でも `dry-run` として振る舞う
-（組み合わせは [requirements.md 2.2](docs/requirements.md#22-共通の動作--req-cmn)）。
+（組み合わせは [要件 2.2](docs/requirements/common.md#22-共通の動作--req-cmn)）。
 
 戻す先はコミット済みの内容なので、保護領域に置いた未コミットの変更は失われる。守りたいなら `disable` にするか、宣言を狭める。
 現れたファイルは消さずに `logs/state/aside/<日時>/` へ退避し、退避先を報告に載せる。
@@ -1317,7 +1317,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 ルールが「どこに書かせないか」を長く決めるのに対し、チケットは作業 1 本のあいだ「今回どこに書くか」を決める。
 チケットは複数を同時に有効にできる。親（メインエージェント）が作業を子チケットに分け、子は別々のワークツリーでサブエージェントが実行する。
-設計は [ccnavi.md](docs/ccnavi.md) の 9、要求は [requirements.md](docs/requirements.md) の REQ-TKT。
+設計は [ccnavi.md](docs/ccnavi.md) の 9、要求は [要件 REQ-TKT](docs/requirements/tickets.md)。
 
 ### 使うかどうかはワークスペースが決める
 

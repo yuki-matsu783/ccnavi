@@ -44,7 +44,7 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 加えて、ADR-0077 の `DENY_SCRIPT_ENV_OVERRIDE` は、保護済みの sh を呼ぶコマンド行で `CCNAVI_*` を
 設定する形を止めている。環境変数が在る限り、その sh が読む値を差し替えられる経路も在る。
 
-`requirements.md` に、置き場を変えられることを約束する要求は無い。
+`docs/requirements.md` に、置き場を変えられることを約束する要求は無い。
 
 ## 決定
 
