@@ -112,7 +112,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
 | [0067](0067-common-layer-flags-are-diagnosis-only.md) | 層の置き場を動かすフラグを診断の経路に限る |
 | [0098](0098-places-are-fixed-to-defaults.md) | 置き場を既定に固定し、置き場を動かす環境変数を廃止する |
-| [0056](0056-state-written-without-showing-the-middle.md) | state の記録は途中を見せない書き方で置き、取りこぼしはロックで塞がない |
+| [0056](0056-state-written-without-showing-the-middle.md) | state の記録は途中を見せない書き方で置き、取りこぼしはロックで塞がない（承認済みチケットの書き方は ADR-0105 が決める） |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
 | [0090](0090-stop-rules-nudge-every-n.md) | `match: Stop` のルールで、ターンの終わり N 回に 1 度止めて文を渡せるようにする |
 
@@ -173,6 +173,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |
 | [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない） |
 | [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す |
+| [0105](0105-approved-ticket-written-durably.md) | 承認済みチケットは一時ファイルに書き切って fsync してから差し替える |
 
 ### 複数のリポジトリと VS Code 拡張
 
