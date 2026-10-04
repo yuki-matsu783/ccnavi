@@ -1,2 +1,0 @@
-{"at": "2026-09-27T13:07:00Z", "ticket": "i0064-05", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "i0064"}
-{"at": "2026-09-27T13:54:34Z", "ticket": "i0064-05", "kind": "cancelled", "from": "doing", "to": "done", "via": "cli", "reason": "main が ADR 0092 を別の決定に使ったため、置き場の ADR の振り直し先を 0093 に変え、sh の写し直し（wip/design/*）を範囲に足した提案 i0064-06 に出し直す（利用者の決定）"}

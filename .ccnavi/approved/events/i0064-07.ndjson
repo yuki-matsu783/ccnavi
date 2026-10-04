@@ -1,2 +1,0 @@
-{"at": "2026-09-27T23:26:26Z", "ticket": "i0064-07", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "i0064"}
-{"at": "2026-10-03T06:17:52Z", "ticket": "i0064-07", "kind": "cancelled", "from": "doing", "to": "done", "via": "cli", "reason": "main が ADR 0093 を使ったため。利用者の決定で、ADR は main で番号を先に押さえ（0098、PR #160）、コードと sh のコメントからは ADR 番号の参照を外す形に変える。i0064-09・10・06 に出し直す"}
