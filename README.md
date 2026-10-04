@@ -1329,6 +1329,11 @@ base_sha: ""
   （`ccnavi --lint` の warn が次の番号を示す）。slug には日本語（ひらがな・カタカナ・漢字）も使える。形に合わないものは
   `--lint` の warn で、承認は止めない（ADR-0100）
 - ワークツリーの名前は識別子と同じ。`.claude/worktrees/feature-50-settings-split-03/`
+- 親のブランチ名も識別子と同じ。既にある `feature/123-login` のような `/` を含むブランチで作業するときは、識別子は
+  `feature-123-login` のまま、親に `branch: feature/123-login` を書く（ADR-0100 の 5 章）。ワークツリーは
+  `ccnavi-git.sh worktree add .claude/worktrees/feature-123-login feature/123-login`（無ければ `-b feature/123-login <起点>`）で、
+  親チケットか提案がそう名乗っているときだけ通る。承認画面に「既存のブランチ feature/123-login を使う」と出る。
+  統合先と保護されたブランチの名前は書けない。承認の後は変えられない。子のブランチは子の識別子
 - 子は親の部分集合として書く。親やフェーズの種類の `scope` を超える項は承認で warn に出るだけで、判定がその上限で切り詰める
 - 書いていない場所は範囲外。親子は厳しい側が採られる
 - 深さは 2 段。範囲は 20 件まで
@@ -2176,7 +2181,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 |---|---|
 | `version` | 形の版。整数。`--yes` と同じ番号 |
 | `root` / `generated_at` | ワークスペースルートと、出した時刻 |
-| `batch[]` | 承認の対象。`{ticket, title, parent, phase, revision, tree, path, overflow}`。`parent` と `phase` は子だけ（親は `null`）。`revision` は親の改版。空なら承認待ちが無い |
+| `batch[]` | 承認の対象。`{ticket, title, parent, phase, revision, tree, path, branch, existing_branch, overflow}`。`branch` は親のブランチ名（親の `branch:`、無ければ識別子。子は子の識別子）、`existing_branch` は `branch:` が既にあるブランチ（手元か origin、または提案がそのブランチの上）を指すか。`parent` と `phase` は子だけ（親は `null`）。`revision` は親の改版。空なら承認待ちが無い |
 | `batch[].overflow[]` | 範囲の超過（親の範囲・フェーズの種類の `scope` を超える項、regex の項）の説明。文字列の並びで、無ければ `[]`。承認は通るが、判定で止まる |
 | `text` | 承認画面の本文そのまま。拡張はこれを等幅で並べ、項目には分けない |
 | `digest` | 見せた中身の指紋。`--yes` の `--digest` にそのまま渡す |
@@ -2428,6 +2433,9 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
   衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる（ADR-0093）
+- 親のワークツリーでは、親のブランチ（親チケットの `branch:`、無ければ識別子）のほかへ `checkout`・`switch` で移れない。
+  `worktree add` は行き先の名前とブランチ名を揃える形だけで、違う名前のブランチを出すのは行き先の名前の親チケットが
+  `branch:` でそう名乗っているときだけ（ADR-0100）
 - 送るのは親だけ。子チケットのワークツリーからの push はラッパースクリプトが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）
 - サブコマンドより前のオプション（`git -c ...` など）は 1 つも受け取らない。`GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す
 
