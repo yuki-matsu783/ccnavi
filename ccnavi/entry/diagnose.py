@@ -47,7 +47,7 @@ KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
 
 # `--test --json` と `--test-samples --json` の形の版。読み手は VS Code 拡張の
-# ルール設定画面。形を変えたら上げる。
+# ルール管理画面。形を変えたら上げる。
 TEST_VERSION = 1
 
 # 見本のパスに書く合言葉。走らせた場所に読み替える。見本を絶対パスで
@@ -240,7 +240,7 @@ def test_json(
     tool: str,
     subject: str,
 ) -> int:
-    """`--test` と同じ判定を JSON で出す。読み手は VS Code 拡張のルール設定画面。"""
+    """`--test` と同じ判定を JSON で出す。読み手は VS Code 拡張のルール管理画面。"""
     body = {"version": TEST_VERSION, "root": root, "rules_path": conf.rules}
     body.update(try_one(stderr, conf, root, tool, subject))
     stdout.write(json.dumps(body, ensure_ascii=True, indent=1))
