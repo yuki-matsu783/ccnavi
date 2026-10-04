@@ -253,7 +253,7 @@ class ImportedFamilyTest(AuthorityHarness):
 
     def test_a_stopped_family_carries_the_reason_family_problems_gives(self):
         """親子のチケットが止まっている（親のツリーの HEAD がブランチを指していない）なら、
-        承認の手前で言っていた止まった理由と手順（`approval.family_stop_text`）を同じ文面で添える。"""
+        承認の手前で言っていた止まった理由と手順（`approval_checks.family_stop_text`）を同じ文面で添える。"""
         self.record("present")
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         verify = self.revision_in_root()

@@ -34,7 +34,7 @@ import yaml
 
 from ..infra import fsio, gitcmd, settings, tree, yamlread
 from ..policy import rules
-from . import approval, approval_marks, phasetypes, risk, syncstate
+from . import approval, approval_checks, approval_marks, phasetypes, risk, syncstate
 
 # 親ごとの上書きの記録の名前。`phases/<親>/config-sync.json`。
 MARK = "config-sync"
@@ -281,7 +281,7 @@ def _approved_parent(conf: settings.Settings, root: str, where: tree.Tree) -> bo
     """そのワークツリーが、同じプロジェクト向けの承認済みの親チケットのものか。"""
     copies, _ = approval.scan(conf, root)
     closed, _ = approval.scan(conf, root, closed=True)
-    ticket = approval.by_id(copies + closed).get(where.name)
+    ticket = approval_checks.by_id(copies + closed).get(where.name)
     return ticket is not None and not ticket.is_child and ticket.project == where.project
 
 

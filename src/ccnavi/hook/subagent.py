@@ -14,7 +14,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import rules
 from ..records import audit
-from ..tickets import approval, flow, phase
+from ..tickets import approval, approval_checks, flow, phase
 from ..tickets import ticket as ticket_mod
 from . import judge, post, projskills, reasons
 
@@ -61,7 +61,7 @@ def at_start(
     # 本物とする側（親のツリー）のチケットを読む。着手で書かれる基準点は親のツリーの
     # チケットにだけ入るので、子のツリーに checkout されている版では足りない。
     copies, _ = approval.scan(conf, root)
-    index = approval.by_id(copies)
+    index = approval_checks.by_id(copies)
     bound = tree.lookup(index, t.name)
     if bound is None:
         return _say(stdout, skills)
@@ -72,8 +72,8 @@ def at_start(
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ。
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
-    approval.align_imported(conf, root, preds)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    approval_checks.align_imported(conf, root, preds)
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先のワークツリーのチケットで判定される。"
@@ -89,7 +89,7 @@ def at_start(
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
         state = "ワークツリーあり" if os.path.isdir(where) else "ワークツリー無し（効かない）"
-        waiting = [f"{p.ticket}（{p.label}）" for p in approval.unmet_predecessors(t, preds)]
+        waiting = [f"{p.ticket}（{p.label}）" for p in approval_checks.unmet_predecessors(t, preds)]
         label = str(t.phase)
         hint = ""
         parent = index.get(t.parent)
@@ -162,7 +162,7 @@ def at_stop(
         return EXIT_OK
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     copies, _ = approval.scan(conf, root)
-    index = approval.by_id(copies)
+    index = approval_checks.by_id(copies)
     targets: list[ticket_mod.Ticket] = []
     bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
     if bound is not None:

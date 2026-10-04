@@ -47,6 +47,7 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, settings, tree
 from . import (
     approval,
+    approval_checks,
     approval_marks,
     archive,
     configsync,
@@ -1139,7 +1140,7 @@ def _parent_any(
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
         closed, _ = approval.scan(conf, root, closed=True)
-        found = tree.lookup(approval.by_id(closed), t.name)
+        found = tree.lookup(approval_checks.by_id(closed), t.name)
         if found is not None and not found.is_child:
             return None if ops.family_stopped(stderr, root, conf, found) else found
     stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")

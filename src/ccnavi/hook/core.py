@@ -34,7 +34,16 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, modes, settings, tree
-from ..tickets import agree, approval, approval_marks, history, phase, review, workflow
+from ..tickets import (
+    agree,
+    approval,
+    approval_checks,
+    approval_marks,
+    history,
+    phase,
+    review,
+    workflow,
+)
 from ..tickets import ticket as ticket_mod
 
 # ---- 入力 -----------------------------------------------------------------------------------
@@ -797,7 +806,7 @@ def moved_on_host(
 def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_mod.Ticket | None:
     """作業中の親の承認済みチケット（本物とする側）。`phase.parent_for_cwd` と同じ引き方。"""
     open_copies, _ = approval.scan(conf, root)
-    found = tree.lookup(approval.by_id(open_copies), parent_id)
+    found = tree.lookup(approval_checks.by_id(open_copies), parent_id)
     if found is None or found.is_child:
         return None
     return found
@@ -828,7 +837,7 @@ def withdraw(
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review_waiting, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = approval.scan_proposals(conf, root, raw.everything)
-    open_index = approval.by_id(approved)
+    open_index = approval_checks.by_id(approved)
     problems: list[str] = []
     wanted = [i for i in dict.fromkeys(ids) if i]
     if not wanted:
@@ -942,7 +951,7 @@ def _withdraw_problems(
         # 親子のチケットが決まらない・親のブランチの外のチケットなど。
         # 状態の操作と同じく止める
         found.append(copy.blocked)
-    if approval.has_record(copy):
+    if approval_checks.has_record(copy):
         # 承認で記録（`ccnavi_approved`）を書いていた頃の古い形。承認で欄が足されているので
         # 承認コミットの親の提案とは一致しない。記録の欄で決める（前の条件のまま）。
         meta = copy.raw[ticket_mod.APPROVAL_KEY]
@@ -994,7 +1003,7 @@ def _withdraw_problems(
         found.append("todo/ に同じ識別子の提案がある（戻す先が塞がっている）")
     if ident not in prior_proposals:
         found.append("承認コミットの親に提案が無い（承認コミットを引けない）")
-    elif compare and not approval.has_record(copy):
+    elif compare and not approval_checks.has_record(copy):
         found += _content_problems(conf, root, copy, prior_proposals[ident])
     return found
 

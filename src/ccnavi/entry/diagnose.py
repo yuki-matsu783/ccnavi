@@ -35,6 +35,7 @@ from ..records import audit
 from ..tickets import (
     agree,
     approval,
+    approval_checks,
     approval_marks,
     approval_times,
     archive,
@@ -640,8 +641,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
-    approval.align_imported(conf, root, preds)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    approval_checks.align_imported(conf, root, preds)
     times = approval_times.approved_times(conf, copies + review)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
@@ -650,7 +651,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         when = times.get(t.path, approval_times.ApprovedTime()).label()
         head = f"{t.ticket}（{t.title}、承認 {when}、{place}、{bound}）"
         if t.is_child:
-            unmet = approval.unmet_predecessors(t, preds)
+            unmet = approval_checks.unmet_predecessors(t, preds)
             need = "要" if t.review_required else "不要"
             head += f" 親 {t.parent} フェーズ {t.phase} レビュー{need}"
             if unmet:
@@ -784,8 +785,10 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         agree.types_resolver(conf, root, open_copies),
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
-    preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals, root)
-    approval.align_imported(conf, root, preds)
+    preds = approval_checks.predecessor_pool_of(
+        open_copies, review_copies, closed_copies, proposals, root
+    )
+    approval_checks.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
     )
@@ -793,9 +796,9 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     worktrees = {t.name: t for t in trees if t.kind == tree.KIND_WORKTREE}
     # 提案の欄に出すのは `todo/` と `review/`。`review/` は承認済みチケットでもあるので、
     # 承認の欄（`copy`）には `review` の状態で出す。
-    proposal_index = approval.by_id(proposals)
-    open_index = approval.by_id(open_copies + review_copies)
-    closed_index = approval.by_id(closed_copies)
+    proposal_index = approval_checks.by_id(proposals)
+    open_index = approval_checks.by_id(open_copies + review_copies)
+    closed_index = approval_checks.by_id(closed_copies)
     # 同じ識別子があるツリーの全部。本物とする側は proposal に、残りは seen_in に出す。
     # 複数のツリーにあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
     # 食い違いを意味しない。どれが本物か決まらないぶんだけを scattered に出す。数え方は
@@ -1018,7 +1021,7 @@ def _ticket_record(
             if status == "closed"
             else [
                 {"ticket": p.ticket, "state": p.state, "label": p.label}
-                for p in approval.unmet_predecessors(source, preds)
+                for p in approval_checks.unmet_predecessors(source, preds)
             ]
         ),
         "human_review": {

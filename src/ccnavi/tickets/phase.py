@@ -34,7 +34,7 @@ from typing import TextIO
 
 from ..infra import gitcmd, settings, shellread, tree
 from ..policy import rules, selfguard
-from . import approval, approval_marks, phasetypes, risk, workflow
+from . import approval, approval_checks, approval_marks, phasetypes, risk, workflow
 from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -730,7 +730,7 @@ def phases_of(
     open_copies, _ = approval.scan(conf, root, raw=raw)
     closed_copies, _ = approval.scan(conf, root, closed=True, raw=raw)
     by_number: dict[int, Phase] = {}
-    owner = approval.by_id(open_copies + closed_copies).get(parent_id)
+    owner = approval_checks.by_id(open_copies + closed_copies).get(parent_id)
     if owner is None and proposed is not None and proposed.ticket == parent_id:
         owner = proposed
     if owner is not None and owner.has_plan:
@@ -758,7 +758,7 @@ def phases_of(
     review_copies, _ = approval.scan_review(conf, root, raw=raw)
     seen: set[str] = set()
     for pool in (closed_copies, review_copies, open_copies):
-        for t in approval.children_of(pool, parent_id):
+        for t in approval_checks.children_of(pool, parent_id):
             if t.phase is None or t.ticket in seen:
                 continue
             seen.add(t.ticket)
@@ -811,7 +811,7 @@ def parent_in(
     # 承認済みチケットの側を読む。承認は親のワークツリーを作る前にも打てるので、そのときの
     # 承認済みチケットは提案があったツリー（プロジェクトのルート）に在る。
     open_copies, _ = approval.scan(conf, root, raw=raw)
-    found = tree.lookup(approval.by_id(open_copies), here.name)
+    found = tree.lookup(approval_checks.by_id(open_copies), here.name)
     if found is None or found.is_child:
         return None
     return found

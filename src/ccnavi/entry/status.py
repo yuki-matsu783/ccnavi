@@ -25,7 +25,7 @@ from typing import TextIO
 
 from ..hook import c1
 from ..infra import fsio, gitcmd, settings, tree
-from ..tickets import approval, approval_times, history, ops, syncstate
+from ..tickets import approval, approval_checks, approval_times, history, ops, syncstate
 from ..tickets import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 10.0
@@ -124,7 +124,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         stdout.write("ccnavi: 作業中・レビュー待ち・承認待ちのチケットは無い\n")
         return 0
 
-    pool = approval.predecessor_pool_of(doing, review, closed, proposals)
+    pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
     times = approval_times.approved_times(conf, doing + review + closed)
     files = _file_states(root, [h for e in entries.values() for h in e.hits])
     fams = syncstate.Families(conf, root)
@@ -222,7 +222,7 @@ class _Family:
         """作業中のチケットの、止まっている理由・注意・次の一手。"""
         stops: list[str] = []
         warns: list[str] = []
-        st = approval.family_standing(self.conf, self.root, t, self.fams)
+        st = approval_checks.family_standing(self.conf, self.root, t, self.fams)
         if st.imported and st.stop:
             stops.append(f"{st.stop}（この親子のチケットの状態は動かさない）")
             stops += syncstate.guidance(self.root, st)
@@ -235,7 +235,7 @@ class _Family:
             stops.append(f"C1 で状態の操作が止まる: {why or '理由が分からない'}")
         carried = uncommitted and verdict == c1.TARGET_YES
         if not t.started_at:
-            for p in approval.unmet_predecessors(t, self.pool):
+            for p in approval_checks.unmet_predecessors(t, self.pool):
                 stops.append(f"先行 {p.ticket} が満たされていない（{p.label}）")
             parent_why = self._parent_not_started(t)
             if parent_why:
@@ -256,7 +256,7 @@ class _Family:
         off = ops.base_off_head(self.root, self.conf, t)
         if off:
             warns.append(off)
-        left = approval.resumed_fields(t)
+        left = approval_checks.resumed_fields(t)
         if left:
             warns.append(
                 f"作業中なのに {', '.join(left)} に値が残っている（done/ から手で戻した再開）。"
@@ -265,7 +265,7 @@ class _Family:
         if (
             not t.is_child
             and t.has_plan
-            and not approval.has_record(t)
+            and not approval_checks.has_record(t)
             and not fsio.lexists(
                 approval.workflow_path(settings.approved_dir(self.conf, t.tree_root), t.ticket)
             )

@@ -18,7 +18,17 @@ from dataclasses import dataclass, replace
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, approval_marks, configsync, flow, history, phase, risk, syncstate
+from . import (
+    approval,
+    approval_checks,
+    approval_marks,
+    configsync,
+    flow,
+    history,
+    phase,
+    risk,
+    syncstate,
+)
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -387,10 +397,10 @@ def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) ->
     if not found.is_child:
         return found.project
     copies, _ = approval.scan(conf, root)
-    parent = approval.by_id(copies).get(found.parent)
+    parent = approval_checks.by_id(copies).get(found.parent)
     if parent is None:
         closed, _ = approval.scan(conf, root, closed=True)
-        parent = approval.by_id(closed).get(found.parent)
+        parent = approval_checks.by_id(closed).get(found.parent)
     return parent.project if parent is not None else found.project
 
 
@@ -516,7 +526,7 @@ def _undecided(
     """
     home = hits[0].parent or hits[0].ticket
     stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
-    st = approval.family_standing(conf, root, hits[0]) if conf is not None else None
+    st = approval_checks.family_standing(conf, root, hits[0]) if conf is not None else None
     if st is not None and st.imported:
         stderr.write(
             f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
@@ -576,7 +586,7 @@ def family_stopped(
     親のワークツリーの外にしか無いとき（元ツリーに未コミットで残ったチケットなど）も、信頼しないチケットを
     動かさないように止める。取り込み状態の無い親子のチケットには何も言わない（今の動きのまま）。
     """
-    st = approval.family_standing(conf, root, found)
+    st = approval_checks.family_standing(conf, root, found)
     if not st.imported:
         return False
     if st.stop:
@@ -653,7 +663,7 @@ def _predecessors_unmet(
     手で動かして承認する進め方があるので、着手の手前でもう一度見る。どの先行が何の
     状態か、どうすればよいかを 1 本ずつ言う。
     """
-    unmet = approval.unmet_predecessors(found, approval.predecessor_pool(conf, root))
+    unmet = approval_checks.unmet_predecessors(found, approval.predecessor_pool(conf, root))
     if not unmet:
         return False
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
@@ -741,7 +751,7 @@ def close_problems(
             f"{parent_id} のフェーズ {held.label} は{held.review_label}。レビューを済ませてから"
         )
     closed_copies, _ = approval.scan(conf, root, closed=True, raw=raw)
-    copy = approval.by_id(copies + closed_copies).get(parent_id)
+    copy = approval_checks.by_id(copies + closed_copies).get(parent_id)
     if copy is not None and copy.has_plan:
         if copy.feedback is None:
             problems.append(
@@ -770,7 +780,7 @@ def _deliverables_missing(
     if not found.is_child or found.phase is None:
         return False
     copies, _ = approval.scan(conf, root)
-    parent = approval.by_id(copies).get(found.parent)
+    parent = approval_checks.by_id(copies).get(found.parent)
     if parent is None or not parent.has_plan:
         return False
     item = parent.item_at(found.phase)
@@ -886,7 +896,7 @@ def unfinished_at_stop(
     if here is None or here.is_main:
         return None
     copies, _ = approval.scan(conf, root, raw=raw)
-    bound = tree.lookup(approval.by_id(copies), here.name)
+    bound = tree.lookup(approval_checks.by_id(copies), here.name)
     if bound is None or not bound.in_progress or bound.blocked or not bound.base_sha:
         return None
     if not bound.is_child and close_problems(root, conf, bound.ticket, raw):

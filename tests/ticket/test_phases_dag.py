@@ -16,7 +16,7 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets import approval, approval_marks, phasetypes, workflow
+from ccnavi.tickets import approval, approval_checks, approval_marks, phasetypes, workflow
 from ccnavi.tickets import ticket as ticket_mod
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -403,7 +403,7 @@ class DagApprovalTest(PhaseHarness):
         held = self.copy()
         self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
         self.assertEqual(held.approved_at, "2026-01-01T00:00:00+09:00")
-        self.assertEqual([], approval.content_problems(held))
+        self.assertEqual([], approval_checks.content_problems(held))
 
     def test_a_workflow_field_in_a_new_copy_is_not_read_and_blocks(self):
         """記録を持たない承認済みチケットの `workflow:` 欄は、承認済みの待ち方として
@@ -413,7 +413,7 @@ class DagApprovalTest(PhaseHarness):
         self._rewrite_copy("workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\n")
         held = self.copy()
         self.assertIsNone(held.workflow)
-        found = [p.detail for p in approval.content_problems(held)]
+        found = [p.detail for p in approval_checks.content_problems(held)]
         self.assertTrue(any("workflow" in d for d in found), found)
 
     def test_a_half_written_record_does_not_pass_for_the_old_form(self):
@@ -440,9 +440,9 @@ class DagApprovalTest(PhaseHarness):
                 record + "workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\n"
             )
             held = self.copy()
-            self.assertFalse(approval.has_record(held), record)
+            self.assertFalse(approval_checks.has_record(held), record)
             self.assertIsNone(held.workflow, record)
-            found = [p.detail for p in approval.content_problems(held)]
+            found = [p.detail for p in approval_checks.content_problems(held)]
             self.assertTrue(any("workflow" in d for d in found), (record, found))
 
     def test_an_unreadable_workflow_file_blocks(self):
@@ -452,7 +452,7 @@ class DagApprovalTest(PhaseHarness):
         held = self.copy()
         self.assertIsNone(held.workflow)
         self.assertIn("待ち方のファイル", held.workflow_unreadable)
-        self.assertTrue(approval.content_problems(held))
+        self.assertTrue(approval_checks.content_problems(held))
 
     def test_a_revision_cannot_move_a_defer_target_behind_approved_children(self):
         def reviewed(text):
