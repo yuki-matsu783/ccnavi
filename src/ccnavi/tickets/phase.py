@@ -1015,7 +1015,8 @@ def _next_hint(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> s
             return (
                 "全体計画のフェーズは全部終わりました。レビューが済んだら、次はフィードバック計画です。"
                 "親チケットに `feedback:` を足して（対応が無くても `[]` で）改版を提案し、"
-                "承認を受けてください。"
+                "承認を受けてください。改版の提案では `started_at`・`completed_at`・`base_sha`・"
+                "`cancelled_at`・`cancel_reason` は空にします。"
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
     if is_dag(parent):

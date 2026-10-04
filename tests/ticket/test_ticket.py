@@ -31,8 +31,8 @@ import unittest
 
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
+from ccnavi.tickets import approval, review, ticket
 from ccnavi.tickets import phase as phase_mod
-from ccnavi.tickets import review, ticket
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -79,6 +79,40 @@ def write(path, text):
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     return path
+
+
+def with_old_record(text: str, source_path: str, source_tree: str = "i0001") -> str:
+    """前の版の承認が書き足した形（`ccnavi_approved` を frontmatter の末尾に持つ）にする。"""
+    record = (
+        "ccnavi_approved:\n"
+        "  approved_at: '2026-01-01T00:00:00+09:00'\n"
+        f"  source_tree: {source_tree}\n"
+        f"  source_path: {json.dumps(source_path)}\n"
+    )
+    head, sep, rest = text.partition("\n---\n")
+    assert sep, text
+    return head + "\n" + record.rstrip("\n") + sep + rest
+
+
+def to_old_form(approved_dir: str, ident: str) -> None:
+    """承認済みチケットを、前の版の承認が書いた形に書き換える。
+
+    前の版は承認の記録（`ccnavi_approved`）と待ち方（`workflow:`）をチケットに書き足し、
+    待ち方のファイルは無かった。取り下げは、記録を持つ古い形には前の条件（欄を読む）を当てる。
+    """
+    path = os.path.join(approved_dir, "doing", ident + ".md")
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    held = approval.workflow_path(approved_dir, ident)
+    wf, _ = approval.read_workflow(approved_dir, ident)
+    if wf is not None:
+        os.remove(held)
+        if not os.listdir(os.path.dirname(held)):
+            os.rmdir(os.path.dirname(held))
+        flow = json.dumps(wf.as_raw())
+        head, sep, rest = text.partition("\n---\n")
+        text = head + f"\nworkflow: {flow}" + sep + rest
+    write(path, with_old_record(text, f"wip/proposals/todo/{ident}.md"))
 
 
 def ticket_text(
@@ -577,6 +611,157 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01-01", result.stdout)
         self.assertIn("親 i0001 の承認済みチケットが作業中に無い", result.stdout)
 
+    def moved_text(self, name, **fields):
+        """提案の本文の、スクリプトの欄だけを書き換えたもの（手で動かす中身）。"""
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        return ticket.set_fields(text, fields)
+
+    def test_a_base_sha_without_started_at_is_blocked(self):
+        # `start` は `started_at` と `base_sha` を一緒に書く。片方だけの形は道具を通っていない。
+        self.propose("i0001", allow=("src/*",))
+        self.hand_move("i0001", self.moved_text("i0001", base_sha="0" * 40))
+        result = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        reason = self.reason(result)
+        self.assertIn("DENY_TICKET_BLOCKED", reason)
+        self.assertIn("base_sha", reason)
+        lint = self.ccnavi("--lint")
+        self.assertNotEqual(lint.returncode, 0)
+        self.assertIn("`started_at` が無いのに `base_sha` がある", lint.stdout)
+
+    def test_fields_left_by_a_resume_are_warned_but_not_blocked(self):
+        # done/ から doing/ へ手で戻す再開では、閉じるときの欄が残る。判定は止めない。
+        self.propose("i0001", allow=("src/*",))
+        self.hand_move(
+            "i0001",
+            self.moved_text("i0001", completed_at="2026-01-01T00:00:00+0000", cancel_reason="x"),
+        )
+        result = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        self.assertNotIn("DENY_TICKET", self.reason(result), self.reason(result))
+        lint = self.ccnavi("--lint", "--json")
+        found = [
+            p
+            for p in json.loads(lint.stdout)["problems"]
+            if "値が残っている" in p["detail"] and "i0001" in p["detail"]
+        ]
+        self.assertEqual([p["severity"] for p in found], ["warn"], found)
+        self.assertIn("`completed_at`", found[0]["detail"])
+        self.assertIn("`cancel_reason`", found[0]["detail"])
+
+    def test_a_proposal_with_a_script_field_is_not_approved(self):
+        # 承認は中身を変えないので、提案に書いた値がそのまま承認済みチケットの値になる。
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        write(source, self.moved_text("i0001", completed_at="2026-01-01T00:00:00+0000"))
+        lint = self.ccnavi("--lint", "--json")
+        found = [
+            p
+            for p in json.loads(lint.stdout)["problems"]
+            if "スクリプト（ccnavi-ticket.sh）だけが書く欄" in p["detail"]
+        ]
+        self.assertEqual([p["severity"] for p in found], ["error"], found)
+        self.assertIn("`completed_at`", found[0]["detail"])
+        result = self.approve()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("だけが書く欄", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+
+    def test_a_proposal_with_an_approval_record_is_not_approved(self):
+        # 承認の記録と続きの子の目印は、ユーザの判断だけが残す。
+        # 提案に書けば古い形や続きの子を装える。
+        for field in ("ccnavi_approved: {}", "followup_of: [i0001-01-01]"):
+            with self.subTest(field=field):
+                self.propose("i0001", allow=("src/*",))
+                source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+                with open(source, encoding="utf-8") as f:
+                    text = f.read()
+                write(source, text.replace("\n---\n", "\n" + field + "\n---\n", 1))
+                lint = self.ccnavi("--lint", "--json")
+                found = [
+                    p
+                    for p in json.loads(lint.stdout)["problems"]
+                    if "は承認の記録で" in p["detail"]
+                ]
+                self.assertEqual([p["severity"] for p in found], ["error"], found)
+                result = self.approve()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("提案には書かない", result.stderr)
+                self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+                os.remove(source)
+
+    def test_a_forged_record_moved_by_hand_is_blocked(self):
+        # `ccnavi_approved: {}` で古い形を装い、手で書いた `workflow:` を効かせようとする形。
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        forged = "ccnavi_approved: {}\nworkflow: {order: dag, waits: {}, review_at: {}}"
+        self.hand_move("i0001", text.replace("\n---\n", "\n" + forged + "\n---\n", 1))
+        result = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        self.assertIn("DENY_TICKET_BLOCKED", self.reason(result))
+        lint = self.ccnavi("--lint")
+        self.assertNotEqual(lint.returncode, 0)
+        self.assertIn("workflow", lint.stdout)
+
+    def test_lint_warns_about_an_old_form_without_an_approval_row(self):
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        self.hand_move("i0001", with_old_record(text, "wip/proposals/todo/i0001.md"))
+        lint = self.ccnavi("--lint", "--json")
+        found = [
+            p
+            for p in json.loads(lint.stdout)["problems"]
+            if "状態の履歴に承認" in p["detail"] and "i0001" in p["detail"]
+        ]
+        self.assertEqual([p["severity"] for p in found], ["warn"], found)
+
+    def test_review_reads_only_what_finish_moved(self):
+        # review/ はエージェントが書ける側。`finish` が書く `completed_at` が無いものは読まない。
+        self.family()
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
+        review = os.path.join(self.parent_tree, "wip", "proposals", "review")
+        with open(os.path.join(review, "i0001-01-01.md"), encoding="utf-8") as f:
+            finished = f.read()
+        stray = ticket.set_fields(
+            finished.replace("i0001-01-01", "i0001-01-05"), {"completed_at": ""}
+        )
+        write(os.path.join(review, "i0001-01-05.md"), stray)
+        # 前の版の承認が書いた記録を持つものも、`completed_at` があれば読む。
+        write(
+            os.path.join(review, "i0001-01-06.md"),
+            with_old_record(finished.replace("i0001-01-01", "i0001-01-06"), "p"),
+        )
+        details = [
+            p["detail"] for p in json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
+        ]
+        self.assertTrue(
+            any("i0001-01-05" in d and "`completed_at` が無い" in d for d in details), details
+        )
+        self.assertFalse([d for d in details if "i0001-01-06.md" in d and "読めない" in d], details)
+        for name in ("i0001-01-01", "i0001-01-06"):
+            held, why = approval.load_copy(os.path.join(review, name + ".md"), require_record=True)
+            self.assertIsNotNone(held, why)
+        held, why = approval.load_copy(os.path.join(review, "i0001-01-05.md"), require_record=True)
+        self.assertIsNone(held)
+
     def close_parent_by_hand(self, name="i0001"):
         """親の承認済みチケットを `doing/` から `done/` へ手で動かす。
 
@@ -809,8 +994,9 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "done", "i0001-01-01.md")))
         with open(review, encoding="utf-8") as f:
             text = f.read()
-        self.assertIn("ccnavi_approved:", text)
-        self.assertIn("completed_at:", text)
+        # review/ で読まれる目印は `finish` が書く `completed_at`。承認の記録は書き足さない。
+        self.assertNotIn("ccnavi_approved:", text)
+        self.assertRegex(text, r'completed_at: "[^"]+"')
         # レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる。
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         after = self.hook(
@@ -1317,7 +1503,9 @@ class TicketTest(unittest.TestCase):
         with open(followup, encoding="utf-8") as f:
             text = f.read()
         self.assertIn("phase: 1", text)
-        self.assertIn("ccnavi_approved:", text)
+        # 続きの子の目印はトップレベルの欄。承認の記録は書かない（時刻は状態の履歴の `raised`）。
+        self.assertIn("followup_of:\n- i0001-01-01\n- i0001-01-02\n", text)
+        self.assertNotIn("ccnavi_approved:", text)
         self.assertIn("u1", text)
         self.assertIn("src/a/*", text)
         self.assertIn("src/b/*", text)
@@ -2271,7 +2459,7 @@ class TicketTest(unittest.TestCase):
         with open(moved, encoding="utf-8") as f:
             after = f.read()
         self.assertIn("# ユーザの覚え書き", after)
-        self.assertIn("ccnavi_approved:", after)
+        self.assertNotIn("ccnavi_approved:", after)
         self.assertIn("started_at:", after)
         self.assertIn("base_sha:", after)
 

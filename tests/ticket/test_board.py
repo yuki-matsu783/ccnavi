@@ -287,6 +287,7 @@ class BoardTest(PhaseHarness):
             fixture = json.load(f)
         self.assertEqual(sorted(fixture), sorted(board))
         self.assertEqual(sorted(fixture["tickets"][0]), sorted(board["tickets"][0]))
+        self.assertEqual(sorted(fixture["tickets"][0]["copy"]), sorted(board["tickets"][0]["copy"]))
         self.assertEqual(sorted(fixture["parents"][0]), sorted(board["parents"][0]))
         self.assertEqual(
             sorted(fixture["parents"][0]["phases"][0]),

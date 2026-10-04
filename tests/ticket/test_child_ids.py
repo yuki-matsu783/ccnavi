@@ -205,9 +205,7 @@ class FollowupRefusesTest(NextChildIdTest):
         return found
 
     def followup(self, phase_no):
-        return approval.followup(
-            self.conf, self.ws, self.parent(), phase_no, [], ["指摘"], "2026-10-04T00:00:00Z"
-        )
+        return approval.followup(self.conf, self.ws, self.parent(), phase_no, [], ["指摘"])
 
     def test_a_full_phase_writes_nothing(self):
         self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)

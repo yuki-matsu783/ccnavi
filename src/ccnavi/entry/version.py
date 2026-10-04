@@ -8,9 +8,17 @@
 
 **互換の版（COMPAT）** は、実行ファイルと、それを呼ぶ側（`.ccnavi/scripts/` の sh と
 VS Code 拡張）との契約の版。呼ぶ側が頼っているフラグや出力の形を、呼ぶ側を直さないと
-動かない形に変えたときだけ 1 上げ、sh の `CCNAVI_COMPAT`（ccnavi-common.sh）と拡張の
-`EXTENSION_COMPAT`（src/core/version.ts）も同じ値に揃える。フラグを足すだけ、JSON の欄を
-足すだけなら上げない。足したものが在るかは `flags` を見れば分かる。
+動かない形に変えたときに 1 上げ、sh の `CCNAVI_COMPAT`（ccnavi-common.sh）と拡張の
+`EXTENSION_COMPAT`（src/core/version.ts）も同じ値に揃える。Chrome 拡張は組み立てのときに
+ここの値を埋め込む。
+
+データの形（承認済みの置き場に置くものの並び、待ち方の置き場、取り下げの条件など）が変わるときも
+上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が新しい形のデータを読むと、
+フラグが同じでも読み違える（待ち方のファイルを知らない実行ファイルは待ち方を一直線と読む）。
+sh が古い実行ファイルの知らない副命令を呼ぶようになったときも同じ。
+
+フラグを足すだけ、JSON の欄を足すだけで、データの形も変わらないなら上げない。足したものが
+在るかは `flags` を見れば分かる。
 
 層（共通層・自身の層・プロジェクトの層）の 3 本は、ファイルの頭の `version:` に書式の版を
 書く。読めない版は、読む側（rules / phasetypes / risk）がもう error にしている
@@ -39,7 +47,7 @@ from ..tickets import ticket as ticket_mod
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-COMPAT = 5
+COMPAT = 6
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 組み立ての元のコミットが分からないときの表記。

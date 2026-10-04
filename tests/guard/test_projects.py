@@ -443,11 +443,14 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる（REQ-MLT-11）
         self.assertIn("■ プロジェクト: lib", approved.stdout)
-        # 継ぐ段は無いが、承認済みチケットには残る
-        # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
+        # 承認は `project:` を書き足さない（中身を変えない）。承認済みチケットのプロジェクトも
+        # 置き場（ツリー）から決まる
         for name in ("i0007", "i0007-01-01"):
             with open(self.approved_path("doing", name + ".md"), encoding="utf-8") as f:
-                self.assertIn("project: lib", f.read())
+                self.assertNotIn("project:", f.read())
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        found = {t["ticket"]: t["project"] for t in board["tickets"]}
+        self.assertEqual(found, {"i0007": "lib", "i0007-01-01": "lib"})
 
     def test_a_declaration_that_disagrees_with_the_place_is_not_approved(self):
         write(

@@ -1,0 +1,48 @@
+{
+  "data": {
+    "repository": {
+      "object": {
+        "history": {
+          "nodes": [
+            {
+              "oid": "7fba31a3baac78239b921878388f8dad4bdb96c8",
+              "parents": {
+                "nodes": [
+                  {
+                    "oid": "9b2c21f0806868c5c9265ba9e6fd4fd500f4bc8a"
+                  }
+                ]
+              }
+            },
+            {
+              "oid": "9b2c21f0806868c5c9265ba9e6fd4fd500f4bc8a",
+              "parents": {
+                "nodes": [
+                  {
+                    "oid": "5c4408d2f782fb391cde52b9d977f0602038b73b"
+                  }
+                ]
+              }
+            },
+            {
+              "oid": "5c4408d2f782fb391cde52b9d977f0602038b73b",
+              "parents": {
+                "nodes": [
+                  {
+                    "oid": "a169b9591f88a97c43da553508adb5068a751c18"
+                  }
+                ]
+              }
+            },
+            {
+              "oid": "a169b9591f88a97c43da553508adb5068a751c18",
+              "parents": {
+                "nodes": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "324969f28182bdd759c13366ffc41fd068d3f0b9": {
+    "text": "---\r\nversion: 1\r\nticket: i0001\r\nhuman_review:\r\n  required: true\r\n  reason: t\r\ntitle: 親\r\nrationale: r\r\nallow:\r\n  - match: Write|Edit\r\n    glob: \"src/*\"\r\n  - match: Write|Edit\r\n    glob: \"wip/*\"\r\n  - match: Write|Edit\r\n    glob: \"tests/*\"\r\nstarted_at: \"\"\r\ncompleted_at: \"\"\r\nbase_sha: \"\"\r\n---\r\n\r\n本文\r\n",
+    "isBinary": false,
+    "isTruncated": false,
+    "byteSize": 303
+  }
+}

@@ -150,7 +150,7 @@ def path(approved_dir: str, ticket_id: str) -> str:
 def stamp() -> str:
     """履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。機械をまたいでも並べて読める。
 
-    時計は fsio の差し替え点（`fsio.clock`）を通る。承認の plan は承認の記録と同じ時刻を書く。
+    時計は fsio の差し替え点（`fsio.clock`）を通る。承認の plan はマーカーと同じ時刻を書く。
     """
     return fsio.utc_stamp()
 

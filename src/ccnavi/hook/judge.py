@@ -14,7 +14,7 @@ from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard
 from ..records import audit, repeat
-from ..tickets import agree, approval, flow, phase
+from ..tickets import approval, flow, phase
 from ..tickets import ticket as ticket_mod
 from . import projskills, reasons, wrapguard
 
@@ -328,7 +328,7 @@ def decide_before(
         )
 
     # 承認済みチケットの置き場（`approval.read_raw`）。1 回の判定で読むのは 1 度だけにし、
-    # 下のレビュー待ちの止め・範囲の索引・承認の知らせ（`agree.news`）で持ち回る。
+    # 下のレビュー待ちの止めと範囲の索引で持ち回る。
     # 判定の途中で置き場のファイルを動かす処理は無いので、読み直さない。
     raw: approval.Raw | None = None
 
@@ -350,8 +350,6 @@ def decide_before(
     # 1 度だけ読んで両方に渡す（設計 9）。ワークスペースルートへの書き込みとシェルでは読まない。
     # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
     # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
-    # 読んだ置き場（`raw`）は、下の承認の知らせ（`agree.news`）にも渡す。間の判定は
-    # 置き場を読むだけで、ファイルを動かさない。
     index = None
     scanned: list[ticket_mod.Ticket] | None = None
     if (
@@ -494,21 +492,14 @@ def decide_before(
     context = ctxfile.for_rules(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
-    # このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）は、
-    # 判定がどれでも 1 度だけつける。応答は 1 つの JSON なので、ルールの文と
-    # 同じ経路（additionalContext）にまとめる。
-    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id, raw)
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
-    # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ経路で渡す。
-    if conf.tickets_enabled:
-        told = "\n\n".join(
-            p
-            for p in (
-                told,
-                ticket_mod.propose_notice(stderr, conf, root, payload, record.subject),
-            )
-            if p
-        )
+    # 足さない（`ticket_mod.propose_notice` の説明）ので、ルールの文と同じ経路
+    # （additionalContext）で渡す。応答は 1 つの JSON なので、まとめる。
+    told = (
+        ticket_mod.propose_notice(stderr, conf, root, payload, record.subject)
+        if conf.tickets_enabled
+        else ""
+    )
     # cwd がプロジェクトの中に入った最初の呼び出しで、そのプロジェクトのスキルの目録を 1 度だけ
     # つける。セッションはワークスペースルートで始まり、あとから cd で入るのがふつう。
     skills = projskills.notice(stderr, conf, root, payload)
@@ -585,8 +576,8 @@ def decide_before(
         # 渡した先が判断するだけの回に毎度コンテキストを 1 段積むことになる。
         # ルールが言及していない場所は記録から読む。
         record.decision, record.enforced = audit.HANDOVER, False
-        # 新しい承認だけは、渡す回にも言う。言わないと、その承認を伝える機会が
-        # 権限モードに渡す呼び出しの分だけ遅れる。
+        # 1 度だけ渡す文（提案を書いた回の確認、プロジェクトのスキルの目録）は、渡す回にも言う。
+        # 言わないと、その文を伝える機会が権限モードに渡す呼び出しの分だけ遅れる。
         if notices or told:
             hookio.write_context(
                 stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([told] if told else []))
@@ -911,8 +902,7 @@ def ticket_verdict(
     source = ticket.path
     head = [
         f"subject: {full}",
-        f"ticket: {ticket.ticket} ({ticket.title}), approved {ticket.approved_at}, "
-        f"worktree {t.name}",
+        f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
         f"scope: {area}",
     ]
     decided = rules.ASK if found.verdict == rules.ASK else rules.DENY
