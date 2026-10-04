@@ -24,7 +24,8 @@ from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog, prune
-from ..tickets import configsync, history, ops, phase, review
+from ..tickets import branchfind, configsync, history, ops, phase, review
+from ..tickets import ticket as ticket_mod
 from . import diagnose, lint, suggest, version
 
 USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
@@ -144,7 +145,7 @@ README.md ("候補の JSON"); the VS Code extension reads it.
 To review the pending tickets and agree to the work areas they declare, run
 
     ccnavi --agree
-    ccnavi --agree i0002 i0002-01        (only these, e.g. from a filtered board;
+    ccnavi --agree i0002 i0002-01-01     (only these, e.g. from a filtered board;
                                             ids go last, after every flag)
 
 It scans wip/proposals/todo/ in every worktree, shows what each ticket makes
@@ -925,10 +926,28 @@ def _parsed(
         if not _FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
             stderr.write(f"ccnavi: c1 sort の {args.command[2]!r} は識別子の形ではない\n")
             return EXIT_ERROR
-        if since and not _REVISION.fullmatch(since):
+        if since and not _revision_ok(since):
             stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")
             return EXIT_ERROR
         code = c1.sort(stdout, stderr, conf, root, args.command[2], since)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+
+    # issue・MR に紐づくブランチを探す。`ccnavi-branches.sh` が呼ぶ。
+    # 読むだけで、何も書かない。
+    # ホストの結果は sh が取ってきて `--result` で渡す（実行ファイルはネットワークに出ない）。
+    if len(args.command) == 3 and args.command[0] == "branches":
+        cwd = args.cwd or os.getcwd()
+        code = branchfind.report(
+            stdout,
+            stderr,
+            conf,
+            root,
+            cwd,
+            args.command[1],
+            args.command[2],
+            args.result,
+            args.json,
+        )
         return EXIT_OK if code == 0 else EXIT_ERROR
 
     if args.command or args.reviewed is not None or args.close_early:
@@ -1406,13 +1425,36 @@ def _decide_actor(args) -> None:
         history.set_via(args.via)
 
 
-# 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスとして読まれる文字列を入れない。
-_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+class _Family:
+    """親の識別子の形（`ticket.is_valid_id` と同じ。日本語の字を含む）。
+
+    sh から渡る引数なので、パスとして読まれる文字列を入れない。前は正規表現で持っていたので、
+    呼び手が使う `fullmatch` の形を残す。
+    """
+
+    @staticmethod
+    def fullmatch(text: str) -> bool:
+        return ticket_mod.is_valid_id(text)
+
+
+_FAMILY = _Family()
+# リポジトリの取り込み状態を分ける名前（`self` かプロジェクト名）。ASCII の 1 語。
+_REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
 _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
-# `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数として読まれる文字列を
-# 入れない）。
-_REVISION = re.compile(r"[0-9a-f]{7,64}|refs/remotes/origin/[A-Za-z0-9][A-Za-z0-9._-]*")
+# `c1 sort` の版。sha か `refs/remotes/origin/<親のブランチ>` の形だけ（git の引数として読まれる
+# 文字列を入れない）。親のブランチは識別子か、親チケットの `branch:` に書ける名前。
+_SHA = re.compile(r"[0-9a-f]{7,64}")
+_ORIGIN_REF = "refs/remotes/origin/"
+
+
+def _revision_ok(since: str) -> bool:
+    if _SHA.fullmatch(since):
+        return True
+    if not since.startswith(_ORIGIN_REF):
+        return False
+    name = since[len(_ORIGIN_REF) :]
+    return ticket_mod.is_valid_id(name) or not ticket_mod.branch_problem(name)
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
@@ -1434,8 +1476,11 @@ def sync_check(
     `reason` に書いて `blocked` にする。
     `repo` は取り込み状態の名前（`self` かプロジェクト名）。ネットワークにも git にも触らない。
     """
-    for name, value in (("識別子", family), ("リポジトリ", repo or "self")):
-        if not _FAMILY.fullmatch(value) or ".." in value:
+    for name, value, pattern in (
+        ("識別子", family, _FAMILY),
+        ("リポジトリ", repo or "self", _REPO_NAME),
+    ):
+        if not pattern.fullmatch(value) or ".." in value:
             stderr.write(f"ccnavi: sync check の{name} {value!r} は識別子の形ではない\n")
             return 1
     problems = lint.family_check(conf, root, family, repo)

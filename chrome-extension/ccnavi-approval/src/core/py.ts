@@ -48,17 +48,32 @@ export interface Snapshot {
   /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い */
   readonly project?: string;
   readonly workspace?: Workspace;
+  /**
+   * 親子のチケットの識別子 → 親のブランチ名。閉包の先行の親子のチケットを読みに行くブランチの見当で、
+   * 判定には使わない（読んだブランチの親チケットが名乗らなければ Python は使わない）
+   */
+  readonly hints?: Readonly<Record<string, string>>;
 }
 
 export interface Family {
+  /** 親のブランチ名（拡張が読み書きするブランチ） */
   readonly name: string;
+  /** 親子のチケットの識別子（親チケットの `branch:` があればブランチ名と違う） */
+  readonly family?: string;
   readonly title: string;
   readonly state: string;
   readonly closed: boolean;
+  /** 親子のチケットが決まらない理由（同じ親子のチケットを名乗るブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
+  readonly conflict?: string;
 }
 
 export interface Closure {
+  /** 親のブランチ名のリスト（先頭が判定する親子のチケット） */
   readonly families: readonly string[];
+  /** ブランチ名 → 親子のチケットの識別子 */
+  readonly idents?: Readonly<Record<string, string>>;
+  /** 同じ親子のチケットを名乗るブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
+  readonly rivals?: readonly string[];
   readonly need: readonly string[];
   readonly absent: readonly string[];
   readonly over_limit: boolean;
@@ -75,6 +90,10 @@ export interface BatchEntry {
   readonly path: string;
   readonly overflow: readonly string[];
   readonly body: string;
+  /** 親のブランチ名（`branch:`、無ければ識別子） */
+  readonly branch?: string;
+  /** `branch:` が既にあるブランチを指すか */
+  readonly existing_branch?: boolean;
 }
 
 export interface Withdrawable {
@@ -95,6 +114,8 @@ export interface Reviewable {
 
 export interface BoardResult {
   readonly family: string;
+  /** 親子のチケットの識別子（親のブランチ名と違うことがある） */
+  readonly ident?: string;
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
@@ -204,7 +225,7 @@ export const py = {
     call: PyCall,
     body: { settings: string | null; snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
-  start: (call: PyCall, body: { settings: string | null; snapshot: Snapshot; issue: number; taken: readonly string[] }) =>
+  start: (call: PyCall, body: { settings: string | null; snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),
   confirm: (
     call: PyCall,

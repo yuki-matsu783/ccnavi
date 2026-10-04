@@ -316,7 +316,8 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
 }
 
 /**
- * 大文字小文字をそろえる（「始める」の重なりの検査）。作る名前は ASCII に限る（`startName`・Python の `ticket._ID`）ので
+ * 大文字小文字をそろえる（「始める」の重なりの検査）。作る名前は ASCII の英数字と記号、それに NFKC で変わらない
+ * 日本語の字（ひらがな・カタカナ・長音記号・CJK 統合漢字・々）に限る（`startName`・Python の `ticket._ID`）ので
  * Python の casefold と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
  * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（厳しくする向き）
  */
@@ -351,12 +352,35 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
   return "";
 }
 
-/** 「始める」で作るブランチの名前の形（issue から決める形）。プロジェクトなら頭に `<名前>-` */
+/** 識別子に使える日本語の字（Python の `ticket.JA_CHARS` と同じ文字クラス） */
+const JA = "\\u3005\\u3041-\\u3096\\u30a1-\\u30fa\\u30fc\\u4e00-\\u9fff";
+/** issue から作る親の識別子の形（`<先頭の語>-<番号>-<slug>`。Python の `ticket._FORM` と同じ） */
+const ISSUE_BRANCH = new RegExp(`^(?<prefix>[a-z][a-z0-9]*)-[1-9][0-9]*-(?<slug>[A-Za-z0-9${JA}][A-Za-z0-9._\\-${JA}]*)$`, "u");
+/** 先頭の語に使えない名前（統合先や保護されたブランチ。Python の `settings._RESERVED_PREFIXES`） */
+const RESERVED_PREFIXES = new Set(["main", "master", "develop", "release"]);
+/** 識別子の長さの上限（Python の `ticket.MAX_ID_LENGTH`） */
+const MAX_ID_LENGTH = 64;
+
+/**
+ * 「始める」で作るブランチの名前の形（issue から決める形）。プロジェクトなら slug の頭に `<名前>-`。
+ * 名前は Python が issue のタイトルから作るが、タイトルは誰でも書けるので、ここでも字と形を確かめ直す（二重の確認）
+ */
 function startName(name: unknown, cfg: RepoConfig): string {
   const branch = github.checkBranch(name);
-  const m = /^(?:(?<project>[A-Za-z0-9][A-Za-z0-9._-]*)-)?i\d{4,}$/.exec(branch);
-  if (!m || (m.groups?.project ?? "") !== cfg.project) {
-    throw new Error(`${branch} は、issue から作る親のブランチの名前の形（${cfg.project ? `${cfg.project}-i<番号>` : "i<番号>"}）になっていない`);
+  const m = ISSUE_BRANCH.exec(branch);
+  const prefix = m?.groups?.prefix ?? "";
+  const slug = m?.groups?.slug ?? "";
+  const ok =
+    m !== null &&
+    branch === branch.normalize("NFC") &&
+    [...branch].length <= MAX_ID_LENGTH &&
+    !RESERVED_PREFIXES.has(prefix) &&
+    !/-[0-9]{2}$/.test(branch) &&
+    (cfg.project ? slug.startsWith(`${cfg.project}-`) : true);
+  if (!ok) {
+    throw new Error(
+      `${branch} は、issue から作る親のブランチの名前の形（${cfg.project ? `<先頭の語>-<番号>-${cfg.project}-<slug>` : "<先頭の語>-<番号>-<slug>"}）になっていない`,
+    );
   }
   return branch;
 }

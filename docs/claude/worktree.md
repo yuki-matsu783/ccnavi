@@ -3,7 +3,7 @@ type: guide
 title: ワークツリーで作業する
 description: ワークツリーの作成、他セッションの変更への対応、統合先へのマージ方法
 tags: [git, worktree]
-keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション]
+keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション, issue, MR, 既存のブランチ, ccnavi-branches.sh]
 ---
 
 # ワークツリーで作業する
@@ -32,7 +32,7 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 
 ## ワークツリーの作り方
 
-- 置き場はワークスペースの`.claude/worktrees/<ブランチ名>`にする。プロジェクトから切る場合も同じ場所に置く。
+- 置き場はワークスペースの`.claude/worktrees/<ブランチ名>`にする（チケットのワークツリーは`.claude/worktrees/<識別子>`）。プロジェクトから切る場合も同じ場所に置く。
   階層は1段だけにして、その下にさらに階層を作らない
 - `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>`で作る。末尾の`<統合先>`を省くと今いるブランチが起点になるため、
   `<統合先>`が`main`のときも省かずに書く
@@ -42,8 +42,22 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   一覧に無いオプションは拒否される。必要なオプションが出てきたら、ユーザに一覧へ足してもらう
 - 行き先の名前とブランチ名は揃える（`-b <行き先の名前>`）。`-B`・`--detach`・`--force`は拒否される。
   `-b`を付けずに2つ目の語を渡す場合、渡せるのは行き先と同じ名前の手元のブランチか`origin/<名前>`だけで、タグやshaは拒否される。
-  親チケットのワークツリーでは、別のブランチへ`checkout` / `switch`できない。ccnaviは親のワークツリーを
-  「名前が親の識別子で、識別子と同じ名前のブランチをチェックアウトしているもの」として探すためである。
+- issueやMRを指定して作業を頼まれたら（`#152`・`!5`・URLなど）、ワークツリーを切る前に、紐づくブランチが既にあるかを
+  `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-branches.sh --issue <番号>`（MRなら`--mr <番号>`）で確かめる。読むだけで、
+  ホストに繋げなければ手元の候補だけを出して「ホストは見ていない」と書く。プロジェクトのissue・MRは`projects/<名前>`に`cd`してから打つ。
+  候補があれば一覧をユーザに見せ、既存のブランチで続けるか（下の`branch:`の手順。承認前の提案の`branch:`は使わない）・
+  新しく`<先頭の語>-<番号>-<slug>`を切るか・やめるかを聞いて、返事を待つ。候補が無ければそのまま進めてよい。
+  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す。止めはしない
+- 既にある`feature/123-login`のような`/`を含むブランチで親チケットの作業をするときは、識別子は`/`を含まない
+  `feature-123-login`にし、提案に`branch: feature/123-login`を書く。承認されるまでは`branch:`は使われないので、
+  親のワークツリーは識別子のブランチで切る（`worktree add .claude/worktrees/feature-123-login -b feature-123-login <統合先>`）。
+  承認の後、親のワークツリーで`ccnavi-git.sh switch feature/123-login`を打つと、そのブランチへ移って承認済みチケットと
+  マーカーを取り込む。既にあれば識別子のブランチをmergeし、無ければ切る。作業ツリーは綺麗にしておく。続けて
+  `ccnavi-git.sh push -u origin feature/123-login`を打つ。子のブランチは子の識別子で、起点は親のブランチ
+  （`-b <子> feature/123-login`）。`ccnavi-sync.sh`の引数は識別子
+- 親チケットのワークツリーでは、別のブランチへ`checkout` / `switch`できない。ccnaviは親のワークツリーを
+  「名前が親の識別子で、親のブランチ（承認済みの親チケットの`branch:`、無ければ識別子と同じ名前）をチェックアウトしているもの」
+  として探すためである。
   別のブランチに移ると、リモートでの承認を取り込む処理がそのワークツリーを飛ばす。この処理には、`ccnavi-sync.sh`と、
   セッション開始時に`ccnavi-fetch.sh`がfast-forwardで進める処理がある。親チケットのブランチを一度でもpushしたか`ccnavi-sync.sh`で取り込んだことがあると、
   親と子のチケットの承認・状態の操作（`start`・`finish`・取り消し・記録・レビューのマーカー）・実行前の判定も止まる
@@ -53,7 +67,8 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   ワークスペースの`main`ではない
 - `<統合先>`がリモートにしか無いときは、先にプロジェクトの中で`ccnavi-git.sh fetch <リモート> <統合先>`を実行する
 - 起点はリモートにある最新の統合先にする。統合先の名前は`CCNAVI_INTEGRATION_BRANCH`を使い、無ければ`ccnavi-sync.sh`が取り込み状態に書いた名前、
-  それも無ければデフォルトブランチ＝`origin/HEAD`が指すものを使う
+  それも無ければデフォルトブランチ＝`origin/HEAD`が指すものを使う。`ccnavi-git.sh push`はこの順で決まる統合先へも
+  （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`が作るマージリクエストの宛先もこの統合先になる
 - 手元の統合先が古いと、そこから切ったブランチも古いコミットから始まり、`<統合先>`に取り込むときにfast-forwardできなくなる。
   そのため、セッションの開始時に`ccnavi-fetch.sh`が手元の統合先をfast-forwardで進める。ワークスペースルートが別のブランチを
   チェックアウトしていても進める。統合先をチェックアウトしているツリーに未コミットの変更があるときと、
@@ -82,8 +97,10 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 - `<統合先>`に直接取り込んだ場合は、取り込みが済んでから`ccnavi-git.sh worktree remove <パス>`と
   `ccnavi-git.sh branch -d <名前>`で片付ける
 - マージリクエストに出した場合は、マージを待たずに、`ready`でDraftを外した直後にワークツリーを片付ける。
-  順番は「`ready` → マーカー`.ccnavi/approved/phases/<親>/ready.json`をコミットしてpush →
-  `ccnavi-clean.sh` → `worktree remove`」とする。マーカーはpushの後に書き出されるため、コミットせずにワークツリーを消すとマーカーも消える。
+  順番は「`ready` → `ccnavi-clean.sh` → `worktree remove`」とする。`ready`はDraftを外す前に、閉じたチケットとその記録
+  （`.ccnavi/approved/`の`done/`・`phases/<親>/`・`events/`・`flows/`。マーカー`ready.json`も含む）をワークスペースの
+  `logs/archive/`へ移し、その削除をコミットしてpushする。`ready`が「置き場に未コミットの変更がある」と言って止まったときは、
+  その削除をコミットしてpushしてから`ready`を打ち直し、Draftが外れてから片付ける。
   親に取り込んで閉じた子のワークツリーも、このときに片付ける
 - マージリクエストに出したブランチは消さない。リモートのブランチは、マージのときにホストが消す。ローカルのブランチはsquashで取り込まれるため
   `branch -d`が通らず、ラッパースクリプトは`-D`を通さない。残ったローカルのブランチはユーザが消す
