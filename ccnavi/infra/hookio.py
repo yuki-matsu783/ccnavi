@@ -69,6 +69,9 @@ class Input:
     # source は SessionStart にだけ来る。`startup` / `resume` / `clear` / `compact`。Stop の促しの
     # 数えを捨てるのは `startup` だけ（ADR-0090、ctxfile.forget）。
     source: str = ""
+    # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
+    # （ADR-0101、tickets.branchfind）。記録にも診断ログにも書かない。
+    prompt: str = ""
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -108,6 +111,7 @@ def decode(stream: TextIO) -> Input:
         agent_type=str(data.get("agent_type") or ""),
         stop_hook_active=data.get("stop_hook_active") is True,
         source=str(data.get("source") or ""),
+        prompt=data.get("prompt") if isinstance(data.get("prompt"), str) else "",
     )
 
 

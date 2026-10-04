@@ -24,7 +24,7 @@ from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog, prune
-from ..tickets import configsync, history, ops, phase, review
+from ..tickets import branchfind, configsync, history, ops, phase, review
 from ..tickets import ticket as ticket_mod
 from . import diagnose, lint, suggest, version
 
@@ -920,6 +920,24 @@ def _parsed(
             stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")
             return EXIT_ERROR
         code = c1.sort(stdout, stderr, conf, root, args.command[2], since)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+
+    # issue・MR に紐づくブランチを探す（ADR-0101）。`ccnavi-branches.sh` が呼ぶ。
+    # 読むだけで、何も書かない。
+    # ホストの結果は sh が取ってきて `--result` で渡す（実行ファイルはネットワークに出ない）。
+    if len(args.command) == 3 and args.command[0] == "branches":
+        cwd = args.cwd or os.getcwd()
+        code = branchfind.report(
+            stdout,
+            stderr,
+            conf,
+            root,
+            cwd,
+            args.command[1],
+            args.command[2],
+            args.result,
+            args.json,
+        )
         return EXIT_OK if code == 0 else EXIT_ERROR
 
     if args.command or args.reviewed is not None or args.close_early:
