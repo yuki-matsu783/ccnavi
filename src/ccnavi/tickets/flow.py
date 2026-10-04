@@ -98,7 +98,7 @@ from collections import deque
 
 import yaml
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, settings, tree, yamlread
 from . import ticket as ticket_mod
 
 # ロックで止めたときの理由コードと、記録のルール名。
@@ -869,8 +869,9 @@ def _front_name(path: str) -> str:
     else:
         return ""
     try:
-        meta = yaml.load("\n".join(body), Loader=_Loader)  # noqa: S506  _Loader は SafeLoader
-    except (yaml.YAMLError, ValueError, RecursionError):
+        # _Loader は SafeLoader。組み立ての途中の素の例外も YAMLError（LoadError）で上がる。
+        meta = yamlread.load("\n".join(body), _Loader)
+    except yaml.YAMLError:
         return ""
     value = meta.get("name") if isinstance(meta, dict) else None
     return clean(value).strip() if isinstance(value, str) else ""

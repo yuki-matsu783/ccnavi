@@ -165,6 +165,7 @@ def decide_before(
             root,
             selfguard.common_layer_files(conf),
             (conf.log, conf.state),
+            tool=payload.tool_name,
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
@@ -326,12 +327,18 @@ def decide_before(
             conf=conf,
         )
 
+    # 承認済みチケットの置き場（`approval.read_raw`）。1 回の判定で読むのは 1 度だけにし、
+    # 下のレビュー待ちの止め・範囲の索引・承認の知らせ（`agree.news`）で持ち回る。
+    # 判定の途中で置き場のファイルを動かす処理は無いので、読み直さない。
+    raw: approval.Raw | None = None
+
     # HITL ポイント。人間レビュー要のフェーズが終わっていてマーカーが無い間、
     # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
-    # ルールより先に見る。
+    # ルールより先に見る。置き場を読むのは cwd がワークツリーかプロジェクトの中のときだけ
+    # （`phase.parent_at`）。
     if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
-        parent = phase.parent_for_cwd(root, conf, payload.cwd)
-        held = phase.held_phase(root, conf, parent.ticket) if parent is not None else None
+        parent, raw = phase.parent_at(root, conf, payload.cwd, raw)
+        held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if held is not None and not exempt:
             record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
@@ -343,6 +350,8 @@ def decide_before(
     # 1 度だけ読んで両方に渡す（設計 9）。ワークスペースルートへの書き込みとシェルでは読まない。
     # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
     # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
+    # 読んだ置き場（`raw`）は、下の承認の知らせ（`agree.news`）にも渡す。間の判定は
+    # 置き場を読むだけで、ファイルを動かさない。
     index = None
     scanned: list[ticket_mod.Ticket] | None = None
     if (
@@ -351,7 +360,9 @@ def decide_before(
         and not target.is_main
         and payload.tool_name in SCOPE_TOOLS
     ):
-        scanned, _ = approval.scan(conf, root)
+        if raw is None:
+            raw = approval.read_raw(conf, root)
+        scanned, _ = approval.scan(conf, root, raw=raw)
         index = approval.by_id(scanned)
 
     # ワークツリーの元リポジトリと承認済みチケットの `project:` の食い違いは、ルールより先に見る。
@@ -486,7 +497,7 @@ def decide_before(
     # このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）は、
     # 判定がどれでも 1 度だけつける。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）にまとめる。
-    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id, raw)
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
     # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ経路で渡す。
     if conf.tickets_enabled:

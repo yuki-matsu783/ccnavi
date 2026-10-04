@@ -102,6 +102,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.settings",
                 "infra.shellread",
                 "infra.tree",
+                "infra.yamlread",
                 "records.redact",
             }
         ),

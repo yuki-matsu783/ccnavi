@@ -192,6 +192,68 @@ class ApprovalNewsTest(PhaseHarness):
         self.assertIn("i0001-01-01", heard)
         self.assertEqual(self.prompt(), "")
 
+    def test_current_copies_are_read_once_and_match_a_fresh_scan(self):
+        """いまの承認済みチケットは置き場を 1 度ずつ読んで集め、1 本ずつ読み直したときと同じ。"""
+        from unittest import mock
+
+        from ccnavi.infra import settings
+        from ccnavi.tickets import agree, approval
+
+        self.parent_only()
+        self.approve_yes(["i0001"])
+        self.next_child()
+        self.approve_yes(["i0001-01-01"])
+        self.assertEqual(approval.close_copy(self.approved, "i0001-01-01"), "")
+        conf, _ = settings.load(self.root)
+
+        fresh: dict[str, str] = {}
+        for closed in (False, True):
+            got, _ = approval.scan(conf, self.root, closed=closed)
+            fresh.update({t.ticket: agree._mark(t) for t in got})
+        got, _ = approval.scan_review(conf, self.root)
+        fresh.update({t.ticket: agree._mark(t) for t in got})
+
+        with (
+            mock.patch.object(approval, "scan_all", wraps=approval.scan_all) as scan_all,
+            mock.patch.object(approval, "review_all", wraps=approval.review_all) as review_all,
+        ):
+            current = agree._copy_marks(conf, self.root)
+        self.assertEqual({i: agree._mark(t) for i, t in current.items()}, fresh)
+        self.assertEqual(set(fresh), {"i0001", "i0001-01-01"})
+        self.assertEqual(scan_all.call_count, 2)  # 作業中と閉じたを 1 度ずつ
+        self.assertEqual(review_all.call_count, 1)
+
+    def test_one_hook_reads_the_approved_copies_once(self):
+        """UserPromptSubmit と PreToolUse（ワークツリーへの書き込み）は、置き場を 1 度だけ読む。
+
+        範囲（実行後の側・実行前の判定）と承認の知らせが、同じ読みを持ち回る。
+        """
+        from unittest import mock
+
+        from ccnavi.tickets import approval
+
+        self.parent_only()
+        self.prompt()  # 起点
+        self.next_child()
+        prompt = self.approve_yes(["i0001", "i0001-01-01"])
+        with (
+            mock.patch.object(approval, "read_raw", wraps=approval.read_raw) as read_raw,
+            mock.patch.object(approval, "scan_all", wraps=approval.scan_all) as scan_all,
+            mock.patch.object(approval, "review_all", wraps=approval.review_all) as review_all,
+        ):
+            heard = self.prompt()
+        self.assertIn(prompt, heard)
+        self.assertEqual(read_raw.call_count, 1)
+        self.assertEqual(scan_all.call_count, 2)  # 作業中と閉じたを 1 度ずつ
+        self.assertEqual(review_all.call_count, 1)
+
+        self.next_child("i0001-01-02")
+        prompt = self.approve_yes(["i0001-01-02"])
+        with mock.patch.object(approval, "read_raw", wraps=approval.read_raw) as read_raw:
+            told = self.before()
+        self.assertIn(prompt, told)
+        self.assertEqual(read_raw.call_count, 1)
+
     def test_a_broken_memo_tells_instead_of_going_quiet(self):
         """記録が壊れていたら、伝えていない承認ごと起点化せず、伝える側を採る。"""
         self.parent_only()

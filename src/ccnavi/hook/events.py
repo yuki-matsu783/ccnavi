@@ -69,15 +69,21 @@ def decide(
 
 
 def watch_context(
-    stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    record: audit.Record,
+    raw: approval.Raw | None = None,
 ) -> tuple[list[post.Watched], post.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
     通った書き込みがターンの終わりに報告される（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
+
+    `raw` は承認済みチケットの置き場を呼び手が読んだもの（`scope_guard`）。
     """
-    return watched_for(stderr, conf, root, record), scope_guard(conf, root)
+    return watched_for(stderr, conf, root, record), scope_guard(conf, root, raw)
 
 
 def watched_for(
@@ -121,11 +127,16 @@ def watched_for(
     return out
 
 
-def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
-    """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
+def scope_guard(
+    conf: settings.Settings, root: str, raw: approval.Raw | None = None
+) -> post.ScopeGuard | None:
+    """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。
+
+    `raw` は呼び手が `approval.read_raw` で読んだもの。渡せば置き場を読み直さない。
+    """
     if not conf.tickets_enabled:
         return None
-    copies, _ = approval.scan(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
     # 種類の上限は層（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
     types: dict[str, dict] = {}
     for copy in copies:
@@ -160,8 +171,13 @@ def decide_at_prompt(
     モデルは後工程に入れない。もう 1 つは、依頼文に issue・MR の指定（`#152`・`!5` など）が
     あるとき。着手の前に紐づくブランチを探してユーザに確かめる指示を足す。
     どちらも文を足すだけで、作業は止めない。
+
+    承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と承認の知らせ
+    （`agree.news`）の両方に渡す。間の `post.at_prompt` はターンの基準を state に書くだけで、
+    置き場のファイルを動かさないので、読み直す必要は無い。
     """
-    watched, scope = watch_context(stderr, conf, root, record)
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    watched, scope = watch_context(stderr, conf, root, record, raw)
     post.at_prompt(
         stderr,
         conf.state,
@@ -174,7 +190,7 @@ def decide_at_prompt(
         functools.partial(configsync.is_synced_write, conf, root),
         root,
     )
-    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id, raw)
     hint = branchfind.prompt_context(conf, root, payload.prompt)
     texts = [text for text in (told, hint) if text]
     if texts:
@@ -212,8 +228,13 @@ def decide_at_stop(
 
     `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
+
+    承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
+    （`ops.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
+    戻さず、`repeat.at_stop` は state を読むだけなので、置き場のファイルは動かない。
     """
-    watched, scope = watch_context(stderr, conf, root, record)
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    watched, scope = watch_context(stderr, conf, root, record, raw)
     report = post.at_stop(
         stderr,
         conf.state,
@@ -231,7 +252,7 @@ def decide_at_stop(
     repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
-    nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
+    nudge = _finish_nudge(stderr, conf, root, payload, record, mode, raw)
     if not nudge:
         # finish の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
@@ -309,6 +330,7 @@ def _finish_nudge(
     payload: hookio.Input,
     record: audit.Record,
     mode: str,
+    raw: approval.Raw | None = None,
 ) -> str:
     """`finish` の打ち忘れを促す文。促さないなら空文字。
 
@@ -319,10 +341,12 @@ def _finish_nudge(
     何もしない。state の置き場が無い（`--state ""`）か、記録を書けないときは促さない。
     覚えられないまま止めると、ターンの終わりのたびに止まるので、何も言わない側を採る。
     チケット制御が disable なら何もしない。
+
+    `raw` は呼び手が同じ hook の中で `approval.read_raw` で読んだ置き場（`decide_at_stop`）。
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
-    found = ops.unfinished_at_stop(root, conf, payload.cwd)
+    found = ops.unfinished_at_stop(root, conf, payload.cwd, raw)
     if found is None or ops.nudged_before(conf.state, payload.session_id, found):
         return ""
     failed = ops.remember_nudge(conf.state, payload.session_id, found)
@@ -460,12 +484,15 @@ def decide_after(
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
     # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、コピーする段は無い。
-    scope = scope_guard(conf, root)
+    # 置き場はここで 1 度だけ読み、下のフェーズの知らせ（`phase.announce`）にも渡す。
+    restore_setting = modes.effective_setting(mode, conf.restore_if_deny)
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    scope = scope_guard(conf, root, raw)
 
-    text = post.check(
+    text, restored = post.check(
         stderr,
         enforcing=mode == modes.ENABLE,
-        restore=modes.effective_setting(mode, conf.restore_if_deny),
+        restore=restore_setting,
         state_dir=conf.state,
         mine=(conf.state, conf.log),
         watched=watched,
@@ -488,8 +515,10 @@ def decide_after(
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
     bounced = ""
     if conf.tickets_enabled:
-        parent = phase.parent_for_cwd(root, conf, payload.cwd)
-        said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
+        # `post.check` が作業ツリーを戻そうとした回は、置き場のファイルも戻っていることが
+        # あるので読み直す。それ以外の回は、上で読んだ置き場をそのまま使う。
+        parent, raw = phase.parent_at(root, conf, payload.cwd, None if restored else raw)
+        said = phase.announce(stderr, root, conf, parent, raw) if parent is not None else ""
         if said:
             text = f"{text}\n\n{said}" if text else said
         # サブエージェントが差し戻しを無視して終わったなら、親にそれを言う。

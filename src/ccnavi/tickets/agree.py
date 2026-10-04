@@ -581,18 +581,26 @@ def _mark(t: ticket_mod.Ticket) -> str:
     return f"{meta.get('approved_at') or ''}/{meta.get('revised_at') or ''}"
 
 
-def _copy_marks(conf: settings.Settings, root: str) -> dict[str, ticket_mod.Ticket]:
+def _copy_marks(
+    conf: settings.Settings, root: str, raw: approval.Raw | None = None
+) -> dict[str, ticket_mod.Ticket]:
     """いまある承認済みチケット。開いたものと閉じたもの。
 
     閉じたものも見る。承認の直後・次の hook の前に子が閉じることがあり、開いたものだけを
     見ると、その承認は誰にも伝わらないまま記録に入る。
+
+    置き場は `read_raw` で 1 度だけ読み、3 つの `scan` に持ち回る。ここは読むだけで
+    途中でファイルを動かさないので、読み直す必要は無い。持ち回らないと、`scan` ごとに
+    `_everything` が残りの置き場を読み直し、1 回の hook で同じ置き場を 3 度ずつ読む。
+    呼び手が同じ hook の中で読んだ `raw` を渡せば、それを使う。
     """
+    raw = raw if raw is not None else approval.read_raw(conf, root)
     found: dict[str, ticket_mod.Ticket] = {}
     for closed in (False, True):
-        got, _ = approval.scan(conf, root, closed=closed)
+        got, _ = approval.scan(conf, root, closed=closed, raw=raw)
         for t in got:
             found[t.ticket] = t
-    review, _ = approval.scan_review(conf, root)
+    review, _ = approval.scan_review(conf, root, raw=raw)
     for t in review:
         found[t.ticket] = t
     return found
@@ -623,7 +631,14 @@ def baseline(
         _write_known(stderr, path, {i: _mark(t) for i, t in _copy_marks(conf, root).items()})
 
 
-def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str) -> str:
+def news(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    session: str,
+    agent_id: str,
+    raw: approval.Raw | None = None,
+) -> str:
     """このセッションがまだ知らない承認済みチケットがあれば、その承認を伝える文。1 度だけ。
 
     最初の hook で記録が無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
@@ -634,12 +649,15 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     読み・判定・書きは直列化していない。同じセッションの hook が同時に走ると、同じ承認を
     2 度伝えることがある。伝えすぎる側なので受け入れる。取るべきでないのは逆で、
     競合のために伝えない形にはしない。
+
+    `raw` は呼び手が同じ hook の中で `approval.read_raw` で読んだ置き場。読んでから
+    置き場のファイルを動かしていないときだけ渡す。無ければここで読む。
     """
     if not conf.state or not conf.tickets_enabled:
         return ""
     path = _news_path(conf.state, session, agent_id)
     known = _known(path)
-    current = _copy_marks(conf, root)
+    current = _copy_marks(conf, root, raw)
     marks = {i: _mark(t) for i, t in current.items()}
     if known is None:
         _write_known(stderr, path, marks)

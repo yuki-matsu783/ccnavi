@@ -71,7 +71,7 @@ from typing import TextIO
 
 import yaml
 
-from ..infra import fsio, globmatch, hookio, settings, tree
+from ..infra import fsio, globmatch, hookio, settings, tree, yamlread
 from ..policy import ctxfile, rules, selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
@@ -1968,8 +1968,8 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
         )
     try:
         # safe_load に限る。任意の Python の型を組み立てる load は、
-        # エージェントが書けるファイルに向けては使えない。
-        front = yaml.safe_load(head)
+        # エージェントが書けるファイルに向けては使えない（yamlread は safe な読み手だけを使う）。
+        front = yamlread.safe_load(head)
     except yaml.YAMLError as exc:
         return (
             None,

@@ -39,7 +39,7 @@ from urllib.parse import urlsplit
 import yaml
 
 from ..hook import reasons
-from ..infra import hookio, settings
+from ..infra import hookio, settings, yamlread
 from ..policy import ruleload, rules
 from ..records import audit, repeat
 from . import diagnose, lint
@@ -307,7 +307,7 @@ def _rule_candidates(
         return [], 0
     try:
         with open(conf.rules, encoding="utf-8") as f:
-            base = yaml.safe_load(f)
+            base = yamlread.safe_load(f.read())
     except (OSError, yaml.YAMLError):
         # 共通層を読めなければ、足したコピーで試せない。試せない候補は出さない。
         return [], len(groups)
