@@ -183,7 +183,7 @@ ADR-0093 の 3.1 は、案 N3（`branch:` キー）を「キーを書き換え�
 | **自分で名乗る形。** 親子のチケット X の本物とするブランチは、そのブランチの上の X の承認済みの親チケットの `branch:`（無ければ識別子。承認前の提案は識別子）がそのブランチの名前と同じもの。手元では `.claude/worktrees/<X>` の HEAD がその名前を指すことも求める（`syncstate.Families.home_tree`） | 別のブランチのチケットに `branch:` を書いても、そのブランチが親のワークツリーにならない |
 | **名乗るブランチが 1 本でなければ止める**（ユーザの決定 1）。手元は同じリポジトリのツリー（ワークスペースルート・プロジェクト・ワークツリー）のうち、HEAD のブランチをそのツリーの親チケットが名乗るもの（`Families.claims`）。Chrome は読んだブランチ（表示用の候補と、判定の入力）のうち、その親子のチケットを名乗るもの（`_ident_branches`）。`branch:` の親子のチケットでは識別子と同じ名前のブランチも読みに行く（`rivals`） | 別のブランチ B2 に `ticket: X`・`branch: B2` のチケットを置いて親子のチケットを 2 つにする。誰でも親子のチケットを止められるが、今もブランチ X を消せば止まるので同じ程度 |
 | **取り込み状態が親のブランチ名を持つ。** 取り込み状態の `branch` と親チケットが名乗る名前が違えば止める（`Families._standing`、`ccnavi-sync.sh`）。書き直すのは、承認済みの `branch:` のブランチへ移って push したときだけ（5.2 の 4） | 取り込んだ後に本物とする側を別のブランチへ動かす。戻すにはユーザが `--forget` で取り込み状態を消す |
-| **承認で決まる。** 提案の `branch:` は使わず、承認済みチケットの `branch:` だけを使う。承認画面に出し、ダイジェスト（チケットの全文）に入る。改版で `branch:` を変えられない（`agree.revision_problems`）。承認済みチケットの置き場はエージェントが書けない（自己防衛） | 提案を書き換えるだけで既存のブランチを取り出す・移る・送る・取り込みの本物とする側にする。見せた後・承認の後の書き換え |
+| **承認で決まる。** 提案の `branch:` は使わず、承認済みチケットの `branch:` だけを使う。承認画面に出し、ダイジェスト（チケットの全文）に入る。改版で `branch:` を変えられない（`agree_candidates.revision_problems`）。承認済みチケットの置き場はエージェントが書けない（自己防衛） | 提案を書き換えるだけで既存のブランチを取り出す・移る・送る・取り込みの本物とする側にする。見せた後・承認の後の書き換え |
 | **使える名前だけを渡す。** 実行ファイルは承認済みの `branch:` も `ticket_ids.branch_problem` と統合先の名前（`Families.integration_names`）で確かめ直し、通らなければ `c1 family` が `branch` の行を出さず `branch_refused` で理由を言い、立ち位置も止める。sh（worktree add・checkout・sync・C1・push の取り込み状態）は `branch` の行が無ければ識別子の外へ動かさずに止める | 手で書いたチケットの `origin/main`・統合先の名前 |
 | **2 つの親子のチケットが同じブランチを名乗らない。** 承認で、親のブランチ名が同じリポジトリの開いた別のチケットの親のブランチ名か識別子と同じなら、両方とも承認しない（`approval.branch_problems`）。sh は同じブランチを名乗る取り込み状態が 2 つ以上なら push・移るを止める（`ccnavi_family_record_of_branch` が全部を出す） | 親子のチケット B の `branch:` を親子のチケット A の識別子にして、A のブランチを B の本物とする側にする |
 
@@ -234,9 +234,9 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識
 | 本物とする側（手元） | `syncstate.Families.home_tree` | HEAD が `Families.branch`（親チケットの名乗る名前）を指すこと |
 | 本物とする側（手元） | `syncstate.Families._standing` | 取り込み状態の `branch` との食い違い、名乗るブランチが 2 本以上で止める。止めたときの文面と案内（`guidance`）は親のブランチ名で言う |
 | 本物とする側（手元） | `approval.outside_reason`・`family_problems` の文面 | 親のブランチ名で言う（置き場の表記は識別子のまま） |
-| 承認 | `agree.screen`・`_batch_entry` | 「■ ブランチ」と「既存のブランチ <名前> を使う」/「新しく切るブランチ」。JSON の `branch`・`existing_branch` |
-| 承認 | `agree.existing_branch_warnings`・`_written_on_own_branch` | `branch:` の親は warn しない。自分のブランチの上かは `branch_name` で見る。既にあるかは `tree.has_branch`（ファイルだけを読む） |
-| 承認 | `agree.revision_problems` | 改版で `branch:` を変えさせない |
+| 承認 | `agree_screen.screen`・`_batch_entry` | 「■ ブランチ」と「既存のブランチ <名前> を使う」/「新しく切るブランチ」。JSON の `branch`・`existing_branch` |
+| 承認 | `agree_candidates.existing_branch_warnings`・`_written_on_own_branch` | `branch:` の親は warn しない。自分のブランチの上かは `branch_name` で見る。既にあるかは `tree.has_branch`（ファイルだけを読む） |
+| 承認 | `agree_candidates.revision_problems` | 改版で `branch:` を変えさせない |
 | 承認 | `approval.branch_problems` | 統合先の名前（`origin/HEAD` を含む）に当たる `branch:` と、2 つの親子のチケットが同じブランチを名乗る形を断る |
 | lint | `lint._parent_trees_off_branch` | 親のワークツリーが親のブランチの上に居るかを `Families.branch` で見る |
 | 実行ファイル | `c1.family`・`cli` の `c1 sort` の版の検査 | 答えに `branch`（使えなければ `branch_refused`）を足す。`c1 sort` の版に `refs/remotes/origin/<親のブランチ>` を受ける |
@@ -256,7 +256,7 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識
 
 変えなかったもの（識別子のまま正しいもの）: ワークツリーの名前と置き場の表記（`approval._authoritative`・`home_dir`・
 `core.withdrawable` の `copy.tree`）、マーカーと跡の置き場、ロックの名前、`review.py` の未送信の検査（居るブランチを読む）、
-`Changes.per_branch`・`agree.read_set`（ツリーの HEAD のブランチ名を読む）。
+`Changes.per_branch`・`agree_digest.read_set`（ツリーの HEAD のブランチ名を読む）。
 
 ### 5.6 試験
 

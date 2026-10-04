@@ -28,7 +28,7 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | `WIP_ROOT` を `ticket` に移す（`ELI5` の隣） | 置き場のパスはチケットの置き場と同じ性質で、review にある理由が無かった。ops ↔ review の循環が消える | 関数の中の import のまま既知の循環として残す（隠すだけで、段の検査は同じに数える） |
-| `approval` を置き場に限り、合意の手続きを新しい `agree` に分ける。`reasons.approved` は `agree.approved_text` の本体にする | 置き場は判定が読む土台で、手続きはユーザの操作。分けると approval は phase・reasons を読まなくなり、向きが agree → approval の 1 本になる | approval の中で手続きを関数の中の import にしたまま残す |
+| `approval` を置き場に限り、合意の手続きを新しい `agree` に分ける。`reasons.approved` は `agree_screen.approved_text` の本体にする | 置き場は判定が読む土台で、手続きはユーザの操作。分けると approval は phase・reasons を読まなくなり、向きが agree → approval の 1 本になる | approval の中で手続きを関数の中の import にしたまま残す |
 | 循環を 1 つも許さない。既知の循環の一覧（`KNOWN_KNOTS`）を消す | 既知として通す一覧は、次に同じ場所で循環ができたときに何も言わない | 一覧を残して空にする |
 | `ccnavi/` を 6 つのサブパッケージに分ける（infra < records < policy < tickets < hook < entry）。直下は `__init__.py`（空）と `__main__.py` だけ | 役割がディレクトリで見え、サブパッケージをまたぐ向きをテストで固定できる。実測でこの順に上向きの import が 0 本だった | 段（7 段）をそのままディレクトリにする（段は深さで切ったもので役割と合わず、名前で探せない） |
 | 段（TIERS）は残し、ドットの名前（`infra.fsio`）で持つ。サブパッケージの表（PACKAGES）を足す | サブパッケージの中の読む順はディレクトリでは言えないので、段が補う | 段を捨ててサブパッケージだけにする |

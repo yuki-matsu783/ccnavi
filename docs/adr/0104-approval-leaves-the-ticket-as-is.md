@@ -18,10 +18,10 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 書き足すもの | 書く場所（この ADR を書いた時点） |
 |---|---|
 | `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval.admit`） |
-| `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree.revise_copy`） |
+| `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree_digest.revise_copy`） |
 | `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval.followup`。`doing/` に直に起こす） |
 | `project:`（frontmatter に無ければ） | 新規の承認（`approval.admit`） |
-| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval.admit`、`agree.revised_front`） |
+| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval.admit`、`agree_digest.revised_front`） |
 
 しかも `admit` は提案をテキストで読み（`fsio.load_text`。改行を LF に揃える）、欄を差し込んで書き直す
 （`insert_front` と `write_text`）。欄を足さない場合でも、CRLF の提案は承認で 1 バイト以上変わる。
@@ -89,7 +89,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 判定の拒否文（`hook/judge.py`）からは承認の時刻を外す。hook の中では履歴も git も読まない | 拒否文にも同じ順で時刻を出す | 判定は hook のたびに走る。時刻のために判定の経路で履歴と git を読むと遅くなるうえ、判定が履歴を読まない取り決めの境目が曖昧になる。時刻が要れば status で聞ける |
 | 全体計画の待ち方は承認のときに固定する（下の「`workflow:` を調べた結果」）。置き場をマーカーと同じ `<承認済みの置き場>/phases/<親>/workflow.yml` に移し、`--agree`（新規と改版）が書き、取り下げが一緒に消す。判定・延期・改版の比べ方はこのファイルを読む | 承認済みチケットに書き続ける。固定をやめて毎回 `phases.yml` から計算する | 前者は中身を変える。後者は承認のあとに `phases.yml` が変わると、作業中の親の待ち方と延期の引き受け手がユーザの見ていないところで変わる。マーカーの置き場に置けば、運び方・取り込み・指紋の扱いをマーカーに揃えられる |
 | `workflow.yml` の扱いをマーカーに揃える。`ccnavi-push-approved.sh` は承認済みの置き場をまるごと add するので足すものは無い。Chrome 拡張は親のブランチの承認済みの置き場をまるごと読み、書くのは実行ファイルのコアが並べたものなので、足すものは無い見込み（実装で確かめる）。指紋は判定が読んだものを `read_set` で覆うので、読めば入る。**C1（`hook/c1.py`）には足す。** 今の `_human` は `phases/<親>/` の下で決まった名前（`close-early.json`・`config-sync.json`・受け入れたスレッド）と番号のマーカーだけをユーザの判断の形と見て、ほかは「見分けられないもの」（d）として止める。`phases/<親>/workflow.yml` をユーザの判断（`--agree`）が書く形として (c) に足す | `flows/` に置く。承認済みの置き場の直下に新しい置き場を作る | `flows/` は子のフローの置き場で、役目が違う。新しい置き場を作ると、運ぶ・取り込む・読む経路のすべてに足すことになる |
-| 古い `workflow:` 欄を読むのは、`ccnavi_approved` を持つ古い承認済みチケットだけにする。それ以外（提案、新しい形の承認済みチケット）に `workflow:` があれば、`--lint`・判定・`--agree` で error にする。**同じ日に改めた**: 古い形でも、欄の待ち方は今の `phases.yml` から計算した待ち方と同じときだけ採り、違えば一直線で読む（下の「残る弱点」） | どれでも欄を読む | 新しい形では待ち方はファイルにしか無い。欄を読むと、手で書いた `workflow:` が承認済みの待ち方として効く。提案に書いた欄は今も `--agree` が error にしている（`agree._workflow_field`）が、判定と手で動かした承認には当たっていない |
+| 古い `workflow:` 欄を読むのは、`ccnavi_approved` を持つ古い承認済みチケットだけにする。それ以外（提案、新しい形の承認済みチケット）に `workflow:` があれば、`--lint`・判定・`--agree` で error にする。**同じ日に改めた**: 古い形でも、欄の待ち方は今の `phases.yml` から計算した待ち方と同じときだけ採り、違えば一直線で読む（下の「残る弱点」） | どれでも欄を読む | 新しい形では待ち方はファイルにしか無い。欄を読むと、手で書いた `workflow:` が承認済みの待ち方として効く。提案に書いた欄は今も `--agree` が error にしている（`agree_candidates._workflow_field`）が、判定と手で動かした承認には当たっていない |
 
 ### 状態を聞く副命令
 
@@ -106,7 +106,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 決めたこと | 採らなかった側 | なぜ |
 |---|---|---|
 | `agree.news` / `agree.baseline` と記録 `<state>/approved-<session>-<agent>.json`、`UserPromptSubmit`（`hook/events.py`）・`PreToolUse`（`hook/judge.py`）・`SessionStart`（`hook/events.py`）からの呼び出しを消す。`ctxfile` の古い `approved-` ファイルの掃除は、残ったファイルを消すために残す | 知らせを残し、起点の取り方を直す | 知らせが確実に効くのはセッションの途中の承認だけで、開始時の取り込みで届いた承認は起点に含まれて取りこぼす。ボードの承認は拡張が同じ文（`--agree --yes` の `prompt`）をクリップボードか新しいセッションで渡す（`extensions/vscode/ccnavi-board/src/prompt-handover.ts`）。端末・GitHub・Chrome の承認では、ユーザがそのあとセッションに一言送るので、status で足りる |
-| 承認を伝える文 `agree.approved_text` は残す（`--agree --yes` の `prompt` が使う）。提案を書いた回に承認の前の確認を勧める文（`ticket_guard.propose_notice`、REQ-APV-14）は、同じ `PreToolUse` の `additionalContext` の経路で今までどおり渡す | 一緒に外す | 確認の案内は承認の知らせと経路を共有しているだけで、役目は別 |
+| 承認を伝える文 `agree_screen.approved_text` は残す（`--agree --yes` の `prompt` が使う）。提案を書いた回に承認の前の確認を勧める文（`ticket_guard.propose_notice`、REQ-APV-14）は、同じ `PreToolUse` の `additionalContext` の経路で今までどおり渡す | 一緒に外す | 確認の案内は承認の知らせと経路を共有しているだけで、役目は別 |
 
 ### 互換の版と取り込む順序
 
