@@ -64,7 +64,6 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 | `design` | 現在の実装の説明。`docs/ccnavi.md`、`wip/design/**`の設計メモ | `docs/ccnavi.md`に付いている |
 | `requirements` | 外から観測できる約束。`docs/requirements.md` | 付いている |
 | `glossary` | 用語集。`docs/CONTEXT.md` | 付いている |
-| `handover` | 引き継ぎ。`HANDOVER.md` | 付いている |
 | `adr` | 設計判断の記録。`docs/adr/NNNN-*.md` | 付いている |
 | `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`docs/skills/*/SKILL.md` | 付けていない（理由は表の下）。`name`・`description`だけを持つ。`--type skill`では何も出ない |
 | `skill-reference` | スキルから切り出した資料。`.claude/skills/*/references/*.md` | 付いている |

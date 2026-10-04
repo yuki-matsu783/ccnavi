@@ -112,10 +112,17 @@ Python 3.12 以降。実行時の依存は PyYAML 1 本だけ。
 
 ```sh
 uv run python -m unittest discover -s tests -t .   # テスト
+uv run python -m unittest discover -s tests/core -t .  # 1 グループ（core guard config ticket sh e2e）
 uv run --with ruff ruff check .                    # 静的検査
 uv run --with ruff ruff format .                   # 整形
+uv run --with ruff ruff format --check .           # 整形の確認だけ
 uv run --with pyinstaller python build.py          # 実行ファイルの組み立て
 ```
+
+テストは `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに落ちる。
+回すグループは `.claude/skills/commit/references/test-groups.md` の表で決める。
+
+`knowledge/` は参照専用の資料で git 管理外。Claude Code の hook にまつわる実測が入っている。
 
 手で 1 回動かす。
 
@@ -181,6 +188,16 @@ dist/ は新しい。.ccnavi/bin/<target>/ は前のまま
 振り分けの sh の不具合に気づけないこと。`ccnavi.settings.local.json` のキー `bin` でも
 `CCNAVI_BIN_PATH` を上書きできるが、変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない。
 
+### 配布する sh を確かめる
+
+```sh
+uv run python -m unittest tests.e2e.test_e2e_sh -v
+```
+
+実行の最初に出る `sh =` がワークスペースルート側を指していることを確かめる。実際に使われるのはワークスペース側の 1 本だけ。
+写す前の版を測るときは `CCNAVI_SH_DIR=<場所>` で差し替える。組み立て済みの実行ファイルを試すので、
+`src/ccnavi/` を直したら組み立て直してから回す（無ければ skip）。モード B（`projects/` を使う形）に触ったら回す。
+
 ### 配布物
 
 PyInstaller の onedir で組み立てる。Windows なら `dist/ccnavi/ccnavi.exe`、
@@ -190,6 +207,45 @@ Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイム
 |---|---|---|
 | onedir | 約 220 ms | 17 MB のフォルダ |
 | onefile | 1000〜1500 ms | 7 MB の 1 ファイル |
+
+## 実測で分かった落とし穴
+
+Claude Code の振る舞いについて測った前提は設計書の付録 C。測り直したときは両方を直す。
+
+- **ワークツリーが消せない（Windows）。** uv のハードリンクで `.venv` の `_yaml.*.pyd` が全ツリーで同じ実体になり、
+  誰かのテストが読み込んでいる間は消せない。`pyproject.toml` の `link-mode = "copy"` で分けてあるが、
+  ハードリンクで作った `.venv` はそのままなので、テストが走っていないときに作り直す。自分のテストが走っている間は残る。
+  落ちたら残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して `git worktree prune`。
+  先に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消すと node_modules で止まる分は避けられる
+- **`${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。** `env` には相対パスを書く
+- **`env` ブロックは再読み込みされない。** セッションを開き直すまで古い値が残る。`command` は即座に反映される
+- **ツールのプロセスに `CLAUDE_PROJECT_DIR` は入っていない。** hook の環境にだけ来る
+- **`.claude/settings.json` は未知のトップレベルキーを拒否する**
+- **PyInstaller は指定したスクリプトをパッケージの外で走らせる。** 相対 import が解けないので、絶対 import の `main.py` を渡す
+- **`shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。** `shellread.py` は先に原文を走査してから語の分割だけを
+  shlex に任せる。走査か shlex のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
+  引用された `<<` による縮退は許容する誤検知（ccnavi.md 6.3、12.2）
+- **`$( )` の中の `case` は bash 3.2 と zsh で読みが分かれる。** `case` が現れたら縮退させている（許容した誤検知）
+- **複合コマンドは 1 つの区間が読めなければ全体が縮退する。** 安全側なのでそのまま
+- **Python の識別子に空白は入らない。** `def test_warn は…` のように英字と日本語の間に空白を入れると構文エラー
+- **Windows のコンソール経由で日本語を引数に渡すと CP932 になり、`jq --arg` が UTF-8 でない JSON を作る。** 本文はファイルで渡す。
+  `jq` の実体は `C:\Program Files\jq\jq` で、`"$JQ"` と引用しないと空白で分かれる
+- **Windows の `gitdir:` の表記**（git 2.39.2、Git Bash と PowerShell）。絶対パス、区切りは `/`、ドライブレターは大文字、
+  `gitdir:` の後ろは半角空白 1 個。`ccnavi_project`（sh）と `tree.py` がこれを前提にしている
+- **Docker Desktop を起動すると `restart=unless-stopped` の GitLab が勝手に上がり、2GB の VM では engine ごと落ちる。**
+  GitLab CE には 4GB 要る
+
+GitLab の実物（CE 18.5.4）で分かったこと。
+
+| 分かったこと | どうしたか |
+|---|---|
+| 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
+| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を落として伏せる。実行ファイルの `remote_kind` も読み飛ばす |
+| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とすので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
+| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tools/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
+| 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |
+
+`dist/`、`build/`、`logs/` は git 管理外。記録には絶対パスとコマンド全文が入るのでコミットしない。
 
 ## 設定
 
@@ -1721,7 +1777,7 @@ JSON で渡す（`--result <path>`）。
 - origin の表記はポートと scheme をそのまま使う（`http://localhost:8929/g/p.git` なら `http://localhost:8929/api/v4`）。
   URL に埋めた資格情報は読み飛ばし、出力では伏せる
 - push の認証は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
-  `GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は [HANDOVER.md](HANDOVER.md)、
+  `GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は [実測で分かった落とし穴](#実測で分かった落とし穴)、
   確かめ直すための道具は `tools/gitlab/probe_gitlab.py`
 - `--result` を実行ファイルに直接渡せるのはユーザの手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。エージェントはスクリプト 2 本を通す
 

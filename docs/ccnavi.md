@@ -14,7 +14,7 @@ keywords: [設計書, 実装, 脅威モデル, 判定, ルール, hook, チケ�
 |---|---|
 | 外から観測できる約束 | [requirements.md](requirements.md) |
 | 使い方と設定、ルールの書き方、記録の読み方 | [README.md](../README.md) |
-| 実装の現状と次の一手、未実装 | [HANDOVER.md](../HANDOVER.md) |
+| 開発の手順、実測で分かった落とし穴 | [README.md](../README.md#開発) |
 | 判断の理由、採らなかった案 | [docs/adr/](adr/README.md) |
 | 用語 | [CONTEXT.md](CONTEXT.md) |
 
@@ -2844,7 +2844,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 要件書にあって手が付いていないもの。確認の記憶（REQ-PRE-07）とその事後無効化（REQ-PST-04）、
 セッション開始時の実効権限の提示（REQ-SES）、記憶の消去（REQ-DIA-05）。一覧と次の一手は
-HANDOVER.md。
+GitHub の issue。
 
 ### 12.4 最終防衛線
 
