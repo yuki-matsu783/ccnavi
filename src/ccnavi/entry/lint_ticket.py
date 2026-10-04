@@ -20,13 +20,7 @@ from ..tickets import (
     review,
 )
 from ..tickets import ticket as ticket_mod
-from .lint_branch import (
-    _branch_name_problems,
-    _existing_branch_problems,
-    _prefix_setting_problems,
-    _worktree_problems,
-)
-from .lint_project import PROJECT_SETTINGS, _registered
+from . import lint_branch, lint_project
 
 
 def _copy_problems(
@@ -249,7 +243,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
         _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
     )
     problems.extend(
-        _branch_name_problems(
+        lint_branch._branch_name_problems(
             proposals,
             copies,
             closed,
@@ -258,12 +252,14 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             conf.branch_prefixes,
         )
     )
-    problems.extend(_prefix_setting_problems(conf))
-    problems.extend(_existing_branch_problems(root, conf, proposals, copies, closed, review))
+    problems.extend(lint_branch._prefix_setting_problems(conf))
+    problems.extend(
+        lint_branch._existing_branch_problems(root, conf, proposals, copies, closed, review)
+    )
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
-    problems.extend(_worktree_problems(root, conf, worktrees, index, copies))
+    problems.extend(lint_branch._worktree_problems(root, conf, worktrees, index, copies))
     names = {t.name for t in worktrees}
     if any(not t.is_child for t in copies):
         problems.extend(_review_token(root))
@@ -574,12 +570,13 @@ def _ticket_hooks(root: str) -> list[Problem]:
         (hookio.SUBAGENT_START, "サブエージェントに開いている子の一覧を渡せない"),
         (hookio.SUBAGENT_STOP, "範囲外の変更を残したサブエージェントを差し戻せない"),
     ):
-        if _registered(root, event) is False:
+        if lint_project._registered(root, event) is False:
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
-                    f"{PROJECT_SETTINGS} の {event} に ccnavi が登録されていない。{what}",
+                    f"{lint_project.PROJECT_SETTINGS} の {event} に"
+                    f" ccnavi が登録されていない。{what}",
                 )
             )
     for name in TICKET_SCRIPTS:

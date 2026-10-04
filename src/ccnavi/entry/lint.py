@@ -59,12 +59,7 @@ from ..tickets import (
     syncstate,
 )
 from ..tickets import ticket as ticket_mod
-from . import version
-from .lint_layers import _layer_configs, _layers, _projected_layer_problems, _sync, _worktree_layers
-from .lint_places import _projects, _scratch, _ticket_places
-from .lint_project import _after, _local_settings, _project_settings
-from .lint_rules import _rules
-from .lint_ticket import _copy_problems, _ticket
+from . import lint_layers, lint_places, lint_project, lint_rules, lint_ticket, version
 
 # `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
 # 読む側（VS Code 拡張）は違う版を「読めない」として扱う。
@@ -343,23 +338,23 @@ def check(
             )
         )
 
-    problems.extend(_project_settings(root))
+    problems.extend(lint_project._project_settings(root))
     problems.extend(_sh_compat(root))
-    problems.extend(_after(root))
-    problems.extend(_rules(conf.rules, root))
+    problems.extend(lint_project._after(root))
+    problems.extend(lint_rules._rules(conf.rules, root))
     problems.extend(_phases(conf))
     problems.extend(_risk(conf, root))
-    problems.extend(_ticket(conf, root))
-    problems.extend(_scratch(conf, root))
-    problems.extend(_projects(conf, root))
+    problems.extend(lint_ticket._ticket(conf, root))
+    problems.extend(lint_places._scratch(conf, root))
+    problems.extend(lint_places._projects(conf, root))
     # 層の読み込みは判定と同じ経路（ruleload.survey）を通る。読めない層の苦情は
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。
-    problems.extend(_layers(io.StringIO(), conf, root))
-    problems.extend(_layer_configs(conf, root))
-    problems.extend(_worktree_layers(conf, root))
-    problems.extend(_ticket_places(conf, root))
-    problems.extend(_local_settings(root))
-    problems.extend(_sync(conf, root))
+    problems.extend(lint_layers._layers(io.StringIO(), conf, root))
+    problems.extend(lint_layers._layer_configs(conf, root))
+    problems.extend(lint_layers._worktree_layers(conf, root))
+    problems.extend(lint_places._ticket_places(conf, root))
+    problems.extend(lint_project._local_settings(root))
+    problems.extend(lint_layers._sync(conf, root))
     return problems
 
 
@@ -528,7 +523,7 @@ def family_check(
         # チケットごとに判定し直し、error がどのチケットのものかを構造で持つ（文面の書式に頼らない）
         found = [
             p
-            for p in _copy_problems(root, conf, [t], index, closed)
+            for p in lint_ticket._copy_problems(root, conf, [t], index, closed)
             if p.severity == SEVERITY_ERROR
         ]
         written = _written_by_chrome(conf, t) if found else None
@@ -552,7 +547,7 @@ def family_check(
     if st.imported and st.stop and not st.closed:
         problems.append(Problem(SEVERITY_ERROR, where, st.stop))
     if st.imported and not st.stop and st.repo != syncstate.SELF and st.home is not None:
-        problems.extend(_projected_layer_problems(conf, st, where))
+        problems.extend(lint_layers._projected_layer_problems(conf, st, where))
     return problems
 
 

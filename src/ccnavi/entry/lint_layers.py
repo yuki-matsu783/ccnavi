@@ -22,7 +22,7 @@ from ..tickets import (
     syncstate,
 )
 from ..tickets import ticket as ticket_mod
-from .lint_rules import _rules
+from . import lint_rules
 
 
 def layer_where(name: str) -> str:
@@ -58,7 +58,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
             continue
         if view.missing:
             continue
-        from_file = _rules(
+        from_file = lint_rules._rules(
             view.path,
             root,
             home=_layer_home(conf, root, view.name),
