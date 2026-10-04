@@ -189,7 +189,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 
 | 書くもの | 中身 |
 |---|---|
-| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
+| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env 6 つ（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）は書かず、既にあれば外す（置き場は固定）。外した値が既定と違えば名前と値を 1 行ずつ出す。以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` も、既定の `logs/decisions.jsonl` と違うので名指しする（記録の書き先が変わるので黙らない）。導入は止めず、終了コードも変えない（`--check` では「揃っていない」に数える） |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,launcher}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
@@ -250,8 +250,8 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 
 ### 4.7 記録
 
-ツール呼び出しは、通したものも判定しなかったものも 1 件 1 行の JSON として `CCNAVI_LOG`
-（既定 `logs/decisions.jsonl`）に追記する。1 行の欄は付録 B。判定しなかった回も残すので、記録が無ければ ccnavi が動かなかったと読める。
+ツール呼び出しは、通したものも判定しなかったものも 1 件 1 行の JSON として
+`logs/decisions.jsonl`（固定）に追記する。1 行の欄は付録 B。判定しなかった回も残すので、記録が無ければ ccnavi が動かなかったと読める。
 
 記録に書く `subject` / `unwrapped` / `detail` は、書く直前に秘密の形を伏せる（`ccnavi/records/redact.py`）。伏せるのは
 記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `decisions.<日時>.jsonl` へローテートし、ローテートした
@@ -752,9 +752,9 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 どれかを含む `deny` / `ask` が、そのまま「この場所に書かせない」の宣言になる。
 変更の実パスがそれに当たれば違反（`POST_VIOLATION`）。そうでなく、ワークツリーに結び付くチケットの
 範囲の外（チケットの `deny` の項を含む）なら、ルールの `allow` に当たっていても `POST_TICKET_SCOPE`（9.5）。
-記録と state の置き場（`CCNAVI_LOG`、`CCNAVI_STATE`）の下は除く。
+記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`）の下は除く。
 
-チケットの置き場（`CCNAVI_TICKETS_PROPOSAL`、`CCNAVI_TICKETS_APPROVED`）に現れた変更は、ccnavi の副命令
+チケットの置き場（`wip/proposals/`、`.ccnavi/approved/`）に現れた変更は、ccnavi の副命令
 （`ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready`）が書いたと内容から読めるぶんだけ除く。
 見るのはコミット済みの版との差で、除くのは次の 3 つ。
 
@@ -851,9 +851,9 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 |---|---|---|
 | `builtin-guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`）の組 |
 | `builtin-guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
-| `builtin-guard-project-home` | ccnavi ディレクトリの名前（`CCNAVI_PROJECT_HOME`）が決まっているとき | 同上 |
+| `builtin-guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
 | `builtin-guard-common-layer` | 共通層の 3 本の置き場が決まっているとき（11.6） | 同上 |
-| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、動かしてあれば `CCNAVI_LOG` とその隣のローテートした分、`CCNAVI_STATE` の下）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
+| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
 
 同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase.prune_form`）。実行ファイルの端末要求は
@@ -960,8 +960,8 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 
 | 何 | 場所 | 誰が書く | git |
 |---|---|---|---|
-| 提案（親も子も） | `wip/proposals/<状態>/<識別子>.md`（`CCNAVI_TICKETS_PROPOSAL`、ツリーのルートからの相対）。状態は `todo`（承認待ち）と `review`（レビュー待ち）の 2 つの置き場。プロジェクト向けはそのプロジェクトの側に置く（11 章） | `todo/` は親が書く。`review/` へ動かすのは `ccnavi-ticket.sh finish` だけ | それを持つリポジトリにコミット |
-| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（`CCNAVI_TICKETS_APPROVED`、ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは `ccnavi --agree`（ユーザ）と、ユーザが `decide` で起こす続きの子。`done/` へはユーザのレビュー（`confirm` / `decide` / `--reviewed` / `close-early`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-push-approved.sh`（9.4） | 親のブランチにコミット |
+| 提案（親も子も） | `wip/proposals/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `todo`（承認待ち）と `review`（レビュー待ち）の 2 つの置き場。プロジェクト向けはそのプロジェクトの側に置く（11 章） | `todo/` は親が書く。`review/` へ動かすのは `ccnavi-ticket.sh finish` だけ | それを持つリポジトリにコミット |
+| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは `ccnavi --agree`（ユーザ）と、ユーザが `decide` で起こす続きの子。`done/` へはユーザのレビュー（`confirm` / `decide` / `--reviewed` / `close-early`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-push-approved.sh`（9.4） | 親のブランチにコミット |
 | フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json`、受け入れた指摘の `accepted.json` | レビューのスクリプト、`ticket finish <親>`、ユーザ | 親のブランチにコミット |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローのハッシュ。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
@@ -994,11 +994,8 @@ ccnavi ディレクトリの組み込みルール（`builtin-guard-project-home`
 
 ワークスペースルート直下はチケットを持たない。
 
-提案の置き場の既定は `wip/proposals/`、承認済みチケットの置き場の既定は
-`.ccnavi/approved/`。今は環境変数 `CCNAVI_TICKETS_PROPOSAL`・`CCNAVI_TICKETS_APPROVED` で差し替えられる。
-値はツリーのルートからの相対で、空文字なら既定に戻る。sh も同じ環境変数を読む。VS Code 拡張は、
-提案の置き場を既定のパスでしか監視しない。この 2 つを含む置き場を動かす環境変数 6 つは廃止し、
-置き場を既定に固定すると決めてある（まだ実装していない）。
+提案の置き場は `wip/proposals/`、承認済みチケットの置き場は `.ccnavi/approved/`（どちらもツリーのルートからの相対）。
+置き場はこの 2 つに固定で、環境変数では動かない。sh と VS Code 拡張も同じパスを見る。
 
 **承認済みチケットは git で共有する。** 承認した機械と作業する機械が違っても承認が届くよう、承認済み
 チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-push-approved.sh` がコミットして push する（9.4）。
@@ -1355,7 +1352,7 @@ warn、チケットで編集対象としているが書き込めない場所（�
 - 計算は、部分ごとの SHA-256 を件数と一緒に改行で並べ、その全体の SHA-256
 
 **承認済みチケットは push するまで届かない。** 承認済みチケットは親のツリーの置き場
-（`CCNAVI_TICKETS_APPROVED`）に置かれ、コミットして push するまで子のワークツリーにも他の機械にも
+（`.ccnavi/approved/`）に置かれ、コミットして push するまで子のワークツリーにも他の機械にも
 渡らない。どちらの経路でも、承認のあと `ccnavi-push-approved.sh` がコミットして push する。変更のあるツリーごとに
 置き場と、承認で `todo/` から消えた提案（追跡されていたものの削除だけ）をコミットし（パスを限る。
 `-a` も `add -A` も使わない）、保護されたブランチ
@@ -1477,7 +1474,7 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 未承認のチケットは判定に何も反映せず、結び付いたワークツリーが無いチケットも適用されない（承認は残るので、同じ名前で
 作り直せばまた適用される）。
 
-チケットの置き場（提案の置き場 `CCNAVI_TICKETS_PROPOSAL` と承認済みチケットの置き場 `CCNAVI_TICKETS_APPROVED` の下）は、
+チケットの置き場（提案の置き場 `wip/proposals/` と承認済みチケットの置き場 `.ccnavi/approved/` の下）は、
 範囲の外として扱わない（次のチケットを提案する手段を残す。提案は承認されるまで判定に何も反映されない）。状態の置き場と
 承認済みチケットは組み込みの `deny`（9.2、8.2）が先に止めるが、組み込みが入るのは実行前のルール集合だけ。
 外し方は、実行前チェック・サブエージェント終了時チェック・ターンの終わりのコミット済みのぶんは置き場ごと
@@ -1989,7 +1986,7 @@ GitLab では、Draft を外すときに `squash` も有効にする。同じ親
 
 **`confirm`** は `requested` が無ければ拒む。依頼のマーカーにあるホストとマージリクエストの番号が承認済みチケットと
 一致しなければ拒む。依頼時の HEAD と今の HEAD が同じで push 済みであることを求める。ただし
-ccnavi 自身の置き場（`CCNAVI_TICKETS_APPROVED` と `CCNAVI_TICKETS_PROPOSAL`）だけを変えたコミットは、
+ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えたコミットは、
 動いたとも未 push とも数えない（マーカーやチケットの移動で依頼が止まらないように）。出し直し（`request`）の
 「依頼済み」の判定と、`request` の push の前提（`_unmet`）も同じ基準で見る。ELI5 の置き場（`wip/eli5/`）だけを変えた
 コミットも、動いたとは数えない（`review._unseen_by_review`。Chrome のレビュー済みも同じ `moved_since` を通る）。
@@ -2189,19 +2186,19 @@ Claude Code はワークスペースを開く。要求は requirements.md の RE
 | ワークスペース自身の層の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース |
 | プロジェクトの層の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | プロジェクト |
 | 固有スクリプト（配点の `script:` が指す先） | 共通層は `.ccnavi/common/scripts/`。自身の層とプロジェクトの層は、それぞれの `.ccnavi/scripts/` | 層と同じ |
-| プロジェクト | `projects/<名前>/`（`CCNAVI_PROJECTS`、既定 `projects`、ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 段に固定 | ワークスペースでは無視。プロジェクト自身の git |
+| プロジェクト | `projects/<名前>/`（`projects/` は固定。ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 段に固定 | ワークスペースでは無視。プロジェクト自身の git |
 | ワークツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
 | 提案 | そのツリーの `wip/proposals/<状態>/<識別子>.md`。プロジェクト向けはそのプロジェクトの git が持つ | そのツリーのリポジトリ |
 | 承認済みチケット（閉じたものを含む）、フェーズのマーカー | 親チケットのツリーの `.ccnavi/approved/`（9.2）。承認済みチケットに `project:` が入る | そのツリーのリポジトリ |
 | 記録、state、セッションの状態 | ワークスペースの `logs/`（`logs/decisions.jsonl`、`logs/state/`、`logs/session/`） | 管理外 |
 | git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` | 管理外 |
 
-`.ccnavi/` は ccnavi ディレクトリの既定の名前（`CCNAVI_PROJECT_HOME` の既定値）。この章の `.ccnavi/` はその既定の名前を指す。
+`.ccnavi/` は ccnavi ディレクトリの固定の名前。この表の置き場はどれも固定で、環境変数では動かない。
 
 層は 3 種で、形は同じ。共通層はどのツリーにも適用され、ワークスペースルートの `.ccnavi/common/` に置く。
 ユーザが持つ設定は ccnavi ディレクトリの下、記録と state は `logs/`、`.claude/` には Claude Code 自身のものだけを置く。
-ccnavi ディレクトリの名前を動かしていなければ、共通層の 3 本と見本も名指しのツールから組み込みの deny（`*/.ccnavi/*`）が止める。
-共通層の置き場は `CCNAVI_PROJECT_HOME` にも env にも付いて動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、
+共通層の 3 本と見本も、名指しのツールからは組み込みの deny（`*/.ccnavi/*`）が止める。
+共通層の置き場は固定。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、
 それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る。層を探す先を動かす `--projects` / `--project-home` も同じ。
 自身の層とプロジェクトの層はそのツリーにだけ適用され、どちらも git プロジェクトルートの下の `.ccnavi/config/` に置く。
 ワークスペース自身に層を分けるのは、ワークスペースのフェーズの種類（`scope: ["ccnavi/*", ...]`）がそのレイアウトにしか合わないから。
@@ -2210,7 +2207,7 @@ ccnavi ディレクトリの名前を動かしていなければ、共通層の 
 ルールと配点は共通層に置く。導入スクリプトのひな形も同じ分け方で配る（11.9）。
 自身の層の `.ccnavi/config/` もユーザの持ち物で、エージェントの Write / Edit は通らない（チケットの `allow` に `.ccnavi/*` があっても組み込みの deny が優先される）。
 
-環境変数は `CCNAVI_PROJECT_HOME` の 1 本。既定 `.ccnavi`、git プロジェクトルートからの相対で、自身の層とプロジェクトの層に同じ値が使われる。
+置き場を動かす環境変数は無い。ccnavi ディレクトリは git プロジェクトルートの直下の `.ccnavi` で、自身の層とプロジェクトの層に同じ名前が使われる。
 `config/` と `scripts/` と 3 本のファイル名は固定。プロジェクトの `config/` と混ぜないのは、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
 
 読むのは常に元リポジトリに checkout されている版（ブランチは問わない）。ワークツリーの中の `.ccnavi/` は、ワークスペースから切ったものも含めて読まない（REQ-MLT-04）。
@@ -2321,7 +2318,7 @@ Grep と Glob は、探し始める場所で層を選び、ルールもその場
 | 層 | `script:` に書けるパス | 解決の基準 |
 |---|---|---|
 | 共通層 | `.ccnavi/common/scripts/...` | ワークスペースルート |
-| 自身の層 | `.ccnavi/scripts/...`（`CCNAVI_PROJECT_HOME` に従う） | ワークスペースルート |
+| 自身の層 | `.ccnavi/scripts/...` | ワークスペースルート |
 | プロジェクトの層 | `.ccnavi/scripts/...`（同上） | そのプロジェクトの git プロジェクトルート |
 
 共通層から `.ccnavi/scripts/` を、層から `.ccnavi/common/scripts/` を指す定義は読み込みで error。指す先が git プロジェクトルートに無ければ
@@ -2373,7 +2370,7 @@ Grep と Glob は、探し始める場所で層を選び、ルールもその場
 コアにすると数の定まらないファイルを呼び出しのたびに比べることになり、実行前チェックの期限を圧迫する。
 
 ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match: Write|Edit|NotebookEdit`、`glob: */.ccnavi/*` の 1 本を `deny` の先頭に足す
-（`builtin-guard-project-home`。パスは `CCNAVI_PROJECT_HOME` の値で組む）。シェルからの書き込みも同じ 1 本
+（`builtin-guard-project-home`。パスは固定の `.ccnavi` で組む）。シェルからの書き込みも同じ 1 本
 （`builtin-guard-setting-files`）で止める。3 本に絞らないのは、配点が呼ぶスクリプトも含めるため。
 
 シェルの側のパスは「区切りが続くか、そこで終わる」形 `\.ccnavi(?:[\\/ \x00\x01]|$)` で書き、`rm -rf .ccnavi` と
@@ -2490,13 +2487,26 @@ git のラッパースクリプトの記録はワークスペースの `logs/<�
 | error | 裸の `id` にコロンが書かれている（3 本とも） |
 | warn | ワークツリーの `.ccnavi/` に、元リポジトリに無いファイルがある（承認済みの領域の下は数えない） |
 
+`projects/` の置き場は固定なので、その前にワークスペースの git の索引に `projects/` の下が載っていないかを見る
+（`git ls-files -s -- projects/`。プロジェクトが 1 つも無くても見る）。索引の mode で 2 つに分け、どちらも `(projects)` の warn にとどめる。
+
+| 索引の `projects/` の下 | 何と読むか | 案内 | 「`.gitignore` に入っていない」 |
+|---|---|---|---|
+| 通常のファイル（mode が `160000` 以外）が 1 本以上 | ぶつかり。ワークスペース自身のソースに `projects/` がある | ワークスペースの `projects/` を別の名前に移す。プロジェクトを置かないならそのままでも動く。gitlink も載っていれば 1 本ずつ名指しし、索引から外してから改名する | 出さない（`.gitignore` に入れるとソースが追跡から外れ、誤った案内になる） |
+| gitlink（mode `160000`）だけ | 載せ忘れ。`.gitignore` に入れる前に `git add` した入れ子のリポジトリ | 索引から外し（`git rm -r --cached`、コミット前なら `git reset`）、`.gitignore` に `/projects/` を足す | 出さない（索引に残る間は `.gitignore` に足しても無視されず、2 つ並ぶと誤った順で直されうる） |
+
+`.gitmodules` に登録した意図的なサブモジュールも、mode だけで見るので載せ忘れと読む。索引を読めない
+（git が無い、git のリポジトリではない）ときは何も言わない。導入スクリプトも入れ終わりに同じ条件で同じ案内を出す。
+止めず、終了コードも変えず、`--check` でも「揃っていない」には数えない。VS Code 拡張は同じ warn をプロジェクト画面に
+出し、どちらの場合も「`.gitignore` に足す」ボタンを出さない。
+
 `--lint` の JSON も同じ指摘を同じ深刻度で出す。層の指摘は `where` に層の名前が入る（`(self) rule-id`、`(projects/lib) (risk) id`）。
 
 端末から打つ `--agree` は、承認の対象の一部が落ちたら終了コード 1。通ったぶんの承認済みチケットは置き、落ちたものは名指しする。
 拡張が子プロセスで打つ `--agree --yes`（10 章）の終了コードは別。
 
 導入スクリプト `ccnavi-setup.sh` は共通層に `rules.yml` と `risks.yml`、自身の層に `phases.yml` のひな形を配り、3 本とも
-「まだ無いもの」の点検に数える。`--all` の env に `CCNAVI_PROJECT_HOME: ".ccnavi"` を足す。
+「まだ無いもの」の点検に数える。
 
 dry-run でまず層の分布を見て、Bash の和と、大文字小文字を区別しない照合で増えた `ask` と `deny` を数えてから `enable` に切り替える。
 
