@@ -169,6 +169,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0096](0096-eli5-place-is-unscoped-and-does-not-move-the-request.md) | `wip/eli5/` はチケットの範囲を当てず、そこだけを変えたコミットは依頼の後に動いたと数えない（除外のパスの読み方は置き換え（ADR-0097）） |
 | [0097](0097-harden-the-eli5-place-and-request.md) | ELI5 の置き場と依頼の検査を厳しくする（パスの `\` と大文字小文字、名前の字、モード、互換の版） |
 | [0100](0100-agent-drafts-child-flow-user-imports.md) | エージェントは子のフローの下書きを提案の置き場に書き、ユーザがフロー編集画面で取り込む |
+| [0101](0101-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す（提案） |
 
 ### 複数のリポジトリと VS Code 拡張
 
