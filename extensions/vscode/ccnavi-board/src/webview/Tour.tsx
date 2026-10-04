@@ -181,7 +181,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [index, measured]);
   useEffect(() => () => focusBefore?.focus?.(), [focusBefore]);
 
-  // Esc でやめる。→ で次へ、← で戻る（端の段ではどちらも何もしない。→ で最後の段を閉じると、読み終える前に消えてしまう）。
+  // Esc でやめる。→ で次へ、← で前へ（端の段ではどちらも何もしない。→ で最後の段を閉じると、読み終える前に消えてしまう）。
   // Tab は吹き出しのボタンの中だけを巡る（裏の画面の「保存」などへ焦点を移さない）
   const count = steps.length;
   useEffect(() => {
@@ -246,11 +246,11 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         <div className="tour-buttons">
           {index > 0 && (
             <button type="button" className="action small" data-action="tour-back" onClick={() => setIndex(index - 1)}>
-              戻る
+              ← 前へ
             </button>
           )}
           <button ref={next} type="button" className="action small primary" data-action="tour-next" onClick={() => (last ? onClose() : setIndex(index + 1))}>
-            {last ? "完了" : "次へ"}
+            {last ? "完了" : "次へ →"}
           </button>
         </div>
       </div>
