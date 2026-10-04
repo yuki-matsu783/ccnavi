@@ -432,6 +432,47 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("deny", result.stdout)
 
+    def test_sed_の書き換えの綴りは止まる(self):
+        # 緩めたのは語の途中の `-i` だけ。独立したオプションの `-i` は今までどおり止める。
+        rules = self.rules_in_shell()
+        for opt in [
+            "-i",
+            "-i.bak",
+            "-i''",
+            "-iE",
+            "-Ei",
+            "-ni",
+            "--in-place",
+            "--in-place=.bak",
+            "'-i'",
+            '"-i"',
+        ]:
+            for command in [
+                f"sed {opt} s/a/b/ {rules}",
+                f"sed -e s/a/b/ {opt} {rules}",
+                f"sed {opt} -e s/a/b/ {rules}",
+            ]:
+                with self.subTest(command=command):
+                    result = self.run_hook("PreToolUse", command=command)
+
+                    self.assertIn("deny", result.stdout)
+                    self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_sed_で読むだけなら語の途中の_i_があっても通る(self):
+        # `feature-id` のようなワークツリー名や式の中の `-i` は、オプションではない。
+        rules = self.rules_in_shell()
+        for command in [
+            f"sed -n 1,20p {rules}",
+            "sed -n 1,20p /x/.claude/worktrees/feature-id/.ccnavi/common/rules.yml",
+            "sed -n 1,20p /x/.claude/worktrees/feature-12-improve/.ccnavi/common/rules.yml",
+            f"sed -E -e s/a-i/b/ {rules}",
+            f"sed -ne 's/a-i/b/p' {rules}",
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
     def test_disable_なら止める側も足さない(self):
         result = self.run_hook(
             "PreToolUse", setting="disable", command="echo x > .ccnavi/common/rules.yml"

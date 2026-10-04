@@ -202,7 +202,9 @@ _SETTINGS_FILES = (
 #      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中を丸ごと指す。
 #      1 のリダイレクトの行き先だけは、語の中の目印まで含めて当てると引用の中の `> 場所` が
 #      書き込み先に見えるので、そちらも除外する。
-#   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。
+#   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。`-i` は独立したオプションの語
+#      （`-i` `-i.bak` `-ni` `--in-place`）だけを数える。`feature-id` のように語の途中に
+#      `-i` が出るだけのパスや式は読みなので止めない。
 #
 # 元と行き先がある cp / ln / install は組が違うので後ろに分けてある。見るのは
 # 行き先の側だけで、行き先は最後の引数なので、コマンドの終わりに来た形に絞る。
@@ -210,7 +212,7 @@ _NOT_A_WORD = re.escape(shellread.SEP) + re.escape(shellread.WORD_SEP)
 _WRITE_VERBS = (
     rf"(>[>|&]* ?[^ {_NOT_A_WORD}]*"
     r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
-    r"|(^|\x00)sed\b[^\x00]*-i[^\x00]*)"
+    r"|(^|\x00)sed\b[^\x00]*[ \x01](-[A-Za-z]*i|--in-place)[^\x00]*)"
 )
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 
