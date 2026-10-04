@@ -570,6 +570,42 @@ class WriterFailureTest(CoreHarness):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertNotIn("承認した。", out)
 
+    def held(self):
+        return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
+
+    def test_a_failed_move_does_not_leave_the_workflow_alone(self):
+        """待ち方は提案を動かす前に書く。動かす段で落ちたら待ち方も戻す。"""
+        doing = os.path.join("doing", "i0001.md")
+        todo = os.path.join("todo", "i0001.md")
+        for name, when in (
+            ("unlink", lambda path: path.endswith(todo)),
+            ("write_bytes", lambda path, data: path.endswith(doing)),
+        ):
+            with self.subTest(name=name):
+                self.propose("i0001", parent_text("i0001", ["research"]))
+                self.commit_parent()
+                changes = self.planned()
+                with self.failing(name, when):
+                    applied, out, err = self.write_changes(changes)
+                self.assertEqual(applied.code, 1, out + err)
+                self.assertFalse(os.path.exists(os.path.join(self.approved, doing)))
+                self.assertFalse(os.path.exists(self.held()), err)
+
+    def test_a_failed_revision_puts_the_workflow_back(self):
+        """改版でチケットを書く段で落ちたら、先に書いた待ち方を前の中身へ戻す。"""
+        self.family(plan=["research", "design"])
+        with open(self.held(), "rb") as f:
+            before = f.read()
+        self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
+        self.commit_parent()
+        changes = self.planned()
+        doing = os.path.join("doing", "i0001.md")
+        with self.failing("write_text", lambda path, *rest: path.endswith(doing)):
+            applied, out, err = self.write_changes(changes)
+        self.assertEqual(applied.code, 1, out + err)
+        with open(self.held(), "rb") as f:
+            self.assertEqual(f.read(), before)
+
     def test_a_revised_proposal_that_cannot_be_removed_is_said_and_goes_on(self):
         self.family(plan=["research", "design"])
         self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
@@ -1069,6 +1105,15 @@ class WithdrawTest(CoreHarness):
             os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md"), "rb"
         ) as f:
             self.assertEqual(f.read(), text.encode())
+
+    def test_a_half_written_record_does_not_skip_the_content_check(self):
+        """`approved_at` の空な記録で古い形を装っても、中身の一致の検査は飛ばない。"""
+        text = self.new_parent()
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        forged = "ccnavi_approved: {approved_at: '', source_tree: i0001, source_path: p}\n"
+        write(path, text.replace("---\n", "---\n" + forged, 1) + "書き足した\n")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
 
     def test_a_manually_moved_child_is_withdrawn(self):
         """手で動かした承認（`todo/` から `doing/` へ rename しただけ）も取り下げられる。

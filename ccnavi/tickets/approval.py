@@ -183,9 +183,9 @@ def load_copy(
     `wip/proposals/review/` はエージェントが書ける側にあるので、そこは `finish` が書く
     `completed_at` を 2 つめの保護として求める（`review_all`）。保護が 1 つしか無い置き場で
     欄まで外すと、組み込みの deny に止められずに置かれたファイルが承認済みとして読まれる。
-    `completed_at` はスクリプトだけが書く欄で、提案に書けば `--agree` と `--lint` が error にする
-    ので、エージェントが `review/` に置いたファイルは読まれない。前の版の承認済みチケット
-    （承認の記録 `ccnavi_approved` を持つ）も `finish` を通れば `completed_at` を持つので読める。
+    前は承認の記録 `ccnavi_approved` を求めていた。欄が `completed_at` に替わるだけで、どちらも
+    組み込みの deny が破れてエージェントが `review/` に書ければ偽れる。2 つめの保護としての強さは
+    変わらない。前の版の承認済みチケットも `finish` を通れば `completed_at` を持つので読める。
 
     `approved_dir` はそのチケットの承認済みの置き場。渡せば、親の待ち方を
     `phases/<親>/workflow.yml` から読んで `Ticket.workflow` に入れる。
@@ -203,7 +203,7 @@ def load_copy(
     if require_record and not ticket.completed_at:
         return None, "`completed_at` が無い。`finish` を通っていない"
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
-    if isinstance(meta, dict):
+    if has_record(ticket):
         ticket.approved_at = str(meta.get("approved_at") or "")
         ticket.source_tree = str(meta.get("source_tree") or "")
         ticket.source_path = str(meta.get("source_path") or "")
@@ -223,9 +223,23 @@ def load_copy(
     return ticket, ""
 
 
+# 前の版の承認が記録（`ccnavi_approved`）に必ず書いていた欄。続きの子も `source_tree` と
+# `source_path` を空で書いていた。
+_RECORD_KEYS = ("approved_at", "source_tree", "source_path")
+
+
 def has_record(t: ticket_mod.Ticket) -> bool:
-    """前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットか。"""
-    return isinstance(t.raw.get(ticket_mod.APPROVAL_KEY), dict)
+    """前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットか。
+
+    古い形として扱うと、取り下げは中身の一致を見ずに記録の欄で決まり、`workflow:` の欄も
+    待ち方として読まれる。`ccnavi_approved: {}` のような書きかけの記録で古い形を装えないよう、
+    前の版が必ず書いた欄が揃い、`approved_at` が空でないときだけ古い形とみなす。提案に
+    記録の欄があれば `--agree` と `--lint` が error にする（`agree.record_field_problems`）。
+    """
+    meta = t.raw.get(ticket_mod.APPROVAL_KEY)
+    if not isinstance(meta, dict) or not all(k in meta for k in _RECORD_KEYS):
+        return False
+    return bool(str(meta.get("approved_at") or "").strip())
 
 
 def workflow_path(approved_dir: str, parent: str) -> str:
@@ -866,29 +880,40 @@ def admit(
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
 
     `wf` は計画を持つ親の待ち方。`phases/<親>/workflow.yml` に固定する（チケットには書かない）。
+    待ち方は提案を動かす前に書き、そのあとの段で落ちたら前の中身へ戻す。承認済みチケットだけが
+    置かれて待ち方が無い形は、手で動かした承認と同じに一直線で読まれ、取り下げの検査も通って
+    しまうので、待ち方だけが残る側（承認済みチケットが無いので効かない）に寄せる。
     `source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
     """
     target = copy_path(approved_dir, ticket.ticket)
     content = fsio.read_bytes(ticket.path)
     if content is None:
         return f"提案を読めない ({ticket.path})"
-    with fsio.policy(message="書けない ({reason})"):
+    restore: tuple[tuple[str, bytes | None], ...] = ()
+    if wf is not None:
+        held = workflow_path(approved_dir, ticket.ticket)
+        restore = ((held, fsio.read_bytes(held)),)
+        failed = write_workflow(approved_dir, ticket.ticket, wf)
+        if failed:
+            return failed
+    with fsio.policy(message="書けない ({reason})", restore=restore):
         failed = fsio.write_bytes(target, content)
     if failed:
+        fsio.put_back(restore)
         return f"書けない ({failed})"
     # 消せなければ書いた側を消して戻す。承認の plan では落ちたときの枝が走らないので、
     # 同じ戻し方を Writer(FS) へ渡す。置けたと数えるのは消せたとき。
     with fsio.policy(
-        message="提案を todo/ から動かせない ({reason})", undo=(target,), places=ticket.ticket
+        message="提案を todo/ から動かせない ({reason})",
+        undo=(target,),
+        restore=restore,
+        places=ticket.ticket,
     ):
         failed = fsio.unlink(ticket.path)
     if failed:
         fsio.remove(target)
+        fsio.put_back(restore)
         return f"提案を todo/ から動かせない ({failed})"
-    if wf is not None:
-        failed = write_workflow(approved_dir, ticket.ticket, wf)
-        if failed:
-            return failed
     history.note(
         approved_dir,
         ticket.ticket,
@@ -1960,9 +1985,16 @@ def approved_times(
 
 
 def _history_time(approved_dir: str, ident: str) -> str:
+    """履歴の最後の承認の時刻。最後の承認のあとに取り下げがあれば空（次の手段の git に任せる）。
+
+    取り下げたあとに手で動かして承認し直すと、履歴には前の承認の行しか残らない。それを今の
+    承認の時刻と言わないため。
+    """
     entries, _ = history.read(approved_dir, ident, limit=0)
     kinds = (history.KIND_APPROVED, history.KIND_RAISED)
     for entry in reversed(entries):
+        if entry.get("kind") == history.KIND_WITHDRAWN:
+            return ""
         if entry.get("kind") in kinds and isinstance(entry.get("at"), str):
             return entry["at"]
     return ""

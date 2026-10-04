@@ -272,6 +272,7 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: agree.Planned) -> agree.Ap
         if rule.on_fail == fsio.FAIL_STOP:
             for path in rule.undo:
                 fsio.remove(path)
+            fsio.put_back(rule.restore)
             stderr.write(head + message + "\n")
             return agree.Applied(1, placed, rule.ticket, message)
         if rule.on_fail == fsio.FAIL_WARN:

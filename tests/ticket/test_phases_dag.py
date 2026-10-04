@@ -410,6 +410,35 @@ class DagApprovalTest(PhaseHarness):
         found = [p.detail for p in approval.content_problems(held)]
         self.assertTrue(any("workflow" in d for d in found), found)
 
+    def test_a_half_written_record_does_not_pass_for_the_old_form(self):
+        """書きかけの記録（`{}`・`approved_at` が空・欄が足りない）は古い形とみなさず、
+        `workflow:` 欄で止める。"""
+        self.use(SEQUENTIAL)
+        self.family(plan=PLAN)
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        held_path = approval.workflow_path(self.approved, "i0001")
+        with open(path, "rb") as f:
+            original = f.read()
+        with open(held_path, "rb") as f:
+            held_bytes = f.read()
+        for record in (
+            "ccnavi_approved: {}\n",
+            "ccnavi_approved: {approved_at: '', source_tree: main, source_path: p}\n",
+            "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00'}\n",
+        ):
+            with open(path, "wb") as f:
+                f.write(original)
+            with open(held_path, "wb") as f:
+                f.write(held_bytes)
+            self._rewrite_copy(
+                record + "workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\n"
+            )
+            held = self.copy()
+            self.assertFalse(approval.has_record(held), record)
+            self.assertIsNone(held.workflow, record)
+            found = [p.detail for p in approval.content_problems(held)]
+            self.assertTrue(any("workflow" in d for d in found), (record, found))
+
     def test_an_unreadable_workflow_file_blocks(self):
         self.use(DAG)
         self.family(plan=PLAN)

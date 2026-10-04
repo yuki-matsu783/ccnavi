@@ -71,6 +71,21 @@ class ApprovedTimeTest(PhaseHarness):
         copy = self.board_copy("i0001-01")
         self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_COMMIT)
 
+    def test_a_reapproval_after_a_withdrawal_reads_the_commit_time(self):
+        """取り下げのあとに手で動かして承認し直したら、前の承認の行は使わず、コミットの時刻を読む。"""
+        self.family(plan=["research"])
+        history.note(self.approved, "i0001", history.KIND_WITHDRAWN, "doing", "todo")
+        text_path = os.path.join(self.approved, "doing", "i0001.md")
+        with open(text_path, encoding="utf-8") as f:
+            text = f.read()
+        os.remove(text_path)
+        self.commit_parent("withdrawn")
+        self.move_by_hand("i0001", text)
+        when = git(self.parent_tree, "log", "-1", "--format=%cI").strip()
+        copy = self.board_copy("i0001")
+        self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_COMMIT)
+        self.assertEqual(copy["approved_at"], when)
+
     def test_an_uncommitted_manual_approval_is_said_so(self):
         self.family(plan=["research"])
         child = child_text("i0001-01", "i0001", 1, ("wip/research/*",), False)

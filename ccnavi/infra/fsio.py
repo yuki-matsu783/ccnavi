@@ -374,6 +374,15 @@ def remove(path: str) -> None:
         _record(path)
 
 
+def put_back(pairs: tuple[tuple[str, bytes | None], ...]) -> None:
+    """パスごとに前の中身へ戻す（中身が None なら消す）。戻せなくても何も出さない。"""
+    for path, data in pairs:
+        if data is None:
+            remove(path)
+        else:
+            write_bytes(path, data)
+
+
 def unlink(path: str) -> str:
     """消す。消せたら空文字、無い・消せないなら理由（`remove` と違って理由を返す）。"""
     if _STAGE["current"] is not None:
@@ -711,7 +720,9 @@ FAIL_HISTORY = "history"  # 履歴の書けなかった知らせに溜めて続�
 class Policy:
     """書けなかったときの扱い。`message` の `{reason}` に理由が入る。
 
-    `undo` は落ちたときに消すパス（書いた側を戻して、両方に残さない）。`places` は、
+    `undo` は落ちたときに消すパス（書いた側を戻して、両方に残さない）。`restore` は落ちたときに
+    前の中身へ戻すパスと中身の組（中身が None なら消す）。先に書いた別のファイルを、片方だけ新しく
+    なった形で残さないために使う。`places` は、
     書けたらその識別子を「置いた」と数える。`group` が同じ行と書き込みは 1 つの組で、
     `FAIL_LINE` で落ちたら残りを飛ばす。`ticket` は知らせの頭に付ける識別子。
     `prefix` は `message` の前に付ける語（呼び手の用件。「マーカーを置けない: 」など）。
@@ -722,6 +733,7 @@ class Policy:
     message: str = "{reason}"
     prefix: str = ""
     undo: tuple[str, ...] = ()
+    restore: tuple[tuple[str, bytes | None], ...] = ()
     places: str = ""
     group: int = 0
     ticket: str = ""

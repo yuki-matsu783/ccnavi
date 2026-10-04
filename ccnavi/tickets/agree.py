@@ -599,7 +599,7 @@ def candidates(
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
         types = types_for(t)
-        complaints = _workflow_field(t) + script_field_problems(t)
+        complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
         complaints += revision_problems(root, conf, t, current, types)
         complaints += approval.family_problems(conf, root, t, fams)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
@@ -623,7 +623,7 @@ def candidates(
     ):
         types = types_for(t)
         complaints, overflow = validate(t, pool, types)
-        complaints += _workflow_field(t) + script_field_problems(t)
+        complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
         complaints += approval.project_problems(t, pool, conf)
         complaints += approval.family_problems(conf, root, t, fams)
         complaints += approval.integration_problems(conf, root, t, fams)
@@ -687,6 +687,28 @@ def script_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
             "提案には値を書かない（空にするか消す）。改版の提案では、承認済みチケットを写したときに"
             "入る started_at・completed_at・base_sha・cancelled_at・cancel_reason を空にする"
             "（改版は承認済みチケットの側の値を残し、計画だけを差し替える）",
+        )
+    ]
+
+
+def record_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
+    """提案に承認の記録（`ccnavi_approved`）か続きの子の目印（`followup_of`）があれば拒む。
+
+    承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。前の版の承認の
+    記録を持つ古い形は取り下げを記録の欄で決め、`workflow:` の欄も待ち方として読む。続きの子の
+    目印は取り下げを止める。どちらもユーザの判断（承認・レビューの行き先）だけが残すもので、
+    提案に書かせると古い形や続きの子を装える。
+    """
+    found = [name for name in (ticket_mod.APPROVAL_KEY, approval.FOLLOWUP_KEY) if name in t.raw]
+    if not found:
+        return []
+    names = ", ".join(f"`{name}`" for name in found)
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"{names} は承認の記録で、ユーザの承認（と続きの子を起こすレビューの行き先）だけが"
+            "残すもの。提案には書かない（改版の提案で承認済みチケットを写したときも消す）",
         )
     ]
 
@@ -1314,15 +1336,22 @@ def revise_copy(
 
     範囲と本文はそのまま。改版の時刻はチケットに書かない（状態の履歴の `revised` に残る。
     フィードバック計画の改版は `feedback: true` を添える）。
+
+    待ち方を先に書き、チケットを書く段で落ちたら待ち方を前の中身へ戻す。片方だけが新しい形
+    （新しい計画に古い待ち方、古い計画に新しい待ち方）を残さないため。
     """
-    current.raw = revised_front(current, revised)
-    failed = approval._write(
-        approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
-    )
-    if failed:
-        return failed
+    held = approval.workflow_path(approved_dir, current.ticket)
+    restore = ((held, fsio.read_bytes(held)),)
     failed = approval.write_workflow(approved_dir, current.ticket, workflow.compute(revised, types))
     if failed:
+        return failed
+    current.raw = revised_front(current, revised)
+    with fsio.policy(restore=restore):
+        failed = approval._write(
+            approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
+        )
+    if failed:
+        fsio.put_back(restore)
         return failed
     history.note(
         approved_dir,

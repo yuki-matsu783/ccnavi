@@ -553,6 +553,9 @@ def _copy_problems(
                     "（残っていると、フローの着手中の扱いなど、着手中として数えない箇所がある）",
                 )
             )
+        unrecorded = _record_unrecorded(conf, t)
+        if unrecorded:
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
         unrecorded = _start_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
@@ -574,6 +577,28 @@ def _copy_problems(
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
     return problems
+
+
+def _record_unrecorded(conf: settings.Settings, t) -> str:
+    """古い形（承認の記録 `ccnavi_approved` を持つ）なのに、状態の履歴に承認の行が無いときの文。
+
+    古い形は取り下げを記録の欄で決め、`workflow:` の欄も待ち方として読む。今の承認は記録を
+    書かないので、新しく置かれた古い形は手で書かれた記録かもしれない。承認の行は `approved`
+    （続きの子は `raised`）。履歴は ccnavi の外で動かした分と、履歴を書く前の版の承認を持たない
+    ので、無いことだけでは止めない（warn）。
+    """
+    if not approval.has_record(t) or not t.tree_root:
+        return ""
+    where = settings.approved_dir(conf, t.tree_root)
+    entries, why = history.read(where, t.ticket, limit=0)
+    kinds = (history.KIND_APPROVED, history.KIND_RAISED)
+    if why or any(e.get("kind") in kinds for e in entries):
+        return ""
+    return (
+        "承認の記録（ccnavi_approved）を持つ古い形なのに、状態の履歴に承認（approved / raised）の"
+        "行が無い。今の承認は記録を書かないので、手で書かれた記録かもしれない。"
+        "ユーザに承認済みチケットを確かめてもらってください（履歴を書く前の版で承認したものなら問題ない）"
+    )
 
 
 def _start_unrecorded(conf: settings.Settings, t) -> str:

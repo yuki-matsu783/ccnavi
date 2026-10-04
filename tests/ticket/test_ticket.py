@@ -675,6 +675,62 @@ class TicketTest(unittest.TestCase):
         self.assertIn("だけが書く欄", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
+    def test_a_proposal_with_an_approval_record_is_not_approved(self):
+        # 承認の記録と続きの子の目印は、ユーザの判断だけが残す。
+        # 提案に書けば古い形や続きの子を装える。
+        for field in ("ccnavi_approved: {}", "followup_of: [i0001-01]"):
+            with self.subTest(field=field):
+                self.propose("i0001", allow=("src/*",))
+                source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+                with open(source, encoding="utf-8") as f:
+                    text = f.read()
+                write(source, text.replace("\n---\n", "\n" + field + "\n---\n", 1))
+                lint = self.ccnavi("--lint", "--json")
+                found = [
+                    p
+                    for p in json.loads(lint.stdout)["problems"]
+                    if "は承認の記録で" in p["detail"]
+                ]
+                self.assertEqual([p["severity"] for p in found], ["error"], found)
+                result = self.approve()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("提案には書かない", result.stderr)
+                self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+                os.remove(source)
+
+    def test_a_forged_record_moved_by_hand_is_blocked(self):
+        # `ccnavi_approved: {}` で古い形を装い、手で書いた `workflow:` を効かせようとする形。
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        forged = "ccnavi_approved: {}\nworkflow: {order: dag, waits: {}, review_at: {}}"
+        self.hand_move("i0001", text.replace("\n---\n", "\n" + forged + "\n---\n", 1))
+        result = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        self.assertIn("DENY_TICKET_BLOCKED", self.reason(result))
+        lint = self.ccnavi("--lint")
+        self.assertNotEqual(lint.returncode, 0)
+        self.assertIn("workflow", lint.stdout)
+
+    def test_lint_warns_about_an_old_form_without_an_approval_row(self):
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        self.hand_move("i0001", with_old_record(text, "wip/proposals/todo/i0001.md"))
+        lint = self.ccnavi("--lint", "--json")
+        found = [
+            p
+            for p in json.loads(lint.stdout)["problems"]
+            if "状態の履歴に承認" in p["detail"] and "i0001" in p["detail"]
+        ]
+        self.assertEqual([p["severity"] for p in found], ["warn"], found)
+
     def test_review_reads_only_what_finish_moved(self):
         # review/ はエージェントが書ける側。`finish` が書く `completed_at` が無いものは読まない。
         self.family()
