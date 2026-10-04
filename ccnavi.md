@@ -1945,6 +1945,8 @@ JSON の欄名は `gate_closed`。これは判定とボードの契約で、こ�
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのは作業ツリーの中で分かる前提検査と、
 sh が取得して JSON ファイルに書き、そのパスを `--result` で渡す。実行ファイルはその JSON の判定とマーカーの操作だけを持つ。sh と実行ファイルの間の契約は、この JSON の形で決まる。
+実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/review_host.py`、`request` と `confirm` の段は `tickets/review.py`、
+`decide` の段は `tickets/review_decide.py`、`ready` と `close-early` の段は `tickets/review_close.py` が持つ。
 
 | `--result` の JSON | 形 |
 |---|---|
@@ -2057,7 +2059,7 @@ push 済みであること。満たしていれば `ready.json` とコメント�
    差分の外の行に付けた指摘がホストに拒まれるか。また、ユーザの手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
    ずれる。`crit review` を開く前に、手元をマージリクエストの先頭に合わせる
 5. 送られた指摘はユーザのスレッドで、本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
-   （`review._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューになり、
+   （`review_host._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューになり、
    `decide` でも通せない
 6. 依頼の後に `wip/eli5/` の下だけを変えたコミットは「ユーザが見るものが動いた」に数えない。直したら push するだけで、
    `confirm` は止まらず、`request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
