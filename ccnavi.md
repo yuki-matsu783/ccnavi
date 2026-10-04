@@ -964,7 +964,7 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（`CCNAVI_TICKETS_APPROVED`、ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは `ccnavi --agree`（ユーザ）と、ユーザが `decide` で起こす続きの子。`done/` へはユーザのレビュー（`confirm` / `decide` / `--reviewed` / `close-early`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-push-approved.sh`（9.4） | 親のブランチにコミット |
 | フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json`、受け入れた指摘の `accepted.json` | レビューのスクリプト、`ticket finish <親>`、ユーザ | 親のブランチにコミット。`ready` は Draft を外す前に、閉じた親子のチケットと一緒にワークスペースの `logs/archive/<リポジトリ>/phases/<親>/` へ退避する（ブランチでは他の機械へ届かなくなる） |
-| 閉じたチケットの退避 | ワークスペースの `logs/archive/<リポジトリ>/`（承認済みの領域と同じ並び）と、ready の印 `ready/<親>.json` | `ccnavi-review.sh ready`（実行ファイルの `review ready`）だけ。エージェントの書き込みは記録の守りが止める | 入れない（`logs/` は git が追跡しない） |
+| 閉じたチケットの退避 | ワークスペースの `logs/archive/<リポジトリ>/`（承認済みの領域と同じ構成）と、ready のマーカー `ready/<親>.json` | `ccnavi-review.sh ready`（実行ファイルの `review ready`）だけ。エージェントの書き込みは記録の保護が止める | 入れない（`logs/` は git が追跡しない） |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローのハッシュ。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
 | 状態の履歴 | 同 `events/<識別子>.ndjson`（9.6。1 行 1 JSON の追記だけ） | 状態を動かす実行ファイル（承認・`ticket` と `review` の副命令・`--reviewed`・`close-early`・hook の告知）。書き換え・消すコードは無い | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
 | 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
@@ -1973,7 +1973,7 @@ push 済みであること。満たしていれば `ready.json` とコメント�
 親のワークツリーに無い（ワークスペースルートに在る）ときは、何も置かずに止める。標準出力は 1 行目がコメントの下書きのパス、
 2 行目が `tree <退避したツリーのルート>` で、sh はこの 2 行目のツリーで未コミットを確かめる（sh と実行ファイルの約束）。
 続いて C1 が退避の削除をコミットして push し、sh が Draft を外し、コメントを投稿する。GitLab では、Draft を外すときに `squash` も
-有効にする。同じ親に 2 度打っても通る。退避を始めた後の打ち直しは、ready の印が今のツリーのもので、`ready.json` のマージリクエストの
+有効にする。同じ親に 2 度打っても通る。退避を始めた後の打ち直しは、ready のマーカーが今のツリーのもので、`ready.json` のマージリクエストの
 番号が今回と同じときだけ、ワークツリーの側の条件だけを見て残りを移す。マージするのはユーザ。
 
 **`close-early` の段**。ユーザが端末で打つ。sh は実行ファイルを `--close-early` で呼び、そのあと残りを issue に書き出して、
@@ -2076,7 +2076,7 @@ push → `ready`」。Draft を外す手段は `ready` だけ。取り込みは�
 チケットの置き場は既定のブランチに残さない。チケットの置き場を残さないのは `ready` の退避で行う。
 `ready` は条件を確かめてから、親のワークツリーの承認済みの領域にある閉じた親（今回の親と、統合先に
 たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`events/` の履歴・`flows/` のフローを、
-ワークスペースの `logs/archive/<リポジトリ>/` へ移す（同じ並びで。`logs/` は git が追跡しないので削除になる）。
+ワークスペースの `logs/archive/<リポジトリ>/` へ移す（同じ構成で。`logs/` は git が追跡しないので削除になる）。
 C1 がその削除をコミットして push してから Draft を外す。統合先には閉じたチケットが残らないので、
 親子のチケットが閉じたことは、統合先の `done/` の代わりに `ccnavi-review.sh merged` の答え（マージ済み）で決め、
 答えが得られないときだけ手元の退避で補う（`ccnavi-sync.sh`）。閉じた識別子の使い回し・子の連番・先行も手元の退避を見る。

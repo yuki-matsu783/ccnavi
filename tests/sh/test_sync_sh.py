@@ -582,7 +582,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("closed", fields(self.record)["state"])
 
     def archive_the_parent(self):
-        """ready の後の姿。親の写しをツリーから消して push し、手元の退避に置く。"""
+        """ready の後の状態。親チケットをツリーから消して push し、手元の退避に置く。"""
         rel = f".ccnavi/approved/doing/{PARENT}.md"
         self.archive_locally(copy_text())
         git(self.tree, "rm", "-q", "--", rel)

@@ -1,6 +1,6 @@
 """閉じた親子のチケットの退避（`ready` が `logs/archive/` へ移す）。
 
-- 退避の並びと移し方（archive.py）
+- 退避の構成と移し方（archive.py）
 - `ready` が条件を確かめてから退避し、打ち直しても通ること
 - C1 の見分け（`c1.classify_all`）と実行後チェック（`post._script_writes`）が、退避の削除だけを
   ccnavi の書き込みとして外すこと
@@ -54,7 +54,7 @@ def closed_text(name, parent="", phase=None, predecessors=()):
 
 
 class ArchiveTreeHarness(unittest.TestCase):
-    """archive.py の並びと移し方。git は使わない。"""
+    """archive.py の構成と移し方。git は使わない。"""
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-archive-")
@@ -79,7 +79,7 @@ class ArchiveTreeHarness(unittest.TestCase):
 
 
 class ArchiveModuleTest(ArchiveTreeHarness):
-    """archive.py の並びと移し方。git は使わない。"""
+    """archive.py の構成と移し方。git は使わない。"""
 
     def test_plan_takes_only_closed_families(self):
         self.assertEqual(archive.closed_parents(self.approved), ["i0001", "old"])
@@ -212,7 +212,7 @@ class ReadyHarness(PhaseHarness):
     """`review ready` が条件を確かめてから閉じた親子のチケットを退避する。"""
 
     def closable(self):
-        """親を閉じて片付け、push 済みにする。fixture（マージリクエストの写し）を返す。"""
+        """親を閉じて片付け、push 済みにする。fixture（マージリクエストの取得結果）を返す。"""
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
@@ -336,7 +336,7 @@ class ReadyArchivesTest(ReadyHarness):
         # 退避の置き場を渡さなければ、前のとおり ccnavi の書き込みとは見分けない（止める）
         plain = c1.classify_all(self.parent_tree, places, "i0001", changed, "", None)
         self.assertNotIn(c1.KIND_B, {kind for kind, _, _ in plain})
-        # 退避の写しが違えば (b) にしない
+        # 退避したコピーが違えば (b) にしない
         write(os.path.join(base, "done", "old-01-01.md"), "書き換えた\n")
         again = {
             rel: kind
@@ -554,7 +554,7 @@ class SecondReviewTest(ReadyHarness):
         other = os.path.join(self.root, "fixture-8.json")
         write(other, json.dumps({"host": "fixture", "mr": {"number": 8, "url": "u/8"}}))
         self.assertNotEqual(self.ready(other).returncode, 0)
-        # ready の印が無ければ（今のツリーで退避を始めていなければ）打ち直しとして通さない
+        # ready のマーカーが無ければ（今のツリーで退避を始めていなければ）打ち直しとして通さない
         os.remove(os.path.join(self.root, "logs", "archive", "self", "ready", "i0001.json"))
         self.assertNotEqual(self.ready(fixture).returncode, 0)
 

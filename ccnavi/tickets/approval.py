@@ -298,7 +298,7 @@ def scan(
         everything = _everything(conf, root, open_all=found)
     kept = _authoritative(found, everything)
     if not closed:
-        # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古い写しは
+        # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古いチケットは
         # 作業中に戻さない（archive.drop_archived）。
         kept = archive.drop_archived(root, kept)
         # 判定が読むのは作業中の側だけ。閉じたものに理由は要らない。
@@ -1238,7 +1238,7 @@ def predecessor_pool_of(
 
     `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
     `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
-    引くのは並びのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
+    引くのはリストのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
     """
     pool = _by_id(open_copies + review + closed)
     for t in proposals:
@@ -1295,7 +1295,7 @@ def align_imported(
     for ident, hits in list(pool.items()):
         if not hits:
             continue
-        # 手元の退避から引いた先行は閉じたもの。親のブランチの写しでは読み直さない。
+        # 手元の退避から引いた先行は閉じたもの。親のブランチ上のチケットでは読み直さない。
         if all(archive.is_archived_path(root, h.path) for h in hits):
             continue
         st = family_standing(conf, root, hits[0], fams)

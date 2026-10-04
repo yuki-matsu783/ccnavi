@@ -19,9 +19,9 @@
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
     `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの履歴（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない。
-    もう 1 つは `ready` の退避（archive.py）が消したもの。ready の印（`logs/archive/<リポジトリ>/
-    ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
-    退避の写しと同じもの（履歴は「退避した」の行だけを足したもの）だけ
+    もう 1 つは `ready` の退避（archive.py）が消したもの。ready のマーカー
+    （`logs/archive/<リポジトリ>/ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
+    退避したコピーと同じもの（履歴は「退避した」の行だけを足したもの）だけ
   - (c) ユーザがコミットするもの（ユーザの判断）。C1 はコミットせずに止める。
     ユーザの判断が一緒に書く
     移動（review/ から done/、doing/ から done/）とマーカーの消去、履歴の追記もここ
@@ -249,8 +249,8 @@ def classify_all(
     approved_rel, review_rel = places
     ready: set[str] = set()
     if archive_at is not None:
-        # 印が効くのは、印を書いたときの先頭と比べている版が同じ間だけ（未コミットなら HEAD、
-        # 未送信の確かめなら `since`）。
+        # マーカーが効くのは、マーカーを書いたときの先頭と比べている版が同じ間だけ
+        # （未コミットなら HEAD、未送信の確かめなら `since`）。
         head = archive.tree_head(tree_root, since or "HEAD")
         ready = archive.ready_files(archive_at[0], archive_at[1], tree_root, head)
     states: dict[str, tuple[bytes | None, bytes | None, bool]] = {}
@@ -410,10 +410,11 @@ def archived_removal(
 ) -> bool:
     """`ready` の退避が消したものか（archive.py）。`rel` は承認済みの領域からの相対。
 
-    ready の印（`archive.ready_files`。そのツリーから ready が移したファイルの一覧）に載っていて、
-    消えた中身が手元の退避の写しと同じ（履歴は「退避した」の行だけを足したもの）ときだけ。
-    ready の印は `logs/archive/` に置かれ、記録の守りがエージェントの書き込みを止める。
-    退避の置き場の途中（`logs` を含む）にリンクがあれば写しを読まない。
+    ready のマーカー（`archive.ready_files`。そのツリーから ready が移したファイルの一覧）に
+    載っていて、
+    消えた中身が手元の退避したコピーと同じ（履歴は「退避した」の行だけを足したもの）ときだけ。
+    ready のマーカーは `logs/archive/` に置かれ、記録の保護がエージェントの書き込みを止める。
+    退避の置き場の途中（`logs` を含む）にリンクがあればコピーを読まない。
     """
     if now is not None or before is None or rel not in ready or not archive.in_ready_places(rel):
         return False
