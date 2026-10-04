@@ -41,7 +41,6 @@ class PromptHintTest(PhaseHarness):
         return out.get("additionalContext") or ""
 
     def test_an_issue_and_an_mr_get_one_instruction_each(self):
-        self.prompt("起点")  # 承認の知らせの起点を置く（この回は何も言わない）
         said = self.prompt("#152 と !5 を見て直して")
         sh = settings.script_command(self.root, "ccnavi-branches.sh")
         self.assertIn(f"'{sh} --issue 152'", said)
@@ -57,17 +56,14 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("候補が無ければ、そのまま進めてよい", said)
 
     def test_no_reference_no_instruction(self):
-        self.prompt("起点")
         self.assertEqual(self.prompt("README の見出し # 概要 を直して。色は #fff"), "")
 
     def test_ticket_control_disabled_says_nothing(self):
-        self.prompt("起点")
         self.assertEqual(self.prompt("#152 を直して", "--ticket-control", "disable"), "")
 
     def test_dry_run_still_says_it(self):
         # 指示を足すだけで止めないので、dry-run でも同じ文を足す（モードが disable なら hook は
         # 何もしない。events.decide の入口）
-        self.prompt("起点", "--mode", "dry-run")
         self.assertIn("--issue 152", self.prompt("#152 を直して", "--mode", "dry-run"))
 
 
