@@ -26,7 +26,7 @@ export interface ColumnDef {
   readonly label: string;
 }
 
-/** 列の並び。該当が 0 件でも落とさない */
+/** 列の順序。該当が 0 件でも落とさない */
 export const COLUMNS: readonly ColumnDef[] = [
   { state: "todo", label: "未着手" },
   { state: "doing", label: "作業中" },
@@ -318,7 +318,7 @@ function isHighRisk(level: string): boolean {
 /**
  * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
  * 断片を落としてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
- * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうが本物）。
+ * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうを採る）。
  */
 function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | null } {
   for (let i = phases.length - 1; i >= 0; i -= 1) {

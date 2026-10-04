@@ -485,7 +485,7 @@ class PostToolUseTable(Workspace):
 
 
 class TicketPlaces(Workspace):
-    """チケットの置き場は範囲の外でも咎めない。ルールはワークツリーを allow で開ける。"""
+    """チケットの置き場は範囲の外でも報告しない。ルールはワークツリーを allow で開ける。"""
 
     def setUp(self):
         super().setUp()
@@ -539,7 +539,7 @@ class TicketPlaces(Workspace):
     def test_post_tool_use_reports_a_scope_finding_without_restoring_it(self):
         """範囲外は報告するが戻さない。戻す根拠はルールの `deny` だけ（post._restorable）。
 
-        咎めているのはルールファイルに無いルール（`(ticket-scope)`）で、
+        報告しているのはルールファイルに無いルール（`(ticket-scope)`）で、
         `CCNAVI_RESTORE_IF_DENY` が言う「`deny` と宣言した場所」ではない。
         """
         rel = "docs/b.md"
@@ -589,7 +589,7 @@ class TicketPlacesElsewhere(TicketPlaces):
 
 
 class ScratchPlace(Workspace):
-    """下書きの置き場（`scratchpad/`）を、実行前チェックだけが範囲の外でも咎めない。
+    """下書きの置き場（`scratchpad/`）を、実行前チェックだけが範囲の外でも報告しない。
 
     外してよい根拠は「そのツリーの git が追跡しないので統合先へ乗らない」ことの 1 つだけ。
     だから外すのは実行前の 1 か所に限り、実行後チェックとサブエージェント終了時チェックは

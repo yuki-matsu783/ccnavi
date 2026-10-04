@@ -131,7 +131,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
   }
 });
 
-test("CB-D59 並びの欄は , で区切って打て、打っている途中の区切りは消えない", async () => {
+test("CB-D59 リストの欄は , で区切って打て、打っている途中の区切りは消えない", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p2")} .row-head`));
@@ -287,7 +287,7 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自分の id は候補に出ない。並びはファイルの順に揃う", async () => {
+test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自分の id は候補に出ない。順序はファイルの順に揃う", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p4")} .row-head`));
@@ -303,7 +303,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
     // after の候補は work の種類だけ。feedback の種類は待つ先にできない
     assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
     assert.deepEqual(values(".f-after", "checked"), ["acceptance"]);
-    // 後から付けても、並びはファイルの順に揃う（YAML に余計な差分を出さない）
+    // 後から付けても、順序はファイルの順に揃う（YAML に余計な差分を出さない）
     pick(dom, `${rowSelector("p4")} .f-after`, "design");
     await dom.settle();
     assert.deepEqual(values(".f-after", "checked"), ["design", "acceptance"]);
@@ -324,7 +324,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
   }
 });
 
-test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外しする。change で届いた選択はそのまま受ける", async () => {
+test("CB-D94 関係の欄は矢印でフォーカスだけを動かし、Space で付け外しする。change で届いた選択はそのまま受ける", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p4")} .row-head`));
@@ -338,7 +338,7 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
     const active = (): string | null => dom.one(`${select} option.active`).getAttribute("value");
     assert.deepEqual(selected(), ["acceptance"]);
     assert.equal(active(), "research");
-    // 矢印は印を動かすだけで、選択を 1 件に縮めない
+    // 矢印はフォーカスを動かすだけで、選択を 1 件に縮めない
     dom.key("ArrowDown", dom.one(select));
     await dom.settle();
     dom.key("ArrowDown", dom.one(select));
@@ -354,7 +354,7 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
     await dom.settle();
     assert.equal(active(), "implement-feedback");
     assert.equal(dom.one(select).getAttribute("aria-activedescendant"), dom.one(`${select} option.active`).id);
-    // 止めきれずに change が届いたときは、届いた選択を並びの順で受ける
+    // 止めきれずに change が届いたときは、届いた選択をリストの順で受ける
     for (const option of dom.all<HTMLOptionElement>(`${select} option`)) {
       option.selected = option.value === "implement-feedback" || option.value === "research";
     }

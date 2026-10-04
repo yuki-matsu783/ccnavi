@@ -361,7 +361,7 @@ def stale_proposals(
 ) -> list[tuple[ticket_mod.Ticket, str]]:
     """承認済みの識別子の `todo/` の提案のうち、本物とするツリーの外に在るので読まなかったもの。
 
-    (提案, 本物とするツリーの名前) の並び。`found` はまとめる前の提案、`kept` は残した側。
+    (提案, 本物とするツリーの名前) のリスト。`found` はまとめる前の提案、`kept` は残した側。
     本物とするツリーの `todo/` に同じ中身の提案が在るもの（親のツリーの改版が子のワークツリーに
     入っているだけ）は入れない。`review/` の提案も入れない（置き場が動いた結果で、承認の対象に
     ならない）。
@@ -468,7 +468,8 @@ def mark_imported(
     - 親子のチケットが閉じている（統合先の `done/` を本物とする）
     - 親のワークツリーの外にしか無いチケット（元ツリーに未コミットで残ったチケットなど）
 
-    **チケットの並びは変えない（落とさない）。** 落とすと「在る」ことで止まっていたもの（承認待ちの
+    **チケットのリストは変えない（落とさない）。
+    ** 落とすと「在る」ことで止まっていたもの（承認待ちの
     重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけなので、取り込み状態の無い親子のチケットと、
     取り込み状態があってもチケットが親のワークツリーにだけある親子のチケットでは、答えは前と同じ。すでに理由（`mark_blocked`）が
     あれば、理由を連ねる（前の理由を消さない）。
@@ -488,12 +489,12 @@ def mark_imported(
 
 
 def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
-    """親のワークツリーの外にしか無いチケットを信頼しない理由と、ユーザが運ぶ手順。"""
+    """親のワークツリーの外にしか無いチケットを信頼しない理由と、ユーザが親のブランチへ移してコミットする手順。"""
     return (
         f"親のブランチ {st.family} のワークツリーの外"
         f"（{t.tree or 'ワークスペースルート'}）にしか無いチケット。"
         "取り込み済みの親子のチケットでは、親のブランチ上のチケットだけが本物。ユーザがそのチケットを親のワークツリー"
-        f"（.claude/worktrees/{st.family}）の同じ置き場へ運んでコミットと push をし、"
+        f"（.claude/worktrees/{st.family}）の同じ置き場へ移してコミットと push をし、"
         "元のチケットを消す"
     )
 
@@ -667,7 +668,7 @@ def _authoritative(
 
 
 def _by_id(found: list[ticket_mod.Ticket]) -> dict[str, list[ticket_mod.Ticket]]:
-    """識別子ごとのチケットの全部。並びは見つけた順。"""
+    """識別子ごとのチケットの全部。順序は見つけた順。"""
     grouped: dict[str, list[ticket_mod.Ticket]] = {}
     for t in found:
         grouped.setdefault(t.ticket, []).append(t)
@@ -838,7 +839,7 @@ def carry_flow(
     ツリーの置き場へボードで保存する。承認で子が別のツリー（親のワークツリーなど）へ動くと、
     フローだけが元のツリーに残り、読まれなくなる（M-3）。承認はユーザの操作なので、ここで一緒に
     動かす。行き先に違う中身のフローが既に在れば上書きせず、そう言う（元のほうも残す）。
-    リンク・ふつうのファイルでないもの・ハードリンクは運ばない（`flow.load` と同じ読み方）。
+    リンク・ふつうのファイルでないもの・ハードリンクは移さない（`flow.load` と同じ読み方）。
     """
     source_root = proposal.tree_root or root
     source = flow.flow_file(conf, source_root, proposal.ticket)
@@ -855,20 +856,20 @@ def carry_flow(
     raw, why = flow.read_bytes(source, source_root)
     if raw is None:
         return [
-            f"{proposal.ticket} のフロー {source} を運ばなかった: {why}。"
+            f"{proposal.ticket} のフロー {source} を移さなかった: {why}。"
             "ユーザが確かめて置き直してください"
         ]
     if fsio.lexists(target):
         held, _ = flow.read_bytes(target)
         if held != raw:
             return [
-                f"{proposal.ticket} のフローを {target} へ運ばなかった: 行き先に違う中身のフローが"
+                f"{proposal.ticket} のフローを {target} へ移さなかった: 行き先に違う中身のフローが"
                 f"既に在る（上書きしない）。{source} と見比べて、ユーザが 1 本に決める"
             ]
         fsio.remove(source)
         return []
     # 落ちたときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
-    cannot = f"{proposal.ticket} のフローを {target} へ運べない ({{reason}})。{source} に残っている"
+    cannot = f"{proposal.ticket} のフローを {target} へ移せない ({{reason}})。{source} に残っている"
     with fsio.policy(message=cannot):
         failed = fsio.write_new(target, raw)
     if failed:
@@ -1057,7 +1058,7 @@ PRED_LABELS = {
 
 @dataclass
 class Predecessor:
-    """先行 1 本の今。`where` は複数の場所にあるときの在り処（`ツリー:置き場` の並び）。"""
+    """先行 1 本の今。`where` は複数の場所にあるときの在り処（`ツリー:置き場` のリスト）。"""
 
     ticket: str
     state: str
@@ -1084,7 +1085,7 @@ def predecessor_pool_of(
     closed: list[ticket_mod.Ticket],
     proposals: list[ticket_mod.Ticket],
 ) -> dict[str, list[ticket_mod.Ticket]]:
-    """先行を引く池。識別子 → 本物とする側のチケットの全部（`ops._places` と同じ集め方）。
+    """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops._places` と同じ集め方）。
 
     承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
@@ -1098,7 +1099,7 @@ def predecessor_pool_of(
 
 
 def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticket_mod.Ticket]]:
-    """いまの置き場から先行を引く池を組む。"""
+    """いまの置き場から先行を引く対応表を組む。"""
     open_copies, _ = scan(conf, root)
     review, _ = scan_review(conf, root)
     closed, _ = scan(conf, root, closed=True)
@@ -1122,10 +1123,11 @@ def align_imported(
       （親のブランチの外にしか無い）
     - 親のワークツリーのチケットが 1 つで、
       閉じていない（作業中・レビュー待ち・承認待ち）: それを採る
-    - 親のワークツリーのチケットが閉じている、チケットが 2 つ以上: 前の池のまま（手元の全ツリーから
-      引いた答え。前の池で満たしていなければ満たさないまま）
+    - 親のワークツリーのチケットが閉じている、
+      チケットが 2 つ以上: 前の対応表のまま（手元の全ツリーから
+      引いた答え。前の対応表で満たしていなければ満たさないまま）
     - 閉じた親子のチケット（統合先の `done/` に親のチケットがある）と、取り込み状態の無い
-      親子のチケット: 前の池のまま
+      親子のチケット: 前の対応表のまま
     """
     fams = syncstate.Families(conf, root)
     if not fams.active:
@@ -1157,14 +1159,14 @@ def align_imported(
 
 
 def _undecided(sample: ticket_mod.Ticket, why: str) -> ticket_mod.Ticket:
-    """先行の池に置く「親子のチケットが決まらない」の項目。理由は `blocked` に入れて運ぶ。"""
+    """先行の対応表に置く「親子のチケットが決まらない」の項目。理由は `blocked` に入れて渡す。"""
     return replace(sample, state=PRED_UNDECIDED, blocked=why)
 
 
 def predecessor_states(
     t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]]
 ) -> list[Predecessor]:
-    """このチケットの先行のそれぞれの今。並びは `predecessors` の順（重ねて書いたものは 1 つ）。"""
+    """このチケットの先行のそれぞれの今。順序は `predecessors` の順（重ねて書いたものは 1 つ）。"""
     out: list[Predecessor] = []
     for ident in dict.fromkeys(t.predecessors):
         hits = pool.get(ident, [])
@@ -1194,7 +1196,7 @@ def predecessor_states(
 def _loop_back(origin: str, first: str, pool: dict[str, list[ticket_mod.Ticket]]) -> list[str]:
     """`first` から先行を辿って `origin` に戻る経路。戻らなければ空。
 
-    辿るのは池で 1 つに決まるチケットだけ（決まらないものは別の苦情になる）。閉じた（`done/`）
+    辿るのは対応表で 1 つに決まるチケットだけ（決まらないものは別の苦情になる）。閉じた（`done/`）
     チケットの先の先行は辿らない。閉じたものは満たしているので、そこで循環が切れる。
     """
     seen: set[str] = set()
@@ -1299,7 +1301,8 @@ def predecessor_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"先行 {p.ticket} が{p.label}。どれが本物か決まらないので満たしたとみなさない。"
+                    f"先行 {p.ticket} が{p.label}。"
+                    "どれが本物か決まらないので満たしたとみなさない。"
                     "先に 1 つに決めてください"
                     "（先へ進んだ側を合流させるか、残ったワークツリーを片付ける）",
                 )
@@ -1456,7 +1459,7 @@ def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str
 #   closed.json  親を閉じた（`ticket finish <親>`）。どのフェーズをどこで見たかを残す
 #
 # closed.json が要るのは、提案（wip/）が統合先に取り込む前に消えるから。マージリクエストを
-# 作らない運び方（全フェーズが `review: chat`）では、親を閉じた事実の残る先がここしか無い。
+# 作らない進め方（全フェーズが `review: chat`）では、親を閉じた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
 PARENT_MARK_CLOSE_EARLY = "close-early"
 PARENT_MARK_CLOSED = "closed"
@@ -1673,7 +1676,7 @@ def child_problems(
     """子と親の構造の検査。承認（`validate`）と判定（`blocking_problems`）が同じ答えを引く。
 
     どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認でも判定でも
-    通さない。1 か所に置くのは、置き場を動かして承認する運びで判定の側の
+    通さない。1 か所に置くのは、置き場を動かして承認する進め方で判定の側の
     検査だけが古くなると、承認を通ったチケットと通らないチケットで答えが分かれるから。
 
     「種類の定義が読めない」はここに入れない。壊れているのは設定で、チケットの形は
@@ -1709,7 +1712,7 @@ def blocking_problems(
     """判定がこの承認済みチケットを信頼できない理由。空なら信頼してよい。
 
     承認のときにしか当たらなかった検査のうち、当たらないと「範囲をどこで切り詰めるか」が
-    決まらないものだけを置く。置き場を動かして承認する運びは `--agree` を通らないので、
+    決まらないものだけを置く。置き場を動かして承認する進め方は `--agree` を通らないので、
     同じ検査を判定の側でも当てる。当たれば範囲は使われず、その場所は止まる。
 
     ここに入れないもの。
@@ -1735,10 +1738,10 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None
     終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
 
-    **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
-    別の池で引くと、ここでは親が見つかって理由が付かないのに、判定の側では見つからず
+    **親を引く対応表は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
+    別の対応表で引くと、ここでは親が見つかって理由が付かないのに、判定の側では見つからず
     `parent=None` のまま子の宣言だけで範囲が決まる（閉じた親やレビュー待ちの親まで
-    引ける池にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
+    引ける対応表にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
     承認していない範囲に書ける経路そのものなので、引けないなら止める側を採る。
 
     親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が

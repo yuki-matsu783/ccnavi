@@ -41,14 +41,14 @@
   「無視されていない」とも別に扱う
 
 frontmatter は PyYAML の SafeLoader（別名を拒む `flow._Loader`）で読む。読めないもの・
-キーと値の並びでないもの・JSON に書けないものは `null` にして、索引づくりは止めない。
+マッピングでないもの・JSON に書けないものは `null` にして、索引づくりは止めない。
 日付などの JSON に載らない値は文字列にする。読むのはファイルの頭の 64 KiB まで（UTF-8）。
 
 ## 引く
 
 同じオプションの繰り返しは OR、違うオプションどうしは AND。大文字小文字は区別せず、
 文字列は NFC に揃えてから比べる。`--type` `--tag` `--keyword` は完全一致（`tags` が
-スカラーでも並びとして扱う）、`--path` は `concept_id` への部分一致、`--text` は
+スカラーでもリストとして扱う）、`--path` は `concept_id` への部分一致、`--text` は
 `concept_id`・`mtime`・frontmatter のすべてのスカラーの値（キー名は含まない）への部分一致。
 `--since` / `--until` は `mtime` と文字列で比べ、`--until` は書いた桁の終わりまで延ばす
 （日付だけなら `T23:59:59`、`THH` なら `:59:59`、`THH:MM` なら `:59`）。0 件でも終了コードは 0。
@@ -276,7 +276,10 @@ def _jsonable(value: Any) -> Any:
 
 
 def front_matter(raw: bytes) -> dict | None:
-    """頭の frontmatter（`---` で始まる YAML）。無い・読めない・並びでない・書けないなら None。"""
+    """頭の frontmatter（`---` で始まる YAML）。
+
+    無い・読めない・マッピングでない・書けないなら None。
+    """
     try:
         text = raw[:HEAD_LIMIT].decode("utf-8-sig", errors="replace")
         lines = text.splitlines()
@@ -522,7 +525,7 @@ def _past(deadline: float | None) -> bool:
 
 @dataclass
 class _Dir:
-    """1 つのディレクトリの途中の姿。"""
+    """1 つのディレクトリの途中の状態。"""
 
     directory: str
     index_rel: str

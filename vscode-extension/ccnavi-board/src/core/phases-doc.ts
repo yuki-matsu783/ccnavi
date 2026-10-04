@@ -3,11 +3,11 @@
  *
  * phases.yml は先頭に使い方の説明、種類の前に理由のコメントを持つ。risk-doc と同じく
  * `yaml` の Document を保ち、変えるところだけを差し替える。種類の入れ替えや改名は
- * 元のノード（対応表の 1 組）をそのまま別の並びへ移す。
+ * 元のノード（対応表の 1 組）をそのまま別のリストへ移す。
  *
  * ここは種類の意味（どの子がどこまで書けるか、レビューが要るか）には触れない。判定は
  * 実行ファイル（phasetypes.py）の仕事で、書式の検証も `--lint --phases <一時ファイル>` に聞く。
- * 画面の欄は文字のまま持ち、並びの欄（scope / deliverables / overlap / requires / after）は
+ * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables / overlap / requires / after）は
  * 文字の配列で持つ。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
@@ -30,7 +30,7 @@ export const PHASES_VERSION = 1;
 /** 範囲が「親の範囲そのまま」であることを言う表記（phasetypes.INHERIT） */
 export const INHERIT = "inherit";
 
-/** 並びで持つ欄。書く順もこの順 */
+/** リストで持つ欄。書く順もこの順 */
 export const LIST_KEYS = ["deliverables", "overlap", "requires", "after"] as const;
 export type ListKey = (typeof LIST_KEYS)[number];
 
@@ -130,7 +130,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     inherit = true;
   } else if (rawScope instanceof Scalar) {
     if (rawScope.value !== INHERIT && rawScope.value !== null) {
-      problems.push(`種類 ${id} の scope \`${String(rawScope.value)}\` は glob の並びか inherit ではありません。画面は inherit として出します`);
+      problems.push(`種類 ${id} の scope \`${String(rawScope.value)}\` は glob のリストか inherit ではありません。画面は inherit として出します`);
     }
     inherit = true;
   } else if (isSeq(rawScope)) {
@@ -228,7 +228,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
         current.value = edited.order;
       }
     } else if (current !== undefined && current !== null) {
-      // 並びや対応表で書かれた欄は、同じ鍵を 2 つにせず、その場で置き換える
+      // リストや対応表で書かれた欄は、同じ鍵を 2 つにせず、その場で置き換える
       top.set("order", edited.order);
     } else {
       const at = top.items.findIndex((p) => isNode(p.key) && (p.key as Scalar).value === "version");
@@ -236,7 +236,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     }
   }
 
-  // phases。元の組を先に全部拾っておき、編集した並びへ移す。
+  // phases。元の組を先に全部拾っておき、編集したリストへ移す。
   // `origin` は読み込んだときの生の位置。中身が対応表でない組は画面に載らず、保存で消える（苦情で言ってある）。
   const existing = top.get("phases", true);
   const originals: Pair[] = isMap(existing) ? existing.items.slice() : [];
@@ -355,9 +355,9 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
 }
 
 /**
- * 並びの欄を書く。空なら欄ごと消す（`keepEmpty` が真なら `[]` で残す。scope の `[]` は
+ * リストの欄を書く。空なら欄ごと消す（`keepEmpty` が真なら `[]` で残す。scope の `[]` は
  * 「何も書けない」の意味で、消すと inherit に変わってしまう）。
- * 変わっていなければ触らない。変わっていれば flow（1 行）の並びで書き直す。
+ * 変わっていなければ触らない。変わっていれば flow（1 行）のリストで書き直す。
  */
 function setList(
   doc: Document,
@@ -513,7 +513,7 @@ function asPhase(raw: unknown): PhaseForm | undefined {
   };
 }
 
-/** 並びの欄は文字の配列で持つ。無ければ空。文字以外が混ざっていれば形が違う */
+/** リストの欄は文字の配列で持つ。無ければ空。文字以外が混ざっていれば形が違う */
 function texts(value: unknown): string[] | undefined {
   if (value === undefined || value === null) {
     return [];

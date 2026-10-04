@@ -272,7 +272,7 @@ class PresentTest(AuthorityHarness):
         self.record("present")
         copies, _ = approval.scan(self.conf(), self.root)
         after = {t.ticket: t.blocked for t in copies}
-        # 並びは変えない（落とさない）。理由だけが足される。
+        # リストは変えない（落とさない）。理由だけが足される。
         self.assertEqual(sorted(before), sorted(after))
         self.assertIn("ワークツリーの外", after["i0001-02"])
         self.assertEqual("", after["i0001-01"])
@@ -289,8 +289,8 @@ class PresentTest(AuthorityHarness):
         lines = check.stdout.splitlines()
         self.assertEqual("check 1", lines[0])
         self.assertTrue(lines[1].startswith("error "), check.stdout)
-        # ユーザが運ぶ手順も言う。
-        self.assertIn("運んでコミットと push", check.stdout)
+        # ユーザが親のブランチへ移してコミットする手順も言う。
+        self.assertIn("移してコミットと push", check.stdout)
 
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
         self.record("present")
@@ -408,7 +408,7 @@ class UndecidedTest(AuthorityHarness):
 
 
 class TombstoneTest(AuthorityHarness):
-    """親子のチケットの取り込み状態は墓標として残り、親のワークツリーを片付けても止めが外れない。
+    """親子のチケットの取り込み状態は削除せずに残り、親のワークツリーを片付けても止めが外れない。
 
     消すと、決まらないで止めていた親子のチケットが取り込み状態の無い扱いに戻り、止めが外れる。
     """
@@ -442,7 +442,8 @@ class TombstoneTest(AuthorityHarness):
         self.assertTrue(st.stop and not st.closed, st)
         self.assertIn("片付けても残る", st.stop)
         # 統合先の取り込み結果の done/ に親のチケットがあれば、
-        # 親子のチケットの取り込み状態に頼らず閉じた親子のチケット（墓標は何も言わない）。
+        # 親子のチケットの取り込み状態に頼らず閉じた親子のチケット
+        # （削除せずに残した取り込み状態は何も言わない）。
         base = os.path.join(self.state, "sync", "self", "integration")
         write(os.path.join(base, "head"), "branch main\nsha abc\n")
         write(
@@ -539,7 +540,8 @@ class MarkTest(AuthorityHarness):
     def test_a_same_named_tree_in_another_repository_is_not_guessed(self):
         """取り込み状態が 1 つでも、同じ名前の親のワークツリーが別のリポジトリにあれば決めない。
 
-        ワークスペースのユーザの付けた名前 `web-i0012` と、プロジェクト web の issue 12
+        ワークスペースのユーザの付けた名前 `web-i0012` と、
+        プロジェクト web の issue 12
         の親子のチケットが並ぶ形。
         """
         from ccnavi.infra import tree
@@ -645,7 +647,7 @@ class IntegrationDoneTest(AuthorityHarness):
 
 class PredecessorTest(AuthorityHarness):
     def test_an_undecided_predecessor_family_is_not_met(self):
-        # 先行 i0002-01 は元ツリーの done/ にある（前の池では満たす）。
+        # 先行 i0002-01 は元ツリーの done/ にある（前の対応表では満たす）。
         # 親子のチケット i0002 は取り込み済みだが、親のワークツリーが無い（決まらない）ので、
         # 満たしたとみなさない。
         write(
@@ -670,7 +672,8 @@ class PredecessorTest(AuthorityHarness):
         )
 
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
-        # 厳しくする向きだけ: 親のワークツリーで閉じていても、前の池で満たしていなければ満たさない。
+        # 厳しくする向きだけ: 親のワークツリーで閉じていても、
+        # 前の対応表で満たしていなければ満たさない。
         Ticket = approval.ticket_mod.Ticket
         done = Ticket(ticket="i0001-09", parent="i0001", state="done", tree_root=self.parent_tree)
         stale = Ticket(ticket="i0001-09", parent="i0001", state="doing", tree_root=self.root)
@@ -678,7 +681,7 @@ class PredecessorTest(AuthorityHarness):
         self.record("present")
         approval.align_imported(self.conf(), self.root, pool)
         self.assertEqual([done, stale], pool["i0001-09"])
-        # 親のワークツリーで閉じていなければ、それを採る（前の池が満たしていても）。
+        # 親のワークツリーで閉じていなければ、それを採る（前の対応表が満たしていても）。
         doing = Ticket(ticket="i0001-08", parent="i0001", state="doing", tree_root=self.parent_tree)
         closed = Ticket(ticket="i0001-08", parent="i0001", state="done", tree_root=self.root)
         pool = {"i0001-08": [doing, closed]}
@@ -699,7 +702,7 @@ class ReadyTest(AuthorityHarness):
 
 
 class DigestTest(AuthorityHarness):
-    """承認の指紋は判定が読んだ中身（read_set）で作る。"""
+    """承認のダイジェストは判定が読んだ中身（read_set）で作る。"""
 
     def judged(self):
         conf = self.conf()
@@ -715,7 +718,7 @@ class DigestTest(AuthorityHarness):
         self.assertIn("(設定):.claude/settings.json", first.read_set)
         self.assertIn("(設定値):approved", first.read_set)
         self.assertEqual(first.digest, self.judged().digest)
-        # 一括の外のチケット（作業中の子）の中身が変われば、画面が同じでも指紋は変わる。
+        # 一括の外のチケット（作業中の子）の中身が変われば、画面が同じでもダイジェストは変わる。
         path = os.path.join(self.approved, "doing", "i0001-01.md")
         with open(path, encoding="utf-8") as f:
             text = f.read()

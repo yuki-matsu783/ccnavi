@@ -195,7 +195,7 @@ def _with_file(stderr: TextIO, bases: list[str], text: str, rel: str) -> str:
 
 
 def bases(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[str]:
-    """ルールが指すファイルを探すルートの並び。近いほうから。
+    """ルールが指すファイルを探すルートのリスト。近いほうから。
 
     行き先（Bash なら cwd）がワークツリーの中なら、まずそのワークツリー。そこに無ければ
     その元リポジトリ、最後にワークスペースルート。ワークツリーで直している最中の

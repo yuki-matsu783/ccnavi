@@ -281,7 +281,7 @@ class StopRulesTest(unittest.TestCase):
     def test_a_stale_project_copy_of_the_common_rule_is_not_counted_twice(self):
         """プロジェクトの層へ写した共通層が古くなって `every` が違っても、数えるのは共通層の 1 本。
 
-        共通層は親の着手でプロジェクトの層へ写すので、写した層が古いまま残ることがある。
+        共通層は親の着手でプロジェクトの層へコピーするので、コピーした層が古いまま残ることがある。
         """
         home = self.project()
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))

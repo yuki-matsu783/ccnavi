@@ -10,7 +10,7 @@ hook は引数を渡さずに起動するので、hook からの判定の入口�
 
 フラグが有効なのは診断の経路（`--lint` / `--test` / `--explain`）だけ。
 ここで見るのは env が使われないことと、
-その門が有効なことの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
+その制限が有効なことの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
 
 起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
 読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
@@ -169,7 +169,7 @@ class EnvDoesNotMoveTheCommonLayerTest(CommonLayerPlaceHarness):
 
 
 class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
-    """診断のためのフラグは残る。消しすぎの見張り。"""
+    """診断のためのフラグは残る。消しすぎを見つけるための確認。"""
 
     def test_each_flag_still_moves_the_common_layer(self):
         """`--rules` / `--phases` / `--risk` は、診断（`--explain`）ではそれぞれの 1 本を動かす。"""
@@ -220,7 +220,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
                 self.assertIn(f"{flag} は診断", result.stderr)
 
     def test_the_wording_is_the_one_the_project_file_flags_use(self):
-        """文面は `--project-rules-file` と同じ。門が 2 つあるように読ませない。"""
+        """文面は `--project-rules-file` と同じ。制限が 2 つあるように読ませない。"""
         one = self.decide("Read", flags=("--rules", self.other_rules), file_path=self.target())
         other = self.decide(
             "Read",

@@ -485,7 +485,7 @@ test("CB-D135 外で変わった知らせは最初の 1 回だけ履歴を空に
   }
 });
 
-test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を出し、並びだけ変わったと言う。時計を進めれば打ち込みは別の 1 件", async () => {
+test("CB-D136 順序だけ変わって未保存のときも保存前の一覧を出し、順序だけ変わったと言う。時計を進めれば打ち込みは別の 1 件", async () => {
   const doc = three();
   const reordered: FlowDoc = { ...doc, nodes: [...doc.nodes].reverse() };
   const dom = await openFlow({ doc, draft: reordered, reviewSave: true });
@@ -493,7 +493,7 @@ test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を
     assert.ok(dirty(dom));
     dom.click(button(dom, "save"));
     await dom.settle();
-    assert.match(dom.one("#review-order-only").textContent ?? "", /並び順だけが変わりました/);
+    assert.match(dom.one("#review-order-only").textContent ?? "", /順序だけが変わりました/);
     assert.equal(dom.posted.filter((m) => m.type === "save").length, 0);
     dom.click(button(dom, "cancel-save"));
     await dom.settle();

@@ -482,16 +482,16 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     }
     case "approve": {
       // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
-      // 見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに書き込まれる中身）も渡す。識別子が同じでも、
+      // 見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに書き込まれる中身）も渡す。識別子が同じでも、
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       if (state === current) {
-        // 運ぶ sh があるかは、承認が返ったこの時点で見る
+        // 承認の push の sh があるかは、承認が返ったこの時点で見る
         dispatch(current, { kind: "approved", outcome, carrier: isFile(path.join(root, PUSH_APPROVED_SCRIPT)) });
       }
       return;
     }
-    // 承認の実行ファイルは承認済みチケットを置くだけで、運ぶ（コミットして push する）のはこの sh
+    // 承認の実行ファイルは承認済みチケットを置くだけで、コミットして push するのはこの sh
     case "carry":
       runInTerminal(root, pushApprovedCommand(root));
       return;

@@ -7,7 +7,7 @@
 2. マーカーの履歴は親に残ること（依頼・レビュー済み・終わりの告知・開き直し）
 3. 書けなくても状態は動き、書けなかったことは警告として出ること
 4. ボードの JSON に新しい側が載ること
-5. 履歴のファイルを、実行後チェックが「エージェントの書き込み」として咎めないこと
+5. 履歴のファイルを、実行後チェックが「エージェントの書き込み」として報告しないこと
 
 道具は並行するチケットの受入テスト（test_ticket.TicketTest）のものを借りる。借りるだけで、
 あちらのテストはここでは走らせない（`load_tests`）。
@@ -185,9 +185,9 @@ class HistoryTest(TicketTest):
         self.assertTrue(any("i0001-01 の履歴" in p for p in board["problems"]), board["problems"])
 
     def test_the_post_monitor_does_not_report_the_history_it_wrote(self):
-        """`ticket start` の履歴は、実行後チェックが保護領域の変更として咎めない。
+        """`ticket start` の履歴は、実行後チェックが保護領域の変更として報告しない。
 
-        実行後チェックは、副命令の書き込みを中身の姿で見分けて外す。
+        実行後チェックは、副命令の書き込みを正規化した内容で見分けて外す。
         """
         self.family_without_starting()
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)

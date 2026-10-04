@@ -18,7 +18,7 @@ function drafted(): FlowDoc {
   return patchData(added.doc, added.id, { prompt: "既存の振る舞いを読む\nそのあと要点をまとめる" });
 }
 
-test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見せた差分から取り込むと編集中に入る。保存に取り込んだ指紋を添える", async () => {
+test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見せた差分から取り込むと編集中に入る。保存に取り込んだハッシュを添える", async () => {
   const dom = await openFlow({ offer: OFFER });
   try {
     assert.match(dom.one("#offer").textContent ?? "", /提案あり/);
@@ -137,7 +137,7 @@ test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が
   }
 });
 
-test("CB-D142 取り込んだあとに元に戻して別の編集をした・取り込んだ中身を直したときは、保存に取り込みの指紋を添えない", async () => {
+test("CB-D142 取り込んだあとに元に戻して別の編集をした・取り込んだ中身を直したときは、保存に取り込みのハッシュを添えない", async () => {
   const dom = await openFlow({ offer: OFFER });
   try {
     const importDraft = async (): Promise<void> => {

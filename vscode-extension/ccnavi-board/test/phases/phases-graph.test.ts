@@ -66,7 +66,7 @@ test("CB-T187 置き場所は id だけで決まる。関係を直しても、�
   const before = spots(form(...base));
 
   // 並べ替えても同じ
-  assert.deepEqual(spots(form(...base.slice().reverse())), before, "ファイルの並びが変わると絵が変わっている");
+  assert.deepEqual(spots(form(...base.slice().reverse())), before, "ファイルの中の順序が変わると絵が変わっている");
 
   // **関係を 1 本足しても、どの点も動かない。** 保存が通るたびに中身は丸ごと届き直すので、
   // 関係を直しながら確かめる間に絵が組み替わると、この画面の用を成さない

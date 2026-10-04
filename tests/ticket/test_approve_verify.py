@@ -285,7 +285,7 @@ class ApproveVerifyTest(PhaseHarness):
                     self.assertIn("--agree --preview --verify", context(inside))
 
     def test_the_notice_stays_inside_the_workspace(self):
-        """ワークスペースの外に同じ並びを掘っても、提案を書いたことにはしない。
+        """ワークスペースの外に同じディレクトリ構成を掘っても、提案を書いたことにはしない。
 
         当てる式はワークスペースルートに固定してある。ツリー（ワークツリー・プロジェクト）は
         どれもルートの下なので、正しい置き場は全部入り、外は入らない。

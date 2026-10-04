@@ -227,7 +227,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
-    // 運ぶ sh をターミナルに送ったときだけ、そう言う。
+    // 承認の push の sh をターミナルに送ったときだけ、そう言う。
     assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
   } finally {
     await page.close();
@@ -336,7 +336,7 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
     assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
-    // 識別子と「絞り込み中か」を別々に送る。空の並びを「全部」に読ませない
+    // 識別子と「絞り込み中か」を別々に送る。空の配列を「全部」に読ませない
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: false });
     // 絞り込んでも上部の集計はボード全体の数のまま（変わるのはボタンの数だけ）
     page.click(page.one("#attention-filter"));

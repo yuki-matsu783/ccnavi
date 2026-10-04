@@ -144,7 +144,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   assert.match(rules, /\.row-head:hover \{ background: var\(--vscode-list-hoverBackground\); outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   // 行末のボタンは、見出しの「＋ 追加」向けの margin-left: auto を打ち消す。詳細度で採られるようにしてあるので、
-  // バンドルの並び（@import の順）が変わっても入れ替わらない
+  // バンドルの順序（@import の順）が変わっても入れ替わらない
   assert.match(rules, /\.row-body \.buttons button\.action \{ margin-left: 0; \}/);
   // 動いたカードの輪も contrast の変数を使い、他のテーマでは緑のまま。左の縁（不備・承認待ち・
   // レビュー待ち）は上書きしない（別の channel）

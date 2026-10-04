@@ -2,8 +2,8 @@
  * Chrome からの承認と取り下げ。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
  * - 1 コミットの組み立て（`createCommitOnBranch`、`expectedHeadOid` = 読んだ P の先頭）と、書いた後の確かめ
- * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。指紋が同じなら見せ直さずに書き、違えば書かない
- * - 見せた指紋が違えば書かない。決まらない親子のチケット・版ずれでは書かない
+ * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。ダイジェストが同じなら見せ直さずに書き、違えば書かない
+ * - 見せたダイジェストが違えば書かない。決まらない親子のチケット・版ずれでは書かない
  * - 取り下げ: 承認コミット（merge を飛ばす）の親の提案をそのまま戻す
  */
 import { before, test } from "node:test";
@@ -96,7 +96,7 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.deepEqual(after?.withdrawable?.map((w) => [w.ticket, w.problems]), [["i0001", ["todo/ に子の提案がある"]]]);
 });
 
-test("CX-T101 先頭が動いたら（expectedHeadOid の競合）新しい Snapshot で判定し直し、指紋が同じなら見せ直さずに書く", async () => {
+test("CX-T101 先頭が動いたら（expectedHeadOid の競合）新しい Snapshot で判定し直し、ダイジェストが同じなら見せ直さずに書く", async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
   mock.beforeCommit = (b) => mock.push(b, { "src/app.py": "print('moved')\n" }, "コードだけの push");
@@ -119,7 +119,7 @@ test("CX-T102 先頭が動いて承認待ちの中身も変わったら、書か
   assert.ok(!(DOING in mock.files("i0001")));
 });
 
-test("CX-T103 見せた指紋が今の中身と違えば、1 つも書かない", async () => {
+test("CX-T103 見せたダイジェストが今の中身と違えば、1 つも書かない", async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
   const out = await approveFamily(REPO, "i0001", { ...shown, digest: "0".repeat(64) }, d);
@@ -217,7 +217,7 @@ test("CX-T108 書けたのに応答だけが落ちたら、先頭が書いたと
   assert.deepEqual(mock.commitCalls.map((c) => c.result), ["written"]);
 });
 
-test(`CX-T109 ${MAX_ROUNDS} 周しても先頭が動き続けたら、ユーザに回す`, async () => {
+test(`CX-T109 ${MAX_ROUNDS} 周しても先頭が動き続けたら、ユーザの対応に切り替える`, async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
   let n = 0;

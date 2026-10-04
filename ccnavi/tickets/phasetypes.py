@@ -180,7 +180,7 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
         # 実行後チェック）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う処理まで
         # 進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
-    # 承認の指紋（read_set）に入れる。種類は待ち方と止め方を決める判定の入力。
+    # 承認のダイジェスト（read_set）に入れる。種類は待ち方と止め方を決める判定の入力。
     fsio.note_read(path, text)
     return parse(text, path, refs)
 
@@ -477,7 +477,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         pt.scope = entries
         pt.scope_globs = [e.glob for e in entries]
     else:
-        problems.append(Problem(SEVERITY_ERROR, ident, "`scope` は glob の並びか `inherit`"))
+        problems.append(Problem(SEVERITY_ERROR, ident, "`scope` は glob のリストか `inherit`"))
         return None, problems
 
     for key in ("deliverables", "overlap", "requires", "after"):
@@ -485,7 +485,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         if raw is None:
             continue
         if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
-            problems.append(Problem(SEVERITY_ERROR, ident, f"`{key}` は文字列の並び"))
+            problems.append(Problem(SEVERITY_ERROR, ident, f"`{key}` は文字列のリスト"))
             return None, problems
         setattr(pt, key, [x.strip() for x in raw if x.strip()])
     for glob in pt.deliverables:

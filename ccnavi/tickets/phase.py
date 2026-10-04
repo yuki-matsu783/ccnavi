@@ -109,7 +109,7 @@ TICKET_APPROVAL_RULE_ID = "builtin-guard-ticket-approval"
 
 
 def commands(subject: str) -> list[str]:
-    """shellread が切ったコマンドの並び。読めなかった生の文字列なら 1 本。"""
+    """shellread が切ったコマンドのリスト。読めなかった生の文字列なら 1 本。"""
     return [c.strip() for c in subject.split("\x00") if c.strip()]
 
 
@@ -359,11 +359,11 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     実行ファイルの側は標準入力が端末であることを求めるので、hook から呼んでも通らないが、
     文字列で止めておけば「なぜ通らないのか」が当たったルールの id で分かる。
 
-    承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
-    合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのはユーザ。
+    承認の push（`ccnavi-push-approved.sh`）も止める。コミットして push することは
+    合意そのものではないが、push は外へ出す操作で、その時機を決めるのはユーザ。
 
     親子のチケットの取り込み状態を消す `ccnavi-sync.sh --forget` も止める。
-    取り込み状態（墓標）を消すと、決まらないで止めていた親子のチケット（gone など）が、
+    削除せずに残した取り込み状態を消すと、決まらないで止めていた親子のチケット（gone など）が、
     取り込み状態の無いものに戻り、動けるようになる。
 
     ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
@@ -378,12 +378,12 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
         # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古いコピーが残っていても止める。
         r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(agree|approve|push-approved)\.sh\b"
-        # 親子のチケットの取り込み状態（墓標）を消す、ユーザが打つスクリプト。消すと、
+        # 親子のチケットの削除せずに残した取り込み状態を消す、ユーザが打つスクリプト。消すと、
         # 止めていた親子のチケットが取り込み状態の無いものとして今の手元の動きに戻るので、
         # 打つのはユーザ。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
         # ユーザの判断に使うスクリプト。中で `--reviewed --chat`・
-        # `--config-synced`・`--close-early` を起こし、最後に運ぶ処理を呼ぶ。打つのはユーザ。
+        # `--config-synced`・`--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
         r"(chat|config-synced|close-early)\b"
     )
@@ -1123,7 +1123,7 @@ def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[in
 def chat_only(
     root: str, conf: settings.Settings, parent_id: str, venues: dict[int, str] | None = None
 ) -> bool:
-    """マージリクエストに出さない運び方か。フェーズが 1 つも無ければ False。
+    """マージリクエストに出さない進め方か。フェーズが 1 つも無ければ False。
 
     1 つでも `mr` で見るフェーズがあれば、その親にはマージリクエストが在る（レビューの依頼が作る）
     ので、早めに閉じたあとも Draft を外す手順を通る。`venues` は数え直しを省くために呼ぶ側が渡す値。

@@ -409,7 +409,7 @@ def reviewed_mark(
 ) -> dict:
     """レビュー済みのマーカーの中身（`phases/<親>/<N>.reviewed`）。
 
-    `confirm`（コア）と `decide` が使う。欄の並びは `{mr, accepted, actor, via, at}` で、
+    `confirm`（コア）と `decide` が使う。欄の順序は `{mr, accepted, actor, via, at}` で、
     Chrome のレビュー済みも同じ形で書く。
     `actor` は付けたユーザ（アカウント）が分かるときだけ、`via` は経路が分かるときだけ書く
     （Chrome は `via: chrome`。手元の `confirm` は `--actor` があるときだけ `actor` と `via: cli` を
@@ -627,9 +627,9 @@ def thread_key(t: Thread) -> str:
 
 
 def decision_digest(d: Decision) -> str:
-    """見せた指摘の指紋。見せてから押すまでに指摘が増えた・変わったら、適用を止める。
+    """見せた指摘のダイジェスト。見せてから押すまでに指摘が増えた・変わったら、適用を止める。
 
-    承認の指紋（`agree.approval_digest`）と同じ組み方。部分ごとの SHA-256 を件数と一緒に
+    承認のダイジェスト（`agree.approval_digest`）と同じ組み方。部分ごとの SHA-256 を件数と一緒に
     並べ、その全体の SHA-256。区切りでつなぐと、本文に区切りを書いてつなぎ目をずらせる。
     """
     assert d.result.mr is not None
@@ -781,8 +781,9 @@ def choose(
 ) -> int:
     """対話の decide の前半（`--reviewed N --accept-unresolved --choose-out <ファイル>`）。
 
-    残った指摘を見せて 1 件ずつ選ばせ、選択と指紋を `{"choices": …, "digest": …}` で書くだけ。
-    何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ
+    残った指摘を見せて 1 件ずつ選ばせ、
+    選択とダイジェストを `{"choices": …, "digest": …}` で書くだけ。
+    何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <ダイジェスト>` で打つ
     （選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たない）。
     """
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
@@ -871,14 +872,17 @@ def decide_yes(
     choices_text: str,
     digest: str,
 ) -> int:
-    """オーバーレイでユーザが押した選択を置く（`--yes <選択の JSON> --digest <指紋> --json`）。
+    """オーバーレイでユーザが押した選択を置く。
 
-    ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘の指紋が一致することを求める。エージェントが
-    これをシェルで打つ形は、組み込みの deny（`phase.ticket_approval_rule`）が止める。
+    形は `--yes <選択の JSON> --digest <ダイジェスト> --json`。
+
+    ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが一致することを
+    求める。エージェントがこれをシェルで打つ形は、組み込みの deny（`phase.ticket_approval_rule`）が
+    止める。
     結果は JSON で返す。違えば何も置かず `mismatch` を返す。
     """
     if not digest.strip():
-        stderr.write("ccnavi: --yes には --digest（見せた指摘の指紋）が要る\n")
+        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が要る\n")
         return 1
     try:
         raw = json.loads(choices_text)
@@ -1977,8 +1981,8 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
     """ユーザが見るものが、まだリモートに届いていないか。
 
     ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。ユーザがレビューで
-    見るのはコードで、置き場を運ぶのは `ccnavi-push-approved.sh` の仕事（push が落ちても
-    コミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
+    見るのはコードで、置き場をコミットして push するのは `ccnavi-push-approved.sh` の仕事
+    （push が落ちてもコミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
     `confirm` の側（`_moved_since_request`）と同じ基準。
 
     `ready` の前提（`_merge_problems`）はこれを使わない。あちらはユーザがリモートを見て
@@ -2070,10 +2074,10 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
-    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 9.2）。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの（設計 9.2）。
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
-    承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを
+    承認の push（`ccnavi-push-approved.sh`）が置き場をまとめてコミットするので、レビューを
     待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty` が同じ理由で外しており、
     基準をそこに揃える。ユーザがレビューで見るものは 1 バイトも変わらない。
 

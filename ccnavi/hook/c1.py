@@ -18,10 +18,11 @@
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
     `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの履歴（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
-  - (c) ユーザが運ぶもの（ユーザの判断）。C1 は運ばずに止める。ユーザの判断が一緒に書く
+  - (c) ユーザがコミットするもの（ユーザの判断）。C1 はコミットせずに止める。
+    ユーザの判断が一緒に書く
     移動（review/ から done/、doing/ から done/）とマーカーの消去、履歴の追記もここ
   - (d) 見分けられないもの。C1 は止める
-  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 が運ぶ。
+  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 がコミットする。
     未コミットのときだけ）
   - `skip` は書きかけの一時ファイル（数えない、コミットもしない）
 
@@ -74,7 +75,10 @@ _TIMEOUT = 20.0
 
 
 def family_of(ident: str) -> str:
-    """識別子が属する親子のチケットの親。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
+    """識別子が属する親子のチケットの親。
+
+    子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。
+    """
     matched = ticket_mod.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
 
@@ -208,7 +212,7 @@ def classify_all(
     changed: list[str],
     since: str = "",
 ) -> list[tuple[str, str, str]]:
-    """変更の並びを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
+    """変更のリストを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
     HEAD）、あれば HEAD と `since`。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。
     """
     approved_rel, review_rel = places

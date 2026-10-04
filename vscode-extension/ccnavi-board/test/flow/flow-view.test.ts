@@ -238,14 +238,14 @@ test("CB-T295 依頼の文は子・書く置き場・いまのフロー・確か
   assert.match(fix, /前の下書きが残っている/);
 });
 
-test("CB-T296 画面からの依頼・提案の操作と、保存に添える取り込んだ下書きの指紋は形を確かめてから受ける", () => {
+test("CB-T296 画面からの依頼・提案の操作と、保存に添える取り込んだ下書きのハッシュは形を確かめてから受ける", () => {
   for (const type of ["openProposal", "request", "requestCopy", "requestOpen"]) {
     assert.deepEqual(asFlowMessage({ type }), { type });
   }
   const doc = templateFlow("i0001-01", "調査");
   const hash = "a".repeat(64);
   assert.deepEqual(asFlowMessage({ type: "save", doc, imported: hash }), { type: "save", doc, imported: hash });
-  // 指紋の形でなければ、取り込みは無かったものとして受ける（下書きを消さない側）
+  // ハッシュの形でなければ、取り込みは無かったものとして受ける（下書きを消さない側）
   for (const bad of ["", "x".repeat(64), "A".repeat(64), "a".repeat(63), 1, null]) {
     assert.deepEqual(asFlowMessage({ type: "save", doc, imported: bad }), { type: "save", doc });
   }

@@ -27,7 +27,7 @@ from ..infra import hookio, settings, tree
 from ..policy import ctxfile, rules
 from ..tickets import flow
 
-# プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（中は組み込みの守りが丸ごと
+# プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（中は組み込みの保護が丸ごと
 # 止めるので、承認したチケットの中でもエージェントが書けない）。
 SKILLS_DIR = "docs/skills"
 SKILL_FILE = "SKILL.md"
@@ -70,7 +70,7 @@ def _front(raw: bytes) -> dict:
 
 
 def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str, str, str]], int]:
-    """(名前, 説明, 相対パス) の並びと、上限で落とした数。名前の順。"""
+    """(名前, 説明, 相対パス) のリストと、上限で落とした数。名前の順。"""
     base = skills_dir(project_root)
     try:
         names = sorted(os.listdir(base))

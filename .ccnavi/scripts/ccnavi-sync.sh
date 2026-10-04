@@ -11,7 +11,7 @@
 # <P> は親のブランチ名（= 親の識別子 = .claude/worktrees/<P>）。省けば、.claude/worktrees/ の下の
 # 親のワークツリー（ディレクトリ名 = ブランチ名で、親チケットか提案がある）を全部。
 #
-# 親子のチケットの取り込み状態は墓標として残す。親のワークツリーを片付けても消さない。
+# 親子のチケットの取り込み状態は削除せずに残す。親のワークツリーを片付けても消さない。
 # 消すと、決まらないで止めていた親子のチケット（gone など）が取り込み状態の無いものに戻り、止めが外れるため。
 # 消すのはユーザが打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
 # エージェントからは組み込みの deny（builtin-guard-ticket-approval）が止める。
@@ -24,7 +24,7 @@
 #      origin HEAD`、読めなければ origin/HEAD・main・master）。設定した名前がリモートに無ければ、
 #      既定に落とさずに止める
 #   3. 統合先を fetch し、親子のチケットごとの取り込みの後、判定に要るもの（done/・共通層・自身の層・
-#      .claude/settings.json）を統合先の取り込み結果 sync/<リポジトリ>/integration/ へ同じ並びでコピーし、head に
+#      .claude/settings.json）を統合先の取り込み結果 sync/<リポジトリ>/integration/ へ同じ構成でコピーし、head に
 #      remote・branch・source・sha・fetched_at を書く。統合先の先頭が前と同じならコピーしない
 #
 # 親子のチケットごとに次を行う（ロックを待って取る）。
@@ -59,7 +59,7 @@
 #
 # 環境変数: CCNAVI_INTEGRATION_BRANCH / CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/
 #   CCNAVI_SYNC_RETRIES（観測ずれの確かめ直しの回数、既定 3）/ CCNAVI_SYNC_RETRY_WAIT（その間隔の秒、既定 5）/
-#   CCNAVI_SYNC_TIMEOUT（ls-remote・fetch 1 回の見張りの秒、既定 60）
+#   CCNAVI_SYNC_TIMEOUT（ls-remote・fetch 1 回のタイムアウト監視の秒、既定 60）
 # 終了コード: 0 全部取り込んだ（取り込むものが無いを含む） / 1 止めた親子のチケットかリポジトリがある /
 #           2 引数か環境の誤り / 3 取り込みの後の検査で止める理由があったのに取り込み状態を書けなかった
 
@@ -76,7 +76,7 @@ sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
   親子のチケットの取り込み状態と統合先の取り込み結果を書く。分かれていれば merge し、衝突したら取りやめてユーザに回す。
   リモートから消えた親のブランチは、統合先の done/ を見て「閉じた」か「消えた」かを決める。
   取り込んだ後、親子のチケットを判定し直し、止める理由があれば取り込み状態を blocked にする。
-  取り込み状態は親のワークツリーを片付けても消えない（墓標）。
+  取り込み状態は親のワークツリーを片付けても消えない（削除せずに残す）。
 
   --forget <P>...  ユーザが打つ。捨てた親子のチケットの取り込み状態を消す（親のワークツリーを片付けた後だけ）。
                    消すと、その名前で切り直した親子のチケットは取り込み状態の無いものとして扱われる。
@@ -331,7 +331,7 @@ busy_state() {
 
 # 統合先の取り込み結果を書く。<リポジトリ> <取り込み状態の名前> <統合先>
 #
-# 統合先の先頭から、判定に要るものをファイルのまま同じ並びでコピーする（Python の読み方を変えずに
+# 統合先の先頭から、判定に要るものをファイルのまま同じ構成でコピーする（Python の読み方を変えずに
 # 済む形）。`git archive` は .gitattributes（export-ignore・export-subst・eol）で中身を変えるので使わず、
 # `ls-tree` と `cat-file blob` でコミットのバイト列そのものを書く。シンボリックリンク（120000）と
 # サブモジュールはコピーしない（読む側がリンクを辿らない決まりと二重にする）。
@@ -513,7 +513,7 @@ sync_family() {
 	case "$lock_rc" in
 	0) ;;
 	2)
-		printf '%s: 古いロック（%s/locks/%s/%s）を奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$P" "$state" "$key" "$P"
+		printf '%s: 古いロック（%s/locks/%s/%s）を強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$P" "$state" "$key" "$P"
 		fail_note
 		return 0
 		;;
@@ -814,7 +814,7 @@ while IFS= read -r key <&4; do
 		continue
 	fi
 	awk -F "$tab" -v k="$key" '$3 == k' "$scratch/families" >"$scratch/these"
-	# 読む先は fd 3。中で起こす git が標準入力を読んでも、親子のチケットの並びを読み取ってしまわない。
+	# 読む先は fd 3。中で起こす git が標準入力を読んでも、親子のチケットの一覧を読み取ってしまわない。
 	while IFS="$tab" read -r fam_p fam_tree fam_key <&3; do
 		[ -n "$fam_p" ] || continue
 		sync_family "$fam_p" "$fam_tree" "$fam_key" "$repo" "$integ" "$heads"

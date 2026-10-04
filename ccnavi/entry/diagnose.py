@@ -42,7 +42,7 @@ BOARD_VERSION = 1
 
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
 # 試したいユーザには「当たらない」ではなく「そもそも見ていない」と言う。
-# 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ並び。
+# 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ順序。
 KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
 
@@ -130,7 +130,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["rules"] = _rules_hit(stderr, conf, root, record)
     out["response"] = _response_text(captured.getvalue())
     # 引用の中から切り出したコマンドにだけヒットしたルールの id。記録と同じく、
-    # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の並びを、
+    # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の一覧を、
     # この場合が無い呼び出しで変えないため。
     if record.quoted:
         out["quoted"] = list(record.quoted)
@@ -309,7 +309,7 @@ def _response_text(written: str) -> str:
 
 
 def load_samples(path: str, root: str) -> list[dict]:
-    """見本を読んで、タイプの順に平らな並びにする。
+    """見本を読んで、タイプの順に平らなリストにする。
 
     タイプの名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず。
     `subject` の合言葉 `/repo` は走らせた場所に読み替える。
@@ -438,7 +438,7 @@ def test_samples(
     return 1 if body["mismatches"] else 0
 
 
-# 層の見出し。共通層と自身の層だけ日本語で名乗る。プロジェクトは名前そのもので、
+# 層の見出し。共通層と自身の層だけ日本語の名前で出す。プロジェクトは名前そのもので、
 # それが id の前置き（`lib:schema`）と同じ表記になる。
 LAYER_LABELS = {ruleload.LAYER_COMMON: "共通層", ruleload.LAYER_SELF: "自身の層"}
 
@@ -756,7 +756,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         review_copies,
         agree.types_resolver(conf, root, open_copies),
     )
-    # 先行を引く池。承認と着手が使うのと同じ集め方。
+    # 先行を引く対応表。承認と着手が使うのと同じ集め方。
     preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
     approval.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
@@ -805,7 +805,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
 
 
 def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
-    """層ごとの宣言（設計 11.9）。並びは 共通層 → 自身の層 → プロジェクト（名前順）。
+    """層ごとの宣言（設計 11.9）。順序は 共通層 → 自身の層 → プロジェクト（名前順）。
 
     rules は重複を捨てたあとの、その層から実際に判定へ入ったぶん。phases と risk は
     その層のファイルに書いてあるぶんで、合成はしない（合成の結果は親のフェーズの
@@ -870,7 +870,7 @@ def _phase_type_record(layer: str, pt) -> dict:
         "kind": pt.kind,
         "title": pt.title,
         "review": pt.review,
-        # scope は `inherit`（親の範囲を継ぐ）のとき None。空の並びと区別が付くように、
+        # scope は `inherit`（親の範囲を継ぐ）のとき None。空のリストと区別が付くように、
         # 継ぐことは `inherit` の 1 語で出す。
         "scope": [_written(e) for e in pt.scope] if pt.scope else ["inherit"],
     }
@@ -894,7 +894,7 @@ def _where(t: ticket_mod.Ticket) -> dict:
 
 
 def _one_per_file(found: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """同じツリーで同じファイルを 2 度読んだぶんをまとめる。並びは見つけた順で、先を残す。
+    """同じツリーで同じファイルを 2 度読んだぶんをまとめる。順序は見つけた順で、先を残す。
 
     鍵にツリーを入れるのは、まとめるのを「1 つの走査の重なり」に限るため。2 つのツリーが
     同じ実体を指す形（`projects/<名前>` がワークスペース自身への symlink など）は
@@ -1054,7 +1054,7 @@ def _phase_record(ph: phase.Phase) -> dict:
 def _parent_record(
     conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
 ) -> dict:
-    """親 1 件。局面、計画、親のマーカー、フェーズの並び。"""
+    """親 1 件。局面、計画、親のマーカー、フェーズのリスト。"""
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     closed = parent.ticket in closed_index
     return {

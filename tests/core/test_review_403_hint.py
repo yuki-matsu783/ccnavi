@@ -71,7 +71,7 @@ class TheHintIsInTheFailurePathTest(unittest.TestCase):
 
 @unittest.skipUnless(SHELL and JQ and CURL, "sh / jq / curl のどれかが無い")
 class OrdinaryFailuresStaySilentTest(unittest.TestCase):
-    """GraphQL 以外の失敗では案内を出さない。出る条件を広げない見張り。"""
+    """GraphQL 以外の失敗では案内を出さない。出る条件を広げないための確認。"""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-403-")

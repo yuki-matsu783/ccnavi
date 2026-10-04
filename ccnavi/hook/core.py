@@ -1,4 +1,4 @@
-"""判定のコアと差し口。手元と Chrome（Pyodide）で同じ判定を動かすため、入出力を差し口に分ける。
+"""判定のコアと差し替え点。手元と Chrome（Pyodide）で同じ判定を動かすため、入出力を分ける。
 
 承認・承認の取り下げ・レビュー済みを、同じ形の 3 段に分ける。
 
@@ -8,7 +8,7 @@
   作業ツリー、Chrome は API で読んだ中身を MEMFS に組んだ仮のツリー。
   core はブランチごとの blob の表（取っていないファイルを `NOT_FETCHED` にする形）を持たない
 - **判定**: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
-  紛れないように名前を変えた）は承認の対象と画面と指紋を、`withdraw` と `confirm` は通らない
+  紛れないように名前を変えた）は承認の対象と画面とダイジェストを、`withdraw` と `confirm` は通らない
   理由を返す
 - **Changes**: 書き込みを値として並べたもの（`plan`）。書くときの落ち方（止める・言って続ける）
   もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
@@ -75,7 +75,8 @@ def read_fs(conf: settings.Settings, root: str, stamp: str = "", actor: Actor | 
 class Verdict:
     """`judge_approval` の答え。`messages` は標準エラーに出す文面（呼び手が出す）。
 
-    `mismatch` は見せた一覧・指紋（`shown_ids` / `shown_digest`）と今のものが違うときの中身。
+    `mismatch` は見せた一覧・ダイジェスト（`shown_ids` / `shown_digest`）と今のものが違うときの
+    中身。
     見せたものを渡さなければ None。
     """
 
@@ -84,7 +85,8 @@ class Verdict:
     digest: str
     messages: str
     mismatch: dict | None = None
-    # 判定が読んだ中身（`<ブランチ>:<相対パス>` → 中身の指紋）。指紋はこれと本文から作る。
+    # 判定が読んだ中身（`<ブランチ>:<相対パス>` → 中身のハッシュ）。
+    # ダイジェストはこれと本文から作る。
     read_set: dict[str, str] = field(default_factory=dict)
 
     @property
@@ -119,13 +121,13 @@ def judge_approval(
     shown_ids: list[str] | None = None,
     shown_digest: str | None = None,
 ) -> Verdict:
-    """承認の対象を組み、画面の本文と指紋を出す。見せたものを渡せば、今のものと比べる。
+    """承認の対象を組み、画面の本文とダイジェストを出す。見せたものを渡せば、今のものと比べる。
 
     比べ方は前の `--agree --yes` と同じ。絞り（`only`）が通らなかったときは、絞らない
-    一覧を今の一覧として比べる（ボードが古い）。識別子と指紋のどちらかが違えば `mismatch`。
+    一覧を今の一覧として比べる（ボードが古い）。識別子とダイジェストのどちらかが違えば `mismatch`。
     """
     err = io.StringIO()
-    # 判定が読んだ中身（read_set）を記録し、指紋に入れる。
+    # 判定が読んだ中身（read_set）を記録し、ダイジェストに入れる。
     with fsio.reading() as seen:
         gathered = agree.gather(err, snapshot.conf, snapshot.root, only)
         shown = gathered
@@ -158,7 +160,7 @@ DELETE = "delete"
 
 @dataclass
 class Changes:
-    """書くものの並び（plan の答え）。
+    """書くもののリスト（plan の答え）。
 
     `planned.stage.items` が書く順（書き込みと見せる行）、`planned.stopped` は途中で止まった
     ところ（止まるまでの分は書く）。`per_branch` はブランチごとのファイルの増減。
@@ -481,14 +483,16 @@ def approve_yes(
     only: list[str] | None = None,
     digest: str = "",
 ) -> int:
-    """`--agree --yes <識別子,…> --digest <指紋> [<絞り>...]`。拡張のオーバーレイで押した承認。
+    """`--agree --yes <識別子,…> --digest <ダイジェスト> [<絞り>...]`。
+
+    拡張のオーバーレイで押した承認。
 
     端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
     ものを承認する経路を使えなくするため。識別子に加えて、見せた承認画面の本文・判定が読んだ中身・
-    承認済みチケットに書き込む中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
+    承認済みチケットに書き込む中身のダイジェスト（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
     画面に出ない欄（`issue` など）が書き換われば承認しない。
-    指紋が無ければ承認しない。
+    ダイジェストが無ければ承認しない。
 
     引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
     「そのとき掛けていた絞り」（`--agree --preview` に渡したものと同じ）。分けないと検査が
@@ -501,7 +505,7 @@ def approve_yes(
     if not shown:
         stderr.write(
             "ccnavi: --yes には --digest（見せた承認画面の本文・判定が読んだ中身・"
-            "承認済みチケットに書き込む中身の指紋）が要る\n"
+            "承認済みチケットに書き込む中身のダイジェスト）が要る\n"
         )
         return 1
     # 絞りが通らなかった（承認待ちに無い識別子が入っている、親の改版を外した）ときは、
@@ -590,7 +594,7 @@ def reviewed_mark(
 
 @dataclass
 class Checked:
-    """`confirm` と `withdraw` の答え。`problems` は標準エラーに出す文面（行の並び）。
+    """`confirm` と `withdraw` の答え。`problems` は標準エラーに出す文面（行のリスト）。
 
     通らなければ `changes` は None。
     """
@@ -725,7 +729,7 @@ def reviewable(snapshot: Snapshot, parent_id: str) -> list[dict]:
     """依頼済みで、まだレビュー済みでないフェーズ。Chrome のボードが出す候補。
 
     並べるだけで、通るかは見ない（通るかは `confirm` がホストから取得した結果で決める）。
-    答えは `{phase, mr, host, children}` の並び。`mr` と `host` は依頼のマーカーの値。
+    答えは `{phase, mr, host, children}` のリスト。`mr` と `host` は依頼のマーカーの値。
     """
     parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
     if parent is None:

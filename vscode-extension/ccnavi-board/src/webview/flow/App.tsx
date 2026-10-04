@@ -21,7 +21,7 @@
  *
  * **エージェントの下書き。** 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
  * 実行ファイルに確かめさせた中身が届き（`proposal`）、文の前後まで見せる差分（`Proposal.tsx`）から「取り込む」で
- * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きの指紋を添え、拡張ホストは
+ * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きのハッシュを添え、拡張ホストは
  * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`request`）は着手の前だけ拡張ホストが言葉を渡す。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -113,7 +113,7 @@ function nextSpot(doc: FlowDoc): { x: number; y: number } {
   return { x: low.x, y: low.bottom + 50 };
 }
 
-/** 並びが同じか（選んだノードの id を毎回作り直さないため） */
+/** 配列が同じか（選んだノードの id を毎回作り直さないため） */
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
@@ -194,12 +194,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const checkSeq = useRef(0);
   // 外で変わった知らせを受けているか。拡張ホストはタブを表に戻すたびに送り直すので、最初の 1 回だけ履歴を空にする
   const changedSeen = useRef(false);
-  // エージェントの下書き。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きの指紋
+  // エージェントの下書き。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きのハッシュ
   const [request, setRequest] = useState<string | undefined>(() => pageOf(initial)?.request);
   const [offer, setOffer] = useState<FlowOffer | undefined>(() => pageOf(initial)?.offer);
   const [proposal, setProposal] = useState<ProposalView | undefined>(undefined);
   const [requestText, setRequestText] = useState<string | undefined>(undefined);
-  // 取り込んだ下書きの指紋と中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に添える（違えば下書きを消させない）
+  // 取り込んだ下書きのハッシュと中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に添える（違えば下書きを消させない）
   const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
@@ -406,7 +406,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setDoc(next);
   };
 
-  /** 戻した・やり直したコピーに無いものを選んでいたら外す（線は並びの位置で指すので、線の選択は外す） */
+  /** 戻した・やり直したコピーに無いものを選んでいたら外す（線は配列の位置で指すので、線の選択は外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
     if (moved === undefined || readOnly) {
       return;
@@ -433,10 +433,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setFocus({ ids: [added.id] });
   };
 
-  /** 消したものを選んでいたら、選ぶのをやめる（線は並びの位置で指すので、線を消したら線の選択は外す） */
+  /** 消したものを選んでいたら、選ぶのをやめる（線は配列の位置で指すので、線を消したら線の選択は外す） */
   const removeNodeAt = (id: string): void => {
     edit(removeNode(doc, id));
-    // ノードと一緒に線も消えて並びの位置がずれるので、線の選択も外す
+    // ノードと一緒に線も消えて配列の位置がずれるので、線の選択も外す
     if ((selected?.kind === "node" && selected.id === id) || selected?.kind === "edge") {
       setSelected(undefined);
     }
@@ -539,7 +539,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const save = (): void => {
-    // 未保存なら、差分が空（並びだけ変わった）でも一覧を出す（一覧がそう言う）
+    // 未保存なら、差分が空（順序だけ変わった）でも一覧を出す（一覧がそう言う）
     if (reviewSave && dirty) {
       setReview(diffFlows(base, doc));
       return;

@@ -248,7 +248,7 @@ until a human has seen it at the terminal with
 
 
 # フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。
-# 空文字を受ける欄は、既定が None のフラグで運ぶ。「記録しない」「state の置き場を持たない」を
+# 空文字を受ける欄は、既定が None のフラグで受け渡す。「記録しない」「state の置き場を持たない」を
 # 言えないと、診断のための 1 回が、走っているセッションの記録と state に必ず入り込む。
 OVERRIDES = (
     ("log", True),
@@ -271,7 +271,7 @@ RELATIVE_OVERRIDES = ("tickets", "project_home")
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
 # プロジェクトの層がまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
-# 閉じた。中身を差し替えるのと結果が同じなので、同じ門に載せる。
+# 閉じた。中身を差し替えるのと結果が同じなので、同じ制限に載せる。
 LAYER_OVERRIDES = (
     ("--rules", "rules", ""),
     ("--phases", "phases", None),
@@ -279,10 +279,10 @@ LAYER_OVERRIDES = (
     ("--projects", "projects", None),
     ("--project-home", "project_home", ""),
 )
-# 落としたときの文面。5 本のフラグで同じものを使う。門が 2 つあるように読ませない。
+# 落としたときの文面。5 本のフラグで同じものを使う。制限が 2 つあるように読ませない。
 DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
 # `.ccnavi/scripts/` の sh が自分で計算して渡すパスと、渡されなかったときの値。
-# どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。
+# どちらも「いまどこで動いているか」で、エージェントが申告するものではない。
 #
 # sh は自分のぶんを先に置き、エージェントの引数を後ろに繋ぐ
 # （`exec "$bin" --root "$root" ticket "$@"`）。argparse は同じオプションを後勝ちで読むので、
@@ -417,7 +417,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--verify", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
-    # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身の指紋
+    # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身のダイジェスト
     # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
@@ -483,7 +483,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 一覧の基点（C1 の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error（例外は `start` の中で configsync が写したプロジェクトの層だけ）。
     parser.add_argument("--record-tree", default="")
-    # 対話の decide の前半。選択と指紋をこのファイルに書くだけで、何も置かない（state の置き場の
+    # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
+    # 何も置かない（state の置き場の
     # 下だけ）。ユーザが選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たないため。
     parser.add_argument("--choose-out", default="")
     # 統合先の名前。リポジトリには置かず、手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
@@ -608,7 +609,7 @@ def _recorded_run(
         outside = _outside_places(root, args, base, reals)
         if outside:
             stderr.write(
-                "ccnavi: C1 が運ぶのは状態だけで、置き場の外に書き込みがあった（"
+                "ccnavi: C1 がコミットするのは状態だけで、置き場の外に書き込みがあった（"
                 + ", ".join(outside)
                 + "）。コミットしない\n"
             )
@@ -617,7 +618,9 @@ def _recorded_run(
 
 
 def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[str]) -> list[str]:
-    """一覧のうち、C1 の置き場（承認済み・レビュー待ち）の外のもの。C1 は状態だけを運ぶ。
+    """一覧のうち、C1 の置き場（承認済み・レビュー待ち）の外のもの。
+
+    C1 がコミットするのは状態だけ。
 
     例外は 1 つだけ。`ticket start` の中で configsync がコピーしたプロジェクトの層と、
     指す先を直した配点のスクリプト（`configsync.is_synced_write` が内容で読めるもの）。
@@ -736,7 +739,7 @@ def _parsed(
     # フラグは設定ファイルより強い。書かれた値のほうも、そこに合わせて差し替える。
     if args.guard_ticket_approval:
         conf.guard_ticket_approval_declared = args.guard_ticket_approval
-    # この門は dry-run を取らない（selfguard.GATE_SETTINGS）。取れない語で書かれて
+    # この切り替えの環境変数は dry-run を取らない（selfguard.GATE_SETTINGS）。取れない語で書かれて
     # いたら、読めない値と同じく enable として扱う。--lint はそれを error にする。
     conf.guard_ticket_approval = selfguard.resolve(
         stderr,
@@ -889,7 +892,8 @@ def _parsed(
 
     # チケットの状態とレビューの操作。payload を読まない。
     # 着手で上書きした設定を、ユーザが端末で見たと残す。
-    # レビューの代わりなので、ユーザの判断と同じ門。
+    #
+    # レビューの代わりなので、ユーザの判断と同じ扱いにする。
     if args.config_synced:
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
@@ -929,7 +933,8 @@ def _parsed(
 
     if args.command or args.reviewed is not None or args.close_early:
         # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
-        # `--yes` を守るのは、見せた指摘の指紋の一致と、シェルから打つ形を止める組み込みの deny。
+        # `--yes` を守るのは、見せた指摘のダイジェストの一致と、
+        # シェルから打つ形を止める組み込みの deny。
         board = args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes)
         if (
             args.reviewed is not None
@@ -952,7 +957,7 @@ def _parsed(
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
     )
-    # この門は enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が
+    # この切り替えの環境変数は enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が
     # 持つので、ここに dry-run は無い。読めない値は enable になる。
     conf.guard_unwatched = selfguard.resolve(
         stderr,
@@ -1249,8 +1254,8 @@ def operate(
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.choose_out:
         # 対話の decide の前半（ロックを持ったままユーザを待たないため分ける）。ユーザが端末で選び、
-        # 選択と指紋を state の置き場に書くだけ。置くのは sh が C1 の中で
-        # `--yes <選択> --digest <指紋>` で打つ。
+        # 選択とダイジェストを state の置き場に書くだけ。置くのは sh が C1 の中で
+        # `--yes <選択> --digest <ダイジェスト>` で打つ。
         if not _inside(_real(os.path.abspath(args.choose_out)), _real(conf.state)):
             stderr.write("ccnavi: --choose-out の書き出し先は state の置き場の下だけ\n")
             return EXIT_ERROR

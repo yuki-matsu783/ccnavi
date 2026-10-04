@@ -370,7 +370,7 @@ ccnavi_record_write() {
 #
 # 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親チケットか提案が
 # あれば 0（SessionStart で早送りする対象の条件の 1 つ）。子チケット（`parent:` を持つ）は
-# 数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして扱わない（ブランチに乗らないので、親のブランチで運べない）。
+# 数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして扱わない（ブランチに乗らないので、親のブランチで共有できない）。
 ccnavi_parent_tree() {
 	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
@@ -395,7 +395,7 @@ ccnavi_parent_tree() {
 
 # ロック。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
-# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（ユーザに回す）。
+# 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを強制取得しかけて元に戻せなかった（人の対応に切り替える）。
 # 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<持ち主の情報>" を子に渡す。
 # 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT・INT・TERM・HUP にも置く）。
 #
@@ -403,11 +403,11 @@ ccnavi_parent_tree() {
 # - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <持ち主の情報> <OS>`、持ち主の情報は `<pid>-<開始時刻>`。
 #   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
 # - 古い: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
-#   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても奪わない
-#   （長い操作を奪って二重に書かせない。待ちで取れなければ「長い」と言って落とす）。pid を確かめ
+#   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても強制取得しない
+#   （長い操作からロックを取り上げて二重に書かせない。待ちで取れなければ「長い」と言って落とす）。pid を確かめ
 #   られない（別のホスト・別の OS・/mnt/ の下・pid が読めない）ときだけ、10 分を過ぎたら時刻で古い
 #   とする（WSL と Git Bash は同じホスト名で pid が通じない）。owner が読めなければ `find -mmin +10`
-# - 奪い方: 奪う操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
+# - 強制取得の仕方: 強制取得の操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
 #   owner の行と今の owner の行が同じなら `mv` で退避して、退避した中の owner がまだ同じなら消して取り直す。
 #   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
 # - 入れ子: CCNAVI_LOCK_HELD が同じ親子のチケットを指し、その識別子がロックの owner の識別子と同じなら、取ったものとして
@@ -466,7 +466,7 @@ ccnavi_lock_take() {
 				log_debug ロックを取った -- "lock=$ccnavi_lk_key"
 				return 0
 			fi
-			# 取った直後に奪われた（owner を書けない・別の中身）。取れていないとして待ちに戻る。
+			# 取った直後に強制取得された（owner を書けない・別の中身）。取れていないとして待ちに戻る。
 			ccnavi_lock_dir=""
 			ccnavi_lock_mark=""
 			log_warn 取ったロックの持ち主を書けなかった -- "lock=$ccnavi_lk_key"
@@ -536,7 +536,7 @@ ccnavi_lock_stale() {
 	[ "$ccnavi_ls_old" = yes ]
 }
 
-# そのロックが 10 分を超えて持たれているか（持ち主が生きていて奪わないときの文面に使う）。<ロック>
+# そのロックが 10 分を超えて持たれているか（持ち主が生きていて強制取得しないときの文面に使う）。<ロック>
 ccnavi_lock_long() {
 	ccnavi_ll_started=$(ccnavi_lock_num "$(ccnavi_lock_owner "$1" | awk '{ print $3 }')")
 	[ -n "$ccnavi_ll_started" ] || return 1
@@ -564,12 +564,12 @@ ccnavi_lock_describe() {
 		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
 }
 
-# 古いロックを奪う。<ロック> <古いと判断したときに読んだ owner の行>
-# 0 奪えた（取り直す）/ 1 奪わなかった（待ちに戻る）/ 2 退けたものを戻せなかった
+# 古いロックを強制取得する。<ロック> <古いと判断したときに読んだ owner の行>
+# 0 強制取得できた（取り直す）/ 1 強制取得しなかった（待ちに戻る）/ 2 退けたものを戻せなかった
 ccnavi_lock_steal() {
 	ccnavi_st_gate="$1.steal"
 	if ! mkdir "$ccnavi_st_gate" 2>/dev/null; then
-		# 別の誰かが奪っている最中。10 分を過ぎた門は落ちた奪い手の残りなので外す。
+		# 別の誰かが強制取得している最中。10 分を過ぎた取得用のロック（.steal）は、途中で落ちた取得の残りなので外す。
 		if [ -n "$(find "$ccnavi_st_gate" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
 			rmdir "$ccnavi_st_gate" 2>/dev/null || :
 		fi
@@ -582,12 +582,12 @@ ccnavi_lock_steal() {
 		mv "$1" "$ccnavi_st_aside" 2>/dev/null; then
 		if [ "$(ccnavi_lock_owner "$ccnavi_st_aside")" = "$2" ]; then
 			rm -rf "$ccnavi_st_aside" 2>/dev/null || :
-			log_info 古いロックを奪った -- "lock=$1"
+			log_info 古いロックを強制取得した -- "lock=$1"
 			ccnavi_st_rc=0
 		elif [ ! -e "$1" ] && mv "$ccnavi_st_aside" "$1" 2>/dev/null; then
 			ccnavi_st_rc=1
 		else
-			log_warn 奪いかけたロックを戻せなかった -- "lock=$1"
+			log_warn 強制取得しかけたロックを戻せなかった -- "lock=$1"
 			ccnavi_st_rc=2
 		fi
 	fi
@@ -596,7 +596,7 @@ ccnavi_lock_steal() {
 }
 
 # 自分が取ったロックを外す。入れ子で取ったもの（ccnavi_lock_dir が空）は外さない。
-# owner の持ち主の情報が自分のものでなければ（奪われた後）触らない。自分が渡した CCNAVI_LOCK_HELD も消す。
+# owner の持ち主の情報が自分のものでなければ（強制取得された後）触らない。自分が渡した CCNAVI_LOCK_HELD も消す。
 ccnavi_lock_drop() {
 	if [ -n "$ccnavi_lock_dir" ]; then
 		ccnavi_ld_line=$(ccnavi_lock_owner "$ccnavi_lock_dir")
@@ -626,13 +626,13 @@ ccnavi_lock_drop() {
 	return 0
 }
 
-# ---- 見張りつきの git（取ってくる操作。ccnavi-fetch.sh と ccnavi-sync.sh が使う）
+# ---- タイムアウト監視つきの git（取ってくる操作。ccnavi-fetch.sh と ccnavi-sync.sh が使う）
 #
 #   ccnavi_git_timed <秒> <標準エラーの書き先> <リポジトリ> <git の引数>...
 #
 # 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
 # ssh の BatchMode は、ユーザが GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
-# 見張りの出力は捨てる（つないだままだと、見張りの sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
+# タイムアウト監視の出力は捨てる（つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
 # 戻り値は git のもの（切ったときは 0 でない）。標準出力は捨てないので、呼ぶ側がリダイレクトする。
 ccnavi_git_timed() {
 	ccnavi_gt_limit="$1"
@@ -654,7 +654,7 @@ ccnavi_git_timed() {
 			</dev/null 2>"$ccnavi_gt_err" &
 	fi
 	ccnavi_gt_pid=$!
-	# 見張りの中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
+	# タイムアウト監視の中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
 	(
 		exec </dev/null >/dev/null 2>&1
 		sleep "$ccnavi_gt_limit"
@@ -719,11 +719,11 @@ ccnavi_git_refusal() {
 # 保護で、ここの戻し（`restore --source` など）には当てない。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
-#   見張りの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回の見張りの秒、既定 60）
+#   タイムアウトの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回のタイムアウトの秒、既定 60）
 #
 # コミットは `--no-verify` でユーザの hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
 # だけで、コードの検査の対象ではないため。署名はユーザの設定に従うが、
-# 見張りの時間を付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
+# タイムアウトを付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
 # 途中で INT・TERM・HUP が来たら、送る前の自分のコミットを戻す（ccnavi_c1_end）。強制終了（KILL）で
 # 残ったコミットは、次の C1 の 5 が「未送信」で止まり、戻し方を言う。
@@ -864,13 +864,13 @@ ccnavi_c1_begin() {
 	case "$ccnavi_cb_rc" in
 	0) ;;
 	2)
-		ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
+		ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id の古いロックを強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
 		return 1
 		;;
 	*)
 		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/$ccnavi_c1_family_id"
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
+			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので強制取得しない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
 			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
 		fi
@@ -920,12 +920,12 @@ ccnavi_c1_prepare() {
 		# 3. C1 の外の変更を見分け、(b) を取り込みの前にコミットする。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "ユーザの判断が未送信" \
-			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
 			"置き場に ccnavi の知らない変更がある" "。ユーザが確かめてください。何も書いていない" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
-			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hook のマーカーと状態の履歴を運ぶ" || return 1
+			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hook のマーカーと状態の履歴をコミットする" || return 1
 		fi
 		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。統合先の取り込み結果も同じ回で書く。
 		ccnavi_cp_rc=0
@@ -949,9 +949,9 @@ ccnavi_c1_prepare() {
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_family_id" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
-			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
 			"置き場に ccnavi の知らない未送信のコミットがある" \
-			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も書いていない" || return 1
+			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も書いていない" || return 1
 		return 0
 	done
 }
@@ -996,7 +996,7 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# ユーザの hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る。
+	# ユーザの hook は実行しない。署名などで尋ねて止まらないよう、タイムアウトで切る。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
@@ -1181,7 +1181,7 @@ ccnavi_c1_inflight=""
 ccnavi_c1_inflight_h0=""
 ccnavi_c1_inflight_list=""
 ccnavi_c1_end() {
-	# 見張りの途中で切られたら、見張りも止める（後で別のプロセスを kill しないように）。
+	# タイムアウト監視の途中で切られたら、監視も止める（後で別のプロセスを kill しないように）。
 	if [ -n "${ccnavi_gt_dog:-}" ]; then
 		kill "$ccnavi_gt_dog" 2>/dev/null || :
 		ccnavi_gt_dog=""

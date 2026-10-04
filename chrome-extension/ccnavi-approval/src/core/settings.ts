@@ -67,11 +67,11 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   return { host: host.id, owner, repo, integration, recentDays: days, extraBranches, project, workspace };
 }
 
-/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、層の名札に予約した名前（`settings.is_reserved_layer_name`） */
+/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、層の名前に予約した名前（`settings.is_reserved_layer_name`） */
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_LAYER = new Set(["common", "self"]);
 
-/** 保存された並びを読む。読めない行は捨てる（画面で直させる） */
+/** 保存された配列を読む。読めない行は捨てる（画面で直させる） */
 export function readRepos(value: unknown, hosts: readonly Host[]): RepoConfig[] {
   if (!Array.isArray(value)) {
     return [];

@@ -10,23 +10,23 @@
 Write / Edit / NotebookEdit を止め、パスの出るシェルからの書き込みも組み込みが止める。
 だから「フローはユーザが書く」は運用ではなく判定で守られる（行き先を追えないシェルの書き込みは
 止まらないので、着手のあとの書き換えは知らせる。下の「着手のあとの書き換え」）。ユーザはボードのフロー編集画面で
-書き、承認済みチケットと同じ運び方（`ccnavi-push-approved.sh`）でコミットする。
-実行後チェックは承認済みの領域を範囲の外として咎めず、frontmatter の無いファイルは
+書き、承認済みチケットと同じく承認の push（`ccnavi-push-approved.sh`）でコミットする。
+実行後チェックは承認済みの領域を範囲の外として報告せず、frontmatter の無いファイルは
 副命令の書き込みとして外す（`post._script_writes`）。だからユーザが保存したフローが
-エージェントの範囲外の変更として咎められることもない。
+エージェントの範囲外の変更として報告されることもない。
 
 ## 下書き
 
 エージェントは、頼まれたときに子のフローの下書きを提案の置き場の `flows/<子>.yml`
 （既定 `wip/proposals/flows/<子>.yml`）に書ける。置くツリーはフローと同じ。提案の置き場は
 範囲の外なので、判定も組み込みの保護も変えずに書ける。下書きには効力が無い。`SubagentStart` の案内
-（`briefing`）も着手の指紋（`fingerprint`）も読まず、承認の指紋にも入らない。ユーザがボードの
+（`briefing`）も着手のハッシュ（`fingerprint`）も読まず、承認のダイジェストにも入らない。ユーザがボードの
 フロー編集画面で差分を読んで取り込み、`flows/<子>.yml`（承認済みの領域）に保存したものだけが効く。
 ここが持つのは置き場のパス（`draft_rel`）と、ボードへ渡す有無（`info` の `draft`）だけ。
 
 ## 形
 
-YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー編集画面が書き、ここが読む。
+YAML の 1 文書で、最上位はマッピング。ボードのフロー編集画面が書き、ここが読む。
 
     id, name, description?, version
     nodes:          [node, ...]
@@ -55,8 +55,8 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
 ユーザの手順書として渡すことになる。ふつうのファイルでないもの（名前付きパイプは開くと固まる）と
 ハードリンク（外の名前から書き換えられる）も読まない（`read_bytes`）。
 
-形の誤り（最上位がキーと値の並びでない、`nodes` が無い、ノードに `id` が無い・重なる、
-`connections` が並びでない）も読めない理由として 1 行で言う（`shape_problem`）。
+形の誤り（最上位がマッピングでない、`nodes` が無い、ノードに `id` が無い・重なる、
+`connections` がリストでない）も読めない理由として 1 行で言う（`shape_problem`）。
 `ccnavi --lint --flow <パス>` は同じ読み手・同じ検査（`load`）でファイルを確かめ、読めなければ
 error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
 これに掛ける（拡張は判定を自分で出さない。正しいかの答えはここ 1 か所）。`--json` なら
@@ -70,13 +70,13 @@ error で言う。ボードのフロー編集画面は、開くときと保存�
 ## 着手のあとの書き換え
 
 ロックと承認済みの領域の保護が止めるのは Write / Edit と、パスの出るシェルの書き込みまで。
-行き先を追えないシェルの書き込みは止まらない。着手のときにフローの指紋を
+行き先を追えないシェルの書き込みは止まらない。着手のときにフローのハッシュを
 `phases/<親>/<子>.flow.json` に記録し（`record_digest`）、SubagentStart と SubagentStop が
-いまの指紋と比べて、違えばユーザとメインに知らせる（`changed_notice`。止めない）。
+いまのハッシュと比べて、違えばユーザとメインに知らせる（`changed_notice`。止めない）。
 
 ## 承認とロック
 
-フローは承認の対象ではない（承認の指紋にも入らない）。中身は着手の前と終わった後なら
+フローは承認の対象ではない（承認のダイジェストにも入らない）。中身は着手の前と終わった後なら
 書き換えられる。着手中（`started_at` があり、`completed_at` も `cancelled_at` も無い）は、
 読んでいる手順が作業の途中で変わらないよう、実行前チェックが Write / Edit / NotebookEdit を
 止める（`lock_hit`）。エージェントの書き込みは承認済みの領域の保護でも止まるが、ロックは
@@ -132,7 +132,7 @@ SPAWN = ("subAgent", "subAgentFlow")
 # 出口を項目ごとに持つ種類と、項目の欄。
 BRANCH_KEYS = {"ifElse": "branches", "switch": "branches", "branch": "branches", ASK: "options"}
 
-# フローの文の中で ccnavi の名乗りを真似させない。`[` / `［` の直後が（互換文字・書式の制御・
+# フローの文の中で ccnavi の接頭辞を真似させない。`[` / `［` の直後が（互換文字・書式の制御・
 # 結合文字・似た形の字をそろえて）`ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
 _BADGE_WORD = "ccnavi"
 _BADGE_OPEN = "〔"
@@ -186,7 +186,7 @@ HARD_LINKED = (
 )
 SWAPPED = "開いているあいだに別のファイルに差し替わったので読まない"
 
-# 着手のときに残すフローの指紋の記録（`phases/<親>/<子>.flow.json`）。
+# 着手のときに残すフローのハッシュの記録（`phases/<親>/<子>.flow.json`）。
 PHASES_DIR = "phases"
 DIGEST_RECORD = "flow"
 # 着手のあとにフローが書き換わったと知らせる理由コード。止めない（知らせるだけ）。
@@ -250,7 +250,7 @@ def draft_rel(conf: settings.Settings, ticket_id: str) -> str:
     承認済みの領域で `flows/` が `doing/` `done/` と並ぶのに揃え、提案の置き場でも
     `todo/` `review/` と並べる。提案の置き場は丸ごとチケットの範囲の外で、`flows/` は守る状態の
     置き場でも走査の対象でもないので、エージェントは判定を変えずに書ける。下書きに効力は無い
-    （`briefing` も着手の指紋も読まない）。効くのはユーザが取り込んで `flow_rel` に保存した
+    （`briefing` も着手のハッシュも読まない）。効くのはユーザが取り込んで `flow_rel` に保存した
     ものだけ。
     """
     return f"{_place_rel(conf.tickets or settings.DEFAULT_TICKETS)}/{FLOWS_DIR}/{ticket_id}{SUFFIX}"
@@ -596,7 +596,7 @@ def as_json(value):
 
     VS Code 拡張のフロー編集画面は、自分の YAML の読み手（1.2）が読んだ中身とこれを見比べ、
     食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ）。
-    文字列・真偽値・null・並び・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
+    文字列・真偽値・null・配列・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
     そのまま載せる。ほかは `{"$ccnavi": <種類>, ...}` の目印にする。
 
     - 浮動小数は `{"$ccnavi": "float", "value": <数>}`
@@ -650,20 +650,20 @@ def shape_problem(data) -> str:
     """読めた中身の形の誤り（最初の 1 つ）。無ければ空。例外は外に出さない。
 
     SubagentStart の読み（`load`）と `--lint --flow` が同じここを通る。見るのは手順として
-    並べるのに要る形だけ。最上位がキーと値の並び、`nodes` がキーと値の並びの並びで、どれも空でない
-    文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、キーと値の並びの並び。
+    並べるのに要る形だけ。最上位がマッピング、`nodes` がマッピングのリストで、どれも空でない
+    文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、マッピングのリスト。
     `id` が無い・重なるノードは並べるときに落ちるので、気づかないうちに手順が欠けることのないよう、
     読まない扱いにする。
     """
     if not isinstance(data, dict):
-        return "最上位がキーと値の並びではない"
+        return "最上位がマッピングではない"
     nodes = data.get("nodes")
     if not isinstance(nodes, list):
-        return "`nodes` の並びが無い"
+        return "`nodes` のリストが無い"
     seen: set[str] = set()
     for index, node in enumerate(nodes):
         if not isinstance(node, dict):
-            return f"nodes[{index}] がキーと値の並びではない"
+            return f"nodes[{index}] がマッピングではない"
         node_id = node.get("id")
         if not isinstance(node_id, str) or not node_id:
             return f"nodes[{index}] に文字列の id が無い"
@@ -673,10 +673,10 @@ def shape_problem(data) -> str:
     if "connections" in data:
         connections = data.get("connections")
         if not isinstance(connections, list):
-            return "`connections` が並びではない"
+            return "`connections` がリストではない"
         for index, connection in enumerate(connections):
             if not isinstance(connection, dict):
-                return f"connections[{index}] がキーと値の並びではない"
+                return f"connections[{index}] がマッピングではない"
     return ""
 
 
@@ -988,7 +988,7 @@ def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
 
 
 def fingerprint(path: str, tree_root: str = "") -> str:
-    """フローのファイルの指紋。無ければ `absent`、読めれば `sha256:<16 進>`、読まないなら
+    """フローのファイルのダイジェスト。無ければ `absent`、読めれば `sha256:<16 進>`、読まないなら
     `unreadable:<理由>`。例外は外に出さない。読み方は `load` と同じ（`read_bytes`）。"""
     try:
         if not os.path.lexists(path):
@@ -1002,8 +1002,10 @@ def fingerprint(path: str, tree_root: str = "") -> str:
 
 
 def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
-    """着手のときに記録した指紋の記録の置き場。フローと同じツリーの
-    `phases/<親>/<子>.flow.json`。"""
+    """着手のときに保存したハッシュの記録の置き場。
+
+    フローと同じツリーの `phases/<親>/<子>.flow.json`。
+    """
     # 形は `approval.child_record_path` と同じ。flow は approval より下の段なので読まず、
     # 形だけを同じにする（`test_flow_hardening` が突き合わせる）。
     approved = settings.approved_dir(conf, child.tree_root or root)
@@ -1011,7 +1013,7 @@ def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Tic
 
 
 def record_digest(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str]:
-    """着手のときのフローの指紋を記録する。(書いた記録のパス, 書けなかった理由)。
+    """着手のときのフローのハッシュを記録する。(書いた記録のパス, 書けなかった理由)。
 
     置き場は子の記録（`.risk.json` など）と同じ `phases/<親>/` で、承認済みの領域にあるので
     エージェントは書けず、親のブランチに乗って他の機械へ届く。フローが無くても記録する
@@ -1037,7 +1039,7 @@ def _describe(mark: str) -> str:
 
 
 def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
-    """着手中の子のフローが、着手のときに記録した指紋から変わっていれば、その知らせ。無ければ空。
+    """着手中の子のフローが、着手のときに記録したハッシュから変わっていれば、その知らせ。無ければ空。
 
     知らせるだけで止めない（厳しくする向き）。ロックと承認済みの領域の保護は Write / Edit と、
     パスの出るシェルの書き込みを止めるが、行き先を追えないシェルの書き込みは止まらない
@@ -1079,7 +1081,7 @@ def clean(text) -> str:
 
 
 def _text(value) -> str:
-    """文字列か数だけを文にする。並びや辞書は中身を辿らない（深い入れ子で落ちない）。"""
+    """文字列か数だけを文にする。リストや辞書は中身を辿らない（深い入れ子で落ちない）。"""
     if isinstance(value, bool):
         return ""
     if isinstance(value, float) and value.is_integer() and abs(value) < 1e21:
@@ -1091,7 +1093,7 @@ def _text(value) -> str:
 
 
 def _line(value) -> str:
-    """1 行にまとめて切る。ccnavi の名乗りは真似させない。"""
+    """1 行にまとめて切る。ccnavi の接頭辞は真似させない。"""
     if isinstance(value, Exception):
         value = str(value)
     text = value if isinstance(value, str) else _text(value)
@@ -1158,7 +1160,7 @@ def _neutral(text: str) -> str:
 
 
 def impersonates(text: str) -> bool:
-    """文に ccnavi の名乗りか案内の区切りに見える箇所が残っているか。テストと確かめ用。"""
+    """文に ccnavi の接頭辞か案内の区切りに見える箇所が残っているか。テストと確かめ用。"""
     skeleton, _ = _skeleton(text)
     if any(_skeleton(p)[0] in skeleton for p in _FENCE_PHRASES):
         return True
@@ -1174,7 +1176,7 @@ def _list(value) -> list:
 
 
 def _capped(parts: list[str], total: int) -> list[str]:
-    """並びを ITEM_LIMIT で切り、残りの数をつける。"""
+    """リストを ITEM_LIMIT で切り、残りの数をつける。"""
     if total > len(parts):
         return parts + [f"…ほか {total - len(parts)} 件"]
     return parts
@@ -1344,7 +1346,7 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
         nexts = _capped(nexts, len(edges))
         if nexts:
             text += " → " + ", ".join(nexts)
-        # 組み立てた行でも見る。種類の名前が `ccnavi…` だと、こちらの `[<種類>]` が名乗りになる。
+        # 組み立てた行でも見る。種類の名前が `ccnavi…` だと、こちらの `[<種類>]` が接頭辞になる。
         text = _neutral(text)
         if used + len(text) > text_limit and lines:
             break

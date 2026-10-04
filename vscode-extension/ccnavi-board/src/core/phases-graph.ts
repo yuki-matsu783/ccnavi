@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面の図。種類の並び（`PhasesForm`）から、点と線と置き場所を組む純関数。
+ * フェーズ管理画面の図。種類のリスト（`PhasesForm`）から、点と線と置き場所を組む純関数。
  *
  * **向きを持つのは `after` の線だけ。** `after` は `order: dag` のときの依存で、
  * 待たれる側 → 待つ側に矢印を描く。`requires` は「計画にこの種類を置くなら一緒に置くべき種類」で、
@@ -133,7 +133,7 @@ function edgesOf(kept: readonly PhasesForm["phases"][number][], known: ReadonlyS
 
 /**
  * 図を組む。id が空の種類は出さない（指すことも指されることもできないので、線を持てない）。
- * 同じ id が 2 つあるときは先に出てきたほうだけを出す（保存は画面が止めるので、直すまでの間の姿）。
+ * 同じ id が 2 つあるときは先に出てきたほうだけを出す（保存は画面が止めるので、直すまでの間の表示）。
  */
 export function graphOf(form: PhasesForm): PhasesGraph {
   const first = new Map<string, PhasesForm["phases"][number]>();

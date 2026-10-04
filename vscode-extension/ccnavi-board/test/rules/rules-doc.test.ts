@@ -131,7 +131,7 @@ test("CB-T46 壊れたタイプは苦情にして、他のタイプは出す", (
   assert.equal(model.sections.allow.length, 1);
 });
 
-test("CB-T47 画面から来た並びは形を確かめてから受け取る", () => {
+test("CB-T47 画面から来た配列は形を確かめてから受け取る", () => {
   const ok = asSections({
     deny: [{ origin: { section: "deny", index: 0 }, id: "a", match: "Bash", kind: "glob", pattern: "*", message: "m" }],
     ask: [],
@@ -249,7 +249,7 @@ allow:
   );
   // 読めない値（every: x）は画面で何も言わずに直さない。直すと --lint の苦情だけが宙に浮く。
   assert.equal(doc.apply(s), text);
-  // 画面から来た並びも同じ。every を持たない古い画面の形は空として受け取る。
+  // 画面から来た配列も同じ。every を持たない古い画面の形は空として受け取る。
   const posted = asSections(JSON.parse(JSON.stringify({ ...s, allow: s.allow })));
   assert.notEqual(posted, undefined);
   assert.deepEqual(

@@ -97,7 +97,7 @@ class BranchNameRulesTest(unittest.TestCase):
         found = ticket_mod.branch_name_problems(ticket, "trunk")
         self.assertEqual(1, len(found), found)
         self.assertIn("統合先の名前（trunk）", found[0])
-        # 固定の並びに当たるものは 1 行だけ。
+        # 固定のリストに当たるものは 1 行だけ。
         self.assertEqual(
             1, len(ticket_mod.branch_name_problems(ticket_mod.Ticket(ticket="main"), "main"))
         )

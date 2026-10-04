@@ -15,7 +15,7 @@
  * 場面で消えることになる。
  *
  * **時間では消さない。** 承認のオーバーレイを閉じたときにはもう消えている、を避ける。
- * 消えるのは、次に列の並びが変わったとき（`movedCards` が別の答えを出したとき）。
+ * 消えるのは、次に列の順序が変わったとき（`movedCards` が別の答えを出したとき）。
  */
 import type { Board } from "./board.js";
 import type { ProposalState } from "./model.js";
@@ -55,7 +55,7 @@ export function samePlacement(before: Placement, after: Placement): boolean {
 
 /**
  * 列が変わったカードと、新しく現れたカード。消えたカードは出さない（動いた表示を付ける先が無い）。
- * 並びは `after` の並び順で、`placementOf` が作ったものなら列の順（未着手 → 作業中 → …）。
+ * 順序は `after` の並び順で、`placementOf` が作ったものなら列の順（未着手 → 作業中 → …）。
  */
 export function movedCards(before: Placement, after: Placement): readonly Moved[] {
   const moved: Moved[] = [];

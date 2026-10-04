@@ -30,7 +30,7 @@ const BUBBLE_WIDTH = 340;
 
 /**
  * 案内を出し直すボタン。**5 画面ともツールバーの最後の子に置く**と、`Tour.css` がヘッダの右上の同じ位置に
- * 小さく固定する（画面ごとにボタンの並びへ混ぜると、置き場所がばらつき、ボードでは操作の邪魔になった）
+ * 小さく固定する（画面ごとにボタンの列へ混ぜると、置き場所がばらつき、ボードでは操作の邪魔になった）
  */
 export function TourButton({ onClick }: { readonly onClick: () => void }): JSX.Element {
   return (

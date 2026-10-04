@@ -181,7 +181,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
 
 async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Promise<Response> {
   if (!Array.isArray(args)) {
-    return { ok: false, error: "args が並びでない" };
+    return { ok: false, error: "args が配列でない" };
   }
   const token = await deps.getToken(host.id);
   if (!token) {
@@ -241,7 +241,7 @@ function commitArgs(args: unknown[]) {
   const [, , branch, expected, headline, body, additions, deletions] = args;
   const name = github.checkBranch(branch);
   if (!Array.isArray(additions) || !Array.isArray(deletions) || additions.length + deletions.length > MAX_FILES) {
-    throw new Error(`書くファイルは ${MAX_FILES} 件までの並び`);
+    throw new Error(`書くファイルは ${MAX_FILES} 件までの配列`);
   }
   if (additions.length + deletions.length === 0) throw new Error("書くものが無い");
   const adds: Addition[] = additions.map((x: unknown) => {
@@ -397,7 +397,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     }
     case "pathObjects": {
       if (!Array.isArray(b) || b.length > 20) {
-        return { ok: false, error: "paths は 20 件までの並び" };
+        return { ok: false, error: "paths は 20 件までの配列" };
       }
       value = await x.pathObjects(client, o, r, github.checkOid(a), b.map(github.checkPath));
       break;
@@ -410,7 +410,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     case "blobs": {
       if (!Array.isArray(a)) {
-        return { ok: false, error: "oids が並びでない" };
+        return { ok: false, error: "oids が配列でない" };
       }
       value = await x.blobs(client, o, r, a.map(github.checkOid));
       break;

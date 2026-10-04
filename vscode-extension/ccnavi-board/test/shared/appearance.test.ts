@@ -182,7 +182,7 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
  * 旧いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
  * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` にそろえたときに
  * その検査が消えた（`ScreenHost<D>.post` は `unknown` を取るので、契約から外しても通ってしまう）。
- * ここで 1 か所にまとめて確かめ直す。6 画面目を足す人は、この並びに 1 行足せば同じ検査が有効になる。
+ * ここで 1 か所にまとめて確かめ直す。6 画面目を足す人は、この配列に 1 行足せば同じ検査が有効になる。
  */
 const APPEARANCE: AppearanceMessage = { type: "appearance", value: "claude-dark" };
 const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases] = [

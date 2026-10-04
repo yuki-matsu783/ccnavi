@@ -135,9 +135,9 @@ async function pages(client: Client, path: string, limit: number, what: string):
   const all: unknown[] = [];
   for (let page = 1; ; page += 1) {
     const { status, body } = await get(client, `${path}${sep}per_page=100&page=${page}`);
-    // 404 や並びでない答えを「無い」と読むと、見落として通してしまう
+    // 404 や配列でない答えを「無い」と読むと、見落として通してしまう
     if (status === 404) throw new HostError(`${what} を読めない（404）`, 404);
-    if (!Array.isArray(body)) throw new HostError(`${what} の応答が並びでない`);
+    if (!Array.isArray(body)) throw new HostError(`${what} の応答が配列でない`);
     all.push(...body);
     if (body.length < 100) return all;
     if (page + 1 > limit) throw new HostError(`${what} が多すぎて読み切れない`);
@@ -199,7 +199,7 @@ async function listTree(client: Client, owner: string, repo: string, commit: str
   for (let page = 1; ; page += 1) {
     const { status, body } = await get(client, `${base}&per_page=100&page=${page}`);
     if (status === 404) return [];
-    if (!Array.isArray(body)) throw new HostError("tree の応答が並びでない");
+    if (!Array.isArray(body)) throw new HostError("tree の応答が配列でない");
     all.push(...(body as TreeItem[]));
     if (body.length < 100) return all;
     if (page >= TREE_PAGES) throw new HostError("置き場の tree が大きすぎて取り切れない。Chrome では読めない");
@@ -484,7 +484,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
 
 // ---- 書き込み -----------------------------------------------------------------
 
-/** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。元に戻すコミットならユーザに回す */
+/** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。元に戻すコミットならユーザの対応に切り替える */
 export const HOST_REFUSED = 409;
 /** 送る前の確認で先頭が読んだものと違った（何も送っていない）。読み直して試し直してよい */
 export const HOST_MOVED = 412;

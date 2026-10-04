@@ -233,7 +233,7 @@ class UnwrappedTest(unittest.TestCase):
         self.assertIsNotNone(unwrapped, "Reading に unwrapped の欄が無い")
         if not unwrapped:
             return []
-        # 語の中の目印（引用がつないだ空白）は層の区切りではない。層の並びを見るので空白に戻す。
+        # 語の中の目印（引用がつないだ空白）は層の区切りではない。層の順序を見るので空白に戻す。
         word_sep = WORD_SEP or "\x01"
         return [layer.replace(word_sep, " ") for layer in unwrapped.split(SEP)]
 
@@ -710,7 +710,7 @@ class MovedTest(unittest.TestCase):
         ]:
             with self.subTest(src=src):
                 self.assertEqual(self.moved(src), [])
-        # 並びの頭で居た場所までは戻る。
+        # コマンド列の頭で居た場所までは戻る。
         self.assertEqual(self.moved("cd .claude && cd docs | rm ../x"), ["rm x"])
 
     def test_case_の枝は読まない(self):

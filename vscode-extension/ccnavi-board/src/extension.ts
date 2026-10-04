@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext): void {
     projects: openProjects,
     flow: openFlow,
   });
-  // サイドパネルより先に読む。入口の並びがこの値で決まる。
+  // サイドパネルより先に読む。入口の順序がこの値で決まる。
   watchTicketControl(context);
   registerSidebar(context);
   // 実行ファイルと拡張の互換の版が食い違っていれば知らせる。待たない（起動を遅らせない）

@@ -45,7 +45,7 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 `project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの統合先の中身。共通層・
 自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む:
 ワークスペースルートにワークスペースの統合先、`projects/<名前>/` にプロジェクトの統合先
-（`done/` と、プロジェクトの統合先の層に共通層を写した層）、親子のチケットは
+（`done/` と、プロジェクトの統合先の層に共通層をコピーした層）、親子のチケットは
 `projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。取り込み状態は
 `sync/self/` と `sync/<名前>/` に分けて組む。
 
@@ -89,7 +89,7 @@ FAMILY_LIMIT = 16
 WORKTREES = ".claude/worktrees"
 
 # 統合先から読むもの（置き場のパスの設定に依らないもの）。
-# 手元の統合先の取り込み結果に書き出すものと同じ並び。
+# 手元の統合先の取り込み結果に書き出すものと同じリスト。
 COMMON_LAYER = ".ccnavi/common"
 SETTINGS_FILE = ".claude/settings.json"
 COMPAT_FILE = lint.SH_COMPAT_FILE.replace(os.sep, "/")
@@ -465,7 +465,7 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
     - 親子のチケットの取り込み状態（`sync/self/families/<P>`）: ホストに在れば `present`、
       無ければ `gone`
 
-    先頭の sha と取り込んだ時刻は書かない。判定が読んだ中身（read_set）に入り、指紋が
+    先頭の sha と取り込んだ時刻は書かない。判定が読んだ中身（read_set）に入り、ダイジェストが
     関係の無い push で変わるため。手元の試験も
     これを state の置き場に書き、同じ取り込み状態で判定させる。
     """
@@ -559,7 +559,7 @@ def _preview(root: str, env: dict[str, str], only: list[str]) -> tuple[int, dict
 
 
 def _op_board(req: dict, root: str) -> dict:
-    """親子のチケット 1 組の承認待ち（読み取りだけ）。
+    """親子のチケット 1 つの承認待ち（読み取りだけ）。
 
     判定の入力は統合先・`P`・閉包の `P_X` だけ。
     """
@@ -585,7 +585,8 @@ def _op_board(req: dict, root: str) -> dict:
     body = first
     narrowed = bool(mine) and len(mine) != len(first["batch"])
     if narrowed:
-        # 画面の本文と指紋を、この親子のチケットの分だけで組み直す（1 回の承認は 1 つの `P`）。
+        # 画面の本文とダイジェストを、この親子のチケットの分だけで組み直す
+        # （1 回の承認は 1 つの `P`）。
         code, body, err = _preview(root, place["env"], mine)
         if body is None:
             return {"family": family, "closure": closure, "refused": _refused(root, code, err)}
@@ -604,11 +605,11 @@ def _op_board(req: dict, root: str) -> dict:
         "reviewable": _reviewable(root, place, family),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出すので、手を加えずに返す。
-        # 指紋はこの本文と承認済みのチケットの中身を覆い、
+        # ダイジェストはこの本文と承認済みのチケットの中身を覆い、
         # 手元の `--agree --preview` と同じ値になる。
         "text": body["text"] if batch else "",
         "digest": body["digest"] if batch else "",
-        # 承認するときに `plan` へ渡す絞り。この指紋を出したときの絞りで、絞らなければ null
+        # 承認するときに `plan` へ渡す絞り。このダイジェストを出したときの絞りで、絞らなければ null
         "only": mine if narrowed else None,
         "rejected": [
             {"ticket": r["ticket"], "problems": [_relative(root, p) for p in r["problems"]]}
@@ -833,21 +834,21 @@ def _changes(root: str, changes: core.Changes | None) -> dict:
 
 
 def _op_plan(req: dict, root: str) -> dict:
-    """親子のチケット 1 組の承認で書くもの（judge → plan）。書かない。"""
+    """親子のチケット 1 つの承認で書くもの（judge → plan）。書かない。"""
     snap, place, family, _ = _family_tree(req, root)
     only = req.get("only")
     if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only)):
-        raise Refused("only は識別子の並び")
+        raise Refused("only は識別子のリスト")
     shown = req.get("shown")
     shown_ids = shown_digest = None
     if shown is not None:
-        # 見せた一覧と指紋。違えば書くものを出さず、preview からやり直させる。
+        # 見せた一覧とダイジェスト。違えば書くものを出さず、preview からやり直させる。
         ids = shown.get("ids") if isinstance(shown, dict) else None
         digest = shown.get("digest") if isinstance(shown, dict) else None
         if not (isinstance(ids, list) and all(isinstance(i, str) for i in ids)) or not (
             isinstance(digest, str) and digest
         ):
-            raise Refused("shown は見せた識別子の並び（ids）と指紋（digest）")
+            raise Refused("shown は見せた識別子のリスト（ids）とダイジェスト（digest）")
         shown_ids, shown_digest = ids, digest
     _writable(snap, family)
     notes = io.StringIO()
@@ -884,7 +885,7 @@ def _op_withdraw(req: dict, root: str) -> dict:
     ids = req.get("ids")
     prior = req.get("prior")
     if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
-        raise Refused("ids は識別子の並び")
+        raise Refused("ids は識別子のリスト")
     if not isinstance(prior, dict) or not all(isinstance(v, str) for v in prior.values()):
         raise Refused("prior は識別子ごとの本文")
     reason = req.get("reason") if isinstance(req.get("reason"), str) else ""
@@ -960,7 +961,7 @@ def _compare_files(compare: object, base: str | None, head: str) -> list[str] | 
     if files is not None and not (
         isinstance(files, list) and all(isinstance(f, str) for f in files)
     ):
-        raise Refused("compare の files はパスの並びか null")
+        raise Refused("compare の files はパスのリストか null")
     if compare.get("base") != base or compare.get("head") != head or files is None:
         return None
     return list(files)
@@ -1015,7 +1016,7 @@ def _op_start(req: dict, root: str) -> dict:
         raise Refused("issue は正の整数（issue の番号）")
     taken = req.get("taken") or []
     if not isinstance(taken, list) or not all(isinstance(n, str) for n in taken):
-        raise Refused("taken はブランチ名の並び")
+        raise Refused("taken はブランチ名のリスト")
     project = _project(snap)
     ident = ticket_mod.issue_identifier(number, project)
     integ = snap["integration"]["name"]

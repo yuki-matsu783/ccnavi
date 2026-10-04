@@ -1,10 +1,10 @@
 /**
  * 読み込んだフローと編集中のフローの見比べ。「未保存」の判定と、保存の前に見せる差分の一覧に使う。
  *
- * - `sameFlow` は中身が同じか（キーの並びは見ない）。元に戻して読み込んだときと同じ中身になれば、未保存を消す
+ * - `sameFlow` は中身が同じか（キーの順序は見ない）。元に戻して読み込んだときと同じ中身になれば、未保存を消す
  * - `diffFlows` は足した・消した・変えたノードと線。ノードは `id` で、線は両端と出入口
  *   （`from` `fromPort` `to` `toPort`）で突き合わせる（ユーザが書いた線は `id` が無いことも重なることもある）。
- *   同じ両端と出入口の線が何本もあれば、並びの順に突き合わせる
+ *   同じ両端と出入口の線が何本もあれば、配列の順に突き合わせる
  * - `textDiff` は同じ突き合わせで、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる。エージェントの
  *   下書きを取り込む前に見せる。フローの文は担当のサブエージェントへの案内文になるので、ユーザが
  *   中身を読めるように、足したもの・消したものは全部の欄を、変えたものは変わった欄の前と後を出す
@@ -31,7 +31,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** 値が同じか。辞書はキーの並びを見ない。並びは順も見る */
+/** 値が同じか。辞書はキーの順序を見ない。配列は順も見る */
 export function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) {
     return true;
@@ -161,7 +161,7 @@ function pair(before: FlowDoc, after: FlowDoc): Paired {
   }
   const removedNodes = before.nodes.filter((node) => !afterNodes.has(node.id));
 
-  // 線は両端と出入口で突き合わせる。同じものが何本もあれば並びの順に
+  // 線は両端と出入口で突き合わせる。同じものが何本もあれば配列の順に
   const pool = new Map<string, FlowConnection[]>();
   for (const c of connectionsOf(before)) {
     const key = connectionKey(c);
@@ -201,7 +201,7 @@ export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
 // ---- 値の前後まで見せる差分（下書きの取り込み）
 
 /** 値の種類（画面が前後に添える）。`1` と `"1"`、`true` と `"true"`、`null` と `"null"` を見分けるため */
-export type ValueKind = "文字列" | "数" | "真偽" | "null" | "辞書" | "並び" | "その他";
+export type ValueKind = "文字列" | "数" | "真偽" | "null" | "辞書" | "配列" | "その他";
 
 /** 欄 1 つの前後。足した欄は `before` が無く、消した欄は `after` が無い */
 export interface FieldText {
@@ -244,7 +244,7 @@ function kindOf(value: unknown): ValueKind {
     return "null";
   }
   if (Array.isArray(value)) {
-    return "並び";
+    return "配列";
   }
   return isRecord(value) ? "辞書" : "その他";
 }
@@ -272,13 +272,13 @@ function headLabel(key: string): string {
   return PLAIN_KEY.test(key) ? key : `[${JSON.stringify(key)}]`;
 }
 
-/** 葉 1 つ。突き合わせは `path`（キーと番号の並びの JSON。型ごと持つので重ならない）で、`field` は見せるだけ */
+/** 葉 1 つ。突き合わせは `path`（キーと番号の配列の JSON。型ごと持つので重ならない）で、`field` は見せるだけ */
 interface Leaf {
   readonly field: string;
   readonly value: unknown;
 }
 
-/** 値を葉まで開く。辞書と並びは中へ下りる。空の辞書・並びは葉として扱う */
+/** 値を葉まで開く。辞書と配列は中へ下りる。空の辞書・配列は葉として扱う */
 function leaves(value: unknown, path: readonly (string | number)[], field: string, out: Map<string, Leaf>): void {
   if (isRecord(value) && Object.keys(value).length > 0) {
     for (const [key, inner] of Object.entries(value)) {

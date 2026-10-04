@@ -328,7 +328,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
   }
 });
 
-test("CB-D07 足したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の並びを送る", async () => {
+test("CB-D07 足したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の順序を送る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one('button[data-action="add"][data-section="allow"]'));

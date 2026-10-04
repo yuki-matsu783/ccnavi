@@ -5,7 +5,7 @@
 1. 索引: git が挙げる md をディレクトリごとの `index.jsonl` に書く。無視されていなければ書かない。
    実体の無い md と ccnavi ディレクトリの下は載せない。md が全部消えたディレクトリの索引は消す
 2. 差分: `concept_id` と `mtime` が同じ行は読み直さない。中身が同じなら書かない
-3. frontmatter: 壊れたもの・別名・並びでないものは null。スカラーの tags は 1 要素。日付は文字列
+3. frontmatter: 壊れたもの・別名・リストでないものは null。スカラーの tags は 1 要素。日付は文字列
 4. 引く: 完全一致・部分一致・日時、同じものは OR・違うものは AND、並べ方、出力の形、桁揃え
 5. CLI: `--docs` の外の絞り込みは言って落とす。誤った値は 1、0 件は 0
    どこから打ってもワークスペースを引く
@@ -281,7 +281,7 @@ class SearchTest(unittest.TestCase):
             ids(docsearch.Query(types=["adr"])), ["docs/adr/0001-git", "docs/adr/0002-ticket"]
         )
         self.assertEqual(ids(docsearch.Query(types=["ad"])), [])
-        # スカラーの tags も 1 要素の並びとして当たる。
+        # スカラーの tags も 1 要素のリストとして当たる。
         self.assertEqual(
             ids(docsearch.Query(tags=["WORKTREE"])), ["docs/adr/0001-git", "docs/claude/worktree"]
         )

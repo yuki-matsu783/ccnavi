@@ -129,7 +129,7 @@ def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> l
 
     行き先が予約名のプロジェクト（`projects/self/` / `projects/common/`）なら層無し。
     ここを名前引きに任せてはいけない。`target.project` が `"self"` のとき、名前は
-    ワークスペース自身の層の名札と一致するので、**そのプロジェクトへの Write / Edit が
+    ワークスペース自身の層の名前と一致するので、**そのプロジェクトへの Write / Edit が
     プロジェクト自身の deny を一度も読まずに、ワークスペースの層のルールで判定される**。
     ワークスペースの層に広い `allow` があればそれで通る。層無しなら共通層だけで
     判定するので、緩む側にはならない。`--lint` が error で名指しし、ユーザが名前を変える
@@ -262,7 +262,7 @@ class LayerView:
     rule_set: rules.RuleSet
     # unreadable は読めなかった理由。空なら読めた（無い層も空として読めた扱い）。
     unreadable: str = ""
-    # missing はファイルが無いこと。不備ではないので、診断は数えるだけで咎めない。
+    # missing はファイルが無いこと。不備ではないので、診断は数えるだけで報告しない。
     missing: bool = False
     # problems は層をまたいだ苦情（重複の info、同 id の warn）。
     problems: list[Problem] = field(default_factory=list)

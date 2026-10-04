@@ -116,7 +116,7 @@ def report(
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
     )
-    # 確認できる者が居ないモードの門。2 値しか取らないので、受け皿も分ける。
+    # 確認できる者が居ないモードの切り替えの環境変数。2 値しか取らないので、受け皿も分ける。
     unwatched_said = io.StringIO()
     guard_unwatched = selfguard.resolve(
         unwatched_said,
@@ -141,7 +141,7 @@ def report(
         Problem(SEVERITY_WARN, "(unwatched)", line.removeprefix("ccnavi: "))
         for line in unwatched_said.getvalue().splitlines()
     ]
-    # この門に dry-run は無い。書いたユーザは「止めずに報告する」つもりでいるのに、
+    # この切り替えの環境変数に dry-run は無い。書いたユーザは「止めずに報告する」つもりでいるのに、
     # 実際は enable と同じに止める。設定ファイルを読んだだけでは、その食い違いが
     # どこにも現れない。warn ではなく error にするのは、直すまで意味が変わらない、
     # つまり直さないと設定ファイルの書き方と実際の動きが食い違ったままになるため。
@@ -245,7 +245,7 @@ def report(
         stdout.write(f"  チケットの承認の経路を守る: {conf.guard_ticket_approval}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から打った検証と hook から届く環境は違うので、どちらを見た結果なのかを
-    # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
+    # 明示する。明示しないと、通った検証が別の設定についての報告になる。
     stdout.write(f"  モード: {mode}（この起動の環境から解決したもの）\n")
 
     for problem in problems:
@@ -256,7 +256,8 @@ def report(
 
 
 # 戻す働きの 2 つが、切られている・予行になっているときに言うこと。
-# 3 値（enable / dry-run / disable）を取る門なので、止めない 2 つの値それぞれに文がある。
+# 3 値（enable / dry-run / disable）を取る切り替えの環境変数なので、
+# 止めない 2 つの値それぞれに文がある。
 _CORE_FILES_VOICE = {
     selfguard.DISABLE: (
         "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
@@ -291,15 +292,16 @@ def _shown(declared: str, mode: str) -> str:
 
 
 def _gate(name: str, declared: str, mode: str, voices: dict[str, str]) -> list[Problem]:
-    """守る働きを持つ門が、止めない値になっていることを言う。enable なら何も言わない。
+    """守る働きを持つ切り替えの環境変数が、止めない値になっていることを言う。
+    enable なら何も言わない。
 
     見るのは `CCNAVI_MODE` を反映したあとの値（`modes.effective_setting`）。書かれた値だけを
-    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた門を「守っている」と読むことに
+    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた切り替えを「守っている」と読むことに
     なる。実行時はモードに従って戻さないので、それはこの検査がいちばん言うべき
     「切れているのに揃って見える」そのものになる。
 
     実際の値が書かれた値と違うときは、そのことも言う。言わないと、直す先が
-    その門なのか `CCNAVI_MODE` なのかが読めない。
+    その切り替えの環境変数なのか `CCNAVI_MODE` なのかが読めない。
     """
     effective = modes.effective_setting(mode, declared)
     said = voices.get(effective)
@@ -367,7 +369,7 @@ def check(
     return problems
 
 
-# sh が互換の版を名乗る場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
+# sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
 # 1 か所で足りる。
 SH_COMPAT_FILE = os.path.join(".ccnavi", "scripts", "ccnavi-common.sh")
 _SH_COMPAT = re.compile(r"^CCNAVI_COMPAT=([0-9]+)[ \t]*$", re.MULTILINE)
@@ -515,7 +517,9 @@ def _copy_problems(
 
     承認で本物とするのは置き場で、`ccnavi_approved` の欄ではない。
 
-    置き場を動かして承認する運びでは `--agree` を通らないので、承認のときにしか
+    承認は置き場で決まり、`ccnavi_approved` の欄では決まらない。
+
+    置き場を動かして承認する進め方では `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
     止まる場所は書き込みのときで、そこで初めて知るのは遅い。ここで全部言う。
 
@@ -777,13 +781,13 @@ def _proposal_problems(
     在る形（動かす途中で止まった形跡）を CI が見逃し、状態の操作が「複数の場所にある」で
     止まって初めて知ることになる。
 
-    **同じリポジトリの中ではツリーごとに数える。** 承認済みチケットは git に入れて運ぶので、
+    **同じリポジトリの中ではツリーごとに数える。** 承認済みチケットは git に入れて共有するので、
     切ったワークツリーの数だけ同じチケットができる。しかもワークツリーはそれぞれ別のコミットを指すので、
     古いほうで `doing`・新しいほうで `done` になるのも普通の形。ツリーをまたいだ食い違いまで
-    咎めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、`--lint` が
+    error にすると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、`--lint` が
     常に非ゼロで終わる。捕まえたいのは 1 つのツリーの中で 2 つの状態に在る形だけ。
 
-    **リポジトリをまたいだら、状態が何であれ咎める。** プロジェクトは自分の git を持つので
+    **リポジトリをまたいだら、状態が何であれ error にする。** プロジェクトは自分の git を持つので
     （設計 11）、そこに同じ識別子が在るのは同じチケットではなく違うチケットどうしの衝突。
     識別子はユーザが選ぶ短い連番で、プロジェクトが独立に振れば重なる。コミットの遅れでは説明が付かないから、
     ツリーごとの免除を当ててはいけない。
@@ -791,9 +795,10 @@ def _proposal_problems(
     problems: list[Problem] = []
 
     # ツリーと状態は分けて持つ。同じ識別子が別のツリーに在るのは普通で（承認済みチケットは
-    # git に入れて運ぶので、切ったワークツリーの数だけ同じチケットができる）、しかもワークツリーは
+    # git に入れて共有するので、切ったワークツリーの数だけ同じチケットができる）、
+    # しかもワークツリーは
     # それぞれ別のコミットを指すから、古いほうが doing・新しいほうが done になるのも普通。
-    # 咎めるのは 1 つのツリーの中で 2 つの状態に在る形だけ。
+    # error にするのは 1 つのツリーの中で 2 つの状態に在る形だけ。
     def place(t, state: str) -> tuple[str, str, str]:
         at = t.tree or "(ワークスペースルート)"
         return (repo_of.get(at, at), at, state)
@@ -861,7 +866,7 @@ def _proposal_problems(
     for ticket_id, places in seen.items():
         # 別のリポジトリに同じ識別子が在るのは、同じチケットではなく**違うチケットどうしの衝突**。
         # 識別子はユーザが選ぶ短い連番なので、プロジェクトが独立に振れば普通に重なる。
-        # コミットの遅れでは説明できないので、状態が何であれ咎める。
+        # コミットの遅れでは説明できないので、状態が何であれ error にする。
         repos = sorted({repo for repo, _, _ in places})
         if len(repos) > 1:
             where = ", ".join(
@@ -883,7 +888,8 @@ def _proposal_problems(
             continue
         # 本物とするツリーでまとめて 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
         # 置き場に在る形（動かす途中で止まった形跡）。`todo/` に在るのは親の改版の途中なので
-        # 咎めない。ツリーをまたいだチケットはまとめれば 1 つに決まるので、ここには出てこない。
+        # error にしない。ツリーをまたいだチケットはまとめれば 1 つに決まるので、
+        # ここには出てこない。
         caught = ticket_mod.collisions(held[ticket_id])
         if not caught:
             continue
@@ -959,7 +965,7 @@ def _branch_name_problems(
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
     `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
-    取り込み結果に書いた名前。どちらも無ければ固定の並びだけを見る。
+    取り込み結果に書いた名前。どちらも無ければ固定のリストだけを見る。
     """
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
@@ -1108,7 +1114,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     """各層の phases / risk が、共通層と合成できるか（設計 11.4.1、11.4.2）。
 
-    見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
+    見るのは合成したあとの内容。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
     全欄一致で捨てた重複を info で言う。共通層自身の苦情は `_phases` / `_risk` が
     別に言うので、ここでは層の側だけを数える。
@@ -1140,7 +1146,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
     使われないものを書いたユーザは、書いたとおりに使われていると思ったまま進む。統合の前に
     気づけるように、ここで名前を挙げる。
 
-    足したファイルを咎めているのではない。設定を書き進める場所はワークツリーでよく、
+    足したファイルを問題にしているのではない。設定を書き進める場所はワークツリーでよく、
     そこから統合するのも普通の手順。言うのは「今はまだ使われていない」という 1 点だけ。
 
     中身の違いは見ない。同じパスのファイルが両方に在れば、それは編集で、git の
@@ -1182,7 +1188,8 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
     - 親子のチケットの取り込み状態が壊れている・gone・blocked、
       `present` なのに親のワークツリーが無い: error（その親子のチケットは決まらないので、
       承認も状態の操作も止まる）。閉じた親子のチケットは、
-      親のワークツリーが残っていれば info（片付けてよい）、片付いていれば何も言わない（墓標）
+      親のワークツリーが残っていれば info（片付けてよい）、
+      片付いていれば何も言わない（削除せずに残す取り込み状態）
     - 統合先の取り込み結果が壊れている・無い・読めない: error（識別子の再利用を確かめられない）
     - 作業ツリーの層と統合先の取り込み結果の層が違う: warn
     - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn
@@ -1427,7 +1434,7 @@ def family_check(
                 for p in found
             ]
         problems.extend(found)
-    # 親のワークツリーの中の読めないチケットも止める理由（読めないチケットは並びに入らないので、
+    # 親のワークツリーの中の読めないチケットも止める理由（読めないチケットはリストに入らないので、
     # 判定し直しの対象から気づかないうちに落ちる）。
     if st.home is not None:
         for _, message in approval.unreadable_copies(conf, st.home.root):
@@ -1509,7 +1516,7 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
     if not conf.tickets_enabled:
         return []
     problems: list[Problem] = []
-    # 名乗るのは `(scratch)` の側。プロジェクトのぶんも `(projects/<名前>)` とは名乗らない。
+    # 前置きは `(scratch)` にする。プロジェクトのぶんも `(projects/<名前>)` は前置きにしない。
     # あちらはその層の設定についての苦情で、ここは追跡の話。同じ前置きにすると、
     # 「層について何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
     where = [("(scratch)", root)]
@@ -1879,7 +1886,7 @@ LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 # 他の機械で、同じ親子のチケットに掛かる保護が別になる。入れないのは、判定の答えを変えない
 # 次の値だけ。
 # 実行ファイルのパス（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
-# 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、見張りと待ちの秒（`CCNAVI_*_TIMEOUT`・
+# 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、タイムアウト監視と待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
 _LOCAL_FORBIDDEN = (
     settings.TICKETS_ENV,
@@ -2099,7 +2106,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     problems.extend(_every_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
-    # どちらも広さを咎めない。読めない every は 1（毎回渡る）になっているので、この式は
+    # どちらも広さを報告しない。読めない every は 1（毎回渡る）になっているので、この式は
     # 読めない every を見逃さない（rules.readable_every）。
     if (
         (rule.additional_context or rule.additional_context_file)
@@ -2200,7 +2207,7 @@ def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
             )
         ]
     # 刻むのは渡す回で、渡すものが無ければ刻んでも何も起きない。文が無くても
-    # 本文（...File）は渡るので、4 つのどれか 1 つでもあれば咎めない。
+    # 本文（...File）は渡るので、4 つのどれか 1 つでもあれば報告しない。
     if not (
         rule.additional_context
         or rule.additional_context_file
@@ -2228,7 +2235,7 @@ def _broad(rule: rules.Rule) -> str:
     ここでは扱わない。
 
     1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる
-    2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような並びは、それだけ多くの
+    2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような書き方は、それだけ多くの
        コマンドに同じ文を添えることになる
     """
     if rule.compiled is not None and rule.compiled.search("x"):
@@ -2266,7 +2273,7 @@ def _inert(match: str) -> list[str]:
 
     ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧を書き写すと、
     判定側が扱うツールを増やしたときにこちらが気づかないうちに古くなり、正しいルールを
-    誤って咎めるようになる。差し込む欄の名前だけは judge の表から借りる。
+    誤って報告するようになる。差し込む欄の名前だけは judge の表から借りる。
     """
     # 対象を持つツールなら何かしら返る値を入れておく。返るかどうかだけを見る。
     probe_input = {field: "x" for field in judge.SUBJECT_FIELDS.values()}
