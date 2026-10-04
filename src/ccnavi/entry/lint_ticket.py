@@ -13,6 +13,7 @@ from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from ..tickets import (
     agree,
+    agree_candidates,
     approval,
     approval_checks,
     approval_marks,
@@ -95,8 +96,8 @@ def _copy_problems(
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
-        types = resolve(agree.project_of(t, pool))
-        complaints, overflow = agree.validate(t, pool, types)
+        types = resolve(agree_candidates.project_of(t, pool))
+        complaints, overflow = agree_candidates.validate(t, pool, types)
         for p in complaints + overflow:
             problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         parent = pool.get(t.parent) if t.is_child else None
@@ -366,10 +367,10 @@ def _approval_problems(
 ) -> list[Problem]:
     """承認で落ちるものを、承認の前に名指しする。ユーザが端末で初めて知るより早く。
 
-    **承認と同じ関数を通す**（`agree.candidates`）。ここだけ `agree.validate` を
-    当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・計画に無い番号・
-    `project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、片方が
-    気づかないうちに弱くなる。`--agree --preview --verify` と同じ答えをここでも言う。
+    **承認と同じ関数を通す**（`agree_candidates.candidates`）。ここだけ
+    `agree_candidates.validate` を当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・
+    計画に無い番号・`project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、
+    片方が気づかないうちに弱くなる。`--agree --preview --verify` と同じ答えをここでも言う。
 
     範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
 
@@ -378,18 +379,18 @@ def _approval_problems(
     `--lint` はワークスペース全体を見る道具で、その終了コードは VS Code の設定画面が
     保存してよいかの判断にも使われる（`phases-panel.ts`）。ここを error にすると、
     編集と関わりのない提案 1 本で、設定の保存も CI も止まる。承認そのものは落とす
-    （`agree.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
+    （`agree_candidates.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
     """
     pending, revisions = agree.waiting(
         proposals,
         copies,
         closed,
         review,
-        agree.types_resolver(conf, root, copies),
+        agree_candidates.types_resolver(conf, root, copies),
     )
     if not pending and not revisions:
         return []
-    batch, rejected, _pool = agree.candidates(root, conf, pending, revisions, copies)
+    batch, rejected, _pool = agree_candidates.candidates(root, conf, pending, revisions, copies)
     problems: list[Problem] = []
     for cand in batch:
         for p in cand.complaints + cand.overflow:

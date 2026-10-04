@@ -25,7 +25,8 @@ def has_record(t: ticket_model.Ticket) -> bool:
     古い形として扱うと、取り下げは中身の一致を見ずに記録の欄で決まり、`workflow:` の欄も
     待ち方として読まれる。`ccnavi_approved: {}` のような書きかけの記録で古い形を装えないよう、
     前の版が必ず書いた欄が揃い、`approved_at` が空でないときだけ古い形とみなす。提案に
-    記録の欄があれば `--agree` と `--lint` が error にする（`agree.record_field_problems`）。
+    記録の欄があれば `--agree` と `--lint` が error にする
+    （`agree_candidates.record_field_problems`）。
     """
     meta = t.raw.get(ticket_model.APPROVAL_KEY)
     if not isinstance(meta, dict) or not all(k in meta for k in _RECORD_KEYS):

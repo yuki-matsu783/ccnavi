@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from ..infra import settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from ..tickets import agree, ticket_ids, ticket_model
+from ..tickets import agree_candidates, ticket_ids, ticket_model
 
 
 def _branch_name_problems(
@@ -155,7 +155,9 @@ def _existing_branch_problems(
     """
     return [
         Problem(SEVERITY_WARN, "(ticket)", f"{text}（親のブランチ名の規則）")
-        for text in agree.existing_branch_warnings(root, conf, proposals, copies, closed, review)
+        for text in agree_candidates.existing_branch_warnings(
+            root, conf, proposals, copies, closed, review
+        )
     ]
 
 

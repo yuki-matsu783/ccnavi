@@ -34,6 +34,7 @@ from ..policy import builtin, ruleload, rules, selfguard
 from ..records import audit
 from ..tickets import (
     agree,
+    agree_candidates,
     approval,
     approval_checks,
     approval_marks,
@@ -784,7 +785,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         open_copies,
         closed_copies,
         review_copies,
-        agree.types_resolver(conf, root, open_copies),
+        agree_candidates.types_resolver(conf, root, open_copies),
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
     preds = approval_checks.predecessor_pool_of(

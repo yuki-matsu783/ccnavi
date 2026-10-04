@@ -400,7 +400,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     ユーザがどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
     フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の書き方が
     承認のときの検査（`agree.py`）、後工程の進め方が承認済みチケットが置かれたとき
-    （`agree.approved_text`）。
+    （`agree_screen.approved_text`）。
 
     dry-run の注記は「止まらない」だけで終えない。止まらないことだけを伝えると、通った
     ことが許可の証拠として読まれる。案内に従うところまでを 1 行に入れる。

@@ -44,7 +44,7 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 # スクリプトだけが書く欄。ユーザもエージェントも書かない。承認済みチケットの側で
 # 行単位に書き換える（`ticket_fields.set_fields`）。承認は提案の中身を変えずに動かすので、
 # 提案に書いた値はそのまま承認済みチケットの値になる。だから提案に空でない値があれば
-# `--agree` と `--lint` が error にする（`agree.script_field_problems`）。
+# `--agree` と `--lint` が error にする（`agree_candidates.script_field_problems`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
 # 前の版の承認が承認済みチケットに書き足していた記録の欄。いまの承認は中身を変えないので

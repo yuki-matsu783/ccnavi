@@ -615,7 +615,7 @@ def scan_all(
                 # 待ち方のコピーは `--agree` だけが書く。提案に書かれていても読まない。
                 ticket.workflow = None
                 # `raw` に `project` を差し込まない。承認は提案のバイト列をそのまま動かすので、
-                # 書かない欄をダイジェスト（`agree.approval_digest`）に入れることになる。
+                # 書かない欄をダイジェスト（`agree_digest.approval_digest`）に入れることになる。
                 # 承認済みチケットの `project` は置き場（ツリー）から決まる（`approval.scan_all`）。
                 found.append(ticket)
     return found, problems

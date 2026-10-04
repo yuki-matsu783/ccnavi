@@ -38,6 +38,9 @@ from typing import TextIO
 from ..infra import fsio, modes, settings, tree
 from ..tickets import (
     agree,
+    agree_candidates,
+    agree_digest,
+    agree_screen,
     approval,
     approval_checks,
     approval_marks,
@@ -102,7 +105,7 @@ class Verdict:
     read_set: dict[str, str] = field(default_factory=dict)
 
     @property
-    def batch(self) -> list[agree.Candidate]:
+    def batch(self) -> list[agree_candidates.Candidate]:
         return self.gathered.batch
 
     @property
@@ -146,11 +149,11 @@ def judge_approval(
         if shown_ids is not None and gathered.refused:
             shown = agree.gather(err, snapshot.conf, snapshot.root)
         # 書き込む中身は読みの中で組む。動かす提案のバイト列を判定の読みにも入れるため。
-        carried = [agree.carried(cand) for cand in shown.batch]
-    read = agree.read_set(snapshot.conf, snapshot.root, seen)
-    read.update(agree.settings_read_set(snapshot.conf, snapshot.root))
+        carried = [agree_digest.carried(cand) for cand in shown.batch]
+    read = agree_digest.read_set(snapshot.conf, snapshot.root, seen)
+    read.update(agree_digest.settings_read_set(snapshot.conf, snapshot.root))
     text = shown.text
-    digest = agree.approval_digest(text, shown.batch, read, carried)
+    digest = agree_digest.approval_digest(text, shown.batch, read, carried)
     mismatch = None
     if shown_ids is not None:
         wanted = sorted({s.strip() for s in shown_ids if s.strip()})
@@ -481,7 +484,7 @@ def verify(
     verdict = agree.verify_verdict(gathered, conf.tickets)
     # 新規の親のブランチ名が既にあるブランチと同じか。warn なので答えは変えない。
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
-    branches = agree.existing_branch_warnings(root, conf, fresh, [], [], [])
+    branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])
     if as_json:
         body = agree.preview_body(root, gathered, judged.digest)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
@@ -583,7 +586,7 @@ def approve_yes(
         return applied.code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = agree.approved_text(tickets, revisions, root)
+    prompt = agree_screen.approved_text(tickets, revisions, root)
     if not as_json:
         stdout.write(lines.getvalue())
         return 0
