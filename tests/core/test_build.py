@@ -15,6 +15,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 import build
 
@@ -117,6 +118,48 @@ class InstallTest(unittest.TestCase):
 
         self.assertEqual(read(other), "arm\n")
         self.assertEqual(sorted(os.listdir(self.bin)), ["darwin-arm64", self.TARGET])
+
+
+class BuildSwapFailureTest(unittest.TestCase):
+    """dist/ccnavi/ の置き換えが PermissionError で落ちたとき、build() は失敗として終わる。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-build-")
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        self.dist = os.path.join(self.dir, "dist")
+        self.target = os.path.join(self.dist, "ccnavi.target")
+
+    def run_build(self, swap):
+        ok = mock.Mock(returncode=0)
+        with (
+            mock.patch.object(build, "ROOT", self.dir),
+            mock.patch.object(build, "DIST", self.dist),
+            mock.patch.object(build, "TARGET", self.target),
+            mock.patch.object(build, "source_commit", return_value="abc"),
+            mock.patch.object(build.subprocess, "run", return_value=ok),
+            mock.patch.object(build, "_swap", side_effect=swap),
+            mock.patch.object(build, "install", return_value="live"),
+            mock.patch.object(build, "build_target", return_value="linux-x86_64"),
+            mock.patch("sys.stderr"),
+        ):
+            return build.build()
+
+    def test_returns_failure_without_a_traceback_and_keeps_the_previous_target(self):
+        os.makedirs(self.dist)
+        write(self.target, "previous\n")
+
+        code = self.run_build(PermissionError("locked"))
+
+        self.assertEqual(code, 1)
+        self.assertEqual(read(self.target), "previous\n")
+
+    def test_writes_the_target_when_the_swap_succeeds(self):
+        os.makedirs(self.dist)
+
+        code = self.run_build(lambda new, live: None)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(read(self.target), "linux-x86_64\n")
 
 
 if __name__ == "__main__":

@@ -458,9 +458,7 @@ def _show_leftovers(stdout: TextIO, parent: ticket_mod.Ticket, left: Leftovers) 
     if left.unplanned:
         stdout.write("  - フィードバック計画: 未計画 → 対応なしの扱い\n")
     for t in left.unresolved:
-        stdout.write(
-            f"  - 未解決 {t.url} {t.path}:{t.line} {review._first_line(t.body)} → 受け入れる\n"
-        )
+        stdout.write(f"  - 未解決 {review.thread_label(t)} → 受け入れる\n")
     if left.nothing:
         stdout.write("  （何も残っていない。ready で足りる）\n")
     stdout.write("残りは別の issue に書き出す。早めに閉じてよいなら y、やめるならそれ以外: ")
@@ -551,9 +549,9 @@ def _close_early_drafts(
         rest.append("- フィードバック計画は立てていない")
     issue += rest or ["（残した作業は無い）"]
     issue += ["", "## 引き継ぐ指摘", ""]
-    issue += [
-        f"- {t.url} {t.path}:{t.line} {review._first_line(t.body)}" for t in left.unresolved
-    ] or ["（未解決のスレッドは残っていない）"]
+    issue += [f"- {review.thread_label(t)}" for t in left.unresolved] or [
+        "（未解決のスレッドは残っていない）"
+    ]
     issue.append("")
     issue_path = os.path.join(conf.state, CLOSE_EARLY_ISSUE_FILE.format(parent=parent.ticket))
     failed = review._write_text(issue_path, "\n".join(issue))
