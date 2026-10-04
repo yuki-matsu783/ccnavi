@@ -1,1 +1,2 @@
 {"at": "2026-10-04T12:42:05Z", "ticket": "i0064-05-02", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "992e160527f1c8dcfcbaaa903822b58adc67f484"}
+{"at": "2026-10-04T13:52:10Z", "ticket": "i0064-05-02", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
