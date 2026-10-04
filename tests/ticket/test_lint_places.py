@@ -483,7 +483,7 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
 
 
 class ShWordTest(unittest.TestCase):
-    """案内のコマンドに載せるパスの綴り（`lint._sh_word`）。
+    """案内のコマンドに載せるパスの綴り（`lint_places._sh_word`）。
 
     導入スクリプトの `sh_word` と同じ綴りにする（`tests/sh/test_setup.py` が両方を比べる）。
     """

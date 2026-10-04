@@ -178,7 +178,7 @@ if [ "$needs_host" = yes ]; then
 	# 気づかずに生の値を使わないようにする。URL に資格情報を埋める使い方は普通にあり、
 	# 出力はエージェントの文脈にも記録にも残る。
 	origin_shown=$(ccnavi_mask_url "$origin")
-	# origin の読み方と道具の選び方は ccnavi-common.sh の「ホスト（GitHub / GitLab）への接続」にある
+	# origin の読み方と道具の選び方は ccnavi-common-host.sh の「ホスト（GitHub / GitLab）への接続」にある
 	# （ccnavi-branches.sh と共有する）。ここは失敗の文面を決め、以降で使う変数に入れるだけ。
 	ccnavi_host_parse "$origin" || {
 		case "$?" in
@@ -229,7 +229,7 @@ if [ -n "$review_top" ]; then
 fi
 
 # api <METHOD> <path> [<JSON body>] レスポンスの JSON を標準出力へ。path は api_base からの相対。
-# 中身は ccnavi-common.sh の ccnavi_host_api。失敗したら標準出力には何も出さず、ホストが返した本文ごと
+# 中身は ccnavi-common-host.sh の ccnavi_host_api。失敗したら標準出力には何も出さず、ホストが返した本文ごと
 # 標準エラーへ出して（api_failed）1 を返す。curl の 1 回の時間の上限は ccnavi_h_max_time（既定 120 秒）。
 api() {
 	ccnavi_host_api "$@"
@@ -289,7 +289,7 @@ project_id() {
 
 default_branch() {
 	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH →
-	# ccnavi-sync.sh の取り込み結果 → origin/HEAD → origin/main・master。ccnavi-common.sh の ccnavi_integration）で、
+	# ccnavi-sync.sh の取り込み結果 → origin/HEAD → origin/main・master。ccnavi-common-state.sh の ccnavi_integration）で、
 	# cwd のツリーが属するリポジトリについて決める。どれも決まらなければ main。
 	db_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	db_name=$(ccnavi_integration "${db_tree:-.}" "$root") || db_name=""

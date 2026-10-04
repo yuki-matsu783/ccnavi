@@ -31,7 +31,16 @@ from typing import TextIO
 
 from ..infra import fsio, gitstate, settings, tree
 from ..policy import rules
-from . import approval, history, phase, phasetypes, syncstate, workflow
+from . import (
+    approval,
+    approval_checks,
+    approval_marks,
+    history,
+    phase,
+    phasetypes,
+    syncstate,
+    workflow,
+)
 from . import ticket as ticket_mod
 
 
@@ -145,7 +154,7 @@ def gather(
     # 本物とするツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
     # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core._say_elsewhere` と
     # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
-    open_index = approval.by_id(approved)
+    open_index = approval_checks.by_id(approved)
     elsewhere = [
         approval.revision_elsewhere_text(conf, root, t, where)
         for t, where in stale
@@ -206,7 +215,7 @@ def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
     return {
         "version": AGREE_VERSION,
         "root": root,
-        "generated_at": approval.now(),
+        "generated_at": approval_marks.now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
         "digest": digest,
@@ -580,12 +589,12 @@ def candidates(
     ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
     （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に何も言わなかった）。
     """
-    open_index = approval.by_id(approved)
+    open_index = approval_checks.by_id(approved)
     # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。落ちた親を対応表に残すと、
     # 承認されない親の範囲で子が検証され、親の承認を経ずに子の承認済みチケットができる。
     # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
     # 親の通過が決まっている。
-    pool = approval.by_id(approved)
+    pool = approval_checks.by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
     # 層ごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じ層のチケットが
@@ -608,7 +617,7 @@ def candidates(
         types = types_for(t)
         complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
         complaints += revision_problems(root, conf, t, current, types)
-        complaints += approval.family_problems(conf, root, t, fams)
+        complaints += approval_checks.family_problems(conf, root, t, fams)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -631,10 +640,10 @@ def candidates(
         types = types_for(t)
         complaints, overflow = validate(t, pool, types)
         complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
-        complaints += approval.project_problems(t, pool, conf)
-        complaints += approval.family_problems(conf, root, t, fams)
-        complaints += approval.integration_problems(conf, root, t, fams)
-        complaints += approval.branch_problems(
+        complaints += approval_checks.project_problems(t, pool, conf)
+        complaints += approval_checks.family_problems(conf, root, t, fams)
+        complaints += approval_checks.integration_problems(conf, root, t, fams)
+        complaints += approval_checks.branch_problems(
             conf, root, t, fams, list(approved) + list(pending) + list(revisions)
         )
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
@@ -648,7 +657,7 @@ def candidates(
             # 先行も、まだ `todo/` に在るので満たさない。
             if preds is None:
                 preds = approval.predecessor_pool(conf, root)
-            complaints += approval.predecessor_problems(t, preds, conf.approved)
+            complaints += approval_checks.predecessor_problems(t, preds, conf.approved)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -677,7 +686,7 @@ def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"`{ticket_mod.WORKFLOW_KEY}` の欄は提案に書かない。待ち方は --agree が"
-            f" {approval.PHASES_DIR}/<親>/{approval.WORKFLOW_FILE} に書く",
+            f" {approval_marks.PHASES_DIR}/<親>/{approval_marks.WORKFLOW_FILE} に書く",
         )
     ]
 
@@ -877,7 +886,7 @@ def _apply_steps(
             # マーカーを消せたかは書くときに分かるので、行は Writer(FS) が消せた種類で出す。
             # reviewed を消せなければそこで止める（`clear_marks`）。
             if t.is_child and t.phase is not None:
-                approval.clear_marks(
+                approval_marks.clear_marks(
                     approval.home_dir(conf, root, t.parent, "", project=t.project),
                     t.parent,
                     t.phase,
@@ -1131,8 +1140,8 @@ def waiting(
     統合先の取り込み結果の `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、
     `candidates` が理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
     """
-    known = approval.by_id(approved + closed + review)
-    open_index = approval.by_id(approved)
+    known = approval_checks.by_id(approved + closed + review)
+    open_index = approval_checks.by_id(approved)
     todo = [t for t in proposals if t.state == ticket_mod.TODO]
     pending = [t for t in todo if t.ticket not in known]
     revisions = [
@@ -1157,7 +1166,7 @@ def _workflow_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket, t
 
 def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod.Ticket]):
     """チケットに使う種類を引く関数。層ごとの読み込みは 1 プロジェクト 1 回。"""
-    pool = approval.by_id(approved)
+    pool = approval_checks.by_id(approved)
     cache: dict[str, dict | None] = {}
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
@@ -1171,7 +1180,7 @@ def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
     """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
-    accepted = approval.accepted_threads(
+    accepted = approval_marks.accepted_threads(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
     )
     notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
@@ -1388,7 +1397,7 @@ def revise_copy(
         return failed
     current.raw = revised_front(current, revised)
     with fsio.policy(restore=restore):
-        failed = approval._write(
+        failed = approval_marks._write(
             approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
         )
     if failed:
@@ -1452,7 +1461,7 @@ def validate(
     if not t.is_child:
         return plan_problems(t, types), overflow
     parent = pool.get(t.parent)
-    problems.extend(approval.child_problems(t, parent))
+    problems.extend(approval_checks.child_problems(t, parent))
     if parent is None or parent.is_child:
         return problems, overflow
     overflow.extend(ticket_mod.subset_problems(t, parent))

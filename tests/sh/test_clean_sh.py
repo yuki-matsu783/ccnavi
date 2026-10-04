@@ -20,14 +20,15 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NODE = shutil.which("node")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-SCRIPTS = ("ccnavi-clean.sh", "ccnavi-clean.js", "ccnavi-common.sh")
-# ccnavi-clean.sh と ccnavi-common.sh が呼ぶ外部コマンド。node を外した PATH でも見えるように残す。
+SCRIPTS = ("ccnavi-clean.sh", "ccnavi-clean.js", *common_sh(SH_DIR))
+# ccnavi-clean.sh と共通部（ccnavi-common*.sh）が呼ぶ外部コマンド。
+# node を外した PATH でも見えるように残す。
 TOOLS = ("basename", "cat", "dirname", "find", "git", "head", "rm", "sed", "sleep", "sort", "tr")
 # Windows は chmod で消せなくならず、root は権限を無視して消す。
 CANNOT_LOCK = os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0)

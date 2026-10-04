@@ -1007,8 +1007,8 @@ def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Tic
 
     フローと同じツリーの `phases/<親>/<子>.flow.json`。
     """
-    # 形は `approval.child_record_path` と同じ。flow は approval より下の段なので読まず、
-    # 形だけを同じにする（`test_flow_hardening` が突き合わせる）。
+    # 形は `approval_marks.child_record_path` と同じ。flow は approval_marks より下の段なので
+    # 読まず、形だけを同じにする（`test_flow_hardening` が突き合わせる）。
     approved = settings.approved_dir(conf, child.tree_root or root)
     return os.path.join(approved, PHASES_DIR, child.parent, f"{child.ticket}.{DIGEST_RECORD}.json")
 

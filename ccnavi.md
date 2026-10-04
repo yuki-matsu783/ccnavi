@@ -192,7 +192,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env 6 つ（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）は書かず、既にあれば外す（置き場は固定）。外した値が既定と違えば名前と値を 1 行ずつ出す。以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` も、既定の `logs/decisions.jsonl` と違うので名指しする（記録の書き先が変わるので黙らない）。導入は止めず、終了コードも変えない（`--check` では「揃っていない」に数える） |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,launcher}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
+| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,launcher}.sh`、共通部の部品 `ccnavi-common-{state,lock,c1,host,log}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
 | 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`index.jsonl` の行が既にあれば足さない。`index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトには足さない |
 
 置き場は 2 つに分けて固定する。
@@ -1003,7 +1003,7 @@ ccnavi ディレクトリの組み込みルール（`builtin-guard-project-home`
 受け取る側はセッションの頭に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
 起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` の取り込み結果、無ければデフォルトブランチ＝
 `origin/HEAD` が指すもの）も、チェックアウトされていなければ `update-ref` で
-進める。統合先の決め方は `ccnavi-common.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は
+進める。統合先の決め方は `ccnavi-common-state.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は
 その名前への直接の push を（`main` などの固定のリストと同じく）拒み、`ccnavi-review.sh` はそれをマージリクエストの宛先にする。
 リモートに届かないときは手元の版で判定を続ける。fetch は 1 回ずつ時間を監視して打ち切り、hook の
 上限に当たらないようにする。
@@ -1405,7 +1405,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 渡らない。どちらの経路でも、承認のあと `ccnavi-push-approved.sh` がコミットして push する。変更のあるツリーごとに
 置き場と、承認で `todo/` から消えた提案（追跡されていたものの削除だけ）をコミットし（パスを限る。
 `-a` も `add -A` も使わない）、保護されたブランチ
-（`main` / `master` / `develop` / `release` / `release/*` と、`ccnavi-common.sh` の `ccnavi_integration` が決める
+（`main` / `master` / `develop` / `release` / `release/*` と、`ccnavi-common-state.sh` の `ccnavi_integration` が決める
 そのリポジトリの統合先。決まらなければ固定のリストだけ）でなければ push する。承認はしない。
 
 | 経路 | 承認の push |
@@ -1946,6 +1946,8 @@ JSON の欄名は `gate_closed`。これは判定とボードの契約で、こ�
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのは作業ツリーの中で分かる前提検査と、
 sh が取得して JSON ファイルに書き、そのパスを `--result` で渡す。実行ファイルはその JSON の判定とマーカーの操作だけを持つ。sh と実行ファイルの間の契約は、この JSON の形で決まる。
+実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/review_host.py`、`request` と `confirm` の段は `tickets/review.py`、
+`decide` の段は `tickets/review_decide.py`、`ready` と `close-early` の段は `tickets/review_close.py` が持つ。
 
 | `--result` の JSON | 形 |
 |---|---|
@@ -2058,7 +2060,7 @@ push 済みであること。満たしていれば `ready.json` とコメント�
    差分の外の行に付けた指摘がホストに拒まれるか。また、ユーザの手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
    ずれる。`crit review` を開く前に、手元をマージリクエストの先頭に合わせる
 5. 送られた指摘はユーザのスレッドで、本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
-   （`review._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューになり、
+   （`review_host._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューになり、
    `decide` でも通せない
 6. 依頼の後に `wip/eli5/` の下だけを変えたコミットは「ユーザが見るものが動いた」に数えない。直したら push するだけで、
    `confirm` は止まらず、`request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
@@ -2188,7 +2190,7 @@ dry-run でも渡す。判定は返さない。
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）
 について探す。読むだけ。
 
-1. sh がホストを読む。繋ぎ方は `ccnavi-common.sh` の「ホスト（GitHub / GitLab）への接続」で、`ccnavi-review.sh` と同じ
+1. sh がホストを読む。繋ぎ方は `ccnavi-common-host.sh` の「ホスト（GitHub / GitLab）への接続」で、`ccnavi-review.sh` と同じ
    （gh / glab、無ければ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN`）。MR 指定はその MR の元ブランチ、issue 指定はその issue を
    参照している開いた MR の元ブランチ（GitHub は開いた PR の題・本文・元ブランチ名、GitLab は `related_merge_requests`）。
    繋げなければ止めず、理由を書く
@@ -2290,7 +2292,7 @@ URL はリンクとして出すが、その先の状態は見に行かない。
 `--lint` の登録の検査は `.claude/settings.json` しか見ず、モードがどこから来たかを示す。`rules.yml` に
 error がある間は配点も種類も保存できない。
 
-`--lint` は `.claude/settings.json` の env の `CCNAVI_BIN_PATH` も見る（`lint._bin_path`）。指す先が在るのに
+`--lint` は `.claude/settings.json` の env の `CCNAVI_BIN_PATH` も見る（`lint_project._bin_path`）。指す先が在るのに
 実行できなければ error（hook が起動しない）。POSIX でだけ見て（`os.access(X_OK)`）、パスは書いたとおりに見て
 `.exe` を補わない。指す先が無いときは言わない（自己防衛が missing と言う）。
 

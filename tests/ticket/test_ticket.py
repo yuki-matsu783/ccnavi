@@ -33,7 +33,7 @@ from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, review, ticket
 from ccnavi.tickets import phase as phase_mod
-from tests import ROOT, common_path
+from tests import ROOT, common_path, common_sh
 from tests.inproc import run_ccnavi
 
 RULES = {
@@ -3082,12 +3082,12 @@ class TicketTest(unittest.TestCase):
     def script(self):
         """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。
 
-        ccnavi-common.sh も一緒に置く。sh は起動して最初に隣の共通部を読むので、
+        共通部（ccnavi-common*.sh）も一緒に置く。sh は起動して最初に隣の共通部を読むので、
         片方だけだと判定の前に「読めない」で落ちる。
         """
         where = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-review.sh")
         os.makedirs(os.path.dirname(where), exist_ok=True)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh()):
             shutil.copy(
                 os.path.join(ROOT, ".ccnavi", "scripts", name),
                 os.path.join(os.path.dirname(where), name),

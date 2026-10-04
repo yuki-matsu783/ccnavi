@@ -341,7 +341,7 @@ def branch_problem(name: str) -> str:
     など）と、統合先や保護されたブランチの名前（main・master・develop・release・release/*・
     release-*。大文字小文字は区別しない）を断る。NFC でない表記も断る（識別子と同じ。
     見た目が同じ別の名前を作らない）。その時点の統合先の名前は、呼び手
-    （`approval.branch_problems`）が比べる。
+    （`approval_checks.branch_problems`）が比べる。
     """
     if not isinstance(name, str) or not name:
         return "ブランチ名が空"
@@ -733,7 +733,7 @@ class Ticket:
     # 並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
     project: str = ""
     # declared_project は frontmatter にユーザが書いた `project:`。宣言ではなく照合に使う。
-    # 置き場と違えば承認しない（approval.project_problems）。`scan` を通さずに読んだとき
+    # 置き場と違えば承認しない（approval_checks.project_problems）。`scan` を通さずに読んだとき
     # （`load` を直に呼ぶ経路）は project と同じ値になる。
     declared_project: str = ""
     # plan は全体計画（作業フェーズの種類のリスト）、feedback はフィードバック計画。
@@ -770,7 +770,7 @@ class Ticket:
     source_tree: str = ""
     source_path: str = ""
     # 待ち方のファイル（`phases/<親>/workflow.yml`）が在るのに読めない理由。空なら読めたか無い。
-    # 判定は読めない待ち方を一直線と読まずに止める（`approval.blocking_problems`）。
+    # 判定は読めない待ち方を一直線と読まずに止める（`approval_checks.blocking_problems`）。
     workflow_unreadable: str = ""
     # 待ち方を古い形の `workflow:` 欄から採ったか（`approval.load_copy`）。採るのは今の phases.yml
     # から計算した待ち方と同じときだけで、違えば欄を捨てて一直線で読み、
@@ -779,7 +779,7 @@ class Ticket:
     workflow_record_differs: bool = False
     # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
     # 同じ識別子のときの理由（`archive.drop_archived`）。
-    # 判定は止める（`approval.content_problems`）。
+    # 判定は止める（`approval_checks.content_problems`）。
     archived_clash: str = ""
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
@@ -1582,7 +1582,7 @@ def collisions(hits: list[Ticket]) -> list[Ticket]:
 
     まとめて 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
     状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
-    同じ条件（`lint._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
+    同じ条件（`lint_ticket._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
     普通なので、まとめて 1 つに決まるものは数えない。
     """
     folded = fold(hits)

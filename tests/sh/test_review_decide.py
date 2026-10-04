@@ -31,7 +31,7 @@ import tempfile
 import threading
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -156,7 +156,7 @@ class ReviewDecideShTest(unittest.TestCase):
         self.ws = os.path.join(self.work, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.state = os.path.join(self.ws, "logs", "state")
         os.makedirs(self.state)

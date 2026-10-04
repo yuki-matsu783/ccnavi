@@ -1,4 +1,4 @@
-"""sh が識別子だけから親子のチケットの親を割り出すこと（ccnavi-common.sh の ccnavi_c1_family）。
+"""sh が識別子だけから親子のチケットの親を割り出すこと（ccnavi-common-c1.sh の ccnavi_c1_family）。
 
 子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁の連番>`。sh も Python（`ticket.child_pattern`）と
 同じく右から 2 段を剥がして親にする。親が `-` や数字を含んでも
@@ -21,7 +21,7 @@ from tests import ROOT
 SHELL = shutil.which("sh") or shutil.which("bash")
 COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
 SCRIPT = (
-    '. "$1"; ccnavi_c1_root=$2; ccnavi_c1_family "$3"; '
+    '. "$0"; ccnavi_c1_root=$1; ccnavi_c1_family "$2"; '
     'printf "%s %s\\n" "$ccnavi_c1_family_id" "$ccnavi_c1_target"'
 )
 
@@ -35,7 +35,7 @@ class FamilyShTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env["CCNAVI_BIN"] = os.path.join(self.root, "no-such-ccnavi")
         result = subprocess.run(
-            [SHELL, "-c", SCRIPT, "sh", COMMON, self.root, ident],
+            [SHELL, "-c", SCRIPT, COMMON, self.root, ident],
             capture_output=True,
             text=True,
             env=env,

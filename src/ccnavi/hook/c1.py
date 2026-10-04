@@ -1,7 +1,7 @@
 """C1 で sh が聞くこと。
 
 状態を書く操作を「ロック → 途中の操作の確認 → C1 の外の変更の見分けとコミット → 取り込み →
-未送信の確かめ → 書く → コミット → push」の 1 操作にするのは sh（`ccnavi-common.sh` の
+未送信の確かめ → 書く → コミット → push」の 1 操作にするのは sh（`ccnavi-common-c1.sh` の
 `ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
 ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
 
@@ -44,7 +44,7 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
-from ..tickets import approval, archive, history, phase, syncstate
+from ..tickets import approval_marks, archive, history, phase, syncstate
 from ..tickets import ticket as ticket_mod
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
@@ -62,7 +62,7 @@ KIND_SKIP = "skip"
 
 # hook の告知が置くマーカーの欄（phase.announce）。これ以外の欄があれば (b) にしない。
 _HOOK_MARK_FIELDS = frozenset({"at", "review", "source", "deferred_to", "tickets"})
-_HOOK_MARKS = (approval.MARK_PENDING, approval.MARK_SKIPPED)
+_HOOK_MARKS = (approval_marks.MARK_PENDING, approval_marks.MARK_SKIPPED)
 # 履歴の行が必ず持つ欄（history.note）。
 _EVENT_FIELDS = ("at", "ticket", "kind")
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
@@ -72,10 +72,10 @@ _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.cc
 # 設定を見た上書きの記録、受け入れたスレッド、ユーザの承認で置かれた承認済みチケット、
 # 承認（`--agree` の新規と改版）が固定した全体計画の待ち方。
 _HUMAN_MARK_NAMES = (
-    f"{approval.PARENT_MARK_CLOSE_EARLY}.json",
+    f"{approval_marks.PARENT_MARK_CLOSE_EARLY}.json",
     "config-sync.json",
-    approval.ACCEPTED_FILE,
-    approval.WORKFLOW_FILE,
+    approval_marks.ACCEPTED_FILE,
+    approval_marks.WORKFLOW_FILE,
 )
 _TIMEOUT = 20.0
 
@@ -338,7 +338,7 @@ def _hook_mark(parts: list[str], parent: str, now: bytes | None, before: bytes |
     """その親子のチケットの `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、
     中身が hook の欄だけ。
     """
-    if len(parts) != 3 or parts[0] != approval.PHASES_DIR or parts[1] != parent:
+    if len(parts) != 3 or parts[0] != approval_marks.PHASES_DIR or parts[1] != parent:
         return False
     if before is not None or now is None:
         return False
@@ -427,8 +427,8 @@ def _judge_record(parts: list[str]) -> bool:
     """`phases/<親>/<子>.judge.json`（record-risk の記録）。"""
     return (
         len(parts) == 3
-        and parts[0] == approval.PHASES_DIR
-        and parts[2].endswith(f".{approval.CHILD_RECORD_JUDGE}.json")
+        and parts[0] == approval_marks.PHASES_DIR
+        and parts[2].endswith(f".{approval_marks.CHILD_RECORD_JUDGE}.json")
     )
 
 
@@ -454,14 +454,17 @@ def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool
         return removed(f"{review_rel}/{parts[1]}") or removed(
             f"{approved_rel}/{ticket_mod.DOING}/{parts[1]}"
         )
-    if len(parts) == 3 and parts[0] == approval.PHASES_DIR:
+    if len(parts) == 3 and parts[0] == approval_marks.PHASES_DIR:
         name = parts[2]
         if name in _HUMAN_MARK_NAMES:
             return True
         number, _, kind = name.partition(".")
-        if _NUMBER.fullmatch(number) and kind in approval.MARKS and removed(rel):
+        if _NUMBER.fullmatch(number) and kind in approval_marks.MARKS and removed(rel):
             return True  # ユーザの承認が消したマーカー（子が足された）
-        if _NUMBER.fullmatch(number) and kind in (approval.MARK_REVIEWED, approval.MARK_SKIPPED):
+        if _NUMBER.fullmatch(number) and kind in (
+            approval_marks.MARK_REVIEWED,
+            approval_marks.MARK_SKIPPED,
+        ):
             return True
     if len(parts) == 2 and parts[0] == history.EVENTS_DIR:
         return bool(_appended_rows(parts, now, before))
