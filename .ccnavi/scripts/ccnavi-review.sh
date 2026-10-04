@@ -19,18 +19,18 @@
 #            → `ccnavi review requested` がマーカーを置く
 #            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。題から Draft を
 #            外してマージするのはユーザの手に残す。
-#            --eli5 <HTML> は必須（ADR-0094・ADR-0095）。変更をやさしく説明した 1 枚の HTML で、
+#            --eli5 <HTML> は必須（付け忘れを後回しにさせない）。変更をやさしく説明した 1 枚の HTML で、
 #            このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html）にコミットしておく。
 #            HEAD に入って push されていれば、マージリクエストの差分に載る。ここは拡張子・在ること・
 #            中身があること・wip/eli5/ の下にあること・名前の字・HEAD で普通のファイル（100644）として
-#            HEAD と同じ中身でコミット済みであることを確かめ（ADR-0097）、
+#            HEAD と同じ中身でコミット済みであることを確かめ、
 #            実行ファイルには渡さない。crit は起動しない（待ち続けるため）。投稿が済んだら、ユーザが打つ
 #            `crit review <パス>` と `crit push <番号>` を標準出力に出す。crit push で送られた指摘は
 #            マージリクエストの行のスレッドになり、confirm が未解決として数え、decide で選べる。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
-#            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、印に残す
-#            （ADR-0093 の 8.9。段階 4）。引けなければ渡さず、印は前と同じ
+#            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、印に残す。
+#            actor は記録で、判定には使わない。引けなければ渡さず、印は前と同じ
 #   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに
 #            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
 #            → issue に回す分があればここが issue を作り、決めた内容をコメントに写す
@@ -40,12 +40,15 @@
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
-# 取り込み済みの家族（origin があり家族の控えが present。chat だけの家族を除く）では、状態を書く
-# request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す（ADR-0093 の 4.3。段階 2d）。
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの控えが present。chat だけのものを除く）では、状態を書く
+# request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
+# （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook の印と跡を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
-# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの家族なら
-# 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る（D27）。それ以外の家族は今のまま。
+# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
+# 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る。
+# ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、運ぶ処理の打ち直しを案内する。
+# それ以外は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
@@ -145,7 +148,7 @@ elif [ "$sub" != merged ]; then
 	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
 
-# 実行ファイルがそのフラグを知っているか（`--version --json` の flags。ADR-0093 の 11.9.1 の決定 C）。
+# 実行ファイルがそのフラグを知っているか（`--version --json` の flags で見る）。
 # 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで落ちる。印は前と同じ中身になる）。
 # 答えは 1 度だけ引いて控える。`$( )` の中から呼ぶと控えが親に残らないので、親で呼ぶ。
 exe_flags=""
@@ -363,8 +366,8 @@ find_mr() {
 		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url}'
 	else
-		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない。ADR-0093 の 11.9.1 の 6）。
-		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない。11.9.3 の 6）
+		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
+		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない）
 		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の綴りを見直してください）。"
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
@@ -576,7 +579,7 @@ post_decision() {
 	fi
 }
 
-# ---- トークンの持ち主（レビュー済みの印の actor。ADR-0093 の 8.9）。引けなければ空で、止めない。
+# ---- トークンの持ち主（レビュー済みの印の actor。記録だけで、判定には使わない）。引けなければ空で、止めない。
 #
 # gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
 # GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
@@ -652,7 +655,7 @@ eli5_posted=""
 trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- C1（ADR-0093 の 4.3。段階 2d）とユーザの判断を運ぶ処理（4.6・D27）
+# ---- C1 とユーザの判断を運ぶ処理
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
 ccnavi_c1_sh="$(dirname "$0")"
@@ -690,13 +693,13 @@ c1_ccnavi() {
 	fi
 }
 
-# ユーザの判断を運ぶ（D27）。取り込み済みの家族だけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
+# ユーザの判断を運ぶ。取り込み済みの親子のチケットだけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
 carry_human() {
 	ccnavi_c1_family "$1"
 	case "$ccnavi_c1_target" in
 	yes)
 		sh "$ccnavi_c1_sh/ccnavi-push-approved.sh" "$ccnavi_c1_family_id" || {
-			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが打ち直す（送るまで、この家族の状態の操作は止まる）\n' \
+			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが打ち直す（送るまで、この親子のチケットの状態の操作は止まる）\n' \
 				"$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
 			return 1
 		}
@@ -722,7 +725,7 @@ fetch)
 	printf '\n'
 	;;
 merged)
-	# いまのブランチ（親のブランチ）の MR がマージ済みか（ADR-0093 の 3.6 の 5）。ccnavi-sync.sh が、
+	# いまのブランチ（親のブランチ）の MR がマージ済みか。ccnavi-sync.sh が、
 	# 親のブランチがリモートから消えて統合先の done/ にも見えないときに、観測ずれかを確かめるために聞く。
 	# 読むだけで、何も書かない。答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
 	#   merged <番号>  終了コード 0
@@ -744,7 +747,7 @@ merged)
 			printf 'unknown\n'
 			exit 3
 		}
-		# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない。11.9.3 の 6）
+		# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない）
 		answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
 			printf 'unknown\n'
 			exit 3
@@ -777,7 +780,7 @@ confirm)
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
 	;;
 request)
-	# 段 -1: ELI5 の HTML（ADR-0094）。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
+	# 段 -1: ELI5 の HTML。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
 	# --eli5 を知らない）。ロックを取る前に確かめ、欠けていれば何も書かずに止める。
 	eli5=""
 	eli5_n=$#
@@ -801,8 +804,8 @@ request)
 		*) set -- "$@" "$eli5_a" ;;
 		esac
 	done
-	# 置き場は wip/eli5/ の下（ADR-0095・ADR-0097）。マージリクエストの差分に載せ、ユーザが crit push で行に指摘を送れる
-	# ようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
+	# 置き場は wip/eli5/ の下で、wip/ のほかの場所は ELI5 にさせない。マージリクエストの差分に載せ、
+	# ユーザが crit push で行に指摘を送れるようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
 	eli5_how="依頼の前に、変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML（外部の読み込み無し）を、このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html。名前は英数字と . _ / - だけ）に普通のファイルとして書いてコミットし、push してから --eli5 <パス> で渡してください。"
 	[ -n "$eli5" ] || fail explainer-missing "request には --eli5 <HTML> が要る。${eli5_how}" 2
 	case "$eli5" in
@@ -839,7 +842,7 @@ request)
   - このワークツリーの外にある（マージリクエストの差分に載らない）"
 	else
 		eli5_rel="${eli5_prefix}${eli5_path##*/}"
-		# 名前に使える字を絞る（ADR-0097）。相対パスは依頼文とユーザが打つ crit の行にそのまま入るので、
+		# 名前に使える字を絞る。相対パスは依頼文とユーザが打つ crit の行にそのまま入るので、
 		# `'`・`$`・バッククォート・空白・改行・日本語などを通すと、打ったユーザのシェルで別のコマンドになる
 		# 綴りを置ける。C ロケールで、許す字を消して印（:）だけが残るかで見る（改行も 1 字として残る）。
 		eli5_rest=$(printf '%s:' "$eli5_rel" | LC_ALL=C tr -d 'A-Za-z0-9._/-')
@@ -878,7 +881,7 @@ request)
 		fail explainer-unmet "ELI5 の HTML ($eli5) が依頼の前提を満たさない:${eli5_unmet}
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
-	# 段 0: 取り込み済みの家族なら C1 の前半（ロック・取り込み）を先に済ませる。
+	# 段 0: 取り込み済みの親子のチケットなら C1 の前半（ロック・取り込み）を先に済ませる。
 	c1_start "$branch"
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
 	tell_skew
@@ -897,14 +900,14 @@ ${eli5_how}"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや C1 の
-	# やり直しで依頼を二重にしない。段階 2d のレビューの決定 D）。
+	# やり直しで依頼を二重にしない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
 		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
 	if [ -n "$posted" ]; then
 		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	else
-		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す（ADR-0095）。HTML の中身は
+		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す。HTML の中身は
 		# 載せない（マージリクエストの差分にある）。目印は 1 行目なので、足しても二重投稿の見分けは変わらない。
 		eli5_posted="$state/review-request-eli5-$$.md"
 		{
@@ -919,7 +922,7 @@ ${eli5_how}"
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
 	c1_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
-	# 段 4: crit の案内（ADR-0095）。crit はユーザの手元で打つ道具で、ここからは起動しない（待ち続けるため）。
+	# 段 4: crit の案内。crit はユーザの手元で打つ道具で、ここからは起動しない（待ち続けるため）。
 	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
 	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
 	# ツリーの絶対パスはユーザの置き場なので字を絞れない。いつも '…' で包み、中の ' は '\'' に置き換える
@@ -996,7 +999,7 @@ decide)
 	if [ -n "$choices" ] || [ -n "$digest" ]; then
 		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡してください。" 2
 	fi
-	# 印に残すアカウント（ADR-0093 の 8.9。段階 5）。confirm と同じくトークンの持ち主をホストに聞き、
+	# 印に残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
 	# ロックを取る前に引く。引けなければ渡さず、印も跡も前と同じ。見るだけの --preview は引かない。
 	# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
 	decide_who=""
@@ -1009,7 +1012,7 @@ decide)
 		fi
 	fi
 	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
-	# 済ませる（ロックを持ったままユーザを待たない。段階 2d のレビューの決定 A）ので、ここでは始めない。
+	# 済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
 	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$branch"
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
@@ -1144,13 +1147,13 @@ close-early)
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	# 取り込み済みの家族なら、締めの印（ユーザの判断）を運ぶ処理で送る（D27）。
+	# 取り込み済みの親子のチケットなら、締めの印（ユーザの判断）を運ぶ処理で送る。
 	carry_human "$branch" || exit 1
 	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
 	;;
 chat)
 	# ユーザが端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	# 取り込み済みの親子のチケットなら、置いた後に運ぶ処理で送る。
 	n="${1:-}"
 	case "$n" in
 	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
@@ -1161,7 +1164,7 @@ chat)
 	;;
 config-synced)
 	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
-	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
+	# 取り込み済みの親子のチケットなら、置いた後に運ぶ処理で送る。
 	parent="${1:-}"
 	case "$parent" in
 	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;

@@ -7,7 +7,7 @@
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
  * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
- * `--suggest --json`（記録からルールの候補を起こす。ルール設定画面が読む。記録を読むので `--log ""` は付けない）。
+ * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
@@ -90,7 +90,7 @@ const EXPLAIN_TIMEOUT_MS = 60_000;
 
 /**
  * 診断の 4 本（`--test` / `--test-samples` / `--lint` / `--lint --json`）に付ける期限（ミリ秒）。
- * この 4 本を待つ間、ルール設定・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
+ * この 4 本を待つ間、ルール管理・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
  * 届いたときにしか活性へ戻さない。ボードと違って HTML の総取り替えも監視の読み直しも無いので、
  * 返らないと画面を閉じるまで戻れない（編集中の内容は消える）。値はボードと承認に揃えて 60 秒。
  */
@@ -113,7 +113,7 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
  * ワークスペースの設定は同じオプションに名札 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
  * `self` を名乗るプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
- * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
+ * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =
@@ -598,8 +598,8 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 }
 
 /**
- * 家族が C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
- * フローの保存の後、運ぶ処理を送るかを決めるのに使う（ADR-0093 の 4.6）。
+ * 親子のチケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * フローの保存の後、運ぶ処理を送るかを決めるのに使う。
  */
 export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
   const launcher = findLauncher(root, setting);

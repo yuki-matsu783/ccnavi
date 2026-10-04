@@ -1,4 +1,4 @@
-"""共通層の置き場は `.ccnavi/common/` 固定（ADR-0052 の受入テスト）。
+"""共通層の置き場は `.ccnavi/common/` 固定の受入テスト。
 
 3 層のうち共通層だけが env（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`）で動き、
 自身の層とプロジェクトの層は `<ccnavi ディレクトリ>/config/` 固定、という非対称を無くす。
@@ -8,13 +8,14 @@ env を渡しても共通層は既定の置き場のままになる。
 確かめるテストが自分の一時ディレクトリを指せなくなる（`ConfigUnionHarness`）。
 hook は引数を渡さずに起動するので、hook からの判定の入口は固定される。
 
-フラグが有効な範囲は ADR-0067 が診断の経路に限った。ここで見るのは env が使われないことと、
+フラグが有効なのは診断の経路（`--lint` / `--test` / `--explain`）だけ。
+ここで見るのは env が使われないことと、
 その門が有効なことの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
 
 起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
 読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
 
-実装は入っている（ADR-0052）。ここが落ちたら、env を読む経路が戻ったということ。
+実装は入っている。ここが落ちたら、env を読む経路が戻ったということ。
 """
 
 from __future__ import annotations
@@ -187,7 +188,7 @@ class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
 
 
 class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
-    """診断の外では、フラグも共通層を動かさない（ADR-0067、issue #65）。
+    """診断の外では、フラグも共通層を動かさない（issue #65）。
 
     `--project-rules-file` / `--project-phases-file` と揃える。有効なのは `--lint` /
     `--test` / `--test-samples` / `--explain` だけで、hook からの判定と
@@ -264,7 +265,7 @@ class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):
     def test_named_tool_writes_into_the_default_place_are_denied_while_the_env_names_another(self):
         """env がよそを指していても、`.ccnavi/common/` の 3 本は組み込みで止まる。
 
-        守る対象は既定の置き場から組み立てる（ADR-0052）。env を読む経路が戻ると、
+        守る対象は既定の置き場から組み立てる。env を読む経路が戻ると、
         `builtin-guard-common-layer` が env の指すよそへ付け替わり、ここが落ちる。
         """
         for path in (self.rules, self.phases, self.risk):

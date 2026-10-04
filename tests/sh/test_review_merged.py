@@ -1,6 +1,7 @@
-"""ccnavi-review.sh merged の約束（ADR-0093 の 3.6 の 5。段階 2b のレビューの決定 B2）。
+"""ccnavi-review.sh merged の約束。
 
-ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、家族の控えに gone を書く。
+ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、親子のチケットの
+控えに gone を書く。
 API が落ちた・答えを読めなかったときは `unknown`（終了コード 3）、道具やトークンが無ければ
 `none` を出さずに止まる。ホストへの道具（curl）は PATH の先頭に置いた代役に差し替える。
 """
@@ -118,7 +119,7 @@ class ReviewMergedTest(unittest.TestCase):
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
 class ReviewMergedGitLabTest(ReviewMergedTest):
-    """GitLab の枝（ADR-0093 の 11.9.1 の 6・11.9.3 の 9）。
+    """GitLab の枝。
 
     フォークの MR を数えず、プロジェクトの id が引けなければ unknown。
     """

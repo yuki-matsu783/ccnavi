@@ -170,7 +170,7 @@ test("CB-T230 置き場かその途中がリンクなら、着手前でも読む
   assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.linked === true));
 });
 
-test("CB-T293 下書きの置き場（ADR-0100）は実行ファイルの flow.draft の写し。欠けた欄はリンクの側、無い答えは null", () => {
+test("CB-T293 下書きの置き場は実行ファイルの flow.draft の写し。欠けた欄はリンクの側、無い答えは null", () => {
   const board = fixture();
   const child = board.tickets.find((t) => t.ticket === "i0001-03")?.flow;
   assert.ok(child !== null && child !== undefined);

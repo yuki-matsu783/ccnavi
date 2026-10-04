@@ -1,9 +1,9 @@
 /**
- * 通信先（ホストの API）の一覧と、そこから組む manifest（ADR-0093 の D24・5.5 の 5）。
+ * 通信先（ホストの API）の一覧と、そこから組む manifest。PAT を外へ送りにくくするため、通信先を絞る。
  *
  * 通信先は配布するときにビルドへ埋め込む。設定画面でホストを足す方法は持たない。
  * `host_permissions` と CSP の `connect-src` は、この一覧の API のオリジンだけにする。
- * CSP に足すのは Pyodide に要る `'wasm-unsafe-eval'` だけ（5.5 の 3）。
+ * CSP に足すのは Pyodide に要る `'wasm-unsafe-eval'` だけ。`'unsafe-eval'`・`'unsafe-inline'` は入れない。
  */
 
 export type HostKind = "github" | "gitlab";
@@ -14,7 +14,7 @@ export interface Host {
   readonly kind: HostKind;
   /** REST の根。`https://api.github.com`、GHES なら `https://<ホスト>/api/v3` */
   readonly api: string;
-  /** GitHub の GraphQL。GitLab は使わない（REST だけ。段階 5） */
+  /** GitHub の GraphQL。GitLab は使わない（REST だけ） */
   readonly graphql: string;
   /** ユーザが開く画面の根。PAT の作成画面へのリンクに使う */
   readonly web: string;
@@ -78,7 +78,7 @@ export function origins(hosts: readonly Host[]): string[] {
 }
 
 /**
- * 画像・フォームの送り先・base を制限する（レビューの 14）。足すのは Pyodide に要る 'wasm-unsafe-eval' だけ。
+ * 画像・フォームの送り先・base を制限する。足すのは Pyodide に要る 'wasm-unsafe-eval' だけ。
  * `default-src 'self'` は入れない: 悪意のある本文の style 属性を DOMPurify が落とす前の解析で、Chromium が
  * インラインの style の違反を毎回報告する（止まるのは同じで、表示の守りは DOMPurify が持つ）
  */
@@ -94,7 +94,7 @@ export function manifest(hosts: readonly Host[], version: string): Record<string
   return {
     manifest_version: 3,
     name: "ccnavi 承認ボード",
-    description: "リモートのブランチにある承認待ちを表示し、承認・取り下げ・レビュー済みを親のブランチへ書く。issue から親のブランチを作ることもできる（ADR-0093 段階 5。GitHub と GitLab）",
+    description: "リモートのブランチにある承認待ちを表示し、承認・取り下げ・レビュー済みを親のブランチへ書く。issue から親のブランチを作ることもできる（GitHub と GitLab）",
     version,
     minimum_chrome_version: "116",
     permissions: ["storage", "alarms"],

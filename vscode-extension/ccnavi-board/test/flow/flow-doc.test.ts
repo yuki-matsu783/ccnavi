@@ -89,13 +89,13 @@ test("CB-T253 書き出しはユーザが読める形で、実行ファイル（
   assert.deepEqual(read.doc, doc);
 });
 
-test("CB-T240 読みはルール設定の画面と同じ yaml の既定で、YAML 1.1 の読み方は真似しない（型の答えは実行ファイル）", () => {
+test("CB-T240 読みはルール管理の画面と同じ yaml の既定で、YAML 1.1 の読み方は真似しない（型の答えは実行ファイル）", () => {
   const read = parseFlow("nodes:\n  - {id: a, type: askUserQuestion, position: {x: 1, y: 2}, data: {multiSelect: yes, off: n, when: 2026-01-01}}\n");
   assert.ok(read.ok, read.ok ? "" : read.error);
   // `yes` `off` は文字のまま（真偽値に差し替えない）。`y` `n` も文字。日付も文字
   assert.deepEqual(read.doc.nodes[0].position, { x: 1, y: 2 });
   assert.deepEqual(read.doc.nodes[0].data, { multiSelect: "yes", off: "n", when: "2026-01-01" });
-  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む綴りを囲む（書式の側の制約。ADR-0035）。y は囲まない
+  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む綴りを囲む（書式の側の制約）。y は囲まない
   const text = serializeFlow(read.doc);
   assert.match(text, /multiSelect: "yes"/);
   assert.match(text, /"off": n/);

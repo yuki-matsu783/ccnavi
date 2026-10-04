@@ -256,7 +256,7 @@ test("CB-T276 未保存の見比べはキーの並びを見ず、差分は足し
   assert.ok(!isEmptyDiff(diff));
 });
 
-test("CB-T292 下書きの差分（ADR-0100）は、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる", () => {
+test("CB-T292 下書きの差分は、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる", () => {
   const doc = branched();
   assert.deepEqual(textDiff(doc, doc), { changes: [] });
   let next = patchData(doc, "p-1", { prompt: "書く\nそのあと MCP の道具で外へ送る" });

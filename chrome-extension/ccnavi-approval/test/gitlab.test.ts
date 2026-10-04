@@ -1,12 +1,12 @@
 /**
- * GitLab・プロジェクトのリポジトリ・「始める」（ADR-0093 の段階 5）。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
+ * GitLab・プロジェクトのリポジトリ・「始める」。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
  * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組む写しは、sh が組んだ期待値と同じ
- * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ家族・承認待ち・指紋を出す（読み取りの一致）
- * - GitLab への書き込みは Commits API の 1 コミット。事後確認（8.4 の 1 段目）: 書いたコミットの親が読んだ先頭と
+ * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・指紋を出す（読み取りの一致）
+ * - GitLab への書き込みは Commits API の 1 コミット。事後確認: 書いたコミットの親が読んだ先頭と
  *   違えば、直前の姿で判定し直し、同じなら残し、違えば打ち消して読み直す。打ち消しも収まらなければユーザに回す
- * - 「始める」（8.6）: issue から `i<番号>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
- * - プロジェクトのリポジトリ（3.3 の 7）: ワークスペースの統合先の共通層で判定し、プロジェクトの親のブランチへ書く
+ * - 「始める」: issue から `i<番号>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
+ * - プロジェクトのリポジトリ: ワークスペースの統合先の共通層で判定し、プロジェクトの親のブランチへ書く
  * - PAT は画面に渡らない。GitLab のスレッドの本文は承認の画面と同じ規則で描く
  */
 import { after, before, test } from "node:test";
@@ -94,7 +94,7 @@ test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む�
   }
 });
 
-test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ家族・承認待ち・指紋・取り下げの可否を出す", async () => {
+test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・指紋・取り下げの可否を出す", async () => {
   const hub = await collectRepo(GH_REPO, glDeps(new MockGitHub(fixture()), "github.com"));
   const lab = await collectRepo(GITLAB_REPO, glDeps(new MockGitLab(fixture())));
   assert.equal(lab.error, "", lab.error);
@@ -185,13 +185,13 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
       ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
     ],
   );
-  // 打ち消しは各ファイルに「最後に変えたのは自分のコミット」を付ける（決定 A）
+  // 打ち消しは各ファイルに「最後に変えたのは自分のコミット」を付ける
   const mine = mock.glCommits[0].oid;
   assert.ok(mock.glCommits[1].actions.filter((a) => a.action !== "create").every((a) => a.last_commit_id === mine));
   // 打ち消した後の置き場は、割り込んだ書き込みの直後と同じ（承認は残らない）
   assert.deepEqual(placeFiles(mock.files("i0001")), placeFiles(mock.commits.get(raced)!.files));
 
-  // 同じファイル（消す提案）を割り込みが変えていれば、GitLab が断るので何も書かない（last_commit_id。決定 A）
+  // 同じファイル（消す提案）を割り込みが変えていれば、GitLab が断るので何も書かない（last_commit_id）
   const same = new MockGitLab(parentOnly());
   const sd = glDeps(same);
   const sshown = shownOf(await collectRepo(GITLAB_REPO, sd), "i0001");
@@ -213,7 +213,7 @@ test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変�
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /8\.4/);
+  assert.match(out.kind === "attention" ? out.message : "", /ホストの履歴を確かめてください/);
   // 打ち消しは last_commit_id で断られ、割り込み 2 の変更は残る（PROBE-1）
   assert.deepEqual(mock.glCommits.map((c) => c.result), ["written", "error"]);
   assert.equal(mock.files("i0001")[DOING], "別の書き手が書いた\n");
@@ -241,7 +241,7 @@ test("CX-T150 「始める」: issue から i<番号> のブランチを統合�
     [new MockGitHub(fixture()), GH_REPO, "github.com"],
     [new MockGitLab(fixture()), GITLAB_REPO, "gitlab.com"],
   ] as const) {
-    mock.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた家族と重なる" }, { number: 1, title: "開いた家族と重なる" }, { number: 30, title: "PR", pull: true });
+    mock.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた親子のチケットと重なる" }, { number: 1, title: "開いた親子のチケットと重なる" }, { number: 30, title: "PR", pull: true });
     const d = glDeps(mock, host);
     const list = await listIssues(repo, d);
     assert.deepEqual(
@@ -261,7 +261,7 @@ test("CX-T150 「始める」: issue から i<番号> のブランチを統合�
     assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にある（i0001）/);
     const again = await startIssue(repo, 12, b.seen ?? null, taken, d);
     assert.equal(again.kind, "refused", host);
-    // 全部のブランチの名前を大文字小文字をそろえて比べる（直近 N 日の外のブランチも。11.9.1 の 7）
+    // 全部のブランチの名前を大文字小文字をそろえて比べる（直近 N 日の外のブランチも）
     assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にある（i0012）/);
     assert.equal(mock.createdBranches.length, 1, host);
   }
@@ -305,7 +305,7 @@ function reviewingOnGitLab(scene: string, host: "github" | "gitlab" = "gitlab"):
   const mock = new MockGitLab(fixture());
   mock.branch(FAMILY, "main");
   const at = mock.push(FAMILY, reviewFamilyFiles(FAMILY), "作業とレビュー待ちの子");
-  // 依頼を投稿したアカウントは id で残る（11.9.1 の 15。見本の lab-bot は id 201）
+  // 依頼を投稿したアカウントは id で残る（見本の lab-bot は id 201）
   mock.push(FAMILY, { [REQUESTED]: requestedMark(at, 7, host, "201") }, "ccnavi: レビューを依頼した");
   mock.attachGitLabScene(FAMILY, loadGitLabScene(scene));
   return mock;
@@ -465,7 +465,7 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   const hostile = '<img src=x onerror="window.__pwned=\'issue\'">題';
   const html = renderRepo(dom.window.document, md, b, actions, {
     issues: { list: [{ number: 12, title: hostile, url: "javascript:window.__pwned='url'" }], error: "" },
-    attention: { i0001: "打ち消せなかった", gone: "見えない家族" },
+    attention: { i0001: "打ち消せなかった", gone: "見えない親子のチケット" },
   });
   dom.window.document.body.append(html);
   const item = html.querySelector("[data-testid=start] li[data-issue='12']") as HTMLElement;

@@ -20,7 +20,7 @@
 形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのはユーザ
 （`/ccnavi-config` の手順）。
 
-実行ファイルはネットワークに出ない（ADR-0028）。読むのは記録と設定だけ。
+実行ファイルはネットワークに出ない。読むのは記録と設定だけ。
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ from ..policy import ruleload, rules
 from ..records import audit, repeat
 from . import diagnose, lint
 
-# `--suggest --json` の形の版。読み手は VS Code 拡張のルール設定画面。形を変えたら上げる。
+# `--suggest --json` の形の版。読み手は VS Code 拡張のルール管理画面。形を変えたら上げる。
 SUGGEST_VERSION = 1
 
 # 候補の種類。

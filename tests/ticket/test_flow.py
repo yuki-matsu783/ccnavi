@@ -1,4 +1,4 @@
-"""子チケットのフロー（設計 9.3.1・9.12、ADR-0085）の受入テスト。
+"""子チケットのフロー（設計 9.3.1・9.12）の受入テスト。
 
 見るのは 8 つ。
 
@@ -14,7 +14,7 @@
    ノードでの動き方を渡す。フローが壊れていても残りの文は渡す
 7. `--explain --json` の子に `flow` の欄が出る（ボードが読む）。閉じた子でフローが無ければ出さない
 8. 入れ子のサブエージェントが差し戻しを無視して終わったら、`systemMessage` にも載せる
-9. エージェントの下書き（`wip/proposals/flows/<子>.yml`、ADR-0100）は書ける。効力は無く、
+9. エージェントの下書き（`wip/proposals/flows/<子>.yml`）は書ける。効力は無く、
    SubagentStart も着手の指紋も読まない。置き場と有無は `flow.draft` に出る
 """
 
@@ -908,7 +908,7 @@ class NestedBounceTest(PhaseHarness):
 
 
 class FlowDraftTest(FlowHarness):
-    """エージェントの下書き（ADR-0100）。書けるが効力は無い。判定と守りは今までどおり。"""
+    """エージェントの下書き。書けるが効力は無い。判定と守りは今までどおり。"""
 
     def draft_in(self, tree_root, name=CHILD):
         return os.path.join(tree_root, "wip", "proposals", "flows", f"{name}.yml")

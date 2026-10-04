@@ -19,9 +19,9 @@ from ..records import audit, prune, repeat
 from ..tickets import agree, approval, configsync, ops, phase
 from . import docsearch, judge, post, projskills, reasons, subagent
 
-# `match: Stop` のルールで止めた回の理由コード（ADR-0090）。記録の `code` と、止めた文の頭に出る。
+# `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
-# `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文（ADR-0090）。ルールの文や
+# `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文。ルールの文や
 # 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
 STOP_PREFACE = (
     "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めないでください。"
@@ -202,11 +202,11 @@ def decide_at_stop(
 
     止めるのは 1 つだけ。cwd のワークツリーのチケットが、作業を終えたように見えるのに
     `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
-    （ADR-0087、`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
+    （`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
     止めたはずの文を報告に載せる。止めるときも報告は同じ応答の `systemMessage` で返す。
 
     `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
-    （ADR-0090、`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
+    （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     report = post.at_stop(
@@ -227,7 +227,7 @@ def decide_at_stop(
         report = f"{report}\n\n{repeated}" if report else repeated
     nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
     if not nudge:
-        # finish の促しで止める回は、ルールの促しを数えもしない（ADR-0090）。1 回の Stop で
+        # finish の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
         nudge = stop_rules_nudge(stderr, conf, root, payload, record, mode)
     if nudge and mode == modes.ENABLE:
@@ -251,10 +251,10 @@ def stop_rules_nudge(
     record: audit.Record,
     mode: str,
 ) -> str:
-    """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文（ADR-0090）。
+    """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文。
 
     書いたルールが無ければ空で、これまでどおり止めない。何を言うか・何回に 1 度かは
-    設定が持ち、ここは当てて数えるだけ（ADR-0057 と同じ分け方）。`every: 10` と書けば
+    設定が持ち、ここは当てて数えるだけ（レビューの勧告と同じ分け方）。`every: 10` と書けば
     「ターンの終わり 10 回に 1 度」止める。
 
     ルールは共通層とワークスペース自身の層からだけ引く（`ruleload.stop_rules`）。プロジェクトの層は
@@ -267,7 +267,7 @@ def stop_rules_nudge(
     - `stop_hook_active` が真（Stop の hook が続けさせた連鎖の 2 回目以降）。数えもしない
     - サブエージェント（`agent_id` がある）。候補は報告につけてメインに返す決まり
     - 数えを覚えられない（`--state ""`、控えを読めない・書けない）。覚えられないまま止めると
-      ターンの終わりのたびに止まるので、何も言わない側を採る（ADR-0087 と同じ）
+      ターンの終わりのたびに止まるので、何も言わない側を採る（`finish` の促しと同じ）
 
     数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
     `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、ユーザへの問いで終わった
@@ -304,7 +304,7 @@ def _finish_nudge(
     record: audit.Record,
     mode: str,
 ) -> str:
-    """`finish` の打ち忘れを促す文（ADR-0087）。促さないなら空文字。
+    """`finish` の打ち忘れを促す文。促さないなら空文字。
 
     メインエージェントの Stop でだけ呼ぶ（SubagentStop は別の手順）。促すのは、同じセッションで
     同じチケットを同じ HEAD のまま促したことが無いときだけ（控えは状態の置き場の
@@ -379,7 +379,7 @@ def decide_at_start(
         texts.append(selfguard.report(outcomes))
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
-    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録（ADR-0091）。
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
@@ -453,7 +453,7 @@ def decide_after(
     # 既定に戻ったことをこのイベントでは言わない。実行前チェックが呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
+    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、写す段は無い。
     scope = scope_guard(conf, root)
 
     text = post.check(
@@ -511,7 +511,7 @@ def decide_after(
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
     # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
-    # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
+    # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる。
     # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
     system = bounced if payload.agent_id else ""
     hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)

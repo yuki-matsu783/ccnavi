@@ -410,7 +410,7 @@ SUBST_MARK = re.compile(r"(^|\x00)zzmark($|[ \x00])")
 #   それ以外は縮退の理由
 SHELL_CASES = [
     ("01", 'echo "$(M)"', "中"),
-    # バッククォートは読まずに止める（ADR-0047）。実行されるものは 02 16 18 20 22 35 40。
+    # バッククォートは読まずに止める。実行されるものは 02 16 18 20 22 35 40。
     ("02", 'echo "`M`"', "backquote"),
     ("03", 'echo "\\$(M)"', "-"),
     ("04", 'echo "\\`M\\`"', "-"),
@@ -527,7 +527,7 @@ def marked(text):
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
 class MovedTest(unittest.TestCase):
-    """`cd` で移った先から見た綴り（ADR-0069、issue #61）。
+    """`cd` で移った先から見た綴り（issue #61）。
 
     `read(src).moved` は、`cd` の行き先を引数に継ぎ足したコマンドを SEP でつないだもの。
     綴りの変わったコマンドだけが並ぶ。書かれた綴り（`text`）は動かさない。
@@ -860,7 +860,7 @@ class SubstTest(unittest.TestCase):
 
 
 class BraceTest(unittest.TestCase):
-    """引用の外のブレース展開を並べる（ADR-0046）。展開はしない。
+    """引用の外のブレース展開を並べる。展開はしない。判定は並んでいれば一律に止める。
 
     期待は bash 3.2 と zsh で実際に確かめた結果。どちらかのシェルが広げる形を並べる。
     """
@@ -967,7 +967,7 @@ def rewrites_of(src, form):
 
 
 class CommandNameTest(unittest.TestCase):
-    """実行するときにシェルが決めるコマンド名を並べる（ADR-0047）。"""
+    """実行するときにシェルが決めるコマンド名を並べる。"""
 
     def test_コマンド名の位置の展開とグロブを並べる(self):
         cases = {
@@ -1016,7 +1016,7 @@ class CommandNameTest(unittest.TestCase):
             "command -v $x",
             "cd $S && ls",
             "echo '$c' | cat",
-            # 外側が縮退する `eval` と `sh -c` の文字列の中は見ない。確認になる（ADR-0047）。
+            # 外側が縮退する `eval` と `sh -c` の文字列の中は見ない。確認になる。
             'sh -c "$c status"',
             'eval "$(ssh-agent -s)"',
             'eval "$x"',
@@ -1034,7 +1034,7 @@ class CommandNameTest(unittest.TestCase):
 
 
 class BackquoteTest(unittest.TestCase):
-    """実行されるバッククォートで読みを止める（ADR-0047）。"""
+    """実行されるバッククォートで読みを止める。"""
 
     def test_実行されるバッククォートを並べる(self):
         cases = {
@@ -1068,7 +1068,7 @@ class BackquoteTest(unittest.TestCase):
 
 
 class AmbiguousFormTest(unittest.TestCase):
-    """シェルで読みが割れる形を並べる（ADR-0047）。"""
+    """シェルで読みが割れる形を並べる。読み分けずに止めて書き直しを求める。"""
 
     def test_読みが割れる形を並べる(self):
         deep = "echo " + '"$(echo ' * 17 + "x" + ')"' * 17

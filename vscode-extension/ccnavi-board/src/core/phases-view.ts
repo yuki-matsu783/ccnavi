@@ -1,16 +1,16 @@
 /**
  * フェーズ管理画面の、拡張ホストと Webview の間の契約。リスク管理（`risk-view.ts`）と同じ作り。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR-0064）。渡すのは「いま何を見せるか」
+ * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
  * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は種類の意味を
- * 判定しない（子の範囲が上限に収まるか、レビューが要るかは実行ファイルが出す。ADR-0035）。
+ * 判定しない（子の範囲が上限に収まるか、レビューが要るかは実行ファイルが出す）。
  *
  * **種類の形（`PHASE_KINDS`・`PhaseForm` など）もここに置く。** 読み書き（`phases-doc.ts`）の側に
  * 置いたままだと、画面がそこから `yaml` を辿ることになり、束ねたものに YAML の解析器が丸ごと入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（ADR-0062）。中身が届くのは、画面の編集を捨ててよいときだけ。
+ * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を捨ててよいときだけ。
  */
 import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
@@ -113,7 +113,7 @@ export function editable(page: PhasesPage): boolean {
 
 /**
  * 画面に見せる中身。読み直せなかったときは種類の代わりに文面を渡す。
- * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（ルール設定と同じ）
+ * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（ルール管理と同じ）
  */
 export type PhasesData =
   | { readonly kind: "page"; readonly page: PhasesPage }

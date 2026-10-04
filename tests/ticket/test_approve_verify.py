@@ -260,7 +260,7 @@ class ApproveVerifyTest(PhaseHarness):
         表に allow を 1 本足す形も試したが、`todo/` が「ccnavi が言及する場所」になり、
         どのタイプも言及しないときの扱い（judge.undeclared_verdict）を通らなくなる。
         確認できる者が居ないモードの deny も、知らない綴りのモードを ask として扱う既定も、
-        そこだけ外れていた（ADR-0059）。**同じ場所とどのルールも言及しない場所が、
+        そこだけ外れていた。**同じ場所とどのルールも言及しない場所が、
         どの権限モードでも同じ判定になること**を確かめる。文は届いたままであることも見る。
         """
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")

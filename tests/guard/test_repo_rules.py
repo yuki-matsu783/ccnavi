@@ -35,7 +35,7 @@ LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
 APPROVAL = "builtin-guard-ticket-approval"
 APPROVAL_CODE = "DENY_TICKET_APPROVAL_CLI"
 SETTING_FILES = "builtin-guard-setting-files"
-# 書き直しを求める形で止めたときの、記録のルール名（ADR-0047）。
+# 書き直しを求める形で止めたときの、記録のルール名。読み分けずに止め、書き直し方を案内する。
 NAME = "(command-name-expansion)"
 BACKQUOTE = "(backquote)"
 AMBIGUOUS = "(ambiguous-form)"
@@ -452,7 +452,7 @@ class RunnerTest(LauncherJudgeTest):
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
 class MovedJudgeTest(LauncherJudgeTest):
-    """`cd` で移った先から見た綴りに、止める側のルールを当てる（ADR-0069、issue #61）。"""
+    """`cd` で移った先から見た綴りに、止める側のルールを当てる（issue #61）。"""
 
     def test_守られた場所へ入ってから書く形は止まる(self):
         # issue #61 の表。どれも綴りからディレクトリの名前が消えて止められずに通っていた。
@@ -514,7 +514,7 @@ class MovedJudgeTest(LauncherJudgeTest):
     def test_行き先を読めない_cd_は読みを変えない(self):
         # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
         # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた綴りで今は
-        # 止まっている形**が止まらなくなる（敵対的レビュー 2026-09-20）。
+        # 止まっている形**が止まらなくなる（敵対的レビュー）。
         for subject in [
             'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
             "cd - && cp /tmp/x .ccnavi/common/rules.yml",
@@ -671,7 +671,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("cat a.txt\n", "allow", "prefer-read-grep", ""),
                 ("curl -s 'https://example.com/a#frag'", "ask", "prefer-webfetch", ""),
                 ('export PATH="$(go env GOPATH)/bin:$PATH"', "ask", "", "UNDECLARED"),
-                # eval の文字列の中はコマンド名を見ない。外側が縮退して確認になる（ADR-0047）。
+                # eval の文字列の中はコマンド名を見ない。外側が縮退して確認になる。
                 ('eval "$(ssh-agent -s)"', "ask", "", "PARSE_UNCERTAIN"),
                 (
                     "sed -n \"$(grep -n '^### レビュー' README.md | cut -d: -f1),+60p\" README.md",
@@ -784,7 +784,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.assertEqual(len(set(responses.values())), 3, "理由の違う縮退に同じ文面を返した")
 
     def test_シェルで読みが割れる形は一律に止める(self):
-        # ADR-0047。`coproc` は敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）で、
+        # `coproc` は敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）で、
         # NAME の読みが bash 4 と zsh で分かれる。読み分けずに止める。
         code = "DENY_AMBIGUOUS_FORM"
         self.check(
@@ -805,7 +805,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         )
 
     def test_バッククォートは一律に止める(self):
-        # ADR-0047。二重引用の中でも、区切りを引用しないヒアドキュメントの中でも実行される。
+        # 二重引用の中でも、区切りを引用しないヒアドキュメントの中でも実行される。
         code = "DENY_BACKQUOTE"
         self.check(
             [
@@ -825,7 +825,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.assertIn("--body-file", body["response"])
 
     def test_実行するときに決まるコマンド名は一律に止める(self):
-        # ADR-0047。どれもどのルールにも当たらず、auto では権限モードに渡っていた。
+        # どれもどのルールにも当たらず、auto では権限モードに渡っていた。
         code = "DENY_COMMAND_NAME_EXPANSION"
         self.check(
             [
@@ -874,7 +874,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 self.assertNotEqual(body["code"], "DENY_COMMAND_NAME_EXPANSION", body["response"])
 
     def test_引用の外のブレース展開は一律に止める(self):
-        # Issue #38（ADR-0046）。どのルールにも当たらないまま、bash は広げた語を実行していた。
+        # Issue #38。どのルールにも当たらないまま、bash は広げた語を実行していた。
         brace, code = "(brace-expansion)", "DENY_BRACE_EXPANSION"
         self.check(
             [

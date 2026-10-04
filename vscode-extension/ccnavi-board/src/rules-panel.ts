@@ -1,10 +1,10 @@
 /**
- * ルール設定画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
+ * ルール管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
@@ -113,11 +113,11 @@ function projectOf(target: RulesTarget): string | undefined {
 function titleOf(target: RulesTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "ccnavi ルール設定";
+      return "ccnavi ルール管理";
     case "self":
-      return "ccnavi ルール設定: ワークスペース";
+      return "ccnavi ルール管理: ワークスペース";
     case "project":
-      return `ccnavi ルール設定: プロジェクト ${target.name}`;
+      return `ccnavi ルール管理: プロジェクト ${target.name}`;
   }
 }
 
@@ -145,7 +145,7 @@ function samplesSetting(): string {
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できません");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -161,7 +161,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ルール設定画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`ルール管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -251,7 +251,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesRel: string;
   const notices: string[] = [];
   if (target.kind === "workspace") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
@@ -446,7 +446,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 
 /**
  * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
- * ときと、保存が通って中身が入れ替わったときだけ（ADR-0062）。
+ * ときと、保存が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;
@@ -519,7 +519,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * ルール設定の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
+ * ルール管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
  * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。

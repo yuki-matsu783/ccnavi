@@ -1,6 +1,6 @@
 /**
  * カードとフェーズ行に出す言葉。判定は実行ファイルがやっていて、ここは JSON が言ったことを
- * 言い換えるだけ。マーカーや済みから状態を組み直さない（ADR-0035）。
+ * 言い換えるだけ。マーカーや済みから状態を組み直さない。
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -154,7 +154,7 @@ export function approvalBody(text: string): BodyLine[] {
   return out;
 }
 
-/** 履歴（ADR-0086）の置き場の呼び名。列の名前ではなく置き場の名前で言う（`review` は作業中の列にいる） */
+/** 履歴の置き場の呼び名。列の名前ではなく置き場の名前で言う（`review` は作業中の列にいる） */
 const PLACE_LABELS: Readonly<Record<string, string>> = {
   todo: "承認待ち",
   doing: "作業中",
@@ -224,7 +224,7 @@ export function historyAt(at: string): string {
 }
 
 /**
- * 先行を満たしていないカードのバッジ（ADR-0088）。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
+ * 先行を満たしていないカードのバッジ。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
  * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
  * `lead` と `ids` は `text` を分けたもので、画面が識別子の途中で折り返さないために使う
  */

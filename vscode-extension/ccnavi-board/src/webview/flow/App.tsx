@@ -6,7 +6,7 @@
  *
  * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）をそのまま反映したもので、
  * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼り付け が止まる）。
- * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く（ADR-0085）。
+ * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く。
  *
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
  * だけ（再読込・保存が通った）。履歴もそこで空にする。
@@ -19,7 +19,7 @@
  * 止まってから（`CHECK_MS`）拡張ホストに確かめ直しを頼む（`check` → `checked`。書きはしない）。答えの
  * warn は画面の注意と並べて出し、渡る手順は右の列のプレビュー、候補の名前は右の欄の選択肢に使う。
  *
- * **エージェントの下書き（ADR-0100）。** 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
+ * **エージェントの下書き。** 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
  * 実行ファイルに確かめさせた中身が届き（`proposal`）、文の前後まで見せる差分（`Proposal.tsx`）から「取り込む」で
  * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きの指紋を添え、拡張ホストは
  * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`request`）は着手の前だけ拡張ホストが言葉を渡す。
@@ -194,7 +194,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const checkSeq = useRef(0);
   // 外で変わった知らせを受けているか。拡張ホストはタブを表に戻すたびに送り直すので、最初の 1 回だけ履歴を空にする
   const changedSeen = useRef(false);
-  // エージェントの下書き（ADR-0100）。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きの指紋
+  // エージェントの下書き。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きの指紋
   const [request, setRequest] = useState<string | undefined>(() => pageOf(initial)?.request);
   const [offer, setOffer] = useState<FlowOffer | undefined>(() => pageOf(initial)?.offer);
   const [proposal, setProposal] = useState<ProposalView | undefined>(undefined);

@@ -131,7 +131,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             title="共通の設定のルール（どのツリーにも適用されます。既定は .ccnavi/common/rules.yml）を編集し、判定を試します"
             onClick={() => post({ type: "openRules", name: "" })}
           >
-            ルール設定
+            ルール管理
           </button>
           {page.ticketsEnabled && (
             <button type="button" className="action" data-action="open-board" data-name="*" onClick={() => post({ type: "openBoard", name: "*" })}>
@@ -232,7 +232,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "section.list",
     title: "プロジェクト",
-    body: "プロジェクトのフォルダの直下にある git リポジトリが 1 行ずつ出ます。「開く ▾」からルール設定画面（チケット制御が有効ならフェーズ管理画面とチケット管理画面も）を開き、「git ▾」から fetch と pull をターミナルで実行できます。検証で見つかった問題も行に出ます。",
+    body: "プロジェクトのフォルダの直下にある git リポジトリが 1 行ずつ出ます。「開く ▾」からルール管理画面（チケット制御が有効ならフェーズ管理画面とチケット管理画面も）を開き、「git ▾」から fetch と pull をターミナルで実行できます。検証で見つかった問題も行に出ます。",
   },
   {
     target: "section.workspace",
@@ -329,7 +329,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           title="ワークスペースの設定のルールを編集し、判定を試します。このルールは共通の設定のルールに足され、ワークスペース（プロジェクト外）のツリーへの書き込みと、すべてのツリーの Bash でヒットします"
           onClick={() => post({ type: "openSelfRules" })}
         >
-          ルール設定
+          ルール管理
         </button>
       </div>
       {page.ticketsEnabled && (

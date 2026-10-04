@@ -1,4 +1,4 @@
-"""合意の手続き。人が提案に合意する（承認する）までの手続きを持つ。
+"""合意の手続き。ユーザが提案に合意する（承認する）までの手続きを持つ。
 
 置き場は approval、合意の手続きは agree。approval は承認済みチケット・マーカー・子の記録が
 どこにどう置かれているかを読み書きするだけで、ここ（agree）を知らない。agree は approval の
@@ -11,13 +11,13 @@
 - 承認の対象を組む（`gather`・`candidates`）。提案を走査し、承認済みチケットと突き合わせ、
   載せるものと落とすものに分ける。形の検査（`validate`・`plan_problems`・`revision_problems`）は
   ここで当てる
-- 人に見せる（`screen`・`preview_body`）。見せたものと承認するものを同じ答えにするため、
+- ユーザに見せる（`screen`・`preview_body`）。見せたものと承認するものを同じ答えにするため、
   一覧を組む関数は 1 つ（`gather`）にしてある
 - 見せたものから変わっていないかを確かめる（`approval_digest`・`read_set`・`verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す
 - 承認の事実をモデルに伝える（`news`・`approved_text`）
 
-判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（ADR-0058）。置き場を手で
+判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（置き場が承認の権威）。置き場を手で
 動かす運びもあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
 """
 
@@ -94,6 +94,9 @@ class Gathered:
     refused: str = ""
     # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを承認の対象にする」）。
     note: str = ""
+    # 権威のツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
+    # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文と指紋には入れない）。
+    elsewhere: list[str] = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -125,15 +128,25 @@ def gather(
     `project:` が決める（設計 11.4.1）ので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` に持たせる。画面は候補が持つ種類を使う。
     """
-    proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
+    raw = approval.read_raw(conf, root)
+    proposals, problems, stale = approval.read_proposals(conf, root, raw.everything)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
-    approved, notes = approval.scan(conf, root)
+    approved, notes = approval.scan(conf, root, raw=raw)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review, _ = approval.scan_review(conf, root, raw=raw)
+    # 権威のツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
+    # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core._say_elsewhere` と
+    # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
+    open_index = approval.by_id(approved)
+    elsewhere = [
+        approval.revision_elsewhere_text(conf, root, t, where)
+        for t, where in stale
+        if approval.revision_elsewhere(t, open_index.get(t.ticket))
+    ]
 
     pending, revisions = waiting(
         proposals, approved, closed, review, types_resolver(conf, root, approved)
@@ -155,7 +168,7 @@ def gather(
             ]
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
-            return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
+            return Gathered([], [], texts, {}, False, broken, "\n".join(lines), elsewhere=elsewhere)
         # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らなければ
         # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
         skipped = {t.ticket for t in revisions if t.ticket not in wanted}
@@ -167,21 +180,21 @@ def gather(
             lines.append("何も承認しない。親の改版も承認の対象に入れてください")
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
-            return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
+            return Gathered([], [], texts, {}, False, broken, "\n".join(lines), elsewhere=elsewhere)
         waiting_count = len(pending) + len(revisions)
         pending = [t for t in pending if t.ticket in wanted]
         revisions = [t for t in revisions if t.ticket in wanted]
         note = f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを承認の対象にする。"
 
     if not pending and not revisions:
-        return Gathered([], [], texts, {}, True, broken, "", note)
+        return Gathered([], [], texts, {}, True, broken, "", note, elsewhere=elsewhere)
 
     batch, rejected, pool = candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
             stderr.write(f"  {p}\n")
-    return Gathered(batch, rejected, texts, pool, False, broken, "", note)
+    return Gathered(batch, rejected, texts, pool, False, broken, "", note, elsewhere=elsewhere)
 
 
 def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
@@ -226,12 +239,17 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     unreadable = _unreadable(gathered)
     if gathered.refused:
         return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
+    elsewhere = _elsewhere(gathered)
     if gathered.nothing_pending:
-        text = (
-            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
-            "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
+        text = f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
+        # 場所違いの改版を名指ししたときは「同じ名前で置いても承認待ちにならない」を言わない。
+        # 改版そのものができないと読めるため（書く場所は上の段が言う）。
+        text += (
+            "。\n"
+            if elsewhere
+            else "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
         )
-        return Verdict(False, VERIFY_NOTHING, head + text + unreadable)
+        return Verdict(False, VERIFY_NOTHING, head + elsewhere + text + unreadable)
 
     lines = [head]
     if gathered.note:
@@ -252,6 +270,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         lines.append(f"  {name.ljust(width)}  {mark}\n")
         lines += [_note_line(note) for note in notes]
 
+    lines.append(elsewhere)
     lines.append(unreadable)
 
     if gathered.rejected:
@@ -265,6 +284,15 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。ユーザに承認を依頼してよい。\n"
     lines.append(tail)
     return Verdict(reason == VERIFY_OK, reason, "".join(lines))
+
+
+def _elsewhere(gathered: Gathered) -> str:
+    """権威のツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。"""
+    if not gathered.elsewhere:
+        return ""
+    lines = ["\n承認待ちに入らない改版がある（権威のツリーの外）。\n"]
+    lines += [_note_line(line) for line in gathered.elsewhere]
+    return "".join(lines)
 
 
 def _unreadable(gathered: Gathered) -> str:
@@ -302,7 +330,7 @@ def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | No
     本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
     本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
 
-    **判定が読んだ中身（ADR-0093 の 6.2 の `read_set`。段階 2c）を指紋に含める。** 提案だけでなく、
+    **判定が読んだ中身（`read_set`）を指紋に含める。** 提案だけでなく、
     判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の控えのどれかが見せたあとに
     変われば、指紋が変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
     入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
@@ -324,7 +352,7 @@ def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | No
 
 
 def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[str, str]:
-    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す（ADR-0093 の 6.2）。
+    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す。
 
     鍵は `<リポジトリ>:<ブランチ>:<ツリーからの相対パス>`（"/" 区切り）。リポジトリは
     ワークスペース自身なら `self`、プロジェクトならその名前（控えの名前と同じ。ブランチ名が
@@ -394,7 +422,7 @@ _SETTINGS_VALUES = ("tickets", "approved", "projects", "project_home")
 
 
 def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
-    """判定が読んだ設定（ADR-0093 の 6.2 の read_set に足す）。
+    """判定が読んだ設定（read_set に足す）。
 
     `settings.load` が読むファイル（`pyproject.toml`・`ccnavi.settings.local.json`）と
     Claude Code の設定（`.claude/settings.json`・`.claude/settings.local.json`）の中身を
@@ -643,7 +671,7 @@ def candidates(
     cache: dict[str, dict | None] = {}
     # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
-    # 家族の立ち位置と統合先の控え（ADR-0093 の 3.3）。1 回の承認で 1 度ずつだけ読む。
+    # 親子のチケットの立ち位置と統合先の控え。1 回の承認で 1 度ずつだけ読む。
     fams = syncstate.Families(conf, root)
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
@@ -689,7 +717,7 @@ def candidates(
                     root, conf, t, parent, types, added.get(t.parent)
                 )
         if t.is_child and t.predecessors:
-            # 先行は `done/` に在って取り消しでないことを求める（ADR-0088）。同じ承認で通る
+            # 先行は `done/` に在って取り消しでないことを求める。同じ承認で通る
             # 先行も、まだ `todo/` に在るので満たさない。
             if preds is None:
                 preds = approval.predecessor_pool(conf, root)
@@ -768,7 +796,7 @@ class Planned:
 def plan_batch(root: str, conf: settings.Settings, batch: list[Candidate], stamp: str) -> Planned:
     """承認の書き込みを、ディスクに書かずに並べる。時刻は `stamp` に固定する。
 
-    書き込みを並べる（ここ、ADR-0093 の 6.2 の plan）と、並べたものを書く
+    書き込みを並べる（ここ、plan）と、並べたものを書く
     （`core.write_fs`、Writer(FS)）の 2 段。Chrome は同じ plan の結果を 1 コミットにする。
     承認の対象の順に、改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。
     """
@@ -881,7 +909,7 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
 
     プロジェクトは提案を置いた場所で決まる。ユーザはここで、書き込みが向かうリポジトリを
-    見て承認する。提案はそのツリーからの相対パスで見せる（ADR-0093 の D22）。絶対パスは
+    見て承認する。提案はそのツリーからの相対パスで見せる。絶対パスは
     機械ごとに違い、承認の指紋（画面の本文を含む）が Chrome と手元で揃わない。
     """
     return (
@@ -1103,7 +1131,7 @@ def waiting(
     （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
     チケットに使う種類を引く関数（`types_resolver`）。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
-    統合先の控えの `done/` にある識別子（ADR-0093 の 3.3 の 4）はここでは外さず、`candidates` が
+    統合先の控えの `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、`candidates` が
     理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
     """
     known = approval.by_id(approved + closed + review)
@@ -1117,7 +1145,7 @@ def waiting(
         and not t.is_child
         and t.has_plan
         and (
-            _plan_differs(t, open_index[t.ticket])
+            approval.plan_differs(t, open_index[t.ticket])
             or _workflow_differs(t, open_index[t.ticket], types_for)
         )
     ]
@@ -1142,10 +1170,6 @@ def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod
         return cache[name]
 
     return types_for
-
-
-def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:
-    return proposal.plan != current.plan or proposal.feedback != current.feedback
 
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
@@ -1407,7 +1431,7 @@ def validate(
     判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。
 
     形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
-    検査を当てる（`blocking_problems`、ADR-0058）ので「判定では補えない」わけではないが、
+    検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
     判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
     承認はユーザがまとめて見て決める場所なので、そこで落ちるものはそこで言う。
     """
