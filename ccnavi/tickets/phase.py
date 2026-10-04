@@ -711,6 +711,7 @@ def phases_of(
     conf: settings.Settings,
     parent_id: str,
     proposed: ticket_mod.Ticket | None = None,
+    raw: approval.Raw | None = None,
 ) -> list[Phase]:
     """この親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組む。
 
@@ -720,9 +721,12 @@ def phases_of(
     提案を渡す（`order_problems`）。渡さないと、親と後のフェーズの子を一緒に承認したとき
     計画が読めずフェーズが 1 つも並ばず、順序の検査が何も見ないまま通る。承認済みチケットが
     あればそちらを使う（改版の計画は承認されるまで使われない）。
+
+    `raw` は呼び手が `approval.read_raw` で読んだ置き場。読んでから置き場のファイルを
+    動かしていないときだけ渡す。渡せば 3 つの `scan` が置き場を読み直さない。無ければここで読む。
     """
-    open_copies, _ = approval.scan(conf, root)
-    closed_copies, _ = approval.scan(conf, root, closed=True)
+    open_copies, _ = approval.scan(conf, root, raw=raw)
+    closed_copies, _ = approval.scan(conf, root, closed=True, raw=raw)
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
     if owner is None and proposed is not None and proposed.ticket == parent_id:
@@ -749,7 +753,7 @@ def phases_of(
     # 作業中（`doing/`）の順に読み、同じ識別子が 2 つの置き場に在れば閉じた側を採る。
     # 閉じたかどうかを決めるのは承認済みチケットの側で、エージェントが書ける `todo/` に同じ識別子を
     # 書いてもフェーズは開き直らない（そちらは承認待ちにもならない。agree.waiting）。
-    review_copies, _ = approval.scan_review(conf, root)
+    review_copies, _ = approval.scan_review(conf, root, raw=raw)
     seen: set[str] = set()
     for pool in (closed_copies, review_copies, open_copies):
         for t in approval.children_of(pool, parent_id):
@@ -1022,6 +1026,7 @@ def order_problems(
     parent: ticket_mod.Ticket,
     types: dict[str, phasetypes.PhaseType] | None,
     adding: list[ticket_mod.Ticket] | None = None,
+    raw: approval.Raw | None = None,
 ) -> list[rules.Problem]:
     """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 9.7）。
 
@@ -1036,6 +1041,8 @@ def order_problems(
     増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
     フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
     次の子が一緒に承認され、1 本ずつ承認したときに落ちるものが、まとめて承認すると通る。
+
+    `raw` は `phases_of` と同じ。
     """
     if not parent.has_plan or child.phase is None:
         return []
@@ -1051,7 +1058,7 @@ def order_problems(
     # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
-    for phase in phases_of(root, conf, parent.ticket, parent):
+    for phase in phases_of(root, conf, parent.ticket, parent, raw=raw):
         if phase.number >= child.phase:
             break
         if phase.number not in waits:
@@ -1154,11 +1161,16 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
     )
 
 
-def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの局面にいるか（設計 9.7）。計画が無ければ空文字。"""
+def stage(
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    raw: approval.Raw | None = None,
+) -> str:
+    """親がいまどの局面にいるか（設計 9.7）。計画が無ければ空文字。`raw` は `phases_of` と同じ。"""
     if not parent.has_plan:
         return ""
-    phases = phases_of(root, conf, parent.ticket)
+    phases = phases_of(root, conf, parent.ticket, raw=raw)
     dag = is_dag(parent)
     held_all = [p for p in phases if p.gate_closed]
     if held_all and not dag:

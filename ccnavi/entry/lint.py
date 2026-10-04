@@ -512,6 +512,7 @@ def _copy_problems(
     copies: list[ticket_mod.Ticket],
     index: dict[str, ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
+    raw: approval.Raw | None = None,
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する。
 
@@ -532,6 +533,9 @@ def _copy_problems(
     - 計画の形と、種類の定義が読めないことは `validate` が付けた severity のまま（error）。
       判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
       承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
+
+    `raw` は呼び手が `approval.read_raw` で読んだ置き場。フェーズの順序（`phase.order_problems`）
+    を子ごとに見るときに、置き場を読み直さないために渡す。
     """
     problems: list[Problem] = []
     pool = dict(index)
@@ -548,7 +552,7 @@ def _copy_problems(
             problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         parent = pool.get(t.parent) if t.is_child else None
         if parent is not None:
-            for p in phase.order_problems(root, conf, t, parent, types):
+            for p in phase.order_problems(root, conf, t, parent, types, raw=raw):
                 # 承認のときは error。承認済みのものに当てるのは「その順で始めた」という
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
@@ -620,7 +624,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(complaints)
     problems.extend(_stale_problems(root, conf, stale, index, done))
 
-    problems.extend(_copy_problems(root, conf, copies, index, closed))
+    problems.extend(_copy_problems(root, conf, copies, index, closed, raw))
 
     resolve = _types_resolver(conf, root)
     for t in copies:
