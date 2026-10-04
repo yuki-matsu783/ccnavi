@@ -19,8 +19,7 @@ Claude Code のツール呼び出しを hook で止め、止めた理由と代�
 
 ```json
 "env": {
-  "CCNAVI_MODE": "dry-run",
-  "CCNAVI_LOG": "logs/decisions.jsonl"
+  "CCNAVI_MODE": "dry-run"
 }
 ```
 
@@ -199,7 +198,7 @@ Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイム
 
 下の形は `sh scripts/ccnavi-setup.sh <ワークスペースルート>` が書く。何度打っても同じ形に
 なり、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
-ところだけを見たいときは `--check`、既定値を持つ設定項目も並べたいときは `--all` を付ける。
+ところだけを見たいときは `--check` を付ける。`--all` も受けるが、今は足すものが無い（置き場の env は廃止した）。
 同じ 1 回で `.vscode/settings.json` も見る（次の節）。触ってほしくないときは `--no-vscode`。
 セッション開始時の取り込み（`ccnavi-fetch.sh`）も `SessionStart` に別の 1 行で登録する。
 1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す。
@@ -218,6 +217,21 @@ Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイム
 
 hook は、そのイベントに ccnavi が登録されていなければ足す。別の表記で登録されているように
 見えるイベントは、足さずに名前を挙げる（知らせずに足すと判定が 2 回走る）。
+
+置き場の env 6 つ（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
+`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）は書かない。既にある `env` に残っていれば外す
+（置き場は固定で、書いても読まれない。下の「置き場は固定」の段落）。外した値が既定と違っていれば、
+名前と値を 1 行ずつ出す。**以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` も、既定
+（`logs/decisions.jsonl`）と違う値として名指しされる。** 記録の書き先が変わり、古い `logs/log.jsonl` は
+もう書かれず `--suggest` も数えないので、黙っては外さない。導入は止めず、終了コードも変えない
+（`--check` では「揃っていない」に数える）。
+
+入れ終わったところで、ワークスペースの git の索引に `projects/` の下が載っていないかを見る。
+載っていれば `--lint` の `(projects)` と同じ条件で、同じ案内を出す。ワークスペース自身のソースに
+`projects/` がある（ぶつかり）なら `projects/` の改名を、入れ子のリポジトリだけが載っている（載せ忘れ）なら
+索引から外して `.gitignore` に `/projects/` を足す手順を案内する。止めず、終了コードも変えない。
+`--check` でも出すが、導入の不足ではないので「揃っていない」には数えない。索引も `.gitignore` も変えない
+（直すのはユーザ）。
 
 ```json
 {
@@ -263,7 +277,6 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
   },
   "env": {
     "CCNAVI_MODE": "dry-run",
-    "CCNAVI_LOG": "logs/decisions.jsonl",
     "CCNAVI_BIN_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
@@ -291,11 +304,33 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 `command` を `${CCNAVI_BIN_PATH}` で書くのは、守る対象と起動する実体を 1 か所にまとめるため
 （shell form なので環境変数は shell が展開する）。その代わり、`env` からこの 1 行が消えると hook が起動しなくなる。
 
+**置き場は固定で、環境変数では動かない。**
+
+| 置き場 | 場所 |
+|---|---|
+| プロジェクト | `projects/`（ワークスペースルートの直下。直下で `.git` を持つディレクトリがプロジェクトになる） |
+| ccnavi ディレクトリ | `.ccnavi/`（各 git プロジェクトルートの直下。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本、`scripts/` が配点の `script:` の置き場） |
+| 提案 | `wip/proposals/`（各ツリーのルートの直下。そのツリーの git が追跡する） |
+| 承認済みチケットとフェーズのマーカー | `.ccnavi/approved/`（各ツリーのルートの直下。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く） |
+| 判定の記録 | `logs/decisions.jsonl`（ワークスペースルートの下） |
+| state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録） |
+
+別の場所を指せるのはフラグ（`--log` / `--state` / `--approved` / `--tickets` / `--projects` /
+`--project-home`）だけで、hook からは渡らない。共通層の置き場（`.ccnavi/common/`）は `--project-home` で
+ccnavi ディレクトリを動かしても動かず、別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけ。
+層の置き場を動かすこれらのフラグ（`--projects` / `--project-home` を含む）は診断（`--lint` / `--test` /
+`--test-samples` / `--explain`）に限り、hook からの判定と `ticket` / `review` の副命令に渡すと無視し、標準エラーに出す。
+
+以前は 6 つの環境変数（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
+`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）で置き場を動かせたが、廃止した。
+`settings.json` の `env` に残っていても読まない。導入スクリプトを打ち直すと外れ、既定と違う値だったものは
+名前と値が 1 行ずつ出る（以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` もここで名指しされる）。
+「記録しない」「state を保存しない」「プロジェクトを数えない」も指定できない。プロジェクトを数えたくなければ
+`projects/` を作らない。
+
 | 変数 | 意味 |
 |---|---|
 | `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
-| `CCNAVI_LOG` | 記録先。既定は `logs/decisions.jsonl`。空文字にすると記録しない |
-| `CCNAVI_STATE` | 実行後チェックの記録を置く state の置き場。既定は `logs/state`。空文字にすると記録を持たない |
 | `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない。`1` より小さい値は既定で動く（「記録の後始末」） |
 | `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
@@ -304,11 +339,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `CCNAVI_DENY_REPEAT` | 同じ理由で同じ呼び出しを何回止めたら、拒否の文面に「言い換えずにユーザに相談する」一文を足し、ターンの終わりにユーザへ報告するか。既定は `3`。2 未満と読めない値は既定に戻る。判定は変わらない（「同じ呼び出しを繰り返し止めたとき」） |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない。「ルールが言及していない呼び出し」）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
 | `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは振り分けの sh `.ccnavi/scripts/ccnavi-launcher.sh` と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows の `.exe` は ccnavi が補う |
-| `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/proposals`。そのツリーの git が追跡する。VS Code 拡張は提案の変化を既定のパスでしか見ないので、既定から動かすと提案の増減でボードが自動更新されず、手で「更新」を押す（承認は反映される） |
-| `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/approved`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL`。空なら `--lint` が指摘する） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--agree` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
-| `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
-| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前をどう変えても動かない（この env でも `--project-home` でも）。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る。`--project-home` も同じ。hook からの判定と `ticket` / `review` の副命令に渡すと無視し、標準エラーに出す |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--agree` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--agree` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -477,7 +508,7 @@ allow:
 | ワークスペース自身の層 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース自身のツリーにだけ適用するもの |
 | プロジェクトの層 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
-変えられるのは ccnavi ディレクトリの名前（`.ccnavi`。`CCNAVI_PROJECT_HOME`）だけ。
+3 層とも置き場は固定で、環境変数では動かない（「設定」の「置き場は固定」）。
 自身の層とプロジェクトの層は形が同じで、どちらも git プロジェクトルートの直下に置く。
 
 | ツール | 当たる層 |
@@ -1259,8 +1290,8 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 ### 置き場と状態
 
-チケットは 1 本のファイルで、2 つの置き場を行き来する。提案は `wip/proposals/<状態>/<識別子>.md`
-（`CCNAVI_TICKETS_PROPOSAL`）、承認済みチケットは `.ccnavi/approved/<状態>/<識別子>.md`（`CCNAVI_TICKETS_APPROVED`）。状態は置き場が表す。
+チケットは 1 本のファイルで、2 つの置き場を行き来する。提案は `wip/proposals/<状態>/<識別子>.md`、
+承認済みチケットは `.ccnavi/approved/<状態>/<識別子>.md`。状態は置き場が表す。
 
 ```
   wip/proposals/todo ──ユーザが承認──→ .ccnavi/approved/doing
@@ -1378,7 +1409,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 **承認済みチケットは親チケットのブランチに乗って他の機械へ届く。** 承認しても push しなければ、他の機械では承認されなかったことになる。
 承認の push は `sh .ccnavi/scripts/ccnavi-push-approved.sh` で行う。
 
-- ワークスペース、`projects/*`、`.claude/worktrees/*` のツリーごとに、変更があれば置き場（`CCNAVI_TICKETS_APPROVED`）だけをコミットし、そのブランチへ push する
+- ワークスペース、`projects/*`、`.claude/worktrees/*` のツリーごとに、変更があれば置き場（`.ccnavi/approved/`）だけをコミットし、そのブランチへ push する
 - シンボリックリンクは辿らず、名指しして飛ばす
 - `main` / `master` / `develop` / `release` / `release/*` と、そのリポジトリの統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
   `ccnavi-sync.sh` の取り込み結果、無ければ `origin/HEAD`・`origin/main`・`origin/master`。決まらなければ固定のリストだけ）、
@@ -1921,7 +1952,7 @@ uv run python tools/check_rules.py     # 同じことを、state と記録を外
 ccnavi --suggest [--json]
 ```
 
-記録（`CCNAVI_LOG` の指すファイルと、同じ置き場で回した `decisions.*.jsonl`）を数えて、ルールの下書きを出す。何も書かない。
+記録（`logs/decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）を数えて、ルールの下書きを出す。何も書かない。
 
 | 候補 | 拾うもの | 出す下書き |
 |---|---|---|
@@ -2109,11 +2140,13 @@ error 2 件、warn 2 件、info 0 件
 | warn | 親のブランチの上のプロジェクトの層が、プロジェクトの統合先の層に共通層をコピーして計算した層と違う（判定は親のブランチの上の層を読まない） |
 | warn | 新規の提案の識別子が、統合先の取り込み結果の `done/` で閉じている（親子のチケットの取り込み状態の有無に依らない。承認はしない） |
 
-**プロジェクト**（`projects/` があるときだけ）
+**プロジェクト**（索引の 2 つのほかは `projects/` にプロジェクトがあるときだけ）
 
 | 深刻度 | 拾うもの |
 |---|---|
-| warn | `projects/` がワークスペースの `.gitignore` に入っていない |
+| warn | ワークスペースの git の索引に、`projects/` の下の通常のファイル（入れ子のリポジトリ以外）が載っている（ぶつかり）。ワークスペース自身のソースに `projects/` があり、名前は変えられないので、ワークスペースの `projects/` を別の名前に移すよう案内する。プロジェクトを置かないならそのままでも動く |
+| warn | ワークスペースの git の索引に、`projects/` の下の入れ子のリポジトリ（gitlink）だけが載っている（載せ忘れ）。`.gitignore` に入れる前に `git add` したものとみて、索引から外して `.gitignore` に `/projects/` を足すよう案内する |
+| warn | `projects/` がワークスペースの `.gitignore` に入っていない。上の 2 つのどちらかが出るときは出さない（同じ原因で、`.gitignore` に入れる案内が誤りか、先に索引から外さないと効かないため） |
 | error | 予約名（`common` / `self`。大文字小文字は問わない）のプロジェクトがある |
 | warn | プロジェクトが `.claude/` を持っている |
 

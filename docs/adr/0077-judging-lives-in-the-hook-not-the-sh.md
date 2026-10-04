@@ -10,7 +10,7 @@ keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
 
 状態: 採用
 
-追記（2026-09-24）: 決定の表で「採らなかった側」の根拠に挙げた「`CCNAVI_PROJECTS` を変えた配布先」は、ADR-0084 で置き場の env 6 つを廃止したので想定しなくなった。`DENY_SCRIPT_ENV_OVERRIDE` は残す。`CCNAVI_BIN_PATH` など、sh が読む変数はまだある。
+追記（2026-09-24）: 決定の表で「採らなかった側」の根拠に挙げた「`CCNAVI_PROJECTS` を変えた配布先」は、ADR-0098 で置き場の env 6 つを廃止したので想定しなくなった。`DENY_SCRIPT_ENV_OVERRIDE` は残す。`CCNAVI_BIN_PATH` など、sh が読む変数はまだある。
 
 ## 状況
 

@@ -10,7 +10,7 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
 
 状態: 採用
 
-追記（2026-09-24）: 状況の表にある `CCNAVI_PROJECTS` と `CCNAVI_PROJECT_HOME` も、ADR-0084 で廃止した。プロジェクトの層は `projects/<名前>/.ccnavi/config/...` に固定され、3 層とも env では動かない。
+追記（2026-09-24）: 状況の表にある `CCNAVI_PROJECTS` と `CCNAVI_PROJECT_HOME` も、ADR-0098 で廃止した。プロジェクトの層は `projects/<名前>/.ccnavi/config/...` に固定され、3 層とも env では動かない。
 
 ## 状況
 
