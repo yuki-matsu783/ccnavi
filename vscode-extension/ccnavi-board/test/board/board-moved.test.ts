@@ -17,23 +17,23 @@ test("CB-T192 列が変わったカードと新規起票のカードだけを出
   const before = placementOf(board);
   assert.deepEqual(placementOf(board), {
     i0001: "doing",
-    "i0001-01": "done",
-    "i0001-02": "doing",
-    "i0001-03": "todo",
-    "i0001-04": "doing",
-    "i0001-05": "cancelled",
+    "i0001-01-01": "done",
+    "i0001-02-02": "doing",
+    "i0001-02-03": "todo",
+    "i0001-02-04": "doing",
+    "i0001-02-05": "cancelled",
   });
 
   // 承認は 未着手 → 作業中。着手も完了も同じ形で出る
-  const after: Placement = { ...before, "i0001-03": "doing", "i0001-02": "done" };
-  // 並びは `after` の並び順。`placementOf` が作ったものなら列の順（未着手 → 作業中 → …）
+  const after: Placement = { ...before, "i0001-02-03": "doing", "i0001-02-02": "done" };
+  // 順序は `after` の並び順。`placementOf` が作ったものなら列の順（未着手 → 作業中 → …）
   assert.deepEqual(movedCards(before, after), [
-    { id: "i0001-03", from: "todo", to: "doing" },
-    { id: "i0001-02", from: "doing", to: "done" },
+    { id: "i0001-02-03", from: "todo", to: "doing" },
+    { id: "i0001-02-02", from: "doing", to: "done" },
   ]);
 
-  // 新しく現れたカードは from を持たない。消えたカードは印を付ける先が無いので出さない
-  const { "i0001-05": _gone, ...rest } = before;
+  // 新しく現れたカードは from を持たない。消えたカードは動いた表示を付ける先が無いので出さない
+  const { "i0001-02-05": _gone, ...rest } = before;
   const added: Placement = { ...rest, i0002: "todo" };
   assert.deepEqual(movedCards(before, added), [{ id: "i0002", to: "todo" }]);
 
@@ -41,11 +41,11 @@ test("CB-T192 列が変わったカードと新規起票のカードだけを出
   assert.deepEqual(movedCards(before, { ...before }), []);
 });
 
-test("CB-T192b 置き場所が同じかを見る（同じなら印を作り直さない）", () => {
+test("CB-T192b 置き場所が同じかを見る（同じなら動いた表示を作り直さない）", () => {
   const before = placementOf(buildBoard(fixture()));
-  assert.equal(samePlacement(before, { ...before }), true, "写しは同じ");
-  assert.equal(samePlacement(before, { ...before, "i0001-03": "doing" }), false, "列が変われば違う");
-  const { "i0001-05": _gone, ...fewer } = before;
+  assert.equal(samePlacement(before, { ...before }), true, "コピーは同じ");
+  assert.equal(samePlacement(before, { ...before, "i0001-02-03": "doing" }), false, "列が変われば違う");
+  const { "i0001-02-05": _gone, ...fewer } = before;
   assert.equal(samePlacement(before, fewer), false, "減っても違う");
   assert.equal(samePlacement(fewer, before), false, "増えても違う");
   // 件数が同じで中身が違う（1 枚消えて 1 枚増えた）のも違う。数だけで同じと見なさない
@@ -79,30 +79,30 @@ function without(board: ReturnType<typeof buildBoard>, ticket: string): ReturnTy
   };
 }
 
-test("CB-T192c 1 枚目は印を付けず、列が動かない読み直しでは前の印を持ち越す", () => {
+test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない読み直しでは前の動いた表示を持ち越す", () => {
   const board = buildBoard(fixture());
 
-  // 1 枚目。比べる相手が無いので、何にも印を付けない（開いた直後に全部が光ると意味が無い）
+  // 1 枚目。比べる相手が無いので、何にも動いた表示を付けない（開いた直後に全部が光ると意味が無い）
   const first = movedStep(NOTHING_MOVED, board);
   assert.deepEqual(first.moved, []);
   assert.notEqual(first.placement, undefined);
 
   // 承認された（未着手 → 作業中）
-  const approved = movedStep(first, moveTo(board, "i0001-03", "doing"));
-  assert.deepEqual(approved.moved, [{ id: "i0001-03", from: "todo", to: "doing" }]);
+  const approved = movedStep(first, moveTo(board, "i0001-02-03", "doing"));
+  assert.deepEqual(approved.moved, [{ id: "i0001-02-03", from: "todo", to: "doing" }]);
 
   // 同じ列のまま渡し直された（承認のオーバーレイの出し入れ、何も変わらなかった「更新」）。
-  // **ここで作り直すと、承認の文を閉じた時点で印が消える**
-  const again = movedStep(approved, moveTo(board, "i0001-03", "doing"));
+  // **ここで作り直すと、承認の文を閉じた時点で動いた表示が消える**
+  const again = movedStep(approved, moveTo(board, "i0001-02-03", "doing"));
   assert.equal(again, approved, "何も変わらないなら、同じ状態をそのまま返す");
-  assert.deepEqual(again.moved, [{ id: "i0001-03", from: "todo", to: "doing" }]);
+  assert.deepEqual(again.moved, [{ id: "i0001-02-03", from: "todo", to: "doing" }]);
 
-  // 次に何かが動いたら、前の印は消えて新しい動きに入れ替わる
-  const next = movedStep(again, moveTo(board, "i0001-02", "done"));
-  // 並びは列の順（未着手 → 作業中 → 完了）
+  // 次に何かが動いたら、前の動いた表示は消えて新しい動きに入れ替わる
+  const next = movedStep(again, moveTo(board, "i0001-02-02", "done"));
+  // 順序は列の順（未着手 → 作業中 → 完了）
   assert.deepEqual(next.moved, [
-    { id: "i0001-03", from: "doing", to: "todo" },
-    { id: "i0001-02", from: "doing", to: "done" },
+    { id: "i0001-02-03", from: "doing", to: "todo" },
+    { id: "i0001-02-02", from: "doing", to: "done" },
   ]);
 });
 
@@ -110,12 +110,12 @@ test("CB-T192d カードが消えただけの読み直しも「変わった」�
   const board = buildBoard(fixture());
   const first = movedStep(NOTHING_MOVED, board);
 
-  // 消えたカードには印を付けられないので `moved` は空。**それでも置き場所は更新する**。
+  // 消えたカードには動いた表示を付けられないので `moved` は空。**それでも置き場所は更新する**。
   // ここを「動いた分が 0 件なら据え置き」にすると、戻ってきたカードが「新規起票」にならない
-  const gone = movedStep(first, without(board, "i0001-03"));
+  const gone = movedStep(first, without(board, "i0001-02-03"));
   assert.deepEqual(gone.moved, []);
   assert.notEqual(gone, first, "置き場所が変わったので、同じ状態は返さない");
 
   const back = movedStep(gone, board);
-  assert.deepEqual(back.moved, [{ id: "i0001-03", to: "todo" }]);
+  assert.deepEqual(back.moved, [{ id: "i0001-02-03", to: "todo" }]);
 });

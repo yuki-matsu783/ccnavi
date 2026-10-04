@@ -2,7 +2,7 @@
  * PAT の期限の知らせ。期限の既定は 90 日。
  *
  * 期限の正はホストの PAT の期限。GitHub は応答ヘッダ `github-authentication-token-expiration` で
- * 返すので、service worker がホストを呼ぶたびに読んで控える。読めなければ、登録のときにユーザが
+ * 返すので、service worker がホストを呼ぶたびに読んで記録する。読めなければ、登録のときにユーザが
  * 入れた日付を使う。どちらも無ければ「期限不明」と出し続ける。
  * 切れる 7 日前から、service worker が 1 日 1 回比べてバッジに出し、ボードは帯で出す。
  */
@@ -17,7 +17,7 @@ export interface TokenMeta {
   readonly host?: string;
   /** 登録のときにユーザが入れた期限（YYYY-MM-DD）。空なら入れていない */
   readonly manual?: string;
-  /** GitLab で期限を最後に聞いた時刻（ISO。`GET /personal_access_tokens/self`。1 日 1 回まで） */
+  /** GitLab に `GET /personal_access_tokens/self` で期限を最後に問い合わせた時刻（ISO）。問い合わせは 1 日 1 回まで */
   readonly checked?: string;
 }
 

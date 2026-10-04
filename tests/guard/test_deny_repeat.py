@@ -22,7 +22,7 @@ NOTE = "言い換えて打ち直さず"
 
 def _env(**extra: str) -> dict[str, str]:
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-    # コアファイルの控えと復元は切る。試したいのは拒否の数えだけ。
+    # コアファイルのバックアップと復元は切る。試したいのは拒否の数えだけ。
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.update(extra)
     return environment
@@ -84,20 +84,20 @@ class DenyMessageTest(unittest.TestCase):
         self.assertIn(NOTE, reason)
 
     def test_other_calls_are_counted_apart(self):
-        """別の対象は別に数える。同じルールでも、違う呼び出しの拒否を束ねない。"""
+        """別の対象は別に数える。同じルールでも、違う呼び出しの拒否をまとめない。"""
         for target in ("a", "b", "c"):
             _, reason = _verdict(_bash(self.state, f"git push origin {target}"))
             self.assertNotIn(NOTE, reason)
 
     def test_dry_run_does_not_count(self):
-        """dry-run は止めていないので数えない。控えも作らない。"""
+        """dry-run は止めていないので数えない。記録も作らない。"""
         for _ in range(3):
             result = _bash(self.state, "git push origin main", mode="dry-run")
             self.assertNotIn(NOTE, result.stdout)
         self.assertEqual([], [f for f in os.listdir(self.state) if f.startswith("denied-")])
 
     def test_unwritable_state_still_denies(self):
-        """控えを書けなくても拒否は拒否のまま。一文が付かないだけ。"""
+        """記録を書けなくても拒否は拒否のまま。一文が付かないだけ。"""
         blocked = os.path.join(self.state, "file")
         with open(blocked, "w", encoding="utf-8") as f:
             f.write("x")

@@ -1,12 +1,12 @@
-"""権威のツリーの外に残った提案の古い写し（承認済みの識別子）の受入テスト。
+"""本物とするツリーの外に残った古い提案（承認済みの識別子）の受入テスト。
 
-承認済みの識別子の提案は、承認済みチケットの写りと合わせて権威のツリー（親のツリー →
+承認済みの識別子の提案は、承認済みチケットと合わせて本物とするツリー（親のツリー →
 元ツリー → 決まらない）を決め、そのツリーに在るものだけを読む（`approval.scan_proposals`）。
 見るのは次のとおり。
 
 1. 改版の前に切ったワークツリーに残った古い版（場面 C）を、改版として承認の対象にしない
-2. 権威のツリーで進めている改版（`todo/` と `doing/` が並ぶ）は、承認の対象に残る
-3. 権威でないツリーに書いた改版は承認の対象にならず、`--lint` が書く場所を案内する
+2. 本物とするツリーで進めている改版（`todo/` と `doing/` が並ぶ）は、承認の対象に残る
+3. 本物としないツリーに書いた改版は承認の対象にならず、`--lint` が書く場所を案内する
 """
 
 from __future__ import annotations
@@ -41,13 +41,13 @@ class StaleProposalTest(PhaseHarness):
         self.family(plan=("research", "design"))
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
-        self.worktree("i0001-07", "i0001")
+        self.worktree("i0001-01-07", "i0001")
         self.assertEqual(self.approve().returncode, 0)
         self.propose("i0001", parent_text("i0001", ["research", "chores"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         stale = os.path.join(
-            self.root, ".claude", "worktrees", "i0001-07", "wip", "proposals", "todo", "i0001.md"
+            self.root, ".claude", "worktrees", "i0001-01-07", "wip", "proposals", "todo", "i0001.md"
         )
         self.assertTrue(os.path.isfile(stale))
 
@@ -63,7 +63,7 @@ class StaleProposalTest(PhaseHarness):
         self.assertTrue(
             any(
                 "計画の違う提案" in line
-                and ".claude/worktrees/i0001-07/wip/proposals/todo/i0001.md" in line
+                and ".claude/worktrees/i0001-01-07/wip/proposals/todo/i0001.md" in line
                 and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
             ),
@@ -71,12 +71,12 @@ class StaleProposalTest(PhaseHarness):
         )
 
     def test_a_revision_in_the_home_tree_stays_waiting(self):
-        """改版は権威のツリーの todo/ に置く。承認済みチケットと並んでも承認待ちに残る。
+        """改版は本物とするツリーの todo/ に置く。承認済みチケットと並んでも承認待ちに残る。
 
-        古い写しを持つワークツリーがあっても、権威のツリーの改版は読む。
+        古い提案を持つワークツリーがあっても、本物とするツリーの改版は読む。
         """
         self.family(plan=("research", "design"))
-        self.worktree("i0001-07", "i0001")
+        self.worktree("i0001-01-07", "i0001")
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
         self.assertEqual(self.pending(), ["i0001"])
@@ -87,9 +87,9 @@ class StaleProposalTest(PhaseHarness):
             self.assertIn("chores", f.read())
 
     def test_a_revision_written_outside_the_home_tree_is_named_with_where_to_write(self):
-        """権威でないツリー（ここではワークスペースルート）に書いた改版は承認の対象にならない。
+        """本物としないツリー（ここではワークスペースルート）に書いた改版は承認の対象にならない。
 
-        何も言わずに落とさず、`--lint` が書く場所（権威のツリーの todo/）を案内する。
+        何も言わずに落とさず、`--lint` が書く場所（本物とするツリーの todo/）を案内する。
         """
         self.family(plan=("research", "design"))
         write(
@@ -111,7 +111,7 @@ class StaleProposalTest(PhaseHarness):
     def test_a_new_proposal_in_a_worktree_is_still_waiting(self):
         """承認済みの無い識別子（新規の提案）は今までどおり。どのツリーに在っても承認待ち。"""
         self.family(plan=("research", "design"))
-        other = self.worktree("i0001-07", "i0001")
+        other = self.worktree("i0001-01-07", "i0001")
         write(
             os.path.join(other, "wip", "proposals", "todo", "i0002.md"),
             parent_text("i0002", ["research"]),
@@ -119,18 +119,18 @@ class StaleProposalTest(PhaseHarness):
         self.assertEqual(self.pending(), ["i0002"])
 
     def test_a_home_revision_copied_into_a_worktree_stays_waiting_and_is_not_named(self):
-        """親のツリーの改版の写しが子のワークツリーにある形。承認待ちに残り、lint も言わない。"""
+        """親のツリーの改版が子のワークツリーにも入っている形。承認待ちに残り、lint も言わない。"""
         self.family(plan=("research", "design"))
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
-        self.worktree("i0001-07", "i0001")  # 改版の todo/ を持ったまま切る
+        self.worktree("i0001-01-07", "i0001")  # 改版の todo/ を持ったまま切る
         self.assertEqual(self.pending(), ["i0001"])
-        lines = self.lint_lines("i0001-07/wip/proposals/todo/i0001.md")
+        lines = self.lint_lines("i0001-01-07/wip/proposals/todo/i0001.md")
         self.assertEqual(lines, [])
 
     def test_the_approved_copies_alone_decide_the_home_tree(self):
         """承認済みチケットが元ツリー（ワークスペースルート）にしか無いとき、親の名前のワークツリーに
-        残った承認前の `todo/` を権威と読まない（Chrome や他のセッションで承認され、手元の
+        残った承認前の `todo/` を本物と読まない（Chrome や他のセッションで承認され、手元の
         ワークツリーに届いていない形）。読むと古い版が改版として承認待ちに入り、巻き戻る。
         """
         self.family(plan=("research", "design"))
@@ -194,8 +194,8 @@ class StaleProposalTest(PhaseHarness):
         )
 
     def test_agree_names_a_revision_written_in_the_workspace_root(self):
-        """権威でないツリー（ワークスペースルート）の改版は承認待ちに入れず、--agree と --verify が
-        ファイルの場所と書くツリーを名指しする。"""
+        """本物としないツリー（ワークスペースルート）の改版は承認待ちに入れず、
+        --agree と --verify がファイルの場所と書くツリーを名指しする。"""
         self.family(plan=("research", "design"))
         write(
             os.path.join(self.root, "wip", "proposals", "todo", "i0001.md"),
@@ -206,30 +206,32 @@ class StaleProposalTest(PhaseHarness):
     def test_agree_names_a_revision_written_in_a_child_worktree(self):
         """子のワークツリーに書いた改版も同じく名指しする。"""
         self.family(plan=("research", "design"))
-        child = self.worktree("i0001-01", "i0001")
+        child = self.worktree("i0001-01-01", "i0001")
         write(
             os.path.join(child, "wip", "proposals", "todo", "i0001.md"),
             parent_text("i0001", ["research", "design", "chores"]),
         )
-        self.verify_names_where_to_write(".claude/worktrees/i0001-01/wip/proposals/todo/i0001.md")
+        self.verify_names_where_to_write(
+            ".claude/worktrees/i0001-01-01/wip/proposals/todo/i0001.md"
+        )
 
     def test_an_old_copy_is_named_while_another_revision_waits_in_the_home_tree(self):
-        """権威のツリーに計画の違う別の改版が在るとき。改版は承認待ちに残り、子のワークツリーに
+        """本物とするツリーに計画の違う別の改版が在るとき。改版は承認待ちに残り、子のワークツリーに
         残った古い版は名指しする。"""
         self.family(plan=("research", "design"))
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
-        self.worktree("i0001-07", "i0001")  # 改版 1 を持ったまま切る
+        self.worktree("i0001-01-07", "i0001")  # 改版 1 を持ったまま切る
         self.propose("i0001", parent_text("i0001", ["research", "chores"]))  # 改版 2
         self.commit_parent()
         self.assertEqual(self.pending(), ["i0001"])
-        lines = self.lint_lines("i0001-07/wip/proposals/todo/i0001.md")
+        lines = self.lint_lines("i0001-01-07/wip/proposals/todo/i0001.md")
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("計画の違う提案", lines[0])
 
 
 class ImportedFamilyTest(AuthorityHarness):
-    """取り込み済みの親子のチケットで、権威のツリーの外に書いた改版の案内。"""
+    """取り込み済みの親子のチケットで、本物とするツリーの外に書いた改版の案内。"""
 
     def revision_in_root(self):
         write(
@@ -268,7 +270,7 @@ def _t(tree, state, project="", parent="", ticket="i0001"):
 
 
 class AuthorityTest(unittest.TestCase):
-    """権威のツリーの決め方（`ticket.authority`）。承認済みチケットと提案が同じ関数を通る。"""
+    """本物とするツリーの決め方（`ticket.authority`）。承認済みチケットと提案が同じ関数を通る。"""
 
     def test_approved_copies_alone_decide(self):
         approved = [_t("", "doing")]

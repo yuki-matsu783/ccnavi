@@ -6,7 +6,7 @@
  * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけで、clone も書き込みもしない。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
- * 片方だけが持てるものを置くと束ねられなくなる。
+ * 片方だけが持てるものを置くとバンドルできなくなる。
  */
 import type { AppearanceMessage } from "./appearance.js";
 import type { LintProblem } from "./lintmodel.js";

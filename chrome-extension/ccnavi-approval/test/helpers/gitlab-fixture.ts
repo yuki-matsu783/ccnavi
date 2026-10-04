@@ -1,17 +1,17 @@
 /**
- * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/。本物の形に合わせて手で組んだもの）を
- * 返す GitLab の代役。
+ * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/）を返す GitLab の代役。見本は本物の形に合わせて
+ * 手で組んだもの。
  *
  * リポジトリの sh の試験（tests/sh/gitlab_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
  *
- * - `GET /api/v4/projects/<namespace と project をまとめて符号化>` → `{"id": 42}`（入れ子のグループも同じ綴り）
+ * - `GET /api/v4/projects/<namespace と project をまとめて符号化>` → `{"id": 42}`（入れ子のグループも同じ表記）
  * - `GET .../merge_requests?state=opened&source_branch=<b>` → `b` が場面のもの（`scene.json`。差し替えられる）なら
  *   `mrs.json`（フォークの MR を含みうる。呼び手が `source_project_id` で絞る）、違えば `[]`
  * - `GET .../merge_requests/<iid>/discussions?page=<N>`・`.../reviewers?page=<N>` → iid が `mrs.json` のどれかなら
  *   `discussions.<N>.json`・`reviewers.<N>.json`（無ければ `[]`。N の既定は 1）
  * - `GET /api/v4/user` → `user.json`
  *
- * 期待値（`expected.json`）は sh が見本から組んだ写しで、拡張の試験（CX-T144）は TS が組んだ写しと比べる。
+ * 期待値（`expected.json`）は sh が見本から組んだ結果で、拡張の試験（CX-T144）は TS が組んだ結果と比べる。
  */
 import fs from "node:fs";
 import path from "node:path";

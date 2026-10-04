@@ -25,8 +25,8 @@ test("CB-T136 登録した入口を帳面から開く。要求する側は相手
   await screens().phases({ kind: "self" });
   await screens().risk();
   await screens().projects();
-  await screens().flow("i0001-01");
-  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "risk", "projects", "flow:i0001-01"]);
+  await screens().flow("i0001-01-01");
+  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "risk", "projects", "flow:i0001-01-01"]);
   forgetScreens();
 });
 

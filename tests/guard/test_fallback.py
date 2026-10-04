@@ -14,7 +14,7 @@ import unittest
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
-# YAML として壊れている。閉じていない並び 1 つ。書き損じの典型。
+# YAML として壊れている。閉じていないリスト 1 つ。書き損じの典型。
 BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 
 
@@ -24,9 +24,9 @@ def run(root, payload, log="", env=None):
     ルールは `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には
     届かない。読めないルールは `--root` の下の共通層に置く。
 
-    コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
-    `logs/state` の控えが書き戻される。組み込みの既定はこの設定に依らず入るので、
+    `logs/state` のバックアップが書き戻される。組み込みの既定はこの設定に依らず入るので、
     見たいものは変わらない。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -146,15 +146,15 @@ class FallbackTest(unittest.TestCase):
         # 止めた先に別の方法が無いと、拒否されたまま進めなくなる。
         self.assertIn("Write", out["permissionDecisionReason"])
 
-    def test_既定でもシェルからの書き込みは綴りを変えても止まる(self):
+    def test_既定でもシェルからの書き込みは表記を変えても止まる(self):
         for command in [
             "echo x >> .claude/hooks/lint-py.sh",
             "sed -i s/deny/allow/ .ccnavi/common/rules.yml",
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
-            # `cd` で入ってから書く形（issue #61）。行き先の綴りから場所の
-            # 名前が消えるので、移った先から見た綴りにも当てないと止められずに通る。
+            # `cd` で入ってから書く形（issue #61）。行き先のパスから場所の
+            # 名前が消えるので、移った先から見たパスにも当てないと止められずに通る。
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",
@@ -164,11 +164,11 @@ class FallbackTest(unittest.TestCase):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
-    def test_既定のシェルの守りは設定で動かした置き場にも当たる(self):
+    def test_既定のシェルの保護は設定で動かした置き場にも当たる(self):
         # 実行ファイルは設定で動く（ccnavi ディレクトリと共通層は固定）。
         # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
         # 壊れたときにだけそこへの書き込みが止まらない（issue #14）。
-        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
+        # 絶対パスは `/` で書く。bash は引用されない `\` を落とすので、`\` の表記のままでは
         # そのコマンドは設定ファイルに書かない。
         for env, command in [
             ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),

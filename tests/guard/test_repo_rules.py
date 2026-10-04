@@ -47,10 +47,10 @@ YES = " --agree --yes x"
 def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     """1 件を本物のルールで判定して、試験の JSON を返す。
 
-    写しと控えは外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
+    承認済みチケットと state は外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
     既定のまま有効にする。4 の表はそれを含めた判定なので。
 
-    `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルの綴りから
+    `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルのパスから
     当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -190,7 +190,7 @@ class RepoRulesTest(unittest.TestCase):
                 self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
 
     def test_確かめる枝は今までどおり免除の側(self):
-        """`--agree --preview --verify` は免除の側。締めたことで巻き添えにしない。"""
+        """`--agree --preview --verify` は免除の側。厳しくしたことで巻き添えにしない。"""
         for subject in [
             "ccnavi --agree --preview --verify",
             "ccnavi --agree --preview --verify i0001",
@@ -202,7 +202,7 @@ class RepoRulesTest(unittest.TestCase):
 
     def test_設定の場所の名前は語の中の目印でも終わる(self):
         # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
-        # 数えないと、分ける前に止まっていた綴りが通るようになる。
+        # 数えないと、分ける前に止まっていた表記が通るようになる。
         for subject in [
             'rm ".ccnavi x"',
             'rm ".claude x"',
@@ -298,7 +298,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
         self.assertNotIn(APPROVAL, hit(body), body["rules"])
 
     def test_sudo_の_sh_c_と_find_exec_の中の承認も止まる(self):
-        # A4。実行役のコマンドの並びを正規表現に持たせる案（B）で残っていた 2 形。
+        # A4。実行役のコマンドの並べ方を正規表現に持たせる案（B）で残っていた 2 形。
         for subject in [
             "sudo -u me sh -c 'ccnavi --agree --yes x'",
             "find . -name x -exec ccnavi --agree --yes {} \\;",
@@ -329,7 +329,7 @@ RUNNERS = [
     "find . -name x -exec {} \\;",
 ]
 
-# 組み込みの守りに当たる、中で実行されるコマンドと、当たるべきルール。
+# 組み込みの保護に当たる、中で実行されるコマンドと、当たるべきルール。
 GUARDED = [
     ("rm -f .ccnavi/common/rules.yml", SETTING_FILES),
     ("mv .claude/settings.json /tmp/settings.json", SETTING_FILES),
@@ -341,7 +341,7 @@ GUARDED = [
     ("ccnavi --agree --yes x", APPROVAL),
     ("sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL),
     # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。
-    ("sh .ccnavi/scripts/ccnavi-agree.sh i0002-03 i0002-04", APPROVAL),
+    ("sh .ccnavi/scripts/ccnavi-agree.sh i0002-01-03 i0002-01-04", APPROVAL),
 ]
 
 
@@ -354,7 +354,7 @@ class RunnerTest(LauncherJudgeTest):
             with self.subTest(subject=inner):
                 self.assert_denied_by(inner, rule_id)
 
-    def test_組み込みの守りは実行役のコマンドの中でも止める(self):
+    def test_組み込みの保護は実行役のコマンドの中でも止める(self):
         # W1。今は実行役のコマンドを付けると、先頭に固定した式が外れて確認になる。
         for runner in RUNNERS:
             for inner, rule_id in GUARDED:
@@ -452,10 +452,10 @@ class RunnerTest(LauncherJudgeTest):
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
 class MovedJudgeTest(LauncherJudgeTest):
-    """`cd` で移った先から見た綴りに、止める側のルールを当てる（issue #61）。"""
+    """`cd` で移った先から見たパスに、止める側のルールを当てる（issue #61）。"""
 
     def test_守られた場所へ入ってから書く形は止まる(self):
-        # issue #61 の表。どれも綴りからディレクトリの名前が消えて止められずに通っていた。
+        # issue #61 の表。どれも表記からディレクトリの名前が消えて止められずに通っていた。
         for subject in [
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .ccnavi && echo x > common/rules.yml",
@@ -467,19 +467,19 @@ class MovedJudgeTest(LauncherJudgeTest):
             "cd .claude && cp /tmp/x settings.json",
             "cd .ccnavi && sed -i s/deny/allow/ common/rules.yml",
             "cd .ccnavi/scripts && mv ccnavi-git.sh /tmp/x",
-            # 元から止まっていた形（行き先の綴りに名前が残る）も、そのまま止まる。
+            # 元から止まっていた形（行き先のパスに名前が残る）も、そのまま止まる。
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
         ]:
             with self.subTest(subject=subject):
                 self.assert_denied_by(subject, SETTING_FILES)
 
-    def test_文面は移った先から見た綴りを示す(self):
+    def test_文面は移った先から見たパスを示す(self):
         body = self.judge("cd .claude && echo x > settings.json")
 
         self.assertIn("`cd` で移った先から見ると", body["response"])
         self.assertIn(".claude/settings.json", body["response"])
 
-    def test_移った先から見た綴りに_allow_は当てない(self):
+    def test_移った先から見たパスに_allow_は当てない(self):
         # 中で実行されるコマンドと同じ線引き（W3）。当てると、`cd` を 1 つ挟むだけで
         # 読み取りの allow が付いて通る形ができる。
         body = self.judge("cd .ccnavi && cat common/rules.yml")
@@ -487,9 +487,9 @@ class MovedJudgeTest(LauncherJudgeTest):
         self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
         self.assertNotEqual(body["verdict"], "allow", body["response"])
 
-    def test_書かれた綴りの当たり方は変わらない(self):
+    def test_書かれた表記の当たり方は変わらない(self):
         # `cd` した先で打つラッパースクリプトは、今までどおり allow に当たる。
-        # 書かれた綴りに継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
+        # 書かれた表記に継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
         for subject in [
             "cd projects/lib && sh ../../.ccnavi/scripts/ccnavi-git.sh status",
             "sh .ccnavi/scripts/ccnavi-git.sh status",
@@ -513,7 +513,7 @@ class MovedJudgeTest(LauncherJudgeTest):
 
     def test_行き先を読めない_cd_は読みを変えない(self):
         # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
-        # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた綴りで今は
+        # 保護（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた表記で今は
         # 止まっている形**が止まらなくなる（敵対的レビュー）。
         for subject in [
             'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
@@ -619,7 +619,7 @@ class SubstRepoRulesTest(unittest.TestCase):
             ]
         )
 
-    def test_組み込みの守りも中身に当たる(self):
+    def test_組み込みの保護も中身に当たる(self):
         self.check(
             [
                 ('echo "$(ccnavi --agree x)"', "deny", "builtin-guard-ticket-approval", ""),
@@ -720,7 +720,7 @@ class SubstRepoRulesTest(unittest.TestCase):
             ]
         )
 
-    def test_回避策の綴りは止まらない(self):
+    def test_回避策の表記は止まらない(self):
         self.check(
             [
                 (
@@ -796,7 +796,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("coproc NAME { find . -delete; }", "deny", AMBIGUOUS, code),
                 ("coproc NAME find . -delete", "deny", AMBIGUOUS, code),
                 ("select x in a b; do echo $x; done", "deny", AMBIGUOUS, code),
-                # 引数に書いた同じ綴りは予約語ではない。
+                # 引数に書いた同じ表記は予約語ではない。
                 ("echo coproc", "ask", "", "UNDECLARED"),
                 ("echo select", "ask", "", "UNDECLARED"),
                 ("for select in a b; do echo $select; done", "ask", "", "UNDECLARED"),
@@ -815,7 +815,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ('gh issue create --title t --body "use `git push` here"', "deny", BACKQUOTE, code),
                 ('gh issue create --title t --body "odd ` backtick"', "deny", BACKQUOTE, code),
                 ('echo "$(echo `id`)"', "deny", BACKQUOTE, code),
-                # 文字として渡す綴りは止まらない。
+                # 文字として渡す表記は止まらない。
                 ('grep -n "\\`git push\\`" f', "allow", "prefer-read-grep", ""),
                 ("grep -n '`git push`' f", "allow", "prefer-read-grep", ""),
             ]

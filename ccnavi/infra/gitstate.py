@@ -17,7 +17,7 @@ open する、想定していないシェル構文で書く。どれも「何が
 実行後は止めていない。すでに走ったものについて後から言うだけなので、遅れは
 待ち時間にしかならず、読めなければ何も言わないだけで、穴も開かない。そのうえ
 「作業ツリーの今の状態」を自前で持つには、保護領域に当たりうるファイルを
-毎回歩いて指紋を取り続けることになり、それは git がすでに持っている情報である。
+毎回歩いてハッシュを取り続けることになり、それは git がすでに持っている情報である。
 持っている側に聞く。
 
 聞く相手はローカルの git だけで、ネットワークへは出ない。
@@ -49,7 +49,7 @@ KIND_GONE = "gone"  # 追跡されていたものが消えた
 # 報告のためだけに在る種類で、自動復元（post._restorable）の対象にはしない。
 KIND_COMMITTED = "committed"
 
-# ユーザへ見せる綴り。記録（`record.paths`）には上の英語のまま残し、報告の文面だけ日本語にする。
+# ユーザへ見せる表記。記録（`record.paths`）には上の英語のまま残し、報告の文面だけ日本語にする。
 KIND_LABELS = {
     KIND_NEW: "新規",
     KIND_CHANGED: "変更",
@@ -78,12 +78,12 @@ class Change:
     """作業ツリーの変更 1 件。"""
 
     kind: str = ""
-    # path は git が返した綴り。作業ツリーのルートからの相対で、区切りは "/"。
+    # path は git が返したパス。作業ツリーのルートからの相対で、区切りは "/"。
     # ユーザに見せる側と、元に戻す手順で git に渡す側は、こちらを使う。
     path: str = ""
     # full は行き着く先まで解いた絶対パス。ルールを当てるのはこちら。
     # 実行前チェックがファイルのパスを解いてから当てるのと同じ理由で、
-    # 綴りを変えただけでルールを外せないようにする。
+    # 表記を変えただけでルールを外せないようにする。
     full: str = ""
     # status は git の 2 文字。索引側と作業ツリー側。報告にそのまま載せる。
     status: str = ""
@@ -131,7 +131,7 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
         [
             "status",
             "--porcelain",
-            # -z は綴りをそのまま NUL 区切りで返す。既定の出力は空白や
+            # -z はパスをそのまま NUL 区切りで返す。既定の出力は空白や
             # 非 ASCII を含むパスを引用符で囲んで自前の escape を掛けるので、
             # 読み戻す側がその escape を解く羽目になる。解き損ねたパスには
             # 保護領域のルールが当たらない。
@@ -159,7 +159,7 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
 def head(top: str, timeout: float = TIMEOUT_SECONDS) -> str:
     """いまの HEAD。読めなければ空文字。
 
-    ターンの始まりに控えて、終わりに「このターンで何がコミットに入ったか」を
+    ターンの始まりに記録して、終わりに「このターンで何がコミットに入ったか」を
     数えるための基準にする（post.at_prompt / post.at_stop）。
     """
     if not top:
@@ -209,7 +209,7 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
     if not done.ok:
         return [], REASON_FAILED
     # 同じパスが複数のコミットに現れるのでまとめる。報告は「何が変わったか」で、
-    # 何回変わったかではない。並びは git が返した順のまま。
+    # 何回変わったかではない。順序は git が返した順のまま。
     seen: set[str] = set()
     changes = []
     for path in done.out.split("\0"):
@@ -248,10 +248,10 @@ def _parse(top: str, entry: str) -> Change | None:
 
 
 def _full(top: str, path: str) -> str:
-    """git の綴りを、行き着く先が 1 つに決まる絶対パスに直す。
+    """git が返したパスを、行き着く先が 1 つに決まる絶対パスに直す。
 
-    実行前チェックと同じ関数（`fsio.full_path`）を通す。同じ場所が 2 通りの綴りで
-    当たると、実行前に通った書き込みが実行後に咎められる（あるいはその逆）。
+    実行前チェックと同じ関数（`fsio.full_path`）を通す。同じ場所が 2 通りのパスで
+    当たると、実行前に通った書き込みが実行後に報告される（あるいはその逆）。
     """
     return fsio.full_path(path, top)
 
@@ -310,9 +310,9 @@ def restore_committed(top: str, path: str, timeout: float = WRITE_TIMEOUT_SECOND
 
     Change を経由しない関数を分けてあるのは、呼ぶ側の出発点が違うから。
     上の restore は「git が変更として返したもの」を戻すが、こちらは
-    「控えが無いので git に頼るしかないもの」を戻す。後者には Change が無い。
+    「バックアップが無いので git に頼るしかないもの」を戻す。後者には Change が無い。
     git が追っていないパスなら失敗して戻り、呼び手はそれを報告に載せる。
-    何も言わずに成功したことにはしない。控えも git も無い場所は、戻せない場所なので。
+    何も言わずに成功したことにはしない。バックアップも git も無い場所は、戻せない場所なので。
     """
     return _git(top, ["restore", "--staged", "--worktree", "--", path], timeout)
 
@@ -322,7 +322,7 @@ def committed_text(
 ) -> tuple[str | None, bool]:
     """HEAD に入っているその 1 本の中身と、読めたかどうか。
 
-    返すのは `(中身, 読めた)`。HEAD にその綴りが無ければ `(None, True)`。「無い」は
+    返すのは `(中身, 読めた)`。HEAD にそのパスが無ければ `(None, True)`。「無い」は
     読めた答えなので、読めなかったことにしない。git を起こせない・期限に達した・
     HEAD そのものが無いときは `(None, False)`。
 

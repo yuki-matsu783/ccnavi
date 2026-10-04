@@ -36,7 +36,7 @@ function nodeIds(dom: DomPage): (string | null)[] {
 
 /** 開始 → プロンプト → 終了 */
 function three(): FlowDoc {
-  let doc = templateFlow("i0001-01", "調査");
+  let doc = templateFlow("i0001-01-01", "調査");
   doc = addNode(doc, "prompt", { x: 260, y: 300 }).doc;
   return { ...doc, connections: [
     { id: "c1", from: "start", to: "prompt-1", fromPort: "output", toPort: "input" },
@@ -127,7 +127,7 @@ test("CB-D125 読むだけのときは元に戻す・やり直す・貼る・複
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
-    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01") } });
+    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01-01") } });
     assert.ok(button(dom, "undo").disabled);
     dom.key("z", undefined, CTRL);
     await dom.settle();
@@ -141,7 +141,7 @@ test("CB-D125 読むだけのときは元に戻す・やり直す・貼る・複
     assert.ok(dirty(dom));
     // 中身が届いたら、履歴は空で未保存も消える
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
-    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01.yml", exists: true, doc: three(), lock: { locked: false, reason: "" } } } });
+    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01-01.yml", exists: true, doc: three(), lock: { locked: false, reason: "" } } } });
     assert.ok(button(dom, "undo").disabled);
     assert.ok(button(dom, "redo").disabled);
     assert.ok(!dirty(dom));
@@ -150,7 +150,7 @@ test("CB-D125 読むだけのときは元に戻す・やり直す・貼る・複
   }
 });
 
-test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、線ごと新しい id で足され、貼ったものが選ばれる。Ctrl+D は複製。開始は写さない", async () => {
+test("CB-D126 選んだノードを Ctrl+C でコピーして Ctrl+V で貼ると、線ごと新しい id で足され、貼ったものが選ばれる。Ctrl+D は複製。開始はコピーしない", async () => {
   const dom = await openFlow({ doc: three() });
   try {
     assert.ok(button(dom, "copy-nodes").disabled);
@@ -174,7 +174,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     dom.key("c", undefined, CTRL);
     await dom.settle();
     assert.match(dom.one("#status").textContent ?? "", /ノードを 2 個、線を 1 本コピーしました/);
-    assert.ok(!dirty(dom), "写しただけでは未保存にしない");
+    assert.ok(!dirty(dom), "コピーしただけでは未保存にしない");
     dom.key("v", undefined, CTRL);
     await dom.settle();
     assert.deepEqual(nodeIds(dom), ["start", "end", "prompt-1", "end-1", "prompt-2"]);
@@ -288,7 +288,7 @@ test("CB-D129 「次から確かめずに保存する」を付けて保存する
   }
 });
 
-test("CB-D130 閉じる前の編集（draft）が渡れば、それを開いて未保存を立て、未保存の間は写しを拡張ホストに控えさせる", async () => {
+test("CB-D130 閉じる前の編集（draft）が渡れば、それを開いて未保存を立て、未保存の間はコピーを拡張ホストに覚えさせる", async () => {
   const draft = renameNode(three(), "prompt-1", "閉じる前の編集");
   const dom = await openFlow({ doc: three(), draft });
   try {
@@ -300,7 +300,7 @@ test("CB-D130 閉じる前の編集（draft）が渡れば、それを開いて�
     const drafts = dom.posted.filter((m) => m.type === "draft");
     assert.ok(drafts.length >= 1);
     assert.deepEqual(drafts[drafts.length - 1].doc, draft);
-    // 戻す先（読み込んだ中身）は draft ではなく doc。名前を元に戻せば未保存が消え、控えも消させる
+    // 戻す先（読み込んだ中身）は draft ではなく doc。名前を元に戻せば未保存が消え、覚えたコピーも消させる
     dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
     await dom.settle();
     dom.type(dom.one<HTMLInputElement>("#inspector input.f-name"), "プロンプト");
@@ -322,7 +322,7 @@ function checksAsked(dom: DomPage): { seq: number; doc: FlowDoc }[] {
   return dom.posted.filter((m) => m.type === "check").map((m) => ({ seq: m.seq as number, doc: m.doc as FlowDoc }));
 }
 
-const SHOWN = ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml";
+const SHOWN = ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml";
 
 test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、開始が無いことは実行ファイルの答えに寄せて 1 度だけ言う。渡る手順はプレビューに出す", async () => {
   const checks: FlowChecks = {
@@ -451,10 +451,10 @@ test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた
     // 答えを待つ間に、もう 1 つ直す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
-    await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古い写しの答え"], rendered: ["1. 古い"] } });
+    await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古いコピーの答え"], rendered: ["1. 古い"] } });
     assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確かめ終わったことにしない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
-    assert.doesNotMatch(dom.one("body").textContent ?? "", /古い写しの答え/);
+    assert.doesNotMatch(dom.one("body").textContent ?? "", /古いコピーの答え/);
     // 今の中身に対する答えは使う
     await waitCheck(dom);
     const second = checksAsked(dom);
@@ -485,7 +485,7 @@ test("CB-D135 外で変わった知らせは最初の 1 回だけ履歴を空に
   }
 });
 
-test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を出し、並びだけ変わったと言う。時計を進めれば打ち込みは別の 1 件", async () => {
+test("CB-D136 順序だけ変わって未保存のときも保存前の一覧を出し、順序だけ変わったと言う。時計を進めれば打ち込みは別の 1 件", async () => {
   const doc = three();
   const reordered: FlowDoc = { ...doc, nodes: [...doc.nodes].reverse() };
   const dom = await openFlow({ doc, draft: reordered, reviewSave: true });
@@ -493,7 +493,7 @@ test("CB-D136 並びだけ変わって未保存のときも保存前の一覧を
     assert.ok(dirty(dom));
     dom.click(button(dom, "save"));
     await dom.settle();
-    assert.match(dom.one("#review-order-only").textContent ?? "", /並び順だけが変わりました/);
+    assert.match(dom.one("#review-order-only").textContent ?? "", /順序だけが変わりました/);
     assert.equal(dom.posted.filter((m) => m.type === "save").length, 0);
     dom.click(button(dom, "cancel-save"));
     await dom.settle();

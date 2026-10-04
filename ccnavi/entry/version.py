@@ -39,10 +39,10 @@ from ..tickets import ticket as ticket_mod
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-COMPAT = 3
+COMPAT = 4
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
-# 組み立ての元のコミットが分からないときの綴り。
+# 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"
 # build.py が組み立てのときに書く部品の名前。パッケージの外に置くので、ソースで動かしている
 # ときに前の組み立ての値を読み違えることが無い。
@@ -51,7 +51,7 @@ BUILDINFO_MODULE = "ccnavi_buildinfo"
 
 def commit() -> str:
     """組み立ての元になったコミット。埋めていなければ `unknown`。"""
-    # 綴りは BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller がまとめる。
+    # 名前は BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller がまとめる。
     try:
         import ccnavi_buildinfo  # type: ignore[import-not-found]
     except ImportError:

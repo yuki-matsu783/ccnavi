@@ -8,7 +8,7 @@ UserPromptSubmit か PreToolUse で「承認済みチケットが置かれた。
 2. PreToolUse（allow になる呼び出し）でも同じ文が 1 度だけ載る
 3. セッションの最初の hook の時点で既にあった承認済みチケットは伝えない（起点）
 4. 別のセッションにはそれぞれ 1 度ずつ伝える。サブエージェントには伝えない
-5. 控えを置けない（`--state ""`）ときは伝えず、控えも作らない
+5. 記録を置けない（`--state ""`）ときは伝えず、記録も作らない
 
 文は `--agree --yes` の `prompt` と同じもの（同じ関数から出る）。
 """
@@ -54,7 +54,8 @@ class ApprovalNewsTest(PhaseHarness):
         )
 
     def approve_yes(self, tickets):
-        # ボードと同じく、見せた指紋（承認画面の本文・判定が読んだ中身・写る中身）を渡す。
+        # ボードと同じく、見せたダイジェスト（承認画面の本文・判定が読んだ中身・書き込む中身）
+        # を渡す。
         # 渡さない `--yes` は承認しない。
         shown = self.ccnavi("--agree", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
@@ -66,7 +67,7 @@ class ApprovalNewsTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.commit_parent()
 
-    def next_child(self, name="i0001-01"):
+    def next_child(self, name="i0001-01-01"):
         self.propose(name, child_text(name, "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
 
@@ -76,10 +77,10 @@ class ApprovalNewsTest(PhaseHarness):
         self.parent_only()
         self.assertEqual(self.prompt(), "")  # 起点。まだ何も無い
         self.next_child()
-        prompt = self.approve_yes(["i0001", "i0001-01"])
+        prompt = self.approve_yes(["i0001", "i0001-01-01"])
         first = self.prompt()
         self.assertIn(prompt, first)
-        self.assertIn("i0001-01", first)
+        self.assertIn("i0001-01-01", first)
         # 子より先に親を着手する順も、この 1 度の文で伝える（REQ-TKT-48）。
         self.assertIn("start <親>", first)
         self.assertEqual(self.prompt(), "")
@@ -87,16 +88,16 @@ class ApprovalNewsTest(PhaseHarness):
     def test_a_batch_without_a_new_parent_does_not_ask_for_the_parent_start(self):
         """子だけの回では、親の `start` を勧めないこと。
 
-        勧めた綴りは、親が着手済みなら「着手済み」で終わる。案内どおりに打って終了コード 1 を
+        勧めたコマンドは、親が着手済みなら「着手済み」で終わる。案内どおりに打って終了コード 1 を
         受け取る文は、案内ではなく誤りの元になる。子より先に親を着手する順そのものは、
         子の行の「親が未着手だと止まる」で残る。
         """
         self.parent_only()
         self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
+        self.approve_yes(["i0001", "i0001-01-01"])
         self.prompt()  # 1 回目の文はここで受け取っておく
-        self.next_child("i0001-02")
-        news = self.approve_yes(["i0001-02"])
+        self.next_child("i0001-01-02")
+        news = self.approve_yes(["i0001-01-02"])
         self.assertNotIn("start <親>", news)
         self.assertIn("親が未着手だと止まる", news)
 
@@ -106,7 +107,7 @@ class ApprovalNewsTest(PhaseHarness):
         self.parent_only()
         self.before()  # 起点
         self.next_child()
-        prompt = self.approve_yes(["i0001", "i0001-01"])
+        prompt = self.approve_yes(["i0001", "i0001-01-01"])
         result = self.event(
             "PreToolUse", tool="Write", file_path=os.path.join(self.parent_tree, "src", "x.py")
         )
@@ -123,23 +124,23 @@ class ApprovalNewsTest(PhaseHarness):
     def test_copies_that_existed_at_the_first_hook_are_not_news(self):
         self.parent_only()
         self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
-        # このセッションの最初の hook。既にある承認済みチケットは知っているものとして控える。
+        self.approve_yes(["i0001", "i0001-01-01"])
+        # このセッションの最初の hook。既にある承認済みチケットは知っているものとして記録する。
         self.assertEqual(self.prompt(), "")
         self.assertEqual(self.before(), "")
 
     def test_session_start_sets_the_baseline_without_speaking_about_it(self):
         self.parent_only()
         self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
+        self.approve_yes(["i0001", "i0001-01-01"])
         started = self.context(self.event("SessionStart"))
-        self.assertNotIn("i0001-01", started)
+        self.assertNotIn("i0001-01-01", started)
         self.assertEqual(self.prompt(), "")
         # 起点の後に承認されたものは伝える。SessionStart（compact の後にも来る）は起点を戻さない。
-        self.next_child("i0001-02")
-        self.approve_yes(["i0001-02"])
+        self.next_child("i0001-01-02")
+        self.approve_yes(["i0001-01-02"])
         self.event("SessionStart")
-        self.assertIn("i0001-02", self.prompt())
+        self.assertIn("i0001-01-02", self.prompt())
 
     # ---- 4. セッションごと。サブエージェントは除く
 
@@ -148,9 +149,9 @@ class ApprovalNewsTest(PhaseHarness):
         self.prompt(session="s1")
         self.prompt(session="s2")
         self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
-        self.assertIn("i0001-01", self.prompt(session="s1"))
-        self.assertIn("i0001-01", self.prompt(session="s2"))
+        self.approve_yes(["i0001", "i0001-01-01"])
+        self.assertIn("i0001-01-01", self.prompt(session="s1"))
+        self.assertIn("i0001-01-01", self.prompt(session="s2"))
         self.assertEqual(self.prompt(session="s1"), "")
         self.assertEqual(self.prompt(session="s2"), "")
         # 承認より後に起動したサブエージェントは、起動時点の承認済みチケットを起点にする。
@@ -184,33 +185,33 @@ class ApprovalNewsTest(PhaseHarness):
         self.approve_yes(["i0001"])
         self.prompt()
         self.next_child()
-        self.approve_yes(["i0001-01"])
+        self.approve_yes(["i0001-01-01"])
         # 次の hook より前に閉じる（子を done にしたときと同じ形）。
-        self.assertEqual(approval.close_copy(self.approved, "i0001-01"), "")
+        self.assertEqual(approval.close_copy(self.approved, "i0001-01-01"), "")
         heard = self.prompt()
-        self.assertIn("i0001-01", heard)
+        self.assertIn("i0001-01-01", heard)
         self.assertEqual(self.prompt(), "")
 
     def test_a_broken_memo_tells_instead_of_going_quiet(self):
-        """控えが壊れていたら、伝えていない承認ごと起点化せず、伝える側を採る。"""
+        """記録が壊れていたら、伝えていない承認ごと起点化せず、伝える側を採る。"""
         self.parent_only()
         self.prompt()
         self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
+        self.approve_yes(["i0001", "i0001-01-01"])
         memo = glob.glob(os.path.join(self.state, "approved-s1-*.json"))[0]
         with open(memo, "w", encoding="utf-8") as f:
             f.write("{ これは JSON ではない")
         heard = self.prompt()
-        self.assertIn("i0001-01", heard)
+        self.assertIn("i0001-01-01", heard)
         self.assertEqual(self.prompt(), "")
 
-    # ---- 5. 控えを置けないときは伝えない
+    # ---- 5. 記録を置けないときは伝えない
 
     def test_without_a_state_dir_nothing_is_told_and_nothing_is_written(self):
         self.parent_only()
         self.prompt(state="")
         self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
+        self.approve_yes(["i0001", "i0001-01-01"])
         self.assertEqual(self.prompt(state=""), "")
         self.assertEqual(glob.glob(os.path.join(self.state, "approved-*")), [])
 

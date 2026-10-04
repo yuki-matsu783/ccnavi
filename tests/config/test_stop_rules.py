@@ -11,7 +11,7 @@
 4. 数えを覚えられない（`--state ""`）ときは止めない
 5. `dry-run` は止めず、止めたはずの文を `systemMessage` に載せる
 6. cwd がプロジェクトの中でも同じルールが当たる。プロジェクトの層のルールも当たる
-7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない綴り、`every` の無いものを
+7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない表記、`every` の無いものを
    warn で言う
 
 `finish` の促しと重なったときの順は tests/ticket/test_stop_nudge.py。
@@ -281,7 +281,7 @@ class StopRulesTest(unittest.TestCase):
     def test_a_stale_project_copy_of_the_common_rule_is_not_counted_twice(self):
         """プロジェクトの層へ写した共通層が古くなって `every` が違っても、数えるのは共通層の 1 本。
 
-        共通層は親の着手でプロジェクトの層へ写すので、写しが古いまま残ることがある。
+        共通層は親の着手でプロジェクトの層へコピーするので、コピーした層が古いまま残ることがある。
         """
         home = self.project()
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
@@ -300,7 +300,7 @@ class StopRulesTest(unittest.TestCase):
         self.assertNotIn("自身の層", reason)
 
     def test_the_file_is_read_from_the_workspace_root_only(self):
-        """本文のファイルはワークスペースルートの版だけ。プロジェクトやワークツリーの写しは読まない。"""
+        """本文のファイルはワークスペースルートの版だけ。プロジェクトやワークツリーの版は読まない。"""
         home = self.project()
         write(os.path.join(self.root, "docs", "review.md"), "ワークスペースの手順")
         write(os.path.join(home, "docs", "review.md"), "プロジェクトの手順")

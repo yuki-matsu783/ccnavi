@@ -48,7 +48,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         setData(message.data);
         // 開いていたメニューの持ち主が一覧から消えていたら閉じる。残すと、同じ名前で
         // 戻ってきたときに押していないメニューが開いた状態で出る。
-        // 一致は `menuId` が組んだ綴りそのもので見る（前方一致だと、`:` を含む名前の
+        // 一致は `menuId` が組んだ表記そのもので見る（前方一致だと、`:` を含む名前の
         // メニューを、その接頭辞になっている別のプロジェクトのものと取り違える）
         const rows = message.data.kind === "page" ? message.data.page.rows : [];
         const alive = new Set(rows.flatMap((r) => MENU_KINDS.map((kind) => menuId(r.name, kind))));

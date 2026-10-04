@@ -16,7 +16,7 @@ sh ならプロジェクトごとに直せる。
 
 投稿の前に前提を全部確かめ（`prepare`）、投稿は sh がして、その結果でマーカーを置く
 （`requested`）。段の名前が違えば、どちらで止まったかが exit code を見なくても分かる。
-`prepare` はマーカー付きの本文を控えの置き場に書き出し、sh はそれを投稿する。
+`prepare` はマーカー付きの本文を state の置き場に書き出し、sh はそれを投稿する。
 
 ## 変更要求はユーザの端末でも通せない
 
@@ -62,7 +62,7 @@ GITLAB_TOKEN = "GITLAB_TOKEN"
 
 TIMEOUT_SECONDS = 15.0
 
-# 控えの置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
+# state の置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
 REQUEST_FILE = "review-request-{parent}-{phase}.md"
 DECIDE_FILE = "review-decide-{parent}-{phase}.md"
 # 残った指摘のうち、ユーザが issue に回すと選んだ分の下書き。sh がこれで issue を作る。
@@ -71,7 +71,7 @@ DECIDE_ISSUE_FILE = "review-issue-{parent}-{phase}.md"
 MR_FILE = "review-mr-{parent}.md"
 # Draft を外すときにマージリクエストへ残すコメント。sh が Draft を外してから投稿する。
 READY_FILE = "review-ready-{parent}.md"
-# ユーザが締めたときの、残りを写す issue の下書きと、マージリクエストへ残すコメント。
+# ユーザが早めに閉じたときの、残りを書き出す issue の下書きと、マージリクエストへ残すコメント。
 CLOSE_EARLY_ISSUE_FILE = "review-close-early-issue-{parent}.md"
 CLOSE_EARLY_NOTE_FILE = "review-close-early-note-{parent}.md"
 MARKER_READY = "<!-- ccnavi:ready -->"
@@ -87,7 +87,8 @@ class Thread:
     line: int = 0
     body: str = ""
     created_at: str = ""
-    # 最初のコメントを書いたアカウント。GitLab の写しだけが持つ（ccnavi の投稿を見分けるため）
+    # 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持つ
+    # （ccnavi の投稿を見分けるため）
     author: str = ""
 
 
@@ -137,7 +138,7 @@ class MergeRequest:
 
 @dataclass
 class Result:
-    """sh が取ってきたリモートの写し。`--result <json>` で渡る。
+    """sh がリモートから取得した結果。`--result <json>` で渡る。
 
     形は 1 つ。`host` と `mr{number,url}` は常に要る。`confirm` と `--reviewed` は
     `threads[]` と `reviews[]`、`requested` は投稿の `url` と `created_at` を見る。
@@ -164,7 +165,7 @@ class Result:
 
     @classmethod
     def from_data(cls, data: object) -> Result:
-        """読んだ JSON の値から組む。Chrome は sh と同じ形の写しを組んで渡す。"""
+        """読んだ JSON の値から組む。Chrome は sh と同じ形の結果を組んで渡す。"""
         if not isinstance(data, dict):
             return cls(error="結果の最上位が辞書ではない")
         if data.get("error"):
@@ -215,13 +216,13 @@ def prepare(
     phase_no: int,
     body_file: str,
 ) -> int:
-    """前提を全部確かめ、投稿する本文を控えの置き場に書き出す。標準出力はその置き場。"""
+    """前提を全部確かめ、投稿する本文を state の置き場に書き出す。標準出力はその置き場。"""
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
     parent, ph = found
     if not conf.state:
-        stderr.write("ccnavi: 控えの置き場が空。投稿する本文を置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。投稿する本文を置く場所が無い\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
     unmet = _unmet(tree_root, conf, ph)
@@ -248,7 +249,7 @@ def prepare(
     # ユーザが読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
     # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
-    # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が印に残す。
+    # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が上書きの記録に残す。
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     synced = configsync.pending(home, parent.ticket)
     if synced:
@@ -270,11 +271,11 @@ def prepare(
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
     if synced:
-        # 本文に載せたことを印に残す。`requested` はこれを見て知らせ済みにする。載せていない
-        # 投稿で知らせ済みにすると、ユーザが一度も見ないまま知らせが出なくなる。
+        # 本文に載せたことを上書きの記録に残す。`requested` はこれを見て知らせ済みにする。
+        # 載せていない投稿で知らせ済みにすると、ユーザが一度も見ないまま知らせが出なくなる。
         failed = configsync.mark_prepared(home, parent.ticket, phase_no)
         if failed:
-            stderr.write(f"ccnavi: 設定の上書きを本文に載せた印を書けない ({failed})\n")
+            stderr.write(f"ccnavi: 設定の上書きを本文に載せた記録を書けない ({failed})\n")
             return 1
     # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
     stdout.write(path + "\n" + draft + "\n")
@@ -289,9 +290,10 @@ def _note_synced(
     where: str,
     phase_no: int | None,
 ) -> None:
-    """設定を上書きしたことを知らせた、と印に残す。書けなくても依頼は済んでいるので止めない。
+    """設定を上書きしたことを知らせた、と上書きの記録に残す。書けなくても依頼は済んでいるので止めない。
 
-    `phase_no` を渡したら、その番号の依頼の本文に載せたとき（`prepare` が印に残した）だけ残す。
+    `phase_no` を渡したら、その番号の依頼の本文に載せたとき（`prepare` が上書きの記録に残した）
+    だけ残す。
     """
     home = approval.home_dir(conf, root, parent, "")
     if configsync.pending(home, parent) is None:
@@ -300,14 +302,14 @@ def _note_synced(
         return
     failed = configsync.mark_notified(home, parent, where)
     if failed:
-        stderr.write(f"ccnavi: 設定を上書きしたことを知らせた印を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 設定を上書きしたことを知らせた記録を書けない: {failed}\n")
 
 
 def mr_draft(parent: ticket_mod.Ticket) -> str:
     """マージリクエストの下書き。1 行目が題、空行のあとが本文。
 
     まだ無ければ sh がこれで作る。ユーザがレビューのときに見るのはこの入れ物なので、
-    親チケットが持っている材料（題・理由・本文・元の課題）をそのまま写す。
+    親チケットが持っている材料（題・理由・本文・元の課題）をそのまま書き写す。
     下書き（Draft）で作るのは、統合を決めるのがユーザだから。題から Draft を外して
     マージするところまでがユーザの手に残る。
     """
@@ -405,13 +407,13 @@ def requested(
 def reviewed_mark(
     mr: int, accepted: list[str], account: str = "", via: str = "", stamp: str = ""
 ) -> dict:
-    """レビュー済みの印の中身（`phases/<親>/<N>.reviewed`）。
+    """レビュー済みのマーカーの中身（`phases/<親>/<N>.reviewed`）。
 
-    `confirm`（コア）と `decide` が使う。欄の並びは `{mr, accepted, actor, via, at}` で、
+    `confirm`（コア）と `decide` が使う。欄の順序は `{mr, accepted, actor, via, at}` で、
     Chrome のレビュー済みも同じ形で書く。
     `actor` は付けたユーザ（アカウント）が分かるときだけ、`via` は経路が分かるときだけ書く
     （Chrome は `via: chrome`。手元の `confirm` は `--actor` があるときだけ `actor` と `via: cli` を
-    渡し、無ければ印は前と同じバイト列）。`stamp` が空なら `at` を
+    渡し、無ければマーカーは前と同じバイト列）。`stamp` が空なら `at` を
     書かず、`approval.write_mark` が今の時刻を入れる。
     """
     mark: dict = {"mr": mr, "accepted": list(accepted)}
@@ -425,7 +427,7 @@ def reviewed_mark(
 
 
 def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
-    """依頼したのと同じマージリクエストの写しか。違えばその説明（標準エラーの行）。"""
+    """依頼したのと同じマージリクエストを取得した結果か。違えばその説明（標準エラーの行）。"""
     if result is None or result.mr is None:
         return ["ccnavi: 結果にマージリクエストが無い"]
     if not requested_mark.get("host") or not requested_mark.get("mr"):
@@ -498,7 +500,8 @@ def settle_and_mark(
     ph: phase.Phase,
     mark: dict,
 ) -> tuple[str, str] | None:
-    """レビュー済みで書くもの（子を `done/` へ、レビュー済みの印）を fsio の控える段に並べる。
+    """レビュー済みで書くもの（子を `done/` へ、
+    レビュー済みのマーカー）を fsio の書き込みを溜める段に並べる。
 
     順は `_settle_children` → `_mark` と同じ（子を先に動かす。理由は `_settle_children`）。
     止まったら（"", 理由）。Writer(FS) は `ccnavi: <理由>` と言って止まる（前と同じ文面）。
@@ -535,7 +538,7 @@ def _settle_children(
 ) -> bool:
     """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
 
-    ユーザが見たことの記録はマーカーで、場所の移動はその写し。
+    ユーザが見たことの記録はマーカーで、場所の移動はそれに合わせたもの。
     動かせなければ言って False。
 
     呼ぶ側はこれをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかった
@@ -619,14 +622,14 @@ class Decision:
 
 
 def thread_key(t: Thread) -> str:
-    """選択をスレッドに対応づける鍵。受け入れの控えと同じく、URL を先に使う。"""
+    """選択をスレッドに対応づける鍵。受け入れの記録と同じく、URL を先に使う。"""
     return t.url or t.id
 
 
 def decision_digest(d: Decision) -> str:
-    """見せた指摘の指紋。見せてから押すまでに指摘が増えた・変わったら、適用を止める。
+    """見せた指摘のダイジェスト。見せてから押すまでに指摘が増えた・変わったら、適用を止める。
 
-    承認の指紋（`agree.approval_digest`）と同じ組み方。部分ごとの SHA-256 を件数と一緒に
+    承認のダイジェスト（`agree.approval_digest`）と同じ組み方。部分ごとの SHA-256 を件数と一緒に
     並べ、その全体の SHA-256。区切りでつなぐと、本文に区切りを書いてつなぎ目をずらせる。
     """
     assert d.result.mr is not None
@@ -725,10 +728,10 @@ def reviewed(
 ) -> int:
     """ユーザが端末で打つ。残った指摘を見せ、1 件ずつ行き先を選ばせる。変更要求は通せない。
 
-    選んだ結果は `apply_decision` が置き、MR に写すコメントと issue の下書きを控えの置き場に
+    選んだ結果は `apply_decision` が置き、MR に書き込むコメントと issue の下書きを state の置き場に
     書き出す。sh がそれを投稿する。
 
-    `chat` はこのセッションで見たフェーズ（`review: chat`）を通す枝。写しも依頼の記録も
+    `chat` はこのセッションで見たフェーズ（`review: chat`）を通す枝。取得した結果も依頼の記録も
     要らない代わりに、種類が chat と宣言しているフェーズにしか使えない。
     """
     if chat:
@@ -778,8 +781,9 @@ def choose(
 ) -> int:
     """対話の decide の前半（`--reviewed N --accept-unresolved --choose-out <ファイル>`）。
 
-    残った指摘を見せて 1 件ずつ選ばせ、選択と指紋を `{"choices": …, "digest": …}` で書くだけ。
-    何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ
+    残った指摘を見せて 1 件ずつ選ばせ、
+    選択とダイジェストを `{"choices": …, "digest": …}` で書くだけ。
+    何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <ダイジェスト>` で打つ
     （選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たない）。
     """
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
@@ -868,14 +872,17 @@ def decide_yes(
     choices_text: str,
     digest: str,
 ) -> int:
-    """オーバーレイでユーザが押した選択を置く（`--yes <選択の JSON> --digest <指紋> --json`）。
+    """オーバーレイでユーザが押した選択を置く。
 
-    ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘の指紋が一致することを求める。エージェントが
-    これをシェルで打つ形は、組み込みの deny（`phase.ticket_approval_rule`）が止める。
+    形は `--yes <選択の JSON> --digest <ダイジェスト> --json`。
+
+    ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが一致することを
+    求める。エージェントがこれをシェルで打つ形は、組み込みの deny（`phase.ticket_approval_rule`）が
+    止める。
     結果は JSON で返す。違えば何も置かず `mismatch` を返す。
     """
     if not digest.strip():
-        stderr.write("ccnavi: --yes には --digest（見せた指摘の指紋）が要る\n")
+        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が要る\n")
         return 1
     try:
         raw = json.loads(choices_text)
@@ -924,11 +931,11 @@ def decide_yes(
 
 
 def _decide_actor() -> tuple[str, str]:
-    """decide の印に入れる (アカウント, 経路)。
+    """decide のマーカーに入れる (アカウント, 経路)。
 
-    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（跡の行の
+    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（履歴の行の
     `actor`）。経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
-    どちらも書かない（confirm と同じく、引けなければ印は前と同じバイト列）。
+    どちらも書かない（confirm と同じく、引けなければマーカーは前と同じバイト列）。
     """
     account = str(history.extra().get("actor") or "")
     return (account, history.via()) if account else ("", "")
@@ -944,12 +951,12 @@ def apply_decision(
 ) -> dict | None:
     """選んだ行き先を置く。端末とオーバーレイが同じここを通る。置けなければ None。
 
-    - 対応しない・issue に回す: 受け入れの控え（`accepted.json`）に足す。次の confirm は数えない
+    - 対応しない・issue に回す: 受け入れの記録（`accepted.json`）に足す。次の confirm は数えない
     - このフェーズで直す: 続きの子を同じ番号で `doing/` に起こす。受け入れないので、次の
       confirm がまた数える。1 件でもあればフェーズは開き直り、レビュー済みのマーカーは置かない
     - どれも直さないなら、レビュー済みのマーカーを置く
 
-    MR に写すコメントと issue の下書きは控えの置き場に書き、sh が投稿する。
+    MR に書き込むコメントと issue の下書きは state の置き場に書き、sh が投稿する。
     """
     assert d.result.mr is not None
     parent, ph = d.parent, d.ph
@@ -958,10 +965,10 @@ def apply_decision(
     picked = {c: [t for t in d.unresolved if choices.get(thread_key(t)) == c] for c in CHOICES}
     accepted = [thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
     fix = picked[CHOICE_FIX]
-    # issue に回す分は、控えの置き場に下書きを書いて sh に渡す。置き場が無ければ回せないので、
+    # issue に回す分は、state の置き場に下書きを書いて sh に渡す。置き場が無ければ回せないので、
     # 何も置く前に断る（受け入れだけが残り、issue は作られない、にしない）
     if picked[CHOICE_ISSUE] and not conf.state:
-        stderr.write("ccnavi: 控えの置き場が空。issue に回す下書きを置けない\n")
+        stderr.write("ccnavi: state の置き場が空。issue に回す下書きを置けない\n")
         return None
     # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない
     # issue やコメントを sh が投稿する
@@ -970,12 +977,12 @@ def apply_decision(
             stale = os.path.join(conf.state, name.format(parent=parent.ticket, phase=ph.number))
             if os.path.exists(stale):
                 fsio.remove(stale)
-    # 受け入れはマーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、
+    # 受け入れはマーカーより先に記録へ。マーカーは上書きも一括の消去もされるので、
     # ユーザが 1 度言った「これは承知で進める」はそちらに置かない。
     if accepted:
         failed = approval.remember_accepted(home, parent.ticket, accepted, ph.number)
         if failed:
-            stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
+            stderr.write(f"ccnavi: 受け入れを記録できない: {failed}\n")
             return None
     if not _settle_children(stdout, stderr, root, conf, parent, ph):
         return None
@@ -1057,7 +1064,7 @@ def _write_decide_comment(
     picked: dict[str, list[Thread]],
     followup: str,
 ) -> None:
-    """MR に写す、決めた内容のコメント。issue の綴りは sh が作ったあとに書き足す。"""
+    """MR に書き込む、決めた内容のコメント。issue の表記は sh が作ったあとに書き足す。"""
     lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）指摘の対応方針:"]
     if picked[CHOICE_KEEP]:
         lines += [
@@ -1128,7 +1135,7 @@ def _reviewed_in_chat(
 ) -> int:
     """このセッションで見たフェーズを、ユーザが端末で通す（設計 9.8）。
 
-    ホストへ出ないので写しも依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
+    ホストへ出ないので取得した結果も依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
     あること（`mr` と宣言したフェーズを手軽な経路で通させない）と、フェーズが終わって
     いること、そして依頼が出ていないこと。依頼を出した先には指摘が付いているかもしれず、
     それを数えずに通す手段はここには用意しない（数えるのは `confirm`、受け入れるのは `decide`）。
@@ -1217,7 +1224,7 @@ def _reviewed_in_chat(
     if synced:
         _note_synced(stderr, conf, root, parent.ticket, phasetypes.REVIEW_CHAT, None)
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
-    # 残した指摘があれば、続きの子を起こす。ホストに写しが無いので、指摘はユーザが打つ。
+    # 残した指摘があれば、続きの子を起こす。ホストから取得した結果が無いので、指摘はユーザが打つ。
     stdout.write(
         "残した指摘があれば、続きの子チケットを起こす。指摘を 1 行ずつ入れ、空行で終えてください"
         "（何も入れなければ起こさない）:\n"
@@ -1254,9 +1261,9 @@ def ready(
     if parent is None:
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
-    # 親の写しが done/ に無いまま Draft を外すと、そのままマージされたときに done/ に親が無いまま
-    # 親のブランチが消え、親子のチケットの判定が「決まらない」になる。それを防ぐ
-    # （判定を締める向き）。
+    # 親のチケットが done/ に無いまま Draft を外すと、
+    # そのままマージされたときに done/ に親が無いまま親のブランチが消え、
+    # 親子のチケットの判定が「決まらない」になる。それを防ぐ（判定を厳しくする向き）。
     if parent.state != ticket_mod.DONE:
         problems.append(
             f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
@@ -1270,7 +1277,8 @@ def ready(
         for p in problems:
             stderr.write(f"  - {p}\n")
         stderr.write(
-            "全部片付けてから打ち直してください。まだ残るものを承知で締めるなら、ユーザが端末で "
+            "全部片付けてから打ち直してください。"
+            "まだ残るものを承知で早めに閉じるなら、ユーザが端末で "
             f"'{settings.script_command(root, 'ccnavi-review.sh')} close-early --reason <理由>' "
             "を打つ\n"
         )
@@ -1279,7 +1287,7 @@ def ready(
     if result is None:
         return 1
     if not conf.state:
-        stderr.write("ccnavi: 控えの置き場が空。コメントの下書きを置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所が無い\n")
         return 1
     wrapped = approval.read_parent_mark(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
@@ -1292,7 +1300,7 @@ def ready(
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
     )
     if wrapped:
-        text.append(f"（ユーザが締めた: {wrapped.get('reason', '')}）")
+        text.append(f"（ユーザが早めに閉じた: {wrapped.get('reason', '')}）")
     path = os.path.join(conf.state, READY_FILE.format(parent=parent.ticket))
     failed = _write_text(path, "\n".join(text) + "\n")
     if failed:
@@ -1320,20 +1328,20 @@ def close_early(
     reason: str,
     result_path: str,
 ) -> int:
-    """ユーザが端末で打つ。「まだ残っているが、キリの良いところまでやった」と締める。
+    """ユーザが端末で打つ。「まだ残っているが、キリの良いところまでやった」と早めに閉じる。
 
     残っているもの（未着手の子、子の無いフェーズ、終わっていないレビュー、
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
     未着手の子を取り消し、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
-    親のマーカー `close-early.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
+    親のマーカー `close-early.json` を置く。残りを別の issue に書き出す下書きを書き、sh がそれで
     issue を作る。ユーザが知らないうちに消えるものは作らない。
 
-    Draft を外すのはここではなく `ready`。締めたあとに親が状態の移動をコミットし、
+    Draft を外すのはここではなく `ready`。早めに閉じたあとに親が状態の移動をコミットし、
     途中の作業の置き場を消して push する。それが済んだことを `ready` が確かめて外す。
     外す経路を `ready` の 1 つにしておくと、外れたマージリクエストは必ず
     「片付いて push 済み」になる。
 
-    作業中の子がいる間は打てない。締めるのは、手が止まっているときだけ。
+    作業中の子がいる間は打てない。早めに閉じるのは、手が止まっているときだけ。
     """
     if not reason.strip():
         stderr.write("ccnavi: --close-early には --reason <理由> が要る\n")
@@ -1342,7 +1350,7 @@ def close_early(
     if parent is None:
         return 1
     if not conf.state:
-        stderr.write("ccnavi: 控えの置き場が空。下書きを置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。下書きを置く場所が無い\n")
         return 1
     result = _result_with_mr(stderr, result_path)
     if result is None:
@@ -1364,19 +1372,20 @@ def close_early(
     if doing:
         stderr.write(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。"
-            "閉じるか取り消してから締めてください\n"
+            "子を閉じるか取り消してから、親を早めに閉じてください\n"
         )
         return 1
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     left = _leftovers(home, parent, phases, result)
-    # 着手で共通層を写したことをまだ知らせていなければ、締める前にここで見せる。y で締めたら
-    # 見たものとして残す。見せないと、締めたあとの finish でもう 1 度端末を求めることになる。
+    # 着手で共通層をコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
+    # y で閉じたら見たものとして残す。見せないと、
+    # 早めに閉じたあとの finish でもう 1 度端末を求めることになる。
     synced = configsync.pending(home, parent.ticket)
     if synced:
         stdout.write(configsync.notice(synced))
     _show_leftovers(stdout, parent, left)
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
-        stderr.write("ccnavi: 締めなかった\n")
+        stderr.write("ccnavi: 早めに閉じなかった\n")
         return 1
     if synced:
         failed = configsync.mark_notified(home, parent.ticket, configsync.NOTIFIED_TERMINAL)
@@ -1397,7 +1406,7 @@ def close_early(
         accepted,
     )
     if failed:
-        stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
+        stderr.write(f"ccnavi: 受け入れを記録できない: {failed}\n")
         return 1
     if not _parent_mark(
         stderr,
@@ -1421,10 +1430,10 @@ def close_early(
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
-    # 下書きの綴りは標準出力に出さない。ここはユーザの端末に向いていて、sh は
-    # 控えの置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
+    # 下書きのパスは標準出力に出さない。ここはユーザの端末に向いていて、sh は
+    # state の置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
-        f"OK: {parent.ticket} を締めた。あとは親に、状態の移動をコミットし、"
+        f"OK: {parent.ticket} を早めに閉じた。あとは親に、状態の移動をコミットし、"
         f"'ticket finish {parent.ticket}' で閉じ、`{ticket_mod.WIP_ROOT}/` を消して push し、"
         "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
@@ -1433,7 +1442,7 @@ def close_early(
 
 @dataclass
 class Leftovers:
-    """締めるときに残っているもの。見せるものと、締めたあとに issue へ写すもの。"""
+    """早めに閉じるときに残っているもの。見せるものと、閉じたあとに issue へ書き出すもの。"""
 
     # 未着手の子。取り消す。
     todo: list[ticket_mod.Ticket]
@@ -1479,8 +1488,8 @@ def _leftovers(
 
 
 def _show_leftovers(stdout: TextIO, parent: ticket_mod.Ticket, left: Leftovers) -> None:
-    """残っているものと、締めたら何が起きるかをユーザに見せて、y/N を促す。"""
-    stdout.write(f"{parent.ticket}（{parent.title}）を締める。残っているもの:\n")
+    """残っているものと、早めに閉じたら何が起きるかをユーザに見せて、y/N を促す。"""
+    stdout.write(f"{parent.ticket}（{parent.title}）を早めに閉じる。残っているもの:\n")
     for t in left.todo:
         stdout.write(f"  - 未着手の子 {t.ticket}（{t.title}）→ 取り消す\n")
     for ph in left.untouched:
@@ -1493,7 +1502,7 @@ def _show_leftovers(stdout: TextIO, parent: ticket_mod.Ticket, left: Leftovers) 
         stdout.write(f"  - 未解決 {t.url} {t.path}:{t.line} {_first_line(t.body)} → 受け入れる\n")
     if left.nothing:
         stdout.write("  （何も残っていない。ready で足りる）\n")
-    stdout.write("残りは別の issue に写す。締めてよいなら y、やめるならそれ以外: ")
+    stdout.write("残りは別の issue に書き出す。早めに閉じてよいなら y、やめるならそれ以外: ")
     stdout.flush()
 
 
@@ -1563,13 +1572,14 @@ def _close_early_drafts(
     skipped: list[int],
     accepted: list[str],
 ) -> str:
-    """残りを写す issue の下書きと、マージリクエストへ残すコメント の下書き。書けなければ理由。"""
+    """残りを書き出す issue の下書きと、マージリクエストへ残すコメント の下書き。
+    書けなければ理由。"""
     assert result.mr is not None
     # 1 行目が題、空行のあとが本文。
     issue = [f"{parent.title} の残り", ""]
     issue += [
         f"元のマージリクエスト: {result.mr.url}（チケット `{parent.ticket}`）",
-        f"締めた理由: {reason.strip()}",
+        f"早めに閉じた理由: {reason.strip()}",
         "",
         "## 残した作業",
         "",
@@ -1590,10 +1600,10 @@ def _close_early_drafts(
         return failed
     note = [
         MARKER_CLOSE_EARLY,
-        f"ユーザが締めた（{stamp}）: {reason.strip()}",
+        f"ユーザが早めに閉じた（{stamp}）: {reason.strip()}",
         f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
         f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
-        "残りは別の issue に写す。親が片付けて ready を打てば Draft が外れる。"
+        "残りは別の issue に書き出す。親が片付けて ready を打てば Draft が外れる。"
         "マージはユーザが行う。",
         "",
     ]
@@ -1631,7 +1641,7 @@ def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
     （crit push が届かない）。
     """
-    # git の `-z` の綴りをそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
+    # git の `-z` の表記をそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
     return _is_own_place(conf, path) or path.startswith(ticket_mod.ELI5 + "/")
 
 
@@ -1689,11 +1699,11 @@ def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
+    承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
-    マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
-    `ccnavi-review.sh` と `ccnavi-agree.sh` の仕事で、ユーザの作業による未コミットの変更とは
-    別に扱う。
+    マーカーをコミットしろ」と言い続けることになる。
+    マーカーと承認済みチケットをコミットして push するのは`ccnavi-review.sh` と
+    `ccnavi-agree.sh` の仕事で、ユーザの作業による未コミットの変更とは別に扱う。
     """
     rc, status = _git(
         tree_root, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
@@ -1702,7 +1712,7 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
         return True
     # `-z` で読む。既定の出力は非 ASCII を引用符で囲んで 8 進でエスケープするので、置き場の中の
     # 日本語のファイルが置き場の外と判定され、「未コミットがある」で依頼が止まる。
-    # `--no-renames` は、改名のときに出る 2 つめの綴り（移動元）が XY を持たない形で
+    # `--no-renames` は、改名のときに出る 2 つめのパス（移動元）が XY を持たない形で
     # 入り込むのを避けるため。phase.scope_findings と同じ読み方。
     for entry in status.split("\0"):
         if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
@@ -1711,7 +1721,8 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
 
 
 def _in_wip(path: str) -> bool:
-    """git の綴りが、途中の作業の置き場（`wip`）の下か。大文字小文字と `\\` の区切りを問わない。"""
+    """git が出したパスが、途中の作業の置き場（`wip`）の下か。
+    大文字小文字と `\\` の区切りを問わない。"""
     folded = path.lower()
     return folded == ticket_mod.WIP_ROOT or folded.startswith(
         (ticket_mod.WIP_ROOT + "/", ticket_mod.WIP_ROOT + "\\")
@@ -1719,7 +1730,7 @@ def _in_wip(path: str) -> bool:
 
 
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
-    """マージに進む前にワークツリーの側で満たしていること。root は文面の sh の綴りに使う。
+    """マージに進む前にワークツリーの側で満たしていること。root は文面の sh のパスに使う。
 
     途中の作業の置き場が追跡から消えていること、未コミットが無いこと、push 済みであること。
     ユーザがマージするときに見るのはリモートの HEAD なので、手元にだけあるものは無いのと同じ。
@@ -1729,7 +1740,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
         return [f"親のワークツリーが無い ({tree_root})"]
     wip = ticket_mod.WIP_ROOT
     # 大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
-    # （`tree.relative` は書いた綴りを返す）は `wip/eli5/` として通すのに、
+    # （`tree.relative` は書いたパスを返す）は `wip/eli5/` として通すのに、
     # git には `WIP/...` で入る。
     # 区別して見ると、それが既定のブランチまで残る。名前に `\` を含む 1 ファイル（`wip\eli5\x`。
     # Linux / macOS では作れる）も `wip` の下と見なして止める。pathspec の `:(icase)` に
@@ -1826,7 +1837,7 @@ def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
 # `:` はパスの区切りなので、数字だけのときにポートと見なす。
 # `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh と同じく、authority の
 # 最後の `@` までをユーザ情報と見る（git がそう切る。トークンに `@` が入る形がある）。
-# IPv6 は `[::1]` の形。sh が読めない綴り（`ssh://user@host/`、大文字の scheme）は
+# IPv6 は `[::1]` の形。sh が読めない表記（`ssh://user@host/`、大文字の scheme）は
 # ここでも読めない扱いにして、--lint と sh の言うことを揃える。
 _REMOTE = re.compile(
     r"^(?:https?://|ssh://git@|git@)(?:[^/]*@)?"
@@ -1835,7 +1846,7 @@ _REMOTE = re.compile(
 
 
 def remote_kind(url: str) -> str:
-    """origin の URL から、GitHub か GitLab か。読めない綴りなら空。"""
+    """origin の URL から、GitHub か GitLab か。読めない表記なら空。"""
     m = _REMOTE.match(url)
     if m is None:
         return ""
@@ -1878,8 +1889,8 @@ def _parent(
     if parent is None:
         stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
         return None
-    # 取り込み済みの親子のチケットが決まらない・閉じているなら、依頼・確認・行き先・締めの印も
-    # 置かない。
+    # 取り込み済みの親子のチケットが決まらない・閉じているなら、
+    # 依頼・確認・行き先・早めに閉じたことのマーカーも置かない。
     if ops.family_stopped(stderr, root, conf, parent):
         return None
     return parent
@@ -1909,7 +1920,7 @@ def _parent_phase(
 
 
 def _result_with_mr(stderr: TextIO, path: str) -> Result | None:
-    """写しを読み、マージリクエストが入っていることまで確かめる。無ければ言って None。"""
+    """取得した結果を読み、マージリクエストが入っていることまで確かめる。無ければ言って None。"""
     result = _result(stderr, path)
     if result is None or result.mr is None:
         stderr.write("ccnavi: 結果にマージリクエストが無い\n")
@@ -1970,8 +1981,8 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
     """ユーザが見るものが、まだリモートに届いていないか。
 
     ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。ユーザがレビューで
-    見るのはコードで、置き場を運ぶのは `ccnavi-push-approved.sh` の仕事（push が落ちても
-    コミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
+    見るのはコードで、置き場をコミットして push するのは `ccnavi-push-approved.sh` の仕事
+    （push が落ちてもコミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
     `confirm` の側（`_moved_since_request`）と同じ基準。
 
     `ready` の前提（`_merge_problems`）はこれを使わない。あちらはユーザがリモートを見て
@@ -1988,7 +1999,7 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
 
 def _result(stderr: TextIO, path: str) -> Result | None:
     if not path:
-        stderr.write("ccnavi: --result <json> が要る。リモートの写しは sh が渡す\n")
+        stderr.write("ccnavi: --result <json> が要る。リモートから取得した結果は sh が渡す\n")
         return None
     result = Result.load(path)
     if result.error:
@@ -1998,7 +2009,7 @@ def _result(stderr: TextIO, path: str) -> Result | None:
 
 
 def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
-    """依頼したのと同じマージリクエストの写しか。違うもので先へ進めない。"""
+    """依頼したのと同じマージリクエストを取得した結果か。違うもので先へ進めない。"""
     result = _result(stderr, path)
     if result is None:
         return None
@@ -2020,10 +2031,12 @@ def _unresolved(
     数えないのは 2 つだけ。機構自身が置いた投稿と、ユーザが「未解決のまま進める」と
     受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。
 
-    機構自身の投稿と見るのは、GitLab の写しで、本文が目印で始まり、書いたのが依頼を投稿した
-    アカウント（`poster`）のときだけ。GitHub の依頼は MR のコメントで
-    スレッドにならないので、目印で始まるスレッドはユーザが書いたものとして数える。投稿者が分からなければ
-    見分けずに数える（誰でも目印を書けるので、本文だけで除くと未解決を隠せる）。
+    機構自身の投稿と見るのは、GitLab から取得した結果で、本文が目印で始まり、
+    書いたのが依頼を投稿したアカウント（`poster`）のときだけ。
+    GitHub の依頼は MR のコメントでスレッドにならないので、
+    目印で始まるスレッドはユーザが書いたものとして数える。
+    投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
+    本文だけで除くと未解決を隠せる）。
     """
     return [
         t
@@ -2061,10 +2074,10 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
-    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 9.2）。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの（設計 9.2）。
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
-    承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを
+    承認の push（`ccnavi-push-approved.sh`）が置き場をまとめてコミットするので、レビューを
     待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty` が同じ理由で外しており、
     基準をそこに揃える。ユーザがレビューで見るものは 1 バイトも変わらない。
 
@@ -2131,7 +2144,7 @@ def _already_requested(
     confirm が止まらないので、ここで出し直させると依頼のコメントが増えるだけになる。
 
     レビュー済みは依頼の有無より先に見る。`close-early` は依頼していないフェーズにも
-    レビュー済みを置くので、依頼の記録が無いことを先に見ると、ユーザが締めたフェーズに
+    レビュー済みを置くので、依頼の記録が無いことを先に見ると、ユーザが早めに閉じたときのフェーズに
     依頼が投稿される。
     """
     if approval.MARK_REVIEWED in ph.marks:

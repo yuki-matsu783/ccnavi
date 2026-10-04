@@ -8,10 +8,11 @@
    範囲に入る。hook は `settings.json` の env で起動するので、ここで見る代入の影響を受けない。
 2. **子チケットのワークツリーからの `ccnavi-git.sh push`。** 子の成果は親が合流してから親の
    ツリーで送る（設計 9.10）。sh も同じ検査を持つが、sh の検査は上の環境変数で外れ、承認済み
-   チケットの探し方を sh の中に写して持つので、写しが食い違うと気づかないうちに外れる（#120）。
-   止める場所を hook に置き、sh の検査は 2 重目として残す。
+   チケットの探し方を sh の中にコピーして持つので、
+   コピーが食い違うと気づかないうちに外れる（#120）。止める場所を hook に置き、
+   sh の検査は 2 重目として残す。
 
-どちらも組み込み。ルールを空にされても消えないように、守りの根拠を守られる対象の外に置く（P4）。
+どちらも組み込み。ルールを空にされても消えないように、保護の根拠を守られる対象の外に置く（P4）。
 
 止める広さは sh の検査に合わせる。登録されていない `.claude/worktrees/<名前>` も、閉じた子
 （`done/`）も、レビュー待ちの子（`review/`）も、YAML として読めない承認済みチケットも、
@@ -55,7 +56,7 @@ _DECLARES = frozenset({"export", "declare", "typeset", "readonly", "local", "uns
 _ASSIGNMENT = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?\+?=")
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # `env -i` は環境を丸ごと空にする。settings.json の env が書き出した置き場も消え、sh は既定の
-# 置き場を見る。変数の名前は並ばないので、この綴りで数える。
+# 置き場を見る。変数の名前は並ばないので、この表記で数える。
 ENV_CLEARED = "env -i"
 _ENV_CLEARS = frozenset({"-i", "--ignore-environment", "-"})
 
@@ -68,7 +69,7 @@ def blocked(name: str) -> bool:
 
 
 def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
-    """保護済みの sh を呼ぶコマンド行に、止める変数の代入があれば（sh の綴り, 変数名）。
+    """保護済みの sh を呼ぶコマンド行に、止める変数の代入があれば（sh のパス, 変数名）。
 
     コマンド行のどこで置いても数える。前置きの代入（`X=… sh …`）、`env X=…`、`export X=…`、
     すでに書き出してある変数への素の代入（`X=…; sh …`。settings.json の env が書き出した変数は
@@ -90,7 +91,8 @@ def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
 def check_child_push(
     conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
 ) -> tuple[str, str, str]:
-    """子チケットのワークツリーからの `ccnavi-git.sh push` なら（ツリーの名前, 親, 見つけた綴り）。
+    """子チケットのワークツリーからの `ccnavi-git.sh push` なら（ツリーの名前, 親,
+    見つけた文字列）。
 
     居場所は payload の cwd から `cd` を追った先（6.3.2）。追えなくなった先で push を
     打つ形は、どのツリーから送るのかが決まらないので止める（親は `?`）。
@@ -170,7 +172,7 @@ def _trees(conf: settings.Settings, root: str) -> list[str]:
 
 
 def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
-    """コマンド 1 本が保護済みの sh を呼ぶなら（sh の綴り, sh に渡る引数）。
+    """コマンド 1 本が保護済みの sh を呼ぶなら（sh のパス, sh に渡る引数）。
 
     `sh <sh>`・`bash <sh>`・`<sh>` の直接の実行・`. <sh>`、と、それを `env` `sudo` などの
     実行役のコマンド越しに呼ぶ形。`sh -c '…'` は読み切れない形として read() が縮退させる。

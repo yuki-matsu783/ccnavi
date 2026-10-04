@@ -5,7 +5,7 @@
  * 識別子（= ブランチ名）は Python（`ticket.issue_identifier`）が決め、始められない理由（統合先の
  * `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版の違い）も
  * Python が出す。ここは issue を読み、Python に聞き、ブランチを作る頼みを service worker に送るだけ。
- * service worker も名前の形・保護された名前・統合先の先頭を自分で確かめる（二重の守り）。
+ * service worker も名前の形・保護された名前・統合先の先頭を自分で確かめる（二重の確認）。
  */
 import { py, PyError, type Snapshot } from "./py.js";
 import type { RepoConfig } from "./settings.js";

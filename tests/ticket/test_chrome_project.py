@@ -2,12 +2,13 @@
 
 見るのは 5 つ。
 
-1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）の親子のチケットを、
+1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）
+の親子のチケットを、
    手元と同じ形の仮のツリー（ワークスペースルート + `projects/<名前>` + そのワークツリー）で判定し、
    承認で書くもの（Changes）はその親子のチケットの親のブランチだけ
 2. プロジェクトの層は計算で決める（プロジェクトの統合先の層に、ワークスペースの共通層を
-   `configsync.projected` で写したもの）。親のブランチの上の層は読まない
-3. 控えはワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
+   `configsync.projected` でコピーしたもの）。親のブランチの上の層は読まない
+3. 取り込み状態はワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
 4. 「始める」: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
    `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・
    互換の版が違う、のどれでも始められない
@@ -63,8 +64,8 @@ def project_integration(**extra):
 def family_files(ident="web-i0012", issue=12):
     return {
         f"wip/proposals/todo/{ident}.md": parent_text(ident, ["research"], issue=issue),
-        f"wip/proposals/todo/{ident}-01.md": child_text(
-            f"{ident}-01", ident, 1, ["wip/research/*"], False
+        f"wip/proposals/todo/{ident}-01-01.md": child_text(
+            f"{ident}-01-01", ident, 1, ["wip/research/*"], False
         ),
         # 親のブランチの上の層は読まない（置き場の外なので拡張はそもそも読まない。
         # 親のブランチの上で書き換えて承認やレビューを不要にさせない）
@@ -106,10 +107,10 @@ class ChromeProjectTest(unittest.TestCase):
     def test_the_board_of_a_project_family_lists_its_proposals(self):
         board = self.ask("board")
         self.assertNotIn("error", board, board)
-        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01"])
+        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01-01"])
         self.assertTrue(board["write"]["allowed"], board["write"])
         self.assertEqual(board["rejected"], [])
-        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーの綴りは出さない）
+        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーのパスは出さない）
         self.assertNotIn(os.path.join(self.tmp, "memfs"), board["text"])
 
     def test_approving_a_project_family_writes_only_its_branch(self):
@@ -144,7 +145,8 @@ class ChromeProjectTest(unittest.TestCase):
             "workspace": workspace(**{".ccnavi/common/risks.yml": RISK_COMMON}),
         }
         layer = self.chrome.project_layer(snap, place)
-        # 共通層にあるファイルは写し（配点の script はプロジェクトの層の置き場へ）、無いものは残す
+        # 共通層にあるファイルはコピーし（配点の script はプロジェクトの層の置き場へ）、
+        # 無いものは残す
         self.assertEqual(layer[".ccnavi/config/phases.yml"], PHASES)
         self.assertIn("script: .ccnavi/scripts/risk.sh", layer[".ccnavi/config/risks.yml"])
         self.assertEqual(layer[".ccnavi/config/rules.yml"], '{"version": 1, "deny": []}\n')
@@ -256,7 +258,9 @@ class StartTest(unittest.TestCase):
             "topic": {
                 "head": HEAD,
                 "files": {
-                    "wip/proposals/todo/i0012-01.md": child_text("i0012-01", "i0012", 1, ["src/*"])
+                    "wip/proposals/todo/i0012-01-01.md": child_text(
+                        "i0012-01-01", "i0012", 1, ["src/*"]
+                    )
                 },
             }
         }

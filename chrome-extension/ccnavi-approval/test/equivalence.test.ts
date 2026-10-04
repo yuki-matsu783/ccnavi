@@ -1,6 +1,6 @@
 /**
  * 同じ要求に、Pyodide（拡張と同じ zip）と手元の CPython が同じ答えを返すか。
- * ボードを 1 回組むあいだに Python へ投げた要求を全部控え、手元の CPython にも投げて比べる。
+ * ボードを 1 回組むあいだに Python へ投げた要求を全部記録し、手元の CPython にも投げて比べる。
  *
  * 判定のコアの見本は `test/fixtures/core-scenarios.json`。手元の試験
  * （`tests/ticket/test_core.py`）が、手元で実際に書いたバイト列と同じ答えになることを確かめて
@@ -66,7 +66,7 @@ test("CX-T062 承認と取り下げで Python に投げた要求（plan・withdr
     return res;
   };
   const branches = fixture();
-  delete branches.i0001.files["wip/proposals/todo/i0001-01.md"];
+  delete branches.i0001.files["wip/proposals/todo/i0001-01-01.md"];
   const mock = new MockGitHub(branches);
   const stats = newStats();
   const repo = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };

@@ -2,17 +2,17 @@
  * GitLab 対応のレビューで直したもの。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
  * - 応答が落ちた書き込みの受け直し（PROBE-2・3）: 自分のコミットを「書いた中身と親の組」で見分けたときだけ受け直す。
- *   見分けられなければユーザに回す
- * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは打ち消さない）
- * - 事後確認と打ち消しの途中でホストが落ちたら、書いたが確認できなかったとしてユーザに回す
+ *   見分けられなければユーザの対応に切り替える
+ * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは元に戻さない）
+ * - 事後確認と元に戻すコミットの途中でホストが落ちたら、書いたが確認できなかったとしてユーザの対応に切り替える
  * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭で閉じた識別子と互換の版を確かめ直す
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
- * - 打ち消しはバイト列のまま戻す（BOM も）
+ * - 元に戻すコミットはバイト列のまま戻す（BOM も）
  * - 「要確認」の親子のチケットには、そのブラウザで書くボタンを出さない
  *
- * 最新のレビューで足したもの: 確かめが落ちたら要確認、打ち消しの前の 412 で打ち消し直す、別の線に付け替わったら
- * ユーザに回す、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
+ * 最新のレビューで足したもの: 確かめが落ちたら要確認、元に戻す前の 412 で元に戻し直す、別の線に付け替わったら
+ * ユーザの対応に切り替える、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -47,7 +47,7 @@ const TOKENS = new Map([
   ["gitlab.com", TOKEN],
 ]);
 const TODO = "wip/proposals/todo/i0001.md";
-const CHILD = "wip/proposals/todo/i0001-01.md";
+const CHILD = "wip/proposals/todo/i0001-01-01.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
 
@@ -100,7 +100,7 @@ test("CX-T161 GitLab で応答が落ち、その上に無関係な書き込み�
   assert.equal(out.kind, "changed", JSON.stringify(out));
   assert.deepEqual(mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]), [
     ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],
-    ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
+    ["written", "ccnavi: i0001 への書き込みを元に戻す（Chrome 拡張 9.9.9）"],
   ]);
   const files = mock.files("i0001");
   assert.ok(!(DOING in files) && TODO in files && CHILD in files && "src/zzz.py" in files);
@@ -125,7 +125,7 @@ test("CX-T162 GitHub で応答が落ち、その上に無関係な書き込み�
   assert.equal(mock.commitCalls.length, 1);
 });
 
-test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、ユーザに回す", async () => {
+test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、ユーザの対応に切り替える", async () => {
   const mock = new MockGitLab(parentOnly());
   mock.branch("side", "main");
   mock.push("side", { "src/side.py": "s\n" }, "別の枝");
@@ -144,7 +144,7 @@ test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けら�
   assert.equal(mock.glCommits.length, 1);
 });
 
-test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時計が呼ぶたびに進んでも、無関係な割り込みでは打ち消さない", async () => {
+test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時計が呼ぶたびに進んでも、無関係な割り込みでは元に戻さない", async () => {
   const mock = new MockGitLab(parentOnly());
   let t = Date.parse(NOW);
   const { d, shown } = await start(mock, "gitlab.com", GITLAB_REPO, () => new Date((t += 61_000)));
@@ -154,7 +154,7 @@ test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時
   assert.equal(mock.glCommits.length, 1);
 });
 
-test("CX-T165 事後確認の途中でホストが落ちたら、書いたが確認できなかったとしてユーザに回す（失敗とは文面を分ける）", async () => {
+test("CX-T165 事後確認の途中でホストが落ちたら、書いたが確認できなかったとしてユーザの対応に切り替える（失敗とは文面を分ける）", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
@@ -253,7 +253,7 @@ test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで
   assert.match(fam?.result?.undecided ?? "", /シンボリックリンク/);
 });
 
-test("CX-T171 打ち消しはバイト列のまま戻す（BOM も落とさない）", async () => {
+test("CX-T171 元に戻すコミットはバイト列のまま戻す（BOM も落とさない）", async () => {
   const f = parentOnly();
   const original = '﻿{"at": "2026-09-01T00:00:00Z", "ticket": "i0001", "kind": "note"}\n';
   f.i0001.files[EVENTS] = original;
@@ -272,7 +272,7 @@ test("CX-T172 「要確認」の親子のチケットには、そのブラウザ
   const dom = new JSDOM("<!doctype html><body></body>");
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
   const actions = { approve: () => undefined, withdraw: () => undefined, review: () => undefined, dismiss: () => undefined };
-  const html = renderRepo(dom.window.document, md, b, actions, { attention: { i0001: "打ち消せなかった" } });
+  const html = renderRepo(dom.window.document, md, b, actions, { attention: { i0001: "元に戻せなかった" } });
   const box = html.querySelector('[data-family="i0001"]') as HTMLElement;
   assert.deepEqual([...box.querySelectorAll("button")].map((x) => (x as HTMLElement).dataset.action), ["dismiss"]);
   assert.match(box.textContent ?? "", /ほかの承認者には見えない/);
@@ -306,7 +306,7 @@ test("CX-T174 応答が落ちた後の確かめや、書いた後の確かめが
   assert.match(out2.kind === "attention" ? out2.message : "", /書いた後の中身を確認できなかった/);
 });
 
-test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何も送っていない）なら、上限の範囲で読み直して打ち消し直す", async () => {
+test("CX-T175 元に戻すコミットを送る前の確認で先頭が動いた（412。何も送っていない）なら、上限の範囲で読み直して元に戻し直す", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
@@ -316,7 +316,7 @@ test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何
   const wrapped: WriteDeps = {
     ...d,
     call: async (op, args) => {
-      if (op === "commit" && (commits += 1) === 2) mock.push("i0001", { "src/zzz.py": "z\n" }, "打ち消しの直前の無関係な push");
+      if (op === "commit" && (commits += 1) === 2) mock.push("i0001", { "src/zzz.py": "z\n" }, "元に戻す直前の無関係な push");
       try {
         return await call(op, args);
       } catch (err) {
@@ -330,13 +330,13 @@ test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何
   assert.deepEqual(statuses, [gl.HOST_MOVED]);
   assert.deepEqual(mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]), [
     ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],
-    ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
+    ["written", "ccnavi: i0001 への書き込みを元に戻す（Chrome 拡張 9.9.9）"],
   ]);
   const files = mock.files("i0001");
   assert.ok(!(DOING in files) && TODO in files && "src/zzz.py" in files);
 });
 
-test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らずユーザに回す", async () => {
+test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らずユーザの対応に切り替える", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   const read = mock.head("i0001") as string;

@@ -1,9 +1,9 @@
 /**
- * 保存の前に見せる差分の一覧（`core/flow-diff.ts` の `diffFlows`）。未保存なのに差分が空なら、並びだけが変わった
- * （`sameFlow` は並びの順を見る）と言う。読み込んだ時点から、足した・消した・変えた
+ * 保存の前に見せる差分の一覧（`core/flow-diff.ts` の `diffFlows`）。未保存なのに差分が空なら、順序だけが変わった
+ * （`sameFlow` は配列の順を見る）と言う。読み込んだ時点から、足した・消した・変えた
  * ノードと線を並べ、「保存する」で拡張ホストへ保存を頼む。「やめる」か Esc で閉じる（編集はそのまま）。
  *
- * 「次から確かめずに保存する」に印を付けて保存すると、設定 `ccnaviBoard.flowSaveReview` を外す（呼び手が送る）。
+ * 「次から確かめずに保存する」にチェックを付けて保存すると、設定 `ccnaviBoard.flowSaveReview` を外す（呼び手が送る）。
  * 見た目は `SaveReview.css`。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
@@ -50,7 +50,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
         <h2 id="save-review-title">保存する前に変更を確かめる</h2>
         <p className="dim small">読み込んだ時点からの変更です。</p>
         {isEmptyDiff(diff) && (
-          <p id="review-order-only">並び順だけが変わりました（ノードと線の中身は同じで、ファイルに書く順が変わります）。</p>
+          <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルに書く順が変わります）。</p>
         )}
         {diff.meta.length > 0 && (
           <>

@@ -13,7 +13,7 @@
 
 ルールはワークツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
 
-チケットの範囲は子 `i0001-01` のもの。
+チケットの範囲は子 `i0001-01-01` のもの。
 
     allow: src/*
     ask:   src/ask/*
@@ -139,7 +139,7 @@ class Workspace(unittest.TestCase):
     """本物の git リポジトリに、承認済みの親 1 本と子 1 本と、チケットの無いワークツリーを置く。"""
 
     # 提案と承認済みチケットの置き場。ツリーのルートからの相対で、道具にもそのまま渡す。
-    # 子クラスで綴りを変え、置き場を決め打ちしていないことを確かめる。
+    # 子クラスでパスを変え、置き場を決め打ちしていないことを確かめる。
     TICKETS = "wip/proposals"
     APPROVED = ".ccnavi/approved"
 
@@ -158,7 +158,7 @@ class Workspace(unittest.TestCase):
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "decisions.jsonl")
         self.parent_tree = self.worktree("i0001", "main")
-        self.child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        self.child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
 
     # ---- 道具
 
@@ -233,10 +233,10 @@ class Workspace(unittest.TestCase):
         )
 
     def after_shell(self, tree, rel, session):
-        """控えを取ってからシェルが rel を書いたことにし、その後の PostToolUse を返す。
+        """記録を取ってからシェルが rel を書いたことにし、その後の PostToolUse を返す。
 
-        控えはセッションごと。行ごとにセッションを変えれば、前の行が書いたファイルは
-        「前から在った変更」として控えに入り、その行が書いた 1 件だけが報告の対象になる。
+        記録はセッションごと。行ごとにセッションを変えれば、前の行が書いたファイルは
+        「前から在った変更」として記録に入り、その行が書いた 1 件だけが報告の対象になる。
         """
         baseline = self.hook("PostToolUse", "Bash", tree, session=session, command="ls")
         self.assertIn(baseline.returncode, (0, 2), baseline.stderr)
@@ -289,7 +289,7 @@ class Workspace(unittest.TestCase):
         """親と子を提案して承認し、子のワークツリーを親のブランチから切って着手する。"""
         self.propose("i0001", **(parent or {"allow": ("src/*",)}))
         self.propose(
-            "i0001-01",
+            "i0001-01-01",
             parent="i0001",
             phase=1,
             **(child or {"allow": ("src/*",), "ask": ("src/ask/*",), "deny": ("src/deny/*",)}),
@@ -298,8 +298,8 @@ class Workspace(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         self.approve()
         self.start_parent()
-        self.worktree("i0001-01", "i0001")
-        started = self.ccnavi("ticket", "start", "i0001-01")
+        self.worktree("i0001-01-01", "i0001")
+        started = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "start")
@@ -346,7 +346,7 @@ class PreToolUseTable(Workspace):
             "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
             "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
             "ask": ("ask", "TICKET_ASK", "ticket", "(ticket-scope)"),
-            # チケットの範囲の中で、ルールも何も言わない。ルールの id もチケットの印も残らない。
+            # チケットの範囲の中で、ルールも何も言わない。ルールの id もチケットの理由も残らない。
             "allow": ("allow", "", "", None),
             # 権限モードに委ねる行。payload に permission_mode を入れないので、委ねた先の
             # 答えは見ない（判定を ask にするか渡すかは権限モード次第）。見るのはコードだけ。
@@ -485,7 +485,7 @@ class PostToolUseTable(Workspace):
 
 
 class TicketPlaces(Workspace):
-    """チケットの置き場は範囲の外でも咎めない。ルールはワークツリーを allow で開ける。"""
+    """チケットの置き場は範囲の外でも報告しない。ルールはワークツリーを allow で開ける。"""
 
     def setUp(self):
         super().setUp()
@@ -495,9 +495,9 @@ class TicketPlaces(Workspace):
     def test_pre_tool_use_exempts_the_ticket_places_only(self):
         # (相対パス, 判定, code)
         cases = (
-            (f"{self.TICKETS}/todo/i0001-01.md", "allow", ""),
+            (f"{self.TICKETS}/todo/i0001-01-01.md", "allow", ""),
             (f"{self.TICKETS}/todo/i0009.md", "allow", ""),
-            # 置き場の綴りの前置に続けただけの場所は置き場ではない。前置は `/` の境で切る。
+            # 置き場のパスの前置に続けただけの場所は置き場ではない。前置は `/` の境で切る。
             (f"{self.TICKETS}X/a.md", "deny", "DENY_TICKET_SCOPE"),
             ("docs/a.md", "deny", "DENY_TICKET_SCOPE"),
         )
@@ -522,7 +522,7 @@ class TicketPlaces(Workspace):
     def test_post_tool_use_exempts_the_ticket_places_only(self):
         # (相対パス, 報告のコード。None は報告しない)
         cases = (
-            (f"{self.TICKETS}/todo/i0001-01.md", None),
+            (f"{self.TICKETS}/todo/i0001-01-01.md", None),
             (f"{self.TICKETS}/todo/i0009.md", None),
             (f"{self.TICKETS}X/b.md", "POST_TICKET_SCOPE"),
             ("docs/b.md", "POST_TICKET_SCOPE"),
@@ -539,7 +539,7 @@ class TicketPlaces(Workspace):
     def test_post_tool_use_reports_a_scope_finding_without_restoring_it(self):
         """範囲外は報告するが戻さない。戻す根拠はルールの `deny` だけ（post._restorable）。
 
-        咎めているのはルールファイルに無いルール（`(ticket-scope)`）で、
+        報告しているのはルールファイルに無いルール（`(ticket-scope)`）で、
         `CCNAVI_RESTORE_IF_DENY` が言う「`deny` と宣言した場所」ではない。
         """
         rel = "docs/b.md"
@@ -566,7 +566,7 @@ class TicketPlaces(Workspace):
 
     def test_subagent_stop_leaves_the_proposals_alone(self):
         # 自分の提案も、他のチケットの提案も。
-        for name in ("i0001-01", "i0009"):
+        for name in ("i0001-01-01", "i0009"):
             write(os.path.join(self.child, *f"{self.TICKETS}/todo/{name}.md".split("/")), "x\n")
         result = self.hook("SubagentStop", "", self.child, agent_id="sub-1")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -582,14 +582,14 @@ class TicketPlaces(Workspace):
 
 
 class TicketPlacesElsewhere(TicketPlaces):
-    """置き場の綴りを変えても、その綴りで外れる。既定の綴りを決め打ちしていないこと。"""
+    """置き場のパスを変えても、そのパスで外れる。既定のパスを決め打ちしていないこと。"""
 
     TICKETS = "work/proposals"
     APPROVED = ".ccnavi/copies"
 
 
 class ScratchPlace(Workspace):
-    """下書きの置き場（`scratchpad/`）を、実行前チェックだけが範囲の外でも咎めない。
+    """下書きの置き場（`scratchpad/`）を、実行前チェックだけが範囲の外でも報告しない。
 
     外してよい根拠は「そのツリーの git が追跡しないので統合先へ乗らない」ことの 1 つだけ。
     だから外すのは実行前の 1 か所に限り、実行後チェックとサブエージェント終了時チェックは
@@ -606,7 +606,7 @@ class ScratchPlace(Workspace):
         ("scratchpad/staging/rules.yml", True, "その下も置き場"),
         ("scratchpadX/a.md", False, "前置に続けただけの場所は置き場ではない"),
         ("docs/scratchpad/a.md", False, "ルートの直下 1 段だけ。`.gitignore` も外さない"),
-        ("SCRATCHPAD/a.md", False, "綴りは区別する。Linux の `SCRATCHPAD/` は追跡される"),
+        ("SCRATCHPAD/a.md", False, "表記は区別する。Linux の `SCRATCHPAD/` は追跡される"),
     )
 
     def setUp(self):
@@ -687,7 +687,7 @@ class Eli5Place(Workspace):
         ("wip/design/plan.md", False, "wip/ のほかの場所には広げない"),
         ("wip/tmp/eli5.html", False, "旧方式の置き場は外さない"),
         ("docs/wip/eli5/a.html", False, "ルートの直下の wip/ だけ"),
-        ("WIP/eli5/a.html", False, "綴りは区別する。依頼の検査と ready も区別する"),
+        ("WIP/eli5/a.html", False, "表記は区別する。依頼の検査と ready も区別する"),
     )
     # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える。
     # 置き場の判定は `\` を `/` に読み替えない
@@ -819,7 +819,7 @@ class Boundaries(Workspace):
             "Bash",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
@@ -843,10 +843,10 @@ class Boundaries(Workspace):
     def test_child_approval_screen_gets_no_new_note(self):
         """子の画面の「この子チケットで編集可能な範囲」には注記をつけない。注記は親の画面だけ。"""
         self.propose("i0001", allow=("src/*",))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.ccnavi("--agree", "--preview")
         self.assertEqual(result.returncode, 0, result.stderr)
-        child = section_of(result.stdout, "== i0001-01")
+        child = section_of(result.stdout, "== i0001-01-01")
         self.assertTrue(child, result.stdout)
         self.assertNotIn(APPROVAL_NOTE, child)
 

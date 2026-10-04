@@ -15,15 +15,15 @@
     <label>owner <input name="owner" required></label>
     <label>リポジトリ <input name="repo" required></label>
     <label>統合先の名前 <input name="integration" placeholder="空ならデフォルトブランチ"></label>
-    <label>直近の日数（表示用） <input name="recentDays" type="number" min="0" max="90" value="3"></label>
+    <label>直近の日数（表示用） <input name="recentDays" type="number" min="0" max="90" value="7"></label>
     <label>指定のブランチ（表示用。空白かカンマで区切る） <input name="extraBranches"></label>
     <label>プロジェクト名（手元の projects/ の下の名前。空ならワークスペース自身） <input name="project" id="repo-project"></label>
     <label>ワークスペースのリポジトリ（プロジェクトを登録するとき） <select name="workspace" id="repo-workspace"><option value="">（選ぶ）</option></select></label>
     <button type="submit">登録</button>
   </form>
   <p id="repo-msg" role="status"></p>
-  <p class="note">直近の日数と指定のブランチは、承認待ちを見つけるのに使うだけです。判定には、統合先と親のブランチ、先行をたどって行き着く親子のチケットのブランチだけを入れます。見せ方の設定で判定の答えが変わらないようにするためです。</p>
-  <p class="note">プロジェクトのリポジトリ（手元で projects/&lt;名前&gt; に clone するもの）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通層・置き場の綴り・互換のマーカーはワークスペースの統合先から読みます。GitLab の入れ子のグループは owner に group/sub と書きます。</p>
+  <p class="note">直近の日数と指定のブランチは、承認待ちを見つけるのに使うだけです。判定には、統合先と親のブランチ、先行をたどって行き着く親のブランチだけを入れます。見せ方の設定で判定の答えが変わらないようにするためです。</p>
+  <p class="note">プロジェクトのリポジトリ（手元で projects/&lt;名前&gt; に clone するもの）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通層・置き場のパス・互換のマーカーはワークスペースの統合先から読みます。GitLab の入れ子のグループは owner に group/sub と書きます。</p>
 </section>
 <section>
   <h2>PAT</h2>
