@@ -335,13 +335,9 @@ def decide_before(
     # HITL ポイント。人間レビュー要のフェーズが終わっていてマーカーが無い間、
     # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
     # ルールより先に見る。置き場を読むのは cwd がワークツリーかプロジェクトの中のときだけ
-    # （`phase.parent_for_cwd` と同じ条件）。
+    # （`phase.parent_at`）。
     if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
-        here = phase.worktree_at(root, conf, payload.cwd)
-        parent = None
-        if here is not None:
-            raw = approval.read_raw(conf, root)
-            parent = phase.parent_in(root, conf, here, raw)
+        parent, raw = phase.parent_at(root, conf, payload.cwd, raw)
         held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if held is not None and not exempt:

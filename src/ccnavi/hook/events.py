@@ -520,12 +520,7 @@ def decide_after(
         # それ以外の回は、上で読んだ置き場をそのまま使う。
         if restore_setting == selfguard.ENABLE and record.decision == audit.DENY:
             raw = None
-        here = phase.worktree_at(root, conf, payload.cwd)
-        parent = None
-        if here is not None:
-            if raw is None:
-                raw = approval.read_raw(conf, root)
-            parent = phase.parent_in(root, conf, here, raw)
+        parent, raw = phase.parent_at(root, conf, payload.cwd, raw)
         said = phase.announce(stderr, root, conf, parent, raw) if parent is not None else ""
         if said:
             text = f"{text}\n\n{said}" if text else said

@@ -790,8 +790,8 @@ def held_phase(
 def worktree_at(root: str, conf: settings.Settings, cwd: str) -> tree.Tree | None:
     """cwd が入っているワークツリーかプロジェクト。ワークスペースルートか外なら None。
 
-    `parent_for_cwd` が置き場を読む前に見る条件。呼び手はこれが None でないときだけ
-    置き場を読み（`approval.read_raw`）、`parent_in` に渡す。
+    `parent_at` が置き場を読む前に見る条件。これが None でないときだけ置き場を読み
+    （`approval.read_raw`）、`parent_in` に渡す。
     """
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
@@ -815,12 +815,26 @@ def parent_in(
     return found
 
 
-def parent_for_cwd(
+def parent_at(
     root: str, conf: settings.Settings, cwd: str, raw: approval.Raw | None = None
-) -> ticket_mod.Ticket | None:
-    """cwd が親のワークツリーの中なら、その親の承認済みチケット。`raw` は `phases_of` と同じ。"""
+) -> tuple[ticket_mod.Ticket | None, approval.Raw | None]:
+    """（cwd が親のワークツリーの中ならその親の承認済みチケット, 引くのに使った置き場）。
+
+    置き場を読むのは cwd がワークツリーかプロジェクトの中で、`raw` が None のときだけ。
+    読んだ置き場を返すので、呼び手は同じ hook の残りの処理に持ち回れる。
+    cwd がワークスペースルートか外なら、`raw` をそのまま返す。
+    """
     here = worktree_at(root, conf, cwd)
-    return parent_in(root, conf, here, raw) if here is not None else None
+    if here is None:
+        return None, raw
+    if raw is None:
+        raw = approval.read_raw(conf, root)
+    return parent_in(root, conf, here, raw), raw
+
+
+def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
+    """cwd が親のワークツリーの中なら、その親の承認済みチケット。"""
+    return parent_at(root, conf, cwd)[0]
 
 
 def hold_reason(phase: Phase, tool: str, root: str) -> str:
