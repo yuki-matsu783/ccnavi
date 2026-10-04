@@ -84,7 +84,7 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 - マージリクエストに出した場合は、マージを待たずに、`ready`でDraftを外した直後にワークツリーを片付ける。
   順番は「`ready` → `ccnavi-clean.sh` → `worktree remove`」とする。`ready`はDraftを外す前に、閉じたチケットとその記録
   （`.ccnavi/approved/`の`done/`・`phases/<親>/`・`events/`・`flows/`。マーカー`ready.json`も含む）をワークスペースの
-  `logs/archive/`へ移し、その削除をコミットしてpushする。`ready`が「削除をコミットしてpushしてから打ち直す」と言って止まったときは、
+  `logs/archive/`へ移し、その削除をコミットしてpushする。`ready`が「置き場に未コミットの変更がある」と言って止まったときは、
   その削除をコミットしてpushしてから`ready`を打ち直し、Draftが外れてから片付ける。
   親に取り込んで閉じた子のワークツリーも、このときに片付ける
 - マージリクエストに出したブランチは消さない。リモートのブランチは、マージのときにホストが消す。ローカルのブランチはsquashで取り込まれるため

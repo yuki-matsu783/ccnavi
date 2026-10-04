@@ -57,8 +57,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
    * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの控えや承認の件数の元にはしない
    */
   const sample = useMemo(
-    () => (tour.touring && board !== undefined && board.totalCount === 0 ? sampleBoard(board.root, board.generatedAt) : undefined),
-    [tour.touring, board],
+    () => (tour.touring && board !== undefined && board.totalCount === 0 && !(view.archived && board.archivedCount > 0) ? sampleBoard(board.root, board.generatedAt) : undefined),
+    [tour.touring, board, view.archived],
   );
   const shown = sample ?? board;
 
@@ -122,7 +122,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 
   // 前の読み直しから動いたカード。数えるのは拡張ホスト（`core/board-moved.ts`）で、画面は出すだけ
   const moved = new Map((data.kind === "board" ? (data.moved ?? []) : []).map((m) => [m.id, m]));
-  const movedOf = (card: Card): Moved | undefined => moved.get(card.id);
+  const movedOf = (card: Card): Moved | undefined => (card.column === "archived" ? undefined : moved.get(card.id));
 
   // 見本は絞り込みに当てない。見本のカードはどのプロジェクトにも親にも属さないので、覚えていた絞り込みが
   // 有効なままだと全部隠れ、案内が指す先を失う
@@ -223,7 +223,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               ))}
             </ul>
           ) : null}
-          {shown.totalCount === 0 ? <p className="board-empty">チケットなし</p> : null}
+          {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
+          {shown.totalCount === 0 && !(archived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
           <div className="board">
             {/* アーカイブの列は「アーカイブ済みのチケットを表示する」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
             {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
@@ -410,7 +411,7 @@ function Column({
       ) : (
         <ul className="cards">
           {column.cards.map((card) => (
-            <CardItem key={card.id} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
+            <CardItem key={`${card.project}/${card.id}`} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
           ))}
         </ul>
       )}

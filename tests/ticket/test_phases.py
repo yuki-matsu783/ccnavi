@@ -897,7 +897,7 @@ class PhaseTest(PhaseHarness):
         # 片付いて push 済み。ready が通り、マーカーと note の下書きができる。
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
-        with open(passed.stdout.strip(), encoding="utf-8") as f:
+        with open(passed.stdout.splitlines()[0], encoding="utf-8") as f:
             note = f.read()
         self.assertIn("ccnavi:ready", note)
         self.assertIn("squash", note)

@@ -1096,18 +1096,21 @@ ready)
 	ccnavi_c1_capture="$state/review-ready-$$.out"
 	ready_rc=0
 	c1_ccnavi "$branch の Draft を外す印を置いた" -- review ready --result "$result" || ready_rc=$?
-	noted=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
+	# 実行ファイルの標準出力は、1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`。
+	noted=$(sed -n '1p' "$ccnavi_c1_capture" 2>/dev/null || :)
+	ready_tree=$(sed -n 's/^tree //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
 	rm -f "$ccnavi_c1_capture"
 	ccnavi_c1_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
 	# C1 の外（取り込み済みでない親子のチケット）では、退避の削除をここでは送らない。
 	# 送る前に Draft を外すと、チケットを残したままマージされうるので、送ってから打ち直してもらう。
+	# 見るのは退避したツリー（実行ファイルが答えたもの）。古い実行ファイルが答えなければ cwd のツリー。
 	if [ "$c1_on" != yes ]; then
-		ready_tree=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || :)
+		[ -n "$ready_tree" ] || ready_tree=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || :)
 		ready_place="${ccnavi_c1_approved:-${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}}"
 		if [ -n "$ready_tree" ] &&
 			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- ":(literal)$ready_place" 2>/dev/null)" ]; then
-			fail ready-unsent "閉じたチケットを logs/archive/ へ退避した（${ready_place} の下の削除）。この削除をコミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
+			fail ready-unsent "${ready_tree} の置き場（${ready_place}）に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
 		fi
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')

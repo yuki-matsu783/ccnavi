@@ -473,3 +473,11 @@ test("CB-T302 置き場に同じ識別子があれば、退避のカードは出
   assert.equal(ids[0].column, "done");
   assert.equal(board.archivedCount, 0);
 });
+
+test("CB-T304 退避のカードの重なりはプロジェクトと識別子で見る。別のプロジェクトの同じ識別子は出す", () => {
+  const base = fixture();
+  const other = { ...archivedJson("i0001-01", "i0001"), project: "lib" };
+  const board = buildBoard({ ...base, archived: [other] });
+  const archived = board.columns.find((c) => c.state === "archived")!;
+  assert.deepEqual(archived.cards.map((card) => `${card.project}/${card.id}`), ["lib/i0001-01"]);
+});

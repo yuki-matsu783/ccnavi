@@ -35,13 +35,14 @@
 #     索引が HEAD と同じときだけで、衝突したら、この sh が始めた merge だけを取りやめて
 #     ユーザに回す。親子のチケットの控えを present で書く
 #   - P がリモートに無い: まず統合先の done/ にこの親子のチケットの親の写し（識別子と承認の時刻が同じ）が
-#     あるか、手元の退避（logs/archive/<リポジトリ>/done/<P>.md。ready が閉じた親子のチケットを移した先）に
-#     親（識別子が P で子でない）があれば閉じた親子のチケット（closed）。統合先には閉じたチケットを
+#     あれば閉じた親子のチケット（closed）。統合先には閉じたチケットを
 #     残さない（ready が退避して消し、squash でマージする）ので、ふつうは統合先の done/ には無い。
 #     無く、送った跡（控え・origin/<P>・追跡の設定）も無ければ、一度も送っていない親子のチケットで
 #     今のまま。送った跡があれば観測ずれを疑い、統合先を取り直して確かめ直す（既定 3 回、5 秒おき）。
-#     それでも無ければ ccnavi-review.sh merged に聞き、マージ済みなら閉じた親子のチケット（closed）、
-#     答えが得られなければ「確かめられなかった」で止める（控えは書き換えない）。マージされていないと
+#     それでも無ければ ccnavi-review.sh merged に聞き、マージ済みなら閉じた親子のチケット（closed）。
+#     答えが得られなければ、手元の退避（logs/archive/<リポジトリ>/done/<P>.md。ready が閉じた親子の
+#     チケットを移した先）に親（識別子が P で子でなく、ツリーに写しが残っていれば承認の時刻も同じ）が
+#     あるときだけ closed で補い、無ければ「確かめられなかった」で止める（控えは書き換えない）。マージされていないと
 #     分かったときだけ、控えがあれば gone を書いて止める（控えが無ければ gone は書かずに止める）
 #
 # 統合先の控えを書いた後、present の親子のチケットごとに実行ファイルの `ccnavi sync check <P> <リポジトリ>` で
@@ -642,7 +643,15 @@ archived_locally() {
 		sed -e 's/[[:space:]]*$//' -e "s/^[\"']//" -e "s/[\"']\$//")
 	[ "$al_id" = "$P" ] || return 1
 	grep -q '^parent:' "$al_dir/$P.md" && return 1
-	return 0
+	# 親のワークツリーに同じ識別子の承認済みの写しが残っていれば、承認の時刻が同じときだけ
+	# （同じ識別子の別の親子のチケットの退避を、今のものと読まない）。
+	al_mine=""
+	for al_file in "$tree/$approved/doing/$P.md" "$tree/$approved/done/$P.md"; do
+		[ -f "$al_file" ] || continue
+		al_mine=$(approved_at_of <"$al_file")
+		[ -z "$al_mine" ] || break
+	done
+	[ -z "$al_mine" ] || [ "$(approved_at_of <"$al_dir/$P.md")" = "$al_mine" ]
 }
 
 # P がリモートに無い。閉じたか、消えたか。
@@ -663,12 +672,6 @@ sync_absent() {
 			ccnavi_record_write "$record" remote origin branch "$P" sha "$kept_sha" \
 				fetched_at "$(date +%s)" state closed reason "統合先の done/ に親の写しがある" || :
 			printf '%s: リモートから消えたが、統合先（%s）の done/ に閉じた記録がある（閉じた親子のチケット）。親のワークツリーは片付けてよい\n' "$P" "$integ"
-			return 0
-		fi
-		if archived_locally; then
-			ccnavi_record_write "$record" remote origin branch "$P" sha "$kept_sha" \
-				fetched_at "$(date +%s)" state closed reason "手元の退避（logs/archive/）に親がある" || :
-			printf '%s: リモートから消えたが、手元の退避（logs/archive/%s/done/）に閉じた記録がある（閉じた親子のチケット）。親のワークツリーは片付けてよい\n' "$P" "$key"
 			return 0
 		fi
 		if [ "$trace" = no ]; then
@@ -697,6 +700,13 @@ sync_absent() {
 		;;
 	0:none) ;;
 	*)
+		# マージ済みかを確かめられないときだけ、手元の退避（ready が移した先）を閉じた証拠として補う。
+		if archived_locally; then
+			ccnavi_record_write "$record" remote origin branch "$P" sha "$kept_sha" \
+				fetched_at "$(date +%s)" state closed reason "手元の退避（logs/archive/）に親がある" || :
+			printf '%s: リモートから消えた。マージ済みかは確かめられなかったが、手元の退避（logs/archive/%s/done/）に閉じた記録がある（閉じた親子のチケット）。親のワークツリーは片付けてよい\n' "$P" "$key"
+			return 0
+		fi
 		printf '%s: 親のブランチがリモートに無く、統合先（%s）にも閉じた記録が無い。マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった。gh・glab か、curl とトークンが要る）。控えは変えずに止めた。確かめられる道具を用意して打ち直すか、ユーザが確かめてください\n' "$P" "$integ"
 		fail_note
 		return 0

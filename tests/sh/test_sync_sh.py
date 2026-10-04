@@ -557,9 +557,9 @@ class SyncTest(unittest.TestCase):
     def archive_locally(self, text):
         write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
 
-    def test_a_parent_in_the_local_archive_is_closed(self):
-        # 手元の退避（ready が移した先）に親があれば、ホストに聞かずに閉じた親子のチケット。
-        self.review_says("none")
+    def test_a_parent_in_the_local_archive_is_closed_when_merge_is_unknown(self):
+        # マージ済みかを確かめられないときだけ、手元の退避（ready が移した先）の親で補う。
+        self.review_says("unknown", 3)
         self.keep_record()
         self.archive_locally(copy_text())
         self.delete_remote_branch(PARENT)
@@ -569,13 +569,49 @@ class SyncTest(unittest.TestCase):
         self.assertIn("閉じた親子のチケット", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
-    def test_a_child_in_the_local_archive_is_not_the_parent(self):
+    def archive_the_parent(self):
+        """ready の後の姿。親の写しをツリーから消して push し、手元の退避に置く。"""
+        rel = f".ccnavi/approved/doing/{PARENT}.md"
+        self.archive_locally(copy_text())
+        git(self.tree, "rm", "-q", "--", rel)
+        git(self.tree, "commit", "-q", "-m", "退避")
+        git(self.tree, "push", "-q", "origin", PARENT)
+
+    def test_a_parent_tree_whose_copy_was_archived_is_still_a_parent_tree(self):
+        self.keep_record()
+        self.archive_the_parent()
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+        listed = self.sync()
+        self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+        self.assertIn(PARENT, listed.stdout)
+
+    def test_the_local_archive_does_not_override_an_unmerged_answer(self):
+        # マージされていないと分かれば、退避があっても閉じたとは読まない。
         self.review_says("none")
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
+        self.assertEqual("gone", fields(self.record)["state"])
+
+    def test_an_archive_of_another_approval_is_not_this_family(self):
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text(approved_at="2020-01-01T00:00:00+0900"))
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+
+    def test_a_child_in_the_local_archive_is_not_the_parent(self):
+        self.review_says("unknown", 3)
         self.keep_record()
         self.archive_locally(copy_text().replace("ticket: i0001\n", "ticket: i0001\nparent: x\n"))
         self.delete_remote_branch(PARENT)
         self.sync(PARENT)
-        self.assertEqual("gone", fields(self.record)["state"])
+        self.assertEqual("present", fields(self.record)["state"])
 
     def test_branch_names_are_matched_exactly(self):
         # i0001-x があっても i0001 があることにはならない（前方一致で取り違えない）。

@@ -475,6 +475,18 @@ class Families:
                 stop=f"親子のチケット {family_id} は閉じている（統合先の done/ に親の写しがある）",
                 closed=True,
             )
+        if home is None and self._archived(repo, family_id):
+            return Standing(
+                family_id,
+                repo,
+                record,
+                home,
+                stop=(
+                    f"親子のチケット {family_id} は閉じている"
+                    "（手元の退避 logs/archive/ に親がある。親のワークツリーは片付けてある）"
+                ),
+                closed=True,
+            )
         if record.broken:
             stop = f"親子のチケット {family_id} の控えが壊れている（{record.broken}）"
         elif record.state == STATE_GONE:
@@ -510,6 +522,15 @@ class Families:
             stop = ""
         return Standing(family_id, repo, record, home, stop=stop)
 
+    def _archived(self, repo: str, family_id: str) -> bool:
+        """手元の退避（`ready` が閉じたチケットを移した先）に、この親子のチケットの親があるか。
+
+        親のワークツリーが無いときだけ呼ぶ。在る間は、退避の後に Draft を外し損ねた ready の
+        打ち直しがあるので、閉じたとは読まない（取り込みが closed を書くまで）。
+        """
+        copy = archived_copy(self.root, repo, family_id)
+        return copy is not None and copy.ticket == family_id and not copy.parent
+
     def _closed_in_integration(self, repo: str, family_id: str, home: tree.Tree | None) -> bool:
         """統合先の控えの `done/` に、この親子のチケットの親の写しがあるか。
 
@@ -544,6 +565,29 @@ def _home_parent_copy(
         if text is not None:
             return _copy_fields(text)
     return None
+
+
+# 手元の退避の置き場（ワークスペースルートから）。archive.ARCHIVE_DIR と同じ綴り
+# （archive はこのモジュールを読むので、ここでは綴りで持つ）。
+ARCHIVE_PARTS = ("logs", "archive")
+
+
+def archived_copy(root: str, repo: str, ident: str) -> DoneCopy | None:
+    """退避 `logs/archive/<リポジトリ>/done/<識別子>.md` の欄。無い・読めない・リンクなら None。"""
+    if not root or not ident or not ticket_mod.is_valid_id(ident):
+        return None
+    parts = (*ARCHIVE_PARTS, repo, ticket_mod.DONE, f"{ident}.md")
+    if _linked_below(root, parts) is not False:
+        return None
+    path = os.path.join(root, *parts)
+    try:
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            return None
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+        with os.fdopen(os.open(path, flags), "rb") as f:
+            return _copy_fields(f.read().decode("utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return None
 
 
 def standing(conf: settings.Settings, root: str, family_id: str, project: str = "") -> Standing:

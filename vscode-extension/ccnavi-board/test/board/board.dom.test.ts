@@ -655,3 +655,30 @@ test("CB-D144 「アーカイブ済みのチケットを表示する」は既定
     await again.close();
   }
 });
+
+test("CB-D145 退避のチケットしか無いボードで表示を入れても、「チケットなし」も案内の見本も出さない", async () => {
+  const archived = {
+    ticket: "old",
+    parent: "",
+    phase: null,
+    title: "退避した親",
+    project: "",
+    path: "/ws/logs/archive/self/done/old.md",
+    approved_at: "",
+    started_at: "",
+    completed_at: "",
+    cancelled_at: "",
+    cancel_reason: "",
+    history: [],
+  };
+  const page = await openBoard({ ...fixture(), tickets: [], parents: [], pending_approval: [], archived: [archived] }, { state: { archived: true } });
+  try {
+    assert.equal(page.all(".board-empty").length, 0);
+    assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
+    await page.send({ type: "tour" });
+    await page.settle();
+    assert.equal(page.all(".tour-sample").length, 0);
+  } finally {
+    await page.close();
+  }
+});

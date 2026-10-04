@@ -1255,7 +1255,7 @@ def ready(
     手元の `logs/archive/` へ退避する（archive.py）。git の上では削除になり、C1 がコミットして
     push してから sh が Draft を外す。squash でマージすると、既定のブランチにチケットは残らない。
     退避した後に打ち直したとき（親が退避にだけある）は、条件の確かめのうちワークツリーの側
-    （未コミット・push 済み）だけを見て、下書きを書き直す。
+    （未コミット・push 済み）だけを見て、下書きを書き直し、前の回が途中で止まった残りを移す。
     """
     archived = _archived_parent(root, conf, cwd)
     if archived is not None:
@@ -1310,12 +1310,37 @@ def ready(
     ):
         return 1
     # 閉じた親子のチケットを手元の退避へ移す。条件は確かめてあり、今回の親は done/ にある。
-    todo = archive.plan(where, archive.closed_parents(where))
-    _, failed = archive.move(root, parent.project, where, todo)
+    return _archive_closed(stdout, stderr, root, conf, parent, where, path)
+
+
+def _archive_closed(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    where: str,
+    path: str,
+) -> int:
+    """閉じた親子のチケットを退避へ移し、下書きのパスと退避したツリーを出す。
+
+    拾う親は、`done/` に在る親と、手元の退避に在ってツリーにも何か残る親（前の回が途中で止まった
+    残り）。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`（sh が
+    そのツリーの未コミットを確かめる）。
+    """
+    home = tree.tree_of(root, where, conf.projects)
+    tree_root = home.root if home is not None else ""
+    parents = sorted(
+        set(archive.closed_parents(where)) | set(archive.archived_parents(root, parent.project))
+    )
+    todo = archive.plan(where, parents, root, parent.project)
+    _, failed = archive.move(root, parent.project, where, todo, parent.ticket, tree_root)
     if failed:
         stderr.write(f"ccnavi: 閉じたチケットを logs/archive/ へ退避できなかった: {failed}\n")
         return 1
     stdout.write(path + "\n")
+    if tree_root:
+        stdout.write(f"tree {tree_root}\n")
     return 0
 
 
@@ -1335,17 +1360,27 @@ def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> t
 
 
 def _archived_parent(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
-    """cwd のワークツリーの親が、承認済みの領域に無く、手元の退避にだけあれば、その親。
+    """cwd のワークツリーの親が、ready の退避を始めた後なら、その親。
 
-    `ready` が退避を済ませた後に打ち直したとき（Draft を外し損ねた）に通すため。
+    承認済みの領域に無く手元の退避にだけある（退避を済ませた後に Draft を外し損ねた）か、
+    `done/` に残っていても ready の印が在る（退避が途中で止まった）とき。前の回が条件を確かめて
+    いるので、打ち直しではワークツリーの側の条件だけを見て、残りを移す。
     """
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
     approved = settings.approved_dir(conf, t.root)
-    for state in (ticket_mod.DOING, ticket_mod.DONE):
-        if os.path.lexists(os.path.join(approved, state, f"{t.name}.md")):
+    if os.path.lexists(os.path.join(approved, ticket_mod.DOING, f"{t.name}.md")):
+        return None
+    if os.path.lexists(os.path.join(approved, ticket_mod.DONE, f"{t.name}.md")):
+        # 前の回の ready が退避を始めて途中で止まった（印が在る）なら、条件は確かめてある。
+        if not archive.ready_started(root, t.project, t.name, t.root):
             return None
+        copy, _ = approval.load_copy(os.path.join(approved, ticket_mod.DONE, f"{t.name}.md"))
+        if copy is None or copy.parent:
+            return None
+        copy.project = t.project
+        return copy
     return archive.archived_parent(root, t.project, t.name)
 
 
@@ -1378,8 +1413,9 @@ def _ready_again(
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
-    stdout.write(path + "\n")
-    return 0
+    # 前の回が途中で止まっていれば、残りをここで移す（移すものが無ければ何もしない）。
+    where = settings.approved_dir(conf, tree.worktree_path(root, parent.ticket))
+    return _archive_closed(stdout, stderr, root, conf, parent, where, path)
 
 
 def close_early(

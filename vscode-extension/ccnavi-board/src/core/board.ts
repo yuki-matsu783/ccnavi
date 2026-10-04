@@ -181,7 +181,9 @@ export function buildBoard(json: BoardJson): Board {
   const pending = new Set(json.pending_approval);
   const live = json.tickets.map((t) => toCard(t, parents, ids, pending));
   // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が本物）
-  const archived = (json.archived ?? []).filter((a) => !ids.has(a.ticket)).map(toArchivedCard);
+  // 鍵はプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
+  const liveKeys = new Set(json.tickets.map((t) => `${t.project}\u0000${t.ticket}`));
+  const archived = (json.archived ?? []).filter((a) => !liveKeys.has(`${a.project}\u0000${a.ticket}`)).map(toArchivedCard);
   const cards = [...live, ...archived];
   cards.sort(compareCards);
 

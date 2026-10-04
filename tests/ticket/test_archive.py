@@ -80,7 +80,9 @@ class ArchiveModuleTest(unittest.TestCase):
         self.assertEqual(archive.closed_parents(self.approved), ["i0001", "old"])
         todo = archive.plan(self.approved, archive.closed_parents(self.approved))
         self.assertEqual(todo.parents, ["i0001", "old"])
-        self.assertEqual(todo.tickets, ["i0001", "i0001-01", "old", "old-01"])
+        # 子のチケットが先、親のチケットが最後（止まったときに親が done/ に残る）
+        self.assertEqual(todo.tickets, ["i0001-01", "old-01", "i0001", "old"])
+        self.assertEqual(todo.files[-1], "done/old.md")
         self.assertIn("phases/i0001/1.reviewed.json", todo.files)
         self.assertIn("events/old.ndjson", todo.files)
         self.assertIn("flows/i0001-01.yml", todo.files)
@@ -233,8 +235,10 @@ class ReadyArchivesTest(PhaseHarness):
         fixture = self.closable()
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
-        with open(passed.stdout.strip(), encoding="utf-8") as f:
+        lines = passed.stdout.splitlines()
+        with open(lines[0], encoding="utf-8") as f:
             self.assertIn("logs/archive/", f.read())
+        self.assertEqual(lines[1], f"tree {self.parent_tree}")
         base = os.path.join(self.root, "logs", "archive", "self")
         for rel in ("done/i0001.md", "done/i0001-01.md", "done/old.md", "done/old-01.md"):
             self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
@@ -253,7 +257,7 @@ class ReadyArchivesTest(PhaseHarness):
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)
-        self.assertTrue(again.stdout.strip().endswith("review-ready-i0001.md"))
+        self.assertTrue(again.stdout.splitlines()[0].endswith("review-ready-i0001.md"))
         # ボードには退避のチケットとして載り、置き場のチケットには出ない。子のワークツリーは
         # 片付けてから見る（残っていると、そこに写った承認済みチケットが置き場の側に出る）
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
@@ -287,7 +291,7 @@ class ReadyArchivesTest(PhaseHarness):
         sorted_out = {
             rel: kind
             for kind, rel, _ in c1.classify_all(
-                self.parent_tree, places, "i0001", changed, "", base
+                self.parent_tree, places, "i0001", changed, "", (self.root, "")
             )
         }
         self.assertEqual(sorted_out[".ccnavi/approved/done/i0001.md"], c1.KIND_B)
@@ -295,14 +299,14 @@ class ReadyArchivesTest(PhaseHarness):
         self.assertEqual(sorted_out[".ccnavi/approved/phases/i0001/closed.json"], c1.KIND_B)
         self.assertEqual(sorted_out[".ccnavi/approved/events/stray.ndjson"], c1.KIND_D)
         # 退避の置き場を渡さなければ、前のとおり ccnavi の書き込みとは見分けない（止める）
-        plain = c1.classify_all(self.parent_tree, places, "i0001", changed, "", "")
+        plain = c1.classify_all(self.parent_tree, places, "i0001", changed, "", None)
         self.assertNotIn(c1.KIND_B, {kind for kind, _, _ in plain})
         # 退避の写しが違えば (b) にしない
         write(os.path.join(base, "done", "old-01.md"), "書き換えた\n")
         again = {
             rel: kind
             for kind, rel, _ in c1.classify_all(
-                self.parent_tree, places, "i0001", changed, "", base
+                self.parent_tree, places, "i0001", changed, "", (self.root, "")
             )
         }
         self.assertEqual(again[".ccnavi/approved/done/old-01.md"], c1.KIND_D)
@@ -328,3 +332,181 @@ class ReadyArchivesTest(PhaseHarness):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReviewFindingsTest(ReadyArchivesTest):
+    """レビューで挙がった指摘の再現（直す前は落ちる）。"""
+
+    def changed(self):
+        status = git(self.parent_tree, "status", "--porcelain", "--no-renames").splitlines()
+        return sorted(line[3:] for line in status)
+
+    def sorted_kinds(self, changed=None, since=""):
+        places = (".ccnavi/approved", "wip/proposals/review")
+        return {
+            rel: kind
+            for kind, rel, _ in c1.classify_all(
+                self.parent_tree,
+                places,
+                "i0001",
+                self.changed() if changed is None else changed,
+                since,
+                (self.root, ""),
+            )
+        }
+
+    def test_1_a_stale_doing_copy_in_a_child_tree_does_not_come_back(self):
+        fixture = self.closable()
+        self.assertEqual(self.ready(fixture).returncode, 0)
+        self.commit_parent("退避")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        self.assertTrue(
+            os.path.isfile(os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01.md"))
+        )
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        opened = {
+            t["ticket"] for t in board["tickets"] if t["copy"]["status"] in ("open", "review")
+        }
+        self.assertNotIn("i0001-01", opened)
+        self.assertNotIn("i0001", opened)
+
+    def test_3_a_stopped_move_is_finished_by_the_next_ready(self):
+        fixture = self.closable()
+        base = os.path.join(self.root, "logs", "archive", "self")
+        write(os.path.join(base, "done", "old-01.md"), "違う中身\n")
+        stopped = self.ready(fixture)
+        self.assertNotEqual(stopped.returncode, 0)
+        os.remove(os.path.join(base, "done", "old-01.md"))
+        again = self.ready(fixture)
+        self.assertEqual(again.returncode, 0, again.stderr)
+        for rel in ("done/i0001.md", "done/old.md", "done/old-01.md", "phases/old/closed.json"):
+            self.assertFalse(os.path.exists(os.path.join(self.approved, *rel.split("/"))), rel)
+            self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
+
+    def test_4_committed_events_are_carried_by_c1(self):
+        fixture = self.closable()
+        self.assertTrue(os.path.isfile(os.path.join(self.approved, "events", "i0001.ndjson")))
+        self.assertEqual(self.ready(fixture).returncode, 0)
+        kinds = self.sorted_kinds()
+        self.assertEqual(kinds[".ccnavi/approved/events/i0001.ndjson"], c1.KIND_B)
+        self.assertEqual(kinds[".ccnavi/approved/events/i0001-01.ndjson"], c1.KIND_B)
+        # 退避の跡の最後は「退避した」
+        entries, _ = history.read(archive.base_dir(self.root, ""), "i0001")
+        self.assertEqual(entries[-1]["kind"], history.KIND_ARCHIVED)
+        # コミットしたあとの未送信の確かめ（since）でも (b)
+        self.commit_parent("退避")
+        changed = sorted(
+            p
+            for p in git(
+                self.parent_tree, "diff", "--name-only", "--no-renames", "HEAD~1", "HEAD"
+            ).splitlines()
+            if p
+        )
+        kinds = self.sorted_kinds(changed, "HEAD~1")
+        self.assertEqual(kinds[".ccnavi/approved/events/i0001.ndjson"], c1.KIND_B)
+        self.assertEqual(kinds[".ccnavi/approved/done/i0001.md"], c1.KIND_B)
+
+    def test_5_a_removal_outside_ready_is_not_carried(self):
+        self.family(plan=["design"])
+        write(os.path.join(self.approved, "done", "old.md"), closed_text("old"))
+        write(os.path.join(self.approved, "events", "old.ndjson"), '{"a": 1}\n')
+        self.commit_parent("old")
+        # 退避に同じ中身を置き、ready を経ずに消す
+        base = archive.base_dir(self.root, "")
+        write(os.path.join(base, "done", "old.md"), closed_text("old"))
+        write(os.path.join(base, "events", "old.ndjson"), '{"a": 1}\n')
+        os.remove(os.path.join(self.approved, "done", "old.md"))
+        os.remove(os.path.join(self.approved, "events", "old.ndjson"))
+        kinds = self.sorted_kinds()
+        self.assertNotEqual(kinds[".ccnavi/approved/done/old.md"], c1.KIND_B)
+        self.assertNotEqual(kinds[".ccnavi/approved/events/old.ndjson"], c1.KIND_B)
+
+    @unittest.skipIf(os.name == "nt", "シンボリックリンクを作れないことがある")
+    def test_6_a_linked_logs_dir_is_not_trusted_by_c1(self):
+        fixture = self.closable()
+        self.assertEqual(self.ready(fixture).returncode, 0)
+        logs = os.path.join(self.root, "logs")
+        moved = os.path.join(self.root, "elsewhere")
+        os.rename(logs, moved)
+        os.symlink(moved, logs)
+        kinds = self.sorted_kinds()
+        self.assertNotIn(c1.KIND_B, set(kinds.values()))
+
+
+class ArchiveModuleReviewTest(ArchiveModuleTest):
+    """archive.py の指摘の再現。"""
+
+    def test_7_a_parent_named_like_a_child_is_not_taken(self):
+        write(os.path.join(self.approved, "done", "rel.md"), closed_text("rel"))
+        write(os.path.join(self.approved, "done", "rel-01.md"), closed_text("rel-01"))
+        todo = archive.plan(self.approved, ["rel"])
+        self.assertEqual(todo.tickets, ["rel"])
+        # 子の形でも、親（parent: を持たない）なら閉じた親として数える
+        self.assertIn("rel-01", archive.closed_parents(self.approved))
+
+    @unittest.skipIf(os.name == "nt", "シンボリックリンクを作れないことがある")
+    def test_6_links_in_done_are_not_taken(self):
+        os.symlink(
+            os.path.join(self.approved, "done", "old.md"),
+            os.path.join(self.approved, "done", "lnk.md"),
+        )
+        self.assertNotIn("lnk", archive.closed_parents(self.approved))
+        todo = archive.plan(self.approved, archive.closed_parents(self.approved))
+        self.assertNotIn("done/lnk.md", todo.files)
+
+    @unittest.skipIf(os.name == "nt", "シンボリックリンクを作れないことがある")
+    def test_6_a_linked_sub_place_in_the_archive_is_not_written(self):
+        elsewhere = tempfile.mkdtemp(prefix="ccnavi-archive-elsewhere-")
+        self.addCleanup(shutil.rmtree, elsewhere, ignore_errors=True)
+        base = archive.base_dir(self.root, "")
+        os.makedirs(base)
+        os.symlink(elsewhere, os.path.join(base, "phases"))
+        todo = archive.plan(self.approved, ["i0001"])
+        _, failed = archive.move(self.root, "", self.approved, todo)
+        self.assertIn("シンボリックリンク", failed)
+        self.assertEqual(os.listdir(elsewhere), [])
+        self.assertTrue(os.path.isfile(os.path.join(self.approved, "done", "i0001.md")))
+
+    def test_4_a_stop_does_not_note_tickets_that_were_not_moved(self):
+        todo = archive.plan(self.approved, ["i0001", "old"])
+        base = archive.base_dir(self.root, "")
+        write(os.path.join(base, "done", "old.md"), "違う\n")
+        _, failed = archive.move(self.root, "", self.approved, todo)
+        self.assertIn("違う中身", failed)
+        # old のチケットは移していないので、退避の跡にも「退避した」は無い
+        base = archive.base_dir(self.root, "")
+        with open(os.path.join(base, "events", "old.ndjson"), encoding="utf-8") as f:
+            self.assertNotIn("archived", f.read())
+        entries, _ = history.read(base, "i0001")
+        self.assertEqual(entries[-1]["kind"], history.KIND_ARCHIVED)
+        # ツリーの跡には書かない（退避の側にだけ書く）
+        for name in os.listdir(os.path.join(self.approved, "events")):
+            with open(os.path.join(self.approved, "events", name), encoding="utf-8") as f:
+                self.assertNotIn("archived", f.read(), name)
+
+
+class ArchivedStandingTest(ArchiveChecksTest):
+    """取り込みの立ち位置: 親のワークツリーが無く、手元の退避に親があれば閉じた親子のチケット。"""
+
+    def test_an_archived_family_without_its_tree_is_closed(self):
+        from ccnavi.tickets import syncstate
+
+        record = os.path.join(self.conf.state, "sync", "self", "families", "i0001")
+        write(record, "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate present\nreason \n")
+        st = syncstate.standing(self.conf, self.root, "i0001")
+        self.assertTrue(st.closed, st.stop)
+        # 退避に無い親子のチケットは前のとおり「決まらない」
+        write(record.replace("i0001", "i0002"), "state present\n")
+        other = syncstate.standing(self.conf, self.root, "i0002")
+        self.assertFalse(other.closed)
+        self.assertIn("ワークツリー", other.stop)
+
+    def test_lookups_stay_in_the_same_repository(self):
+        lib = archive.base_dir(self.root, "lib")
+        write(os.path.join(lib, "done", "i0009-01.md"), closed_text("i0009-01", "i0009"))
+        self.assertEqual(archive.find(self.root, "i0009-01", ""), [])
+        self.assertEqual([t.project for t in archive.find(self.root, "i0009-01", "lib")], ["lib"])
+        text = closed_text("i0002-01", "i0002", predecessors=["i0009-01"])
+        t, _ = ticket_mod.parse(text)
+        pool = approval.predecessor_pool_of([t], [], [], [], self.root)
+        self.assertNotIn("i0009-01", pool)

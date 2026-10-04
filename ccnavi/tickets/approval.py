@@ -284,6 +284,7 @@ def scan(
         notes = raw.closed_notes if closed else raw.open_notes
         kept = _authoritative(found, raw.everything)
         if not closed:
+            kept = archive.drop_archived(root, kept)
             mark_blocked(conf, kept)
             mark_imported(conf, root, kept)
         return kept, list(notes)
@@ -296,6 +297,9 @@ def scan(
         everything = _everything(conf, root, open_all=found)
     kept = _authoritative(found, everything)
     if not closed:
+        # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古い写しは
+        # 作業中に戻さない（archive.drop_archived）。
+        kept = archive.drop_archived(root, kept)
         # 判定が読むのは作業中の側だけ。閉じたものに印は要らない。
         mark_blocked(conf, kept)
         mark_imported(conf, root, kept)
@@ -307,11 +311,11 @@ def scan_review(
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """レビュー待ちのチケット。権威のあるツリーの側だけを残す（`scan` と同じ規則）。"""
     if raw is not None:
-        kept = _authoritative(raw.review, raw.everything)
+        kept = archive.drop_archived(root, _authoritative(raw.review, raw.everything))
         mark_imported(conf, root, kept)
         return kept, list(raw.review_notes)
     found, notes = review_all(conf, root)
-    kept = _authoritative(found, _everything(conf, root, review=found))
+    kept = archive.drop_archived(root, _authoritative(found, _everything(conf, root, review=found)))
     mark_imported(conf, root, kept)
     return kept, notes
 
@@ -947,8 +951,13 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
     """
     seen = _everything(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    # 退避は親のリポジトリ（プロジェクト）のものだけを見る。親が置き場に無ければ全部を見る。
+    projects = {t.project for t in seen + proposals if t.ticket == parent_id}
+    archived: set[str] = set()
+    for project in sorted(projects) if projects else [None]:
+        archived |= archive.ids(root, project)
     used = 0
-    for ident in [t.ticket for t in seen + proposals] + sorted(archive.ids(root)):
+    for ident in [t.ticket for t in seen + proposals] + sorted(archived):
         m = ticket_mod.child_pattern().match(ident)
         if m and m.group("parent") == parent_id:
             used = max(used, int(m.group("seq")))
@@ -1114,14 +1123,14 @@ def predecessor_pool_of(
         if t.state == ticket_mod.TODO and t.ticket not in pool:
             pool.setdefault(t.ticket, []).append(t)
     if root:
-        wanted = {
-            ident
-            for t in open_copies + review + closed + proposals
-            for ident in t.predecessors
-            if ident not in pool
-        }
+        # 引くのは、その先行を書いたチケットと同じリポジトリ（プロジェクト）の退避だけ。
+        wanted: dict[str, set[str]] = {}
+        for t in open_copies + review + closed + proposals:
+            for ident in t.predecessors:
+                if ident not in pool:
+                    wanted.setdefault(ident, set()).add(t.project)
         for ident in sorted(wanted):
-            found = archive.find(root, ident)
+            found = [h for p in sorted(wanted[ident]) for h in archive.find(root, ident, p)]
             if found:
                 pool[ident] = found
     return pool

@@ -734,9 +734,9 @@ def _script_writes(
       閉じた置き場に現れた組。片側だけなら外さない
 
     * `ready` の退避（`tickets/archive.py`）が消したもの。閉じた親の `done/` の親子のチケット・
-      `phases/<親>/`・`events/`・`flows/` の削除で、消えた中身がワークスペースの `logs/archive/` の
-      写しと同じもの（見分けは C1 と同じ `c1.archived_removal`）。`root`（ワークスペースルート）が
-      空なら外さない
+      `phases/<親>/`・`events/`・`flows/` の削除で、ready の印に載り、消えた中身がワークスペースの
+      `logs/archive/` の写しと同じもの（見分けは C1 と同じ `c1.archived_removal`）。`root`
+      （ワークスペースルート）が空なら外さない
 
     範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済みチケット、消えただけの
     チケットは外さず、今までどおり報告する。承認済みチケットの frontmatter はそのワークツリーの
@@ -809,23 +809,26 @@ def _archived_removals(
     where: tree.Tree,
     root: str,
 ) -> set[str]:
-    """`ready` の退避が消したと内容で読める削除の実パス（`c1.archived_removal`）。"""
+    """`ready` の退避が消したと読める削除の実パス（`c1.archived_removal`。ready の印に載り、
+    中身が退避の写しと同じもの）。"""
     if not root or not approved_rel:
         return set()
     approved = approved_rel.strip("/")
-    gone = {rel for change, rel in here if not os.path.lexists(change.full)}
+    gone = [(change, rel) for change, rel in here if not os.path.lexists(change.full)]
     if not gone:
         return set()
-    base = archive.base_dir(root, where.project)
+    ready = archive.ready_files(root, where.project, where.root)
+    if not ready:
+        return set()
     out: set[str] = set()
-    for change, rel in here:
-        if rel not in gone or not rel.startswith(approved + "/"):
+    for change, rel in gone:
+        if not rel.startswith(approved + "/"):
             continue
         before, readable = gitcmd.blob(top, "HEAD", change.path)
         if not readable or before is None:
             continue
-        parts = rel[len(approved) + 1 :].split("/")
-        if c1.archived_removal(parts, None, before, base, approved, gone.__contains__):
+        inside = rel[len(approved) + 1 :]
+        if c1.archived_removal(inside, None, before, ready, root, where.project):
             out.add(change.full)
     return out
 

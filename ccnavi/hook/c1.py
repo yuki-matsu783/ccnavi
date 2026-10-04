@@ -18,10 +18,9 @@
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
     `phases/<親>/<N>.pending`・`.skipped` と、その印の跡（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない。
-    もう 1 つは `ready` の退避（archive.py）が消したもの。閉じた親（手元の `logs/archive/` の
-    `done/` に子でない親として在り、同じ変更の中で `done/<親>.md` も消えている）の
-    `done/` の親子のチケット・`phases/<親>/` の下・`events/` の跡・`flows/` のフローの削除で、
-    消えた中身が退避の写しと同じものだけ
+    もう 1 つは `ready` の退避（archive.py）が消したもの。ready の印（`logs/archive/<リポジトリ>/
+    ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
+    退避の写しと同じもの（跡は「退避した」の行だけを足したもの）だけ
   - (c) ユーザが運ぶもの（ユーザの判断）。C1 は運ばずに止める。ユーザの判断が一緒に書く
     移動（review/ から done/、doing/ から done/）とマーカーの消去、跡の追記もここ
   - (d) 見分けられないもの。C1 は止める
@@ -170,9 +169,8 @@ def sort(
         stderr.write(f"ccnavi: c1 sort: {why}\n")
         return 1
     stdout.write(HEAD + "\n")
-    project = syncstate.project_of_key(st.repo)
-    archive_base = archive.base_dir(root, project)
-    for kind, rel, why in classify_all(tree_root, places, parent, changed, since, archive_base):
+    archive_at = (root, syncstate.project_of_key(st.repo))
+    for kind, rel, why in classify_all(tree_root, places, parent, changed, since, archive_at):
         stdout.write(f"{kind} {rel}\n")
         if why:
             stdout.write(f"why {rel} {' '.join(why.split())}\n")
@@ -213,15 +211,18 @@ def classify_all(
     parent: str,
     changed: list[str],
     since: str = "",
-    archive_base: str = "",
+    archive_at: tuple[str, str] | None = None,
 ) -> list[tuple[str, str, str]]:
     """変更の並びを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
     HEAD）、あれば HEAD と `since`。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。
 
-    `archive_base` はそのリポジトリの退避の置き場（`archive.base_dir`）。空なら退避の削除を
-    (b) にしない。
+    `archive_at` は `(ワークスペースルート, プロジェクト)`。渡せば、ready がこのツリーから退避した
+    削除を (b) にする（`archived_removal`）。None なら (b) にしない。
     """
     approved_rel, review_rel = places
+    ready: set[str] = set()
+    if archive_at is not None:
+        ready = archive.ready_files(archive_at[0], archive_at[1], tree_root)
     states: dict[str, tuple[bytes | None, bytes | None, bool]] = {}
     for rel in changed:
         if since:
@@ -263,7 +264,10 @@ def classify_all(
             if (
                 _hook_mark(parts, parent, now, before)
                 or _hook_events(parts, parent, now, before)
-                or archived_removal(parts, now, before, archive_base, approved_rel, removed)
+                or (
+                    archive_at is not None
+                    and archived_removal(inside, now, before, ready, *archive_at)
+                )
             ):
                 out.append((KIND_B, rel, ""))
             elif not since and _judge_record(parts):
@@ -366,58 +370,23 @@ def _hook_events(parts: list[str], parent: str, now: bytes | None, before: bytes
 
 
 def archived_removal(
-    parts: list[str],
+    rel: str,
     now: bytes | None,
     before: bytes | None,
-    archive_base: str,
-    approved_rel: str,
-    removed,
+    ready: set[str],
+    root: str,
+    project: str,
 ) -> bool:
-    """`ready` の退避が消したものか（archive.py）。
+    """`ready` の退避が消したものか（archive.py）。`rel` は承認済みの領域からの相対。
 
-    消えたのが閉じた親子のチケットの `done/`・`phases/<親>/`・`events/`・`flows/` のファイルで、
-    その親が退避の `done/` に子でない親として在り、同じ変更の中で `done/<親>.md` も消えていて、
-    消えた中身が退避の写しと同じときだけ。
+    ready の印（`archive.ready_files`。そのツリーから ready が移したファイルの一覧）に載っていて、
+    消えた中身が手元の退避の写しと同じ（跡は「退避した」の行だけを足したもの）ときだけ。
+    印は `logs/archive/` に置かれ、記録の守りがエージェントの書き込みを止める。退避の置き場の
+    途中（`logs` を含む）にリンクがあれば写しを読まない。
     """
-    if not archive_base or now is not None or before is None or len(parts) < 2:
+    if now is not None or before is None or rel not in ready:
         return False
-    if parts[0] == ticket_mod.DONE and len(parts) == 2 and parts[1].endswith(".md"):
-        family = family_of(parts[1][: -len(".md")])
-    elif parts[0] == approval.PHASES_DIR and len(parts) >= 3:
-        family = parts[1]
-    elif parts[0] == history.EVENTS_DIR and len(parts) == 2 and parts[1].endswith(history.SUFFIX):
-        family = family_of(parts[1][: -len(history.SUFFIX)])
-    elif parts[0] == archive.FLOWS_DIR and len(parts) == 2:
-        stem, ext = os.path.splitext(parts[1])
-        if ext not in archive.FLOW_SUFFIXES:
-            return False
-        family = family_of(stem)
-    else:
-        return False
-    if family_of(family) != family or not removed(f"{approved_rel}/{ticket_mod.DONE}/{family}.md"):
-        return False
-    closed = _archive_file(archive_base, [ticket_mod.DONE, f"{family}.md"])
-    if closed is None:
-        return False
-    try:
-        copy, _ = ticket_mod.parse(closed.decode("utf-8"))
-    except UnicodeDecodeError:
-        return False
-    if copy is None or copy.ticket != family or copy.parent:
-        return False
-    return archive.same_bytes(_archive_file(archive_base, parts), before)
-
-
-def _archive_file(archive_base: str, parts: list[str]) -> bytes | None:
-    """退避の置き場の中のファイル。途中のリンクは辿らない。"""
-    path = archive_base
-    for part in parts:
-        if part in ("", ".", ".."):
-            return None
-        path = os.path.join(path, part)
-        if os.path.islink(path):
-            return None
-    return _read(path)[0]
+    return archive.holds(rel, archive.archived_bytes(root, project, rel), before)
 
 
 def _judge_record(parts: list[str]) -> bool:

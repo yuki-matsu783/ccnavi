@@ -119,3 +119,32 @@ test("CB-T192d カードが消えただけの読み直しも「変わった」�
   const back = movedStep(gone, board);
   assert.deepEqual(back.moved, [{ id: "i0001-03", to: "todo" }]);
 });
+
+test("CB-T305 完了からアーカイブへ移ったカードは「動いた」に数えない", () => {
+  const base = fixture();
+  const done = base.tickets.find((t) => t.ticket === "i0001-01")!;
+  const before = placementOf(buildBoard(base));
+  const after = placementOf(
+    buildBoard({
+      ...base,
+      tickets: base.tickets.filter((t) => t.ticket !== "i0001-01"),
+      archived: [
+        {
+          ticket: done.ticket,
+          parent: done.parent,
+          phase: done.phase,
+          title: done.title,
+          project: done.project,
+          path: "/ws/logs/archive/self/done/i0001-01.md",
+          approved_at: "",
+          started_at: "",
+          completed_at: "",
+          cancelled_at: "",
+          cancel_reason: "",
+          history: [],
+        },
+      ],
+    }),
+  );
+  assert.deepEqual(movedCards(before, after), []);
+});

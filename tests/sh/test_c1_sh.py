@@ -1542,3 +1542,54 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
+class C1HostNotImportedTest(C1HostTest):
+    """取り込み済みでない親子のチケットの ready。退避の削除は送らずに止め、Draft を外さない。"""
+
+    imported = False
+
+    def mover(self, tree_line):
+        return executable(
+            os.path.join(self._tmp.name, "bin", "mover"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            '*" review ready "*)\n'
+            '  root=""; prev=""\n'
+            '  for a in "$@"; do [ "$prev" = --root ] && root="$a"; prev="$a"; done\n'
+            '  mkdir -p "$root/logs/state"; : >"$root/logs/state/note.md"\n'
+            "  printf '%s\\n' \"$root/logs/state/note.md\"\n"
+            f"  {tree_line}\n"
+            "  exit 0 ;;\n"
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+
+    def test_ready_stops_when_the_archived_tree_has_uncommitted_changes(self):
+        # 退避したツリー（実行ファイルが答える）に未コミットの削除がある。cwd が綺麗でも止める。
+        other = os.path.join(self._tmp.name, "other")
+        git(self._tmp.name, "init", "-q", "-b", "main", other)
+        for key, value in CONFIG:
+            git(other, "config", key, value)
+        write(os.path.join(other, APPROVED, "done", "old.md"), "x\n")
+        git(other, "add", "-A")
+        git(other, "commit", "-q", "-m", "old")
+        os.remove(os.path.join(other, APPROVED, "done", "old.md"))
+        ready = self.review("ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{other}'"))
+        self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("未コミットの変更がある", ready.stderr)
+        self.assertNotIn("Draft を外した", ready.stdout)
+
+    def test_ready_goes_on_when_the_archived_tree_is_clean(self):
+        ready = self.review(
+            "ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{self.tree}'")
+        )
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("Draft を外した", ready.stdout)
+
+
+# ホストの道具立てだけを借りる。C1HostTest の試験（C1 の中が前提）はここでは回さない。
+for _name in [n for n in dir(C1HostTest) if n.startswith("test_")]:
+    if _name not in C1HostNotImportedTest.__dict__:
+        setattr(C1HostNotImportedTest, _name, None)

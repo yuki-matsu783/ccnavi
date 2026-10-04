@@ -725,8 +725,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         "tickets": [],
         "parents": [],
         # 手元の退避（`logs/archive/`）にある閉じたチケット。表示のためだけに載せ、判定（scan・
-        # 承認待ち・先行の池）には混ぜない。置き場に同じ識別子がまだ在るもの（退避の後の push が
-        # 戻されたなど）は `tickets` の側に出すので、ここには出さない。
+        # 承認待ち・先行の池）には混ぜない。置き場に同じプロジェクトの同じ識別子がまだ在るもの
+        # （退避の後の push が戻されたなど）は `tickets` の側に出すので、ここには出さない。
         "archived": [],
     }
     if not conf.tickets_enabled:
@@ -806,16 +806,16 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
             continue
         payload["parents"].append(_parent_record(conf, root, parent, closed_index))
     payload["archived"] = _archived_records(
-        root, {t["ticket"] for t in payload["tickets"]}, problems
+        root, {(t["project"], t["ticket"]) for t in payload["tickets"]}, problems
     )
     return payload
 
 
-def _archived_records(root: str, skip: set[str], problems: list[str]) -> list[dict]:
-    """手元の退避にある閉じたチケット（表示用）。`skip` の識別子は出さない。"""
+def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]) -> list[dict]:
+    """手元の退避にある閉じたチケット（表示用）。`skip` の（プロジェクト, 識別子）は出さない。"""
     out = []
     for t in archive.closed_tickets(root):
-        if t.ticket in skip:
+        if (t.project, t.ticket) in skip:
             continue
         entries, unreadable = history.read(archive.base_dir(root, t.project), t.ticket)
         if unreadable:
