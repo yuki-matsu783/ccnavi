@@ -565,6 +565,9 @@ def _copy_problems(
         unrecorded = _record_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
+        if t.workflow_record_differs:
+            warned = f"{t.ticket}: {OLD_WORKFLOW_DIFFERS}"
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", warned))
         unrecorded = _start_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
@@ -586,6 +589,14 @@ def _copy_problems(
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
     return problems
+
+
+OLD_WORKFLOW_DIFFERS = (
+    "古い形（承認の記録 ccnavi_approved を持つ）の workflow: 欄の待ち方が、今の phases.yml から"
+    "計算した待ち方と違うので、欄を使わず全体計画を一直線（前の番号を全部待つ）で読んでいる。"
+    "欄は手で書けるので、計算と合わない待ち方は効かせない。並行にしたければ、改版でユーザに"
+    " --agree を通してもらう"
+)
 
 
 def _record_unrecorded(conf: settings.Settings, t) -> str:

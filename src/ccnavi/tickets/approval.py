@@ -64,7 +64,7 @@ import yaml
 
 from ..infra import fsio, gitcmd, settings, tree, yamlread
 from ..policy import rules
-from . import archive, flow, history, syncstate, workflow
+from . import archive, flow, history, phasetypes, syncstate, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -207,6 +207,8 @@ def load_copy(
         ticket.approved_at = str(meta.get("approved_at") or "")
         ticket.source_tree = str(meta.get("source_tree") or "")
         ticket.source_path = str(meta.get("source_path") or "")
+        # 欄の待ち方を採るかは、今の phases.yml と見比べてから決める（`settle_old_workflows`）。
+        ticket.workflow_from_record = ticket.workflow is not None
     else:
         # 新しい形では待ち方は欄に無い。手で書いた `workflow:` を承認済みの待ち方として効かせない。
         ticket.workflow = None
@@ -215,8 +217,10 @@ def load_copy(
         if why:
             ticket.workflow = None
             ticket.workflow_unreadable = why
+            ticket.workflow_from_record = False
         elif held is not None:
             ticket.workflow = held
+            ticket.workflow_from_record = False
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案をコピーしたか）とは違うもので、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
@@ -323,7 +327,33 @@ def scan_all(
             c.tree, c.tree_root, c.project = t.name, t.root, t.project
         found.extend(got)
         notes.extend(complaints)
+    settle_old_workflows(conf, root, found)
     return found, notes
+
+
+def settle_old_workflows(
+    conf: settings.Settings, root: str, found: list[ticket_mod.Ticket]
+) -> None:
+    """古い形の `workflow:` 欄の待ち方を、今の phases.yml から計算した待ち方と同じときだけ採る。
+
+    古い形とみなすのは記録 `ccnavi_approved` の欄が揃ったものだが、記録は手で書ける。欄の待ち方を
+    そのまま採ると、手で書いた記録と `workflow:` で、ユーザが承認していない待ち方（並行に進める
+    など）を効かせられる。そこで、今の種類から `workflow.compute` で計算した待ち方と同じときだけ
+    欄を採り、違えば欄を使わず一直線（前の番号を全部待つ。いちばん厳しい形）で読む。
+    `Ticket.workflow_record_differs` を立て、`--lint` と status が warn で言う。
+
+    承認のあとに phases.yml を直した本物の古い承認も一直線に倒れる。止まる側で、並行に戻すには
+    改版で `--agree` を通す（待ち方のファイルが書かれ、欄より先に読まれる）。
+    """
+    cache: dict[str, dict | None] = {}
+    for t in found:
+        if not t.workflow_from_record or t.workflow is None:
+            continue
+        if t.project not in cache:
+            cache[t.project] = phasetypes.load_types(conf, root, t.project)
+        if t.workflow.as_raw() != workflow.compute(t, cache[t.project]).as_raw():
+            t.workflow = None
+            t.workflow_record_differs = True
 
 
 def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
@@ -345,6 +375,7 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tick
             c.project = t.project
         found.extend(got)
         notes.extend(complaints)
+    settle_old_workflows(conf, root, found)
     return found, notes
 
 

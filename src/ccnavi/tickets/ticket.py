@@ -772,6 +772,11 @@ class Ticket:
     # 待ち方のファイル（`phases/<親>/workflow.yml`）が在るのに読めない理由。空なら読めたか無い。
     # 判定は読めない待ち方を一直線と読まずに止める（`approval.blocking_problems`）。
     workflow_unreadable: str = ""
+    # 待ち方を古い形の `workflow:` 欄から採ったか（`approval.load_copy`）。採るのは今の phases.yml
+    # から計算した待ち方と同じときだけで、違えば欄を捨てて一直線で読み、
+    # `workflow_record_differs` を立てる（`approval.settle_old_workflows`）。
+    workflow_from_record: bool = False
+    workflow_record_differs: bool = False
     # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
     # 同じ識別子のときの理由（`archive.drop_archived`）。
     # 判定は止める（`approval.content_problems`）。

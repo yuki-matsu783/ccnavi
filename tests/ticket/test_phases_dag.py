@@ -16,6 +16,7 @@ import json
 import os
 import unittest
 
+from ccnavi.infra import settings
 from ccnavi.tickets import approval, phasetypes, workflow
 from ccnavi.tickets import ticket as ticket_mod
 from tests import common_path
@@ -248,6 +249,12 @@ class DagApprovalTest(PhaseHarness):
         self.assertIsNotNone(t, why)
         return t
 
+    def scanned(self, name="i0001"):
+        """判定が読むのと同じ走査（`approval.scan`）で読んだ承認済みチケット。"""
+        conf, _ = settings.load(self.root)
+        kept, _ = approval.scan(conf, self.root)
+        return next(t for t in kept if t.ticket == name)
+
     def close_first_phase(self):
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/a/*"], review=False)
@@ -392,8 +399,8 @@ class DagApprovalTest(PhaseHarness):
 
     def test_an_old_copy_with_the_record_still_reads_its_workflow_field(self):
         """前の版の承認（記録 `ccnavi_approved` と `workflow:` を書き足した形）は、
-        欄の待ち方で読む。"""
-        self.use(SEQUENTIAL)
+        欄の待ち方が今の phases.yml から計算した待ち方と同じなら、欄の待ち方で読む。"""
+        self.use(DAG)
         self.family(plan=PLAN)
         self._rewrite_copy(
             "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', source_tree: main, "
@@ -404,6 +411,34 @@ class DagApprovalTest(PhaseHarness):
         self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
         self.assertEqual(held.approved_at, "2026-01-01T00:00:00+09:00")
         self.assertEqual([], approval.content_problems(held))
+        self.commit_parent("old form")
+        held = self.scanned()
+        self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertFalse(held.workflow_record_differs)
+
+    def test_a_forged_old_workflow_that_differs_from_the_computed_one_is_read_as_sequential(self):
+        """記録を揃えて書いた古い形でも、欄の待ち方が今の phases.yml から計算した待ち方と
+        違えば欄を使わず一直線で読み、`--lint` と status が warn で言う。"""
+        self.use(SEQUENTIAL)
+        self.family(plan=PLAN)
+        self._rewrite_copy(
+            "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', source_tree: main, "
+            "source_path: wip/proposals/todo/i0001.md}\n"
+            "workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}, review_at: {}}\n"
+        )
+        self.commit_parent("forge")
+        held = self.scanned()
+        self.assertTrue(approval.has_record(held))
+        self.assertIsNone(held.workflow)
+        self.assertTrue(held.workflow_record_differs)
+        self.assertEqual(
+            workflow.effective(held, None).as_raw(), workflow.compute(held, None).as_raw()
+        )
+        self.assertEqual(workflow.waits_of(held, 4, None), [1, 2, 3])
+        linted = self.ccnavi("--lint")
+        self.assertIn("今の phases.yml から計算した待ち方と違う", linted.stdout + linted.stderr)
+        status = self.ccnavi("ticket", "status", "i0001")
+        self.assertIn("今の phases.yml から計算した待ち方と違う", status.stdout)
 
     def test_a_workflow_field_in_a_new_copy_is_not_read_and_blocks(self):
         """記録を持たない承認済みチケットの `workflow:` 欄は、承認済みの待ち方として
