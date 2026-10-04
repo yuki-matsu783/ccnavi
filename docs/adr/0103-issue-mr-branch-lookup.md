@@ -73,7 +73,7 @@ origin を見る。
 
 ### 2.3 sh と実行ファイルの間の JSON
 
-sh が書いて `--result` で渡す（ccnavi.md の 9.13）。
+sh が書いて `--result` で渡す（設計 9.13）。
 
 ```json
 {"checked": true, "host": "github.com", "repo": "acme/widgets",
