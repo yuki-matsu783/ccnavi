@@ -42,23 +42,12 @@ import io
 import json
 import os
 import re
-import shutil
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, archive, configsync, history, ops, phase, phasetypes, syncstate
+from . import approval, archive, configsync, history, ops, phase, phasetypes, review_host, syncstate
 from . import ticket as ticket_mod
-
-# 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
-MARKER_REQUEST = "<!-- ccnavi:request "
-MARKER_COMMENT = "<!-- ccnavi:comment -->"
-MARKER_DECIDE = "<!-- ccnavi:decide -->"
-MARKER_PREFIX = "<!-- ccnavi:"
-
-GITHUB_TOKEN = "GITHUB_TOKEN"
-GITLAB_TOKEN = "GITLAB_TOKEN"
 
 TIMEOUT_SECONDS = 15.0
 
@@ -74,137 +63,6 @@ READY_FILE = "review-ready-{parent}.md"
 # ユーザが早めに閉じたときの、残りを書き出す issue の下書きと、マージリクエストへ残すコメント。
 CLOSE_EARLY_ISSUE_FILE = "review-close-early-issue-{parent}.md"
 CLOSE_EARLY_NOTE_FILE = "review-close-early-note-{parent}.md"
-MARKER_READY = "<!-- ccnavi:ready -->"
-MARKER_CLOSE_EARLY = "<!-- ccnavi:close-early -->"
-
-
-@dataclass
-class Thread:
-    id: str = ""
-    resolved: bool = False
-    url: str = ""
-    path: str = ""
-    line: int = 0
-    body: str = ""
-    created_at: str = ""
-    # 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持つ
-    # （ccnavi の投稿を見分けるため）
-    author: str = ""
-
-
-@dataclass
-class Review:
-    state: str = ""
-    url: str = ""
-    submitted_at: str = ""
-    # author はレビュアーの識別。同じユーザの最新のレビューだけを数えるために要る。
-    # GitHub は過去の全レビューを返すので、後で approve しても古い変更要求が残る。
-    author: str = ""
-
-
-# 変更要求の状態。GitHub の CHANGES_REQUESTED と、GitLab の requested_changes をこの値にまとめる。
-CHANGES_REQUESTED = "CHANGES_REQUESTED"
-DISMISSED = "DISMISSED"
-APPROVED = "APPROVED"
-# ユーザごとの最新を選ぶ対象。コメントだけのレビュー（COMMENTED）と、書きかけ（PENDING）は判断を
-# 変えないので飛ばす。飛ばさないと、変更要求の後に同じユーザがコメントだけのレビューを出すと
-# 変更要求が消える。
-# 変更要求は同じユーザの Approve か dismiss まで残る
-_DECIDING = (APPROVED, CHANGES_REQUESTED, DISMISSED)
-
-
-def effective(reviews: list[Review]) -> list[Review]:
-    """レビュアーごとに、判断を示した最新の 1 件。取り下げられたものは無い扱い。
-
-    判断を示したレビューは Approve・変更要求・取り下げ（dismiss）だけ。コメントだけのレビューや
-    書きかけは数えない（前は数えたので、変更要求の後に同じユーザがコメントするだけで変更要求が消えた）。
-    """
-    latest: dict[str, Review] = {}
-    for r in reviews:
-        if r.state.upper() not in _DECIDING:
-            continue
-        key = r.author or r.url or id(r)
-        current = latest.get(key)
-        if current is None or _epoch(r.submitted_at) >= _epoch(current.submitted_at):
-            latest[key] = r
-    return [r for r in latest.values() if r.state.upper() != DISMISSED]
-
-
-@dataclass
-class MergeRequest:
-    number: int = 0
-    url: str = ""
-
-
-@dataclass
-class Result:
-    """sh がリモートから取得した結果。`--result <json>` で渡る。
-
-    形は 1 つ。`host` と `mr{number,url}` は常に要る。`confirm` と `--reviewed` は
-    `threads[]` と `reviews[]`、`requested` は投稿の `url` と `created_at` を見る。
-    """
-
-    host: str = ""
-    mr: MergeRequest | None = None
-    threads: list[Thread] = field(default_factory=list)
-    reviews: list[Review] = field(default_factory=list)
-    url: str = ""
-    created_at: str = ""
-    # 投稿したアカウント（`requested` の結果だけ。ccnavi の投稿を見分けるため依頼の記録に残す）
-    author: str = ""
-    error: str = ""
-
-    @classmethod
-    def load(cls, path: str) -> Result:
-        data, failed = fsio.read_json(path)
-        if isinstance(failed, OSError):
-            return cls(error=f"結果を読めない ({failed})")
-        if failed is not None:
-            return cls(error=f"結果が JSON として読めない ({failed})")
-        return cls.from_data(data)
-
-    @classmethod
-    def from_data(cls, data: object) -> Result:
-        """読んだ JSON の値から組む。Chrome は sh と同じ形の結果を組んで渡す。"""
-        if not isinstance(data, dict):
-            return cls(error="結果の最上位が辞書ではない")
-        if data.get("error"):
-            return cls(error=str(data["error"]))
-        mr = data.get("mr")
-        found = None
-        if isinstance(mr, dict) and mr.get("number"):
-            found = MergeRequest(int(mr.get("number") or 0), str(mr.get("url") or ""))
-        return cls(
-            host=str(data.get("host") or ""),
-            mr=found,
-            threads=[
-                Thread(
-                    id=str(t.get("id") or ""),
-                    resolved=bool(t.get("resolved")),
-                    url=str(t.get("url") or ""),
-                    path=str(t.get("path") or ""),
-                    line=int(t.get("line") or 0),
-                    body=str(t.get("body") or ""),
-                    created_at=str(t.get("created_at") or ""),
-                    author=str(t.get("author") or ""),
-                )
-                for t in data.get("threads") or []
-                if isinstance(t, dict)
-            ],
-            reviews=[
-                Review(
-                    str(r.get("state") or ""),
-                    str(r.get("url") or ""),
-                    str(r.get("submitted_at") or ""),
-                    str(r.get("author") or ""),
-                )
-                for r in data.get("reviews") or []
-                if isinstance(r, dict)
-            ],
-            url=str(data.get("url") or ""),
-            created_at=str(data.get("created_at") or ""),
-            author=str(data.get("author") or ""),
-        )
 
 
 def prepare(
@@ -261,7 +119,7 @@ def prepare(
     key = hashlib.sha256(
         (body + "\n" + (head.out.strip() if head.ok else "")).encode("utf-8")
     ).hexdigest()[:16]
-    marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
+    marker = f"{review_host.MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
     draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
     failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(
@@ -426,7 +284,7 @@ def reviewed_mark(
     return mark
 
 
-def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
+def matching_problems(result: review_host.Result | None, requested_mark: dict) -> list[str]:
     """依頼したのと同じマージリクエストを取得した結果か。違えばその説明（標準エラーの行）。"""
     if result is None or result.mr is None:
         return ["ccnavi: 結果にマージリクエストが無い"]
@@ -447,17 +305,25 @@ def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
 
 
 def review_problems(
-    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, phase_no: int, result: Result
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    phase_no: int,
+    result: review_host.Result,
 ) -> list[str]:
     """レビュー済みにできない理由（変更要求のレビュー、未解決のスレッド）。標準エラーの行。"""
-    changes = [r for r in effective(result.reviews) if r.state.upper() == CHANGES_REQUESTED]
+    changes = [
+        r
+        for r in review_host.effective(result.reviews)
+        if r.state.upper() == review_host.CHANGES_REQUESTED
+    ]
     if changes:
         return [
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
             "レビュアーの approve / dismiss を待ってください",
             *[f"  - {r.url}" for r in changes],
         ]
-    unresolved = _unresolved(
+    unresolved = review_host._unresolved(
         result.threads,
         approval.accepted_threads(
             approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
@@ -615,13 +481,13 @@ class Decision:
 
     parent: ticket_mod.Ticket
     ph: phase.Phase
-    result: Result
-    unresolved: list[Thread]
+    result: review_host.Result
+    unresolved: list[review_host.Thread]
     # issue に回せるか。回せるのはフィードバック計画が承認されたあと（設計 9.11）。
     can_issue: bool
 
 
-def thread_key(t: Thread) -> str:
+def thread_key(t: review_host.Thread) -> str:
     """選択をスレッドに対応づける鍵。受け入れの記録と同じく、URL を先に使う。"""
     return t.url or t.id
 
@@ -671,13 +537,16 @@ def _decision(
     result = _matching(stderr, result_path, requested_mark)
     if result is None:
         return None
-    if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
+    if any(
+        r.state.upper() == review_host.CHANGES_REQUESTED
+        for r in review_host.effective(result.reviews)
+    ):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
             "レビュアーの approve / dismiss を待ってください\n"
         )
         return None
-    unresolved = _unresolved(
+    unresolved = review_host._unresolved(
         result.threads,
         approval.accepted_threads(
             approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
@@ -1027,12 +896,12 @@ def apply_decision(
     }
 
 
-def _thread_line(t: Thread) -> str:
+def _thread_line(t: review_host.Thread) -> str:
     return f"{t.url} {t.path}:{t.line} {_first_line(t.body)}"
 
 
 def _write_decide_issue(
-    stderr: TextIO, conf: settings.Settings, d: Decision, threads: list[Thread]
+    stderr: TextIO, conf: settings.Settings, d: Decision, threads: list[review_host.Thread]
 ) -> str:
     """issue に回す指摘の下書き。1 行目が題、空行のあとが本文。書けなければ空。"""
     assert d.result.mr is not None
@@ -1060,11 +929,14 @@ def _write_decide_comment(
     stderr: TextIO,
     conf: settings.Settings,
     d: Decision,
-    picked: dict[str, list[Thread]],
+    picked: dict[str, list[review_host.Thread]],
     followup: str,
 ) -> None:
     """MR に書き込む、決めた内容のコメント。issue の表記は sh が作ったあとに書き足す。"""
-    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）指摘の対応方針:"]
+    lines = [
+        review_host.MARKER_DECIDE,
+        f"フェーズ {d.ph.number} の未解決（Unresolved）指摘の対応方針:",
+    ]
     if picked[CHOICE_KEEP]:
         lines += [
             "",
@@ -1081,7 +953,7 @@ def _write_decide_comment(
         lines += ["", "issue に回す:", *[f"- {thread_key(t)}" for t in picked[CHOICE_ISSUE]]]
     if not any(picked.values()):
         lines = [
-            MARKER_DECIDE,
+            review_host.MARKER_DECIDE,
             f"フェーズ {d.ph.number} で未解決（Unresolved）の指摘なし。レビュー済みにした。",
         ]
     path = os.path.join(conf.state, DECIDE_FILE.format(parent=d.parent.ticket, phase=d.ph.number))
@@ -1090,7 +962,9 @@ def _write_decide_comment(
         stderr.write(f"ccnavi: 記録を書き出せない ({failed})\n")
 
 
-def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], followup: str) -> str:
+def _decided_prompt(
+    root: str, d: Decision, picked: dict[str, list[review_host.Thread]], followup: str
+) -> str:
     """決めたことを Claude Code に渡す文。ボードがコピーか新しいセッションで渡す。"""
     if not any(picked.values()):
         # 選ぶものが無かった。0 件の内訳は並べず、レビュー済みになったことだけ言う
@@ -1381,7 +1255,7 @@ def _archive_place_problem(
 
 def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> tuple[str, str]:
     """Draft を外したときのコメントの下書きを書く。パスと、書けなかった理由（無ければ空）。"""
-    text = [MARKER_READY, f"チケット `{parent}` の作業は終わり、Draft を外した。"]
+    text = [review_host.MARKER_READY, f"チケット `{parent}` の作業は終わり、Draft を外した。"]
     text.append(
         f"`{ticket_mod.WIP_ROOT}/` は片付けてある。閉じたチケットとその記録"
         f"（`{conf.approved}/` の done/・phases/・events/・flows/）は手元の `logs/archive/` へ"
@@ -1511,7 +1385,10 @@ def close_early(
     if result is None:
         return 1
     assert result.mr is not None
-    if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
+    if any(
+        r.state.upper() == review_host.CHANGES_REQUESTED
+        for r in review_host.effective(result.reviews)
+    ):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。端末からも通せない。"
             "レビュアーの approve / dismiss を待ってください\n"
@@ -1610,7 +1487,7 @@ class Leftovers:
     # フィードバック計画がまだ無い。対応なしの扱いにする。
     unplanned: bool
     # 未解決のスレッド。受け入れる。
-    unresolved: list[Thread]
+    unresolved: list[review_host.Thread]
 
     @property
     def nothing(self) -> bool:
@@ -1620,7 +1497,10 @@ class Leftovers:
 
 
 def _leftovers(
-    approved_dir: str, parent: ticket_mod.Ticket, phases: list[phase.Phase], result: Result
+    approved_dir: str,
+    parent: ticket_mod.Ticket,
+    phases: list[phase.Phase],
+    result: review_host.Result,
 ) -> Leftovers:
     not_ended = [ph for ph in phases if not ph.ended]
 
@@ -1636,7 +1516,7 @@ def _leftovers(
         ],
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
-        unresolved=_unresolved(
+        unresolved=review_host._unresolved(
             result.threads, approval.accepted_threads(approved_dir, parent.ticket)
         ),
     )
@@ -1719,7 +1599,7 @@ def _settle(
 def _close_early_drafts(
     conf: settings.Settings,
     parent: ticket_mod.Ticket,
-    result: Result,
+    result: review_host.Result,
     reason: str,
     stamp: str,
     left: Leftovers,
@@ -1754,7 +1634,7 @@ def _close_early_drafts(
     if failed:
         return failed
     note = [
-        MARKER_CLOSE_EARLY,
+        review_host.MARKER_CLOSE_EARLY,
         f"ユーザが早めに閉じた（{stamp}）: {reason.strip()}",
         f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
         f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
@@ -1985,55 +1865,6 @@ def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
     return parent.review_at(last) == phase_no
 
 
-# ---- リモートに要る道具の有無。exe は使わないが、--lint が言う。
-
-# ホストにはポートが付く（`localhost:8929`）。ポートを捨てると、手元や社内に立てた
-# GitLab を GitHub と見分ける判定まで誤る。ssh の `git@host:group/proj` の
-# `:` はパスの区切りなので、数字だけのときにポートと見なす。
-# `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh と同じく、authority の
-# 最後の `@` までをユーザ情報と見る（git がそう切る。トークンに `@` が入る形がある）。
-# IPv6 は `[::1]` の形。sh が読めない表記（`ssh://user@host/`、大文字の scheme）は
-# ここでも読めない扱いにして、--lint と sh の言うことを揃える。
-_REMOTE = re.compile(
-    r"^(?:https?://|ssh://git@|git@)(?:[^/]*@)?"
-    r"(?P<host>\[[^\]/]+\]|[^/:@]+)(?::\d+)?[/:]+(?P<path>.+?)(?:\.git)?/?$"
-)
-
-
-def remote_kind(url: str) -> str:
-    """origin の URL から、GitHub か GitLab か。読めない表記なら空。"""
-    m = _REMOTE.match(url)
-    if m is None:
-        return ""
-    host = m.group("host")
-    return "github" if host == "github.com" else "gitlab"
-
-
-def transport_problem(url: str) -> str:
-    """sh がリモートを読み書きできる形になっているか。なっていなければ、その説明。
-
-    sh と同じ順で探す。`gh` / `glab` があればそれ、無ければ `curl` とトークン。
-    どちらも無ければ、レビューの依頼と確認は動かない。
-    """
-    kind = remote_kind(url)
-    if not kind:
-        return f"origin ({url}) が GitHub でも GitLab でもない"
-    if shutil.which("jq") is None:
-        return "jq が無い。結果の JSON を組み立てられない"
-    cli = "gh" if kind == "github" else "glab"
-    if shutil.which(cli) is not None:
-        return ""
-    token = GITHUB_TOKEN if kind == "github" else GITLAB_TOKEN
-    if shutil.which("curl") is None:
-        return (
-            f"{cli} も curl も無い。MCP などでユーザがリモートを読む形にするか、"
-            "どちらかを入れてください"
-        )
-    if not os.environ.get(token, ""):
-        return f"{cli} が無く、curl に付ける {token} も無い"
-    return ""
-
-
 # ---- 内部
 
 
@@ -2074,7 +1905,7 @@ def _parent_phase(
     return parent, ph
 
 
-def _result_with_mr(stderr: TextIO, path: str) -> Result | None:
+def _result_with_mr(stderr: TextIO, path: str) -> review_host.Result | None:
     """取得した結果を読み、マージリクエストが入っていることまで確かめる。無ければ言って None。"""
     result = _result(stderr, path)
     if result is None or result.mr is None:
@@ -2152,18 +1983,18 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
     return bool(failed or changed)
 
 
-def _result(stderr: TextIO, path: str) -> Result | None:
+def _result(stderr: TextIO, path: str) -> review_host.Result | None:
     if not path:
         stderr.write("ccnavi: --result <json> が要る。リモートから取得した結果は sh が渡す\n")
         return None
-    result = Result.load(path)
+    result = review_host.Result.load(path)
     if result.error:
         stderr.write(f"ccnavi: リモートを読めていない: {result.error}\n")
         return None
     return result
 
 
-def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
+def _matching(stderr: TextIO, path: str, requested_mark: dict) -> review_host.Result | None:
     """依頼したのと同じマージリクエストを取得した結果か。違うもので先へ進めない。"""
     result = _result(stderr, path)
     if result is None:
@@ -2172,41 +2003,6 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
     for line in problems:
         stderr.write(line + "\n")
     return None if problems else result
-
-
-def _unresolved(
-    threads: list[Thread], accepted: set[str], host: str = "", poster: str = ""
-) -> list[Thread]:
-    """まだ解決されていない指摘。
-
-    付いた時刻では絞らない。依頼より後のものだけを数えると、
-    指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで
-    前回の指摘が数から消える。ユーザが解決も受け入れもしていないのに通る形になる。
-
-    数えないのは 2 つだけ。機構自身が置いた投稿と、ユーザが「未解決のまま進める」と
-    受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。
-
-    機構自身の投稿と見るのは、GitLab から取得した結果で、本文が目印で始まり、
-    書いたのが依頼を投稿したアカウント（`poster`）のときだけ。
-    GitHub の依頼は MR のコメントでスレッドにならないので、
-    目印で始まるスレッドはユーザが書いたものとして数える。
-    投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
-    本文だけで除くと未解決を隠せる）。
-    """
-    return [
-        t
-        for t in threads
-        if not t.resolved
-        and not _ccnavi_post(t, host, poster)
-        and t.url not in accepted
-        and t.id not in accepted
-    ]
-
-
-def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:
-    """ccnavi 自身が投稿したスレッドか（`_unresolved`）。"""
-    mine = host == "gitlab" and bool(poster) and t.author == poster
-    return mine and t.body.startswith(MARKER_PREFIX)
 
 
 def _poster(parent: ticket_mod.Ticket, phase_no: int, root: str, conf: settings.Settings) -> str:
@@ -2343,15 +2139,6 @@ def _read_body(path: str) -> str | None:
 
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:
     return gitcmd.output(cwd, args, TIMEOUT_SECONDS)
-
-
-def _epoch(text: str) -> float:
-    if not text:
-        return 0.0
-    try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
-    except ValueError:
-        return 0.0
 
 
 def _first_line(body: str) -> str:

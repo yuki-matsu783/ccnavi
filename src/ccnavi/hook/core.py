@@ -624,8 +624,8 @@ def confirm(
     """レビュー済みにしてよいかを見て、通れば書くもの（子を `done/` へ、
     レビュー済みのマーカー）を並べる。
 
-    `result` はホストから取得した結果（`review.Result`、`ccnavi-review.sh` が組む形）。読めなかった
-    ときの扱い（`--result` が無い、読めない）は読む側（手元は `confirm_local`）が持つ。
+    `result` はホストから取得した結果（`review_host.Result`、`ccnavi-review.sh` が組む形）。
+    読めなかったときの扱い（`--result` が無い、読めない）は読む側（手元は `confirm_local`）が持つ。
     `changed_since_request` は依頼の後にユーザが見るものが動いたかの説明（空なら動いていない）。
     手元は git の差分、Chrome は compare API から作る。
     """

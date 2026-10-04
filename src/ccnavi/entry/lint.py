@@ -61,7 +61,7 @@ from ..tickets import (
     ops,
     phase,
     phasetypes,
-    review,
+    review_host,
     risk,
     syncstate,
 )
@@ -1855,7 +1855,7 @@ def _review_token(root: str) -> list[Problem]:
     url = out.strip() if rc == 0 else ""
     if not url:
         return [Problem(SEVERITY_WARN, "(ticket)", "origin が無い。レビューの依頼と確認は動かない")]
-    problem = review.transport_problem(url)
+    problem = review_host.transport_problem(url)
     if problem:
         return [Problem(SEVERITY_WARN, "(ticket)", f"{problem}。レビューの依頼と確認は動かない")]
     return []
