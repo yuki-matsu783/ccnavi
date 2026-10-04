@@ -77,3 +77,17 @@ error がある間は配点も種類も保存できない。
 `--lint` は `.claude/settings.json` の env の `CCNAVI_BIN_PATH` も見る（`lint._bin_path`）。指す先が在るのに
 実行できなければ error（hook が起動しない）。POSIX でだけ見る（`os.access(X_OK)`）。パスは書いたとおりに見て、
 `.exe` を補わない。指す先が無いときは言わない（自己防衛が missing と言う）。
+
+**拡張との取り決め**（REQ-EXT）のうち、作りに関わるもの。
+
+- 文字コード: 入口（`__main__` の `hookio.rebind_streams`）が標準入出力を UTF-8・改行 LF に張り直す。診断の JSON
+  （`--explain` / `--test` / `--test-samples` / `--lint` / `--suggest` / `--version`）は `ensure_ascii=True` で ASCII に落とし、
+  承認の JSON と残った指摘の JSON は `ensure_ascii=False` で書く
+- 古い実行ファイルの見分け: argparse の苦情（`unrecognized arguments: --version`）を拡張が読む。
+  `parse_args` の `SystemExit` は捕まえて終了コード 1 にする
+- `ccnavi c1 family <親>` の答え（1 行目 `c1 1`、`target yes|no|stop`）は、sh（C1）だけでなく拡張も読む。
+  フローを保存した後に承認の push を送るかを、これで決める
+- 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える（`docs/claude/logging.md`）。
+  `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
+- Chrome 拡張は実行ファイルを起動せず、`src/ccnavi/` を Pyodide で import して、判定のコア（`hook/core.py` の
+  Snapshot → 判定 → Changes）と `cli.run` を直に呼ぶ。呼ぶ名前の一覧は REQ-EXT-27 の表にある
