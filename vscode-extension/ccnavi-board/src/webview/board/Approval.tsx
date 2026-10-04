@@ -93,7 +93,7 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
     case "decideLoading":
       return (
         <>
-          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）の指摘を読み込み中…</p>
+          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）指摘を読み込み中…</p>
           <div className="approval-actions">
             <Cancel label="やめる" />
           </div>
@@ -189,7 +189,7 @@ function Body({
 /**
  * 承認画面の本文。実行ファイルが組んだ文字列を行のまま出し、**説明の付く見出しだけ**その次の行を
  * ツールチップにまとめる（`approvalBody`）。まとめた説明は目には出さないが、読み上げと選択には残す。
- * まとめられるかどうかを決めるのは見出しの綴りだけで、画面は中身を解釈しない。
+ * まとめられるかどうかを決めるのは見出しの表記だけで、画面は中身を解釈しない。
  */
 function BodyText({ text }: { readonly text: string }): JSX.Element {
   const lines = approvalBody(text);

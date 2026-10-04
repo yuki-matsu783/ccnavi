@@ -18,22 +18,22 @@
 ツールを含むルールは、「この場所はエージェントに好きに書かせない」と
 プロジェクトが宣言したものなので、そのままここでの保護領域になる。宣言を
 2 か所に分けて書かせない。分ければ必ず食い違い、食い違った側は誰にも
-気づかれないまま緩む。
+気づかれないまま判定が緩む。
 
 `ask` も保護領域に数えるのは、そこが「ユーザが 1 度見るべき場所」だから。
 実行前チェックは引数を見て確認を出すが、シェルやビルドが書いたぶんは
 引数に現れないので、誰にも確認が出ないまま通っている。あとから言う先がここしかない。
 
 当てる先は git が返したパスを解いた絶対パス。実行前チェックがファイルのパスを
-解いてから当てるのと同じ理由で、綴りを変えただけで外せてはいけない。
+解いてから当てるのと同じ理由で、表記を変えただけで外せてはいけない。
 
 ## 前から在った変更を原因にしない
 
 作業ツリーは、セッションが始まる前から汚れていることがある。他のセッションの
 書きかけ、ユーザが直している最中のもの。それを「直前の実行が壊した」として
 差し戻すと、エージェントは他人の作業を戻しにいく。だから初回に見えたものは
-その場で控えを取り、以降は新しく現れたものだけを原因付きで報告する。
-控えの側も 1 度は伝えるが、文面を分けて、戻すなと明示する。
+その場で記録を取り、以降は新しく現れたものだけを原因付きで報告する。
+記録した側も 1 度は伝えるが、文面を分けて、戻すなと明示する。
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ CODE_PREEXISTING = "POST_PREEXISTING"
 # 引数に現れないのでここでしか見つからない。
 CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
 
-# 範囲外の変更を咎めているのは、ルールファイルの中のルールではなく承認済みチケット。
+# 範囲外の変更を報告しているのは、ルールファイルの中のルールではなく承認済みチケット。
 # 出所にこの名前をつけて、ルールファイルを探しても見つからないことを示す。
 TICKET_SCOPE_RULE = "(ticket-scope)"
 
@@ -90,10 +90,10 @@ REASON_NO_TURN_BASELINE = "no-turn-baseline"
 # 全部を並べると本文が流れて 1 件も読まれない。
 REPORT_LIMIT = 12
 
-# 控えに残す件数の上限。セッションが長引いても記録が膨らまないように。
+# 記録に残す件数の上限。セッションが長引いても記録が膨らまないように。
 SEEN_LIMIT = 500
 
-# 対象の綴りを載せるときの長さの上限。
+# 対象の文字列を載せるときの長さの上限。
 SUBJECT_LIMIT = 200
 
 
@@ -116,7 +116,7 @@ def check(
     （dry-run）では復元も行わない。呼び出しにも作業ツリーにも手を出さないことが
     そのモードの約束なので、自分の判断でファイルを動かしては意味がない。
 
-    mine は ccnavi 自身が書く場所。記録と控えがそれで、置き場は設定で動くので、
+    mine は ccnavi 自身が書く場所。記録と state がそれで、置き場は設定で動くので、
     ルールが守る場所の中を指すこともある。自分の書き込みを自分の違反として
     報告しはじめると、実行後チェックは 1 回目から嘘しか言わなくなる。
 
@@ -134,7 +134,7 @@ def check(
     if not read:
         return ""
 
-    # ターンの基準を持たないツリーを初めて見たら、その場で控える。ターンの途中で
+    # ターンの基準を持たないツリーを初めて見たら、その場で記録する。ターンの途中で
     # 切られたワークツリーがこれにあたる（`at_prompt` のときには無いので基準が無く、
     # 基準が無いツリーのコミットはターンの終わりに数えられない）。ワークツリーを
     # 切ってから手を付けるのがこのリポジトリの手順なので、切ったターンがまるごと
@@ -152,7 +152,7 @@ def check(
         for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
     if not found:
-        # 違反が無くても、初回なら控えを作る。ここを飛ばすと、綺麗な作業ツリーで
+        # 違反が無くても、初回なら記録を作る。ここを飛ばすと、綺麗な作業ツリーで
         # 始まったセッションはいつまでも「初回」のままになり、その後に現れた
         # 汚れが全部「前から在ったもの」になってしまい、誰も差し戻されなくなる。
         if first_time:
@@ -163,7 +163,7 @@ def check(
     fresh = [f for f in found if f.key() not in seen]
     known = [f for f in found if f.key() in seen]
     # 初めて見たセッションでは、今そこに在るものは直前の実行の結果ではない。
-    # 控えを取るだけにして、原因を付けずに 1 度だけ伝える。
+    # 記録を取るだけにして、原因を付けずに 1 度だけ伝える。
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
@@ -194,7 +194,7 @@ def check(
         state_dir,
         payload.session_id,
         seen
-        # 戻せたものは控えに入れない。同じ場所がもう一度汚れたら、それは
+        # 戻せたものは記録に入れない。同じ場所がもう一度汚れたら、それは
         # すでに知っている変更ではなく新しい出来事なので、もう一度言う。
         | {f.key() for f in fresh if f.key() not in restored}
         | {f.key() for f in carried},
@@ -218,7 +218,7 @@ def check(
     if fresh:
         record.decision, record.enforced = audit.DENY, enforcing
     else:
-        # この呼び出しは何も汚していない。控えの報告は状態の通知であって、
+        # この呼び出しは何も汚していない。記録した変更の報告は状態の通知であって、
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
@@ -252,10 +252,10 @@ def _note_new_trees(
     session: str,
     read: list[tuple[Watched, str, list[gitstate.Change]]],
 ) -> None:
-    """ターンの基準にまだ居ないツリーの HEAD を控える。居るツリーには触らない。
+    """ターンの基準にまだ居ないツリーの HEAD を記録する。居るツリーには触らない。
 
-    書き直すのは、控えに無いツリーが 1 本でもあるときだけ。呼び出しのたびに
-    控えを書き直すと、ツールを打つ数だけ書き込みが増える。ターンの基準そのもの
+    書き直すのは、記録に無いツリーが 1 本でもあるときだけ。呼び出しのたびに
+    記録を書き直すと、ツールを打つ数だけ書き込みが増える。ターンの基準そのもの
     （`baseline`）は動かさない。あれは「ターンの始まりに何が汚れていたか」で、
     あとから足すと、このターンで現れた汚れを前から在ったことにしてしまう。
     """
@@ -286,14 +286,14 @@ def _committed_findings(
 ) -> tuple[list[Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
-    見るのは、ターンの始まりに控えた HEAD からの差分（`gitstate.committed`）。
-    控えを持たないツリー（ターンの途中で現れた、HEAD を読めなかった）は飛ばす。
+    見るのは、ターンの始まりに記録した HEAD からの差分（`gitstate.committed`）。
+    記録を持たないツリー（ターンの途中で現れた、HEAD を読めなかった）は飛ばす。
     数えていない期間を、数えたことにしない。
 
     チケットの置き場は外す。承認はユーザが提案を `.ccnavi/approved/` へ動かして
-    コミットする運びで（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
+    コミットする進め方で（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
     外さないと、ユーザが承認するたびに、その操作が違反としてターンの報告に並ぶ。
-    置き場の綴りは `places` で受け取る。チケット制御を切ったワークスペースでも
+    置き場のパスは `places` で受け取る。チケット制御を切ったワークスペースでも
     承認のコミットは在りうるので、`scope` の有無で外れたり外れなかったりさせない。
 
     2 つめに返すのは、数えなかったツリーの名前。**何も出さずに飛ばすことはしない。** 基準が
@@ -318,9 +318,9 @@ def _committed_findings(
             )
             uncounted.append(w.tree.name or ".")
             continue
-        # 着手が写した分かどうかは、コミットされた中身で答える。ディスクで答えると、
+        # 着手がコピーした分かどうかは、コミットされた中身で答える。ディスクで答えると、
         # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
-        # チェック・控えと復元・ここの 3 つから同時に外れる。
+        # チェック・バックアップと復元・ここの 3 つから同時に外れる。
         judged = (
             functools.partial(_committed_synced, synced, top, base, changes) if synced else None
         )
@@ -333,7 +333,7 @@ def _committed_findings(
 
 
 def _spelled(change: gitstate.Change, top: str) -> str:
-    """変更の、リンクを解く前の絶対の綴り。ツリーのルートが分からなければ解いた先。"""
+    """変更の、リンクを解く前の絶対パス。ツリーのルートが分からなければ解いた先。"""
     if not top or not change.path:
         return change.full
     return os.path.join(top, change.path.replace("/", os.sep))
@@ -349,7 +349,7 @@ def _committed_synced(
     """コミットされた中身で `synced` に答えさせる。読めなければ外さない。
 
     変更後は HEAD、変更前はターンの始まりの版の中身。どちらもバイト列のまま読む。文字列で
-    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、写した分でも食い違う。
+    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、コピーした分でも食い違う。
     """
     path = next((c.path for c in changes if c.full == full), "")
     if not path:
@@ -380,7 +380,7 @@ def at_stop(
     変えるためのもので、こちらはユーザが「このターンで何が変わったか」を 1 度で
     見るためのものになる。
 
-    セッションの控え（`seen`）は見ない。あれは「モデルへ 1 度伝えた」を
+    セッションの記録（`seen`）は見ない。あれは「モデルへ 1 度伝えた」を
     覚えているもので、ユーザはまだ 1 度も見ていないことがある。代わりに見るのは
     ターンの始まりに取った基準で、そこに無いものだけが、このターンで起きたこと。
 
@@ -480,7 +480,7 @@ class ScopeGuard:
     """承認された作業範囲を、実行後の側から当てるための持ち物。
 
     実行前チェックと同じ範囲・同じ当て方を使う。別に書くと、同じ書き込みが
-    実行前は通って実行後に咎められる（あるいはその逆）ことになり、
+    実行前は通って実行後に報告される（あるいはその逆）ことになり、
     どちらが本当の範囲なのかを誰も言えなくなる。鍵はファイルの行き先で、
     その行き先のワークツリーに結び付いた承認済みチケットの範囲を当てる。
     """
@@ -497,10 +497,10 @@ class ScopeGuard:
     types: dict[str, dict[str, phasetypes.PhaseType]] = field(default_factory=dict)
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
-        """この変更が範囲の外なら、咎める文面と出所を返す。中なら None。
+        """この変更が範囲の外なら、報告する文面と出所を返す。中なら None。
 
         範囲は実行前チェックと同じく、親の範囲と種類の上限で切り詰める（phase.scope_verdict）。
-        チケットの置き場は外でも咎めない。次のチケットを提案できなくすると、
+        チケットの置き場は外でも報告しない。次のチケットを提案できなくすると、
         いちど承認した範囲から永久に出られなくなる。外し方は実行前チェックと同じ関数。
         """
         t = tree.tree_of(self.root, full, self.projects)
@@ -517,7 +517,7 @@ class ScopeGuard:
         # （追跡されないので統合先へ乗らない）が崩れている。そこは報告から外さずに言う。
         if ticket_mod.is_ticket_place(rel, self.tickets, self.approved):
             return None
-        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える。ADR-0096）。
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える）。
         if ticket_mod.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
@@ -540,7 +540,7 @@ class ScopeGuard:
             "blocked. "
         )
         if found.limit == phase.LIMIT_BLOCKED:
-            # 範囲の外に出たのではなく、チケット自体が信頼できない（ADR-0058）。範囲を
+            # 範囲の外に出たのではなく、チケット自体が信頼できない。範囲を
             # 見せても直しようが無いので、引っかかった検査を名指しする。
             message = (
                 f"The approved ticket {ticket.ticket} for worktree {t.name} does not hold "
@@ -577,15 +577,16 @@ class ScopeGuard:
                 "covers it and ask the user to run 'ccnavi --agree'."
             )
         rule = rules.Rule(id=TICKET_SCOPE_RULE, message=message)
-        # 出所はその写し自身の場所。写しはツリーごとに在るので、1 か所にはまとめられない。
+        # 出所はその承認済みチケット自身の場所。承認済みチケットはツリーごとに在るので、
+        # 1 か所にはまとめられない。
         return rule, ticket.path
 
 
 @dataclass
 class Finding:
-    """報告する 1 件。何が変わったかと、それを咎めているのが誰かの組。
+    """報告する 1 件。何が変わったかと、それを報告しているのが誰かの組。
 
-    咎める側が 2 通りある。ルールファイルが守ると宣言した場所と、承認された
+    報告する側が 2 通りある。ルールファイルが守ると宣言した場所と、承認された
     チケットが作業範囲の外だと言う場所。どちらから来たかを一緒に持っておかないと、
     報告の出所がすべてルールファイルと書かれることになり、見に行ったユーザが
     そこに無いルールを探すことになる。
@@ -595,12 +596,12 @@ class Finding:
     group: list[rules.Rule]
     source: str
     code: str
-    # どのツリーで見つけたか。ワークスペースルートなら空。控えの鍵と報告に使う。
+    # どのツリーで見つけたか。ワークスペースルートなら空。記録の鍵と報告に使う。
     tree_name: str = ""
     tree_root: str = ""
 
     def key(self) -> str:
-        """控えの鍵。ツリーが違えば同じ相対パスでも別の変更。"""
+        """記録の鍵。ツリーが違えば同じ相対パスでも別の変更。"""
         return f"{self.tree_name}|{self.change.key()}" if self.tree_name else self.change.key()
 
 
@@ -610,7 +611,7 @@ class Watched:
 
     ワークスペースのツリーにはワークスペースのルール、プロジェクトとそのワークツリーには
     そのプロジェクトのルール。実行前チェックと同じ引き方でなければ、実行前に通った
-    書き込みが実行後に咎められる。
+    書き込みが実行後に報告される。
     """
 
     tree: tree.Tree
@@ -684,8 +685,9 @@ def _findings(
         if change.full in script:
             continue
         # 着手のときに共通層でプロジェクトの層を上書きした分（`configsync.is_synced_write`）。
-        # 内容と印で見分け、読めないものは外さない。渡すのは解く前の綴り。解いた先で答えると、
-        # 設定を別の写しへのシンボリックリンクに差し替えた形が、指す先の中身で外れる。
+        # 内容と上書きの記録で見分け、読めないものは外さない。渡すのは解く前のパス。
+        # 解いた先で答えると、設定を別のコピーへのシンボリックリンクに差し替えた形が、
+        # 指す先の中身で外れる。
         if synced is not None and synced(_spelled(change, top or tree_root)):
             continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
@@ -721,8 +723,8 @@ def _script_writes(
 
     * どちらの版も範囲を宣言していないもの（マーカー、`.risk.json`、閉じの記録）
     * スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
-    * `finish` と `cancel` の移動。同じ姿のチケットが `doing/` から消えて、レビュー待ちか
-      閉じた置き場に現れた組。片側だけなら外さない
+    * `finish` と `cancel` の移動。正規化した内容が同じチケットが `doing/` から消えて、
+      レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
 
     範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済みチケット、消えただけの
     チケットは外さず、今までどおり報告する。承認済みチケットの frontmatter はそのワークツリーの
@@ -760,7 +762,7 @@ def _script_writes(
         # （`ticket.script_fields_set`）。
         drop = _droppable(before)
         if _shape(before, drop) == _shape(now, drop):
-            # 同じ姿。どちらも範囲を宣言していない（マーカー・記録）か、
+            # 正規化した内容が同じ。どちらも範囲を宣言していない（マーカー・記録）か、
             # まだ無かったスクリプトの欄が足されただけか。
             out.add(change.full)
         elif now is None or _shape(now, drop) is None:
@@ -771,15 +773,15 @@ def _script_writes(
         ):
             arrived.append((change, now))
     for change, before, drop in gone:
-        # 行き先の姿は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
+        # 行き先の正規化した内容は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
         # 消えた側がまだ持っていないので落ち、着手の時刻と基準点は両側に残る。
         shape = _shape(before, drop)
         landed = [c for c, now in arrived if _shape(now, drop) == shape]
         leaving = [c for c, other, _ in gone if _shape(other, drop) == shape]
-        # **組は 1 対 1 のときだけ外す。** どちらかの側に同じ姿が 2 つ以上あると、
+        # **組は 1 対 1 のときだけ外す。** どちらかの側に同じ内容が 2 つ以上あると、
         # どれがどれの行き先なのかを内容からは決められない。正規の移動 1 件に、
-        # 同じ姿のチケットのただの削除や、行き先に直接置いた偽物も一緒に外れる。
-        # 同じ姿ということは識別子まで同じということなので、揃うのは普通の手順では
+        # 同じ内容のチケットのただの削除や、行き先に直接置いた偽物も一緒に外れる。
+        # 同じ内容ということは識別子まで同じということなので、揃うのは普通の手順では
         # 起きない。曖昧なら全部報告する側を採る。
         if len(landed) == 1 and len(leaving) == 1:
             out.add(change.full)
@@ -788,13 +790,13 @@ def _script_writes(
 
 
 def _droppable(before: str | None) -> tuple[str, ...]:
-    """姿から落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
+    """正規化するときに落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
     held = ticket_mod.script_fields_set(before) if before is not None else ()
     return tuple(f for f in ticket_mod.SCRIPT_FIELDS if f not in held)
 
 
 def _shape(text: str | None, drop: tuple[str, ...]) -> str | None:
-    """その版の姿。無い・読めない・チケットでないなら None。"""
+    """その版を正規化した内容。無い・読めない・チケットでないなら None。"""
     return ticket_mod.script_shape(text, drop) if text is not None else None
 
 
@@ -822,16 +824,16 @@ def _restorable(finding: Finding) -> bool:
     * `ask` は「ユーザが 1 度見る場所」。見た結果が「よい」であることもあるので、
       戻すと、ユーザが確認に「はい」と答えた編集をあとから無かったことにする
     * チケットの範囲外は、ルールファイルが何も言っていない場所。戻す根拠が
-      ルールに無いうえ、咎めているルール（`TICKET_SCOPE_RULE`）は出所を示すための
+      ルールに無いうえ、報告しているルール（`TICKET_SCOPE_RULE`）は出所を示すための
       作りもので、`decision` を持たない
 
     報告は 3 つとも出したままにする。戻さないことと、報告しないことは別（`_guarding`）。
     設定の名前（`CCNAVI_RESTORE_IF_DENY`）が言うとおりの対象がここになる。
 
-    戻さなかった 1 件は控えに入る（`check`）。戻していないのでファイルは汚れたままで、
+    戻さなかった 1 件は記録に入る（`check`）。戻していないのでファイルは汚れたままで、
     `git status` は次の呼び出しでも同じ 1 件を返す。毎回言えば、同じ汚れについて
     同じ文が呼び出しの数だけ積まれる。だから呼び出しごとの報告はセッションで 1 度だけで、
-    その後はターンの終わりの報告（`at_stop`）がユーザに見せる。戻した 1 件だけが控えに
+    その後はターンの終わりの報告（`at_stop`）がユーザに見せる。戻した 1 件だけが記録に
     入らないのは、戻したあとに同じ場所が汚れたらそれは新しい出来事だから。
     """
     if finding.change.kind == gitstate.KIND_COMMITTED:
@@ -991,11 +993,11 @@ def _seen_path(state_dir: str, session: str) -> str:
 
 
 def _turn_path(state_dir: str, session: str) -> str:
-    """ターンの基準を置く場所。セッションの控えとは別に持つ。
+    """ターンの基準を置く場所。セッションの記録とは別に持つ。
 
-    2 つは寿命が違う。セッションの控えは「モデルへ 1 度伝えた」を覚えていて
+    2 つは寿命が違う。セッションの記録は「モデルへ 1 度伝えた」を覚えていて
     セッションが終わるまで残るが、こちらはターンごとに取り直す。同じファイルに
-    まとめると、ターンの区切りでセッションの控えまで消えることになる。
+    まとめると、ターンの区切りでセッションの記録まで消えることになる。
     """
     name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.turn.json")
@@ -1012,7 +1014,7 @@ def at_prompt(
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
 ) -> None:
-    """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
+    """ターンの始まり。いま保護領域に在る変更を記録して、このターンの基準にする。
 
     これが無いと、ターンの終わりの報告が「今そこにある変更」しか言えない。
     ユーザ自身の書きかけも、他のセッションが置いたものも、前のターンで
@@ -1024,7 +1026,7 @@ def at_prompt(
     """
     read = _read_all(stderr, watched, record)
     if not read:
-        # 基準を取れなかった。前のターンの控えが残っていると、そこに入っている
+        # 基準を取れなかった。前のターンの記録が残っていると、そこに入っている
         # HEAD を「このターンの始まり」として読むことになり、前のターンの
         # コミットをこのターンの成果として並べる。基準の側は「言い落とす」ほうに
         # なるのに、HEAD の側だけ「言い過ぎる」ほうになるので、消しておく。
@@ -1036,7 +1038,7 @@ def at_prompt(
         for w, top, changes in read
         for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
-    # ツリーごとの HEAD も控える。ターンの終わりに「このターンでコミットに
+    # ツリーごとの HEAD も記録する。ターンの終わりに「このターンでコミットに
     # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。
     heads = {top: gitstate.head(top) for _, top, _ in read if top}
     _save_turn(
@@ -1057,8 +1059,8 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     持っていないなら、ターンの始まりを見ていない。登録されていないか、
     そのイベントで読めなかったか。そこで「全部このターンの成果」として
     報告すると、前から在ったものまで並ぶので、そのときは何も言わない。
-    見えていない期間を、見えたことにしない。`heads` を持たない控え（壊れたものや
-    HEAD を控える前の版）も、控えが無いときと同じく基準なしとして扱う。
+    見えていない期間を、見えたことにしない。`heads` を持たない記録（壊れたものや
+    HEAD を記録する前の版）も、記録が無いときと同じく基準なしとして扱う。
     """
     if not state_dir:
         return set(), False, {}
@@ -1096,15 +1098,15 @@ def _save_turn(
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
     """すでに報告した変更と、このセッションで初めて見るかどうかを返す。
 
-    読めなければ「初めて」として扱う。控えを失ったときに、前から在った変更を
-    直前の実行のせいにするより、もう一度控えを取り直すほうが害が小さい。
+    読めなければ「初めて」として扱う。記録を失ったときに、前から在った変更を
+    直前の実行のせいにするより、もう一度記録を取り直すほうが害が小さい。
     """
     if not state_dir:
         return set(), True
     data, failed = fsio.read_json(_seen_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: 実行後チェックの控えを読めない: {failed}\n")
+            stderr.write(f"ccnavi: 実行後チェックの記録を読めない: {failed}\n")
         return set(), True
     seen = data.get("seen") if isinstance(data, dict) else None
     if not isinstance(seen, list):
@@ -1113,9 +1115,9 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
 
 
 def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> None:
-    """控えを書く。書けなかったことは報告して捨てる。
+    """記録を書く。書けなかったことは報告して捨てる。
 
-    ここでの失敗はチェックを止めない。控えが無ければ同じ変更をもう一度報告する
+    ここでの失敗はチェックを止めない。記録が無ければ同じ変更をもう一度報告する
     ことになり、うるさいが、見落とすよりはよい。
     """
     if not state_dir:
@@ -1124,4 +1126,4 @@ def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> 
         _seen_path(state_dir, session), {"seen": sorted(seen)[:SEEN_LIMIT]}
     )
     if failed:
-        stderr.write(f"ccnavi: 実行後チェックの控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 実行後チェックの記録を書けない: {failed}\n")

@@ -1,7 +1,7 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は 未着手 / 作業中 / 完了 / 取り消し。置き場（ADR-0055）との対応は、未着手 = `wip/proposals/todo/`、
+ * 列は 未着手 / 作業中 / 完了 / 取り消し。置き場との対応は、未着手 = `wip/proposals/todo/`、
  * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの属性で言う）、
  * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの。承認済みチケット・マーカー・
  * レビュー待ち・ワークツリーはカードのバッジで出す。止まっているかや承認待ちの判断はここでやり直さない。JSON が
@@ -26,7 +26,7 @@ export interface ColumnDef {
   readonly label: string;
 }
 
-/** 列の並び。該当が 0 件でも落とさない */
+/** 列の順序。該当が 0 件でも落とさない */
 export const COLUMNS: readonly ColumnDef[] = [
   { state: "todo", label: "未着手" },
   { state: "doing", label: "作業中" },
@@ -50,7 +50,7 @@ export interface PhaseChip {
   readonly state: PhaseJson["state"];
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
-  /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。JSON の `review_waiting` の写し */
+  /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。JSON の `review_waiting` をそのまま持つ */
   readonly reviewWaiting: boolean;
   readonly reviewRequired: boolean;
   /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
@@ -94,7 +94,7 @@ export interface Card {
   readonly riskLevel: string;
   readonly riskPoints: number | null;
   readonly seenIn: readonly SeenInJson[];
-  /** どれが本物か決まらない写りの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
+  /** どれが本物か決まらないチケットの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
   readonly scattered: readonly SeenInJson[];
   /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
@@ -111,7 +111,7 @@ export interface Card {
   /** 読み手が気づくべき食い違い */
   readonly issues: readonly string[];
   /**
-   * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（ADR-0058）。
+   * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。
    * `copyStatus` は `open` のままなので、列や承認済みのバッジからは分からない。
    */
   readonly blocked: string;
@@ -121,22 +121,22 @@ export interface Card {
   /**
    * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
    * 親の改版。バッジの「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
-   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらない写り、不備、
+   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらないチケット、不備、
    * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
   /**
-   * 子のフロー（ADR-0085）。親は null。在るか・着手中で書けないかは実行ファイルの答えの写しで、
+   * 子のフロー。親は null。在るか・着手中で書けないかは実行ファイルの答えをそのまま持ち、
    * カードの「フロー」ボタンの言葉だけに使う。ユーザが動く必要（`attention`）には数えない
    */
   readonly flow: FlowJson | null;
   /**
-   * 状態が動いた跡の新しい側（古い順。ADR-0086）。補助の記録で、列やバッジはここから組まない。
+   * 状態の履歴の新しい側（古い順）。補助の記録で、列やバッジはここから組まない。
    * カードの折りたためる「履歴」に並べるだけ
    */
   readonly history: readonly HistoryEntryJson[];
   /**
-   * 満たしていない先行（ADR-0088）。空でなければ、承認も着手も止まる。実行ファイルの答えの写しで、
+   * 満たしていない先行。空でなければ、承認も着手も止まる。実行ファイルの答えをそのまま持ち、
    * カードの「先行待ち」のバッジに使う
    */
   readonly predecessorsUnmet: readonly PredecessorUnmetJson[];
@@ -318,7 +318,7 @@ function isHighRisk(level: string): boolean {
 /**
  * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
  * 断片を落としてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
- * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうが本物）。
+ * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうを採る）。
  */
 function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | null } {
   for (let i = phases.length - 1; i >= 0; i -= 1) {

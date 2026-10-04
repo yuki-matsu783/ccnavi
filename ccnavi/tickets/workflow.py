@@ -1,7 +1,7 @@
-"""全体計画の待ち方（設計 9.7、ADR-0078）。
+"""全体計画の待ち方（設計 9.7）。
 
 `--agree` が全体計画を承認するとき（改版を含む）に、ここで待ち方を計算して親の承認済み
-チケットの `workflow:` に写す。判定・延期・フィードバック計画の前提はその写しだけを読む。
+チケットの `workflow:` に書き出す。判定・延期・フィードバック計画の前提はそのコピーだけを読む。
 計算はこの 1 か所に置き、延期の引き受け手を 2 か所で違って言わないようにする。
 """
 
@@ -59,9 +59,9 @@ def _defer_target(
 ) -> int | None:
     """延期した n 番目を引き受ける番号。
 
-    一直線なら、次の延期していない番号。`dag` なら、後ろで n を待つ（写しの `waits` に n を
-    持つ）、延期していない最小の番号。待たない番号が引き受けると、延期した作業が閉じる前に
-    そのレビューが済んでしまう。
+    一直線なら、次の延期していない番号。`dag` なら、
+    後ろで n を待つ（コピーした待ち方の `waits` に n を持つ）、延期していない最小の番号。
+    待たない番号が引き受けると、延期した作業が閉じる前にそのレビューが済んでしまう。
     """
     for m in range(n + 1, len(parent.plan) + 1):
         if parent.plan[m - 1].deferred:
@@ -73,9 +73,9 @@ def _defer_target(
 
 
 def effective(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workflow:
-    """判定に使う待ち方。承認済みの親は写しだけを読む。
+    """判定に使う待ち方。承認済みの親はコピーした待ち方だけを読む。
 
-    写しを持たない承認済みの親は一直線で読み、いまの種類からは計算しない。種類から計算するのは、
+    コピーした待ち方を持たない承認済みの親は一直線で読み、いまの種類からは計算しない。種類から計算するのは、
     まだ承認されていない提案（同じ承認で通る親と、改版の提案）だけ。
     """
     if parent.workflow is not None:
@@ -86,7 +86,8 @@ def effective(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workf
 
 
 def waits_of(parent: ticket_mod.Ticket, number: int, types: dict | None) -> list[int]:
-    """N 番目が待つ番号。全体計画は写しで読み、写しが無ければ（承認前の提案）その場で計算する。
+    """N 番目が待つ番号。全体計画はコピーした待ち方で読み、それが無ければ（承認前の提案）
+    その場で計算する。
 
     フィードバック計画は一直線で、前の番号を全部待つ（`overlap` の組は待たない）。
     """
@@ -106,7 +107,7 @@ def waits_of(parent: ticket_mod.Ticket, number: int, types: dict | None) -> list
 
 
 def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
-    """全体計画の待ち方が組めるか。並び、終端、延期の引き受け手（設計 9.7）。"""
+    """全体計画の待ち方が組めるか。順序、終端、延期の引き受け手（設計 9.7）。"""
     found: list[rules.Problem] = []
     if types is None or not parent.has_plan:
         return found

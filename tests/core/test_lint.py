@@ -43,14 +43,14 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     """ルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
 
     書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
-    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の綴りの
+    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の表記の
     話に付き合わずに済む。
     """
     body: dict = {"version": version, "deny": list(rules)}
     if allow:
         body["allow"] = [ALLOWED]
     # 置くのは共通層の既定の場所。検証は `--rules` で指せるが、同じファイルを hook の
-    # 判定にも掛けるテストがあり、そちらには届かない（ADR-0067）。
+    # 判定にも掛けるテストがあり、そちらには届かない。
     return write(directory, common_relpath("rules"), json.dumps(body, indent=2))
 
 
@@ -122,7 +122,7 @@ class LintTest(unittest.TestCase):
         # テストが走った機械にあるファイルを報告することになる。
         self.root = directory.name
 
-    def test_不備が無ければ何も咎めずに0で終わる(self):
+    def test_不備が無ければ何も指摘せずに0で終わる(self):
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -148,9 +148,9 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(counts(result.stdout)[0], 1)
 
-    def test_承認の門にdry_runと書いたらerrorになる(self):
-        # この門は enable か disable しか取らない。dry-run と書いたユーザは止まらない
-        # つもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
+    def test_承認の切り替えの環境変数にdry_runと書いたらerrorになる(self):
+        # この切り替えの環境変数は enable か disable しか取らない。dry-run と書いたユーザは
+        # 止まらないつもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
         # だけでは、その食い違いがどこにも現れない。
         result = ccnavi(
             self.root,
@@ -169,7 +169,7 @@ class LintTest(unittest.TestCase):
         # 実際の値も言う。言わないと、止まっているのか通っているのかが分からない。
         self.assertIn("enable として動いている", result.stdout)
 
-    def test_確認できない側の門を切ったらwarnで言う(self):
+    def test_確認できない側の切り替えの環境変数を切ったらwarnで言う(self):
         # 切ってあること自体は設定として正しいので error にはしない。それでも
         # 言うのは、切れている状態が外から見て「ルールが揃っている状態」と
         # 区別が付かないため。
@@ -221,7 +221,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_GUARD_CORE_FILES=dry-run", result.stdout)
         self.assertIn("CCNAVI_RESTORE_IF_DENY=dry-run", result.stdout)
 
-    def test_切った門はJSONのproblemsにも出る(self):
+    def test_切った切り替えの環境変数はJSONのproblemsにも出る(self):
         # 読み手は CI と VS Code の拡張。ユーザ向けの本文しか持たない苦情は、
         # そこからは無いのと同じ。
         result = ccnavi(
@@ -249,12 +249,12 @@ class LintTest(unittest.TestCase):
         self.assertNotIn("CCNAVI_RESTORE_IF_DENY", result.stdout)
         self.assertIn("error 0 件、warn 0 件", result.stdout)
 
-    def test_確認できない側の門は既定でenableと出る(self):
+    def test_確認できない側の切り替えの環境変数は既定でenableと出る(self):
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertIn("確認できる者が居ないモードで守る: enable", result.stdout)
 
-    def test_承認の門にenableと書いてもerrorにならない(self):
+    def test_承認の切り替えの環境変数にenableと書いてもerrorにならない(self):
         result = ccnavi(
             self.root,
             "--lint",
@@ -270,7 +270,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 0)
 
     def test_チケット制御に読めない値を書いたらerrorになる(self):
-        # 切ったつもりの綴り違いは enable として動く。守りは消えないが、
+        # 切ったつもりの書き誤りは enable として動く。保護は消えないが、
         # 書いたユーザは切れていると思い続けるので、直すまで error で名指しする。
         result = ccnavi(
             self.root,
@@ -305,7 +305,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 0)
 
     def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
-        # 動かす途中で止まった跡（写せたが消せなかった）。状態の操作は「複数の場所にある」で
+        # 動かす途中で止まった形跡（コピーできたが消せなかった）。状態の操作は「複数の場所にある」で
         # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
         # 閉じた側との重複だけが通る。
         for state in ("doing", "done"):
@@ -343,7 +343,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("i0001 が複数の場所にある", result.stdout)
         self.assertIn("(ワークスペースルート):review", result.stdout)
 
-    def test_doneに1つだけ在るのは咎めない(self):
+    def test_doneに1つだけ在るのは指摘しない(self):
         # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても何も言わないまま。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done"),
@@ -388,7 +388,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("BOM (U+FEFF)", result.stdout)
 
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
-        # 承認の権威は置き場（ADR-0058）。`.ccnavi/approved/` は組み込みの守りが
+        # 承認を本物とするのは置き場。`.ccnavi/approved/` は組み込みの保護が
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
         # 読む。端末もボードも無いユーザが、置き場を動かすだけで承認できる方法。
         write(
@@ -403,8 +403,8 @@ class LintTest(unittest.TestCase):
         self.assertNotIn("を読めない", result.stdout)
 
     def test_レビュー待ちの置き場では承認の記録を求める(self):
-        # `wip/proposals/review/` はエージェントが書ける側にある。守りが組み込みの deny
-        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の守りとして残す（ADR-0058）。
+        # `wip/proposals/review/` はエージェントが書ける側にある。保護が組み込みの deny
+        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の保護として残す。
         write(
             os.path.join(self.root, "wip", "proposals", "review"),
             "i0001.md",
@@ -450,7 +450,7 @@ class LintTest(unittest.TestCase):
         ):
             # 名前にはタイプが付く。同じ id が別のタイプに居ることがあるので、
             # どちらの話なのかを名前が言えないと直しに行く先が決まらない。
-            self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を咎めていない")
+            self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を報告していない")
 
     def test_askとallowのmessageはerrorになりルールは効いたまま(self):
         # ask の文面はユーザの確認ダイアログにしか出ず、allow の文面はどこにも出ない
@@ -476,8 +476,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("error: mig: ask に message がある", result.stdout)
         self.assertIn("error: anything: allow に message がある", result.stdout)
-        self.assertNotIn("quiet", result.stdout, "文面の無い ask は咎めない")
-        # 咎めたルールも読み込まれている（--explain に載る）。
+        self.assertNotIn("quiet", result.stdout, "文面の無い ask は報告しない")
+        # 報告したルールも読み込まれている（--explain に載る）。
         shown = ccnavi(self.root, "--explain", "--rules", path, "--mode", "enable").stdout
         self.assertIn("mig", shown)
         self.assertIn("quiet", shown)
@@ -516,17 +516,17 @@ class LintTest(unittest.TestCase):
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
         # id 無しが 1 件、重複が 1 件、当たらない match が 1 件。重複は 2 件目だけを
-        # 咎める。1 件目は、他に同じ id が無ければそのままで正しいルールだから。
+        # 報告する。1 件目は、他に同じ id が無ければそのままで正しいルールだから。
         self.assertEqual(warns, 3, result.stdout)
         self.assertIn("id が無い", result.stdout)
         self.assertIn("id が重複", result.stdout)
         self.assertIn("Task", result.stdout)
 
-    def test_権限ルールの名前で書いたmatchは咎めない(self):
+    def test_権限ルールの名前で書いたmatchは指摘しない(self):
         # Claude Code の権限ルール `ToolName(指定子)` の括弧の中を除いた名前は、
         # 判定が対象を取り出せる。PowerShell はコマンド、Grep / Glob は探す場所、
         # Skill はスキル名、WebFetch は URL。lint の probe がその欄を渡し損ねると、
-        # 正しいルールを咎める。
+        # 正しいルールを報告する。
         result = lint(
             self.root,
             rules_file(
@@ -542,7 +542,7 @@ class LintTest(unittest.TestCase):
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
         # WebSearch は指定子を持たず、Task は今の Claude Code に無い。
-        # どちらも対象を取り出せないので、この 2 つだけを名前ごとに咎める。
+        # どちらも対象を取り出せないので、この 2 つだけを名前ごとに報告する。
         self.assertEqual(warns, 2, result.stdout)
         self.assertIn("WebSearch", result.stdout)
         self.assertIn("Task", result.stdout)
@@ -555,7 +555,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(errors, 0)
         self.assertIn("dry-run なので判定はしても、呼び出しには何もしない", result.stdout)
         # 戻す働きの 2 つは、書かれた値が enable でもモードに合わせて dry-run になる。
-        # 実効値で見るので、そのぶんも言う（門の名前と、モードに合わせたことの両方）。
+        # 実効値で見るので、そのぶんも言う
+        # （切り替えの環境変数の名前と、モードに合わせたことの両方）。
         self.assertEqual(warns, 3, result.stdout)
         self.assertIn("CCNAVI_MODE=dry-run なので実際は dry-run", result.stdout)
 
@@ -698,7 +699,7 @@ class LintTest(unittest.TestCase):
 
     def test_json_は同じ苦情を機械可読な形で返し終了コードも同じ(self):
         # VS Code 拡張が読む形（README「lint の JSON」）。文面の版と同じ判定を
-        # 同じ深刻度で運ぶ。error があれば終了コードも同じく非ゼロ。
+        # 同じ深刻度で返す。error があれば終了コードも同じく非ゼロ。
         path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")
 
         result = ccnavi(self.root, "--lint", "--json", "--rules", path, "--mode", "dry-run")

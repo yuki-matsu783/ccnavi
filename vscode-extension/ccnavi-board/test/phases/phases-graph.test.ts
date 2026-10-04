@@ -2,7 +2,7 @@
  * フェーズ管理画面の図を組む純関数（`src/core/phases-graph.ts`）。
  *
  * 見るところは 4 つ。**線に向きが無いこと**（`requires` は一緒に置く条件で、順序ではない）、
- * **判定をしないこと**（循環も到達不能も見つけない。ADR-0035）、**置き場所が id だけで
+ * **判定をしないこと**（循環も到達不能も見つけない）、**置き場所が id だけで
  * 決まること**（保存のたびに中身が届き直すので、関係を直すたびに点の配置が変わると使いものにならない）、
  * そして**線が気づかないうちに消えないこと**（id にハイフンが使えるので、名前の作り方を誤ると別の線と同じ名前になる）。
  */
@@ -55,7 +55,7 @@ test("CB-T186 図は判定をしない（循環も、行き先の無い参照も
   // 図の形に「循環」「不正」を名指しする欄は無い
   assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 
-  // このファイルに無い種類への参照は、何も言わずに線にしない（綴り違いか他の層かは、画面は言わない）
+  // このファイルに無い種類への参照は、何も言わずに線にしない（表記違いか他の層かは、画面は言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["外の種類"] }))), []);
   // 自分自身への参照も線にしない（--lint が警告する。画面は何も言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["a"], overlap: ["a"] }))), []);
@@ -66,14 +66,14 @@ test("CB-T187 置き場所は id だけで決まる。関係を直しても、�
   const before = spots(form(...base));
 
   // 並べ替えても同じ
-  assert.deepEqual(spots(form(...base.slice().reverse())), before, "ファイルの並びが変わると絵が変わっている");
+  assert.deepEqual(spots(form(...base.slice().reverse())), before, "ファイルの中の順序が変わると絵が変わっている");
 
   // **関係を 1 本足しても、どの点も動かない。** 保存が通るたびに中身は丸ごと届き直すので、
   // 関係を直しながら確かめる間に絵が組み替わると、この画面の用を成さない
   const linked = base.map((p) => (p.id === "docs" ? { ...p, requires: ["design"] } : p));
   assert.deepEqual(spots(form(...linked)), before, "関係を足したら点が動いた");
 
-  // 綴りを間違えて線にならなくても、点は動かない
+  // 表記を間違えて線にならなくても、点は動かない
   const typo = base.map((p) => (p.id === "staging" ? { ...p, requires: ["acceptence"] } : p));
   assert.deepEqual(spots(form(...typo)), before, "行き先の無い参照で点が動いた");
 
@@ -118,14 +118,14 @@ test("CB-T190b id にハイフンが入っていても、線が別の線に潰�
   assert.equal(new Set(graph.edges.map((edge) => edge.id)).size, 2);
 });
 
-test("CB-T191 控えは、動かした点を丸めて入れ、図から消えた種類を落とす", () => {
+test("CB-T191 位置の記録は、動かした点を丸めて入れ、図から消えた種類を落とす", () => {
   // ドラッグそのものは jsdom で見る（CB-D80）。ここで見るのは、それが呼ぶ中身
   assert.deepEqual(withSpot({}, "a", 10.4, 20.6), { a: { x: 10, y: 21 } });
   assert.deepEqual(withSpot({ a: { x: 1, y: 2 } }, "b", 3, 4), { a: { x: 1, y: 2 }, b: { x: 3, y: 4 } });
   // 同じ種類を動かし直すと上書き
   assert.deepEqual(withSpot({ a: { x: 1, y: 2 } }, "a", 9, 9), { a: { x: 9, y: 9 } });
 
-  // 図に出ている種類の控えだけを残す（id を打ち替えるたびに溜まるため）
+  // 図に出ている種類の記録だけを残す（id を打ち替えるたびに溜まるため）
   assert.deepEqual(keepSpots({ a: { x: 1, y: 2 }, b: { x: 3, y: 4 } }, ["a"]), { a: { x: 1, y: 2 } });
   // 変わらないときは、同じものをそのまま返す（返す形が変わると図が描き直される）
   const same = { a: { x: 1, y: 2 } };

@@ -42,16 +42,16 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # 環境変数から設定を差し込む経路を閉じる。`-c diff.external=<コマンド>` を引数で
 # 拒否しても、GIT_CONFIG_COUNT/KEY/VALUE と GIT_EXTERNAL_DIFF で同じことができる。
 # 引数だけ見て環境を見ないと、防いだつもりの穴が別の経路で開いたままになる。
-# GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が門になっているので、
-# 番号を数えて消す必要はない。門を閉じれば全部読まれない。
+# GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が無ければ読まれないので、
+# 番号を数えて消す必要はない。GIT_CONFIG_COUNT を消せば全部読まれない。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || :
 
 # 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
 # 止まるので、案内に `git stash push -u` と書くと、案内された先でもう 1 度拒否される。
 # 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
-# $0 は呼ばれたときの綴りそのままなので、ワークツリーの中から相対で呼ばれても合う。
+# $0 は呼ばれたときのパスそのままなので、ワークツリーの中から相対で呼ばれても合う。
 SELF="sh $0"
-# 取り込みの sh（ADR-0093 の段階 2b）。リモートに合わせる経路はここへ案内する。
+# 取り込みの sh。リモートに合わせる経路はここへ案内する。
 SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
 
 # reject <識別子> <文面>。文面は標準エラーへ出す契約。識別子は拒否の種類を表す短い語で、
@@ -73,7 +73,7 @@ WS=$(ccnavi_workspace) ||
 	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 # 解いたルートを logger に渡し、書くたびに探し直させない。
 ccnavi_log_root="$WS"
-# git の綴り（リンクを解いたもの）と比べるための、リンクを解いたルート。
+# git が返すパス（リンクを解いたもの）と比べるための、リンクを解いたルート。
 WS_P=$(ccnavi_phys "$WS")
 
 usage() {
@@ -103,15 +103,15 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                    : や + を含む引数 (refspec・URL) は不可。手元の ref は ccnavi-sync.sh が進める)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release と統合先 (CCNAVI_INTEGRATION_BRANCH、無ければ
-                   ccnavi-sync.sh の控え、無ければ origin/HEAD) へ直接は送れない。
+                   ccnavi-sync.sh の取り込み結果、無ければ origin/HEAD) へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
-                   リモートから消えた (家族の控えが gone の) 親のブランチへは送れない)
+                   リモートから消えた (取り込み状態が gone の) 親のブランチへは送れない)
 
 通さないもの (代わりの手段):
   reset clean   sh .ccnavi/scripts/ccnavi-git.sh stash push -u で退避する。消さない
                 リモートに合わせるなら sh .ccnavi/scripts/ccnavi-sync.sh <P> (親のブランチ)。
                 ほかのブランチは fetch <リモート> <ブランチ> のあと merge <リモート>/<ブランチ>。
-                分かれていて進めないならユーザに回す (checkout -B で付け替えない)
+                分かれていて進めないならユーザの対応に切り替える (checkout -B で付け替えない)
   rebase cherry-pick revert am apply bisect  履歴を書き換えない
   config clone submodule  ユーザに依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
@@ -119,8 +119,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                 なってしまうので、値を見ずに一律で拒否する
 
 オプション: branch checkout switch fetch pull merge commit rm restore cat-file worktree は
-            許可リストで読む。長いオプションは略さずに書く (略した綴りは通らない)。
-            短いオプションは束ねてよく、値を取る字 (-b など) の後ろは値として読む
+            許可リストで読む。長いオプションは略さずに書く (略した表記は通らない)。
+            短いオプションはまとめて書いてよく、値を取る字 (-b など) の後ろは値として読む
 
 出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
 環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS
@@ -166,8 +166,8 @@ for arg in ${1+"$@"}; do
 		reject moved-root "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
 		;;
 	--?*)
-		# 略した綴り（`--outp=x`・`--upload-p=...`）。parse-options を使う副命令は長いオプションの
-		# 略を受けるので、止める名前の頭に当たる綴りも止める（ADR-0093 の段階 2b のレビュー）。
+		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使う副命令は長いオプションの
+		# 略を受けるので、止める名前の頭に当たる表記も止める。
 		# `--text`（diff の正式な名前）だけは textconv の頭でも通す。
 		gl_name="${arg#--}"
 		gl_name="${gl_name%%=*}"
@@ -197,25 +197,25 @@ has() {
 	return 1
 }
 
-# オプションを許可リストで読む（ADR-0093 の段階 2b のレビュー。ユーザの決定 A）。
+# オプションを許可リストで読む。止める名前を並べるだけでは、長いオプションの略とまとめた短いオプションで抜けるため。
 #
 #   ow_flags="' quiet detach '"   値を取らない長いオプション（前後を空白で挟む）
 #   ow_values="' orphan '"         値を取る長いオプション（`--x=v` か次の語）
 #   ow_optvals="' track '"         値を `=` でだけ取れる長いオプション（`--x` だけでもよい）
 #   ow_sflags="qmt"               値を取らない短いオプションの字
-#   ow_svalues="b"                値を取る短いオプションの字（束の残りか次の語が値）
-#   ow_soptvals="u"               値を束の残りでだけ取れる短いオプションの字
+#   ow_svalues="b"                値を取る短いオプションの字（まとめた残りの字か次の語が値）
+#   ow_soptvals="u"               値をまとめた残りの字でだけ取れる短いオプションの字
 #   opt_walk <コールバック> [<引数>...]
 #
 # git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
-# 名前を並べるやり方では略した綴りが通ってしまう。ここは一覧に**そのままの綴り**である名前だけを通し、ほかの `--` は
-# 断る（略した綴りも断る）。短いオプションの束（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら束の
-# 残りをその値として扱う。
+# 名前を並べるやり方では略した表記が通ってしまう。ここは一覧に**そのままの表記**である名前だけを通し、ほかの `--` は
+# 断る（略した表記も断る）。まとめた短いオプション（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら
+# 残りの字をその値として扱う。
 #
 # コールバックは `<コールバック> opt <-x か --name> <値>`・`pos <語>`・`end`（`--` を見た）で呼ぶ。
 # 止める判定はコールバックが持つ（一覧に入れた上で、名前を見て reject する）。
 ow_reject() {
-	reject option-not-allowed "$sub の $1 は通しません。通すオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した綴りを、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に足してもらってください。"
+	reject option-not-allowed "$sub の $1 は通しません。通すオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に足してもらってください。"
 }
 opt_walk() {
 	ow_cb="$1"
@@ -329,14 +329,14 @@ ow_spec() {
 }
 
 # 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に
-# 当たるパスかを見る。当たれば in_store=yes。ADR-0093 の段階 0。
+# 当たるパスかを見る。当たれば in_store=yes。
 #
 # `checkout <ref> <パス>`・`restore --source <ref>` で置き場を過去の中身に戻す形と、
 # `restore --ours / --theirs` で置き場の衝突を片側の中身で解く形を止めるために使う。
 # 置き場を動かすのはユーザと ccnavi のスクリプトで、エージェントが git で戻すと、承認が
 # 無かったことにも、取り下げた承認が戻ったことにもなる。
 #
-# 比べるのは git のトップからの綴り。cwd からの相対（`approved/doing/x.md` を `.ccnavi/` の中で打つ）も
+# 比べるのは git のトップからのパス。cwd からの相対（`approved/doing/x.md` を `.ccnavi/` の中で打つ）も
 # `..` を取り除いてから比べる。置き場の親（`.ccnavi`・`wip`・`.`）も置き場ごと戻すので当たる。
 # `*` `?` `[` と `:` で始まる pathspec は、どこに当たるかをここで決められないので当たるとみなす。
 # 大文字小文字はそろえる（Windows と macOS の既定のファイルシステムは区別しない）。
@@ -353,7 +353,7 @@ store_hit() {
 	sh_review=$(printf '%s' "${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}/review" | tr '\\' '/')
 	case "$sh_arg" in
 	/* | [A-Za-z]:/*)
-		# 絶対の綴り。トップの綴りは OS で揃わない（`C:/x` と `/c/x`）ので、置き場の綴りを
+		# 絶対パス。トップのパスは OS で表記が揃わない（`C:/x` と `/c/x`）ので、置き場のパスを
 		# 含むかだけを見る。
 		sh_path="$sh_arg"
 		;;
@@ -428,7 +428,7 @@ cat-file)
 	;;
 
 grep)
-	# `-O` / `--open-files-in-pager` は当たったファイルを外部コマンドで開く。束（`-iO`）と略も見る。
+	# `-O` / `--open-files-in-pager` は当たったファイルを外部コマンドで開く。まとめた短いオプション（`-iO`）と略も見る。
 	# 値を取る短いオプション（-e -f -A -B -C -m）より後ろの字は値なので数えない。
 	for arg in ${1+"$@"}; do
 		case "$arg" in
@@ -459,7 +459,7 @@ grep)
 	;;
 
 branch)
-	# 許可リストで読む（略した長いオプションと、束ねた短いオプションを 1 字ずつ見る）。
+	# 許可リストで読む（略した長いオプションと、まとめた短いオプションを 1 字ずつ見る）。
 	# 消す・改名する・複製する・追跡先を書き換える形は、一覧に入れた上で名前を見て止める。
 	ow_spec "list all remotes verbose quiet show-current no-column no-color ignore-case omit-empty no-track delete create-reflog no-create-reflog force move copy unset-upstream edit-description" \
 		"sort format points-at set-upstream-to" \
@@ -486,8 +486,8 @@ branch)
 	;;
 
 tag)
-	# 一覧だけ通す。位置の引数（`tag <名前>` はタグを作る）は -l / --list のときの絞り込みだけ
-	# （ADR-0093 の段階 2b のレビューの相談 1）。--contains などの値を次の語で取る形は、値ごと読み飛ばす。
+	# 一覧だけ通す。位置の引数（`tag <名前>` はタグを作る）は -l / --list のときの絞り込みだけ。
+	# --contains などの値を次の語で取る形は、値ごと読み飛ばす。
 	tg_list=no
 	tg_words=""
 	tg_skip=no
@@ -530,13 +530,13 @@ worktree)
 		# できる。プロジェクトに .claude/ ができて --lint が error になり、
 		# tree_of の探す場所からも外れる（設計 4.1）。
 		#
-		# 書き換えずに止める。打った綴りと起きたことが食い違うと、記録を読んだ
+		# 書き換えずに止める。打ったパスと起きたことが食い違うと、記録を読んだ
 		# ユーザが追えなくなる。
 		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと読み飛ばす。
 		# 知らないオプションは通さない。通すと行き先を取り違え、検査そのものが
-		# 意味を失う（2026-09-12 の決定）。
+		# 意味を失う。
 		#
-		# 行き先の名前とブランチ名を揃える（ADR-0093 の 3.1 の 10。段階 2b）。親のブランチ名は親の
+		# 行き先の名前とブランチ名を揃える。親のブランチ名は親の
 		# 識別子で、ワークツリーの名前も同じ。`-B`（既存のブランチの付け替え）・`--detach`（ブランチの
 		# 外）・`-f`（他のワークツリーが使うブランチや残った登録の上書き）は、その結び付きを崩すか、
 		# 親のブランチを別のコミットへ向け直すので通さない。
@@ -597,7 +597,7 @@ worktree)
 			;;
 		esac
 		if [ "$wt_ok" = no ]; then
-			# 案内は cwd に合わせた綴りで出す。絶対パスだけを出すと、受け取った側が
+			# 案内は cwd に合わせたパスで出す。絶対パスだけを出すと、受け取った側が
 			# そのまま打てはするが、次に別の場所から打つときに応用が効かない。
 			wt_name=$(basename "$wt_dest")
 			wt_here=$(ccnavi_abs .)
@@ -622,12 +622,12 @@ worktree)
 			esac
 			reject worktree-outside "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
 		fi
-		# 行き先の名前 = ブランチ名（ADR-0093 の 3.1 の 10）。-b が無く 2 つ目の語も無ければ、
+		# 行き先の名前 = ブランチ名。-b が無く 2 つ目の語も無ければ、
 		# git は行き先の名前でブランチを切るので揃う。
 		wt_leaf="${wt_abs##*/}"
-		# 親チケットの branch:（ADR-0100 の 5 章）。行き先の名前（識別子）の承認済みチケットが名乗る
+		# 親チケットの branch:。行き先の名前（識別子）の承認済みチケットが名乗る
 		# ブランチ名なら、行き先の名前と違うブランチを通す（提案の branch: は使わない）。名前は実行ファイルに聞く（sh は
-		# チケットを読まない）。聞けなければ識別子と同じ名前だけを通す（締める向き）。
+		# チケットを読まない）。聞けなければ識別子と同じ名前だけを通す（厳しくする向き）。
 		wt_home=""
 		if { [ -n "$wt_new" ] && [ "$wt_new" != "$wt_leaf" ]; } ||
 			{ [ -z "$wt_new" ] && [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; }; then
@@ -701,7 +701,7 @@ rm)
 	# 索引や HEAD と食い違うファイルを既定で拒む。`rm -rf` の代わりとして
 	# rules.yml が名指しで勧める経路なので、勧めた先が通らない形にはしない。
 	#
-	# 通さないのは -f（略した --forc と束の -rf も）。それを付けると、コミットしていない変更ごと消える。
+	# 通さないのは -f（略した --forc と、まとめた -rf も）。それを付けると、コミットしていない変更ごと消える。
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
 	# -r は通す。付けても、中の 1 つでも書きかけがあれば git が止める。
 	[ "$#" -eq 0 ] && reject rm-no-path "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
@@ -730,9 +730,9 @@ restore)
 	# 既定もこの形は止めない（ccnavi/policy/builtin.py）。
 	#
 	# 別のコミットの中身で戻す形（--source）と、衝突を片側の中身で解く形（--ours / --theirs）は、
-	# 承認済みチケットの置き場に当たるパスには使わせない（ADR-0093 の段階 0）。
-	# 置き場を過去の中身に戻すと、承認が無かったことにも、消えた印が戻ったことにもなる。
-	# 置き場の衝突は、どちらの承認を採るかをユーザが決める。オプションは許可リストで読む（段階 2b）。
+	# 承認済みチケットの置き場に当たるパスには使わせない。
+	# 置き場を過去の中身に戻すと、承認が無かったことにも、消えたマーカーが戻ったことにもなる。
+	# 置き場の衝突は、どちらの承認を採るかをユーザが決める。オプションは許可リストで読む。
 	[ "$#" -eq 0 ] && reject restore-no-path "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	rs_source=no
 	rs_side=no
@@ -780,7 +780,7 @@ merge)
 	# 止めるのは、衝突をユーザが見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
 	# もう一方の変更を気づかないうちに落とす。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、落ちたことは差分にも記録にも残らない。
-	# オプションは許可リストで読む（略した --strategy-o=ours・束の -sours も同じに読む。段階 2b）。
+	# オプションは許可リストで読む（略した --strategy-o=ours・まとめた -sours も同じに読む）。
 	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash" \
 		"message file strategy strategy-option" "log" "qvne" "mFsX"
 	merge_cb() {
@@ -803,11 +803,11 @@ merge-file)
 	# ファイルを書く手段は Edit / Write にそろえる。そちらなら hook が行き先を見られる。
 	#
 	# オプションは知っているものだけ通す。git は長いオプションの略記 (--std) も
-	# 打ち消し (--no-stdout) も受け取るので、知らない綴りを通すと -p を付けたつもりで
+	# 否定の形 (--no-stdout) も受け取るので、知らない表記を通すと -p を付けたつもりで
 	# 書き込みに戻る。-L と --marker-size は値を次の語で取る。`-L -p` の -p は
 	# ラベルで、-p を付けたことにならない (git はファイルを書く)。だから値ごと読み飛ばす。
 	# `--` の後ろはファイル名。そこに -p があっても数えない。
-	# 束ねた短いオプション (-pq) は分けて書かせる。1 文字ずつ読むと -L の値を取り違える。
+	# まとめた短いオプション (-pq) は分けて書かせる。1 文字ずつ読むと -L の値を取り違える。
 	#
 	# --object-id は通す。衝突の最中なら :2:<パス> :1:<パス> :3:<パス> を直に渡せて、
 	# 一時ファイルが要らない。-p が無いと結果をオブジェクトとしてリポジトリに書くが、
@@ -840,7 +840,7 @@ merge-file)
 commit)
 	# 通す。中身の点検は /commit スキルと ask ルールの側でやる。
 	# ここで見るのは、点検そのものを行わない形（--no-verify・-n）と、直前のコミットを書き換える
-	# --amend。オプションは許可リストで読む（略した --no-verif・束の -an も同じに読む。段階 2b）。
+	# --amend。オプションは許可リストで読む（略した --no-verif・まとめた -an も同じに読む）。
 	ow_spec "all quiet verbose signoff no-signoff only include allow-empty allow-empty-message dry-run short porcelain long branch null status no-status reset-author edit no-edit verify no-verify pathspec-file-nul amend" \
 		"message file author date cleanup trailer pathspec-from-file template fixup squash" "untracked-files" \
 		"aqvsoiezn" "mFt" "u"
@@ -862,15 +862,15 @@ checkout | switch)
 	# ブランチを移る形は通す。作業ツリーの中身を捨てる形だけ止める。
 	# `git checkout -- .` は、書きかけを何も言わずに消す。取り返せない。
 	#
-	# オプションは許可リストで読む（ADR-0093 の段階 2b のレビュー。ユーザの決定 A）。略した長い
-	# オプション（`--force-c`・`--det`・`--orph=`）は断り、束ねた短いオプションは 1 字ずつ読んで、
+	# オプションは許可リストで読む。略した長い
+	# オプション（`--force-c`・`--det`・`--orph=`）は断り、まとめた短いオプションは 1 字ずつ読んで、
 	# 値を取る字（checkout の b・B、switch の c・C）の後ろは値として扱う（`-qbnew` は -q -b new）。
 	#
-	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C・--force-create）は通さない
-	# （5.2。D36）。親のブランチを付け替えると、承認済みチケットの置き場ごと別の中身になる。
+	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C・--force-create）は通さない。
+	# 親のブランチを付け替えると、承認済みチケットの置き場ごと別の中身になる。
 	#
 	# `checkout <ref> <パス>` は `--` が無くてもパスを別のコミットの中身に戻す。承認済みチケットの
-	# 置き場に当たるパスは通さない（段階 0）。オプションでない最初の語が行き先か起点で、2 つ目からがパス。
+	# 置き場に当たるパスは通さない。オプションでない最初の語が行き先か起点で、2 つ目からがパス。
 	if [ "$sub" = checkout ]; then
 		ow_spec "quiet progress no-progress detach track no-track guess no-guess merge overlay no-overlay recurse-submodules no-recurse-submodules ignore-skip-worktree-bits force ours theirs" \
 			"orphan conflict pathspec-from-file" "track recurse-submodules" "qmtlf" "bB"
@@ -929,26 +929,26 @@ checkout | switch)
 		return 0
 	}
 	opt_walk checkout_cb ${1+"$@"}
-	# 親のワークツリー（.claude/worktrees/<P> で、親の写しか提案があるもの）では、許す形
-	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない（3.1 の 10）。
-	# 親の写しか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
+	# 親のワークツリー（.claude/worktrees/<P> で、親チケットか提案があるもの）では、許す形
+	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
+	# 親チケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
-	# このツリーへ取り込まなくなる。家族の控えがある親（親のブランチを一度でも origin へ push したか、
+	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
 	# ccnavi-sync.sh で取り込んだ親）では、実行ファイル（syncstate.standing）が親のワークツリーを決められず、
 	# 親と子のチケットの承認・状態の操作・実行前の判定を止める。
 	#
-	# 承認済みの branch: のブランチへ移る（ADR-0100 の 5 章）: 親のワークツリーが識別子のブランチの上に居て、
-	# 承認済みの親の写しが branch: <B> を名乗るときだけ、checkout / switch <B>（-b・--create も同じ）を
-	# 次の 1 操作にする。作業ツリーが綺麗で、途中の操作が無く、家族の控えが無いか識別子のブランチの
+	# 承認済みの branch: のブランチへ移る: 親のワークツリーが識別子のブランチの上に居て、
+	# 承認済みの親チケットが branch: <B> を名乗るときだけ、checkout / switch <B>（-b・--create も同じ）を
+	# 次の 1 操作にする。作業ツリーが綺麗で、途中の操作が無く、取り込み状態が無いか識別子のブランチの
 	# present のときだけ。B が無ければ今の先頭から切る。在れば（手元か origin）B へ移ってから識別子の
 	# ブランチを merge し、承認済みチケットとマーカーを B に乗せる。merge が落ちたら取りやめて識別子の
-	# ブランチへ戻る。家族の控えは、移った後に B を push したとき書き直る（push_record_family）。
+	# ブランチへ戻る。取り込み状態は、移った後に B を push したとき書き直る（push_record_family）。
 	co_carry() {
 		cc_B="$co_home"
 		cc_X="$co_name"
 		if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-			reject carry-dirty "親のブランチ $cc_B へ移る前に、作業ツリーの変更をコミットしてください（承認済みチケットとマーカーはコミットに入ったものだけが $cc_B へ運ばれます）。"
+			reject carry-dirty "親のブランチ $cc_B へ移る前に、作業ツリーの変更をコミットしてください（承認済みチケットとマーカーはコミットに入ったものだけが $cc_B へ移ります）。"
 		fi
 		for cc_mark in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply; do
 			if [ -e "$(git rev-parse --git-path "$cc_mark" 2>/dev/null)" ]; then
@@ -962,14 +962,14 @@ checkout | switch)
 			cc_state=$(ccnavi_record_get "$cc_record" state)
 			case "$cc_kept" in
 			'' | "$cc_X" | "$cc_B") ;;
-			*) reject carry-record "家族 $cc_X の控えは親のブランチを $cc_kept としています。$cc_B へは移りません。ユーザが確かめてください。" ;;
+			*) reject carry-record "親子のチケット $cc_X の取り込み状態は親のブランチを $cc_kept としています。$cc_B へは移りません。ユーザが確かめてください。" ;;
 			esac
 			[ "$cc_state" = present ] ||
-				reject carry-record "家族 $cc_X の控えが ${cc_state:-読めない} です。$cc_B へは移りません。$SYNC $cc_X の案内に従ってください。"
+				reject carry-record "親子のチケット $cc_X の取り込み状態が ${cc_state:-読めない} です。$cc_B へは移りません。$SYNC $cc_X の案内に従ってください。"
 		fi
 		cc_others=$(ccnavi_family_record_of_branch "$WS" "$cc_key" "$cc_B" | grep -v -x -F -- "$cc_record" || :)
 		if [ -n "$cc_others" ]; then
-			reject carry-claimed "$cc_B は別の家族（${cc_others##*/}）の親のブランチです。2 つの家族が同じブランチを名乗ると権威が決まらないので移りません。"
+			reject carry-claimed "$cc_B は別の親子のチケット（${cc_others##*/}）の親のブランチです。2 つの親子のチケットが同じブランチを名乗ると、どちらのチケットを本物とするか決まらないので移りません。"
 		fi
 		cc_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-carry) || reject carry-tmp "一時ファイルが作れません。"
 		if git show-ref --verify --quiet "refs/heads/$cc_B" || git show-ref --verify --quiet "refs/remotes/origin/$cc_B"; then
@@ -979,16 +979,16 @@ checkout | switch)
 				rm -f "$cc_out"
 				exit 1
 			fi
-			if ! git merge --no-edit -q -m "ccnavi: $cc_X の承認済みチケットを $cc_B へ運ぶ" "refs/heads/$cc_X" >"$cc_out" 2>&1; then
+			if ! git merge --no-edit -q -m "ccnavi: $cc_X の承認済みチケットを $cc_B へ取り込む" "refs/heads/$cc_X" >"$cc_out" 2>&1; then
 				git merge --abort >/dev/null 2>&1 || :
 				git checkout -q "$cc_X" >/dev/null 2>&1 || :
-				printf 'fail  git %s  %s の承認済みチケットを %s へ運べなかった（merge を取りやめて %s に戻った）。どちらを採るかはユーザに伝えてください\n' "$sub" "$cc_X" "$cc_B" "$cc_X"
+				printf 'fail  git %s  %s の承認済みチケットを %s へ取り込めなかった（merge を取りやめて %s に戻った）。どちらを採るかはユーザに伝えてください\n' "$sub" "$cc_X" "$cc_B" "$cc_X"
 				tail -n "$FAIL_LINES" "$cc_out"
 				rm -f "$cc_out"
 				log_info 親のブランチへ移れなかった -- "reason=carry-merge"
 				exit 1
 			fi
-			cc_how="既存のブランチ $cc_B へ移り、$cc_X を merge して承認済みチケットとマーカーを運んだ"
+			cc_how="既存のブランチ $cc_B へ移り、$cc_X を merge して承認済みチケットとマーカーを取り込んだ"
 		else
 			if ! git checkout -q -b "$cc_B" >"$cc_out" 2>&1; then
 				printf 'fail  git %s  親のブランチ %s を切れなかった\n' "$sub" "$cc_B"
@@ -1001,7 +1001,7 @@ checkout | switch)
 		rm -f "$cc_out"
 		log_info 親のブランチへ移った -- "family=$cc_X"
 		printf 'ok  git %s  親のブランチ %s へ移った\n' "$sub" "$cc_B"
-		printf '%s。続けて %s push -u origin %s を打つと、家族の控えが %s で作られる（書き直る）\n' "$cc_how" "$SELF" "$cc_B" "$cc_B"
+		printf '%s。続けて %s push -u origin %s を打つと、取り込み状態が %s で作られる（書き直る）\n' "$cc_how" "$SELF" "$cc_B" "$cc_B"
 		exit 0
 	}
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
@@ -1018,16 +1018,16 @@ checkout | switch)
 			elif [ "$co_words" -eq 1 ] || { [ "$co_words" -ge 2 ] && [ "$sub" = switch ]; }; then
 				co_to="$co_one"
 			fi
-			# 親のブランチは承認済みの親チケットの branch:（無ければ識別子。提案の branch: は使わない。
-			# ADR-0100 の 5 章）。移り先があるときだけ実行ファイルに聞く。聞けない・名前が使えないなら
-			# 識別子だけを親のブランチとする（締める向き）。
+			# 親のブランチは承認済みの親チケットの branch:（無ければ識別子。提案の branch: は使わない）。
+			# 移り先があるときだけ実行ファイルに聞く。聞けない・名前が使えないなら
+			# 識別子だけを親のブランチとする（厳しくする向き）。
 			co_home="$co_name"
 			case "$co_to" in
 			'' | HEAD) ;;
 			*) co_home=$(ccnavi_family_branch "$WS" "$co_name") || co_home="$co_name" ;;
 			esac
 			# 承認済みの branch: のブランチへ移る（識別子のブランチの上で承認を受けた後の 1 回だけ）。
-			# 移った先へ承認済みチケットとマーカーを運ぶので、ここで済ませて終える（co_carry）。
+			# 移った先へ承認済みチケットとマーカーを取り込むので、ここで済ませて終える（co_carry）。
 			co_cur=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 			if [ -n "$co_to" ] && [ "$co_to" = "$co_home" ] && [ "$co_home" != "$co_name" ] &&
 				[ "$co_cur" = "$co_name" ]; then
@@ -1046,7 +1046,7 @@ checkout | switch)
 
 fetch | pull)
 	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗になる。
-	# オプションは許可リストで読む（略した --prun・--rebas も断る。段階 2b）。
+	# オプションは許可リストで読む（略した --prun・--rebas も断る）。
 	if [ "$sub" = fetch ]; then
 		ow_spec "quiet verbose progress no-progress tags no-tags all dry-run no-recurse-submodules force prune prune-tags unshallow show-forced-updates no-show-forced-updates write-fetch-head no-write-fetch-head" \
 			"jobs depth deepen shallow-since" "" "qvntfpP" "j"
@@ -1068,8 +1068,8 @@ fetch | pull)
 			;;
 		pos)
 			# refspec（`+refs/heads/x:refs/heads/y`・`x:y`）は、取ってきたものを手元の
-			# ブランチへ直に書く。`+` は早送りでない書き換えも通す。取ってくるのはブランチ名だけにする
-			# （ADR-0093 の段階 0）。URL も `:` を含むので同じく止まる。取得先は設定済みのリモート名で書く。
+			# ブランチへ直に書く。`+` は早送りでない書き換えも通す。取ってくるのはブランチ名だけにする。
+			# URL も `:` を含むので同じく止まる。取得先は設定済みのリモート名で書く。
 			case "$2" in
 			*:* | *+*)
 				reject fetch-refspec "$2 は取ってきたものを手元の参照へ直に書く形（refspec）か URL です。取ってくるのはブランチ名だけで、$SELF $sub <リモート> <ブランチ> の形で書いてください。手元の ref は $SYNC <ブランチ> が進めます（親のワークツリー以外のブランチは、取ってきた後の $SELF merge <リモート>/<ブランチ>）。"
@@ -1088,7 +1088,7 @@ push)
 	#
 	# 通さないのは「戻せなくなる形」と「ユーザの判断を経ない形」の 2 つ。
 	# 履歴を書き換える force、消す delete、まとめて送る all/mirror/tags、
-	# 別の綴りへ送る refspec（`HEAD:main` が書ける）、そして統合先そのものへの直接の push。
+	# 別の名前へ送る refspec（`HEAD:main` が書ける）、そして統合先そのものへの直接の push。
 	# 統合はユーザがマージリクエストで行う。
 	push_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
@@ -1154,32 +1154,32 @@ push)
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
-	# 固定の並びに無い名前の統合先（develop-v1.0.0 など）も止める。名前は ccnavi-fetch.sh が
-	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の控え →
+	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。名前は ccnavi-fetch.sh が
+	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 →
 	# origin/HEAD → origin/main・master）で、このツリーが属するリポジトリ（プロジェクトならその
-	# プロジェクト）について決める。決まらなければ上の固定の並びだけで判定する。
+	# プロジェクト）について決める。決まらなければ上の固定のリストだけで判定する。
 	push_integ=$(ccnavi_integration "${push_top:-.}" "$WS") || push_integ=""
 	log_debug push の統合先 -- "integration=$push_integ"
 	if [ -n "$push_integ" ] && [ "$push_branch" = "$push_integ" ]; then
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 	fi
-	# リモートから消えた親のブランチ（家族の控えが gone）へは送らない（ADR-0093 の 3.6。段階 2b）。
-	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた家族）を確かめないまま家族が
-	# 動き出す。毎回の ls-remote はせず、控えを読むだけにする。ユーザが戻した後は ccnavi-sync.sh が
+	# リモートから消えた親のブランチ（取り込み状態が gone）へは送らない。
+	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
+	# 動き出す。毎回の ls-remote はせず、取り込み状態を読むだけにする。ユーザが戻した後は ccnavi-sync.sh が
 	# present に書き直して、この拒否が解ける。
-	# 控えは識別子を鍵にして、中の branch に親のブランチ名を持つ（ADR-0100 の 5 章）。居るブランチの名前で
-	# 控えの branch を探す（識別子と違う名前の親のブランチでも引ける）。
+	# 取り込み状態は識別子を鍵にして、中の branch に親のブランチ名を持つ。居るブランチの名前で
+	# 取り込み状態の branch を探す（識別子と違う名前の親のブランチでも引ける）。
 	push_key=$(ccnavi_repo_key "${push_top:-.}" "$WS")
 	push_record=$(ccnavi_family_record_of_branch "$WS" "$push_key" "$push_branch")
 	case "$push_record" in
 	*"
 "*)
-		reject push-ambiguous-family "$push_branch を親のブランチとする家族の控えが 2 つ以上あります（$(printf '%s' "$push_record" | sed 's|.*/||' | tr '\n' ' ')）。2 つの家族が同じブランチを名乗ると権威が決まらないので送りません。ユーザが確かめてください。"
+		reject push-ambiguous-family "$push_branch を親のブランチとする取り込み状態が 2 つ以上あります（$(printf '%s' "$push_record" | sed 's|.*/||' | tr '\n' ' ')）。2 つの親子のチケットが同じブランチを名乗ると、どちらのチケットを本物とするか決まらないので送りません。ユーザが確かめてください。"
 		;;
 	esac
 	if [ -n "$push_record" ] && [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
 		push_family="${push_record##*/}"
-		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（家族 $push_family の控えが gone）。普通の push で作り直すと、消えた理由を確かめないまま家族が動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_family が出します）、戻した後に $SYNC $push_family を打ち直すと送れます。家族を捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_family で家族の控えを消します（エージェントは打ちません）。"
+		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（親子のチケット $push_family の取り込み状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_family が出します）、戻した後に $SYNC $push_family を打ち直すと送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_family で取り込み状態を消します（エージェントは打ちません）。"
 	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do
@@ -1233,16 +1233,18 @@ clone | submodule | lfs)
 	;;
 esac
 
-# push が通ったら、親のブランチなら家族の控えを作る（ADR-0093 の 4.3「最初の push で C1 の対象に入る」。段階 2b）。
+# push が通ったら、親のブランチなら取り込み状態を作る。最初の push からその親子のチケットを C1 の
+# 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
 #
 # 送った先が親のブランチ（.claude/worktrees/<P> で、居るブランチが親のブランチ（親チケットの branch:、
-# 無ければディレクトリ名と同じ名前）、親の写しか提案がある）で、送り先が origin のときだけ。控えの鍵は
-# 識別子（ディレクトリ名）で、中の branch に親のブランチ名を書く（ADR-0100 の 5 章）。控えがあれば（present）sha を書き直すだけで、closed・
-# blocked は触らない。控えが無く、置き場に未コミットの変更があれば作らずに言う（未送信の状態を
-# 持ち込まないため）。控えがあると SessionStart の早送りと ccnavi-sync.sh の消えたかの確かめの対象になる。
+# 無ければディレクトリ名と同じ名前）、親チケットか提案がある）で、送り先が origin のときだけ。取り込み状態の
+# 鍵は識別子（ディレクトリ名）で、中の branch に親のブランチ名を書く。取り込み状態があれば（present）sha を
+# 書き直すだけで、closed・blocked は触らない。取り込み状態が無く、置き場に未コミットの変更があれば作らずに言う
+# （未送信の状態を持ち込まないため）。取り込み状態があると SessionStart の早送りと ccnavi-sync.sh の消えたかの
+# 確かめの対象になる。
 push_record_family() {
 	# 送り先は git と同じ順で解く: 引数のリモート → branch.<b>.pushRemote → remote.pushDefault →
-	# branch.<b>.remote → origin。origin 以外へ送ったなら控えを作らない（控えは origin の P を見る）。
+	# branch.<b>.remote → origin。origin 以外へ送ったなら取り込み状態を作らない（取り込み状態は origin の P を見る）。
 	pr_remote="${push_seen_remote:-}"
 	if [ -z "$pr_remote" ]; then
 		pr_remote=$(git config --get "branch.$push_branch.pushRemote" 2>/dev/null ||
@@ -1254,8 +1256,8 @@ push_record_family() {
 	"$WS_P"/.claude/worktrees/*) ;;
 	*) return 0 ;;
 	esac
-	# ワークツリーの名前が親の識別子で、居るブランチが親のブランチ（親チケットの branch:、無ければ識別子。
-	# ADR-0100 の 5 章）のときだけ。親のブランチ名は実行ファイルに聞き、聞けなければ識別子と同じ名前のときだけ。
+	# ワークツリーの名前が親の識別子で、居るブランチが親のブランチ（親チケットの branch:、無ければ識別子）の
+	# ときだけ。親のブランチ名は実行ファイルに聞き、聞けなければ識別子と同じ名前のときだけ。
 	pr_name="${push_top##*/}"
 	ccnavi_parent_tree "$push_top" "$pr_name" || return 0
 	pr_rc=0
@@ -1263,22 +1265,22 @@ push_record_family() {
 	case "$pr_rc" in
 	0) ;;
 	1) pr_want="$pr_name" ;; # 実行ファイルが無い。識別子と同じ名前のときだけ（前の動き）
-	*) return 0 ;;           # 名前が使えない・答えない。控えを作らない
+	*) return 0 ;;           # 名前が使えない・答えない。取り込み状態を作らない
 	esac
 	[ "$pr_want" = "$push_branch" ] || return 0
 	pr_sha=$(git rev-parse --verify --quiet HEAD 2>/dev/null || :)
 	[ -n "$pr_sha" ] || return 0
 	push_record=$(ccnavi_family_record "$WS" "$push_key" "$pr_name")
 	pr_kept=$(ccnavi_record_get "$push_record" branch)
-	# 控えが識別子のブランチのままなら、承認済みの branch: のブランチへ移った（co_carry）後の最初の push。
+	# 取り込み状態が識別子のブランチのままなら、承認済みの branch: のブランチへ移った（co_carry）後の最初の push。
 	# present のときだけ親のブランチ名を書き直す。
 	[ -z "$pr_kept" ] || [ "$pr_kept" = "$push_branch" ] || [ "$pr_kept" = "$pr_name" ] || return 0
 	pr_state=$(ccnavi_record_get "$push_record" state)
 	case "$pr_state" in
 	present)
 		if [ -n "$pr_kept" ] && [ "$pr_kept" != "$push_branch" ]; then
-			printf '案内: 家族 %s の控えの親のブランチを %s から %s に書き直した\n' "$pr_name" "$pr_kept" "$push_branch"
-			log_info 家族の控えの親のブランチを書き直した -- "family=$pr_name"
+			printf '案内: 親子のチケット %s の取り込み状態の親のブランチを %s から %s に書き直した\n' "$pr_name" "$pr_kept" "$push_branch"
+			log_info 取り込み状態の親のブランチを書き直した -- "family=$pr_name"
 		fi
 		ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
 			fetched_at "$(ccnavi_record_get "$push_record" fetched_at)" state present \
@@ -1293,14 +1295,14 @@ push_record_family() {
 	pr_dirty=$(git -C "$push_top" status --porcelain --untracked-files=all -- \
 		"${pr_approved%/}" "${pr_proposals%/}/review" 2>/dev/null | cut -c4- | tr '\n' ' ' | sed 's/ *$//')
 	if [ -n "$pr_dirty" ]; then
-		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この家族は取り込み（%s %s）の対象になる\n' \
+		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この親子のチケットは取り込み（%s %s）の対象になる\n' \
 			"$pr_dirty" "$SYNC" "$pr_name"
 		return 0
 	fi
 	if ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
 		fetched_at "$(date +%s)" state present reason ""; then
-		log_info 家族の控えを作った -- "family=$pr_name" "repo=$push_key"
-		printf '案内: %s の家族の控えを作った。以後、リモートでの承認は %s %s で取り込む\n' \
+		log_info 親子のチケットの取り込み状態を作った -- "family=$pr_name" "repo=$push_key"
+		printf '案内: %s の取り込み状態を作った。以後、リモートでの承認は %s %s で取り込む\n' \
 			"$pr_name" "$SYNC" "$pr_name"
 	fi
 	return 0
@@ -1340,7 +1342,7 @@ logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 status=0
 git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
 
-# 記録の綴り。エージェントがそのまま sed -n で開ける形で返す。
+# 記録のパス。エージェントがそのまま sed -n で開ける形で返す。
 #
 # 基準はワークスペースルート。モード B ではエージェントの cwd がプロジェクトの中に
 # あるので、git のトップからの相対を返すと届かない。ワークスペースの中に居るときは
@@ -1349,8 +1351,8 @@ case "$logfile" in
 "$WS"/*) logrel="${logfile#"$WS"/}" ;;
 *) logrel="$logfile" ;;
 esac
-# cwd から相対で開けないなら、絶対の綴りをそのまま返す。2 つ並べない。
-# 並べると、受け取った側がどちらを開くか迷い、綴りの切り出しも要る。
+# cwd から相対で開けないなら、絶対パスをそのまま返す。2 つ並べない。
+# 並べると、受け取った側がどちらを開くか迷い、パスの切り出しも要る。
 if [ ! -f "$logrel" ]; then
 	logrel="$logfile"
 fi

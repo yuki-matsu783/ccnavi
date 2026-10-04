@@ -1,17 +1,17 @@
-"""Chrome の承認・取り下げ（ADR-0093 の段階 3）の Python の入口の受入テスト。
+"""Chrome の承認・取り下げの Python の入口の受入テスト。
 
 見るのは 7 つ。
 
-1. 取り込みの控え相当: ホストに無く統合先でも閉じていない家族は `gone` で組み、その家族の
-   写しは決まらない（3.3 の 3・5）。判定の入力に読めない（バイナリの）ファイルがあれば止める
-2. 版ずれ（7.3・D31）: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
+1. 取り込み状態相当: ホストに無く統合先でも閉じていない親子のチケットは `gone` で組み、
+   その親子のチケットは決まらない。判定の入力に読めない（バイナリの）ファイルがあれば止める
+2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
    受けない
-3. 見せた一覧と指紋（8.3 の 2）: 違えば書くものを出さない
-4. 書く先は親のブランチ `P` だけ（8.4）。予約の名前・統合先の名前へは書かない（8.5）
-5. 跡の行に経路（chrome）・アカウント・拡張の版が入る（7.3・8.8）
-6. 手元の ccnavi が、Chrome の書いた写しを同じに読む（判定し直しで error が出ない）。
-   error が出れば、Chrome と手元の版の違いとして名指しする（7.3）
-7. 取り下げの可否をボードに出す（8.8）
+3. 見せた一覧とダイジェスト: 違えば書くものを出さない
+4. 書く先は親のブランチ `P` だけ。予約の名前・統合先の名前へは書かない
+5. 履歴の行に経路（chrome）・アカウント・拡張の版が入る
+6. 手元の ccnavi が、Chrome の書いた承認済みチケットを同じに読む（判定し直しで error が出ない）。
+   error が出れば、Chrome と手元の版の違いとして名指しする
+7. 取り下げの可否をボードに出す
 """
 
 from __future__ import annotations
@@ -78,16 +78,17 @@ class ChromeWriteHarness(CoreHarness):
 
 class RecordsTest(ChromeWriteHarness):
     def test_an_absent_family_is_gone_and_its_stale_copy_is_undecided(self):
-        """P の上に古い写し（閉じた i0009-01）があっても、i0009 がホストに無ければ決まらない。"""
+        """P の上に古いチケット（閉じた i0009-01-01）があっても、
+        i0009 がホストに無ければ決まらない。"""
         self.family(plan=["research"])
-        text = child_text("i0009-01", "i0009", 1, ["wip/research/*"], False).replace(
+        text = child_text("i0009-01-01", "i0009", 1, ["wip/research/*"], False).replace(
             'completed_at: ""', 'completed_at: "2026-01-01T00:00:00+0000"'
         )
-        write(os.path.join(self.approved, "done", "i0009-01.md"), text)
-        child = child_text("i0001-01", "i0001", 1, ["wip/research/*"], False).replace(
-            "human_review:", 'predecessors: ["i0009-01"]\nhuman_review:', 1
+        write(os.path.join(self.approved, "done", "i0009-01-01.md"), text)
+        child = child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], False).replace(
+            "human_review:", 'predecessors: ["i0009-01-01"]\nhuman_review:', 1
         )
-        self.propose("i0001-01", child)
+        self.propose("i0001-01-01", child)
         self.commit_parent()
         request = self.chrome_request("plan", "i0001")
         request["snapshot"]["absent"] = ["i0009"]
@@ -96,13 +97,16 @@ class RecordsTest(ChromeWriteHarness):
         self.assertNotIn("error", body, body)
         self.assertEqual(body["identifiers"], [])
         rejected = {r["ticket"]: r["problems"] for r in body["rejected"]}
-        self.assertTrue(any("i0009" in p and "gone" in p for p in rejected["i0001-01"]), rejected)
+        self.assertTrue(
+            any("i0009" in p and "gone" in p for p in rejected["i0001-01-01"]), rejected
+        )
         records = _chrome().records(
             request["snapshot"], _chrome()._placement(None), ["i0001", "i0009"]
         )
         self.assertIn("state gone", records["sync/self/families/i0009"])
         self.assertIn("state present", records["sync/self/families/i0001"])
-        # 先頭の sha は控えに書かない（指紋が関係の無い push で変わらないように。6.2）
+        # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
+        # 6.2）
         self.assertTrue(all("sha" not in text for text in records.values() if "\n" in text))
 
     def test_an_unreadable_input_stops_the_board_and_the_plan(self):
@@ -128,11 +132,11 @@ class WriteGuardTest(ChromeWriteHarness):
         self.assertEqual([e["ticket"] for e in board["batch"]], ["i0001"])
         shown = {"ids": first["identifiers"], "digest": first["digest"]}
         refused = self.answer(self.chrome_request("plan", "i0001", shown=shown))
-        self.assertIn("7.3", refused["error"])
+        self.assertIn("互換", refused["error"])
         withdraw = self.answer(
             self.chrome_request("withdraw", "i0001", ids=["i0001"], prior={"i0001": "x"})
         )
-        self.assertIn("7.3", withdraw["error"])
+        self.assertIn("互換", withdraw["error"])
 
     def test_a_different_digest_writes_nothing(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
@@ -142,7 +146,7 @@ class WriteGuardTest(ChromeWriteHarness):
         body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
         self.assertIsNotNone(body["mismatch"])
         self.assertIsNone(body["changes"])
-        # 見せた後に提案が変われば、同じ指紋でも書かない
+        # 見せた後に提案が変われば、同じダイジェストでも書かない
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.commit_parent()
         shown = {"ids": first["identifiers"], "digest": first["digest"]}
@@ -188,23 +192,26 @@ class WrittenCopyTest(ChromeWriteHarness):
 
     def test_the_local_ccnavi_reads_what_chrome_wrote_the_same(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         body = self.plan()
-        self.assertEqual(body["identifiers"], ["i0001", "i0001-01"])
+        self.assertEqual(body["identifiers"], ["i0001", "i0001-01-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        # 手元の控えは Chrome と同じ（取り込み済みの家族）。判定し直し（C3）で error が出ない
+        # 手元の取り込み状態は Chrome と同じ（取り込み済みの親子のチケット）。
+        # 判定し直し（C3）で error が出ない
         self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual(preview["batch"], [])
         explained = self.ccnavi("--lint", "--json")
         errors = [p for p in json.loads(explained.stdout)["problems"] if p["severity"] == "error"]
         self.assertEqual(errors, [])
-        events, _ = history.read(self.approved, "i0001-01")
+        events, _ = history.read(self.approved, "i0001-01-01")
         self.assertEqual(events[-1]["via"], "chrome")
         # 子のワークツリーを切って着手の判定が通る形（手元の続きの操作が読める）
         doing = os.path.join(self.approved, "doing")
-        self.assertEqual(sorted(os.listdir(doing)), ["i0001-01.md", "i0001.md"])
+        self.assertEqual(sorted(os.listdir(doing)), ["i0001-01-01.md", "i0001.md"])
 
     def test_a_disagreement_names_the_chrome_and_local_versions(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
@@ -216,14 +223,14 @@ class WrittenCopyTest(ChromeWriteHarness):
             text = f.read()
         write(copy, text.replace("  - research", "  - no-such-phase", 1))
         problems = lint.family_check(self.conf(), self.root, "i0001", "self")
-        self.assertTrue(problems, "壊した写しは判定し直しで error になる")
+        self.assertTrue(problems, "壊した承認済みチケットは判定し直しで error になる")
         self.assertTrue(
             problems[0].detail.startswith(f"Chrome 9.9.9 と手元 {version.VERSION} で判定が違う: "),
             problems[0].detail,
         )
 
     def test_a_later_local_touch_is_not_blamed_on_chrome(self):
-        """Chrome の承認の後に手元の跡（着手など）があれば、違いを Chrome の版のせいにしない。"""
+        """Chrome の承認の後に手元の履歴（着手など）があれば、違いを Chrome の版のせいにしない。"""
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         body = self.plan()
@@ -269,7 +276,7 @@ class EntryDetailTest(ChromeWriteHarness):
             ("confirm", {"phase": 1, "result": {"host": "h", "mr": {"number": 1, "url": "u"}}}),
         ):
             body = self.answer(self.chrome_request(op, "i0001", **extra))
-            self.assertIn("7.3", body.get("error", ""), op)
+            self.assertIn("互換", body.get("error", ""), op)
 
 
 class WithdrawableTest(ChromeWriteHarness):
@@ -291,7 +298,10 @@ class WithdrawableTest(ChromeWriteHarness):
 
 class ProjectTest(ChromeWriteHarness):
     def test_a_proposal_naming_a_project_is_not_approved_from_the_workspace(self):
-        """段階 3 はワークスペースのリポジトリだけ。プロジェクトの提案は承認しない（3.3 の 7）"""
+        """Chrome の承認はワークスペースのリポジトリだけ。プロジェクトの提案は承認しない。
+
+        プロジェクトのリポジトリが拡張に登録されていなければ、プロジェクトが絡む提案は承認しない。
+        """
         text = parent_text("i0001", ["research"]).replace(
             "ticket: i0001\n", "ticket: i0001\nproject: web\n", 1
         )

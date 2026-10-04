@@ -1,10 +1,10 @@
-"""プロジェクトのスキルの目録（名前・説明・場所）を組む（ADR-0091）。
+"""プロジェクトのスキルの目録（名前・説明・場所）を組む。
 
-プロジェクトは `.claude/` を持たない（ADR-0033）。Claude Code がそこのスキルを読み、
+プロジェクトは `.claude/` を持たない。Claude Code がそこのスキルを読み、
 ワークスペースルートの決め方も最初の `.claude/` で止まるため。そこで、プロジェクト向けの
 スキルの形をした手順書はプロジェクトの `docs/skills/<名前>/SKILL.md` に置き、ccnavi は
 目録だけを渡す。本文はエージェントが要るときに自分で開く。置き場は ccnavi ディレクトリ
-（`.ccnavi/`）の外で、ふつうのファイルと同じくチケットの範囲の中でだけ書ける（守りは変えない）。
+（`.ccnavi/`）の外で、ふつうのファイルと同じくチケットの範囲の中でだけ書ける（保護は変えない）。
 
 渡すのは cwd がそのプロジェクトのツリー（元リポジトリか、そこから切ったワークツリー）の
 中にあるときだけ。読むのは元リポジトリの版で、ワークツリーに checkout された版は読まない
@@ -27,7 +27,8 @@ from ..infra import hookio, settings, tree
 from ..policy import ctxfile, rules
 from ..tickets import flow
 
-# プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（ADR-0091）。
+# プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（中は組み込みの保護が丸ごと
+# 止めるので、承認したチケットの中でもエージェントが書けない）。
 SKILLS_DIR = "docs/skills"
 SKILL_FILE = "SKILL.md"
 # 目録に載せる数の上限。超えた分は数だけ言う。
@@ -43,7 +44,7 @@ FENCE_CLOSE = "  ---- 目録ここまで ----"
 # 目録に載せるスキルのディレクトリ名。これ以外（改行・空白・括弧・区切りに似た文など）を持つ
 # 名前は読まない。パスは文にそのまま出るので、名前で文を組み立てさせない。
 NAME = re.compile(r"^[A-Za-z0-9._-]+$")
-# 1 度だけ渡す文の数えの鍵（`ctxfile` の控え）。プロジェクトごとに分ける。
+# 1 度だけ渡す文の数えの鍵（`ctxfile` の記録）。プロジェクトごとに分ける。
 ONCE_ID = "builtin-project-skills"
 
 
@@ -69,7 +70,7 @@ def _front(raw: bytes) -> dict:
 
 
 def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str, str, str]], int]:
-    """(名前, 説明, 相対パス) の並びと、上限で落とした数。名前の順。"""
+    """(名前, 説明, 相対パス) のリストと、上限で落とした数。名前の順。"""
     base = skills_dir(project_root)
     try:
         names = sorted(os.listdir(base))
@@ -113,8 +114,8 @@ def notice(
 
     `SessionStart` と `SubagentStart`（`at_start`）に加え、cwd がプロジェクトの中にある最初の
     `PreToolUse` でも呼ぶ。セッションはワークスペースルートで始まり、あとから `cd` で入るのが
-    ふつうなので、開始だけでは届かない。数えは `additionalContextOnce` と同じ控えに置き、
-    `SessionStart`（compact の後を含む）で忘れる。控えの置き場が無いときは、開始では渡し、
+    ふつうなので、開始だけでは届かない。数えは `additionalContextOnce` と同じ記録に置き、
+    `SessionStart`（compact の後を含む）で忘れる。記録の置き場が無いときは、開始では渡し、
     `PreToolUse` では渡さない（呼び出しのたびに目録を重ねて渡さない）。
     """
     project = project_of(conf, root, payload.cwd)

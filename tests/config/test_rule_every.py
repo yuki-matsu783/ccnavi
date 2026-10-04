@@ -13,11 +13,12 @@
 例外を覚えなくてよい。ここを先に固定しておかないと、`additionalContextOnce` が
 1 回目に届く形へ戻る。
 
-数えの置き場は `additionalContextOnce` の控えと同じ（`logs/state/once-<session>-<agent>.json`）で、
-文脈の分け方も同じ（セッションと、サブエージェントならその 1 回の起動）。控えを置く場所が
+数えの置き場は `additionalContextOnce` の記録と同じ（`logs/state/once-<session>-<agent>.json`）で、
+文脈の分け方も同じ（セッションと、サブエージェントならその 1 回の起動）。記録を置く場所が
 無いとき（`--state ""`）は毎回渡す（`ctxfile.py` の既存の決まり）。
 
-実装は入っている（ADR-0057）。ここが落ちたら、`every` の刻みが上の表と食い違ったということ。
+実装は入っている。しきい値と文面は設定が持ち、実行ファイルは当たった回数を数えるだけ。
+ここが落ちたら、`every` の刻みが上の表と食い違ったということ。
 `--lint` の検査は tests/core/test_lint_every.py。
 """
 
@@ -59,8 +60,7 @@ class EveryTest(unittest.TestCase):
     def rules(self, *allow: dict) -> str:
         """共通層の既定の場所にルールを 1 本置く。
 
-        `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には届かない
-        （ADR-0067）。
+        `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には届かない。
         """
         body = {
             "version": 1,
@@ -129,12 +129,12 @@ class EveryTest(unittest.TestCase):
         return [self.hit(**kw) for _ in range(times)]
 
     def saved(self) -> str:
-        """控えに残った本文を全部つないだもの。何も残っていなければ空。"""
+        """記録に残った本文を全部つないだもの。何も残っていなければ空。"""
         if not os.path.isdir(self.state):
             return ""
         bodies = []
         for name in sorted(os.listdir(self.state)):
-            # 控えは once-<session>-<agent>.json。同じ置き場に selfguard/ などもある。
+            # 記録は once-<session>-<agent>.json。同じ置き場に selfguard/ などもある。
             if not name.startswith("once-") or not name.endswith(".json"):
                 continue
             with open(os.path.join(self.state, name), encoding="utf-8") as f:
@@ -196,7 +196,7 @@ class EveryTest(unittest.TestCase):
         self.assertEqual(got[9], f"{EVERY}\n\n渡す回のたびの本文")
         self.assertEqual([g for i, g in enumerate(got) if i not in (4, 9)], [""] * 8)
 
-    # --- 控え ---------------------------------------------------------------
+    # --- 記録 ---------------------------------------------------------------
 
     def test_the_count_is_split_by_session_and_agent(self):
         """数えはセッションと `agent_id` で分かれる。サブエージェントは自分の数えを持つ。"""
@@ -215,7 +215,7 @@ class EveryTest(unittest.TestCase):
         self.assertEqual(self.hits(3, state=""), [f"{EVERY}\n\n{ONCE}"] * 3)
 
     def test_rules_with_neither_every_nor_once_leave_no_count(self):
-        """`every` も `Once` も持たないルールは、控えに数えを書かない。"""
+        """`every` も `Once` も持たないルールは、記録に数えを書かない。"""
         self.rules(rule("plain", additionalContext=EVERY))
         self.assertEqual(self.hits(3), [EVERY] * 3)
         self.assertNotIn("plain", self.saved())

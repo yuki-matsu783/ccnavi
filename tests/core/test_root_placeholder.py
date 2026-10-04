@@ -34,7 +34,7 @@ class RootPlaceholderTest(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.root = os.path.realpath(self.dir.name)
         self.addCleanup(self.dir.cleanup)
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = write(
             common_path(self.root, "rules"),
             json.dumps(
@@ -129,11 +129,11 @@ class RootPlaceholderTest(unittest.TestCase):
     def test_glob_form_and_spelling_of_the_root(self):
         out = self.judge("Write", os.path.join(self.root, "wip", "a.md"))
         self.assertIn("wip", out.get("permissionDecisionReason", ""))
-        # 綴りを変えても行き着く先で当たる。`..` と、大文字小文字。
+        # 表記を変えても行き着く先で当たる。`..` と、大文字小文字。
         detour = os.path.join(self.root, "docs", "..", "README.md")
         self.assertEqual(self.judge("Write", detour).get("permissionDecision"), "deny")
-        # ワークスペースルートの綴りも、どの機械でも区別せずに当てる。区別する機械では
-        # 別の場所を指す綴りだが、それでも止める側を採る（`{root}` を機械で変えない）。
+        # ワークスペースルートのパスも、どの機械でも区別せずに当てる。区別する機械では
+        # 別の場所を指すパスだが、それでも止める側を採る（`{root}` を機械で変えない）。
         swapped = os.path.join(self.root.swapcase(), "README.md")
         self.assertEqual(self.judge("Write", swapped).get("permissionDecision"), "deny")
 
@@ -163,7 +163,7 @@ class RootPlaceholderTest(unittest.TestCase):
         self.assertTrue(any("{root}" in str(p) for p in problems), problems)
         rule_set, problems = rules.load(self.rules, self.root)
         self.assertEqual(problems, [])
-        # 書いた綴りは残り、置き換わるのは翻訳後の式だけ。
+        # 書いた表記は残り、置き換わるのは翻訳後の式だけ。
         self.assertEqual(rule_set.deny[0].regex, MAIN_TREE)
         self.assertNotIn("{root}", rule_set.deny[0].compiled.pattern)
 

@@ -5,7 +5,7 @@
  *   拡張の Worker と同じ中身
  * - `nativePy`: 手元の CPython（リポジトリの uv の環境）で入口を 1 行 1 要求で回すもの
  *
- * 同じ要求を両方に投げて答えを比べる（ADR-0093 の 6.2「同じ答えを出すことの確かめ方」）。
+ * 同じ要求を両方に投げて答えを比べ、拡張と手元が同じ判定を出すことを確かめる。
  */
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";

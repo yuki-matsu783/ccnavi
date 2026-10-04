@@ -1,19 +1,19 @@
-"""親チケットの `branch:`（ADR-0100 の 5 章）の読み方・承認・lint・Chrome の入口。
+"""親チケットの `branch:`の読み方・承認・lint・Chrome の入口。
 
 一時ディレクトリの git で、識別子 `feature-12-login` の親に `branch: feature/12-login` を書く。
 見るのは次のとおり（sh を通す主な経路は tests/sh/test_branch_field_sh.py が見る）。
 
-1. 字と形（`ticket.branch_problem`）。保護されたブランチの名前と git で使えない綴りは error
+1. 字と形（`ticket.branch_problem`）。保護されたブランチの名前と git で使えない表記は error
 2. 子に書いた `branch:` は warn で読まない。使えない名前の提案は読めない（error）
 3. 承認画面と JSON: 「■ ブランチ」と「既存のブランチ <名前> を使う」/「新しく切るブランチ」、
    `branch`・`existing_branch`。既にあるブランチとのぶつかりの warn は出さない
 4. 改版で `branch:` を変えさせない。統合先の名前に当たる `branch:` は承認しない
 5. lint: 親のワークツリーが親のブランチ（`branch:` の値）の上に居なければ warn
-6. Chrome の入口: 家族はそのブランチを名乗る承認済みの親の写しで決まり（承認前の提案は識別子で
-   名乗る）、書くものはそのブランチだけ。同じ家族を名乗るブランチが 2 本あれば、先行の家族でも
+6. Chrome の入口: 親子のチケットはそのブランチを名乗る承認済みの親チケットで決まり（承認前の提案は識別子で
+   名乗る）、書くものはそのブランチだけ。同じ親子のチケットを名乗るブランチが 2 本あれば、先行の親子のチケットでも
    決めない
 7. 承認前の提案の `branch:` は c1 family も lint も使わない。統合先（origin/HEAD を含む）と、
-   2 つの家族が同じブランチを名乗る形は承認しない
+   2 つの親子のチケットが同じブランチを名乗る形は承認しない
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from tests.ticket.test_ticket import RULES, git, write
 
 PARENT = "feature-12-login"
 BRANCH = "feature/12-login"
-CHILD = PARENT + "-01"
+CHILD = PARENT + "-01-01"
 HEAD = "0" * 40
 
 
@@ -265,8 +265,8 @@ class BranchFieldApprovalTest(unittest.TestCase):
         self.propose(where=self.root, branch=other)
         body = self.preview()
         problems = " ".join(" ".join(r["problems"]) for r in body["rejected"])
-        self.assertIn(f"親のブランチ {other} を別の家族（{other}）も", problems)
-        # どちらの家族のブランチか決まらないので、両方とも承認しない
+        self.assertIn(f"親のブランチ {other} を別の親子のチケット（{other}）も", problems)
+        # どちらの親子のチケットのブランチか決まらないので、両方とも承認しない
         self.assertEqual(sorted(r["ticket"] for r in body["rejected"]), sorted([PARENT, other]))
 
     def test_lint_warns_when_the_parent_tree_is_off_its_branch(self):
@@ -334,8 +334,8 @@ def _approved(text):
 
 
 def _family_files(branch=BRANCH, ident=PARENT, predecessors=()):
-    """親のブランチの置き場。承認済みの親の写し（`branch:` 付き）と、承認待ちの子の提案。"""
-    child = child_text(f"{ident}-01", ident, 1, ["wip/research/*"], False)
+    """親のブランチの置き場。承認済みの親チケット（`branch:` 付き）と、承認待ちの子の提案。"""
+    child = child_text(f"{ident}-01-01", ident, 1, ["wip/research/*"], False)
     if predecessors:
         lines = child.split("\n")
         lines[5:5] = ["predecessors:", *[f"  - {p}" for p in predecessors]]
@@ -344,7 +344,7 @@ def _family_files(branch=BRANCH, ident=PARENT, predecessors=()):
         f".ccnavi/approved/doing/{ident}.md": _approved(
             with_branch(parent_text(ident, ["research"], allow=("src/*", "wip/*")), branch)
         ),
-        f"wip/proposals/todo/{ident}-01.md": child,
+        f"wip/proposals/todo/{ident}-01-01.md": child,
     }
 
 
@@ -366,7 +366,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
                     else {BRANCH: {"head": HEAD, "files": _family_files()}}
                 ),
             },
-            # 識別子と同じ名前のブランチ（同じ家族を名乗るかを確かめに読む）はホストに無い
+            # 識別子と同じ名前のブランチ（同じ親子のチケットを名乗るかを確かめに読む）はホストに無い
             "absent": [PARENT] if absent is None else absent,
         }
         request = {
@@ -389,7 +389,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         )
 
     def test_a_proposal_claims_only_its_identifier(self):
-        """承認前の提案の branch: では名乗らない（識別子のブランチの家族として読む）。"""
+        """承認前の提案の branch: では名乗らない（識別子のブランチの親子のチケットとして読む）。"""
         proposal = {
             f"wip/proposals/todo/{PARENT}.md": with_branch(
                 parent_text(PARENT, ["research"], allow=("src/*",)), BRANCH
@@ -449,7 +449,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
             )
         }
         branches = {
-            BRANCH: {"head": HEAD, "files": _family_files(predecessors=(f"{other}-01",))},
+            BRANCH: {"head": HEAD, "files": _family_files(predecessors=(f"{other}-01-01",))},
             "feature/20-dep": {"head": HEAD, "files": dep},
             other: {"head": HEAD, "files": dep2},
         }
@@ -457,7 +457,8 @@ class ChromeBranchFieldTest(unittest.TestCase):
         self.assertEqual(closure["ambiguous"], [other])
         board = self.ask("board", branches=branches)
         self.assertIn(
-            "先行の家族（feature-20-dep）を名乗るブランチが 1 本でない", board["undecided"]
+            "先行の親子のチケット（feature-20-dep）を名乗るブランチが 1 本でない",
+            board["undecided"],
         )
 
     def test_the_closure_asks_for_the_identifier_branch(self):

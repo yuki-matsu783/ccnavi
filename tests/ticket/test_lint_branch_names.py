@@ -1,15 +1,16 @@
-"""識別子を親のブランチ名にできるかを `--lint` が warn で言う（ADR-0093 の段階 0、ADR-0100）。
+"""識別子を親のブランチ名にできるかを `--lint` が warn で言う。
 
-親のブランチ名は親の識別子そのものにする。段階 0 では承認も判定も変えず、
+親のブランチ名は親の識別子そのものにする。ここでは承認も判定も変えず、
 `--lint` の warn だけを足す。
 見るのは 4 つ。
 
 1. 新規の提案の識別子の形: ブランチ名として安全でない（`..`・`.lock`・`.` で終わる）、統合先や
-   保護されたブランチの名前、`<先頭の語>-<番号>-<slug>` の形でない（ADR-0100）、番号の重なり、
+   保護されたブランチの名前、`<先頭の語>-<番号>-<slug>` の形でない、番号の重なり、
    既にあるブランチと同じ名前
 2. 承認済み・閉じた識別子には 1 を言わない（もう変えられないので、言っても常態になるだけ）
 3. 大文字小文字だけが違う識別子
-4. 子の形（`<親>-<2 桁>`）に当たる親の識別子
+4. 末尾が `-<2 桁>` の親の識別子（`-<2 桁>-<2 桁>` なら子の形そのもの、`-<2 桁>` だけなら
+   子の識別子の途中と紛れる）
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from ccnavi.infra import settings
 from ccnavi.tickets import ticket as ticket_mod
 from tests.inproc import run_ccnavi
 
-ADRS = ("ADR-0093", "ADR-0100")
+ADR = "（親のブランチ名の規則）"
 
 
 def write(path, text):
@@ -100,20 +101,20 @@ class BranchNameRulesTest(unittest.TestCase):
                 self.assertTrue(any("統合先" in f for f in found), found)
 
     def test_the_integration_branch_is_reserved_when_given(self):
-        # その時点の統合先の名前（D30。段階 2b）。環境変数は読まず、渡されたときだけ見る。
+        # その時点の統合先の名前。環境変数は読まず、渡されたときだけ見る。
         ticket = ticket_mod.Ticket(ticket="Trunk")
         self.assertFalse(any("統合先" in f for f in ticket_mod.branch_name_problems(ticket)))
         found = ticket_mod.branch_name_problems(ticket, "trunk")
         self.assertIn("統合先の名前（trunk）", found[0])
-        # 固定の並びに当たるものは 1 行だけ。
+        # 固定のリストに当たるものは 1 行だけ。
         main = ticket_mod.branch_name_problems(ticket_mod.Ticket(ticket="main"), "main")
         self.assertEqual(1, len([f for f in main if "統合先" in f]), main)
         # 子は見ない。
-        child = ticket_mod.Ticket(ticket="trunk-01", parent="trunk")
-        self.assertEqual([], ticket_mod.branch_name_problems(child, "trunk-01"))
+        child = ticket_mod.Ticket(ticket="trunk-01-01", parent="trunk")
+        self.assertEqual([], ticket_mod.branch_name_problems(child, "trunk-01-01"))
 
     def test_names_outside_the_form_are_named(self):
-        """ADR-0100: 新しい親は `<先頭の語>-<番号>-<slug>`。前の形とユーザが付けた名前は warn。"""
+        """新しい親は `<先頭の語>-<番号>-<slug>`。前の形とユーザが付けた名前は warn。"""
         for name, issue, word in (
             ("i0131", 131, "`i<番号>` の形はもう使わない"),
             ("I0131", None, "`i<番号>` の形はもう使わない"),
@@ -129,7 +130,6 @@ class BranchNameRulesTest(unittest.TestCase):
                 found = self.problems(name, issue=issue)
                 self.assertEqual(1, len(found), found)
                 self.assertIn(word, found[0])
-                self.assertIn("ADR-0100", found[0])
 
     def test_the_next_serial_is_suggested(self):
         found = self.problems("login", serial=72)
@@ -219,25 +219,32 @@ class BranchNameRulesTest(unittest.TestCase):
 
     def test_next_serial(self):
         self.assertEqual(1, ticket_mod.next_serial([]))
-        self.assertEqual(1, ticket_mod.next_serial(["login", "abc-01"]))
+        self.assertEqual(1, ticket_mod.next_serial(["login", "abc-01-01"]))
         self.assertEqual(
             71,
             ticket_mod.next_serial(
-                ["i0062", "feature-63-x", "hotfix-70-y", "i0062-01", "web-i0012", "feature-99-z-01"]
+                [
+                    "i0062",
+                    "feature-63-x",
+                    "hotfix-70-y",
+                    "i0062-01-01",
+                    "web-i0012",
+                    "feature-99-z-01-01",
+                ]
             ),
         )
         self.assertEqual(3, ticket_mod.next_serial(["spike-9-x", "fix-2-y"]))
         self.assertEqual(10, ticket_mod.next_serial(["spike-9-x"], ("spike",)))
 
     def test_children_are_only_checked_for_ref_safety(self):
-        # 子の識別子は `<親>-<2 桁>` で、親の名前の規則は親の側で見る。
-        self.assertEqual([], self.problems("i0131-01", parent="i0131"))
-        self.assertEqual([], self.problems("main-01", parent="main"))
-        self.assertEqual([], self.problems("feature-1-統合-01", parent="feature-1-統合"))
+        # 子の識別子は `<親>-<2 桁>-<2 桁>` で、親の名前の規則は親の側で見る。
+        self.assertEqual([], self.problems("i0131-01-01", parent="i0131"))
+        self.assertEqual([], self.problems("main-01-01", parent="main"))
+        self.assertEqual([], self.problems("feature-1-統合-01-01", parent="feature-1-統合"))
 
 
 class PrefixSettingTest(unittest.TestCase):
-    """`CCNAVI_BRANCH_PREFIXES`（ADR-0100）。ファイルを書かなくても既定の並びで足りる。"""
+    """`CCNAVI_BRANCH_PREFIXES`。ファイルを書かなくても既定のリストで足りる。"""
 
     def test_parse(self):
         self.assertEqual(
@@ -324,7 +331,7 @@ class LintBranchNamesTest(unittest.TestCase):
             input="",
             env=environment,
         )
-        return [line for line in result.stdout.splitlines() if any(a in line for a in ADRS)]
+        return [line for line in result.stdout.splitlines() if ADR in line]
 
     def test_new_proposals_are_named(self):
         self.propose("i0131")
@@ -391,7 +398,7 @@ class LintBranchNamesTest(unittest.TestCase):
         self.propose("trunk")
         reserved = [line for line in self.lint() if "統合先" in line]
         self.assertEqual([], reserved)
-        # 環境変数は読まない（sh が決めて --integration-branch で渡す。D30）。
+        # 環境変数は読まない（sh が決めて --integration-branch で渡す）。
         lines = self.lint(env={"CCNAVI_INTEGRATION_BRANCH": "trunk"})
         self.assertEqual([], [line for line in lines if "統合先" in line])
         lines = [line for line in self.lint("--integration-branch", "trunk") if "統合先" in line]
@@ -399,7 +406,8 @@ class LintBranchNamesTest(unittest.TestCase):
         self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
     def test_the_name_ccnavi_sync_recorded_is_reserved(self):
-        # --integration-branch が無ければ、ccnavi-sync.sh が控えに書いた名前を読む（決定 B3）。
+        # --integration-branch が無ければ、
+        # ccnavi-sync.sh が取り込み結果に書いた名前を読む。
         self.propose("trunk")
         write(
             os.path.join(self.ws, "state", "sync", "self", "integration", "head"),
@@ -443,15 +451,32 @@ class LintBranchNamesTest(unittest.TestCase):
         )
 
     def test_a_parent_shaped_like_a_child(self):
+        self.place("done", "abc-01-02")
+        lines = self.lint()
+        self.assertEqual(1, len(lines), lines)
+        self.assertIn("abc-01-02 は親なのに、識別子が子の形", lines[0])
+        self.assertIn("abc の子として扱われる", lines[0])
+        self.assertIn("末尾を `-<2 桁>` にしない", lines[0])
+
+    def test_a_parent_ending_in_two_digits_is_still_named(self):
+        # 右から 2 段を剥がすので親の割り出しは誤らないが、別の親の子の途中
+        # （`<親>-<フェーズ>`）と紛れる。
+        # 旧い形の子と同じ綴りなので、今までどおり warn にする。
         self.place("done", "abc-01")
         lines = self.lint()
         self.assertEqual(1, len(lines), lines)
-        self.assertIn("abc-01 は親なのに、識別子が子の形", lines[0])
-        self.assertIn("abc の子として扱われる", lines[0])
+        self.assertIn("abc-01 は親なのに、識別子の末尾が `-<2 桁>`", lines[0])
+        self.assertIn("子の識別子の途中", lines[0])
+        self.assertNotIn("の子として扱われる", lines[0])
+
+    def test_a_parent_ending_in_one_digit_is_not_named(self):
+        self.place("done", "abc-1")
+        self.place("done", "web-i0012")
+        self.assertEqual([], self.lint())
 
     def test_real_children_are_not_named(self):
         self.place("doing", "abc")
-        self.place("doing", "abc-01", parent="abc")
+        self.place("doing", "abc-01-01", parent="abc")
         self.assertEqual([], self.lint())
 
 

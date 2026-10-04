@@ -18,7 +18,7 @@ sh と同じ道具を使わないほうが、片方の壊れがもう片方に�
 
 ## 認証画面を出さない
 
-push は URL にトークンを埋めない（埋めると origin の綴りに混ざる）。git のラッパースクリプトは
+push は URL にトークンを埋めない（埋めると origin の URL に混ざる）。git のラッパースクリプトは
 `GIT_CONFIG_COUNT` を落とすので環境変数でも差し替えられない。一時リポジトリの
 `credential.helper` を空文字で一度リセットしてから（system / global の GCM を外す）、
 トークンを返す helper を足す。
@@ -402,7 +402,7 @@ def main() -> int:
     propose(parent_tree, "i0001", allow=("src/*", "wip/*"), title="挨拶を足す", issue=issue_no)
     propose(
         parent_tree,
-        "i0001-01",
+        "i0001-01-01",
         parent="i0001",
         phase=1,
         allow=("src/a/*",),
@@ -411,7 +411,7 @@ def main() -> int:
     )
     propose(
         parent_tree,
-        "i0001-02",
+        "i0001-01-02",
         parent="i0001",
         phase=1,
         allow=("src/b/*",),
@@ -422,7 +422,7 @@ def main() -> int:
     approved = exe("--agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
 
-    for child in ("i0001-01", "i0001-02"):
+    for child in ("i0001-01-01", "i0001-01-02"):
         tree = worktree(child, "i0001")
         started = sh(TICKET_SH, parent_tree, "start", child)
         record(f"ticket start {child}", started.returncode == 0, started.stderr.strip()[:200])
@@ -432,22 +432,22 @@ def main() -> int:
 
     child_push = sh(
         GIT_SH,
-        os.path.join(ROOT, ".claude", "worktrees", "i0001-01"),
+        os.path.join(ROOT, ".claude", "worktrees", "i0001-01-01"),
         "push",
         "-u",
         "origin",
-        "i0001-01",
+        "i0001-01-01",
     )
     record(
         "子のワークツリーからの push はラッパースクリプトが拒む",
         child_push.returncode != 0 and "子チケット" in (child_push.stderr + child_push.stdout),
     )
 
-    for child in ("i0001-01", "i0001-02"):
+    for child in ("i0001-01-01", "i0001-01-02"):
         done = sh(TICKET_SH, parent_tree, "finish", child)
         record(f"ticket finish {child}", done.returncode == 0, done.stderr.strip()[:200])
     commit_all(parent_tree, "finish")
-    for child in ("i0001-01", "i0001-02"):
+    for child in ("i0001-01-01", "i0001-01-02"):
         git(parent_tree, "merge", "--quiet", "--no-edit", child)
 
     said = hook("PostToolUse", "Bash", parent_tree, command="ls")
@@ -639,7 +639,7 @@ def main() -> int:
     )
     acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:decide -->")]
     record(
-        "受け入れの note が MR に写る",
+        "受け入れの note が MR に書き込まれる",
         bool(acc) and f"#note_{disc2_note}" in acc[-1].get("body", ""),
     )
     checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
@@ -680,12 +680,12 @@ def main() -> int:
     )
     record("ready の note が MR にある", has_marker(notes_of(pid, iid), "<!-- ccnavi:ready -->"))
 
-    # ---- 5. 別の親をユーザが締める（close-early）
+    # ---- 5. 別の親をユーザが早めに閉じる（close-early）
     parent2 = worktree("i0002", "main")
-    propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で締める親")
+    propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で早めに閉じる親")
     propose(
         parent2,
-        "i0002-01",
+        "i0002-01-01",
         parent="i0002",
         phase=1,
         allow=("src/c/*",),
@@ -700,7 +700,7 @@ def main() -> int:
         "POST",
         f"/projects/{pid}/merge_requests",
         ROOT_TOKEN,
-        {"source_branch": "i0002", "target_branch": "main", "title": "Draft: 途中で締める親"},
+        {"source_branch": "i0002", "target_branch": "main", "title": "Draft: 途中で早めに閉じる親"},
         tag="mr-create-i0002",
     )
     record("ユーザが i0002 の MR を作る", status == 201)
@@ -725,11 +725,15 @@ def main() -> int:
             i for i in (issues if isinstance(issues, list) else []) if "残り" in i.get("title", "")
         ]
         record(
-            "残りを写す issue ができる", bool(made), f"{made[0].get('web_url') if made else '無し'}"
+            "残りを書き出す issue ができる",
+            bool(made),
+            f"{made[0].get('web_url') if made else '無し'}",
         )
         record(
             "未着手の子が cancelled/ へ動く",
-            os.path.exists(os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01.md")),
+            os.path.exists(
+                os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01-01.md")
+            ),
         )
         record(
             "close-early のコメントが MR にある",

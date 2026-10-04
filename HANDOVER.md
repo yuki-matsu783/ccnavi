@@ -29,14 +29,16 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 hook の 7 イベントの全部、実行前のルール照合、実行後チェック、コアファイルの自己防衛、チケット制御、
 複数のリポジトリ（層の和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
-VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理・フェーズ管理）。
+VS Code 拡張（ボード・ルール管理・リスク管理・プロジェクト管理・フェーズ管理）。
 このリポジトリ自身には dry-run で仕掛けてある。
 
-チケットの流れは ADR-0055、層の和は設計 11.2〜11.4.2、共通層の置き場は ADR-0052、
-設定と記録の置き場は ADR-0042。ファイルの構成と開発用 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh`
+チケットは 1 本のファイルで、提案の置き場（`wip/proposals/`）と承認済みチケットの置き場
+（`.ccnavi/approved/`）を行き来し、どこに在るかが状態を表す（設計 9.2・9.6）。層の和は設計 11.2〜11.4.2。
+共通層は `.ccnavi/common/` に固定で、環境変数では動かない。ユーザが持つ設定は ccnavi ディレクトリの下、
+記録と state の置き場は `logs/` に置く（設計 11.2）。ファイルの構成と開発用 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh`
 `test-ext.sh`）は README の「構成」「開発」。
 
-リスク管理画面は共通層の 1 本だけを開く（設計 11.11）。ルール設定画面とフェーズ管理画面は層に追従する。
+リスク管理画面は共通層の 1 本だけを開く（設計 11.11）。ルール管理画面とフェーズ管理画面は層に追従する。
 
 確認コマンド。
 
@@ -53,7 +55,7 @@ uv run --with pyinstaller python build.py
 
 ## 未実装
 
-- 確認の記憶（REQ-PRE-07）。ルールが `ask` と書いた確認は対象外（ADR-0009）
+- 確認の記憶（REQ-PRE-07）。ルールが `ask` と書いた確認は対象外
 - 確認の記憶の事後無効化（REQ-PST-04）。REQ-PRE-07 と対
 - セッション開始時の提示（REQ-SES）。REQ-SES-02 / -03 はチケットがあるので書ける形
 - 記憶の消去（REQ-DIA-05）
@@ -76,7 +78,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 ### 未了: Python 側
 
-1. **シェルの守りは、空白を含むパスへの `>` の書き込みを止めない。** リダイレクトの行き先を拾う形
+1. **シェル実行への組み込みの保護は、空白を含むパスへの `>` の書き込みを止めない。** リダイレクトの行き先を拾う形
    （`selfguard._WRITE_VERBS`）が引用の中の空白の目印（`\x01`）で止まる。
    `echo x > "projects/has space/.ccnavi/config/rules.yml"` は `builtin-guard-setting-files` に当たらず、
    ルールが何も言わなければ ask になる。`tee` `cp` `mv`、`cd` してからの相対の `>`、Write / Edit は止まる。
@@ -85,7 +87,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
    `tree.projects()` が空なら先に返る。clone する前が一番確かめたい時点
 3. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと列挙から外れ、その中のパスがワークスペースルートとして
    判定される（プロジェクトの `deny` が外れる）。判定は変えず `--lint` と `--explain` が名指しする方針だが、まだ言わない
-4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` の綴りがある」を warn で言うようにする
+4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` のパスがある」を warn で言うようにする
 5. 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
 
 ### ccnavi 自身の設計の穴
@@ -100,12 +102,12 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 ### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（ユーザが直す）
 
 usage の `confirm` の説明が「依頼より後の未解決スレッドが無ければ」のままで、挙動（時刻で絞らず未解決の全部を
-数える。ADR-0031）と違う。冒頭のコメントの一覧にも `ready` `close-early` `origin` が無い。
+数える）と違う。冒頭のコメントの一覧にも `ready` `close-early` `origin` が無い。
 `.ccnavi/scripts/` は `deny` なので、ユーザが直すか `staging` のフェーズで写す版を作る。
 
 ### 複数のリポジトリで確かめること
 
-- プロジェクトの数に対する `ms`。5 本で期限の半分を超えるなら、ルールの読み込みに mtime の控えを足す
+- プロジェクトの数に対する `ms`。5 本で期限の半分を超えるなら、ルールの読み込みに mtime の記録を足す
 - `projects/` をワークスペースの `.gitignore` に入れたとき、Claude Code がプロジェクトの中の CLAUDE.md を読むか
 - `cwd` がプロジェクトの中にあるとき、hook の `${CLAUDE_PROJECT_DIR}` がワークスペースルートのままか
 
@@ -139,16 +141,16 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 ### 残っている誤検知と取りこぼし
 
-- 空白を含まないパターンは引用の中でも当たる（`echo ".env"` が `.env` のルールに当たる）。直すならルール書式の版が上がる（ADR-0010）
+- 空白を含まないパターンは引用の中でも当たる（`echo ".env"` が `.env` のルールに当たる）。直すならルール書式の版が上がる
 - `git -C /repo push` は `*git push*` に当たらない。knowledge にグローバルオプションの飛ばし方がある
 
 ### 未了: 別件
 
 - `build.py` の置き換えが `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
-- ワークスペースの `.git` の commit-graph の控えの一覧が欠けた控えを指している。`git commit-graph write --reachable --split=replace` で直る
+- ワークスペースの `.git` の commit-graph の分割ファイルの一覧が、欠けた分割ファイルを指している。`git commit-graph write --reachable --split=replace` で直る
 - 承認済みチケットの書き込みが原子的でない。途中で機械が落ちると中身が NUL で埋まる
 - Windows で `tests.guard.test_fallback` が 1 件落ちる。テストが絶対パスを引用せずに埋め込んでおり、bash が `\` を落とす。
-  ガードの判定は正しく、テストの綴りを直す
+  ガードの判定は正しく、テストに埋め込むパスの書き方を直す
 - 未解決の一覧で、位置の無いスレッドが ` :0 ` と出る
 
 ## 実測で分かった落とし穴
@@ -173,7 +175,7 @@ Claude Code の振る舞いについて測った前提は設計書の付録 C。
 - **Python の識別子に空白は入らない。** `def test_warn は…` のように英字と日本語の間に空白を入れると構文エラー
 - **Windows のコンソール経由で日本語を引数に渡すと CP932 になり、`jq --arg` が UTF-8 でない JSON を作る。** 本文はファイルで渡す。
   `jq` の実体は `C:\Program Files\jq\jq` で、`"$JQ"` と引用しないと空白で分かれる
-- **Windows の `gitdir:` の綴り**（git 2.39.2、Git Bash と PowerShell）。絶対パス、区切りは `/`、ドライブレターは大文字、
+- **Windows の `gitdir:` の表記**（git 2.39.2、Git Bash と PowerShell）。絶対パス、区切りは `/`、ドライブレターは大文字、
   `gitdir:` の後ろは半角空白 1 個。`ccnavi_project`（sh）と `tree.py` がこれを前提にしている
 - **Docker Desktop を起動すると `restart=unless-stopped` の GitLab が勝手に上がり、2GB の VM では engine ごと落ちる。**
   GitLab CE には 4GB 要る

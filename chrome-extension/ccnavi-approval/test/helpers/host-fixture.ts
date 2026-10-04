@@ -1,5 +1,5 @@
 /**
- * 録ったホストの応答の見本（test/fixtures/host/github/<場面>/。ADR-0093 の 8.9。段階 4）を返す代役。
+ * 録ったホストの応答の見本（test/fixtures/host/github/<場面>/）。
  *
  * リポジトリの sh の試験（tests/sh/github_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
  *
@@ -12,7 +12,7 @@
  * - `GET /user` → `user.json`
  * - GraphQL は、見本の応答が持つ欄（`THREAD_FIELDS`）が問い合わせに語として全部あるときだけ答える
  *
- * 期待値（`expected.json`）は sh が見本から組んだ写しで、拡張の試験（CX-T129）は TS が組んだ写しと比べる。
+ * 期待値（`expected.json`）は sh が見本から組んだ結果で、拡張の試験（CX-T129）は TS が組んだ結果と比べる。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -51,7 +51,7 @@ function prNumber(scene: Scene): number {
 
 /**
  * 見本の応答が持つ欄。問い合わせがどれかを落とせば、本物は答えにその欄を入れないので、代役も答えない
- * （欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。sh の代役と同じ並び。
+ * （欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。sh の代役と同じ順序。
  */
 export const THREAD_FIELDS = ["reviewThreads", "pageInfo", "hasNextPage", "endCursor", "nodes", "id", "isResolved", "comments", "url", "path", "line", "body", "createdAt"];
 

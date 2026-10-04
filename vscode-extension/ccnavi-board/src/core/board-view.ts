@@ -1,12 +1,12 @@
 /**
  * ボード画面の、拡張ホストと Webview の間の契約。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR: 拡張の画面を React にする）。
+ * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。
  * 拡張ホストが渡すのは「いま何を見せるか」（`BoardData`）だけで、列やカードの DOM は画面が作る。
  * 画面が返すのはユーザが押した操作（`BoardMessage`）だけで、判定も実行ファイルの呼び出しもしない。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
- * 片方だけが持てるものを置くと束ねられなくなる。
+ * 片方だけが持てるものを置くとバンドルできなくなる。
  */
 import type { ApprovePreview } from "./approvemodel.js";
 import type { DecidePreview } from "./decidemodel.js";
@@ -26,7 +26,7 @@ export type ApprovalOverlay =
   | { readonly kind: "error"; readonly error: string }
   /**
    * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す。
-   * `carried` は承認済みチケットを運ぶ sh をターミナルに**送ることにしたか**（その sh が置いてあるか）。
+   * `carried` は承認済みチケットをコミットして push する sh をターミナルに**送ることにしたか**（その sh が置いてあるか）。
    * 送るのは拡張ホストで、送れたかまでは見ていない。真のときだけ、そう言う
    */
   | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean }
@@ -75,7 +75,7 @@ export type BoardData =
       readonly approval?: ApprovalOverlay;
       /**
        * 前の読み直しから動いたカード（`board-moved.ts`）。**決めるのも覚えるのも拡張ホスト**で、
-       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に印を出すだけ
+       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に動いた表示を出すだけ
        */
       readonly moved?: readonly Moved[];
       /**

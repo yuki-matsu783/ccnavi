@@ -1,10 +1,10 @@
-"""記録と控えの後始末（prune）の受入テスト。
+"""記録と state の後始末（prune）の受入テスト。
 
 見るのは 4 つ。
 
 1. 記録は上限を超えたときだけ `decisions.<日時>.jsonl` へ名前を変え、中身を捨てない
 2. ローテートした記録は保持日数を過ぎたものだけを消し、いま書いている記録は消さない
-3. 控えはセッションごとにまとめて判断する。どれか 1 つでも新しければ全部を残し、
+3. 記録はセッションごとにまとめて判断する。どれか 1 つでも新しければ全部を残し、
    いま始まったセッションと、セッションを名前に持たないものは消さない
 4. 入口の 2 つ。`ccnavi --prune` は `--preview` なら動かさずに並べ、そうでなければ端末を
    求める。セッションの開始でも走り、動かした数を記録に残し、失敗しても開始を止めない
@@ -193,7 +193,7 @@ class LogPruneTest(_Base):
 
 class StatePruneTest(_Base):
     def session_files(self, s: str, age: float) -> list[str]:
-        """1 つのセッションが置く控えを全部置く。"""
+        """1 つのセッションが置く記録を全部置く。"""
         paths = [
             _write(os.path.join(self.state, f"{s}.json"), age_days=age),
             _write(os.path.join(self.state, f"{s}.turn.json"), age_days=age),
@@ -240,7 +240,7 @@ class StatePruneTest(_Base):
     def test_files_without_a_session_are_left_alone(self):
         keep = [
             _write(os.path.join(self.state, "review-request-i0001-1.md"), age_days=90),
-            _write(os.path.join(self.state, "risk-judge-i0001-01.md"), age_days=90),
+            _write(os.path.join(self.state, "risk-judge-i0001-01-01.md"), age_days=90),
             _write(os.path.join(self.state, "aside", "20260101-000000", "new.txt"), age_days=90),
             _write(os.path.join(self.state, "selfguard", "store", "abc"), age_days=90),
         ]
@@ -249,7 +249,7 @@ class StatePruneTest(_Base):
             self.assertTrue(os.path.exists(path), path)
 
     def test_denied_file_of_a_live_session_is_kept(self):
-        # 拒否の数え（repeat）の控えは、1 度書いたきりで長く続くセッションがある。
+        # 拒否の数え（repeat）の記録は、1 度書いたきりで長く続くセッションがある。
         # 名前をセッションと読めないと、それ自身の日付で消える。
         kept = self.session_files(S_LIVE, 20)
         _age(os.path.join(self.state, f"{S_LIVE}.turn.json"), 0.1)
@@ -301,7 +301,7 @@ class StatePruneTest(_Base):
         self.assertTrue(any("リンク" in p for p in report.problems), report.problems)
 
     def test_loose_keyed_file_goes_by_its_own_date(self):
-        # セッションの綴りが他に無く、切れ目が決まらない。それ自身の日付で見る。
+        # セッションの表記が他に無く、切れ目が決まらない。それ自身の日付で見る。
         old = _write(os.path.join(self.state, f"subagent-{S_OLD}-x.bounced"), age_days=20)
         new = _write(os.path.join(self.state, f"subagent-{S_LIVE}-x.bounced"), age_days=1)
         self.run_prune()

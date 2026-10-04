@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-branches issue・MR に紐づくブランチを探す（ADR-0101）。読むだけで、作業ツリーにも git にも書かない。
+# ccnavi-branches issue・MR に紐づくブランチを探す。読むだけで、作業ツリーにも git にも書かない。
 #
 #   sh .ccnavi/scripts/ccnavi-branches.sh --issue <番号> [--json]
 #   sh .ccnavi/scripts/ccnavi-branches.sh --mr <番号> [--json]
@@ -91,7 +91,7 @@ here="$(pwd -W 2>/dev/null || pwd)"
 git rev-parse --show-toplevel >/dev/null 2>&1 ||
 	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で打ってください。"
 state="$root/${CCNAVI_STATE:-logs/state}"
-mkdir -p "$state" 2>/dev/null || fail no-state "控えの置き場（${state}）を作れません。" 2
+mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
 host_err="$state/branches-host-err-$$"
 trap 'rm -f "$result" "$host_err"' EXIT
@@ -108,7 +108,7 @@ fi
 
 # ---- ホスト。読めなければ理由を書いて、手元の候補だけにする。
 
-# JSON の文字列に入れる綴り（`\` と `"` を逃がす）。理由の文面は改行を含まない。
+# JSON の文字列に入れる表記（`\` と `"` を逃がす）。理由の文面は改行を含まない。
 json_text() {
 	printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
@@ -119,7 +119,7 @@ unchecked() {
 	log_info ホストを見ていない -- "kind=$kind" "reason=$2"
 }
 
-# API が落ちたら、どの呼び出しかを控える（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は写さない。
+# API が落ちたら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 }
@@ -185,7 +185,7 @@ look_at_host() {
 	fi
 	origin_shown=$(ccnavi_mask_url "$origin")
 	if ! ccnavi_host_parse "$origin"; then
-		unchecked "origin の綴りを読めない（${origin_shown}）" origin-unreadable
+		unchecked "origin の URL を読めない（${origin_shown}）" origin-unreadable
 		return 0
 	fi
 	connect_rc=0

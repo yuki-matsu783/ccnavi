@@ -1,5 +1,5 @@
 /**
- * 通信先の一覧から manifest を組む（ADR-0093 の D24・5.5 の 3・5）。
+ * 通信先の一覧から manifest を組む。通信先はビルドに埋め込み、CSP に足すのは 'wasm-unsafe-eval' だけ。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -11,7 +11,7 @@ import { HERE } from "./helpers/python.js";
 
 const defaults = () => parseHosts(fs.readFileSync(path.join(HERE, "hosts.json"), "utf8"));
 
-test("CX-T001 既定の通信先は api.github.com と gitlab.com だけ。host_permissions と connect-src が同じ並び", () => {
+test("CX-T001 既定の通信先は api.github.com と gitlab.com だけ。host_permissions と connect-src が同じ順序", () => {
   const m = manifest(defaults(), "0.1.0") as { host_permissions: string[]; content_security_policy: { extension_pages: string } };
   assert.deepEqual(m.host_permissions, ["https://api.github.com/*", "https://gitlab.com/*"]);
   assert.equal(

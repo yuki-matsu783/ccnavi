@@ -37,7 +37,7 @@
 当たれば許可になる。どこにも当たらなければ、ccnavi は判定を持たず、
 Claude Code の権限モードに従う（判定は cli.py）。
 
-強い側を先に見るのは、緩める側のルールを 1 行足しただけで守りが消える形を
+強い側を先に見るのは、緩める側のルールを 1 行足しただけで保護が消える形を
 作らないため。`allow` は「まだ何も言われていない場所」に許可を置くもので、
 `deny` に例外を作る手段ではない。
 
@@ -47,7 +47,7 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 起こさないことと、`additionalContext` を当てる先になること。Claude Code 側の権限の
 扱いはルールファイルからは変えられない。
 
-## 綴りの大文字小文字
+## 表記の大文字小文字
 
 `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は
 `.Ccnavi/config/rules.yml` にも当たる。当たり方が機械で変わると、同じルールファイルが
@@ -60,7 +60,7 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 
 `{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR、端末なら --root）の実パスに
 読み込み時に置き換わる。「ワークスペースの下」を絶対パスの直書きなしに書くための
-もので、Windows と WSL と Linux で綴りが分かれない。glob なら `{root}/wip/*`、regex なら
+もので、Windows と WSL と Linux で表記が分かれない。glob なら `{root}/wip/*`、regex なら
 `^{root}[\\/]` のように書く。ワークスペースルートが渡らない読み方をしたルールは error で名指しする。
 """
 
@@ -95,9 +95,9 @@ ALLOW = "allow"
 SECTIONS = (DENY, ASK, ALLOW)
 
 # `match` に書ける、ツールではない名前。メインエージェントのターンの終わり（Stop）に当たる。
-# 見るのは `allow` だけで、渡す回（`every`）にだけ Stop を止めて文を渡す（ADR-0090）。
+# 見るのは `allow` だけで、渡す回（`every`）にだけ Stop を止めて文を渡す。
 # 名前をイベント名と同じにしたのは、ツール名と取り違えないため。当てる先の文字列は
-# 無いので固定の綴りに当て、ルールは `glob: "*"` と書く。
+# 無いので固定の文字列に当て、ルールは `glob: "*"` と書く。
 STOP_MATCH = "Stop"
 STOP_SUBJECT = "(stop)"
 
@@ -126,7 +126,7 @@ ROOT_PLACEHOLDER = "{root}"
 # 読み込み時に、先読みを使わない入れ子の式へ展開する（not_root_pattern、設計 i0061 2）。
 NOT_ROOT_PLACEHOLDER = "{!root}"
 
-# 展開の最内と、各段の「ここで文字列が終わる」に置く綴り。`$` ではなく `\Z` なのは、
+# 展開の最内と、各段の「ここで文字列が終わる」に置く表記。`$` ではなく `\Z` なのは、
 # `$` が末尾の改行の直前にも当たるため。言いたいのは「終わる」であって「行末」ではない。
 _NOT_ROOT_END = r"\Z"
 
@@ -140,7 +140,7 @@ _NOT_ROOT_END = r"\Z"
 MAX_ROOT_LEN = 256
 
 # 生成できなかった `deny` / `ask` に持たせる式。どの文字列にも当たるので、そのルールが
-# 見るツールの呼び出しは全部止まる。守りが消えるより止まるほうがよい、という向きを
+# 見るツールの呼び出しは全部止まる。保護が消えるより止まるほうがよい、という向きを
 # 採るために使う（設計 i0061 4.3）。
 _MATCH_EVERYTHING = "^"
 
@@ -159,7 +159,7 @@ _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
 
 # 層の名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、層をつけた形と見分けが付かない。
-# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 11.4）。
+# 名前の表記に 1 文字を予約するほうが、前置きの表記を別にするより安い（設計 11.4）。
 ID_SEPARATOR = ":"
 
 # 苦情の出どころ（`Problem.kind`）。「いまは通らないが、書いた側に直すものは無い」もの。
@@ -167,10 +167,10 @@ ID_SEPARATOR = ":"
 # 全体を見る `--lint` は warn にする（提案 1 本で設定画面の保存と CI が止まらないように）。
 KIND_NOT_YET = "not-yet"
 
-# 組み込みの守りの名前の頭。ルールファイルからは書けない（読み込まずに error）。
+# 組み込みルールの名前の頭。ルールファイルからは書けない（読み込まずに error）。
 # 同じ id で書いたルールがあると組み込みを足さない形にすると、何にも当たらない 1 本を
-# その名前で書くだけで守りを気づかれないうちに消せてしまう。ルールファイルの記述に依らず
-# 足すのが組み込みの役目なので、置き換える経路をなくす。外したいなら env でその守りごと切る。
+# その名前で書くだけで組み込みの保護を気づかれないうちに消せてしまう。ルールファイルの記述に依らず
+# 足すのが組み込みの役目なので、置き換える経路をなくす。外したいなら env でその保護ごと切る。
 RESERVED_ID_PREFIX = "builtin-guard-"
 
 
@@ -178,7 +178,7 @@ def root_pattern(root: str) -> str:
     """ワークスペースルートの実パスを、regex に埋めて安全な形にする。
 
     区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
-    解いた綴り（judge.full_path）で、Windows では `\\` になるが、ルールを書くユーザは
+    解いたパス（judge.full_path）で、Windows では `\\` になるが、ルールを書くユーザは
     `/` で考える。大文字小文字は式ごと区別せずに当てるので（_build）、ここでは機械を
     見ない。見ると `c:` と `C:` の扱いが機械で分かれる。
     """
@@ -250,7 +250,7 @@ def fill_root(text: str, root: str) -> str:
     """モデルへ渡す文の `{root}` を、ワークスペースルートの実パスに置き換える。
 
     文面で sh を案内するときは `{root}` から書く（スクリプトはワークスペースにしか無く、
-    ワークツリーやプロジェクトの中からは相対の綴りが届かない）。綴りは glob に埋めるのと
+    ワークツリーやプロジェクトの中からは相対パスが届かない）。パスは glob に埋めるのと
     同じ形で、区切りは `/`。ルートが渡らない読み方（診断で `--root` が無い）では
     置き換えずにそのまま返す。
     """
@@ -272,7 +272,7 @@ def readable_every(written: object) -> int:
 
     読めなかったときに何をするかは呼ぶ側が決める。判定（_build）は 1 として扱って
     毎回渡し、--lint は error にして名指しする。同じ「読めるか」を 2 か所で
-    別々に書くと、何も言われずに無視される値と咎められる値が食い違う。
+    別々に書くと、何も言われずに無視される値と指摘される値が食い違う。
     """
     if written is None:
         return EVERY_DEFAULT
@@ -304,10 +304,10 @@ class Rule:
     # id は報告でルールを名指しするための名前。壊れたものを名指しできるように。
     # 層の和では `lib:schema` のように層の名前が前に付く（ruleload.prefix_ids）。
     id: str = ""
-    # bare_id は書かれたままの id。層の名前をつける前の綴りで、層をまたいで
+    # bare_id は書かれたままの id。層の名前をつける前の表記で、層をまたいで
     # 同じルールかどうかを見るときの鍵になる（設計 11.4「重複は後ろを捨てる」）。
     # id から前置きを取り除いて求める形にすると、`:` を含む id を書いたユーザの定義が
-    # 取り除かれる側になるので、書いたときの綴りをそのまま持つ。
+    # 取り除かれる側になるので、書いたときの表記をそのまま持つ。
     bare_id: str = ""
     # source はこのルールが来た層（common / self / プロジェクトの名前）。記録の
     # `source` 欄と `--explain` がこれを読む（設計 11.9）。
@@ -319,7 +319,7 @@ class Rule:
     # 詳しくは globmatch.translate を参照。
     glob: str = ""
     # regex は本当に正規表現が要るときの最後の手段。これを使ったルールこそ
-    # いちばん厳しく見直す対象なので、glob の別の綴りではなく別の欄にしてある。
+    # いちばん厳しく見直す対象なので、glob の別の表記ではなく別の欄にしてある。
     # glob では書けない「語の左側の切れ目」が要るときも、こちらを使う。
     regex: str = ""
     # message は、なぜ止めたかと、代わりに何をすればよいかを言う。
@@ -346,7 +346,7 @@ class Rule:
     every: int = 1
     # every_written は書かれたままの値。読めない値（0・負・整数でない）でもルールは
     # 組み上げ、every は 1（毎回渡す）として扱う。ここで受け付けずにルールごと捨てると、--lint の
-    # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。咎めるのは
+    # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。指摘するのは
     # --lint の仕事で、そのために書かれた値をそのまま持つ。書いていなければ None。
     every_written: object = None
     # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
@@ -354,10 +354,10 @@ class Rule:
     decision: str = ""
     # root は読んだときのワークスペースルート。文面の `{root}` を、モデルへ渡すときに
     # 置き換える先（spoken_message）。書いた文面（message）は置き換えずに持つ。
-    # 報告と --explain は書いた綴りを出す（glob / regex と同じ扱い）。
+    # 報告と --explain は書いた表記を出す（glob / regex と同じ扱い）。
     root: str = ""
 
-    # degraded_message は、ルールが書かれたとおりに組み立てられず、守りを消さないために
+    # degraded_message は、ルールが書かれたとおりに組み立てられず、保護を消さないために
     # 別の形で判定に使っているときに、止められた側へ返す文面。`{!root}` を展開できなかった
     # `deny` / `ask` がこれにあたる（_ungeneratable）。書いた文面（message）を上書きすると
     # 書いたユーザの言葉が消え、`--explain` と記録にも出なくなるので、別の欄に持つ。
@@ -376,9 +376,9 @@ class Rule:
     def key(self) -> tuple:
         """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 11.4、11.8）。
 
-        比べるのは書いた綴りではなく、`{root}` を置き換えたあとの式。共通層と
+        比べるのは書いた表記ではなく、`{root}` を置き換えたあとの式。共通層と
         プロジェクトの層に同じ `{root}/...` を書いた定義は、置き換え先が同じ
-        ワークスペースルートなので、ここで一致する。書いた綴りで比べると、
+        ワークスペースルートなので、ここで一致する。書いた表記で比べると、
         同じ場所を指す 2 本を違うものとして両方判定に使うことになる。
         """
         return (
@@ -412,8 +412,8 @@ class Rule:
 class RuleSet:
     """ルールファイル 1 本ぶん。タイプごとに分けて持つ。
 
-    1 本の並びにして各ルールが自分の判定を持つ形にもできるが、分けておくと
-    「強い順に見る」が並びの順そのものになる。判定の側がタイプを選び違える形を
+    1 本のリストにして各ルールが自分の判定を持つ形にもできるが、分けておくと
+    「強い順に見る」がリストの順そのものになる。判定の側がタイプを選び違える形を
     残さないほうが、あとからタイプを足したときに間違いが起きにくい。
     """
 
@@ -455,7 +455,7 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
 def readable(content: bytes) -> bool:
     """その中身を、load がルールファイルとして読めるか。
 
-    読めなければ呼び手（ruleload.load_rules）は組み込みの既定を使う。控えの中身を見て
+    読めなければ呼び手（ruleload.load_rules）は組み込みの既定を使う。バックアップの中身を見て
     「この呼び出しの直前に既定を使っていたか」を決めるのに使う（selfguard）。線を load と
     別に引くと、既定を使っていたのに使っていないと読む、あるいはその逆が起きる。
     """
@@ -472,7 +472,7 @@ def _decode(text: str, path: str) -> dict:
     except yaml.YAMLError as exc:
         raise ValueError(f"{path} を YAML として読めない: {exc}") from exc
     if not isinstance(data, dict):
-        raise ValueError(f"{path} のルールがキーと値の並びではない")
+        raise ValueError(f"{path} のルールがマッピングではない")
     return data
 
 
@@ -507,12 +507,12 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
         if raw_section is None:
             continue
         if not isinstance(raw_section, list):
-            problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` が並びではない"))
+            problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` がリストではない"))
             continue
         for i, raw in enumerate(raw_section):
             rule, problem = _build(raw, name, i, root, builtin)
             # 苦情とルールは同時に返りうる。`{!root}` を組み立てられなかった deny / ask が
-            # これで、「報告する」と「守りを消さない」を両立させる唯一の方法（設計 i0061 4.4）。
+            # これで、「報告する」と「保護を消さない」を両立させる唯一の方法（設計 i0061 4.4）。
             # 捨てるだけにすると、生成に失敗した deny が気づかないうちに消えて、
             # 止められずに通るようになる。
             if problem is not None:
@@ -539,7 +539,7 @@ def _build(
     """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
-        return None, Problem(SEVERITY_ERROR, where, "ルールがキーと値の並びではない")
+        return None, Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")
 
     written_id = str(raw.get("id") or "")
     rule = Rule(
@@ -572,11 +572,11 @@ def _build(
         return None, Problem(
             SEVERITY_ERROR,
             name,
-            f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みの守りの名前で、"
+            f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みルールの名前で、"
             "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
             "別の名前にしてください。"
             "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
-            "その守りごと切ってください",
+            "その保護ごと切ってください",
         )
     if not rule.message and section in _NEEDS_MESSAGE:
         return None, Problem(
@@ -591,8 +591,8 @@ def _build(
             SEVERITY_ERROR, name, "glob と regex の両方がある。どちらで判定するのか決められない"
         )
 
-    # `{root}` はワークスペースルートの実パスに置き換える。書いた綴り（rule.glob / rule.regex）は
-    # そのまま残し、置き換えるのは翻訳後の式だけ。報告と --explain は書いた綴りを出す。
+    # `{root}` はワークスペースルートの実パスに置き換える。書いた表記（rule.glob / rule.regex）は
+    # そのまま残し、置き換えるのは翻訳後の式だけ。報告と --explain は書いた表記を出す。
     uses_root = ROOT_PLACEHOLDER in rule.regex or ROOT_PLACEHOLDER in rule.glob
     if uses_root and not root:
         return None, Problem(
@@ -643,9 +643,9 @@ def _build(
 
     # `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で
     # 変えると、同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた
-    # 守りを `.Ccnavi/` と書くだけで止められずに通せ、どの機械でも区別しないチケットの範囲とも
+    # 保護を `.Ccnavi/` と書くだけで止められずに通せ、どの機械でも区別しないチケットの範囲とも
     # 食い違う。
-    # ルールはユーザが宣言する場所の意図なので、機械の都合ではなく綴りの意味で読む
+    # ルールはユーザが宣言する場所の意図なので、機械の都合ではなく書かれたパスの意味で読む
     # （phasetypes._globs / risk._factors / selfguard._folded / チケットの範囲と同じ形）。
     # 区別が要る `regex` は `(?-i:...)` で囲む。
     flags = re.IGNORECASE
@@ -697,7 +697,7 @@ def _not_root_suffix(expression: str) -> str:
     """`{!root}` の後ろに続く式への苦情（warn）。無ければ空。
 
     続けてよいかどうかは意味の問題で、機械には判定できない。展開結果が読み終える
-    位置がパスの区切りである保証は無いので、区切りを前提にした綴り
+    位置がパスの区切りである保証は無いので、区切りを前提にした表記
     （`^{!root}[\\\\/]foo`）は壊れてはいないが、まず書いたユーザの勘違い。
     止めるほどではないので warn（設計 i0061 3.3）。
     """
@@ -707,7 +707,7 @@ def _not_root_suffix(expression: str) -> str:
     return (
         f"`{NOT_ROOT_PLACEHOLDER}` の直後に `{rest[:16]}` が続いている。"
         "展開結果が読み終える位置はパスの区切りとは限らないので、区切りを前提にした"
-        "綴りは意図どおりに動かない。任意の位置から続けるなら `.*` で受けてください"
+        "表記は意図どおりに動かない。任意の位置から続けるなら `.*` で受けてください"
     )
 
 
@@ -761,10 +761,10 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
     if section == ALLOW:
         return None, problem
     rule.compiled = re.compile(_MATCH_EVERYTHING)
-    # 書いた文面（message）は残す。`--explain` と記録が書いた綴りを出す約束は、
+    # 書いた文面（message）は残す。`--explain` と記録が書いた表記を出す約束は、
     # glob / regex だけでなく文面にも当てはまる（Rule の message のコメント）。
     rule.degraded_message = (
-        f"{detail}。守りが消えるのを避けるため、ルール '{rule.id or name}' が見るツール"
+        f"{detail}。保護が消えるのを避けるため、ルール '{rule.id or name}' が見るツール"
         f"（{rule.match}）を止めています。ワークスペースをもっと浅い場所へ移すか、"
         "ユーザに、このルールが書かれているルールファイルから外してもらってください。"
     )

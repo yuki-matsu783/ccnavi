@@ -4,7 +4,7 @@
  *
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
  * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の種類（`.ccnavi/common/phases.yml`。場所は固定）、
@@ -53,7 +53,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
@@ -74,7 +74,7 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: PhasesDocument;
   readonly phasesPath: string;
-  /** ワークスペースルートからの相対で見せる綴り */
+  /** ワークスペースルートからの相対で見せるパス */
   readonly phasesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
@@ -168,7 +168,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -260,7 +260,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesPath: string;
   const notices: string[] = [];
   if (target.kind === "common") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_PHASES` など）では動かせない。
     phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
@@ -459,7 +459,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 
 /**
  * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
- * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
+ * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;
@@ -602,7 +602,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     redraw(current);
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は種類の中身が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToPhases);
     }
@@ -706,7 +706,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
+    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
     fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }

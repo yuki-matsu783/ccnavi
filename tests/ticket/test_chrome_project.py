@@ -1,16 +1,17 @@
-"""Chrome の入口のプロジェクトのリポジトリと「始める」（ADR-0093 の段階 5）の受入テスト。
+"""Chrome の入口のプロジェクトのリポジトリと「始める」の受入テスト。
 
 見るのは 5 つ。
 
-1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）の家族を、
+1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）
+の親子のチケットを、
    手元と同じ形の仮のツリー（ワークスペースルート + `projects/<名前>` + そのワークツリー）で判定し、
-   承認で書くもの（Changes）はその家族の親のブランチだけ
-2. プロジェクトの層は D28 の計算（プロジェクトの統合先の層に、ワークスペースの共通層を
-   `configsync.projected` で写したもの）。親のブランチの上の層は読まない
-3. 控えはワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
-4. 「始める」（8.6）: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
-   `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・互換の版が違う、
-   のどれでも始められない
+   承認で書くもの（Changes）はその親子のチケットの親のブランチだけ
+2. プロジェクトの層は計算で決める（プロジェクトの統合先の層に、ワークスペースの共通層を
+   `configsync.projected` でコピーしたもの）。親のブランチの上の層は読まない
+3. 取り込み状態はワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
+4. 「始める」: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
+   `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・
+   互換の版が違う、のどれでも始められない
 5. プロジェクト名が予約の名前（`common`・`self`）や識別子の形でなければ受けない
 """
 
@@ -63,10 +64,11 @@ def project_integration(**extra):
 def family_files(ident="web-i0012", issue=12):
     return {
         f"wip/proposals/todo/{ident}.md": parent_text(ident, ["research"], issue=issue),
-        f"wip/proposals/todo/{ident}-01.md": child_text(
-            f"{ident}-01", ident, 1, ["wip/research/*"], False
+        f"wip/proposals/todo/{ident}-01-01.md": child_text(
+            f"{ident}-01-01", ident, 1, ["wip/research/*"], False
         ),
-        # 親のブランチの上の層は読まない（置き場の外なので拡張はそもそも読まない。3.3 の 6）
+        # 親のブランチの上の層は読まない（置き場の外なので拡張はそもそも読まない。
+        # 親のブランチの上で書き換えて承認やレビューを不要にさせない）
     }
 
 
@@ -105,10 +107,10 @@ class ChromeProjectTest(unittest.TestCase):
     def test_the_board_of_a_project_family_lists_its_proposals(self):
         board = self.ask("board")
         self.assertNotIn("error", board, board)
-        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01"])
+        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01-01"])
         self.assertTrue(board["write"]["allowed"], board["write"])
         self.assertEqual(board["rejected"], [])
-        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーの綴りは出さない）
+        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーのパスは出さない）
         self.assertNotIn(os.path.join(self.tmp, "memfs"), board["text"])
 
     def test_approving_a_project_family_writes_only_its_branch(self):
@@ -143,7 +145,8 @@ class ChromeProjectTest(unittest.TestCase):
             "workspace": workspace(**{".ccnavi/common/risks.yml": RISK_COMMON}),
         }
         layer = self.chrome.project_layer(snap, place)
-        # 共通層にあるファイルは写し（配点の script はプロジェクトの層の置き場へ）、無いものは残す
+        # 共通層にあるファイルはコピーし（配点の script はプロジェクトの層の置き場へ）、
+        # 無いものは残す
         self.assertEqual(layer[".ccnavi/config/phases.yml"], PHASES)
         self.assertIn("script: .ccnavi/scripts/risk.sh", layer[".ccnavi/config/risks.yml"])
         self.assertEqual(layer[".ccnavi/config/rules.yml"], '{"version": 1, "deny": []}\n')
@@ -199,9 +202,9 @@ class ChromeProjectTest(unittest.TestCase):
 
 
 class StartTest(unittest.TestCase):
-    """「始める」（8.6）。識別子は ticket.issue_identifier の 1 つだけから決める。
+    """「始める」。識別子は ticket.issue_identifier の 1 つだけから決める。
 
-    3.1 の 11・ADR-0100。
+    Python と Pyodide が同じ関数を使い、名前が食い違わないようにする。
     """
 
     def setUp(self):
@@ -246,7 +249,7 @@ class StartTest(unittest.TestCase):
         return json.loads(self.chrome.handle(json.dumps(request), os.path.join(self.tmp, "m")))
 
     def test_the_identifier_comes_from_the_issue(self):
-        """ADR-0100: `feature-<番号>-<slug>`。slug は issue のタイトルから作る。"""
+        """`feature-<番号>-<slug>`。slug は issue のタイトルから作る。"""
         self.assertEqual(
             self.start(12),
             {
@@ -293,16 +296,18 @@ class StartTest(unittest.TestCase):
             "topic": {
                 "head": HEAD,
                 "files": {
-                    f"wip/proposals/todo/{name}-01.md": child_text(f"{name}-01", name, 1, ["src/*"])
+                    f"wip/proposals/todo/{name}-01-01.md": child_text(
+                        f"{name}-01-01", name, 1, ["src/*"]
+                    )
                 },
             }
         }
         body = self.start(12, branches=other)
-        self.assertTrue(any("開いた家族 topic" in p for p in body["problems"]), body)
+        self.assertTrue(any("開いた親子のチケット topic" in p for p in body["problems"]), body)
 
     def test_a_different_compat_is_refused(self):
         body = self.start(12, compat=version.COMPAT + 1)
-        self.assertTrue(any("7.3" in p for p in body["problems"]), body)
+        self.assertTrue(any("互換" in p for p in body["problems"]), body)
 
     def test_bad_numbers_are_refused(self):
         for bad in (0, -3, True, "12", None):

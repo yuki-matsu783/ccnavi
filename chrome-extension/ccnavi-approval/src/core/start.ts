@@ -1,12 +1,12 @@
 /**
- * 「始める」（ADR-0093 の 8.6・D19。段階 5）。issue から親のブランチを統合先の今の先頭に作る。PR/MR は作らない
+ * 「始める」。issue から親のブランチを統合先の今の先頭に作る。PR/MR は作らない
  * （差分 0 のブランチからは作れないので、最初の push の後に `ccnavi-review.sh request` が作る）。
  *
- * 識別子（= ブランチ名）は Python（`ticket.issue_identifier`。3.1 の 11・ADR-0100）が issue の番号とタイトルから
+ * 識別子（= ブランチ名）は Python（`ticket.issue_identifier`）が issue の番号とタイトルから
  * `feature-<番号>-<slug>` の形に決め、始められない理由（統合先の
- * `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版の違い）も
+ * `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版の違い）も
  * Python が出す。ここは issue を読み、Python に聞き、ブランチを作る頼みを service worker に送るだけ。
- * service worker も名前の形・保護された名前・統合先の先頭を自分で確かめる（二重の守り）。
+ * service worker も名前の形・保護された名前・統合先の先頭を自分で確かめる（二重の確認）。
  */
 import { py, PyError, type Snapshot } from "./py.js";
 import type { RepoConfig } from "./settings.js";
@@ -25,7 +25,7 @@ export async function listIssues(repo: RepoConfig, deps: Deps): Promise<Issue[]>
 
 /**
  * issue から始める。`issue` は一覧で選んだ issue（番号とタイトル。タイトルから識別子の slug を作る）、
- * `seen` はボードが読んだブランチ（開いた家族の見分けに使う）、`taken` はボードが見たブランチの名前。
+ * `seen` はボードが読んだブランチ（開いた親子のチケットの見分けに使う）、`taken` はボードが見たブランチの名前。
  * 統合先は押した時点で読み直す。先頭の語は既定の `feature`（ラベルからは決めない）。
  */
 export async function startIssue(
@@ -44,7 +44,7 @@ export async function startIssue(
       branches: { ...(seen?.branches ?? {}), ...fresh.branches },
       absent: [],
     };
-    // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る（11.9.1 の 7）
+    // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
     const res = await py.start(deps.py, {
       settings: base.settings,

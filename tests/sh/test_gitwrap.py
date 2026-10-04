@@ -271,7 +271,7 @@ class PassTest(GitWrapperTest):
     def test_push_sends_the_current_branch(self):
         """作業用のブランチは、そのままの名前で送れる。
 
-        レビューはマージリクエストの実物に結ぶので、そこまではエージェントが運べる。
+        レビューはマージリクエストの実物に結ぶので、そこまではエージェントが進められる。
         統合（マージ）はユーザの側に残してある。
         """
         bare = self.make_bare()
@@ -306,14 +306,14 @@ class PassTest(GitWrapperTest):
         os.makedirs(os.path.join(copies, "doing"))
         with open(os.path.join(copies, "doing", "i0001.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001\n---\n")
-        with open(os.path.join(copies, "doing", "i0001-01.md"), "w", encoding="utf-8") as f:
-            f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
+        with open(os.path.join(copies, "doing", "i0001-01-01.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
         # 閉じた子。承認済みチケットは done/ に動いているが、ツリーはまだ子のもの。
         os.makedirs(os.path.join(copies, "done"))
-        with open(os.path.join(copies, "done", "i0001-02.md"), "w", encoding="utf-8") as f:
-            f.write("---\nversion: 1\nticket: i0001-02\nparent: i0001\nphase: 1\n---\n")
+        with open(os.path.join(copies, "done", "i0001-01-02.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01-02\nparent: i0001\nphase: 1\n---\n")
         trees = {}
-        for name in ("i0001", "i0001-01", "i0001-02", "free"):
+        for name in ("i0001", "i0001-01-01", "i0001-01-02", "free"):
             path = os.path.join(self.dir, ".claude", "worktrees", name)
             git(self.dir, "worktree", "add", "-q", path, "-b", name)
             trees[name] = path
@@ -330,7 +330,7 @@ class PassTest(GitWrapperTest):
                 env=environment,
             )
 
-        for name in ("i0001-01", "i0001-02"):
+        for name in ("i0001-01-01", "i0001-01-02"):
             with self.subTest(tree=name):
                 child = push_from(name)
                 self.assertEqual(2, child.returncode, child.stdout + child.stderr)
@@ -356,7 +356,7 @@ class PassTest(GitWrapperTest):
         bare = self.make_bare()
         git(self.dir, "remote", "add", "origin", bare)
         trees = {}
-        for name in ("i0001", "i0001-01"):
+        for name in ("i0001", "i0001-01-01"):
             path = os.path.join(self.dir, ".claude", "worktrees", name)
             git(self.dir, "worktree", "add", "-q", path, "-b", name)
             trees[name] = path
@@ -364,8 +364,8 @@ class PassTest(GitWrapperTest):
         os.makedirs(doing)
         with open(os.path.join(doing, "i0001.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001\n---\n")
-        with open(os.path.join(doing, "i0001-01.md"), "w", encoding="utf-8") as f:
-            f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
+        with open(os.path.join(doing, "i0001-01-01.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
 
         def push_from(name):
             return subprocess.run(
@@ -377,7 +377,7 @@ class PassTest(GitWrapperTest):
                 errors="replace",
             )
 
-        child = push_from("i0001-01")
+        child = push_from("i0001-01-01")
         self.assertEqual(2, child.returncode, child.stdout + child.stderr)
         self.assertIn("子チケット", child.stderr)
         parent = push_from("i0001")
@@ -426,7 +426,7 @@ class MergeFileTest(GitWrapperTest):
             ("merge-file", "-L", "-p", current, base, other),
             # `--` の後ろはファイル名。
             ("merge-file", "--union", "--", "-p", base, other),
-            # 打ち消しと略記は git が受け取るので、知らない綴りとして止める。
+            # 否定の形と略記は git が受け取るので、知らない表記として止める。
             ("merge-file", "-p", "--no-stdout", current, base, other),
             ("merge-file", "--std", current, base, other),
             ("merge-file", "-pq", current, base, other),
@@ -618,11 +618,11 @@ def git_out(cwd, *args):
 
 
 class ResetGuidanceTest(GitWrapperTest):
-    """reset は通さず、リモートに合わせたいときは ccnavi-sync.sh を案内する（ADR-0093 の 2b。D36）。
+    """reset は通さず、リモートに合わせたいときは ccnavi-sync.sh を案内する。
 
     前は `checkout -B <ブランチ> <リモート>/<ブランチ>` を案内していた。付け替えはブランチにしか無い
     コミットを何も言わずに外し、親のブランチなら承認済みチケットの置き場ごと中身を変えるので、
-    ccnavi-sync.sh（早送りか merge、衝突したら取りやめる）ができた段階 2b で止め、案内を移した。
+    ccnavi-sync.sh（早送りか merge、衝突したら取りやめる）を入れたときに止め、案内を移した。
     """
 
     def diverge(self):
@@ -689,7 +689,7 @@ class ResetGuidanceTest(GitWrapperTest):
 
 
 class BranchForceMoveTest(GitWrapperTest):
-    """`branch -M`（強制の改名）と `-C`（強制の複製）を止める（ADR-0093 の段階 0）。
+    """`branch -M`（強制の改名）と `-C`（強制の複製）を止める。
 
     短いオプションの検査は小文字の f・m・u だけを見ていたので、大文字の -M は通っていた。
     ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、改名すると引けなくなる。
@@ -735,7 +735,7 @@ class BranchForceMoveTest(GitWrapperTest):
 
 
 class FetchRefspecTest(GitWrapperTest):
-    """fetch・pull は refspec（`:` と `+` を含む引数）を通さない（ADR-0093 の段階 0）。
+    """fetch・pull は refspec（`:` と `+` を含む引数）を通さない。
 
     `+refs/heads/x:refs/heads/x` は取ってきたものを手元のブランチへ直に書き、`+` は
     早送りでない書き換えも通す。取ってくるのはリモート名とブランチ名だけにする。
@@ -771,7 +771,7 @@ class FetchRefspecTest(GitWrapperTest):
         stderr = self.assertRejected("fetch", "origin", "main:main").stderr
         self.assertIn("ccnavi-git.sh fetch <リモート> <ブランチ>", stderr)
         self.assertNotIn("git fetch", stderr.replace("ccnavi-git.sh", ""))
-        # 手元の ref を進めるのは ccnavi-sync.sh（段階 2b で文面を書き換えた。3.1 の 10）。
+        # 手元の ref を進めるのは ccnavi-sync.sh。
         self.assertIn("ccnavi-sync.sh <ブランチ> が進めます", stderr)
 
     def test_remote_and_branch_still_pass(self):
@@ -786,7 +786,7 @@ class FetchRefspecTest(GitWrapperTest):
 
 
 class StoreRewindTest(GitWrapperTest):
-    """承認済みチケットの置き場を過去の中身に戻す形を止める（ADR-0093 の段階 0）。
+    """承認済みチケットの置き場を過去の中身に戻す形を止める。
 
     `checkout <ref> <パス>` と `restore --source <ref>` は置き場を別のコミットの中身に戻し、
     `restore --ours / --theirs` は置き場の衝突を片側にそろえる。どれも承認が無かったことにも、
@@ -794,7 +794,7 @@ class StoreRewindTest(GitWrapperTest):
     """
 
     COPY = ".ccnavi/approved/doing/i0001.md"
-    REVIEW = "wip/proposals/review/i0001-01.md"
+    REVIEW = "wip/proposals/review/i0001-01-01.md"
 
     def setUp(self):
         super().setUp()
@@ -879,7 +879,7 @@ class StoreRewindTest(GitWrapperTest):
         self.assertUntouched()
 
     def test_a_moved_store_is_followed(self):
-        # 置き場の綴りを設定で動かしても、その綴りで止める。
+        # 置き場のパスを設定で動かしても、そのパスで止める。
         result = self.run_wrapper(
             "restore",
             "--source",
@@ -904,7 +904,7 @@ class StoreRewindTest(GitWrapperTest):
         self.assertTrue(self.read("tracked.txt").startswith("line 0\n"))
 
     def test_moving_between_branches_still_passes(self):
-        # 行き先だけの形と、-b / -c の値と起点は、パスと読まない（-B / -C は段階 2b で止めた）。
+        # 行き先だけの形と、-b / -c の値と起点は、パスと読まない（-B / -C は止める）。
         for args in (
             ("checkout", "-b", "topic", "HEAD~1"),
             ("switch", "--create", "topic2", "HEAD"),
@@ -934,7 +934,7 @@ def write_text(path, text):
 
 
 class WorktreeNameTest(GitWrapperTest):
-    """worktree add は行き先の名前とブランチ名を揃える形だけ通す（ADR-0093 の 3.1 の 10。段階 2b）。
+    """worktree add は行き先の名前とブランチ名を揃える形だけ通す。
 
     親のブランチ名は親の識別子で、ワークツリーの名前も同じ。-B（既存のブランチの付け替え）・
     --detach・-f はその結び付きを崩すか、親のブランチを別のコミットへ向け直す。
@@ -982,12 +982,12 @@ class WorktreeNameTest(GitWrapperTest):
 
 
 class ParentWorktreeSwitchTest(GitWrapperTest):
-    """親のワークツリーでは別のブランチへ移らない（ADR-0093 の 3.1 の 10。段階 2b）。
+    """親のワークツリーでは別のブランチへ移らない。
 
-    親のワークツリーは .claude/worktrees/<P> で、親の写しか提案（`ticket: <P>`、`parent:` なし）が
+    親のワークツリーは .claude/worktrees/<P> で、親チケットか提案（`ticket: <P>`、`parent:` なし）が
     あるもの。別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh が
     リモートでの承認をこのツリーへ取り込まなくなる。親のブランチを一度でも push したか
-    ccnavi-sync.sh で取り込んだ親（家族の控えがある親）では、親と子のチケットの承認・
+    ccnavi-sync.sh で取り込んだ親（取り込み状態がある親）では、親と子のチケットの承認・
     状態の操作・実行前の判定も止まる。拒否文はその中身を言う。
     """
 
@@ -1041,20 +1041,22 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_a_child_worktree_is_not_a_parent(self):
-        child = os.path.join(self.dir, ".claude", "worktrees", "i0001-01")
-        git(self.dir, "worktree", "add", "-q", child, "-b", "i0001-01")
+        child = os.path.join(self.dir, ".claude", "worktrees", "i0001-01-01")
+        git(self.dir, "worktree", "add", "-q", child, "-b", "i0001-01-01")
         write_text(
-            os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01.md"),
-            "---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n",
+            os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01-01.md"),
+            "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n",
         )
         result = run_in(child, "checkout", "-b", "elsewhere")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 class FamilyRecordPushTest(GitWrapperTest):
-    """push が通ったら親のブランチの家族の控えを作り、控えが gone なら送らない（ADR-0093 の 4.3）。
+    """push が通ったら親子のチケットの取り込み状態を作り、取り込み状態が gone なら送らない。
 
-    控えは ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
+    最初の push で取り込み状態を作るので、その親子のチケットは C1 の対象に入る。
+
+    取り込み状態は ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
     """
 
     def setUp(self):
@@ -1092,7 +1094,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         self.assertEqual("origin", fields["remote"])
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), fields["sha"])
         self.assertTrue(fields["fetched_at"].isdigit())
-        self.assertIn("家族の控えを作った", result.stdout)
+        self.assertIn("の取り込み状態を作った", result.stdout)
         self.assertIn("ccnavi-sync.sh i0001", result.stdout)
 
     def test_uncommitted_store_changes_keep_the_family_out(self):
@@ -1112,7 +1114,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         result = self.push()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.fields()["sha"])
-        self.assertNotIn("家族の控えを作った", result.stdout)
+        self.assertNotIn("の取り込み状態を作った", result.stdout)
 
     def test_a_gone_family_is_not_pushed(self):
         write_text(
@@ -1139,10 +1141,10 @@ class FamilyRecordPushTest(GitWrapperTest):
 
 
 class AllowListTest(GitWrapperTest):
-    """オプションは許可リストで読む（ADR-0093 の段階 2b のレビュー。ユーザの決定 A）。
+    """オプションは許可リストで読む。
 
     git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
-    名前を並べるやり方では止められずに通る。束ねた短いオプション（`-qbnew`）は 1 字ずつ読み、
+    名前を並べるやり方では止められずに通る。まとめた短いオプション（`-qbnew`）は 1 字ずつ読み、
     値を取る字の後ろは値として扱う。
     """
 
@@ -1231,7 +1233,7 @@ class AllowListTest(GitWrapperTest):
 
 
 class ParentWorktreeValueBundleTest(ParentWorktreeSwitchTest):
-    """親のワークツリーでは、値を束ねた綴り（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
+    """親のワークツリーでは、値をまとめた書き方（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
 
     def test_moving_away_from_the_parent_branch_is_rejected(self):
         for args in (
@@ -1266,7 +1268,7 @@ class ParentWorktreeValueBundleTest(ParentWorktreeSwitchTest):
 
 
 class WorktreeDetachTest(GitWrapperTest):
-    """2 つ目の語がタグ・sha だと detached になる。名前が揃っていても止める（軽 17）。"""
+    """2 つ目の語がタグ・sha だと detached になる。名前が揃っていても止める。"""
 
     def test_tags_and_shas_are_rejected(self):
         sha = git_out(self.dir, "rev-parse", "HEAD")
@@ -1289,7 +1291,8 @@ class WorktreeDetachTest(GitWrapperTest):
 
 
 class SymlinkedWorkspaceTest(GitWrapperTest):
-    """リンクを経た作業場でも守りが有効（git の綴りとワークスペースの綴りを揃える。中 12）。"""
+    """リンクを経た作業場でも組み込みの保護が有効
+    （git のパスとワークスペースのパスを揃える。中 12）。"""
 
     def setUp(self):
         super().setUp()
@@ -1319,11 +1322,11 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
     def test_the_family_record_is_written_through_the_link(self):
         result = run_in(self.via_link, "push", "-u", "origin", "i0001")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("家族の控えを作った", result.stdout)
+        self.assertIn("の取り込み状態を作った", result.stdout)
 
 
 class PushRemoteResolutionTest(FamilyRecordPushTest):
-    """送り先は git と同じ順で解き、origin 以外へ送ったら控えを作らない（軽 18）。"""
+    """送り先は git と同じ順で解き、origin 以外へ送ったら取り込み状態を作らない。"""
 
     def test_a_push_remote_other_than_origin_writes_no_record(self):
         other = self.make_bare()
@@ -1342,11 +1345,11 @@ class PushRemoteResolutionTest(FamilyRecordPushTest):
 
 
 class IntegrationPushTest(GitWrapperTest):
-    """固定の並び（main など）に無い名前の統合先へも直接は送らない（ADR-0093 の D30）。
+    """固定のリスト（main など）に無い名前の統合先へも直接は送らない。
 
-    統合先の名前は ccnavi-fetch.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の控え →
+    統合先の名前は ccnavi-fetch.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 →
     origin/HEAD → origin/main・master）で、push したツリーが属するリポジトリについて決める。
-    決まらなければ固定の並びだけで判定する（今までの挙動）。
+    決まらなければ固定のリストだけで判定する（今までの挙動）。
     """
 
     BRANCH = "develop-v1.0.0"
@@ -1387,7 +1390,7 @@ class IntegrationPushTest(GitWrapperTest):
         git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{name}")
 
     def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
-        """origin/HEAD も origin/main・master も無ければ、固定の並びに無い名前は通す。"""
+        """origin/HEAD も origin/main・master も無ければ、固定のリストに無い名前は通す。"""
         result = self.push()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertNotEqual("", self.landed())
@@ -1407,7 +1410,7 @@ class IntegrationPushTest(GitWrapperTest):
         self.assertRefused(self.push())
 
     def test_the_environment_wins_and_the_fixed_list_still_holds(self):
-        """環境変数が別の名前なら origin/HEAD は読まない。固定の並びはそのまま止める。"""
+        """環境変数が別の名前なら origin/HEAD は読まない。固定のリストはそのまま止める。"""
         self.point_origin_head(self.dir, self.BRANCH)
         result = self.push(CCNAVI_INTEGRATION_BRANCH="trunk")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
@@ -1437,7 +1440,7 @@ class IntegrationPushTest(GitWrapperTest):
         result = self.push(project)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-        # プロジェクトの統合先（控え）が develop-v1.0.0 なら止める。送り先は空のものに替えて見る。
+        # プロジェクトの統合先（取り込み結果）が develop-v1.0.0 なら止める。送り先は空のものに替えて見る。
         bare2 = os.path.join(parent, "app2.git")
         git(project, "init", "-q", "--bare", bare2)
         git(project, "remote", "set-url", "origin", bare2)
@@ -1449,7 +1452,7 @@ class IntegrationPushTest(GitWrapperTest):
 
 
 class SafeAdditionsTest(GitWrapperTest):
-    """許可リストに足した、履歴を書き換えない形（ADR-0093 の段階 2b のレビューの相談 2）。
+    """許可リストに足した、履歴を書き換えない形。
 
     足したもの: commit --fixup・--squash、fetch と pull の --depth・--deepen・--shallow-since・
     --unshallow、merge と pull の --autostash・--no-autostash、fetch の --show-forced-updates・
@@ -1507,7 +1510,7 @@ class SafeAdditionsTest(GitWrapperTest):
 
 
 class TagListOnlyTest(GitWrapperTest):
-    """tag は一覧だけ。位置の引数は -l / --list のときの絞り込みだけ（相談 1）。"""
+    """tag は一覧だけ。位置の引数は -l / --list のときの絞り込みだけ。タグは作らせない。"""
 
     def test_creating_a_tag_is_rejected(self):
         for args in (

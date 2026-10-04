@@ -2,12 +2,12 @@
 
 設計 wip/design/approve-carry.md 1 と 6.3。確かめるのは次のとおり。
 
-17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットは運ばない
-18. 運ぶものが無ければ 0 で `運ぶ承認済みチケットは無い。`
-19. `main` の上のツリーはコミットして push しない（0、標準エラーに綴り）
+17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットはコミットしない
+18. コミットするものが無ければ 0 で `コミットして push する承認済みチケットは無い。`
+19. `main` の上のツリーはコミットして push しない（0、標準エラーにブランチ名）
 20. push が落ちると 1、コミットは残る
 21. detached のツリーは飛ばす
-22. `ccnavi-agree.sh` が承認のあと運ぶ
+22. `ccnavi-agree.sh` が承認のあとコミットして push する
 23. `ccnavi-agree.sh` は並べた識別子を `--agree` の後ろに渡し、`-` で始まる語と空の語は断る
 
 ワークスペースは一時ディレクトリに git と bare のリモートで作る。承認そのものは
@@ -16,7 +16,7 @@ ccnavi の実行ファイルの代わりに、承認済みチケットを 1 枚�
 
 読み返すのは終了コード・出力と、git に残ったものだけ。
 
-`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -38,7 +38,7 @@ PUSH_SCRIPTS = ("ccnavi-push-approved.sh", "ccnavi-common.sh")
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
-NOTHING = "運ぶ承認済みチケットは無い。"
+NOTHING = "コミットして push する承認済みチケットは無い。"
 
 # 承認の代わり。STUB_ARGS があれば受けた引数を 1 行ずつ書き、STUB_EXIT が 0 でなければ落ち、
 # STUB_TREE があればそこに承認済みチケットを置く。
@@ -200,7 +200,7 @@ class Workspace(unittest.TestCase):
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class PushApprovedTest(Workspace):
-    # ---- 17. 置き場だけを運ぶ
+    # ---- 17. 置き場だけをコミットする
 
     def test_commits_only_the_approved_place_and_pushes(self):
         tree = self.worktree("i0001")
@@ -220,7 +220,7 @@ class PushApprovedTest(Workspace):
         self.assertNotIn(NOTHING, result.stdout)
 
     def test_does_not_carry_changes_someone_else_staged(self):
-        """先にステージされていた他人の変更も運ばない。パスを限るのはコミットまで。"""
+        """先にステージされていた他人の変更もコミットしない。パスを限るのはコミットまで。"""
         tree = self.worktree("i0001")
         self.place(tree)
         write(os.path.join(tree, "README.md"), "ステージ済みの書きかけ\n")
@@ -233,27 +233,74 @@ class PushApprovedTest(Workspace):
         self.assertTrue(self.dirty(tree, "README.md"))
 
     def test_leftover_flow_temp_files_are_not_carried(self):
-        """ボードの保存が残した `flows/.<名前>.<番号>.tmp` は運ばず、フローは運ぶ（L-e）。"""
+        """ボードの保存が残した `flows/.<名前>.<番号>.tmp` はコミットせず、
+        フローはコミットする（L-e）。
+        """
         tree = self.worktree("i0001")
         flows = os.path.join(tree, ".ccnavi", "approved", "flows")
-        write(os.path.join(flows, "i0001-01.yml"), "nodes: []\n")
-        temp = write(os.path.join(flows, ".i0001-01.yml.123.abcdef.tmp"), "half")
+        write(os.path.join(flows, "i0001-01-01.yml"), "nodes: []\n")
+        temp = write(os.path.join(flows, ".i0001-01-01.yml.123.abcdef.tmp"), "half")
 
         result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01.yml"])
+        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01-01.yml"])
         self.assertTrue(os.path.exists(temp))
         self.assertEqual(self.staged(tree), "")
-        # 一時ファイルだけが残っていても、運ぶものは無い。
+        # 一時ファイルだけが残っていても、コミットするものは無い。
         again = self.push()
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn(NOTHING, again.stdout)
 
-    # ---- 18. 運ぶものが無い
+    def test_a_removed_draft_is_carried_with_the_flow(self):
+        """取り込んで消えた下書き（`wip/proposals/flows/`）は、
+        フローと一緒にコミットして push する。
+        書き直された下書き・追跡していない下書きには触れない。"""
+        tree = self.worktree("i0001")
+        drafts = "wip/proposals/flows"
+        taken = f"{drafts}/i0001-01-01.yml"
+        rewritten = f"{drafts}/i0001-01-02.yml"
+        untracked = f"{drafts}/i0001-01-03.yml"
+        for rel in (taken, rewritten):
+            write(os.path.join(tree, *rel.split("/")), "nodes: []\n")
+        git(tree, "add", "--", taken, rewritten)
+        git(tree, "commit", "-q", "-m", "drafts")
+        flow = ".ccnavi/approved/flows/i0001-01-01.yml"
+        write(os.path.join(tree, *flow.split("/")), "nodes: []\n")
+        os.remove(os.path.join(tree, *taken.split("/")))
+        write(os.path.join(tree, *rewritten.split("/")), "nodes: [x]\n")
+        write(os.path.join(tree, *untracked.split("/")), "nodes: []\n")
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 同じ中身なので、名前の付け替えとして読まずに 2 つのパスで見る。
+        out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([flow, taken]), result.stdout + result.stderr)
+        self.assertTrue(self.dirty(tree, rewritten))
+        self.assertTrue(self.dirty(tree, untracked))
+        self.assertEqual(self.dirty(tree, taken), "")
+        self.assertEqual(self.staged(tree), "")
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_drafts_alone_are_not_carried(self):
+        """フローの保存が無ければコミットしない（置き場の変更が無いツリーには入らない）。"""
+        tree = self.worktree("i0001")
+        taken = "wip/proposals/flows/i0001-01-01.yml"
+        write(os.path.join(tree, *taken.split("/")), "nodes: []\n")
+        git(tree, "add", "--", taken)
+        git(tree, "commit", "-q", "-m", "draft")
+        os.remove(os.path.join(tree, *taken.split("/")))
+        before = self.head(tree)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(NOTHING, result.stdout)
+        self.assertEqual(self.head(tree), before)
+
+    # ---- 18. コミットするものが無い
 
     def test_nothing_to_carry_says_so(self):
         tree = self.worktree("i0001")
-        # 置き場の外の書きかけは運ぶものに数えない。
+        # 置き場の外の書きかけはコミットするものに数えない。
         write(os.path.join(tree, "README.md"), "書きかけ\n")
         before = self.head(tree)
         result = self.push()
@@ -273,7 +320,7 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.remote_head("main"), "")
         self.assertIn("main", result.stderr)
 
-    # 固定の並びに無い名前の統合先（ADR-0093 の D30）。決め方は ccnavi_integration。
+    # 固定のリストに無い名前の統合先。決め方は ccnavi_integration。
 
     def assertNotPushed(self, result, tree, branch):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -316,7 +363,7 @@ class PushApprovedTest(Workspace):
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "develop-v1.0.0")
         self.place(project)
-        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先は別（控えが無く origin も空）。
+        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先は別（取り込み結果が無く origin も空）。
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
             "branch develop-v1.0.0\n",
@@ -363,7 +410,7 @@ class PushApprovedTest(Workspace):
         self.assertIn("loose", result.stderr)
         self.assertEqual(self.head(loose), before)
         self.assertTrue(self.dirty(loose, APPROVED))
-        # 飛ばしても、他のツリーは運ぶ。
+        # 飛ばしても、他のツリーはコミットして push する。
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.remote_head("i0002"), self.head(tree))
 
@@ -383,10 +430,11 @@ class PushApprovedTest(Workspace):
         self.assertNotIn(NOTHING, result.stdout)
 
     def test_carries_the_place_named_by_ccnavi_approved(self):
-        """12. `CCNAVI_TICKETS_APPROVED` を既定と違う綴りにすると、その置き場を運ぶ。
+        """12. `CCNAVI_TICKETS_APPROVED` を既定と違うパスにすると、
+        その置き場をコミットして push する。
 
-        既定の置き場（`.ccnavi/approved`）は運ばない。環境変数の名前は `ccnavi/infra/settings.py` の
-        `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
+        既定の置き場（`.ccnavi/approved`）はコミットしない。環境変数の名前は
+        `ccnavi/infra/settings.py` の `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
         """
         other = "approved/tickets"
         tree = self.worktree("i0001")
@@ -403,14 +451,14 @@ class PushApprovedTest(Workspace):
     # ---- チケット approve-carry-05 の 7・8
 
     def said(self, result, name):
-        """sh 自身が標準エラーに name を名指ししたか。git のエラー文に紛れた綴りは数えない。"""
+        """sh 自身が標準エラーに name を名指ししたか。git のエラー文に紛れた名前は数えない。"""
         return any(
             line.startswith("ccnavi-push-approved:") and name in line
             for line in result.stderr.splitlines()
         )
 
     def test_a_failed_add_in_one_tree_does_not_stop_the_others(self):
-        """7. 1 本のツリーで `git add` が落ちても、もう 1 本は運ぶ。
+        """7. 1 本のツリーで `git add` が落ちても、もう 1 本はコミットして push する。
 
         終了コードは 1 で、落ちたツリーを標準エラーで名指しする。
         """
@@ -428,7 +476,7 @@ class PushApprovedTest(Workspace):
         self.assertTrue(self.said(result, "locked"), result.stderr)
         self.assertEqual(self.head(locked), before)
         self.assertEqual(self.remote_head("locked"), "")
-        # 落ちたツリーのあとでも、他のツリーは運ぶ。
+        # 落ちたツリーのあとでも、他のツリーはコミットして push する。
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.committed(tree), [f"{APPROVED}/i0002.md"])
         self.assertEqual(self.remote_head("i0002"), self.head(tree))
@@ -436,7 +484,7 @@ class PushApprovedTest(Workspace):
     def test_a_symlink_under_worktrees_is_not_followed(self):
         """8. `.claude/worktrees/` の下のシンボリックリンクは辿らない。標準エラーに言う。
 
-        リンク先はワークスペースの外のリポジトリ。本物のワークツリーは運ぶ。
+        リンク先はワークスペースの外のリポジトリ。本物のワークツリーはコミットして push する。
         """
         outside = os.path.join(self._tmp.name, "outside")
         outside_remote = self.repository(outside, "work")
@@ -484,7 +532,7 @@ class PushApprovedTest(Workspace):
         """`projects/` そのものがシンボリックリンクなら、その下のリポジトリにコミットしない。
 
         リンク先の中の 1 件ずつはリンクではないので、置き場の段で確かめないと辿ってしまう。
-        飛ばしたことは標準エラーに言う。本物のワークツリーは運ぶ。
+        飛ばしたことは標準エラーに言う。本物のワークツリーはコミットして push する。
         """
         app, remote = self.outside_repository("elsewhere-projects")
         before = self.head(app)
@@ -512,8 +560,8 @@ class PushApprovedTest(Workspace):
     def test_projects_that_names_the_workspace_root_falls_back_to_the_default(self):
         """`CCNAVI_PROJECTS=/` は末尾の `/` を落とすと空になり、ルートの直下を全部数えることになる。
 
-        既定の `projects` に戻すので、ルートの直下に置いた別のリポジトリは運ばない。
-        本物のワークツリーは運ぶ。
+        既定の `projects` に戻すので、ルートの直下に置いた別のリポジトリはコミットしない。
+        本物のワークツリーはコミットして push する。
         """
         app = os.path.join(self.ws, "stray")
         remote = self.repository(app, "work")
@@ -530,7 +578,7 @@ class PushApprovedTest(Workspace):
     def test_approved_place_that_names_the_tree_root_falls_back_to_the_default(self):
         """`CCNAVI_TICKETS_APPROVED=.` はツリー全体を指す。
 
-        既定の置き場に戻し、書きかけは運ばない。
+        既定の置き場に戻し、書きかけはコミットしない。
         """
         tree = self.worktree("i0001")
         self.place(tree)
@@ -561,7 +609,8 @@ class PushApprovedTest(Workspace):
     def test_only_a_detached_tree_is_skipped_without_saying_nothing(self):
         """14. detached のツリーにしか変更が無いときは 0 で終わる。
 
-        「運ぶ承認済みチケットは無い。」とは言わず、飛ばしたことを標準エラーに言う。
+        「コミットして push する承認済みチケットは無い。」とは言わず、
+        飛ばしたことを標準エラーに言う。
         """
         loose = self.worktree("loose", detach=True)
         self.place(loose)
@@ -582,12 +631,13 @@ class PushApprovedTest(Workspace):
         for word in ("-x", "../i0001", "a/b", ""):
             wrong = self.push(word)
             self.assertEqual(wrong.returncode, 2, word + wrong.stdout + wrong.stderr)
-        # 取り込み済みでない家族の名指しは運ばない（今のまま、ユーザがコミットする）。
+        # 取り込み済みでない親子のチケットの名指しはコミットしない（今のまま、ユーザがコミットする）
+        # 。
         tree = self.worktree("i0001")
         self.place(tree)
         named = self.push("i0001")
         self.assertEqual(named.returncode, 0, named.stdout + named.stderr)
-        self.assertIn("取り込み済みの家族でない", named.stdout)
+        self.assertIn("取り込み済みの親子のチケットでない", named.stdout)
         self.assertTrue(self.dirty(tree, APPROVED))
         self.assertEqual(self.remote_head("i0001"), "")
         outside = os.path.join(self._tmp.name, "elsewhere")
@@ -598,7 +648,9 @@ class PushApprovedTest(Workspace):
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class ApproveCarriesTest(Workspace):
-    """22. `ccnavi-agree.sh` は承認のあと `ccnavi-push-approved.sh` で運ぶ（設計 1.4）。"""
+    """22. `ccnavi-agree.sh` は承認のあと `ccnavi-push-approved.sh` で
+    コミットして push する（設計 1.4）。
+    """
 
     scripts = APPROVE_SCRIPTS
 
@@ -625,11 +677,11 @@ class ApproveCarriesTest(Workspace):
         """
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
-        result = self.approve("i0002-03", "i0002-04", STUB_ARGS=args)
+        result = self.approve("i0002-01-03", "i0002-01-04", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
         self.assertEqual(got[:1], ["--root"], got)
-        self.assertEqual(got[2:], ["--agree", "i0002-03", "i0002-04"], got)
+        self.assertEqual(got[2:], ["--agree", "i0002-01-03", "i0002-01-04"], got)
 
     def test_approve_without_ids_takes_all_pending(self):
         self.worktree("i0001")
@@ -664,10 +716,10 @@ class ApproveCarriesTest(Workspace):
         """使い方を出すのは語が 1 つのときだけ。識別子と並んだ `help` を何も言わずに捨てない。"""
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
-        result = self.approve("help", "i0002-01", STUB_ARGS=args)
+        result = self.approve("help", "i0002-01-01", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.received(args)[2:], ["--agree", "help", "i0002-01"])
-        refused = self.approve("--help", "i0002-01")
+        self.assertEqual(self.received(args)[2:], ["--agree", "help", "i0002-01-01"])
+        refused = self.approve("--help", "i0002-01-01")
         self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 
     def test_approve_carries_after_approval(self):
@@ -679,7 +731,9 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
     def test_approve_says_when_there_is_nothing_to_carry(self):
-        """運ぶ段は ccnavi-push-approved.sh に任せる。運ぶものが無ければその 1 行が出る。"""
+        """コミットと push の段は ccnavi-push-approved.sh に任せる。
+        コミットするものが無ければその 1 行が出る。
+        """
         self.worktree("i0001")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -695,7 +749,7 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(self.remote_head("i0001"), "")
 
     def test_failed_push_does_not_fail_the_approval(self):
-        """運ぶ失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""
+        """コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""
         git(self.ws, "remote", "set-url", "origin", os.path.join(self._tmp.name, "missing.git"))
         tree = self.worktree("i0001")
         result = self.approve(STUB_TREE=tree)

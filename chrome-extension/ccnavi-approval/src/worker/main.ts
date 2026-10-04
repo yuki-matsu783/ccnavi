@@ -1,10 +1,11 @@
 /**
- * Pyodide を動かす Web Worker（ADR-0093 の 7.2・8.1）。拡張のページ（ボード）が起こす。
+ * Pyodide を動かす Web Worker。拡張のページ（ボード）が起こす。判定を TS で書き直さず、手元と同じ ccnavi の
+ * Python をここで動かすことで、判定を 1 か所に保つ。
  *
  * 同梱の Pyodide を読み、同梱の Python（ccnavi・純 Python の PyYAML・入口 `ccnavi_chrome`）を
  * MEMFS の `/app` に展開して import する。PAT も拡張の API も触らない。受けるのは要求の JSON だけ。
  */
-// @ts-expect-error 同梱の Pyodide はビルドが dist/pyodide/ に置く（束ねない）
+// @ts-expect-error 同梱の Pyodide はビルドが dist/pyodide/ に置く（バンドルしない）
 import { loadPyodide } from "./pyodide/pyodide.mjs";
 
 interface PyodideLike {

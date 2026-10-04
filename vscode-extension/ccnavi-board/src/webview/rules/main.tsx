@@ -1,6 +1,6 @@
 /**
- * ルール設定画面の入口。最初の中身は HTML に埋まっている（`<script type="application/json">`）。
- * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は拡張ホストからは入れ直されない（ADR-0062）
+ * ルール管理画面の入口。最初の中身は HTML に埋まっている（`<script type="application/json">`）。
+ * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は拡張ホストからは入れ直されない
  * ので、ここが走るのはパネルを開いたとき。VS Code が画面を作り直す経路（`Developer: Reload Webviews`、
  * 別ウィンドウへ移す）では同じ HTML からもう 1 度走るが、`ready` を送れば今の中身が届く。
  */
@@ -12,6 +12,6 @@ import { App } from "./App.js";
 
 const root = document.getElementById("root");
 if (root !== null) {
-  const initial = readInitial<RulesData>(DATA_ID, "ルール設定画面", (error) => ({ kind: "error", error }));
+  const initial = readInitial<RulesData>(DATA_ID, "ルール管理画面", (error) => ({ kind: "error", error }));
   createRoot(root).render(<App initial={initial} />);
 }

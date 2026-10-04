@@ -18,7 +18,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
 | `config` | 設定の層の合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
-| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・運ぶ sh・取ってくる sh・ランチャー・clean） | 約 80 秒 |
+| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean） | 約 80 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh
@@ -78,7 +78,7 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 ## 拡張（`vscode-extension/ccnavi-board`）のグループ
 
 拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / shared）。
-こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る（ADR-0061）。
+こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る。
 
 ```sh
 cd vscode-extension/ccnavi-board

@@ -1,4 +1,4 @@
-"""issue・MR に紐づくブランチを探す（ADR-0101）。
+"""issue・MR に紐づくブランチを探す。
 
 入口は 2 つある。
 
@@ -235,7 +235,7 @@ class Host:
         }
 
 
-# ホストから来た綴りのうち、出力に載せるもの。改行や制御文字で行を割らせない。
+# ホストから来た表記のうち、出力に載せるもの。改行や制御文字で行を割らせない。
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -348,7 +348,7 @@ def _tickets(conf: settings.Settings, root: str, project: str) -> list[ticket_mo
 def _branch_of_ticket(t: ticket_mod.Ticket, approved: bool) -> str:
     """チケットが名乗るブランチ。
 
-    承認前の提案の `branch:` は使わない（ADR-0100 の 5.2）ので識別子。
+    承認前の提案の `branch:` は使わないので識別子。
     """
     if not approved:
         return t.ticket

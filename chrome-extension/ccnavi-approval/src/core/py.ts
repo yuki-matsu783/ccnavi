@@ -1,6 +1,6 @@
 /**
  * Pyodide の上の入口（`py/ccnavi_chrome.py`）との約束。判定はすべて Python が出し、
- * ここは形だけを持つ（ADR-0035）。
+ * ここは形だけを持つ。TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため。
  */
 
 /** 要求と答えの形の版。`ccnavi_chrome.SCHEMA` と揃える */
@@ -12,7 +12,7 @@ export interface Placement {
   readonly integration_paths: readonly string[];
   readonly integration_files: readonly string[];
   readonly branch_paths: readonly string[];
-  /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの（段階 5） */
+  /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの */
   readonly workspace_paths: readonly string[];
   readonly workspace_files: readonly string[];
   /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層） */
@@ -33,7 +33,7 @@ export interface Integration {
   readonly head: string;
 }
 
-/** プロジェクトのリポジトリのワークスペースの統合先の中身（段階 5。共通層・自身の層・設定・互換のマーカー） */
+/** プロジェクトのリポジトリのワークスペースの統合先の中身（共通層・自身の層・設定・互換のマーカー） */
 export interface Workspace {
   readonly integration: Integration;
   readonly files: Record<string, string>;
@@ -45,11 +45,11 @@ export interface Snapshot {
   readonly integration: Integration;
   readonly branches: Record<string, Branch>;
   readonly absent: readonly string[];
-  /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い（段階 5） */
+  /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い */
   readonly project?: string;
   readonly workspace?: Workspace;
   /**
-   * 家族の識別子 → 親のブランチ名（ADR-0100 の 5 章）。閉包の先行の家族を読みに行くブランチの見当で、
+   * 親子のチケットの識別子 → 親のブランチ名。閉包の先行の親子のチケットを読みに行くブランチの見当で、
    * 判定には使わない（読んだブランチの親チケットが名乗らなければ Python は使わない）
    */
   readonly hints?: Readonly<Record<string, string>>;
@@ -58,21 +58,21 @@ export interface Snapshot {
 export interface Family {
   /** 親のブランチ名（拡張が読み書きするブランチ） */
   readonly name: string;
-  /** 家族の識別子（親チケットの `branch:` があればブランチ名と違う。ADR-0100 の 5 章） */
+  /** 親子のチケットの識別子（親チケットの `branch:` があればブランチ名と違う） */
   readonly family?: string;
   readonly title: string;
   readonly state: string;
   readonly closed: boolean;
-  /** 家族が決まらない理由（同じ家族を名乗るブランチが 2 本以上ある など）。あればこの家族は判定しない */
+  /** 親子のチケットが決まらない理由（同じ親子のチケットを名乗るブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
   readonly conflict?: string;
 }
 
 export interface Closure {
-  /** 親のブランチ名の並び（先頭が判定する家族） */
+  /** 親のブランチ名のリスト（先頭が判定する親子のチケット） */
   readonly families: readonly string[];
-  /** ブランチ名 → 家族の識別子 */
+  /** ブランチ名 → 親子のチケットの識別子 */
   readonly idents?: Readonly<Record<string, string>>;
-  /** 同じ家族を名乗るブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
+  /** 同じ親子のチケットを名乗るブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
   readonly rivals?: readonly string[];
   readonly need: readonly string[];
   readonly absent: readonly string[];
@@ -90,7 +90,7 @@ export interface BatchEntry {
   readonly path: string;
   readonly overflow: readonly string[];
   readonly body: string;
-  /** 親のブランチ名（`branch:`、無ければ識別子。ADR-0100 の 5 章） */
+  /** 親のブランチ名（`branch:`、無ければ識別子） */
   readonly branch?: string;
   /** `branch:` が既にあるブランチを指すか */
   readonly existing_branch?: boolean;
@@ -103,7 +103,7 @@ export interface Withdrawable {
   readonly problems: readonly string[];
 }
 
-/** 依頼済みでまだレビュー済みでないフェーズ（8.9。段階 4）。通るかは `confirm` が決める */
+/** 依頼済みでまだレビュー済みでないフェーズ。通るかは `confirm` が決める */
 export interface Reviewable {
   readonly phase: number;
   readonly mr: number;
@@ -114,21 +114,21 @@ export interface Reviewable {
 
 export interface BoardResult {
   readonly family: string;
-  /** 家族の識別子（親のブランチ名と違うことがある。ADR-0100 の 5 章） */
+  /** 親子のチケットの識別子（親のブランチ名と違うことがある） */
   readonly ident?: string;
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
-  /** 書けるか（互換の版・書く先の名前。Python が決める。7.3・8.5） */
+  /** 書けるかどうか。互換の版と書く先の名前をもとに Python が決める */
   readonly write?: { readonly allowed: boolean; readonly reason: string };
   readonly withdrawable?: readonly Withdrawable[];
-  /** レビュー済みを付けられる候補（段階 4） */
+  /** レビュー済みを付けられる候補 */
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
-  /** 見せた画面の指紋（承認のときに Python が読み直した中身と比べる。8.3） */
+  /** 見せた画面のダイジェスト（承認のときに Python が読み直した中身と比べる） */
   readonly digest?: string;
-  /** 承認するときに `plan` へ渡す絞り（指紋を出したときの絞り。null なら絞らない） */
+  /** 承認するときに `plan` へ渡す絞り（ダイジェストを出したときの絞り。null なら絞らない） */
   readonly only?: readonly string[] | null;
   readonly rejected?: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
   readonly problems?: readonly string[];
@@ -180,7 +180,7 @@ export interface Compare {
   readonly files: readonly string[] | null;
 }
 
-/** 「始める」の答え（8.6。段階 5）。`problems` が空なら `identifier` の名前でブランチを作れる */
+/** 「始める」の答え。`problems` が空なら `identifier` の名前でブランチを作れる */
 export interface StartResult {
   readonly identifier: string;
   readonly integration: string;

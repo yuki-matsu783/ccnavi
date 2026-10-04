@@ -32,7 +32,7 @@ deny:
     why: .claude/ の下も worktrees/ 以外は main では触らない
   - tool: Write
     subject: "/repo/projects/lib/docs/skills/deploy/SKILL.md"
-    why: プロジェクトのスキル（ADR-0091）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
+    why: プロジェクトのスキル（docs/skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
     why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
@@ -106,8 +106,8 @@ deny:
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/rule-samples.yml"
     why: >-
-      共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
-      （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒にユーザに渡す
+      共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める。
+      見本の下書きは scratchpad に置き、ルールの下書きと一緒にユーザに渡す
   - tool: Edit
     subject: "/repo/.ccnavi/common/risks.yml"
     why: リスクの配点も同じ。自分の作業の重さを自分で決められる
@@ -116,13 +116,13 @@ deny:
     why: ガードを起動する hook 本体
   - tool: Edit
     subject: "/repo/docs/../.ccnavi/common/rules.yml"
-    why: 迂回した綴りでも行き着く先で当たる
+    why: 迂回したパスでも行き着く先で当たる
   - tool: Bash
     subject: "echo x > /repo/.ccnavi/common/rules.yml"
     why: Write で拒否した場所。リダイレクトで同じところに届く
   - tool: Bash
     subject: "cd /repo && printf x >> .claude/hooks/lint-py.sh"
-    why: 相対の綴りでも、追記でも同じ場所
+    why: 相対パスでも、追記でも同じ場所
   - tool: Bash
     subject: "sed -i s/deny/allow/ /repo/.ccnavi/common/rules.yml"
     why: その場で書き換える形
@@ -153,16 +153,16 @@ deny:
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.Claude/Settings.json"
     why: >-
-      綴りを変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
-      組み込みの守りが綴りの違いを無視して止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
+      表記を変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
+      組み込みの保護が表記の違いを無視して止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
   - tool: Bash
     subject: "GIT push origin main"
     why: >-
-      Windows では大文字でも同じコマンドが走る。綴りで判定が割れると、同じルールが
+      Windows では大文字でも同じコマンドが走る。表記で判定が割れると、同じルールが
       機械によって止めたり通したりする
   - tool: Read
     subject: "/repo/.claude/worktrees/x/.ENV"
-    why: 認証情報の場所も綴りを問わない
+    why: 認証情報の場所も表記を問わない
   - tool: Write
     subject: "/repo/.ccnavi/scripts/ccnavi-git.sh"
     why: git の入口。書き換えれば git のルールがまとめて外れる
@@ -171,7 +171,7 @@ deny:
     why: 通さないはずのサブコマンドを通す形に変えられる
   - tool: Bash
     subject: "cd /repo/.claude/worktrees/x && echo x > ../../scripts/ccnavi-git.sh"
-    why: .claude を通らない綴り。Bash の対象は解かれないので名前で捕まえる
+    why: .claude を通らないパス。Bash の対象は解かれないので名前で捕まえる
 
 ask:
   - tool: Write
@@ -196,11 +196,11 @@ ask:
     why: パイプの後ろに立つ取得も拾う。コマンドの先頭なら当たる
   - tool: Bash
     subject: "CURL https://example.com"
-    why: 勧めるほうの文面も綴りを問わない。止める側だけ区別しないと、案内が綴りで消える
+    why: 勧めるほうの文面も表記を問わない。止める側だけ区別しないと、案内が表記の違いで消える
   - tool: Bash
     subject: "echo curl is a tool"
     why: >-
-      引数に出ただけの綴りには当たらない。どのルールも言及せず権限モードへ渡る。
+      引数に出ただけの名前には当たらない。どのルールも言及せず権限モードへ渡る。
       当たると、取得について書く作業がそのまま止まる
   - tool: Bash
     subject: "docker run --rm alpine"
@@ -236,7 +236,7 @@ ask:
     why: ルールを確かめる手そのもの。ルールファイルの名前が引数に出ても deny には当たらない
   - tool: Bash
     subject: "cp /repo/.ccnavi/common/rules.yml /tmp/backup.yml"
-    why: 写しを取っているだけ。cp は行き先の側だけを見るので deny には当たらない
+    why: コピーを取っているだけ。cp は行き先の側だけを見るので deny には当たらない
   - tool: Bash
     subject: "diff /repo/.claude/settings.json /repo/.claude/settings.local.json"
     why: 2 つ並べて見比べるだけ。deny には当たらない
@@ -266,12 +266,12 @@ allow:
   - tool: Bash
     subject: "CAT /etc/hosts"
     why: >-
-      コマンドの名前も区別しない（同じ綴りには同じ判定）。区別しない機械では `cat` そのものなので、
-      小文字なら通る呼び出しを綴りだけで別扱いにしない。代償として、区別する機械で `CAT` という
-      別の実行ファイルが在れば、この allow がそれにも掛かる（ADR-0051）
+      コマンドの名前も区別しない（大文字小文字だけが違う名前には同じ判定）。区別しない機械では `cat` そのものなので、
+      小文字なら通る呼び出しを大文字か小文字かだけで別扱いにしない。代償として、区別する機械で `CAT` という
+      別の実行ファイルが在れば、この allow がそれにも掛かる
   - tool: Bash
     subject: "FIND /etc -name x"
-    why: 同上。prefer-glob も綴りを問わず当てる
+    why: 同上。prefer-glob も表記を問わず当てる
   - tool: Bash
     subject: 'grep -n "git push" README.md'
     why: >-
@@ -330,7 +330,7 @@ allow:
     why: これが git の打ち方そのもの。ここを止めたら何もできない
   - tool: Bash
     subject: "cp /repo/.ccnavi/scripts/ccnavi-git.sh /tmp/backup.sh"
-    why: 控えを取っているだけ。ccnavi-git.sh の名前が出るので allow に当たる
+    why: バックアップを取っているだけ。ccnavi-git.sh の名前が出るので allow に当たる
   - tool: Bash
     subject: "find /repo/ccnavi -name *.py"
     why: >-
@@ -350,9 +350,9 @@ allow:
     subject: "(stop)"
     why: >-
       ターンの終わり。skill-review-every-10 が使われ、10 回に 1 度止めて振り返りの手順を渡す
-      （ADR-0090）。every が無い・プロジェクトの層にしか無いルールでは判定に入らない
+      every が無い・プロジェクトの層にしか無いルールでは判定に入らない
   - tool: Write
     subject: "/repo/.claude/worktrees/lib1/docs/skills/deploy/SKILL.md"
     why: >-
-      プロジェクトから切ったワークツリーの docs/skills/（ADR-0091）。守りの外のふつうの場所で、
+      プロジェクトから切ったワークツリーの docs/skills/（プロジェクトのスキルの置き場）。組み込みの保護の外のふつうの場所で、
       worktrees の allow に当たる。チケットがあればその範囲でさらに絞られる

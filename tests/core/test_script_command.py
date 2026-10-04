@@ -1,6 +1,6 @@
-"""文面で案内する `.ccnavi/scripts/` の sh の綴り（settings.script_command）。
+"""文面で案内する `.ccnavi/scripts/` の sh のパス（settings.script_command）。
 
-スクリプトはワークスペースにしか無いので、案内はワークスペースルートから綴る。
+スクリプトはワークスペースにしか無いので、案内はワークスペースルートから書く。
 プロジェクトから切ったワークツリーでは、相対の `sh .ccnavi/scripts/...` が届かない。
 """
 
@@ -58,7 +58,7 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase.exempt(request.text, request.reason), request.text)
             ready = shellread.read(f"{review} ready")
             self.assertTrue(phase.forbidden(ready.text), ready.text)
-            finish = shellread.read(f"{ticket} finish i0001-01")
+            finish = shellread.read(f"{ticket} finish i0001-01-01")
             self.assertTrue(phase.forbidden(finish.text), finish.text)
 
     def test_separator_is_slash(self):
@@ -70,7 +70,7 @@ class ScriptCommandTest(unittest.TestCase):
     def test_spelling_stays_exempt_and_forbidden(self):
         """案内どおりに打った形が、止めている間の例外にもサブエージェントの禁止にも当たること。
 
-        案内だけ絶対パスにして、判定が相対の綴りしか見ていなければ、案内どおり打った
+        案内だけ絶対パスにして、判定が相対パスしか見ていなければ、案内どおり打った
         レビューの依頼が、止めている間の判定に止められる。
         """
         with tempfile.TemporaryDirectory() as root:
@@ -79,7 +79,7 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase.exempt(f"{review} request --phase 1 --body-file b.md", ""))
             self.assertTrue(phase.exempt(f"{review} confirm --phase 1", ""))
             self.assertTrue(phase.forbidden(f"{review} ready"))
-            self.assertTrue(phase.forbidden(f"{ticket} finish i0001-01"))
+            self.assertTrue(phase.forbidden(f"{ticket} finish i0001-01-01"))
             rule = phase.ticket_approval_rule("", root)
             approve = settings.script_command(root, "ccnavi-agree.sh")
             self.assertIsNotNone(rule.compiled.search(approve))

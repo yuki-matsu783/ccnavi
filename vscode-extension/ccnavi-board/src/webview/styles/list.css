@@ -1,5 +1,5 @@
 /*
- * 設定 3 画面（ルール設定・リスク管理・フェーズ管理）の一覧。1 件 1 行で、押した行だけ下に欄が開く。
+ * 設定 3 画面（ルール管理・リスク管理・フェーズ管理）の一覧。1 件 1 行で、押した行だけ下に欄が開く。
  * 行の見出し（.row-head）の列の幅は画面ごとに決める。欄名は欄の左に置き、欄と欄名は親の格子に並ぶ
  * （.field は display: contents）。出番の少ない欄は details.more に畳み、値があるときだけ開いて出す。
  */
@@ -38,7 +38,7 @@
 .row-body .buttons { grid-column: 1 / -1; display: flex; gap: 4px; justify-content: flex-end; padding-top: 4px; }
 /* 行末のボタンは右端に詰める。`button.action.small` の `margin-left: auto`（見出しの「＋ 追加」向け）を
    打ち消すためのもので、**`.action` まで書いて詳細度で勝たせる**。同じ詳細度だと、どちらが先に
-   束ねられたかで見た目が変わる（CSS の `@import` は先頭に集まるので、並びは入口の 1 行で動く） */
+   バンドルされたかで見た目が変わる（CSS の `@import` は先頭に集まるので、順序は入口の 1 行で動く） */
 .row-body .buttons button.action { margin-left: 0; }
 .row-body .wide { grid-column: 1 / -1; }
 .row-body textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; }

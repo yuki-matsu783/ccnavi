@@ -1,27 +1,29 @@
-"""C1（ADR-0093 の 4.3・4.4。段階 2d）で sh が聞くこと。
+"""C1 で sh が聞くこと。
 
 状態を書く操作を「ロック → 途中の操作の確認 → C1 の外の変更の見分けとコミット → 取り込み →
 未送信の確かめ → 書く → コミット → push」の 1 操作にするのは sh（`ccnavi-common.sh` の
-`ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（D17・4.5）。
-ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。D33）。
+`ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
+ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
 
-- `ccnavi c1 family <識別子>`: その識別子の家族と、C1 の対象かと、親のブランチ名（`branch`。
-  親チケットの `branch:`、無ければ識別子。ADR-0100 の 5 章）
-  - 対象は、置き場の綴りが相対で、家族の控えがあり（取り込み済み）、chat だけの家族でなく、
-    止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い家族（D11）
-  - 止める理由のある取り込み済みの家族は `target stop`。sh は何も書かずに止める
+- `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象かと、親のブランチ名
+  （`branch`。親チケットの `branch:`、無ければ識別子）
+  - 対象は、置き場のパスが相対で、取り込み状態があり（取り込み済み）、
+    chat だけの親子のチケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い
+    など）の無い親子のチケット
+  - 止める理由のある取り込み済みの親子のチケットは `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
 - `ccnavi c1 sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
-  `wip/proposals/review/`）の変更を 4.4 の (b)・(c)・(d) に分ける
-  - 版が無ければ未コミットの変更（C1 の 3）、版があれば `<版>..HEAD` でコミットに入った
-    変更（C1 の 5）
-  - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その家族の
-    `phases/<親>/<N>.pending`・`.skipped` と、その印の跡（`events/<親>.ndjson` の
+  `wip/proposals/review/`）の変更を次の (b)・(c)・(d) に分ける
+  - 版が無ければ未コミットの変更（取り込みの前にコミットする分）、版があれば `<版>..HEAD` で
+    コミットに入った変更（取り込みの後に未送信を確かめる分）
+  - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
+    `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの履歴（`events/<親>.ndjson` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
-  - (c) ユーザが運ぶもの（ユーザの判断）。C1 は運ばずに止める。ユーザの判断が一緒に書く
-    移動（review/ から done/、doing/ から done/）とマーカーの消去、跡の追記もここ
+  - (c) ユーザがコミットするもの（ユーザの判断）。C1 はコミットせずに止める。
+    ユーザの判断が一緒に書く
+    移動（review/ から done/、doing/ から done/）とマーカーの消去、履歴の追記もここ
   - (d) 見分けられないもの。C1 は止める
-  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 が運ぶ。
+  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 がコミットする。
     未コミットのときだけ）
   - `skip` は書きかけの一時ファイル（数えない、コミットもしない）
 
@@ -58,13 +60,13 @@ KIND_SKIP = "skip"
 # hook の告知が置くマーカーの欄（phase.announce）。これ以外の欄があれば (b) にしない。
 _HOOK_MARK_FIELDS = frozenset({"at", "review", "source", "deferred_to", "tickets"})
 _HOOK_MARKS = (approval.MARK_PENDING, approval.MARK_SKIPPED)
-# 跡の行が必ず持つ欄（history.note）。
+# 履歴の行が必ず持つ欄（history.note）。
 _EVENT_FIELDS = ("at", "ticket", "kind")
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
 # configsync の `*.ccnavi-sync`）。
 _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$")
-# ユーザの判断が書くもの（4.4 の表）。フローの本文、reviewed・close-early の印、設定を見た印、
-# 受け入れたスレッド、ユーザの承認で置かれた写し。
+# ユーザの判断が書くもの。フローの本文、reviewed・close-early のマーカー、
+# 設定を見た上書きの記録、受け入れたスレッド、ユーザの承認で置かれた承認済みチケット。
 _HUMAN_MARK_NAMES = (
     f"{approval.PARENT_MARK_CLOSE_EARLY}.json",
     "config-sync.json",
@@ -74,13 +76,19 @@ _TIMEOUT = 20.0
 
 
 def family_of(ident: str) -> str:
-    """識別子の家族の親（3.3 の 5）。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
+    """識別子が属する親子のチケットの親。
+
+    子の形（`<親>-<2 桁>-<2 桁>`）なら右から 2 段を剥がした親、そうでなければ自身。
+    """
     matched = ticket_mod.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
 
 
 def _relative_places(conf: settings.Settings) -> tuple[str, str] | None:
-    """置き場の綴り（承認済み、レビュー待ち）。どちらかが絶対パスなら None（3.1 の 12）。"""
+    """置き場のパス（承認済み、レビュー待ち）。どちらかが絶対パスなら None。
+
+    絶対パスの置き場はブランチに乗らないので、C1 の対象にしない。
+    """
     approved = fsio.slashed(conf.approved or settings.DEFAULT_APPROVED).strip("/")
     tickets = fsio.slashed(conf.tickets or settings.DEFAULT_TICKETS).rstrip("/")
     raw = (conf.approved or "", conf.tickets or "")
@@ -93,11 +101,13 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
     """C1 の対象か（`TARGET_YES` / `TARGET_NO` / `TARGET_STOP`）と、その理由と立ち位置。"""
     st = syncstate.standing_any(conf, root, parent)
     if _relative_places(conf) is None:
-        return TARGET_NO, "置き場の綴りが絶対パス（C1 と Chrome の対象外）", st
+        return TARGET_NO, "置き場のパスが絶対パス（C1 と Chrome の対象外）", st
     if not st.imported:
-        return TARGET_NO, "家族の控えが無い（取り込み済みでない。今の手元の動きのまま）", st
+        why = "親子のチケットの取り込み状態が無い（取り込み済みでない。今の手元の動きのまま）"
+        return TARGET_NO, why, st
     if _chat_only(conf, root, parent):
-        return TARGET_NO, "chat だけの家族（マージリクエストを持たない。今の手元の動きのまま）", st
+        why = "chat だけの親子のチケット（マージリクエストを持たない。今の手元の動きのまま）"
+        return TARGET_NO, why, st
     if st.stop or st.home is None:
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
     origin = gitcmd.run(st.home.root, ["config", "--get", "remote.origin.url"], _TIMEOUT)
@@ -109,17 +119,17 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
 
 
 def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
-    """`ccnavi c1 family <識別子>`。家族と、C1 の対象か。"""
+    """`ccnavi c1 family <識別子>`。親子のチケットと、C1 の対象か。"""
     parent = family_of(ident)
     lines = [("family", parent)]
     places = _relative_places(conf)
     verdict, why, st = target(conf, root, parent)
     lines.append(("repo", st.repo))
-    # 親のブランチ名（ADR-0100 の 5 章）。sh は識別子からブランチ名を組み立てず、これを使う
-    # （ref・fetch・push・ls-remote・家族の控えの `branch`）。名前は承認済みの親の写しの `branch:`
-    # だけから引き（提案の `branch:` は使わない）、`ticket.branch_problem` と統合先の名前を
-    # 通らなければ `branch` の行を出さずに `branch_refused` で理由を言う（sh はその家族を
-    # 識別子の外へ動かさずに止める）。
+    # 親のブランチ名。sh は識別子からブランチ名を組み立てず、これを使う
+    # （ref・fetch・push・ls-remote・取り込み状態の `branch`）。名前は承認済みの親チケットの
+    # `branch:` だけから引き（提案の `branch:` は使わない）、`ticket.branch_problem` と統合先の
+    # 名前を通らなければ `branch` の行を出さずに `branch_refused` で理由を言う（sh はその親子の
+    # チケットを識別子の外へ動かさずに止める）。
     fams = syncstate.Families(conf, root)
     branch = st.branch or fams.branch_any(parent)
     refused = fams.branch_refusal(parent, branch, _project_guess(fams, parent, st))
@@ -149,7 +159,7 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
 
 
 def _project_guess(fams: syncstate.Families, parent: str, st: syncstate.Standing) -> str:
-    """家族のリポジトリ（プロジェクトの名前。ワークスペース自身なら空）の見当。"""
+    """親子のチケットのリポジトリ（プロジェクトの名前。ワークスペース自身なら空）の見当。"""
     if st.imported:
         return syncstate.project_of_key(st.repo)
     named = [w for w in fams.worktrees() if w.name == parent]
@@ -175,7 +185,7 @@ def sort(
     places = _relative_places(conf)
     st = syncstate.standing_any(conf, root, parent)
     if places is None or st.home is None:
-        stderr.write(f"ccnavi: c1 sort: 家族 {parent} の親のワークツリーが決まらない\n")
+        stderr.write(f"ccnavi: c1 sort: 親子のチケット {parent} の親のワークツリーが決まらない\n")
         return 1
     tree_root = st.home.root
     changed, why = _changed(tree_root, places, since)
@@ -215,7 +225,7 @@ def _changed(tree_root: str, places: tuple[str, str], since: str) -> tuple[list[
 
 
 class _Unreadable(Exception):
-    """中身を読めない（UTF-8 でない跡など）。理由を持って (d) にする。"""
+    """中身を読めない（UTF-8 でない履歴など）。理由を持って (d) にする。"""
 
 
 def classify_all(
@@ -225,7 +235,7 @@ def classify_all(
     changed: list[str],
     since: str = "",
 ) -> list[tuple[str, str, str]]:
-    """変更の並びを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
+    """変更のリストを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
     HEAD）、あれば HEAD と `since`。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。
     """
     approved_rel, review_rel = places
@@ -296,12 +306,15 @@ _NUMBER = re.compile(r"[0-9]+")
 
 
 def _lf(data: bytes) -> bytes:
-    """改行を LF に揃える（autocrlf で作業ツリーだけ CRLF になった跡を、コミット済みと比べる）。"""
+    """改行を LF に揃える（autocrlf で作業ツリーだけ CRLF になった形跡を、
+    コミット済みと比べる）。"""
     return data.replace(b"\r\n", b"\n")
 
 
 def _hook_mark(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:
-    """その家族の `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、中身が hook の欄だけ。"""
+    """その親子のチケットの `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、
+    中身が hook の欄だけ。
+    """
     if len(parts) != 3 or parts[0] != approval.PHASES_DIR or parts[1] != parent:
         return False
     if before is not None or now is None:
@@ -319,7 +332,7 @@ def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) ->
     """`events/<名前>.ndjson` の追記の行（JSON）。追記でなければ None。読めなければ _Unreadable。
 
     変更前が在り、変更前（改行を LF に揃えたもの）が前置きで、足した部分が改行で終わるときだけ。
-    新しい跡のファイルは追記と読まない。
+    新しい履歴のファイルは追記と読まない。
     """
     if len(parts) != 2 or parts[0] != history.EVENTS_DIR or now is None or before is None:
         return None
@@ -336,7 +349,7 @@ def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) ->
     try:
         text = tail.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise _Unreadable(f"跡の追記を UTF-8 として読めない（{exc.reason}）") from exc
+        raise _Unreadable(f"履歴の追記を UTF-8 として読めない（{exc.reason}）") from exc
     rows = []
     for line in text.split("\n")[:-1]:
         try:
@@ -352,7 +365,7 @@ def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) ->
 
 
 def _hook_events(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:
-    """その家族の親の跡への、hook の印（pending・skipped）の行だけの追記か。"""
+    """その親子のチケットの親の履歴への、hook のマーカー（pending・skipped）の行だけの追記か。"""
     if len(parts) != 2 or parts[1] != f"{parent}{history.SUFFIX}":
         return False
     rows = _appended_rows(parts, now, before)
@@ -376,22 +389,23 @@ def _judge_record(parts: list[str]) -> bool:
 
 
 def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool:
-    """ユーザの判断が書くものの形（4.4 の表）。形だけで見る（(c) も (d) も C1 は止める）。
+    """ユーザの判断が書くものの形。形だけで見る（(c) も (d) も C1 は止める）。
 
-    フローの本文、ユーザの承認で置かれた写し、reviewed・(b) でない skipped・close-early・
-    設定を見た印・受け入れたスレッド、ユーザの判断が消したマーカー、ユーザの判断が一緒に書く
-    移動（review/ から done/、doing/ から done/）、跡の追記（読める行だけ）。
+    フローの本文、ユーザの承認で置かれた承認済みチケット、
+    reviewed・(b) でない skipped・close-early・設定を見た上書きの記録・受け入れたスレッド、
+    ユーザの判断が消したマーカー、ユーザの判断が一緒に書く移動（review/ から done/、
+    doing/ から done/）、履歴の追記（読める行だけ）。
     """
     rel = f"{approved_rel}/{'/'.join(parts)}"
     if len(parts) == 2 and parts[0] == "flows" and parts[1].endswith((".yml", ".yaml")):
         return True
     if len(parts) == 2 and parts[0] == ticket_mod.DOING:
         if added(rel):
-            return True  # ユーザの承認で置かれた写し
-        # 締め（close-early）の取り消しで done/ へ動いた
+            return True  # ユーザの承認で置かれた承認済みチケット
+        # 親を早めに閉じたとき（close-early）の取り消しで done/ へ動いた
         return removed(rel) and added(f"{approved_rel}/{ticket_mod.DONE}/{parts[1]}")
     if len(parts) == 2 and parts[0] == ticket_mod.DONE and added(rel):
-        # ユーザのレビュー（review/ から）か締めの取り消し（doing/ から）で動いた先
+        # ユーザのレビュー（review/ から）か早めに閉じたときの取り消し（doing/ から）で動いた先
         return removed(f"{review_rel}/{parts[1]}") or removed(
             f"{approved_rel}/{ticket_mod.DOING}/{parts[1]}"
         )

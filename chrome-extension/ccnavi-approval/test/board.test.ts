@@ -1,5 +1,5 @@
 /**
- * 読み取り専用ボードの組み立て（ADR-0093 段階 1）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * 読み取り専用ボードの組み立て。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -41,7 +41,7 @@ async function run(
 
 const family = (b: RepoBoard, name: string) => b.families.find((f) => f.family.name === name);
 
-test("CX-T040 直近のブランチから家族を見分ける。コードだけのブランチと統合先は家族にしない", async () => {
+test("CX-T040 直近のブランチから親子のチケットを見分ける。コードだけのブランチと統合先は親子のチケットとして扱わない", async () => {
   const { board } = await run();
   assert.equal(board.error, "");
   assert.deepEqual(board.integration && { name: board.integration.name, source: board.integration.source }, { name: "main", source: "default" });
@@ -50,16 +50,16 @@ test("CX-T040 直近のブランチから家族を見分ける。コードだけ
   assert.equal(board.compat?.same, true);
 });
 
-test("CX-T041 先行の閉包の家族（直近の外）を読み足し、統合先で閉じた家族は読まない", async () => {
+test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み足し、統合先で閉じた親子のチケットは読まない", async () => {
   const { board, mock } = await run();
   const f = family(board, "i0001");
   assert.deepEqual(f?.result?.closure.families, ["i0001", "i0003"]);
   assert.ok(mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0003"));
-  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた家族は読まない");
-  // 今の ccnavi の答え: 先行 i0003-01 が閉じていないので子は承認の対象にしない
+  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた親子のチケットは読まない");
+  // 今の ccnavi の答え: 先行 i0003-01-01 が閉じていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01 が閉じていない/);
+  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
+  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01-01 が閉じていない/);
   assert.equal(f?.result?.batch?.[0].path, "i0001:wip/proposals/todo/i0001.md");
 });
 
@@ -77,12 +77,12 @@ test("CX-T042 判定の入力は統合先・P・閉包だけ。表示用のブ�
   assert.deepEqual({ ...b, schema: 0 }, { ...a, schema: 0 });
 });
 
-test("CX-T043 先行の家族のブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
+test("CX-T043 先行の親のブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
   const { board } = await run();
   const f = family(board, "i0002");
   assert.deepEqual(f?.result?.closure.absent, ["i0007"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0002-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /i0007-01 がどの置き場/);
+  assert.equal(f?.result?.rejected?.[0].ticket, "i0002-01-01");
+  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /i0007-01-01 がどの置き場/);
 });
 
 test("CX-T044 統合先の名前: 設定したブランチが無ければ止めて名前を出す。設定どおりなら「設定」と出す", async () => {
@@ -103,18 +103,18 @@ test("CX-T045 互換のマーカーが違えば、どちらを更新するかを
   assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）が書かれていない/);
 });
 
-test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）", async () => {
+test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読む（8.2）", async () => {
   const cache = memoryCache();
   const first = await run(fixture(), {}, cache);
   assert.ok(first.board.stats.blobsFetched > 0);
   const second = await run(fixture(), {}, cache);
   assert.equal(second.board.stats.blobsFetched, 0);
   assert.ok(second.board.stats.graphql < first.board.stats.graphql);
-  // 読み取りの回数は ADR の見積もりの桁（承認 1 回で 40 回ほど）に収まる
+  // 読み取りの回数は見積もりの桁（承認 1 回で 40 回ほど）に収まる
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 
-test("CX-T047 置き場の綴りは統合先の .claude/settings.json から読む", async () => {
+test("CX-T047 置き場のパスは統合先の .claude/settings.json から読む", async () => {
   const b = fixture();
   b.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets" } });
   const moved = b.i0001.files;
@@ -136,20 +136,20 @@ test("CX-T048 置き場がリポジトリの外を指すワークスペースは
   assert.match(board.error, /リポジトリの外を指している/);
 });
 
-test("CX-T049 先行の閉包が 16 家族を超えたら決まらないで止める（3.3 の 5）", async () => {
+test("CX-T049 先行の閉包が 16 組の親子のチケットを超えたら決まらないで止める（3.3 の 5）", async () => {
   const b = fixture();
   const base = b.main.files;
   const chain = Array.from({ length: 17 }, (_, i) => `c${String(i + 1).padStart(2, "0")}x`);
   const text = (id: string, pred: string) =>
-    `---\nversion: 1\nticket: ${id}\nparent: ${id.slice(0, -3)}\nphase: 1\npredecessors:\n  - ${pred}\nhuman_review:\n  required: false\n  reason: r\ntitle: t\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: "wip/research/*"\n---\n\n本文\n`;
-  b.i0001.files["wip/proposals/todo/i0001-01.md"] = text("i0001-01", `${chain[0]}-01`);
+    `---\nversion: 1\nticket: ${id}\nparent: ${id.slice(0, -6)}\nphase: 1\npredecessors:\n  - ${pred}\nhuman_review:\n  required: false\n  reason: r\ntitle: t\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: "wip/research/*"\n---\n\n本文\n`;
+  b.i0001.files["wip/proposals/todo/i0001-01-01.md"] = text("i0001-01-01", `${chain[0]}-01-01`);
   chain.forEach((fam, i) => {
-    b[fam] = { committedDate: "2026-09-01T00:00:00Z", files: { ...base, [`wip/proposals/todo/${fam}-01.md`]: text(`${fam}-01`, `${chain[i + 1] ?? "zz"}-01`) } };
+    b[fam] = { committedDate: "2026-09-01T00:00:00Z", files: { ...base, [`wip/proposals/todo/${fam}-01-01.md`]: text(`${fam}-01-01`, `${chain[i + 1] ?? "zz"}-01-01`) } };
   });
   const { board } = await run(b);
   const r = family(board, "i0001")?.result;
   assert.equal(r?.closure.over_limit, true);
-  assert.match(r?.undecided ?? "", /16 を超える家族/);
+  assert.match(r?.undecided ?? "", /16 組を超える親子のチケット/);
 });
 
 test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意のある本文は消毒して描く", async () => {
@@ -168,7 +168,7 @@ test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意の
   assert.equal(doc.querySelector('[data-family="i0001"] pre')?.children.length, 0);
 });
 
-test("CX-T180 承認済みの親の写しの branch: で、識別子と違う名前のブランチ（/ を含む）を家族にする。承認前の提案の branch: では名乗らない。同じ家族を名乗るブランチが 2 本なら判定しない（ADR-0100 の 5 章）", async () => {
+test("CX-T180 承認済みの親チケットの branch: で、識別子と違う名前のブランチ（/ を含む）を親子のチケットにする。承認前の提案の branch: では名乗らない。同じ親子のチケットを名乗るブランチが 2 本なら判定しない", async () => {
   const proposal = fixture().i0001.files["wip/proposals/todo/i0001.md"].replace("ticket: i0001\n", "ticket: i0001\nbranch: feature/1-login\n");
   // 承認前: 提案の branch: では名乗らない
   const before = fixture();
@@ -177,7 +177,7 @@ test("CX-T180 承認済みの親の写しの branch: で、識別子と違う名
   const early = await run(before);
   assert.equal(family(early.board, "feature/1-login"), undefined);
 
-  // 承認済み: 写しの branch: で名乗る
+  // 承認済み: 承認済みチケットの branch: で名乗る
   const b = fixture();
   const files: Record<string, string> = { ...b.i0001.files };
   delete files["wip/proposals/todo/i0001.md"];
@@ -191,9 +191,9 @@ test("CX-T180 承認済みの親の写しの branch: で、識別子と違う名
   assert.equal(f?.error, "");
   assert.equal(f?.result?.ident, "i0001");
   assert.deepEqual(f?.result?.closure.families, ["feature/1-login", "i0003"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01");
+  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
 
-  // 識別子と同じ名前のブランチにも branch: の無い承認済みの写しがあれば、同じ家族を名乗るブランチが 2 本
+  // 識別子と同じ名前のブランチにも branch: の無い承認済みチケットがあれば、同じ親子のチケットを名乗るブランチが 2 本
   const rival = fixture();
   rival["feature/1-login"] = { ...rival.i0001, files };
   rival.i0001 = { ...rival.i0001, files: { ...rival.i0001.files, ".ccnavi/approved/doing/i0001.md": files[".ccnavi/approved/doing/i0001.md"].replace("branch: feature/1-login\n", "") } };

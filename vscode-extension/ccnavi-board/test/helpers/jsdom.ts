@@ -12,7 +12,7 @@
  * - `DOMMatrixReadOnly`（React Flow が点の transform を読むのに使う。無いと例外で止まる）
  *
  * どちらも**大きさと行列を偽るだけ**で、本物の配置はしない。だから、ここで見てよいのは
- * 「動かしたら控えに入るか」までで、**動いた先の座標そのものは見ない**（図の倍率で決まる）。
+ * 「動かしたら state に入るか」までで、**動いた先の座標そのものは見ない**（図の倍率で決まる）。
  */
 import type { JSDOM as JSDOMType } from "jsdom" with { "resolution-mode": "import" };
 
@@ -90,7 +90,7 @@ export async function loadPageJsdom(html: string, initialState?: unknown): Promi
         const [width, height] = sizeOf(this);
         return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height, toJSON: () => ({}) };
       };
-      // 点の transform を読むのに使う。行列の綴りだけ読めればよい
+      // 点の transform を読むのに使う。行列の表記だけ読めればよい
       w.DOMMatrixReadOnly = class {
         readonly m11: number;
         readonly m12: number;

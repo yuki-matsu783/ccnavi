@@ -1,11 +1,11 @@
-"""控えを置く側が、途中を見せない書き方を通っていることの受入テスト。
+"""記録を置く側が、途中を見せない書き方を通っていることの受入テスト。
 
 `fsio` 側の単体テストは `write_text_atomic` そのものしか見ない。それだけだと、
 呼び出し側が素の書き方に戻されてもスイートは通ってしまう（実際に戻して
-確かめた）。ここで見るのは配線で、控えを置く 4 か所が `write_json_atomic` を
+確かめた）。ここで見るのは配線で、記録を置く 4 か所が `write_json_atomic` を
 通ること。
 
-もう 1 つ見るのは、控えを読めなかったときに書き戻さないこと。読めないのは控えが
+もう 1 つ見るのは、記録を読めなかったときに書き戻さないこと。読めないのは記録が
 在るときにしか起きないので、そこで「まだ何も無い」として書くと、覚えていたぶんを
 消すことになる。
 """
@@ -40,7 +40,7 @@ def _once_rule() -> rules.Rule:
 
 
 class WiringTest(unittest.TestCase):
-    """控えを置く 4 か所が、途中を見せない書き方を通ること。"""
+    """記録を置く 4 か所が、途中を見せない書き方を通ること。"""
 
     def setUp(self):
         self.state = tempfile.mkdtemp(prefix="ccnavi-wiring-")
@@ -71,11 +71,11 @@ class WiringTest(unittest.TestCase):
 
 
 class UnreadableStateTest(unittest.TestCase):
-    """読めなかった控えを、空で上書きしないこと。
+    """読めなかった記録を、空で上書きしないこと。
 
     読みの打ち直しが尽きるのは、重なりが続いたときだけ。そこで書き戻すと、
     覚えていたぶんが消える。読めなかった回は、文は渡す側を採りつつ、
-    控えには触らない。
+    記録には触らない。
     """
 
     def setUp(self):
@@ -84,7 +84,7 @@ class UnreadableStateTest(unittest.TestCase):
         self.path = ctxfile._once_path(self.state, "s1", "")
 
     def test_keeps_the_state_when_it_cannot_be_read(self):
-        # 覚えている控えを用意する。
+        # 覚えている記録を用意する。
         ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
         before = fsio.read_json(self.path)[0]
         self.assertEqual(before, {"given": {"note": 1}})
@@ -97,9 +97,9 @@ class UnreadableStateTest(unittest.TestCase):
 
         # 文は渡す（覚えられないなら言う側を採る）。
         self.assertIn("1 度だけの文。", text)
-        # 控えは消えていない。
+        # 記録は消えていない。
         self.assertEqual(fsio.read_json(self.path)[0], before)
-        self.assertIn("控えを読めない", self.err.getvalue())
+        self.assertIn("記録を読めない", self.err.getvalue())
 
     def test_missing_state_is_written_as_usual(self):
         """無いのは普通の状態。ここは今までどおり書く。"""

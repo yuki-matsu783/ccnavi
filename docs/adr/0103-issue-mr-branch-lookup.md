@@ -5,7 +5,7 @@ description: UserPromptSubmit で依頼文の issue・MR の指定（#152・!5�
 tags: [ticket, sh-scripts, worktree]
 keywords: [issue, MR, マージリクエスト, ブランチ, 既存のブランチ, UserPromptSubmit, additionalContext, ccnavi-branches.sh, branches, branch:, prompt, gh, glab, curl, GITHUB_TOKEN, GITLAB_TOKEN, ホスト]
 ---
-# ADR-0101: issue・MR を指定された依頼では、紐づくブランチを探してユーザに確かめてから進める
+# ADR-0103: issue・MR を指定された依頼では、紐づくブランチを探してユーザに確かめてから進める
 
 状態: 採用（2026-10-04 に実装）
 
@@ -14,9 +14,9 @@ keywords: [issue, MR, マージリクエスト, ブランチ, 既存のブラン
 2026-10-04。ユーザは「#152 を直して」「!5 の指摘に対応して」のように、issue や MR を指定して作業を頼む。
 そのとき、その issue や MR に紐づくブランチ（ユーザか別の機械が既に切った `feature/152-login`、MR の元ブランチ、
 承認済みチケットの `branch:`）が既にあることがある。エージェントがそれを見ずに新しい `<先頭の語>-<番号>-<slug>`
-（ADR-0100）を切ると、同じ作業が 2 本のブランチに分かれる。
+（ADR-0102）を切ると、同じ作業が 2 本のブランチに分かれる。
 
-ADR-0100 の 5 章で、親チケットは `branch:` 欄で既存のブランチを名乗れるようになった。足りないのは、着手の前に
+ADR-0102 の 5 章で、親チケットは `branch:` キーで既存のブランチを名乗れるようになった。足りないのは、着手の前に
 「既にあるか」を確かめる手順と、それをエージェントに思い出させる仕組み。
 
 ユーザの決定:
@@ -30,10 +30,10 @@ ADR-0100 の 5 章で、親チケットは `branch:` 欄で既存のブランチ
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | UserPromptSubmit で依頼文（payload の `prompt`）から issue・MR の指定を探し、あれば `additionalContext` で指示を足す（`branchfind.prompt_context`）。判定は返さない | ユーザの決定 1。依頼の直後、エージェントが手を動かす前に届く経路はこれだけ | PreToolUse で `worktree add` を止める（決定 1 に反する。止めると判定が増える） |
-| 指示の中身は「`sh {root}/.ccnavi/scripts/ccnavi-branches.sh --issue N` / `--mr N` を打ち、候補があれば一覧を見せて 3 択を聞き、返事を待つ。候補が無ければ進めてよい」。sh の綴りはワークスペースルートの絶対パス（`settings.script_command`。ルールの `{root}` と同じ考え方） | プロジェクトやワークツリーの中からも打てる綴りにする（docs/claude/projects.md） | 相対の `sh .ccnavi/scripts/...` |
-| 既存のブランチで続けるときは、承認済みの `branch:` で使う（新しい親の提案に `branch:` を書き、承認の後に `ccnavi-git.sh switch <B>`）。承認前の提案の `branch:` は使わないことを指示に書く | ADR-0100 の 5.2 をそのまま使う。新しい経路を作らない | 指示の中で既存のブランチへ直に移らせる |
+| 指示の中身は「`sh {root}/.ccnavi/scripts/ccnavi-branches.sh --issue N` / `--mr N` を打ち、候補があれば一覧を見せて 3 択を聞き、返事を待つ。候補が無ければ進めてよい」。sh の表記はワークスペースルートの絶対パス（`settings.script_command`。ルールの `{root}` と同じ考え方） | プロジェクトやワークツリーの中からも打てる表記にする（docs/claude/projects.md） | 相対の `sh .ccnavi/scripts/...` |
+| 既存のブランチで続けるときは、承認済みの `branch:` で使う（新しい親の提案に `branch:` を書き、承認の後に `ccnavi-git.sh switch <B>`）。承認前の提案の `branch:` は使わないことを指示に書く | ADR-0102 の 5.2 をそのまま使う。新しい経路を作らない | 指示の中で既存のブランチへ直に移らせる |
 | チケット制御が disable なら指示を出さない。モードが disable なら hook 全体が何もしない（既存の入口）。dry-run でも出す | 指示が親の識別子と `branch:` の承認に寄る。承認の知らせ（`agree.news`）と同じ扱い。止めないので dry-run で黙る理由が無い | — |
-| 紐づくブランチを探すのは新しい sh `ccnavi-branches.sh`。ホストは sh が読み、手元（ブランチ・ワークツリー・チケット）は実行ファイルの副命令 `ccnavi branches <issue\|mr> <番号> --result <json>` が読む | 実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。チケットの読み方（承認済み・提案・権威のあるツリー）を sh に写さない | 全部を sh で（チケットの YAML を sh で読むことになる） |
+| 紐づくブランチを探すのは新しい sh `ccnavi-branches.sh`。ホストは sh が読み、手元（ブランチ・ワークツリー・チケット）は実行ファイルの副命令 `ccnavi branches <issue\|mr> <番号> --result <json>` が読む | 実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。チケットの読み方（承認済み・提案・本物とする側のあるツリー）を sh に写さない | 全部を sh で（チケットの YAML を sh で読むことになる） |
 | ホストへの繋ぎ方（origin の読み方、gh / glab の疎通、curl とトークン、API の呼び方、ページ送り）を `ccnavi-common.sh` の「ホスト（GitHub / GitLab）への接続」に移し、`ccnavi-review.sh` と共有する | 同じ処理を 2 本に書くと片方だけが古くなる。失敗の文面は呼ぶ側が決める（review は止める、branches は「ホストは見ていない」と言って続ける） | 新しい共通ファイル（配る sh と、sh を写すテストの一覧がすべて増える） |
 | ホストに繋げない（origin が無い・道具もトークンも無い・API が落ちた・開いた MR が 2000 本を超える）ときは止めず、手元の候補だけを出して「ホストは見ていない（理由）」と書く | 黙って空にすると「候補なし＝新しく切ってよい」と読まれる | 止める（ホストを持たない手元だけのリポジトリで使えない） |
 | 出力は 1 候補 1 行（`候補 <ブランチ>  在りか=…  由来=…  MR=…  ワークツリー=…  チケット=…`）と `--json` | エージェントが読んでそのままユーザに見せられる。機械にも渡せる | — |
@@ -60,13 +60,13 @@ ADR-0100 の 5 章で、親チケットは `branch:` 欄で既存のブランチ
 
 | 指定 | 候補 | 誰が読むか |
 |---|---|---|
-| MR | その MR の元ブランチ（GitHub は `pulls/<N>` の `head.ref`、GitLab は `merge_requests/<N>` の `source_branch`）。フォークから出たものは印を付ける | sh（ホスト） |
+| MR | その MR の元ブランチ（GitHub は `pulls/<N>` の `head.ref`、GitLab は `merge_requests/<N>` の `source_branch`）。フォークから出たものは目印を付ける | sh（ホスト） |
 | issue | その issue を参照している開いた MR の元ブランチ。GitHub は開いた PR を全部読み、題・本文の `#<N>`（前が英数字・`_`・`&`・`/` でない）か `issues/<N>`、元ブランチの名前の番号で選ぶ。GitLab は `issues/<N>/related_merge_requests` の `opened` | sh（ホスト） |
 | issue | 名前に番号を含むブランチ（手元と origin。番号の前後が数字でないこと: `feature-152-x`・`fix/152-y`・`issue-152`・`x-152`） | 実行ファイル（git の ref） |
 | issue | `issue: <N>` を持つ親チケット（同じリポジトリの課題だけ）の親のブランチ。承認済み（作業中・レビュー待ち・閉じた）は `branch:`（無ければ識別子）、承認待ちの提案は識別子（提案の `branch:` は使わない） | 実行ファイル（チケット） |
 
 どの候補にも、そのブランチをチェックアウトしているツリー（元のツリーとワークツリー）と、結び付くチケット（親のブランチ名か
-識別子がそのブランチのもの）を添える。並びはチケット由来・MR 由来・名前由来の順。
+識別子がそのブランチのもの）を添える。順序はチケット由来・MR 由来・名前由来の順。
 
 見るリポジトリは cwd のもの。`projects/<名前>/`（とそこから切ったワークツリー）の中から打てば、そのプロジェクトのリポジトリと
 origin を見る。
@@ -96,7 +96,7 @@ sh が書いて `--result` で渡す（ccnavi.md の 9.13）。
 ## 4. 試験
 
 `tests/core/test_branchfind_refs.py`（拾う・拾わないの表、URL の数え方、まとめ方、番号の前後）、
-`tests/ticket/test_branchfind.py`（UserPromptSubmit の指示と綴り、チケット制御 disable・dry-run、副命令の手元の候補・
+`tests/ticket/test_branchfind.py`（UserPromptSubmit の指示と表記、チケット制御 disable・dry-run、副命令の手元の候補・
 ワークツリー・承認前の `branch:` を使わない・承認済みの `branch:`・ホストの結果・MR・引数の誤り）、
 `tests/sh/test_branches_sh.py`（curl の代役で GitHub と GitLab の MR の元ブランチ・issue を参照する MR、トークン無し・
 origin 無し・API の失敗で「ホストは見ていない」、origin の資格情報を出さない、プロジェクトの中から打つ、引数の誤り）。

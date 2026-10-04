@@ -1,5 +1,5 @@
 /**
- * 段階 3 のレビューで直したものの回帰試験（ADR-0093 の 11.7.1）。
+ * 承認と取り下げを入れたときのレビューで直したものの回帰試験。
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -41,7 +41,7 @@ function client(mock: MockGitHub) {
 
 function parentOnly(): Record<string, FixtureBranch> {
   const f = fixture();
-  delete f.i0001.files["wip/proposals/todo/i0001-01.md"];
+  delete f.i0001.files["wip/proposals/todo/i0001-01-01.md"];
   return f;
 }
 
@@ -70,7 +70,7 @@ test("CX-T118 取り下げ: GitHub が承認コミットを renamed で返して
 test("CX-T119 取り下げ: 承認コミットが P の first-parent の鎖の上に無ければ（別の枝で承認して merge）出さない（決定 B）", async () => {
   const mock = new MockGitHub(parentOnly());
   const d = depsFor(mock);
-  // 承認した中身を作るだけの写し
+  // 承認した中身を作るだけのコピー
   const copy = new MockGitHub(parentOnly());
   const cd = depsFor(copy);
   assert.equal((await approveFamily(REPO, "i0001", await shown(cd), cd)).kind, "written");
@@ -139,21 +139,21 @@ test("CX-T123 service worker が書く頼みを断ったら（登録していな
   const out = await approveFamily(REPO, "i0001", seen, d);
   assert.equal(out.kind, "failed");
   assert.match(out.kind === "failed" ? out.message : "", /登録していない/);
-  // 段階 5 のレビューの後（11.9.1 の 8）は、読み取りも登録したリポジトリだけ受けるので、ホストに何も頼まない
+  // 読み取りも登録したリポジトリだけ受けるので、ホストに何も頼まない
   assert.equal(mock.calls.length, before);
   assert.equal(mock.commitCalls.length, 0);
 });
 
 test("CX-T124 コミットの見出しは先頭の数件と件数に畳んで 200 字に収め、全件は本文に書く", () => {
-  const ids = Array.from({ length: 40 }, (_, i) => `i0001-${String(i + 1).padStart(2, "0")}`);
+  const ids = Array.from({ length: 40 }, (_, i) => `i0001-01-${String(i + 1).padStart(2, "0")}`);
   const m = commitMessage(ids, "を承認", "承認した", "9.9.9");
-  assert.equal(m.headline, "ccnavi: i0001-01, i0001-02, i0001-03 ほか 37 件 を承認（Chrome 拡張 9.9.9）");
+  assert.equal(m.headline, "ccnavi: i0001-01-01, i0001-01-02, i0001-01-03 ほか 37 件 を承認（Chrome 拡張 9.9.9）");
   assert.ok(m.headline.length <= 200);
   for (const id of ids) assert.ok(m.body.includes(`- ${id}\n`), id);
   assert.deepEqual(commitMessage(["i0001"], "を承認", "承認した", "9.9.9"), { headline: "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）", body: "" });
 });
 
-test("CX-T125 Pyodide の仮のツリー（/ws）の下でも、置き場の綴りの途中の ws を畳まずに書く", async () => {
+test("CX-T125 Pyodide の仮のツリー（/ws）の下でも、置き場のパスの途中の ws を畳まずに書く", async () => {
   const f = parentOnly();
   const env = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/ws" } });
   for (const b of Object.values(f)) {

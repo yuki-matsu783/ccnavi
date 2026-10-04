@@ -1,18 +1,18 @@
 /**
- * フローの本文が正しいかを実行ファイルに聞く（ADR-0035・ADR-0085）。フロー編集画面の、開くときと保存の前。
+ * フローの本文が正しいかを実行ファイルに聞く。フロー編集画面の、開くときと保存の前。
  *
  * 読めるか（大きさ・UTF-8 として読めるか・YAML として読めるか・別名）と形（`nodes` が無い、`id` が無い・重なる など）の答えは
  * 実行ファイルの `--lint --json --flow <パス>` が出す。読み手も検査も SubagentStart と同じもの
- * （`ccnavi/tickets/flow.py` の `load`）で、拡張は自分で判定し直さない。ルール設定・リスク管理・フェーズ管理の
+ * （`ccnavi/tickets/flow.py` の `load`）で、拡張は自分で判定し直さない。ルール管理・リスク管理・フェーズ管理の
  * 画面が `--lint --rules` / `--risk` / `--phases` に一時ファイルで聞くのと同じ形。
  *
  * 一時ファイルは画面ごとの一時ディレクトリ（`os.tmpdir()` の下の `ccnavi-flow-*`）に、**呼ぶたびに別の名前**
  * （`flow-<番号>-<乱数>.yml`）で `wx` で書き、確かめ終わったら消す。同じ画面で開くときと保存が重なっても
- * 互いの本文を読み違えない。苦情は一時ファイルのパスを名乗るので、画面に出すときは対象のファイルの綴りに直す。
+ * 互いの本文を読み違えない。苦情は一時ファイルのパスで出るので、画面に出すときは対象のファイルのパスに直す。
  *
  * 通ったときは、実行ファイルが読んだ中身（`flow.data`）を返す。画面はそれを自分の中身と見比べる
  * （`flow-match.ts`）。あわせて、実行ファイルがそのフローについて言ったこと（`(flow)` の warn、担当に渡る手順
- * `rendered`、選べる名前 `candidates`）を `FlowChecks` にまとめて返す。warn も一時ファイルのパスを名乗るので綴りを直す。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
+ * `rendered`、選べる名前 `candidates`）を `FlowChecks` にまとめて返す。warn も一時ファイルのパスで出るのでパスを直す。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
  * （`--flow` を知らない古い実行ファイルと同じ扱い）。
  *
  * VS Code の API は使わない（単体テストで確かめる。実行ファイルの答えは偽物を渡す）。
@@ -66,7 +66,7 @@ export async function lintFlowText(
     if (!ran.ok) {
       return { ok: false, error: ran.error };
     }
-    // 苦情は渡した一時ファイルのパスを名乗るので、対象のファイルの綴りに直す
+    // 苦情は渡した一時ファイルのパスで出るので、対象のファイルのパスに直す
     const rename = (detail: string): string => detail.split(tmp).join(shown);
     const problems = problemsOfFlow(ran.value);
     const errors = problems.filter((p) => p.severity === "error");

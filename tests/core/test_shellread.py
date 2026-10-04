@@ -78,7 +78,7 @@ class ReadTest(_Readable, unittest.TestCase):
         cases = [
             ("""grep -n "regex: '(>" rules.yml""", "> rules.yml"),
             ('grep -n "x>y" notes.md', "x>y"),
-            # ヒアドキュメントについて書く作業も同じ。区切り記号と同じ綴りが
+            # ヒアドキュメントについて書く作業も同じ。区切り記号と同じ表記が
             # 引用の中に出るが、そこで本文が始まるわけではない。
             ('grep -n "<<EOF" README.md', "<<"),
         ]
@@ -107,7 +107,7 @@ class ReadTest(_Readable, unittest.TestCase):
 
     def test_算術式は落ちる(self):
         # 中でコマンドは走らない。落とす理由は別にあって、左シフトの `<<` が
-        # ヒアドキュメントの区切り記号と同じ綴りだから。残すと本文の始まりに
+        # ヒアドキュメントの区切り記号と同じ表記だから。残すと本文の始まりに
         # 見えて、閉じない本文としてコマンド全体が読めなくなる。
         for src in ["echo $((1 << 2))", "echo $(( 1 << 2 ))", "n=$((i + 1))"]:
             with self.subTest(src=src):
@@ -233,7 +233,7 @@ class UnwrappedTest(unittest.TestCase):
         self.assertIsNotNone(unwrapped, "Reading に unwrapped の欄が無い")
         if not unwrapped:
             return []
-        # 語の中の目印（引用がつないだ空白）は層の区切りではない。層の並びを見るので空白に戻す。
+        # 語の中の目印（引用がつないだ空白）は層の区切りではない。層の順序を見るので空白に戻す。
         word_sep = WORD_SEP or "\x01"
         return [layer.replace(word_sep, " ") for layer in unwrapped.split(SEP)]
 
@@ -252,7 +252,7 @@ class UnwrappedTest(unittest.TestCase):
             # 実行役のコマンドと、飛ばすオプション・値・位置引数
             "env rm x": ["rm x"],
             "env FOO=1 BAR=2 rm x": ["rm x"],
-            # env と sudo は `=` を含む引数を綴りを問わず代入に数える
+            # env と sudo は `=` を含む引数を表記を問わず代入に数える
             "env a+=1 rm x": ["rm x"],
             "env a.b=1 rm x": ["rm x"],
             "sudo a+=1 rm x": ["rm x"],
@@ -410,7 +410,7 @@ SUBST_MARK = re.compile(r"(^|\x00)zzmark($|[ \x00])")
 #   それ以外は縮退の理由
 SHELL_CASES = [
     ("01", 'echo "$(M)"', "中"),
-    # バッククォートは読まずに止める（ADR-0047）。実行されるものは 02 16 18 20 22 35 40。
+    # バッククォートは読まずに止める。実行されるものは 02 16 18 20 22 35 40。
     ("02", 'echo "`M`"', "backquote"),
     ("03", 'echo "\\$(M)"', "-"),
     ("04", 'echo "\\`M\\`"', "-"),
@@ -527,10 +527,10 @@ def marked(text):
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
 class MovedTest(unittest.TestCase):
-    """`cd` で移った先から見た綴り（ADR-0069、issue #61）。
+    """`cd` で移った先から見たパス（issue #61）。
 
     `read(src).moved` は、`cd` の行き先を引数に継ぎ足したコマンドを SEP でつないだもの。
-    綴りの変わったコマンドだけが並ぶ。書かれた綴り（`text`）は動かさない。
+    表記の変わったコマンドだけが並ぶ。書かれた表記（`text`）は動かさない。
     """
 
     def moved(self, src):
@@ -549,7 +549,7 @@ class MovedTest(unittest.TestCase):
                 self.assertIn(show(want), [show(c) for c in self.moved(src)])
 
     def test_守られた場所へ入ってから書く形(self):
-        # issue #61 の表。どれも綴りからディレクトリの名前が消える形。
+        # issue #61 の表。どれも表記からディレクトリの名前が消える形。
         rules = ".ccnavi/common/rules.yml"
         self.assert_moved(
             {
@@ -569,10 +569,10 @@ class MovedTest(unittest.TestCase):
             }
         )
 
-    def test_書かれた綴りは動かさない(self):
-        # ここが要。ルールは綴りに固定して書かれているので、書かれた側に継ぎ足すと
+    def test_書かれた表記は動かさない(self):
+        # ここが要。ルールは表記に固定して書かれているので、書かれた側に継ぎ足すと
         # いま当たっているものが外れる（サブエージェントの禁止の `…ccnavi-ticket.sh start`、
-        # コマンドの頭に固定した組み込みの守り）。
+        # コマンドの頭に固定した組み込みの保護）。
         cases = {
             "cd .claude && echo x > settings.json": "cd .claude" + SEP + "echo x > settings.json",
             "cd .ccnavi && rm -rf common": "cd .ccnavi" + SEP + "rm -rf common",
@@ -602,7 +602,7 @@ class MovedTest(unittest.TestCase):
             with self.subTest(src=src):
                 self.assertEqual(self.moved(src), [])
 
-    def test_上に戻る綴りは畳む(self):
+    def test_上に戻るパスは畳む(self):
         self.assert_moved(
             {
                 "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh": (
@@ -613,7 +613,7 @@ class MovedTest(unittest.TestCase):
                 "cd a && rm ../../x": "rm ../x",
                 # 絶対パスはそのまま。そこから先の行き先になる。
                 "cd /tmp && rm x": "rm /tmp/x",
-                # 末尾の区切りは残す（名前がそこで終わる形に当てる守りのため）。
+                # 末尾の区切りは残す（名前がそこで終わる形に当てる保護のため）。
                 "cd .claude && rm -rf hooks/": "rm -rf .claude/hooks/",
             }
         )
@@ -632,7 +632,7 @@ class MovedTest(unittest.TestCase):
         )
 
     def test_値にパスを取る語は値だけ継ぎ足す(self):
-        # `dd` は守りが名指ししている動詞。`of=x` は代入の形をしているが引数。
+        # `dd` は保護が名指ししている動詞。`of=x` は代入の形をしているが引数。
         self.assert_moved(
             {
                 "cd .claude && dd if=/tmp/x of=settings.json": (
@@ -643,7 +643,7 @@ class MovedTest(unittest.TestCase):
 
     def test_fd_の番号には継ぎ足さない(self):
         # `2>&1` の `1` はファイルではない。継ぎ足すと `.ccnavi/1` になり、
-        # 守りの綴りが引数に現れる。
+        # 保護の表記が引数に現れる。
         self.assertEqual(self.moved("cd .ccnavi && rm ../a 2>&1"), ["rm a 2 >& 1"])
 
     def test_置換の中で移った先も並べる(self):
@@ -710,11 +710,11 @@ class MovedTest(unittest.TestCase):
         ]:
             with self.subTest(src=src):
                 self.assertEqual(self.moved(src), [])
-        # 並びの頭で居た場所までは戻る。
+        # コマンド列の頭で居た場所までは戻る。
         self.assertEqual(self.moved("cd .claude && cd docs | rm ../x"), ["rm x"])
 
     def test_case_の枝は読まない(self):
-        # `case` の `)` はサブシェルの閉じと同じ綴りで来るので、枝の出入りが読めない。
+        # `case` の `)` はサブシェルの閉じと同じ表記で来るので、枝の出入りが読めない。
         # 読むと、枝の中の `cd` が枝の外の書き込みに継ぎ足される（誤検知）。
         for src in [
             "(case x in x) cd .claude;; esac); echo x > settings.json",
@@ -725,7 +725,7 @@ class MovedTest(unittest.TestCase):
 
     def test_行き先を読めない形では継ぎ足さないだけ(self):
         # 縮退させない。縮退すると生の文字列で見るので、`cd - && rm -f <守られた場所>` の
-        # ように、書かれた綴りで**今は止まっている**形が止まらなくなる（敵対的レビュー）。
+        # ように、書かれた表記で**今は止まっている**形が止まらなくなる（敵対的レビュー）。
         for src in [
             "cd - && rm x",
             "cd && rm x",
@@ -754,7 +754,7 @@ class MovedTest(unittest.TestCase):
         self.assertEqual(self.moved("cd - && cd /tmp && rm x"), ["rm /tmp/x"])
 
     def test_居場所の長さと語数には上限がある(self):
-        # `cd a` を並べると居場所の綴りが伸びる。綴りを整え直す手間が長さに比例するので、
+        # `cd a` を並べると居場所のパスが伸びる。パスを整え直す手間が長さに比例するので、
         # 上限が無いと全体が二乗になり、判定の期限（judge の 3 秒）の外で時間を使える
         # （敵対的レビュー）。
         chain = "cd a " + "&& cd a " * 4000 + "&& rm x"
@@ -829,7 +829,7 @@ class SubstTest(unittest.TestCase):
                 self.assertTrue(result.degraded)
                 self.assertEqual(result.reason, shellread.REASON_AMBIGUOUS_SUBST)
 
-    def test_切り出さない綴りは文字のまま(self):
+    def test_切り出さない表記は文字のまま(self):
         # 文字として書く方法（単一引用、$'…'、\$(、\`、引用付き heredoc）を必ず残す。
         for src in [
             "grep -n '$(git push)' f",
@@ -860,7 +860,7 @@ class SubstTest(unittest.TestCase):
 
 
 class BraceTest(unittest.TestCase):
-    """引用の外のブレース展開を並べる（ADR-0046）。展開はしない。
+    """引用の外のブレース展開を並べる。展開はしない。判定は並んでいれば一律に止める。
 
     期待は bash 3.2 と zsh で実際に確かめた結果。どちらかのシェルが広げる形を並べる。
     """
@@ -967,7 +967,7 @@ def rewrites_of(src, form):
 
 
 class CommandNameTest(unittest.TestCase):
-    """実行するときにシェルが決めるコマンド名を並べる（ADR-0047）。"""
+    """実行するときにシェルが決めるコマンド名を並べる。"""
 
     def test_コマンド名の位置の展開とグロブを並べる(self):
         cases = {
@@ -1016,7 +1016,7 @@ class CommandNameTest(unittest.TestCase):
             "command -v $x",
             "cd $S && ls",
             "echo '$c' | cat",
-            # 外側が縮退する `eval` と `sh -c` の文字列の中は見ない。確認になる（ADR-0047）。
+            # 外側が縮退する `eval` と `sh -c` の文字列の中は見ない。確認になる。
             'sh -c "$c status"',
             'eval "$(ssh-agent -s)"',
             'eval "$x"',
@@ -1025,7 +1025,7 @@ class CommandNameTest(unittest.TestCase):
                 self.assertEqual(rewrites_of(src, shellread.FORM_COMMAND_NAME), [])
 
     def test_コマンドを大量に並べても線形で読む(self):
-        # 敵対的レビュー。並べた綴りの重複除去が二乗で、8000 本で 20 秒を超えていた。
+        # 敵対的レビュー。並べた表記の重複除去が二乗で、8000 本で 20 秒を超えていた。
         src = "; ".join(f"$c{i} push" for i in range(8000))
         start = time.monotonic()
         names = rewrites_of(src, shellread.FORM_COMMAND_NAME)
@@ -1034,7 +1034,7 @@ class CommandNameTest(unittest.TestCase):
 
 
 class BackquoteTest(unittest.TestCase):
-    """実行されるバッククォートで読みを止める（ADR-0047）。"""
+    """実行されるバッククォートで読みを止める。"""
 
     def test_実行されるバッククォートを並べる(self):
         cases = {
@@ -1068,7 +1068,7 @@ class BackquoteTest(unittest.TestCase):
 
 
 class AmbiguousFormTest(unittest.TestCase):
-    """シェルで読みが割れる形を並べる（ADR-0047）。"""
+    """シェルで読みが割れる形を並べる。読み分けずに止めて書き直しを求める。"""
 
     def test_読みが割れる形を並べる(self):
         deep = "echo " + '"$(echo ' * 17 + "x" + ')"' * 17

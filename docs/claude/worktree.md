@@ -24,7 +24,7 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 
 ## 他セッションの作業を踏まないために
 
-- 自分のワークツリーの外（ワークスペースルートや他のワークツリー）にある未コミットの変更は、他セッションのものとして扱う
+- 自分のワークツリーの外、つまりワークスペースルートや他のワークツリーにある未コミットの変更は、他セッションのものとして扱う
 - 他セッションの書きかけの変更は、コミットも、ブランチの移動も、`reset`もしない。ビルドが失敗していても直さず、
   何が失敗しているかを報告して判断を仰ぐ
 - 変更の退避が必要なときは`ccnavi-git.sh stash push -u`を使う。退避で変更を消す前に、下書きの置き場（docs/claude/scratchpad.md）へ
@@ -47,26 +47,26 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   ホストに繋げなければ手元の候補だけを出して「ホストは見ていない」と書く。プロジェクトのissue・MRは`projects/<名前>`に`cd`してから打つ。
   候補があれば一覧をユーザに見せ、既存のブランチで続けるか（下の`branch:`の手順。承認前の提案の`branch:`は使わない）・
   新しく`<先頭の語>-<番号>-<slug>`を切るか・やめるかを聞いて、返事を待つ。候補が無ければそのまま進めてよい。
-  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す（止めはしない。ADR-0101）
+  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す。止めはしない
 - 既にある`feature/123-login`のような`/`を含むブランチで親チケットの作業をするときは、識別子は`/`を含まない
   `feature-123-login`にし、提案に`branch: feature/123-login`を書く。承認されるまでは`branch:`は使われないので、
   親のワークツリーは識別子のブランチで切る（`worktree add .claude/worktrees/feature-123-login -b feature-123-login <統合先>`）。
   承認の後、親のワークツリーで`ccnavi-git.sh switch feature/123-login`を打つと、そのブランチへ移って承認済みチケットと
-  マーカーを運ぶ（既にあれば識別子のブランチをmergeし、無ければ切る。作業ツリーは綺麗にしておく）。続けて
+  マーカーを取り込む。既にあれば識別子のブランチをmergeし、無ければ切る。作業ツリーは綺麗にしておく。続けて
   `ccnavi-git.sh push -u origin feature/123-login`を打つ。子のブランチは子の識別子で、起点は親のブランチ
-  （`-b <子> feature/123-login`）。`ccnavi-sync.sh`の引数は識別子（ADR-0100の5章）
+  （`-b <子> feature/123-login`）。`ccnavi-sync.sh`の引数は識別子
 - 親チケットのワークツリーでは、別のブランチへ`checkout` / `switch`できない。ccnaviは親のワークツリーを
   「名前が親の識別子で、親のブランチ（承認済みの親チケットの`branch:`、無ければ識別子と同じ名前）をチェックアウトしているもの」
   として探すためである。
-  別のブランチに移ると、リモートでの承認を取り込む処理（`ccnavi-sync.sh`と、セッション開始時に`ccnavi-fetch.sh`が
-  fast-forwardで進める処理）がそのワークツリーを飛ばす。親チケットのブランチを一度でもpushしたか`ccnavi-sync.sh`で取り込んだことがあると、
-  親と子のチケットの承認・状態の操作（`start`・`finish`・取り消し・記録・レビューの印）・実行前の判定も止まる
+  別のブランチに移ると、リモートでの承認を取り込む処理がそのワークツリーを飛ばす。この処理には、`ccnavi-sync.sh`と、
+  セッション開始時に`ccnavi-fetch.sh`がfast-forwardで進める処理がある。親チケットのブランチを一度でもpushしたか`ccnavi-sync.sh`で取り込んだことがあると、
+  親と子のチケットの承認・状態の操作（`start`・`finish`・取り消し・記録・レビューのマーカー）・実行前の判定も止まる
 - `branch` `checkout` `switch` `fetch` `pull` `merge` `commit` `rm` `restore`のオプションは、許可リストと照らし合わせて通すかどうかが決まる。
-  長いオプションは略さずに書く（`--force-c`のような略は拒否される）
+  長いオプションは略さずに書く。`--force-c`のような略は拒否される
 - プロジェクトのワークツリーは`cd projects/<名前>`してから切る。`<統合先>`はそのプロジェクトのブランチで、
   ワークスペースの`main`ではない
 - `<統合先>`がリモートにしか無いときは、先にプロジェクトの中で`ccnavi-git.sh fetch <リモート> <統合先>`を実行する
-- 起点はリモートにある最新の統合先にする。統合先の名前は`CCNAVI_INTEGRATION_BRANCH`を使い、無ければ`ccnavi-sync.sh`が控えに書いた名前、
+- 起点はリモートにある最新の統合先にする。統合先の名前は`CCNAVI_INTEGRATION_BRANCH`を使い、無ければ`ccnavi-sync.sh`が取り込み状態に書いた名前、
   それも無ければデフォルトブランチ＝`origin/HEAD`が指すものを使う。`ccnavi-git.sh push`はこの順で決まる統合先へも
   （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`が作るマージリクエストの宛先もこの統合先になる
 - 手元の統合先が古いと、そこから切ったブランチも古いコミットから始まり、`<統合先>`に取り込むときにfast-forwardできなくなる。
@@ -78,7 +78,7 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   同じリモートで先に取ってくるのに失敗すると統合先は取りに行かず、統合先をチェックアウトしているツリーの結果は
   そのツリーの名前で出るためである。
   そのときは、ワークツリーを切る前に`ccnavi-git.sh fetch origin <統合先>`と`ccnavi-git.sh log --oneline <統合先>..origin/<統合先>`で確かめる。
-  fetchが通ってlogに何も出なければ、手元の統合先は最新である。fetchが落ちるなら原因（ネットワーク・認証）を解消し、
+  fetchが通ってlogに何も出なければ、手元の統合先は最新である。fetchが落ちるならネットワークや認証といった原因を解消し、
   logにコミットが出るなら次の項目の手順で`origin/<統合先>`から切る。
   分岐しているならユーザに合流させてもらい、未コミットの変更があるならそのツリーの持ち主に聞く
 - 手元の統合先を進めるのは、セッションの開始時の`ccnavi-fetch.sh`だけである。`ccnavi-git.sh fetch origin <統合先>`が進めるのは
@@ -102,5 +102,5 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   親に取り込んで閉じた子のワークツリーも、このときに片付ける
 - マージリクエストに出したブランチは消さない。リモートのブランチは、マージのときにホストが消す。ローカルのブランチはsquashで取り込まれるため
   `branch -d`が通らず、ラッパースクリプトは`-D`を通さない。残ったローカルのブランチはユーザが消す
-- `worktree remove`の前に`ccnavi-clean.sh <名前>`で生成物（node_modules・.venvなど）を消す。Windowsで削除が
+- `worktree remove`の前に`ccnavi-clean.sh <名前>`でnode_modules・.venvなどの生成物を消す。Windowsで削除が
   途中で止まるのを防ぐためである。未コミットの変更があるワークツリーでは、`ccnavi-clean.sh`は何も消さずに止まる

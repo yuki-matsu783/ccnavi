@@ -1,4 +1,4 @@
-"""`ccnavi --lint --flow <パス>` の受入テスト（ADR-0035・ADR-0085）。
+"""`ccnavi --lint --flow <パス>` の受入テスト。
 
 VS Code 拡張のフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
 これに掛け、正しいかの答えを実行ファイルから受ける。見るのは 5 つ。
@@ -6,10 +6,10 @@ VS Code 拡張のフロー編集画面は、開くときと保存の前に編集
 1. SubagentStart と同じ読み手・同じ検査（`flow.load`）で読み、読めなければ `(flow)` の error
 2. 読めるフローには `(flow)` の苦情が出ない
 3. `--json` の形は README「lint の JSON」のまま（`where` が `(flow)`）
-4. 形の誤り（`nodes` が無い、`id` が無い・重なる、`connections` が並びでない）は
+4. 形の誤り（`nodes` が無い、`id` が無い・重なる、`connections` がリストでない）は
    SubagentStart の読み（`flow.load`）とここで同じ理由になる
 5. 診断の外では落として言う。`--lint` でない診断でも読まずにそう言う
-6. `--json` には読めた中身（`flow.data`）を載せる。JSON にそのまま載らない値は印にする
+6. `--json` には読めた中身（`flow.data`）を載せる。JSON にそのまま載らない値は目印にする
    （拡張は自分の読みとこれを見比べ、食い違えば開かない・保存しない）
 """
 
@@ -53,12 +53,12 @@ class FlowLintTest(unittest.TestCase):
         self.assertEqual(len(problems), 1, problems)
         self.assertEqual(problems[0]["severity"], "error")
         self.assertIn(reason, problems[0]["detail"])
-        # 苦情は渡したパスを名乗る（画面が対象のファイルの綴りに直す）。
+        # 苦情には渡したパスを出す（画面が対象のファイルのパスに直す）。
         self.assertTrue(problems[0]["detail"].startswith(path), problems[0]["detail"])
 
     def test_a_readable_flow_has_no_flow_problem(self):
         self.assertEqual(self.flow_problems(self.file(WORKFLOW_YAML)), [])
-        # ユーザ向けの本文も、確かめたフローを名乗る。
+        # ユーザ向けの本文も、確かめたフローの名前を出す。
         path = self.file(WORKFLOW_YAML)
         text = run_ccnavi(["--root", self.root, "--lint", "--flow", path])
         self.assertIn(f"フロー: {path}", text.stdout)
@@ -88,15 +88,15 @@ class FlowLintTest(unittest.TestCase):
 
     def test_shape_errors_are_the_same_reasons_as_subagent_start(self):
         for text, reason in (
-            ("", "最上位がキーと値の並びではない"),
-            ("- 1\n", "最上位がキーと値の並びではない"),
-            ("name: x\n", "`nodes` の並びが無い"),
-            ("nodes: [1]\n", "nodes[0] がキーと値の並びではない"),
+            ("", "最上位がマッピングではない"),
+            ("- 1\n", "最上位がマッピングではない"),
+            ("name: x\n", "`nodes` のリストが無い"),
+            ("nodes: [1]\n", "nodes[0] がマッピングではない"),
             ("nodes:\n  - {type: start}\n", "nodes[0] に文字列の id が無い"),
             ("nodes:\n  - {id: 1, type: start}\n", "nodes[0] に文字列の id が無い"),
             ("nodes:\n  - {id: a}\n  - {id: a}\n", "ノードの id が重なっている（a）"),
-            ("nodes: []\nconnections: {}\n", "`connections` が並びではない"),
-            ("nodes: []\nconnections: [1]\n", "connections[0] がキーと値の並びではない"),
+            ("nodes: []\nconnections: {}\n", "`connections` がリストではない"),
+            ("nodes: []\nconnections: [1]\n", "connections[0] がマッピングではない"),
         ):
             with self.subTest(text=text):
                 path = self.file(text)
@@ -368,7 +368,7 @@ def yaml_load(text: str):
 
 
 class FlowCandidatesTest(unittest.TestCase):
-    """選べるエージェントとスキルの名前（`flow.catalog`）と、綴りの warn（`name_problems`）。"""
+    """選べるエージェントとスキルの名前（`flow.catalog`）と、表記の warn（`name_problems`）。"""
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-flow-cand-")
@@ -451,7 +451,7 @@ subAgentFlows:
 
 
 class FlowLintExtrasTest(unittest.TestCase):
-    """`--lint --json --flow` の `flow.rendered` と `flow.candidates`、構造と綴りの warn。"""
+    """`--lint --json --flow` の `flow.rendered` と `flow.candidates`、構造と表記の warn。"""
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-flow-extra-")

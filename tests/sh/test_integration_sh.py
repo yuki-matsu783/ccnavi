@@ -1,8 +1,8 @@
-"""統合先の名前を決める順（ccnavi-common.sh の ccnavi_integration。ADR-0093 の D30）。
+"""統合先の名前を決める順（ccnavi-common.sh の ccnavi_integration）。
 
 ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
 ccnavi-review.sh（マージリクエストの宛先）が同じ関数を読む。順は
-CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の控え（sync/<リポジトリ>/integration/head）→
+CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果（sync/<リポジトリ>/integration/head）→
 origin/HEAD → origin/main・origin/master。どれも無ければ「分からない」（終了コード 1）。
 
 使い捨てのワークスペースを組み、ccnavi-common.sh を読む sh から関数を呼んで、標準出力と
@@ -94,7 +94,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertIntegration("main")
 
     def test_origin_head_wins_over_main(self):
-        """デフォルトブランチが develop-v1.0.0 のように固定の並びに無い名前でも読む。"""
+        """デフォルトブランチが develop-v1.0.0 のように固定のリストに無い名前でも読む。"""
         remote_ref(self.ws, "main")
         remote_ref(self.ws, "develop-v1.0.0")
         head = "refs/remotes/origin/develop-v1.0.0"
@@ -125,7 +125,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertIntegration("develop-v1.0.0", tree)
 
     def test_a_project_reads_its_own_record_and_refs(self):
-        """プロジェクトは自分の控えと自分の origin を読み、ワークスペースのものは読まない。"""
+        """プロジェクトは自分の取り込み結果と自分の origin を読み、ワークスペースのものは読まない。"""
         project = os.path.join(self.ws, "projects", "app")
         seed(project)
         self.record("self", "develop-v1.0.0")

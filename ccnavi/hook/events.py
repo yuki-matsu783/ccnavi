@@ -19,9 +19,9 @@ from ..records import audit, prune, repeat
 from ..tickets import agree, approval, branchfind, configsync, ops, phase
 from . import docsearch, judge, post, projskills, reasons, subagent
 
-# `match: Stop` のルールで止めた回の理由コード（ADR-0090）。記録の `code` と、止めた文の頭に出る。
+# `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
-# `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文（ADR-0090）。ルールの文や
+# `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文。ルールの文や
 # 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
 STOP_PREFACE = (
     "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めないでください。"
@@ -74,7 +74,7 @@ def watch_context(
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
-    通った書き込みがターンの終わりに咎められる（あるいはその逆）ことになり、
+    通った書き込みがターンの終わりに報告される（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
     """
     return watched_for(stderr, conf, root, record), scope_guard(conf, root)
@@ -92,7 +92,7 @@ def watched_for(
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
     ルールの引き方は実行前チェックと同じで、共通層にそのツリーの層を足した和。
-    別に書くと、実行前に通った書き込みがターンの終わりに咎められる。
+    別に書くと、実行前に通った書き込みがターンの終わりに報告される。
     """
     ws = tree.main_tree(root)
     if payload is None:
@@ -153,12 +153,12 @@ def decide_at_prompt(
 
     原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
-    ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
+    ターンの終わりに「このターンで何が変わったか」を言えるようにする記録だけ。
 
     例外は 2 つ。1 つは、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた
     承認済みチケット）。それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
     モデルは後工程に入れない。もう 1 つは、依頼文に issue・MR の指定（`#152`・`!5` など）が
-    あるとき。着手の前に紐づくブランチを探してユーザに確かめる指示を足す（ADR-0101）。
+    あるとき。着手の前に紐づくブランチを探してユーザに確かめる指示を足す。
     どちらも文を足すだけで、作業は止めない。
     """
     watched, scope = watch_context(stderr, conf, root, record)
@@ -206,11 +206,11 @@ def decide_at_stop(
 
     止めるのは 1 つだけ。cwd のワークツリーのチケットが、作業を終えたように見えるのに
     `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
-    （ADR-0087、`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
+    （`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
     止めたはずの文を報告に載せる。止めるときも報告は同じ応答の `systemMessage` で返す。
 
     `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
-    （ADR-0090、`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
+    （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     report = post.at_stop(
@@ -231,7 +231,7 @@ def decide_at_stop(
         report = f"{report}\n\n{repeated}" if report else repeated
     nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
     if not nudge:
-        # finish の促しで止める回は、ルールの促しを数えもしない（ADR-0090）。1 回の Stop で
+        # finish の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
         nudge = stop_rules_nudge(stderr, conf, root, payload, record, mode)
     if nudge and mode == modes.ENABLE:
@@ -255,23 +255,23 @@ def stop_rules_nudge(
     record: audit.Record,
     mode: str,
 ) -> str:
-    """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文（ADR-0090）。
+    """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文。
 
     書いたルールが無ければ空で、これまでどおり止めない。何を言うか・何回に 1 度かは
-    設定が持ち、ここは当てて数えるだけ（ADR-0057 と同じ分け方）。`every: 10` と書けば
+    設定が持ち、ここは当てて数えるだけ（レビューの勧告と同じ分け方）。`every: 10` と書けば
     「ターンの終わり 10 回に 1 度」止める。
 
     ルールは共通層とワークスペース自身の層からだけ引く（`ruleload.stop_rules`）。プロジェクトの層は
     外のリポジトリで、そこに書かれた 1 行が cwd に依らずメインのターンの終わりを止められて
     しまうため。本文のファイルもワークスペースルートの版だけを読む（ワークツリーやプロジェクトの
-    写しはエージェントが書き換えられる）。
+    版はエージェントが書き換えられる）。
 
     止めない回:
 
     - `stop_hook_active` が真（Stop の hook が続けさせた連鎖の 2 回目以降）。数えもしない
     - サブエージェント（`agent_id` がある）。候補は報告につけてメインに返す決まり
-    - 数えを覚えられない（`--state ""`、控えを読めない・書けない）。覚えられないまま止めると
-      ターンの終わりのたびに止まるので、何も言わない側を採る（ADR-0087 と同じ）
+    - 数えを覚えられない（`--state ""`、記録を読めない・書けない）。覚えられないまま止めると
+      ターンの終わりのたびに止まるので、何も言わない側を採る（`finish` の促しと同じ）
 
     数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
     `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、ユーザへの問いで終わった
@@ -308,15 +308,15 @@ def _finish_nudge(
     record: audit.Record,
     mode: str,
 ) -> str:
-    """`finish` の打ち忘れを促す文（ADR-0087）。促さないなら空文字。
+    """`finish` の打ち忘れを促す文。促さないなら空文字。
 
     メインエージェントの Stop でだけ呼ぶ（SubagentStop は別の手順）。促すのは、同じセッションで
-    同じチケットを同じ HEAD のまま促したことが無いときだけ（控えは状態の置き場の
+    同じチケットを同じ HEAD のまま促したことが無いときだけ（記録は state の置き場の
     `nudged-<セッション>.json`）。コミットを足して HEAD が進めば、また促してよい。加えて
     `stop_hook_active` が真なら（Stop の hook が続けさせた結果なら。ほかの hook が止めた分も含む）
-    何もしない。控えの置き場が無い（`--state ""`）か、控えを書けないときは促さない。覚えられないまま
-    止めると、ターンの終わりのたびに止まるので、何も言わない側を採る。チケット制御が disable なら
-    何もしない。
+    何もしない。state の置き場が無い（`--state ""`）か、記録を書けないときは促さない。
+    覚えられないまま止めると、ターンの終わりのたびに止まるので、何も言わない側を採る。
+    チケット制御が disable なら何もしない。
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
@@ -325,7 +325,7 @@ def _finish_nudge(
         return ""
     failed = ops.remember_nudge(conf.state, payload.session_id, found)
     if failed:
-        stderr.write(f"ccnavi: finish を促した記録を控えられないので、促さない: {failed}\n")
+        stderr.write(f"ccnavi: finish を促した記録を残せないので、促さない: {failed}\n")
         return ""
     record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
@@ -343,15 +343,15 @@ def decide_at_start(
     record: audit.Record,
     deadline: float | None = None,
 ) -> int:
-    """セッションが始まったとき。大きい対象の控えをここで 1 度だけ取る。
+    """セッションが始まったとき。大きい対象のバックアップをここで 1 度だけ取る。
 
     deadline は hook の判定の期限（`judge.DEADLINE_SECONDS`）。md の索引を新しくするのは
     その残りまでに収める（hook の timeout を超えない）。
 
-    ここで取るのは実行ファイルで、ツール呼び出しのたびに写すには大きすぎる。
+    ここで取るのは実行ファイルで、ツール呼び出しのたびにコピーするには大きすぎる。
     このイベントは 1 セッションに 1 回しか来ないので、重い仕事を置く先になる。
 
-    判定は返さない。何も起きていない時点なので、言うことは 2 つだけ。控えを
+    判定は返さない。何も起きていない時点なので、言うことは 2 つだけ。バックアップを
     取れなかったこと（あれば）と、チケット制御が有効なときの作業の進め方。
     後者は起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
     改めて届かないと、compact のあとのモデルは進め方を知らないまま続ける。
@@ -372,7 +372,7 @@ def decide_at_start(
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
-    # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
+    # 承認の記録は捨てない。記録が無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     agree.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
     record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
@@ -383,7 +383,7 @@ def decide_at_start(
         texts.append(selfguard.report(outcomes))
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
-    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録（ADR-0091）。
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
@@ -400,7 +400,7 @@ def decide_at_start(
 
 
 def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
-    """記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。
+    """記録のローテートと、古い記録・終わったセッションの記録の削除（prune）。
 
     ここに置くのは、セッションに 1 度しか来ない場所だから。実行前チェックに置くと、呼び出しの
     たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
@@ -409,7 +409,7 @@ def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session:
     try:
         report = prune.run(root, conf.log, conf.state, session)
     except Exception as exc:  # noqa: BLE001 - 後始末の失敗でセッションの開始を止めない
-        stderr.write(f"ccnavi: 記録と控えの後始末に失敗した: {exc}\n")
+        stderr.write(f"ccnavi: 記録と state の後始末に失敗した: {exc}\n")
         return ""
     for problem in report.problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -442,10 +442,10 @@ def decide_after(
     # 設定ファイルを先に戻す。ルールを読むより前でなければならない。あとから
     # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
     # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。
-    # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
+    # 保護の根拠を、この呼び出しが触れる前の状態に返してから読む。
     # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と印で見分けて外す
+    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と上書きの記録で見分けて外す
     # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(configsync.is_synced_write, conf, root)
     restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
@@ -457,7 +457,7 @@ def decide_after(
     # 既定に戻ったことをこのイベントでは言わない。実行前チェックが呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
+    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、コピーする段は無い。
     scope = scope_guard(conf, root)
 
     text = post.check(
@@ -515,7 +515,7 @@ def decide_after(
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
     # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
-    # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
+    # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる。
     # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
     system = bounced if payload.agent_id else ""
     hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)

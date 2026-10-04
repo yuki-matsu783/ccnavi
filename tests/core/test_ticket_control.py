@@ -4,8 +4,8 @@
 
 1. チケット制御が有効なセッションの頭で、直接作業とチケット作業の使い分けが届く
 2. `CCNAVI_TICKET_CONTROL=disable` なら届かない
-3. 入口の sh の綴りと、dry-run の注記。頭では言わないもの（レビューの sh、設定ファイルの
-   綴り）が載っていないこと
+3. 入口の sh のパスと、dry-run の注記。頭では言わないもの（レビューの sh、設定ファイルの
+   パス）が載っていないこと
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ class TicketControlTest(unittest.TestCase):
         self.assertNotIn("dry-run", text)
 
     def test_後から届くものは頭では言わない(self):
-        # レビューの sh はフェーズの終わりと ready の手順で、設定ファイルの綴りは承認の
+        # レビューの sh はフェーズの終わりと ready の手順で、設定ファイルのパスは承認の
         # ときの検査で名指しされる。頭で渡す文はそのぶん短くしてある。
         text = self.context(self.start("--mode", "enable"))
 

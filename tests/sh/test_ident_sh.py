@@ -1,6 +1,6 @@
-"""sh の識別子の検査（`ccnavi-common.sh` の `ccnavi_is_ident`。ADR-0100）。
+"""sh の識別子の検査（`ccnavi-common.sh` の `ccnavi_is_ident`）。
 
-日本語の識別子を通し、パスやシェルで意味を持つ綴り（`/`・`..`・先頭の `-`・空白・制御文字・
+日本語の識別子を通し、パスやシェルで意味を持つ表記（`/`・`..`・先頭の `-`・空白・制御文字・
 記号）を止める。ロケール（C・C.UTF-8）とシェル（sh・bash）を変えても答えが同じこと、
 前の形（`i0055-01`）も通ることを見る。字の種類（全角記号・NFD）は実行ファイルが止めるので、
 ここでは ASCII の外のバイトは通す（`ticket.id_problem` と並べて見る）。
@@ -90,7 +90,7 @@ class IsIdentTest(unittest.TestCase):
                 self.assertTrue(ticket_mod.is_valid_id(value))
 
 
-# 親のブランチ名（`ccnavi_is_branch`。ADR-0100 の 5 章）。
+# 親のブランチ名（`ccnavi_is_branch`）。
 # 識別子の字に段の区切りの `/` を足したもの。
 BRANCH_GOOD = ["feature/123-login", "hotfix/45", "user/x_y.z", "feature-1-x", "a/日本語"]
 BRANCH_BAD = [

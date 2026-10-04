@@ -1,8 +1,8 @@
 /**
- * PAT の期限の知らせ（ADR-0093 の 5.5・D25）。
+ * PAT の期限の知らせ。期限の既定は 90 日。
  *
  * 期限の正はホストの PAT の期限。GitHub は応答ヘッダ `github-authentication-token-expiration` で
- * 返すので、service worker がホストを呼ぶたびに読んで控える。読めなければ、登録のときにユーザが
+ * 返すので、service worker がホストを呼ぶたびに読んで記録する。読めなければ、登録のときにユーザが
  * 入れた日付を使う。どちらも無ければ「期限不明」と出し続ける。
  * 切れる 7 日前から、service worker が 1 日 1 回比べてバッジに出し、ボードは帯で出す。
  */
@@ -17,7 +17,7 @@ export interface TokenMeta {
   readonly host?: string;
   /** 登録のときにユーザが入れた期限（YYYY-MM-DD）。空なら入れていない */
   readonly manual?: string;
-  /** GitLab で期限を最後に聞いた時刻（ISO。`GET /personal_access_tokens/self`。1 日 1 回まで。段階 5） */
+  /** GitLab に `GET /personal_access_tokens/self` で期限を最後に問い合わせた時刻（ISO）。問い合わせは 1 日 1 回まで */
   readonly checked?: string;
 }
 
@@ -60,7 +60,7 @@ export function expiryNotice(host: string, meta: TokenMeta | undefined, now: Dat
       text: `${host} の PAT の期限が分からない（ホストの応答から読めず、登録のときにも入れていない）。設定画面で期限を入れてください`,
     };
   }
-  // 残りはミリ秒で比べる（切り捨てた日数で比べると 7 日と数時間前から知らせてしまう。レビューの 7）。
+  // 残りはミリ秒で比べる（切り捨てた日数で比べると 7 日と数時間前から知らせてしまう）。
   // 見せる日数は切り上げ（残り 2 日と 1 時間は「あと 3 日」）
   const ms = Date.parse(expiresAt) - now.getTime();
   const left = ms > 0 ? Math.ceil(ms / DAY) : Math.floor(ms / DAY);

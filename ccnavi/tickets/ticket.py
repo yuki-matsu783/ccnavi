@@ -1,6 +1,6 @@
 """作業チケットの読み込みと、そこが宣言する作業範囲。
 
-## チケットは提案であって権威ではない
+## チケットは提案であって本物ではない
 
 チケットはエージェントが書く。だからチケットの中身をそのまま判定に使うと、
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の範囲を広げられる。
@@ -30,10 +30,10 @@
 
     ---
     version: 1
-    ticket: i0050-03
+    ticket: i0050-02-01
     parent: i0050
     phase: 2
-    predecessors: [i0050-01]
+    predecessors: [i0050-01-01]
     human_review: {required: true, reason: 設定の読み込み経路を変えるため}
     title: 設定画面の分割
     rationale: |
@@ -49,7 +49,7 @@
     base_sha: ""
     ---
 
-状態は frontmatter ではなく置き場が表す（ADR-0055）。チケットは 1 本のファイルで、
+状態は frontmatter ではなく置き場が表す。チケットは 1 本のファイルで、
 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）を
 行き来する。ユーザが動かす向きは承認済みの側へ、エージェントが動かす向きは提案の側へ。
 
@@ -85,7 +85,7 @@ BOM = "\ufeff"
 # このビルドが読めるチケット書式の版。
 VERSION = 1
 
-# 状態。置き場の名前そのもの（ADR-0055）。
+# 状態。置き場の名前そのもの。
 # 提案の置き場（`wip/proposals/`）に並ぶのは todo と review。
 TODO = "todo"
 REVIEW = "review"
@@ -108,36 +108,45 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 # ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
-# 範囲のパスに書けない綴り。`..` は範囲の外へ出る綴り、絶対パスと `~` は
-# プロジェクトの外を指す綴り、`$` は展開されるまで行き先が決まらない綴り。
+# 範囲のパスに書けない表記。`..` は範囲の外へ出る表記、絶対パスと `~` は
+# プロジェクトの外を指す表記、`$` は展開されるまで行き先が決まらない表記。
 _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 
-# 識別子（ADR-0100）。親は 1 語、子は `<親>-<2 桁連番>`。新しい親は `<先頭の語>-<番号>-<slug>`
-# （`feature-12-login` など）の形にそろえる。形は lint の warn で、読めるかどうかは文字と長さだけで
-# 決める（`i0055` のような前の形も読む）。
+# 識別子。親は 1 語、子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。新しい親は
+# `<先頭の語>-<番号>-<slug>`（`feature-12-login` など）の形にそろえる。形は lint の warn で、
+# 読めるかどうかは文字と長さだけで決める（`i0055` のような前の形も読む）。
+# 識別子だけから親を割り出すときは、右から 2 段（`-<2 桁>-<2 桁>`）を剥がす。親が `-` や数字を
+# 含んでも（`web-i0012-05-01` の親は `web-i0012`）割り出し方は 1 通りに決まる。
 #
 # 使える文字は ASCII の英数字と `.` `_` `-`、それに日本語の字（ひらがな・カタカナ・長音記号・
 # CJK 統合漢字・々）。先頭は ASCII の英数字。全角英数・全角記号・全角空白・ほかの Unicode は
 # 使わない（見た目の同じ別の字で名前を紛らわせない。パスやシェルで意味を持つ字を入れない）。
-# 綴りは NFC に限る（macOS の NFD の綴りは、見た目が同じでもバイト列が違う別の名前になる）。
+# 表記は NFC に限る（macOS の NFD の表記は、見た目が同じでもバイト列が違う別の名前になる）。
 JA_CHARS = "々ぁ-ゖァ-ヺー一-鿿"
-# 文字クラスの中身（`[...]` に入れて使う）。拡張（TS）と sh はこの並びを写す。
+# 文字クラスの中身（`[...]` に入れて使う）。拡張（TS）と sh はこの文字クラスをそのまま使う。
 ID_CHARS = "A-Za-z0-9._\\-" + JA_CHARS
 _ID = re.compile(rf"^[A-Za-z0-9][{ID_CHARS}]*\Z")
-_CHILD = re.compile(rf"^(?P<parent>[A-Za-z0-9][{ID_CHARS}]*)-(?P<seq>[0-9]{{2}})\Z")
+_CHILD = re.compile(
+    rf"^(?P<parent>[A-Za-z0-9][{ID_CHARS}]*)-(?P<phase>[0-9]{{2}})-(?P<seq>[0-9]{{2}})\Z"
+)
+# 子の識別子に書けるフェーズ番号と連番の上限（どちらも 2 桁）。
+MAX_CHILD_NUMBER = 99
+# 親の識別子の末尾に置かないもの（`-<2 桁>`）。子の識別子の途中（`<親>-<フェーズ>`）と紛れる。
+_CHILD_TAIL = re.compile(r"-[0-9]{2}\Z")
 # プロジェクトの名前（`projects/` の下のディレクトリ名）。こちらは ASCII のまま。
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
-# 識別子の長さの上限（文字数。子は親 + 3 文字なので、親は実質 61 文字まで）。
+# 識別子の長さの上限（文字数。子は親 + 6 文字なので、親は実質 58 文字まで）。
 # 識別子はパスに 2 回出ることがある（`.claude/worktrees/<親>/.ccnavi/approved/phases/<親>/...`）。
-# Windows の MAX_PATH（260）から、ワークスペースまでの綴り（40 文字ほど）と置き場の綴りを
+# Windows の MAX_PATH（260）から、ワークスペースまでのパス（40 文字ほど）と置き場のパスを
 # 引いた残り。
 # Linux の 1 つの名前の上限（255 バイト）も、日本語 1 字 3 バイトで 64 字なら収まる。
 MAX_ID_LENGTH = 64
-# issue から作る識別子と、新規の提案に勧める長さ（lint の warn）。上限との差は子の連番と余裕。
+# issue から作る識別子と、新規の提案に勧める長さ（lint の warn）。上限との差は子のフェーズ番号・
+# 連番と余裕。
 SUGGESTED_ID_LENGTH = 48
 
-# 新しい親の識別子の形（ADR-0100）。`<先頭の語>-<番号>-<slug>`。先頭の語は使える並び
+# 新しい親の識別子の形。`<先頭の語>-<番号>-<slug>`。先頭の語は使えるリスト
 # （`settings.branch_prefixes`。既定は feature・hotfix・fix など）にあるものだけを形に合うと読む。
 # 番号は issue の番号か ccnavi の通し番号。
 _FORM = re.compile(
@@ -146,7 +155,7 @@ _FORM = re.compile(
 )
 # issue から始めるときの既定の先頭の語。
 DEFAULT_ISSUE_PREFIX = "feature"
-# 前の形（ADR-0093 の 3.1 の 4・7）。読むのと、通し番号を数えるのにだけ使う。
+# 前の形（`i<番号>`・`<プロジェクト名>-i<番号>`）。読むのと、通し番号を数えるのにだけ使う。
 _LEGACY_ISSUE_ID = re.compile(r"^i(?P<num>[0-9]+)\Z", re.IGNORECASE)
 _LEGACY_PROJECT_ISSUE_ID = re.compile(
     r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i(?P<num>[0-9]+)\Z", re.IGNORECASE
@@ -163,7 +172,7 @@ def id_problem(text: str) -> str:
         return "識別子が無い"
     if unicodedata.normalize("NFC", text) != text:
         return (
-            "識別子が NFC でない（macOS で濁点が分かれた NFD の綴りなど）。"
+            "識別子が NFC でない（macOS で濁点が分かれた NFD の表記など）。"
             "見た目が同じでも別の名前になるので NFC で書く"
         )
     if not _ID.match(text):
@@ -191,8 +200,22 @@ def is_valid_name(text: str) -> bool:
 
 
 def child_pattern() -> re.Pattern:
-    """子の識別子の形（`<親>-<2 桁連番>`）。承認の側が次の連番を数えるのに使う。"""
+    """子の識別子の形（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）。
+
+    名前付きグループは `parent`・`phase`・`seq`。承認の側が次の連番を数えるのと、
+    識別子だけから親を割り出すのに使う。
+    """
     return _CHILD
+
+
+def child_id(parent: str, phase: int, seq: int) -> str:
+    """子の識別子を組む。フェーズ番号も連番も 2 桁の 0 埋め。"""
+    return f"{parent}-{phase:02d}-{seq:02d}"
+
+
+def child_tail_pattern() -> re.Pattern:
+    """親の識別子の末尾に置かない形（`-<2 桁>`）。子の識別子の途中と紛れる。"""
+    return _CHILD_TAIL
 
 
 def form_of(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> re.Match | None:
@@ -224,7 +247,7 @@ def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> i
 
 
 def next_serial(names, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int:
-    """issue の無い提案に使う、次の通し番号（ADR-0100）。番号を持つ識別子の最大 + 1。
+    """issue の無い提案に使う、次の通し番号。番号を持つ識別子の最大 + 1。
 
     数えるのは親の識別子だけ（子は親の番号を持つ）。先頭の語が違っても同じ通し番号を使う。
     番号を持つものが無ければ 1。
@@ -254,14 +277,16 @@ def issue_slug(title: str, room: int = SUGGESTED_ID_LENGTH) -> str:
 def issue_identifier(
     number: int, title: str = "", project: str = "", prefix: str = DEFAULT_ISSUE_PREFIX
 ) -> str:
-    """issue から親の識別子を決める（ADR-0100。ADR-0093 の 3.1 の 11 の「同じ関数」）。
+    """issue から親の識別子を決める。
 
     `<prefix>-<番号>-<slug>`（既定の prefix は `feature`）。slug は issue のタイトルから作る
     （`issue_slug`）。プロジェクトの issue なら slug の頭に `<プロジェクト名>-` を付ける
     （`feature-12-web-<slug>`。issue の番号はリポジトリごとなので、ワークスペースや
     別のプロジェクトの同じ番号の issue と名前を分ける）。
     タイトルから何も残らなければ slug は `issue`。全体は `SUGGESTED_ID_LENGTH` 文字に収める。
-    末尾が子の形（`-<2 桁>`）になるときは、その部分を落とす。
+    末尾が `-<2 桁>` になるときは、その部分を落とす（`-<2 桁>-<2 桁>` なら子の識別子そのもの、
+    `-<2 桁>` だけでも子の識別子の途中の `<親>-<フェーズ番号>` と紛れる。lint の warn に当たらない
+    名前にする）。
     「issue → 識別子」はこの 1 つだけで、Chrome 拡張も Pyodide の上でこれを呼ぶ。
     番号が正の整数でないか、プロジェクト名が形に合わなければ ValueError。
     """
@@ -274,7 +299,7 @@ def issue_identifier(
     head = f"{prefix}-{number}-" + (f"{project}-" if project else "")
     slug = issue_slug(title if isinstance(title, str) else "", SUGGESTED_ID_LENGTH - len(head))
     ident = head + slug
-    while slug and _CHILD.match(ident):
+    while slug and _CHILD_TAIL.search(ident):
         slug = slug[:-3].rstrip("-")
         ident = head + slug
     if not slug:
@@ -285,35 +310,36 @@ def issue_identifier(
     return ident
 
 
-# 親のブランチ名は親の識別子そのもの（ADR-0093 の 3.1）。識別子を、ブランチ名として安全で、
+# 親のブランチ名は、`branch:` が無ければ親の識別子そのもの（名前を求める関数が恒等写像なので、
+# Python・sh・TS で食い違わない）。識別子を、ブランチ名として安全で、
 # 統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。
 #
-# 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じ並び）。
+# 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じリスト）。
 # 大文字小文字を区別せずに比べる。`release/*` は識別子に `/` を書けないので、
 # ここでは `release` と `release-*` だけを見る。
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 
 
-# 親のブランチ名の欄（ADR-0100 の 5 章）。
+# 親のブランチ名のキー。
 BRANCH_KEY = "branch"
 # ブランチ名の長さの上限（文字数）。ref はパスにもなる（`.git/refs/heads/<名前>`）ので、
 # 識別子と同じく短く保つ。
 MAX_BRANCH_LENGTH = 200
-# 親のブランチ名に使える字。識別子の字（`ID_CHARS`）に段の区切りの `/` を足したもの。先頭は ASCII の
-# 英数字。git が許すほかの字（`$`・`;`・引用符・全角の字など）は、sh と拡張が名前を扱う箇所で意味を
-# 持つか、見た目の同じ別の名前を作るので使わない（締める向き）。
+# 親のブランチ名に使える字。識別子の字（`ID_CHARS`）に階層の区切りの `/` を足したもの。
+# 先頭は ASCII の英数字。git が許すほかの字（`$`・`;`・引用符・全角の字など）は、sh と拡張が
+# 名前を扱う箇所で意味を持つか、見た目の同じ別の名前を作るので使わない（厳しくする向き）。
 _BRANCH = re.compile(rf"^[A-Za-z0-9][{ID_CHARS}/]*\Z")
-# 先頭の段に置けない語（git の ref の綴りとリモートの名前）。大文字小文字は区別しない。
+# 先頭の階層に置けない語（git の ref の名前とリモートの名前）。大文字小文字は区別しない。
 _REF_PREFIXES = ("refs", "heads", "remotes", "tags", "origin", "upstream", "head")
 
 
 def branch_problem(name: str) -> str:
-    """`branch:` に書いた名前を親のブランチ名に使えない理由。使えれば空（ADR-0100 の 5 章）。
+    """`branch:` に書いた名前を親のブランチ名に使えない理由。使えれば空。
 
     字は識別子の字に `/` を足したものだけ（`_BRANCH`）。そのうえで
-    `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる段・`.lock` で終わる段
+    `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる階層・`.lock` で終わる階層
     など）と、統合先や保護されたブランチの名前（main・master・develop・release・release/*・
-    release-*。大文字小文字は区別しない）を断る。NFC でない綴りも断る（識別子と同じ。
+    release-*。大文字小文字は区別しない）を断る。NFC でない表記も断る（識別子と同じ。
     見た目が同じ別の名前を作らない）。その時点の統合先の名前は、呼び手
     （`approval.branch_problems`）が比べる。
     """
@@ -332,31 +358,32 @@ def branch_problem(name: str) -> str:
         return "git のブランチ名に使えない形（`..`・`//`・先頭や末尾の `/`・末尾の `.`）"
     for part in name.split("/"):
         if part.startswith(".") or part.endswith(".lock"):
-            return "git のブランチ名に使えない形（`.` で始まる段・`.lock` で終わる段）"
+            return "git のブランチ名に使えない形（`.` で始まる階層・`.lock` で終わる階層）"
     folded = name.casefold()
     parts = folded.split("/")
     if parts[0] in _REF_PREFIXES:
         return (
-            f"先頭の段 `{name.split('/')[0]}` は git の ref の綴り（refs・heads・remotes・tags）か"
+            f"先頭の階層 `{name.split('/')[0]}` は git の ref の名前"
+            "（refs・heads・remotes・tags）か"
             "リモートの名前（origin・upstream）と紛れる。"
             "`origin/main` のような名前は親のブランチにしない"
         )
     if any(p == "head" or p.endswith("_head") for p in parts):
-        return "`HEAD`・`FETCH_HEAD` のような段は git の特別な名前と紛れる"
+        return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛れる"
     if (
         folded in RESERVED_BRANCH_IDS
         or parts[0] in RESERVED_BRANCH_IDS
         or folded.startswith("release-")
     ):
         return (
-            "統合先や保護されたブランチの名前（main・master・develop・release と、それを先頭の段に"
-            "持つ main/*・release/* など、release-*）は親のブランチにしない"
+            "統合先や保護されたブランチの名前（main・master・develop・release と、"
+            "それを先頭の階層に持つ main/*・release/* など、release-*）は親のブランチにしない"
         )
     return ""
 
 
 def branch_name(t: Ticket) -> str:
-    """親チケットの親のブランチ名。`branch:` があればその値、無ければ識別子（ADR-0100 の 5 章）。
+    """親チケットの親のブランチ名。`branch:` があればその値、無ければ識別子。
 
     子のブランチは子の識別子（子は `branch:` を持たない）。
     """
@@ -373,16 +400,19 @@ def branch_name_problems(
 ) -> list[str]:
     """新規の提案の識別子が、親のブランチ名の規則に合わないところ。
 
-    ADR-0093 の 3.1 の 2・5・6 と ADR-0100。
+    規則は、ref として安全な形（`..` を含まない、`.lock` や `.` で終わらない）、統合先や保護された
+    ブランチの名前を使わない、新しい親は `<先頭の語>-<番号>-<slug>` の形で、番号は `issue:` の番号か
+    ccnavi の通し番号、親は `-<2 桁>` で終わらない（`-<2 桁>-<2 桁>` で終われば子の識別子そのもの、
+    `-<2 桁>` だけでも子の識別子の途中の `<親>-<フェーズ番号>` と紛れる）。
 
     見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのはユーザに見せる文で、
-    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子（3.1 の 3）、
-    子の形に当たる親の識別子、番号の重なりは、他のチケットと並べて見るので `lint` の側で数える。
+    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子、子の形に当たる親の識別子、
+    番号の重なりは、他のチケットと並べて見るので `lint` の側で数える。
 
-    `integration` はその時点の統合先の名前（D30。段階 2b）。環境変数からは読まず、呼び手が
-    渡したときだけ予約に足す。固定の並び（main など）と同じく大文字小文字を区別せずに比べる。
+    `integration` はその時点の統合先の名前。環境変数からは読まず、呼び手が
+    渡したときだけ予約に足す。固定のリスト（main など）と同じく大文字小文字を区別せずに比べる。
     `serial` は次の通し番号（`next_serial`）。渡されたときだけ、形の warn の文に添える。
-    `prefixes` は使える先頭の語の並び（`settings.branch_prefixes`）。
+    `prefixes` は使える先頭の語のリスト（`settings.branch_prefixes`）。
     """
     name = t.ticket
     folded = name.casefold()
@@ -411,14 +441,14 @@ def branch_name_problems(
 def _form_problems(
     t: Ticket, serial: int = 0, prefixes=settings.DEFAULT_BRANCH_PREFIXES
 ) -> list[str]:
-    """新しい親の識別子が `<先頭の語>-<番号>-<slug>` の形と `issue:` に合っているか（ADR-0100）。
+    """新しい親の識別子が `<先頭の語>-<番号>-<slug>` の形と `issue:` に合っているか。
 
     - 形（先頭の語は `prefixes` のどれか）に合わなければ言う。前の形（`i<番号>`・
       `<プロジェクト名>-i<番号>`）は使わないと添える
     - `issue:`（同じリポジトリの課題）があれば、番号が issue と同じか。プロジェクトの issue なら
       slug の頭が `<プロジェクト名>-` か
     - 別のリポジトリの課題（`owner/repo#N`）は番号を比べない（その番号はこのリポジトリの issue と
-      紛れるので、通し番号を使う。ADR-0093 の 3.1 の 8 と同じ考え）
+      紛れるので、通し番号を使う）
     - 長さが勧める上限（`SUGGESTED_ID_LENGTH`）を超えるか
     """
     name = t.ticket
@@ -433,12 +463,11 @@ def _form_problems(
             want = f"feature-{t.issue}-" + (f"{t.project}-" if t.project else "") + "<slug>"
             return [
                 f"{head}親の識別子は {shape} にする。"
-                f"`issue: {t.issue}` から始めるなら `{want}` など（ADR-0100）"
+                f"`issue: {t.issue}` から始めるなら `{want}` など"
             ]
         hint = f"次の通し番号は {serial}" if serial else "番号は既にある識別子の番号の続き"
         return [
-            f"{head}親の識別子は {shape} にする。"
-            f"issue が無ければ ccnavi の通し番号を使う（{hint}。ADR-0100）"
+            f"{head}親の識別子は {shape} にする。issue が無ければ ccnavi の通し番号を使う（{hint}）"
         ]
     found: list[str] = []
     number = int(matched.group("num"))
@@ -446,7 +475,7 @@ def _form_problems(
     if own_issue and number != t.issue:
         found.append(
             f"識別子の番号 {number} が `issue: {t.issue}` と違う。"
-            f"issue から始める識別子は `{prefix}-{t.issue}-<slug>` にする（ADR-0100）"
+            f"issue から始める識別子は `{prefix}-{t.issue}-<slug>` にする"
         )
     elif (
         own_issue
@@ -457,13 +486,13 @@ def _form_problems(
         found.append(
             f"プロジェクト {t.project} の issue から始める識別子は "
             f"`{prefix}-{t.issue}-{t.project}-<slug>` にする。issue の番号はリポジトリごとなので、"
-            "ワークスペースや別のプロジェクトの同じ番号の issue と名前を分ける（ADR-0100）"
+            "ワークスペースや別のプロジェクトの同じ番号の issue と名前を分ける"
         )
     if len(name) > SUGGESTED_ID_LENGTH:
         found.append(
             f"識別子が {SUGGESTED_ID_LENGTH} 文字を超える（{len(name)} 文字）。"
             "ワークツリーのパスが Windows の上限（MAX_PATH）に近づくので"
-            " slug を短くする（ADR-0100）"
+            " slug を短くする"
         )
     return found
 
@@ -480,10 +509,10 @@ _WILDCARDS = "*?["
 
 
 def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem]]:
-    """計画の並びを読む。種類が在るかはここでは見ない（種類を読むのは承認の側）。"""
+    """計画のリストを読む。種類が在るかはここでは見ない（種類を読むのは承認の側）。"""
     problems: list[Problem] = []
     if not isinstance(raw, list):
-        problems.append(Problem(SEVERITY_ERROR, name, f"`{key}` は並びで書く"))
+        problems.append(Problem(SEVERITY_ERROR, name, f"`{key}` はリストで書く"))
         return None, problems
     items: list[PlanItem] = []
     for i, entry in enumerate(raw):
@@ -519,12 +548,12 @@ def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem
     return items, problems
 
 
-# 別のリポジトリの課題の綴り（`owner/repo#12`。GitLab の入れ子のグループ `group/sub/proj#12` も）。
+# 別のリポジトリの課題の表記（`owner/repo#12`。GitLab の入れ子のグループ `group/sub/proj#12` も）。
 _ISSUE_REF = re.compile(r"^(?P<repo>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)#(?P<number>\d+)$")
 
 
 def _issue_ref(raw) -> tuple[str, int | None]:
-    """課題の綴り。答えは (別のリポジトリの `owner/repo` か空, 番号か None)。"""
+    """課題の表記。答えは (別のリポジトリの `owner/repo` か空, 番号か None)。"""
     if isinstance(raw, str):
         m = _ISSUE_REF.match(raw.strip())
         if m:
@@ -537,7 +566,7 @@ def _issue_ref(raw) -> tuple[str, int | None]:
 
 
 def issue_label(t: Ticket) -> str:
-    """課題の綴り（`#12`・`owner/repo#12`）。MR の `Closes` と承認の画面が使う。無ければ空。"""
+    """課題の表記（`#12`・`owner/repo#12`）。MR の `Closes` と承認の画面が使う。無ければ空。"""
     if t.issue is None:
         return ""
     return f"{t.issue_repo}#{t.issue}"
@@ -557,7 +586,7 @@ def _issue_number(raw) -> int | None:
 
 
 def _fold(path: str) -> str:
-    """比べるための綴り。範囲の照合はどの機械でも大文字小文字を区別しない。"""
+    """比べるための表記。範囲の照合はどの機械でも大文字小文字を区別しない。"""
     return path.lower()
 
 
@@ -578,11 +607,11 @@ class Entry:
         if self.compiled is None:
             return False
         if self.glob and not any(c in self.glob for c in _WILDCARDS):
-            # ワイルドカードの無い綴りは前置。`src` が範囲なら `src` という
+            # ワイルドカードの無いパスは前置。`src` が範囲なら `src` という
             # 名前のファイルも `src/` の下も中。そこだけ外になるのは驚きでしかない。
             # 大文字小文字は揃えてから比べる。機械によって区別の有無が変わると、
-            # 同じチケットと同じ綴りで止まる場所が Windows と Linux で食い違う。
-            # 範囲はユーザが宣言する意図なので、機械の都合ではなく綴りの意味で読む。
+            # 同じチケットと同じパスで止まる場所が Windows と Linux で食い違う。
+            # 範囲はユーザが宣言する意図なので、機械の都合ではなく書かれたパスの意味で読む。
             here, there = _fold(rel), _fold(self.glob)
             return here == there or here.startswith(there + "/")
         return self.compiled.match(rel) is not None
@@ -633,10 +662,10 @@ WORKFLOW_DAG = "dag"
 
 @dataclass
 class Workflow:
-    """全体計画の待ち方の写し。`--agree` が計算して親の承認済みチケットに書く（設計 9.7）。
+    """全体計画の待ち方のコピー。`--agree` が計算して親の承認済みチケットに書く（設計 9.7）。
 
     `waits` は全体計画の番号 → 待つ番号、`review_at` は延期した番号 → 引き受ける番号。
-    判定はこの写しだけを読み、`phases.yml` を読み直さない。
+    判定はこのコピーだけを読み、`phases.yml` を読み直さない。
     """
 
     order: str = WORKFLOW_SEQUENTIAL
@@ -684,15 +713,15 @@ class Ticket:
     phase: int | None = None
     predecessors: list[str] = field(default_factory=list)
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
-    # `Closes #<番号>` へ写す。無くても動く。
+    # `Closes #<番号>` へ書き出す。無くても動く。
     issue: int | None = None
-    # issue_repo は、課題が別のリポジトリにあるときのその綴り（`issue: owner/repo#N` の
-    # `owner/repo`。ADR-0093 の 3.1 の 8）。同じリポジトリの課題なら空。
+    # issue_repo は、課題が別のリポジトリにあるときのその表記（`issue: owner/repo#N` の
+    # `owner/repo`）。同じリポジトリの課題なら空。識別子は issue から決めずユーザが付ける。
     issue_repo: str = ""
-    # branch は親のブランチ名（ADR-0100 の 5 章）。親だけが持つ任意の欄で、無ければ親のブランチ名は
+    # branch は親のブランチ名。親だけが持つ任意の欄で、無ければ親のブランチ名は
     # 識別子そのもの。識別子・ファイル名・ワークツリー名は `/` を含まないまま、`feature/123-login`
-    # のような既存のブランチで作業するために使う。承認画面に出し、承認の指紋に入る
-    # （写しの全文が入る）。
+    # のような既存のブランチで作業するために使う。承認画面に出し、承認のダイジェストに入る
+    # （チケットの全文が入る）。
     branch: str = ""
     # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
@@ -703,12 +732,12 @@ class Ticket:
     # 置き場と違えば承認しない（approval.project_problems）。`scan` を通さずに読んだとき
     # （`load` を直に呼ぶ経路）は project と同じ値になる。
     declared_project: str = ""
-    # plan は全体計画（作業フェーズの種類の並び）、feedback はフィードバック計画。
+    # plan は全体計画（作業フェーズの種類のリスト）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
     # 「見たうえで対応なし」。設計 9.7。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
-    # workflow は全体計画の待ち方の写し。親の承認済みチケットだけが持ち、書くのは `--agree`。
+    # workflow は全体計画の待ち方のコピー。親の承認済みチケットだけが持ち、書くのは `--agree`。
     workflow: Workflow | None = None
     review_required: bool = True
     review_reason: str = ""
@@ -730,13 +759,13 @@ class Ticket:
     tree_root: str = ""
     path: str = ""
     # 承認済みチケットにだけある。`ccnavi_approved` を持たない（ユーザが置き場を動かしただけの）
-    # チケットでは空になる。承認の権威は置き場で、この欄は記録（設計 9.2）。
+    # チケットでは空になる。承認を本物とするのは置き場で、この欄は記録（設計 9.2）。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
-    # 判定の側でも当てるために置く（ADR-0058）。
+    # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。
     blocked: str = ""
 
     @property
@@ -769,7 +798,7 @@ class Ticket:
     def review_at(self, number: int) -> int | None:
         """この番号のフェーズのレビューが行われる番号。延期なら引き受ける番号。
 
-        全体計画の番号は写し（`workflow`）で読む。フィードバック計画は一直線で、次にレビューが
+        全体計画の番号はコピーした待ち方（`workflow`）で読む。フィードバック計画は一直線で、次にレビューが
         ある番号。延期の先が無ければ None（計画が壊れている）。
         """
         item = self.item_at(number)
@@ -824,8 +853,8 @@ class Ticket:
 def load(path: str) -> tuple[Ticket | None, list[Problem]]:
     """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
-        # fsio を通す。承認の plan（控える段）の中では、同じ承認で動かしたチケットを動かした後の
-        # 姿で読む（ADR-0093 の 6.2）。
+        # fsio を通す。承認の plan（書き込みを溜める段）の中では、
+        # 同じ承認で動かしたチケットを動かした後の状態で読む。
         text = fsio.load_text(path)
     except FileNotFoundError:
         return None, []
@@ -843,7 +872,7 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     ファイルを開く部分と分けてあるのは、テストと承認の画面が同じ処理を通るため。
 
     欄は種類ごとに読み手を分けてある。どれかが「これ以上読めない」と言えば
-    そこで止め、それまでの苦情を全部返す。苦情の並びは欄の並びのまま。
+    そこで止め、それまでの苦情を全部返す。苦情の順序は欄の順序のまま。
     """
     front, body, problems = _frontmatter(text)
     if front is None:
@@ -894,13 +923,36 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
                 Problem(
                     SEVERITY_ERROR,
                     name,
-                    f"子の識別子は `{ticket.parent}-<2 桁連番>` の形で書く。親の識別子が名前空間",
+                    f"子の識別子は `{ticket.parent}-<2 桁のフェーズ番号>-<2 桁の連番>` の形で書く"
+                    f"（フェーズ 5 の 1 枚目なら `{child_id(ticket.parent, 5, 1)}`）。"
+                    "親の識別子が名前空間で、フェーズ番号は `phase` と同じ値",
                 )
             )
             return True
         phase = front.get("phase")
         if isinstance(phase, bool) or not isinstance(phase, int) or phase < 0:
             problems.append(Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が要る"))
+            return True
+        if phase > MAX_CHILD_NUMBER:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"`phase: {phase}` は子の識別子に書けない。識別子のフェーズ番号は"
+                    f" 2 桁（0〜{MAX_CHILD_NUMBER}）なので、計画を {MAX_CHILD_NUMBER} "
+                    "フェーズまでに分ける",
+                )
+            )
+            return True
+        if int(matched.group("phase")) != phase:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"子の識別子のフェーズ番号（{matched.group('phase')}）が `phase: {phase}` と"
+                    f"食い違う。識別子は `{ticket.parent}-{phase:02d}-<2 桁の連番>` の形で書く",
+                )
+            )
             return True
         ticket.phase = phase
     else:
@@ -924,7 +976,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     if isinstance(raw_preds, list):
         ticket.predecessors = [_text(p).strip() for p in raw_preds if _text(p).strip()]
     elif raw_preds is not None:
-        problems.append(Problem(SEVERITY_ERROR, name, "`predecessors` は並びで書く"))
+        problems.append(Problem(SEVERITY_ERROR, name, "`predecessors` はリストで書く"))
         return True
 
     for key in ("plan", "feedback"):
@@ -973,9 +1025,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     raw_branch = front.get(BRANCH_KEY)
     if raw_branch is not None:
         if not isinstance(raw_branch, str):
-            problems.append(
-                Problem(SEVERITY_ERROR, name, "`branch` はブランチ名を文字列で書く（ADR-0100）")
-            )
+            problems.append(Problem(SEVERITY_ERROR, name, "`branch` はブランチ名を文字列で書く"))
             return True
         if ticket.is_child:
             problems.append(
@@ -1076,7 +1126,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
 def render(ticket: Ticket, extra: dict | None = None) -> str:
     """チケットを文面に戻す。承認済みチケットを作るときと、スクリプトが欄を書くときに使う。
 
-    読んだ frontmatter をそのまま出す。並びが変わっても意味は変わらない。
+    読んだ frontmatter をそのまま出す。順序が変わっても意味は変わらない。
     """
     front = dict(ticket.raw)
     if extra:
@@ -1105,8 +1155,8 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
                 Problem(SEVERITY_WARN, child.ticket, regex_overflow_detail(entry.regex))
             )
             continue
-        # ワイルドカードがあれば、前置に 1 文字足した綴りを親に当てる。`src/b/*` なら
-        # `src/b/x`。無ければ綴りそのもの。前置の末尾の `/` を落として当てると、
+        # ワイルドカードがあれば、前置に 1 文字足したパスを親に当てる。`src/b/*` なら
+        # `src/b/x`。無ければパスそのもの。前置の末尾の `/` を落として当てると、
         # 親の `src/b/*` が `src/b` に当たらず、正当な子を「超えている」と読む。
         probe = entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
         verdict = parent.decide(probe)
@@ -1143,7 +1193,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
     置き場は提案の置き場（`CCNAVI_TICKETS_PROPOSAL`）と承認済みチケットの置き場
     （`CCNAVI_TICKETS_APPROVED`）。
-    ここはチケットの範囲の外でも咎めない。咎めると、親が自分のワークツリーに次の子を
+    ここはチケットの範囲の外でも報告しない。報告すると、親が自分のワークツリーに次の子を
     提案する経路と、承認がブランチに乗る経路が使えなくなる。
 
     外して開くのは提案の `todo/` だけ。`review/` は `guard_rules`、承認済みチケットは
@@ -1170,10 +1220,10 @@ def _under(rel: str, place_rel: str) -> bool:
     同じく、どの機械でも区別しない。
 
     `rel` の `\\` は `/` に直さない。呼び手が渡すのは `tree.relative`
-    （`os.sep` を `/` に直した綴り）か
-    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\proposals\\todo\\x.py` という
-    名前のファイル 1 個が置き場の中に見え、範囲の判定から外れる。置き場の綴り（設定の値）
-    だけは直す。
+    （`os.sep` を `/` に直したパス）か
+    git が出したパスで、どちらも区切りは `/`。直すと Linux / macOS で
+    `wip\\proposals\\todo\\x.py` という名前のファイル 1 個が置き場の中に見え、範囲の判定から外れる。
+    置き場のパス（設定の値）だけは直す。
     """
     base = _fold(place_rel.replace("\\", "/").strip("/"))
     return bool(base) and _fold(rel).startswith(base + "/")
@@ -1203,7 +1253,7 @@ def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bo
 # 下書きと使い捨ての置き場。ツリーのルートの直下 1 段で、名前は固定。設定で動かさない。
 # 動かせると、その値を実際のソースの置き場（`src` など）に向けるだけで、承認した範囲を
 # 迂回して書ける場所ができる。除外してよい理由が「git が追跡しない」ことにある以上、
-# 追跡から外しているワークスペースの `.gitignore` の 1 行と同じ綴りに固定するほうが筋が通る。
+# 追跡から外しているワークスペースの `.gitignore` の 1 行と同じ名前に固定するほうが筋が通る。
 SCRATCH = "scratchpad"
 
 
@@ -1211,12 +1261,12 @@ def is_scratch_place(rel: str) -> bool:
     """ツリーのルートからの相対パスが、下書きの置き場の下にあるか。
 
     `scratchpad/` は `.gitignore` が追跡から外す置き場で、下書き・再現用のスクリプト・調べた
-    出力を置く（docs/claude/scratchpad.md）。チケットの範囲の外でも咎めない。
-    咎めると、範囲を宣言したワークツリーほど手元に何も置けなくなり、承認が要る作業だけが
+    出力を置く（docs/claude/scratchpad.md）。チケットの範囲の外でも報告しない。
+    報告すると、範囲を宣言したワークツリーほど手元に何も置けなくなり、承認が要る作業だけが
     下書きの場所を失う。開けても範囲は広がらない。ここに書いたものは git が追跡しないので、
     統合先のブランチには 1 バイトも乗らない。
 
-    **綴りの大文字小文字は区別する。範囲の照合（`_fold`）とは逆にしてある。** 外してよい
+    **名前の大文字小文字は区別する。範囲の照合（`_fold`）とは逆にしてある。** 外してよい
     理由が「追跡されない」ことにあり、追跡から外しているのは `.gitignore` の `/scratchpad/` で、
     その照合は Linux では区別するため。区別せずに外すと、Linux の `SCRATCHPAD/` が「追跡される
     のに範囲を当てない場所」になり、承認した範囲の外の変更が統合先へ乗る経路ができる。
@@ -1233,33 +1283,34 @@ def is_scratch_place(rel: str) -> bool:
     return rel.startswith(SCRATCH + "/")
 
 
-# ELI5 の HTML の置き場（ADR-0095・ADR-0096）。依頼につける、変更をやさしく説明した HTML を置く。
+# ELI5 の HTML の置き場。依頼につける、変更をやさしく説明した HTML を置く。マージリクエストの
+# 差分に載るよう `wip/` の下にコミットする。
 # 名前は固定。設定で動かさない（動かせると、その値をソースの置き場に向けるだけで範囲を迂回できる）。
 ELI5 = "wip/eli5"
 
 # 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に丸ごと消す。
-# 既定のブランチに残す場所はマージリクエストと issue。綴りは設定から導かず固定する。
-# 読むのは review（片付けの検査）と ops（締めたあとの案内）。
+# 既定のブランチに残す場所はマージリクエストと issue。パスは設定から導かず固定する。
+# 読むのは review（片付けの検査）と ops（早めに閉じたあとの案内）。
 WIP_ROOT = "wip"
 
 
 def is_eli5_place(rel: str) -> bool:
     """ツリーのルートからの相対パスが、ELI5 の HTML の置き場（`wip/eli5/`）の下にあるか。
 
-    チケットの範囲を当てない（ADR-0096）。ELI5 はレビューの依頼に必ずつける材料で、親の範囲に
+    チケットの範囲を当てない。ELI5 はレビューの依頼に必ずつける材料で、親の範囲に
     毎回 `wip/eli5/*` を書かせると、書き忘れた親は依頼の手前で止まる。ここは `wip/` の下なので
     `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
     `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
 
     `scratchpad/` と違って git が追跡する置き場なので、実行後チェック（`post.ScopeGuard.finding`）と
     サブエージェント終了時チェック（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
-    実行前に通った書き込みがコミットのあとで範囲の外として咎められる。
+    実行前に通った書き込みがコミットのあとで範囲の外として報告される。
 
-    綴りの大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
+    名前の大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
     （`git ls-files -- wip`）も区別して `wip/` を見るので、区別しない側に広げない。
 
-    `\\` は `/` に直さない。呼び手の綴りは `tree.relative`（`os.sep` を `/` に直したもの）か
-    git の綴りで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
+    `\\` は `/` に直さない。呼び手のパスは `tree.relative`（`os.sep` を `/` に直したもの）か
+    git が出したパスで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
     名前のファイル 1 個が置き場に
     見え、範囲の判定から外れ、しかも `ready` の片付け（`git ls-files -- wip`）の対象にもならない。
     """
@@ -1283,12 +1334,12 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     答えが変わるのは `scratchpad/` が追跡されているとき、すなわち外してよい根拠
     （追跡されないので統合先のブランチへ乗らない）が既に崩れているときだけ。
     そこで外すと、根拠が崩れたことを知らせる唯一の経路を自分でなくすことになる。
-    だから外さない。実行前に通ったものが実行後に咎められる形は残るが、咎められる
+    だから外さない。実行前に通ったものが実行後に報告される形は残るが、報告される
     のは「そのリポジトリで `scratchpad/` が追跡されている」ときだけで、それは本当に
     知らせるべきことになる。
 
     ELI5 の置き場（`is_eli5_place`）も外す。こちらは追跡される置き場なので、実行後チェックと
-    サブエージェント終了時チェックも同じく外す（ADR-0096）。
+    サブエージェント終了時チェックも同じく外す。
     """
     return (
         is_ticket_place(rel, tickets_rel, approved_rel)
@@ -1297,7 +1348,12 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     )
 
 
-def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
+def scan(
+    root: str,
+    tickets_rel: str,
+    projects_dir: str = "",
+    approved: list[Ticket] | None = None,
+) -> tuple[list[Ticket], list[Problem]]:
     """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場をつける。
 
     集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
@@ -1305,10 +1361,15 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
     置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
     プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 11.5、REQ-MLT-14）。
     ワークスペースの `wip/<名前>/proposals/` は読まない。
-    同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
+    同じ識別子が複数のツリーにあれば、本物とするツリーの側だけを残す。
+
+    `approved` は、まとめる前の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。
+    渡せば、承認済みの識別子の提案は、承認済みチケットで決めた本物とするツリーの側だけを残す
+    （`dedupe`）。組むのは `approval.scan_proposals`（承認済みチケットはそちらが読む）。
+    渡さないと、本物とするツリーの外に残った古い提案も残る。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
-    return dedupe(found), problems
+    return dedupe(found, approved), problems
 
 
 def scan_all(
@@ -1316,7 +1377,7 @@ def scan_all(
 ) -> tuple[list[Ticket], list[Problem]]:
     """ワークスペースルートと全ワークツリーの提案を、重複をまとめずに集める。
 
-    ボード（`--explain --json`）が「どのツリーに写っているか」を見せるために使う。
+    ボード（`--explain --json`）が「どのツリーにあるか」を見せるために使う。
     判定と承認は `scan` のまとめた側を読む。
     """
     found: list[Ticket] = []
@@ -1324,7 +1385,7 @@ def scan_all(
     ws = tree.main_tree(root)
     # 置き場がプロジェクトを決める（設計 11.5）。提案はどのツリーでも同じ相対の置き場に
     # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
-    # git で運ぶので、提案も同じブランチに乗せる（設計 9.2、REQ-MLT-14）。
+    # git で共有するので、提案も同じブランチに乗せる（設計 9.2、REQ-MLT-14）。
     # frontmatter の `project:` は照合に使うだけ。
     places = [
         (t, tickets_rel, t.project)
@@ -1339,13 +1400,13 @@ def scan_all(
             except OSError:
                 continue
             # 大文字小文字を区別しない機械では `DONE/` が `done/` として開ける。
-            # 置き場が状態なので、綴りまで同じディレクトリだけを読む。
+            # 置き場が状態なので、表記まで同じディレクトリだけを読む。
             if os.path.basename(os.path.realpath(directory)) != state:
                 problems.append(
                     Problem(
                         SEVERITY_WARN,
                         state,
-                        f"{os.path.relpath(directory, root)} の綴りが状態の名前 `{state}` と"
+                        f"{os.path.relpath(directory, root)} の表記が状態の名前 `{state}` と"
                         "違うので読まない",
                     )
                 )
@@ -1371,7 +1432,7 @@ def scan_all(
                     continue
                 ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
                 ticket.project = place_project
-                # 待ち方の写しは `--agree` だけが書く。提案に書かれていても読まない。
+                # 待ち方のコピーは `--agree` だけが書く。提案に書かれていても読まない。
                 ticket.workflow = None
                 if place_project and not ticket.declared_project:
                     # 承認済みチケットにも残す。judge は親の承認済みチケットを引けないとき
@@ -1382,48 +1443,87 @@ def scan_all(
     return found, problems
 
 
-def fold(hits: list[Ticket]) -> list[Ticket]:
-    """同じ識別子の写りを、権威のあるツリーの側にまとめる。
+def fold(hits: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticket]:
+    """同じ識別子のチケットを、本物とするツリーの側にまとめる。
 
     子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
-    写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
-    あればそれが本物で、残りは写し。
+    入っている。本物とするのは親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
+    あればそれが本物で、残りはほかのツリー上のチケット。
 
     親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
     そのプロジェクト）の側を採る。ワークツリーは片付ければ消えるが、元ツリーは消えない。
     親のワークツリーを作る前と、合流して片付けた後がこの形で、ここで行き先を決めないと、
     片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。
 
-    **ただし、元ツリーより先の置き場に在る写しが 1 つでもあれば採らない。** 元ツリーを
-    権威にしてよい根拠は「他の写しは合流の結果で、同じか手前の状態」であって、合流
-    していないワークツリーで先に進んだ写し（親のツリーで閉じ、子のツリーが取り込んだ形）
+    **ただし、元ツリーより先の置き場に在るチケットが 1 つでもあれば採らない。** 元ツリーを
+    本物としてよい根拠は「他のツリー上のチケットは合流の結果で、同じか手前の状態」であって、合流
+    していないワークツリーで先に進んだチケット（親のツリーで閉じ、子のツリーが取り込んだ形）
     があるときは成り立たない。そこで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
     記録を別の差分で書き直す。決めずに残し、ユーザに合流させる。
 
-    どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
+    どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれを優先するか
     決まらない（検証が「複数の場所にある」と言う状態）。
 
     リポジトリをまたいだ衝突はまとめない。識別子はユーザが選ぶ短い連番なので、プロジェクトが
-    独立に振ればぶつかる（設計 11）。それは写しではなく違うチケットなので、どちらかを権威に
+    独立に振ればぶつかる（設計 11）。それは同じチケットではなく違うチケットなので、どちらかを本物と
     すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
+
+    `approved` は同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。
+    在れば、本物とするツリーは**承認済みチケットだけで**同じ順・同じ条件で決め
+    （`authority`。承認済みチケットの側の `approval._authoritative` と同じ関数）、そのツリーに
+    在る提案だけを残す。そこに提案が無ければ何も残らない。承認で本物とするツリーの `todo/` が
+    消えたあと、承認の前に切ったワークツリーに残った `todo/` の提案を承認待ちや改版と読まない
+    ため。提案だけで本物とする側を決めると、承認済みチケットが元ツリーにしか無いのに親の名前の
+    ワークツリーに古い `todo/` が残る形で、古い側が本物になる。改版は本物とするツリーの `todo/` に
+    置くので、改版は残る。
+
+    **`approved` を渡さないと、承認済みの識別子でも提案だけでまとめる。** 本物とするツリーの
+    外に残った古い提案が残るので、承認待ち・改版・ボードの提案の欄を決める呼び手は
+    `approval.scan_proposals` を通す。
     """
-    if len({t.project for t in hits}) > 1:
+    if approved and len({t.project for t in [*approved, *hits]}) > 1:
         return hits
-    home = hits[0].parent or hits[0].ticket
-    at_home = [t for t in hits if t.tree == home]
-    if at_home:
-        return at_home
-    at_origin = [t for t in hits if t.tree == origin_tree(t)]
-    if not at_origin or behind(at_origin, hits):
+    if not approved:
+        if len({t.project for t in hits}) > 1:
+            return hits
+        home = hits[0].parent or hits[0].ticket
+        at_home = [t for t in hits if t.tree == home]
+        if at_home:
+            return at_home
+        at_origin = [t for t in hits if t.tree == origin_tree(t)]
+        if not at_origin or behind(at_origin, hits):
+            return hits
+        return at_origin
+    where = authority(approved)
+    if where is None:
         return hits
-    return at_origin
+    return [t for t in hits if t.tree == where]
+
+
+def authority(copies: list[Ticket]) -> str | None:
+    """同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）から、本物とするツリーの名前を決める。
+
+    親のツリー（親自身なら自分のツリー）→ 元ツリー（先へ進んだチケットが無いときだけ）の順。
+    決まらないとき（どちらにも無い、元ツリーより先のチケットがある、リポジトリをまたぐ）は None。
+    承認済みチケット（`approval._authoritative`）と、承認済みの識別子の提案（`fold`）が
+    この 1 つの関数で決める。
+    """
+    if not copies or len({t.project for t in copies}) > 1:
+        return None
+    for t in copies:
+        if t.tree == (t.parent or t.ticket):
+            return t.tree
+    at_origin = [t for t in copies if t.tree == origin_tree(t)]
+    if not at_origin or behind(at_origin, copies):
+        return None
+    return origin_tree(at_origin[0])
 
 
 def origin_tree(t: Ticket) -> str:
     """このチケットの元ツリーの名前。ワークスペースなら空、プロジェクトならその名前。
 
     ワークツリーの名前は識別子だが、元ツリーの名前はプロジェクトの名前（ワークスペース
-    から切ったものなら空）。`tree.Tree.name` と同じ綴りで並ぶ。
+    から切ったものなら空）。`tree.Tree.name` と同じ表記で並ぶ。
     """
     return t.project or tree.MAIN
 
@@ -1431,7 +1531,7 @@ def origin_tree(t: Ticket) -> str:
 def progress(state: str) -> int:
     """置き場の進み具合。`todo` < `doing` < `review` < `done`。空は `doing` として読む。
 
-    承認済みチケットの写しは置き場を持たないことがある（`state` が空）。判定と同じく
+    承認済みチケットは置き場を持たないことがある（`state` が空）。判定と同じく
     作業中として数える。
     """
     order = (TODO, DOING, REVIEW, DONE)
@@ -1442,14 +1542,14 @@ def progress(state: str) -> int:
 
 
 def behind(some: list[Ticket], hits: list[Ticket]) -> bool:
-    """`some` より先の置き場に在る写しが `hits` にあるか。"""
+    """`some` より先の置き場に在るチケットが `hits` にあるか。"""
     return max(progress(t.state) for t in hits) > max(progress(t.state) for t in some)
 
 
 def collided_states(states: list[str]) -> list[str]:
-    """1 つのツリーの中で、どれが本物か決まらない置き場の並び。決まっていれば空。
+    """1 つのツリーの中で、どれが本物か決まらない置き場のリスト。決まっていれば空。
 
-    同じ識別子が 2 つの置き場に在るのは、動かす途中で止まった跡（写せたが消せなかった）。
+    同じ識別子が 2 つの置き場に在るのは、動かす途中で止まった形跡（コピーできたが消せなかった）。
     ただし `todo/` は親の改版の途中なので、承認済みチケットと並んでいてよい。
     `--lint` の ERROR と、ボードの `scattered` が同じ数え方をするためにここに置く。
     """
@@ -1462,12 +1562,12 @@ def collided_states(states: list[str]) -> list[str]:
 
 
 def collisions(hits: list[Ticket]) -> list[Ticket]:
-    """どれが本物か決まらない写りの全部。決まっていれば空。
+    """どれが本物か決まらないチケットの全部。決まっていれば空。
 
     まとめて 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
     状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
-    同じ条件（`lint._proposal_problems` も同じ関数を通る）。写りがあること自体は
-    普通なので、まとめて 1 つに決まる写りは数えない。
+    同じ条件（`lint._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
+    普通なので、まとめて 1 つに決まるものは数えない。
     """
     folded = fold(hits)
     if len(folded) > 1 and collided_states([t.state for t in folded]):
@@ -1476,23 +1576,30 @@ def collisions(hits: list[Ticket]) -> list[Ticket]:
 
 
 def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
-    """識別子ごとの写りの全部。並びは見つけた順。"""
+    """識別子ごとのチケットの全部。順序は見つけた順。"""
     grouped: dict[str, list[Ticket]] = {}
     for t in found:
         grouped.setdefault(t.ticket, []).append(t)
     return grouped
 
 
-def dedupe(found: list[Ticket]) -> list[Ticket]:
-    """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。"""
+def dedupe(found: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticket]:
+    """同じ識別子が複数のツリーにあるとき、本物とするツリーの側だけを残す。
+
+    `approved` は、まとめる前の承認済みチケットの全部。承認済みの識別子は、そのチケットで
+    本物とするツリーを決める（`fold`）。承認済みの無い識別子（新規の提案）は今までどおり。
+    渡さないと、承認済みの識別子でも提案だけでまとめるので、本物とするツリーの外に残った
+    古い提案（承認の前に切ったワークツリーの `todo/` など）が残る。
+    """
+    settled = by_ticket(approved or [])
     kept: list[Ticket] = []
-    for hits in by_ticket(found).values():
-        kept.extend(fold(hits))
+    for ticket_id, hits in by_ticket(found).items():
+        kept.extend(fold(hits, settled.get(ticket_id)))
     return kept
 
 
 def _place(tickets_rel: str) -> str:
-    """置き場の綴りに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/proposals`）にも当たる。"""
+    """置き場のパスに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/proposals`）にも当たる。"""
     parts = [re.escape(p) for p in tickets_rel.split("/") if p]
     optional = r"(?:[^\\/\s\x00]+[\\/])?"
     if len(parts) < 2:
@@ -1509,7 +1616,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     """状態の置き場を守るルール。組み込みで、ルールファイルには書かない。
 
     通るのは状態を動かすスクリプトだけ。そのスクリプトの呼び出し文字列には
-    置き場の綴りが現れないので、ここに当たらない。root は文面の sh の綴りに使う。
+    置き場のパスが現れないので、ここに当たらない。root は文面の sh のパスに使う。
     """
     place = state_dir_regex(tickets_rel)
     message = (
@@ -1528,13 +1635,24 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     # 当たっても、状態の名前を大文字で書く正当な用事は無い。
     write_rule.compiled = re.compile(place, re.IGNORECASE)
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
-    # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無い綴り
+    # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無いパス
     # （`mv x wip/proposals/done`）でも当てる。
     states = "|".join(GUARDED_STATES)
-    loose = _place(tickets_rel) + rf"[\\/]({states})([\\/]|\s|$)"
-    # 写す動詞は行き先が最後の引数。置き場から外へ写す読み向きの cp は止めない。
-    last = _place(tickets_rel) + rf"[\\/]({states})([\\/][^ \x00]*)?($|\x00)"
-    shell = rf"{selfguard._WRITE_VERBS}{loose}|{selfguard._COPY_VERBS}{last}"
+    review = _place(tickets_rel) + rf"[\\/]({states})"
+    loose = review + r"([\\/]|\s|$)"
+    # コピーする動詞は行き先だけで当てる。置き場から外へコピーする読み向きの cp は止めない。行き先の
+    # 読み方（`-t` の値か、選択肢でない最後の引数）は組み込みの保護と同じ部品を使う。
+    # ここで別に書くと、
+    # `cp -t <置き場> <提案>` のように片方だけが読む書き方が通る。
+    # 状態の置き場が入っているディレクトリ（提案の置き場）を行き先にして、元の名前を状態の名前に
+    # した形（`cp -r /tmp/review wip/proposals/`）も同じ部品で止める。
+    shell = "|".join(
+        (
+            rf"{selfguard._WRITE_VERBS}{loose}",
+            selfguard.copy_destination_regex(selfguard.copy_last_place(review), loose),
+            selfguard.holder_regex(selfguard.under(_place(tickets_rel)), states),
+        )
+    )
     shell_rule = rules.Rule(
         id=STATE_RULE_ID + "-shell",
         match="Bash|PowerShell",
@@ -1565,7 +1683,7 @@ def propose_notice(
 
     - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの扱い
       （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、
-      知らない綴りのモードを ask として扱う既定も、そこだけ外れる（REQ-PRE-08）
+      知らない表記のモードを ask として扱う既定も、そこだけ外れる（REQ-PRE-08）
     - 判定は強いタイプから見て最初に当たった段で決まるので、**提案の置き場に `deny` か
       `ask` を書いているワークスペースには文が届かない。** 承認の流れをいちばん
       気にしているところにだけ届かない、という向きになる
@@ -1576,7 +1694,7 @@ def propose_notice(
     過去形にしないのはそのため。書けたかどうかは、この文を渡す時点では決まっていない。
 
     1 つの文脈（セッション、サブエージェントなら 1 回の起動）で最初の 1 回だけ渡る。
-    数えは `ctxfile` の控えを、ルールと同じ形で使う（この 1 本は表に入れないので、
+    数えは `ctxfile` の記録を、ルールと同じ形で使う（この 1 本は表に入れないので、
     判定には一切現れない）。2 本目からは何も渡さない。提案を 1 本書くたびに同じ文を積むと、
     長いセッションではそれだけでコンテキストを使ってしまう。
     """
@@ -1592,7 +1710,7 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
 
     `guard_rules` は前を問わない形（`(^|[\\/])`）で当てるが、あれは deny なので、余分に
     当たるぶんは止めすぎる側へ外れるだけ。文を渡す側を同じ形で当てると、ワークスペースの
-    外に `wip/proposals/todo/` という並びのディレクトリを作っただけの場所でも
+    外に `wip/proposals/todo/` という構成のディレクトリを作っただけの場所でも
     「提案を書いた」と読む。
     ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下（設計 11)
     なので、ルートの下に限れば正しい置き場は全部入り、外は入らない。
@@ -1604,7 +1722,7 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
 
 
 def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
-    """文と、数えの鍵になる id を運ぶ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
+    """文と、数えの鍵になる id を持つ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
     return rules.Rule(
         id=PROPOSE_RULE_ID,
         additional_context_once=(
@@ -1649,7 +1767,7 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
 def script_fields_set(text: str) -> tuple[str, ...]:
     """その版が既に値を持っている、スクリプトの欄。
 
-    姿を突き合わせる側が「落としてよい欄」を決めるのに使う（`post._script_writes`）。
+    正規化した内容を突き合わせる側が「落としてよい欄」を決めるのに使う（`post._script_writes`）。
     **落としてよいのは、コミット済みの版がまだ持っていない欄だけ。** 副命令はどれも
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
@@ -1676,7 +1794,7 @@ def script_fields_set(text: str) -> tuple[str, ...]:
 
 
 def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None:
-    """frontmatter を持つチケットなら、`drop` の欄を落とした姿を返す。無ければ None。
+    """frontmatter を持つチケットなら、`drop` の欄を落として正規化した内容を返す。無ければ None。
 
     実行後チェックが「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
     答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
@@ -1687,10 +1805,10 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
     `SCRIPT_FIELDS` の部分集合で、決めるのは呼ぶ側（`script_fields_set` を引いて、
     コミット済みの版がまだ持っていない欄だけを渡す）。範囲
     （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
-    そこが 1 文字でも変われば別の姿になり、チェックは今までどおり報告する。
+    そこが 1 文字でも変われば別の内容になり、チェックは今までどおり報告する。
 
     切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
-    落とす。揃えないと、スクリプトが書いた直後の姿が「スクリプトが書いていない形」に見える。
+    落とす。揃えないと、スクリプトが書いた直後の内容が「スクリプトが書いていない形」に見える。
 
     frontmatter を持たないもの（マーカー、`.risk.json`、閉じの記録）は None。範囲を
     宣言しないので、正規の設置と偽の設置を内容からは見分けられない。**そこは外れる。**
@@ -1745,7 +1863,7 @@ def insert_front(text: str, key: str, value) -> str:
 
 
 def _yaml_scalar(value: str) -> str:
-    """欄の値を、YAML が文字列として読み戻せる綴りにする。"""
+    """欄の値を、YAML が文字列として読み戻せる表記にする。"""
     return (
         yaml.safe_dump(value, allow_unicode=True, default_style='"').strip().removesuffix("\n...")
     )
@@ -1764,12 +1882,12 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
         if raw_section is None:
             continue
         if not isinstance(raw_section, list):
-            problems.append(Problem(SEVERITY_ERROR, name, f"`{section}` が並びではない"))
+            problems.append(Problem(SEVERITY_ERROR, name, f"`{section}` がリストではない"))
             continue
         for i, raw in enumerate(raw_section):
             where = f"{section}[{i}]"
             if not isinstance(raw, dict):
-                problems.append(Problem(SEVERITY_ERROR, name, f"{where} がキーと値の並びではない"))
+                problems.append(Problem(SEVERITY_ERROR, name, f"{where} がマッピングではない"))
                 continue
             match = _text(raw.get("match"))
             tools = [w.strip() for w in match.split("|") if w.strip()]
@@ -1827,7 +1945,7 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
         # 通す側にはしない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、
-        # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う姿で通る。弾いたまま、
+        # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う内容で通る。弾いたまま、
         # 目に見えない原因だけを名指しする。
         if lines and lines[0].lstrip(BOM).strip() == FENCE:
             detail = (
@@ -1861,7 +1979,7 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     if front is None:
         return None, "", [Problem(SEVERITY_ERROR, "(file)", "frontmatter が空")]
     if not isinstance(front, dict):
-        return None, "", [Problem(SEVERITY_ERROR, "(file)", "frontmatter がキーと値の並びではない")]
+        return None, "", [Problem(SEVERITY_ERROR, "(file)", "frontmatter がマッピングではない")]
     return front, body + ("\n" if body and not body.endswith("\n") else ""), []
 
 

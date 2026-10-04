@@ -3,7 +3,7 @@
  * 読んでしまう語を見分ける。
  *
  * `yaml` は 1.2 の規則でしか引用符を足さないので、`yes` `on` `1:30` `0755` のような値を裸で書くと
- * PyYAML は真偽値・六十進・八進として読み、`message` が `True` になったり id が `True` を名乗ったりする。
+ * PyYAML は真偽値・六十進・八進として読み、`message` が `True` になったり id が `True` になったりする。
  * `--lint` はそれを止めない（読めた値が正しい型なら苦情が無い）。ここに当たる文字は
  * 引用符で囲んで書く。当たらない文字を囲まないのは、変えていない行の見た目を保つため。
  *
@@ -28,7 +28,7 @@ const PATTERNS: readonly RegExp[] = [
   /^<<$/,
 ];
 
-/** PyYAML（YAML 1.1）が文字列以外に読む綴りなら真。空文字は真（`null` に読まれる） */
+/** PyYAML（YAML 1.1）が文字列以外に読む表記なら真。空文字は真（`null` に読まれる） */
 export function yaml11Ambiguous(text: string): boolean {
   if (text === "") {
     return true;

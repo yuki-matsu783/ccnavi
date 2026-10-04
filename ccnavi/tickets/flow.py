@@ -1,4 +1,4 @@
-"""子チケットのフロー（作業の手順のグラフ）。設計 9.3.1・9.12、ADR-0085。
+"""子チケットのフロー（作業の手順のグラフ）。設計 9.3.1・9.12。着手中は書き換えを止める。
 
 子チケット 1 本につき 1 本、担当のサブエージェントが作業中に読む手順書を置ける。
 置き場は**承認済みの領域**の `<承認済みチケットの置き場>/flows/<子>.yml`
@@ -6,18 +6,27 @@
 置き場を持つツリーはチケットと同じ（承認済みチケットが在るツリー。プロジェクトの
 チケットならそのプロジェクトのツリー）で、チケットと同じ git に乗る。
 
-承認済みの領域は組み込みの守り（`builtin-guard-project-home`）がエージェントの
-Write / Edit / NotebookEdit を止め、綴りの出るシェルからの書き込みも組み込みが止める。
+承認済みの領域は組み込みの保護（`builtin-guard-project-home`）がエージェントの
+Write / Edit / NotebookEdit を止め、パスの出るシェルからの書き込みも組み込みが止める。
 だから「フローはユーザが書く」は運用ではなく判定で守られる（行き先を追えないシェルの書き込みは
 止まらないので、着手のあとの書き換えは知らせる。下の「着手のあとの書き換え」）。ユーザはボードのフロー編集画面で
-書き、承認済みチケットと同じ運び方（`ccnavi-push-approved.sh`）でコミットする。
-実行後チェックは承認済みの領域を範囲の外として咎めず、frontmatter の無いファイルは
+書き、承認済みチケットと同じく承認の push（`ccnavi-push-approved.sh`）でコミットする。
+実行後チェックは承認済みの領域を範囲の外として報告せず、frontmatter の無いファイルは
 副命令の書き込みとして外す（`post._script_writes`）。だからユーザが保存したフローが
-エージェントの範囲外の変更として咎められることもない。
+エージェントの範囲外の変更として報告されることもない。
+
+## 下書き
+
+エージェントは、頼まれたときに子のフローの下書きを提案の置き場の `flows/<子>.yml`
+（既定 `wip/proposals/flows/<子>.yml`）に書ける。置くツリーはフローと同じ。提案の置き場は
+範囲の外なので、判定も組み込みの保護も変えずに書ける。下書きには効力が無い。`SubagentStart` の案内
+（`briefing`）も着手のハッシュ（`fingerprint`）も読まず、承認のダイジェストにも入らない。ユーザがボードの
+フロー編集画面で差分を読んで取り込み、`flows/<子>.yml`（承認済みの領域）に保存したものだけが効く。
+ここが持つのは置き場のパス（`draft_rel`）と、ボードへ渡す有無（`info` の `draft`）だけ。
 
 ## 形
 
-YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー編集画面が書き、ここが読む。
+YAML の 1 文書で、最上位はマッピング。ボードのフロー編集画面が書き、ここが読む。
 
     id, name, description?, version
     nodes:          [node, ...]
@@ -26,7 +35,7 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
     node       = {id, type, name, position: {x, y}, data: {...}}
     connection = {id, from, to, fromPort, toPort, condition?}
 
-読むのは `yaml.safe_load`（ルールや設定と同じ読み手）に、別名（`*名前`）を拒む守りを足したもの
+読むのは `yaml.safe_load`（ルールや設定と同じ読み手）に、別名（`*名前`）を拒む処理を足したもの
 （`_Loader`）。別名は同じ部分木を何度でも指せるので、入れ子にすると小さなファイルが辿る量で
 膨らむ（billion laughs）。手順書に別名は要らないので、量で切らずに別名ごと読まない。
 
@@ -46,31 +55,32 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
 ユーザの手順書として渡すことになる。ふつうのファイルでないもの（名前付きパイプは開くと固まる）と
 ハードリンク（外の名前から書き換えられる）も読まない（`read_bytes`）。
 
-形の誤り（最上位がキーと値の並びでない、`nodes` が無い、ノードに `id` が無い・重なる、
-`connections` が並びでない）も読めない理由として 1 行で言う（`shape_problem`）。
+形の誤り（最上位がマッピングでない、`nodes` が無い、ノードに `id` が無い・重なる、
+`connections` がリストでない）も読めない理由として 1 行で言う（`shape_problem`）。
 `ccnavi --lint --flow <パス>` は同じ読み手・同じ検査（`load`）でファイルを確かめ、読めなければ
 error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
-これに掛ける（ADR-0035。正しいかの答えはここ 1 か所）。`--json` なら読めた中身も載せ（`as_json`）、
-画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば開かない・保存しない。
-読めたフローの線の構造（`structure_problems`）と名前の綴り（`name_problems`）は warn で足し、
+これに掛ける（拡張は判定を自分で出さない。正しいかの答えはここ 1 か所）。`--json` なら
+読めた中身も載せ（`as_json`）、画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば
+開かない・保存しない。
+読めたフローの線の構造（`structure_problems`）と名前の表記（`name_problems`）は warn で足し、
 読むのは止めない。
 
-読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの写しは読まない。
+読むのは本物とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリー上の版は読まない。
 
 ## 着手のあとの書き換え
 
-ロックと承認済みの領域の守りが止めるのは Write / Edit と、綴りの出るシェルの書き込みまで。
-行き先を追えないシェルの書き込みは止まらない。着手のときにフローの指紋を
-`phases/<親>/<子>.flow.json` に控え（`record_digest`）、SubagentStart と SubagentStop が
-いまの指紋と比べて、違えばユーザとメインに知らせる（`changed_notice`。止めない）。
+ロックと承認済みの領域の保護が止めるのは Write / Edit と、パスの出るシェルの書き込みまで。
+行き先を追えないシェルの書き込みは止まらない。着手のときにフローのハッシュを
+`phases/<親>/<子>.flow.json` に記録し（`record_digest`）、SubagentStart と SubagentStop が
+いまのハッシュと比べて、違えばユーザとメインに知らせる（`changed_notice`。止めない）。
 
 ## 承認とロック
 
-フローは承認の対象ではない（承認の指紋にも入らない）。中身は着手の前と終わった後なら
+フローは承認の対象ではない（承認のダイジェストにも入らない）。中身は着手の前と終わった後なら
 書き換えられる。着手中（`started_at` があり、`completed_at` も `cancelled_at` も無い）は、
 読んでいる手順が作業の途中で変わらないよう、実行前チェックが Write / Edit / NotebookEdit を
-止める（`lock_hit`）。エージェントの書き込みは承認済みの領域の守りでも止まるが、ロックは
-その守りを切った設定でも当てはまり、止めた理由を名指しする。ボードも着手中は保存しない。
+止める（`lock_hit`）。エージェントの書き込みは承認済みの領域の保護でも止まるが、ロックは
+その保護を切った設定でも当てはまり、止めた理由を名指しする。ボードも着手中は保存しない。
 """
 
 from __future__ import annotations
@@ -122,14 +132,14 @@ SPAWN = ("subAgent", "subAgentFlow")
 # 出口を項目ごとに持つ種類と、項目の欄。
 BRANCH_KEYS = {"ifElse": "branches", "switch": "branches", "branch": "branches", ASK: "options"}
 
-# フローの文の中で ccnavi の名乗りを真似させない。`[` / `［` の直後が（互換文字・書式の制御・
+# フローの文の中で ccnavi の接頭辞を真似させない。`[` / `［` の直後が（互換文字・書式の制御・
 # 結合文字・似た形の字をそろえて）`ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
 _BADGE_WORD = "ccnavi"
 _BADGE_OPEN = "〔"
 _BADGE_CLOSE = "〕"
 # 括弧の閉じを探す範囲（元の文字数）。
 _BADGE_REACH = 64
-# ラテン文字に似た形の字（キリル・ギリシャ・アルメニアなど）。`ccnavi` の綴りに要る字だけ。
+# ラテン文字に似た形の字（キリル・ギリシャ・アルメニアなど）。`ccnavi` の表記に要る字だけ。
 _CONFUSABLE = {
     "\u0441": "c",  # с キリル
     "\u0421": "c",  # С
@@ -176,7 +186,7 @@ HARD_LINKED = (
 )
 SWAPPED = "開いているあいだに別のファイルに差し替わったので読まない"
 
-# 着手のときに控えるフローの指紋の記録（`phases/<親>/<子>.flow.json`）。
+# 着手のときに残すフローのハッシュの記録（`phases/<親>/<子>.flow.json`）。
 PHASES_DIR = "phases"
 DIGEST_RECORD = "flow"
 # 着手のあとにフローが書き換わったと知らせる理由コード。止めない（知らせるだけ）。
@@ -204,17 +214,22 @@ def _is_absolute(rel: str) -> bool:
     return os.path.isabs(rel) or rel.startswith("/") or rel[1:3] == ":/"
 
 
-def approved_rel(conf: settings.Settings) -> str:
-    """承認済みチケットの置き場の綴り（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。
-
-    `./`・`//`・`x/..` は整える（L-b）。整えないと、判定が整えた綴りに当てたときに
-    置き場の綴りと食い違い、ロックが外れる。
-    """
-    raw = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/")
+def _place_rel(raw: str) -> str:
+    """置き場のパスを整える（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。"""
+    raw = raw.replace("\\", "/")
     if _is_absolute(raw):
         return posixpath.normpath(raw).rstrip("/") or "/"
     norm = posixpath.normpath(raw).strip("/")
     return raw.strip("/") if norm in ("", ".") else norm
+
+
+def approved_rel(conf: settings.Settings) -> str:
+    """承認済みチケットの置き場のパス（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。
+
+    `./`・`//`・`x/..` は整える（L-b）。整えないと、判定が整えたパスに当てたときに
+    置き場のパスと食い違い、ロックが外れる。
+    """
+    return _place_rel(conf.approved or settings.DEFAULT_APPROVED)
 
 
 def flow_rel(conf: settings.Settings, ticket_id: str) -> str:
@@ -223,16 +238,33 @@ def flow_rel(conf: settings.Settings, ticket_id: str) -> str:
 
 
 def flow_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
-    """このツリーでの子のフローの絶対パス（`./` や `x/..` は整えた綴り）。"""
+    """このツリーでの子のフローの絶対パス（`./` や `x/..` は整えたパス）。"""
     return os.path.normpath(
         os.path.join(settings.approved_dir(conf, tree_root), FLOWS_DIR, f"{ticket_id}{SUFFIX}")
     )
 
 
+def draft_rel(conf: settings.Settings, ticket_id: str) -> str:
+    """子のフローの下書きの置き場。提案の置き場の `flows/<子>.yml`。
+
+    承認済みの領域で `flows/` が `doing/` `done/` と並ぶのに揃え、提案の置き場でも
+    `todo/` `review/` と並べる。提案の置き場は丸ごとチケットの範囲の外で、`flows/` は守る状態の
+    置き場でも走査の対象でもないので、エージェントは判定を変えずに書ける。下書きに効力は無い
+    （`briefing` も着手のハッシュも読まない）。効くのはユーザが取り込んで `flow_rel` に保存した
+    ものだけ。
+    """
+    return f"{_place_rel(conf.tickets or settings.DEFAULT_TICKETS)}/{FLOWS_DIR}/{ticket_id}{SUFFIX}"
+
+
+def draft_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
+    """このツリーでの子のフローの下書きの絶対パス。"""
+    return os.path.normpath(os.path.join(tree_root, *draft_rel(conf, ticket_id).split("/")))
+
+
 def linked(tree_root: str, path: str) -> bool:
     """tree_root から path までの途中（path 自身を含む）に、シンボリックリンクがあるか。
 
-    `configsync._linked` と同じ読み方。綴りのままさかのぼり、実体が tree_root に着いたところで
+    `configsync._linked` と同じ読み方。パスのままさかのぼり、実体が tree_root に着いたところで
     止める。tree_root より上のリンク（macOS の `/tmp` など）は数えない。着けなければ
     （外を指している）リンクと同じに扱う。
     """
@@ -254,8 +286,8 @@ def linked(tree_root: str, path: str) -> bool:
 def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str, bool]:
     """フローのファイルの絶対パスと、それを持つツリーのルートと、在るかどうか。
 
-    読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
-    読まない。子のワークツリーはエージェントが作業する場所で、そこの写しはシェルの書き込み
+    読むのは本物とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
+    読まない。子のワークツリーはエージェントが作業する場所で、そこにある版はシェルの書き込み
     （行き先を追えない形）で書き換えられうる（M-2）。
     リンクでも「在る」とする（読むかどうかは `load` が決める。気づかないうちに別の版へ移ることは
     しない）。
@@ -274,12 +306,17 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
 
     `tree` はファイルを持つツリーのルート。ボードはそこからファイルまでの途中にリンクが
     あれば書かない。`linked` はその途中にリンクがあるか（在るときだけ見る）。
+
+    `draft` はエージェントが書く下書きの `{path, rel, exists, linked}`。置くツリーは
+    フローと同じ（`tree`）。ボードはパスを組まずにここを読む。下書きの中身はここでも読まない。
     """
     if not child.is_child:
         return None
     path, base, exists = resolve(conf, root, child)
     if not exists and child.state in (ticket_mod.DONE, ticket_mod.CANCELLED):
         return None
+    draft = draft_file(conf, base, child.ticket)
+    draft_exists = os.path.lexists(draft)
     return {
         "path": path,
         "rel": flow_rel(conf, child.ticket),
@@ -287,6 +324,12 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
         "exists": exists,
         "linked": exists and linked(base, path),
         "locked": child.in_progress and child.state == ticket_mod.DOING,
+        "draft": {
+            "path": draft,
+            "rel": draft_rel(conf, child.ticket),
+            "exists": draft_exists,
+            "linked": draft_exists and linked(base, draft),
+        },
     }
 
 
@@ -297,12 +340,12 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     """このパスが子のフローの置き場なら（ファイルの名前, そのツリーのプロジェクト）。違えば None。
 
     名前は `flows/` の下の残り（`<子>.yml`）。プロジェクトは置き場を持つツリーのもの
-    （ワークスペースなら空、ワークスペースの外なら None）。綴りは解いたものでも解く前の
+    （ワークスペースなら空、ワークスペースの外なら None）。パスは解いたものでも解く前の
     ものでもよい。大文字小文字は範囲の照合と同じく区別しない。
 
-    名前は Windows で同じファイルを指す綴りをまとめる。末尾の `.` と空白、`:` から後ろ
+    名前は Windows で同じファイルを指す表記をまとめる。末尾の `.` と空白、`:` から後ろ
     （`::$DATA` などの代替データストリーム）を落とす（止める向きだけ）。8.3 形式の短い
-    名前（子の名前が 8 字を超えるときの `I0001-~1.YML` など）はまとめられない。解いた綴り
+    名前（子の名前が 8 字を超えるときの `I0001-~1.YML` など）はまとめられない。解いたパス
     （`full`）が長い名前に戻すのに任せる。
     """
     if not path:
@@ -314,7 +357,7 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     shared = absolute
     if not absolute and (rel == ".." or rel.startswith("../")):
         # ツリーの外（`../shared/approved`）を指す置き場。ツリーをまたいで 1 か所になりうるので、
-        # `..` を落とした残りの綴りで当て、どのプロジェクトの子でも止める（止める向き）。
+        # `..` を落とした残りのパスで当て、どのプロジェクトの子でも止める（止める向き）。
         rel = "/".join(p for p in rel.split("/") if p != "..")
         shared = True
     marker = _fold(rel if absolute else f"/{rel}" if rel else "") + f"/{FLOWS_DIR}/"
@@ -336,7 +379,7 @@ def lock_hit(
 ) -> ticket_mod.Ticket | None:
     """この書き込みを止める、着手中の子。無ければ None。
 
-    `copies` はどのツリーの写しも並べたもの（識別子で 1 本にまとめる前）。どれか 1 本でも
+    `copies` はどのツリー上のチケットも並べたもの（識別子で 1 本にまとめる前）。どれか 1 本でも
     着手中なら止める（止める向きだけ）。`project` は置き場を持つツリーのプロジェクト
     （ワークスペースなら空）。
     ワークスペースルート・プロジェクト・どのワークツリーでも、同じ子の置き場なら止める。
@@ -368,8 +411,8 @@ def inode_hit(
 ) -> ticket_mod.Ticket | None:
     """書き込み先が、着手中の子のフローとハードリンクで同じ中身なら、その子。無ければ None。
 
-    ハードリンクは綴りに置き場が出ないので `locate` では当たらない（M-1）。書き込み先が
-    在って、名前が 2 つ以上あるときだけ、着手中の子のフロー（どのツリーの写しの置き場も）と
+    ハードリンクはパスに置き場が出ないので `locate` では当たらない（M-1）。書き込み先が
+    在って、名前が 2 つ以上あるときだけ、着手中の子のフロー（どのツリー上のチケットの置き場も）と
     (デバイス, inode) を比べる。止める向きだけ。ふつうのファイル（名前が 1 つ）には何も読まない。
     """
     try:
@@ -466,7 +509,7 @@ class _AliasRefused(yaml.YAMLError):
 
 
 class _Loader(yaml.SafeLoader):
-    """`yaml.safe_load` の読み手に、別名を拒む守りを足したもの。
+    """`yaml.safe_load` の読み手に、別名を拒む処理を足したもの。
 
     別名は同じ部分木を何度でも指せる。入れ子にすると、小さなファイルでも辿る量が指数で
     膨らむ（billion laughs）。自分を指す別名は循環する値になる。手順書に別名は要らないので、
@@ -520,7 +563,7 @@ def parse(raw: bytes) -> tuple[dict | None, str]:
     except UnicodeDecodeError as exc:
         return None, f"{NOT_UTF8}（{exc.start + 1} バイト目）"
     try:
-        # _Loader は SafeLoader に別名の守りを足したもの（任意の型は作らない）。
+        # _Loader は SafeLoader に別名を拒む処理を足したもの（任意の型は作らない）。
         data = yaml.load(text, Loader=_Loader)
     except _AliasRefused:
         return None, ALIASED
@@ -542,7 +585,7 @@ def parse(raw: bytes) -> tuple[dict | None, str]:
 
 NOT_UTF8 = "UTF-8 として読めない"
 
-# `as_json` の印の鍵。JSON にそのまま載らない値（下）をこの鍵を持つオブジェクトで表す。
+# `as_json` の目印の鍵。JSON にそのまま載らない値（下）をこの鍵を持つオブジェクトで表す。
 JSON_MARK = "$ccnavi"
 # JSON の数として拡張（JavaScript）が崩さずに読める整数の範囲
 _SAFE_INT = 2**53 - 1
@@ -552,9 +595,9 @@ def as_json(value):
     """読めた中身を JSON に載せる形にする（`--lint --json --flow` の `flow.data`）。
 
     VS Code 拡張のフロー編集画面は、自分の YAML の読み手（1.2）が読んだ中身とこれを見比べ、
-    食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ。ADR-0035）。
-    文字列・真偽値・null・並び・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
-    そのまま載せる。ほかは `{"$ccnavi": <種類>, ...}` の印にする。
+    食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ）。
+    文字列・真偽値・null・配列・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
+    そのまま載せる。ほかは `{"$ccnavi": <種類>, ...}` の目印にする。
 
     - 浮動小数は `{"$ccnavi": "float", "value": <数>}`
       （JSON では 1 と 1.0 の区別が消えるので包む）。
@@ -564,7 +607,7 @@ def as_json(value):
       `{"$ccnavi": "map", "items": [[キー, 値], ...]}`
     - 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs` の 1 件）・
       そのほかは
-      `{"$ccnavi": "date" | "datetime" | "bytes" | "set" | "tuple" | "other", "text": <綴り>}`
+      `{"$ccnavi": "date" | "datetime" | "bytes" | "set" | "tuple" | "other", "text": <文字列>}`
     """
     if value is None or isinstance(value, (bool, str)):
         return value
@@ -607,20 +650,20 @@ def shape_problem(data) -> str:
     """読めた中身の形の誤り（最初の 1 つ）。無ければ空。例外は外に出さない。
 
     SubagentStart の読み（`load`）と `--lint --flow` が同じここを通る。見るのは手順として
-    並べるのに要る形だけ。最上位がキーと値の並び、`nodes` がキーと値の並びの並びで、どれも空でない
-    文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、キーと値の並びの並び。
+    並べるのに要る形だけ。最上位がマッピング、`nodes` がマッピングのリストで、どれも空でない
+    文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、マッピングのリスト。
     `id` が無い・重なるノードは並べるときに落ちるので、気づかないうちに手順が欠けることのないよう、
     読まない扱いにする。
     """
     if not isinstance(data, dict):
-        return "最上位がキーと値の並びではない"
+        return "最上位がマッピングではない"
     nodes = data.get("nodes")
     if not isinstance(nodes, list):
-        return "`nodes` の並びが無い"
+        return "`nodes` のリストが無い"
     seen: set[str] = set()
     for index, node in enumerate(nodes):
         if not isinstance(node, dict):
-            return f"nodes[{index}] がキーと値の並びではない"
+            return f"nodes[{index}] がマッピングではない"
         node_id = node.get("id")
         if not isinstance(node_id, str) or not node_id:
             return f"nodes[{index}] に文字列の id が無い"
@@ -630,10 +673,10 @@ def shape_problem(data) -> str:
     if "connections" in data:
         connections = data.get("connections")
         if not isinstance(connections, list):
-            return "`connections` が並びではない"
+            return "`connections` がリストではない"
         for index, connection in enumerate(connections):
             if not isinstance(connection, dict):
-                return f"connections[{index}] がキーと値の並びではない"
+                return f"connections[{index}] がマッピングではない"
     return ""
 
 
@@ -903,9 +946,9 @@ def _flow_nodes(data) -> list[dict]:
 def name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
     """`subAgent` の種類（`builtInType`）と `skill` の名前（`name`）が候補に無いもの（1 件 1 行）。
 
-    綴りの誤りを見つけるため。空の欄は言わない（書きかけ）。スキルの `:` を含む名前
+    書き誤りを見つけるため。空の欄は言わない（書きかけ）。スキルの `:` を含む名前
     （プラグインのスキル）は、ディレクトリの中から確かめられないので言わない。大文字小文字だけが
-    違えば、正しい綴りをつける。例外は外に出さない。
+    違えば、正しい表記をつける。例外は外に出さない。
     """
     try:
         return _name_problems(data, cat)
@@ -935,7 +978,7 @@ def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
         hint = f"。大文字小文字が違う（{_line(near[0])}）" if near else ""
         out.append(
             f"ノード {_named(node)} の{what} {_line(value)} が候補に無い"
-            "（組み込みと .claude/ の下に無い。綴りの誤りかもしれない。"
+            "（組み込みと .claude/ の下に無い。書き誤りかもしれない。"
             f"ユーザ・プラグインのものなら気にしなくてよい）{hint}"
         )
     return out
@@ -945,7 +988,7 @@ def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
 
 
 def fingerprint(path: str, tree_root: str = "") -> str:
-    """フローのファイルの指紋。無ければ `absent`、読めれば `sha256:<16 進>`、読まないなら
+    """フローのファイルのダイジェスト。無ければ `absent`、読めれば `sha256:<16 進>`、読まないなら
     `unreadable:<理由>`。例外は外に出さない。読み方は `load` と同じ（`read_bytes`）。"""
     try:
         if not os.path.lexists(path):
@@ -959,18 +1002,21 @@ def fingerprint(path: str, tree_root: str = "") -> str:
 
 
 def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
-    """着手のときに控えた指紋の記録の置き場。フローと同じツリーの `phases/<親>/<子>.flow.json`。"""
-    # 形は `approval.child_record_path` と同じ。flow は approval より下の段なので読まず、形を写す
-    # （`test_flow_hardening` が突き合わせる）。
+    """着手のときに保存したハッシュの記録の置き場。
+
+    フローと同じツリーの `phases/<親>/<子>.flow.json`。
+    """
+    # 形は `approval.child_record_path` と同じ。flow は approval より下の段なので読まず、
+    # 形だけを同じにする（`test_flow_hardening` が突き合わせる）。
     approved = settings.approved_dir(conf, child.tree_root or root)
     return os.path.join(approved, PHASES_DIR, child.parent, f"{child.ticket}.{DIGEST_RECORD}.json")
 
 
 def record_digest(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str]:
-    """着手のときのフローの指紋を控える。(書いた記録のパス, 書けなかった理由)。
+    """着手のときのフローのハッシュを記録する。(書いた記録のパス, 書けなかった理由)。
 
     置き場は子の記録（`.risk.json` など）と同じ `phases/<親>/` で、承認済みの領域にあるので
-    エージェントは書けず、親のブランチに乗って他の機械へ届く。フローが無くても控える
+    エージェントは書けず、親のブランチに乗って他の機械へ届く。フローが無くても記録する
     （着手のあとに現れたことも知らせるため）。
     """
     path, base, _ = resolve(conf, root, child)
@@ -993,11 +1039,11 @@ def _describe(mark: str) -> str:
 
 
 def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
-    """着手中の子のフローが、着手のときに控えた指紋から変わっていれば、その知らせ。無ければ空。
+    """着手中の子のフローが、着手のときに記録したハッシュから変わっていれば、その知らせ。無ければ空。
 
-    知らせるだけで止めない（締める向き）。ロックと承認済みの領域の守りは Write / Edit と、
-    綴りの出るシェルの書き込みを止めるが、行き先を追えないシェルの書き込みは止まらない
-    （M-2）。控えが無い（この仕組みより前に着手した）子には何も言わない。例外は外に出さない。
+    知らせるだけで止めない（厳しくする向き）。ロックと承認済みの領域の保護は Write / Edit と、
+    パスの出るシェルの書き込みを止めるが、行き先を追えないシェルの書き込みは止まらない
+    （M-2）。記録が無い（この仕組みより前に着手した）子には何も言わない。例外は外に出さない。
     """
     try:
         if not (child.is_child and child.in_progress):
@@ -1035,11 +1081,11 @@ def clean(text) -> str:
 
 
 def _text(value) -> str:
-    """文字列か数だけを文にする。並びや辞書は中身を辿らない（深い入れ子で落ちない）。"""
+    """文字列か数だけを文にする。リストや辞書は中身を辿らない（深い入れ子で落ちない）。"""
     if isinstance(value, bool):
         return ""
     if isinstance(value, float) and value.is_integer() and abs(value) < 1e21:
-        # 整数の値の小数（`1.0`）は整数の綴りにする。ボード（JavaScript の `String`）と揃える。
+        # 整数の値の小数（`1.0`）は整数の表記にする。ボード（JavaScript の `String`）と揃える。
         return str(int(value))
     if isinstance(value, (str, int, float)):
         return str(value)
@@ -1047,7 +1093,7 @@ def _text(value) -> str:
 
 
 def _line(value) -> str:
-    """1 行にまとめて切る。ccnavi の名乗りは真似させない。"""
+    """1 行にまとめて切る。ccnavi の接頭辞は真似させない。"""
     if isinstance(value, Exception):
         value = str(value)
     text = value if isinstance(value, str) else _text(value)
@@ -1062,7 +1108,7 @@ _IGNORED = ("Mn", "Mc", "Me", "Cf", "Cc", "Zs")
 
 
 def _skeleton(text: str) -> tuple[str, list[int]]:
-    """見た目で比べるための綴りと、その 1 字ずつの元の位置。
+    """見た目で比べるための表記と、その 1 字ずつの元の位置。
 
     互換分解（NFKD。全角の `［` は `[`、`ⅽ` は `c`）し、結合文字・書式の制御・制御文字・
     空白を落とし、似た形の字（`_CONFUSABLE`）をラテン文字に置き換え、大文字小文字をそろえる。
@@ -1084,7 +1130,7 @@ def _neutral(text: str) -> str:
 
     - `[` / `［`（互換文字も）の直後が `ccnavi` で始まる括弧は、開きと、その先の最初の閉じ
       （`]` / `］`）を `〔` `〕` に置き換える。`[ccnavi dry-run]`・`[CCNAVI]`・幅の無い字や
-      結合文字を挟んだもの・キリル文字の `с` で綴ったものも同じ
+      結合文字を挟んだもの・キリル文字の `с` で書いたものも同じ
     - 案内の区切りの行の文（`_FENCE_PHRASES`）は `_FENCE_SHOWN` に置き換える
     """
     skeleton, origin = _skeleton(text)
@@ -1114,7 +1160,7 @@ def _neutral(text: str) -> str:
 
 
 def impersonates(text: str) -> bool:
-    """文に ccnavi の名乗りか案内の区切りに見える箇所が残っているか。テストと確かめ用。"""
+    """文に ccnavi の接頭辞か案内の区切りに見える箇所が残っているか。テストと確かめ用。"""
     skeleton, _ = _skeleton(text)
     if any(_skeleton(p)[0] in skeleton for p in _FENCE_PHRASES):
         return True
@@ -1130,7 +1176,7 @@ def _list(value) -> list:
 
 
 def _capped(parts: list[str], total: int) -> list[str]:
-    """並びを ITEM_LIMIT で切り、残りの数をつける。"""
+    """リストを ITEM_LIMIT で切り、残りの数をつける。"""
     if total > len(parts):
         return parts + [f"…ほか {total - len(parts)} 件"]
     return parts
@@ -1183,7 +1229,7 @@ def _summary(node: dict, flows: dict) -> str:
 
 
 def _branch_index(port: str) -> int | None:
-    """`branch-<番号>` の番号。番号は ASCII の数字だけ。違う綴りなら None。"""
+    """`branch-<番号>` の番号。番号は ASCII の数字だけ。違う表記なら None。"""
     head, _, digits = port.rpartition("-")
     if head != "branch" or not digits or not (digits.isascii() and digits.isdigit()):
         return None
@@ -1193,7 +1239,7 @@ def _branch_index(port: str) -> int | None:
 
 
 def _port_key(connection: dict) -> tuple:
-    """出口の並べ順。`branch-<番号>` は番号の順、それ以外は綴りの順で後ろ。"""
+    """出口の並べ順。`branch-<番号>` は番号の順、それ以外は文字列の順で後ろ。"""
     port = _text(connection.get("fromPort"))
     index = _branch_index(port)
     return (0, index, "") if index is not None else (1, 0, port)
@@ -1300,7 +1346,7 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
         nexts = _capped(nexts, len(edges))
         if nexts:
             text += " → " + ", ".join(nexts)
-        # 組み立てた行でも見る。種類の名前が `ccnavi…` だと、こちらの `[<種類>]` が名乗りになる。
+        # 組み立てた行でも見る。種類の名前が `ccnavi…` だと、こちらの `[<種類>]` が接頭辞になる。
         text = _neutral(text)
         if used + len(text) > text_limit and lines:
             break

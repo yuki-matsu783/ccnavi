@@ -19,7 +19,7 @@ export const VERSION_SCHEMA = 1;
  * 拡張が頼る実行ファイルの契約の版。ccnavi/entry/version.py の COMPAT、ccnavi-common.sh の CCNAVI_COMPAT と揃える
  * （tests/sh/test_compat_skew.py が 3 か所を見比べる）。上げ方は ccnavi/entry/version.py の説明のとおり
  */
-export const EXTENSION_COMPAT = 4;
+export const EXTENSION_COMPAT = 5;
 
 export interface VersionInfo {
   readonly schema: number;
@@ -86,7 +86,7 @@ export function rebuildHint(fromSource: boolean): string {
 export const UPDATE_EXTENSION_HINT =
   "拡張を新しくしてください（ccnavi のリポジトリの vscode-extension/ccnavi-board で pnpm package して入れ直す）";
 
-/** 名乗りに使う実行ファイルの版とコミット（`0.1.0 abc1234`） */
+/** 表示に使う実行ファイルの版とコミット（`0.1.0 abc1234`） */
 function named(info: VersionInfo): string {
   const commit = info.commit === "unknown" ? "コミット不明" : info.commit.slice(0, 12);
   return `${info.version} ${commit}`;

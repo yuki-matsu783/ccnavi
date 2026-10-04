@@ -7,7 +7,7 @@
 3. ルールが置いた確認と権限モードへの委譲が区別して返ること
 4. ルールがチケットより強いこと
 
-3 つ目が要る理由は ADR-0009 にある。権限モードへの委譲は設定の穴に起因するので、
+3 つ目が要る理由は次のとおり。権限モードへの委譲は設定の穴に起因するので、
 穴が直るまで同じ問いが繰り返される。ルールが置いた確認はユーザが意図して置いた
 確認ポイントで、繰り返されること自体に価値がある。混ぜると前者の数に
 後者が埋もれる。
@@ -45,12 +45,12 @@ class SectionsTest(unittest.TestCase):
         """タイプを渡してルールファイルを 1 本置く。
 
         書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
-        読み手がそのまま受け取る。タイプの強さを見たいテストで、YAML の綴りの
+        読み手がそのまま受け取る。タイプの強さを見たいテストで、YAML の表記の
         話に付き合わずに済む。
         """
         body = {"version": 1, **sections}
         # 置くのは共通層の既定の場所。`--rules` は診断でだけ有効で、hook の判定には
-        # 届かない（ADR-0067）。
+        # 届かない。
         return write(common_path(self.root, "rules"), json.dumps(body))
 
     def judge(self, tool: str, subject: str) -> dict:
@@ -99,7 +99,8 @@ class SectionsTest(unittest.TestCase):
         self.assertIn("UNDECLARED", out["permissionDecisionReason"])
 
     def test_未言及の文は危険の表明ではないと言う(self):
-        # ADR-0009。危険だと書くと、受け取った側は存在しない危険を探しに行く。
+        # ccnavi は判定を持たないからユーザに聞く。
+        # 危険だと書くと、受け取った側は存在しない危険を探しに行く。
         self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         reason = self.judge("Bash", "ls -la")["permissionDecisionReason"]

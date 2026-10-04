@@ -1,9 +1,9 @@
-"""issue・MR に紐づくブランチを探す仕組みの受入テスト（ADR-0101）。
+"""issue・MR に紐づくブランチを探す仕組みの受入テスト。
 
 見るのは 2 つ。
 
 1. UserPromptSubmit: 依頼文に issue・MR の指定があれば、`ccnavi-branches.sh` を打って候補をユーザに
-   確かめる指示が `additionalContext` に載る。綴りはワークスペースルートの絶対パスから書く。
+   確かめる指示が `additionalContext` に載る。表記はワークスペースルートの絶対パスから書く。
    指定が無い・外れ・チケット制御が disable のときは載らない。判定（止める・聞く）は返さない
 2. 副命令 `ccnavi branches <issue|mr> <番号> --result <json>`: 手元の候補（名前に番号を含む
    ブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh が書いたホストの結果と合わせて出す。
@@ -115,7 +115,7 @@ class BranchesCommandTest(PhaseHarness):
         self.assertIn("候補 4 件", text)
 
     def test_tickets_with_the_issue_and_the_unapproved_branch_field(self):
-        # 承認前の提案の branch: は使わない（ADR-0100 の 5.2）。候補は識別子のブランチ
+        # 承認前の提案の branch: は使わない。候補は識別子のブランチ
         self.propose(
             "feature-152-login",
             with_branch(parent_text("feature-152-login", ["research"], issue=152), "topic/x"),

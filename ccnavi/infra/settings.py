@@ -1,13 +1,13 @@
 """ccnavi の設定を解決する。
 
-設定は環境変数で運ぶ。プロジェクトはそれを Claude Code の設定ファイルの env
+設定は環境変数で渡す。プロジェクトはそれを Claude Code の設定ファイルの env
 ブロックに書く。エージェント側の設定スキーマが独自キーを拒むため、そこが独自の値を書ける
 唯一の場所になる。
 
 値はプロセスの環境から読み、設定ファイルからは読まない。この違いに意味がある。
 hook が受け取る環境はセッション開始時に固定されるので、あとから設定ファイルを
 直してもセッションを開き直すまで反映されない。その古さは不便だが、同時に、
-エージェントが自分を見張るものを緩めるのを防いでいる唯一の仕組みでもある。
+エージェントが自分を監視するものを緩めるのを防いでいる唯一の仕組みでもある。
 設定ファイルは作業ツリーの中にあってエージェントが書けるので、そこから読んだ
 値は次のツール呼び出しから反映されてしまう。
 
@@ -28,12 +28,12 @@ from typing import NamedTuple
 #
 # 共通層の 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
 # `.ccnavi/common/` に固定で、env では動かない。3 層のうち共通層だけが別の決まり方を
-# していた非対称を無くしたもの（ADR-0052）。診断のためにここを動かすには `--rules` /
+# していた非対称を無くしたもの。診断のためにここを動かすには `--rules` /
 # `--phases` / `--risk` のフラグを使う。hook は引数を渡さずに起動するので、
 # 判定の入口は固定される。
 MODE_ENV = "CCNAVI_MODE"
 LOG_ENV = "CCNAVI_LOG"
-# STATE_ENV はセッションごとの控えの置き場。
+# STATE_ENV はstate の置き場（セッションごとの記録）。
 STATE_ENV = "CCNAVI_STATE"
 # 戻す働きは 2 つあり、守る対象の決まり方が違うので環境変数も分けてある。
 #
@@ -63,14 +63,14 @@ GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # 「誰も見ないまま通った」になる。disable なら判定を返さず、そのモードの
 # 取り決めに委ねる。ccnavi はルールに書かれたものだけを止める道具になる。
 #
-# この門に dry-run は無い。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
+# この切り替えの環境変数に dry-run は無い。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
 GUARD_UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
-# 守ることになる。hook の登録に書いた綴りをそのまま渡してもらう。
+# 守ることになる。hook の登録に書いたパスをそのまま渡してもらう。
 BIN_ENV = "CCNAVI_BIN_PATH"
-# BIN_SUFFIXES は、書かれた綴りに無いときだけ継ぎ足して探す拡張子。
+# BIN_SUFFIXES は、書かれたパスに無いときだけ継ぎ足して探す拡張子。
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
 # TICKET_CONTROL_ENV は、チケット制御を使うか。enable（既定）/ disable の 2 値。
@@ -97,24 +97,25 @@ PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # つけるか（repeat）。既定は 3。判定は変わらず、文面とユーザへの報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
-# INTEGRATION_ENV は統合先の名前（ADR-0093 の D30）。`done/` と層と置き場の綴りを読むブランチで、
-# 親のブランチはここから切る。**ccnavi はこの環境変数を読まない。** 読むのは sh
-# （`ccnavi-sync.sh`）で、sh が環境変数か `.claude/settings.local.json` の `env` から決め、
-# 要る所へ `--integration-branch` で渡す。settings.local.json の `env` は Claude Code が
-# 起こしたプロセスにしか渡らないので、ユーザが端末で打つ sh のために、その値だけを
-# `sync paths` が読んで返す（integration_local）。
+# INTEGRATION_ENV は統合先の名前。リポジトリには置かず、未設定ならホストのデフォルトブランチ。
+# `done/` と層と置き場のパスを読むブランチで、親のブランチはここから切る。
+# **ccnavi はこの環境変数を読まない。** 読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
+# `.claude/settings.local.json` の `env` から決め、要る所へ `--integration-branch` で渡す。
+# settings.local.json の `env` は Claude Code が起こしたプロセスにしか渡らないので、ユーザが端末で
+# 打つ sh のために、その値だけを `sync paths` が読んで返す（integration_local）。
 INTEGRATION_ENV = "CCNAVI_INTEGRATION_BRANCH"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
 LOCAL_CLAUDE_SETTINGS = os.path.join(".claude", "settings.local.json")
 # 共有の設定。`env` に書いた値は、Claude Code が起こしたプロセスに渡る。
 SHARED_CLAUDE_SETTINGS = os.path.join(".claude", "settings.json")
-# BRANCH_PREFIXES_ENV は親の識別子の先頭の語の並び（ADR-0100）。カンマか空白で区切る
+# BRANCH_PREFIXES_ENV は親の識別子の先頭の語のリスト。カンマか空白で区切る
 # （`feature,hotfix,fix`）。無ければ DEFAULT_BRANCH_PREFIXES。ユーザがファイルを書かなくても
-# 既定の並びで足り、並びを変えたい人だけが settings.json（か settings.local.json）の `env` に書く。
+# 既定のリストで足り、リストを変えたい人だけが settings.json（か settings.local.json）の
+# `env` に書く。
 BRANCH_PREFIXES_ENV = "CCNAVI_BRANCH_PREFIXES"
 # 既定の先頭の語。`release` は統合先や保護されたブランチの名前（`release-*`）に当たるので入れない。
 DEFAULT_BRANCH_PREFIXES = ("feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs")
-# 先頭の語に使えない名前（`ticket.RESERVED_BRANCH_IDS` と同じ並び）。
+# 先頭の語に使えない名前（`ticket.RESERVED_BRANCH_IDS` と同じリスト）。
 _RESERVED_PREFIXES = ("main", "master", "develop", "release")
 _PREFIX = re.compile(r"^[a-z][a-z0-9]*\Z")
 
@@ -129,16 +130,16 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # 既定の置き場。ワークスペースルートからの相対。
 #
 # ユーザが持つ設定（共通層の 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、
-# 実行のたびに書かれる記録と控えは `logs/` に置く（ADR-0042）。
+# 実行のたびに書かれる記録と state は `logs/` に置く。
 # `.claude/` には Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを残す。
 #
 # 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
-# ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
+# ccnavi ディレクトリの名前は各層のパスで、共通層はこの既定に固定されている。
 # 診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、
-# hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
+# hook は引数を渡さずに起動するから、判定の入口はここから動かない。
 DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
-# 控えはセッションごとの一時的な状態なので、記録とは分けてまとめておく。
+# state はセッションごとの一時的な状態なので、記録とは分けてまとめておく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join("logs", "state")
 # 提案は各作業ツリーの `wip/proposals/` に置く。ユーザが読み、ユーザが承認するものなので、
@@ -147,10 +148,10 @@ DEFAULT_STATE = os.path.join("logs", "state")
 DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
-# 承認をプロジェクトの git で運ぶため。承認したユーザの機械にだけ在る形だと、A が承認して
+# 承認をプロジェクトの git で共有するため。承認したユーザの機械にだけ在る形だと、A が承認して
 # B の機械で作業する流れが成り立たない（設計 9.2）。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
-# 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ（ADR-0055）。
+# 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ。
 DEFAULT_APPROVED = ".ccnavi/approved"
 # フェーズの種類はユーザが持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
@@ -167,17 +168,17 @@ DEFAULT_PROJECTS = "projects"
 # ディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため
 # （設計 11.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
-# 引用せずにシェルへ渡せる綴り。空白とシェルの記号を含まない。
+# 引用せずにシェルへ渡せるパス。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
 # 二重引用符の中でも意味を持つ文字。
 _SPECIAL_IN_DOUBLE_QUOTES = re.compile(r'["\\$`!]')
 
 
 def script_command(root: str, name: str) -> str:
-    """文面で案内する `.ccnavi/scripts/` の sh の綴り。ワークスペースルートから書く。
+    """文面で案内する `.ccnavi/scripts/` の sh のパス。ワークスペースルートから書く。
 
     スクリプトはワークスペースにしか無く、プロジェクトから切ったワークツリーでは相対の
-    `sh .ccnavi/scripts/...` が届かない。綴りはルールの `{root}`（rules.root_glob）と揃え、
+    `sh .ccnavi/scripts/...` が届かない。パスはルールの `{root}`（rules.root_glob）と揃え、
     区切りは `/` にそろえる（Git Bash は `C:/...` を読める）。
 
     空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に分け、止めている間の例外と
@@ -190,7 +191,7 @@ def script_command(root: str, name: str) -> str:
 
 
 def _quoted(path: str) -> str:
-    """文面に置くパスの綴り。引用が要るときだけ引用する（引用の決め方は script_command）。"""
+    """文面に置くパスの表記。引用が要るときだけ引用する（引用の決め方は script_command）。"""
     if _BARE_PATH.fullmatch(path):
         return path
     if not _SPECIAL_IN_DOUBLE_QUOTES.search(path):
@@ -199,46 +200,46 @@ def _quoted(path: str) -> str:
 
 
 def bin_command(bin_path: str) -> str:
-    """文面で案内する ccnavi 自身の綴り。設定（CCNAVI_BIN_PATH）が指すものを打てる形にする。
+    """文面で案内する ccnavi 自身のパス。設定（CCNAVI_BIN_PATH）が指すものを打てる形にする。
 
-    案内した綴りをそのまま打てないと、案内は「そういうものが在るらしい」で終わる。
-    hook が起動しているのと同じ綴りを案内するのが、いちばん確かめようがある。
+    案内したパスをそのまま打てないと、案内は「そういうものが在るらしい」で終わる。
+    hook が起動しているのと同じパスを案内するのが、いちばん確かめようがある。
 
     設定が無ければ `ccnavi`。PATH に置いたユーザはそれで打てるし、置いていないユーザには
-    綴りを尋ねる手掛かりになる。`.sh` は `sh` を頭に付ける（起動役はシェルの
+    パスを尋ねる手掛かりになる。`.sh` は `sh` を頭に付ける（起動役はシェルの
     スクリプト。ccnavi-launcher.sh がこれにあたる）。
     """
     if not bin_path:
         return "ccnavi"
     path = bin_path.replace("\\", "/")
-    # 綴りの大小は区別しない。Windows と macOS の既定のファイルシステムでは `LAUNCHER.SH` も
-    # 同じシェルのスクリプトで、区別すると `sh` の付かない打てない綴りを案内することになる。
+    # 名前の大小は区別しない。Windows と macOS の既定のファイルシステムでは `LAUNCHER.SH` も
+    # 同じシェルのスクリプトで、区別すると `sh` の付かない打てないパスを案内することになる。
     return f"sh {_quoted(path)}" if path.lower().endswith(".sh") else _quoted(path)
 
 
-# ccnavi ディレクトリの下の固定の綴り。層はこの形でしか置けない。
+# ccnavi ディレクトリの下の固定のパス。層はこの形でしか置けない。
 LAYER_CONFIG_DIR = "config"
 # 層が持てる設定。3 本は独立に無くてよい。
 KIND_RULES = "rules"
 KIND_PHASES = "phases"
 KIND_RISK = "risk"
 LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
-# 層の設定のファイル名。kind は記録と `--explain --json` の鍵の綴りなので、ファイル名とは別に持つ。
+# 層の設定のファイル名。kind は記録と `--explain --json` の鍵の表記なので、ファイル名とは別に持つ。
 LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
-# 層の名前。記録の `source` と id の前置きに使う綴り（設計 11.4）。ruleload が
+# 層の名前。記録の `source` と id の前置きに使う表記（設計 11.4）。ruleload が
 # 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
 LAYER_SELF = "self"
-# 層の名札に予約してある綴り。プロジェクトはこの名前を使えない。
+# 層の名札に予約してある表記。プロジェクトはこの名前を使えない。
 RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
-# 予約名のプロジェクトの控えの key につける前置き。名札の側（`rules:self`）と
+# 予約名のプロジェクトのバックアップの key につける前置き。名札の側（`rules:self`）と
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
 
-# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 11.4）。
+# 層の種別。その層がどこから来たかを、名札の表記とは別に持つ（設計 11.4）。
 #
-# 名札の綴りでは種別を決められない。`projects/common/` の名札は `common` だが
+# 名札の表記では種別を決められない。`projects/common/` の名札は `common` だが
 # 共通層ではないし、`projects/self/` の名札は `self` だがワークスペース自身の層
 # ではない。`layer == LAYER_COMMON` のような文字列比較で種別を決めると、
 # プロジェクトが名前を 1 つ選ぶだけで、共通層と同じ扱いを受けられてしまう。
@@ -251,7 +252,7 @@ class LayerFile(NamedTuple):
     """層 1 つの設定ファイル。守る対象（selfguard）へ渡す形（`ruleload.layer_files`）。
 
     `origin` は層の種別（ORIGIN_*）、`layer` は名札（`common` / `self` /
-    プロジェクトの名前）、`kind` は rules / phases / risk、`path` はその綴り。
+    プロジェクトの名前）、`kind` は rules / phases / risk、`path` はそのパス。
     種別をつけるのは、受け取る側が名札の文字列比較をしなくて済むようにするため。
     """
 
@@ -262,16 +263,16 @@ class LayerFile(NamedTuple):
 
 
 def is_reserved_layer_name(name: str) -> bool:
-    """その名前が層の名札に予約してあるか（`common` / `self`、設計 11.4）。
+    """その名前が層の名前に予約してあるか（`common` / `self`、設計 11.4）。
 
     予約の判断はここ 1 か所だけで持つ。ruleload（層を数える・行き先の層を引く）、
     lint（名指しする）、approval（`project:` を承認しない）、phase / risk
     （層の phases / risk を足さない）が同じ答えを引く。片側でしか予約を
     見ていないと、数えない層の名前で別の層の判定を引ける。
 
-    綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
+    名前の大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
     `Self:schema` になり、記録を読むユーザが `self:schema`（ワークスペース自身の層）と
-    取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも
+    取り違える。機械が表記を区別するかどうかとは別の話なので、どの機械でも
     大文字小文字を区別せずに扱う。`--lint` が error で名指しする（lint._projects）。
     """
     folded = (name or "").casefold()
@@ -281,14 +282,15 @@ def is_reserved_layer_name(name: str) -> bool:
 def approved_dir(conf: Settings, tree_root: str) -> str:
     """このツリーの承認済みチケットの置き場（絶対）。
 
-    写しとマーカーはそのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く
-    （設計 9.2）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
+    承認済みチケットとマーカーはそのツリーの git が追跡し、
+    親チケットのブランチに乗って他の機械へ届く（設計 9.2）。
+    だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
     """
     return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
 
 
 def layer_script_home(conf: Settings) -> str:
-    """各層の `script:` に書ける唯一の綴り（設計 11.4.2）。
+    """各層の `script:` に書ける唯一のパス（設計 11.4.2）。
 
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
 
@@ -319,7 +321,7 @@ class Settings:
     log: str = ""
     rules: str = ""
     state: str = ""
-    # 同じ理由の拒否を何回目から名指しするか。書かれたままの綴りで、読むのは repeat.threshold。
+    # 同じ理由の拒否を何回目から名指しするか。書かれたままの値で、読むのは repeat.threshold。
     deny_repeat: str = ""
     # 戻す働きの 2 つ。どちらも mode と同じ enable / dry-run / disable を取る。
     #
@@ -329,16 +331,16 @@ class Settings:
     # 戻さない既定は「宣言したのに守られない」を既定にすることでもあるので、
     # 既定は enable にしてある。切りたいプロジェクトは明示して切る。
     #
-    # guard_core_files は、ccnavi 自身の設定ファイルを控えから戻すかどうか。
+    # guard_core_files は、ccnavi 自身の設定ファイルをバックアップから戻すかどうか。
     # 対象は組み込みで固定なので、広がりようがない。
     restore_if_deny: str = ""
     guard_core_files: str = ""
     # guard_ticket_approval はチケットの承認の経路（承認・レビュー済みの受け入れ・
     # 状態の移動）をエージェントの手から守るか。enable / disable の 2 つだけを取る。
     #
-    # guard_ticket_approval_declared は、解決する前にユーザが書いた綴り。判定はこれを
+    # guard_ticket_approval_declared は、解決する前にユーザが書いた値。判定はこれを
     # 読まない。読むのは --lint で、dry-run のように「書けるつもりで書かれたが
-    # この門には無い値」を名指しするために要る。解決した値だけを持っていると、
+    # この切り替えの環境変数には無い値」を名指しするために要る。解決した値だけを持っていると、
     # 書いたユーザの思い違いが enable として扱われた時点で消える。
     guard_ticket_approval: str = ""
     guard_ticket_approval_declared: str = ""
@@ -349,19 +351,19 @@ class Settings:
     guard_unwatched: str = ""
 
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
-    # 対象に入るのは、綴りを推測して守ると、そこに在る別のファイルを
+    # 対象に入るのは、パスを推測して守ると、そこに在る別のファイルを
     # 「ccnavi の実体」として扱うことになるため。
     bin: str = ""
 
     # ticket_control はチケット制御を使うか。enable / disable の 2 つだけを取る。
     # 解決は cli が selfguard.resolve で行い、読めない値は enable として扱う。
-    # ticket_control_declared は解決する前にユーザが書いた綴りで、--lint がそれを名指しする。
+    # ticket_control_declared は解決する前にユーザが書いた値で、--lint がそれを名指しする。
     ticket_control: str = ""
     ticket_control_declared: str = ""
 
     # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
     # approved は承認済みチケットの置き場（各ツリーのルートからの相対、"/" 区切り）。
-    # 絶対で 1 か所を指さないのは、そのツリーの git に乗って運ばれるから。判定が読むのは
+    # 絶対で 1 か所を指さないのは、そのツリーの git に乗って他の PC に届くから。判定が読むのは
     # approved だけ。
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
     tickets: str = ""
@@ -385,12 +387,12 @@ class Settings:
     # 共通層の種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
     # 編集中の層の種類を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
-    # branch_prefixes は親の識別子の先頭の語の並び（ADR-0100。`branch_prefixes`）。
+    # branch_prefixes は親の識別子の先頭の語のリスト（`branch_prefixes`）。
     # branch_prefixes_rejected は環境変数に書かれていたが使えない語（lint が warn で名指しする）。
     branch_prefixes: tuple = DEFAULT_BRANCH_PREFIXES
     branch_prefixes_rejected: tuple = ()
-    # integration_branch は統合先の名前（ADR-0093 の D30）。環境変数からは読まず、
-    # `--integration-branch` で渡されたときだけ入る。いまは識別子の予約（3.1 の 5）の検査が読む。
+    # integration_branch は統合先の名前。環境変数からは読まず、`--integration-branch` で
+    # 渡されたときだけ入る。いまは識別子の予約（統合先と同じ名前を使わせない）の検査が読む。
     integration_branch: str = ""
 
     @property
@@ -404,7 +406,7 @@ class Settings:
         return self.ticket_control != TICKET_CONTROL_DISABLE
 
 
-# ticket_control の値。modes / selfguard と同じ綴りだが、settings は両方より下に
+# ticket_control の値。modes / selfguard と同じ表記だが、settings は両方より下に
 # あるので、ここに持つ。
 TICKET_CONTROL_ENABLE = "enable"
 TICKET_CONTROL_DISABLE = "disable"
@@ -440,13 +442,13 @@ def load(root: str) -> tuple[Settings, list[str]]:
         project_home=DEFAULT_PROJECT_HOME,
     )
     # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
-    # 空文字を受ける欄は、「記録しない」「控えを持たない」「プロジェクトを数えない」を
+    # 空文字を受ける欄は、「記録しない」「state の置き場を持たない」「プロジェクトを数えない」を
     # 言えるようにしてある。承認済みチケットの置き場は空文字を受けない。チケット制御を切るのは
     # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
     #
     # 共通層の 3 本（rules / phases / risk）はこの表に無い。env でも上書き設定ファイルでも
     # 動かず、既定の `.ccnavi/common/` のまま。動かせるのはフラグだけで、そちらは
-    # cli._override が重ねる（ADR-0052）。
+    # cli._override が重ねる。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
         ("project_home", PROJECT_HOME_ENV, _relative, False),
@@ -479,7 +481,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     for name in ("restore_if_deny", "guard_core_files", "guard_ticket_approval", "ticket_control"):
         if isinstance(conf.get(name), str):
             setattr(settings, name, conf[name])
-    # 書かれた綴りをそのまま控える。上書き設定ファイルは ccnavi 自身を開発している
+    # 書かれた値をそのまま残す。上書き設定ファイルは ccnavi 自身を開発している
     # ときだけ読むものだが、そこに dry-run と書いたユーザにも --lint から同じことを言う。
     for name in ("guard_ticket_approval", "ticket_control"):
         if isinstance(conf.get(name), str):
@@ -523,7 +525,7 @@ def _layer_name(home_root: str) -> str:
 
 
 def _relative(root: str, path: str) -> str:
-    """提案の置き場の綴りを、作業ツリーのルートからの相対に揃える。
+    """提案の置き場のパスを、作業ツリーのルートからの相対に揃える。
 
     絶対パスは受けない。作業ツリーごとに違うルートに継ぎ足すものなので、
     絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが
@@ -586,22 +588,22 @@ def _resolve(root: str, path: str) -> str:
 
 
 def _resolve_bin(root: str, path: str) -> str:
-    """実行ファイルの綴りを、この環境に在る形へ直す。
+    """実行ファイルのパスを、この環境に在る形へ直す。
 
     書かれたとおりに在れば、それを使う。`.exe` まで書いてある設定が Windows で
     そのまま通るのはこの経路になる。無いときだけ、付くかもしれない拡張子を
     継ぎ足して探す。hook の登録に書いた `dist/ccnavi/ccnavi` の 1 行が、
     Windows では `ccnavi.exe` に、Linux ではそのまま当たる。PyInstaller が
     Windows でだけ `.exe` を付けるので、3 つの環境で同じ 1 行を使うと、
-    設定の綴りとファイルの綴りがここで食い違う。
+    設定のパスとファイルのパスがここで食い違う。
 
     プラットフォームで分けない。WSL から Windows 側の置き場を指す形があり、
-    そこでも守れるほうがよい。継ぎ足した綴りは在るものだけを採るので、
+    そこでも守れるほうがよい。継ぎ足したパスは在るものだけを採るので、
     推測で別のファイルを実体として扱うことにはならない。
 
-    どちらも無ければ書かれたまま返す。ここで空にすると、綴りを間違えた設定が
+    どちらも無ければ書かれたまま返す。ここで空にすると、パスを間違えた設定が
     「実行ファイルを守らない設定」と見分けられなくなる。無いことは selfguard が
-    missing と言い、綴りを確かめるよう促す。
+    missing と言い、パスを確かめるよう促す。
     """
     full = _resolve(root, path)
     if os.path.exists(full):
@@ -613,10 +615,10 @@ def _resolve_bin(root: str, path: str) -> str:
 
 
 def integration_local(root: str) -> str:
-    """`.claude/settings.local.json` の `env` に書かれた統合先の名前（ADR-0093 の D30）。
+    """`.claude/settings.local.json` の `env` に書かれた統合先の名前。
 
     環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。ユーザが端末で打つ sh には
-    settings.local.json の `env` が渡らないので、JSON を読む役（D33）をここが持つ。
+    settings.local.json の `env` が渡らないので、JSON を読む役をここが持つ（sh は jq を使わない）。
     ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先に落ちる）。
     """
     try:
@@ -628,16 +630,17 @@ def integration_local(root: str) -> str:
     value = env.get(INTEGRATION_ENV) if isinstance(env, dict) else None
     if not isinstance(value, str):
         return ""
-    # 1 行で返す契約（D33）。改行を含む値は使えないので空に落とす。
+    # 1 行で返す契約（sh は jq を使わず 1 行 1 項目で読む）。改行を含む値は使えないので空に落とす。
     return "" if ("\n" in value or "\r" in value) else value.strip()
 
 
 def integration_recorded(state: str) -> str:
-    """`ccnavi-sync.sh` が統合先の控えに書いた統合先の名前（ADR-0093 の D30。段階 2b のレビュー）。
+    """`ccnavi-sync.sh` が統合先の取り込み結果に書いた統合先の名前。
 
-    `<控えの置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目。D33）。控えが無い・
-    読めない・途中にシンボリックリンクがあるときは空（既定の予約だけになる）。環境変数は読まない。
-    控えの中のリンクは辿らない（写すときに落としてあり、読む側でも辿らない決まり）。
+    `<state の置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目）。
+    取り込み結果が無い・読めない・途中にシンボリックリンクがあるときは空（既定の予約だけになる）。
+    環境変数は読まない。取り込み結果の中のリンクは辿らない（コピーするときに落としてあり、
+    読む側でも辿らない決まり）。
     """
     if not state:
         return ""
@@ -663,7 +666,7 @@ def is_branch_prefix(word: str) -> bool:
 
 
 def parse_branch_prefixes(text: str) -> tuple[tuple, tuple]:
-    """先頭の語の並びを読む。答えは（使う並び, 使えない語）。使える語が無ければ既定の並び。"""
+    """先頭の語のリストを読む。答えは（使うリスト, 使えない語）。使える語が無ければ既定のリスト。"""
     words: list[str] = []
     rejected: list[str] = []
     for word in re.split(r"[\s,]+", text or ""):
@@ -678,11 +681,11 @@ def parse_branch_prefixes(text: str) -> tuple[tuple, tuple]:
 
 
 def branch_prefixes(root: str) -> tuple[tuple, tuple]:
-    """親の識別子の先頭の語の並び（ADR-0100）。答えは（使う並び, 使えない語）。
+    """親の識別子の先頭の語のリスト。答えは（使うリスト, 使えない語）。
 
     環境変数 `CCNAVI_BRANCH_PREFIXES` を先に見る（Claude Code が settings.json の `env` を渡す）。
     無ければ、ユーザが端末で打つときのために `.claude/settings.local.json`、`.claude/settings.json`
-    の `env` の順に読む。どこにも無ければ既定の並び。
+    の `env` の順に読む。どこにも無ければ既定のリスト。
     """
     if BRANCH_PREFIXES_ENV in os.environ:
         return parse_branch_prefixes(os.environ[BRANCH_PREFIXES_ENV])

@@ -2,11 +2,11 @@
  * 設定画面で入れるもの（`chrome.storage.local` の `repos`）。PAT はここに持たない（別の鍵で
  * service worker だけが読む）。
  *
- * - 統合先の名前（D30）: リポジトリごと。空ならホストのデフォルトブランチ
- * - 直近 N 日（表示用。D2）: 既定 3 日。ここに入ったブランチは提案を見つけるのに使うだけで、
+ * - 統合先の名前: リポジトリごと。空ならホストのデフォルトブランチ
+ * - 直近 N 日（表示用）: 既定 7 日。ここに入ったブランチは提案を見つけるのに使うだけで、
  *   判定の入力（統合先・`P`・閉包の `P_X`）は変えない
- * - ユーザが指定したブランチ（表示用。D2）
- * - プロジェクト名（段階 5。3.3 の 7・10.3 の 1）: このリポジトリが手元で `projects/<名前>` に clone される
+ * - ユーザが指定したブランチ（表示用）
+ * - プロジェクト名: このリポジトリが手元で `projects/<名前>` に clone される
  *   プロジェクトなら、その名前。空ならワークスペース自身。プロジェクトのリポジトリは、判定に要るワークスペースの
  *   統合先（共通層・設定・互換のマーカー）を読むために、登録したワークスペースのリポジトリ（`workspace`）を名指しする
  */
@@ -22,17 +22,26 @@ export interface RepoConfig {
   readonly integration: string;
   readonly recentDays: number;
   readonly extraBranches: readonly string[];
-  /** プロジェクト名（`projects/<名前>` の名前）。空ならワークスペース自身（段階 5） */
+  /** プロジェクト名（`projects/<名前>` の名前）。空ならワークスペース自身 */
   readonly project: string;
   /** プロジェクトのリポジトリのワークスペース（`repoKey` の形）。ワークスペース自身なら空 */
   readonly workspace: string;
 }
 
-export const DEFAULT_RECENT_DAYS = 3;
+export const DEFAULT_RECENT_DAYS = 7;
 export const MAX_RECENT_DAYS = 90;
 
 export function repoKey(r: Pick<RepoConfig, "host" | "owner" | "repo">): string {
   return `${r.host}/${r.owner}/${r.repo}`;
+}
+
+/** 直近の日数を確かめる（0〜`MAX_RECENT_DAYS` の整数）。外れたら理由を投げる */
+export function checkRecentDays(value: unknown): number {
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 0 || days > MAX_RECENT_DAYS) {
+    throw new Error(`直近の日数は 0〜${MAX_RECENT_DAYS} の整数で入れてください`);
+  }
+  return days;
 }
 
 /** 入れた値を確かめて揃える。読めなければ理由を投げる */
@@ -46,10 +55,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   const repo = checkName(String(raw.repo ?? "").trim(), "リポジトリ名");
   const integ = String(raw.integration ?? "").trim();
   const integration = integ === "" ? "" : checkBranch(integ);
-  const days = Number(raw.recentDays ?? DEFAULT_RECENT_DAYS);
-  if (!Number.isInteger(days) || days < 0 || days > MAX_RECENT_DAYS) {
-    throw new Error(`直近の日数は 0〜${MAX_RECENT_DAYS} の整数で入れてください`);
-  }
+  const days = checkRecentDays(raw.recentDays ?? DEFAULT_RECENT_DAYS);
   const extras = Array.isArray(raw.extraBranches)
     ? raw.extraBranches
     : String(raw.extraBranches ?? "")
@@ -67,11 +73,11 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   return { host: host.id, owner, repo, integration, recentDays: days, extraBranches, project, workspace };
 }
 
-/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、層の名札に予約した名前（`settings.is_reserved_layer_name`） */
+/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、層の名前に予約した名前（`settings.is_reserved_layer_name`） */
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_LAYER = new Set(["common", "self"]);
 
-/** 保存された並びを読む。読めない行は捨てる（画面で直させる） */
+/** 保存された配列を読む。読めない行は捨てる（画面で直させる） */
 export function readRepos(value: unknown, hosts: readonly Host[]): RepoConfig[] {
   if (!Array.isArray(value)) {
     return [];
@@ -88,4 +94,39 @@ export function readRepos(value: unknown, hosts: readonly Host[]): RepoConfig[] 
     }
   }
   return out;
+}
+
+/** `chrome.storage.local` のうち、ここで使う分 */
+export interface StorageArea {
+  get(keys: string | string[] | null): Promise<Record<string, unknown>>;
+  set(items: Record<string, unknown>): Promise<void>;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** 1 つのリポジトリの直近の日数を書き換える（ボードの入力欄）。外れた値は投げて、何も書かない */
+export async function saveRecentDays(area: StorageArea, hosts: readonly Host[], key: string, value: unknown): Promise<number> {
+  if (typeof value === "string" && value.trim() === "") {
+    throw new Error(`直近の日数は 0〜${MAX_RECENT_DAYS} の整数で入れてください`);
+  }
+  const days = checkRecentDays(typeof value === "string" ? value.trim() : value);
+  const got = await area.get("repos");
+  const stored = Array.isArray(got.repos) ? got.repos : [];
+  let found = false;
+  const next = stored.map((row) => {
+    try {
+      if (isRecord(row) && repoKey(normalizeRepo(row, hosts)) === key) {
+        found = true;
+        return { ...row, recentDays: days };
+      }
+    } catch {
+      // 読めない行は触らない
+    }
+    return row;
+  });
+  if (!found) throw new Error(`${key} は登録されていない`);
+  await area.set({ repos: next });
+  return days;
 }

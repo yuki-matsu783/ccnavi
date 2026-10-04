@@ -56,7 +56,9 @@ class ApproveVerifyTest(PhaseHarness):
 
     def test_pending_batch_passes_and_places_nothing(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
 
         result = self.verify()
@@ -67,7 +69,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertNotIn("落ちる", result.stdout)
         # 確かめただけ。承認済みチケットは置かれていない。
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
 
     def test_check_narrowed_to_one_id(self):
         """絞りは `--agree` と同じ意味。指定した 1 件だけを見る。"""
@@ -83,12 +85,12 @@ class ApproveVerifyTest(PhaseHarness):
     def test_a_rejected_proposal_fails_the_check_with_its_reason(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         # 計画に無い番号の子。承認の対象にしない側に載る。
-        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
+        self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))
         self.commit_parent()
 
         result = self.verify()
         self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
-        self.assertIn("i0001-05", result.stdout)
+        self.assertIn("i0001-05-05", result.stdout)
         self.assertIn("落ちる", result.stdout)
         self.assertIn("計画に無い", result.stdout)
         self.assertIn("直してから", result.stdout)
@@ -118,7 +120,7 @@ class ApproveVerifyTest(PhaseHarness):
     def test_scope_overflow_passes_but_is_shown(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         # 種類（調査）の範囲を超える子。承認は止まらず、判定が切り詰める。
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/design/*",)))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/design/*",)))
         self.commit_parent()
 
         result = self.verify()
@@ -195,7 +197,7 @@ class ApproveVerifyTest(PhaseHarness):
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         # 計画に無い番号の子。承認の対象にしない側に載る。
-        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
+        self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))
         self.commit_parent()
 
         verified = self.verify()
@@ -205,7 +207,7 @@ class ApproveVerifyTest(PhaseHarness):
         lint = self.ccnavi("--lint")
         self.assertNotEqual(lint.returncode, 0, lint.stdout + lint.stderr)
         said = lint.stdout + lint.stderr
-        self.assertIn("i0001-05: ", said)
+        self.assertIn("i0001-05-05: ", said)
         self.assertIn("計画に無い", said)
 
     def test_lint_says_the_order_problem_too(self):
@@ -217,11 +219,13 @@ class ApproveVerifyTest(PhaseHarness):
         重さは warn（`rules.KIND_NOT_YET`）で、承認の側は落としたままであることも見る。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         self.approve()
         # フェーズ 1 が閉じていないのに、フェーズ 2 の子を先回りして書く。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ("wip/design/*",)))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ("wip/design/*",)))
         self.commit_parent()
 
         verified = self.verify()
@@ -233,10 +237,10 @@ class ApproveVerifyTest(PhaseHarness):
         # 設定画面の保存（phases-panel.ts は --lint の終了コードを見る）も CI も止まる。
         lint = self.ccnavi("--lint")
         said = lint.stdout + lint.stderr
-        self.assertIn("i0001-02: ", said)
+        self.assertIn("i0001-02-02: ", said)
         self.assertIn("が閉じるまで承認しない", said)
-        self.assertIn("warn: (ticket): i0001-02: ", said)
-        self.assertNotIn("error: (ticket): i0001-02: ", said)
+        self.assertIn("warn: (ticket): i0001-02-02: ", said)
+        self.assertNotIn("error: (ticket): i0001-02-02: ", said)
         self.assertEqual(lint.returncode, 0, said)
 
     # ---- 7. 書いた回に案内が届く
@@ -259,8 +263,8 @@ class ApproveVerifyTest(PhaseHarness):
 
         表に allow を 1 本足す形も試したが、`todo/` が「ccnavi が言及する場所」になり、
         どのタイプも言及しないときの扱い（judge.undeclared_verdict）を通らなくなる。
-        確認できる者が居ないモードの deny も、知らない綴りのモードを ask として扱う既定も、
-        そこだけ外れていた（ADR-0059）。**同じ場所とどのルールも言及しない場所が、
+        確認できる者が居ないモードの deny も、知らない表記のモードを ask として扱う既定も、
+        そこだけ外れていた。**同じ場所とどのルールも言及しない場所が、
         どの権限モードでも同じ判定になること**を確かめる。文は届いたままであることも見る。
         """
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
@@ -285,7 +289,7 @@ class ApproveVerifyTest(PhaseHarness):
                     self.assertIn("--agree --preview --verify", context(inside))
 
     def test_the_notice_stays_inside_the_workspace(self):
-        """ワークスペースの外に同じ並びを掘っても、提案を書いたことにはしない。
+        """ワークスペースの外に同じディレクトリ構成を掘っても、提案を書いたことにはしない。
 
         当てる式はワークスペースルートに固定してある。ツリー（ワークツリー・プロジェクト）は
         どれもルートの下なので、正しい置き場は全部入り、外は入らない。

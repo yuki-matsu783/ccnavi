@@ -1,22 +1,22 @@
 /**
- * ボードの DOM を組む。判定は出さず、Python の答えを並べるだけ（ADR-0035）。
+ * ボードの DOM を組む。判定は出さず、Python の答えを並べるだけ（判定を 1 か所に保つため）。
  *
- * 素の文字列はすべて `textContent`。Markdown の本文だけを消毒した断片で入れる（5.5 の 2）。
- * 段階 3 から、承認と取り下げのボタンを出す。出すかは Python の答え（`write.allowed`・
+ * 素の文字列はすべて `textContent`。Markdown の本文だけを消毒した断片で入れる。
+ * 承認と取り下げのボタンを出す。出すかは Python の答え（`write.allowed`・
  * `withdrawable` の理由）で決まり、ここは答えのとおりに並べるだけ。押したときの動き（`Actions`）は
  * 呼び手が渡す。渡さなければボタンを出さない（読み取りだけ）。
- * 段階 4 から、依頼済みのフェーズのレビューの欄（MR のスレッドと、通らない理由）と「レビュー済みにする」を出す。
+ * 依頼済みのフェーズのレビューの欄（MR のスレッドと、通らない理由）と「レビュー済みにする」を出す。
  * スレッドの本文は承認の画面と同じ規則で描く（Markdown は消毒した断片、隠れる書き方は通さない、HTML コメントは
- * 見える印。5.5 の 2・段階 3 のレビューの決定 A）。
- * 段階 5 から GitLab の MR（`!番号`）とプロジェクトのリポジトリ、「始める」（issue の一覧と、押すと親のブランチを
- * 作るボタン。8.6）、打ち消しが収まらなかった家族の「要確認」（8.4）を出す。issue の題も素の文字列（textContent）。
+ * 見える形で出す。承認者に見えないまま承認させないため）。
+ * GitLab の MR（`!番号`）とプロジェクトのリポジトリ、「始める」（issue の一覧と、押すと親のブランチを
+ * 作るボタン）、元に戻すコミットでも競合が収まらなかった親子のチケットの「要確認」を出す。issue の題も素の文字列（textContent）。
  */
 import type { Renderer } from "./sanitize.js";
 import type { ReviewPanel } from "./reviewed.js";
 import { ALLOWED_URI } from "./sanitize.js";
 import type { FamilyBoard, RepoBoard } from "./snapshot.js";
 import type { Issue } from "./github.js";
-import { repoKey } from "./settings.js";
+import { MAX_RECENT_DAYS, repoKey } from "./settings.js";
 
 function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
   const node = doc.createElement(tag);
@@ -29,19 +29,21 @@ function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, cls = 
 export interface Actions {
   approve(repo: RepoBoard, family: FamilyBoard): void;
   withdraw(repo: RepoBoard, family: FamilyBoard, ticket: string): void;
-  /** レビュー済みにする（段階 4）。渡さなければ「レビュー済みにする」を出さない */
+  /** レビュー済みにする。渡さなければ「レビュー済みにする」を出さない */
   review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
-  /** issue の一覧を読む（段階 5。「始める」）。渡さなければ「始める」の欄を出さない */
+  /** issue の一覧を読む（「始める」）。渡さなければ「始める」の欄を出さない */
   loadIssues?(repo: RepoBoard): void;
-  /** issue から親のブランチを作る（段階 5。8.6） */
+  /** issue から親のブランチを作る */
   start?(repo: RepoBoard, issue: Issue): void;
-  /** 「要確認」を外す（ユーザが確かめた。8.4） */
+  /** 直近の日数を変える（入力欄の文字列のまま渡す。検査と保存は呼び手）。渡さなければ入力欄を出さない */
+  setRecentDays?(repo: RepoBoard, value: string): void;
+  /** 「要確認」を外す（ユーザが確かめた） */
   dismiss?(repo: RepoBoard, family: string): void;
 }
 
-/** ボードの外から足すもの（段階 5）。家族ごとの「要確認」と、読んだ issue の一覧 */
+/** ボードの外から足すもの。親子のチケットごとの「要確認」と、読んだ issue の一覧 */
 export interface Extras {
-  /** 家族の名前 → 打ち消しが収まらなかったときの文面 */
+  /** 親のブランチ名 → 元に戻すコミットでも競合が収まらなかったときの文面 */
   readonly attention?: Readonly<Record<string, string>>;
   readonly issues?: { readonly list: readonly Issue[] | null; readonly error: string };
 }
@@ -62,6 +64,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     line.dataset.testid = "integration";
     head.append(line);
   }
+  if (actions?.setRecentDays) head.append(recentDaysForm(doc, board, actions.setRecentDays));
   section.append(head);
 
   if (board.error) {
@@ -77,11 +80,11 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
   const scope = el(doc, "p", "scope", `見たブランチ（表示用）: ${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`);
   section.append(scope);
   if (board.families.length === 0) {
-    section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（家族）は無い"));
+    section.append(el(doc, "p", "empty", "見たブランチに親のブランチ（親子のチケット）は無い"));
   }
   for (const f of board.families) {
     const why = extras.attention?.[f.family.name];
-    // 「要確認」の家族には、このブラウザでは書くボタンを出さない（ユーザが確かめて外すまで。11.9.1 の決定 B）
+    // 「要確認」の親子のチケットには、このブラウザでは書くボタンを出さない（ユーザが確かめて外すまで）
     const box = renderFamily(
       doc,
       md,
@@ -97,7 +100,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     if (why) box.insertBefore(attention(doc, why, actions?.dismiss ? () => actions.dismiss?.(board, f.family.name) : undefined), box.children[1] ?? null);
     section.append(box);
   }
-  // 家族として見えていない（ブランチが見えなくなった）家族の「要確認」も出す
+  // ブランチが見えなくなった親子のチケットの「要確認」も出す
   for (const [name, why] of Object.entries(extras.attention ?? {})) {
     if (board.families.some((f) => f.family.name === name)) continue;
     const box = el(doc, "article", "family");
@@ -108,23 +111,23 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
   }
   if (actions?.loadIssues && actions.start) section.append(renderStart(doc, board, actions, extras.issues));
   const s = board.stats;
-  section.append(el(doc, "p", "stats", `読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（控えから ${s.blobsCached} 件）`));
+  section.append(el(doc, "p", "stats", `読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（キャッシュから ${s.blobsCached} 件）`));
   return section;
 }
 
-/** 打ち消しが収まらなかった家族（8.4）。ユーザがホストの履歴を確かめたら外す */
+/** 元に戻すコミットでも競合が収まらなかった親子のチケット。ユーザがホストの履歴を確かめたら外す */
 function attention(doc: Document, text: string, onDismiss?: () => void): HTMLElement {
   const box = el(doc, "div", "attention");
   box.dataset.testid = "attention";
   box.append(notice(doc, "error", `要確認: ${text}`));
   box.append(
-    el(doc, "p", "note", "この要確認はこのブラウザにだけ記録している（ほかの承認者には見えない）。ホストの履歴を確かめて直すまで、このブラウザからはこの家族に書かない"),
+    el(doc, "p", "note", "この要確認はこのブラウザにだけ記録している（ほかの承認者には見えない）。ホストの履歴を確かめて直すまで、このブラウザからはこの親子のチケットに書かない"),
   );
   if (onDismiss) box.append(button(doc, "確かめた（要確認を外す）", "dismiss", onDismiss));
   return box;
 }
 
-/** 「始める」（8.6）の欄。issue は押されてから読む（ボードを開くたびには読まない） */
+/** 「始める」の欄。issue は押されてから読む（ボードを開くたびには読まない） */
 function renderStart(doc: Document, board: RepoBoard, actions: Actions, issues?: Extras["issues"]): HTMLElement {
   const box = el(doc, "section", "start");
   box.dataset.testid = "start";
@@ -163,6 +166,30 @@ export interface FamilyActions {
   review?(phase: number): void;
 }
 
+/** 直近の日数の入力欄（リポジトリごと。設定画面と同じ値） */
+function recentDaysForm(doc: Document, board: RepoBoard, set: (repo: RepoBoard, value: string) => void): HTMLFormElement {
+  const form = el(doc, "form", "recent-days");
+  form.dataset.testid = "recent-days";
+  const label = el(doc, "label", "", "直近の日数（表示用） ");
+  const input = el(doc, "input");
+  input.type = "number";
+  input.name = "recentDays";
+  input.min = "0";
+  input.max = String(MAX_RECENT_DAYS);
+  input.step = "1";
+  input.value = String(board.repo.recentDays);
+  label.append(input);
+  const submit = el(doc, "button", "action", "変える");
+  submit.type = "submit";
+  submit.dataset.action = "recent-days";
+  form.append(label, submit);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    set(board, input.value);
+  });
+  return form;
+}
+
 function button(doc: Document, text: string, action: string, onClick: () => void): HTMLButtonElement {
   const b = el(doc, "button", "action", text);
   b.type = "button";
@@ -176,7 +203,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   box.dataset.family = f.family.name;
   const title = el(doc, "h3");
   title.append(el(doc, "code", "", f.family.name), doc.createTextNode(` ${f.family.title}`));
-  // 親チケットの branch: で識別子と違うブランチを使う家族は、識別子も出す（ADR-0100 の 5 章）
+  // 親チケットの branch: で識別子と違うブランチを使う親子のチケットは、識別子も出す
   if (f.family.family && f.family.family !== f.family.name) {
     title.append(doc.createTextNode(" （識別子 "), el(doc, "code", "", f.family.family), doc.createTextNode("）"));
   }
@@ -191,10 +218,10 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   }
   const others = r.closure.families.filter((n) => n !== f.family.name);
   if (others.length > 0) {
-    box.append(el(doc, "p", "closure", `判定に入れたほかの家族（先行をたどって行き着くもの）: ${others.join(", ")}`));
+    box.append(el(doc, "p", "closure", `判定に入れたほかの親子のチケット（先行をたどって行き着くもの）: ${others.join(", ")}`));
   }
   if (r.closure.absent.length > 0) {
-    box.append(notice(doc, "warn", `先行の家族のブランチがリモートに無い: ${r.closure.absent.join(", ")}`));
+    box.append(notice(doc, "warn", `先行の親のブランチがリモートに無い: ${r.closure.absent.join(", ")}`));
   }
   if (r.undecided) {
     box.append(notice(doc, "error", r.undecided));
@@ -210,7 +237,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   }
   if (r.text) {
     // ccnavi が出した承認の画面の本文（範囲・リスク・計画など）を、最初に開いた形で出す（REQ-APV-01 の
-    // 「範囲を最初に」。レビューの決定 A）。閉じた details には入れない。素の文字列なので textContent
+    // 「範囲を最初に」）。閉じた details には入れない。素の文字列なので textContent
     const screen = el(doc, "section", "screen");
     screen.dataset.testid = "screen";
     screen.append(el(doc, "h4", "", "承認の画面（ccnavi が出したもの。承認するとこのとおりに書く）"));
@@ -235,11 +262,11 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   const write = r.write ?? { allowed: false, reason: "" };
   if (batch.length > 0 && r.digest) {
     if (!write.allowed) {
-      box.append(notice(doc, "warn", write.reason || "この家族には書けない"));
+      box.append(notice(doc, "warn", write.reason || "この親子のチケットには書けない"));
     } else if (actions) {
       const bar = el(doc, "div", "actions");
       bar.append(button(doc, `承認する（${batch.map((e) => e.ticket).join(", ")}）`, "approve", actions.approve));
-      bar.append(el(doc, "span", "digest", `指紋 ${r.digest.slice(0, 12)}`));
+      bar.append(el(doc, "span", "digest", `ダイジェスト ${r.digest.slice(0, 12)}`));
       box.append(bar);
     }
   }
@@ -282,7 +309,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   return box;
 }
 
-/** リンクを http(s)・mailto の綴りのときだけ付ける。ほかは文字だけ（5.5 の 2） */
+/** リンクを http(s)・mailto の表記のときだけ付ける。ほかは文字だけ */
 function link(doc: Document, href: string, text: string): HTMLElement {
   if (!ALLOWED_URI.test(href.trim())) return el(doc, "span", "", text);
   const a = el(doc, "a", "", text);
@@ -293,8 +320,8 @@ function link(doc: Document, href: string, text: string): HTMLElement {
 }
 
 /**
- * 依頼済みのフェーズのレビューの欄（8.9）。スレッドは未解決を先に、本文は承認の画面と同じ消毒で描く。
- * 「レビュー済みにする」は、Python が通さない理由を返さず、書ける家族で、読めたときだけ出す。
+ * 依頼済みのフェーズのレビューの欄。スレッドは未解決を先に、本文は承認の画面と同じ消毒で描く。
+ * 「レビュー済みにする」は、Python が通さない理由を返さず、書ける親子のチケットで、読めたときだけ出す。
  */
 export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, writable: boolean, actions?: FamilyActions): HTMLElement {
   const box = el(doc, "section", "review");
@@ -310,8 +337,8 @@ export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, wr
     box.append(notice(doc, "error", panel.error));
     return box;
   }
-  // 並べるのは写しのとおり。GitHub では目印で始まるスレッドもユーザのものとして数え、GitLab で依頼を投稿したアカウントの
-  // ccnavi の依頼のスレッドを数えないのは Python（11.8.1 の決定 C）。ここは未解決の件数を写しのとおりに出す
+  // 並べるのは取得した結果のとおり。GitHub では目印で始まるスレッドもユーザのものとして数え、GitLab で依頼を投稿したアカウントの
+  // ccnavi の依頼のスレッドを数えないのは Python。ここは未解決の件数を取得した結果のとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;
   box.append(el(doc, "p", "threads-count", `スレッド ${threads.length} 件（未解決 ${unresolved} 件）・レビュー ${panel.copy?.reviews.length ?? 0} 件`));

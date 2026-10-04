@@ -62,7 +62,7 @@ CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 # 承認済みチケット自体が信頼できない（親が引けない、置き場と `project:` が違う、など）。
 # 範囲の外に書いたのではないので、CODE_TICKET_SCOPE とは分ける。受け取った側の次の一手も
 # 違う。範囲外なら範囲の中で済ませる方法があるが、こちらはユーザがチケットを直すまで
-# どこにも書けない（ADR-0058）。
+# どこにも書けない。
 CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
@@ -71,7 +71,7 @@ TICKET_RULE = "(ticket-scope)"
 
 # 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
 # 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく括弧付きの形の名前にする
-# （rewrite_rule、ADR-0046、ADR-0047）。
+# （rewrite_rule）。
 CODE_REWRITE = {
     shellread.FORM_BRACE: "DENY_BRACE_EXPANSION",
     shellread.FORM_COMMAND_NAME: "DENY_COMMAND_NAME_EXPANSION",
@@ -80,7 +80,7 @@ CODE_REWRITE = {
 }
 
 # 理由に載せる対象の長さの上限。対象はエージェントが今書いたものなので、
-# ここでは同じものを指せれば足りる。ヒアドキュメントは 1 ファイル分を運べるので、
+# ここでは同じものを指せれば足りる。ヒアドキュメントには 1 ファイル分を丸ごと書けるので、
 # 全文を載せると理由の本体が下へ流れて読まれなくなる。
 SUBJECT_LIMIT = 200
 
@@ -206,7 +206,7 @@ def reason_for(
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
     # 出所はルールの id で示す。プロジェクトのルールの id には `lib:git-push` の形で
     # プロジェクトの名前が付く（REQ-MLT-07）ので、id だけでどのファイルを見に行けばよいかが
-    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無い綴りが
+    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無いパスが
     # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
     if rule.id == phase.TICKET_APPROVAL_RULE_ID:
@@ -233,8 +233,8 @@ def ran_by(runner: str, inner: str) -> str:
     元の形（`env rm -f …`）だけを見た読み手には、ルールのどこが当たったのかが分からない。
     ルールは `rm` について書かれていて、`env` については何も言っていないので。
 
-    `cd` で移った先から見た綴りに当たったときも同じで、書いた綴り（`rm settings.json`）には
-    当たったルールの名前が出てこない。どこへ書こうとしているかを綴りで示す。
+    `cd` で移った先から見たパスに当たったときも同じで、書いた表記（`rm settings.json`）には
+    当たったルールの名前が出てこない。どこへ書こうとしているかをパスで示す。
     """
     if runner == shellread.MOVED:
         return (
@@ -343,7 +343,7 @@ def rewrite(subject: str, form: str, found: list[str]) -> str:
     )
 
 
-# 止めた文に並べる綴りの数。1 つ直せば残りも同じ直し方になる。
+# 止めた文に並べる表記の数。1 つ直せば残りも同じ直し方になる。
 _REWRITES_SHOWN = 5
 
 # 形ごとの（見つけたものの呼び名, 書き直し方）。
@@ -396,9 +396,9 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
 
     言うのは線引きと入口だけにする。この文はセッションの開始（起動・再開・compact・clear）
     のたびに届くので、後から必要な場所で改めて届くものを頭では言わない。名指しするのは、
-    レビューの sh の綴りがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
+    レビューの sh のパスがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
     ユーザがどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
-    フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の綴りが
+    フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の書き方が
     承認のときの検査（`agree.py`）、後工程の進め方が承認済みチケットが置かれたとき
     （`agree.approved_text`）。
 

@@ -129,16 +129,16 @@ test("CB-T84 保存できない理由と読み込みの苦情を出し、錠は�
     assert.match(dom.one(".problems").textContent, /factors がリスト（配列）ではありません/);
     // 作業中のチケットが現れたら、保存は押せなくなる（編集の途中はそのまま）
     dom.type(dom.one("#find"), "");
-    await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
+    await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] } });
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
-    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
+    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-T122 項目の一覧は 1 件 1 行で、控えてある id の行は開いて出す", async () => {
+test("CB-T122 項目の一覧は 1 件 1 行で、state に残してある id の行は開いて出す", async () => {
   const dom = await openRisk({}, { open: ["ci", "q"] });
   try {
     assert.equal(dom.all("#factors > li.factor").length, 4);
@@ -147,7 +147,7 @@ test("CB-T122 項目の一覧は 1 件 1 行で、控えてある id の行は�
       ["f2", "f4"],
     );
     assert.equal(dom.all("#find").length, 1);
-    // 折りたたむと控えからも消える
+    // 折りたたむと state からも消える
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
     assert.deepEqual((dom.state() as { open: string[] }).open, ["q"]);
@@ -285,7 +285,7 @@ test("CB-D57 見た目の切り替えは body のクラスだけを付け替え�
   }
 });
 
-test("CB-D58 加点条件の選択肢は 6 つで、キーの綴りと説明を並べて出す", async () => {
+test("CB-D58 加点条件の選択肢は 6 つで、キーの表記と説明を並べて出す", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));

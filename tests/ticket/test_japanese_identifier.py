@@ -1,14 +1,14 @@
-"""日本語を含む識別子で、承認 → 着手 → 判定 → 終える の主な経路が通ること（ADR-0100）。
+"""日本語を含む識別子で、承認 → 着手 → 判定 → 終える の主な経路が通ること。
 
 本物の git リポジトリとワークツリーを一時ディレクトリに作る。親 `feature-64-統合先の解決` と
-子 `feature-64-統合先の解決-01` を、`test_ticket.py` と同じ道具で通す。見るのは 5 つ。
+子 `feature-64-統合先の解決-01-01` を、`test_ticket.py` と同じ道具で通す。見るのは 5 つ。
 
 1. 親のワークツリーの上で書いた提案は、既にある自分のブランチと重なると言われない（lint）
 2. 承認で承認済みチケットが置かれ、着手で基準点が書かれる（ワークツリーの名前とブランチ名が日本語）
 3. 子のワークツリーへの書き込みが子のチケットで判定される（範囲の外は止まる）
 4. 子を終えると `review/` へ移る。git の出力（`status`・`diff --name-only`）の 8 進の引用に
    惑わされず、日本語のファイル名の承認済みチケットを読み戻せる
-5. NFD の綴りの提案は読めない（error）
+5. NFD の表記の提案は読めない（error）
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import RULES, git, ticket_text, write
 
 PARENT = "feature-64-統合先の解決"
-CHILD = PARENT + "-01"
+CHILD = PARENT + "-01-01"
 
 
 class JapaneseIdentifierTest(unittest.TestCase):
@@ -102,7 +102,7 @@ class JapaneseIdentifierTest(unittest.TestCase):
 
         # 1. 自分のワークツリーの上の提案は、自分のブランチと重なると言われない。形の warn も無い
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertNotIn("ADR-0100", lint.stdout, lint.stdout)
+        self.assertNotIn("（親のブランチ名の規則）", lint.stdout, lint.stdout)
         self.assertNotIn("識別子に使えない文字", lint.stdout + lint.stderr)
 
         # 2. 承認と着手

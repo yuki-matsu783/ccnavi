@@ -45,7 +45,7 @@ class AdditionalContextTest(unittest.TestCase):
     def rules(self, **sections) -> str:
         body = {"version": 1, **sections}
         # 置くのは共通層の既定の場所。`--rules` は診断でだけ有効で、hook の判定には
-        # 届かない（ADR-0067）。
+        # 届かない。
         return write(common_path(self.root, "rules"), json.dumps(body))
 
     def run_ccnavi(self, *args: str, payload: str = "") -> subprocess.CompletedProcess:
@@ -199,10 +199,10 @@ class AdditionalContextTest(unittest.TestCase):
         # セッションの開始（compact の後も含む）で忘れる。
         hit("s1", event="SessionStart")
         self.assertEqual(hit("s1").get("additionalContext"), NOTE)
-        # 控えの置き場が無ければ毎回届く。
+        # 記録の置き場が無ければ毎回届く。
         self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
         self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
-        # 試験は控えを消費しない。
+        # 試験は記録を消費しない。
         self.run_ccnavi("--state", state, "--test", "Write", target)
         self.assertEqual(hit("s3").get("additionalContext"), NOTE)
 

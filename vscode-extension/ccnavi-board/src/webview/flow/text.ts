@@ -1,9 +1,9 @@
 /**
- * フロー編集画面に出す言葉。ノードの印と、1 行の要約。
+ * フロー編集画面に出す言葉。ノードの目印と、1 行の要約。
  *
- * 印は**種類の性質**を言うだけで、良し悪しは言わない。止まる・戻るを決めるのは実行ファイルと、
+ * 目印は**種類の性質**を言うだけで、良し悪しは言わない。止まる・戻るを決めるのは実行ファイルと、
  * サブエージェントに渡る道具（AskUserQuestion はどのサブエージェントにも渡らない。入れ子の上限では
- * Agent ツールが渡らない。付録 C、ADR-0085）。
+ * Agent ツールが渡らない。付録 C）。
  */
 import { branchItems, dataText, nodeType, type FlowNode } from "../../core/flow-doc.js";
 
@@ -13,7 +13,7 @@ export interface Badge {
   readonly title: string;
 }
 
-/** 種類に付く印。無ければ undefined */
+/** 種類に付く目印。無ければ undefined */
 export function badgeOf(type: string): Badge | undefined {
   if (type === "askUserQuestion") {
     return {
