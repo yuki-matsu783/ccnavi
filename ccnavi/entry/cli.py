@@ -25,7 +25,7 @@ from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog, prune
 from ..tickets import configsync, history, ops, phase, review
-from . import diagnose, lint, suggest, version
+from . import diagnose, lint, status, suggest, version
 
 USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
 
@@ -182,8 +182,9 @@ The VS Code board extension agrees from an overlay instead of the terminal:
 
 --yes needs no terminal; it refuses when the batch or the text changed since it
 was shown, and when --digest is missing.
-The next UserPromptSubmit / PreToolUse tells the model once about the new
-copies (the same text the extension hands to Claude Code).
+The hooks do not tell the model about approvals. The extension hands the
+model the same text as --yes prints in `prompt`; otherwise the parent agent asks
+with `ccnavi ticket status [<parent>]`.
 
 The parent agent moves tickets between states and asks for reviews through the
 scripts in .ccnavi/scripts/, which call
@@ -193,6 +194,10 @@ scripts in .ccnavi/scripts/, which call
          it to wip/proposals/review/ when the phase is reviewed, else to
          .ccnavi/approved/done/; cancel moves it to .ccnavi/approved/done/)
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
+    ccnavi ticket status [<parent>]
+        (reads only: place, approval time, started or not, uncommitted / unpushed
+         by the local remote-tracking ref, why it is stopped, and the next step;
+         a subagent may run it too)
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review confirm   --cwd <dir> --phase N --result <json> [--actor <account>]
@@ -1280,7 +1285,13 @@ def operate(
     verb = words[1] if len(words) > 1 else ""
     target = words[2] if len(words) > 2 else ""
     code = 1
-    if kind == "ticket" and verb in ("start", "finish", "cancel") and target:
+    if kind == "ticket" and verb == "status":
+        # ticket status [<親>]。読むだけ（サブエージェントにも許す）。
+        if len(words) > 3:
+            stderr.write("ccnavi: ticket status に渡せる親は 1 つだけ\n")
+        else:
+            code = status.run(stdout, stderr, root, conf, c1.family_of(target) if target else "")
+    elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
         elif verb == "finish":
