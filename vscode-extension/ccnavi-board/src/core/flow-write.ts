@@ -304,18 +304,61 @@ export function removeDraftFile(tree: string, file: string, hash: string): Draft
   if (crypto.createHash("sha256").update(read.bytes).digest("hex") !== hash) {
     return { ok: false, error: "下書きは、取り込んだあとに書き直されているため消しません。新しい案は「提案あり」から確かめてください" };
   }
-  // 確かめてから消すまでの間にリンクへ差し替えられても、unlink はリンクそのものを消し、指す先には触れない
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
     return { ok: false, error: `下書きは消しません: ${linked} がシンボリックリンクです` };
   }
+  // 確かめてから消すまでの間に書き直されると、新しい案を消してしまう。先に同じディレクトリの別の名前へ移し
+  // （ほかの書き手はもう触れない）、移したものを確かめ直してから消す。違えば元の名前へ戻す
+  const aside = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.removing`);
   try {
-    fs.unlinkSync(file);
+    fs.renameSync(file, aside);
   } catch (error) {
     if (code(error) === "ENOENT") {
       return { ok: true, removed: false };
     }
     return { ok: false, error: `下書きを消せません: ${(error as Error).message}` };
   }
+  let again: string;
+  try {
+    // 移したものもリンク・ハードリンク・ふつうのファイルでないものなら消さない（移す直前に差し替えられた）
+    const moved = readFlowFile(tree, aside);
+    again = moved === undefined ? "" : crypto.createHash("sha256").update(moved.bytes).digest("hex");
+  } catch {
+    again = "";
+  }
+  if (again !== hash) {
+    return { ok: false, error: putBack(aside, file, "下書きは、取り込んだあとに書き直されているため消しません。新しい案は「提案あり」から確かめてください") };
+  }
+  try {
+    fs.unlinkSync(aside);
+  } catch (error) {
+    return { ok: false, error: putBack(aside, file, `下書きを消せません: ${(error as Error).message}`) };
+  }
   return { ok: true, removed: true };
+}
+
+/**
+ * 移した下書きを元の名前へ戻す。元の名前に新しいファイルが在れば上書きしない（`link` は在れば失敗する。Windows の NTFS でも
+ * 使える）。戻せなければ、移した先の名前を言う
+ */
+function putBack(aside: string, file: string, why: string): string {
+  try {
+    fs.linkSync(aside, file);
+    fs.unlinkSync(aside);
+    return why;
+  } catch (error) {
+    if (code(error) !== "EEXIST") {
+      try {
+        // ハードリンクを作れないファイルシステム。元の名前がまだ無いときだけ名前を戻す
+        if (!fs.existsSync(file)) {
+          fs.renameSync(aside, file);
+          return why;
+        }
+      } catch {
+        // 下で移した先を言う
+      }
+    }
+    return `${why}（移した下書きは ${aside} に残っています）`;
+  }
 }

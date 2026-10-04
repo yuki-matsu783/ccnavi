@@ -149,6 +149,8 @@ interface PanelState {
   /** 画面に見せている依頼の文（コピー / 新しいセッションで開く はこれを渡す） */
   requestPrompt?: string;
   offerTimer?: NodeJS.Timeout;
+  /** 錠を聞き直したときの「着手の前か」。読み直すと消す（読み込んだ答えに戻る） */
+  beforeStart?: boolean;
 }
 
 /** 開いているパネル。子の識別子ごとに 1 枚 */
@@ -361,12 +363,21 @@ function draftExists(target: FlowTarget): boolean {
   }
 }
 
-/** 依頼のボタンの言葉。下書きの置き場を答えない古い実行ファイルなら出さない */
-function requestOf(target: FlowTarget, lock: FlowLock, flowExists: boolean): string | undefined {
+/**
+ * 依頼のボタンの言葉。下書きの置き場を答えない古い実行ファイルなら出さない。着手の前かは、読み込んだあとに錠を
+ * 聞き直していればその答え（`current.beforeStart`）を使う（読み込んだあとに着手・終わり・取り消しがあっても出さない）
+ */
+function requestOf(current: PanelState, loaded: Loaded): string | undefined {
+  const target = loaded.target;
   if (target.flow.draft === null) {
     return undefined;
   }
-  return requestLabel({ beforeStart: target.beforeStart, locked: lock.locked, flowExists, draftExists: draftExists(target) });
+  return requestLabel({
+    beforeStart: current.beforeStart ?? target.beforeStart,
+    locked: current.lock.locked,
+    flowExists: loaded.exists,
+    draftExists: draftExists(target),
+  });
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -466,11 +477,16 @@ function watchFile(current: PanelState): void {
   watcher.onDidChange(changed);
   watcher.onDidDelete(changed);
   current.fileWatchers.push(watcher);
-  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す（編集は捨てない）
+  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す（編集は捨てない）。置き場のディレクトリ（`flows/`）は
+  // 開いた時点で無いことが多いので、在るツリーのルートから相対の綴りで見張る（後から作られても届く）
   const draft = loaded.target.flow.draft;
   if (draft !== null) {
+    const relative = path.relative(loaded.target.flow.tree, draft.path);
+    const inside = loaded.target.flow.tree !== "" && relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
     const drafts = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(vscode.Uri.file(path.dirname(draft.path)), path.basename(draft.path)),
+      inside
+        ? new vscode.RelativePattern(vscode.Uri.file(loaded.target.flow.tree), relative.split(path.sep).join("/"))
+        : new vscode.RelativePattern(vscode.Uri.file(path.dirname(draft.path)), path.basename(draft.path)),
     );
     const moved = () => scheduleOffer(current);
     drafts.onDidCreate(moved);
@@ -524,9 +540,10 @@ async function refreshLock(current: PanelState): Promise<{ readonly lock: FlowLo
     current.lock = lock;
     current.host.post({ type: "lock", lock } satisfies ToFlow);
     // 着手・終わり・取り消しで、依頼のボタンを出すかが変わる
-    if (target !== undefined && current.loaded !== undefined) {
-      const request = requestOf({ ...current.loaded.target, beforeStart: target.beforeStart }, lock, current.loaded.exists);
-      current.host.post({ type: "offer", ...(request === undefined ? {} : { request }), ...(current.loaded.offer === undefined ? {} : { offer: current.loaded.offer }) } satisfies ToFlow);
+    // 確かめられなければ、着手の前とは言えないので出さない側にする
+    current.beforeStart = target?.beforeStart ?? false;
+    if (current.loaded !== undefined) {
+      current.host.post({ type: "offer", ...requestAndOffer(current, current.loaded) } satisfies ToFlow);
     }
   }
   return { lock, target };
@@ -563,7 +580,7 @@ function show(current: PanelState): void {
 
 /** 画面に渡す依頼のボタンの言葉と「提案あり」。無いものは欄ごと省く */
 function requestAndOffer(current: PanelState, loaded: Loaded): { request?: string; offer?: FlowOffer } {
-  const request = requestOf(loaded.target, current.lock, loaded.exists);
+  const request = requestOf(current, loaded);
   return { ...(request === undefined ? {} : { request }), ...(loaded.offer === undefined ? {} : { offer: loaded.offer }) };
 }
 
@@ -651,6 +668,7 @@ async function reload(current: PanelState): Promise<void> {
   }
   current.loaded = loaded;
   current.lock = loaded.target.lock;
+  current.beforeStart = undefined;
   if (restore !== undefined) {
     const same =
       restore.path === loaded.target.flow.path && restore.exists === loaded.exists && restore.mtimeMs === loaded.mtimeMs && restore.hash === loaded.hash;
@@ -850,7 +868,7 @@ function shellWord(text: string): string {
 function request(current: PanelState): void {
   const loaded = current.loaded;
   const draft = loaded?.target.flow.draft ?? null;
-  if (loaded === undefined || draft === null || requestOf(loaded.target, current.lock, loaded.exists) === undefined) {
+  if (loaded === undefined || draft === null || requestOf(current, loaded) === undefined) {
     fail(current, "いまはエージェントにフローを頼めません（着手の前の子だけで頼めます）");
     return;
   }

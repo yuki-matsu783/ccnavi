@@ -29,3 +29,7 @@
   background: var(--vscode-textCodeBlock-background, transparent);
   border: 1px solid var(--vscode-panel-border);
 }
+.proposal-value-kind {
+  float: left; margin-right: 6px; padding: 0 4px; border-radius: 3px; font-size: .8em;
+  color: var(--vscode-badge-foreground); background: var(--vscode-badge-background);
+}

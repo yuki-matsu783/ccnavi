@@ -200,12 +200,17 @@ export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
 
 // ---- 値の前後まで見せる差分（下書きの取り込み。ADR-0100）
 
+/** 値の種類（画面が前後に添える）。`1` と `"1"`、`true` と `"true"`、`null` と `"null"` を見分けるため */
+export type ValueKind = "文字列" | "数" | "真偽" | "null" | "辞書" | "並び" | "その他";
+
 /** 欄 1 つの前後。足した欄は `before` が無く、消した欄は `after` が無い */
 export interface FieldText {
-  /** 欄の綴り（`中身.prompt`・`中身.options[0].label` の形。頭の欄だけ呼び名にする） */
+  /** 欄の綴り（`中身.prompt`・`中身.options[0].label` の形。頭の欄は呼び名にし、記号や英字以外を含むキーは `["…"]` で囲む） */
   readonly field: string;
   readonly before?: string;
+  readonly beforeKind?: ValueKind;
   readonly after?: string;
+  readonly afterKind?: ValueKind;
 }
 
 export interface TextChange {
@@ -216,13 +221,38 @@ export interface TextChange {
   readonly texts: readonly FieldText[];
 }
 
-/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の綴り */
+export interface TextDiff {
+  readonly changes: readonly TextChange[];
+  /**
+   * 欄ごとの前後に分けて見せられなかった理由（欄の綴りが重なる・違うのに違う欄が見つからない）。あれば画面は取り込ませない。
+   * 見せられなかったものは、生の JSON の前後を `texts` に入れてある
+   */
+  readonly problem?: string;
+}
+
+function kindOf(value: unknown): ValueKind {
+  if (typeof value === "string") {
+    return "文字列";
+  }
+  if (typeof value === "number") {
+    return "数";
+  }
+  if (typeof value === "boolean") {
+    return "真偽";
+  }
+  if (value === null) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    return "並び";
+  }
+  return isRecord(value) ? "辞書" : "その他";
+}
+
+/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の綴り。種類は `kindOf` で別に添える */
 function shown(value: unknown): string {
   if (typeof value === "string") {
     return value;
-  }
-  if (value === undefined) {
-    return "";
   }
   try {
     return JSON.stringify(value) ?? String(value);
@@ -231,75 +261,133 @@ function shown(value: unknown): string {
   }
 }
 
-/** 値を葉まで開く。辞書と並びは中へ下りる（並びは `[番号]`）。空の辞書・並びは葉として扱う */
-function leaves(value: unknown, at: string, out: Map<string, string>): void {
+/** 英字・数字・`_` `-` だけのキーは `.キー` で、ほかは `["キー"]` で書く（`.` や `[` を含むキーで綴りが重ならないように） */
+const PLAIN_KEY = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+
+/** 頭の欄の綴り。呼び名の在る欄は呼び名、英字のキーはそのまま、ほかは `["キー"]`（呼び名と重ならない） */
+function headLabel(key: string): string {
+  if (Object.prototype.hasOwnProperty.call(FIELD_LABELS, key)) {
+    return FIELD_LABELS[key];
+  }
+  return PLAIN_KEY.test(key) ? key : `[${JSON.stringify(key)}]`;
+}
+
+/** 葉 1 つ。突き合わせは `path`（キーと番号の並びの JSON。型ごと持つので重ならない）で、`field` は見せるだけ */
+interface Leaf {
+  readonly field: string;
+  readonly value: unknown;
+}
+
+/** 値を葉まで開く。辞書と並びは中へ下りる。空の辞書・並びは葉として扱う */
+function leaves(value: unknown, path: readonly (string | number)[], field: string, out: Map<string, Leaf>): void {
   if (isRecord(value) && Object.keys(value).length > 0) {
     for (const [key, inner] of Object.entries(value)) {
       if (inner !== undefined) {
-        leaves(inner, at === "" ? fieldLabel(key) : `${at}.${key}`, out);
+        leaves(inner, [...path, key], PLAIN_KEY.test(key) ? `${field}.${key}` : `${field}[${JSON.stringify(key)}]`, out);
       }
     }
     return;
   }
   if (Array.isArray(value) && value.length > 0) {
-    value.forEach((inner, index) => leaves(inner, `${at}[${index}]`, out));
+    value.forEach((inner, index) => leaves(inner, [...path, index], `${field}[${index}]`, out));
     return;
   }
-  out.set(at, shown(value));
+  out.set(JSON.stringify(path), { field, value });
 }
 
-function leavesOf(value: Readonly<Record<string, unknown>>, skip: ReadonlySet<string>): Map<string, string> {
-  const out = new Map<string, string>();
+function leavesOf(value: Readonly<Record<string, unknown>>, skip: ReadonlySet<string>): Map<string, Leaf> {
+  const out = new Map<string, Leaf>();
   for (const [key, inner] of Object.entries(value)) {
     if (!skip.has(key) && inner !== undefined) {
-      leaves(inner, fieldLabel(key), out);
+      leaves(inner, [key], headLabel(key), out);
     }
   }
   return out;
 }
 
-/** 2 つの値の、違う葉の前後。片方にしか無い葉は、もう片方を空にする */
-function fieldTexts(a: Readonly<Record<string, unknown>> | undefined, b: Readonly<Record<string, unknown>> | undefined, skip: ReadonlySet<string>): FieldText[] {
-  const before = a === undefined ? new Map<string, string>() : leavesOf(a, skip);
-  const after = b === undefined ? new Map<string, string>() : leavesOf(b, skip);
-  const fields = [...new Set([...before.keys(), ...after.keys()])];
-  const out: FieldText[] = [];
-  for (const field of fields) {
-    const was = before.get(field);
-    const now = after.get(field);
-    if (was === now) {
+/** 2 つの値の、違う葉の前後。片方にしか無い葉は、もう片方を空にする。見せる綴りが重なれば `ambiguous` */
+function fieldTexts(
+  a: Readonly<Record<string, unknown>> | undefined,
+  b: Readonly<Record<string, unknown>> | undefined,
+  skip: ReadonlySet<string>,
+): { readonly texts: FieldText[]; readonly ambiguous: boolean } {
+  const before = a === undefined ? new Map<string, Leaf>() : leavesOf(a, skip);
+  const after = b === undefined ? new Map<string, Leaf>() : leavesOf(b, skip);
+  const paths = [...new Set([...before.keys(), ...after.keys()])];
+  const texts: FieldText[] = [];
+  const fields = new Map<string, string>();
+  let ambiguous = false;
+  for (const path of paths) {
+    const was = before.get(path);
+    const now = after.get(path);
+    const field = (now ?? was)?.field ?? "";
+    const seen = fields.get(field);
+    if (seen !== undefined && seen !== path) {
+      ambiguous = true;
+    }
+    fields.set(field, path);
+    if (was !== undefined && now !== undefined && sameValue(was.value, now.value)) {
       continue;
     }
-    out.push({ field, ...(was === undefined ? {} : { before: was }), ...(now === undefined ? {} : { after: now }) });
+    texts.push({
+      field,
+      ...(was === undefined ? {} : { before: shown(was.value), beforeKind: kindOf(was.value) }),
+      ...(now === undefined ? {} : { after: shown(now.value), afterKind: kindOf(now.value) }),
+    });
   }
-  return out;
+  return { texts, ambiguous };
 }
 
-/** `before`（いまのフロー）から `after`（下書き）への差分を、値の前後まで */
-export function textDiff(before: FlowDoc, after: FlowDoc): readonly TextChange[] {
+/** 欄ごとに分けられなかったときの、生の JSON の前後 */
+function rawTexts(a: unknown, b: unknown): FieldText[] {
+  return [
+    {
+      field: "（全体の JSON）",
+      ...(a === undefined ? {} : { before: shown(a), beforeKind: kindOf(a) }),
+      ...(b === undefined ? {} : { after: shown(b), afterKind: kindOf(b) }),
+    },
+  ];
+}
+
+/**
+ * `before`（いまのフロー）から `after`（下書き）への差分を、値の前後まで。欄の綴りが重なるか、違うのに違う欄が
+ * 見つからないものは、生の JSON の前後を入れて `problem` で言う（画面は取り込ませない）
+ */
+export function textDiff(before: FlowDoc, after: FlowDoc): TextDiff {
   const paired = pair(before, after);
-  const out: TextChange[] = [];
-  const meta = fieldTexts(before, after, META_SKIP);
-  if (meta.length > 0) {
-    out.push({ kind: "meta", label: "", texts: meta });
-  }
+  const changes: TextChange[] = [];
+  let problem: string | undefined;
+  const add = (kind: TextChange["kind"], label: string, a: Readonly<Record<string, unknown>> | undefined, b: Readonly<Record<string, unknown>> | undefined, skip: ReadonlySet<string>): void => {
+    const made = fieldTexts(a, b, skip);
+    if (made.ambiguous) {
+      problem = "欄の名前が重なって見分けられないもの（`.` や `[` を含むキーなど）があるため、欄ごとの前後に分けられません";
+      changes.push({ kind, label, texts: rawTexts(a, b) });
+    } else if (made.texts.length === 0 && a !== undefined && b !== undefined && !sameValue(a, b)) {
+      problem = "中身が違うのに、違う欄を見つけられません";
+      changes.push({ kind, label, texts: rawTexts(a, b) });
+    } else if (made.texts.length > 0) {
+      changes.push({ kind, label, texts: made.texts });
+    }
+  };
+  const metaOf = (doc: FlowDoc): Record<string, unknown> => Object.fromEntries(Object.entries(doc).filter(([key]) => !META_SKIP.has(key)));
+  add("meta", "", metaOf(before), metaOf(after), META_SKIP);
   for (const n of paired.addedNodes) {
-    out.push({ kind: "added-node", label: nodeLabel(n), texts: fieldTexts(undefined, n, NODE_SKIP) });
+    add("added-node", nodeLabel(n), undefined, n, NODE_SKIP);
   }
   for (const n of paired.removedNodes) {
-    out.push({ kind: "removed-node", label: nodeLabel(n), texts: fieldTexts(n, undefined, NODE_SKIP) });
+    add("removed-node", nodeLabel(n), n, undefined, NODE_SKIP);
   }
   for (const [old, n] of paired.changedNodes) {
-    out.push({ kind: "changed-node", label: nodeLabel(n), texts: fieldTexts(old, n, NODE_SKIP) });
+    add("changed-node", nodeLabel(n), old, n, NODE_SKIP);
   }
   for (const c of paired.addedConnections) {
-    out.push({ kind: "added-connection", label: connectionLabelOf(after, c), texts: fieldTexts(undefined, c, CONNECTION_SKIP) });
+    add("added-connection", connectionLabelOf(after, c), undefined, c, CONNECTION_SKIP);
   }
   for (const c of paired.removedConnections) {
-    out.push({ kind: "removed-connection", label: connectionLabelOf(before, c), texts: fieldTexts(c, undefined, CONNECTION_SKIP) });
+    add("removed-connection", connectionLabelOf(before, c), c, undefined, CONNECTION_SKIP);
   }
   for (const [old, c] of paired.changedConnections) {
-    out.push({ kind: "changed-connection", label: connectionLabelOf(after, c), texts: fieldTexts(old, c, CONNECTION_SKIP) });
+    add("changed-connection", connectionLabelOf(after, c), old, c, CONNECTION_SKIP);
   }
-  return out;
+  return problem === undefined ? { changes } : { changes, problem };
 }

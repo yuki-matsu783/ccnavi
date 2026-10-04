@@ -199,7 +199,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [offer, setOffer] = useState<FlowOffer | undefined>(() => pageOf(initial)?.offer);
   const [proposal, setProposal] = useState<ProposalView | undefined>(undefined);
   const [requestText, setRequestText] = useState<string | undefined>(undefined);
-  const imported = useRef<string | undefined>(undefined);
+  // 取り込んだ下書きの指紋と中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に添える（違えば下書きを消させない）
+  const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
@@ -348,6 +349,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       post({ type: "check", seq: checkSeq.current, doc });
     }, CHECK_MS);
     return () => clearTimeout(timer);
+  }, [doc]);
+
+  // 取り込んだ中身から編集で離れたら、取り込みの印を外す（元に戻して同じ中身にしても付け直さない。下書きを消さない側）
+  useEffect(() => {
+    const taken = imported.current;
+    if (taken !== undefined && doc !== undefined && !sameFlow(doc, taken.doc)) {
+      imported.current = undefined;
+    }
   }, [doc]);
 
   // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
@@ -508,7 +517,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setReview(undefined);
     setBusy(true);
     setStatus({ text: "着手中でないかを確かめて保存中…", error: false });
-    post({ type: "save", doc, ...(imported.current === undefined ? {} : { imported: imported.current }) });
+    const taken = imported.current;
+    post({ type: "save", doc, ...(taken !== undefined && sameFlow(doc, taken.doc) ? { imported: taken.hash } : {}) });
   };
 
   const openProposal = (): void => {
@@ -522,10 +532,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       return;
     }
     edit(taken.doc);
-    imported.current = taken.hash;
+    imported.current = { hash: taken.hash, doc: taken.doc };
     setProposal(undefined);
     setSelected(undefined);
-    setStatus({ text: "下書きを取り込みました（まだ保存していません）。確かめて保存すると、取り込んだ下書きは消えます", error: false });
+    setStatus({ text: "下書きを取り込みました（まだ保存していません）。そのまま保存すると、取り込んだ下書きは消えます（直してから保存したときは残します）", error: false });
   };
 
   const save = (): void => {

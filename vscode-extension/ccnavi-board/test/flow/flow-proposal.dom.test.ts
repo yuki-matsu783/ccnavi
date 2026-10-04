@@ -136,3 +136,60 @@ test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が
     await dom.close();
   }
 });
+
+test("CB-D142 取り込んだあとに元に戻して別の編集をした・取り込んだ中身を直したときは、保存に取り込みの指紋を添えない", async () => {
+  const dom = await openFlow({ offer: OFFER });
+  try {
+    const importDraft = async (): Promise<void> => {
+      dom.click(dom.one('[data-action="open-proposal"]'));
+      await dom.settle();
+      await dom.send({ type: "proposal", proposal: { doc: drafted(), hash: HASH, draftPath: OFFER.draftPath } });
+      dom.click(dom.one('[data-action="import-proposal"]'));
+      await dom.settle();
+    };
+    // 取り込み → 元に戻す → 別の編集 → 保存
+    await importDraft();
+    dom.click(dom.one('[data-action="undo"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
+    await dom.settle();
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.equal(dom.posted.filter((m) => m.type === "save").pop()?.imported, undefined);
+    await dom.send({ type: "failed", message: "やめた" });
+    // 取り込み → 直す → 保存
+    await importDraft();
+    dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
+    await dom.settle();
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.equal(dom.posted.filter((m) => m.type === "save").pop()?.imported, undefined);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値の種類の違い（\"1.0.0\" と 1）は種類の印で見える", async () => {
+  const dom = await openFlow({ offer: OFFER });
+  try {
+    dom.click(dom.one('[data-action="open-proposal"]'));
+    await dom.settle();
+    const base = templateFlow("i0001-01", "調査");
+    const reordered = { ...base, nodes: [...base.nodes].reverse() } as FlowDoc;
+    await dom.send({ type: "proposal", proposal: { doc: reordered, hash: HASH, draftPath: OFFER.draftPath } });
+    assert.equal(dom.all("#proposal-problem").length, 0);
+    assert.match(dom.one("#proposal-order-only").textContent ?? "", /並び順だけ/);
+    assert.ok(!dom.one<HTMLButtonElement>('[data-action="import-proposal"]').disabled);
+    // 型の違いは種類の印で見える
+    dom.click(dom.one('[data-action="cancel-proposal"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="open-proposal"]'));
+    await dom.settle();
+    const typed = { ...base, version: 1 } as unknown as FlowDoc;
+    await dom.send({ type: "proposal", proposal: { doc: typed, hash: HASH, draftPath: OFFER.draftPath } });
+    const kinds = dom.all(".proposal-value-kind").map((e) => e.textContent);
+    assert.ok(kinds.includes("数"), kinds.join(","));
+  } finally {
+    await dom.close();
+  }
+});

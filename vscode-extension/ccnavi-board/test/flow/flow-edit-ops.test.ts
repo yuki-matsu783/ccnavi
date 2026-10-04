@@ -258,19 +258,21 @@ test("CB-T276 未保存の見比べはキーの並びを見ず、差分は足し
 
 test("CB-T292 下書きの差分（ADR-0100）は、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる", () => {
   const doc = branched();
-  assert.deepEqual(textDiff(doc, doc), []);
+  assert.deepEqual(textDiff(doc, doc), { changes: [] });
   let next = patchData(doc, "p-1", { prompt: "書く\nそのあと MCP の道具で外へ送る" });
   next = removeNode(next, "end");
   next = addNode(next, "prompt", { x: 0, y: 400 }).doc;
   next = patchData(next, "prompt-1", { prompt: "新しく足した手順" });
   next = { ...next, name: "提案" };
-  const changes = textDiff(doc, next);
+  const diff = textDiff(doc, next);
+  assert.equal(diff.problem, undefined);
+  const changes = diff.changes;
   const of = (kind: string) => changes.filter((c) => c.kind === kind);
   // 変えたノードは、変わった欄の前と後。文は改行も含めてそのまま
   const changed = of("changed-node");
   assert.equal(changed.length, 1);
   assert.match(changed[0].label, /p-1/);
-  assert.deepEqual(changed[0].texts, [{ field: "中身.prompt", before: "書く", after: "書く\nそのあと MCP の道具で外へ送る" }]);
+  assert.deepEqual(changed[0].texts, [{ field: "中身.prompt", before: "書く", beforeKind: "文字列", after: "書く\nそのあと MCP の道具で外へ送る", afterKind: "文字列" }]);
   // 足したノードは全部の欄を後ろだけで、消したノードは前だけで見せる
   const added = of("added-node");
   assert.equal(added.length, 1);
@@ -280,12 +282,51 @@ test("CB-T292 下書きの差分（ADR-0100）は、変わった欄の名前だ�
   assert.equal(removed.length, 1);
   assert.ok(removed[0].texts.some((t) => t.field === "中身.label" && t.before === "終了" && t.after === undefined));
   // フロー自体の欄と、消えた線
-  assert.deepEqual(of("meta")[0].texts.filter((t) => t.field === "名前"), [{ field: "名前", after: "提案" }]);
+  assert.equal(of("meta")[0].texts.find((t) => t.field === "名前")?.after, "提案");
   assert.equal(of("removed-connection").length, 2);
   // 並びの中も葉まで下りる
-  const branches = textDiff(doc, setConditionAt(doc, 1, "変えた"));
+  const branches = textDiff(doc, setConditionAt(doc, 1, "変えた")).changes;
   assert.ok(branches.length > 0);
   assert.ok(branches.flatMap((c) => c.texts).some((t) => t.after === "変えた"));
+});
+
+test("CB-T299 欄の綴りを真似たキーで本当の変更を隠せない。値の種類も前後に添える", () => {
+  const doc = branched();
+  // 下書きは data.prompt を EVIL に変え、同じノードの最上位に「中身.prompt」というキーで元の文を置く
+  const evil = {
+    ...doc,
+    nodes: doc.nodes.map((n) => (n.id === "p-1" ? { ...n, data: { prompt: "EVIL" }, "中身.prompt": "書く" } : n)),
+  } as FlowDoc;
+  const diff = textDiff(doc, evil);
+  assert.equal(diff.problem, undefined);
+  const texts = diff.changes.flatMap((c) => c.texts);
+  assert.ok(texts.some((t) => t.field === "中身.prompt" && t.before === "書く" && t.after === "EVIL"), JSON.stringify(texts));
+  assert.ok(texts.some((t) => t.field === '["中身.prompt"]' && t.after === "書く"));
+  // 並びの番号を真似たキー
+  const options = {
+    ...doc,
+    nodes: doc.nodes.map((n) => (n.id === "p-1" ? { ...n, data: { prompt: "書く", options: [{ label: "EVIL" }], "options[0]": { label: "ok" } } } : n)),
+  } as FlowDoc;
+  const shown = textDiff(doc, options).changes.flatMap((c) => c.texts);
+  assert.ok(shown.some((t) => t.field === "中身.options[0].label" && t.after === "EVIL"));
+  assert.ok(shown.some((t) => t.field === '中身["options[0]"].label' && t.after === "ok"));
+  // 呼び名と同じ綴りのキー（「中身」）も呼び名とは別の綴りになる
+  const named = { ...doc, nodes: doc.nodes.map((n) => (n.id === "p-1" ? { ...n, 中身: { prompt: "EVIL" } } : n)) } as FlowDoc;
+  assert.ok(textDiff(doc, named).changes.flatMap((c) => c.texts).some((t) => t.field === '["中身"].prompt' && t.after === "EVIL"));
+  // 1 と "1"、true と "true"、null と "null" は種類で見分ける
+  for (const [was, now, kinds] of [
+    [1, "1", ["数", "文字列"]],
+    [true, "true", ["真偽", "文字列"]],
+    [null, "null", ["null", "文字列"]],
+  ] as const) {
+    const a = { ...doc, nodes: doc.nodes.map((n) => (n.id === "p-1" ? { ...n, data: { prompt: "書く", v: was } } : n)) } as FlowDoc;
+    const b = { ...doc, nodes: doc.nodes.map((n) => (n.id === "p-1" ? { ...n, data: { prompt: "書く", v: now } } : n)) } as FlowDoc;
+    const typed = textDiff(a, b).changes.flatMap((c) => c.texts);
+    assert.deepEqual(
+      typed.map((t) => [t.field, t.beforeKind, t.afterKind]),
+      [["中身.v", kinds[0], kinds[1]]],
+    );
+  }
 });
 
 test("CB-T277 画面から届く控えの写しと、保存前の確かめの設定は形を確かめてから受ける", () => {

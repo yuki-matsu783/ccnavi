@@ -268,3 +268,33 @@ test("CB-T298 リンク・ハードリンク・ふつうのファイルでない
     assert.ok(fs.existsSync(fifo));
   }
 });
+
+test("CB-T300 確かめてから消すまでの間に書き直された下書きは、移したものを確かめ直して元へ戻し、消さない", () => {
+  const tree = scratch();
+  const file = draftPlace(tree);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "nodes: []\n");
+  // import の名前空間は読むだけなので、本体の node:fs を差し替える（ソースの fs は呼ぶたびに本体を引く）
+  const real = require("node:fs") as { renameSync: typeof fs.renameSync };
+  const original = real.renameSync;
+  // 照合のあと、移す直前にエージェントが書き直した、を真似る
+  real.renameSync = (from, to) => {
+    if (String(from) === file) {
+      fs.writeFileSync(file, "nodes: [new]\n");
+    }
+    original(from, to);
+  };
+  try {
+    const raced = removeDraftFile(tree, file, sha("nodes: []\n"));
+    assert.equal(raced.ok, false);
+    assert.match(raced.ok ? "" : raced.error, /書き直されている/);
+  } finally {
+    real.renameSync = original;
+  }
+  assert.equal(fs.readFileSync(file, "utf8"), "nodes: [new]\n");
+  // 移した名前（.*.removing）は残らない
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.yml"]);
+  // 消せたときも残らない
+  assert.deepEqual(removeDraftFile(tree, file, sha("nodes: [new]\n")), { ok: true, removed: true });
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
+});

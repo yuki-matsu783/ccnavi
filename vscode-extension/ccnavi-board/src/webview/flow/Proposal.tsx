@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, type JSX } from "react";
 
-import { textDiff, type TextChange } from "../../core/flow-diff.js";
+import { textDiff, type TextChange, type ValueKind } from "../../core/flow-diff.js";
 import type { FlowDoc } from "../../core/flow-doc.js";
 import type { FlowLock, FlowProposal } from "../../core/flow-view.js";
 import { post } from "./post.js";
@@ -31,6 +31,11 @@ export type ProposalView =
   | { readonly kind: "error"; readonly error: string }
   | { readonly kind: "ready"; readonly proposal: FlowProposal };
 
+/** 値の種類の印（`1` と `"1"` を見分ける） */
+function Kind({ kind }: { readonly kind: ValueKind | undefined }): JSX.Element | null {
+  return kind === undefined ? null : <span className="proposal-value-kind">{kind}</span>;
+}
+
 function Change({ change }: { readonly change: TextChange }): JSX.Element {
   return (
     <li className="proposal-change" data-kind={change.kind}>
@@ -43,11 +48,13 @@ function Change({ change }: { readonly change: TextChange }): JSX.Element {
             <dt>{text.field}</dt>
             {text.before !== undefined && (
               <dd className="proposal-before" title="いまのフロー">
+                <Kind kind={text.beforeKind} />
                 <pre>{text.before}</pre>
               </dd>
             )}
             {text.after !== undefined && (
               <dd className="proposal-after" title="下書き">
+                <Kind kind={text.afterKind} />
                 <pre>{text.after}</pre>
               </dd>
             )}
@@ -74,7 +81,10 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   useEffect(() => {
     cancel.current?.focus();
   }, []);
-  const changes = view.kind === "ready" ? textDiff(base, view.proposal.doc) : [];
+  const diff = view.kind === "ready" ? textDiff(base, view.proposal.doc) : undefined;
+  const changes = diff?.changes ?? [];
+  // 欄ごとに分けて見せられなかった下書きは取り込ませない（読めていないものを入れない）
+  const blocked = lock.locked || diff?.problem !== undefined;
   return (
     <div className="review-backdrop">
       <section className="review proposal" id="proposal-review" role="dialog" aria-modal="true" aria-labelledby="proposal-review-title">
@@ -91,6 +101,11 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
               下書き {view.proposal.draftPath} と、いまのフローとの違いです。フローの文は担当のサブエージェントへの案内になります。
               外部の道具を使わせる指示などが紛れていないか、文を読んでから取り込んでください。
             </p>
+            {diff?.problem !== undefined && (
+              <p className="proposal-error" id="proposal-problem">
+                取り込めません: {diff.problem}。下の全体の JSON を確かめ、エディタで直すか、エージェントに書き直しを頼んでください。
+              </p>
+            )}
             {changes.length === 0 && <p id="proposal-order-only">並び順だけが違います（ノードと線の中身は同じです）。</p>}
             <ul className="proposal-list">
               {changes.map((change, index) => (
@@ -110,7 +125,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
             閉じる
           </button>
           {view.kind === "ready" && (
-            <button type="button" className="action primary" data-action="import-proposal" disabled={lock.locked} onClick={() => onImport(view.proposal)}>
+            <button type="button" className="action primary" data-action="import-proposal" disabled={blocked} onClick={() => onImport(view.proposal)}>
               {dirty ? "未保存の変更を捨てて取り込む" : "取り込む"}
             </button>
           )}
