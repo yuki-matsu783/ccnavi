@@ -131,6 +131,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "policy.builtin",
                 "policy.ctxfile",
                 "policy.selfguard",
+                "policy.selfguard_targets",
+                "policy.selfguard_shell",
                 "tickets.archive",
                 "tickets.flow",
                 "tickets.history",

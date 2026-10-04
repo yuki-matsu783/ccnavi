@@ -21,7 +21,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import platformtag, settings, shellread
-from ccnavi.policy import rules, selfguard
+from ccnavi.policy import rules, selfguard, selfguard_shell, selfguard_targets
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -357,7 +357,7 @@ class SelfGuardTest(unittest.TestCase):
         write(project, json.dumps(RULES))
 
         layers = [settings.LayerFile(settings.ORIGIN_PROJECT, "lib", "rules", project)]
-        found = selfguard.targets(self.repo, self.rules, "", layers, projects)
+        found = selfguard_targets.targets(self.repo, self.rules, "", layers, projects)
 
         own = [t for t in found if t.key == "rules:lib"]
         self.assertEqual(len(own), 1, [t.key for t in found])
@@ -374,7 +374,7 @@ class SelfGuardTest(unittest.TestCase):
         self.worktree()
         outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")
 
-        found = selfguard.targets(self.repo, outside, "")
+        found = selfguard_targets.targets(self.repo, outside, "")
 
         self.assertEqual([t.label for t in found if t.copy], self.own_copies())
 
@@ -406,7 +406,7 @@ class SelfGuardTest(unittest.TestCase):
         # 式は守る先を全部並べた大きなもので、組み立てとコンパイルに時間がかかる。
         # `match: Bash` の 1 本なので、Bash 以外のツールでは組み立てない。
         with mock.patch.object(
-            selfguard, "guard_shell_regex", wraps=selfguard.guard_shell_regex
+            selfguard_shell, "guard_shell_regex", wraps=selfguard_shell.guard_shell_regex
         ) as built:
             for tool, field in (("Edit", "file_path"), ("Read", "file_path"), ("bash", "command")):
                 with self.subTest(tool=tool):
@@ -424,15 +424,15 @@ class SelfGuardTest(unittest.TestCase):
         # Bash に足した 1 本は、ツール名を渡さない呼び手（従来）が足すものと同じ。
         def built(tool):
             rule_set = rules.RuleSet(version=rules.VERSION)
-            selfguard.add_rules(rule_set, root=self.repo, tool=tool)
+            selfguard_shell.add_rules(rule_set, root=self.repo, tool=tool)
             return rule_set.deny
 
         everything = built(None)
-        shell = next(r for r in everything if r.id == selfguard.SHELL_RULE_ID)
+        shell = next(r for r in everything if r.id == selfguard_shell.SHELL_RULE_ID)
         command = "echo x > .ccnavi/common/rules.yml"
         self.assertTrue(shell.matches("Bash", command))
         self.assertEqual([r.key() for r in built("Bash")], [r.key() for r in everything])
-        rest = [r.key() for r in everything if r.id != selfguard.SHELL_RULE_ID]
+        rest = [r.key() for r in everything if r.id != selfguard_shell.SHELL_RULE_ID]
         for tool in ("Edit", "Write", "Read", "bash", "BASH", " Bash", "mcp__shell__Bash", ""):
             with self.subTest(tool=tool):
                 self.assertEqual([r.key() for r in built(tool)], rest)
@@ -1083,25 +1083,25 @@ class InsertTest(unittest.TestCase):
     """組み込みの保護を組み立てられないときの扱い。"""
 
     BROKEN = {
-        "id": selfguard.RECORDS_RULE_ID,
+        "id": selfguard_shell.RECORDS_RULE_ID,
         "match": "Write|Edit|NotebookEdit",
         "regex": "(",
-        "message": selfguard.RECORDS_MESSAGE,
+        "message": selfguard_shell.RECORDS_MESSAGE,
     }
 
     def test_組み立てられない保護は判定を止めずに外し診断ログに残す(self):
         for root, expected in (("/ws", "/ws"), ("", None)):
             with self.subTest(root=root):
                 rule_set = rules.RuleSet(version=rules.VERSION)
-                with mock.patch.object(selfguard.diaglog, "get") as get:
-                    selfguard._insert(rule_set, dict(self.BROKEN), root)
+                with mock.patch.object(selfguard_shell.diaglog, "get") as get:
+                    selfguard_shell._insert(rule_set, dict(self.BROKEN), root)
                 self.assertEqual(rule_set.deny, [])
                 # root が無ければ省いた扱い（CLAUDE_PROJECT_DIR）。出どころは実行ファイルと同じ。
                 get.assert_called_once_with("ccnavi", expected)
                 warned = get.return_value.warn
                 warned.assert_called_once()
                 fields = warned.call_args.kwargs
-                self.assertEqual(fields["rule"], selfguard.RECORDS_RULE_ID)
+                self.assertEqual(fields["rule"], selfguard_shell.RECORDS_RULE_ID)
                 self.assertGreaterEqual(fields["problems"], 1)
                 # 式（守る先のパスが入る）は渡さない。
                 self.assertEqual(set(fields), {"rule", "problems"})
@@ -1109,9 +1109,9 @@ class InsertTest(unittest.TestCase):
     def test_組み立てられる保護は先頭に挿し診断ログに書かない(self):
         rule_set = rules.RuleSet(version=rules.VERSION)
         good = dict(self.BROKEN, regex="x$")
-        with mock.patch.object(selfguard.diaglog, "get") as get:
-            selfguard._insert(rule_set, good, "/ws")
-        self.assertEqual([r.id for r in rule_set.deny], [selfguard.RECORDS_RULE_ID])
+        with mock.patch.object(selfguard_shell.diaglog, "get") as get:
+            selfguard_shell._insert(rule_set, good, "/ws")
+        self.assertEqual([r.id for r in rule_set.deny], [selfguard_shell.RECORDS_RULE_ID])
         get.assert_not_called()
 
 

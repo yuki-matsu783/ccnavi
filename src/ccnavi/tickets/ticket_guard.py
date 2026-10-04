@@ -9,7 +9,7 @@ import re
 from typing import TextIO
 
 from ..infra import hookio, settings
-from ..policy import ctxfile, rules, selfguard
+from ..policy import ctxfile, rules, selfguard_shell
 from . import ticket_model
 
 STATE_RULE_ID = "builtin-ticket-state"
@@ -67,9 +67,9 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     # した形（`cp -r /tmp/review wip/proposals/`）も同じ部品で止める。
     shell = "|".join(
         (
-            rf"{selfguard._WRITE_VERBS}{loose}",
-            selfguard.copy_destination_regex(selfguard.copy_last_place(review), loose),
-            selfguard.holder_regex(selfguard.under(_place(tickets_rel)), states),
+            rf"{selfguard_shell._WRITE_VERBS}{loose}",
+            selfguard_shell.copy_destination_regex(selfguard_shell.copy_last_place(review), loose),
+            selfguard_shell.holder_regex(selfguard_shell.under(_place(tickets_rel)), states),
         )
     )
     shell_rule = rules.Rule(

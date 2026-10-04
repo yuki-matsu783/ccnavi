@@ -14,7 +14,7 @@ from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
-from ..policy import builtin, ctxfile, ruleload, rules, selfguard
+from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
 from ..records import audit, prune, repeat
 from ..tickets import approval, approval_checks, branchfind, configsync, ops, phase
 from . import docsearch, judge, post, projskills, reasons, subagent
@@ -387,7 +387,7 @@ def decide_at_start(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(
+        selfguard_targets.targets(
             root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
         ),
     )

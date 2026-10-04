@@ -12,7 +12,15 @@ from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import EXIT_OK
-from ..policy import builtin, ctxfile, ruleload, rules, selfguard
+from ..policy import (
+    builtin,
+    ctxfile,
+    ruleload,
+    rules,
+    selfguard,
+    selfguard_shell,
+    selfguard_targets,
+)
 from ..records import audit, repeat
 from ..tickets import (
     approval,
@@ -114,7 +122,7 @@ def guard_setting_files(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(
+        selfguard_targets.targets(
             root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
         ),
     )
@@ -165,12 +173,12 @@ def decide_before(
         record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(
+        selfguard_shell.add_rules(
             rule_set,
             conf.bin,
             conf.project_home,
             root,
-            selfguard.common_layer_files(conf),
+            selfguard_shell.common_layer_files(conf),
             (conf.log, conf.state),
             tool=payload.tool_name,
         )

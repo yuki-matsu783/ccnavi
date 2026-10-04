@@ -33,7 +33,7 @@ from dataclasses import dataclass, field, replace
 from typing import TextIO
 
 from ..infra import gitcmd, settings, shellread, tree
-from ..policy import rules, selfguard
+from ..policy import rules, selfguard_shell
 from . import (
     approval,
     approval_checks,
@@ -107,7 +107,7 @@ HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 # 数えると、引用の中に書いた `"a --preview"` が単独の語に見えて、再び免除が成立する。
 _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
-_NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
+_NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
     rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--config-synced\b"
     r"|\b(ticket|review)\s+"
@@ -379,7 +379,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     ここではなく `human_path_form` が止める。実行ファイルのパスに頼らず見るため。
     """
     names = [r"ccnavi(\.exe)?"]
-    clause = selfguard.binary_clause(bin_path)
+    clause = selfguard_shell.binary_clause(bin_path)
     if clause:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"

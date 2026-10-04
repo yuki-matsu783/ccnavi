@@ -313,7 +313,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
 def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     """守る対象（selfguard）に渡す、層ごとの設定ファイル（種別, 名札, kind, パス）。
 
-    共通層は phases と risk の 2 本だけ返す。共通層の rules は `selfguard.targets` が
+    共通層は phases と risk の 2 本だけ返す。共通層の rules は `selfguard_targets.targets` が
     `rules_path` で受け取っているので、ここから重ねると同じファイルが 2 度並ぶ。
 
     自身の層とプロジェクトの層は 3 本とも返す。差し替え（`--project-rules-file`）は

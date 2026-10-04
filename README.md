@@ -2632,6 +2632,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/policy/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
 | `src/ccnavi/policy/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の記録 |
 | `src/ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルのバックアップと復元 |
+| `src/ccnavi/policy/selfguard_targets.py` | 守る対象の一覧。設定ファイル・層の 3 本・実行ファイルと、ワークツリー側の写し |
+| `src/ccnavi/policy/selfguard_shell.py` | 守る対象へのシェルからの書き込みを止める組み込みのルール（正規表現と `add_rules`） |
 | `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、リスク、操作 |
 | `src/ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
 | `src/ccnavi/tickets/ticket_model.py` | チケットの形。書式の定数・状態の名前・範囲の項・計画の項・待ち方と `Ticket` |
