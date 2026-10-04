@@ -38,7 +38,7 @@ export async function startIssue(repo: RepoConfig, issue: number, seen: Snapshot
     };
     // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
-    const res = await py.start(deps.py, { settings: base.settings, snapshot, issue, taken: [...new Set([...taken, ...all])] });
+    const res = await py.start(deps.py, { snapshot, issue, taken: [...new Set([...taken, ...all])] });
     if (res.problems.length > 0) return { kind: "refused", message: res.problems.join("\n") };
     const made = (await deps.call("createBranch", [repo.owner, repo.repo, res.identifier, base.integration.head])) as { name: string; head: string };
     return { kind: "started", name: made.name, head: made.head };

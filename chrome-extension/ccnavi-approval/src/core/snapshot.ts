@@ -5,7 +5,7 @@
  * 流れ:
  *
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ）。設定したブランチが無ければ止める
- * 2. 統合先の `.claude/settings.json` を読み、置き場のパスを Python に出させる
+ * 2. 置き場のパスを Python に出させる（既定に固定。統合先の `.claude/settings.json` の `env` は読まない）
  * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python
  * 4. 直近 N 日とユーザの指定のブランチ（表示用）の置き場を読み、親子のチケットを Python に見分けさせる
  * 5. 親子のチケットごとに、参照の閉包の足りないブランチを読み足し、Python に承認待ちを出させる。
@@ -180,7 +180,6 @@ export class Reader {
 
 export interface IntegrationRead {
   readonly integration: Snapshot["integration"];
-  readonly settings: string | null;
   readonly place: Placement;
   readonly compat: Compat;
 }
@@ -197,21 +196,19 @@ async function integrationOf(repo: RepoConfig, reader: Reader, what: string): Pr
   return { name, source, head } as const;
 }
 
-/** 1〜3: 統合先を決め、置き場のパス・統合先の中身・互換のマーカーを読む。統合先が無ければ投げる */
+/** 1〜3: 統合先を決め、置き場のパス（既定に固定）を聞いて、統合先の中身・互換のマーカーを読む。統合先が無ければ投げる */
 export async function readIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   if (repo.project) return await readProjectIntegration(repo, reader, deps);
   const integration = await integrationOf(repo, reader, "");
   const { name, head } = integration;
-  const first = await reader.read(name, head, [".claude/settings.json"]);
-  const settings = first.files[".claude/settings.json"] ?? null;
-  const place: Placement = await py.placement(deps.py, settings);
+  const place: Placement = await py.placement(deps.py);
   await reader.read(name, head, [...place.integration_paths, ...place.integration_files]);
   const compat = await py.compat(deps.py, reader.snapshot(integration));
-  return { integration, settings, place, compat };
+  return { integration, place, compat };
 }
 
 /**
- * プロジェクトのリポジトリ: 置き場のパス・共通層・互換のマーカーはワークスペースの統合先から、
+ * プロジェクトのリポジトリ: 置き場のパスは既定に固定。共通層・設定・互換のマーカーはワークスペースの統合先から、
  * 閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先から読む。プロジェクトの層の計算は Python
  */
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
@@ -221,16 +218,14 @@ async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: De
   }
   const wsReader = new Reader(ws.repo, { ...deps, call: ws.call, workspace: undefined });
   const wsInteg = await integrationOf(ws.repo, wsReader, "ワークスペースの");
-  const first = await wsReader.read(wsInteg.name, wsInteg.head, [".claude/settings.json"]);
-  const settings = first.files[".claude/settings.json"] ?? null;
-  const place: Placement = await py.placement(deps.py, settings);
+  const place: Placement = await py.placement(deps.py);
   const wsBranch = await wsReader.read(wsInteg.name, wsInteg.head, [...place.workspace_paths, ...place.workspace_files]);
   reader.project = repo.project;
   reader.workspace = { integration: wsInteg, files: wsBranch.files, binary: wsBranch.binary, links: wsBranch.links ?? [] };
   const integration = await integrationOf(repo, reader, "");
   await reader.read(integration.name, integration.head, place.project_paths);
   const compat = await py.compat(deps.py, reader.snapshot(integration));
-  return { integration, settings, place, compat };
+  return { integration, place, compat };
 }
 
 /** リポジトリ 1 つを読んで、親子のチケットごとの承認待ちを組む。失敗は `error` に入れて返す */
@@ -239,10 +234,10 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
   const reader = new Reader(repo, deps);
   let integration: Snapshot["integration"] | null = null;
   try {
-    // 1〜3. 統合先、置き場のパス、統合先の中身、互換のマーカー
+    // 1〜3. 統合先、置き場のパス（既定に固定）、統合先の中身、互換のマーカー
     const base = await readIntegration(repo, reader, deps);
     integration = base.integration;
-    const { settings, place, compat } = base;
+    const { place, compat } = base;
     const name = integration.name;
 
     // 4. 表示用のブランチ（直近 N 日とユーザの指定）
@@ -262,12 +257,12 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
     for (const c of candidates) {
       await reader.read(c, heads.get(c) as string, place.branch_paths);
     }
-    const families = await py.families(deps.py, settings, reader.snapshot(integration), candidates);
+    const families = await py.families(deps.py, reader.snapshot(integration), candidates);
 
     // 5. 親子のチケットごとの承認待ち
     const boards: FamilyBoard[] = [];
     for (const family of families) {
-      boards.push(await familyBoard(family, reader, integration, settings, place, deps));
+      boards.push(await familyBoard(family, reader, integration, place, deps));
     }
     return { repo, integration, compat, candidates, missingExtras, families: boards, error: "", stats: deps.stats, seen: reader.snapshot(integration) };
   } catch (err) {
@@ -280,13 +275,12 @@ async function closureInput(
   family: string,
   reader: Reader,
   integration: Snapshot["integration"],
-  settings: string | null,
   place: Placement,
   deps: Deps,
 ): Promise<Snapshot> {
   // 閉包の足りない親子のチケットを読み足す。無いブランチは `absent` に入り、Python が決める
   for (let round = 0; round < 32; round += 1) {
-    const closure = await py.closure(deps.py, settings, reader.snapshot(integration), family);
+    const closure = await py.closure(deps.py, reader.snapshot(integration), family);
     if (closure.over_limit || closure.need.length === 0) break;
     for (const n of closure.need) {
       const sha = await reader.head(n);
@@ -295,7 +289,7 @@ async function closureInput(
   }
   // 判定の入力は統合先・P・閉包だけ。表示用のブランチを混ぜないよう、ここで絞る
   const all = reader.snapshot(integration);
-  const closure = await py.closure(deps.py, settings, all, family);
+  const closure = await py.closure(deps.py, all, family);
   const keep = new Set([integration.name, ...closure.families]);
   const branches: Record<string, Branch> = {};
   for (const [k, v] of Object.entries(all.branches)) if (keep.has(k)) branches[k] = v;
@@ -306,19 +300,18 @@ async function familyBoard(
   family: Family,
   reader: Reader,
   integration: Snapshot["integration"],
-  settings: string | null,
   place: Placement,
   deps: Deps,
 ): Promise<FamilyBoard> {
   try {
-    const input = await closureInput(family.name, reader, integration, settings, place, deps);
-    const board = await py.board(deps.py, settings, input, family.name);
+    const input = await closureInput(family.name, reader, integration, place, deps);
+    const board = await py.board(deps.py, input, family.name);
     const result = await withdrawableHere(board, reader, place, family.name);
     const reviews = await reviewPanels(
       board.reviewable ?? [],
       deps.py,
       (op, args) => reader.call(op, ...args),
-      { settings, snapshot: input, family: family.name },
+      { snapshot: input, family: family.name },
       deps.now(),
     );
     return { family, result, error: "", reviews };
@@ -381,6 +374,6 @@ export async function readFamily(repo: RepoConfig, family: string, deps: Deps, a
     throw new Error(`親のブランチ ${family} がホストに無い`);
   }
   await reader.read(family, head, base.place.branch_paths);
-  const input = await closureInput(family, reader, base.integration, base.settings, base.place, deps);
+  const input = await closureInput(family, reader, base.integration, base.place, deps);
   return { ...base, input, head };
 }

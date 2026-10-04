@@ -188,28 +188,27 @@ async function ask<T>(call: PyCall, op: string, body: Record<string, unknown>, k
 }
 
 export const py = {
-  placement: (call: PyCall, settings: string | null) => ask<Placement>(call, "placement", { settings }, "placement"),
-  families: (call: PyCall, settings: string | null, snapshot: Snapshot, candidates: readonly string[]) =>
-    ask<Family[]>(call, "families", { settings, snapshot, candidates }, "families"),
-  closure: (call: PyCall, settings: string | null, snapshot: Snapshot, family: string) =>
-    ask<Closure>(call, "closure", { settings, snapshot, family }, ""),
-  board: (call: PyCall, settings: string | null, snapshot: Snapshot, family: string) =>
-    ask<BoardResult>(call, "board", { settings, snapshot, family }, ""),
+  placement: (call: PyCall) => ask<Placement>(call, "placement", {}, "placement"),
+  families: (call: PyCall, snapshot: Snapshot, candidates: readonly string[]) =>
+    ask<Family[]>(call, "families", { snapshot, candidates }, "families"),
+  closure: (call: PyCall, snapshot: Snapshot, family: string) =>
+    ask<Closure>(call, "closure", { snapshot, family }, ""),
+  board: (call: PyCall, snapshot: Snapshot, family: string) =>
+    ask<BoardResult>(call, "board", { snapshot, family }, ""),
   compat: (call: PyCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
     call: PyCall,
-    body: { settings: string | null; snapshot: Snapshot; family: string; only: readonly string[] | null; shown: { ids: readonly string[]; digest: string }; stamp: string; actor: Actor },
+    body: { snapshot: Snapshot; family: string; only: readonly string[] | null; shown: { ids: readonly string[]; digest: string }; stamp: string; actor: Actor },
   ) => ask<PlanResult>(call, "plan", { ...body }, ""),
   withdraw: (
     call: PyCall,
-    body: { settings: string | null; snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
+    body: { snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
-  start: (call: PyCall, body: { settings: string | null; snapshot: Snapshot; issue: number; taken: readonly string[] }) =>
+  start: (call: PyCall, body: { snapshot: Snapshot; issue: number; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),
   confirm: (
     call: PyCall,
     body: {
-      settings: string | null;
       snapshot: Snapshot;
       family: string;
       phase: number;
