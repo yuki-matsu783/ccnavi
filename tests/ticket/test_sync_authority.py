@@ -906,7 +906,7 @@ class LintTest(AuthorityHarness):
         self.assertIn("phases.yml", drift[0]["detail"])
 
     def test_the_projected_layer_on_the_parent_branch_is_compared(self):
-        from ccnavi.entry import lint
+        from ccnavi.entry import lint_layers
 
         conf = self.conf()
         self_base = os.path.join(self.state, "sync", "self", "integration")
@@ -922,14 +922,14 @@ class LintTest(AuthorityHarness):
             record=syncstate.Family("w0001", "web", "present"),
             home=approval.tree.Tree("w0001", home, project="web", kind="worktree"),
         )
-        problems = lint._projected_layer_problems(conf, st, "(x)")
+        problems = lint_layers._projected_layer_problems(conf, st, "(x)")
         # 共通層の rules と、プロジェクトの統合先の phases が P の上に無い。
         self.assertEqual(2, len(problems), problems)
         write(os.path.join(home, ".ccnavi", "config", "rules.yml"), "rules: []\n")
         write(os.path.join(home, ".ccnavi", "config", "phases.yml"), "types: {}\r\n")
-        self.assertEqual([], lint._projected_layer_problems(conf, st, "(x)"))
+        self.assertEqual([], lint_layers._projected_layer_problems(conf, st, "(x)"))
         write(os.path.join(home, ".ccnavi", "config", "risks.yml"), "x: 1\n")
-        problems = lint._projected_layer_problems(conf, st, "(x)")
+        problems = lint_layers._projected_layer_problems(conf, st, "(x)")
         self.assertEqual(1, len(problems))
         self.assertIn("risks.yml", problems[0].detail)
 
