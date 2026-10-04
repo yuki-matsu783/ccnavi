@@ -924,16 +924,19 @@ def settle_review(
     return moved, ""
 
 
-def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
-    """この親の次の子の識別子。どの置き場に在る子よりも後ろの連番。"""
+def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: int) -> str:
+    """この親のこのフェーズの次の子の識別子。どの置き場に在る同じフェーズの子よりも後ろの連番。
+
+    連番はフェーズごとに 1 から数える（`<親>-<フェーズ番号>-<連番>`）。
+    """
     seen = _everything(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     used = 0
     for t in seen + proposals:
         m = ticket_mod.child_pattern().match(t.ticket)
-        if m and m.group("parent") == parent_id:
+        if m and m.group("parent") == parent_id and int(m.group("phase")) == phase_no:
             used = max(used, int(m.group("seq")))
-    return f"{parent_id}-{used + 1:02d}"
+    return ticket_mod.child_id(parent_id, phase_no, used + 1)
 
 
 def followup(
@@ -951,7 +954,7 @@ def followup(
     そのフェーズは開き直り、マーカーは消える（REQ-TKT-21）。範囲は見た子の範囲の和。
     本文には指摘を写す。返すのは識別子と、起こせなかった理由。
     """
-    ident = next_child_id(conf, root, parent.ticket)
+    ident = next_child_id(conf, root, parent.ticket, phase_no)
     where = home_dir(conf, root, parent.ticket, "", project=parent.project)
     front: dict = {
         "version": ticket_mod.VERSION,

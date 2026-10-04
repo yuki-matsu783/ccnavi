@@ -275,7 +275,10 @@ def _tickets_in(files: dict[str, str], place: dict, states: tuple[str, ...] | No
 
 
 def family_of(ident: str) -> str:
-    """識別子が属する親子のチケットの親。子の形なら `parent`、そうでなければ自分。"""
+    """識別子が属する親子のチケットの親。
+
+    子の形（`<親>-<2 桁>-<2 桁>`）なら `parent`、そうでなければ自分。
+    """
     m = ticket_mod.child_pattern().match(ident)
     return m.group("parent") if m else ident
 

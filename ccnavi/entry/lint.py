@@ -951,7 +951,9 @@ def _branch_name_problems(
       （`ticket.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
     - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
       ブランチもワークツリーも同じ名前になる
-    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。親子のチケットを引くとき、別の親の子と読まれる
+    - 末尾が `-<2 桁>` の親の識別子。`-<2 桁>-<2 桁>` で終われば子の形（`<親>-<フェーズ>-<連番>`）に
+      当たり、親子のチケットを引くとき別の親の子と読まれる。`-<2 桁>` だけでも、別の親の子の識別子の
+      途中（`<親>-<フェーズ>`）と紛れる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
     `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
@@ -986,17 +988,27 @@ def _branch_name_problems(
             )
 
     child = ticket_mod.child_pattern()
+    tail = ticket_mod.child_tail_pattern()
     parents = sorted({t.ticket for t in everyone if not t.is_child})
     for name in parents:
-        matched = child.match(name)
-        if matched is None:
+        if tail.search(name) is None:
             continue
+        matched = child.match(name)
+        if matched is not None:
+            said_how = (
+                f"識別子が子の形（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）と一致する。"
+                f"親子のチケットをまとめるとき {matched.group('parent')} の子として扱われる"
+            )
+        else:
+            said_how = (
+                "識別子の末尾が `-<2 桁>` で、別の親の子の識別子の途中"
+                "（`<親>-<2 桁のフェーズ番号>`）と紛れる"
+            )
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{name} は親なのに、識別子が子の形（`<親>-<2 桁>`）と一致する。"
-                f"親子のチケットをまとめるとき {matched.group('parent')} の子として扱われる。"
+                f"{name} は親なのに、{said_how}。"
                 "親の識別子の末尾を `-<2 桁>` にしないでください（親のブランチ名の規則）",
             )
         )

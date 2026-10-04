@@ -30,10 +30,10 @@
 
     ---
     version: 1
-    ticket: i0050-03
+    ticket: i0050-02-01
     parent: i0050
     phase: 2
-    predecessors: [i0050-01]
+    predecessors: [i0050-01-01]
     human_review: {required: true, reason: 設定の読み込み経路を変えるため}
     title: 設定画面の分割
     rationale: |
@@ -111,9 +111,13 @@ MAX_SCOPE_ENTRIES = 20
 # プロジェクトの外を指す綴り、`$` は展開されるまで行き先が決まらない綴り。
 _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 
-# 識別子。親は自由な 1 語、子は `<親>-<2 桁連番>`。
+# 識別子。親は自由な 1 語、子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。
+# 識別子だけから親を割り出すときは、右から 2 段（`-\d{2}-\d{2}`）を剥がす。親が `-` や数字を
+# 含んでも（`web-i0012-05-01` の親は `web-i0012`）割り出し方は 1 通りに決まる。
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<seq>\d{2})$")
+_CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<phase>\d{2})-(?P<seq>\d{2})$")
+# 親の識別子の末尾に置かないもの（`-<2 桁>`）。子の識別子の途中（`<親>-<フェーズ>`）と紛れる。
+_CHILD_TAIL = re.compile(r"-\d{2}$")
 
 
 def is_valid_id(text: str) -> bool:
@@ -125,8 +129,22 @@ def is_valid_id(text: str) -> bool:
 
 
 def child_pattern() -> re.Pattern:
-    """子の識別子の形（`<親>-<2 桁連番>`）。承認の側が次の連番を数えるのに使う。"""
+    """子の識別子の形（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）。
+
+    名前付きグループは `parent`・`phase`・`seq`。承認の側が次の連番を数えるのと、
+    識別子だけから親を割り出すのに使う。
+    """
     return _CHILD
+
+
+def child_id(parent: str, phase: int, seq: int) -> str:
+    """子の識別子を組む。フェーズ番号も連番も 2 桁の 0 埋め。"""
+    return f"{parent}-{phase:02d}-{seq:02d}"
+
+
+def child_tail_pattern() -> re.Pattern:
+    """親の識別子の末尾に置かない形（`-<2 桁>`）。子の識別子の途中と紛れる。"""
+    return _CHILD_TAIL
 
 
 # 親のブランチ名は親の識別子そのもの（名前を求める関数が恒等写像なので、Python・sh・TS で
@@ -164,8 +182,9 @@ def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
     """新規の提案の識別子が、親のブランチ名の規則に合わないところ。
 
     規則は、ref として安全な形（`..` を含まない、`.lock` や `.` で終わらない）、`^i\\d+$` は
-    `issue:` があるときだけ、統合先や保護されたブランチの名前を使わない、issue の無い親は
-    `-<2 桁>` で終わらない（子の識別子と紛れる）。
+    `issue:` があるときだけ、統合先や保護されたブランチの名前を使わない、親は
+    `-<2 桁>` で終わらない（`-<2 桁>-<2 桁>` で終われば子の識別子そのもの、`-<2 桁>` だけでも
+    子の識別子の途中の `<親>-<フェーズ番号>` と紛れる）。
 
     見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのはユーザに見せる文で、
     深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子と、
@@ -668,13 +687,25 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
                 Problem(
                     SEVERITY_ERROR,
                     name,
-                    f"子の識別子は `{ticket.parent}-<2 桁連番>` の形で書く。親の識別子が名前空間",
+                    f"子の識別子は `{ticket.parent}-<2 桁のフェーズ番号>-<2 桁の連番>` の形で書く"
+                    f"（フェーズ 5 の 1 枚目なら `{child_id(ticket.parent, 5, 1)}`）。"
+                    "親の識別子が名前空間で、フェーズ番号は `phase` と同じ値",
                 )
             )
             return True
         phase = front.get("phase")
         if isinstance(phase, bool) or not isinstance(phase, int) or phase < 0:
             problems.append(Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が要る"))
+            return True
+        if int(matched.group("phase")) != phase:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"子の識別子のフェーズ番号（{matched.group('phase')}）が `phase: {phase}` と"
+                    f"食い違う。識別子は `{ticket.parent}-{phase:02d}-<2 桁の連番>` の形で書く",
+                )
+            )
             return True
         ticket.phase = phase
     else:

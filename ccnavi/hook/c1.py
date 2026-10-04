@@ -74,7 +74,10 @@ _TIMEOUT = 20.0
 
 
 def family_of(ident: str) -> str:
-    """識別子が属する親子のチケットの親。子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。"""
+    """識別子が属する親子のチケットの親。
+
+    子の形（`<親>-<2 桁>-<2 桁>`）なら右から 2 段を剥がした親、そうでなければ自身。
+    """
     matched = ticket_mod.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
 
