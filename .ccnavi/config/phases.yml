@@ -56,7 +56,7 @@ phases:
     kind: work
     title: 文書
     review: mr
-    scope: ["README.md", "docs/*", "CLAUDE.md", ".claude/skills/*"]
+    scope: ["README.md", "docs/*", "extensions/vscode/ccnavi-board/docs/*", "extensions/chrome/ccnavi-approval/docs/*", "CLAUDE.md", ".claude/skills/*"]
 
   design-feedback:
     kind: feedback
