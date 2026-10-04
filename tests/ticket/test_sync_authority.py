@@ -22,7 +22,7 @@ from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.tickets import agree, approval, syncstate
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
-from tests.ticket.test_ticket import git, write
+from tests.ticket.test_ticket import git, to_old_form, write
 
 
 def record_text(name, state, reason="", sha="0" * 40):
@@ -456,8 +456,9 @@ class TombstoneTest(AuthorityHarness):
 
     def test_an_old_family_with_the_same_id_is_not_read_as_closed(self):
         # 統合先の done/ のチケットの承認の時刻が、
-        # 親のワークツリーのチケットと違えば閉じたとしない。
+        # 親のワークツリーのチケットと違えば閉じたとしない（承認の記録を持つ古い形どうし）。
         self.record("present")
+        to_old_form(self.approved, "i0001")
         base = os.path.join(self.state, "sync", "self", "integration")
         write(os.path.join(base, "head"), "branch main\nsha abc\n")
         write(

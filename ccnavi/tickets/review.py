@@ -582,11 +582,10 @@ def _followup_from_choice(
     parent: ticket_mod.Ticket,
     ph: phase.Phase,
     items: list[str],
-    stamp: str,
 ) -> str | None:
     """ユーザが選んだ続きの子を `doing/` に起こし、識別子を返す。起こせなければ None。"""
     children = [t for t in ph.tickets if ph.states.get(t.ticket) in ticket_mod.FINISHED]
-    ident, failed = approval.followup(conf, root, parent, ph.number, children, items, stamp)
+    ident, failed = approval.followup(conf, root, parent, ph.number, children, items)
     if failed:
         stderr.write(f"ccnavi: 続きの子チケットを起こせない: {failed}\n")
         return None
@@ -956,7 +955,6 @@ def apply_decision(
     """
     assert d.result.mr is not None
     parent, ph = d.parent, d.ph
-    stamp = approval.now()
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     picked = {c: [t for t in d.unresolved if choices.get(thread_key(t)) == c] for c in CHOICES}
     accepted = [thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
@@ -985,7 +983,7 @@ def apply_decision(
     followup = ""
     if fix:
         items = [_thread_line(t) for t in fix]
-        ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items, stamp)
+        ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items)
         if ident is None:
             return None
         followup = ident
@@ -1234,7 +1232,7 @@ def _reviewed_in_chat(
         items.append(line.strip())
     if not items:
         return 0
-    ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items, approval.now())
+    ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items)
     return 0 if ident is not None else 1
 
 

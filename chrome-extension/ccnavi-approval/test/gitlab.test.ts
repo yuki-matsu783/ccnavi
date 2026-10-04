@@ -80,6 +80,7 @@ function placeFiles(files: Record<string, string>): Record<string, string> {
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
+const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
 test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
   assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "requested-changes", "resolved"]);
@@ -131,6 +132,7 @@ test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミ
     [
       ["create", DOING],
       ["create", EVENTS],
+      ["create", WORKFLOW],
       ["delete", TODO],
     ].sort(),
   );

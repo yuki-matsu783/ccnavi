@@ -68,10 +68,12 @@ function shownOf(b: RepoBoard, family: string) {
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
+const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
 test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足す・消すは Python の Changes のとおり。書いた後の中身も確かめる", async () => {
   const { mock, d } = world();
   const before = mock.head("i0001");
+  const proposal = mock.files("i0001")[TODO];
   const out = await approveFamily(REPO, "i0001", shownOf(await board(d), "i0001"), d);
   assert.equal(out.kind, "written", JSON.stringify(out));
   assert.equal(mock.commitCalls.length, 1);
@@ -80,11 +82,13 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.equal(call.expected, before);
   assert.equal(call.headline, `ccnavi: i0001 を承認（Chrome 拡張 ${VERSION}）`);
   assert.deepEqual(call.deletions, [{ path: TODO }]);
-  assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING, EVENTS].sort());
-  // 書いた中身: 承認済みチケットと状態の履歴（経路・アカウント・拡張の版）
+  assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING, EVENTS, WORKFLOW].sort());
+  // 書いた中身: 提案のままの承認済みチケット（欄を書き足さない）、待ち方、状態の履歴（経路・アカウント・拡張の版）
   const files = mock.files("i0001");
   assert.ok(!(TODO in files));
-  assert.match(files[DOING], /^ccnavi_approved:/m);
+  assert.equal(files[DOING], proposal);
+  assert.doesNotMatch(files[DOING], /^ccnavi_approved:/m);
+  assert.match(files[WORKFLOW], /^order: /m);
   const event = JSON.parse(files[EVENTS].trim().split("\n").pop() as string);
   assert.deepEqual({ kind: event.kind, via: event.via, actor: event.actor, version: event.version }, { kind: "approved", via: "chrome", actor: LOGIN, version: VERSION });
   // 統合先・ほかのブランチには書かない

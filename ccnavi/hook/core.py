@@ -131,10 +131,12 @@ def judge_approval(
         shown = gathered
         if shown_ids is not None and gathered.refused:
             shown = agree.gather(err, snapshot.conf, snapshot.root)
+        # 書き込む中身は読みの中で組む。動かす提案のバイト列を判定の読みにも入れるため。
+        carried = [agree.carried(cand) for cand in shown.batch]
     read = agree.read_set(snapshot.conf, snapshot.root, seen)
     read.update(agree.settings_read_set(snapshot.conf, snapshot.root))
     text = shown.text
-    digest = agree.approval_digest(text, shown.batch, read)
+    digest = agree.approval_digest(text, shown.batch, read, carried)
     mismatch = None
     if shown_ids is not None:
         wanted = sorted({s.strip() for s in shown_ids if s.strip()})

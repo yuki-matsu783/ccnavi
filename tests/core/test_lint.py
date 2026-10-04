@@ -402,9 +402,9 @@ class LintTest(unittest.TestCase):
         self.assertNotIn("ccnavi_approved", result.stdout)
         self.assertNotIn("を読めない", result.stdout)
 
-    def test_レビュー待ちの置き場では承認の記録を求める(self):
+    def test_レビュー待ちの置き場ではfinishの欄を求める(self):
         # `wip/proposals/review/` はエージェントが書ける側にある。保護が組み込みの deny
-        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の保護として残す。
+        # 1 枚しか無いので、そこは `finish` が書く `completed_at` を 2 枚目の保護として求める。
         write(
             os.path.join(self.root, "wip", "proposals", "review"),
             "i0001.md",
@@ -414,7 +414,7 @@ class LintTest(unittest.TestCase):
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("ccnavi_approved", result.stdout)
+        self.assertIn("`completed_at` が無い", result.stdout)
         self.assertNotIn("BOM (U+FEFF)", result.stdout)
 
     def test_版が違うルールはerrorになる(self):

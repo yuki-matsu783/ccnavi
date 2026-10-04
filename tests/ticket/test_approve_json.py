@@ -390,6 +390,22 @@ class ApproveJsonTest(PhaseHarness):
         copy = os.path.join(self.approved, "doing", "i0001.md")
         self.assert_refused_after_edit(copy, "---\n", "---\nnote: x\n", shown, tickets=["i0001"])
 
+    def test_yes_refuses_when_only_the_line_endings_of_a_proposal_changed(self):
+        """承認は提案のバイト列をそのまま動かす。見せたあとで改行だけを CRLF に変えても、
+        見せた指紋では承認しない（書く中身が変わるので）。"""
+        self.pending_parent_and_child()
+        shown = self.preview()
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
+        with open(child, "rb") as f:
+            data = f.read()
+        with open(child, "wb") as f:
+            f.write(data.replace(b"\n", b"\r\n"))
+        self.commit_parent("crlf after preview")
+        result = self.yes(["i0001", "i0001-01"], digest=shown["digest"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIsNotNone(json.loads(result.stdout)["mismatch"])
+        self.assertFalse(self.copy_exists("i0001-01"))
+
     def test_nul_in_the_markdown_body_still_approves(self):
         """本文に生の NUL があっても、見せた指紋で承認できる（指紋は区切りの文字に頼らない）。"""
         self.pending_parent_and_child()

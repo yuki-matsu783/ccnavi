@@ -14,7 +14,8 @@
 - ユーザに見せる（`screen`・`preview_body`）。見せたものと承認するものを同じ答えにするため、
   一覧を組む関数は 1 つ（`gather`）にしてある
 - 見せたものから変わっていないかを確かめる（`approval_digest`・`read_set`・`verify_verdict`）
-- 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す
+- 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す。新規の承認は提案の
+  中身を変えずに動かし、全体計画の待ち方は `phases/<親>/workflow.yml` に固定する
 - 承認の事実をモデルに伝える（`news`・`approved_text`）
 
 判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で本物とするのは置き場）。置き場を手で
@@ -321,7 +322,12 @@ def _note_line(note: str) -> str:
     return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
 
 
-def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | None = None) -> str:
+def approval_digest(
+    text: str,
+    batch: list[Candidate],
+    read: dict[str, str] | None = None,
+    carried_parts: list[bytes] | None = None,
+) -> str:
     """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに書き込む中身の
     SHA-256 の 16 進（小文字）。
 
@@ -336,18 +342,24 @@ def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | No
     入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
     （`<ブランチ>:<相対パス>` → 中身の指紋）。
 
-    一括のチケットの書き込む中身（`_carried`）も残して指紋に含める。読んだ中身から決まるものだが、読みの
+    一括のチケットの書き込む中身（`carried`）も残して指紋に含める。読んだ中身から決まるものだが、読みの
     記録（`fsio.reading`）を通らない読みが紛れても、書き込む中身の変化は取りこぼさないように。
+    中身はバイト列で入れる。新規の承認は提案のバイト列をそのまま動かすので、改行や BOM だけの
+    書き換えも指紋を変える。`carried` は呼び手が判定の読みの中で組んで渡す
+    （`core.judge_approval`）。
+    渡さなければここで組む。
 
     部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
     区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
     本文は生の制御文字（`\\x00` も）をそのまま通すので、どの文字も「中身に出ない」とは言えない。
     読んだ中身の部分は `<鍵>\\n<中身の指紋>`（指紋は 16 進の固定長なので、最後の改行で切れる）。
     """
-    parts = [text] + [_carried(cand) for cand in batch]
+    if carried_parts is None:
+        carried_parts = [carried(cand) for cand in batch]
+    parts = [text.encode("utf-8")] + list(carried_parts)
     if read is not None:
-        parts += [f"{key}\n{digest}" for key, digest in sorted(read.items())]
-    lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
+        parts += [f"{key}\n{digest}".encode() for key, digest in sorted(read.items())]
+    lines = [str(len(parts))] + [hashlib.sha256(p).hexdigest() for p in parts]
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
@@ -461,22 +473,41 @@ def _folded(path: str) -> str:
     return os.path.normcase(os.path.normpath(path))
 
 
-def _carried(cand: Candidate) -> str:
-    """承認済みチケットに書き込む中身。承認の記録の欄を足す前の姿で書き出す。
+def carried(cand: Candidate) -> bytes:
+    """承認で書き込む中身のバイト列。承認済みチケットと、親なら待ち方のファイル。
 
-    改版は承認済みチケットの frontmatter の計画だけを差し替え、本文は承認済みチケットの
-    ものを残す（`revise_copy`）。新規は提案をそのまま書き出す（`write_copy`）。
+    新規は提案のバイト列そのもの（`approval.admit` が動かす中身）。読んだバイト列の指紋を
+    判定の読み（`read_set`）にも入れる。読みの記録は改行を揃えた本文で指紋を取るので、それだけでは
+    改行や BOM だけの書き換えを覆わない。改版は承認済みチケットの frontmatter の計画だけを差し替え、
+    本文は承認済みチケットのものを残す（`revise_copy`）。待ち方は `phases/<親>/workflow.yml` に
+    書く中身（`approval.workflow_bytes`）を後ろに足す。区切りは件数つきの指紋の並びで決まる
+    （`approval_digest`）ので、ここでは長さを頭に付けてつなぐ。
     """
     t = cand.ticket
     if cand.is_revision and cand.current is not None:
-        front, body = revised_front(cand.current, t, cand.types), cand.current.body
+        front, body = revised_front(cand.current, t), cand.current.body
+        ticket_bytes = ticket_mod.render(replace(cand.current, raw=front, body=body)).encode(
+            "utf-8"
+        )
     else:
-        front, body = dict(t.raw), t.body
-        front.pop(ticket_mod.WORKFLOW_KEY, None)
-        if t.has_plan and not t.is_child:
-            front[ticket_mod.WORKFLOW_KEY] = workflow.compute(t, cand.types).as_raw()
-    front.pop(ticket_mod.APPROVAL_KEY, None)
-    return ticket_mod.render(replace(t, raw=front, body=body))
+        ticket_bytes = fsio.read_bytes(t.path) or b""
+        fsio.note_exact(t.path, ticket_bytes)
+    wf = _workflow_to_write(cand)
+    workflow_bytes = approval.workflow_bytes(wf) if wf is not None else b""
+    return b"%d\n" % len(ticket_bytes) + ticket_bytes + workflow_bytes
+
+
+def _workflow_to_write(cand: Candidate) -> ticket_mod.Workflow | None:
+    """この承認で `phases/<親>/workflow.yml` に書く待ち方。書かないなら None。
+
+    新規は計画を持つ親だけ。改版はいつも書く（計画か待ち方が変わったから改版になる）。
+    """
+    t = cand.ticket
+    if t.is_child:
+        return None
+    if cand.is_revision or t.has_plan:
+        return workflow.compute(t, cand.types)
+    return None
 
 
 def _batch_entry(cand: Candidate) -> dict:
@@ -685,7 +716,8 @@ def candidates(
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
         types = types_for(t)
-        complaints = _workflow_field(t) + revision_problems(root, conf, t, current, types)
+        complaints = _workflow_field(t) + script_field_problems(t)
+        complaints += revision_problems(root, conf, t, current, types)
         complaints += approval.family_problems(conf, root, t, fams)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
@@ -708,7 +740,7 @@ def candidates(
     ):
         types = types_for(t)
         complaints, overflow = validate(t, pool, types)
-        complaints += _workflow_field(t)
+        complaints += _workflow_field(t) + script_field_problems(t)
         complaints += approval.project_problems(t, pool, conf)
         complaints += approval.family_problems(conf, root, t, fams)
         complaints += approval.integration_problems(conf, root, t, fams)
@@ -743,6 +775,31 @@ def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"`{ticket_mod.WORKFLOW_KEY}` は --agree が書く欄。提案には書かない",
+        )
+    ]
+
+
+def script_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
+    """提案にスクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）の空でない値があれば拒む。
+
+    承認は提案の中身を変えずに動かすので、提案に書いた値はそのまま承認済みチケットの値になる。
+    `review/` の 2 つめの保護（`completed_at`）や着手の基準点（`base_sha`）は、これらの欄を
+    スクリプトだけが書くことを前提にしている。
+    """
+    found = [
+        name
+        for name in ticket_mod.SCRIPT_FIELDS
+        if t.raw.get(name) not in (None, "") and str(t.raw.get(name)).strip()
+    ]
+    if not found:
+        return []
+    names = ", ".join(f"`{name}`" for name in found)
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"{names} はスクリプト（ccnavi-ticket.sh）だけが書く欄。"
+            "提案には値を書かない（空にするか消す）",
         )
     ]
 
@@ -835,9 +892,7 @@ def _apply_steps(
                     conf, root, t.ticket, t.parent, t.tree_root, project=t.project
                 )
                 with fsio.policy(places=t.ticket):
-                    failed = revise_copy(
-                        where, cand.current, t, stamp, cand.plans_feedback, cand.types
-                    )
+                    failed = revise_copy(where, cand.current, t, cand.plans_feedback, cand.types)
                 if failed:
                     return t.ticket, failed
                 removing = "改版の提案を todo/ から消せない ({reason})"
@@ -872,8 +927,7 @@ def _apply_steps(
             where = approval.home_dir(
                 conf, root, t.ticket, t.parent, t.tree_root, project=t.project
             )
-            wf = workflow.compute(t, cand.types) if t.has_plan and not t.is_child else None
-            failed = approval.admit(where, t, approval.source_branch(t), stamp, wf)
+            failed = approval.admit(where, t, approval.source_branch(t), _workflow_to_write(cand))
             if failed:
                 return t.ticket, failed
             if t.is_child:
@@ -1366,46 +1420,45 @@ def revise_copy(
     approved_dir: str,
     current: ticket_mod.Ticket,
     revised: ticket_mod.Ticket,
-    stamp: str,
     feedback_planned: bool,
     types: dict | None = None,
 ) -> str:
-    """承認済みチケットの計画と待ち方を差し替える。範囲と承認の記録はそのまま。"""
-    front = revised_front(current, revised, types)
-    meta = dict(front.get(ticket_mod.APPROVAL_KEY) or {})
-    meta["revised_at"] = stamp
-    if feedback_planned:
-        meta["feedback_at"] = stamp
-    front[ticket_mod.APPROVAL_KEY] = meta
-    current.raw = front
+    """承認済みチケットの計画を差し替え、待ち方を `phases/<親>/workflow.yml` に書き直す。
+
+    範囲と本文はそのまま。改版の時刻はチケットに書かない（状態の履歴の `revised` に残る。
+    フィードバック計画の改版は `feedback: true` を添える）。
+    """
+    current.raw = revised_front(current, revised)
     failed = approval._write(
         approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
     )
-    if not failed:
-        history.note(
-            approved_dir,
-            current.ticket,
-            history.KIND_REVISED,
-            ticket_mod.DOING,
-            ticket_mod.DOING,
-            feedback=True if feedback_planned else None,
-        )
-    return failed
+    if failed:
+        return failed
+    failed = approval.write_workflow(approved_dir, current.ticket, workflow.compute(revised, types))
+    if failed:
+        return failed
+    history.note(
+        approved_dir,
+        current.ticket,
+        history.KIND_REVISED,
+        ticket_mod.DOING,
+        ticket_mod.DOING,
+        feedback=True if feedback_planned else None,
+    )
+    return ""
 
 
-def revised_front(
-    current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None = None
-) -> dict:
-    """改版で書く frontmatter。承認済みチケットの frontmatter の計画と待ち方を差し替えたコピー。
+def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dict:
+    """改版で書く frontmatter。承認済みチケットの frontmatter の計画を差し替えたコピー。
 
     `current` は書き換えない。承認の指紋（`digest`）も同じものから組むので、見せた
-    中身と書く中身が食い違わない。
+    中身と書く中身が食い違わない。待ち方は書かない（`phases/<親>/workflow.yml` に書く）。
+    前の版の承認済みチケットに残る `workflow:` 欄はそのまま残す（ファイルが在ればファイルを読む）。
     """
     front = dict(current.raw)
     front["plan"] = [item.as_raw() for item in revised.plan]
     if revised.feedback is not None:
         front["feedback"] = [item.as_raw() for item in revised.feedback]
-    front[ticket_mod.WORKFLOW_KEY] = workflow.compute(revised, types).as_raw()
     return front
 
 

@@ -513,7 +513,7 @@ def _copy_problems(
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する。
 
-    承認で本物とするのは置き場で、`ccnavi_approved` の欄ではない。
+    承認で本物とするのは置き場で、チケットの中の欄ではない。
 
     置き場を動かして承認する運びでは `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
@@ -528,6 +528,8 @@ def _copy_problems(
     - 計画の形と、種類の定義が読めないことは `validate` が付けた severity のまま（error）。
       判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
       承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
+    - 再開（`done/` から `doing/` へ手で戻す）で残った閉じるときの欄は warn。ユーザの再開を
+      止めないため、判定も止めない
     """
     problems: list[Problem] = []
     pool = dict(index)
@@ -535,6 +537,18 @@ def _copy_problems(
         pool.setdefault(t.ticket, t)
     resolve = _types_resolver(conf, root)
     for t in copies:
+        left = approval.resumed_fields(t)
+        if left:
+            names = ", ".join(f"`{name}`" for name in left)
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket}: 作業中（doing/）なのに {names} に値が残っている。"
+                    "done/ から手で戻した再開なら、ユーザがその欄を空にしてください"
+                    "（残っていると、フローの着手中の扱いなど、着手中として数えない箇所がある）",
+                )
+            )
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue

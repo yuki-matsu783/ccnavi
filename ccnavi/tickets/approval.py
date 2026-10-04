@@ -15,11 +15,16 @@
 承認済みチケットは `.ccnavi/approved/` に置く。ccnavi ディレクトリの下なので、組み込みの
 保護がエージェントの書き込みを止める。
 
-**本物とするのはこの置き場で、`ccnavi_approved` の欄ではない。** 欄は承認の記録で、
-持たないチケットも承認済みとして読む。そこに置けたのは書ける権限を持つユーザだけだから。
-だから提案を手で `doing/` へ動かすことが、端末とボードに続く 3 つめの承認の経路になる。
-その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
+**本物とするのはこの置き場で、チケットの中の欄ではない。** そこに置けたのは書ける権限を持つ
+ユーザだけだから。だから提案を手で `doing/` へ動かすことが、端末・ボード・Chrome に続く承認の
+経路になる。その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
 `blocking_problems` が判定の側で当てる。
+
+**承認はチケットの中身を変えない。** 提案のバイト列をそのまま `doing/` へ動かし、欄を書き足さない
+（改行も BOM も変えない）。どの経路で承認しても承認済みチケットは提案とバイト単位で同じになり、
+欄の有無から「承認が途中で止まった」と読み違える形が無くなる。前の版は承認の記録
+（`ccnavi_approved`）・`project:`・`workflow:` を書き足していた。残っている古い承認済みチケットは
+そのまま読む（消さない）。
 
 ## チケットは 1 本のファイルで、コピーを持たない
 
@@ -38,6 +43,14 @@
 
 `phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みのマーカーを置く。
 レビューが済むまで止める判定（phase.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
+
+## 待ち方の固定
+
+全体計画の待ち方（`workflow.compute` の結果）は、承認のときに `phases/<親>/workflow.yml` へ
+固定する（`--agree` の新規の承認と改版が書く）。承認のあとに `phases.yml` が変わっても、作業中の
+親の待ち方と延期の引き受け手がユーザの見ていないところで変わらないようにするため。読む側は
+承認済みチケットを読むときにこのファイルを `Ticket.workflow` に入れる（`load_copy`）。
+手で動かした承認にはこのファイルが無く、一直線で読む。
 """
 
 from __future__ import annotations
@@ -45,6 +58,8 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field, replace
+
+import yaml
 
 from ..infra import fsio, settings, tree
 from ..policy import rules
@@ -63,6 +78,10 @@ MARK_SKIPPED = "skipped"
 # pending は「終わったと 1 度伝えた」のマーカー。同じ文を呼び出しごとに繰り返さないため。
 MARK_PENDING = "pending"
 MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
+# 全体計画の待ち方を固定するファイル（`phases/<親>/workflow.yml`）。
+WORKFLOW_FILE = "workflow.yml"
+# 続きの子の目印（トップレベルの欄）。前の版は承認の記録（`ccnavi_approved`）の中に書いていた。
+FOLLOWUP_KEY = "followup_of"
 
 
 def copy_path(approved_dir: str, ticket_id: str) -> str:
@@ -87,18 +106,18 @@ def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Tic
     `state` を添える。閉じたものは取り消しの欄で `done` と `cancelled` に分ける。
     """
     directory = os.path.join(approved_dir, DONE_DIR if closed else DOING_DIR)
-    return _load_dir(directory)
+    return _load_dir(directory, approved_dir=approved_dir)
 
 
 def _load_dir(
-    directory: str, require_record: bool = False
+    directory: str, require_record: bool = False, approved_dir: str = ""
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
-    found, unread = _load_dir_detail(directory, require_record)
+    found, unread = _load_dir_detail(directory, require_record, approved_dir)
     return found, [message for _, message in unread]
 
 
 def _load_dir_detail(
-    directory: str, require_record: bool = False
+    directory: str, require_record: bool = False, approved_dir: str = ""
 ) -> tuple[list[ticket_mod.Ticket], list[tuple[str, str]]]:
     """`_load_dir` の中身。読めなかったものを (パス, 説明) で返す（置き場ごとならパスは置き場）。"""
     try:
@@ -115,7 +134,7 @@ def _load_dir_detail(
         if not name.endswith(".md"):
             continue
         path = os.path.join(directory, name)
-        ticket, reason = load_copy(path, require_record)
+        ticket, reason = load_copy(path, require_record, approved_dir)
         if ticket is None:
             unread.append((path, f"承認済みチケット {path} を読めない（{reason}）"))
             continue
@@ -138,7 +157,7 @@ def unreadable_copies(conf: settings.Settings, tree_root: str) -> list[tuple[str
         (os.path.join(approved, DONE_DIR), False),
         (os.path.join(tree_root, conf.tickets.replace("/", os.sep), ticket_mod.REVIEW), True),
     ):
-        out.extend(_load_dir_detail(directory, require)[1])
+        out.extend(_load_dir_detail(directory, require, approved)[1])
     return out
 
 
@@ -150,37 +169,116 @@ def state_of(directory: str, ticket: ticket_mod.Ticket) -> str:
     return name
 
 
-def load_copy(path: str, require_record: bool = False) -> tuple[ticket_mod.Ticket | None, str]:
+def load_copy(
+    path: str, require_record: bool = False, approved_dir: str = ""
+) -> tuple[ticket_mod.Ticket | None, str]:
     """承認済みチケットを 1 本読む。2 つめは読めなかった理由。
 
     理由を返すのは、読めない承認済みチケットを `--lint` が名指しするため。
     「読めない」だけでは、BOM のような目に見えない原因に気づけない。
 
-    `require_record` は `ccnavi_approved` の欄を必須にするか。`.ccnavi/approved/` は
+    `require_record` は `completed_at`（空でない値）を必須にするか。`.ccnavi/approved/` は
     組み込みの保護がエージェントの書き込みを止めるので、置き場だけで承認と言える。
-    `wip/proposals/review/` はエージェントが書ける側にあるので、そこは欄を求め続ける
-    （`review_all`）。保護が 1 つしか無い置き場で欄まで外すと、組み込みの deny に止められずに
-    置かれたファイルが承認済みとして読まれる。
+    `wip/proposals/review/` はエージェントが書ける側にあるので、そこは `finish` が書く
+    `completed_at` を 2 つめの保護として求める（`review_all`）。保護が 1 つしか無い置き場で
+    欄まで外すと、組み込みの deny に止められずに置かれたファイルが承認済みとして読まれる。
+    `completed_at` はスクリプトだけが書く欄で、提案に書けば `--agree` と `--lint` が error にする
+    ので、エージェントが `review/` に置いたファイルは読まれない。前の版の承認済みチケット
+    （承認の記録 `ccnavi_approved` を持つ）も `finish` を通れば `completed_at` を持つので読める。
+
+    `approved_dir` はそのチケットの承認済みの置き場。渡せば、親の待ち方を
+    `phases/<親>/workflow.yml` から読んで `Ticket.workflow` に入れる。
+    チケットの中の `workflow:` 欄は、
+    前の版の承認の記録を持つ古い承認済みチケットのときだけ読む（ファイルが在ればファイルを採る）。
+    それ以外のチケットの `workflow:` 欄は読まず、`blocking_problems` が止める。
     """
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
         detail = problems[0].detail if problems else "チケットとして読めない"
         return None, detail
-    # `ccnavi_approved` は承認の記録であって、承認そのものではない。本物とするのは
+    # 前の版の承認が書いた記録（`ccnavi_approved`）。いまの承認は書かない。承認を本物とするのは
     # 置き場で、`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを止める。
-    # 欄を必須にすると、端末もボードも無いユーザが置き場を動かして承認する経路が使えなくなる。
     # 欄が無いぶんの検査（親子・計画・置き場）は `blocking_problems` が判定の側で当てる。
+    if require_record and not ticket.completed_at:
+        return None, "`completed_at` が無い。`finish` を通っていない"
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
-    if require_record and not isinstance(meta, dict):
-        return None, f"`{ticket_mod.APPROVAL_KEY}` の欄が無い。承認を通っていない"
     if isinstance(meta, dict):
         ticket.approved_at = str(meta.get("approved_at") or "")
         ticket.source_tree = str(meta.get("source_tree") or "")
         ticket.source_path = str(meta.get("source_path") or "")
+    else:
+        # 新しい形では待ち方は欄に無い。手で書いた `workflow:` を承認済みの待ち方として効かせない。
+        ticket.workflow = None
+    if approved_dir and not ticket.is_child:
+        held, why = read_workflow(approved_dir, ticket.ticket)
+        if why:
+            ticket.workflow = None
+            ticket.workflow_unreadable = why
+        elif held is not None:
+            ticket.workflow = held
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案をコピーしたか）とは違うもので、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
     return ticket, ""
+
+
+def has_record(t: ticket_mod.Ticket) -> bool:
+    """前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットか。"""
+    return isinstance(t.raw.get(ticket_mod.APPROVAL_KEY), dict)
+
+
+def workflow_path(approved_dir: str, parent: str) -> str:
+    """親の待ち方を固定するファイル（`phases/<親>/workflow.yml`）。"""
+    return os.path.join(approved_dir, PHASES_DIR, parent, WORKFLOW_FILE)
+
+
+def workflow_bytes(wf: ticket_mod.Workflow) -> bytes:
+    """待ち方のファイルの中身。改行は LF に固定する。
+
+    Chrome のコミットと手元で同じバイト列にするため。
+    """
+    dumped = yaml.safe_dump(
+        wf.as_raw(), allow_unicode=True, sort_keys=False, default_flow_style=False
+    )
+    return dumped.encode("utf-8")
+
+
+def read_workflow(approved_dir: str, parent: str) -> tuple[ticket_mod.Workflow | None, str]:
+    """親の待ち方のファイルを読む。無ければ (None, "")、読めなければ (None, 理由)。
+
+    fsio を通す。承認の plan の中では同じ承認で書いた後の姿を読み、承認の指紋の
+    `read_set` にも入る（判定が読んだものとして）。
+    """
+    path = workflow_path(approved_dir, parent)
+    data = fsio.read_bytes(path)
+    if data is None:
+        if fsio.lexists(path):
+            return None, f"待ち方のファイル {path} を読めない"
+        return None, ""
+    try:
+        raw = yaml.safe_load(data.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError):
+        return None, f"待ち方のファイル {path} を YAML として読めない"
+    wf, bad = ticket_mod.parse_workflow(parent, raw)
+    if wf is None:
+        detail = bad[0].detail if bad else "形が読めない"
+        return None, f"待ち方のファイル {path} の{detail}"
+    return wf, ""
+
+
+def write_workflow(approved_dir: str, parent: str, wf: ticket_mod.Workflow) -> str:
+    """親の待ち方のファイルを書く。書けなかった理由を返す。書けたら空文字。
+
+    同じ中身が既に在れば書かない（改版で待ち方が変わらないときに、変わらないファイルを
+    書いたことにしない。Chrome はそれを 1 コミットの変更として運ぶ）。
+    """
+    path = workflow_path(approved_dir, parent)
+    content = workflow_bytes(wf)
+    if fsio.read_bytes(path) == content:
+        return ""
+    with fsio.policy(message="待ち方を書けない ({reason})"):
+        failed = fsio.write_bytes(path, content)
+    return f"待ち方を書けない ({failed})" if failed else ""
 
 
 def trees(conf: settings.Settings, root: str) -> list[tree.Tree]:
@@ -215,15 +313,17 @@ def scan_all(
 def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """全ツリーのレビュー待ち（提案の置き場の `review/`）を、重複をまとめずに集める。
 
-    ここに在るのは承認済みチケットが `finish` で動いてきたもの。`ccnavi_approved` を持たない
-    ファイルは読まない。この置き場はエージェントが書ける側にあり、保護は組み込みの
-    deny 1 つなので、欄を 2 つめの保護として残す。
+    ここに在るのは承認済みチケットが `finish` で動いてきたもの。`completed_at`（空でない値）を
+    持たないファイルは読まない。この置き場はエージェントが書ける側にあり、保護は組み込みの
+    deny 1 つなので、`finish` が書く欄を 2 つめの保護として残す（`load_copy`）。
     """
     found: list[ticket_mod.Ticket] = []
     notes: list[str] = []
     for t in trees(conf, root):
         directory = os.path.join(t.root, conf.tickets.replace("/", os.sep), ticket_mod.REVIEW)
-        got, complaints = _load_dir(directory, require_record=True)
+        got, complaints = _load_dir(
+            directory, require_record=True, approved_dir=settings.approved_dir(conf, t.root)
+        )
         for c in got:
             c.tree, c.tree_root, c.state = t.name, t.root, ticket_mod.REVIEW
             c.project = t.project
@@ -755,38 +855,26 @@ def admit(
     approved_dir: str,
     ticket: ticket_mod.Ticket,
     source_tree: str,
-    approved_at: str,
     wf: ticket_mod.Workflow | None = None,
 ) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
-    承認の記録（`ccnavi_approved`）を足して書き、元の提案を消す。消せなければ書いた側を
+    **中身は変えない。** 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
+    書いて元を消す。欄を書き足さず、改行も BOM も変えない。端末・ボード・Chrome・手で動かす、の
+    どれで承認しても承認済みチケットが提案とバイト単位で同じになるように。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
 
-    `source_tree` は提案が乗っていたブランチの名前、`source_path` はそのリポジトリからの
-    相対パス。手元と Chrome で承認済みチケットの中身を同じにするため。前は
-    ツリーの名前と絶対パスを書いていた。読む側（`load_copy`）はどちらの形も読み、判定は
-    この 2 つを読まない（`diagnose` が見せるだけ）。
+    `wf` は計画を持つ親の待ち方。`phases/<親>/workflow.yml` に固定する（チケットには書かない）。
+    `source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
     """
-    meta = {
-        "approved_at": approved_at,
-        "source_tree": source_tree,
-        "source_path": source_path(ticket),
-    }
     target = copy_path(approved_dir, ticket.ticket)
-    # ユーザの書いた行（コメント、`|` のブロック）を保つ。読み直して書き出さず、承認の記録の
-    # 欄と、置き場から決まった `project:`（frontmatter に無ければ）だけを足す。
-    try:
-        text = fsio.load_text(ticket.path)
-    except OSError as exc:
-        return f"提案を読めない ({exc})"
-    if ticket.project and not ticket.declared_project:
-        text = ticket_mod.insert_front(text, "project", ticket.project)
-    if wf is not None:
-        text = ticket_mod.insert_front(text, ticket_mod.WORKFLOW_KEY, wf.as_raw())
-    failed = _write(target, ticket_mod.insert_front(text, ticket_mod.APPROVAL_KEY, meta))
+    content = fsio.read_bytes(ticket.path)
+    if content is None:
+        return f"提案を読めない ({ticket.path})"
+    with fsio.policy(message="書けない ({reason})"):
+        failed = fsio.write_bytes(target, content)
     if failed:
-        return failed
+        return f"書けない ({failed})"
     # 消せなければ書いた側を消して戻す。承認の plan では落ちたときの枝が走らないので、
     # 同じ戻し方を Writer(FS) へ渡す。置けたと数えるのは消せたとき。
     with fsio.policy(
@@ -796,6 +884,10 @@ def admit(
     if failed:
         fsio.remove(target)
         return f"提案を todo/ から動かせない ({failed})"
+    if wf is not None:
+        failed = write_workflow(approved_dir, ticket.ticket, wf)
+        if failed:
+            return failed
     history.note(
         approved_dir,
         ticket.ticket,
@@ -948,7 +1040,6 @@ def followup(
     phase_no: int,
     children: list[ticket_mod.Ticket],
     items: list[str],
-    stamp: str,
 ) -> tuple[str, str]:
     """レビューで残った指摘の続きの子を、ユーザの判断で `doing/` に直に起こす。
 
@@ -992,12 +1083,9 @@ def followup(
         if entries:
             front[name] = entries
     front.update({"started_at": "", "completed_at": "", "base_sha": ""})
-    front[ticket_mod.APPROVAL_KEY] = {
-        "approved_at": stamp,
-        "source_tree": "",
-        "source_path": "",
-        "followup_of": [c.ticket for c in children],
-    }
+    # 続きの子の目印。提案を経ずにここで作るチケットなので、作るときに書く（承認で中身を
+    # 変えることには当たらない）。時刻は状態の履歴の `raised` に残る。
+    front[FOLLOWUP_KEY] = [c.ticket for c in children]
     body = ["", "## 引き継ぐ指摘", ""]
     body += [f"- {item}" for item in items] or ["（指摘の一覧は無い）"]
     body.append("")
@@ -1720,12 +1808,63 @@ def blocking_problems(
       止めると、レビュー待ちの間その子が一切書けなくなり、レビュー待ちでも Write を通す形
       とは結果が食い違う。`--lint` が warn で言う
     - 範囲の超過。判定が親と種類の上限で切り詰めるので、止める理由が無い
+    - 再開（`done/` から `doing/` へ手で戻す）で残った `completed_at` などの欄。ユーザの再開を
+      止めないよう、`--lint` が warn で言うだけにする
+
+    ここに入れる、中身だけで分かる矛盾。
+    - `started_at` が無いのに `base_sha` がある。`start` は 2 つを一緒に書くので道具を通らない形で、
+      `base_sha` は範囲外の検査とリスクの基準点に使われる
+    - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は `--agree` が
+      `phases/<親>/workflow.yml` に書くもので、欄を承認済みの待ち方として効かせない
+    - 待ち方のファイルが読めない。一直線と読むと、ユーザが承認した待ち方と違う順で進む
     """
     problems = list(project_problems(t, pool, conf))
+    problems.extend(content_problems(t))
     if t.is_child:
         missing = f"親 {t.parent} の承認済みチケットが作業中に無い（未承認か、閉じている）"
         problems.extend(child_problems(t, pool.get(t.parent), missing))
     return [p for p in problems if p.severity == rules.SEVERITY_ERROR]
+
+
+def content_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
+    """作業中の承認済みチケットの、中身だけで分かる欄の矛盾（判定が止める分）。"""
+    problems: list[rules.Problem] = []
+    if t.base_sha and not t.started_at:
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                "`started_at` が無いのに `base_sha` がある。2 つは着手（`start`）が一緒に書く欄で、"
+                "片方だけの形は道具を通っていない。ユーザが承認済みチケットを確かめて直してください",
+            )
+        )
+    if ticket_mod.WORKFLOW_KEY in t.raw and not has_record(t):
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"`{ticket_mod.WORKFLOW_KEY}:` の欄がある。待ち方は --agree が "
+                f"{PHASES_DIR}/<親>/{WORKFLOW_FILE} に書くもので、チケットには書かない。"
+                "ユーザが欄を消してください",
+            )
+        )
+    if t.workflow_unreadable:
+        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.workflow_unreadable))
+    return problems
+
+
+def resumed_fields(t: ticket_mod.Ticket) -> list[str]:
+    """作業中（`doing/`）なのに値が残っている、閉じるときに書く欄の名前。
+
+    `finish` と `cancel` は `doing/` から動かすので、道具を通る限り残らない。残るのは、ユーザが
+    `done/` から `doing/` へ手で戻した再開の形。判定では止めず、`--lint` が warn で言う。
+    """
+    values = {
+        "completed_at": t.completed_at,
+        "cancelled_at": t.cancelled_at,
+        "cancel_reason": t.cancel_reason,
+    }
+    return [name for name, value in values.items() if value]
 
 
 def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:

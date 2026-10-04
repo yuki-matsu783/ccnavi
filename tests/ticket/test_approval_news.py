@@ -159,8 +159,9 @@ class ApprovalNewsTest(PhaseHarness):
 
     # ---- 4b. 伝え漏れ（敵対的レビューが見つけた 3 つ）
 
-    def test_a_revision_of_the_parent_is_told_once(self):
-        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。版まで見て伝える。"""
+    def test_a_revision_of_the_parent_is_told_by_the_prompt_only(self):
+        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。改版の時刻をチケットに
+        書かなくなったので、hook の知らせは改版を伝えない。伝えるのは `--agree --yes` の文。"""
         self.parent_only()
         self.prompt()  # 起点
         self.approve_yes(["i0001"])
@@ -171,9 +172,6 @@ class ApprovalNewsTest(PhaseHarness):
         self.commit_parent()
         told = self.approve_yes(["i0001"])
         self.assertIn("改版", told)
-        heard = self.prompt()
-        self.assertIn("i0001", heard)
-        self.assertIn("改版", heard)
         self.assertEqual(self.prompt(), "")
 
     def test_a_copy_closed_before_the_next_hook_is_still_told(self):

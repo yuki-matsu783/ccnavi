@@ -34,8 +34,8 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 # ---- 時計（判定のコアの Clock の差し口）
 #
 # 時刻はこの 2 つの関数だけが読む。`clock` で固定すると、その間の `stamp` と `utc_stamp` は
-# 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と履歴（`at`）に同じ時刻を
-# 書き、Chrome（Pyodide）と手元が同じ入力から同じバイト列を出すため。
+# 同じ 1 つの時刻を返す。承認の plan が履歴（`at`）やマーカーに書く時刻を固定し、
+# Chrome（Pyodide）と手元が同じ入力から同じバイト列を出すため。
 _CLOCK: dict = {"fixed": ""}
 _STAMP_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
 
@@ -598,6 +598,20 @@ def note_read(path: str, content: str | bytes | None) -> None:
     digest = READ_ABSENT if content is None else content_digest(content)
     for seen in _READERS:
         seen.setdefault(key, digest)
+
+
+def note_exact(path: str, content: bytes | None) -> None:
+    """読んだバイト列を、改行を揃えずに記録する（同じパスの前の記録を置き換える）。
+
+    承認はバイト列をそのまま動かすので、動かす提案は改行や BOM だけの違いも判定の読みとして
+    覆う（`agree.carried`）。ほかの読みは `note_read` のまま（機械の改行で指紋が変わらないように）。
+    """
+    if not _READERS:
+        return
+    key = os.path.normpath(parent_resolved(os.path.abspath(path)))
+    digest = READ_ABSENT if content is None else "bytes:" + hashlib.sha256(content).hexdigest()
+    for seen in _READERS:
+        seen[key] = digest
 
 
 def content_digest(content: str | bytes) -> str:
