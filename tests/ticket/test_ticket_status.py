@@ -7,7 +7,8 @@
 1. 手で置いて未コミットの承認: 時刻は「未コミット（手で置いた）」、ユーザに運んでもらう案内。
    C1 の対象でなければ「start へ進んでよい」、対象なら「ユーザが運ぶまで start は止まる」
 2. コミット済みで未 push・push 済みを、手元のリモート追跡の ref で言い分ける
-3. 止まっている理由: 親が未着手・先行・基準点が HEAD の祖先でない。再開で残った欄は注意
+3. 止まっている理由: 親が未着手・先行・C1 が止める親子。基準点が HEAD の祖先でないことと、
+   再開で残った欄は注意
 4. 承認待ち・閉じたもの。状態を動かす行には「親（メインエージェント）だけが実行する」
 5. 親を省けば開いている親子を全部、知らない親なら終了コード 1
 """
@@ -79,6 +80,17 @@ class TicketStatusTest(PhaseHarness):
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
 
+    def test_a_family_c1_stops_names_the_reason_and_does_not_say_go(self):
+        self.by_hand()
+        stop = (c1.TARGET_STOP, "親のワークツリーが決まらない", None)
+        with mock.patch.object(c1, "target", return_value=stop):
+            mine = self.block(self.said("i0001"), "i0001")
+        self.assertIn(
+            "止まっている理由: C1 で状態の操作が止まる: 親のワークツリーが決まらない", mine
+        )
+        self.assertNotIn("start へ進んでよい", mine)
+        self.assertNotIn("ccnavi-ticket.sh start", mine)
+
     def test_a_planned_parent_without_a_fixed_workflow_is_read_straight(self):
         self.by_hand(text=parent_text("i0001", ["research", "design"]))
         mine = self.block(self.said(), "i0001")
@@ -125,7 +137,7 @@ class TicketStatusTest(PhaseHarness):
         parent = self.block(self.said("i0001"), "i0001")
         self.assertIn("ccnavi-ticket.sh start i0001", parent)
 
-    def test_a_planted_base_sha_off_the_worktree_history_is_a_stop(self):
+    def test_a_planted_base_sha_off_the_worktree_history_is_a_warning(self):
         self.family(plan=["research"])
         other = self.worktree("elsewhere", "main")
         write(os.path.join(other, "x.txt"), "x\n")
@@ -138,8 +150,11 @@ class TicketStatusTest(PhaseHarness):
         write(path, text.replace('base_sha: ""', f'base_sha: "{stray}"', 1))
         self.commit_parent("planted")
         mine = self.block(self.said("i0001"), "i0001")
-        self.assertIn("止まっている理由: 基準点", mine)
+        # 基準点が HEAD の祖先でないのは warn（start は止めない）。started_at の無い base_sha は
+        # 判定が blocked で止めるので、止まっている理由はそちらで出る。
+        self.assertIn("注意: 基準点", mine)
         self.assertIn("HEAD の祖先でない", mine)
+        self.assertIn("止まっている理由: `started_at` が無いのに `base_sha` がある", mine)
         self.assertNotIn("ccnavi-ticket.sh start i0001'", mine)
 
     def test_fields_left_by_a_resume_are_a_warning(self):

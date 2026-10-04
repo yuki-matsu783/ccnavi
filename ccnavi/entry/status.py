@@ -155,14 +155,15 @@ class _Family:
         self.root, self.conf, self.name = root, conf, name
         self.entries, self.pool, self.times, self.files = entries, pool, times, files
         self.fams = fams
-        self._c1: str | None = None
+        self._c1: tuple[str, str] | None = None
         self.ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
         self.push_sh = settings.script_command(root, "ccnavi-push-approved.sh")
 
-    def c1_target(self) -> str:
-        """この親子が C1 の対象か（`ccnavi c1 family` と同じ `c1.target`）。1 度だけ引く。"""
+    def c1_target(self) -> tuple[str, str]:
+        """この親子が C1 の対象か（`ccnavi c1 family` と同じ `c1.target`）と理由。1 度だけ引く。"""
         if self._c1 is None:
-            self._c1, _, _ = c1.target(self.conf, self.root, self.name)
+            verdict, why, _ = c1.target(self.conf, self.root, self.name)
+            self._c1 = (verdict, why)
         return self._c1
 
     def describe(self, e: Entry, revision: bool) -> list[str]:
@@ -228,31 +229,33 @@ class _Family:
         if t.blocked:
             stops.append(t.blocked)
         uncommitted = file_state.kind == FILE_UNCOMMITTED
-        carried = uncommitted and self.c1_target() == c1.TARGET_YES
+        verdict, why = self.c1_target()
+        if verdict == c1.TARGET_STOP and not (st.imported and st.stop):
+            # C1 の sh（ccnavi-ticket.sh）が状態の操作を断る。
+            stops.append(f"C1 で状態の操作が止まる: {why or '理由が分からない'}")
+        carried = uncommitted and verdict == c1.TARGET_YES
         if not t.started_at:
             for p in approval.unmet_predecessors(t, self.pool):
                 stops.append(f"先行 {p.ticket} が満たされていない（{p.label}）")
             parent_why = self._parent_not_started(t)
             if parent_why:
                 stops.append(parent_why)
-            off = ops.base_off_head(self.root, self.conf, t)
-            if off:
-                stops.append(off)
             if carried:
                 stops.append(
                     "取り込み済みの親子（C1 の対象）で、承認済みチケットが親のブランチに"
                     "未コミット。ユーザが運ぶまで start は止まる"
                 )
         else:
-            off = ops.base_off_head(self.root, self.conf, t)
-            if off:
-                warns.append(off)
             if not _started_recorded(self.conf, t):
                 warns.append(
                     "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行が無い。"
                     "start を通さずに書かれた欄かもしれない。ユーザに started_at と base_sha を"
                     "確かめてもらう"
                 )
+        # 基準点が HEAD の祖先でないのは warn。`start` は止めない（基準点を HEAD で書き直す）。
+        off = ops.base_off_head(self.root, self.conf, t)
+        if off:
+            warns.append(off)
         left = approval.resumed_fields(t)
         if left:
             warns.append(
@@ -283,7 +286,7 @@ class _Family:
         if stops:
             nexts.append("止まっている理由を解く（ユーザに確かめる）")
         elif not t.started_at:
-            if uncommitted:
+            if uncommitted and verdict == c1.TARGET_NO:
                 nexts.append("運ぶのを待たずに start へ進んでよい（この親子は C1 の対象ではない）")
             nexts += self._start_lines(t)
         elif t.is_child:
