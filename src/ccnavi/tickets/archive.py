@@ -222,7 +222,7 @@ def _regular_md(directory: str) -> list[str]:
 
 
 def _fields(data: bytes | None) -> syncstate.DoneCopy | None:
-    """チケットの識別子・親・承認の時刻（チケットとしての検査は掛けない）。"""
+    """チケットの識別子・親・着手と取り消しの欄（チケットとしての検査は掛けない）。"""
     if data is None:
         return None
     try:
@@ -232,7 +232,7 @@ def _fields(data: bytes | None) -> syncstate.DoneCopy | None:
 
 
 def archived_fields(root: str, project: str, ident: str) -> syncstate.DoneCopy | None:
-    """退避の `done/<識別子>.md` の識別子・親・承認の時刻。無い・読めない・リンクなら None。
+    """退避の `done/<識別子>.md` の識別子・親・着手と取り消しの欄。無い・読めない・リンクなら None。
 
     大文字小文字だけが違う識別子も同じものとして引く（区別しないファイルシステムでは、ブランチと
     ワークツリーの名前がぶつかるため。使い回しの検査を緩めない向き）。
@@ -256,26 +256,53 @@ def same_id(a: str, b: str) -> bool:
 
 
 def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """手元の退避に、同じリポジトリで承認の時刻も同じコピーがあるチケットを落とす。
+    """手元の退避に、同じリポジトリで同じチケットと言えるコピーがあるチケットを落とす。
 
     `ready` の後も子のワークツリーには切ったときの `doing/` のチケットが残る。親のツリーから消えた
     識別子は、その古いチケットが権威として読まれ、作業中に戻ってしまう。閉じて退避したものは閉じた
-    ものとして扱う（判定の scan から外す）。承認の時刻が違えば同じ識別子の別のチケットなので残す。
+    ものとして扱う（判定の scan から外す）。
+
+    同じチケットかは、承認の時刻ではなく着手と取り消しの欄で決める（承認はチケットの中身を
+    変えないので、承認の時刻の欄は古い形にしか無い）。
+
+    - 着手も取り消しもしていない写し（欄が 3 つとも空）は、退避より前の写しとして落とす。子の
+      ワークツリーを切ったのは着手より前で、残る写しはふつうこの形。閉じた識別子は新規に承認
+      しない（`approval.integration_problems` が退避の識別子を拒む）ので、同じ識別子の未着手の
+      チケットは古い写ししか無い
+    - 欄があれば、統合先の `done/` の親と同じく `syncstate.same_parent` で比べ、同じと言えるときだけ
+      落とす。違えば同じ識別子の別のチケットとみなして残す
+    - 両方に古い形の承認の時刻があって違えば、どちらでも残す（前の版と同じ見方）
     """
     if not root or not tickets:
         return tickets
     out = []
     for t in tickets:
         copy = archived_fields(root, t.project, t.ticket)
-        if (
-            copy is not None
-            and copy.ticket == t.ticket
-            and copy.approved_at
-            and copy.approved_at == t.approved_at
-        ):
+        if copy is not None and copy.ticket == t.ticket and _same_ticket(_mine(t), copy):
             continue
         out.append(t)
     return out
+
+
+def _same_ticket(mine: syncstate.DoneCopy, archived: syncstate.DoneCopy) -> bool:
+    # 退避の写しと同じチケットか（drop_archived の説明のとおり）。
+    if mine.approved_at and archived.approved_at and mine.approved_at != archived.approved_at:
+        return False
+    if not any(getattr(mine, name) for name in syncstate.MATCH_FIELDS):
+        return True
+    return syncstate.same_parent(mine, archived)
+
+
+def _mine(t: ticket_mod.Ticket) -> syncstate.DoneCopy:
+    # 照合に使う欄だけを、退避の欄と同じ形で。
+    return syncstate.DoneCopy(
+        ticket=t.ticket,
+        parent=t.parent,
+        base_sha=t.base_sha,
+        started_at=t.started_at,
+        cancelled_at=t.cancelled_at,
+        approved_at=t.approved_at,
+    )
 
 
 # ---- 移す

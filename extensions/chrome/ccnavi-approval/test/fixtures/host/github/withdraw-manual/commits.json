@@ -1,0 +1,28 @@
+[
+  {
+    "sha": "42af9a5194d72bb99cd7b4cc24a80d95de3ff908",
+    "node_id": "C_kwDO42af9a5194d72bb99cd7",
+    "commit": {
+      "author": {
+        "name": "Hana Sato",
+        "email": "hana@example.com",
+        "date": "2026-09-29T03:00:00Z"
+      },
+      "committer": {
+        "name": "Hana Sato",
+        "email": "hana@example.com",
+        "date": "2026-09-29T03:00:00Z"
+      },
+      "message": "Rename wip/proposals/todo/i0001.md to .ccnavi/approved/doing/i0001.md"
+    },
+    "url": "https://api.github.com/repos/acme/widgets/commits/42af9a5194d72bb99cd7b4cc24a80d95de3ff908",
+    "html_url": "https://github.com/acme/widgets/commit/42af9a5194d72bb99cd7b4cc24a80d95de3ff908",
+    "parents": [
+      {
+        "sha": "2904d8f9a6c5cf3e9c487ddde17c5d860529786b",
+        "url": "https://api.github.com/repos/acme/widgets/commits/2904d8f9a6c5cf3e9c487ddde17c5d860529786b",
+        "html_url": "https://github.com/acme/widgets/commit/2904d8f9a6c5cf3e9c487ddde17c5d860529786b"
+      }
+    ]
+  }
+]

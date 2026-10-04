@@ -14,7 +14,7 @@ from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard
 from ..records import audit, repeat
-from ..tickets import agree, approval, flow, phase
+from ..tickets import approval, flow, phase
 from ..tickets import ticket as ticket_mod
 from . import projskills, reasons, wrapguard
 
@@ -165,6 +165,7 @@ def decide_before(
             root,
             selfguard.common_layer_files(conf),
             (conf.log, conf.state),
+            tool=payload.tool_name,
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
@@ -326,12 +327,18 @@ def decide_before(
             conf=conf,
         )
 
+    # 承認済みチケットの置き場（`approval.read_raw`）。1 回の判定で読むのは 1 度だけにし、
+    # 下のレビュー待ちの止めと範囲の索引で持ち回る。
+    # 判定の途中で置き場のファイルを動かす処理は無いので、読み直さない。
+    raw: approval.Raw | None = None
+
     # HITL ポイント。人間レビュー要のフェーズが終わっていてマーカーが無い間、
     # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
-    # ルールより先に見る。
+    # ルールより先に見る。置き場を読むのは cwd がワークツリーかプロジェクトの中のときだけ
+    # （`phase.parent_at`）。
     if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
-        parent = phase.parent_for_cwd(root, conf, payload.cwd)
-        held = phase.held_phase(root, conf, parent.ticket) if parent is not None else None
+        parent, raw = phase.parent_at(root, conf, payload.cwd, raw)
+        held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if held is not None and not exempt:
             record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
@@ -351,7 +358,9 @@ def decide_before(
         and not target.is_main
         and payload.tool_name in SCOPE_TOOLS
     ):
-        scanned, _ = approval.scan(conf, root)
+        if raw is None:
+            raw = approval.read_raw(conf, root)
+        scanned, _ = approval.scan(conf, root, raw=raw)
         index = approval.by_id(scanned)
 
     # ワークツリーの元リポジトリと承認済みチケットの `project:` の食い違いは、ルールより先に見る。
@@ -483,21 +492,14 @@ def decide_before(
     context = ctxfile.for_rules(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
-    # このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）は、
-    # 判定がどれでも 1 度だけつける。応答は 1 つの JSON なので、ルールの文と
-    # 同じ経路（additionalContext）にまとめる。
-    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
-    # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ経路で渡す。
-    if conf.tickets_enabled:
-        told = "\n\n".join(
-            p
-            for p in (
-                told,
-                ticket_mod.propose_notice(stderr, conf, root, payload, record.subject),
-            )
-            if p
-        )
+    # 足さない（`ticket_mod.propose_notice` の説明）ので、ルールの文と同じ経路
+    # （additionalContext）で渡す。応答は 1 つの JSON なので、まとめる。
+    told = (
+        ticket_mod.propose_notice(stderr, conf, root, payload, record.subject)
+        if conf.tickets_enabled
+        else ""
+    )
     # cwd がプロジェクトの中に入った最初の呼び出しで、そのプロジェクトのスキルの目録を 1 度だけ
     # つける。セッションはワークスペースルートで始まり、あとから cd で入るのがふつう。
     skills = projskills.notice(stderr, conf, root, payload)
@@ -574,8 +576,8 @@ def decide_before(
         # 渡した先が判断するだけの回に毎度コンテキストを 1 段積むことになる。
         # ルールが言及していない場所は記録から読む。
         record.decision, record.enforced = audit.HANDOVER, False
-        # 新しい承認だけは、渡す回にも言う。言わないと、その承認を伝える機会が
-        # 権限モードに渡す呼び出しの分だけ遅れる。
+        # 1 度だけ渡す文（提案を書いた回の確認、プロジェクトのスキルの目録）は、渡す回にも言う。
+        # 言わないと、その文を伝える機会が権限モードに渡す呼び出しの分だけ遅れる。
         if notices or told:
             hookio.write_context(
                 stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([told] if told else []))
@@ -900,8 +902,7 @@ def ticket_verdict(
     source = ticket.path
     head = [
         f"subject: {full}",
-        f"ticket: {ticket.ticket} ({ticket.title}), approved {ticket.approved_at}, "
-        f"worktree {t.name}",
+        f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
         f"scope: {area}",
     ]
     decided = rules.ASK if found.verdict == rules.ASK else rules.DENY

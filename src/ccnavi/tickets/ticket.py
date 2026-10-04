@@ -71,7 +71,7 @@ from typing import TextIO
 
 import yaml
 
-from ..infra import fsio, globmatch, hookio, settings, tree
+from ..infra import fsio, globmatch, hookio, settings, tree, yamlread
 from ..policy import ctxfile, rules, selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
@@ -498,10 +498,13 @@ def _form_problems(
 
 
 # スクリプトだけが書く欄。ユーザもエージェントも書かない。承認済みチケットの側で
-# 行単位に書き換える（`set_fields`）。
+# 行単位に書き換える（`set_fields`）。承認は提案の中身を変えずに動かすので、提案に書いた値は
+# そのまま承認済みチケットの値になる。だから提案に空でない値があれば `--agree` と `--lint` が
+# error にする（`agree.script_field_problems`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
-# 承認済みチケットにだけある欄。承認の記録。
+# 前の版の承認が承認済みチケットに書き足していた記録の欄。いまの承認は中身を変えないので
+# 書かない。残っている古い承認済みチケットを読むためだけに名前を持つ。
 APPROVAL_KEY = "ccnavi_approved"
 
 # glob のワイルドカード。これより前が字義どおりの前置。
@@ -662,7 +665,8 @@ WORKFLOW_DAG = "dag"
 
 @dataclass
 class Workflow:
-    """全体計画の待ち方のコピー。`--agree` が計算して親の承認済みチケットに書く（設計 9.7）。
+    """全体計画の待ち方のコピー。`--agree` が計算して `<承認済みの置き場>/phases/<親>/workflow.yml`
+    に書く（設計 9.7）。前の版は親の承認済みチケットの `workflow:` 欄に書いていた。
 
     `waits` は全体計画の番号 → 待つ番号、`review_at` は延期した番号 → 引き受ける番号。
     判定はこのコピーだけを読み、`phases.yml` を読み直さない。
@@ -680,7 +684,7 @@ class Workflow:
         }
 
 
-def _workflow(name: str, raw) -> tuple[Workflow | None, list[Problem]]:
+def parse_workflow(name: str, raw) -> tuple[Workflow | None, list[Problem]]:
     bad = [Problem(SEVERITY_ERROR, name, f"`{WORKFLOW_KEY}` の形が読めない")]
     if not isinstance(raw, dict):
         return None, bad
@@ -753,16 +757,21 @@ class Ticket:
     # 読んだままの frontmatter。承認済みチケットを作るときに使う。
     raw: dict = field(default_factory=dict)
     body: str = ""
-    # 見つけた場所。提案なら状態とワークツリー、承認済みチケットなら承認の記録から。
+    # 見つけた場所。提案なら状態とワークツリー、
+    # 承認済みチケットなら置き場（`approval.scan_all`）から。
     state: str = ""
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 承認済みチケットにだけある。`ccnavi_approved` を持たない（ユーザが置き場を動かしただけの）
-    # チケットでは空になる。承認を本物とするのは置き場で、この欄は記録（設計 9.2）。
+    # 前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットにだけある。
+    # いまの承認は書かないので、新しい承認済みチケットでは空。
+    # 承認を本物とするのは置き場（設計 9.2）。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
+    # 待ち方のファイル（`phases/<親>/workflow.yml`）が在るのに読めない理由。空なら読めたか無い。
+    # 判定は読めない待ち方を一直線と読まずに止める（`approval.blocking_problems`）。
+    workflow_unreadable: str = ""
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
     # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。
@@ -997,7 +1006,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
 
     raw_workflow = front.get(WORKFLOW_KEY)
     if raw_workflow is not None and not ticket.is_child:
-        workflow, bad = _workflow(name, raw_workflow)
+        workflow, bad = parse_workflow(name, raw_workflow)
         problems.extend(bad)
         if workflow is None:
             return True
@@ -1357,7 +1366,7 @@ def scan(
     """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場をつける。
 
     集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
-    承認済みチケットが動いてきたもので、`ccnavi_approved` を持つ（approval.scan_review）。
+    承認済みチケットが `finish` で動いてきたもので、`completed_at` を持つ（approval.scan_review）。
     置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
     プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 11.5、REQ-MLT-14）。
     ワークスペースの `wip/<名前>/proposals/` は読まない。
@@ -1434,11 +1443,9 @@ def scan_all(
                 ticket.project = place_project
                 # 待ち方のコピーは `--agree` だけが書く。提案に書かれていても読まない。
                 ticket.workflow = None
-                if place_project and not ticket.declared_project:
-                    # 承認済みチケットにも残す。judge は親の承認済みチケットを引けないとき
-                    # （親が閉じた）子の承認済みチケットの
-                    # `project` を見る。ここで入れないとその行き先が空になる。
-                    ticket.raw["project"] = place_project
+                # `raw` に `project` を差し込まない。承認は提案のバイト列をそのまま動かすので、
+                # 書かない欄をダイジェスト（`agree.approval_digest`）に入れることになる。
+                # 承認済みチケットの `project` は置き場（ツリー）から決まる（`approval.scan_all`）。
                 found.append(ticket)
     return found, problems
 
@@ -1678,8 +1685,8 @@ def propose_notice(
     書いた直後に、要る場所で言う。
 
     **判定には足さない。** これは文であって判定ではないので、ルールの表（`rule_set`）には
-    入れず、承認の知らせ（`agree.news`）と同じ経路で渡す。表に allow を 1 本足す形は
-    採らない。次の 3 つを一緒に引き受けることになるため。
+    入れず、ルールの文と同じ経路（PreToolUse の `additionalContext`）で渡す。表に allow を
+    1 本足す形は採らない。次の 3 つを一緒に引き受けることになるため。
 
     - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの扱い
       （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、
@@ -1833,35 +1840,6 @@ def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None
     return "\n".join(kept)
 
 
-def insert_front(text: str, key: str, value) -> str:
-    """frontmatter の閉じの `---` の前に、欄を 1 つ足す。ユーザの書いた行は保つ。
-
-    承認のときに `ccnavi_approved` を足すのに使う。読み直して書き出す（render）と、
-    ユーザが書いたコメントや `|` のブロックが消える。同じ鍵の行が既にあれば消してから足す
-    （最上位の鍵だけ。字下げされた行はその欄の続きとして一緒に消す）。
-    """
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != FENCE:
-        return text
-    end = next((i for i in range(1, len(lines)) if lines[i].strip() == FENCE), None)
-    if end is None:
-        return text
-    kept = [lines[0]]
-    skipping = False
-    for line in lines[1:end]:
-        if line.startswith((" ", "\t", "-")) and skipping:
-            continue
-        skipping = line.split(":", 1)[0].strip() == key and not line.startswith((" ", "\t"))
-        if not skipping:
-            kept.append(line)
-    dumped = yaml.safe_dump(
-        {key: value}, allow_unicode=True, sort_keys=False, default_flow_style=False
-    ).rstrip("\n")
-    kept.extend(dumped.splitlines())
-    kept.extend(lines[end:])
-    return "\n".join(kept) + ("\n" if text.endswith("\n") else "")
-
-
 def _yaml_scalar(value: str) -> str:
     """欄の値を、YAML が文字列として読み戻せる表記にする。"""
     return (
@@ -1968,8 +1946,8 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
         )
     try:
         # safe_load に限る。任意の Python の型を組み立てる load は、
-        # エージェントが書けるファイルに向けては使えない。
-        front = yaml.safe_load(head)
+        # エージェントが書けるファイルに向けては使えない（yamlread は safe な読み手だけを使う）。
+        front = yamlread.safe_load(head)
     except yaml.YAMLError as exc:
         return (
             None,

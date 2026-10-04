@@ -283,8 +283,8 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
     for name in os.listdir(state_dir):
         if not name.endswith(".json"):
             continue
-        # 承認を伝えた記録（agree.news）は同じ場所に置く。こちらはセッションの
-        # 再開で捨てず、古いものだけ一緒に掃く。
+        # 承認を伝えた記録（`approved-<セッション>-<エージェント>.json`）は、hook が承認を
+        # 伝えていた頃に同じ場所に置いていた。今は書かない。残ったものを古いものだけ一緒に掃く。
         stale = name.startswith("approved-")
         if not stale and not name.startswith("once-"):
             continue

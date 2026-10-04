@@ -23,7 +23,7 @@ from typing import TextIO
 
 import yaml
 
-from ..infra import hookio, settings, tree
+from ..infra import hookio, settings, tree, yamlread
 from ..policy import ctxfile, rules
 from ..tickets import flow
 
@@ -63,7 +63,8 @@ def _front(raw: bytes) -> dict:
     except StopIteration:
         return {}
     try:
-        data = yaml.load("\n".join(lines[1:end]), Loader=flow._Loader)  # noqa: S506 - 別名を拒む SafeLoader
+        # 別名を拒む SafeLoader。組み立ての途中の素の例外（`!!int` の空など）も YAMLError で上がる。
+        data = yamlread.load("\n".join(lines[1:end]), flow._Loader)
     except yaml.YAMLError:
         return {}
     return data if isinstance(data, dict) else {}

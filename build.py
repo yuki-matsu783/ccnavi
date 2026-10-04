@@ -127,6 +127,11 @@ def build() -> int:
         stamp,
         "--hidden-import",
         version.BUILDINFO_MODULE,
+        # libyaml の C 拡張。YAML は C の読み手で読む（src/ccnavi/infra/yamlread.py）。PyYAML は
+        # 拡張を try の中で読むので、取りこぼすと何も言わずに純 Python の読み手（約 10 倍遅い）に
+        # 戻る。PyInstaller はいまも拾うが、拾い方が変わっても落ちないよう名指しする。
+        "--hidden-import",
+        "yaml._yaml",
         os.path.join(ROOT, "main.py"),
     ]
     result = subprocess.run(command, cwd=ROOT)

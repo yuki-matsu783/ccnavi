@@ -111,8 +111,11 @@ def check(
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
     root: str = "",
-) -> str:
-    """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
+) -> tuple[str, bool]:
+    """実行後の 1 回ぶんを処理し、（モデルに返す文, 作業ツリーを戻そうとしたか）を返す。
+
+    返す文が無ければ空文字。2 つ目は、戻しを 1 件でも試みたら真（戻せなかった分を含む）。
+    呼び手はこれで、戻しで動いたかもしれないファイル（チケットの置き場など）を読み直すか決める。
 
     enforcing は、このモードが判定を実際に適用する側かどうか。適用しない側
     （dry-run）では復元も行わない。呼び出しにも作業ツリーにも手を出さないことが
@@ -130,11 +133,11 @@ def check(
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
-        return ""
+        return "", False
 
     read = _read_all(stderr, watched, record)
     if not read:
-        return ""
+        return "", False
 
     # ターンの基準を持たないツリーを初めて見たら、その場で記録する。ターンの途中で
     # 切られたワークツリーがこれにあたる（`at_prompt` のときには無いので基準が無く、
@@ -162,7 +165,7 @@ def check(
         if first_time:
             _save_seen(stderr, state_dir, payload.session_id, set())
         record.decision, record.enforced = audit.ALLOW, True
-        return ""
+        return "", False
 
     fresh = [f for f in found if f.key() not in seen]
     known = [f for f in found if f.key() in seen]
@@ -171,6 +174,8 @@ def check(
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
+    # 戻しを試みたか。戻せなかった 1 件も途中までファイルを動かしたかもしれないので含める。
+    tried = False
     # 戻すのは `deny` と宣言された場所だけ（`_restorable`）。報告する対象より狭い。
     # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.effective_setting）ので、
     # ここで enforcing を見る必要はない。掛ける場所を 1 か所にまとめてあるのは、
@@ -182,6 +187,7 @@ def check(
             here = [f for f in fresh if f.tree_name == w.tree.name and _restorable(f)]
             if not here:
                 continue
+            tried = True
             done = _restore(stderr, top, state_dir, [f.change for f in here])
             restored.update({f.key(): done[f.change.path] for f in here if f.change.path in done})
     # dry-run では戻さない代わりに、戻していたはずだと言う。selfguard の
@@ -239,7 +245,7 @@ def check(
     ]
     blocks += [_preexisting(f) for f in carried[:REPORT_LIMIT]]
     if not blocks:
-        return ""
+        return "", tried
 
     shown, dropped = blocks[:REPORT_LIMIT], len(blocks) - REPORT_LIMIT
     if dropped > 0:
@@ -247,7 +253,7 @@ def check(
             f"[ccnavi] {dropped} more changed paths in protected areas are not listed here. "
             "Run 'git status' to see the rest before you undo anything."
         )
-    return "\n\n".join(shown)
+    return "\n\n".join(shown), tried
 
 
 def _note_new_trees(

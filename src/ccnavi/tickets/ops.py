@@ -1,7 +1,8 @@
 """チケットの状態を動かす操作。`ccnavi ticket start|finish|cancel <識別子>`。
 
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
-サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
+サブエージェントからの呼び出しは hook の判定が止める（`hook/judge.py` が `phase.forbidden` で
+`DENY_SUBAGENT_TICKET_OP` を返す）。実行ファイルは呼び手がサブエージェントかを知らない。
 
 やることは置き場を動かして欄を書くことだけ（状態は置き場が表す）。`start` は置き場を動かさず
 `doing/` の欄を書く。`finish` は `doing/` から `wip/proposals/review/`（レビュー要）か
@@ -690,15 +691,20 @@ def _parent_still_busy(
     return bool(problems)
 
 
-def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[str]:
+def close_problems(
+    root: str, conf: settings.Settings, parent_id: str, raw: approval.Raw | None = None
+) -> list[str]:
     """親を閉じられない理由の一覧。空なら閉じてよい。
 
     `review ready`（Draft を外す）も同じ条件を見る。閉じてよい状態と、マージに
     進んでよい状態は同じもの。ユーザが close-early で早めに閉じていれば、
     開いている子以外は問わない。ユーザが早めに閉じたあとに残っているものは、
     閉じたときに別の issue へ書き出してある。
+
+    `raw` は呼び手が `approval.read_raw` で読んだ置き場。読んでから置き場のファイルを
+    動かしていないときだけ渡す。無ければここで読む。
     """
-    copies, _ = approval.scan(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
     open_children = [t.ticket for t in copies if t.parent == parent_id]
     if open_children:
         return [
@@ -721,12 +727,12 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     ):
         return []
     problems: list[str] = []
-    held = phase.held_phase(root, conf, parent_id)
+    held = phase.held_phase(root, conf, parent_id, raw)
     if held is not None:
         problems.append(
             f"{parent_id} のフェーズ {held.label} は{held.review_label}。レビューを済ませてから"
         )
-    closed_copies, _ = approval.scan(conf, root, closed=True)
+    closed_copies, _ = approval.scan(conf, root, closed=True, raw=raw)
     copy = approval.by_id(copies + closed_copies).get(parent_id)
     if copy is not None and copy.has_plan:
         if copy.feedback is None:
@@ -734,7 +740,9 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
                 f"{parent_id} はフィードバック計画がまだ。対応が無くても "
                 "`feedback: []` を改版で出して承認を受けてから"
             )
-        unfinished = [p.label for p in phase.phases_of(root, conf, parent_id) if not p.ended]
+        unfinished = [
+            p.label for p in phase.phases_of(root, conf, parent_id, raw=raw) if not p.ended
+        ]
         if unfinished:
             problems.append(
                 f"{parent_id} には終わっていないフェーズがある（{', '.join(unfinished)}）。"
@@ -847,7 +855,9 @@ class Unfinished:
     head: str = ""
 
 
-def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinished | None:
+def unfinished_at_stop(
+    root: str, conf: settings.Settings, cwd: str, raw: approval.Raw | None = None
+) -> Unfinished | None:
     """メインエージェントが終わろうとしたとき、`finish` を打ち忘れていそうなチケット。
 
     促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
@@ -861,15 +871,17 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
 
     git を読めなければ促さない。促しは保護ではないので、読めないときは今までどおり何も出さずに通す。
+
+    `raw` は `close_problems` と同じ。ここは読むだけで置き場を動かさない。
     """
     here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if here is None or here.is_main:
         return None
-    copies, _ = approval.scan(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
     bound = tree.lookup(approval.by_id(copies), here.name)
     if bound is None or not bound.in_progress or bound.blocked or not bound.base_sha:
         return None
-    if not bound.is_child and close_problems(root, conf, bound.ticket):
+    if not bound.is_child and close_problems(root, conf, bound.ticket, raw):
         return None
     rc, out = gitcmd.output(
         here.root, ["status", "--porcelain", "--untracked-files=all"], TIMEOUT_SECONDS
@@ -961,6 +973,38 @@ def finish_nudge(root: str, found: Unfinished) -> str:
             "この案内は同じ HEAD では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
         ]
     )
+
+
+def base_off_head(root: str, conf: settings.Settings, t: ticket_mod.Ticket) -> str:
+    """基準点（`base_sha`）がチケットのワークツリーの HEAD の祖先でないときの文。でなければ空。
+
+    着手の欄はスクリプトだけが書く。承認はチケットの中身を変えないので、手で動かした承認では
+    提案の段階で書かれた基準点がそのまま入りうる。`--lint` と `ccnavi ticket status` が warn で
+    言う。`start` では止めない（`started_at` も仕込まれていれば「着手済み」で先に返り、`base_sha`
+    だけなら判定が `blocked` で止め、`start` は基準点を HEAD で書き直す）。ワークツリーが無い・
+    HEAD を読めないときは確かめられないので空を返す（言わない）。判定には入れない
+    （判定は git を読まない）。
+    """
+    if not t.base_sha:
+        return ""
+    owner = tree.project_root(conf.projects, t.project) or root
+    worktree = tree.worktree_path(root, t.ticket)
+    if not tree.is_worktree_of(owner, worktree):
+        return ""
+    head = _head(worktree)
+    if not head or _is_ancestor(worktree, t.base_sha, head):
+        return ""
+    return (
+        f"基準点（base_sha: {t.base_sha}）がワークツリー {worktree} の HEAD の祖先でない。"
+        "着手の欄はスクリプトだけが書くもので、提案の段階で書かれた値か、ワークツリーの履歴を"
+        "書き換えたあとかもしれない。ユーザに承認済みチケットの base_sha を確かめてもらってください"
+    )
+
+
+def _is_ancestor(worktree: str, base: str, head: str) -> bool:
+    """`base` が `head` の祖先（か同じ）か。確かめられなければ偽（warn で言う側）。"""
+    done = gitcmd.run(worktree, ["merge-base", "--is-ancestor", base, head], TIMEOUT_SECONDS)
+    return done.ok
 
 
 def _branch_words(t: ticket_mod.Ticket) -> str:

@@ -402,6 +402,43 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_シェルの守りの式は_Bash_のときだけ組み立てる(self):
+        # 式は守る先を全部並べた大きなもので、組み立てとコンパイルに時間がかかる。
+        # `match: Bash` の 1 本なので、Bash 以外のツールでは組み立てない。
+        with mock.patch.object(
+            selfguard, "guard_shell_regex", wraps=selfguard.guard_shell_regex
+        ) as built:
+            for tool, field in (("Edit", "file_path"), ("Read", "file_path"), ("bash", "command")):
+                with self.subTest(tool=tool):
+                    built.reset_mock()
+                    self.run_hook("PreToolUse", tool=tool, **{field: "README.md"})
+                    self.assertEqual(built.call_count, 0)
+            built.reset_mock()
+            result = self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+            self.assertEqual(built.call_count, 1)
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_ツール名を渡したときもシェルの守りは同じ1本(self):
+        # 足すかどうかを決めるのは `Rule.matches` と同じツール名の当て方（rules.tool_matches）。
+        # Bash に足した 1 本は、ツール名を渡さない呼び手（従来）が足すものと同じ。
+        def built(tool):
+            rule_set = rules.RuleSet(version=rules.VERSION)
+            selfguard.add_rules(rule_set, root=self.repo, tool=tool)
+            return rule_set.deny
+
+        everything = built(None)
+        shell = next(r for r in everything if r.id == selfguard.SHELL_RULE_ID)
+        command = "echo x > .ccnavi/common/rules.yml"
+        self.assertTrue(shell.matches("Bash", command))
+        self.assertEqual([r.key() for r in built("Bash")], [r.key() for r in everything])
+        rest = [r.key() for r in everything if r.id != selfguard.SHELL_RULE_ID]
+        for tool in ("Edit", "Write", "Read", "bash", "BASH", " Bash", "mcp__shell__Bash", ""):
+            with self.subTest(tool=tool):
+                self.assertEqual([r.key() for r in built(tool)], rest)
+                # 足さなかったツールでは、足していても当たらなかった。
+                self.assertFalse(shell.matches(tool, command))
+
     def test_cd_で入ってから書く形も止まる(self):
         # issue #61。保護はパスに当てるので、`cd` で入ると行き先から名前が消える。
         # hook の登録そのもの（.claude/settings.json と .claude/hooks/）にも及んでいた。

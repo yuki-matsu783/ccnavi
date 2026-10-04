@@ -28,10 +28,8 @@ import os
 import time
 from typing import TextIO
 
-import yaml
-
 from ..hook import judge
-from ..infra import hookio, modes, settings, tree
+from ..infra import hookio, modes, settings, tree, yamlread
 from ..policy import builtin, ruleload, rules, selfguard
 from ..records import audit
 from ..tickets import agree, approval, archive, flow, history, phase, phasetypes, risk, workflow
@@ -315,7 +313,7 @@ def load_samples(path: str, root: str) -> list[dict]:
     `subject` の合言葉 `/repo` は走らせた場所に読み替える。
     """
     with open(path, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+        raw = yamlread.safe_load(f.read())
     if not isinstance(raw, dict):
         raise ValueError(f"見本の形が違う。最上位はタイプの対応表のはず: {path}")
     samples = []
@@ -618,22 +616,27 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     if not conf.tickets_enabled:
         stdout.write(f"  {settings.TICKET_CONTROL_ENV}=disable。範囲の制限は掛かっていない\n")
         return 0
-    copies, notes = approval.scan(conf, root)
+    # 承認済みチケットの置き場はここで 1 度だけ読み、局面とフェーズ（`phase.stage`・
+    # `phase.phases_of`）まで持ち回る。ここは読むだけで、置き場のファイルを動かさない。
+    raw = approval.read_raw(conf, root)
+    copies, notes = approval.scan(conf, root, raw=raw)
     for note in notes:
         stdout.write(f"  {note}\n")
     if not copies:
         stdout.write("  承認されたチケットが無い。範囲の制限は掛かっていない\n")
         return 0
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
     approval.align_imported(conf, root, preds)
+    times = approval.approved_times(conf, copies + review)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
         place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
-        head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{place}、{bound}）"
+        when = times.get(t.path, approval.ApprovedTime()).label()
+        head = f"{t.ticket}（{t.title}、承認 {when}、{place}、{bound}）"
         if t.is_child:
             unmet = approval.unmet_predecessors(t, preds)
             need = "要" if t.review_required else "不要"
@@ -647,7 +650,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             for path in t.paths(name):
                 stdout.write(f"    {name:<5} {path}\n")
     for parent in [t for t in copies if not t.is_child]:
-        where = phase.stage(root, conf, parent)
+        where = phase.stage(root, conf, parent, raw)
         if where:
             stdout.write(f"  {parent.ticket} の局面: {where}\n")
         where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
@@ -658,7 +661,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             stdout.write(
                 f"  {parent.ticket} のマージリクエストの Draft を外した。マージはユーザが行う\n"
             )
-        for ph in phase.phases_of(root, conf, parent.ticket):
+        for ph in phase.phases_of(root, conf, parent.ticket, raw=raw):
             marks = ", ".join(sorted(ph.marks)) or "マーカーなし"
             if not ph.tickets:
                 state = "未計画（子がまだ無い）"
@@ -740,7 +743,11 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     # 承認済みの識別子の提案は、承認済みチケットと合わせて本物とするツリーを決める
     # （`approval.scan_proposals` と同じまとめ方）。本物とするツリーの外に残った古い提案を
     # 承認待ちや作業中として出さないため。
-    settled = approval._everything(conf, root)
+    # 承認済みチケットの置き場はここで 1 度だけ読み、親ごとの局面とフェーズ
+    # （`_parent_record`）まで持ち回る。親ごとに読み直すと、読む回数が親の数とツリーの数の
+    # 積で増える。ボードは読むだけで、置き場のファイルを動かさない。
+    raw = approval.read_raw(conf, root)
+    settled = raw.everything
     proposals = ticket_mod.dedupe(everything, settled)
     # 複数のツリーにあるチケットの一覧（`seen_in` / `scattered`）は、
     # 承認済みチケットの置き場に在るものも数える。チケットは 1 本のファイルで、
@@ -748,11 +755,11 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     # `review/` は提案の置き場でもあり承認済みチケットでもあるので、2 つの走査が同じファイルを拾う。
     # 同じ実体を 2 つと数えると「複数の場所にある」になるので、パスでまとめる。
     everything = _one_per_file(everything + settled)
-    open_copies, notes = approval.scan(conf, root)
+    open_copies, notes = approval.scan(conf, root, raw=raw)
     problems.extend(notes)
-    closed_copies, notes = approval.scan(conf, root, closed=True)
+    closed_copies, notes = approval.scan(conf, root, closed=True, raw=raw)
     problems.extend(notes)
-    review_copies, notes = approval.scan_review(conf, root)
+    review_copies, notes = approval.scan_review(conf, root, raw=raw)
     problems.extend(notes)
 
     pending, revisions = agree.waiting(
@@ -785,6 +792,10 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         tid: [_where(t) for t in ticket_mod.collisions(hits)] for tid, hits in grouped.items()
     }
 
+    # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
+    times = approval.approved_times(
+        conf, [t for t in (*open_index.values(), *closed_index.values()) if t is not None]
+    )
     for ticket_id in sorted(set(proposal_index) | set(open_index) | set(closed_index)):
         payload["tickets"].append(
             _ticket_record(
@@ -799,6 +810,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
                 scattered.get(ticket_id, []),
                 problems,
                 preds,
+                times,
             )
         )
 
@@ -806,7 +818,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     for parent in sorted(open_copies + closed_copies, key=lambda x: x.ticket):
         if parent.is_child:
             continue
-        payload["parents"].append(_parent_record(conf, root, parent, closed_index))
+        payload["parents"].append(_parent_record(conf, root, parent, closed_index, raw))
     payload["archived"] = _archived_records(
         root, {(t["project"], t["ticket"]) for t in payload["tickets"]}, problems
     )
@@ -830,7 +842,9 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 "title": t.title,
                 "project": t.project,
                 "path": t.path,
-                "approved_at": t.approved_at,
+                # 承認は欄を書かない。古い形の欄が無ければ、退避した状態の履歴の承認の時刻。
+                "approved_at": t.approved_at
+                or approval.history_time(archive.base_dir(root, t.project), t.ticket),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
                 "cancelled_at": t.cancelled_at,
@@ -961,6 +975,7 @@ def _ticket_record(
     scattered: list[dict],
     problems: list[str],
     preds: dict[str, list[ticket_mod.Ticket]],
+    times: dict[str, approval.ApprovedTime],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -1013,7 +1028,12 @@ def _ticket_record(
         "copy": (
             {
                 "status": status,
-                "approved_at": copy.approved_at,
+                # 承認の時刻（`approval.approved_times`）。`approved_from` はどこから引いたか:
+                # history（状態の履歴）/ commit（doing/ に足したコミット）/
+                # uncommitted（履歴もコミットも無い。手で置いてまだコミットしていない）/
+                # 空（分からない）。uncommitted と空のとき approved_at は空。
+                "approved_at": times.get(copy.path, approval.ApprovedTime()).at,
+                "approved_from": times.get(copy.path, approval.ApprovedTime()).source,
                 "source_tree": copy.source_tree,
                 "path": copy.path,
             }
@@ -1089,16 +1109,20 @@ def _phase_record(ph: phase.Phase) -> dict:
 
 
 def _parent_record(
-    conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
+    conf: settings.Settings,
+    root: str,
+    parent: ticket_mod.Ticket,
+    closed_index: dict,
+    raw: approval.Raw | None = None,
 ) -> dict:
-    """親 1 件。局面、計画、親のマーカー、フェーズのリスト。"""
+    """親 1 件。局面、計画、親のマーカー、フェーズのリスト。`raw` は `phase.phases_of` と同じ。"""
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     closed = parent.ticket in closed_index
     return {
         "ticket": parent.ticket,
         "closed": closed,
         # 閉じた親に「クローズ可」と言っても意味が無い。局面は動いている親だけが持つ。
-        "stage": "" if closed else phase.stage(root, conf, parent),
+        "stage": "" if closed else phase.stage(root, conf, parent, raw),
         "plan": [item.as_raw() for item in parent.plan],
         "feedback": (
             [item.as_raw() for item in parent.feedback] if parent.feedback is not None else None
@@ -1111,5 +1135,5 @@ def _parent_record(
             where, parent.ticket, approval.PARENT_MARK_CLOSED
         ),
         "accepted_threads": sorted(approval.accepted_threads(where, parent.ticket)),
-        "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket)],
+        "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket, raw=raw)],
     }

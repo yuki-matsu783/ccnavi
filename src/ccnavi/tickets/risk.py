@@ -53,7 +53,7 @@ from dataclasses import dataclass, field, replace
 
 import yaml
 
-from ..infra import gitcmd, globmatch, settings, tree
+from ..infra import gitcmd, globmatch, settings, tree, yamlread
 from ..policy.rules import ID_SEPARATOR, SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
 VERSION = 1
@@ -242,7 +242,7 @@ def parse(
     """
     problems: list[Problem] = []
     try:
-        data = yaml.safe_load(text)
+        data = yamlread.safe_load(text)
     except yaml.YAMLError as exc:
         return None, [Problem(SEVERITY_ERROR, where, f"YAML として読めない: {exc}")]
     if not isinstance(data, dict):
