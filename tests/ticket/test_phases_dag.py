@@ -16,7 +16,7 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets import approval, phasetypes, workflow
+from ccnavi.tickets import approval, approval_checks, approval_marks, phasetypes, workflow
 from ccnavi.tickets import ticket as ticket_mod
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -201,21 +201,21 @@ class AcceptedScopeTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, home, ignore_errors=True)
         owner = ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in PLAN])
         owner.workflow = workflow.compute(owner, types_of(DAG))
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-2"], 2), "")
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-all"]), "")
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 2), "")
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"]), "")
         # 2（acceptance）で受け入れたものは、並行した 3（implement）では数えない。
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-all"})
         # 2 と、2 を待つ 4（docs）では受け入れ済み。
-        self.assertEqual(approval.accepted_threads(home, "i0001", 2, owner), {"t-2", "t-all"})
-        self.assertEqual(approval.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 2, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
         # 番号を渡さなければ親全体。
-        self.assertEqual(approval.accepted_threads(home, "i0001"), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001"), {"t-2", "t-all"})
         # 並行した 3 で同じスレッドを受け入れ直せば、3 でも有効
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-2"], 3), "")
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 3), "")
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
         # 親全体で受け入れたものは、番号付きで受け入れ直しても狭まらない
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-all"], 2), "")
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"], 2), "")
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
 
 
 class NextHintTest(unittest.TestCase):
@@ -231,7 +231,7 @@ class NextHintTest(unittest.TestCase):
             ph = phase_mod.Phase("i0001", n, item=owner.plan[n - 1], owner=owner)
             if n in (1, 3):
                 ph.tickets, ph.states = [done], {"c": ticket_mod.DONE}
-                ph.marks = {approval.MARK_SKIPPED: {}}
+                ph.marks = {approval_marks.MARK_SKIPPED: {}}
             phases.append(ph)
         hint = phase_mod._next_hint(owner, phases, 3)
         self.assertIn("次に始められるのは 2", hint)
@@ -403,7 +403,7 @@ class DagApprovalTest(PhaseHarness):
         held = self.copy()
         self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
         self.assertEqual(held.approved_at, "2026-01-01T00:00:00+09:00")
-        self.assertEqual([], approval.content_problems(held))
+        self.assertEqual([], approval_checks.content_problems(held))
 
     def test_a_workflow_field_in_a_new_copy_is_not_read_and_blocks(self):
         """記録を持たない承認済みチケットの `workflow:` 欄は、承認済みの待ち方として
@@ -413,7 +413,7 @@ class DagApprovalTest(PhaseHarness):
         self._rewrite_copy("workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\n")
         held = self.copy()
         self.assertIsNone(held.workflow)
-        found = [p.detail for p in approval.content_problems(held)]
+        found = [p.detail for p in approval_checks.content_problems(held)]
         self.assertTrue(any("workflow" in d for d in found), found)
 
     def test_a_half_written_record_does_not_pass_for_the_old_form(self):
@@ -440,9 +440,9 @@ class DagApprovalTest(PhaseHarness):
                 record + "workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\n"
             )
             held = self.copy()
-            self.assertFalse(approval.has_record(held), record)
+            self.assertFalse(approval_checks.has_record(held), record)
             self.assertIsNone(held.workflow, record)
-            found = [p.detail for p in approval.content_problems(held)]
+            found = [p.detail for p in approval_checks.content_problems(held)]
             self.assertTrue(any("workflow" in d for d in found), (record, found))
 
     def test_an_unreadable_workflow_file_blocks(self):
@@ -452,7 +452,7 @@ class DagApprovalTest(PhaseHarness):
         held = self.copy()
         self.assertIsNone(held.workflow)
         self.assertIn("待ち方のファイル", held.workflow_unreadable)
-        self.assertTrue(approval.content_problems(held))
+        self.assertTrue(approval_checks.content_problems(held))
 
     def test_a_revision_cannot_move_a_defer_target_behind_approved_children(self):
         def reviewed(text):

@@ -32,7 +32,20 @@ from ..hook import judge
 from ..infra import hookio, modes, settings, tree, yamlread
 from ..policy import builtin, ruleload, rules, selfguard
 from ..records import audit
-from ..tickets import agree, approval, archive, flow, history, phase, phasetypes, risk, workflow
+from ..tickets import (
+    agree,
+    approval,
+    approval_checks,
+    approval_marks,
+    approval_times,
+    archive,
+    flow,
+    history,
+    phase,
+    phasetypes,
+    risk,
+    workflow,
+)
 from ..tickets import ticket as ticket_mod
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
@@ -628,17 +641,17 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
-    approval.align_imported(conf, root, preds)
-    times = approval.approved_times(conf, copies + review)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    approval_checks.align_imported(conf, root, preds)
+    times = approval_times.approved_times(conf, copies + review)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
         place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
-        when = times.get(t.path, approval.ApprovedTime()).label()
+        when = times.get(t.path, approval_times.ApprovedTime()).label()
         head = f"{t.ticket}（{t.title}、承認 {when}、{place}、{bound}）"
         if t.is_child:
-            unmet = approval.unmet_predecessors(t, preds)
+            unmet = approval_checks.unmet_predecessors(t, preds)
             need = "要" if t.review_required else "不要"
             head += f" 親 {t.parent} フェーズ {t.phase} レビュー{need}"
             if unmet:
@@ -654,10 +667,12 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         if where:
             stdout.write(f"  {parent.ticket} の局面: {where}\n")
         where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
-        wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
+        wrapped = approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
+        )
         if wrapped:
             stdout.write(f"  {parent.ticket} はユーザが早めに閉じた: {wrapped.get('reason', '')}\n")
-        if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
+        if approval_marks.read_parent_mark(where, parent.ticket, approval_marks.PARENT_MARK_READY):
             stdout.write(
                 f"  {parent.ticket} のマージリクエストの Draft を外した。マージはユーザが行う\n"
             )
@@ -711,7 +726,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     payload: dict = {
         "version": BOARD_VERSION,
         "root": root,
-        "generated_at": approval.now(),
+        "generated_at": approval_marks.now(),
         "settings": {
             "ticket_control": conf.ticket_control or settings.TICKET_CONTROL_ENABLE,
             "tickets": conf.tickets,
@@ -770,8 +785,10 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         agree.types_resolver(conf, root, open_copies),
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
-    preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals, root)
-    approval.align_imported(conf, root, preds)
+    preds = approval_checks.predecessor_pool_of(
+        open_copies, review_copies, closed_copies, proposals, root
+    )
+    approval_checks.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
     )
@@ -779,9 +796,9 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     worktrees = {t.name: t for t in trees if t.kind == tree.KIND_WORKTREE}
     # 提案の欄に出すのは `todo/` と `review/`。`review/` は承認済みチケットでもあるので、
     # 承認の欄（`copy`）には `review` の状態で出す。
-    proposal_index = approval.by_id(proposals)
-    open_index = approval.by_id(open_copies + review_copies)
-    closed_index = approval.by_id(closed_copies)
+    proposal_index = approval_checks.by_id(proposals)
+    open_index = approval_checks.by_id(open_copies + review_copies)
+    closed_index = approval_checks.by_id(closed_copies)
     # 同じ識別子があるツリーの全部。本物とする側は proposal に、残りは seen_in に出す。
     # 複数のツリーにあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
     # 食い違いを意味しない。どれが本物か決まらないぶんだけを scattered に出す。数え方は
@@ -793,7 +810,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     }
 
     # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
-    times = approval.approved_times(
+    times = approval_times.approved_times(
         conf, [t for t in (*open_index.values(), *closed_index.values()) if t is not None]
     )
     for ticket_id in sorted(set(proposal_index) | set(open_index) | set(closed_index)):
@@ -844,7 +861,7 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 "path": t.path,
                 # 承認は欄を書かない。古い形の欄が無ければ、退避した状態の履歴の承認の時刻。
                 "approved_at": t.approved_at
-                or approval.history_time(archive.base_dir(root, t.project), t.ticket),
+                or approval_times.history_time(archive.base_dir(root, t.project), t.ticket),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
                 "cancelled_at": t.cancelled_at,
@@ -975,7 +992,7 @@ def _ticket_record(
     scattered: list[dict],
     problems: list[str],
     preds: dict[str, list[ticket_mod.Ticket]],
-    times: dict[str, approval.ApprovedTime],
+    times: dict[str, approval_times.ApprovedTime],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -1004,7 +1021,7 @@ def _ticket_record(
             if status == "closed"
             else [
                 {"ticket": p.ticket, "state": p.state, "label": p.label}
-                for p in approval.unmet_predecessors(source, preds)
+                for p in approval_checks.unmet_predecessors(source, preds)
             ]
         ),
         "human_review": {
@@ -1028,12 +1045,12 @@ def _ticket_record(
         "copy": (
             {
                 "status": status,
-                # 承認の時刻（`approval.approved_times`）。`approved_from` はどこから引いたか:
+                # 承認の時刻（`approval_times.approved_times`）。`approved_from` はどこから引いたか:
                 # history（状態の履歴）/ commit（doing/ に足したコミット）/
                 # uncommitted（履歴もコミットも無い。手で置いてまだコミットしていない）/
                 # 空（分からない）。uncommitted と空のとき approved_at は空。
-                "approved_at": times.get(copy.path, approval.ApprovedTime()).at,
-                "approved_from": times.get(copy.path, approval.ApprovedTime()).source,
+                "approved_at": times.get(copy.path, approval_times.ApprovedTime()).at,
+                "approved_from": times.get(copy.path, approval_times.ApprovedTime()).source,
                 "source_tree": copy.source_tree,
                 "path": copy.path,
             }
@@ -1069,11 +1086,11 @@ def _ticket_record(
     if unreadable:
         problems.append(f"{ticket_id} の履歴: {unreadable}")
     if source.parent:
-        record["risk"] = approval.read_child_record(
-            where, source.parent, ticket_id, approval.CHILD_RECORD_RISK
+        record["risk"] = approval_marks.read_child_record(
+            where, source.parent, ticket_id, approval_marks.CHILD_RECORD_RISK
         )
-        record["judge"] = approval.read_child_record(
-            where, source.parent, ticket_id, approval.CHILD_RECORD_JUDGE
+        record["judge"] = approval_marks.read_child_record(
+            where, source.parent, ticket_id, approval_marks.CHILD_RECORD_JUDGE
         )
     return record
 
@@ -1127,13 +1144,15 @@ def _parent_record(
         "feedback": (
             [item.as_raw() for item in parent.feedback] if parent.feedback is not None else None
         ),
-        "close_early": approval.read_parent_mark(
-            where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
+        "close_early": approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
         ),
-        "ready": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY),
-        "closed_record": approval.read_parent_mark(
-            where, parent.ticket, approval.PARENT_MARK_CLOSED
+        "ready": approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_READY
         ),
-        "accepted_threads": sorted(approval.accepted_threads(where, parent.ticket)),
+        "closed_record": approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_CLOSED
+        ),
+        "accepted_threads": sorted(approval_marks.accepted_threads(where, parent.ticket)),
         "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket, raw=raw)],
     }

@@ -14,10 +14,11 @@ from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from ..tickets import (
     agree,
     approval,
+    approval_checks,
     history,
     ops,
     phase,
-    review,
+    review_host,
 )
 from ..tickets import ticket as ticket_mod
 from . import lint_branch, lint_project
@@ -45,7 +46,7 @@ def _copy_problems(
 
     - `blocked` は判定が止める理由なので error
     - フェーズの順序は warn。狂っていても範囲の決まり方には影響せず、判定も止めない
-      （`approval.blocking_problems`）。承認のときは error だが、承認済みのものに当てるのは
+      （`approval_checks.blocking_problems`）。承認のときは error だが、承認済みのものに当てるのは
       「その順で始めた」という記録で、いま止める根拠にはならない
     - 計画の形と、種類の定義が読めないことは `validate` が付けた severity のまま（error）。
       判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
@@ -65,7 +66,7 @@ def _copy_problems(
         pool.setdefault(t.ticket, t)
     resolve = _types_resolver(conf, root)
     for t in copies:
-        left = approval.resumed_fields(t)
+        left = approval_checks.resumed_fields(t)
         if left:
             names = ", ".join(f"`{name}`" for name in left)
             problems.append(
@@ -111,7 +112,7 @@ def _record_unrecorded(conf: settings.Settings, t) -> str:
     （続きの子は `raised`）。履歴は ccnavi の外で動かした分と、履歴を書く前の版の承認を持たない
     ので、無いことだけでは止めない（warn）。
     """
-    if not approval.has_record(t) or not t.tree_root:
+    if not approval_checks.has_record(t) or not t.tree_root:
         return ""
     where = settings.approved_dir(conf, t.tree_root)
     entries, why = history.read(where, t.ticket, limit=0)
@@ -204,7 +205,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     review, notes = approval.scan_review(conf, root, raw=raw)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
-    index = approval.by_id(copies)
+    index = approval_checks.by_id(copies)
     done = {t.ticket for t in closed + review}
 
     # 承認済みの識別子の提案は、承認済みチケットと合わせて本物とするツリーを決める
@@ -233,12 +234,12 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
-    approval.align_imported(conf, root, preds)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    approval_checks.align_imported(conf, root, preds)
     # 統合先の done/ で閉じた識別子も閉じたものに数える（開いた親子のチケットでも統合先の
     # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
     # 名指しする。
-    done |= approval.integration_closed(conf, root, proposals)
+    done |= approval_checks.integration_closed(conf, root, proposals)
     problems.extend(
         _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
     )
@@ -451,7 +452,7 @@ def _proposal_problems(
             # 先行の数え方は承認と着手と同じ（`done/` に在って取り消しでないものだけ満たす）。
             # 着手はこれで止まるので、ここに出るのは
             # 着手のあとに先行が動いたか、止める前の版で着手したもの。
-            unmet = approval.unmet_predecessors(t, preds or {})
+            unmet = approval_checks.unmet_predecessors(t, preds or {})
             if unmet:
                 names = ", ".join(f"{p.ticket}（{p.label}）" for p in unmet)
                 problems.append(
@@ -554,7 +555,7 @@ def _review_token(root: str) -> list[Problem]:
     url = out.strip() if rc == 0 else ""
     if not url:
         return [Problem(SEVERITY_WARN, "(ticket)", "origin が無い。レビューの依頼と確認は動かない")]
-    problem = review.transport_problem(url)
+    problem = review_host.transport_problem(url)
     if problem:
         return [Problem(SEVERITY_WARN, "(ticket)", f"{problem}。レビューの依頼と確認は動かない")]
     return []

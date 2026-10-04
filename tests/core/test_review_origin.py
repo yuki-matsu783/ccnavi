@@ -14,7 +14,7 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi.tickets import review
+from ccnavi.tickets import review_host
 from tests import ROOT
 
 SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-review.sh")
@@ -46,7 +46,7 @@ class RemoteKindTest(unittest.TestCase):
         }
         for url, kind in cases.items():
             with self.subTest(url=url):
-                self.assertEqual(review.remote_kind(url), kind)
+                self.assertEqual(review_host.remote_kind(url), kind)
 
 
 @unittest.skipUnless(SHELL and JQ and CURL, "sh / jq / curl のどれかが無い")

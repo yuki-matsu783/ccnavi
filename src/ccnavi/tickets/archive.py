@@ -18,9 +18,9 @@ Draft を外すので、squash でマージすると既定のブランチには�
 
 退避は補助の記録で、判定の正ではない。読むのは次のところだけで、どれも「閉じた」側に厳しくする向き。
 
-- 閉じた識別子の使い回しの検査（`approval.integration_problems` / `integration_closed`）と、子の連番
-  （`approval.next_child_id`）。退避にある識別子は閉じたものとして数える（同じリポジトリのものだけ）
-- 先行を引く対応表（`approval.predecessor_pool_of`）。置き場のどこにも無い先行を、
+- 閉じた識別子の使い回しの検査（`approval_checks.integration_problems` / `integration_closed`）と、
+  子の連番（`approval.next_child_id`）。退避にある識別子は閉じたものとして数える（同じリポジトリのものだけ）
+- 先行を引く対応表（`approval_checks.predecessor_pool_of`）。置き場のどこにも無い先行を、
   同じリポジトリの退避の `done/` から引く
 - 判定の走査（`approval.scan`）。子のワークツリーに残った古いチケットを、退避に同じ承認のチケットが
   あれば作業中に戻さない（`drop_archived`）
@@ -267,8 +267,8 @@ def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mo
 
     - 着手も取り消しもしていない写し（欄が 3 つとも空）は、退避より前の写しとして落とす。子の
       ワークツリーを切ったのは着手より前で、残る写しはふつうこの形。閉じた識別子は新規に承認
-      しない（`approval.integration_problems` が退避の識別子を拒む）ので、同じ識別子の未着手の
-      チケットは古い写ししか無い
+      しない（`approval_checks.integration_problems` が退避の識別子を拒む）ので、同じ識別子の
+      未着手のチケットは古い写ししか無い
     - 欄があれば、統合先の `done/` の親と同じく `syncstate.same_parent` で比べ、同じと言えるときだけ
       落とす。違えば同じ識別子の別のチケットとみなして残す
     - 両方に古い形の承認の時刻があって違えば、どちらでも残す（前の版と同じ見方）
@@ -501,7 +501,8 @@ def _ready_row(row: dict) -> bool:
     kind = row.get("kind")
     if kind == history.KIND_ARCHIVED:
         return True
-    # "ready" は approval.PARENT_MARK_READY（approval はこのモジュールを読むので、表記で持つ）。
+    # "ready" は approval_marks.PARENT_MARK_READY（approval_marks はこのモジュールより上の段なので、
+    # 表記で持つ）。
     return kind == history.KIND_PARENT_MARK and row.get("mark") == "ready"
 
 

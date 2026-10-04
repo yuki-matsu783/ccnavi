@@ -599,7 +599,7 @@ export interface PullReview {
   readonly author: string;
 }
 
-/** ホストから取得した結果（`ccnavi-review.sh fetch` と同じ形。Python の `review.Result` が読む） */
+/** ホストから取得した結果（`ccnavi-review.sh fetch` と同じ形。Python の `review_host.Result` が読む） */
 export interface ReviewCopy {
   readonly host: "github" | "gitlab";
   readonly mr: { readonly number: number; readonly url: string };

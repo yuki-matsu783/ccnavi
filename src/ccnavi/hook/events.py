@@ -16,7 +16,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard
 from ..records import audit, prune, repeat
-from ..tickets import approval, branchfind, configsync, ops, phase
+from ..tickets import approval, approval_checks, branchfind, configsync, ops, phase
 from . import docsearch, judge, post, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
@@ -144,7 +144,7 @@ def scope_guard(
             types[copy.project] = phase.load_types(conf, root, copy.project) or {}
     return post.ScopeGuard(
         root=root,
-        copies=approval.by_id(copies),
+        copies=approval_checks.by_id(copies),
         projects=conf.projects,
         tickets=conf.tickets,
         approved=conf.approved,
