@@ -502,6 +502,18 @@ class DagApprovalTest(PhaseHarness):
         self.assertIn("待ち方のファイル", held.workflow_unreadable)
         self.assertTrue(approval.content_problems(held))
 
+    def test_a_workflow_file_left_without_its_parent_is_warned_by_lint(self):
+        """親の承認済みチケットがどこにも無いのに残った待ち方のファイルを、`--lint` が warn で言う。"""
+        self.use(DAG)
+        self.family(plan=PLAN)
+        said = "待ち方のファイルがあるのに、親 i0001 の承認済みチケットがどの置き場"
+        linted = self.ccnavi("--lint")
+        self.assertNotIn(said, linted.stdout + linted.stderr)
+        os.remove(os.path.join(self.approved, "doing", "i0001.md"))
+        self.commit_parent("drop the parent")
+        linted = self.ccnavi("--lint")
+        self.assertIn(".ccnavi/approved/phases/i0001/workflow.yml: " + said, linted.stdout)
+
     def test_a_revision_cannot_move_a_defer_target_behind_approved_children(self):
         def reviewed(text):
             return text.replace(

@@ -590,6 +590,38 @@ def _copy_problems(
     return problems
 
 
+def _orphan_workflows(conf: settings.Settings, root: str, raw: approval.Raw) -> list[Problem]:
+    """親の承認済みチケットがどこにも無いのに残った待ち方のファイル（`phases/<親>/workflow.yml`）。
+
+    待ち方のファイルは `--agree` が書き、取り下げが一緒に消す。親を手で動かして消した・取り下げの
+    途中で止まった、などで残ると、同じ識別子で後から承認した親（手で動かした承認は待ち方を書かない）
+    の待ち方として読まれる。判定には入れず warn で言う。
+    """
+    known = {t.ticket for t in raw.everything}
+    problems: list[Problem] = []
+    for t in approval.trees(conf, root):
+        phases_dir = os.path.join(settings.approved_dir(conf, t.root), approval.PHASES_DIR)
+        try:
+            names = sorted(os.listdir(phases_dir))
+        except OSError:
+            continue
+        for name in names:
+            held = approval.workflow_path(settings.approved_dir(conf, t.root), name)
+            if name in known or not os.path.lexists(held):
+                continue
+            shown = os.path.relpath(held, root).replace(os.sep, "/")
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{shown}: 待ち方のファイルがあるのに、親 {name} の承認済みチケットがどの置き場"
+                    "（作業中・レビュー待ち・閉じた）にも無い。同じ識別子で後から承認した親の待ち方として"
+                    "読まれるので、取り下げや手での移動で残ったものなら、ユーザが消してください",
+                )
+            )
+    return problems
+
+
 OLD_WORKFLOW_DIFFERS = (
     "古い形（承認の記録 ccnavi_approved を持つ）の workflow: 欄の待ち方が、今の phases.yml から"
     "計算した待ち方と違うので、欄を使わず全体計画を一直線（前の番号を全部待つ）で読んでいる。"
@@ -709,6 +741,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(_stale_problems(root, conf, stale, index, done))
 
     problems.extend(_copy_problems(root, conf, copies, index, closed, raw))
+    problems.extend(_orphan_workflows(conf, root, raw))
 
     resolve = _types_resolver(conf, root)
     for t in copies:
