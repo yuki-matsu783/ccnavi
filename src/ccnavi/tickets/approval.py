@@ -782,7 +782,7 @@ def update_fields(path: str, fields: dict) -> str:
             text = f.read()
     except OSError as exc:
         return f"読めない ({exc})"
-    return approval_marks._write(path, ticket_mod.set_fields(text, fields))
+    return approval_marks.write_ticket(path, ticket_mod.set_fields(text, fields))
 
 
 def close_copy(approved_dir: str, ticket_id: str) -> str:
@@ -1028,7 +1028,7 @@ def followup(
     body += [f"- {item}" for item in items] or ["（指摘の一覧は無い）"]
     body.append("")
     t = ticket_mod.Ticket(ticket=ident, raw=front, body="\n".join(body))
-    failed = approval_marks._write(copy_path(where, ident), ticket_mod.render(t))
+    failed = approval_marks.write_ticket(copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed
     history.note(

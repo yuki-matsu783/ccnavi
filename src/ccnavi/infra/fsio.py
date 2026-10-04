@@ -220,12 +220,14 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     ディレクトリに作る。他所（`/tmp` など）に作るとコピーになってしまい、この型が
     成り立たなくなる。
 
-    一時ファイルの名前は、拡張子の前に一意な部分を挟んで作る（`a.json` なら
-    `a.<一意>.part.json`）。固定の名前にすると、同時に書く 2 つが同じ一時ファイルを
-    取り合い、片方の書きかけをもう片方が差し替えることになる。直そうとした問題が
-    形を変えて戻るので、ここは一意でなければならない。拡張子と先頭を残すのは、
-    落ちて残った一時ファイルを、本番と同じ名前の条件（`ctxfile.forget` など）で
-    掃除できるようにするため。
+    一時ファイルの名前は、先頭に `.` を付け、拡張子の前に一意な部分を挟んで作る
+    （`a.json` なら `.a.<一意>.part.json`）。固定の名前にすると、同時に書く 2 つが同じ
+    一時ファイルを取り合い、片方の書きかけをもう片方が差し替えることになる。直そうとした
+    問題が形を変えて戻るので、ここは一意でなければならない。先頭の `.` と `.part` は、
+    承認済みの置き場に落ちて残ったものを `ccnavi-push-approved.sh` と C1 のコミットが
+    運ばないため（どちらも `.<名前>.part*` の形を除く）。元の名前と拡張子を残すのは、
+    落ちて残った一時ファイルを、本番と同じ名前の条件（`ctxfile.forget` と `prune` は
+    先頭の `.` を外してから当てる。`temp_origin`）で掃除できるようにするため。
 
     **守るのは「同時に読む側」までで、電源断は守らない。** 差し替えの前に
     `fsync` をしていないので、ディスクへ実際に届く順はファイルシステム任せ。
@@ -245,7 +247,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
 
     def write() -> None:
         os.makedirs(directory, exist_ok=True)
-        handle, part = tempfile.mkstemp(dir=directory, prefix=f"{stem}.", suffix=f".part{suffix}")
+        handle, part = tempfile.mkstemp(dir=directory, prefix=f".{stem}.", suffix=f".part{suffix}")
         try:
             # mkstemp は必ず 0600 で作る。os.replace は inode ごと差し替えるので、
             # そのままだと行き先の権限が気づかないうちに 0600 に狭まる（POSIX で実際に確かめた）。
@@ -270,6 +272,20 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
             raise
 
     return _recorded(path, _write_with_retry(write))
+
+
+# `write_text_atomic` が落ちて残した一時ファイルの名前。
+# `.<元の名前の拡張子の前>.<一意>.part<拡張子>` の形。
+_ATOMIC_TEMP = re.compile(r"^\.(?P<stem>.+)\.[^.]+\.part(?P<suffix>\.[^.]*)?$")
+
+
+def temp_origin(name: str) -> str:
+    """`write_text_atomic` の一時ファイルの名前なら、先頭の `.` を外した名前。違えばそのまま。
+
+    掃除する側が、本番と同じ「先頭と拡張子」の条件を当てられるようにする
+    （`.once-a-b.x1y2.part.json` → `once-a-b.x1y2.part.json`）。
+    """
+    return name[1:] if _ATOMIC_TEMP.match(name) else name
 
 
 def _mode_for(path: str) -> int:
@@ -325,31 +341,56 @@ def write_bytes_atomic(path: str, content: bytes) -> str:
     """
     if _STAGE["current"] is not None:
         return _stage_put(Op(OP_BYTES_ATOMIC, path, bytes(content)))
+    return _recorded(path, _write_with_retry(lambda: _replace_durably(path, content)))
+
+
+def write_text_durable(path: str, text: str, newline: str | None = None) -> str:
+    """本文を `write_bytes_atomic` と同じ書き方で書く。書けたら空文字、駄目なら理由。
+
+    承認済みチケットを書き直すところ（改版、着手・終わりの欄、続きの子を起こす）が使う。
+    改行は `write_text`（`open(path, "w", newline=newline)`）と同じに変える。`newline=None` なら
+    機械の改行（Windows は CRLF）になる。書き方を変えても、手元のファイルの改行は前と同じ。
+    """
+    if _STAGE["current"] is not None:
+        return _stage_put(
+            Op(OP_TEXT_DURABLE, path, _encode(text, newline), text=text, newline=newline)
+        )
+    content = _disk_text(text, newline)
+    return _recorded(path, _write_with_retry(lambda: _replace_durably(path, content)))
+
+
+def _disk_text(text: str, newline: str | None) -> bytes:
+    """`open(path, "w", encoding="utf-8", newline=newline)` が書くのと同じバイト列。"""
+    if newline is None:
+        text = text.replace("\n", os.linesep)
+    elif newline not in ("", "\n"):
+        text = text.replace("\n", newline)
+    return text.encode("utf-8")
+
+
+def _replace_durably(path: str, content: bytes) -> None:
+    """`write_bytes_atomic` の本体。書けなければ OSError を投げる。"""
     directory = os.path.dirname(path) or "."
     name = os.path.basename(path)
-
-    def write() -> None:
-        os.makedirs(directory, exist_ok=True)
-        handle, part = tempfile.mkstemp(dir=directory, prefix=f".{name}.", suffix=".part")
+    os.makedirs(directory, exist_ok=True)
+    handle, part = tempfile.mkstemp(dir=directory, prefix=f".{name}.", suffix=".part")
+    try:
+        os.chmod(part, _mode_for(path))
         try:
-            os.chmod(part, _mode_for(path))
-            try:
-                stream = os.fdopen(handle, "wb")
-            except BaseException:
-                os.close(handle)
-                raise
-            with stream as f:
-                f.write(content)
-                f.flush()
-                _sync_file(f.fileno())
-            os.replace(part, path)
+            stream = os.fdopen(handle, "wb")
         except BaseException:
-            with contextlib.suppress(OSError):
-                os.remove(part)
+            os.close(handle)
             raise
-        _sync_directory(directory)
-
-    return _recorded(path, _write_with_retry(write))
+        with stream as f:
+            f.write(content)
+            f.flush()
+            _sync_file(f.fileno())
+        os.replace(part, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(part)
+        raise
+    _sync_directory(directory)
 
 
 def _sync_file(fd: int) -> None:
@@ -794,6 +835,7 @@ OP_TEXT = "text"  # write_text
 OP_TEXT_ATOMIC = "text-atomic"  # write_text_atomic / write_json_atomic
 OP_BYTES = "bytes"  # write_bytes
 OP_BYTES_ATOMIC = "bytes-atomic"  # write_bytes_atomic
+OP_TEXT_DURABLE = "text-durable"  # write_text_durable
 OP_NEW = "new"  # write_new（在れば書かない）
 OP_REMOVE = "remove"  # remove（無くても消せなくても何も出さない）
 OP_UNLINK = "unlink"  # unlink（消せなければ理由）

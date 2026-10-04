@@ -103,5 +103,23 @@ class UnreadableStateTest(unittest.TestCase):
         self.assertEqual(fsio.read_json(self.path)[0], {"given": {"note": 1}})
 
 
+class LeftoverTempTest(unittest.TestCase):
+    """落ちて残った一時ファイル（`.once-….part.json`）を、本番と同じ条件で掃く。"""
+
+    def test_forget_sweeps_this_sessions_leftover_temporary_file(self):
+        state = tempfile.mkdtemp(prefix="ccnavi-leftover-")
+        once = os.path.basename(ctxfile._once_path(state, "s1", ""))
+        stem, suffix = os.path.splitext(once)
+        leftover = os.path.join(state, f".{stem}.abc12345.part{suffix}")
+        other = os.path.join(state, ".other.abc12345.part.json")
+        for path in (leftover, other):
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("{}")
+        ctxfile.forget(state, "s1")
+        self.assertFalse(os.path.exists(leftover))
+        # once- の記録でない一時ファイルには触らない。
+        self.assertTrue(os.path.exists(other))
+
+
 if __name__ == "__main__":
     unittest.main()

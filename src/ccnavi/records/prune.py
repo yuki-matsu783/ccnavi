@@ -411,17 +411,20 @@ def _session_entries(
         if name != SELFGUARD_STORE and os.path.isdir(path):
             groups.setdefault(name, []).append(path)
 
-    keyed: list[tuple[str, str, str]] = []
-    for name in names:
-        path = os.path.join(state_dir, name)
+    keyed: list[tuple[str, str, str, str]] = []
+    for entry in names:
+        path = os.path.join(state_dir, entry)
         if not os.path.isfile(path):
             continue
+        # 書きかけで落ちて残った一時ファイル（`.once-….part.json`）は、先頭の `.` を外して本番と同じ
+        # 条件で当てる。同じセッションの記録と一緒に消える。
+        name = fsio.temp_origin(entry)
         pair = next(
             ((p, s) for p, s in _SESSION_AND_KEY if name.startswith(p) and name.endswith(s)),
             None,
         )
         if pair is not None:
-            keyed.append((name, pair[0], pair[1]))
+            keyed.append((entry, name, pair[0], pair[1]))
             continue
         for pattern in (*_SESSION_ONLY, _SEEN):
             m = pattern.match(name)
@@ -431,10 +434,10 @@ def _session_entries(
 
     loose = []
     known = sorted(groups, key=len, reverse=True)
-    for name, prefix, suffix in keyed:
+    for entry, name, prefix, suffix in keyed:
         middle = name[len(prefix) : len(name) - len(suffix)]
         token = next((t for t in known if middle.startswith(t + "-")), None)
-        path = os.path.join(state_dir, name)
+        path = os.path.join(state_dir, entry)
         if token is None:
             loose.append(path)
         else:

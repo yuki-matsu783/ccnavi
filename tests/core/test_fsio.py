@@ -199,8 +199,10 @@ class WriteAtomicTest(unittest.TestCase):
 
         固定の名前（`<行き先>.part` など）だと、同時に書く 2 つが同じ一時
         ファイルを取り合い、片方の書きかけをもう片方が差し替える。
-        先頭と拡張子を残すのは、落ちて残った分を ctxfile.forget の
-        「`once-` で始まり `.json` で終わる」という条件で掃除させるため。
+        先頭の `.` と `.part` は、承認済みの置き場に残ったものを運ぶ側
+        （ccnavi-push-approved.sh と hook/c1.py）が除くため。元の名前と拡張子を
+        残すのは、先頭の `.` を外せば（`temp_origin`）ctxfile.forget の
+        「`once-` で始まり `.json` で終わる」という条件で掃除できるようにするため。
         """
         seen: list[str] = []
         real = tempfile.mkstemp
@@ -216,9 +218,17 @@ class WriteAtomicTest(unittest.TestCase):
 
         self.assertEqual(len(set(seen)), 3, f"一時ファイルの名前が重なった: {seen}")
         for name in seen:
-            self.assertTrue(name.startswith("once-abc-def."), name)
-            self.assertTrue(name.endswith(".json"), name)
-            self.assertNotEqual(name, "once-abc-def.json")
+            self.assertTrue(name.startswith(".once-abc-def."), name)
+            self.assertTrue(name.endswith(".part.json"), name)
+            self.assertRegex(name, r"^\.[^/]*\.part(\.[^/]*)?$")
+            origin = fsio.temp_origin(name)
+            self.assertTrue(origin.startswith("once-abc-def."), origin)
+            self.assertTrue(origin.endswith(".json"), origin)
+
+    def test_temp_origin_leaves_other_names_alone(self):
+        for name in ("once-abc-def.json", ".hidden.json", ".x.part", "a.b.part.json"):
+            self.assertEqual(fsio.temp_origin(name), name)
+        self.assertEqual(fsio.temp_origin(".a.b.c.x1y2_z.part.json"), "a.b.c.x1y2_z.part.json")
 
 
 class WriteBytesAtomicTest(unittest.TestCase):
@@ -346,6 +356,43 @@ class WriteBytesAtomicTest(unittest.TestCase):
         (op,) = stage.items
         self.assertEqual(op.kind, fsio.OP_BYTES_ATOMIC)
         self.assertEqual(op.content, b"x")
+
+
+class WriteTextDurableTest(unittest.TestCase):
+    """承認済みチケットの書き直し（write_text_durable）。改行は write_text と同じに書く。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-text-durable-")
+        self.path = os.path.join(self.dir, "i0001.md")
+
+    def _read(self, path: str) -> bytes:
+        with open(path, "rb") as f:
+            return f.read()
+
+    def test_newline_matches_write_text(self):
+        plain = os.path.join(self.dir, "plain.md")
+        for newline in (None, "", "\n", "\r\n"):
+            with self.subTest(newline=newline):
+                text = "---\nticket: i0001\n---\n本文\n"
+                self.assertEqual(fsio.write_text(plain, text, newline), "")
+                self.assertEqual(fsio.write_text_durable(self.path, text, newline), "")
+                self.assertEqual(self._read(self.path), self._read(plain))
+
+    def test_failed_replace_keeps_the_previous_content(self):
+        self.assertEqual(fsio.write_text_durable(self.path, "before"), "")
+        with mock.patch("os.replace", side_effect=OSError(errno.ENOSPC, "no space")):
+            self.assertNotEqual(fsio.write_text_durable(self.path, "after"), "")
+        self.assertEqual(self._read(self.path), b"before")
+        self.assertEqual(sorted(os.listdir(self.dir)), ["i0001.md"])
+
+    def test_staged_write_keeps_lf_in_the_changes(self):
+        with fsio.staging() as stage:
+            self.assertEqual(fsio.write_text_durable(self.path, "a\nb\n"), "")
+            self.assertEqual(fsio.read_text(self.path), "a\nb\n")
+        self.assertFalse(os.path.exists(self.path))
+        (op,) = stage.items
+        self.assertEqual(op.kind, fsio.OP_TEXT_DURABLE)
+        self.assertEqual(op.content, b"a\nb\n")
 
 
 if __name__ == "__main__":

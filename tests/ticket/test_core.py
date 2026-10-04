@@ -620,7 +620,7 @@ class WriterFailureTest(CoreHarness):
         self.commit_parent()
         changes = self.planned()
         doing = os.path.join("doing", "i0001.md")
-        with self.failing("write_text", lambda path, *rest: path.endswith(doing)):
+        with self.failing("write_text_durable", lambda path, *rest: path.endswith(doing)):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 1, out + err)
         with open(self.held(), "rb") as f:

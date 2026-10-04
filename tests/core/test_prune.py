@@ -237,6 +237,23 @@ class StatePruneTest(_Base):
         for path in kept:
             self.assertTrue(os.path.exists(path), path)
 
+    def test_leftover_temporary_file_goes_with_its_session(self):
+        """落ちて残った `.once-<セッション>-….part.json` も、そのセッションと一緒に消える。"""
+        doomed = self.session_files(S_OLD, 20)
+        leftover = _write(
+            os.path.join(self.state, f".once-{S_OLD}-main.abc12345.part.json"), age_days=20
+        )
+        kept = self.session_files(S_LIVE, 20)
+        _age(os.path.join(self.state, f"{S_LIVE}.turn.json"), 0.1)
+        live_leftover = _write(
+            os.path.join(self.state, f".once-{S_LIVE}-main.abc12345.part.json"), age_days=20
+        )
+        self.run_prune()
+        for path in [*doomed, leftover]:
+            self.assertFalse(os.path.exists(path), path)
+        for path in [*kept, live_leftover]:
+            self.assertTrue(os.path.exists(path), path)
+
     def test_files_without_a_session_are_left_alone(self):
         keep = [
             _write(os.path.join(self.state, "review-request-i0001-1.md"), age_days=90),
