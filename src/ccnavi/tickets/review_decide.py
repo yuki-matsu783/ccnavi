@@ -353,8 +353,8 @@ def decide_yes(
     形は `--yes <選択の JSON> --digest <ダイジェスト> --json`。
 
     ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが一致することを
-    求める。エージェントがこれをシェルで打つ形は、組み込みの deny（`phase.ticket_approval_rule`）が
-    止める。
+    求める。エージェントがこれをシェルで打つ形は、組み込みの deny
+    （`phase_forms.ticket_approval_rule`）が止める。
     結果は JSON で返す。違えば何も置かず `mismatch` を返す。
     """
     if not digest.strip():

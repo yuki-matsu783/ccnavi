@@ -15,15 +15,7 @@ from typing import TextIO
 from ..hook import c1, core
 from ..infra import fsio, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import (
-    history,
-    ops,
-    phase,
-    review,
-    review_close,
-    review_decide,
-    ticket_ids,
-)
+from ..tickets import history, ops, phase, review, review_close, review_decide, ticket_ids
 from . import cli_args, cli_usage, lint, status
 
 

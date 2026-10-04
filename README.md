@@ -2655,6 +2655,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/agree_digest.py` | 承認の対象の指紋（ダイジェストと読みの範囲）と、承認で書く本文 |
 | `src/ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
+| `src/ccnavi/tickets/phase_forms.py` | ユーザだけが打つコマンドの形（承認・レビュー済み・ガードの切り替え・記録の片付け）を見分ける組み込みのルール |
+| `src/ccnavi/tickets/phase_scope.py` | 子チケットの範囲の当て方と、範囲の外の変更の洗い出し |
 | `src/ccnavi/tickets/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
 | `src/ccnavi/tickets/flow.py` | 子チケットのフロー（作業の手順のグラフ）。置き場・着手中のロック・読み込み・子に渡す案内 |
 | `src/ccnavi/tickets/flow_text.py` | フローに書かれた文字列の整え方。制御文字・長さ・印や囲みのなりすまし |

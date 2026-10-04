@@ -1,7 +1,7 @@
 """チケットの状態を動かす操作。`ccnavi ticket start|finish|cancel <識別子>`。
 
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
-サブエージェントからの呼び出しは hook の判定が止める（`hook/judge.py` が `phase.forbidden` で
+サブエージェントからの呼び出しは hook の判定が止める（`hook/judge.py` が `phase_forms.forbidden` で
 `DENY_SUBAGENT_TICKET_OP` を返す）。実行ファイルは呼び手がサブエージェントかを知らない。
 
 やることは置き場を動かして欄を書くことだけ（状態は置き場が表す）。`start` は置き場を動かさず

@@ -777,7 +777,7 @@ def resumed_fields(t: ticket_model.Ticket) -> list[str]:
 def mark_blocked(conf: settings.Settings, kept: list[ticket_model.Ticket]) -> None:
     """判定が読む承認済みチケットに、信頼できない理由を付ける。
 
-    理由を読むのは `phase.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
+    理由を読むのは `phase_scope.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
     終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
 

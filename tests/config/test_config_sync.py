@@ -22,7 +22,7 @@ import os
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import configsync, ops, phase, risk
+from ccnavi.tickets import configsync, ops, phase_forms, risk
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
@@ -460,7 +460,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
 
     def test_config_synced_is_denied_to_the_agent(self):
         """エージェントが Bash で打つ形は、ユーザの判断の経路と同じ組み込みの deny が止める。"""
-        rule = phase.ticket_approval_rule("", self.ws)
+        rule = phase_forms.ticket_approval_rule("", self.ws)
         self.assertIsNotNone(rule.compiled.search("ccnavi --config-synced i0001"))
 
     def test_notified_only_after_the_notice_was_put_in_the_request(self):

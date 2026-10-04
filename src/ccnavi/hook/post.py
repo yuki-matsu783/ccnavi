@@ -48,7 +48,15 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, gitstate, hookio, settings, tree
 from ..policy import rules, selfguard
 from ..records import audit
-from ..tickets import archive, phase, phasetypes, ticket_fields, ticket_model, ticket_places
+from ..tickets import (
+    archive,
+    phase_forms,
+    phase_scope,
+    phasetypes,
+    ticket_fields,
+    ticket_model,
+    ticket_places,
+)
 from . import c1
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -437,7 +445,8 @@ def at_stop(
     record.rules = sorted({rule.id or "(id 無し)" for f in found for rule in f.group})
 
     lines = [
-        f"[ccnavi] 守ると宣言した場所が、この{phase.TURN_DEFINED}で {len(found)} 件変わりました。"
+        f"[ccnavi] 守ると宣言した場所が、この{phase_forms.TURN_DEFINED}で"
+        f" {len(found)} 件変わりました。"
     ]
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
@@ -475,7 +484,7 @@ def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
     trees = f"ワークツリー {shown} "
     if len(names) > 1:
         trees = f"ワークツリー {len(names)} 本（{shown}）"
-    turn = phase.TURN_DEFINED if define else "ターン"
+    turn = phase_forms.TURN_DEFINED if define else "ターン"
     return (
         f"[ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護領域のファイルを"
         "変更していないかを確認します。"
@@ -511,7 +520,7 @@ class ScopeGuard:
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
         """この変更が範囲の外なら、報告する文面と出所を返す。中なら None。
 
-        範囲は実行前チェックと同じく、親の範囲と種類の上限で切り詰める（phase.scope_verdict）。
+        範囲は実行前チェックと同じく、親の範囲と種類の上限で切り詰める（phase_scope.scope_verdict）。
         チケットの置き場は外でも報告しない。次のチケットを提案できなくすると、
         いちど承認した範囲から永久に出られなくなる。外し方は実行前チェックと同じ関数。
         """
@@ -533,13 +542,13 @@ class ScopeGuard:
         if ticket_places.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
-        item = phase.plan_item(ticket, parent)
+        item = phase_scope.plan_item(ticket, parent)
         pt = (
             self.types.get(parent.project, {}).get(item.type)
             if item is not None and parent is not None
             else None
         )
-        found = phase.scope_verdict(ticket, parent, pt, rel)
+        found = phase_scope.scope_verdict(ticket, parent, pt, rel)
         if not found.outside:
             return None
         area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(empty)"
@@ -551,7 +560,7 @@ class ScopeGuard:
             "The ticket was approved with that overflow shown as a warning; writes there stay "
             "blocked. "
         )
-        if found.limit == phase.LIMIT_BLOCKED:
+        if found.limit == phase_scope.LIMIT_BLOCKED:
             # 範囲の外に出たのではなく、チケット自体が信頼できない。範囲を
             # 見せても直しようが無いので、引っかかった検査を名指しする。
             message = (
@@ -561,7 +570,7 @@ class ScopeGuard:
                 "repair the approved ticket or where it sits. Tell them the problem above and "
                 "ask them to run 'ccnavi --lint', which names every ticket in this state."
             )
-        elif found.limit == phase.LIMIT_TYPE and found.type is not None:
+        elif found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
             message = (
                 inside + f"outside what phase type {found.type.title} ({found.type.id}) allows "
                 f"({', '.join(found.type.scope_globs)}). "
@@ -569,7 +578,7 @@ class ScopeGuard:
                 + "Send the output to a path that type covers, do the work in a later phase "
                 "whose type covers this path, or ask the user to change phases.yml."
             )
-        elif found.limit == phase.LIMIT_PARENT and parent is not None:
+        elif found.limit == phase_scope.LIMIT_PARENT and parent is not None:
             parent_area = (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(empty)"
             )
@@ -1123,7 +1132,7 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     data, failed = fsio.read_json(_turn_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を読めない: {failed}\n")
+            stderr.write(f"ccnavi: {phase_forms.TURN_DEFINED}の基準を読めない: {failed}\n")
         return set(), False, {}
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
@@ -1148,7 +1157,7 @@ def _save_turn(
         {"baseline": sorted(baseline)[:SEEN_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
-        stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を書けない: {failed}\n")
+        stderr.write(f"ccnavi: {phase_forms.TURN_DEFINED}の基準を書けない: {failed}\n")
 
 
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:

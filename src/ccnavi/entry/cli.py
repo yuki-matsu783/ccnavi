@@ -80,7 +80,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         stderr.write(RENAMED_APPROVE_NOTICE)
         return EXIT_BLOCK  # 2。使い方の誤り（1）と分け、案内だけで終える
     # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
-    # 走り、省略せずに書いた形しか見ない組み込みの deny（`phase._CLI_FORMS`）に止められない。
+    # 走り、省略せずに書いた形しか見ない組み込みの deny（`phase_forms._CLI_FORMS`）に止められない。
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
     # パスは sh が計算して渡す。2 度来ていないかを見るので、リストで受ける（WRAPPER_FLAGS）。
     parser.add_argument("--root", action="append", default=None)
@@ -530,7 +530,7 @@ def _parsed(
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
         # 確かめるだけの枝は `--preview` と一緒に使う。単独で打てる形にすると、組み込みの
-        # deny（phase.ticket_approval_rule）が免除するのは `--preview` の付いた `--agree`
+        # deny（phase_forms.ticket_approval_rule）が免除するのは `--preview` の付いた `--agree`
         # だけなので、エージェントが打てないものを案内することになる。
         if args.verify and not args.preview:
             stderr.write("ccnavi: --verify は --agree --preview と一緒に使う\n")
@@ -547,7 +547,7 @@ def _parsed(
             return EXIT_OK if code == 0 else EXIT_ERROR
         # 拡張のオーバーレイでユーザが押した承認。端末の確認の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
-        # deny（phase.ticket_approval_rule）が止める。
+        # deny（phase_forms.ticket_approval_rule）が止める。
         if args.yes:
             history.set_via(history.VIA_BOARD)
             # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。

@@ -27,6 +27,8 @@ from ..tickets import (
     approval_checks,
     flow,
     phase,
+    phase_forms,
+    phase_scope,
     ticket_guard,
     ticket_model,
     ticket_places,
@@ -189,7 +191,7 @@ def decide_before(
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
-            rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
+            rule_set.deny.append(phase_forms.ticket_approval_rule(conf.bin, root))
 
     subject, bare, inner, rewrites = screen(payload.tool_name, record.subject, record)
 
@@ -239,16 +241,16 @@ def decide_before(
             )
 
     # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
-    # （phase.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の置き場を
-    # シェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
+    # （phase_forms.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の
+    # 置き場をシェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
     if (
-        payload.tool_name in phase.SHELL_TOOLS
+        payload.tool_name in phase_forms.SHELL_TOOLS
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        found = phase.prune_form(record.subject, conf.bin)
+        found = phase_forms.prune_form(record.subject, conf.bin)
         if found:
-            record.code = phase.CODE_RECORDS_PRUNE
-            record.rules = [phase.RECORDS_PRUNE_RULE_ID]
+            record.code = phase_forms.CODE_RECORDS_PRUNE
+            record.rules = [phase_forms.RECORDS_PRUNE_RULE_ID]
             return refuse(
                 stdout,
                 mode,
@@ -257,7 +259,7 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        phase.CODE_RECORDS_PRUNE, subject, phase.prune_message()
+                        phase_forms.CODE_RECORDS_PRUNE, subject, phase_forms.prune_message()
                     )
                 ],
                 conf=conf,
@@ -265,16 +267,16 @@ def decide_before(
 
     # ユーザの判断の経路のうち、hook のほかに保護が無い形（端末要求を切る形、ボードの経路の形）は
     # 止める。実行ファイルを呼ぶ表記は追い切れないので、呼び方ではなく文字列の組で見る
-    # （phase.human_path_form）。
+    # （phase_forms.human_path_form）。
     if (
         conf.tickets_enabled
         and conf.guard_ticket_approval != selfguard.DISABLE
-        and payload.tool_name in phase.SHELL_TOOLS
+        and payload.tool_name in phase_forms.SHELL_TOOLS
     ):
-        kind, found = phase.human_path_form(record.subject)
+        kind, found = phase_forms.human_path_form(record.subject)
         if found:
-            record.code = phase.CODE_TICKET_APPROVAL
-            record.rules = [phase.TICKET_APPROVAL_RULE_ID]
+            record.code = phase_forms.CODE_TICKET_APPROVAL
+            record.rules = [phase_forms.TICKET_APPROVAL_RULE_ID]
             return refuse(
                 stdout,
                 mode,
@@ -283,11 +285,11 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        phase.CODE_TICKET_APPROVAL,
+                        phase_forms.CODE_TICKET_APPROVAL,
                         subject,
-                        phase.guard_off_message(found)
+                        phase_forms.guard_off_message(found)
                         if kind == "guard-off"
-                        else phase.board_form_message(found),
+                        else phase_forms.board_form_message(found),
                     )
                 ],
                 conf=conf,
@@ -323,14 +325,14 @@ def decide_before(
     if (
         conf.tickets_enabled
         and payload.agent_id
-        and payload.tool_name in phase.SHELL_TOOLS
-        and phase.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
+        and payload.tool_name in phase_forms.SHELL_TOOLS
+        and phase_forms.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
     ):
         # 禁止は中で実行されるコマンドにも当てる。`env sh …ccnavi-ticket.sh start` を
         # 元の形だけで見ると、先頭の `sh` に固定した形が外れて止まらずに通る。
         runner, layer = ("", "")
-        if not phase.forbidden(subject):
-            runner, layer = next((r, x) for r, x, _ in inner if phase.forbidden(x))
+        if not phase_forms.forbidden(subject):
+            runner, layer = next((r, x) for r, x, _ in inner if phase_forms.forbidden(x))
         record.code, record.rules = phase.CODE_SUBAGENT, [reasons.TICKET_RULE]
         record.unwrapped = layer
         return refuse(
@@ -351,10 +353,10 @@ def decide_before(
     # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
     # ルールより先に見る。置き場を読むのは cwd がワークツリーかプロジェクトの中のときだけ
     # （`phase.parent_at`）。
-    if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
+    if conf.tickets_enabled and payload.tool_name in phase_forms.HELD_TOOLS:
         parent, raw = phase.parent_at(root, conf, payload.cwd, raw)
         held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
-        exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
+        exempt = payload.tool_name == "Bash" and phase_forms.exempt(subject, record.degraded)
         if held is not None and not exempt:
             record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
             reason = phase.hold_reason(held, payload.tool_name, root)
@@ -551,8 +553,8 @@ def decide_before(
         # 生の文字列ではない。読み切れなかったことを根拠のコードにしない。
         read_through = all(layer for _, layer, _ in via)
         record.code = reasons.code_for(payload.tool_name, "" if read_through else record.degraded)
-        if any(rule.id == phase.TICKET_APPROVAL_RULE_ID for rule in group):
-            record.code = phase.CODE_TICKET_APPROVAL
+        if any(rule.id == phase_forms.TICKET_APPROVAL_RULE_ID for rule in group):
+            record.code = phase_forms.CODE_TICKET_APPROVAL
     elif verdict == rules.DENY:
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
         # allow / ask に当たっている（そのときは文面がルールの id を名指しする）。
@@ -835,7 +837,7 @@ def ticket_verdict(
 
     範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
-    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側を採る（phase.scope_verdict）。
+    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側を採る（phase_scope.scope_verdict）。
     承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
     名指しする。ルールの判定と比べて強い側を採るのは呼び手。
 
@@ -875,10 +877,10 @@ def ticket_verdict(
     # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
     # phases.yml を開かない。
     pt, notice = None, ""
-    if parent is not None and phase.plan_item(ticket, parent) is not None:
+    if parent is not None and phase_scope.plan_item(ticket, parent) is not None:
         types = phase.load_types(conf, root, parent.project)
-        pt = phase.type_for(conf, root, ticket, parent, types or {})
-        missing = phase.unread_type(conf, root, ticket, parent, types)
+        pt = phase_scope.type_for(conf, root, ticket, parent, types or {})
+        missing = phase_scope.unread_type(conf, root, ticket, parent, types)
         if missing:
             notice = (
                 f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の種類 `{missing}` が"
@@ -887,11 +889,11 @@ def ticket_verdict(
                 "種類が消えている。ユーザに伝えて直してもらってください"
                 "（'ccnavi --lint' が箇所を言う）。"
             )
-    found = phase.scope_verdict(ticket, parent, pt, rel)
+    found = phase_scope.scope_verdict(ticket, parent, pt, rel)
     if found.verdict == rules.ALLOW:
         return rules.ALLOW, "", notice, ""
 
-    if found.limit == phase.LIMIT_BLOCKED:
+    if found.limit == phase_scope.LIMIT_BLOCKED:
         # 範囲の外に書いたのではなく、チケット自体が信頼できない。範囲を見せても
         # 直しようが無いので、代わりに引っかかった検査を名指しする。
         return (
@@ -950,7 +952,7 @@ def ticket_verdict(
         )
     # 上限ごとに次にすることが違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
     # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
-    if found.limit == phase.LIMIT_TYPE and found.type is not None:
+    if found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
         pt = found.type
         head.append(f"limit: phase type {pt.title} ({pt.id}): {', '.join(pt.scope_globs)}")
         body = (
@@ -959,7 +961,7 @@ def ticket_verdict(
             "a warning; writes there stay blocked. Do the work in a later phase whose type "
             "covers this path, or ask the user to change phases.yml."
         )
-    elif found.limit == phase.LIMIT_PARENT and parent is not None:
+    elif found.limit == phase_scope.LIMIT_PARENT and parent is not None:
         parent_area = ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(空)"
         head.append(f"limit: parent {parent.ticket}: {parent_area}")
         body = (

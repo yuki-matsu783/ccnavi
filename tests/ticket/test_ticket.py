@@ -31,8 +31,7 @@ import unittest
 
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
-from ccnavi.tickets import approval, review, ticket_fields
-from ccnavi.tickets import phase as phase_mod
+from ccnavi.tickets import approval, phase_forms, review, ticket_fields
 from tests import ROOT, common_path, common_sh
 from tests.inproc import run_ccnavi
 
@@ -1182,7 +1181,7 @@ class TicketTest(unittest.TestCase):
         self.close_phase()
         review_sh = settings.script_command(self.root, "ccnavi-review.sh")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn(phase_mod.EXEMPT_NOTE, self.reason(said))
+        self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(said))
 
         guided = f"{review_sh} request --phase 1 --body-file b.md"
         decorated = self.hook(
@@ -1192,12 +1191,12 @@ class TicketTest(unittest.TestCase):
             command=f"cd {self.parent_tree} && {guided} | tail -3",
         )
         self.assertIn("DENY_PHASE_REVIEW", self.reason(decorated))
-        self.assertIn(phase_mod.EXEMPT_NOTE, self.reason(decorated))
+        self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(decorated))
 
         # サブエージェントの起動にはシェルのパスの話をしない。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
-        self.assertNotIn(phase_mod.EXEMPT_NOTE, self.reason(spawn))
+        self.assertNotIn(phase_forms.EXEMPT_NOTE, self.reason(spawn))
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
@@ -1222,11 +1221,11 @@ class TicketTest(unittest.TestCase):
 
         # 判定の土台そのもの。shellread が読んだ文字列は 1 本のコマンドで、免除の形に当たる。
         reading = shellread.read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
-        self.assertEqual(len(phase_mod.commands(reading.text)), 1, reading.text)
-        self.assertTrue(phase_mod.exempt(reading.text, reading.reason))
+        self.assertEqual(len(phase_forms.commands(reading.text)), 1, reading.text)
+        self.assertTrue(phase_forms.exempt(reading.text, reading.reason))
         # 連結の片方が違えば止める側は変わらない。
         joined = shellread.read('ls; sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
-        self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
+        self.assertFalse(phase_forms.exempt(joined.text, joined.reason))
 
     def test_gate_does_not_exempt_the_command_run_inside_a_runner(self):
         """止めている間に通す形は、実行役のコマンドの中で実行されるコマンドには当てない。

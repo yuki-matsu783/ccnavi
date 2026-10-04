@@ -13,15 +13,7 @@ from typing import TextIO
 from ..infra import fsio, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import (
-    approval,
-    archive,
-    configsync,
-    phase,
-    risk,
-    syncstate,
-    ticket_model,
-)
+from ..tickets import approval, archive, configsync, phase, risk, syncstate, ticket_model
 from ..tickets import ticket as ticket_mod
 from . import lint_rules
 

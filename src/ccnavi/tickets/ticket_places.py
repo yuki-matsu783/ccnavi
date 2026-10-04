@@ -25,7 +25,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
     実行前チェックは `is_unscoped` を通ってここへ来る。実行後チェックとサブエージェント終了時
     チェックは直に呼ぶ（`post._script_writes` / `post._committed_findings` /
-    `post.ScopeGuard.finding`、`phase.scope_findings`）。
+    `post.ScopeGuard.finding`、`phase_scope.scope_findings`）。
 
     **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
     `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの実行後チェックは、置き場を
@@ -129,7 +129,7 @@ def is_eli5_place(rel: str) -> bool:
     `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
 
     `scratchpad/` と違って git が追跡する置き場なので、実行後チェック（`post.ScopeGuard.finding`）と
-    サブエージェント終了時チェック（`phase.scope_findings`）も、ここを明示的に外す。外さないと、
+    サブエージェント終了時チェック（`phase_scope.scope_findings`）も、ここを明示的に外す。外さないと、
     実行前に通った書き込みがコミットのあとで範囲の外として報告される。
 
     名前の大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
@@ -149,7 +149,7 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     実行前は、これから書かれる 1 つのパスを見る。下書きの置き場を外すのはここだけで
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
 
-    実行後チェック（`post`）とサブエージェント終了時チェック（`phase.scope_findings`）は
+    実行後チェック（`post`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）は
     下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの実行後チェックは
     内容で決める（`post._script_writes`）。外し方を揃えないのは、
     **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`

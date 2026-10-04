@@ -547,7 +547,7 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], l
 def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
     """子の範囲が種類の上限を超えている項を名指しする。子 ⊆ 種類。
 
-    超えていても承認は止めない（warn）。判定が種類の上限でも切り詰める（phase.scope_verdict）。
+    超えていても承認は止めない（warn）。判定が種類の上限でも切り詰める（phase_scope.scope_verdict）。
     """
     if pt.inherits_scope:
         return []

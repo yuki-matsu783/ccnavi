@@ -43,7 +43,7 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
 
-    とくに `base_sha` は、サブエージェント終了時チェック（`phase.scope_findings` の
+    とくに `base_sha` は、サブエージェント終了時チェック（`phase_scope.scope_findings` の
     `base_sha..HEAD`）と実績リスク（`risk.measure`）の基準点。ここを書き換えられると、
     コミット済みの範囲外の変更が検査から消える。落とす欄を「いつでも」にすると、その
     書き換えが実行後チェックからも消える。

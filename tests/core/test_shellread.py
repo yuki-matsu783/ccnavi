@@ -6,7 +6,7 @@ from ccnavi.infra import shellread, shellread_cd, shellread_scan
 from ccnavi.infra.shellread import SEP, read
 from ccnavi.infra.shellread_scan import REASON_UNTERMINATED
 from ccnavi.infra.shellread_words import REASON_TAKEN_AS_CODE
-from ccnavi.tickets import phase
+from ccnavi.tickets import phase_forms
 
 # 語の中の切れ目の目印。コマンドの区切り（SEP）と別の文字になる予定で、
 # 実装が入るまでは無い。無い間は、それを前提にしたテストを skip する。
@@ -850,17 +850,17 @@ class SubstTest(unittest.TestCase):
     def test_止めている間の免除はコマンドが全部ラッパースクリプトのときだけ(self):
         substituted = read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(cat f)"')
         self.assertFalse(
-            phase.exempt(substituted.text, substituted.reason),
+            phase_forms.exempt(substituted.text, substituted.reason),
             "置換の中の cat まで免除した",
         )
         lines = read(
             "sh .ccnavi/scripts/ccnavi-ticket.sh finish x\nsh .ccnavi/scripts/ccnavi-git.sh status"
         )
-        self.assertTrue(phase.exempt(lines.text, lines.reason), show(lines.text))
+        self.assertTrue(phase_forms.exempt(lines.text, lines.reason), show(lines.text))
 
     def test_置換の中の状態を動かすスクリプトもサブエージェントに許さない(self):
         inner = read('echo "$(sh .ccnavi/scripts/ccnavi-ticket.sh finish x)"')
-        self.assertTrue(phase.forbidden(inner.text), show(inner.text))
+        self.assertTrue(phase_forms.forbidden(inner.text), show(inner.text))
 
 
 class BraceTest(unittest.TestCase):

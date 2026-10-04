@@ -11,7 +11,7 @@ from __future__ import annotations
 from ..infra import settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
 from ..policy import rules
-from ..tickets import phase
+from ..tickets import phase, phase_forms
 
 # 返す理由に載せる理由コード。ccnavi.md 付録 B の体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
@@ -209,10 +209,10 @@ def reason_for(
     # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無いパスが
     # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
-    if rule.id == phase.TICKET_APPROVAL_RULE_ID:
+    if rule.id == phase_forms.TICKET_APPROVAL_RULE_ID:
         # 組み込み。ルールファイルには無いので、そこを探させない。
         code, source = (
-            phase.CODE_TICKET_APPROVAL,
+            phase_forms.CODE_TICKET_APPROVAL,
             f"builtin rule: {rule.id} ({settings.GUARD_TICKET_APPROVAL_ENV})",
         )
 

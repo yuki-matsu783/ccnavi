@@ -54,6 +54,7 @@ from . import (
     configsync,
     ops,
     phase,
+    phase_forms,
     review_host,
     ticket_model,
     ticket_places,
@@ -260,7 +261,7 @@ def requested(
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"
-        f"{phase.TURN_DEFINED}を終えてユーザを待ってください\n"
+        f"{phase_forms.TURN_DEFINED}を終えてユーザを待ってください\n"
     )
     return 0
 
@@ -486,7 +487,7 @@ def _outside_approved(
 ) -> tuple[list[str], str]:
     """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
 
-    NUL 区切りで読む理由は phase.scope_findings と同じ。既定の出力は非 ASCII を
+    NUL 区切りで読む理由は phase_scope.scope_findings と同じ。既定の出力は非 ASCII を
     引用符で囲んで 8 進でエスケープするので、そのまま照らし合わせると日本語のファイルが
     置き場の外か中かを読み違える。`--no-renames` を付けるのは、改名を 1 行にまとめられると
     移動元のパスが出力に出ず、置き場の外から中へ動かしたファイルが「置き場の中だけ」に見えるため。
@@ -534,7 +535,7 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     # `-z` で読む。既定の出力は非 ASCII を引用符で囲んで 8 進でエスケープするので、置き場の中の
     # 日本語のファイルが置き場の外と判定され、「未コミットがある」で依頼が止まる。
     # `--no-renames` は、改名のときに出る 2 つめのパス（移動元）が XY を持たない形で
-    # 入り込むのを避けるため。phase.scope_findings と同じ読み方。
+    # 入り込むのを避けるため。phase_scope.scope_findings と同じ読み方。
     for entry in status.split("\0"):
         if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
             return True

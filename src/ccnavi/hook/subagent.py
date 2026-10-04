@@ -14,7 +14,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import rules
 from ..records import audit
-from ..tickets import approval, approval_checks, flow, phase, ticket_model
+from ..tickets import approval, approval_checks, flow, phase, phase_scope, ticket_model
 from ..tickets import ticket as ticket_mod
 from . import judge, post, projskills, reasons
 
@@ -169,7 +169,7 @@ def at_stop(
         targets = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     findings = []
     for child in targets:
-        outside, unreadable = phase.scope_findings(root, conf, child, index.get(child.parent))
+        outside, unreadable = phase_scope.scope_findings(root, conf, child, index.get(child.parent))
         if unreadable:
             stderr.write(f"ccnavi: {child.ticket} のワークツリーを読めない: {unreadable}\n")
             continue
@@ -207,17 +207,17 @@ def at_stop(
     return EXIT_OK
 
 
-def _limit_note(child: ticket_model.Ticket, found: phase.ScopeVerdict) -> str:
+def _limit_note(child: ticket_model.Ticket, found: phase_scope.ScopeVerdict) -> str:
     """子の範囲の中なのに外とされたパスにつける、止めた上限の名指し。子の範囲の外なら空。
 
     つけないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ
     戻せと言われても戻し先が分からない。
     """
-    if found.limit == phase.LIMIT_BLOCKED:
+    if found.limit == phase_scope.LIMIT_BLOCKED:
         return f"（チケットを信頼できない: {child.blocked}）"
-    if found.limit == phase.LIMIT_TYPE and found.type is not None:
+    if found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
         return f"（種類 {found.type.title} の上限の外）"
-    if found.limit == phase.LIMIT_PARENT:
+    if found.limit == phase_scope.LIMIT_PARENT:
         return f"（親 {child.parent} の範囲の外）"
     return ""
 
