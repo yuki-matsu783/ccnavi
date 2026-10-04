@@ -403,10 +403,18 @@ class Rule:
         """このルールがこのツールと対象に当たるかどうか。"""
         if self.compiled is None or not subject:
             return False
-        for want in self.match.split("|"):
-            if want.strip() == tool:
-                return self.compiled.search(subject) is not None
+        if tool_matches(self.match, tool):
+            return self.compiled.search(subject) is not None
         return False
+
+
+def tool_matches(match: str, tool: str) -> bool:
+    """`match:`（`|` 区切り）がこのツール名を含むか。大文字小文字を区別した完全一致。
+
+    `Rule.matches` のツール名の側。組み込みの保護を、当たりようの無いツールで組み立てずに
+    済ませる判断（`selfguard.add_rules`）も、同じこの 1 本で決める。
+    """
+    return any(want.strip() == tool for want in match.split("|"))
 
 
 @dataclass

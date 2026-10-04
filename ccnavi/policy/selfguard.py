@@ -789,6 +789,8 @@ def _spelled(path: str) -> str:
 # 書けない。同じ名前のルールと重なることが無いので、当たった id を名指しされたユーザは
 # 組み込みのルールだと分かる。
 SHELL_RULE_ID = "builtin-guard-setting-files"
+# シェルから書き込む形の 1 本を当てるツール（`add_rules`）。
+SHELL_MATCH = "Bash"
 
 SHELL_MESSAGE = (
     "ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。"
@@ -909,6 +911,7 @@ def add_rules(
     root: str = "",
     common_files: tuple[str, ...] = (),
     records: tuple[str, str] = ("", ""),
+    tool: str | None = None,
 ) -> None:
     """ガード自身を守るルールを、判定に足す。
 
@@ -932,17 +935,25 @@ def add_rules(
     ルールファイルに何が書いてあっても足す。組み込みの名前（rules.RESERVED_ID_PREFIX）は
     ルールファイルに書けないので、同じ id の重なりは起きない（書けるとどうなるかは
     RESERVED_ID_PREFIX の側に書いてある）。
+
+    `tool` は判定するツール名。渡せば、シェルから書き込む形の 1 本は、その名前に当たる
+    ときだけ組み立てる。式は大きく（守る先のパスを全部並べる）、組み立てとコンパイルが
+    判定 1 回の時間の多くを占める。`match: Bash` に当たらないツールでは
+    `rules.Rule.matches` が式を見ずに外すので、足さなくても判定は同じになる。
+    当たるかどうかは `rules.tool_matches` で決め、`Rule.matches` と同じ答えを引く。
+    None なら（ツールを決めずに並べる呼び手）これまでどおり足す。
     """
-    _insert(
-        rule_set,
-        {
-            "id": SHELL_RULE_ID,
-            "match": "Bash",
-            "regex": guard_shell_regex(root, bin_path, project_home, common_files),
-            "message": SHELL_MESSAGE,
-        },
-        root,
-    )
+    if tool is None or rules.tool_matches(SHELL_MATCH, tool):
+        _insert(
+            rule_set,
+            {
+                "id": SHELL_RULE_ID,
+                "match": SHELL_MATCH,
+                "regex": guard_shell_regex(root, bin_path, project_home, common_files),
+                "message": SHELL_MESSAGE,
+            },
+            root,
+        )
     clause = binary_clause(bin_path)
     if clause:
         _insert(
