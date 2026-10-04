@@ -1330,10 +1330,13 @@ base_sha: ""
   `--lint` の warn で、承認は止めない（ADR-0100）
 - ワークツリーの名前は識別子と同じ。`.claude/worktrees/feature-50-settings-split-03/`
 - 親のブランチ名も識別子と同じ。既にある `feature/123-login` のような `/` を含むブランチで作業するときは、識別子は
-  `feature-123-login` のまま、親に `branch: feature/123-login` を書く（ADR-0100 の 5 章）。ワークツリーは
-  `ccnavi-git.sh worktree add .claude/worktrees/feature-123-login feature/123-login`（無ければ `-b feature/123-login <起点>`）で、
-  親チケットか提案がそう名乗っているときだけ通る。承認画面に「既存のブランチ feature/123-login を使う」と出る。
-  統合先と保護されたブランチの名前は書けない。承認の後は変えられない。子のブランチは子の識別子
+  `feature-123-login` のまま、親に `branch: feature/123-login` を書く（ADR-0100 の 5 章）。承認画面に
+  「既存のブランチ feature/123-login を使う」と出る。承認されるまでは `branch:` を使わず、識別子のブランチ
+  （`worktree add .claude/worktrees/feature-123-login -b feature-123-login <起点>`）で作業する。承認の後、親のワークツリーで
+  `ccnavi-git.sh switch feature/123-login` を打つと、そのブランチへ移って承認済みチケットとマーカーを運ぶ（既にあれば
+  識別子のブランチを merge し、無ければ切る）。続けて `push -u origin feature/123-login` で家族の控えがそのブランチになる。
+  統合先・保護されたブランチの名前、`origin/main` のような git の綴りと紛れる名前、別の家族が使うブランチは書けない。
+  承認の後は変えられない。子のブランチは子の識別子
 - 子は親の部分集合として書く。親やフェーズの種類の `scope` を超える項は承認で warn に出るだけで、判定がその上限で切り詰める
 - 書いていない場所は範囲外。親子は厳しい側が採られる
 - 深さは 2 段。範囲は 20 件まで
@@ -2433,9 +2436,10 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
   衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる（ADR-0093）
-- 親のワークツリーでは、親のブランチ（親チケットの `branch:`、無ければ識別子）のほかへ `checkout`・`switch` で移れない。
+- 親のワークツリーでは、親のブランチ（承認済みの親チケットの `branch:`、無ければ識別子）のほかへ `checkout`・`switch` で移れない。
+  識別子のブランチの上から承認済みの `branch:` のブランチへ移るのは、承認済みチケットを運ぶ 1 操作になる
   `worktree add` は行き先の名前とブランチ名を揃える形だけで、違う名前のブランチを出すのは行き先の名前の親チケットが
-  `branch:` でそう名乗っているときだけ（ADR-0100）
+  承認済みの `branch:` でそう名乗っているときだけ（ADR-0100）
 - 送るのは親だけ。子チケットのワークツリーからの push はラッパースクリプトが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）
 - サブコマンドより前のオプション（`git -c ...` など）は 1 つも受け取らない。`GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す
 
