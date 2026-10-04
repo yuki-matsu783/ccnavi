@@ -10,11 +10,11 @@ import { lockedReason } from "../../src/core/flow-view.js";
 import { openFlow, savedDoc } from "../helpers/flow.js";
 
 const HASH = "0123456789abcdef".repeat(4);
-const OFFER = { draftPath: ".claude/worktrees/i0001/wip/proposals/flows/i0001-01.yml" };
+const OFFER = { draftPath: ".claude/worktrees/i0001/wip/proposals/flows/i0001-01-01.yml" };
 
 /** 雛形にプロンプトを 1 つ足した下書き */
 function drafted(): FlowDoc {
-  const added = addNode(templateFlow("i0001-01", "調査"), "prompt", { x: 200, y: 300 });
+  const added = addNode(templateFlow("i0001-01-01", "調査"), "prompt", { x: 200, y: 300 });
   return patchData(added.doc, added.id, { prompt: "既存の振る舞いを読む\nそのあと要点をまとめる" });
 }
 
@@ -22,7 +22,7 @@ test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見
   const dom = await openFlow({ offer: OFFER });
   try {
     assert.match(dom.one("#offer").textContent ?? "", /提案あり/);
-    assert.match(dom.one("#offer").textContent ?? "", /wip\/proposals\/flows\/i0001-01\.yml/);
+    assert.match(dom.one("#offer").textContent ?? "", /wip\/proposals\/flows\/i0001-01-01\.yml/);
     dom.click(dom.one('[data-action="open-proposal"]'));
     await dom.settle();
     assert.equal(dom.posted.filter((m) => m.type === "openProposal").length, 1);
@@ -53,7 +53,7 @@ test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見
     const save = dom.posted.filter((m) => m.type === "save").pop();
     assert.equal(save?.imported, HASH);
     // 保存が通って中身が届いたら、取り込みの印は消える（次の保存に添えない）
-    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01.yml", exists: true, doc: draft, lock: { locked: false, reason: "" } } } });
+    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01-01.yml", exists: true, doc: draft, lock: { locked: false, reason: "" } } } });
     assert.equal(dom.all("#offer").length, 0, "下書きが消えれば提案ありも消える");
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
@@ -76,7 +76,7 @@ test("CB-D140 未保存の変更があれば捨てることを言ってから取
     assert.match(dom.one("#proposal-dirty").textContent ?? "", /未保存の変更があります/);
     assert.equal(dom.one('[data-action="import-proposal"]').textContent, "未保存の変更を捨てて取り込む");
     // 着手された（錠が掛かった）。取り込みも止まる
-    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01") } });
+    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01-01") } });
     assert.ok(dom.one<HTMLButtonElement>('[data-action="import-proposal"]').disabled);
     assert.match(dom.one(".proposal-locked").textContent ?? "", /DENY_TICKET_FLOW_LOCKED/);
     dom.key("Escape");
@@ -111,7 +111,7 @@ test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が
     dom.click(button);
     await dom.settle();
     assert.equal(dom.posted.filter((m) => m.type === "request").length, 1);
-    await dom.send({ type: "requestText", prompt: "[ccnavi] ユーザが子チケット i0001-01 のフローの作成を頼んだ" });
+    await dom.send({ type: "requestText", prompt: "[ccnavi] ユーザが子チケット i0001-01-01 のフローの作成を頼んだ" });
     assert.match(dom.one("#request-text pre").textContent ?? "", /フローの作成を頼んだ/);
     dom.click(dom.one('[data-action="request-copy"]'));
     dom.click(dom.one('[data-action="request-open"]'));
@@ -126,7 +126,7 @@ test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が
     assert.equal(dom.one('[data-action="request-flow"]').textContent, "エージェントにフローを頼み直す");
     assert.equal(dom.all("#offer").length, 1);
     // 着手された。錠が掛かれば出さない
-    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01") } });
+    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01-01") } });
     assert.equal(dom.all('[data-action="request-flow"]').length, 0);
     // 拡張ホストが言葉を外した（着手の前でない）
     await dom.send({ type: "lock", lock: { locked: false, reason: "" } });
@@ -174,7 +174,7 @@ test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値
   try {
     dom.click(dom.one('[data-action="open-proposal"]'));
     await dom.settle();
-    const base = templateFlow("i0001-01", "調査");
+    const base = templateFlow("i0001-01-01", "調査");
     const reordered = { ...base, nodes: [...base.nodes].reverse() } as FlowDoc;
     await dom.send({ type: "proposal", proposal: { doc: reordered, hash: HASH, draftPath: OFFER.draftPath } });
     assert.equal(dom.all("#proposal-problem").length, 0);

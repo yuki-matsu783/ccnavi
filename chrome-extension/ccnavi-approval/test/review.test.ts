@@ -41,7 +41,7 @@ function client(mock: MockGitHub) {
 
 function parentOnly(): Record<string, FixtureBranch> {
   const f = fixture();
-  delete f.i0001.files["wip/proposals/todo/i0001-01.md"];
+  delete f.i0001.files["wip/proposals/todo/i0001-01-01.md"];
   return f;
 }
 
@@ -145,9 +145,9 @@ test("CX-T123 service worker が書く頼みを断ったら（登録していな
 });
 
 test("CX-T124 コミットの見出しは先頭の数件と件数に畳んで 200 字に収め、全件は本文に書く", () => {
-  const ids = Array.from({ length: 40 }, (_, i) => `i0001-${String(i + 1).padStart(2, "0")}`);
+  const ids = Array.from({ length: 40 }, (_, i) => `i0001-01-${String(i + 1).padStart(2, "0")}`);
   const m = commitMessage(ids, "を承認", "承認した", "9.9.9");
-  assert.equal(m.headline, "ccnavi: i0001-01, i0001-02, i0001-03 ほか 37 件 を承認（Chrome 拡張 9.9.9）");
+  assert.equal(m.headline, "ccnavi: i0001-01-01, i0001-01-02, i0001-01-03 ほか 37 件 を承認（Chrome 拡張 9.9.9）");
   assert.ok(m.headline.length <= 200);
   for (const id of ids) assert.ok(m.body.includes(`- ${id}\n`), id);
   assert.deepEqual(commitMessage(["i0001"], "を承認", "承認した", "9.9.9"), { headline: "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）", body: "" });

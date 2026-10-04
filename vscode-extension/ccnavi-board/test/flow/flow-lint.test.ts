@@ -11,7 +11,7 @@ import * as path from "node:path";
 import { FLOW_TEMP_PREFIX, lintFlowText, type FlowLintRun } from "../../src/core/flow-lint.js";
 import { FLOW_WHERE, parseLintJson, problemsOfFlow, unknownOption, type LintJson } from "../../src/core/lintmodel.js";
 
-const SHOWN = ".ccnavi/approved/flows/i0001-01.yml";
+const SHOWN = ".ccnavi/approved/flows/i0001-01-01.yml";
 
 function tmpDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-lint-"));

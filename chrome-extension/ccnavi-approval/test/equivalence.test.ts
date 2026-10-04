@@ -66,7 +66,7 @@ test("CX-T062 承認と取り下げで Python に投げた要求（plan・withdr
     return res;
   };
   const branches = fixture();
-  delete branches.i0001.files["wip/proposals/todo/i0001-01.md"];
+  delete branches.i0001.files["wip/proposals/todo/i0001-01-01.md"];
   const mock = new MockGitHub(branches);
   const stats = newStats();
   const repo = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };

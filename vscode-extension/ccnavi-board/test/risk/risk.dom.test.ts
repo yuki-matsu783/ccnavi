@@ -129,9 +129,9 @@ test("CB-T84 保存できない理由と読み込みの苦情を出し、錠は�
     assert.match(dom.one(".problems").textContent, /factors がリスト（配列）ではありません/);
     // 作業中のチケットが現れたら、保存は押せなくなる（編集の途中はそのまま）
     dom.type(dom.one("#find"), "");
-    await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
+    await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] } });
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
-    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
+    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
   } finally {
     await dom.close();

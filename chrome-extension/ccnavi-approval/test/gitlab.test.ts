@@ -63,7 +63,7 @@ function glDeps(mock: MockGitHub, host = "gitlab.com", repos: RepoConfig[] = [GI
 
 function parentOnly(): Record<string, FixtureBranch> {
   const f = fixture();
-  delete f.i0001.files["wip/proposals/todo/i0001-01.md"];
+  delete f.i0001.files["wip/proposals/todo/i0001-01-01.md"];
   return f;
 }
 
@@ -172,7 +172,7 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
   let raced = "";
-  const CHILD = "wip/proposals/todo/i0001-01.md";
+  const CHILD = "wip/proposals/todo/i0001-01-01.md";
   mock.beforeCommit = (b) => {
     raced = mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込んだ子の提案");
   };
@@ -203,7 +203,7 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
 });
 
 test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変わると、止めてユーザに回す（要確認）。他人の変更は消さない（PROBE-1）", async () => {
-  const CHILD = "wip/proposals/todo/i0001-01.md";
+  const CHILD = "wip/proposals/todo/i0001-01-01.md";
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
@@ -392,7 +392,7 @@ test("CX-T154 プロジェクトのリポジトリ: ワークスペースの統�
   assert.equal(b.error, "", b.error);
   const fam = b.families.find((f) => f.family.name === "web-i0012");
   assert.ok(fam?.result?.digest, JSON.stringify(fam));
-  assert.deepEqual(fam.result.batch?.map((e) => e.ticket), ["web-i0012", "web-i0012-01"]);
+  assert.deepEqual(fam.result.batch?.map((e) => e.ticket), ["web-i0012", "web-i0012-01-01"]);
   assert.equal(fam.result.write?.allowed, true);
   const out = await approveFamily(project, "web-i0012", shownOf(b, "web-i0012"), make());
   assert.equal(out.kind, "written", JSON.stringify(out));

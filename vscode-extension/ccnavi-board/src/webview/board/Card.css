@@ -51,7 +51,7 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .badge.hold, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--board-error-text); }
 .badge.blocked { color: var(--board-error-text); font-weight: 600; }
 /* 先行待ち。止まっているのは承認と着手で、書き込みではないので警告の色。
-   識別子（`i0001-02`）の途中では折り返さない。折れるのは識別子の間だけ */
+   識別子（`i0001-02-02`）の途中では折り返さない。折れるのは識別子の間だけ */
 .badge.preds { color: var(--board-warn-text); }
 .badge-id { white-space: nowrap; }
 .badge.mark-requested { color: var(--board-yellow-text); }

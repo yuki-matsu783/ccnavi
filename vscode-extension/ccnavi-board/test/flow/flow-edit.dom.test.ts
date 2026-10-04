@@ -36,7 +36,7 @@ function nodeIds(dom: DomPage): (string | null)[] {
 
 /** 開始 → プロンプト → 終了 */
 function three(): FlowDoc {
-  let doc = templateFlow("i0001-01", "調査");
+  let doc = templateFlow("i0001-01-01", "調査");
   doc = addNode(doc, "prompt", { x: 260, y: 300 }).doc;
   return { ...doc, connections: [
     { id: "c1", from: "start", to: "prompt-1", fromPort: "output", toPort: "input" },
@@ -127,7 +127,7 @@ test("CB-D125 読むだけのときは元に戻す・やり直す・貼る・複
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
-    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01") } });
+    await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01-01") } });
     assert.ok(button(dom, "undo").disabled);
     dom.key("z", undefined, CTRL);
     await dom.settle();
@@ -141,7 +141,7 @@ test("CB-D125 読むだけのときは元に戻す・やり直す・貼る・複
     assert.ok(dirty(dom));
     // 中身が届いたら、履歴は空で未保存も消える
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
-    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01.yml", exists: true, doc: three(), lock: { locked: false, reason: "" } } } });
+    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01-01.yml", exists: true, doc: three(), lock: { locked: false, reason: "" } } } });
     assert.ok(button(dom, "undo").disabled);
     assert.ok(button(dom, "redo").disabled);
     assert.ok(!dirty(dom));
@@ -322,7 +322,7 @@ function checksAsked(dom: DomPage): { seq: number; doc: FlowDoc }[] {
   return dom.posted.filter((m) => m.type === "check").map((m) => ({ seq: m.seq as number, doc: m.doc as FlowDoc }));
 }
 
-const SHOWN = ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml";
+const SHOWN = ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml";
 
 test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、開始が無いことは実行ファイルの答えに寄せて 1 度だけ言う。渡る手順はプレビューに出す", async () => {
   const checks: FlowChecks = {

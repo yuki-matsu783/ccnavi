@@ -56,10 +56,10 @@ test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み
   assert.deepEqual(f?.result?.closure.families, ["i0001", "i0003"]);
   assert.ok(mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0003"));
   assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた親子のチケットは読まない");
-  // 今の ccnavi の答え: 先行 i0003-01 が閉じていないので子は承認の対象にしない
+  // 今の ccnavi の答え: 先行 i0003-01-01 が閉じていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01 が閉じていない/);
+  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
+  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01-01 が閉じていない/);
   assert.equal(f?.result?.batch?.[0].path, "i0001:wip/proposals/todo/i0001.md");
 });
 
@@ -81,8 +81,8 @@ test("CX-T043 先行の親子のチケットのブランチが無いときは、
   const { board } = await run();
   const f = family(board, "i0002");
   assert.deepEqual(f?.result?.closure.absent, ["i0007"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0002-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /i0007-01 がどの置き場/);
+  assert.equal(f?.result?.rejected?.[0].ticket, "i0002-01-01");
+  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /i0007-01-01 がどの置き場/);
 });
 
 test("CX-T044 統合先の名前: 設定したブランチが無ければ止めて名前を出す。設定どおりなら「設定」と出す", async () => {
@@ -141,10 +141,10 @@ test("CX-T049 先行の閉包が 16 組の親子のチケットを超えたら�
   const base = b.main.files;
   const chain = Array.from({ length: 17 }, (_, i) => `c${String(i + 1).padStart(2, "0")}x`);
   const text = (id: string, pred: string) =>
-    `---\nversion: 1\nticket: ${id}\nparent: ${id.slice(0, -3)}\nphase: 1\npredecessors:\n  - ${pred}\nhuman_review:\n  required: false\n  reason: r\ntitle: t\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: "wip/research/*"\n---\n\n本文\n`;
-  b.i0001.files["wip/proposals/todo/i0001-01.md"] = text("i0001-01", `${chain[0]}-01`);
+    `---\nversion: 1\nticket: ${id}\nparent: ${id.slice(0, -6)}\nphase: 1\npredecessors:\n  - ${pred}\nhuman_review:\n  required: false\n  reason: r\ntitle: t\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: "wip/research/*"\n---\n\n本文\n`;
+  b.i0001.files["wip/proposals/todo/i0001-01-01.md"] = text("i0001-01-01", `${chain[0]}-01-01`);
   chain.forEach((fam, i) => {
-    b[fam] = { committedDate: "2026-09-01T00:00:00Z", files: { ...base, [`wip/proposals/todo/${fam}-01.md`]: text(`${fam}-01`, `${chain[i + 1] ?? "zz"}-01`) } };
+    b[fam] = { committedDate: "2026-09-01T00:00:00Z", files: { ...base, [`wip/proposals/todo/${fam}-01-01.md`]: text(`${fam}-01-01`, `${chain[i + 1] ?? "zz"}-01-01`) } };
   });
   const { board } = await run(b);
   const r = family(board, "i0001")?.result;

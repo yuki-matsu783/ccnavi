@@ -23,13 +23,13 @@ export function flowHtml(data: FlowData, options: Partial<RenderOptions> = {}): 
 export function page(overrides: Partial<FlowPage> = {}): FlowPage {
   return {
     root: "/ws",
-    ticket: "i0001-01",
+    ticket: "i0001-01-01",
     title: "調査",
     parent: "i0001",
-    flowPath: ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml",
-    flowRel: ".ccnavi/approved/flows/i0001-01.yml",
+    flowPath: ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml",
+    flowRel: ".ccnavi/approved/flows/i0001-01-01.yml",
     exists: true,
-    doc: templateFlow("i0001-01", "調査"),
+    doc: templateFlow("i0001-01-01", "調査"),
     lock: OPEN_LOCK,
     ...overrides,
   };

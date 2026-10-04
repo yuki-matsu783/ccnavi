@@ -26,7 +26,7 @@ function clickSvg(dom: DomPage, element: unknown): void {
 
 /** 印のある 2 種類（問いとサブエージェント）を足した雛形 */
 function marked(): FlowDoc {
-  let doc = templateFlow("i0001-01", "調査");
+  let doc = templateFlow("i0001-01-01", "調査");
   doc = addNode(doc, "askUserQuestion", { x: 200, y: 300 }).doc;
   doc = addNode(doc, "subAgent", { x: 400, y: 300 }).doc;
   return patchData(doc, "subAgent-1", { description: "資料を深掘りする" });
@@ -60,7 +60,7 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
     // 読んだまま（在るファイル）なら保存は押せない
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
     assert.equal(dom.all("#lock").length, 0);
-    assert.match(dom.one(".path").textContent ?? "", /\.ccnavi\/approved\/flows\/i0001-01\.yml/);
+    assert.match(dom.one(".path").textContent ?? "", /\.ccnavi\/approved\/flows\/i0001-01-01\.yml/);
   } finally {
     await dom.close();
   }
@@ -76,11 +76,11 @@ test("CB-D108 ファイルが無ければ雛形を見せ、そのまま保存で
     assert.ok(dom.one<HTMLButtonElement>('[data-action="open-flow"]').disabled, "無いファイルはエディタで開けない");
     dom.click(save);
     await dom.settle();
-    assert.deepEqual(savedDoc(dom), templateFlow("i0001-01", "調査"));
+    assert.deepEqual(savedDoc(dom), templateFlow("i0001-01-01", "調査"));
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "往復の間は止める");
     assert.match(dom.one("#status").textContent ?? "", /着手中でないかを確かめて保存中/);
     // 拡張ホストが断った（錠を聞き直したら着手中だった）
-    await dom.send({ type: "failed", message: lockedReason("i0001-01") });
+    await dom.send({ type: "failed", message: lockedReason("i0001-01-01") });
     assert.match(dom.one("#status").textContent ?? "", /DENY_TICKET_FLOW_LOCKED/);
     assert.ok(dom.one(".foot").classList.contains("error"));
   } finally {
@@ -89,8 +89,8 @@ test("CB-D108 ファイルが無ければ雛形を見せ、そのまま保存で
 });
 
 test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、部品箱・欄・保存を止める。外れれば戻る", async () => {
-  const lock = { locked: true, reason: lockedReason("i0001-02") };
-  const dom = await openFlow({ ticket: "i0001-02", doc: marked(), lock, exists: false });
+  const lock = { locked: true, reason: lockedReason("i0001-02-02") };
+  const dom = await openFlow({ ticket: "i0001-02-02", doc: marked(), lock, exists: false });
   try {
     const banner = dom.one("#lock").textContent ?? "";
     assert.match(banner, /着手中のため、フローを書き換えられません/);
@@ -214,7 +214,7 @@ test("CB-D112 外のファイルを取り込むボタンは無い。中身（dat
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
-    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01.yml", exists: true, doc: sample(), lock: { locked: false, reason: "" } } } });
+    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01-01.yml", exists: true, doc: sample(), lock: { locked: false, reason: "" } } } });
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
     assert.equal(dom.all(".react-flow__node").length, 4);
   } finally {
@@ -263,7 +263,7 @@ test("CB-D117 ノードと線の × で消せる。押しても選ばない。�
   } finally {
     await dom.close();
   }
-  const locked = await openFlow({ doc: marked(), lock: { locked: true, reason: lockedReason("i0001-01") } });
+  const locked = await openFlow({ doc: marked(), lock: { locked: true, reason: lockedReason("i0001-01-01") } });
   try {
     assert.equal(locked.all('[data-action="canvas-remove-node"]').length, 0);
     clickSvg(locked, locked.one(".react-flow__edge"));
@@ -276,7 +276,7 @@ test("CB-D117 ノードと線の × で消せる。押しても選ばない。�
 
 test("CB-D118 グループは枠で描き、欄で名前を直して解ける。解くと中のノードは図の上の位置で外へ出る", async () => {
   const doc: FlowDoc = {
-    ...templateFlow("i0001-01", "調査"),
+    ...templateFlow("i0001-01-01", "調査"),
     nodes: [
       { id: "g", type: "group", name: "下調べ", position: { x: 40, y: 100 }, data: {}, style: { width: 300, height: 200 } },
       { id: "start", type: "start", name: "開始", position: { x: 40, y: 60 }, data: { label: "開始" }, parentId: "g" },
@@ -355,7 +355,7 @@ function pickedIds(dom: DomPage): (string | null)[] {
 }
 
 test("CB-D120 Shift を押しながら選んでいるノードを押すと、そのノードだけ選びから外れ、ほかは残る。右の欄は残ったノードに移る", async () => {
-  let doc = templateFlow("i0001-01", "調査");
+  let doc = templateFlow("i0001-01-01", "調査");
   doc = addNode(doc, "prompt", { x: 400, y: 80 }).doc;
   const dom = await openFlow({ doc });
   try {
@@ -403,7 +403,7 @@ test("CB-D120 Shift を押しながら選んでいるノードを押すと、そ
 /** グループ 1 つ（中に開始）と終了のフロー */
 function grouped(): FlowDoc {
   return {
-    ...templateFlow("i0001-01", "調査"),
+    ...templateFlow("i0001-01-01", "調査"),
     nodes: [
       { id: "g", type: "group", name: "下調べ", position: { x: 40, y: 100 }, data: {}, style: { width: 300, height: 200 } },
       { id: "start", type: "start", name: "開始", position: { x: 40, y: 60 }, data: { label: "開始" }, parentId: "g" },
@@ -441,7 +441,7 @@ test("CB-D121 グループの縁を押して離すだけなら未保存にしな
 });
 
 test("CB-D122 読むだけのときは、グループの縁を出さず、「グループを解く」「グループ化」を押せない", async () => {
-  const dom = await openFlow({ doc: grouped(), lock: { locked: true, reason: lockedReason("i0001-01") } });
+  const dom = await openFlow({ doc: grouped(), lock: { locked: true, reason: lockedReason("i0001-01-01") } });
   try {
     dom.click(dom.one('.react-flow__node[data-id="g"]'));
     await dom.settle();

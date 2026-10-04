@@ -51,7 +51,7 @@ function world(branches: Record<string, FixtureBranch> = fixture()) {
 /** 子の提案の無い見本（親を取り下げられる形。子が無い） */
 function parentOnly(): Record<string, FixtureBranch> {
   const f = fixture();
-  delete f.i0001.files["wip/proposals/todo/i0001-01.md"];
+  delete f.i0001.files["wip/proposals/todo/i0001-01-01.md"];
   return f;
 }
 
@@ -145,13 +145,13 @@ test("CX-T104 決まらない親子のチケットでは書かない（読めな
 
   // ホストに無い親子のチケット i0009 の古い写しを P の上に持っていても、先行を満たしたとは数えない
   const f = fixture();
-  const done = f.main.files[".ccnavi/approved/done/i0005-01.md"].replace(/i0005/g, "i0009");
-  f.i0001.files[".ccnavi/approved/done/i0009-01.md"] = done;
-  f.i0001.files["wip/proposals/todo/i0001-01.md"] = f.i0001.files["wip/proposals/todo/i0001-01.md"].replace("i0003-01", "i0009-01");
+  const done = f.main.files[".ccnavi/approved/done/i0005-01-01.md"].replace(/i0005/g, "i0009");
+  f.i0001.files[".ccnavi/approved/done/i0009-01-01.md"] = done;
+  f.i0001.files["wip/proposals/todo/i0001-01-01.md"] = f.i0001.files["wip/proposals/todo/i0001-01-01.md"].replace("i0003-01-01", "i0009-01-01");
   const gone = world(f);
   const r = (await board(gone.d)).families.find((x) => x.family.name === "i0001")?.result;
   assert.deepEqual(r?.closure.absent, ["i0009"]);
-  const rejected = r?.rejected?.find((x) => x.ticket === "i0001-01");
+  const rejected = r?.rejected?.find((x) => x.ticket === "i0001-01-01");
   assert.ok(rejected?.problems.some((p) => /i0009/.test(p) && /gone/.test(p)), JSON.stringify(r?.rejected));
 });
 

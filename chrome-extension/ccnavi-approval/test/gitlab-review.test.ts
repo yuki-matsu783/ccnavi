@@ -47,7 +47,7 @@ const TOKENS = new Map([
   ["gitlab.com", TOKEN],
 ]);
 const TODO = "wip/proposals/todo/i0001.md";
-const CHILD = "wip/proposals/todo/i0001-01.md";
+const CHILD = "wip/proposals/todo/i0001-01-01.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
 
