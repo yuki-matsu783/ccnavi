@@ -1397,7 +1397,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         from tests.ticket.test_core import _chrome
 
         chrome = _chrome()
-        place = chrome._placement(None)
+        place = chrome._placement()
         keep = tuple(p + "/" for p in place["integration_paths"])
         main = {
             rel: text

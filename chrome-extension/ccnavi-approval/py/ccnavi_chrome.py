@@ -94,16 +94,12 @@ COMMON_LAYER = ".ccnavi/common"
 SETTINGS_FILE = ".claude/settings.json"
 COMPAT_FILE = lint.SH_COMPAT_FILE.replace(os.sep, "/")
 
-# 置き場のパスを変える環境変数。統合先の `.claude/settings.json` の `env` から読む。
-# 親のブランチから読むと、そこで書き換えて承認やレビューを外せるため。
-PLACEMENT_ENV = (settings.TICKETS_ENV, settings.APPROVED_ENV, settings.PROJECT_HOME_ENV)
-
 # 取り込み状態に当たるものの置き場（仮のツリーの中。手元の既定の state の置き場と同じパス）。
 STATE_DIR = settings.DEFAULT_STATE.replace(os.sep, "/")
 
-# 絶対パスの表記。置き場がリポジトリの外を指すワークスペースは Chrome の対象外。
-# ブランチに乗らないので、親のブランチを本物とする側にできない。
-_ABSOLUTE = re.compile(r"^(?:[/\\~]|[A-Za-z]:)")
+# ホストから来たパスのうち、根から始まるもの（絶対パス・ホーム・ドライブ）の表記。
+# 仮のツリーの外へ出ないよう `_check_rel` が断る。
+_ROOTED = re.compile(r"^(?:[/\\~]|[A-Za-z]:)")
 
 
 class Refused(Exception):
@@ -131,42 +127,18 @@ def handle(request: str, root: str = "/ws") -> str:
 # ---- 置き場のパス -------------------------------------------------------------------
 
 
-def _env_from_settings(text: str | None) -> dict[str, str]:
-    """統合先の `.claude/settings.json` の `env` のうち、置き場のパスを変えるものだけ。"""
-    if not text:
-        return {}
-    try:
-        data = json.loads(text)
-    except ValueError as exc:
-        raise Refused(f"統合先の {SETTINGS_FILE} を JSON として読めない ({exc})") from None
-    env = data.get("env") if isinstance(data, dict) else None
-    if not isinstance(env, dict):
-        return {}
-    return {k: v for k, v in env.items() if k in PLACEMENT_ENV and isinstance(v, str) and v}
+def _placement() -> dict:
+    """置き場のパス。既定に固定する。
 
-
-def _placement(settings_text: str | None) -> dict:
-    env = _env_from_settings(settings_text)
-    absolute = sorted(k for k, v in env.items() if _ABSOLUTE.match(v))
-    if absolute:
-        raise Refused(
-            "置き場のパスがリポジトリの外を指している（"
-            + ", ".join(f"{k}={env[k]}" for k in absolute)
-            + "）。ブランチに乗らないので Chrome では読めない"
-        )
-    with _environ(env):
-        conf, _ = settings.load("/nonexistent-ccnavi-root")
-    tickets = conf.tickets.strip("/")
-    approved = conf.approved.strip("/")
-    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
-    for name, value in (("提案", tickets), ("承認済み", approved), ("層", home)):
-        if not value or ".." in value.split("/"):
-            raise Refused(f"{name}の置き場のパスを読めない: {value!r}")
+    統合先の `.claude/settings.json` の `env` も、手元の env も読まない。
+    """
+    tickets = settings.DEFAULT_TICKETS.replace(os.sep, "/").strip("/")
+    approved = settings.DEFAULT_APPROVED.replace(os.sep, "/").strip("/")
+    home = settings.DEFAULT_PROJECT_HOME.replace(os.sep, "/").strip("/")
     own_layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
     return {
         "tickets": tickets,
         "approved": approved,
-        "env": env,
         # 統合先から読むもの。承認済みは閉じたものだけ（作業中のものは `P` を本物とする。
         # 古い統合先から切った `P` でも閉じた識別子の使い直しを見つけるため、`done/` は常に読む）。
         "integration_paths": sorted({f"{approved}/{ticket_mod.DONE}", COMMON_LAYER, own_layer}),
@@ -183,7 +155,7 @@ def _placement(settings_text: str | None) -> dict:
 
 
 def _op_placement(req: dict, root: str) -> dict:
-    return {"placement": _placement(_text_or_none(req.get("settings")))}
+    return {"placement": _placement()}
 
 
 # ---- Snapshot の読み -------------------------------------------------------------------
@@ -241,15 +213,11 @@ def _workspace_files(snap: dict) -> dict[str, str]:
 
 def _check_rel(path: object) -> str:
     """ホストから来た相対パスを、仮のツリーの外へ出ない形に限る。"""
-    if not isinstance(path, str) or not path or _ABSOLUTE.match(path) or "\\" in path:
+    if not isinstance(path, str) or not path or _ROOTED.match(path) or "\\" in path:
         raise Refused(f"読めないパス: {path!r}")
     if any(part in ("", ".", "..") for part in path.split("/")):
         raise Refused(f"読めないパス: {path!r}")
     return path
-
-
-def _text_or_none(value: object) -> str | None:
-    return value if isinstance(value, str) else None
 
 
 def _files(snap: dict, name: str) -> dict[str, str]:
@@ -299,7 +267,7 @@ def _op_families(req: dict, root: str) -> dict:
     閉じた親（`done/`）しか無いブランチは数えない。
     """
     snap = _snapshot(req)
-    place = _placement(_text_or_none(req.get("settings")))
+    place = _placement()
     closed = _closed(snap, place)
     candidates = req.get("candidates")
     if not isinstance(candidates, list):
@@ -330,7 +298,7 @@ def _op_closure(req: dict, root: str) -> dict:
     まだ読んでいない親子のチケットは `need` で返し、拡張が読んでから呼び直す。
     """
     snap = _snapshot(req)
-    place = _placement(_text_or_none(req.get("settings")))
+    place = _placement()
     family = req.get("family")
     if not isinstance(family, str) or not family:
         raise Refused("family が無い")
@@ -443,7 +411,7 @@ def project_layer(snap: dict, place: dict) -> dict[str, str]:
     """
     ws = snap["workspace"]["files"]
     own = _files(snap, snap["integration"]["name"])
-    with _environ(place["env"]):
+    with _environ():
         conf, _ = settings.load("/nonexistent-ccnavi-root")
     out: dict[str, str] = {}
     for kind, name in settings.LAYER_FILE_NAMES.items():
@@ -526,28 +494,24 @@ def _write(base: str, rel: str, text: str) -> None:
 
 
 class _environ:
-    """置き場のパスの環境変数を、この呼び出しのあいだだけ入れる。他の ccnavi の変数は外す。"""
+    """ccnavi の変数を、この呼び出しのあいだだけ外す（手元の env が判定に混ざらないように）。"""
 
-    def __init__(self, env: dict[str, str]):
-        self.env = env
+    def __init__(self):
         self.saved: dict[str, str] = {}
 
     def __enter__(self):
         for k in list(os.environ):
             if k.startswith("CCNAVI_") or k == "CLAUDE_PROJECT_DIR":
                 self.saved[k] = os.environ.pop(k)
-        os.environ.update(self.env)
         return self
 
     def __exit__(self, *exc):
-        for k in self.env:
-            os.environ.pop(k, None)
         os.environ.update(self.saved)
 
 
-def _preview(root: str, env: dict[str, str], only: list[str]) -> tuple[int, dict | None, str]:
+def _preview(root: str, only: list[str]) -> tuple[int, dict | None, str]:
     out, err = io.StringIO(), io.StringIO()
-    with _environ(env):
+    with _environ():
         code = cli.run(
             io.StringIO(""), out, err, ["--root", root, "--agree", "--preview", "--json", *only]
         )
@@ -564,7 +528,7 @@ def _op_board(req: dict, root: str) -> dict:
     判定の入力は統合先・`P`・閉包の `P_X` だけ。
     """
     snap = _snapshot(req)
-    place = _placement(_text_or_none(req.get("settings")))
+    place = _placement()
     family = req.get("family")
     if not isinstance(family, str) or family not in snap["branches"]:
         raise Refused("family のブランチが snapshot に無い")
@@ -578,7 +542,7 @@ def _op_board(req: dict, root: str) -> dict:
         return {"family": family, "undecided": unreadable, "closure": closure}
     _build(root, snap, place, closure["families"])
 
-    code, first, err = _preview(root, place["env"], [])
+    code, first, err = _preview(root, [])
     if first is None:
         return {"family": family, "closure": closure, "refused": _refused(root, code, err)}
     mine = [e["ticket"] for e in first["batch"] if (e.get("parent") or e["ticket"]) == family]
@@ -587,7 +551,7 @@ def _op_board(req: dict, root: str) -> dict:
     if narrowed:
         # 画面の本文とダイジェストを、この親子のチケットの分だけで組み直す
         # （1 回の承認は 1 つの `P`）。
-        code, body, err = _preview(root, place["env"], mine)
+        code, body, err = _preview(root, mine)
         if body is None:
             return {"family": family, "closure": closure, "refused": _refused(root, code, err)}
     batch = [_entry(root, e) for e in body["batch"] if e["ticket"] in mine]
@@ -671,7 +635,7 @@ def _write_refusal(snap: dict, family: str) -> str:
 
 def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
     """作業中のチケットごとの取り下げの可否。仮のツリーは組んである前提。"""
-    with _environ(place["env"]):
+    with _environ():
         conf, _ = settings.load(root)
         snapshot = core.read_fs(conf, root)
         found = core.withdrawable(snapshot, family)
@@ -727,7 +691,7 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     """
     _stamp(req)
     snap = _snapshot(req)
-    place = _placement(_text_or_none(req.get("settings")))
+    place = _placement()
     family = req.get("family")
     if not isinstance(family, str) or family not in snap["branches"]:
         raise Refused("family のブランチが snapshot に無い")
@@ -852,7 +816,7 @@ def _op_plan(req: dict, root: str) -> dict:
         shown_ids, shown_digest = ids, digest
     _writable(snap, family)
     notes = io.StringIO()
-    with _environ(place["env"]):
+    with _environ():
         snapshot = _core_snapshot(req, root)
         actor = snapshot.actor
         with history.session(actor.via or history.VIA_CHROME, notes, actor.account, actor.version):
@@ -889,7 +853,7 @@ def _op_withdraw(req: dict, root: str) -> dict:
     if not isinstance(prior, dict) or not all(isinstance(v, str) for v in prior.values()):
         raise Refused("prior は識別子ごとの本文")
     reason = req.get("reason") if isinstance(req.get("reason"), str) else ""
-    with _environ(place["env"]):
+    with _environ():
         snapshot = _core_snapshot(req, root)
         checked = core.withdraw(
             snapshot, ids, {k: v.encode("utf-8") for k, v in prior.items()}, reason
@@ -924,7 +888,7 @@ def _op_confirm(req: dict, root: str) -> dict:
         raise Refused(f"result を読めない: {result.error}")
     head = str(snap["branches"][family].get("head") or "")
     compare = req.get("compare")
-    with _environ(place["env"]):
+    with _environ():
         snapshot = _core_snapshot(req, root)
         recorded = core.requested_head(snapshot, family, phase_no)
         if compare is None and recorded and recorded != head and review._is_sha(recorded):
@@ -969,7 +933,7 @@ def _compare_files(compare: object, base: str | None, head: str) -> list[str] | 
 
 def _reviewable(root: str, place: dict, family: str) -> list[dict]:
     """依頼済みでまだレビュー済みでないフェーズ。仮のツリーは組んである前提。"""
-    with _environ(place["env"]):
+    with _environ():
         conf, _ = settings.load(root)
         return core.reviewable(core.read_fs(conf, root), family)
 
@@ -1010,7 +974,7 @@ def _op_start(req: dict, root: str) -> dict:
     ワークスペースの統合先）と、拡張が見たブランチ（`snapshot.branches` と `taken` の名前）。
     """
     snap = _snapshot(req)
-    place = _placement(_text_or_none(req.get("settings")))
+    place = _placement()
     number = req.get("issue")
     if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
         raise Refused("issue は正の整数（issue の番号）")

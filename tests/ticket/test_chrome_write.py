@@ -98,9 +98,7 @@ class RecordsTest(ChromeWriteHarness):
         self.assertEqual(body["identifiers"], [])
         rejected = {r["ticket"]: r["problems"] for r in body["rejected"]}
         self.assertTrue(any("i0009" in p and "gone" in p for p in rejected["i0001-01"]), rejected)
-        records = _chrome().records(
-            request["snapshot"], _chrome()._placement(None), ["i0001", "i0009"]
-        )
+        records = _chrome().records(request["snapshot"], _chrome()._placement(), ["i0001", "i0009"])
         self.assertIn("state gone", records["sync/self/families/i0009"])
         self.assertIn("state present", records["sync/self/families/i0001"])
         # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
