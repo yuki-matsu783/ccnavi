@@ -358,13 +358,11 @@ ccnavi_is_branch() {
 
 # ---- 部品を読む
 #
-# 置き場は呼んだ sh（`$0`）のディレクトリ。このファイルを読んだのと同じ場所から読む。
+# 置き場は呼んだ sh（`$0`）のディレクトリ。呼ぶ側がこのファイルを探すのと同じ
+# `dirname "$0"` で求め、このファイルを読んだのと同じ場所から読む。
 # 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の sh を
 # 保護済み sh の中で走らせられるため。
-case "$0" in
-*/*) ccnavi_lib_dir=${0%/*} ;;
-*) ccnavi_lib_dir=. ;;
-esac
+ccnavi_lib_dir=$(dirname "$0")
 for ccnavi_lib_part in state lock c1 host log; do
 	[ -f "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" ] || {
 		printf 'ccnavi: 共通部の部品 %s が見つかりません。scripts/ccnavi-setup.sh --force で配り直してください\n' "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" >&2
