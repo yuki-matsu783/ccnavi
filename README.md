@@ -2616,6 +2616,9 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/infra/hookio.py` | stdin の payload の解釈と、stdout に返す応答の組み立て |
 | `src/ccnavi/infra/globmatch.py` | glob から正規表現への翻訳 |
 | `src/ccnavi/infra/shellread.py` | コマンド文字列のうち実際に実行される部分の切り出し |
+| `src/ccnavi/infra/shellread_scan.py` | 原文の走査。引用の状態を持ったまま、置換・ヒアドキュメント・コメント・改行を片付ける |
+| `src/ccnavi/infra/shellread_words.py` | コマンドの語の見分け。コマンド名・実行役のコマンド・オプションの幅・リダイレクト |
+| `src/ccnavi/infra/shellread_cd.py` | `cd` で移った先の追跡 |
 | `src/ccnavi/infra/settings.py` | 環境と設定ファイルからの設定解決 |
 | `src/ccnavi/infra/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
 | `src/ccnavi/infra/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |

@@ -21,7 +21,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import platformtag, settings, shellread
-from ccnavi.policy import rules, selfguard, selfguard_shell, selfguard_targets
+from ccnavi.policy import rules, selfguard_shell, selfguard_targets
 from tests import ROOT
 from tests.inproc import run_ccnavi
 

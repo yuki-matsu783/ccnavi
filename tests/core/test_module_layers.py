@@ -100,7 +100,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.hookio",
                 "infra.platformtag",
                 "infra.settings",
-                "infra.shellread",
+                "infra.shellread_scan",
+                "infra.shellread_words",
                 "infra.tree",
                 "infra.yamlread",
                 "records.redact",
@@ -113,6 +114,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "infra.gitstate",
+                "infra.shellread",
+                "infra.shellread_cd",
                 "infra.modes",
                 "policy.rules",
                 "records.audit",

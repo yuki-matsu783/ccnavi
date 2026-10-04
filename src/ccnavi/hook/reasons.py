@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from ..infra import settings, shellread
+from ..infra import settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
 from ..policy import rules
 from ..tickets import phase
@@ -286,11 +286,11 @@ def unreadable(reason: str) -> str:
     後者なのに前者を渡された読み手は、書いた覚えのないコマンドを探しに行く。
     """
     what = {
-        shellread.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
-        shellread.REASON_TAKEN_AS_CODE: (
+        shellread_scan.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
+        shellread_words.REASON_TAKEN_AS_CODE: (
             "this command hands a string to something that runs it as code"
         ),
-        shellread.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
+        shellread_scan.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
     }.get(reason, "this command could not be read")
     return (
         "note: " + what + ", so this rule was matched against the raw text of the "

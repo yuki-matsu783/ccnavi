@@ -21,7 +21,7 @@ import os
 import re
 import unittest
 
-from ccnavi.infra import shellread
+from ccnavi.infra import shellread, shellread_scan, shellread_words
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -152,7 +152,7 @@ class RepoRulesTest(unittest.TestCase):
         body = judge("Bash", 'grep -n "<<" README.md')
         self.assertEqual(body["verdict"], "deny")
         self.assertEqual(body["code"], "PARSE_UNCERTAIN")
-        self.assertEqual(body["degraded"], shellread.REASON_UNTERMINATED)
+        self.assertEqual(body["degraded"], shellread_scan.REASON_UNTERMINATED)
         self.assertIn("raw text", body["response"])
 
     def test_コマンド置換の中の_git_は止まる(self):
@@ -450,7 +450,9 @@ class RunnerTest(LauncherJudgeTest):
         self.assertNotIn("が実行する", body["response"])
 
 
-@unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+@unittest.skipUnless(
+    hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
+)
 class MovedJudgeTest(LauncherJudgeTest):
     """`cd` で移った先から見たパスに、止める側のルールを当てる（issue #61）。"""
 
@@ -772,9 +774,17 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_縮退の断りは理由ごとに違う(self):
         responses = {}
         for subject, reason, phrase in [
-            ('echo "git push', shellread.REASON_UNTERMINATED, "quote or heredoc"),
-            ("echo $(git push", shellread.REASON_UNTERMINATED_SUBST, "$( ) in this command never"),
-            ("bash -c x; git push origin main", shellread.REASON_TAKEN_AS_CODE, "runs it as code"),
+            ('echo "git push', shellread_scan.REASON_UNTERMINATED, "quote or heredoc"),
+            (
+                "echo $(git push",
+                shellread_scan.REASON_UNTERMINATED_SUBST,
+                "$( ) in this command never",
+            ),
+            (
+                "bash -c x; git push origin main",
+                shellread_words.REASON_TAKEN_AS_CODE,
+                "runs it as code",
+            ),
         ]:
             with self.subTest(subject=subject):
                 body = judge("Bash", subject)

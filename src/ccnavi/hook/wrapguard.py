@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import settings, shellread, tree
+from ..infra import settings, shellread, shellread_words, tree
 from ..tickets import ticket_model
 
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
@@ -180,14 +180,14 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
     """
     words = _strip_heads(words)
     depth = 0
-    while words and depth <= shellread.UNWRAP_DEPTH:
-        k = shellread._name_index(words)
+    while words and depth <= shellread_words.UNWRAP_DEPTH:
+        k = shellread_words._name_index(words)
         if k >= len(words):
             return None
-        name = shellread._base(words[k])
+        name = shellread_words._base(words[k])
         args = words[k + 1 :]
-        if name in shellread._RUNNERS:
-            inner = shellread._runner_command(name, args)
+        if name in shellread_words._RUNNERS:
+            inner = shellread_words._runner_command(name, args)
             if not inner:
                 return None
             words = inner[0]
@@ -217,12 +217,12 @@ def _set_names(words: list[str]) -> list[str]:
     names: list[str] = []
     words = _strip_heads(words)
     depth = 0
-    while words and depth <= shellread.UNWRAP_DEPTH:
-        k = shellread._name_index(words)
+    while words and depth <= shellread_words.UNWRAP_DEPTH:
+        k = shellread_words._name_index(words)
         names.extend(_assigned(w) for w in words[:k] if _assigned(w))
         if k >= len(words):
             break
-        name = shellread._base(words[k])
+        name = shellread_words._base(words[k])
         args = words[k + 1 :]
         if name == "env":
             names.extend(_env_names(args))
@@ -236,9 +236,9 @@ def _set_names(words: list[str]) -> list[str]:
                 elif _NAME.fullmatch(arg):
                     names.append(arg)
             break
-        if name not in shellread._RUNNERS:
+        if name not in shellread_words._RUNNERS:
             break
-        inner = shellread._runner_command(name, args)
+        inner = shellread_words._runner_command(name, args)
         if not inner:
             break
         words = inner[0]
@@ -291,8 +291,8 @@ def _strip_heads(words: list[str]) -> list[str]:
             if i < len(words) and words[i] == "()":
                 i += 1
             continue
-        if word in shellread._RESERVED:
-            if word in shellread._TAKES_A_WORD:
+        if word in shellread_words._RESERVED:
+            if word in shellread_words._TAKES_A_WORD:
                 return []
             i += 1
             continue
