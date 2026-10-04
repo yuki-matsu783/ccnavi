@@ -37,7 +37,7 @@ from . import builtin, rules
 from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 
 # 層の名前。共通層と自身の層は固定で、プロジェクトの層はプロジェクトの名前を使う。
-# 実体は settings が持つ（phase / risk も同じ綴りが要るが、そこは ruleload を
+# 実体は settings が持つ（phase / risk も同じ名前が要るが、そこは ruleload を
 # import できない）。ここは読み手のための別名。予約の判断は settings にまとめてある
 # （`settings.is_reserved_layer_name`）。
 LAYER_COMMON = settings.LAYER_COMMON
@@ -65,7 +65,7 @@ def load_rules(
     ではなく「設定が壊れている」。拒否にすると、壊れたファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
     ファイルを置く前に hook を登録しただけでセッションの呼び出しが全部止まる（REQ-PRE-06）。
-    既定は設定を丸ごと受け取る。守る場所の綴りは設定で動くので（builtin.rule_data）。
+    既定は設定を丸ごと受け取る。守る場所のパスは設定で動くので（builtin.rule_data）。
 
     出所は、いま当てているルールがどこから来たか。既定を使っているなら
     読めなかったファイルではない。そのファイルを出所として出すと、見に行ったユーザが
@@ -95,7 +95,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
     予約名のプロジェクト（`projects/common/` と `projects/self/`）は数えない。
     `common:id` / `self:id` と区別が付かないので、名前を 2 つ予約するほうが、
-    接頭辞の綴りを別にするより手間が少ない（設計 11.4）。綴り違い（`projects/Self/`）も
+    接頭辞の表記を別にするより手間が少ない（設計 11.4）。表記違い（`projects/Self/`）も
     同じに扱う（`settings.is_reserved_layer_name`）。`--lint` が error で言う。
 
     数えないことは、そのプロジェクトが緩く扱われるという意味ではない。行き先の
@@ -215,7 +215,7 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
     """後ろの層を前の集合に足す。重複は捨て、同 id で中身が違うものは両方残す。
 
     裸の `id` が同じで `{root}` 置換後の全欄が一致する定義は、同じルールの重複と
-    みなして後ろを捨てる（info）。見本を写して始めたプロジェクトが共通層と同じ行を
+    みなして後ろを捨てる（info）。見本をコピーして始めたプロジェクトが共通層と同じ行を
     持つのは普通の形で、それを衝突と呼ぶと本当の衝突が埋もれる。
 
     中身が違えば両方判定に使う（warn）。rules は足すだけの設定なので、`deny` と `ask` は
@@ -309,7 +309,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
 
 
 def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
-    """守る対象（selfguard）に渡す、層ごとの設定ファイル（種別, 名札, kind, 綴り）。
+    """守る対象（selfguard）に渡す、層ごとの設定ファイル（種別, 名札, kind, パス）。
 
     共通層は phases と risk の 2 本だけ返す。共通層の rules は `selfguard.targets` が
     `rules_path` で受け取っているので、ここから重ねると同じファイルが 2 度並ぶ。
@@ -317,10 +317,10 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     自身の層とプロジェクトの層は 3 本とも返す。差し替え（`--project-rules-file`）は
     見ない。あれは診断のためのもので、守る対象は本来の置き場のほうになる。
 
-    種別（`settings.ORIGIN_*`）をつける。受け取る側は控えの key と、戻す先の git を
-    ここから決める。名札の綴りでは決められない。`projects/common/` の名札は
+    種別（`settings.ORIGIN_*`）をつける。受け取る側はバックアップの key と、戻す先の git を
+    ここから決める。名札の表記では決められない。`projects/common/` の名札は
     `common` なので、名札で比べると共通層と同じ key になり、重複の排除でその層の 3 本が
-    控えと復元の対象から丸ごと落ちる。
+    バックアップと復元の対象から丸ごと落ちる。
 
     予約名のプロジェクトも並べる。判定の層としては数えない（layers）が、ファイルは
     守る。`--lint` が名前を変えるよう言っているあいだも、そこに置いてある 3 本は
@@ -368,9 +368,9 @@ def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
 def stop_rules(conf: settings.Settings, root: str) -> list[rules.Rule]:
     """ターンの終わりに当てるルール。共通層とワークスペース自身の層の `allow` だけ。
 
-    - プロジェクトの層は見ない。着手で共通層をプロジェクトの層へ配った写しが古くなっても
+    - プロジェクトの層は見ない。着手で共通層をプロジェクトの層へ配ったコピーが古くなっても
       二重に数えない
-    - 同じ id（層の前置きを除いた綴り）は最初の 1 本だけ
+    - 同じ id（層の前置きを除いた表記）は最初の 1 本だけ
     - `every` が 2 より小さいものは使わない。ターンの終わりのたびに止まる（`--lint` も言う）
     """
     said = io.StringIO()

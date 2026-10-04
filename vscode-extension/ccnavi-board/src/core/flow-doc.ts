@@ -16,7 +16,7 @@
  * （React Flow の決まり）。グループは中のノードより前に並べる（React Flow は親を先に読む）。
  * グループの中にグループは置かない。
  *
- * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はその写しの
+ * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はそのコピーの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
  * 書き出しは中身から組み直す（コメントや書き方は残らない。ユーザが保存したときだけ書く）。
@@ -26,7 +26,7 @@
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
  * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
- * ここには VS Code の API も node も DOM も入れない。画面（React）が束ねて読むため。
+ * ここには VS Code の API も node も DOM も入れない。画面（React）がバンドルして読むため。
  */
 import { Document, parseDocument, Scalar, visit } from "yaml";
 
@@ -96,7 +96,7 @@ export function branchKey(type: string): "branches" | "options" | undefined {
   return undefined;
 }
 
-/** 出入口の綴り。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow._port_label` も同じ綴りで読む） */
+/** 出入口の表記。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow._port_label` も同じ表記で読む） */
 export const INPUT_PORT = "input";
 export const OUTPUT_PORT = "output";
 export function branchPort(index: number): string {
@@ -239,7 +239,7 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
 /**
  * 書き出す本文。字下げ 2 のブロック形式で、長い行を折らない。複数行の文は `|` の形で書く。
  * 同じ中身が 2 度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
- * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む綴り（`yes` `0755` `2026-01-01` など）と、
+ * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む表記（`yes` `0755` `2026-01-01` など）と、
  * 裸や `|` では PyYAML が読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
  * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
  *
@@ -330,7 +330,7 @@ export function templateFlow(ticket: string, title: string): FlowDoc {
   };
 }
 
-// ---- 編集（どれも新しい写しを返す。触ったところ以外は元のまま）
+// ---- 編集（どれも新しいコピーを返す。触ったところ以外は元のまま）
 
 /** 新しいノードの `data`。画面が欄を持つものだけ */
 export function defaultData(type: PaletteType): Record<string, unknown> {
@@ -767,7 +767,7 @@ export function resizeGroup(doc: FlowDoc, id: string, size: FlowSize, position?:
  * - ほかのノードは、真ん中がグループの枠の中に落ちればそのグループに入り、どの枠にも落ちなければ
  *   グループから出る。枠が重なっていれば、後ろに並ぶ（図で上に描かれる）グループに入る
  *
- * 位置もグループも変わらなければ、同じ写しをそのまま返す（押しただけで未保存にしない）。
+ * 位置もグループも変わらなければ、同じものをそのまま返す（押しただけで未保存にしない）。
  */
 export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDoc {
   const index = doc.nodes.findIndex((n) => n.id === id);
@@ -812,8 +812,8 @@ export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDo
 
 /**
  * ドラッグで動いた点をまとめて置く。位置は React Flow の決まり（グループの中のノードはグループからの位置）で、
- * 写しの今のグループに対して読む。グループを先に置き、そのあとほかのノードを置く（一緒に動いた
- * グループの新しい位置から読むため）。何も変わらなければ同じ写しを返す。
+ * コピーの今のグループに対して読む。グループを先に置き、そのあとほかのノードを置く（一緒に動いた
+ * グループの新しい位置から読むため）。何も変わらなければ同じものを返す。
  */
 export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; readonly position: FlowPoint }[]): FlowDoc {
   const typeOf = new Map(doc.nodes.map((node) => [node.id, isGroup(node)]));
@@ -834,7 +834,7 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
 // ---- コピー・貼り付け・複製
 
 /**
- * コピーしたノードと線（画面の中の控え）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
+ * コピーしたノードと線（画面の中に保持する）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
  *
  * - `nodes` は元の並びの順（グループは中のノードより前）。`parentId` は元の id のまま持つ
  * - `absolute` はコピーした時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
@@ -891,7 +891,7 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
 
 /**
  * コピーしたものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
- * `parentId` を新しい id に付け替える。出口の綴り（`branch-<番号>`）と `data` はそのまま（分岐の出口の並びも
+ * `parentId` を新しい id に付け替える。出口の表記（`branch-<番号>`）と `data` はそのまま（分岐の出口の並びも
  * 一緒にコピーしているので、同じ出口に付く）。
  *
  * 置き場所は、グループの外のノードは `offset` だけずらす。グループの中のノードは、
@@ -962,7 +962,7 @@ export interface Ports {
 }
 
 /**
- * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（ユーザが書いたフローが別の綴りを
+ * ノードの出入口。種類ごとの既定に、読んだ線が使っている表記を足す（ユーザが書いたフローが別の表記を
  * 使っていても、線を落とさずに描くため）。
  */
 export function portsOf(node: FlowNode, connections: readonly FlowConnection[]): Ports {
@@ -995,7 +995,7 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
 
 /** 線につける言葉。`condition` があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
 /**
- * 線の言葉に使う値の綴り。実行ファイルの `flow._text` と同じ読み方にする。真偽値は空、数は整数ならその綴り
+ * 線の言葉に使う値の表記。実行ファイルの `flow._text` と同じ読み方にする。真偽値は空、数は整数ならその表記
  * （`1.0` は `1`）、文字列はそのまま、ほかは空
  */
 function labelText(value: unknown): string {

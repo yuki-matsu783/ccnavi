@@ -20,9 +20,9 @@
 # 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
 #
-# 取り込み済みの親子のチケット（origin があり、親子のチケットの控えが present。chat だけのものを除く）の start・finish・cancel は
-# C1 で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
-# ロック → 途中の操作の確認 → hook の印と跡を先にコミット →
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。chat だけのものを除く）の
+# start・finish・cancel は C1 で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
+# ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
 # それ以外の親子のチケットは今のまま（書くだけ。コミットと push はエージェント）。

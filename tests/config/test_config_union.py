@@ -11,7 +11,7 @@
 
 lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空）。
 
-`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と控えの
+`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と state の
 `logs/`）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切ったワークツリーに
 ワークツリー側の設定ができ、設計 11.6 が名指しした穴（ワークツリー側の設定が書けて戻らない）を
 再現できる。
@@ -241,7 +241,7 @@ FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
 
 
 def layer_path(root, kind, home=HOME):
-    """その git プロジェクトルートの層のファイル（rules / phases / risk）の綴り。"""
+    """その git プロジェクトルートの層のファイル（rules / phases / risk）のパス。"""
     return os.path.join(root, home, "config", FILE_NAMES[kind])
 
 
@@ -300,10 +300,10 @@ KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
 # 戻らない）を一度も再現できない。
 GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 
-# 雛形のワークスペース。1 度だけ組んで、以後は写しを配る。
+# 雛形のワークスペース。1 度だけ組んで、以後はコピーを配る。
 #
 # 組み直す形だと 1 件あたり git が 9 回（ワークスペースと 2 つのプロジェクトの
-# init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。写しなら
+# init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。コピーなら
 # git は雛形の 9 回だけで済む。テストごとに別のディレクトリを配るのは変わらないので、
 # テストどうしが状態を共有することもない（`setUpClass` にまとめる形との違いはここ）。
 _TEMPLATE = ""
@@ -748,7 +748,7 @@ class RootPlaceholderUnionTest(ConfigUnionHarness):
                 "id": "root-vendor",
                 "match": "Write|Edit",
                 "glob": "{root}/projects/lib/vendor/*",
-                "message": "vendor はワークスペースルートから数えた綴りで止める。",
+                "message": "vendor はワークスペースルートから数えたパスで止める。",
             },
         ]
         write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
@@ -765,7 +765,7 @@ class RootPlaceholderUnionTest(ConfigUnionHarness):
         )
 
     def test_a_copied_root_rule_is_dropped_as_a_duplicate(self):
-        """11.8: 重複の判定は置き換えた後の欄で比べる。`{root}` ごと写した定義は捨てる。"""
+        """11.8: 重複の判定は置き換えた後の欄で比べる。`{root}` ごとコピーした定義は捨てる。"""
         write(self.rules, json.dumps(dict(COMMON_RULES, deny=[*COMMON_RULES["deny"], ROOT_RULE])))
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[ROOT_RULE, *LIB_RULES["deny"]]))
 
@@ -858,7 +858,8 @@ class DuplicateTest(ConfigUnionHarness):
         self.assertTrue(any("credentials" in p["detail"] for p in warns), warns)
 
     def test_bash_union_drops_identical_duplicates_too(self):
-        """11.4: Bash の和でも同じ。共通層の `terraform` を写した lib の定義は 1 本にまとまる。"""
+        """11.4: Bash の和でも同じ。共通層の `terraform` をコピーした lib の定義は 1
+        本にまとまる。"""
         copied = dict(LIB_RULES)
         copied["deny"] = [*LIB_RULES["deny"], COMMON_RULES["deny"][1]]
         write_layer(self.lib, rules=copied)
@@ -965,7 +966,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
     """
 
     def start_turn(self, cwd):
-        """ターンを起こし、そのツリーの控えを取らせる。初回の実行後は控えるだけ。"""
+        """ターンを起こし、そのツリーの記録を取らせる。初回の実行後は記録するだけ。"""
         started = self.hook("", self.ws, event="UserPromptSubmit")
         self.assertEqual(started.returncode, 0, started.stderr)
         first = self.hook("Bash", cwd, event="PostToolUse", command="python gen.py")

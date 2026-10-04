@@ -2,7 +2,7 @@
  * service worker。PAT を持ち、ホストの API を呼ぶのはここだけ。画面で XSS が起きても PAT に届きにくくするため。
  *
  * PAT は `chrome.storage.local` に平文で置く（一度の登録で使い続けるため。対策するのは XSS だけ）。鍵は `token:<ホスト>` で、画面の側は
- * この鍵を読まない（画面が読むのは `repos` だけ）。PAT の期限は `tokenMeta:<ホスト>` に控え、
+ * この鍵を読まない（画面が読むのは `repos` だけ）。PAT の期限は `tokenMeta:<ホスト>` に記録し、
  * 1 日 1 回（`chrome.alarms`）比べて、切れる 7 日前からバッジに出す。
  */
 import { ALARM, ensureDailyAlarm } from "../core/alarm.js";

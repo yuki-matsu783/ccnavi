@@ -13,7 +13,7 @@
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（ワークスペースかプロジェクトの設定の種類なら `--project-phases-file <名前>=<パス>`）で
  * 差し替えられる（リスク管理画面・フェーズ管理画面）。
- * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと控えは外し、記録も残さない
+ * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと state の置き場は外し、記録も残さない
  * （試し打ちで記録を汚さない）。
  */
 import { execFile } from "node:child_process";
@@ -104,7 +104,7 @@ function cutOff(what: string, ms: number): string {
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つかりません（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれもありません）。設定 ccnaviBoard.binPath で指定できます";
 
-/** 見るのはルールだけ。チケット制御と控えは外し、記録も残さない */
+/** 見るのはルールだけ。チケット制御と state の置き場は外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
 
 /**
@@ -263,7 +263,7 @@ export type { ApproveOutcome };
 
 /**
  * 承認待ちの一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
- * 記録と控えは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
+ * 記録と state の置き場は外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(
   root: string,
@@ -394,7 +394,7 @@ export async function runDecideYes(
 }
 
 /**
- * sh のスクリプト（`.ccnavi/scripts/` の下）を子プロセスで走らせる。綴りは `/` 区切りにする
+ * sh のスクリプト（`.ccnavi/scripts/` の下）を子プロセスで走らせる。パスは `/` 区切りにする
  * （Windows の Git Bash は `C:/…` を読める）
  */
 function runScript(
@@ -468,7 +468,7 @@ export async function runSamples(
 /**
  * 記録からルールの候補を起こす（`--suggest --json`、README「候補の JSON」）。読むのは保存済みの
  * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と見本の判定で確かめたものだけ。
- * 記録を読むので `--log ""` は付けない（控えは実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
+ * 記録を読むので `--log ""` は付けない（state の置き場は実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
  */
 export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {
   const launcher = findLauncher(root, setting);

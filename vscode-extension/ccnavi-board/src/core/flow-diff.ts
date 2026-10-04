@@ -52,7 +52,7 @@ export function sameFlow(a: FlowDoc, b: FlowDoc): boolean {
   return a === b || sameValue(a, b);
 }
 
-/** 変わった欄の呼び名。知らない欄は綴りのまま */
+/** 変わった欄の呼び名。知らない欄は表記のまま */
 const FIELD_LABELS: Readonly<Record<string, string>> = {
   name: "名前",
   type: "種類",
@@ -205,7 +205,7 @@ export type ValueKind = "文字列" | "数" | "真偽" | "null" | "辞書" | "�
 
 /** 欄 1 つの前後。足した欄は `before` が無く、消した欄は `after` が無い */
 export interface FieldText {
-  /** 欄の綴り（`中身.prompt`・`中身.options[0].label` の形。頭の欄は呼び名にし、記号や英字以外を含むキーは `["…"]` で囲む） */
+  /** 欄の表記（`中身.prompt`・`中身.options[0].label` の形。頭の欄は呼び名にし、記号や英字以外を含むキーは `["…"]` で囲む） */
   readonly field: string;
   readonly before?: string;
   readonly beforeKind?: ValueKind;
@@ -224,7 +224,7 @@ export interface TextChange {
 export interface TextDiff {
   readonly changes: readonly TextChange[];
   /**
-   * 欄ごとの前後に分けて見せられなかった理由（欄の綴りが重なる・違うのに違う欄が見つからない）。あれば画面は取り込ませない。
+   * 欄ごとの前後に分けて見せられなかった理由（欄の表記が重なる・違うのに違う欄が見つからない）。あれば画面は取り込ませない。
    * 見せられなかったものは、生の JSON の前後を `texts` に入れてある
    */
   readonly problem?: string;
@@ -249,7 +249,7 @@ function kindOf(value: unknown): ValueKind {
   return isRecord(value) ? "辞書" : "その他";
 }
 
-/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の綴り。種類は `kindOf` で別に添える */
+/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の表記。種類は `kindOf` で別に添える */
 function shown(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -261,10 +261,10 @@ function shown(value: unknown): string {
   }
 }
 
-/** 英字・数字・`_` `-` だけのキーは `.キー` で、ほかは `["キー"]` で書く（`.` や `[` を含むキーで綴りが重ならないように） */
+/** 英字・数字・`_` `-` だけのキーは `.キー` で、ほかは `["キー"]` で書く（`.` や `[` を含むキーで表記が重ならないように） */
 const PLAIN_KEY = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
-/** 頭の欄の綴り。呼び名の在る欄は呼び名、英字のキーはそのまま、ほかは `["キー"]`（呼び名と重ならない） */
+/** 頭の欄の表記。呼び名の在る欄は呼び名、英字のキーはそのまま、ほかは `["キー"]`（呼び名と重ならない） */
 function headLabel(key: string): string {
   if (Object.prototype.hasOwnProperty.call(FIELD_LABELS, key)) {
     return FIELD_LABELS[key];
@@ -305,7 +305,7 @@ function leavesOf(value: Readonly<Record<string, unknown>>, skip: ReadonlySet<st
   return out;
 }
 
-/** 2 つの値の、違う葉の前後。片方にしか無い葉は、もう片方を空にする。見せる綴りが重なれば `ambiguous` */
+/** 2 つの値の、違う葉の前後。片方にしか無い葉は、もう片方を空にする。見せる表記が重なれば `ambiguous` */
 function fieldTexts(
   a: Readonly<Record<string, unknown>> | undefined,
   b: Readonly<Record<string, unknown>> | undefined,
@@ -350,7 +350,7 @@ function rawTexts(a: unknown, b: unknown): FieldText[] {
 }
 
 /**
- * `before`（いまのフロー）から `after`（下書き）への差分を、値の前後まで。欄の綴りが重なるか、違うのに違う欄が
+ * `before`（いまのフロー）から `after`（下書き）への差分を、値の前後まで。欄の表記が重なるか、違うのに違う欄が
  * 見つからないものは、生の JSON の前後を入れて `problem` で言う（画面は取り込ませない）
  */
 export function textDiff(before: FlowDoc, after: FlowDoc): TextDiff {

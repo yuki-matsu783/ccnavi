@@ -11,19 +11,19 @@
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
-# 取り込み済みの親子のチケット（origin があり、親子のチケットの控えが present。chat だけのものを除く）の親のワークツリーは、
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。chat だけのものを除く）のワークツリーは、
 # C1 と同じ手順で運ぶ。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（C1 の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
 # 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
 # push が落ちてもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
-# 答えない実行ファイルで親子のチケットの控えがあれば、運ばずに止める。
+# 答えない実行ファイルで親子のチケットの取り込み状態があれば、運ばずに止める。
 #
 # <親> を並べると、その親子のチケットだけを運ぶ。取り込み済みでない親子のチケットは運ばない（今のまま、ユーザがコミット
 # する）。省けば今どおり、置き場に変更のあるツリー全部。
 #
 # 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
 # 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
-# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（写しは作らない）ので、
+# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（コピーは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）は運ばない。
 # 同じく、ボードのフロー編集画面が取り込んだ下書き（$CCNAVI_TICKETS_PROPOSAL の flows/）を
 # フローの保存のあとに消すので、追跡されていた下書きの削除だけを運ぶ。未追跡の下書きと、書き直された
@@ -82,7 +82,7 @@ projects="${CCNAVI_PROJECTS:-projects}"
 approved="${approved%/}"
 proposals="${proposals%/}"
 projects="${projects%/}"
-# 落として空になる綴り（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
+# 落として空になるパス（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
 # ルートの直下を全部ツリーとして数え、承認済みチケットの置き場ならツリー全体をコミットする。
 # どちらも頼まれた置き場ではないので、既定に戻す。
 case "$approved" in
@@ -98,7 +98,7 @@ esac
 # 落ちて残っても運ばない。書きかけの中身をユーザの手順書としてコミットしないため。
 skip_temp=":(exclude)$approved/flows/.*.tmp"
 
-# ツリーごとの結果を subshell (while はパイプの右側なので別プロセス) の外へ持ち出すための控え。
+# ツリーごとの結果を subshell (while はパイプの右側なので別プロセス) の外へ持ち出すための一時ファイル。
 state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {
 	printf 'ccnavi-push-approved: 一時ファイルが作れません。\n' >&2
 	exit 2
@@ -232,7 +232,7 @@ if [ "$#" -gt 0 ]; then
 fi
 
 # ワークスペースルートから rel を 1 段ずつ下り、シンボリックリンクの段があれば 0。
-# その段（ルートからの綴り）を linked に残す。`.claude` だけがリンクでも見逃さない。
+# その段（ルートからのパス）を linked に残す。`.claude` だけがリンクでも見逃さない。
 linked=""
 linked_segment() {
 	linked=""
@@ -269,7 +269,7 @@ for place in "$projects" ".claude/worktrees"; do
 				"$place/$(basename "$dir")" >&2
 			continue
 		fi
-		# glob が何にも当たらなければ綴りのまま残るので、-d で落とす。
+		# glob が何にも当たらなければパターンがそのまま残るので、-d で落とす。
 		[ -d "$dir" ] || continue
 		trees="$trees
 $dir"
@@ -288,7 +288,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	changed=$(git -C "$tree" status --porcelain -- "$approved" "$skip_temp" 2>/dev/null || :)
 	[ -n "$changed" ] || continue
 
-	# 何か 1 つでも運ぶ対象があったことの印。detached で処理しなくても「無い」とは言わない。
+	# 何か 1 つでも運ぶ対象があったことの記録。detached で処理しなくても「無い」とは言わない。
 	printf 'seen\n' >>"$state"
 
 	name=$(basename "$tree")
@@ -304,9 +304,9 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	"$root/.claude/worktrees/$branch")
 		ccnavi_c1_family "$branch"
 		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$branch" ]; then
-			# 取り込み済みの親子のチケットの子のワークツリー。写しとマーカーは親のワークツリーに置くので、
+			# 取り込み済みの親子のチケットの子のワークツリー。チケットとマーカーは親のワークツリーに置くので、
 			# 子のツリーの置き場の変更は運ばない（子のブランチはリモートに出さない）。
-			printf 'ccnavi-push-approved: %s は親子のチケット %s の子のワークツリー。子のツリーの置き場の変更は運ばない（写しは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
+			printf 'ccnavi-push-approved: %s は親子のチケット %s の子のワークツリー。子のツリーの置き場の変更は運ばない（チケットは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
 				"$name" "$ccnavi_c1_family_id" >&2
 			printf 'fail\n' >>"$state"
 			continue
@@ -336,7 +336,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	}
 	# 承認で todo/ から消えた提案。追跡されていたものの削除だけを入れる（`ls-files --deleted`）。
 	# 未追跡の下書きも、編集中の提案も入れない。消えたものが無ければ pathspec にも足さない
-	# （git に知られていない綴りを pathspec に並べると commit が落ちる）。
+	# （git に知られていないパスを pathspec に並べると commit が落ちる）。
 	gone=$(git -C "$tree" ls-files --deleted -z -- "$proposals/todo" 2>/dev/null | tr '\000' '\n' || :)
 	scope="$approved"
 	if [ -n "$gone" ]; then
@@ -347,7 +347,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		scope="$approved
 $proposals/todo"
 	fi
-	# 取り込んで消えたフローの下書き。追跡されていたものの削除だけを、1 件ずつの綴りで入れる。
+	# 取り込んで消えたフローの下書き。追跡されていたものの削除だけを、1 件ずつのパスで入れる。
 	# 置き場ごと pathspec に並べると、書き直されて残っている下書きまでコミットに入るため。
 	drafts=$(git -C "$tree" ls-files --deleted -z -- "$proposals/flows" 2>/dev/null | tr '\000' '\n' || :)
 	if [ -n "$drafts" ]; then

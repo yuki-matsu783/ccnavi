@@ -17,7 +17,7 @@
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す
 - 承認の事実をモデルに伝える（`news`・`approved_text`）
 
-判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（置き場が承認の権威）。置き場を手で
+判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で本物とするのは置き場）。置き場を手で
 動かす運びもあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
 """
 
@@ -94,7 +94,7 @@ class Gathered:
     refused: str = ""
     # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを承認の対象にする」）。
     note: str = ""
-    # 権威のツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
+    # 本物とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
     # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文と指紋には入れない）。
     elsewhere: list[str] = field(default_factory=list)
 
@@ -138,7 +138,7 @@ def gather(
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
-    # 権威のツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
+    # 本物とするツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
     # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core._say_elsewhere` と
     # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
     open_index = approval.by_id(approved)
@@ -257,7 +257,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     names = [c.ticket.ticket for c in gathered.batch] + [t.ticket for t, _ in gathered.rejected]
     width = max((len(name) for name in names), default=0)
     rows: list[tuple[str, str, list[str]]] = []
-    # 苦情の綴りから識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
+    # 苦情の文面から識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
     # 同じものが出ている）。残すのは重さと中身。
     for cand in gathered.batch:
         notes = [f"{p.severity}: {p.detail}" for p in cand.complaints]
@@ -287,10 +287,10 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
 
 
 def _elsewhere(gathered: Gathered) -> str:
-    """権威のツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。"""
+    """本物とするツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。"""
     if not gathered.elsewhere:
         return ""
-    lines = ["\n承認待ちに入らない改版がある（権威のツリーの外）。\n"]
+    lines = ["\n承認待ちに入らない改版がある（本物とするツリーの外）。\n"]
     lines += [_note_line(line) for line in gathered.elsewhere]
     return "".join(lines)
 
@@ -301,7 +301,7 @@ def _unreadable(gathered: Gathered) -> str:
     終了コードは動かさない。`--agree` も、承認待ちが 1 件も無いとき以外はこれで
     止まらないので、ここで落とすと「確かめは『いいえ』なのに承認は通る」になる。走査は絞る前の
     全ツリーを見るから、他のセッションの書きかけ 1 本で自分の提案が止まることにもなる。
-    出さずに済ませることもしない。自分が書いた 1 本かもしれないので、件数と綴りを本文に出す。
+    出さずに済ませることもしない。自分が書いた 1 本かもしれないので、件数と文面を本文に出す。
     """
     if not gathered.problems:
         return ""
@@ -322,22 +322,22 @@ def _note_line(note: str) -> str:
 
 
 def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | None = None) -> str:
-    """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに写る中身の
+    """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに書き込む中身の
     SHA-256 の 16 進（小文字）。
 
     ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
     見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
-    本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
+    本文だけを比べても、画面に出ないのに承認済みチケットへ書き込む欄（`issue`、Markdown の
     本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
 
     **判定が読んだ中身（`read_set`）を指紋に含める。** 提案だけでなく、
-    判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の控えのどれかが見せたあとに
+    判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の取り込み結果のどれかが見せたあとに
     変われば、指紋が変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
     入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
     （`<ブランチ>:<相対パス>` → 中身の指紋）。
 
-    束のチケットの写る中身（`_carried`）も残して指紋に含める。読んだ中身から決まるものだが、読みの
-    記録（`fsio.reading`）を通らない読みが紛れても、写る中身の変化は取りこぼさないように。
+    一括のチケットの書き込む中身（`_carried`）も残して指紋に含める。読んだ中身から決まるものだが、読みの
+    記録（`fsio.reading`）を通らない読みが紛れても、書き込む中身の変化は取りこぼさないように。
 
     部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
     区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
@@ -352,22 +352,23 @@ def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | No
 
 
 def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[str, str]:
-    """判定が読んだ中身（`fsio.reading` の控え）を、機械に依らない鍵に直す。
+    """判定が読んだ中身（`fsio.reading` に溜めた内容）を、
+    機械に依らない鍵に直す。
 
     鍵は `<リポジトリ>:<ブランチ>:<ツリーからの相対パス>`（"/" 区切り）。リポジトリは
-    ワークスペース自身なら `self`、プロジェクトならその名前（控えの名前と同じ。ブランチ名が
+    ワークスペース自身なら `self`、プロジェクトならその名前（取り込み状態の名前と同じ。ブランチ名が
     リポジトリをまたいで重なっても鍵は同じにならない。git の ref に `:` は使えない）。
     ブランチはそのツリーの HEAD が指すブランチ名（読めなければツリーの名前。ワークスペースルートの
     名前は空）で、`Changes.per_branch` と同じ決め方。ツリーは承認済みチケットを持ちうるもの全部
     （`trees`）で、最長一致。鍵に使ったツリーの HEAD の中身も `<リポジトリ>:<ブランチ>:(HEAD)` で
     入れる（切り離した HEAD の sha が変わればツリーの名前の鍵は同じでも指紋が変わる）。
-    控えの置き場の下は、取り込みの控え（`sync/`）だけを `(控え):<相対パス>` で
-    入れ、ほかの控え（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
+    state の置き場の下は、取り込み状態（`sync/`）だけを `(控え):<相対パス>` で
+    入れ、ほかの記録（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
     変わりうる）。ワークスペースの外は絶対パスのまま。
     """
-    # 読みの控えの綴りはリンクをたどった先（`fsio.note_read`）なので、比べる側も
+    # 溜めた読みのパスはリンクをたどった先（`fsio.note_read`）なので、比べる側も
     # たどった先に揃えてから大文字小文字をそろえる（macOS の /tmp のようなリンクを経たルート、
-    # Windows の綴りの揺れ）。
+    # Windows の表記の揺れ）。
     held = sorted(
         ((_real(t.root), t) for t in approval.trees(conf, root)),
         key=lambda x: len(x[0]),
@@ -415,8 +416,8 @@ _SETTINGS_FILES = (
     settings.LOCAL_CLAUDE_SETTINGS,
 )
 # 承認の判定に影響する設定の値（環境変数からも来るので、ファイルの中身とは別に値そのものを入れる）。
-# 置き場の綴りとチケット制御だけ。控えの置き場（`state`）は入れない（取り込みの控えは中身で
-# `(控え):` に入る。置き場の綴りだけが違う起動で見せ直しにならないように）。モードと承認の守りは
+# 置き場のパスとチケット制御だけ。state の置き場（`state`）は入れない（取り込み状態は中身で
+# `(控え):` に入る。置き場のパスだけが違う起動で見せ直しにならないように）。モードと承認の保護は
 # 承認の答えを変えない（端末を求めるかどうか）ので入れない。
 _SETTINGS_VALUES = ("tickets", "approved", "projects", "project_home")
 
@@ -426,9 +427,9 @@ def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
 
     `settings.load` が読むファイル（`pyproject.toml`・`ccnavi.settings.local.json`）と
     Claude Code の設定（`.claude/settings.json`・`.claude/settings.local.json`）の中身を
-    `(設定):<相対パス>` で、判定に影響する値（置き場の綴り・チケット制御など。
+    `(設定):<相対パス>` で、判定に影響する値（置き場のパス・チケット制御など。
     環境変数から来るもの）を `(設定値):<名前>` で入れる。
-    見せたあとに置き場の綴りや設定が変われば、同じ画面でも指紋が変わる。
+    見せたあとに置き場のパスや設定が変われば、同じ画面でも指紋が変わる。
     """
     out: dict[str, str] = {}
     for rel in _SETTINGS_FILES:
@@ -444,7 +445,7 @@ def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
             if not inside.startswith(".."):
                 value = inside.replace(os.sep, "/")
         out[f"(設定値):{name}"] = fsio.content_digest(value)
-    # チケット制御は綴り（空・enable）ではなく有効かどうかで入れる。
+    # チケット制御は書かれた値（空・enable）ではなく有効かどうかで入れる。
     out["(設定値):ticket_control"] = fsio.content_digest(str(conf.tickets_enabled))
     return out
 
@@ -461,10 +462,10 @@ def _folded(path: str) -> str:
 
 
 def _carried(cand: Candidate) -> str:
-    """承認済みチケットに写る中身。承認の記録の欄を足す前の姿で書き出す。
+    """承認済みチケットに書き込む中身。承認の記録の欄を足す前の姿で書き出す。
 
     改版は承認済みチケットの frontmatter の計画だけを差し替え、本文は承認済みチケットの
-    ものを残す（`revise_copy`）。新規は提案をそのまま写す（`write_copy`）。
+    ものを残す（`revise_copy`）。新規は提案をそのまま書き出す（`write_copy`）。
     """
     t = cand.ticket
     if cand.is_revision and cand.current is not None:
@@ -500,7 +501,7 @@ def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: s
     2 か所で文を持つと、ユーザが貼った文と hook が渡した文が食い違う。
 
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
-    revisions は親の改版だった識別子。root はワークスペースルートで、sh の綴りに使う。
+    revisions は親の改版だった識別子。root はワークスペースルートで、sh のパスに使う。
     """
     lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:
@@ -533,7 +534,7 @@ def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: s
 
 
 def _news_path(state_dir: str, session: str, agent_id: str) -> str:
-    """このセッション（サブエージェントならその起動）が知っている承認済みチケットの控え。
+    """このセッション（サブエージェントならその起動）が知っている承認済みチケットの記録。
     `once-<session>-<agent>.json`（ctxfile）と同じ並びに置く。"""
     session_part = fsio.safe_name(session) or "unknown"
     agent_part = fsio.safe_name(agent_id) or "main"
@@ -541,7 +542,7 @@ def _news_path(state_dir: str, session: str, agent_id: str) -> str:
 
 
 def _known(path: str) -> dict[str, str] | None:
-    """控えにある「識別子 → 版」。控えが無ければ None。
+    """記録にある「識別子 → 版」。記録が無ければ None。
 
     読めるのに壊れているときは空の辞書を返す。「無い」と同じに扱うと、まだ伝えて
     いない承認ごと現状を起点にして何も伝えないことになる。何も知らないことにして、
@@ -559,7 +560,7 @@ def _known(path: str) -> dict[str, str] | None:
 def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
     failed = fsio.write_json_atomic(path, {"known": dict(sorted(known.items()))})
     if failed:
-        stderr.write(f"ccnavi: 承認を伝えた控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 承認を伝えた記録を書けない: {failed}\n")
 
 
 def _mark(t: ticket_mod.Ticket) -> str:
@@ -577,7 +578,7 @@ def _copy_marks(conf: settings.Settings, root: str) -> dict[str, ticket_mod.Tick
     """いまある承認済みチケット。開いたものと閉じたもの。
 
     閉じたものも見る。承認の直後・次の hook の前に子が閉じることがあり、開いたものだけを
-    見ると、その承認は誰にも伝わらないまま控えに入る。
+    見ると、その承認は誰にも伝わらないまま記録に入る。
     """
     found: dict[str, ticket_mod.Ticket] = {}
     for closed in (False, True):
@@ -603,9 +604,9 @@ def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list
 def baseline(
     stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str
 ) -> None:
-    """控えが無ければ、いまの承認済みチケットを「知っているもの」として書く。文は出さない。
+    """記録が無ければ、いまの承認済みチケットを「知っているもの」として書く。文は出さない。
 
-    SessionStart から呼ぶ。起動・再開・compact のどれでも来るが、控えがあれば
+    SessionStart から呼ぶ。起動・再開・compact のどれでも来るが、記録があれば
     触らない。compact の前に置かれた承認は、compact のあとにも 1 度は伝える。
     """
     if not conf.state or not conf.tickets_enabled:
@@ -618,10 +619,10 @@ def baseline(
 def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str) -> str:
     """このセッションがまだ知らない承認済みチケットがあれば、その承認を伝える文。1 度だけ。
 
-    最初の hook で控えが無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
+    最初の hook で記録が無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
     それより後に置かれた承認済みチケットと、版の変わった承認済みチケット（親の改版）が「新しい承認」になる。
-    控えを置けない（`--state ""`）ときは何も伝えない。診断の試し打ちで記録を汚さない側を採る。
-    サブエージェントは自分の控えを持つので、起動より前の承認は伝えない。
+    記録を置けない（`--state ""`）ときは何も伝えない。診断の試し打ちで記録を汚さない側を採る。
+    サブエージェントは自分の記録を持つので、起動より前の承認は伝えない。
 
     読み・判定・書きは直列化していない。同じセッションの hook が同時に走ると、同じ承認を
     2 度伝えることがある。伝えすぎる側なので受け入れる。取るべきでないのは逆で、
@@ -671,7 +672,8 @@ def candidates(
     cache: dict[str, dict | None] = {}
     # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
-    # 親子のチケットの立ち位置と統合先の控え。1 回の承認で 1 度ずつだけ読む。
+    # 親子のチケットの立ち位置と統合先の取り込み結果。
+    # 1 回の承認で 1 度ずつだけ読む。
     fams = syncstate.Families(conf, root)
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
@@ -733,7 +735,7 @@ def candidates(
 
 
 def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案に待ち方の写し（`workflow:`）が書いてあれば拒む。写しを書くのは `--agree` だけ。"""
+    """提案に待ち方のコピー（`workflow:`）が書いてあれば拒む。コピーを書くのは `--agree` だけ。"""
     if ticket_mod.WORKFLOW_KEY not in t.raw:
         return []
     return [
@@ -812,10 +814,10 @@ def _apply_steps(
     batch: list[Candidate],
     stamp: str,
 ) -> tuple[str, str] | None:
-    """`plan_batch` の中身。書き込みは fsio の控える段に積み、見せる行も同じ並びに積む。
+    """`plan_batch` の中身。書き込みは fsio の書き込みを溜める段に積み、見せる行も同じ並びに積む。
 
     書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
-    控える段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
+    書き込みを溜める段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
     """
     for cand in batch:
         t = cand.ticket
@@ -1068,7 +1070,7 @@ def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
     if not found:
         return []
     return [
-        "■ 待ち方（承認すると親に写し、後から phases.yml を直しても変わらない）",
+        "■ 待ち方（承認すると親にコピーし、後から phases.yml を直しても変わらない）",
         *("    " + x for x in found),
     ]
 
@@ -1127,12 +1129,12 @@ def waiting(
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
     改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
-    計画が同じでも、いまの種類で計算した待ち方が承認済みチケットの写しと違えば改版になる
+    計画が同じでも、いまの種類で計算した待ち方が承認済みチケット上の待ち方と違えば改版になる
     （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
     チケットに使う種類を引く関数（`types_resolver`）。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
-    統合先の控えの `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、`candidates` が
-    理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
+    統合先の取り込み結果の `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、
+    `candidates` が理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
     """
     known = approval.by_id(approved + closed + review)
     open_index = approval.by_id(approved)
@@ -1394,7 +1396,7 @@ def revise_copy(
 def revised_front(
     current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None = None
 ) -> dict:
-    """改版で書く frontmatter。承認済みチケットの frontmatter の計画と待ち方を差し替えた写し。
+    """改版で書く frontmatter。承認済みチケットの frontmatter の計画と待ち方を差し替えたコピー。
 
     `current` は書き換えない。承認の指紋（`digest`）も同じものから組むので、見せた
     中身と書く中身が食い違わない。

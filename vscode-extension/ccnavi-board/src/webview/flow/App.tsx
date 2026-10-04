@@ -11,7 +11,7 @@
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
  * だけ（再読込・保存が通った）。履歴もそこで空にする。
  *
- * **写しを替えるのは `edit()` だけ。** 直す前の写しを履歴（`core/flow-history.ts`）に積んでから替える。
+ * **コピーを替えるのは `edit()` だけ。** 直す前のコピーを履歴（`core/flow-history.ts`）に積んでから替える。
  * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts` の `sameFlow`）ので、
  * 元に戻して読み込んだときと同じ中身になれば消える。
  *
@@ -64,7 +64,7 @@ import { badgeOf } from "./text.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: FlowLock = { locked: true, reason: "" };
-/** 編集中の写しを拡張ホストへ控えさせるまでの間（打つたびに送らない） */
+/** 編集中のコピーを拡張ホストへ送って覚えさせるまでの間（打つたびに送らない） */
 const DRAFT_MS = 300;
 /** 編集が止まってから実行ファイルに確かめ直させるまでの間 */
 const CHECK_MS = 800;
@@ -165,7 +165,7 @@ const TOUR_STEPS: readonly TourStep[] = [
 
 export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [data, setData] = useState<FlowData>(initial);
-  // 読み込んだ中身（未保存の見比べと、保存前の差分の元）と、編集中の写し
+  // 読み込んだ中身（未保存の見比べと、保存前の差分の元）と、編集中のコピー
   const [base, setBase] = useState<FlowDoc | undefined>(() => pageOf(initial)?.doc);
   const [doc, setDoc] = useState<FlowDoc | undefined>(() => pageOf(initial)?.draft ?? pageOf(initial)?.doc);
   const [history, setHistory] = useState<FlowHistory>(emptyHistory);
@@ -180,12 +180,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [minimap, setMinimap] = useState(minimapShown);
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
-  // コピーしたノード（画面の中の控え）と、同じ控えを何回貼り付けたか（貼り付けるたびに少しずつずらす）
+  // コピーしたノード（画面の中に保持する）と、同じものを何回貼り付けたか（貼り付けるたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
-  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指す写し、`pendingDoc` は頼んで答えを待っている写し、
-  // `checkSeq` は最後に頼んだ確認の番号。写しが替わるたびに番号を進め、待っていた答えは捨てる
-  // （答えを待つ間に直すと、古い写しの答えを今の答えと取り違えるため）
+  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指すコピー、`pendingDoc` は頼んで答えを待っているコピー、
+  // `checkSeq` は最後に頼んだ確認の番号。コピーが替わるたびに番号を進め、待っていた答えは捨てる
+  // （答えを待つ間に直すと、古いコピーの答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | undefined>(undefined);
@@ -300,8 +300,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
   }, [dirty]);
 
-  // 未保存の写しを拡張ホストに控えさせる（未保存のまま閉じられたら、開き直して戻せるように）。
-  // 打つたびには送らず、止まってから送る。未保存でなくなったら控えを消させる
+  // 未保存のコピーを拡張ホストに覚えさせる（未保存のまま閉じられたら、開き直して戻せるように）。
+  // 打つたびには送らず、止まってから送る。未保存でなくなったら覚えたコピーを消させる
   const sentDraft = useRef(false);
   useEffect(() => {
     if (!dirty) {
@@ -329,16 +329,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
 
-  // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指す写しと同じなら頼まない
+  // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指すコピーと同じなら頼まない
   useEffect(() => {
     if (doc === undefined || pendingDoc.current === doc) {
       return;
     }
-    // 写しが替わった。待っていた答えは古い写しのものなので捨てる（番号を進める）
+    // コピーが替わった。待っていた答えは古いコピーのものなので捨てる（番号を進める）
     checkSeq.current += 1;
     pendingDoc.current = undefined;
     if (checkedDoc.current === doc) {
-      // 答えが指す写しに戻った（元に戻すなど）。確かめ直さない
+      // 答えが指すコピーに戻った（元に戻すなど）。確かめ直さない
       setChecking(false);
       return;
     }
@@ -351,7 +351,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     return () => clearTimeout(timer);
   }, [doc]);
 
-  // 取り込んだ中身から編集で離れたら、取り込みの印を外す（元に戻して同じ中身にしても付け直さない。下書きを消さない側）
+  // 取り込んだ中身から編集で離れたら、取り込んだ記録を外す（元に戻して同じ中身にしても付け直さない。下書きを消さない側）
   useEffect(() => {
     const taken = imported.current;
     if (taken !== undefined && doc !== undefined && !sameFlow(doc, taken.doc)) {
@@ -394,7 +394,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const readOnly = lock.locked || busy;
 
   /**
-   * 写しを替える唯一の入り口。直す前の写しを履歴に積む。`typing` は欄に打った文字のときの欄の名前で、
+   * コピーを替える唯一の入り口。直す前のコピーを履歴に積む。`typing` は欄に打った文字のときの欄の名前で、
    * 同じ欄に続けて打ったものは 1 件にまとめる
    */
   const edit = (next: FlowDoc, typing?: string): void => {
@@ -406,7 +406,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setDoc(next);
   };
 
-  /** 戻した・やり直した写しに無いものを選んでいたら外す（線は並びの位置で指すので、線の選択は外す） */
+  /** 戻した・やり直したコピーに無いものを選んでいたら外す（線は並びの位置で指すので、線の選択は外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
     if (moved === undefined || readOnly) {
       return;
@@ -718,7 +718,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           minimap={minimap}
           onPick={pick}
           onMove={(moves) => {
-            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じ写しを返す）
+            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じものを返す）
             const next = placeNodes(doc, moves);
             if (next !== doc) {
               edit(next);
@@ -728,7 +728,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           onRemoveNode={removeNodeAt}
           onRemoveEdge={removeEdgeAt}
           onResizeGroup={(id, size, position) => {
-            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じ写しを返す）
+            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じものを返す）
             const next = resizeGroup(doc, id, size, position);
             if (next !== doc) {
               edit(next);

@@ -9,7 +9,7 @@ GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undra
 落とす土台は作れない（`remote_kind` はホスト名で github と読むので、127.0.0.1 に
 立てた偽物は gitlab として読まれる）。そこで 2 本に分ける。
 
-- 枝が在ることと、案内が次の一手を名指ししていること: スクリプトの綴りを読む
+- 枝が在ることと、案内が次の一手を名指ししていること: スクリプトの文面を読む
   （`test_sh_portability.py` と同じやり方）
 - GraphQL 以外の失敗では案内を出さないこと: 閉じたポートへ実際に打つ
 """
@@ -62,7 +62,7 @@ class TheHintIsInTheFailurePathTest(unittest.TestCase):
         self.assertIn("graphql)", body)
 
     def test_the_hint_names_the_next_move(self):
-        """番号だけでは次に何をすればよいか分からない。写しの作り方まで名指しする。"""
+        """番号だけでは次に何をすればよいか分からない。取得した結果の作り方まで名指しする。"""
         body = api_failed_body(script_text())
         for word in MUST_NAME:
             with self.subTest(word=word):

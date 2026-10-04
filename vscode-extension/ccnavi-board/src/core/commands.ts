@@ -12,7 +12,7 @@
  */
 import * as path from "node:path";
 
-/** 承認済みチケットを運ぶ sh の、ワークスペースルートからの綴り */
+/** 承認済みチケットを運ぶ sh の、ワークスペースルートからのパス */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
@@ -53,14 +53,14 @@ export function approveArgs(
   return ["--agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
-/** レビューの sh の、ワークスペースルートからの綴り */
+/** レビューの sh の、ワークスペースルートからのパス */
 export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
 
 /**
  * `ccnavi-review.sh decide <N> --preview`。残った指摘と指紋を JSON で見る（何も置かない）。
  * sh は実行した場所を親のワークツリーとして実行ファイルに渡すので、子プロセスの cwd を親のワークツリーにする。
  * `.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから切ったワークツリーには届かないので、
- * sh はワークスペースルートから綴る（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
+ * sh はワークスペースルートからのパスで書く（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
  */
 export function decidePreviewArgs(phase: number): readonly string[] {
   return ["decide", String(phase), "--preview"];
@@ -80,12 +80,12 @@ export function decideArgs(
 }
 
 /**
- * 文面で案内する `.ccnavi/scripts/` の sh の綴り。実行ファイルの `settings.script_command` と同じ引用の規則で、
+ * 文面で案内する `.ccnavi/scripts/` の sh のパス。実行ファイルの `settings.script_command` と同じ引用の規則で、
  * ワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する。引用しないと
  * sh が単語に分け、止めている間の例外（`\S*ccnavi-...`）にも当たらない。まず `"..."`、`"` の中でも意味を持つ
  * 文字があるときだけ単引用符にする。
- * 実行ファイルは root を realpath で解いてから組む。ここは渡された綴りをそのまま使うので、実行ファイルの
- * 案内と同じ綴りにしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
+ * 実行ファイルは root を realpath で解いてから組む。ここは渡されたパスをそのまま使うので、実行ファイルの
+ * 案内と同じパスにしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
  */
 export function scriptCommand(root: string, name: string): string {
   const base = toPosixPath(root).replace(/\/+$/, "");

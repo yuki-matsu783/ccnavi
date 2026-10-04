@@ -69,7 +69,7 @@ test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し
   }
 });
 
-test("CB-T243 (flow) の error があれば、実行ファイルの理由を対象のファイルの綴りに直して断る。走らせられなければ断る", async () => {
+test("CB-T243 (flow) の error があれば、実行ファイルの理由を対象のファイルのパスに直して断る。走らせられなければ断る", async () => {
   const dir = tmpDir();
   try {
     let tmp = "";
@@ -112,7 +112,7 @@ test("CB-T244 lint の JSON から (flow) の苦情だけを引き、古い実�
   const stderr = "usage: ccnavi [--root ROOT] ...\n              [command ...]\nccnavi: error: unrecognized arguments: --flow\n";
   assert.equal(unknownOption(stderr, "--flow"), true);
   assert.equal(unknownOption(stderr, "--risk"), false);
-  // usage の行に出る綴り（[--flow FLOW]）は数えない
+  // usage の行に出る表記（[--flow FLOW]）は数えない
   assert.equal(unknownOption("usage: ccnavi [--flow FLOW]\nccnavi: error: something else\n", "--flow"), false);
 });
 
@@ -184,7 +184,7 @@ test("CB-T247 答えに読んだ中身（flow）が無ければ通さない（�
   }
 });
 
-test("CB-T278 通ったときは (flow) の warn を対象のファイルの綴りに直し、渡る手順（rendered）と候補（candidates）を添えて返す", async () => {
+test("CB-T278 通ったときは (flow) の warn を対象のファイルのパスに直し、渡る手順（rendered）と候補（candidates）を添えて返す", async () => {
   const dir = tmpDir();
   try {
     let tmp = "";

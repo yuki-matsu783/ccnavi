@@ -135,7 +135,7 @@ test("CB-T90 足す・消す・空の並びは欄ごと消す・scope の inheri
     .filter((p) => p.id !== "acceptance")
     .map((p) => {
       if (p.id === "implement") {
-        // requires を空にすれば欄ごと消え、scope を inherit にすれば綴りで書く
+        // requires を空にすれば欄ごと消え、scope を inherit にすれば値として書く
         return { ...p, requires: [], inherit: true };
       }
       if (p.id === "implement-feedback") {
@@ -204,7 +204,7 @@ test("CB-T94 画面から来た内容は形だけ確かめる。並びに文字�
   assert.deepEqual(ok.phases[0].deliverables, []);
   assert.equal(ok.order, "dag");
   assert.deepEqual(ok.phases[0].after, ["b"]);
-  // 待ち方は必ず持つ。知らない綴りも受け取らない
+  // 待ち方は必ず持つ。知らない表記も受け取らない
   assert.equal(asPhasesForm({ phases: [] }), undefined);
   assert.equal(asPhasesForm({ order: "graph", phases: [] }), undefined);
   assert.equal(asPhasesForm({ order: "dag", phases: [{ id: "a", kind: "work", review: "mr", after: [1] }] }), undefined);
@@ -262,7 +262,7 @@ test("CB-T198 order と after を読み、書き戻す。sequential は元から
   const again = readPhases(out);
   assert.equal(again.model.form.order, "dag");
   assert.deepEqual(again.model.form.phases.find((p) => p.id === "implement")?.after, ["design"]);
-  // dag から sequential に戻すと、欄は綴りで残る（書いた意図を消さない）
+  // dag から sequential に戻すと、欄は値として残る（書いた意図を消さない）
   assert.match(again.apply({ ...again.model.form, order: "sequential" }), /^order: sequential$/m);
 });
 

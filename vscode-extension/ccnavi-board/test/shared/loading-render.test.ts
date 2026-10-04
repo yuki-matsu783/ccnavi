@@ -24,7 +24,7 @@ test("CB-T200 読み込み中の 1 枚はスクリプトを持たず、名前を
   assert.match(renderLoadingPage("x", "x", { nonce: "N2", style: "" }), /<body>/);
 });
 
-test("CB-T200b 読み込み中の一言は「<何>を読み込み中...」で、5 画面の入れ物も束ねた画面が組み上がるまで同じ一言を持つ", () => {
+test("CB-T200b 読み込み中の一言は「<何>を読み込み中...」で、5 画面の入れ物もバンドルした画面が組み上がるまで同じ一言を持つ", () => {
   assert.equal(loadingText("チケット"), "チケットを読み込み中…");
   const options = { nonce: "N", script: "", style: "" };
   const error = { kind: "error", error: "x" } as const;

@@ -109,7 +109,7 @@ export function isHttpUrl(url: string): boolean {
 }
 
 /**
- * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ綴り
+ * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ表記
  * （`ccnavi/tickets/agree.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
  * **まとめるのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
@@ -162,7 +162,7 @@ const PLACE_LABELS: Readonly<Record<string, string>> = {
   done: "完了",
 };
 
-/** 履歴の種類の呼び名。知らない種類は綴りのまま出す */
+/** 履歴の種類の呼び名。知らない種類は表記のまま出す */
 const HISTORY_KIND_LABELS: Readonly<Record<string, string>> = {
   approved: "承認",
   revised: "計画の改版",
@@ -178,7 +178,7 @@ const HISTORY_KIND_LABELS: Readonly<Record<string, string>> = {
 /** 親のマーカーの呼び名 */
 const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
   ready: "Draft を外した",
-  "close-early": "早期に締めた",
+  "close-early": "早めに閉じた",
   closed: "親を閉じた",
 };
 
@@ -196,7 +196,7 @@ export const VIA_LABELS: Readonly<Record<string, string>> = {
 
 /**
  * 履歴の 1 行の本文。「承認（承認待ち → 作業中）」「フェーズ 1: レビュー依頼済み」「取り消し（作業中 → 完了）: 理由」。
- * 実行ファイルが書いた跡を言い換えるだけで、ここから状態を組み直さない
+ * 実行ファイルが書いた履歴を言い換えるだけで、ここから状態を組み直さない
  */
 export function historyText(e: HistoryEntryJson): string {
   const phase = e.phase === null ? "" : `フェーズ ${e.phase}: `;
@@ -217,7 +217,7 @@ export function historyText(e: HistoryEntryJson): string {
   return `${e.kind === "phase-reopened" ? phase : ""}${label}${move}${reason}`;
 }
 
-/** 履歴の時刻。UTC の ISO 8601 を「2026-09-26 09:00 UTC」に。読めない綴りはそのまま */
+/** 履歴の時刻。UTC の ISO 8601 を「2026-09-26 09:00 UTC」に。読めない表記はそのまま */
 export function historyAt(at: string): string {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?Z$/.exec(at);
   return m === null ? at : `${m[1]} ${m[2]} UTC`;

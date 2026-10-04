@@ -4,7 +4,7 @@
 
 1. 種類の `order` と `after` の読み方（循環、指す先、層の合わせ方）
 2. `dag` では祖先でないフェーズを待たずに承認できる。一直線では待つ
-3. 待ち方は承認のときに親へ写し、あとで phases.yml を直しても進行中の親には反映されない
+3. 待ち方は承認のときに親へコピーし、あとで phases.yml を直しても進行中の親には反映されない
 4. 計画が同じ改版で、直した phases.yml を進行中の親に反映できる
 5. 計画の検査（並び、終端、延期の引き受け手）
 6. 受け入れはそのフェーズと、それを待つ番号にだけ当てはまる
@@ -328,7 +328,7 @@ class DagApprovalTest(PhaseHarness):
         self.assertIn("3: implement — 待つ: 1", result.stdout)
 
     def test_a_workflow_written_in_a_proposal_is_refused(self):
-        """待ち方の写しを書くのは `--agree` だけ。提案に書いてあれば承認しない。
+        """待ち方のコピーを書くのは `--agree` だけ。提案に書いてあれば承認しない。
 
         引用符付きの鍵でも同じ。
         """
@@ -346,7 +346,8 @@ class DagApprovalTest(PhaseHarness):
             self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_an_approved_parent_without_a_workflow_is_read_as_sequential(self):
-        """写しを持たない承認済みの親は、いまの phases.yml から計算せず一直線で待たせる。"""
+        """コピーした待ち方を持たない承認済みの親は、
+        いまの phases.yml から計算せず一直線で待たせる。"""
         self.use(SEQUENTIAL)
         self.family(plan=PLAN)
         path = os.path.join(self.approved, "doing", "i0001.md")

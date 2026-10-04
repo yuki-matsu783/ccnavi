@@ -28,7 +28,7 @@ const PATTERNS: readonly RegExp[] = [
   /^<<$/,
 ];
 
-/** PyYAML（YAML 1.1）が文字列以外に読む綴りなら真。空文字は真（`null` に読まれる） */
+/** PyYAML（YAML 1.1）が文字列以外に読む表記なら真。空文字は真（`null` に読まれる） */
 export function yaml11Ambiguous(text: string): boolean {
   if (text === "") {
     return true;

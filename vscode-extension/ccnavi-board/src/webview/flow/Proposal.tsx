@@ -31,7 +31,7 @@ export type ProposalView =
   | { readonly kind: "error"; readonly error: string }
   | { readonly kind: "ready"; readonly proposal: FlowProposal };
 
-/** 値の種類の印（`1` と `"1"` を見分ける） */
+/** 値の種類の表示（`1` と `"1"` を見分ける） */
 function Kind({ kind }: { readonly kind: ValueKind | undefined }): JSX.Element | null {
   return kind === undefined ? null : <span className="proposal-value-kind">{kind}</span>;
 }

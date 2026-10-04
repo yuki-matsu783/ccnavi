@@ -3,12 +3,12 @@
 見るのは 8 つ。
 
 1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は何も言わず無視する
-2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。ユーザが保存したフローを
+2. エージェントの書き込みは、どのツリーの置き場でも組み込みの保護が止める。ユーザが保存したフローを
    実行後チェックが範囲外の変更として咎めない（H1）
 3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
    別名（アンカーとエイリアス）は読まない
 4. 壊れた・大きい・リンクのフローで落ちない。文の量に上限がある。ccnavi の名乗りを真似させない
-5. 着手中の子のフローへの書き込みを止める。解いた綴りと解く前の綴りの両方で。着手の前と、
+5. 着手中の子のフローへの書き込みを止める。解いたパスと解く前のパスの両方で。着手の前と、
    終わった後は止めない
 6. SubagentStart がフローのファイルを名指しし、手順と、askUserQuestion / subAgent の
    ノードでの動き方を渡す。フローが壊れていても残りの文は渡す
@@ -281,7 +281,7 @@ class FlowRenderTest(unittest.TestCase):
         # 出口が項目の id とちょうど同じなら、その項目。
         data["connections"][1]["fromPort"] = "b"
         self.assertIn("3（NO）", flow.render(data)[0][1])
-        # 数字の綴りは ASCII だけ。`²` を 2 と読まない。
+        # 数字の表記は ASCII だけ。`²` を 2 と読まない。
         self.assertEqual(flow._port_label(node, "branch-²"), "")
         self.assertEqual(flow._port_label(node, "xbranch-1"), "")
 
@@ -637,7 +637,7 @@ class FlowGuardTest(FlowHarness):
     """エージェントはどのツリーの置き場にも書けない。ユーザの保存は咎めない。"""
 
     def test_agent_writes_are_denied_in_every_tree(self):
-        """組み込みの守り（builtin-guard-project-home）が、承認済みの領域の `flows/` を
+        """組み込みの保護（builtin-guard-project-home）が、承認済みの領域の `flows/` を
         ワークスペースルート・親のワークツリー・子のワークツリー・プロジェクトのどれでも止める。"""
         child_tree = self.worktree(CHILD, "i0001")
         project = os.path.join(self.root, "projects", "p")
@@ -735,7 +735,7 @@ class FlowLockTest(FlowHarness):
         # 誰が書いても同じ（サブエージェントでも）。大文字小文字も問わない。
         upper = os.path.join(self.parent_tree, ".ccnavi", "Approved", "FLOWS", "I0001-01.YML")
         self.assert_locked(self.write_to(upper, agent_id="sub-1"))
-        # 相対の綴り・`..` を挟んだ綴り・NotebookEdit。
+        # 相対パス・`..` を挟んだパス・NotebookEdit。
         rel = os.path.join(".ccnavi", "approved", "flows", f"{CHILD}.yml")
         self.assert_locked(self.write_to(rel, cwd=self.parent_tree))
         dotted = os.path.join(self.parent_tree, ".ccnavi", "approved", ".", "x", "..", "flows")
@@ -746,7 +746,7 @@ class FlowLockTest(FlowHarness):
         self.assert_not_locked(self.write_to(self.flow_in(self.parent_tree, "i0001-09")))
 
     def test_links_do_not_get_around_the_lock(self):
-        """置き場を指すリンク越しの綴りも、リンクに差し替えたフローの綴りも止める（H2）。"""
+        """置き場を指すリンク越しのパスも、リンクに差し替えたフローのパスも止める（H2）。"""
         real = write(os.path.join(self.parent_tree, "wip", "flow-real.yml"), WORKFLOW_YAML)
         os.remove(self.flow_path)
         os.symlink(real, self.flow_path)
@@ -908,7 +908,7 @@ class NestedBounceTest(PhaseHarness):
 
 
 class FlowDraftTest(FlowHarness):
-    """エージェントの下書き。書けるが効力は無い。判定と守りは今までどおり。"""
+    """エージェントの下書き。書けるが効力は無い。判定と組み込みの保護は今までどおり。"""
 
     def draft_in(self, tree_root, name=CHILD):
         return os.path.join(tree_root, "wip", "proposals", "flows", f"{name}.yml")

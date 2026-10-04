@@ -13,7 +13,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 ## 状況
 
 チケットは 2 本のファイルで表していた。エージェントが書く提案（`wip/proposals/<状態>/`）と、
-承認のときに写す承認済みチケット（`.ccnavi/tickets/`）で、状態は提案の側の置き場
+承認のときにコピーする承認済みチケット（`.ccnavi/tickets/`）で、状態は提案の側の置き場
 （`todo` / `doing` / `done` / `cancelled`）が持ち、承認済みチケットは開（直下）と閉（`closed/`）の
 2 段だけを持っていた。判定が読むのは承認済みチケット、フェーズの終わりを決めるのは提案の置き場、
 レビューの進みはマーカー、と 3 か所を読み合わせていた（ccnavi.md 9.6）。
@@ -53,13 +53,13 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 | `.ccnavi/approved/done/` | ユーザが見て閉じた。取り消しも `cancelled_at` を持ってここに入る | ユーザ（`check` / `accept` / `--reviewed --chat` / `wrapup`）、レビュー不要の `done`、`cancel` |
 
 承認の意味は変えない。ユーザが読んで合意したものが `.ccnavi/approved/` に入り、エージェントは
-そこに書けない。変わるのは「写す」が「動かす」になること。
+そこに書けない。変わるのは「コピーする」が「動かす」になること。
 
 **現行との変化点**
 
 | 項目 | 前 | 後 |
 |---|---|---|
-| ファイルの本数 | 提案 + 承認済みチケット（写し）の 2 本 | 1 本が動く |
+| ファイルの本数 | 提案 + 承認済みチケット（コピー）の 2 本 | 1 本が動く |
 | 提案の置き場の状態 | `todo` / `doing` / `done` / `cancelled` | `todo` / `review` |
 | 承認済みチケットの置き場 | `.ccnavi/tickets/`（開は直下、閉は `closed/`） | `.ccnavi/approved/`（`doing/` / `done/`） |
 | 承認 | 承認済みチケットを書く。提案は `todo/` に残る | `todo/` から `approved/doing/` へ動かす（`ccnavi_approved` を足す） |
@@ -69,13 +69,13 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 | `ticket done`（親） | 同上 | `approved/done/` へ |
 | `ticket cancel` | `todo/` か `doing/` → `cancelled/` | `approved/doing/` → `approved/done/`（`cancelled_at` / `cancel_reason` を書く）。未承認の提案は消せばよい |
 | レビュー済み（`check` / `accept` / `--reviewed --chat` / `wrapup`） | `reviewed` のマーカーを置く | マーカーを置き、そのフェーズ（延期を引き受けた分を含む）の `review/` の子を `approved/done/` へ動かす |
-| 未解決の指摘を残す判断（`accept`、`--chat`） | 受け入れて進むだけ | 受け入れて進むか、**続きの子チケットを `approved/doing/` に起こす**かをユーザが端末で選ぶ。起こした子は同じフェーズの番号で、範囲は見た子の和、本文に指摘を写す。承認はユーザが選んだことで済んでいる |
+| 未解決の指摘を残す判断（`accept`、`--chat`） | 受け入れて進むだけ | 受け入れて進むか、**続きの子チケットを `approved/doing/` に起こす**かをユーザが端末で選ぶ。起こした子は同じフェーズの番号で、範囲は見た子の和、本文に指摘を書き出す。承認はユーザが選んだことで済んでいる |
 | フェーズが終わった | `todo/` にも `doing/` にも無く `done/` が 1 枚以上 | `doing/` に無く、`review/` か `done/`（取り消しでない）が 1 枚以上 |
-| 状態を守る組み込み | `doing/` `done/` `cancelled/` への直接の作成・移動を止める | `review/` への直接の作成・移動を止める。`approved/` は今までどおり ccnavi ディレクトリの守りが止める |
+| 状態を守る組み込み | `doing/` `done/` `cancelled/` への直接の作成・移動を止める | `review/` への直接の作成・移動を止める。`approved/` は今までどおり ccnavi ディレクトリの保護が止める |
 | `--lint` | 旧の置き場（`wip/tickets/`）の残りを名指し | 加えて `.ccnavi/tickets/` と `wip/proposals/{doing,done,cancelled}/` の残りも名指し |
 | 承認の運び（`ccnavi-push-approved.sh`） | 承認済みチケットの置き場だけをコミット | 加えて `todo/` から消えた提案（追跡されていたもの）もコミットに入れる |
 
-置き場の綴りは今までどおり env（`CCNAVI_TICKETS_PROPOSAL` / `CCNAVI_TICKETS_APPROVED`）で決められる。
+置き場のパスは今までどおり env（`CCNAVI_TICKETS_PROPOSAL` / `CCNAVI_TICKETS_APPROVED`）で決められる。
 既定が `.ccnavi/tickets` から `.ccnavi/approved` に変わる。マーカーと子の記録（`phases/<親>/`）は
 `.ccnavi/approved/phases/` に移るだけで形は変えない。
 
@@ -88,9 +88,9 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 - **場所で「誰の番か」が分かる。** `wip/proposals/` に在ればエージェントが動かした直後で次はユーザ
   （承認かレビュー）、`.ccnavi/approved/` に在ればユーザが動かした直後で次はエージェント（作業）か
   終わり。読み合わせが要らない
-- **写しをやめても、承認の権威は落ちない。** 判定が読むのは `.ccnavi/approved/doing/` だけで、
+- **コピーをやめても、承認済みチケットを本物とする仕組みは弱まらない。** 判定が読むのは `.ccnavi/approved/doing/` だけで、
   そこはエージェントが書けない。承認のあとに提案を書き足す手段が無くなるので、ADR-0023 で守ろうと
-  したもの（承認した内容が残る）は、写しではなくファイルそのものが担う
+  したもの（承認した内容が残る）は、コピーではなくファイルそのものが担う
 - **続きの子をユーザが起こすのは、承認と同じ行為。** ユーザが端末で「この指摘は続きで直す」と選ぶことは、
   その範囲で作業してよいという合意そのものなので、承認の往復を挟まない。エージェントが起こす
   形にすると承認が要る（提案の側に書く）。ユーザが起こすから `approved/` に直に置ける
@@ -98,8 +98,8 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 ## 得たもの・失ったもの
 
 - 得たもの: チケット 1 本につきファイル 1 本。`ls wip/proposals/review` で「ユーザが見るべきもの」が並ぶ
-- 得たもの: レビューの残りを続きの子に写す往復が 1 回減る
-- 得たもの: `phase.sync`（提案の欄を写しに写す・閉じたら `closed/` へ動かす）が要らなくなる
+- 得たもの: レビューの残りを続きの子に書き出す往復が 1 回減る
+- 得たもの: `phase.sync`（提案の欄を承認済みチケットにコピーする・閉じたら `closed/` へ動かす）が要らなくなる
 - 失ったもの: **承認済みチケットと提案の diff が取れない。** 承認したあとに何を書き足したかは、
   git の履歴で見ることになる（提案は承認で `todo/` から消え、その削除がコミットに入る）
 - 失ったもの: **既定のまま使っていたツリーは移行が要る。** `.ccnavi/tickets/` を
@@ -112,7 +112,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 
 ## 採らなかった案
 
-- **提案の置き場の状態に `review` を足すだけ（写しは残す）。** 「レビュー待ち」は見えるように
+- **提案の置き場の状態に `review` を足すだけ（コピーは残す）。** 「レビュー待ち」は見えるように
   なるが、2 本のファイルの読み合わせは残る
 - **`review/` も `.ccnavi/approved/` の下に置く。** ユーザの番のものはエージェントが書けない場所に、
   と揃えたかったが、`done` はエージェントが打つ操作で、その結果がエージェントの書けない場所に

@@ -1,6 +1,6 @@
 """`ccnavi sync paths` の約束。
 
-`ccnavi-sync.sh` は jq を使わず JSON も読まない。置き場の綴りと、`.claude/settings.local.json` の
+`ccnavi-sync.sh` は jq を使わず JSON も読まない。置き場のパスと、`.claude/settings.local.json` の
 `env` に書かれた統合先の名前を、実行ファイルが 1 行 1 項目（`<鍵> <値>`）で返す。
 統合先の名前は環境変数からは読まない（sh が先に環境変数を見る）。
 """
