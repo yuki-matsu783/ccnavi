@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sampleBoard } from "../../src/core/tour-sample.js";
 import { buildBoard, isKnownPath, parentCardOf, parentTreeOf, phaseChipOf, type Card } from "../../src/core/board.js";
-import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
+import type { ArchivedTicketJson, BoardJson, ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 
 function cardsOf(board: ReturnType<typeof buildBoard>): Map<string, Card> {
@@ -18,9 +18,10 @@ test("CB-T05 列は置き場から引き、親のあとに子が並ぶ。レビ�
       ["doing", ["i0001", "i0001-02-02", "i0001-02-04"]],
       ["done", ["i0001-01-01"]],
       ["cancelled", ["i0001-02-05"]],
+      ["archived", []],
     ],
   );
-  assert.deepEqual(board.columns.map((c) => c.label), ["未着手", "作業中", "完了", "取り消し"]);
+  assert.deepEqual(board.columns.map((c) => c.label), ["未着手", "作業中", "完了", "取り消し", "アーカイブ"]);
   assert.equal(board.totalCount, 6);
   // 残りは未着手と作業中（レビュー待ちを含む）
   assert.equal(board.remainingCount, 4);
@@ -387,7 +388,7 @@ test("CB-T139 止まっていないチケットは今までどおり、不備も
 test("CB-T215 案内の見本のボードは、承認待ち・作業中・完了のカードを持ち、どれも見本と分かる題を持つ", () => {
   const board = sampleBoard("/ws", "2026-01-01");
   const byState = Object.fromEntries(board.columns.map((column) => [column.state, column.cards.map((card) => card.id)]));
-  assert.deepEqual(byState, { todo: ["sample-a"], doing: ["sample-b", "sample-b-02-01"], done: ["sample-b-01-01"], cancelled: [] });
+  assert.deepEqual(byState, { todo: ["sample-a"], doing: ["sample-b", "sample-b-02-01"], done: ["sample-b-01-01"], cancelled: [], archived: [] });
   assert.deepEqual(board.pendingApproval, ["sample-a"]);
   assert.equal(board.root, "/ws");
   const cards = board.columns.flatMap((column) => column.cards);
@@ -424,4 +425,59 @@ test("CB-T263 先行待ちはカードへそのまま渡り、列と要対応は
   assert.equal(after.attention, before.attention);
   // 欄が空なら何も持たない
   assert.deepEqual(before.predecessorsUnmet, []);
+});
+
+function archivedJson(ticket: string, parent = ""): ArchivedTicketJson {
+  return {
+    ticket,
+    parent,
+    phase: parent === "" ? null : 1,
+    title: `退避した ${ticket}`,
+    project: "",
+    path: `/ws/logs/archive/self/done/${ticket}.md`,
+    approved_at: "2026-01-01T00:00:00+09:00",
+    started_at: "",
+    completed_at: "2026-01-02T00:00:00+09:00",
+    cancelled_at: "",
+    cancel_reason: "",
+    history: [{ at: "2026-01-03T00:00:00Z", kind: "archived", from: "done", to: "archive", via: "cli", phase: null, mark: "", reason: "" }],
+  };
+}
+
+test("CB-T301 退避のチケットはアーカイブの列に並び、操作も要対応も持たず、集計と親の候補に数えない", () => {
+  const base = fixture();
+  const board = buildBoard({ ...base, archived: [archivedJson("old"), archivedJson("old-01-01", "old")] });
+  const archived = board.columns.find((c) => c.state === "archived")!;
+  assert.deepEqual(archived.cards.map((card) => card.id), ["old", "old-01-01"]);
+  const parent = archived.cards[0];
+  assert.equal(parent.column, "archived");
+  assert.equal(parent.copyStatus, "archived");
+  assert.equal(parent.attention, false);
+  assert.deepEqual(parent.actions, []);
+  assert.equal(parent.history.at(-1)?.kind, "archived");
+  assert.equal(archived.cards[1].family, "old");
+  assert.equal(board.archivedCount, 2);
+  assert.equal(board.totalCount, buildBoard(base).totalCount);
+  assert.equal(board.remainingCount, buildBoard(base).remainingCount);
+  assert.ok(!board.parents.some((p) => p.id === "old"));
+  // 退避したファイルは開ける（カードの openPath がそのパス）
+  assert.ok(isKnownPath(board, "/ws/logs/archive/self/done/old.md"));
+  assert.ok(!isKnownPath(buildBoard(base), "/ws/logs/archive/self/done/old.md"));
+});
+
+test("CB-T302 置き場に同じ識別子があれば、退避のカードは出さない（置き場の側が本物）", () => {
+  const base = fixture();
+  const board = buildBoard({ ...base, archived: [archivedJson("i0001-01-01", "i0001")] });
+  const ids = board.columns.flatMap((c) => c.cards).filter((card) => card.id === "i0001-01-01");
+  assert.equal(ids.length, 1);
+  assert.equal(ids[0].column, "done");
+  assert.equal(board.archivedCount, 0);
+});
+
+test("CB-T304 退避のカードの重なりはプロジェクトと識別子で見る。別のプロジェクトの同じ識別子は出す", () => {
+  const base = fixture();
+  const other = { ...archivedJson("i0001-01-01", "i0001"), project: "lib" };
+  const board = buildBoard({ ...base, archived: [other] });
+  const archived = board.columns.find((c) => c.state === "archived")!;
+  assert.deepEqual(archived.cards.map((card) => `${card.project}/${card.id}`), ["lib/i0001-01-01"]);
 });

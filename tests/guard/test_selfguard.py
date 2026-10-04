@@ -485,7 +485,18 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_記録と_state_の置き場もシェルからの書き込みで止まる(self):
         # 記録と state は判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
-        for command in ("rm logs/decisions.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
+        # 閉じたチケットの退避（logs/archive）も、閉じた記録として判定が読むので同じく守る。
+        for command in (
+            "rm logs/decisions.jsonl",
+            "rm -rf logs/state",
+            "mv logs/state /tmp/x",
+            "rm -rf logs/archive",
+            "cp /tmp/x.md logs/archive/self/done/i0001.md",
+            # 退避の置き場を丸ごと別のもので置き換える形
+            "cp -r /tmp/archive logs/",
+            "mv /tmp/x/archive logs/",
+            "cp -t logs /tmp/archive",
+        ):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
@@ -512,6 +523,7 @@ class SelfGuardTest(unittest.TestCase):
                 os.path.join(self.repo, "logs", "decisions.jsonl"),
                 os.path.join(self.repo, "logs", "decisions.20260927-120000.jsonl"),
                 os.path.join(self.repo, "Logs", "State", "x.json"),
+                os.path.join(self.repo, "logs", "archive", "self", "done", "i0001.md"),
                 # 置き場を動かしてある（--state / --log）。
                 os.path.join(self.state, "denied-x.json"),
                 self.log,
@@ -528,6 +540,7 @@ class SelfGuardTest(unittest.TestCase):
             os.path.join(self.repo, "logs", "git-20260913-000000-1.log"),
             os.path.join(self.repo, "logs", "notes.md"),
             os.path.join(self.repo, "logstate", "x.json"),
+            os.path.join(self.repo, "logs", "archived-notes.md"),
             os.path.join(self.repo, "src", "logs", "catalog.jsonl"),
             os.path.join(self.repo, "state-notes", "x.md"),
         ):

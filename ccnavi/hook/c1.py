@@ -18,7 +18,10 @@
     コミットに入った変更（取り込みの後に未送信を確かめる分）
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
     `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの履歴（`events/<親>.ndjson` の
-    `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
+    `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない。
+    もう 1 つは `ready` の退避（archive.py）が消したもの。ready の印（`logs/archive/<リポジトリ>/
+    ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
+    退避の写しと同じもの（履歴は「退避した」の行だけを足したもの）だけ
   - (c) ユーザがコミットするもの（ユーザの判断）。C1 はコミットせずに止める。
     ユーザの判断が一緒に書く
     移動（review/ から done/、doing/ から done/）とマーカーの消去、履歴の追記もここ
@@ -41,7 +44,7 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
-from ..tickets import approval, history, phase, syncstate
+from ..tickets import approval, archive, history, phase, syncstate
 from ..tickets import ticket as ticket_mod
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
@@ -193,7 +196,8 @@ def sort(
         stderr.write(f"ccnavi: c1 sort: {why}\n")
         return 1
     stdout.write(HEAD + "\n")
-    for kind, rel, why in classify_all(tree_root, places, parent, changed, since):
+    archive_at = (root, syncstate.project_of_key(st.repo))
+    for kind, rel, why in classify_all(tree_root, places, parent, changed, since, archive_at):
         stdout.write(f"{kind} {rel}\n")
         if why:
             stdout.write(f"why {rel} {' '.join(why.split())}\n")
@@ -234,11 +238,21 @@ def classify_all(
     parent: str,
     changed: list[str],
     since: str = "",
+    archive_at: tuple[str, str] | None = None,
 ) -> list[tuple[str, str, str]]:
     """変更のリストを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
     HEAD）、あれば HEAD と `since`。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。
+
+    `archive_at` は `(ワークスペースルート, プロジェクト)`。渡せば、ready がこのツリーから退避した
+    削除を (b) にする（`archived_removal`）。None なら (b) にしない。
     """
     approved_rel, review_rel = places
+    ready: set[str] = set()
+    if archive_at is not None:
+        # 印が効くのは、印を書いたときの先頭と比べている版が同じ間だけ（未コミットなら HEAD、
+        # 未送信の確かめなら `since`）。
+        head = archive.tree_head(tree_root, since or "HEAD")
+        ready = archive.ready_files(archive_at[0], archive_at[1], tree_root, head)
     states: dict[str, tuple[bytes | None, bytes | None, bool]] = {}
     for rel in changed:
         if since:
@@ -277,7 +291,14 @@ def classify_all(
             continue
         parts = inside.split("/")
         try:
-            if _hook_mark(parts, parent, now, before) or _hook_events(parts, parent, now, before):
+            if (
+                _hook_mark(parts, parent, now, before)
+                or _hook_events(parts, parent, now, before)
+                or (
+                    archive_at is not None
+                    and archived_removal(inside, now, before, ready, *archive_at)
+                )
+            ):
                 out.append((KIND_B, rel, ""))
             elif not since and _judge_record(parts):
                 out.append((KIND_KEEP, rel, ""))
@@ -377,6 +398,26 @@ def _hook_events(parts: list[str], parent: str, now: bytes | None, before: bytes
         and row.get("ticket") == parent
         for row in rows
     )
+
+
+def archived_removal(
+    rel: str,
+    now: bytes | None,
+    before: bytes | None,
+    ready: set[str],
+    root: str,
+    project: str,
+) -> bool:
+    """`ready` の退避が消したものか（archive.py）。`rel` は承認済みの領域からの相対。
+
+    ready の印（`archive.ready_files`。そのツリーから ready が移したファイルの一覧）に載っていて、
+    消えた中身が手元の退避の写しと同じ（履歴は「退避した」の行だけを足したもの）ときだけ。
+    ready の印は `logs/archive/` に置かれ、記録の守りがエージェントの書き込みを止める。
+    退避の置き場の途中（`logs` を含む）にリンクがあれば写しを読まない。
+    """
+    if now is not None or before is None or rel not in ready or not archive.in_ready_places(rel):
+        return False
+    return archive.holds(rel, archive.archived_bytes(root, project, rel), before)
 
 
 def _judge_record(parts: list[str]) -> bool:

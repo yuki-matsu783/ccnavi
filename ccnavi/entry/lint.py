@@ -54,6 +54,7 @@ from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets import (
     agree,
     approval,
+    archive,
     configsync,
     flow,
     history,
@@ -640,7 +641,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
     approval.align_imported(conf, root, preds)
     # 統合先の done/ で閉じた識別子も閉じたものに数える（開いた親子のチケットでも統合先の
     # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
@@ -1333,7 +1334,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
     problems: list[Problem] = []
     fams = syncstate.Families(conf, root)
     for work in tree.worktrees(root, conf.projects):
-        if not _holds_parent(conf, work):
+        if not _holds_parent(conf, work, root):
             continue
         branch = tree.branch_of(work.root)
         want = fams.branch(work.name, work.project)
@@ -1357,10 +1358,11 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
     return problems
 
 
-def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
+def _holds_parent(conf: settings.Settings, work: tree.Tree, root: str = "") -> bool:
     """そのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか。
 
-    sh の `ccnavi_parent_tree` と同じ見方。
+    sh の `ccnavi_parent_tree` と同じ見方。ready の後はツリーから親が消えて手元の退避
+    （`logs/archive/<リポジトリ>/done/`）へ移るので、そこに親が在っても親のワークツリーとして扱う。
     """
     approved = settings.approved_dir(conf, work.root)
     proposals = os.path.join(work.root, conf.tickets.replace("/", os.sep))
@@ -1375,7 +1377,8 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
         t, _ = ticket_mod.load(path)
         if t is not None and t.ticket == work.name and not t.parent:
             return True
-    return False
+    held = archive.archived_fields(root, work.project, work.name) if root else None
+    return held is not None and held.ticket == work.name and not held.parent
 
 
 def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]]:

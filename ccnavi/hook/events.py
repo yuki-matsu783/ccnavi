@@ -172,6 +172,7 @@ def decide_at_prompt(
         record,
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
+        root,
     )
     told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
     hint = branchfind.prompt_context(conf, root, payload.prompt)
@@ -223,6 +224,7 @@ def decide_at_stop(
         record,
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
+        root,
     )
     # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
     # 言い換えで回っているかもしれないことをユーザにも 1 度言う。止めはしない。
@@ -476,6 +478,8 @@ def decide_after(
         # 外れなかったりさせない。
         places=(conf.tickets, conf.approved),
         synced=synced,
+        # 退避（`ready`）が消した閉じたチケットを見分けるため、`logs/archive/` を読む。
+        root=root,
     )
     # 設定ファイルについて言うことは、実行後チェックの報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。

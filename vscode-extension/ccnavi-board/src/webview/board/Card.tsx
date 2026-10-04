@@ -172,7 +172,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
       </span>,
     );
   }
-  if (!card.worktreeExists && card.copyStatus !== "closed") {
+  if (!card.worktreeExists && card.copyStatus !== "closed" && card.copyStatus !== "archived") {
     badges.push(<Badge key="worktree" kind="worktree none" text="ワークツリーなし" />);
   }
   if (isHighRisk(card.riskLevel)) {
@@ -198,7 +198,8 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
  */
 function Facts({ card }: { readonly card: Card }): JSX.Element {
   const facts: JSX.Element[] = [];
-  const closedInColumn = card.copyStatus === "closed" && (card.column === "done" || card.column === "cancelled");
+  // アーカイブの列にいるカード（手元の退避にだけあるもの）も、列が状態を言うので同じ扱いにする
+  const closedInColumn = (card.copyStatus === "closed" && (card.column === "done" || card.column === "cancelled")) || card.column === "archived";
   if (card.copyStatus !== "none" && !closedInColumn) {
     facts.push(<Fact key="copy" kind={`copy-${card.copyStatus}`} text={COPY_LABELS[card.copyStatus]} />);
   }

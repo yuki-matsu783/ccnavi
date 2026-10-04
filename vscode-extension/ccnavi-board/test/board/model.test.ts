@@ -154,3 +154,34 @@ test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま�
   assert.deepEqual(parsed.board.tickets[3].predecessors_unmet, [{ ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" }]);
   assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
 });
+
+test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+  const base = JSON.parse(fixtureText()) as Record<string, unknown>;
+  const parsed = parseBoardJson(
+    JSON.stringify({
+      ...base,
+      archived: [
+        { ticket: "old", title: "古い親", path: "/ws/logs/archive/self/done/old.md", history: [{ at: "t", kind: "archived", from: "done", to: "archive", via: "cli" }] },
+        "壊れた行",
+      ],
+    }),
+  );
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  assert.equal(parsed.board.archived?.length, 1);
+  const old = parsed.board.archived![0];
+  assert.equal(old.ticket, "old");
+  assert.equal(old.parent, "");
+  assert.equal(old.phase, null);
+  assert.equal(old.path, "/ws/logs/archive/self/done/old.md");
+  assert.equal(old.history[0].kind, "archived");
+  // この欄を出さない古い実行ファイル
+  const { archived: _dropped, ...older } = base;
+  const parsedOlder = parseBoardJson(JSON.stringify(older));
+  assert.equal(parsedOlder.ok, true);
+  if (parsedOlder.ok) {
+    assert.deepEqual(parsedOlder.board.archived, []);
+  }
+});

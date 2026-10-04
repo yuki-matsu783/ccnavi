@@ -17,6 +17,7 @@ import { post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
 import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
+import { FILTER_LABELS } from "./text.js";
 
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSS の min-width と同じ値 */
 const MIN_WIDTH = 220;
@@ -56,8 +57,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
    * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの state や承認の件数の元にはしない
    */
   const sample = useMemo(
-    () => (tour.touring && board !== undefined && board.totalCount === 0 ? sampleBoard(board.root, board.generatedAt) : undefined),
-    [tour.touring, board],
+    () => (tour.touring && board !== undefined && board.totalCount === 0 && !(view.archived && board.archivedCount > 0) ? sampleBoard(board.root, board.generatedAt) : undefined),
+    [tour.touring, board, view.archived],
   );
   const shown = sample ?? board;
 
@@ -92,10 +93,15 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 
   // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、落とした後の値
   const project = projectOptions(board).includes(view.project) ? view.project : EMPTY.project;
-  const parent = board !== undefined && board.parents.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
+  // アーカイブを表示しているときは、退避した親も絞り込みの候補に入る（選んでいた親が退避されても外さない）
+  const parentOptions = board === undefined ? [] : view.archived ? [...board.parents, ...board.archivedParents] : board.parents;
+  const parent = parentOptions.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
+  const shownParents = sample === undefined ? parentOptions : (shown?.parents ?? []);
   // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が有効なままにすると、
   // 出すものが無いのに「絞り込み中」になる
   const attention = board !== undefined && view.attention;
+  // アーカイブ済みのチケット（手元の退避）を出すか。既定は出さない。隠すのが既定なので、絞り込み（filtering）には数えない
+  const archived = view.archived;
   const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
 
   // 絞り込み中かどうかは body に出す。カードの表示・非表示は CSS（.card.hidden）が受け持つ
@@ -114,18 +120,19 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     if (board === undefined) {
       return;
     }
-    saveState({ project, parent, attention, folded: view.folded, widths: view.widths });
-  }, [board === undefined, project, parent, attention, view.folded, view.widths]);
+    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths });
+  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths]);
 
   // 前の読み直しから動いたカード。数えるのは拡張ホスト（`core/board-moved.ts`）で、画面は出すだけ
   const moved = new Map((data.kind === "board" ? (data.moved ?? []) : []).map((m) => [m.id, m]));
-  const movedOf = (card: Card): Moved | undefined => moved.get(card.id);
+  const movedOf = (card: Card): Moved | undefined => (card.column === "archived" ? undefined : moved.get(card.id));
 
   // 見本は絞り込みに当てない。見本のカードはどのプロジェクトにも親にも属さないので、覚えていた絞り込みが
   // 有効なままだと全部隠れ、案内が指す先を失う
   const hiddenOf = (card: Card): boolean =>
     sample === undefined &&
-    ((project !== EMPTY.project && card.project !== project) ||
+    ((!archived && card.column === "archived") ||
+    (project !== EMPTY.project && card.project !== project) ||
     (parent !== EMPTY.parent && card.family !== parent) ||
     (attention && !card.attention));
 
@@ -167,12 +174,12 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              {shown.parents.length > 0 ? (
+              {shownParents.length > 0 ? (
                 <label className="filter">
                   親
                   <select id="parent-filter" value={parent} onChange={(event) => setView((now) => ({ ...now, parent: event.target.value }))}>
                     <option value="*">すべて</option>
-                    {shown.parents.map((p) => (
+                    {shownParents.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title === "" ? p.id : `${p.id} ${p.title}`}
                       </option>
@@ -180,8 +187,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              <label className="filter attention" title="ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
-                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応のみ
+              <label className="filter attention" title={FILTER_LABELS.attentionTitle}>
+                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
+              </label>
+              <label className="filter archived" title={FILTER_LABELS.archivedTitle}>
+                <input type="checkbox" id="archived-filter" checked={archived} onChange={(event) => setView((now) => ({ ...now, archived: event.target.checked }))} /> {FILTER_LABELS.archived}
               </label>
               <button
                 type="button"
@@ -216,9 +226,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               ))}
             </ul>
           ) : null}
-          {shown.totalCount === 0 ? <p className="board-empty">チケットなし</p> : null}
+          {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
+          {shown.totalCount === 0 && !(archived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
           <div className="board">
-            {shown.columns.map((column) => (
+            {/* アーカイブの列は「アーカイブ済みのチケットを表示する」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
+            {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
               <Column
                 key={column.state}
                 column={column}
@@ -402,7 +414,7 @@ function Column({
       ) : (
         <ul className="cards">
           {column.cards.map((card) => (
-            <CardItem key={card.id} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
+            <CardItem key={`${card.project}/${card.id}`} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
           ))}
         </ul>
       )}

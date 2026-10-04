@@ -1,13 +1,15 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は 未着手 / 作業中 / 完了 / 取り消し。置き場との対応は、未着手 = `wip/proposals/todo/`、
+ * 列は 未着手 / 作業中 / 完了 / 取り消し / アーカイブ。置き場との対応は、未着手 = `wip/proposals/todo/`、
  * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの属性で言う）、
- * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの。承認済みチケット・マーカー・
+ * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの、アーカイブ = 手元の退避
+ * （`logs/archive/`。JSON の `archived` の欄。既定では画面が隠す）。承認済みチケット・マーカー・
  * レビュー待ち・ワークツリーはカードのバッジで出す。止まっているかや承認待ちの判断はここでやり直さない。JSON が
  * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
 import type {
+  ArchivedTicketJson,
   BoardJson,
   CopyStatus,
   FlowJson,
@@ -32,6 +34,7 @@ export const COLUMNS: readonly ColumnDef[] = [
   { state: "doing", label: "作業中" },
   { state: "done", label: "完了" },
   { state: "cancelled", label: "取り消し" },
+  { state: "archived", label: "アーカイブ" },
 ];
 
 /**
@@ -158,11 +161,16 @@ export interface Board {
   readonly projects: readonly string[];
   /** 親の絞り込みの候補。識別子順 */
   readonly parents: readonly ParentOption[];
+  /** 退避した親（アーカイブの列の親）。アーカイブを表示しているときだけ、親の絞り込みの候補に足す */
+  readonly archivedParents: readonly ParentOption[];
   readonly problems: readonly string[];
   readonly pendingApproval: readonly string[];
+  /** 置き場のカードの数（アーカイブは数えない） */
   readonly totalCount: number;
   readonly remainingCount: number;
   readonly issueCount: number;
+  /** アーカイブのカードの数 */
+  readonly archivedCount: number;
   readonly generatedAt: string;
   readonly root: string;
 }
@@ -173,7 +181,12 @@ export function buildBoard(json: BoardJson): Board {
   const parents = new Map<string, ParentJson>(json.parents.map((p) => [p.ticket, p]));
   const ids = new Set(json.tickets.map((t) => t.ticket));
   const pending = new Set(json.pending_approval);
-  const cards = json.tickets.map((t) => toCard(t, parents, ids, pending));
+  const live = json.tickets.map((t) => toCard(t, parents, ids, pending));
+  // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が本物）
+  // 鍵はプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
+  const liveKeys = new Set(json.tickets.map((t) => `${t.project}\u0000${t.ticket}`));
+  const archived = (json.archived ?? []).filter((a) => !liveKeys.has(`${a.project}\u0000${a.ticket}`)).map(toArchivedCard);
+  const cards = [...live, ...archived];
   cards.sort(compareCards);
 
   const columns: BoardColumn[] = COLUMNS.map((column) => {
@@ -183,12 +196,15 @@ export function buildBoard(json: BoardJson): Board {
   return {
     columns,
     projects: json.projects,
-    parents: cards.filter((card) => card.isParent).map((card) => ({ id: card.id, title: card.title })),
+    parents: cards.filter((card) => card.isParent && card.column !== "archived").map((card) => ({ id: card.id, title: card.title })),
+    archivedParents: cards.filter((card) => card.isParent && card.column === "archived").map((card) => ({ id: card.id, title: card.title })),
     problems: json.problems,
     pendingApproval: json.pending_approval,
-    totalCount: cards.length,
-    remainingCount: cards.filter((card) => REMAINING.includes(card.column)).length,
-    issueCount: cards.filter((card) => card.issues.length > 0).length,
+    // 集計は置き場のカードだけ。アーカイブは既定で隠すので、数に入れると見えないものを数えることになる
+    totalCount: live.length,
+    remainingCount: live.filter((card) => REMAINING.includes(card.column)).length,
+    issueCount: live.filter((card) => card.issues.length > 0).length,
+    archivedCount: archived.length,
     generatedAt: json.generated_at,
     root: json.root,
   };
@@ -296,6 +312,59 @@ function toCard(
     flow: isParent ? null : flowOf(t.flow, column),
     history: t.history,
     predecessorsUnmet: t.predecessors_unmet,
+  };
+}
+
+/**
+ * 手元の退避にある閉じたチケットのカード。表示するだけで、操作も要対応も持たない。
+ * 選ぶと退避したファイルを開く（`isKnownPath` は列のカードの `openPath` を見るので、そのまま開ける）
+ */
+function toArchivedCard(a: ArchivedTicketJson): Card {
+  const isParent = a.parent === "";
+  return {
+    id: a.ticket,
+    title: a.title,
+    parent: a.parent,
+    phase: a.phase,
+    project: a.project,
+    isParent,
+    column: "archived",
+    proposalState: null,
+    proposalTree: "",
+    family: isParent ? a.ticket : a.parent,
+    openPath: a.path,
+    copyStatus: "archived",
+    approvedAt: a.approved_at,
+    reviewRequired: false,
+    reviewReason: "",
+    worktreeExists: false,
+    worktreePath: "",
+    baseSha: "",
+    startedAt: a.started_at,
+    completedAt: a.completed_at,
+    cancelledAt: a.cancelled_at,
+    cancelReason: a.cancel_reason,
+    riskLevel: "",
+    riskPoints: null,
+    seenIn: [],
+    scattered: [],
+    marks: [],
+    gateClosed: false,
+    reviewWaiting: false,
+    pendingApproval: false,
+    stage: "",
+    wrapped: false,
+    ready: false,
+    phases: [],
+    actions: [],
+    issues: [],
+    blocked: "",
+    mrUrl: "",
+    mrNumber: null,
+    attention: false,
+    flow: null,
+    history: a.history,
+    predecessorsUnmet: [],
   };
 }
 

@@ -48,7 +48,7 @@ from dataclasses import dataclass, field, replace
 
 from ..infra import fsio, settings, tree
 from ..policy import rules
-from . import flow, history, syncstate, workflow
+from . import archive, flow, history, syncstate, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -285,6 +285,7 @@ def scan(
         notes = raw.closed_notes if closed else raw.open_notes
         kept = _authoritative(found, raw.everything)
         if not closed:
+            kept = archive.drop_archived(root, kept)
             mark_blocked(conf, kept)
             mark_imported(conf, root, kept)
         return kept, list(notes)
@@ -297,6 +298,9 @@ def scan(
         everything = _everything(conf, root, open_all=found)
     kept = _authoritative(found, everything)
     if not closed:
+        # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古い写しは
+        # 作業中に戻さない（archive.drop_archived）。
+        kept = archive.drop_archived(root, kept)
         # 判定が読むのは作業中の側だけ。閉じたものに理由は要らない。
         mark_blocked(conf, kept)
         mark_imported(conf, root, kept)
@@ -308,11 +312,11 @@ def scan_review(
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """レビュー待ちのチケット。本物とするツリーの側だけを残す（`scan` と同じ規則）。"""
     if raw is not None:
-        kept = _authoritative(raw.review, raw.everything)
+        kept = archive.drop_archived(root, _authoritative(raw.review, raw.everything))
         mark_imported(conf, root, kept)
         return kept, list(raw.review_notes)
     found, notes = review_all(conf, root)
-    kept = _authoritative(found, _everything(conf, root, review=found))
+    kept = archive.drop_archived(root, _authoritative(found, _everything(conf, root, review=found)))
     mark_imported(conf, root, kept)
     return kept, notes
 
@@ -627,7 +631,21 @@ def integration_problems(
     取り込み結果が壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
     承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
     （今のまま）。
+
+    手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある識別子も、閉じた
+    識別子として数える。統合先には閉じたチケットを残さないので、手元ではここが閉じた記録になる
+    （別の機械では見えない）。退避は取り込み状態の有無に依らず見る。退避との比べは大文字小文字を
+    区別しない（区別しないファイルシステムでは、ブランチとワークツリーの名前がぶつかるため）。
     """
+    if any(archive.same_id(t.ticket, i) for i in archive.ids(root, t.project)):
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"{t.ticket} は手元の退避（{archive.ARCHIVE_DIR.replace(os.sep, '/')}/）で"
+                "閉じている。閉じた識別子を新規に承認しない。識別子を変えて出し直してください",
+            )
+        ]
     fams = fams or syncstate.Families(conf, root)
     if not fams.active:
         return []
@@ -662,15 +680,21 @@ def integration_problems(
 def integration_closed(
     conf: settings.Settings, root: str, proposals: list[ticket_mod.Ticket]
 ) -> set[str]:
-    """統合先の取り込み結果の `done/` に同じ識別子がある新規の提案（閉じた識別子の再利用）。"""
+    """統合先の取り込み結果の `done/` か手元の退避に同じ識別子がある新規の提案。
+
+    閉じた識別子の再利用を見つける。
+    """
     fams = syncstate.Families(conf, root)
-    if not fams.active:
-        return set()
-    return {
-        t.ticket
-        for t in proposals
-        if t.state == ticket_mod.TODO and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
-    }
+    archived: dict[str, set[str]] = {}
+
+    def closed(t: ticket_mod.Ticket) -> bool:
+        if t.project not in archived:
+            archived[t.project] = archive.ids(root, t.project)
+        if any(archive.same_id(t.ticket, i) for i in archived[t.project]):
+            return True
+        return fams.active and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
+
+    return {t.ticket for t in proposals if t.state == ticket_mod.TODO and closed(t)}
 
 
 def _everything(
@@ -993,16 +1017,32 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: 
 
     連番はフェーズごとに 1 から数える（`<親>-<フェーズ番号>-<連番>`）。フェーズ番号か連番が
     2 桁に収まらなければ識別子を組めないので ValueError（呼び手は何も書かずに止まる）。
+
+    手元の退避（`logs/archive/`）にある子も数える（閉じた子の連番を使い回さない）。退避の子は
+    親の識別子を大文字小文字を区別せずに比べる（`integration_problems` と同じ見方）。
     """
     top = ticket_mod.MAX_CHILD_NUMBER
     if not 0 <= phase_no <= top:
         raise ValueError(f"フェーズ {phase_no} は子の識別子に書けない（フェーズ番号は 0〜{top}）")
     seen = _everything(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    # 退避は親のリポジトリ（プロジェクト）のものだけを見る。親が置き場に無ければ全部を見る。
+    projects = {t.project for t in seen + proposals if t.ticket == parent_id}
+    archived: set[str] = set()
+    for project in sorted(projects) if projects else [None]:
+        archived |= archive.ids(root, project)
     used = 0
     for t in seen + proposals:
         m = ticket_mod.child_pattern().match(t.ticket)
         if m and m.group("parent") == parent_id and int(m.group("phase")) == phase_no:
+            used = max(used, int(m.group("seq")))
+    for ident in sorted(archived):
+        m = ticket_mod.child_pattern().match(ident)
+        if (
+            m
+            and archive.same_id(m.group("parent"), parent_id)
+            and int(m.group("phase")) == phase_no
+        ):
             used = max(used, int(m.group("seq")))
     if used >= top:
         raise ValueError(
@@ -1188,17 +1228,33 @@ def predecessor_pool_of(
     review: list[ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
     proposals: list[ticket_mod.Ticket],
+    root: str = "",
 ) -> dict[str, list[ticket_mod.Ticket]]:
     """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops._places` と同じ集め方）。
 
     承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
     残れば、どれが本物か決まらない。
+
+    `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
+    `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
+    引くのは並びのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
     """
     pool = _by_id(open_copies + review + closed)
     for t in proposals:
         if t.state == ticket_mod.TODO and t.ticket not in pool:
             pool.setdefault(t.ticket, []).append(t)
+    if root:
+        # 引くのは、その先行を書いたチケットと同じリポジトリ（プロジェクト）の退避だけ。
+        wanted: dict[str, set[str]] = {}
+        for t in open_copies + review + closed + proposals:
+            for ident in t.predecessors:
+                if ident not in pool:
+                    wanted.setdefault(ident, set()).add(t.project)
+        for ident in sorted(wanted):
+            found = [h for p in sorted(wanted[ident]) for h in archive.find(root, ident, p)]
+            if found:
+                pool[ident] = found
     return pool
 
 
@@ -1208,7 +1264,7 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
     review, _ = scan_review(conf, root)
     closed, _ = scan(conf, root, closed=True)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    pool = predecessor_pool_of(open_copies, review, closed, proposals)
+    pool = predecessor_pool_of(open_copies, review, closed, proposals, root)
     align_imported(conf, root, pool)
     return pool
 
@@ -1238,6 +1294,9 @@ def align_imported(
         return
     for ident, hits in list(pool.items()):
         if not hits:
+            continue
+        # 手元の退避から引いた先行は閉じたもの。親のブランチの写しでは読み直さない。
+        if all(archive.is_archived_path(root, h.path) for h in hits):
             continue
         st = family_standing(conf, root, hits[0], fams)
         if not st.imported or st.closed:

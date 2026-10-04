@@ -527,8 +527,9 @@ ccnavi_integration() {
 # そのツリーが、名前の親子のチケットの親のワークツリーか。<ツリー> <名前>
 #
 # 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親チケットか提案が
-# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。子チケット（`parent:` を持つ）は
-# 数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして扱わない（ブランチに乗らないので、親のブランチで共有できない）。
+# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。ready が退避した後は、手元の退避の親チケットも見る。
+# 子チケット（`parent:` を持つ）は数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして
+# 扱わない（ブランチに乗らないので、親のブランチで共有できない）。
 ccnavi_parent_tree() {
 	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
@@ -548,7 +549,26 @@ ccnavi_parent_tree() {
 			sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
 		[ "$ccnavi_pt_id" = "$2" ] && return 0
 	done
-	return 1
+	# ready の後は、親子のチケットは手元の退避（<ワークスペース>/logs/archive/<リポジトリ>/done/）へ
+	# 移り、ツリーには残らない。そこに親（`parent:` を持たない）が在れば、まだ親のワークツリーとして扱う
+	# （Draft を外し損ねた ready の打ち直し・取り込み・早送りのため）。ワークスペースは
+	# `.claude/worktrees/<名前>` の 2 つ上。途中にリンクがあれば信じない。
+	case "$1" in
+	*/.claude/worktrees/*) ccnavi_pt_ws="${1%/.claude/worktrees/*}" ;;
+	*) return 1 ;;
+	esac
+	ccnavi_pt_key=$(ccnavi_repo_key "$1" "$ccnavi_pt_ws")
+	ccnavi_pt_file="$ccnavi_pt_ws/logs"
+	for ccnavi_pt_part in archive "$ccnavi_pt_key" done "$2.md"; do
+		[ -L "$ccnavi_pt_file" ] && return 1
+		ccnavi_pt_file="$ccnavi_pt_file/$ccnavi_pt_part"
+	done
+	[ -L "$ccnavi_pt_file" ] && return 1
+	[ -f "$ccnavi_pt_file" ] || return 1
+	grep -q '^parent:' "$ccnavi_pt_file" 2>/dev/null && return 1
+	ccnavi_pt_id=$(sed -n 's/^ticket:[[:space:]]*//p' "$ccnavi_pt_file" 2>/dev/null | head -n 1 |
+		sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
+	[ "$ccnavi_pt_id" = "$2" ]
 }
 
 # ロック。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
