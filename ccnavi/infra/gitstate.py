@@ -168,6 +168,35 @@ def head(top: str, timeout: float = TIMEOUT_SECONDS) -> str:
     return done.out.strip() if done.ok else ""
 
 
+def branch_names(top: str, timeout: float = TIMEOUT_SECONDS) -> set[str]:
+    """手元のブランチと origin のブランチの名前。
+
+    `refs/heads/` と `refs/remotes/origin/` を外した表記で返す。
+
+    新規の提案の親のブランチ名が既にあるかを確かめるのに使う。refname は
+    `core.quotePath` の引用を受けないので、日本語の名前もそのまま返る。読めなければ空。
+    `origin/HEAD`（デフォルトブランチを指す別名）は数えない。
+    """
+    if not top or not os.path.isdir(top):
+        return set()
+    done = gitcmd.run(
+        top,
+        ["for-each-ref", "--format=%(refname)", "refs/heads/", "refs/remotes/origin/"],
+        timeout,
+    )
+    if not done.ok:
+        return set()
+    names: set[str] = set()
+    for line in done.out.splitlines():
+        for prefix in ("refs/heads/", "refs/remotes/origin/"):
+            if line.startswith(prefix):
+                name = line[len(prefix) :]
+                if name and not (prefix == "refs/remotes/origin/" and name == "HEAD"):
+                    names.add(name)
+                break
+    return names
+
+
 def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]:
     """`base..HEAD` でコミットに入ったパス。読めなければ理由を返す。
 

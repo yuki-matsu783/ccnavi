@@ -5,7 +5,8 @@
 `ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
 ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
 
-- `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象か
+- `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象かと、親のブランチ名
+  （`branch`。親チケットの `branch:`、無ければ識別子）
   - 対象は、置き場のパスが相対で、取り込み状態があり（取り込み済み）、
     chat だけの親子のチケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い
     など）の無い親子のチケット
@@ -17,7 +18,10 @@
     コミットに入った変更（取り込みの後に未送信を確かめる分）
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
     `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの履歴（`events/<親>.ndjson` の
-    `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない
+    `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない。
+    もう 1 つは `ready` の退避（archive.py）が消したもの。ready のマーカー
+    （`logs/archive/<リポジトリ>/ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
+    退避したコピーと同じもの（履歴は「退避した」の行だけを足したもの）だけ
   - (c) ユーザがコミットするもの（ユーザの判断）。C1 はコミットせずに止める。
     ユーザの判断が一緒に書く
     移動（review/ から done/、doing/ から done/）とマーカーの消去、履歴の追記もここ
@@ -40,7 +44,7 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
-from ..tickets import approval, history, phase, syncstate
+from ..tickets import approval, archive, history, phase, syncstate
 from ..tickets import ticket as ticket_mod
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
@@ -77,7 +81,7 @@ _TIMEOUT = 20.0
 def family_of(ident: str) -> str:
     """識別子が属する親子のチケットの親。
 
-    子の形（`<親>-<2 桁>`）なら親、そうでなければ自身。
+    子の形（`<親>-<2 桁>-<2 桁>`）なら右から 2 段を剥がした親、そうでなければ自身。
     """
     matched = ticket_mod.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
@@ -124,6 +128,20 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     places = _relative_places(conf)
     verdict, why, st = target(conf, root, parent)
     lines.append(("repo", st.repo))
+    # 親のブランチ名。sh は識別子からブランチ名を組み立てず、これを使う
+    # （ref・fetch・push・ls-remote・取り込み状態の `branch`）。名前は承認済みの親チケットの
+    # `branch:` だけから引き（提案の `branch:` は使わない）、`ticket.branch_problem` と統合先の
+    # 名前を通らなければ `branch` の行を出さずに `branch_refused` で理由を言う（sh はその親子の
+    # チケットを識別子の外へ動かさずに止める）。
+    fams = syncstate.Families(conf, root)
+    branch = st.branch or fams.branch_any(parent)
+    refused = fams.branch_refusal(parent, branch, _project_guess(fams, parent, st))
+    if refused:
+        lines.append(("branch_refused", refused))
+        if verdict == TARGET_YES:
+            verdict, why = TARGET_STOP, refused
+    else:
+        lines.append(("branch", branch))
     if places is not None:
         lines += [("approved", places[0]), ("review", places[1])]
     lines.append(("target", verdict))
@@ -141,6 +159,14 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     if verdict == TARGET_YES and st.home is not None:
         stdout.write(f"tree {st.home.root}\n")
     return 0
+
+
+def _project_guess(fams: syncstate.Families, parent: str, st: syncstate.Standing) -> str:
+    """親子のチケットのリポジトリ（プロジェクトの名前。ワークスペース自身なら空）の見当。"""
+    if st.imported:
+        return syncstate.project_of_key(st.repo)
+    named = [w for w in fams.worktrees() if w.name == parent]
+    return named[0].project if len(named) == 1 else ""
 
 
 def _chat_only(conf: settings.Settings, root: str, parent: str) -> bool:
@@ -170,7 +196,8 @@ def sort(
         stderr.write(f"ccnavi: c1 sort: {why}\n")
         return 1
     stdout.write(HEAD + "\n")
-    for kind, rel, why in classify_all(tree_root, places, parent, changed, since):
+    archive_at = (root, syncstate.project_of_key(st.repo))
+    for kind, rel, why in classify_all(tree_root, places, parent, changed, since, archive_at):
         stdout.write(f"{kind} {rel}\n")
         if why:
             stdout.write(f"why {rel} {' '.join(why.split())}\n")
@@ -211,11 +238,21 @@ def classify_all(
     parent: str,
     changed: list[str],
     since: str = "",
+    archive_at: tuple[str, str] | None = None,
 ) -> list[tuple[str, str, str]]:
     """変更のリストを分ける。答えは `(分け, パス, 理由)`。`since` が無ければ未コミット（今の中身と
     HEAD）、あれば HEAD と `since`。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。
+
+    `archive_at` は `(ワークスペースルート, プロジェクト)`。渡せば、ready がこのツリーから退避した
+    削除を (b) にする（`archived_removal`）。None なら (b) にしない。
     """
     approved_rel, review_rel = places
+    ready: set[str] = set()
+    if archive_at is not None:
+        # マーカーが効くのは、マーカーを書いたときの先頭と比べている版が同じ間だけ
+        # （未コミットなら HEAD、未送信の確かめなら `since`）。
+        head = archive.tree_head(tree_root, since or "HEAD")
+        ready = archive.ready_files(archive_at[0], archive_at[1], tree_root, head)
     states: dict[str, tuple[bytes | None, bytes | None, bool]] = {}
     for rel in changed:
         if since:
@@ -254,7 +291,14 @@ def classify_all(
             continue
         parts = inside.split("/")
         try:
-            if _hook_mark(parts, parent, now, before) or _hook_events(parts, parent, now, before):
+            if (
+                _hook_mark(parts, parent, now, before)
+                or _hook_events(parts, parent, now, before)
+                or (
+                    archive_at is not None
+                    and archived_removal(inside, now, before, ready, *archive_at)
+                )
+            ):
                 out.append((KIND_B, rel, ""))
             elif not since and _judge_record(parts):
                 out.append((KIND_KEEP, rel, ""))
@@ -354,6 +398,27 @@ def _hook_events(parts: list[str], parent: str, now: bytes | None, before: bytes
         and row.get("ticket") == parent
         for row in rows
     )
+
+
+def archived_removal(
+    rel: str,
+    now: bytes | None,
+    before: bytes | None,
+    ready: set[str],
+    root: str,
+    project: str,
+) -> bool:
+    """`ready` の退避が消したものか（archive.py）。`rel` は承認済みの領域からの相対。
+
+    ready のマーカー（`archive.ready_files`。そのツリーから ready が移したファイルの一覧）に
+    載っていて、
+    消えた中身が手元の退避したコピーと同じ（履歴は「退避した」の行だけを足したもの）ときだけ。
+    ready のマーカーは `logs/archive/` に置かれ、記録の保護がエージェントの書き込みを止める。
+    退避の置き場の途中（`logs` を含む）にリンクがあればコピーを読まない。
+    """
+    if now is not None or before is None or rel not in ready or not archive.in_ready_places(rel):
+        return False
+    return archive.holds(rel, archive.archived_bytes(root, project, rel), before)
 
 
 def _judge_record(parts: list[str]) -> bool:

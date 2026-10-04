@@ -400,8 +400,8 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
     assert.ok(dom.one("#changed").classList.contains("hidden"));
     await dom.send({ type: "changed" });
     assert.ok(!dom.one("#changed").classList.contains("hidden"));
-    await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
-    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
+    await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] } });
+    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "錠が掛かっていれば保存は押せない");
     await dom.send({ type: "failed", message: "--lint が error を報告した" });
     assert.equal(dom.one("#status").textContent, "--lint が error を報告した");
@@ -448,9 +448,9 @@ test("CB-T50 dry-run のときは止めないことを言い、enable と未設�
 });
 
 test("CB-T51 保存できない理由と読み込みの苦情を出す", async () => {
-  const locked = await openRules({ lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
+  const locked = await openRules({ lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] } });
   try {
-    assert.equal(locked.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
+    assert.equal(locked.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(!locked.one("#lock").classList.contains("hidden"));
   } finally {
     await locked.close();

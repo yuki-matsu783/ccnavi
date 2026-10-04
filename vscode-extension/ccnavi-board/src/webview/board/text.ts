@@ -6,7 +6,15 @@ import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 import type { HistoryEntryJson } from "../../core/model.js";
 
-export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ" } as const;
+export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ", archived: "アーカイブ済み" } as const;
+
+/** ツールバーの絞り込みのチェックボックスの言葉 */
+export const FILTER_LABELS = {
+  attention: "要対応のみ",
+  attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
+  archived: "アーカイブ済みのチケットを表示する",
+  archivedTitle: "Draft を外したとき（ccnavi-review.sh ready）に手元の logs/archive/ へ退避した、閉じたチケットを「アーカイブ」の列に表示します。既定では隠します",
+} as const;
 
 export const MARK_LABELS: Readonly<Record<string, string>> = {
   pending: "エージェントに終了を通知済み",
@@ -160,6 +168,7 @@ const PLACE_LABELS: Readonly<Record<string, string>> = {
   doing: "作業中",
   review: "レビュー待ち",
   done: "完了",
+  archive: "アーカイブ",
 };
 
 /** 履歴の種類の呼び名。知らない種類は表記のまま出す */
@@ -172,6 +181,7 @@ const HISTORY_KIND_LABELS: Readonly<Record<string, string>> = {
   cancelled: "取り消し",
   settled: "レビュー済みで閉じた",
   withdrawn: "承認の取り下げ",
+  archived: "アーカイブへ退避",
   "phase-reopened": "マーカーを消した（子が足された）",
 };
 

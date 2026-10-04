@@ -54,6 +54,7 @@ from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets import (
     agree,
     approval,
+    archive,
     configsync,
     flow,
     history,
@@ -644,7 +645,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
     approval.align_imported(conf, root, preds)
     # 統合先の done/ で閉じた識別子も閉じたものに数える（開いた親子のチケットでも統合先の
     # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
@@ -660,8 +661,11 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             closed,
             review,
             conf.integration_branch or settings.integration_recorded(conf.state),
+            conf.branch_prefixes,
         )
     )
+    problems.extend(_prefix_setting_problems(conf))
+    problems.extend(_existing_branch_problems(root, conf, proposals, copies, closed, review))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -955,7 +959,12 @@ def _closed_todo_text(ticket_id: str, rel: str) -> str:
 
 
 def _branch_name_problems(
-    proposals: list, copies: list, closed: list, review: list, integration: str = ""
+    proposals: list,
+    copies: list,
+    closed: list,
+    review: list,
+    integration: str = "",
+    prefixes=settings.DEFAULT_BRANCH_PREFIXES,
 ) -> list[Problem]:
     """識別子を親のブランチ名にできるか（warn だけ。拒否は `ccnavi-git.sh` が受け持つ）。
 
@@ -965,7 +974,9 @@ def _branch_name_problems(
       （`ticket.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
     - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
       ブランチもワークツリーも同じ名前になる
-    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。親子のチケットを引くとき、別の親の子と読まれる
+    - 末尾が `-<2 桁>` の親の識別子。`-<2 桁>-<2 桁>` で終われば子の形（`<親>-<フェーズ>-<連番>`）に
+      当たり、親子のチケットを引くとき別の親の子と読まれる。`-<2 桁>` だけでも、別の親の子の識別子の
+      途中（`<親>-<フェーズ>`）と紛れる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
     `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
@@ -974,15 +985,19 @@ def _branch_name_problems(
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
     settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
+    serial = ticket_mod.next_serial([t.ticket for t in everyone], prefixes)
     said: set[str] = set()
+    fresh: list = []
     for t in proposals:
         if t.state != ticket_mod.TODO or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
-        for text in ticket_mod.branch_name_problems(t, integration):
+        fresh.append(t)
+        for text in ticket_mod.branch_name_problems(t, integration, serial, prefixes):
             problems.append(
                 Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（親のブランチ名の規則）")
             )
+    problems.extend(_number_problems(everyone, fresh, prefixes, serial))
 
     spellings: dict[str, set[str]] = {}
     for t in everyone:
@@ -1000,21 +1015,97 @@ def _branch_name_problems(
             )
 
     child = ticket_mod.child_pattern()
+    tail = ticket_mod.child_tail_pattern()
     parents = sorted({t.ticket for t in everyone if not t.is_child})
     for name in parents:
-        matched = child.match(name)
-        if matched is None:
+        if tail.search(name) is None:
             continue
+        matched = child.match(name)
+        if matched is not None:
+            said_how = (
+                f"識別子が子の形（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）と一致する。"
+                f"親子のチケットをまとめるとき {matched.group('parent')} の子として扱われる"
+            )
+        else:
+            said_how = (
+                "識別子の末尾が `-<2 桁>` で、別の親の子の識別子の途中"
+                "（`<親>-<2 桁のフェーズ番号>`）と紛れる"
+            )
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{name} は親なのに、識別子が子の形（`<親>-<2 桁>`）と一致する。"
-                f"親子のチケットをまとめるとき {matched.group('parent')} の子として扱われる。"
+                f"{name} は親なのに、{said_how}。"
                 "親の識別子の末尾を `-<2 桁>` にしないでください（親のブランチ名の規則）",
             )
         )
     return problems
+
+
+def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list[Problem]:
+    """新規の提案の親の識別子の番号が、同じリポジトリの別の親と重なるか（warn）。
+
+    番号は issue の番号か ccnavi の通し番号で、両方が同じ数になりうる。issue の番号はリポジトリ
+    ごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。前の形（`i0055`）の番号も数える。
+    """
+    problems: list[Problem] = []
+    owners: dict[tuple[str, int], set[str]] = {}
+    for t in everyone:
+        if t.is_child:
+            continue
+        number = ticket_mod.identifier_number(t.ticket, prefixes)
+        if number is not None:
+            owners.setdefault((t.project, number), set()).add(t.ticket)
+    for t in fresh:
+        if t.is_child:
+            continue
+        number = ticket_mod.identifier_number(t.ticket, prefixes)
+        if number is None:
+            continue
+        others = sorted(owners.get((t.project, number), set()) - {t.ticket})
+        if others:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket}: 識別子の番号 {number} が {', '.join(others)} と重なる。"
+                    "issue の番号と通し番号が同じ数になっていないか確かめる。"
+                    f"issue が無いなら次の通し番号は {serial}（親のブランチ名の規則）",
+                )
+            )
+    return problems
+
+
+def _prefix_setting_problems(conf: settings.Settings) -> list[Problem]:
+    """`CCNAVI_BRANCH_PREFIXES` に書かれた、先頭の語に使えない語（warn）。"""
+    if not conf.branch_prefixes_rejected:
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            "(settings)",
+            f"{settings.BRANCH_PREFIXES_ENV} の {', '.join(conf.branch_prefixes_rejected)} は"
+            "先頭の語に使えないので読まない（英小文字で始まる英小文字と数字。main・master・"
+            "develop・release は使えない）。"
+            f"使うリストは {', '.join(conf.branch_prefixes)}（親のブランチ名の規則）",
+        )
+    ]
+
+
+def _existing_branch_problems(
+    root: str, conf: settings.Settings, proposals: list, copies: list, closed: list, review: list
+) -> list[Problem]:
+    """新規の提案（親）のブランチ名が、そのリポジトリの手元か origin に既にあるか（warn）。
+
+    親のブランチ名は識別子そのもの。既にあるブランチと同じ名前で承認すると、別の作業のブランチを
+    親のブランチとして取り込み・送ることになる。止めはせず、承認の前に名指しする。
+    提案がそのブランチの上で書かれている（`.claude/worktrees/<識別子>` がそのブランチを
+    チェックアウトしていて、提案がその中にある）ときは、そのブランチが親のブランチなので言わない。
+    """
+    return [
+        Problem(SEVERITY_WARN, "(ticket)", f"{text}（親のブランチ名の規則）")
+        for text in agree.existing_branch_warnings(root, conf, proposals, copies, closed, review)
+    ]
 
 
 def _worktree_problems(
@@ -1242,31 +1333,40 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem]:
-    """名前が親の識別子なのに、HEAD が別のブランチを指す親のワークツリー（移行の検査）。"""
+    """名前が親の識別子なのに、HEAD が親のブランチ（`branch:`、無ければ識別子）でないブランチを
+    指す親のワークツリー（移行の検査）。"""
     problems: list[Problem] = []
+    fams = syncstate.Families(conf, root)
     for work in tree.worktrees(root, conf.projects):
-        if not _holds_parent(conf, work):
+        if not _holds_parent(conf, work, root):
             continue
         branch = tree.branch_of(work.root)
-        if branch == work.name:
+        want = fams.branch(work.name, work.project)
+        if branch == want:
             continue
+        named = (
+            f"親のブランチの名前は識別子（{work.name}）と同じ"
+            if want == work.name
+            else f"親のブランチは親チケットの branch: の {want}"
+        )
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                 f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
-                f"親のブランチの名前は識別子（{work.name}）と同じで、取り込み（ccnavi-sync.sh）と"
-                "本物とする側の検査は同じ名前のブランチだけを見る。"
+                f"{named}で、取り込み（ccnavi-sync.sh）と"
+                "本物とする側の検査はそのブランチだけを見る。"
                 "親が閉じるのを待ってから、ブランチを切り替えてください",
             )
         )
     return problems
 
 
-def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
+def _holds_parent(conf: settings.Settings, work: tree.Tree, root: str = "") -> bool:
     """そのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか。
 
-    sh の `ccnavi_parent_tree` と同じ見方。
+    sh の `ccnavi_parent_tree` と同じ見方。ready の後はツリーから親が消えて手元の退避
+    （`logs/archive/<リポジトリ>/done/`）へ移るので、そこに親が在っても親のワークツリーとして扱う。
     """
     approved = settings.approved_dir(conf, work.root)
     proposals = os.path.join(work.root, conf.tickets.replace("/", os.sep))
@@ -1281,7 +1381,8 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
         t, _ = ticket_mod.load(path)
         if t is not None and t.ticket == work.name and not t.parent:
             return True
-    return False
+    held = archive.archived_fields(root, work.project, work.name) if root else None
+    return held is not None and held.ticket == work.name and not held.parent
 
 
 def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]]:

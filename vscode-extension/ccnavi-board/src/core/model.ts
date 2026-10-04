@@ -10,15 +10,17 @@ export const BOARD_VERSION = 1;
 /**
  * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
  * 列は 未着手（`todo/`）/ 作業中（`approved/doing/` と `review/`）/ 完了（`approved/done/`）/ 取り消し
- * （`approved/done/` で `cancelled_at` を持つ）の 4 つ。レビュー待ちは列ではなくカードの属性で分かる
+ * （`approved/done/` で `cancelled_at` を持つ）の 4 つ。レビュー待ちは列ではなくカードの属性で分かる。
+ * 5 つめのアーカイブは置き場ではなく、手元の退避（`logs/archive/`。`ccnavi-review.sh ready` が閉じた
+ * 親子のチケットを移した先）にあるもの。表示するだけで、既定では隠す
  */
-export type ProposalState = "todo" | "doing" | "done" | "cancelled";
+export type ProposalState = "todo" | "doing" | "done" | "cancelled" | "archived";
 /**
- * 承認済みチケットの今。`open` は `.ccnavi/approved/doing/`、`review` は `wip/proposals/review/`（承認済みのまま
+ * 承認済みチケットの今。`archived` は手元の退避（`logs/archive/`）にだけあるもの（JSON の `archived` の欄から組む）。`open` は `.ccnavi/approved/doing/`、`review` は `wip/proposals/review/`（承認済みのまま
  * ユーザのレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は
  * 承認待ちの提案だけ
  */
-export type CopyStatus = "open" | "review" | "closed" | "none";
+export type CopyStatus = "open" | "review" | "closed" | "none" | "archived";
 export type PhaseState = "planned" | "active" | "ended";
 export type TreeKind = "main" | "project" | "worktree";
 
@@ -158,6 +160,26 @@ export interface TicketJson {
   readonly history: readonly HistoryEntryJson[];
 }
 
+/**
+ * 手元の退避（`logs/archive/`）にある閉じたチケット 1 件。表示のためだけの欄で、実行ファイルは判定に混ぜない。
+ * 置き場（`tickets`）に同じ識別子があるものは、実行ファイルがここに出さない
+ */
+export interface ArchivedTicketJson {
+  readonly ticket: string;
+  readonly parent: string;
+  readonly phase: number | null;
+  readonly title: string;
+  readonly project: string;
+  /** 退避したファイルの絶対パス（`<ワークスペース>/logs/archive/<リポジトリ>/done/<識別子>.md`） */
+  readonly path: string;
+  readonly approved_at: string;
+  readonly started_at: string;
+  readonly completed_at: string;
+  readonly cancelled_at: string;
+  readonly cancel_reason: string;
+  readonly history: readonly HistoryEntryJson[];
+}
+
 export interface PhaseJson {
   readonly number: number;
   readonly type: string;
@@ -230,6 +252,8 @@ export interface BoardJson {
   readonly pending_approval: readonly string[];
   readonly tickets: readonly TicketJson[];
   readonly parents: readonly ParentJson[];
+  /** 手元の退避にある閉じたチケット（表示用）。任意の欄で、この欄を出さない古い実行ファイルでは空か無し */
+  readonly archived?: readonly ArchivedTicketJson[];
 }
 
 export type ParseResult =
@@ -277,6 +301,7 @@ export function parseBoardJson(text: string): ParseResult {
       pending_approval: list(raw.pending_approval).map(str),
       tickets: list(raw.tickets).filter(isRecord).map(ticket),
       parents: list(raw.parents).filter(isRecord).map(parent),
+      archived: list(raw.archived).filter(isRecord).map(archived),
     },
   };
 }
@@ -339,6 +364,23 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     risk: isRecord(raw.risk) ? raw.risk : null,
     judge: isRecord(raw.judge) ? raw.judge : null,
     flow: isRecord(raw.flow) ? flow(raw.flow) : null,
+    history: list(raw.history).filter(isRecord).map(historyEntry),
+  };
+}
+
+function archived(raw: Record<string, unknown>): ArchivedTicketJson {
+  return {
+    ticket: str(raw.ticket),
+    parent: str(raw.parent),
+    phase: num(raw.phase),
+    title: str(raw.title),
+    project: str(raw.project),
+    path: str(raw.path),
+    approved_at: str(raw.approved_at),
+    started_at: str(raw.started_at),
+    completed_at: str(raw.completed_at),
+    cancelled_at: str(raw.cancelled_at),
+    cancel_reason: str(raw.cancel_reason),
     history: list(raw.history).filter(isRecord).map(historyEntry),
   };
 }

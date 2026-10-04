@@ -130,20 +130,20 @@ test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（
 });
 
 test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そのまま読み直せて注意が出ない", () => {
-  const doc = templateFlow("i0001-01", "調査");
+  const doc = templateFlow("i0001-01-01", "調査");
   assert.deepEqual(
     doc.nodes.map((node) => node.type),
     ["start", "end"],
   );
-  assert.equal(doc.id, "i0001-01-flow");
-  assert.equal(doc.name, "i0001-01 調査");
+  assert.equal(doc.id, "i0001-01-01-flow");
+  assert.equal(doc.name, "i0001-01-01 調査");
   assert.deepEqual(connectionsOf(doc), [{ id: "c-start-end", from: "start", to: "end", fromPort: "output", toPort: "input" }]);
   const read = parseFlow(serializeFlow(doc));
   assert.ok(read.ok);
   assert.deepEqual(read.doc, doc);
   assert.deepEqual(flowNotices(doc), []);
   // 題が空なら名前は識別子だけ
-  assert.equal(templateFlow("i0002-01", "").name, "i0002-01");
+  assert.equal(templateFlow("i0002-01-01", "").name, "i0002-01-01");
 });
 
 test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {

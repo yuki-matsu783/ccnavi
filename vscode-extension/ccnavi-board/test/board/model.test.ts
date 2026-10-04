@@ -8,7 +8,7 @@ test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", (
   assert.equal(board.version, BOARD_VERSION);
   assert.deepEqual(
     board.tickets.map((t) => t.ticket),
-    ["i0001", "i0001-01", "i0001-02", "i0001-03", "i0001-04", "i0001-05"],
+    ["i0001", "i0001-01-01", "i0001-02-02", "i0001-02-03", "i0001-02-04", "i0001-02-05"],
   );
   assert.equal(board.settings.approved, ".ccnavi/approved");
   const by = new Map(board.tickets.map((t) => [t.ticket, t]));
@@ -17,16 +17,16 @@ test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", (
     board.tickets.map((t) => [t.ticket, t.proposal?.state ?? null, t.copy.status]),
     [
       ["i0001", null, "open"],
-      ["i0001-01", null, "closed"],
-      ["i0001-02", null, "open"],
-      ["i0001-03", "todo", "none"],
-      ["i0001-04", "review", "review"],
-      ["i0001-05", null, "closed"],
+      ["i0001-01-01", null, "closed"],
+      ["i0001-02-02", null, "open"],
+      ["i0001-02-03", "todo", "none"],
+      ["i0001-02-04", "review", "review"],
+      ["i0001-02-05", null, "closed"],
     ],
   );
-  assert.notEqual(by.get("i0001-05")!.cancelled_at, "");
-  assert.deepEqual(board.parents[0].phases[1].states, { "i0001-02": "doing", "i0001-04": "review", "i0001-05": "cancelled" });
-  assert.deepEqual(board.pending_approval, ["i0001-03"]);
+  assert.notEqual(by.get("i0001-02-05")!.cancelled_at, "");
+  assert.deepEqual(board.parents[0].phases[1].states, { "i0001-02-02": "doing", "i0001-02-04": "review", "i0001-02-05": "cancelled" });
+  assert.deepEqual(board.pending_approval, ["i0001-02-03"]);
   assert.equal(board.parents.length, 1);
   assert.equal(board.parents[0].phases.length, 2);
 });
@@ -144,13 +144,44 @@ test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄�
 test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま使う。欄が無ければ空（満たしている扱い）", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
-  tickets[3].predecessors_unmet = [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];
+  tickets[3].predecessors_unmet = [{ ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];
   delete tickets[1].predecessors_unmet;
   const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) {
     return;
   }
-  assert.deepEqual(parsed.board.tickets[3].predecessors_unmet, [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }]);
+  assert.deepEqual(parsed.board.tickets[3].predecessors_unmet, [{ ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" }]);
   assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
+});
+
+test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+  const base = JSON.parse(fixtureText()) as Record<string, unknown>;
+  const parsed = parseBoardJson(
+    JSON.stringify({
+      ...base,
+      archived: [
+        { ticket: "old", title: "古い親", path: "/ws/logs/archive/self/done/old.md", history: [{ at: "t", kind: "archived", from: "done", to: "archive", via: "cli" }] },
+        "壊れた行",
+      ],
+    }),
+  );
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  assert.equal(parsed.board.archived?.length, 1);
+  const old = parsed.board.archived![0];
+  assert.equal(old.ticket, "old");
+  assert.equal(old.parent, "");
+  assert.equal(old.phase, null);
+  assert.equal(old.path, "/ws/logs/archive/self/done/old.md");
+  assert.equal(old.history[0].kind, "archived");
+  // この欄を出さない古い実行ファイル
+  const { archived: _dropped, ...older } = base;
+  const parsedOlder = parseBoardJson(JSON.stringify(older));
+  assert.equal(parsedOlder.ok, true);
+  if (parsedOlder.ok) {
+    assert.deepEqual(parsedOlder.board.archived, []);
+  }
 });

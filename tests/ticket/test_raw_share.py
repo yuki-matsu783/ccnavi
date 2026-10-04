@@ -64,14 +64,14 @@ class RawShareTest(PhaseHarness):
     def ended_phase(self):
         """`review: chat` のフェーズ 1 を終わらせる（レビュー準備中になる手前）。"""
         self.family(plan=["chores", "design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["src/a*"], review=False))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/a*"], review=False))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("src/a1.py", "x\n")])
-        closed = self.close_child("i0001-01")
+        self.run_child("i0001-01-01", [("src/a1.py", "x\n")])
+        closed = self.close_child("i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
 
     def approved_files(self) -> int:
         """全ツリーの承認済みチケットの置き場（作業中・閉じた）とレビュー待ちのファイルの数。"""

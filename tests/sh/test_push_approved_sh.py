@@ -238,12 +238,12 @@ class PushApprovedTest(Workspace):
         """
         tree = self.worktree("i0001")
         flows = os.path.join(tree, ".ccnavi", "approved", "flows")
-        write(os.path.join(flows, "i0001-01.yml"), "nodes: []\n")
-        temp = write(os.path.join(flows, ".i0001-01.yml.123.abcdef.tmp"), "half")
+        write(os.path.join(flows, "i0001-01-01.yml"), "nodes: []\n")
+        temp = write(os.path.join(flows, ".i0001-01-01.yml.123.abcdef.tmp"), "half")
 
         result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01.yml"])
+        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01-01.yml"])
         self.assertTrue(os.path.exists(temp))
         self.assertEqual(self.staged(tree), "")
         # 一時ファイルだけが残っていても、コミットするものは無い。
@@ -257,14 +257,14 @@ class PushApprovedTest(Workspace):
         書き直された下書き・追跡していない下書きには触れない。"""
         tree = self.worktree("i0001")
         drafts = "wip/proposals/flows"
-        taken = f"{drafts}/i0001-01.yml"
-        rewritten = f"{drafts}/i0001-02.yml"
-        untracked = f"{drafts}/i0001-03.yml"
+        taken = f"{drafts}/i0001-01-01.yml"
+        rewritten = f"{drafts}/i0001-01-02.yml"
+        untracked = f"{drafts}/i0001-01-03.yml"
         for rel in (taken, rewritten):
             write(os.path.join(tree, *rel.split("/")), "nodes: []\n")
         git(tree, "add", "--", taken, rewritten)
         git(tree, "commit", "-q", "-m", "drafts")
-        flow = ".ccnavi/approved/flows/i0001-01.yml"
+        flow = ".ccnavi/approved/flows/i0001-01-01.yml"
         write(os.path.join(tree, *flow.split("/")), "nodes: []\n")
         os.remove(os.path.join(tree, *taken.split("/")))
         write(os.path.join(tree, *rewritten.split("/")), "nodes: [x]\n")
@@ -284,7 +284,7 @@ class PushApprovedTest(Workspace):
     def test_drafts_alone_are_not_carried(self):
         """フローの保存が無ければコミットしない（置き場の変更が無いツリーには入らない）。"""
         tree = self.worktree("i0001")
-        taken = "wip/proposals/flows/i0001-01.yml"
+        taken = "wip/proposals/flows/i0001-01-01.yml"
         write(os.path.join(tree, *taken.split("/")), "nodes: []\n")
         git(tree, "add", "--", taken)
         git(tree, "commit", "-q", "-m", "draft")
@@ -319,6 +319,71 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.committed(self.ws), [f"{APPROVED}/i0001.md"])
         self.assertEqual(self.remote_head("main"), "")
         self.assertIn("main", result.stderr)
+
+    # 固定のリストに無い名前の統合先。決め方は ccnavi_integration。
+
+    def assertNotPushed(self, result, tree, branch):
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.remote_head(branch), "")
+        self.assertIn(f"統合先 {branch}", result.stderr)
+
+    def test_the_branch_origin_head_points_to_is_committed_but_not_pushed(self):
+        tree = self.worktree("develop-v1.0.0")
+        ref = "refs/remotes/origin/develop-v1.0.0"
+        git(self.ws, "update-ref", ref, "HEAD")
+        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
+        self.place(tree)
+        self.assertNotPushed(self.push(), tree, "develop-v1.0.0")
+
+    def test_the_environment_and_the_record_name_the_integration(self):
+        tree = self.worktree("develop-v1.0.0")
+        self.place(tree)
+        env = self.env(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
+        self.assertNotPushed(self.push(env=env), tree, "develop-v1.0.0")
+
+        other = self.worktree("release-2")
+        self.place(other)
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "remote origin\nbranch release-2\nsource default\n",
+        )
+        self.assertNotPushed(self.push(), other, "release-2")
+
+    def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
+        """統合先が決まらない（origin/HEAD も origin/main・master も無い）なら今までどおり送る。"""
+        tree = self.worktree("develop-v1.0.0")
+        self.place(tree)
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("develop-v1.0.0"), self.head(tree))
+
+    def test_a_project_is_judged_by_its_own_integration(self):
+        """projects/<名前>/ のツリーは、そのプロジェクトの統合先で判定する。"""
+        project = os.path.join(self.ws, "projects", "app")
+        remote = self.repository(project, "develop-v1.0.0")
+        self.place(project)
+        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先は別
+        # （取り込み結果が無く origin も空）。
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "branch develop-v1.0.0\n",
+        )
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.head_of(remote, "develop-v1.0.0"), self.head(project))
+
+        write(os.path.join(project, *APPROVED.split("/"), "i0002.md"), "approved\n")
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "app", "integration", "head"),
+            "branch develop-v1.0.0\n",
+        )
+        before = self.head_of(remote, "develop-v1.0.0")
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("統合先 develop-v1.0.0", result.stderr)
+        self.assertEqual(self.head_of(remote, "develop-v1.0.0"), before)
+        self.assertNotEqual(self.head(project), before)
 
     # ---- 20. push が落ちる
 
@@ -613,11 +678,11 @@ class ApproveCarriesTest(Workspace):
         """
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
-        result = self.approve("i0002-03", "i0002-04", STUB_ARGS=args)
+        result = self.approve("i0002-01-03", "i0002-01-04", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
         self.assertEqual(got[:1], ["--root"], got)
-        self.assertEqual(got[2:], ["--agree", "i0002-03", "i0002-04"], got)
+        self.assertEqual(got[2:], ["--agree", "i0002-01-03", "i0002-01-04"], got)
 
     def test_approve_without_ids_takes_all_pending(self):
         self.worktree("i0001")
@@ -652,10 +717,10 @@ class ApproveCarriesTest(Workspace):
         """使い方を出すのは語が 1 つのときだけ。識別子と並んだ `help` を何も言わずに捨てない。"""
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
-        result = self.approve("help", "i0002-01", STUB_ARGS=args)
+        result = self.approve("help", "i0002-01-01", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.received(args)[2:], ["--agree", "help", "i0002-01"])
-        refused = self.approve("--help", "i0002-01")
+        self.assertEqual(self.received(args)[2:], ["--agree", "help", "i0002-01-01"])
+        refused = self.approve("--help", "i0002-01-01")
         self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 
     def test_approve_carries_after_approval(self):

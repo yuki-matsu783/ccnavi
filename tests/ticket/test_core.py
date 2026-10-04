@@ -128,13 +128,13 @@ class CoreHarness(PhaseHarness):
     def reviewed_phase_one(self):
         """フェーズ 1（MR で見る設計）の子を閉じて合流し、レビューを依頼したところまで進める。"""
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         return fixture
@@ -198,7 +198,9 @@ class CoreHarness(PhaseHarness):
         place = chrome._placement(None)
         closure = chrome._closure(snap, place, request["family"])
         shutil.rmtree(os.path.join(self.state, "sync"), ignore_errors=True)
-        for rel, text in chrome.records(snap, place, closure["families"]).items():
+        for rel, text in chrome.records(
+            snap, place, closure["families"], closure["idents"]
+        ).items():
             write(os.path.join(self.state, *rel.split("/")), text)
 
     def ask_chrome(self, request):
@@ -245,7 +247,9 @@ class SourcePathTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         new_form = self.ccnavi("--agree", "--preview", "--json")
         verify_new = self.ccnavi("--agree", "--preview", "--verify")
@@ -278,9 +282,9 @@ class SourcePathTest(CoreHarness):
         self.assertEqual(board_new["parents"], board_old["parents"])
         # 実行前チェックも同じ（子の範囲で書ける・範囲の外は止まる）。
         self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree("i0001-01", "i0001")
+        tree = self.worktree("i0001-01-01", "i0001")
         self.start_parent()
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01").returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01-01").returncode, 0)
         inside = self.hook("PreToolUse", "Write", tree, file_path=f"{tree}/wip/research/a.md")
         outside = self.hook("PreToolUse", "Write", tree, file_path=f"{tree}/src/a.py")
         self.assertNotIn('"deny"', inside.stdout)
@@ -416,7 +420,9 @@ class PlanWriterTest(CoreHarness):
 
     def test_new_parent_and_child(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         changes, out = self.plan_and_write()
         self.assertIn("承認した。", out)
@@ -424,11 +430,11 @@ class PlanWriterTest(CoreHarness):
         self.assertEqual(
             [(r["op"], r["path"]) for r in rows],
             [
-                ("create", ".ccnavi/approved/doing/i0001-01.md"),
+                ("create", ".ccnavi/approved/doing/i0001-01-01.md"),
                 ("create", ".ccnavi/approved/doing/i0001.md"),
-                ("create", ".ccnavi/approved/events/i0001-01.ndjson"),
+                ("create", ".ccnavi/approved/events/i0001-01-01.ndjson"),
                 ("create", ".ccnavi/approved/events/i0001.ndjson"),
-                ("delete", "wip/proposals/todo/i0001-01.md"),
+                ("delete", "wip/proposals/todo/i0001-01-01.md"),
                 ("delete", "wip/proposals/todo/i0001.md"),
             ],
         )
@@ -439,13 +445,13 @@ class PlanWriterTest(CoreHarness):
 
     def test_revision_and_feedback_plan(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         self.assertEqual(self.confirm(fixture, 1).returncode, 0)
@@ -457,13 +463,13 @@ class PlanWriterTest(CoreHarness):
 
     def test_adding_a_child_clears_the_marks(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         marks = os.path.join(self.approved, "phases", "i0001")
         write(os.path.join(marks, "1.requested"), '{"at": "x"}')
         write(os.path.join(marks, "1.reviewed"), '{"at": "x"}')
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         _, out = self.plan_and_write()
         self.assertIn("マーカー（requested, reviewed）を消した", out)
@@ -474,37 +480,37 @@ class PlanWriterTest(CoreHarness):
         self.family(plan=["design"])
         todo = os.path.join(self.root, "wip", "proposals", "todo")
         write(
-            os.path.join(todo, "i0001-01.md"),
-            child_text("i0001-01", "i0001", 1, ["wip/design/*"]),
+            os.path.join(todo, "i0001-01-01.md"),
+            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
         )
-        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01.yml")
+        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml")
         write(flow, "version: 1\nsteps: []\n")
         _, out = self.plan_and_write()
-        self.assertIn("i0001-01 のフローを", out)
+        self.assertIn("i0001-01-01 のフローを", out)
         self.assertFalse(os.path.exists(flow))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "flows", "i0001-01.yml")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "flows", "i0001-01-01.yml")))
 
     def test_a_flow_that_cannot_be_written_says_so_and_skips_the_rest(self):
         """移せなかったフローは行で言い、元を消さない（前と同じ落ち方）。"""
         self.family(plan=["design"])
         todo = os.path.join(self.root, "wip", "proposals", "todo")
         write(
-            os.path.join(todo, "i0001-01.md"),
-            child_text("i0001-01", "i0001", 1, ["wip/design/*"]),
+            os.path.join(todo, "i0001-01-01.md"),
+            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
         )
-        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01.yml")
+        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml")
         write(flow, "version: 1\nsteps: []\n")
         snapshot = self.snapshot()
         verdict = core.judge_approval(snapshot)
         changes = core.plan(snapshot, verdict)
         # 並べた後で行き先にファイルを置く（書く前に別の誰かが置いた形）。
-        write(os.path.join(self.approved, "flows", "i0001-01.yml"), "other\n")
+        write(os.path.join(self.approved, "flows", "i0001-01-01.yml"), "other\n")
         applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
         self.assertIn("へ移せない", out)
         self.assertNotIn("から", out.split("へ移せない")[1].split("\n")[0])
         self.assertTrue(os.path.exists(flow))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
 
 
 class WriterFailureTest(CoreHarness):
@@ -559,13 +565,13 @@ class WriterFailureTest(CoreHarness):
 
     def reopened(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         marks = os.path.join(self.approved, "phases", "i0001")
         write(os.path.join(marks, "1.requested"), '{"at": "x"}')
         write(os.path.join(marks, "1.reviewed"), '{"at": "x"}')
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         return marks
 
@@ -580,7 +586,7 @@ class WriterFailureTest(CoreHarness):
         with self.failing("unlink", lambda path: path.endswith("1.reviewed")):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 1)
-        self.assertEqual(applied.placed, ["i0001-02"])
+        self.assertEqual(applied.placed, ["i0001-01-02"])
         self.assertIn("レビュー済みのマーカー", err)
         self.assertIn("ここで止める", err)
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
@@ -621,20 +627,20 @@ class WriterFailureTest(CoreHarness):
     def test_a_move_whose_target_appeared_stops(self):
         """並べた後に行き先が置かれていたら、動かさずに止める（上書きしない）。"""
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         from ccnavi.tickets import review
 
         result = review.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
         checked = core.confirm(self.snapshot(), "i0001", 1, result, "")
-        done = write(os.path.join(self.approved, "done", "i0001-01.md"), "other\n")
+        done = write(os.path.join(self.approved, "done", "i0001-01-01.md"), "other\n")
         applied, out, err = self.write_changes(checked.changes)
         self.assertEqual(applied.code, 1)
         self.assertIn("行き先に既に在る", err)
@@ -762,20 +768,22 @@ class CoreChromeTest(CoreHarness):
 
     def test_approve_new(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         answer = self.same_as_cli("approve-new", "i0001")
-        self.assertEqual(answer["identifiers"], ["i0001", "i0001-01"])
+        self.assertEqual(answer["identifiers"], ["i0001", "i0001-01-01"])
 
     def test_approve_reopens_a_reviewed_phase(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         marks = os.path.join(self.approved, "phases", "i0001")
         write(os.path.join(marks, "1.requested"), '{"at": "x"}')
         write(os.path.join(marks, "1.reviewed"), '{"at": "x"}')
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         answer = self.same_as_cli("approve-reopen", "i0001")
         self.assertIn(
@@ -806,7 +814,7 @@ class CoreChromeTest(CoreHarness):
             "worktree",
             "remove",
             "--force",
-            tree_mod.worktree_path(self.root, "i0001-01"),
+            tree_mod.worktree_path(self.root, "i0001-01-01"),
         )
         answer = self.same_as_cli("feedback-plan", "i0001")
         self.assertIn("  i0001 のフィードバック計画を改版した", answer["lines"])
@@ -816,12 +824,12 @@ class CoreChromeTest(CoreHarness):
         copies = {
             "i0001": [
                 ("doing", parent_text("i0001", ["research"])),
-                ("done", self.done("i0001-01", "i0001", [])),
+                ("done", self.done("i0001-01-01", "i0001", [])),
             ],
             "i0002": [
                 ("doing", parent_text("i0002", ["research"])),
-                ("done", self.done("i0002-01", "i0002", ["i0001-01"])),
-                ("doing", child_text("i0002-02", "i0002", 1, ["wip/research/*"], False)),
+                ("done", self.done("i0002-01-01", "i0002", ["i0001-01-01"])),
+                ("doing", child_text("i0002-01-02", "i0002", 1, ["wip/research/*"], False)),
             ],
             "i0003": [("doing", parent_text("i0003", ["research"]))],
         }
@@ -836,23 +844,23 @@ class CoreChromeTest(CoreHarness):
                 )
         todo = os.path.join(trees["i0003"], "wip", "proposals", "todo")
         write(
-            os.path.join(todo, "i0003-01.md"),
+            os.path.join(todo, "i0003-01-01.md"),
             self.with_predecessors(
-                child_text("i0003-01", "i0003", 1, ["wip/research/*"], False), ["i0002-01"]
+                child_text("i0003-01-01", "i0003", 1, ["wip/research/*"], False), ["i0002-01-01"]
             ),
         )
         write(
-            os.path.join(todo, "i0003-02.md"),
+            os.path.join(todo, "i0003-01-02.md"),
             self.with_predecessors(
-                child_text("i0003-02", "i0003", 1, ["wip/research/*"], False), ["i0002-02"]
+                child_text("i0003-01-02", "i0003", 1, ["wip/research/*"], False), ["i0002-01-02"]
             ),
         )
         for path in trees.values():
             git(path, "add", "-A")
             git(path, "commit", "--quiet", "-m", "copies")
         answer = self.same_as_cli("predecessors", "i0003")
-        self.assertEqual(answer["identifiers"], ["i0003-01"])
-        self.assertEqual([r["ticket"] for r in answer["rejected"]], ["i0003-02"])
+        self.assertEqual(answer["identifiers"], ["i0003-01-01"])
+        self.assertEqual([r["ticket"] for r in answer["rejected"]], ["i0003-01-02"])
 
     def done(self, name, parent, predecessors):
         text = child_text(name, parent, 1, ["wip/research/*"], False)
@@ -953,8 +961,8 @@ class CoreChromeTest(CoreHarness):
             _normalized(answer["changes"]), _normalized(self.diff(before, self.disk()))
         )
         paths = [(r["op"], r["path"]) for r in answer["changes"]["i0001"]]
-        self.assertIn(("create", ".ccnavi/approved/done/i0001-01.md"), paths)
-        self.assertIn(("delete", "wip/proposals/review/i0001-01.md"), paths)
+        self.assertIn(("create", ".ccnavi/approved/done/i0001-01-01.md"), paths)
+        self.assertIn(("delete", "wip/proposals/review/i0001-01-01.md"), paths)
         mark = next(r for r in answer["changes"]["i0001"] if r["path"].endswith("1.reviewed"))
         # Chrome のマーカーは経路（chrome）を持つ。アカウントは要求に無いので書かない。
         self.assertEqual(
@@ -1009,7 +1017,9 @@ class WithdrawTest(CoreHarness):
 
     def test_a_parent_with_a_child_is_not_withdrawn(self):
         text = self.approved_parent()
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         problems = self.problems({"i0001": text.encode()})
         self.assertTrue(any("子の提案" in p for p in problems), problems)
         self.assertEqual(self.approve().returncode, 0)
@@ -1033,15 +1043,15 @@ class WithdrawTest(CoreHarness):
         text = parent_text("i0001", ["research"])
         self.propose("i0001", text)
         self.commit_parent()
-        other = self.worktree("i0001-05", "i0001")  # todo/i0001 を持ったまま切る
+        other = self.worktree("i0001-01-05", "i0001")  # todo/i0001 を持ったまま切る
         self.assertEqual(self.approve().returncode, 0)
         self.assertEqual(self.problems({"i0001": text.encode()}), [])
         listed = core.withdrawable(self.snapshot(), "i0001")
         self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
         # 承認済みの無い子の提案は、どのツリーに在っても止める（前と同じ）。
         write(
-            os.path.join(other, "wip", "proposals", "todo", "i0001-01.md"),
-            child_text("i0001-01", "i0001", 1, ("wip/research/*",), False),
+            os.path.join(other, "wip", "proposals", "todo", "i0001-01-01.md"),
+            child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False),
         )
         problems = self.problems({"i0001": text.encode()})
         self.assertTrue(any("子の提案" in p for p in problems), problems)
@@ -1091,11 +1101,13 @@ class RecordWritesTest(CoreHarness):
 
     def test_each_command_lists_what_it_wrote(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         steps = [
-            ("--agree", "--yes", "i0001,i0001-01", "--digest", digest, "--json"),
+            ("--agree", "--yes", "i0001,i0001-01-01", "--digest", digest, "--json"),
             ("ticket", "start", "i0001"),
         ]
         for args in steps:
@@ -1103,15 +1115,15 @@ class RecordWritesTest(CoreHarness):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(sorted(listed), self.changed(self.parent_tree), args)
             self.commit_parent(" ".join(args))
-        tree = self.worktree("i0001-01", "i0001")
-        result, listed = self.record("ticket", "start", "i0001-01")
+        tree = self.worktree("i0001-01-01", "i0001")
+        result, listed = self.record("ticket", "start", "i0001-01-01")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(sorted(listed), self.changed(self.parent_tree))
         self.commit_parent("start 01")
         write(os.path.join(tree, "wip", "research", "summary.md"), "s\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "work")
-        result, listed = self.record("ticket", "finish", "i0001-01")
+        result, listed = self.record("ticket", "finish", "i0001-01-01")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(sorted(listed), self.changed(self.parent_tree))
         self.assertTrue(listed)

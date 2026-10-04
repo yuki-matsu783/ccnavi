@@ -48,8 +48,9 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, gitstate, hookio, settings, tree
 from ..policy import rules, selfguard
 from ..records import audit
-from ..tickets import phase, phasetypes
+from ..tickets import archive, phase, phasetypes
 from ..tickets import ticket as ticket_mod
+from . import c1
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。
@@ -109,6 +110,7 @@ def check(
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
+    root: str = "",
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
@@ -149,7 +151,9 @@ def check(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
+        for f in _findings(
+            changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced, root
+        )
     ]
     if not found:
         # 違反が無くても、初回なら記録を作る。ここを飛ばすと、綺麗な作業ツリーで
@@ -373,6 +377,7 @@ def at_stop(
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
+    root: str = "",
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域をユーザへ報告する。
 
@@ -402,7 +407,9 @@ def at_stop(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
+        for f in _findings(
+            changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced, root
+        )
         if f.key() not in baseline
     ]
     # このターンでコミットに入ったぶんも足す。`git status` はコミットを見せないので、
@@ -655,6 +662,7 @@ def _findings(
     top: str = "",
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
+    root: str = "",
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
@@ -677,7 +685,7 @@ def _findings(
     own = tuple(os.path.realpath(p) for p in mine if p)
     name = where.name
     tree_root = where.root
-    script = _script_writes(changes, places, top, where)
+    script = _script_writes(changes, places, top, where, root)
     found = []
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
@@ -708,6 +716,7 @@ def _script_writes(
     places: tuple[str, str],
     top: str,
     where: tree.Tree,
+    root: str = "",
 ) -> set[str]:
     """チケットの置き場の変更のうち、ccnavi の副命令が書いたと読めるものの実パス。
 
@@ -725,6 +734,11 @@ def _script_writes(
     * スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
     * `finish` と `cancel` の移動。正規化した内容が同じチケットが `doing/` から消えて、
       レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
+
+    * `ready` の退避（`tickets/archive.py`）が消したもの。閉じた親の `done/` の親子のチケット・
+      `phases/<親>/`・`events/`・`flows/` の削除で、ready のマーカーに載り、消えた中身が
+      ワークスペースの `logs/archive/` のコピーと同じもの（見分けは C1 と同じ
+      `c1.archived_removal`）。`root`（ワークスペースルート）が空なら外さない
 
     範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済みチケット、消えただけの
     チケットは外さず、今までどおり報告する。承認済みチケットの frontmatter はそのワークツリーの
@@ -772,6 +786,7 @@ def _script_writes(
             rel, tickets_rel, approved_rel
         ):
             arrived.append((change, now))
+    out |= _archived_removals(here, approved_rel, top, where, root)
     for change, before, drop in gone:
         # 行き先の正規化した内容は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
         # 消えた側がまだ持っていないので落ち、着手の時刻と基準点は両側に残る。
@@ -786,6 +801,37 @@ def _script_writes(
         if len(landed) == 1 and len(leaving) == 1:
             out.add(change.full)
             out.add(landed[0].full)
+    return out
+
+
+def _archived_removals(
+    here: list[tuple[gitstate.Change, str]],
+    approved_rel: str,
+    top: str,
+    where: tree.Tree,
+    root: str,
+) -> set[str]:
+    """`ready` の退避が消したと読める削除の実パス（`c1.archived_removal`。ready のマーカーに載り、
+    中身が退避したコピーと同じもの）。"""
+    if not root or not approved_rel:
+        return set()
+    approved = approved_rel.strip("/")
+    gone = [(change, rel) for change, rel in here if not os.path.lexists(change.full)]
+    if not gone:
+        return set()
+    ready = archive.ready_files(root, where.project, where.root, archive.tree_head(where.root))
+    if not ready:
+        return set()
+    out: set[str] = set()
+    for change, rel in gone:
+        if not rel.startswith(approved + "/"):
+            continue
+        before, readable = gitcmd.blob(top, "HEAD", change.path)
+        if not readable or before is None:
+            continue
+        inside = rel[len(approved) + 1 :]
+        if c1.archived_removal(inside, None, before, ready, root, where.project):
+            out.add(change.full)
     return out
 
 
@@ -1013,6 +1059,7 @@ def at_prompt(
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
+    root: str = "",
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を記録して、このターンの基準にする。
 
@@ -1036,7 +1083,9 @@ def at_prompt(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
+        for f in _findings(
+            changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced, root
+        )
     ]
     # ツリーごとの HEAD も記録する。ターンの終わりに「このターンでコミットに
     # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。

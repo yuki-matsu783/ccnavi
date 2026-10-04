@@ -36,7 +36,8 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
       "integration": {"name": "main", "source": "setting" | "default", "head": "<sha>"},
       "branches": {"<名前>": {"head": "<sha>", "files": {"<相対パス>": "<本文>"},
                               "binary": ["<相対パス>", ...]}},
-      "absent": ["<ホストに無かったブランチ>", ...]
+      "absent": ["<ホストに無かったブランチ>", ...],
+      "hints": {"<識別子>": "<親のブランチ名>", ...}    （任意）
     }
 
 統合先のブランチも `branches` に入る。読むのは置き場のサブツリーだけ。
@@ -53,7 +54,17 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
     "workspace": {"integration": {"name": ..., "source": ..., "head": ...},
                   "files": {...}, "binary": [...], "links": [...]}
 
-「始める」の `start` も答える。issue の番号から識別子を決め
+親子のチケットの親のブランチ名は親チケットの `branch:`（無ければ識別子）。
+要求の `family` は親のブランチ名のまま（拡張が読み書きするブランチ）で、親子のチケットの識別子は
+そのブランチの上の親チケットが自分のブランチだと名乗ることで決まる（`_family_ident`）。
+仮のツリーは `.claude/worktrees/<識別子>` に組み、HEAD を親のブランチに向け、取り込み状態は
+識別子を鍵に `branch` へ親のブランチ名を書く。同じ親子のチケットを名乗るブランチが snapshot に
+2 本以上あれば、どれを本物とするか決まらないとして止める。閉包の先行の親子のチケットのブランチは、
+snapshot の中で名乗るブランチを探し、無ければ要求の `hints`（識別子 → ブランチ名。ボードの
+親子のチケットの一覧から拡張が渡す）、それも無ければ識別子と同じ名前を読みに行く。読んだブランチが
+名乗らなければ使わない。
+
+「始める」の `start` も答える。issue の番号とタイトルから識別子を決め
 （手元と同じ `ticket.issue_identifier`）、始められない理由（統合先の `done/` にある・同じ名前の
 ブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版の違い）を返す。
 ブランチを作るのは拡張（service worker）。
@@ -204,7 +215,7 @@ def _snapshot(req: dict) -> dict:
         _check_files(bname, branch)
     project = snap.get("project") or ""
     if project:
-        if not isinstance(project, str) or not ticket_mod.is_valid_id(project):
+        if not isinstance(project, str) or not ticket_mod.is_valid_name(project):
             raise Refused(f"プロジェクト名が読めない: {project!r}")
         if settings.is_reserved_layer_name(project):
             raise Refused(f"プロジェクト名 {project} は層の名前として予約してある（common・self）")
@@ -277,9 +288,114 @@ def _tickets_in(files: dict[str, str], place: dict, states: tuple[str, ...] | No
 
 
 def family_of(ident: str) -> str:
-    """識別子が属する親子のチケットの親。子の形なら `parent`、そうでなければ自分。"""
+    """識別子が属する親子のチケットの親。
+
+    子の形（`<親>-<2 桁>-<2 桁>`）なら `parent`、そうでなければ自分。
+    """
     m = ticket_mod.child_pattern().match(ident)
     return m.group("parent") if m else ident
+
+
+def _claimers(snap: dict, place: dict, name: str) -> list:
+    """ブランチ `name` を自分の親のブランチだと名乗る親チケット。
+
+    見るのはそのブランチの置き場の開いたもの（提案の todo/・review/ と承認済みの doing/）で、親が
+    名乗る名前（`_claimed`）が `name` と同じもの。
+    """
+    return [
+        t
+        for state, t in _tickets_in(
+            _files(snap, name), place, (*ticket_mod.STATES, ticket_mod.DOING)
+        )
+        if not t.is_child and _claimed(state, t) == name
+    ]
+
+
+def _claimed(state: str, t) -> str:
+    """親チケットが名乗る親のブランチ名。
+
+    承認済み（doing/・review/）は `branch:`（無ければ識別子）、承認前の提案（todo/）は識別子
+    （提案の `branch:` は承認されるまで使わない）。
+    """
+    return t.ticket if state == ticket_mod.TODO else ticket_mod.branch_name(t)
+
+
+def _family_ident(snap: dict, place: dict, name: str) -> str:
+    """親のブランチ `name` の親子のチケットの識別子。名乗る親が 1 つに決まらなければ Refused。"""
+    idents = sorted({t.ticket for t in _claimers(snap, place, name)})
+    if len(idents) == 1:
+        return idents[0]
+    if not idents:
+        raise Refused(f"ブランチ {name} を自分の親のブランチだと名乗る親チケットが無い")
+    raise Refused(
+        f"ブランチ {name} を親のブランチだと名乗る親チケットが 2 つ以上ある"
+        f"（{', '.join(idents)}）。親子のチケットが決まらない"
+    )
+
+
+def _tree_ident(snap: dict, place: dict, name: str) -> str:
+    """仮のツリーに組むブランチ `name` の識別子（閉包の親子のチケットを含む）。
+
+    名乗る親チケットが 1 つならその識別子。名乗る親が無い（閉包の先行の親子のチケットで、親の提案や
+    承認済みチケットがそのブランチの置き場に無い）ときは、前と同じくブランチ名を識別子とする（識別子の形のときだけ）。
+    """
+    idents = sorted({t.ticket for t in _claimers(snap, place, name)})
+    if len(idents) == 1:
+        return idents[0]
+    if not idents and ticket_mod.is_valid_id(name):
+        return name
+    return _family_ident(snap, place, name)
+
+
+def _ident_branches(snap: dict, place: dict) -> dict[str, list[str]]:
+    """識別子 → それを名乗るブランチのリスト（snapshot の中の、統合先以外のブランチ）。"""
+    integ = snap["integration"]["name"]
+    out: dict[str, set[str]] = {}
+    for name in snap["branches"]:
+        if name == integ:
+            continue
+        for t in _claimers(snap, place, name):
+            out.setdefault(t.ticket, set()).add(name)
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def _rival_problem(snap: dict, place: dict, name: str, ident: str) -> str:
+    """親子のチケット `ident` を名乗るブランチが `name` のほかにもあれば、止める理由。"""
+    others = [b for b in _ident_branches(snap, place).get(ident, []) if b != name]
+    if not others:
+        return ""
+    return (
+        f"親子のチケット {ident} を名乗るブランチが 1 本でない"
+        f"（{', '.join([name, *others])}。どれもその上の親チケットが自分のブランチだと"
+        "名乗っている）。どれを本物とするか決まらないので、この親子のチケットは判定しない"
+        ""
+    )
+
+
+def _ambiguous_problem(closure: dict) -> str:
+    """閉包の先行の親子のチケットを名乗るブランチが 2 本以上あれば、止める理由。"""
+    if not closure.get("ambiguous"):
+        return ""
+    return (
+        f"先行の親子のチケット（{', '.join(closure['ambiguous'])}）を名乗るブランチが 1 本でない。"
+        "どれを本物とするか決まらないので、この親子のチケットは判定しない"
+    )
+
+
+def _hints(req: dict) -> dict[str, str]:
+    """要求か snapshot の `hints`（識別子 → 親のブランチ名）。読むブランチの見当にだけ使う
+    （判定には使わない。読んだブランチが名乗らなければ使わない）。"""
+    snap = req.get("snapshot")
+    raw = req.get("hints")
+    if raw is None and isinstance(snap, dict):
+        raw = snap.get("hints")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in raw.items()
+    ):
+        raise Refused("hints は識別子からブランチ名への対応")
+    return raw
 
 
 def _closed(snap: dict, place: dict) -> set[str]:
@@ -294,9 +410,12 @@ def _closed(snap: dict, place: dict) -> set[str]:
 def _op_families(req: dict, root: str) -> dict:
     """候補のブランチのうち、親のブランチ（親子のチケットのブランチ）であるもの。
 
-    親子のチケットのブランチ = そのブランチの置き場に、ブランチ名と同じ識別子の親の提案か
-    承認済みのチケットがある。
-    閉じた親（`done/`）しか無いブランチは数えない。
+    親子のチケットのブランチ = そのブランチの置き場に、そのブランチを自分の親のブランチだと名乗る
+    親の提案か承認済みのチケットがある（`branch:` がブランチ名と同じか、`branch:` が無くて識別子が
+    ブランチ名と同じ）。閉じた親（`done/`）しか無いブランチは数えない。答えの `name` は
+    ブランチ名、`family` は親子のチケットの識別子。同じ親子のチケットを名乗るブランチが候補に
+    2 本以上ある・1 本のブランチを 2 つの親子のチケットが名乗るときは `conflict` に止める理由を
+    入れる（拡張はその親子のチケットを判定しない）。
     """
     snap = _snapshot(req)
     place = _placement(_text_or_none(req.get("settings")))
@@ -312,12 +431,30 @@ def _op_families(req: dict, root: str) -> dict:
         parents = [
             (state, t)
             for state, t in _tickets_in(files, place, (*ticket_mod.STATES, ticket_mod.DOING))
-            if t.ticket == name and not t.is_child
+            if not t.is_child and _claimed(state, t) == name
         ]
         if not parents:
             continue
         state, t = parents[0]
-        found.append({"name": name, "title": t.title, "state": state, "closed": name in closed})
+        idents = sorted({p.ticket for _, p in parents})
+        conflict = ""
+        if len(idents) > 1:
+            conflict = (
+                f"ブランチ {name} を親のブランチだと名乗る親チケットが 2 つ以上ある"
+                f"（{', '.join(idents)}）。親子のチケットが決まらない"
+            )
+        else:
+            conflict = _rival_problem(snap, place, name, t.ticket)
+        found.append(
+            {
+                "name": name,
+                "family": t.ticket,
+                "title": t.title,
+                "state": state,
+                "closed": t.ticket in closed,
+                "conflict": conflict,
+            }
+        )
     return {"families": found}
 
 
@@ -334,15 +471,33 @@ def _op_closure(req: dict, root: str) -> dict:
     family = req.get("family")
     if not isinstance(family, str) or not family:
         raise Refused("family が無い")
-    return _closure(snap, place, family)
+    return _closure(snap, place, family, _hints(req))
 
 
-def _closure(snap: dict, place: dict, family: str) -> dict:
+def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None = None) -> dict:
+    """親子のチケットの閉包。
+
+    `families` は親のブランチ名のリスト（先頭が `family`）、`idents` はブランチ名 →
+    親子のチケットの識別子、`rivals` は親子のチケットの識別子と同じ名前のブランチ
+    （`branch:` を持つ親子のチケットで、同じ親子のチケットを名乗るブランチが無いかを確かめるために
+    読む。判定の入力には入れない）。"""
     closed = _closed(snap, place)
     absent = set(snap.get("absent") or [])
+    owners = _ident_branches(snap, place)
+    hints = hints or {}
     families = [family]
+    idents: dict[str, str] = {}
     need: list[str] = []
+    rivals: list[str] = []
+    ambiguous: list[str] = []
     queue = [family]
+    if family in snap["branches"]:
+        idents[family] = _family_ident(snap, place, family)
+        mine = idents[family]
+        if mine != family:
+            rivals.append(mine)
+            if mine not in snap["branches"] and mine not in absent:
+                need.append(mine)
     while queue:
         name = queue.pop(0)
         if name not in snap["branches"]:
@@ -352,13 +507,27 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
         for _, t in _tickets_in(_files(snap, name), place):
             for ident in t.predecessors:
                 fam = family_of(ident)
-                if fam in families or ident in closed or fam in closed:
+                if ident in closed or fam in closed:
                     continue
-                families.append(fam)
-                queue.append(fam)
+                found = owners.get(fam, [])
+                if len(found) > 1:
+                    # 先行の親子のチケットを名乗るブランチが 2 本以上。
+                    # 判定する親子のチケットと同じく決まらない
+                    if fam not in ambiguous:
+                        ambiguous.append(fam)
+                    continue
+                branch = found[0] if found else hints.get(fam, fam)
+                if branch in families:
+                    continue
+                families.append(branch)
+                idents[branch] = fam
+                queue.append(branch)
     over = len(families) > FAMILY_LIMIT
     return {
         "families": families,
+        "idents": idents,
+        "rivals": rivals,
+        "ambiguous": ambiguous,
         "need": [] if over else need,
         "absent": sorted(absent & set(families)),
         "over_limit": over,
@@ -376,7 +545,9 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
 # ---- 仮のツリーと承認待ち ---------------------------------------------------------------
 
 
-def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
+def _build(
+    root: str, snap: dict, place: dict, families: list[str], idents: dict | None = None
+) -> None:
     """統合先をワークスペースルートに、親子のチケットをワークツリーに置いた仮のツリーを組む。
 
     プロジェクトのリポジトリは、ワークスペースの統合先をワークスペースルートに、
@@ -415,11 +586,16 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
     for name in families:
         if name not in snap["branches"] or name == integ:
             continue
-        if not ticket_mod.is_valid_id(name):
-            raise Refused(f"親のブランチ名が識別子の形でない: {name!r}")
-        tree = os.path.join(root, *WORKTREES.split("/"), name)
+        ident = _tree_ident(snap, place, name)
+        if not ticket_mod.is_valid_id(ident):
+            raise Refused(f"親子のチケットの識別子が識別子の形でない: {ident!r}")
+        if name != ident and ticket_mod.branch_problem(name):
+            raise Refused(
+                f"親のブランチ名が使えない: {name!r}（{ticket_mod.branch_problem(name)}）"
+            )
+        tree = os.path.join(root, *WORKTREES.split("/"), ident)
         os.makedirs(tree, exist_ok=True)
-        registry = os.path.join(owner, ".git", "worktrees", name)
+        registry = os.path.join(owner, ".git", "worktrees", ident)
         os.makedirs(registry)
         gitfile = os.path.join(tree, ".git")
         with open(gitfile, "w", encoding="utf-8") as f:
@@ -429,7 +605,7 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
         _head(registry, name)
         for path, text in _files(snap, name).items():
             _write(tree, path, text)
-    for rel, text in records(snap, place, families).items():
+    for rel, text in records(snap, place, families, idents).items():
         _write(root, f"{STATE_DIR}/{rel}", text)
 
 
@@ -456,7 +632,9 @@ def project_layer(snap: dict, place: dict) -> dict[str, str]:
     return out
 
 
-def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
+def records(
+    snap: dict, place: dict, families: list[str], idents: dict | None = None
+) -> dict[str, str]:
     """取り込み状態に当たるもの（state の置き場からの相対パス → 中身）。
     手元の `ccnavi-sync.sh` が書く形。
 
@@ -503,10 +681,23 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
     for name in families:
         if name == integ["name"]:
             continue
+        # 取り込み状態の鍵は親子のチケットの識別子、中の branch に親のブランチ名。ホストに
+        # 無い親子のチケットは名乗る親チケットを読めないので、読みに行った名前
+        # （識別子かその見当）で書く。
         if name in snap["branches"]:
-            out[f"{base}/families/{name}"] = f"remote origin\nbranch {name}\nstate present\n"
+            ident = _tree_ident(snap, place, name)
+            out[f"{base}/families/{ident}"] = f"remote origin\nbranch {name}\nstate present\n"
         elif name in absent:
-            out[f"{base}/families/{name}"] = (
+            # 読みに行った名前の親子のチケット（閉包の `idents`。無ければその名前を識別子とする）。
+            # 識別子の形でなければ取り込み状態を書けないので、黙って飛ばさず決まらないとして止める。
+            ident = (idents or {}).get(name, name)
+            if not ticket_mod.is_valid_id(ident):
+                raise Refused(
+                    f"ホストに無い親のブランチ {name} の親子のチケット（{ident}）が"
+                    "識別子の形でない。"
+                    "親子のチケットが決まらない"
+                )
+            out[f"{base}/families/{ident}"] = (
                 f"remote origin\nbranch {name}\nstate gone\n"
                 f"reason 親のブランチ {name} がホストに無い\n"
             )
@@ -568,20 +759,24 @@ def _op_board(req: dict, root: str) -> dict:
     family = req.get("family")
     if not isinstance(family, str) or family not in snap["branches"]:
         raise Refused("family のブランチが snapshot に無い")
-    closure = _closure(snap, place, family)
+    closure = _closure(snap, place, family, _hints(req))
     if closure["over_limit"]:
         return {"family": family, "undecided": closure["message"], "closure": closure}
     if closure["need"]:
         raise Refused(f"閉包の親子のチケットをまだ読んでいない: {', '.join(closure['need'])}")
+    ident = closure["idents"][family]
+    rival = _rival_problem(snap, place, family, ident) or _ambiguous_problem(closure)
+    if rival:
+        return {"family": family, "ident": ident, "undecided": rival, "closure": closure}
     unreadable = _unreadable(snap, closure)
     if unreadable:
         return {"family": family, "undecided": unreadable, "closure": closure}
-    _build(root, snap, place, closure["families"])
+    _build(root, snap, place, closure["families"], closure["idents"])
 
     code, first, err = _preview(root, place["env"], [])
     if first is None:
         return {"family": family, "closure": closure, "refused": _refused(root, code, err)}
-    mine = [e["ticket"] for e in first["batch"] if (e.get("parent") or e["ticket"]) == family]
+    mine = [e["ticket"] for e in first["batch"] if (e.get("parent") or e["ticket"]) == ident]
     body = first
     narrowed = bool(mine) and len(mine) != len(first["batch"])
     if narrowed:
@@ -593,16 +788,18 @@ def _op_board(req: dict, root: str) -> dict:
     batch = [_entry(root, e) for e in body["batch"] if e["ticket"] in mine]
     return {
         "family": family,
+        # 親子のチケットの識別子（親のブランチ名と違うことがある）
+        "ident": ident,
         "closure": closure,
         # 互換の版と書く先の名前から、書けるかを見る。書けなければ表示だけにする。
         "write": {
             "allowed": not _write_refusal(snap, family),
             "reason": _write_refusal(snap, family),
         },
-        "withdrawable": _withdrawable(req, root, place, family),
+        "withdrawable": _withdrawable(req, root, place, ident),
         # レビュー済みを付けられる候補。
         # 通るかは `confirm` がホストから取得した結果で決める
-        "reviewable": _reviewable(root, place, family),
+        "reviewable": _reviewable(root, place, ident),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出すので、手を加えずに返す。
         # ダイジェストはこの本文と承認済みのチケットの中身を覆い、
@@ -614,7 +811,7 @@ def _op_board(req: dict, root: str) -> dict:
         "rejected": [
             {"ticket": r["ticket"], "problems": [_relative(root, p) for p in r["problems"]]}
             for r in first["rejected"]
-            if family_of(r["ticket"]) == family
+            if family_of(r["ticket"]) == ident
         ],
         "problems": [_relative(root, p) for p in first["problems"]],
     }
@@ -628,7 +825,7 @@ def _unreadable(snap: dict, closure: dict) -> str:
     無いとも空とも読ませず「決まらない」として止める（取っていないファイルと同じ扱い。書く操作が
     あるので、言うだけにせず止める）。シンボリックリンクを含む親子のチケットは止まるので、リンクが指すパスへ書き込むことも無い。
     """
-    names = [snap["integration"]["name"], *closure["families"]]
+    names = [snap["integration"]["name"], *closure["families"], *closure.get("rivals", [])]
     found = [
         f"{name}:{path}（{what}）"
         for name in dict.fromkeys(names)
@@ -670,7 +867,7 @@ def _write_refusal(snap: dict, family: str) -> str:
 
 
 def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
-    """作業中のチケットごとの取り下げの可否。仮のツリーは組んである前提。"""
+    """作業中のチケットごとの取り下げの可否。仮のツリーは組んである前提。`family` は識別子。"""
     with _environ(place["env"]):
         conf, _ = settings.load(root)
         snapshot = core.read_fs(conf, root)
@@ -699,6 +896,8 @@ def _entry(root: str, entry: dict) -> dict:
 
 # 仮のツリーのパスの前に来てよい字（行の頭・空白・引用符・括弧・区切り）。
 # 途中の段（`wip/ws/`）は畳まない。
+# 識別子に使える字（`ticket.ID_CHARS`。日本語の字を含む）。
+ID_CHARS = ticket_mod.ID_CHARS
 _BEFORE_ROOT = r"(?<![^\s'\"`(（「:：,、=])"
 
 
@@ -711,7 +910,9 @@ def _relative(root: str, text: str) -> str:
     """
     base = re.escape(os.path.join(root, *WORKTREES.split("/")) + os.sep)
     out = re.sub(
-        _BEFORE_ROOT + base + r"([A-Za-z0-9][A-Za-z0-9._-]*)" + re.escape(os.sep), r"\1:", text
+        _BEFORE_ROOT + base + rf"([A-Za-z0-9][{ID_CHARS}]*)" + re.escape(os.sep),
+        r"\1:",
+        text,
     )
     out = re.sub(_BEFORE_ROOT + re.escape(root + os.sep), "", out)
     return out.replace(os.sep, "/") if os.sep != "/" else out
@@ -723,7 +924,8 @@ def _relative(root: str, text: str) -> str:
 def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     """親子のチケットの仮のツリーを組む。時刻は組む前に確かめる。
 
-    答えは (snapshot, 置き場, 親のブランチ名, 閉包)。
+    答えは (snapshot, 置き場, 親のブランチ名, 閉包)。要求の `family` は親のブランチ名で、
+    親子のチケットの識別子は閉包の `idents[family]`。
     """
     _stamp(req)
     snap = _snapshot(req)
@@ -731,15 +933,19 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     family = req.get("family")
     if not isinstance(family, str) or family not in snap["branches"]:
         raise Refused("family のブランチが snapshot に無い")
-    closure = _closure(snap, place, family)
+    closure = _closure(snap, place, family, _hints(req))
     if closure["over_limit"]:
         raise Refused(closure["message"])
     if closure["need"]:
         raise Refused(f"閉包の親子のチケットをまだ読んでいない: {', '.join(closure['need'])}")
+    rival = _rival_problem(snap, place, family, closure["idents"][family])
+    rival = rival or _ambiguous_problem(closure)
+    if rival:
+        raise Refused(rival)
     unreadable = _unreadable(snap, closure)
     if unreadable:
         raise Refused(unreadable)
-    _build(root, snap, place, closure["families"])
+    _build(root, snap, place, closure["families"], closure["idents"])
     return snap, place, family, closure
 
 
@@ -914,8 +1120,9 @@ def _op_confirm(req: dict, root: str) -> dict:
     `need_compare`（`{base, head}`）で返す。拡張は compare API で読んでから
     呼び直す（閉包の `need` と同じ形）。
     """
-    snap, place, family, _ = _family_tree(req, root)
+    snap, place, family, closure = _family_tree(req, root)
     _writable(snap, family)
+    ident = closure["idents"][family]
     phase_no = req.get("phase")
     if not isinstance(phase_no, int) or isinstance(phase_no, bool):
         raise Refused("phase はフェーズの番号")
@@ -926,7 +1133,7 @@ def _op_confirm(req: dict, root: str) -> dict:
     compare = req.get("compare")
     with _environ(place["env"]):
         snapshot = _core_snapshot(req, root)
-        recorded = core.requested_head(snapshot, family, phase_no)
+        recorded = core.requested_head(snapshot, ident, phase_no)
         if compare is None and recorded and recorded != head and review._is_sha(recorded):
             return {
                 "family": family,
@@ -935,9 +1142,9 @@ def _op_confirm(req: dict, root: str) -> dict:
                 **_changes(root, None),
             }
         changed = core.moved_on_host(
-            snapshot, family, phase_no, head, _compare_files(compare, recorded, head)
+            snapshot, ident, phase_no, head, _compare_files(compare, recorded, head)
         )
-        checked = core.confirm(snapshot, family, phase_no, result, changed)
+        checked = core.confirm(snapshot, ident, phase_no, result, changed)
     body = _changes(root, checked.changes)
     _one_branch(body, family)
     return {
@@ -968,7 +1175,8 @@ def _compare_files(compare: object, base: str | None, head: str) -> list[str] | 
 
 
 def _reviewable(root: str, place: dict, family: str) -> list[dict]:
-    """依頼済みでまだレビュー済みでないフェーズ。仮のツリーは組んである前提。"""
+    """依頼済みでまだレビュー済みでないフェーズ。仮のツリーは組んである前提。
+    `family` は識別子。"""
     with _environ(place["env"]):
         conf, _ = settings.load(root)
         return core.reviewable(core.read_fs(conf, root), family)
@@ -1006,6 +1214,9 @@ def _compat(snap: dict) -> dict:
 def _op_start(req: dict, root: str) -> dict:
     """issue から始める親のブランチの名前と、始められない理由。
 
+    名前は issue の番号とタイトル（`title`）から `ticket.issue_identifier` が決める。先頭の語は
+    `prefix`（無ければ `feature`）。
+
     ブランチは作らない（拡張の service worker が作る）。入力は統合先（と、プロジェクトなら
     ワークスペースの統合先）と、拡張が見たブランチ（`snapshot.branches` と `taken` の名前）。
     """
@@ -1017,13 +1228,21 @@ def _op_start(req: dict, root: str) -> dict:
     taken = req.get("taken") or []
     if not isinstance(taken, list) or not all(isinstance(n, str) for n in taken):
         raise Refused("taken はブランチ名のリスト")
+    title = req.get("title") or ""
+    if not isinstance(title, str) or len(title) > 1000:
+        raise Refused("title は issue のタイトル（1000 文字まで）")
+    prefix = req.get("prefix") or ticket_mod.DEFAULT_ISSUE_PREFIX
+    if not isinstance(prefix, str) or not settings.is_branch_prefix(prefix):
+        raise Refused(f"prefix は先頭の語（英小文字と数字）: {prefix!r}")
     project = _project(snap)
-    ident = ticket_mod.issue_identifier(number, project)
+    ident = ticket_mod.issue_identifier(number, title, project, prefix)
     integ = snap["integration"]["name"]
     folded = ident.casefold()
     problems = list(
         ticket_mod.branch_name_problems(
-            ticket_mod.Ticket(ticket=ident, issue=number, project=project), integ
+            ticket_mod.Ticket(ticket=ident, issue=number, project=project),
+            integ,
+            prefixes=(prefix, *settings.DEFAULT_BRANCH_PREFIXES),
         )
     )
     if folded in {i.casefold() for i in _closed(snap, place)}:

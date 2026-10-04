@@ -22,20 +22,20 @@
    "kind": "worktree"
   },
   {
-   "name": "i0001-01",
-   "root": "<root>/.claude/worktrees/i0001-01",
+   "name": "i0001-01-01",
+   "root": "<root>/.claude/worktrees/i0001-01-01",
    "project": "",
    "kind": "worktree"
   },
   {
-   "name": "i0001-02",
-   "root": "<root>/.claude/worktrees/i0001-02",
+   "name": "i0001-02-02",
+   "root": "<root>/.claude/worktrees/i0001-02-02",
    "project": "",
    "kind": "worktree"
   },
   {
-   "name": "i0001-04",
-   "root": "<root>/.claude/worktrees/i0001-04",
+   "name": "i0001-02-04",
+   "root": "<root>/.claude/worktrees/i0001-02-04",
    "project": "",
    "kind": "worktree"
   }
@@ -148,7 +148,7 @@
  ],
  "problems": [],
  "pending_approval": [
-  "i0001-03"
+  "i0001-02-03"
  ],
  "tickets": [
   {
@@ -220,10 +220,10 @@
    ]
   },
   {
-   "ticket": "i0001-01",
+   "ticket": "i0001-01-01",
    "parent": "i0001",
    "phase": 1,
-   "title": "子 i0001-01",
+   "title": "子 i0001-01-01",
    "project": "",
    "issue": null,
    "predecessors": [],
@@ -238,11 +238,11 @@
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-01.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-01-01.md"
    },
    "worktree": {
     "exists": true,
-    "path": "<root>/.claude/worktrees/i0001-01",
+    "path": "<root>/.claude/worktrees/i0001-01-01",
     "project": ""
    },
    "started_at": "2026-09-13T13:50:22+0000",
@@ -253,15 +253,15 @@
    "seen_in": [],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml",
-    "rel": ".ccnavi/approved/flows/i0001-01.yml",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml",
+    "rel": ".ccnavi/approved/flows/i0001-01-01.yml",
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": true,
     "linked": false,
     "locked": false,
     "draft": {
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-01.yml",
-     "rel": "wip/proposals/flows/i0001-01.yml",
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-01-01.yml",
+     "rel": "wip/proposals/flows/i0001-01-01.yml",
      "exists": false,
      "linked": false
     }
@@ -280,7 +280,7 @@
    "history": [
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01",
+     "ticket": "i0001-01-01",
      "kind": "approved",
      "from": "todo",
      "to": "doing",
@@ -289,7 +289,7 @@
     },
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01",
+     "ticket": "i0001-01-01",
      "kind": "started",
      "from": "doing",
      "to": "doing",
@@ -298,7 +298,7 @@
     },
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01",
+     "ticket": "i0001-01-01",
      "kind": "finished",
      "from": "doing",
      "to": "review",
@@ -306,7 +306,7 @@
     },
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01",
+     "ticket": "i0001-01-01",
      "kind": "settled",
      "from": "review",
      "to": "done",
@@ -316,10 +316,10 @@
    ]
   },
   {
-   "ticket": "i0001-02",
+   "ticket": "i0001-02-02",
    "parent": "i0001",
    "phase": 2,
-   "title": "子 i0001-02",
+   "title": "子 i0001-02-02",
    "project": "",
    "issue": null,
    "predecessors": [],
@@ -334,11 +334,11 @@
     "status": "open",
     "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001-02.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001-02-02.md"
    },
    "worktree": {
     "exists": true,
-    "path": "<root>/.claude/worktrees/i0001-02",
+    "path": "<root>/.claude/worktrees/i0001-02-02",
     "project": ""
    },
    "started_at": "2026-09-13T13:50:22+0000",
@@ -349,15 +349,15 @@
    "seen_in": [],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02.yml",
-    "rel": ".ccnavi/approved/flows/i0001-02.yml",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02-02.yml",
+    "rel": ".ccnavi/approved/flows/i0001-02-02.yml",
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
     "locked": true,
     "draft": {
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02.yml",
-     "rel": "wip/proposals/flows/i0001-02.yml",
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-02.yml",
+     "rel": "wip/proposals/flows/i0001-02-02.yml",
      "exists": false,
      "linked": false
     }
@@ -367,7 +367,7 @@
    "history": [
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02",
+     "ticket": "i0001-02-02",
      "kind": "approved",
      "from": "todo",
      "to": "doing",
@@ -376,7 +376,7 @@
     },
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02",
+     "ticket": "i0001-02-02",
      "kind": "started",
      "from": "doing",
      "to": "doing",
@@ -386,10 +386,10 @@
    ]
   },
   {
-   "ticket": "i0001-03",
+   "ticket": "i0001-02-03",
    "parent": "i0001",
    "phase": 2,
-   "title": "子 i0001-03",
+   "title": "子 i0001-02-03",
    "project": "",
    "issue": null,
    "predecessors": [],
@@ -402,7 +402,7 @@
     "state": "todo",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-03.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02-03.md"
    },
    "blocked": "",
    "copy": {
@@ -410,7 +410,7 @@
    },
    "worktree": {
     "exists": false,
-    "path": "<root>/.claude/worktrees/i0001-03"
+    "path": "<root>/.claude/worktrees/i0001-02-03"
    },
    "started_at": "",
    "completed_at": "",
@@ -421,25 +421,25 @@
     {
      "tree": "i0001",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-03.md"
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02-03.md"
     },
     {
-     "tree": "i0001-02",
+     "tree": "i0001-02-02",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/todo/i0001-03.md"
+     "path": "<root>/.claude/worktrees/i0001-02-02/wip/proposals/todo/i0001-02-03.md"
     }
    ],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-03.yml",
-    "rel": ".ccnavi/approved/flows/i0001-03.yml",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02-03.yml",
+    "rel": ".ccnavi/approved/flows/i0001-02-03.yml",
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
     "locked": false,
     "draft": {
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-03.yml",
-     "rel": "wip/proposals/flows/i0001-03.yml",
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-03.yml",
+     "rel": "wip/proposals/flows/i0001-02-03.yml",
      "exists": false,
      "linked": false
     }
@@ -449,10 +449,10 @@
    "history": []
   },
   {
-   "ticket": "i0001-04",
+   "ticket": "i0001-02-04",
    "parent": "i0001",
    "phase": 2,
-   "title": "子 i0001-04",
+   "title": "子 i0001-02-04",
    "project": "",
    "issue": null,
    "predecessors": [],
@@ -465,18 +465,18 @@
     "state": "review",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-04.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
    },
    "blocked": "",
    "copy": {
     "status": "review",
     "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-04.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
    },
    "worktree": {
     "exists": true,
-    "path": "<root>/.claude/worktrees/i0001-04",
+    "path": "<root>/.claude/worktrees/i0001-02-04",
     "project": ""
    },
    "started_at": "2026-09-13T13:50:22+0000",
@@ -488,25 +488,25 @@
     {
      "tree": "i0001",
      "state": "review",
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-04.md"
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
     },
     {
-     "tree": "i0001-04",
+     "tree": "i0001-02-04",
      "state": "review",
-     "path": "<root>/.claude/worktrees/i0001-04/wip/proposals/review/i0001-04.md"
+     "path": "<root>/.claude/worktrees/i0001-02-04/wip/proposals/review/i0001-02-04.md"
     }
    ],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-04.yml",
-    "rel": ".ccnavi/approved/flows/i0001-04.yml",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02-04.yml",
+    "rel": ".ccnavi/approved/flows/i0001-02-04.yml",
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
     "locked": false,
     "draft": {
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-04.yml",
-     "rel": "wip/proposals/flows/i0001-04.yml",
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-04.yml",
+     "rel": "wip/proposals/flows/i0001-02-04.yml",
      "exists": false,
      "linked": false
     }
@@ -525,7 +525,7 @@
    "history": [
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-04",
+     "ticket": "i0001-02-04",
      "kind": "approved",
      "from": "todo",
      "to": "doing",
@@ -534,7 +534,7 @@
     },
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-04",
+     "ticket": "i0001-02-04",
      "kind": "started",
      "from": "doing",
      "to": "doing",
@@ -543,7 +543,7 @@
     },
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-04",
+     "ticket": "i0001-02-04",
      "kind": "finished",
      "from": "doing",
      "to": "review",
@@ -552,10 +552,10 @@
    ]
   },
   {
-   "ticket": "i0001-05",
+   "ticket": "i0001-02-05",
    "parent": "i0001",
    "phase": 2,
-   "title": "子 i0001-05",
+   "title": "子 i0001-02-05",
    "project": "",
    "issue": null,
    "predecessors": [],
@@ -570,11 +570,11 @@
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-05.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-02-05.md"
    },
    "worktree": {
     "exists": false,
-    "path": "<root>/.claude/worktrees/i0001-05"
+    "path": "<root>/.claude/worktrees/i0001-02-05"
    },
    "started_at": "",
    "completed_at": "",
@@ -589,7 +589,7 @@
    "history": [
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-05",
+     "ticket": "i0001-02-05",
      "kind": "approved",
      "from": "todo",
      "to": "doing",
@@ -598,7 +598,7 @@
     },
     {
      "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-05",
+     "ticket": "i0001-02-05",
      "kind": "cancelled",
      "from": "doing",
      "to": "done",
@@ -630,10 +630,10 @@
      "label": "1（調査）",
      "state": "ended",
      "tickets": [
-      "i0001-01"
+      "i0001-01-01"
      ],
      "states": {
-      "i0001-01": "done"
+      "i0001-01-01": "done"
      },
      "marks": {},
      "review_required": false,
@@ -663,14 +663,14 @@
      "label": "2（設計）",
      "state": "active",
      "tickets": [
-      "i0001-02",
-      "i0001-04",
-      "i0001-05"
+      "i0001-02-02",
+      "i0001-02-04",
+      "i0001-02-05"
      ],
      "states": {
-      "i0001-02": "doing",
-      "i0001-04": "review",
-      "i0001-05": "cancelled"
+      "i0001-02-02": "doing",
+      "i0001-02-04": "review",
+      "i0001-02-05": "cancelled"
      },
      "marks": {},
      "review_required": true,
@@ -686,5 +686,6 @@
     }
    ]
   }
- ]
+ ],
+ "archived": []
 }

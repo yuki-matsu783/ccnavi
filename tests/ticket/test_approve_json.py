@@ -57,7 +57,9 @@ class ApproveJsonTest(PhaseHarness):
     def pending_parent_and_child(self):
         """親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
 
     # ---- 1. preview は読むだけ
@@ -66,16 +68,18 @@ class ApproveJsonTest(PhaseHarness):
         self.pending_parent_and_child()
         # 種類の範囲を超える子。超過は承認を拒まないので一覧に載り、overflow[] を持つ
         # （設計 approve-carry 3.3）。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("wip/design/*",)))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/design/*",)))
         # 計画に無い番号の子。形が壊れているので、承認の対象にしない側に載る。
-        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
+        self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))
         # frontmatter の読めない提案。読めない提案の側に載る。
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
         body = self.preview()
         self.assertEqual(body["version"], APPROVE_VERSION)
-        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01", "i0001-02"])
+        self.assertEqual(
+            [b["ticket"] for b in body["batch"]], ["i0001", "i0001-01-01", "i0001-01-02"]
+        )
         parent, child, beyond = body["batch"]
         self.assertIsNone(parent["parent"])
         self.assertIsNone(parent["phase"])
@@ -83,7 +87,9 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(parent["overflow"], [])
         self.assertEqual(child["parent"], "i0001")
         self.assertEqual(child["phase"], 1)
-        self.assertTrue(child["path"].replace("\\", "/").endswith("wip/proposals/todo/i0001-01.md"))
+        self.assertTrue(
+            child["path"].replace("\\", "/").endswith("wip/proposals/todo/i0001-01-01.md")
+        )
         self.assertEqual(child["overflow"], [])
         # 超えた項は文字列のリストで、種類の名前と「超えている」を含む。
         self.assertTrue(beyond["overflow"], beyond)
@@ -92,26 +98,28 @@ class ApproveJsonTest(PhaseHarness):
             any("超えている" in p and "調査" in p for p in beyond["overflow"]), beyond["overflow"]
         )
         self.assertIn("チケットの承認リクエスト: 3 件", body["text"])
-        self.assertIn("== i0001-01", body["text"])
-        self.assertIn("== i0001-02", body["text"])
+        self.assertIn("== i0001-01-01", body["text"])
+        self.assertIn("== i0001-01-02", body["text"])
         self.assertIn("編集対象としているが", body["text"])
         # rejected[] に残るのは形の壊れた子だけ。
-        self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-05"])
+        self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-05-05"])
         self.assertTrue(any("計画に無い" in p for p in body["rejected"][0]["problems"]))
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
         # 見ただけ。承認済みチケットは置かれていない。
         self.assertFalse(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01"))
-        self.assertFalse(self.copy_exists("i0001-02"))
+        self.assertFalse(self.copy_exists("i0001-01-01"))
+        self.assertFalse(self.copy_exists("i0001-01-02"))
 
     def test_letter_case_alone_is_not_an_overflow(self):
         """表記の大文字小文字だけが種類の範囲と違う子は、超過にならない（overflow[] が空）。"""
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("WIP/Research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("WIP/Research/*",), False)
+        )
         self.commit_parent()
 
         body = self.preview()
-        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01"])
+        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01-01"])
         self.assertEqual(body["batch"][1]["overflow"], [])
         self.assertEqual(body["rejected"], [])
         self.assertNotIn("編集対象としているが", body["text"])
@@ -128,17 +136,17 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_with_the_shown_batch_places_copies_and_returns_a_prompt(self):
         self.pending_parent_and_child()
-        result = self.yes(["i0001", "i0001-01"])
+        result = self.yes(["i0001", "i0001-01-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         body = json.loads(result.stdout)
         self.assertEqual(body["version"], APPROVE_VERSION)
-        self.assertEqual(body["approved"], ["i0001", "i0001-01"])
+        self.assertEqual(body["approved"], ["i0001", "i0001-01-01"])
         self.assertEqual(len(body["copies"]), 2)
         self.assertTrue(self.copy_exists("i0001"))
-        self.assertTrue(self.copy_exists("i0001-01"))
+        self.assertTrue(self.copy_exists("i0001-01-01"))
         # Claude Code に渡す文。承認された識別子と、後工程の進め方が入っている。
         self.assertIn("i0001", body["prompt"])
-        self.assertIn("i0001-01", body["prompt"])
+        self.assertIn("i0001-01-01", body["prompt"])
         self.assertIn("承認", body["prompt"])
         self.assertIn("ccnavi-ticket.sh start", body["prompt"])
         # 承認したので一覧は空になる。
@@ -146,9 +154,9 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_order_of_identifiers_does_not_matter(self):
         self.pending_parent_and_child()
-        result = self.yes(["i0001-01", "i0001"])
+        result = self.yes(["i0001-01-01", "i0001"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.copy_exists("i0001-01"))
+        self.assertTrue(self.copy_exists("i0001-01-01"))
 
     # ---- 4. 見せた一覧と違えば承認しない
 
@@ -160,9 +168,9 @@ class ApproveJsonTest(PhaseHarness):
         body = json.loads(result.stdout)
         self.assertEqual(body["version"], APPROVE_VERSION)
         self.assertEqual(body["mismatch"]["expected"], ["i0001"])
-        self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01"])
+        self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01-01"])
         self.assertFalse(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01"))
+        self.assertFalse(self.copy_exists("i0001-01-01"))
 
     def test_a_filtered_overlay_approves_only_what_it_showed(self):
         """絞り込み中の承認。preview と yes に同じ絞りを渡し、見せた分だけを承認する。"""
@@ -174,9 +182,9 @@ class ApproveJsonTest(PhaseHarness):
         result = self.yes(["i0001"], "i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01"))
+        self.assertFalse(self.copy_exists("i0001-01-01"))
         # 絞りをつけずに同じことを頼めば、絞らない一覧と比べて食い違いになる。
-        self.assertEqual(self.preview()["batch"][0]["ticket"], "i0001-01")
+        self.assertEqual(self.preview()["batch"][0]["ticket"], "i0001-01-01")
 
     def test_yes_without_the_filter_compares_against_the_whole_batch(self):
         """絞りをつけない `--yes` は、絞らない一覧と比べる。部分だけを何も言わずに通さない。"""
@@ -184,12 +192,12 @@ class ApproveJsonTest(PhaseHarness):
         result = self.yes(["i0001"])
         self.assertEqual(result.returncode, 1)
         body = json.loads(result.stdout)
-        self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01"])
+        self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01-01"])
         self.assertFalse(self.copy_exists("i0001"))
 
     def test_yes_refuses_unknown_identifiers(self):
         self.pending_parent_and_child()
-        result = self.yes(["i0001", "i0001-01", "i9999"])
+        result = self.yes(["i0001", "i0001-01-01", "i9999"])
         self.assertEqual(result.returncode, 1)
         self.assertIn("i9999", json.loads(result.stdout)["mismatch"]["expected"])
         self.assertFalse(self.copy_exists("i0001"))
@@ -203,7 +211,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_without_json_prints_the_human_lines(self):
         self.pending_parent_and_child()
         digest = self.preview()["digest"]
-        result = self.ccnavi("--agree", "--yes", "i0001,i0001-01", "--digest", digest)
+        result = self.ccnavi("--agree", "--yes", "i0001,i0001-01-01", "--digest", digest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
@@ -226,17 +234,17 @@ class ApproveJsonTest(PhaseHarness):
         """2. 見せた `digest` を `--yes` に渡すと承認できる。"""
         self.pending_parent_and_child()
         shown = self.preview()["digest"]
-        result = self.yes(["i0001", "i0001-01"], digest=shown)
+        result = self.yes(["i0001", "i0001-01-01"], digest=shown)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01"])
-        self.assertTrue(self.copy_exists("i0001-01"))
+        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01-01"])
+        self.assertTrue(self.copy_exists("i0001-01-01"))
 
     def test_yes_refuses_when_the_shown_text_changed(self):
         """3. 見せたあとで子の中身を書き換えると、識別子が同じでも承認しない。"""
         inside = "wip/research/*"
         beyond = "src/a/*"
         for label, old, new in (
-            ("題", "title: 子 i0001-01", "title: 書き換えた題"),
+            ("題", "title: 子 i0001-01-01", "title: 書き換えた題"),
             ("理由", "rationale: r", "rationale: 書き換えた理由"),
             ("範囲（上限の内側）", f'glob: "{inside}"', 'glob: "wip/research/sub/*"'),
             ("範囲（上限の外）", f'glob: "{beyond}"', 'glob: "src/b/*"'),
@@ -245,7 +253,7 @@ class ApproveJsonTest(PhaseHarness):
                 self.setUp()
                 self.pending_parent_and_child()
                 path = self.propose(
-                    "i0001-01", child_text("i0001-01", "i0001", 1, (inside, beyond), False)
+                    "i0001-01-01", child_text("i0001-01-01", "i0001", 1, (inside, beyond), False)
                 )
                 self.commit_parent()
                 shown = self.preview()
@@ -257,32 +265,32 @@ class ApproveJsonTest(PhaseHarness):
                 write(path, text.replace(old, new, 1))
                 self.commit_parent("edit after preview")
 
-                result = self.yes(["i0001", "i0001-01"], digest=shown["digest"])
+                result = self.yes(["i0001", "i0001-01-01"], digest=shown["digest"])
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 body = json.loads(result.stdout)
                 self.assertEqual(body["version"], APPROVE_VERSION)
                 mismatch = body["mismatch"]
-                self.assertEqual(mismatch["expected"], ["i0001", "i0001-01"])
-                self.assertEqual(mismatch["current"], ["i0001", "i0001-01"])
+                self.assertEqual(mismatch["expected"], ["i0001", "i0001-01-01"])
+                self.assertEqual(mismatch["current"], ["i0001", "i0001-01-01"])
                 self.assertEqual(mismatch["digest"]["expected"], shown["digest"])
                 self.assertNotEqual(mismatch["digest"]["current"], shown["digest"])
                 self.assertEqual(mismatch["digest"]["current"], self.preview()["digest"])
                 self.assertFalse(self.copy_exists("i0001"))
-                self.assertFalse(self.copy_exists("i0001-01"))
+                self.assertFalse(self.copy_exists("i0001-01-01"))
 
     def test_yes_without_a_digest_is_refused(self):
         """4. `--yes` に `--digest` が無ければ承認しない。誤りとして言う。"""
         self.pending_parent_and_child()
         for args in (
-            ("--agree", "--yes", "i0001,i0001-01", "--json"),
-            ("--agree", "--yes", "i0001,i0001-01"),
+            ("--agree", "--yes", "i0001,i0001-01-01", "--json"),
+            ("--agree", "--yes", "i0001,i0001-01-01"),
         ):
             with self.subTest(" ".join(args)):
                 result = self.ccnavi(*args)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("--digest", result.stderr)
                 self.assertFalse(self.copy_exists("i0001"))
-                self.assertFalse(self.copy_exists("i0001-01"))
+                self.assertFalse(self.copy_exists("i0001-01-01"))
 
     # ---- 4c. ダイジェストは承認済みチケットに書き込む欄も覆う（チケット approve-carry-05 の 1〜5）
 
@@ -290,12 +298,12 @@ class ApproveJsonTest(PhaseHarness):
         """`issue:` を持つ親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
         parent = self.propose("i0001", parent_text("i0001", ["research", "design"], issue=issue))
         child = self.propose(
-            "i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False)
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
         )
         self.commit_parent()
         return parent, child
 
-    def assert_refused_after_edit(self, path, old, new, shown, tickets=("i0001", "i0001-01")):
+    def assert_refused_after_edit(self, path, old, new, shown, tickets=("i0001", "i0001-01-01")):
         """見せたあとで path の old を new に書き換えてコミットすると、
         見せたダイジェストでは承認しない。
 
@@ -331,7 +339,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_refuses_when_only_the_markdown_body_of_a_child_changed(self):
         """2. 見せたあとで子の Markdown の本文だけを書き換えても、ダイジェストで承認しない。"""
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
         shown = self.preview()
         self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
 
@@ -343,14 +351,14 @@ class ApproveJsonTest(PhaseHarness):
         ccnavi の知らない欄（`note:`）は画面に出ないが、そのまま承認済みチケットに書き込まれる。
         """
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("rationale: r\n", "rationale: r\nnote: x\n", 1))
         self.commit_parent("unknown field")
 
         shown = self.preview()
-        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01"])
+        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01-01"])
         self.assertNotIn("note", shown["text"])
         self.assert_refused_after_edit(child, "note: x", "note: y", shown)
 
@@ -398,17 +406,17 @@ class ApproveJsonTest(PhaseHarness):
         """本文に生の NUL があっても、
         見せたダイジェストで承認できる（ダイジェストは区切りの文字に頼らない）。"""
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
         self.commit_parent("nul in body")
 
         shown = self.preview()
-        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01"])
-        result = self.yes(["i0001", "i0001-01"], digest=shown["digest"])
+        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01-01"])
+        result = self.yes(["i0001", "i0001-01-01"], digest=shown["digest"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.copy_exists("i0001-01"))
+        self.assertTrue(self.copy_exists("i0001-01-01"))
 
     def test_moving_a_nul_in_the_body_after_preview_is_refused(self):
         """見せたあとで本文の NUL の位置だけをずらすと、見せたダイジェストでは承認しない。
@@ -417,7 +425,7 @@ class ApproveJsonTest(PhaseHarness):
         （各部分が frontmatter から始まるため）ので、この確かめは振る舞いを固定するためのもの。
         """
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
@@ -448,11 +456,11 @@ class ApproveJsonTest(PhaseHarness):
         """4. 見せた `digest` を大文字にして `--yes` に渡しても承認できる。"""
         self.pending_parent_and_child()
         shown = self.preview()["digest"]
-        result = self.yes(["i0001", "i0001-01"], digest=shown.upper())
+        result = self.yes(["i0001", "i0001-01-01"], digest=shown.upper())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01"])
+        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01-01"])
         self.assertTrue(self.copy_exists("i0001"))
-        self.assertTrue(self.copy_exists("i0001-01"))
+        self.assertTrue(self.copy_exists("i0001-01-01"))
 
     def test_preview_text_shows_the_issue_of_the_parent(self):
         """5. `issue:` を持つ親のプレビューの `text` に、その番号が出る。"""
@@ -470,14 +478,14 @@ class ApproveJsonTest(PhaseHarness):
         self.assertIn("端末", refused.stderr)
         self.assertFalse(self.copy_exists("i0001"))
 
-        result = self.yes(["i0001", "i0001-01"], "--guard-ticket-approval", "enable")
+        result = self.yes(["i0001", "i0001-01-01"], "--guard-ticket-approval", "enable")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.copy_exists("i0001"))
 
     def test_preview_does_not_need_a_terminal(self):
         self.pending_parent_and_child()
         body = self.preview("--guard-ticket-approval", "enable")
-        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01"])
+        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01-01"])
 
     # ---- 6. フィクスチャ
 
@@ -485,23 +493,23 @@ class ApproveJsonTest(PhaseHarness):
         self.pending_parent_and_child()
         # 種類の範囲を超える子は一覧に載り、`overflow` を持つ。計画に無い番号の子は
         # 承認の対象にしない側に載る。拡張は両方の形を読むので、同じ一覧に並べて書き出す。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("wip/design/*",)))
-        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/design/*",)))
+        self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))
         self.commit_parent()
         preview = self.preview()
         self._check_fixture("approve-preview.json", preview)
 
         # 承認の答えは親と子 1 枚の形で書き出す。超過のある子は提案を下げてから承認する。
-        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02.md"))
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-02.md"))
         self.commit_parent()
-        result = self.yes(["i0001", "i0001-01"])
+        result = self.yes(["i0001", "i0001-01-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self._check_fixture("approve-yes.json", json.loads(result.stdout))
 
         # 食い違いの形も拡張が読むので、同じく書き出す。
-        self.propose("i0001-03", child_text("i0001-03", "i0001", 2, ("wip/design/*",)))
+        self.propose("i0001-02-03", child_text("i0001-02-03", "i0001", 2, ("wip/design/*",)))
         self.commit_parent()
-        result = self.yes(["i0001-09"])
+        result = self.yes(["i0001-01-09"])
         self.assertEqual(result.returncode, 1)
         self._check_fixture("approve-mismatch.json", json.loads(result.stdout))
 
@@ -515,19 +523,19 @@ class ApproveJsonTest(PhaseHarness):
         混じるので、機械によって変わる。
         """
         self.pending_parent_and_child()
-        os.makedirs(os.path.join(self.approved, "doing", "i0001-01.md"))
-        result = self.yes(["i0001", "i0001-01"])
+        os.makedirs(os.path.join(self.approved, "doing", "i0001-01-01.md"))
+        result = self.yes(["i0001", "i0001-01-01"])
         self.assertEqual(result.returncode, 1)
         body = json.loads(result.stdout)
         self.assertEqual(body["version"], APPROVE_VERSION)
         self.assertEqual(body["partial"]["placed"], ["i0001"])
-        self.assertEqual(body["partial"]["ticket"], "i0001-01")
+        self.assertEqual(body["partial"]["ticket"], "i0001-01-01")
         self.assertIn("書けない", body["partial"]["reason"])
         self.assertNotIn("approved", body)
         # 置いたものは戻さない。親は承認済みチケットに入ったまま。
         self.assertTrue(self.copy_exists("i0001"))
         # 標準エラーには止まったところが出る。
-        self.assertIn("i0001-01", result.stderr)
+        self.assertIn("i0001-01-01", result.stderr)
 
     def test_partial_carries_the_progress_lines(self):
         """止まるまでに出た行も渡す。端末だけが知っていて拡張が知らない状態を作らない。
@@ -536,27 +544,27 @@ class ApproveJsonTest(PhaseHarness):
         そのフェーズのマーカーが消え、その行が `lines` に入る。
         """
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         self.assertEqual(self.confirm(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
 
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
-        self.propose("i0001-03", child_text("i0001-03", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-03", child_text("i0001-01-03", "i0001", 1, ["wip/design/*"]))
         self.commit_parent("propose 02 03")
-        os.makedirs(os.path.join(self.approved, "doing", "i0001-03.md"))
-        result = self.yes(["i0001-02", "i0001-03"])
+        os.makedirs(os.path.join(self.approved, "doing", "i0001-01-03.md"))
+        result = self.yes(["i0001-01-02", "i0001-01-03"])
         self.assertEqual(result.returncode, 1)
         partial = json.loads(result.stdout)["partial"]
-        self.assertEqual(partial["placed"], ["i0001-02"])
-        self.assertEqual(partial["ticket"], "i0001-03")
+        self.assertEqual(partial["placed"], ["i0001-01-02"])
+        self.assertEqual(partial["ticket"], "i0001-01-03")
         self.assertTrue(
             any("マーカー" in line for line in partial["lines"]),
             partial["lines"],
@@ -566,12 +574,12 @@ class ApproveJsonTest(PhaseHarness):
         """1 件目で止まったら placed は空。「一部だけ置かれた」と言わせない。"""
         self.pending_parent_and_child()
         os.makedirs(os.path.join(self.approved, "doing", "i0001.md"))
-        result = self.yes(["i0001", "i0001-01"])
+        result = self.yes(["i0001", "i0001-01-01"])
         self.assertEqual(result.returncode, 1)
         body = json.loads(result.stdout)
         self.assertEqual(body["partial"]["placed"], [])
         self.assertEqual(body["partial"]["ticket"], "i0001")
-        self.assertFalse(self.copy_exists("i0001-01"))
+        self.assertFalse(self.copy_exists("i0001-01-01"))
 
     def _fixture(self, name):
         with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:
