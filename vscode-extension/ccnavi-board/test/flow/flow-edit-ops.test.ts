@@ -330,7 +330,7 @@ test("CB-T299 欄の表記を真似たキーで本当の変更を隠せない。
 });
 
 test("CB-T277 画面から届く未保存のコピーと、保存前の確かめの設定は形を確かめてから受ける", () => {
-  const doc = templateFlow("i0001-01", "調査");
+  const doc = templateFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "draft", doc }), { type: "draft", doc });
   assert.deepEqual(asFlowMessage({ type: "draft", doc: null }), { type: "draft", doc: null });
   assert.equal(asFlowMessage({ type: "draft", doc: { nodes: "x" } }), undefined);
@@ -340,7 +340,7 @@ test("CB-T277 画面から届く未保存のコピーと、保存前の確かめ
 });
 
 test("CB-T279 確かめ直しの頼みは番号と読めるコピーがあるときだけ受ける。実行ファイルの答えがあれば、開始が無いという画面の注意は出さない", () => {
-  const doc = templateFlow("i0001-01", "調査");
+  const doc = templateFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "check", seq: 3, doc }), { type: "check", seq: 3, doc });
   assert.equal(asFlowMessage({ type: "check", seq: "3", doc }), undefined);
   assert.equal(asFlowMessage({ type: "check", seq: Number.NaN, doc }), undefined);

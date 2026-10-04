@@ -205,12 +205,12 @@ test("CB-D62 読み直せなかったら理由を出し、種類は出さない"
 test("CB-D63 種類が無いファイルは、保存する前に足すと言う。苦情と錠はそのまま出す", async () => {
   const dom = await openPhases({
     model: readPhases("version: 1\nphases: nope\n").model,
-    lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] },
+    lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] },
   });
   try {
     assert.match(dom.one("#phases .empty").textContent, /種類がありません。種類が 1 つも無いファイルは実行ファイルが読めない/);
     assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
-    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
+    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
   } finally {
     await dom.close();

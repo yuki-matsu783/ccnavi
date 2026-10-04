@@ -120,7 +120,7 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
     assert.ok(panel, scene);
     assert.equal(panel.error, "", scene);
     assert.equal(panel.phase, 1);
-    assert.deepEqual(panel.children, [`${FAMILY}-01`]);
+    assert.deepEqual(panel.children, [`${FAMILY}-01-01`]);
     if (why) assert.match(panel.problems.join("\n"), why, scene);
     else assert.deepEqual(panel.problems, [], scene);
     const html = renderRepo(dom.window.document, md, board, noop);
@@ -146,8 +146,8 @@ test("CX-T132 レビュー済みにする: 子を done/ へ動かし、マーカ
   const mark = JSON.parse(files[MARK]);
   assert.deepEqual(Object.keys(mark), ["mr", "accepted", "actor", "via", "at"]);
   assert.deepEqual([mark.mr, mark.accepted, mark.actor, mark.via], [42, [], LOGIN, "chrome"]);
-  assert.ok(`.ccnavi/approved/done/${FAMILY}-01.md` in files);
-  assert.ok(!(`wip/proposals/review/${FAMILY}-01.md` in files));
+  assert.ok(`.ccnavi/approved/done/${FAMILY}-01-01.md` in files);
+  assert.ok(!(`wip/proposals/review/${FAMILY}-01-01.md` in files));
   const last = JSON.parse(files[`.ccnavi/approved/events/${FAMILY}.ndjson`].trim().split("\n").pop() as string);
   assert.deepEqual([last.kind, last.mark, last.via, last.actor, last.version], ["phase-mark", "reviewed", "chrome", LOGIN, "9.9.9"]);
   // 書いた後のボードからは候補が消える

@@ -65,8 +65,8 @@ def project_integration(**extra):
 def family_files(ident="web-i0012", issue=12):
     return {
         f"wip/proposals/todo/{ident}.md": parent_text(ident, ["research"], issue=issue),
-        f"wip/proposals/todo/{ident}-01.md": child_text(
-            f"{ident}-01", ident, 1, ["wip/research/*"], False
+        f"wip/proposals/todo/{ident}-01-01.md": child_text(
+            f"{ident}-01-01", ident, 1, ["wip/research/*"], False
         ),
         # 親のブランチの上のレイヤーは読まない（置き場の外なので拡張はそもそも読まない。
         # 親のブランチの上で書き換えて承認やレビューを不要にさせない）
@@ -108,7 +108,7 @@ class ChromeProjectTest(unittest.TestCase):
     def test_the_board_of_a_project_family_lists_its_proposals(self):
         board = self.ask("board")
         self.assertNotIn("error", board, board)
-        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01"])
+        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01-01"])
         self.assertTrue(board["write"]["allowed"], board["write"])
         self.assertEqual(board["rejected"], [])
         # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーのパスは出さない）
@@ -259,7 +259,9 @@ class StartTest(unittest.TestCase):
             "topic": {
                 "head": HEAD,
                 "files": {
-                    "wip/proposals/todo/i0012-01.md": child_text("i0012-01", "i0012", 1, ["src/*"])
+                    "wip/proposals/todo/i0012-01-01.md": child_text(
+                        "i0012-01-01", "i0012", 1, ["src/*"]
+                    )
                 },
             }
         }

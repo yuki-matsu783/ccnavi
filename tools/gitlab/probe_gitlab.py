@@ -402,7 +402,7 @@ def main() -> int:
     propose(parent_tree, "i0001", allow=("src/*", "wip/*"), title="挨拶を足す", issue=issue_no)
     propose(
         parent_tree,
-        "i0001-01",
+        "i0001-01-01",
         parent="i0001",
         phase=1,
         allow=("src/a/*",),
@@ -411,7 +411,7 @@ def main() -> int:
     )
     propose(
         parent_tree,
-        "i0001-02",
+        "i0001-01-02",
         parent="i0001",
         phase=1,
         allow=("src/b/*",),
@@ -422,7 +422,7 @@ def main() -> int:
     approved = exe("--agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
 
-    for child in ("i0001-01", "i0001-02"):
+    for child in ("i0001-01-01", "i0001-01-02"):
         tree = worktree(child, "i0001")
         started = sh(TICKET_SH, parent_tree, "start", child)
         record(f"ticket start {child}", started.returncode == 0, started.stderr.strip()[:200])
@@ -432,22 +432,22 @@ def main() -> int:
 
     child_push = sh(
         GIT_SH,
-        os.path.join(ROOT, ".claude", "worktrees", "i0001-01"),
+        os.path.join(ROOT, ".claude", "worktrees", "i0001-01-01"),
         "push",
         "-u",
         "origin",
-        "i0001-01",
+        "i0001-01-01",
     )
     record(
         "子のワークツリーからの push はラッパースクリプトが拒む",
         child_push.returncode != 0 and "子チケット" in (child_push.stderr + child_push.stdout),
     )
 
-    for child in ("i0001-01", "i0001-02"):
+    for child in ("i0001-01-01", "i0001-01-02"):
         done = sh(TICKET_SH, parent_tree, "finish", child)
         record(f"ticket finish {child}", done.returncode == 0, done.stderr.strip()[:200])
     commit_all(parent_tree, "finish")
-    for child in ("i0001-01", "i0001-02"):
+    for child in ("i0001-01-01", "i0001-01-02"):
         git(parent_tree, "merge", "--quiet", "--no-edit", child)
 
     said = hook("PostToolUse", "Bash", parent_tree, command="ls")
@@ -685,7 +685,7 @@ def main() -> int:
     propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で早めに閉じる親")
     propose(
         parent2,
-        "i0002-01",
+        "i0002-01-01",
         parent="i0002",
         phase=1,
         allow=("src/c/*",),
@@ -731,7 +731,9 @@ def main() -> int:
         )
         record(
             "未着手の子が cancelled/ へ動く",
-            os.path.exists(os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01.md")),
+            os.path.exists(
+                os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01-01.md")
+            ),
         )
         record(
             "close-early のコメントが MR にある",

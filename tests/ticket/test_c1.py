@@ -46,7 +46,7 @@ class FamilyTest(AuthorityHarness):
         return lines(result.stdout)
 
     def test_no_record_is_not_a_target(self):
-        answer = self.ask("i0001-01")
+        answer = self.ask("i0001-01-01")
         self.assertEqual(answer["family"], "i0001")
         self.assertEqual(answer["target"], "no")
         self.assertIn("取り込み状態が無い", answer["why"])
@@ -55,7 +55,7 @@ class FamilyTest(AuthorityHarness):
     def test_a_present_family_is_a_target_with_its_tree(self):
         self.record("present")
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        answer = self.ask("i0001-01")
+        answer = self.ask("i0001-01-01")
         self.assertEqual(answer["target"], "yes")
         self.assertEqual(answer["repo"], "self")
         self.assertEqual(os.path.realpath(answer["tree"]), os.path.realpath(self.parent_tree))
@@ -178,15 +178,15 @@ class SortTest(AuthorityHarness):
     def test_moves_written_by_a_human_decision_are_c(self):
         """ユーザのレビュー（review/ から done/）と早めに閉じたときの取り消し（doing/ から done/）、
         マーカーの消去は (c)。"""
-        review = "wip/proposals/review/i0001-01.md"
-        self.put(review, child_text("i0001-01", "i0001", 1, ["wip/research/*"]))
+        review = "wip/proposals/review/i0001-01-01.md"
+        self.put(review, child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]))
         mark = f"{APPROVED}/phases/i0001/1.pending"
         self.put(mark, json.dumps({"review": "mr", "at": "t"}))
         self.commit_parent("in review")
         os.remove(os.path.join(self.parent_tree, *review.split("/")))
         os.remove(os.path.join(self.parent_tree, *mark.split("/")))
-        done = f"{APPROVED}/done/i0001-01.md"
-        self.put(done, child_text("i0001-01", "i0001", 1, ["wip/research/*"]))
+        done = f"{APPROVED}/done/i0001-01-01.md"
+        self.put(done, child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]))
         found = dict((path, kind) for kind, path in self.sort())
         self.assertEqual(found, {review: "c", done: "c", mark: "c"})
 
@@ -221,20 +221,20 @@ class SortTest(AuthorityHarness):
         self.assertEqual(self.sort(), [("d", self.events())])
 
     def test_flows_approvals_and_other_files(self):
-        flow = f"{APPROVED}/flows/i0001-01.yml"
-        copy = f"{APPROVED}/doing/i0001-02.md"
+        flow = f"{APPROVED}/flows/i0001-01-01.yml"
+        copy = f"{APPROVED}/doing/i0001-01-02.md"
         other = f"{APPROVED}/notes.txt"
-        review = "wip/proposals/review/i0001-01.md"
+        review = "wip/proposals/review/i0001-01-01.md"
         self.put(flow, "steps: []\n")
-        self.put(copy, child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.put(copy, child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.put(other, "x\n")
         self.put(review, "x\n")
         found = dict((path, kind) for kind, path in self.sort())
         self.assertEqual(found, {flow: "c", copy: "c", other: "d", review: "d"})
 
     def test_judge_records_are_kept_and_temp_files_skipped(self):
-        judge = f"{APPROVED}/phases/i0001/i0001-01.judge.json"
-        temp = f"{APPROVED}/flows/.i0001-01.yml.123.tmp"
+        judge = f"{APPROVED}/phases/i0001/i0001-01-01.judge.json"
+        temp = f"{APPROVED}/flows/.i0001-01-01.yml.123.tmp"
         part = f"{APPROVED}/doing/.i0001.md.abc.part"
         self.put(judge, "{}")
         self.put(temp, "x")
@@ -251,7 +251,7 @@ class SortTest(AuthorityHarness):
         self.commit_parent("unsent")
         self.assertEqual(self.sort(base), sorted([("b", pending), ("c", reviewed)]))
         # 未コミットの judge.json は keep だが、コミット済みの未送信なら見分けない（d）。
-        judge = f"{APPROVED}/phases/i0001/i0001-01.judge.json"
+        judge = f"{APPROVED}/phases/i0001/i0001-01-01.judge.json"
         self.put(judge, "{}")
         self.commit_parent("judge")
         self.assertIn(("d", judge), self.sort(base))
@@ -279,25 +279,25 @@ class RecordTreeTest(AuthorityHarness):
         return result, listed
 
     def test_the_list_is_relative_to_the_parent_tree(self):
-        self.worktree("i0001-02", "i0001")
-        result, listed = self.run_recorded("ticket", "cancel", "i0001-01", "--reason", "r")
+        self.worktree("i0001-01-02", "i0001")
+        result, listed = self.run_recorded("ticket", "cancel", "i0001-01-01", "--reason", "r")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(f"{APPROVED}/done/i0001-01.md", listed)
-        self.assertIn(f"{APPROVED}/doing/i0001-01.md", listed)
+        self.assertIn(f"{APPROVED}/done/i0001-01-01.md", listed)
+        self.assertIn(f"{APPROVED}/doing/i0001-01-01.md", listed)
         self.assertTrue(all(not os.path.isabs(p) for p in listed), listed)
 
     def test_writing_outside_the_places_is_an_error_and_the_list_is_kept(self):
         # 承認は提案（wip/proposals/todo/）を消す。C1 の置き場の外なので error。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent("propose")
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         result, listed = self.run_recorded(
-            "--agree", "--yes", "i0001-02", "--digest", preview["digest"], "--json"
+            "--agree", "--yes", "i0001-01-02", "--digest", preview["digest"], "--json"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場の外に書き込みがあった", result.stderr)
-        self.assertIn("wip/proposals/todo/i0001-02.md", listed)
-        self.assertIn(f"{APPROVED}/doing/i0001-02.md", listed)
+        self.assertIn("wip/proposals/todo/i0001-01-02.md", listed)
+        self.assertIn(f"{APPROVED}/doing/i0001-01-02.md", listed)
 
     def test_record_tree_needs_record_writes(self):
         result = self.ccnavi("--record-tree", self.parent_tree, "ticket", "start", "i0001")
@@ -387,14 +387,14 @@ class RecordTreeReviewTest(PhaseHarness):
 
     def test_request_decide_and_ready_write_only_the_places(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         fixture = self.remote()
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         requested = self.request(fixture, 1)
         self.assertEqual(requested.returncode, 0, requested.stderr)
@@ -431,14 +431,14 @@ class ChooseTest(PhaseHarness):
 
     def test_choose_writes_only_the_choices(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         fixture = self.remote()
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         self.commit_parent("requested")
@@ -482,7 +482,7 @@ class BypassTest(AuthorityHarness):
     def test_state_operations_without_record_tree_are_refused(self):
         before = self.ccnavi("c1", "family", "i0001")
         self.assertIn("target yes", before.stdout)
-        refused = self.ccnavi("ticket", "finish", "i0001-01")
+        refused = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
         self.assertIn("C1 の対象", refused.stderr)
         fixture = write(os.path.join(self.root, "r.json"), json.dumps({"host": "x"}))
@@ -496,7 +496,7 @@ class BypassTest(AuthorityHarness):
             self.assertIn("C1 の対象", result.stderr, args)
 
     def test_record_risk_and_human_entries_are_not_refused_here(self):
-        risk = self.ccnavi("ticket", "record-risk", "i0001-01", "x", "yes", "--reason", "r")
+        risk = self.ccnavi("ticket", "record-risk", "i0001-01-01", "x", "yes", "--reason", "r")
         self.assertNotIn("C1 の対象", risk.stderr)
         chat = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat")
         self.assertNotIn("C1 の対象", chat.stderr)

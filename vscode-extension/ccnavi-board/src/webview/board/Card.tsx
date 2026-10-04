@@ -157,7 +157,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   }
   // 先行を満たしていない。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
   if (card.predecessorsUnmet.length > 0) {
-    // 識別子（`i0001-02`）の途中では折り返さない。折り返すのは識別子の間の空白か、見出しと括弧の間だけ
+    // 識別子（`i0001-02-02`）の途中では折り返さない。折り返すのは識別子の間の空白か、見出しと括弧の間だけ
     const badge = predecessorsBadge(card);
     badges.push(
       <span key="preds" className="badge preds" title={badge.title}>

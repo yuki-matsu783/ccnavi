@@ -248,17 +248,23 @@ class DagApprovalTest(PhaseHarness):
         return t
 
     def close_first_phase(self):
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/a/*"], review=False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/a/*"], review=False)
+        )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/a/x.md", "x\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/a/x.md", "x\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
 
     def propose_branches(self):
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["tests/a/*"], review=False))
-        self.propose("i0001-03", child_text("i0001-03", "i0001", 3, ["src/a/*"], review=False))
+        self.propose(
+            "i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["tests/a/*"], review=False)
+        )
+        self.propose(
+            "i0001-03-03", child_text("i0001-03-03", "i0001", 3, ["src/a/*"], review=False)
+        )
         self.commit_parent("propose 02 03")
         return self.approve()
 
@@ -272,13 +278,13 @@ class DagApprovalTest(PhaseHarness):
         self.close_first_phase()
         result = self.propose_branches()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertTrue(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertTrue(self.approved_child("i0001-03-03"))
         # 合流点は、両方の枝が閉じるまで承認しない。
-        self.propose("i0001-04", child_text("i0001-04", "i0001", 4, ["wip/d/*"]))
+        self.propose("i0001-04-04", child_text("i0001-04-04", "i0001", 4, ["wip/d/*"]))
         self.commit_parent("propose 04")
         refused = self.approve()
-        self.assertFalse(self.approved_child("i0001-04"))
+        self.assertFalse(self.approved_child("i0001-04-04"))
         self.assertIn("閉じるまで承認しない", refused.stderr)
 
     def test_sequential_still_waits_for_every_earlier_phase(self):
@@ -286,8 +292,8 @@ class DagApprovalTest(PhaseHarness):
         self.family(plan=PLAN)
         self.close_first_phase()
         result = self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertFalse(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertFalse(self.approved_child("i0001-03-03"))
         self.assertIn("閉じるまで承認しない", result.stderr)
 
     def test_changing_phases_yml_later_does_not_loosen_a_running_parent(self):
@@ -297,8 +303,8 @@ class DagApprovalTest(PhaseHarness):
         self.use(DAG)
         self.close_first_phase()
         self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertFalse(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertFalse(self.approved_child("i0001-03-03"))
 
     def test_changing_phases_yml_later_does_not_tighten_a_running_parent(self):
         self.use(DAG)
@@ -306,7 +312,7 @@ class DagApprovalTest(PhaseHarness):
         self.use(SEQUENTIAL)
         self.close_first_phase()
         self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-03-03"))
 
     def test_a_revision_with_the_same_plan_applies_the_new_phases_yml(self):
         self.use(SEQUENTIAL)
@@ -364,8 +370,8 @@ class DagApprovalTest(PhaseHarness):
         self.use(DAG)
         self.close_first_phase()
         self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertFalse(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertFalse(self.approved_child("i0001-03-03"))
 
     def test_a_revision_cannot_move_a_defer_target_behind_approved_children(self):
         def reviewed(text):

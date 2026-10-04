@@ -231,14 +231,14 @@ class TicketTest(unittest.TestCase):
     def family(self, review=(True, False)):
         """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子のワークツリーを作って着手する。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",), review=review[0])
-        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",), review=review[1])
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",), review=review[0])
+        self.propose("i0001-01-02", parent="i0001", phase=1, allow=("src/b/*",), review=review[1])
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.start_parent()
-        for child in ("i0001-01", "i0001-02"):
+        for child in ("i0001-01-01", "i0001-01-02"):
             self.worktree(child, "i0001")
             started = self.ccnavi("ticket", "start", child)
             self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
@@ -250,7 +250,7 @@ class TicketTest(unittest.TestCase):
 
     def test_writes_are_judged_by_where_they_land(self):
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
 
         inside = self.hook(
             "PreToolUse",
@@ -269,7 +269,7 @@ class TicketTest(unittest.TestCase):
             file_path=os.path.join(child, "src", "b", "x.py"),
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
-        self.assertIn("i0001-01", self.reason(outside))
+        self.assertIn("i0001-01-01", self.reason(outside))
 
         # 親のツリーは親の範囲で判定される。
         parent_ok = self.hook(
@@ -346,10 +346,10 @@ class TicketTest(unittest.TestCase):
     def test_no_worktree_means_no_ticket(self):
         """ワークツリーが無い子は判定に使われない。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.assertEqual(self.approve().returncode, 0)
         self.start_parent()
-        result = self.ccnavi("ticket", "start", "i0001-01")
+        result = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ワークツリー", result.stderr)
 
@@ -361,9 +361,9 @@ class TicketTest(unittest.TestCase):
         「有効」と言われながら権限モード任せになる（敵対的レビューで実際に確かめた）。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.assertEqual(self.approve().returncode, 0)
-        child = self.worktree("I0001-01", "i0001")
+        child = self.worktree("I0001-01-01", "i0001")
         outside = self.hook(
             "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
         )
@@ -382,15 +382,15 @@ class TicketTest(unittest.TestCase):
         超えた項は承認しても書けないことを、承認するユーザがその場で読めるようにする。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
-        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.propose("i0001-01-02", parent="i0001", phase=1, allow=("src/b/*",))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("編集対象としているが", result.stdout)
         self.assertIn("`docs/*` は親 i0001 の範囲を超えている", result.stdout)
         self.assertNotIn("承認の対象にしない", result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-02.md")))
 
     def test_write_beyond_the_parent_is_denied_and_names_the_parent(self):
         """子の範囲の中でも親の範囲の外は止まり、文面の `limit:` 行が親を名指しする。
@@ -398,14 +398,14 @@ class TicketTest(unittest.TestCase):
         子自身の範囲の外は今までどおりで、`limit:` 行を足さない（`scope:` 行で足りる）。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "docs/*"))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*", "docs/*"))
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.start_parent()
-        child = self.worktree("i0001-01", "i0001")
-        started = self.ccnavi("ticket", "start", "i0001-01")
+        child = self.worktree("i0001-01-01", "i0001")
+        started = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
 
         inside = self.hook(
@@ -431,14 +431,14 @@ class TicketTest(unittest.TestCase):
 
     def test_approve_only_the_listed_tickets(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.propose("i0002", allow=("docs/*",))
-        result = self.ccnavi("--agree", "i0001", "i0001-01", stdin="y\n")
+        result = self.ccnavi("--agree", "i0001", "i0001-01-01", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
         self.assertNotIn("i0002", result.stdout.split("チケットの承認リクエスト")[1])
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0002.md")))
         # 残した分は次の --agree で承認の対象に入る
         self.assertEqual(self.approve().returncode, 0)
@@ -446,11 +446,11 @@ class TicketTest(unittest.TestCase):
 
     def test_listed_child_without_its_pending_parent_is_refused(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        result = self.ccnavi("--agree", "i0001-01", stdin="y\n")
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
+        result = self.ccnavi("--agree", "i0001-01-01", stdin="y\n")
         self.assertEqual(result.returncode, 1)
         self.assertIn("親 i0001 が承認されていない", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_listed_id_with_nothing_pending_is_refused_too(self):
@@ -469,19 +469,21 @@ class TicketTest(unittest.TestCase):
 
     def test_grandchild_is_refused(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        self.propose("i0001-01-01", parent="i0001-01", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01-01-01", parent="i0001-01-01", phase=1, allow=("src/a/*",))
         result = self.approve()
         self.assertIn("2 段", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01-01-01.md"))
+        )
 
     def test_editing_the_proposal_does_not_widen_the_scope(self):
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         # 承認後に同じ識別子の提案を todo/ に書き足しても、判定に使われるのは承認済みチケット。
         write(
-            os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md"),
-            ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*")),
+            os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md"),
+            ticket_text("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*")),
         )
         result = self.hook(
             "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
@@ -530,9 +532,9 @@ class TicketTest(unittest.TestCase):
         # 親を動かさずに子だけ動かすと、子の範囲をどの親で切り詰めるかが決まらない。
         # 承認ならそこで落ちる。置き場を動かすだけの進め方では判定が止める。
         self.propose("i0001", allow=("src/*",))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        self.hand_move("i0001-01")
-        child = self.worktree("i0001-01", "i0001")
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01-01")
+        child = self.worktree("i0001-01-01", "i0001")
 
         # 子が自分の範囲だと言っている場所でも通さない。
         result = self.hook(
@@ -567,12 +569,12 @@ class TicketTest(unittest.TestCase):
         # 止まる場所は書き込みのときで、そこで初めて知るのは遅い。承認の画面が
         # 無い進め方では、`--lint` がその代わりになる。
         self.propose("i0001", allow=("src/*",))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        self.hand_move("i0001-01")
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01-01")
 
         result = self.ccnavi("--lint")
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("i0001-01", result.stdout)
+        self.assertIn("i0001-01-01", result.stdout)
         self.assertIn("親 i0001 の承認済みチケットが作業中に無い", result.stdout)
 
     def close_parent_by_hand(self, name="i0001"):
@@ -599,9 +601,9 @@ class TicketTest(unittest.TestCase):
         """
         # 子は親（src/*）に無い範囲を宣言する。承認は警告で通す。
         self.propose("i0001", allow=("src/*",))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("docs/*",))
         self.assertEqual(self.approve().returncode, 0)
-        child = self.worktree("i0001-01", "i0001")
+        child = self.worktree("i0001-01-01", "i0001")
         self.close_parent_by_hand()
 
         result = self.hook(
@@ -620,15 +622,15 @@ class TicketTest(unittest.TestCase):
         同じ出力から確かめる。対応表が分かれると、その子は自分の宣言だけで範囲が決まる。
         """
         self.propose("i0001", allow=("src/*",))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("docs/*",))
         self.assertEqual(self.approve().returncode, 0)
-        self.worktree("i0001-01", "i0001")
+        self.worktree("i0001-01-01", "i0001")
         self.close_parent_by_hand()
 
         result = self.ccnavi("--explain", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
         records = {t["ticket"]: t for t in json.loads(result.stdout)["tickets"]}
-        self.assertIn("i0001", records["i0001-01"]["blocked"])
+        self.assertIn("i0001", records["i0001-01-01"]["blocked"])
 
         open_ids = {k for k, v in records.items() if v.get("copy", {}).get("status") == "open"}
         for name in open_ids:
@@ -642,9 +644,9 @@ class TicketTest(unittest.TestCase):
 
     def test_parent_and_child_strictest_wins(self):
         self.propose("i0001", allow=("src/a/*",), ask=("src/b/*",))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*"))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*"))
         self.assertEqual(self.approve().returncode, 0)
-        child = self.worktree("i0001-01", "i0001")
+        child = self.worktree("i0001-01-01", "i0001")
         result = self.hook(
             "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
         )
@@ -656,18 +658,18 @@ class TicketTest(unittest.TestCase):
 
     def test_state_directories_cannot_be_written_directly(self):
         self.family()
-        target = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+        target = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
         self.assertIn("builtin-ticket-state", self.reason(result))
         moved = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="mv .ccnavi/approved/doing/i0001-01.md wip/proposals/review/",
+            command="mv .ccnavi/approved/doing/i0001-01-01.md wip/proposals/review/",
         )
         self.assertIn("builtin-ticket-state", self.reason(moved))
         # todo/ への作成は自由。
-        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-03.md")
+        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-03.md")
         free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
         self.assertNotIn("builtin-ticket-state", self.reason(free))
 
@@ -680,32 +682,32 @@ class TicketTest(unittest.TestCase):
         """
         self.family()
         for command in (
-            "cp -t wip/proposals/review/ .ccnavi/approved/doing/i0001-01.md",
-            "cp -t wip/proposals/review .ccnavi/approved/doing/i0001-01.md",
-            "cp -vt wip/proposals/review /tmp/i0001-01.md",
-            "cp --target-directory=wip/proposals/review /tmp/i0001-01.md",
-            "ln -st wip/proposals/review /tmp/i0001-01.md",
-            "install -t wip/proposals/review /tmp/i0001-01.md",
-            "sudo cp -t wip/proposals/review /tmp/i0001-01.md",
-            "cp /tmp/i0001-01.md wip/proposals/review",
-            "cp /tmp/i0001-01.md wip/proposals/review/",
-            "cp /tmp/i0001-01.md wip/proposals/review -f",
-            "cp /tmp/i0001-01.md wip/proposals/review/i0001-01.md 2>/dev/null",
+            "cp -t wip/proposals/review/ .ccnavi/approved/doing/i0001-01-01.md",
+            "cp -t wip/proposals/review .ccnavi/approved/doing/i0001-01-01.md",
+            "cp -vt wip/proposals/review /tmp/i0001-01-01.md",
+            "cp --target-directory=wip/proposals/review /tmp/i0001-01-01.md",
+            "ln -st wip/proposals/review /tmp/i0001-01-01.md",
+            "install -t wip/proposals/review /tmp/i0001-01-01.md",
+            "sudo cp -t wip/proposals/review /tmp/i0001-01-01.md",
+            "cp /tmp/i0001-01-01.md wip/proposals/review",
+            "cp /tmp/i0001-01-01.md wip/proposals/review/",
+            "cp /tmp/i0001-01-01.md wip/proposals/review -f",
+            "cp /tmp/i0001-01-01.md wip/proposals/review/i0001-01-01.md 2>/dev/null",
             "cp -r /tmp/review wip/proposals/",
             "cp -r /tmp/review wip/proposals",
             "mv /tmp/review wip/proposals/",
-            "cd wip/proposals && cp /tmp/i0001-01.md review",
-            "cd wip/proposals/review && cp /tmp/i0001-01.md .",
+            "cd wip/proposals && cp /tmp/i0001-01-01.md review",
+            "cd wip/proposals/review && cp /tmp/i0001-01-01.md .",
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
                 self.assertIn("builtin-ticket-state", self.reason(result))
         for command in (
-            "cp wip/proposals/review/i0001-01.md /tmp/x",
-            "cp -t /tmp/out wip/proposals/review/i0001-01.md",
-            "cp /tmp/i0001-03.md wip/proposals/todo/",
-            "cp -t wip/proposals/todo /tmp/i0001-03.md",
-            "cp /tmp/i0001-03.md wip/proposals/",
+            "cp wip/proposals/review/i0001-01-01.md /tmp/x",
+            "cp -t /tmp/out wip/proposals/review/i0001-01-01.md",
+            "cp /tmp/i0001-01-03.md wip/proposals/todo/",
+            "cp -t wip/proposals/todo /tmp/i0001-01-03.md",
+            "cp /tmp/i0001-01-03.md wip/proposals/",
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
@@ -718,14 +720,14 @@ class TicketTest(unittest.TestCase):
             "Bash",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
         parent = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
 
@@ -737,7 +739,7 @@ class TicketTest(unittest.TestCase):
         """
         self.family()
         for command in (
-            "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001-01",
+            "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001-01-01",
             "cd ../i0001 && sh .ccnavi/scripts/ccnavi-git.sh push origin i0001",
         ):
             with self.subTest(command=command):
@@ -799,18 +801,18 @@ class TicketTest(unittest.TestCase):
         レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる。
         """
         self.family()
-        result = self.ccnavi("ticket", "finish", "i0001-01")
+        result = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertEqual(result.returncode, 0, result.stderr)
-        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
         self.assertTrue(os.path.exists(review))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "done", "i0001-01-01.md")))
         with open(review, encoding="utf-8") as f:
             text = f.read()
         self.assertIn("ccnavi_approved:", text)
         self.assertIn("completed_at:", text)
         # レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる。
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         after = self.hook(
             "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
         )
@@ -818,9 +820,11 @@ class TicketTest(unittest.TestCase):
 
     def test_start_records_the_base_point(self):
         self.family()
-        with open(os.path.join(self.approved, "doing", "i0001-01.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.approved, "doing", "i0001-01-01.md"), encoding="utf-8") as f:
             copy = f.read()
-        head = git(os.path.join(self.root, ".claude", "worktrees", "i0001-01"), "rev-parse", "HEAD")
+        head = git(
+            os.path.join(self.root, ".claude", "worktrees", "i0001-01-01"), "rev-parse", "HEAD"
+        )
         self.assertIn(head.strip(), copy)
         self.assertIn("started_at:", copy)
 
@@ -829,12 +833,12 @@ class TicketTest(unittest.TestCase):
     def family_without_starting(self):
         """親 1 本と子 1 本を承認して、子のワークツリーだけ作る（どちらも未着手）。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        return self.worktree("i0001-01", "i0001")
+        return self.worktree("i0001-01-01", "i0001")
 
     def test_a_child_does_not_start_before_its_parent(self):
         """親が未着手のまま子を着手できないこと。案内は親の `start`（REQ-TKT-48）。
@@ -843,27 +847,27 @@ class TicketTest(unittest.TestCase):
         最初の子の着手に置けば、親の作業が実際に始まる時点で言える。
         """
         self.family_without_starting()
-        refused = self.ccnavi("ticket", "start", "i0001-01")
+        refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-01 の親 i0001 が未着手", refused.stderr)
+        self.assertIn("i0001-01-01 の親 i0001 が未着手", refused.stderr)
         # 案内の sh はワークスペースルートからの絶対パス。子のワークツリーから打てるパス。
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"{ticket_sh} start i0001", refused.stderr)
         self.assertNotIn("sh .ccnavi/scripts/", refused.stderr)
         # 止まった回は、子の着手の欄を書かない。
-        with open(os.path.join(self.approved, "doing", "i0001-01.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.approved, "doing", "i0001-01-01.md"), encoding="utf-8") as f:
             self.assertIn('started_at: ""', f.read())
 
         # 親を着手すれば、案内のとおりに通る。2 枚目からは何も増えない。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
-        started = self.ccnavi("ticket", "start", "i0001-01")
+        started = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
+        self.propose("i0001-01-02", parent="i0001", phase=1, allow=("src/b/*",))
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "next")
         self.assertEqual(self.approve().returncode, 0)
-        self.worktree("i0001-02", "i0001")
-        second = self.ccnavi("ticket", "start", "i0001-02")
+        self.worktree("i0001-01-02", "i0001")
+        second = self.ccnavi("ticket", "start", "i0001-01-02")
         self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
 
     def test_a_closed_parent_does_not_take_a_new_child(self):
@@ -879,9 +883,9 @@ class TicketTest(unittest.TestCase):
         os.replace(
             os.path.join(self.approved, "doing", "i0001.md"), os.path.join(closed, "i0001.md")
         )
-        refused = self.ccnavi("ticket", "start", "i0001-01")
+        refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-01 の親 i0001 は作業中ではない（いまは done/）", refused.stderr)
+        self.assertIn("i0001-01-01 の親 i0001 は作業中ではない（いまは done/）", refused.stderr)
 
     def test_a_parent_that_is_still_a_proposal_asks_for_approval_first(self):
         """親が承認前なら、案内は承認から始めること。
@@ -892,12 +896,12 @@ class TicketTest(unittest.TestCase):
         勧めると、案内のとおりに打っても通らない。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        self.hand_move("i0001-01")
-        self.worktree("i0001-01", "i0001")
-        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01-01")
+        self.worktree("i0001-01-01", "i0001")
+        refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
+        self.assertIn("i0001-01-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
         self.assertIn("--agree", refused.stderr)
 
     def test_a_child_without_any_parent_at_all_is_named(self):
@@ -906,17 +910,17 @@ class TicketTest(unittest.TestCase):
         ユーザが子だけ置き場へ動かし、親を書き忘れた形。`_find` は子を引けるので、親の側を
         引いたときの「無い」をここで言わないと、ワークツリーの検査まで進んで別の話になる。
         """
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        self.hand_move("i0001-01")
-        self.worktree("i0001-01", "main")
-        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01-01")
+        self.worktree("i0001-01-01", "main")
+        refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-01 の親 i0001 が見つからない", refused.stderr)
+        self.assertIn("i0001-01-01 の親 i0001 が見つからない", refused.stderr)
 
     # ---- 4. フェーズの終わりと HITL ポイント
 
     def close_phase(self):
-        for child in ("i0001-01", "i0001-02"):
+        for child in ("i0001-01-01", "i0001-01-02"):
             done = self.ccnavi("ticket", "finish", child)
             self.assertEqual(done.returncode, 0, done.stderr)
         git(self.parent_tree, "add", "-A")
@@ -947,7 +951,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Write",
             self.parent_tree,
-            file_path=os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-03.md"),
+            file_path=os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-03.md"),
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(plan))
         # main からの起動は止まらない。
@@ -1077,7 +1081,7 @@ class TicketTest(unittest.TestCase):
 
     # ---- レビュー（sh の代わりに、テストがリモートから取得した結果を渡す）
 
-    def remote(self, merge=("i0001-01", "i0001-02")):
+    def remote(self, merge=("i0001-01-01", "i0001-01-02")):
         """origin と、合流して push した親ブランチ。リモートから取得した結果（JSON）の置き場を返す。
 
         sh がリモートから取ってくる形そのもの。テストはネットワークに出ないので、
@@ -1132,19 +1136,19 @@ class TicketTest(unittest.TestCase):
     def test_request_needs_merged_children_and_check_opens_the_gate(self):
         self.family()
         # 子のツリーに成果を積んでから閉じる。合流していない子を見分けるため。
-        for child in ("i0001-01", "i0001-02"):
+        for child in ("i0001-01-01", "i0001-01-02"):
             tree = os.path.join(self.root, ".claude", "worktrees", child)
             write(os.path.join(tree, "src", child[-1], "work.py"), "x\n")
             git(tree, "add", "-A")
             git(tree, "commit", "--quiet", "-m", "work")
         self.close_phase()
         # 子を 1 本だけ合流した形で、前提の未充足を見る。
-        fixture = self.remote(merge=("i0001-01",))
+        fixture = self.remote(merge=("i0001-01-01",))
         refused = self.request(fixture)
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-02", refused.stderr)
+        self.assertIn("i0001-01-02", refused.stderr)
         self.assertIn("取り込まれていない", refused.stderr)
-        git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-02")
+        git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-02")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
 
         ok = self.request(fixture)
@@ -1215,7 +1219,7 @@ class TicketTest(unittest.TestCase):
         fixture = self.remote()
         ok = self.request(fixture)
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        stray = os.path.join(self.approved, "done", "i0001-01.md")
+        stray = os.path.join(self.approved, "done", "i0001-01-01.md")
         write(stray, "stray\n")
         check = self.ccnavi(
             "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
@@ -1224,7 +1228,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("行き先に既に在る", check.stderr)
         marker = os.path.join(self.approved, "phases", "i0001", "1.reviewed")
         self.assertFalse(os.path.exists(marker))
-        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
         self.assertTrue(os.path.exists(review))
         with open(stray, encoding="utf-8") as f:
             self.assertEqual(f.read(), "stray\n")
@@ -1286,8 +1290,8 @@ class TicketTest(unittest.TestCase):
         self.family()
         self.close_phase()
         review = os.path.join(self.parent_tree, "wip", "proposals", "review")
-        self.assertTrue(os.path.exists(os.path.join(review, "i0001-01.md")))
-        self.assertTrue(os.path.exists(os.path.join(review, "i0001-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(review, "i0001-01-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(review, "i0001-01-02.md")))
         fixture = self.remote()
         self.assertEqual(self.request(fixture).returncode, 0)
         data = read_json(fixture)
@@ -1307,8 +1311,8 @@ class TicketTest(unittest.TestCase):
             stdin="f\n",
         )
         self.assertEqual(chosen.returncode, 0, chosen.stdout + chosen.stderr)
-        self.assertIn("i0001-03", chosen.stdout)
-        followup = os.path.join(self.approved, "doing", "i0001-03.md")
+        self.assertIn("i0001-01-03", chosen.stdout)
+        followup = os.path.join(self.approved, "doing", "i0001-01-03.md")
         self.assertTrue(os.path.exists(followup))
         with open(followup, encoding="utf-8") as f:
             text = f.read()
@@ -1317,7 +1321,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("u1", text)
         self.assertIn("src/a/*", text)
         self.assertIn("src/b/*", text)
-        for child in ("i0001-01", "i0001-02"):
+        for child in ("i0001-01-01", "i0001-01-02"):
             self.assertFalse(os.path.exists(os.path.join(review, child + ".md")))
             self.assertTrue(os.path.exists(os.path.join(self.approved, "done", child + ".md")))
         self.assertFalse(
@@ -1329,11 +1333,11 @@ class TicketTest(unittest.TestCase):
         # フェーズは開き直り、止まっていたのが解ける。続きの子は普通に着手できる。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="続き")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
-        self.worktree("i0001-03", "i0001")
-        started = self.ccnavi("ticket", "start", "i0001-03")
+        self.worktree("i0001-01-03", "i0001")
+        started = self.ccnavi("ticket", "start", "i0001-01-03")
         self.assertEqual(started.returncode, 0, started.stderr)
         # 続きの子の範囲は見た子の和。
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-03")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-03")
         inside = self.hook(
             "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "y.py")
         )
@@ -1547,12 +1551,12 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         answer = json.loads(done.stdout)
         self.assertTrue(answer["ok"])
-        self.assertEqual(answer["followup"], "i0001-03")
+        self.assertEqual(answer["followup"], "i0001-01-03")
         self.assertFalse(answer["reviewed"])
-        self.assertIn("i0001-03", answer["prompt"])
+        self.assertIn("i0001-01-03", answer["prompt"])
         kept = read_json(os.path.join(self.approved, "phases", "i0001", "accepted.json"))
         self.assertEqual(kept["threads"], ["u1"])
-        with open(os.path.join(self.approved, "doing", "i0001-03.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.approved, "doing", "i0001-01-03.md"), encoding="utf-8") as f:
             text = f.read()
         self.assertIn("u2", text)
         self.assertNotIn("u1", text)
@@ -1563,7 +1567,7 @@ class TicketTest(unittest.TestCase):
         with open(comment, encoding="utf-8") as f:
             posted = f.read()
         self.assertTrue(posted.startswith("<!-- ccnavi:decide -->"))
-        self.assertIn("i0001-03", posted)
+        self.assertIn("i0001-01-03", posted)
 
     def test_decide_yes_without_a_fix_marks_the_phase_reviewed(self):
         fixture = self.two_threads()
@@ -1615,7 +1619,7 @@ class TicketTest(unittest.TestCase):
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-03.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-03.md")))
 
     def test_decide_in_the_terminal_asks_one_by_one(self):
         """端末では 1 件ずつ選ぶ。知らない文字で何も置かずにやめる。"""
@@ -1630,15 +1634,15 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(refused.returncode, 0)
         done = self.decide(fixture, stdin="f\nk\n")
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertIn("i0001-03", done.stdout)
+        self.assertIn("i0001-01-03", done.stdout)
         kept = read_json(os.path.join(self.approved, "phases", "i0001", "accepted.json"))
         self.assertEqual(kept["threads"], ["u2"])
 
     def test_a_todo_with_the_same_id_as_an_approved_ticket_is_not_the_operand(self):
         """同じ識別子が todo/ にもあっても、状態の操作は doing/ の側を相手にする。"""
         self.family()
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        done = self.ccnavi("ticket", "finish", "i0001-01")
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
+        done = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertEqual(done.returncode, 0, done.stderr)
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("todo/ にも在る", lint.stdout)
@@ -1652,17 +1656,17 @@ class TicketTest(unittest.TestCase):
         self.family()
         os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
         shutil.copy(
-            os.path.join(self.approved, "doing", "i0001-01.md"),
-            os.path.join(self.approved, "done", "i0001-01.md"),
+            os.path.join(self.approved, "doing", "i0001-01-01.md"),
+            os.path.join(self.approved, "done", "i0001-01-01.md"),
         )
-        done = self.ccnavi("ticket", "finish", "i0001-01")
+        done = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(done.returncode, 0, done.stdout)
-        self.assertIn("i0001-01 が複数の場所にある", done.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")))
+        self.assertIn("i0001-01-01 が複数の場所にある", done.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001-01-01.md")))
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertNotEqual(lint.returncode, 0, lint.stdout)
-        self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
+        self.assertIn("i0001-01-01 が複数の場所にある", lint.stdout)
 
     def test_folding_the_parent_worktree_does_not_stop_the_operations(self):
         """親のワークツリーを片付けても操作は通る。元ツリー上のチケットを本物とする。
@@ -1675,12 +1679,12 @@ class TicketTest(unittest.TestCase):
         git(self.root, "merge", "--quiet", "--no-edit", "i0001")
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
 
-        done = self.ccnavi("ticket", "finish", "i0001-02")
+        done = self.ccnavi("ticket", "finish", "i0001-01-02")
 
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("複数の場所にある", done.stderr)
         # 本物とする側が元ツリーなので、置き場の移動も元ツリーに書かれる。
-        moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-02.md")
+        moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-01-02.md")
         self.assertTrue(os.path.exists(moved), moved)
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertNotIn("複数の場所にある", lint.stdout)
@@ -1693,13 +1697,13 @@ class TicketTest(unittest.TestCase):
         記録を別の差分で書き直す。決めずに止めて、ユーザに合流させる。
         """
         self.family()
-        closed = self.ccnavi("ticket", "finish", "i0001-02")
+        closed = self.ccnavi("ticket", "finish", "i0001-01-02")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "close i0001-02")
+        git(self.parent_tree, "commit", "--quiet", "-m", "close i0001-01-02")
         # 子のツリーは閉じたところまで取り込み、元ツリーは 1 つ手前で止まる。
         git(
-            os.path.join(self.root, ".claude", "worktrees", "i0001-02"),
+            os.path.join(self.root, ".claude", "worktrees", "i0001-01-02"),
             "merge",
             "--quiet",
             "--no-edit",
@@ -1708,16 +1712,16 @@ class TicketTest(unittest.TestCase):
         git(self.root, "merge", "--quiet", "--no-edit", "i0001~1")
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
 
-        again = self.ccnavi("ticket", "finish", "i0001-02")
+        again = self.ccnavi("ticket", "finish", "i0001-01-02")
 
         self.assertNotEqual(again.returncode, 0, again.stdout)
-        self.assertIn("i0001-02 が複数の場所にある", again.stderr)
-        self.assertIn("i0001-02:done", again.stderr)
+        self.assertIn("i0001-01-02 が複数の場所にある", again.stderr)
+        self.assertIn("i0001-01-02:done", again.stderr)
         # 次の一手まで言う。どの場所のチケットも追跡されたファイルなので、「1 つにしてから」
         # だけでは受け取った側にできることが読めない。
         self.assertIn("合流", again.stderr)
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn("i0001-02 が複数の場所にある", lint.stdout)
+        self.assertIn("i0001-01-02 が複数の場所にある", lint.stdout)
 
     # 閉じた承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
     CLOSED = (
@@ -1784,7 +1788,7 @@ class TicketTest(unittest.TestCase):
         self.close_phase()
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
-        self.propose("i0001-03", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-03", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("マーカー", result.stdout)
@@ -1801,7 +1805,7 @@ class TicketTest(unittest.TestCase):
         範囲外から範囲の中への移動が止められずに通る。
         """
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         os.makedirs(os.path.join(child, "src", "a"), exist_ok=True)
         git(child, "mv", "src/keep.py", "src/a/keep.py")
         git(child, "commit", "--quiet", "-m", "範囲の中へ移す")
@@ -1841,7 +1845,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "submodule を足す")
 
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         write(os.path.join(sub, "f.txt"), "b\n")
         git(sub, "commit", "--quiet", "-am", "s2")
         after = git(sub, "rev-parse", "HEAD").strip()
@@ -1869,7 +1873,7 @@ class TicketTest(unittest.TestCase):
 
     def test_subagent_stop_bounces_out_of_scope_once(self):
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         write(os.path.join(child, "src", "b", "stray.py"), "x\n")
         git(child, "add", "-A")
         git(child, "commit", "--quiet", "-m", "stray")
@@ -1892,8 +1896,8 @@ class TicketTest(unittest.TestCase):
         `agent_id` を持たない記録は `ignored_bounce` が消せないので、消えなかった。
         """
         self.family()
-        first_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
-        second_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-02")
+        first_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        second_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01-02")
         write(os.path.join(first_tree, "src", "b", "stray.py"), "x\n")
         write(os.path.join(second_tree, "docs", "stray.md"), "x\n")
 
@@ -1907,7 +1911,7 @@ class TicketTest(unittest.TestCase):
     def test_subagent_stop_bounces_again_in_the_next_session(self):
         """記録はセッションで分ける。state の置き場はワークスペースに 1 つしか無い。"""
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         write(os.path.join(child, "src", "b", "stray.py"), "x\n")
 
         first = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s1")
@@ -1924,8 +1928,8 @@ class TicketTest(unittest.TestCase):
         self.family()
         result = self.hook("SubagentStart", "", self.parent_tree, agent_id="sub-1")
         text = self.reason(result)
-        self.assertIn("i0001-01", text)
-        self.assertIn("i0001-02", text)
+        self.assertIn("i0001-01-01", text)
+        self.assertIn("i0001-01-02", text)
         self.assertIn("src/a/*", text)
 
     def test_subagent_start_says_nothing_outside_the_family(self):
@@ -1941,10 +1945,10 @@ class TicketTest(unittest.TestCase):
             # 子の一覧は渡らない。どの起動にも付く「スキル候補」の 1 行だけ。
             self.assertEqual(self.reason(result), CANDIDATE_NOTE, cwd)
         # 子のワークツリーからは、その子だけ。
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         text = self.reason(self.hook("SubagentStart", "", child, agent_id="sub-1"))
-        self.assertIn("i0001-01", text)
-        self.assertNotIn("i0001-02", text)
+        self.assertIn("i0001-01-01", text)
+        self.assertNotIn("i0001-01-02", text)
 
     # ---- 7. ユーザの判断の経路
 
@@ -1972,13 +1976,13 @@ class TicketTest(unittest.TestCase):
         for command in (
             "ccnavi --agree",
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
-            "uv run python -m ccnavi ticket start i0001-01",
+            "uv run python -m ccnavi ticket start i0001-01-01",
             "ls && ./ccnavi review confirm --phase 1",
             "ccnavi --close-early --reason x --result r.json",
-            "ccnavi ticket finish i0001-01",
-            "ccnavi ticket record-risk i0001-01 untested yes --reason x",
+            "ccnavi ticket finish i0001-01-01",
+            "ccnavi ticket record-risk i0001-01-01 untested yes --reason x",
             # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup 2.3）。
-            "uv run python -m ccnavi --agree --yes i0001,i0001-01 --json",
+            "uv run python -m ccnavi --agree --yes i0001,i0001-01-01 --json",
             "ccnavi --agree --preview --json; ccnavi --agree --yes i0001",
             # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
             "ccnavi --agree --preview --yes i0001 --json",
@@ -2006,7 +2010,7 @@ class TicketTest(unittest.TestCase):
         for command in (
             "ccnavi --explain",
             "ccnavi --lint",
-            "sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
+            "sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
             # 一覧を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
             "uv run python -m ccnavi --agree --preview --json",
             "echo --agree --preview",
@@ -2023,7 +2027,7 @@ class TicketTest(unittest.TestCase):
         # 免除の範囲がコマンドをまたぐと、後ろに --preview を書くだけで前の承認が通る。
         for command in (
             "& ccnavi.exe --agree",
-            "ccnavi --agree --yes i0001,i0001-01 --json; ccnavi --agree --preview",
+            "ccnavi --agree --yes i0001,i0001-01-01 --json; ccnavi --agree --preview",
             "ccnavi --agree; echo --preview",
             "ccnavi --agree --yes i0001 | findstr --preview",
         ):
@@ -2235,7 +2239,7 @@ class TicketTest(unittest.TestCase):
             "PowerShell",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
@@ -2645,11 +2649,11 @@ class TicketTest(unittest.TestCase):
         self.family()
         self.close_phase()
         fixture = self.remote()
-        git(self.root, "worktree", "remove", "--force", ".claude/worktrees/i0001-01")
-        git(self.root, "branch", "-D", "i0001-01")
+        git(self.root, "worktree", "remove", "--force", ".claude/worktrees/i0001-01-01")
+        git(self.root, "branch", "-D", "i0001-01-01")
         refused = self.request(fixture)
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-01", refused.stderr)
+        self.assertIn("i0001-01-01", refused.stderr)
         self.assertIn("消えている", refused.stderr)
 
     def test_unresolved_threads_survive_a_new_request(self):
@@ -2749,17 +2753,17 @@ class TicketTest(unittest.TestCase):
     def test_prepare_writes_a_merge_request_draft(self):
         """マージリクエストが無ければ sh が作れるように、下書きを書き出すこと。"""
         self.propose("i0001", allow=("src/*", "wip/*"), title="挨拶の言語を切り替える", issue=12)
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         self.assertEqual(self.approve().returncode, 0)
         self.start_parent()
-        self.worktree("i0001-01", "i0001")
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01").returncode, 0)
-        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01").returncode, 0)
+        self.worktree("i0001-01-01", "i0001")
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01-01").returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "done")
-        self.remote(merge=("i0001-01",))
+        self.remote(merge=("i0001-01-01",))
 
         prepared = self.ccnavi(
             "--cwd",
@@ -2943,7 +2947,7 @@ class TicketTest(unittest.TestCase):
 
     def test_parent_hears_about_an_ignored_bounce(self):
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         write(os.path.join(child, "src", "b", "stray.py"), "x\n")
         git(child, "add", "-A")
         git(child, "commit", "--quiet", "-m", "stray")
@@ -2975,7 +2979,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("SubagentStop", result.stdout)
         self.assertIn("origin が無い", result.stdout)
         # 超えている子を、承認の前に名指しする。
-        self.propose("i0001-03", parent="i0001", phase=2, allow=("docs/*",))
+        self.propose("i0001-02-03", parent="i0001", phase=2, allow=("docs/*",))
         result = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("超えている", result.stdout)
 
@@ -2983,7 +2987,7 @@ class TicketTest(unittest.TestCase):
         self.family()
         result = self.ccnavi("--explain")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("i0001-01", result.stdout)
+        self.assertIn("i0001-01-01", result.stdout)
         self.assertIn("フェーズ 1", result.stdout)
 
 

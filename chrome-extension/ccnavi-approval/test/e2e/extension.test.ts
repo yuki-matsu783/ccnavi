@@ -119,7 +119,7 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   const families = await page.locator("[data-family]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.family));
   assert.deepEqual(families, ["i0001", "i0002"]);
   assert.equal(await page.locator('[data-family="i0001"] [data-ticket="i0001"].entry').count(), 1);
-  assert.match((await page.textContent('[data-family="i0001"] .rejected')) ?? "", /先行 i0003-01 が閉じていない/);
+  assert.match((await page.textContent('[data-family="i0001"] .rejected')) ?? "", /先行 i0003-01-01 が閉じていない/);
   assert.match((await page.textContent('[data-family="i0001"] .closure')) ?? "", /i0003/);
   // 見た目を目で確かめるとき: CCNAVI_E2E_SHOT=<png のパス>
   if (process.env.CCNAVI_E2E_SHOT) await page.screenshot({ path: process.env.CCNAVI_E2E_SHOT, fullPage: true });
@@ -198,7 +198,7 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
 test("CX-T076 着手前で子の無い承認は、ボードから取り下げられる（承認コミットの親の提案に戻す）", async () => {
   const original = fixture().i0001.files["wip/proposals/todo/i0001.md"];
   // 開発者が子の提案を片付けた（子の提案があれば取り下げは出さない）
-  mock.push("i0001", { "wip/proposals/todo/i0001-01.md": null }, "子の提案を片付ける");
+  mock.push("i0001", { "wip/proposals/todo/i0001-01-01.md": null }, "子の提案を片付ける");
   const page = await openBoard();
   const said = await press(page, '[data-family="i0001"] .approved-item[data-ticket="i0001"] button[data-action=withdraw]');
   assert.match(said, /^written: 取り下げを書いた/);

@@ -7,14 +7,14 @@ test("CB-T34 着手済みのチケット（approved/doing/ にあり started_at 
   const lock = lockFromBoard(fixture());
   assert.equal(lock.locked, true);
   // 親 i0001 は doing/ にあるが着手していない。レビュー待ち・閉じた子・取り消した子も数えない
-  assert.deepEqual(lock.doing, ["i0001-02"]);
-  assert.match(lock.reason, /i0001-02/);
+  assert.deepEqual(lock.doing, ["i0001-02-02"]);
+  assert.match(lock.reason, /i0001-02-02/);
 });
 
 test("CB-T35 着手済みが無ければ保存できる。承認待ち・未着手・レビュー待ち・完了は数えない", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) =>
-    t.ticket === "i0001-02" ? { ...t, started_at: "" } : t,
+    t.ticket === "i0001-02-02" ? { ...t, started_at: "" } : t,
   );
   const lock = lockFromBoard({ ...board, tickets });
   assert.equal(lock.locked, false);

@@ -2,10 +2,10 @@
  * 見本のリポジトリ。模擬の GitHub（test/helpers/mock-github.ts）がこれを API で返す。
  *
  * - `main`（統合先）: 共通レイヤー、互換のマーカー、閉じた親子のチケット i0005 の `done/`
- * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01（開いた親子のチケット。直近の外なので閉包で読む）と
- *   i0005-01（統合先で閉じている。そこで止まる）
+ * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01-01（開いた親子のチケット。直近の外なので閉包で読む）と
+ *   i0005-01-01（統合先で閉じている。そこで止まる）
  * - `i0002`（直近）: 悪意のある Markdown を本文に持つ親の提案と、範囲が親の外に出る子（承認の対象にしない）。
- *   子の先行 i0007-01 の親のブランチは無い
+ *   子の先行 i0007-01-01 の親のブランチは無い
  * - `i0003`（古い）: 親と子の提案。表示用のブランチには入らない
  * - `feature-x`（直近）: コードだけのブランチ（親子のチケットのブランチではない）
  */
@@ -160,7 +160,7 @@ const MAIN_FILES: Record<string, string> = {
   ".ccnavi/common/phases.yml": PHASES,
   ".ccnavi/common/rules.yml": RULES,
   ".ccnavi/approved/done/i0005.md": done("i0005", null, null),
-  ".ccnavi/approved/done/i0005-01.md": done("i0005-01", "i0005", 1),
+  ".ccnavi/approved/done/i0005-01-01.md": done("i0005-01-01", "i0005", 1),
   "README.md": "見本\n",
   "src/app.py": "print('main')\n",
 };
@@ -174,7 +174,7 @@ export function fixture(compat = COMPAT): Record<string, FixtureBranch> {
       files: {
         ...main,
         "wip/proposals/todo/i0001.md": parent("i0001", "見本の親 i0001", "## やること\n\n- **調べる**\n- `設計` する\n"),
-        "wip/proposals/todo/i0001-01.md": child("i0001-01", "i0001", 1, "wip/research/*", ["i0003-01", "i0005-01"]),
+        "wip/proposals/todo/i0001-01-01.md": child("i0001-01-01", "i0001", 1, "wip/research/*", ["i0003-01-01", "i0005-01-01"]),
         "src/app.py": "print('i0001')\n",
       },
     },
@@ -183,7 +183,7 @@ export function fixture(compat = COMPAT): Record<string, FixtureBranch> {
       files: {
         ...main,
         "wip/proposals/todo/i0002.md": parent("i0002", "悪意のある本文を持つ親 i0002", HOSTILE_MARKDOWN, ["research"]),
-        "wip/proposals/todo/i0002-01.md": child("i0002-01", "i0002", 1, "docs/*", ["i0007-01"]),
+        "wip/proposals/todo/i0002-01-01.md": child("i0002-01-01", "i0002", 1, "docs/*", ["i0007-01-01"]),
       },
     },
     i0003: {
@@ -191,7 +191,7 @@ export function fixture(compat = COMPAT): Record<string, FixtureBranch> {
       files: {
         ...main,
         "wip/proposals/todo/i0003.md": parent("i0003", "古い親子のチケット i0003", "古い本文\n", ["research"]),
-        "wip/proposals/todo/i0003-01.md": child("i0003-01", "i0003", 1, "wip/research/*"),
+        "wip/proposals/todo/i0003-01-01.md": child("i0003-01-01", "i0003", 1, "wip/research/*"),
       },
     },
     "feature-x": {
@@ -240,7 +240,7 @@ export function reviewFamilyFiles(id: string, phases = 1): Record<string, string
     "wip/design/plan.md": "設計\n",
   };
   for (let n = 1; n <= phases; n += 1) {
-    const child = `${id}-0${n}`;
+    const child = `${id}-0${n}-01`;
     out[`wip/proposals/review/${child}.md`] = approvedCopy(child, id, ["completed_at: 2026-09-28T10:00:00+0900"], 1, n);
   }
   return out;
@@ -274,7 +274,7 @@ export function projectFixture(): Record<string, FixtureBranch> {
         ...main,
         ".ccnavi/config/phases.yml": "version: 1\nphases: {}\n",
         "wip/proposals/todo/web-i0012.md": parent("web-i0012", "プロジェクトの親 web-i0012", "プロジェクトの本文\n"),
-        "wip/proposals/todo/web-i0012-01.md": child("web-i0012-01", "web-i0012", 1, "wip/research/*"),
+        "wip/proposals/todo/web-i0012-01-01.md": child("web-i0012-01-01", "web-i0012", 1, "wip/research/*"),
       },
     },
   };

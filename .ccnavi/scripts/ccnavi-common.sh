@@ -27,7 +27,7 @@
 # この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときだけ。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=3
+CCNAVI_COMPAT=4
 
 # 相対パスを絶対に直す。
 #
@@ -768,9 +768,10 @@ ccnavi_c1_family() {
 	ccnavi_c1_tree=""
 	# 取り込み状態が 1 つも無ければ、実行ファイルに聞かずに対象外（一時ディレクトリも要らない）。
 	ccnavi_cf_state=$(ccnavi_state "$ccnavi_c1_root")
+	# 子の識別子（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）なら、右から 2 段を剥がして親にする。
 	ccnavi_cf_p="$1"
 	case "$ccnavi_cf_p" in
-	*-[0-9][0-9]) ccnavi_cf_p="${ccnavi_cf_p%-[0-9][0-9]}" ;;
+	?*-[0-9][0-9]-[0-9][0-9]) ccnavi_cf_p="${ccnavi_cf_p%-[0-9][0-9]-[0-9][0-9]}" ;;
 	esac
 	ccnavi_cf_any=no
 	for ccnavi_cf_rec in "$ccnavi_cf_state"/sync/*/families/"$ccnavi_cf_p"; do

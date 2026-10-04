@@ -13,7 +13,7 @@
 
 ルールはワークツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
 
-チケットの範囲は子 `i0001-01` のもの。
+チケットの範囲は子 `i0001-01-01` のもの。
 
     allow: src/*
     ask:   src/ask/*
@@ -158,7 +158,7 @@ class Workspace(unittest.TestCase):
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "decisions.jsonl")
         self.parent_tree = self.worktree("i0001", "main")
-        self.child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        self.child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
 
     # ---- 道具
 
@@ -289,7 +289,7 @@ class Workspace(unittest.TestCase):
         """親と子を提案して承認し、子のワークツリーを親のブランチから切って着手する。"""
         self.propose("i0001", **(parent or {"allow": ("src/*",)}))
         self.propose(
-            "i0001-01",
+            "i0001-01-01",
             parent="i0001",
             phase=1,
             **(child or {"allow": ("src/*",), "ask": ("src/ask/*",), "deny": ("src/deny/*",)}),
@@ -298,8 +298,8 @@ class Workspace(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         self.approve()
         self.start_parent()
-        self.worktree("i0001-01", "i0001")
-        started = self.ccnavi("ticket", "start", "i0001-01")
+        self.worktree("i0001-01-01", "i0001")
+        started = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "start")
@@ -495,7 +495,7 @@ class TicketPlaces(Workspace):
     def test_pre_tool_use_exempts_the_ticket_places_only(self):
         # (相対パス, 判定, code)
         cases = (
-            (f"{self.TICKETS}/todo/i0001-01.md", "allow", ""),
+            (f"{self.TICKETS}/todo/i0001-01-01.md", "allow", ""),
             (f"{self.TICKETS}/todo/i0009.md", "allow", ""),
             # 置き場のパスの前置に続けただけの場所は置き場ではない。前置は `/` の境で切る。
             (f"{self.TICKETS}X/a.md", "deny", "DENY_TICKET_SCOPE"),
@@ -522,7 +522,7 @@ class TicketPlaces(Workspace):
     def test_post_tool_use_exempts_the_ticket_places_only(self):
         # (相対パス, 報告のコード。None は報告しない)
         cases = (
-            (f"{self.TICKETS}/todo/i0001-01.md", None),
+            (f"{self.TICKETS}/todo/i0001-01-01.md", None),
             (f"{self.TICKETS}/todo/i0009.md", None),
             (f"{self.TICKETS}X/b.md", "POST_TICKET_SCOPE"),
             ("docs/b.md", "POST_TICKET_SCOPE"),
@@ -566,7 +566,7 @@ class TicketPlaces(Workspace):
 
     def test_subagent_stop_leaves_the_proposals_alone(self):
         # 自分の提案も、他のチケットの提案も。
-        for name in ("i0001-01", "i0009"):
+        for name in ("i0001-01-01", "i0009"):
             write(os.path.join(self.child, *f"{self.TICKETS}/todo/{name}.md".split("/")), "x\n")
         result = self.hook("SubagentStop", "", self.child, agent_id="sub-1")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -819,7 +819,7 @@ class Boundaries(Workspace):
             "Bash",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
@@ -843,10 +843,10 @@ class Boundaries(Workspace):
     def test_child_approval_screen_gets_no_new_note(self):
         """子の画面の「この子チケットで編集可能な範囲」には注記をつけない。注記は親の画面だけ。"""
         self.propose("i0001", allow=("src/*",))
-        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.ccnavi("--agree", "--preview")
         self.assertEqual(result.returncode, 0, result.stderr)
-        child = section_of(result.stdout, "== i0001-01")
+        child = section_of(result.stdout, "== i0001-01-01")
         self.assertTrue(child, result.stdout)
         self.assertNotIn(APPROVAL_NOTE, child)
 
