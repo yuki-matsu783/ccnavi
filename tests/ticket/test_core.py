@@ -1109,9 +1109,16 @@ class WithdrawTest(CoreHarness):
         write(self.held(), held + "# 手で足した行\n")
         problems = self.problems({"i0001": text.encode()})
         self.assertTrue(any("待ち方が変わった" in p for p in problems), problems)
+
+    def test_a_planned_parent_without_workflow_is_withdrawn(self):
+        """手で動かした計画を持つ親は待ち方のファイルを持たない。改版は必ずファイルを書くので、
+        無いのは待ち方の改版が起きていない形として取り下げられる（中身の一致は今どおり見る）。"""
+        text = self.new_parent()
         os.remove(self.held())
+        self.assertEqual(self.problems({"i0001": text.encode()}), [])
+        write(os.path.join(self.approved, "doing", "i0001.md"), text + "x")
         problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("待ち方のファイル" in p for p in problems), problems)
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
 
     def test_phases_yml_changed_after_the_approval_is_not_withdrawn(self):
         self.use(SEQUENTIAL)

@@ -997,7 +997,8 @@ def _content_problems(
 
     親は加えて、`phases/<親>/workflow.yml` の中身が、`prior` と今の `phases.yml` から計算した
     待ち方（`workflow.compute`）と同じであることを求める。待ち方だけの改版は `doing/` を変えない
-    ので、ここで見る。ファイルが無いなら、承認が待ち方を書かない形（計画の無い親）に限って通す。
+    ので、ここで見る。ファイルが無いなら通す。改版は必ずこのファイルを書くので、無いのは
+    待ち方を書かない承認（計画の無い親か、手で動かした承認）で、待ち方の改版は起きていない。
     承認のあとに `phases.yml` が変わっていれば計算が変わって一致せず、止める側に倒れる。
     """
     current = fsio.read_bytes(copy.path)
@@ -1010,24 +1011,21 @@ def _content_problems(
         ]
     if copy.is_child:
         return []
-    try:
-        proposed, _ = ticket_mod.parse(prior.decode("utf-8"))
-    except UnicodeDecodeError:
-        proposed = None
-    if proposed is None:
-        return ["承認コミットの親の提案をチケットとして読めないので、待ち方を確かめられない"]
     where = settings.approved_dir(conf, copy.tree_root)
     path = approval.workflow_path(where, copy.ticket)
     held = fsio.read_bytes(path)
     if held is None and fsio.lexists(path):
         return [f"{approval.PHASES_DIR}/{copy.ticket}/{approval.WORKFLOW_FILE} を読めない"]
     if held is None:
-        if proposed.has_plan:
-            return [
-                f"計画を持つ親なのに待ち方のファイル（{approval.PHASES_DIR}/{copy.ticket}/"
-                f"{approval.WORKFLOW_FILE}）が無い。承認したときの待ち方を確かめられない"
-            ]
+        # 手で動かした承認（計画を持つ親でも待ち方のファイルを書かない）か、計画の無い親。
+        # 改版は必ず待ち方のファイルを書くので、無ければ待ち方の改版は起きていない。
         return []
+    try:
+        proposed, _ = ticket_mod.parse(prior.decode("utf-8"))
+    except UnicodeDecodeError:
+        proposed = None
+    if proposed is None:
+        return ["承認コミットの親の提案をチケットとして読めないので、待ち方を確かめられない"]
     types = phase.load_types(conf, root, copy.project)
     if held != approval.workflow_bytes(workflow.compute(proposed, types)):
         return [
