@@ -30,7 +30,7 @@
 
 .tour-bubble.center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-.tour-bubble h3 { margin: 0 0 6px; font-size: 1.05em; }
+.tour-bubble h3 { margin: 0 24px 6px 0; font-size: 1.05em; }
 
 .tour-count { margin: 0 24px 2px 0; color: var(--vscode-descriptionForeground); font-size: .85em; }
 

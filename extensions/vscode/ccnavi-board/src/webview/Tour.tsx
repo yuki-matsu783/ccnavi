@@ -191,7 +191,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         return;
       }
       if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-        // 裏の画面（一覧の選択や図のスクロール）へは渡さない
+        // 既定の動き（裏の画面の横スクロール）を止める
         event.preventDefault();
         event.stopPropagation();
         const step = event.key === "ArrowRight" ? 1 : -1;
