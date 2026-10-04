@@ -144,7 +144,7 @@ README.md ("候補の JSON"); the VS Code extension reads it.
 To review the pending tickets and agree to the work areas they declare, run
 
     ccnavi --agree
-    ccnavi --agree i0002 i0002-01        (only these, e.g. from a filtered board;
+    ccnavi --agree i0002 i0002-01-01     (only these, e.g. from a filtered board;
                                             ids go last, after every flag)
 
 It scans wip/proposals/todo/ in every worktree, shows what each ticket makes

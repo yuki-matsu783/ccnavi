@@ -34,7 +34,7 @@ from ccnavi.tickets import flow, ticket
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
-CHILD = "i0001-01"
+CHILD = "i0001-01-01"
 
 # 見本のフロー。ユーザがボードのフロー編集画面で書く YAML の形。
 WORKFLOW_YAML = """\
@@ -110,16 +110,18 @@ class FlowPlaceTest(unittest.TestCase):
     """置き場は承認済みの領域に固定。以前の `flow:` の欄は読まない。"""
 
     def test_the_place_is_fixed_under_the_approved_area(self):
-        self.assertEqual(flow.flow_rel(conf_with(), CHILD), ".ccnavi/approved/flows/i0001-01.yml")
-        self.assertEqual(flow.flow_rel(conf_with("x/appr/"), CHILD), "x/appr/flows/i0001-01.yml")
+        self.assertEqual(
+            flow.flow_rel(conf_with(), CHILD), ".ccnavi/approved/flows/i0001-01-01.yml"
+        )
+        self.assertEqual(flow.flow_rel(conf_with("x/appr/"), CHILD), "x/appr/flows/i0001-01-01.yml")
         self.assertEqual(
             flow.flow_file(conf_with(), "/w", CHILD),
-            os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01.yml"),
+            os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01-01.yml"),
         )
 
     def test_the_old_flow_field_is_silently_ignored(self):
         text = child_text(CHILD, "i0001", 1, ("wip/research/*",))
-        for value in ("references/i0001-01/flow.json", "../../etc/passwd", "[1, 2]"):
+        for value in ("references/i0001-01-01/flow.json", "../../etc/passwd", "[1, 2]"):
             t, problems = ticket.parse(text.replace("\nphase:", f"\nflow: {value}\nphase:", 1))
             self.assertIsNotNone(t, problems)
             self.assertEqual(problems, [])
@@ -129,26 +131,26 @@ class FlowPlaceTest(unittest.TestCase):
         root = tempfile.mkdtemp(prefix="ccnavi-flow-")
         self.addCleanup(os.rmdir, root)
         conf = conf_with()
-        place = os.path.join(root, ".ccnavi", "approved", "flows", "i0001-01.yml")
-        self.assertEqual(flow.locate(conf, root, place), ("i0001-01.yml", ""))
-        upper = os.path.join(root, ".CCNAVI", "Approved", "FLOWS", "I0001-01.YML")
-        self.assertEqual(flow.locate(conf, root, upper), ("i0001-01.yml", ""))
-        self.assertIsNone(flow.locate(conf, root, os.path.join(root, "flows", "i0001-01.yml")))
+        place = os.path.join(root, ".ccnavi", "approved", "flows", "i0001-01-01.yml")
+        self.assertEqual(flow.locate(conf, root, place), ("i0001-01-01.yml", ""))
+        upper = os.path.join(root, ".CCNAVI", "Approved", "FLOWS", "I0001-01-01.YML")
+        self.assertEqual(flow.locate(conf, root, upper), ("i0001-01-01.yml", ""))
+        self.assertIsNone(flow.locate(conf, root, os.path.join(root, "flows", "i0001-01-01.yml")))
         self.assertIsNone(
             flow.locate(conf, root, os.path.join(root, ".ccnavi", "approved", "doing", "x.md"))
         )
         # ワークスペースの外は、どのプロジェクトのものでもない。
-        outside = flow.locate(conf, root, "/elsewhere/.ccnavi/approved/flows/i0001-01.yml")
-        self.assertEqual(outside, ("i0001-01.yml", None))
+        outside = flow.locate(conf, root, "/elsewhere/.ccnavi/approved/flows/i0001-01-01.yml")
+        self.assertEqual(outside, ("i0001-01-01.yml", None))
 
     def test_every_copy_counts_for_the_lock(self):
         """識別子でまとめる前のリストを見る。1 本でも着手中なら止める（L1）。"""
         idle, running = child_ticket(), child_ticket(started=True)
-        self.assertIs(flow.lock_hit([idle, running], "", "i0001-01.yml"), running)
-        self.assertIsNone(flow.lock_hit([idle], "", "i0001-01.yml"))
-        self.assertIsNone(flow.lock_hit([running], None, "i0001-01.yml"))
-        self.assertIsNone(flow.lock_hit([running], "", "i0001-02.yml"))
-        self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, "i0001-01.yml"), running)
+        self.assertIs(flow.lock_hit([idle, running], "", "i0001-01-01.yml"), running)
+        self.assertIsNone(flow.lock_hit([idle], "", "i0001-01-01.yml"))
+        self.assertIsNone(flow.lock_hit([running], None, "i0001-01-01.yml"))
+        self.assertIsNone(flow.lock_hit([running], "", "i0001-01-02.yml"))
+        self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, "i0001-01-01.yml"), running)
 
 
 class FlowRenderTest(unittest.TestCase):
@@ -657,7 +659,7 @@ class FlowGuardTest(FlowHarness):
             json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"], "deny"
         )
         # シェルから書く形は builtin-guard-setting-files が止める。
-        rel = ".ccnavi/approved/flows/i0001-01.yml"
+        rel = ".ccnavi/approved/flows/i0001-01-01.yml"
         for command in (f"echo x > {rel}", f"cp /tmp/x {rel}", f"tee {rel} < /dev/null"):
             with self.subTest(command=command):
                 payload = {
@@ -733,7 +735,7 @@ class FlowLockTest(FlowHarness):
         self.assert_locked(self.write_to(self.flow_in(child_tree)))
         self.assert_locked(self.write_to(self.flow_in(self.root)))
         # 誰が書いても同じ（サブエージェントでも）。大文字小文字も問わない。
-        upper = os.path.join(self.parent_tree, ".ccnavi", "Approved", "FLOWS", "I0001-01.YML")
+        upper = os.path.join(self.parent_tree, ".ccnavi", "Approved", "FLOWS", "I0001-01-01.YML")
         self.assert_locked(self.write_to(upper, agent_id="sub-1"))
         # 相対パス・`..` を挟んだパス・NotebookEdit。
         rel = os.path.join(".ccnavi", "approved", "flows", f"{CHILD}.yml")
@@ -743,7 +745,7 @@ class FlowLockTest(FlowHarness):
         self.assert_locked(self.write_to(self.flow_path, tool="NotebookEdit"))
         self.assertTrue(self.board_flow(CHILD)["locked"])
         # 別の子の置き場は止めない。
-        self.assert_not_locked(self.write_to(self.flow_in(self.parent_tree, "i0001-09")))
+        self.assert_not_locked(self.write_to(self.flow_in(self.parent_tree, "i0001-01-09")))
 
     def test_links_do_not_get_around_the_lock(self):
         """置き場を指すリンク越しのパスも、リンクに差し替えたフローのパスも止める（H2）。"""
@@ -856,10 +858,10 @@ class NestedBounceTest(PhaseHarness):
 
     def test_nested_ignored_bounce_is_also_a_system_message(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",)))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",)))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        child_tree = self.run_child("i0001-01")
+        child_tree = self.run_child("i0001-01-01")
         write(os.path.join(child_tree, "src", "stray.py"), "x\n")
         git(child_tree, "add", "-A")
         git(child_tree, "commit", "--quiet", "-m", "stray")
@@ -886,10 +888,10 @@ class NestedBounceTest(PhaseHarness):
 
     def test_top_level_launch_keeps_the_message_for_the_model_only(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",)))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",)))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        child_tree = self.run_child("i0001-01")
+        child_tree = self.run_child("i0001-01-01")
         write(os.path.join(child_tree, "src", "stray.py"), "x\n")
         git(child_tree, "add", "-A")
         git(child_tree, "commit", "--quiet", "-m", "stray")
@@ -1012,7 +1014,7 @@ class FlowDraftTest(FlowHarness):
 
     def test_the_draft_is_not_in_the_approval_digest(self):
         """承認のダイジェスト（`--agree --preview --json` の digest）に下書きは入らない。"""
-        other = "i0001-02"
+        other = "i0001-01-02"
         self.propose(other, child_text(other, "i0001", 1, ("wip/research/*",)))
         self.commit_parent("another child")
         before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]

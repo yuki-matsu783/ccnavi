@@ -725,7 +725,7 @@ def project_mismatch(
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
     # チケットの範囲がいつまでも判定に使われる。
     assert index is not None
-    # ticket_verdict と同じ引き方。ここだけ厳密に引くと、区別しない機械で `I0001-01` と
+    # ticket_verdict と同じ引き方。ここだけ厳密に引くと、区別しない機械で `I0001-01-01` と
     # 切ったワークツリーは範囲の判定に掛かりながら、取り違えの検査を素通りする。
     ticket = tree.lookup(index, t.name)
     if ticket is None:
@@ -846,7 +846,7 @@ def ticket_verdict(
         return "", "", "", ""
     assert index is not None
     # 区別しない機械では表記の違いを許す。SubagentStart / SubagentStop / 実行後チェックと
-    # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切ったワークツリーは案内では
+    # 同じ引き方。ここだけ厳密に引くと、`I0001-01-01` と切ったワークツリーは案内では
     # 有効と言われながら判定では権限モード任せになる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:

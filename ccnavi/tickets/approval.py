@@ -954,12 +954,18 @@ def settle_review(
     return moved, ""
 
 
-def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
-    """この親の次の子の識別子。どの置き場に在る子よりも後ろの連番。
+def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: int) -> str:
+    """この親のこのフェーズの次の子の識別子。どの置き場に在る同じフェーズの子よりも後ろの連番。
+
+    連番はフェーズごとに 1 から数える（`<親>-<フェーズ番号>-<連番>`）。フェーズ番号か連番が
+    2 桁に収まらなければ識別子を組めないので ValueError（呼び手は何も書かずに止まる）。
 
     手元の退避（`logs/archive/`）にある子も数える（閉じた子の連番を使い回さない）。退避の子は
     親の識別子を大文字小文字を区別せずに比べる（`integration_problems` と同じ見方）。
     """
+    top = ticket_mod.MAX_CHILD_NUMBER
+    if not 0 <= phase_no <= top:
+        raise ValueError(f"フェーズ {phase_no} は子の識別子に書けない（フェーズ番号は 0〜{top}）")
     seen = _everything(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     # 退避は親のリポジトリ（プロジェクト）のものだけを見る。親が置き場に無ければ全部を見る。
@@ -968,15 +974,48 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
     for project in sorted(projects) if projects else [None]:
         archived |= archive.ids(root, project)
     used = 0
-    for ident in [t.ticket for t in seen + proposals]:
-        m = ticket_mod.child_pattern().match(ident)
-        if m and m.group("parent") == parent_id:
+    for t in seen + proposals:
+        m = ticket_mod.child_pattern().match(t.ticket)
+        if m and m.group("parent") == parent_id and int(m.group("phase")) == phase_no:
             used = max(used, int(m.group("seq")))
     for ident in sorted(archived):
         m = ticket_mod.child_pattern().match(ident)
-        if m and archive.same_id(m.group("parent"), parent_id):
+        if (
+            m
+            and archive.same_id(m.group("parent"), parent_id)
+            and int(m.group("phase")) == phase_no
+        ):
             used = max(used, int(m.group("seq")))
-    return f"{parent_id}-{used + 1:02d}"
+    if used >= top:
+        raise ValueError(
+            f"親 {parent_id} のフェーズ {phase_no} の子が連番 {top} まで埋まっている。"
+            "子の識別子の連番は 2 桁なので、続きの子を起こせない"
+        )
+    return ticket_mod.child_id(parent_id, phase_no, used + 1)
+
+
+def existing_ticket_file(conf: settings.Settings, root: str, ident: str) -> str:
+    """この識別子のファイルが、どこかの置き場にすでに在ればそのパス。無ければ空。
+
+    読めないファイル（壊れた frontmatter など）も名前で拾う。大文字小文字は区別しない
+    （区別しないファイルシステムでは同じファイルになる）。見るのは全ツリーの承認済みの
+    `doing/` `done/` と、提案の `todo/` `review/`。
+    """
+    want = (ident + ".md").casefold()
+    for t in trees(conf, root):
+        approved = settings.approved_dir(conf, t.root)
+        proposals = os.path.join(t.root, conf.tickets.replace("/", os.sep))
+        places = [os.path.join(approved, DOING_DIR), os.path.join(approved, DONE_DIR)]
+        places += [os.path.join(proposals, state) for state in ticket_mod.STATES]
+        for place in places:
+            try:
+                names = os.listdir(place)
+            except OSError:
+                continue
+            for name in names:
+                if name.casefold() == want:
+                    return os.path.join(place, name)
+    return ""
 
 
 def followup(
@@ -994,7 +1033,17 @@ def followup(
     そのフェーズは開き直り、マーカーは消える（REQ-TKT-21）。範囲は見た子の範囲の和。
     本文には指摘を書き写す。返すのは識別子と、起こせなかった理由。
     """
-    ident = next_child_id(conf, root, parent.ticket)
+    try:
+        ident = next_child_id(conf, root, parent.ticket, phase_no)
+    except ValueError as exc:
+        return "", str(exc)
+    # 同じ識別子のファイルがどこかに在れば（読めなかったものも）上書きしない。
+    taken = existing_ticket_file(conf, root, ident)
+    if taken:
+        return (
+            ident,
+            f"{ident} のファイルがすでに在る（{taken}）。上書きしないので、中身を確かめて片付ける",
+        )
     where = home_dir(conf, root, parent.ticket, "", project=parent.project)
     front: dict = {
         "version": ticket_mod.VERSION,

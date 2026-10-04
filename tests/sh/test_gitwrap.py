@@ -306,14 +306,14 @@ class PassTest(GitWrapperTest):
         os.makedirs(os.path.join(copies, "doing"))
         with open(os.path.join(copies, "doing", "i0001.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001\n---\n")
-        with open(os.path.join(copies, "doing", "i0001-01.md"), "w", encoding="utf-8") as f:
-            f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
+        with open(os.path.join(copies, "doing", "i0001-01-01.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
         # 閉じた子。承認済みチケットは done/ に動いているが、ツリーはまだ子のもの。
         os.makedirs(os.path.join(copies, "done"))
-        with open(os.path.join(copies, "done", "i0001-02.md"), "w", encoding="utf-8") as f:
-            f.write("---\nversion: 1\nticket: i0001-02\nparent: i0001\nphase: 1\n---\n")
+        with open(os.path.join(copies, "done", "i0001-01-02.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01-02\nparent: i0001\nphase: 1\n---\n")
         trees = {}
-        for name in ("i0001", "i0001-01", "i0001-02", "free"):
+        for name in ("i0001", "i0001-01-01", "i0001-01-02", "free"):
             path = os.path.join(self.dir, ".claude", "worktrees", name)
             git(self.dir, "worktree", "add", "-q", path, "-b", name)
             trees[name] = path
@@ -330,7 +330,7 @@ class PassTest(GitWrapperTest):
                 env=environment,
             )
 
-        for name in ("i0001-01", "i0001-02"):
+        for name in ("i0001-01-01", "i0001-01-02"):
             with self.subTest(tree=name):
                 child = push_from(name)
                 self.assertEqual(2, child.returncode, child.stdout + child.stderr)
@@ -356,7 +356,7 @@ class PassTest(GitWrapperTest):
         bare = self.make_bare()
         git(self.dir, "remote", "add", "origin", bare)
         trees = {}
-        for name in ("i0001", "i0001-01"):
+        for name in ("i0001", "i0001-01-01"):
             path = os.path.join(self.dir, ".claude", "worktrees", name)
             git(self.dir, "worktree", "add", "-q", path, "-b", name)
             trees[name] = path
@@ -364,8 +364,8 @@ class PassTest(GitWrapperTest):
         os.makedirs(doing)
         with open(os.path.join(doing, "i0001.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001\n---\n")
-        with open(os.path.join(doing, "i0001-01.md"), "w", encoding="utf-8") as f:
-            f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
+        with open(os.path.join(doing, "i0001-01-01.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
 
         def push_from(name):
             return subprocess.run(
@@ -377,7 +377,7 @@ class PassTest(GitWrapperTest):
                 errors="replace",
             )
 
-        child = push_from("i0001-01")
+        child = push_from("i0001-01-01")
         self.assertEqual(2, child.returncode, child.stdout + child.stderr)
         self.assertIn("子チケット", child.stderr)
         parent = push_from("i0001")
@@ -794,7 +794,7 @@ class StoreRewindTest(GitWrapperTest):
     """
 
     COPY = ".ccnavi/approved/doing/i0001.md"
-    REVIEW = "wip/proposals/review/i0001-01.md"
+    REVIEW = "wip/proposals/review/i0001-01-01.md"
 
     def setUp(self):
         super().setUp()
@@ -1041,11 +1041,11 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_a_child_worktree_is_not_a_parent(self):
-        child = os.path.join(self.dir, ".claude", "worktrees", "i0001-01")
-        git(self.dir, "worktree", "add", "-q", child, "-b", "i0001-01")
+        child = os.path.join(self.dir, ".claude", "worktrees", "i0001-01-01")
+        git(self.dir, "worktree", "add", "-q", child, "-b", "i0001-01-01")
         write_text(
-            os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01.md"),
-            "---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n",
+            os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01-01.md"),
+            "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n",
         )
         result = run_in(child, "checkout", "-b", "elsewhere")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)

@@ -50,12 +50,12 @@ test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠�
     assert.equal((page.state() as { parent: string }).parent, "i0001");
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: true });
-    page.click(page.one('button[data-action="approve-one"][data-ticket="i0001-03"]'));
+    assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-02-03"], filtered: true });
+    page.click(page.one('button[data-action="approve-one"][data-ticket="i0001-02-03"]'));
     await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: true });
+    assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-02-03"], filtered: true });
     // カードを押すと提案を開く。ボタンの上では開かない
-    page.click(page.one('.card[data-id="i0001-01"]'));
+    page.click(page.one('.card[data-id="i0001-01-01"]'));
     await page.settle();
     assert.equal(page.posted.at(-1)?.type, "open");
   } finally {
@@ -65,17 +65,17 @@ test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠�
 
 test("CB-D46 書き込みが止まっているカードは「要対応のみ」でも残る", async () => {
   // 信頼できない理由（`blocked`）は不備として積まれ、`attention` が真になる（board.ts）。素の版では
-  // i0001-02 は隠れる（CB-D42）ので、理由を付けたときだけ残ることが確かめられる。
+  // i0001-02-02 は隠れる（CB-D42）ので、理由を付けたときだけ残ることが確かめられる。
   const base = fixture();
   const stopped = base.tickets.map((t) =>
-    t.ticket === "i0001-02" ? { ...t, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" } : t,
+    t.ticket === "i0001-02-02" ? { ...t, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" } : t,
   );
   const page = await openBoard({ ...base, tickets: stopped });
   try {
     page.click(page.one("#attention-filter"));
     await page.settle();
-    assert.ok(!page.one('.card[data-id="i0001-02"]').classList.contains("hidden"));
-    assert.match(page.one('.card[data-id="i0001-02"]').textContent ?? "", /書き込み停止中/);
+    assert.ok(!page.one('.card[data-id="i0001-02-02"]').classList.contains("hidden"));
+    assert.match(page.one('.card[data-id="i0001-02-02"]').textContent ?? "", /書き込み停止中/);
   } finally {
     await page.close();
   }
@@ -90,11 +90,11 @@ test("CB-D42 「要対応のみ」でユーザが動く必要の無いカード�
     await page.settle();
     assert.ok(page.document.body.classList.contains("filtering"));
     assert.ok(page.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    assert.ok(page.one('.card[data-id="i0001-01"]').classList.contains("hidden"));
-    assert.ok(page.one('.card[data-id="i0001-02"]').classList.contains("hidden"));
-    assert.ok(!page.one('.card[data-id="i0001-03"]').classList.contains("hidden"));
-    assert.ok(page.one('.card[data-id="i0001-04"]').classList.contains("hidden"));
-    assert.ok(page.one('.card[data-id="i0001-05"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001-01-01"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001-02-02"]').classList.contains("hidden"));
+    assert.ok(!page.one('.card[data-id="i0001-02-03"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001-02-04"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001-02-05"]').classList.contains("hidden"));
     assert.equal(page.one('.column[data-state="todo"] > h2 > .count').textContent, "1");
     assert.equal(page.one('.column[data-state="doing"] > h2 > .count').textContent, "0");
     assert.equal(page.one('.column[data-state="done"] > h2 > .count').textContent, "0");
@@ -102,7 +102,7 @@ test("CB-D42 「要対応のみ」でユーザが動く必要の無いカード�
     assert.equal((page.state() as { attention: boolean }).attention, true);
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: true });
+    assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-02-03"], filtered: true });
     page.click(page.one("#attention-filter"));
     await page.settle();
     assert.ok(!page.document.body.classList.contains("filtering"));
@@ -116,7 +116,7 @@ test("CB-D42 「要対応のみ」でユーザが動く必要の無いカード�
   try {
     assert.equal(again.one<HTMLInputElement>("#attention-filter").checked, true);
     assert.ok(again.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    assert.ok(!again.one('.card[data-id="i0001-03"]').classList.contains("hidden"));
+    assert.ok(!again.one('.card[data-id="i0001-02-03"]').classList.contains("hidden"));
   } finally {
     await again.close();
   }
@@ -156,8 +156,8 @@ test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提�
     page.click(page.one("#attention-filter"));
     await page.settle();
     assert.ok(!page.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    assert.ok(!page.one('.card[data-id="i0001-02"]').classList.contains("hidden"));
-    assert.ok(page.one('.card[data-id="i0001-01"]').classList.contains("hidden"));
+    assert.ok(!page.one('.card[data-id="i0001-02-02"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001-01-01"]').classList.contains("hidden"));
   } finally {
     await page.close();
   }
@@ -302,7 +302,7 @@ test("CB-D49 承認のオーバーレイは Esc で閉じる。承認してい�
 test("CB-D50 カードは Enter でも開く。ボタンやリンクの上では開かない", async () => {
   const page = await openBoard();
   try {
-    page.key("Enter", page.one('.card[data-id="i0001-01"]'));
+    page.key("Enter", page.one('.card[data-id="i0001-01-01"]'));
     await page.settle();
     assert.equal(page.posted.at(-1)?.type, "open");
     const sent = page.posted.length;
@@ -311,7 +311,7 @@ test("CB-D50 カードは Enter でも開く。ボタンやリンクの上では
     await page.settle();
     assert.equal(page.posted.length, sent);
     // 他のキーでは開かない
-    page.key("a", page.one('.card[data-id="i0001-01"]'));
+    page.key("a", page.one('.card[data-id="i0001-01-01"]'));
     await page.settle();
     assert.equal(page.posted.length, sent);
   } finally {
@@ -396,25 +396,25 @@ test("CB-D82 渡された分にだけ動いた表示を出す。渡されなけ�
     // 開いた直後は拡張ホストが何も渡さない（比べる相手が無い）。全部が光ると「動いた」の意味が無くなる
     assert.deepEqual(page.all(".card.moved"), []);
 
-    await page.send({ type: "data", data: data([{ id: "i0001-03", from: "todo", to: "doing" }]) });
+    await page.send({ type: "data", data: data([{ id: "i0001-02-03", from: "todo", to: "doing" }]) });
     assert.deepEqual(
       page.all(".card.moved").map((card) => card.getAttribute("data-id")),
-      ["i0001-03"],
+      ["i0001-02-03"],
     );
-    const card = page.one('.card[data-id="i0001-03"]');
+    const card = page.one('.card[data-id="i0001-02-03"]');
     assert.equal(card.getAttribute("data-moved"), "todo-doing");
     assert.equal(card.querySelector(".moved-mark")?.textContent, "未着手 → 作業中");
 
     // 承認の文のオーバーレイを出し入れしても、拡張ホストが同じ分を渡し続ける限り動いた表示は消えない
     await page.send({
       type: "data",
-      data: { ...data([{ id: "i0001-03", from: "todo", to: "doing" }]), approval: { kind: "done", count: 1, prompt: "文" } },
+      data: { ...data([{ id: "i0001-02-03", from: "todo", to: "doing" }]), approval: { kind: "done", count: 1, prompt: "文" } },
     });
-    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-03"]);
+    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-02-03"]);
 
     // 別のカードが動いたと渡されたら、動いた表示はそちらに移る
-    await page.send({ type: "data", data: data([{ id: "i0001-02", from: "doing", to: "done" }]) });
-    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-02"]);
+    await page.send({ type: "data", data: data([{ id: "i0001-02-02", from: "doing", to: "done" }]) });
+    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-02-02"]);
 
     // 何も渡されなければ動いた表示は出ない（読み直せなかった画面を挟んだ後も同じ）
     await page.send({ type: "data", data: { kind: "error", error: "読めない" } });
@@ -428,8 +428,8 @@ test("CB-D82 渡された分にだけ動いた表示を出す。渡されなけ�
 test("CB-D82b 新規起票のカードは「新規起票」と言う", async () => {
   const page = await openBoard();
   try {
-    await page.send({ type: "data", data: data([{ id: "i0001-03", to: "todo" }]) });
-    const card = page.one('.card[data-id="i0001-03"]');
+    await page.send({ type: "data", data: data([{ id: "i0001-02-03", to: "todo" }]) });
+    const card = page.one('.card[data-id="i0001-02-03"]');
     assert.ok(card.classList.contains("moved"));
     assert.equal(card.getAttribute("data-moved"), "none-todo");
     assert.equal(card.querySelector(".moved-mark")?.textContent, "新規起票");
@@ -588,16 +588,16 @@ test("CB-D105 案内の最中にボードが読み直せなくなったら案内
 test("CB-D123 履歴を開け閉めしてもカードの提案は開かない。カードの他の場所を押せば開く", async () => {
   const base = fixture();
   const history = [{ at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" }];
-  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-01" ? { ...t, history } : t)) });
+  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-01-01" ? { ...t, history } : t)) });
   try {
     const before = page.posted.length;
-    page.click(page.one('.card[data-id="i0001-01"] details.history summary'));
+    page.click(page.one('.card[data-id="i0001-01-01"] details.history summary'));
     await page.settle();
     assert.equal(page.posted.length, before);
-    page.click(page.one('.card[data-id="i0001-01"] .history-text'));
+    page.click(page.one('.card[data-id="i0001-01-01"] .history-text'));
     await page.settle();
     assert.equal(page.posted.length, before);
-    page.click(page.one('.card[data-id="i0001-01"] .title'));
+    page.click(page.one('.card[data-id="i0001-01-01"] .title'));
     await page.settle();
     assert.equal(page.posted.at(-1)?.type, "open");
   } finally {

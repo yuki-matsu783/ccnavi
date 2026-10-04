@@ -329,33 +329,33 @@ class ApproveOnlyTest(PhaseHarness):
         self.family(plan=("acceptance", "implement"))
         # 親を改版してフェーズ 1 を設計にする。子はまだ旧計画（受入テスト作成）の範囲で出す
         self.propose("i0001", parent_text("i0001", ["design", "acceptance", "implement"]))
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
         # 絞らないときは、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
         # 「編集対象としているが」として出る（設計 approve-carry 3.2）。n で何も適用しない
         whole = self.ccnavi("--agree", stdin="n\n")
         self.assertIn("編集対象としているが", whole.stdout)
         self.assertIn("超えている", whole.stdout)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-02.md")))
         # 改版を外して子だけ並べても、旧計画で通してはいけない
-        only = self.ccnavi("--agree", "i0001-02", stdin="y\n")
+        only = self.ccnavi("--agree", "i0001-01-02", stdin="y\n")
         self.assertEqual(only.returncode, 1, only.stdout + only.stderr)
         self.assertIn("改版", only.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-02.md")))
 
     def test_child_of_a_rejected_parent_is_not_approved(self):
         # 親が落ちたら（置き場に無いプロジェクト）、その子も親が承認されていないので落ちる。
         # 子自身は正しいので、落ちた親を対応表に残すと子だけ承認済みチケットになる
         parent = parent_text("i0001", ["design"]).replace("plan:", "project: nope\nplan:", 1)
         self.propose("i0001", parent)
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/design/*",)))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/design/*",)))
         self.commit_parent()
         result = self.approve()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("i0001 は承認の対象にしない", result.stderr)
         self.assertIn("親 i0001 が承認されていない", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
 
 
 class PhaseTest(PhaseHarness):
@@ -449,16 +449,16 @@ class PhaseTest(PhaseHarness):
         """
         self.family(plan=["research", "design"])
         # 種類の範囲を超える子。承認でき、承認済みチケットが置かれる。
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["src/a/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/a/*"]))
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
         self.assertIn("編集対象としているが", approved.stdout)
         self.assertIn("超えている", approved.stdout)
         self.assertIn("調査", approved.stdout)
-        self.assertNotIn("i0001-01 は承認の対象にしない", approved.stderr)
+        self.assertNotIn("i0001-01-01 は承認の対象にしない", approved.stderr)
         # 計画に無い番号。承認した子は todo/ から動いているので、消すものは無い。
-        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ["wip/research/*"]))
+        self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ["wip/research/*"]))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("計画に無い", refused.stderr)
@@ -472,10 +472,10 @@ class PhaseTest(PhaseHarness):
         """
         self.family(plan=["research", "design"])
         # 種類は `wip/research/*`。子は表記だけ違う `WIP/Research/*` を宣言する。
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["WIP/Research/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["WIP/Research/*"]))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
         self.assertNotIn("超えている", result.stderr)
 
     # ---- 3. 順序は承認で止まる
@@ -483,35 +483,35 @@ class PhaseTest(PhaseHarness):
     def test_next_phase_waits_for_the_previous_one(self):
         self.family(plan=["research", "design"])
         self.propose(
-            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
         )
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         self.commit_parent()
         result = self.approve()
         # 1 番目は通り、2 番目は「1 が閉じるまで」で落ちる。
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
         self.assertIn("閉じるまで承認しない", result.stderr)
         self.assertIn("子がまだ無い", result.stderr) if "子がまだ無い" in result.stderr else None
 
         # 1 番目を閉じる（成果物を置く）。
-        self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/research/summary.md", "まとめ\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
         # レビュー不要の種類なので、マーカーは skipped。2 番目が承認される。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
 
     def test_overlapping_types_can_be_planned_together(self):
         self.family(plan=["acceptance", "implement"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["tests/a/*"]))
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/a/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["tests/a/*"]))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/a/*"]))
         self.commit_parent()
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
 
     def test_a_batch_does_not_pass_a_later_child_over_one_that_reopens_an_earlier_phase(self):
         """前のフェーズに足す子と次のフェーズの子を一緒に承認しても、次の子は通さない（issue #31）。
@@ -522,26 +522,26 @@ class PhaseTest(PhaseHarness):
         """
         self.family(plan=["research", "design"])
         self.propose(
-            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
         )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/research/summary.md", "まとめ\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         # フェーズ 1 は閉じてレビュー不要。次のフェーズの子と、フェーズ 1 に足す子を一緒に出す。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         self.propose(
-            "i0001-03", child_text("i0001-03", "i0001", 1, ["wip/research/*"], review=False)
+            "i0001-01-03", child_text("i0001-01-03", "i0001", 1, ["wip/research/*"], review=False)
         )
         self.commit_parent("propose 02 03")
         result = self.approve()
         self.assertTrue(
-            os.path.exists(os.path.join(self.approved, "doing", "i0001-03.md")), result.stderr
+            os.path.exists(os.path.join(self.approved, "doing", "i0001-01-03.md")), result.stderr
         )
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
-        self.assertIn("同じ承認で i0001-03 を足すので開き直る", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
+        self.assertIn("同じ承認で i0001-01-03 を足すので開き直る", result.stderr)
 
     def test_a_new_parent_and_a_later_phase_child_together_still_keep_the_order(self):
         """承認済みチケットの無い親と、2 番目のフェーズの子を一緒に承認しても、子は通さない。
@@ -550,82 +550,82 @@ class PhaseTest(PhaseHarness):
         ディスクに無く、フェーズが 1 つも並ばないので、順序の検査が何も見ずに通っていた。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 2, ["wip/design/*"]))
+        self.propose("i0001-02-01", child_text("i0001-02-01", "i0001", 2, ["wip/design/*"]))
         self.commit_parent()
         result = self.approve()
         self.assertTrue(
             os.path.exists(os.path.join(self.approved, "doing", "i0001.md")), result.stderr
         )
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-01.md")))
         self.assertIn("1（調査） が閉じるまで承認しない（子がまだ無い）", result.stderr)
 
     def test_a_new_parent_with_children_in_two_phases_passes_only_the_first(self):
         """親・1 番目の子・2 番目の子を一緒に承認すると、1 番目の子までが通り、2 番目は落ちる。"""
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.propose(
-            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
         )
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         self.commit_parent()
         result = self.approve()
         self.assertTrue(
             os.path.exists(os.path.join(self.approved, "doing", "i0001.md")), result.stderr
         )
         self.assertTrue(
-            os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")), result.stderr
+            os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")), result.stderr
         )
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
-        self.assertIn("同じ承認で i0001-01 を足すが、まだ閉じていない", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
+        self.assertIn("同じ承認で i0001-01-01 を足すが、まだ閉じていない", result.stderr)
 
     # ---- 4. 成果物
 
     def test_last_child_cannot_close_without_deliverables(self):
         self.family(plan=["research", "design"])
         self.propose(
-            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
         )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01")
-        refused = self.close_child("i0001-01")
+        self.run_child("i0001-01-01")
+        refused = self.close_child("i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("成果物が無い", refused.stderr)
         self.assertIn("wip/research/summary.md", refused.stderr)
-        tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         write(os.path.join(tree, "wip", "research", "summary.md"), "x\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "summary")
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
 
     # ---- 5. 延期
 
     def test_deferred_phase_does_not_close_the_gate_and_is_covered_later(self):
         self.family(plan=[("design", "defer"), "implement", "acceptance"])
         # implement は acceptance を要るが、acceptance が後ろにあっても計画としては足りる。
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("一緒に見る", self.reason(said))
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
         # 延期したフェーズには依頼できない。
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         refused = self.request(fixture, 1)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("一緒に見る", refused.stderr)
         # 2 番目を閉じて依頼すると、1 番目も含まれる。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/a/*"]))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/a/*"]))
         self.commit_parent("propose 02")
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-02", [("src/a/x.py", "x\n")])
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.run_child("i0001-02-02", [("src/a/x.py", "x\n")])
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent("close 02")
-        self.merge("i0001-02")
+        self.merge("i0001-02-02")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
@@ -646,21 +646,21 @@ class PhaseTest(PhaseHarness):
         サブエージェントの起動が止まる（DENY_PHASE_REVIEW）。ユーザは何が起きたか分からない。
         """
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         self.assertEqual(self.confirm(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
         # 同じフェーズに子をもう 1 枚足すが、置き場に同じ名前のディレクトリを作って書けなくする。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
         self.commit_parent("propose 02")
-        os.makedirs(os.path.join(self.approved, "doing", "i0001-02.md"))
+        os.makedirs(os.path.join(self.approved, "doing", "i0001-01-02.md"))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("書けない", refused.stderr)
@@ -676,13 +676,13 @@ class PhaseTest(PhaseHarness):
         self.assertIn("全部閉じてレビューが済んでから", early.stderr)
         self.propose("i0001", parent_text("i0001", ["design"]))
 
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         # ボードの JSON は「依頼済みで止まったまま」を review_waiting で言う。レビューが
@@ -720,13 +720,13 @@ class PhaseTest(PhaseHarness):
 
     def test_feedback_work_phase_runs_and_decide_sends_the_rest_to_an_issue(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         # 差し戻し。未解決の指摘が付いて check は通らない。
@@ -749,13 +749,13 @@ class PhaseTest(PhaseHarness):
         self.assertIn("フェーズ 2（実装フィードバック対応）", result.stdout)
         self.assertIn("局面: フィードバック対応中", result.stdout)
         # 2 番目の子（範囲は親の範囲そのまま）。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/*"]))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/*"]))
         self.commit_parent("propose 02")
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-02", [("src/fix.py", "x\n")])
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.run_child("i0001-02-02", [("src/fix.py", "x\n")])
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent("close 02")
-        self.merge("i0001-02")
+        self.merge("i0001-02-02")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertEqual(self.request(fixture, 2).returncode, 0)
@@ -851,7 +851,7 @@ class PhaseTest(PhaseHarness):
     def test_ready_needs_the_parent_to_be_closable(self):
         """Draft を外せるのは、親を閉じられる状態と同じ。閉じたあとでも打てる。"""
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         fixture = self.remote()
@@ -860,10 +860,10 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("Draft を外せない", refused.stderr)
         self.assertIn("close-early", refused.stderr)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         requested = self.request(fixture, 1)
         self.assertEqual(requested.returncode, 0, requested.stderr)
@@ -915,22 +915,22 @@ class PhaseTest(PhaseHarness):
         issue に書き出される。"""
         self.family(plan=["research", "design", "acceptance", "implement"])
         self.propose(
-            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
         )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/research/summary.md", "s\n")])
+        self.run_child("i0001-01-01", [("wip/research/summary.md", "s\n")])
         # 作業中の子がいる間は早めに閉じられない。
         fixture = self.remote()
         refused = self.close_early(fixture)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("作業中の子", refused.stderr)
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         # 2 番目の子を提案して承認するが、着手はしない（todo/ に残る）。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         self.commit_parent("propose 02")
         self.assertEqual(self.approve().returncode, 0)
         self.start_parent()
@@ -940,23 +940,23 @@ class PhaseTest(PhaseHarness):
         # n なら何も変わらない。
         declined = self.close_early(fixture, answer="n")
         self.assertNotEqual(declined.returncode, 0)
-        self.assertIn("i0001-02", declined.stdout)
+        self.assertIn("i0001-02-02", declined.stdout)
         self.assertIn("実装とテスト", declined.stdout)
         self.assertIn("フィードバック計画", declined.stdout)
         self.assertIn("u/7#t0", declined.stdout)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
         # y で早めに閉じる。
         done = self.close_early(fixture, reason="今期はここまで")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("早めに閉じた", done.stdout)
-        cancelled = os.path.join(self.approved, "done", "i0001-02.md")
+        cancelled = os.path.join(self.approved, "done", "i0001-02-02.md")
         self.assertTrue(os.path.exists(cancelled))
         with open(cancelled, encoding="utf-8") as f:
             self.assertIn("cancelled_at:", f.read())
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "close-early.json"))
         self.assertEqual(mark["reason"], "今期はここまで")
-        self.assertEqual(mark["cancelled"], ["i0001-02"])
+        self.assertEqual(mark["cancelled"], ["i0001-02-02"])
         self.assertEqual(sorted(mark["skipped"]), [2, 3, 4])
         self.assertEqual(mark["accepted"], ["u/7#t0"])
         with open(
@@ -964,7 +964,7 @@ class PhaseTest(PhaseHarness):
         ) as f:
             issue = f.read()
         self.assertTrue(issue.startswith("親 の残り\n\n"))
-        self.assertIn("i0001-02", issue)
+        self.assertIn("i0001-02-02", issue)
         self.assertIn("実装とテスト", issue)
         self.assertIn("u/7#t0", issue)
         self.assertIn("今期はここまで", issue)
@@ -1024,15 +1024,15 @@ class PhaseTest(PhaseHarness):
 
         self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*")))
         self.propose(
-            "i0001-01", ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+            "i0001-01-01", ticket_text("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         )
         self.propose(
-            "i0001-02", ticket_text("i0001-02", parent="i0001", phase=2, allow=("src/b/*",))
+            "i0001-02-02", ticket_text("i0001-02-02", parent="i0001", phase=2, allow=("src/b/*",))
         )
         self.commit_parent()
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
 
 
 def scoped_child_text(name, parent, phase, allow=(), ask=(), regex=()):
@@ -1118,24 +1118,26 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
             '    review: none\n    scope: ["wip/design/*"]\n',
         )
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"], review=False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"], review=False)
+        )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
 
-        closed = self.ccnavi("ticket", "finish", "i0001-01", "--phases", loose)
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01", "--phases", loose)
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("--phases は診断", closed.stderr, "落としたことを言っていない")
         # `review: mr` のまま。閉じた先はレビュー待ちで、`.ccnavi/approved/done/` ではない。
         self.assertTrue(
             os.path.exists(
-                os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+                os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
             ),
             "レビュー待ちへ動いていない（渡した種類で判定された）",
         )
         self.assertFalse(
-            os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")),
+            os.path.exists(os.path.join(self.approved, "done", "i0001-01-01.md")),
             "レビューを飛ばして閉じた",
         )
 
@@ -1146,14 +1148,14 @@ class ChatReviewTest(PhaseHarness):
     def chat_phase(self, plan=("chores", "design")):
         """`review: chat` のフェーズを 1 つ終わらせて、告知の文を返す。"""
         self.family(plan=list(plan))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["src/a*"], review=False))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/a*"], review=False))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("src/a1.py", "x\n")])
-        closed = self.close_child("i0001-01")
+        self.run_child("i0001-01-01", [("src/a1.py", "x\n")])
+        closed = self.close_child("i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         return self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
 
     def test_chat_phase_closes_the_gate_and_the_human_opens_it_from_the_terminal(self):
@@ -1170,7 +1172,7 @@ class ChatReviewTest(PhaseHarness):
         # n と答えればマーカーは置かれない。
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="n\n")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-01", refused.stdout)
+        self.assertIn("i0001-01-01", refused.stdout)
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
@@ -1179,7 +1181,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(passed.returncode, 0, passed.stderr)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(mark["by"], "chat")
-        self.assertEqual(mark["tickets"], ["i0001-01"])
+        self.assertEqual(mark["tickets"], ["i0001-01-01"])
         opened = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(opened))
         # 2 度打っても通る（同じことを言うだけ）。
@@ -1191,7 +1193,7 @@ class ChatReviewTest(PhaseHarness):
         """このセッションで見たフェーズも、レビュー済みで review/ の子は done/ へ動き、
         ユーザが指摘を打てば続きの子が doing/ に起きる。"""
         self.chat_phase()
-        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
         self.assertTrue(os.path.exists(review))
         passed = self.ccnavi(
             "--cwd",
@@ -1203,8 +1205,8 @@ class ChatReviewTest(PhaseHarness):
         )
         self.assertEqual(passed.returncode, 0, passed.stdout + passed.stderr)
         self.assertFalse(os.path.exists(review))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")))
-        followup = os.path.join(self.approved, "doing", "i0001-02.md")
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001-01-01.md")))
+        followup = os.path.join(self.approved, "doing", "i0001-01-02.md")
         self.assertTrue(os.path.exists(followup), passed.stdout)
         with open(followup, encoding="utf-8") as f:
             text = f.read()
@@ -1220,13 +1222,13 @@ class ChatReviewTest(PhaseHarness):
     def test_chat_does_not_open_a_phase_that_is_declared_for_a_merge_request(self):
         """緩める側だけ止める。`mr` の宣言を安い経路で通させない。"""
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("マージリクエスト", refused.stderr)
@@ -1254,22 +1256,24 @@ class ChatReviewTest(PhaseHarness):
     ):
         """厳しい側を採る。延期を引き受けた側が、引き受けた分より緩い場所で見ない。"""
         self.family(plan=[("design", "defer"), "chores"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"], review=False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"], review=False)
+        )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         # 延期したフェーズでは止まらない。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/a*"], review=False))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/a*"], review=False))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-02", [("src/a1.py", "x\n")])
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.run_child("i0001-02-02", [("src/a1.py", "x\n")])
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent("close 02")
-        self.merge("i0001-02")
+        self.merge("i0001-02-02")
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
         self.assertIn("request --phase 2", said)
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
@@ -1303,21 +1307,23 @@ class ChatReviewTest(PhaseHarness):
     def test_a_covered_phase_falls_back_to_a_merge_request_when_the_type_is_unreadable(self):
         """覆っている分の種類が読めなくなっても、延期したレビューは消えない。"""
         self.family(plan=[("design", "defer"), "chores"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"], review=False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"], review=False)
+        )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/a*"], review=False))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/a*"], review=False))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-02", [("src/a1.py", "x\n")])
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.run_child("i0001-02-02", [("src/a1.py", "x\n")])
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent("close 02")
-        self.merge("i0001-02")
+        self.merge("i0001-02-02")
         # 承認のあとで種類が読めなくなる（ユーザが phases.yml を触っている最中、層の切り替え）。
         write(self.phases, "version: 1\nphases: {}\n")
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
@@ -1351,15 +1357,15 @@ class ChatReviewTest(PhaseHarness):
         # 残したまま先へ進むと、実行後チェックがそれを報告して告知が読めなくなる。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.commit_parent("フィードバック計画")
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/b*"], review=False))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/b*"], review=False))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-02", [("src/b1.py", "y\n")])
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.run_child("i0001-02-02", [("src/b1.py", "y\n")])
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         # 承認済みチケットの更新まで入れて commit する。残すと実行後チェックがそちらを報告し、
         # フェーズの告知が読めない（実行後チェックは stderr、告知は stdout の JSON）。
         self.commit_parent("close 02")
-        self.merge("i0001-02")
+        self.merge("i0001-02-02")
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
         self.assertIn("ccnavi-review.sh chat 2", said)
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
@@ -1416,7 +1422,7 @@ class ScopeLimitTest(PhaseHarness):
     親の範囲は既定で `src/*`, `wip/*`, `tests/*`、フェーズ 1 の種類 research は `wip/research/*`。
     """
 
-    def approved_child(self, text, name="i0001-01", plan=("research", "design")):
+    def approved_child(self, text, name="i0001-01-01", plan=("research", "design")):
         """親を承認し、子を提案して承認し、子のワークツリーを作って着手する。ワークツリーを返す。"""
         self.family(plan=plan)
         self.propose(name, text)
@@ -1449,13 +1455,13 @@ class ScopeLimitTest(PhaseHarness):
         """4. regex の子は承認でき、「編集対象としているが」に出る。"""
         self.family(plan=["research", "design"])
         self.propose(
-            "i0001-01",
-            scoped_child_text("i0001-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",)),
+            "i0001-01-01",
+            scoped_child_text("i0001-01-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",)),
         )
         self.commit_parent("propose child")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
         self.assertIn("編集対象としているが", approved.stdout)
         self.assertIn("regex", approved.stdout.split("編集対象としているが", 1)[1])
         self.assertNotIn("承認の対象にしない", approved.stderr)
@@ -1465,7 +1471,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_write_beyond_the_phase_type_is_denied_and_names_the_type(self):
         """7. enable: 種類の上限の外で子の範囲の中への Write は DENY_TICKET_SCOPE。"""
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         inside = self.write_to(tree, "wip/research/note.md")
         self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
@@ -1484,7 +1490,7 @@ class ScopeLimitTest(PhaseHarness):
         dry-run の文面は今の judge.decide_before のもの（設計 4.4「新しい処理は足さない」）。
         """
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         result = self.write_to(tree, "src/a/x.py", mode="dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1498,7 +1504,7 @@ class ScopeLimitTest(PhaseHarness):
         """9. 種類の上限の中で子が `ask` と書いた場所は TICKET_ASK のまま。外なら止まる。"""
         tree = self.approved_child(
             scoped_child_text(
-                "i0001-01",
+                "i0001-01-01",
                 "i0001",
                 1,
                 allow=("wip/research/a/*",),
@@ -1516,7 +1522,9 @@ class ScopeLimitTest(PhaseHarness):
     def test_inherit_scope_does_not_cut_by_the_type(self):
         """10. 種類の scope が inherit なら、種類では切り詰めない。"""
         write(self.phases, PHASES_INHERIT)
-        tree = self.approved_child(child_text("i0001-01", "i0001", 1, ["src/a/*"]), plan=["open"])
+        tree = self.approved_child(
+            child_text("i0001-01-01", "i0001", 1, ["src/a/*"]), plan=["open"]
+        )
         result = self.write_to(tree, "src/a/x.py")
         self.assertNotEqual(self.decision(result), "deny", result.stdout)
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
@@ -1529,12 +1537,12 @@ class ScopeLimitTest(PhaseHarness):
         os.remove(self.phases)
         self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*")))
         self.propose(
-            "i0001-01", ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+            "i0001-01-01", ticket_text("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         )
         self.commit_parent()
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        tree = self.run_child("i0001-01")
+        tree = self.run_child("i0001-01-01")
         inside = self.write_to(tree, "src/a/x.py")
         self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
         self.assertNotIn("読めない", self.reason(inside))
@@ -1546,7 +1554,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_unreadable_type_does_not_cut_by_type_but_says_so(self):
         """12. 親が計画を持ち番号の種類が読めないとき、種類では切り詰めず notice。親では止まる。"""
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
         )
         for label, text in (
             ("種類を消した", PHASES_WITHOUT_RESEARCH),
@@ -1581,7 +1589,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_undecodable_phases_file_does_not_crash_the_write_judge(self):
         """6. phases.yml が UTF-8 として読めなくても、Write の判定は例外で終わらない。"""
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         self.break_phases_encoding()
         result = self.write_to(tree, "src/a/x.py")
@@ -1594,13 +1602,13 @@ class ScopeLimitTest(PhaseHarness):
     def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
         """7. 同じ状態で、Bash の実行前チェック（止めるかどうかの経路）も例外で終わらない。"""
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         self.break_phases_encoding()
         for command in (
             "ls",
             "echo x > src/a/x.py",
-            "sh ../../../.ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
+            "sh ../../../.ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         ):
             with self.subTest(command):
                 self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))
@@ -1612,7 +1620,7 @@ class ScopeLimitTest(PhaseHarness):
         （設計 4.2 の表の 1 行目）で、注記を出すと毎回の Write に余計な 1 行が載る。
         """
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         os.remove(self.phases)
         self.assertFalse(os.path.exists(self.phases))
@@ -1628,7 +1636,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_regex_child_is_judged_by_the_real_path(self):
         """14. regex の子: 実際のパスで親と種類に当てる。"""
         tree = self.approved_child(
-            scoped_child_text("i0001-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",))
+            scoped_child_text("i0001-01-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",))
         )
         inside = self.write_to(tree, "wip/research/x.md")
         self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
@@ -1649,7 +1657,7 @@ class ScopeLimitTest(PhaseHarness):
         区別が要るなら `(?-i:...)` で囲む。
         """
         tree = self.approved_child(
-            scoped_child_text("i0001-01", "i0001", 1, regex=("^wip/research/",))
+            scoped_child_text("i0001-01-01", "i0001", 1, regex=("^wip/research/",))
         )
         inside = self.write_to(tree, "wip/Research/x.md")
         self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
@@ -1662,7 +1670,7 @@ class ScopeLimitTest(PhaseHarness):
         チケットの範囲でも書けることを見る。
         """
         tree = self.approved_child(
-            scoped_child_text("i0001-01", "i0001", 1, regex=("^wip/(?-i:research)/",))
+            scoped_child_text("i0001-01-01", "i0001", 1, regex=("^wip/(?-i:research)/",))
         )
         inside = self.write_to(tree, "wip/research/x.md")
         self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
@@ -1676,7 +1684,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
         """15. 実行後チェック: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         self.hook("UserPromptSubmit", "", tree)
         first = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
@@ -1697,7 +1705,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_subagent_stop_bounces_a_change_beyond_the_type_and_names_it(self):
         """16. SubagentStop: 種類の上限の外の変更で差し戻し、上限の名指しが付く。"""
         tree = self.approved_child(
-            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         write(os.path.join(tree, "wip", "research", "ok.md"), "ok\n")
         write(os.path.join(tree, "src", "a", "stray.py"), "x\n")
