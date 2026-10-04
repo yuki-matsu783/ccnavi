@@ -30,7 +30,7 @@ import unittest
 import yaml
 
 from ccnavi.infra import yamlread
-from tests import ROOT, common_path
+from tests import ROOT, SRC, common_path
 
 DOCS = [
     "",
@@ -188,6 +188,7 @@ class SameOutcomeTest(unittest.TestCase):
 class FallbackTest(unittest.TestCase):
     def test_without_libyaml(self):
         """`CSafeLoader` の無い PyYAML でも読める。"""
+        before = yamlread.LOADER
         saved = getattr(yaml, "CSafeLoader", None)
         if saved is not None:
             delattr(yaml, "CSafeLoader")
@@ -199,7 +200,7 @@ class FallbackTest(unittest.TestCase):
             if saved is not None:
                 yaml.CSafeLoader = saved
             importlib.reload(yamlread)
-        self.assertIs(yamlread.LOADER, saved or yaml.SafeLoader)
+        self.assertIs(yamlread.LOADER, before)
 
     def test_unverified_libyaml_version(self):
         """libyaml の版が見比べた版でなければ C を使わない。"""
@@ -207,6 +208,7 @@ class FallbackTest(unittest.TestCase):
             self.skipTest(NO_C)
         from yaml import _yaml
 
+        before = yamlread.LOADER
         saved = _yaml.get_version_string
         try:
             for version in ("0.2.4", "0.2.6", "0.3.0", "1.0.0"):
@@ -223,7 +225,7 @@ class FallbackTest(unittest.TestCase):
         finally:
             _yaml.get_version_string = saved
             importlib.reload(yamlread)
-        self.assertIs(yamlread.LOADER, C_LOADER)
+        self.assertIs(yamlread.LOADER, before)
 
 
 class DeepNestingTest(unittest.TestCase):
@@ -249,7 +251,7 @@ class DeepNestingTest(unittest.TestCase):
                 "except yaml.YAMLError:\n"
                 "    sys.exit(3)\n"
             )
-            env = dict(os.environ, PYTHONPATH=ROOT)
+            env = dict(os.environ, PYTHONPATH=SRC)
             with self.subTest(loader=loader.__name__):
                 result = subprocess.run(
                     [sys.executable, "-c", code],
@@ -309,7 +311,7 @@ class BrokenTicketHookTest(unittest.TestCase):
         }
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)
-        env.update(CCNAVI_GUARD_CORE_FILES="disable", PYTHONPATH=ROOT)
+        env.update(CCNAVI_GUARD_CORE_FILES="disable", PYTHONPATH=SRC)
         args = ["--root", root, "--log", "", "--state", self.state, "--mode", "enable"]
         done = subprocess.run(
             [sys.executable, "-c", _HOOK, mode, *args],
