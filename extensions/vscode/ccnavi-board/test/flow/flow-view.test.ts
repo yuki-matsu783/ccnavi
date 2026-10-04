@@ -39,7 +39,9 @@ test("CB-T225 画面から届くメッセージは形を確かめ、崩れたも
 test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に使える表記だけ受ける", () => {
   assert.equal(flowTicketOf({ ticket: "i0001-01-01" }), "i0001-01-01");
   assert.equal(flowTicketOf({ ticket: "web.i0002-01-03" }), "web.i0002-01-03");
-  for (const bad of ["", " i0001-01-01", "../i0001-01-01", "i0001/01", "i0001\\01", "-x"]) {
+  // 日本語の字を含む識別子
+  assert.equal(flowTicketOf({ ticket: "feature-64-統合先の解決-01-01" }), "feature-64-統合先の解決-01-01");
+  for (const bad of ["", " i0001-01-01", "../i0001-01-01", "i0001/01", "i0001\\01", "-x", "統合", "feature-1-ＡＢ", "feature-1-が"]) {
     assert.equal(flowTicketOf({ ticket: bad }), undefined, bad);
   }
   assert.equal(flowTicketOf({ ticket: 1 }), undefined);

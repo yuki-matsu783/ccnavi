@@ -298,7 +298,7 @@ def scan(
         everything = _everything(conf, root, open_all=found)
     kept = _authoritative(found, everything)
     if not closed:
-        # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古い写しは
+        # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古いチケットは
         # 作業中に戻さない（archive.drop_archived）。
         kept = archive.drop_archived(root, kept)
         # 判定が読むのは作業中の側だけ。閉じたものに理由は要らない。
@@ -495,7 +495,7 @@ def mark_imported(
 def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
     """親のワークツリーの外にしか無いチケットを信頼しない理由と、ユーザが親のブランチへ移してコミットする手順。"""
     return (
-        f"親のブランチ {st.family} のワークツリーの外"
+        f"親のブランチ {st.branch_name} のワークツリーの外"
         f"（{t.tree or 'ワークスペースルート'}）にしか無いチケット。"
         "取り込み済みの親子のチケットでは、親のブランチ上のチケットだけが本物。ユーザがそのチケットを親のワークツリー"
         f"（.claude/worktrees/{st.family}）の同じ置き場へ移してコミットと push をし、"
@@ -542,7 +542,7 @@ def family_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"提案が親のブランチ {st.family} のワークツリーの外"
+                f"提案が親のブランチ {st.branch_name} のワークツリーの外"
                 f"（{t.tree or 'ワークスペースルート'}）にある。"
                 "取り込み済みの親子のチケットの提案は"
                 f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
@@ -550,6 +550,64 @@ def family_problems(
             )
         ]
     return []
+
+
+def branch_problems(
+    conf: settings.Settings,
+    root: str,
+    t: ticket_mod.Ticket,
+    fams: syncstate.Families | None = None,
+    others: list[ticket_mod.Ticket] | None = None,
+) -> list[rules.Problem]:
+    """親のブランチ名を承認してよいか。
+
+    - `branch:` がそのリポジトリの統合先の名前に当たれば承認しない。比べる名前は
+      `Families.integration_names`（環境変数・`.claude/settings.local.json`・統合先の取り込み結果・
+      `origin/HEAD`・`origin/main`・`origin/master`）。固定のリストと字の検査は
+      `ticket.branch_problem` が読むときに済ませている
+    - 2 つの親子のチケットが同じブランチを名乗る（この親のブランチ名が、同じリポジトリの開いた別の
+      チケットの親のブランチ名か識別子と同じ。大文字小文字は区別しない）なら承認しない。`others` は
+      比べるチケット（承認済みと承認待ち）
+    """
+    if t.is_child:
+        return []
+    fams = fams or syncstate.Families(conf, root)
+    found: list[rules.Problem] = []
+    if t.branch:
+        folded = t.branch.casefold()
+        hits = [n for n in fams.integration_names(t.project or "") if n.casefold() == folded]
+        if hits:
+            found.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）に当たる。"
+                    "統合先を親のブランチにしない",
+                )
+            )
+    mine = ticket_mod.branch_name(t).casefold()
+    clash = sorted(
+        {
+            o.ticket
+            for o in others or []
+            if o.ticket != t.ticket
+            and (o.parent or o.ticket) != t.ticket
+            and o.project == t.project
+            and mine in {ticket_mod.branch_name(o).casefold(), o.ticket.casefold()}
+        }
+    )
+    if clash:
+        found.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"親のブランチ {ticket_mod.branch_name(t)} を別の親子のチケット"
+                f"（{', '.join(clash)}）も親のブランチか識別子として使っている。"
+                "2 つの親子のチケットが同じブランチを名乗ると、"
+                "どちらのチケットを本物とするか決まらないので承認しない",
+            )
+        )
+    return found
 
 
 def family_stop_text(root: str, st: syncstate.Standing) -> str:
@@ -1180,7 +1238,7 @@ def predecessor_pool_of(
 
     `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
     `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
-    引くのは並びのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
+    引くのはリストのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
     """
     pool = _by_id(open_copies + review + closed)
     for t in proposals:
@@ -1237,7 +1295,7 @@ def align_imported(
     for ident, hits in list(pool.items()):
         if not hits:
             continue
-        # 手元の退避から引いた先行は閉じたもの。親のブランチの写しでは読み直さない。
+        # 手元の退避から引いた先行は閉じたもの。親のブランチ上のチケットでは読み直さない。
         if all(archive.is_archived_path(root, h.path) for h in hits):
             continue
         st = family_standing(conf, root, hits[0], fams)

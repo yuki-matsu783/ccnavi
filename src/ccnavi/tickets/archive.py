@@ -12,7 +12,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 
 置き場はワークスペースルートの `logs/archive/<リポジトリ>/` で、`<リポジトリ>` は
 ワークスペース自身なら `self`、プロジェクトならその名前（取り込み状態と同じ分け方）。
-その下は承認済みの領域と同じ並び
+その下は承認済みの領域と同じ構成
 （`done/<識別子>.md`・`phases/<親>/...`・`events/<識別子>.ndjson`・`flows/<子>.yml`）にする。
 `logs/` は git が追跡しないので、退避は手元の機械にだけ残る。
 
@@ -22,11 +22,11 @@ Draft を外すので、squash でマージすると既定のブランチには�
   （`approval.next_child_id`）。退避にある識別子は閉じたものとして数える（同じリポジトリのものだけ）
 - 先行を引く対応表（`approval.predecessor_pool_of`）。置き場のどこにも無い先行を、
   同じリポジトリの退避の `done/` から引く
-- 判定の走査（`approval.scan`）。子のワークツリーに残った古い写しを、退避に同じ承認の写しがあれば
-  作業中に戻さない（`drop_archived`）
+- 判定の走査（`approval.scan`）。子のワークツリーに残った古いチケットを、退避に同じ承認のチケットが
+  あれば作業中に戻さない（`drop_archived`）
 - 取り込み（`ccnavi-sync.sh`・`syncstate`）。マージ済みかを確かめられないときと、親のワークツリーを
   片付けた後に、退避の親を閉じた証拠として補う。親のワークツリーの見分け（`ccnavi_parent_tree`）も見る
-- C1 の見分けと実行後チェック。ready の印（`ready/<親>.json`）に載っている削除だけを
+- C1 の見分けと実行後チェック。ready のマーカー（`ready/<親>.json`）に載っている削除だけを
   ccnavi の書き込みと読む
 
 退避の置き場は手元にしか無いので、別の機械ではこれらの検査に使えない（ユーザが受け入れた）。
@@ -66,7 +66,7 @@ def top(root: str) -> str:
 
 
 def base_dir(root: str, project: str) -> str:
-    """そのリポジトリの退避の置き場（承認済みの領域と同じ並びを持つ）。"""
+    """そのリポジトリの退避の置き場（承認済みの領域と同じ構成を持つ）。"""
     return os.path.join(top(root), syncstate.repo_key(project))
 
 
@@ -256,10 +256,10 @@ def same_id(a: str, b: str) -> bool:
 
 
 def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """手元の退避に、同じリポジトリで承認の時刻も同じ写しがあるチケットを落とす。
+    """手元の退避に、同じリポジトリで承認の時刻も同じコピーがあるチケットを落とす。
 
-    `ready` の後も子のワークツリーには切ったときの `doing/` の写しが残る。親のツリーから消えた
-    識別子は、その古い写しが権威として読まれ、作業中に戻ってしまう。閉じて退避したものは閉じた
+    `ready` の後も子のワークツリーには切ったときの `doing/` のチケットが残る。親のツリーから消えた
+    識別子は、その古いチケットが権威として読まれ、作業中に戻ってしまう。閉じて退避したものは閉じた
     ものとして扱う（判定の scan から外す）。承認の時刻が違えば同じ識別子の別のチケットなので残す。
     """
     if not root or not tickets:
@@ -322,7 +322,7 @@ def archived_parents(root: str, project: str) -> list[str]:
 
 
 def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "") -> Plan:
-    """閉じた親の並びから、移すファイルを決める。
+    """閉じた親のリストから、移すファイルを決める。
 
     親として拾うのは、`done/` に `parent:` を持たないチケットとして在るものと、手元の退避に親として
     在るもの（前の回が途中で止まった残り。`root` を渡したときだけ）。子は名前の形ではなくチケットの
@@ -421,7 +421,7 @@ def same_bytes(a: bytes | None, b: bytes | None) -> bool:
 
 
 def _lines(data: bytes) -> list[bytes] | None:
-    """改行を LF に揃えた行の並び（末尾の空行は落とす）。"""
+    """改行を LF に揃えた行のリスト（末尾の空行は落とす）。"""
     body = data.replace(b"\r\n", b"\n")
     lines = body.split(b"\n")
     if lines and lines[-1] == b"":
@@ -438,12 +438,12 @@ def _is_ready_line(line: bytes) -> bool:
 
 
 def holds(rel: str, held: bytes | None, data: bytes | None) -> bool:
-    """退避の写し `held` が、ツリーの中身 `data` を写したものか。
+    """退避したコピー `held` が、ツリーの中身 `data` を写したものか。
 
     履歴（`events/`）は、`data` の行が全部 `held` に在り、`held` にだけ在る行が ready の流れの行
     （「退避した」と、ready が置く Draft を外したマーカーの行）だけなら同じと読む。C1 は
-    コミット済みの中身と比べるが、ready はマーカーを置いてから写し、退避の側にだけ「退避した」を
-    足すので、写しにはその行が足されている。それ以外は中身が同じこと。
+    コミット済みの中身と比べるが、ready はマーカーを置いてからコピーし、退避の側にだけ「退避した」を
+    足すので、コピーにはその行が足されている。それ以外は中身が同じこと。
     """
     if same_bytes(held, data):
         return True
@@ -496,11 +496,11 @@ def archived_bytes(root: str, project: str, rel: str) -> bytes | None:
         return None
 
 
-# ---- ready が退避した印（どの親のワークツリーから、どのファイルを移したか）
+# ---- ready が退避したマーカー（どの親のワークツリーから、どのファイルを移したか）
 #
 # C1 の見分けと実行後チェックは、ready の流れで消したものだけを ccnavi の書き込みとして外す。
 # 「退避に同じ中身がある」だけで外すと、ready を経ない削除も黙ってコミットされる。
-# ready の印は退避の置き場の `ready/<親>.json` で、`logs/archive/` は記録の守りが
+# ready のマーカーは退避の置き場の `ready/<親>.json` で、`logs/archive/` は記録の保護が
 # エージェントの書き込みを止める。
 
 READY_DIR = "ready"
@@ -510,7 +510,7 @@ def _tree_key(tree_root: str) -> str:
     return os.path.normcase(os.path.realpath(tree_root)) if tree_root else ""
 
 
-# ready の印に載せてよいのは、承認済みの領域のこの 4 つの下だけ。
+# ready のマーカーに載せてよいのは、承認済みの領域のこの 4 つの下だけ。
 READY_PLACES = (f"{ticket_mod.DONE}/", f"{PHASES_DIR}/", f"{history.EVENTS_DIR}/", f"{FLOWS_DIR}/")
 
 
@@ -542,8 +542,9 @@ def _read_ready(root: str, project: str, name: str) -> dict | None:
 def ready_files(root: str, project: str, tree_root: str, head: str) -> set[str]:
     """その回の ready がそのツリーから移したファイル（承認済みの領域からの相対）。
 
-    ready の印が効くのは、印を書いたときのツリーの先頭（`head`）と、いま比べている版が同じ間だけ。
-    ready の削除がコミットされてツリーが進めば、印は以後の削除には効かない（ready の外の削除を
+    ready のマーカーが効くのは、マーカーを書いたときのツリーの先頭（`head`）と、いま比べている版が
+    同じ間だけ。
+    ready の削除がコミットされてツリーが進めば、マーカーは以後の削除には効かない（ready の外の削除を
     ccnavi の書き込みとしてコミットしない）。`head` が空なら何も返さない。
     """
     if not root or not head:
@@ -565,9 +566,9 @@ def ready_files(root: str, project: str, tree_root: str, head: str) -> set[str]:
 
 
 def ready_started(root: str, project: str, parent: str, tree_root: str) -> bool:
-    """そのツリーで、その親の ready が退避を始めたか（印 `ready/<親>.json` が在るか）。
+    """そのツリーで、その親の ready が退避を始めたか（マーカー `ready/<親>.json` が在るか）。
 
-    ready の印は条件を確かめた後にだけ書くので、在れば条件は前の回で確かめてある。
+    ready のマーカーは条件を確かめた後にだけ書くので、在れば条件は前の回で確かめてある。
     """
     data = _read_ready(root, project, f"{parent}.json")
     return data is not None and data.get("tree") == _tree_key(tree_root)
@@ -576,7 +577,7 @@ def ready_started(root: str, project: str, parent: str, tree_root: str) -> bool:
 def _note_ready(
     root: str, project: str, parent: str, tree_root: str, rels: list[str], head: str
 ) -> str:
-    """ready の印に、これから移すファイルとツリーの先頭を書く（消す前に書く）。
+    """ready のマーカーに、これから移すファイルとツリーの先頭を書く（消す前に書く）。
 
     同じ先頭の前の回（途中で止まった）の一覧には足し、先頭が進んでいれば今回の分で書き直す。
     """
@@ -598,21 +599,22 @@ def move(
     ready_parent: str = "",
     tree_root: str = "",
 ) -> tuple[list[str], str]:
-    """`todo` のファイルを退避へ移す。移した相対の並びと、止まった理由（無ければ空）。
+    """`todo` のファイルを退避へ移す。移した相対パスのリストと、止まった理由（無ければ空）。
 
     1 本ずつ、退避の側へ一時ファイルから書いて読み戻して確かめ、それから元を消す（元の消去は
     fsio を通すので、C1 の一覧に載る）。退避の側の書き込みは一覧に載せない（`logs/` は
     リポジトリに入らない）。退避の置き場の途中（`logs` から行き先のディレクトリまで）にリンクが
     あれば書かずに止める。
 
-    履歴（`events/`）はツリーの中身をそのまま写し、「退避した」の 1 行は退避の側にだけ足す。足すのは
-    そのチケット（`done/`）を移したときで、途中で止まっても移していないチケットに「退避した」は残らない。
-    行き先に写しが既に在るとき、ツリーの中身を写したものと読めれば（前の回の残り）写さずに元だけ
+    履歴（`events/`）はツリーの中身をそのままコピーし、「退避した」の 1 行は退避の側にだけ足す。
+    足すのはそのチケット（`done/`）を移したときで、途中で止まっても移していないチケットに「退避した」は残らない。
+    行き先にコピーが既に在るとき、ツリーの中身をコピーしたものと読めれば（前の回の残り）コピーせずに元だけ
     消す。違えば、チケット（`done/`）なら上書きせずに止め（閉じた記録を書き換えない）、マーカー・
     履歴・フローなら今の中身で置き換える（push が通らずに C1 が戻した後の打ち直し）。
 
-    `ready_parent` と `tree_root` を渡せば、消す前に ready の印（`ready/<親>.json`）へ移すファイルを
-    足す。途中で止まっても、そこまでに移した分は戻さない（元は git に残っていて、C1 が戻す）。
+    `ready_parent` と `tree_root` を渡せば、消す前に ready のマーカー（`ready/<親>.json`）へ移す
+    ファイルを足す。途中で止まっても、そこまでに移した分は戻さない（元は git に残っていて、
+    C1 が戻す）。
     """
     base = base_dir(root, project)
     if _linked(root, tuple(os.path.relpath(base, root).split(os.sep))):

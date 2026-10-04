@@ -324,12 +324,18 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
 }
 
 /**
+ * 識別子の形（Python の `ticket._ID` と同じ。先頭は ASCII の英数字、続きは英数字・`.`・`_`・`-` と
+ * ひらがな・カタカナ・長音記号・CJK 統合漢字・々）
+ */
+const TICKET_ID = /^[A-Za-z0-9][A-Za-z0-9._\-\u3005\u3041-\u3096\u30a1-\u30fa\u30fc\u4e00-\u9fff]*$/u;
+
+/**
  * ボードの「フロー」ボタンの中身（`{type: "flow", ticket}`）の識別子。形が違えば undefined。
  * 識別子に使えない表記（空・空白・パスの区切り）は受けない。開く先は拡張ホストがボードの答えから引き直す。
  */
 export function flowTicketOf(message: { readonly ticket?: unknown }): string | undefined {
   const ticket = message.ticket;
-  if (typeof ticket !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(ticket)) {
+  if (typeof ticket !== "string" || !TICKET_ID.test(ticket)) {
     return undefined;
   }
   return ticket;

@@ -736,9 +736,9 @@ def _script_writes(
       レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
 
     * `ready` の退避（`tickets/archive.py`）が消したもの。閉じた親の `done/` の親子のチケット・
-      `phases/<親>/`・`events/`・`flows/` の削除で、ready の印に載り、消えた中身がワークスペースの
-      `logs/archive/` の写しと同じもの（見分けは C1 と同じ `c1.archived_removal`）。`root`
-      （ワークスペースルート）が空なら外さない
+      `phases/<親>/`・`events/`・`flows/` の削除で、ready のマーカーに載り、消えた中身が
+      ワークスペースの `logs/archive/` のコピーと同じもの（見分けは C1 と同じ
+      `c1.archived_removal`）。`root`（ワークスペースルート）が空なら外さない
 
     範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済みチケット、消えただけの
     チケットは外さず、今までどおり報告する。承認済みチケットの frontmatter はそのワークツリーの
@@ -811,8 +811,8 @@ def _archived_removals(
     where: tree.Tree,
     root: str,
 ) -> set[str]:
-    """`ready` の退避が消したと読める削除の実パス（`c1.archived_removal`。ready の印に載り、
-    中身が退避の写しと同じもの）。"""
+    """`ready` の退避が消したと読める削除の実パス（`c1.archived_removal`。ready のマーカーに載り、
+    中身が退避したコピーと同じもの）。"""
     if not root or not approved_rel:
         return set()
     approved = approved_rel.strip("/")

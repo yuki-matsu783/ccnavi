@@ -226,6 +226,9 @@ ask:
     subject: "sed -n 1,20p /repo/.ccnavi/common/rules.yml"
     why: ガードの設定でも、-i が無ければ書き換えない。deny には当たらない
   - tool: Bash
+    subject: "sed -n 1,20p /repo/.claude/worktrees/feature-id/.ccnavi/common/rules.yml"
+    why: パスの途中に -i があるだけの読み。独立したオプションの -i ではないので deny に当たらない
+  - tool: Bash
     subject: "uv run python -m unittest discover -s tests -t ."
     why: 検査コマンド。どのルールも言及しない
   - tool: Bash

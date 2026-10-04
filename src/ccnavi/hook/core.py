@@ -464,12 +464,20 @@ def verify(
         _say_elsewhere(stderr, judged.gathered)
     gathered = judged.gathered
     verdict = agree.verify_verdict(gathered, conf.tickets)
+    # 新規の親のブランチ名が既にあるブランチと同じか。warn なので答えは変えない。
+    fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
+    branches = agree.existing_branch_warnings(root, conf, fresh, [], [], [])
     if as_json:
         body = agree.preview_body(root, gathered, judged.digest)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
+        body["branch_warnings"] = branches
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
     else:
         stdout.write(verdict.text)
+        if branches:
+            stdout.write("\n既にあるブランチと同じ名前の親（warn。承認は止めない）:\n")
+            for line in branches:
+                stdout.write(f"  - {line}\n")
     return modes.EXIT_OK if verdict.ok else modes.EXIT_ANSWER_NO
 
 
