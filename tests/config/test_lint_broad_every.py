@@ -1,6 +1,6 @@
 """`every > 1` のルールに `--lint` の広い allow 苦情を掛けないことの受入テスト。
 
-`_broad`（src/ccnavi/entry/lint.py）は、広い allow に `additionalContext` があると
+`_broad`（src/ccnavi/entry/lint_rules.py）は、広い allow に `additionalContext` があると
 「当たるたびに同じ文が積まれる」と warn する。`every`（渡す回の刻み。i0055）を
 書いたルールは当たった中の 1 回しか渡らないので、この理屈は成り立たない。
 
