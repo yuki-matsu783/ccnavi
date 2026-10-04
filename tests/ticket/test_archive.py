@@ -2,8 +2,8 @@
 
 - 退避の構成と移し方（archive.py）
 - `ready` が条件を確かめてから退避し、打ち直しても通ること
-- C1 の見分け（`c1.classify_all`）と実行後チェック（`post._script_writes`）が、退避の削除だけを
-  ccnavi の書き込みとして外すこと
+- C1 の見分け（`c1.classify_all`）と実行後チェック（`post_findings._script_writes`）が、
+  退避の削除だけを ccnavi の書き込みとして外すこと
 - 閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見ること
 - ボードの JSON に退避のチケットが載ること（判定には混ぜない）
 """

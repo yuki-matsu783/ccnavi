@@ -38,7 +38,7 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
 def script_fields_set(text: str) -> tuple[str, ...]:
     """その版が既に値を持っている、スクリプトの欄。
 
-    正規化した内容を突き合わせる側が「落としてよい欄」を決めるのに使う（`post._script_writes`）。
+    正規化した内容を突き合わせる側が「落としてよい欄」を決めるのに使う（`post_findings._script_writes`）。
     **落としてよいのは、コミット済みの版がまだ持っていない欄だけ。** 副命令はどれも
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
@@ -68,7 +68,7 @@ def script_shape(text: str, drop: tuple[str, ...] = ticket_model.SCRIPT_FIELDS) 
     """frontmatter を持つチケットなら、`drop` の欄を落として正規化した内容を返す。無ければ None。
 
     実行後チェックが「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
-    答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
+    答えるのに使う（`post_findings._script_writes`）。台帳を持たないのは、承認とマーカーが親の
     ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
     clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。
 

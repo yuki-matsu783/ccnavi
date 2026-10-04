@@ -17,7 +17,7 @@ from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
 from ..records import audit, prune, repeat
 from ..tickets import approval, approval_checks, branchfind, configsync, ops, phase
-from . import docsearch, judge, post, projskills, reasons, subagent
+from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -74,7 +74,7 @@ def watch_context(
     root: str,
     record: audit.Record,
     raw: approval.Raw | None = None,
-) -> tuple[list[post.Watched], post.ScopeGuard | None]:
+) -> tuple[list[post.Watched], post_findings.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
@@ -129,7 +129,7 @@ def watched_for(
 
 def scope_guard(
     conf: settings.Settings, root: str, raw: approval.Raw | None = None
-) -> post.ScopeGuard | None:
+) -> post_findings.ScopeGuard | None:
     """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。
 
     `raw` は呼び手が `approval.read_raw` で読んだもの。渡せば置き場を読み直さない。
@@ -142,7 +142,7 @@ def scope_guard(
     for copy in copies:
         if copy.has_plan and copy.project not in types:
             types[copy.project] = phase.load_types(conf, root, copy.project) or {}
-    return post.ScopeGuard(
+    return post_findings.ScopeGuard(
         root=root,
         copies=approval_checks.by_id(copies),
         projects=conf.projects,

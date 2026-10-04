@@ -42,7 +42,7 @@ MODE_ENV = "CCNAVI_MODE"
 # RESTORE_IF_DENY_ENV は、ルールが `deny` と宣言した場所を戻す。対象は
 # ルールファイル次第で動くので、プロジェクトが書いたぶんだけ広がる。
 # 戻すのは `deny` だけで、`ask` と承認済みチケットの範囲外は報告に留める
-# （post._restorable）。実行後チェックが見る範囲（post._guarding）より狭い。
+# （post._restorable）。実行後チェックが見る範囲（post_findings._guarding）より狭い。
 # GUARD_CORE_FILES_ENV は、ccnavi 自身を成り立たせている設定ファイルを
 # 戻す。対象は組み込みで固定されていて、ルールファイルには書かない。
 #

@@ -16,7 +16,7 @@ from ..policy import rules
 from ..records import audit
 from ..tickets import approval, approval_checks, flow, phase, phase_scope, ticket_model
 from ..tickets import ticket as ticket_mod
-from . import judge, post, projskills, reasons
+from . import judge, post, post_findings, projskills, reasons
 
 # サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
 # 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
@@ -184,9 +184,9 @@ def at_stop(
         return EXIT_OK
 
     record.decision, record.paths = audit.DENY, [f"{c.ticket}:{rel}" for c, rel, _ in findings]
-    record.rules, record.code = [reasons.TICKET_RULE], post.CODE_TICKET_SCOPE
+    record.rules, record.code = [reasons.TICKET_RULE], post_findings.CODE_TICKET_SCOPE
     lines = [
-        f"[ccnavi] {post.CODE_TICKET_SCOPE}: 子チケットの範囲の外に変更が残っています（"
+        f"[ccnavi] {post_findings.CODE_TICKET_SCOPE}: 子チケットの範囲の外に変更が残っています（"
         f"{len(findings)} 件）。範囲の中へ戻すか、要るなら親に伝えて次のチケットにしてください。"
     ]
     for child, rel, found in findings[: post.REPORT_LIMIT]:
@@ -231,7 +231,7 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
         return ""
     fsio.remove(_bounce_path(state_dir, payload.session_id, agent_id))
     return (
-        f"[ccnavi] {post.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
+        f"[ccnavi] {post_findings.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
         "差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の"
         "変更を確かめてください。"
     )

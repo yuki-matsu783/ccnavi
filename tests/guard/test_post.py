@@ -52,7 +52,7 @@ RULES = {
             "message": "proposals are moved by the scripts.",
         },
     ],
-    # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
+    # `ask` も保護領域（post_findings._guarding）。報告はされるが、戻す対象ではない
     # （post._restorable）。文面は書かない。ask に message を書くと lint が error。
     "ask": [
         {

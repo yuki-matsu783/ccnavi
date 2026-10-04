@@ -3179,7 +3179,8 @@ class TicketTest(unittest.TestCase):
 
 
 class ScriptShapeTest(unittest.TestCase):
-    """`script_shape` は、スクリプトが書く欄だけを落とす（`post._script_writes` の土台）。"""
+    """`script_shape` は、スクリプトが書く欄だけを落とす（`post_findings._script_writes` の
+    土台）。"""
 
     body = '---\nid: i0001\nallow:\n  - match: Write|Edit\n    glob: "src/*"\n---\n本文\n'
 

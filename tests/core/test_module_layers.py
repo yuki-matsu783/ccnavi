@@ -202,6 +202,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "hook.judge",
                 "tickets.ops",
                 "hook.post",
+                "hook.post_findings",
+                "hook.post_report",
                 "tickets.review",
                 "tickets.review_close",
                 "tickets.review_decide",
