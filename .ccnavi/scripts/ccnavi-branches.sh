@@ -90,7 +90,7 @@ ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 git rev-parse --show-toplevel >/dev/null 2>&1 ||
 	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で打ってください。"
-state="$root/${CCNAVI_STATE:-logs/state}"
+state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
 host_err="$state/branches-host-err-$$"

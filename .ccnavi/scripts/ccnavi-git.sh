@@ -349,8 +349,8 @@ store_hit() {
 		return 0
 		;;
 	esac
-	sh_approved=$(printf '%s' "${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" | tr '\\' '/')
-	sh_review=$(printf '%s' "${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}/review" | tr '\\' '/')
+	sh_approved=.ccnavi/approved   # 固定
+	sh_review=wip/proposals/review # 固定
 	case "$sh_arg" in
 	/* | [A-Za-z]:/*)
 		# 絶対パス。トップのパスは OS で表記が揃わない（`C:/x` と `/c/x`）ので、置き場のパスを
@@ -1119,23 +1119,17 @@ push)
 			# ccnavi が承認済みチケットを探すのと同じツリー（ワークスペースルート・projects/ の下・
 			# .claude/worktrees/ の下。approval.trees）を全部見る。識別子は重ならないので、
 			# どこで見つかってもこのツリーの子のもの。
-			push_projects="${CCNAVI_PROJECTS:-projects}"
+			push_projects=projects # 固定
 			case "$push_projects" in
 			/* | [A-Za-z]:*) ;;
 			*) push_projects="$push_root/$push_projects" ;;
 			esac
 			for push_tree in "$push_root" "$push_projects"/* "$push_root"/.claude/worktrees/*; do
 				[ -d "$push_tree" ] || continue
-				case "${CCNAVI_TICKETS_APPROVED:-}" in
-				/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
-				# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。食い違うと、
-				# env を書いていないワークスペースで、この検査が気づかないうちに行われなくなる。
-				*) push_copies="$push_tree/${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" ;;
-				esac
-				case "${CCNAVI_TICKETS_PROPOSAL:-}" in
-				/* | [A-Za-z]:*) push_proposals="$CCNAVI_TICKETS_PROPOSAL" ;;
-				*) push_proposals="$push_tree/${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}" ;;
-				esac
+				# hook 側の既定（settings.py の DEFAULT_APPROVED・DEFAULT_TICKETS）と同じ場所を見る。
+				# 食い違うと、この検査が別の場所を見て、気づかないうちに行われなくなる。
+				push_copies="$push_tree/.ccnavi/approved" # 固定
+				push_proposals="$push_tree/wip/proposals" # 固定
 				# レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る。子を閉じたあと、親が
 				# 取り込んで片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
 				for push_copy in "$push_copies/doing/$push_name.md" "$push_copies/done/$push_name.md" \
@@ -1290,8 +1284,8 @@ push_record_family() {
 	'') ;;
 	*) return 0 ;;
 	esac
-	pr_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-	pr_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
+	pr_approved=.ccnavi/approved # 固定
+	pr_proposals=wip/proposals   # 固定
 	pr_dirty=$(git -C "$push_top" status --porcelain --untracked-files=all -- \
 		"${pr_approved%/}" "${pr_proposals%/}/review" 2>/dev/null | cut -c4- | tr '\n' ' ' | sed 's/ *$//')
 	if [ -n "$pr_dirty" ]; then

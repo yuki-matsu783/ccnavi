@@ -64,7 +64,7 @@
 #
 # 実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。ここが git で取ってくる。
 # 置き場のパスと settings.local.json の読みだけを実行ファイル（`ccnavi sync paths`）に聞く。
-# 実行ファイルが無ければ、ほかの sh と同じく環境変数のパス（無ければ既定）を使う。在るのに
+# 実行ファイルが無ければ、ほかの sh と同じく既定のパス（固定）を使う。在るのに
 # 答えなかったときは、統合先を取り違えないよう止める。
 #
 # 環境変数: CCNAVI_INTEGRATION_BRANCH / CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/
@@ -279,16 +279,13 @@ family_branch() {
 	printf '%s\n' "$fb_name"
 }
 approved=$(info approved)
-proposals=$(info proposals)
 home=$(info home)
 integration_local=$(info integration)
-[ -n "$approved" ] || approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-[ -n "$proposals" ] || proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
-[ -n "$home" ] || home="${CCNAVI_PROJECT_HOME:-.ccnavi}"
+[ -n "$approved" ] || approved=.ccnavi/approved # 固定
+[ -n "$home" ] || home=.ccnavi # 固定
 approved="${approved%/}"
-proposals="${proposals%/}"
 home="${home%/}"
-projects="${CCNAVI_PROJECTS:-projects}"
+projects=projects # 固定
 projects="${projects%/}"
 
 # ---- 統合先の名前

@@ -166,5 +166,343 @@ class CrossRepositoryTest(unittest.TestCase):
         self.assertNotIn("複数の場所にある", result.stdout)
 
 
+# `projects/` のぶつかりの知らせの先頭の句。VS Code 拡張（`projects-render.ts`）が
+# この句で始まる `(projects)` の苦情を見分けてバナーに出す。`lint.py` の文面と揃える
+# （設計 wip/design/i0064-fixed-places.md §4.2）。
+TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
+# 既存の「無視されていない」の文面の頭。
+NOT_IGNORED = "projects/ がワークスペースの git で無視されていない"
+
+
+class ProjectsCollisionTest(unittest.TestCase):
+    """`projects/` の置き場がワークスペース自身のソースとぶつかったときの `--lint`（A5・A6）。
+
+    ワークスペースの git が `projects/` の下のファイルを追跡していると、名前を逃がす手段が
+    無い（置き場は固定）。`.gitignore` に `/projects/` を足すとソースが追跡から
+    外れるので、「無視されていない」の案内は誤りになる。代わりに `(projects)` の warn を 1 件だけ
+    出す。
+
+    | 追跡がある | プロジェクトがある | 無視されていない | 出すもの |
+    |---|---|---|---|
+    | はい | どちらでも | どちらでも | ぶつかりの warn だけ（A5） |
+    | いいえ | はい | はい | 既存の「無視されていない」（A6） |
+    | いいえ | はい | いいえ | 何も言わない |
+    | いいえ | いいえ | — | 何も言わない |
+
+    フラグ（`--projects` など）は渡さず、`--root` の下の既定の置き場を見る。
+    A5 は実装前は赤（ぶつかりの知らせがまだ無い）。A6 は今どおりで緑（回帰の見張り）。
+    """
+
+    def setUp(self):
+        self.ws = tempfile.mkdtemp(prefix="ccnavi-collision-")
+        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
+        os.makedirs(os.path.join(self.ws, ".claude"))
+        git(self.ws, "init", "--quiet", "-b", "main")
+        write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), json.dumps({"version": 1}))
+        write(os.path.join(self.ws, "src", "keep.py"), "print(1)\n")
+        self.projects = os.path.join(self.ws, "projects")
+
+    def track(self, path="projects/foo.txt", ignore=""):
+        """ワークスペースのソースとして `projects/` の下のファイルを追跡させる。"""
+        write(os.path.join(self.ws, ".gitignore"), f"/.claude/\n{ignore}")
+        write(os.path.join(self.ws, *path.split("/")), "ワークスペース自身のソース\n")
+        # `-f`: `.gitignore` に入れた後でも追跡させる（追跡は無視の設定より先に決まる）。
+        git(self.ws, "add", "-f", "--", ".gitignore", "src/keep.py", path)
+        git(self.ws, "commit", "--quiet", "-m", "init")
+
+    def no_tracking(self, ignore=""):
+        write(os.path.join(self.ws, ".gitignore"), f"/.claude/\n{ignore}")
+        git(self.ws, "add", "--", ".gitignore", "src/keep.py")
+        git(self.ws, "commit", "--quiet", "-m", "init")
+
+    def project(self, name="lib"):
+        """`projects/<名前>/` に自分の git を持つプロジェクトを 1 つ置く（追跡はさせない）。"""
+        root = os.path.join(self.projects, name)
+        write(os.path.join(root, "src", "keep.py"), "print(1)\n")
+        git(root, "init", "--quiet", "-b", "main")
+        git(root, "add", "-A")
+        git(root, "commit", "--quiet", "-m", "init")
+        return root
+
+    def lint(self):
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        result = run_ccnavi(
+            ["--root", self.ws, "--lint", "--json", "--mode", "enable"],
+            input="",
+            env=environment,
+        )
+        try:
+            return json.loads(result.stdout)["problems"]
+        except (ValueError, KeyError) as exc:
+            self.fail(f"--lint --json が読めない: {exc}\n{result.stdout}\n{result.stderr}")
+
+    def about_projects(self):
+        """`(projects)` の名札の苦情。プロジェクトごとの `(projects/<名前>)` は含めない。"""
+        return [p for p in self.lint() if p["where"] == "(projects)"]
+
+    # ---- A5. 追跡があるとき
+
+    def test_a_tracked_file_under_projects_is_named_once_with_the_lead_phrase(self):
+        """追跡があれば、先頭の句つきの warn を 1 件だけ出す。例のファイルも添える。"""
+        self.track()
+        self.project()
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+        self.assertIn("projects/foo.txt", found[0]["detail"])
+
+    def test_the_collision_replaces_the_not_ignored_warning(self):
+        """「無視されていない」は出さない。この場合、その案内（`.gitignore` に入れる）は誤り。"""
+        self.track()
+        self.project()
+
+        details = [p["detail"] for p in self.lint()]
+
+        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
+
+    def test_the_collision_is_named_even_without_any_project(self):
+        """プロジェクトが 0 件でも出す。これからプロジェクトを置こうとした人に要る知らせ。"""
+        self.track()
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+
+    def test_the_collision_is_named_when_projects_is_ignored_too(self):
+        """追跡されているものは `.gitignore` に入っていても追跡のまま。無視の有無は問わない。"""
+        self.track(ignore="/projects/\n")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+
+    def test_the_other_project_checks_still_run_beside_the_collision(self):
+        """予約名と `.claude/` の検査（各プロジェクトごと）は、ぶつかりがあっても今どおり出す。"""
+        self.track()
+        lib = self.project("lib")
+        os.makedirs(os.path.join(lib, ".claude"))
+
+        details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
+
+        self.assertTrue(any(".claude/ を持つ" in d for d in details), details)
+
+    # ---- A6. 追跡が無いとき（今どおり）
+
+    def test_no_tracking_and_not_ignored_still_says_not_ignored(self):
+        """追跡が無く、プロジェクトがあり、無視されていなければ、今どおり「無視されていない」。"""
+        self.no_tracking()
+        self.project()
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        self.assertIn(NOT_IGNORED, found[0]["detail"])
+        self.assertFalse(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+
+    def test_no_tracking_and_ignored_says_nothing_about_projects(self):
+        self.no_tracking(ignore="/projects/\n")
+        self.project()
+
+        self.assertEqual(self.about_projects(), [])
+
+    def test_no_tracking_and_no_project_says_nothing_about_projects(self):
+        self.no_tracking()
+
+        self.assertEqual(self.about_projects(), [])
+
+
+# 載せ忘れの文面で、先頭の句の直後に来る句。ぶつかりとの見分けに使う（設計 §4.2）。
+FORGOT_NEXT = "（入れ子のリポジトリとして"
+
+
+class ProjectsAddedByMistakeTest(unittest.TestCase):
+    """索引の `projects/` の下が gitlink だけのとき（載せ忘れ）の `--lint`（A5b・A5c）。
+
+    `.gitignore` に `/projects/` を入れ忘れたまま `git add -A` した人の索引には、
+    `projects/<名前>` が gitlink（mode 160000）で載る。ワークスペース自身のソースが
+    `projects/` にあるわけではないので、改名ではなく「索引から外して無視に入れる」を案内する。
+    通常のファイルもあるときは、ぶつかりとして改名を案内し、gitlink を名指しする（A5c）。
+
+    gitlink は人が踏むのと同じ手で作る: `projects/<名前>` で `git init` して 1 回コミットし、
+    ワークスペースで `-f` を付けずに `git add -A`（設計 §6）。
+
+    ワークスペースの作りと `--lint` の読み方は A5 と同じものを借りる（継ぐと A5 のテストまで
+    ここで走り直す）。
+    """
+
+    setUp = ProjectsCollisionTest.setUp
+    project = ProjectsCollisionTest.project
+    lint = ProjectsCollisionTest.lint
+    about_projects = ProjectsCollisionTest.about_projects
+
+    def forget(self, *names, commit=True, ignore_after=False):
+        """入れ子のリポジトリを置き、`.gitignore` に入れないまま `git add -A` する。"""
+        write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
+        for name in names or ("lib",):
+            self.project(name)
+        git(self.ws, "add", "-A")
+        if commit:
+            git(self.ws, "commit", "--quiet", "-m", "init")
+        if ignore_after:
+            # 後から `.gitignore` に足しても、索引に載ったものには効かない。
+            write(os.path.join(self.ws, ".gitignore"), "/.claude/\n/projects/\n")
+
+    def indexed(self):
+        return git(self.ws, "ls-files", "-s", "--", "projects/")
+
+    # ---- A5b. gitlink だけ
+
+    def test_a_gitlink_alone_is_named_once_as_added_by_mistake(self):
+        self.forget()
+        self.assertIn("160000", self.indexed())
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        detail = found[0]["detail"]
+        self.assertTrue(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
+        self.assertIn("`projects/lib`", detail)
+        self.assertIn("git rm -r --cached projects", detail)
+        self.assertIn("/projects/", detail)
+        self.assertNotIn("git mv", detail)
+        self.assertNotIn("ほか", detail)
+
+    def test_added_by_mistake_replaces_the_not_ignored_warning(self):
+        self.forget()
+
+        details = [p["detail"] for p in self.lint()]
+
+        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
+
+    def test_added_by_mistake_is_named_when_projects_is_ignored_afterwards(self):
+        """`.gitignore` に `/projects/` があっても、索引に載っている限り言う。"""
+        self.forget(ignore_after=True)
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
+
+    def test_added_by_mistake_is_named_before_the_commit(self):
+        """索引に載せただけでコミット前でも言う。直し方に `git reset -- projects` も並ぶ。"""
+        self.forget(commit=False)
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
+        self.assertIn("git reset -- projects", found[0]["detail"])
+
+    def test_two_gitlinks_name_the_first_and_count_the_rest(self):
+        self.forget("app", "lib")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("`projects/app` ほか 1 件", found[0]["detail"])
+
+    def test_added_by_mistake_is_named_even_after_the_project_is_gone(self):
+        """入れ子のリポジトリが消えて gitlink だけが索引に残っていても言う。"""
+        self.forget()
+        # 消す代わりに `projects/` の外へ動かす（Windows では `.git/objects` が読み取り専用で
+        # rmtree が断る。後始末はワークスペースごと消す setUp の側に任せる）。
+        os.replace(os.path.join(self.projects, "lib"), os.path.join(self.ws, "moved-lib"))
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
+
+    def test_the_claude_check_still_runs_beside_added_by_mistake(self):
+        """プロジェクトごとの `.claude/` の検査は今どおり出る。"""
+        self.forget()
+        os.makedirs(os.path.join(self.projects, "lib", ".claude"))
+
+        details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
+
+        self.assertTrue(any(".claude/ を持つ" in d for d in details), details)
+
+    # ---- A5c. 通常のファイルと gitlink の両方
+
+    def test_a_file_and_a_gitlink_are_named_once_as_a_collision(self):
+        write(os.path.join(self.ws, "projects", "foo.txt"), "ワークスペース自身のソース\n")
+        self.forget()
+        self.assertIn("160000", self.indexed())
+        self.assertIn("projects/foo.txt", self.indexed())
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        detail = found[0]["detail"]
+        self.assertTrue(detail.startswith(TRACKED_LEAD), detail)
+        self.assertFalse(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
+        self.assertIn("git mv projects apps", detail)
+        self.assertIn("git rm --cached projects/lib", detail)
+        self.assertNotIn("git rm -r --cached projects", detail)
+        details = [p["detail"] for p in self.lint()]
+        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
+
+    # ---- 空白を含む gitlink
+
+    def test_a_gitlink_with_a_space_is_quoted_in_the_rm_cached_command(self):
+        """`git rm --cached` に載せるパスは、sh で割れる文字を含むときだけ `'…'` で囲む。
+
+        囲まないと `git rm --cached projects/my lib` になり、`projects/my` と `lib` の 2 つを
+        指すコマンドを案内してしまう。名指し（`、` 区切りのほう）は囲まない。
+        """
+        write(os.path.join(self.ws, "projects", "foo.txt"), "ワークスペース自身のソース\n")
+        self.forget("my lib", "app")
+        self.assertIn("projects/my lib", self.indexed())
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        detail = found[0]["detail"]
+        self.assertIn("`projects/app`、`projects/my lib`", detail)
+        self.assertIn("`git rm --cached projects/app 'projects/my lib'`", detail)
+
+    def test_added_by_mistake_with_a_space_still_names_the_whole_place(self):
+        """gitlink だけのときの `git rm -r --cached projects` はパスを並べないので囲まない。"""
+        self.forget("my lib")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        detail = found[0]["detail"]
+        self.assertTrue(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
+        self.assertIn("`projects/my lib`", detail)
+        self.assertIn("`git rm -r --cached projects`", detail)
+
+
+class ShWordTest(unittest.TestCase):
+    """案内のコマンドに載せるパスの綴り（`lint._sh_word`）。
+
+    導入スクリプトの `sh_word` と同じ綴りにする（`tests/sh/test_setup.py` が両方を比べる）。
+    """
+
+    def test_spelling(self):
+        from ccnavi.entry.lint import _sh_word
+
+        cases = {
+            "projects/lib": "projects/lib",
+            "projects/my-lib_2.x": "projects/my-lib_2.x",
+            "projects/日本語": "projects/日本語",
+            "projects/my lib": "'projects/my lib'",
+            "projects/a$b": "'projects/a$b'",
+            "projects/it's": "'projects/it'\\''s'",
+        }
+        for path, want in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(_sh_word(path), want)
+
+
 if __name__ == "__main__":
     unittest.main()
