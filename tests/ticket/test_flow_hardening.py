@@ -139,8 +139,8 @@ class FlowSpellingTest(unittest.TestCase):
 
     def test_a_place_outside_the_tree_is_locked_for_every_project(self):
         conf = conf_with("../shared/approved")
-        found = flow.locate(conf, "/w", "/elsewhere/shared/approved/flows/i0001-01.yml")
-        self.assertEqual(found, ("i0001-01.yml", flow.ANY_PROJECT))
+        found = flow.locate(conf, "/w", "/elsewhere/shared/approved/flows/i0001-01-01.yml")
+        self.assertEqual(found, ("i0001-01-01.yml", flow.ANY_PROJECT))
 
     def test_windows_aliases_of_the_name_are_folded(self):
         """末尾の `.` と空白、代替データストリームは同じファイルに届く（止める向きにそろえる）。"""
@@ -148,15 +148,15 @@ class FlowSpellingTest(unittest.TestCase):
         conf = conf_with()
         base = os.path.join(root, ".ccnavi", "approved", "flows")
         for name in (
-            "i0001-01.yml.",
-            "i0001-01.yml ",
-            "i0001-01.yml::$DATA",
-            "I0001-01.YML",
-            "i0001-01.yml:x",
+            "i0001-01-01.yml.",
+            "i0001-01-01.yml ",
+            "i0001-01-01.yml::$DATA",
+            "I0001-01-01.YML",
+            "i0001-01-01.yml:x",
         ):
             with self.subTest(name=name):
                 found = flow.locate(conf, root, os.path.join(base, name))
-                self.assertEqual(found, ("i0001-01.yml", ""))
+                self.assertEqual(found, ("i0001-01-01.yml", ""))
                 self.assertIsNotNone(flow.lock_hit([child_ticket(True)], "", found[0]))
 
     def test_case_folding_keeps_offsets_with_dotted_capital_i(self):
@@ -164,14 +164,14 @@ class FlowSpellingTest(unittest.TestCase):
         conf = conf_with()
         running = child_ticket(started=True)
         for path in (
-            "/home/İsmail/ws/.ccnavi/approved/flows/I0001-01.YML",
-            "/home/İsmail/ws/.ccnavi/Approved/flows/i0001-01.yml",
-            "/home/ismail/ws/.CCNAVI/APPROVED/FLOWS/I0001-01.YML",
+            "/home/İsmail/ws/.ccnavi/approved/flows/I0001-01-01.YML",
+            "/home/İsmail/ws/.ccnavi/Approved/flows/i0001-01-01.yml",
+            "/home/ismail/ws/.CCNAVI/APPROVED/FLOWS/I0001-01-01.YML",
         ):
             with self.subTest(path=path):
                 found = flow.locate(conf, "/home/ismail/ws", path)
                 self.assertIsNotNone(found)
-                self.assertEqual(found[0], "i0001-01.yml")
+                self.assertEqual(found[0], "i0001-01-01.yml")
                 self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, found[0]), running)
         self.assertEqual(len(flow._fold("İx")), 2)
 
@@ -374,7 +374,7 @@ class FlowParentBriefingTest(PhaseHarness):
 
     def test_parent_cwd_lists_paths_only_and_the_child_cwd_gets_the_steps(self):
         self.propose("i0001", parent_text("i0001", ["research"], allow=("src/*", "wip/*")))
-        kids = ["i0001-01", "i0001-02"]
+        kids = ["i0001-01-01", "i0001-01-02"]
         for i, kid in enumerate(kids, 1):
             self.propose(kid, child_text(kid, "i0001", 1, (f"wip/research/r{i}/*",)))
         self.commit_parent()
@@ -393,11 +393,11 @@ class FlowParentBriefingTest(PhaseHarness):
             "自分の担当の子チケットのフローだけを読んで従ってください。他の子のフローには従わない",
             text,
         )
-        child_tree = self.run_child("i0001-01")
+        child_tree = self.run_child("i0001-01-01")
         own = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-2"))
         self.assertIn(flow.FENCE_OPEN, own)
         self.assertIn("3. [askUserQuestion] 方針", own)
-        self.assertNotIn("i0001-02", own)
+        self.assertNotIn("i0001-01-02", own)
 
 
 class FlowCarriedOnApprovalTest(PhaseHarness):

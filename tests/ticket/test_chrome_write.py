@@ -78,16 +78,16 @@ class ChromeWriteHarness(CoreHarness):
 
 class RecordsTest(ChromeWriteHarness):
     def test_an_absent_family_is_gone_and_its_stale_copy_is_undecided(self):
-        """P の上に古い写し（閉じた i0009-01）があっても、i0009 がホストに無ければ決まらない。"""
+        """P の上に古い写し（閉じた i0009-01-01）があっても、i0009 がホストに無ければ決まらない。"""
         self.family(plan=["research"])
-        text = child_text("i0009-01", "i0009", 1, ["wip/research/*"], False).replace(
+        text = child_text("i0009-01-01", "i0009", 1, ["wip/research/*"], False).replace(
             'completed_at: ""', 'completed_at: "2026-01-01T00:00:00+0000"'
         )
-        write(os.path.join(self.approved, "done", "i0009-01.md"), text)
-        child = child_text("i0001-01", "i0001", 1, ["wip/research/*"], False).replace(
-            "human_review:", 'predecessors: ["i0009-01"]\nhuman_review:', 1
+        write(os.path.join(self.approved, "done", "i0009-01-01.md"), text)
+        child = child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], False).replace(
+            "human_review:", 'predecessors: ["i0009-01-01"]\nhuman_review:', 1
         )
-        self.propose("i0001-01", child)
+        self.propose("i0001-01-01", child)
         self.commit_parent()
         request = self.chrome_request("plan", "i0001")
         request["snapshot"]["absent"] = ["i0009"]
@@ -96,7 +96,9 @@ class RecordsTest(ChromeWriteHarness):
         self.assertNotIn("error", body, body)
         self.assertEqual(body["identifiers"], [])
         rejected = {r["ticket"]: r["problems"] for r in body["rejected"]}
-        self.assertTrue(any("i0009" in p and "gone" in p for p in rejected["i0001-01"]), rejected)
+        self.assertTrue(
+            any("i0009" in p and "gone" in p for p in rejected["i0001-01-01"]), rejected
+        )
         records = _chrome().records(
             request["snapshot"], _chrome()._placement(None), ["i0001", "i0009"]
         )
@@ -188,10 +190,12 @@ class WrittenCopyTest(ChromeWriteHarness):
 
     def test_the_local_ccnavi_reads_what_chrome_wrote_the_same(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         body = self.plan()
-        self.assertEqual(body["identifiers"], ["i0001", "i0001-01"])
+        self.assertEqual(body["identifiers"], ["i0001", "i0001-01-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
         # 手元の控えは Chrome と同じ（取り込み済みの親子のチケット）。
         # 判定し直し（C3）で error が出ない
@@ -201,11 +205,11 @@ class WrittenCopyTest(ChromeWriteHarness):
         explained = self.ccnavi("--lint", "--json")
         errors = [p for p in json.loads(explained.stdout)["problems"] if p["severity"] == "error"]
         self.assertEqual(errors, [])
-        events, _ = history.read(self.approved, "i0001-01")
+        events, _ = history.read(self.approved, "i0001-01-01")
         self.assertEqual(events[-1]["via"], "chrome")
         # 子のワークツリーを切って着手の判定が通る形（手元の続きの操作が読める）
         doing = os.path.join(self.approved, "doing")
-        self.assertEqual(sorted(os.listdir(doing)), ["i0001-01.md", "i0001.md"])
+        self.assertEqual(sorted(os.listdir(doing)), ["i0001-01-01.md", "i0001.md"])
 
     def test_a_disagreement_names_the_chrome_and_local_versions(self):
         self.propose("i0001", parent_text("i0001", ["research"]))

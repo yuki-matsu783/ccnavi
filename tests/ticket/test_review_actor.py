@@ -58,7 +58,7 @@ class ActorHarness(CoreHarness):
             *extra,
         )
 
-    def last_event(self, ident="i0001-01"):
+    def last_event(self, ident="i0001-01-01"):
         events, _ = history.read(self.approved, ident)
         return events[-1]
 
@@ -206,7 +206,7 @@ class ReviewableTest(ActorHarness):
         board = self.ask_chrome(self.chrome_request("board", "i0001"))
         self.assertEqual(
             board["reviewable"],
-            [{"phase": 1, "mr": 7, "host": "fixture", "children": ["i0001-01"]}],
+            [{"phase": 1, "mr": 7, "host": "fixture", "children": ["i0001-01-01"]}],
         )
         # ボードの要求は取り込みの控え相当を手元にも写す（手元は C1 の対象になり、直打ちの
         # confirm を断る）。ここでは手元の印を置くためだけに控えを外す
@@ -283,13 +283,13 @@ class ReviewRuleTest(ActorHarness):
 
     def test_the_request_records_the_poster_when_known(self):
         self.family(plan=["design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         self.remote()
         body = write(os.path.join(self.root, "body.md"), "見てほしい\n")
         prepared = self.ccnavi(

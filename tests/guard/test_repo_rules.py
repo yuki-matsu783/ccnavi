@@ -341,7 +341,7 @@ GUARDED = [
     ("ccnavi --agree --yes x", APPROVAL),
     ("sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL),
     # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。
-    ("sh .ccnavi/scripts/ccnavi-agree.sh i0002-03 i0002-04", APPROVAL),
+    ("sh .ccnavi/scripts/ccnavi-agree.sh i0002-01-03 i0002-01-04", APPROVAL),
 ]
 
 

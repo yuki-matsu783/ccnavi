@@ -52,7 +52,7 @@ class StopNudgeTest(TicketTest):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout) if result.stdout.strip() else {}
 
-    def child_tree(self, name="i0001-01"):
+    def child_tree(self, name="i0001-01-01"):
         return os.path.join(self.root, ".claude", "worktrees", name)
 
     def commit_work(self, tree, rel="src/a/work.py"):
@@ -76,15 +76,15 @@ class StopNudgeTest(TicketTest):
         body = self.body(self.stop(tree))
         self.assertEqual(body.get("decision"), "block")
         reason = body["reason"]
-        self.assertIn(f"[ccnavi] {CODE} (ticket: i0001-01)", reason)
+        self.assertIn(f"[ccnavi] {CODE} (ticket: i0001-01-01)", reason)
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
-        self.assertIn(f"'{ticket_sh} finish i0001-01'", reason)
+        self.assertIn(f"'{ticket_sh} finish i0001-01-01'", reason)
         self.assertIn("続ける理由", reason)
         self.assertIn("コミットが 1 件", reason)
         # 連鎖の 2 回目（Stop の hook が続けさせた後）は促さない。
         self.assert_quiet(self.stop(tree, active=True))
         # 閉じれば促さない。
-        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01").returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
         self.assert_quiet(self.stop(tree))
 
     def test_dry_run_does_not_block_but_tells_the_user(self):
@@ -125,7 +125,7 @@ class StopNudgeTest(TicketTest):
     def test_a_parent_held_for_review_is_not_asked(self):
         """レビュー準備中の親は、既存の Stop の案内（ユーザを待つ）と食い違わないよう促さない。"""
         self.family(review=(True, True))
-        for child in ("i0001-01", "i0001-02"):
+        for child in ("i0001-01-01", "i0001-01-02"):
             self.assertEqual(self.ccnavi("ticket", "finish", child).returncode, 0)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "done")
@@ -225,9 +225,9 @@ class StopNudgeTest(TicketTest):
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)
-        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01").returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
         # 別の子で、親を --no-ff で取り込む（マージのコミットが 1 つできる）。
-        other = self.child_tree("i0001-02")
+        other = self.child_tree("i0001-01-02")
         self.commit_work(self.parent_tree, rel="src/parent.py")
         git(other, "merge", "--quiet", "--no-ff", "--no-edit", "i0001")
         self.assert_quiet(self.stop(other))

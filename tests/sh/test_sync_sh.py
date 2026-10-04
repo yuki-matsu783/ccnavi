@@ -51,7 +51,7 @@ def copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
     return f"{head}ccnavi_approved:\n  approved_at: {approved_at}\n---\n{body}"
 
 
-def child_copy_text(name=f"{PARENT}-01", parent=PARENT):
+def child_copy_text(name=f"{PARENT}-01-01", parent=PARENT):
     return f"---\nversion: 1\nticket: {name}\nparent: {parent}\nphase: 1\n{ALLOW}---\n"
 
 
@@ -223,7 +223,7 @@ class SyncTest(unittest.TestCase):
     # ---- 取り込み（P がリモートにある）
 
     def test_fast_forward_and_records(self):
-        head = self.remote_commit(PARENT, ".ccnavi/approved/doing/i0001-01.md", "child\n")
+        head = self.remote_commit(PARENT, ".ccnavi/approved/doing/i0001-01-01.md", "child\n")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
@@ -334,7 +334,7 @@ class SyncTest(unittest.TestCase):
         # 元ツリーに未コミットで残った子の写し（親のワークツリーの外）。取り込み済みの
         # 親子のチケットでは信頼しないので、検査が親子のチケットを止める。
         stray = write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
@@ -362,7 +362,7 @@ class SyncTest(unittest.TestCase):
         )
         os.chmod(old, 0o755)
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
@@ -383,7 +383,7 @@ class SyncTest(unittest.TestCase):
         )
         os.chmod(racer, 0o755)
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=racer)
@@ -405,7 +405,7 @@ class SyncTest(unittest.TestCase):
         )
         os.chmod(holder, 0o755)
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=holder, CCNAVI_LOCK_WAIT="0")
@@ -417,7 +417,7 @@ class SyncTest(unittest.TestCase):
         # 閉じた親子のチケット（控えが closed）は検査しない（状態の操作が無い）。
         self.keep_record()
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         self.remote_commit("main", f".ccnavi/approved/done/{PARENT}.md", copy_text())

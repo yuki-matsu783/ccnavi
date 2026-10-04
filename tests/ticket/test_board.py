@@ -36,49 +36,51 @@ class BoardTest(PhaseHarness):
         """親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、
         同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子のワークツリーにも写っている。"""
         self.family(plan=("research", "design"))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
-        self.merge("i0001-01")
+        self.run_child("i0001-01-01", [("wip/research/summary.md", "まとめ\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        self.merge("i0001-01-01")
 
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ("wip/design/*",)))
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ("wip/design/*",)))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         # 承認の後、ワークツリーを切る前に次の子を提案する。切ったワークツリーは
         # 親のブランチの承認済みチケットなので、この提案がそこにも見える。
-        self.propose("i0001-03", child_text("i0001-03", "i0001", 2, ("wip/design/*",)))
+        self.propose("i0001-02-03", child_text("i0001-02-03", "i0001", 2, ("wip/design/*",)))
         self.commit_parent()
-        self.run_child("i0001-02")
+        self.run_child("i0001-02-02")
 
     def test_tickets_carry_proposal_copy_marks_and_worktree(self):
         self.scene()
         board = self.board()
         self.assertEqual(board["version"], 1)
         by_id = {t["ticket"]: t for t in board["tickets"]}
-        self.assertEqual(sorted(by_id), ["i0001", "i0001-01", "i0001-02", "i0001-03"])
+        self.assertEqual(sorted(by_id), ["i0001", "i0001-01-01", "i0001-02-02", "i0001-02-03"])
 
-        closed = by_id["i0001-01"]
+        closed = by_id["i0001-01-01"]
         self.assertIsNone(closed["proposal"])
         self.assertEqual(closed["copy"]["status"], "closed")
         self.assertTrue(closed["worktree"]["exists"])
         self.assertTrue(closed["completed_at"])
 
-        doing = by_id["i0001-02"]
+        doing = by_id["i0001-02-02"]
         self.assertIsNone(doing["proposal"])
         self.assertEqual(doing["copy"]["status"], "open")
         self.assertTrue(doing["worktree"]["exists"])
-        self.assertTrue(doing["worktree"]["path"].endswith("i0001-02"))
+        self.assertTrue(doing["worktree"]["path"].endswith("i0001-02-02"))
         self.assertEqual(doing["parent"], "i0001")
         self.assertEqual(doing["phase"], 2)
 
-        waiting = by_id["i0001-03"]
+        waiting = by_id["i0001-02-03"]
         self.assertEqual(waiting["proposal"]["state"], "todo")
         self.assertEqual(waiting["proposal"]["tree"], "i0001")
         self.assertEqual(waiting["copy"], {"status": "none"})
         self.assertFalse(waiting["worktree"]["exists"])
-        self.assertEqual(sorted(s["tree"] for s in waiting["seen_in"]), ["i0001", "i0001-02"])
+        self.assertEqual(sorted(s["tree"] for s in waiting["seen_in"]), ["i0001", "i0001-02-02"])
 
         parent = by_id["i0001"]
         self.assertEqual(parent["parent"], "")
@@ -93,9 +95,9 @@ class BoardTest(PhaseHarness):
         # 切った時点の写しを持つ。承認済みチケットの置き場に在るものも写る）。
         # 数や状態の違いを食い違いに数えない。
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
-        self.assertEqual(len(by_id["i0001-01"]["seen_in"]), 3)
+        self.assertEqual(len(by_id["i0001-01-01"]["seen_in"]), 3)
         self.assertEqual(
-            sorted({s["state"] for s in by_id["i0001-01"]["seen_in"]}), ["doing", "done"]
+            sorted({s["state"] for s in by_id["i0001-01-01"]["seen_in"]}), ["doing", "done"]
         )
 
     def move(self, ticket_id, source_tree, target_tree, state="todo"):
@@ -113,45 +115,45 @@ class BoardTest(PhaseHarness):
         親子のチケットのカードが全部「複数の場所にある」になり、状態の操作も止まる。
         """
         self.scene()
-        self.move("i0001-03", self.parent_tree, self.root)
+        self.move("i0001-02-03", self.parent_tree, self.root)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
-        self.assertEqual(by_id["i0001-03"]["scattered"], [])
+        self.assertEqual(by_id["i0001-02-03"]["scattered"], [])
         # 写り自体は残る。決まらなさだけを scattered が言う。
         self.assertEqual(
-            [(s["tree"], s["state"]) for s in by_id["i0001-03"]["seen_in"]],
-            [("", "todo"), ("i0001-02", "todo")],
+            [(s["tree"], s["state"]) for s in by_id["i0001-02-03"]["seen_in"]],
+            [("", "todo"), ("i0001-02-02", "todo")],
         )
 
     def test_scattered_lists_every_copy_when_no_authoritative_tree_holds_one(self):
         """親のツリーにも元ツリーにも無ければ、どれが本物か決まらない。候補を全部出す。"""
         self.scene()
-        elsewhere = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
-        self.move("i0001-03", self.parent_tree, elsewhere)
+        elsewhere = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        self.move("i0001-02-03", self.parent_tree, elsewhere)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(
-            sorted((s["tree"], s["state"]) for s in by_id["i0001-03"]["scattered"]),
-            [("i0001-01", "todo"), ("i0001-02", "todo")],
+            sorted((s["tree"], s["state"]) for s in by_id["i0001-02-03"]["scattered"]),
+            [("i0001-01-01", "todo"), ("i0001-02-02", "todo")],
         )
         # 巻き込まれていない識別子は空のまま。
-        self.assertEqual(by_id["i0001-02"]["scattered"], [])
+        self.assertEqual(by_id["i0001-02-02"]["scattered"], [])
 
     def test_scattered_says_the_same_tree_holding_two_places(self):
         """動かす途中で止まった跡は、権威のツリーの中でも言う（`--lint` と同じ数え方）。"""
         self.scene()
-        doing = os.path.join(self.approved, "doing", "i0001-02.md")
+        doing = os.path.join(self.approved, "doing", "i0001-02-02.md")
         with open(doing, encoding="utf-8") as f:
             text = f.read()
-        write(os.path.join(self.approved, "done", "i0001-02.md"), text)
+        write(os.path.join(self.approved, "done", "i0001-02-02.md"), text)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(
-            sorted((s["tree"], s["state"]) for s in by_id["i0001-02"]["scattered"]),
+            sorted((s["tree"], s["state"]) for s in by_id["i0001-02-02"]["scattered"]),
             [("i0001", "doing"), ("i0001", "done")],
         )
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn("i0001-02 が複数の場所にある", lint.stdout)
+        self.assertIn("i0001-02-02 が複数の場所にある", lint.stdout)
 
     def test_a_ticket_waiting_for_review_is_not_scattered(self):
         """`review/` は提案の置き場でもあり承認済みチケットでもある。同じ実体を 2 つと数えない。"""
@@ -159,10 +161,10 @@ class BoardTest(PhaseHarness):
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         review = [t for t in self.board()["tickets"] if t["copy"]["status"] == "review"]
         self.assertEqual([t["ticket"] for t in review], [])
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
-        waiting = by_id["i0001-02"]
+        waiting = by_id["i0001-02-02"]
         self.assertEqual(waiting["copy"]["status"], "review")
         self.assertEqual(waiting["scattered"], [])
         # 同じファイルを 2 つの走査が拾っても、写りは 1 ツリーに 1 つ。
@@ -180,52 +182,53 @@ class BoardTest(PhaseHarness):
         self.scene()
         self.assertEqual(self.approve().returncode, 0)
         stale = os.path.join(
-            self.root, ".claude", "worktrees", "i0001-02", "wip", "proposals", "todo"
+            self.root, ".claude", "worktrees", "i0001-02-02", "wip", "proposals", "todo"
         )
-        self.assertTrue(os.path.isfile(os.path.join(stale, "i0001-03.md")))
+        self.assertTrue(os.path.isfile(os.path.join(stale, "i0001-02-03.md")))
 
         board = self.board()
         by_id = {t["ticket"]: t for t in board["tickets"]}
-        self.assertIsNone(by_id["i0001-03"]["proposal"])
-        self.assertEqual(by_id["i0001-03"]["copy"]["status"], "open")
-        self.assertEqual(by_id["i0001-03"]["scattered"], [])
+        self.assertIsNone(by_id["i0001-02-03"]["proposal"])
+        self.assertEqual(by_id["i0001-02-03"]["copy"]["status"], "open")
+        self.assertEqual(by_id["i0001-02-03"]["scattered"], [])
         self.assertEqual(board["pending_approval"], [])
         # 写り自体は seen_in に残る。
         self.assertIn(
-            ("i0001-02", "todo"), {(s["tree"], s["state"]) for s in by_id["i0001-03"]["seen_in"]}
+            ("i0001-02-02", "todo"),
+            {(s["tree"], s["state"]) for s in by_id["i0001-02-03"]["seen_in"]},
         )
 
         # 計画の同じ古い写しは `--lint` も言わない（承認の前に切ったワークツリーに残る普通の形）。
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertNotIn("i0001-02/wip/proposals/todo/i0001-03.md", lint.stdout)
+        self.assertNotIn("i0001-02-02/wip/proposals/todo/i0001-02-03.md", lint.stdout)
 
     def test_a_stale_review_copy_left_in_a_worktree_is_not_in_progress_after_closing(self):
         """場面 B。`review/` の古い写しが残ったワークツリーがあっても、閉じたものは閉じたまま。"""
         self.scene()
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent()
-        self.worktree("i0001-09", "i0001")  # review/i0001-02 を持ったまま切る
+        self.worktree("i0001-01-09", "i0001")  # review/i0001-02-02 を持ったまま切る
         # 親のツリーで閉じる（レビューを終えて done/ へ）。
-        self.move_to_done("i0001-02")
+        self.move_to_done("i0001-02-02")
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
-        self.assertIsNone(by_id["i0001-02"]["proposal"])
-        self.assertEqual(by_id["i0001-02"]["copy"]["status"], "closed")
+        self.assertIsNone(by_id["i0001-02-02"]["proposal"])
+        self.assertEqual(by_id["i0001-02-02"]["copy"]["status"], "closed")
 
         # review/ の古い写しは `--lint` も言わない（ボードと承認待ちからは外す）。
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertNotIn("i0001-09/wip/proposals/review/i0001-02.md", lint.stdout)
+        self.assertNotIn("i0001-01-09/wip/proposals/review/i0001-02-02.md", lint.stdout)
 
     def test_a_review_copy_in_a_worktree_matching_the_home_tree_is_not_named(self):
         """権威のツリーと同じ置き場の写しは、子のワークツリーに写っているだけ。名指ししない。"""
         self.scene()
-        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent()
-        self.worktree("i0001-09", "i0001")
+        self.worktree("i0001-01-09", "i0001")
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
-        self.assertEqual(by_id["i0001-02"]["copy"]["status"], "review")
+        self.assertEqual(by_id["i0001-02-02"]["copy"]["status"], "review")
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertNotIn("i0001-09/wip/proposals/review/i0001-02.md", lint.stdout)
+        self.assertNotIn("i0001-01-09/wip/proposals/review/i0001-02-02.md", lint.stdout)
 
     def move_to_done(self, ticket_id):
         source = os.path.join(self.parent_tree, "wip", "proposals", "review", ticket_id + ".md")
@@ -236,7 +239,7 @@ class BoardTest(PhaseHarness):
 
     def test_pending_approval_lists_proposals_without_a_copy(self):
         self.scene()
-        self.assertEqual(self.board()["pending_approval"], ["i0001-03"])
+        self.assertEqual(self.board()["pending_approval"], ["i0001-02-03"])
 
     def test_parents_carry_phases_and_gates(self):
         self.scene()
@@ -253,8 +256,8 @@ class BoardTest(PhaseHarness):
         self.assertFalse(phases[1]["gate_closed"])
         self.assertFalse(phases[1]["review_waiting"])
         self.assertEqual(phases[2]["state"], "active")
-        self.assertEqual(phases[2]["tickets"], ["i0001-02"])
-        self.assertEqual(phases[2]["states"], {"i0001-02": "doing"})
+        self.assertEqual(phases[2]["tickets"], ["i0001-02-02"])
+        self.assertEqual(phases[2]["states"], {"i0001-02-02": "doing"})
         self.assertTrue(phases[2]["review_required"])
 
     def test_with_ticket_control_disabled_the_board_is_empty_and_says_why(self):

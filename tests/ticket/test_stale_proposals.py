@@ -41,13 +41,13 @@ class StaleProposalTest(PhaseHarness):
         self.family(plan=("research", "design"))
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
-        self.worktree("i0001-07", "i0001")
+        self.worktree("i0001-01-07", "i0001")
         self.assertEqual(self.approve().returncode, 0)
         self.propose("i0001", parent_text("i0001", ["research", "chores"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         stale = os.path.join(
-            self.root, ".claude", "worktrees", "i0001-07", "wip", "proposals", "todo", "i0001.md"
+            self.root, ".claude", "worktrees", "i0001-01-07", "wip", "proposals", "todo", "i0001.md"
         )
         self.assertTrue(os.path.isfile(stale))
 
@@ -63,7 +63,7 @@ class StaleProposalTest(PhaseHarness):
         self.assertTrue(
             any(
                 "計画の違う提案" in line
-                and ".claude/worktrees/i0001-07/wip/proposals/todo/i0001.md" in line
+                and ".claude/worktrees/i0001-01-07/wip/proposals/todo/i0001.md" in line
                 and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
             ),
@@ -76,7 +76,7 @@ class StaleProposalTest(PhaseHarness):
         古い写しを持つワークツリーがあっても、権威のツリーの改版は読む。
         """
         self.family(plan=("research", "design"))
-        self.worktree("i0001-07", "i0001")
+        self.worktree("i0001-01-07", "i0001")
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
         self.assertEqual(self.pending(), ["i0001"])
@@ -111,7 +111,7 @@ class StaleProposalTest(PhaseHarness):
     def test_a_new_proposal_in_a_worktree_is_still_waiting(self):
         """承認済みの無い識別子（新規の提案）は今までどおり。どのツリーに在っても承認待ち。"""
         self.family(plan=("research", "design"))
-        other = self.worktree("i0001-07", "i0001")
+        other = self.worktree("i0001-01-07", "i0001")
         write(
             os.path.join(other, "wip", "proposals", "todo", "i0002.md"),
             parent_text("i0002", ["research"]),
@@ -123,9 +123,9 @@ class StaleProposalTest(PhaseHarness):
         self.family(plan=("research", "design"))
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
-        self.worktree("i0001-07", "i0001")  # 改版の todo/ を持ったまま切る
+        self.worktree("i0001-01-07", "i0001")  # 改版の todo/ を持ったまま切る
         self.assertEqual(self.pending(), ["i0001"])
-        lines = self.lint_lines("i0001-07/wip/proposals/todo/i0001.md")
+        lines = self.lint_lines("i0001-01-07/wip/proposals/todo/i0001.md")
         self.assertEqual(lines, [])
 
     def test_the_approved_copies_alone_decide_the_home_tree(self):
@@ -206,12 +206,14 @@ class StaleProposalTest(PhaseHarness):
     def test_agree_names_a_revision_written_in_a_child_worktree(self):
         """子のワークツリーに書いた改版も同じく名指しする。"""
         self.family(plan=("research", "design"))
-        child = self.worktree("i0001-01", "i0001")
+        child = self.worktree("i0001-01-01", "i0001")
         write(
             os.path.join(child, "wip", "proposals", "todo", "i0001.md"),
             parent_text("i0001", ["research", "design", "chores"]),
         )
-        self.verify_names_where_to_write(".claude/worktrees/i0001-01/wip/proposals/todo/i0001.md")
+        self.verify_names_where_to_write(
+            ".claude/worktrees/i0001-01-01/wip/proposals/todo/i0001.md"
+        )
 
     def test_an_old_copy_is_named_while_another_revision_waits_in_the_home_tree(self):
         """権威のツリーに計画の違う別の改版が在るとき。改版は承認待ちに残り、子のワークツリーに
@@ -219,11 +221,11 @@ class StaleProposalTest(PhaseHarness):
         self.family(plan=("research", "design"))
         self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
         self.commit_parent()
-        self.worktree("i0001-07", "i0001")  # 改版 1 を持ったまま切る
+        self.worktree("i0001-01-07", "i0001")  # 改版 1 を持ったまま切る
         self.propose("i0001", parent_text("i0001", ["research", "chores"]))  # 改版 2
         self.commit_parent()
         self.assertEqual(self.pending(), ["i0001"])
-        lines = self.lint_lines("i0001-07/wip/proposals/todo/i0001.md")
+        lines = self.lint_lines("i0001-01-07/wip/proposals/todo/i0001.md")
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("計画の違う提案", lines[0])
 

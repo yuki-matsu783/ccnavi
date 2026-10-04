@@ -8,7 +8,8 @@
    保護されたブランチの名前、`issue:` の無い `i<番号>`
 2. 承認済み・閉じた識別子には 1 を言わない（もう変えられないので、言っても常態になるだけ）
 3. 大文字小文字だけが違う識別子
-4. 子の形（`<親>-<2 桁>`）に当たる親の識別子
+4. 末尾が `-<2 桁>` の親の識別子（`-<2 桁>-<2 桁>` なら子の形そのもの、`-<2 桁>` だけなら
+   子の識別子の途中と紛れる）
 """
 
 from __future__ import annotations
@@ -102,8 +103,8 @@ class BranchNameRulesTest(unittest.TestCase):
             1, len(ticket_mod.branch_name_problems(ticket_mod.Ticket(ticket="main"), "main"))
         )
         # 子は見ない。
-        child = ticket_mod.Ticket(ticket="trunk-01", parent="trunk")
-        self.assertEqual([], ticket_mod.branch_name_problems(child, "trunk-01"))
+        child = ticket_mod.Ticket(ticket="trunk-01-01", parent="trunk")
+        self.assertEqual([], ticket_mod.branch_name_problems(child, "trunk-01-01"))
 
     def test_issue_shaped_names_need_an_issue(self):
         for name in ("i0131", "I0131", "i7"):
@@ -174,9 +175,9 @@ class BranchNameRulesTest(unittest.TestCase):
             ticket_mod.issue_identifier(12, "../x")
 
     def test_children_are_only_checked_for_ref_safety(self):
-        # 子の識別子は `<親>-<2 桁>` で、親の名前の規則は親の側で見る。
-        self.assertEqual([], self.problems("i0131-01", parent="i0131"))
-        self.assertEqual([], self.problems("main-01", parent="main"))
+        # 子の識別子は `<親>-<2 桁>-<2 桁>` で、親の名前の規則は親の側で見る。
+        self.assertEqual([], self.problems("i0131-01-01", parent="i0131"))
+        self.assertEqual([], self.problems("main-01-01", parent="main"))
 
 
 class LintBranchNamesTest(unittest.TestCase):
@@ -295,15 +296,32 @@ class LintBranchNamesTest(unittest.TestCase):
         )
 
     def test_a_parent_shaped_like_a_child(self):
+        self.place("done", "abc-01-02")
+        lines = self.lint()
+        self.assertEqual(1, len(lines), lines)
+        self.assertIn("abc-01-02 は親なのに、識別子が子の形", lines[0])
+        self.assertIn("abc の子として扱われる", lines[0])
+        self.assertIn("末尾を `-<2 桁>` にしない", lines[0])
+
+    def test_a_parent_ending_in_two_digits_is_still_named(self):
+        # 右から 2 段を剥がすので親の割り出しは誤らないが、別の親の子の途中
+        # （`<親>-<フェーズ>`）と紛れる。
+        # 旧い形の子と同じ綴りなので、今までどおり warn にする。
         self.place("done", "abc-01")
         lines = self.lint()
         self.assertEqual(1, len(lines), lines)
-        self.assertIn("abc-01 は親なのに、識別子が子の形", lines[0])
-        self.assertIn("abc の子として扱われる", lines[0])
+        self.assertIn("abc-01 は親なのに、識別子の末尾が `-<2 桁>`", lines[0])
+        self.assertIn("子の識別子の途中", lines[0])
+        self.assertNotIn("の子として扱われる", lines[0])
+
+    def test_a_parent_ending_in_one_digit_is_not_named(self):
+        self.place("done", "abc-1")
+        self.place("done", "web-i0012")
+        self.assertEqual([], self.lint())
 
     def test_real_children_are_not_named(self):
         self.place("doing", "abc")
-        self.place("doing", "abc-01", parent="abc")
+        self.place("doing", "abc-01-01", parent="abc")
         self.assertEqual([], self.lint())
 
 

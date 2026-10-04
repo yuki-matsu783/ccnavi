@@ -119,7 +119,7 @@ class ChildPushTest(unittest.TestCase):
         write(common_path(self.root, "rules"), json.dumps({"version": 1}))
         base = os.path.join(self.root, ".claude", "worktrees")
         # git に登録していないディレクトリで作る。sh の検査は登録を問わないので、hook も問わない。
-        self.trees = {n: os.path.join(base, n) for n in ("i0001", "i0001-01", "plain")}
+        self.trees = {n: os.path.join(base, n) for n in ("i0001", "i0001-01-01", "plain")}
         for path in self.trees.values():
             os.makedirs(path)
 
@@ -127,22 +127,22 @@ class ChildPushTest(unittest.TestCase):
         parent = self.trees["i0001"]
         if where == "parent-doing":
             return write(
-                os.path.join(parent, ".ccnavi/approved/doing/i0001-01.md"),
-                ticket("i0001-01", "i0001"),
+                os.path.join(parent, ".ccnavi/approved/doing/i0001-01-01.md"),
+                ticket("i0001-01-01", "i0001"),
             )
         if where == "root-done":
             return write(
-                os.path.join(self.root, ".ccnavi/approved/done/i0001-01.md"),
-                ticket("i0001-01", "i0001"),
+                os.path.join(self.root, ".ccnavi/approved/done/i0001-01-01.md"),
+                ticket("i0001-01-01", "i0001"),
             )
         if where == "parent-review":
             return write(
-                os.path.join(parent, "wip/proposals/review/i0001-01.md"),
-                ticket("i0001-01", "i0001"),
+                os.path.join(parent, "wip/proposals/review/i0001-01-01.md"),
+                ticket("i0001-01-01", "i0001"),
             )
         if where == "broken":
             return write(
-                os.path.join(parent, ".ccnavi/approved/doing/i0001-01.md"),
+                os.path.join(parent, ".ccnavi/approved/doing/i0001-01-01.md"),
                 "---\nparent: i0001\n: : [unclosed\n",
             )
         raise AssertionError(where)
@@ -150,7 +150,7 @@ class ChildPushTest(unittest.TestCase):
     def cwd(self, where):
         return {
             "parent": self.trees["i0001"],
-            "child": self.trees["i0001-01"],
+            "child": self.trees["i0001-01-01"],
             "plain": self.trees["plain"],
         }[where]
 
@@ -201,17 +201,17 @@ class ChildPushTest(unittest.TestCase):
     def test_parent_agent_cd_into_child(self):
         self.place("parent-doing")
         reason = self.hook(
-            self.root, "cd .claude/worktrees/i0001-01 && " + " ".join(GIT + ["push"])
+            self.root, "cd .claude/worktrees/i0001-01-01 && " + " ".join(GIT + ["push"])
         )
         self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
         # 親のツリーへ移ってから打つ形は通す。
-        reason = self.hook(self.trees["i0001-01"], "cd ../i0001 && " + " ".join(GIT + ["push"]))
+        reason = self.hook(self.trees["i0001-01-01"], "cd ../i0001 && " + " ".join(GIT + ["push"]))
         self.assertNotIn(wrapguard.CODE_CHILD_PUSH, reason)
 
     def test_inside_a_function(self):
         self.place("parent-doing")
         command = "f() { " + " ".join(GIT + ["push"]) + "; }; f"
-        reason = self.hook(self.trees["i0001-01"], command)
+        reason = self.hook(self.trees["i0001-01-01"], command)
         self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
 
     def test_unreadable_cd_stops(self):
@@ -227,7 +227,7 @@ class ChildPushTest(unittest.TestCase):
         except (OSError, NotImplementedError):
             self.skipTest("symlink を作れない")
         self.addCleanup(os.remove, link)
-        child = os.path.join(link, ".claude", "worktrees", "i0001-01")
+        child = os.path.join(link, ".claude", "worktrees", "i0001-01-01")
         reason = self.hook(child, " ".join(GIT + ["push"]))
         self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
 
@@ -258,7 +258,7 @@ class ShAgreesTest(unittest.TestCase):
         self.git("add", "-A", cwd=self.root)
         self.git("commit", "--quiet", "-m", "init", cwd=self.root)
         self.trees = {}
-        for name in ("i0001", "i0001-01", "plain"):
+        for name in ("i0001", "i0001-01-01", "plain"):
             path = os.path.join(self.root, ".claude", "worktrees", name)
             self.git("worktree", "add", "--quiet", path, "-b", name, "main", cwd=self.root)
             self.trees[name] = path
@@ -293,10 +293,10 @@ class ShAgreesTest(unittest.TestCase):
     def test_sh_agrees(self):
         parent = self.trees["i0001"]
         places = {
-            "parent-doing": os.path.join(parent, ".ccnavi/approved/doing/i0001-01.md"),
-            "root-done": os.path.join(self.root, ".ccnavi/approved/done/i0001-01.md"),
-            "parent-review": os.path.join(parent, "wip/proposals/review/i0001-01.md"),
-            "broken": os.path.join(parent, ".ccnavi/approved/doing/i0001-01.md"),
+            "parent-doing": os.path.join(parent, ".ccnavi/approved/doing/i0001-01-01.md"),
+            "root-done": os.path.join(self.root, ".ccnavi/approved/done/i0001-01-01.md"),
+            "parent-review": os.path.join(parent, "wip/proposals/review/i0001-01-01.md"),
+            "broken": os.path.join(parent, ".ccnavi/approved/doing/i0001-01-01.md"),
         }
         for where, sub, placed, stops in CHILD_CASES:
             if sub != "push":
@@ -305,13 +305,13 @@ class ShAgreesTest(unittest.TestCase):
                 text = (
                     "---\nparent: i0001\n: : [unclosed\n"
                     if placed == "broken"
-                    else ticket("i0001-01", "i0001")
+                    else ticket("i0001-01-01", "i0001")
                 )
                 path = write(places[placed], text)
                 try:
                     cwd = {
                         "parent": parent,
-                        "child": self.trees["i0001-01"],
+                        "child": self.trees["i0001-01-01"],
                         "plain": self.trees["plain"],
                     }[where]
                     result = self.run_sh(cwd, "push")
@@ -330,10 +330,10 @@ class ShAgreesTest(unittest.TestCase):
             self.skipTest("symlink を作れない")
         self.addCleanup(os.remove, link)
         write(
-            os.path.join(self.trees["i0001"], ".ccnavi/approved/doing/i0001-01.md"),
-            ticket("i0001-01", "i0001"),
+            os.path.join(self.trees["i0001"], ".ccnavi/approved/doing/i0001-01-01.md"),
+            ticket("i0001-01-01", "i0001"),
         )
-        result = self.run_sh(os.path.join(link, ".claude", "worktrees", "i0001-01"), "push")
+        result = self.run_sh(os.path.join(link, ".claude", "worktrees", "i0001-01-01"), "push")
         # 本物の sh も両辺をリンクを解いた綴りで比べる。比べないとリンクを経た作業場で守りが外れる。
         stopped = "子チケットのワークツリー" in result.stderr
         self.assertTrue(stopped, result.stderr)

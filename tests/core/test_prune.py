@@ -240,7 +240,7 @@ class StatePruneTest(_Base):
     def test_files_without_a_session_are_left_alone(self):
         keep = [
             _write(os.path.join(self.state, "review-request-i0001-1.md"), age_days=90),
-            _write(os.path.join(self.state, "risk-judge-i0001-01.md"), age_days=90),
+            _write(os.path.join(self.state, "risk-judge-i0001-01-01.md"), age_days=90),
             _write(os.path.join(self.state, "aside", "20260101-000000", "new.txt"), age_days=90),
             _write(os.path.join(self.state, "selfguard", "store", "abc"), age_days=90),
         ]

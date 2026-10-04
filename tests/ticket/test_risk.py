@@ -99,20 +99,22 @@ class RiskTest(PhaseHarness):
     def one_child(self, review=False):
         scope = ("src/*", "wip/*", ".github/*")
         self.propose("i0001", parent_text("i0001", ["work"], allow=scope))
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, list(scope), review=review))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, list(scope), review=review)
+        )
         self.commit_parent()
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        return self.run_child("i0001-01", [("wip/research/summary.md", "s\n")])
+        return self.run_child("i0001-01-01", [("wip/research/summary.md", "s\n")])
 
     def record(self):
-        return read_json(os.path.join(self.approved, "phases", "i0001", "i0001-01.risk.json"))
+        return read_json(os.path.join(self.approved, "phases", "i0001", "i0001-01-01.risk.json"))
 
     # ---- 2. 差分から数える
 
     def test_small_change_is_low_and_the_phase_is_skipped(self):
         self.one_child()
-        closed = self.close_child("i0001-01")
+        closed = self.close_child("i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("リスク: 0 (LOW)", closed.stdout)
         self.assertEqual(0, self.record()["points"])
@@ -128,7 +130,7 @@ class RiskTest(PhaseHarness):
         git(tree, "rm", "-q", os.path.join("src", "keep.py"))
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "big")
-        closed = self.close_child("i0001-01")
+        closed = self.close_child("i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("(CRITICAL)", closed.stdout)
         self.assertIn("宣言に関わらず", closed.stdout)
@@ -141,7 +143,7 @@ class RiskTest(PhaseHarness):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("実績のリスクが高い", self.reason(said))
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         self.assertIn("実績のリスクが高い", self.reason(spawn))
@@ -165,10 +167,10 @@ class RiskTest(PhaseHarness):
         write(os.path.join(tree, "src", "b.py"), "b\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "big")
-        closed = self.close_child("i0001-01")
+        closed = self.close_child("i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.commit_parent("close 01")
-        self.merge("i0001-01")
+        self.merge("i0001-01-01")
         said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
         self.assertIn("実績のリスクが高い", said)
         self.assertIn("マージリクエストで見てもらうことを勧めます", said)
@@ -197,17 +199,17 @@ class RiskTest(PhaseHarness):
                     return real(cwd, args)
 
                 with mock.patch.object(risk, "_git", broken):
-                    closed = self.close_child("i0001-01")
+                    closed = self.close_child("i0001-01-01")
                 self.assertNotEqual(closed.returncode, 0)
                 self.assertIn("のリスクを測れない", closed.stderr)
                 self.assertIn(said, closed.stderr)
                 self.assertFalse(
                     os.path.exists(
-                        os.path.join(self.approved, "phases", "i0001", "i0001-01.risk.json")
+                        os.path.join(self.approved, "phases", "i0001", "i0001-01-01.risk.json")
                     )
                 )
         # 読めるようになれば閉じられる。
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
 
     # ---- 3. スクリプト
 
@@ -225,12 +227,12 @@ class RiskTest(PhaseHarness):
             "  - {id: broken, points: 45, script: .ccnavi/common/scripts/none.sh, message: 無い}\n",
         )
         self.one_child()
-        closed = self.ccnavi("ticket", "finish", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         record = self.record()
         self.assertEqual(75, record["points"])
         by_id = {h["id"]: h for h in record["hits"]}
-        self.assertIn("i0001-01", by_id["counted"]["detail"])
+        self.assertIn("i0001-01-01", by_id["counted"]["detail"])
         self.assertEqual(45, by_id["broken"]["points"])
         self.assertTrue(record["unmeasured"])
         self.assertIn("測れなかった", closed.stdout)
@@ -245,11 +247,11 @@ class RiskTest(PhaseHarness):
             " message: テスト無し}\n",
         )
         tree = self.one_child()
-        refused = self.ccnavi("ticket", "finish", "i0001-01")
+        refused = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("untested", refused.stderr)
         self.assertIn("judge", refused.stderr)
-        with open(os.path.join(self.state, "risk-judge-i0001-01.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.state, "risk-judge-i0001-01-01.md"), encoding="utf-8") as f:
             prompt = f.read()
         self.assertIn("テストの無い振る舞いの変更を含むか", prompt)
         self.assertIn("wip/research/summary.md", prompt)
@@ -257,33 +259,33 @@ class RiskTest(PhaseHarness):
         judged = self.ccnavi(
             "ticket",
             "record-risk",
-            "i0001-01",
+            "i0001-01-01",
             "untested",
             "yes",
             "--reason",
             "テストが無い",
         )
         self.assertEqual(judged.returncode, 0, judged.stderr)
-        wrong = self.ccnavi("ticket", "record-risk", "i0001-01", "nope", "yes", "--reason", "x")
+        wrong = self.ccnavi("ticket", "record-risk", "i0001-01-01", "nope", "yes", "--reason", "x")
         self.assertNotEqual(wrong.returncode, 0)
         # HEAD が動いたら判定は古い。
         write(os.path.join(tree, "src", "later.py"), "1\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "later")
-        stale = self.ccnavi("ticket", "finish", "i0001-01")
+        stale = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(stale.returncode, 0)
         self.assertIn("untested", stale.stderr)
         judged = self.ccnavi(
             "ticket",
             "record-risk",
-            "i0001-01",
+            "i0001-01-01",
             "untested",
             "no",
             "--reason",
             "テストを足した",
         )
         self.assertEqual(judged.returncode, 0, judged.stderr)
-        closed = self.ccnavi("ticket", "finish", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertEqual(0, self.record()["points"])
         # サブエージェントは judge を打てない。
@@ -294,8 +296,8 @@ class RiskTest(PhaseHarness):
             "session_id": "s1",
             "agent_id": "sub-1",
             "tool_input": {
-                "command": "sh .ccnavi/scripts/ccnavi-ticket.sh record-risk i0001-01 untested yes "
-                "--reason x"
+                "command": "sh .ccnavi/scripts/ccnavi-ticket.sh record-risk i0001-01-01 "
+                "untested yes --reason x"
             },
         }
         denied = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
@@ -319,7 +321,7 @@ class RiskTest(PhaseHarness):
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "big")
 
-        closed = self.ccnavi("ticket", "finish", "i0001-01", "--risk", cheap)
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01", "--risk", cheap)
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("--risk は診断", closed.stderr, "落としたことを言っていない")
@@ -332,7 +334,7 @@ class RiskTest(PhaseHarness):
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "big")
 
-        closed = self.ccnavi("ticket", "finish", "i0001-01", "--risk", "")
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01", "--risk", "")
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("--risk は診断", closed.stderr)
@@ -357,16 +359,16 @@ class RiskTest(PhaseHarness):
         git(tree, "commit", "--quiet", "-m", "big")
 
         refused = self.ccnavi(
-            "ticket", "finish", "i0001-01", "--root", os.path.join(self.root, "x")
+            "ticket", "finish", "i0001-01-01", "--root", os.path.join(self.root, "x")
         )
 
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("--root は 1 度しか渡せない", refused.stderr)
         # 止まったことを、結末の側でも見る。閉じても記録を残してもいない。
-        doing = os.path.join(self.approved, "doing", "i0001-01.md")
+        doing = os.path.join(self.approved, "doing", "i0001-01-01.md")
         self.assertTrue(os.path.exists(doing), "doing/ から動いた")
         self.assertFalse(
-            os.path.exists(os.path.join(self.approved, "phases", "i0001", "i0001-01.risk.json")),
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "i0001-01-01.risk.json")),
             "採点の記録が残った",
         )
 
@@ -377,7 +379,7 @@ class RiskTest(PhaseHarness):
         linted = self.ccnavi("--lint")
         self.assertIn("(risk)", linted.stdout + linted.stderr)
         self.one_child()
-        closed = self.ccnavi("ticket", "finish", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("組み込みの配点", closed.stderr)
         self.assertIn(risk.BUILTIN, closed.stdout)

@@ -149,15 +149,15 @@ class ReaderTest(unittest.TestCase):
 
 
 class AuthorityHarness(PhaseHarness):
-    """親 i0001 と子 i0001-01 を承認し、子のワークツリーを作って着手した状態から始める。"""
+    """親 i0001 と子 i0001-01-01 を承認し、子のワークツリーを作って着手した状態から始める。"""
 
     def setUp(self):
         super().setUp()
         self.family(plan=["research", "design"])
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"]))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]))
         self.commit_parent("propose child")
         self.assertEqual(self.approve().returncode, 0)
-        self.child_tree = self.run_child("i0001-01")
+        self.child_tree = self.run_child("i0001-01-01")
 
     def record(self, state, name="i0001", reason="", repo="self"):
         return write(
@@ -241,7 +241,7 @@ class PresentTest(AuthorityHarness):
         self.record("present")
         self.assertNotEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
         board = self.board()
-        self.assertEqual("", self.blocked_of(board, "i0001-01"))
+        self.assertEqual("", self.blocked_of(board, "i0001-01-01"))
 
     def blocked_of(self, board, ticket):
         for parent in board.get("parents", []):
@@ -256,28 +256,28 @@ class PresentTest(AuthorityHarness):
     def test_a_copy_only_outside_the_parent_tree_is_not_trusted(self):
         # 元ツリー（ワークスペースルート）に未コミットで残った写し。
         # 権威のツリーが無いときに元ツリーを採る形。
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
-        stray = os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001-02.md")
+        self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
+        stray = os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001-02-02.md")
         with open(
-            os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02-02.md"),
             encoding="utf-8",
         ) as f:
             write(stray, f.read())
-        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02.md"))
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02-02.md"))
         copies, _ = approval.scan(self.conf(), self.root)
         before = {t.ticket: t.blocked for t in copies}
-        self.assertIn("i0001-02", before)
+        self.assertIn("i0001-02-02", before)
         self.record("present")
         copies, _ = approval.scan(self.conf(), self.root)
         after = {t.ticket: t.blocked for t in copies}
         # 並びは変えない（落とさない）。印だけが足される。
         self.assertEqual(sorted(before), sorted(after))
-        self.assertIn("ワークツリーの外", after["i0001-02"])
-        self.assertEqual("", after["i0001-01"])
+        self.assertIn("ワークツリーの外", after["i0001-02-02"])
+        self.assertEqual("", after["i0001-01-01"])
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         self.assertTrue(
             any(
-                p["severity"] == "error" and "i0001-02" in p["detail"] and "外" in p["detail"]
+                p["severity"] == "error" and "i0001-02-02" in p["detail"] and "外" in p["detail"]
                 for p in lint["problems"]
             ),
             lint,
@@ -293,8 +293,8 @@ class PresentTest(AuthorityHarness):
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
         self.record("present")
         write(
-            os.path.join(self.root, "wip", "proposals", "todo", "i0001-02.md"),
-            child_text("i0001-02", "i0001", 1, ["wip/research/*"]),
+            os.path.join(self.root, "wip", "proposals", "todo", "i0001-01-02.md"),
+            child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]),
         )
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual([], preview["batch"])
@@ -307,20 +307,22 @@ class PresentTest(AuthorityHarness):
         self.record("present")
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
-        started = self.ccnavi("ticket", "finish", "i0001-01")
+        started = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, started.returncode)
         self.assertIn("HEAD がブランチ i0001 を指していない", started.stderr)
         self.assertIn("切り直して", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
         # 子の写しが親のワークツリーから消え、元ツリーにだけ残った形。
-        inside = os.path.join(self.approved, "doing", "i0001-01.md")
+        inside = os.path.join(self.approved, "doing", "i0001-01-01.md")
         with open(inside, encoding="utf-8") as f:
             text = f.read()
         os.remove(inside)
-        stray = write(os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001-01.md"), text)
+        stray = write(
+            os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001-01-01.md"), text
+        )
         self.record("present")
-        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("ワークツリーの外", finished.stderr)
         self.assertTrue(os.path.isfile(stray))
@@ -329,10 +331,10 @@ class PresentTest(AuthorityHarness):
     def test_the_check_names_an_unreadable_copy_in_the_parent_tree(self):
         self.record("present")
         self.assertEqual(0, self.ccnavi("sync", "check", "i0001").returncode)
-        write(os.path.join(self.approved, "doing", "i0001-05.md"), "---\nticket: [\n---\n")
+        write(os.path.join(self.approved, "doing", "i0001-01-05.md"), "---\nticket: [\n---\n")
         check = self.ccnavi("sync", "check", "i0001")
         self.assertEqual(1, check.returncode, check.stdout + check.stderr)
-        self.assertIn("i0001-05.md", check.stdout)
+        self.assertIn("i0001-01-05.md", check.stdout)
 
     def test_the_check_refuses_a_path_like_argument(self):
         check = self.ccnavi("sync", "check", "../x")
@@ -355,11 +357,11 @@ class UndecidedTest(AuthorityHarness):
         result = self.write_to(self.child_tree, "wip/research/a")
         self.assertEqual("deny", self.decision(result))
         self.assertIn("gone", self.reason(result))
-        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("gone", finished.stderr)
         self.assertIn("ccnavi-sync.sh", finished.stderr)
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual([], preview["batch"])
@@ -367,7 +369,7 @@ class UndecidedTest(AuthorityHarness):
 
     def test_blocked_names_the_reason_and_the_way_out(self):
         self.record("blocked", reason="手元と判定が違う")
-        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("手元と判定が違う", finished.stderr)
         self.assertIn("打ち直して", finished.stderr)
@@ -384,12 +386,12 @@ class UndecidedTest(AuthorityHarness):
         os.makedirs(os.path.join(self.state, "sync", "self", "families"))
         os.symlink(real, os.path.join(self.state, "sync", "self", "families", "i0001"))
         self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
-        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertIn("壊れている", finished.stderr)
 
     def test_closed_family_does_not_move(self):
         self.record("closed")
-        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("閉じている", finished.stderr)
         self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
@@ -416,12 +418,12 @@ class TombstoneTest(AuthorityHarness):
         stray = os.path.join(self.root, ".ccnavi", "approved", "doing")
         os.makedirs(stray)
         # 元ツリーに同じ親子のチケットの写しを残して、親のワークツリーを片付ける。
-        for name in ("i0001.md", "i0001-01.md"):
+        for name in ("i0001.md", "i0001-01-01.md"):
             with open(os.path.join(self.approved, "doing", name), encoding="utf-8") as f:
                 write(os.path.join(stray, name), f.read())
         git(self.root, "worktree", "remove", "--force", self.child_tree)
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
-        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("gone", finished.stderr)
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
@@ -496,7 +498,7 @@ class BusyParentTest(AuthorityHarness):
         os.makedirs(os.path.join(gitdir, "rebase-merge"))
         with open(os.path.join(gitdir, "HEAD"), "w", encoding="utf-8") as f:
             f.write(head + "\n")
-        finished = self.ccnavi("ticket", "finish", "i0001-01")
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("途中の操作（rebase-merge）", finished.stderr)
 
@@ -506,7 +508,7 @@ class MarkTest(AuthorityHarness):
         self.record("gone")
         Ticket = approval.ticket_mod.Ticket
         t = Ticket(
-            ticket="i0001-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
+            ticket="i0001-01-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
         )
         approval.mark_imported(self.conf(), self.root, [t])
         self.assertTrue(t.blocked.startswith("前の理由 / "), t.blocked)
@@ -586,22 +588,22 @@ class IntegrationDoneTest(AuthorityHarness):
         )
 
     def test_an_identifier_closed_in_the_integration_is_not_new(self):
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
-        self.assertIn("i0001-02", [b["ticket"] for b in self.preview()["batch"]])
+        self.assertIn("i0001-01-02", [b["ticket"] for b in self.preview()["batch"]])
         # 親子のチケットの控えが無くても、取り込んだ跡のあるリポジトリなら
         # 統合先の done/ で確かめる。
         # 古い統合先から切ったブランチで、識別子の再利用を新規として通さないため。
-        self.integration_done("i0001-02")
+        self.integration_done("i0001-01-02")
         preview = self.preview()
-        self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
-        self.assertTrue(self.rejected_with(preview, "i0001-02", "done/ で閉じている"), preview)
+        self.assertNotIn("i0001-01-02", [b["ticket"] for b in preview["batch"]])
+        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "done/ で閉じている"), preview)
         self.record("present")
         preview = self.preview()
-        self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
+        self.assertNotIn("i0001-01-02", [b["ticket"] for b in preview["batch"]])
         # 板にも理由つきで出る（何も言わずに消えない）。
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
-        self.assertTrue(any("i0001-02" in p["detail"] for p in lint["problems"]))
+        self.assertTrue(any("i0001-01-02" in p["detail"] for p in lint["problems"]))
 
     def test_a_new_family_cannot_reuse_a_closed_identifier(self):
         # 控えの無い新しい親子のチケット（別の親）の識別子が、統合先の done/ で閉じている。
@@ -614,52 +616,52 @@ class IntegrationDoneTest(AuthorityHarness):
         self.assertTrue(self.rejected_with(preview, "i0005", "done/ で閉じている"), preview)
 
     def test_a_broken_or_missing_integration_does_not_pass_silently(self):
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         base = os.path.join(self.state, "sync", "self")
         # 取り込んだ跡（親子のチケットの控え）はあるのに統合先の控えが無い
         # （最初の push で親子のチケットの控えができた直後など）。
         self.record("present")
         preview = self.preview()
-        self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
-        self.assertTrue(self.rejected_with(preview, "i0001-02", "決まらない"), preview)
+        self.assertNotIn("i0001-01-02", [b["ticket"] for b in preview["batch"]])
+        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "決まらない"), preview)
         # head の無い控え（入れ替えが終わらない）。
         os.makedirs(os.path.join(base, "integration"))
         os.makedirs(os.path.join(base, "integration.old.9"))
         preview = self.preview()
-        self.assertTrue(self.rejected_with(preview, "i0001-02", "入れ替えが終わらない"), preview)
+        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "入れ替えが終わらない"), preview)
         # 壊れた head（リンク）。
         os.rmdir(os.path.join(base, "integration.old.9"))
         real = write(os.path.join(self.root, "elsewhere-head"), "branch main\n")
         os.symlink(real, os.path.join(base, "integration", "head"))
         preview = self.preview()
-        self.assertTrue(self.rejected_with(preview, "i0001-02", "決まらない"), preview)
+        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "決まらない"), preview)
         # 直せば通る。
         os.remove(os.path.join(base, "integration", "head"))
         write(os.path.join(base, "integration", "head"), "branch main\nsha abc\n")
-        self.assertIn("i0001-02", [b["ticket"] for b in self.preview()["batch"]])
+        self.assertIn("i0001-01-02", [b["ticket"] for b in self.preview()["batch"]])
 
 
 class PredecessorTest(AuthorityHarness):
     def test_an_undecided_predecessor_family_is_not_met(self):
-        # 先行 i0002-01 は元ツリーの done/ にある（前の池では満たす）。親子のチケット i0002 は
+        # 先行 i0002-01-01 は元ツリーの done/ にある（前の池では満たす）。親子のチケット i0002 は
         # 取り込み済みだが、親のワークツリーが無い（決まらない）ので、満たしたとみなさない。
         write(
-            os.path.join(self.root, ".ccnavi", "approved", "done", "i0002-01.md"),
-            child_text("i0002-01", "i0002", 1, ["src/*"]).replace(
+            os.path.join(self.root, ".ccnavi", "approved", "done", "i0002-01-01.md"),
+            child_text("i0002-01-01", "i0002", 1, ["src/*"]).replace(
                 'completed_at: ""', 'completed_at: "2026-09-01T00:00:00+0900"'
             ),
         )
-        text = child_text("i0001-02", "i0001", 1, ["wip/research/*"]).replace(
-            "phase: 1\n", "phase: 1\npredecessors: [i0002-01]\n"
+        text = child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]).replace(
+            "phase: 1\n", "phase: 1\npredecessors: [i0002-01-01]\n"
         )
-        self.propose("i0001-02", text)
+        self.propose("i0001-01-02", text)
         self.commit_parent()
         before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
-        self.assertIn("i0001-02", [b["ticket"] for b in before["batch"]], before)
+        self.assertIn("i0001-01-02", [b["ticket"] for b in before["batch"]], before)
         self.record("present", name="i0002")
         after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
-        self.assertNotIn("i0001-02", [b["ticket"] for b in after["batch"]])
+        self.assertNotIn("i0001-01-02", [b["ticket"] for b in after["batch"]])
         self.assertTrue(
             any("親子のチケットが決まらない" in " ".join(r["problems"]) for r in after["rejected"]),
             after,
@@ -668,18 +670,22 @@ class PredecessorTest(AuthorityHarness):
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
         # 締める向きだけ: 親のワークツリーで閉じていても、前の池で満たしていなければ満たさない。
         Ticket = approval.ticket_mod.Ticket
-        done = Ticket(ticket="i0001-09", parent="i0001", state="done", tree_root=self.parent_tree)
-        stale = Ticket(ticket="i0001-09", parent="i0001", state="doing", tree_root=self.root)
-        pool = {"i0001-09": [done, stale]}
+        done = Ticket(
+            ticket="i0001-01-09", parent="i0001", state="done", tree_root=self.parent_tree
+        )
+        stale = Ticket(ticket="i0001-01-09", parent="i0001", state="doing", tree_root=self.root)
+        pool = {"i0001-01-09": [done, stale]}
         self.record("present")
         approval.align_imported(self.conf(), self.root, pool)
-        self.assertEqual([done, stale], pool["i0001-09"])
+        self.assertEqual([done, stale], pool["i0001-01-09"])
         # 親のワークツリーで閉じていなければ、それを採る（前の池が満たしていても）。
-        doing = Ticket(ticket="i0001-08", parent="i0001", state="doing", tree_root=self.parent_tree)
-        closed = Ticket(ticket="i0001-08", parent="i0001", state="done", tree_root=self.root)
-        pool = {"i0001-08": [doing, closed]}
+        doing = Ticket(
+            ticket="i0001-01-08", parent="i0001", state="doing", tree_root=self.parent_tree
+        )
+        closed = Ticket(ticket="i0001-01-08", parent="i0001", state="done", tree_root=self.root)
+        pool = {"i0001-01-08": [doing, closed]}
         approval.align_imported(self.conf(), self.root, pool)
-        self.assertEqual([doing], pool["i0001-08"])
+        self.assertEqual([doing], pool["i0001-01-08"])
 
 
 class ReadyTest(AuthorityHarness):
@@ -702,17 +708,17 @@ class DigestTest(AuthorityHarness):
         return core.judge_approval(core.read_fs(conf, self.root))
 
     def test_a_change_in_what_the_judge_read_changes_the_digest(self):
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         first = self.judged()
         self.assertTrue(first.batch)
-        self.assertIn("self:i0001:.ccnavi/approved/doing/i0001-01.md", first.read_set)
+        self.assertIn("self:i0001:.ccnavi/approved/doing/i0001-01-01.md", first.read_set)
         self.assertIn("self:i0001:(HEAD)", first.read_set)
         self.assertIn("(設定):.claude/settings.json", first.read_set)
         self.assertIn("(設定値):approved", first.read_set)
         self.assertEqual(first.digest, self.judged().digest)
         # 束の外の写し（作業中の子）の中身が変われば、画面が同じでも指紋は変わる。
-        path = os.path.join(self.approved, "doing", "i0001-01.md")
+        path = os.path.join(self.approved, "doing", "i0001-01-01.md")
         with open(path, encoding="utf-8") as f:
             text = f.read()
         write(path, text + "\n追記\n")
@@ -744,7 +750,7 @@ class DigestTest(AuthorityHarness):
         self.assertFalse([k for k in keys if k.startswith("(外)")], keys)
 
     def test_a_settings_change_changes_the_digest(self):
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         first = self.judged()
         write(os.path.join(self.root, ".claude", "settings.local.json"), "{}\n")

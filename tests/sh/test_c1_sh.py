@@ -56,7 +56,7 @@ CONFIG = (
     ("commit.gpgsign", "false"),
 )
 PARENT = "i0001"
-CHILD = f"{PARENT}-01"
+CHILD = f"{PARENT}-01-01"
 APPROVED = ".ccnavi/approved"
 
 # 実行ファイルの代わり。このツリーのソースを起こす。
@@ -421,8 +421,8 @@ class C1TicketTest(C1Harness):
     # ---- 3. 競合
 
     def test_a_remote_ahead_is_taken_in_before_writing(self):
-        rel = f"{APPROVED}/doing/i0001-02.md"
-        remote = self.remote_commit(rel, child_text("i0001-02", PARENT, 1, ("wip/design/*",)))
+        rel = f"{APPROVED}/doing/i0001-01-02.md"
+        remote = self.remote_commit(rel, child_text("i0001-01-02", PARENT, 1, ("wip/design/*",)))
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(os.path.isfile(os.path.join(self.tree, rel)))
@@ -431,8 +431,8 @@ class C1TicketTest(C1Harness):
 
     def test_a_take_in_that_blocks_the_family_writes_nothing(self):
         """取り込みの後の検査で親子のチケットが止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
-        rel = f"{APPROVED}/doing/i0001-02.md"
-        self.remote_commit(rel, "---\nticket: i0001-02\n---\n")
+        rel = f"{APPROVED}/doing/i0001-01-02.md"
+        self.remote_commit(rel, "---\nticket: i0001-01-02\n---\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("blocked", result.stderr)
@@ -944,8 +944,8 @@ class C1HumanTest(PhaseOne, C1Harness):
         追跡していない下書きには触れない。"""
         drafts = "wip/proposals/flows"
         taken = f"{drafts}/{CHILD}.yml"
-        rewritten = f"{drafts}/{PARENT}-02.yml"
-        untracked = f"{drafts}/{PARENT}-03.yml"
+        rewritten = f"{drafts}/{PARENT}-01-02.yml"
+        untracked = f"{drafts}/{PARENT}-01-03.yml"
         for rel in (taken, rewritten):
             write(os.path.join(self.tree, rel), "nodes: []\n")
         git(self.tree, "add", "--", taken, rewritten)

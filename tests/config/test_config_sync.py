@@ -169,17 +169,17 @@ class ConfigSyncTest(ConfigUnionHarness):
             project="lib",
         )
         self.propose(
-            "i0001-01",
-            ticket_text("i0001-01", project="lib", parent="i0001", phase=1, allow=SCOPE),
+            "i0001-01-01",
+            ticket_text("i0001-01-01", project="lib", parent="i0001", phase=1, allow=SCOPE),
             project="lib",
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.worktree(self.lib, "i0001")
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
-        child = self.worktree(self.lib, "i0001-01")
+        child = self.worktree(self.lib, "i0001-01-01")
 
-        started = self.ccnavi("ticket", "start", "i0001-01")
+        started = self.ccnavi("ticket", "start", "i0001-01-01")
 
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertNotIn("共通層で上書きした", started.stdout)
@@ -292,14 +292,14 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
             project="lib",
         )
         self.propose(
-            "i0001-01",
-            ticket_text("i0001-01", project="lib", parent="i0001", phase=1, allow=SCOPE),
+            "i0001-01-01",
+            ticket_text("i0001-01-01", project="lib", parent="i0001", phase=1, allow=SCOPE),
             project="lib",
         )
         self.assertEqual(self.approve().returncode, 0)
         self.worktree(self.lib, "i0001")
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
-        child = self.worktree(self.lib, "i0001-01")
+        child = self.worktree(self.lib, "i0001-01-01")
         target = config_of(child, "rules")
         write(target, read(self.rules))
 
