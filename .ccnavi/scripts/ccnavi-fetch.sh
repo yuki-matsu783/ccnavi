@@ -52,8 +52,8 @@ set -u
 # 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-approved=.ccnavi/approved # 固定（ADR-0092）
-projects=projects          # 固定（ADR-0092）
+approved=.ccnavi/approved # 固定
+projects=projects          # 固定
 
 # 見つからなければ何も出さずに終わる。セッションの頭に走るので、ここで止めても得るものが無い。
 root=$(ccnavi_workspace) || exit 0

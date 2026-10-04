@@ -20,9 +20,9 @@
 # <親> を並べると、その親子のチケットだけを運ぶ。取り込み済みでない親子のチケットは運ばない（今のまま、ユーザがコミット
 # する）。省けば今どおり、置き場に変更のあるツリー全部。
 #
-# 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
-# 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
-# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（写しは作らない）ので、
+# 数えるツリーは、ワークスペース、projects の下、.claude/worktrees の下。
+# 置き場は .ccnavi/approved（どの置き場も固定）。承認は提案を
+# wip/proposals の todo/ から動かす（写しは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）は運ばない。
 #
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけを運ばない
@@ -71,9 +71,9 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
-projects="${CCNAVI_PROJECTS:-projects}"
+approved=.ccnavi/approved # 固定
+proposals=wip/proposals   # 固定
+projects=projects         # 固定
 # 末尾の / を落とす。`[ -L "projects/" ]` はリンクを辿って偽になる。
 approved="${approved%/}"
 proposals="${proposals%/}"
