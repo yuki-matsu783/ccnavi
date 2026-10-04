@@ -995,7 +995,8 @@ def _ticket_record(
         "seen_in": seen_in,
         "scattered": scattered,
         # 子のフロー（設計 9.3.1。着手中は書き換えを止める）。
-        # `{path, rel, tree, exists, linked, locked}`。親は null。
+        # `{path, rel, tree, exists, linked, locked, draft}`。draft はエージェントの下書きの
+        # `{path, rel, exists, linked}`（効力は無い）。親は null。
         # locked は判定がそのフローへの書き込みを止めているか（着手中）。読むのは承認済み
         # チケットがあればその側、無ければ提案。
         "flow": flow.info(conf, root, copy if copy is not None else source),

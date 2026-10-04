@@ -249,6 +249,50 @@ class PushApprovedTest(Workspace):
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn(NOTHING, again.stdout)
 
+    def test_a_removed_draft_is_carried_with_the_flow(self):
+        """取り込んで消えた下書き（`wip/proposals/flows/`）は、フローと一緒に運ぶ。
+        書き直された下書き・追跡していない下書きには触れない。"""
+        tree = self.worktree("i0001")
+        drafts = "wip/proposals/flows"
+        taken = f"{drafts}/i0001-01.yml"
+        rewritten = f"{drafts}/i0001-02.yml"
+        untracked = f"{drafts}/i0001-03.yml"
+        for rel in (taken, rewritten):
+            write(os.path.join(tree, *rel.split("/")), "nodes: []\n")
+        git(tree, "add", "--", taken, rewritten)
+        git(tree, "commit", "-q", "-m", "drafts")
+        flow = ".ccnavi/approved/flows/i0001-01.yml"
+        write(os.path.join(tree, *flow.split("/")), "nodes: []\n")
+        os.remove(os.path.join(tree, *taken.split("/")))
+        write(os.path.join(tree, *rewritten.split("/")), "nodes: [x]\n")
+        write(os.path.join(tree, *untracked.split("/")), "nodes: []\n")
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 同じ中身なので、名前の付け替えとして読まずに 2 つのパスで見る。
+        out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([flow, taken]), result.stdout + result.stderr)
+        self.assertTrue(self.dirty(tree, rewritten))
+        self.assertTrue(self.dirty(tree, untracked))
+        self.assertEqual(self.dirty(tree, taken), "")
+        self.assertEqual(self.staged(tree), "")
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_drafts_alone_are_not_carried(self):
+        """フローの保存が無ければ運ばない（置き場の変更が無いツリーには入らない）。"""
+        tree = self.worktree("i0001")
+        taken = "wip/proposals/flows/i0001-01.yml"
+        write(os.path.join(tree, *taken.split("/")), "nodes: []\n")
+        git(tree, "add", "--", taken)
+        git(tree, "commit", "-q", "-m", "draft")
+        os.remove(os.path.join(tree, *taken.split("/")))
+        before = self.head(tree)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(NOTHING, result.stdout)
+        self.assertEqual(self.head(tree), before)
+
     # ---- 18. 運ぶものが無い
 
     def test_nothing_to_carry_says_so(self):

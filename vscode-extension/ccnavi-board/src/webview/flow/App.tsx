@@ -18,6 +18,11 @@
  * **実行ファイルが言ったこと（`FlowChecks`）は画面で作らない。** 開くときの答えは中身と一緒に届き、編集したら
  * 止まってから（`CHECK_MS`）拡張ホストに確かめ直しを頼む（`check` → `checked`。書きはしない）。答えの
  * warn は画面の注意と並べて出し、渡る手順は右の列のプレビュー、候補の名前は右の欄の選択肢に使う。
+ *
+ * **エージェントの下書き。** 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
+ * 実行ファイルに確かめさせた中身が届き（`proposal`）、文の前後まで見せる差分（`Proposal.tsx`）から「取り込む」で
+ * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きの指紋を添え、拡張ホストは
+ * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`request`）は着手の前だけ拡張ホストが言葉を渡す。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -45,7 +50,7 @@ import {
   type PaletteType,
 } from "../../core/flow-doc.js";
 import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
-import type { FlowChecks, FlowData, FlowLock, FlowPage, ToFlow } from "../../core/flow-view.js";
+import type { FlowChecks, FlowData, FlowLock, FlowOffer, FlowPage, FlowProposal, ToFlow } from "../../core/flow-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { getState, setState } from "../vscode.js";
@@ -53,6 +58,7 @@ import { Canvas, type Selection } from "./Canvas.js";
 import { Inspector } from "./Inspector.js";
 import { post } from "./post.js";
 import { Preview } from "./Preview.js";
+import { ProposalReview, RequestText, type ProposalView } from "./Proposal.js";
 import { SaveReview } from "./SaveReview.js";
 import { badgeOf } from "./text.js";
 
@@ -188,6 +194,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const checkSeq = useRef(0);
   // 外で変わった知らせを受けているか。拡張ホストはタブを表に戻すたびに送り直すので、最初の 1 回だけ履歴を空にする
   const changedSeen = useRef(false);
+  // エージェントの下書き。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きの指紋
+  const [request, setRequest] = useState<string | undefined>(() => pageOf(initial)?.request);
+  const [offer, setOffer] = useState<FlowOffer | undefined>(() => pageOf(initial)?.offer);
+  const [proposal, setProposal] = useState<ProposalView | undefined>(undefined);
+  const [requestText, setRequestText] = useState<string | undefined>(undefined);
+  // 取り込んだ下書きの指紋と中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に添える（違えば下書きを消させない）
+  const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
@@ -218,6 +231,23 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         setChecks(page?.checks);
         setChecking(false);
         setCheckError(undefined);
+        setRequest(page?.request);
+        setOffer(page?.offer);
+        setProposal(undefined);
+        setRequestText(undefined);
+        imported.current = undefined;
+      } else if (message.type === "offer") {
+        const answer = message as { request?: string; offer?: FlowOffer };
+        setRequest(answer.request);
+        setOffer(answer.offer);
+      } else if (message.type === "proposal") {
+        const answer = message as { proposal?: FlowProposal; error?: string };
+        // 閉じたあとに届いた答えは捨てる
+        setProposal((now) =>
+          now === undefined ? now : answer.proposal !== undefined ? { kind: "ready", proposal: answer.proposal } : { kind: "error", error: String(answer.error ?? "") },
+        );
+      } else if (message.type === "requestText") {
+        setRequestText(String((message as { prompt?: unknown }).prompt ?? ""));
       } else if (message.type === "failed") {
         setBusy(false);
         setStatus({ text: String(message.message ?? ""), error: true });
@@ -319,6 +349,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       post({ type: "check", seq: checkSeq.current, doc });
     }, CHECK_MS);
     return () => clearTimeout(timer);
+  }, [doc]);
+
+  // 取り込んだ中身から編集で離れたら、取り込みの印を外す（元に戻して同じ中身にしても付け直さない。下書きを消さない側）
+  useEffect(() => {
+    const taken = imported.current;
+    if (taken !== undefined && doc !== undefined && !sameFlow(doc, taken.doc)) {
+      imported.current = undefined;
+    }
   }, [doc]);
 
   // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
@@ -479,7 +517,25 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setReview(undefined);
     setBusy(true);
     setStatus({ text: "着手中でないかを確かめて保存中…", error: false });
-    post({ type: "save", doc });
+    const taken = imported.current;
+    post({ type: "save", doc, ...(taken !== undefined && sameFlow(doc, taken.doc) ? { imported: taken.hash } : {}) });
+  };
+
+  const openProposal = (): void => {
+    setProposal({ kind: "loading" });
+    post({ type: "openProposal" });
+  };
+
+  /** 下書きの中身を編集中の内容に入れる。書かない（保存はいつもの経路）。着手中は入れない */
+  const importProposal = (taken: FlowProposal): void => {
+    if (lock.locked) {
+      return;
+    }
+    edit(taken.doc);
+    imported.current = { hash: taken.hash, doc: taken.doc };
+    setProposal(undefined);
+    setSelected(undefined);
+    setStatus({ text: "下書きを取り込みました（まだ保存していません）。そのまま保存すると、取り込んだ下書きは消えます（直してから保存したときは残します）", error: false });
   };
 
   const save = (): void => {
@@ -500,6 +556,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
+    if (proposal !== undefined || requestText !== undefined) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setProposal(undefined);
+        setRequestText(undefined);
+      }
+      return;
+    }
     if (review !== undefined) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -541,6 +605,17 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           再読込
         </button>
       </div>
+      {offer !== undefined && (
+        <div id="offer" className="banner missing" role="status">
+          <span>
+            提案あり: エージェントの下書き（{offer.draftPath}）が、いまのフローと違います。
+            {offer.problem !== undefined && <span className="dim">（読めません: {offer.problem}）</span>}
+          </span>
+          <button type="button" className="action" data-action="open-proposal" disabled={busy} onClick={openProposal}>
+            提案を見る
+          </button>
+        </div>
+      )}
       <header className="toolbar">
         <div className="summary">
           <span className="flow-ticket">
@@ -583,6 +658,18 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <button type="button" className="action" data-action="toggle-minimap" aria-pressed={minimap} title="図の右下のミニマップを出す・隠す" onClick={toggleMinimap}>
             {minimap ? "ミニマップを隠す" : "ミニマップを出す"}
           </button>
+          {request !== undefined && !lock.locked && (
+            <button
+              type="button"
+              className="action"
+              data-action="request-flow"
+              disabled={busy}
+              title="エージェントへの依頼の文を組みます。エージェントは下書きを書くだけで、取り込むかはこの画面で決めます"
+              onClick={() => post({ type: "request" })}
+            >
+              {request}
+            </button>
+          )}
           <button type="button" className="action" data-action="open-flow" disabled={!page.exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
@@ -655,6 +742,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       </div>
       {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
       {review !== undefined && <SaveReview diff={review} onConfirm={confirmSave} onCancel={() => setReview(undefined)} />}
+      {proposal !== undefined && (
+        <ProposalReview view={proposal} base={base} lock={lock} dirty={dirty} onImport={importProposal} onCancel={() => setProposal(undefined)} />
+      )}
+      {requestText !== undefined && <RequestText prompt={requestText} onClose={() => setRequestText(undefined)} />}
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>

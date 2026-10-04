@@ -54,6 +54,11 @@ export interface FlowTarget {
   readonly project: string;
   readonly flow: FlowJson;
   readonly lock: FlowLock;
+  /**
+   * 着手の前（承認待ちか、承認済みで未着手）か。エージェントへの依頼のボタンを出すかだけに使い、
+   * 守りには使わない（取り込みと保存を止めるのは錠。錠は実行ファイルの答えのまま）
+   */
+  readonly beforeStart: boolean;
 }
 
 export type FlowTargetResult = { readonly ok: true; readonly target: FlowTarget } | { readonly ok: false; readonly error: string };
@@ -80,6 +85,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
       parent: found.parent,
       project: found.project,
       flow: found.flow,
+      beforeStart: found.started_at === "" && found.completed_at === "" && found.cancelled_at === "",
       lock: found.flow.locked
         ? { locked: true, reason: lockedReason(ticket) }
         : found.flow.linked
@@ -97,6 +103,83 @@ export function flowButtonLabel(flow: FlowJson): string {
     return "フロー: 閲覧（着手中）";
   }
   return flow.exists ? "フロー: 編集" : "フロー: 作成";
+}
+
+// ---- エージェントへの依頼と、下書きの取り込み
+
+/**
+ * 「エージェントにフローの作成を頼む」ボタンの言葉。出さないなら undefined。
+ *
+ * 出すのは着手の前（承認待ち・承認済みで未着手）で、錠が掛かっていない（着手中・リンク・確認中でない）ときだけ。
+ * 着手中は取り込めないので、頼んでも使えない下書きができる。下書きが既に在れば「頼み直す」
+ */
+export function requestLabel(state: {
+  readonly beforeStart: boolean;
+  readonly locked: boolean;
+  readonly flowExists: boolean;
+  readonly draftExists: boolean;
+}): string | undefined {
+  if (!state.beforeStart || state.locked) {
+    return undefined;
+  }
+  if (state.draftExists) {
+    return "エージェントにフローを頼み直す";
+  }
+  return state.flowExists ? "エージェントにフローの直しを頼む" : "エージェントにフローの作成を頼む";
+}
+
+/** 依頼の文の材料。パスは絶対（エージェントはどの cwd からでも開ける） */
+export interface FlowRequest {
+  readonly ticket: string;
+  readonly title: string;
+  readonly parent: string;
+  /** 下書きを書く置き場（`tickets[].flow.draft.path`） */
+  readonly draftPath: string;
+  /** いまのフロー（在るときだけ。`tickets[].flow.path`） */
+  readonly flowPath?: string;
+  /** 下書きが既に在る（頼み直す） */
+  readonly redo: boolean;
+  /** 確かめる 1 行（`ccnavi --lint --flow <下書き>` を打てる形） */
+  readonly lintCommand: string;
+}
+
+/**
+ * エージェントへの依頼の文。承認の文と同じく「コピー / 新しいセッションで開く」で渡す。
+ * 依頼は書き込みの許可条件ではない（下書きの置き場は頼まなくても書ける）。文が言うのは、どの子の・どこに書くか・
+ * 何を確かめてから渡すか・どこに書かないか、だけ
+ */
+export function flowRequestPrompt(request: FlowRequest): string {
+  const what = request.flowPath === undefined ? "作成" : "直し";
+  const head = request.title === "" ? request.ticket : `${request.ticket}（${request.title}）`;
+  const lines = [`[ccnavi] ユーザが子チケット ${head} のフローの${what}を頼んだ（親 ${request.parent}）。`];
+  lines.push(`- 下書きを書く置き場: ${request.draftPath}（YAML。形はフロー編集画面が書くものと同じ: id・name・version・nodes・connections）`);
+  if (request.flowPath !== undefined) {
+    lines.push(`- いまのフロー: ${request.flowPath}（読んで、直すところだけ変えた全体を下書きに書く）`);
+  }
+  if (request.redo) {
+    lines.push("- 前の下書きが残っている。読んで、書き直してよい");
+  }
+  lines.push(
+    `- 書いたら \`${request.lintCommand}\` で確かめ、error が無くなってからユーザに渡す`,
+    "- 効力のあるフロー（.ccnavi/approved/flows/）には書かない。書くのは下書きだけで、ユーザがフロー編集画面で差分を読んで取り込む",
+  );
+  return lines.join("\n");
+}
+
+/** 「提案あり」。下書きが在り、中身がいまのフローと違う（`sameFlow` が偽）か、読めない */
+export interface FlowOffer {
+  /** 下書きのファイル（ワークスペースルートからの相対で見せる。外なら絶対） */
+  readonly draftPath: string;
+  /** 読めない理由（リンク・ハードリンク・YAML として読めない など）。読めれば無い */
+  readonly problem?: string;
+}
+
+/** 開いた下書き。実行ファイルの `--lint --flow` が通り、画面の読みとも食い違わなかった中身 */
+export interface FlowProposal {
+  readonly doc: FlowDoc;
+  /** 読んだバイトの指紋（sha256 の 16 進）。取り込んで保存したあと、同じ中身のときだけ下書きを消す */
+  readonly hash: string;
+  readonly draftPath: string;
 }
 
 // ---- 画面に見せる形
@@ -140,6 +223,10 @@ export interface FlowPage {
   readonly draft?: FlowDoc;
   /** 開くときに実行ファイルが `doc` について言ったこと */
   readonly checks?: FlowChecks;
+  /** エージェントへの依頼のボタンの言葉（`requestLabel`）。無ければ出さない */
+  readonly request?: string;
+  /** 「提案あり」。無ければ下書きが無いか、いまのフローと同じ */
+  readonly offer?: FlowOffer;
 }
 
 export type FlowData =
@@ -158,6 +245,12 @@ export type ToFlow =
   | { readonly type: "tour" }
   /** 頼まれた確かめ（`check`）の答え。`seq` は頼んだときの番号。確かめられなければ `error` */
   | { readonly type: "checked"; readonly seq: number; readonly checks?: FlowChecks; readonly error?: string }
+  /** 下書きか錠が動いた。依頼のボタンの言葉と「提案あり」を出し直す（編集は捨てない） */
+  | { readonly type: "offer"; readonly request?: string; readonly offer?: FlowOffer }
+  /** 開いた下書き（`openProposal` の答え）。取り込めなければ `error` */
+  | { readonly type: "proposal"; readonly proposal?: FlowProposal; readonly error?: string }
+  /** 依頼の文（`request` の答え）。画面は文と「コピー / 新しいセッションで開く」を出す */
+  | { readonly type: "requestText"; readonly prompt: string }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側は `asFlowMessage` で形を確かめてから使う */
@@ -166,14 +259,22 @@ export type FlowMessage =
   | { readonly type: "reload"; readonly dirty: boolean }
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  | { readonly type: "save"; readonly doc: FlowDoc }
+  /** `imported` は、読み込んでから取り込んだ下書きの指紋。保存が通ったら、下書きがまだ同じ中身なら消す */
+  | { readonly type: "save"; readonly doc: FlowDoc; readonly imported?: string }
   /** 編集中の写し。未保存のまま閉じられたときに戻すため、拡張ホストが控える。未保存でなくなったら null */
   | { readonly type: "draft"; readonly doc: FlowDoc | null }
   /** 保存の前に差分を確かめるか（設定に書く） */
   | { readonly type: "reviewSave"; readonly value: boolean }
   /** 編集中の写しを実行ファイルに確かめさせる（渡る手順・warn・候補を取り直す）。書きはしない */
   | { readonly type: "check"; readonly seq: number; readonly doc: FlowDoc }
-  | { readonly type: "tourDone" };
+  | { readonly type: "tourDone" }
+  /** 「提案あり」を開く。拡張ホストが下書きを読んで実行ファイルに確かめさせ、`proposal` で返す */
+  | { readonly type: "openProposal" }
+  /** エージェントへの依頼の文を組む */
+  | { readonly type: "request" }
+  /** 依頼の文をコピーする・新しいセッションで開く。文は拡張ホストが持っている分を使う */
+  | { readonly type: "requestCopy" }
+  | { readonly type: "requestOpen" };
 
 /**
  * 画面から届いたものを確かめる。**形が崩れていたら捨てる**（保存の中身が読めないものを書かない）。
@@ -182,11 +283,15 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; dirty?: unknown; doc?: unknown; value?: unknown; seq?: unknown };
+  const m = message as { type?: unknown; dirty?: unknown; doc?: unknown; value?: unknown; seq?: unknown; imported?: unknown };
   switch (m.type) {
     case "ready":
     case "openFile":
     case "tourDone":
+    case "openProposal":
+    case "request":
+    case "requestCopy":
+    case "requestOpen":
       return { type: m.type };
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
@@ -194,7 +299,11 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
       return typeof m.dirty === "boolean" ? { type: "dirty", dirty: m.dirty } : undefined;
     case "save": {
       const doc = asFlowDoc(m.doc);
-      return doc === undefined ? undefined : { type: "save", doc };
+      if (doc === undefined) {
+        return undefined;
+      }
+      // 指紋の形（sha256 の 16 進）でなければ、取り込みは無かったものとして扱う（下書きを消さない側）
+      return typeof m.imported === "string" && /^[0-9a-f]{64}$/.test(m.imported) ? { type: "save", doc, imported: m.imported } : { type: "save", doc };
     }
     case "draft": {
       if (m.doc === null) {
