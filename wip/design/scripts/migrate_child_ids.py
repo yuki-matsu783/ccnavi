@@ -13,7 +13,8 @@
 
 `ccnavi_approved.source_path`（承認したときに提案が在った場所の記録）は過去の事実なので
 書き換えない。チケットの無い記録（子が置き場に無い `phases/<親>/<親>-NN.*`）はフェーズが
-分からないので動かさず、名前を出す。
+分からず新しい名前を決められないので、ユーザの決定どおり消す。
+消して空になった `phases/<親>/` も消す。
 
 使い方（ツリーのルートで）:
 
@@ -144,7 +145,7 @@ def main() -> int:
     for src, dst in renames:
         print(f"  {src} → {dst}")
     if orphans:
-        print("チケットが無いので動かさない記録（フェーズが分からない）:")
+        print("消すもの（チケットが無く、フェーズが分からない記録）:")
         for path in orphans:
             print(f"  {path}")
     if not args.apply:
@@ -161,7 +162,17 @@ def main() -> int:
             print(f"移す先が既にある: {dst}", file=sys.stderr)
             return 1
         os.rename(src, dst)
-    print(f"移した: 書き換え {len(rewrites)} 件、名前の変更 {len(renames)} 件")
+    emptied: list[str] = []
+    for path in orphans:
+        os.remove(path)
+        parent = os.path.dirname(path)
+        if not os.listdir(parent):
+            os.rmdir(parent)
+            emptied.append(parent)
+    print(
+        f"移した: 書き換え {len(rewrites)} 件、名前の変更 {len(renames)} 件、"
+        f"消した記録 {len(orphans)} 件、消した空のディレクトリ {len(emptied)} 件"
+    )
     return 0
 
 
