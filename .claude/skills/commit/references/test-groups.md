@@ -68,7 +68,7 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 全件を回すとき:
 
 - 表のどの行にも当たらないファイルを変えた
-- `.ccnavi/scripts/ccnavi-common.sh`、`.ccnavi/common/`、`.ccnavi/config/`、`tests/__init__.py`、`tests/inproc.py`、
+- `.ccnavi/scripts/ccnavi-common*.sh`（入口と部品）、`.ccnavi/common/`、`.ccnavi/config/`、`tests/__init__.py`、`tests/inproc.py`、
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
 - 統合先に取り込む前、MR に出す前
 - どの行に当たるか迷った
