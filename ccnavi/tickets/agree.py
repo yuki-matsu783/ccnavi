@@ -139,15 +139,14 @@ def gather(
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
     # 権威のツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
-    # 入れない。黙って外さず、書く場所を名指しする。
+    # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core._say_elsewhere` と
+    # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
     open_index = approval.by_id(approved)
     elsewhere = [
         approval.revision_elsewhere_text(conf, root, t, where)
         for t, where in stale
         if approval.revision_elsewhere(t, open_index.get(t.ticket))
     ]
-    for line in elsewhere:
-        stderr.write(f"ccnavi: {line}\n")
 
     pending, revisions = waiting(
         proposals, approved, closed, review, types_resolver(conf, root, approved)
@@ -242,9 +241,13 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
     elsewhere = _elsewhere(gathered)
     if gathered.nothing_pending:
-        text = (
-            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
-            "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
+        text = f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
+        # 場所違いの改版を名指ししたときは「同じ名前で置いても承認待ちにならない」を言わない。
+        # 改版そのものができないと読めるため（書く場所は上の段が言う）。
+        text += (
+            "。\n"
+            if elsewhere
+            else "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
         )
         return Verdict(False, VERIFY_NOTHING, head + elsewhere + text + unreadable)
 
@@ -1142,7 +1145,7 @@ def waiting(
         and not t.is_child
         and t.has_plan
         and (
-            _plan_differs(t, open_index[t.ticket])
+            approval.plan_differs(t, open_index[t.ticket])
             or _workflow_differs(t, open_index[t.ticket], types_for)
         )
     ]
@@ -1167,10 +1170,6 @@ def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod
         return cache[name]
 
     return types_for
-
-
-def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:
-    return proposal.plan != current.plan or proposal.feedback != current.feedback
 
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:

@@ -104,6 +104,15 @@ class Verdict:
         return self.gathered.identifiers
 
 
+def _say_elsewhere(stderr: TextIO, gathered: agree.Gathered) -> None:
+    """権威のツリーの外に在る計画の違う版の案内（`Gathered.elsewhere`）を標準エラーに出す。
+
+    `--verify` のテキストは本文に同じ段を持つので、そこでは呼ばない（同じ名指しを 2 度出さない）。
+    """
+    for line in gathered.elsewhere:
+        stderr.write(f"ccnavi: {line}\n")
+
+
 def judge_approval(
     snapshot: Snapshot,
     only: list[str] | None = None,
@@ -342,6 +351,7 @@ def approve(
     snapshot = read_fs(conf, root)
     verdict = judge_approval(snapshot, only)
     stderr.write(verdict.messages)
+    _say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
     if gathered.refused:
         return 1
@@ -390,6 +400,7 @@ def preview(
     """
     verdict = judge_approval(read_fs(conf, root), only)
     stderr.write(verdict.messages)
+    _say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
     if gathered.refused:
         return 1
@@ -445,6 +456,10 @@ def verify(
     """
     judged = judge_approval(read_fs(conf, root), only)
     stderr.write(judged.messages)
+    if as_json:
+        # テキストの本文には `verify_verdict` が名指しの段を入れる。JSON の本体には無いので
+        # 標準エラーへ出す。
+        _say_elsewhere(stderr, judged.gathered)
     gathered = judged.gathered
     verdict = agree.verify_verdict(gathered, conf.tickets)
     if as_json:
@@ -494,6 +509,7 @@ def approve_yes(
     snapshot = read_fs(conf, root)
     verdict = judge_approval(snapshot, narrowed, shown_ids=wanted, shown_digest=digest)
     stderr.write(verdict.messages)
+    _say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
     if verdict.mismatch is not None:
         current = verdict.mismatch["current"]

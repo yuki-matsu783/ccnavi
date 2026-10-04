@@ -395,12 +395,12 @@ def revision_elsewhere(t: ticket_mod.Ticket, current: ticket_mod.Ticket | None) 
     条件は承認の改版（`agree.waiting`）と同じく、作業中の承認済みチケットがある親で、計画か
     フィードバック計画が違うもの。
     """
-    return (
-        current is not None
-        and not t.is_child
-        and t.has_plan
-        and (t.plan != current.plan or t.feedback != current.feedback)
-    )
+    return current is not None and not t.is_child and t.has_plan and plan_differs(t, current)
+
+
+def plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:
+    """提案の計画（全体計画かフィードバック計画）が承認済みチケットと違うか。改版の条件。"""
+    return proposal.plan != current.plan or proposal.feedback != current.feedback
 
 
 def revision_elsewhere_text(
@@ -414,8 +414,10 @@ def revision_elsewhere_text(
 
     場所はどちらもワークスペースルートからのパスで出す（ツリーの名前ではなく、
     `.claude/worktrees/<親>` や `projects/<名前>`）。`--lint` と `--agree`（`--verify` も）が
-    同じ文面を出す。取り込み済みの家族では、権威のツリーが親のワークツリー（`family_problems` が
-    言う書く場所と同じ）なので、場所は繰り返さず push してから頼むことだけを足す。
+    同じ文面を出す。取り込み済みの家族では、家族が決まらない・閉じているなら止まった理由と
+    手順（`family_stop_text`。`family_problems` と同じ文面）を足す。決まっていれば、権威の
+    ツリーが親のワークツリー（`family_problems` が言う書く場所と同じ）なので、場所は繰り返さず
+    push してから頼むことだけを足す。
     """
     rel = os.path.relpath(t.path, root).replace(os.sep, "/")
     place = tree_path(conf, root, where, t.project)
@@ -427,7 +429,9 @@ def revision_elsewhere_text(
     fams = fams or syncstate.Families(conf, root)
     if fams.active:
         st = family_standing(conf, root, t, fams)
-        if st.imported and st.home is not None:
+        if st.imported and st.stop:
+            text += "。取り込み済みの家族が止まっている: " + family_stop_text(root, st)
+        elif st.imported and st.home is not None:
             text += "。取り込み済みの家族なので、書いたら push してから承認を頼んでください"
     return text
 
@@ -520,8 +524,7 @@ def family_problems(
     if not st.imported:
         return []
     if st.stop:
-        hint = " / ".join(syncstate.guidance(root, st))
-        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"{st.stop}。承認しない。{hint}")]
+        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, family_stop_text(root, st))]
     if st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
         return [
             rules.Problem(
@@ -534,6 +537,12 @@ def family_problems(
             )
         ]
     return []
+
+
+def family_stop_text(root: str, st: syncstate.Standing) -> str:
+    """家族が決まらない・閉じているので承認しない理由と、ユーザが打つ手順（`family_problems`）。"""
+    hint = " / ".join(syncstate.guidance(root, st))
+    return f"{st.stop}。承認しない。{hint}"
 
 
 def integration_problems(

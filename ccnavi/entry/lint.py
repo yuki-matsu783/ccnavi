@@ -814,7 +814,7 @@ def _proposal_problems(
             continue
         if t.ticket in index:
             current = index[t.ticket]
-            if not t.is_child and t.has_plan and agree._plan_differs(t, current):
+            if not t.is_child and t.has_plan and approval.plan_differs(t, current):
                 continue  # 親の改版。承認待ちに入る
             problems.append(
                 Problem(
