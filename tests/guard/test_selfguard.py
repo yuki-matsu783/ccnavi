@@ -444,6 +444,9 @@ class SelfGuardTest(unittest.TestCase):
             "-ni",
             "--in-place",
             "--in-place=.bak",
+            "--in",
+            "--i",
+            "--in-pl=.bak",
             "'-i'",
             '"-i"',
         ]:

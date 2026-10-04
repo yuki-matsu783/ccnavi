@@ -203,7 +203,8 @@ _SETTINGS_FILES = (
 #      1 のリダイレクトの行き先だけは、語の中の目印まで含めて当てると引用の中の `> 場所` が
 #      書き込み先に見えるので、そちらも除外する。
 #   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。`-i` は独立したオプションの語
-#      （`-i` `-i.bak` `-ni` `--in-place`）だけを数える。`feature-id` のように語の途中に
+#      （`-i` `-i.bak` `-ni` `--in-place`。GNU sed は長いオプションの省略形 `--in` `--i` も
+#      受けるので `--i` で始まる語は全部）だけを数える。`feature-id` のように語の途中に
 #      `-i` が出るだけのパスや式は読みなので止めない。
 #
 # 元と行き先がある cp / ln / install は組が違うので後ろに分けてある。見るのは
@@ -212,7 +213,7 @@ _NOT_A_WORD = re.escape(shellread.SEP) + re.escape(shellread.WORD_SEP)
 _WRITE_VERBS = (
     rf"(>[>|&]* ?[^ {_NOT_A_WORD}]*"
     r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
-    r"|(^|\x00)sed\b[^\x00]*[ \x01](-[A-Za-z]*i|--in-place)[^\x00]*)"
+    r"|(^|\x00)sed\b[^\x00]*[ \x01](-[A-Za-z]*i|--i)[^\x00]*)"
 )
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 
