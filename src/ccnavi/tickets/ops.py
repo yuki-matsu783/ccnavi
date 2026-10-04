@@ -18,7 +18,7 @@ from dataclasses import dataclass, replace
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, configsync, flow, history, phase, risk, syncstate
+from . import approval, approval_marks, configsync, flow, history, phase, risk, syncstate
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -76,7 +76,7 @@ def start(
     synced = _sync_config(stderr, root, conf, found, worktree)
     if synced is None:
         return 1
-    fields = {"started_at": approval.now(), "base_sha": sha}
+    fields = {"started_at": approval_marks.now(), "base_sha": sha}
     failed = approval.update_fields(found.path, fields)
     if failed:
         stderr.write(f"ccnavi: {ticket_id} に着手の欄を書けない: {failed}\n")
@@ -164,7 +164,7 @@ def _sync_config(
         if c.unparsed:
             line += "。上書き前を読めなかった"
         lines.append(line)
-    mark = approval.parent_mark_path(where, found.ticket, configsync.MARK)
+    mark = approval_marks.parent_mark_path(where, found.ticket, configsync.MARK)
     lines.append(
         f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
         f" '{git_sh} add' してコミットしてください。"
@@ -198,7 +198,7 @@ def finish(
     scored = _score_child(stdout, stderr, root, conf, found)
     if scored is None:
         return 1
-    fields = {"completed_at": approval.now()}
+    fields = {"completed_at": approval_marks.now()}
     state = ticket_mod.REVIEW if _needs_review(root, conf, found) else ticket_mod.DONE
     code = _move(stdout, stderr, root, conf, found, state, fields, f"完了 {fields['completed_at']}")
     if code == 0 and scored:
@@ -243,10 +243,10 @@ def _close_parent(
     """
     where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
     venues = phase.review_venues(root, conf, found.ticket)
-    failed = approval.write_parent_mark(
+    failed = approval_marks.write_parent_mark(
         where,
         found.ticket,
-        approval.PARENT_MARK_CLOSED,
+        approval_marks.PARENT_MARK_CLOSED,
         {"reviews": {str(n): venues[n] for n in sorted(venues)}},
     )
     if failed:
@@ -261,7 +261,7 @@ def _close_parent(
             "Draft を外す手順は無い。途中の作業は既定のブランチに残さない\n"
         )
         return
-    if approval.read_parent_mark(where, found.ticket, approval.PARENT_MARK_READY):
+    if approval_marks.read_parent_mark(where, found.ticket, approval_marks.PARENT_MARK_READY):
         stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
     review_sh = settings.script_command(root, "ccnavi-review.sh")
@@ -297,7 +297,7 @@ def cancel(
         return 1
     if _parent_still_busy(stderr, root, conf, found):
         return 1
-    fields = {"cancelled_at": approval.now(), "cancel_reason": reason.strip()}
+    fields = {"cancelled_at": approval_marks.now(), "cancel_reason": reason.strip()}
     return _move(
         stdout,
         stderr,
@@ -352,19 +352,21 @@ def record_risk(
         return 1
     where = approval.home_dir(conf, root, ticket_id, found.parent, project=found.project)
     record = (
-        approval.read_child_record(where, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE)
+        approval_marks.read_child_record(
+            where, found.parent, ticket_id, approval_marks.CHILD_RECORD_JUDGE
+        )
         or {}
     )
     record[factor_id] = {
         "hit": answer == "yes",
         "reason": reason.strip(),
         "head": head,
-        "at": approval.now(),
+        "at": approval_marks.now(),
         # その項目がどの層に書いてあるか（設計 11.9）。
         "source": factor.source,
     }
-    failed = approval.write_child_record(
-        where, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE, record
+    failed = approval_marks.write_child_record(
+        where, found.parent, ticket_id, approval_marks.CHILD_RECORD_JUDGE, record
     )
     if failed:
         stderr.write(f"ccnavi: 判定を記録できない: {failed}\n")
@@ -411,13 +413,17 @@ def _score_child(
         return None
     where = approval.home_dir(conf, root, found.ticket, found.parent, project=found.project)
     judgements = (
-        approval.read_child_record(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
+        approval_marks.read_child_record(
+            where, found.parent, found.ticket, approval_marks.CHILD_RECORD_JUDGE
+        )
         or {}
     )
     # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、
     # この C1 でコミットする。
     fsio.note_input(
-        approval.child_record_path(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
+        approval_marks.child_record_path(
+            where, found.parent, found.ticket, approval_marks.CHILD_RECORD_JUDGE
+        )
     )
     env = {
         "CCNAVI_BASE_SHA": diff.base,
@@ -448,14 +454,14 @@ def _score_child(
             stderr.write(f"  問い: {where}\n")
         return None
     record = score.as_dict()
-    record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
+    record.update({"head": diff.head, "base": diff.base, "at": approval_marks.now()})
     record["summary"] = diff.summary()
     if definition.dropped:
         # 空として扱った層の名前を残す（設計 11.2）。共通層だけで測ったことが、
         # あとから記録を読んだユーザに分かる。
         record["fallback"] = ",".join(definition.dropped)
-    failed = approval.write_child_record(
-        where, found.parent, found.ticket, approval.CHILD_RECORD_RISK, record
+    failed = approval_marks.write_child_record(
+        where, found.parent, found.ticket, approval_marks.CHILD_RECORD_RISK, record
     )
     if failed:
         stderr.write(f"ccnavi: リスクを記録できない: {failed}\n")
@@ -722,8 +728,10 @@ def close_problems(
             f"'{settings.script_command(root, 'ccnavi-review.sh')} config-synced {parent_id}' を"
             "打って見てもらってください"
         ]
-    if approval.read_parent_mark(
-        approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_CLOSE_EARLY
+    if approval_marks.read_parent_mark(
+        approval.home_dir(conf, root, parent_id, ""),
+        parent_id,
+        approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):
         return []
     problems: list[str] = []

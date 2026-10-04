@@ -31,7 +31,7 @@ from typing import TextIO
 
 from ..infra import fsio, gitstate, settings, tree
 from ..policy import rules
-from . import approval, history, phase, phasetypes, syncstate, workflow
+from . import approval, approval_marks, history, phase, phasetypes, syncstate, workflow
 from . import ticket as ticket_mod
 
 
@@ -206,7 +206,7 @@ def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
     return {
         "version": AGREE_VERSION,
         "root": root,
-        "generated_at": approval.now(),
+        "generated_at": approval_marks.now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
         "digest": digest,
@@ -677,7 +677,7 @@ def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"`{ticket_mod.WORKFLOW_KEY}` の欄は提案に書かない。待ち方は --agree が"
-            f" {approval.PHASES_DIR}/<親>/{approval.WORKFLOW_FILE} に書く",
+            f" {approval_marks.PHASES_DIR}/<親>/{approval_marks.WORKFLOW_FILE} に書く",
         )
     ]
 
@@ -877,7 +877,7 @@ def _apply_steps(
             # マーカーを消せたかは書くときに分かるので、行は Writer(FS) が消せた種類で出す。
             # reviewed を消せなければそこで止める（`clear_marks`）。
             if t.is_child and t.phase is not None:
-                approval.clear_marks(
+                approval_marks.clear_marks(
                     approval.home_dir(conf, root, t.parent, "", project=t.project),
                     t.parent,
                     t.phase,
@@ -1171,7 +1171,7 @@ def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
     """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
-    accepted = approval.accepted_threads(
+    accepted = approval_marks.accepted_threads(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
     )
     notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
@@ -1388,7 +1388,7 @@ def revise_copy(
         return failed
     current.raw = revised_front(current, revised)
     with fsio.policy(restore=restore):
-        failed = approval._write(
+        failed = approval_marks._write(
             approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
         )
     if failed:

@@ -34,7 +34,7 @@ import yaml
 
 from ..infra import fsio, gitcmd, settings, tree, yamlread
 from ..policy import rules
-from . import approval, phasetypes, risk, syncstate
+from . import approval, approval_marks, phasetypes, risk, syncstate
 
 # 親ごとの上書きの記録の名前。`phases/<親>/config-sync.json`。
 MARK = "config-sync"
@@ -168,9 +168,9 @@ def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
     先に上書きの記録を置くのは、上書きのあとに着手が止まっても、上書きしたことが知らせに残るように
     するため。1 本でも書けなければ、書いた分と上書きの記録を元に戻す。
     """
-    path = approval.parent_mark_path(approved_dir, parent, MARK)
+    path = approval_marks.parent_mark_path(approved_dir, parent, MARK)
     previous = _read(path)
-    mark = approval.read_parent_mark(approved_dir, parent, MARK) or {}
+    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK) or {}
     entries = {str(f.get("path")): f for f in mark.get("files") or [] if isinstance(f, dict)}
     for c in copied:
         entries[c.rel] = {
@@ -183,7 +183,7 @@ def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
             "changed": c.changed,
             "unparsed": c.unparsed,
         }
-    failed = approval.write_parent_mark(
+    failed = approval_marks.write_parent_mark(
         approved_dir,
         parent,
         MARK,
@@ -258,7 +258,7 @@ def is_synced_write(
     if now is None or not _same(now, expected):
         return False
     home = approval.home_dir(conf, root, where.name, "")
-    mark = approval.read_parent_mark(home, where.name, MARK) or {}
+    mark = approval_marks.read_parent_mark(home, where.name, MARK) or {}
     entry = next(
         (
             f
@@ -287,7 +287,7 @@ def _approved_parent(conf: settings.Settings, root: str, where: tree.Tree) -> bo
 
 def pending(approved_dir: str, parent: str) -> dict | None:
     """まだ知らせていない上書きの記録。無いか知らせ済みなら None。"""
-    mark = approval.read_parent_mark(approved_dir, parent, MARK)
+    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK)
     if not mark or mark.get("notified") or not mark.get("files"):
         return None
     return mark
@@ -321,11 +321,11 @@ def notice(mark: dict) -> str:
 def mark_prepared(approved_dir: str, parent: str, phase_no: int) -> str:
     """依頼の本文に知らせを載せた、と上書きの記録に残す。
     `requested` はこれを見て知らせ済みにする。"""
-    mark = approval.read_parent_mark(approved_dir, parent, MARK)
+    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK)
     if not mark:
         return ""
     mark["prepared"] = phase_no
-    return approval.write_parent_mark(approved_dir, parent, MARK, mark)
+    return approval_marks.write_parent_mark(approved_dir, parent, MARK, mark)
 
 
 def prepared_for(approved_dir: str, parent: str, phase_no: int) -> bool:
@@ -336,11 +336,11 @@ def prepared_for(approved_dir: str, parent: str, phase_no: int) -> bool:
 
 def mark_notified(approved_dir: str, parent: str, where: str) -> str:
     """知らせたことを上書きの記録に残す。2 回目以降のレビューでは繰り返さない。"""
-    mark = approval.read_parent_mark(approved_dir, parent, MARK)
+    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK)
     if not mark:
         return ""
     mark["notified"] = where
-    return approval.write_parent_mark(approved_dir, parent, MARK, mark)
+    return approval_marks.write_parent_mark(approved_dir, parent, MARK, mark)
 
 
 def acknowledge(

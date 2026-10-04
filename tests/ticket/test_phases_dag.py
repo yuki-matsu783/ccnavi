@@ -16,7 +16,7 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets import approval, phasetypes, workflow
+from ccnavi.tickets import approval, approval_marks, phasetypes, workflow
 from ccnavi.tickets import ticket as ticket_mod
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -201,21 +201,21 @@ class AcceptedScopeTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, home, ignore_errors=True)
         owner = ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in PLAN])
         owner.workflow = workflow.compute(owner, types_of(DAG))
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-2"], 2), "")
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-all"]), "")
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 2), "")
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"]), "")
         # 2（acceptance）で受け入れたものは、並行した 3（implement）では数えない。
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-all"})
         # 2 と、2 を待つ 4（docs）では受け入れ済み。
-        self.assertEqual(approval.accepted_threads(home, "i0001", 2, owner), {"t-2", "t-all"})
-        self.assertEqual(approval.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 2, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
         # 番号を渡さなければ親全体。
-        self.assertEqual(approval.accepted_threads(home, "i0001"), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001"), {"t-2", "t-all"})
         # 並行した 3 で同じスレッドを受け入れ直せば、3 でも有効
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-2"], 3), "")
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 3), "")
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
         # 親全体で受け入れたものは、番号付きで受け入れ直しても狭まらない
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-all"], 2), "")
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"], 2), "")
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
 
 
 class NextHintTest(unittest.TestCase):
@@ -231,7 +231,7 @@ class NextHintTest(unittest.TestCase):
             ph = phase_mod.Phase("i0001", n, item=owner.plan[n - 1], owner=owner)
             if n in (1, 3):
                 ph.tickets, ph.states = [done], {"c": ticket_mod.DONE}
-                ph.marks = {approval.MARK_SKIPPED: {}}
+                ph.marks = {approval_marks.MARK_SKIPPED: {}}
             phases.append(ph)
         hint = phase_mod._next_hint(owner, phases, 3)
         self.assertIn("次に始められるのは 2", hint)

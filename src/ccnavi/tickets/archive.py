@@ -501,7 +501,8 @@ def _ready_row(row: dict) -> bool:
     kind = row.get("kind")
     if kind == history.KIND_ARCHIVED:
         return True
-    # "ready" は approval.PARENT_MARK_READY（approval はこのモジュールを読むので、表記で持つ）。
+    # "ready" は approval_marks.PARENT_MARK_READY（approval_marks はこのモジュールより上の段なので、
+    # 表記で持つ）。
     return kind == history.KIND_PARENT_MARK and row.get("mark") == "ready"
 
 

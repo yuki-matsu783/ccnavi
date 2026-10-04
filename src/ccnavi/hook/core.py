@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, modes, settings, tree
-from ..tickets import agree, approval, history, phase, review, workflow
+from ..tickets import agree, approval, approval_marks, history, phase, review, workflow
 from ..tickets import ticket as ticket_mod
 
 # ---- 入力 -----------------------------------------------------------------------------------
@@ -638,10 +638,10 @@ def confirm(
     ph = review._phase(root, conf, parent, phase_no)
     if ph is None:
         return Checked([f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"], None)
-    if approval.MARK_REVIEWED in ph.marks:
+    if approval_marks.MARK_REVIEWED in ph.marks:
         # 重ね打ちでマーカーと履歴を書き直さない（`_already_requested` と同じ文面の形）
         return Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if requested_mark is None:
         return Checked(["ccnavi: 依頼の記録が無い。先に request してください"], None)
     if changed_since_request:
@@ -713,13 +713,13 @@ def confirm_local(
     if found is None:
         return 1
     parent, ph = found
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     moved = ""
     result = None
     # 読む順は前と同じ。依頼の記録が無ければ差分も取得した結果も見ない。
     # 動いていれば取得した結果を読まない。レビュー済みなら差分も取得した結果も読まない
     # （コアが「レビュー済み」で止める。Chrome と同じ文面）
-    if requested_mark is not None and approval.MARK_REVIEWED not in ph.marks:
+    if requested_mark is not None and approval_marks.MARK_REVIEWED not in ph.marks:
         moved = review._moved_since_request(
             tree.worktree_path(root, parent.ticket), conf, requested_mark
         )
@@ -747,8 +747,8 @@ def reviewable(snapshot: Snapshot, parent_id: str) -> list[dict]:
         return []
     out = []
     for ph in phase.phases_of(snapshot.root, snapshot.conf, parent.ticket):
-        mark = ph.marks.get(approval.MARK_REQUESTED)
-        if mark is None or approval.MARK_REVIEWED in ph.marks:
+        mark = ph.marks.get(approval_marks.MARK_REQUESTED)
+        if mark is None or approval_marks.MARK_REVIEWED in ph.marks:
             continue
         try:
             mr = int(mark.get("mr") or 0)
@@ -769,7 +769,7 @@ def _requested_mark(snapshot: Snapshot, parent_id: str, phase_no: int) -> dict |
     """依頼のマーカー。親・フェーズ・依頼の記録のどれかが無ければ None。"""
     parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
     ph = review._phase(snapshot.root, snapshot.conf, parent, phase_no) if parent else None
-    return ph.marks.get(approval.MARK_REQUESTED) if ph is not None else None
+    return ph.marks.get(approval_marks.MARK_REQUESTED) if ph is not None else None
 
 
 def requested_head(snapshot: Snapshot, parent_id: str, phase_no: int) -> str | None:
@@ -976,17 +976,17 @@ def _withdraw_problems(
         if any(t.parent == ident and t.state == ticket_mod.TODO for t in proposals):
             found.append("todo/ に子の提案がある")
         marks_dir = os.path.join(
-            settings.approved_dir(conf, copy.tree_root), approval.PHASES_DIR, ident
+            settings.approved_dir(conf, copy.tree_root), approval_marks.PHASES_DIR, ident
         )
         try:
             # 待ち方のファイルはマーカーではない（承認で置く）。中身は `_content_problems` が見る。
-            if [n for n in fsio.listdir(marks_dir) if n != approval.WORKFLOW_FILE]:
-                found.append(f"{approval.PHASES_DIR}/{ident}/ にマーカーがある")
+            if [n for n in fsio.listdir(marks_dir) if n != approval_marks.WORKFLOW_FILE]:
+                found.append(f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある")
         except FileNotFoundError:
             pass
         except OSError as exc:
             # 読めないなら、無いとは言えない（取り下げを緩めない）。
-            found.append(f"{approval.PHASES_DIR}/{ident}/ を読めない ({exc})")
+            found.append(f"{approval_marks.PHASES_DIR}/{ident}/ を読めない ({exc})")
     todo = os.path.join(
         copy.tree_root, conf.tickets.replace("/", os.sep), ticket_mod.TODO, ident + ".md"
     )
@@ -1028,7 +1028,9 @@ def _content_problems(
     path = approval.workflow_path(where, copy.ticket)
     held = fsio.read_bytes(path)
     if held is None and fsio.lexists(path):
-        return [f"{approval.PHASES_DIR}/{copy.ticket}/{approval.WORKFLOW_FILE} を読めない"]
+        return [
+            f"{approval_marks.PHASES_DIR}/{copy.ticket}/{approval_marks.WORKFLOW_FILE} を読めない"
+        ]
     if held is None:
         # 手で動かした承認（計画を持つ親でも待ち方のファイルを書かない）か、計画の無い親。
         # 改版は必ず待ち方のファイルを書くので、無ければ待ち方の改版は起きていない。

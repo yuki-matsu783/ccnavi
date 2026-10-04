@@ -34,7 +34,7 @@ from typing import TextIO
 
 from ..infra import gitcmd, settings, shellread, tree
 from ..policy import rules, selfguard
-from . import approval, phasetypes, risk, workflow
+from . import approval, approval_marks, phasetypes, risk, workflow
 from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -607,7 +607,9 @@ class Phase:
         `review_label` が出す「レビュー準備中」「レビュー待ち」で、この表記は
         判定とボードの間の契約としてだけ残っている（設計 9.8）。
         """
-        return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
+        return (
+            self.ended and self.review_required and approval_marks.MARK_REVIEWED not in self.marks
+        )
 
     @property
     def review_waiting(self) -> bool:
@@ -624,7 +626,7 @@ class Phase:
         ホストから取得する結果があるので、`mr` と同じに True でよい。
         このセッションで見る待ちは `review_kind` と `gate_closed` で読む（設計 9.8）。
         """
-        return self.gate_closed and approval.MARK_REQUESTED in self.marks
+        return self.gate_closed and approval_marks.MARK_REQUESTED in self.marks
 
     @property
     def review_label(self) -> str:
@@ -767,10 +769,10 @@ def phases_of(
     # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに分かれて置かれる。
     where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
-        phase.marks = approval.marks(where, parent_id, phase.number)
+        phase.marks = approval_marks.marks(where, parent_id, phase.number)
         for t in phase.tickets:
-            record = approval.read_child_record(
-                where, parent_id, t.ticket, approval.CHILD_RECORD_RISK
+            record = approval_marks.read_child_record(
+                where, parent_id, t.ticket, approval_marks.CHILD_RECORD_RISK
             )
             if record:
                 phase.risks[t.ticket] = record
@@ -916,8 +918,8 @@ def announce(
         n = phase.number
         if phase.deferred:
             at = phase.review_at
-            failed = approval.write_mark(
-                where, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
+            failed = approval_marks.write_mark(
+                where, parent.ticket, n, approval_marks.MARK_SKIPPED, {"deferred_to": at}
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
@@ -927,11 +929,11 @@ def announce(
                 + _next_hint(parent, phases, n)
             )
         elif phase.review_required:
-            failed = approval.write_mark(
+            failed = approval_marks.write_mark(
                 where,
                 parent.ticket,
                 n,
-                approval.MARK_PENDING,
+                approval_marks.MARK_PENDING,
                 {"review": phase.review_kind, **_type_source(phase)},
             )
             if failed:
@@ -987,11 +989,11 @@ def announce(
                     f"{hold_note}"
                 )
         else:
-            failed = approval.write_mark(
+            failed = approval_marks.write_mark(
                 where,
                 parent.ticket,
                 n,
-                approval.MARK_SKIPPED,
+                approval_marks.MARK_SKIPPED,
                 {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase)},
             )
             if failed:
@@ -1064,7 +1066,7 @@ def reviewed_or_skipped(phase: Phase) -> bool:
         return True
     if not phase.review_required:
         return True
-    return approval.MARK_REVIEWED in phase.marks
+    return approval_marks.MARK_REVIEWED in phase.marks
 
 
 def order_problems(
@@ -1163,7 +1165,11 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_mod.Ticket)
         if not phase.ended:
             return False
         if phase.number == last:
-            asked = {approval.MARK_REQUESTED, approval.MARK_REVIEWED, approval.MARK_SKIPPED}
+            asked = {
+                approval_marks.MARK_REQUESTED,
+                approval_marks.MARK_REVIEWED,
+                approval_marks.MARK_SKIPPED,
+            }
             return reviewed_or_skipped(phase) or bool(asked & set(phase.marks))
         if not reviewed_or_skipped(phase):
             return False
@@ -1198,13 +1204,16 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
     if not parent.has_plan:
         return ""
     last = len(parent.plan)
-    if approval.read_mark(approved_dir, parent.ticket, last, approval.MARK_REVIEWED) is not None:
+    if (
+        approval_marks.read_mark(approved_dir, parent.ticket, last, approval_marks.MARK_REVIEWED)
+        is not None
+    ):
         return ""
-    return approval.write_mark(
+    return approval_marks.write_mark(
         approved_dir,
         parent.ticket,
         last,
-        approval.MARK_REVIEWED,
+        approval_marks.MARK_REVIEWED,
         {"by": "feedback-plan", "at": stamp, "accepted": []},
     )
 
@@ -1230,10 +1239,10 @@ def stage(
         for p in held_all:
             groups.setdefault(p.review_label, []).append(p.label)
         return "、".join(f"{label}（{'、'.join(names)}）" for label, names in groups.items())
-    if approval.read_parent_mark(
+    if approval_marks.read_parent_mark(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
-        approval.PARENT_MARK_CLOSE_EARLY,
+        approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):
         # ユーザが早めに閉じた。残りは別の issue に書き出してあるので、閉じられる。
         return "閉じられる（ユーザが早めに閉じた）"

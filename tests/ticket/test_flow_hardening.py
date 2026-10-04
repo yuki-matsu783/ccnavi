@@ -25,7 +25,7 @@ import unittest
 import yaml
 
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, flow
+from ccnavi.tickets import approval_marks, flow
 from tests.ticket.test_flow import (
     CHILD,
     WORKFLOW,
@@ -275,13 +275,13 @@ class FlowDigestTest(FlowHarness):
 
     def test_start_records_the_digest_of_the_flow(self):
         self.run_child(CHILD)
-        # 置き場は子の記録（`approval.child_record_path`）と同じ形。
+        # 置き場は子の記録（`approval_marks.child_record_path`）と同じ形。
         conf = conf_with(".ccnavi/approved")
         running = child_ticket(started=True)
         running.tree_root = self.parent_tree
         self.assertEqual(
             flow.digest_record_path(conf, self.root, running),
-            approval.child_record_path(self.approved, "i0001", CHILD, flow.DIGEST_RECORD),
+            approval_marks.child_record_path(self.approved, "i0001", CHILD, flow.DIGEST_RECORD),
         )
         record = self.record()
         self.assertTrue(record["fingerprint"].startswith("sha256:"), record)

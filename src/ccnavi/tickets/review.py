@@ -46,7 +46,18 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, archive, configsync, history, ops, phase, phasetypes, review_host, syncstate
+from . import (
+    approval,
+    approval_marks,
+    archive,
+    configsync,
+    history,
+    ops,
+    phase,
+    phasetypes,
+    review_host,
+    syncstate,
+)
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 15.0
@@ -213,7 +224,7 @@ def requested(
     if already:
         stderr.write(f"ccnavi: {already}\n")
         return 1
-    again = approval.MARK_REQUESTED in ph.marks
+    again = approval_marks.MARK_REQUESTED in ph.marks
     result = _result_with_mr(stderr, result_path)
     if result is None:
         return 1
@@ -236,7 +247,7 @@ def requested(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         phase_no,
-        approval.MARK_REQUESTED,
+        approval_marks.MARK_REQUESTED,
         {
             "head": head.strip(),
             "mr": result.mr.number,
@@ -272,7 +283,7 @@ def reviewed_mark(
     `actor` は付けたユーザ（アカウント）が分かるときだけ、`via` は経路が分かるときだけ書く
     （Chrome は `via: chrome`。手元の `confirm` は `--actor` があるときだけ `actor` と `via: cli` を
     渡し、無ければマーカーは前と同じバイト列）。`stamp` が空なら `at` を
-    書かず、`approval.write_mark` が今の時刻を入れる。
+    書かず、`approval_marks.write_mark` が今の時刻を入れる。
     """
     mark: dict = {"mr": mr, "accepted": list(accepted)}
     if account:
@@ -325,7 +336,7 @@ def review_problems(
         ]
     unresolved = review_host._unresolved(
         result.threads,
-        approval.accepted_threads(
+        approval_marks.accepted_threads(
             approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
             parent.ticket,
             phase_no,
@@ -385,8 +396,8 @@ def settle_and_mark(
             )
         home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
         with fsio.policy(prefix="マーカーを置けない: "):
-            failed = approval.write_mark(
-                home, parent.ticket, ph.number, approval.MARK_REVIEWED, mark
+            failed = approval_marks.write_mark(
+                home, parent.ticket, ph.number, approval_marks.MARK_REVIEWED, mark
             )
         if failed:
             return "", f"マーカーを置けない: {failed}"
@@ -525,7 +536,7 @@ def _decision(
     if found is None:
         return None
     parent, ph = found
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if requested_mark is None:
         stderr.write("ccnavi: 依頼の記録が無い。先に request してください\n")
         return None
@@ -548,7 +559,7 @@ def _decision(
         return None
     unresolved = review_host._unresolved(
         result.threads,
-        approval.accepted_threads(
+        approval_marks.accepted_threads(
             approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
             parent.ticket,
             phase_no,
@@ -848,7 +859,7 @@ def apply_decision(
     # 受け入れはマーカーより先に記録へ。マーカーは上書きも一括の消去もされるので、
     # ユーザが 1 度言った「これは承知で進める」はそちらに置かない。
     if accepted:
-        failed = approval.remember_accepted(home, parent.ticket, accepted, ph.number)
+        failed = approval_marks.remember_accepted(home, parent.ticket, accepted, ph.number)
         if failed:
             stderr.write(f"ccnavi: 受け入れを記録できない: {failed}\n")
             return None
@@ -866,7 +877,7 @@ def apply_decision(
         home,
         parent.ticket,
         ph.number,
-        approval.MARK_REVIEWED,
+        approval_marks.MARK_REVIEWED,
         reviewed_mark(d.result.mr.number, accepted, *_decide_actor()),
     ):
         return None
@@ -1041,7 +1052,7 @@ def _reviewed_in_chat(
             "子を全部閉じてから\n"
         )
         return 1
-    if approval.MARK_REQUESTED in ph.marks:
+    if approval_marks.MARK_REQUESTED in ph.marks:
         # 依頼を出したあとに --chat で通すと、マージリクエストに付いた指摘を数えずに
         # 止めていた判定を外せてしまう。数える手段（confirm）と、数えたうえで受け入れる手段
         # （decide）がある。
@@ -1051,7 +1062,7 @@ def _reviewed_in_chat(
             f"'{review_sh} decide {ph.number}'）から\n"
         )
         return 1
-    if approval.MARK_REVIEWED in ph.marks:
+    if approval_marks.MARK_REVIEWED in ph.marks:
         stdout.write(f"OK: フェーズ {ph.number} はすでにレビュー済み\n")
         return 0
     synced = configsync.pending(
@@ -1090,7 +1101,7 @@ def _reviewed_in_chat(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         ph.number,
-        approval.MARK_REVIEWED,
+        approval_marks.MARK_REVIEWED,
         data,
     ):
         return 1
@@ -1180,7 +1191,9 @@ def ready(
     if misplaced:
         stderr.write(f"ccnavi: {misplaced}\n")
         return 1
-    wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
+    wrapped = approval_marks.read_parent_mark(
+        where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
+    )
     path, failed = _ready_note(conf, parent.ticket, wrapped)
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
@@ -1189,7 +1202,7 @@ def ready(
         stderr,
         where,
         parent.ticket,
-        approval.PARENT_MARK_READY,
+        approval_marks.PARENT_MARK_READY,
         {"mr": result.mr.number, "url": result.mr.url},
     ):
         return 1
@@ -1296,7 +1309,7 @@ def _archived_parent(
     if result is None or result.mr is None:
         return None
     marks = [
-        approval.read_parent_mark(where, t.name, approval.PARENT_MARK_READY)
+        approval_marks.read_parent_mark(where, t.name, approval_marks.PARENT_MARK_READY)
         for where in (approved, archive.base_dir(root, t.project))
     ]
     if not any(isinstance(m, dict) and m.get("mr") == result.mr.number for m in marks):
@@ -1334,10 +1347,12 @@ def _ready_again(
         return 1
     # 早めに閉じたマーカーは、途中で止まった回ならツリーに、移し終えていれば退避に在る
     where = settings.approved_dir(conf, tree.worktree_path(root, parent.ticket))
-    wrapped = approval.read_parent_mark(
-        where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
-    ) or approval.read_parent_mark(
-        archive.base_dir(root, parent.project), parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
+    wrapped = approval_marks.read_parent_mark(
+        where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
+    ) or approval_marks.read_parent_mark(
+        archive.base_dir(root, parent.project),
+        parent.ticket,
+        approval_marks.PARENT_MARK_CLOSE_EARLY,
     )
     path, failed = _ready_note(conf, parent.ticket, wrapped)
     if failed:
@@ -1424,7 +1439,7 @@ def close_early(
         if failed:
             stderr.write(f"ccnavi: 設定の上書きを見たと残せない: {failed}\n")
             return 1
-    stamp = approval.now()
+    stamp = approval_marks.now()
     settled = _settle(
         stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason
     )
@@ -1432,7 +1447,7 @@ def close_early(
         return 1
     cancelled, skipped, reviewed_now = settled
     accepted = [thread_key(t) for t in left.unresolved]
-    failed = approval.remember_accepted(
+    failed = approval_marks.remember_accepted(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         accepted,
@@ -1444,7 +1459,7 @@ def close_early(
         stderr,
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
-        approval.PARENT_MARK_CLOSE_EARLY,
+        approval_marks.PARENT_MARK_CLOSE_EARLY,
         {
             "reason": reason.strip(),
             "at": stamp,
@@ -1517,7 +1532,7 @@ def _leftovers(
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
         unresolved=review_host._unresolved(
-            result.threads, approval.accepted_threads(approved_dir, parent.ticket)
+            result.threads, approval_marks.accepted_threads(approved_dir, parent.ticket)
         ),
     )
 
@@ -1568,14 +1583,14 @@ def _settle(
     pending = {ph.number for ph in left.not_ended}
     for ph in phases:
         if ph.number in pending:
-            if approval.MARK_SKIPPED in ph.marks:
+            if approval_marks.MARK_SKIPPED in ph.marks:
                 continue
             if not _mark(
                 stderr,
                 approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
                 parent.ticket,
                 ph.number,
-                approval.MARK_SKIPPED,
+                approval_marks.MARK_SKIPPED,
                 {"by": "close-early", "at": stamp},
             ):
                 return None
@@ -1588,7 +1603,7 @@ def _settle(
                 approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
                 parent.ticket,
                 ph.number,
-                approval.MARK_REVIEWED,
+                approval_marks.MARK_REVIEWED,
                 {"by": "close-early", "at": stamp, "mr": mr_number, "accepted": []},
             ):
                 return None
@@ -1918,7 +1933,7 @@ def _mark(
     stderr: TextIO, approved_dir: str, parent: str, number: int, kind: str, data: dict
 ) -> bool:
     """フェーズのマーカーを置く。置けなければ言って False。"""
-    failed = approval.write_mark(approved_dir, parent, number, kind, data)
+    failed = approval_marks.write_mark(approved_dir, parent, number, kind, data)
     if failed:
         stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
         return False
@@ -1927,7 +1942,7 @@ def _mark(
 
 def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data: dict) -> bool:
     """親のマーカーを置く。置けなければ言って False。"""
-    failed = approval.write_parent_mark(approved_dir, parent, name, data)
+    failed = approval_marks.write_parent_mark(approved_dir, parent, name, data)
     if failed:
         stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
         return False
@@ -2008,7 +2023,7 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> review_host.Re
 def _poster(parent: ticket_mod.Ticket, phase_no: int, root: str, conf: settings.Settings) -> str:
     """そのフェーズの依頼を投稿したアカウント（依頼の記録の `poster`）。無ければ空。"""
     ph = _phase(root, conf, parent, phase_no)
-    mark = ph.marks.get(approval.MARK_REQUESTED) if ph is not None else None
+    mark = ph.marks.get(approval_marks.MARK_REQUESTED) if ph is not None else None
     return str((mark or {}).get("poster") or "")
 
 
@@ -2098,9 +2113,9 @@ def _already_requested(
     レビュー済みを置くので、依頼の記録が無いことを先に見ると、ユーザが早めに閉じたときのフェーズに
     依頼が投稿される。
     """
-    if approval.MARK_REVIEWED in ph.marks:
+    if approval_marks.MARK_REVIEWED in ph.marks:
         return f"フェーズ {phase_no} はレビュー済み"
-    mark = ph.marks.get(approval.MARK_REQUESTED)
+    mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if mark is None:
         return ""
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])

@@ -35,6 +35,7 @@ from ..records import audit
 from ..tickets import (
     agree,
     approval,
+    approval_marks,
     approval_times,
     archive,
     flow,
@@ -665,10 +666,12 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         if where:
             stdout.write(f"  {parent.ticket} の局面: {where}\n")
         where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
-        wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
+        wrapped = approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
+        )
         if wrapped:
             stdout.write(f"  {parent.ticket} はユーザが早めに閉じた: {wrapped.get('reason', '')}\n")
-        if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
+        if approval_marks.read_parent_mark(where, parent.ticket, approval_marks.PARENT_MARK_READY):
             stdout.write(
                 f"  {parent.ticket} のマージリクエストの Draft を外した。マージはユーザが行う\n"
             )
@@ -722,7 +725,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     payload: dict = {
         "version": BOARD_VERSION,
         "root": root,
-        "generated_at": approval.now(),
+        "generated_at": approval_marks.now(),
         "settings": {
             "ticket_control": conf.ticket_control or settings.TICKET_CONTROL_ENABLE,
             "tickets": conf.tickets,
@@ -1080,11 +1083,11 @@ def _ticket_record(
     if unreadable:
         problems.append(f"{ticket_id} の履歴: {unreadable}")
     if source.parent:
-        record["risk"] = approval.read_child_record(
-            where, source.parent, ticket_id, approval.CHILD_RECORD_RISK
+        record["risk"] = approval_marks.read_child_record(
+            where, source.parent, ticket_id, approval_marks.CHILD_RECORD_RISK
         )
-        record["judge"] = approval.read_child_record(
-            where, source.parent, ticket_id, approval.CHILD_RECORD_JUDGE
+        record["judge"] = approval_marks.read_child_record(
+            where, source.parent, ticket_id, approval_marks.CHILD_RECORD_JUDGE
         )
     return record
 
@@ -1138,13 +1141,15 @@ def _parent_record(
         "feedback": (
             [item.as_raw() for item in parent.feedback] if parent.feedback is not None else None
         ),
-        "close_early": approval.read_parent_mark(
-            where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
+        "close_early": approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
         ),
-        "ready": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY),
-        "closed_record": approval.read_parent_mark(
-            where, parent.ticket, approval.PARENT_MARK_CLOSED
+        "ready": approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_READY
         ),
-        "accepted_threads": sorted(approval.accepted_threads(where, parent.ticket)),
+        "closed_record": approval_marks.read_parent_mark(
+            where, parent.ticket, approval_marks.PARENT_MARK_CLOSED
+        ),
+        "accepted_threads": sorted(approval_marks.accepted_threads(where, parent.ticket)),
         "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket, raw=raw)],
     }
