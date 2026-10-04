@@ -128,5 +128,32 @@ class LintEveryTest(unittest.TestCase):
         self.assertEqual(self.said(done.stdout, "only-file"), [], done.stdout)
 
 
+class LintScriptPathTest(unittest.TestCase):
+    setUp = LintEveryTest.setUp
+    lint = LintEveryTest.lint
+    said = LintEveryTest.said
+    """message の `.ccnavi/scripts/` に `{root}` が付いていなければ warn（issue #211）。"""
+
+    def deny(self, name: str, message: str) -> dict:
+        return {"id": name, "match": "Bash", "glob": "*git push*", "message": message}
+
+    def test_bare_scripts_path_in_message_is_a_warning(self):
+        body = {
+            "version": 1,
+            "deny": [
+                self.deny("bare", "'sh .ccnavi/scripts/ccnavi-git.sh ...' を使ってください"),
+                self.deny("rooted", "'sh {root}/.ccnavi/scripts/ccnavi-git.sh ...' を使う"),
+                self.deny("plain", "push はユーザが行う"),
+            ],
+        }
+        path = write(os.path.join(self.root, "rules.yml"), json.dumps(body))
+        done = self.lint(path)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        said = self.said(done.stdout, "bare")
+        self.assertTrue(any(s.startswith("warn:") and "{root}" in s for s in said), done.stdout)
+        self.assertEqual(self.said(done.stdout, "rooted"), [], done.stdout)
+        self.assertEqual(self.said(done.stdout, "plain"), [], done.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

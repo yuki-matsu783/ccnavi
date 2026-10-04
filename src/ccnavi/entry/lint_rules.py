@@ -8,11 +8,15 @@
 from __future__ import annotations
 
 import os
+import re
 
 from ..hook import judge
 from ..infra import hookio
 from ..policy import ctxfile, rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+
+# `{root}/` が前に付いていない `.ccnavi/scripts/`（文面の sh は `{root}/` から書く）。
+_BARE_SCRIPTS = re.compile(r"(?<!\{root\}/)\.ccnavi/scripts/")
 
 
 def _rules(
@@ -114,6 +118,19 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                 name,
                 f"{rule.decision} に message がある。{where}ので、モデルに渡す文は "
                 "additionalContext に書き、message は消してください",
+            )
+        )
+
+    # 文面の sh は `{root}` から書く。相対の `.ccnavi/scripts/...` は、cwd がプロジェクトの中
+    # だと見つからない（docs/claude/projects.md「ルールの文面にshを書くとき」）。
+    # 判定は変わらず、案内を受けたモデルの実行が失敗するだけなので warn。
+    if _BARE_SCRIPTS.search(rule.message):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                "message の `.ccnavi/scripts/` に `{root}` が付いていない。cwd がプロジェクトの"
+                "中だと相対パスの sh が見つからない。`{root}/.ccnavi/scripts/...` と書いてください",
             )
         )
 
