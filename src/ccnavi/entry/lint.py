@@ -518,9 +518,7 @@ def _copy_problems(
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する。
 
-    承認で本物とするのは置き場で、チケットの中の欄ではない。
-
-    承認は置き場で決まり、`ccnavi_approved` の欄では決まらない。
+    承認は置き場で決まり、チケットの中の欄（`ccnavi_approved` など）では決まらない。
 
     置き場を動かして承認する進め方では `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
@@ -573,7 +571,8 @@ def _copy_problems(
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
         off = ops.base_off_head(root, conf, t) if t.started_at else ""
         if off:
-            # 判定には入れない（判定は git を読まない）。`start` は着手の前に同じ形で止める。
+            # 判定には入れない（判定は git を読まない）。`start` も止めない（通れば基準点を
+            # HEAD で書き直すので、止めても防げる形が無い）。ここと status が warn で知らせる。
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {off}"))
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
