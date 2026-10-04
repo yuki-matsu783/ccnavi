@@ -8,8 +8,9 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
 
 見るのは次のとおり。
 
-1. 親チケット（か提案）が名乗るまでは、識別子と違う名前のブランチをワークツリーに出せない。
-   名乗れば出せる（既にあるブランチを出す形も、`-b` で切る形も）
+1. 承認前の提案の `branch:` は使わない（識別子のブランチで作業する）。承認を受けたら、親の
+   ワークツリーで承認済みの `branch:` のブランチへ移る（`ccnavi-git.sh switch <B>`）。既にあれば
+   識別子のブランチを merge して承認済みチケットとマーカーを運び、無ければ切る
 2. 承認画面（`--agree --preview --json`）が「既存のブランチ <名前> を使う」と言い、
    既にあるブランチとぶつかる warn は出さない
 3. 最初の push が家族の控えを識別子の鍵で作り、中の `branch` に親のブランチ名を書く
@@ -18,7 +19,10 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
 5. 親のワークツリーでは親のブランチ（`branch:` の値）のほかへ移れない（識別子の名前のブランチへも）
 6. 子のワークツリーからは送れない（子のブランチは子の識別子）
 7. 同じ家族を名乗るブランチが 2 本あれば、権威が決まらないとして止める
-8. 消えた（控えが gone の）親のブランチへは送れない
+8. 消えた（控えが gone の）親のブランチへは送れない。同じブランチを名乗る控えが 2 つでも送れない
+9. 承認前の `branch:`・使えない `branch:`（手で書いた写しの `origin/main` など、統合先）は、
+   worktree add・checkout・sync・c1 family・push のどれも使わない
+10. 承認前に識別子のブランチを送った家族も、移って送れば控えの `branch` が書き直る
 """
 
 from __future__ import annotations
@@ -199,32 +203,34 @@ class BranchFieldTest(unittest.TestCase):
     def head_branch(self, tree):
         return git(tree, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
 
-    def propose_in_root(self):
-        """ワークツリーを作る前の、ワークスペースルートの提案（`branch:` 付き）。"""
-        return write(
-            os.path.join(self.ws, TODO, PARENT + ".md"),
-            with_branch(parent_text(PARENT, ["design"], allow=("src/*", "wip/*")), BRANCH),
-        )
-
     def add_parent_tree(self):
-        self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
-        self.propose_in_root()
-        self.ok(self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", BRANCH))
-        self.assertEqual(self.head_branch(self.tree), BRANCH)
+        """識別子のブランチで親のワークツリーを切り（承認前は識別子のブランチで作業する）、
+        `branch:` 付きの提案と子の提案を書いてコミットする。"""
+        self.ok(
+            self.sh(
+                "ccnavi-git.sh",
+                "worktree",
+                "add",
+                f".claude/worktrees/{PARENT}",
+                "-b",
+                PARENT,
+                "main",
+            )
+        )
+        self.propose(BRANCH)
 
-    def move_proposals(self):
-        """提案を親のワークツリーへ運び（親のブランチの上で書く。ADR-0093 の 3.2）、子も足す。"""
-        os.remove(os.path.join(self.ws, TODO, PARENT + ".md"))
+    def propose(self, branch, tree=None):
+        tree = tree or self.tree
         write(
-            os.path.join(self.tree, TODO, PARENT + ".md"),
-            with_branch(parent_text(PARENT, ["design"], allow=("src/*", "wip/*")), BRANCH),
+            os.path.join(tree, TODO, PARENT + ".md"),
+            with_branch(parent_text(PARENT, ["design"], allow=("src/*", "wip/*")), branch),
         )
         write(
-            os.path.join(self.tree, TODO, CHILD + ".md"),
+            os.path.join(tree, TODO, CHILD + ".md"),
             child_text(CHILD, PARENT, 1, ("wip/design/*",), False),
         )
-        git(self.tree, "add", "-A")
-        git(self.tree, "commit", "-q", "-m", "propose")
+        git(tree, "add", "-A")
+        git(tree, "commit", "-q", "-m", "propose")
 
     def approve(self):
         preview = self.ok(self.exe("--agree", "--preview", "--json"))
@@ -237,29 +243,46 @@ class BranchFieldTest(unittest.TestCase):
         git(self.tree, "commit", "-q", "-m", "approve")
         return body
 
+    def carry(self, branch=BRANCH):
+        """承認済みの branch: のブランチへ移る（承認済みチケットとマーカーを運ぶ）。"""
+        moved = self.ok(self.sh("ccnavi-git.sh", "switch", branch, cwd=self.tree))
+        self.assertEqual(self.head_branch(self.tree), branch)
+        return moved
+
     def imported_family(self):
-        """承認して送り、取り込み済みにした家族。"""
+        """承認して branch: のブランチへ移り、送って取り込み済みにした家族。"""
+        self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
         self.add_parent_tree()
-        self.move_proposals()
         self.approve()
+        self.carry()
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
         self.ok(self.sh("ccnavi-sync.sh", PARENT))
+
+    def write_approved_copy(self, branch):
+        """手で書いた承認済みの親の写し（承認では作れない名前の `branch:` を試すため）。"""
+        text = with_branch(parent_text(PARENT, ["design"], allow=("src/*",)), branch)
+        text = text.replace(
+            "---\n\n本文", "ccnavi_approved:\n  approved_at: 2026-10-01T00:00:00+0900\n---\n\n本文"
+        )
+        write(os.path.join(self.tree, APPROVED, "doing", PARENT + ".md"), text)
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "copy")
 
     # ---- 主な経路
 
     def test_the_main_path_on_an_existing_branch_with_a_slash(self):
-        # 1. 名乗る親チケットが無ければ、識別子と違う名前のブランチは出せない
         self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
+        self.add_parent_tree()
+
+        # 1. 承認前の提案の branch: は使わない（親のブランチは識別子）
+        family = self.ok(self.exe("c1", "family", PARENT))
+        self.assertIn(f"branch {PARENT}\n", family.stdout)
+        moved = self.refused(self.sh("ccnavi-git.sh", "switch", BRANCH, cwd=self.tree))
+        self.assertIn(f"親のブランチは {PARENT}", moved.stderr)
         refused = self.refused(
-            self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", BRANCH)
+            self.sh("ccnavi-git.sh", "worktree", "add", ".claude/worktrees/other", BRANCH)
         )
-        self.assertIn(f"branch: {BRANCH}", refused.stderr)
-        self.assertFalse(os.path.exists(self.tree))
-        # 提案（ワークスペースルート）が branch: で名乗れば出せる
-        self.propose_in_root()
-        self.ok(self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", BRANCH))
-        self.assertEqual(self.head_branch(self.tree), BRANCH)
-        self.move_proposals()
+        self.assertIn("承認を受けてから", refused.stderr)
 
         # 2. 承認画面は既にあるブランチを使うと言い、ぶつかりの warn は出さない
         verify = self.exe("--agree", "--preview", "--verify", "--json")
@@ -273,18 +296,25 @@ class BranchFieldTest(unittest.TestCase):
         self.assertEqual(child["branch"], CHILD)
         self.approve()
 
-        # 3. 最初の push が家族の控えを識別子の鍵で作る
+        # 3. 承認済みの branch: のブランチへ移る。承認済みチケットが移った先に乗り、既存の作業も残る
+        family = self.ok(self.exe("c1", "family", PARENT))
+        self.assertIn(f"branch {BRANCH}\n", family.stdout)
+        moved = self.carry()
+        self.assertIn("承認済みチケットとマーカーを運んだ", moved.stdout)
+        self.assertTrue(os.path.isfile(os.path.join(self.tree, APPROVED, "doing", PARENT + ".md")))
+        self.assertTrue(os.path.isfile(os.path.join(self.tree, "src", "login.py")))
+        self.assertEqual(git(self.tree, "status", "--porcelain").stdout, "")
+
+        # 4. 最初の push が家族の控えを識別子の鍵で作り、中の branch に親のブランチ名を書く
         pushed = self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
         self.assertIn("家族の控えを作った", pushed.stdout)
         record = fields(self.record)
         self.assertEqual((record["branch"], record["state"]), (BRANCH, "present"))
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-        self.assertEqual(self.remote_sha(PARENT), "")
         family = self.ok(self.exe("c1", "family", PARENT))
-        self.assertIn(f"branch {BRANCH}\n", family.stdout)
         self.assertIn("target yes\n", family.stdout)
 
-        # 4. 取り込みと着手（C1 は親のブランチ名へ送る）
+        # 5. 取り込みと着手（C1 は親のブランチ名へ送る）
         synced = self.ok(self.sh("ccnavi-sync.sh", PARENT))
         self.assertIn("リモートと同じ", synced.stdout)
         started = self.ok(self.sh("ccnavi-ticket.sh", "start", PARENT))
@@ -293,14 +323,14 @@ class BranchFieldTest(unittest.TestCase):
         self.assertEqual(fields(self.record)["sha"], self.sha(self.tree, "HEAD"))
         self.assertEqual(self.remote_sha(PARENT), "")
 
-        # 5. 親のワークツリーでは親のブランチのほかへ移れない（識別子の名前のブランチへも）
-        for args in (("switch", "--create", "other"), ("checkout", "-b", PARENT)):
+        # 6. 親のワークツリーでは親のブランチのほかへ移れない（識別子のブランチへも戻れない）
+        for args in (("switch", "--create", "other"), ("switch", PARENT)):
             with self.subTest(args=args):
                 moved = self.refused(self.sh("ccnavi-git.sh", *args, cwd=self.tree))
                 self.assertIn(f"親のブランチは {BRANCH}", moved.stderr)
         self.assertEqual(self.head_branch(self.tree), BRANCH)
 
-        # 6. 子は子の識別子のブランチで、親のブランチから切る。子からは送らない
+        # 7. 子は子の識別子のブランチで、親のブランチから切る。子からは送らない
         self.ok(
             self.sh(
                 "ccnavi-git.sh",
@@ -314,7 +344,6 @@ class BranchFieldTest(unittest.TestCase):
         )
         child_tree = os.path.join(self.ws, ".claude", "worktrees", CHILD)
         self.ok(self.sh("ccnavi-ticket.sh", "start", CHILD))
-        git(child_tree, "merge", "-q", "--ff-only", BRANCH)
         write(os.path.join(child_tree, "wip", "design", "plan.md"), "# 設計\n")
         git(child_tree, "add", "-A")
         git(child_tree, "commit", "-q", "-m", "design")
@@ -326,7 +355,7 @@ class BranchFieldTest(unittest.TestCase):
         )
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-        # 4（続き）. 他の機械の push を取り込む（ccnavi-sync.sh とセッションの頭の早送り）
+        # 8. 他の機械の push を取り込む（ccnavi-sync.sh とセッションの頭の早送り）
         self.remote_commit("wip/note-1.md", "1\n")
         synced = self.ok(self.sh("ccnavi-sync.sh", PARENT))
         self.assertIn("早送りで取り込んだ", synced.stdout)
@@ -338,47 +367,144 @@ class BranchFieldTest(unittest.TestCase):
         )
         self.assertEqual(self.sha(self.tree, "HEAD"), remote)
 
-        # lint は親のワークツリーが親のブランチの上に居ると読む
         lint = self.exe("--lint")
         self.assertNotIn("の上に居る", lint.stdout + lint.stderr)
 
-    def test_a_new_branch_named_by_the_field_can_be_cut(self):
-        name, branch = "feature-124-x", "hotfix/45"
-        write(
-            os.path.join(self.ws, TODO, name + ".md"),
-            with_branch(parent_text(name, ["design"], allow=("src/*",)), branch),
+    def test_a_family_pushed_before_approval_moves_its_record(self):
+        """承認前に識別子のブランチを送った（控えが識別子）家族も、移って送れば控えが書き直る。"""
+        self.add_parent_tree()
+        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", PARENT, cwd=self.tree))
+        self.assertEqual(fields(self.record)["branch"], PARENT)
+        self.ok(self.sh("ccnavi-sync.sh", PARENT))
+        self.approve()
+        self.ok(self.sh("ccnavi-git.sh", "push", "origin", PARENT, cwd=self.tree))
+        self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
+        self.carry()
+        # 移った後、送るまでは家族を止める（控えは識別子のブランチのまま）
+        family = self.ok(self.exe("c1", "family", PARENT))
+        self.assertIn("target stop\n", family.stdout)
+        self.assertIn("まだ送っていない", family.stdout)
+        synced = self.sh("ccnavi-sync.sh", PARENT)
+        self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
+        self.assertIn("まだ送っていない", synced.stdout)
+        pushed = self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
+        self.assertIn(f"{PARENT} から {BRANCH} に書き直した", pushed.stdout)
+        self.assertEqual(fields(self.record)["branch"], BRANCH)
+        self.ok(self.sh("ccnavi-sync.sh", PARENT))
+        self.ok(self.sh("ccnavi-ticket.sh", "start", PARENT))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_a_new_branch_named_by_the_approved_field_is_cut(self):
+        self.add_parent_tree()
+        # 承認前は、まだ無い名前でも使わない
+        git(self.tree, "rm", "-q", f"{TODO}/{PARENT}.md", f"{TODO}/{CHILD}.md")
+        git(self.tree, "commit", "-q", "-m", "drop")
+        self.propose("hotfix/45")
+        self.refused(self.sh("ccnavi-git.sh", "switch", "--create", "hotfix/45", cwd=self.tree))
+        self.refused(
+            self.sh(
+                "ccnavi-git.sh", "worktree", "add", ".claude/worktrees/x", "-b", "hotfix/45", "main"
+            )
         )
+        self.approve()
+        moved = self.carry("hotfix/45")
+        self.assertIn("を切った", moved.stdout)
+        self.assertTrue(os.path.isfile(os.path.join(self.tree, APPROVED, "doing", PARENT + ".md")))
+
+    # ---- 使わない branch:
+
+    def test_an_unapproved_field_is_not_used_anywhere(self):
+        """承認前の提案の branch: で、他人の既存ブランチを出す・移る・送る・取り込むことはできない。
+
+        どれも識別子のブランチで行う。
+        """
+        other = "alice/work"
+        self.remote_commit("src/alice.py", "x = 1\n", branch=other, start="main")
+        self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", other))
+        write(
+            os.path.join(self.ws, TODO, PARENT + ".md"),
+            with_branch(parent_text(PARENT, ["design"], allow=("src/*",)), other),
+        )
+        refused = self.refused(
+            self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", other)
+        )
+        self.assertIn("承認を受けてから", refused.stderr)
+        os.remove(os.path.join(self.ws, TODO, PARENT + ".md"))
         self.ok(
             self.sh(
                 "ccnavi-git.sh",
                 "worktree",
                 "add",
-                f".claude/worktrees/{name}",
+                f".claude/worktrees/{PARENT}",
                 "-b",
-                branch,
+                PARENT,
                 "main",
             )
         )
-        tree = os.path.join(self.ws, ".claude", "worktrees", name)
-        self.assertEqual(self.head_branch(tree), branch)
-        # 名乗っていない名前は今どおり断る
-        self.refused(
+        self.propose(other)
+        self.refused(self.sh("ccnavi-git.sh", "switch", other, cwd=self.tree))
+        self.refused(self.sh("ccnavi-git.sh", "checkout", "-b", other, cwd=self.tree))
+        family = self.ok(self.exe("c1", "family", PARENT))
+        self.assertIn(f"branch {PARENT}\n", family.stdout)
+        # 送るのも取り込むのも識別子のブランチ
+        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", PARENT, cwd=self.tree))
+        self.assertEqual(fields(self.record)["branch"], PARENT)
+        self.ok(self.sh("ccnavi-sync.sh", PARENT))
+        self.assertEqual(fields(self.record)["branch"], PARENT)
+        self.assertEqual(self.head_branch(self.tree), PARENT)
+
+    def test_an_unusable_approved_field_stops_every_path(self):
+        """承認済みの写しに使えない branch:（手で書いたもの）があれば、sh はどこでも使わずに
+        止める。
+        """
+        self.ok(
             self.sh(
-                "ccnavi-git.sh", "worktree", "add", ".claude/worktrees/feature-125-y", "-b", "x/y"
+                "ccnavi-git.sh",
+                "worktree",
+                "add",
+                f".claude/worktrees/{PARENT}",
+                "-b",
+                PARENT,
+                "main",
             )
         )
+        for bad in ("origin/main", "main/x", "x/HEAD", "trunk"):
+            with self.subTest(bad=bad):
+                if bad == "trunk":
+                    git(self.ws, "update-ref", "refs/remotes/origin/trunk", "refs/heads/main")
+                    git(
+                        self.ws,
+                        "symbolic-ref",
+                        "refs/remotes/origin/HEAD",
+                        "refs/remotes/origin/trunk",
+                    )
+                self.write_approved_copy(bad)
+                family = self.ok(self.exe("c1", "family", PARENT))
+                self.assertIn("branch_refused ", family.stdout)
+                self.assertNotIn("\nbranch ", family.stdout)
+                self.refused(self.sh("ccnavi-git.sh", "switch", bad, cwd=self.tree))
+                self.refused(
+                    self.sh("ccnavi-git.sh", "worktree", "add", ".claude/worktrees/y", "-b", bad)
+                )
+                synced = self.sh("ccnavi-sync.sh", PARENT)
+                self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
+                self.assertIn("親のブランチ名が使えない", synced.stdout)
+                synced = self.sh("ccnavi-sync.sh")
+                self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
+        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 
     # ---- 止める形
 
     def test_two_branches_claiming_one_family_stop_it(self):
         self.imported_family()
-        # 識別子と同じ名前のブランチに、branch: の無い親の写しを置く（同じ家族を名乗る）
+        # 識別子と同じ名前のブランチに、branch: の無い承認済みの親の写しを置く（同じ家族を名乗る）
+        # （移る前の識別子のブランチは手元に残っている）
         rival = os.path.join(self.ws, ".claude", "worktrees", "rival")
-        git(self.ws, "worktree", "add", "-q", rival, "-b", PARENT, "main")
-        write(
-            os.path.join(rival, APPROVED, "doing", PARENT + ".md"),
-            parent_text(PARENT, ["design"], allow=("src/*",)),
+        git(self.ws, "worktree", "add", "-q", rival, PARENT)
+        text = parent_text(PARENT, ["design"], allow=("src/*",)).replace(
+            "---\n\n本文", "ccnavi_approved:\n  approved_at: 2026-10-01T00:00:00+0900\n---\n\n本文"
         )
+        write(os.path.join(rival, APPROVED, "doing", PARENT + ".md"), text)
         family = self.ok(self.exe("c1", "family", PARENT))
         self.assertIn("target stop\n", family.stdout)
         self.assertIn("名乗るブランチが 1 本でない", family.stdout)
@@ -408,6 +534,15 @@ class BranchFieldTest(unittest.TestCase):
         )
         self.assertIn(f"家族 {PARENT} の控えが gone", refused.stderr)
         self.assertIn(f"ccnavi-sync.sh {PARENT}", refused.stderr)
+
+    def test_two_records_on_one_branch_stop_the_push(self):
+        self.imported_family()
+        other = os.path.join(self.state, "sync", "self", "families", "feature-9-other")
+        write(other, f"remote origin\nbranch {BRANCH}\nstate present\nreason \n")
+        refused = self.refused(
+            self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree)
+        )
+        self.assertIn("2 つ以上あります", refused.stderr)
 
 
 if __name__ == "__main__":
