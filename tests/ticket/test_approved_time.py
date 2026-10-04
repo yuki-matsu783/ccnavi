@@ -47,6 +47,30 @@ class ApprovedTimeTest(PhaseHarness):
         self.assertEqual(copy["approved_at"], approved[-1]["at"])
         self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_HISTORY)
 
+    def test_an_old_record_is_read_after_the_history_and_before_git(self):
+        """前の版の承認が書いた記録（古い形）の時刻は、履歴が無ければコミットより先に読む。"""
+        self.family(plan=["research"])
+        old = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False).replace(
+            "---\n",
+            "---\nccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', "
+            "source_tree: main, source_path: wip/proposals/todo/i0001-01-01.md}\n",
+            1,
+        )
+        self.move_by_hand("i0001-01-01", old)
+        copy = self.board_copy("i0001-01-01")
+        self.assertEqual(copy["approved_at"], "2026-01-01T00:00:00+09:00")
+        self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_RECORD)
+        # git の無い場でも記録は読める
+        held = self.copies()["i0001-01-01"]
+        times = approval.approved_times(self.conf(), [held], use_git=False)
+        self.assertEqual(times[held.path].source, approval.APPROVED_FROM_RECORD)
+        # 履歴があれば履歴が先
+        with history.session(history.VIA_TERMINAL, None):
+            history.note(self.approved, "i0001-01-01", history.KIND_APPROVED, "todo", "doing")
+        self.assertEqual(
+            self.board_copy("i0001-01-01")["approved_from"], approval.APPROVED_FROM_HISTORY
+        )
+
     def test_a_committed_manual_approval_reads_the_commit_time(self):
         self.family(plan=["research"])
         child = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)

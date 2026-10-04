@@ -2128,6 +2128,7 @@ def _write(path: str, text: str) -> str:
 
 # どこから引いた時刻か。
 APPROVED_FROM_HISTORY = "history"  # 状態の履歴の approved（続きの子は raised）
+APPROVED_FROM_RECORD = "record"  # 前の版の承認が書いた `ccnavi_approved.approved_at`（古い形）
 APPROVED_FROM_COMMIT = "commit"  # doing/ に足したコミットの時刻
 APPROVED_UNCOMMITTED = "uncommitted"  # 履歴もコミットも無い（手で置いて、まだコミットしていない）
 # git を打たない場（Chrome の Pyodide）では、履歴の無い承認の時刻は分からない（空）。
@@ -2156,14 +2157,16 @@ def approved_times(
 
     1. 状態の履歴 `events/<識別子>.ndjson` の `approved`（続きの子は `raised`）の
        うち新しいものの `at`
-    2. 1 で取れないチケットがあるツリーだけ、ツリーごとに 1 回
+    2. 前の版の承認が書いた記録（古い形の `ccnavi_approved.approved_at`）。前の版は承認のときに
+       この欄へ時刻を書いていた。履歴を書く前の版の承認は履歴を持たないので、コミットの時刻より先に読む
+    3. 1 と 2 で取れないチケットがあるツリーだけ、ツリーごとに 1 回
        `git log --no-renames --diff-filter=A` を打ち、`doing/<識別子>.md` を足した
        コミットのうち新しいものの時刻。`--no-renames` を付けるのは、GitHub の画面での
        移動が rename のコミットになり、付けないと足したことにならないため
-    3. どちらも無ければ「未コミット（手で置いた）」（`doing/` にあるものだけ。ほかは分からない）
+    4. どれも無ければ「未コミット（手で置いた）」（`doing/` にあるものだけ。ほかは分からない）
 
     判定は履歴も git も読まない取り決めなので、hook の判定の経路からは呼ばない。`use_git` が偽
-    （Chrome の Pyodide など、git の無い場）なら 2 を飛ばし、1 で取れなければ分からないとする。
+    （Chrome の Pyodide など、git の無い場）なら 3 を飛ばし、1 と 2 で取れなければ分からないとする。
     """
     out: dict[str, ApprovedTime] = {}
     missing: dict[str, list[ticket_mod.Ticket]] = {}
@@ -2172,6 +2175,8 @@ def approved_times(
         at = history_time(where, t.ticket) if where else ""
         if at:
             out[t.path] = ApprovedTime(at, APPROVED_FROM_HISTORY)
+        elif t.approved_at:
+            out[t.path] = ApprovedTime(t.approved_at, APPROVED_FROM_RECORD)
         elif t.tree_root:
             missing.setdefault(t.tree_root, []).append(t)
     if not use_git or sys.platform == "emscripten":
