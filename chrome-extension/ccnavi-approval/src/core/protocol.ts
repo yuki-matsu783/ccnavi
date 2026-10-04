@@ -273,7 +273,10 @@ function api(client: github.Client) {
   return client.host.kind === "gitlab" ? gitlab : github;
 }
 
-/** 統合先の今の先頭（リモートに無ければ断る） */
+/**
+ * 統合先の今の先頭（リモートに無ければ断る）。書く頼みでは先頭の値は使わず、統合先がリモートに
+ * 在るかを確かめるためだけに呼ぶ
+ */
 async function integrationHead(client: github.Client, cfg: RepoConfig, integ: string): Promise<string> {
   const head = await api(client).branchHead(client, cfg.owner, cfg.repo, integ);
   if (head === null) throw new Error(`統合先 ${integ} がリモートに無い`);
@@ -422,7 +425,8 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       } catch (err) {
         return refuse((err as Error).message);
       }
-      // 書く先の保護: 登録したリポジトリだけ。統合先の名前と置き場のパスはボードの値を信頼せず、自分で引く
+      // 書く先の保護: 登録したリポジトリだけ。統合先の名前はボードの値を信頼せず自分で引き、
+      // 置き場のパスは既定に固定する（ボードの値も統合先の `.claude/settings.json` も読まない）
       const cfg = await registeredRepo(deps, client, o, r);
       if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなので書かない`);
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;

@@ -20,7 +20,7 @@ export interface Places {
 
 /**
  * 置き場のパス。既定に固定する（`ccnavi_chrome._placement` と同じ）。統合先の `.claude/settings.json` の
- * `env` は読まない。置き場を既定から動かしたワークスペースは Chrome の対象外
+ * `env` は読まない。`env` で置き場を動かしたワークスペースでも断らず、既定の置き場を読み書きする
  */
 export const DEFAULT_PLACES: Places = Object.freeze({ tickets: DEFAULT_TICKETS, approved: DEFAULT_APPROVED });
 
