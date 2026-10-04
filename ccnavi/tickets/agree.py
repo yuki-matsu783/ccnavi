@@ -16,7 +16,7 @@
 - 見せたものから変わっていないかを確かめる（`approval_digest`・`read_set`・`verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す。新規の承認は提案の
   中身を変えずに動かし、全体計画の待ち方は `phases/<親>/workflow.yml` に固定する
-- 承認の事実をモデルに伝える（`news`・`approved_text`）
+- 承認の事実をモデルに伝える文を組む（`approved_text`。拡張が `--agree --yes` の `prompt` で渡す）
 
 判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で本物とするのは置き場）。置き場を手で
 動かす運びもあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
@@ -527,9 +527,8 @@ def _batch_entry(cand: Candidate) -> dict:
 def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
     """チケットが承認されたことをモデルに伝える文。
 
-    `--agree --yes` の `prompt`（拡張が Claude Code に渡す）と、hook が次の
-    UserPromptSubmit / PreToolUse で渡す `additionalContext` の両方がここから出る。
-    2 か所で文を持つと、ユーザが貼った文と hook が渡した文が食い違う。
+    `--agree --yes` の `prompt`（拡張が Claude Code に渡す）がここから出る。hook は承認を
+    伝えない。ほかの経路の承認は、エージェントが `ccnavi-ticket.sh status` で聞く。
 
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
     revisions は親の改版だった識別子。root はワークスペースルートで、sh のパスに使う。
@@ -559,122 +558,6 @@ def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: s
         )
     lines.append(guide)
     return "\n".join(lines)
-
-
-# ---- 承認の事実を hook がモデルへ伝える
-
-
-def _news_path(state_dir: str, session: str, agent_id: str) -> str:
-    """このセッション（サブエージェントならその起動）が知っている承認済みチケットの記録。
-    `once-<session>-<agent>.json`（ctxfile）と同じ並びに置く。"""
-    session_part = fsio.safe_name(session) or "unknown"
-    agent_part = fsio.safe_name(agent_id) or "main"
-    return os.path.join(state_dir, f"approved-{session_part}-{agent_part}.json")
-
-
-def _known(path: str) -> dict[str, str] | None:
-    """記録にある「識別子 → 版」。記録が無ければ None。
-
-    読めるのに壊れているときは空の辞書を返す。「無い」と同じに扱うと、まだ伝えて
-    いない承認ごと現状を起点にして何も伝えないことになる。何も知らないことにして、
-    伝える側を採る。
-    """
-    data, failed = fsio.read_json(path)
-    if failed is not None:
-        return None if isinstance(failed, FileNotFoundError) else {}
-    known = data.get("known") if isinstance(data, dict) else None
-    if isinstance(known, dict):
-        return {k: str(v) for k, v in known.items() if isinstance(k, str)}
-    return {}
-
-
-def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
-    failed = fsio.write_json_atomic(path, {"known": dict(sorted(known.items()))})
-    if failed:
-        stderr.write(f"ccnavi: 承認を伝えた記録を書けない: {failed}\n")
-
-
-def _mark(t: ticket_mod.Ticket) -> str:
-    """承認済みチケット 1 枚の版。承認した時刻と、改版した時刻。
-
-    改版（`revise_copy`）は承認済みチケットを書き換えるだけで識別子を増やさないので、識別子だけを
-    比べても新しい合意だと分からない。版まで見る。
-    """
-    meta = t.raw.get(ticket_mod.APPROVAL_KEY)
-    meta = meta if isinstance(meta, dict) else {}
-    return f"{meta.get('approved_at') or ''}/{meta.get('revised_at') or ''}"
-
-
-def _copy_marks(conf: settings.Settings, root: str) -> dict[str, ticket_mod.Ticket]:
-    """いまある承認済みチケット。開いたものと閉じたもの。
-
-    閉じたものも見る。承認の直後・次の hook の前に子が閉じることがあり、開いたものだけを
-    見ると、その承認は誰にも伝わらないまま記録に入る。
-    """
-    found: dict[str, ticket_mod.Ticket] = {}
-    for closed in (False, True):
-        got, _ = approval.scan(conf, root, closed=closed)
-        for t in got:
-            found[t.ticket] = t
-    review, _ = approval.scan_review(conf, root)
-    for t in review:
-        found[t.ticket] = t
-    return found
-
-
-def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """まだ伝えていない承認済みチケット。版が変わったもの（改版）も含む。"""
-    out = []
-    for ident, t in sorted(current.items()):
-        recorded = known.get(ident)
-        if recorded is None or recorded != _mark(t):
-            out.append(t)
-    return out
-
-
-def baseline(
-    stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str
-) -> None:
-    """記録が無ければ、いまの承認済みチケットを「知っているもの」として書く。文は出さない。
-
-    SessionStart から呼ぶ。起動・再開・compact のどれでも来るが、記録があれば
-    触らない。compact の前に置かれた承認は、compact のあとにも 1 度は伝える。
-    """
-    if not conf.state or not conf.tickets_enabled:
-        return
-    path = _news_path(conf.state, session, agent_id)
-    if _known(path) is None:
-        _write_known(stderr, path, {i: _mark(t) for i, t in _copy_marks(conf, root).items()})
-
-
-def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str) -> str:
-    """このセッションがまだ知らない承認済みチケットがあれば、その承認を伝える文。1 度だけ。
-
-    最初の hook で記録が無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
-    それより後に置かれた承認済みチケットと、版の変わった承認済みチケット（親の改版）が「新しい承認」になる。
-    記録を置けない（`--state ""`）ときは何も伝えない。診断の試し打ちで記録を汚さない側を採る。
-    サブエージェントは自分の記録を持つので、起動より前の承認は伝えない。
-
-    読み・判定・書きは直列化していない。同じセッションの hook が同時に走ると、同じ承認を
-    2 度伝えることがある。伝えすぎる側なので受け入れる。取るべきでないのは逆で、
-    競合のために伝えない形にはしない。
-    """
-    if not conf.state or not conf.tickets_enabled:
-        return ""
-    path = _news_path(conf.state, session, agent_id)
-    known = _known(path)
-    current = _copy_marks(conf, root)
-    marks = {i: _mark(t) for i, t in current.items()}
-    if known is None:
-        _write_known(stderr, path, marks)
-        return ""
-    fresh = _fresh(known, current)
-    if not fresh:
-        return ""
-    # 消えた承認済みチケットの分も残す。1 回読めなかっただけで「知らない」に戻すと、
-    # 次の回に同じ承認をもう一度伝えることになる。
-    _write_known(stderr, path, {**known, **marks})
-    return approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
 def candidates(
@@ -767,14 +650,16 @@ def candidates(
 
 
 def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案に待ち方のコピー（`workflow:`）が書いてあれば拒む。コピーを書くのは `--agree` だけ。"""
+    """提案に待ち方の欄（`workflow:`）が書いてあれば拒む。待ち方を書くのは `--agree` だけで、
+    置き場は `phases/<親>/workflow.yml`（承認はチケットの中身を変えない）。"""
     if ticket_mod.WORKFLOW_KEY not in t.raw:
         return []
     return [
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"`{ticket_mod.WORKFLOW_KEY}` は --agree が書く欄。提案には書かない",
+            f"`{ticket_mod.WORKFLOW_KEY}` の欄は提案に書かない。待ち方は --agree が"
+            f" {approval.PHASES_DIR}/<親>/{approval.WORKFLOW_FILE} に書く",
         )
     ]
 
@@ -799,7 +684,9 @@ def script_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"{names} はスクリプト（ccnavi-ticket.sh）だけが書く欄。"
-            "提案には値を書かない（空にするか消す）",
+            "提案には値を書かない（空にするか消す）。改版の提案では、承認済みチケットを写したときに"
+            "入る started_at・completed_at・base_sha・cancelled_at・cancel_reason を空にする"
+            "（改版は承認済みチケットの側の値を残し、計画だけを差し替える）",
         )
     ]
 

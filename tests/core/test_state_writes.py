@@ -2,7 +2,7 @@
 
 `fsio` 側の単体テストは `write_text_atomic` そのものしか見ない。それだけだと、
 呼び出し側が素の書き方に戻されてもスイートは通ってしまう（実際に戻して
-確かめた）。ここで見るのは配線で、記録を置く 4 か所が `write_json_atomic` を
+確かめた）。ここで見るのは配線で、記録を置く 3 か所が `write_json_atomic` を
 通ること。
 
 もう 1 つ見るのは、記録を読めなかったときに書き戻さないこと。読めないのは記録が
@@ -22,7 +22,6 @@ from unittest import mock
 from ccnavi.hook import post
 from ccnavi.infra import fsio, hookio
 from ccnavi.policy import ctxfile, rules
-from ccnavi.tickets import agree
 
 
 def _payload(session: str = "s1", agent: str = "") -> hookio.Input:
@@ -64,10 +63,6 @@ class WiringTest(unittest.TestCase):
         self._assert_atomic(
             lambda: post._save_turn(self.err, self.state, "s1", {"a"}, {"/tmp/tree": "abc123"})
         )
-
-    def test_approval_known_state(self):
-        path = os.path.join(self.state, "approved-s1.json")
-        self._assert_atomic(lambda: agree._write_known(self.err, path, {"i0001": "1"}))
 
 
 class UnreadableStateTest(unittest.TestCase):

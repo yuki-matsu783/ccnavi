@@ -344,7 +344,7 @@ class DagApprovalTest(PhaseHarness):
             self.commit_parent()
             result = self.approve()
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("--agree が書く欄", result.stderr)
+            self.assertIn("の欄は提案に書かない", result.stderr)
             self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_the_workflow_is_fixed_in_its_own_file_and_not_in_the_ticket(self):

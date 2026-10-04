@@ -1,16 +1,12 @@
-"""承認の事実を hook がモデルへ 1 度だけ伝えることの受入テスト。
+"""承認したことの伝わり方の受入テスト。
 
-設計 wip/design/approve-popup.md 2.4。ユーザがボードで承認したあと、モデルは次の
-UserPromptSubmit か PreToolUse で「承認済みチケットが置かれた。後工程を進める」を読む。
-見るのは 5 つ。
+承認したことは、拡張が渡す文（`--agree --yes` の `prompt`）と `ccnavi-ticket.sh status` で伝わる。
+hook は承認を伝えない。hook がセッションの最初で起点を取り、それより後に増えた承認を伝える形は、
+セッションの開始時の取り込みで届いた承認を起点に含めて取りこぼした。見るのは 3 つ。
 
-1. 承認の後の UserPromptSubmit で `additionalContext` に文が載り、もう 1 度は載らない
-2. PreToolUse（allow になる呼び出し）でも同じ文が 1 度だけ載る
-3. セッションの最初の hook の時点で既にあった承認済みチケットは伝えない（起点）
-4. 別のセッションにはそれぞれ 1 度ずつ伝える。サブエージェントには伝えない
-5. 記録を置けない（`--state ""`）ときは伝えず、記録も作らない
-
-文は `--agree --yes` の `prompt` と同じもの（同じ関数から出る）。
+1. `--agree --yes` の `prompt` に、承認したチケットと次の一手が載る
+2. 承認のあとの UserPromptSubmit・PreToolUse・SessionStart は承認を伝えない
+3. 承認を伝えた記録（`approved-<セッション>-<エージェント>.json`）を書かない
 """
 
 from __future__ import annotations
@@ -23,7 +19,7 @@ import unittest
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 
 
-class ApprovalNewsTest(PhaseHarness):
+class ApprovalToldTest(PhaseHarness):
     # ---- 道具
 
     def event(self, event, session="s1", agent_id="", tool="", state=None, **tool_input):
@@ -70,19 +66,15 @@ class ApprovalNewsTest(PhaseHarness):
         self.propose(name, child_text(name, "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
 
-    # ---- 1. UserPromptSubmit で 1 度
+    # ---- 1. 拡張が渡す文
 
-    def test_prompt_after_approval_carries_the_news_once(self):
+    def test_the_prompt_names_the_approved_tickets_and_the_order_of_start(self):
         self.parent_only()
-        self.assertEqual(self.prompt(), "")  # 起点。まだ何も無い
         self.next_child()
         prompt = self.approve_yes(["i0001", "i0001-01"])
-        first = self.prompt()
-        self.assertIn(prompt, first)
-        self.assertIn("i0001-01", first)
-        # 子より先に親を着手する順も、この 1 度の文で伝える（REQ-TKT-48）。
-        self.assertIn("start <親>", first)
-        self.assertEqual(self.prompt(), "")
+        self.assertIn("i0001-01", prompt)
+        # 子より先に親を着手する順も、この文で伝える（REQ-TKT-48）。
+        self.assertIn("start <親>", prompt)
 
     def test_a_batch_without_a_new_parent_does_not_ask_for_the_parent_start(self):
         """子だけの回では、親の `start` を勧めないこと。
@@ -94,131 +86,56 @@ class ApprovalNewsTest(PhaseHarness):
         self.parent_only()
         self.next_child()
         self.approve_yes(["i0001", "i0001-01"])
-        self.prompt()  # 1 回目の文はここで受け取っておく
         self.next_child("i0001-02")
-        news = self.approve_yes(["i0001-02"])
-        self.assertNotIn("start <親>", news)
-        self.assertIn("親が未着手だと止まる", news)
+        told = self.approve_yes(["i0001-02"])
+        self.assertNotIn("start <親>", told)
+        self.assertIn("親が未着手だと止まる", told)
 
-    # ---- 2. PreToolUse でも 1 度
-
-    def test_pre_tool_use_carries_the_news_once_alongside_the_verdict(self):
+    def test_a_revision_is_told_by_the_prompt(self):
         self.parent_only()
-        self.before()  # 起点
+        self.approve_yes(["i0001"])
+        self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
+        self.commit_parent()
+        self.assertIn("改版", self.approve_yes(["i0001"]))
+
+    # ---- 2. hook は伝えない
+
+    def test_hooks_do_not_tell_about_approvals(self):
+        self.parent_only()
+        self.assertEqual(self.prompt(), "")
+        self.before()
+        self.context(self.event("SessionStart"))
         self.next_child()
-        prompt = self.approve_yes(["i0001", "i0001-01"])
+        self.approve_yes(["i0001", "i0001-01"])
+        self.assertNotIn("承認され", self.prompt())
+        self.assertNotIn("承認され", self.before())
+        self.assertNotIn("承認され", self.before(session="s2", agent_id="sub-1"))
+        self.assertNotIn("i0001-01", self.context(self.event("SessionStart")))
+        self.assertNotIn("承認され", self.prompt(session="s2"))
+
+    def test_the_verdict_still_comes_back_after_an_approval(self):
+        self.parent_only()
+        self.next_child()
+        self.approve_yes(["i0001", "i0001-01"])
         result = self.event(
             "PreToolUse", tool="Write", file_path=os.path.join(self.parent_tree, "src", "x.py")
         )
-        out = json.loads(result.stdout)["hookSpecificOutput"]
-        self.assertIn(prompt, out.get("additionalContext") or "")
-        # 判定は判定で返っている（承認された範囲の中なので allow のまま）。
-        self.assertNotEqual(out.get("permissionDecision"), "deny")
-        self.assertEqual(self.before(), "")
-        # 一方で聞いたなら、もう一方でも言わない。
-        self.assertEqual(self.prompt(), "")
+        if result.stdout.strip():
+            out = json.loads(result.stdout)["hookSpecificOutput"]
+            self.assertNotEqual(out.get("permissionDecision"), "deny")
 
-    # ---- 3. 起点より前の承認済みチケットは伝えない
+    # ---- 3. 記録を書かない
 
-    def test_copies_that_existed_at_the_first_hook_are_not_news(self):
+    def test_no_memo_of_told_approvals_is_written(self):
         self.parent_only()
-        self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
-        # このセッションの最初の hook。既にある承認済みチケットは知っているものとして記録する。
-        self.assertEqual(self.prompt(), "")
-        self.assertEqual(self.before(), "")
-
-    def test_session_start_sets_the_baseline_without_speaking_about_it(self):
-        self.parent_only()
-        self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
-        started = self.context(self.event("SessionStart"))
-        self.assertNotIn("i0001-01", started)
-        self.assertEqual(self.prompt(), "")
-        # 起点の後に承認されたものは伝える。SessionStart（compact の後にも来る）は起点を戻さない。
-        self.next_child("i0001-02")
-        self.approve_yes(["i0001-02"])
         self.event("SessionStart")
-        self.assertIn("i0001-02", self.prompt())
-
-    # ---- 4. セッションごと。サブエージェントは除く
-
-    def test_each_session_hears_once_and_subagents_do_not(self):
-        self.parent_only()
-        self.prompt(session="s1")
-        self.prompt(session="s2")
-        self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
-        self.assertIn("i0001-01", self.prompt(session="s1"))
-        self.assertIn("i0001-01", self.prompt(session="s2"))
-        self.assertEqual(self.prompt(session="s1"), "")
-        self.assertEqual(self.prompt(session="s2"), "")
-        # 承認より後に起動したサブエージェントは、起動時点の承認済みチケットを起点にする。
-        self.assertEqual(self.before(session="s1", agent_id="sub-1"), "")
-        self.assertEqual(self.before(session="s1", agent_id="sub-1"), "")
-
-    # ---- 4b. 伝え漏れ（敵対的レビューが見つけた 3 つ）
-
-    def test_a_revision_of_the_parent_is_told_by_the_prompt_only(self):
-        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。改版の時刻をチケットに
-        書かなくなったので、hook の知らせは改版を伝えない。伝えるのは `--agree --yes` の文。"""
-        self.parent_only()
-        self.prompt()  # 起点
-        self.approve_yes(["i0001"])
-        self.assertIn("i0001", self.prompt())
-        self.assertEqual(self.prompt(), "")
-        # 全体計画を差し替えて再承認する。識別子は同じまま。
-        self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
-        self.commit_parent()
-        told = self.approve_yes(["i0001"])
-        self.assertIn("改版", told)
-        self.assertEqual(self.prompt(), "")
-
-    def test_a_copy_closed_before_the_next_hook_is_still_told(self):
-        """承認の直後に子が閉じても、その承認は 1 度伝える。"""
-        from ccnavi.tickets import approval
-
-        self.parent_only()
-        self.approve_yes(["i0001"])
         self.prompt()
+        self.before()
         self.next_child()
-        self.approve_yes(["i0001-01"])
-        # 次の hook より前に閉じる（子を done にしたときと同じ形）。
-        self.assertEqual(approval.close_copy(self.approved, "i0001-01"), "")
-        heard = self.prompt()
-        self.assertIn("i0001-01", heard)
-        self.assertEqual(self.prompt(), "")
-
-    def test_a_broken_memo_tells_instead_of_going_quiet(self):
-        """記録が壊れていたら、伝えていない承認ごと起点化せず、伝える側を採る。"""
-        self.parent_only()
+        self.approve_yes(["i0001", "i0001-01"])
         self.prompt()
-        self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
-        memo = glob.glob(os.path.join(self.state, "approved-s1-*.json"))[0]
-        with open(memo, "w", encoding="utf-8") as f:
-            f.write("{ これは JSON ではない")
-        heard = self.prompt()
-        self.assertIn("i0001-01", heard)
-        self.assertEqual(self.prompt(), "")
-
-    # ---- 5. 記録を置けないときは伝えない
-
-    def test_without_a_state_dir_nothing_is_told_and_nothing_is_written(self):
-        self.parent_only()
-        self.prompt(state="")
-        self.next_child()
-        self.approve_yes(["i0001", "i0001-01"])
-        self.assertEqual(self.prompt(state=""), "")
+        self.before()
         self.assertEqual(glob.glob(os.path.join(self.state, "approved-*")), [])
-
-    def test_the_memo_lives_next_to_the_once_memo(self):
-        self.parent_only()
-        self.prompt()
-        files = glob.glob(os.path.join(self.state, "approved-s1-*.json"))
-        self.assertEqual(len(files), 1)
-        with open(files[0], encoding="utf-8") as f:
-            self.assertIn("known", json.load(f))
 
 
 if __name__ == "__main__":

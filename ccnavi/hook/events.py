@@ -16,7 +16,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard
 from ..records import audit, prune, repeat
-from ..tickets import agree, approval, configsync, ops, phase
+from ..tickets import approval, configsync, ops, phase
 from . import docsearch, judge, post, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
@@ -151,13 +151,13 @@ def decide_at_prompt(
 ) -> int:
     """ユーザが何か言ったとき。ターンの基準をここで取る。
 
-    原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
+    何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする記録だけ。
 
-    例外は、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）。
-    それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
-    モデルは後工程に入れない。
+    承認されたことも伝えない。ボードの承認は拡張が承認の文（`agree.approved_text`）を渡し、
+    ほかの経路の承認は、エージェントが `ccnavi-ticket.sh status` で聞く。hook が起点を取って
+    増えた承認を数える形は、セッションの開始時の取り込みで届いた承認を起点に含めて取りこぼした。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     post.at_prompt(
@@ -171,9 +171,6 @@ def decide_at_prompt(
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
     )
-    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
-    if told:
-        hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
 
 
@@ -368,9 +365,6 @@ def decide_at_start(
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
-    # 承認の記録は捨てない。記録が無ければ、いまの承認済みチケットを「知っているもの」として
-    # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
-    agree.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
     record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
