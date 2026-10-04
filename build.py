@@ -138,7 +138,13 @@ def build() -> int:
     if result.returncode != 0:
         return result.returncode
 
-    _swap(os.path.join(staging, NAME), os.path.join(DIST, NAME))
+    try:
+        _swap(os.path.join(staging, NAME), os.path.join(DIST, NAME))
+    except OSError as e:
+        # 置き場は前の版のまま（_swap が戻す）。`ccnavi.target` は前の版の目印なので書き換えない。
+        print(f"dist/{NAME}{os.sep} へ置き換えられなかった: {e}", file=sys.stderr)
+        print(f"dist/ は前のまま。組み立てた版は {staging} にある", file=sys.stderr)
+        return 1
     target = build_target()
     with open(TARGET, "w", encoding="utf-8", newline="\n") as f:
         f.write(target + "\n")
