@@ -228,6 +228,34 @@ def head_text(tree_root: str) -> str | None:
         return None
 
 
+def has_branch(repo_root: str, name: str) -> bool:
+    """そのリポジトリに、手元のブランチか origin のブランチ `name` があるか（ADR-0100 の 5 章）。
+
+    ファイルだけを読む（git は起こさない。承認画面を組む判定の中から呼ばれる）。見るのは git
+    ディレクトリの `refs/heads/<名前>`・`refs/remotes/origin/<名前>` と `packed-refs` の行。
+    `..` や空の段を含む名前は読まない（git ディレクトリの外を読まない）。
+    """
+    parts = name.split("/") if isinstance(name, str) else []
+    if not parts or any(p in ("", ".", "..") for p in parts):
+        return False
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return False
+    wanted = (f"refs/heads/{name}", f"refs/remotes/origin/{name}")
+    for ref in wanted:
+        if os.path.isfile(os.path.join(gitdir, *ref.split("/"))):
+            return True
+    try:
+        with open(os.path.join(gitdir, "packed-refs"), encoding="utf-8") as f:
+            for line in f:
+                _, _, ref = line.strip().partition(" ")
+                if ref in wanted:
+                    return True
+    except (OSError, ValueError):
+        pass
+    return False
+
+
 # 途中の操作の印（git ディレクトリの中の名前）。
 BUSY_MARKS = (
     "MERGE_HEAD",

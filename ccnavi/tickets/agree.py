@@ -55,6 +55,9 @@ class Candidate:
     types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
     notes: list[str] = field(default_factory=list)
+    # 親の `branch:` が既にあるブランチ（手元か origin、または提案がそのブランチの上）を指すか
+    # （ADR-0100 の 5 章）。承認画面に「既存のブランチ <名前> を使う」と出す。
+    existing_branch: bool = False
 
     @property
     def is_revision(self) -> bool:
@@ -460,6 +463,9 @@ def _batch_entry(cand: Candidate) -> dict:
         "revision": cand.is_revision,
         "tree": t.tree or "",
         "path": t.path,
+        # 親のブランチ名（ADR-0100 の 5 章）。`branch:` が無ければ識別子。
+        "branch": ticket_mod.branch_name(t),
+        "existing_branch": cand.existing_branch,
         "overflow": [p.detail for p in cand.overflow],
     }
 
@@ -682,6 +688,7 @@ def candidates(
         complaints += approval.project_problems(t, pool, conf)
         complaints += approval.family_problems(conf, root, t, fams)
         complaints += approval.integration_problems(conf, root, t, fams)
+        complaints += approval.branch_problems(conf, root, t, fams)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
             if parent is not None:
@@ -697,7 +704,15 @@ def candidates(
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        batch.append(Candidate(ticket=t, complaints=complaints, overflow=overflow, types=types))
+        batch.append(
+            Candidate(
+                ticket=t,
+                complaints=complaints,
+                overflow=overflow,
+                types=types,
+                existing_branch=bool(t.branch) and branch_exists(root, conf, t),
+            )
+        )
         pool[t.ticket] = t
         if t.is_child:
             added.setdefault(t.parent, []).append(t)
@@ -999,6 +1014,20 @@ def screen(
                 "    この親のマージリクエストの本文に Closes として書く番号。"
                 "マージされると、この課題も閉じる"
             )
+        if not t.is_child and t.branch:
+            lines.append(f"■ ブランチ: {t.branch}")
+            if cand.existing_branch:
+                lines.append(
+                    f"    既存のブランチ {t.branch} を使う。識別子（{t.ticket}）と別の名前で、"
+                    f"ワークツリーは .claude/worktrees/{t.ticket}。"
+                    "取り込み・送る・マージリクエストはこのブランチで行う"
+                )
+            else:
+                lines.append(
+                    f"    新しく切るブランチ。識別子（{t.ticket}）と別の名前で、"
+                    f"ワークツリーは .claude/worktrees/{t.ticket}。"
+                    "取り込み・送る・マージリクエストはこのブランチで行う"
+                )
         if t.rationale.strip():
             lines.append("■ エージェントが書いた理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
@@ -1271,6 +1300,15 @@ def revision_problems(
                 "改版で変えられるのは plan と feedback だけ。題か課題番号が承認済みチケットと違う",
             )
         )
+    if revised.branch != current.branch:
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                revised.ticket,
+                "改版で変えられるのは plan と feedback だけ。`branch:` が承認済みチケットと違う"
+                "（親のブランチは承認で決まる。ADR-0100）",
+            )
+        )
     # 全体計画: 子がある番号までは同じ並びでなければならない。
     if revised.plan != current.plan:
         frozen = _last_phase_with_children(conf, root, current.ticket)
@@ -1463,6 +1501,10 @@ def existing_branch_warnings(
         if t.state != ticket_mod.TODO or t.is_child or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
+        if t.branch:
+            # `branch:` で既にあるブランチを指すのは、そのブランチで作業するという宣言。warn は
+            # 出さず、承認画面に「既存のブランチ <名前> を使う」と出す（ADR-0100 の 5 章）。
+            continue
         if _written_on_own_branch(root, conf, t):
             continue
         repo = tree.project_root(conf.projects, t.project) if t.project else root
@@ -1480,10 +1522,26 @@ def existing_branch_warnings(
 
 
 def _written_on_own_branch(root: str, conf: settings.Settings, t) -> bool:
-    """提案が、自分の識別子の名前のワークツリーの中にあり、そのワークツリーが同じ名前のブランチの上か。"""
+    """提案が、自分の識別子の名前のワークツリーの中にあり、そのワークツリーが親のブランチ
+    （`branch:`、無ければ識別子）の上か。"""
     if not t.path:
         return False
     here = tree.tree_of(root, t.path, conf.projects)
     if here is None or here.is_main or here.name != t.ticket:
         return False
-    return tree.branch_of(here.root) == t.ticket
+    return tree.branch_of(here.root) == ticket_mod.branch_name(t)
+
+
+def branch_exists(root: str, conf: settings.Settings, t) -> bool:
+    """親の `branch:` のブランチが既にあるか（ADR-0100 の 5 章）。
+
+    提案がそのブランチの上で書かれている（`_written_on_own_branch`）か、そのリポジトリの手元か
+    origin にそのブランチがある（`tree.has_branch`。ファイルだけを読む）とき。Chrome の仮の
+    ツリーでは提案はいつも親のブランチの上にある。
+    """
+    if not t.branch:
+        return False
+    if _written_on_own_branch(root, conf, t):
+        return True
+    repo = tree.project_root(conf.projects, t.project) if t.project else root
+    return tree.has_branch(repo, t.branch)

@@ -294,6 +294,66 @@ def issue_identifier(
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 
 
+# 親のブランチ名の欄（ADR-0100 の 5 章）。
+BRANCH_KEY = "branch"
+# ブランチ名の長さの上限（文字数）。ref はパスにもなる（`.git/refs/heads/<名前>`）ので、
+# 識別子と同じく短く保つ。
+MAX_BRANCH_LENGTH = 200
+# 親のブランチ名に使える字。識別子の字（`ID_CHARS`）に段の区切りの `/` を足したもの。先頭は ASCII の
+# 英数字。git が許すほかの字（`$`・`;`・引用符・全角の字など）は、sh と拡張が名前を扱う箇所で意味を
+# 持つか、見た目の同じ別の名前を作るので使わない（締める向き）。
+_BRANCH = re.compile(rf"^[A-Za-z0-9][{ID_CHARS}/]*\Z")
+
+
+def branch_problem(name: str) -> str:
+    """`branch:` に書いた名前を親のブランチ名に使えない理由。使えれば空（ADR-0100 の 5 章）。
+
+    字は識別子の字に `/` を足したものだけ（`_BRANCH`）。そのうえで
+    `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる段・`.lock` で終わる段
+    など）と、統合先や保護されたブランチの名前（main・master・develop・release・release/*・
+    release-*。大文字小文字は区別しない）を断る。NFC でない綴りも断る（識別子と同じ。
+    見た目が同じ別の名前を作らない）。その時点の統合先の名前は、呼び手
+    （`approval.branch_problems`）が比べる。
+    """
+    if not isinstance(name, str) or not name:
+        return "ブランチ名が空"
+    if unicodedata.normalize("NFC", name) != name:
+        return "ブランチ名が NFC でない（見た目が同じでも別の名前になるので NFC で書く）"
+    if len(name) > MAX_BRANCH_LENGTH:
+        return f"ブランチ名が長すぎる（{len(name)} 文字。上限は {MAX_BRANCH_LENGTH} 文字）"
+    if not _BRANCH.match(name):
+        return (
+            "ブランチ名に使えない字がある（先頭は ASCII の英数字、続きは英数字・"
+            "`.`・`_`・`-`・`/`・ひらがな・カタカナ・漢字。空白・制御文字・記号は使わない）"
+        )
+    if ".." in name or "//" in name or name.startswith("/") or name.endswith(("/", ".")):
+        return "git のブランチ名に使えない形（`..`・`//`・先頭や末尾の `/`・末尾の `.`）"
+    for part in name.split("/"):
+        if part.startswith(".") or part.endswith(".lock"):
+            return "git のブランチ名に使えない形（`.` で始まる段・`.lock` で終わる段）"
+    folded = name.casefold()
+    if (
+        folded in RESERVED_BRANCH_IDS
+        or folded.startswith("release/")
+        or folded.startswith("release-")
+    ):
+        return (
+            "統合先や保護されたブランチの名前（main・master・develop・release・release/*・"
+            "release-*）は親のブランチにしない"
+        )
+    return ""
+
+
+def branch_name(t: Ticket) -> str:
+    """親チケットの親のブランチ名。`branch:` があればその値、無ければ識別子（ADR-0100 の 5 章）。
+
+    子のブランチは子の識別子（子は `branch:` を持たない）。
+    """
+    if t.is_child:
+        return t.ticket
+    return t.branch or t.ticket
+
+
 def branch_name_problems(
     t: Ticket,
     integration: str = "",
@@ -618,6 +678,11 @@ class Ticket:
     # issue_repo は、課題が別のリポジトリにあるときのその綴り（`issue: owner/repo#N` の
     # `owner/repo`。ADR-0093 の 3.1 の 8）。同じリポジトリの課題なら空。
     issue_repo: str = ""
+    # branch は親のブランチ名（ADR-0100 の 5 章）。親だけが持つ任意の欄で、無ければ親のブランチ名は
+    # 識別子そのもの。識別子・ファイル名・ワークツリー名は `/` を含まないまま、`feature/123-login`
+    # のような既存のブランチで作業するために使う。承認画面に出し、承認の指紋に入る
+    # （写しの全文が入る）。
+    branch: str = ""
     # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
     # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
@@ -893,6 +958,31 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
         else:
             ticket.issue = number
             ticket.issue_repo = repo
+
+    raw_branch = front.get(BRANCH_KEY)
+    if raw_branch is not None:
+        if not isinstance(raw_branch, str):
+            problems.append(
+                Problem(SEVERITY_ERROR, name, "`branch` はブランチ名を文字列で書く（ADR-0100）")
+            )
+            return True
+        if ticket.is_child:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    "`branch` は親だけの欄。子では読まない（子のブランチは子の識別子）",
+                )
+            )
+        else:
+            spelled = raw_branch.strip()
+            why = branch_problem(spelled)
+            if why:
+                problems.append(
+                    Problem(SEVERITY_ERROR, name, f"`branch: {spelled}` は使えない。{why}")
+                )
+                return True
+            ticket.branch = spelled
     return False
 
 

@@ -5,7 +5,8 @@
 `ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（D17・4.5）。
 ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。D33）。
 
-- `ccnavi c1 family <識別子>`: その識別子の家族と、C1 の対象か
+- `ccnavi c1 family <識別子>`: その識別子の家族と、C1 の対象かと、親のブランチ名（`branch`。
+  親チケットの `branch:`、無ければ識別子。ADR-0100 の 5 章）
   - 対象は、置き場の綴りが相対で、家族の控えがあり（取り込み済み）、chat だけの家族でなく、
     止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い家族（D11）
   - 止める理由のある取り込み済みの家族は `target stop`。sh は何も書かずに止める
@@ -114,6 +115,9 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     places = _relative_places(conf)
     verdict, why, st = target(conf, root, parent)
     lines.append(("repo", st.repo))
+    # 親のブランチ名（ADR-0100 の 5 章）。sh は識別子からブランチ名を組み立てず、これを使う
+    # （ref・fetch・push・ls-remote・家族の控えの `branch`）。
+    lines.append(("branch", st.branch or syncstate.Families(conf, root).branch_any(parent)))
     if places is not None:
         lines += [("approved", places[0]), ("review", places[1])]
     lines.append(("target", verdict))

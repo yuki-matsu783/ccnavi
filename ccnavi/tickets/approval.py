@@ -311,7 +311,7 @@ def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
     """親のワークツリーの外にしか無い写しを信頼しない理由と、ユーザが運ぶ手順
     （ADR-0093 の 3.5）。"""
     return (
-        f"親のブランチ {st.family} のワークツリーの外"
+        f"親のブランチ {st.branch_name} のワークツリーの外"
         f"（{t.tree or 'ワークスペースルート'}）にしか無い写し。"
         "取り込み済みの家族では親のブランチの写しだけが本物。ユーザがその写しを親のワークツリー"
         f"（.claude/worktrees/{st.family}）の同じ置き場へ運んでコミットと push をし、"
@@ -355,13 +355,50 @@ def family_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"提案が親のブランチ {st.family} のワークツリーの外"
+                f"提案が親のブランチ {st.branch_name} のワークツリーの外"
                 f"（{t.tree or 'ワークスペースルート'}）にある。取り込み済みの家族の提案は"
                 f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
                 "承認を頼んでください",
             )
         ]
     return []
+
+
+def branch_problems(
+    conf: settings.Settings,
+    root: str,
+    t: ticket_mod.Ticket,
+    fams: syncstate.Families | None = None,
+) -> list[rules.Problem]:
+    """親の `branch:` が、その時点の統合先の名前に当たれば承認しない（ADR-0100 の 5 章）。
+
+    固定の並び（main など）と字の検査は `ticket.branch_problem` が読むときに済ませている。ここで
+    比べるのは、そのリポジトリの統合先の名前（環境変数 `CCNAVI_INTEGRATION_BRANCH`、
+    `.claude/settings.local.json` の `env`、取り込みの控えの `head` の `branch`）で、大文字小文字を
+    区別しない。名前が分からなければ固定の並びだけで決める（`ccnavi-git.sh` の push の拒否と同じ）。
+    """
+    if t.is_child or not t.branch:
+        return []
+    fams = fams or syncstate.Families(conf, root)
+    names = {
+        os.environ.get(settings.INTEGRATION_ENV, ""),
+        settings.integration_local(root),
+    }
+    integ = fams.integration(syncstate.repo_key(t.project)) if fams.active else None
+    if integ is not None and not integ.broken:
+        names.add(integ.branch)
+    folded = t.branch.casefold()
+    hits = sorted(n for n in names if n and n.casefold() == folded)
+    if not hits:
+        return []
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）に当たる。"
+            "統合先を親のブランチにしない（ADR-0100）",
+        )
+    ]
 
 
 def integration_problems(

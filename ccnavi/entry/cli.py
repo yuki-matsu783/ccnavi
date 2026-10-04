@@ -916,7 +916,7 @@ def _parsed(
         if not _FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
             stderr.write(f"ccnavi: c1 sort の {args.command[2]!r} は識別子の形ではない\n")
             return EXIT_ERROR
-        if since and not _REVISION.fullmatch(since):
+        if since and not _revision_ok(since):
             stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")
             return EXIT_ERROR
         code = c1.sort(stdout, stderr, conf, root, args.command[2], since)
@@ -1410,9 +1410,20 @@ _FAMILY = _Family()
 _REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
 _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
-# `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数として読まれる綴りを
-# 入れない）。
-_REVISION = re.compile(rf"[0-9a-f]{{7,64}}|refs/remotes/origin/[A-Za-z0-9][{ticket_mod.ID_CHARS}]*")
+# `c1 sort` の版。sha か `refs/remotes/origin/<親のブランチ>` の形だけ（git の引数として読まれる
+# 綴りを入れない）。親のブランチは識別子か、親チケットの `branch:` に書ける名前
+# （ADR-0100 の 5 章）。
+_SHA = re.compile(r"[0-9a-f]{7,64}")
+_ORIGIN_REF = "refs/remotes/origin/"
+
+
+def _revision_ok(since: str) -> bool:
+    if _SHA.fullmatch(since):
+        return True
+    if not since.startswith(_ORIGIN_REF):
+        return False
+    name = since[len(_ORIGIN_REF) :]
+    return ticket_mod.is_valid_id(name) or not ticket_mod.branch_problem(name)
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが

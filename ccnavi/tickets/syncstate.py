@@ -115,6 +115,8 @@ class Family:
     sha: str = ""
     broken: str = ""
     path: str = ""
+    # 控えに書いた親のブランチ名（ADR-0100 の 5 章）。前の控えは識別子と同じ名前を書いている。
+    branch: str = ""
 
 
 def family_path(state_dir: str, repo: str, name: str) -> str:
@@ -144,6 +146,7 @@ def family(state_dir: str, repo: str, name: str) -> Family | None:
         reason=record.get("reason", ""),
         sha=record.get("sha", ""),
         path=path,
+        branch=record.get("branch", ""),
     )
 
 
@@ -349,7 +352,8 @@ class Standing:
     """家族の立ち位置。`record` が None なら取り込み済みでない（今の動きのまま）。
 
     `stop` は決まらない・閉じているので止める理由（空なら止めない）。`closed` は閉じた家族。
-    `home` は親のワークツリー（`.claude/worktrees/<P>` で HEAD が `P` を指すもの）。
+    `home` は親のワークツリー（`.claude/worktrees/<P>` で HEAD が親のブランチを指すもの）。
+    `branch` は親のブランチ名（親チケットの `branch:`、無ければ識別子。ADR-0100 の 5 章）。
     """
 
     family: str
@@ -358,6 +362,11 @@ class Standing:
     home: tree.Tree | None = None
     stop: str = ""
     closed: bool = False
+    branch: str = ""
+
+    @property
+    def branch_name(self) -> str:
+        return self.branch or self.family
 
     @property
     def imported(self) -> bool:
@@ -379,6 +388,7 @@ class Families:
         self._standings: dict[tuple[str, str], Standing] = {}
         self._integrations: dict[str, Integration | None] = {}
         self._done: dict[str, tuple[set[str], str]] = {}
+        self._branches: dict[tuple[str, str], str] = {}
 
     def worktrees(self) -> list[tree.Tree]:
         if self._worktrees is None:
@@ -438,11 +448,96 @@ class Families:
 
     def home_tree(self, family_id: str, project: str) -> tree.Tree | None:
         """親のワークツリー。名前（大文字小文字まで）が家族の識別子で、元が同じリポジトリで、
-        HEAD がブランチ `<P>` を指すもの。無ければ None。ファイルだけを読む（git は起こさない）。"""
+        HEAD が親のブランチ（`branch`）を指すもの。無ければ None。ファイルだけを読む
+        （git は起こさない）。"""
         work = self._named_tree(family_id, project)
-        if work is not None and tree.branch_of(work.root) == family_id:
+        if work is not None and tree.branch_of(work.root) == self.branch(family_id, project):
             return work
         return None
+
+    def branch(self, family_id: str, project: str = "") -> str:
+        """家族の親のブランチ名（ADR-0100 の 5 章）。ファイルだけを読む（git は起こさない）。
+
+        親チケットが名乗る名前（`branch:`、無ければ識別子）を、次の順に探す。
+
+        1. 親のワークツリー（`.claude/worktrees/<P>`）の親の写しか提案（`declared_branch`）
+        2. 家族の控えの `branch`（取り込み・push・C1 が書いた名前）
+        3. ほかのツリー（ワークスペースルート・プロジェクト・ワークツリー）の親の写しか提案。
+           親のワークツリーを作る前（提案をワークスペースルートで書いた）に引くため
+        4. どれにも無ければ識別子
+
+        権威はこの名前のブランチの上の親チケットが自分で名乗る形で決まる（`claims`）。ここで引いた
+        名前と控えの名前が食い違えば、立ち位置（`standing`）が止める。
+        """
+        key = (project or "", family_id)
+        if key not in self._branches:
+            self._branches[key] = self._branch(family_id, project or "")
+        return self._branches[key]
+
+    def _branch(self, family_id: str, project: str) -> str:
+        named = self._named_tree(family_id, project)
+        if named is not None:
+            found = declared_branch(self.conf, named.root, family_id)
+            if found is not None:
+                return found
+        record = family(self.conf.state, repo_key(project), family_id) if self.active else None
+        if record is not None and record.branch:
+            return record.branch
+        for work in self._all_trees():
+            if work.project != project or (named is not None and work.root == named.root):
+                continue
+            found = declared_branch(self.conf, work.root, family_id)
+            if found is not None:
+                return found
+        return family_id
+
+    def branch_any(self, family_id: str, project: str | None = None) -> str:
+        """リポジトリの分からない家族の親のブランチ名（`branch`）。
+
+        リポジトリが分かればそれで引く。分からなければ、取り込み済みならその控えのリポジトリ、
+        そうでなければ識別子の名前のワークツリーの元リポジトリで引く。それも無ければ全部のツリーの
+        親チケットを見て、名乗る名前が 1 つに決まればそれ、決まらなければ識別子。
+        """
+        if project is None:
+            st = self.standing_any(family_id)
+            if st.imported:
+                project = project_of_key(st.repo)
+            else:
+                named = [w for w in self.worktrees() if w.name == family_id]
+                if len(named) == 1:
+                    project = named[0].project
+        if project is not None:
+            return self.branch(family_id, project)
+        # リポジトリが決まらない（取り込み前で、親のワークツリーもまだ無い）。どのリポジトリの
+        # ツリーの親チケットでも、名乗る名前が 1 つに決まるときだけそれを使う。
+        found = {
+            name
+            for work in self._all_trees()
+            if (name := declared_branch(self.conf, work.root, family_id)) is not None
+        }
+        return found.pop() if len(found) == 1 else family_id
+
+    def claims(self, family_id: str, project: str = "") -> list[str]:
+        """家族を名乗るブランチ（ADR-0100 の 5 章）。
+
+        手元のツリー（同じリポジトリのワークスペースルートかプロジェクトと、ワークツリー）のうち、
+        HEAD が指すブランチの名前が、そのツリーの家族の親チケット（承認済みか提案）が名乗る名前
+        （`branch:`、無ければ識別子）と同じもの。2 本以上あれば権威が決まらない
+        （`standing` が止める）。
+        """
+        found: set[str] = set()
+        for work in self._all_trees():
+            if work.project != project:
+                continue
+            head = tree.branch_of(work.root)
+            if not head:
+                continue
+            if declared_branch(self.conf, work.root, family_id) == head:
+                found.add(head)
+        return sorted(found)
+
+    def _all_trees(self) -> list[tree.Tree]:
+        return [tree.main_tree(self.root), *tree.projects(self.conf.projects), *self.worktrees()]
 
     def _named_tree(self, family_id: str, project: str) -> tree.Tree | None:
         if not tree.exact_name(self.root, family_id):
@@ -457,6 +552,7 @@ class Families:
         record = family(self.conf.state, repo, family_id) if self.active else None
         if record is None:
             return Standing(family_id, repo)
+        branch = self.branch(family_id, project)
         home = self.home_tree(family_id, project)
         if record.state == STATE_CLOSED or self._closed_in_integration(repo, family_id, home):
             return Standing(
@@ -466,16 +562,23 @@ class Families:
                 home,
                 stop=f"家族 {family_id} は閉じている（統合先の done/ に親の写しがある）",
                 closed=True,
+                branch=branch,
             )
         if record.broken:
             stop = f"家族 {family_id} の控えが壊れている（{record.broken}）"
         elif record.state == STATE_GONE:
             stop = (
-                f"親のブランチ {family_id} がリモートに無く、統合先にも閉じた記録が無い"
-                "（家族の控えが gone）。この家族の状態を決められない"
+                f"親のブランチ {record.branch or branch} がリモートに無く、"
+                "統合先にも閉じた記録が無い（家族の控えが gone）。この家族の状態を決められない"
             )
         elif record.state == STATE_BLOCKED:
             stop = f"取り込みの検査で家族 {family_id} を止めた（{record.reason or '理由なし'}）"
+        elif record.branch and record.branch != branch:
+            stop = (
+                f"家族 {family_id} の控えの親のブランチ（{record.branch}）と、親チケットが名乗る"
+                f"親のブランチ（{branch}）が違う。取り込んだ後に `branch:` が変わったか、"
+                "別のブランチの写しを見ている。どちらの写しを本物とするかが決まらない"
+            )
         elif home is None:
             named = self._named_tree(family_id, project)
             busy = tree.busy_of(named.root) if named is not None else ""
@@ -488,7 +591,7 @@ class Families:
                 )
             elif named is not None:
                 stop = (
-                    f"親のワークツリー（{where}）の HEAD がブランチ {family_id} を指していない。"
+                    f"親のワークツリー（{where}）の HEAD がブランチ {branch} を指していない。"
                     "取り込み済みの家族でどの写しを本物とするかが決まらない"
                 )
             else:
@@ -498,8 +601,15 @@ class Families:
                     "（家族の控えは、親のワークツリーを片付けても残る）"
                 )
         else:
-            stop = ""
-        return Standing(family_id, repo, record, home, stop=stop)
+            rivals = [b for b in self.claims(family_id, project) if b != branch]
+            stop = (
+                f"家族 {family_id} を名乗るブランチが 1 本でない（{', '.join([branch, *rivals])}。"
+                "どれもその上の親チケットが自分のブランチだと名乗っている）。権威が決まらない"
+                "（ADR-0100 の 5 章）"
+                if rivals
+                else ""
+            )
+        return Standing(family_id, repo, record, home, stop=stop, branch=branch)
 
     def _closed_in_integration(self, repo: str, family_id: str, home: tree.Tree | None) -> bool:
         """統合先の控えの `done/` に、この家族の親の写しがあるか（家族の控えに頼らない）。
@@ -520,6 +630,34 @@ class Families:
         if mine is None or not mine.approved_at:
             return True
         return mine.approved_at == closed.approved_at
+
+
+def declared_branch(conf: settings.Settings, tree_root: str, family_id: str) -> str | None:
+    """そのツリーの家族の親チケットが名乗る親のブランチ名（`branch:`、無ければ識別子）。
+
+    見るのは承認済みの `doing/`・`done/`、提案の `review/`・`todo/` の順で、最初に見つかった
+    `ticket: <P>` の親（`parent:` を持たない）のもの。どこにも無ければ None。チケットとしての検査は
+    掛けない（`branch:` の値は読んだまま返し、使えない名前は承認の側が断る）。
+    """
+    approved = settings.approved_dir(conf, tree_root)
+    proposals = os.path.join(tree_root, conf.tickets.replace("/", os.sep))
+    for path in (
+        os.path.join(approved, ticket_mod.DOING, f"{family_id}.md"),
+        os.path.join(approved, ticket_mod.DONE, f"{family_id}.md"),
+        os.path.join(proposals, ticket_mod.REVIEW, f"{family_id}.md"),
+        os.path.join(proposals, ticket_mod.TODO, f"{family_id}.md"),
+    ):
+        text = fsio.read_text(path)
+        if text is None:
+            continue
+        front, _, problems = ticket_mod._frontmatter(text)
+        if not isinstance(front, dict) or problems:
+            continue
+        if str(front.get("ticket") or "") != family_id or front.get("parent"):
+            continue
+        raw = front.get(ticket_mod.BRANCH_KEY)
+        return raw.strip() if isinstance(raw, str) and raw.strip() else family_id
+    return None
 
 
 def _home_parent_copy(
@@ -561,6 +699,7 @@ def guidance(root: str, st: Standing) -> list[str]:
     sync = settings.script_command(root, "ccnavi-sync.sh")
     git = settings.script_command(root, "ccnavi-git.sh")
     name = st.family
+    branch = st.branch_name
     if st.closed:
         return [f"家族 {name} は閉じている。状態の操作は無い。親のワークツリーは片付けてよい"]
     record = st.record
@@ -573,7 +712,7 @@ def guidance(root: str, st: Standing) -> list[str]:
     if record is not None and record.state == STATE_GONE:
         return [
             f"オンラインで '{sync} {name}' を打つと戻し方が出る。改名・消し間違いならユーザに"
-            f"元の名前 {name} でブランチを戻してもらい、オンラインで '{sync} {name}' を"
+            f"元の名前 {branch} でブランチを戻してもらい、オンラインで '{sync} {name}' を"
             "打ち直してください",
             f"家族を捨てたなら、親のワークツリーを片付けて（'{git} worktree remove "
             f".claude/worktrees/{name}'）、ユーザに '{sync} --forget {name}' で家族の控えを"
@@ -590,10 +729,21 @@ def guidance(root: str, st: Standing) -> list[str]:
             "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから"
             "打ち直してください"
         ]
+    if "名乗るブランチが 1 本でない" in st.stop:
+        return [
+            f"家族 {name} の親チケットを、親のブランチ {branch} の上だけに残してください。"
+            "ほかのブランチの写しを消すか、そのブランチを片付けるのはユーザが決めます"
+        ]
+    if "控えの親のブランチ" in st.stop:
+        return [
+            f"親チケットの branch: を控えの名前に戻すか、家族を捨てて切り直すならユーザに "
+            f"'{sync} --forget {name}' で家族の控えを消してもらってください"
+            "（エージェントは打たない）"
+        ]
     return [
-        f"親のワークツリーを切り直してください（'{git} fetch origin {name}' のあと "
-        f"'{git} worktree add .claude/worktrees/{name} -b {name} origin/{name}'）。"
-        f"別のブランチに居るなら {name} に戻してください。"
+        f"親のワークツリーを切り直してください（'{git} fetch origin {branch}' のあと "
+        f"'{git} worktree add .claude/worktrees/{name} -b {branch} origin/{branch}'）。"
+        f"別のブランチに居るなら {branch} に戻してください。"
         f"閉じた家族なら、オンラインで '{sync}' を打って"
         "統合先を取り込み直してください。捨てた家族なら、ユーザに "
         f"'{sync} --forget {name}' で家族の控えを消してもらってください",
