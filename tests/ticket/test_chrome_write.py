@@ -24,7 +24,7 @@ from ccnavi.infra import settings
 from ccnavi.tickets import history
 from tests.ticket.test_core import CoreHarness, _chrome
 from tests.ticket.test_phases import child_text, parent_text
-from tests.ticket.test_ticket import git, write
+from tests.ticket.test_ticket import git, to_old_form, write
 
 ACTOR = {"account": "alice", "version": "9.9.9"}
 
@@ -292,6 +292,9 @@ class WithdrawableTest(ChromeWriteHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
+        # 承認の記録を持つ古い形には、前の条件（欄を読む）を当てる。
+        to_old_form(self.approved, "i0001")
+        self.commit_parent("old form")
         board = self.answer(self.chrome_request("board", "i0001"))
         self.assertEqual(
             board["withdrawable"],

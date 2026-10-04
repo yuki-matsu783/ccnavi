@@ -23,6 +23,7 @@ import shutil
 import tempfile
 import unittest
 
+from ccnavi.tickets import history
 from tests import common_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, RULES, git, read_json, write
@@ -704,7 +705,11 @@ class PhaseTest(PhaseHarness):
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             text = f.read()
         self.assertIn("feedback: []", text)
-        self.assertIn("feedback_at", text)
+        # 改版の時刻はチケットに書かず、状態の履歴の `revised`（`feedback: true`）に残る。
+        self.assertNotIn("feedback_at", text)
+        events, _ = history.read(self.approved, "i0001")
+        revised = [e for e in events if e["kind"] == history.KIND_REVISED]
+        self.assertEqual([e.get("feedback") for e in revised], [True])
         # 改版の提案は承認で todo/ から消える。
         self.assertFalse(
             os.path.exists(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md"))

@@ -1,6 +1,6 @@
 """テストから ccnavi を 1 回動かす。プロセスを起こさず、同じプロセスの中で cli.run を呼ぶ。
 
-`python -m ccnavi` は標準入出力を整えて cli.run を呼ぶだけ（ccnavi/__main__.py）。
+`python -m ccnavi` は標準入出力を整えて cli.run を呼ぶだけ（src/ccnavi/__main__.py）。
 テストが見るのは引数・標準入力・標準出力・標準エラー・終了コードで、それは
 cli.run の入口と出口そのものなので、プロセスを起こさなくても同じものが読める。
 
@@ -51,7 +51,7 @@ def run_ccnavi(
     with contextlib.ExitStack() as stack:
         if env is not None:
             # 走った機械の git の設定を締め出す分（tests.GIT_ENV）は、環境を空にしても
-            # 残す。ccnavi は判定の中で git を起こす（ccnavi/infra/gitcmd.py）ので、ここで
+            # 残す。ccnavi は判定の中で git を起こす（src/ccnavi/infra/gitcmd.py）ので、ここで
             # 落とすと、この経路だけがホストの `~/.gitconfig` を読み直す。
             # 呼び手が同じ名前を渡したときは呼び手を優先する。締め出し方そのものを
             # 試すテストが、ここでの締め出しに上書きされないようにするため。

@@ -19,7 +19,7 @@ import tempfile
 import unittest
 
 from ccnavi.entry import version
-from tests import ROOT
+from tests import ROOT, SRC
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
@@ -57,7 +57,7 @@ def sh_compat() -> int:
 
 
 def extension_compat() -> int:
-    path = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "src", "core", "version.ts")
+    path = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "version.ts")
     with open(path, encoding="utf-8") as f:
         found = re.search(r"^export const EXTENSION_COMPAT = ([0-9]+);$", f.read(), re.MULTILINE)
     assert found is not None, "src/core/version.ts に EXTENSION_COMPAT が無い"
@@ -108,7 +108,7 @@ class CompatSkewTest(unittest.TestCase):
     def test_v3_in_the_ccnavi_repository_the_fix_is_a_rebuild(self):
         """V3 build.py とソースがあれば組み立て直しを言う。"""
         write(os.path.join(self.ws, "build.py"), "", mode=0o644)
-        write(os.path.join(self.ws, "ccnavi", "__main__.py"), "", mode=0o644)
+        write(os.path.join(self.ws, "src", "ccnavi", "__main__.py"), "", mode=0o644)
         self.put_bin(STUB.format(compat=sh_compat() + 1))
         result = self.run_ticket()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -129,7 +129,9 @@ class CompatSkewTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         fake = os.path.join(self.ws, "ccnavi-src")
         python = sys.executable.replace("\\", "/")
-        write(fake, f'#!/bin/sh\ncd "{ROOT}" && exec "{python}" -m ccnavi "$@"\n')
+        write(
+            fake, f'#!/bin/sh\ncd "{ROOT}" && PYTHONPATH="{SRC}" exec "{python}" -m ccnavi "$@"\n'
+        )
         script = (
             '. "$1/.ccnavi/scripts/ccnavi-common.sh"\n'
             'if said=$(ccnavi_compat_skew "$1" "$2"); then echo same; else echo "$said"; fi\n'
@@ -148,7 +150,7 @@ class CompatAgreesTest(unittest.TestCase):
     def test_v6_the_executable_the_sh_and_the_extension_declare_the_same_compat(self):
         """V6 互換の版は 3 か所に書く。上げるときは揃えて上げる。
 
-        上げ方は ccnavi/entry/version.py の説明のとおり。
+        上げ方は src/ccnavi/entry/version.py の説明のとおり。
         """
         self.assertEqual(sh_compat(), version.COMPAT)
         self.assertEqual(extension_compat(), version.COMPAT)
@@ -167,6 +169,51 @@ class CompatAgreesTest(unittest.TestCase):
         改名の前の sh（互換 2）は `--approve` を渡して落ちるので、食い違いとして知らせる。
         """
         self.assertGreaterEqual(version.COMPAT, 3)
+
+    def test_v9_approval_leaving_the_ticket_as_is_raised_the_compat_to_4(self):
+        """V9 承認がチケットの中身を変えなくなり、待ち方の置き場（`phases/<親>/workflow.yml`）と
+        取り下げの条件が変わった。sh は `ticket status` を呼ぶ。なので 4 以上。
+
+        古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）は待ち方を一直線と読み、
+        `status` を知らないので、食い違いとして知らせる。
+        """
+        self.assertGreaterEqual(version.COMPAT, 4)
+
+
+@unittest.skipIf(not SHELL, "sh も bash も見つからない")
+class TicketStatusPassTest(unittest.TestCase):
+    """`ccnavi-ticket.sh status` は親を省いても実行ファイルへ渡す（C1 を通らない）。"""
+
+    def setUp(self):
+        self.ws = tempfile.mkdtemp(prefix="ccnavi-status-")
+        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
+        shutil.copytree(SCRIPTS, os.path.join(self.ws, ".ccnavi", "scripts"))
+        write(os.path.join(self.ws, "dist", "ccnavi", "ccnavi"), STUB.format(compat=sh_compat()))
+
+    def run_ticket(self, *args):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        return subprocess.run(
+            [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), *args],
+            cwd=self.ws,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+
+    def test_status_without_a_parent_reaches_the_executable(self):
+        result = self.run_ticket("status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ticket status", result.stdout)
+
+    def test_status_with_a_parent_reaches_the_executable(self):
+        result = self.run_ticket("status", "i0001")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ticket status i0001", result.stdout)
+
+    def test_other_verbs_still_need_an_id(self):
+        result = self.run_ticket("start")
+        self.assertEqual(result.returncode, 2, result.stdout)
 
 
 if __name__ == "__main__":

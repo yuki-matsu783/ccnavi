@@ -45,8 +45,8 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 | 変えたもの | 足すグループ |
 |---|---|
 | `tests/<グループ>/` の中 | そのグループ |
-| `ccnavi/**/*.py`・`main.py` | `guard` `config` `ticket` |
-| `ccnavi/infra/platformtag.py` | 上に加えて `sh` |
+| `src/ccnavi/**/*.py`・`main.py` | `guard` `config` `ticket` |
+| `src/ccnavi/infra/platformtag.py` | 上に加えて `sh` |
 | `build.py` | `guard` `sh` `e2e` |
 | `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
@@ -54,9 +54,9 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh` | `sh` |
 | `.claude/hooks/test-py.sh` | `e2e` |
-| `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`vscode-extension/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
+| `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/fixtures/` | `guard` `ticket` |
-| `vscode-extension/` | `ticket`（`core` の `test_test_json` も例を読む） |
+| `extensions/vscode/` | `ticket`（`core` の `test_test_json` も例を読む） |
 | `docs/adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
@@ -73,15 +73,15 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 - 統合先に取り込む前、MR に出す前
 - どの行に当たるか迷った
 
-`ccnavi/**/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
+`src/ccnavi/**/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
 
-## 拡張（`vscode-extension/ccnavi-board`）のグループ
+## 拡張（`extensions/vscode/ccnavi-board`）のグループ
 
 拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / shared）。
 こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る。
 
 ```sh
-cd vscode-extension/ccnavi-board
+cd extensions/vscode/ccnavi-board
 pnpm test:plan src/core/rules-doc.ts   # 何を回すかだけ見る
 pnpm test:for src/core/rules-doc.ts    # 回す
 pnpm test                              # 全部

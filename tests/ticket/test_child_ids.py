@@ -139,7 +139,9 @@ class FamilyOfTest(unittest.TestCase):
                 self.assertEqual(c1.family_of(ident), family)
 
     def test_the_chrome_entry_gives_the_same_answer(self):
-        path = os.path.join(ROOT, "chrome-extension", "ccnavi-approval", "py", "ccnavi_chrome.py")
+        path = os.path.join(
+            ROOT, "extensions", "chrome", "ccnavi-approval", "py", "ccnavi_chrome.py"
+        )
         spec = importlib.util.spec_from_file_location("ccnavi_chrome_family", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -203,9 +205,7 @@ class FollowupRefusesTest(NextChildIdTest):
         return found
 
     def followup(self, phase_no):
-        return approval.followup(
-            self.conf, self.ws, self.parent(), phase_no, [], ["指摘"], "2026-10-04T00:00:00Z"
-        )
+        return approval.followup(self.conf, self.ws, self.parent(), phase_no, [], ["指摘"])
 
     def test_a_full_phase_writes_nothing(self):
         self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)

@@ -33,8 +33,9 @@
 | ワークツリーを切る・`<統合先>` に取り込む・片付ける、他セッションの変更の影響を受けた、issue・MR を指定して作業を頼まれた | `docs/claude/worktree.md` |
 | 下書きや使い捨てのファイルを置く | `docs/claude/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `docs/claude/projects.md` |
+| 承認済みチケットの状態を確かめる（着手の前、引き継ぎを読んだあと、承認の有無に迷ったとき）。ファイルを読んで推測せず `sh .ccnavi/scripts/ccnavi-ticket.sh status` を打つ | `docs/claude/projects.md` |
 | 提案を書く、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `docs/claude/decisions.md` |
 | sh やスクリプトを書く、ワークスペースルート・統合先ブランチなどの用語を確かめる、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `docs/claude/environment.md` |
-| ccnavi の実行ファイル（`ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
+| ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
 | フィードバックメッセージが届いた、`.claude/skills/` を直したくなった、フィードバック計画を書く | `docs/claude/skill-review.md` |

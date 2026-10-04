@@ -1,0 +1,611 @@
+/**
+ * 実行ファイルを探して走らせる。Node の子プロセスを使うが VS Code には依存しない。
+ * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
+ *
+ * 走らせるのは 9 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
+ * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
+ * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
+ * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
+ * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
+ * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）。
+ * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
+ * 判定と検証はルールファイルを差し替えられる。
+ * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
+ * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（ワークスペースかプロジェクトの設定の種類なら `--project-phases-file <名前>=<パス>`）で
+ * 差し替えられる（リスク管理画面・フェーズ管理画面）。
+ * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと state の置き場は外し、記録も残さない
+ * （試し打ちで記録を汚さない）。
+ */
+import { execFile } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import {
+  parseApprovePreview,
+  parseApproveResult,
+  partialMessage,
+  type ApproveMismatch,
+  type ApproveOutcome,
+  type ApprovePreview,
+  type ApproveResult,
+} from "./core/approvemodel.js";
+import {
+  approveArgs,
+  c1TargetOf,
+  decideArgs,
+  decidePreviewArgs,
+  previewArgs,
+  REVIEW_SCRIPT,
+  toPosixPath,
+  type Launcher,
+} from "./core/commands.js";
+import {
+  parseDecidePreview,
+  parseDecideResult,
+  type DecideOutcome,
+  type DecidePreview,
+} from "./core/decidemodel.js";
+import { parseLintJson, unknownOption, type LintJson } from "./core/lintmodel.js";
+import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
+import { parseBoardJson, type BoardJson } from "./core/model.js";
+import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
+import {
+  parseSamplesJson,
+  parseTestJson,
+  type SamplesJson,
+  type TestJson,
+} from "./core/testmodel.js";
+import { missingFlags, parseVersionJson, type VersionProbe } from "./core/version.js";
+
+export type LoadResult =
+  | { readonly ok: true; readonly board: BoardJson; readonly launcher: Launcher }
+  | { readonly ok: false; readonly error: string; readonly launcher: Launcher | undefined };
+
+export type RunResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: string };
+
+export interface LintResult {
+  readonly ok: boolean;
+  /** `--lint` の報告そのもの。error があれば終了コードが非ゼロで ok が偽 */
+  readonly report: string;
+}
+
+/** ボードの JSON はチケットが増えても数百 KB。余裕を持って 32 MB まで受ける */
+const MAX_OUTPUT = 32 * 1024 * 1024;
+
+/**
+ * 承認の 2 本に付ける期限（ミリ秒）。承認している間オーバーレイは閉じられないので、
+ * 実行ファイルが返らないとパネルが「承認している…」から戻らなくなる。
+ * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て 60 秒。
+ */
+const APPROVE_TIMEOUT_MS = 60_000;
+
+/**
+ * ボードの読み直し（`--explain --json`）に付ける期限（ミリ秒）。返らないと画面の「更新」が
+ * 押されたまま戻らず、以後の読み直しも何も出さずに捨てられる（board-panel の loading が真のまま残る）。
+ * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て承認と同じ 60 秒。
+ */
+const EXPLAIN_TIMEOUT_MS = 60_000;
+
+/**
+ * 診断の 4 本（`--test` / `--test-samples` / `--lint` / `--lint --json`）に付ける期限（ミリ秒）。
+ * この 4 本を待つ間、ルール管理・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
+ * 届いたときにしか活性へ戻さない。ボードと違って HTML の総取り替えも監視の読み直しも無いので、
+ * 返らないと画面を閉じるまで戻れない（編集中の内容は消える）。値はボードと承認に揃えて 60 秒。
+ */
+const DIAGNOSE_TIMEOUT_MS = 60_000;
+
+/** 期限で打ち切ったときの文面。標準エラーには何も残らないので、呼び手の代わりにここで組む */
+function cutOff(what: string, ms: number): string {
+  return `${what} を ${ms / 1000} 秒で打ち切りました`;
+}
+
+const NOT_FOUND =
+  "ccnavi の実行ファイルが見つかりません（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、src/ccnavi/__main__.py のどれもありません）。設定 ccnaviBoard.binPath で指定できます";
+
+/** 見るのはルールだけ。チケット制御と state の置き場は外し、記録も残さない */
+const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
+
+/**
+ * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは `--rules` で、
+ * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
+ * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
+ * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
+ * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
+ * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
+ * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
+ */
+export type RulesOverride =
+  | { readonly kind: "workspace"; readonly path: string }
+  | { readonly kind: "project"; readonly name: string; readonly path: string }
+  | { readonly kind: "self"; readonly path: string };
+
+/**
+ * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、リスクの配点を `--risk` で、
+ * 共通の設定のフェーズの種類を `--phases` で、ワークスペースの設定（`self`）かプロジェクトの設定の種類を
+ * `--project-phases-file <名前>=<パス>` で差し替えられる。後者の種類は共通の設定と合成して確かめられる。
+ * 判定（`--test`）には配点も種類も関係ないので、そちらは RulesOverride だけを受ける。
+ */
+export type LintOverride =
+  | RulesOverride
+  | { readonly kind: "risk"; readonly path: string }
+  | { readonly kind: "phases"; readonly path: string }
+  | { readonly kind: "layerPhases"; readonly name: string; readonly path: string };
+
+function overrideArgs(override: LintOverride): string[] {
+  switch (override.kind) {
+    case "workspace":
+      return ["--rules", override.path];
+    case "project":
+      return ["--project-rules-file", `${override.name}=${override.path}`];
+    case "self":
+      return ["--project-rules-file", `self=${override.path}`];
+    case "risk":
+      return ["--risk", override.path];
+    case "phases":
+      return ["--phases", override.path];
+    case "layerPhases":
+      return ["--project-phases-file", `${override.name}=${override.path}`];
+  }
+}
+
+export function findLauncher(root: string, setting: string): Launcher | undefined {
+  return locate({
+    root,
+    setting,
+    settingsEnvBin: readSettingsEnvBin(root),
+    hostTarget: hostTarget(process.platform, process.arch),
+    exists: (p) => {
+      try {
+        return fs.statSync(p).isFile();
+      } catch {
+        return false;
+      }
+    },
+    join: path.join,
+    isAbsolute: path.isAbsolute,
+  });
+}
+
+/** `.claude/settings.local.json` が先、無ければ `.claude/settings.json`。Claude Code の env の重なりと同じ */
+function readSettingsEnvBin(root: string): string | undefined {
+  for (const name of ["settings.local.json", "settings.json"]) {
+    let text: string;
+    try {
+      text = fs.readFileSync(path.join(root, ".claude", name), "utf8");
+    } catch {
+      continue;
+    }
+    const found = binFromSettingsJson(text);
+    if (found !== undefined) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+interface Ran {
+  readonly code: number;
+  readonly stdout: string;
+  readonly stderr: string;
+  /** 期限で打ち切った（execFile が強制終了した）。標準エラーには何も残らないので、呼び手が文面を作る */
+  readonly killed: boolean;
+}
+
+function run(
+  launcher: Launcher,
+  root: string,
+  args: readonly string[],
+  timeout?: number,
+): Promise<Ran> {
+  const common = ["--root", root, ...args];
+  const [file, argv] =
+    launcher.kind === "exe"
+      ? [launcher.path, common]
+      : ["uv", ["run", "python", "-m", "ccnavi", ...common]];
+  return spawn(file, argv, root, timeout);
+}
+
+/** 子プロセスを 1 本走らせ、終了コード・出力・打ち切られたかを返す */
+function spawn(file: string, argv: readonly string[], cwd: string, timeout?: number): Promise<Ran> {
+  return new Promise((resolve) => {
+    execFile(
+      file,
+      argv,
+      {
+        cwd,
+        maxBuffer: MAX_OUTPUT,
+        windowsHide: true,
+        ...(timeout === undefined ? {} : { timeout }),
+        // 標準出力は ASCII に落としてあるが、標準エラーの日本語が化けないように。
+        env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
+      },
+      (error, stdout, stderr) => {
+        const code =
+          error === null
+            ? 0
+            : typeof (error as { code?: unknown }).code === "number"
+              ? ((error as { code: number }).code as number)
+              : -1;
+        resolve({
+          code,
+          stdout,
+          stderr: stderr.trim() || (error ? error.message : ""),
+          killed: (error as { killed?: unknown } | null)?.killed === true,
+        });
+      },
+    );
+  });
+}
+
+export async function loadBoard(root: string, setting: string): Promise<LoadResult> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, launcher, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
+  if (ran.code !== 0) {
+    const why = ran.killed
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒たっても応答が無いため打ち切りました`
+      : ran.stderr;
+    return { ok: false, launcher, error: `ccnavi --explain --json が失敗しました: ${why}` };
+  }
+  const parsed = parseBoardJson(ran.stdout);
+  if (!parsed.ok) {
+    return { ok: false, launcher, error: parsed.error };
+  }
+  return { ok: true, launcher, board: parsed.board };
+}
+
+/** 承認の答え。形は契約の側（`core/approvemodel.ts`）が持つ */
+export type { ApproveOutcome };
+
+/**
+ * 承認待ちの一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
+ * 記録と state の置き場は外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
+ */
+export async function runApprovePreview(
+  root: string,
+  setting: string,
+  only: readonly string[] = [],
+): Promise<RunResult<ApprovePreview>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
+  if (ran.killed) {
+    return {
+      ok: false,
+      error: `${cutOff("ccnavi --agree --preview --json", APPROVE_TIMEOUT_MS)}。何も承認していません`,
+    };
+  }
+  if (ran.code !== 0) {
+    // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
+    // 読めない提案の行より後ろに出るので、1 行目だけでは伝わらない。
+    return { ok: false, error: `ccnavi --agree --preview --json が失敗しました:\n${ran.stderr.trim()}` };
+  }
+  const parsed = parseApprovePreview(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/**
+ * 見せた一覧をそのまま承認する（`--agree --yes <識別子,…> --digest <ダイジェスト> --json`）。
+ * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
+ */
+export async function runApproveYes(
+  root: string,
+  setting: string,
+  tickets: readonly string[],
+  digest: string,
+  only: readonly string[] = [],
+): Promise<ApproveOutcome> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
+  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（agree.py の for cand in batch）ので、
+  // 途中で強制終了されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
+  // ここで拾わないと何が起きたのか伝わらない。
+  if (ran.killed) {
+    return {
+      ok: false,
+      error:
+        `${cutOff("ccnavi --agree --yes", APPROVE_TIMEOUT_MS)}。` +
+        "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットと push はターミナルに送っていません" +
+        "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確かめてください",
+    };
+  }
+  const parsed = parseApproveResult(ran.stdout);
+  if (parsed.ok) {
+    return ran.code === 0
+      ? parsed
+      : { ok: false, error: `ccnavi --agree --yes が失敗しました: ${firstLine(ran.stderr)}` };
+  }
+  if ("mismatch" in parsed) {
+    return parsed;
+  }
+  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで何も言わないとユーザは
+  // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
+  if ("partial" in parsed) {
+    return { ok: false, error: partialMessage(parsed.partial) };
+  }
+  const said = firstLine(ran.stderr) || firstLine(ran.stdout);
+  return { ok: false, error: said === "" ? `ccnavi --agree --yes の出力を読み取れません（${parsed.error}）` : said };
+}
+
+/**
+ * 残った指摘の 2 本に付ける期限（ミリ秒）。sh がホストからスレッドを取ってくるので承認より長い。
+ * 置いている間オーバーレイは閉じられないので、返らないとパネルが戻らなくなる
+ */
+const DECIDE_TIMEOUT_MS = 120_000;
+
+/**
+ * 残った指摘とダイジェストを見る（`ccnavi-review.sh decide <N> --preview`）。何も置かない。
+ * ホストを読むのは sh（実行ファイルはネットワークに出ない）なので、実行ファイルではなく sh を走らせる。
+ * cwd は親のワークツリー（sh はそこを親として実行ファイルに渡す）
+ */
+export async function runDecidePreview(
+  root: string,
+  shell: string,
+  tree: string,
+  phase: number,
+): Promise<RunResult<DecidePreview>> {
+  const ran = await runScript(shell, root, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。反映していません` };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `ccnavi-review.sh decide --preview が失敗しました:\n${ran.stderr.trim()}` };
+  }
+  const parsed = parseDecidePreview(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/**
+ * ユーザが選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`）。
+ * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
+ */
+export async function runDecideYes(
+  root: string,
+  shell: string,
+  tree: string,
+  phase: number,
+  choices: Readonly<Record<string, string>>,
+  digest: string,
+): Promise<DecideOutcome> {
+  const ran = await runScript(shell, root, tree, decideArgs(phase, choices, digest), DECIDE_TIMEOUT_MS);
+  if (ran.killed) {
+    return {
+      ok: false,
+      error:
+        `${cutOff("ccnavi-review.sh decide", DECIDE_TIMEOUT_MS)}。` +
+        "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確かめてください",
+    };
+  }
+  const parsed = parseDecideResult(ran.stdout.trim().split("\n").pop() ?? "");
+  if (parsed.ok || "mismatch" in parsed) {
+    return parsed;
+  }
+  const said = firstLine(ran.stderr) || firstLine(ran.stdout);
+  return { ok: false, error: said === "" ? `ccnavi-review.sh decide の出力を読み取れません（${parsed.error}）` : said };
+}
+
+/**
+ * sh のスクリプト（`.ccnavi/scripts/` の下）を子プロセスで走らせる。パスは `/` 区切りにする
+ * （Windows の Git Bash は `C:/…` を読める）
+ */
+function runScript(
+  shell: string,
+  root: string,
+  cwd: string,
+  args: readonly string[],
+  timeout: number,
+): Promise<Ran> {
+  return spawn(shell, [toPosixPath(path.join(root, REVIEW_SCRIPT)), ...args], cwd, timeout);
+}
+
+/** 1 件を判定する。`rules` は当てるルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */
+export async function runTest(
+  root: string,
+  setting: string,
+  rules: RulesOverride,
+  tool: string,
+  subject: string,
+): Promise<RunResult<TestJson>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, [
+    ...overrideArgs(rules),
+    ...RULES_ONLY,
+    "--test",
+    tool,
+    subject,
+    "--json",
+  ], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --test --json", DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `ccnavi --test --json が失敗しました: ${ran.stderr}` };
+  }
+  const parsed = parseTestJson(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/** 見本をぜんぶ判定に掛ける */
+export async function runSamples(
+  root: string,
+  setting: string,
+  rules: RulesOverride,
+  samplesPath: string,
+): Promise<RunResult<SamplesJson>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, [
+    ...overrideArgs(rules),
+    ...RULES_ONLY,
+    "--test-samples",
+    samplesPath,
+    "--json",
+  ], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --test-samples --json", DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `ccnavi --test-samples --json が失敗しました: ${ran.stderr}` };
+  }
+  const parsed = parseSamplesJson(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/**
+ * 記録からルールの候補を起こす（`--suggest --json`、README「候補の JSON」）。読むのは保存済みの
+ * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と見本の判定で確かめたものだけ。
+ * 記録を読むので `--log ""` は付けない（state の置き場は実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
+ */
+export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, ["--suggest", "--json"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --suggest --json", DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    if (unknownOption(ran.stderr, "--suggest")) {
+      return { ok: false, error: "実行ファイルが --suggest に対応していません（古い版です）。実行ファイルを更新してください" };
+    }
+    return { ok: false, error: `ccnavi --suggest --json が失敗しました: ${firstLine(ran.stderr)}` };
+  }
+  const parsed = parseSuggestJson(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/** 設定を検証する。error が 1 件でもあれば ok が偽 */
+export async function runLint(
+  root: string,
+  setting: string,
+  override: LintOverride,
+): Promise<RunResult<LintResult>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --lint", DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code < 0 || ran.code > 1) {
+    return { ok: false, error: `ccnavi --lint が失敗しました: ${ran.stderr}` };
+  }
+  return { ok: true, value: { ok: ran.code === 0, report: ran.stdout.trim() } };
+}
+
+/**
+ * 実運用の設定をそのまま検証し、苦情を JSON で受ける（README「lint の JSON」）。
+ * 差し替えは無し。プロジェクト管理画面が、置き場とプロジェクトごとの warn を拾うために呼ぶ。
+ * error があると終了コードが 1 になるが、それは JSON の中身で分かるので失敗にしない。
+ */
+/** 出力の最初の空でない行。画面の 1 行に収める用途で、全量は要らない */
+function firstLine(text: string): string {
+  return text.split(/\r?\n/).map((l) => l.trim()).find((l) => l !== "") ?? "";
+}
+
+export async function runLintJson(root: string, setting: string): Promise<RunResult<LintJson>> {
+  return lintJson(root, setting, [], "ccnavi --lint --json");
+}
+
+/**
+ * 子チケットのフロー 1 本を実行ファイルに確かめさせる（`--lint --json --flow <パス>`）。
+ * フロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルに書いて渡す。読み手と検査は
+ * SubagentStart と同じもので、答えは `(flow)` の苦情（`problemsOfFlow`）。
+ * 先に `--version --json` で `--flow` を知っているかを見る。知らない古い実行ファイル（`--version` も
+ * 知らないものを含む）は、確かめられないとして失敗にする（開かない・保存しない側）。
+ */
+export async function runFlowLint(root: string, setting: string, flowPath: string): Promise<RunResult<LintJson>> {
+  const what = "ccnavi --lint --json --flow";
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const refused = missingFlags(probe, ["--flow"], what, hasSource(root));
+  if (refused !== undefined) {
+    return { ok: false, error: refused };
+  }
+  return lintJson(root, setting, ["--flow", flowPath], what);
+}
+
+/**
+ * 実行ファイルに版を聞く（`--version --json`）。実行ファイルが見つからなければ undefined。
+ * `--version` を知らない古い実行ファイルは argparse の「知らないオプション」で見分けて `old` にする
+ * （見分けにこの苦情を使うのは、ここの 1 か所だけ）。
+ */
+export async function probeVersion(root: string, setting: string): Promise<VersionProbe | undefined> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return undefined;
+  }
+  const ran = await run(launcher, root, ["--version", "--json"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { kind: "failed", error: cutOff("ccnavi --version --json", DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    if (unknownOption(ran.stderr, "--version")) {
+      return { kind: "old" };
+    }
+    return { kind: "failed", error: `ccnavi --version --json が失敗しました: ${firstLine(ran.stderr)}` };
+  }
+  const parsed = parseVersionJson(ran.stdout);
+  return parsed.ok ? { kind: "ok", info: parsed.value } : { kind: "failed", error: parsed.error };
+}
+
+/**
+ * ワークスペースが ccnavi のリポジトリ（組み立てる元の build.py とソースがある）か。
+ * 実行ファイルが古いときの直し方が、組み立て直しか配り直しかで分かれる
+ */
+export function hasSource(root: string): boolean {
+  return fs.existsSync(path.join(root, "build.py")) && fs.existsSync(path.join(root, "src", "ccnavi", "__main__.py"));
+}
+
+async function lintJson(root: string, setting: string, extra: readonly string[], what: string): Promise<RunResult<LintJson>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, ["--lint", "--json", ...extra], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code < 0 || ran.code > 1) {
+    return { ok: false, error: `${what} が失敗しました: ${firstLine(ran.stderr)}` };
+  }
+  const parsed = parseLintJson(ran.stdout);
+  if (parsed.ok) {
+    return { ok: true, value: parsed.value };
+  }
+  // 設定の不備などで実行ファイルが JSON ではなくユーザ向けの文面を出したときは、JSON.parse の苦情より
+  // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
+  const said = firstLine(ran.stdout) || firstLine(ran.stderr);
+  return { ok: false, error: said === "" ? `${what} の出力を読めません（${parsed.error}）` : `${what} の出力: ${said}` };
+}
+
+/**
+ * 親子のチケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * フローの保存の後、承認の push を送るかを決めるのに使う。
+ */
+export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return "";
+  }
+  const ran = await run(launcher, root, ["c1", "family", parent], EXPLAIN_TIMEOUT_MS);
+  return ran.code === 0 ? c1TargetOf(ran.stdout) : "";
+}
