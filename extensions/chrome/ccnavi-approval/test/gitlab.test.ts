@@ -80,6 +80,7 @@ function placeFiles(files: Record<string, string>): Record<string, string> {
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
+const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
 test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
   assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "requested-changes", "resolved"]);
@@ -131,6 +132,7 @@ test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミ
     [
       ["create", DOING],
       ["create", EVENTS],
+      ["create", WORKFLOW],
       ["delete", TODO],
     ].sort(),
   );
@@ -140,16 +142,19 @@ test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミ
   assert.match(files[EVENTS], /"via": "chrome"/);
   assert.match(files[EVENTS], new RegExp(`"actor": "${GL_LOGIN}"`));
 
-  // 取り下げ: 承認コミットを GitLab の履歴（first_parent）から引き、元の提案をそのまま戻す
+  // 取り下げ: 承認コミットを GitLab の履歴（first_parent）から引き、元の提案をそのまま戻す。
+  // 固定した待ち方も一緒に消す
   const back = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", "押し間違い", glDeps(mock));
   assert.equal(back.kind, "written", JSON.stringify(back));
   const second = mock.glCommits[1];
   assert.deepEqual(second.actions.map((a) => [a.action, a.file_path]).sort(), [
     ["create", TODO],
     ["delete", DOING],
+    ["delete", WORKFLOW],
     ["update", EVENTS],
   ]);
   assert.equal(mock.files("i0001")[TODO], parentOnly().i0001.files[TODO]);
+  assert.ok(!(WORKFLOW in mock.files("i0001")));
 });
 
 test("CX-T147 事後確認: 書く直前に関係の無い書き込み（コード）が割り込んでも、判定し直して同じなら残す（元に戻さない）", async () => {

@@ -630,11 +630,13 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
     approval.align_imported(conf, root, preds)
+    times = approval.approved_times(conf, copies + review)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
         place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
-        head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{place}、{bound}）"
+        when = times.get(t.path, approval.ApprovedTime()).label()
+        head = f"{t.ticket}（{t.title}、承認 {when}、{place}、{bound}）"
         if t.is_child:
             unmet = approval.unmet_predecessors(t, preds)
             need = "要" if t.review_required else "不要"
@@ -790,6 +792,10 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         tid: [_where(t) for t in ticket_mod.collisions(hits)] for tid, hits in grouped.items()
     }
 
+    # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
+    times = approval.approved_times(
+        conf, [t for t in (*open_index.values(), *closed_index.values()) if t is not None]
+    )
     for ticket_id in sorted(set(proposal_index) | set(open_index) | set(closed_index)):
         payload["tickets"].append(
             _ticket_record(
@@ -804,6 +810,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
                 scattered.get(ticket_id, []),
                 problems,
                 preds,
+                times,
             )
         )
 
@@ -835,7 +842,9 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 "title": t.title,
                 "project": t.project,
                 "path": t.path,
-                "approved_at": t.approved_at,
+                # 承認は欄を書かない。古い形の欄が無ければ、退避した状態の履歴の承認の時刻。
+                "approved_at": t.approved_at
+                or approval.history_time(archive.base_dir(root, t.project), t.ticket),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
                 "cancelled_at": t.cancelled_at,
@@ -966,6 +975,7 @@ def _ticket_record(
     scattered: list[dict],
     problems: list[str],
     preds: dict[str, list[ticket_mod.Ticket]],
+    times: dict[str, approval.ApprovedTime],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -1018,7 +1028,12 @@ def _ticket_record(
         "copy": (
             {
                 "status": status,
-                "approved_at": copy.approved_at,
+                # 承認の時刻（`approval.approved_times`）。`approved_from` はどこから引いたか:
+                # history（状態の履歴）/ commit（doing/ に足したコミット）/
+                # uncommitted（履歴もコミットも無い。手で置いてまだコミットしていない）/
+                # 空（分からない）。uncommitted と空のとき approved_at は空。
+                "approved_at": times.get(copy.path, approval.ApprovedTime()).at,
+                "approved_from": times.get(copy.path, approval.ApprovedTime()).source,
                 "source_tree": copy.source_tree,
                 "path": copy.path,
             }

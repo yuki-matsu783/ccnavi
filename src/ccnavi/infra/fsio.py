@@ -34,8 +34,8 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 # ---- 時計（判定のコアの Clock の差し替え点）
 #
 # 時刻はこの 2 つの関数だけが読む。`clock` で固定すると、その間の `stamp` と `utc_stamp` は
-# 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と履歴（`at`）に同じ時刻を
-# 書き、Chrome（Pyodide）と手元が同じ入力から同じバイト列を出すため。
+# 同じ 1 つの時刻を返す。承認の plan が履歴（`at`）やマーカーに書く時刻を固定し、
+# Chrome（Pyodide）と手元が同じ入力から同じバイト列を出すため。
 _CLOCK: dict = {"fixed": ""}
 _STAMP_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
 
@@ -374,6 +374,15 @@ def remove(path: str) -> None:
         _record(path)
 
 
+def put_back(pairs: tuple[tuple[str, bytes | None], ...]) -> None:
+    """パスごとに前の中身へ戻す（中身が None なら消す）。戻せなくても何も出さない。"""
+    for path, data in pairs:
+        if data is None:
+            remove(path)
+        else:
+            write_bytes(path, data)
+
+
 def unlink(path: str) -> str:
     """消す。消せたら空文字、無い・消せないなら理由（`remove` と違って理由を返す）。"""
     if _STAGE["current"] is not None:
@@ -600,6 +609,21 @@ def note_read(path: str, content: str | bytes | None) -> None:
         seen.setdefault(key, digest)
 
 
+def note_exact(path: str, content: bytes | None) -> None:
+    """読んだバイト列を、改行を揃えずに記録する（同じパスの前の記録を置き換える）。
+
+    承認はバイト列をそのまま動かすので、動かす提案は改行や BOM だけの違いも判定の読みとして
+    覆う（`agree.carried`）。ほかの読みは `note_read` のまま（機械の改行でダイジェストが
+    変わらないように）。
+    """
+    if not _READERS:
+        return
+    key = os.path.normpath(parent_resolved(os.path.abspath(path)))
+    digest = READ_ABSENT if content is None else "bytes:" + hashlib.sha256(content).hexdigest()
+    for seen in _READERS:
+        seen[key] = digest
+
+
 def content_digest(content: str | bytes) -> str:
     """中身のハッシュ。
 
@@ -701,7 +725,9 @@ FAIL_HISTORY = "history"  # 履歴の書けなかった知らせに溜めて続�
 class Policy:
     """書けなかったときの扱い。`message` の `{reason}` に理由が入る。
 
-    `undo` は落ちたときに消すパス（書いた側を戻して、両方に残さない）。`places` は、
+    `undo` は落ちたときに消すパス（書いた側を戻して、両方に残さない）。`restore` は落ちたときに
+    前の中身へ戻すパスと中身の組（中身が None なら消す）。先に書いた別のファイルを、片方だけ新しく
+    なった形で残さないために使う。`places` は、
     書けたらその識別子を「置いた」と数える。`group` が同じ行と書き込みは 1 つの組で、
     `FAIL_LINE` で落ちたら残りを飛ばす。`ticket` は知らせの頭に付ける識別子。
     `prefix` は `message` の前に付ける語（呼び手の用件。「マーカーを置けない: 」など）。
@@ -712,6 +738,7 @@ class Policy:
     message: str = "{reason}"
     prefix: str = ""
     undo: tuple[str, ...] = ()
+    restore: tuple[tuple[str, bytes | None], ...] = ()
     places: str = ""
     group: int = 0
     ticket: str = ""

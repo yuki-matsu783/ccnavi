@@ -128,7 +128,7 @@ class RawShareTest(PhaseHarness):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
 
     def test_pre_tool_use_hold_reads_once(self):
-        """レビュー待ちの止めは、親を引くのとフェーズを組むのと承認の知らせで同じ読みを使う。"""
+        """レビュー待ちの止めは、親を引くのとフェーズを組むので同じ読みを使う。"""
         self.ended_phase()
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         for tool, extra in (("Agent", {"description": "次の子"}), ("Bash", {"command": "make"})):
@@ -141,14 +141,14 @@ class RawShareTest(PhaseHarness):
                 self.assertIn("DENY_PHASE_REVIEW", self.reason(result))
                 self.assertEqual(reads.counts(), ONCE)
 
-    def test_pre_tool_use_at_the_workspace_root_reads_once(self):
-        """ワークスペースルートのシェルは止めの側で読まず、承認の知らせの 1 度だけ。"""
+    def test_pre_tool_use_at_the_workspace_root_reads_nothing(self):
+        """ワークスペースルートのシェルは置き場を読まない（承認の知らせは外した）。"""
         self.ended_phase()
         result, reads = self.counted(
             lambda: self.hook("PreToolUse", "Bash", self.root, command="ls")
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(reads.counts(), ONCE)
+        self.assertEqual(reads.counts(), (0, 0, 0))
 
     def test_stop_reads_once(self):
         """ターンの終わりは、範囲と `finish` の促し（閉じられるかの検査）で同じ読みを使う。"""

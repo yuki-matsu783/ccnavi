@@ -325,17 +325,48 @@ def done_ids(integ: Integration | None, approved_rel: str) -> tuple[set[str], st
 
 @dataclass(frozen=True)
 class DoneCopy:
-    """統合先の `done/` 上のチケットの、閉じたかを決めるのに要る欄だけ。"""
+    """統合先の `done/` 上のチケットの、閉じたかを決めるのに要る欄だけ。
+
+    照合に使うのは、スクリプトだけが書く着手と取り消しの欄（`base_sha`・`started_at`・
+    `cancelled_at`）。`approved_at` は、承認で欄を書いていた頃の古い形を読むためだけに持つ。
+    """
 
     ticket: str
     parent: str
-    approved_at: str
+    base_sha: str = ""
+    started_at: str = ""
+    cancelled_at: str = ""
+    approved_at: str = ""
+
+
+# 同じ親かを比べる欄。最初に両方が値を持つ欄で決める。
+MATCH_FIELDS = ("base_sha", "started_at", "cancelled_at")
+
+
+def same_parent(mine: DoneCopy | None, closed: DoneCopy) -> bool:
+    """手元の親（`mine`）と統合先の `done/` の親（`closed`）が同じ親チケットか。
+
+    `base_sha` → `started_at` → `cancelled_at` の順に、最初に両方が値を持つ欄が同じなら同じとする。
+    空どうしは一致としない（空文字は無いとみなす）。どの欄でも照合できないとき、手元に親が無いときは
+    同じとしない（閉じていない側に倒し、止めて戻し方を出す）。
+
+    移行の間だけ、両方に 3 つとも無く両方に古い `approved_at` があれば、それで比べる。
+    """
+    if mine is None:
+        return False
+    for name in MATCH_FIELDS:
+        a, b = getattr(mine, name), getattr(closed, name)
+        if a and b:
+            return a == b
+    if any(getattr(c, n) for c in (mine, closed) for n in MATCH_FIELDS):
+        return False
+    return bool(mine.approved_at) and mine.approved_at == closed.approved_at
 
 
 def done_copy(integ: Integration, approved_rel: str, ident: str) -> DoneCopy | None:
     """統合先の `done/<識別子>.md` の frontmatter の欄。無い・読めなければ None。
 
-    閉じたかを決めるのに要るのは識別子・親・承認の時刻だけなので、チケットとしての検査
+    閉じたかを決めるのに要るのは識別子・親・着手と取り消しの欄だけなので、チケットとしての検査
     （範囲の欄など）は掛けない（検査に落ちる古いチケットでも、閉じた記録として読む）。
     """
     data, why = integ.file(f"{approved_rel.strip('/')}/done/{ident}.md")
@@ -347,6 +378,13 @@ def done_copy(integ: Integration, approved_rel: str, ident: str) -> DoneCopy | N
         return None
 
 
+def _text(value: object) -> str:
+    # 欄の値を文字列で。None と空白だけの値は無いとみなす。
+    if value is None or isinstance(value, (dict, list)):
+        return ""
+    return str(value).strip()
+
+
 def _copy_fields(text: str) -> DoneCopy | None:
     # 同じパッケージの frontmatter の読み方を使う（チケットの検査は掛けない）。
     front, _, problems = ticket_mod._frontmatter(text)
@@ -355,9 +393,12 @@ def _copy_fields(text: str) -> DoneCopy | None:
     record = front.get("ccnavi_approved")
     approved_at = record.get("approved_at") if isinstance(record, dict) else ""
     return DoneCopy(
-        ticket=str(front.get("ticket") or ""),
-        parent=str(front.get("parent") or ""),
-        approved_at=str(approved_at or ""),
+        ticket=_text(front.get("ticket")),
+        parent=_text(front.get("parent")),
+        base_sha=_text(front.get("base_sha")),
+        started_at=_text(front.get("started_at")),
+        cancelled_at=_text(front.get("cancelled_at")),
+        approved_at=_text(approved_at),
     )
 
 
@@ -728,8 +769,9 @@ class Families:
 
         取り込み状態には頼らない。
 
-        親のワークツリーに承認済みの親のチケットがあれば、承認の時刻が同じときだけ閉じたとする。
-        同じ識別子の古い親子のチケットを、今のものと読まない（sh の見方と同じ）。
+        親のワークツリーの承認済みの親のチケットと、着手と取り消しの欄（`same_parent`）で同じ親だと
+        言えるときだけ閉じたとする。同じ識別子の古い親子のチケットを、今のものと読まない。手元に親が
+        無いときと、どの欄でも照合できないときは閉じていない側に倒す（sh の見方と同じ）。
         """
         ids, why = self.done(repo)
         if why or family_id not in ids:
@@ -740,10 +782,7 @@ class Families:
         closed = done_copy(integ, self.conf.approved, family_id)
         if closed is None or closed.ticket != family_id or closed.parent:
             return False
-        mine = _home_parent_copy(self.conf, home, family_id)
-        if mine is None or not mine.approved_at:
-            return True
-        return mine.approved_at == closed.approved_at
+        return same_parent(_home_parent_copy(self.conf, home, family_id), closed)
 
 
 def approved_branch(conf: settings.Settings, tree_root: str, family_id: str) -> str | None:

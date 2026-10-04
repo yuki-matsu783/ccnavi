@@ -15,6 +15,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { sceneKind } from "./host-fixture.js";
 import { HERE } from "./python.js";
 
 export const GITLAB_SCENES = path.join(HERE, "test", "fixtures", "host", "gitlab");
@@ -28,10 +29,11 @@ export interface GitLabScene {
   readonly files: Record<string, unknown>;
 }
 
+/** レビューの場面。取り下げの見本（`scene.json` の `kind` が `withdraw`）は `withdraw-fixture.ts` が読む */
 export function gitlabSceneNames(): string[] {
   return fs
     .readdirSync(GITLAB_SCENES)
-    .filter((n) => fs.statSync(path.join(GITLAB_SCENES, n)).isDirectory())
+    .filter((n) => fs.statSync(path.join(GITLAB_SCENES, n)).isDirectory() && sceneKind(GITLAB_SCENES, n) !== "withdraw")
     .sort();
 }
 

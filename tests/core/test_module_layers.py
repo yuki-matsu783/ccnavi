@@ -183,6 +183,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.cli",
                 "entry.diagnose",
                 "entry.lint",
+                "entry.status",
                 "entry.suggest",
                 "entry.version",
                 "hook.events",

@@ -39,6 +39,8 @@ CONFIG = (
 PARENT = "i0001"
 COPY = f".ccnavi/approved/doing/{PARENT}.md"
 APPROVED_AT = "2026-09-01T00:00:00+0900"
+BASE_SHA = "1" * 40
+STARTED_AT = "2026-09-02T00:00:00+09:00"
 
 
 # 読める承認済みチケットにするための範囲
@@ -46,8 +48,16 @@ APPROVED_AT = "2026-09-01T00:00:00+0900"
 ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
 
-def copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
-    """親の承認済みチケット（ブロックの形の ccnavi_approved）。"""
+def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", body=""):
+    """着手済みの親の承認済みチケット（承認で欄を書かない形。着手の欄はスクリプトが書く）。"""
+    head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
+    fields = f"base_sha: {base_sha}\n" if base_sha else ""
+    fields += f"started_at: '{started_at}'\n" if started_at else ""
+    return f"{head}{fields}{extra}---\n{body}"
+
+
+def old_copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
+    """承認で欄を書いていた頃の、未着手の親の承認済みチケット（ブロックの形の ccnavi_approved）。"""
     head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
     return f"{head}ccnavi_approved:\n  approved_at: {approved_at}\n---\n{body}"
 
@@ -84,6 +94,52 @@ def fields(path):
 
 def os_name():
     return subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
+
+
+@unittest.skipIf(SHELL is None, "sh が無い")
+class FrontFieldTest(unittest.TestCase):
+    """sh の `front_field` が、Python の `syncstate._text`（YAML で読んだ値）と同じ値を出す。
+
+    `null`・`~`・引用符の外の注記を sh だけが値として読むと、閉じたかの照合が Python と食い違う。
+    """
+
+    VALUES = (
+        "abc",
+        '"abc # x"',
+        "'a b'",
+        "abc # c",
+        "null",
+        "Null",
+        "NULL",
+        "~",
+        "",
+        '""',
+        "#x",
+        "a#b",
+        '"q" # c',
+        "' sp '",
+    )
+
+    def sh_value(self, line):
+        with open(os.path.join(SH_DIR, "ccnavi-sync.sh"), encoding="utf-8") as f:
+            text = f.read()
+        start = text.index("front_field() {")
+        body = text[start : text.index("\n}\n", start) + 3]
+        script = body + 'printf "%s\\n" "$1" | front_field base_sha\n'
+        done = subprocess.run(
+            [SHELL, "-c", script, "sh", line], capture_output=True, text=True, encoding="utf-8"
+        )
+        return done.stdout.rstrip("\n")
+
+    def test_the_same_values_as_python(self):
+        from ccnavi.tickets import syncstate
+        from ccnavi.tickets import ticket as ticket_mod
+
+        for value in self.VALUES:
+            with self.subTest(value=value):
+                front, _, _ = ticket_mod._frontmatter(f"---\nticket: x\nbase_sha: {value}\n---\n")
+                expected = syncstate._text(front.get("base_sha"))
+                self.assertEqual(self.sh_value(f"base_sha: {value}"), expected)
 
 
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
@@ -447,10 +503,20 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(os.path.dirname(self.record), "i0002")))
         self.assertTrue(os.path.isdir(tree))
 
-    def close_on_main(self, approved_at=APPROVED_AT):
-        self.remote_commit(
-            "main", f".ccnavi/approved/done/{PARENT}.md", copy_text(approved_at=approved_at)
-        )
+    def close_on_main(self, text=None):
+        self.remote_commit("main", f".ccnavi/approved/done/{PARENT}.md", text or copy_text())
+
+    def mine(self, text):
+        """親のワークツリーの承認済みの親チケットを置き換える。"""
+        self.local_commit(COPY, text)
+        git(self.tree, "push", "-q", "origin", PARENT)
+
+    def closed_after_delete(self):
+        self.review_says("none")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        return fields(self.record)["state"], done
 
     def test_a_merged_and_deleted_branch_is_closed(self):
         self.keep_record()
@@ -473,15 +539,69 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("closed", fields(self.record)["state"])
 
     def test_an_old_done_copy_of_the_same_id_is_not_this_family(self):
-        # 同じ識別子の古い親チケット（承認の時刻が違う）は、
-        # 今の親子のチケットが閉じた記録ではない。
-        self.review_says("none")
-        self.keep_record()
-        self.close_on_main(approved_at="2020-01-01T00:00:00+0900")
-        self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
+        # 同じ識別子の古い親チケット（着手の基準点が違う）は、
+        # 今の親子のチケットが閉じた記録ではない。後ろの欄（started_at）が同じでも見ない。
+        self.close_on_main(copy_text(base_sha="2" * 40))
+        state, done = self.closed_after_delete()
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("gone", fields(self.record)["state"])
+        self.assertEqual("gone", state)
+
+    def test_started_at_is_compared_when_base_sha_is_on_one_side_only(self):
+        self.mine(copy_text(base_sha=""))
+        self.close_on_main(copy_text())
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_a_parent_cancelled_before_start_is_matched_by_cancelled_at(self):
+        # 未着手のまま取り消した親は cancelled_at で照合する（永久に止まらない）。
+        unstarted = copy_text(base_sha="", started_at="", extra="cancelled_at: '2026-09-03'\n")
+        self.mine(unstarted)
+        self.close_on_main(unstarted)
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_nothing_to_compare_is_not_closed(self):
+        # どの欄でも照合できない（空どうし、空文字）なら閉じていない側に倒し、止めて戻し方を出す。
+        bare = copy_text(base_sha="''", started_at="")
+        self.mine(bare)
+        self.close_on_main(bare)
+        state, done = self.closed_after_delete()
+        self.assertEqual("gone", state)
+        self.assertIn("戻し方", done.stdout)
+
+    def test_fields_in_the_body_are_not_read(self):
+        # 欄は frontmatter の行頭だけから拾う。本文の同じ語の行で別の値を拾わない。
+        self.mine(copy_text(base_sha="", body="base_sha: aaaa\n"))
+        self.close_on_main(copy_text(base_sha="", body="base_sha: bbbb\n"))
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_a_crlf_done_copy_is_read(self):
+        self.close_on_main(copy_text().replace("\n", "\r\n"))
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_old_copies_on_both_sides_compare_the_approval_time(self):
+        # 承認で欄を書いていた頃の形どうしは、移行の間だけ approved_at で比べる。
+        self.mine(old_copy_text())
+        self.close_on_main(old_copy_text())
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_old_copies_with_another_approval_time_are_not_closed(self):
+        self.mine(old_copy_text())
+        self.close_on_main(old_copy_text(approved_at="2020-01-01T00:00:00+0900"))
+        self.assertEqual("gone", self.closed_after_delete()[0])
+
+    def test_an_old_done_copy_is_not_matched_with_a_new_one(self):
+        # 片方に着手の欄があれば approved_at では比べない。
+        self.close_on_main(old_copy_text())
+        self.assertEqual("gone", self.closed_after_delete()[0])
+
+    def test_a_parent_missing_in_the_parent_tree_is_not_closed(self):
+        # 承認前の提案だけが残る親のワークツリー（この親子のチケットは閉じようがない）。
+        os.makedirs(os.path.join(self.tree, "wip", "proposals", "todo"))
+        git(self.tree, "mv", "--", COPY, f"wip/proposals/todo/{PARENT}.md")
+        git(self.tree, "commit", "-q", "-m", "back to todo")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        self.close_on_main()
+        state, done = self.closed_after_delete()
+        self.assertEqual("gone", state, done.stdout + done.stderr)
 
     def test_a_child_copy_in_done_is_not_the_parent(self):
         self.review_says("none")
@@ -609,9 +729,11 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("gone", fields(self.record)["state"])
 
     def test_an_archive_of_another_approval_is_not_this_family(self):
+        # 親のワークツリーに親チケットが残っていれば、着手の欄（base_sha）でも
+        # 同じ親と言えるときだけ。
         self.review_says("unknown", 3)
         self.keep_record()
-        self.archive_locally(copy_text(approved_at="2020-01-01T00:00:00+0900"))
+        self.archive_locally(copy_text(base_sha="0000000"))
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)

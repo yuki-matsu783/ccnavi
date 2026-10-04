@@ -1,7 +1,8 @@
 """チケットの状態を動かす操作。`ccnavi ticket start|finish|cancel <識別子>`。
 
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
-サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
+サブエージェントからの呼び出しは hook の判定が止める（`hook/judge.py` が `phase.forbidden` で
+`DENY_SUBAGENT_TICKET_OP` を返す）。実行ファイルは呼び手がサブエージェントかを知らない。
 
 やることは置き場を動かして欄を書くことだけ（状態は置き場が表す）。`start` は置き場を動かさず
 `doing/` の欄を書く。`finish` は `doing/` から `wip/proposals/review/`（レビュー要）か
@@ -972,6 +973,38 @@ def finish_nudge(root: str, found: Unfinished) -> str:
             "この案内は同じ HEAD では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
         ]
     )
+
+
+def base_off_head(root: str, conf: settings.Settings, t: ticket_mod.Ticket) -> str:
+    """基準点（`base_sha`）がチケットのワークツリーの HEAD の祖先でないときの文。でなければ空。
+
+    着手の欄はスクリプトだけが書く。承認はチケットの中身を変えないので、手で動かした承認では
+    提案の段階で書かれた基準点がそのまま入りうる。`--lint` と `ccnavi ticket status` が warn で
+    言う。`start` では止めない（`started_at` も仕込まれていれば「着手済み」で先に返り、`base_sha`
+    だけなら判定が `blocked` で止め、`start` は基準点を HEAD で書き直す）。ワークツリーが無い・
+    HEAD を読めないときは確かめられないので空を返す（言わない）。判定には入れない
+    （判定は git を読まない）。
+    """
+    if not t.base_sha:
+        return ""
+    owner = tree.project_root(conf.projects, t.project) or root
+    worktree = tree.worktree_path(root, t.ticket)
+    if not tree.is_worktree_of(owner, worktree):
+        return ""
+    head = _head(worktree)
+    if not head or _is_ancestor(worktree, t.base_sha, head):
+        return ""
+    return (
+        f"基準点（base_sha: {t.base_sha}）がワークツリー {worktree} の HEAD の祖先でない。"
+        "着手の欄はスクリプトだけが書くもので、提案の段階で書かれた値か、ワークツリーの履歴を"
+        "書き換えたあとかもしれない。ユーザに承認済みチケットの base_sha を確かめてもらってください"
+    )
+
+
+def _is_ancestor(worktree: str, base: str, head: str) -> bool:
+    """`base` が `head` の祖先（か同じ）か。確かめられなければ偽（warn で言う側）。"""
+    done = gitcmd.run(worktree, ["merge-base", "--is-ancestor", base, head], TIMEOUT_SECONDS)
+    return done.ok
 
 
 def _branch_words(t: ticket_mod.Ticket) -> str:

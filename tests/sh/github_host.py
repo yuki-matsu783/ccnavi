@@ -64,7 +64,20 @@ def _missing_fields(query: str, fields) -> list[str]:
 
 
 def scene_names() -> list[str]:
-    return sorted(n for n in os.listdir(SCENES) if os.path.isdir(os.path.join(SCENES, n)))
+    """レビューの場面。
+
+    取り下げの見本（`scene.json` の `kind` が `withdraw`）は拡張の試験だけが読む。
+    """
+    return sorted(
+        n
+        for n in os.listdir(SCENES)
+        if os.path.isdir(os.path.join(SCENES, n)) and _kind(n) != "withdraw"
+    )
+
+
+def _kind(scene: str) -> str:
+    with open(os.path.join(SCENES, scene, "scene.json"), encoding="utf-8") as f:
+        return str(json.load(f).get("kind") or "")
 
 
 def _load(scene: str, name: str):

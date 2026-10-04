@@ -1,0 +1,8 @@
+{
+  "c21187351187aea6ece188a35200843923e063b7": {
+    "text": "---\nversion: 1\nticket: i0001\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
+    "isBinary": false,
+    "isTruncated": false,
+    "byteSize": 301
+  }
+}

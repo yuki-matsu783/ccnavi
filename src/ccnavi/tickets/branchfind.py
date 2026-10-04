@@ -131,8 +131,7 @@ def _blank(text: str, *patterns: re.Pattern) -> str:
 def prompt_context(conf: settings.Settings, root: str, text: str) -> str:
     """依頼文に issue・MR の指定があれば、紐づくブランチを探してユーザに確かめる指示。無ければ空。
 
-    チケット制御が disable なら出さない（指示の中身が親の識別子と `branch:` の承認に寄るため。
-    承認の知らせ `agree.news` と同じ扱い）。
+    チケット制御が disable なら出さない（指示の中身が親の識別子と `branch:` の承認に寄るため）。
     """
     if not conf.tickets_enabled:
         return ""

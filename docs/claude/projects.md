@@ -3,7 +3,7 @@ type: guide
 title: プロジェクトを置いて作業する
 description: ワークスペースに複数のリポジトリを置いて管理する方法。置き場、チケット、設定の関連
 tags: [projects, ticket]
-keywords: [プロジェクト, projects, リポジトリ, clone, チケット, マーカー, 記録, ワークツリー, 層, message]
+keywords: [プロジェクト, projects, リポジトリ, clone, チケット, マーカー, 記録, ワークツリー, 層, message, status, 承認済みチケットの状態]
 ---
 
 # プロジェクトを置いて作業する
@@ -46,6 +46,18 @@ Draftを外したマーカー（`ready.json`）は、`ready`が閉じたチケ�
 差分を読んで取り込み、保存したものだけが効く。保存とコミット・pushはユーザが`ccnavi-push-approved.sh`で行う。取り込んで消えた下書きも
 一緒にコミットして push する。着手中はユーザも書き換えられない。着手のあとにフローが変わると、`NOTICE_TICKET_FLOW_CHANGED`で
 ユーザに知らされる。親のツリーから起動されたときは、自分が担当する子のフローだけに従う。
+
+## 承認済みチケットの状態を確かめるとき
+
+着手の前、引き継ぎを読んだあと、承認の有無に迷ったときは、ファイルを読んで推測せず
+`sh .ccnavi/scripts/ccnavi-ticket.sh status [<親>]`を打つ。置き場、承認の時刻、着手しているか、
+未コミットか・未pushか、止まっている理由、次の一手をccnaviが言う。読むだけなので、サブエージェントも打てる。
+
+承認はチケットの中身を変えない。手で`doing/`へ動かした承認とccnaviの承認は同じ中身になるので、欄が無いことや
+未コミットであることは、承認が途中で止まった印ではない。未コミットの承認済みチケットはエージェントが運ばず、
+statusが言うとおりユーザに`ccnavi-push-approved.sh <親>`を打ってもらう。
+
+## チケットの置き場の移り方
 
 チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち）→`.ccnavi/approved/doing/`（ユーザが承認）→
 `wip/proposals/review/`（`ticket finish`。レビューが要るとき）→`.ccnavi/approved/done/`（ユーザがレビュー）の順に

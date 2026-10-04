@@ -1,0 +1,19 @@
+[
+  {
+    "id": "f02d81311799553e76a123df663d53cef9d21f87",
+    "short_id": "f02d8131",
+    "created_at": "2026-09-29T03:00:00.000+00:00",
+    "parent_ids": [
+      "92c6cc1ac11c6ef1f04dc1288e7435f6e7e2bdcb"
+    ],
+    "title": "Move wip/proposals/todo/i0001.md to .ccnavi/approved/doing/i0001.md",
+    "message": "Move wip/proposals/todo/i0001.md to .ccnavi/approved/doing/i0001.md\n",
+    "author_name": "Hana Sato",
+    "author_email": "hana@example.com",
+    "authored_date": "2026-09-29T03:00:00.000+00:00",
+    "committer_name": "Hana Sato",
+    "committer_email": "hana@example.com",
+    "committed_date": "2026-09-29T03:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/widgets/-/commit/f02d81311799553e76a123df663d53cef9d21f87"
+  }
+]
