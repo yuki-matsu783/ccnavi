@@ -343,6 +343,41 @@ class ProjectsCollisionTest(unittest.TestCase):
         self.assertEqual(found[0]["severity"], "warn")
         self.assertIn(NOT_IGNORED, found[0]["detail"])
 
+    def test_symlinked_projects_dir_not_ignored_still_says_not_ignored(self):
+        """`projects` がシンボリックリンクでも言う。`projects/` で問うと git が rc=128 で断る。"""
+        self.no_tracking()
+        target = tempfile.mkdtemp(prefix="ccnavi-linked-")
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        try:
+            os.symlink(target, self.projects, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertIn(NOT_IGNORED, found[0]["detail"])
+
+    def test_empty_projects_flag_does_not_crash_the_lint(self):
+        """`--projects ""`（診断のフラグ）でも `--lint` は落ちず、置き場の苦情は出さない。"""
+        self.no_tracking()
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+
+        result = run_ccnavi(
+            ["--root", self.ws, "--projects", "", "--lint", "--json", "--mode", "enable"],
+            input="",
+            env=environment,
+        )
+
+        # 終了コードは見ない（この部屋の rules.yml は空で、`deny` が空の error が出る）。
+        # 落ちたなら JSON の報告が無い。
+        try:
+            problems = json.loads(result.stdout)["problems"]
+        except (ValueError, KeyError) as exc:
+            self.fail(f"--lint が報告を出さずに落ちた: {exc}\n{result.stdout}\n{result.stderr}")
+        self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
+
 
 # 載せ忘れの文面で、先頭の句の直後に来る句。ぶつかりとの見分けに使う（設計 §4.2）。
 FORGOT_NEXT = "（入れ子のリポジトリとして"

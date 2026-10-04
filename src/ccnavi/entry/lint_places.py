@@ -121,9 +121,12 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
         problems.append(Problem(SEVERITY_WARN, "(projects)", indexed))
     # 無視の確認は、置き場のディレクトリが在るときだけ行う（プロジェクトが 0 件でもよい）。
     # ディレクトリが無いのはプロジェクトを使っていないワークスペースで、何も言わない。
-    # 末尾の `/` を付けると、`/projects/` のようなディレクトリ向けの行が当たる。
-    rel = rel or os.path.relpath(conf.projects, root).replace(os.sep, "/")
-    if indexed is None and os.path.isdir(conf.projects) and _ignored(root, rel + "/") is False:
+    # `rel` が空（`--projects ""` やワークスペースの外を指す診断のフラグ）のときは、
+    # ワークスペースの git の話ではないので確認を飛ばす。
+    # 末尾の `/` は付けない。`projects` がシンボリックリンクだと `projects/` は
+    # git が rc=128（beyond a symbolic link）で断る。ディレクトリが実在すれば、
+    # 末尾の `/` が無くても `/projects/` のようなディレクトリ向けの行に当たる。
+    if rel and indexed is None and os.path.isdir(conf.projects) and _ignored(root, rel) is False:
         problems.append(
             Problem(
                 SEVERITY_WARN,
