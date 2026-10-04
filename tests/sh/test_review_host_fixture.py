@@ -601,7 +601,10 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(self.created_target(), "develop-v1.0.0")
 
     def test_request_targets_the_recorded_integration(self):
-        """宛先は ccnavi-fetch.sh と同じ順で決める。統合先の取り込み結果は origin/master より先に読む。"""
+        """宛先は ccnavi-fetch.sh と同じ順で決める。
+
+        統合先の取り込み結果は origin/master より先に読む。
+        """
         subprocess.run(
             ["git", "-C", self.ws, "update-ref", "refs/remotes/origin/master", "HEAD"], check=True
         )

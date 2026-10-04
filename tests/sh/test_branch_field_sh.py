@@ -19,7 +19,8 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
 5. 親のワークツリーでは親のブランチ（`branch:` の値）のほかへ移れない（識別子の名前のブランチへも）
 6. 子のワークツリーからは送れない（子のブランチは子の識別子）
 7. 同じ親子のチケットを名乗るブランチが 2 本あれば、どれを本物とするか決まらないとして止める
-8. 消えた（取り込み状態が gone の）親のブランチへは送れない。同じブランチを名乗る取り込み状態が 2 つでも送れない
+8. 消えた（取り込み状態が gone の）親のブランチへは送れない。同じブランチを名乗る取り込み状態が
+   2 つでも送れない
 9. 承認前の `branch:`・使えない `branch:`（手で書いたチケットの `origin/main` など、統合先）は、
    worktree add・checkout・sync・c1 family・push のどれも使わない
 10. 承認前に識別子のブランチを送った親子のチケットも、移って送れば取り込み状態の `branch` が書き直る
@@ -497,7 +498,8 @@ class BranchFieldTest(unittest.TestCase):
 
     def test_two_branches_claiming_one_family_stop_it(self):
         self.imported_family()
-        # 識別子と同じ名前のブランチに、branch: の無い承認済みの親チケットを置く（同じ親子のチケットを名乗る）
+        # 識別子と同じ名前のブランチに、branch: の無い承認済みの親チケットを置く
+        # （同じ親子のチケットを名乗る）
         # （移る前の識別子のブランチは手元に残っている）
         rival = os.path.join(self.ws, ".claude", "worktrees", "rival")
         git(self.ws, "worktree", "add", "-q", rival, PARENT)

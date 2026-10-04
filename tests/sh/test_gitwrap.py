@@ -1347,7 +1347,8 @@ class PushRemoteResolutionTest(FamilyRecordPushTest):
 class IntegrationPushTest(GitWrapperTest):
     """固定のリスト（main など）に無い名前の統合先へも直接は送らない。
 
-    統合先の名前は ccnavi-fetch.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 →
+    統合先の名前は ccnavi-fetch.sh と同じ順（CCNAVI_INTEGRATION_BRANCH →
+    ccnavi-sync.sh の取り込み結果 →
     origin/HEAD → origin/main・master）で、push したツリーが属するリポジトリについて決める。
     決まらなければ固定のリストだけで判定する（今までの挙動）。
     """
@@ -1440,7 +1441,8 @@ class IntegrationPushTest(GitWrapperTest):
         result = self.push(project)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-        # プロジェクトの統合先（取り込み結果）が develop-v1.0.0 なら止める。送り先は空のものに替えて見る。
+        # プロジェクトの統合先（取り込み結果）が develop-v1.0.0 なら止める。
+        # 送り先は空のものに替えて見る。
         bare2 = os.path.join(parent, "app2.git")
         git(project, "init", "-q", "--bare", bare2)
         git(project, "remote", "set-url", "origin", bare2)

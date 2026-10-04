@@ -363,7 +363,8 @@ class PushApprovedTest(Workspace):
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "develop-v1.0.0")
         self.place(project)
-        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先は別（取り込み結果が無く origin も空）。
+        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先は別
+        # （取り込み結果が無く origin も空）。
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
             "branch develop-v1.0.0\n",

@@ -125,7 +125,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertIntegration("develop-v1.0.0", tree)
 
     def test_a_project_reads_its_own_record_and_refs(self):
-        """プロジェクトは自分の取り込み結果と自分の origin を読み、ワークスペースのものは読まない。"""
+        """プロジェクトは自分の取り込み結果と origin を読み、ワークスペースのものは読まない。"""
         project = os.path.join(self.ws, "projects", "app")
         seed(project)
         self.record("self", "develop-v1.0.0")
