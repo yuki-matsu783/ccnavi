@@ -1,4 +1,4 @@
-"""保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（ccnavi/hook/wrapguard.py）。
+"""保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（src/ccnavi/hook/wrapguard.py）。
 
 止める・通すの判定は hook が持ち、sh の検査は 2 重目の確認にする。
 

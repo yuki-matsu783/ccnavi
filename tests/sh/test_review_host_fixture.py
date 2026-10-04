@@ -4,7 +4,7 @@
 見るのは 3 つ。
 
 1. 録ったホストの応答の見本
-   （`chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む JSON
+   （`extensions/chrome/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む JSON
    （`fetch`。`fetched_at` を除く）が、見本の期待値（`expected.json`）と同じ。拡張の試験
    （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ JSON を組む
 2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの `review.effective`・`_unresolved`）が
@@ -14,7 +14,7 @@
    呼び手が `--actor` を渡しても受けない
 
 ホストの API が変わって見本を録り直したら、`CCNAVI_HOST_FIXTURE=1` を付けてこのテストを回し、
-期待値を書き直す（手順は chrome-extension/ccnavi-approval/README.md の「ホストの応答の見本」）。
+期待値を書き直す（手順は extensions/chrome/ccnavi-approval/README.md の「ホストの応答の見本」）。
 """
 
 from __future__ import annotations

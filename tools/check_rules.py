@@ -52,7 +52,10 @@ def arguments(rules_path: str = RULES) -> list[str]:
 
 def environment() -> dict[str, str]:
     """`CCNAVI_*` を外した環境。走らせたユーザの dry-run や設定の差し替えを判定に入れない。"""
-    return {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    # パッケージは src レイアウト。入れていない Python でもこのツリーのソースを読む。
+    env["PYTHONPATH"] = os.path.join(ROOT, "src")
+    return env
 
 
 def main() -> int:

@@ -25,7 +25,9 @@ import sys
 import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, ROOT)
+# パッケージは src レイアウト（`src/ccnavi/`）。import 名は ccnavi のまま。
+SRC = os.path.join(ROOT, "src")
+sys.path.insert(0, SRC)
 
 from ccnavi.entry import version  # noqa: E402
 from ccnavi.infra import platformtag  # noqa: E402
@@ -51,7 +53,7 @@ def build_target() -> str:
     """組み立てた実行ファイルが動く機械の `<os>-<arch>`。
 
     PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。
-    導入スクリプトはこの語を配布先のディレクトリ名にする（ccnavi/infra/platformtag.py）。
+    導入スクリプトはこの語を配布先のディレクトリ名にする（src/ccnavi/infra/platformtag.py）。
     """
     return platformtag.host_target()
 
@@ -87,7 +89,7 @@ def source_commit(root: str) -> str:
 def write_buildinfo(stamp: str, commit: str) -> str:
     """組み立ての元のコミットを書いた部品を `stamp` に置き、そのパスを返す。
 
-    パッケージ（`ccnavi/`）の外に置く。中に置くと、ソースで動かしたときに前の組み立ての
+    パッケージ（`src/ccnavi/`）の外に置く。中に置くと、ソースで動かしたときに前の組み立ての
     コミットを名乗る。
     """
     os.makedirs(stamp, exist_ok=True)
@@ -120,7 +122,7 @@ def build() -> int:
         "--specpath",
         work,
         "--paths",
-        ROOT,
+        SRC,
         "--paths",
         stamp,
         "--hidden-import",

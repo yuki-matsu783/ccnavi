@@ -63,7 +63,7 @@ APPROVED = ".ccnavi/approved"
 
 # 実行ファイルの代わり。このツリーのソースを起こす。
 EXE = """#!/bin/sh
-PYTHONPATH='{root}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
 # git の代わり。push だけ、本物の push を済ませてから落ちたふりをする（応答だけが落ちた形）。
@@ -1034,7 +1034,7 @@ case " $* " in
   printf '{{"version":1,"ok":true,"reviewed":true,"followup":""}}\\n'
   exit 0 ;;
 esac
-PYTHONPATH='{root}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
 # git の代役。`remote get-url origin` だけをホストの代役の URL で答え、残りは本物に渡す
@@ -1159,7 +1159,7 @@ case " $* " in
 *" --config-synced "*)
   put "$m/config-sync.json" '{{"files": [], "notified": "terminal"}}'; exit 0 ;;
 esac
-PYTHONPATH='{root}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
 

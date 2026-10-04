@@ -227,7 +227,7 @@ info_from=""
 if bin=$(ccnavi_bin "$root"); then
 	info_from="$bin"
 	sync_info=$("$bin" --root "$root" sync paths 2>"$scratch/info" </dev/null) || info_from="failed:$bin"
-elif [ -f "$root/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
 	info_from="uv run python -m ccnavi"
 	sync_info=$(cd "$root" && uv run --quiet python -m ccnavi --root "$root" sync paths 2>"$scratch/info" </dev/null) ||
 		info_from="failed:uv run python -m ccnavi"

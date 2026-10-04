@@ -141,7 +141,7 @@ if bin=$(ccnavi_bin "$root"); then
 		tell_skew
 		"$bin" --root "$root" --cwd "$here" "$@"
 	}
-elif [ -f "$root/ccnavi/__main__.py" ]; then
+elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 elif [ "$sub" != merged ]; then
 	# merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。

@@ -410,7 +410,7 @@ REQ-APV-14 の文は判定ではないので、ルールの表に載せない。
 | REQ-DIA-10 | 事象 | 承認の対象の機械可読な提示を求められたとき（`--agree --preview --json`）、ccnavi は、承認の対象・承認画面の本文・承認の対象にしない提案とその理由・読めない提案を JSON で返し、承認済みチケットを置かないこと。承認の対象は承認が使うのと同じ関数で求めること |
 
 診断コマンドは hook から呼ばれず、ユーザが端末から打つ。REQ-DIA-06、REQ-DIA-02 の JSON 版
-（`--test --json` / `--test-samples --json`）、REQ-DIA-08 は VS Code の拡張（`vscode-extension/ccnavi-board/`）も読む。
+（`--test --json` / `--test-samples --json`）、REQ-DIA-08 は VS Code の拡張（`extensions/vscode/ccnavi-board/`）も読む。
 拡張は判定の答えを自前で出し直さず、実行ファイルが出したものを並べる。
 
 REQ-DIA-03 が無いと、報告するだけのモードや試験の結果が、判定を適用するモードの保証にならない。

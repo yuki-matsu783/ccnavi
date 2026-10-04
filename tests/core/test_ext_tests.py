@@ -2,7 +2,7 @@
 
 見るのは 2 つ。
 
-1. `vscode-extension/ccnavi-board/scripts/test-groups.js --plan` が、触ったファイルから
+1. `extensions/vscode/ccnavi-board/scripts/test-groups.js --plan` が、触ったファイルから
    回すグループを決める。中の関数は呼ばず、出る 1 行だけを見る（`groups=... compile=...
    webview=...`）。この行が sh（`.claude/hooks/test-ext.sh`）との契約
 2. `.claude/hooks/mark-ext.sh` が、拡張のファイルを触ったときだけ書き残す
@@ -23,7 +23,7 @@ import unittest
 
 from tests import ROOT
 
-BOARD = os.path.join(ROOT, "vscode-extension", "ccnavi-board")
+BOARD = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board")
 RUNNER = os.path.join(BOARD, "scripts", "test-groups.js")
 MARK = os.path.join(ROOT, ".claude", "hooks", "mark-ext.sh")
 TEST_EXT = os.path.join(ROOT, ".claude", "hooks", "test-ext.sh")
@@ -228,7 +228,7 @@ class ExtTestPlanTest(unittest.TestCase):
         self.assertEqual(plan("package.json"), plan("./package.json"))
 
     def test_paths_outside_the_extension_call_nothing(self):
-        got = plan(os.path.join(ROOT, "ccnavi", "main.py"))
+        got = plan(os.path.join(ROOT, "src", "ccnavi", "main.py"))
         self.assertEqual([], got["groups"])
         self.assertFalse(got["compile"])
 
@@ -236,7 +236,9 @@ class ExtTestPlanTest(unittest.TestCase):
         # hook が渡すのは絶対パス。ワークツリーで作業していると、その途中に
         # .claude/worktrees/<名前>/ が挟まる。どちらのパスでも同じ結論になる。
         absolute = os.path.join(BOARD, "src", "core", "risk-doc.ts")
-        worktree = "/tmp/ws/.claude/worktrees/w1/vscode-extension/ccnavi-board/src/core/risk-doc.ts"
+        worktree = (
+            "/tmp/ws/.claude/worktrees/w1/extensions/vscode/ccnavi-board/src/core/risk-doc.ts"
+        )
         expected = plan("src/core/risk-doc.ts")
         self.assertEqual(expected, plan(absolute))
         self.assertEqual(expected, plan(worktree))
@@ -278,32 +280,32 @@ class MarkExtHookTest(unittest.TestCase):
 
     def test_an_extension_file_is_written_down(self):
         with tempfile.TemporaryDirectory() as ws:
-            path = "/repo/vscode-extension/ccnavi-board/src/core/board.ts"
+            path = "/repo/extensions/vscode/ccnavi-board/src/core/board.ts"
             self.assertEqual([path], self.mark(ws, path))
 
     def test_a_worktree_path_is_written_down(self):
         with tempfile.TemporaryDirectory() as ws:
-            path = "/repo/.claude/worktrees/w1/vscode-extension/ccnavi-board/test/board/b.test.ts"
+            path = "/repo/.claude/worktrees/w1/extensions/vscode/ccnavi-board/test/board/b.test.ts"
             self.assertEqual([path], self.mark(ws, path))
 
     def test_a_windows_path_is_written_down_with_slashes(self):
         # JSON の中でバックスラッシュは 2 個に増えている。
         with tempfile.TemporaryDirectory() as ws:
-            given = "C:\\\\repo\\\\vscode-extension\\\\ccnavi-board\\\\src\\\\core\\\\board.ts"
+            given = "C:\\\\repo\\\\extensions\\\\vscode\\\\ccnavi-board\\\\src\\\\core\\\\board.ts"
             self.assertEqual(
-                ["C:/repo/vscode-extension/ccnavi-board/src/core/board.ts"],
+                ["C:/repo/extensions/vscode/ccnavi-board/src/core/board.ts"],
                 self.mark(ws, given),
             )
 
     def test_files_outside_the_extension_are_not_written_down(self):
         with tempfile.TemporaryDirectory() as ws:
-            self.assertEqual([], self.mark(ws, "/repo/ccnavi/main.py"))
+            self.assertEqual([], self.mark(ws, "/repo/src/ccnavi/main.py"))
             self.assertEqual([], self.mark(ws, "/repo/docs/adr/0036-tests-at-stop.md"))
 
     def test_the_same_file_twice_is_harmless(self):
         # 同じターンで 2 回直しても、回すグループは変わらない（Stop 側で sort -u する）。
         with tempfile.TemporaryDirectory() as ws:
-            path = "/repo/vscode-extension/ccnavi-board/src/core/board.ts"
+            path = "/repo/extensions/vscode/ccnavi-board/src/core/board.ts"
             self.mark(ws, path)
             self.assertEqual([path, path], self.mark(ws, path))
 
@@ -331,7 +333,7 @@ class TestExtHookTest(unittest.TestCase):
         base = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base, True)
         workspace = os.path.join(base, "ws")
-        board = os.path.join(base, tree, "vscode-extension", "ccnavi-board")
+        board = os.path.join(base, tree, "extensions", "vscode", "ccnavi-board")
         os.makedirs(os.path.join(board, "scripts"))
         os.makedirs(os.path.join(workspace, "logs", "session"))
         with open(os.path.join(board, "scripts", "test-groups.js"), "w", encoding="utf-8") as f:

@@ -370,7 +370,7 @@ class PushApprovedTest(Workspace):
         その置き場をコミットして push する。
 
         既定の置き場（`.ccnavi/approved`）はコミットしない。環境変数の名前は
-        `ccnavi/infra/settings.py` の `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
+        `src/ccnavi/infra/settings.py` の `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
         """
         other = "approved/tickets"
         tree = self.worktree("i0001")

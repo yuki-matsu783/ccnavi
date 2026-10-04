@@ -113,7 +113,7 @@ ccnavi_c1_label=ccnavi-push-approved
 ccnavi_c1_sh="$(dirname "$0")"
 if bin=$(ccnavi_bin "$root"); then
 	ccnavi_c1_exe() { "$bin" --root "$root" "$@"; }
-elif [ -f "$root/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
 	ccnavi_c1_exe() { (cd "$root" && uv run --quiet python -m ccnavi --root "$root" "$@"); }
 else
 	ccnavi_c1_exe() { return 1; }

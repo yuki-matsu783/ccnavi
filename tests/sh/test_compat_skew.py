@@ -19,7 +19,7 @@ import tempfile
 import unittest
 
 from ccnavi.entry import version
-from tests import ROOT
+from tests import ROOT, SRC
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
@@ -57,7 +57,7 @@ def sh_compat() -> int:
 
 
 def extension_compat() -> int:
-    path = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "src", "core", "version.ts")
+    path = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "version.ts")
     with open(path, encoding="utf-8") as f:
         found = re.search(r"^export const EXTENSION_COMPAT = ([0-9]+);$", f.read(), re.MULTILINE)
     assert found is not None, "src/core/version.ts に EXTENSION_COMPAT が無い"
@@ -108,7 +108,7 @@ class CompatSkewTest(unittest.TestCase):
     def test_v3_in_the_ccnavi_repository_the_fix_is_a_rebuild(self):
         """V3 build.py とソースがあれば組み立て直しを言う。"""
         write(os.path.join(self.ws, "build.py"), "", mode=0o644)
-        write(os.path.join(self.ws, "ccnavi", "__main__.py"), "", mode=0o644)
+        write(os.path.join(self.ws, "src", "ccnavi", "__main__.py"), "", mode=0o644)
         self.put_bin(STUB.format(compat=sh_compat() + 1))
         result = self.run_ticket()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -129,7 +129,9 @@ class CompatSkewTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         fake = os.path.join(self.ws, "ccnavi-src")
         python = sys.executable.replace("\\", "/")
-        write(fake, f'#!/bin/sh\ncd "{ROOT}" && exec "{python}" -m ccnavi "$@"\n')
+        write(
+            fake, f'#!/bin/sh\ncd "{ROOT}" && PYTHONPATH="{SRC}" exec "{python}" -m ccnavi "$@"\n'
+        )
         script = (
             '. "$1/.ccnavi/scripts/ccnavi-common.sh"\n'
             'if said=$(ccnavi_compat_skew "$1" "$2"); then echo same; else echo "$said"; fi\n'
@@ -148,7 +150,7 @@ class CompatAgreesTest(unittest.TestCase):
     def test_v6_the_executable_the_sh_and_the_extension_declare_the_same_compat(self):
         """V6 互換の版は 3 か所に書く。上げるときは揃えて上げる。
 
-        上げ方は ccnavi/entry/version.py の説明のとおり。
+        上げ方は src/ccnavi/entry/version.py の説明のとおり。
         """
         self.assertEqual(sh_compat(), version.COMPAT)
         self.assertEqual(extension_compat(), version.COMPAT)

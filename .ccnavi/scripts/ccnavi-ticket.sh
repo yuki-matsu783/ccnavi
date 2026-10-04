@@ -90,7 +90,7 @@ root=$(ccnavi_workspace) || {
 if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
 	ccnavi_c1_exe() { "$bin" --root "$root" "$@"; }
-elif [ -f "$root/ccnavi/__main__.py" ]; then
+elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi_c1_exe() { (cd "$root" && uv run python -m ccnavi --root "$root" "$@"); }
 else
 	printf 'ccnavi-ticket: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2

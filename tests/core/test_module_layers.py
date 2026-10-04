@@ -1,6 +1,6 @@
-"""`ccnavi/` の import の向きを、テストで守る。
+"""`src/ccnavi/` の import の向きを、テストで守る。
 
-`ccnavi/` は役割ごとのサブパッケージ 6 つ（`PACKAGES`）に分かれ、その中にモジュールが並ぶ。
+`src/ccnavi/` は役割ごとのサブパッケージ 6 つ（`PACKAGES`）に分かれ、その中にモジュールが並ぶ。
 読む順は 2 つの表で書く。サブパッケージの順（`PACKAGES`）と、モジュールの段（`TIERS`）。
 ディレクトリが言えるのは「どの役割か」までで、同じサブパッケージの中の読む順は言えない。
 段がそれを補う。2 つの表と食い違う import を名指しする。
@@ -9,7 +9,7 @@
 自身の層・プロジェクトの層）を指すため。ここで言う段はモジュールを読む順で、
 別のもの。
 
-読むのは `ccnavi/` の下の `.py` の import 文だけ。実行ファイルは起動しないので速い。
+読むのは `src/ccnavi/` の下の `.py` の import 文だけ。実行ファイルは起動しないので速い。
 モジュールはドットでつないだ名前で呼ぶ（`infra.fsio`）。直下の `__init__` と
 `__main__` はそのままの名前。
 
@@ -19,7 +19,7 @@
 見るのは 6 つ。
 
 1. どのモジュールも段をちょうど 1 つ持つ。モジュールを足したら、どの段かを決めさせる
-2. 置き場の形。`ccnavi/` の直下のディレクトリは `PACKAGES` と同じで、それより深い階層を
+2. 置き場の形。`src/ccnavi/` の直下のディレクトリは `PACKAGES` と同じで、それより深い階層を
    作らない。どのサブパッケージにも `__init__.py` があり、中身は役割を書いた docstring だけ
    （再輸出しない。`from .infra import fsio` の行き先が `infra/__init__.py` にならないように）
 3. import の行き先は、同じ段か下の段。上を向いた import を名指しする
@@ -34,7 +34,7 @@
 **5 が要るのは、1 から 4 と 6 が import 文しか読まないから。**
 `importlib.import_module("ccnavi.hook.judge")` と、ドットの無い `import ccnavi` に
 続く `ccnavi.hook.judge.…` は、行き先が import 文に残らないので 1 つも見つからない。
-どちらも `ccnavi/` では 1 度も使っていないので、書き方ごと止めるほうが安い。
+どちらも `src/ccnavi/` では 1 度も使っていないので、書き方ごと止めるほうが安い。
 同じ理由で、パッケージの中の書き方を相対の 2 形に限る。同じサブパッケージは
 `from . import x`、別のサブパッケージは `from ..infra import fsio`（`from ..infra.modes import
 EXIT_OK` も可）。3 段以上の相対（`from ...`）、自分のサブパッケージを `..` で指す形
@@ -44,11 +44,11 @@ EXIT_OK` も可）。3 段以上の相対（`from ...`）、自分のサブパ�
 は止める。**回避できないわけではない。** `getattr` や `exec` で組み立てれば、いまでも
 隠せる。そこまで防ぐには import を実行時に捕まえるしかなく、この速さを手放す。
 
-`main.py`（PyInstaller の入口）は `ccnavi/` の外なので、ここには入らない。
+`main.py`（PyInstaller の入口）は `src/ccnavi/` の外なので、ここには入らない。
 中身は `__main__.py` と同じ 2 行で、`tests/core/test_entry.py` が見ている。
 
 `core` はいつも回るので（`.claude/skills/commit/references/test-groups.md`）、
-`ccnavi/` の `.py` を変えたコミットでは必ずここも走る。
+`src/ccnavi/` の `.py` を変えたコミットでは必ずここも走る。
 """
 
 from __future__ import annotations
@@ -57,9 +57,9 @@ import ast
 import os
 import unittest
 
-from tests import ROOT
+from tests import SRC
 
-PACKAGE = os.path.join(ROOT, "ccnavi")
+PACKAGE = os.path.join(SRC, "ccnavi")
 
 # サブパッケージは下から上へ。下のサブパッケージは上のサブパッケージを知らない。
 #
@@ -209,7 +209,7 @@ def path_of(module: str) -> str:
 
 
 def directories() -> list[str]:
-    """`ccnavi/` の直下のディレクトリ（`__pycache__` を除く）。"""
+    """`src/ccnavi/` の直下のディレクトリ（`__pycache__` を除く）。"""
     return sorted(
         name
         for name in os.listdir(PACKAGE)
@@ -218,7 +218,7 @@ def directories() -> list[str]:
 
 
 def modules() -> list[str]:
-    """`ccnavi/` に置いてあるモジュールの、ドットでつないだ名前。
+    """`src/ccnavi/` に置いてあるモジュールの、ドットでつないだ名前。
 
     直下の `.py` と、直下のディレクトリの `.py`。サブパッケージの `__init__.py` は数えない
     （中身が docstring だけであることを 2 で見る）。
@@ -306,7 +306,7 @@ def hiding_in(module: str) -> list[str]:
     - `import ccnavi`（ドット無し）。`import ccnavi.hook.judge` と違い、行き先が
       import 文に出ない。使うときは `ccnavi.hook.judge.…` という属性の参照になる
     - `importlib` / `__import__` / `sys.modules`。行き先が文字列になる
-    - 3 段以上の相対（`from ...`）。`ccnavi/` は 2 階層までなので、外へ出るか、行き先を
+    - 3 段以上の相対（`from ...`）。`src/ccnavi/` は 2 階層までなので、外へ出るか、行き先を
       読み違える
     - 自分の居るサブパッケージを `..` で指す形（`infra` の中の `from ..infra import fsio`）。
       同じサブパッケージは `from . import fsio` と書く。2 つの書き方が同じ行き先に並ぶのを避ける
@@ -446,14 +446,14 @@ class ModuleTiersTest(unittest.TestCase):
         self.assertEqual(
             sorted(name for name, _ in PACKAGES),
             directories(),
-            "`ccnavi/` の直下のディレクトリが PACKAGES と違う。サブパッケージを足すなら "
+            "`src/ccnavi/` の直下のディレクトリが PACKAGES と違う。サブパッケージを足すなら "
             f"PACKAGES に役割と順を書いてから作る。いまの役割は {PACKAGE_MEANING}",
         )
         stray = sorted(mod for mod in self.modules if not package_of(mod) and mod not in TOP_LEVEL)
         self.assertEqual(
             [],
             stray,
-            "`ccnavi/` の直下にモジュールがある。直下に置くのは `__init__` と `__main__` だけ。"
+            "`src/ccnavi/` の直下にモジュールがある。直下に置くのは `__init__` と `__main__` だけ。"
             f"役割に合うサブパッケージへ置く（{PACKAGE_MEANING}）",
         )
         deeper = sorted(
