@@ -20,7 +20,7 @@ import unittest
 
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import agree, approval, approval_checks, syncstate
+from ccnavi.tickets import agree, approval, approval_checks, syncstate, ticket_model
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, to_old_form, write
 
@@ -567,7 +567,7 @@ class BusyParentTest(AuthorityHarness):
 class MarkTest(AuthorityHarness):
     def test_an_earlier_reason_is_kept(self):
         self.record("gone")
-        Ticket = approval.ticket_mod.Ticket
+        Ticket = ticket_model.Ticket
         t = Ticket(
             ticket="i0001-01-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
         )
@@ -733,7 +733,7 @@ class PredecessorTest(AuthorityHarness):
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
         # 厳しくする向きだけ: 親のワークツリーで閉じていても、
         # 前の対応表で満たしていなければ満たさない。
-        Ticket = approval.ticket_mod.Ticket
+        Ticket = ticket_model.Ticket
         done = Ticket(
             ticket="i0001-01-09", parent="i0001", state="done", tree_root=self.parent_tree
         )

@@ -30,7 +30,7 @@ from unittest import mock
 import yaml
 
 from ccnavi.infra import settings
-from ccnavi.tickets import flow, ticket
+from ccnavi.tickets import flow, ticket, ticket_model
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -98,7 +98,7 @@ def conf_with(approved: str = "") -> settings.Settings:
     return conf
 
 
-def child_ticket(started: bool = False) -> ticket.Ticket:
+def child_ticket(started: bool = False) -> ticket_model.Ticket:
     t, problems = ticket.parse(child_text(CHILD, "i0001", 1, ("wip/research/*",)))
     assert t is not None, problems
     if started:
@@ -501,24 +501,24 @@ class FlowInfoTest(unittest.TestCase):
         self.addCleanup(__import__("shutil").rmtree, self.root, True)
         self.conf = conf_with()
 
-    def child(self, state: str, started: bool = False) -> ticket.Ticket:
+    def child(self, state: str, started: bool = False) -> ticket_model.Ticket:
         t = child_ticket(started=started)
         t.tree_root = self.root
         t.state = state
-        if state == ticket.DONE:
+        if state == ticket_model.DONE:
             t.completed_at = "2026-09-26T00:00:00Z"
-        if state == ticket.CANCELLED:
+        if state == ticket_model.CANCELLED:
             t.cancelled_at = "2026-09-26T00:00:00Z"
         return t
 
     def test_closed_children_without_a_flow_have_no_field(self):
-        for state in (ticket.DONE, ticket.CANCELLED):
+        for state in (ticket_model.DONE, ticket_model.CANCELLED):
             with self.subTest(state=state):
                 self.assertIsNone(flow.info(self.conf, self.root, self.child(state, started=True)))
 
     def test_closed_children_with_a_flow_keep_the_field(self):
         write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
-        for state in (ticket.DONE, ticket.CANCELLED):
+        for state in (ticket_model.DONE, ticket_model.CANCELLED):
             with self.subTest(state=state):
                 shown = flow.info(self.conf, self.root, self.child(state, started=True))
                 self.assertIsNotNone(shown)
@@ -527,7 +527,11 @@ class FlowInfoTest(unittest.TestCase):
                 self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
 
     def test_open_children_keep_the_field_without_a_flow(self):
-        for state, started in ((ticket.DOING, False), (ticket.DOING, True), (ticket.TODO, False)):
+        for state, started in (
+            (ticket_model.DOING, False),
+            (ticket_model.DOING, True),
+            (ticket_model.TODO, False),
+        ):
             with self.subTest(state=state, started=started):
                 shown = flow.info(self.conf, self.root, self.child(state, started=started))
                 self.assertIsNotNone(shown)
@@ -539,19 +543,21 @@ class FlowInfoTest(unittest.TestCase):
         # 着手のあとでも錠は掛けない（錠は `doing` の間だけ）。
         for started in (False, True):
             with self.subTest(started=started):
-                shown = flow.info(self.conf, self.root, self.child(ticket.REVIEW, started=started))
+                shown = flow.info(
+                    self.conf, self.root, self.child(ticket_model.REVIEW, started=started)
+                )
                 self.assertIsNotNone(shown)
                 self.assertFalse(shown["exists"])
                 self.assertFalse(shown["locked"])
                 self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
         write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
-        shown = flow.info(self.conf, self.root, self.child(ticket.REVIEW, started=True))
+        shown = flow.info(self.conf, self.root, self.child(ticket_model.REVIEW, started=True))
         self.assertTrue(shown["exists"])
         self.assertFalse(shown["locked"])
 
     def test_the_draft_sits_in_the_same_tree_under_the_proposal_place(self):
         """下書きの置き場は提案の置き場の `flows/<子>.yml`。置くツリーはフローと同じ。"""
-        shown = flow.info(self.conf, self.root, self.child(ticket.TODO))
+        shown = flow.info(self.conf, self.root, self.child(ticket_model.TODO))
         draft = shown["draft"]
         self.assertEqual(draft["rel"], f"wip/proposals/flows/{CHILD}.yml")
         self.assertEqual(
@@ -561,12 +567,12 @@ class FlowInfoTest(unittest.TestCase):
         self.assertFalse(draft["exists"])
         self.assertFalse(draft["linked"])
         write(draft["path"], WORKFLOW_YAML)
-        draft = flow.info(self.conf, self.root, self.child(ticket.TODO))["draft"]
+        draft = flow.info(self.conf, self.root, self.child(ticket_model.TODO))["draft"]
         self.assertTrue(draft["exists"])
         self.assertFalse(draft["linked"])
         # プロジェクトの子は、そのプロジェクトのツリーの提案の置き場（フローと同じツリー）。
         project = os.path.join(self.root, "projects", "web")
-        child = self.child(ticket.DOING)
+        child = self.child(ticket_model.DOING)
         child.tree_root = project
         shown = flow.info(self.conf, self.root, child)
         self.assertEqual(os.path.realpath(shown["tree"]), os.path.realpath(project))

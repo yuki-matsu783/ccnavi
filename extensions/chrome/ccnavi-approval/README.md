@@ -43,7 +43,7 @@ GitLab で ccnavi の書き込みどうしの競合を捕まえる seq ファイ
   から読み、層はプロジェクトの統合先の層に共通層をコピーしたもので判定する（親のブランチの上の層は読まない）。Chrome の登録の名前は手元のディレクトリ名と揃える（ずれると、手元で取り込んだ後に
   判定し直したとき親子のチケットが止まる）
 - 「始める」: ボードの「issue を読む」で開いた issue を読み、「始める」を押すと、issue の番号から決めた識別子
-  （`feature-<番号>-<slug>`・`feature-<番号>-<プロジェクト名>-<slug>`。slug は issue のタイトルから作る。同梱の ccnavi の `ticket.issue_identifier`）の親のブランチを統合先の今の先頭から作る。
+  （`feature-<番号>-<slug>`・`feature-<番号>-<プロジェクト名>-<slug>`。slug は issue のタイトルから作る。同梱の ccnavi の `ticket_ids.issue_identifier`）の親のブランチを統合先の今の先頭から作る。
   統合先の `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版が違う、のどれかなら作らない。
   PR/MR は作らない（最初の push の後に `ccnavi-review.sh request` が作る）
 

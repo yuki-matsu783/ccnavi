@@ -45,7 +45,7 @@ import stat
 from dataclasses import dataclass, field
 
 from ..infra import fsio, gitcmd
-from . import history, syncstate
+from . import history, syncstate, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
 # ワークスペースルートからの退避の置き場。`logs/` は .gitignore に入っている。
@@ -114,7 +114,7 @@ def _repo_names(root: str) -> list[str]:
 
 def _done_dir(root: str, repo: str) -> str:
     """退避の `done/`。途中にリンクがあれば空文字（読まない）。"""
-    parts = (*ARCHIVE_DIR.split(os.sep), repo, ticket_mod.DONE)
+    parts = (*ARCHIVE_DIR.split(os.sep), repo, ticket_model.DONE)
     if _linked(root, parts) is not False:
         return ""
     return os.path.join(root, *parts)
@@ -132,13 +132,13 @@ def ids(root: str, project: str | None = None) -> set[str]:
     return out
 
 
-def find(root: str, ident: str, project: str | None = None) -> list[ticket_mod.Ticket]:
+def find(root: str, ident: str, project: str | None = None) -> list[ticket_model.Ticket]:
     """退避の `done/<識別子>.md` を読む。読めないものは落とす。
 
     `project` を渡せばそのリポジトリ（ワークスペース自身なら空文字）だけ、None なら全リポジトリ。
     状態は `done`（取り消しの欄があれば `cancelled`）。ツリーは持たない。
     """
-    if not ticket_mod.is_valid_id(ident):
+    if not ticket_ids.is_valid_id(ident):
         return []
     out = []
     repos = _repo_names(root) if project is None else [syncstate.repo_key(project)]
@@ -155,7 +155,7 @@ def find(root: str, ident: str, project: str | None = None) -> list[ticket_mod.T
     return out
 
 
-def closed_tickets(root: str) -> list[ticket_mod.Ticket]:
+def closed_tickets(root: str) -> list[ticket_model.Ticket]:
     """退避にある閉じたチケットの全部（ボードの表示用。判定には混ぜない）。"""
     out = []
     for repo in _repo_names(root):
@@ -178,17 +178,17 @@ def closed_tickets(root: str) -> list[ticket_mod.Ticket]:
     return out
 
 
-def _load(path: str, ident: str, repo: str) -> ticket_mod.Ticket | None:
+def _load(path: str, ident: str, repo: str) -> ticket_model.Ticket | None:
     t, _ = ticket_mod.load(path)
     if t is None or t.ticket != ident:
         return None
-    t.state = ticket_mod.CANCELLED if t.cancelled_at else ticket_mod.DONE
+    t.state = ticket_model.CANCELLED if t.cancelled_at else ticket_model.DONE
     t.project = syncstate.project_of_key(repo)
     t.tree, t.tree_root = "", ""
     return t
 
 
-def archived_parent(root: str, project: str, ident: str) -> ticket_mod.Ticket | None:
+def archived_parent(root: str, project: str, ident: str) -> ticket_model.Ticket | None:
     """退避にある親（識別子が同じで、子でない）。無ければ None。"""
     directory = _done_dir(root, syncstate.repo_key(project))
     if not directory:
@@ -237,16 +237,16 @@ def archived_fields(root: str, project: str, ident: str) -> syncstate.DoneCopy |
     大文字小文字だけが違う識別子も同じものとして引く（区別しないファイルシステムでは、ブランチと
     ワークツリーの名前がぶつかるため。使い回しの検査を緩めない向き）。
     """
-    if not ticket_mod.is_valid_id(ident):
+    if not ticket_ids.is_valid_id(ident):
         return None
     name = ident
-    if archived_bytes(root, project, f"{ticket_mod.DONE}/{ident}.md") is None:
+    if archived_bytes(root, project, f"{ticket_model.DONE}/{ident}.md") is None:
         directory = _done_dir(root, syncstate.repo_key(project))
         folded = [i for i in (_regular_md(directory) if directory else []) if same_id(i, ident)]
         if not folded:
             return None
         name = folded[0]
-    copy = _fields(archived_bytes(root, project, f"{ticket_mod.DONE}/{name}.md"))
+    copy = _fields(archived_bytes(root, project, f"{ticket_model.DONE}/{name}.md"))
     return copy if copy is not None and copy.ticket == name else None
 
 
@@ -255,7 +255,7 @@ def same_id(a: str, b: str) -> bool:
     return a.casefold() == b.casefold()
 
 
-def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
+def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]:
     """手元の退避に、同じリポジトリで同じチケットと言えるコピーがあるチケットを落とす。
 
     `ready` の後も子のワークツリーには切ったときの `doing/` のチケットが残る。親のツリーから消えた
@@ -307,8 +307,8 @@ REUSED_REASON = (
 )
 
 
-def _in_parent_tree(t: ticket_mod.Ticket) -> bool:
-    # 親のツリー（親自身なら自分のツリー）で見つけたか。`ticket.authority` と同じ見方。
+def _in_parent_tree(t: ticket_model.Ticket) -> bool:
+    # 親のツリー（親自身なら自分のツリー）で見つけたか。`ticket_fold.authority` と同じ見方。
     return t.tree == (t.parent or t.ticket)
 
 
@@ -326,7 +326,7 @@ def _same_ticket(
     return _SAME if syncstate.same_parent(mine, archived) else _OTHER
 
 
-def _mine(t: ticket_mod.Ticket) -> syncstate.DoneCopy:
+def _mine(t: ticket_model.Ticket) -> syncstate.DoneCopy:
     # 照合に使う欄だけを、退避の欄と同じ形で。
     return syncstate.DoneCopy(
         ticket=t.ticket,
@@ -356,7 +356,7 @@ class Plan:
 
 def _done_copies(approved_dir: str) -> dict[str, syncstate.DoneCopy]:
     """`done/` のふつうのファイルの、識別子 → 欄。読めない・名前と違うものは落とす。"""
-    directory = os.path.join(approved_dir, ticket_mod.DONE)
+    directory = os.path.join(approved_dir, ticket_model.DONE)
     out = {}
     for ident in _regular_md(directory):
         copy = _fields(fsio.read_bytes(os.path.join(directory, f"{ident}.md")))
@@ -396,7 +396,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
         here = done.get(p)
         if here is not None and not here.parent:
             family.add(p)
-        elif here is None and root and not _lexists(approved_dir, ticket_mod.DOING, f"{p}.md"):
+        elif here is None and root and not _lexists(approved_dir, ticket_model.DOING, f"{p}.md"):
             # 作業中に同じ識別子が在れば、退避の親とは別の（開いた）親子のチケット。拾わない。
             held = archived_fields(root, project, p)
             if held is not None and not held.parent:
@@ -411,14 +411,14 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     # どの置き場にもチケットの無い識別子（取り下げた子など）。履歴とフローしか残っていないので、
     # このときだけ子の形（`<親>-<フェーズ番号>-<連番>`）で親に結ぶ。チケットが在る識別子は
     # `parent:` 欄で決める。
-    known = set(done) | set(_regular_md(os.path.join(approved_dir, ticket_mod.DOING)))
+    known = set(done) | set(_regular_md(os.path.join(approved_dir, ticket_model.DOING)))
 
     def belongs(ident: str) -> bool:
         if ident in family or ident in children:
             return True
         if ident in known or (root and archived_fields(root, project, ident) is not None):
             return False
-        matched = ticket_mod.child_pattern().match(ident)
+        matched = ticket_ids.child_pattern().match(ident)
         return matched is not None and matched.group("parent") in family
 
     out = Plan(parents=sorted(family))
@@ -435,7 +435,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     kids = sorted(i for i in done if i in children)
     elders = sorted(i for i in done if i in family)
     out.tickets = kids + elders
-    out.files += [f"{ticket_mod.DONE}/{i}.md" for i in out.tickets]
+    out.files += [f"{ticket_model.DONE}/{i}.md" for i in out.tickets]
     return out
 
 
@@ -572,7 +572,12 @@ def _tree_key(tree_root: str) -> str:
 
 
 # ready のマーカーに載せてよいのは、承認済みの領域のこの 4 つの下だけ。
-READY_PLACES = (f"{ticket_mod.DONE}/", f"{PHASES_DIR}/", f"{history.EVENTS_DIR}/", f"{FLOWS_DIR}/")
+READY_PLACES = (
+    f"{ticket_model.DONE}/",
+    f"{PHASES_DIR}/",
+    f"{history.EVENTS_DIR}/",
+    f"{FLOWS_DIR}/",
+)
 
 
 def in_ready_places(rel: str) -> bool:
@@ -698,7 +703,7 @@ def move(
         if held is None and os.path.lexists(target):
             return moved, f"退避の行き先 {target} を読めない（ふつうのファイルでないかリンク）"
         if not holds(rel, held, data):
-            if held is not None and rel.startswith(f"{ticket_mod.DONE}/"):
+            if held is not None and rel.startswith(f"{ticket_model.DONE}/"):
                 return moved, (
                     f"退避の行き先 {target} に違う中身が既に在る。閉じたチケットを上書きしないので"
                     "止めた。ユーザが中身を確かめてください"
@@ -710,8 +715,8 @@ def move(
             failed = _write(root, project, rel, content)
             if failed:
                 return moved, failed
-        if rel.startswith(f"{ticket_mod.DONE}/"):
-            failed = _note_archived(root, project, rel[len(ticket_mod.DONE) + 1 : -len(".md")])
+        if rel.startswith(f"{ticket_model.DONE}/"):
+            failed = _note_archived(root, project, rel[len(ticket_model.DONE) + 1 : -len(".md")])
             if failed:
                 return moved, failed
         failed = fsio.unlink(source)
@@ -729,7 +734,7 @@ def _note_archived(root: str, project: str, ident: str) -> str:
         "at": history.stamp(),
         "ticket": ident,
         "kind": history.KIND_ARCHIVED,
-        "from": ticket_mod.DONE,
+        "from": ticket_model.DONE,
         "to": PLACE,
         "via": history.via(),
     }

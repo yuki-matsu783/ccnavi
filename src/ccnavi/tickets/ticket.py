@@ -3,8 +3,7 @@
 識別子とブランチ名の規則は `ticket_ids`、チケットの形（データクラスと書式の定数）は
 `ticket_model`、範囲を当てない置き場は `ticket_places`、同じ識別子のまとめ方は `ticket_fold`、
 状態の置き場を守るルールと提案の文は `ticket_guard`、スクリプトが書く欄の書き換えは
-`ticket_fields` に分けてある。どれも ticket を読まない。外から使う名前は、ここから
-`ticket.<名前>` でそのまま読めるように読み込み直してある。
+`ticket_fields` に分けてある。どれも ticket を読まない。
 
 ## チケットは提案であって本物ではない
 
@@ -22,7 +21,7 @@
 判定はルールの判定とチケットの判定の厳しい側を採る（設計 1）。チケットが足すのは
 「宣言した範囲の外は止める」「deny と書いた場所は止める」「ask と書いた場所は聞く」だけで、
 ルールの allow を狭めることはあっても、ルールの deny や ask を緩めることは無い。
-例外は 2 つ（`is_unscoped`）。チケットの置き場は、次の提案を書けるようにしておくために
+例外は 2 つ（`ticket_places.is_unscoped`）。チケットの置き場は、次の提案を書けるようにしておくために
 範囲を当てない。
 下書きの置き場（`scratchpad/`）は、git が追跡しないので範囲を当てない。
 子は親の部分集合で、親子は厳しい側を採る。どう書いてもチケットが無いときより
@@ -77,82 +76,7 @@ import yaml
 from ..infra import fsio, globmatch, tree, yamlread
 from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-
-# 分けた先の名前。ここで使わない名前も `X as X` で読み直し、`ticket.<名前>` のまま読めるようにする。
-from .ticket_fields import script_fields_set as script_fields_set
-from .ticket_fields import script_shape as script_shape
-from .ticket_fields import set_fields as set_fields
-from .ticket_fold import authority as authority
-from .ticket_fold import behind as behind
-from .ticket_fold import by_ticket as by_ticket
-from .ticket_fold import collided_states as collided_states
-from .ticket_fold import collisions as collisions
-from .ticket_fold import dedupe
-from .ticket_fold import fold as fold
-from .ticket_fold import origin_tree as origin_tree
-from .ticket_fold import progress as progress
-from .ticket_guard import PROPOSE_RULE_ID as PROPOSE_RULE_ID
-from .ticket_guard import STATE_RULE_ID as STATE_RULE_ID
-from .ticket_guard import guard_rules as guard_rules
-from .ticket_guard import propose_notice as propose_notice
-from .ticket_guard import state_dir_regex as state_dir_regex
-from .ticket_ids import _CHILD, BRANCH_KEY, MAX_CHILD_NUMBER, branch_problem, child_id, id_problem
-from .ticket_ids import DEFAULT_ISSUE_PREFIX as DEFAULT_ISSUE_PREFIX
-from .ticket_ids import EMPTY_SLUG as EMPTY_SLUG
-from .ticket_ids import ID_CHARS as ID_CHARS
-from .ticket_ids import JA_CHARS as JA_CHARS
-from .ticket_ids import MAX_BRANCH_LENGTH as MAX_BRANCH_LENGTH
-from .ticket_ids import MAX_ID_LENGTH as MAX_ID_LENGTH
-from .ticket_ids import RESERVED_BRANCH_IDS as RESERVED_BRANCH_IDS
-from .ticket_ids import SUGGESTED_ID_LENGTH as SUGGESTED_ID_LENGTH
-from .ticket_ids import branch_name as branch_name
-from .ticket_ids import branch_name_problems as branch_name_problems
-from .ticket_ids import child_pattern as child_pattern
-from .ticket_ids import child_tail_pattern as child_tail_pattern
-from .ticket_ids import form_of as form_of
-from .ticket_ids import has_form as has_form
-from .ticket_ids import identifier_number as identifier_number
-from .ticket_ids import is_valid_id as is_valid_id
-from .ticket_ids import is_valid_name as is_valid_name
-from .ticket_ids import issue_identifier as issue_identifier
-from .ticket_ids import issue_slug as issue_slug
-from .ticket_ids import next_serial as next_serial
-from .ticket_model import APPROVAL_KEY as APPROVAL_KEY
-from .ticket_model import (
-    BOM,
-    FENCE,
-    OUTSIDE,
-    PLAN_REVIEWS,
-    SCRIPT_FIELDS,
-    STATES,
-    VERSION,
-    WORKFLOW_DAG,
-    WORKFLOW_KEY,
-    WORKFLOW_SEQUENTIAL,
-    WRITE_TOOLS,
-    Entry,
-    PlanItem,
-    Ticket,
-    Workflow,
-)
-from .ticket_model import CANCELLED as CANCELLED
-from .ticket_model import DOING as DOING
-from .ticket_model import DONE as DONE
-from .ticket_model import FINISHED as FINISHED
-from .ticket_model import GUARDED_STATES as GUARDED_STATES
-from .ticket_model import PLAN_REVIEW_DEFER as PLAN_REVIEW_DEFER
-from .ticket_model import PLAN_REVIEW_MR as PLAN_REVIEW_MR
-from .ticket_model import REVIEW as REVIEW
-from .ticket_model import TODO as TODO
-from .ticket_places import ELI5 as ELI5
-from .ticket_places import SCRATCH as SCRATCH
-from .ticket_places import WIP_ROOT as WIP_ROOT
-from .ticket_places import is_eli5_place as is_eli5_place
-from .ticket_places import is_scratch_place as is_scratch_place
-from .ticket_places import is_ticket_place as is_ticket_place
-from .ticket_places import is_unscoped as is_unscoped
-from .ticket_places import lands_in_finished_state as lands_in_finished_state
-from .ticket_places import leaves_open_state as leaves_open_state
+from . import ticket_fold, ticket_ids, ticket_model
 
 # 範囲の件数の上限。設計 9.3。大量に並べてユーザがレビューしきれない
 # ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
@@ -163,17 +87,17 @@ MAX_SCOPE_ENTRIES = 20
 _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 
 
-def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem]]:
+def _plan(name: str, key: str, raw) -> tuple[list[ticket_model.PlanItem] | None, list[Problem]]:
     """計画のリストを読む。種類が在るかはここでは見ない（種類を読むのは承認の側）。"""
     problems: list[Problem] = []
     if not isinstance(raw, list):
         problems.append(Problem(SEVERITY_ERROR, name, f"`{key}` はリストで書く"))
         return None, problems
-    items: list[PlanItem] = []
+    items: list[ticket_model.PlanItem] = []
     for i, entry in enumerate(raw):
         where = f"{key}[{i}]"
         if isinstance(entry, str) and entry.strip():
-            items.append(PlanItem(type=entry.strip()))
+            items.append(ticket_model.PlanItem(type=entry.strip()))
             continue
         if isinstance(entry, dict):
             kind = _text(entry.get("type")).strip()
@@ -181,17 +105,17 @@ def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem
             if not kind:
                 problems.append(Problem(SEVERITY_ERROR, name, f"{where} に `type` が無い"))
                 return None, problems
-            if review and review not in PLAN_REVIEWS:
+            if review and review not in ticket_model.PLAN_REVIEWS:
                 problems.append(
                     Problem(
                         SEVERITY_ERROR,
                         name,
-                        f"{where} の `review` は {' か '.join(PLAN_REVIEWS)}。"
+                        f"{where} の `review` は {' か '.join(ticket_model.PLAN_REVIEWS)}。"
                         "弱める向き（none）は書けない",
                     )
                 )
                 return None, problems
-            items.append(PlanItem(type=kind, review=review))
+            items.append(ticket_model.PlanItem(type=kind, review=review))
             continue
         problems.append(Problem(SEVERITY_ERROR, name, f"{where} は種類の名前か {{type, review}}"))
         return None, problems
@@ -220,7 +144,7 @@ def _issue_ref(raw) -> tuple[str, int | None]:
     return "", _issue_number(raw)
 
 
-def issue_label(t: Ticket) -> str:
+def issue_label(t: ticket_model.Ticket) -> str:
     """課題の表記（`#12`・`owner/repo#12`）。MR の `Closes` と承認の画面が使う。無ければ空。"""
     if t.issue is None:
         return ""
@@ -240,18 +164,18 @@ def _issue_number(raw) -> int | None:
     return number if number > 0 else None
 
 
-def parse_workflow(name: str, raw) -> tuple[Workflow | None, list[Problem]]:
-    bad = [Problem(SEVERITY_ERROR, name, f"`{WORKFLOW_KEY}` の形が読めない")]
+def parse_workflow(name: str, raw) -> tuple[ticket_model.Workflow | None, list[Problem]]:
+    bad = [Problem(SEVERITY_ERROR, name, f"`{ticket_model.WORKFLOW_KEY}` の形が読めない")]
     if not isinstance(raw, dict):
         return None, bad
     order = _text(raw.get("order")).strip()
     waits_raw = raw.get("waits") or {}
     review_raw = raw.get("review_at") or {}
-    if order not in (WORKFLOW_SEQUENTIAL, WORKFLOW_DAG):
+    if order not in (ticket_model.WORKFLOW_SEQUENTIAL, ticket_model.WORKFLOW_DAG):
         return None, bad
     if not isinstance(waits_raw, dict) or not isinstance(review_raw, dict):
         return None, bad
-    wf = Workflow(order=order)
+    wf = ticket_model.Workflow(order=order)
     try:
         for k, v in waits_raw.items():
             if not isinstance(v, list):
@@ -264,7 +188,7 @@ def parse_workflow(name: str, raw) -> tuple[Workflow | None, list[Problem]]:
     return wf, []
 
 
-def load(path: str) -> tuple[Ticket | None, list[Problem]]:
+def load(path: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
         # fsio を通す。承認の plan（書き込みを溜める段）の中では、
@@ -280,7 +204,7 @@ def load(path: str) -> tuple[Ticket | None, list[Problem]]:
     return ticket, problems
 
 
-def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
+def parse(text: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     """読み込み済みの文面からチケットを組み立てる。
 
     ファイルを開く部分と分けてあるのは、テストと承認の画面が同じ処理を通るため。
@@ -292,7 +216,7 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     if front is None:
         return None, problems
 
-    ticket = Ticket(
+    ticket = ticket_model.Ticket(
         ticket=_text(front.get("ticket")).strip(),
         parent=_text(front.get("parent")).strip(),
         title=_text(front.get("title")),
@@ -310,35 +234,36 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     return ticket, problems
 
 
-def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Problem]) -> bool:
     """版と識別子と親子の形。読めなければ True。"""
     name = ticket.ticket
     version = front.get("version")
-    if version != VERSION:
+    if version != ticket_model.VERSION:
         problems.append(
             Problem(
                 SEVERITY_ERROR,
                 name,
-                f"チケット書式の版 {version!r} は扱えない（このビルドが読むのは {VERSION}）。"
+                f"チケット書式の版 {version!r} は扱えない"
+                f"（このビルドが読むのは {ticket_model.VERSION}）。"
                 "タイプは rules.yml と同じ deny / ask / allow で、`target_directories` は読まない",
             )
         )
         return True
 
-    problem = id_problem(name)
+    problem = ticket_ids.id_problem(name)
     if problem:
         problems.append(Problem(SEVERITY_ERROR, name, problem))
         return True
 
     if ticket.parent:
-        matched = _CHILD.match(name)
+        matched = ticket_ids._CHILD.match(name)
         if matched is None or matched.group("parent") != ticket.parent:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     name,
                     f"子の識別子は `{ticket.parent}-<2 桁のフェーズ番号>-<2 桁の連番>` の形で書く"
-                    f"（フェーズ 5 の 1 枚目なら `{child_id(ticket.parent, 5, 1)}`）。"
+                    f"（フェーズ 5 の 1 枚目なら `{ticket_ids.child_id(ticket.parent, 5, 1)}`）。"
                     "親の識別子が名前空間で、フェーズ番号は `phase` と同じ値",
                 )
             )
@@ -347,13 +272,14 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
         if isinstance(phase, bool) or not isinstance(phase, int) or phase < 0:
             problems.append(Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が要る"))
             return True
-        if phase > MAX_CHILD_NUMBER:
+        if phase > ticket_ids.MAX_CHILD_NUMBER:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     name,
                     f"`phase: {phase}` は子の識別子に書けない。識別子のフェーズ番号は"
-                    f" 2 桁（0〜{MAX_CHILD_NUMBER}）なので、計画を {MAX_CHILD_NUMBER} "
+                    f" 2 桁（0〜{ticket_ids.MAX_CHILD_NUMBER}）なので、"
+                    f"計画を {ticket_ids.MAX_CHILD_NUMBER} "
                     "フェーズまでに分ける",
                 )
             )
@@ -378,7 +304,7 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
     return False
 
 
-def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Problem]) -> bool:
     """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
     name = ticket.ticket
     # frontmatter の `project:` は照合用の宣言。本当のプロジェクトは提案を置いた場所で、
@@ -409,7 +335,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
         else:
             ticket.feedback = items
 
-    raw_workflow = front.get(WORKFLOW_KEY)
+    raw_workflow = front.get(ticket_model.WORKFLOW_KEY)
     if raw_workflow is not None and not ticket.is_child:
         workflow, bad = parse_workflow(name, raw_workflow)
         problems.extend(bad)
@@ -436,7 +362,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
             ticket.issue = number
             ticket.issue_repo = repo
 
-    raw_branch = front.get(BRANCH_KEY)
+    raw_branch = front.get(ticket_ids.BRANCH_KEY)
     if raw_branch is not None:
         if not isinstance(raw_branch, str):
             problems.append(Problem(SEVERITY_ERROR, name, "`branch` はブランチ名を文字列で書く"))
@@ -451,7 +377,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
             )
         else:
             spelled = raw_branch.strip()
-            why = branch_problem(spelled)
+            why = ticket_ids.branch_problem(spelled)
             if why:
                 problems.append(
                     Problem(SEVERITY_ERROR, name, f"`branch: {spelled}` は使えない。{why}")
@@ -461,7 +387,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     return False
 
 
-def _read_review(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+def _read_review(ticket: ticket_model.Ticket, front: dict, problems: list[Problem]) -> bool:
     """人間レビューの要否と理由。読めなければ True。"""
     name = ticket.ticket
     review = front.get("human_review")
@@ -492,7 +418,7 @@ def _read_review(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
     return False
 
 
-def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+def _read_scope(ticket: ticket_model.Ticket, front: dict, problems: list[Problem]) -> bool:
     """判定に使われない欄への注意、スクリプトの欄、範囲の項。範囲が成り立たなければ True。"""
     name = ticket.ticket
     for key in ("tools", "deny_commands", "target_directories"):
@@ -506,7 +432,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
                 )
             )
 
-    for key in SCRIPT_FIELDS:
+    for key in ticket_model.SCRIPT_FIELDS:
         setattr(ticket, key, _text(front.get(key)).strip())
 
     entries, scope_problems = _entries(front, name)
@@ -537,7 +463,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
     return False
 
 
-def render(ticket: Ticket, extra: dict | None = None) -> str:
+def render(ticket: ticket_model.Ticket, extra: dict | None = None) -> str:
     """チケットを文面に戻す。承認済みチケットを作るときと、スクリプトが欄を書くときに使う。
 
     読んだ frontmatter をそのまま出す。順序が変わっても意味は変わらない。
@@ -546,10 +472,10 @@ def render(ticket: Ticket, extra: dict | None = None) -> str:
     if extra:
         front.update(extra)
     dumped = yaml.safe_dump(front, allow_unicode=True, sort_keys=False, default_flow_style=False)
-    return f"{FENCE}\n{dumped}{FENCE}\n{ticket.body}"
+    return f"{ticket_model.FENCE}\n{dumped}{ticket_model.FENCE}\n{ticket.body}"
 
 
-def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
+def subset_problems(child: ticket_model.Ticket, parent: ticket_model.Ticket) -> list[Problem]:
     """子が親の部分集合でない項を名指しする。
 
     glob 同士の包含は一般には決められないので、子の項の字義どおりの前置を
@@ -598,7 +524,7 @@ def regex_overflow_detail(regex: str) -> str:
 
 def combine(child: str, parent: str) -> str:
     """親子の判定を、厳しい側を採る形で合わせる。"""
-    order = {rules.DENY: 3, rules.ASK: 2, rules.ALLOW: 1, OUTSIDE: 4}
+    order = {rules.DENY: 3, rules.ASK: 2, rules.ALLOW: 1, ticket_model.OUTSIDE: 4}
     return child if order[child] >= order[parent] else parent
 
 
@@ -606,8 +532,8 @@ def scan(
     root: str,
     tickets_rel: str,
     projects_dir: str = "",
-    approved: list[Ticket] | None = None,
-) -> tuple[list[Ticket], list[Problem]]:
+    approved: list[ticket_model.Ticket] | None = None,
+) -> tuple[list[ticket_model.Ticket], list[Problem]]:
     """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場をつける。
 
     集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
@@ -619,22 +545,22 @@ def scan(
 
     `approved` は、まとめる前の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。
     渡せば、承認済みの識別子の提案は、承認済みチケットで決めた本物とするツリーの側だけを残す
-    （`dedupe`）。組むのは `approval.scan_proposals`（承認済みチケットはそちらが読む）。
+    （`ticket_fold.dedupe`）。組むのは `approval.scan_proposals`（承認済みチケットはそちらが読む）。
     渡さないと、本物とするツリーの外に残った古い提案も残る。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
-    return dedupe(found, approved), problems
+    return ticket_fold.dedupe(found, approved), problems
 
 
 def scan_all(
     root: str, tickets_rel: str, projects_dir: str = ""
-) -> tuple[list[Ticket], list[Problem]]:
+) -> tuple[list[ticket_model.Ticket], list[Problem]]:
     """ワークスペースルートと全ワークツリーの提案を、重複をまとめずに集める。
 
     ボード（`--explain --json`）が「どのツリーにあるか」を見せるために使う。
     判定と承認は `scan` のまとめた側を読む。
     """
-    found: list[Ticket] = []
+    found: list[ticket_model.Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
     # 置き場がプロジェクトを決める（設計 11.5）。提案はどのツリーでも同じ相対の置き場に
@@ -647,7 +573,7 @@ def scan_all(
     ]
     for t, rel, place_project in places:
         base = os.path.join(t.root, rel.replace("/", os.sep))
-        for state in STATES:
+        for state in ticket_model.STATES:
             directory = os.path.join(base, state)
             try:
                 names = sorted(os.listdir(directory))
@@ -695,9 +621,9 @@ def scan_all(
     return found, problems
 
 
-def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
+def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Problem]]:
     problems: list[Problem] = []
-    entries: list[Entry] = []
+    entries: list[ticket_model.Entry] = []
     for section in rules.SECTIONS:
         raw_section = front.get(section)
         if raw_section is None:
@@ -712,7 +638,7 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
                 continue
             match = _text(raw.get("match"))
             tools = [w.strip() for w in match.split("|") if w.strip()]
-            if not any(t in WRITE_TOOLS for t in tools):
+            if not any(t in ticket_model.WRITE_TOOLS for t in tools):
                 problems.append(
                     Problem(
                         SEVERITY_WARN,
@@ -758,26 +684,28 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
             except re.error as exc:
                 problems.append(Problem(SEVERITY_ERROR, name, f"{where} を式にできない: {exc}"))
                 continue
-            entries.append(Entry(decision=section, glob=glob, regex=regex, compiled=compiled))
+            entries.append(
+                ticket_model.Entry(decision=section, glob=glob, regex=regex, compiled=compiled)
+            )
     return entries, problems
 
 
 def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     lines = text.splitlines()
-    if not lines or lines[0].strip() != FENCE:
+    if not lines or lines[0].strip() != ticket_model.FENCE:
         # 通す側にはしない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、
         # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う内容で通る。弾いたまま、
         # 目に見えない原因だけを名指しする。
-        if lines and lines[0].lstrip(BOM).strip() == FENCE:
+        if lines and lines[0].lstrip(ticket_model.BOM).strip() == ticket_model.FENCE:
             detail = (
-                f"先頭に BOM (U+FEFF) が付いていて `{FENCE}` で始まっていない。"
+                f"先頭に BOM (U+FEFF) が付いていて `{ticket_model.FENCE}` で始まっていない。"
                 "BOM 無しの UTF-8 で保存し直してください"
             )
         else:
-            detail = f"先頭が `{FENCE}` で始まっていない"
+            detail = f"先頭が `{ticket_model.FENCE}` で始まっていない"
         return None, "", [Problem(SEVERITY_ERROR, "(file)", detail)]
     for i in range(1, len(lines)):
-        if lines[i].strip() == FENCE:
+        if lines[i].strip() == ticket_model.FENCE:
             head = "\n".join(lines[1:i])
             body = "\n".join(lines[i + 1 :])
             break
@@ -785,7 +713,13 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
         return (
             None,
             "",
-            [Problem(SEVERITY_ERROR, "(file)", f"frontmatter が `{FENCE}` で閉じていない")],
+            [
+                Problem(
+                    SEVERITY_ERROR,
+                    "(file)",
+                    f"frontmatter が `{ticket_model.FENCE}` で閉じていない",
+                )
+            ],
         )
     try:
         # safe_load に限る。任意の Python の型を組み立てる load は、

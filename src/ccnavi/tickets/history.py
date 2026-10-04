@@ -40,7 +40,7 @@ from collections.abc import Iterator
 from typing import TextIO
 
 from ..infra import fsio
-from . import ticket as ticket_mod
+from . import ticket_ids
 
 # 承認済みの領域の下の置き場と、ファイルの拡張子。
 EVENTS_DIR = "events"
@@ -142,7 +142,7 @@ def path(approved_dir: str, ticket_id: str) -> str:
 
     呼び手は識別子を検査済みのチケットから渡すが、ここでも同じ検査を当てる（多重の保護）。
     """
-    if not ticket_mod.is_valid_id(ticket_id):
+    if not ticket_ids.is_valid_id(ticket_id):
         return ""
     return os.path.join(approved_dir, EVENTS_DIR, ticket_id + SUFFIX)
 

@@ -48,8 +48,7 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, gitstate, hookio, settings, tree
 from ..policy import rules, selfguard
 from ..records import audit
-from ..tickets import archive, phase, phasetypes
-from ..tickets import ticket as ticket_mod
+from ..tickets import archive, phase, phasetypes, ticket_fields, ticket_model, ticket_places
 from . import c1
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -336,7 +335,7 @@ def _committed_findings(
         )
         for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, synced=judged):
             rel = tree.relative(w.tree, finding.change.full)
-            if ticket_mod.is_ticket_place(rel, tickets, approved):
+            if ticket_places.is_ticket_place(rel, tickets, approved):
                 continue
             out.append(finding)
     return out, uncounted
@@ -499,7 +498,7 @@ class ScopeGuard:
     """
 
     root: str
-    copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
+    copies: dict[str, ticket_model.Ticket] = field(default_factory=dict)
     # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる（設計 11.3）。
     projects: str = ""
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
@@ -528,10 +527,10 @@ class ScopeGuard:
         # 追跡から外れている `scratchpad/` はそもそもこの経路に現れない。現れたということは
         # そのツリーの git が `scratchpad/` を追跡しているということで、外してよい根拠
         # （追跡されないので統合先へ乗らない）が崩れている。そこは報告から外さずに言う。
-        if ticket_mod.is_ticket_place(rel, self.tickets, self.approved):
+        if ticket_places.is_ticket_place(rel, self.tickets, self.approved):
             return None
         # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える）。
-        if ticket_mod.is_eli5_place(rel):
+        if ticket_places.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
         item = phase.plan_item(ticket, parent)
@@ -737,7 +736,7 @@ def _script_writes(
     外すのは 3 つ。
 
     * どちらの版も範囲を宣言していないもの（マーカー、`.risk.json`、閉じの記録）
-    * スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
+    * スクリプトだけが書く欄（`ticket_model.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
     * `finish` と `cancel` の移動。正規化した内容が同じチケットが `doing/` から消えて、
       レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
 
@@ -762,7 +761,7 @@ def _script_writes(
         (change, rel)
         for change in changes
         for rel in [tree.relative(where, change.full)]
-        if ticket_mod.is_ticket_place(rel, tickets_rel, approved_rel)
+        if ticket_places.is_ticket_place(rel, tickets_rel, approved_rel)
     ]
     if not here:
         return set()
@@ -779,16 +778,18 @@ def _script_writes(
         now = fsio.read_text(change.full, errors="replace")
         # 落としてよいのは、コミット済みの版がまだ持っていない欄だけ。副命令はどれも
         # 1 度しか書かないので、既に値がある欄が変わったのなら副命令が書いたものではない
-        # （`ticket.script_fields_set`）。
+        # （`ticket_fields.script_fields_set`）。
         drop = _droppable(before)
         if _shape(before, drop) == _shape(now, drop):
             # 正規化した内容が同じ。どちらも範囲を宣言していない（マーカー・記録）か、
             # まだ無かったスクリプトの欄が足されただけか。
             out.add(change.full)
         elif now is None or _shape(now, drop) is None:
-            if before is not None and ticket_mod.leaves_open_state(rel, tickets_rel, approved_rel):
+            if before is not None and ticket_places.leaves_open_state(
+                rel, tickets_rel, approved_rel
+            ):
                 gone.append((change, before, drop))
-        elif _shape(before, drop) is None and ticket_mod.lands_in_finished_state(
+        elif _shape(before, drop) is None and ticket_places.lands_in_finished_state(
             rel, tickets_rel, approved_rel
         ):
             arrived.append((change, now))
@@ -843,13 +844,13 @@ def _archived_removals(
 
 def _droppable(before: str | None) -> tuple[str, ...]:
     """正規化するときに落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
-    held = ticket_mod.script_fields_set(before) if before is not None else ()
-    return tuple(f for f in ticket_mod.SCRIPT_FIELDS if f not in held)
+    held = ticket_fields.script_fields_set(before) if before is not None else ()
+    return tuple(f for f in ticket_model.SCRIPT_FIELDS if f not in held)
 
 
 def _shape(text: str | None, drop: tuple[str, ...]) -> str | None:
     """その版を正規化した内容。無い・読めない・チケットでないなら None。"""
-    return ticket_mod.script_shape(text, drop) if text is not None else None
+    return ticket_fields.script_shape(text, drop) if text is not None else None
 
 
 def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:

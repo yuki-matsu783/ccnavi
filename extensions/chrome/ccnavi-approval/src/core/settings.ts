@@ -73,7 +73,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   return { host: host.id, owner, repo, integration, recentDays: days, extraBranches, project, workspace };
 }
 
-/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、層の名前に予約した名前（`settings.is_reserved_layer_name`） */
+/** プロジェクト名の形（識別子と同じ。`ticket_ids._ID`）と、層の名前に予約した名前（`settings.is_reserved_layer_name`） */
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_LAYER = new Set(["common", "self"]);
 

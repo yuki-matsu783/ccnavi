@@ -43,6 +43,7 @@ from ..infra import fsio, globmatch, settings, tree, yamlread
 from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from . import ticket as ticket_mod
+from . import ticket_model
 
 VERSION = 1
 
@@ -110,7 +111,7 @@ class PhaseType:
     kind: str = KIND_WORK
     review: str = REVIEW_MR
     # None なら inherit（親の範囲そのまま）。
-    scope: list[ticket_mod.Entry] | None = None
+    scope: list[ticket_model.Entry] | None = None
     scope_globs: list[str] = field(default_factory=list)
     deliverables: list[str] = field(default_factory=list)
     overlap: list[str] = field(default_factory=list)
@@ -153,7 +154,7 @@ class PhaseType:
         for entry in self.scope:
             if entry.matches(rel):
                 return rules.ALLOW
-        return ticket_mod.OUTSIDE
+        return ticket_model.OUTSIDE
 
     def overlaps(self, other: PhaseType) -> bool:
         """並行してよい組か。どちらかが相手を挙げていれば対称に当てはまる。"""
@@ -511,10 +512,10 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
     return pt, problems
 
 
-def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], list[Problem]]:
+def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], list[Problem]]:
     """範囲の glob を、子チケットの範囲と同じ規則で式にする。"""
     problems: list[Problem] = []
-    entries: list[ticket_mod.Entry] = []
+    entries: list[ticket_model.Entry] = []
     for i, item in enumerate(raw):
         if not isinstance(item, str) or not item.strip():
             problems.append(Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` が文字列ではない"))
@@ -539,11 +540,11 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
         except re.error as exc:
             problems.append(Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` を式にできない: {exc}"))
             continue
-        entries.append(ticket_mod.Entry(decision=rules.ALLOW, glob=glob, compiled=compiled))
+        entries.append(ticket_model.Entry(decision=rules.ALLOW, glob=glob, compiled=compiled))
     return entries, problems
 
 
-def scope_problems(child: ticket_mod.Ticket, pt: PhaseType) -> list[Problem]:
+def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
     """子の範囲が種類の上限を超えている項を名指しする。子 ⊆ 種類。
 
     超えていても承認は止めない（warn）。判定が種類の上限でも切り詰める（phase.scope_verdict）。

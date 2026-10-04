@@ -2,7 +2,7 @@
  * 「始める」。issue から親のブランチを統合先の今の先頭に作る。PR/MR は作らない
  * （差分 0 のブランチからは作れないので、最初の push の後に `ccnavi-review.sh request` が作る）。
  *
- * 識別子（= ブランチ名）は Python（`ticket.issue_identifier`）が issue の番号とタイトルから
+ * 識別子（= ブランチ名）は Python（`ticket_ids.issue_identifier`）が issue の番号とタイトルから
  * `feature-<番号>-<slug>` の形に決め、始められない理由（統合先の
  * `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版の違い）も
  * Python が出す。ここは issue を読み、Python に聞き、ブランチを作る頼みを service worker に送るだけ。

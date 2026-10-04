@@ -58,8 +58,8 @@ from ..tickets import (
     phasetypes,
     risk,
     syncstate,
+    ticket_model,
 )
-from ..tickets import ticket as ticket_mod
 from . import lint_layers, lint_places, lint_project, lint_rules, lint_ticket, version
 
 # `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
@@ -514,7 +514,7 @@ def family_check(
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
 
-    def ours(t: ticket_mod.Ticket) -> bool:
+    def ours(t: ticket_model.Ticket) -> bool:
         return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo
 
     mine = [t for t in copies if ours(t)]
@@ -552,7 +552,7 @@ def family_check(
     return problems
 
 
-def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | None:
+def _written_by_chrome(conf: settings.Settings, t: ticket_model.Ticket) -> str | None:
     """この承認済みチケットを最後に書いたのが Chrome 拡張なら、その拡張の版。
     そうでなければ None。
 

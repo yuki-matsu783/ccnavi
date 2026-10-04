@@ -3,7 +3,7 @@
 日本語の識別子を通し、パスやシェルで意味を持つ表記（`/`・`..`・先頭の `-`・空白・制御文字・
 記号）を止める。ロケール（C・C.UTF-8）とシェル（sh・bash）を変えても答えが同じこと、
 前の形（`i0055-01`）も通ることを見る。字の種類（全角記号・NFD）は実行ファイルが止めるので、
-ここでは ASCII の外のバイトは通す（`ticket.id_problem` と並べて見る）。
+ここでは ASCII の外のバイトは通す（`ticket_ids.id_problem` と並べて見る）。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import subprocess
 import unicodedata
 import unittest
 
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import ticket_ids
 from tests import ROOT
 
 COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
@@ -84,10 +84,10 @@ class IsIdentTest(unittest.TestCase):
         for value in ("feature-1-ＡＢ", unicodedata.normalize("NFD", "feature-1-が")):
             with self.subTest(value=value):
                 self.assertTrue(is_ident(SHELLS[0], value, "C"))
-                self.assertFalse(ticket_mod.is_valid_id(value))
+                self.assertFalse(ticket_ids.is_valid_id(value))
         for value in GOOD:
             with self.subTest(value=value):
-                self.assertTrue(ticket_mod.is_valid_id(value))
+                self.assertTrue(ticket_ids.is_valid_id(value))
 
 
 # 親のブランチ名（`ccnavi_is_branch`）。
@@ -163,10 +163,10 @@ class IsBranchTest(unittest.TestCase):
     def test_the_executable_agrees(self):
         for value in BRANCH_GOOD:
             with self.subTest(value=value):
-                self.assertEqual(ticket_mod.branch_problem(value), "")
+                self.assertEqual(ticket_ids.branch_problem(value), "")
         for value in BRANCH_BAD:
             with self.subTest(value=value):
-                self.assertNotEqual(ticket_mod.branch_problem(value), "")
+                self.assertNotEqual(ticket_ids.branch_problem(value), "")
 
 
 if __name__ == "__main__":

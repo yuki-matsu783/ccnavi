@@ -8,14 +8,15 @@ import os
 
 from ..infra import gitcmd, gitstate, settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from ..tickets import ticket as ticket_mod
+from ..tickets import ticket_places
 
 
 def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
     """下書きの置き場が、そのリポジトリの git に追跡されていないか（REQ-TKT-44）。
 
-    実行前チェックはチケットの範囲を `scratchpad/` に当てない（`ticket.is_scratch_place`）。外して
-    よい根拠は「git が追跡しないので統合先のブランチに乗らない」ことの 1 つだけ。
+    実行前チェックはチケットの範囲を `scratchpad/` に当てない
+    （`ticket_places.is_scratch_place`）。外してよい根拠は「git が追跡しないので
+    統合先のブランチに乗らない」ことの 1 つだけ。
 
     **この警告で穴が無くなるわけではない。** 根拠が崩れた場合は、実行後チェックと
     サブエージェント終了時チェックが `scratchpad/` の変更を範囲外として報告する（`is_unscoped` の
@@ -47,7 +48,7 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
         (f"(scratch/{p.name})", tree.project_root(conf.projects, p.name))
         for p in tree.projects(conf.projects)
     ]
-    place = ticket_mod.SCRATCH
+    place = ticket_places.SCRATCH
     for name, home in where:
         tracked = _tracked(home, place)
         ignored = _ignored(home, place + "/")

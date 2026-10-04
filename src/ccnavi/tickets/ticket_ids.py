@@ -9,7 +9,7 @@ import re
 import unicodedata
 
 from ..infra import settings
-from .ticket_model import Ticket
+from . import ticket_model
 
 # 識別子。親は 1 語、子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。新しい親は
 # `<先頭の語>-<番号>-<slug>`（`feature-12-login` など）の形にそろえる。形は lint の warn で、
@@ -281,7 +281,7 @@ def branch_problem(name: str) -> str:
     return ""
 
 
-def branch_name(t: Ticket) -> str:
+def branch_name(t: ticket_model.Ticket) -> str:
     """親チケットの親のブランチ名。`branch:` があればその値、無ければ識別子。
 
     子のブランチは子の識別子（子は `branch:` を持たない）。
@@ -292,7 +292,7 @@ def branch_name(t: Ticket) -> str:
 
 
 def branch_name_problems(
-    t: Ticket,
+    t: ticket_model.Ticket,
     integration: str = "",
     serial: int = 0,
     prefixes=settings.DEFAULT_BRANCH_PREFIXES,
@@ -338,7 +338,7 @@ def branch_name_problems(
 
 
 def _form_problems(
-    t: Ticket, serial: int = 0, prefixes=settings.DEFAULT_BRANCH_PREFIXES
+    t: ticket_model.Ticket, serial: int = 0, prefixes=settings.DEFAULT_BRANCH_PREFIXES
 ) -> list[str]:
     """新しい親の識別子が `<先頭の語>-<番号>-<slug>` の形と `issue:` に合っているか。
 

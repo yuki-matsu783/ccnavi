@@ -7,10 +7,12 @@ ticket から分けた。ticket を読まない。
 from __future__ import annotations
 
 from ..infra import tree
-from .ticket_model import CANCELLED, DOING, DONE, REVIEW, TODO, Ticket
+from . import ticket_model
 
 
-def fold(hits: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticket]:
+def fold(
+    hits: list[ticket_model.Ticket], approved: list[ticket_model.Ticket] | None = None
+) -> list[ticket_model.Ticket]:
     """同じ識別子のチケットを、本物とするツリーの側にまとめる。
 
     子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
@@ -67,7 +69,7 @@ def fold(hits: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticke
     return [t for t in hits if t.tree == where]
 
 
-def authority(copies: list[Ticket]) -> str | None:
+def authority(copies: list[ticket_model.Ticket]) -> str | None:
     """同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）から、本物とするツリーの名前を決める。
 
     親のツリー（親自身なら自分のツリー）→ 元ツリー（先へ進んだチケットが無いときだけ）の順。
@@ -86,7 +88,7 @@ def authority(copies: list[Ticket]) -> str | None:
     return origin_tree(at_origin[0])
 
 
-def origin_tree(t: Ticket) -> str:
+def origin_tree(t: ticket_model.Ticket) -> str:
     """このチケットの元ツリーの名前。ワークスペースなら空、プロジェクトならその名前。
 
     ワークツリーの名前は識別子だが、元ツリーの名前はプロジェクトの名前（ワークスペース
@@ -101,14 +103,14 @@ def progress(state: str) -> int:
     承認済みチケットは置き場を持たないことがある（`state` が空）。判定と同じく
     作業中として数える。
     """
-    order = (TODO, DOING, REVIEW, DONE)
-    state = state or DOING
-    if state == CANCELLED:
-        state = DONE  # 取り消しも閉じた側。置き場は `done/`
+    order = (ticket_model.TODO, ticket_model.DOING, ticket_model.REVIEW, ticket_model.DONE)
+    state = state or ticket_model.DOING
+    if state == ticket_model.CANCELLED:
+        state = ticket_model.DONE  # 取り消しも閉じた側。置き場は `done/`
     return order.index(state) if state in order else 0
 
 
-def behind(some: list[Ticket], hits: list[Ticket]) -> bool:
+def behind(some: list[ticket_model.Ticket], hits: list[ticket_model.Ticket]) -> bool:
     """`some` より先の置き場に在るチケットが `hits` にあるか。"""
     return max(progress(t.state) for t in hits) > max(progress(t.state) for t in some)
 
@@ -121,14 +123,14 @@ def collided_states(states: list[str]) -> list[str]:
     `--lint` の ERROR と、ボードの `scattered` が同じ数え方をするためにここに置く。
     """
     distinct = sorted(set(states))
-    if len(distinct) > 1 and TODO not in distinct:
+    if len(distinct) > 1 and ticket_model.TODO not in distinct:
         return distinct
     if len(states) > 1 and len(distinct) < len(states):
         return states
     return []
 
 
-def collisions(hits: list[Ticket]) -> list[Ticket]:
+def collisions(hits: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]:
     """どれが本物か決まらないチケットの全部。決まっていれば空。
 
     まとめて 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
@@ -142,15 +144,17 @@ def collisions(hits: list[Ticket]) -> list[Ticket]:
     return []
 
 
-def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
+def by_ticket(found: list[ticket_model.Ticket]) -> dict[str, list[ticket_model.Ticket]]:
     """識別子ごとのチケットの全部。順序は見つけた順。"""
-    grouped: dict[str, list[Ticket]] = {}
+    grouped: dict[str, list[ticket_model.Ticket]] = {}
     for t in found:
         grouped.setdefault(t.ticket, []).append(t)
     return grouped
 
 
-def dedupe(found: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticket]:
+def dedupe(
+    found: list[ticket_model.Ticket], approved: list[ticket_model.Ticket] | None = None
+) -> list[ticket_model.Ticket]:
     """同じ識別子が複数のツリーにあるとき、本物とするツリーの側だけを残す。
 
     `approved` は、まとめる前の承認済みチケットの全部。承認済みの識別子は、そのチケットで
@@ -159,7 +163,7 @@ def dedupe(found: list[Ticket], approved: list[Ticket] | None = None) -> list[Ti
     古い提案（承認の前に切ったワークツリーの `todo/` など）が残る。
     """
     settled = by_ticket(approved or [])
-    kept: list[Ticket] = []
+    kept: list[ticket_model.Ticket] = []
     for ticket_id, hits in by_ticket(found).items():
         kept.extend(fold(hits, settled.get(ticket_id)))
     return kept

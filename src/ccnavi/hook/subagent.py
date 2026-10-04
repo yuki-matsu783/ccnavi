@@ -14,7 +14,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import rules
 from ..records import audit
-from ..tickets import approval, approval_checks, flow, phase
+from ..tickets import approval, approval_checks, flow, phase, ticket_model
 from ..tickets import ticket as ticket_mod
 from . import judge, post, projskills, reasons
 
@@ -163,7 +163,7 @@ def at_stop(
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     copies, _ = approval.scan(conf, root)
     index = approval_checks.by_id(copies)
-    targets: list[ticket_mod.Ticket] = []
+    targets: list[ticket_model.Ticket] = []
     bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
     if bound is not None:
         targets = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
@@ -207,7 +207,7 @@ def at_stop(
     return EXIT_OK
 
 
-def _limit_note(child: ticket_mod.Ticket, found: phase.ScopeVerdict) -> str:
+def _limit_note(child: ticket_model.Ticket, found: phase.ScopeVerdict) -> str:
     """子の範囲の中なのに外とされたパスにつける、止めた上限の名指し。子の範囲の外なら空。
 
     つけないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ

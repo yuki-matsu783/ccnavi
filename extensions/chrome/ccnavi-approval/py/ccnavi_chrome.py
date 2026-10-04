@@ -65,7 +65,7 @@ snapshot の中で名乗るブランチを探し、無ければ要求の `hints`
 名乗らなければ使わない。
 
 「始める」の `start` も答える。issue の番号とタイトルから識別子を決め
-（手元と同じ `ticket.issue_identifier`）、始められない理由（統合先の `done/` にある・同じ名前の
+（手元と同じ `ticket_ids.issue_identifier`）、始められない理由（統合先の `done/` にある・同じ名前の
 ブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版の違い）を返す。
 ブランチを作るのは拡張（service worker）。
 """
@@ -83,7 +83,15 @@ import sys
 from ccnavi.entry import cli, lint, version
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import configsync, history, review, review_host, syncstate
+from ccnavi.tickets import (
+    configsync,
+    history,
+    review,
+    review_host,
+    syncstate,
+    ticket_ids,
+    ticket_model,
+)
 from ccnavi.tickets import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
@@ -152,7 +160,7 @@ def _placement() -> dict:
         "approved": approved,
         # 統合先から読むもの。承認済みは閉じたものだけ（作業中のものは `P` を本物とする。
         # 古い統合先から切った `P` でも閉じた識別子の使い直しを見つけるため、`done/` は常に読む）。
-        "integration_paths": sorted({f"{approved}/{ticket_mod.DONE}", COMMON_LAYER, own_layer}),
+        "integration_paths": sorted({f"{approved}/{ticket_model.DONE}", COMMON_LAYER, own_layer}),
         "integration_files": [SETTINGS_FILE, COMPAT_FILE],
         # 親のブランチから読むもの。
         "branch_paths": [approved, tickets],
@@ -160,7 +168,7 @@ def _placement() -> dict:
         # 設定・互換のマーカー）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
         "workspace_paths": sorted({COMMON_LAYER, own_layer}),
         "workspace_files": [SETTINGS_FILE, COMPAT_FILE],
-        "project_paths": sorted({f"{approved}/{ticket_mod.DONE}", own_layer}),
+        "project_paths": sorted({f"{approved}/{ticket_model.DONE}", own_layer}),
         "layer_dir": own_layer,
     }
 
@@ -187,7 +195,7 @@ def _snapshot(req: dict) -> dict:
         _check_files(bname, branch)
     project = snap.get("project") or ""
     if project:
-        if not isinstance(project, str) or not ticket_mod.is_valid_name(project):
+        if not isinstance(project, str) or not ticket_ids.is_valid_name(project):
             raise Refused(f"プロジェクト名が読めない: {project!r}")
         if settings.is_reserved_layer_name(project):
             raise Refused(f"プロジェクト名 {project} は層の名前として予約してある（common・self）")
@@ -238,9 +246,9 @@ def _files(snap: dict, name: str) -> dict[str, str]:
 
 def _tickets_in(files: dict[str, str], place: dict, states: tuple[str, ...] | None = None):
     """ブランチの置き場にあるチケット（提案と承認済み）。読めないものは飛ばす。"""
-    dirs = [(place["tickets"], s) for s in ticket_mod.STATES] + [
-        (place["approved"], ticket_mod.DOING),
-        (place["approved"], ticket_mod.DONE),
+    dirs = [(place["tickets"], s) for s in ticket_model.STATES] + [
+        (place["approved"], ticket_model.DOING),
+        (place["approved"], ticket_model.DONE),
     ]
     for base, state in dirs:
         if states is not None and state not in states:
@@ -260,7 +268,7 @@ def family_of(ident: str) -> str:
 
     子の形（`<親>-<2 桁>-<2 桁>`）なら `parent`、そうでなければ自分。
     """
-    m = ticket_mod.child_pattern().match(ident)
+    m = ticket_ids.child_pattern().match(ident)
     return m.group("parent") if m else ident
 
 
@@ -273,7 +281,7 @@ def _claimers(snap: dict, place: dict, name: str) -> list:
     return [
         t
         for state, t in _tickets_in(
-            _files(snap, name), place, (*ticket_mod.STATES, ticket_mod.DOING)
+            _files(snap, name), place, (*ticket_model.STATES, ticket_model.DOING)
         )
         if not t.is_child and _claimed(state, t) == name
     ]
@@ -285,7 +293,7 @@ def _claimed(state: str, t) -> str:
     承認済み（doing/・review/）は `branch:`（無ければ識別子）、承認前の提案（todo/）は識別子
     （提案の `branch:` は承認されるまで使わない）。
     """
-    return t.ticket if state == ticket_mod.TODO else ticket_mod.branch_name(t)
+    return t.ticket if state == ticket_model.TODO else ticket_ids.branch_name(t)
 
 
 def _family_ident(snap: dict, place: dict, name: str) -> str:
@@ -310,7 +318,7 @@ def _tree_ident(snap: dict, place: dict, name: str) -> str:
     idents = sorted({t.ticket for t in _claimers(snap, place, name)})
     if len(idents) == 1:
         return idents[0]
-    if not idents and ticket_mod.is_valid_id(name):
+    if not idents and ticket_ids.is_valid_id(name):
         return name
     return _family_ident(snap, place, name)
 
@@ -369,7 +377,7 @@ def _hints(req: dict) -> dict[str, str]:
 def _closed(snap: dict, place: dict) -> set[str]:
     """統合先の `done/` にある識別子（取り消し済みを含む）。"""
     files = _files(snap, snap["integration"]["name"])
-    return {t.ticket for _, t in _tickets_in(files, place, (ticket_mod.DONE,))}
+    return {t.ticket for _, t in _tickets_in(files, place, (ticket_model.DONE,))}
 
 
 # ---- 親子のチケット -------------------------------------------------------------------
@@ -398,7 +406,7 @@ def _op_families(req: dict, root: str) -> dict:
         files = _files(snap, name)
         parents = [
             (state, t)
-            for state, t in _tickets_in(files, place, (*ticket_mod.STATES, ticket_mod.DOING))
+            for state, t in _tickets_in(files, place, (*ticket_model.STATES, ticket_model.DOING))
             if not t.is_child and _claimed(state, t) == name
         ]
         if not parents:
@@ -545,7 +553,7 @@ def _build(
         owner = os.path.join(root, settings.DEFAULT_PROJECTS, project)
         os.makedirs(os.path.join(owner, ".git", "worktrees"))
         _head(os.path.join(owner, ".git"), integ)
-        done = f"{place['approved']}/{ticket_mod.DONE}/"
+        done = f"{place['approved']}/{ticket_model.DONE}/"
         for path, text in _files(snap, integ).items():
             if path.startswith(done):
                 _write(owner, path, text)
@@ -555,11 +563,11 @@ def _build(
         if name not in snap["branches"] or name == integ:
             continue
         ident = _tree_ident(snap, place, name)
-        if not ticket_mod.is_valid_id(ident):
+        if not ticket_ids.is_valid_id(ident):
             raise Refused(f"親子のチケットの識別子が識別子の形でない: {ident!r}")
-        if name != ident and ticket_mod.branch_problem(name):
+        if name != ident and ticket_ids.branch_problem(name):
             raise Refused(
-                f"親のブランチ名が使えない: {name!r}（{ticket_mod.branch_problem(name)}）"
+                f"親のブランチ名が使えない: {name!r}（{ticket_ids.branch_problem(name)}）"
             )
         tree = os.path.join(root, *WORKTREES.split("/"), ident)
         os.makedirs(tree, exist_ok=True)
@@ -659,7 +667,7 @@ def records(
             # 読みに行った名前の親子のチケット（閉包の `idents`。無ければその名前を識別子とする）。
             # 識別子の形でなければ取り込み状態を書けないので、黙って飛ばさず決まらないとして止める。
             ident = (idents or {}).get(name, name)
-            if not ticket_mod.is_valid_id(ident):
+            if not ticket_ids.is_valid_id(ident):
                 raise Refused(
                     f"ホストに無い親のブランチ {name} の親子のチケット（{ident}）が"
                     "識別子の形でない。"
@@ -822,7 +830,7 @@ def _write_refusal(snap: dict, family: str) -> str:
         return f"{compat['message']}。表示だけにして、承認と取り下げのボタンは出さない"
     folded = family.casefold()
     if (
-        folded in ticket_mod.RESERVED_BRANCH_IDS
+        folded in ticket_ids.RESERVED_BRANCH_IDS
         or folded.startswith("release-")
         or folded == snap["integration"]["name"].casefold()
     ):
@@ -860,8 +868,8 @@ def _entry(root: str, entry: dict) -> dict:
 
 # 仮のツリーのパスの前に来てよい字（行の頭・空白・引用符・括弧・区切り）。
 # 途中の段（`wip/ws/`）は畳まない。
-# 識別子に使える字（`ticket.ID_CHARS`。日本語の字を含む）。
-ID_CHARS = ticket_mod.ID_CHARS
+# 識別子に使える字（`ticket_ids.ID_CHARS`。日本語の字を含む）。
+ID_CHARS = ticket_ids.ID_CHARS
 _BEFORE_ROOT = r"(?<![^\s'\"`(（「:：,、=])"
 
 
@@ -1178,7 +1186,7 @@ def _compat(snap: dict) -> dict:
 def _op_start(req: dict, root: str) -> dict:
     """issue から始める親のブランチの名前と、始められない理由。
 
-    名前は issue の番号とタイトル（`title`）から `ticket.issue_identifier` が決める。先頭の語は
+    名前は issue の番号とタイトル（`title`）から `ticket_ids.issue_identifier` が決める。先頭の語は
     `prefix`（無ければ `feature`）。
 
     ブランチは作らない（拡張の service worker が作る）。入力は統合先（と、プロジェクトなら
@@ -1195,16 +1203,16 @@ def _op_start(req: dict, root: str) -> dict:
     title = req.get("title") or ""
     if not isinstance(title, str) or len(title) > 1000:
         raise Refused("title は issue のタイトル（1000 文字まで）")
-    prefix = req.get("prefix") or ticket_mod.DEFAULT_ISSUE_PREFIX
+    prefix = req.get("prefix") or ticket_ids.DEFAULT_ISSUE_PREFIX
     if not isinstance(prefix, str) or not settings.is_branch_prefix(prefix):
         raise Refused(f"prefix は先頭の語（英小文字と数字）: {prefix!r}")
     project = _project(snap)
-    ident = ticket_mod.issue_identifier(number, title, project, prefix)
+    ident = ticket_ids.issue_identifier(number, title, project, prefix)
     integ = snap["integration"]["name"]
     folded = ident.casefold()
     problems = list(
-        ticket_mod.branch_name_problems(
-            ticket_mod.Ticket(ticket=ident, issue=number, project=project),
+        ticket_ids.branch_name_problems(
+            ticket_model.Ticket(ticket=ident, issue=number, project=project),
             integ,
             prefixes=(prefix, *settings.DEFAULT_BRANCH_PREFIXES),
         )

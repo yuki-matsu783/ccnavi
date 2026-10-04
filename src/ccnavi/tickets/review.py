@@ -55,6 +55,8 @@ from . import (
     ops,
     phase,
     review_host,
+    ticket_model,
+    ticket_places,
 )
 from . import ticket as ticket_mod
 
@@ -164,7 +166,7 @@ def _note_synced(
         stderr.write(f"ccnavi: 設定を上書きしたことを知らせた記録を書けない: {failed}\n")
 
 
-def mr_draft(parent: ticket_mod.Ticket) -> str:
+def mr_draft(parent: ticket_model.Ticket) -> str:
     """マージリクエストの下書き。1 行目が題、空行のあとが本文。
 
     まだ無ければ sh がこれで作る。ユーザがレビューのときに見るのはこの入れ物なので、
@@ -308,7 +310,7 @@ def matching_problems(result: review_host.Result | None, requested_mark: dict) -
 def review_problems(
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     phase_no: int,
     result: review_host.Result,
 ) -> list[str]:
@@ -363,7 +365,7 @@ def settle_and_mark(
     stage,
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     ph: phase.Phase,
     mark: dict,
 ) -> tuple[str, str] | None:
@@ -381,7 +383,7 @@ def settle_and_mark(
             return "", failed
         if moved:
             stage.line(
-                f"レビュー待ちの子を {conf.approved}/{ticket_mod.DONE}/ へ動かした: "
+                f"レビュー待ちの子を {conf.approved}/{ticket_model.DONE}/ へ動かした: "
                 f"{', '.join(moved)}"
             )
         home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
@@ -400,7 +402,7 @@ def _settle_children(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     ph: phase.Phase,
 ) -> bool:
     """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
@@ -419,7 +421,7 @@ def _settle_children(
         return False
     if moved:
         stdout.write(
-            f"レビュー待ちの子を {conf.approved}/{ticket_mod.DONE}/ へ動かした: "
+            f"レビュー待ちの子を {conf.approved}/{ticket_model.DONE}/ へ動かした: "
             f"{', '.join(moved)}\n"
         )
     return True
@@ -461,7 +463,7 @@ def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     （crit push が届かない）。
     """
     # git の `-z` の表記をそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
-    return _is_own_place(conf, path) or path.startswith(ticket_mod.ELI5 + "/")
+    return _is_own_place(conf, path) or path.startswith(ticket_places.ELI5 + "/")
 
 
 # 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
@@ -543,8 +545,8 @@ def _in_wip(path: str) -> bool:
     """git が出したパスが、途中の作業の置き場（`wip`）の下か。
     大文字小文字と `\\` の区切りを問わない。"""
     folded = path.lower()
-    return folded == ticket_mod.WIP_ROOT or folded.startswith(
-        (ticket_mod.WIP_ROOT + "/", ticket_mod.WIP_ROOT + "\\")
+    return folded == ticket_places.WIP_ROOT or folded.startswith(
+        (ticket_places.WIP_ROOT + "/", ticket_places.WIP_ROOT + "\\")
     )
 
 
@@ -557,7 +559,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
     problems: list[str] = []
     if not os.path.isdir(tree_root):
         return [f"親のワークツリーが無い ({tree_root})"]
-    wip = ticket_mod.WIP_ROOT
+    wip = ticket_places.WIP_ROOT
     # 大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
     # （`tree.relative` は書いたパスを返す）は `wip/eli5/` として通すのに、
     # git には `WIP/...` で入る。
@@ -592,7 +594,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
 
 def _parent_any(
     stderr: TextIO, root: str, conf: settings.Settings, cwd: str
-) -> ticket_mod.Ticket | None:
+) -> ticket_model.Ticket | None:
     """cwd の親。閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す `ready` のため）。"""
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
@@ -613,7 +615,7 @@ def _write_text(path: str, text: str) -> str:
 
 
 def _covered_header(
-    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, ph: phase.Phase
+    root: str, conf: settings.Settings, parent: ticket_model.Ticket, ph: phase.Phase
 ) -> str:
     """依頼文の先頭に置く「このレビューが含むフェーズ」と「このレビューのリスク」。
 
@@ -641,7 +643,7 @@ def _covered_header(
     return head + "\n" if head else ""
 
 
-def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
+def _is_last_feedback_review(parent: ticket_model.Ticket, phase_no: int) -> bool:
     """フィードバック作業フェーズの最後のレビューか。"""
     if not parent.has_plan or not parent.feedback:
         return False
@@ -654,7 +656,7 @@ def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
 
 def _parent(
     stderr: TextIO, root: str, conf: settings.Settings, cwd: str
-) -> ticket_mod.Ticket | None:
+) -> ticket_model.Ticket | None:
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is None:
         stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
@@ -667,7 +669,7 @@ def _parent(
 
 
 def _phase(
-    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, number: int
+    root: str, conf: settings.Settings, parent: ticket_model.Ticket, number: int
 ) -> phase.Phase | None:
     for ph in phase.phases_of(root, conf, parent.ticket):
         if ph.number == number:
@@ -677,7 +679,7 @@ def _phase(
 
 def _parent_phase(
     stderr: TextIO, root: str, conf: settings.Settings, cwd: str, number: int
-) -> tuple[ticket_mod.Ticket, phase.Phase] | None:
+) -> tuple[ticket_model.Ticket, phase.Phase] | None:
     """cwd の親と、その番号のフェーズ。どちらか無ければ言って None。"""
     parent = _parent(stderr, root, conf, cwd)
     if parent is None:
@@ -724,7 +726,7 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
     if not ph.ended:
         unmet.append("フェーズが終わっていない（doing/ に子が残っている）")
     for child in ph.tickets:
-        if ph.states.get(child.ticket) not in (ticket_mod.REVIEW, ticket_mod.DONE):
+        if ph.states.get(child.ticket) not in (ticket_model.REVIEW, ticket_model.DONE):
             continue
         # 子のブランチは識別子と同じ名前。ワークツリーではなくブランチを引くので、
         # ワークツリーを消しても検査から外れない。引けなければ前提の未充足。
@@ -789,7 +791,7 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> review_host.Re
     return None if problems else result
 
 
-def _poster(parent: ticket_mod.Ticket, phase_no: int, root: str, conf: settings.Settings) -> str:
+def _poster(parent: ticket_model.Ticket, phase_no: int, root: str, conf: settings.Settings) -> str:
     """そのフェーズの依頼を投稿したアカウント（依頼の記録の `poster`）。無ければ空。"""
     ph = _phase(root, conf, parent, phase_no)
     mark = ph.marks.get(approval_marks.MARK_REQUESTED) if ph is not None else None

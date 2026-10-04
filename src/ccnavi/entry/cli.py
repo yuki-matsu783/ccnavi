@@ -33,8 +33,8 @@ from ..tickets import (
     review,
     review_close,
     review_decide,
+    ticket_ids,
 )
-from ..tickets import ticket as ticket_mod
 from . import diagnose, lint, status, suggest, version
 
 USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
@@ -1450,7 +1450,7 @@ def _decide_actor(args) -> None:
 
 
 class _Family:
-    """親の識別子の形（`ticket.is_valid_id` と同じ。日本語の字を含む）。
+    """親の識別子の形（`ticket_ids.is_valid_id` と同じ。日本語の字を含む）。
 
     sh から渡る引数なので、パスとして読まれる文字列を入れない。前は正規表現で持っていたので、
     呼び手が使う `fullmatch` の形を残す。
@@ -1458,7 +1458,7 @@ class _Family:
 
     @staticmethod
     def fullmatch(text: str) -> bool:
-        return ticket_mod.is_valid_id(text)
+        return ticket_ids.is_valid_id(text)
 
 
 _FAMILY = _Family()
@@ -1478,7 +1478,7 @@ def _revision_ok(since: str) -> bool:
     if not since.startswith(_ORIGIN_REF):
         return False
     name = since[len(_ORIGIN_REF) :]
-    return ticket_mod.is_valid_id(name) or not ticket_mod.branch_problem(name)
+    return ticket_ids.is_valid_id(name) or not ticket_ids.branch_problem(name)
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが

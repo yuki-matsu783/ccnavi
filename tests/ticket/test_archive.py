@@ -19,7 +19,7 @@ import unittest
 
 from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, approval_checks, archive, history
+from ccnavi.tickets import approval, approval_checks, archive, history, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, read_json, write
@@ -184,7 +184,7 @@ class ArchiveChecksTest(ChecksHarness):
 
     def test_a_reused_identifier_is_refused(self):
         t, _ = ticket_mod.parse(closed_text("i0001"))
-        t.state = ticket_mod.TODO
+        t.state = ticket_model.TODO
         problems = approval_checks.integration_problems(self.conf, self.root, t)
         self.assertEqual(len(problems), 1)
         self.assertIn("退避", problems[0].detail)
@@ -649,7 +649,7 @@ class SecondReviewChecksTest(ChecksHarness):
 
     def test_6_an_identifier_reused_with_other_letter_case_is_refused(self):
         t, _ = ticket_mod.parse(closed_text("I0001"))
-        t.state = ticket_mod.TODO
+        t.state = ticket_model.TODO
         self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
         self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), {"I0001"})
         self.assertIsNotNone(archive.archived_fields(self.root, "", "I0001"))
@@ -665,7 +665,7 @@ class ReusedIdentifierTest(ChecksHarness):
     def found(self, text, tree):
         t, problems = ticket_mod.parse(text)
         self.assertIsNotNone(t, problems)
-        t.tree, t.state = tree, ticket_mod.DOING
+        t.tree, t.state = tree, ticket_model.DOING
         return t
 
     def test_an_unstarted_copy_in_a_child_tree_is_dropped(self):
@@ -768,7 +768,7 @@ class PhaseChildIdsChecksTest(ChecksHarness):
         self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 2), "i0001-02-08")
         self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01")
         t, _ = ticket_mod.parse(closed_text("i0001-02-07", "i0001", 2))
-        t.state = ticket_mod.TODO
+        t.state = ticket_model.TODO
         self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
 
 

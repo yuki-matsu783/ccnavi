@@ -39,6 +39,8 @@ from . import (
     phase,
     phasetypes,
     syncstate,
+    ticket_ids,
+    ticket_model,
     workflow,
 )
 from . import ticket as ticket_mod
@@ -52,14 +54,14 @@ class Candidate:
     数えない（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
     """
 
-    ticket: ticket_mod.Ticket
+    ticket: ticket_model.Ticket
     complaints: list[rules.Problem] = field(default_factory=list)
     # 範囲の超過（親の範囲・種類の上限を超えた項、regex の項）。承認は止めず、判定が
     # 切り詰める。判定に影響する（止まる）ので、判定に影響しない記述の注意（complaints の warn）
     # とは分けて持つ。
     overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま使われている承認済みチケット。
-    current: ticket_mod.Ticket | None = None
+    current: ticket_model.Ticket | None = None
     # このチケットに使うフェーズの種類（共通層 + `project:` が指す層、設計 11.4.1）。
     # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持っておく。
     types: dict | None = None
@@ -98,7 +100,7 @@ class Gathered:
     """
 
     batch: list[Candidate]
-    rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]]
+    rejected: list[tuple[ticket_model.Ticket, list[rules.Problem]]]
     problems: list[str]
     pool: dict
     nothing_pending: bool
@@ -510,7 +512,7 @@ def carried(cand: Candidate) -> bytes:
     return b"%d\n" % len(ticket_bytes) + ticket_bytes + workflow_bytes
 
 
-def _workflow_to_write(cand: Candidate) -> ticket_mod.Workflow | None:
+def _workflow_to_write(cand: Candidate) -> ticket_model.Workflow | None:
     """この承認で `phases/<親>/workflow.yml` に書く待ち方。書かないなら None。
 
     新規は計画を持つ親だけ。改版はいつも書く（計画か待ち方が変わったから改版になる）。
@@ -534,13 +536,13 @@ def _batch_entry(cand: Candidate) -> dict:
         "tree": t.tree or "",
         "path": t.path,
         # 親のブランチ名。`branch:` が無ければ識別子。
-        "branch": ticket_mod.branch_name(t),
+        "branch": ticket_ids.branch_name(t),
         "existing_branch": cand.existing_branch,
         "overflow": [p.detail for p in cand.overflow],
     }
 
 
-def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
+def approved_text(tickets: list[ticket_model.Ticket], revisions: set[str], root: str) -> str:
     """チケットが承認されたことをモデルに伝える文。
 
     `--agree --yes` の `prompt`（拡張が Claude Code に渡す）がここから出る。hook は承認を
@@ -579,10 +581,10 @@ def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: s
 def candidates(
     root: str,
     conf: settings.Settings,
-    pending: list[ticket_mod.Ticket],
-    revisions: list[ticket_mod.Ticket],
-    approved: list[ticket_mod.Ticket],
-) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
+    pending: list[ticket_model.Ticket],
+    revisions: list[ticket_model.Ticket],
+    approved: list[ticket_model.Ticket],
+) -> tuple[list[Candidate], list[tuple[ticket_model.Ticket, list[rules.Problem]]], dict]:
     """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための対応表。
 
     承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
@@ -596,17 +598,17 @@ def candidates(
     # 親の通過が決まっている。
     pool = approval_checks.by_id(approved)
     batch: list[Candidate] = []
-    rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
+    rejected: list[tuple[ticket_model.Ticket, list[rules.Problem]]] = []
     # 層ごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じ層のチケットが
     # 何件あっても、ファイルを読むのはその層につき 1 度で足りる。
     cache: dict[str, dict | None] = {}
     # 先行を引く対応表。先行を書いた子が居るときだけ、最初の 1 回で組む。
-    preds: dict[str, list[ticket_mod.Ticket]] | None = None
+    preds: dict[str, list[ticket_model.Ticket]] | None = None
     # 親子のチケットの立ち位置と統合先の取り込み結果。
     # 1 回の承認で 1 度ずつだけ読む。
     fams = syncstate.Families(conf, root)
 
-    def types_for(t: ticket_mod.Ticket) -> dict | None:
+    def types_for(t: ticket_model.Ticket) -> dict | None:
         name = project_of(t, pool)
         if name not in cache:
             cache[name] = phase.load_types(conf, root, name)
@@ -633,7 +635,7 @@ def candidates(
     # 開き直したものとして読む。
     # 子はフェーズの番号の順に並べる。識別子の順だと、後のフェーズの子（-02）が前のフェーズに
     # 足す子（-03）より先に検査され、開き直す前のマーカーで通ってしまう。
-    added: dict[str, list[ticket_mod.Ticket]] = {}
+    added: dict[str, list[ticket_model.Ticket]] = {}
     for t in sorted(
         pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
     ):
@@ -676,23 +678,23 @@ def candidates(
     return batch, rejected, pool
 
 
-def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
+def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
     """提案に待ち方の欄（`workflow:`）が書いてあれば拒む。待ち方を書くのは `--agree` だけで、
     置き場は `phases/<親>/workflow.yml`（承認はチケットの中身を変えない）。"""
-    if ticket_mod.WORKFLOW_KEY not in t.raw:
+    if ticket_model.WORKFLOW_KEY not in t.raw:
         return []
     return [
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"`{ticket_mod.WORKFLOW_KEY}` の欄は提案に書かない。待ち方は --agree が"
+            f"`{ticket_model.WORKFLOW_KEY}` の欄は提案に書かない。待ち方は --agree が"
             f" {approval_marks.PHASES_DIR}/<親>/{approval_marks.WORKFLOW_FILE} に書く",
         )
     ]
 
 
-def script_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案にスクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）の空でない値があれば拒む。
+def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
+    """提案にスクリプトだけが書く欄（`ticket_model.SCRIPT_FIELDS`）の空でない値があれば拒む。
 
     承認は提案の中身を変えずに動かすので、提案に書いた値はそのまま承認済みチケットの値になる。
     `review/` の 2 つめの保護（`completed_at`）や着手の基準点（`base_sha`）は、これらの欄を
@@ -700,7 +702,7 @@ def script_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
     """
     found = [
         name
-        for name in ticket_mod.SCRIPT_FIELDS
+        for name in ticket_model.SCRIPT_FIELDS
         if t.raw.get(name) not in (None, "") and str(t.raw.get(name)).strip()
     ]
     if not found:
@@ -718,7 +720,7 @@ def script_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
     ]
 
 
-def record_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
+def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
     """提案に承認の記録（`ccnavi_approved`）か続きの子の目印（`followup_of`）があれば拒む。
 
     承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。前の版の承認の
@@ -726,7 +728,7 @@ def record_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
     目印は取り下げを止める。どちらもユーザの判断（承認・レビューの行き先）だけが残すもので、
     提案に書かせると古い形や続きの子を装える。
     """
-    found = [name for name in (ticket_mod.APPROVAL_KEY, approval.FOLLOWUP_KEY) if name in t.raw]
+    found = [name for name in (ticket_model.APPROVAL_KEY, approval.FOLLOWUP_KEY) if name in t.raw]
     if not found:
         return []
     names = ", ".join(f"`{name}`" for name in found)
@@ -740,7 +742,7 @@ def record_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
     ]
 
 
-def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
+def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> str:
     """このチケットの層を決める `project:`（設計 11.4.1）。
 
     子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
@@ -897,7 +899,7 @@ def _apply_steps(
     return None
 
 
-def _origin_line(t: ticket_mod.Ticket) -> str:
+def _origin_line(t: ticket_model.Ticket) -> str:
     """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
 
     プロジェクトは提案を置いた場所で決まる。ユーザはここで、書き込みが向かうリポジトリを
@@ -912,7 +914,7 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
 
 def screen(
     batch: list[Candidate],
-    pool: dict[str, ticket_mod.Ticket],
+    pool: dict[str, ticket_model.Ticket],
 ) -> str:
     """承認を求める画面を組む。
 
@@ -1048,7 +1050,7 @@ def screen(
     return "\n".join(lines)
 
 
-def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None) -> list[str]:
+def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | None) -> list[str]:
     lines = []
     for i, item in enumerate(items):
         n = start + i
@@ -1057,7 +1059,7 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
         review = ""
         if item.deferred:
             review = "レビューは次と一緒に"
-        elif item.review == ticket_mod.PLAN_REVIEW_MR:
+        elif item.review == ticket_model.PLAN_REVIEW_MR:
             review = "レビュー要: 計画で強めた"
         elif pt is not None:
             review = {
@@ -1068,7 +1070,7 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
     return lines
 
 
-def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
+def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:
     """`dag` の計画の待ち。辺の書き漏れをユーザが見つける場所（設計 9.7）。"""
     found = workflow.lines(t, wf)
     if not found:
@@ -1080,7 +1082,7 @@ def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
 
 
 def _plan_diff_lines(
-    current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None
+    current: ticket_model.Ticket, revised: ticket_model.Ticket, types: dict | None
 ) -> list[str]:
     lines = []
     if current.plan != revised.plan:
@@ -1108,12 +1110,12 @@ def _plan_diff_lines(
     return lines
 
 
-def _phase_label(t: ticket_mod.Ticket, pool: dict, types: dict | None) -> str:
+def _phase_label(t: ticket_model.Ticket, pool: dict, types: dict | None) -> str:
     pt = _type_of(t, pool, types)
     return f"{t.phase}: {pt.title}" if pt is not None else str(t.phase)
 
 
-def _type_of(t: ticket_mod.Ticket, pool: dict, types: dict | None):
+def _type_of(t: ticket_model.Ticket, pool: dict, types: dict | None):
     parent = pool.get(t.parent) if t.is_child else None
     if parent is None or not parent.has_plan or t.phase is None or not types:
         return None
@@ -1122,12 +1124,12 @@ def _type_of(t: ticket_mod.Ticket, pool: dict, types: dict | None):
 
 
 def waiting(
-    proposals: list[ticket_mod.Ticket],
-    approved: list[ticket_mod.Ticket],
-    closed: list[ticket_mod.Ticket],
-    review: list[ticket_mod.Ticket],
+    proposals: list[ticket_model.Ticket],
+    approved: list[ticket_model.Ticket],
+    closed: list[ticket_model.Ticket],
+    review: list[ticket_model.Ticket],
     types_for,
-) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
+) -> tuple[list[ticket_model.Ticket], list[ticket_model.Ticket]]:
     """いま `--agree` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
@@ -1142,7 +1144,7 @@ def waiting(
     """
     known = approval_checks.by_id(approved + closed + review)
     open_index = approval_checks.by_id(approved)
-    todo = [t for t in proposals if t.state == ticket_mod.TODO]
+    todo = [t for t in proposals if t.state == ticket_model.TODO]
     pending = [t for t in todo if t.ticket not in known]
     revisions = [
         t
@@ -1158,18 +1160,20 @@ def waiting(
     return pending, revisions
 
 
-def _workflow_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket, types_for) -> bool:
+def _workflow_differs(
+    proposal: ticket_model.Ticket, current: ticket_model.Ticket, types_for
+) -> bool:
     fresh = workflow.compute(proposal, types_for(proposal)).as_raw()
     held = current.workflow.as_raw() if current.workflow is not None else None
     return fresh != held
 
 
-def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod.Ticket]):
+def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_model.Ticket]):
     """チケットに使う種類を引く関数。層ごとの読み込みは 1 プロジェクト 1 回。"""
     pool = approval_checks.by_id(approved)
     cache: dict[str, dict | None] = {}
 
-    def types_for(t: ticket_mod.Ticket) -> dict | None:
+    def types_for(t: ticket_model.Ticket) -> dict | None:
         name = project_of(t, pool)
         if name not in cache:
             cache[name] = phase.load_types(conf, root, name)
@@ -1178,7 +1182,7 @@ def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod
     return types_for
 
 
-def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
+def feedback_notes(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> list[str]:
     """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
     accepted = approval_marks.accepted_threads(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
@@ -1191,7 +1195,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket
     return notes
 
 
-def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
+def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Problem]:
     """親の計画が種類の定義と合っているか（設計 9.7）。"""
     problems: list[rules.Problem] = []
     if not t.has_plan:
@@ -1272,8 +1276,8 @@ def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
 def revision_problems(
     root: str,
     conf: settings.Settings,
-    revised: ticket_mod.Ticket,
-    current: ticket_mod.Ticket,
+    revised: ticket_model.Ticket,
+    current: ticket_model.Ticket,
     types: dict | None,
 ) -> list[rules.Problem]:
     """親の改版を受けてよいか（設計 9.7）。"""
@@ -1377,8 +1381,8 @@ def revision_problems(
 
 def revise_copy(
     approved_dir: str,
-    current: ticket_mod.Ticket,
-    revised: ticket_mod.Ticket,
+    current: ticket_model.Ticket,
+    revised: ticket_model.Ticket,
     feedback_planned: bool,
     types: dict | None = None,
 ) -> str:
@@ -1407,14 +1411,14 @@ def revise_copy(
         approved_dir,
         current.ticket,
         history.KIND_REVISED,
-        ticket_mod.DOING,
-        ticket_mod.DOING,
+        ticket_model.DOING,
+        ticket_model.DOING,
         feedback=True if feedback_planned else None,
     )
     return ""
 
 
-def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dict:
+def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> dict:
     """改版で書く frontmatter。承認済みチケットの frontmatter の計画を差し替えたコピー。
 
     `current` は書き換えない。承認のダイジェスト（`digest`）も同じものから組むので、見せた
@@ -1428,7 +1432,7 @@ def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dic
     return front
 
 
-def _scope_signature(t: ticket_mod.Ticket) -> tuple:
+def _scope_signature(t: ticket_model.Ticket) -> tuple:
     return tuple((e.decision, e.glob, e.regex) for e in t.entries)
 
 
@@ -1443,7 +1447,7 @@ def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str
 
 
 def validate(
-    t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], types: dict | None = None
+    t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket], types: dict | None = None
 ) -> tuple[list[rules.Problem], list[rules.Problem]]:
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
 
@@ -1505,7 +1509,7 @@ def existing_branch_warnings(
     cache: dict[str, set[str]] = {}
     said: set[str] = set()
     for t in proposals:
-        if t.state != ticket_mod.TODO or t.is_child or t.ticket in settled or t.ticket in said:
+        if t.state != ticket_model.TODO or t.is_child or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
         if t.branch:
@@ -1536,7 +1540,7 @@ def _written_on_own_branch(root: str, conf: settings.Settings, t) -> bool:
     here = tree.tree_of(root, t.path, conf.projects)
     if here is None or here.is_main or here.name != t.ticket:
         return False
-    return tree.branch_of(here.root) == ticket_mod.branch_name(t)
+    return tree.branch_of(here.root) == ticket_ids.branch_name(t)
 
 
 def branch_exists(root: str, conf: settings.Settings, t) -> bool:

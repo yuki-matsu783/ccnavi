@@ -25,8 +25,9 @@ from . import (
     phasetypes,
     review,
     review_host,
+    ticket_ids,
+    ticket_model,
 )
-from . import ticket as ticket_mod
 
 DECIDE_FILE = "review-decide-{parent}-{phase}.md"
 # 残った指摘のうち、ユーザが issue に回すと選んだ分の下書き。sh がこれで issue を作る。
@@ -54,18 +55,18 @@ def _followup_from_choice(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     ph: phase.Phase,
     items: list[str],
 ) -> str | None:
     """ユーザが選んだ続きの子を `doing/` に起こし、識別子を返す。起こせなければ None。"""
-    children = [t for t in ph.tickets if ph.states.get(t.ticket) in ticket_mod.FINISHED]
+    children = [t for t in ph.tickets if ph.states.get(t.ticket) in ticket_model.FINISHED]
     ident, failed = approval.followup(conf, root, parent, ph.number, children, items)
     if failed:
         stderr.write(f"ccnavi: 続きの子チケットを起こせない: {failed}\n")
         return None
     stdout.write(
-        f"続きの子チケット {ident} を {conf.approved}/{ticket_mod.DOING}/ に起こした"
+        f"続きの子チケット {ident} を {conf.approved}/{ticket_model.DOING}/ に起こした"
         f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
         "フェーズは開き直り、マーカーは消えた。\n"
         f"次は{_followup_next(root, parent, ident)}\n"
@@ -73,13 +74,13 @@ def _followup_from_choice(
     return ident
 
 
-def _followup_next(root: str, parent: ticket_mod.Ticket, ident: str) -> str:
+def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
     """続きの子を起こしたあと、エージェントが打つ 2 手。"""
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     return (
         f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
-        f"{ticket_mod.branch_name(parent)}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
+        f"{ticket_ids.branch_name(parent)}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
         "着手する"
     )
 
@@ -88,7 +89,7 @@ def _followup_next(root: str, parent: ticket_mod.Ticket, ident: str) -> str:
 class Decision:
     """残った指摘を決める前の、見せる材料。preview と適用が同じものから組む。"""
 
-    parent: ticket_mod.Ticket
+    parent: ticket_model.Ticket
     ph: phase.Phase
     result: review_host.Result
     unresolved: list[review_host.Thread]
@@ -610,7 +611,7 @@ def _reviewed_in_chat(
     stderr: TextIO,
     conf: settings.Settings,
     root: str,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     ph: phase.Phase,
     accept_unresolved: bool,
 ) -> int:

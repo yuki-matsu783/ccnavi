@@ -10,7 +10,7 @@ from typing import TextIO
 
 from ..infra import hookio, settings
 from ..policy import ctxfile, rules, selfguard
-from .ticket_model import GUARDED_STATES, TODO, WRITE_TOOLS
+from . import ticket_model
 
 STATE_RULE_ID = "builtin-ticket-state"
 # 提案を書いた回に、承認を頼む前の確認を伝えるルールの id。
@@ -28,7 +28,7 @@ def _place(tickets_rel: str) -> str:
 
 def state_dir_regex(tickets_rel: str) -> str:
     """直接の作成・移動を止める置き場に当たる式。パス用。"""
-    return rf"(^|[\\/]){_place(tickets_rel)}[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
+    return rf"(^|[\\/]){_place(tickets_rel)}[\\/]({'|'.join(ticket_model.GUARDED_STATES)})[\\/]"
 
 
 def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
@@ -45,7 +45,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     )
     write_rule = rules.Rule(
         id=STATE_RULE_ID,
-        match="|".join(WRITE_TOOLS),
+        match="|".join(ticket_model.WRITE_TOOLS),
         regex=place,
         message=message,
         decision=rules.DENY,
@@ -56,7 +56,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
     # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無いパス
     # （`mv x wip/proposals/done`）でも当てる。
-    states = "|".join(GUARDED_STATES)
+    states = "|".join(ticket_model.GUARDED_STATES)
     review = _place(tickets_rel) + rf"[\\/]({states})"
     loose = review + r"([\\/]|\s|$)"
     # コピーする動詞は行き先だけで当てる。置き場から外へコピーする読み向きの cp は止めない。行き先の
@@ -117,7 +117,7 @@ def propose_notice(
     判定には一切現れない）。2 本目からは何も渡さない。提案を 1 本書くたびに同じ文を積むと、
     長いセッションではそれだけでコンテキストを使ってしまう。
     """
-    if payload.tool_name not in WRITE_TOOLS or not subject:
+    if payload.tool_name not in ticket_model.WRITE_TOOLS or not subject:
         return ""
     if not _propose_place(conf.tickets, root).search(subject):
         return ""
@@ -136,7 +136,10 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
 
     大文字小文字は区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。
     """
-    place = rf"^{rules.root_pattern(root)}[\\/][^\x00]*{_place(tickets_rel)}[\\/]{TODO}[\\/]"
+    place = (
+        rf"^{rules.root_pattern(root)}[\\/][^\x00]*{_place(tickets_rel)}"
+        rf"[\\/]{ticket_model.TODO}[\\/]"
+    )
     return re.compile(place, re.IGNORECASE)
 
 

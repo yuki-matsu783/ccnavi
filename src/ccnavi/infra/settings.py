@@ -102,7 +102,7 @@ SHARED_CLAUDE_SETTINGS = os.path.join(".claude", "settings.json")
 BRANCH_PREFIXES_ENV = "CCNAVI_BRANCH_PREFIXES"
 # 既定の先頭の語。`release` は統合先や保護されたブランチの名前（`release-*`）に当たるので入れない。
 DEFAULT_BRANCH_PREFIXES = ("feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs")
-# 先頭の語に使えない名前（`ticket.RESERVED_BRANCH_IDS` と同じリスト）。
+# 先頭の語に使えない名前（`ticket_ids.RESERVED_BRANCH_IDS` と同じリスト）。
 _RESERVED_PREFIXES = ("main", "master", "develop", "release")
 _PREFIX = re.compile(r"^[a-z][a-z0-9]*\Z")
 

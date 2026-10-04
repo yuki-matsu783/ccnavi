@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from .ticket_model import DOING, DONE, REVIEW, _fold
+from . import ticket_model
 
 
 def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -17,7 +17,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     ここはチケットの範囲の外でも報告しない。報告すると、親が自分のワークツリーに次の子を
     提案する経路と、承認がブランチに乗る経路が使えなくなる。
 
-    外して開くのは提案の `todo/` だけ。`review/` は `guard_rules`、承認済みチケットは
+    外して開くのは提案の `todo/` だけ。`review/` は `ticket_guard.guard_rules`、承認済みチケットは
     自己防衛の組み込みが deny で止め、ルールの deny はチケットより強い。
 
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
@@ -29,7 +29,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
     **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
     `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの実行後チェックは、置き場を
-    そのまま外さずに、内容で外すぶんを決める（`script_shape`、`post._script_writes`）。
+    そのまま外さずに、内容で外すぶんを決める（`ticket_fields.script_shape`、`post._script_writes`）。
     """
     return any(_under(rel, place) for place in (tickets_rel, approved_rel))
 
@@ -46,8 +46,8 @@ def _under(rel: str, place_rel: str) -> bool:
     `wip\\proposals\\todo\\x.py` という名前のファイル 1 個が置き場の中に見え、範囲の判定から外れる。
     置き場のパス（設定の値）だけは直す。
     """
-    base = _fold(place_rel.replace("\\", "/").strip("/"))
-    return bool(base) and _fold(rel).startswith(base + "/")
+    base = ticket_model._fold(place_rel.replace("\\", "/").strip("/"))
+    return bool(base) and ticket_model._fold(rel).startswith(base + "/")
 
 
 def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -57,7 +57,9 @@ def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     （`todo/`）を `review/` に置き直す形が移動として外れる。これは、ユーザの承認を通っていない
     ものをレビュー待ちに見せる形になる。
     """
-    return _under(rel, f"{approved_rel}/{DOING}") or _under(rel, f"{tickets_rel}/{REVIEW}")
+    return _under(rel, f"{approved_rel}/{ticket_model.DOING}") or _under(
+        rel, f"{tickets_rel}/{ticket_model.REVIEW}"
+    )
 
 
 def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -68,7 +70,9 @@ def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bo
     「承認済みチケットを消す」のと同じ結果になるから。承認済みチケットが 1 本も無い
     ワークツリーは範囲を持たず、範囲を持たないツリーはチケットの側から何も言われない。
     """
-    return _under(rel, f"{tickets_rel}/{REVIEW}") or _under(rel, f"{approved_rel}/{DONE}")
+    return _under(rel, f"{tickets_rel}/{ticket_model.REVIEW}") or _under(
+        rel, f"{approved_rel}/{ticket_model.DONE}"
+    )
 
 
 # 下書きと使い捨ての置き場。ツリーのルートの直下 1 段で、名前は固定。設定で動かさない。
@@ -87,10 +91,11 @@ def is_scratch_place(rel: str) -> bool:
     下書きの場所を失う。開けても範囲は広がらない。ここに書いたものは git が追跡しないので、
     統合先のブランチには 1 バイトも乗らない。
 
-    **名前の大文字小文字は区別する。範囲の照合（`_fold`）とは逆にしてある。** 外してよい
-    理由が「追跡されない」ことにあり、追跡から外しているのは `.gitignore` の `/scratchpad/` で、
-    その照合は Linux では区別するため。区別せずに外すと、Linux の `SCRATCHPAD/` が「追跡される
-    のに範囲を当てない場所」になり、承認した範囲の外の変更が統合先へ乗る経路ができる。
+    **名前の大文字小文字は区別する。範囲の照合（`ticket_model._fold`）とは逆にしてある。**
+    外してよい理由が「追跡されない」ことにあり、追跡から外しているのは
+    `.gitignore` の `/scratchpad/` で、その照合は Linux では区別するため。区別せずに外すと、
+    Linux の `SCRATCHPAD/` が「追跡されるのに範囲を当てない場所」になり、承認した範囲の外の
+    変更が統合先へ乗る経路ができる。
     区別する側を採れば、どの機械でも除外は追跡から外れる範囲より狭いままで、狭いぶんは
     範囲の判定が止めるだけで済む。
 

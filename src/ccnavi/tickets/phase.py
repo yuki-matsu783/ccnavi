@@ -34,7 +34,16 @@ from typing import TextIO
 
 from ..infra import gitcmd, settings, shellread, tree
 from ..policy import rules, selfguard
-from . import approval, approval_checks, approval_marks, phasetypes, risk, workflow
+from . import (
+    approval,
+    approval_checks,
+    approval_marks,
+    phasetypes,
+    risk,
+    ticket_model,
+    ticket_places,
+    workflow,
+)
 from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -447,13 +456,13 @@ class Phase:
 
     parent: str
     number: int
-    tickets: list[ticket_mod.Ticket] = field(default_factory=list)
+    tickets: list[ticket_model.Ticket] = field(default_factory=list)
     states: dict[str, str] = field(default_factory=dict)
     marks: dict[str, dict] = field(default_factory=dict)
     # 計画があるときだけ。item は計画の項、type は種類、owner は親の承認済みチケット。
-    item: ticket_mod.PlanItem | None = None
+    item: ticket_model.PlanItem | None = None
     type: phasetypes.PhaseType | None = None
-    owner: ticket_mod.Ticket | None = None
+    owner: ticket_model.Ticket | None = None
     # 子ごとの実績のリスク（閉じるときに数えた記録）。子の識別子 → 記録。
     risks: dict[str, dict] = field(default_factory=dict)
     # 延期を引き受けた前のフェーズが、種類として宣言している「見る場所」。引き受けた側は
@@ -534,19 +543,19 @@ class Phase:
         ユーザが見るのを待っている段（設計 9.8）。
         """
         states = list(self.states.values())
-        if not states or any(s in (ticket_mod.TODO, ticket_mod.DOING, "") for s in states):
+        if not states or any(s in (ticket_model.TODO, ticket_model.DOING, "") for s in states):
             return False
-        return any(s in (ticket_mod.REVIEW, ticket_mod.DONE) for s in states)
+        return any(s in (ticket_model.REVIEW, ticket_model.DONE) for s in states)
 
     @property
     def declared_review(self) -> str | None:
         """このフェーズの種類と計画の項が言う「見る場所」。宣言が無ければ None。
 
-        計画の項は `mr` にだけ強められる（`ticket.PLAN_REVIEWS`）ので、項が `mr` なら
+        計画の項は `mr` にだけ強められる（`ticket_model.PLAN_REVIEWS`）ので、項が `mr` なら
         種類より優先する。種類の無い番号（計画が無い、種類のファイルが無い、その名前の
         種類が読めない）は、言っている者が居ないので None。
         """
-        if self.item is not None and self.item.review == ticket_mod.PLAN_REVIEW_MR:
+        if self.item is not None and self.item.review == ticket_model.PLAN_REVIEW_MR:
             return phasetypes.REVIEW_MR
         if self.type is not None:
             return self.type.review
@@ -573,7 +582,7 @@ class Phase:
         from_children = any(
             t.review_required
             for t in self.tickets
-            if self.states.get(t.ticket) in (ticket_mod.REVIEW, ticket_mod.DONE)
+            if self.states.get(t.ticket) in (ticket_model.REVIEW, ticket_model.DONE)
         )
         # 実績のリスクは、宣言を厳しい側にだけ上書きする（risk.py）。
         needed = from_children or self.risk_escalates
@@ -659,7 +668,7 @@ def phases_of(
     root: str,
     conf: settings.Settings,
     parent_id: str,
-    proposed: ticket_mod.Ticket | None = None,
+    proposed: ticket_model.Ticket | None = None,
     raw: approval.Raw | None = None,
 ) -> list[Phase]:
     """この親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組む。
@@ -684,7 +693,7 @@ def phases_of(
         # 層は親の承認済みチケットの `project:` が決める（設計 11.4.1）。ユーザが承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
-        if owner.workflow is None and owner.state == ticket_mod.TODO:
+        if owner.workflow is None and owner.state == ticket_model.TODO:
             # 承認前の提案。延期の引き受け手を、承認でコピーするものと同じ計算で読む。
             owner = replace(owner, workflow=workflow.compute(owner, types or None))
         for n, item in owner.numbered():
@@ -750,7 +759,7 @@ def worktree_at(root: str, conf: settings.Settings, cwd: str) -> tree.Tree | Non
 
 def parent_in(
     root: str, conf: settings.Settings, here: tree.Tree, raw: approval.Raw | None = None
-) -> ticket_mod.Ticket | None:
+) -> ticket_model.Ticket | None:
     """ツリー `here`（`worktree_at` の答え）が親のワークツリーなら、その親の承認済みチケット。
 
     `raw` は `phases_of` と同じ。
@@ -766,7 +775,7 @@ def parent_in(
 
 def parent_at(
     root: str, conf: settings.Settings, cwd: str, raw: approval.Raw | None = None
-) -> tuple[ticket_mod.Ticket | None, approval.Raw | None]:
+) -> tuple[ticket_model.Ticket | None, approval.Raw | None]:
     """（cwd が親のワークツリーの中ならその親の承認済みチケット, 引くのに使った置き場）。
 
     置き場を読むのは cwd がワークツリーかプロジェクトの中で、`raw` が None のときだけ。
@@ -781,7 +790,7 @@ def parent_at(
     return parent_in(root, conf, here, raw), raw
 
 
-def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
+def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_model.Ticket | None:
     """cwd が親のワークツリーの中なら、その親の承認済みチケット。"""
     return parent_at(root, conf, cwd)[0]
 
@@ -849,7 +858,7 @@ def announce(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     raw: approval.Raw | None = None,
 ) -> str:
     """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。
@@ -954,7 +963,7 @@ def announce(
     return "\n\n".join(texts)
 
 
-def _next_hint(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> str:
+def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) -> str:
     """次のフェーズの計画を促す 1 文。計画が無ければ空。"""
     if not parent.has_plan:
         return ""
@@ -992,12 +1001,12 @@ def _next_hint(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> s
     )
 
 
-def is_dag(parent: ticket_mod.Ticket) -> bool:
+def is_dag(parent: ticket_model.Ticket) -> bool:
     """親の待ち方のコピーが `dag` か。"""
-    return parent.workflow is not None and parent.workflow.order == ticket_mod.WORKFLOW_DAG
+    return parent.workflow is not None and parent.workflow.order == ticket_model.WORKFLOW_DAG
 
 
-def waits_done(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> bool:
+def waits_done(parent: ticket_model.Ticket, phases: list[Phase], number: int) -> bool:
     """N 番目が待つフェーズが、全部閉じてレビューが済んでいるか。"""
     by_number = {p.number: p for p in phases}
     for m in workflow.waits_of(parent, number, None):
@@ -1019,10 +1028,10 @@ def reviewed_or_skipped(phase: Phase) -> bool:
 def order_problems(
     root: str,
     conf: settings.Settings,
-    child: ticket_mod.Ticket,
-    parent: ticket_mod.Ticket,
+    child: ticket_model.Ticket,
+    parent: ticket_model.Ticket,
     types: dict[str, phasetypes.PhaseType] | None,
-    adding: list[ticket_mod.Ticket] | None = None,
+    adding: list[ticket_model.Ticket] | None = None,
     raw: approval.Raw | None = None,
 ) -> list[rules.Problem]:
     """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 9.7）。
@@ -1096,7 +1105,7 @@ def order_problems(
     return problems
 
 
-def plan_finished(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> bool:
+def plan_finished(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> bool:
     """全体計画のフェーズが全部閉じ、最後のレビューを頼んであるか。フィードバック計画を出せる条件。
 
     レビューが「通った」ことは求めない。差し戻し（未解決の指摘）を受けたあとに出すのが
@@ -1141,7 +1150,7 @@ def chat_only(
     return bool(venues) and phasetypes.REVIEW_MR not in venues.values()
 
 
-def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str) -> str:
+def settle_last_review(approved_dir: str, parent: ticket_model.Ticket, stamp: str) -> str:
     """フィードバック計画の承認で、全体計画の最後のレビューを済んだ扱いにする。
 
     ユーザがレビューの結果を見たうえで対応を計画したので、その計画の承認がレビューの
@@ -1168,7 +1177,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 def stage(
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     raw: approval.Raw | None = None,
 ) -> str:
     """親がいまどの局面にいるか（設計 9.7）。計画が無ければ空文字。`raw` は `phases_of` と同じ。"""
@@ -1219,7 +1228,7 @@ LIMIT_TYPE = "type"
 LIMIT_BLOCKED = "blocked"
 
 # 範囲の外として止める判定。
-_OUTSIDE = (ticket_mod.OUTSIDE, rules.DENY)
+_OUTSIDE = (ticket_model.OUTSIDE, rules.DENY)
 
 
 @dataclass
@@ -1243,8 +1252,8 @@ class ScopeVerdict:
 
 
 def scope_verdict(
-    child: ticket_mod.Ticket,
-    parent: ticket_mod.Ticket | None,
+    child: ticket_model.Ticket,
+    parent: ticket_model.Ticket | None,
     pt: phasetypes.PhaseType | None,
     rel: str,
 ) -> ScopeVerdict:
@@ -1278,8 +1287,8 @@ def scope_verdict(
 
 
 def plan_item(
-    child: ticket_mod.Ticket, parent: ticket_mod.Ticket | None
-) -> ticket_mod.PlanItem | None:
+    child: ticket_model.Ticket, parent: ticket_model.Ticket | None
+) -> ticket_model.PlanItem | None:
     """子の番号が指す、親の計画の項。親が計画を持たない、番号が無い、計画に無いなら None。"""
     if parent is None or not parent.has_plan or child.phase is None:
         return None
@@ -1289,8 +1298,8 @@ def plan_item(
 def type_for(
     conf: settings.Settings,
     root: str,
-    child: ticket_mod.Ticket,
-    parent: ticket_mod.Ticket | None,
+    child: ticket_model.Ticket,
+    parent: ticket_model.Ticket | None,
     types: dict[str, phasetypes.PhaseType] | None = None,
 ) -> phasetypes.PhaseType | None:
     """子の番号の種類。親が計画を持たない、番号が無い、種類が引けないなら None。
@@ -1309,8 +1318,8 @@ def type_for(
 def unread_type(
     conf: settings.Settings,
     root: str,
-    child: ticket_mod.Ticket,
-    parent: ticket_mod.Ticket | None,
+    child: ticket_model.Ticket,
+    parent: ticket_model.Ticket | None,
     types: dict[str, phasetypes.PhaseType] | None,
 ) -> str:
     """子の番号の種類が読めないなら、その種類の id。読めた、または読むものが無ければ空。
@@ -1330,7 +1339,10 @@ def unread_type(
 
 
 def scope_findings(
-    root: str, conf: settings.Settings, child: ticket_mod.Ticket, parent: ticket_mod.Ticket | None
+    root: str,
+    conf: settings.Settings,
+    child: ticket_model.Ticket,
+    parent: ticket_model.Ticket | None,
 ) -> tuple[list[tuple[str, ScopeVerdict]], str]:
     """子のワークツリーに残っている範囲外の変更と、その判定。2 つめは読めなかった理由。
 
@@ -1399,10 +1411,10 @@ def scope_findings(
         # 外してよい根拠（追跡されないので統合先へ乗らない）が崩れている。範囲外のものが
         # コミットに乗って統合先へ入る経路を見ているのはここだけなので、そこは除外して報告を
         # 消すことはしない。
-        if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
+        if ticket_places.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
         # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える）。
-        if ticket_mod.is_eli5_place(rel):
+        if ticket_places.is_eli5_place(rel):
             continue
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:

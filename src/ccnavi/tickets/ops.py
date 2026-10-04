@@ -28,6 +28,9 @@ from . import (
     phase,
     risk,
     syncstate,
+    ticket_ids,
+    ticket_model,
+    ticket_places,
 )
 from . import ticket as ticket_mod
 
@@ -45,12 +48,12 @@ def start(
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
-    if found.state != ticket_mod.DOING:
+    if found.state != ticket_model.DOING:
         stderr.write(
             f"ccnavi: {ticket_id} は承認済みの作業中ではない（いまは {found.state}/）。"
             + (
                 "先にユーザに 'ccnavi --agree' を通してもらってください"
-                if found.state == ticket_mod.TODO
+                if found.state == ticket_model.TODO
                 else ""
             )
             + "\n"
@@ -95,13 +98,13 @@ def start(
         os.path.dirname(os.path.dirname(found.path)),
         found.ticket,
         history.KIND_STARTED,
-        ticket_mod.DOING,
-        ticket_mod.DOING,
+        ticket_model.DOING,
+        ticket_model.DOING,
         base_sha=sha,
     )
     stdout.write(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
-        f"置き場は {ticket_mod.DOING}/ のまま\n"
+        f"置き場は {ticket_model.DOING}/ のまま\n"
     )
     if found.is_child:
         # 着手のときのフローのハッシュを記録する。SubagentStart / SubagentStop が、着手のあとに
@@ -127,7 +130,7 @@ def _sync_config(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    found: ticket_mod.Ticket,
+    found: ticket_model.Ticket,
     worktree: str,
 ) -> list[str] | None:
     """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 11.12）。
@@ -190,7 +193,7 @@ def finish(
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
-    if found.state != ticket_mod.DOING:
+    if found.state != ticket_model.DOING:
         stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
         return 1
     if not found.started_at:
@@ -209,7 +212,7 @@ def finish(
     if scored is None:
         return 1
     fields = {"completed_at": approval_marks.now()}
-    state = ticket_mod.REVIEW if _needs_review(root, conf, found) else ticket_mod.DONE
+    state = ticket_model.REVIEW if _needs_review(root, conf, found) else ticket_model.DONE
     code = _move(stdout, stderr, root, conf, found, state, fields, f"完了 {fields['completed_at']}")
     if code == 0 and scored:
         for line in scored:
@@ -219,7 +222,7 @@ def finish(
     return code
 
 
-def _needs_review(root: str, conf: settings.Settings, found: ticket_mod.Ticket) -> bool:
+def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
     """この子を閉じたとき、ユーザが見る対象になるか（設計 9.8）。親は見ない。
 
     フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
@@ -232,13 +235,13 @@ def _needs_review(root: str, conf: settings.Settings, found: ticket_mod.Ticket) 
     for ph in phase.phases_of(root, conf, found.parent):
         if ph.number != found.phase:
             continue
-        ph.states[found.ticket] = ticket_mod.DONE
+        ph.states[found.ticket] = ticket_model.DONE
         return ph.deferred or ph.review_required
     return found.review_required
 
 
 def _close_parent(
-    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> None:
     """親を閉じたあとの記録と案内。
 
@@ -262,7 +265,7 @@ def _close_parent(
     if failed:
         stderr.write(f"ccnavi: 閉じた記録を書けない: {failed}\n")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
-    wip = ticket_mod.WIP_ROOT
+    wip = ticket_places.WIP_ROOT
     if phase.chat_only(root, conf, found.ticket, venues):
         stdout.write(
             f"次は、この移動をコミットし、`{wip}/` を消して"
@@ -296,13 +299,13 @@ def cancel(
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
-    if found.state == ticket_mod.TODO:
+    if found.state == ticket_model.TODO:
         stderr.write(
             f"ccnavi: {ticket_id} は未承認の提案（todo/）。取り消しの記録は要らないので、"
             "ファイルを消せばよい\n"
         )
         return 1
-    if found.state != ticket_mod.DOING:
+    if found.state != ticket_model.DOING:
         stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
         return 1
     if _parent_still_busy(stderr, root, conf, found):
@@ -314,7 +317,7 @@ def cancel(
         root,
         conf,
         found,
-        ticket_mod.DONE,
+        ticket_model.DONE,
         fields,
         f"取り消し: {reason.strip()}",
     )
@@ -388,7 +391,7 @@ def record_risk(
     return 0
 
 
-def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
+def _project_of(conf: settings.Settings, root: str, found: ticket_model.Ticket) -> str:
     """このチケットの層を決める `project:`（設計 11.4.1、11.4.2）。
 
     本物とするのは承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
@@ -405,7 +408,7 @@ def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) ->
 
 
 def _score_child(
-    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> list[str] | None:
     """子の実績のリスクを数えて記録する。閉じられなければ None。
 
@@ -485,12 +488,12 @@ def _score_child(
 
 def _places(
     root: str, conf: settings.Settings, ticket_id: str
-) -> tuple[list[ticket_mod.Ticket], list[str], list[ticket_mod.Problem]]:
+) -> tuple[list[ticket_model.Ticket], list[str], list[ticket_mod.Problem]]:
     """この識別子のチケットが在る置き場を全部引く。読めなかった理由と提案の不備も返す。
 
     本物とするツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
     """
-    hits: list[ticket_mod.Ticket] = []
+    hits: list[ticket_model.Ticket] = []
     copies, notes = approval.scan(conf, root)
     hits += [t for t in copies if t.ticket == ticket_id]
     review, more = approval.scan_review(conf, root)
@@ -501,11 +504,11 @@ def _places(
     # `todo/` は承認の前の状態。承認済みチケット（作業中・レビュー待ち・閉じた）が在れば、同じ
     # 識別子の `todo/` は改版の候補か書き損じで、状態の操作の相手ではない（`--lint` が言う）。
     if not hits:
-        hits += [t for t in proposals if t.ticket == ticket_id and t.state == ticket_mod.TODO]
+        hits += [t for t in proposals if t.ticket == ticket_id and t.state == ticket_model.TODO]
     return hits, notes + more, problems
 
 
-def _where(hits: list[ticket_mod.Ticket]) -> str:
+def _where(hits: list[ticket_model.Ticket]) -> str:
     """複数の置き場に在るときに、その在り処を並べた文言。"""
     return ", ".join(f"{t.tree or '(ワークスペースルート)'}:{t.state}" for t in hits)
 
@@ -513,7 +516,7 @@ def _where(hits: list[ticket_mod.Ticket]) -> str:
 def _undecided(
     stderr: TextIO,
     head: str,
-    hits: list[ticket_mod.Ticket],
+    hits: list[ticket_model.Ticket],
     root: str = "",
     conf: settings.Settings | None = None,
 ) -> None:
@@ -553,7 +556,7 @@ def _undecided(
 
 def _find(
     stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
-) -> ticket_mod.Ticket | None:
+) -> ticket_model.Ticket | None:
     """この識別子のチケットを、どの置き場に在っても 1 つ引く。`state` に置き場が入る。
 
     2 つ以上残れば、どれが本物か決まらないので止める。
@@ -578,7 +581,7 @@ def _find(
 
 
 def family_stopped(
-    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """取り込み済みの親子のチケットが決まらない・閉じているなら、言って True。
 
@@ -607,7 +610,7 @@ def family_stopped(
 
 
 def _parent_not_started(
-    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 9.6、REQ-TKT-48）。
 
@@ -634,13 +637,13 @@ def _parent_not_started(
         _undecided(stderr, head, hits, root, conf)
         return True
     parent = hits[0]
-    if parent.state == ticket_mod.TODO:
+    if parent.state == ticket_model.TODO:
         stderr.write(
             head + "がまだ承認されていない（todo/）。先にユーザに 'ccnavi --agree' を通してもらい、"
             f"'{ticket_sh} start {found.parent}' で着手してください\n"
         )
         return True
-    if parent.state != ticket_mod.DOING:
+    if parent.state != ticket_model.DOING:
         # 置き場だけを言う。`review/` に親があるのは壊れたデータのときだけだが、そこで
         # 「閉じた」と言うと、文面が事実と違う。
         stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。子を足す相手ではない\n")
@@ -655,7 +658,7 @@ def _parent_not_started(
 
 
 def _predecessors_unmet(
-    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """子の先行が全部 `done/` に在って取り消しでないか。欠けていれば止めて言う。
 
@@ -669,7 +672,7 @@ def _predecessors_unmet(
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     stderr.write(
         f"ccnavi: {found.ticket} の先行が満たされていないので着手しない"
-        f"（先行は {conf.approved}/{ticket_mod.DONE}/ に在って取り消しでないこと）:\n"
+        f"（先行は {conf.approved}/{ticket_model.DONE}/ に在って取り消しでないこと）:\n"
     )
     for p in unmet:
         stderr.write(f"  - 先行 {p.ticket}: {p.label}\n")
@@ -692,7 +695,7 @@ def _predecessors_unmet(
 
 
 def _parent_still_busy(
-    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """親を閉じてよいか。開いている子やレビュー待ちのフェーズがある間は閉じさせない。
 
@@ -770,7 +773,7 @@ def close_problems(
 
 
 def _deliverables_missing(
-    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 9.8）。
 
@@ -795,7 +798,7 @@ def _deliverables_missing(
         others = [
             t.ticket
             for t in ph.tickets
-            if t.ticket != found.ticket and ph.states.get(t.ticket) == ticket_mod.DOING
+            if t.ticket != found.ticket and ph.states.get(t.ticket) == ticket_model.DOING
         ]
         if others:
             return False
@@ -824,7 +827,7 @@ def _move(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    found: ticket_mod.Ticket,
+    found: ticket_model.Ticket,
     state: str,
     fields: dict[str, str],
     said: str,
@@ -835,12 +838,12 @@ def _move(
         stderr.write(f"ccnavi: {found.ticket} に欄を書けない: {failed}\n")
         return 1
     where = os.path.dirname(os.path.dirname(found.path))
-    if state == ticket_mod.REVIEW:
+    if state == ticket_model.REVIEW:
         failed = approval.to_review(where, found.tree_root, conf.tickets, found.ticket)
-        place = f"{conf.tickets}/{ticket_mod.REVIEW}/"
+        place = f"{conf.tickets}/{ticket_model.REVIEW}/"
     else:
         failed = approval.close_copy(where, found.ticket)
-        place = f"{conf.approved}/{ticket_mod.DONE}/"
+        place = f"{conf.approved}/{ticket_model.DONE}/"
     if failed:
         stderr.write(f"ccnavi: {found.ticket}: {failed}\n")
         return 1
@@ -849,16 +852,16 @@ def _move(
         where,
         found.ticket,
         history.KIND_CANCELLED if cancelled else history.KIND_FINISHED,
-        ticket_mod.DOING,
+        ticket_model.DOING,
         state,
         reason=fields.get("cancel_reason") if cancelled else None,
     )
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
-    if state == ticket_mod.REVIEW:
+    if state == ticket_model.REVIEW:
         stdout.write(
             "ユーザのレビューを待つ。"
             "レビューが済むとユーザの操作（confirm / decide / --reviewed）で "
-            f"{conf.approved}/{ticket_mod.DONE}/ へ動く\n"
+            f"{conf.approved}/{ticket_model.DONE}/ へ動く\n"
         )
     return 0
 
@@ -867,7 +870,7 @@ def _move(
 class Unfinished:
     """Stop で `finish` を促す相手。`ahead` は基準点より先のコミットの数。"""
 
-    ticket: ticket_mod.Ticket
+    ticket: ticket_model.Ticket
     worktree: str
     ahead: int
     head: str = ""
@@ -916,7 +919,7 @@ def unfinished_at_stop(
     return Unfinished(bound, here.root, ahead, head)
 
 
-def _own_commits(worktree: str, t: ticket_mod.Ticket, parent_branch: str = "") -> int:
+def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "") -> int:
     """基準点より先の、このチケットが自分で作ったコミットの数。数えられなければ 0（促さない側）。
 
     取り込んだだけのコミットは数えない。子なら親のブランチ（`parent_branch`。親チケットの
@@ -983,7 +986,7 @@ def finish_nudge(root: str, found: Unfinished) -> str:
     return "\n".join(
         [
             f"[ccnavi] {CODE_FINISH_NUDGE} (ticket: {t.ticket})",
-            f"{kind} {t.ticket} は着手済みのまま作業中（{ticket_mod.DOING}/）です。ワークツリー "
+            f"{kind} {t.ticket} は着手済みのまま作業中（{ticket_model.DOING}/）です。ワークツリー "
             f"{found.worktree} に未コミットの変更が無く、基準点 {t.base_sha[:12]} より先に"
             f"コミットが {found.ahead} 件あります。",
             f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
@@ -993,7 +996,7 @@ def finish_nudge(root: str, found: Unfinished) -> str:
     )
 
 
-def base_off_head(root: str, conf: settings.Settings, t: ticket_mod.Ticket) -> str:
+def base_off_head(root: str, conf: settings.Settings, t: ticket_model.Ticket) -> str:
     """基準点（`base_sha`）がチケットのワークツリーの HEAD の祖先でないときの文。でなければ空。
 
     着手の欄はスクリプトだけが書く。承認はチケットの中身を変えないので、手で動かした承認では
@@ -1025,14 +1028,14 @@ def _is_ancestor(worktree: str, base: str, head: str) -> bool:
     return done.ok
 
 
-def _branch_words(t: ticket_mod.Ticket) -> str:
+def _branch_words(t: ticket_model.Ticket) -> str:
     """ワークツリーを作る案内の、ブランチの語。
 
     親の `branch:` が識別子と違えば、そのブランチを出す（既にあればそのまま、無ければ `-b` で
     切る。`ccnavi-git.sh worktree add` は `branch:` と一致する名前だけを通す）。ほかは今どおり
     `-b <識別子>`。
     """
-    branch = ticket_mod.branch_name(t)
+    branch = ticket_ids.branch_name(t)
     if branch == t.ticket:
         return f"-b {t.ticket}"
     return f"{branch}'（無ければ '-b {branch} <起点>'）"

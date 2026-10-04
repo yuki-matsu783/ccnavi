@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval
+from . import approval, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
 ISSUE = "issue"
@@ -326,32 +326,32 @@ def _checked_out(conf: settings.Settings, root: str, repo: tree.Tree) -> dict[st
     return out
 
 
-def _tickets(conf: settings.Settings, root: str, project: str) -> list[ticket_mod.Ticket]:
+def _tickets(conf: settings.Settings, root: str, project: str) -> list[ticket_model.Ticket]:
     """このリポジトリの承認済みチケット（作業中・レビュー待ち・閉じた）と、承認待ちの提案。"""
-    found: list[ticket_mod.Ticket] = []
+    found: list[ticket_model.Ticket] = []
     doing, _ = approval.scan(conf, root)
     for t in doing:
-        t.state = t.state or ticket_mod.DOING
+        t.state = t.state or ticket_model.DOING
     done, _ = approval.scan(conf, root, closed=True)
     for t in done:
-        t.state = ticket_mod.DONE
+        t.state = ticket_model.DONE
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    todo = [t for t in proposals if t.state == ticket_mod.TODO]
+    todo = [t for t in proposals if t.state == ticket_model.TODO]
     for t in [*doing, *review, *done, *todo]:
         if t.project == project:
             found.append(t)
     return found
 
 
-def _branch_of_ticket(t: ticket_mod.Ticket, approved: bool) -> str:
+def _branch_of_ticket(t: ticket_model.Ticket, approved: bool) -> str:
     """チケットが名乗るブランチ。
 
     承認前の提案の `branch:` は使わないので識別子。
     """
     if not approved:
         return t.ticket
-    return ticket_mod.branch_name(t)
+    return ticket_ids.branch_name(t)
 
 
 def collect(
@@ -393,7 +393,7 @@ def collect(
         for t in tickets:
             if t.is_child or t.issue != number or t.issue_repo:
                 continue
-            approved = t.state != ticket_mod.TODO
+            approved = t.state != ticket_model.TODO
             link = TicketLink(t.ticket, t.state, approved, t.title, t.issue)
             issue_tickets.append(link)
             candidate(_branch_of_ticket(t, approved)).add_source("ticket")
@@ -405,7 +405,7 @@ def collect(
     for branch, c in found.items():
         c.worktrees = sorted(checked_out.get(branch, []))
         for t in tickets:
-            approved = t.state != ticket_mod.TODO
+            approved = t.state != ticket_model.TODO
             # 承認済みの `branch:` へ移る前は、識別子のブランチ（親のワークツリー）にも結び付く
             if branch in (_branch_of_ticket(t, approved), t.ticket):
                 c.tickets.append(TicketLink(t.ticket, t.state, approved, t.title, t.issue))

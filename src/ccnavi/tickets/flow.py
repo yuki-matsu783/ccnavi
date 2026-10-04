@@ -99,7 +99,7 @@ from collections import deque
 import yaml
 
 from ..infra import fsio, settings, tree, yamlread
-from . import ticket as ticket_mod
+from . import ticket_model
 
 # ロックで止めたときの理由コードと、記録のルール名。
 CODE_LOCKED = "DENY_TICKET_FLOW_LOCKED"
@@ -283,7 +283,9 @@ def linked(tree_root: str, path: str) -> bool:
     return False
 
 
-def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str, bool]:
+def resolve(
+    conf: settings.Settings, root: str, child: ticket_model.Ticket
+) -> tuple[str, str, bool]:
     """フローのファイルの絶対パスと、それを持つツリーのルートと、在るかどうか。
 
     読むのは本物とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
@@ -297,7 +299,7 @@ def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tup
     return path, base, os.path.lexists(path)
 
 
-def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict | None:
+def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict | None:
     """ボード（`--explain --json`）に出すフローの欄。子でなければ None。
 
     閉じた子（終わった・取り消した）でフローが無ければ None。閉じた子にフローを作っても
@@ -313,7 +315,7 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
     if not child.is_child:
         return None
     path, base, exists = resolve(conf, root, child)
-    if not exists and child.state in (ticket_mod.DONE, ticket_mod.CANCELLED):
+    if not exists and child.state in (ticket_model.DONE, ticket_model.CANCELLED):
         return None
     draft = draft_file(conf, base, child.ticket)
     draft_exists = os.path.lexists(draft)
@@ -323,7 +325,7 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
         "tree": base,
         "exists": exists,
         "linked": exists and linked(base, path),
-        "locked": child.in_progress and child.state == ticket_mod.DOING,
+        "locked": child.in_progress and child.state == ticket_model.DOING,
         "draft": {
             "path": draft,
             "rel": draft_rel(conf, child.ticket),
@@ -375,8 +377,8 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
 
 
 def lock_hit(
-    copies: list[ticket_mod.Ticket], project: str | None, name: str
-) -> ticket_mod.Ticket | None:
+    copies: list[ticket_model.Ticket], project: str | None, name: str
+) -> ticket_model.Ticket | None:
     """この書き込みを止める、着手中の子。無ければ None。
 
     `copies` はどのツリー上のチケットも並べたもの（識別子で 1 本にまとめる前）。どれか 1 本でも
@@ -407,8 +409,8 @@ def hard_linked(path: str) -> bool:
 
 
 def inode_hit(
-    conf: settings.Settings, root: str, copies: list[ticket_mod.Ticket], path: str
-) -> ticket_mod.Ticket | None:
+    conf: settings.Settings, root: str, copies: list[ticket_model.Ticket], path: str
+) -> ticket_model.Ticket | None:
     """書き込み先が、着手中の子のフローとハードリンクで同じ中身なら、その子。無ければ None。
 
     ハードリンクはパスに置き場が出ないので `locate` では当たらない（M-1）。書き込み先が
@@ -434,7 +436,7 @@ def inode_hit(
     return None
 
 
-def locked_message(conf: settings.Settings, child: ticket_mod.Ticket, path: str) -> str:
+def locked_message(conf: settings.Settings, child: ticket_model.Ticket, path: str) -> str:
     """ロックで止めたときの文面。"""
     ticket = clean(child.ticket)
     return "\n".join(
@@ -1002,7 +1004,7 @@ def fingerprint(path: str, tree_root: str = "") -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
+def digest_record_path(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> str:
     """着手のときに保存したハッシュの記録の置き場。
 
     フローと同じツリーの `phases/<親>/<子>.flow.json`。
@@ -1013,7 +1015,9 @@ def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Tic
     return os.path.join(approved, PHASES_DIR, child.parent, f"{child.ticket}.{DIGEST_RECORD}.json")
 
 
-def record_digest(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str]:
+def record_digest(
+    conf: settings.Settings, root: str, child: ticket_model.Ticket
+) -> tuple[str, str]:
     """着手のときのフローのハッシュを記録する。(書いた記録のパス, 書けなかった理由)。
 
     置き場は子の記録（`.risk.json` など）と同じ `phases/<親>/` で、承認済みの領域にあるので
@@ -1039,7 +1043,7 @@ def _describe(mark: str) -> str:
     return clean(mark.partition(":")[2]) or "読めない"
 
 
-def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
+def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> str:
     """着手中の子のフローが、着手のときに記録したハッシュから変わっていれば、その知らせ。無ければ空。
 
     知らせるだけで止めない（厳しくする向き）。ロックと承認済みの領域の保護は Write / Edit と、
@@ -1362,7 +1366,7 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
 def briefing(
     conf: settings.Settings,
     root: str,
-    child: ticket_mod.Ticket,
+    child: ticket_model.Ticket,
     scope: str,
     budget: int = TOTAL_TEXT_LIMIT,
     full: bool = True,

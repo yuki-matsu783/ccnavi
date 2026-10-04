@@ -14,8 +14,15 @@ from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard
 from ..records import audit, repeat
-from ..tickets import approval, approval_checks, flow, phase
-from ..tickets import ticket as ticket_mod
+from ..tickets import (
+    approval,
+    approval_checks,
+    flow,
+    phase,
+    ticket_guard,
+    ticket_model,
+    ticket_places,
+)
 from . import projskills, reasons, wrapguard
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
@@ -170,7 +177,7 @@ def decide_before(
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
     if conf.tickets_enabled:
-        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
+        rule_set.deny.extend(ticket_guard.guard_rules(conf.tickets, root))
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
@@ -351,7 +358,7 @@ def decide_before(
     # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
     # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
     index = None
-    scanned: list[ticket_mod.Ticket] | None = None
+    scanned: list[ticket_model.Ticket] | None = None
     if (
         conf.tickets_enabled
         and target is not None
@@ -493,10 +500,10 @@ def decide_before(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
-    # 足さない（`ticket_mod.propose_notice` の説明）ので、ルールの文と同じ経路
+    # 足さない（`ticket_guard.propose_notice` の説明）ので、ルールの文と同じ経路
     # （additionalContext）で渡す。応答は 1 つの JSON なので、まとめる。
     told = (
-        ticket_mod.propose_notice(stderr, conf, root, payload, record.subject)
+        ticket_guard.propose_notice(stderr, conf, root, payload, record.subject)
         if conf.tickets_enabled
         else ""
     )
@@ -709,7 +716,7 @@ def project_mismatch(
     root: str,
     t: tree.Tree,
     full: str,
-    index: dict[str, ticket_mod.Ticket] | None,
+    index: dict[str, ticket_model.Ticket] | None,
 ) -> str:
     """ワークツリーの元リポジトリと、そこに結び付く承認済みチケットの `project:` が
     違えば、その理由の文。
@@ -756,8 +763,8 @@ def flow_lock(
     root: str,
     payload: hookio.Input,
     full: str,
-    copies: list[ticket_mod.Ticket] | None,
-) -> tuple[str, list[ticket_mod.Ticket] | None]:
+    copies: list[ticket_model.Ticket] | None,
+) -> tuple[str, list[ticket_model.Ticket] | None]:
     """着手中の子のフローへの書き込みなら、その理由の文。と、読んだ承認済みチケットのリスト。
 
     当てるのは解いたパス（`full`）と、解く前のパス（payload のパスを cwd から繋いで `..` を
@@ -806,7 +813,7 @@ def ticket_verdict(
     tool: str,
     full: str,
     t: tree.Tree | None,
-    index: dict[str, ticket_mod.Ticket] | None,
+    index: dict[str, ticket_model.Ticket] | None,
     rule_hit: tuple[str, str] | None = None,
 ) -> tuple[str, str, str, str]:
     """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
@@ -854,7 +861,7 @@ def ticket_verdict(
     if ticket is None:
         return "", "", "", ""
     rel = tree.relative(t, full)
-    if ticket_mod.is_unscoped(rel, conf.tickets, conf.approved):
+    if ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
         return "", "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
     # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では

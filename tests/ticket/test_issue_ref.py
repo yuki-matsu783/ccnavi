@@ -14,7 +14,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree, review
+from ccnavi.tickets import agree, review, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 
 
@@ -65,7 +65,7 @@ class IssueRefTest(unittest.TestCase):
         self.assertIn("Closes #12", review.mr_draft(same).splitlines())
         self.assertIn("Closes acme/other#12", review.mr_draft(other).splitlines())
         self.assertEqual("acme/other#12", ticket_mod.issue_label(other))
-        self.assertEqual("", ticket_mod.issue_label(ticket_mod.Ticket(ticket="x")))
+        self.assertEqual("", ticket_mod.issue_label(ticket_model.Ticket(ticket="x")))
 
     def test_a_revision_cannot_move_the_issue_to_another_repository(self):
         current, _ = self.parse("12")

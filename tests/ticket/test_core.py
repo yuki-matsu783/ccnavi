@@ -38,8 +38,7 @@ from ccnavi.entry import lint, version
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, history
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import approval, history, ticket_model
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
@@ -1112,7 +1111,7 @@ def _default_placement(chrome):
     approved = settings.DEFAULT_APPROVED.replace(os.sep, "/").strip("/")
     home = settings.DEFAULT_PROJECT_HOME.replace(os.sep, "/").strip("/")
     layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
-    done = f"{approved}/{ticket_mod.DONE}"
+    done = f"{approved}/{ticket_model.DONE}"
     return {
         "tickets": tickets,
         "approved": approved,

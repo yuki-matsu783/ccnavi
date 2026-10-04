@@ -31,7 +31,7 @@ import unittest
 
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
-from ccnavi.tickets import approval, review, ticket
+from ccnavi.tickets import approval, review, ticket_fields
 from ccnavi.tickets import phase as phase_mod
 from tests import ROOT, common_path, common_sh
 from tests.inproc import run_ccnavi
@@ -616,7 +616,7 @@ class TicketTest(unittest.TestCase):
         source = os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md")
         with open(source, encoding="utf-8") as f:
             text = f.read()
-        return ticket.set_fields(text, fields)
+        return ticket_fields.set_fields(text, fields)
 
     def test_a_base_sha_without_started_at_is_blocked(self):
         # `start` は `started_at` と `base_sha` を一緒に書く。片方だけの形は道具を通っていない。
@@ -740,7 +740,7 @@ class TicketTest(unittest.TestCase):
         review = os.path.join(self.parent_tree, "wip", "proposals", "review")
         with open(os.path.join(review, "i0001-01-01.md"), encoding="utf-8") as f:
             finished = f.read()
-        stray = ticket.set_fields(
+        stray = ticket_fields.set_fields(
             finished.replace("i0001-01-01", "i0001-01-05"), {"completed_at": ""}
         )
         write(os.path.join(review, "i0001-01-05.md"), stray)
@@ -3191,40 +3191,44 @@ class ScriptShapeTest(unittest.TestCase):
         after = self.started('started_at: "2026-09-22T00:00:00Z"\nbase_sha: "abc"\n')
 
         self.assertEqual(
-            ticket.script_shape(after),
-            ticket.script_shape(self.body),
+            ticket_fields.script_shape(after),
+            ticket_fields.script_shape(self.body),
             "着手の時刻と基準点は ccnavi が書く欄なので、正規化した内容に出てはいけない",
         )
 
     def test_スクリプトの欄の続きの行も落ちる(self):
         after = self.started("cancel_reason: |\n  複数行の\n  理由\n")
 
-        self.assertEqual(ticket.script_shape(after), ticket.script_shape(self.body))
+        self.assertEqual(ticket_fields.script_shape(after), ticket_fields.script_shape(self.body))
 
     def test_範囲が変われば正規化した内容も変わる(self):
         wider = self.body.replace('glob: "src/*"', 'glob: "*"')
 
-        self.assertNotEqual(ticket.script_shape(wider), ticket.script_shape(self.body))
+        self.assertNotEqual(
+            ticket_fields.script_shape(wider), ticket_fields.script_shape(self.body)
+        )
 
     def test_本文が変われば正規化した内容も変わる(self):
         self.assertNotEqual(
-            ticket.script_shape(self.body.replace("本文", "別の本文")),
-            ticket.script_shape(self.body),
+            ticket_fields.script_shape(self.body.replace("本文", "別の本文")),
+            ticket_fields.script_shape(self.body),
         )
 
     def test_同じ表記の欄でも字下げされていれば落とさない(self):
         # 範囲の中に `started_at:` と書いても、欄ではないので正規化した内容に残る。
         nested = self.body.replace('    glob: "src/*"', '    glob: "src/*"\n    started_at: "x"')
 
-        self.assertNotEqual(ticket.script_shape(nested), ticket.script_shape(self.body))
+        self.assertNotEqual(
+            ticket_fields.script_shape(nested), ticket_fields.script_shape(self.body)
+        )
 
     def test_前置きが無いものは正規化した内容を持たない(self):
         # マーカーと記録がこれ。範囲を宣言しないので、内容からは見分けられない。
-        self.assertIsNone(ticket.script_shape('{"phase": 1}\n'))
-        self.assertIsNone(ticket.script_shape(""))
+        self.assertIsNone(ticket_fields.script_shape('{"phase": 1}\n'))
+        self.assertIsNone(ticket_fields.script_shape(""))
 
     def test_閉じの無い前置きは正規化した内容を持たない(self):
-        self.assertIsNone(ticket.script_shape("---\nid: i0001\n本文\n"))
+        self.assertIsNone(ticket_fields.script_shape("---\nid: i0001\n本文\n"))
 
 
 if __name__ == "__main__":

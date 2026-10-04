@@ -8,20 +8,19 @@
 from __future__ import annotations
 
 from ..policy import rules
-from . import phasetypes
-from . import ticket as ticket_mod
+from . import phasetypes, ticket_model
 
 
-def _order(parent: ticket_mod.Ticket, types: dict | None) -> str:
+def _order(parent: ticket_model.Ticket, types: dict | None) -> str:
     """使う `order`。計画に読めない種類が 1 つでもあれば一直線。
 
     祖先が分からないものを並行にしない。
     """
     if types is None or getattr(types, "order", "") != phasetypes.ORDER_DAG:
-        return ticket_mod.WORKFLOW_SEQUENTIAL
+        return ticket_model.WORKFLOW_SEQUENTIAL
     if any(types.get(item.type) is None for item in parent.plan):
-        return ticket_mod.WORKFLOW_SEQUENTIAL
-    return ticket_mod.WORKFLOW_DAG
+        return ticket_model.WORKFLOW_SEQUENTIAL
+    return ticket_model.WORKFLOW_DAG
 
 
 def _depends(types, later: str, earlier: str) -> bool:
@@ -29,10 +28,10 @@ def _depends(types, later: str, earlier: str) -> bool:
     return later == earlier or earlier in types.ancestors(later)
 
 
-def compute(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workflow:
+def compute(parent: ticket_model.Ticket, types: dict | None) -> ticket_model.Workflow:
     """親の全体計画の待ち方を計算する。"""
     order = _order(parent, types)
-    wf = ticket_mod.Workflow(order=order)
+    wf = ticket_model.Workflow(order=order)
     items = list(parent.plan)
     for n, item in enumerate(items, start=1):
         mine = (types or {}).get(item.type)
@@ -41,7 +40,7 @@ def compute(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workflo
             theirs = (types or {}).get(earlier.type)
             if mine is not None and theirs is not None and mine.overlaps(theirs):
                 continue
-            if order == ticket_mod.WORKFLOW_DAG and not _depends(types, item.type, earlier.type):
+            if order == ticket_model.WORKFLOW_DAG and not _depends(types, item.type, earlier.type):
                 continue
             waits.append(m)
         wf.waits[n] = waits
@@ -55,7 +54,7 @@ def compute(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workflo
 
 
 def _defer_target(
-    wf: ticket_mod.Workflow, parent: ticket_mod.Ticket, types: dict | None, n: int
+    wf: ticket_model.Workflow, parent: ticket_model.Ticket, types: dict | None, n: int
 ) -> int | None:
     """延期した n 番目を引き受ける番号。
 
@@ -66,13 +65,13 @@ def _defer_target(
     for m in range(n + 1, len(parent.plan) + 1):
         if parent.plan[m - 1].deferred:
             continue
-        if wf.order == ticket_mod.WORKFLOW_DAG and n not in wf.waits.get(m, []):
+        if wf.order == ticket_model.WORKFLOW_DAG and n not in wf.waits.get(m, []):
             continue
         return m
     return None
 
 
-def effective(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workflow:
+def effective(parent: ticket_model.Ticket, types: dict | None) -> ticket_model.Workflow:
     """判定に使う待ち方。承認済みの親はコピーした待ち方だけを読む。
 
     コピーした待ち方を持たない承認済みの親は一直線で読み、いまの種類からは計算しない。種類から計算するのは、
@@ -80,12 +79,12 @@ def effective(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workf
     """
     if parent.workflow is not None:
         return parent.workflow
-    if parent.state == ticket_mod.TODO:
+    if parent.state == ticket_model.TODO:
         return compute(parent, types)
     return compute(parent, None)
 
 
-def waits_of(parent: ticket_mod.Ticket, number: int, types: dict | None) -> list[int]:
+def waits_of(parent: ticket_model.Ticket, number: int, types: dict | None) -> list[int]:
     """N 番目が待つ番号。全体計画はコピーした待ち方で読み、それが無ければ（承認前の提案）
     その場で計算する。
 
@@ -106,14 +105,14 @@ def waits_of(parent: ticket_mod.Ticket, number: int, types: dict | None) -> list
     return waits
 
 
-def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
+def problems(parent: ticket_model.Ticket, types: dict | None) -> list[rules.Problem]:
     """全体計画の待ち方が組めるか。順序、終端、延期の引き受け手（設計 9.7）。"""
     found: list[rules.Problem] = []
     if types is None or not parent.has_plan:
         return found
     wf = compute(parent, types)
     items = parent.plan
-    if wf.order == ticket_mod.WORKFLOW_DAG:
+    if wf.order == ticket_model.WORKFLOW_DAG:
         for i, earlier in enumerate(items):
             for j in range(i + 1, len(items)):
                 later = items[j]
@@ -158,7 +157,7 @@ def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
         if (
             tpt is not None
             and tpt.review == phasetypes.REVIEW_NONE
-            and target_item.review != ticket_mod.PLAN_REVIEW_MR
+            and target_item.review != ticket_model.PLAN_REVIEW_MR
         ):
             found.append(
                 rules.Problem(
@@ -170,9 +169,9 @@ def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
     return found
 
 
-def lines(parent: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
+def lines(parent: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:
     """ユーザ向けの待ちの一覧。承認画面と `--explain` に出す。一直線なら延期の引き受け手だけ。"""
-    if wf.order != ticket_mod.WORKFLOW_DAG:
+    if wf.order != ticket_model.WORKFLOW_DAG:
         defers = [
             f"{n}: {parent.plan[n - 1].type} — レビューは {at} と一緒に"
             for n, at in sorted(wf.review_at.items())

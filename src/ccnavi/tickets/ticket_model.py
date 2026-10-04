@@ -16,7 +16,7 @@ from ..policy import rules
 FENCE = "---"
 
 # BOM (U+FEFF)。`str.strip()` は空白と見なさないので、付いていると先頭の `---` が
-# `---` と一致しない。目に見えないので、弾くときは原因を名指しする（_frontmatter）。
+# `---` と一致しない。目に見えないので、弾くときは原因を名指しする（ticket._frontmatter）。
 BOM = "\ufeff"
 
 # このビルドが読めるチケット書式の版。
@@ -42,9 +42,9 @@ GUARDED_STATES = (REVIEW,)
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # スクリプトだけが書く欄。ユーザもエージェントも書かない。承認済みチケットの側で
-# 行単位に書き換える（`set_fields`）。承認は提案の中身を変えずに動かすので、提案に書いた値は
-# そのまま承認済みチケットの値になる。だから提案に空でない値があれば `--agree` と `--lint` が
-# error にする（`agree.script_field_problems`）。
+# 行単位に書き換える（`ticket_fields.set_fields`）。承認は提案の中身を変えずに動かすので、
+# 提案に書いた値はそのまま承認済みチケットの値になる。だから提案に空でない値があれば
+# `--agree` と `--lint` が error にする（`agree.script_field_problems`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
 # 前の版の承認が承認済みチケットに書き足していた記録の欄。いまの承認は中身を変えないので
@@ -171,13 +171,14 @@ class Ticket:
     # （チケットの全文が入る）。
     branch: str = ""
     # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
-    # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
-    # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
-    # 並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
+    # 置いた場所で、`ticket.scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、
+    # ワークツリーの中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。
+    # 親も子も同じ置き場に並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと
+    # 突き合わせる。
     project: str = ""
     # declared_project は frontmatter にユーザが書いた `project:`。宣言ではなく照合に使う。
-    # 置き場と違えば承認しない（approval_checks.project_problems）。`scan` を通さずに読んだとき
-    # （`load` を直に呼ぶ経路）は project と同じ値になる。
+    # 置き場と違えば承認しない（approval_checks.project_problems）。`ticket.scan` を通さずに
+    # 読んだとき（`ticket.load` を直に呼ぶ経路）は project と同じ値になる。
     declared_project: str = ""
     # plan は全体計画（作業フェーズの種類のリスト）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は

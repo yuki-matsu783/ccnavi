@@ -20,17 +20,18 @@ from ..tickets import (
     ops,
     phase,
     review_host,
+    ticket_fold,
+    ticket_model,
 )
-from ..tickets import ticket as ticket_mod
 from . import lint_branch, lint_project
 
 
 def _copy_problems(
     root: str,
     conf: settings.Settings,
-    copies: list[ticket_mod.Ticket],
-    index: dict[str, ticket_mod.Ticket],
-    closed: list[ticket_mod.Ticket],
+    copies: list[ticket_model.Ticket],
+    index: dict[str, ticket_model.Ticket],
+    closed: list[ticket_model.Ticket],
     raw: approval.Raw | None = None,
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する。
@@ -450,21 +451,21 @@ def _proposal_problems(
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
-    # チケットそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket.collisions` が
+    # チケットそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket_fold.collisions` が
     # 決め、ボードの `scattered` と状態の操作が止まる条件に揃える（同じ答えを 2 か所で
     # 出さない）。数えるのは `index`（識別子ごとに 1 つ）ではなく全部。同じ識別子が 2 つ
     # 残っているのがまさに言いたい形なので、引き当ての表で数えると自分でまとめてしまう。
     held: dict[str, list] = {}
     for t in copies:
-        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DOING))
+        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_model.DOING))
         held.setdefault(t.ticket, []).append(t)
     for t in closed:
-        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DONE))
+        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_model.DONE))
         held.setdefault(t.ticket, []).append(t)
     for t in proposals:
         seen.setdefault(t.ticket, []).append(place(t, t.state))
         held.setdefault(t.ticket, []).append(t)
-        if t.state != ticket_mod.TODO:
+        if t.state != ticket_model.TODO:
             continue
         if t.ticket in index:
             current = index[t.ticket]
@@ -475,7 +476,7 @@ def _proposal_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
-                    f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る"
+                    f"{current.state or ticket_model.DOING}/）なのに todo/ にも在る"
                     f"（{_rel(root, t.path)}）。"
                     "計画の改版でなければ todo/ の側を消してください",
                 )
@@ -536,7 +537,7 @@ def _proposal_problems(
         # 置き場に在る形（動かす途中で止まった形跡）。`todo/` に在るのは親の改版の途中なので
         # error にしない。ツリーをまたいだチケットはまとめれば 1 つに決まるので、
         # ここには出てこない。
-        caught = ticket_mod.collisions(held[ticket_id])
+        caught = ticket_fold.collisions(held[ticket_id])
         if not caught:
             continue
         where = ", ".join(

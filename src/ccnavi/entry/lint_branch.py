@@ -6,8 +6,7 @@ from __future__ import annotations
 
 from ..infra import settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from ..tickets import agree
-from ..tickets import ticket as ticket_mod
+from ..tickets import agree, ticket_ids, ticket_model
 
 
 def _branch_name_problems(
@@ -23,7 +22,7 @@ def _branch_name_problems(
     親のブランチ名は親の識別子そのものにする。そのために次を名指しする。
 
     - 新規の提案（`todo/` にあって、承認済みでも閉じてもいないもの）の識別子の形
-      （`ticket.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
+      （`ticket_ids.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
     - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
       ブランチもワークツリーも同じ名前になる
     - 末尾が `-<2 桁>` の親の識別子。`-<2 桁>-<2 桁>` で終われば子の形（`<親>-<フェーズ>-<連番>`）に
@@ -37,15 +36,15 @@ def _branch_name_problems(
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
     settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
-    serial = ticket_mod.next_serial([t.ticket for t in everyone], prefixes)
+    serial = ticket_ids.next_serial([t.ticket for t in everyone], prefixes)
     said: set[str] = set()
     fresh: list = []
     for t in proposals:
-        if t.state != ticket_mod.TODO or t.ticket in settled or t.ticket in said:
+        if t.state != ticket_model.TODO or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
         fresh.append(t)
-        for text in ticket_mod.branch_name_problems(t, integration, serial, prefixes):
+        for text in ticket_ids.branch_name_problems(t, integration, serial, prefixes):
             problems.append(
                 Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（親のブランチ名の規則）")
             )
@@ -66,8 +65,8 @@ def _branch_name_problems(
                 )
             )
 
-    child = ticket_mod.child_pattern()
-    tail = ticket_mod.child_tail_pattern()
+    child = ticket_ids.child_pattern()
+    tail = ticket_ids.child_tail_pattern()
     parents = sorted({t.ticket for t in everyone if not t.is_child})
     for name in parents:
         if tail.search(name) is None:
@@ -105,13 +104,13 @@ def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list
     for t in everyone:
         if t.is_child:
             continue
-        number = ticket_mod.identifier_number(t.ticket, prefixes)
+        number = ticket_ids.identifier_number(t.ticket, prefixes)
         if number is not None:
             owners.setdefault((t.project, number), set()).add(t.ticket)
     for t in fresh:
         if t.is_child:
             continue
-        number = ticket_mod.identifier_number(t.ticket, prefixes)
+        number = ticket_ids.identifier_number(t.ticket, prefixes)
         if number is None:
             continue
         others = sorted(owners.get((t.project, number), set()) - {t.ticket})

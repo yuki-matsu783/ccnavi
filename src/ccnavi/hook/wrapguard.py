@@ -27,7 +27,7 @@ import os
 import re
 
 from ..infra import settings, shellread, tree
-from ..tickets import ticket as ticket_mod
+from ..tickets import ticket_model
 
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
 CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
@@ -142,9 +142,9 @@ def child_parent(conf: settings.Settings, root: str, name: str) -> tuple[str, st
         approved = settings.approved_dir(conf, top)
         proposals = os.path.join(top, (conf.tickets or "").replace("/", os.sep))
         for path in (
-            os.path.join(approved, ticket_mod.DOING, name + ".md"),
-            os.path.join(approved, ticket_mod.DONE, name + ".md"),
-            os.path.join(proposals, ticket_mod.REVIEW, name + ".md"),
+            os.path.join(approved, ticket_model.DOING, name + ".md"),
+            os.path.join(approved, ticket_model.DONE, name + ".md"),
+            os.path.join(proposals, ticket_model.REVIEW, name + ".md"),
         ):
             if not os.path.isfile(path):
                 continue
