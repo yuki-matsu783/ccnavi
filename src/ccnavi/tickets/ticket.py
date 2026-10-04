@@ -772,6 +772,10 @@ class Ticket:
     # 待ち方のファイル（`phases/<親>/workflow.yml`）が在るのに読めない理由。空なら読めたか無い。
     # 判定は読めない待ち方を一直線と読まずに止める（`approval.blocking_problems`）。
     workflow_unreadable: str = ""
+    # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
+    # 同じ識別子のときの理由（`archive.drop_archived`）。
+    # 判定は止める（`approval.content_problems`）。
+    archived_clash: str = ""
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
     # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。

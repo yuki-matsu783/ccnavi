@@ -654,6 +654,76 @@ class SecondReviewChecksTest(ChecksHarness):
         self.assertEqual(approval.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04")
 
 
+class ReusedIdentifierTest(ChecksHarness):
+    """退避と同じ識別子の未着手のチケット。
+
+    子のワークツリーの写しは落とし、親のツリーのものは残して止める。
+    """
+
+    def found(self, text, tree):
+        t, problems = ticket_mod.parse(text)
+        self.assertIsNotNone(t, problems)
+        t.tree, t.state = tree, ticket_mod.DOING
+        return t
+
+    def test_an_unstarted_copy_in_a_child_tree_is_dropped(self):
+        stale = self.found(child_text("i0001-01-03", "i0001", 1, ["src/*"]), "i0001-01-03")
+        self.assertEqual(archive.drop_archived(self.root, [stale]), [])
+
+    def test_an_unstarted_ticket_in_the_parent_tree_is_kept_and_blocked(self):
+        parent = self.found(parent_text("i0001", ["research"]), "i0001")
+        child = self.found(child_text("i0001-01-03", "i0001", 1, ["src/*"]), "i0001")
+        kept = archive.drop_archived(self.root, [parent, child])
+        self.assertEqual([t.ticket for t in kept], ["i0001", "i0001-01-03"])
+        for t in kept:
+            self.assertIn("別の機械で使い直した", t.archived_clash)
+            self.assertIn("logs/archive", t.blocked)
+            found = [p.detail for p in approval.content_problems(t)]
+            self.assertIn(archive.REUSED_REASON, found)
+
+
+class ReusedIdentifierFamilyTest(PhaseHarness):
+    """別の機械で閉じた識別子を使い直した親子は、消えずに止まる。
+
+    理由が判定・ボード・--lint・status に出る。
+    """
+
+    def test_a_reused_family_in_the_parent_tree_stays_and_is_blocked(self):
+        base = archive.base_dir(self.root, "")
+        write(os.path.join(base, "done", "i0001.md"), closed_text("i0001"))
+        write(os.path.join(base, "done", "i0001-01-01.md"), closed_text("i0001-01-01", "i0001"))
+        doing = os.path.join(self.approved, "doing")
+        write(os.path.join(doing, "i0001.md"), parent_text("i0001", ["research"]))
+        write(
+            os.path.join(doing, "i0001-01-01.md"),
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]),
+        )
+        self.commit_parent("使い直した親子")
+        conf, _ = settings.load(self.root)
+        kept, _ = approval.scan(conf, self.root)
+        blocked = {t.ticket: t.blocked for t in kept}
+        self.assertEqual(set(blocked), {"i0001", "i0001-01-01"})
+        for why in blocked.values():
+            self.assertIn("別の機械で使い直した", why)
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        opened = {t["ticket"]: t for t in board["tickets"] if t["copy"]["status"] == "open"}
+        self.assertIn("i0001-01-01", opened)
+        linted = self.ccnavi("--lint")
+        self.assertIn("i0001-01-01: " + archive.REUSED_REASON, linted.stdout + linted.stderr)
+        status = self.ccnavi("ticket", "status", "i0001")
+        self.assertIn("別の機械で使い直した", status.stdout)
+        # 判定: 子のワークツリーでの書き込みは範囲を使わずに止まる
+        tree = self.worktree("i0001-01-01", "i0001")
+        decided = self.hook(
+            "PreToolUse",
+            "Write",
+            tree,
+            file_path=os.path.join(tree, "wip", "research", "a.md"),
+            content="x",
+        )
+        self.assertIn("別の機械で使い直した", self.reason(decided))
+
+
 class PhaseChildIdsTest(ArchiveTreeHarness):
     """子の識別子が `<親>-<フェーズ番号>-<連番>` の親子の退避。"""
 
