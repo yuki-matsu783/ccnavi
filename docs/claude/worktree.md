@@ -3,7 +3,7 @@ type: guide
 title: ワークツリーで作業する
 description: ワークツリーの作成、他セッションの変更への対応、統合先へのマージ方法
 tags: [git, worktree]
-keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション]
+keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション, issue, MR, 既存のブランチ, ccnavi-branches.sh]
 ---
 
 # ワークツリーで作業する
@@ -42,6 +42,12 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   一覧に無いオプションは拒否される。必要なオプションが出てきたら、ユーザに一覧へ足してもらう
 - 行き先の名前とブランチ名は揃える（`-b <行き先の名前>`）。`-B`・`--detach`・`--force`は拒否される。
   `-b`を付けずに2つ目の語を渡す場合、渡せるのは行き先と同じ名前の手元のブランチか`origin/<名前>`だけで、タグやshaは拒否される。
+- issueやMRを指定して作業を頼まれたら（`#152`・`!5`・URLなど）、ワークツリーを切る前に、紐づくブランチが既にあるかを
+  `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-branches.sh --issue <番号>`（MRなら`--mr <番号>`）で確かめる。読むだけで、
+  ホストに繋げなければ手元の候補だけを出して「ホストは見ていない」と書く。プロジェクトのissue・MRは`projects/<名前>`に`cd`してから打つ。
+  候補があれば一覧をユーザに見せ、既存のブランチで続けるか（下の`branch:`の手順。承認前の提案の`branch:`は使わない）・
+  新しく`<先頭の語>-<番号>-<slug>`を切るか・やめるかを聞いて、返事を待つ。候補が無ければそのまま進めてよい。
+  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す（止めはしない。ADR-0101）
 - 既にある`feature/123-login`のような`/`を含むブランチで親チケットの作業をするときは、識別子は`/`を含まない
   `feature-123-login`にし、提案に`branch: feature/123-login`を書く。承認されるまでは`branch:`は使われないので、
   親のワークツリーは識別子のブランチで切る（`worktree add .claude/worktrees/feature-123-login -b feature-123-login <統合先>`）。
