@@ -518,12 +518,12 @@ class PushApprovedTest(Workspace):
         for word in ("-x", "../i0001", "a/b", ""):
             wrong = self.push(word)
             self.assertEqual(wrong.returncode, 2, word + wrong.stdout + wrong.stderr)
-        # 取り込み済みでない親のブランチの名指しは運ばない（今のまま、ユーザがコミットする）。
+        # 取り込み済みでない親子のチケットの名指しは運ばない（今のまま、ユーザがコミットする）。
         tree = self.worktree("i0001")
         self.place(tree)
         named = self.push("i0001")
         self.assertEqual(named.returncode, 0, named.stdout + named.stderr)
-        self.assertIn("取り込み済みの親のブランチでない", named.stdout)
+        self.assertIn("取り込み済みの親子のチケットでない", named.stdout)
         self.assertTrue(self.dirty(tree, APPROVED))
         self.assertEqual(self.remote_head("i0001"), "")
         outside = os.path.join(self._tmp.name, "elsewhere")

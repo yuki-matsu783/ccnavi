@@ -132,7 +132,7 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "commit", "--quiet", "-m", "init")
         # 共通層は `--root` の下の既定の置き場に置く。`--rules` / `--phases` は診断
         # （`--lint` / `--test` / `--explain`）でだけ有効なので、hook の判定と `--reviewed`
-        # には渡せない（ADR-0067）。差し替えたいテストはこのファイルに書き直す。
+        # には渡せない。差し替えたいテストはこのファイルに書き直す。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.phases = write(common_path(self.root, "phases"), PHASES)
         self.state = os.path.join(self.root, "state")
@@ -826,7 +826,7 @@ class PhaseTest(PhaseHarness):
         self.assertTrue(text.startswith("レビューで残った指摘（i0001 のフェーズ 2）\n\n"))
         self.assertIn("u/7#t1", text)
         self.assertNotIn("u/7#t0", text)
-        # レビュー済みのフェーズに confirm を重ねない（ADR-0093 の 11.8.1 の決定 B）
+        # レビュー済みのフェーズに confirm を重ねない。重ねるとマーカーと履歴が書き直される
         again = self.confirm(fixture, 2)
         self.assertEqual(again.returncode, 1)
         self.assertIn("フェーズ 2 はレビュー済み", again.stderr)
@@ -1078,7 +1078,7 @@ phases:
 
 
 class WrapperFlagsComeOnceTest(PhaseHarness):
-    """sh が計算して渡すパス（`--root` / `--cwd`）は 2 度渡せない（ADR-0067、issue #65）。
+    """sh が計算して渡すパス（`--root` / `--cwd`）は 2 度渡せない（issue #65）。
 
     `ccnavi-review.sh` は `"$bin" --root "$root" --cwd "$here" "$@"` の形で呼ぶ。
     どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。後ろに
@@ -1100,7 +1100,7 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
 
 
 class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
-    """`ticket` の副命令に `--phases` を足しても、種類は共通層のまま（ADR-0067、issue #65）。
+    """`ticket` の副命令に `--phases` を足しても、種類は共通層のまま（issue #65）。
 
     `.ccnavi/scripts/ccnavi-ticket.sh` が引数をそのまま渡すので、この形はエージェントが
     Bash で打てる。通していた頃は、`review: mr` の種類を `review: none` と名乗る
@@ -1138,7 +1138,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
 
 
 class ChatReviewTest(PhaseHarness):
-    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 9.8、ADR-0065）。"""
+    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 9.8）。"""
 
     def chat_phase(self, plan=("chores", "design")):
         """`review: chat` のフェーズを 1 つ終わらせて、告知の文を返す。"""
@@ -1186,7 +1186,7 @@ class ChatReviewTest(PhaseHarness):
 
     def test_chat_review_moves_the_child_to_done_and_can_raise_a_followup(self):
         """このセッションで見たフェーズも、レビュー済みで review/ の子は done/ へ動き、
-        ユーザが指摘を打てば続きの子が doing/ に起きる（ADR-0055）。"""
+        ユーザが指摘を打てば続きの子が doing/ に起きる。"""
         self.chat_phase()
         review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
         self.assertTrue(os.path.exists(review))

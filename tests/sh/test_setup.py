@@ -86,7 +86,8 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。README「設定」の見本と対になる。表記が変わると、
 # ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものが食い違う。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
-# セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する（ADR-0060）。
+# セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
+# デフォルトブランチを ff で進め、ワークツリーの起点を新しくする。
 FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 # --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側にほかに取れる方法がない。
@@ -323,7 +324,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_LOG"], "logs/decisions.jsonl")
 
     def test_does_not_write_the_common_layer_paths(self):
-        """ADR-0052: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
+        """共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
 
         既定と同じ値を書いても動きは変わらないが、読まれない語が設定に残ると、
         そこを直せば置き場が動くと読める。`--all` の一覧にも書かない。

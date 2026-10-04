@@ -92,7 +92,7 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
   );
-  // 親のブランチを並べると、その親のブランチのチケットだけを運ぶ（ADR-0093 の 4.6。フローの保存の後）。
+  // 親を並べると、その親子のチケットだけを運ぶ（フローの保存の後）。
   assert.equal(
     pushApprovedCommand("/ws", ["i0001"]),
     "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",

@@ -22,7 +22,7 @@ def run(root, payload, log="", env=None):
     """道具を 1 回動かす。ワークスペースルートを呼び出しごとに変えられる。
 
     ルールは `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には
-    届かない（ADR-0067）。読めないルールは `--root` の下の共通層に置く。
+    届かない。読めないルールは `--root` の下の共通層に置く。
 
     コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
@@ -153,7 +153,7 @@ class FallbackTest(unittest.TestCase):
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
-            # `cd` で入ってから書く形（issue #61、ADR-0069）。行き先のパスから場所の
+            # `cd` で入ってから書く形（issue #61）。行き先のパスから場所の
             # 名前が消えるので、移った先から見たパスにも当てないと止められずに通る。
             "cd .ccnavi/common && echo x > rules.yml",
             "cd .claude && echo x > settings.json",

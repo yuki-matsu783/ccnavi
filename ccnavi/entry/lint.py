@@ -458,8 +458,8 @@ def flow_problems(
     を返す。読めなければ中身と行は None。
     読み手も検査も `flow.load` そのもの（大きさ、リンク・ふつうのファイルでない・ハードリンク、
     UTF-8 として読めない、YAML として読めない、別名、形）。ここで別に書くと、画面が
-    「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（ADR-0035）。
-    読めなければ error。
+    「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（読みの答えは
+    実行ファイルの 1 か所に置く）。読めなければ error。
     ツリーの中のファイルなら、ツリーのルートからの途中のリンクも見る（SubagentStart と同じ）。
     無いファイルも error にする（確かめたつもりで何も確かめていない形を作らない）。
     中身を返すのは、拡張が値の意味（`0755` や `yes` を何と読むか）を自分で決めずに済ませるため。
@@ -511,7 +511,9 @@ def _copy_problems(
     index: dict[str, ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
 ) -> list[Problem]:
-    """作業中の承認済みチケットを検査する（ADR-0058）。
+    """作業中の承認済みチケットを検査する。
+
+    承認で本物とするのは置き場で、`ccnavi_approved` の欄ではない。
 
     置き場を動かして承認する運びでは `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
@@ -632,9 +634,9 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     }
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     approval.align_imported(conf, root, preds)
-    # 統合先の done/ で閉じた識別子（取り込み済みの親のブランチ。
-    # ADR-0093 の 3.3 の 4）も閉じたものに数える。承認の対象から外れる（`agree.waiting`）ので、
-    # 何も言わずに済ませず名指しする。
+    # 統合先の done/ で閉じた識別子も閉じたものに数える（開いた親子のチケットでも統合先の
+    # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
+    # 名指しする。
     done |= approval.integration_closed(conf, root, proposals)
     problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
     problems.extend(
@@ -841,7 +843,8 @@ def _proposal_problems(
         )
     for t in index.values():
         if t.started_at:
-            # 先行の数え方は承認と着手と同じ（ADR-0088）。着手はこれで止まるので、ここに出るのは
+            # 先行の数え方は承認と着手と同じ（`done/` に在って取り消しでないものだけ満たす）。
+            # 着手はこれで止まるので、ここに出るのは
             # 着手のあとに先行が動いたか、止める前の版で着手したもの。
             unmet = approval.unmet_predecessors(t, preds or {})
             if unmet:
@@ -895,7 +898,7 @@ def _proposal_problems(
 def _branch_name_problems(
     proposals: list, copies: list, closed: list, review: list, integration: str = ""
 ) -> list[Problem]:
-    """識別子を親のブランチ名にできるか（ADR-0093 の 3.1。段階 0 なので warn だけ）。
+    """識別子を親のブランチ名にできるか（warn だけ。拒否は `ccnavi-git.sh` が受け持つ）。
 
     親のブランチ名は親の識別子そのものにする。そのために次を名指しする。
 
@@ -903,11 +906,11 @@ def _branch_name_problems(
       （`ticket.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
     - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
       ブランチもワークツリーも同じ名前になる
-    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。親のブランチを引くとき、別の親の子と読まれる
+    - 子の形（`<親>-<2 桁>`）に当たる親の識別子。親子のチケットを引くとき、別の親の子と読まれる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
     `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
-    取り込み結果に書いた名前（段階 2b）。どちらも無ければ固定の並びだけを見る。
+    取り込み結果に書いた名前。どちらも無ければ固定の並びだけを見る。
     """
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
@@ -918,7 +921,9 @@ def _branch_name_problems(
             continue
         said.add(t.ticket)
         for text in ticket_mod.branch_name_problems(t, integration):
-            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（ADR-0093）"))
+            problems.append(
+                Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（親のブランチ名の規則）")
+            )
 
     spellings: dict[str, set[str]] = {}
     for t in everyone:
@@ -931,7 +936,7 @@ def _branch_name_problems(
                     "(ticket)",
                     f"{' と '.join(sorted(names))} は大文字小文字だけが違う。"
                     "大文字小文字を区別しないファイルシステムでは、ブランチとワークツリーの"
-                    "名前がぶつかる（ADR-0093）",
+                    "名前がぶつかる（親のブランチ名の規則）",
                 )
             )
 
@@ -946,9 +951,8 @@ def _branch_name_problems(
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{name} は親なのに、識別子が子の形（`<親>-<2 桁>`）と一致する。"
-                "親のブランチのチケットをまとめるとき"
-                f" {matched.group('parent')} の子として扱われる。"
-                "親の識別子の末尾を `-<2 桁>` にしないでください（ADR-0093）",
+                f"親子のチケットをまとめるとき {matched.group('parent')} の子として扱われる。"
+                "親の識別子の末尾を `-<2 桁>` にしないでください（親のブランチ名の規則）",
             )
         )
     return problems
@@ -1123,20 +1127,19 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _sync(conf: settings.Settings, root: str) -> list[Problem]:
-    """取り込み状態と、取り込み済みの親のブランチで本物とする側（ADR-0093 の 3.3・3.5・3.6。
-    段階 2c）。
+    """取り込み状態と、取り込み済みの親子のチケットで本物とする側（親のブランチ上のチケットだけを本物とする）。
 
-    - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査 3.5 の 1）
-    - 親のブランチの取り込み状態が壊れている・gone・blocked、
-      `present` なのに親のワークツリーが無い: error（その親のブランチは決まらないので、
-      承認も状態の操作も止まる）。閉じた親のブランチは、
+    - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査）
+    - 親子のチケットの取り込み状態が壊れている・gone・blocked、
+      `present` なのに親のワークツリーが無い: error（その親子のチケットは決まらないので、
+      承認も状態の操作も止まる）。閉じた親子のチケットは、
       親のワークツリーが残っていれば info（片付けてよい）、片付いていれば何も言わない（墓標）
     - 統合先の取り込み結果が壊れている・無い・読めない: error（識別子の再利用を確かめられない）
     - 作業ツリーの層と統合先の取り込み結果の層が違う: warn
-    - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn（D28）
+    - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn
 
     親のワークツリーの外にしか無いチケット（移行の検査）は、チケットの `blocked` として
-    `_copy_problems` が error で言う。取り込み状態の無い親のブランチには、
+    `_copy_problems` が error で言う。取り込み状態の無い親子のチケットには、
     最初の 1 つのほかは何も言わない。
     """
     problems = _parent_trees_off_branch(conf, root)
@@ -1179,7 +1182,7 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem]:
-    """名前が親の識別子なのに、HEAD が別のブランチを指す親のワークツリー（3.5 の 1）。"""
+    """名前が親の識別子なのに、HEAD が別のブランチを指す親のワークツリー（移行の検査）。"""
     problems: list[Problem] = []
     for work in tree.worktrees(root, conf.projects):
         if not _holds_parent(conf, work):
@@ -1252,9 +1255,10 @@ def _read_plain(path: str) -> bytes | None:
 def _layer_drift(
     conf: settings.Settings, integ: syncstate.Integration, home: str, where: str
 ) -> list[Problem]:
-    """作業ツリーの層と、統合先の取り込み結果の層（同じパス）が違うか（ADR-0093 の 3.4）。
+    """作業ツリーの層と、統合先の取り込み結果の層（同じパス）が違うか。
 
-    判定はまだ作業ツリーの層を読む（段階 2c では統合先の取り込み結果へ切り替えない）。違いは、
+    手元の判定は作業ツリーの層を読み、統合先の取り込み結果へは切り替えない（統合先の層が作業ツリーより
+    緩いときに通るものが増えるため）。違いは、
     統合先に入るまで他の機械と Chrome の判定に使われないという知らせ。
     """
     home_rel = fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
@@ -1293,7 +1297,10 @@ def _layer_drift(
 def _projected_layer_problems(
     conf: settings.Settings, st: syncstate.Standing, where: str
 ) -> list[Problem]:
-    """`P` の上のプロジェクトの層が、統合先から計算した層と違うか（ADR-0093 の D28）。
+    """`P` の上のプロジェクトの層が、統合先から計算した層と違うか。
+
+    Chrome の判定は `P` の上の層を読まず、この計算した層を使う（`P` の上で層を書き換えて
+    承認やレビューを不要にできないように）。
 
     計算した層は「プロジェクトの統合先の層（取り込み結果）に、ワークスペースの統合先の共通層（取り込み結果）を
     `configsync.projected` でコピーしたもの」。着手のときの configsync と同じく、共通層にある
@@ -1324,7 +1331,7 @@ def _projected_layer_problems(
                 where,
                 f"親のブランチ {st.family} の上のプロジェクトの層（{rel}）が、統合先の層と"
                 "共通層から計算した層と違う。"
-                "判定は親のブランチの上の層を読まない（ADR-0093 の D28）。"
+                "判定は親のブランチの上の層を読まない。"
                 "統合先で直すか、着手のときにもう一度コピーしてください",
             )
         )
@@ -1334,11 +1341,11 @@ def _projected_layer_problems(
 def family_check(
     conf: settings.Settings, root: str, family: str, repo: str | None = None
 ) -> list[Problem]:
-    """取り込みの後の検査（ADR-0093 の 4.2 の 4。`ccnavi sync check <P> [<リポジトリ>]`）。
+    """取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）。
 
-    この親のブランチの承認済みチケットを判定し直し（C3）、本物とする側の検査（親のワークツリーの外のチケット・
-    決まらない）とあわせて、止める理由（error）を返す。層の食い違い（D28）は warn で返す。
-    error があれば sh が親のブランチの取り込み状態を `blocked` にする。
+    この親子のチケットの承認済みチケットを判定し直し（C3）、本物とする側の検査（親のワークツリーの外のチケット・
+    決まらない）とあわせて、止める理由（error）を返す。層の食い違いは warn で返す。
+    error があれば sh が親子のチケットの取り込み状態を `blocked` にする。
     `repo` は取り込み状態の名前（`self` かプロジェクト名）で、sh が渡す。
     無ければ取り込み状態のあるリポジトリを全部探す。
     """
@@ -1388,14 +1395,14 @@ def family_check(
 
 
 def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | None:
-    """この承認済みチケットを最後に書いたのが Chrome 拡張なら、その拡張の版（7.3）。
+    """この承認済みチケットを最後に書いたのが Chrome 拡張なら、その拡張の版。
     そうでなければ None。
 
     履歴の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
     その後に手元の
     操作（着手・マーカーなど）の履歴があれば、違いが手元の操作から来ることもあるので名指ししない。
     互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として版を名指しする
-    （止めるかどうかは変えない。親のブランチの取り込み状態を `blocked` にするのは sh）。
+    （止めるかどうかは変えない。親子のチケットの取り込み状態を `blocked` にするのは sh）。
     """
     events, _ = history.read(settings.approved_dir(conf, t.tree_root), t.ticket)
     if not events:
@@ -1812,14 +1819,16 @@ def _project_settings(root: str) -> list[Problem]:
     return problems
 
 
-# `.claude/settings.local.json` に置かせない、承認と判定に影響する値（ADR-0093 の 3.3 の 6）。
+# `.claude/settings.local.json` に置かせない、承認と判定に影響する値。
 # 置き場のパス・プロジェクトの置き場・ccnavi ディレクトリ・state の置き場（取り込み状態を読む先）・
-# チケット制御と承認の保護の切り替え・動作モード。例外は統合先の名前（D30 で置き場に決めた）だけ。
+# チケット制御と承認の保護の切り替え・動作モード。例外は統合先の名前だけ（リポジトリに置かず、
+# 手元では環境変数で持つと決めた値なので）。
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 #
 # 保護と判定の働きを変える値（戻す働き・ccnavi 自身の設定の保護・確かめられないモードの止め・
 # 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
-# 他の機械で、同じ親のブランチに掛かる保護が別になる。入れないのは、判定の答えを変えない次の値だけ。
+# 他の機械で、同じ親子のチケットに掛かる保護が別になる。入れないのは、判定の答えを変えない
+# 次の値だけ。
 # 実行ファイルのパス（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
 # 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、見張りと待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
@@ -1841,13 +1850,13 @@ _LOCAL_FORBIDDEN = (
 
 
 def _local_settings(root: str) -> list[Problem]:
-    """`.claude/settings.local.json` の env に、承認に影響する値が無いかを見る
-    （ADR-0093 の 3.3 の 6）。
+    """`.claude/settings.local.json` の env に、承認に影響する値が無いかを見る。
 
     承認と判定は、置き場のパスなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
-    ユーザが端末で打つ sh には使われないので、同じ親のブランチのチケットを別のパスで読むことになる。
-    例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前の置き場として決めた。D30）。
+    ユーザが端末で打つ sh には使われないので、同じ親子のチケットを別のパスで読むことになる。
+    例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前はリポジトリに置かず、手元では環境変数で
+    持つと決めた）。
     """
     path = os.path.join(root, LOCAL_SETTINGS)
     try:
@@ -1866,8 +1875,8 @@ def _local_settings(root: str) -> list[Problem]:
             "(project)",
             f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
             "ファイルに置かない（Chrome と端末の sh には使われないので、"
-            "同じ親のブランチのチケットをプロセスごとに"
-            "別のパスで読むことになる）。"
+            "同じ親子のチケットを"
+            "プロセスごとに別のパスで読むことになる）。"
             f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
             "渡してください。"
             f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",
@@ -1923,7 +1932,7 @@ def _rules(
     1 件だけ足した層が毎回 error を出し続けることになる。
 
     `project` はプロジェクトの層かどうか。ターンの終わりのルール（`match: Stop`）は
-    プロジェクトの層から読まないので、そこに書いたものを言う（ADR-0090）。
+    プロジェクトの層から読まない（共通層と自身の層だけ）ので、そこに書いたものを言う。
     """
     home = home or root or os.path.dirname(os.path.abspath(path))
     try:
@@ -2063,7 +2072,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
 
 
 def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[Problem]:
-    """`match: Stop` のルール（ターンの終わりに止めて文を渡す。ADR-0090）の書き方。
+    """`match: Stop` のルール（ターンの終わり N 回に 1 度止めて文を渡す）の書き方。
 
     見るのは 4 つ。どれも判定は変えないので warn。
 

@@ -38,7 +38,7 @@
 # 理由を 1 行出し、settings.json は書く。指定された `--deploy` が使えないときだけ 2 で止める。
 # ユーザが指定したものが無いのは、環境の誤りとして扱う。
 #
-# 置き場は 2 つに分けて固定する（ADR-0044）。CCNAVI_BIN_PATH が指すのは
+# 置き場は 2 つに分けて固定する。CCNAVI_BIN_PATH が指すのは
 # .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh。代わりに通る sh と同じ置き場）で、
 # 実行ファイルは機械ごとに .ccnavi/bin/<os>-<arch>/ に置く。振り分けの sh は、自分の 1 つ上の
 # bin/ から、hook を起動した機械に合うものを選ぶ。settings.json は Windows・WSL・Linux・macOS で
@@ -74,8 +74,8 @@ HOOK_TIMEOUT=10
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart SubagentStop"
 # セッションの開始時に、承認済みチケットとマーカー（親ブランチに含まれて届く）と、ワークツリーの
 # 起点になるデフォルトブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
-# 取得しないと、別の機械で承認したものが反映されず、古い main からブランチを切ることになる
-# （ADR-0060）。通信するので、要らないプロジェクトは --no-fetch で外す。上限は、sh の中の
+# 取得しないと、別の機械で承認したものが反映されず、古い main からブランチを切ることになる。
+# 通信するので、要らないプロジェクトは --no-fetch で外す。上限は、sh の中の
 # 見張り（1 回 15 秒）が重なっても収まる長さにしてある。
 FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 FETCH_TIMEOUT=60
@@ -108,7 +108,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。
 # ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが実行する
-# 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、取り込み状態の書き出し。ADR-0093 の 4.2）。
+# 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、取り込み状態の書き出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
 # node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して js を渡す。
@@ -628,7 +628,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 # 設定ファイルの中で見つけられること。
 #
 # 共通層の 3 本（rules / phases / risk）は、ここにも書かない。置き場は `.ccnavi/common/`
-# に固定で、env では変わらないので、書いても読まれない（ADR-0052）。読まれない名前を
+# に固定で、env では変わらないので、書いても読まれない。読まれない名前を
 # 設定項目の一覧に混ぜると、そこを直せば置き場が変わるように読めてしまう。
 if [ "$all" = yes ]; then
 	env_json=$(printf '%s' "$env_json" | jq '. + {

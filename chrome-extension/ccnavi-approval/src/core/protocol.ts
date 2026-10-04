@@ -1,23 +1,23 @@
 /**
- * 画面と service worker のあいだの約束（ADR-0093 の 5.5 の 4）。
+ * 画面と service worker のあいだの約束。
  *
  * PAT を読むのは service worker だけ。画面は PAT を受け取らず、ホストの API は名前で限った
  * 操作を頼む。PAT を書く・消すのは設定画面からだけ受ける。送り手は拡張の自分のページに限り、
  * 他の拡張・ウェブページからの呼び出し（`onMessageExternal`）は受けない。
  *
- * 段階 4 から、レビュー済みのために MR のスレッドとレビュー（`reviewCopy`）と、依頼の後の変更の
+ * レビュー済みのために MR のスレッドとレビュー（`reviewCopy`）と、依頼の後の変更の
  * 一覧（`compareFiles`）を読む。どちらも読むだけ。
  *
- * 段階 3 から、書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
+ * 書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
  * 書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か統合先の名前（ボードの値を信頼せず
  * 自分で引く）なら断り、書くパスは置き場（統合先の `.claude/settings.json` から自分で引く）の下に限る
- * （8.5・レビューの決定 D）。同じ検査を Python も行うので、書く先とパスは 2 か所で確かめる。PAT の期限（D25）は、
+ * （Python も同じ検査をする。画面で XSS が起きても書く先を広げないための二重の確認）。PAT の期限は、
  * GitHub なら応答ヘッダから、GitLab なら `GET /personal_access_tokens/self` から読んで記録し、画面へは期限だけを返す。
  * GitLab に問い合わせるのは 1 日 1 回。
  *
- * 段階 5 から GitLab（`gitlab.ts`）も同じ操作の名前で受ける。`commit` の答えは `{oid, parent}` で、`parent` は
- * ホストが実際に積んだ先（8.4）。GitHub では `expectedHeadOid` で読んだ先頭に決まり、GitLab では事後に確かめる。
- * 「始める」のために、読む操作 `issues` と、ボードからだけ受ける `createBranch` を足した（8.6）。`createBranch` は
+ * GitLab（`gitlab.ts`）も同じ操作の名前で受ける。`commit` の答えは `{oid, parent}` で、`parent` は
+ * ホストが実際に積んだ先。GitHub では `expectedHeadOid` で読んだ先頭に決まり、GitLab では事後に確かめる。
+ * 「始める」のために、読む操作 `issues` と、ボードからだけ受ける `createBranch` も受ける。`createBranch` は
  * 登録したリポジトリの統合先の今の先頭から、issue から決める形の名前でブランチを作り、予約の名前・統合先の名前は断る。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
@@ -96,9 +96,9 @@ export interface Deps {
   getToken(host: string): Promise<string>;
   setToken(host: string, token: string): Promise<void>;
   clearToken(host: string): Promise<void>;
-  /** PAT の期限の記録（D25）。PAT そのものとは別の鍵に置く */
+  /** PAT の期限の記録。PAT そのものとは別の鍵に置く */
   getMeta(host: string): Promise<TokenMeta>;
-  /** 設定画面で登録したリポジトリ（書く頼みはここにあるものだけ受ける。決定 D） */
+  /** 設定画面で登録したリポジトリ（書く頼みはここにあるものだけ受ける） */
   getRepos(): Promise<RepoConfig[]>;
   /** 待つ（レート制限の Retry-After）。無ければ本物の時計 */
   readonly sleep?: (ms: number) => Promise<void>;
@@ -114,7 +114,7 @@ export interface TokenStatus {
 }
 
 const TOKEN = /^[A-Za-z0-9_\-.]{8,255}$/;
-/** 書く先にしない名前（8.5。`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
+/** 書く先にしない名前（`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
 /** 1 コミットで書くファイルの上限と、1 ファイルの大きさの上限（base64 の字数） */
 const MAX_FILES = 200;
 const MAX_CONTENTS = 4 * 1024 * 1024;
@@ -196,7 +196,7 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
     gitlabOk = res.ok && host.kind === "gitlab";
     return res;
   } finally {
-    // 応答から期限を読めたら記録する（D25。ホストの値が正）
+    // 応答から期限を読めたら記録する（ホストの値が正）
     const iso = seen.expiration ? github.parseExpiration(seen.expiration) : "";
     if (iso) {
       const meta = await deps.getMeta(host.id);
@@ -209,7 +209,7 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
 
 const DAY_MS = 24 * 3600 * 1000;
 
-/** GitLab の PAT の期限を 1 日 1 回聞いて記録する（D25。読めなければ登録のときの日付のまま） */
+/** GitLab の PAT の期限を 1 日 1 回聞いて記録する（読めなければ登録のときの日付のまま） */
 async function gitlabExpiry(client: github.Client, deps: Deps): Promise<void> {
   const meta = await deps.getMeta(client.host.id);
   const last = meta.checked ? Date.parse(meta.checked) : NaN;
@@ -233,7 +233,7 @@ function refuse(error: string): Response {
 interface Addition extends github.FileAddition {
   /** GitLab の Commits API の action（作るか書き換えるか）。GitHub は使わない */
   readonly op?: "create" | "update";
-  /** GitLab: そのファイルを最後に変えたと書き手が知っているコミット（元に戻すコミットに使う。決定 A） */
+  /** GitLab: そのファイルを最後に変えたと書き手が知っているコミット（元に戻すコミットに使う） */
   readonly last?: string;
 }
 
@@ -278,7 +278,7 @@ async function placesAt(deps: Deps, client: github.Client, cfg: RepoConfig, inte
   const a = api(client);
   const head = await a.branchHead(client, cfg.owner, cfg.repo, integ);
   if (head === null) throw new Error(`統合先 ${integ} がリモートに無い`);
-  // プロジェクトのリポジトリは、置き場のパスをワークスペースの統合先の設定から読む（段階 5。3.3 の 7）
+  // プロジェクトのリポジトリは、置き場のパスをワークスペースの統合先の設定から読む
   const where = cfg.project ? await workspaceOf(deps, cfg) : { client, cfg, integ, head };
   const w = api(where.client);
   const objs = await w.pathObjects(where.client, where.cfg.owner, where.cfg.repo, where.head, [".claude/settings.json"]);
@@ -318,7 +318,7 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
 /**
  * 大文字小文字をそろえる（「始める」の重なりの検査）。作る名前は ASCII に限る（`startName`・Python の `ticket._ID`）ので
  * Python の casefold と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
- * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（厳しくする向き。11.9.3 の 14）
+ * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（厳しくする向き）
  */
 function fold(text: string): string {
   return text.normalize("NFKC").toLowerCase();
@@ -328,7 +328,7 @@ function fold(text: string): string {
 const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
 
 /**
- * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（8.6。二重の確認）: 閉じた識別子（`done/` の名前を
+ * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（二重の確認）: 閉じた識別子（`done/` の名前を
  * 大文字小文字をそろえて）と互換の版（ワークスペースの統合先の CCNAVI_COMPAT と同梱の版）。空なら作ってよい
  */
 async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string, head: string, name: string): Promise<string> {
@@ -337,7 +337,7 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
   const text = await fileAt(ws.client, ws.cfg, ws.head, COMPAT_FILE);
   const theirs = text === null ? null : Number(/^CCNAVI_COMPAT=(\d+)\s*$/m.exec(text)?.[1] ?? NaN);
   if (deps.compat === undefined || theirs === null || theirs !== deps.compat) {
-    return `統合先の互換の版（${theirs ?? "無い"}）と拡張の互換の版（${deps.compat ?? "不明"}）が違うので作らない（ADR-0093 の 7.3）`;
+    return `統合先の互換の版（${theirs ?? "無い"}）と拡張の互換の版（${deps.compat ?? "不明"}）が違うので作らない`;
   }
   const a = api(client);
   const done = `${places.approved}/done`;
@@ -346,12 +346,12 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
     const entries = client.host.kind === "gitlab" ? await gitlab.tree(client, cfg.owner, cfg.repo, obj.oid, head, done) : await github.tree(client, cfg.owner, cfg.repo, obj.oid);
     const folded = fold(name);
     const hit = entries.find((e) => !e.path.includes("/") && fold(e.path) === `${folded}.md`);
-    if (hit) return `${name} は統合先 ${integ} の done/ で閉じている（閉じた識別子は使い直さない。ADR-0093 の 3.1 の 5）`;
+    if (hit) return `${name} は統合先 ${integ} の done/ で閉じている（閉じた識別子は使い直さない）`;
   }
   return "";
 }
 
-/** 「始める」で作るブランチの名前の形（issue から決める形。3.1 の 4・7）。プロジェクトなら頭に `<名前>-` */
+/** 「始める」で作るブランチの名前の形（issue から決める形）。プロジェクトなら頭に `<名前>-` */
 function startName(name: unknown, cfg: RepoConfig): string {
   const branch = github.checkBranch(name);
   const m = /^(?:(?<project>[A-Za-z0-9][A-Za-z0-9._-]*)-)?i\d{4,}$/.exec(branch);
@@ -374,7 +374,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
   const o = lab ? gitlab.checkNamespace(owner) : github.checkName(owner, "owner");
   const r = github.checkName(repo, "repo");
   const x = api(client);
-  // 読み取りも、設定画面で登録したリポジトリ（プロジェクトのワークスペースも登録したもの）だけ受ける（11.9.1 の 8）
+  // 読み取りも、設定画面で登録したリポジトリ（プロジェクトのワークスペースも登録したもの）だけ受ける
   const known = await registeredRepo(deps, client, o, r);
   if (!known) {
     const why = `${o}/${r} は設定画面に登録していないリポジトリなので${op === "commit" || op === "createBranch" ? "書かない" : "読まない"}`;
@@ -432,7 +432,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       } catch (err) {
         return refuse((err as Error).message);
       }
-      // 書く先の保護（決定 D）: 登録したリポジトリだけ。統合先の名前と置き場のパスはボードの値を信頼せず、自分で引く
+      // 書く先の保護: 登録したリポジトリだけ。統合先の名前と置き場のパスはボードの値を信頼せず、自分で引く
       const cfg = await registeredRepo(deps, client, o, r);
       if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなので書かない`);
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
@@ -472,7 +472,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = await x.commitParents(client, o, r, github.checkOid(a));
       break;
     case "reviewCopy":
-      // レビュー済み（段階 4）: MR のスレッドとレビューを取得する。読むだけ。登録したリポジトリだけ
+      // レビュー済み: MR のスレッドとレビューを取得する。読むだけ。登録したリポジトリだけ
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
       value = await x.reviewCopy(client, o, r, github.checkBranch(a));
       break;
@@ -484,12 +484,12 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = await x.branchNames(client, o, r);
       break;
     case "issues":
-      // 「始める」（段階 5）: 開いた issue の一覧。読むだけ。登録したリポジトリだけ
+      // 「始める」: 開いた issue の一覧。読むだけ。登録したリポジトリだけ
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
       value = await x.issues(client, o, r);
       break;
     case "createBranch": {
-      // 「始める」（段階 5。8.6）: 親のブランチを統合先の今の先頭から作る。PR/MR は作らない
+      // 「始める」: 親のブランチを統合先の今の先頭から作る。PR/MR は作らない
       const cfg = await registeredRepo(deps, client, o, r);
       if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなのでブランチを作らない`);
       let name: string;
@@ -500,12 +500,12 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return refuse(`${name} は保護されたブランチか統合先の名前なので作らない（ADR-0093 の 8.5）`);
+        return refuse(`${name} は保護されたブランチか統合先の名前なので作らない`);
       }
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
       if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで読んだときから動いている。ボードを更新してから始め直してください`);
-      // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない。11.9.1 の 7）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
+      // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
       if (same.length > 0) return refuse(`${name} は既にある（${same.join(", ")}）`);

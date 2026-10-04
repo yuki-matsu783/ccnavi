@@ -3,7 +3,7 @@
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
 サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
 
-やることは置き場を動かして欄を書くことだけ（ADR-0055）。`start` は置き場を動かさず
+やることは置き場を動かして欄を書くことだけ（状態は置き場が表す）。`start` は置き場を動かさず
 `doing/` の欄を書く。`finish` は `doing/` から `wip/proposals/review/`（レビュー要）か
 `.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
 ワークツリーの削除は親のマージ手順に任せる。順序は「子の成果をマージ → finish →
@@ -22,7 +22,7 @@ from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
 
-# Stop で `finish` の打ち忘れを促すときの理由コード（ADR-0087）。止めるのは 1 回だけの促しで、
+# Stop で `finish` の打ち忘れを促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。
 CODE_FINISH_NUDGE = "NUDGE_TICKET_FINISH"
 
@@ -94,7 +94,7 @@ def start(
     )
     if found.is_child:
         # 着手のときのフローの指紋を記録する。SubagentStart / SubagentStop が、着手のあとに
-        # 書き換わったら知らせる（設計 9.3.1、ADR-0085。止めない）。
+        # 書き換わったら知らせる（設計 9.3.1。止めない）。
         started = replace(found, started_at=fields["started_at"])
         where, failed = flow.record_digest(conf, root, started)
         if failed:
@@ -408,8 +408,7 @@ def _score_child(
         approval.read_child_record(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
         or {}
     )
-    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、この C1 で運ぶ
-    # （ADR-0093 の 4.3「そのほか」）。
+    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、この C1 で運ぶ。
     fsio.note_input(
         approval.child_record_path(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
     )
@@ -499,8 +498,8 @@ def _undecided(
 
     「1 つにしてから」だけだと、どのツリー上のチケットも追跡されたファイルなので、受け取った側に
     できることが読めない。本物とする側の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの親のブランチでは、本物とする側が親のブランチに決まって
-    いるので、3.6 の案内（ADR-0093）を出す。
+    それが決まらない理由を名指しする。取り込み済みの親子のチケットでは、本物とする側が親のブランチに決まって
+    いるので、取り込み状態から引いた解き方（`syncstate.guidance`）を出す。
     """
     home = hits[0].parent or hits[0].ticket
     stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
@@ -509,7 +508,7 @@ def _undecided(
         stderr.write(
             f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
             "上のチケットだけ"
-            "（取り込み済みの親のブランチ）。ほかのツリー上のチケットは読まない\n"
+            "（取り込み済みの親子のチケット）。ほかのツリー上のチケットは読まない\n"
         )
         for line in syncstate.guidance(root, st) if st.stop else []:
             stderr.write(f"  {line}\n")
@@ -558,27 +557,25 @@ def _find(
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """取り込み済みの親のブランチが決まらない・閉じているなら、言って True（ADR-0093 の 3.3・3.6）。
+    """取り込み済みの親子のチケットが決まらない・閉じているなら、言って True。
 
-    その親のブランチのチケットの状態の操作（着手・終了・取り消し・記録・レビューのマーカー）は止める。引いたチケットが
+    その親子のチケットの状態の操作（着手・終了・取り消し・記録・レビューのマーカー）は止める。引いたチケットが
     親のワークツリーの外にしか無いとき（元ツリーに未コミットで残ったチケットなど）も、信頼しないチケットを
-    動かさないように止める。取り込み状態の無い親のブランチには何も言わない（今の動きのまま。D11）。
+    動かさないように止める。取り込み状態の無い親子のチケットには何も言わない（今の動きのまま）。
     """
     st = approval.family_standing(conf, root, found)
     if not st.imported:
         return False
     if st.stop:
-        stderr.write(
-            f"ccnavi: {found.ticket}: {st.stop}。この親のブランチのチケットの状態は動かさない\n"
-        )
+        stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この親子のチケットの状態は動かさない\n")
         for line in syncstate.guidance(root, st):
             stderr.write(f"  {line}\n")
         return True
     if st.home is not None and not syncstate.same_tree(found.tree_root, st.home.root):
         stderr.write(
             f"ccnavi: {found.ticket}: チケットが親のブランチ {st.family} のワークツリーの外"
-            f"（{found.tree or 'ワークスペースルート'}）にしか無い。取り込み済みの親のブランチでは"
-            "親のブランチ上のチケットだけが本物なので、このチケットは動かさない\n"
+            f"（{found.tree or 'ワークスペースルート'}）にしか無い。"
+            "取り込み済みの親子のチケットでは親のブランチ上のチケットだけが本物なので、このチケットは動かさない\n"
             f"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
             "コミットと push をしてから打ち直す\n"
         )
@@ -637,10 +634,10 @@ def _parent_not_started(
 def _predecessors_unmet(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """子の先行が全部 `done/` に在って取り消しでないか（ADR-0088）。欠けていれば止めて言う。
+    """子の先行が全部 `done/` に在って取り消しでないか。欠けていれば止めて言う。
 
     承認でも同じ検査を当てるが、承認のあとに先行が動くこと（ユーザが `done/` から戻す）と、置き場を
-    手で動かして承認する運び（ADR-0058）があるので、着手の手前でもう一度見る。どの先行が何の
+    手で動かして承認する運びがあるので、着手の手前でもう一度見る。どの先行が何の
     状態か、どうすればよいかを 1 本ずつ言う。
     """
     unmet = approval.unmet_predecessors(found, approval.predecessor_pool(conf, root))
@@ -845,7 +842,7 @@ class Unfinished:
 
 
 def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinished | None:
-    """メインエージェントが終わろうとしたとき、`finish` を打ち忘れていそうなチケット（ADR-0087）。
+    """メインエージェントが終わろうとしたとき、`finish` を打ち忘れていそうなチケット。
 
     促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
 
@@ -885,7 +882,7 @@ def _own_commits(worktree: str, t: ticket_mod.Ticket) -> int:
 
     取り込んだだけのコミットは数えない。子なら親のブランチ（名前は親の識別子。子のブランチを識別子で
     引くのと同じ慣習、`review._unmet`）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
-    （`origin/HEAD`。ADR-0060）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
+    （`origin/HEAD`。セッションの頭で進める）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
     （`--no-merges`）。子で親のブランチを引けなければ、自分のものか決まらないので 0 を返す。
     親で `origin/HEAD` が無い（リモートの無いリポジトリ）ときは、除くものが無いので基準点の先を
     全部数える。
@@ -925,7 +922,7 @@ def _nudge_path(state_dir: str, session: str) -> str:
 
 
 def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
-    """このセッションで、同じチケットを同じ HEAD のまま促したことがあるか（ADR-0087）。"""
+    """このセッションで、同じチケットを同じ HEAD のまま促したことがあるか。促すのは 1 回だけ。"""
     data = fsio.read_dict(_nudge_path(state_dir, session)) or {}
     return data.get(found.ticket.ticket) == found.head
 

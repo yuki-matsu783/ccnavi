@@ -154,14 +154,15 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertEqual(extension_compat(), version.COMPAT)
 
     def test_v7_the_eli5_request_change_raised_the_compat_to_2(self):
-        """V7 ELI5 の依頼の形（ADR-0094〜0097）で sh と実行ファイルの契約が変わったので 2 以上。
+        """V7 ELI5 の依頼の形（`request` の `--eli5` と、wip/eli5/ のコミット済みの HTML）で
+        sh と実行ファイルの契約が変わったので 2 以上。
 
         古い sh（互換 1）と組み合わせると、食い違いとして知らせる。
         """
         self.assertGreaterEqual(version.COMPAT, 2)
 
     def test_v8_renaming_the_approve_flag_to_agree_raised_the_compat_to_3(self):
-        """V8 `--approve` を `--agree` に改名した（ADR-0099）ので 3 以上。
+        """V8 `--approve` を `--agree` に改名したので 3 以上。
 
         改名の前の sh（互換 2）は `--approve` を渡して落ちるので、食い違いとして知らせる。
         """

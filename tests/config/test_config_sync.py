@@ -1,4 +1,7 @@
-"""着手の前に共通層でプロジェクトの層を上書きする（設計 11.12、ADR-0084）。
+"""着手の前に共通層でプロジェクトの層を上書きする（設計 11.12）。
+
+共通層は各プロジェクトへ配る定義で、正本はプロジェクトの `.ccnavi/config/`。
+プロジェクト向けの親の `ticket start` で、違うファイルを共通層の中身で上書きする。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通層は
 rules / phases / risks の 3 本を持ち、lib はそれぞれ別の中身を持つ。app は層を持たない。
@@ -82,11 +85,11 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertEqual(mark["notified"], "")
 
     def test_the_start_c1_carries_the_synced_layer(self):
-        """D34: C1 の書いたパスの一覧（基点は親のワークツリー）で、着手のコピーは外でも通す。"""
+        """C1 の書いたパスの一覧（基点は親のワークツリー）で、着手のコピーは外でも通す。"""
         write(self.risk, COMMON_SCRIPT_RISK)
         write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
-        # 取り込み済みの親のブランチ（取り込み状態がある）の承認済みチケットは親のワークツリーに在る
-        # （2c）。提案を親のワークツリーに書いて承認し、それから取り込み状態を置く。
+        # 取り込み済みの親子のチケット（取り込み状態がある）の承認済みチケットは
+        # 親のワークツリーに在る。提案を親のワークツリーに書いて承認し、それから取り込み状態を置く。
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         text = ticket_text("i0001", project="lib", allow=SCOPE)
         write(os.path.join(tree, "wip", "proposals", "todo", "i0001.md"), text)

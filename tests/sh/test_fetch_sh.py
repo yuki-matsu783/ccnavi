@@ -5,7 +5,7 @@
 1. そのツリーがチェックアウトしているブランチを upstream まで ff で進める（承認済みチケットと
    マーカーが届く経路。設計 9.2）
 2. ワークツリーの起点になるデフォルトブランチを、チェックアウトされていなくても ff で進める
-   （ADR-0060）
+   （古い起点から枝が伸びないようにする）
 
 ワークスペースは一時ディレクトリに git と bare のリモートで作る。リモートを進めるのは
 別に clone した押し手で、ワークスペース側からは「他の機械が push した」ように見える。
@@ -302,11 +302,13 @@ class FetchTest(unittest.TestCase):
         self.assertIn("取ってこられなかった", done.stdout)
         self.assertEqual("", done.stderr.strip())
 
-    # ---- 取り込み済みの親のブランチ（ADR-0093 の 4.2。段階 2b）
+    # ---- 取り込み済みの親子のチケット
+    # SessionStart は親のワークツリーを早送りするだけで、merge はしない。
 
     def family(self, name="i0001", record=True):
-        """親のワークツリー .claude/worktrees/<name>
-        （親チケットを送ってある）と親のブランチの取り込み状態。"""
+        """親のワークツリー .claude/worktrees/<name>（親チケットを送ってある）と、
+        親子のチケットの取り込み状態。
+        """
         self.leave_main()
         tree = os.path.join(self.ws, ".claude", "worktrees", name)
         git(self.ws, "worktree", "add", "-q", tree, "-b", name, "main")
@@ -324,7 +326,7 @@ class FetchTest(unittest.TestCase):
 
     def test_a_family_is_fast_forwarded_past_unrelated_work_in_progress(self):
         # 前は未コミットの変更があるだけで進めなかった。
-        # 取り込み済みの親のブランチは重なりを git に任せる。
+        # 取り込み済みの親子のチケットでは重なりを git に任せる。
         tree = self.family()
         head = self.advance(self.remote, "i0001")
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
@@ -398,7 +400,7 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
 
     def test_the_budget_is_checked_before_fetching(self):
-        # 枠を過ぎたら fetch ごと飛ばして名指しする（レビューの中 9）。起点も進めない。
+        # 枠を過ぎたら fetch ごと飛ばして名指しする。起点も進めない。
         tree = self.family()
         before = self.sha(tree, "HEAD")
         main_before = self.sha(self.ws, "refs/heads/main")
@@ -413,7 +415,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("取りに行かなかった", done.stdout)
 
     def test_a_refusal_that_is_not_an_overlap_says_why(self):
-        # 重なっていないのに「重なる」と言わない（レビューの軽 19）。
+        # 重なっていないのに「重なる」と言わない。
         tree = self.family()
         before = self.sha(tree, "HEAD")
         self.advance(self.remote, "i0001")
@@ -425,7 +427,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("と重なる", done.stdout)
 
     def test_a_family_in_a_single_branch_clone_is_forwarded(self):
-        # origin の fetch の並びが main だけでも origin/P を進める（レビューの中 13）。
+        # origin の fetch の並びが main だけでも origin/P を進める（fetch に行き先を書く）。
         tree = self.family()
         git(self.ws, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
         head = self.advance(self.remote, "i0001")
@@ -433,7 +435,7 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(head, self.sha(tree, "HEAD"))
 
     def test_the_worktree_base_follows_the_integration_branch(self):
-        # 2 周目（ワークツリーの起点）は統合先に合わせる（決定 B6）。
+        # 2 周目（ワークツリーの起点）は統合先に合わせる。
         git(self.ws, "push", "-q", "origin", "main:develop")
         git(self.ws, "branch", "-q", "develop", "main")
         self.leave_main()
@@ -464,7 +466,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("nope（統合先）がリモートに無い", done.stdout)
 
     def test_a_worktree_without_a_record_keeps_the_old_rule(self):
-        # 取り込み状態の無い（取り込み済みでない）親のブランチは今までどおり。
+        # 取り込み状態の無い（取り込み済みでない）親子のチケットは今までどおり。
         # 書きかけがあれば進めない。
         tree = self.family(record=False)
         before = self.sha(tree, "HEAD")

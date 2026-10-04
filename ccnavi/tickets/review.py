@@ -107,7 +107,8 @@ CHANGES_REQUESTED = "CHANGES_REQUESTED"
 DISMISSED = "DISMISSED"
 APPROVED = "APPROVED"
 # ユーザごとの最新を選ぶ対象。コメントだけのレビュー（COMMENTED）と、書きかけ（PENDING）は判断を
-# 変えないので飛ばす（ADR-0093 の 11.8.1 の決定 A）。
+# 変えないので飛ばす。飛ばさないと、変更要求の後に同じユーザがコメントだけのレビューを出すと
+# 変更要求が消える。
 # 変更要求は同じユーザの Approve か dismiss まで残る
 _DECIDING = (APPROVED, CHANGES_REQUESTED, DISMISSED)
 
@@ -164,7 +165,7 @@ class Result:
 
     @classmethod
     def from_data(cls, data: object) -> Result:
-        """読んだ JSON の値から組む。Chrome は sh と同じ形の結果を組んで渡す（ADR-0093 の 8.9）。"""
+        """読んだ JSON の値から組む。Chrome は sh と同じ形の結果を組んで渡す。"""
         if not isinstance(data, dict):
             return cls(error="結果の最上位が辞書ではない")
         if data.get("error"):
@@ -254,8 +255,8 @@ def prepare(
     if synced:
         body = configsync.notice(synced) + body
     # 目印に、本文と親のブランチの先頭から作った鍵を入れる。sh は同じ目印の投稿が MR に
-    # 既にあれば投稿し直さない（打ち直し・C1 のやり直しで依頼を二重にしない。段階 2d の
-    # レビューの決定 D）。子を足してやり直した依頼は先頭が違うので、別の鍵になる。
+    # 既にあれば投稿し直さない（打ち直し・C1 のやり直しで依頼を二重にしない）。
+    # 子を足してやり直した依頼は先頭が違うので、別の鍵になる。
     head = gitcmd.run(tree_root, ["rev-parse", "HEAD"])
     key = hashlib.sha256(
         (body + "\n" + (head.out.strip() if head.ok else "")).encode("utf-8")
@@ -315,7 +316,7 @@ def mr_draft(parent: ticket_mod.Ticket) -> str:
     title = parent.title.strip() or parent.ticket
     lines = [f"Draft: {title}", ""]
     if parent.issue:
-        # 別のリポジトリの課題は `Closes owner/repo#N`（ADR-0093 の 3.1 の 8・8.7）
+        # 別のリポジトリの課題は `Closes owner/repo#N`（`issue:` に `owner/repo#N` を許している）
         lines += [f"Closes {ticket_mod.issue_label(parent)}", ""]
     lines += [
         f"チケット `{parent.ticket}`。ワークツリーは `.claude/worktrees/{parent.ticket}`。",
@@ -406,12 +407,13 @@ def requested(
 def reviewed_mark(
     mr: int, accepted: list[str], account: str = "", via: str = "", stamp: str = ""
 ) -> dict:
-    """レビュー済みのマーカーの中身（`phases/<親>/<N>.reviewed`。ADR-0093 の 8.9）。
+    """レビュー済みのマーカーの中身（`phases/<親>/<N>.reviewed`）。
 
-    `confirm`（コア）と `decide` が使う。欄の並びは 8.9 の `{mr, accepted, actor, via, at}`。
+    `confirm`（コア）と `decide` が使う。欄の並びは `{mr, accepted, actor, via, at}` で、
+    Chrome のレビュー済みも同じ形で書く。
     `actor` は付けたユーザ（アカウント）が分かるときだけ、`via` は経路が分かるときだけ書く
-    （Chrome は `via: chrome`。段階 2a の手元の経路はどちらも渡さず、マーカーは前と同じバイト列。
-    手元の `actor` と `via: cli` は `--actor` を入れる段で書く）。`stamp` が空なら `at` を
+    （Chrome は `via: chrome`。手元の `confirm` は `--actor` があるときだけ `actor` と `via: cli` を
+    渡し、無ければマーカーは前と同じバイト列）。`stamp` が空なら `at` を
     書かず、`approval.write_mark` が今の時刻を入れる。
     """
     mark: dict = {"mr": mr, "accepted": list(accepted)}
@@ -429,7 +431,7 @@ def matching_problems(result: Result | None, requested_mark: dict) -> list[str]:
     if result is None or result.mr is None:
         return ["ccnavi: 結果にマージリクエストが無い"]
     if not requested_mark.get("host") or not requested_mark.get("mr"):
-        # 照合できない依頼の記録で通すと、別の MR のスレッドでレビュー済みにできる（11.8.1 の 8）
+        # 照合できない依頼の記録で通すと、別の MR のスレッドでレビュー済みにできる
         return ["ccnavi: 依頼の記録にホストかマージリクエストの番号が無い。依頼し直してください"]
     if result.host != requested_mark.get("host"):
         return [
@@ -536,7 +538,7 @@ def _settle_children(
 ) -> bool:
     """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
 
-    ユーザが見たことの記録はマーカーで、場所の移動はそれに合わせたもの（ADR-0055）。
+    ユーザが見たことの記録はマーカーで、場所の移動はそれに合わせたもの。
     動かせなければ言って False。
 
     呼ぶ側はこれをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかった
@@ -781,7 +783,7 @@ def choose(
 
     残った指摘を見せて 1 件ずつ選ばせ、選択と指紋を `{"choices": …, "digest": …}` で書くだけ。
     何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <指紋>` で打つ
-    （ADR-0093 の段階 2d のレビューの決定 A。選ぶのを C1 のロックの外で済ませる）。
+    （選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たない）。
     """
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
     if d is None:
@@ -925,7 +927,7 @@ def decide_yes(
 
 
 def _decide_actor() -> tuple[str, str]:
-    """decide のマーカーに入れる (アカウント, 経路)（ADR-0093 の 8.9。段階 5）。
+    """decide のマーカーに入れる (アカウント, 経路)。
 
     アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（履歴の行の
     `actor`）。経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
@@ -1059,7 +1061,7 @@ def _write_decide_comment(
     followup: str,
 ) -> None:
     """MR に書き込む、決めた内容のコメント。issue の表記は sh が作ったあとに書き足す。"""
-    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）の指摘の対応方針:"]
+    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）指摘の対応方針:"]
     if picked[CHOICE_KEEP]:
         lines += [
             "",
@@ -1133,7 +1135,8 @@ def _reviewed_in_chat(
     あること（`mr` と宣言したフェーズを手軽な経路で通させない）と、フェーズが終わって
     いること、そして依頼が出ていないこと。依頼を出した先には指摘が付いているかもしれず、
     それを数えずに通す手段はここには用意しない（数えるのは `confirm`、受け入れるのは `decide`）。
-    実績のリスクが高ければマージリクエストを勧めるが、止めはしない（ADR-0065）。
+    実績のリスクが高ければマージリクエストを勧めるが、止めはしない（このセッションで受ける
+    レビューもマージリクエストと並ぶ道として残す）。
     """
     if accept_unresolved:
         stderr.write(
@@ -1246,7 +1249,7 @@ def ready(
     """Draft を外してよいかを確かめ、マーカーとコメントの下書きを置く。外すのは sh。
 
     条件は「親を閉じられる」と同じ（ops.close_problems）に、「親の承認済みチケットが `done/` に
-    ある」（ADR-0093 の 3.6）を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
+    ある」を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものはユーザが行う。
     """
@@ -1256,7 +1259,7 @@ def ready(
     problems = ops.close_problems(root, conf, parent.ticket)
     # 親のチケットが done/ に無いまま Draft を外すと、
     # そのままマージされたときに done/ に親が無いまま親のブランチが消え、
-    # 親のブランチの判定が「決まらない」になる（ADR-0093 の 3.6。厳しくする向き）。
+    # 親子のチケットの判定が「決まらない」になる。それを防ぐ（判定を厳しくする向き）。
     if parent.state != ticket_mod.DONE:
         problems.append(
             f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
@@ -1610,7 +1613,7 @@ def _approved_rel(conf: settings.Settings) -> str:
 
 
 def _own_places(conf: settings.Settings) -> tuple[str, ...]:
-    """ccnavi 自身が動かす置き場。承認済みチケットと提案の 2 つ（ADR-0055）。
+    """ccnavi 自身が動かす置き場。承認済みチケットと提案の 2 つ。
 
     チケットは 2 つの置き場を行き来するので、片方だけを外すと `finish` の移動
     （`doing/` → `review/`）が「ユーザが見るものが動いた」に数えられる。
@@ -1625,7 +1628,7 @@ def _is_own_place(conf: settings.Settings, path: str) -> bool:
 def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     """依頼の後に変わっても「ユーザが見るものが動いた」に数えない場所か。
 
-    ccnavi 自身の置き場と、ELI5 の HTML の置き場（`wip/eli5/`。ADR-0096）。ELI5 は依頼に添える
+    ccnavi 自身の置き場と、ELI5 の HTML の置き場（`wip/eli5/`）。ELI5 は依頼に添える
     説明で、成果物ではない（`ready` の前に消える）。直すたびに依頼し直させると、指摘を受けて
     説明を直すたびに依頼のコメントが増え、レビュー済みにしにくくなる。代わりに、
     直した ELI5 をユーザが見直す保証は無くなる。
@@ -1736,7 +1739,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
     # （`tree.relative` は書いたパスを返す）は `wip/eli5/` として通すのに、
     # git には `WIP/...` で入る。
     # 区別して見ると、それが既定のブランチまで残る。名前に `\` を含む 1 ファイル（`wip\eli5\x`。
-    # Linux / macOS では作れる）も `wip` の下と見なして止める（ADR-0097）。pathspec の `:(icase)` に
+    # Linux / macOS では作れる）も `wip` の下と見なして止める。pathspec の `:(icase)` に
     # 頼らず全部を `-z` で読んで絞るのは、`\` の名前を pathspec で拾えないのと、
     # git の版に依らないため。
     rc, tracked = _git(tree_root, ["ls-files", "-z"])
@@ -1882,8 +1885,8 @@ def _parent(
     if parent is None:
         stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
         return None
-    # 取り込み済みの親のブランチが決まらない・閉じているなら、
-    # 依頼・確認・行き先・早めに閉じたことのマーカーも置かない（ADR-0093 の 3.3・3.6）。
+    # 取り込み済みの親子のチケットが決まらない・閉じているなら、
+    # 依頼・確認・行き先・早めに閉じたことのマーカーも置かない。
     if ops.family_stopped(stderr, root, conf, parent):
         return None
     return parent
@@ -2025,7 +2028,7 @@ def _unresolved(
     受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。
 
     機構自身の投稿と見るのは、GitLab から取得した結果で、本文が目印で始まり、
-    書いたのが依頼を投稿したアカウント（`poster`）のときだけ（ADR-0093 の 11.8.1 の決定 C）。
+    書いたのが依頼を投稿したアカウント（`poster`）のときだけ。
     GitHub の依頼は MR のコメントでスレッドにならないので、
     目印で始まるスレッドはユーザが書いたものとして数える。
     投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
@@ -2100,7 +2103,7 @@ def moved_since(
 ) -> str:
     """依頼の後に、ユーザが見るものが動いたか（`_moved_since_request` の読みを除いた判定）。
 
-    手元の confirm と Chrome のレビュー済み（ADR-0093 の 8.9）が同じこの関数で決める。
+    手元の confirm と Chrome のレビュー済みが同じこの関数で決める。
     `head` は親のブランチの今の先頭。`changed` は依頼時の先頭（マーカーの `head`）から `head` までに
     変わったパスで、置き場で絞る前のもの。読めなかった（差分を取れない、ホストの一覧が
     打ち切られた、依頼時のコミットが祖先でない）なら None で、動いたと数える。
@@ -2117,7 +2120,7 @@ def moved_since(
     # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
     if not _is_sha(recorded) or changed is None:
         return moved
-    # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、ユーザが見るものを動かさない（ADR-0096）。
+    # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、ユーザが見るものを動かさない。
     if any(not _unseen_by_review(conf, path) for path in changed):
         return moved
     return ""

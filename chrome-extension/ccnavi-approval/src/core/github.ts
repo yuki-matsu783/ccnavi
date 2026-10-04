@@ -1,9 +1,9 @@
 /**
- * GitHub の読み書き（ADR-0093 の 8.2・8.4・8.8）。service worker だけが呼ぶ。PAT は引数で受け、外へ返さない。
+ * GitHub の読み書き。service worker だけが呼ぶ。PAT は引数で受け、外へ返さない。
  *
- * 操作は名前で限る（5.5 の 4）。画面から来るのは操作の名前と引数だけで、URL・クエリ・ヘッダは
+ * 操作は名前で限る。画面から来るのは操作の名前と引数だけで、URL・クエリ・ヘッダは
  * ここで組む。GraphQL の問い合わせは固定の文で、引数は変数で渡す（文に継ぎ足さない）。
- * 書くのは `createCommitOnBranch`（`expectedHeadOid` つき）の 1 つだけ（段階 3）。
+ * 書くのは `createCommitOnBranch`（`expectedHeadOid` つき）の 1 つだけ。
  */
 import type { Host } from "./hosts.js";
 
@@ -11,14 +11,14 @@ export type Fetch = (url: string, init: { method: string; headers: Record<string
   status: number;
   ok: boolean;
   json(): Promise<unknown>;
-  /** 応答ヘッダ。PAT の期限（`github-authentication-token-expiration`）を読む（5.5・D25） */
+  /** 応答ヘッダ。PAT の期限（`github-authentication-token-expiration`）を読む */
   headers?: { get(name: string): string | null };
 }>;
 
 /** PAT の期限を返す応答ヘッダ（GitHub の fine-grained / classic のトークン） */
 export const EXPIRATION_HEADER = "github-authentication-token-expiration";
 
-/** 呼んだ回数。読み取り量の見積もり（8.2）と突き合わせるために数える */
+/** 呼んだ回数。読み取り量の見積もりと突き合わせるために数える */
 export interface Counter {
   rest: number;
   graphql: number;
@@ -33,7 +33,7 @@ export class HostError extends Error {
   }
 }
 
-/** 1 回の GraphQL で取る blob の上限（8.2） */
+/** 1 回の GraphQL で取る blob の上限 */
 export const BLOB_BATCH = 50;
 /** 直近のブランチを読むページの上限。100 × 10 本を超えるリポジトリは古い方を諦める */
 const REF_PAGES = 10;
@@ -237,7 +237,7 @@ function repoPath(owner: string, repo: string): string {
   return `/repos/${encodeURIComponent(checkName(owner, "owner"))}/${encodeURIComponent(checkName(repo, "repo"))}`;
 }
 
-/** リポジトリのデフォルトブランチ（3.3 の統合先の既定） */
+/** リポジトリのデフォルトブランチ（統合先を設定していないときの既定） */
 export async function repoInfo(client: Client, owner: string, repo: string): Promise<{ defaultBranch: string }> {
   const { status, body } = await rest(client, repoPath(owner, repo));
   if (status === 404) {
@@ -275,7 +275,7 @@ export interface RecentRef {
   readonly committedDate: string;
 }
 
-/** `since` より後に先頭が動いたブランチ（表示用。D2） */
+/** `since` より後に先頭が動いたブランチ（表示用） */
 export async function recentRefs(client: Client, owner: string, repo: string, since: Date): Promise<RecentRef[]> {
   const out: RecentRef[] = [];
   let after: string | null = null;
@@ -357,7 +357,7 @@ export interface TreeEntry {
 /** シンボリックリンクの mode。中身は指す先のパスなので、ファイルとして読まない（12） */
 export const LINK_MODE = "120000";
 
-/** tree を再帰で読む。`truncated` なら取り切れないので止める（8.2） */
+/** tree を再帰で読む。`truncated` なら取り切れないので止める */
 export async function tree(client: Client, owner: string, repo: string, oid: string): Promise<TreeEntry[]> {
   const { status, body } = await rest(client, `${repoPath(owner, repo)}/git/trees/${checkOid(oid)}?recursive=1`);
   if (status === 404) {
@@ -381,7 +381,7 @@ export interface BlobText {
   readonly binary: boolean;
 }
 
-/** blob を sha でまとめて取る（8.2。1 回に最大 50 件） */
+/** blob を sha でまとめて取る（1 回に最大 50 件） */
 export async function blobs(client: Client, owner: string, repo: string, oids: readonly string[]): Promise<Record<string, BlobText>> {
   if (oids.length > BLOB_BATCH) {
     throw new HostError(`blob は 1 回に ${BLOB_BATCH} 件まで`);
@@ -414,7 +414,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
       out[oid] = { text: null, binary: true };
       return;
     }
-    // 本文が途中で切られていたら「無い」とも「空」とも読ませない（6.2 の NOT_FETCHED と同じ考え）。
+    // 本文が途中で切られていたら「無い」とも「空」とも読ませない（取っていないファイルと同じ扱い）。
     if (typeof b.byteSize === "number" && encoder.encode(b.text).length !== b.byteSize) {
       throw new HostError(`blob ${oid} の本文が大きさと合わない（取り切れていない）`);
     }
@@ -423,7 +423,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   return out;
 }
 
-// ---- 段階 3: 書き込みと、取り下げのための履歴・MR の Approve・PAT の期限 ----------------------
+// ---- 書き込みと、取り下げのための履歴・MR の Approve・PAT の期限 ----------------------
 
 /** 期限のヘッダの表記（`2026-12-31 00:00:00 UTC`・`2026-12-31 09:00:00 +0900`）を ISO にする。読めなければ空 */
 export function parseExpiration(text: string): string {
@@ -436,7 +436,7 @@ export function parseExpiration(text: string): string {
 
 const VIEWER = `query { viewer { login } }`;
 
-/** PAT の持ち主のアカウント名（状態の履歴の `actor`。8.8・8.9） */
+/** PAT の持ち主のアカウント名（状態の履歴の `actor`） */
 export async function viewer(client: Client): Promise<string> {
   const data = await graphql(client, VIEWER, {});
   const login = (data.viewer as { login?: unknown } | undefined)?.login;
@@ -457,7 +457,7 @@ export interface FileAddition {
 }
 
 /**
- * 親のブランチへ 1 コミットで書く（8.4）。`expectedHeadOid` が先頭と違えば GitHub が断るので、
+ * 親のブランチへ 1 コミットで書く。`expectedHeadOid` が先頭と違えば GitHub が断るので、
  * そのまま競合の検出になる（Git Data API + PATCH refs は使わない）。答えは新しいコミットの sha。
  */
 export async function createCommit(
@@ -524,9 +524,9 @@ export async function firstParentChain(client: Client, owner: string, repo: stri
 }
 
 /**
- * 承認コミット（8.8 の 2）: `sha` から遡って `path`（`doing/<識別子>.md`）を最後に変えたコミットが、
+ * 承認コミット: `sha` から遡って `path`（`doing/<識別子>.md`）を最後に変えたコミットが、
  * 最初の親に `path` が無く自分には在る（足した）コミットで、親が 1 つで、`sha` の first-parent の鎖の上に
- * あるときだけ、そのコミットと親を返す（決定 B）。どれかを確かめられなければ null（取り下げを出さない）。
+ * あるときだけ、そのコミットと親を返す。どれかを確かめられなければ null（取り下げを出さない）。
  *
  * 「足した」はコミットの変更の一覧（`files` の `status`）に頼らない。GitHub は承認コミット（提案の削除と
  * 承認済みのチケットの追加）を `renamed` と返すことがあり、一覧は 300 件で切れるため。両方の木で `path` を引いて比べる。
@@ -556,7 +556,7 @@ export async function commitParents(client: Client, owner: string, repo: string,
   return parents.map((p) => checkOid(p.sha));
 }
 
-/** 親のブランチの開いた MR に付いている Approve（8.10）。付いていれば、書くと外れうることを出す */
+/** 親のブランチの開いた MR に付いている Approve。付いていれば、書くと外れうることを出す */
 export async function pullApprovals(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; approvals: number }[]> {
   const head = encodeURIComponent(`${checkName(owner, "owner")}:${checkBranch(branch)}`);
   const { items: pulls } = await restPages(client, `${repoPath(owner, repo)}/pulls?head=${head}&state=open&per_page=30`, 3);
@@ -576,7 +576,7 @@ export async function pullApprovals(client: Client, owner: string, repo: string,
   return out;
 }
 
-// ---- 段階 4: レビュー済み（8.9）。MR のスレッドとレビューを取得した結果と、依頼の後の変更の一覧 --------------
+// ---- レビュー済み。MR のスレッドとレビューを取得した結果と、依頼の後の変更の一覧 --------------
 
 /** スレッド 1 つ（`ccnavi-review.sh` の `threads` と同じ形） */
 export interface ReviewThread {
@@ -587,7 +587,7 @@ export interface ReviewThread {
   readonly line: number;
   readonly body: string;
   readonly created_at: string;
-  /** 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（11.8.1 の決定 C） */
+  /** 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（目印は誰でも書けるので書き手で見る） */
   readonly author?: string;
 }
 
@@ -694,7 +694,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
 }
 
 /**
- * 親のブランチの MR のスレッドとレビューを取得した結果（8.9）。`ccnavi-review.sh fetch` と同じ形で、
+ * 親のブランチの MR のスレッドとレビューを取得した結果。`ccnavi-review.sh fetch` と同じ形で、
  * 同じ見本（test/fixtures/host/github/）から同じ結果になることを試験が見る。MR が無ければ投げる。
  */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
@@ -709,7 +709,7 @@ export async function reviewCopy(client: Client, owner: string, repo: string, br
 export const COMPARE_FILES_LIMIT = 300;
 
 /**
- * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス（8.9）。改名は元と先の両方を入れる（手元の
+ * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス。改名は元と先の両方を入れる（手元の
  * `--no-renames` と同じ）。読めない・打ち切られた・`base` が祖先でない（`ahead`・`identical` でない）なら
  * `files` は null で、Python が「動いた」と数える。
  */
@@ -731,7 +731,7 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   return { base: b, head: h, files };
 }
 
-// ---- 段階 5: 「始める」（8.6）。issue の一覧と、親のブランチを作る -------------------------------
+// ---- 「始める」。issue の一覧と、親のブランチを作る -------------------------------
 
 /** 全部のブランチの名前を読むページの上限（100 × 50）。超えたら読み切れないので止める（「始める」の重なりの検査） */
 export const BRANCH_PAGES = 50;

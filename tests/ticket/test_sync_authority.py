@@ -1,9 +1,9 @@
-"""取り込み済みの親のブランチで本物とする側（ADR-0093 の 3.3〜3.6。段階 2c）。
+"""取り込み済みの親子のチケットで本物とする側。
 
-親のブランチの取り込み状態（`<state の置き場>/sync/<リポジトリ>/families/<P>`）がある親のブラン
-チは、本物とする側を親のブランチ（`.claude/worktrees/<P>` で HEAD が `<P>` を指すツリー）に固定し、
+取り込み状態（`<state の置き場>/sync/<リポジトリ>/families/<P>`）がある親子のチケットは、
+本物とする側を親のブランチ（`.claude/worktrees/<P>` で HEAD が `<P>` を指すツリー）に固定し、
 決まらなければ承認も状態の操作も実行前チェックも止める。
-取り込み状態の無い親のブランチは前と同じ答え（D11）。
+取り込み状態の無い親子のチケットは前と同じ答え。
 
 取り込み状態は sh（`ccnavi-sync.sh`）が書くものを、ここでは手で置く。
 判定は git もネットワークも使わない。
@@ -193,8 +193,10 @@ class AuthorityHarness(PhaseHarness):
 
 
 class NoRecordTest(AuthorityHarness):
-    """取り込み状態の無い親のブランチは前と同じ答え（D11）。`sync/` があっても、
-    その親のブランチの取り込み状態が無ければ同じ。"""
+    """取り込み状態の無い親子のチケットは前と同じ答え。
+
+    `sync/` があっても、その親子のチケットの取り込み状態が無ければ同じ。
+    """
 
     def stable_board(self):
         # 生成の時刻は秒で変わるので外す（秒の境目で比べがぶれない）。
@@ -219,7 +221,7 @@ class NoRecordTest(AuthorityHarness):
         )
         self.assertEqual(before[:3], after[:3])
         self.assertNotEqual("deny", after[0])
-        # lint は他の親のブランチ（i0099）の取り込み状態と、
+        # lint は他の親子のチケット（i0099）の取り込み状態と、
         # 取り込んだ形跡があるのに統合先の取り込み結果が無いことだけを足して言う。
         extra = [
             p
@@ -254,7 +256,8 @@ class PresentTest(AuthorityHarness):
         raise AssertionError(f"{ticket} が板に無い")
 
     def test_a_copy_only_outside_the_parent_tree_is_not_trusted(self):
-        # 元ツリー（ワークスペースルート）に未コミットで残ったチケット（ADR-0073 の形）。
+        # 元ツリー（ワークスペースルート）に未コミットで残ったチケット。
+        # 本物とする側のツリーが無いときに元ツリーを採る形。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
         stray = os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001-02.md")
         with open(
@@ -286,7 +289,7 @@ class PresentTest(AuthorityHarness):
         lines = check.stdout.splitlines()
         self.assertEqual("check 1", lines[0])
         self.assertTrue(lines[1].startswith("error "), check.stdout)
-        # ユーザが運ぶ手順も言う（3.5）。
+        # ユーザが運ぶ手順も言う。
         self.assertIn("運んでコミットと push", check.stdout)
 
     def test_a_proposal_outside_the_parent_tree_is_not_approved(self):
@@ -312,7 +315,7 @@ class PresentTest(AuthorityHarness):
         self.assertIn("切り直して", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
-        # 子のチケットが親のワークツリーから消え、元ツリーにだけ残った形（ADR-0073 の形）。
+        # 子のチケットが親のワークツリーから消え、元ツリーにだけ残った形。
         inside = os.path.join(self.approved, "doing", "i0001-01.md")
         with open(inside, encoding="utf-8") as f:
             text = f.read()
@@ -405,16 +408,16 @@ class UndecidedTest(AuthorityHarness):
 
 
 class TombstoneTest(AuthorityHarness):
-    """親のブランチの取り込み状態は墓標として残り、親のワークツリーを片付けても止めが外れない。
+    """親子のチケットの取り込み状態は墓標として残り、親のワークツリーを片付けても止めが外れない。
 
-    レビューの決定 A。
+    消すと、決まらないで止めていた親子のチケットが取り込み状態の無い扱いに戻り、止めが外れる。
     """
 
     def test_folding_the_parent_tree_does_not_lift_the_stop(self):
         self.record("gone")
         stray = os.path.join(self.root, ".ccnavi", "approved", "doing")
         os.makedirs(stray)
-        # 元ツリーに同じ親のブランチのチケットを残して、親のワークツリーを片付ける。
+        # 元ツリーに同じ親子のチケットを残して、親のワークツリーを片付ける。
         for name in ("i0001.md", "i0001-01.md"):
             with open(os.path.join(self.approved, "doing", name), encoding="utf-8") as f:
                 write(os.path.join(stray, name), f.read())
@@ -439,7 +442,7 @@ class TombstoneTest(AuthorityHarness):
         self.assertTrue(st.stop and not st.closed, st)
         self.assertIn("片付けても残る", st.stop)
         # 統合先の取り込み結果の done/ に親のチケットがあれば、
-        # 親のブランチの取り込み状態に頼らず閉じた親のブランチ（墓標は何も言わない）。
+        # 親子のチケットの取り込み状態に頼らず閉じた親子のチケット（墓標は何も言わない）。
         base = os.path.join(self.state, "sync", "self", "integration")
         write(os.path.join(base, "head"), "branch main\nsha abc\n")
         write(
@@ -536,10 +539,8 @@ class MarkTest(AuthorityHarness):
     def test_a_same_named_tree_in_another_repository_is_not_guessed(self):
         """取り込み状態が 1 つでも、同じ名前の親のワークツリーが別のリポジトリにあれば決めない。
 
-        11.9.3 の 13。
-
         ワークスペースのユーザの付けた名前 `web-i0012` と、プロジェクト web の issue 12
-        の親のブランチが並ぶ形。
+        の親子のチケットが並ぶ形。
         """
         from ccnavi.infra import tree
 
@@ -591,8 +592,9 @@ class IntegrationDoneTest(AuthorityHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         self.assertIn("i0001-02", [b["ticket"] for b in self.preview()["batch"]])
-        # 親のブランチの取り込み状態が無くても、
-        # 取り込んだ形跡のあるリポジトリなら統合先の done/ で確かめる（3.3 の 4）。
+        # 親子のチケットの取り込み状態が無くても、取り込んだ形跡のあるリポジトリなら
+        # 統合先の done/ で確かめる。古い統合先から切ったブランチで、識別子の再利用を
+        # 新規として通さないため。
         self.integration_done("i0001-02")
         preview = self.preview()
         self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
@@ -605,7 +607,7 @@ class IntegrationDoneTest(AuthorityHarness):
         self.assertTrue(any("i0001-02" in p["detail"] for p in lint["problems"]))
 
     def test_a_new_family_cannot_reuse_a_closed_identifier(self):
-        # 取り込み状態の無い新しい親のブランチ（別の親）の識別子が、統合先の done/ で閉じている。
+        # 取り込み状態の無い新しい親子のチケット（別の親）の識別子が、統合先の done/ で閉じている。
         self.propose("i0005", parent_text("i0005", ["research"]))
         self.commit_parent()
         self.assertIn("i0005", [b["ticket"] for b in self.preview()["batch"]])
@@ -618,8 +620,8 @@ class IntegrationDoneTest(AuthorityHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
         base = os.path.join(self.state, "sync", "self")
-        # 取り込んだ形跡（親のブランチの取り込み状態）はあるのに統合先の取り込み結果が無い
-        # （最初の push で親のブランチの取り込み状態ができた直後など）。
+        # 取り込んだ形跡（親子のチケットの取り込み状態）はあるのに統合先の取り込み結果が無い
+        # （最初の push で親子のチケットの取り込み状態ができた直後など）。
         self.record("present")
         preview = self.preview()
         self.assertNotIn("i0001-02", [b["ticket"] for b in preview["batch"]])
@@ -644,7 +646,7 @@ class IntegrationDoneTest(AuthorityHarness):
 class PredecessorTest(AuthorityHarness):
     def test_an_undecided_predecessor_family_is_not_met(self):
         # 先行 i0002-01 は元ツリーの done/ にある（前の池では満たす）。
-        # 親のブランチ i0002 は取り込み済みだが親のワークツリーが無い（決まらない）ので、
+        # 親子のチケット i0002 は取り込み済みだが、親のワークツリーが無い（決まらない）ので、
         # 満たしたとみなさない。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done", "i0002-01.md"),
@@ -663,7 +665,7 @@ class PredecessorTest(AuthorityHarness):
         after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertNotIn("i0001-02", [b["ticket"] for b in after["batch"]])
         self.assertTrue(
-            any("親のブランチが決まらない" in " ".join(r["problems"]) for r in after["rejected"]),
+            any("親子のチケットが決まらない" in " ".join(r["problems"]) for r in after["rejected"]),
             after,
         )
 
@@ -697,7 +699,7 @@ class ReadyTest(AuthorityHarness):
 
 
 class DigestTest(AuthorityHarness):
-    """承認の指紋は判定が読んだ中身（read_set）で作る（ADR-0093 の 6.2。段階 2c）。"""
+    """承認の指紋は判定が読んだ中身（read_set）で作る。"""
 
     def judged(self):
         conf = self.conf()

@@ -1,4 +1,4 @@
-"""前の名前 `--approve`（ADR-0099 で `--agree` に改名）の扱い。
+"""前の名前 `--approve`（`--agree` に改名した）の扱い。
 
 案内を標準エラーに出して終了コード 2 で終わる。別名ではないので、承認の処理は
 呼ばれない。ヘルプにも `--version` の flags 一覧（契約）にも出ない。
@@ -31,7 +31,7 @@ class ApproveRenamedTest(unittest.TestCase):
             with self.subTest(argv=argv):
                 result = run_ccnavi(argv, input="", cwd=ROOT)
                 self.assertEqual(2, result.returncode)
-                self.assertIn("--agree に改名しました（ADR-0099）", result.stderr)
+                self.assertIn("--agree に改名しました。", result.stderr)
                 self.assertIn("ccnavi-agree.sh", result.stderr)
                 self.assertEqual("", result.stdout)
 

@@ -1,4 +1,6 @@
-"""ホストの応答の見本を返す GitLab の代役（ADR-0093 の 8.9。段階 5）。
+"""ホストの応答の見本を返す GitLab の代役。
+
+Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。
 
 見本は `chrome-extension/ccnavi-approval/test/fixtures/host/gitlab/<場面>/` にある。拡張の試験
 （`test/helpers/gitlab-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
@@ -15,7 +17,8 @@
 - 依頼の投稿（`GET`/`POST .../merge_requests/<iid>/notes`）は、状態のファイル（環境変数
   `FAKE_GITLAB_STATE`）に溜めて返す。投稿したアカウントは id 201
   （名前は `FAKE_GITLAB_POSTER`、既定 `lab-bot`）。
-  見本に置かない（依頼の記録の `poster` を試すため。11.8.1 の決定 C）
+  見本に置かない（依頼の記録の `poster` を試すため。ccnavi の依頼のスレッドを未解決から除くのは、
+  依頼を投稿したアカウントが書いたときだけ）
 - ほかは 404
 - `FAKE_GITLAB_NO_PROJECT` を立てると、プロジェクトそのもの（`GET /projects/<パス>`）を 404 にする
 

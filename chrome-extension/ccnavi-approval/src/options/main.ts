@@ -2,8 +2,8 @@
  * 設定画面。リポジトリ（統合先の名前・直近 N 日・指定のブランチ）と PAT を登録する。
  *
  * PAT は service worker に渡して置かせ、この画面では読み返さない（登録済みかと期限だけを聞く）。
- * 期限（D25）はホストの応答から読む。読めないときのために、登録のときに日付を入れられる。
- * 通信先は埋め込んだ一覧から選ぶだけで、ここで足せない（D24）。
+ * 期限はホストの応答から読む。読めないときのために、登録のときに日付を入れられる。
+ * 通信先は埋め込んだ一覧から選ぶだけで、ここで足せない。
  */
 import type { Response, TokenStatus } from "../core/protocol.js";
 import { normalizeRepo, readRepos, repoKey, type RepoConfig } from "../core/settings.js";

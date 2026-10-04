@@ -1,13 +1,13 @@
 /**
  * 見本のリポジトリ。模擬の GitHub（test/helpers/mock-github.ts）がこれを API で返す。
  *
- * - `main`（統合先）: 共通層、互換のマーカー、閉じた親のブランチ i0005 の `done/`
- * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01（開いた親のブランチ。直近の外なので閉包で読む）と
+ * - `main`（統合先）: 共通層、互換のマーカー、閉じた親子のチケット i0005 の `done/`
+ * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01（開いた親子のチケット。直近の外なので閉包で読む）と
  *   i0005-01（統合先で閉じている。そこで止まる）
  * - `i0002`（直近）: 悪意のある Markdown を本文に持つ親の提案と、範囲が親の外に出る子（承認の対象にしない）。
  *   子の先行 i0007-01 の親のブランチは無い
  * - `i0003`（古い）: 親と子の提案。表示用のブランチには入らない
- * - `feature-x`（直近）: コードだけのブランチ（親のブランチではない）
+ * - `feature-x`（直近）: コードだけのブランチ（親子のチケットのブランチではない）
  */
 
 import { COMPAT } from "../helpers/compat.js";
@@ -117,7 +117,7 @@ function done(id: string, parentId: string | null, phase: number | null): string
   ].join("\n");
 }
 
-/** 悪意のある Markdown（ADR-0093 の 5.5 の 6）。描いても何も動かないことを試験が見る */
+/** 悪意のある Markdown。描いても何も動かないことを試験が見る */
 export const HOSTILE_MARKDOWN = [
   "# 悪意のある本文",
   "",
@@ -190,7 +190,7 @@ export function fixture(compat = COMPAT): Record<string, FixtureBranch> {
       committedDate: "2026-09-01T00:00:00Z",
       files: {
         ...main,
-        "wip/proposals/todo/i0003.md": parent("i0003", "古い家族 i0003", "古い本文\n", ["research"]),
+        "wip/proposals/todo/i0003.md": parent("i0003", "古い親子のチケット i0003", "古い本文\n", ["research"]),
         "wip/proposals/todo/i0003-01.md": child("i0003-01", "i0003", 1, "wip/research/*"),
       },
     },
@@ -201,7 +201,7 @@ export function fixture(compat = COMPAT): Record<string, FixtureBranch> {
   };
 }
 
-/** 承認済みのチケット（作業中の親、レビュー待ちの子）。段階 4 のレビュー済みの見本 */
+/** 承認済みのチケット（作業中の親、レビュー待ちの子）。レビュー済みの見本 */
 function approvedCopy(id: string, parentId: string | null, lines: string[], phases = 1, phase = 1): string {
   return [
     "---",
@@ -231,7 +231,7 @@ function approvedCopy(id: string, parentId: string | null, lines: string[], phas
 }
 
 /**
- * レビューを依頼したフェーズを持つ親のブランチ（段階 4）。親は作業中（計画は MR で見る design の 1 フェーズ）、
+ * レビューを依頼したフェーズを持つ親子のチケット。親は作業中（計画は MR で見る design の 1 フェーズ）、
  * 子はレビュー待ち。依頼のマーカーは `requested`（`head` は依頼時の先頭。見本を積んでから書く）
  */
 export function reviewFamilyFiles(id: string, phases = 1): Record<string, string> {
@@ -246,19 +246,19 @@ export function reviewFamilyFiles(id: string, phases = 1): Record<string, string
   return out;
 }
 
-/** 依頼のマーカー（`ccnavi review requested` が置く形）。GitLab は依頼を投稿したアカウント（`poster`）も持つ（11.8.1 の決定 C） */
+/** 依頼のマーカー（`ccnavi review requested` が置く形）。GitLab は依頼を投稿したアカウント（`poster`）も持つ */
 export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" = "github", poster = ""): string {
   const url = host === "gitlab" ? `https://gitlab.com/acme/widgets/-/merge_requests/${mr}#note_1` : `https://github.com/acme/widgets/pull/${mr}#issuecomment-1`;
   return JSON.stringify({ head, mr, url, host, since: "2026-09-29T00:00:00Z", ...(poster ? { poster } : {}) });
 }
 
 /**
- * プロジェクトのリポジトリ（段階 5。手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
+ * プロジェクトのリポジトリ（手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
  *
- * - `main`（プロジェクトの統合先）: 閉じた親のブランチ web-i0003 の `done/` とプロジェクトの層（rules.yml だけ）。
+ * - `main`（プロジェクトの統合先）: 閉じた親子のチケット web-i0003 の `done/` とプロジェクトの層（rules.yml だけ）。
  *   共通層・置き場のパス・互換のマーカーはワークスペース（`fixture()` の `main`）から読む
  * - `web-i0012`（直近）: issue #12 から始めた親と子の提案
- * - `web-i0012` の上の `.ccnavi/config/phases.yml` は読まない（置き場の外。3.3 の 6）
+ * - `web-i0012` の上の `.ccnavi/config/phases.yml` は読まない（置き場の外）
  */
 export function projectFixture(): Record<string, FixtureBranch> {
   const main = {

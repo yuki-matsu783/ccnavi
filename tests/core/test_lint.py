@@ -50,7 +50,7 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     if allow:
         body["allow"] = [ALLOWED]
     # 置くのは共通層の既定の場所。検証は `--rules` で指せるが、同じファイルを hook の
-    # 判定にも掛けるテストがあり、そちらには届かない（ADR-0067）。
+    # 判定にも掛けるテストがあり、そちらには届かない。
     return write(directory, common_relpath("rules"), json.dumps(body, indent=2))
 
 
@@ -388,7 +388,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("BOM (U+FEFF)", result.stdout)
 
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
-        # 承認を本物とするのは置き場（ADR-0058）。`.ccnavi/approved/` は組み込みの保護が
+        # 承認を本物とするのは置き場。`.ccnavi/approved/` は組み込みの保護が
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
         # 読む。端末もボードも無いユーザが、置き場を動かすだけで承認できる方法。
         write(
@@ -404,7 +404,7 @@ class LintTest(unittest.TestCase):
 
     def test_レビュー待ちの置き場では承認の記録を求める(self):
         # `wip/proposals/review/` はエージェントが書ける側にある。保護が組み込みの deny
-        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の保護として残す（ADR-0058）。
+        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の保護として残す。
         write(
             os.path.join(self.root, "wip", "proposals", "review"),
             "i0001.md",

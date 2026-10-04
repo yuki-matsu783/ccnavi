@@ -3,7 +3,7 @@
  *
  * 目印は**種類の性質**を言うだけで、良し悪しは言わない。止まる・戻るを決めるのは実行ファイルと、
  * サブエージェントに渡る道具（AskUserQuestion はどのサブエージェントにも渡らない。入れ子の上限では
- * Agent ツールが渡らない。付録 C、ADR-0085）。
+ * Agent ツールが渡らない。付録 C）。
  */
 import { branchItems, dataText, nodeType, type FlowNode } from "../../core/flow-doc.js";
 

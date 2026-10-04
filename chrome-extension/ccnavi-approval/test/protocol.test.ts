@@ -1,5 +1,5 @@
 /**
- * service worker の約束（ADR-0093 の 5.5 の 4）: PAT を画面へ返さない、送り手を限る、操作を名前で限る。
+ * service worker の約束。PAT を画面へ返さない、送り手を限る、操作を名前で限る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

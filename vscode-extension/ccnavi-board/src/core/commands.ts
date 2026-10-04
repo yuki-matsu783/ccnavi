@@ -134,8 +134,8 @@ export function reviewedPrompt(
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
- * `parents` を渡すとその親のブランチのチケットだけを運ぶ（ADR-0093 の 4.6。取り込み済みの親のブランチのチケットだけが送られ、
- * そうでない親のブランチのチケットは今どおりユーザがコミットする）。
+ * `parents` を渡すとその親子のチケットだけを運ぶ（取り込み済みのものだけが送られ、
+ * そうでないものは今どおりユーザがコミットする）。
  */
 export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {
   const names = parents.map((p) => ` ${shellQuote(p)}`).join("");

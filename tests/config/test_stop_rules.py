@@ -1,8 +1,9 @@
 """`match: Stop` のルール（ターンの終わりに N 回に 1 度止めて文を渡す）の受入テスト。
 
-メインエージェントの Stop は、これまで `finish` の打ち忘れ（ADR-0087）のほかは止めなかった。
+メインエージェントの Stop は、これまで `finish` の打ち忘れのほかは止めなかった。
 `match: Stop` の `allow` のルールを書いたときだけ、渡す回（`every`）に `decision: block` で止め、
-ルールの文を `reason` に載せる（ADR-0090）。見るのは次のとおり。
+ルールの文を `reason` に載せる。Stop でモデルに文を届ける経路は、止めて `reason` に
+書くことしか無いため。見るのは次のとおり。
 
 1. 書いていなければ今までどおり止めない
 2. `every: N` で N 回に 1 度止める。本文のファイルも載る。数えはセッションごと
@@ -278,7 +279,10 @@ class StopRulesTest(unittest.TestCase):
             self.assertEqual(self.blocked(self.stop(cwd=cwd)), "")
 
     def test_a_stale_project_copy_of_the_common_rule_is_not_counted_twice(self):
-        """共通層のコピー（ADR-0084）が古くなって `every` が違っても、数えるのは共通層の 1 本。"""
+        """プロジェクトの層へ写した共通層が古くなって `every` が違っても、数えるのは共通層の 1 本。
+
+        共通層は親の着手でプロジェクトの層へ写すので、写した層が古いまま残ることがある。
+        """
         home = self.project()
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
         stale = {"version": 1, "allow": [stop_rule(additionalContext=NUDGE, every=3)]}

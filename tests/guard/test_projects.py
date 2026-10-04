@@ -148,7 +148,7 @@ class ProjectsTest(unittest.TestCase):
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = write(common_path(self.ws, "rules"), json.dumps(WS_RULES))
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
@@ -189,7 +189,7 @@ class ProjectsTest(unittest.TestCase):
         """実行ファイルを 1 回起動する。
 
         `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ有効な
-        （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
+        ので、置き場は `--root` の下の既定のまま。「`projects/` を
         数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -394,7 +394,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
 
     def test_project_skills_are_written_only_under_the_ticket_rules(self):
-        """docs/skills/（ADR-0091）は保護の外のふつうの場所。チケットの範囲の中でだけ書ける。
+        """docs/skills/ は保護の外のふつうの場所。チケットの範囲の中でだけ書ける。
 
         置き場を ccnavi ディレクトリの外にしたのは、組み込みの保護を緩めずに済ませるため。
         範囲に入れた子のワークツリーでは通り、範囲の外とチケットの無いワークツリーでは、
@@ -553,8 +553,10 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
     def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
-        """取り込み済みのプロジェクトの親のブランチ（取り込み状態は sync/<プロジェクト>/）も止まる
-        （2c）。"""
+        """取り込み済みのプロジェクトの親子のチケットも止まる。
+
+        取り込み状態は sync/<プロジェクト>/ に置く。
+        """
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
@@ -567,7 +569,7 @@ class ProjectsTest(unittest.TestCase):
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
         # ワークスペースの取り込み状態に同じ名前があっても、
-        # プロジェクトの親のブランチには当たらない。
+        # プロジェクトの親子のチケットには当たらない。
         record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
         write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
         write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")

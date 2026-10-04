@@ -113,7 +113,7 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
  * ワークスペースの設定は同じオプションに名札 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
  * `self` を名乗るプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
- * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
+ * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =
@@ -598,8 +598,8 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 }
 
 /**
- * 親のブランチが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
- * フローの保存の後、運ぶ処理を送るかを決めるのに使う（ADR-0093 の 4.6）。
+ * 親子のチケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * フローの保存の後、運ぶ処理を送るかを決めるのに使う。
  */
 export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
   const launcher = findLauncher(root, setting);

@@ -400,7 +400,7 @@ class DenyTest(GuardHarness):
     def judged(self, command, *flags, guard="enable"):
         """`--test --json` で 1 本判定し、当たったルールの id を返す。
 
-        hook の payload では共通層を動かせない（`--rules` は診断でだけ有効。ADR-0067）。
+        hook の payload では共通層を動かせない（`--rules` は診断でだけ有効）。
         試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を保護が
         追うかどうかは、こちらで見る（REQ-DIA-03）。
         """
@@ -415,7 +415,7 @@ class DenyTest(GuardHarness):
         """11.6: 共通層が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
 
         置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけ
-        （env は使われない。ADR-0052、ADR-0067）。それでも動かせる以上、
+        （env は使われず、フラグも診断でだけ有効）。それでも動かせる以上、
         保護は動かした先を追う（`common_shell_clause`）。名指しのツールは
         `common_layer_regex` が同じ先を追うので、こちらを外すと、同じファイルが
         `Write` では止まってシェルでは通る形になる。
@@ -484,7 +484,8 @@ class SetupTest(unittest.TestCase):
         os.makedirs(os.path.join(src, "dist", "ccnavi", "_internal"))
         write(binary, "#!/bin/sh\nexit 0\n")
         os.chmod(binary, 0o755)
-        # 置き場の名前になる目印と、hook が起動する振り分けの sh（ADR-0044）。
+        # 置き場の名前になる目印と、hook が起動する振り分けの sh。sh は `.ccnavi/scripts/` に置き、
+        # 実行ファイルは隣ではなく `../bin/<os>-<arch>/` に探す。
         write(os.path.join(src, "dist", "ccnavi.target"), platformtag.host_target() + "\n")
         os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
         shutil.copy(LAUNCHER, os.path.join(src, ".ccnavi", "scripts", "ccnavi-launcher.sh"))

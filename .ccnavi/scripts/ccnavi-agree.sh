@@ -4,7 +4,7 @@
 #   sh .ccnavi/scripts/ccnavi-agree.sh [<識別子>...]
 #
 # 承認そのものは ccnavi の `--agree`。承認された提案は todo/ から親チケットのツリーの
-# $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）の doing/ へ動く（ADR-0055）。そこは
+# $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）の doing/ へ動く（写しは作らない）。そこは
 # プロジェクトの git が追跡していて、コミットして push するまで他の機械には届かない（設計 9.2）。
 # A が承認して B の機械で作業する流れは、この push で成り立つ。
 #

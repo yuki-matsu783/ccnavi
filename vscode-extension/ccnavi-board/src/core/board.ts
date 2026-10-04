@@ -1,7 +1,7 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は 未着手 / 作業中 / 完了 / 取り消し。置き場（ADR-0055）との対応は、未着手 = `wip/proposals/todo/`、
+ * 列は 未着手 / 作業中 / 完了 / 取り消し。置き場との対応は、未着手 = `wip/proposals/todo/`、
  * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの属性で言う）、
  * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの。承認済みチケット・マーカー・
  * レビュー待ち・ワークツリーはカードのバッジで出す。止まっているかや承認待ちの判断はここでやり直さない。JSON が
@@ -111,7 +111,7 @@ export interface Card {
   /** 読み手が気づくべき食い違い */
   readonly issues: readonly string[];
   /**
-   * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（ADR-0058）。
+   * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。
    * `copyStatus` は `open` のままなので、列や承認済みのバッジからは分からない。
    */
   readonly blocked: string;
@@ -126,17 +126,17 @@ export interface Card {
    */
   readonly attention: boolean;
   /**
-   * 子のフロー（ADR-0085）。親は null。在るか・着手中で書けないかは実行ファイルの答えをそのまま持ち、
+   * 子のフロー。親は null。在るか・着手中で書けないかは実行ファイルの答えをそのまま持ち、
    * カードの「フロー」ボタンの言葉だけに使う。ユーザが動く必要（`attention`）には数えない
    */
   readonly flow: FlowJson | null;
   /**
-   * 状態の履歴の新しい側（古い順。ADR-0086）。補助の記録で、列やバッジはここから組まない。
+   * 状態の履歴の新しい側（古い順）。補助の記録で、列やバッジはここから組まない。
    * カードの折りたためる「履歴」に並べるだけ
    */
   readonly history: readonly HistoryEntryJson[];
   /**
-   * 満たしていない先行（ADR-0088）。空でなければ、承認も着手も止まる。実行ファイルの答えをそのまま持ち、
+   * 満たしていない先行。空でなければ、承認も着手も止まる。実行ファイルの答えをそのまま持ち、
    * カードの「先行待ち」のバッジに使う
    */
   readonly predecessorsUnmet: readonly PredecessorUnmetJson[];

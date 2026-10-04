@@ -8,7 +8,7 @@
 export const BOARD_VERSION = 1;
 
 /**
- * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`、ADR-0055）だが、
+ * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
  * 列は 未着手（`todo/`）/ 作業中（`approved/doing/` と `review/`）/ 完了（`approved/done/`）/ 取り消し
  * （`approved/done/` で `cancelled_at` を持つ）の 4 つ。レビュー待ちは列ではなくカードの属性で分かる
  */
@@ -57,9 +57,9 @@ export interface SeenInJson {
 }
 
 /**
- * 子チケットのフロー（設計 9.3.1、ADR-0085）。親は null。
+ * 子チケットのフロー（設計 9.3.1）。親は null。
  * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
- * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない（ADR-0035）。
+ * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
   /** 読む先の絶対パス（本物とする側のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ本物とする側のツリーのパス） */
@@ -75,7 +75,7 @@ export interface FlowJson {
 }
 
 /**
- * 状態の履歴の 1 行（ADR-0086）。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
+ * 状態の履歴の 1 行。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
  * 補助の記録で、状態の正は置き場（`copy` / `proposal`）。拡張は並べるだけで、ここから状態を組み直さない。
  */
 export interface HistoryEntryJson {
@@ -98,7 +98,7 @@ export interface HistoryEntryJson {
 }
 
 /**
- * 満たしていない先行 1 本（ADR-0088）。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
+ * 満たしていない先行 1 本。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
  * 求める。その答えを実行ファイルが出し、拡張はそのまま受け取るだけ（先行の置き場から組み直さない）。
  */
 export interface PredecessorUnmetJson {
@@ -122,7 +122,7 @@ export interface TicketJson {
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /**
-   * 空でなければ「読めるが信頼できない」理由（ADR-0058）。判定はこのチケットの
+   * 空でなければ「読めるが信頼できない」理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。判定はこのチケットの
    * ワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`copy.status` は
    * `open` のままなので、止まっていることはこの欄でしか分からない。
    */

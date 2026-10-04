@@ -17,8 +17,8 @@
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #
-# 取り込み状態とロック（ADR-0093 の段階 2b）の関数は、下の「取り込み状態とロック」にまとめてある。
-# C1（段階 2d）の関数は、その下の「C1」にまとめてある。
+# 取り込み状態とロックの関数は、下の「取り込み状態とロック」にまとめてある。
+# C1 の関数は、その下の「C1」にまとめてある。
 #
 # ほかに診断ログの 4 つ（log_debug / log_info / log_warn / log_error）がある。こちらは
 # 標準出力にも標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
@@ -300,14 +300,15 @@ ccnavi_mask_url() {
 		-e 's#^[^/:@]*:[^/@]*@#<伏せた>@#'
 }
 
-# ---- 取り込み状態とロック（ADR-0093 の 3.6・4.2・4.3。段階 2b）
+# ---- 取り込み状態とロック
 #
-# 取り込み状態は 1 行 1 項目の `<鍵> <値>`（D33）。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない。
+# 取り込み状態は 1 行 1 項目の `<鍵> <値>`。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない
+# （JSON は実行ファイルが読んで、sh には 1 行で返す）。
 # 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
 #
-#   sync/<リポジトリ>/families/<P>   親のブランチの取り込み状態（remote branch sha fetched_at state reason）
+#   sync/<リポジトリ>/families/<P>   親子のチケットの取り込み状態（remote branch sha fetched_at state reason）
 #   sync/<リポジトリ>/integration/   統合先の取り込み結果（統合先の done/・層・置き場のパスの設定のコピーと head）
-#   locks/<リポジトリ>/<P>/          ロック（D32）。中の owner に持ち主を 1 行で書く
+#   locks/<リポジトリ>/<P>/          ロック。中の owner に持ち主を 1 行で書く
 #
 # <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。
 
@@ -330,7 +331,7 @@ ccnavi_repo_key() {
 	fi
 }
 
-# 親のブランチの取り込み状態のパス。<ワークスペースルート> <リポジトリ> <P>
+# 親子のチケットの取り込み状態のパス。<ワークスペースルート> <リポジトリ> <P>
 ccnavi_family_record() {
 	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
 }
@@ -365,11 +366,11 @@ ccnavi_record_write() {
 	}
 }
 
-# そのツリーが、その名前の親のブランチのワークツリーか。<ツリー> <名前>
+# そのツリーが、名前の親子のチケットの親のワークツリーか。<ツリー> <名前>
 #
 # 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親チケットか提案が
-# あれば 0（ADR-0093 の 4.2「SessionStart の早送り」の対象の条件）。子チケット（`parent:` を持つ）は
-# 数えない。置き場のパスが絶対パス（リポジトリの外）なら親のブランチとして扱わない（3.1 の 12）。
+# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。子チケット（`parent:` を持つ）は
+# 数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして扱わない（ブランチに乗らないので、親のブランチで運べない）。
 ccnavi_parent_tree() {
 	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
@@ -392,7 +393,7 @@ ccnavi_parent_tree() {
 	return 1
 }
 
-# ロック（D32）。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
+# ロック。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
 # 0 取れた（入れ子を含む）/ 1 待っても取れなかった / 2 古いロックを奪いかけて元に戻せなかった（ユーザに回す）。
 # 取れたら ccnavi_lock_dir に置き場を入れ、CCNAVI_LOCK_HELD="<リポジトリ>/<P>:<持ち主の情報>" を子に渡す。
@@ -401,7 +402,7 @@ ccnavi_parent_tree() {
 # - `mkdir` の原子性で取る。`flock` は macOS に無い
 # - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <持ち主の情報> <OS>`、持ち主の情報は `<pid>-<開始時刻>`。
 #   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
-# - 古い（段階 2d のレビューの決定 B）: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
+# - 古い: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
 #   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても奪わない
 #   （長い操作を奪って二重に書かせない。待ちで取れなければ「長い」と言って落とす）。pid を確かめ
 #   られない（別のホスト・別の OS・/mnt/ の下・pid が読めない）ときだけ、10 分を過ぎたら時刻で古い
@@ -409,12 +410,12 @@ ccnavi_parent_tree() {
 # - 奪い方: 奪う操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
 #   owner の行と今の owner の行が同じなら `mv` で退避して、退避した中の owner がまだ同じなら消して取り直す。
 #   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
-# - 入れ子: CCNAVI_LOCK_HELD が同じ親のブランチを指し、その識別子がロックの owner の識別子と同じなら、取ったものとして
+# - 入れ子: CCNAVI_LOCK_HELD が同じ親子のチケットを指し、その識別子がロックの owner の識別子と同じなら、取ったものとして
 #   進み、外さない（識別子の合わない値は偽物として無視する）
 ccnavi_lock_dir=""
 ccnavi_lock_mark=""
 ccnavi_lock_set_held=""
-# 取る前の CCNAVI_LOCK_HELD（入れ子で別のロックを取ったとき、外すときに元へ戻す。段階 2d）。
+# 取る前の CCNAVI_LOCK_HELD（入れ子で別のロックを取ったとき、外すときに元へ戻す）。
 ccnavi_lock_prev_held=""
 ccnavi_lock_prev_set=""
 ccnavi_lock_os() {
@@ -611,7 +612,7 @@ ccnavi_lock_drop() {
 	fi
 	if [ -n "$ccnavi_lock_set_held" ]; then
 		# 入れ子の中で別のロック（統合先の取り込み結果のロックなど）を取ったときは、外側から渡された値に戻す。
-		# 消したままにすると、外側（C1）が持つ親のブランチのロックを、この sh の後の段が入れ子と読めない。
+		# 消したままにすると、外側（C1）が持つ親子のチケットのロックを、この sh の後の段が入れ子と読めない。
 		if [ -n "$ccnavi_lock_prev_set" ]; then
 			CCNAVI_LOCK_HELD="$ccnavi_lock_prev_held"
 			export CCNAVI_LOCK_HELD
@@ -691,13 +692,13 @@ ccnavi_git_refusal() {
 	fi
 }
 
-# ---- C1（ADR-0093 の 4.3・4.4。段階 2d）
+# ---- C1
 #
-# 取り込み済みの親のブランチについて、チケットの状態を書く一連の操作を 1 つの操作にまとめる。親のブランチ 1 本に、
-# 親チケットと子チケットのまとまりが 1 つ対応する。ここで対象にするのは、origin があり取り込み状態が present の
-# 親のブランチのうち、chat だけの親のブランチを除いたもの（D11）。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
+# 取り込み済みの親子のチケットについて、チケットの状態を書く一連の操作を 1 つの操作にまとめる。親子のチケットは
+# 親のブランチ 1 本に対応する。ここで対象にするのは、origin があり取り込み状態が present の親子のチケットのうち、
+# chat だけのものを除いたもの。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
 #
-#   ccnavi_c1_family <識別子>   親のブランチと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
+#   ccnavi_c1_family <識別子>   親子のチケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
 #   ccnavi_c1_write <文> -- <実行ファイルの引数>...
 #                               6 元の先頭 7 書く 8 コミット 9 push 10 届いたか 11 戻して 1 回だけやり直す
@@ -711,16 +712,17 @@ ccnavi_git_refusal() {
 # 文面はすべて標準エラーへ出す（ボードは標準出力の JSON を読むため）。実行ファイルの標準出力は
 # そのまま通す。ccnavi_c1_capture に書き先を入れると、そこへ書く。
 #
-# 実行ファイルはネットワークに出ずコミットもしない（D17）。見分けと書いたパスの一覧は実行ファイルが
+# 実行ファイルはネットワークに出ずコミットもしない。見分けと書いたパスの一覧は実行ファイルが
 # 出し（`c1 family`・`c1 sort`・`--record-writes`）、取り込み（ccnavi-sync.sh を入れ子のロックで起こす）・
-# コミット（`commit --only`。D35）・push・届いたかの確かめ・戻し（比較つきの update-ref。reset は
-# 使わない）はここが持つ。git はエージェントの入口の ccnavi-git.sh を通らずに直に呼ぶ（4.3 の戻し）。
+# コミット（`commit --only`。ほかのステージ済みの変更を巻き込まない）・push・届いたかの確かめ・戻し（比較つきの update-ref。reset は
+# 使わない）はここが持つ。git は ccnavi-git.sh を通らずに直に呼ぶ。ccnavi-git.sh はエージェントの入口の
+# 保護で、ここの戻し（`restore --source` など）には当てない。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
 #   見張りの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回の見張りの秒、既定 60）
 #
 # コミットは `--no-verify` でユーザの hook（pre-commit・commit-msg）を実行しない。コミットするのは状態のファイル
-# だけで、コードの検査の対象ではないため（段階 2d のレビューの決定 C）。署名はユーザの設定に従うが、
+# だけで、コードの検査の対象ではないため。署名はユーザの設定に従うが、
 # 見張りの時間を付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
 # 途中で INT・TERM・HUP が来たら、送る前の自分のコミットを戻す（ccnavi_c1_end）。強制終了（KILL）で
@@ -754,7 +756,7 @@ ccnavi_c1_number() {
 	esac
 }
 
-# 親のブランチと、C1 の対象か。<識別子>
+# 親子のチケットと、C1 の対象か。<識別子>
 #
 # ccnavi_c1_target: yes（C1 で回す）/ no（今の手元の動きのまま）/ stop（取り込み済みだが止める理由がある）。
 # 実行ファイルが答えなかった（古い・落ちた）ときは、取り込み状態があれば stop、無ければ no。
@@ -764,7 +766,7 @@ ccnavi_c1_family() {
 	ccnavi_c1_family_id=""
 	ccnavi_c1_repo=""
 	ccnavi_c1_tree=""
-	# 取り込み状態が 1 つも無ければ、実行ファイルに聞かずに対象外（D11。一時ディレクトリも要らない）。
+	# 取り込み状態が 1 つも無ければ、実行ファイルに聞かずに対象外（一時ディレクトリも要らない）。
 	ccnavi_cf_state=$(ccnavi_state "$ccnavi_c1_root")
 	ccnavi_cf_p="$1"
 	case "$ccnavi_cf_p" in
@@ -779,7 +781,7 @@ ccnavi_c1_family() {
 	done
 	if [ "$ccnavi_cf_any" = no ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
-		ccnavi_c1_why="親のブランチの取り込み状態が無い（取り込み済みでない。今の手元の動きのまま）"
+		ccnavi_c1_why="親子のチケットの取り込み状態が無い（取り込み済みでない。今の手元の動きのまま）"
 		return 0
 	fi
 	ccnavi_c1_scratch || {
@@ -793,7 +795,7 @@ ccnavi_c1_family() {
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。親のブランチの取り込み状態があるので、書かずに止める。実行ファイルを新しくしてください"
+		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。親子のチケットの取り込み状態があるので、書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_c1_target=$(sed -n 's/^target //p' "$ccnavi_c1_tmp/family" | head -n 1)
@@ -826,7 +828,7 @@ ccnavi_c1_family() {
 
 # 止めたときの文面（ccnavi_c1_target が stop）。
 ccnavi_c1_refuse() {
-	ccnavi_c1_say "親のブランチ ${ccnavi_c1_family_id:-?} のチケットの状態を書かずに止めた。${ccnavi_c1_why}"
+	ccnavi_c1_say "親子のチケット ${ccnavi_c1_family_id:-?} のチケットの状態を書かずに止めた。${ccnavi_c1_why}"
 	while IFS= read -r ccnavi_rf_hint; do
 		[ -n "$ccnavi_rf_hint" ] && printf '  %s\n' "$ccnavi_rf_hint" >&2
 	done <"$ccnavi_c1_tmp/hints"
@@ -862,15 +864,15 @@ ccnavi_c1_begin() {
 	case "$ccnavi_cb_rc" in
 	0) ;;
 	2)
-		ccnavi_c1_say "親のブランチ $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
+		ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id の古いロックを奪う途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/${ccnavi_c1_family_id}）"
 		return 1
 		;;
 	*)
 		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_c1_root")/locks/$ccnavi_c1_repo/$ccnavi_c1_family_id"
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_c1_say "親のブランチ $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
+			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので奪わない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
-			ccnavi_c1_say "親のブランチ $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
+			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
 		fi
 		return 1
 		;;
@@ -941,7 +943,7 @@ ccnavi_c1_prepare() {
 		ccnavi_cp_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 		ccnavi_cp_state=$(ccnavi_record_get "$ccnavi_cp_record" state)
 		if [ "$ccnavi_cp_state" != present ]; then
-			ccnavi_c1_say "取り込みの後、親のブランチの取り込み状態が ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
+			ccnavi_c1_say "取り込みの後、親子のチケットの取り込み状態が ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
@@ -954,7 +956,7 @@ ccnavi_c1_prepare() {
 	done
 }
 
-# 一覧のパスだけをコミットする（D35）。<一覧> <文>。新しいファイルは先に add する。
+# 一覧のパスだけをコミットする。<一覧> <文>。新しいファイルは先に add する。
 # 変わったものが 1 つも無ければコミットせずに 0（ccnavi_c1_committed は空）。
 # 落ちたら、この実行が add したパスを索引から外して 1（索引を元に戻す）。
 ccnavi_c1_committed=""
@@ -994,7 +996,7 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# ユーザの hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る（決定 C）。
+	# ユーザの hook は実行しない。署名などで尋ねて止まらないよう、見張りの時間で切る。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
@@ -1162,15 +1164,15 @@ ccnavi_c1_undo() {
 	return 0
 }
 
-# 送れた。親のブランチの取り込み状態の sha を書き換える（state はそのまま present）。<送った先頭>
+# 送れた。親子のチケットの取り込み状態の sha を書き換える（state はそのまま present）。<送った先頭>
 ccnavi_c1_sent() {
 	ccnavi_cn_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 	if [ "$(ccnavi_record_get "$ccnavi_cn_record" state)" = present ]; then
 		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_family_id" sha "$1" \
 			fetched_at "$(ccnavi_record_get "$ccnavi_cn_record" fetched_at)" state present reason "" ||
-			ccnavi_c1_say "親のブランチの取り込み状態（${ccnavi_cn_record}）を書けなかった"
+			ccnavi_c1_say "親子のチケットの取り込み状態（${ccnavi_cn_record}）を書けなかった"
 	fi
-	ccnavi_c1_say "親のブランチ $ccnavi_c1_family_id のチケットの状態を送った（$(printf '%.12s' "$1")）"
+	ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のチケットの状態を送った（$(printf '%.12s' "$1")）"
 	log_info C1 で送った -- "family=$ccnavi_c1_family_id"
 }
 

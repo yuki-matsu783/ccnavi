@@ -8,7 +8,7 @@
  *
  * CSS がここに来るのは、Webview の CSP が nonce を持つ `<style>` しか通さないため。nonce は
  * 入れ物の HTML を組む側（拡張ホスト）が作るので、挿すのもそちら。CSS の中身は画面の側
- * （`src/webview/<名前>/*.css`）にあり、ここが知っているのはバンドルの出口のパスだけ（ADR-0066）。
+ * （`src/webview/<名前>/*.css`）にあり、ここが知っているのはバンドルの出口のパスだけ。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";

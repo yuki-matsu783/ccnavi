@@ -1,5 +1,5 @@
 /**
- * 読み取り専用ボードの組み立て（ADR-0093 段階 1）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * 読み取り専用ボードの組み立て。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -41,7 +41,7 @@ async function run(
 
 const family = (b: RepoBoard, name: string) => b.families.find((f) => f.family.name === name);
 
-test("CX-T040 直近のブランチから親のブランチを見分ける。コードだけのブランチと統合先は親のブランチにしない", async () => {
+test("CX-T040 直近のブランチから親子のチケットを見分ける。コードだけのブランチと統合先は親子のチケットとして扱わない", async () => {
   const { board } = await run();
   assert.equal(board.error, "");
   assert.deepEqual(board.integration && { name: board.integration.name, source: board.integration.source }, { name: "main", source: "default" });
@@ -50,12 +50,12 @@ test("CX-T040 直近のブランチから親のブランチを見分ける。コ
   assert.equal(board.compat?.same, true);
 });
 
-test("CX-T041 先行の閉包の親のブランチ（直近の外）を読み足し、統合先で閉じた親のブランチは読まない", async () => {
+test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み足し、統合先で閉じた親子のチケットは読まない", async () => {
   const { board, mock } = await run();
   const f = family(board, "i0001");
   assert.deepEqual(f?.result?.closure.families, ["i0001", "i0003"]);
   assert.ok(mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0003"));
-  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた親のブランチは読まない");
+  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた親子のチケットは読まない");
   // 今の ccnavi の答え: 先行 i0003-01 が閉じていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
   assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01");
@@ -110,7 +110,7 @@ test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読
   const second = await run(fixture(), {}, cache);
   assert.equal(second.board.stats.blobsFetched, 0);
   assert.ok(second.board.stats.graphql < first.board.stats.graphql);
-  // 読み取りの回数は ADR の見積もりの桁（承認 1 回で 40 回ほど）に収まる
+  // 読み取りの回数は見積もりの桁（承認 1 回で 40 回ほど）に収まる
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 
@@ -136,7 +136,7 @@ test("CX-T048 置き場がリポジトリの外を指すワークスペースは
   assert.match(board.error, /リポジトリの外を指している/);
 });
 
-test("CX-T049 先行の閉包の親のブランチが 16 を超えたら決まらないで止める（3.3 の 5）", async () => {
+test("CX-T049 先行の閉包が 16 組の親子のチケットを超えたら決まらないで止める（3.3 の 5）", async () => {
   const b = fixture();
   const base = b.main.files;
   const chain = Array.from({ length: 17 }, (_, i) => `c${String(i + 1).padStart(2, "0")}x`);
@@ -149,7 +149,7 @@ test("CX-T049 先行の閉包の親のブランチが 16 を超えたら決ま�
   const { board } = await run(b);
   const r = family(board, "i0001")?.result;
   assert.equal(r?.closure.over_limit, true);
-  assert.match(r?.undecided ?? "", /16 を超える親のブランチ/);
+  assert.match(r?.undecided ?? "", /16 組を超える親子のチケット/);
 });
 
 test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意のある本文は消毒して描く", async () => {

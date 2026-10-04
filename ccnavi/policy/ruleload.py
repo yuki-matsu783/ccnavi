@@ -368,7 +368,8 @@ def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
 def stop_rules(conf: settings.Settings, root: str) -> list[rules.Rule]:
     """ターンの終わりに当てるルール。共通層とワークスペース自身の層の `allow` だけ。
 
-    - プロジェクトの層は見ない。共通層を配ったコピー（ADR-0084）が古くなっても二重に数えない
+    - プロジェクトの層は見ない。着手で共通層をプロジェクトの層へ配ったコピーが古くなっても
+      二重に数えない
     - 同じ id（層の前置きを除いた表記）は最初の 1 本だけ
     - `every` が 2 より小さいものは使わない。ターンの終わりのたびに止まる（`--lint` も言う）
     """

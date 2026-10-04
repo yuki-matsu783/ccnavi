@@ -1,30 +1,31 @@
-"""Chrome 拡張（ADR-0093 段階 1）が Pyodide の上で呼ぶ入口。
+"""Chrome 拡張が Pyodide の上で呼ぶ入口。
 
 拡張はホストの API でブランチの置き場を読み、その中身（Snapshot）をここへ渡す。ここは
 ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--agree --preview --json`）を
-そのまま動かす（ADR-0093 の 8.1）。承認待ちの一覧も、親のブランチの見分けも、参照の閉包も、
-互換の比べも Python が出し、拡張（TS）は並べるだけ（ADR-0035）。
+そのまま動かす。承認待ちの一覧も、親子のチケットの見分けも、参照の閉包も、
+互換の比べも Python が出し、拡張（TS）は並べるだけ。TS で判定し直すと、hook・lint と答えが
+2 か所に分かれるため。
 
-段階 2a から、判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` も呼べる
-（`plan`・`withdraw`・`confirm` の操作）。どれも書くもの（Changes）を値で返すだけで、
-ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。段階 3 から、
-拡張は `plan`（承認）と
-`withdraw`（取り下げ）の答えを親のブランチへの 1 コミットにして書く（8.3・8.4）。
-段階 4 から `confirm`（レビュー済み）の答えも同じく書く（8.9）。ボードの答えの `reviewable` が
-候補のフェーズで、ホストからスレッドとレビューを取得した結果は拡張が組んで `result` で渡す。
+判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` も呼べる。どれも書くもの
+（Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。
+拡張は `plan`（承認）・`withdraw`（取り下げ）・`confirm`（レビュー済み）の答えを、親のブランチへの
+1 コミットにして書く。
+ボードの答えの `reviewable` が候補のフェーズで、ホストからスレッドとレビューを取得した結果は
+拡張が組んで `result` で渡す。
 
-段階 3 から、仮のツリーに手元の取り込み状態に当たるもの（`logs/state/sync/self/`。統合先の
-取り込み結果である `done/`・層・設定のコピーと、閉包の親のブランチの取り込み状態）も組む（3.3。
-段階 2c の「Chrome の入口で取り込み状態を組む」）。手元と同じ判定のコードが、これを取り込み済みの
-親のブランチとして読む。
+仮のツリーには、手元の取り込み状態に当たるもの（`logs/state/sync/self/`。統合先の取り込み結果
+である `done/`・層・設定のコピーと、閉包の親子のチケットの取り込み状態）も組む。
+手元と同じ判定のコードが、これを取り込み済みの親子のチケットとして読む。
 
-- ホストに在る親のブランチ（`P` と閉包の `P_X`）は `present`
-- ホストに無く、統合先の `done/` でも閉じていない親のブランチは `gone`（決まらない。3.3 の 3）
+- ホストに在る親子のチケット（`P` と閉包の `P_X`）は `present`
+- ホストに無く、統合先の `done/` でも閉じていない親子のチケットは `gone`。親チケットのブランチが無く
+  統合先でも閉じていなければ、新規の承認として通すと改版の制約を迂回できるので「決まらない」で止める
 - 判定の入力に読めない（バイナリの）ファイルがあれば、何も判定せず「決まらない」で止める
-  （6.2 の `NOT_FETCHED` と同じ考え。無いとも空とも読ませない）
+  （取っていないファイルと同じく、無いとも空とも読ませない）
 
-書く操作（`plan`・`withdraw`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば受けない
-（7.3・D31）。書く先は親のブランチ `P` だけで、予約の名前・統合先の名前は受けない（8.5）。
+書く操作（`plan`・`withdraw`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば受けない。
+互換の違う判定をリモートに乗せると、手元の取り込みで判定し直したときに答えが分かれるため。
+書く先は親チケットのブランチ `P` だけで、予約の名前・統合先の名前は受けない。
 
 呼び方は `handle(<要求の JSON>, root)`。`root` は仮のツリーを組む場所で、Pyodide では `/ws`、
 手元の試験では一時ディレクトリ。答えは JSON の文字列。
@@ -38,22 +39,23 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
       "absent": ["<ホストに無かったブランチ>", ...]
     }
 
-統合先のブランチも `branches` に入る。読むのは置き場のサブツリーだけ（8.2）。
+統合先のブランチも `branches` に入る。読むのは置き場のサブツリーだけ。
 
-段階 5 から、プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）
-も読む。Snapshot に `project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの
-統合先の中身。共通層・自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは
-手元と同じ形で組む: ワークスペースルートにワークスペースの統合先、`projects/<名前>/` に
-プロジェクトの統合先（`done/` と、D28 の計算の層）、親のブランチは `projects/<名前>` のワークツリー
-として `.claude/worktrees/<P>` に置く。取り込み状態は `sync/self/` と `sync/<名前>/` に分けて組む。
+プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）も読む。Snapshot に
+`project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの統合先の中身。共通層・
+自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む:
+ワークスペースルートにワークスペースの統合先、`projects/<名前>/` にプロジェクトの統合先
+（`done/` と、プロジェクトの統合先の層に共通層を写した層）、親子のチケットは
+`projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。取り込み状態は
+`sync/self/` と `sync/<名前>/` に分けて組む。
 
     "project": "<プロジェクト名>",
     "workspace": {"integration": {"name": ..., "source": ..., "head": ...},
                   "files": {...}, "binary": [...], "links": [...]}
 
-段階 5 から「始める」（8.6）の `start` も答える。issue の番号から識別子を決め
-（`ticket.issue_identifier`。3.1 の 11）、始められない理由（統合先の `done/` にある・同じ名前の
-ブランチがある・開いた親のブランチに同じ識別子がある・予約の名前・互換の版の違い）を返す。
+「始める」の `start` も答える。issue の番号から識別子を決め
+（手元と同じ `ticket.issue_identifier`）、始められない理由（統合先の `done/` にある・同じ名前の
+ブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版の違い）を返す。
 ブランチを作るのは拡張（service worker）。
 """
 
@@ -76,27 +78,31 @@ from ccnavi.tickets import ticket as ticket_mod
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
 SCHEMA = 1
 
-# 取り込み状態の名前（ワークスペース自身）。段階 3 はワークスペースのリポジトリだけ（11 章）。
+# 取り込み状態の名前（ワークスペース自身）。
 SELF_REPO = syncstate.SELF
 
-# 参照の閉包で辿る親のブランチの上限（ADR-0093 の 3.3 の 5）。
+# 参照の閉包で辿る親子のチケットの上限。1 組あたり tree 1 回と blob をまとめて読む 1 回なので、
+# 承認 1 回の読み取りが 40 回ほどに収まる。超えたら「決まらない」で止め、手元での確かめを案内する。
 FAMILY_LIMIT = 16
 
 # ワークツリーの置き場。tree.WORKTREES_DIR と同じパスを "/" で持つ。
 WORKTREES = ".claude/worktrees"
 
-# 統合先から読むもの（置き場のパスの設定に依らないもの）。3.3 の「手元の統合先」と同じ並び。
+# 統合先から読むもの（置き場のパスの設定に依らないもの）。
+# 手元の統合先の取り込み結果に書き出すものと同じ並び。
 COMMON_LAYER = ".ccnavi/common"
 SETTINGS_FILE = ".claude/settings.json"
 COMPAT_FILE = lint.SH_COMPAT_FILE.replace(os.sep, "/")
 
-# 置き場のパスを変える環境変数。統合先の `.claude/settings.json` の `env` から読む（3.3 の 6）。
+# 置き場のパスを変える環境変数。統合先の `.claude/settings.json` の `env` から読む。
+# 親のブランチから読むと、そこで書き換えて承認やレビューを外せるため。
 PLACEMENT_ENV = (settings.TICKETS_ENV, settings.APPROVED_ENV, settings.PROJECT_HOME_ENV)
 
 # 取り込み状態に当たるものの置き場（仮のツリーの中。手元の既定の state の置き場と同じパス）。
 STATE_DIR = settings.DEFAULT_STATE.replace(os.sep, "/")
 
-# 絶対パスの表記。置き場がリポジトリの外を指すワークスペースは Chrome の対象外（3.1 の 12）。
+# 絶対パスの表記。置き場がリポジトリの外を指すワークスペースは Chrome の対象外。
+# ブランチに乗らないので、親のブランチを本物とする側にできない。
 _ABSOLUTE = re.compile(r"^(?:[/\\~]|[A-Za-z]:)")
 
 
@@ -146,7 +152,7 @@ def _placement(settings_text: str | None) -> dict:
         raise Refused(
             "置き場のパスがリポジトリの外を指している（"
             + ", ".join(f"{k}={env[k]}" for k in absolute)
-            + "）。ブランチに乗らないので Chrome では読めない（ADR-0093 の 3.1 の 12）"
+            + "）。ブランチに乗らないので Chrome では読めない"
         )
     with _environ(env):
         conf, _ = settings.load("/nonexistent-ccnavi-root")
@@ -161,12 +167,13 @@ def _placement(settings_text: str | None) -> dict:
         "tickets": tickets,
         "approved": approved,
         "env": env,
-        # 統合先から読むもの。承認済みは閉じたものだけ（`P` を本物とする。3.3 の 1・4）。
+        # 統合先から読むもの。承認済みは閉じたものだけ（作業中のものは `P` を本物とする。
+        # 古い統合先から切った `P` でも閉じた識別子の使い直しを見つけるため、`done/` は常に読む）。
         "integration_paths": sorted({f"{approved}/{ticket_mod.DONE}", COMMON_LAYER, own_layer}),
         "integration_files": [SETTINGS_FILE, COMPAT_FILE],
         # 親のブランチから読むもの。
         "branch_paths": [approved, tickets],
-        # プロジェクトのリポジトリ（段階 5）。ワークスペースの統合先から読むもの（共通層・自身の層・
+        # プロジェクトのリポジトリ。ワークスペースの統合先から読むもの（共通層・自身の層・
         # 設定・互換のマーカー）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
         "workspace_paths": sorted({COMMON_LAYER, own_layer}),
         "workspace_files": [SETTINGS_FILE, COMPAT_FILE],
@@ -221,7 +228,7 @@ def _check_files(bname: str, branch: object) -> None:
 
 
 def _project(snap: dict) -> str:
-    """このリポジトリのプロジェクト名（ワークスペース自身なら空。段階 5）。"""
+    """このリポジトリのプロジェクト名（ワークスペース自身なら空）。"""
     return str(snap.get("project") or "")
 
 
@@ -270,7 +277,7 @@ def _tickets_in(files: dict[str, str], place: dict, states: tuple[str, ...] | No
 
 
 def family_of(ident: str) -> str:
-    """識別子のチケットの親のブランチ（3.3 の 5）。子の形なら `parent`、そうでなければ自分。"""
+    """識別子が属する親子のチケットの親。子の形なら `parent`、そうでなければ自分。"""
     m = ticket_mod.child_pattern().match(ident)
     return m.group("parent") if m else ident
 
@@ -281,14 +288,14 @@ def _closed(snap: dict, place: dict) -> set[str]:
     return {t.ticket for _, t in _tickets_in(files, place, (ticket_mod.DONE,))}
 
 
-# ---- 親のブランチ -------------------------------------------------------------------------------
+# ---- 親子のチケット -------------------------------------------------------------------
 
 
 def _op_families(req: dict, root: str) -> dict:
-    """候補のブランチのうち、親のブランチであるもの。
+    """候補のブランチのうち、親のブランチ（親子のチケットのブランチ）であるもの。
 
-    親のブランチ = そのブランチの置き場に、
-    ブランチ名と同じ識別子の親の提案か承認済みのチケットがある（4.2 の見分け）。
+    親子のチケットのブランチ = そのブランチの置き場に、ブランチ名と同じ識別子の親の提案か
+    承認済みのチケットがある。
     閉じた親（`done/`）しか無いブランチは数えない。
     """
     snap = _snapshot(req)
@@ -315,10 +322,12 @@ def _op_families(req: dict, root: str) -> dict:
 
 
 def _op_closure(req: dict, root: str) -> dict:
-    """親のブランチ `family` の判定に要る親のブランチの閉包（3.3 の 5）。
+    """親子のチケット `family` の判定に要る、親子のチケットの閉包。
+
+    先行を多段で辿るので、1 段だけでは手元と答えが変わる。
 
     提案と承認済みのチケットの `predecessors` を辿り、統合先の `done/` にあるもので止める。
-    まだ読んでいない親のブランチは `need` で返し、拡張が読んでから呼び直す。
+    まだ読んでいない親子のチケットは `need` で返し、拡張が読んでから呼び直す。
     """
     snap = _snapshot(req)
     place = _placement(_text_or_none(req.get("settings")))
@@ -354,7 +363,8 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
         "absent": sorted(absent & set(families)),
         "over_limit": over,
         "message": (
-            f"先行を辿ると {FAMILY_LIMIT} を超える親のブランチに広がった（{', '.join(families)}）。"
+            f"先行を辿ると {FAMILY_LIMIT} 組を超える親子のチケットに広がった"
+            f"（{', '.join(families)}）。"
             "Chrome では判定できない。計画を分けて先行を減らすか、手元で "
             "`--agree --preview --verify` を打って確かめる"
             if over
@@ -367,11 +377,12 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
 
 
 def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
-    """統合先をワークスペースルートに、親のブランチをワークツリーに置いた仮のツリーを組む。
+    """統合先をワークスペースルートに、親子のチケットをワークツリーに置いた仮のツリーを組む。
 
-    プロジェクトのリポジトリ（段階 5）は、ワークスペースの統合先をワークスペースルートに、
+    プロジェクトのリポジトリは、ワークスペースの統合先をワークスペースルートに、
     プロジェクトの統合先を `projects/<名前>/` に置き、
-    親のブランチをそのプロジェクトのワークツリーにする。
+    親子のチケットをそのプロジェクトの
+    ワークツリーにする。
     """
     shutil.rmtree(root, ignore_errors=True)
     os.makedirs(os.path.join(root, ".git", "worktrees"))
@@ -379,7 +390,7 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
     project = _project(snap)
     owner = root
     if not project:
-        # HEAD はブランチの名前を読む先（承認の記録の `source_tree`。D22）。
+        # HEAD はブランチの名前を読む先（承認の記録の `source_tree` はブランチ名）。
         _head(os.path.join(root, ".git"), integ)
         keep = tuple(p + "/" for p in place["integration_paths"])
         for path, text in _files(snap, integ).items():
@@ -423,11 +434,12 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
 
 
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
-    """プロジェクトの層（プロジェクトからの相対パス → 中身）。ADR-0093 の D28 の計算。
+    """プロジェクトの層（プロジェクトからの相対パス → 中身）。
 
     「プロジェクトの統合先の現在の層に、ワークスペースの統合先の共通層を `configsync.projected` で
     写したもの」。共通層にあるファイルだけを写し、無いファイルはプロジェクトの側を残す（着手の
-    configsync と同じ）。`P` の上の層は読まない（3.3 の 6）。
+    configsync と同じ）。`P` の上の層は読まない。`P` の上で層を書き換えて承認やレビューを
+    外せないようにするため。
     """
     ws = snap["workspace"]["files"]
     own = _files(snap, snap["integration"]["name"])
@@ -450,11 +462,11 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
 
     - 統合先の取り込み結果（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
       `.claude/settings.json` のコピーと `head`
-    - 親のブランチの取り込み状態（`sync/self/families/<P>`）: ホストに在る親のブランチは `present`、
-      無い親のブランチは `gone`
+    - 親子のチケットの取り込み状態（`sync/self/families/<P>`）: ホストに在れば `present`、
+      無ければ `gone`
 
     先頭の sha と取り込んだ時刻は書かない。判定が読んだ中身（read_set）に入り、指紋が
-    関係の無い push で変わるため（6.2「全ブランチの head_sha は入れない」）。手元の試験も
+    関係の無い push で変わるため。手元の試験も
     これを state の置き場に書き、同じ取り込み状態で判定させる。
     """
     integ = snap["integration"]
@@ -547,7 +559,10 @@ def _preview(root: str, env: dict[str, str], only: list[str]) -> tuple[int, dict
 
 
 def _op_board(req: dict, root: str) -> dict:
-    """親のブランチ 1 つの承認待ち（読み取りだけ）。判定の入力は統合先・`P`・閉包の `P_X`（D2）。"""
+    """親子のチケット 1 組の承認待ち（読み取りだけ）。
+
+    判定の入力は統合先・`P`・閉包の `P_X` だけ。
+    """
     snap = _snapshot(req)
     place = _placement(_text_or_none(req.get("settings")))
     family = req.get("family")
@@ -557,7 +572,7 @@ def _op_board(req: dict, root: str) -> dict:
     if closure["over_limit"]:
         return {"family": family, "undecided": closure["message"], "closure": closure}
     if closure["need"]:
-        raise Refused(f"閉包の親のブランチをまだ読んでいない: {', '.join(closure['need'])}")
+        raise Refused(f"閉包の親子のチケットをまだ読んでいない: {', '.join(closure['need'])}")
     unreadable = _unreadable(snap, closure)
     if unreadable:
         return {"family": family, "undecided": unreadable, "closure": closure}
@@ -570,7 +585,7 @@ def _op_board(req: dict, root: str) -> dict:
     body = first
     narrowed = bool(mine) and len(mine) != len(first["batch"])
     if narrowed:
-        # 画面の本文と指紋を、この親のブランチの分だけで組み直す。1 回の承認は 1 つの `P`（8.3）。
+        # 画面の本文と指紋を、この親子のチケットの分だけで組み直す（1 回の承認は 1 つの `P`）。
         code, body, err = _preview(root, place["env"], mine)
         if body is None:
             return {"family": family, "closure": closure, "refused": _refused(root, code, err)}
@@ -578,17 +593,17 @@ def _op_board(req: dict, root: str) -> dict:
     return {
         "family": family,
         "closure": closure,
-        # 互換の版と書く先の名前から、書けるかを見る（7.3・8.5）。書けなければ表示だけにする。
+        # 互換の版と書く先の名前から、書けるかを見る。書けなければ表示だけにする。
         "write": {
             "allowed": not _write_refusal(snap, family),
             "reason": _write_refusal(snap, family),
         },
         "withdrawable": _withdrawable(req, root, place, family),
-        # レビュー済みを付けられる候補（段階 4）。
+        # レビュー済みを付けられる候補。
         # 通るかは `confirm` がホストから取得した結果で決める
         "reviewable": _reviewable(root, place, family),
         "batch": batch,
-        # 画面の本文は提案をツリーからの相対パスで出す（D22）ので、手を加えずに返す。
+        # 画面の本文は提案をツリーからの相対パスで出すので、手を加えずに返す。
         # 指紋はこの本文と承認済みのチケットの中身を覆い、
         # 手元の `--agree --preview` と同じ値になる。
         "text": body["text"] if batch else "",
@@ -609,10 +624,8 @@ def _unreadable(snap: dict, closure: dict) -> str:
 
     バイナリ（`binary`）とシンボリックリンク（`links`）は読まない。シンボリックリンクの中身は指す先の
     パスの文字列で、手元でリンクを辿って読む中身とは違う。判定がそれらを読むかは分からないので、
-    無いとも空とも読ませず「決まらない」として止める（6.2 の `NOT_FETCHED`）。段階 1 では知らせる
-    だけだったが、段階 3 で書き込むようになったので止めるようにした。
-    シンボリックリンクを含む親のブランチは
-    止まるので、リンクが指すパスへ書き込むことも無い。
+    無いとも空とも読ませず「決まらない」として止める（取っていないファイルと同じ扱い。書く操作が
+    あるので、言うだけにせず止める）。シンボリックリンクを含む親子のチケットは止まるので、リンクが指すパスへ書き込むことも無い。
     """
     names = [snap["integration"]["name"], *closure["families"]]
     found = [
@@ -632,22 +645,19 @@ def _unreadable(snap: dict, closure: dict) -> str:
         return ""
     return (
         f"判定の入力に本文を読めないファイルがある（{', '.join(found)}）。"
-        "この親のブランチは決まらない。手元で `--agree --preview --verify` を打って確かめる"
+        "この親子のチケットは決まらない。手元で `--agree --preview --verify` を打って確かめる"
     )
 
 
 def _write_refusal(snap: dict, family: str) -> str:
-    """この親のブランチ `P` へ書けない理由（空なら書ける）。
+    """この親子のチケット `P` へ書けない理由（空なら書ける）。
 
-    - 同梱の互換の版が統合先と違う（7.3・D31）。表示だけにする
-    - 書く先が予約の名前か統合先の名前（8.5）。保護されたブランチと統合先へは書かない
+    - 同梱の互換の版が統合先と違う。表示だけにする
+    - 書く先が予約の名前か統合先の名前（保護されたブランチと統合先へは書かない）
     """
     compat = _compat(snap)
     if not compat["same"]:
-        return (
-            f"{compat['message']}。表示だけにして、承認と取り下げのボタンは出さない"
-            "（ADR-0093 の 7.3）"
-        )
+        return f"{compat['message']}。表示だけにして、承認と取り下げのボタンは出さない"
     folded = family.casefold()
     if (
         folded in ticket_mod.RESERVED_BRANCH_IDS
@@ -659,7 +669,7 @@ def _write_refusal(snap: dict, family: str) -> str:
 
 
 def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
-    """作業中のチケットごとの取り下げの可否（8.8）。仮のツリーは組んである前提。"""
+    """作業中のチケットごとの取り下げの可否。仮のツリーは組んである前提。"""
     with _environ(place["env"]):
         conf, _ = settings.load(root)
         snapshot = core.read_fs(conf, root)
@@ -706,12 +716,14 @@ def _relative(root: str, text: str) -> str:
     return out.replace(os.sep, "/") if os.sep != "/" else out
 
 
-# ---- 判定のコア（段階 2a。書くものを値で返すだけ） ---------------------------------------
+# ---- 判定のコア（書くものを値で返すだけ） ---------------------------------------------
 
 
 def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
-    """親のブランチの仮のツリーを組む。答えは (snapshot, 置き場, 親のブランチ, 閉包)。
-    時刻は組む前に確かめる。"""
+    """親子のチケットの仮のツリーを組む。時刻は組む前に確かめる。
+
+    答えは (snapshot, 置き場, 親のブランチ名, 閉包)。
+    """
     _stamp(req)
     snap = _snapshot(req)
     place = _placement(_text_or_none(req.get("settings")))
@@ -722,7 +734,7 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     if closure["over_limit"]:
         raise Refused(closure["message"])
     if closure["need"]:
-        raise Refused(f"閉包の親のブランチをまだ読んでいない: {', '.join(closure['need'])}")
+        raise Refused(f"閉包の親子のチケットをまだ読んでいない: {', '.join(closure['need'])}")
     unreadable = _unreadable(snap, closure)
     if unreadable:
         raise Refused(unreadable)
@@ -750,16 +762,16 @@ def _writable(snap: dict, family: str) -> None:
 
 
 def _one_branch(changes: dict, family: str) -> None:
-    """書くものが親のブランチ `P` の中だけか（1 回の承認は 1 つの `P`。8.3・8.4）。
+    """書くものが親のブランチ `P` の中だけか（1 回の承認は 1 つの `P`）。
 
     提案が `P` 以外のブランチ（閉包の `P_X` など）にあると、消す先が別のブランチになる。
-    その形は承認しない（8.4「P 以外のブランチにある提案は承認しない」）。
+    その形は承認しない。
     """
     others = sorted(k for k in (changes.get("changes") or {}) if k != family)
     if others:
         raise Refused(
             f"書くものが親のブランチ {family} の外（{', '.join(others or ['?'])}）に及ぶ。"
-            f"提案は {family} の上に置いてから承認を頼む（ADR-0093 の 3.2）"
+            f"提案は {family} の上に置いてから承認を頼む"
         )
 
 
@@ -821,7 +833,7 @@ def _changes(root: str, changes: core.Changes | None) -> dict:
 
 
 def _op_plan(req: dict, root: str) -> dict:
-    """親のブランチ 1 つの承認で書くもの（6.2 の judge → plan）。書かない。"""
+    """親子のチケット 1 組の承認で書くもの（judge → plan）。書かない。"""
     snap, place, family, _ = _family_tree(req, root)
     only = req.get("only")
     if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only)):
@@ -829,7 +841,7 @@ def _op_plan(req: dict, root: str) -> dict:
     shown = req.get("shown")
     shown_ids = shown_digest = None
     if shown is not None:
-        # 見せた一覧と指紋（8.3 の 2）。違えば書くものを出さず、preview からやり直させる。
+        # 見せた一覧と指紋。違えば書くものを出さず、preview からやり直させる。
         ids = shown.get("ids") if isinstance(shown, dict) else None
         digest = shown.get("digest") if isinstance(shown, dict) else None
         if not (isinstance(ids, list) and all(isinstance(i, str) for i in ids)) or not (
@@ -866,7 +878,7 @@ def _op_plan(req: dict, root: str) -> dict:
 
 
 def _op_withdraw(req: dict, root: str) -> dict:
-    """承認の取り下げで書くもの（8.8）。`prior` は識別子ごとの承認コミットの親の提案の本文。"""
+    """承認の取り下げで書くもの。`prior` は識別子ごとの承認コミットの親の提案の本文。"""
     snap, place, family, _ = _family_tree(req, root)
     _writable(snap, family)
     ids = req.get("ids")
@@ -891,7 +903,7 @@ def _op_withdraw(req: dict, root: str) -> dict:
 
 
 def _op_confirm(req: dict, root: str) -> dict:
-    """レビュー済みで書くもの（8.9。段階 4）。書かない。
+    """レビュー済みで書くもの。書かない。
 
     `result` は `ccnavi-review.sh` が組むのと同じ形の、
     取得した結果（`{host, mr, threads, reviews}`）。
@@ -955,13 +967,13 @@ def _compare_files(compare: object, base: str | None, head: str) -> list[str] | 
 
 
 def _reviewable(root: str, place: dict, family: str) -> list[dict]:
-    """依頼済みでまだレビュー済みでないフェーズ（8.9）。仮のツリーは組んである前提。"""
+    """依頼済みでまだレビュー済みでないフェーズ。仮のツリーは組んである前提。"""
     with _environ(place["env"]):
         conf, _ = settings.load(root)
         return core.reviewable(core.read_fs(conf, root), family)
 
 
-# ---- 互換のマーカー（7.3） --------------------------------------------------------------------
+# ---- 互換のマーカー --------------------------------------------------------------------------
 
 
 def _op_compat(req: dict, root: str) -> dict:
@@ -987,11 +999,11 @@ def _compat(snap: dict) -> dict:
     return {"extension": ours, "repository": theirs, "same": theirs == ours, "message": message}
 
 
-# ---- 「始める」（8.6。段階 5） -------------------------------------------------------------
+# ---- 「始める」 ------------------------------------------------------------------------
 
 
 def _op_start(req: dict, root: str) -> dict:
-    """issue から始める親のブランチの名前と、始められない理由（8.6・3.1 の 4・5・7）。
+    """issue から始める親のブランチの名前と、始められない理由。
 
     ブランチは作らない（拡張の service worker が作る）。入力は統合先（と、プロジェクトなら
     ワークスペースの統合先）と、拡張が見たブランチ（`snapshot.branches` と `taken` の名前）。
@@ -1015,8 +1027,7 @@ def _op_start(req: dict, root: str) -> dict:
     )
     if folded in {i.casefold() for i in _closed(snap, place)}:
         problems.append(
-            f"{ident} は統合先 {integ} の done/ で閉じている（閉じた識別子は使い直さない。"
-            "ADR-0093 の 3.1 の 5）"
+            f"{ident} は統合先 {integ} の done/ で閉じている（閉じた識別子は使い直さない）"
         )
     names = [n for n in [*snap["branches"], *taken] if n != integ]
     same = sorted({n for n in names if n.casefold() == folded})
@@ -1033,14 +1044,13 @@ def _op_start(req: dict, root: str) -> dict:
             }
         )
         if hits:
-            problems.append(f"開いた親のブランチ {name} に同じ識別子がある（{', '.join(hits)}）")
+            problems.append(f"開いた親子のチケット {name} に同じ識別子がある（{', '.join(hits)}）")
     compat = _compat(snap)
     if not compat["same"]:
-        problems.append(f"{compat['message']}（ADR-0093 の 7.3）")
+        problems.append(compat["message"])
     if problems:
         problems.append(
             "この issue からは始められない。識別子をユーザが付けて（フォールバック）始める"
-            "（ADR-0093 の 3.2・8.6）"
         )
     return {"identifier": ident, "integration": integ, "problems": problems}
 
@@ -1067,7 +1077,7 @@ def main(argv: list[str]) -> int:
     """手元の試験用: `python ccnavi_chrome.py <root>` で、標準入力の 1 行 1 要求に 1 行で答える。
 
     拡張の試験が、Pyodide と同じ要求を手元の CPython にも投げて答えを
-    突き合わせる（ADR-0093 の 6.2）。
+    突き合わせる。
     """
     root = argv[1] if len(argv) > 1 else ""
     if not root:

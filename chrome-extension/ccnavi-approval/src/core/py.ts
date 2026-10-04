@@ -1,6 +1,6 @@
 /**
  * Pyodide の上の入口（`py/ccnavi_chrome.py`）との約束。判定はすべて Python が出し、
- * ここは形だけを持つ（ADR-0035）。
+ * ここは形だけを持つ。TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため。
  */
 
 /** 要求と答えの形の版。`ccnavi_chrome.SCHEMA` と揃える */
@@ -12,7 +12,7 @@ export interface Placement {
   readonly integration_paths: readonly string[];
   readonly integration_files: readonly string[];
   readonly branch_paths: readonly string[];
-  /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの（段階 5） */
+  /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの */
   readonly workspace_paths: readonly string[];
   readonly workspace_files: readonly string[];
   /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層） */
@@ -33,7 +33,7 @@ export interface Integration {
   readonly head: string;
 }
 
-/** プロジェクトのリポジトリのワークスペースの統合先の中身（段階 5。共通層・自身の層・設定・互換のマーカー） */
+/** プロジェクトのリポジトリのワークスペースの統合先の中身（共通層・自身の層・設定・互換のマーカー） */
 export interface Workspace {
   readonly integration: Integration;
   readonly files: Record<string, string>;
@@ -45,7 +45,7 @@ export interface Snapshot {
   readonly integration: Integration;
   readonly branches: Record<string, Branch>;
   readonly absent: readonly string[];
-  /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い（段階 5） */
+  /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い */
   readonly project?: string;
   readonly workspace?: Workspace;
 }
@@ -84,7 +84,7 @@ export interface Withdrawable {
   readonly problems: readonly string[];
 }
 
-/** 依頼済みでまだレビュー済みでないフェーズ（8.9。段階 4）。通るかは `confirm` が決める */
+/** 依頼済みでまだレビュー済みでないフェーズ。通るかは `confirm` が決める */
 export interface Reviewable {
   readonly phase: number;
   readonly mr: number;
@@ -98,14 +98,14 @@ export interface BoardResult {
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
-  /** 書けるかどうか。互換の版と書く先の名前をもとに Python が決める（7.3・8.5） */
+  /** 書けるかどうか。互換の版と書く先の名前をもとに Python が決める */
   readonly write?: { readonly allowed: boolean; readonly reason: string };
   readonly withdrawable?: readonly Withdrawable[];
-  /** レビュー済みを付けられる候補（段階 4） */
+  /** レビュー済みを付けられる候補 */
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
-  /** 見せた画面の指紋（承認のときに Python が読み直した中身と比べる。8.3） */
+  /** 見せた画面の指紋（承認のときに Python が読み直した中身と比べる） */
   readonly digest?: string;
   /** 承認するときに `plan` へ渡す絞り（指紋を出したときの絞り。null なら絞らない） */
   readonly only?: readonly string[] | null;
@@ -159,7 +159,7 @@ export interface Compare {
   readonly files: readonly string[] | null;
 }
 
-/** 「始める」の答え（8.6。段階 5）。`problems` が空なら `identifier` の名前でブランチを作れる */
+/** 「始める」の答え。`problems` が空なら `identifier` の名前でブランチを作れる */
 export interface StartResult {
   readonly identifier: string;
   readonly integration: string;

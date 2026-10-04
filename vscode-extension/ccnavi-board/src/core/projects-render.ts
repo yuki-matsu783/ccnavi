@@ -10,7 +10,7 @@
  * CSS も画面の側の持ち物で、部品と同じ置き場にある（`src/webview/projects/*.css`。5 画面共通のぶんは
  * `src/webview/styles/`）。それをバンドルした 1 本（`out/webview/projects.css`）を、ここが `<style nonce>` に
  * 流し込む。挿すのがここなのは、Webview の CSP が nonce を持つ `<style>` しか通さず、nonce を作るのが
- * 入れ物を組む側だから（ADR-0066）。
+ * 入れ物を組む側だから。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
 import { loadingMarkup } from "./loading-render.js";

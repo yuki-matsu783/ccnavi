@@ -602,7 +602,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   }
 });
 
-test("CB-T13b 親の絞り込みを出し、カードに親のブランチを付ける", async () => {
+test("CB-T13b 親の絞り込みを出し、カードにどの親子のチケットかを付ける", async () => {
   const page = await openBoard();
   try {
     assert.equal(page.all("#parent-filter").length, 1);

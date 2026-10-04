@@ -1,5 +1,5 @@
 /**
- * Chrome の「レビュー済み」（ADR-0093 の 8.9。段階 4）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome の「レビュー済み」。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
  * - 録ったホストの応答の見本（test/fixtures/host/github/）から TS が組む結果が、sh が組んだ期待値と同じ
  * - 依頼の後の変更の一覧（compare API）は、打ち切り・祖先でない・無い、のどれでも null（動いたと数える）
@@ -46,7 +46,7 @@ function client(fetch: gh.Fetch) {
   return { host: HOSTS[0], token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait };
 }
 
-/** 依頼を済ませた親のブランチ i0004 を積み、場面の見本を付けた模擬の GitHub */
+/** 依頼を済ませた親子のチケット i0004 を積み、場面の見本を付けた模擬の GitHub */
 function reviewing(scene: string): MockGitHub {
   const mock = new MockGitHub(fixture());
   mock.branch(FAMILY, "main");
@@ -108,10 +108,10 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
   for (const [scene, button, why] of [
     ["resolved", 1, null],
     ["full-page", 1, null],
-    // GitHub では目印で始まるスレッドも数える（11.8.1 の決定 C）
+    // GitHub では目印で始まるスレッドも数える（目印は誰でも書ける）
     ["paged", 0, /未解決のスレッドが 4 件残っている/],
     ["changes-requested", 0, /変更要求のレビューが立っている/],
-    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない（決定 A）
+    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない
     ["cr-commented", 0, /変更要求のレビューが立っている/],
     ["pending", 0, /変更要求のレビューが立っている/],
   ] as const) {
@@ -271,7 +271,7 @@ test("CX-T140 レビュー済みの読み取りの受け口も、設定画面で
   assert.ok(!mock.calls.some((c) => c.includes("/pulls")), mock.calls.join("\n"));
 });
 
-test("CX-T141 同じ親のブランチの依頼済みのフェーズが 2 つでも、MR・スレッド・レビューは 1 度だけ読む", async () => {
+test("CX-T141 同じ親子のチケットの依頼済みのフェーズが 2 つでも、MR・スレッド・レビューは 1 度だけ読む", async () => {
   const mock = new MockGitHub(fixture());
   mock.branch(FAMILY, "main");
   const at = mock.push(FAMILY, reviewFamilyFiles(FAMILY, 2), "2 フェーズぶんのレビュー待ち");

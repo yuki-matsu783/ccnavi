@@ -1,5 +1,5 @@
-"""ccnavi-review.sh がホストの応答から組む JSON と、マーカーのアカウント
-（ADR-0093 の 8.9。段階 4）の受入テスト。
+"""ccnavi-review.sh がホストの応答から組む JSON と、マーカーのアカウント（`actor`）の
+受入テスト。
 
 見るのは 3 つ。
 
@@ -48,7 +48,7 @@ exit 0
 """
 
 
-# ELI5 の HTML の既定の置き場。ワークツリーの wip/ の下にコミットする（ADR-0095）
+# ELI5 の HTML の既定の置き場。ワークツリーの wip/ の下にコミットし、マージリクエストの差分に載せる
 ELI5 = "wip/eli5/phase-1.html"
 
 
@@ -62,8 +62,8 @@ def write(path, text):
 def conclusion(copy: dict, poster: str = "") -> dict:
     """JSON から出る結論。confirm が止める理由のうち、ホストから取ってきた JSON で決まるもの。
 
-    GitLab は依頼を投稿したアカウント（`poster`）の ccnavi の依頼のスレッドを数えない
-    （11.8.1 の決定 C）。
+    GitLab は依頼を投稿したアカウント（`poster`）の ccnavi の依頼のスレッドを数えない。
+    目印は誰でも書けるので、書いたアカウントでも確かめる。
     """
     result = review.Result.from_data(copy)
     changes = [
@@ -167,7 +167,7 @@ class HostFixtureTest(unittest.TestCase):
         self.assertEqual(said("full-page"), {"changes_requested": [], "unresolved": []})
         paged = said("paged")
         self.assertEqual(paged["changes_requested"], [])
-        # GitHub では目印で始まるスレッドもユーザのものとして数える（11.8.1 の決定 C）
+        # GitHub では目印で始まるスレッドもユーザのものとして数える（依頼はスレッドにならない）
         self.assertEqual(len(paged["unresolved"]), 4)
         self.assertIn("PRRT_kwDOAbCdEs5P2003", paged["unresolved"])
         for scene in ("changes-requested", "cr-commented", "pending"):
@@ -278,7 +278,7 @@ class HostFixtureTest(unittest.TestCase):
         self.assertIn("createdAt", ask(q.replace(" createdAt", ""))["errors"][0]["message"])
 
     def test_decide_passes_the_token_owner_and_the_way(self):
-        """段階 5: decide のマーカーにも actor と via（ボードは board、端末は terminal）"""
+        """decide のマーカーにも actor と via（ボードは board、端末は terminal）"""
         for args, via in (
             (["decide", "1", "--choices", "{}", "--digest", "d"], "board"),
             (["decide", "1"], "terminal"),
@@ -309,7 +309,7 @@ class HostFixtureTest(unittest.TestCase):
     def old_exe(self, flags):
         """古い実行ファイルの代役。知らないフラグ（--actor・--via）を渡されると引数の誤りで落ちる。
 
-        `flags` が None なら `--version --json` を知らない（段階 4 より前）。
+        `flags` が None なら `--version --json` を知らない（`--actor` を入れる前の版）。
         387d4a6 の実行ファイルは
         `--actor` を知っていて `--via` を知らない（`["--actor"]`）。
         """
@@ -341,7 +341,7 @@ class HostFixtureTest(unittest.TestCase):
         return path
 
     def test_an_old_exe_gets_only_the_flags_it_knows(self):
-        """決定 C: `--version --json` の flags に無いフラグは渡さない（古いものが落ちる）。"""
+        """`--version --json` の flags に無いフラグは渡さない（古いものが落ちる）。"""
         for flags, confirm_actor in ((None, False), (["--actor"], True)):
             with self.subTest(flags=flags):
                 exe = self.old_exe(flags)
@@ -374,7 +374,7 @@ class HostFixtureTest(unittest.TestCase):
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
 class GitLabHostFixtureTest(unittest.TestCase):
-    """段階 5: GitLab の見本から sh が組む JSON と結論。拡張も同じ期待値と比べる。"""
+    """GitLab の見本から sh が組む JSON と結論。拡張も同じ期待値と比べる。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -470,7 +470,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             with open(os.path.join(gitlab_host.SCENES, scene, "conclusion.json")) as f:
                 return json.load(f)
 
-        # 依頼したアカウントの ccnavi の依頼のスレッドは数えない（11.8.1 の決定 C）
+        # 依頼したアカウントの ccnavi の依頼のスレッドは数えない
         self.assertEqual(said("resolved"), {"changes_requested": [], "unresolved": []})
         self.assertEqual(len(said("requested-changes")["changes_requested"]), 1)
         self.assertEqual(said("requested-changes")["unresolved"], [])
@@ -489,7 +489,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
 
     def test_an_unreadable_project_id_stops_with_a_reason(self):
         """プロジェクトの id を読めなければ、MR が無いと取り違えず（作り直さず）、
-        理由を言って止める（11.9.3 の 6）。"""
+        理由を言って止める。"""
         done = self.review("impostor", "fetch", FAKE_GITLAB_NO_PROJECT="1")
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("プロジェクト", done.stderr)
@@ -524,7 +524,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         return stub
 
     def eli5(self, rel=ELI5, text="<!doctype html><p>やさしい説明</p>\n", commit=True):
-        """ELI5 の HTML をワークツリーに書く。commit なら追跡してコミットする（ADR-0095）。"""
+        """ELI5 の HTML をワークツリーに書く。commit なら追跡してコミットする。"""
         path = write(os.path.join(self.ws, *rel.split("/")), text)
         if commit:
             git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
@@ -546,14 +546,14 @@ class GitLabHostFixtureTest(unittest.TestCase):
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
                 result = json.load(f)
-            # 投稿者は名前でなく id で残す（11.9.1 の 15）
+            # 投稿者は名前でなく id で残す（名前で比べると取り違える）
             self.assertEqual((result["host"], result["author"]), ("gitlab", "201"))
             self.assertEqual(result["mr"]["number"], 7)
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)
 
     def test_request_stops_without_an_eli5_html(self):
-        """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める（ADR-0097）。
+        """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める。
 
         実行ファイルもホストも触らない。旧方式（追跡しない wip/tmp/ の HTML）も、wip/eli5/ の外の
         wip/ も、名前に `'`・`$`・空白・日本語を含むものも、リンクや実行ビット付きも止まる。
@@ -633,7 +633,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 self.assertFalse(os.path.exists(state))
 
     def test_request_points_to_crit_push_and_keeps_eli5_from_the_exe(self):
-        """投稿が済んだら、ユーザが打つ crit review <相対> と crit push <番号> を出す（ADR-0095）。
+        """投稿が済んだら、ユーザが打つ crit review <相対> と crit push <番号> を出す。
 
         相対は打った場所から解く。--eli5 は実行ファイルには渡さない。crit・glab が PATH に
         無くても止めない。
@@ -658,7 +658,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             number = json.load(f)["mr"]["number"]
         said = [line for line in done.stdout.splitlines() if line.startswith("ELI5 を見る: ")]
         self.assertEqual(len(said), 1, done.stdout)
-        # ツリーの絶対パスはいつも '…' で包む（中の ' は '\'' に。ADR-0097）
+        # ツリーの絶対パスはいつも '…' で包む（中の ' は '\'' に。ユーザの置き場なので字は絞れない）
         self.assertIn("cd '", said[0])
         top = said[0].split("cd ", 1)[1].split(" ", 1)[0].strip("'")
         self.assertTrue(os.path.isabs(top), top)
@@ -680,7 +680,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertNotIn("やさしい説明", body)
 
     def test_the_tree_path_is_quoted_for_the_shell(self):
-        """ツリーの絶対パスに `'`・`$`・空白があっても、案内の cd は 1 語のまま（ADR-0097）。"""
+        """ツリーの絶対パスに `'`・`$`・空白があっても、案内の cd は 1 語のまま。"""
         moved = os.path.join(self._tmp.name, "w s'$(touch pwned)")
         shutil.move(self.ws, moved)
         self.ws = moved

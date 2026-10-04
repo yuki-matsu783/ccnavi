@@ -50,7 +50,7 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .badge.copy-none { color: var(--board-info-text); }
 .badge.hold, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--board-error-text); }
 .badge.blocked { color: var(--board-error-text); font-weight: 600; }
-/* 先行待ち（ADR-0088）。止まっているのは承認と着手で、書き込みではないので警告の色。
+/* 先行待ち。止まっているのは承認と着手で、書き込みではないので警告の色。
    識別子（`i0001-02`）の途中では折り返さない。折れるのは識別子の間だけ */
 .badge.preds { color: var(--board-warn-text); }
 .badge-id { white-space: nowrap; }
@@ -102,7 +102,7 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 /* カードが狭いと 2 つ目のボタンは次の行へ回す。1 つでも幅に収まらなければボタンの中で折り返す */
 .card-actions > button.action { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-/* 状態の履歴（ADR-0086）。既定で畳む。開くと新しい順に 1 行ずつ。時刻と経路は薄く */
+/* 状態の履歴。既定で畳む。開くと新しい順に 1 行ずつ。時刻と経路は薄く */
 .history { margin-top: 6px; font-size: .82em; color: var(--vscode-descriptionForeground); }
 .history summary { cursor: pointer; width: fit-content; }
 .history summary:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
