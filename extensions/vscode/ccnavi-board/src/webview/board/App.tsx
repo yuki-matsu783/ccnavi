@@ -104,14 +104,18 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const archived = view.archived;
   const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
   // 「アーカイブ済みチケットを表示」を入れたら、右端に足されるアーカイブの列まで横へ送る。
-  // ユーザが入れたときだけ動かす（覚えていた値で開き直したときには動かさない）
+  // ユーザが入れたときだけ動かす（覚えていた値で開き直したときには動かさない）。
+  // 送るのはボードの横だけ。列の scrollIntoView だと、列の高さに合わせて文書の縦まで動いてしまう
   const revealArchived = useRef(false);
   useEffect(() => {
     if (!archived || !revealArchived.current) {
       return;
     }
     revealArchived.current = false;
-    document.querySelector('.board > [data-state="archived"]')?.scrollIntoView?.({ block: "nearest", inline: "end" });
+    const board = document.querySelector<HTMLElement>(".board");
+    if (board !== null) {
+      board.scrollLeft = board.scrollWidth;
+    }
   }, [archived]);
 
   // 絞り込み中かどうかは body に出す。カードの表示・非表示は CSS（.card.hidden）が受け持つ

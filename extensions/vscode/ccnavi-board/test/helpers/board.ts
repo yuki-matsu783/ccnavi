@@ -16,7 +16,7 @@ import type { BoardJson } from "../../src/core/model.js";
 import { renderBoardPage, type RenderOptions } from "../../src/core/render.js";
 import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
 import { screenScript, screenStyle } from "./bundle.js";
-import { loadPage, type DomPage } from "./dom.js";
+import { loadPage, type DomPage, type LoadOptions } from "./dom.js";
 import { fixture } from "./fixture.js";
 
 export const NONCE = "TEST-NONCE-123";
@@ -27,8 +27,8 @@ export function boardPage(data: BoardData, options: Partial<RenderOptions> = {})
 }
 
 /** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */
-export async function openPage(data: BoardData, initialState?: unknown): Promise<DomPage> {
-  const page = await loadPage(boardPage(data), initialState);
+export async function openPage(data: BoardData, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
+  const page = await loadPage(boardPage(data), initialState, options);
   await page.settle();
   return page;
 }
@@ -36,9 +36,9 @@ export async function openPage(data: BoardData, initialState?: unknown): Promise
 /** 見本（`test/fixtures/board.json`）のボードを開く。差し替えたいところだけ渡す */
 export async function openBoard(
   json: BoardJson = fixture(),
-  extra: { readonly approval?: ApprovalOverlay; readonly filter?: string; readonly state?: unknown } = {},
+  extra: { readonly approval?: ApprovalOverlay; readonly filter?: string; readonly state?: unknown; readonly prepare?: LoadOptions["prepare"] } = {},
 ): Promise<DomPage> {
-  return openPage({ kind: "board", board: buildBoard(json), approval: extra.approval, filter: extra.filter }, extra.state);
+  return openPage({ kind: "board", board: buildBoard(json), approval: extra.approval, filter: extra.filter }, extra.state, { prepare: extra.prepare });
 }
 
 /** 承認画面の見本（`--agree --preview --json` の出力そのもの）。Python 側の tests/ticket/test_approve_json.py が書き出す */
