@@ -562,6 +562,17 @@ class FlowInfoTest(unittest.TestCase):
         draft = flow.info(self.conf, self.root, self.child(ticket.TODO))["draft"]
         self.assertTrue(draft["exists"])
         self.assertFalse(draft["linked"])
+        # プロジェクトの子は、そのプロジェクトのツリーの提案の置き場（フローと同じツリー）。
+        project = os.path.join(self.root, "projects", "web")
+        child = self.child(ticket.DOING)
+        child.tree_root = project
+        shown = flow.info(self.conf, self.root, child)
+        self.assertEqual(os.path.realpath(shown["tree"]), os.path.realpath(project))
+        self.assertEqual(
+            os.path.realpath(shown["draft"]["path"]),
+            os.path.realpath(os.path.join(project, "wip", "proposals", "flows", f"{CHILD}.yml")),
+        )
+        self.assertEqual(shown["draft"]["rel"], f"wip/proposals/flows/{CHILD}.yml")
         # 提案の置き場を変えれば下書きの置き場も付いて動く。
         conf = conf_with()
         conf.tickets = "./work/props/"
@@ -896,10 +907,6 @@ class NestedBounceTest(PhaseHarness):
         self.assertNotIn("systemMessage", out)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class FlowDraftTest(FlowHarness):
     """エージェントの下書き（ADR-0100）。書けるが効力は無い。判定と守りは今までどおり。"""
 
@@ -1003,6 +1010,25 @@ class FlowDraftTest(FlowHarness):
         errors = [x for x in lint.stdout.splitlines() if x.startswith("error:")]
         self.assertFalse([x for x in errors if "proposals/flows" in x.replace("\\", "/")], errors)
 
+    def test_the_draft_is_not_in_the_approval_digest(self):
+        """承認の指紋（`--agree --preview --json` の digest）に下書きは入らない。"""
+        other = "i0001-02"
+        self.propose(other, child_text(other, "i0001", 1, ("wip/research/*",)))
+        self.commit_parent("another child")
+        before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
+        self.assertTrue(before)
+        write(self.draft_in(self.parent_tree, other), WORKFLOW_YAML)
+        write(self.draft_in(self.parent_tree), WORKFLOW_YAML)
+        after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
+        self.assertEqual(before, after)
+        # 承認の前の子にも、提案のツリーの置き場で欄が出る
+        shown = self.board_flow(other)["draft"]
+        self.assertTrue(shown["exists"])
+        self.assertEqual(
+            os.path.realpath(shown["path"]),
+            os.path.realpath(self.draft_in(self.parent_tree, other)),
+        )
+
     def test_a_linked_draft_is_named(self):
         real = write(os.path.join(self.parent_tree, "wip", "draft-real.yml"), WORKFLOW_YAML)
         os.makedirs(os.path.dirname(self.draft_in(self.parent_tree)), exist_ok=True)
@@ -1010,3 +1036,7 @@ class FlowDraftTest(FlowHarness):
         shown = self.board_flow(CHILD)["draft"]
         self.assertTrue(shown["exists"])
         self.assertTrue(shown["linked"])
+
+
+if __name__ == "__main__":
+    unittest.main()
