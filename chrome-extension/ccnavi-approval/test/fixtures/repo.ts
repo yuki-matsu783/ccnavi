@@ -256,25 +256,25 @@ export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" =
  * プロジェクトのリポジトリ（手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
  *
  * - `main`（プロジェクトの統合先）: 閉じた親子のチケット web-i0003 の `done/` とプロジェクトの層（rules.yml だけ）。
- *   共通層・置き場のパス・互換のマーカーはワークスペース（`fixture()` の `main`）から読む
+ *   共通層・設定・互換のマーカーはワークスペース（`fixture()` の `main`）から読む（置き場のパスは既定に固定）
  * - `web-i0012`（直近）: issue #12 から始めた親と子の提案
  * - `web-i0012` の上の `.ccnavi/config/phases.yml` は読まない（置き場の外）
  */
-export function projectFixture(): Record<string, FixtureBranch> {
+export function projectFixture(name = "web"): Record<string, FixtureBranch> {
   const main = {
     ".ccnavi/config/rules.yml": RULES,
-    ".ccnavi/approved/done/web-i0003.md": done("web-i0003", null, null),
+    [`.ccnavi/approved/done/${name}-i0003.md`]: done(`${name}-i0003`, null, null),
     "README.md": "プロジェクト\n",
   };
   return {
     main: { committedDate: "2026-09-20T00:00:00Z", files: main },
-    "web-i0012": {
+    [`${name}-i0012`]: {
       committedDate: "2026-09-28T10:00:00Z",
       files: {
         ...main,
         ".ccnavi/config/phases.yml": "version: 1\nphases: {}\n",
-        "wip/proposals/todo/web-i0012.md": parent("web-i0012", "プロジェクトの親 web-i0012", "プロジェクトの本文\n"),
-        "wip/proposals/todo/web-i0012-01.md": child("web-i0012-01", "web-i0012", 1, "wip/research/*"),
+        [`wip/proposals/todo/${name}-i0012.md`]: parent(`${name}-i0012`, `プロジェクトの親 ${name}-i0012`, "プロジェクトの本文\n"),
+        [`wip/proposals/todo/${name}-i0012-01.md`]: child(`${name}-i0012-01`, `${name}-i0012`, 1, "wip/research/*"),
       },
     },
   };

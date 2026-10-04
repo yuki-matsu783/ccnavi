@@ -253,6 +253,16 @@ class EntryDetailTest(ChromeWriteHarness):
         )
         self.assertEqual(chrome._relative("/ws", "'/ws/a' と a/ws/b"), "'a' と a/ws/b")
 
+    def test_host_paths_that_leave_the_tree_are_refused(self):
+        """ホストから来たパスは、根から始まるもの・区切りが `\\` のもの・`..` を含むものを断る。"""
+        chrome = _chrome()
+        self.assertEqual(
+            chrome._check_rel("wip/proposals/todo/i0001.md"), "wip/proposals/todo/i0001.md"
+        )
+        for path in ("/a", "~/a", "C:/a", "a\\b", "a/../b"):
+            with self.subTest(path=path), self.assertRaises(chrome.Refused):
+                chrome._check_rel(path)
+
     def test_a_history_that_cannot_be_written_stops_the_plan(self):
         chrome = _chrome()
         chrome._unwritten("/ws", "")

@@ -123,9 +123,16 @@ test("CX-T047 置き場は既定に固定し、統合先の .claude/settings.jso
   for (const k of Object.keys(b.i0001.files)) {
     if (k.startsWith("wip/proposals/")) b.i0001.files[k.replace("wip/proposals/", "wip/tickets/")] = b.i0001.files[k];
   }
+  // 承認済みの置き場と層も既定のものを読む。env の指す先（moved/）には同じ形のものを置いても読まない
+  b.main.files[".ccnavi/config/rules.yml"] = b.main.files[".ccnavi/common/rules.yml"];
+  b.main.files["moved/approved/done/i0001.md"] = b.main.files[".ccnavi/approved/done/i0005.md"];
+  b.main.files["moved/home/config/rules.yml"] = b.main.files[".ccnavi/common/rules.yml"];
   const { board } = await run(b);
   assert.equal(board.error, "");
   assert.deepEqual(family(board, "i0001")?.result?.batch?.map((e) => e.path), ["i0001:wip/proposals/todo/i0001.md"]);
+  const read = Object.keys(board.seen?.branches.main?.files ?? {});
+  assert.ok(read.includes(".ccnavi/approved/done/i0005.md") && read.includes(".ccnavi/config/rules.yml"), JSON.stringify(read));
+  assert.deepEqual(read.filter((p) => p.startsWith("moved/")), []);
 });
 
 test("CX-T048 置き場の env に絶対パスを入れても止めず、既定の置き場を読む", async () => {
