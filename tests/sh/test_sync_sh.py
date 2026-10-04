@@ -52,7 +52,7 @@ def copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
     return f"{head}ccnavi_approved:\n  approved_at: {approved_at}\n---\n{body}"
 
 
-def child_copy_text(name=f"{PARENT}-01", parent=PARENT):
+def child_copy_text(name=f"{PARENT}-01-01", parent=PARENT):
     return f"---\nversion: 1\nticket: {name}\nparent: {parent}\nphase: 1\n{ALLOW}---\n"
 
 
@@ -224,7 +224,7 @@ class SyncTest(unittest.TestCase):
     # ---- 取り込み（P がリモートにある）
 
     def test_fast_forward_and_records(self):
-        head = self.remote_commit(PARENT, ".ccnavi/approved/doing/i0001-01.md", "child\n")
+        head = self.remote_commit(PARENT, ".ccnavi/approved/doing/i0001-01-01.md", "child\n")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
@@ -335,7 +335,7 @@ class SyncTest(unittest.TestCase):
         # 元ツリーに未コミットで残った子チケット（親のワークツリーの外）。
         # 取り込み済みの親子のチケットでは信頼しないので、検査が親子のチケットを止める。
         stray = write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
@@ -363,7 +363,7 @@ class SyncTest(unittest.TestCase):
         )
         os.chmod(old, 0o755)
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
@@ -384,7 +384,7 @@ class SyncTest(unittest.TestCase):
         )
         os.chmod(racer, 0o755)
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=racer)
@@ -406,7 +406,7 @@ class SyncTest(unittest.TestCase):
         )
         os.chmod(holder, 0o755)
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=holder, CCNAVI_LOCK_WAIT="0")
@@ -418,7 +418,7 @@ class SyncTest(unittest.TestCase):
         # 閉じた親子のチケット（取り込み状態が closed）は検査しない（状態の操作が無い）。
         self.keep_record()
         write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01.md"),
+            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         self.remote_commit("main", f".ccnavi/approved/done/{PARENT}.md", copy_text())
@@ -541,16 +541,88 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
 
-    def test_a_merged_request_waits_instead_of_calling_it_gone(self):
-        # MR がマージ済みと分かれば観測の食い違い。消えたとは言わない。
+    def test_a_merged_request_is_closed_without_a_done_copy(self):
+        # 統合先には閉じたチケットを残さない（ready が退避して消し、squash でマージする）ので、
+        # MR がマージ済みと分かれば閉じた親子のチケット。消えたとは言わない。
         self.review_says("merged 42")
         self.keep_record()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="1")
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def test_a_merged_answer_does_not_wait_for_the_integration(self):
+        # 統合先の done/ を待つ確かめ直しは、マージ済みかの答えが得られないときだけ。
+        self.review_says("merged 42")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        started = time.monotonic()
+        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="2")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def archive_locally(self, text):
+        write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
+
+    def test_a_parent_in_the_local_archive_is_closed_when_merge_is_unknown(self):
+        # マージ済みかを確かめられないときだけ、手元の退避（ready が移した先）の親で補う。
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("logs/archive/self/done/", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def archive_the_parent(self):
+        """ready の後の状態。親チケットをツリーから消して push し、手元の退避に置く。"""
+        rel = f".ccnavi/approved/doing/{PARENT}.md"
+        self.archive_locally(copy_text())
+        git(self.tree, "rm", "-q", "--", rel)
+        git(self.tree, "commit", "-q", "-m", "退避")
+        git(self.tree, "push", "-q", "origin", PARENT)
+
+    def test_a_parent_tree_whose_copy_was_archived_is_still_a_parent_tree(self):
+        self.keep_record()
+        self.archive_the_parent()
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+        listed = self.sync()
+        self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+        self.assertIn(PARENT, listed.stdout)
+
+    def test_the_local_archive_does_not_override_an_unmerged_answer(self):
+        # マージされていないと分かれば、退避があっても閉じたとは読まない。
+        self.review_says("none")
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
+        self.assertEqual("gone", fields(self.record)["state"])
+
+    def test_an_archive_of_another_approval_is_not_this_family(self):
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text(approved_at="2020-01-01T00:00:00+0900"))
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+
+    def test_a_child_in_the_local_archive_is_not_the_parent(self):
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text().replace("ticket: i0001\n", "ticket: i0001\nparent: x\n"))
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
         self.assertEqual("present", fields(self.record)["state"])
 
     def test_branch_names_are_matched_exactly(self):

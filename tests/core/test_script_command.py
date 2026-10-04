@@ -58,7 +58,7 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase.exempt(request.text, request.reason), request.text)
             ready = shellread.read(f"{review} ready")
             self.assertTrue(phase.forbidden(ready.text), ready.text)
-            finish = shellread.read(f"{ticket} finish i0001-01")
+            finish = shellread.read(f"{ticket} finish i0001-01-01")
             self.assertTrue(phase.forbidden(finish.text), finish.text)
 
     def test_separator_is_slash(self):
@@ -79,7 +79,7 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase.exempt(f"{review} request --phase 1 --body-file b.md", ""))
             self.assertTrue(phase.exempt(f"{review} confirm --phase 1", ""))
             self.assertTrue(phase.forbidden(f"{review} ready"))
-            self.assertTrue(phase.forbidden(f"{ticket} finish i0001-01"))
+            self.assertTrue(phase.forbidden(f"{ticket} finish i0001-01-01"))
             rule = phase.ticket_approval_rule("", root)
             approve = settings.script_command(root, "ccnavi-agree.sh")
             self.assertIsNotNone(rule.compiled.search(approve))

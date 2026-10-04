@@ -130,7 +130,7 @@ test("CX-T117 service worker が書く先に許す置き場は既定に固定し
   assert.equal((await dispatch(commit(".ccnavi/approved/doing/x.md"), BOARD, d)).ok, true);
 });
 
-test("CX-T180 置き場の env に絶対パスを入れても、service worker は書く頼みを止めず既定の置き場に書く", async () => {
+test("CX-T213 置き場の env に絶対パスを入れても、service worker は書く頼みを止めず既定の置き場に書く", async () => {
   const f = fixture();
   f.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "/srv/proposals", CCNAVI_TICKETS_APPROVED: "C:/srv/approved" } });
   const m = new MockGitHub(f);

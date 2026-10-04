@@ -1,5 +1,6 @@
 /**
- * 画面が覚えておくもの。絞り込み（プロジェクト・親・要対応のみ）、折りたたんだ列、ドラッグで決めた列の幅。
+ * 画面が覚えておくもの。絞り込み（プロジェクト・親・要対応のみ・アーカイブ済みを表示するか）、折りたたんだ列、
+ * ドラッグで決めた列の幅。
  *
  * 置き場は Webview の state で、拡張が HTML を作り直しても（裏に回って作り直されても）残る。
  */
@@ -9,11 +10,13 @@ export interface ViewState {
   readonly project: string;
   readonly parent: string;
   readonly attention: boolean;
+  /** アーカイブ済みのチケット（手元の退避）を表示するか。既定は表示しない */
+  readonly archived: boolean;
   readonly folded: readonly string[];
   readonly widths: Readonly<Record<string, number>>;
 }
 
-export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, folded: [], widths: {} };
+export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, archived: false, folded: [], widths: {} };
 
 /** 覚えていた値を読む。型が違うもの・知らないものは既定を使う */
 export function loadState(): ViewState {
@@ -23,6 +26,7 @@ export function loadState(): ViewState {
     project: typeof saved.project === "string" ? saved.project : EMPTY.project,
     parent: typeof saved.parent === "string" ? saved.parent : EMPTY.parent,
     attention: saved.attention === true,
+    archived: saved.archived === true,
     folded: Array.isArray(saved.folded) ? saved.folded.filter((f): f is string => typeof f === "string") : [],
     widths: Object.fromEntries(Object.entries(widths).filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)),
   };
@@ -37,6 +41,7 @@ export function saveState(state: ViewState): void {
     project: state.project,
     parent: state.parent,
     attention: state.attention,
+    archived: state.archived,
     folded: state.folded,
     widths: state.widths,
   });

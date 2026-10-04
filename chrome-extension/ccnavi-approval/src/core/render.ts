@@ -16,7 +16,7 @@ import type { ReviewPanel } from "./reviewed.js";
 import { ALLOWED_URI } from "./sanitize.js";
 import type { FamilyBoard, RepoBoard } from "./snapshot.js";
 import type { Issue } from "./github.js";
-import { repoKey } from "./settings.js";
+import { MAX_RECENT_DAYS, repoKey } from "./settings.js";
 
 function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
   const node = doc.createElement(tag);
@@ -35,6 +35,8 @@ export interface Actions {
   loadIssues?(repo: RepoBoard): void;
   /** issue から親のブランチを作る */
   start?(repo: RepoBoard, issue: Issue): void;
+  /** 直近の日数を変える（入力欄の文字列のまま渡す。検査と保存は呼び手）。渡さなければ入力欄を出さない */
+  setRecentDays?(repo: RepoBoard, value: string): void;
   /** 「要確認」を外す（ユーザが確かめた） */
   dismiss?(repo: RepoBoard, family: string): void;
 }
@@ -62,6 +64,7 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
     line.dataset.testid = "integration";
     head.append(line);
   }
+  if (actions?.setRecentDays) head.append(recentDaysForm(doc, board, actions.setRecentDays));
   section.append(head);
 
   if (board.error) {
@@ -163,6 +166,30 @@ export interface FamilyActions {
   review?(phase: number): void;
 }
 
+/** 直近の日数の入力欄（リポジトリごと。設定画面と同じ値） */
+function recentDaysForm(doc: Document, board: RepoBoard, set: (repo: RepoBoard, value: string) => void): HTMLFormElement {
+  const form = el(doc, "form", "recent-days");
+  form.dataset.testid = "recent-days";
+  const label = el(doc, "label", "", "直近の日数（表示用） ");
+  const input = el(doc, "input");
+  input.type = "number";
+  input.name = "recentDays";
+  input.min = "0";
+  input.max = String(MAX_RECENT_DAYS);
+  input.step = "1";
+  input.value = String(board.repo.recentDays);
+  label.append(input);
+  const submit = el(doc, "button", "action", "変える");
+  submit.type = "submit";
+  submit.dataset.action = "recent-days";
+  form.append(label, submit);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    set(board, input.value);
+  });
+  return form;
+}
+
 function button(doc: Document, text: string, action: string, onClick: () => void): HTMLButtonElement {
   const b = el(doc, "button", "action", text);
   b.type = "button";
@@ -176,6 +203,10 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   box.dataset.family = f.family.name;
   const title = el(doc, "h3");
   title.append(el(doc, "code", "", f.family.name), doc.createTextNode(` ${f.family.title}`));
+  // 親チケットの branch: で識別子と違うブランチを使う親子のチケットは、識別子も出す
+  if (f.family.family && f.family.family !== f.family.name) {
+    title.append(doc.createTextNode(" （識別子 "), el(doc, "code", "", f.family.family), doc.createTextNode("）"));
+  }
   box.append(title);
   if (f.error) {
     box.append(notice(doc, "error", f.error));

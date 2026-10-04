@@ -1198,7 +1198,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 ルールファイルが壊れて組み込みの既定を使っている間も同じ。
 
 - `.claude/` の `hooks/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、`ccnavi-git.sh`、実行ファイル、
-  共通層の 3 本（`.ccnavi/common/`）、記録と state の置き場（`logs/decisions.jsonl` と `logs/state`）
+  共通層の 3 本（`.ccnavi/common/`）、記録と state の置き場（`logs/decisions.jsonl` と `logs/state`）、閉じたチケットの退避（`logs/archive`）
 - パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
 - 場所のパスは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない。止める側が広がるだけなので問題にしない
 
@@ -1298,12 +1298,12 @@ frontmatter は rules.yml と同じタイプ（`deny` / `ask` / `allow`）。適
 ```yaml
 ---
 version: 1
-ticket: i0050-03
+ticket: feature-50-settings-split-02-01
 issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
 project: lib             # 置き場と同じ名前。省ける（提案を置いた場所が決める）
-parent: i0050            # 子だけ。親は書かない
+parent: feature-50-settings-split  # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり
-predecessors: [i0050-01] # 子だけ。先に閉じているべき子。承認と着手（start）で求める。書き込みは止めない
+predecessors: [feature-50-settings-split-01-01] # 子だけ。先に閉じているべき子。承認と着手（start）で求める。書き込みは止めない
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
@@ -1322,8 +1322,23 @@ base_sha: ""
 ---
 ```
 
-- 識別子は子が `<親>-<2 桁連番>`。親の識別子はユーザが決める（issue 番号など）
-- ワークツリーの名前は識別子と同じ。`.claude/worktrees/i0050-03/`
+- 識別子は子が `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`（親 feature-50-settings-split のフェーズ 2 の 1 枚目は
+  `feature-50-settings-split-02-01`）。フェーズ番号は `phase:` と同じ値で、食い違うと読めない（error）。
+  親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、
+  `hotfix-64-統合先の解決`）。先頭の語は既定で `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs` のどれかで、
+  チャットで「hotfix で」と言えばエージェントがその語で書く。リストを変えるときだけ `.claude/settings.json` の `env` に
+  `CCNAVI_BRANCH_PREFIXES=feature,hotfix,fix` のように書く。番号は issue があれば issue の番号、無ければ通し番号
+  （`ccnavi --lint` の warn が次の番号を示す）。slug には日本語（ひらがな・カタカナ・漢字）も使える。形に合わないものと、
+  末尾が `-<2 桁>` の親は `--lint` の warn で、承認は止めない
+- ワークツリーの名前は識別子と同じ。`.claude/worktrees/feature-50-settings-split-02-01/`
+- 親のブランチ名も識別子と同じ。既にある `feature/123-login` のような `/` を含むブランチで作業するときは、識別子は
+  `feature-123-login` のまま、親に `branch: feature/123-login` を書く。承認画面に
+  「既存のブランチ feature/123-login を使う」と出る。承認されるまでは `branch:` を使わず、識別子のブランチ
+  （`worktree add .claude/worktrees/feature-123-login -b feature-123-login <起点>`）で作業する。承認の後、親のワークツリーで
+  `ccnavi-git.sh switch feature/123-login` を打つと、そのブランチへ移って承認済みチケットとマーカーを取り込む（既にあれば
+  識別子のブランチを merge し、無ければ切る）。続けて `push -u origin feature/123-login` で取り込み状態がそのブランチになる。
+  統合先・保護されたブランチの名前、`origin/main` のような git の ref と紛れる名前、別の親子のチケットが使うブランチは書けない。
+  承認の後は変えられない。子のブランチは子の識別子
 - 子は親の部分集合として書く。親やフェーズの種類の `scope` を超える項は承認で warn に出るだけで、判定がその上限で切り詰める
 - 書いていない場所は範囲外。親子は厳しい側が採られる
 - 深さは 2 段。範囲は 20 件まで
@@ -1337,8 +1352,8 @@ base_sha: ""
 
 ```sh
 ccnavi --agree
-ccnavi --agree i0002 i0002-01   # 並べた識別子だけを承認の対象にする
-ccnavi --agree --preview --verify i0002 i0002-01   # 承認できる状態かを確かめるだけ（置かない）
+ccnavi --agree i0002 i0002-01-01   # 並べた識別子だけを承認の対象にする
+ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態かを確かめるだけ（置かない）
 ```
 
 全ツリー（ワークスペース、プロジェクト、ワークツリー）の `wip/proposals/` を走査し、未承認のものをまとめて見せる。
@@ -1365,7 +1380,9 @@ ccnavi --agree --preview --verify i0002 i0002-01   # 承認できる状態かを
 
 - ワークスペース、`projects/*`、`.claude/worktrees/*` のツリーごとに、変更があれば置き場（`CCNAVI_TICKETS_APPROVED`）だけをコミットし、そのブランチへ push する
 - シンボリックリンクは辿らず、名指しして飛ばす
-- `main` / `master` / `develop` / `release` / `release/*` と、ブランチをチェックアウトしていないツリーは push せず、コミットまでで止める
+- `main` / `master` / `develop` / `release` / `release/*` と、そのリポジトリの統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
+  `ccnavi-sync.sh` の取り込み結果、無ければ `origin/HEAD`・`origin/main`・`origin/master`。決まらなければ固定のリストだけ）、
+  ブランチをチェックアウトしていないツリーは push せず、コミットまでで止める
 - コミットするものが無ければ `コミットして push する承認済みチケットは無い。` と 1 行出す
 - エージェントが打つ形は組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）が止める
 
@@ -1378,7 +1395,9 @@ ccnavi --agree --preview --verify i0002 i0002-01   # 承認できる状態かを
 `ccnavi-agree.sh` は承認が通れば、承認の push の段が 1 で終わっても 0 を返す。
 
 受け取る側では、セッション開始時に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは fast-forward だけで、未コミットの変更があるツリーや
-分岐したツリーは触らず理由を 1 行で示す。取ってくるのは、チェックアウト中のブランチと、リポジトリのデフォルトブランチ（`origin/HEAD`）。
+分岐したツリーは触らず理由を 1 行で示す。取ってくるのは、チェックアウト中のブランチと、ワークツリーの起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
+`ccnavi-sync.sh` の取り込み結果、無ければデフォルトブランチ＝`origin/HEAD`）。統合先の決め方は
+`ccnavi-common.sh` の `ccnavi_integration` 1 か所にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が作るマージリクエストの宛先も同じ順で決める。
 リモートに届かないときも止めず、手元の版で判定する。認証は尋ねず、fetch 1 回を `CCNAVI_FETCH_TIMEOUT` 秒（既定 15）で切る。
 認証で失敗したときはその旨を 1 行添えるので、ユーザが端末で一度 `git fetch origin` を打って資格情報を保存すれば、次のセッションから通る。
 
@@ -1610,7 +1629,7 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 残った指摘の対応方針はユーザが決める（`decide`）。ボードの「決める」か、端末で `ccnavi-review.sh decide <N>`。
 
 - **対応しない（受け入れて進む）。** `phases/<親>/accepted.json` に記録し、次の `confirm` から数えない
-- **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<次の連番>.md` に直に置く
+- **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<フェーズ番号>-<そのフェーズの次の連番>.md` に直に置く
   （範囲は見た子の範囲の和）。フェーズは開き直り、マーカーは消える
 - **issue に回す。** 受け入れたうえで、その指摘を載せた issue を作る。フィードバック計画が承認されたあとだけ選べる
 
@@ -1629,7 +1648,7 @@ JSON で渡す（`--result <path>`）。
 | `decide N` | sh が取ってくる → `--reviewed N --accept-unresolved`（ユーザに見せ、指摘ごとに対応方針を選ばせる）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `decide N --preview`（`--preview --json`。一覧とダイジェスト）と `decide N --choices <JSON> --digest <ダイジェスト>`（`--yes <JSON> --digest <ダイジェスト> --json`）で同じ経路を通る |
 | （`chat` のフェーズ） | ユーザが親のワークツリーの端末で `ccnavi-review.sh chat <N>` を打つ（中身は `ccnavi --reviewed <N> --chat`。取り込み済みの親子のチケットなら最後に承認の push（`ccnavi-push-approved.sh`）を呼ぶ）。依頼も、取得した結果も無い |
 | `comment` | sh が投稿する。実行ファイルは関わらない |
-| `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置く）→ sh が Draft を外してコメントを投稿する。親が打つ。マージはユーザ |
+| `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置き、閉じた親子のチケットを手元の `logs/archive/` へ退避する）→ C1 が退避の削除をコミットして push → sh が Draft を外してコメントを投稿する。親が打つ。マージはユーザ |
 | `close-early --reason <理由> [--no-issue]` | まだ残っているが「キリの良いところまでやった」と早めに閉じる。ユーザが端末で打つ。`--close-early`（残りを見せて y/N、未着手の子を取り消し、マーカーを置く）→ sh が残りを issue に書き出し、コメントを投稿する。Draft は親が片付けてから `ready` で外す |
 | `fetch` | 取得した JSON を標準出力へ。デバッグ用 |
 | `origin` | origin をどう読んだか（ホスト・scheme・API の URL・使う道具）。origin の読み方が合わないときに確かめる |
@@ -1646,8 +1665,52 @@ JSON で渡す（`--result <path>`）。
 **Draft を外すのは親、マージはユーザ。** `ready` は、親を閉じられる状態（全フェーズが終わり、フィードバック計画が承認され、レビューが済んでいる）
 に加えて、親の承認済みチケットが `done/` にあること（閉じる前に Draft を外してマージされると、親の記録の無いまま親のブランチが消え、
 親子のチケットが決まらなくなる）と、`wip/` が追跡から消えていて、未コミットが無く、push 済みであることを求める。取り込みは squash（GitLab ではマージリクエストの
-`squash` を有効にする）。順は「親を `finish` で閉じる → `rm -r wip` をコミット → push → `ready` → マーカー `ready.json` をコミットして push →
-ワークツリーを片付ける」。ワークツリーの片付けはマージを待たない。
+`squash` を有効にする）。順は「親を `finish` で閉じる → `rm -r wip` をコミット → push → `ready` → ワークツリーを片付ける」。
+ワークツリーの片付けはマージを待たない。
+
+**チケットの置き場は既定のブランチに残さない。** `ready` は条件を確かめてから、親のワークツリー（`.claude/worktrees/<親>`）の承認済みの領域にある閉じた親
+（今回の親と、統合先にたまっていた過去の親。`done/` に在る親）について、次のファイルをワークスペースの `logs/archive/<リポジトリ>/` へ移す
+（`<リポジトリ>` はワークスペース自身なら `self`、プロジェクトならその名前。その下は承認済みの領域と同じ構成）。
+
+- `done/` の親と子のチケット
+- `phases/<親>/` の下（マーカー・子の記録・`ready.json`・`closed.json`）
+- `events/` の親と子の履歴（ツリーの中身をそのままコピーし、「退避した」`archived` の 1 行は退避の側にだけ足す。退避に既に在れば上書きせず、
+  ツリーにあって退避に無い行だけを足す）。どの置き場にもチケットの無い子（取り下げた子など）の履歴も、その親子のものとして移す
+- `flows/` の子のフロー
+
+子は名前の形ではなくチケットの `parent:` 欄で親に結ぶ。移す順はマーカー・履歴・フロー・子のチケット・親のチケットで、1 本ずつ
+一時ファイルから書いて読み戻してから元を消す。退避の置き場の途中（`logs` から行き先まで）にリンクがあれば書かずに止める。
+親の承認済みチケットが親のワークツリーではなくワークスペースルートなどに在るときは、他の親子のチケットまで消さないよう、何も置かずに止める
+（親のワークツリーで打ち直す）。
+
+`logs/` は git が追跡しないので、git の上では削除になる。取り込み済みの親子のチケットでは C1 がこの削除をコミットして push してから
+Draft を外すので、squash でマージすると既定のブランチにはチケットが残らない。取り込み済みでない親子のチケットでは、sh は Draft を外さずに止め、
+削除をコミットして push してから `ready` を打ち直すよう案内する（確かめるのは、実行ファイルが答えた退避したツリーの置き場）。
+条件を確かめた後、移す前に ready のマーカー `logs/archive/<リポジトリ>/ready/<親>.json`（どのツリーの、どの先頭（HEAD）から、どのファイルを
+移すか）を書く。打ち直した `ready`（Draft を外し損ねた、移す途中で止まった）は、ready のマーカーが今のツリーのものであり、Draft を外したマーカー
+（`ready.json`。ツリーか退避）のマージリクエストの番号が今回と同じときだけ、ワークツリーの側の条件（未コミット・push 済み）だけを見て、
+残りを移してから通る。そろわなければ通常の条件の確かめに回る。退避の行き先に違う中身のチケットが既に在れば、上書きせずに止める。
+
+`review ready` の標準出力は、1 行目がコメントの下書きのパス、2 行目が `tree <退避したツリーのルート>`。sh は C1 の外では 2 行目のツリーの
+置き場に未コミットの変更が無いことを確かめてから Draft を外す（実行ファイルとの約束。2 行目が無い古い実行ファイルでは cwd のツリーを見る）。
+
+退避は手元の機械にだけ残る補助の記録で、次のところが「閉じたもの」として読む。別の機械ではこの検査に使えない。
+
+- 閉じた識別子の使い回し（承認と `--lint`）と、子の連番（続きの子の識別子）。同じリポジトリの退避だけを見て、大文字小文字だけが違う識別子も
+  同じものとして数える
+- 先行（`predecessors`）。どの置き場にも無い先行を、同じリポジトリの退避の `done/` から引く
+- `ccnavi-sync.sh`。親のブランチがリモートから消えたとき、統合先の `done/` に親が無ければ、先に `ccnavi-review.sh merged` に聞き、
+  マージ済みと答えれば閉じた親子のチケットにする。答えが得られないときだけ、統合先を取り直して確かめ直し、それでも無ければ退避に親
+  （ツリーにチケットが残っていれば承認の時刻も同じ）があることで補う。判定の側も、取り込み状態が present のまま親のワークツリーを
+  片付けた後なら、退避に親があれば閉じた親子のチケットとして読む（gone・blocked・壊れているときは今までどおり止める）
+- 親のワークツリーの見分け（`ccnavi-sync.sh`・`ccnavi-fetch.sh`・`ccnavi-git.sh`・`--lint`）。ツリーから親のチケットが消えても、
+  退避に親があれば親のワークツリーとして扱う
+- 判定の走査。子のワークツリーに残った `doing/` の古いチケットは、退避に同じリポジトリで承認の時刻も同じチケットがあれば、作業中に戻さない
+
+退避の削除は、C1 の見分けと実行後チェックが ccnavi の書き込みとして外す。外すのは、ready のマーカーにそのツリーから移したと載っていて
+（比べている版がマーカーを書いたときの先頭と同じ間だけ。ready の削除をコミットしてツリーが進めば、マーカーは以後の削除に効かない）、
+`done/`・`phases/`・`events/`・`flows/` の下にあり、消えた中身が退避したコピーと同じもの（履歴は ready の流れの行だけを足したもの）。
+`logs/archive/` は記録と state の置き場の守り（`builtin-guard-records` と、シェルの側の `builtin-guard-setting-files`）が書き込みを止める。
 
 **まだ残っているが早めに閉じたいとき**は、ユーザが端末で `close-early --reason <理由>` を打つ。作業中の子がいる間は打てない。残っているものを全部
 見せてから y/N を取り、未着手の子の取り消し（理由は `close-early: <理由>`）、省略とレビュー済みのマーカー、未解決の受け入れ、残りの issue への書き出しを行う。
@@ -1681,6 +1744,28 @@ factors:
 
 点と加点した理由は、閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの依頼文の先頭
 （「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に出る。壊れた `risks.yml` は組み込みを使い、`--lint` と閉じたときの出力がそのことを示す。
+
+### issue・MR を指定された依頼
+
+「#152 を直して」「!5 の指摘に対応して」のように issue や MR を指定して頼むと、`UserPromptSubmit` で ccnavi が依頼文から
+指定（`#152`・`issue 152`・`.../issues/152`、`!5`・`MR 5`・`PR #12`・`.../pull/5`・`.../-/merge_requests/5`）を見つけ、
+着手の前に紐づくブランチを探してユーザに確かめるよう、エージェントに指示を足す。
+**止めはしない**（指示を足すだけ）。コードブロックの中、`# 見出し`、色の `#fff`、`C#` などは拾わない。チケット制御が disable なら足さない。
+
+エージェントが打つのは次の 1 本で、読むだけ。
+
+```sh
+sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-branches.sh --issue 152   # MR なら --mr 5。--json で JSON
+```
+
+出すのは、MR の元ブランチ、issue を参照している開いた MR の元ブランチ（ホストは `ccnavi-review.sh` と同じく gh / glab か、
+curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含むブランチ（手元と origin）、`issue: 152` を持つチケットの親のブランチ。
+1 候補 1 行で、チェックアウトしているワークツリーと結び付くチケットを添える。ホストに繋げなければ手元の候補だけを出し、
+「ホストは見ていない」と理由を書く。`projects/<名前>/` の中から打てば、そのプロジェクトのリポジトリを見る。
+
+候補があれば、エージェントは一覧を見せて「既存のブランチで続ける・新しく `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞き、
+返事を待つ。既存のブランチで続けるときは、親チケットの `branch:` に書いて承認を受け、承認の後に `ccnavi-git.sh switch <ブランチ>`
+で移る（承認前の提案の `branch:` は使わない）。
 
 ### サブエージェントに渡すもの
 
@@ -1907,7 +1992,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 ccnavi --lint                                # 実運用と同じ設定を見る
 ccnavi --lint --rules .ccnavi/common/next.yml # 入れ替える前のファイルを見る
 ccnavi --lint --json                         # 同じ苦情を JSON で（「lint の JSON」）
-ccnavi --lint --flow .ccnavi/approved/flows/i0001-01.yml # 子のフロー 1 本も確かめる
+ccnavi --lint --flow .ccnavi/approved/flows/i0001-01-01.yml # 子のフロー 1 本も確かめる
 ```
 
 ```
@@ -1993,7 +2078,7 @@ error 2 件、warn 2 件、info 0 件
 | 深刻度 | 拾うもの |
 |---|---|
 | error | 承認済みチケットの置き場への `Write` / `Edit` をルールが止めていない（承認の意味が消える） |
-| error | 同じ識別子が複数の置き場にある、子の識別子が `<親>-<2 桁連番>` の形でない、連番が重なる |
+| error | 同じ識別子が複数の置き場にある、子の識別子が `<親>-<2 桁のフェーズ番号>-<2 桁の連番>` の形でないかフェーズ番号が `phase:` と食い違う、連番が重なる |
 | error | 孫を持つ子 |
 | warn | 範囲の超過がある子。超過は、親の範囲かフェーズの種類の `scope` を超える項と、regex の項。判定がその上限で切り詰めて止めるので、承認と同じく CI の終了コードを失敗にしない |
 | error | ワークツリーの元リポジトリと承認済みチケットの `project:` が違う |
@@ -2141,6 +2226,7 @@ ccnavi --explain --json
 | `pending_approval[]` | `--agree` で承認の対象に入る識別子（承認済みチケットの無い提案と、親の改版） |
 | `tickets[]` | 識別子ごとに 1 件。提案と承認済みチケットのどちらか一方しか無くても出す |
 | `parents[]` | 承認済みチケットのある親ごとの局面とフェーズ。承認前の親はフェーズを持たないのでここに無い |
+| `archived[]` | 手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある閉じたチケット。表示のためだけの任意の欄で、判定（承認待ち・先行・局面）には混ぜない。`tickets[]` に同じ識別子があるものは出さない。`{ticket, parent, phase, title, project, path, approved_at, started_at, completed_at, cancelled_at, cancel_reason, history}`。`path` は退避したファイルの絶対パス、`history[]` は退避した履歴（`tickets[]` の `history[]` と同じ形。最後の行は `kind` が `archived`）。この欄を持たない古い実行ファイルの答えも同じ版のまま読める（拡張は無ければ空とする） |
 
 `tickets[]` の 1 件。
 
@@ -2157,7 +2243,7 @@ ccnavi --explain --json
 | `scattered[]` | どれが本物か決まらない、チケットがある場所の全部。`{tree, state, path}`。決まっていれば空。本物とする側のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
 | `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは本物とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
-| `history[]` | 状態の履歴の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（本物とする側のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled`（置き場が動いたもの）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の履歴に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook`。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態は置き場の欄で決まる。履歴が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
+| `history[]` | 状態の履歴の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（本物とする側のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled` / `archived`（置き場が動いたもの。`archived` は `ready` が退避したことを示し、`to` は `archive`）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の履歴に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook`。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態は置き場の欄で決まる。履歴が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
 
 `parents[]` の 1 件。
 
@@ -2188,7 +2274,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 |---|---|
 | `version` | 形の版。整数。`--yes` と同じ番号 |
 | `root` / `generated_at` | ワークスペースルートと、出した時刻 |
-| `batch[]` | 承認の対象。`{ticket, title, parent, phase, revision, tree, path, overflow}`。`parent` と `phase` は子だけ（親は `null`）。`revision` は親の改版。空なら承認待ちが無い |
+| `batch[]` | 承認の対象。`{ticket, title, parent, phase, revision, tree, path, branch, existing_branch, overflow}`。`branch` は親のブランチ名（親の `branch:`、無ければ識別子。子は子の識別子）、`existing_branch` は `branch:` が既にあるブランチ（手元か origin、または提案がそのブランチの上）を指すか。`parent` と `phase` は子だけ（親は `null`）。`revision` は親の改版。空なら承認待ちが無い |
 | `batch[].overflow[]` | 範囲の超過（親の範囲・フェーズの種類の `scope` を超える項、regex の項）の説明。文字列の配列で、無ければ `[]`。承認は通るが、判定で止まる |
 | `text` | 承認画面の本文そのまま。拡張はこれを等幅で並べ、項目には分けない |
 | `digest` | 見せた中身のダイジェスト。`--yes` の `--digest` にそのまま渡す |
@@ -2251,7 +2337,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 
 ```json
 {"version": 1, "ok": true, "parent": "i0050", "phase": 2,
- "reviewed": false, "followup": "i0050-03",
+ "reviewed": false, "followup": "i0050-02-02",
  "kept": ["…"], "fix": ["…"], "issue": [],
  "issue_draft": "", "prompt": "[ccnavi] ユーザが…",
  "issue_url": "", "warning": ""}
@@ -2433,12 +2519,18 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 - 通す形の一覧に無いものは拒否する。`git branch -D`、`git worktree remove --force`、`git tag -d`、`git checkout -- <パス>` のように
   取り返しがつかない形も、サブコマンドの中で止める
 - `push` は**今いるブランチを、そのままの名前で送る形だけ**通す。`--force`・`--force-with-lease`・`--delete`・`--all`・`--mirror`・`--tags`、
-  別の名前へ送る refspec（`HEAD:main` など）は通さない。`main` `master` `develop` `release` `release/*` へ直接は送れない。マージはユーザの側に残す
+  別の名前へ送る refspec（`HEAD:main` など）は通さない。`main` `master` `develop` `release` `release/*` と、そのリポジトリの統合先
+  （`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` の取り込み結果、無ければ `origin/HEAD`・`origin/main`・`origin/master`。
+  `develop-v1.0.0` のような名前でもよい）へ直接は送れない。統合先が決まらなければ固定のリストだけで判定する。マージはユーザの側に残す
 - `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。
   `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない。親のブランチを別のコミットへ付け替えると、親のブランチ上の承認済みチケットが差し替わるため
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
   衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる
+- 親のワークツリーでは、親のブランチ（承認済みの親チケットの `branch:`、無ければ識別子）のほかへ `checkout`・`switch` で移れない。
+  識別子のブランチの上から承認済みの `branch:` のブランチへ移るのは、承認済みチケットを取り込む 1 操作になる
+  `worktree add` は行き先の名前とブランチ名を揃える形だけで、違う名前のブランチを出すのは行き先の名前の親チケットが
+  承認済みの `branch:` でそう名乗っているときだけ
 - 送るのは親だけ。子チケットのワークツリーからの push はラッパースクリプトが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）
 - サブコマンドより前のオプション（`git -c ...` など）は 1 つも受け取らない。`GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す
 
@@ -2506,6 +2598,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。端末の `ccnavi-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になるデフォルトブランチを取ってくる。進めるのは fast-forward だけ |
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを閉じた・消えたに分け、親子のチケットの取り込み状態と統合先の取り込み結果を書く |
+| `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、ユーザが手で回す道具。自動テストは呼ばない |

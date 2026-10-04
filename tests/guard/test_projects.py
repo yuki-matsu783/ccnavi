@@ -430,14 +430,14 @@ class ProjectsTest(unittest.TestCase):
             ticket_text("i0007", allow=("src/*",)),
         )
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007-01.md"),
-            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
+            os.path.join(self.lib, "wip", "proposals", "todo", "i0007-01-01.md"),
+            ticket_text("i0007-01-01", parent="i0007", allow=("src/a/*",)),
         )
         # 承認の前から、親も子も同じプロジェクトとしてボードに出る
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
         found = {t["ticket"]: t["project"] for t in board["tickets"]}
-        self.assertEqual(found, {"i0007": "lib", "i0007-01": "lib"})
-        self.assertEqual(board["pending_approval"], ["i0007", "i0007-01"])
+        self.assertEqual(found, {"i0007": "lib", "i0007-01-01": "lib"})
+        self.assertEqual(board["pending_approval"], ["i0007", "i0007-01-01"])
 
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -445,7 +445,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("■ プロジェクト: lib", approved.stdout)
         # 継ぐ段は無いが、承認済みチケットには残る
         # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
-        for name in ("i0007", "i0007-01"):
+        for name in ("i0007", "i0007-01-01"):
             with open(self.approved_path("doing", name + ".md"), encoding="utf-8") as f:
                 self.assertIn("project: lib", f.read())
 
@@ -466,8 +466,8 @@ class ProjectsTest(unittest.TestCase):
             ticket_text("i0007", allow=("src/*",)),
         )
         write(
-            os.path.join(self.app, "wip", "proposals", "todo", "i0007-01.md"),
-            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
+            os.path.join(self.app, "wip", "proposals", "todo", "i0007-01-01.md"),
+            ticket_text("i0007-01-01", parent="i0007", allow=("src/a/*",)),
         )
         result = self.ccnavi("--agree", stdin="y\n")
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
@@ -475,7 +475,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子は親と同じ置き場に置いて", result.stderr)
         self.assertTrue(os.path.exists(self.approved_path("doing", "i0007.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007-01-01.md")))
 
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/proposals/ に置く。プロジェクトのワークツリーの中も普通の置き場で、

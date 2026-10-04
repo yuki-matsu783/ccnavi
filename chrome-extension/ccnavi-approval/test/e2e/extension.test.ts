@@ -92,7 +92,7 @@ test("CX-T071 設定画面で PAT とリポジトリを登録する。PAT は画
   await page.fill("#repo-form [name=repo]", "widgets");
   await page.click("#repo-form button[type=submit]");
   await page.waitForSelector("#repo-list li");
-  assert.match((await page.textContent("#repo-list")) ?? "", /github\.com\/acme\/widgets（統合先 デフォルトブランチ・直近 3 日）/);
+  assert.match((await page.textContent("#repo-list")) ?? "", /github\.com\/acme\/widgets（統合先 デフォルトブランチ・直近 7 日）/);
   await page.fill("#token-value", TOKEN);
   await page.click("#token-form button[type=submit]");
   await page.waitForFunction(() => document.getElementById("token-list")?.textContent?.includes("登録済み"));
@@ -119,15 +119,15 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   const families = await page.locator("[data-family]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.family));
   assert.deepEqual(families, ["i0001", "i0002"]);
   assert.equal(await page.locator('[data-family="i0001"] [data-ticket="i0001"].entry').count(), 1);
-  assert.match((await page.textContent('[data-family="i0001"] .rejected')) ?? "", /先行 i0003-01 が閉じていない/);
+  assert.match((await page.textContent('[data-family="i0001"] .rejected')) ?? "", /先行 i0003-01-01 が閉じていない/);
   assert.match((await page.textContent('[data-family="i0001"] .closure')) ?? "", /i0003/);
   // 見た目を目で確かめるとき: CCNAVI_E2E_SHOT=<png のパス>
   if (process.env.CCNAVI_E2E_SHOT) await page.screenshot({ path: process.env.CCNAVI_E2E_SHOT, fullPage: true });
-  // 承認のボタンは承認待ちのある親子のチケットだけ。レビュー済みとフォームは出さない。「始める」は
+  // 承認のボタンは承認待ちのある親子のチケットだけ。レビュー済みとフォームは出さない（直近の日数のフォームと「始める」の issue のボタンだけは出す）。「始める」は
   // issue を押してから読む（ボードを開くたびには読まない）
   const actions = await page.locator("main button").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).closest<HTMLElement>("[data-family]")?.dataset.family ?? "-"}:${(e as HTMLElement).dataset.action}`));
-  assert.deepEqual(actions, ["i0001:approve", "i0002:approve", "-:issues"]);
-  assert.equal(await page.locator("main form").count(), 0);
+  assert.deepEqual(actions, ["-:recent-days", "i0001:approve", "i0002:approve", "-:issues"]);
+  assert.equal(await page.locator("main form:not([data-testid=recent-days])").count(), 0);
   // 承認の画面の本文は開いた形でボタンの上に見えている
   assert.ok(await page.locator('[data-family="i0001"] [data-testid=screen] pre').isVisible());
   const above = await page.evaluate(() => {
@@ -198,7 +198,7 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
 test("CX-T076 着手前で子の無い承認は、ボードから取り下げられる（承認コミットの親の提案に戻す）", async () => {
   const original = fixture().i0001.files["wip/proposals/todo/i0001.md"];
   // 開発者が子の提案を片付けた（子の提案があれば取り下げは出さない）
-  mock.push("i0001", { "wip/proposals/todo/i0001-01.md": null }, "子の提案を片付ける");
+  mock.push("i0001", { "wip/proposals/todo/i0001-01-01.md": null }, "子の提案を片付ける");
   const page = await openBoard();
   const said = await press(page, '[data-family="i0001"] .approved-item[data-ticket="i0001"] button[data-action=withdraw]');
   assert.match(said, /^written: 取り下げを書いた/);
@@ -333,20 +333,22 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   await page.close();
 });
 
-test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（i<番号>）の親のブランチを統合先の先頭に作る。閉じた識別子の issue は作らない", async () => {
-  lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた親子のチケットと重なる" });
+test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（feature-<番号>-<slug>）の親のブランチを統合先の先頭に作る。閉じた識別子の issue は作らない", async () => {
+  lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "Closed" });
+  const closedText = lab.files("main")[".ccnavi/approved/done/i0005.md"].replaceAll("i0005", "feature-5-closed");
+  lab.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "閉じた親子のチケット");
   const page = await openBoard();
   await page.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await page.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="12"]`);
   const said = await press(page, `${GL_REPO} [data-testid=start] li[data-issue="12"] button[data-action=start]`);
-  assert.match(said, /^written: 親のブランチ i0012 を作った/);
-  assert.deepEqual(lab.createdBranches, [{ name: "i0012", sha: lab.head("main") }]);
+  assert.match(said, /^written: 親のブランチ feature-12-新しい機能 を作った/);
+  assert.deepEqual(lab.createdBranches, [{ name: "feature-12-新しい機能", sha: lab.head("main") }]);
   await page.close();
   const again = await openBoard();
   await again.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await again.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="5"]`);
   const refused = await press(again, `${GL_REPO} [data-testid=start] li[data-issue="5"] button[data-action=start]`);
-  assert.match(refused, /^refused: 始めなかった: i0005 は統合先 main の done\/ で閉じている/);
+  assert.match(refused, /^refused: 始めなかった: feature-5-closed は統合先 main の done\/ で閉じている/);
   assert.equal(lab.createdBranches.length, 1);
   assert.ok(!(await again.content()).includes(TOKEN));
   await again.close();

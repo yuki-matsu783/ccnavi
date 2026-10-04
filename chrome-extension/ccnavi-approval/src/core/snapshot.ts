@@ -74,6 +74,26 @@ export interface RepoBoard {
 /** 読んでいる間にブランチの先頭が動いた。書く流れは読み直して再試行する */
 export class MovedError extends Error {}
 
+/**
+ * リポジトリごとの、親子のチケットの識別子 → 親のブランチ名。ボードの親子のチケットの一覧から覚えておき、
+ * 閉包の先行の親子のチケットを読みに行くブランチの見当に使う（書く流れが読み直すときも）。判定には使わない
+ */
+const familyHints = new Map<string, Record<string, string>>();
+
+function hintKey(repo: RepoConfig): string {
+  return `${repo.host}/${repo.owner}/${repo.repo}`;
+}
+
+/** 親子のチケットの一覧から見当を覚えておく（識別子とブランチ名が同じものも入れる） */
+export function rememberHints(repo: RepoConfig, families: readonly Family[]): Record<string, string> {
+  const hints: Record<string, string> = { ...(familyHints.get(hintKey(repo)) ?? {}) };
+  for (const f of families) {
+    if (f.family) hints[f.family] = f.name;
+  }
+  familyHints.set(hintKey(repo), hints);
+  return hints;
+}
+
 export class Reader {
   readonly branches: Record<string, Branch> = {};
   readonly absent: string[] = [];
@@ -85,6 +105,10 @@ export class Reader {
     private readonly repo: RepoConfig,
     private readonly deps: Deps,
   ) {}
+
+  get repoConfig(): RepoConfig {
+    return this.repo;
+  }
 
   call<T>(op: string, ...args: unknown[]): Promise<T> {
     return this.deps.call(op, [this.repo.owner, this.repo.repo, ...args]) as Promise<T>;
@@ -258,6 +282,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
       await reader.read(c, heads.get(c) as string, place.branch_paths);
     }
     const families = await py.families(deps.py, reader.snapshot(integration), candidates);
+    rememberHints(repo, families);
 
     // 5. 親子のチケットごとの承認待ち
     const boards: FamilyBoard[] = [];
@@ -277,10 +302,12 @@ async function closureInput(
   integration: Snapshot["integration"],
   place: Placement,
   deps: Deps,
+  hints?: Readonly<Record<string, string>>,
 ): Promise<Snapshot> {
+  const withHints = (snap: Snapshot): Snapshot => (hints ? { ...snap, hints } : snap);
   // 閉包の足りない親子のチケットを読み足す。無いブランチは `absent` に入り、Python が決める
   for (let round = 0; round < 32; round += 1) {
-    const closure = await py.closure(deps.py, reader.snapshot(integration), family);
+    const closure = await py.closure(deps.py, withHints(reader.snapshot(integration)), family);
     if (closure.over_limit || closure.need.length === 0) break;
     for (const n of closure.need) {
       const sha = await reader.head(n);
@@ -288,9 +315,10 @@ async function closureInput(
     }
   }
   // 判定の入力は統合先・P・閉包だけ。表示用のブランチを混ぜないよう、ここで絞る
-  const all = reader.snapshot(integration);
+  const all = withHints(reader.snapshot(integration));
   const closure = await py.closure(deps.py, all, family);
-  const keep = new Set([integration.name, ...closure.families]);
+  // 同じ親子のチケットを名乗るブランチの確かめ（rivals）も残す。判定の入力には Python が入れない
+  const keep = new Set([integration.name, ...closure.families, ...(closure.rivals ?? [])]);
   const branches: Record<string, Branch> = {};
   for (const [k, v] of Object.entries(all.branches)) if (keep.has(k)) branches[k] = v;
   return { ...all, integration, branches, absent: all.absent.filter((a) => keep.has(a)) };
@@ -304,7 +332,11 @@ async function familyBoard(
   deps: Deps,
 ): Promise<FamilyBoard> {
   try {
-    const input = await closureInput(family.name, reader, integration, place, deps);
+    if (family.conflict) {
+      // 同じ親子のチケットを名乗るブランチが 2 本以上ある など。判定しない
+      return { family, result: null, error: family.conflict };
+    }
+    const input = await closureInput(family.name, reader, integration, place, deps, familyHints.get(hintKey(reader.repoConfig)));
     const board = await py.board(deps.py, input, family.name);
     const result = await withdrawableHere(board, reader, place, family.name);
     const reviews = await reviewPanels(
@@ -374,6 +406,6 @@ export async function readFamily(repo: RepoConfig, family: string, deps: Deps, a
     throw new Error(`親のブランチ ${family} がホストに無い`);
   }
   await reader.read(family, head, base.place.branch_paths);
-  const input = await closureInput(family, reader, base.integration, base.place, deps);
+  const input = await closureInput(family, reader, base.integration, base.place, deps, familyHints.get(hintKey(repo)));
   return { ...base, input, head };
 }
