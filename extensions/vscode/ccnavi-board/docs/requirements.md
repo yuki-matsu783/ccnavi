@@ -10,7 +10,7 @@ keywords: [要件, VS Code 拡張, ボード, チケット管理, ルール管�
 
 VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを書く。入口はサイドパネルとコマンドパレットで、チケット管理（ボード）・ルール管理・リスク管理・フェーズ管理・プロジェクト管理の 5 画面と、ボードの子のカードから開くフロー編集画面がある。使い方と組み立ては [README](../README.md)、作りは [design.md](design.md) にある。
 
-拡張と ccnavi 本体の間の取り決め（拡張が呼ぶコマンド、読む JSON の形、互換の版）は本体側に書く。本体の [要件書](../../../../docs/requirements.md) と [設計](../../../../docs/ccnavi.md) を見る。
+拡張と ccnavi 本体の間の取り決め（拡張が呼ぶコマンド、読む JSON の形、互換の版）は本体側に書く。本体の [要件書](../../../../docs/requirements.md) と [設計](../../../../docs/design.md) を見る。
 
 ## 詳細
 
@@ -29,4 +29,4 @@ VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを�
 共通の設定（`.ccnavi/common/`）・ワークスペースの設定・プロジェクトの設定を、実行ファイルや ccnavi 本体の docs では「層（layer）」と呼ぶ（共通層・自身の層（`self`）・プロジェクトの層）。
 
 - 出力の形: ccnavi の README「ボードの JSON」「試験の JSON」
-- 設計: ccnavi.md 10、要求 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06
+- 設計: [設計 10](../../../../docs/design/diagnostics.md)、要求: [要件 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06](../../../../docs/requirements/diagnostics.md)

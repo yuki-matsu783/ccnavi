@@ -67,7 +67,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `disable` | 判定しない。記録に `mode-disabled` を残す |
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY`、`CCNAVI_GUARD_CORE_FILES`）も同じ 3 値を取り、`CCNAVI_MODE=dry-run` のときは
-こちらが `enable` でも `dry-run` として振る舞う。組み合わせの表は requirements.md 2.2。
+こちらが `enable` でも `dry-run` として振る舞う。組み合わせの表は [要件 2.2](../requirements/common.md)。
 
 `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL`、`CCNAVI_GUARD_UNWATCHED` は `enable` / `disable` の 2 値。
 

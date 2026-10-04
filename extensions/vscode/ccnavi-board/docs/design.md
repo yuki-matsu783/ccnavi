@@ -10,7 +10,7 @@ keywords: [設計, VS Code 拡張, 構成, 拡張ホスト, webview, React, core
 
 VS Code 拡張「ccnavi ボード」の作りを書く。拡張ホスト（`src/`）が ccnavi の実行ファイルを子プロセスで呼んで中身を組み、画面（`src/webview/`、React）がそれを描く。何をするかは [requirements.md](requirements.md)、使い方と組み立ては [README](../README.md) にある。
 
-拡張が呼ぶ実行ファイルのコマンドと読む JSON の形、互換の版は本体側の取り決めで、本体の [要件書](../../../../docs/requirements.md) と [設計](../../../../docs/ccnavi.md) に書く。
+拡張が呼ぶ実行ファイルのコマンドと読む JSON の形、互換の版は本体側の取り決めで、本体の [要件書](../../../../docs/requirements.md) と [設計](../../../../docs/design.md) に書く。
 
 ## 詳細
 
