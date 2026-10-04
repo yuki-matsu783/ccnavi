@@ -503,7 +503,8 @@ class DagApprovalTest(PhaseHarness):
         self.assertTrue(approval.content_problems(held))
 
     def test_a_workflow_file_left_without_its_parent_is_warned_by_lint(self):
-        """親の承認済みチケットがどこにも無いのに残った待ち方のファイルを、`--lint` が warn で言う。"""
+        """親の承認済みチケットがどこにも無いのに残った待ち方のファイルを、
+        `--lint` が warn で言う。"""
         self.use(DAG)
         self.family(plan=PLAN)
         said = "待ち方のファイルがあるのに、親 i0001 の承認済みチケットがどの置き場"
