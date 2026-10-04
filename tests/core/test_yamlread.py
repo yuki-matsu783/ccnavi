@@ -73,6 +73,10 @@ SPLIT = {
     "directive": "%foo bar\n---\na: 1\n",
     "flow-colon": "{a:}\n",
     "flow-question": "[? ]\n",
+    "flow-plain-question": "paths: [src/a?.py]\n",
+    "flow-url-query": "k: [http://x/?q=1]\n",
+    "flow-key-question": "k: {a?b: 1}\n",
+    "flow-question-at": "[x?@]\n",
     "surrogate-escape": 'a: "\\uD800"\n',
     "surrogate-escape-long": 'a: "\\U0000DC00"\n',
     "surrogate-pair": 'a: "\\uD83D\\uDE00"\n',
@@ -166,6 +170,19 @@ class SameOutcomeTest(unittest.TestCase):
         differ = [n for n, d in SPLIT.items() if raw(d, C_LOADER) != raw(d, yaml.SafeLoader)]
         # BOM が先頭のもの・値の中のタブなど、念のため回すだけで分かれないものもある
         self.assertGreaterEqual(len(differ), 8, differ)
+
+    def test_question_outside_flow_plain_stays_on_c(self):
+        """`?` があっても、クォートした値・ブロックの値なら C のまま読む。
+
+        純 Python に回すのは、フローの中のクォートしない値に `?` があるときだけ。
+        """
+        if C_LOADER is None:
+            self.skipTest(NO_C)
+        for doc in ('["a?b"]\n', "- a?b\n", "k: http://x/?q=1\n", "{'a?': \"b?\"}\n"):
+            with self.subTest(doc=doc):
+                self.assertIsNone(yamlread._SPLIT.search(doc))
+                self.assertTrue(yamlread._c_ok(doc, C_LOADER))
+        self.assertFalse(yamlread._c_ok(SPLIT["flow-plain-question"], C_LOADER))
 
 
 class FallbackTest(unittest.TestCase):

@@ -50,6 +50,9 @@ libyaml と純 Python の読み手は、次の文書で読める・読めない�
 - 行頭の `%` で始まる知らない指示子（`%foo`）。純 Python は読み飛ばし、libyaml は断る
 - フローの中で `:` の直後に区切りが来る形（`{a:}`・`[a:]`）と、`?` 単体の明示のキー
   （`[? ]`）。純 Python は読み、libyaml は断る
+- フローの中のクォートしない値に入った `?`（`paths: [src/a?.py]`・`k: [http://x/?q=1]`・
+  `k: {a?b: 1}`・`[x?@]`）。libyaml は読み、純 Python は `ParserError`・`ScannerError` で断る。
+  クォートした値（`["a?b"]`）とブロックの値（`- a?b`）は分かれない
 - ダブルクォートの中のサロゲートのエスケープ（`"\\uD800"`・`"\\U0000DC00"`。ペアの
   `"\\uD83D\\uDE00"` も）。純 Python は読み、libyaml は `ScannerError` で断る。`\\u`・`\\U` の
   エスケープはすべて純 Python に回す
@@ -59,6 +62,10 @@ C を使うのは速さのためで、判定は変えない。そこで、文書
 （BOM は先頭のものも、`?` は文字列の中のものも、`\\u` はサロゲートでないものも回す）が、
 遅くなるだけで結果は変わらない。実際のルール・設定・チケットにはまず出ないので、速さはほぼ
 変わらない。この一覧は、ランダムに組んだ短い文書で二つの読み手を見比べて拾ったもの。
+
+フローの中のクォートしない値の `?` だけは、文字では当てない。クォートした値やブロックの値の
+`?` まで回すと、URL を書いた設定が軒並み遅くなるため。入れ子の深さを数えるのと同じイベントの
+流れで、フローのコレクションの中のクォートしない値を見る（`_c_ok`）。
 
 ## 例外とメッセージ
 
@@ -109,7 +116,8 @@ LOADER: type = _pick_loader()
 # （300 段から 500 段の間）より十分浅く、Windows の 1 MB のスタックでも余裕がある値にする。
 DEPTH_LIMIT = 100
 
-# 二つの読み手で結果が分かれうる書き方。当たれば純 Python で読む（上の docstring の一覧と同じ順）。
+# 二つの読み手で結果が分かれうる書き方。当たれば純 Python で読む（上の docstring の一覧と同じ順。
+# フローの中のクォートしない値の `?` は `_c_ok` が見る）。
 _SPLIT = re.compile(
     r"[\t\ufeff]"  # タブ・BOM
     r"|!(?=[\s,\]}]|\Z)"  # 非特定タグ `!` 単体
@@ -136,16 +144,31 @@ _OPEN = (yaml.SequenceStartEvent, yaml.MappingStartEvent)
 _CLOSE = (yaml.SequenceEndEvent, yaml.MappingEndEvent)
 
 
-def _shallow(text: str, loader: type) -> bool:
-    """入れ子が `DEPTH_LIMIT` 段以内か。構文の誤りはここで `yaml.YAMLError` として上がる。"""
-    depth = 0
+def _c_ok(text: str, loader: type) -> bool:
+    """C の読み手で組み立ててよいか。構文の誤りはここで `yaml.YAMLError` として上がる。
+
+    入れ子が `DEPTH_LIMIT` 段を超えるか、フローのコレクションの中にクォートしない値で `?` を
+    含むものがあれば偽（純 Python に回す）。クォートしない値の style は、C のパーサでは `''`、
+    純 Python のパーサでは None になるので、両方を見る。
+    """
+    flows: list[bool] = []  # 開いているコレクションごとに、フローか
+    in_flow = 0
     for event in yaml.parse(text, Loader=loader):  # noqa: S506  イベントを流すだけで値は作らない
         if isinstance(event, _OPEN):
-            depth += 1
-            if depth > DEPTH_LIMIT:
+            flow = bool(event.flow_style)
+            flows.append(flow)
+            in_flow += flow
+            if len(flows) > DEPTH_LIMIT:
                 return False
         elif isinstance(event, _CLOSE):
-            depth -= 1
+            in_flow -= flows.pop()
+        elif (
+            in_flow
+            and isinstance(event, yaml.ScalarEvent)
+            and not event.style
+            and "?" in event.value
+        ):
+            return False
     return True
 
 
@@ -178,7 +201,7 @@ def safe_load(text: str, loader: type | None = None) -> object:
     loader = loader or LOADER
     if loader is not yaml.SafeLoader:
         try:
-            if _SPLIT.search(text) or not _shallow(text, loader):
+            if _SPLIT.search(text) or not _c_ok(text, loader):
                 loader = yaml.SafeLoader
         except yaml.YAMLError:
             raise
