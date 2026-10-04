@@ -863,7 +863,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
-実行ファイルのパス（`selfguard.binary_clause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも当てる。
+実行ファイルのパス（`selfguard_shell.binary_clause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも当てる。
 このパスは `builtin-guard-binary` と、`builtin-guard-setting-files` の場所の一覧と、承認のルール（9.5）の実行ファイルの名前に入る。
 パスを `.` `..` を落とした要素に割り、名前で 2 つの形を切り替える。
 
@@ -1611,7 +1611,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 呼び出しで走らせる形、擬似端末（`script`・`pty`）で端末要求を満たす形。hook は最終防衛線ではない（12.4）。
 
 どちらも実行役のコマンド越し（`env`・`sudo`・`sh -c`・`source`・`find -exec`）に打った形を、中で実行される
-コマンドで止める（6.3.1）。実行ファイルのパスには `selfguard.binary_clause`（8.2）が入るので、
+コマンドで止める（6.3.1）。実行ファイルのパスには `selfguard_shell.binary_clause`（8.2）が入るので、
 `sh .ccnavi/bin/<os>-<arch>/ccnavi --agree …` も同じルールで止まる。
 
 ### 9.6 状態遷移
@@ -2530,11 +2530,11 @@ ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match:
 読むだけなので組み込みの保護では止めず、通すかどうかはルールに任せる。`cp /tmp/x .ccnavi && echo` や `cp /tmp/x .ccnavi > /dev/null` のように
 後ろに何か続けた形、`sudo` / `env` の後ろ（shellread が実行役のコマンドを外した層）、`cd` で移った先から見た表記も止める。
 動かした ccnavi ディレクトリ・共通層の 3 本・実行ファイルの表記は、書き込み用・最後の引数用・`-t` の値用に分けて足す
-（`selfguard.shell_write_regex`）。共通層の 3 本はファイルなので、ディレクトリを取る `-t` の値には足さない。
+（`selfguard_shell.shell_write_regex`）。共通層の 3 本はファイルなので、ディレクトリを取る `-t` の値には足さない。
 当て方は組み込みのルールの regex 1 本のまま（`rules._build` を通る）で、語の割り方が 1 通りに決まる形に書いてある。
 
 行き先を、守るものが入っているディレクトリにした形（`cp /tmp/decisions.jsonl logs/`・`mv /tmp/decisions.jsonl logs/`・
-`cp -t logs /tmp/decisions.jsonl`）は、行き先の表記に守る名前が出ないので、元の名前で見る（`selfguard.holder_regex`。`mv` も含める）。
+`cp -t logs /tmp/decisions.jsonl`）は、行き先の表記に守る名前が出ないので、元の名前で見る（`selfguard_shell.holder_regex`。`mv` も含める）。
 止めるのは、元の側に守る名前の語（後ろの区切りは問わない）か、名前の決まらない語（グロブ・`$`・逆引用・ブレース、
 `.` と `..` で終わる元）があるか、`-T` / `--no-target-directory` があるときだけ。`cp /tmp/notes.txt logs/` のように別の名前を
 置くだけの形は止めない（`logs/` の下の git のラッパースクリプトの記録は守らない）。組を作る先は、`logs/` の中の記録と state の置き場、
