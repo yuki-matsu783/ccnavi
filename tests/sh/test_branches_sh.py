@@ -27,14 +27,14 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, SRC
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
 
 EXE = """#!/bin/sh
-PYTHONPATH='{root}' exec '{python}' -m ccnavi "$@"
+PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@"
 """
 
 # curl の代役。`-X <M>` と URL を読み、FAKE_ROUTES の JSON（"<M> <URL>" → [状態, 本文]）から答える。
@@ -129,7 +129,7 @@ class BranchesShTest(unittest.TestCase):
         for name in ("ccnavi-branches.sh", "ccnavi-common.sh"):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.exe = write(
-            os.path.join(base, "exe", "ccnavi"), EXE.format(root=ROOT, python=sys.executable)
+            os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
         )
         os.chmod(self.exe, os.stat(self.exe).st_mode | stat.S_IXUSR)
         self.bin = os.path.join(base, "bin")

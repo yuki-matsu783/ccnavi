@@ -18,7 +18,9 @@ from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # VS Code 拡張が読む `--suggest --json` の例。形を変えたらここも書き直す。
-FIXTURE = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures", "suggest.json")
+FIXTURE = os.path.join(
+    ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "suggest.json"
+)
 
 RULES = """\
 version: 1

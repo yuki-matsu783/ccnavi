@@ -358,7 +358,7 @@ host_target() {
 runnable_targets() {
 	# $1 この機械。この機械で動く組み立ての名前を、優先する順に空白区切りで並べる。
 	# arm64 の macOS と Windows は x86_64 の実行ファイルを変換して動かす（Rosetta 2 /
-	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と ccnavi/infra/platformtag.py と揃える。
+	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と src/ccnavi/infra/platformtag.py と揃える。
 	case "$1" in
 	darwin-arm64) printf '%s' "$1 darwin-x86_64" ;;
 	windows-arm64) printf '%s' "$1 windows-x86_64" ;;

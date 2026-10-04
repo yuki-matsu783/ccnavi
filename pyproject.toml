@@ -37,11 +37,12 @@ dev = ["pyinstaller>=6.10", "ruff>=0.6"]
 link-mode = "copy"
 
 [tool.hatch.build.targets.wheel]
-# 配るのは ccnavi パッケージだけ。tests/・tools/・chrome-extension/・main.py・build.py は入れない。
-packages = ["ccnavi"]
+# 配るのは ccnavi パッケージだけ。tests/・tools/・extensions/・main.py・build.py は入れない。
+# src レイアウト。import 名は ccnavi のまま。
+packages = ["src/ccnavi"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/ccnavi"]
+include = ["/src/ccnavi"]
 
 [tool.ruff]
 line-length = 100

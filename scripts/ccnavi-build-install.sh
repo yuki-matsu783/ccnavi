@@ -11,7 +11,7 @@
 # ccnavi は、build.py がビルドと .ccnavi/bin/<os>-<arch>/ への配置を両方行う
 # （scripts/../build.py 参照）。
 #
-# 拡張機能は、code にインストール済みのバージョンが vscode-extension/ccnavi-board/package.json の
+# 拡張機能は、code にインストール済みのバージョンが extensions/vscode/ccnavi-board/package.json の
 # バージョン以上なら、インストール済みのバージョンのパッチを 1 つ上げてからビルドする。
 # package.json のほうが大きければ、そのままビルドする。VS Code は、インストール済みと同じか
 # 古いバージョンの vsix を入れ直しとして受け付けない。そのため、インストール済みのバージョンを超える番号にする。
@@ -63,7 +63,7 @@ main() {
   # このスクリプトは scripts/ にあるので、1 つ上をリポジトリのルートとして扱う。
   ROOT=$(cd "$(dirname "$0")/.." && pwd)
   # 拡張機能のソースがあるディレクトリ。
-  EXT_DIR="$ROOT/vscode-extension/ccnavi-board"
+  EXT_DIR="$ROOT/extensions/vscode/ccnavi-board"
 
   # .git がディレクトリなら、ワークツリーではなく本体で実行している。そのときだけリモートから取り込む。
   # （ワークツリーでは .git はファイルになる）

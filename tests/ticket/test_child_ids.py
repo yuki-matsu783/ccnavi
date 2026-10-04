@@ -139,7 +139,9 @@ class FamilyOfTest(unittest.TestCase):
                 self.assertEqual(c1.family_of(ident), family)
 
     def test_the_chrome_entry_gives_the_same_answer(self):
-        path = os.path.join(ROOT, "chrome-extension", "ccnavi-approval", "py", "ccnavi_chrome.py")
+        path = os.path.join(
+            ROOT, "extensions", "chrome", "ccnavi-approval", "py", "ccnavi_chrome.py"
+        )
         spec = importlib.util.spec_from_file_location("ccnavi_chrome_family", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

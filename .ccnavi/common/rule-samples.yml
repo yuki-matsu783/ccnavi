@@ -22,7 +22,7 @@ deny:
     subject: "/repo/README.md"
     why: main の作業ツリーでは編集しない。作業はワークツリーの中で
   - tool: Edit
-    subject: "/repo/ccnavi/cli.py"
+    subject: "/repo/src/ccnavi/cli.py"
     why: 同上。ソースも main では触らない
   - tool: Write
     subject: "/repo/.gitignore"
@@ -261,7 +261,7 @@ allow:
     subject: "cd /repo && sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
     why: このプロジェクトの作業手順。コマンド列の途中でも通る
   - tool: Bash
-    subject: "grep -n TODO ccnavi/cli.py"
+    subject: "grep -n TODO src/ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
   - tool: Bash
     subject: "CAT /etc/hosts"
@@ -296,7 +296,7 @@ allow:
     subject: "# git push origin main"
     why: コメントだけの行は何も走らない
   - tool: Write
-    subject: "/repo/.claude/worktrees/x/ccnavi/cli.py"
+    subject: "/repo/.claude/worktrees/x/src/ccnavi/cli.py"
     why: ワークツリーの中のソース。main の側は deny
   - tool: Write
     subject: "/repo/.claude/worktrees/x/tests/test_glob.py"

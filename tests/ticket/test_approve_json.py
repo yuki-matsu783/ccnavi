@@ -11,7 +11,7 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
    `prompt`（Claude Code に渡す文）が返る
 4. `--yes` の識別子が一覧と違えば承認済みチケットを置かず、`mismatch` で exit 1
 5. `--yes` は端末の壁を通らない。素の `--agree` は今までどおり壁で止まる
-6. 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/approve-*.json）と同じ形
+6. 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/approve-*.json）と同じ形
 
 形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。
 """
@@ -26,7 +26,7 @@ from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PHASES, PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, write
 
-FIXTURES = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures")
+FIXTURES = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures")
 
 APPROVE_VERSION = 1
 

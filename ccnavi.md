@@ -206,7 +206,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 ```
 
 hook の `command` は振り分けの sh を指す 1 行で、どの実行ファイルを起動するかは起動した機械が決める。置き場の名前は
-`build.py` が書く `dist/ccnavi.target` の `<os>-<arch>` で、語は `ccnavi/infra/platformtag.py`・`.ccnavi/scripts/ccnavi-launcher.sh`・
+`build.py` が書く `dist/ccnavi.target` の `<os>-<arch>` で、語は `src/ccnavi/infra/platformtag.py`・`.ccnavi/scripts/ccnavi-launcher.sh`・
 `scripts/ccnavi-setup.sh` の `host_target` の 3 か所で揃える。sh は ccnavi のリポジトリでも配布先でも同じパスに置き、
 ccnavi のリポジトリの hook も同じ sh を通る。
 
@@ -253,11 +253,11 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 ツール呼び出しは、通したものも判定しなかったものも 1 件 1 行の JSON として `CCNAVI_LOG`
 （既定 `logs/decisions.jsonl`）に追記する。1 行の欄は付録 B。判定しなかった回も残すので、記録が無ければ ccnavi が動かなかったと読める。
 
-記録に書く `subject` / `unwrapped` / `detail` は、書く直前に秘密の形を伏せる（`ccnavi/records/redact.py`）。伏せるのは
+記録に書く `subject` / `unwrapped` / `detail` は、書く直前に秘密の形を伏せる（`src/ccnavi/records/redact.py`）。伏せるのは
 記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `decisions.<日時>.jsonl` へローテートし、ローテートした
 記録と終わったセッションの記録（`logs/state/`）は 14 日で消す。走るのはセッション開始と `ccnavi --prune` だけで、
 実行前チェックでは走らない。記録はセッションごとにまとめて、どれかが保持日数のうちに書かれていれば全部残す
-（`ccnavi/records/prune.py`）。`<セッション>.json` と読むのは UUID の形の名前だけで、知らない名前のファイルと、
+（`src/ccnavi/records/prune.py`）。`<セッション>.json` と読むのは UUID の形の名前だけで、知らない名前のファイルと、
 リンクになった置き場（`logs/state` そのものと `selfguard/`）には触らない。しきい値は 0 のほか 1 MB・1 日より
 小さい値と有限でない値を受けず、既定で動く。ローテート先は `O_EXCL` で先に押さえてから名前を変える。
 伏せる前にも 4000 字（上限の 4 倍）で切り、伏せる手間が実行前チェックの期限に届かないようにする。「記録が無ければ動かなかった」は、ローテートした分と合わせて読む。
@@ -2203,7 +2203,7 @@ state も内部で外す。拡張と `tools/check_rules.py` は念のため `--l
 診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと落とし、落としたことを標準エラーに
 出す。守る対象も本来の場所のまま。層の配点にはまだ差し替えが無い。
 
-**互換の版**（`ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
+**互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
 比べ、`--lint` は sh の値と比べる（`(version)` の warn）。食い違えばどれも直し方（ccnavi のリポジトリなら組み立て直し、配布先なら
 配り直し、拡張が古ければ入れ直し）を名指しし、止めはしない。新しいフラグを使う前は、渡してみて argparse のエラーで見分けるのでは
@@ -2296,7 +2296,7 @@ ccnavi ディレクトリの名前を動かしていなければ、共通層の 
 共通層の置き場は `CCNAVI_PROJECT_HOME` にも env にも付いて動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、
 それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る。層を探す先を動かす `--projects` / `--project-home` も同じ。
 自身の層とプロジェクトの層はそのツリーにだけ適用され、どちらも git プロジェクトルートの下の `.ccnavi/config/` に置く。
-ワークスペース自身に層を分けるのは、ワークスペースのフェーズの種類（`scope: ["ccnavi/*", ...]`）がそのレイアウトにしか合わないから。
+ワークスペース自身に層を分けるのは、ワークスペースのフェーズの種類（`scope: ["src/*", ...]`）がそのレイアウトにしか合わないから。
 
 共通層のフェーズの種類は空から始める。ワークスペースの種類は自身の層 `<ワークスペースルート>/.ccnavi/config/phases.yml` に置き、
 ルールと配点は共通層に置く。導入スクリプトのひな形も同じ分け方で配る（11.9）。
