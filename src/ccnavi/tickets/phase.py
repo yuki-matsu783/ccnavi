@@ -1016,6 +1016,54 @@ def reviewed_or_skipped(phase: Phase) -> bool:
     return approval_marks.MARK_REVIEWED in phase.marks
 
 
+def resumed_review(
+    root: str,
+    conf: settings.Settings,
+    child: ticket_mod.Ticket,
+    raw: approval.Raw | None = None,
+) -> str:
+    """作業中（`doing/`）の子のフェーズに、レビュー済みのマーカーが残っている形の警告文。無ければ空。
+
+    運用の基本は、閉じたチケットを戻さず新しいチケットを作り直すこと。ユーザが `done/` から
+    `doing/` へ手で戻す再開は想定しておらず、されるとそのフェーズの `reviewed` が残って、
+    もう一度 `finish` しても止まらず、レビューの告知も出ない。機構はマーカーを消さない
+    （消すかはレビューをやり直すかどうかで、ユーザが決める）。判定も `start` も止めず、
+    `--lint` と `status` がこの文を warn で言う。
+
+    レビューが要らないフェーズ（`reviewed_or_skipped` が `reviewed` を見ずに通る、
+    レビュー不要と延期）は、マーカーが残っていても止める条件に入らないので言わない。文には子の識別子を入れない
+    （呼び手が前に付ける）。
+    """
+    if child.state != ticket_mod.DOING or not child.is_child or child.phase is None:
+        return ""
+    for ph in phases_of(root, conf, child.parent, raw=raw):
+        if ph.number != child.phase:
+            continue
+        if ph.deferred or not ph.review_required:
+            return ""
+        if approval_marks.MARK_REVIEWED not in ph.marks:
+            return ""
+        mark = "/".join(
+            (
+                conf.approved or settings.DEFAULT_APPROVED,
+                approval_marks.PHASES_DIR,
+                child.parent,
+                f"{ph.number}.{approval_marks.MARK_REVIEWED}",
+            )
+        )
+        git = settings.script_command(root, "ccnavi-git.sh")
+        push = settings.script_command(root, "ccnavi-push-approved.sh")
+        return (
+            f"作業中（doing/）ですが、フェーズ {ph.label} の reviewed マーカーが残っています。"
+            "レビューをやり直すならマーカーを消してください"
+            f"（消し方: ユーザが親 {child.parent} のワークツリーで '{git} rm {mark}' を打ち、"
+            f"'{push} {child.parent}' でコミットして送る）。"
+            "続きの作業だけなら、そのままで構いません。"
+            "運用の基本は、新しいチケットを作り直すことです"
+        )
+    return ""
+
+
 def order_problems(
     root: str,
     conf: settings.Settings,

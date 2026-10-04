@@ -25,7 +25,7 @@ from typing import TextIO
 
 from ..hook import c1
 from ..infra import fsio, gitcmd, settings, tree
-from ..tickets import approval, approval_checks, approval_times, history, ops, syncstate
+from ..tickets import approval, approval_checks, approval_times, history, ops, phase, syncstate
 from ..tickets import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 10.0
@@ -262,6 +262,9 @@ class _Family:
                 f"作業中なのに {', '.join(left)} に値が残っている（done/ から手で戻した再開）。"
                 "ユーザにその欄を空にしてもらう"
             )
+        review_left = phase.resumed_review(self.root, self.conf, t)
+        if review_left:
+            warns.append(review_left)
         if (
             not t.is_child
             and t.has_plan
