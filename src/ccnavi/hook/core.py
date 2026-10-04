@@ -314,6 +314,8 @@ def _write_op(op: fsio.Op) -> str:
         return fsio.write_text_durable(op.path, op.text, op.newline)
     if op.kind == fsio.OP_BYTES_ATOMIC:
         return fsio.write_bytes_atomic(op.path, op.content or b"")
+    if op.kind == fsio.OP_NEW_DURABLE:
+        return fsio.write_new_durable(op.path, op.content or b"")
     if op.kind == fsio.OP_NEW:
         return fsio.write_new(op.path, op.content or b"")
     if op.kind == fsio.OP_REMOVE:
@@ -995,7 +997,9 @@ def _withdraw_problems(
         )
         try:
             # 待ち方のファイルはマーカーではない（承認で置く）。中身は `_content_problems` が見る。
-            if [n for n in fsio.listdir(marks_dir) if n != approval_marks.WORKFLOW_FILE]:
+            # 書きかけで落ちて残った一時ファイル（`.<名前>.<一意>.part`）もマーカーではない。
+            names = fsio.listdir(marks_dir)
+            if [n for n in names if n != approval_marks.WORKFLOW_FILE and not fsio.is_temp_name(n)]:
                 found.append(f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある")
         except FileNotFoundError:
             pass

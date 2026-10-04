@@ -1450,6 +1450,19 @@ class WithdrawTest(CoreHarness):
         listed = core.withdrawable(self.snapshot(), "i0001")
         self.assertTrue(any("子の提案" in p for p in listed[0][2]), listed)
 
+    def test_a_leftover_temporary_file_is_not_a_marker(self):
+        """書きかけで落ちて残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
+        text = self.approved_parent()
+        marks = os.path.join(self.approved, "phases", "i0001")
+        write(os.path.join(marks, ".workflow.yml.abc12345.part"), "half")
+        write(os.path.join(marks, ".1.pending.abc12345.part"), "half")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertFalse(any("マーカー" in p for p in problems), problems)
+        # 本物のマーカーが一緒に在れば、今までどおり止める。
+        write(os.path.join(marks, "1.pending"), "{}")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("マーカーがある" in p for p in problems), problems)
+
     def test_an_unreadable_marks_place_refuses(self):
         """マーカーの置き場を読めない（ディレクトリでない）なら、無いとは言わずに止める。"""
         text = self.approved_parent()

@@ -395,5 +395,58 @@ class WriteTextDurableTest(unittest.TestCase):
         self.assertEqual(op.content, b"a\nb\n")
 
 
+class WriteNewDurableTest(unittest.TestCase):
+    """フローの移し（write_new_durable）。在れば書かず、無ければ途中を見せずに置く。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-new-durable-")
+        self.path = os.path.join(self.dir, "flows", "i0001-01-01.yml")
+
+    def test_writes_when_absent(self):
+        self.assertEqual(fsio.write_new_durable(self.path, b"a: 1\r\n"), "")
+        with open(self.path, "rb") as f:
+            self.assertEqual(f.read(), b"a: 1\r\n")
+        self.assertEqual(os.listdir(os.path.dirname(self.path)), ["i0001-01-01.yml"])
+
+    def test_does_not_overwrite(self):
+        self.assertEqual(fsio.write_new_durable(self.path, b"before"), "")
+        failed = fsio.write_new_durable(self.path, b"after")
+        self.assertNotEqual(failed, "")
+        with open(self.path, "rb") as f:
+            self.assertEqual(f.read(), b"before")
+        self.assertEqual(os.listdir(os.path.dirname(self.path)), ["i0001-01-01.yml"])
+
+    def test_failed_replace_leaves_nothing(self):
+        with mock.patch("os.replace", side_effect=OSError(errno.ENOSPC, "no space")):
+            self.assertNotEqual(fsio.write_new_durable(self.path, b"x"), "")
+        self.assertEqual(os.listdir(os.path.dirname(self.path)), [])
+
+    def test_staged_write_refuses_an_existing_file(self):
+        os.makedirs(os.path.dirname(self.path))
+        with open(self.path, "wb") as f:
+            f.write(b"held")
+        with fsio.staging() as stage:
+            self.assertNotEqual(fsio.write_new_durable(self.path, b"x"), "")
+        self.assertEqual(stage.items, [])
+
+    def test_staged_write_is_queued_as_its_own_kind(self):
+        with fsio.staging() as stage:
+            self.assertEqual(fsio.write_new_durable(self.path, b"x"), "")
+        (op,) = stage.items
+        self.assertEqual(op.kind, fsio.OP_NEW_DURABLE)
+
+
+class TempNameTest(unittest.TestCase):
+    def test_temporary_names(self):
+        for name in (
+            ".workflow.yml.abc12345.part",
+            ".once-a-b.x1y2.part.json",
+            ".i0001.md.k_9.part",
+        ):
+            self.assertTrue(fsio.is_temp_name(name), name)
+        for name in ("workflow.yml", "1.pending", "1.requested", ".hidden", "a.b.part", ".part"):
+            self.assertFalse(fsio.is_temp_name(name), name)
+
+
 if __name__ == "__main__":
     unittest.main()

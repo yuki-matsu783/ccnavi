@@ -285,7 +285,16 @@ def temp_origin(name: str) -> str:
     掃除する側が、本番と同じ「先頭と拡張子」の条件を当てられるようにする
     （`.once-a-b.x1y2.part.json` → `once-a-b.x1y2.part.json`）。
     """
-    return name[1:] if _ATOMIC_TEMP.match(name) else name
+    return name[1:] if is_temp_name(name) else name
+
+
+def is_temp_name(name: str) -> bool:
+    """途中を見せない書き方が落ちて残した一時ファイルの名前か。
+
+    `write_bytes_atomic` などの `.<名前>.<一意>.part` と、`write_text_atomic` の
+    `.<名前>.<一意>.part<拡張子>` の形。先頭が `.` でない名前は当たらない。
+    """
+    return bool(_ATOMIC_TEMP.match(name))
 
 
 def _mode_for(path: str) -> int:
@@ -357,6 +366,27 @@ def write_text_durable(path: str, text: str, newline: str | None = None) -> str:
         )
     content = _disk_text(text, newline)
     return _recorded(path, _write_with_retry(lambda: _replace_durably(path, content)))
+
+
+def write_new_durable(path: str, content: bytes) -> str:
+    """まだ無いファイルとして、`write_bytes_atomic` と同じ書き方で書く。在れば書かずに理由を返す。
+
+    承認した子のフローを承認済みのツリーへ移すところが使う。在るかを確かめてから一時ファイルに
+    書き切り、`os.replace` で置く。**確かめてから置くまでの間に別の誰か（ボードの保存など）が
+    同じ名前に置くと、それを上書きする。** `write_new`（`O_EXCL`）はそこを塞ぐが、途中で落ちると
+    書きかけを残す。どちらを取るかは書く側が決める。
+    """
+    if _STAGE["current"] is not None:
+        if lexists(path):
+            return str(OSError(errno.EEXIST, os.strerror(errno.EEXIST), path))
+        return _stage_put(Op(OP_NEW_DURABLE, path, bytes(content)))
+
+    def write() -> None:
+        if os.path.lexists(path):
+            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), path)
+        _replace_durably(path, content)
+
+    return _recorded(path, _write_with_retry(write))
 
 
 def _disk_text(text: str, newline: str | None) -> bytes:
@@ -836,6 +866,7 @@ OP_TEXT_ATOMIC = "text-atomic"  # write_text_atomic / write_json_atomic
 OP_BYTES = "bytes"  # write_bytes
 OP_BYTES_ATOMIC = "bytes-atomic"  # write_bytes_atomic
 OP_TEXT_DURABLE = "text-durable"  # write_text_durable
+OP_NEW_DURABLE = "new-durable"  # write_new_durable（在れば書かない）
 OP_NEW = "new"  # write_new（在れば書かない）
 OP_REMOVE = "remove"  # remove（無くても消せなくても何も出さない）
 OP_UNLINK = "unlink"  # unlink（消せなければ理由）

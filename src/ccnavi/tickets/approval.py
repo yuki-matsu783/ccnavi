@@ -838,7 +838,9 @@ def carry_flow(
     # 落ちたときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
     cannot = f"{proposal.ticket} のフローを {target} へ移せない ({{reason}})。{source} に残っている"
     with fsio.policy(message=cannot):
-        failed = fsio.write_new(target, raw)
+        # 途中で落ちても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
+        # ボードの保存が割り込むと上書きしうるが、書きかけのフローを残すよりよいと採った。
+        failed = fsio.write_new_durable(target, raw)
     if failed:
         return [cannot.replace("{reason}", failed)]
     kept = (
