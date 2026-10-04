@@ -434,38 +434,95 @@ class TombstoneTest(AuthorityHarness):
             )
         )
 
-    def test_a_present_record_without_the_parent_tree_is_undecided_until_closed(self):
+    def integration_done_parent(self, front):
+        base = os.path.join(self.state, "sync", "self", "integration")
+        write(os.path.join(base, "head"), "branch main\nsha abc\n")
+        write(
+            os.path.join(base, ".ccnavi", "approved", "done", "i0001.md"),
+            "---\nversion: 1\nticket: i0001\n" + front + "---\n",
+        )
+
+    def parent_fields(self):
+        with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
+            copy = syncstate._copy_fields(f.read())
+        self.assertTrue(copy.base_sha and copy.started_at, copy)
+        return copy
+
+    def test_a_present_record_without_the_parent_tree_is_not_closed(self):
+        # 手元に親が無ければ、統合先の done/ に親があっても同じ親だと言えない。
+        # 閉じていない側に倒す。
         self.record("present")
+        mine = self.parent_fields()
         git(self.root, "worktree", "remove", "--force", self.child_tree)
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.stop and not st.closed, st)
         self.assertIn("片付けても残る", st.stop)
-        # 統合先の取り込み結果の done/ に親のチケットがあれば、
-        # 親子のチケットの取り込み状態に頼らず閉じた親子のチケット（墓標は何も言わない）。
-        base = os.path.join(self.state, "sync", "self", "integration")
-        write(os.path.join(base, "head"), "branch main\nsha abc\n")
-        write(
-            os.path.join(base, ".ccnavi", "approved", "done", "i0001.md"),
-            "---\nversion: 1\nticket: i0001\n---\n",
+        self.integration_done_parent(f"base_sha: {mine.base_sha}\n")
+        st = syncstate.standing(self.conf(), self.root, "i0001")
+        self.assertTrue(st.stop and not st.closed, st)
+
+    def test_the_same_base_sha_reads_as_closed(self):
+        self.record("present")
+        mine = self.parent_fields()
+        self.integration_done_parent(
+            f"base_sha: {mine.base_sha}\nstarted_at: '{mine.started_at}'\n"
+            f"completed_at: '{mine.started_at}'\n"
         )
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.closed, st)
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
-        self.assertFalse([p for p in lint["problems"] if p["where"] == "(sync/self/i0001)"])
+        mine = [p for p in lint["problems"] if p["where"] == "(sync/self/i0001)"]
+        self.assertEqual(["info"], [p["severity"] for p in mine], mine)
+        self.assertIn("片付けてよい", mine[0]["detail"])
+
+    def test_a_different_base_sha_is_another_family(self):
+        # 最初に両方が値を持つ欄（base_sha）で決める。後ろの欄が同じでも見ない。
+        self.record("present")
+        mine = self.parent_fields()
+        self.integration_done_parent(f"base_sha: '0000000'\nstarted_at: '{mine.started_at}'\n")
+        st = syncstate.standing(self.conf(), self.root, "i0001")
+        self.assertFalse(st.closed)
+        self.assertEqual("", st.stop)
+
+    def test_nothing_to_compare_is_not_closed(self):
+        # 未着手のまま閉じた形どうしなど、どの欄でも照合できなければ閉じていない。
+        # 空の値と空どうしは一致としない。
+        self.record("present")
+        self.integration_done_parent("base_sha: ''\nstarted_at:\n")
+        st = syncstate.standing(self.conf(), self.root, "i0001")
+        self.assertFalse(st.closed)
+
+    def test_the_order_of_fields(self):
+        copy = syncstate.DoneCopy
+        mine = copy("i0001", "", base_sha="", started_at="t1", cancelled_at="c1")
+        self.assertTrue(syncstate.same_parent(mine, copy("i0001", "", started_at="t1")))
+        self.assertFalse(syncstate.same_parent(mine, copy("i0001", "", started_at="t2")))
+        # started_at が片方にしか無ければ、次の cancelled_at で比べる。
+        unstarted = copy("i0001", "", cancelled_at="c1")
+        self.assertTrue(syncstate.same_parent(unstarted, copy("i0001", "", cancelled_at="c1")))
+        self.assertTrue(syncstate.same_parent(mine, unstarted))
+        self.assertFalse(syncstate.same_parent(mine, copy("i0001", "", cancelled_at="c2")))
+        self.assertFalse(syncstate.same_parent(None, unstarted))
+        self.assertFalse(syncstate.same_parent(copy("i0001", ""), copy("i0001", "")))
+        # 古い approved_at は、両方に 3 つとも無く、両方にあるときだけ。
+        old = copy("i0001", "", approved_at="a1")
+        self.assertTrue(syncstate.same_parent(old, copy("i0001", "", approved_at="a1")))
+        self.assertFalse(syncstate.same_parent(old, copy("i0001", "", approved_at="a2")))
+        self.assertFalse(syncstate.same_parent(old, copy("i0001", "")))
+        self.assertFalse(
+            syncstate.same_parent(old, copy("i0001", "", approved_at="a1", started_at="t1"))
+        )
+
+    def test_frontmatter_values_are_read_without_the_body(self):
+        copy = syncstate._copy_fields("---\nticket: i0001\nbase_sha: ''\n---\nbase_sha: abc\n")
+        self.assertEqual("", copy.base_sha)
 
     def test_an_old_family_with_the_same_id_is_not_read_as_closed(self):
-        # 統合先の done/ のチケットの承認の時刻が、
-        # 親のワークツリーのチケットと違えば閉じたとしない（承認の記録を持つ古い形どうし）。
+        # 承認の記録を持つ古い形どうしで、着手の欄が無い統合先の親は承認の時刻で比べる。
         self.record("present")
         to_old_form(self.approved, "i0001")
-        base = os.path.join(self.state, "sync", "self", "integration")
-        write(os.path.join(base, "head"), "branch main\nsha abc\n")
-        write(
-            os.path.join(base, ".ccnavi", "approved", "done", "i0001.md"),
-            "---\nversion: 1\nticket: i0001\nccnavi_approved:\n"
-            "  approved_at: 2000-01-01T00:00:00+0900\n---\n",
-        )
+        self.integration_done_parent("ccnavi_approved:\n  approved_at: 2000-01-01T00:00:00+0900\n")
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertFalse(st.closed)
         self.assertEqual("", st.stop)
