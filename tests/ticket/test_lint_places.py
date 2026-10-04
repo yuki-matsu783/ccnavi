@@ -187,8 +187,9 @@ class ProjectsCollisionTest(unittest.TestCase):
     | はい | どちらでも | どちらでも | ぶつかりの warn だけ（A5） |
     | いいえ | はい | はい | 既存の「無視されていない」（A6） |
     | いいえ | はい | いいえ | 何も言わない |
-    | いいえ | いいえ | はい | 何も言わない |
-    | いいえ | いいえ | いいえ | 既存の「無視されていない」（clone 前でも確かめる） |
+    | いいえ | いいえ（`projects/` は在る） | はい | 何も言わない |
+    | いいえ | いいえ（`projects/` は在る） | いいえ | 既存の「無視されていない」 |
+    | いいえ | いいえ（`projects/` が無い） | どちらでも | 何も言わない |
 
     フラグ（`--projects` など）は渡さず、`--root` の下の既定の置き場を見る。
     A5 は実装前は赤（ぶつかりの知らせがまだ無い）。A6 は今どおりで緑（回帰の見張り）。
@@ -318,10 +319,23 @@ class ProjectsCollisionTest(unittest.TestCase):
 
         self.assertEqual(self.about_projects(), [])
 
-    def test_no_project_yet_and_not_ignored_still_says_not_ignored(self):
-        """clone 前（`projects/` が無い）でも、無視されていなければ言う。"""
+    def test_no_projects_dir_says_nothing_about_projects(self):
+        """`projects/` が無い（プロジェクトを使わない）ワークスペースには何も言わない。"""
         self.no_tracking()
         self.assertFalse(os.path.exists(self.projects))
+
+        self.assertEqual(self.about_projects(), [])
+
+    def test_empty_projects_dir_and_ignored_says_nothing_about_projects(self):
+        self.no_tracking(ignore="/projects/\n")
+        os.makedirs(self.projects)
+
+        self.assertEqual(self.about_projects(), [])
+
+    def test_empty_projects_dir_and_not_ignored_says_not_ignored(self):
+        """`projects/` は在るがプロジェクトが 0 件でも、無視されていなければ言う。"""
+        self.no_tracking()
+        os.makedirs(self.projects)
 
         found = self.about_projects()
 

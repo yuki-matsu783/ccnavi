@@ -106,7 +106,8 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
     予約名（`common` / `self`、表記違いも含む）を使っていないこと、プロジェクトが
     `.claude/` を持たないことを見る。層の中身は
-    `_layers` が見る。無視の確認はプロジェクトが無くても行う（clone 前に確かめる）。
+    `_layers` が見る。無視の確認は、置き場のディレクトリが在るなら、プロジェクトが 0 件でも行う。
+    ディレクトリ自体が無いワークスペースでは何も言わない（プロジェクトを使わない人への苦情になる）。
 
     その前に、置き場がワークスペースの git の索引に載っていないかを見る（`_in_index`）。
     載っていれば「無視されていない」の代わりにそれを言う。プロジェクトが 1 つも無くても
@@ -118,11 +119,11 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     indexed = _in_index(root, rel) if rel else None
     if indexed is not None:
         problems.append(Problem(SEVERITY_WARN, "(projects)", indexed))
-    # 無視の確認はプロジェクトが無くても行う。clone 前の置き場に `.gitignore` が要るかを、
-    # clone する前に確かめられるようにするため。末尾の `/` を付けると、まだ無いパスにも
-    # `/projects/` のようなディレクトリ向けの行が当たる。
+    # 無視の確認は、置き場のディレクトリが在るときだけ行う（プロジェクトが 0 件でもよい）。
+    # ディレクトリが無いのはプロジェクトを使っていないワークスペースで、何も言わない。
+    # 末尾の `/` を付けると、`/projects/` のようなディレクトリ向けの行が当たる。
     rel = rel or os.path.relpath(conf.projects, root).replace(os.sep, "/")
-    if indexed is None and _ignored(root, rel + "/") is False:
+    if indexed is None and os.path.isdir(conf.projects) and _ignored(root, rel + "/") is False:
         problems.append(
             Problem(
                 SEVERITY_WARN,
