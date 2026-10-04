@@ -31,6 +31,10 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
     書いて送ったものが、経路・時刻・拡張の版のほかは同じ
+
+`CCNAVI_SH_DIR` があれば、`.ccnavi/scripts/` の `.sh` を写したあと、その上に `CCNAVI_SH_DIR` の
+`.sh` を重ねる。写す前の版（`wip/design/scripts/` など）を確かめるときに使う。写す版は一部の sh
+だけを持ち、`ccnavi-ticket.sh` などは持たないので、差し替えではなく重ねる。
 """
 
 from __future__ import annotations
@@ -52,6 +56,8 @@ from tests.ticket.test_ticket import RULES
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
+# 写す前の版の sh（`wip/design/scripts/` など）。`.ccnavi/scripts/` の上に重ねる。
+OVERLAY_DIR = os.environ.get("CCNAVI_SH_DIR", "")
 CONFIG = (
     ("user.email", "t@example.invalid"),
     ("user.name", "t"),
@@ -137,6 +143,11 @@ class C1Harness(unittest.TestCase):
         for name in os.listdir(SH_DIR):
             if name.endswith(".sh"):
                 shutil.copy(os.path.join(SH_DIR, name), self.scripts)
+        if OVERLAY_DIR:
+            overlay = os.path.join(ROOT, OVERLAY_DIR)
+            for name in os.listdir(overlay):
+                if name.endswith(".sh"):
+                    shutil.copy(os.path.join(overlay, name), self.scripts)
         git(base, "init", "-q", "-b", "main", self.ws)
         for key, value in CONFIG:
             git(self.ws, "config", key, value)
@@ -797,6 +808,42 @@ class C1TicketTest(C1Harness):
         self.assertIn(os.path.relpath(judge, self.tree).replace(os.sep, "/"), self.committed())
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
+
+
+class PlacesAreNotReadTest(C1Harness):
+    """控えの置き場を動かす環境変数は読まない（置き場は固定。A9）。
+
+    `.ccnavi/scripts/` が写す版（i0064-10）になる前は落ちる。写す前の sh（`ccnavi-common.sh` の
+    `ccnavi_state`）は `CCNAVI_STATE` を読み、ロックと控えを env が指す場所に置くため。
+    """
+
+    def hold_lock(self):
+        os.makedirs(self.lock_dir())
+        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
+        system = subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
+        now = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout)
+        write(
+            os.path.join(self.lock_dir(), "owner"),
+            f"{host} {os.getpid()} {now} {os.getpid()}-{now} {system}\n",
+        )
+
+    def test_the_state_variable_does_not_move_the_lock_or_the_record(self):
+        outside = os.path.join(self._tmp.name, "elsewhere-state")
+        # 既定の置き場（logs/state/locks/...）のロックを持たれていれば、env を入れても止まる。
+        self.hold_lock()
+        held = self.ticket("start", PARENT, CCNAVI_STATE=outside)
+        self.assertEqual(held.returncode, 1, held.stdout + held.stderr)
+        self.assertIn("ロックを他の操作が持っている", held.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+        shutil.rmtree(self.lock_dir())
+        # ロックが空けば、既定の置き場でロックを取り、家族の控えを既定の置き場に書いて送る。
+        result = self.ticket("start", PARENT, CCNAVI_STATE=outside)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        head = self.sha(self.tree, "HEAD")
+        self.assertEqual(self.remote_sha(), head)
+        self.assertEqual(fields(self.record)["sha"], head)
+        self.assertFalse(os.path.exists(self.lock_dir()))
+        self.assertFalse(os.path.exists(outside), "CCNAVI_STATE を読んでいる")
 
 
 class C1NotImportedTest(C1Harness):

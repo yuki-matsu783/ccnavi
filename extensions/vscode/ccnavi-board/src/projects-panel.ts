@@ -9,7 +9,7 @@
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
  * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
- * そのルールファイルの場所は layers（層）の答えを使い、`CCNAVI_PROJECT_HOME` から自分で組まない。
+ * そのルールファイルの場所は layers（層）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
  *
  * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
  * の出現を監視して拾う。書くのは、ユーザがボタンを押したときの `.gitignore`、置き場のディレクトリ、
@@ -268,7 +268,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
   // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
   // 設定のパス（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
   // ワークスペースの設定のパスが取れない（JSON として読めない）なら、設定のルールファイルの監視は張らない。
-  const rel = projectsRel === "" ? "projects" : projectsRel;
+  const rel = projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
   const patterns = [
     `${rel}/*/.git`,
@@ -489,10 +489,6 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
 
 function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName: string): void {
   const root = current.folder.uri.fsPath;
-  if (page.projectsDir === "") {
-    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、clone 先を決められません");
-    return;
-  }
   const remote = checkRemote(rawUrl);
   if (!remote.ok) {
     fail(current, remote.error);
@@ -522,10 +518,6 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
 }
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
-  if (page.projectsRel === "") {
-    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、.gitignore に足す行がありません");
-    return;
-  }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");
   const before = readText(file);
   try {

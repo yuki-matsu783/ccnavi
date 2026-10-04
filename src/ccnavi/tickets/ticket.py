@@ -1200,8 +1200,8 @@ def combine(child: str, parent: str) -> str:
 def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """ツリーのルートからの相対パスが、チケットの置き場の下にあるか。
 
-    置き場は提案の置き場（`CCNAVI_TICKETS_PROPOSAL`）と承認済みチケットの置き場
-    （`CCNAVI_TICKETS_APPROVED`）。
+    置き場は提案の置き場（`wip/proposals/`）と承認済みチケットの置き場
+    （`.ccnavi/approved/`）。どちらも固定で、env では動かない。
     ここはチケットの範囲の外でも報告しない。報告すると、親が自分のワークツリーに次の子を
     提案する経路と、承認がブランチに乗る経路が使えなくなる。
 

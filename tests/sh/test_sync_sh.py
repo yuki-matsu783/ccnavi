@@ -9,6 +9,10 @@ ccnavi-sync.sh は親のブランチを取り込み（早送りか merge）、�
 読み返すのは終了コード・標準出力と、git に残った ref、
 取り込み状態（logs/state/sync/...）の中身だけ。
 MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めた代役の sh に差し替える。
+
+`CCNAVI_SH_DIR` で、写す sh（`SCRIPTS` の 3 本）の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。`.ccnavi/scripts/` に写す前の版
+（`wip/design/scripts/` など）を確かめるときに使う（`tests/sh/test_gitwrap.py` と同じ）。
 """
 
 from __future__ import annotations
@@ -29,7 +33,7 @@ from tests import ROOT, SRC
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
 GIT = shutil.which("git")
-SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = ("ccnavi-sync.sh", "ccnavi-common.sh", "ccnavi-git.sh")
 CONFIG = (
     ("user.email", "t@example.invalid"),
@@ -143,7 +147,7 @@ class FrontFieldTest(unittest.TestCase):
 
 
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
-class SyncTest(unittest.TestCase):
+class SyncHarness(unittest.TestCase):
     """ワークスペース 1 つ（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。"""
 
     def setUp(self):
@@ -277,6 +281,17 @@ class SyncTest(unittest.TestCase):
         )
         return done.stdout.strip()
 
+    def launcher(self, body=None):
+        path = write(
+            os.path.join(self._tmp.name, "bin", "ccnavi"),
+            body or f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n',
+        )
+        os.chmod(path, 0o755)
+        return path
+
+
+@unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
+class SyncTest(SyncHarness):
     # ---- 取り込み（P がリモートにある）
 
     def test_fast_forward_and_records(self):
@@ -891,14 +906,6 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.mirror))
         self.assertFalse(os.path.exists(self.record))
 
-    def launcher(self, body=None):
-        path = write(
-            os.path.join(self._tmp.name, "bin", "ccnavi"),
-            body or f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n',
-        )
-        os.chmod(path, 0o755)
-        return path
-
     def test_settings_local_json_names_the_integration_branch(self):
         # ユーザが端末で打つ sh には settings.local.json の env が反映されない。
         # 実行ファイルが読んで渡す。
@@ -1080,6 +1087,76 @@ class SyncTest(unittest.TestCase):
     def kill_group(self, proc):
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(proc.pid, signal.SIGKILL)
+
+
+@unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
+class PlacesAreNotReadTest(SyncHarness):
+    """置き場を動かす環境変数は読まない（置き場は固定。A9）。
+
+    `.ccnavi/scripts/` が写す版（i0064-10）になる前は落ちる。写す前の sh は、
+    `ccnavi-common.sh` の `ccnavi_state` が `CCNAVI_STATE` を、`ccnavi_parent_tree` が
+    `CCNAVI_TICKETS_APPROVED`・`CCNAVI_TICKETS_PROPOSAL` を読み、`ccnavi-sync.sh` の予備が
+    `CCNAVI_TICKETS_*`・`CCNAVI_PROJECT_HOME` を、`projects` が `CCNAVI_PROJECTS` を読むため。
+    """
+
+    def moved(self):
+        """既定と違う綴りの 5 つ。控えはワークスペースの外の絶対パス、ほかは相対。"""
+        self.outside = os.path.join(self._tmp.name, "elsewhere-state")
+        return {
+            "CCNAVI_STATE": self.outside,
+            "CCNAVI_TICKETS_APPROVED": "tickets/approved",
+            "CCNAVI_TICKETS_PROPOSAL": "tickets/proposals/",
+            "CCNAVI_PROJECT_HOME": ".nav",
+            "CCNAVI_PROJECTS": "repos",
+        }
+
+    def arrange(self):
+        """リモートに親の 1 件、統合先に done/ と層、提案だけの家族、家族の無いプロジェクト。"""
+        self.head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
+        self.remote_commit("main", ".ccnavi/approved/done/old.md", "old\n")
+        self.remote_commit("main", ".ccnavi/config/phases.yml", "phases\n")
+        # 提案（wip/proposals/todo/）だけがある親。既定の提案の置き場で家族と見つける。
+        other = os.path.join(self.ws, ".claude", "worktrees", "i0002")
+        git(self.ws, "worktree", "add", "-q", other, "-b", "i0002", "main")
+        rel = "wip/proposals/todo/i0002.md"
+        write(os.path.join(other, rel), "---\nversion: 1\nticket: i0002\n---\n")
+        git(other, "add", "--", rel)
+        git(other, "commit", "-q", "-m", "propose")
+        git(other, "push", "-q", "-u", "origin", "i0002")
+        project = os.path.join(self.ws, "projects", "p")
+        git(self._tmp.name, "init", "-q", "-b", "main", project)
+        git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))
+
+    def assertDefaultPlaces(self, done):
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        # 親のワークツリーを既定の置き場（.ccnavi/approved・wip/proposals）で家族と見つけた。
+        self.assertEqual(self.head, self.sha(self.tree, "HEAD"))
+        self.assertEqual("present", fields(self.record)["state"])
+        self.assertEqual(self.head, fields(self.record)["sha"])
+        other = os.path.join(self.state, "sync", "self", "families", "i0002")
+        self.assertEqual("present", fields(other)["state"])
+        # 統合先の控えは既定の置き場の done/ と層（.ccnavi/config）を写す。
+        for rel in (".ccnavi/approved/done/old.md", ".ccnavi/config/phases.yml"):
+            self.assertTrue(os.path.isfile(os.path.join(self.mirror, rel)), rel)
+        # プロジェクトは既定の projects/ の下で見つける。
+        self.assertIn("p: リモートのブランチの一覧を取ってこられなかった", done.stdout)
+        # env が指す場所には何も作らない。
+        self.assertFalse(os.path.exists(self.outside), "CCNAVI_STATE を読んでいる")
+        for rel in ("tickets", ".nav", "repos"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws, rel)), rel)
+            self.assertFalse(os.path.exists(os.path.join(self.mirror, rel)), rel)
+
+    def test_the_variables_do_not_move_the_places(self):
+        """実行ファイルが `sync paths` に答える道。env を入れても既定の置き場で取り込む。"""
+        self.arrange()
+        done = self.sync(CCNAVI_BIN_PATH=self.launcher(), **self.moved())
+        self.assertDefaultPlaces(done)
+
+    def test_the_fallback_without_an_answer_uses_the_defaults(self):
+        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。"""
+        self.arrange()
+        done = self.sync(CCNAVI_BIN_PATH=self.launcher("#!/bin/sh\nexit 0\n"), **self.moved())
+        self.assertDefaultPlaces(done)
 
 
 if __name__ == "__main__":

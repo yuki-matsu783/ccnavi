@@ -1,8 +1,9 @@
 """保護済みの sh（`.ccnavi/scripts/ccnavi-*.sh`）を呼ぶ形のうち、実行前に止めるもの 2 つ。
 
 1. **sh の検査の材料を変える環境変数を、同じコマンド行で置く形。** sh はワークスペースルート・
-   承認済みチケットの置き場・実行ファイルを環境変数から読む（`ccnavi-common.sh`）。
-   `CCNAVI_TICKETS_APPROVED=/x sh …ccnavi-git.sh push` は、存在しない置き場を見て子の push を
+   実行ファイルを環境変数から読む（`ccnavi-common.sh`）。
+   `CCNAVI_WORKSPACE=<子のワークツリー> sh …ccnavi-git.sh push` は、子のワークツリーを
+   ワークスペースルートと読ませ、`.claude/worktrees/` の下に居ないことにして子の push を
    通す。拒否されたエージェントが言い換えて再試行する形そのもので、2.1 の「逸れていく LLM」の
    範囲に入る。hook は `settings.json` の env で起動するので、ここで見る代入の影響を受けない。
 2. **子チケットのワークツリーからの `ccnavi-git.sh push`。** 子の成果は親が合流してから親の
@@ -32,8 +33,8 @@ CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
 ENV_RULE_ID = "builtin-script-env"
 CHILD_PUSH_RULE_ID = "builtin-child-push"
 
-# 保護済みの sh の名前。置き場（`.ccnavi/scripts/`）は `CCNAVI_PROJECT_HOME` で変わりうるので、
-# 名前で見る。
+# 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが、呼び出しの綴りは
+# 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
 _SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh")
 _GIT_SCRIPT = "ccnavi-git.sh"
 
