@@ -580,13 +580,18 @@ def _copy_marks(conf: settings.Settings, root: str) -> dict[str, ticket_mod.Tick
 
     閉じたものも見る。承認の直後・次の hook の前に子が閉じることがあり、開いたものだけを
     見ると、その承認は誰にも伝わらないまま記録に入る。
+
+    置き場は `read_raw` で 1 度だけ読み、3 つの `scan` に持ち回る。ここは読むだけで
+    途中でファイルを動かさないので、読み直す必要は無い。持ち回らないと、`scan` ごとに
+    `_everything` が残りの置き場を読み直し、1 回の hook で同じ置き場を 3 度ずつ読む。
     """
+    raw = approval.read_raw(conf, root)
     found: dict[str, ticket_mod.Ticket] = {}
     for closed in (False, True):
-        got, _ = approval.scan(conf, root, closed=closed)
+        got, _ = approval.scan(conf, root, closed=closed, raw=raw)
         for t in got:
             found[t.ticket] = t
-    review, _ = approval.scan_review(conf, root)
+    review, _ = approval.scan_review(conf, root, raw=raw)
     for t in review:
         found[t.ticket] = t
     return found
