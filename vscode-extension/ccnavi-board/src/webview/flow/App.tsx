@@ -1,12 +1,12 @@
 /**
  * フロー編集画面の本体。帯・ツールバー・部品箱・図・右の欄。
  *
- * 見せる中身は拡張ホストが渡す（`FlowData`）。画面が持つのは、人が触って決めるもの（編集中のフロー、
- * 選んでいるもの、直前の操作の一言、元に戻す履歴、写したノード）だけ。
+ * 見せる中身は拡張ホストが渡す（`FlowData`）。画面が持つのは、ユーザが触って決めるもの（編集中のフロー、
+ * 選んでいるもの、直前の操作の一言、元に戻す履歴、コピーしたノード）だけ。
  *
- * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）のままで、
- * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼る が止まる）。
- * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く（ADR-0085）。
+ * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）をそのまま反映したもので、
+ * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼り付け が止まる）。
+ * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く。
  *
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
  * だけ（再読込・保存が通った）。履歴もそこで空にする。
@@ -121,7 +121,7 @@ function now(): number {
   return typeof clock === "function" ? Number((clock as () => number)()) : Date.now();
 }
 
-/** 押した鍵が欄の中か（欄の中の Ctrl+Z や Ctrl+C は欄に任せる） */
+/** キーを押した先が欄の中か（欄の中の Ctrl+Z や Ctrl+C は欄に任せる） */
 function inField(target: EventTarget | null): boolean {
   const element = target as { tagName?: unknown; isContentEditable?: unknown } | null;
   if (element === null || typeof element.tagName !== "string") {
@@ -135,25 +135,25 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#flow-palette",
     title: "部品箱",
-    body: "押すとノードが図に足される。利用者に聞く（askUserQuestion）ノードでは、担当のサブエージェントは手を止めてメインに返す。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に当たったらメインに返す。",
+    body: "押すと、ノードが図に足されます。ユーザに聞く（askUserQuestion）ノードでは、担当のサブエージェントが手を止めてメインに返します。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に達したらメインに返します。",
   },
   {
     target: "#flow-graph",
     title: "図",
     body:
-      "ノードの右の点から次のノードの左の点へ引くと線が繋がる（開始へ入る線と、終了から出る線は引けない）。ノードや線を押すと、右の欄で中身を直せる。ノードや線にポインタを載せると出る × で消せる。" +
-      "Shift を押しながらノードを押す（何も無いところを引いて囲む）といくつも選べ、「グループ化」で枠にまとめられる。枠の中へ引いたノードは枠に入り、外へ引くと出る。" +
-      "Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直す。選んだノードは Ctrl+C で写して Ctrl+V で貼り、Ctrl+D で複製する（開始は写さない）。",
+      "ノードの右の点から次のノードの左の点へドラッグすると、線でつながります（開始へ入る線と、終了から出る線は引けません）。ノードや線を押すと、右の欄で中身を直せます。ノードや線にポインタを載せると × が出て、押すと消せます。" +
+      "Shift を押しながらノードを押すか、Shift を押しながら何も無いところをドラッグして囲むと、複数のノードを選べます。選んだノードは「グループ化」で枠にまとめられます。枠の中へドラッグしたノードは枠に入り、外へドラッグすると枠から出ます。" +
+      "Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直せます。選んだノードは Ctrl+C でコピーして Ctrl+V で貼り付け、Ctrl+D で複製できます（開始はコピーしません）。",
   },
   {
     target: "#inspector",
     title: "欄",
-    body: "選んだノードの中身（プロンプト・問いと選択肢・分岐の条件など）を直す。この画面に入力欄が無い種類は、名前だけ直せて中身はそのまま残る。",
+    body: "選んだノードの中身（プロンプト、問いと選択肢、分岐の条件など）を直せます。この画面に入力欄が無い種類は、名前だけを直せて、中身はそのまま残ります。",
   },
   {
     target: "#save",
     title: "保存",
-    body: "読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で見せてから保存する。保存の直前に、子チケットが着手中でないかを ccnavi に聞き直す。着手中なら書かない（担当のサブエージェントが読んでいる手順が途中で変わるのを防ぐ）。",
+    body: "読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で表示してから保存します。保存の直前に、子チケットが着手中でないかを ccnavi に確かめ直します。着手中なら書き込みません（担当のサブエージェントが読んでいる手順が、途中で変わるのを防ぐためです）。",
   },
 ];
 
@@ -169,16 +169,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [changed, setChanged] = useState(false);
   const [selected, setSelected] = useState<Selection | undefined>(undefined);
   const [picked, setPicked] = useState<readonly string[]>([]);
-  // 図の外で選んだノード（部品箱で足した・グループ化で作った・貼った）。図はこれが替わったときだけ、それを選び直す
+  // 図の外で選んだノード（部品箱で足した・グループ化で作った・貼り付けた）。図はこれが替わったときだけ、それを選び直す
   const [focus, setFocus] = useState<{ readonly ids: readonly string[] } | undefined>(undefined);
   const [minimap, setMinimap] = useState(minimapShown);
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
-  // 写したノード（画面の中のクリップボード）と、同じものを何回貼ったか（貼るたびに少しずつずらす）
+  // コピーしたノード（画面の中のクリップボード）と、同じものを何回貼り付けたか（貼り付けるたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
   // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指す内容、`pendingDoc` は頼んで答えを待っている内容、
-  // `checkSeq` は最後に頼んだ確かめの番号。内容が替わるたびに番号を進め、待っていた答えは捨てる
+  // `checkSeq` は最後に頼んだ確認の番号。内容が替わるたびに番号を進め、待っていた答えは捨てる
   // （答えを待つ間に直すと、古い内容の答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
@@ -211,7 +211,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         setReview(undefined);
         setReviewSave(page?.reviewSave === true);
         setLock(page?.lock ?? NO_LOCK);
-        // 頼んでいた確かめの答えは捨てる（番号を進める）
+        // 頼んでいた確認の答えは捨てる（番号を進める）
         checkSeq.current += 1;
         checkedDoc.current = page?.checks === undefined ? undefined : page.doc;
         pendingDoc.current = undefined;
@@ -291,11 +291,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   }, [doc, dirty]);
 
   // 図で選んでいるノードが変わった。**毎回同じ関数を渡す**（React Flow は onSelectionChange が替わるたびに
-  // その時の選びで呼び直すので、描くたびに作り直すと、押した直後の古い選びで呼ばれる）
+  // その時の選択で呼び直すので、描くたびに作り直すと、押した直後の古い選択で呼ばれる）
   const pick = useCallback((ids: readonly string[]): void => {
     setPicked((now) => (sameIds(now, ids) ? now : ids));
-    // Shift を押しながら選んでいたノードを押すと、React Flow はそれを選びから外す。右の欄がそのノードの
-    // ままにならないよう、残った選びの最後のノード（残っていなければ何も無い）に替える
+    // Shift を押しながら選んでいたノードを押すと、React Flow はそれを選択から外す。右の欄がそのノードの
+    // ままにならないよう、選択に残ったノードの最後（残っていなければ何も無い）に替える
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
 
@@ -324,7 +324,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
   const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc, { exe: checks !== undefined })), [doc, checks]);
 
-  // 鍵を受け取る側は 1 度だけ張り、中身は描くたびに最新へ差し替える
+  // キー入力を受け取る側は 1 度だけ張り、中身は描くたびに最新へ差し替える
   const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
     const listener = (event: KeyboardEvent): void => onKey.current(event);
@@ -344,7 +344,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     onKey.current = () => undefined;
     return (
       <>
-        <p className="empty">フロー編集画面を読み込み直せなかった。原因を直してから「再読込」を押してください。</p>
+        <p className="empty">フロー編集画面を読み込み直せませんでした。原因を直してから「再読込」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           再読込
@@ -368,7 +368,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setDoc(next);
   };
 
-  /** 戻した・やり直した内容に無いものを選んでいたら外す（線はリストの位置で指すので、線の選びは外す） */
+  /** 戻した・やり直した内容に無いものを選んでいたら外す（線は配列の位置で指すので、線の選択は外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
     if (moved === undefined || readOnly) {
       return;
@@ -395,10 +395,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setFocus({ ids: [added.id] });
   };
 
-  /** 消したものを選んでいたら、選ぶのをやめる（線はリストの位置で指すので、線を消したら線の選びは外す） */
+  /** 消したものを選んでいたら、選ぶのをやめる（線は配列の位置で指すので、線を消したら線の選択は外す） */
   const removeNodeAt = (id: string): void => {
     edit(removeNode(doc, id));
-    // ノードと一緒に線も消えてリストの位置がずれるので、線の選びも外す
+    // ノードと一緒に線も消えて配列の位置がずれるので、線の選択も外す
     if ((selected?.kind === "node" && selected.id === id) || selected?.kind === "edge") {
       setSelected(undefined);
     }
@@ -422,11 +422,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setFocus({ ids: [grouped.id] });
   };
 
-  // 写す・複製するのは、図で選んでいるノード（無ければ右の欄に出しているノード）
+  // コピー・複製するのは、図で選んでいるノード（無ければ右の欄に出しているノード）
   const chosen = picked.length > 0 ? picked : selected?.kind === "node" ? [selected.id] : [];
   const copyable = copyNodes(doc, chosen) !== undefined;
 
-  /** 貼った・複製したノードを選ぶ。右の欄は最後のノード */
+  /** 貼り付けた・複製したノードを選ぶ。右の欄は最後のノード */
   const choose = (ids: readonly string[]): void => {
     setFocus({ ids });
     setSelected(ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] });
@@ -435,12 +435,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const copy = (): void => {
     const copied = copyNodes(doc, chosen);
     if (copied === undefined) {
-      setStatus({ text: "写せるノードを選んでいない（開始は写さない）", error: false });
+      setStatus({ text: "コピーできるノードが選ばれていません（開始はコピーしません）", error: false });
       return;
     }
     clip.current = { clip: copied, pasted: 0 };
     setHasClip(true);
-    setStatus({ text: `ノードを ${copied.nodes.length} 個、線を ${copied.connections.length} 本写した。Ctrl+V で貼る`, error: false });
+    setStatus({ text: `ノードを ${copied.nodes.length} 個、線を ${copied.connections.length} 本コピーしました。Ctrl+V で貼り付けられます`, error: false });
   };
 
   const paste = (): void => {
@@ -452,7 +452,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     const pasted = pasteNodes(doc, held.clip, { x: PASTE_OFFSET.x * held.pasted, y: PASTE_OFFSET.y * held.pasted });
     edit(pasted.doc);
     choose(pasted.ids);
-    setStatus({ text: `ノードを ${pasted.ids.length} 個貼った`, error: false });
+    setStatus({ text: `ノードを ${pasted.ids.length} 個貼り付けました`, error: false });
   };
 
   const duplicate = (): void => {
@@ -461,12 +461,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
     const made = duplicateNodes(doc, chosen);
     if (made === undefined) {
-      setStatus({ text: "複製できるノードを選んでいない（開始は複製しない）", error: false });
+      setStatus({ text: "複製できるノードが選ばれていません（開始は複製しません）", error: false });
       return;
     }
     edit(made.doc);
     choose(made.ids);
-    setStatus({ text: `ノードを ${made.ids.length} 個複製した`, error: false });
+    setStatus({ text: `ノードを ${made.ids.length} 個複製しました`, error: false });
   };
 
   const toggleMinimap = (): void => {
@@ -532,7 +532,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     <>
       {lock.locked && (
         <div id="lock" className="lock" role="status">
-          {lock.reason === "" ? "着手中かどうかを確かめられないので、読み取り専用で開いている。" : lock.reason}
+          {lock.reason === "" ? "着手中かどうかを確かめられないため、読み取り専用で開いています。" : lock.reason}
         </div>
       )}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
@@ -546,10 +546,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <span className="flow-ticket">
             <strong>{page.ticket}</strong> {page.title}
           </span>
-          <span className="path" title={`${page.flowRel}（承認済みの領域。書くのは人だけで、コミットも人がする）`}>
+          <span className="path" title={`${page.flowRel}（承認済みの領域です。書き込むのもコミットするのもユーザだけです）`}>
             {page.flowPath}
           </span>
-          {!page.exists && <span className="dim">（ファイルはまだ無い。保存すると作られる）</span>}
+          {!page.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}
           <span id="dirty" className={dirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>
@@ -561,13 +561,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <button type="button" className="action" data-action="redo" disabled={readOnly || !canRedo(history)} title="やり直す（Ctrl+Shift+Z / Ctrl+Y）" onClick={redoEdit}>
             やり直す
           </button>
-          <button type="button" className="action" data-action="copy-nodes" disabled={!copyable} title="選んだノードと、選んだノード同士の線を写す（Ctrl+C）。開始は写さない" onClick={copy}>
-            写す
+          <button type="button" className="action" data-action="copy-nodes" disabled={!copyable} title="選んだノードと、それらをつなぐ線をコピーします（Ctrl+C）。開始はコピーしません" onClick={copy}>
+            コピー
           </button>
-          <button type="button" className="action" data-action="paste-nodes" disabled={readOnly || !hasClip} title="写したノードを貼る（Ctrl+V）" onClick={paste}>
-            貼る
+          <button type="button" className="action" data-action="paste-nodes" disabled={readOnly || !hasClip} title="コピーしたノードを貼り付けます（Ctrl+V）" onClick={paste}>
+            貼り付け
           </button>
-          <button type="button" className="action" data-action="duplicate-nodes" disabled={readOnly || !copyable} title="選んだノードをその場で複製する（Ctrl+D）。開始は複製しない" onClick={duplicate}>
+          <button type="button" className="action" data-action="duplicate-nodes" disabled={readOnly || !copyable} title="選んだノードをその場で複製します（Ctrl+D）。開始は複製しません" onClick={duplicate}>
             複製
           </button>
           <button
@@ -575,7 +575,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             className="action"
             data-action="group-nodes"
             disabled={readOnly || groupable.length < 2}
-            title="Shift を押しながらノードを 2 つ以上選ぶと、枠（グループ）にまとめられる。枠は図の上の囲みで、手順は変わらない"
+            title="Shift を押しながらノードを 2 つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません"
             onClick={group}
           >
             グループ化
@@ -603,7 +603,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             </li>
           ))}
           {(checks?.warns ?? []).map((warn, index) => (
-            <li key={`exe-${index}`} data-source="exe" title="ccnavi --lint --flow の warn（保存は止めない）">
+            <li key={`exe-${index}`} data-source="exe" title="ccnavi --lint --flow の warn です（保存は止めません）">
               {warn}
             </li>
           ))}

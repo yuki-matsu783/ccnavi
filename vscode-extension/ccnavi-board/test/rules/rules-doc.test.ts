@@ -9,12 +9,12 @@ const TEXT = `# 先頭の説明。消えてはいけない。
 version: 1
 
 deny:
-  # push は人が行う
+  # push はユーザが行う
   - id: git-push
     match: Bash
     glob: "*git push*"
     message: >-
-      push は人が行う。
+      push はユーザが行う。
       ラッパに依頼する。
 
   - id: secrets
@@ -46,7 +46,7 @@ test("CB-T41 タイプごとに id / match / glob か regex / message を読む"
       ["secrets", "Read|Write", "regex", "/secrets/", { section: "deny", index: 1 }],
     ],
   );
-  assert.equal(model.sections.deny[0].message, "push は人が行う。 ラッパに依頼する。");
+  assert.equal(model.sections.deny[0].message, "push はユーザが行う。 ラッパに依頼する。");
   assert.deepEqual(model.sections.ask, []);
   assert.equal(model.sections.allow[0].pattern, "^(ls|cat)\\b");
 });
@@ -66,8 +66,8 @@ test("CB-T43 欄を変えても、他のルールのコメントと折り返し�
   };
   const out = doc.apply(edited);
   assert.match(out, /^# 先頭の説明。消えてはいけない。/);
-  assert.match(out, /  # push は人が行う\n  - id: git-push/);
-  assert.match(out, /message: >-\n      push は人が行う。\n      ラッパに依頼する。/);
+  assert.match(out, /  # push はユーザが行う\n  - id: git-push/);
+  assert.match(out, /message: >-\n      push はユーザが行う。\n      ラッパに依頼する。/);
   assert.match(out, /regex: '\/secrets\/\|\/keys\/'/);
   assert.match(out, /message: 見るだけ。書かない/);
   // 読み直しても同じ形
@@ -95,7 +95,7 @@ test("CB-T44 タイプを移すとコメントごと動き、glob と regex は�
   const again = forms(out);
   assert.deepEqual(again.deny.map((r) => r.id), ["secrets"]);
   assert.deepEqual(again.ask.map((r) => [r.id, r.kind, r.pattern]), [["git-push", "regex", "\\bgit push\\b"]]);
-  assert.match(out, /ask:\n  # push は人が行う\n  - id: git-push/);
+  assert.match(out, /ask:\n  # push はユーザが行う\n  - id: git-push/);
   assert.doesNotMatch(out, /glob: "\*git push\*"/);
 });
 
@@ -151,7 +151,7 @@ deny:
   - id: git-push
     match: Bash
     glob: "*git push*"
-    message: push は人が行う
+    message: push はユーザが行う
     additionalContext: >-
       ラッパを通せば
       親が送れる
@@ -191,7 +191,7 @@ deny:
   - id: git-push
     match: Bash
     glob: "*git push*"
-    message: push は人が行う
+    message: push はユーザが行う
     additionalContext: ラッパを通す
     additionalContextFile: docs/push.md
 allow:

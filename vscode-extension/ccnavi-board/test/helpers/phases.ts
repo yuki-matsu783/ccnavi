@@ -24,10 +24,10 @@ export const NONCE = "TEST-NONCE-123";
  * **待ち方は dag で、流れを `after` で書く**（調査 → 設計と受入テスト作成 → 実装とテスト）。
  * feedback の種類は `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
  */
-export const SAMPLE_PHASES_TEXT = `# フェーズの種類（設計 9.7）。人が持つ設定で、エージェントは書き換えない。
+export const SAMPLE_PHASES_TEXT = `# フェーズの種類（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
 #
 # 親チケットの \`plan:\` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
-# \`ccnavi --approve\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
+# \`ccnavi --agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
 # \`kind: feedback\` の種類を並べて改版を出す（対応が無くても \`[]\` で出す）。
 #
 # \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。

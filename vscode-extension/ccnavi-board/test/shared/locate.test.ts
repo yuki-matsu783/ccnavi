@@ -129,7 +129,7 @@ test("CB-T119 E3 名前が ccnavi-launcher.sh でない表記は表記そのま�
   );
 });
 
-test("CB-T24 機械の語は ccnavi/platformtag.py と揃える", () => {
+test("CB-T24 機械の語は ccnavi/infra/platformtag.py と揃える", () => {
   assert.equal(hostTarget("win32", "x64"), "windows-x86_64");
   assert.equal(hostTarget("darwin", "arm64"), "darwin-arm64");
   assert.equal(hostTarget("linux", "x64"), "linux-x86_64");

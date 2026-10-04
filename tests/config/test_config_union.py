@@ -5,7 +5,7 @@
 
 層は 3 種。
 
-- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。ADR-0052）
+- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。env では動かさない）
 - ワークスペース自身の層: `<ワークスペースルート>/.ccnavi/config/`
 - プロジェクトの層: `projects/<名前>/.ccnavi/config/`
 
@@ -185,7 +185,7 @@ ASK_VENDOR = {
     "id": "ask-vendor",
     "match": "Write|Edit",
     "glob": "*/vendor/*",
-    "message": "vendor は人に確かめてから触る。",
+    "message": "vendor はユーザに確かめてから触る。",
 }
 
 # NotebookEdit を実際の `tool_name` として通すためのルール。欄は notebook_path。
@@ -193,7 +193,7 @@ NOTEBOOK_RULE = {
     "id": "notebook",
     "match": "NotebookEdit",
     "glob": "*/notebooks/*",
-    "message": "ノートは人が回す。",
+    "message": "ノートはユーザが回す。",
 }
 
 # `{root}` を含む定義。共通層と層の両方に同じものを置いて、置換後の全欄一致を見る（11.8）。
@@ -421,12 +421,12 @@ class ConfigUnionHarness(unittest.TestCase):
 
         層の置き場はフラグで渡さない。共通層の 3 本（`--rules` / `--phases` / `--risk`）も、
         層を探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
-        `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる（ADR-0067）。
+        `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる。
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
         「`projects/` を数えない」を言いたいテストは `env={"CCNAVI_PROJECTS": ""}`
-        を渡す。人が `settings.json` に書く経路がそれで、フラグではない。
+        を渡す。ユーザが `settings.json` に書く経路がそれで、フラグではない。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -467,7 +467,7 @@ class ConfigUnionHarness(unittest.TestCase):
         return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), **options)
 
     def approve(self):
-        return self.ccnavi("--approve", stdin="y\n")
+        return self.ccnavi("--agree", stdin="y\n")
 
     def lint_json(self, *args, **options):
         result = self.ccnavi("--lint", "--json", *args, **options)
@@ -674,8 +674,13 @@ class ToolLayerTest(ConfigUnionHarness):
             "message": "社内のページは取りに行かない。",
         }
         write_layer(self.ws, rules=dict(OWN_RULES, deny=[*OWN_RULES["deny"], own]))
-        skill = {"id": "release", "match": "Skill", "glob": "release*", "message": "人が回す。"}
-        agent = {"id": "migrate", "match": "Agent", "glob": "*migrate*", "message": "人が回す。"}
+        skill = {"id": "release", "match": "Skill", "glob": "release*", "message": "ユーザが回す。"}
+        agent = {
+            "id": "migrate",
+            "match": "Agent",
+            "glob": "*migrate*",
+            "message": "ユーザが回す。",
+        }
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], skill, agent]))
 
         for cwd in (self.ws, self.lib, self.app):
@@ -696,7 +701,7 @@ class ToolLayerTest(ConfigUnionHarness):
             "id": "ps-psql",
             "match": "PowerShell",
             "glob": "*psql*",
-            "message": "人が回す。",
+            "message": "ユーザが回す。",
         }
         deny = [*LIB_RULES["deny"], self.SECRETS, powershell]
         write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
@@ -709,7 +714,7 @@ class ToolLayerTest(ConfigUnionHarness):
                 self.assert_denied(self.hook("PowerShell", cwd, command="psql"), "lib:ps-psql")
 
     def test_a_layer_allow_now_reaches_grep_and_tools_without_a_path(self):
-        """ADR-0048 の代償。
+        """層をツールの種類で選ぶ形の代償。パスを持つツールは行き先の層、持たないツールは全部の層の和を足す。
 
         行き先の層の allow が Grep に当たり、層の allow がパスを持たないツールに当たる。
         """
@@ -953,7 +958,7 @@ class ProblemsSaidOnceTest(ConfigUnionHarness):
 
 
 class PostMonitoringUnionTest(ConfigUnionHarness):
-    """実行後の監視も「共通層 + そのツリーの層」の和（11.7）。
+    """実行後チェックも「共通層 + そのツリーの層」の和（11.7）。
 
     行き先の層 1 本のままの実装では、共通層の deny の場所が保護領域に数えられない。
     プロジェクトのツリー（共通層）と、ワークスペースのワークツリー（自身の層）の両方で見る。

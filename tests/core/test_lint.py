@@ -50,7 +50,7 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     if allow:
         body["allow"] = [ALLOWED]
     # 置くのは共通層の既定の場所。検証は `--rules` で指せるが、同じファイルを hook の
-    # 判定にも掛けるテストがあり、そちらには届かない（ADR-0067）。
+    # 判定にも掛けるテストがあり、そちらには届かない。
     return write(directory, common_relpath("rules"), json.dumps(body, indent=2))
 
 
@@ -149,8 +149,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 1)
 
     def test_承認の切り替えの環境変数にdry_runと書いたらerrorになる(self):
-        # この切り替えの環境変数は enable か disable しか取らない。dry-run と書いた人は止まらない
-        # つもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
+        # この切り替えの環境変数は enable か disable しか取らない。dry-run と書いたユーザは
+        # 止まらないつもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
         # だけでは、その食い違いがどこにも現れない。
         result = ccnavi(
             self.root,
@@ -188,7 +188,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("確認できる者が居ないモードで守る: disable", result.stdout)
 
     def test_戻す働きを切ったらwarnで言う(self):
-        # 人向けの本文には値が 1 行ずつ出るが、`problems` に入らないと
+        # ユーザ向けの本文には値が 1 行ずつ出るが、`problems` に入らないと
         # `--json` を読む CI と拡張からは「揃っている」と見える。
         result = ccnavi(
             self.root,
@@ -222,7 +222,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_RESTORE_IF_DENY=dry-run", result.stdout)
 
     def test_切った切り替えの環境変数はJSONのproblemsにも出る(self):
-        # 読み手は CI と VS Code の拡張。人向けの本文しか持たない苦情は、
+        # 読み手は CI と VS Code の拡張。ユーザ向けの本文しか持たない苦情は、
         # そこからは無いのと同じ。
         result = ccnavi(
             self.root,
@@ -271,7 +271,7 @@ class LintTest(unittest.TestCase):
 
     def test_チケット制御に読めない値を書いたらerrorになる(self):
         # 切ったつもりの書き違いは enable として動く。守りは消えないが、
-        # 書いた人は切れていると思い続けるので、直すまで error で名指しする。
+        # 書いたユーザは切れていると思い続けるので、直すまで error で名指しする。
         result = ccnavi(
             self.root,
             "--lint",
@@ -358,7 +358,7 @@ class LintTest(unittest.TestCase):
 
     def test_BOMの付いた提案はerrorでBOMを名指しする(self):
         # BOM は目に見えないので、`---` と書いたのに拒まれたように見える。
-        # 文面が原因を言わないと、書いた人はエディタで見えているものを疑えない。
+        # 文面が原因を言わないと、書いたユーザはエディタで見えているものを疑えない。
         write(
             os.path.join(self.root, "wip", "proposals", "todo"),
             "i0001.md",
@@ -373,7 +373,7 @@ class LintTest(unittest.TestCase):
 
     def test_BOMの付いた承認済みチケットはdoneに在ってもerrorになる(self):
         # 判定は閉じた承認済みチケットを読まないが、読めないファイルが置き場に残っている
-        # こと自体は書いた人の思い違いで、承認済みチケットは親のブランチに乗って他の機械へ
+        # こと自体は書いたユーザの思い違いで、承認済みチケットは親のブランチに乗って他の機械へ
         # そのまま届く。閉じた側の苦情を捨てると、届いた先でも何も言われないままになる。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done"),
@@ -388,9 +388,9 @@ class LintTest(unittest.TestCase):
         self.assertIn("BOM (U+FEFF)", result.stdout)
 
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
-        # 承認したかどうかは置き場で決まる（ADR-0058）。`.ccnavi/approved/` は組み込みの守りが
+        # 承認したかどうかは置き場で決まる。`.ccnavi/approved/` は組み込みの守りが
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
-        # 読む。端末もボードも無い人が、置き場を動かすだけで承認できる方法。
+        # 読む。端末もボードも無いユーザが、置き場を動かすだけで承認できる方法。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "doing"),
             "i0001.md",
@@ -404,7 +404,7 @@ class LintTest(unittest.TestCase):
 
     def test_レビュー待ちの置き場では承認の記録を求める(self):
         # `wip/proposals/review/` はエージェントが書ける側にある。守りが組み込みの deny
-        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の守りとして残す（ADR-0058）。
+        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の守りとして残す。
         write(
             os.path.join(self.root, "wip", "proposals", "review"),
             "i0001.md",
@@ -453,14 +453,19 @@ class LintTest(unittest.TestCase):
             self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を報告していない")
 
     def test_askとallowのmessageはerrorになりルールは効いたまま(self):
-        # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない（実際に確かめた）。
-        # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
+        # ask の文面はユーザの確認ダイアログにしか出ず、allow の文面はどこにも出ない
+        # （実際に確かめた）。書いたユーザは「モデルに届く」と思って書くので、届かない欄を残さない。
         # ただしルールごと落とすと、文面を書いただけで ask が外れて通るので、読み込みは通す。
         body = {
             "version": 1,
             "deny": [SOUND],
             "ask": [
-                {"id": "mig", "match": "Write", "glob": "*/migrations/*", "message": "人が見る"},
+                {
+                    "id": "mig",
+                    "match": "Write",
+                    "glob": "*/migrations/*",
+                    "message": "ユーザが見る",
+                },
                 {"id": "quiet", "match": "Write", "glob": "*/quiet/*"},
             ],
             "allow": [dict(ALLOWED, message="通す")],
@@ -564,7 +569,7 @@ class LintTest(unittest.TestCase):
 
     def test_作業ツリーの中に書かれたoffはerrorになる(self):
         # 監視される側が書けるファイルから監視を止める記述。判定の側には
-        # 人が渡した off と見分ける手段が無いので、ここで見つけるしかない。
+        # ユーザが渡した off と見分ける手段が無いので、ここで見つけるしかない。
         write(
             self.root,
             os.path.join(".claude", "settings.json"),
@@ -601,7 +606,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("組み立て不能", checked.stdout)
         self.assertIn("組み立て不能", decided.stderr, "判定と検証が別のことを言っている")
 
-    def test_実行後の監視が登録されていなければwarnになる(self):
+    def test_実行後チェックが登録されていなければwarnになる(self):
         write(
             self.root,
             os.path.join(".claude", "settings.json"),
@@ -610,7 +615,7 @@ class LintTest(unittest.TestCase):
 
         result = lint(self.root, rules_file(self.root, SOUND))
 
-        self.assertEqual(result.returncode, 0, "実行前の判定は動くのでガードは消えていない")
+        self.assertEqual(result.returncode, 0, "実行前チェックは動くのでガードは消えていない")
         self.assertEqual(counts(result.stdout), (0, 1))
         self.assertIn("PostToolUse", result.stdout)
 
@@ -670,8 +675,8 @@ class LintTest(unittest.TestCase):
         ]
         self.assertTrue(named, f"実行できない sh を error で名指ししていない: {result.stdout}")
 
-    def test_git_の作業ツリーでなければ監視が何も見ないとwarnになる(self):
-        # 登録はされているのに見る先が無い状態。実行後の監視は git の差分で
+    def test_git_の作業ツリーでなければ実行後チェックが何も見ないとwarnになる(self):
+        # 登録はされているのに見る先が無い状態。実行後チェックは git の差分で
         # 見るので、リポジトリでない場所では 1 件も検知しない。
         write(
             self.root,
@@ -686,7 +691,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("作業ツリーを読めない", result.stdout)
 
     def test_設定ファイルが無ければ登録については何も言わない(self):
-        # hook は利用者ごとの設定にも書ける。そちらはここから見えないので、
+        # hook はユーザごとの設定にも書ける。そちらはここから見えないので、
         # 見えないものを「無い」と報告すると正しい設定に苦情を出すことになる。
         result = lint(self.root, rules_file(self.root, SOUND))
 

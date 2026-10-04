@@ -10,7 +10,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.fsio import full_path
+from ccnavi.infra.fsio import full_path
 
 
 class FullPathTest(unittest.TestCase):
@@ -63,7 +63,7 @@ class RuleReachTest(unittest.TestCase):
     def test_迂回したパスの書き方でも保護領域のルールに当たる(self):
         import re
 
-        from ccnavi.globmatch import translate
+        from ccnavi.infra.globmatch import translate
 
         pattern = re.compile(translate("*/secrets/*"))
         with tempfile.TemporaryDirectory() as base:

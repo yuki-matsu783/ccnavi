@@ -1,19 +1,19 @@
-"""Chrome の承認・取り下げ（ADR-0093 の段階 3）の Python の入口の受入テスト。
+"""Chrome の承認・取り下げの Python の入口の受入テスト。
 
 見るのは 7 つ。
 
 1. 取り込みの同期状態に当たるもの: ホストに無く統合先でも閉じていない親子チケットは `gone` で組み、
-その親子チケットの
-   承認済みチケットは決まらない（3.3 の 3・5）。判定の入力に読めない（バイナリの）
+その
+   承認済みチケットは決まらない。判定の入力に読めない（バイナリの）
    ファイルがあれば止める
-2. 版ずれ（7.3・D31）: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
+2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
    受けない
-3. 見せた一覧とダイジェスト（8.3 の 2）: 違えば書くものを出さない
-4. 書く先は親のブランチ `P` だけ（8.4）。予約の名前・統合先の名前へは書かない（8.5）
-5. 履歴の行に経路（chrome）・アカウント・拡張の版が入る（7.3・8.8）
+3. 見せた一覧とダイジェスト: 違えば書くものを出さない
+4. 書く先は親のブランチ `P` だけ。予約の名前・統合先の名前へは書かない
+5. 履歴の行に経路（chrome）・アカウント・拡張の版が入る
 6. 手元の ccnavi が、Chrome の書いた承認済みチケットを同じに読む（判定し直しで error が出ない）。
-   error が出れば、Chrome と手元の版の違いとして名指しする（7.3）
-7. 取り下げの可否をボードに出す（8.8）
+   error が出れば、Chrome と手元の版の違いとして名指しする
+7. 取り下げの可否をボードに出す
 """
 
 from __future__ import annotations
@@ -21,7 +21,9 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi import history, lint, settings, version
+from ccnavi.entry import lint, version
+from ccnavi.infra import settings
+from ccnavi.tickets import history
 from tests.ticket.test_core import CoreHarness, _chrome
 from tests.ticket.test_phases import child_text, parent_text
 from tests.ticket.test_ticket import git, write
@@ -129,11 +131,11 @@ class WriteGuardTest(ChromeWriteHarness):
         self.assertEqual([e["ticket"] for e in board["batch"]], ["i0001"])
         shown = {"ids": first["identifiers"], "digest": first["digest"]}
         refused = self.answer(self.chrome_request("plan", "i0001", shown=shown))
-        self.assertIn("7.3", refused["error"])
+        self.assertIn("互換", refused["error"])
         withdraw = self.answer(
             self.chrome_request("withdraw", "i0001", ids=["i0001"], prior={"i0001": "x"})
         )
-        self.assertIn("7.3", withdraw["error"])
+        self.assertIn("互換", withdraw["error"])
 
     def test_a_different_digest_writes_nothing(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
@@ -194,10 +196,11 @@ class WrittenCopyTest(ChromeWriteHarness):
         body = self.plan()
         self.assertEqual(body["identifiers"], ["i0001", "i0001-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        # 手元の同期状態は Chrome と同じ（取り込み済みの親子チケット）。判定し直し（C3）
+        # 手元の同期状態は Chrome と同じ（取り込み済みの親子チケット）。
+        # 判定し直し（C3）
         # で error が出ない
         self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual(preview["batch"], [])
         explained = self.ccnavi("--lint", "--json")
         errors = [p for p in json.loads(explained.stdout)["problems"] if p["severity"] == "error"]
@@ -273,7 +276,7 @@ class EntryDetailTest(ChromeWriteHarness):
             ("confirm", {"phase": 1, "result": {"host": "h", "mr": {"number": 1, "url": "u"}}}),
         ):
             body = self.answer(self.chrome_request(op, "i0001", **extra))
-            self.assertIn("7.3", body.get("error", ""), op)
+            self.assertIn("互換", body.get("error", ""), op)
 
 
 class WithdrawableTest(ChromeWriteHarness):
@@ -295,7 +298,10 @@ class WithdrawableTest(ChromeWriteHarness):
 
 class ProjectTest(ChromeWriteHarness):
     def test_a_proposal_naming_a_project_is_not_approved_from_the_workspace(self):
-        """段階 3 はワークスペースのリポジトリだけ。プロジェクトの提案は承認しない（3.3 の 7）"""
+        """Chrome の承認はワークスペースのリポジトリだけ。プロジェクトの提案は承認しない。
+
+        プロジェクトのリポジトリが拡張に登録されていなければ、プロジェクトが絡む提案は承認しない。
+        """
         text = parent_text("i0001", ["research"]).replace(
             "ticket: i0001\n", "ticket: i0001\nproject: web\n", 1
         )

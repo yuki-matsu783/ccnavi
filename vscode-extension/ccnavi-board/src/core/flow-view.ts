@@ -1,15 +1,15 @@
 /**
  * フロー編集画面の、拡張ホストと Webview の間の契約。フェーズ管理（`phases-view.ts`）と同じ作り。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR-0064）。渡すのは「いま何を見せるか」
- * （`FlowData`）だけで、画面が返すのは人が押した操作（`FlowMessage`）だけ。
+ * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
+ * （`FlowData`）だけで、画面が返すのはユーザが押した操作（`FlowMessage`）だけ。
  *
- * **着手中かどうかを画面は決めない**（ADR-0035・ADR-0085）。錠は実行ファイルの `--explain --json` の
- * `tickets[].flow.locked` をそのまま写す（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
+ * **着手中かどうかを画面は決めない**。錠は実行ファイルの `--explain --json` の
+ * `tickets[].flow.locked` をそのまま使う（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
  * `started_at` などから組み直さない。保存の直前にも拡張ホストが実行ファイルに聞き直す。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（ADR-0062）。中身が届くのは、画面の編集を捨ててよいときだけ。
+ * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を捨ててよいときだけ。
  *
  * ここには VS Code の API も DOM も node も入れない。
  */
@@ -30,20 +30,20 @@ export const OPEN_LOCK: FlowLock = { locked: false, reason: "" };
 /** 実行ファイルが着手中と言った子の錠の文面。いつ外れるかまで言う */
 export function lockedReason(ticket: string): string {
   return (
-    `子チケット ${ticket} は着手中なので、フローは書き換えられない（ccnavi が DENY_TICKET_FLOW_LOCKED で止めている）。` +
-    "担当のサブエージェントが読んでいる手順が作業の途中で変わるのを防ぐため。" +
-    `ロックは ${ticket} が finish で終わるか cancel で取り消されると外れる。手順を直すなら、終わってから直すか、次の子チケットのフローに書いてください`
+    `子チケット ${ticket} は着手中のため、フローを書き換えられません（ccnavi が DENY_TICKET_FLOW_LOCKED で止めています）。` +
+    "担当のサブエージェントが読んでいる手順が、作業の途中で変わるのを防ぐためです。" +
+    `ロックは、${ticket} が finish で終わるか cancel で取り消されると外れます。手順を直すなら、終わってから直すか、次の子チケットのフローに書いてください`
   );
 }
 
 /** 置き場の途中かファイルがシンボリックリンク。読まないし書かない */
 export function linkedReason(rel: string): string {
-  return `フローの置き場（${rel}）かその途中がシンボリックリンクなので、読まないし書かない。リンクの先は承認済みの領域の外かもしれない。リンクを外してから開き直してください`;
+  return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み書きしません。リンク先は承認済みの領域の外かもしれません。リンクを外してから開き直してください`;
 }
 
-/** 確かめられなかったとき。閉じる側にする */
+/** 確かめられなかったとき。書けない扱いにする */
 export function lockFromFailure(error: string): FlowLock {
-  return { locked: true, reason: `着手中かを確かめられないので、書かない: ${error}` };
+  return { locked: true, reason: `着手中かどうかを確かめられないため、書き込みません: ${error}` };
 }
 
 /** ボードの JSON から引いた、この子のフロー */
@@ -64,13 +64,13 @@ export type FlowTargetResult = { readonly ok: true; readonly target: FlowTarget 
 export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult {
   const found = board.tickets.find((t) => t.ticket === ticket);
   if (found === undefined) {
-    return { ok: false, error: `チケット ${ticket} が実行ファイルの答えに無い` };
+    return { ok: false, error: `チケット ${ticket} が実行ファイルの出力にありません` };
   }
   if (found.parent === "") {
-    return { ok: false, error: `${ticket} は親チケット。フローを持つのは子チケットだけ` };
+    return { ok: false, error: `${ticket} は親チケットです。フローを持つのは子チケットだけです` };
   }
   if (found.flow === null) {
-    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの答えに無い（完了・取り消しの子でファイルが無いか、実行ファイルが古い）` };
+    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルが無いか、実行ファイルが古いかのどちらかです）` };
   }
   return {
     ok: true,
@@ -85,7 +85,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
         : found.flow.linked
           ? { locked: true, reason: linkedReason(found.flow.rel) }
           : found.flow.tree === ""
-            ? lockFromFailure("フローを持つツリーが実行ファイルの答えに無い（実行ファイルが古い）")
+            ? lockFromFailure("フローを持つツリーが実行ファイルの出力にありません（実行ファイルが古いためです）")
             : OPEN_LOCK,
     },
   };
@@ -153,7 +153,7 @@ export type ToFlow =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: FlowLock }
   | { readonly type: "changed" }
-  /** 頼んだ往復が起きなかった（人が確認をやめた）。画面は欄を戻す */
+  /** 頼んだ往復が起きなかった（ユーザが確認をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   | { readonly type: "tour" }
   /** 頼まれた確かめ（`check`）の答え。`seq` は頼んだときの番号。確かめられなければ `error` */

@@ -1,4 +1,6 @@
-"""保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（ccnavi/wrapguard.py、ADR-0077）。
+"""保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（ccnavi/hook/wrapguard.py）。
+
+止める・通すの判定は hook が持ち、sh の検査は 2 重目の守りにする。
 
 1. sh の検査の材料を変える環境変数を、同じコマンド行で置いて保護済みの sh を呼ぶ形
 2. 子チケットのワークツリーからの `ccnavi-git.sh push`。親エージェントが打っても止める
@@ -17,7 +19,8 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import shellread, wrapguard
+from ccnavi.hook import wrapguard
+from ccnavi.infra import shellread
 from tests import GIT_ENV, ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -55,7 +58,7 @@ class EnvTest(unittest.TestCase):
             "unset CCNAVI_TICKETS_PROPOSAL && sh .ccnavi/scripts/ccnavi-git.sh push",
             "sudo env CLAUDE_PROJECT_DIR=/x bash .ccnavi/scripts/ccnavi-review.sh confirm",
             "CCNAVI_NEW_THING=1 ../../../.ccnavi/scripts/ccnavi-git.sh status",
-            "cd a && CCNAVI_BIN_PATH=f sh ../.ccnavi/scripts/ccnavi-approve.sh",
+            "cd a && CCNAVI_BIN_PATH=f sh ../.ccnavi/scripts/ccnavi-agree.sh",
             # 関数の定義の本体。頭（`f()`・`function f`）を名前と読み違えると見落とす。
             "f() { CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
             "f(){ CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
@@ -331,7 +334,7 @@ class ShAgreesTest(unittest.TestCase):
             ticket("i0001-01", "i0001"),
         )
         result = self.run_sh(os.path.join(link, ".claude", "worktrees", "i0001-01"), "push")
-        # 本物の sh も両辺をリンクを解いたパスで比べる（ADR-0093 の段階 2b のレビューの中 12）。
+        # 本物の sh も両辺をリンクを解いたパスで比べる。比べないとリンクを経た作業場で守りが外れる。
         stopped = "子チケットのワークツリー" in result.stderr
         self.assertTrue(stopped, result.stderr)
 

@@ -5,9 +5,9 @@
 結果を前提にする。
 
 1. ワークツリーを `ccnavi-git.sh worktree add` で切り、提案（`wip/proposals/todo/`）を書いて
-   `ccnavi-git.sh` でコミットする。実行ファイルの `--approve --preview --json` が承認待ちに数える
-2. 端末の無い `ccnavi-approve.sh` は承認の壁で止まり、何も置かず何も送らない
-3. `ccnavi-approve.sh` で承認する。承認済みチケットが `doing/` に置かれ、
+   `ccnavi-git.sh` でコミットする。実行ファイルの `--agree --preview --json` が承認待ちに数える
+2. 端末の無い `ccnavi-agree.sh` は承認の壁で止まり、何も置かず何も送らない
+3. `ccnavi-agree.sh` で承認する。承認済みチケットが `doing/` に置かれ、
    `ccnavi-push-approved.sh` が置き場（と消えた提案）だけをコミットして push する。
    同じツリーの書きかけはコミットしない。別の機械（clone）から承認済みチケットが読める
 4. コミットするものが無ければ `ccnavi-push-approved.sh` は 0 で
@@ -26,7 +26,7 @@ tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で�
     uv run --with pyinstaller python build.py
     uv run python -m unittest tests.e2e.test_e2e_push -v
 
-承認は端末からしか通らない（`--approve` の壁）。テストは端末を持たないので、段 3 からは
+承認は端末からしか通らない（`--agree` の壁）。テストは端末を持たないので、段 3 からは
 `CCNAVI_GUARD_TICKET_APPROVAL=disable` を渡して y を標準入力から送る。単体のテストが
 `--guard-ticket-approval disable` で切るのと同じ扱いで、壁そのものは段 2 で見る。
 
@@ -173,7 +173,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.ok(self.run_sh("ccnavi-git.sh", "add", f"{PROPOSAL}/{TICKET}.md", cwd=self.tree))
         self.ok(self.run_sh("ccnavi-git.sh", "commit", "-m", "propose", cwd=self.tree))
         proposed = out(self.tree, "rev-parse", "HEAD")
-        preview = self.binary("--approve", "--preview", "--json")
+        preview = self.binary("--agree", "--preview", "--json")
         self.ok(preview)
         self.assertEqual([TICKET], [b["ticket"] for b in json.loads(preview.stdout)["batch"]])
 
@@ -182,7 +182,7 @@ class ApproveAndPushTest(unittest.TestCase):
         write(os.path.join(self.tree, "src", "draft.py"), "x\n")
 
         # 2. 端末が無いと承認の壁で止まる。承認済みチケットも、コミットも、push も出ない。
-        walled = self.run_sh("ccnavi-approve.sh", stdin="y\n")
+        walled = self.run_sh("ccnavi-agree.sh", stdin="y\n")
         self.assertEqual(1, walled.returncode, walled.stdout + walled.stderr)
         self.assertIn("端末", walled.stderr)
         self.assertFalse(os.path.exists(self.approved_copy()))
@@ -192,7 +192,7 @@ class ApproveAndPushTest(unittest.TestCase):
         # 3. 承認。実行ファイルが doing/ に置き、ccnavi-push-approved.sh がコミットして push する。
         approved = self.ok(
             self.run_sh(
-                "ccnavi-approve.sh", stdin="y\n", env={"CCNAVI_GUARD_TICKET_APPROVAL": "disable"}
+                "ccnavi-agree.sh", stdin="y\n", env={"CCNAVI_GUARD_TICKET_APPROVAL": "disable"}
             )
         )
         self.assertIn("承認した", approved.stdout)

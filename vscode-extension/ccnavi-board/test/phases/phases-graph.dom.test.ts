@@ -70,12 +70,12 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     const notes = dom.all(".graph-note").map((note) => note.textContent ?? "");
     assert.deepEqual(notes.length, 1);
     assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていません/);
-    // 線が落ちた理由は断定しない（書き間違いかもしれない。ADR-0035）。良し悪しも言わない
+    // 線にならなかった理由は断定しない（書き間違いかもしれない）。良し悪しも言わない
     assert.doesNotMatch(notes[0], /他の層の種類を指す/);
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
     // sequential でも after が無ければ、判定に使われないという注意は出さない
     assert.doesNotMatch(notes.join(""), /sequential/);
-    // 「人が見る」の意味はバッジのツールチップにある
+    // 「ユーザが見る」の意味はバッジのツールチップにある
     assert.match(dom.one(".tag.hitl").getAttribute("title") ?? "", /種類の宣言（review）/);
   } finally {
     await dom.close();
@@ -84,7 +84,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
   // sequential なのに after がある。矢印が判定に使われないことを言う
   const seq = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n  b:\n    kind: work\n    review: mr\n    after: [a]\n") });
   try {
-    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に効きません/);
+    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に使われません/);
   } finally {
     await seq.close();
   }
@@ -135,7 +135,7 @@ test("CB-D77 保存してある位置で点が置かれ、図を触っても pha
     const node = dom.all('.react-flow__node[data-id="implement"]')[0];
     assert.match((node as unknown as { style: { transform: string } }).style.transform, /translate\(40px,\s*80px\)/);
 
-    // 図を触っても保存には渡らない（座標は人が持つ設定に入れない）
+    // 図を触っても保存には渡らない（座標はユーザが持つ設定に入れない）
     assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
   } finally {
     await dom.close();
@@ -159,7 +159,7 @@ test("CB-D80 点を掴んで離すと、その位置が state に入る（jsdom�
     assert.ok(Number.isFinite(spots.implement.x) && Number.isFinite(spots.implement.y), "保存した位置が数でない");
     // 動いた先は図の倍率で決まるので、値そのものは約束しない
 
-    // ドラッグしても保存には渡らない（座標は人が持つ設定に入れない）
+    // ドラッグしても保存には渡らない（座標はユーザが持つ設定に入れない）
     assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
   } finally {
     dom.close();
@@ -224,7 +224,7 @@ test("CB-D89 見本の図は after の矢印で流れを描き、work と feedba
     assert.match(dom.one('.phase-group[data-kind="work"]').textContent ?? "", /作業（plan:）/);
     assert.match(dom.one('.phase-group[data-kind="feedback"]').textContent ?? "", /フィードバック対応（feedback:）/);
     assert.match(dom.one(".phase-group-arrow").textContent ?? "", /レビュー後/);
-    // 見本は dag で、落ちた線も id の空の種類も無いので、注意は 1 つも出ない
+    // 見本は dag で、線にならなかった参照も id の空の種類も無いので、注意は 1 つも出ない
     assert.equal(dom.all(".graph-note").length, 0);
   } finally {
     await dom.close();

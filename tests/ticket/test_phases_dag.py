@@ -1,4 +1,4 @@
-"""全体計画を DAG で待たせる（設計 9.7、ADR-0078）の受入テスト。
+"""全体計画を DAG で待たせる（設計 9.7）の受入テスト。
 
 見るのは 6 つ。
 
@@ -16,8 +16,8 @@ import json
 import os
 import unittest
 
-from ccnavi import approval, phasetypes, workflow
-from ccnavi import ticket as ticket_mod
+from ccnavi.tickets import approval, phasetypes, workflow
+from ccnavi.tickets import ticket as ticket_mod
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import write
@@ -221,7 +221,7 @@ class AcceptedScopeTest(unittest.TestCase):
 class NextHintTest(unittest.TestCase):
     def test_an_earlier_branch_without_children_is_offered(self):
         """3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる。"""
-        from ccnavi import phase as phase_mod
+        from ccnavi.tickets import phase as phase_mod
 
         owner = ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in PLAN])
         owner.workflow = workflow.compute(owner, types_of(DAG))
@@ -328,7 +328,7 @@ class DagApprovalTest(PhaseHarness):
         self.assertIn("3: implement — 待つ: 1", result.stdout)
 
     def test_a_workflow_written_in_a_proposal_is_refused(self):
-        """待ち方のコピーを書くのは `--approve` だけ。提案に書いてあれば承認しない。
+        """待ち方のコピーを書くのは `--agree` だけ。提案に書いてあれば承認しない。
 
         引用符付きの鍵でも同じ。
         """
@@ -342,7 +342,7 @@ class DagApprovalTest(PhaseHarness):
             self.commit_parent()
             result = self.approve()
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("--approve が書く欄", result.stderr)
+            self.assertIn("--agree が書く欄", result.stderr)
             self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_an_approved_parent_without_a_workflow_is_read_as_sequential(self):

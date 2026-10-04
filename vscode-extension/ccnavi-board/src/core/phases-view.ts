@@ -1,16 +1,16 @@
 /**
  * フェーズ管理画面の、拡張ホストと Webview の間の契約。リスク管理（`risk-view.ts`）と同じ作り。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR-0064）。渡すのは「いま何を見せるか」
- * （`PhasesData`）だけで、画面が返すのは人が押した操作（`PhasesMessage`）だけ。画面は種類の意味を
- * 判定しない（子の範囲が上限に収まるか、レビューが要るかは実行ファイルが出す。ADR-0035）。
+ * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
+ * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は種類の意味を
+ * 判定しない（子の範囲が上限に収まるか、レビューが要るかは実行ファイルが出す）。
  *
  * **種類の形（`PHASE_KINDS`・`PhaseForm` など）もここに置く。** 読み書き（`phases-doc.ts`）の側に
  * 置いたままだと、画面がそこから `yaml` を辿ることになり、束ねたものに YAML の解析器が丸ごと入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（ADR-0062）。中身が届くのは、画面の編集を捨ててよいときだけ。
+ * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を捨ててよいときだけ。
  */
 import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
@@ -32,7 +32,7 @@ export type PhaseOrder = (typeof ORDERS)[number];
 
 /** 待ち方の説明。select のラベル */
 export const ORDER_LABELS: Readonly<Record<PhaseOrder, string>> = {
-  sequential: "sequential（既定。全体計画は一直線で、前の番号を全部待つ）",
+  sequential: "sequential（既定。全体計画を番号順に進め、前の番号をすべて待つ）",
   dag: "dag（after でつないだ流れ。after をたどった先にある種類だけを待ち、他は並行して進む）",
 };
 
@@ -79,7 +79,7 @@ export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
 
 /** レビューの既定の説明。select のラベル */
 export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
-  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上なら要る）",
+  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが要る）",
   mr: "mr（マージリクエストのレビューを受ける）",
 };
 
@@ -126,7 +126,7 @@ export type ToPhases =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
-  /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
+  /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   /** この画面の案内をまだ見ていない（拡張ホストの `globalState`）。画面は吹き出しの案内を出す */
   | { readonly type: "tour" }

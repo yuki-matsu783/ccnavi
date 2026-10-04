@@ -1,4 +1,8 @@
-"""C1（ADR-0093 の 4.3・4.4・4.6。段階 2d）の受入テスト。
+"""C1 の受入テスト。
+
+C1 は、取り込み済みの親子チケットで状態を書く操作を
+「ロック → 取り込み → 書く → コミット → push」の 1 操作にし、push が通るまで完了にしない形。
+Chrome が未 push の古い状態で判定しないようにする。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-ticket.sh・ccnavi-review.sh・
 ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを `python -m ccnavi` で
@@ -17,16 +21,18 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    1 回だけやり直す
 6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error
-   （D34 の configsync のコピーは例外。
+   （着手で configsync が
+   プロジェクトの層へ写したものは例外。
    tests/ticket/test_core.py と tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
-   人の判断（c）と知らない変更（d）は止める
-9. 人の判断の入口（ccnavi-review.sh chat など）は、
-   取り込み済みの親子チケットなら承認の push を自動で呼ぶ
-10. D11: 同期状態の無い親子チケット・origin の無いリポジトリ・chat だけの親子チケットは今のまま
+   ユーザの判断（c）と知らない変更（d）は止める
+9. ユーザの判断の入口（ccnavi-review.sh chat など）は、
+   取り込み済みの親子チケットなら
+   承認の push を自動で呼ぶ
+10. 同期状態の無い親子チケット・origin の無いリポジトリ・chat だけの親子チケットは今のまま
     （コミットも push もしない）
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
-12. Chrome のレビュー済み（段階 4）: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
+12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
     書いて送ったものが、経路・時刻・拡張の版のほかは同じ
 """
 
@@ -76,7 +82,8 @@ exec '{git}' "$@"
 """
 
 
-# ELI5 の HTML の置き場。親のワークツリーの wip/ の下にコミットして push する（ADR-0095）
+# ELI5 の HTML の置き場。親のワークツリーの wip/ の下にコミットして push し、
+# マージリクエストの差分に載せる
 ELI5 = "wip/eli5/phase-1.html"
 
 
@@ -179,9 +186,9 @@ class C1Harness(unittest.TestCase):
         )
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "propose")
-        preview = self.exe("--approve", "--preview", "--json")
+        preview = self.exe("--agree", "--preview", "--json")
         digest = json.loads(preview.stdout)["digest"]
-        done = self.exe("--approve", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
+        done = self.exe("--agree", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve")
@@ -264,7 +271,7 @@ class C1Harness(unittest.TestCase):
         return sorted(line for line in out.splitlines() if line)
 
     def eli5(self):
-        """ELI5 の HTML を親のワークツリーの wip/ の下に書き、コミットして push する（ADR-0095）。
+        """ELI5 の HTML を親のワークツリーの wip/ の下に書き、コミットして push する。
 
         マージリクエストの差分に載せる置き場。返すのはツリーのルートからの相対。
         """
@@ -325,7 +332,7 @@ class C1TicketTest(C1Harness):
         self.assertFalse(os.path.exists(self.lock_dir()))
 
     def test_other_staged_changes_stay_out_of_the_commit(self):
-        """commit --only（D35）: 索引の他の変更はコミットに入らず、索引に残る。"""
+        """commit --only: 索引の他の変更はコミットに入らず、索引に残る。"""
         write(os.path.join(self.tree, "src", "other.py"), "x = 1\n")
         git(self.tree, "add", "--", "src/other.py")
         # 取り込みの merge は索引が HEAD と同じときだけなので、リモートと同じ形で見る。
@@ -342,7 +349,7 @@ class C1TicketTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{CHILD}.md", self.committed())
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    # ---- 8. hook の書きかけ（b）は先にコミットする。人の判断（c）と知らない変更（d）は止める
+    # ---- 8. hook の書きかけ（b）は先にコミットする。ユーザの判断（c）と知らない変更（d）は止める
 
     def test_hook_marks_and_events_are_committed_before_the_take_in(self):
         pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
@@ -371,7 +378,7 @@ class C1TicketTest(C1Harness):
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertIn("ユーザの判断が未送信", result.stderr)
         self.assertIn(f"ccnavi-push-approved.sh {PARENT}", result.stderr)
         self.assertEqual(self.read(self.copy(PARENT)), copy)
         self.assertEqual(self.sha(self.tree, "HEAD"), head)
@@ -389,7 +396,7 @@ class C1TicketTest(C1Harness):
         self.mark(1, "skipped", {"by": "agent", "at": "t"})
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertIn("ユーザの判断が未送信", result.stderr)
 
     def test_an_unsent_commit_in_the_place_stops(self):
         """未送信の置き場のコミットが (b) でなければ止める（REQ-APV-11 の補足）。"""
@@ -557,7 +564,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.subjects(2), ["other", f"ccnavi: {PARENT} に着手"])
 
     def test_a_term_before_the_push_ends_undoes_the_commit(self):
-        """送る前に TERM が来たら、自分のコミットを戻して抜ける（段階 2d のレビューの 16）。"""
+        """送る前に TERM が来たら、自分のコミットを戻して抜ける。"""
         import signal
         import time
 
@@ -597,7 +604,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(fields(self.record)["sha"], self.sha(self.tree, "HEAD"))
 
     def test_a_delivered_push_whose_check_also_failed_is_not_written_twice(self):
-        """push の応答も ls-remote も落ちたが届いていた（段階 2d のレビューの 5）。
+        """push の応答も ls-remote も落ちたが届いていた。
 
         戻して取り込み直すと自分のコミットが戻るので、書き直さずに成功で終える。
         """
@@ -626,7 +633,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 
-    # ---- コミット（決定 C）と、落ちたときの索引
+    # ---- コミット（`--no-verify` とタイムアウト監視の時間）と、落ちたときの索引
 
     def test_a_failed_commit_leaves_nothing_staged(self):
         """署名に落ちてコミットできなければ、add した新しいファイルも索引から外す（レビュー 1）。"""
@@ -662,7 +669,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    # ---- C1 を飛ばさせない（段階 2d のレビューの 3）
+    # ---- C1 を飛ばさせない
 
     def test_a_double_dash_does_not_slip_past_c1(self):
         result = self.ticket("start", "--", PARENT)
@@ -701,10 +708,10 @@ class C1TicketTest(C1Harness):
             f.write(json.dumps({"at": "t", "ticket": PARENT, "kind": "approved"}) + "\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("人の判断が未送信", result.stderr)
+        self.assertIn("ユーザの判断が未送信", result.stderr)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
 
-    # ---- ロック（決定 B）
+    # ---- ロック（同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない）
 
     def test_a_long_lock_of_a_live_owner_is_not_taken(self):
         os.makedirs(self.lock_dir())
@@ -733,7 +740,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(old))
         self.assertIn(f"持ち主は pid {os.getpid()}・ホスト {host}・開始 {at}", result.stderr)
-        self.assertIn("人に終了させてもらってから打ち直して", result.stderr)
+        self.assertIn("ユーザに終了させてもらってから打ち直して", result.stderr)
         self.assertTrue(os.path.isdir(self.lock_dir()))
 
     # ---- 基点のリンク
@@ -795,7 +802,7 @@ class C1TicketTest(C1Harness):
 
 
 class C1NotImportedTest(C1Harness):
-    """10. D11: 同期状態の無い親子チケットは今のまま（書くだけ。コミットも push もしない）。"""
+    """10. 同期状態の無い親子チケットは今のまま（書くだけ。コミットも push もしない）。"""
 
     imported = False
 
@@ -834,8 +841,10 @@ class C1NotImportedTest(C1Harness):
 
 
 class C1ChatOnlyTest(C1Harness):
-    """10. D11: chat だけの親子チケット（マージリクエストを持たない）は、
-    取り込み済みでも C1 にしない。"""
+    """10. chat だけの親子チケット（マージリクエストを持たない）は、
+    取り込み済みでも
+    C1 にしない。
+    """
 
     plan = ("chores",)
 
@@ -867,7 +876,8 @@ class PhaseOne:
 
 
 class C1HumanTest(PhaseOne, C1Harness):
-    """9. 人の判断の入口は、取り込み済みの親子チケットなら承認の push を自動で呼ぶ（D27）。
+    """9. ユーザの判断の入口は、取り込み済みの親子チケットなら承認の push を自動で呼ぶ。
+
     11. 承認の push。
     """
 
@@ -890,7 +900,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(typed.returncode, 0, typed.stdout + typed.stderr)
         stopped = self.ticket("finish", CHILD)
         self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
-        self.assertIn("人の判断が未送信", stopped.stderr)
+        self.assertIn("ユーザの判断が未送信", stopped.stderr)
         self.assertNotIn("知らない変更", stopped.stderr)
         carried = self.sh("ccnavi-push-approved.sh", PARENT)
         self.assertEqual(carried.returncode, 0, carried.stdout + carried.stderr)
@@ -933,11 +943,11 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("コミットは残した", result.stderr)
         self.assertIn(rel, self.committed())
-        # 次の C1 は未送信の人の判断を見つけて止まり、承認の push を打ち直すよう言う。
+        # 次の C1 は未送信のユーザの判断を見つけて止まり、承認の push を打ち直すよう言う。
         os.remove(os.path.join(self.remote, "hooks", "pre-receive"))
         stopped = self.ticket("start", PARENT)
         self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
-        self.assertIn("未送信の人の判断", stopped.stderr)
+        self.assertIn("未送信のユーザの判断", stopped.stderr)
         again = self.sh("ccnavi-push-approved.sh", PARENT)
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
@@ -953,7 +963,7 @@ class C1HumanTest(PhaseOne, C1Harness):
 
 
 class C1NotImportedHumanTest(PhaseOne, C1Harness):
-    """10. D11: 同期状態の無い親子チケットでは、人の判断の入口は置くだけでコミットしない
+    """10. 同期状態の無い親子チケットでは、ユーザの判断の入口は置くだけでコミットしない
     （今のまま）。"""
 
     plan = ("chores", "design")
@@ -1217,7 +1227,8 @@ class C1HostTest(C1Harness):
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
         self.assertEqual(len(Host.notes), 1)
-        # 依頼文は ELI5 の在りか（差分の中の相対パス）と crit push の送り先を言う（ADR-0095）
+        # 依頼文は ELI5 の在りか（差分の中の相対パス）と crit push の送り先を言う。
+        # 指摘はユーザが crit push で行のスレッドとして送る
         self.assertIn(f"`crit review {ELI5}`", Host.notes[0]["body"])
         self.assertIn("`crit push 1`", Host.notes[0]["body"])
         confirmed = self.review("confirm", "--phase", "1")
@@ -1228,7 +1239,7 @@ class C1HostTest(C1Harness):
         self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
 
     def test_a_request_is_not_posted_twice_across_runs(self):
-        """決定 D: 投稿の後に落ちた依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
+        """投稿の後に落ちた依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
         once = os.path.join(self._tmp.name, "failed-once")
         html = self.eli5()
@@ -1246,7 +1257,7 @@ class C1HostTest(C1Harness):
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
 
     def test_terminal_decide_chooses_outside_c1_and_writes_inside(self):
-        """決定 A: 端末の decide は、選ぶのを C1 の外で済ませ、C1 の中では --yes で書くだけ。"""
+        """端末の decide は、選ぶのを C1 の外で済ませ、C1 の中では --yes で書くだけ。"""
         chooser = executable(
             os.path.join(self._tmp.name, "bin", "chooser"),
             "#!/bin/sh\n"
@@ -1285,7 +1296,7 @@ class C1HostTest(C1Harness):
 
 @unittest.skipIf(shutil.which("jq") is None, "jq が要る")
 class C1ChromeConfirmTest(PhaseOne, C1Harness):
-    """Chrome のレビュー済みと手元の confirm の突き合わせ（ADR-0093 の 8.9。段階 4 の決定 3）。
+    """Chrome のレビュー済みと手元の confirm の突き合わせ。
 
     取り込み済みの親子チケットでは、手元の CLI を直に打つと C1 に断られる
     （`--record-tree` が無い）。そこで
@@ -1354,7 +1365,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         return files
 
     def chrome_request(self, scene=None):
-        """拡張が組むのと同じ要求（統合先 main、親子チケット i0001、見本のコピー、
+        """拡張が組むのと同じ要求（統合先 main、親 i0001、見本のコピー、
         依頼の後の変更の一覧）。"""
         from tests.ticket.test_core import _chrome
 
@@ -1482,7 +1493,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         self.assertEqual((local["actor"], local["via"]), ("octo-reviewer", "cli"))
         self.assertEqual(list(remote), list(local))
 
-        # レビュー済みに重ねて打てば、手元も Chrome も同じ文面で止め、何も送らない（決定 B）
+        # レビュー済みに重ねて打てば、手元も Chrome も同じ文面で止め、何も送らない
         again = self.same_refusal(self.SCENE)
         self.assertEqual(again["problems"], ["ccnavi: フェーズ 1 はレビュー済み"])
 

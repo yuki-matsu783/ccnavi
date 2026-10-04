@@ -1,8 +1,8 @@
 """保護済み sh が起動する実行ファイルを探す順（.ccnavi/scripts/ccnavi-common.sh の ccnavi_bin）。
 
-人が端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
+ユーザが端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
 CCNAVI_BIN_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
-`.ccnavi/bin/<os>-<arch>/` にしか無い（ADR-0044）。そこを見ないと、配布先では必ず
+`.ccnavi/bin/<os>-<arch>/` にしか無い。そこを見ないと、配布先では必ず
 「実行ファイルが無い」で止まる。
 
 ワークスペースを使い捨てで組み、実行ファイルの代わりに受け取った引数を書くだけの sh を置く。
@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import platformtag
+from ccnavi.infra import platformtag
 from tests import ROOT
 
 SHELL = shutil.which("sh") or shutil.which("bash")

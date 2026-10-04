@@ -1,4 +1,7 @@
-"""ccnavi-sync.sh の受入テスト（ADR-0093 の 4.2・3.6。段階 2b とそのレビュー）。
+"""ccnavi-sync.sh の受入テスト。
+
+ccnavi-sync.sh は親のブランチを取り込み（早送りか merge）、リモートから消えた親のブランチは
+統合先の done/ で閉じたかを確かめてから、親子チケットの同期状態に書く。
 
 使い捨てのワークスペースと bare のリモートを組み、sh を外から呼ぶ。リモートを動かすのは別に clone
 した押し手で、ワークスペースからは「他の機械が push した」「ホストがブランチを消した」ように見える。
@@ -38,7 +41,8 @@ APPROVED_AT = "2026-09-01T00:00:00+0900"
 
 
 # 読める承認済みチケットにするための範囲
-# （取り込みの後の検査は読めない承認済みチケットで親子チケットを止める）。
+# 。取り込みの後の検査は、読めない承認済みチケットで
+# 親子チケットを止める。
 ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
 
@@ -258,7 +262,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("", git(self.tree, "status", "--porcelain").stdout.strip())
 
     def test_a_merge_in_progress_is_left_alone(self):
-        # 利用者自身の途中の merge を取りやめない（レビューの重大 4）。
+        # ユーザ自身の途中の merge を取りやめない。
         other = os.path.join(self._tmp.name, "other")
         git(self.tree, "checkout", "-q", "-b", "side")
         self.local_commit(COPY, copy_text(body="side\n"))
@@ -271,7 +275,7 @@ class SyncTest(unittest.TestCase):
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("途中の操作（MERGE_HEAD）", done.stdout)
-        self.assertTrue(os.path.exists(merge_head), "利用者の merge を取りやめた")
+        self.assertTrue(os.path.exists(merge_head), "ユーザの merge を取りやめた")
         self.assertFalse(os.path.exists(other))
 
     def test_staged_changes_stop_a_merge(self):
@@ -296,7 +300,7 @@ class SyncTest(unittest.TestCase):
             self.assertEqual("書きかけ\n", f.read())
 
     def test_a_refusal_that_is_not_an_overlap_says_why(self):
-        # 重なっていないのに「（空）と重なる」と言わない（レビューの軽 19）。
+        # 重なっていないのに「（空）と重なる」と言わない。
         self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         write(os.path.join(self.git_path(self.tree, "index.lock")), "")
         done = self.sync(PARENT)
@@ -321,7 +325,7 @@ class SyncTest(unittest.TestCase):
         # 取り込みの後の検査も 1 度だけ（ここは実行ファイルが無いので、しなかったと 1 度言う）。
         self.assertEqual(1, done.stdout.count(f"{PARENT}: 実行ファイルが無い"), done.stdout)
 
-    # ---- 取り込みの後の検査（4.2 の 4。段階 2c）
+    # ---- 取り込みの後の検査（`--lint` の該当分と判定し直し）
 
     def test_the_check_blocks_the_family_and_a_later_run_clears_it(self):
         launcher = self.launcher()
@@ -426,14 +430,15 @@ class SyncTest(unittest.TestCase):
 
     def test_a_single_branch_clone_still_sees_the_parent_branch(self):
         # origin の fetch の refspec が main だけでも、origin/P を進めて取り込む
-        # （レビューの中 13）。
+        # 。
+        # sh の中の fetch は行き先を書く。
         git(self.ws, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
         head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
 
-    # ---- P がリモートに無い（3.6）
+    # ---- P がリモートに無い（マージ後に消えたか、改名・消し間違いか）
 
     def test_a_family_never_pushed_is_left_as_it_is(self):
         tree = self.parent_tree("i0002")
@@ -459,7 +464,7 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("closed", fields(self.record)["state"])
 
     def test_a_closed_family_without_a_record_is_closed(self):
-        # 同期状態が無くても、統合先で閉じていれば閉じた親子チケット（レビューの重大 2）。
+        # 同期状態が無くても、統合先で閉じていれば閉じた親子チケット。
         self.close_on_main()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
@@ -470,7 +475,8 @@ class SyncTest(unittest.TestCase):
 
     def test_an_old_done_copy_of_the_same_id_is_not_this_family(self):
         # 同じ識別子の古い親子チケットの承認済みチケット（承認の時刻が違う）は、
-        # この親子チケットが閉じた記録ではない（中 6）。
+        #
+        # 今の親子チケットが閉じた記録ではない。
         self.review_says("none")
         self.keep_record()
         self.close_on_main(approved_at="2020-01-01T00:00:00+0900")
@@ -508,8 +514,8 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(kept, record["sha"])
 
     def test_a_pushed_branch_without_a_record_stops_without_writing_gone(self):
-        # push した形跡（origin/P・追跡の設定）はあるが同期状態の無い親子チケット
-        # （2b より前に送った親子チケット）。
+        # push した形跡（origin/P・追跡の設定）はあるが、同期状態の無い親子チケット
+        # （同期状態を作る仕組みが入る前に送ったもの）。
         self.review_says("none")
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
@@ -518,7 +524,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.record))
 
     def test_an_unknown_merge_answer_does_not_write_gone(self):
-        # API が落ちた・道具が無い（決定 B2）。none のときだけ gone を書く。
+        # API が落ちた・道具が無い。none のときだけ gone を書く。
         for text, code in (("unknown", 3), ("", 2), ("", 0), ("merged?", 0)):
             with self.subTest(text=text, code=code):
                 self.review_says(text, code)
@@ -559,10 +565,10 @@ class SyncTest(unittest.TestCase):
         done = self.sync(PARENT)
         self.assertEqual("gone", fields(self.record)["state"], done.stdout)
 
-    # ---- 同期状態の寿命（中 11）
+    # ---- 同期状態の寿命（削除せずに残し、消すのはユーザの `--forget` だけ）
 
     def test_records_of_removed_worktrees_are_kept_as_tombstones(self):
-        # 親のワークツリーを片付けて sync を打っても、gone の同期状態は消えない（決定 A）。
+        # 親のワークツリーを片付けて sync を打っても、gone の同期状態は消えない。
         self.keep_record("gone")
         git(self.ws, "worktree", "remove", "--force", self.tree)
         done = self.sync()
@@ -599,7 +605,8 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(self.record))
 
-    # ---- 統合先（D30）と統合先の同期状態（D26）
+    # ---- 統合先（設定か、無ければホストのデフォルトブランチ）と、
+    # 統合先の同期状態（最後に取り込んだ先頭）
 
     def put_on_main(self, files):
         pusher = self.pusher()
@@ -637,7 +644,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.mirror, "README.md")))
 
     def test_links_are_not_copied_into_the_mirror(self):
-        # 同期状態の中にシンボリックリンクは写さない（決定 B4）。
+        # 同期状態の中にシンボリックリンクは写さない。
         pusher = self.pusher()
         git(pusher, "checkout", "-q", "main")
         os.makedirs(os.path.join(pusher, ".ccnavi", "approved", "done"), exist_ok=True)
@@ -701,7 +708,7 @@ class SyncTest(unittest.TestCase):
         return path
 
     def test_settings_local_json_names_the_integration_branch(self):
-        # 人が端末で打つ sh には settings.local.json の env が反映されない。
+        # ユーザが端末で打つ sh には settings.local.json の env が反映されない。
         # 実行ファイルが読んで渡す。
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
         write(
@@ -718,7 +725,7 @@ class SyncTest(unittest.TestCase):
         self.assertIn("統合先: main（環境変数", done.stdout)
 
     def test_a_failing_executable_stops_instead_of_using_the_default(self):
-        # 実行ファイルが在るのに答えなければ、統合先を何も言わずに既定に戻さない（中 14）。
+        # 実行ファイルが在るのに答えなければ、統合先を何も言わずに既定に戻さない。
         launcher = self.launcher("#!/bin/sh\necho broken >&2\nexit 1\n")
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
@@ -726,7 +733,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.mirror))
 
     def test_the_host_default_branch_is_read_from_the_remote(self):
-        # 手元の origin/HEAD が無くても、ls-remote --symref でホストの既定を読む（軽 22）。
+        # 手元の origin/HEAD が無くても、ls-remote --symref でホストの既定を読む。
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/trunk")
         git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/trunk")
         git(self.ws, "remote", "set-head", "origin", "--delete")
@@ -745,7 +752,7 @@ class SyncTest(unittest.TestCase):
 
     def test_a_project_without_families_does_not_fail_the_run(self):
         # 引数を省いた回で、親子チケットの無いプロジェクトの ls-remote が落ちても 1 にしない
-        # （軽 21）。
+        # 。
         project = os.path.join(self.ws, "projects", "p")
         git(self._tmp.name, "init", "-q", "-b", "main", project)
         git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))
@@ -779,7 +786,7 @@ class SyncTest(unittest.TestCase):
                 done = self.sync(bad)
                 self.assertEqual(2, done.returncode, done.stdout + done.stderr)
 
-    # ---- ロック（D32 とレビューの重大 3・中 7・中 15・軽 23）
+    # ---- ロック（mkdir で取り、ホスト名・pid・開始時刻を書く。古いロックは mv で強制取得する）
 
     def test_a_held_lock_stops_the_family(self):
         lock = self.own_lock(os.getpid(), int(time.time()))
@@ -814,7 +821,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(lock))
 
     def test_a_live_owner_is_not_robbed_after_ten_minutes(self):
-        # 決定 B: 同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない。
+        # 同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない。
         lock = self.own_lock(os.getpid(), int(time.time()) - 3600)
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
@@ -853,7 +860,7 @@ class SyncTest(unittest.TestCase):
 
     @unittest.skipIf(DASH is None, "dash が無い")
     def test_a_terminated_run_releases_its_lock_under_dash(self):
-        # dash は EXIT の trap を TERM で走らせない。TERM でもロックを外す（軽 16）。
+        # dash は EXIT の trap を TERM で走らせない。TERM でもロックを外す。
         write(os.path.join(self.scripts, "ccnavi-review.sh"), "#!/bin/sh\nsleep 30\n")
         self.keep_record()
         self.delete_remote_branch(PARENT)

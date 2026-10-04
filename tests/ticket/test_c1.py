@@ -1,16 +1,20 @@
-"""C1 の実行ファイルの側（ADR-0093 の 4.3・4.4。段階 2d）の受入テスト。
+"""C1 の実行ファイルの側の受入テスト。
+
+C1 は、取り込み済みの親子チケットで状態を書く操作を
+「ロック → 取り込み → 書く → コミット → push」の 1 操作にする形。
+実行ファイルは対象かの見分けと書いたパスの一覧だけを持ち、git の操作は sh が持つ。
 
 見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は tests/sh/test_c1_sh.py が見る。
 
 1. `ccnavi c1 family <識別子>`: 親子チケット（子なら親）と、C1 の対象か。
-同期状態の無い親子チケット・chat だけの親子チケットは
-   対象外（D11）、決まらない親子チケットは stop
-2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（4.4 の (b)・(c)・(d)、数えない一時ファイル、
+   同期状態の無い親子チケット・chat だけの親子チケットは対象外、決まらない親子チケットは stop
+2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（ccnavi が書いたと内容で分かるもの・
+   ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
-   （一覧は書く。D34 の configsync のコピーは例外で、tests/config/test_configsync.py が見る）
-4. 人の判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）はエージェントから
-   止める
+   （一覧は書く。着手で configsync がコピーた層は例外で、tests/config/test_configsync.py が見る）
+4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）は
+   エージェントから止める
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi import c1
+from ccnavi.hook import c1
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_sync_authority import AuthorityHarness
 from tests.ticket.test_ticket import git, read_json, write
@@ -170,7 +174,8 @@ class SortTest(AuthorityHarness):
         self.assertEqual(self.sort(), [("b", self.events())])
 
     def test_moves_written_by_a_human_decision_are_c(self):
-        """人のレビュー（review/ から done/）と締め（doing/ から done/）、マーカーの消去は (c)。"""
+        """ユーザのレビュー（review/ から done/）と締め（doing/ から done/）、
+        マーカーの消去は (c)。"""
         review = "wip/proposals/review/i0001-01.md"
         self.put(review, child_text("i0001-01", "i0001", 1, ["wip/research/*"]))
         mark = f"{APPROVED}/phases/i0001/1.pending"
@@ -283,9 +288,9 @@ class RecordTreeTest(AuthorityHarness):
         # 承認は提案（wip/proposals/todo/）を消す。C1 の置き場の外なので error。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent("propose")
-        preview = json.loads(self.ccnavi("--approve", "--preview", "--json").stdout)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         result, listed = self.run_recorded(
-            "--approve", "--yes", "i0001-02", "--digest", preview["digest"], "--json"
+            "--agree", "--yes", "i0001-02", "--digest", preview["digest"], "--json"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場の外に書き込みがあった", result.stderr)
@@ -304,7 +309,7 @@ class HumanEntryGuardTest(AuthorityHarness):
             "sh .ccnavi/scripts/ccnavi-review.sh chat 1",
             "sh .ccnavi/scripts/ccnavi-review.sh config-synced i0001",
             "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason r",
-            # シェルに選択肢を付けた形も同じ（段階 2d のレビュー）
+            # シェルに選択肢を付けた形も同じ
             "sh -x .ccnavi/scripts/ccnavi-push-approved.sh",
             "bash -e -x .ccnavi/scripts/ccnavi-review.sh chat 1",
             "sh -x .ccnavi/scripts/ccnavi-sync.sh --forget i0001",
@@ -348,7 +353,7 @@ class RecordTreeReviewTest(PhaseHarness):
     """本物の実行ファイルで、`--record-tree` 付きの依頼・行き先・Draft 外しが置き場だけを書く。
 
     PhaseHarness は状態ディレクトリを `--state` で動かしている（上書きした置き場）。下書きはそこへ
-    書かれ、一覧にも置き場の外にも数えない（段階 2d のレビューの 7）。
+    書かれ、一覧にも置き場の外にも数えない。
     """
 
     WRITERS = ("requested", "confirm", "ready")
@@ -420,7 +425,7 @@ class RecordTreeReviewTest(PhaseHarness):
 
 
 class ChooseTest(PhaseHarness):
-    """対話の decide の前半（`--choose-out`）: 選んで書くだけで、置き場に何も置かない（決定 A）。"""
+    """対話の decide の前半（`--choose-out`）: 選んで書くだけで、置き場に何も置かない。"""
 
     def test_choose_writes_only_the_choices(self):
         self.family(plan=["design"])
@@ -463,7 +468,9 @@ class ChooseTest(PhaseHarness):
 
 
 class BypassTest(AuthorityHarness):
-    """C1 の対象の親子チケット（取り込み済みで origin がある）は、C1 を通らない状態の操作を断る。"""
+    """C1 の対象の親子チケット（取り込み済みで origin がある）は、C1 を通らない
+    状態の操作を断る。
+    """
 
     def setUp(self):
         super().setUp()

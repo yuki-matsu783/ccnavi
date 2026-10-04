@@ -25,7 +25,7 @@ import tomllib
 import unittest
 
 import build
-from ccnavi import version
+from ccnavi.entry import version
 from tests import GIT_ENV, ROOT
 from tests.inproc import run_ccnavi
 

@@ -10,10 +10,10 @@
 2. 子が親の範囲を超えても承認はでき、超えた場所への書き込みは判定で止まること
 3. 状態の置き場への直接の作成と、サブエージェントからの状態の移動が止まること
 4. フェーズが終わるとレビューで止まり、レビューが済むと開くこと
-5. 変更要求のレビューは人の端末からも通せないこと
+5. 変更要求のレビューはユーザの端末からも通せないこと
 6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
 7. 置き場を動かすだけで承認になること、承認のときにしか当たらなかった構造の検査が
-   判定の側でも当たること（ADR-0058）
+   判定の側でも当たること（承認は置き場で決まる）
 """
 
 from __future__ import annotations
@@ -29,9 +29,10 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi import phase as phase_mod
-from ccnavi import review, settings, shellread, ticket
-from ccnavi.subagent import CANDIDATE_NOTE
+from ccnavi.hook.subagent import CANDIDATE_NOTE
+from ccnavi.infra import settings, shellread
+from ccnavi.tickets import phase as phase_mod
+from ccnavi.tickets import review, ticket
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -42,7 +43,7 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.ccnavi/*",
-            "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
+            "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
         }
     ],
 }
@@ -127,7 +128,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
@@ -159,7 +160,7 @@ class TicketTest(unittest.TestCase):
                 "disable",
                 "--restore-if-deny",
                 "disable",
-                # 人の判断の経路の端末要求は切る。テストは端末を持たない。
+                # ユーザの判断の経路の端末要求は切る。テストは端末を持たない。
                 # 経路そのものの検査は、個別に enable を渡す。
                 "--guard-ticket-approval",
                 "disable",
@@ -209,9 +210,9 @@ class TicketTest(unittest.TestCase):
         """承認して、承認済みチケットを親のブランチに乗せる。
 
         承認済みチケットは親のツリーに置かれ、コミットして初めて子のワークツリーへ渡る。
-        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順でたどる。
+        本番で `ccnavi-agree.sh` がやることを、テストでも同じ順でたどる。
         """
-        result = self.ccnavi("--approve", stdin=answer + "\n")
+        result = self.ccnavi("--agree", stdin=answer + "\n")
         if os.path.isdir(self.approved):
             git(self.parent_tree, "add", "-A")
             git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
@@ -319,7 +320,7 @@ class TicketTest(unittest.TestCase):
 
         `docs/Design/*` と書いた範囲に `docs/design/plan.md` が当たる。機械に
         任せると、同じチケットと同じ表記で、止まる場所が Windows と Linux で
-        食い違う。範囲は人が宣言する意図なので、機械の都合ではなく表記の意味で
+        食い違う。範囲はユーザが宣言する意図なので、機械の都合ではなく表記の意味で
         読む（`_fold` と `_entries` の re.IGNORECASE）。
         """
         self.propose("i0001", allow=("src/*", "README.md", "docs/Design/*"))
@@ -378,7 +379,7 @@ class TicketTest(unittest.TestCase):
         """親の範囲を超える子も承認できる。超えた項は承認画面の「編集対象としているが」に出る。
 
         判定は親の範囲で切り詰めるので、承認で止める理由が無い（設計 approve-carry 3.1）。
-        超えた項は承認しても書けないことを、承認する人がその場で読めるようにする。
+        超えた項は承認しても書けないことを、承認するユーザがその場で読めるようにする。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
@@ -432,21 +433,21 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.propose("i0002", allow=("docs/*",))
-        result = self.ccnavi("--approve", "i0001", "i0001-01", stdin="y\n")
+        result = self.ccnavi("--agree", "i0001", "i0001-01", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
         self.assertNotIn("i0002", result.stdout.split("チケットの承認リクエスト")[1])
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0002.md")))
-        # 残した分は次の --approve で承認の対象に入る
+        # 残した分は次の --agree で承認の対象に入る
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0002.md")))
 
     def test_listed_child_without_its_pending_parent_is_refused(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        result = self.ccnavi("--approve", "i0001-01", stdin="y\n")
+        result = self.ccnavi("--agree", "i0001-01", stdin="y\n")
         self.assertEqual(result.returncode, 1)
         self.assertIn("親 i0001 が承認されていない", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
@@ -455,13 +456,13 @@ class TicketTest(unittest.TestCase):
     def test_listed_id_with_nothing_pending_is_refused_too(self):
         # 承認待ちが空でも、識別子を並べたなら「無い」は失敗。
         # 終了コードが他の承認待ちの有無で変わらない
-        result = self.ccnavi("--approve", "i0001", stdin="y\n")
+        result = self.ccnavi("--agree", "i0001", stdin="y\n")
         self.assertEqual(result.returncode, 1)
         self.assertIn("承認待ちに無い: i0001", result.stderr)
 
     def test_listed_id_that_is_not_pending_approves_nothing(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        result = self.ccnavi("--approve", "i0001", "i0009", stdin="y\n")
+        result = self.ccnavi("--agree", "i0001", "i0009", stdin="y\n")
         self.assertEqual(result.returncode, 1)
         self.assertIn("承認待ちに無い: i0009", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
@@ -487,12 +488,12 @@ class TicketTest(unittest.TestCase):
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
 
-    # ---- 2b. 置き場を動かすだけの承認（ADR-0058）
+    # ---- 2b. 置き場を動かすだけの承認（承認は置き場で決まり、記録の欄は必須にしない）
 
     def hand_move(self, name, text=""):
-        """人が GitHub の画面でやることと同じ。提案を承認済みの置き場へ動かすだけ。
+        """ユーザが GitHub の画面でやることと同じ。提案を承認済みの置き場へ動かすだけ。
 
-        `ccnavi_approved` は足さない。端末もボードも無い人には足す手段が無い。
+        `ccnavi_approved` は足さない。端末もボードも無いユーザには足す手段が無い。
         """
         source = os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md")
         with open(source, encoding="utf-8") as f:
@@ -504,7 +505,7 @@ class TicketTest(unittest.TestCase):
 
     def test_moving_the_file_alone_approves_it(self):
         # 承認したかどうかは置き場で決まる。`.ccnavi/approved/` は組み込みの守りがエージェントの
-        # 書き込みを止めるので、そこに在ること自体が人の合意になる。
+        # 書き込みを止めるので、そこに在ること自体がユーザの合意になる。
         self.propose("i0001", allow=("src/*",))
         self.hand_move("i0001")
 
@@ -543,7 +544,8 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("DENY_TICKET_SCOPE", reason)
 
     def test_a_moved_ticket_whose_project_does_not_match_its_place_cannot_write(self):
-        # `project:` は宣言ではなく照合（ADR-0038）。承認が突き合わせていた食い違いを、
+        # `project:` は宣言ではなく照合で、プロジェクトは置き場が決める。
+        # 承認が突き合わせていた食い違いを、
         # 置き場を動かすだけの進め方では判定が突き合わせる。
         self.propose("i0001", allow=("src/*",))
         source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
@@ -593,7 +595,7 @@ class TicketTest(unittest.TestCase):
         判定が `parent` を引く索引は作業中のものだけ。親を閉じると引けなくなり、
         `scope_verdict` は子の宣言だけで範囲を決める。止めるフラグを付ける側だけが閉じた親も
         引ける対応表を使っていたので、フラグは付かず範囲も切り詰められない、という抜けが
-        あった。親を引けない子は止める側を採る（ADR-0058）。
+        あった。親を引けない子は止める側を採る。
         """
         # 子は親（src/*）に無い範囲を宣言する。承認は警告で通す。
         self.propose("i0001", allow=("src/*",))
@@ -612,7 +614,7 @@ class TicketTest(unittest.TestCase):
     def test_the_board_shows_that_a_blocked_ticket_is_stopped(self):
         """止めるフラグの付いたチケットが、ボードの JSON にもその旨で出ること。
 
-        判定と `--lint` にしか伝わらないと、ボードしか見ない人には書き込みが全部
+        判定と `--lint` にしか伝わらないと、ボードしか見ないユーザには書き込みが全部
         止まっていることが見えず、`status` は素の `open` のままになる。あわせて
         「フラグが付いていないのに親を引けない子」が居ないこと（対応表が分かれていないこと）も
         同じ出力から確かめる。対応表が分かれると、その子は自分の宣言だけで範囲が決まる。
@@ -794,7 +796,7 @@ class TicketTest(unittest.TestCase):
         """レビュー要の子を閉じると、承認済みチケットは doing/ から wip/proposals/review/ へ動く。
 
         動かすのはエージェント（承認は要らない）。範囲が消える向きなので危険は増えない。
-        レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる（ADR-0055）。
+        レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる。
         """
         self.family()
         result = self.ccnavi("ticket", "finish", "i0001-01")
@@ -873,7 +875,7 @@ class TicketTest(unittest.TestCase):
         self.family_without_starting()
         closed = os.path.join(self.approved, "done")
         os.makedirs(closed, exist_ok=True)
-        # 人が手で閉じた形（置き場を動かすのは人。ADR-0055）。
+        # ユーザが手で閉じた形（.ccnavi/approved/ の中で置き場を動かすのはユーザ）。
         os.replace(
             os.path.join(self.approved, "doing", "i0001.md"), os.path.join(closed, "i0001.md")
         )
@@ -884,7 +886,8 @@ class TicketTest(unittest.TestCase):
     def test_a_parent_that_is_still_a_proposal_asks_for_approval_first(self):
         """親が承認前なら、案内は承認から始めること。
 
-        人が子だけ置き場を動かすと起きる（ADR-0058 の進め方。承認画面なら落ちる）。`start` は
+        ユーザが子だけ置き場を動かすと起きる（置き場を動かすだけで承認になる進め方。承認画面なら
+        落ちる）。`start` は
         `doing/` の承認済みチケットにしか通らないので、`todo/` の親にそのまま `start` を
         勧めると、案内のとおりに打っても通らない。
         """
@@ -895,12 +898,12 @@ class TicketTest(unittest.TestCase):
         refused = self.ccnavi("ticket", "start", "i0001-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
-        self.assertIn("--approve", refused.stderr)
+        self.assertIn("--agree", refused.stderr)
 
     def test_a_child_without_any_parent_at_all_is_named(self):
         """親の提案がどこにも無い子は、親が無いと言って止めること。
 
-        人が子だけ置き場へ動かし、親を書き忘れた形。`_find` は子を引けるので、親の側を
+        ユーザが子だけ置き場へ動かし、親を書き忘れた形。`_find` は子を引けるので、親の側を
         引いたときの「無い」をここで言わないと、ワークツリーの検査まで進んで別の話になる。
         """
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
@@ -925,7 +928,7 @@ class TicketTest(unittest.TestCase):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("フェーズ 1 が終わりました", self.reason(said))
         self.assertIn("request", self.reason(said))
-        # ELI5 の置き場を名指しする（ADR-0095）
+        # ELI5 の置き場を名指しする
         self.assertIn("--eli5 wip/eli5/phase-1.html", self.reason(said))
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
@@ -1276,9 +1279,9 @@ class TicketTest(unittest.TestCase):
         )
 
     def test_review_moves_the_children_to_done_and_accept_can_raise_a_followup(self):
-        """レビューが済むと review/ の子は done/ へ動く。指摘が残れば人が続きの子を起こせる。
+        """レビューが済むと review/ の子は done/ へ動く。指摘が残ればユーザが続きの子を起こせる。
 
-        ADR-0055。続きの子は .ccnavi/approved/doing/ に直に置かれ、承認は人が選んだことで済む。
+        続きの子は .ccnavi/approved/doing/ に直に置かれ、承認はユーザが選んだことで済む。
         """
         self.family()
         self.close_phase()
@@ -1382,10 +1385,10 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
 
     def test_a_crit_push_thread_on_the_eli5_blocks_and_leaves_with_wip(self):
-        """ELI5 の HTML を wip/ にコミットし、人が crit push で行に指摘を送った形（ADR-0095）。
+        """ELI5 の HTML を wip/ にコミットし、ユーザが crit push で行に指摘を送った形。
 
         crit push はマージリクエストの行のスレッド（GitHub はレビューのコメント、GitLab は差分の
-        discussion）を立てる。目印で始まらない人の投稿なので、confirm は未解決として数えて止め、
+        discussion）を立てる。目印で始まらないユーザの投稿なので、confirm は未解決として数えて止め、
         decide はその 1 件を選べる。wip/ が追跡されている間は ready の前提（_merge_problems）が
         落ち、wip/ を消してコミットすると外れる。squash した成果物に HTML は残らない。
         """
@@ -1437,7 +1440,7 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(git(self.parent_tree, "ls-files", "--", "wip").strip(), "")
 
     def test_an_eli5_only_commit_does_not_move_the_request(self):
-        """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない（ADR-0096）。
+        """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない。
 
         confirm は止まらず、request の打ち直しも要らない（依頼済みと答える）。ただし push は求める
         （差分に無い ELI5 には crit push が届かない）。ELI5 とほかのファイルを一緒に変えたコミットは
@@ -1493,7 +1496,7 @@ class TicketTest(unittest.TestCase):
         """ready の前提は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も止める。
 
         大文字小文字を区別しない FS では範囲の除外が `WIP/eli5/` を通しうるので、ready の側で
-        区別せずに拾う（ADR-0097）。
+        区別せずに拾う。
         """
         self.family()
         self.close_phase()
@@ -1577,7 +1580,7 @@ class TicketTest(unittest.TestCase):
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
         self.assertFalse(os.path.exists(stale))
-        # レビュー済みのフェーズに confirm を重ねない（ADR-0093 の 11.8.1 の決定 B）
+        # レビュー済みのフェーズに confirm を重ねない。重ねるとマーカーと跡が書き直される
         again = self.confirm(fixture)
         self.assertEqual(again.returncode, 1)
         self.assertIn("フェーズ 1 はレビュー済み", again.stderr)
@@ -1676,7 +1679,7 @@ class TicketTest(unittest.TestCase):
 
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("複数の場所にある", done.stderr)
-        # 元ツリーを優先するので、置き場の移動も元ツリーに書かれる（ADR-0073 の代償）。
+        # 元ツリーを優先するので、置き場の移動も元ツリーに書かれる。
         moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-02.md")
         self.assertTrue(os.path.exists(moved), moved)
         lint = self.ccnavi("--lint", "--mode", "enable")
@@ -1687,7 +1690,7 @@ class TicketTest(unittest.TestCase):
 
         親のツリーで閉じ、子のツリーだけがそれを取り込み、元ツリーは 1 つ手前で
         止まっている形。ここで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
-        記録を別の差分で書き直す。決めずに止めて、人に合流させる。
+        記録を別の差分で書き直す。決めずに止めて、ユーザに合流させる。
         """
         self.family()
         closed = self.ccnavi("ticket", "finish", "i0001-02")
@@ -1937,7 +1940,7 @@ class TicketTest(unittest.TestCase):
         for cwd in (self.root, self.worktree("research-abc", "main")):
             result = self.hook("SubagentStart", "", cwd, agent_id="sub-r")
             self.assertEqual(result.returncode, 0, result.stderr)
-            # 子の一覧は渡らない。どの起動にも付く「スキル候補」の 1 行（ADR-0090）だけ。
+            # 子の一覧は渡らない。どの起動にも付く「スキル候補」の 1 行だけ。
             self.assertEqual(self.reason(result), CANDIDATE_NOTE, cwd)
         # 子のワークツリーからは、その子だけ。
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
@@ -1945,10 +1948,10 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01", text)
         self.assertNotIn("i0001-02", text)
 
-    # ---- 7. 人の判断の経路
+    # ---- 7. ユーザの判断の経路
 
     def test_cli_flags_take_no_abbreviation(self):
-        """人の判断のフラグは全部綴ったときだけ有効。
+        """ユーザの判断のフラグは全部書いたときだけ有効。
 
         組み込みの deny は全部綴った形しか見ないので、前方一致で走ると `--close` や
         `--review` がそこで止められずに通る。実行ファイルの側で受けないことを確かめる。
@@ -1969,7 +1972,7 @@ class TicketTest(unittest.TestCase):
     def test_cli_paths_are_denied_from_the_shell_unless_disabled(self):
         self.family()
         for command in (
-            "ccnavi --approve",
+            "ccnavi --agree",
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
             "uv run python -m ccnavi ticket start i0001-01",
             "ls && ./ccnavi review confirm --phase 1",
@@ -1977,14 +1980,14 @@ class TicketTest(unittest.TestCase):
             "ccnavi ticket finish i0001-01",
             "ccnavi ticket record-risk i0001-01 untested yes --reason x",
             # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup 2.3）。
-            "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
-            "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
+            "uv run python -m ccnavi --agree --yes i0001,i0001-01 --json",
+            "ccnavi --agree --preview --json; ccnavi --agree --yes i0001",
             # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
-            "ccnavi --approve --preview --yes i0001 --json",
-            "ccnavi --approve --yes i0001 --preview",
-            # 承認のスクリプトも人の経路。中身は --approve と承認済みチケットの push。
-            "sh .ccnavi/scripts/ccnavi-approve.sh",
-            # 承認の push の sh も人が打つ。push は外へ出す操作で、時機は人が決める
+            "ccnavi --agree --preview --yes i0001 --json",
+            "ccnavi --agree --yes i0001 --preview",
+            # 承認のスクリプトもユーザの経路。中身は --agree と承認済みチケットの push。
+            "sh .ccnavi/scripts/ccnavi-agree.sh",
+            # 承認の push の sh もユーザが打つ。push は外へ出す操作で、時機はユーザが決める
             # （設計 approve-carry 1.6）。
             "sh .ccnavi/scripts/ccnavi-push-approved.sh",
             "bash /abs/.ccnavi/scripts/ccnavi-push-approved.sh",
@@ -1999,7 +2002,7 @@ class TicketTest(unittest.TestCase):
             )
             self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
             if "push-approved" in command:
-                # 止めた理由に、承認の push の sh も人が打つことを書く。
+                # 止めた理由に、承認の push の sh もユーザが打つことを書く。
                 self.assertIn("ccnavi-push-approved.sh", self.reason(result), command)
         # 読むだけの形と、スクリプト経由は通る。
         for command in (
@@ -2007,8 +2010,8 @@ class TicketTest(unittest.TestCase):
             "ccnavi --lint",
             "sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
             # 一覧を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
-            "uv run python -m ccnavi --approve --preview --json",
-            "echo --approve --preview",
+            "uv run python -m ccnavi --agree --preview --json",
+            "echo --agree --preview",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -2021,10 +2024,10 @@ class TicketTest(unittest.TestCase):
         # PowerShell も同じ。PowerShell は shellread で読めないので生の文字列に当たる。
         # 免除の範囲がコマンドをまたぐと、後ろに --preview を書くだけで前の承認が通る。
         for command in (
-            "& ccnavi.exe --approve",
-            "ccnavi --approve --yes i0001,i0001-01 --json; ccnavi --approve --preview",
-            "ccnavi --approve; echo --preview",
-            "ccnavi --approve --yes i0001 | findstr --preview",
+            "& ccnavi.exe --agree",
+            "ccnavi --agree --yes i0001,i0001-01 --json; ccnavi --agree --preview",
+            "ccnavi --agree; echo --preview",
+            "ccnavi --agree --yes i0001 | findstr --preview",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -2038,7 +2041,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "PowerShell",
             self.parent_tree,
-            command="ccnavi --approve --preview --json",
+            command="ccnavi --agree --preview --json",
             guard_ticket_approval="enable",
         )
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
@@ -2052,7 +2055,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
         # 切ると通る。
-        result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
+        result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --agree")
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
     def test_board_decisions_are_denied_from_the_shell(self):
@@ -2067,22 +2070,22 @@ class TicketTest(unittest.TestCase):
             ".ccnavi/scripts/ccnavi-review.sh decide 2 --choices j --digest d",
             "env sh .ccnavi/scripts/ccnavi-review.sh decide 1 --choices j --digest d",
             "/tmp/x --reviewed 1 --accept-unresolved --yes j --digest d --json",
-            "./copy --yes i0001 --approve --digest d",
+            "./copy --yes i0001 --agree --digest d",
             # 敵対的レビューで止められずに通った形。読み取り用の道具に似た名前、
             # 文字列を実行する道具、引数のリスト、変数に入れた副命令、分け書き
             "/tmp/cat.bin --reviewed 1 --accept-unresolved --yes j --digest d",
-            "awk 'BEGIN{system(\"ccnavi --approve --yes a --digest X\")}'",
+            "awk 'BEGIN{system(\"ccnavi --agree --yes a --digest X\")}'",
             "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
             "--digest Y\")}'",
             "perl -e 'system(\"ccnavi --reviewed 3 --accept-unresolved --yes X --digest Y\")'",
-            'python3 -c "import ccnavi.cli as c; '
+            'python3 -c "import ccnavi.entry.cli as c; '
             "c.run(0, 0, 0, ['--reviewed', '1', '--yes', '{}'])\"",
             "S=decide; sh .ccnavi/scripts/ccnavi-review.sh $S 1 --choices x --digest y",
             "cp .ccnavi/scripts/ccnavi-review.sh /tmp/r.sh; "
             "sh /tmp/r.sh decide 1 --choices x --digest y",
             "/tmp/cc --y\"\"es --appr''ove",
             # コミットの文面でも、コマンド置換の中は実行される
-            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(/tmp/cc --approve --yes x)"',
+            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(/tmp/cc --agree --yes x)"',
         ):
             result = self.hook(
                 "PreToolUse",
@@ -2092,15 +2095,15 @@ class TicketTest(unittest.TestCase):
                 guard_ticket_approval="enable",
             )
             self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # 見るだけの形と、端末で人が選ぶ形は止めない（後者は実行ファイルが端末を求める）。
+        # 見るだけの形と、端末でユーザが選ぶ形は止めない（後者は実行ファイルが端末を求める）。
         for command in (
             "sh .ccnavi/scripts/ccnavi-review.sh decide 1 --preview",
             "sh .ccnavi/scripts/ccnavi-review.sh decide 1",
             "apt-get install --yes git",
-            "grep -n -- '--approve --yes' README.md",
-            "echo ccnavi --approve --yes x",
+            "grep -n -- '--agree --yes' README.md",
+            "echo ccnavi --agree --yes x",
             # コミットの文面は実行されない
-            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: --approve --yes の説明"',
+            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: --agree --yes の説明"',
             "sh .ccnavi/scripts/ccnavi-git.sh commit -m 'CCNAVI_GUARD_TICKET_APPROVAL=x を止める'",
         ):
             result = self.hook(
@@ -2120,27 +2123,27 @@ class TicketTest(unittest.TestCase):
         """
         self.family()
         for tool, command in (
-            ("Bash", "CCNAVI_GUARD_TICKET_APPROVAL=disable uv run -m ccnavi --approve"),
+            ("Bash", "CCNAVI_GUARD_TICKET_APPROVAL=disable uv run -m ccnavi --agree"),
             (
                 "Bash",
                 "env CCNAVI_GUARD_TICKET_APPROVAL=disable python -m ccnavi.__main__ --reviewed 1",
             ),
-            ("Bash", "export CCNAVI_GUARD_TICKET_APPROVAL=disable; /tmp/x --approve"),
-            ("Bash", "bash -c 'CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --approve'"),
-            ("Bash", ": ${CCNAVI_GUARD_TICKET_APPROVAL:=disable}; /tmp/x --approve"),
-            ("Bash", "read CCNAVI_GUARD_TICKET_APPROVAL <<< disable; /tmp/x --approve"),
+            ("Bash", "export CCNAVI_GUARD_TICKET_APPROVAL=disable; /tmp/x --agree"),
+            ("Bash", "bash -c 'CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --agree'"),
+            ("Bash", ": ${CCNAVI_GUARD_TICKET_APPROVAL:=disable}; /tmp/x --agree"),
+            ("Bash", "read CCNAVI_GUARD_TICKET_APPROVAL <<< disable; /tmp/x --agree"),
             ("Bash", "printf -v CCNAVI_GUARD_TICKET_APPROVAL disable"),
             ("Bash", "/tmp/x --guard-ticket-approval disable --close-early --reason r"),
-            ("Bash", "/tmp/x --guard-ticket-approval=$v --approve"),
-            ("PowerShell", "$env:CCNAVI_GUARD_TICKET_APPROVAL = 'disable'; ccnavi.exe --approve"),
+            ("Bash", "/tmp/x --guard-ticket-approval=$v --agree"),
+            ("PowerShell", "$env:CCNAVI_GUARD_TICKET_APPROVAL = 'disable'; ccnavi.exe --agree"),
             (
                 "PowerShell",
                 "[Environment]::SetEnvironmentVariable('CCNAVI_GUARD_TICKET_APPROVAL','x')",
             ),
             ("PowerShell", "Set-Item env:CCNAVI_GUARD_TICKET_APPROVAL disable"),
             # 敵対的レビューで止められずに通った形。引用と分け書き、言語の中からの設定、名前の参照
-            ("Bash", '/tmp/cc "--guard-ticket-approval" disable --approve'),
-            ("Bash", "/tmp/cc --guard-ticket-''approval disable --approve"),
+            ("Bash", '/tmp/cc "--guard-ticket-approval" disable --agree'),
+            ("Bash", "/tmp/cc --guard-ticket-''approval disable --agree"),
             (
                 "Bash",
                 "python3 -c \"import os;os.environ['CCNAVI_GUARD_TICKET_APPROVAL']='disable'\"",
@@ -2180,16 +2183,16 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --approve",
+            command="CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --agree",
         )
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
     def test_approval_scripts_are_denied_in_any_letter_case(self):
-        """9・10. 止める表記は大文字小文字を区別しない。文面は人が確かめる前提を言わない。
+        """9・10. 止める表記は大文字小文字を区別しない。文面はユーザが確かめる前提を言わない。
 
         Windows と macOS の既定のファイルシステムは表記の大小を区別しないので、
         表記を変えただけの sh も同じものが走る。ボードは Enter まで送るので、
-        「利用者が確かめて実行します」は実際の動きと合わない。
+        「ユーザが確かめて実行します」は実際の動きと合わない。
         """
         for command in (
             "sh .ccnavi/scripts/CCNAVI-PUSH-APPROVED.sh",
@@ -2206,11 +2209,11 @@ class TicketTest(unittest.TestCase):
                 )
                 reason = self.reason(result)
                 self.assertIn("DENY_TICKET_APPROVAL_CLI", reason)
-                self.assertNotIn("利用者が確かめて実行します", reason)
+                self.assertNotIn("ユーザが確かめて実行します", reason)
 
     def test_approve_and_reviewed_need_a_terminal_unless_disabled(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        refused = self.ccnavi("--approve", "--guard-ticket-approval", "enable", stdin="y\n")
+        refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("端末", refused.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
@@ -2259,13 +2262,13 @@ class TicketTest(unittest.TestCase):
         path = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
         with open(path, encoding="utf-8") as f:
             text = f.read()
-        write(path, text.replace("---\n", "---\n# 人の覚え書き\n", 1))
+        write(path, text.replace("---\n", "---\n# ユーザの覚え書き\n", 1))
         self.assertEqual(self.approve().returncode, 0)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         moved = os.path.join(self.approved, "doing", "i0001.md")
         with open(moved, encoding="utf-8") as f:
             after = f.read()
-        self.assertIn("# 人の覚え書き", after)
+        self.assertIn("# ユーザの覚え書き", after)
         self.assertIn("ccnavi_approved:", after)
         self.assertIn("started_at:", after)
         self.assertIn("base_sha:", after)
@@ -2313,7 +2316,7 @@ class TicketTest(unittest.TestCase):
         """置き場の中の日本語のファイルが、置き場の外に見えないこと。
 
         `git status --porcelain` は `-z` が無いと非 ASCII を 8 進にエスケープして引用符で包む。
-        そのまま前置き一致に当てると、置き場の中のファイルが「人の作業の汚れ」になってしまい、
+        そのまま前置き一致に当てると、置き場の中のファイルが「ユーザの作業の汚れ」になってしまい、
         依頼が「未コミットの変更がある」で止まる。
         """
         self.family()
@@ -2358,7 +2361,7 @@ class TicketTest(unittest.TestCase):
         return os.path.join(self.approved, "phases", "i0001", "1.requested")
 
     def reviewed(self, fixture):
-        """人が端末で打つ経路（--reviewed）。未解決の指摘は受け入れる。"""
+        """ユーザが端末で打つ経路（--reviewed）。未解決の指摘は受け入れる。"""
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -2373,7 +2376,7 @@ class TicketTest(unittest.TestCase):
     # 動かし方。どれも「依頼の前」か「依頼の後」のコピーから始まる。
 
     def move_markers_unpushed_before_request(self, fixture):
-        # ccnavi-push-approved.sh は push が落ちてもコミットを残す。人の承認が落ちた形。
+        # ccnavi-push-approved.sh は push が落ちてもコミットを残す。ユーザの承認が落ちた形。
         write(os.path.join(self.approved, "doing", "unrelated.md"), "承認が落ちた形\n")
         git(self.parent_tree, "add", "--", ".ccnavi/approved")
         git(self.parent_tree, "commit", "--quiet", "-m", "ccnavi: 承認済みチケットを更新")
@@ -2394,7 +2397,7 @@ class TicketTest(unittest.TestCase):
         self.commit_code("later.py", "マーカーと一緒に")
 
     def move_code_and_forge_head(self, head):
-        """人が見ていないコミットを積み、マーカーの `head` を sha でない値に書き換える。
+        """ユーザが見ていないコミットを積み、マーカーの `head` を sha でない値に書き換える。
 
         マーカーは親のブランチに乗って他の機械から届く。`HEAD` のような「今」を指す値を
         revision として渡すと `head..HEAD` が空差分になり、見ていないコミットがそのまま通る。
@@ -2437,7 +2440,7 @@ class TicketTest(unittest.TestCase):
         self.commit_markers()
 
     def move_code_after_the_human_accepted(self, fixture):
-        # 人の経路で一度受け入れた後に、見ていない変更を積んで受け入れをやり直す。
+        # ユーザの経路で一度受け入れた後に、見ていない変更を積んで受け入れをやり直す。
         self.move_markers_with_an_open_thread(fixture)
         accepted = self.reviewed(fixture)
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
@@ -2461,9 +2464,9 @@ class TicketTest(unittest.TestCase):
         - request（依頼済み）: 置き場だけが動いた形では出し直させない。check が止まらないので、
           出し直しても依頼のコメントが増えるだけになる
         - check: 置き場だけが動いた形（push 済みでも手元だけでも）では止まらない。
-          人がレビューで見るものは変わっていない。置き場の外が動いていれば、
+          ユーザがレビューで見るものは変わっていない。置き場の外が動いていれば、
           置き場に見せかけたもの（改名、置き場に見える名前、sha でない head）も含めて止まる
-        - 人が端末で打つ経路（--reviewed）も check と同じ基準で見る
+        - ユーザが端末で打つ経路（--reviewed）も check と同じ基準で見る
 
         前置き（親子の承認・着手、フェーズの終わり、origin への push、依頼）は 1 度だけ作り、
         行ごとに「依頼の前」か「依頼の後」のコピーへ戻してから動かす。
@@ -2504,7 +2507,7 @@ class TicketTest(unittest.TestCase):
              "check", False, None, None),
             ("置き場だけ・未解決の指摘あり", after, self.move_markers_with_an_open_thread,
              "reviewed", True, None, None),
-            ("人が受け入れた後に置き場の外", after, self.move_code_after_the_human_accepted,
+            ("ユーザが受け入れた後に置き場の外", after, self.move_code_after_the_human_accepted,
              "reviewed", False, moved, None),
         ]  # fmt: skip
         ways = {"request": self.request, "check": self.confirm, "reviewed": self.reviewed}
@@ -2566,7 +2569,7 @@ class TicketTest(unittest.TestCase):
         """依頼の後に HEAD が動いたら、request で依頼を出し直せること（#36）。
 
         check が「request をやり直す」と案内する一方で、request が「依頼済み」で
-        止まり、人がマーカーを外すまで進めなかった。出し直しても、前の依頼への
+        止まり、ユーザがマーカーを外すまで進めなかった。出し直しても、前の依頼への
         未解決の指摘は数え続ける。
         """
         self.family()
@@ -2622,7 +2625,7 @@ class TicketTest(unittest.TestCase):
         """依頼せずにレビュー済みになったフェーズへ、依頼を投稿しないこと。
 
         `close-early` は依頼していないフェーズにもレビュー済みを置く。依頼の記録が無いことを
-        先に見ていた版では、人が締めたフェーズに request が通り、MR に依頼が投稿された。
+        先に見ていた版では、ユーザが締めたフェーズに request が通り、MR に依頼が投稿された。
         """
         self.family()
         self.close_phase()
@@ -2654,7 +2657,7 @@ class TicketTest(unittest.TestCase):
         """指摘が残ったまま依頼をやり直しても、数から消えないこと。
 
         依頼より後のスレッドだけを数えていた版では、子をもう 1 本足して承認してもらい、
-        依頼をやり直すだけで前回の指摘が数から消え、check が通った。人が解決も
+        依頼をやり直すだけで前回の指摘が数から消え、check が通った。ユーザが解決も
         受け入れもしていないのに通る形で、実物の GitLab で流れを通したときに出た。
         """
         self.family()
@@ -2686,7 +2689,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(again.returncode, 0)
         self.assertIn("未解決", again.stderr)
 
-        # 人が受け入れれば通り、受け入れた分は次から数えない。
+        # ユーザが受け入れれば通り、受け入れた分は次から数えない。
         accepted = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -2699,15 +2702,15 @@ class TicketTest(unittest.TestCase):
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
         # 受け入れでレビュー済みになった。マーカーを外して確かめ直しても、受け入れた分は数えない
-        # （レビュー済みのフェーズには confirm を重ねない。ADR-0093 の 11.8.1 の決定 B）
+        # （レビュー済みのフェーズには confirm を重ねない）
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
 
     def test_the_acceptance_survives_a_later_check(self):
-        """人が受け入れたスレッドは、あとから走った check で消えないこと。
+        """ユーザが受け入れたスレッドは、あとから走った check で消えないこと。
 
         受け入れをフェーズのマーカーに書いていた版では、次に通った check が同じマーカーを
-        `accepted: []` で上書きし、記録が飛んだ。人がもう一度同じスレッドを
+        `accepted: []` で上書きし、記録が飛んだ。ユーザがもう一度同じスレッドを
         受け入れることになる。受け入れの記録はマーカーと別の場所に置く。
         """
         self.family()
@@ -2733,7 +2736,7 @@ class TicketTest(unittest.TestCase):
 
         # check が通るとマーカーは書き換わるが、受け入れの記録は残る（レビュー済みには重ねないので、
         # マーカーを外して
-        # から確かめる。ADR-0093 の 11.8.1 の決定 B）。
+        # から確かめる）。
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
         self.assertIn("u1", read_json(kept)["threads"])

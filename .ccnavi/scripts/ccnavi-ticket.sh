@@ -9,9 +9,9 @@
 # record-risk は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は finish で閉じられない。
 #
-# 状態は置き場で表す（ADR-0055）。承認待ちは wip/proposals/todo/、承認済みの作業中は
+# 状態は置き場で表し、チケットは 1 本のファイルが置き場を動く。承認待ちは wip/proposals/todo/、承認済みの作業中は
 # .ccnavi/approved/doing/、レビュー待ちは wip/proposals/review/、閉じたものは
-# .ccnavi/approved/done/。人が動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
+# .ccnavi/approved/done/。ユーザが動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
 # wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
 # 作ったり動かしたりするのは ccnavi が止める。
 # サブエージェントからの呼び出しも ccnavi が止める（agent_id が付いていたら拒む）。
@@ -20,8 +20,9 @@
 # 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
 #
-# 取り込み済みの親子チケット（origin があり同期状態が present。chat だけの親子チケットを除く）の
-# start・finish・cancel は C1 で回す（ADR-0093 の 4.3。段階 2d）:
+# 取り込み済みの親子チケット（origin があり、親子チケットの同期状態が present。chat だけのものを除く）の
+# start・finish・cancel は C1 で回す。Chrome 拡張から見える親子チケットに未 push の状態を溜めないため、次を 1 操作にする。
+#
 # ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
@@ -45,7 +46,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <
   cancel       doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい
   record-risk  定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
 
-  レビュー待ち（review/）から done/ へ動かすのは人（ccnavi-review.sh confirm / decide、
+  レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm / decide、
   ccnavi --reviewed）。
 
   提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通層の
@@ -107,7 +108,7 @@ start | finish | cancel)
 	trap 'ccnavi_c1_end' EXIT
 	trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 	# 識別子は実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語
-	# （`start -- <親>` で C1 を経ずに通らないようにする。段階 2d のレビュー）。
+	# （`start -- <親>` で C1 を経ずに通らないようにする）。
 	c1_id=""
 	c1_skip=""
 	c1_first=yes

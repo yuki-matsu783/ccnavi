@@ -18,7 +18,8 @@
 サブエージェントならその 1 回の起動）。状態ファイルを置く場所が無いとき（`--state ""`）は
 毎回渡す（`ctxfile.py` の既存の決まり）。
 
-実装は入っている（ADR-0057）。ここが落ちたら、`every` の刻みが上の表と食い違ったということ。
+実装は入っている。しきい値と文面は設定が持ち、実行ファイルは当たった回数を数えるだけ。
+ここが落ちたら、`every` の刻みが上の表と食い違ったということ。
 `--lint` の検査は tests/core/test_lint_every.py。
 """
 
@@ -60,13 +61,17 @@ class EveryTest(unittest.TestCase):
     def rules(self, *allow: dict) -> str:
         """共通層の既定の場所にルールを 1 本置く。
 
-        `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には届かない
-        （ADR-0067）。
+        `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には届かない。
         """
         body = {
             "version": 1,
             "deny": [
-                {"id": "push", "match": "Bash", "glob": "*git push*", "message": "push は人が行う"}
+                {
+                    "id": "push",
+                    "match": "Bash",
+                    "glob": "*git push*",
+                    "message": "push はユーザが行う",
+                }
             ],
             "allow": list(allow),
         }

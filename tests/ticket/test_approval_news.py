@@ -1,6 +1,6 @@
 """承認の事実を hook がモデルへ 1 度だけ伝えることの受入テスト。
 
-設計 wip/design/approve-popup.md 2.4。人がボードで承認したあと、モデルは次の
+設計 wip/design/approve-popup.md 2.4。ユーザがボードで承認したあと、モデルは次の
 UserPromptSubmit か PreToolUse で「承認済みチケットが置かれた。後工程を進める」を読む。
 見るのは 5 つ。
 
@@ -10,7 +10,7 @@ UserPromptSubmit か PreToolUse で「承認済みチケットが置かれた。
 4. 別のセッションにはそれぞれ 1 度ずつ伝える。サブエージェントには伝えない
 5. 状態ファイルを置けない（`--state ""`）ときは伝えず、状態ファイルも作らない
 
-文は `--approve --yes` の `prompt` と同じもの（同じ関数から出る）。
+文は `--agree --yes` の `prompt` と同じもの（同じ関数から出る）。
 """
 
 from __future__ import annotations
@@ -56,9 +56,9 @@ class ApprovalNewsTest(PhaseHarness):
     def approve_yes(self, tickets):
         # ボードと同じく、見せたダイジェスト（承認画面の本文・判定が読んだ中身・写る中身）を渡す。
         # 渡さない `--yes` は承認しない。
-        shown = self.ccnavi("--approve", "--preview", "--json")
+        shown = self.ccnavi("--agree", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
-        result = self.ccnavi("--approve", "--yes", ",".join(tickets), "--digest", digest, "--json")
+        result = self.ccnavi("--agree", "--yes", ",".join(tickets), "--digest", digest, "--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)["prompt"]
 
@@ -178,7 +178,7 @@ class ApprovalNewsTest(PhaseHarness):
 
     def test_a_copy_closed_before_the_next_hook_is_still_told(self):
         """承認の直後に子が閉じても、その承認は 1 度伝える。"""
-        from ccnavi import approval
+        from ccnavi.tickets import approval
 
         self.parent_only()
         self.approve_yes(["i0001"])

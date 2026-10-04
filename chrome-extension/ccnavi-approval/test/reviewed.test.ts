@@ -1,5 +1,5 @@
 /**
- * Chrome の「レビュー済み」（ADR-0093 の 8.9。段階 4）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome の「レビュー済み」。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
  * - 録ったホストの応答の見本（test/fixtures/host/github/）から TS が組むコピーが、sh が組んだ期待値と同じ
  * - 依頼の後の変更の一覧（compare API）は、打ち切り・祖先でない・無い、のどれでも null（動いたと数える）
@@ -108,10 +108,10 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
   for (const [scene, button, why] of [
     ["resolved", 1, null],
     ["full-page", 1, null],
-    // GitHub では目印で始まるスレッドも数える（11.8.1 の決定 C）
+    // GitHub では目印で始まるスレッドも数える（目印は誰でも書ける）
     ["paged", 0, /未解決のスレッドが 4 件残っている/],
     ["changes-requested", 0, /変更要求のレビューが立っている/],
-    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない（決定 A）
+    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない
     ["cr-commented", 0, /変更要求のレビューが立っている/],
     ["pending", 0, /変更要求のレビューが立っている/],
   ] as const) {
@@ -172,7 +172,7 @@ test("CX-T133 未解決・変更要求が残れば書かない。ボードを開
   assert.equal(mock.commitCalls.length, 0);
 });
 
-test("CX-T134 依頼の後に人が見るもの（置き場の外）が動いたら書かない。置き場だけの変更なら書く", async () => {
+test("CX-T134 依頼の後にユーザが見るもの（置き場の外）が動いたら書かない。置き場だけの変更なら書く", async () => {
   const mock = reviewing("resolved");
   mock.push(FAMILY, { "src/late.py": "print(1)\n" }, "依頼の後のコード");
   const out = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));

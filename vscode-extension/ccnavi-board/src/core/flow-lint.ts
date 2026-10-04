@@ -1,9 +1,9 @@
 /**
- * フローの本文が正しいかを実行ファイルに聞く（ADR-0035・ADR-0085）。フロー編集画面の、開くときと保存の前。
+ * フローの本文が正しいかを実行ファイルに聞く。フロー編集画面の、開くときと保存の前。
  *
  * 読めるか（大きさ・UTF-8 として読めるか・YAML として読めるか・別名）と形（`nodes` が無い、`id` が無い・重なる など）の答えは
  * 実行ファイルの `--lint --json --flow <パス>` が出す。読み手も検査も SubagentStart と同じもの
- * （`ccnavi/flow.py` の `load`）で、拡張は自分で判定し直さない。ルール設定・リスク管理・フェーズ管理の
+ * （`ccnavi/tickets/flow.py` の `load`）で、拡張は自分で判定し直さない。ルール設定・リスク管理・フェーズ管理の
  * 画面が `--lint --rules` / `--risk` / `--phases` に一時ファイルで聞くのと同じ形。
  *
  * 一時ファイルは画面ごとの一時ディレクトリ（`os.tmpdir()` の下の `ccnavi-flow-*`）に、**呼ぶたびに別の名前**
@@ -11,7 +11,7 @@
  * 互いの本文を読み違えない。苦情には一時ファイルのパスが出るので、画面に出すときは対象のファイルのパスに直す。
  *
  * 通ったときは、実行ファイルが読んだ中身（`flow.data`）を返す。画面はそれを自分の中身と見比べる
- * （`flow-agree.ts`）。あわせて、実行ファイルがそのフローについて言ったこと（`(flow)` の warn、担当に渡る手順
+ * （`flow-match.ts`）。あわせて、実行ファイルがそのフローについて言ったこと（`(flow)` の warn、担当に渡る手順
  * `rendered`、選べる名前 `candidates`）を `FlowChecks` にまとめて返す。warn にも一時ファイルのパスが出るのでパスを直す。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
  * （`--flow` を知らない古い実行ファイルと同じ扱い）。
  *
@@ -46,8 +46,8 @@ function tempName(): string {
 /**
  * 本文を一時ファイルに書いて実行ファイルに確かめさせる。`(flow)` の error が 1 件でもあれば理由を返す。
  * ほかの設定の苦情（ルールなど）では止めない。実行ファイルを走らせられない・答えを読めない・答えに
- * 読んだ中身（`flow`）が無いときも止める側（確かめられないものを正しいとは言わない）。
- * 本文はバイト列でも渡せる（開くときは読んだバイトのまま渡し、UTF-8 として壊れているかも実行ファイルに言わせる）。
+ * 読んだ中身（`flow`）が無いときも止める（確かめられないものを正しいとは言わない）。
+ * 本文はバイト列でも渡せる（開くときは読んだバイトのまま渡し、UTF-8 として不正かどうかも実行ファイルに言わせる）。
  */
 export async function lintFlowText(
   text: string | Uint8Array,
@@ -60,7 +60,7 @@ export async function lintFlowText(
     try {
       fs.writeFileSync(tmp, text, typeof text === "string" ? { encoding: "utf8", flag: "wx" } : { flag: "wx" });
     } catch (error) {
-      return { ok: false, error: `確かめるための一時ファイルを書けない: ${(error as Error).message}` };
+      return { ok: false, error: `確かめるための一時ファイルを書けません: ${(error as Error).message}` };
     }
     const ran = await lint(tmp);
     if (!ran.ok) {
@@ -72,13 +72,13 @@ export async function lintFlowText(
     const errors = problems.filter((p) => p.severity === "error");
     if (errors.length > 0) {
       const said = errors.map((p) => rename(p.detail)).join("\n");
-      return { ok: false, error: `実行ファイル（--lint --flow）がフローを読めないと返した: ${said}` };
+      return { ok: false, error: `実行ファイル（--lint --flow）が、フローを読めないと返しました: ${said}` };
     }
     const flow = ran.value.flow;
     if (flow === undefined || flow.data === null || flow.data === undefined) {
       return {
         ok: false,
-        error: "実行ファイル（--lint --flow）が読んだ中身（flow）を返さない（古い版）。確かめられないので進めない。実行ファイルを更新してください",
+        error: "実行ファイル（--lint --flow）が、読んだ中身（flow）を返しません（古い版です）。確かめられないため、先へ進めません。実行ファイルを更新してください",
       };
     }
     const checks: FlowChecks = {

@@ -50,7 +50,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
         <h2 id="save-review-title">保存する前に変更を確かめる</h2>
         <p className="dim small">読み込んだ時点からの変更です。</p>
         {isEmptyDiff(diff) && (
-          <p id="review-order-only">順序だけ変わった（ノードと線の中身は同じで、ファイルに書く順が変わる）。</p>
+          <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルに書く順が変わります）。</p>
         )}
         {diff.meta.length > 0 && (
           <>
@@ -68,7 +68,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
         <Items title="変えた線" kind="changed-connections" items={diff.changedConnections} />
         <label className="review-skip">
           <input type="checkbox" className="f-review-skip" checked={skip} onChange={(event) => setSkip(event.target.checked)} />
-          次から確かめずに保存する（設定 ccnaviBoard.flowSaveReview で戻せる）
+          次から確かめずに保存する（設定 ccnaviBoard.flowSaveReview で戻せます）
         </label>
         <div className="review-actions">
           <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>

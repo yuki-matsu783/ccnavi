@@ -90,7 +90,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                 ブランチをリモートに合わせるなら checkout -B <ブランチ> <リモート>/<ブランチ>
                 (外れるコミットの変更が行き先に入っていることを確かめてから)
   rebase cherry-pick revert am apply bisect  履歴を書き換えない
-  config clone submodule  利用者に依頼する
+  config clone submodule  ユーザに依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
                 読み取り専用のサブコマンドでも任意コマンドの実行や書き込みに
                 化けるので、値を見ずに一律で拒否する
@@ -119,7 +119,7 @@ esac
 # 列挙して弾く手は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
 # 形で落とす。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
 case "$1" in
--*) reject "サブコマンドより前のオプション ($1) は受け取りません。素の形 ($SELF <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由を利用者に伝えてください。" ;;
+-*) reject "サブコマンドより前のオプション ($1) は受け取りません。素の形 ($SELF <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由をユーザに伝えてください。" ;;
 esac
 
 sub="$1"
@@ -167,16 +167,16 @@ branch)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		--force | --delete=* | --move | --move=* | --set-upstream-to | --set-upstream-to=* | --edit-description)
-			reject "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
+			reject "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るならユーザに依頼してください。"
 			;;
 		--*) ;;
 		-*)
 			case "$arg" in
 			*D*)
-				reject "$arg は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
+				reject "$arg は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいならユーザに依頼してください。"
 				;;
 			*f* | *m* | *u*)
-				reject "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
+				reject "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由をユーザに伝えてください。"
 				;;
 			esac
 			;;
@@ -188,7 +188,7 @@ tag)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-l | --list | --contains | --contains=* | --points-at | --points-at=* | --merged | --no-merged | --sort=* | --format=* | -n | -n[0-9]*) ;;
-		-*) reject "tag は一覧だけ通します ($arg は不可)。タグを作る・消すのは利用者に依頼してください。" ;;
+		-*) reject "tag は一覧だけ通します ($arg は不可)。タグを作る・消すのはユーザに依頼してください。" ;;
 		esac
 	done
 	;;
@@ -199,7 +199,7 @@ remote)
 		-v | --verbose | show | get-url) ;;
 		-*) reject "remote は一覧だけ通します ($arg は不可)。" ;;
 		add | set-url | set-head | set-branches | remove | rm | rename | prune | update)
-			reject "remote $arg は取得先・送信先を書き換えます。利用者に依頼してください。"
+			reject "remote $arg は取得先・送信先を書き換えます。ユーザに依頼してください。"
 			;;
 		esac
 	done
@@ -215,10 +215,10 @@ worktree)
 		# tree_of の探す場所からも外れる（設計 4.1）。
 		#
 		# 書き換えずに止める。打った綴りと起きたことがずれると、記録を読んだ
-		# 人が追えなくなる。
+		# ユーザが追えなくなる。
 		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと飛ばす。
 		# 知らないオプションは通さない。通すと行き先を取り違え、検査そのものが
-		# 意味を失う（2026-09-12 の決定）。
+		# 意味を失う。
 		wt_dest=""
 		wt_skip=0
 		wt_first=1
@@ -238,7 +238,7 @@ worktree)
 			--detach | -d | --force | -f | --checkout | --no-checkout | --lock | \
 				--guess-remote | --no-guess-remote | --track | --no-track | --quiet | -q) ;;
 			-*)
-				reject "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中にワークツリーを作ってしまいます。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
+				reject "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中にワークツリーを作ってしまいます。使いたい形があれば、ユーザに伝えて一覧に足してもらってください。"
 				;;
 			*)
 				if [ -z "$wt_dest" ]; then
@@ -303,7 +303,7 @@ stash)
 	case "$action" in
 	list | show | push | save | pop | apply | -*) ;;
 	drop | clear)
-		reject "stash $action は退避した変更を捨てます。中身を $SELF stash show -p で確かめ、要らないと判断した理由を利用者に伝えてください。"
+		reject "stash $action は退避した変更を捨てます。中身を $SELF stash show -p で確かめ、要らないと判断した理由をユーザに伝えてください。"
 		;;
 	*) reject "stash $action は通しません。使えるのは list / show / push / pop / apply です。" ;;
 	esac
@@ -328,7 +328,7 @@ rm)
 			reject "rm にツリー全体 ($arg) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
 			;;
 		--force)
-			reject "$arg はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてから利用者に伝えてください。"
+			reject "$arg はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてからユーザに伝えてください。"
 			;;
 		--*) ;;
 		-*)
@@ -367,7 +367,7 @@ merge)
 	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
 	# 解こうとする手をラッパースクリプトが止めてしまっては、止めた先に進む道が無くなる。
 	#
-	# 止めるのは、衝突を人が見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
+	# 止めるのは、衝突をユーザが見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
 	# もう一方の変更を黙って落とす。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、落ちたことは差分にも記録にも残らない。
 	prev=""
@@ -454,10 +454,10 @@ push)
 	# 自分が居るブランチを、同じ名前でそのまま送る形だけを通す。レビューは
 	# マージリクエストの実物に結ぶので、そこまではエージェントが自分で運べたほうがよい。
 	#
-	# 通さないのは「戻せなくなる形」と「人の判断を飛び越す形」の 2 つ。
+	# 通さないのは「戻せなくなる形」と「ユーザの判断を飛び越す形」の 2 つ。
 	# 履歴を書き換える force、消す delete、まとめて送る all/mirror/tags、
 	# 別の綴りへ送る refspec（`HEAD:main` が書ける）、そして統合先そのものへの直接の push。
-	# 統合は人がマージリクエストで行う。
+	# 統合はユーザがマージリクエストで行う。
 	push_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
 		reject "いまブランチの上に居ません（detached HEAD）。送る先が決まらないので通しません。"
@@ -465,7 +465,7 @@ push)
 	# 子チケットのワークツリーからは送らない。レビューはマージリクエストの実物に結び、
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
-	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
+	# ある枝ができ、ユーザが見た HEAD と合流した HEAD が食い違う道になる。
 	# 見分けるのは承認済みチケット（各ツリーの `.ccnavi/approved/{doing,done}/<名前>.md` と
 	# レビュー待ちの `wip/proposals/review/<名前>.md`）に `parent:` があるかだけ。
 	# 承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
@@ -478,7 +478,7 @@ push)
 	# 2 つとも実際のパス（symlink を畳んだもの）にそろえてから比べる。WS は論理の pwd から、
 	# push_top は git の実際のパスから作られるので、ワークスペースを symlink 越しに開くと
 	# （macOS の /tmp → /private/tmp など）case に当たらず、検査が丸ごと飛ぶ。
-	# 同じ検査を hook も持つ（ADR-0077）。こちらは 2 重目。
+	# 止める・通すの判定は hook が持ち、同じ検査を hook が先に当てる。こちらは 2 重目。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	[ -z "$push_top" ] || push_top=$(cd "$push_top" 2>/dev/null && { pwd -P -W 2>/dev/null || pwd -P; }) || :
 	push_root=$(cd "$WS" 2>/dev/null && { pwd -P -W 2>/dev/null || pwd -P; }) || push_root="$WS"
@@ -524,7 +524,7 @@ push)
 	fi
 	case "$push_branch" in
 	main | master | develop | release | release/*)
-		reject "$push_branch は統合先です。統合は利用者がマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
+		reject "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
 	push_seen_remote=""
@@ -535,10 +535,10 @@ push)
 			reject "$arg は送る前の検査を飛ばします。検査が落ちるなら原因を直してください。"
 			;;
 		--force-with-lease | --force-with-lease=* | --force-if-includes | -f | --force)
-			reject "$arg はリモートの履歴を書き換えます。送り直したい理由を利用者に伝えてください。"
+			reject "$arg はリモートの履歴を書き換えます。送り直したい理由をユーザに伝えてください。"
 			;;
 		-d | --delete)
-			reject "$arg はリモートのブランチを消します。利用者に依頼してください。"
+			reject "$arg はリモートのブランチを消します。ユーザに依頼してください。"
 			;;
 		--all | --mirror | --tags | --follow-tags | --prune | --atomic)
 			reject "$arg は今のブランチ以外も動かします。通すのは、居るブランチをそのまま送る形だけです。"
@@ -560,19 +560,19 @@ push)
 	done
 	;;
 reset)
-	reject "reset は作業中の変更やコミットを消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。ブランチをリモートに合わせたい（squash マージの後で fast-forward できない、など）なら、$SELF fetch <リモート> <ブランチ> のあと $SELF checkout -B <ブランチ> <リモート>/<ブランチ> を使ってください。書きかけとぶつかるなら git が拒みます。ただし、そのブランチにしか無いコミットは黙って外れます。先に $SELF log --oneline <リモート>/<ブランチ>..HEAD で外れるコミットを見て、それが触ったファイルについて $SELF diff HEAD <リモート>/<ブランチ> -- <ファイル> が空（変更が行き先に入っている）ことを確かめてから打ってください。空でなければ打たずに利用者に伝えてください。"
+	reject "reset は作業中の変更やコミットを消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。ブランチをリモートに合わせたい（squash マージの後で fast-forward できない、など）なら、$SELF fetch <リモート> <ブランチ> のあと $SELF checkout -B <ブランチ> <リモート>/<ブランチ> を使ってください。書きかけとぶつかるなら git が拒みます。ただし、そのブランチにしか無いコミットは黙って外れます。先に $SELF log --oneline <リモート>/<ブランチ>..HEAD で外れるコミットを見て、それが触ったファイルについて $SELF diff HEAD <リモート>/<ブランチ> -- <ファイル> が空（変更が行き先に入っている）ことを確かめてから打ってください。空でなければ打たずにユーザに伝えてください。"
 	;;
 clean)
 	reject "$sub は作業中の変更を消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
 	;;
 rebase | cherry-pick | revert | am | apply | bisect | filter-branch | replace | update-ref | symbolic-ref | reflog | gc | notes)
-	reject "$sub は履歴か参照を書き換えます。通しません。必要な理由を利用者に伝えてください。"
+	reject "$sub は履歴か参照を書き換えます。通しません。必要な理由をユーザに伝えてください。"
 	;;
 config)
-	reject "config は設定を読み書きします。値には資格情報が混ざるので通しません。必要な値は利用者に尋ねてください。"
+	reject "config は設定を読み書きします。値には資格情報が混ざるので通しません。必要な値はユーザに尋ねてください。"
 	;;
 clone | submodule | lfs)
-	reject "$sub は外から中身を持ち込みます。通しません。利用者に依頼してください。"
+	reject "$sub は外から中身を持ち込みます。通しません。ユーザに依頼してください。"
 	;;
 *)
 	reject "$sub はホワイトリストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
@@ -668,7 +668,7 @@ else
 	# サブシェルの中で cd してから打っても防げず、ここで pwd を見ても親の cwd は分からないので、
 	# 起きたときに立て直し方を言う。
 	if [ "$sub" = worktree ] && [ "${action:-}" = remove ] && body | grep -q 'Permission denied'; then
-		printf '案内: ワークツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直します。中にファイルが残っているなら消さずに利用者に報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
+		printf '案内: ワークツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直します。中にファイルが残っているなら消さずにユーザに報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
 	fi
 fi
 

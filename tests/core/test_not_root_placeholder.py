@@ -26,7 +26,7 @@ import re
 import tempfile
 import unittest
 
-from ccnavi import rules
+from ccnavi.policy import rules
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -78,7 +78,7 @@ def rules_file(directory: str, *rule: dict, section: str = "deny") -> str:
     """ルールファイルを 1 枚書いてパスを返す。
 
     置くのは共通層の既定の場所。hook として呼ぶ側は `--rules` を渡せない
-    （診断でだけ有効。ADR-0067）ので、ワークスペースルートの下の既定のパスに要る。
+    （診断でだけ有効な）ので、ワークスペースルートの下の既定のパスに要る。
     直に `rules.load` に渡すだけのテストは、どこに在っても同じ。
     """
     return write(
@@ -263,7 +263,7 @@ class NotRootExpansionTest(unittest.TestCase):
         """観点 14。書いた表記は残り、置き換わるのは翻訳後の式だけ。
 
         既存の `{root}` と同じ扱い（rules.py の `_build` のコメント）。
-        `--explain` と報告が 475 字の展開結果を出すと、人には読めない。
+        `--explain` と報告が 475 字の展開結果を出すと、ユーザには読めない。
         """
         rule_set, _ = rules.load(self.path, absolute(r"C:\Users\u\ccnavi"))
         rule = rule_set.deny[0]
@@ -397,16 +397,16 @@ class NotRootLimitTest(unittest.TestCase):
         self.assertTrue(rule_set.ask[0].compiled.search(absolute(r"C:\anywhere\x.md")))
 
     def test_the_written_message_survives_a_failure(self):
-        """組み立てに失敗しても、人が書いた文面は消えない。
+        """組み立てに失敗しても、ユーザが書いた文面は消えない。
 
         敵対的レビューで見つかった契約違反の回帰テスト。`--explain` と記録は
         書いた表記を出す約束で、それは glob / regex だけでなく文面にも掛かる。
         止められた側へ返す説明は別の欄に持つ。
         """
-        path = rules_file(self.dir.name, outside_rule(message="人が書いた本当の文面"))
+        path = rules_file(self.dir.name, outside_rule(message="ユーザが書いた本当の文面"))
         rule_set, _ = rules.load(path, self.long_root(600))
         rule = rule_set.deny[0]
-        self.assertEqual(rule.message, "人が書いた本当の文面")
+        self.assertEqual(rule.message, "ユーザが書いた本当の文面")
         self.assertIn("組み立てられない", rule.spoken_message())
 
     def test_allow_falls_the_other_way(self):

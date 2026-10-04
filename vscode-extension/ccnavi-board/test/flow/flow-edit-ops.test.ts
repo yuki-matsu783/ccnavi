@@ -1,5 +1,5 @@
 /**
- * フロー編集画面の編集の道具。線を引ける先（`canConnect` / `connect`）、写す・貼る・複製する（`flow-doc.ts`）、
+ * フロー編集画面の編集の道具。線を引ける先（`canConnect` / `connect`）、コピー・貼り付け・複製（`flow-doc.ts`）、
  * 元に戻す履歴（`flow-history.ts`）、読み込んだ時点との見比べ（`flow-diff.ts`）を見る。
  */
 import { test } from "node:test";
@@ -93,7 +93,7 @@ test("CB-T272 写して貼ると id を振り直し、選んだノード同士�
   const clip = copyNodes(doc, ["if-1", "p-1", "end"]);
   assert.ok(clip !== undefined);
   assert.deepEqual(clip.nodes.map((n) => n.id), ["if-1", "p-1", "end"]);
-  // 片方しか写していない線（開始 → 分岐）は写さない
+  // 片方の端しかコピーしていない線（開始 → 分岐）はコピーしない
   assert.deepEqual(clip.connections.map((c) => c.id), ["c2", "c3", "c4"]);
   const pasted = pasteNodes(doc, clip);
   assert.deepEqual(pasted.ids, ["ifElse-1", "prompt-1", "end-1"]);
@@ -108,19 +108,19 @@ test("CB-T272 写して貼ると id を振り直し、選んだノード同士�
     { id: "c-ifElse-1-end-1", from: "ifElse-1", to: "end-1", fromPort: "branch-1", toPort: "input" },
     { id: "c-prompt-1-end-1", from: "prompt-1", to: "end-1", fromPort: "output", toPort: "input" },
   ]);
-  // 中身と知らない欄は深いコピー（元を触っても貼ったものは変わらない）
+  // 中身と知らない欄はディープコピー（元を触っても貼り付けたものは変わらない）
   assert.deepEqual(byId(next, "prompt-1").extra, { keep: true });
   assert.deepEqual(byId(next, "ifElse-1").data, byId(doc, "if-1").data);
   assert.notEqual(byId(next, "ifElse-1").data, byId(doc, "if-1").data);
-  // グループは写していないが、元のグループが残っているので同じグループの中で 40 ずらす
+  // グループはコピーしていないが、元のグループが残っているので同じグループの中で 40 ずらす
   const group = groupOf(doc, byId(doc, "if-1"));
   assert.ok(group !== undefined);
   assert.equal(byId(next, "ifElse-1").parentId, group.id);
   assert.deepEqual(absolutePosition(next, "ifElse-1"), { x: absolutePosition(doc, "if-1").x + 40, y: absolutePosition(doc, "if-1").y + 40 });
-  // 終了は写せる。外に置いて 40 ずらす
+  // 終了はコピーできる。外に置いて 40 ずらす
   assert.equal(byId(next, "end-1").parentId, undefined);
   assert.deepEqual(byId(next, "end-1").position, { x: 490, y: 240 });
-  // 同じものをもう 1 度貼ると、また別の id
+  // 同じものをもう 1 度貼り付けると、また別の id
   const again = pasteNodes(next, clip, { x: 80, y: 80 });
   assert.deepEqual(again.ids, ["ifElse-2", "prompt-2", "end-2"]);
 });
@@ -149,9 +149,9 @@ test("CB-T273 開始は写さない。グループを写すと中のノードも
   // 枠は 40 ずれる。大きさは元のまま
   assert.deepEqual(byId(next, "group-2").position, { x: (group.position as { x: number }).x + 40, y: (group.position as { y: number }).y + 40 });
   assert.deepEqual(byId(next, "group-2").style, group.style);
-  // 中のノード同士の線（分岐の真 → プロンプト）は写る
+  // 中のノード同士の線（分岐の真 → プロンプト）はコピーされる
   assert.deepEqual(connectionsOf(next).slice(4).map((c) => [c.from, c.fromPort, c.to]), [["ifElse-1", "branch-0", "prompt-1"]]);
-  // 元のグループが消えていたら、写した時点の図の上の位置から 40 ずらして外に置く
+  // 元のグループが消えていたら、コピーした時点の図の上の位置から 40 ずらして外に置く
   const clip = copyNodes(doc, ["p-1"]);
   assert.ok(clip !== undefined);
   const gone = removeNode(doc, group.id);
@@ -274,9 +274,9 @@ test("CB-T279 確かめ直しの頼みは番号と読める内容があるとき
   assert.equal(asFlowMessage({ type: "check", seq: 1, doc: { nodes: 1 } }), undefined);
   // 開始が無い: 画面だけなら画面が言い、実行ファイルの答えがあれば（実行ファイルが「start が無い」と言う）言わない
   const noStart = removeNode(doc, "start");
-  assert.ok(flowNotices(noStart).some((n) => /開始（start）のノードが無い/.test(n)));
-  assert.ok(!flowNotices(noStart, { exe: true }).some((n) => /開始（start）のノードが無い/.test(n)));
+  assert.ok(flowNotices(noStart).some((n) => /開始（start）のノードがありません/.test(n)));
+  assert.ok(!flowNotices(noStart, { exe: true }).some((n) => /開始（start）のノードがありません/.test(n)));
   // 開始が 2 つは実行ファイルが言わないので、答えがあっても画面が言う
   const twoStarts = addNode(doc, "start", { x: 0, y: 400 }).doc;
-  assert.ok(flowNotices(twoStarts, { exe: true }).some((n) => /開始（start）のノードが 2 つある/.test(n)));
+  assert.ok(flowNotices(twoStarts, { exe: true }).some((n) => /開始（start）のノードが 2 つあります/.test(n)));
 });

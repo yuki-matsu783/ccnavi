@@ -30,7 +30,7 @@ test("CB-T136 登録した入口を帳面から開く。要求する側は相手
   forgetScreens();
 });
 
-test("CB-T137 登録前に開こうとしたら止める（組み立ての誤りで、利用者の操作では起きない）", () => {
+test("CB-T137 登録前に開こうとしたら止める（組み立ての誤りで、ユーザの操作では起きない）", () => {
   forgetScreens();
   assert.throws(() => screens(), /registerScreens/);
 });

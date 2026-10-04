@@ -4,9 +4,9 @@
  *
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
- * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
+ * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
  * 対象は 3 種（設計 11.2）。共通の設定のルール（`.ccnavi/common/rules.yml`）、
  * ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの設定のルール
@@ -165,7 +165,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     return;
   }
 
-  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間、押しても何も起きないように見えないように。
+  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
   // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviRules", titleOf(target), vscode.ViewColumn.One, {
@@ -251,7 +251,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesRel: string;
   const notices: string[] = [];
   if (target.kind === "workspace") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
@@ -267,13 +267,13 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（ここのルールは 1 件も効いていません）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（このファイルのルールは 1 件も判定に使われていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;
@@ -326,10 +326,10 @@ function registerPanelHandlers(current: PanelState): void {
 
   // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
   // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが届いていなかったらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -445,8 +445,8 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
- * ときと、保存が通って中身が入れ替わったときだけ（ADR-0062）。
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
+ * ときと、保存が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;
@@ -552,7 +552,7 @@ function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesDa
 /**
  * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what` は捨てるもの。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 判定とサンプルはファイルに触らないが、捨てた編集で出した答えを
  * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
@@ -569,7 +569,7 @@ function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToRules);
 }

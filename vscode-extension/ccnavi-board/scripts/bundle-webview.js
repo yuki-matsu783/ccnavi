@@ -7,12 +7,12 @@
 //
 // **画面の一覧は表で持たない。** `src/webview/<名前>/main.tsx` があるものが画面で、出口は
 // `out/webview/<名前>.js`。CSS は同じ置き場の `style.css` が入口で、出口は `out/webview/<名前>.css`。
-// 表にすると、画面を足したときに黙って古くなる
-// （`scripts/test-groups.js` が同じ見つけ方をする。片方だけ直す、が起きないように）。
+// 表にすると、画面を足したときに気づかないうちに古くなる
+// （`scripts/test-groups.js` も同じ見つけ方をする。片方だけ直してしまわないように揃えてある）。
 //
-// 読む側（`src/webview-asset.ts` の `webviewScript` / `webviewStyle`）に渡すのは**拡張子まで込みの
-// `<名前>.js`・`<名前>.css`** で、ここの名前そのものではない（`board-panel.ts` は
-// `webviewScript("board.js")` と書く）。読む側は名前で引くので、画面が増えても直すところは無い。
+// 読む側（`src/webview-asset.ts` の `webviewScript` / `webviewStyle`）に渡すのは**画面の名前**
+// （`board-panel.ts` は `webviewScript("board")` と書く）で、拡張子は読む側が付ける。
+// 読む側は名前で引くので、画面が増えても直すところは無い。
 //
 // CSS は小さくしない（JS は小さくする）。`<style nonce>` に入るぶんは数 KB で、画面のスクリプト
 // （1 本 200KB 強）に比べれば誤差になる。そのぶん、開発者ツールで読める形のまま出て、esbuild が
@@ -82,7 +82,7 @@ esbuild
     format: "iife",
     jsx: "automatic",
     minify: true,
-    // React の開発用の検査（開発者向けの警告と遅い経路）を落とす
+    // React の開発用の検査（開発者向けの警告と遅い経路）を外す
     define: { "process.env.NODE_ENV": '"production"' },
   })
   .then(() =>
@@ -92,7 +92,7 @@ esbuild
       // （esbuild の minify は JS と CSS の両方に掛かる）と、画面のスクリプトが CSS を持ち回らない
       // ようにするため（CSS を挿すのは入れ物を組む側で、画面は nonce を知らない）。
       entryPoints: found.map((screen) => ({ in: screen.style, out: screen.name })),
-      // `@import` 以外で外を指す書き方（url() など）は無い。あれば esbuild が名指しで落とす
+      // `@import` 以外で外を指す書き方（url() など）は無い。あれば esbuild が名指しでエラーにする
       minify: false,
     }),
   )

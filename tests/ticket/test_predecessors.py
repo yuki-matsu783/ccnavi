@@ -1,4 +1,4 @@
-"""先行（`predecessors`）を承認と着手で求める（ADR-0088）の受入テスト。道具を外から呼んで応答だけを見る。
+"""先行（`predecessors`）を承認と着手で求める受入テスト。道具を外から呼んで応答だけを見る。
 
 見るのは 6 つ。
 
@@ -23,7 +23,7 @@ import os
 import shutil
 import unittest
 
-from ccnavi import modes, settings
+from ccnavi.infra import modes, settings
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
 
 
@@ -166,13 +166,13 @@ class PredecessorTest(TicketTest):
     def test_the_board_preview_and_verify_show_why(self):
         self.family()
         self.propose_after("i0001-03", "i0001-01")
-        shown = self.ccnavi("--approve", "--preview", "--json")
+        shown = self.ccnavi("--agree", "--preview", "--json")
         self.assertEqual(shown.returncode, 0, shown.stderr)
         body = json.loads(shown.stdout)
         self.assertEqual(body["batch"], [])
         rejected = {r["ticket"]: r["problems"] for r in body["rejected"]}
         self.assertTrue(any("先行 i0001-01 が閉じていない" in p for p in rejected["i0001-03"]))
-        verified = self.ccnavi("--approve", "--preview", "--verify")
+        verified = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verified.returncode, modes.EXIT_ANSWER_NO, verified.stdout)
         self.assertIn("落ちる", verified.stdout)
         self.assertIn("先行 i0001-01", verified.stdout)
@@ -193,7 +193,10 @@ class PredecessorTest(TicketTest):
     # ---- 3. 着手
 
     def test_start_refuses_a_hand_moved_child_whose_predecessor_is_open(self):
-        """置き場を手で動かして承認した子（ADR-0058）は承認の検査を通らない。着手が同じ検査で止める。"""
+        """置き場を手で動かして承認した子は承認の検査を通らない。着手が同じ検査で止める。
+
+        承認は置き場で決まるので、`doing/` へ手で動かしただけでも承認済みになる。
+        """
         self.family(review=(False, False))
         self.propose(
             "i0001-03", parent="i0001", phase=1, allow=("src/c/*",), predecessors=("i0001-01",)
@@ -215,7 +218,7 @@ class PredecessorTest(TicketTest):
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
 
     def test_start_refuses_when_the_predecessor_was_reopened_after_approval(self):
-        """承認のときは done/ だった先行を人が doing/ へ戻した（再開）。着手はもう一度見る。"""
+        """承認のときは done/ だった先行をユーザが doing/ へ戻した（再開）。着手はもう一度見る。"""
         self.family(review=(False, False))
         self.finish("i0001-01")
         self.propose_after("i0001-03", "i0001-01")
@@ -342,19 +345,20 @@ class PredecessorTest(TicketTest):
         # リダイレクトは ccnavi ディレクトリの守りが止める。
         self.assertEqual(bash("echo x > .ccnavi/approved/doing/i0001-03.md"), "deny")
         # 書き込み先を読めないコマンド（sed -i）は何も言われずに通ることはない。
-        # 聞ける者が居る権限モードでは Claude Code が利用者に聞き（ccnavi は判定を出さない）、
+        # 聞ける者が居る権限モードでは Claude Code がユーザに聞き（ccnavi は判定を出さない）、
         # 居なければ ccnavi が断る（judge.undeclared_verdict）。
-        # 書かれても実行後の監視が書き換えとして言う（ADR-0075）。
+        # 書かれても実行後チェックが書き換えとして言う。副命令が書く欄のほかが変わった内容に
+        # なるため。
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))
         self.assertEqual(bash(sed, "bypassPermissions"), "deny")
-        # 承認を自分で出す経路（端末の外からの --approve / --yes）も止まる。
+        # 承認を自分で出す経路（端末の外からの --agree / --yes）も止まる。
         approve = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             guard_ticket_approval="enable",
-            command="ccnavi --approve --yes i0001-03",
+            command="ccnavi --agree --yes i0001-03",
         )
         self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(approve))
         # サブエージェントは着手そのものを打てない。

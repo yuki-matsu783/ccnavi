@@ -273,7 +273,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     existing.items = pairs;
   } else {
     // 無い、対応表でない、`{}` の 1 行書き（flow）は、ブロックの対応表に置き換える。
-    // flow のまま中身を入れると全部が 1 行になり、以後の差分とコメントの置き場が壊れる。
+    // flow のまま中身を入れると全部が 1 行になり、以後の差分もコメントの置き場も行単位で扱えなくなる。
     const map = new YAMLMap();
     map.items = pairs;
     top.set("phases", map);

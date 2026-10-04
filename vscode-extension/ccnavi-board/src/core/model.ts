@@ -8,14 +8,14 @@
 export const BOARD_VERSION = 1;
 
 /**
- * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`、ADR-0055）だが、
+ * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
  * 列は 未着手（`todo/`）/ 作業中（`approved/doing/` と `review/`）/ 完了（`approved/done/`）/ 取り消し
  * （`approved/done/` で `cancelled_at` を持つ）の 4 つ。レビュー待ちは列ではなくカードの属性で分かる
  */
 export type ProposalState = "todo" | "doing" | "done" | "cancelled";
 /**
  * 承認済みチケットの今。`open` は `.ccnavi/approved/doing/`、`review` は `wip/proposals/review/`（承認済みのまま
- * 人のレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は
+ * ユーザのレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は
  * 承認待ちの提案だけ
  */
 export type CopyStatus = "open" | "review" | "closed" | "none";
@@ -57,9 +57,9 @@ export interface SeenInJson {
 }
 
 /**
- * 子チケットのフロー（設計 9.3.1、ADR-0085）。親は null。
+ * 子チケットのフロー（設計 9.3.1）。親は null。
  * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
- * 拡張は写すだけで、`started_at` などから組み直さない（ADR-0035）。
+ * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
   /** 読む先の絶対パス（優先するツリーの版、無ければ子のワークツリーの版。どちらにも無ければ優先するツリーの側の表記） */
@@ -75,7 +75,7 @@ export interface FlowJson {
 }
 
 /**
- * 状態の履歴の 1 行（ADR-0086）。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
+ * 状態の履歴の 1 行。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
  * 履歴は補助で、状態は置き場（`copy` / `proposal`）で決まる。拡張は並べるだけで、ここから状態を組み直さない。
  */
 export interface HistoryEntryJson {
@@ -98,14 +98,14 @@ export interface HistoryEntryJson {
 }
 
 /**
- * 満たしていない先行 1 本（ADR-0088）。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
- * 求める。その答えを実行ファイルが出し、拡張は写すだけ（先行の置き場から組み直さない）。
+ * 満たしていない先行 1 本。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
+ * 求める。その答えを実行ファイルが出し、拡張はそのまま受け取るだけ（先行の置き場から組み直さない）。
  */
 export interface PredecessorUnmetJson {
   readonly ticket: string;
   /** `todo` / `doing` / `review`（閉じれば満たす）、`cancelled` / `missing` / `scattered`（待っても満たさない） */
   readonly state: string;
-  /** 人向けの言葉（「作業中（doing/）」など）。実行ファイルが付ける */
+  /** ユーザ向けの言葉（「作業中（doing/）」など）。実行ファイルが付ける */
   readonly label: string;
 }
 
@@ -122,7 +122,7 @@ export interface TicketJson {
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /**
-   * 空でなければ「読めるが信頼できない」理由（ADR-0058）。判定はこのチケットの
+   * 空でなければ「読めるが信頼できない」理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。判定はこのチケットの
    * ワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`copy.status` は
    * `open` のままなので、止まっていることはこの欄でしか分からない。
    */
@@ -156,7 +156,7 @@ export interface PhaseJson {
   readonly marks: Readonly<Record<string, Record<string, unknown>>>;
   readonly review_required: boolean;
   readonly gate_closed: boolean;
-  /** 依頼を出したのに止まったまま（人のレビュー待ち）。判定が出した値で、拡張は組み直さない */
+  /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。判定が出した値で、拡張は組み直さない */
   readonly review_waiting: boolean;
   readonly deferred: boolean;
   readonly review_at: number | null;
@@ -353,9 +353,9 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     rel: str(raw.rel),
     tree: str(raw.tree),
     exists: raw.exists === true,
-    // 欄が欠けていたら書かない側にする（リンクかを確かめられない）
+    // 欄が欠けていたら書かない扱いにする（リンクかを確かめられない）
     linked: raw.linked !== false,
-    // 欄が欠けていたら閉じる側にする（止まっているかを確かめられないので、書かせない）
+    // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
   };
 }

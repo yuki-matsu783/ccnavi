@@ -89,8 +89,8 @@ Write で書く  -> deny（builtin-guard-common-layer。conf が指す場所を�
 「同じ宣言が経路で食い違うと、守っていると言いながら回避できる形が残る」として無くしたのと
 同じ形なので、こちらも作らない。
 
-穴に届くのは、人が `settings.json` の hook の command に `--rules <別の場所>` と書き足した
-ときだけで、滅多にない。ただし穴に当たるのは、まさにその設定を必要とした人になる。
+穴に届くのは、ユーザが `settings.json` の hook の command に `--rules <別の場所>` と書き足した
+ときだけで、滅多にない。ただし穴に当たるのは、まさにその設定を必要としたユーザになる。
 
 ADR-0067 のあとは、その hook の command から動かす手段も閉じた。それでも `common_shell_clause` は
 残してある。診断（`--test`）が判定と同じ関数を通るので、そこで動かした先を守らないと
@@ -102,7 +102,7 @@ ADR-0067 のあとは、その hook の command から動かす手段も閉じ�
   `rules.yml` を共有する、読み取り専用の場所に置く、といった使い方は、hook の command に
   フラグを書き足すか、シンボリックリンクに頼ることになる（ADR-0067 でフラグの手段も
   閉じたので、残るのはシンボリックリンクだけ）
-- 配布済みの `settings.json` に `CCNAVI_RULES` を書いて既定の外を指していた利用者が
+- 配布済みの `settings.json` に `CCNAVI_RULES` を書いて既定の外を指していたユーザが
   居た場合、更新後は何も知らせずに `.ccnavi/common/rules.yml` を読む。値が無視されたことは
   どこにも出ない。効かなくなった env が `settings.json` に残っていることを `--lint` で知らせるかは決めていない
 - `tests/sh/test_setup.py` の `REQUIRED_ENV` が 1 本減り、配る `settings.json` に

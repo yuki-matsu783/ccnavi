@@ -90,7 +90,7 @@ class HandoverTest(unittest.TestCase):
                 self.assertEqual("handover", record["decision"])
 
     def test_handover_is_not_counted_as_asking_the_user(self):
-        """渡した回と人に聞いた回は、記録の上で混ざらない。"""
+        """渡した回とユーザに聞いた回は、記録の上で混ざらない。"""
         _, handed = run("auto")
         _, asked = run("someFutureMode")
         self.assertNotEqual(handed["decision"], asked["decision"])
@@ -163,7 +163,7 @@ class RulesStillWinTest(unittest.TestCase):
                 self.assertEqual("deny", decision_of(self, result))
 
     def test_an_explicit_ask_is_never_handed_over(self):
-        """ルールが ask と書いた場所は、auto でも人に出す。意図した確認ポイント。"""
+        """ルールが ask と書いた場所は、auto でもユーザに出す。意図した確認ポイント。"""
         result, record = run("auto", command="git commit -m x")
         self.assertEqual("ask", decision_of(self, result))
         self.assertEqual("RULE_ASK", record["code"])

@@ -7,8 +7,8 @@
 19. `main` の上のツリーはコミットして push しない（0、標準エラーにブランチ名）
 20. push が落ちると 1、コミットは残る
 21. detached のツリーは飛ばす
-22. `ccnavi-approve.sh` が承認のあとコミットして push する
-23. `ccnavi-approve.sh` は並べた識別子を `--approve` の後ろに渡し、`-` で始まる語と空の語は断る
+22. `ccnavi-agree.sh` が承認のあとコミットして push する
+23. `ccnavi-agree.sh` は並べた識別子を `--agree` の後ろに渡し、`-` で始まる語と空の語は断る
 
 ワークスペースは一時ディレクトリに git と bare のリモートで作る。承認そのものは
 ccnavi の実行ファイルの代わりに、承認済みチケットを 1 枚置くだけの sh（stub）で済ませる。
@@ -35,7 +35,7 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 PUSH_SCRIPTS = ("ccnavi-push-approved.sh", "ccnavi-common.sh")
-APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-approve.sh")
+APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
 NOTHING = "コミットして push する承認済みチケットは無い。"
@@ -323,8 +323,8 @@ class PushApprovedTest(Workspace):
     def test_carries_the_place_named_by_ccnavi_approved(self):
         """12. `CCNAVI_TICKETS_APPROVED` を既定と違うパスにすると、その置き場をコミットする。
 
-        既定の置き場（`.ccnavi/approved`）はコミットしない。環境変数の名前は `ccnavi/settings.py` の
-        `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
+        既定の置き場（`.ccnavi/approved`）はコミットしない。環境変数の名前は
+        `ccnavi/infra/settings.py` の `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
         """
         other = "approved/tickets"
         tree = self.worktree("i0001")
@@ -521,7 +521,7 @@ class PushApprovedTest(Workspace):
         for word in ("-x", "../i0001", "a/b", ""):
             wrong = self.push(word)
             self.assertEqual(wrong.returncode, 2, word + wrong.stdout + wrong.stderr)
-        # 取り込み済みでない親子チケットの名指しはコミットしない（今のまま、人がコミットする）。
+        # 取り込み済みでない親子チケットの名指しはコミットしない（今のまま、ユーザがコミットする）。
         tree = self.worktree("i0001")
         self.place(tree)
         named = self.push("i0001")
@@ -537,7 +537,7 @@ class PushApprovedTest(Workspace):
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class ApproveCarriesTest(Workspace):
-    """22. `ccnavi-approve.sh` は承認のあと `ccnavi-push-approved.sh` で
+    """22. `ccnavi-agree.sh` は承認のあと `ccnavi-push-approved.sh` で
     コミットして push する（設計 1.4）。
     """
 
@@ -553,7 +553,7 @@ class ApproveCarriesTest(Workspace):
             CCNAVI_BIN_PATH=posix(self.stub),
             **{k: posix(v) if k in ("STUB_TREE", "STUB_ARGS") else v for k, v in extra.items()},
         )
-        return self.run_sh("ccnavi-approve.sh", *ids, env=env)
+        return self.run_sh("ccnavi-agree.sh", *ids, env=env)
 
     def received(self, path):
         with open(path, encoding="utf-8") as f:
@@ -570,14 +570,14 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
         self.assertEqual(got[:1], ["--root"], got)
-        self.assertEqual(got[2:], ["--approve", "i0002-03", "i0002-04"], got)
+        self.assertEqual(got[2:], ["--agree", "i0002-03", "i0002-04"], got)
 
     def test_approve_without_ids_takes_all_pending(self):
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
         result = self.approve(STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.received(args)[2:], ["--approve"])
+        self.assertEqual(self.received(args)[2:], ["--agree"])
 
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
@@ -607,7 +607,7 @@ class ApproveCarriesTest(Workspace):
         args = os.path.join(self._tmp.name, "args")
         result = self.approve("help", "i0002-01", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.received(args)[2:], ["--approve", "help", "i0002-01"])
+        self.assertEqual(self.received(args)[2:], ["--agree", "help", "i0002-01"])
         refused = self.approve("--help", "i0002-01")
         self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 

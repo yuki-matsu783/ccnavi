@@ -1,6 +1,6 @@
 """見本をぜんぶ判定に掛けて、期待と食い違ったものを並べる。
 
-`/ccnavi-config` スキルが呼ぶ。人が直接打ってもよい。
+`/ccnavi-config` スキルが呼ぶ。ユーザが直接打ってもよい。
 
     uv run python tools/check_rules.py [ルールファイル]
 
@@ -19,35 +19,48 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# 共通層のルールと見本の既定の置き場（ADR-0042）。
+# 共通層のルールと見本の置き場。
 RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
 SAMPLES = os.path.join(ROOT, ".ccnavi", "common", "rule-samples.yml")
 
 
+def arguments(rules_path: str = RULES) -> list[str]:
+    """`python -m ccnavi` に渡す引数。
+
+    全件テスト（tests/core/test_check_rules.py）も同じものを使う。
+
+    `--root` は区切りを `/` に揃えて渡す。見本の `/repo` は `--root` の表記にそのまま
+    置き換わるので、Windows の `\\` が残ると Bash の見本でエスケープとして読まれる。
+    ccnavi の側はルートを realpath と normcase で解いてから使うので、`C:/...` でも同じ場所になる。
+    """
+    return [
+        "--root",
+        ROOT.replace("\\", "/"),
+        "--rules",
+        rules_path,
+        # 見るのはルールだけ。承認済みチケットと状態ディレクトリは外し、記録も残さない。
+        "--approved",
+        "",
+        "--state",
+        "",
+        "--log",
+        "",
+        "--test-samples",
+        SAMPLES,
+    ]
+
+
+def environment() -> dict[str, str]:
+    """`CCNAVI_*` を外した環境。走らせたユーザの dry-run や設定の差し替えを判定に入れない。"""
+    return {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+
+
 def main() -> int:
     rules_path = sys.argv[1] if len(sys.argv) > 1 else RULES
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     done = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "ccnavi",
-            "--root",
-            ROOT,
-            "--rules",
-            rules_path,
-            # 見るのはルールだけ。承認済みチケットと状態ディレクトリは外し、記録も残さない。
-            "--approved",
-            "",
-            "--state",
-            "",
-            "--log",
-            "",
-            "--test-samples",
-            SAMPLES,
-        ],
+        [sys.executable, "-m", "ccnavi", *arguments(rules_path)],
         cwd=ROOT,
-        env=environment,
+        env=environment(),
     )
     return done.returncode
 

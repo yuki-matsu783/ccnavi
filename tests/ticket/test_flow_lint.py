@@ -1,4 +1,4 @@
-"""`ccnavi --lint --flow <パス>` の受入テスト（ADR-0035・ADR-0085）。
+"""`ccnavi --lint --flow <パス>` の受入テスト。
 
 VS Code 拡張のフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
 これに掛け、正しいかの答えを実行ファイルから受ける。見るのは 5 つ。
@@ -21,7 +21,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi import flow
+from ccnavi.tickets import flow
 from tests.inproc import run_ccnavi
 from tests.ticket.test_flow import WORKFLOW_YAML
 from tests.ticket.test_ticket import write
@@ -58,7 +58,7 @@ class FlowLintTest(unittest.TestCase):
 
     def test_a_readable_flow_has_no_flow_problem(self):
         self.assertEqual(self.flow_problems(self.file(WORKFLOW_YAML)), [])
-        # 人向けの本文も、確かめたフローを名乗る。
+        # ユーザ向けの本文も、確かめたフローの名前を出す。
         path = self.file(WORKFLOW_YAML)
         text = run_ccnavi(["--root", self.root, "--lint", "--flow", path])
         self.assertIn(f"フロー: {path}", text.stdout)

@@ -10,7 +10,7 @@ levels:
   high: 40
   critical: 70
 factors:
-  # 大きい差分は人が見る
+  # 大きい差分はユーザが見る
   - id: big-diff
     points: 25
     lines_over: 300
@@ -75,7 +75,7 @@ test("CB-T75 欄を変えても他の項目のコメントは残り、数は数�
   });
   assert.match(out, /^# 先頭の説明。消えてはいけない。\n/);
   assert.match(out, /  high: 45\n/);
-  assert.match(out, /  # 大きい差分は人が見る\n  - id: big-diff/);
+  assert.match(out, /  # 大きい差分はユーザが見る\n  - id: big-diff/);
   assert.match(out, /  - id: ci\n    points: 40\n    glob: "\.github\/\*\*"\n    message: CI に触った\n/);
   assert.doesNotMatch(out, /max:/);
   assert.match(out, /judge: テストの無い振る舞いの変更を含むか\n    message: テスト無し\n/);

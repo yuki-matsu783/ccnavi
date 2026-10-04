@@ -12,7 +12,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi import shellread
+from ccnavi.infra import shellread
 from tests import ROOT, common_path, fixture_workspace
 from tests.inproc import run_ccnavi
 
@@ -109,7 +109,7 @@ class VerdictTest(unittest.TestCase):
         self.assertIn("git push", out["additionalContext"])
 
     def test_disableは何も判定しない(self):
-        # disable は起動した人の環境からしか反映されない。フラグからは反映されない。
+        # disable は起動したユーザの環境からしか反映されない。フラグからは反映されない。
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_MODE"] = "disable"
         result = run_ccnavi(
@@ -162,7 +162,7 @@ class ReasonTest(unittest.TestCase):
         self.assertIn("rule: dotenv", got[0])
 
     def test_複数返った理由は一件ずつ単独で読んで成立する(self):
-        # 同じ出来事に複数の判定が同時に当たるとき、そのうちどれが利用者の目に
+        # 同じ出来事に複数の判定が同時に当たるとき、そのうちどれがユーザの目に
         # 入るかは決まらない。上の 1 行を下の全部が参照する形は、1 件だけが
         # 切り出されて見えた時点で意味を失う。
         got = reasons(self, run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env")))
@@ -176,7 +176,7 @@ class ReasonTest(unittest.TestCase):
 
     def test_読めなかった判定は件ごとにそう名乗る(self):
         # 読めなかったという断りは、1 回だけ先頭に置くと、その下の 1 件だけを
-        # 読んだ人には届かない。届かなかった人は、書いた覚えのないコマンドを
+        # 読んだユーザには届かない。届かなかったユーザは、書いた覚えのないコマンドを
         # 実行したと告げられたことになる。
         got = reasons(
             self,
@@ -190,7 +190,7 @@ class ReasonTest(unittest.TestCase):
                 self.assertIn("raw text", part, "読めたときと同じ文面になっている")
 
     def test_理由は他の判定の結果に言及しない(self):
-        # 「上の」「下の」で他の件を指した時点で、1 件だけ読んだ人には
+        # 「上の」「下の」で他の件を指した時点で、1 件だけ読んだユーザには
         # 指した先が無い文になる。
         text = verdict(self, run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env")))[
             "permissionDecisionReason"

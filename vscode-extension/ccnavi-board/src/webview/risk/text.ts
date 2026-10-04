@@ -1,7 +1,7 @@
 /**
  * リスク管理画面に出す言葉。要約の文、欄の名前、絞り込みが当てる文字列。
  *
- * 点は数えない（ADR-0035）。ここが作るのは「この項目はどう当たるか」を読める語順に並べた文だけで、
+ * 点は数えない。ここが作るのは「この項目はどう当たるか」を読める語順に並べた文だけで、
  * 何点になるかは実行ファイルが子を閉じるときに出す。
  */
 import { KIND_LABELS, type FactorForm, type FactorKind } from "../../core/risk-view.js";
@@ -56,9 +56,9 @@ export function summaryId(factor: FactorForm): string {
   return factor.id === "" ? "（id 未設定）" : factor.id;
 }
 
-/** 要約の点。未設定なら横棒 */
+/** 要約の点。未設定なら「（未設定）」と言う */
 export function summaryPoints(factor: FactorForm): string {
-  return factor.points === "" ? "—" : `${factor.points} 点`;
+  return factor.points === "" ? "（未設定）" : `${factor.points} 点`;
 }
 
 /** 加点条件と値をツールチップに出す文 */
@@ -69,10 +69,13 @@ export function kindTitle(factor: FactorForm): string {
 /**
  * 絞り込みが当てる文字列。**画面に出ている語（加点条件のラベルと要約の文）でも、キーの表記
  * （`lines_over` など）でも当たる。** 要約に出る文をそのまま含めるので、加点条件を変えれば
- * 当たる語も変わる。
+ * 当たる語も変わる。ただし空の欄の代わりに出す断り（「（id 未設定）」「（未設定）」「（基準 未設定）」など）は
+ * 書いてある値ではないので含めない。「未設定」で探しても、空の欄がある項目には当たらない。
  */
 export function findText(factor: FactorForm): string {
-  const summary = summaryId(factor) + summaryPoints(factor) + describe(factor).map((part) => part.text).join("") + factor.message;
+  const points = factor.points === "" ? "" : summaryPoints(factor);
+  const described = factor.value === "" ? "" : describe(factor).map((part) => part.text).join("");
+  const summary = factor.id + points + described + factor.message;
   return `${factor.id} ${factor.kind} ${KIND_LABELS[factor.kind].label} ${summary}`.toLowerCase();
 }
 

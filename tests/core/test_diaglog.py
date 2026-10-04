@@ -1,4 +1,4 @@
-"""診断ログ（ccnavi/diaglog.py）と、その後始末（prune._prune_diag）。
+"""診断ログ（ccnavi/records/diaglog.py）と、その後始末（prune._prune_diag）。
 
 見るのは 6 つ。
 
@@ -8,10 +8,11 @@
 3. レベルの絞り込み。CCNAVI_LOG_LEVEL（大文字小文字を問わない）、空と読めない値は INFO
 4. 置き場は `<root>/logs/diag/<出どころ>.log`。無ければ作る。root が無ければ書かない
 5. 書けないときは何も出さずに捨てる。標準出力にも標準エラーにも何も出さない。書く前に
-   mask_userinfo（3 つの言語で共通の伏せ字）と redact を通す
+   mask_userinfo（3 つの言語で共通の、資格情報の伏せ方）と redact を通す
 6. prune は保持日数を過ぎた診断ログを消し、上限を超えたものをローテートする。dry_run は本番と
    同じ結果を示す
-7. リンク（logs・logs/diag・書き先）を辿らない。使えない字の出どころでは書かない。ファイルは 0600
+7. リンク（logs・logs/diag・書き込み先）をたどらない。使えない字の出どころでは書かない。
+   ファイルは 0600
 
 sh と拡張が同じ行を出すことは tests/sh/test_diaglog_sh.py が見る。
 """
@@ -29,7 +30,7 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi import diaglog, prune
+from ccnavi.records import diaglog, prune
 
 # 時刻・レベル・出どころ[pid] の頭。
 HEAD = re.compile(

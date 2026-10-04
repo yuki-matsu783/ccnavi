@@ -1,4 +1,5 @@
-"""状態の履歴（ADR-0086）の受入テスト。道具を外から呼んで、状態の履歴のファイルと応答を見る。
+"""状態の履歴（チケットごとの追記専用のファイル。状態の正は置き場のまま）の受入テスト。
+道具を外から呼んで、状態の履歴のファイルと応答を見る。
 
 見るのは 5 つ。
 
@@ -6,7 +7,7 @@
 2. マーカーの履歴の行は親に残ること（依頼・レビュー済み・終わりの告知・開き直し）
 3. 書けなくても状態は動き、書けなかったことは警告として出ること
 4. ボードの JSON に新しい側が載ること
-5. 状態の履歴のファイルを、実行後の監視が「エージェントの書き込み」として報告しないこと
+5. 状態の履歴のファイルを、実行後チェックが「エージェントの書き込み」として報告しないこと
 
 道具は並行するチケットの受入テスト（test_ticket.TicketTest）のものを借りる。借りるだけで、
 あちらのテストはここでは走らせない（`load_tests`）。
@@ -19,7 +20,7 @@ import os
 import re
 import unittest
 
-from ccnavi import history
+from ccnavi.tickets import history
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
 
@@ -90,11 +91,11 @@ class HistoryTest(TicketTest):
         self.assertEqual(last["reason"], "要らなくなった")
 
     def test_a_board_approval_says_board(self):
-        """ボードの `--approve --yes` は経路 board で残る。"""
+        """ボードの `--agree --yes` は経路 board で残る。"""
         self.propose("i0001", allow=("src/*",))
-        shown = self.ccnavi("--approve", "--preview", "--json")
+        shown = self.ccnavi("--agree", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
-        placed = self.ccnavi("--approve", "--yes", "i0001", "--digest", digest, "--json")
+        placed = self.ccnavi("--agree", "--yes", "i0001", "--digest", digest, "--json")
         self.assertEqual(placed.returncode, 0, placed.stdout + placed.stderr)
         self.assertEqual(self.kinds("i0001"), [("approved", "todo", "doing", "board")])
 
@@ -184,8 +185,10 @@ class HistoryTest(TicketTest):
         self.assertTrue(any("i0001-01 の履歴" in p for p in board["problems"]), board["problems"])
 
     def test_the_post_monitor_does_not_report_the_history_it_wrote(self):
-        """`ticket start` が足した履歴の行は、
-        実行後の監視が保護領域の変更として報告しない（ADR-0075）。
+        """`ticket start` の履歴の行は、
+        実行後チェックが保護領域の変更として報告しない。
+
+        実行後チェックは、副命令の書き込みを正規化した内容で見分けて外す。
         """
         self.family_without_starting()
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
@@ -227,7 +230,7 @@ class HistoryTest(TicketTest):
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         write(os.path.join(self.approved, "events"), "ディレクトリではない\n")
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         for name in ("i0001", "i0001-01", "i0001-02"):
             self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", name + ".md")))

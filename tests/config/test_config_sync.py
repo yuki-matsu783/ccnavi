@@ -1,4 +1,7 @@
-"""着手の前に共通層でプロジェクトの層を上書きする（設計 11.12、ADR-0084）。
+"""着手の前に共通層でプロジェクトの層を上書きする（設計 11.12）。
+
+共通層は各プロジェクトへ配る定義で、元のファイルはプロジェクトの `.ccnavi/config/`。
+プロジェクト向けの親の `ticket start` で、違うファイルを共通層の中身で上書きする。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通層は
 rules / phases / risks の 3 本を持ち、lib はそれぞれ別の中身を持つ。app は層を持たない。
@@ -8,7 +11,7 @@ rules / phases / risks の 3 本を持ち、lib はそれぞれ別の中身を�
 1. 親の `ticket start` が、共通層にあるファイルだけを親のワークツリーへ写し、マーカーを置く
 2. 子の着手とワークスペース自身の作業では写さない
 3. 最初のレビューの依頼の頭に載り、2 回目からは載らない
-4. 写した書き込みを、実行後の監視とバックアップと復元が戻さず、報告もしない。写した後に
+4. 写した書き込みを、実行後チェックとバックアップと復元が戻さず、報告もしない。写した後に
    手を入れたものは今までどおり扱う
 """
 
@@ -18,7 +21,8 @@ import json
 import os
 from unittest import mock
 
-from ccnavi import configsync, ops, phase, risk, settings
+from ccnavi.infra import settings
+from ccnavi.tickets import configsync, ops, phase, risk
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
@@ -81,11 +85,11 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertEqual(mark["notified"], "")
 
     def test_the_start_c1_carries_the_synced_layer(self):
-        """D34: C1 の書いたパスの一覧（基点は親のワークツリー）で、着手のコピーは外でも通す。"""
+        """C1 の書いたパスの一覧（基点は親のワークツリー）で、着手のコピーは外でも通す。"""
         write(self.risk, COMMON_SCRIPT_RISK)
         write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
         # 取り込み済みの親子チケット（同期状態がある）
-        # の承認済みチケットは親のワークツリーに在る（2c）。提案を親の
+        # の承認済みチケットは親のワークツリーに在る。提案を親の
         # ワークツリーに書いて承認し、それから同期状態を置く。
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         text = ticket_text("i0001", project="lib", allow=SCOPE)
@@ -386,7 +390,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertEqual(read(config_of(tree, "rules")), before)
 
     def test_uncommitted_edits_stop_the_start(self):
-        """写す先に未コミットの変更があれば、人の書きかけを上書きしないよう止める。"""
+        """写す先に未コミットの変更があれば、ユーザの書きかけを上書きしないよう止める。"""
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
@@ -439,7 +443,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertIn("中身が変わった識別子: credentials", started.stdout)
 
     def test_a_parent_without_review_cannot_close_until_a_human_saw_it(self):
-        """レビューの無い親は、人が端末で見たと残すまで閉じられない。"""
+        """レビューの無い親は、ユーザが端末で見たと残すまで閉じられない。"""
         self.start_parent()
 
         refused = self.ccnavi("ticket", "finish", "i0001")
@@ -455,7 +459,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
 
     def test_config_synced_is_denied_to_the_agent(self):
-        """エージェントが Bash で打つ形は、人の判断の経路と同じ組み込みの deny が止める。"""
+        """エージェントが Bash で打つ形は、ユーザの判断の経路と同じ組み込みの deny が止める。"""
         rule = phase.ticket_approval_rule("", self.ws)
         self.assertIsNotNone(rule.compiled.search("ccnavi --config-synced i0001"))
 
@@ -546,7 +550,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertTrue(os.path.islink(target))
 
     def test_writing_back_after_a_human_fix_is_not_exempt(self):
-        """写した分をコミットしたあと人が直したら、共通層の中身へ戻す書き込みは外さない。"""
+        """写した分をコミットしたあとユーザが直したら、共通層の中身へ戻す書き込みは外さない。"""
         conf = self.settings()
         tree, _ = self.start_parent()
         target = config_of(tree, "rules")

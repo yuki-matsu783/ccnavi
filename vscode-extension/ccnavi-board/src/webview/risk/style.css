@@ -4,7 +4,7 @@
  * ここに 1 行足す。
  *
  * 束ねるのは `scripts/bundle-webview.js`（出口は `out/webview/risk.css`）。拡張ホストはそれを読んで
- * `<style nonce>` に流し込む（`src/core/risk-render.ts`）。ADR-0066。
+ * `<style nonce>` に流し込む（`src/core/risk-render.ts`）。
  */
 @import "../styles/page.css";
 @import "../styles/list.css";

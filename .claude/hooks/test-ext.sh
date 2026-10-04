@@ -49,7 +49,7 @@ esac
 # mark-ext.sh が書き残している。
 [ -s "$files" ] || exit 0
 
-# node が無い機械では回せない。モデルが直せることではないので、差し戻さずに人へ言う。
+# node が無い機械では回せない。モデルが直せることではないので、差し戻さずにユーザへ言う。
 if ! command -v node >/dev/null 2>&1; then
 	printf 'ccnavi: node が無いので拡張のテストを回していません（要るのは Node 22）。\n' >&2
 	rm -f "$files"
@@ -93,7 +93,7 @@ while IFS= read -r root; do
 	status=$?
 	[ "$status" = 0 ] && continue
 	# 3 は「node_modules が無い」など環境が足りない側。テストは落ちていないので、
-	# 差し戻して「落ちたテストを直せ」と言うのは嘘になる。人へ回す。
+	# 差し戻して「落ちたテストを直せ」と言うのは嘘になる。ユーザへ回す。
 	if [ "$status" = 3 ]; then
 		notready=$out
 		continue
@@ -128,7 +128,7 @@ tried=$((tried + 1))
 if [ "$tried" -gt "$MAX" ]; then
 	rm -f "$counter" "$files"
 	# ここは exit 0 なのでモデルには届かない。届けると差し戻しと同じことになる。
-	# 上限の意味は「機械の往復をやめて人に返す」なので、宛先は人でよい。
+	# 上限の意味は「機械の往復をやめてユーザに返す」なので、宛先はユーザでよい。
 	printf 'ccnavi: %s のテストが落ちたまま %s 回差し戻したので、これ以上は止めません。\n' \
 		"$failed" "$MAX" >&2
 	printf '%s\n' "$(printf '%s' "$output" | tail -20)" >&2

@@ -14,7 +14,7 @@ export type Severity = "error" | "warn";
 
 export interface LintProblem {
   readonly severity: Severity;
-  /** 人向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` など。ファイル全体への苦情なら空 */
+  /** ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` など。ファイル全体への苦情なら空 */
   readonly where: string;
   readonly detail: string;
 }
@@ -130,7 +130,7 @@ export const FLOW_WHERE = "(flow)";
 /**
  * 渡したフローについての苦情。`where` が `(flow)` のもの。フロー編集画面はこれだけを読む
  * （ほかの設定の苦情でフローの保存を止めない）。読めるか・形が正しいかの答えは実行ファイルが出し、
- * 拡張は並べるだけ（ADR-0035）
+ * 拡張は並べるだけ
  */
 export function problemsOfFlow(lint: LintJson): LintProblem[] {
   return lint.problems.filter((p) => p.where === FLOW_WHERE);

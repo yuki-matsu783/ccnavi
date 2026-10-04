@@ -1,18 +1,18 @@
 /**
- * 段階 5 のレビューで直したもの（ADR-0093 の 11.9.1）。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
+ * GitLab 対応のレビューで直したもの。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
  * - 応答が落ちた書き込みの受け直し（PROBE-2・3）: 自分のコミットを「書いた中身と親の組」で見分けたときだけ受け直す。
- *   見分けられなければ人の対応に切り替える
+ *   見分けられなければユーザの対応に切り替える
  * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは打ち消さない）
- * - 事後確認と打ち消しの途中でホストが落ちたら、書いたが確認できなかったとして人の対応に切り替える
+ * - 事後確認と打ち消しの途中でホストが落ちたら、書いたが確認できなかったとしてユーザの対応に切り替える
  * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭で閉じた識別子と互換の版を確かめ直す
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
  * - 打ち消しはバイト列のまま戻す（BOM も）
  * - 「要確認」の親子チケットには、そのブラウザで書くボタンを出さない
  *
- * 最新のレビュー（11.9.3）で足したもの: 確かめが落ちたら要確認、打ち消しの前の 412 で打ち消し直す、別の線に付け替わったら
- * 人の対応に切り替える、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
+ * 最新のレビューで足したもの: 確かめが落ちたら要確認、打ち消しの前の 412 で打ち消し直す、別の線に付け替わったら
+ * ユーザの対応に切り替える、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -125,7 +125,7 @@ test("CX-T162 GitHub で応答が落ち、その上に無関係な書き込み�
   assert.equal(mock.commitCalls.length, 1);
 });
 
-test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、人の対応に切り替える", async () => {
+test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、ユーザの対応に切り替える", async () => {
   const mock = new MockGitLab(parentOnly());
   mock.branch("side", "main");
   mock.push("side", { "src/side.py": "s\n" }, "別の枝");
@@ -154,7 +154,7 @@ test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時
   assert.equal(mock.glCommits.length, 1);
 });
 
-test("CX-T165 事後確認の途中でホストが落ちたら、書いたが確認できなかったとして人の対応に切り替える（失敗とは文面を分ける）", async () => {
+test("CX-T165 事後確認の途中でホストが落ちたら、書いたが確認できなかったとしてユーザの対応に切り替える（失敗とは文面を分ける）", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
@@ -195,7 +195,7 @@ test("CX-T167 「始める」: service worker も統合先の先頭で閉じた�
   mock.branch("I0012", "main");
   const folded = await ask(d, "i0012");
   assert.match((folded as { error: string }).error, /i0012 は既にある（I0012）/);
-  // 互換分解で同じになる名前（全角）も重なりとして拾う（11.9.3 の 14）
+  // 互換分解で同じになる名前（全角）も重なりとして拾う
   mock.branch("ｉ００１３", "main");
   const wide = await ask(d, "i0013");
   assert.match((wide as { error: string }).error, /i0013 は既にある（ｉ００１３）/);
@@ -280,7 +280,7 @@ test("CX-T172 「要確認」の親子チケットには、そのブラウザで
   assert.equal(html.querySelectorAll('[data-family="i0002"] button[data-action=approve]').length, 1);
 });
 
-// ---- 最新のレビューで直したもの（ADR-0093 の 11.9.3） ------------------------------------------------
+// ---- 最新のレビューで直したもの ------------------------------------------------
 
 test("CX-T174 応答が落ちた後の確かめや、書いた後の確かめが落ちたら、失敗でなく要確認（書いたかもしれないが確認できない）", async () => {
   // 応答が落ちた直後に先頭を読む要求も落ちる
@@ -336,7 +336,7 @@ test("CX-T175 打ち消しを送る前の確認で先頭が動いた（412。何
   assert.ok(!(DOING in files) && TODO in files && "src/zzz.py" in files);
 });
 
-test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らず人の対応に切り替える", async () => {
+test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らずユーザの対応に切り替える", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   const read = mock.head("i0001") as string;

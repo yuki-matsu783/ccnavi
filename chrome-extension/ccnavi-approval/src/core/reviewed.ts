@@ -1,5 +1,5 @@
 /**
- * レビュー済み（ADR-0093 の 8.9。段階 4）の読み取り側。
+ * レビュー済みの読み取り側。
  *
  * 判定（依頼の記録・依頼の後に動いたか・同じ MR か・変更要求・未解決のスレッド）は Python の
  * `confirm`（手元の `ccnavi review confirm` と同じコア）が出す。ここはホストから材料を取ってきて渡すだけ:
@@ -8,9 +8,9 @@
  * - 依頼の後に親のブランチが動いていれば、Python が求める 2 つ（`need_compare`）の変更の一覧（`compareFiles`）
  *
  * ボードはこれで候補のフェーズごとに「通るか」と理由とスレッドを出し、書く流れ（`write.ts` の
- * `confirmPhase`）は押したときに同じ手順を読み直して 1 コミットにする。段階 5 から GitLab の MR も読む
+ * `confirmPhase`）は押したときに同じ手順を読み直して 1 コミットにする。GitLab の MR も読む
  * （コピーの形は同じ。GitLab のスレッドは最初のノートの書き手 `author` を持ち、Python が依頼の投稿者
- * `poster` と比べて ccnavi の依頼のスレッドを除く。11.8.1 の決定 C）。
+ * `poster` と比べて ccnavi の依頼のスレッドを除く。目印は誰でも書けるので書き手で見分ける）。
  */
 import type { Compare, ConfirmResult, PyCall, Reviewable, Snapshot, Actor } from "./py.js";
 import { py } from "./py.js";

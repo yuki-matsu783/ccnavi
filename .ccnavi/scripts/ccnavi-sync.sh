@@ -1,20 +1,19 @@
 #!/bin/sh
-# ccnavi-sync 親のブランチをリモートから取り込み、親子チケットの同期状態と統合先の同期状態を書く
-# （ADR-0093 の 4.2・3.6。段階 2b）。
+# ccnavi-sync 親のブランチをリモートから取り込み、親子チケットの同期状態と統合先の同期状態を書く。
 #
 #   sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
-#   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （人が打つ。親子チケットの同期状態を消す）
+#   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （ユーザが打つ。親子チケットの同期状態を消す）
 #
-# 人が打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
+# ユーザが打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
 # ccnavi-fetch.sh は早送りしかしないので、分かれた親子チケットを取り込むのと、親のブランチが
-# リモートから消えたかを確かめるのはここだけ（D12・D13）。
+# リモートから消えたかを確かめるのはここだけ（セッションの頭を待たせず、merge の書きかけも残さないため）。
 #
 # <P> は親のブランチ名（= 親の識別子 = .claude/worktrees/<P>）。省けば、.claude/worktrees/ の下の
 # 親のワークツリー（ディレクトリ名 = ブランチ名で、親の承認済みチケットか提案がある）を全部。
 #
-# 親子チケットの同期状態は削除せずに残す（段階 2c のレビューの決定 A）。親のワークツリーを片付けても消さない。
-# 消すと、決まらないで止めていた親子チケット（gone など）が同期状態の無い親子チケットに戻り、止めが外れるため。
-# 消すのは人が打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
+# 親子チケットの同期状態は削除せずに残す。親のワークツリーを片付けても消さない。
+# 消すと、決まらないで止めていた親子チケット（gone など）が同期状態の無いものに戻り、止めが外れるため。
+# 消すのはユーザが打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
 # エージェントからは組み込みの deny（builtin-guard-ticket-approval）が止める。
 #
 # リポジトリ（ワークスペース自身と、親子チケットの元のプロジェクト）ごとに 1 回、次の順に行う。
@@ -23,18 +22,18 @@
 #   2. 統合先の名前を決める。CCNAVI_INTEGRATION_BRANCH（環境変数、無ければ
 #      .claude/settings.local.json の env）、空ならホストのデフォルトブランチ（`ls-remote --symref
 #      origin HEAD`、読めなければ origin/HEAD・main・master）。設定した名前がリモートに無ければ、
-#      既定に落とさずに止める（D30）
+#      既定に落とさずに止める
 #   3. 統合先を fetch し、親子チケットごとの取り込みの後、判定に要るもの（done/・共通層・自身の層・
 #      .claude/settings.json）を統合先の同期状態 sync/<リポジトリ>/integration/ へ同じ配置で写し、head に
-#      remote・branch・source・sha・fetched_at を書く（D26）。統合先の先頭が前と同じなら写さない
+#      remote・branch・source・sha・fetched_at を書く。統合先の先頭が前と同じなら写さない
 #
-# 親子チケットごとに次を行う（ロックを待って取る。D32）。
+# 親子チケットごとに次を行う（ロックを待って取る）。
 #
-#   - 途中の操作（merge・cherry-pick・revert・rebase）があれば何もせず止める（利用者の途中の
+#   - 途中の操作（merge・cherry-pick・revert・rebase）があれば何もせず止める（ユーザの途中の
 #     merge を取りやめない）
 #   - P がリモートにある: fetch して、早送りできれば早送り、分かれていれば merge。merge は
-#     索引が HEAD と同じときだけ（D35）で、衝突したら、この sh が始めた merge だけを取りやめて
-#     人の対応に切り替える。親子チケットの同期状態を present で書く
+#     索引が HEAD と同じときだけで、衝突したら、この sh が始めた merge だけを取りやめて
+#     ユーザの対応に切り替える。親子チケットの同期状態を present で書く
 #   - P がリモートに無い: まず統合先の done/ にこの親子チケットの親の承認済みチケット（識別子と承認の時刻が同じ）が
 #     あれば閉じた親子チケット（closed）。無く、push した形跡（同期状態・origin/<P>・追跡の設定）も無ければ、
 #     一度も送っていない親子チケットで今のまま。push した形跡があれば観測ずれを疑い、統合先を取り直して
@@ -44,9 +43,9 @@
 #     （同期状態が無ければ gone は書かずに止める）
 #
 # 統合先の同期状態を書いた後、present の親子チケットごとに実行ファイルの `ccnavi sync check <P> <リポジトリ>` で
-# 判定し直す（どのツリーを優先するかの確認と、承認済みチケットの判定し直し。4.2 の 4）。error があれば
-# 親子チケットの同期状態を blocked にして、理由を reason に書いて止める。判定（hook・承認・状態の操作）は blocked の親子チケットを
-# 止める（2c）。解き方は、理由を直してから同じ P でこの sh をオンラインで打ち直すこと（取り込みで
+# 判定し直す（どのツリーを優先するかの確認と、承認済みチケットの判定し直し）。error があれば
+# 親子チケットの同期状態を blocked にして、理由を reason に書いて止める。判定（hook・承認・
+# 状態の操作）は blocked の親子チケットを止める。解き方は、理由を直してから同じ P でこの sh をオンラインで打ち直すこと（取り込みで
 # present に書き直してから検査し直すので、通れば present に戻る）。書く前にロックを取り直し、同期状態が
 # まだ present かを確かめる（並行する sync が書いた gone・closed を上書きしない）。ロックが取れない・
 # 書けないときは 3 回まで試し、それでも書けなければ終了コード 3 で終わる（止めるべき親子チケットが止まって
@@ -74,13 +73,13 @@ sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
 sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
 
   親のブランチ <P>（省けば .claude/worktrees/ の下の親のワークツリー全部）をリモートから取り込み、
-  親子チケットの同期状態と統合先の同期状態を書く。分かれていれば merge し、衝突したら取りやめて人の対応に切り替える。
+  親子チケットの同期状態と統合先の同期状態を書く。分かれていれば merge し、衝突したら取りやめてユーザの対応に切り替える。
   リモートから消えた親のブランチは、統合先の done/ を見て「閉じた」か「消えた」かを決める。
   取り込んだ後、親子チケットを判定し直し、止める理由があれば親子チケットの同期状態を blocked にする。
   親子チケットの同期状態は親のワークツリーを片付けても消えない（削除せずに残す）。
 
-  --forget <P>...  人が打つ。捨てた親子チケットの同期状態を消す（親のワークツリーを片付けた後だけ）。
-                   消すと、その名前で切り直した親子チケットは同期状態の無い親子チケットとして扱われる。
+  --forget <P>...  ユーザが打つ。捨てた親子チケットの同期状態を消す（親のワークツリーを片付けた後だけ）。
+                   消すと、その名前で切り直した親子チケットは同期状態の無いものとして扱われる。
 
   統合先: CCNAVI_INTEGRATION_BRANCH（環境変数か .claude/settings.local.json の env）、
           空ならホストのデフォルトブランチ
@@ -161,7 +160,7 @@ trap 'cleanup; exit 130' INT TERM HUP
 
 log_info 受け付けた -- "args=$#" "forget=$forget"
 
-# ---- 人が打つ --forget（親子チケットの同期状態を消す）。ネットワークも実行ファイルも使わない。
+# ---- ユーザが打つ --forget（親子チケットの同期状態を消す）。ネットワークも実行ファイルも使わない。
 
 if [ "$forget" = yes ]; then
 	forget_rc=0
@@ -178,7 +177,7 @@ if [ "$forget" = yes ]; then
 			fg_key="${fg_record%/families/*}"
 			fg_key="${fg_key##*/}"
 			if [ -L "$state/sync/$fg_key" ] || [ -L "$state/sync/$fg_key/families" ]; then
-				printf '%s: 同期状態の置き場（sync/%s）がシンボリックリンク。辿らないので消さない。人が中身を確かめる\n' "$want" "$fg_key"
+				printf '%s: 同期状態の置き場（sync/%s）がシンボリックリンク。辿らないので消さない。ユーザが中身を確かめる\n' "$want" "$fg_key"
 				forget_rc=1
 				continue
 			fi
@@ -192,7 +191,7 @@ if [ "$forget" = yes ]; then
 			fi
 			fg_state=$(ccnavi_record_get "$fg_record" state)
 			if rm -f "$fg_record"; then
-				printf '%s: 親子チケットの同期状態（sync/%s/families/%s。state %s）を消した。この名前の親子チケットは同期状態の無い親子チケットとして扱われる\n' \
+				printf '%s: 親子チケットの同期状態（sync/%s/families/%s。state %s）を消した。この名前の親子チケットは同期状態の無いものとして扱われる\n' \
 					"$want" "$fg_key" "$want" "${fg_state:-?}"
 				log_info 親子チケットの同期状態を消した -- "family=$want" "repo=$fg_key" "state=$fg_state"
 			else
@@ -216,7 +215,7 @@ git_path() {
 	esac
 }
 
-# ---- 置き場のパスと、settings.local.json の統合先。実行ファイルに聞く（D33）。
+# ---- 置き場のパスと、settings.local.json の統合先。実行ファイルに聞く（JSON は sh で読まない）。
 
 sync_info=""
 info_from=""
@@ -253,7 +252,7 @@ home="${home%/}"
 projects="${CCNAVI_PROJECTS:-projects}"
 projects="${projects%/}"
 
-# ---- 統合先の名前（D30）
+# ---- 統合先の名前
 
 if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
 	integration_want="$CCNAVI_INTEGRATION_BRANCH"
@@ -514,7 +513,7 @@ sync_family() {
 	case "$lock_rc" in
 	0) ;;
 	2)
-		printf '%s: 古いロック（%s/locks/%s/%s）を強制取得する途中で止まり、元に戻せなかった。人が中身を見て片付ける\n' "$P" "$state" "$key" "$P"
+		printf '%s: 古いロック（%s/locks/%s/%s）を強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$P" "$state" "$key" "$P"
 		fail_note
 		return 0
 		;;
@@ -568,7 +567,7 @@ sync_present() {
 		fi
 	else
 		# 分かれている。非 ff の merge は、重ならないステージ済みの変更があっても拒む（git 2.43）ので、
-		# 先に見て言う（D35）。
+		# 先に見て言う。
 		if ! git -C "$tree" diff --cached --quiet 2>/dev/null; then
 			printf '%s: リモートと分かれていて merge が要るが、ステージ済みの変更がある。コミットするか sh %s/ccnavi-git.sh restore --staged <パス> で外してから打ち直してください\n' \
 				"$P" "$here_sh"
@@ -585,7 +584,7 @@ sync_present() {
 					git -C "$tree" merge --abort >/dev/null 2>&1 || :
 				fi
 				if [ -n "$conflicted" ]; then
-					printf '%s: リモートと分かれていて merge が衝突した（%s）。取り込みをやめた（merge --abort）。どちらを採るかは人が決める\n' \
+					printf '%s: リモートと分かれていて merge が衝突した（%s）。取り込みをやめた（merge --abort）。どちらを採るかはユーザが決める\n' \
 						"$P" "$conflicted"
 				else
 					cat "$scratch/out" >>"$scratch/err"
@@ -612,7 +611,7 @@ approved_at_of() {
 #
 # 在るだけでは見ない。識別子（`ticket:`）が P で、子（`parent:`）でなく、承認の時刻が親のワークツリーの
 # 承認済みチケットと同じときだけ「閉じた」とする（同じ識別子の古い親子チケットの承認済みチケットを、
-# この親子チケットのものと読まない）。親のワークツリーに承認済みチケットが無い（承認前の提案だけ）なら、
+# 今のものと読まない）。親のワークツリーに承認済みチケットが無い（承認前の提案だけ）なら、
 # この親子チケットは閉じようがない。
 closed_in_integration() {
 	ci_body=$(git -C "$repo" show "refs/remotes/origin/$integ:$approved/done/$P.md" 2>/dev/null) || return 1
@@ -630,7 +629,7 @@ closed_in_integration() {
 	[ "$(printf '%s\n' "$ci_body" | approved_at_of)" = "$ci_mine" ]
 }
 
-# P がリモートに無い。閉じたか、消えたか（3.6）。
+# P がリモートに無い。閉じたか、消えたか。
 sync_absent() {
 	kept_sha=$(ccnavi_record_get "$record" sha)
 	trace=no
@@ -689,13 +688,13 @@ sync_absent() {
 	fi
 	printf '  戻し方 1（改名・消し間違い）: 元の名前 %s でブランチを作り直す。端末なら git push origin %s:refs/heads/%s（同期状態にある、最後に取り込んだか送った %s の先頭）、GitHub ならマージリクエストの画面の「Restore branch」、GitLab ならマージリクエストの refs/merge-requests/<番号>/head から %s を作る。戻したら sh %s/ccnavi-sync.sh %s を打ち直す\n' \
 		"$P" "${kept_sha:-<最後に取り込んだ sha>}" "$P" "$P" "$P" "$here_sh" "$P"
-	printf '  戻し方 2（親子チケットを捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、人が sh %s/ccnavi-sync.sh --forget %s を打つと親子チケットの同期状態が消える（同じ名前で切り直せる。エージェントは打たない）\n' \
+	printf '  戻し方 2（親子チケットを捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、ユーザが sh %s/ccnavi-sync.sh --forget %s を打つと親子チケットの同期状態が消える（同じ名前で切り直せる。エージェントは打たない）\n' \
 		"$here_sh" "$P" "$here_sh" "$P"
 	fail_note
 	return 0
 }
 
-# ---- 取り込みの後の検査（4.2 の 4。段階 2c）
+# ---- 取り込みの後の検査
 
 # 実行ファイルを起こす。`sync paths` を答えたのと同じもの。<引数>...
 run_ccnavi() {
@@ -722,7 +721,7 @@ check_family() {
 	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
 	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
 		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、落ちた）。検査の error ではない
-		# ので親子チケットは止めない。前（段階 2b）と同じ動き。
+		# ので親子チケットは止めない。この検査が入る前と同じ動き。
 		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。親子チケットは止めていない。実行ファイルを新しくして打ち直してください\n' \
 			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"
 		log_warn 取り込みの後の検査を実行できなかった -- "family=$1" "rc=$cf_rc"
@@ -756,7 +755,7 @@ check_family() {
 		[ -n "$cf_done" ] || sleep 1
 	done
 	if [ -n "$cf_done" ]; then
-		printf '%s: 取り込みの後の検査で親子チケットを止めた（親子チケットの同期状態を blocked にした）。%s\n' "$1" "$cf_reason"
+		printf '%s: 取り込みの後の検査で親子チケットを止めた（同期状態を blocked にした）。%s\n' "$1" "$cf_reason"
 		sed -n 's/^error /  - /p' "$scratch/check"
 		printf '  直してから、オンラインで sh %s/ccnavi-sync.sh %s を打ち直してください（検査し直して通れば present に戻る）\n' "$here_sh" "$1"
 		fail_note

@@ -18,7 +18,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import risk
+from ccnavi.tickets import risk
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, read_json, write
@@ -87,7 +87,7 @@ class RiskTest(PhaseHarness):
     def setUp(self):
         super().setUp()
         # 配点と種類は共通層の既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
-        # `ticket` の副命令には届かない（ADR-0067）。差し替えるテストはこの書き方に書き直す。
+        # `ticket` の副命令には届かない。差し替えるテストはこの書き方に書き直す。
         self.risk = write(common_path(self.root, "risk"), RISK)
         # 範囲の上限が無く、レビュー不要の種類。宣言では「レビュー不要」な作業を実績で上書きする。
         write(
@@ -157,7 +157,8 @@ class RiskTest(PhaseHarness):
     def test_escalated_phase_is_seen_in_the_session_and_only_recommends_a_merge_request(self):
         """実績は「要る」としか言わない。宣言が none のフェーズは chat に上がり、MR は勧めるだけ。
 
-        強制しないのは ADR-0065。勧めたのに chat で通したことはマーカーに残る。
+        強制すると、ローカルで回している作業が大きくなった時点で認証が要るようになるため、
+        勧めるだけにする。勧めたのに chat で通したことはマーカーに残る。
         """
         tree = self.one_child(review=False)
         write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
@@ -300,7 +301,7 @@ class RiskTest(PhaseHarness):
         denied = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(denied))
 
-    # ---- 5. 副命令に配点を渡しても反映されない（ADR-0067）
+    # ---- 5. 副命令に配点を渡しても反映されない（`--risk` は診断でだけ有効）
 
     def test_a_risk_flag_on_ticket_done_does_not_change_the_score(self):
         """`ticket finish <子> --risk <別の配点>` は採点を差し替えない。issue #65。

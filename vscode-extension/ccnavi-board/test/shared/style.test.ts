@@ -1,7 +1,7 @@
 /**
  * 5 つの画面の CSS。置き場は画面（React）と同じ `src/webview/<名前>/` で、部品 1 つに CSS 1 本。
  * 束ねる（`scripts/bundle-webview.js`）と画面 1 つにつき 1 本になり、拡張がそれを `<style nonce>` に
- * 流し込む（ADR-0066）。
+ * 流し込む。
  *
  * ここで見るのは 3 つ。骨組み（`styles/page.css`）が 5 画面とも 1 か所から来ていること、
  * ハイコントラストのテーマ向けの書き方が残っていること、そして**置いた CSS が束ねから漏れて
@@ -60,7 +60,7 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
  * `@import` の行き先。`"./x.css"` はそのファイルからの相対で、`"@xyflow/react/dist/style.css"` の
  * ように `.` で始まらないものは node_modules から解く（esbuild が束ねるときと同じ解き方）。
  *
- * 外から来る CSS を入れているのは図の 1 本だけ（ADR-0070）。ここで解けないと、このテストは
+ * 外から来る CSS を入れているのは図の 1 本だけ（React Flow の CSS）。ここで解けないと、このテストは
  * 落ちるのではなく **`readFileSync` の ENOENT で例外になる**ので、行き先を間違えたのか置き忘れたのかが
  * 読めなくなる。解けないパスは名指しで落とす。
  */
@@ -117,7 +117,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.match(style, /\.toolbar \{ display: flex;/);
     assert.match(style, /\.banner\.warn \{ border-color:/);
     assert.match(style, /input\[type=text\], input\[type=search\], textarea, select \{ background:/);
-    // 骨組みの定義は 1 度だけ（画面ごとのコピーを残さない）
+    // 骨組みの定義は 1 度だけ（画面ごとの複製を残さない）
     assert.equal((style.match(/\.toolbar \{ display: flex;/g) ?? []).length, 1);
     // 見た目を指定しなければ素の body。Claude の配色の CSS は常に持つ
     assert.ok(html.includes("\n<body>\n"));
@@ -155,7 +155,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
 test("CB-T193 動いたカードの強調表示は、光らせない設定を尊び、色だけに頼らない", () => {
   const html = flatStyle(board());
   // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
-  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌う人に 2 秒の脈動が出る
+  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌うユーザに 2 秒の脈動が出る
   assert.match(html, /@media \(prefers-reduced-motion: reduce\) \{ \.card\.moved \{ animation: none; \} \}/);
   // どこからどこへ動いたかは帯の文で言う（色が見分けられなくても読める）。中身は Card.tsx の movedLabel
   assert.match(html, /\.moved-mark \{[^}]*color: var\(--vscode-charts-green\);/);

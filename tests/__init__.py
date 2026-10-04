@@ -5,14 +5,14 @@ import os
 import shutil as _shutil
 import tempfile as _tempfile
 
-from ccnavi import settings as _settings
+from ccnavi.infra import settings as _settings
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 共通層の 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
-# hook の判定とチケット・レビューの副命令には届かない（ADR-0067）。
+# hook の判定とチケット・レビューの副命令には届かない。
 #
 # パスは実行ファイルから引く。テスト側にもう 1 つパスを持つと、既定が動いたときに
 # 2 つが気づかないうちに食い違う。既定のパスそのものは tests/config/test_common_layer_place.py が
@@ -38,7 +38,8 @@ def _block_host_git_config() -> dict[str, str]:
       なる。テストは 1,000 回以上 commit するので、署名の有無だけで全体が倍になる
 
     どちらも「テストが緩む」ではなく「テストの答えが機械で変わる」問題で、
-    同じチケットがどの環境でも同じ場所で止まるという設計（ADR-0051、ticket.py）と
+    同じチケットがどの環境でも同じ場所で止まるという設計（regex も大文字小文字を
+    区別せずに当て、機械で答えを割らない。ticket.py）と
     合わない。
 
     空の設定ではなく `init.defaultBranch` を書いた設定を指すのは、git 自身の
@@ -67,7 +68,7 @@ def _block_host_git_config() -> dict[str, str]:
 #
 # ここで `os.environ` に入れるのは、テストが git を起こす経路が 1 つではないため。
 # 各テストの `git()` ヘルパ（13 か所ある）だけでなく、検査対象の sh
-# （`ccnavi-git.sh` など）も、ccnavi 自身（`ccnavi/gitcmd.py`）も git を起こす。
+# （`ccnavi-git.sh` など）も、ccnavi 自身（`ccnavi/infra/gitcmd.py`）も git を起こす。
 # 引数に `-c` を足す形では、自分が直に起こす分しか防げない。
 GIT_ENV = _block_host_git_config()
 os.environ.update(GIT_ENV)
@@ -89,7 +90,7 @@ def common_path(root: str, kind: str) -> str:
 def fixture_workspace(name: str = "rules.yml") -> str:
     """`tests/fixtures/<name>` を共通層のルールに据えたワークスペースルート。
 
-    `--rules` は診断でだけ有効な（ADR-0067）ので、見本のルールを指すのには使わない。
+    `--rules` は診断でだけ有効なので、見本のルールを指すのには使わない。
     `--root` にここを渡して、共通層の既定の置き場から読ませる。
 
     リポジトリ自身をルートにしないので、走った機械の `.ccnavi/common/rules.yml` が

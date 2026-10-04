@@ -1,5 +1,5 @@
 /**
- * Chrome からの承認と取り下げ（ADR-0093 段階 3）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome からの承認と取り下げ。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
  * - 1 コミットの組み立て（`createCommitOnBranch`、`expectedHeadOid` = 読んだ P の先頭）と、書いた後の確かめ
  * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。ダイジェストが同じなら見せ直さずに書き、違えば書かない
@@ -48,7 +48,7 @@ function world(branches: Record<string, FixtureBranch> = fixture()) {
   return { mock, d: depsFor(mock) };
 }
 
-/** 子の提案の無い見本（親を取り下げられる形。8.8 の「子が無い」） */
+/** 子の提案の無い見本（親を取り下げられる形。子が無い） */
 function parentOnly(): Record<string, FixtureBranch> {
   const f = fixture();
   delete f.i0001.files["wip/proposals/todo/i0001-01.md"];
@@ -81,7 +81,7 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.equal(call.headline, `ccnavi: i0001 を承認（Chrome 拡張 ${VERSION}）`);
   assert.deepEqual(call.deletions, [{ path: TODO }]);
   assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING, EVENTS].sort());
-  // 書いた中身: 承認済みチケットと状態の履歴（経路・アカウント・拡張の版。7.3・8.8）
+  // 書いた中身: 承認済みチケットと状態の履歴（経路・アカウント・拡張の版）
   const files = mock.files("i0001");
   assert.ok(!(TODO in files));
   assert.match(files[DOING], /^ccnavi_approved:/m);
@@ -90,7 +90,7 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   // 統合先・ほかのブランチには書かない
   assert.ok(mock.commitCalls.every((c) => c.branch === "i0001"));
   // 承認した後のボード: 承認待ちから消え、作業中の承認済みチケットとして出る。子の提案があるので
-  // 取り下げは出さない（8.8）
+  // 取り下げは出さない
   const after = (await board(d)).families.find((f) => f.family.name === "i0001")?.result;
   assert.deepEqual(after?.batch?.map((e) => e.ticket), []);
   assert.deepEqual(after?.withdrawable?.map((w) => [w.ticket, w.problems]), [["i0001", ["todo/ に子の提案がある"]]]);
@@ -143,7 +143,7 @@ test("CX-T104 決まらない親子チケットでは書かない（読めない
   assert.match(out.kind === "refused" ? out.message : "", /バイナリ/);
   assert.equal(bin.mock.commitCalls.length, 0);
 
-  // ホストに無い親子チケット i0009 の古い承認済みチケットを P の上に持っていても、先行を満たしたとは数えない（3.3 の 3・5）
+  // ホストに無い親子チケット i0009 の古い承認済みチケットを P の上に持っていても、先行を満たしたとは数えない
   const f = fixture();
   const done = f.main.files[".ccnavi/approved/done/i0005-01.md"].replace(/i0005/g, "i0009");
   f.i0001.files[".ccnavi/approved/done/i0009-01.md"] = done;
@@ -163,7 +163,7 @@ test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3
   assert.match(r?.write?.reason ?? "", /拡張を更新する/);
   const out = await approveFamily(REPO, "i0001", shownOf(b, "i0001"), d);
   assert.equal(out.kind, "refused");
-  assert.match(out.kind === "refused" ? out.message : "", /7\.3/);
+  assert.match(out.kind === "refused" ? out.message : "", /拡張を更新する/);
   const w = await withdrawTicket(REPO, "i0001", "i0001", "", d);
   assert.equal(w.kind, "refused");
   assert.equal(mock.commitCalls.length, 0);
@@ -217,7 +217,7 @@ test("CX-T108 書けたのに応答だけが落ちたら、先頭が書いたと
   assert.deepEqual(mock.commitCalls.map((c) => c.result), ["written"]);
 });
 
-test(`CX-T109 ${MAX_ROUNDS} 周しても先頭が動き続けたら、人の対応に切り替える`, async () => {
+test(`CX-T109 ${MAX_ROUNDS} 周しても先頭が動き続けたら、ユーザの対応に切り替える`, async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
   let n = 0;

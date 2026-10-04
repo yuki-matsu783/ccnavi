@@ -1,6 +1,6 @@
 """チケットを置き場から置き場へ動かす（approval.move_file）の受入テスト。
 
-ADR-0055 で、承認済みチケットは 1 本のファイルとして doing/ → review/ → done/ と動く。
+承認済みチケットは 1 本のファイルとして doing/ → review/ → done/ と動く。
 動かす途中で止まると同じ識別子が 2 か所に残り、以後どの操作も「複数の場所にある」で
 止まる。見るのは 4 つ。
 
@@ -19,7 +19,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import approval
+from ccnavi.tickets import approval
 
 TEXT = "---\nticket: i0001\n---\nbody\n"
 

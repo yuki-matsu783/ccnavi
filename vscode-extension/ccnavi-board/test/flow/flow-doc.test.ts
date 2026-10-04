@@ -65,7 +65,7 @@ test("CB-T218 YAML を読んで書くだけなら、知らない欄も知らな�
   assert.doesNotMatch(text, /^\s*\{/m);
 });
 
-test("CB-T253 書き出しは人が読める形で、実行ファイル（YAML 1.1）が別の型に読む表記は引用符で囲む", () => {
+test("CB-T253 書き出しはユーザが読める形で、実行ファイル（YAML 1.1）が別の型に読む表記は引用符で囲む", () => {
   // 同じ中身を 2 か所で持っても別名にしない（実行ファイルは別名を読まない）
   const shared = { x: 1, y: 2 };
   const doc: FlowDoc = {
@@ -95,7 +95,7 @@ test("CB-T240 読みはルール設定の画面と同じ yaml の既定で、YAM
   // `yes` `off` は文字のまま（真偽値に差し替えない）。`y` `n` も文字。日付も文字
   assert.deepEqual(read.doc.nodes[0].position, { x: 1, y: 2 });
   assert.deepEqual(read.doc.nodes[0].data, { multiSelect: "yes", off: "n", when: "2026-01-01" });
-  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む表記を囲む（書式の側の制約。ADR-0035）。y は囲まない
+  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む表記を囲む（書式の側の制約）。y は囲まない
   const text = serializeFlow(read.doc);
   assert.match(text, /multiSelect: "yes"/);
   assert.match(text, /"off": n/);
@@ -148,14 +148,14 @@ test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そ�
 
 test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
   const refused: [string, RegExp][] = [
-    ["nodes: [", /画面の YAML パーサーで読めないので図にできない/],
-    ["a: 1\na: 2\n", /画面の YAML パーサーで読めないので図にできない/],
-    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読めないので図にできない/],
-    ["", /描けない/],
-    ["- 1\n", /描けない/],
-    ["name: x\n", /描けない/],
-    ["nodes:\n  - {type: start}\n", /描けない/],
-    ["nodes: [1]\n", /描けない/],
+    ["nodes: [", /画面の YAML パーサーで読めないため、図にできません/],
+    ["a: 1\na: 2\n", /画面の YAML パーサーで読めないため、図にできません/],
+    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読めないため、図にできません/],
+    ["", /描けません/],
+    ["- 1\n", /描けません/],
+    ["name: x\n", /描けません/],
+    ["nodes:\n  - {type: start}\n", /描けません/],
+    ["nodes: [1]\n", /描けません/],
   ];
   for (const [text, reason] of refused) {
     const result = parseFlow(text);
@@ -247,18 +247,18 @@ test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え
   assert.deepEqual(flowNotices(single), []);
   // サブフロー（1 段）の中の subAgent（2 段）。子の下 2 段で、まだ上限の中
   assert.equal(nesting(nested(1)).depth, 2);
-  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("段重なる")));
+  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("段重なっています")));
   // もう 1 段重ねると 3 段。既定の上限（メインの下 3 段、子は 1 段目）を超える
   assert.equal(nesting(nested(2)).depth, 3);
-  const warned = flowNotices(nested(2)).find((n) => n.includes("段重なる"));
+  const warned = flowNotices(nested(2)).find((n) => n.includes("段重なっています"));
   assert.ok(warned !== undefined);
-  assert.match(warned, /子の下に 3 段重なる/);
+  assert.match(warned, /子の下に 3 段重なっています/);
   assert.match(warned, /メインの下 3 段/);
-  assert.match(warned, /そのノードで止まってメインへ戻る/);
+  assert.match(warned, /そのノードで止まってメインへ戻ります/);
   // 巡るサブフローは数えきれないと言う
   const loop = nested(2, true);
   assert.equal(nesting(loop).cyclic, true);
-  assert.ok(flowNotices(loop).some((n) => n.includes("巡っている")));
+  assert.ok(flowNotices(loop).some((n) => n.includes("サブフローの呼び出しが循環しています（subAgentFlowId が輪になっています）")));
   // サブフローの中身は描かないことも言う
   assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が 1 本")));
 });
@@ -282,7 +282,7 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を足
   // 開始に入口は無く、終了に出口は無い
   assert.deepEqual(portsOf(doc.nodes[0], []).inputs, []);
   assert.deepEqual(portsOf(doc.nodes[3], []).outputs, []);
-  // 人が書いた線が別の表記の出口を使っていれば、その出口も描く
+  // ユーザが書いた線が別の表記の出口を使っていれば、その出口も描く
   const odd = connect(doc, "mcp-1", "success", "end-1", "in-2");
   const mcpPorts = portsOf(odd.nodes[2], connectionsOf(odd));
   assert.deepEqual(
@@ -355,7 +355,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(again.doc, "a").parentId, "group-1");
   assert.deepEqual(absolutePosition(again.doc, "b"), { x: 400, y: 200 });
   assert.deepEqual(again.doc.nodes.map((n) => n.id), ["group-1", "a", "group-2", "b", "c"]);
-  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに気づかないうちに入らない）
+  // 指す先の無い parentId が指す id は使わない（そのノードが気づかないうちに新しいグループに入ることはない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 700, y: 500 }, parentId: "group-1" }, ...three().nodes] };
   const fresh = groupNodes(stray, ["a", "b"]);
   assert.ok(fresh !== undefined);
@@ -399,7 +399,7 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
   const moved = placeNode(doc, "a", { x: 80, y: 60 });
   assert.equal(byId(moved, "a").parentId, "group-1");
   assert.deepEqual(byId(moved, "a").position, { x: 4, y: 12 });
-  // 動かしていなければ同じ値（押しただけで未保存にしない）
+  // 動かしていなければ同じものを返す（押しただけで未保存にしない）
   assert.equal(placeNode(doc, "a", { x: 100, y: 100 }), doc);
   assert.equal(placeNode(doc, "group-1", { x: 76, y: 48 }), doc);
   assert.equal(placeNode(doc, "nothing", { x: 0, y: 0 }), doc);
@@ -436,7 +436,7 @@ test("CB-T257 まとめて動かしたときは React Flow の位置（枠から
   const inner = placeNodes(grouped.doc, [{ id: "a", position: { x: 30, y: 60 } }]);
   assert.deepEqual(byId(inner, "a").position, { x: 30, y: 60 });
   assert.equal(byId(inner, "a").parentId, "group-1");
-  // 何も動いていなければ同じ値
+  // 何も動いていなければ同じものを返す
   assert.equal(placeNodes(grouped.doc, [{ id: "a", position: { x: 24, y: 52 } }]), grouped.doc);
 });
 
@@ -454,7 +454,7 @@ test("CB-T258 グループの大きさを変える。左や上の辺を動かし
   assert.deepEqual(absolutePosition(grown, "a"), { x: 100, y: 100 });
   // 下限
   assert.deepEqual(byId(resizeGroup(doc, "group-1", { width: 10, height: 10 }), "group-1").style, { width: 120, height: 80 });
-  // 変わらなければ同じ値。グループでないものは変えない
+  // 変わらなければ同じものを返す。グループでないものは変えない
   assert.equal(resizeGroup(doc, "group-1", { width: 238, height: 166 }, { x: 76, y: 48 }), doc);
   assert.equal(resizeGroup(doc, "a", { width: 500, height: 500 }), doc);
 });

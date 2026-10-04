@@ -35,7 +35,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   // 本文のダイジェスト。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
   // フィクスチャでは伏せてある。
   assert.equal(preview.digest, "<digest>");
-  // 対象にしないのは形の壊れた子（計画に無い番号）だけ。
+  // 対象にしないのは形の正しくない子（計画に無い番号）だけ。
   assert.equal(preview.rejected.length, 1);
   assert.equal(preview.rejected[0].ticket, "i0001-05");
   assert.ok(preview.rejected[0].problems[0].includes("計画に無い"));
@@ -113,7 +113,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   });
   assert.ok(stopped.includes("i0001-01 で止まりました"));
   assert.ok(stopped.includes("i0001 の 1 件は承認済みチケットに入っています"));
-  assert.ok(stopped.includes("コミットと push は送っていません"));
+  assert.ok(stopped.includes("コミットと push はターミナルに送っていません"));
   assert.ok(stopped.includes("マーカーを消した"), "端末に出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
@@ -132,10 +132,10 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   assert.ok(!after.includes("i0001 で止まりました"));
 
   // 「が」と識別子の間は空白 1 つ。止まった識別子が分からない（空）ときは空白を重ねない
-  assert.ok(stopped.startsWith("ccnavi --approve --yes が i0001-01 で止まりました: 書けない (…)。"), stopped);
-  assert.ok(after.startsWith("ccnavi --approve --yes が i0001 の後始末で止まりました: "), after);
+  assert.ok(stopped.startsWith("ccnavi --agree --yes が i0001-01 で止まりました: 書けない (…)。"), stopped);
+  assert.ok(after.startsWith("ccnavi --agree --yes が i0001 の後始末で止まりました: "), after);
   const unknown = partialMessage({ placed: [], ticket: "", reason: "書けない", lines: [] });
-  assert.ok(unknown.startsWith("ccnavi --approve --yes が止まりました: 書けない。"), unknown);
+  assert.ok(unknown.startsWith("ccnavi --agree --yes が止まりました: 書けない。"), unknown);
   // 継ぎ目だけを見る。識別子があれば「が」のあとに空白ちょうど 1 つ、無ければ「が」の直後に「止まりました」
   assert.match(stopped, /--yes が [^\s]/, stopped);
   assert.match(unknown, /--yes が止まりました/, unknown);

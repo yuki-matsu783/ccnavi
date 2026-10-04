@@ -1,16 +1,16 @@
 /**
- * 実機の試験（ADR-0093 段階 1・3、確認事項 4・5）。試験用の通信先（127.0.0.1）で組んだ拡張（dist-e2e/）を
+ * 実機の試験。Pyodide が MV3 の CSP で動くかと、PAT の期限の応答ヘッダを拡張の fetch で読めるかも見る。試験用の通信先（127.0.0.1）で組んだ拡張（dist-e2e/）を
  * Chromium（headless=new）に読み込み、模擬の GitHub を相手に次を確かめる。
  *
  * - 拡張のページの Web Worker で Pyodide が MV3 の CSP（'wasm-unsafe-eval' だけ）の下で起動し、ccnavi を import できる
  * - 設定画面で PAT とリポジトリを登録し、ボードが描ける
  * - 悪意のある Markdown を描いても、承認しても何も動かない
  * - ボードから承認と取り下げを書く（`createCommitOnBranch` の 1 コミット）
- * - 段階 4: 依頼済みのフェーズに MR のスレッドを出し（悪意のある本文でも何も動かず、隠れない）、
+ * - 依頼済みのフェーズに MR のスレッドを出し（悪意のある本文でも何も動かず、隠れない）、
  *   ボードからレビュー済みのマーカーを書く
- * - service worker が PAT の期限のヘッダを CORS に公開されていなくても読み、ボードの帯とバッジで知らせる（確認事項 5。模擬のホストで）
+ * - service worker が PAT の期限のヘッダを CORS に公開されていなくても読み、ボードの帯とバッジで知らせる（模擬のホストで）
  * - PAT はボードに渡らない
- * - 段階 5: 通信先にセルフホストの GitLab（模擬。127.0.0.1:18788）を足したビルドで、GitLab のリポジトリを登録し、
+ * - 通信先にセルフホストの GitLab（模擬。127.0.0.1:18788）を足したビルドで、GitLab のリポジトリを登録し、
  *   ボードを描き（スレッドの悪意のある本文でも何も動かない）、Commits API で承認を書き、「始める」で issue から
  *   親のブランチを作る。PAT は画面に渡らない
  *
@@ -123,12 +123,12 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   assert.match((await page.textContent('[data-family="i0001"] .closure')) ?? "", /i0003/);
   // 見た目を目で確かめるとき: CCNAVI_E2E_SHOT=<png のパス>
   if (process.env.CCNAVI_E2E_SHOT) await page.screenshot({ path: process.env.CCNAVI_E2E_SHOT, fullPage: true });
-  // 段階 3: 承認のボタンは承認待ちのある親子チケットだけ。レビュー済みとフォームは出さない。段階 5 の「始める」は
+  // 承認のボタンは承認待ちのある親子チケットだけ。レビュー済みとフォームは出さない。「始める」は
   // issue を押してから読む（ボードを開くたびには読まない）
   const actions = await page.locator("main button").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).closest<HTMLElement>("[data-family]")?.dataset.family ?? "-"}:${(e as HTMLElement).dataset.action}`));
   assert.deepEqual(actions, ["i0001:approve", "i0002:approve", "-:issues"]);
   assert.equal(await page.locator("main form").count(), 0);
-  // 承認の画面の本文は開いた形でボタンの上に見えている（決定 A）
+  // 承認の画面の本文は開いた形でボタンの上に見えている
   assert.ok(await page.locator('[data-family="i0001"] [data-testid=screen] pre').isVisible());
   const above = await page.evaluate(() => {
     const box = document.querySelector('[data-family="i0001"]') as HTMLElement;
@@ -197,7 +197,7 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
 
 test("CX-T076 着手前で子の無い承認は、ボードから取り下げられる（承認コミットの親の提案に戻す）", async () => {
   const original = fixture().i0001.files["wip/proposals/todo/i0001.md"];
-  // 開発者が子の提案を片付けた（子の提案があれば取り下げは出さない。8.8）
+  // 開発者が子の提案を片付けた（子の提案があれば取り下げは出さない）
   mock.push("i0001", { "wip/proposals/todo/i0001-01.md": null }, "子の提案を片付ける");
   const page = await openBoard();
   const said = await press(page, '[data-family="i0001"] .approved-item[data-ticket="i0001"] button[data-action=withdraw]');

@@ -29,7 +29,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi import tree
+from ccnavi.infra import tree
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -148,7 +148,7 @@ class ProjectsTest(unittest.TestCase):
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効（ADR-0067）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = write(common_path(self.ws, "rules"), json.dumps(WS_RULES))
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
@@ -189,7 +189,7 @@ class ProjectsTest(unittest.TestCase):
         """実行ファイルを 1 回起動する。
 
         `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ有効な
-        （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
+        ので、置き場は `--root` の下の既定のまま。「`projects/` を
         数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -354,7 +354,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0008.md"),
             ticket_text("i0008", allow=("src/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
         wrong = self.worktree(self.app, "i0007")
@@ -383,7 +383,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
         wrong = self.worktree(self.app, "I0007")
@@ -394,7 +394,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
 
     def test_project_skills_are_written_only_under_the_ticket_rules(self):
-        """docs/skills/（ADR-0091）は守りの外のふつうの場所。チケットの範囲の中でだけ書ける。
+        """docs/skills/ は守りの外のふつうの場所。チケットの範囲の中でだけ書ける。
 
         置き場を ccnavi ディレクトリの外にしたのは、組み込みの守りを緩めずに済ませるため。
         範囲に入れた子のワークツリーでは通り、範囲の外とチケットの無いワークツリーでは、
@@ -404,7 +404,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0009.md"),
             ticket_text("i0009", allow=("docs/skills/deploy/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.worktree(self.lib, "i0009")
         skill = os.path.join(tree, "docs", "skills", "deploy", "SKILL.md")
@@ -439,9 +439,9 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(found, {"i0007": "lib", "i0007-01": "lib"})
         self.assertEqual(board["pending_approval"], ["i0007", "i0007-01"])
 
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        # 承認の画面は、書き込みが向かうリポジトリを人に見せる（REQ-MLT-11）
+        # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる（REQ-MLT-11）
         self.assertIn("■ プロジェクト: lib", approved.stdout)
         # 継ぐ段は無いが、承認済みチケットには残る
         # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
@@ -454,7 +454,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.ws, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", project="lib", allow=("src/*",)),
         )
-        result = self.ccnavi("--approve", stdin="y\n")
+        result = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場（ワークスペース）と違う", result.stderr)
         self.assertIn("wip/proposals/ に置いて", result.stderr)
@@ -469,7 +469,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.app, "wip", "proposals", "todo", "i0007-01.md"),
             ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
         )
-        result = self.ccnavi("--approve", stdin="y\n")
+        result = self.ccnavi("--agree", stdin="y\n")
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
         # 1 で終わる（REQ-MLT-31）。
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -487,7 +487,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(tree, "wip", "proposals", "todo", "i0010.md"),
             ticket_text("i0010", allow=("src/*",)),
         )
-        approved = self.ccnavi("--approve", stdin="y\n")
+        approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertNotIn("の中に提案がある", approved.stderr)
         self.assertIn("■ プロジェクト: lib", approved.stdout)
@@ -496,7 +496,8 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        # 着手で共通層を写したので、レビューの無いこの親は人が端末で見てから閉じる（設計 11.12）。
+        # 着手で共通層を写したので、レビューの無いこの親はユーザが端末で見てから
+        # 閉じる（設計 11.12）。
         seen = self.ccnavi("--config-synced", "i0010", stdin="y\n")
         self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
         done = self.ccnavi("ticket", "finish", "i0010")
@@ -539,7 +540,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
+        self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
         # 承認はプロジェクトの todo/ からプロジェクトの doing/ へ動かす。取り消すと done/ へ。
         # 置き場はプロジェクトの git が持つ（設計 11.5）。
         lib_approved = os.path.join(self.lib, ".ccnavi", "approved")
@@ -552,13 +553,15 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
     def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
-        """取り込み済みのプロジェクトの親子チケット（同期状態は sync/<プロジェクト>/）も止まる（2c）
-        。"""
+        """取り込み済みのプロジェクトの親子チケットも止まる。
+
+        同期状態は sync/<プロジェクト>/ に置く。
+        """
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
+        self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "--quiet", "-m", "approve")
         tree = self.worktree(self.lib, "i0007")
@@ -578,7 +581,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
         self.assertIn("gone", cancelled.stderr)
 
-    # ---- 5. 実行後の監視はツリーごと
+    # ---- 5. 実行後チェックはツリーごと
 
     def test_post_monitoring_reads_the_project_tree_the_call_touched(self):
         started = self.hook("", self.ws, event="UserPromptSubmit")
@@ -603,7 +606,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
         self.assertEqual(record["rules"], ["app:schema"])
 
-        # ターンの終わりは全部のツリーを見て、ツリーの名前をつけて人に言う。
+        # ターンの終わりは全部のツリーを見て、ツリーの名前をつけてユーザに言う。
         stopped = self.hook("", self.ws, event="Stop")
         self.assertEqual(stopped.returncode, 0, stopped.stderr)
         self.assertIn("app: schema/x.sql", self.system_message(stopped))

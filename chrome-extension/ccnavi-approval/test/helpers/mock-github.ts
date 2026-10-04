@@ -2,12 +2,12 @@
  * 模擬の GitHub。見本のリポジトリ（test/fixtures/repo.ts）を、拡張が使う REST と GraphQL の形で返す。
  * sha は git と同じ作り方（blob は `blob <大きさ>\0<中身>` の sha1）で、tree は中身のリストから作る。
  *
- * 段階 3 から書ける: `createCommitOnBranch`（`expectedHeadOid` が先頭と違えば断る）でコミットを積み、
+ * 書ける: `createCommitOnBranch`（`expectedHeadOid` が先頭と違えば断る）でコミットを積み、
  * コミットの履歴（`GET /commits?sha=&path=`・`GET /commits/<sha>`）、開いた MR と Approve、
  * PAT の期限のヘッダを返す。試験は `push`・`merge` で他の書き手を、`beforeCommit` で書く直前の
  * 割り込みを作る。
  *
- * 段階 4 から、録ったホストの応答の見本（test/fixtures/host/github/。`host-fixture.ts`）をブランチに付けると、
+ * 録ったホストの応答の見本（test/fixtures/host/github/。`host-fixture.ts`）をブランチに付けると、
  * その MR・スレッド・レビューを見本のとおりに返す（`attachScene`）。依頼の後の変更の一覧（`GET /compare/<b>...<h>`）も返す。
  *
  * 単体試験は `fetch` の代わりに `mockFetch` を渡し、実機の試験は `serve` で HTTP に出す。
@@ -89,7 +89,7 @@ export class MockGitHub {
   readonly scenes = new Map<string, Scene>();
   /** 開いた MR（ブランチ → 番号と Approve） */
   readonly pulls: Record<string, { number: number; reviews: { user: string; state: string }[] }[]> = {};
-  /** 開いた issue（「始める」。段階 5） */
+  /** 開いた issue（「始める」） */
   readonly issues: { number: number; title: string; pull?: boolean }[] = [];
   /** 作ったブランチ（「始める」の頼み。名前と元の sha） */
   readonly createdBranches: { name: string; sha: string }[] = [];
@@ -460,7 +460,7 @@ export class MockGitHub {
   /**
    * HTTP に出す（実機の試験）。閉じる関数を返す。
    * PAT の期限のヘッダは `Access-Control-Expose-Headers` に載せない（拡張の fetch が CORS の制限を
-   * 受けずに読めるか、を実機で確かめるため。10.2 の確認事項 5）。
+   * 受けずに読めるか、を実機で確かめるため）。
    */
   serve(port: number): Promise<() => Promise<void>> {
     const server = http.createServer((req, res) => {

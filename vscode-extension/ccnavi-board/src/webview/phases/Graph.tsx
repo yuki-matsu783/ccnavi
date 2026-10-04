@@ -2,13 +2,13 @@
  * フェーズの種類の関係を図で見せる。点が種類、線が `requires` と `overlap` と `after`。
  *
  * **矢印を付けるのは `after` だけ。** `requires` は「一緒に置くべき」で、順序ではない（`phases-graph.ts` の頭）。
- * 見る場所が `none` でない種類は、点の縁を強めて「人が見る」を示す（種類の宣言。計画の延期や
+ * 見る場所が `none` でない種類は、点の縁を強めて「ユーザが見る」を示す（種類の宣言。計画の延期や
  * 実績のリスクで変わることは図の下の一言が言う）。
  * 図が判定をしないのも同じところに書いてある。ここは `graphOf` が組んだものを描くだけで、
  * 何が正しいかは言わない。
  *
  * **編集はしない。** 点をドラッグで動かせるが、動かした先は画面の state（`state.ts` の spots）に入るだけで、
- * `phases.yml` には書かない。人が持つ設定に座標は入れない。関係そのものを直すのは一覧のほう。
+ * `phases.yml` には書かない。ユーザが持つ設定に座標は入れない。関係そのものを直すのは一覧のほう。
  *
  * 点を押すと一覧へ戻り、その種類の行が開く（`onPick`）。
  *
@@ -62,7 +62,7 @@ function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
         </span>
         {data.review !== "none" && (
           <span className="tag hitl" title="種類の宣言（review）です。計画の延期や実績のリスクで、実際に見る場所は変わります">
-            人が見る
+            ユーザが見る
           </span>
         )}
       </span>
@@ -333,7 +333,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
         ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
         minZoom={0.3}
         maxZoom={1.6}
-        // 図は読むだけなので、消す・繋ぐの鍵は受けない
+        // 図は読むだけなので、消す・繋ぐためのキーは受けない
         deleteKeyCode={null}
       >
         <Background />
