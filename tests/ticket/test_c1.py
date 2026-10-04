@@ -417,9 +417,8 @@ class RecordTreeReviewTest(PhaseHarness):
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         passed = self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
-        self.assertTrue(
-            read_json(os.path.join(self.approved, "phases", "i0001", "ready.json"))["mr"]
-        )
+        archived = os.path.join(self.root, "logs", "archive", "self")
+        self.assertTrue(read_json(os.path.join(archived, "phases", "i0001", "ready.json"))["mr"])
         self.assertEqual(len(self.recorded), 3)
         self.places_only()
 

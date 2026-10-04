@@ -1198,7 +1198,7 @@ payload の `stop_hook_active` が真なとき、控えを置けないとき、�
 ルールファイルが壊れて組み込みの既定を使っている間も同じ。
 
 - `.claude/` の `hooks/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、`ccnavi-git.sh`、実行ファイル、
-  共通層の 3 本（`.ccnavi/common/`）、記録と控え（`logs/decisions.jsonl` と `logs/state`）
+  共通層の 3 本（`.ccnavi/common/`）、記録と控え（`logs/decisions.jsonl` と `logs/state`）、閉じたチケットの退避（`logs/archive`）
 - 綴りは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
 - 場所の綴りは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない。止める側が広がるだけなので問題にしない
 
@@ -1628,7 +1628,7 @@ JSON で渡す（`--result <path>`）。
 | `decide N` | sh が取ってくる → `--reviewed N --accept-unresolved`（ユーザに見せ、指摘ごとに対応方針を選ばせる）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `decide N --preview`（`--preview --json`。一覧と指紋）と `decide N --choices <JSON> --digest <指紋>`（`--yes <JSON> --digest <指紋> --json`）で同じ経路を通る |
 | （`chat` のフェーズ） | ユーザが親のワークツリーの端末で `ccnavi-review.sh chat <N>` を打つ（中身は `ccnavi --reviewed <N> --chat`。取り込み済みの親子のチケットなら最後に運ぶ処理を呼ぶ）。依頼も写しも無い |
 | `comment` | sh が投稿する。実行ファイルは関わらない |
-| `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置く）→ sh が Draft を外してコメントを投稿する。親が打つ。マージはユーザ |
+| `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置き、閉じた親子のチケットを手元の `logs/archive/` へ退避する）→ C1 が退避の削除をコミットして push → sh が Draft を外してコメントを投稿する。親が打つ。マージはユーザ |
 | `close-early --reason <理由> [--no-issue]` | まだ残っているが「キリの良いところまでやった」と締める。ユーザが端末で打つ。`--close-early`（残りを見せて y/N、未着手の子を取り消し、マーカーを置く）→ sh が残りを issue に写し、コメントを投稿する。Draft は親が片付けてから `ready` で外す |
 | `fetch` | 取得した JSON を標準出力へ。デバッグ用 |
 | `origin` | origin をどう読んだか（ホスト・scheme・API の綴り・使う道具）。origin の読み方が合わないときに確かめる |
@@ -1645,8 +1645,32 @@ JSON で渡す（`--result <path>`）。
 **Draft を外すのは親、マージはユーザ。** `ready` は、親を閉じられる状態（全フェーズが終わり、フィードバック計画が承認され、レビューが済んでいる）
 に加えて、親の承認済みチケットが `done/` にあること（閉じる前に Draft を外してマージされると、親の記録の無いまま親のブランチが消え、
 親子のチケットが決まらなくなる）と、`wip/` が追跡から消えていて、未コミットが無く、push 済みであることを求める。取り込みは squash（GitLab ではマージリクエストの
-`squash` を有効にする）。順は「親を `finish` で閉じる → `rm -r wip` をコミット → push → `ready` → マーカー `ready.json` をコミットして push →
-ワークツリーを片付ける」。ワークツリーの片付けはマージを待たない。
+`squash` を有効にする）。順は「親を `finish` で閉じる → `rm -r wip` をコミット → push → `ready` → ワークツリーを片付ける」。
+ワークツリーの片付けはマージを待たない。
+
+**チケットの置き場は既定のブランチに残さない。** `ready` は条件を確かめてから、親のワークツリーの承認済みの領域にある閉じた親
+（今回の親と、統合先にたまっていた過去の親。`done/` に在る親）について、次のファイルをワークスペースの `logs/archive/<リポジトリ>/` へ移す
+（`<リポジトリ>` はワークスペース自身なら `self`、プロジェクトならその名前。その下は承認済みの領域と同じ並び）。
+
+- `done/` の親と子のチケット
+- `phases/<親>/` の下（マーカー・子の記録・`ready.json`・`closed.json`）
+- `events/` の親と子の跡（退避した印 `archived` を 1 行足してから移す）
+- `flows/` の子のフロー
+
+`logs/` は git が追跡しないので、git の上では削除になる。取り込み済みの親子のチケットでは C1 がこの削除をコミットして push してから
+Draft を外すので、squash でマージすると既定のブランチにはチケットが残らない。取り込み済みでない親子のチケットでは、sh は Draft を外さずに止め、
+削除をコミットして push してから `ready` を打ち直すよう案内する。退避の後に打ち直した `ready`（Draft を外し損ねたとき）は、
+ワークツリーの側の条件（未コミット・push 済み）だけを見て通る。退避の行き先に違う中身が既に在れば、上書きせずに止める。
+
+退避は手元の機械にだけ残る補助の記録で、次の 3 か所が「閉じたもの」として読む。別の機械ではこの検査に使えない。
+
+- 閉じた識別子の使い回し（承認と `--lint`）と、子の連番（続きの子の識別子）
+- 先行（`predecessors`）。どの置き場にも無い先行を退避の `done/` から引く
+- `ccnavi-sync.sh`。親のブランチがリモートから消えたとき、統合先の `done/` に親が無くても、退避に親があるか、`ccnavi-review.sh merged` が
+  マージ済みと答えれば閉じた親子のチケットにする
+
+退避の削除は、C1 の見分けと実行後チェックが ccnavi の書き込みとして外す（閉じた親の `done/<親>.md` も同じ変更の中で消えていて、
+消えた中身が退避の写しと同じものだけ）。`logs/archive/` は記録と控えの守り（`builtin-guard-records`）が書き込みを止める。
 
 **まだ残っているが締めたいとき**は、ユーザが端末で `close-early --reason <理由>` を打つ。作業中の子がいる間は打てない。残っているものを全部
 見せてから y/N を取り、未着手の子の取り消し（理由は `close-early: <理由>`）、省略とレビュー済みのマーカー、未解決の受け入れ、残りの issue 化を行う。
@@ -2124,6 +2148,7 @@ ccnavi --explain --json
 | `pending_approval[]` | `--agree` で承認の対象に入る識別子（承認済みチケットの無い提案と、親の改版） |
 | `tickets[]` | 識別子ごとに 1 件。提案と承認済みチケットのどちらか一方しか無くても出す |
 | `parents[]` | 承認済みチケットのある親ごとの局面とフェーズ。承認前の親はフェーズを持たないのでここに無い |
+| `archived[]` | 手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある閉じたチケット。表示のためだけの任意の欄で、判定（承認待ち・先行・局面）には混ぜない。`tickets[]` に同じ識別子があるものは出さない。`{ticket, parent, phase, title, project, path, approved_at, started_at, completed_at, cancelled_at, cancel_reason, history}`。`path` は退避したファイルの絶対パス、`history[]` は退避した跡（`tickets[]` の `history[]` と同じ形。最後の行は `kind` が `archived`）。この欄を持たない古い実行ファイルの答えも同じ版のまま読める（拡張は無ければ空とする） |
 
 `tickets[]` の 1 件。
 
@@ -2140,7 +2165,7 @@ ccnavi --explain --json
 | `scattered[]` | どれが本物か決まらない、写っている場所の全部。`{tree, state, path}`。決まっていれば空。権威のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
 | `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, draft}`。`path` は読む先の絶対パス（権威のツリー＝承認済みチケットが在るツリーの版だけ。子のワークツリーの写しは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く）、`rel` はツリーのルートからの相対（承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml`。中身は YAML）、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`（置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml`。ボードは綴りを組まずにこれを読み、いまのフローと違えば「提案あり」を出す）。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
-| `history[]` | 状態が動いた跡の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（権威のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled`（置き場が動いたもの）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の跡に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook`。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態の正は置き場の欄。跡が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
+| `history[]` | 状態が動いた跡の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（権威のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled` / `archived`（置き場が動いたもの。`archived` は `ready` が退避した印で、`to` は `archive`）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の跡に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook`。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態の正は置き場の欄。跡が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
 
 `parents[]` の 1 件。
 

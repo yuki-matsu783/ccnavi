@@ -236,6 +236,8 @@ def _close_parent(
 
     案内は運び方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
     無いなら統合先に取り込むところまで。ccnavi はどちらでもマージしない。
+    Draft を外す `ready` は、閉じたチケットとその記録を手元の `logs/archive/` へ退避してから外す
+    （`review.ready`・archive.py）。この記録（`closed.json`）も一緒に退避される。
     """
     where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
     venues = phase.review_venues(root, conf, found.ticket)
@@ -265,7 +267,9 @@ def _close_parent(
         f"次は、この移動をコミットし、`{wip}/` を消して"
         f"（'{git_sh} rm -r {wip}'）コミットし、"
         f"push してから '{review_sh} ready' で Draft を外してください"
-        "（「マージに進んでよい」の合図）。途中の作業は既定のブランチに残さない。"
+        "（「マージに進んでよい」の合図）。ready は Draft を外す前に、閉じたチケットとその記録"
+        f"（`{conf.approved}/` の done/・phases/・events/・flows/）を手元の logs/archive/ へ移し、"
+        "その削除をコミットして push する。途中の作業もチケットも既定のブランチに残さない。"
         "マージはユーザが squash で行う\n"
     )
 

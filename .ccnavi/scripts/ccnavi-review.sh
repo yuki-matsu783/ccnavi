@@ -69,7 +69,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で打つ。--preview は一覧を JSON で見るだけ）
-  ready                                           閉じられ、wip を片付けて push 済みなら Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
+  ready                                           閉じられ、wip を片付けて push 済みなら、閉じたチケットを logs/archive/ へ退避して削除を push し、Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（ユーザが端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   chat         <N>                                chat で見るフェーズをユーザがこのセッションで見終えた（ユーザが端末で打つ。ccnavi --reviewed <N> --chat）
   config-synced <親>                              着手で上書きした設定をユーザが端末で見た（ユーザが端末で打つ。ccnavi --config-synced <親>）
@@ -1087,7 +1087,9 @@ decide)
 	;;
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
-	# ここが外してコメントを投稿する。マージはユーザ。
+	# 閉じた親子のチケット（done/ の親子・phases/<親>/・events/・flows/）を手元の logs/archive/ へ
+	# 退避する（git の上では削除）。C1 の中なら、その削除をコミットして push してから、ここが外して
+	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
 	c1_start "$branch"
 	fetch_all >"$result"
 	tell_skew
@@ -1098,6 +1100,16 @@ ready)
 	rm -f "$ccnavi_c1_capture"
 	ccnavi_c1_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
+	# C1 の外（取り込み済みでない親子のチケット）では、退避の削除をここでは送らない。
+	# 送る前に Draft を外すと、チケットを残したままマージされうるので、送ってから打ち直してもらう。
+	if [ "$c1_on" != yes ]; then
+		ready_tree=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || :)
+		ready_place="${ccnavi_c1_approved:-${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}}"
+		if [ -n "$ready_tree" ] &&
+			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- ":(literal)$ready_place" 2>/dev/null)" ]; then
+			fail ready-unsent "閉じたチケットを logs/archive/ へ退避した（${ready_place} の下の削除）。この削除をコミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
+		fi
+	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	still=$(undraft "$number")

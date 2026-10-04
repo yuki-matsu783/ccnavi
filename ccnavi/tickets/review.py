@@ -48,7 +48,7 @@ from datetime import datetime
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, configsync, history, ops, phase, phasetypes
+from . import approval, archive, configsync, history, ops, phase, phasetypes
 from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
@@ -1249,7 +1249,17 @@ def ready(
     ある」を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものはユーザが行う。
+
+    条件を確かめて印を置いたあと、親のツリーの承認済みの領域から、閉じた親（今回の親と、統合先に
+    たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`events/`・`flows/` を
+    手元の `logs/archive/` へ退避する（archive.py）。git の上では削除になり、C1 がコミットして
+    push してから sh が Draft を外す。squash でマージすると、既定のブランチにチケットは残らない。
+    退避した後に打ち直したとき（親が退避にだけある）は、条件の確かめのうちワークツリーの側
+    （未コミット・push 済み）だけを見て、下書きを書き直す。
     """
+    archived = _archived_parent(root, conf, cwd)
+    if archived is not None:
+        return _ready_again(stdout, stderr, root, conf, archived, result_path)
     parent = _parent_any(stderr, root, conf, cwd)
     if parent is None:
         return 1
@@ -1286,25 +1296,87 @@ def ready(
         parent.ticket,
         approval.PARENT_MARK_CLOSE_EARLY,
     )
-    text = [MARKER_READY, f"チケット `{parent.ticket}` の作業は終わり、Draft を外した。"]
-    text.append(
-        f"`{ticket_mod.WIP_ROOT}/` は片付けてある。マージするかどうかはユーザが決める。"
-        "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
-    )
-    if wrapped:
-        text.append(f"（ユーザが締めた: {wrapped.get('reason', '')}）")
-    path = os.path.join(conf.state, READY_FILE.format(parent=parent.ticket))
-    failed = _write_text(path, "\n".join(text) + "\n")
+    path, failed = _ready_note(conf, parent.ticket, wrapped)
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
+    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     if not _parent_mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+        where,
         parent.ticket,
         approval.PARENT_MARK_READY,
         {"mr": result.mr.number, "url": result.mr.url},
     ):
+        return 1
+    # 閉じた親子のチケットを手元の退避へ移す。条件は確かめてあり、今回の親は done/ にある。
+    todo = archive.plan(where, archive.closed_parents(where))
+    _, failed = archive.move(root, parent.project, where, todo)
+    if failed:
+        stderr.write(f"ccnavi: 閉じたチケットを logs/archive/ へ退避できなかった: {failed}\n")
+        return 1
+    stdout.write(path + "\n")
+    return 0
+
+
+def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> tuple[str, str]:
+    """Draft を外したときのコメントの下書きを書く。パスと、書けなかった理由（無ければ空）。"""
+    text = [MARKER_READY, f"チケット `{parent}` の作業は終わり、Draft を外した。"]
+    text.append(
+        f"`{ticket_mod.WIP_ROOT}/` は片付けてある。閉じたチケットとその記録"
+        f"（`{conf.approved}/` の done/・phases/・events/・flows/）は手元の `logs/archive/` へ"
+        "退避し、このブランチからは消してある。マージするかどうかはユーザが決める。"
+        "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
+    )
+    if wrapped:
+        text.append(f"（ユーザが締めた: {wrapped.get('reason', '')}）")
+    path = os.path.join(conf.state, READY_FILE.format(parent=parent))
+    return path, _write_text(path, "\n".join(text) + "\n")
+
+
+def _archived_parent(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
+    """cwd のワークツリーの親が、承認済みの領域に無く、手元の退避にだけあれば、その親。
+
+    `ready` が退避を済ませた後に打ち直したとき（Draft を外し損ねた）に通すため。
+    """
+    t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
+    if t is None or t.is_main:
+        return None
+    approved = settings.approved_dir(conf, t.root)
+    for state in (ticket_mod.DOING, ticket_mod.DONE):
+        if os.path.lexists(os.path.join(approved, state, f"{t.name}.md")):
+            return None
+    return archive.archived_parent(root, t.project, t.name)
+
+
+def _ready_again(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    result_path: str,
+) -> int:
+    """退避を済ませた親に打ち直した `ready`。ワークツリーの側の条件だけを見て、下書きを書き直す。"""
+    problems = _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
+    if problems:
+        stderr.write(
+            "ccnavi: まだ Draft を外せない（閉じたチケットは logs/archive/ へ退避済み）:\n"
+        )
+        for p in problems:
+            stderr.write(f"  - {p}\n")
+        return 1
+    if _result_with_mr(stderr, result_path) is None:
+        return 1
+    if not conf.state:
+        stderr.write("ccnavi: 控えの置き場が空。コメントの下書きを置く場所が無い\n")
+        return 1
+    wrapped = approval.read_parent_mark(
+        archive.base_dir(root, parent.project), parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
+    )
+    path, failed = _ready_note(conf, parent.ticket, wrapped)
+    if failed:
+        stderr.write(f"ccnavi: {failed}\n")
         return 1
     stdout.write(path + "\n")
     return 0

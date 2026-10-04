@@ -17,6 +17,7 @@ import { post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
 import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
+import { FILTER_LABELS } from "./text.js";
 
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSS の min-width と同じ値 */
 const MIN_WIDTH = 220;
@@ -96,6 +97,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が有効なままにすると、
   // 出すものが無いのに「絞り込み中」になる
   const attention = board !== undefined && view.attention;
+  // アーカイブ済みのチケット（手元の退避）を出すか。既定は出さない。隠すのが既定なので、絞り込み（filtering）には数えない
+  const archived = view.archived;
   const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
 
   // 絞り込み中かどうかは body に出す。カードの表示・非表示は CSS（.card.hidden）が受け持つ
@@ -114,8 +117,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     if (board === undefined) {
       return;
     }
-    saveState({ project, parent, attention, folded: view.folded, widths: view.widths });
-  }, [board === undefined, project, parent, attention, view.folded, view.widths]);
+    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths });
+  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths]);
 
   // 前の読み直しから動いたカード。数えるのは拡張ホスト（`core/board-moved.ts`）で、画面は出すだけ
   const moved = new Map((data.kind === "board" ? (data.moved ?? []) : []).map((m) => [m.id, m]));
@@ -125,7 +128,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 有効なままだと全部隠れ、案内が指す先を失う
   const hiddenOf = (card: Card): boolean =>
     sample === undefined &&
-    ((project !== EMPTY.project && card.project !== project) ||
+    ((!archived && card.column === "archived") ||
+    (project !== EMPTY.project && card.project !== project) ||
     (parent !== EMPTY.parent && card.family !== parent) ||
     (attention && !card.attention));
 
@@ -180,8 +184,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              <label className="filter attention" title="ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
-                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応のみ
+              <label className="filter attention" title={FILTER_LABELS.attentionTitle}>
+                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
+              </label>
+              <label className="filter archived" title={FILTER_LABELS.archivedTitle}>
+                <input type="checkbox" id="archived-filter" checked={archived} onChange={(event) => setView((now) => ({ ...now, archived: event.target.checked }))} /> {FILTER_LABELS.archived}
               </label>
               <button
                 type="button"
@@ -218,7 +225,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           ) : null}
           {shown.totalCount === 0 ? <p className="board-empty">チケットなし</p> : null}
           <div className="board">
-            {shown.columns.map((column) => (
+            {/* アーカイブの列は「アーカイブ済みのチケットを表示する」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
+            {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
               <Column
                 key={column.state}
                 column={column}

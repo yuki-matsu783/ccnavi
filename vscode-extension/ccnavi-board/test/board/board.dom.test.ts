@@ -604,3 +604,54 @@ test("CB-D123 履歴を開け閉めしてもカードの提案は開かない。
     await page.close();
   }
 });
+
+test("CB-D144 「アーカイブ済みのチケットを表示する」は既定で外れていて、入れるとアーカイブの列と退避のカードが出る。state に残る", async () => {
+  const archived = {
+    ticket: "old",
+    parent: "",
+    phase: null,
+    title: "退避した親",
+    project: "",
+    path: "/ws/logs/archive/self/done/old.md",
+    approved_at: "",
+    started_at: "",
+    completed_at: "",
+    cancelled_at: "",
+    cancel_reason: "",
+    history: [],
+  };
+  const json = { ...fixture(), archived: [archived] };
+  const page = await openBoard(json);
+  try {
+    const box = page.one<HTMLInputElement>("#archived-filter");
+    assert.equal(box.checked, false);
+    assert.match(box.parentElement?.textContent ?? "", /アーカイブ済みのチケットを表示する/);
+    assert.equal(page.all('.column[data-state="archived"]').length, 0);
+    page.click(box);
+    await page.settle();
+    assert.equal((page.state() as { archived: boolean }).archived, true);
+    // 絞り込みではない（承認の送り先は変わらない）
+    assert.ok(!page.document.body.classList.contains("filtering"));
+    assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
+    assert.equal(page.one('.column[data-state="archived"] > h2 > .count').textContent, "1");
+    assert.equal(page.one('button.fold[data-fold="archived"]').textContent, "アーカイブ");
+    // 押すと退避したファイルを開く
+    page.click(page.one('.card[data-id="old"]'));
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "open", filePath: "/ws/logs/archive/self/done/old.md" });
+    // 「要対応のみ」と重ねると隠れる（アーカイブは要対応に入らない）
+    page.click(page.one("#attention-filter"));
+    await page.settle();
+    assert.ok(page.one('.card[data-id="old"]').classList.contains("hidden"));
+  } finally {
+    await page.close();
+  }
+  // 読み直しても入ったまま
+  const again = await openBoard(json, { state: { archived: true } });
+  try {
+    assert.equal(again.one<HTMLInputElement>("#archived-filter").checked, true);
+    assert.ok(!again.one('.card[data-id="old"]').classList.contains("hidden"));
+  } finally {
+    await again.close();
+  }
+});

@@ -540,17 +540,42 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
 
-    def test_a_merged_request_waits_instead_of_calling_it_gone(self):
-        # MR がマージ済みと分かれば観測の食い違い。消えたとは言わない。
+    def test_a_merged_request_is_closed_without_a_done_copy(self):
+        # 統合先には閉じたチケットを残さない（ready が退避して消し、squash でマージする）ので、
+        # MR がマージ済みと分かれば閉じた親子のチケット。消えたとは言わない。
         self.review_says("merged 42")
         self.keep_record()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="1")
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
-        self.assertEqual("present", fields(self.record)["state"])
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def archive_locally(self, text):
+        write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
+
+    def test_a_parent_in_the_local_archive_is_closed(self):
+        # 手元の退避（ready が移した先）に親があれば、ホストに聞かずに閉じた親子のチケット。
+        self.review_says("none")
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("logs/archive/self/done/", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def test_a_child_in_the_local_archive_is_not_the_parent(self):
+        self.review_says("none")
+        self.keep_record()
+        self.archive_locally(copy_text().replace("ticket: i0001\n", "ticket: i0001\nparent: x\n"))
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
+        self.assertEqual("gone", fields(self.record)["state"])
 
     def test_branch_names_are_matched_exactly(self):
         # i0001-x があっても i0001 があることにはならない（前方一致で取り違えない）。

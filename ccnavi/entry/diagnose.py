@@ -34,7 +34,7 @@ from ..hook import judge
 from ..infra import hookio, modes, settings, tree
 from ..policy import builtin, ruleload, rules, selfguard
 from ..records import audit
-from ..tickets import agree, approval, flow, history, phase, phasetypes, risk, workflow
+from ..tickets import agree, approval, archive, flow, history, phase, phasetypes, risk, workflow
 from ..tickets import ticket as ticket_mod
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
@@ -627,7 +627,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
     approval.align_imported(conf, root, preds)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
@@ -724,9 +724,14 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         "pending_approval": [],
         "tickets": [],
         "parents": [],
+        # 手元の退避（`logs/archive/`）にある閉じたチケット。表示のためだけに載せ、判定（scan・
+        # 承認待ち・先行の池）には混ぜない。置き場に同じ識別子がまだ在るもの（退避の後の push が
+        # 戻されたなど）は `tickets` の側に出すので、ここには出さない。
+        "archived": [],
     }
     if not conf.tickets_enabled:
         problems.append(f"{settings.TICKET_CONTROL_ENV}=disable。チケット制御を使っていない")
+        payload["archived"] = _archived_records(root, set(), problems)
         return payload
 
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
@@ -756,7 +761,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         agree.types_resolver(conf, root, open_copies),
     )
     # 先行を引く池。承認と着手が使うのと同じ集め方。
-    preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
+    preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals, root)
     approval.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
@@ -800,7 +805,38 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         if parent.is_child:
             continue
         payload["parents"].append(_parent_record(conf, root, parent, closed_index))
+    payload["archived"] = _archived_records(
+        root, {t["ticket"] for t in payload["tickets"]}, problems
+    )
     return payload
+
+
+def _archived_records(root: str, skip: set[str], problems: list[str]) -> list[dict]:
+    """手元の退避にある閉じたチケット（表示用）。`skip` の識別子は出さない。"""
+    out = []
+    for t in archive.closed_tickets(root):
+        if t.ticket in skip:
+            continue
+        entries, unreadable = history.read(archive.base_dir(root, t.project), t.ticket)
+        if unreadable:
+            problems.append(f"{t.ticket} の履歴（退避）: {unreadable}")
+        out.append(
+            {
+                "ticket": t.ticket,
+                "parent": t.parent,
+                "phase": t.phase,
+                "title": t.title,
+                "project": t.project,
+                "path": t.path,
+                "approved_at": t.approved_at,
+                "started_at": t.started_at,
+                "completed_at": t.completed_at,
+                "cancelled_at": t.cancelled_at,
+                "cancel_reason": t.cancel_reason,
+                "history": entries,
+            }
+        )
+    return out
 
 
 def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:

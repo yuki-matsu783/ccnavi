@@ -72,7 +72,7 @@ def at_start(
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ。
-    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
     approval.align_imported(conf, root, preds)
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"

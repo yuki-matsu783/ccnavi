@@ -48,7 +48,7 @@ from dataclasses import dataclass, field, replace
 
 from ..infra import fsio, settings, tree
 from ..policy import rules
-from . import flow, history, syncstate, workflow
+from . import archive, flow, history, syncstate, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -567,7 +567,20 @@ def integration_problems(
     控えが壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
     承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
     （今のまま）。
+
+    手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある識別子も、閉じた
+    識別子として数える。統合先には閉じたチケットを残さないので、手元ではここが閉じた記録になる
+    （別の機械では見えない）。退避は控えの有無に依らず見る。
     """
+    if t.ticket in archive.ids(root, t.project):
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"{t.ticket} は手元の退避（{archive.ARCHIVE_DIR.replace(os.sep, '/')}/）で"
+                "閉じている。閉じた識別子を新規に承認しない。識別子を変えて出し直してください",
+            )
+        ]
     fams = fams or syncstate.Families(conf, root)
     if not fams.active:
         return []
@@ -602,15 +615,18 @@ def integration_problems(
 def integration_closed(
     conf: settings.Settings, root: str, proposals: list[ticket_mod.Ticket]
 ) -> set[str]:
-    """統合先の控えの `done/` に同じ識別子がある新規の提案（閉じた識別子の再利用）。"""
+    """統合先の控えの `done/` か手元の退避に同じ識別子がある新規の提案（閉じた識別子の再利用）。"""
     fams = syncstate.Families(conf, root)
-    if not fams.active:
-        return set()
-    return {
-        t.ticket
-        for t in proposals
-        if t.state == ticket_mod.TODO and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
-    }
+    archived: dict[str, set[str]] = {}
+
+    def closed(t: ticket_mod.Ticket) -> bool:
+        if t.project not in archived:
+            archived[t.project] = archive.ids(root, t.project)
+        if t.ticket in archived[t.project]:
+            return True
+        return fams.active and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
+
+    return {t.ticket for t in proposals if t.state == ticket_mod.TODO and closed(t)}
 
 
 def _everything(
@@ -925,12 +941,15 @@ def settle_review(
 
 
 def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
-    """この親の次の子の識別子。どの置き場に在る子よりも後ろの連番。"""
+    """この親の次の子の識別子。どの置き場に在る子よりも後ろの連番。
+
+    手元の退避（`logs/archive/`）にある子も数える（閉じた子の連番を使い回さない）。
+    """
     seen = _everything(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     used = 0
-    for t in seen + proposals:
-        m = ticket_mod.child_pattern().match(t.ticket)
+    for ident in [t.ticket for t in seen + proposals] + sorted(archive.ids(root)):
+        m = ticket_mod.child_pattern().match(ident)
         if m and m.group("parent") == parent_id:
             used = max(used, int(m.group("seq")))
     return f"{parent_id}-{used + 1:02d}"
@@ -1078,17 +1097,33 @@ def predecessor_pool_of(
     review: list[ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
     proposals: list[ticket_mod.Ticket],
+    root: str = "",
 ) -> dict[str, list[ticket_mod.Ticket]]:
     """先行を引く池。識別子 → 権威のある写りの全部（`ops._places` と同じ集め方）。
 
     承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。写りが 2 つ以上
     残れば、どれが本物か決まらない。
+
+    `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
+    `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
+    引くのは並びのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
     """
     pool = _by_id(open_copies + review + closed)
     for t in proposals:
         if t.state == ticket_mod.TODO and t.ticket not in pool:
             pool.setdefault(t.ticket, []).append(t)
+    if root:
+        wanted = {
+            ident
+            for t in open_copies + review + closed + proposals
+            for ident in t.predecessors
+            if ident not in pool
+        }
+        for ident in sorted(wanted):
+            found = archive.find(root, ident)
+            if found:
+                pool[ident] = found
     return pool
 
 
@@ -1098,7 +1133,7 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
     review, _ = scan_review(conf, root)
     closed, _ = scan(conf, root, closed=True)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    pool = predecessor_pool_of(open_copies, review, closed, proposals)
+    pool = predecessor_pool_of(open_copies, review, closed, proposals, root)
     align_imported(conf, root, pool)
     return pool
 
@@ -1126,6 +1161,9 @@ def align_imported(
         return
     for ident, hits in list(pool.items()):
         if not hits:
+            continue
+        # 手元の退避から引いた先行は閉じたもの。親のブランチの写しでは読み直さない。
+        if all(archive.is_archived_path(root, h.path) for h in hits):
             continue
         st = family_standing(conf, root, hits[0], fams)
         if not st.imported or st.closed:

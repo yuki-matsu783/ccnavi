@@ -1252,6 +1252,35 @@ class C1HostTest(C1Harness):
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
 
+    def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
+        """ready の退避（閉じたチケットの削除）は、C1 がコミットして push してから Draft を外す。"""
+        old = f"{APPROVED}/events/old.ndjson"
+        write(os.path.join(self.tree, *old.split("/")), "{}\n")
+        git(self.tree, "add", old)
+        git(self.tree, "commit", "-q", "-m", "old")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        mover = executable(
+            os.path.join(self._tmp.name, "bin", "mover"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            '*" review ready "*)\n'
+            '  prev=""; for a in "$@"; do\n'
+            '    [ "$prev" = --record-writes ] && list="$a"\n'
+            '    [ "$prev" = --record-tree ] && tree="$a"\n'
+            '    prev="$a"; done\n'
+            f'  rm "$tree/{old}"\n'
+            f"  printf '{old}\\n' >\"$list\"\n"
+            "  exit 0 ;;\n"
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        ready = self.review("ready", CCNAVI_BIN_PATH=mover)
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("Draft を外した", ready.stdout)
+        self.carried(old)
+        self.assertFalse(os.path.exists(os.path.join(self.tree, *old.split("/"))))
+        self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", old).stdout, "")
+
     def test_a_request_is_not_posted_twice_across_runs(self):
         """投稿の後に落ちた依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")

@@ -249,14 +249,14 @@ _COPY_END = r"(?:[\\/]|$)"
 _PLACES = (
     r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
-    r"logs[\\/](decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _END,
+    r"logs[\\/](decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|archive)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
     r"\.claude(?:[\\/](hooks|settings)|" + _COPY_TERM + r")",
     # 行き先が ccnavi ディレクトリそのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
-    r"logs[\\/](decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _COPY_END,
+    r"logs[\\/](decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|archive)" + _COPY_END,
     r"ccnavi-git\.sh",
 )
 
@@ -474,7 +474,7 @@ def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
 
 # 記録と控えの置き場の既定の綴り（`_PLACES` の `logs/` の節と同じ場所）を、名指しのツールに
 # 当てる形。当てる先は解決済みの絶対パスなので、末尾で閉じる。
-_RECORDS_PLACES = r"[\\/]logs[\\/](?:decisions(?:\.[^\\/]*)?\.jsonl$|state(?:[\\/]|$))"
+_RECORDS_PLACES = r"[\\/]logs[\\/](?:decisions(?:\.[^\\/]*)?\.jsonl$|(?:state|archive)(?:[\\/]|$))"
 
 
 def records_regex(log_path: str = "", state_dir: str = "") -> str:
@@ -545,8 +545,9 @@ COMMON_LAYER_MESSAGE = (
 RECORDS_RULE_ID = "builtin-guard-records"
 
 RECORDS_MESSAGE = (
-    "ccnavi の記録と控えの置き場（logs/decisions*.jsonl と logs/state/）です。判定が読み、"
-    "「ccnavi が何を判定したか」を後から確かめる元なので、エージェントは書き換えません。"
+    "ccnavi の記録と控えの置き場（logs/decisions*.jsonl と logs/state/）か、閉じたチケットの"
+    "退避（logs/archive/）です。判定が読み、「ccnavi が何を判定したか」・「何が閉じたか」を"
+    "後から確かめる元なので、エージェントは書き換えません。"
     "シェルからの書き込みでも拒否される場所です。読むだけなら止まりません。"
 )
 

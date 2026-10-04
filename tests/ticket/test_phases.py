@@ -901,8 +901,11 @@ class PhaseTest(PhaseHarness):
             note = f.read()
         self.assertIn("ccnavi:ready", note)
         self.assertIn("squash", note)
-        mark = read_json(os.path.join(self.approved, "phases", "i0001", "ready.json"))
+        # 印は閉じたチケットと一緒に手元の退避（logs/archive/）へ移る
+        archived = os.path.join(self.root, "logs", "archive", "self")
+        mark = read_json(os.path.join(archived, "phases", "i0001", "ready.json"))
         self.assertEqual(mark["mr"], 7)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "done", "i0001.md")))
         # 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し）。
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)

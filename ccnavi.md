@@ -367,7 +367,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 |---|---|
 | `rm -rf`、`git push`、`git reset --hard` | 止める |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
-| シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込む綴りと場所の組で見る。8.2） |
+| シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込む綴りと場所の組で見る。8.2） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
@@ -849,11 +849,11 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
-| `builtin-guard-setting-files` | 常に | Bash で、書き込む綴り（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と控えの `logs/decisions.jsonl` `logs/state`）の組 |
+| `builtin-guard-setting-files` | 常に | Bash で、書き込む綴り（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と控えの `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
 | `builtin-guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
 | `builtin-guard-project-home` | ccnavi ディレクトリの綴り（`CCNAVI_PROJECT_HOME`）が決まっているとき | 同上 |
 | `builtin-guard-common-layer` | 共通層の 3 本の置き場が決まっているとき（11.6） | 同上 |
-| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と控えの置き場（`logs/decisions*.jsonl`、`logs/state/`、動かしてあれば `CCNAVI_LOG` とその隣のローテートした分、`CCNAVI_STATE` の下）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
+| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と控えの置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`、動かしてあれば `CCNAVI_LOG` とその隣のローテートした分、`CCNAVI_STATE` の下）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
 
 同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase.prune_form`）。実行ファイルの端末要求は
@@ -1971,7 +1971,14 @@ push は親だけが行う。hook は子チケットのワークツリーから�
 
 順は運び方で分かれる。マージリクエストがあるなら「親を `finish` で閉じる → `wip/` を消してコミット →
 push → `ready`」。Draft を外す手段は `ready` だけ。取り込みはユーザが squash で行い、途中のコミットと
-チケットの置き場は既定のブランチに残さない。全部 `chat` で回した親は、「親を `finish` で閉じる →
+チケットの置き場は既定のブランチに残さない。チケットの置き場を残さないのは `ready` の退避で行う。
+`ready` は条件を確かめてから、親のワークツリーの承認済みの領域にある閉じた親（今回の親と、統合先に
+たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`events/` の跡・`flows/` のフローを、
+ワークスペースの `logs/archive/<リポジトリ>/` へ移す（同じ並びで。`logs/` は git が追跡しないので削除になる）。
+C1 がその削除をコミットして push してから Draft を外す。統合先には閉じたチケットが残らないので、
+親子のチケットが閉じたことは、統合先の `done/` の代わりに、手元の退避か `ccnavi-review.sh merged` の答え
+（マージ済み）で決める（`ccnavi-sync.sh`）。閉じた識別子の使い回し・子の連番・先行も手元の退避を見る。
+退避は手元の機械にしか無いので、別の機械ではこれらの検査に使えない。全部 `chat` で回した親は、「親を `finish` で閉じる →
 `wip/` を消してコミット → 統合先に取り込む」で終わる。ccnavi はどちらでもマージを行わず、
 マージされたかも見ない。
 
