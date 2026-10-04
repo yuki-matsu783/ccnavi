@@ -135,7 +135,7 @@ class NoJudgeTest(unittest.TestCase):
                 self.assertEqual("handover", record["decision"])
 
     def test_an_unreadable_command_is_refused_even_with_the_gate_open(self):
-        """読み切れなかった呼び出しは、門を開けても渡さない（REQ-PRE-04）。
+        """読み切れなかった呼び出しは、確認を省くモードでも渡さない（REQ-PRE-04）。
         渡す先が「確認しない」と決まっている以上、読めなかったことを言える場所が他に無い。"""
         result, record = run(
             "bypassPermissions",

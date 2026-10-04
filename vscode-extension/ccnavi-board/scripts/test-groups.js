@@ -212,7 +212,7 @@ function webviewGroups(map, rel) {
   return groups;
 }
 
-/** 画面の並びを、それを読むグループの並びにする。 */
+/** 画面の配列を、それを読むグループの配列にする。 */
 function groupsFor(wanted, map) {
   const groups = new Set();
   for (const screen of wanted) {

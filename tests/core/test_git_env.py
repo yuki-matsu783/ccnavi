@@ -1,4 +1,4 @@
-"""走った機械の git の設定が、テストから締め出されているかを見張る。
+"""走った機械の git の設定が、テストから締め出されているかを確かめる。
 
 締め出しそのものは `tests/__init__.py` の `_block_host_git_config` が置く。ここは
 それが有効かを見る側で、無効になる経路が 3 つあるので 3 つとも見る。
@@ -85,7 +85,7 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
     """`run_ccnavi(env=...)` が環境を空にしても、締め出しだけは残る。
 
     ccnavi は判定の中で git を起こすので、ここで落ちるとその経路だけがホストの
-    `~/.gitconfig` を読み直す。落ちても大半のテストは通ってしまうので、見張りが要る。
+    `~/.gitconfig` を読み直す。落ちても大半のテストは通ってしまうので、それを確かめるテストが要る。
     """
 
     def test_the_block_is_still_there_with_an_empty_env(self):

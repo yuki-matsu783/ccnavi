@@ -67,7 +67,7 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
 });
 
-test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON と見せた指紋で渡す", () => {
+test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON と見せたダイジェストで渡す", () => {
   assert.deepEqual(decidePreviewArgs(2), ["decide", "2", "--preview"]);
   assert.deepEqual(decideArgs(1, { u1: "keep", "https://x/y#z": "fix" }, "d0"), [
     "decide",
@@ -79,7 +79,7 @@ test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON
   ]);
 });
 
-test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペースルートからの絶対パスで送る", () => {
+test("CB-T19b 承認の push の sh は、ワークスペースルートからの絶対パスで送る", () => {
   // 絶対パスなので、前のコマンドが別の場所へ cd したターミナルでも届く。
   assert.equal(pushApprovedCommand("/ws"), "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh'");
   // Windows の区切りは "/" に直す（Git Bash が読める形）。
@@ -92,7 +92,7 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
   );
-  // 親を並べると、その親子のチケットだけを運ぶ（フローの保存の後）。
+  // 親を並べると、その親子のチケットだけをコミットして push する（フローの保存の後）。
   assert.equal(
     pushApprovedCommand("/ws", ["i0001"]),
     "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",

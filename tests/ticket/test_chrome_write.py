@@ -6,7 +6,7 @@
    その親子のチケットは決まらない。判定の入力に読めない（バイナリの）ファイルがあれば止める
 2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
    受けない
-3. 見せた一覧と指紋: 違えば書くものを出さない
+3. 見せた一覧とダイジェスト: 違えば書くものを出さない
 4. 書く先は親のブランチ `P` だけ。予約の名前・統合先の名前へは書かない
 5. 履歴の行に経路（chrome）・アカウント・拡張の版が入る
 6. 手元の ccnavi が、Chrome の書いた承認済みチケットを同じに読む（判定し直しで error が出ない）。
@@ -103,7 +103,8 @@ class RecordsTest(ChromeWriteHarness):
         )
         self.assertIn("state gone", records["sync/self/families/i0009"])
         self.assertIn("state present", records["sync/self/families/i0001"])
-        # 先頭の sha は取り込み状態に書かない（指紋が関係の無い push で変わらないように。6.2）
+        # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
+        # 6.2）
         self.assertTrue(all("sha" not in text for text in records.values() if "\n" in text))
 
     def test_an_unreadable_input_stops_the_board_and_the_plan(self):
@@ -143,7 +144,7 @@ class WriteGuardTest(ChromeWriteHarness):
         body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
         self.assertIsNotNone(body["mismatch"])
         self.assertIsNone(body["changes"])
-        # 見せた後に提案が変われば、同じ指紋でも書かない
+        # 見せた後に提案が変われば、同じダイジェストでも書かない
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.commit_parent()
         shown = {"ids": first["identifiers"], "digest": first["digest"]}

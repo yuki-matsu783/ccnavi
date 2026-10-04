@@ -29,7 +29,7 @@ export function scopeTitle(phase: PhaseForm): string {
   return phase.inherit ? "親の範囲そのまま" : phase.scope.join(", ");
 }
 
-/** 並びの欄は 1 つの欄に "," 区切りで出し、打つたびに並びへ戻す */
+/** リストの欄は 1 つの欄に "," 区切りで出し、打つたびにリストへ戻す */
 export function splitList(text: string): readonly string[] {
   return text
     .split(",")
@@ -58,7 +58,7 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
 
 /**
  * 図の下に出す注意。**当てはまるときだけ出す。** 線の読み方は凡例（`Graph.tsx` の `Legend`）が持ち、
- * 細かい説明（「ユーザが見る」の意味、待ち方が決まる時点）は札のツールチップとヘルプに置く。
+ * 細かい説明（「ユーザが見る」の意味、待ち方が決まる時点）はバッジのツールチップとヘルプに置く。
  * 毎回 6 文を並べていたときは、要る注意がほかの文に埋もれていた。
  *
  * **線が落ちた理由は言わない。** 表記違いかもしれないし、ほかの設定の種類かもしれない。

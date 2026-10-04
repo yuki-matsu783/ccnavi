@@ -18,7 +18,7 @@
 - 承認の事実をモデルに伝える（`news`・`approved_text`）
 
 判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で本物とするのは置き場）。置き場を手で
-動かす運びもあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
+動かす進め方もあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ class Candidate:
         )
 
 
-# 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が名乗る。
+# 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が出す。
 # VS Code のボード拡張が読み、知らない番号なら読まずに版の違いを言う。
 AGREE_VERSION = 1
 
@@ -95,7 +95,7 @@ class Gathered:
     # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを承認の対象にする」）。
     note: str = ""
     # 本物とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
-    # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文と指紋には入れない）。
+    # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文とダイジェストには入れない）。
     elsewhere: list[str] = field(default_factory=list)
 
     @property
@@ -322,27 +322,28 @@ def _note_line(note: str) -> str:
 
 
 def approval_digest(text: str, batch: list[Candidate], read: dict[str, str] | None = None) -> str:
-    """承認の指紋。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに書き込む中身の
+    """承認のダイジェスト。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに書き込む中身の
     SHA-256 の 16 進（小文字）。
 
-    ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
+    ボードは preview のダイジェストを `--yes` に `--digest` で返す。識別子だけを比べると、
     見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
     本文だけを比べても、画面に出ないのに承認済みチケットへ書き込む欄（`issue`、Markdown の
     本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
 
-    **判定が読んだ中身（`read_set`）を指紋に含める。** 提案だけでなく、
+    **判定が読んだ中身（`read_set`）をダイジェストに含める。** 提案だけでなく、
     判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の取り込み結果のどれかが見せたあとに
-    変われば、指紋が変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
+    変われば、ダイジェストが変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
     入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
-    （`<ブランチ>:<相対パス>` → 中身の指紋）。
+    （`<ブランチ>:<相対パス>` → 中身のハッシュ）。
 
-    一括のチケットの書き込む中身（`_carried`）も残して指紋に含める。読んだ中身から決まるものだが、読みの
+    一括のチケットの書き込む中身（`_carried`）も残してダイジェストに含める。読んだ中身から決まるものだが、読みの
     記録（`fsio.reading`）を通らない読みが紛れても、書き込む中身の変化は取りこぼさないように。
 
-    部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
+    部分をそのままつながず、部分ごとのハッシュを件数と一緒に並べて、そのリストのハッシュを取る。
     区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
     本文は生の制御文字（`\\x00` も）をそのまま通すので、どの文字も「中身に出ない」とは言えない。
-    読んだ中身の部分は `<鍵>\\n<中身の指紋>`（指紋は 16 進の固定長なので、最後の改行で切れる）。
+    読んだ中身の部分は `<鍵>\\n<中身のハッシュ>`（ハッシュは 16 進の固定長なので、最後の改行で
+    切れる）。
     """
     parts = [text] + [_carried(cand) for cand in batch]
     if read is not None:
@@ -361,7 +362,7 @@ def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[s
     ブランチはそのツリーの HEAD が指すブランチ名（読めなければツリーの名前。ワークスペースルートの
     名前は空）で、`Changes.per_branch` と同じ決め方。ツリーは承認済みチケットを持ちうるもの全部
     （`trees`）で、最長一致。鍵に使ったツリーの HEAD の中身も `<リポジトリ>:<ブランチ>:(HEAD)` で
-    入れる（切り離した HEAD の sha が変わればツリーの名前の鍵は同じでも指紋が変わる）。
+    入れる（切り離した HEAD の sha が変わればツリーの名前の鍵は同じでもダイジェストが変わる）。
     state の置き場の下は、取り込み状態（`sync/`）だけを `(控え):<相対パス>` で
     入れ、ほかの記録（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
     変わりうる）。ワークスペースの外は絶対パスのまま。
@@ -429,7 +430,7 @@ def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
     Claude Code の設定（`.claude/settings.json`・`.claude/settings.local.json`）の中身を
     `(設定):<相対パス>` で、判定に影響する値（置き場のパス・チケット制御など。
     環境変数から来るもの）を `(設定値):<名前>` で入れる。
-    見せたあとに置き場のパスや設定が変われば、同じ画面でも指紋が変わる。
+    見せたあとに置き場のパスや設定が変われば、同じ画面でもダイジェストが変わる。
     """
     out: dict[str, str] = {}
     for rel in _SETTINGS_FILES:
@@ -462,7 +463,7 @@ def _folded(path: str) -> str:
 
 
 def _carried(cand: Candidate) -> str:
-    """承認済みチケットに書き込む中身。承認の記録の欄を足す前の姿で書き出す。
+    """承認済みチケットに書き込む中身。承認の記録の欄を足す前の内容で書き出す。
 
     改版は承認済みチケットの frontmatter の計画だけを差し替え、本文は承認済みチケットの
     ものを残す（`revise_copy`）。新規は提案をそのまま書き出す（`write_copy`）。
@@ -535,7 +536,7 @@ def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: s
 
 def _news_path(state_dir: str, session: str, agent_id: str) -> str:
     """このセッション（サブエージェントならその起動）が知っている承認済みチケットの記録。
-    `once-<session>-<agent>.json`（ctxfile）と同じ並びに置く。"""
+    `once-<session>-<agent>.json`（ctxfile）と同じディレクトリに置く。"""
     session_part = fsio.safe_name(session) or "unknown"
     agent_part = fsio.safe_name(agent_id) or "main"
     return os.path.join(state_dir, f"approved-{session_part}-{agent_part}.json")
@@ -653,14 +654,14 @@ def candidates(
     revisions: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
 ) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
-    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための池。
+    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための対応表。
 
     承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
     ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
     （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に何も言わなかった）。
     """
     open_index = approval.by_id(approved)
-    # 親子を引く池は、承認済みチケットと、今回の承認で通ったものだけ。落ちた親を池に残すと、
+    # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。落ちた親を対応表に残すと、
     # 承認されない親の範囲で子が検証され、親の承認を経ずに子の承認済みチケットができる。
     # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
     # 親の通過が決まっている。
@@ -670,7 +671,7 @@ def candidates(
     # 層ごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じ層のチケットが
     # 何件あっても、ファイルを読むのはその層につき 1 度で足りる。
     cache: dict[str, dict | None] = {}
-    # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
+    # 先行を引く対応表。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
     # 親子のチケットの立ち位置と統合先の取り込み結果。
     # 1 回の承認で 1 度ずつだけ読む。
@@ -751,7 +752,7 @@ def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
     """このチケットの層を決める `project:`（設計 11.4.1）。
 
     子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
-    `project_problems` が落とす。親が池に居ないときだけ、子の置き場の値をそのまま読む。
+    `project_problems` が落とす。親が対応表に居ないときだけ、子の置き場の値をそのまま読む。
     """
     if t.is_child:
         parent = pool.get(t.parent)
@@ -814,7 +815,7 @@ def _apply_steps(
     batch: list[Candidate],
     stamp: str,
 ) -> tuple[str, str] | None:
-    """`plan_batch` の中身。書き込みは fsio の書き込みを溜める段に積み、見せる行も同じ並びに積む。
+    """`plan_batch` の中身。書き込みは fsio の書き込みを溜める段に積み、見せる行も同じ順序で積む。
 
     書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
     書き込みを溜める段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
@@ -912,7 +913,7 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
 
     プロジェクトは提案を置いた場所で決まる。ユーザはここで、書き込みが向かうリポジトリを
     見て承認する。提案はそのツリーからの相対パスで見せる。絶対パスは
-    機械ごとに違い、承認の指紋（画面の本文を含む）が Chrome と手元で揃わない。
+    機械ごとに違い、承認のダイジェスト（画面の本文を含む）が Chrome と手元で揃わない。
     """
     return (
         f"■ プロジェクト: {t.project or 'ワークスペース'}"
@@ -1015,7 +1016,7 @@ def screen(
         elif t.has_plan:
             lines.append("■ 全体計画")
             lines.append(
-                "    承認すると、この並びで進めることに合意したことになる。"
+                "    承認すると、この順序で進めることに合意したことになる。"
                 "前のフェーズが閉じるまで、次のフェーズの子は承認できない"
             )
             lines += _plan_lines(t.plan, 1, cand_types)
@@ -1297,7 +1298,7 @@ def revision_problems(
                 "改版で変えられるのは plan と feedback だけ。題か課題番号が承認済みチケットと違う",
             )
         )
-    # 全体計画: 子がある番号までは同じ並びでなければならない。
+    # 全体計画: 子がある番号までは同じ順序でなければならない。
     if revised.plan != current.plan:
         frozen = _last_phase_with_children(conf, root, current.ticket)
         if frozen > len(revised.plan) or revised.plan[:frozen] != current.plan[:frozen]:
@@ -1335,7 +1336,7 @@ def revision_problems(
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
     if revised.feedback != current.feedback:
         if current.feedback is not None:
-            # 残りの切り出し先は運び方で違う。マージリクエストがあれば issue に切り出せるが、
+            # 残りの切り出し先は進め方で違う。マージリクエストがあれば issue に切り出せるが、
             # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
             elsewhere = (
                 "残りは新しい親チケットの提案として wip/proposals/todo/ に書いてください"
@@ -1398,7 +1399,7 @@ def revised_front(
 ) -> dict:
     """改版で書く frontmatter。承認済みチケットの frontmatter の計画と待ち方を差し替えたコピー。
 
-    `current` は書き換えない。承認の指紋（`digest`）も同じものから組むので、見せた
+    `current` は書き換えない。承認のダイジェスト（`digest`）も同じものから組むので、見せた
     中身と書く中身が食い違わない。
     """
     front = dict(current.raw)
@@ -1428,7 +1429,7 @@ def validate(
 ) -> tuple[list[rules.Problem], list[rules.Problem]]:
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
 
-    返すのは 2 つの並び。1 つめはチケットの形の苦情で、error があれば承認しない。
+    返すのは 2 つのリスト。1 つめはチケットの形の苦情で、error があれば承認しない。
     2 つめは範囲の超過（親の範囲・種類の上限を超えた項、regex の項）で、承認は止めない。
     判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。
 

@@ -429,7 +429,7 @@ class SyncTest(unittest.TestCase):
         self.assertNotIn("検査", done.stdout)
 
     def test_a_single_branch_clone_still_sees_the_parent_branch(self):
-        # origin の fetch の並びが main だけでも、origin/P を進めて取り込む。
+        # origin の fetch の refspec が main だけでも、origin/P を進めて取り込む。
         # sh の中の fetch は行き先を書く。
         git(self.ws, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
         head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
@@ -563,7 +563,7 @@ class SyncTest(unittest.TestCase):
         done = self.sync(PARENT)
         self.assertEqual("gone", fields(self.record)["state"], done.stdout)
 
-    # ---- 取り込み状態の寿命（墓標として残し、消すのはユーザの `--forget` だけ）
+    # ---- 取り込み状態の寿命（削除せずに残し、消すのはユーザの `--forget` だけ）
 
     def test_records_of_removed_worktrees_are_kept_as_tombstones(self):
         # 親のワークツリーを片付けて sync を打っても、gone の取り込み状態は消えない。
@@ -783,7 +783,7 @@ class SyncTest(unittest.TestCase):
                 done = self.sync(bad)
                 self.assertEqual(2, done.returncode, done.stdout + done.stderr)
 
-    # ---- ロック（mkdir で取り、ホスト名・pid・開始時刻を書く。古いロックは mv で奪う）
+    # ---- ロック（mkdir で取り、ホスト名・pid・開始時刻を書く。古いロックは mv で強制取得する）
 
     def test_a_held_lock_stops_the_family(self):
         lock = self.own_lock(os.getpid(), int(time.time()))
@@ -818,7 +818,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(lock))
 
     def test_a_live_owner_is_not_robbed_after_ten_minutes(self):
-        # 同じ機械で持ち主が生きていれば、10 分を過ぎても奪わない。
+        # 同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない。
         lock = self.own_lock(os.getpid(), int(time.time()) - 3600)
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
@@ -831,7 +831,8 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(lock))
 
     def test_another_thief_holds_the_steal_gate(self):
-        # 奪う操作は 1 つずつ。門（<ロック>.steal）が新しければ奪わずに待つ。
+        # 強制取得の操作は 1 つずつ。取得用のロック（<ロック>.steal）が新しければ
+        # 強制取得せずに待つ。
         lock = self.own_lock(self.dead_pid(), int(time.time()))
         os.makedirs(lock + ".steal")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")

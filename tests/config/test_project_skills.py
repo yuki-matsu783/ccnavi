@@ -101,7 +101,7 @@ class ProjectSkillsTest(unittest.TestCase):
     def test_the_ccnavi_directory_is_no_longer_read(self):
         """置き場は docs/skills/。.ccnavi/skills/ に置いたものは目録に載らない。
 
-        docs/skills/ は守りの外のふつうの場所で、承認したチケットの範囲の中で書ける。
+        docs/skills/ は組み込みの保護の外のふつうの場所で、承認したチケットの範囲の中で書ける。
         """
         write(
             os.path.join(self.lib, ".ccnavi", "skills", "old", "SKILL.md"),

@@ -3,7 +3,7 @@
 取り込み状態は `ccnavi-sync.sh` と、
 親のブランチを最初に push したときの `ccnavi-git.sh push` が書き、判定はここで読むだけ。
 判定は git もネットワークも起こさない（`tree.py` の前提）ので、統合先と親のブランチの
-リモートの姿は、sh が取り込み状態に書き出したものしか知らない。
+リモートの状態は、sh が取り込み状態に書き出したものしか知らない。
 
     <state の置き場>/sync/<リポジトリ>/families/<P>
         親子のチケットの取り込み状態
@@ -21,7 +21,7 @@
 一度も push していない）は今の動きのまま（Chrome はリモートにある `P` しか見ないので、
 二重状態は起きない）。
 
-親子のチケットの取り込み状態は墓標として残る（親のワークツリーを片付けても消えない。
+親子のチケットの取り込み状態は削除せずに残す（親のワークツリーを片付けても消えない。
 消すのはユーザが打つ `ccnavi-sync.sh --forget <P>` だけ）。取り込み状態と統合先の取り込み結果から、
 親子のチケットの立ち位置（`Standing`）を決める。
 
@@ -163,7 +163,7 @@ def family(state_dir: str, repo: str, name: str) -> Family | None:
 
 
 def family_names(state_dir: str) -> list[tuple[str, str]]:
-    """親子のチケットの取り込み状態の (リポジトリ, 親の識別子) の並び。
+    """親子のチケットの取り込み状態の (リポジトリ, 親の識別子) のリスト。
     書きかけ（`*.tmp.*`）は数えない。"""
     base = os.path.join(state_dir, SYNC_DIR)
     out: list[tuple[str, str]] = []
@@ -175,7 +175,7 @@ def family_names(state_dir: str) -> list[tuple[str, str]]:
 
 
 def repos(state_dir: str) -> list[str]:
-    """取り込み状態のあるリポジトリの名前の並び。"""
+    """取り込み状態のあるリポジトリの名前のリスト。"""
     return _names(os.path.join(state_dir, SYNC_DIR)) if state_dir else []
 
 
@@ -240,7 +240,7 @@ class Integration:
                 continue
             if stat.S_ISREG(mode):
                 out.append(name)
-        # 名前の並びも判定の入力（承認の指紋の read_set に入れる）。
+        # 名前のリストも判定の入力（承認のダイジェストの read_set に入れる）。
         fsio.note_read(directory, "\n".join(out))
         return out, ""
 

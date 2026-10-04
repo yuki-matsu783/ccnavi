@@ -1,15 +1,15 @@
-"""判定のコアと差し口の受入テスト。
+"""判定のコアと差し替え点の受入テスト。
 
-判定のコアは入出力を持たない関数にし、ファイルシステム・git・API は差し口に分ける。
+判定のコアは入出力を持たない関数にし、ファイルシステム・git・API は差し替え点に分ける。
 Chrome（Pyodide）と手元が同じコアで判定するため。
 
 見るのは 7 つ。
 
-1. 時計（Clock の差し口）: `fsio.clock` で固定した時刻を、承認の記録と履歴が同じに書く
+1. 時計（Clock の差し替え点）: `fsio.clock` で固定した時刻を、承認の記録と履歴が同じに書く
 2. 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
    前の形（絶対パス・ツリーの名前）の承認済みチケットも同じに読み、判定の答えは変わらない
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
-   書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの運び・フィードバック計画）
+   書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
 4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
    （新規・マーカーの消去・改版・フィードバック計画・多段の先行と落ちる提案・取り下げ・レビュー済み）。
    同じ要求と答えを拡張の試験の見本（`chrome-extension/ccnavi-approval/test/fixtures/core-scenarios.json`）
@@ -157,7 +157,8 @@ class CoreHarness(PhaseHarness):
     def chrome_request(self, op, family, heads=None, **extra):
         """手元のツリーから、拡張が組むのと同じ形の要求を作る（統合先は main）。
 
-        ブランチの先頭は既定で `0` の並び。`heads` で名前ごとに本物の先頭を渡せる（レビュー済みは
+        ブランチの先頭は既定で `0` を並べたもの。
+        `heads` で名前ごとに本物の先頭を渡せる（レビュー済みは
         依頼時の先頭と比べるので、親のブランチの本物の先頭が要る）。
         """
         chrome = _chrome()
@@ -203,7 +204,7 @@ class CoreHarness(PhaseHarness):
     def mirror_records(self, chrome, request):
         """Chrome の入口が仮のツリーに組む取り込み状態相当を、手元の state の置き場にも書く。
 
-        手元も同じ取り込み状態で判定する（取り込み済みの親子のチケットとして読む）ので、画面の本文と指紋（判定が読んだ中身。
+        手元も同じ取り込み状態で判定する（取り込み済みの親子のチケットとして読む）ので、画面の本文とダイジェスト（判定が読んだ中身。
         取り込み状態を含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
@@ -281,7 +282,7 @@ class SourcePathTest(CoreHarness):
         a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
         for key in ("batch", "text", "rejected", "problems"):
             self.assertEqual(a[key], b[key], key)
-        # 指紋は判定が読んだ中身（read_set）で作るので、読んだ承認済みチケットの
+        # ダイジェストは判定が読んだ中身（read_set）で作るので、読んだ承認済みチケットの
         # バイト列が変われば変わる（見せたあとに承認済みチケットが書き換わった承認を通さない）。
         self.assertNotEqual(a["digest"], b["digest"])
         self.assertEqual(verify_new.returncode, verify_old.returncode)
@@ -482,7 +483,7 @@ class PlanWriterTest(CoreHarness):
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
 
     def test_a_flow_is_carried_to_the_parent_tree(self):
-        """提案が別のツリー（ワークスペースルート）に在れば、フローも親のツリーへ運ぶ。"""
+        """提案が別のツリー（ワークスペースルート）に在れば、フローも親のツリーへ移す。"""
         self.family(plan=["design"])
         todo = os.path.join(self.root, "wip", "proposals", "todo")
         write(
@@ -497,7 +498,7 @@ class PlanWriterTest(CoreHarness):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "flows", "i0001-01.yml")))
 
     def test_a_flow_that_cannot_be_written_says_so_and_skips_the_rest(self):
-        """運べなかったフローは行で言い、元を消さない（前と同じ落ち方）。"""
+        """移せなかったフローは行で言い、元を消さない（前と同じ落ち方）。"""
         self.family(plan=["design"])
         todo = os.path.join(self.root, "wip", "proposals", "todo")
         write(
@@ -513,8 +514,8 @@ class PlanWriterTest(CoreHarness):
         write(os.path.join(self.approved, "flows", "i0001-01.yml"), "other\n")
         applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("へ運べない", out)
-        self.assertNotIn("から", out.split("へ運べない")[1].split("\n")[0])
+        self.assertIn("へ移せない", out)
+        self.assertNotIn("から", out.split("へ移せない")[1].split("\n")[0])
         self.assertTrue(os.path.exists(flow))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
 
@@ -685,7 +686,7 @@ class CoreChromeTest(CoreHarness):
     """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す。
 
     比べるのは、Changes（経路の欄だけを落として）、見せる行、止まったか、問題点の文面、
-    画面の本文と指紋。取り下げは手元の CLI が無い（Chrome だけの操作）ので、
+    画面の本文とダイジェスト。取り下げは手元の CLI が無い（Chrome だけの操作）ので、
     手元のコアを通して書いたものと比べる。
     """
 
@@ -810,7 +811,8 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent()
         # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの承認済みチケットを読む
         # （取り込み状態の無い親子のチケット）ので、残すと手元だけが子のツリーの古い承認済み
-        # チケットを読み、判定が読んだ中身（read_set）で作る指紋が Chrome（統合先と P だけを読む）と
+        # チケットを読み、判定が読んだ中身（read_set）
+        # で作るダイジェストが Chrome（統合先と P だけを読む）と
         # 食い違う。
         git(
             self.root,

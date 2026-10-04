@@ -1,7 +1,8 @@
 """着手の前に、共通層の設定をプロジェクトの層へコピーする（設計 11.12）。
 
-共通層（`.ccnavi/common/`）は、共通の設定を各プロジェクトへ配るための定義で、正本は
-各プロジェクトの `.ccnavi/config/`。共通層はワークスペースの git にあるので、プロジェクトだけを
+共通層（`.ccnavi/common/`）は、共通の設定を各プロジェクトへ配るための定義で、判定が読むのは
+各プロジェクトの `.ccnavi/config/` のほう。
+共通層はワークスペースの git にあるので、プロジェクトだけを
 clone したユーザからは見えない。そこで親チケットに着手するとき、共通層の各ファイルと、親の
 ワークツリーにあるプロジェクトの層の同じ名前のファイルを比べ、違えば共通層で上書きする。
 
@@ -15,10 +16,10 @@ clone したユーザからは見えない。そこで親チケットに着手�
 - コピーしたことは親の上書きの記録 `config-sync.json` に残し、最初のレビューで知らせる。
   レビューが無いまま親を閉じようとしたら止め、ユーザが端末で見たことを残すまで閉じさせない
 
-写した層のファイルは、実行後チェックとバックアップと復元（どちらも `.ccnavi/` を守る）から見れば
+コピーした層のファイルは、実行後チェックとバックアップと復元（どちらも `.ccnavi/` を守る）から見れば
 エージェントの書き込みと区別が付かない。区別は内容で付ける（`is_synced_write`）。
 誰が書いたかの台帳は持たない。台帳は git に入らないので、clone した別の機械には届かず、
-同じ写した層がその機械でだけ報告される。内容で見れば、上書きの記録は git を通じて届く。
+同じコピーした層がその機械でだけ報告される。内容で見れば、上書きの記録は git を通じて届く。
 """
 
 from __future__ import annotations
@@ -59,7 +60,7 @@ class Copied:
     # 上書きで消える識別子と、同じ識別子のまま中身が変わるもの。
     lost: list[str] = field(default_factory=list)
     changed: list[str] = field(default_factory=list)
-    # 上書き前を識別子の並びとして読めなかった（消える識別子を名指しできない）。
+    # 上書き前を識別子のリストとして読めなかった（消える識別子を名指しできない）。
     unparsed: bool = False
 
     @property
@@ -226,7 +227,8 @@ def is_synced_write(
     2. そのパスの途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で答えてしまう
     3. その中身が、共通層の対応するもの（設定はプロジェクトの層の形に直したもの、
        スクリプトはそのまま）と同じ（改行の違いは見ない）
-    4. **その親の**上書きの記録 `config-sync.json` が、その相対パスとその中身の指紋を名指ししている
+    4. **その親の**上書きの記録 `config-sync.json` が、
+       その相対パスとその中身のハッシュを名指ししている
     5. 変更前のコミット済みの中身が、上書きの記録に残した上書き前の中身と同じ。
        外すのはコピーしてからコミットするまでの間だけで、
        ユーザが直してコミットしたあとに共通層の中身へ戻す書き込みは外さない
@@ -459,7 +461,7 @@ def _unreadable_as_layer(conf: settings.Settings, kind: str, content: bytes) -> 
     except yaml.YAMLError:
         return "YAML として読めない"
     if not isinstance(data, dict):
-        return "キーと値の並びではない"
+        return "マッピングではない"
     _, problems = rules.parse(data)
     errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
     return "; ".join(p.detail for p in errors)
@@ -558,7 +560,8 @@ def _read_strict(path: str) -> tuple[bytes | None, str]:
 def _replace(path: str, content: bytes) -> str:
     """一時ファイル（`*.ccnavi-sync`）に書いてから置き換える。途中で止まっても半端な中身を残さない。
 
-    fsio を通す（C1 の記録層が、写した層を「この実行で書いたパス」に数え、`start` の C1 で運ぶ）。
+    fsio を通す（C1 の記録層が、写した層を「この実行で書いたパス」に数え、`start` の C1 で
+    コミットする）。
     """
     return fsio.replace_bytes(path, content, ".ccnavi-sync")
 

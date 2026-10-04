@@ -94,8 +94,9 @@ FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
-# 承認済みチケットを運ぶ sh（ccnavi-push-approved.sh）も配る。ボードは承認のあとこれを
-# 端末に送るので、配らないと配布先のボードは運べない（設計 approve-carry 1.5）。
+# 承認済みチケットをコミットして push する sh（ccnavi-push-approved.sh）も配る。
+# ボードは承認のあとこれを端末に送るので、配らないと配布先のボードは
+# 承認の push ができない（設計 approve-carry 1.5）。
 DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
     "ccnavi-common.sh",
@@ -365,9 +366,9 @@ class WritesTheExpectedShape(SetupTest):
             self.assertEqual(env[name], "enable", name)
 
     def test_the_ticket_approval_gate_does_not_follow_a_dry_run_mode(self):
-        """承認の門は dry-run で導入しても enable で書く。
+        """承認の切り替えの環境変数は dry-run で導入しても enable で書く。
 
-        この門は enable か disable しか取らない。dry-run と書くと、ccnavi の
+        この環境変数は enable か disable しか取らない。dry-run と書くと、ccnavi の
         `--lint` が error にするし、書いたユーザは止まらないつもりでいるのに
         実際は止まる。導入スクリプトがその食い違いを作らない。
         """
@@ -379,9 +380,9 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(self.read_settings()["env"][TICKET_APPROVAL_ENV], "enable")
 
     def test_the_unwatched_gate_is_written_as_enable(self):
-        """確認できる者が居ないモードの門も、モードに合わせず enable で書く。
+        """確認できる者が居ないモードの切り替えの環境変数も、モードに合わせず enable で書く。
 
-        この門も enable か disable しか取らない。止めずに報告する段は
+        この環境変数も enable か disable しか取らない。止めずに報告する段は
         CCNAVI_MODE=dry-run が持つので、dry-run で導入したプロジェクトでも
         ここは enable のまま書く。切るプロジェクトは自分で 1 行書き換える。
         """
@@ -425,7 +426,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_says_what_is_still_missing(self):
         """登録しただけでは動かないので、ユーザが置くものを挙げる（S12）。
 
-        振り分けの sh は代わりに通る sh と同じ並びに出る。
+        振り分けの sh は代わりに通る sh と同じ一覧に出る。
         """
         result = self.run_setup()
         missing = section(result.stdout, "まだ無いもの")
@@ -480,7 +481,7 @@ class KeepsWhatItFinds(SetupTest):
         """バックアップは最初の 1 回だけ取る。
 
         毎回取り直すと、打ち直した数だけバックアップが新しくなり、戻れるのは 1 手前
-        までになる。そこには既に ccnavi が入っているので、入れる前の姿へ
+        までになる。そこには既に ccnavi が入っているので、入れる前の状態へ
         戻す手立てが消える。
         """
         self.write_settings({"env": {"MY_IMPORTANT": "keep"}})
@@ -968,7 +969,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """15. 配布元に ccnavi-push-approved.sh が無ければ、最後の「まだ無いもの」に挙げる。
 
         ボードは承認のあとこの sh を端末に送る。配れなかったことが最後の一覧に出ないと、
-        配布先で運べない理由をユーザが読み取れない。
+        配布先で承認の push ができない理由をユーザが読み取れない。
         """
         src = self.make_source()
         os.remove(os.path.join(src, ".ccnavi", "scripts", "ccnavi-push-approved.sh"))
@@ -1360,7 +1361,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
     def test_is_not_settled_while_the_lines_are_missing(self):
         """配布が済んでいても、.gitignore が欠けていれば揃っていない。
 
-        --check を門にしている手順がそこを通すと、次のコミットで実行ファイルが
+        --check の結果で先へ進むかを決める手順がそこを通すと、次のコミットで実行ファイルが
         履歴に入る。
         """
         src = self.make_source()

@@ -105,9 +105,9 @@ export interface BoardResult {
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
-  /** 見せた画面の指紋（承認のときに Python が読み直した中身と比べる） */
+  /** 見せた画面のダイジェスト（承認のときに Python が読み直した中身と比べる） */
   readonly digest?: string;
-  /** 承認するときに `plan` へ渡す絞り（指紋を出したときの絞り。null なら絞らない） */
+  /** 承認するときに `plan` へ渡す絞り（ダイジェストを出したときの絞り。null なら絞らない） */
   readonly only?: readonly string[] | null;
   readonly rejected?: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
   readonly problems?: readonly string[];

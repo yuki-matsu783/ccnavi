@@ -31,14 +31,14 @@
  * **未保存のまま閉じたとき。** VS Code の Webview パネルには、閉じるのを止める手段（保存・破棄・取り消しを聞いてから
  * 閉じる）が無い（`onDidDispose` は閉じた後に呼ばれる）。代わりに、未保存の間はタブの題の頭に「●」を付け、
  * 画面が送ってくる編集中のコピー（`draft`）を覚えておく。閉じた後に未保存だったら、「開き直して戻す」
- * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身の指紋が
+ * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身のハッシュが
  * 変わっていなければコピーを未保存のまま戻し、変わっていれば戻さずにコピーを名前の無い YAML のエディタで開く
  * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
  *
  * **エージェントの下書き。** 置き場は実行ファイルに聞く（`tickets[].flow.draft`）。下書きが在り、中身が
  * いまのフローと違えば（`sameFlow` が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
  * 掛け、error なら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
- * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときの指紋と同じときだけ消し
+ * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときのハッシュと同じときだけ消し
  * （`core/flow-write.ts` の `removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
  * 依頼の文を組み、ボードと同じ「コピー / 新しいセッションで開く」（`prompt-handover.ts`）で渡す。
  */
@@ -93,7 +93,7 @@ interface Loaded {
   readonly exists: boolean;
   /** 無いときは 0 */
   readonly mtimeMs: number;
-  /** 読んだバイトの指紋（sha256 の 16 進）。無いときは空 */
+  /** 読んだバイトのハッシュ（sha256 の 16 進）。無いときは空 */
   readonly hash: string;
   readonly doc: FlowDoc;
   /** 画面に見せるパス（ワークスペースルートからの相対。外なら絶対） */
@@ -111,11 +111,11 @@ interface Restore {
   readonly path: string;
   readonly exists: boolean;
   readonly mtimeMs: number;
-  /** 閉じたときに読んであったバイトの指紋。置き場・有無・時刻・指紋が今と全部同じときだけ戻す */
+  /** 閉じたときに読んであったバイトのハッシュ。置き場・有無・時刻・ハッシュが今と全部同じときだけ戻す */
   readonly hash: string;
 }
 
-/** 読んだバイトの指紋 */
+/** 読んだバイトのハッシュ */
 function hashOf(bytes: Uint8Array): string {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
@@ -144,7 +144,7 @@ interface PanelState {
   /** 画面に渡している、戻したコピー（次に読み直すまで） */
   shownDraft?: FlowDoc;
   seq: number;
-  /** 画面に渡した下書きの指紋。保存のときに届いた `imported` がこの中にあるときだけ、下書きを消しに行く */
+  /** 画面に渡した下書きのハッシュ。保存のときに届いた `imported` がこの中にあるときだけ、下書きを消しに行く */
   offered: Set<string>;
   /** 画面に見せている依頼の文（コピー / 新しいセッションで開く はこれを渡す） */
   requestPrompt?: string;
@@ -316,7 +316,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
-    throw refuse("ノードの並び（id が文字列のノード）を取り出せないため、図を描けません");
+    throw refuse("ノードのリスト（id が文字列のノード）を取り出せないため、図を描けません");
   }
   return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks, offer: readOffer(root, target, doc) };
 }
@@ -800,7 +800,7 @@ async function check(current: PanelState, seq: number, doc: FlowDoc): Promise<vo
 
 /**
  * 「提案あり」を開く。下書きを読んだバイトのまま実行ファイルに確かめさせ（`--lint --json --flow`。SubagentStart と同じ読み）、
- * error なら取り込めないと言う。通れば画面の読みと実行ファイルの読みを見比べ（開くときと同じ）、中身と指紋を返す
+ * error なら取り込めないと言う。通れば画面の読みと実行ファイルの読みを見比べ（開くときと同じ）、中身とハッシュを返す
  */
 async function openProposal(current: PanelState): Promise<void> {
   const loaded = current.loaded;
@@ -851,7 +851,7 @@ async function openProposal(current: PanelState): Promise<void> {
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
-    refuse("ノードの並び（id が文字列のノード）を取り出せないため、図を描けません");
+    refuse("ノードのリスト（id が文字列のノード）を取り出せないため、図を描けません");
     return;
   }
   const hash = hashOf(bytes);
@@ -952,7 +952,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   // 取り込んだ下書きは、保存が成功したこの時点で消す（取り込んだときと同じ中身のときだけ）
   const drafted = removeImported(current, target, imported);
   await reload(current);
-  // 取り込み済みの親子のチケット（C1 の対象）だけ、運ぶ処理を送る。フローはユーザの書いたものなので C1 は運ばず、
+  // 取り込み済みの親子のチケット（C1 の対象）だけ、承認の push を送る。フローはユーザが書いたものなので C1 ではコミットせず、
   // ユーザの操作の最後に送る。ターミナルは対話中のことがあるので、勝手に打ち込まず、ユーザがボタンを押したときだけ送る。
   // それ以外の親子のチケットは今どおりユーザがコミットする。
   const root = current.folder.uri.fsPath;
@@ -976,7 +976,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   }
 }
 
-/** 普通のファイルが在るか（運ぶ sh が配られているか） */
+/** 普通のファイルが在るか（承認の push の sh が配られているか） */
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();

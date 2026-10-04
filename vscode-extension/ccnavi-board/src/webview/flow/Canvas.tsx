@@ -10,7 +10,7 @@
  * 作り直すが、測った大きさ（`measured`）は引き継ぐ（引き継がないと点が一瞬消える）。
  *
  * グループ（`type: "group"`）は React Flow の親子で描く。中のノードに `parentId` を付け、位置は
- * グループからの位置のまま渡す。グループは点の並びの前に置き、ほかの点より奥に描く。
+ * グループからの位置のまま渡す。グループは点の配列の前に置き、ほかの点より奥に描く。
  * ドラッグを放したときに、どのグループに入るか・出るかはコピーの側（`placeNodes`）が決める。
  *
  * ノードと線には × のボタンを付ける（ノードは右上、線は真ん中。載せた・選んだときだけ見える）。
@@ -74,7 +74,7 @@ import {
 } from "../../core/flow-doc.js";
 import { badgeOf, summaryOf, type Badge } from "./text.js";
 
-/** いま選んでいるもの。線は並びの位置で指す（id が無い線もある） */
+/** いま選んでいるもの。線はリストの位置で指す（id が無い線もある） */
 export type Selection = { readonly kind: "node"; readonly id: string } | { readonly kind: "edge"; readonly index: number };
 
 interface StepData extends Record<string, unknown> {

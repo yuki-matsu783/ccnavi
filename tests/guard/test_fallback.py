@@ -14,7 +14,7 @@ import unittest
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
-# YAML として壊れている。閉じていない並び 1 つ。書き損じの典型。
+# YAML として壊れている。閉じていないリスト 1 つ。書き損じの典型。
 BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 
 

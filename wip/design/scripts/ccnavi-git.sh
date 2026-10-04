@@ -42,8 +42,8 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # 環境変数から設定を差し込む道を閉じる。`-c diff.external=<コマンド>` を引数で
 # 弾いても、GIT_CONFIG_COUNT/KEY/VALUE と GIT_EXTERNAL_DIFF で同じことができる。
 # 引数だけ見て環境を見ないと、塞いだつもりの穴が横に開いたままになる。
-# GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が門になっているので、
-# 番号を数えて消す必要はない。門を閉じれば全部読まれない。
+# GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が切り替えになっているので、
+# 番号を数えて消す必要はない。COUNT を消せば全部読まれない。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || :
 
 # 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
@@ -452,7 +452,7 @@ fetch | pull)
 
 push)
 	# 自分が居るブランチを、同じ名前でそのまま送る形だけを通す。レビューは
-	# マージリクエストの実物に結ぶので、そこまではエージェントが自分で運べたほうがよい。
+	# マージリクエストの実物に結ぶので、そこまではエージェントが自分で進められたほうがよい。
 	#
 	# 通さないのは「戻せなくなる形」と「ユーザの判断を飛び越す形」の 2 つ。
 	# 履歴を書き換える force、消す delete、まとめて送る all/mirror/tags、

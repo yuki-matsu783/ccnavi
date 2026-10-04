@@ -32,7 +32,7 @@ test(`CX-T115 切れる ${WARN_DAYS} 日前から知らせ、切れたら差し�
   assert.equal(expiryNotice("github.com", { host: at(-1) }, NOW).level, "expired");
   const manual = expiryNotice("github.com", { manual: "2026-10-02" }, NOW);
   assert.deepEqual([manual.level, manual.source], ["soon", "manual"]);
-  // ホストの値が正（登録のときの日付より先に使う）
+  // ホストの値を優先する（登録のときの日付より先に使う）
   assert.equal(expiryNotice("github.com", { host: at(60), manual: "2026-10-02" }, NOW).level, "ok");
   const unknown = expiryNotice("github.com", {}, NOW);
   assert.equal(unknown.level, "unknown");

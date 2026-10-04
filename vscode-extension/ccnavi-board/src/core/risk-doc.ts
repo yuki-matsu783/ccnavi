@@ -3,7 +3,7 @@
  *
  * risks.yml は先頭に使い方の説明、項目の前後に理由や例のコメントを持つ。素直に読んで
  * dump し直すとそれが全部消えるので、rules-doc と同じく `yaml` の Document を保ち、
- * 変えるところだけを差し替える。項目の入れ替えは元のノードをそのまま別の並びへ移す。
+ * 変えるところだけを差し替える。項目の入れ替えは元のノードをそのまま別のリストへ移す。
  *
  * ここは配点の意味（何点になるか）には触れない。数えるのは実行ファイル（risk.py）の仕事で、
  * 書式の検証も `--lint --risk <一時ファイル>` に聞く。画面の欄は文字のまま持ち、整数で
@@ -185,7 +185,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
     }
   }
 
-  // factors。元のノードを先に全部拾っておき、編集した並びへ移す。
+  // factors。元のノードを先に全部拾っておき、編集したリストへ移す。
   // `origin` は読み込んだときの生の位置なので、対応表でない項目の分も位置を空けて持つ
   // （詰めると、その後ろの項目が 1 つずれた元ノードに書き込まれる）。
   const existing = top.get("factors", true);
@@ -208,12 +208,12 @@ function applyTo(doc: Document, edited: RiskForm): string {
     return node;
   });
   if (isSeq(existing)) {
-    // 先頭の項目を消したときは、付け替えたコメントを並びの見出しとして戻す。
+    // 先頭の項目を消したときは、付け替えたコメントをリストの見出しとして戻す。
     if (adopted !== undefined && !nodes.includes(adopted) && !existing.commentBefore) {
       existing.commentBefore = adopted.commentBefore ?? null;
     }
     keepSpacing(existing.items, nodes);
-    // 並びの前後のコメントは並びのノードに付いているので、並びは残して中身だけ替える。
+    // リストの前後のコメントはリストのノードに付いているので、リストは残して中身だけ替える。
     existing.items = nodes;
     existing.flow = nodes.length === 0;
   } else if (nodes.length > 0) {
@@ -225,9 +225,9 @@ function applyTo(doc: Document, edited: RiskForm): string {
 }
 
 /**
- * 並びの先頭の項目の前にあるコメントは、読み込みでは並びのほうに付く。
+ * リストの先頭の項目の前にあるコメントは、読み込みではリストのほうに付く。
  * そのままだと先頭の項目を移したときにコメントが置き去りになるので、項目に付け直す。
- * 付け直した項目を返す（呼び手は、その項目が消えたときにコメントを並びへ戻す）。
+ * 付け直した項目を返す（呼び手は、その項目が消えたときにコメントをリストへ戻す）。
  */
 function adoptLeadingComment(seq: YAMLSeq, first: YAMLMap | undefined): YAMLMap | undefined {
   if (first === undefined || !seq.commentBefore) {
@@ -242,7 +242,7 @@ function adoptLeadingComment(seq: YAMLSeq, first: YAMLMap | undefined): YAMLMap 
 }
 
 /**
- * 項目の前の空行は、項目ではなく「並びの何番目か」に付いていたものとして揃える。
+ * 項目の前の空行は、項目ではなく「リストの何番目か」に付いていたものとして揃える。
  * 先頭に来た項目と一緒に空行も移ると `factors:` の直後に空白だけの行が出るため。
  */
 function keepSpacing(before: readonly unknown[], after: readonly YAMLMap[]): void {

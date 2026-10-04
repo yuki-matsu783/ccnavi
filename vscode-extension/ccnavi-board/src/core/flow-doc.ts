@@ -43,7 +43,7 @@ export interface FlowConnection {
   readonly [key: string]: unknown;
 }
 
-/** フロー 1 本。`nodes` だけは必ず並び。ほかの欄は読んだまま */
+/** フロー 1 本。`nodes` だけは必ずリスト。ほかの欄は読んだまま */
 export interface FlowDoc {
   readonly nodes: readonly FlowNode[];
   readonly [key: string]: unknown;
@@ -58,7 +58,7 @@ export type FlowRead = { readonly ok: true; readonly doc: FlowDoc } | { readonly
 
 // ---- 種類
 
-/** 画面の部品箱に並べる種類。並びもこの順 */
+/** 画面の部品箱に並べる種類。並べる順もこの順 */
 export const PALETTE = ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "skill"] as const;
 export type PaletteType = (typeof PALETTE)[number];
 
@@ -85,7 +85,7 @@ export function isEditableType(type: string): type is PaletteType {
   return (PALETTE as readonly string[]).includes(type);
 }
 
-/** 分岐の出口を持つ種類。出口は `data` の並び（`branches` か `options`）の 1 件ずつ */
+/** 分岐の出口を持つ種類。出口は `data` のリスト（`branches` か `options`）の 1 件ずつ */
 export function branchKey(type: string): "branches" | "options" | undefined {
   if (type === "ifElse" || type === "switch" || type === "branch") {
     return "branches";
@@ -170,7 +170,7 @@ export function dataText(node: FlowNode, key: string): string {
   return str(nodeData(node)[key]);
 }
 
-/** 分岐の出口の並び（`branches` / `options`）。1 件は `{label, condition?, description?, ...}` */
+/** 分岐の出口のリスト（`branches` / `options`）。1 件は `{label, condition?, description?, ...}` */
 export function branchItems(node: FlowNode): readonly Readonly<Record<string, unknown>>[] {
   const key = branchKey(nodeType(node));
   if (key === undefined) {
@@ -188,8 +188,8 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
  * 画面はそれを通ったものだけを開く。読み手はルール管理の画面（`rules-doc.ts`）と同じ `yaml` の既定。
  *
  * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
- * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードの並び（`id` が文字列の
- * キーと値の並び）が取れないとき。**例外は外に出さない。**
+ * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードのリスト（`id` が文字列の
+ * マッピング）が取れないとき。**例外は外に出さない。**
  */
 export function parseFlow(text: string): FlowRead {
   const read = parseFlowValue(text);
@@ -197,7 +197,7 @@ export function parseFlow(text: string): FlowRead {
     return read;
   }
   const doc = asFlowDoc(read.value);
-  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）を取り出せないため、図を描けません" } : { ok: true, doc };
+  return doc === undefined ? { ok: false, error: "ノードのリスト（id が文字列のノード）を取り出せないため、図を描けません" } : { ok: true, doc };
 }
 
 /**
@@ -223,7 +223,7 @@ function firstLine(text: string): string {
 }
 
 /**
- * 描ける形か。最上位がキーと値の並びで、`nodes` が「文字列の `id` を持つキーと値の並び」の並び。
+ * 描ける形か。最上位がマッピングで、`nodes` が「文字列の `id` を持つマッピング」のリスト。
  * 画面から届いた保存の中身もここで受ける（崩れていたら書かない。正しいかは保存の前に実行ファイルが言う）。
  */
 export function asFlowDoc(raw: unknown): FlowDoc | undefined {
@@ -479,7 +479,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は**並びの位置で指す**（ユーザが書いたフローの線は id が無いことも重なることもある）。
+ * 線を消す。線は**配列の位置で指す**（ユーザが書いたフローの線は id が無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -836,7 +836,7 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
 /**
  * コピーしたノードと線（画面の中に保持する）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
  *
- * - `nodes` は元の並びの順（グループは中のノードより前）。`parentId` は元の id のまま持つ
+ * - `nodes` は元の配列の順（グループは中のノードより前）。`parentId` は元の id のまま持つ
  * - `absolute` はコピーした時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
  *   コピーした）は、この位置で外に置く
  * - `connections` はコピーしたノード同士の線だけ（片方しかコピーしていない線は含めない）
@@ -891,7 +891,7 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
 
 /**
  * コピーしたものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
- * `parentId` を新しい id に付け替える。出口の表記（`branch-<番号>`）と `data` はそのまま（分岐の出口の並びも
+ * `parentId` を新しい id に付け替える。出口の表記（`branch-<番号>`）と `data` はそのまま（分岐の出口のリストも
  * 一緒にコピーしているので、同じ出口に付く）。
  *
  * 置き場所は、グループの外のノードは `offset` だけずらす。グループの中のノードは、
@@ -899,7 +899,7 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
  * - グループは貼らず、元のグループが貼る先にまだあるなら、同じグループの中で `offset` だけずらす
  * - 元のグループが貼る先に無ければ、コピーした時点の図の上の位置から `offset` だけずらして外に置く
  *
- * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（コピーしたときの並びのまま）。
+ * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（コピーしたときの順のまま）。
  */
 export function pasteNodes(doc: FlowDoc, clip: FlowClip, offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } {
   const renamed = new Map<string, string>();

@@ -42,8 +42,8 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # 環境変数から設定を差し込む経路を閉じる。`-c diff.external=<コマンド>` を引数で
 # 拒否しても、GIT_CONFIG_COUNT/KEY/VALUE と GIT_EXTERNAL_DIFF で同じことができる。
 # 引数だけ見て環境を見ないと、防いだつもりの穴が別の経路で開いたままになる。
-# GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が門になっているので、
-# 番号を数えて消す必要はない。門を閉じれば全部読まれない。
+# GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が無ければ読まれないので、
+# 番号を数えて消す必要はない。GIT_CONFIG_COUNT を消せば全部読まれない。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || :
 
 # 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
@@ -109,7 +109,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   reset clean   sh .ccnavi/scripts/ccnavi-git.sh stash push -u で退避する。消さない
                 リモートに合わせるなら sh .ccnavi/scripts/ccnavi-sync.sh <P> (親のブランチ)。
                 ほかのブランチは fetch <リモート> <ブランチ> のあと merge <リモート>/<ブランチ>。
-                分かれていて進めないならユーザに回す (checkout -B で付け替えない)
+                分かれていて進めないならユーザの対応に切り替える (checkout -B で付け替えない)
   rebase cherry-pick revert am apply bisect  履歴を書き換えない
   config clone submodule  ユーザに依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path

@@ -7,10 +7,10 @@
  */
 import type { BoardJson, LayerJson } from "./model.js";
 
-/** ワークスペースの設定の名札 */
+/** ワークスペースの設定に付ける層の名前 */
 export const LAYER_SELF = "self";
 
-/** 層（layer）の名札に予約してある表記。この名前のプロジェクトはプロジェクトの設定として数えない */
+/** 層（layer）の名前に予約してある表記。この名前のプロジェクトはプロジェクトの設定として数えない */
 const RESERVED = ["common", LAYER_SELF];
 
 /** ワークスペースの設定。実行ファイルは常に出す。JSON に無ければ undefined */

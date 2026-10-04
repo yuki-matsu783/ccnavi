@@ -71,7 +71,7 @@ export interface RepoBoard {
   readonly seen?: Snapshot | null;
 }
 
-/** 読んでいる間にブランチの先頭が動いた。書く流れは読み直して周を回す */
+/** 読んでいる間にブランチの先頭が動いた。書く流れは読み直して再試行する */
 export class MovedError extends Error {}
 
 export class Reader {
@@ -371,7 +371,7 @@ export interface FamilyRead extends IntegrationRead {
 
 /**
  * 書く流れのために、親子のチケット 1 組ぶんを新しく読み直す（毎回 Snapshot を組み直す）。
- * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の姿を読み直す）
+ * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の状態を読み直す）
  */
 export async function readFamily(repo: RepoConfig, family: string, deps: Deps, at?: string): Promise<FamilyRead> {
   const reader = new Reader(repo, deps);

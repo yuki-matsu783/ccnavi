@@ -75,7 +75,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
     // sequential でも after が無ければ、判定に使われないという注意は出さない
     assert.doesNotMatch(notes.join(""), /sequential/);
-    // 「ユーザが見る」の意味は札のツールチップにある
+    // 「ユーザが見る」の意味はバッジのツールチップにある
     assert.match(dom.one(".tag.hitl").getAttribute("title") ?? "", /種類の宣言（review）/);
   } finally {
     await dom.close();

@@ -38,9 +38,11 @@ class ApproveJsonTest(PhaseHarness):
         return json.loads(result.stdout)
 
     def yes(self, tickets, *extra, digest=None):
-        """`--agree --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。extra は絞りかフラグ。
+        """`--agree --yes <識別子,…> --digest <ダイジェスト> --json [<絞り>...]`。
+        extra は絞りかフラグ。
 
-        拡張と同じく、直前に同じ extra でプレビューして、見せた本文の指紋（`digest`）を渡す。
+        拡張と同じく、直前に同じ extra でプレビューして、見せた本文のダイジェスト（`digest`）
+        を渡す。
         digest を名指しすると、その値をそのまま渡す（見せたあとに提案が変わった形）。
         """
         if digest is None:
@@ -83,7 +85,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(child["phase"], 1)
         self.assertTrue(child["path"].replace("\\", "/").endswith("wip/proposals/todo/i0001-01.md"))
         self.assertEqual(child["overflow"], [])
-        # 超えた項は文字列の並びで、種類の名前と「超えている」を含む。
+        # 超えた項は文字列のリストで、種類の名前と「超えている」を含む。
         self.assertTrue(beyond["overflow"], beyond)
         self.assertTrue(all(isinstance(p, str) for p in beyond["overflow"]), beyond)
         self.assertTrue(
@@ -206,7 +208,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
 
-    # ---- 4b. 見せた本文の指紋を照合する（チケット approve-carry-04 の 1〜5）
+    # ---- 4b. 見せた本文のダイジェストを照合する（チケット approve-carry-04 の 1〜5）
 
     def test_preview_carries_a_stable_digest_of_the_text(self):
         """1. preview の答えに `digest`（SHA-256 の 16 進 64 文字）が載る。
@@ -282,7 +284,7 @@ class ApproveJsonTest(PhaseHarness):
                 self.assertFalse(self.copy_exists("i0001"))
                 self.assertFalse(self.copy_exists("i0001-01"))
 
-    # ---- 4c. 指紋は承認済みチケットに書き込む欄も覆う（チケット approve-carry-05 の 1〜5）
+    # ---- 4c. ダイジェストは承認済みチケットに書き込む欄も覆う（チケット approve-carry-05 の 1〜5）
 
     def pending_parent_with_issue_and_child(self, issue=4242):
         """`issue:` を持つ親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
@@ -294,7 +296,8 @@ class ApproveJsonTest(PhaseHarness):
         return parent, child
 
     def assert_refused_after_edit(self, path, old, new, shown, tickets=("i0001", "i0001-01")):
-        """見せたあとで path の old を new に書き換えてコミットすると、見せた指紋では承認しない。
+        """見せたあとで path の old を new に書き換えてコミットすると、
+        見せたダイジェストでは承認しない。
 
         tickets は見せた一括のチケットの識別子。承認済みチケットがまだ無いものは、
         置かれないことも見る。
@@ -320,19 +323,19 @@ class ApproveJsonTest(PhaseHarness):
             self.assertFalse(self.copy_exists(name), name)
 
     def test_yes_refuses_when_only_the_issue_of_the_parent_changed(self):
-        """1. 見せたあとで親の `issue:` だけを書き換えると、見せた指紋では承認しない。"""
+        """1. 見せたあとで親の `issue:` だけを書き換えると、見せたダイジェストでは承認しない。"""
         parent, _ = self.pending_parent_with_issue_and_child(4242)
         shown = self.preview()
         self.assert_refused_after_edit(parent, "issue: 4242", "issue: 4343", shown)
 
     def test_yes_refuses_when_only_the_markdown_body_of_a_child_changed(self):
-        """2. 見せたあとで子の Markdown の本文だけを書き換えても、見せた指紋では承認しない。"""
+        """2. 見せたあとで子の Markdown の本文だけを書き換えても、ダイジェストで承認しない。"""
         self.pending_parent_and_child()
         child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         shown = self.preview()
         self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
 
-    # ---- 4d. 指紋は画面に出ない欄と改版で書く中身も覆う（チケット approve-carry-07）
+    # ---- 4d. ダイジェストは画面に出ない欄と改版で書く中身も覆う（チケット approve-carry-07）
 
     def test_yes_refuses_when_only_an_unknown_field_of_a_child_changed(self):
         """見せたあとで、承認画面に出ない frontmatter の欄だけを書き換えると承認しない。
@@ -366,9 +369,9 @@ class ApproveJsonTest(PhaseHarness):
         return path, shown
 
     def test_yes_refuses_when_the_revision_proposal_changed(self):
-        """親の改版を見せたあとで、改版の提案の計画を書き換えると、見せた指紋では承認しない。
+        """親の改版を見せたあとで、改版の提案の計画を書き換えると、見せたダイジェストでは承認しない。
 
-        書き換えたあとも改版として成り立つ並び（足す項を `design` に）にして、
+        書き換えたあとも改版として成り立つ順序（足す項を `design` に）にして、
         一括のチケットに残したまま書く計画だけを変える。
         """
         path, shown = self.pending_revision()
@@ -384,14 +387,16 @@ class ApproveJsonTest(PhaseHarness):
         """親の改版を見せたあとで、今の承認済みチケットの frontmatter だけが変わると承認しない。
 
         改版で書くのは、今の承認済みチケットの frontmatter の計画だけを差し替えた中身
-        （`revise_copy`）。提案の frontmatter をそのまま指紋に入れる実装では、この書き換えを見逃す。
+        （`revise_copy`）。提案の frontmatter をそのままダイジェストに入れる実装では、
+        この書き換えを見逃す。
         """
         path, shown = self.pending_revision()
         copy = os.path.join(self.approved, "doing", "i0001.md")
         self.assert_refused_after_edit(copy, "---\n", "---\nnote: x\n", shown, tickets=["i0001"])
 
     def test_nul_in_the_markdown_body_still_approves(self):
-        """本文に生の NUL があっても、見せた指紋で承認できる（指紋は区切りの文字に頼らない）。"""
+        """本文に生の NUL があっても、
+        見せたダイジェストで承認できる（ダイジェストは区切りの文字に頼らない）。"""
         self.pending_parent_and_child()
         child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         with open(child, encoding="utf-8") as f:
@@ -406,7 +411,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertTrue(self.copy_exists("i0001-01"))
 
     def test_moving_a_nul_in_the_body_after_preview_is_refused(self):
-        """見せたあとで本文の NUL の位置だけをずらすと、見せた指紋では承認しない。
+        """見せたあとで本文の NUL の位置だけをずらすと、見せたダイジェストでは承認しない。
 
         つなぎ目をずらす形の書き換え。区切りの文字でつないでいた頃の実装でもここは止まる
         （各部分が frontmatter から始まるため）ので、この確かめは振る舞いを固定するためのもの。
@@ -422,7 +427,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assert_refused_after_edit(child, "前\x00後\n", "前後\x00\n", shown)
 
     def test_digest_changes_when_only_the_overflow_changes(self):
-        """3. 提案はそのままで、種類の scope が変わって子の超過が増えると、指紋が変わる。"""
+        """3. 提案はそのままで、種類の scope が変わって子の超過が増えると、ダイジェストが変わる。"""
         self.pending_parent_and_child()
         before = self.preview()
         self.assertEqual(before["batch"][1]["overflow"], [])
@@ -574,7 +579,7 @@ class ApproveJsonTest(PhaseHarness):
 
     # 走らせるたびに変わる欄。フィクスチャと比べるときは外す。
     VOLATILE = ("generated_at",)
-    # 本文の指紋。本文は一時ディレクトリのパスを含むので、走らせるたびに値が変わる。
+    # 本文のダイジェスト。本文は一時ディレクトリのパスを含むので、走らせるたびに値が変わる。
     # 形（SHA-256 の 16 進）だけ確かめて、固定の文字列に置き換えてから比べる。
     DIGEST = "<digest>"
 

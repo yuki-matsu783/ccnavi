@@ -19,7 +19,7 @@ const SETTINGS = JSON.stringify({
   },
 });
 
-test("CB-T30 hooks をイベント・matcher・コマンドの平らな並びで読む", () => {
+test("CB-T30 hooks をイベント・matcher・コマンドの平らなリストで読む", () => {
   const entries = parseHooks(SETTINGS, "settings");
   assert.deepEqual(
     entries.map((e) => [e.event, e.matcher, e.command, e.timeout]),

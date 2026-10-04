@@ -297,7 +297,7 @@ class FetchTest(unittest.TestCase):
         path = os.pathsep.join([helpers, os.environ.get("PATH", "")])
         started = time.monotonic()
         done = self.fetch(PATH=path, CCNAVI_FETCH_TIMEOUT="2")
-        self.assertLess(time.monotonic() - started, 20, "見張りが切っていない")
+        self.assertLess(time.monotonic() - started, 20, "タイムアウト監視が切っていない")
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertIn("取ってこられなかった", done.stdout)
         self.assertEqual("", done.stderr.strip())
@@ -427,7 +427,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("と重なる", done.stdout)
 
     def test_a_family_in_a_single_branch_clone_is_forwarded(self):
-        # origin の fetch の並びが main だけでも origin/P を進める（fetch に行き先を書く）。
+        # origin の fetch の refspec が main だけでも origin/P を進める（fetch に行き先を書く）。
         tree = self.family()
         git(self.ws, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
         head = self.advance(self.remote, "i0001")

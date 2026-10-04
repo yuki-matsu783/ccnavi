@@ -76,7 +76,7 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart 
 # 起点になるデフォルトブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
 # 取得しないと、別の機械で承認したものが反映されず、古い main からブランチを切ることになる。
 # 通信するので、要らないプロジェクトは --no-fetch で外す。上限は、sh の中の
-# 見張り（1 回 15 秒）が重なっても収まる長さにしてある。
+# タイムアウト監視（1 回 15 秒）が重なっても収まる長さにしてある。
 FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 FETCH_TIMEOUT=60
 
@@ -365,7 +365,7 @@ runnable_targets() {
 }
 
 runs_here() {
-	# $1 目印の値 / $2 runnable_targets の並び
+	# $1 目印の値 / $2 runnable_targets のリスト
 	case " $2 " in
 	*" $1 "*) return 0 ;;
 	esac
@@ -603,11 +603,11 @@ shape=$(printf '%s' "$current" | jq -r '
 # 忘れると、この 2 つも dry-run のまま残る。--mode enable で実行し直すか、
 # 設定ファイルの 3 行を書き換えるまで、保護は弱いまま。
 #
-# 2 値の門（CCNAVI_GUARD_TICKET_APPROVAL と CCNAVI_GUARD_UNWATCHED）は、モードに合わせず
+# 2 値の切り替えの環境変数（CCNAVI_GUARD_TICKET_APPROVAL と CCNAVI_GUARD_UNWATCHED）は、モードに合わせず
 # enable で書く。どちらも enable か disable しか取らず、dry-run と書くと ccnavi の --lint が
-# 指摘する。承認の経路の門（CCNAVI_GUARD_TICKET_APPROVAL）は、通ればそれで済んでしまい、
+# 指摘する。承認の経路の切り替えの環境変数（CCNAVI_GUARD_TICKET_APPROVAL）は、通ればそれで済んでしまい、
 # 済んだことは報告しても戻らない。そのため「止めずに報告する」段を持てない。確認できるユーザが
-# いないモードの門（CCNAVI_GUARD_UNWATCHED）は、止めずに報告する段を CCNAVI_MODE=dry-run が
+# いないモードの切り替えの環境変数（CCNAVI_GUARD_UNWATCHED）は、止めずに報告する段を CCNAVI_MODE=dry-run が
 # 受け持つので、こちらには要らない。
 #
 # 値は --arg で 1 つずつ渡す。行にまとめてから分けると、値に混ざった改行がそのまま

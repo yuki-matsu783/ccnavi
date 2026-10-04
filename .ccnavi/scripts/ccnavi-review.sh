@@ -46,8 +46,8 @@
 # ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
 # ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
-# 運ぶ処理（ccnavi-push-approved.sh <親>）を呼んで送る。
-# ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、運ぶ処理の打ち直しを案内する。
+# 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る。
+# ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、承認の push の打ち直しを案内する。
 # それ以外は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
@@ -343,7 +343,7 @@ pages() {
 	esac
 	all='[]'
 	while :; do
-		# 呼び手が `|| ...` で受けると set -e が有効にならないので、落ちたらここで 1 を返す（並びでない答えも）
+		# 呼び手が `|| ...` で受けると set -e が有効にならないので、落ちたらここで 1 を返す（配列でない答えも）
 		chunk=$(api GET "$rel${sep}per_page=100&page=$page") || return 1
 		n=$(printf '%s' "$chunk" | "$JQ" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
 		all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
@@ -655,7 +655,7 @@ eli5_posted=""
 trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- C1 とユーザの判断を運ぶ処理
+# ---- C1 と、ユーザの判断を送る承認の push
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
 ccnavi_c1_sh="$(dirname "$0")"
@@ -693,7 +693,7 @@ c1_ccnavi() {
 	fi
 }
 
-# ユーザの判断を運ぶ。取り込み済みの親子のチケットだけ、運ぶ処理を <親> で呼ぶ。それ以外は今のまま運ばない。
+# ユーザの判断をコミットして push する。取り込み済みの親子のチケットだけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
 carry_human() {
 	ccnavi_c1_family "$1"
 	case "$ccnavi_c1_target" in
@@ -966,7 +966,7 @@ decide)
 	# 残った指摘の行き先を、ユーザが指摘ごとに決める。形は 3 つ。
 	#   decide <N>                                   端末で 1 件ずつ選ぶ（ユーザが打つ）
 	#   decide <N> --preview                         見せる一覧を JSON で返す。何も置かない（ボードが読む）
-	#   decide <N> --choices <JSON> --digest <指紋>  ボードでユーザが押した選択を置く
+	#   decide <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
 	# 最後の形は、エージェントが打つと組み込みの deny（builtin-guard-ticket-approval）が止める。
 	n="${1:-}"
 	case "$n" in
@@ -1046,7 +1046,7 @@ decide)
 		exit 1
 		;;
 	yes)
-		# 1. ユーザが端末で選ぶ（何も置かない。選択と指紋を state の置き場に書くだけ）。
+		# 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
 		chosen="$state/review-choose-$$.json"
 		ccnavi --reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
 			rm -f "$chosen"
@@ -1057,7 +1057,7 @@ decide)
 			fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
 		}
 		rm -f "$chosen"
-		# 2. C1 の中で、選んだものを置く（`--yes`。見せた指摘と今の指摘の指紋が同じときだけ）。
+		# 2. C1 の中で、選んだものを置く（`--yes`。見せた指摘と今の指摘のダイジェストが同じときだけ）。
 		ccnavi_c1_begin || exit 1
 		c1_on=yes
 		ccnavi_c1_capture="$state/review-decide-$$.out"
@@ -1147,13 +1147,13 @@ close-early)
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を運ぶ処理で送る。
+	# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 	carry_human "$branch" || exit 1
 	printf 'OK: 早めに閉じた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
 	;;
 chat)
 	# ユーザが端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
-	# 取り込み済みの親子のチケットなら、置いた後に運ぶ処理で送る。
+	# 取り込み済みの親子のチケットなら、置いた後に承認の push で送る。
 	n="${1:-}"
 	case "$n" in
 	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
@@ -1164,7 +1164,7 @@ chat)
 	;;
 config-synced)
 	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
-	# 取り込み済みの親子のチケットなら、置いた後に運ぶ処理で送る。
+	# 取り込み済みの親子のチケットなら、置いた後に承認の push で送る。
 	parent="${1:-}"
 	case "$parent" in
 	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;

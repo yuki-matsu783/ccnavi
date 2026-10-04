@@ -110,8 +110,8 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
 /**
  * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは `--rules` で、
  * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
- * ワークスペースの設定は同じオプションに名札 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
- * `self` を名乗るプロジェクトはプロジェクトの設定として数えないので取り違えない。
+ * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
+ * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
  * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
@@ -291,7 +291,7 @@ export async function runApprovePreview(
 }
 
 /**
- * 見せた一覧をそのまま承認する（`--agree --yes <識別子,…> --digest <指紋> --json`）。
+ * 見せた一覧をそのまま承認する（`--agree --yes <識別子,…> --digest <ダイジェスト> --json`）。
  * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
  */
 export async function runApproveYes(
@@ -343,7 +343,7 @@ export async function runApproveYes(
 const DECIDE_TIMEOUT_MS = 120_000;
 
 /**
- * 残った指摘と指紋を見る（`ccnavi-review.sh decide <N> --preview`）。何も置かない。
+ * 残った指摘とダイジェストを見る（`ccnavi-review.sh decide <N> --preview`）。何も置かない。
  * ホストを読むのは sh（実行ファイルはネットワークに出ない）なので、実行ファイルではなく sh を走らせる。
  * cwd は親のワークツリー（sh はそこを親として実行ファイルに渡す）
  */
@@ -365,7 +365,7 @@ export async function runDecidePreview(
 }
 
 /**
- * ユーザが選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`）。
+ * ユーザが選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`）。
  * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
  */
 export async function runDecideYes(
@@ -599,7 +599,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 
 /**
  * 親子のチケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
- * フローの保存の後、運ぶ処理を送るかを決めるのに使う。
+ * フローの保存の後、承認の push を送るかを決めるのに使う。
  */
 export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
   const launcher = findLauncher(root, setting);

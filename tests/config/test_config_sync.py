@@ -1,6 +1,6 @@
 """着手の前に共通層でプロジェクトの層を上書きする（設計 11.12）。
 
-共通層は各プロジェクトへ配る定義で、正本はプロジェクトの `.ccnavi/config/`。
+共通層は各プロジェクトへ配る定義で、元のファイルはプロジェクトの `.ccnavi/config/`。
 プロジェクト向けの親の `ticket start` で、違うファイルを共通層の中身で上書きする。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通層は
@@ -211,7 +211,7 @@ class ConfigSyncTest(ConfigUnionHarness):
 
     def test_post_monitor_reports_an_edit_after_the_sync(self):
         """4: コピーした後に手を入れたものは、
-        上書きの記録の指紋と合わないので今までどおり報告する。"""
+        上書きの記録のハッシュと合わないので今までどおり報告する。"""
         tree, _ = self.start_parent()
         write(
             config_of(tree, "risk"),
@@ -570,7 +570,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertIn("rules.yml", said.stdout + said.stderr)
 
     def test_close_problems_hold_ready_until_a_human_saw_it(self):
-        """Draft を外す `ready` も同じ門を通る。知らせていない上書きがあれば止める。"""
+        """Draft を外す `ready` も同じ人の確認を通る。知らせていない上書きがあれば止める。"""
         conf = self.settings()
         self.start_parent()
 

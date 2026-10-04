@@ -179,7 +179,7 @@ test("CB-T274 履歴は直す前のコピーを積み、戻す・やり直すで
   const forward = redo(back2.history, a);
   assert.ok(forward !== undefined);
   assert.equal(forward.doc, b);
-  // 戻してから別の操作をすると、やり直しの並びは消える
+  // 戻してから別の操作をすると、やり直しのリストは消える
   const branched = record(forward.history, b);
   assert.ok(!canRedo(branched));
   assert.equal(redo(branched, b), undefined);
@@ -225,7 +225,7 @@ test("CB-T275 同じ欄に続けて打った字は 1 件にまとめる。間が
   assert.equal(after.past.length, back.history.past.length + 1);
 });
 
-test("CB-T276 未保存の見比べはキーの並びを見ず、差分は足した・消した・変えたノードと線と、フローの欄を言う", () => {
+test("CB-T276 未保存の見比べはキーの順序を見ず、差分は足した・消した・変えたノードと線と、フローの欄を言う", () => {
   const doc = branched();
   assert.ok(sameFlow(doc, JSON.parse(JSON.stringify(doc)) as FlowDoc));
   assert.ok(sameValue({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 }));
@@ -284,7 +284,7 @@ test("CB-T292 下書きの差分は、変わった欄の名前だけでなく値
   // フロー自体の欄と、消えた線
   assert.equal(of("meta")[0].texts.find((t) => t.field === "名前")?.after, "提案");
   assert.equal(of("removed-connection").length, 2);
-  // 並びの中も葉まで下りる
+  // 配列の中も葉まで下りる
   const branches = textDiff(doc, setConditionAt(doc, 1, "変えた")).changes;
   assert.ok(branches.length > 0);
   assert.ok(branches.flatMap((c) => c.texts).some((t) => t.after === "変えた"));
@@ -302,7 +302,7 @@ test("CB-T299 欄の表記を真似たキーで本当の変更を隠せない。
   const texts = diff.changes.flatMap((c) => c.texts);
   assert.ok(texts.some((t) => t.field === "中身.prompt" && t.before === "書く" && t.after === "EVIL"), JSON.stringify(texts));
   assert.ok(texts.some((t) => t.field === '["中身.prompt"]' && t.after === "書く"));
-  // 並びの番号を真似たキー
+  // 配列の番号を真似たキー
   const options = {
     ...doc,
     nodes: doc.nodes.map((n) => (n.id === "p-1" ? { ...n, data: { prompt: "書く", options: [{ label: "EVIL" }], "options[0]": { label: "ok" } } } : n)),

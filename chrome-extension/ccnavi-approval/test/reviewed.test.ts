@@ -245,10 +245,10 @@ test("CX-T137 レビュー済みで Python に投げた要求（board・confirm�
   }
 });
 
-test("CX-T139 レビューの一覧が 404・並びでないなら投げ（レビュー無しと読まない）、compare の一覧が並びでないなら null", async () => {
+test("CX-T139 レビューの一覧が 404・配列でないなら投げ（レビュー無しと読まない）、compare の一覧が配列でないなら null", async () => {
   const answer = (status: number, json: unknown) => async () => ({ status, ok: status < 300, json: async () => json, headers: { get: () => null } });
   await assert.rejects(gh.pullReviews(client(answer(404, { message: "Not Found" })), "acme", "widgets", 42), /404/);
-  await assert.rejects(gh.pullReviews(client(answer(200, { message: "?" })), "acme", "widgets", 42), /並びでない/);
+  await assert.rejects(gh.pullReviews(client(answer(200, { message: "?" })), "acme", "widgets", 42), /配列でない/);
   const a = "a".repeat(40);
   const b = "b".repeat(40);
   assert.equal((await gh.compareFiles(client(answer(200, { status: "ahead" })), "acme", "widgets", a, b)).files, null);
@@ -256,7 +256,7 @@ test("CX-T139 レビューの一覧が 404・並びでないなら投げ（レ�
   assert.deepEqual((await gh.compareFiles(client(answer(200, { status: "identical", files: [] })), "acme", "widgets", a, b)).files, []);
 });
 
-test("CX-T140 レビュー済みの読み取りの受け口も、設定画面で登録したリポジトリだけ受ける", async () => {
+test("CX-T140 レビュー済みの読み取りのハンドラも、設定画面で登録したリポジトリだけ受ける", async () => {
   const mock = reviewing("resolved");
   const d = deps(mock, new Map([["github.com", TOKEN]]), new Map(), () => new Date(), []);
   const at = JSON.parse(mock.files(FAMILY)[REQUESTED]).head as string;

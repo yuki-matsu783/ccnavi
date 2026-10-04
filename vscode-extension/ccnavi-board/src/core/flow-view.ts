@@ -177,7 +177,7 @@ export interface FlowOffer {
 /** 開いた下書き。実行ファイルの `--lint --flow` が通り、画面の読みとも食い違わなかった中身 */
 export interface FlowProposal {
   readonly doc: FlowDoc;
-  /** 読んだバイトの指紋（sha256 の 16 進）。取り込んで保存したあと、同じ中身のときだけ下書きを消す */
+  /** 読んだバイトのハッシュ（sha256 の 16 進）。取り込んで保存したあと、同じ中身のときだけ下書きを消す */
   readonly hash: string;
   readonly draftPath: string;
 }
@@ -259,7 +259,7 @@ export type FlowMessage =
   | { readonly type: "reload"; readonly dirty: boolean }
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  /** `imported` は、読み込んでから取り込んだ下書きの指紋。保存が通ったら、下書きがまだ同じ中身なら消す */
+  /** `imported` は、読み込んでから取り込んだ下書きのハッシュ。保存が通ったら、下書きがまだ同じ中身なら消す */
   | { readonly type: "save"; readonly doc: FlowDoc; readonly imported?: string }
   /** 編集中のコピー。未保存のまま閉じられたときに戻すため、拡張ホストが覚えておく。未保存でなくなったら null */
   | { readonly type: "draft"; readonly doc: FlowDoc | null }
@@ -302,7 +302,7 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
       if (doc === undefined) {
         return undefined;
       }
-      // 指紋の形（sha256 の 16 進）でなければ、取り込みは無かったものとして扱う（下書きを消さない側）
+      // ハッシュの形（sha256 の 16 進）でなければ、取り込みは無かったものとして扱う（下書きを消さない側）
       return typeof m.imported === "string" && /^[0-9a-f]{64}$/.test(m.imported) ? { type: "save", doc, imported: m.imported } : { type: "save", doc };
     }
     case "draft": {

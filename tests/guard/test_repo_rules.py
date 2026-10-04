@@ -298,7 +298,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
         self.assertNotIn(APPROVAL, hit(body), body["rules"])
 
     def test_sudo_の_sh_c_と_find_exec_の中の承認も止まる(self):
-        # A4。実行役のコマンドの並びを正規表現に持たせる案（B）で残っていた 2 形。
+        # A4。実行役のコマンドの並べ方を正規表現に持たせる案（B）で残っていた 2 形。
         for subject in [
             "sudo -u me sh -c 'ccnavi --agree --yes x'",
             "find . -name x -exec ccnavi --agree --yes {} \\;",

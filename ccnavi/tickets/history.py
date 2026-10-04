@@ -26,7 +26,7 @@ Windows の追記はその保証が弱く、同時に書けば行が混ざりう
 ## 置き場
 
 承認済みチケットと同じツリーの承認済みの領域の `events/<識別子>.ndjson`。マーカーと同じく
-親のブランチに入れて git で運ぶ（設計 9.2）。拡張子を `.jsonl` にしないのは、`*.jsonl` を
+親のブランチに入れて git で共有する（設計 9.2）。拡張子を `.jsonl` にしないのは、`*.jsonl` を
 無視するリポジトリが多く（このリポジトリも判定の記録のために無視している）、無視されると
 `ccnavi-push-approved.sh` の `git add` が気づかないうちに落とすから。
 """
@@ -148,7 +148,7 @@ def path(approved_dir: str, ticket_id: str) -> str:
 def stamp() -> str:
     """履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。機械をまたいでも並べて読める。
 
-    時計は fsio の差し口（`fsio.clock`）を通る。承認の plan は承認の記録と同じ時刻を書く。
+    時計は fsio の差し替え点（`fsio.clock`）を通る。承認の plan は承認の記録と同じ時刻を書く。
     """
     return fsio.utc_stamp()
 
@@ -185,12 +185,12 @@ def note(
         failed = "識別子の形ではないので、ファイルの名前に使わない"
         _state["failures"].append(
             f"{ticket_id!r} の履歴（{kind}）を書かない（{failed}）。状態は動いた"
-            "（状態の正は置き場で、履歴は補助）"
+            "（状態は置き場で決まり、履歴は補助）"
         )
         return failed
     template = (
         f"{ticket_id} の履歴（{kind}）を {target} に書けない"
-        "（{reason}）。状態は動いた（状態の正は置き場で、履歴は補助）"
+        "（{reason}）。状態は動いた（状態は置き場で決まり、履歴は補助）"
     )
     try:
         # 知らない型が混ざっても落とさず、文字列にして残す。

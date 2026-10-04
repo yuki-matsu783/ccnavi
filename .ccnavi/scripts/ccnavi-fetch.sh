@@ -25,7 +25,7 @@
 # セッションの頭の文脈がそれで埋まる。
 #
 # **待たせない。** 認証を尋ねる画面を出させず（GIT_TERMINAL_PROMPT・GCM_INTERACTIVE）、
-# fetch 1 回に見張りを付けて CCNAVI_FETCH_TIMEOUT 秒（既定 15）で切る。hook の上限（60 秒）に
+# fetch 1 回にタイムアウトを付けて CCNAVI_FETCH_TIMEOUT 秒（既定 15）で切る。hook の上限（60 秒）に
 # 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
 #
 # **認証で落ちたときは、そう言う。** 尋ねないので、資格情報が無いか切れていると毎回落ちる。
@@ -40,7 +40,7 @@
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
 # 取り込み（merge）・消えたかの確かめ・取り込み状態の書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
-# fetch 1 回の見張りも枠の残りより長くしない（hook の上限は 60 秒）。
+# fetch 1 回のタイムアウトも枠の残りより長くしない（hook の上限は 60 秒）。
 #
 # **「リモートにその ref が無い」で落ちた fetch は、その origin を落ちたものに数えない。** 数えると、
 # 同じ origin の統合先の取り込みまで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
@@ -107,7 +107,7 @@ ccnavi_fetch_left() {
 # リモートにその ref が無くて落ちたら 4（その origin を落ちたものに数えない）。
 # 時間の枠（CCNAVI_FETCH_BUDGET、既定 45 秒）を過ぎていたら取りに行かずに 5。
 #
-# 見張り（ccnavi_git_timed）が limit 秒か枠の残りの短い方で切る。hook の上限（60 秒）を超えないため。
+# タイムアウト監視（ccnavi_git_timed）が limit 秒か枠の残りの短い方で切る。hook の上限（60 秒）を超えないため。
 # 単一ブランチの clone でも origin/<ブランチ> が進むよう、行き先を書いて取る（sh の中の git。
 # ccnavi-git.sh の入口の refspec の拒否とは別の話）。
 ccnavi_fetch_git() {

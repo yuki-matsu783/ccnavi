@@ -161,7 +161,7 @@ class Definition:
 
 
 def _file_digest(home: str, rel: str) -> str:
-    """スクリプトの中身の指紋。置き場が決まっていないか読めなければ空文字。"""
+    """スクリプトの中身のハッシュ。置き場が決まっていないか読めなければ空文字。"""
     if not home:
         return ""
     try:
@@ -284,7 +284,7 @@ def parse(
     if raw_factors is None:
         raw_factors = []
     if not isinstance(raw_factors, list):
-        return None, [Problem(SEVERITY_ERROR, where, "`factors` が並びではない")]
+        return None, [Problem(SEVERITY_ERROR, where, "`factors` がリストではない")]
     factors, more = _factors(raw_factors, where, script_homes)
     problems += more
     if any(p.severity == SEVERITY_ERROR for p in problems):
@@ -429,7 +429,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
 
     同 `id` の衝突で層を空にしないのは、空にすると点が小さくなる側になるから。
     両方を数えれば、衝突は点を増やす向きにしか影響しない（ルールの同 `id` と同じ扱い）。
-    裸の `id` にコロンは書けないので、名乗り直した `id` が他の項目と重なることは無い。
+    裸の `id` にコロンは書けないので、層の名前を前に付けた `id` が他の項目と重なることは無い。
 
     合成後の `levels` の順が崩れる error のときは、その層を空として扱い、共通層だけを返す。
     """
@@ -525,7 +525,7 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、パスを持たない
     （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
-    名札と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
+    名前と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
     配点を書ける側が層を選べると、自分のリスクを自分で下げる方法になる。
     """
     if settings.is_reserved_layer_name(project):

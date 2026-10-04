@@ -235,7 +235,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
     } else if (actions) {
       const bar = el(doc, "div", "actions");
       bar.append(button(doc, `承認する（${batch.map((e) => e.ticket).join(", ")}）`, "approve", actions.approve));
-      bar.append(el(doc, "span", "digest", `指紋 ${r.digest.slice(0, 12)}`));
+      bar.append(el(doc, "span", "digest", `ダイジェスト ${r.digest.slice(0, 12)}`));
       box.append(bar);
     }
   }

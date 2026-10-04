@@ -17,7 +17,7 @@ export const MARK_LABELS: Readonly<Record<string, string>> = {
 
 export const PHASE_STATE_LABELS = { planned: "未着手", active: "進行中", ended: "終了" } as const;
 
-/** 列の呼び名。列の並びと同じ 1 か所（`core/board.ts` の `COLUMNS`）から引く */
+/** 列の呼び名。列の順序と同じ 1 か所（`core/board.ts` の `COLUMNS`）から引く */
 const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUMNS.map((c) => [c.state, c.label]));
 
 /**
@@ -60,7 +60,7 @@ export function phaseStatusFull(p: PhaseChip): string {
   return phaseStatusFullItems(p).join(" · ");
 }
 
-/** 全文の項目の並び。画面は項目ごとに区切って、項目の途中では折り返さない */
+/** 全文の項目のリスト。画面は項目ごとに区切って、項目の途中では折り返さない */
 export function phaseStatusFullItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
@@ -86,7 +86,7 @@ export function phaseStatusBrief(p: PhaseChip): string {
   return phaseStatusBriefItems(p).join(" · ");
 }
 
-/** 要約の項目の並び。無ければ空 */
+/** 要約の項目のリスト。無ければ空 */
 export function phaseStatusBriefItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
@@ -112,7 +112,7 @@ export function isHttpUrl(url: string): boolean {
  * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ表記
  * （`ccnavi/tickets/agree.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
- * **まとめるのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
+ * **まとめるのはこのリストに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
  * （「エージェントが書いた理由」の本文を隠してはいけない）。
  */

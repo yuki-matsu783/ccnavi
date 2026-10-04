@@ -345,7 +345,7 @@ class ApproveOnlyTest(PhaseHarness):
 
     def test_child_of_a_rejected_parent_is_not_approved(self):
         # 親が落ちたら（置き場に無いプロジェクト）、その子も親が承認されていないので落ちる。
-        # 子自身は正しいので、落ちた親を池に残すと子だけ承認済みチケットになる
+        # 子自身は正しいので、落ちた親を対応表に残すと子だけ承認済みチケットになる
         parent = parent_text("i0001", ["design"]).replace("plan:", "project: nope\nplan:", 1)
         self.propose("i0001", parent)
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/design/*",)))
@@ -884,7 +884,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("rm -r wip", closed.stdout)
         self.assertIn("squash", closed.stdout)
-        # 閉じた記録は運び方によらず置く（REQ-TKT-47）。
+        # 閉じた記録は進め方によらず置く（REQ-TKT-47）。
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
         self.assertEqual(record["reviews"], {"1": "mr"})
         self.commit_parent("状態の移動")

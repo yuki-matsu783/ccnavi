@@ -272,7 +272,7 @@ def readable_every(written: object) -> int:
 
     読めなかったときに何をするかは呼ぶ側が決める。判定（_build）は 1 として扱って
     毎回渡し、--lint は error にして名指しする。同じ「読めるか」を 2 か所で
-    別々に書くと、何も言われずに無視される値と咎められる値が食い違う。
+    別々に書くと、何も言われずに無視される値と指摘される値が食い違う。
     """
     if written is None:
         return EVERY_DEFAULT
@@ -346,7 +346,7 @@ class Rule:
     every: int = 1
     # every_written は書かれたままの値。読めない値（0・負・整数でない）でもルールは
     # 組み上げ、every は 1（毎回渡す）として扱う。ここで受け付けずにルールごと捨てると、--lint の
-    # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。咎めるのは
+    # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。指摘するのは
     # --lint の仕事で、そのために書かれた値をそのまま持つ。書いていなければ None。
     every_written: object = None
     # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
@@ -412,8 +412,8 @@ class Rule:
 class RuleSet:
     """ルールファイル 1 本ぶん。タイプごとに分けて持つ。
 
-    1 本の並びにして各ルールが自分の判定を持つ形にもできるが、分けておくと
-    「強い順に見る」が並びの順そのものになる。判定の側がタイプを選び違える形を
+    1 本のリストにして各ルールが自分の判定を持つ形にもできるが、分けておくと
+    「強い順に見る」がリストの順そのものになる。判定の側がタイプを選び違える形を
     残さないほうが、あとからタイプを足したときに間違いが起きにくい。
     """
 
@@ -472,7 +472,7 @@ def _decode(text: str, path: str) -> dict:
     except yaml.YAMLError as exc:
         raise ValueError(f"{path} を YAML として読めない: {exc}") from exc
     if not isinstance(data, dict):
-        raise ValueError(f"{path} のルールがキーと値の並びではない")
+        raise ValueError(f"{path} のルールがマッピングではない")
     return data
 
 
@@ -507,7 +507,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
         if raw_section is None:
             continue
         if not isinstance(raw_section, list):
-            problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` が並びではない"))
+            problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` がリストではない"))
             continue
         for i, raw in enumerate(raw_section):
             rule, problem = _build(raw, name, i, root, builtin)
@@ -539,7 +539,7 @@ def _build(
     """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
-        return None, Problem(SEVERITY_ERROR, where, "ルールがキーと値の並びではない")
+        return None, Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")
 
     written_id = str(raw.get("id") or "")
     rule = Rule(

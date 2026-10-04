@@ -172,7 +172,7 @@ APP_RULES = {
     ],
 }
 
-# lib 側の、app の `deploy` と同じ呼び出しに当たる deny。並びが名前順かを見る。
+# lib 側の、app の `deploy` と同じ呼び出しに当たる deny。名前順に並ぶかを見る。
 LIB_DEPLOY = {
     "id": "deploy-any",
     "match": "Bash",
@@ -204,7 +204,7 @@ ROOT_RULE = {
     "message": "secret.txt は置かない。",
 }
 
-# YAML として壊れている。閉じていない並び。
+# YAML として壊れている。閉じていないリスト。
 BROKEN = "version: 1\ndeny: [\n"
 
 # ccnavi ディレクトリの既定の名前（設計 11.2、`CCNAVI_PROJECT_HOME` の既定）。
@@ -803,7 +803,7 @@ class BashUnionTest(ConfigUnionHarness):
         self.assertEqual(self.last_record().get("source"), "lib")
 
     def test_two_non_empty_project_layers_take_part_in_name_order(self):
-        """11.4: 非空のプロジェクトの層が 2 つでも両方が和に入り、並びは名前順。"""
+        """11.4: 非空のプロジェクトの層が 2 つでも両方が和に入り、順序は名前順。"""
         write_layer(self.app, rules=APP_RULES)
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], LIB_DEPLOY]))
 
@@ -1113,7 +1113,7 @@ class ExplainTest(ConfigUnionHarness):
     def test_explain_json_carries_every_layer(self):
         """11.9: `--explain --json` に層ごとの rules 全件と phases / risk の定義と出どころが出る。
 
-        形は README「ボードの JSON」に足す。ここでは `layers` の並びに `name`（common / self /
+        形は README「ボードの JSON」に足す。ここでは `layers` のリストに `name`（common / self /
         プロジェクト名）と `rules` / `phases` / `risk` が在ることまでを固定する。
         """
         result = self.ccnavi("--explain", "--json")

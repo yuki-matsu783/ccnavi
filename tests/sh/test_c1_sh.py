@@ -14,7 +14,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 1. 順序: hook のマーカーと状態の履歴を先にコミット → 取り込み → 書く →
    書いたパスだけ commit --only → push。
    統合先の取り込み結果も同じ回で書く
-2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・運ぶ処理は入れ子で通る
+2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・承認の push は入れ子で通る
 3. 競合: リモートが進んでいれば取り込んでから書く。衝突したら取りやめて何も書かない
 4. 途中の操作（merge など）があれば始めない
 5. 戻し: push が通らなければ、自分のコミットを比較つきで戻し、書いたパスの中身も戻して
@@ -22,13 +22,13 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
    プロジェクトの層へ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
-8. hook の書きかけ（pending・skipped・状態の履歴の追記）は運び、
+8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
 9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親子のチケットなら
-   運ぶ処理を自動で呼ぶ
+   承認の push を自動で呼ぶ
 10. 取り込み状態の無い親子のチケット・origin の無いリポジトリ・chat だけの親子のチケットは今のまま
     （コミットも push もしない）
-11. 運ぶ処理（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
+11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
     書いて送ったものが、経路・時刻・拡張の版のほかは同じ
 """
@@ -347,7 +347,7 @@ class C1TicketTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{CHILD}.md", self.committed())
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    # ---- 8. hook の書きかけ（b）は先に運ぶ。ユーザの判断（c）と知らない変更（d）は止める
+    # ---- 8. hook の書きかけ（b）は先にコミットする。ユーザの判断（c）と知らない変更（d）は止める
 
     def test_hook_marks_and_events_are_committed_before_the_take_in(self):
         pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
@@ -359,7 +359,10 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(
             self.subjects(2),
-            [f"ccnavi: {PARENT} に着手", f"ccnavi: {PARENT} の hook のマーカーと状態の履歴を運ぶ"],
+            [
+                f"ccnavi: {PARENT} に着手",
+                f"ccnavi: {PARENT} の hook のマーカーと状態の履歴をコミットする",
+            ],
         )
         self.assertEqual(
             self.committed("HEAD~1"), sorted([pending, f"{APPROVED}/events/{PARENT}.ndjson"])
@@ -628,7 +631,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 
-    # ---- コミット（`--no-verify` と見張りの時間）と、落ちたときの索引
+    # ---- コミット（`--no-verify` とタイムアウト監視の時間）と、落ちたときの索引
 
     def test_a_failed_commit_leaves_nothing_staged(self):
         """署名に落ちてコミットできなければ、add した新しいファイルも索引から外す（レビュー 1）。"""
@@ -693,7 +696,9 @@ class C1TicketTest(C1Harness):
             f.write(json.dumps(row).encode() + b"\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(f"ccnavi: {PARENT} の hook のマーカーと状態の履歴を運ぶ", self.subjects(2))
+        self.assertIn(
+            f"ccnavi: {PARENT} の hook のマーカーと状態の履歴をコミットする", self.subjects(2)
+        )
 
     def test_a_forged_event_line_stops(self):
         events = f"{APPROVED}/events/{PARENT}.ndjson"
@@ -704,7 +709,7 @@ class C1TicketTest(C1Harness):
         self.assertIn("ユーザの判断が未送信", result.stderr)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
 
-    # ---- ロック（同じ機械で持ち主が生きていれば、10 分を過ぎても奪わない）
+    # ---- ロック（同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない）
 
     def test_a_long_lock_of_a_live_owner_is_not_taken(self):
         os.makedirs(self.lock_dir())
@@ -785,7 +790,7 @@ class C1TicketTest(C1Harness):
             self.tree, *APPROVED.split("/"), "phases", PARENT, f"{CHILD}.judge.json"
         )
         write(judge, json.dumps({"x": {"hit": False, "reason": "r", "head": "h", "at": "t"}}))
-        # 記録（judge.json）が未コミットでも、finish の C1 は止めずに運ぶ。
+        # 記録（judge.json）が未コミットでも、finish の C1 は止めずにコミットして push する。
         result = self.ticket("finish", CHILD)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotEqual(self.sha(self.tree, "HEAD"), head)
@@ -834,7 +839,8 @@ class C1NotImportedTest(C1Harness):
 
 
 class C1ChatOnlyTest(C1Harness):
-    """10. chat だけの親子のチケット（マージリクエストを持たない）は、取り込み済みでも
+    """10. chat だけの親子のチケット（マージリクエストを持たない）は、
+    取り込み済みでも
     C1 にしない。
     """
 
@@ -868,9 +874,9 @@ class PhaseOne:
 
 
 class C1HumanTest(PhaseOne, C1Harness):
-    """9. ユーザの判断の入口は、取り込み済みの親子のチケットなら運ぶ処理を自動で呼ぶ。
+    """9. ユーザの判断の入口は、取り込み済みの親子のチケットなら承認の push を自動で呼ぶ。
 
-    11. 運ぶ処理。
+    11. 承認の push。
     """
 
     plan = ("chores", "design")
@@ -886,7 +892,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(self.dirty(), "")
 
     def test_a_chat_review_typed_directly_is_named_as_a_human_decision(self):
-        """直に打った chat の書き込みは、次の C1 で (c) として止まり、運ぶ処理を案内する。"""
+        """直に打った chat の書き込みは、次の C1 で (c) として止まり、承認の push を案内する。"""
         self.finish_phase_one()
         typed = self.exe("--cwd", self.tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(typed.returncode, 0, typed.stdout + typed.stderr)
@@ -899,7 +905,9 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(self.dirty(), "")
 
     def test_push_approved_without_names_skips_child_trees(self):
-        """名前を省いた運ぶ処理: 親は 1 度だけ運び、子のワークツリーの置き場は運ばずに言う。"""
+        """名前を省いた承認の push: 親は 1 度だけコミットして push し、
+        子のワークツリーの置き場はコミットせずに言う。
+        """
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
         child = self.child_tree()
@@ -933,7 +941,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("コミットは残した", result.stderr)
         self.assertIn(rel, self.committed())
-        # 次の C1 は未送信のユーザの判断を見つけて止まり、運ぶ処理を打ち直すよう言う。
+        # 次の C1 は未送信のユーザの判断を見つけて止まり、承認の push を打ち直すよう言う。
         os.remove(os.path.join(self.remote, "hooks", "pre-receive"))
         stopped = self.ticket("start", PARENT)
         self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
@@ -943,7 +951,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
 
     def test_push_approved_carries_a_removed_draft_with_the_flow(self):
-        """取り込んで消えた下書きは、フローと一緒に運ぶ。書き直された下書きと
+        """取り込んで消えた下書きは、フローと一緒にコミットして push する。書き直された下書きと
         追跡していない下書きには触れない。"""
         drafts = "wip/proposals/flows"
         taken = f"{drafts}/{CHILD}.yml"
@@ -983,7 +991,7 @@ class C1HumanTest(PhaseOne, C1Harness):
 
 class C1NotImportedHumanTest(PhaseOne, C1Harness):
     """10. 取り込み状態の無い親子のチケットでは、
-    ユーザの判断の入口は置くだけで運ばない（今のまま）。"""
+    ユーザの判断の入口は置くだけでコミットしない（今のまま）。"""
 
     plan = ("chores", "design")
     imported = False

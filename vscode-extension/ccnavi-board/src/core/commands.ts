@@ -1,9 +1,9 @@
 /**
- * ユーザの判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の並び。
+ * ユーザの判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の配列。
  *
  * 承認と残った指摘の行き先は、ボードのオーバーレイでユーザが押したものを、拡張が子プロセスで打つ
  * （`--agree --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。ターミナルの壁は無く、
- * 代わりに「見せたものと今のものが同じ」ことを実行ファイルが指紋で求める。エージェントが Bash で
+ * 代わりに「見せたものと今のものが同じ」ことを実行ファイルがダイジェストで求める。エージェントが Bash で
  * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` はターミナル（tty）から打つもので、
  * ボードには置かない。
  *
@@ -12,7 +12,7 @@
  */
 import * as path from "node:path";
 
-/** 承認済みチケットを運ぶ sh の、ワークスペースルートからのパス */
+/** 承認の push の sh の、ワークスペースルートからのパス */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
@@ -39,11 +39,11 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 }
 
 /**
- * `--agree --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
- * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに入る中身。preview の `digest`）、
+ * `--agree --yes <識別子,…> --digest <ダイジェスト> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに入る中身。preview の `digest`）、
  * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
- * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
+ * 絞り込み中の承認がいつも食い違いになる。ダイジェストを渡さないと、実行ファイルは承認しない。
  */
 export function approveArgs(
   tickets: readonly string[],
@@ -57,7 +57,7 @@ export function approveArgs(
 export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
 
 /**
- * `ccnavi-review.sh decide <N> --preview`。残った指摘と指紋を JSON で見る（何も置かない）。
+ * `ccnavi-review.sh decide <N> --preview`。残った指摘とダイジェストを JSON で見る（何も置かない）。
  * sh は実行した場所を親のワークツリーとして実行ファイルに渡すので、子プロセスの cwd を親のワークツリーにする。
  * `.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから切ったワークツリーには届かないので、
  * sh はワークスペースルートからのパスで書く（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
@@ -67,8 +67,8 @@ export function decidePreviewArgs(phase: number): readonly string[] {
 }
 
 /**
- * `ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`。ユーザがオーバーレイで選んだ行き先を置く。
- * 指紋は見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
+ * `ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`。ユーザがオーバーレイで選んだ行き先を置く。
+ * ダイジェストは見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
  * エージェントがこの形を打つと、組み込みの deny（builtin-guard-ticket-approval）が止める
  */
 export function decideArgs(
@@ -134,7 +134,7 @@ export function reviewedPrompt(
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
- * `parents` を渡すとその親子のチケットだけを運ぶ（取り込み済みのものだけが送られ、
+ * `parents` を渡すとその親子のチケットだけをコミットして push する（取り込み済みのものだけが送られ、
  * そうでないものは今どおりユーザがコミットする）。
  */
 export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {

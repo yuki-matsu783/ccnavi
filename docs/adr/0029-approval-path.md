@@ -33,7 +33,7 @@ keywords: [承認, チケット, 経路, フロー, ルール, 制御]
 | `--lint` が、超えている子・深さ・ホストに合うトークン・SubagentStart/Stop の登録・スクリプトの有無・`CCNAVI_GUARD_TICKET_APPROVAL=disable` を言う | 承認の場で初めて知るより早く |
 
 旧名 `CCNAVI_GUARD_CLI` は `CCNAVI_GUARD_TICKET_APPROVAL` に改めた。守る手段（CLI から打つ形）
-ではなく、守る対象（チケットの承認の経路）で名乗る。旧名はもう読まれず、`--lint` が言う。
+ではなく、守る対象（チケットの承認の経路）で名前を付ける。旧名はもう読まれず、`--lint` が言う。
 旧名で `disable` と書いてあった設定は、読まれなくなった時点で既定の `enable` に戻る。
 
 ## 得たもの・失ったもの

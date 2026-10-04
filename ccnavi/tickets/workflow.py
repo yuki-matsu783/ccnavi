@@ -107,7 +107,7 @@ def waits_of(parent: ticket_mod.Ticket, number: int, types: dict | None) -> list
 
 
 def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
-    """全体計画の待ち方が組めるか。並び、終端、延期の引き受け手（設計 9.7）。"""
+    """全体計画の待ち方が組めるか。順序、終端、延期の引き受け手（設計 9.7）。"""
     found: list[rules.Problem] = []
     if types is None or not parent.has_plan:
         return found

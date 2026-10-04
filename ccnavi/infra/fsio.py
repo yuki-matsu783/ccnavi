@@ -31,7 +31,7 @@ from typing import Any
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 
-# ---- 時計（判定のコアの Clock の差し口）
+# ---- 時計（判定のコアの Clock の差し替え点）
 #
 # 時刻はこの 2 つの関数だけが読む。`clock` で固定すると、その間の `stamp` と `utc_stamp` は
 # 同じ 1 つの時刻を返す。承認の plan が承認の記録（`approved_at`）と履歴（`at`）に同じ時刻を
@@ -91,7 +91,7 @@ def full_path(path: str, cwd: str) -> str:
     まだ存在しないファイルへの書き込みがこれにあたる。
 
     実行前チェック（judge）と実行後チェック（gitstate）が同じパスに直す。別々に持つと、
-    同じ場所が 2 通りのパスで当たり、実行前に通った書き込みが実行後に咎められる。
+    同じ場所が 2 通りのパスで当たり、実行前に通った書き込みが実行後に報告される。
     """
     if not path:
         return ""
@@ -519,7 +519,7 @@ def lexists(path: str) -> bool:
 
 
 def listdir(directory: str) -> list[str]:
-    """ディレクトリの名前の一覧（並びは決めない）。無ければ `os.listdir` と同じ例外。
+    """ディレクトリの名前の一覧（順序は決めない）。無ければ `os.listdir` と同じ例外。
 
     溜める段があれば、そこで足した名前を足し、消した名前を落とす。
     """
@@ -556,15 +556,15 @@ def load_text(path: str) -> str:
     return text
 
 
-# ---- 判定が読んだ中身（`read_set`。承認の指紋に入れる）
+# ---- 判定が読んだ中身（`read_set`。承認のダイジェストに入れる）
 #
 # 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
-# 読んだファイルの中身の指紋を記録する。無かった・読めなかったファイルも「無い」として記録する
+# 読んだファイルの中身のハッシュを記録する。無かった・読めなかったファイルも「無い」として記録する
 # （後から現れれば判定が変わりうる）。溜める段（`staging`）から読んだ分は数えない（判定の
-# 入力ではなく、plan の途中の姿）。承認の指紋（`agree.approval_digest`）がこれを使う。
+# 入力ではなく、plan の途中の内容）。承認のダイジェスト（`agree.approval_digest`）がこれを使う。
 #
 # 中身は改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。機械の
-# 改行で指紋が変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
+# 改行でハッシュが変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
 
 # 無い・読めないファイルを表す値。
 READ_ABSENT = "-"
@@ -573,7 +573,7 @@ _READERS: list[dict[str, str]] = []
 
 @contextlib.contextmanager
 def reading() -> Iterator[dict[str, str]]:
-    """この間に読んだファイル（絶対パス → 中身の指紋か `READ_ABSENT`）を集める。
+    """この間に読んだファイル（絶対パス → 中身のハッシュか `READ_ABSENT`）を集める。
 
     同じファイルを 2 度読んだら最初の中身を採る。入れ子にすると外側にも同じものが入る。
     """
@@ -601,7 +601,10 @@ def note_read(path: str, content: str | bytes | None) -> None:
 
 
 def content_digest(content: str | bytes) -> str:
-    """中身の指紋。改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。"""
+    """中身のハッシュ。
+
+    改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。
+    """
     if isinstance(content, bytes):
         try:
             content = content.decode("utf-8")
@@ -652,7 +655,8 @@ def _record(path: str) -> None:
 def note_input(path: str) -> None:
     """読んだ入力を、書いたものと同じく一覧に載せる（在るときだけ）。
 
-    record-risk の記録（`<子>.judge.json`）は自分では運ばず、それを読む `finish` の C1 が運ぶ。
+    record-risk の記録（`<子>.judge.json`）は自分ではコミットせず、
+    それを読む `finish` の C1 がコミットして push する。
     """
     if _RECORDERS and os.path.lexists(path) and not os.path.islink(path):
         _record(path)
@@ -756,7 +760,7 @@ STREAM_ERR = "stderr"
 
 @dataclass
 class Line:
-    """ユーザに見せる 1 行。書き込みと同じ並びに置き、同じ組が落ちたら出さない。"""
+    """ユーザに見せる 1 行。書き込みと同じリストに置き、同じ組が落ちたら出さない。"""
 
     text: str
     group: int = 0
@@ -764,7 +768,7 @@ class Line:
 
 
 class Stage:
-    """溜めた書き込みの並びと、溜めた後の中身の見え方。"""
+    """溜めた書き込みのリストと、溜めた後の中身の見え方。"""
 
     def __init__(self) -> None:
         self.items: list[Op | Line | Call] = []

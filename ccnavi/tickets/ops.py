@@ -93,18 +93,19 @@ def start(
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
     if found.is_child:
-        # 着手のときのフローの指紋を記録する。SubagentStart / SubagentStop が、着手のあとに
+        # 着手のときのフローのハッシュを記録する。SubagentStart / SubagentStop が、着手のあとに
         # 書き換わったら知らせる（設計 9.3.1。止めない）。
         started = replace(found, started_at=fields["started_at"])
         where, failed = flow.record_digest(conf, root, started)
         if failed:
             stderr.write(
-                f"ccnavi: {ticket_id} のフローの指紋を記録できない（{failed}）。"
+                f"ccnavi: {ticket_id} のフローのハッシュを記録できない（{failed}）。"
                 "着手のあとの書き換えは知らせられない\n"
             )
         else:
             stdout.write(
-                f"フローの指紋を {where} に記録した。承認済みチケットと同じくユーザがコミットする\n"
+                f"フローのハッシュを {where} に記録した。"
+                "承認済みチケットと同じくユーザがコミットする\n"
             )
     for line in synced:
         stdout.write(line + "\n")
@@ -231,10 +232,10 @@ def _close_parent(
     """親を閉じたあとの記録と案内。
 
     記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
-    統合先に取り込む前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
+    統合先に取り込む前に `wip/` ごと消えるので、マージリクエストを作らない進め方では
     閉じた事実の残る先がここしか無い（設計 9.8）。
 
-    案内は運び方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
+    案内は進め方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
     無いなら統合先に取り込むところまで。ccnavi はどちらでもマージしない。
     """
     where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
@@ -408,7 +409,8 @@ def _score_child(
         approval.read_child_record(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
         or {}
     )
-    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、この C1 で運ぶ。
+    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、
+    # この C1 でコミットする。
     fsio.note_input(
         approval.child_record_path(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
     )
@@ -475,7 +477,7 @@ def _places(
     closed, _ = approval.scan(conf, root, closed=True)
     hits += [t for t in closed if t.ticket == ticket_id]
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
-    # `todo/` は承認の前の姿。承認済みチケット（作業中・レビュー待ち・閉じた）が在れば、同じ
+    # `todo/` は承認の前の状態。承認済みチケット（作業中・レビュー待ち・閉じた）が在れば、同じ
     # 識別子の `todo/` は改版の候補か書き損じで、状態の操作の相手ではない（`--lint` が言う）。
     if not hits:
         hits += [t for t in proposals if t.ticket == ticket_id and t.state == ticket_mod.TODO]
@@ -514,7 +516,7 @@ def _undecided(
             stderr.write(f"  {line}\n")
         if not st.stop:
             stderr.write(
-                "  親のワークツリーの外のチケットは、親のブランチへ運んでから消すか、"
+                "  親のワークツリーの外のチケットは、親のブランチへ移してコミットしてから消すか、"
                 "残ったワークツリーを片付けてから打ち直してください\n"
             )
         return
@@ -576,7 +578,7 @@ def family_stopped(
             f"ccnavi: {found.ticket}: チケットが親のブランチ {st.family} のワークツリーの外"
             f"（{found.tree or 'ワークスペースルート'}）にしか無い。"
             "取り込み済みの親子のチケットでは親のブランチ上のチケットだけが本物なので、このチケットは動かさない\n"
-            f"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/{st.family}）へ運んで"
+            f"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/{st.family}）へ移して"
             "コミットと push をしてから打ち直す\n"
         )
         return True
@@ -637,7 +639,7 @@ def _predecessors_unmet(
     """子の先行が全部 `done/` に在って取り消しでないか。欠けていれば止めて言う。
 
     承認でも同じ検査を当てるが、承認のあとに先行が動くこと（ユーザが `done/` から戻す）と、置き場を
-    手で動かして承認する運びがあるので、着手の手前でもう一度見る。どの先行が何の
+    手で動かして承認する進め方があるので、着手の手前でもう一度見る。どの先行が何の
     状態か、どうすればよいかを 1 本ずつ言う。
     """
     unmet = approval.unmet_predecessors(found, approval.predecessor_pool(conf, root))
@@ -929,7 +931,7 @@ def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
 
 def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
     """促した (チケット, HEAD) を記録する。書けなければ理由。
-    git で運ぶ履歴（history）には入れない。"""
+    git で共有する履歴（history）には入れない。"""
     path = _nudge_path(state_dir, session)
     data = fsio.read_dict(path) or {}
     data[found.ticket.ticket] = found.head
