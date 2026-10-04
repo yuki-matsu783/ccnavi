@@ -40,6 +40,11 @@ export interface ProposalJson {
 export interface CopyJson {
   readonly status: CopyStatus;
   readonly approved_at?: string;
+  /**
+   * 承認の時刻をどこから引いたか。`history`（状態の履歴）・`commit`（doing/ に足したコミット）・
+   * `uncommitted`（手で置いてまだコミットしていない。approved_at は空）・空（分からない）
+   */
+  readonly approved_from?: string;
   readonly source_tree?: string;
   readonly path?: string;
 }
@@ -321,6 +326,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     copy: {
       status: status === "open" || status === "review" || status === "closed" ? status : "none",
       approved_at: str(copy.approved_at),
+      approved_from: str(copy.approved_from),
       source_tree: str(copy.source_tree),
       path: str(copy.path),
     },

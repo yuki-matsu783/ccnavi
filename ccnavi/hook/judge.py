@@ -899,8 +899,7 @@ def ticket_verdict(
     source = ticket.path
     head = [
         f"subject: {full}",
-        f"ticket: {ticket.ticket} ({ticket.title}), approved {ticket.approved_at}, "
-        f"worktree {t.name}",
+        f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
         f"scope: {area}",
     ]
     decided = rules.ASK if found.verdict == rules.ASK else rules.DENY
