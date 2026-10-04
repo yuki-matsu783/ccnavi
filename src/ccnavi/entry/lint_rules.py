@@ -15,24 +15,25 @@ from ..infra import hookio
 from ..policy import ctxfile, rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
-# `{root}/` が前に付いていない `.ccnavi/scripts/`（文面の sh は `{root}/` から書く）。
-_BARE_SCRIPTS = re.compile(r"(?<!\{root\}/)\.ccnavi/scripts/")
-# 語（空白・引用符で区切られた塊）の先頭が絶対パスの印: `/`、`~`、`C:\` や `C:/` のドライブ表記。
-_ABSOLUTE_START = re.compile(r"^(?:[/~]|[A-Za-z]:[\\/])")
-_WORD_BREAK = " \t\r\n'\"`"
+# `.ccnavi/scripts/` のヒット。直前の `./` と `../` の連なりは、相対の書き方なので手前にたどる。
+_SCRIPTS = re.compile(r"(?:\.{1,2}/)*\.ccnavi/scripts/")
+# その手前の 1 文字がこれなら、ヒットはパスの途中（絶対パス・`$VAR/`・`{root}/`・`~/`・
+# ディレクトリ名の続き）。空白・引用符・括弧・`=`・`:` や語頭は、パスの始まりとして相対に数える。
+_PATH_MID = frozenset("/\\}~$._-")
 
 
 def _has_relative_scripts(text: str) -> bool:
-    """文面に、絶対パスでも `{root}/` 始まりでもない `.ccnavi/scripts/` があるか。
+    """文面に、cwd に左右される相対パスの `.ccnavi/scripts/` があるか。
 
-    絶対パスは cwd に左右されないので警告しない。判定は `.ccnavi/scripts/` を含む語の先頭。
+    ヒットの直前（`./` と `../` の連なりを除いた位置）の 1 文字を見る。`/` `\\` `}` `~` `$`
+    `.` 英数字 `_` `-` ならパスの途中（絶対パス、`{root}/`、`$VAR/`、`~/` など）なので言わない。
+    語頭や、空白・引用符・括弧・`=`・`:` の直後なら相対パスの始まりとして言う。
     """
-    for hit in _BARE_SCRIPTS.finditer(text):
-        start = hit.start()
-        while start > 0 and text[start - 1] not in _WORD_BREAK:
-            start -= 1
-        if not _ABSOLUTE_START.match(text[start:]):
-            return True
+    for hit in _SCRIPTS.finditer(text):
+        before = text[hit.start() - 1] if hit.start() > 0 else ""
+        if before and (before.isascii() and before.isalnum() or before in _PATH_MID):
+            continue
+        return True
     return False
 
 

@@ -129,10 +129,11 @@ class LintEveryTest(unittest.TestCase):
 
 
 class LintScriptPathTest(unittest.TestCase):
+    """message の `.ccnavi/scripts/` に `{root}` が付いていなければ warn（issue #211）。"""
+
     setUp = LintEveryTest.setUp
     lint = LintEveryTest.lint
     said = LintEveryTest.said
-    """message の `.ccnavi/scripts/` に `{root}` が付いていなければ warn（issue #211）。"""
 
     def deny(self, name: str, message: str) -> dict:
         return {"id": name, "match": "Bash", "glob": "*git push*", "message": message}
@@ -183,6 +184,13 @@ class LintScriptPathTest(unittest.TestCase):
             "drive-back": "sh C:\\ws/.ccnavi/scripts/x.sh",
             "drive-fwd": 'sh "d:/ws/.ccnavi/scripts/x.sh"',
             "rooted": "sh {root}/.ccnavi/scripts/x.sh",
+            "space": "sh '/c/Users/John Smith/ws/.ccnavi/scripts/x.sh'",
+            "fullwidth": "（/opt/ws/.ccnavi/scripts/x.sh を使う）",
+            "corner": "「/opt/ws/.ccnavi/scripts/x.sh」を使う",
+            "link": "[x](/opt/ws/.ccnavi/scripts/x.sh)",
+            "equals": "sh --script=/opt/ws/.ccnavi/scripts/x.sh",
+            "var": "sh $CLAUDE_PROJECT_DIR/.ccnavi/scripts/x.sh",
+            "braced-var": "sh ${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/x.sh",
         }
         out = self.lint_rules(*(rule(k, additionalContext=v) for k, v in cases.items()))
         for k in cases:
@@ -193,6 +201,10 @@ class LintScriptPathTest(unittest.TestCase):
             "bare": "sh .ccnavi/scripts/x.sh",
             "dot": "sh ./.ccnavi/scripts/x.sh",
             "up": "sh ../../.ccnavi/scripts/x.sh",
+            "paren": "（.ccnavi/scripts/x.sh を使う）",
+            "corner": "「./.ccnavi/scripts/x.sh」を使う",
+            "equals": "sh --script=.ccnavi/scripts/x.sh",
+            "link": "[x](../.ccnavi/scripts/x.sh)",
             "mixed": "sh /abs/.ccnavi/scripts/a.sh と sh .ccnavi/scripts/b.sh",
         }
         out = self.lint_rules(*(rule(k, additionalContext=v) for k, v in cases.items()))
