@@ -627,9 +627,15 @@ test("CB-D144 「アーカイブ済みのチケットを表示する」は既定
     assert.equal(box.checked, false);
     assert.match(box.parentElement?.textContent ?? "", /アーカイブ済みのチケットを表示する/);
     assert.equal(page.all('.column[data-state="archived"]').length, 0);
+    // 入れたら、右端に足されたアーカイブの列まで横へ送る
+    const scrolled: { state: string | undefined; options: unknown }[] = [];
+    page.window.HTMLElement.prototype.scrollIntoView = function (this: HTMLElement, options?: unknown) {
+      scrolled.push({ state: this.dataset.state, options: JSON.parse(JSON.stringify(options)) as unknown });
+    };
     page.click(box);
     await page.settle();
     assert.equal((page.state() as { archived: boolean }).archived, true);
+    assert.deepEqual(scrolled, [{ state: "archived", options: { block: "nearest", inline: "end" } }]);
     // 絞り込みではない（承認の送り先は変わらない）
     assert.ok(!page.document.body.classList.contains("filtering"));
     assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
@@ -650,6 +656,14 @@ test("CB-D144 「アーカイブ済みのチケットを表示する」は既定
   const again = await openBoard(json, { state: { archived: true } });
   try {
     assert.equal(again.one<HTMLInputElement>("#archived-filter").checked, true);
+    // 覚えていた値で開き直したときは送らない
+    let scrolledAgain = false;
+    again.window.HTMLElement.prototype.scrollIntoView = () => {
+      scrolledAgain = true;
+    };
+    again.click(again.one('button[data-action="refresh"]'));
+    await again.settle();
+    assert.equal(scrolledAgain, false);
     assert.ok(!again.one('.card[data-id="old"]').classList.contains("hidden"));
   } finally {
     await again.close();
