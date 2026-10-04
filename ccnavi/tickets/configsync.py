@@ -1,15 +1,17 @@
-"""着手の前に、共通層の設定をプロジェクトの層へ写す（設計 11.12、ADR-0084）。
+"""着手の前に、共通レイヤーの設定をプロジェクトのレイヤーへ写す（設計 11.12、ADR-0084）。
 
-共通層（`.ccnavi/common/`）は、共通の設定を各プロジェクトへ配るための定義で、正本は
-各プロジェクトの `.ccnavi/config/`。共通層はワークスペースの git にあるので、プロジェクトだけを
-clone したユーザからは見えない。そこで親チケットに着手するとき、共通層の各ファイルと、親の
-ワークツリーにあるプロジェクトの層の同じ名前のファイルを比べ、違えば共通層で上書きする。
+共通レイヤー（`.ccnavi/common/`）は、共通の設定を各プロジェクトへ配るための定義で、正本は
+各プロジェクトの `.ccnavi/config/`。
+共通レイヤーはワークスペースの git にあるので、プロジェクトだけを
+clone したユーザからは見えない。そこで親チケットに着手するとき、共通レイヤーの各ファイルと、親の
+ワークツリーにあるプロジェクトのレイヤーの同じ名前のファイルを比べ、違えば共通レイヤーで上書きする。
 
-- 写すのは共通層にあるファイルだけ。共通層に無いファイル（このワークスペースでは
+- 写すのは共通レイヤーにあるファイルだけ。共通レイヤーに無いファイル（このワークスペースでは
   `phases.yml`）は、プロジェクトの側を消さずに残す
-- 配点の `script:` が指す共通層のスクリプトも写し、指す先をプロジェクトの層の綴りに直す。
-  層から共通層のスクリプトは指せない（11.4.2）ので、直さずに写すとプロジェクトの配点が壊れる
-- 写す前に、プロジェクトの層として読めるかを確かめる。読めなければ何も写さず、着手しない
+- 配点の `script:` が指す共通レイヤーのスクリプトも写し、
+指す先をプロジェクトのレイヤーの綴りに直す。
+  レイヤーから共通レイヤーのスクリプトは指せない（11.4.2）ので、直さずに写すとプロジェクトの配点が壊れる
+- 写す前に、プロジェクトのレイヤーとして読めるかを確かめる。読めなければ何も写さず、着手しない
 - 上書きで消える識別子と、中身の変わる識別子を名指しする
 - 写す先に未コミットの変更があれば、ユーザの書きかけを上書きしないよう何も写さない
 - 写したことは親の印 `config-sync.json` に残し、最初のレビューで知らせる。レビューが無いまま
@@ -75,7 +77,7 @@ class Copied:
 
 
 def common_files(conf: settings.Settings) -> dict[str, str]:
-    """共通層の 3 本のうち、置いてあるもの。kind → 絶対パス。"""
+    """共通レイヤーの 3 本のうち、置いてあるもの。kind → 絶対パス。"""
     found = {}
     for kind, path in (
         (settings.KIND_RULES, conf.rules),
@@ -88,11 +90,11 @@ def common_files(conf: settings.Settings) -> dict[str, str]:
 
 
 def projected(conf: settings.Settings, kind: str, content: bytes) -> bytes:
-    """共通層の中身を、プロジェクトの層に置くときの形にする。
+    """共通レイヤーの中身を、プロジェクトのレイヤーに置くときの形にする。
 
-    配点だけ、`script:` の値の頭にある共通層の置き場を、プロジェクトの層の置き場へ直す。
+    配点だけ、`script:` の値の頭にある共通レイヤーの置き場を、プロジェクトのレイヤーの置き場へ直す。
     直すのは `script:` の値だけ。`glob` や `message` に同じ綴りがあっても触らない
-    （「共通層のスクリプトの変更に点を付ける」項目が、意味ごと別の項目に変わるため）。
+    （「共通レイヤーのスクリプトの変更に点を付ける」項目が、意味ごと別の項目に変わるため）。
     """
     if kind != settings.KIND_RISK:
         return content
@@ -112,15 +114,15 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Copie
     for kind, common in common_files(conf).items():
         raw, why = _read_strict(common)
         # 一覧を作ったあとに消えたもの（raw が None）も読めないとして止める。空として
-        # 写すと、プロジェクトの層を中身の無い設定で上書きする。
+        # 写すと、プロジェクトのレイヤーを中身の無い設定で上書きする。
         if why or raw is None:
             name = os.path.basename(common)
-            return [], f"共通層の {name} を読めない ({why or '無い'})"
+            return [], f"共通レイヤーの {name} を読めない ({why or '無い'})"
         content = projected(conf, kind, raw)
         why = _unreadable_as_layer(conf, kind, content)
         if why:
             name = os.path.basename(common)
-            return [], f"共通層の {name} をプロジェクトの層として読めない: {why}"
+            return [], f"共通レイヤーの {name} をプロジェクトのレイヤーとして読めない: {why}"
         if kind == settings.KIND_RISK:
             scripts = _scripts_of(conf, root, raw)
         copied, why = _compare(
@@ -133,7 +135,7 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Copie
     for source, rel in scripts:
         raw, why = _read_strict(source)
         if why or raw is None:
-            return [], f"共通層の配点が指すスクリプト {source} を読めない ({why or '無い'})"
+            return [], f"共通レイヤーの配点が指すスクリプト {source} を読めない ({why or '無い'})"
         target = os.path.join(tree_root, rel.replace("/", os.sep))
         copied, why = _compare(KIND_SCRIPT, tree_root, target, raw)
         if why:
@@ -210,7 +212,7 @@ def is_synced_write(
     content: bytes | None = None,
     prior: bytes | None | object = UNSET,
 ) -> bool:
-    """その変更が、親の着手で共通層を写したものだと読めるか。
+    """その変更が、親の着手で共通レイヤーを写したものだと読めるか。
 
     `content` は変更後の中身（渡さなければディスク上の今の中身）、`prior` は変更前として
     比べるコミット済みの中身（渡さなければそのワークツリーの HEAD。None はその版に無い）。
@@ -223,11 +225,11 @@ def is_synced_write(
        識別子で、そのチケットの `project:` がワークツリーのプロジェクトと同じ）の中。
        元リポジトリ、子のワークツリー、チケットの無いワークツリー、他のプロジェクトは外さない
     2. その綴りの途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で答えてしまう
-    3. その中身が、共通層の対応するもの（設定はプロジェクトの層の形に直したもの、
+    3. その中身が、共通レイヤーの対応するもの（設定はプロジェクトのレイヤーの形に直したもの、
        スクリプトはそのまま）と同じ（改行の違いは見ない）
     4. **その親の**印 `config-sync.json` が、その相対パスとその中身の指紋を名指ししている
     5. 変更前のコミット済みの中身が、印に残した上書き前の中身と同じ。外すのは写してから
-       コミットするまでの間だけで、ユーザが直してコミットしたあとに共通層の中身へ戻す書き込みは外さない
+       コミットするまでの間だけで、ユーザが直してコミットしたあとに共通レイヤーの中身へ戻す書き込みは外さない
 
     読めないものは外さない。
     """
@@ -294,8 +296,8 @@ def notice(mark: dict) -> str:
     lines = [
         "## プロジェクトの設定が変わった",
         "",
-        "着手のときに、ワークスペースの共通層（`.ccnavi/common/`）とこのプロジェクトの "
-        "`.ccnavi/` が違っていたので、共通層で上書きした。この変更もレビューの対象。",
+        "着手のときに、ワークスペースの共通レイヤー（`.ccnavi/common/`）とこのプロジェクトの "
+        "`.ccnavi/` が違っていたので、共通レイヤーで上書きした。この変更もレビューの対象。",
         "",
     ]
     for f in mark.get("files") or []:
@@ -402,7 +404,7 @@ def _compare(kind: str, tree_root: str, target: str, content: bytes) -> tuple[Co
 
 
 def _scripts_of(conf: settings.Settings, root: str, raw: bytes) -> list[tuple[str, str]]:
-    """共通層の配点が指すスクリプト。（共通層の実体, 写す先のツリーからの相対）。"""
+    """共通レイヤーの配点が指すスクリプト。（共通レイヤーの実体, 写す先のツリーからの相対）。"""
     definition, _ = risk.parse(raw.decode("utf-8", errors="replace"), "(risk)")
     if definition is None:
         return []
@@ -420,7 +422,7 @@ def _scripts_of(conf: settings.Settings, root: str, raw: bytes) -> list[tuple[st
 
 
 def _expected(conf: settings.Settings, root: str, rel: str) -> bytes | None:
-    """ツリーからの相対 rel に写るはずの、共通層の中身。対応するものが無ければ None。"""
+    """ツリーからの相対 rel に写るはずの、共通レイヤーの中身。対応するものが無ければ None。"""
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
     for kind, common in common_files(conf).items():
         if rel == f"{home}/{settings.LAYER_CONFIG_DIR}/{settings.LAYER_FILE_NAMES[kind]}":
@@ -434,7 +436,7 @@ def _expected(conf: settings.Settings, root: str, rel: str) -> bytes | None:
 
 
 def _unreadable_as_layer(conf: settings.Settings, kind: str, content: bytes) -> str:
-    """プロジェクトの層として読めないなら、その理由。"""
+    """プロジェクトのレイヤーとして読めないなら、その理由。"""
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
@@ -555,7 +557,8 @@ def _read_strict(path: str) -> tuple[bytes | None, str]:
 def _replace(path: str, content: bytes) -> str:
     """一時ファイル（`*.ccnavi-sync`）に書いてから置き換える。途中で止まっても半端な中身を残さない。
 
-    fsio を通す（C1 の記録層が、写した層を「この実行で書いたパス」に数える。ADR-0093 の 4.3）。
+    fsio を通す（C1 の記録層が、写したレイヤーを「この実行で書いたパス」に数える。
+    ADR-0093 の 4.3）。
     """
     return fsio.replace_bytes(path, content, ".ccnavi-sync")
 

@@ -1408,7 +1408,7 @@ def now() -> str:
 
 
 def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """`project:` が層の名前に予約してある綴りなら error（設計 11.4）。"""
+    """`project:` がレイヤーの名前に予約してある綴りなら error（設計 11.4）。"""
     if not t.project or not settings.is_reserved_layer_name(t.project):
         return []
     reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
@@ -1416,8 +1416,8 @@ def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"`project: {t.project}` は層の名前として予約してある綴り（{reserved}）。"
-            "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
+            f"`project: {t.project}` はレイヤーの名前として予約してある綴り（{reserved}）。"
+            "その名前のプロジェクトはレイヤーとして数えないので、このチケットのレイヤーが決まらない。"
             "ワークスペース自身の提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"
             "そのプロジェクトの名前を変えてから置いてください",
         )
@@ -1434,7 +1434,7 @@ def project_problems(
     無い。承認の画面が置き場から引いた値を出し、それが承認済みチケットに残る。
 
     予約名（`common` / `self`）は指せない。置き場にその名前のディレクトリが在っても
-    層としては数えないので（`ruleload.layers`）、指せると「層が決まらないチケット」を
+    レイヤーとしては数えないので（`ruleload.layers`）、指せると「レイヤーが決まらないチケット」を
     承認することになる。
     """
     if t.declared_project and t.declared_project != t.project:
@@ -1464,7 +1464,7 @@ def project_problems(
                 "子は親と同じ置き場に置いてください",
             )
         ]
-    # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それは層では
+    # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それはレイヤーでは
     # ないので、指せてはいけない。素の一覧で見ると通ってしまう。
     known = {
         p.name for p in tree.projects(conf.projects) if not settings.is_reserved_layer_name(p.name)

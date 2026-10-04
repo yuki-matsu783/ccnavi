@@ -50,7 +50,7 @@ class Candidate:
     overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま使われている承認済みチケット。
     current: ticket_mod.Ticket | None = None
-    # このチケットに使うフェーズの種類（共通層 + `project:` が指す層、設計 11.4.1）。
+    # このチケットに使うフェーズの種類（共通レイヤー + `project:` が指すレイヤー、設計 11.4.1）。
     # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持っておく。
     types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
@@ -121,7 +121,7 @@ def gather(
     承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
     通らなかった理由は `refused` に入れて返す。呼び手はそれを見て何もしない。
 
-    フェーズの種類は承認の対象全体で 1 つに決まらない。どの層の種類を使うかは各チケットの
+    フェーズの種類は承認の対象全体で 1 つに決まらない。どのレイヤーの種類を使うかは各チケットの
     `project:` が決める（設計 11.4.1）ので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` に持たせる。画面は候補が持つ種類を使う。
     """
@@ -638,8 +638,8 @@ def candidates(
     pool = approval.by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
-    # 層ごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じ層のチケットが
-    # 何件あっても、ファイルを読むのはその層につき 1 度で足りる。
+    # レイヤーごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じレイヤーのチケットが
+    # 何件あっても、ファイルを読むのはそのレイヤーにつき 1 度で足りる。
     cache: dict[str, dict | None] = {}
     # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_mod.Ticket]] | None = None
@@ -718,7 +718,7 @@ def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
 
 
 def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
-    """このチケットの層を決める `project:`（設計 11.4.1）。
+    """このチケットのレイヤーを決める `project:`（設計 11.4.1）。
 
     子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
     `project_problems` が落とす。親が池に居ないときだけ、子の置き場の値をそのまま読む。
@@ -900,7 +900,7 @@ def screen(
     「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
-    種類は候補が持っているものを使う。承認の対象の中でもチケットごとに層が違いうるので、
+    種類は候補が持っているものを使う。承認の対象の中でもチケットごとにレイヤーが違いうるので、
     画面の側で 1 つに決めない。
     """
     lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
@@ -1131,7 +1131,7 @@ def _workflow_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket, t
 
 
 def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod.Ticket]):
-    """チケットに使う種類を引く関数。層ごとの読み込みは 1 プロジェクト 1 回。"""
+    """チケットに使う種類を引く関数。レイヤーごとの読み込みは 1 プロジェクト 1 回。"""
     pool = approval.by_id(approved)
     cache: dict[str, dict | None] = {}
 

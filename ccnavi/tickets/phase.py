@@ -58,7 +58,7 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 # push を含めるのは、リモートに置く枝は親ブランチ 1 本で、それを送るのが親の仕事だから。
 # git のラッパースクリプトも子チケットのツリーからの push を拒むが、そちらは cwd のツリーで見る。
 # サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、
-# サブエージェントかどうかで止める層をここに持つ。
+# サブエージェントかどうかで止めるレイヤーをここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
     r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|chat"
@@ -124,9 +124,9 @@ def exempt(subject: str, degraded: str) -> bool:
 def forbidden(subject: str, unwrapped: str = "") -> bool:
     """サブエージェントに許さない形を含むか。
 
-    unwrapped は shellread が作る、中で実行されるコマンドの層（`\\x00` でつないだもの）。
+    unwrapped は shellread が作る、中で実行されるコマンドのレイヤー（`\\x00` でつないだもの）。
     禁止の形はコマンドの先頭の `sh` に固定しているので、`env sh …` や `sh -c '…'` は
-    元の形では当たらない。層にも当てる。止める側にだけ足す当て先で、`exempt` には渡さない。
+    元の形では当たらない。レイヤーにも当てる。止める側にだけ足す当て先で、`exempt` には渡さない。
     """
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject) + commands(unwrapped))
 
@@ -639,11 +639,11 @@ class Phase:
 
 
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
-    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
+    """そのプロジェクトのレイヤーの phases.yml。空の `project` はワークスペース自身のレイヤー。
 
-    予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
-    名前と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
+    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、綴りを持たない
+    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
+    名前と一致し、そのプロジェクトの phases がワークスペースのレイヤーとして合成される。
     """
     if settings.is_reserved_layer_name(project):
         return ""
@@ -656,7 +656,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
 def common_types(
     conf: settings.Settings,
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層の種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
+    """共通レイヤーの種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
     if not conf.phases:
         return None, []
     types, notes = phasetypes.load(conf.phases)
@@ -667,18 +667,19 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 11.4.1）。
+    """共通レイヤー + そのレイヤーの種類と、**そのレイヤーの**苦情（設計 11.4.1）。
 
-    どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
-    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
-    言うと、層の話を読みに来たユーザが同じ文を 2 度読むことになる。
+    どのレイヤーを足すかは親の承認済みチケットの `project:` が決める。
+    空ならワークスペース自身のレイヤー。
+    共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
+    言うと、レイヤーの話を読みに来たユーザが同じ文を 2 度読むことになる。
 
-    無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
-    組み込みには戻さない。共通層が在るのに戻すと、共通層の種類が消える。
+    無いレイヤーは空（苦情なし）。壊れたレイヤーも空として扱うが、そちらは error を返す。
+    組み込みには戻さない。共通レイヤーが在るのに戻すと、共通レイヤーの種類が消える。
     """
     common, notes = common_types(conf)
     if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 11.2）。
+        # 共通レイヤーが壊れている。レイヤーは足さない（設計 11.2）。
         return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
@@ -693,7 +694,7 @@ def layer_types(
 def load_types(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> dict[str, phasetypes.PhaseType] | None:
-    """判定が使うフェーズの種類。どの層にも無ければ None（番号だけの挙動）。"""
+    """判定が使うフェーズの種類。どのレイヤーにも無ければ None（番号だけの挙動）。"""
     types, _ = layer_types(conf, root, project)
     return types
 
@@ -727,7 +728,8 @@ def phases_of(
     if owner is None and proposed is not None and proposed.ticket == parent_id:
         owner = proposed
     if owner is not None and owner.has_plan:
-        # 層は親の承認済みチケットの `project:` が決める（設計 11.4.1）。ユーザが承認した値で、
+        # レイヤーは親の承認済みチケットの `project:` が決める（設計 11.4.1）。
+        # ユーザが承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         if owner.workflow is None and owner.state == ticket_mod.TODO:
@@ -845,10 +847,10 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置くマーカーに足す、その種類の層（設計 11.9）。
+    """種類を根拠に置くマーカーに足す、その種類のレイヤー（設計 11.9）。
 
     `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
-    層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
+    レイヤーを書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
     """
     return {"source": phase.type.source} if phase.type is not None else {}
 
@@ -1278,8 +1280,8 @@ def type_for(
 ) -> phasetypes.PhaseType | None:
     """子の番号の種類。親が計画を持たない、番号が無い、種類が引けないなら None。
 
-    `types` を渡せばそこから引き、ファイルは読まない（実行後チェックは層ごとに 1 度だけ
-    読んで持つ）。渡さなければ、親が計画を持つときだけ親の `project:` の層を読む。
+    `types` を渡せばそこから引き、ファイルは読まない（実行後チェックはレイヤーごとに 1 度だけ
+    読んで持つ）。渡さなければ、親が計画を持つときだけ親の `project:` のレイヤーを読む。
     """
     item = plan_item(child, parent)
     if item is None or parent is None:
@@ -1298,7 +1300,7 @@ def unread_type(
 ) -> str:
     """子の番号の種類が読めないなら、その種類の id。読めた、または読むものが無ければ空。
 
-    `types` は `load_types` が返したもの（None を含む）。phases.yml がどの層にも無いのは
+    `types` は `load_types` が返したもの（None を含む）。phases.yml がどのレイヤーにも無いのは
     番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに種類が
     引けない（壊れた・種類を消した）ときだけ返す。そのとき判定は種類では切り詰めない。
     deny にすると、ユーザが phases.yml を直している間、全部の子のワークツリーで書き込みが止まる。

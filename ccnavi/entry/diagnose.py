@@ -140,7 +140,8 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
 def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
     """`Stop`（ターンの終わり。ADR-0090）の試し。判定ではなく、使われるルールを並べる。
 
-    ターンの終わりに当てるのは、共通層と自身の層の `allow` で、`every` が 2 以上のものだけ
+    ターンの終わりに当てるのは、共通レイヤーと自身のレイヤーの `allow` で、
+    `every` が 2 以上のものだけ
     （`ruleload.stop_rules`）。使われるものがあれば `allow`、無ければ判定に入らない（`skip`）。
     `deny` / `ask` にはならない。数えは見ない（試しで控えを進めない）。
     """
@@ -171,7 +172,8 @@ def test(
     if tool == rules.STOP_MATCH:
         stdout.write(f"verdict: {out['verdict']}\ntool: {tool}\n")
         stdout.write(
-            "note: ターンの終わり（ADR-0090）。使われるのは共通層と自身の層の allow で、"
+            "note: ターンの終わり（ADR-0090）。"
+            "使われるのは共通レイヤーと自身のレイヤーの allow で、"
             "every が 2 以上のものだけ。渡す回にだけ止める\n"
         )
         if not out["rules"]:
@@ -258,15 +260,15 @@ def _rules_hit(
     当たらなかった理由をユーザが自分で辿れない。
 
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
-    ルールファイルの外から来た根拠）。層のルールは `self:docs` / `lib:source` の形の
-    id で当たるので（REQ-MLT-07）、同じ綴りで引けるように層ごと並べる。
+    ルールファイルの外から来た根拠）。レイヤーのルールは `self:docs` / `lib:source` の形の
+    id で当たるので（REQ-MLT-07）、同じ綴りで引けるようにレイヤーごと並べる。
     """
     if not record.rules:
         return []
 
     by_id = {}
-    # 判定（`judge.decide_before`）が同じ共通層を読み、苦情を先に書いている。ここでも書くと
-    # 同じ行が 2 度出るので、読み直しの苦情は捨てる。層の苦情は `survey` が書かずに持つ。
+    # 判定（`judge.decide_before`）が同じ共通レイヤーを読み、苦情を先に書いている。ここでも書くと
+    # 同じ行が 2 度出るので、読み直しの苦情は捨てる。レイヤーの苦情は `survey` が書かずに持つ。
     for view in ruleload.survey(io.StringIO(), conf, root):
         by_id.update({rule.id: rule for rule in view.rule_set.all() if rule.id})
 
@@ -346,7 +348,8 @@ def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -
     呼び出しは通るので期待は満たしているが、通した理由が「allow に当たった」では
     ない。ルールを書いても当たらない場所なので、食い違いとは別に数えて必ず見せる。
     """
-    # 見本ごとに判定するので、共通層の苦情は見本の数だけ書かれる。行き先で読む層は見本ごとに
+    # 見本ごとに判定するので、共通レイヤーの苦情は見本の数だけ書かれる。
+    # 行き先で読むレイヤーは見本ごとに
     # 違うので、まとめて捨てずに、まだ書いていない行だけを書く。
     said: set[str] = set()
     results = []
@@ -438,9 +441,9 @@ def test_samples(
     return 1 if body["mismatches"] else 0
 
 
-# 層の見出し。共通層と自身の層だけ日本語で名乗る。プロジェクトは名前そのもので、
+# レイヤーの見出し。共通レイヤーと自身のレイヤーだけ日本語で名乗る。プロジェクトは名前そのもので、
 # それが id の前置き（`lib:schema`）と同じ綴りになる。
-LAYER_LABELS = {ruleload.LAYER_COMMON: "共通層", ruleload.LAYER_SELF: "自身の層"}
+LAYER_LABELS = {ruleload.LAYER_COMMON: "共通レイヤー", ruleload.LAYER_SELF: "自身のレイヤー"}
 
 
 def layer_label(name: str) -> str:
@@ -459,14 +462,16 @@ def _shown(root: str, path: str) -> str:
 
 
 def layer_home(conf: settings.Settings, root: str, name: str) -> str:
-    """その層の git プロジェクトルート。共通層は持たない（ワークスペースルートを返す）。"""
+    """そのレイヤーの git プロジェクトルート。
+    共通レイヤーは持たない（ワークスペースルートを返す）。"""
     if name in (ruleload.LAYER_COMMON, ruleload.LAYER_SELF):
         return root
     return tree.project_root(conf.projects, name)
 
 
 def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> str:
-    """その層の phases / risk の綴り。共通層は `.ccnavi/common/` 固定で、設定が持つ既定そのもの。"""
+    """そのレイヤーの phases / risk の綴り。
+    共通レイヤーは `.ccnavi/common/` 固定で、設定が持つ既定そのもの。"""
     if name == ruleload.LAYER_COMMON:
         return conf.phases if kind == settings.KIND_PHASES else conf.risk
     return settings.layer_path(conf, layer_home(conf, root, name), kind, name)
@@ -478,11 +483,11 @@ def _written(entry) -> str:
 
 
 def layer_phase_types(path: str) -> tuple[list, str]:
-    """その層のフェーズの種類と、読めなかった理由。無い層は空。
+    """そのレイヤーのフェーズの種類と、読めなかった理由。無いレイヤーは空。
 
-    合成はしない。ここで出すのは「どの層に何が書いてあるか」で、id ごとに
+    合成はしない。ここで出すのは「どのレイヤーに何が書いてあるか」で、id ごとに
     合わせた結果は判定の側（phase）が持つ。`overlap` / `requires` の参照は
-    確かめない。層は共通層の種類を指してよいので、1 本だけで確かめると
+    確かめない。レイヤーは共通レイヤーの種類を指してよいので、1 本だけで確かめると
     正しい定義まで「読めない」になる（設計 11.4.1）。
     """
     if not path or not os.path.isfile(path):
@@ -494,9 +499,9 @@ def layer_phase_types(path: str) -> tuple[list, str]:
 
 
 def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
-    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みには戻さない）。
+    """そのレイヤーのリスクの項目と、読めなかった理由。無いレイヤーは空（組み込みには戻さない）。
 
-    `script:` に書ける綴りは層ごとに違う（設計 11.4.2）ので、読み方も層ごとに分ける。
+    `script:` に書ける綴りはレイヤーごとに違う（設計 11.4.2）ので、読み方もレイヤーごとに分ける。
     """
     if not path or not os.path.isfile(path):
         return [], ""
@@ -514,17 +519,19 @@ def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str
 def _explain_phases(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """層ごとのフェーズの種類（設計 11.9）。id は裸のまま、層は欄で出す。"""
+    """レイヤーごとのフェーズの種類（設計 11.9）。id は裸のまま、レイヤーは欄で出す。"""
     tables = [
         (v.name, *layer_phase_types(layer_config(conf, root, v.name, settings.KIND_PHASES)))
         for v in views
     ]
     counts = "、".join(f"{layer_label(name)} {len(items)} 種" for name, items, _ in tables)
     stdout.write(f"\n■ phases（{counts}）\n")
-    stdout.write(f"  {'id':<16}{'層':<10}{'kind':<8}{'title':<16}{'review':<8}scope\n")
+    stdout.write(f"  {'id':<16}{'レイヤー':<10}{'kind':<8}{'title':<16}{'review':<8}scope\n")
     for name, items, unreadable in tables:
         if unreadable:
-            stdout.write(f"  {layer_label(name)}: 読めない: {unreadable}。この層は空として扱う\n")
+            stdout.write(
+                f"  {layer_label(name)}: 読めない: {unreadable}。このレイヤーは空として扱う\n"
+            )
         for pt in items:
             scope = ", ".join(_written(e) for e in pt.scope) if pt.scope else "inherit"
             head = f"  {pt.id:<16}{layer_label(name):<10}{pt.kind:<8}{pt.title:<16}"
@@ -534,21 +541,24 @@ def _explain_phases(
 def _explain_risk(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """層ごとのリスクの配点（設計 11.9）。境目の点は共通層のものを出す。"""
+    """レイヤーごとのリスクの配点（設計 11.9）。境目の点は共通レイヤーのものを出す。"""
     tables = [
         (v.name, *layer_risk(conf, v.name, layer_config(conf, root, v.name, settings.KIND_RISK)))
         for v in views
     ]
     common, _ = risk.load(conf.risk)
-    # 共通層の境目の点。層の `levels` はキーごとに小さいほうを採るので、実際に使われる値は
-    # チケットの層で決まる（設計 11.4.2）。ここに出すのは共通層の側の既定。
+    # 共通レイヤーの境目の点。
+    # レイヤーの `levels` はキーごとに小さいほうを採るので、実際に使われる値は
+    # チケットのレイヤーで決まる（設計 11.4.2）。ここに出すのは共通レイヤーの側の既定。
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
     stdout.write(f"\n■ risk（levels: {levels}）\n")
-    stdout.write(f"  {'id':<16}{'層':<10}{'加点条件':<20}{'points':<8}message\n")
+    stdout.write(f"  {'id':<16}{'レイヤー':<10}{'加点条件':<20}{'points':<8}message\n")
     for name, items, unreadable in tables:
         if unreadable:
-            stdout.write(f"  {layer_label(name)}: 読めない: {unreadable}。この層は空として扱う\n")
+            stdout.write(
+                f"  {layer_label(name)}: 読めない: {unreadable}。このレイヤーは空として扱う\n"
+            )
         for factor in items:
             how = f"{factor.kind} {factor.value}"
             stdout.write(
@@ -569,7 +579,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
     stdout.write(
-        "  パスを持つツールは共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
+        "  パスを持つツールは共通レイヤー + 行き先のレイヤー、"
+        "持たないツールは全部のレイヤーの和で判定する"
         "（設計 11.4）\n"
     )
 
@@ -577,10 +588,10 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         counts = " / ".join(f"{name} {len(view.rule_set.section(name))}" for name in rules.SECTIONS)
         stdout.write(f"\n■ rules {layer_label(view.name)}（{_shown(root, view.path)}、{counts}）\n")
         if view.unreadable:
-            stdout.write(f"  読めない: {view.unreadable}。この層は空として扱う\n")
+            stdout.write(f"  読めない: {view.unreadable}。このレイヤーは空として扱う\n")
             continue
         if view.missing:
-            stdout.write("  この層は置いていない（無い = 空）\n")
+            stdout.write("  このレイヤーは置いていない（無い = 空）\n")
             continue
         for name in rules.SECTIONS:
             for rule in view.rule_set.section(name):
@@ -600,7 +611,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     )
     stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
     stdout.write("    不明なモード                  ユーザに確認が出る\n")
-    # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
+    # ここだけはレイヤーの設定で変わるので、書いてあるとおりの結末を出す。
     if (conf.guard_unwatched or "").strip().lower() == selfguard.DISABLE:
         stdout.write(
             "    dontAsk / bypassPermissions   そのモードに委ねる"
@@ -800,11 +811,12 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
 
 
 def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
-    """層ごとの宣言（設計 11.9）。並びは 共通層 → 自身の層 → プロジェクト（名前順）。
+    """レイヤーごとの宣言（設計 11.9）。
+    並びは 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。
 
-    rules は重複を捨てたあとの、その層から実際に判定へ入ったぶん。phases と risk は
-    その層のファイルに書いてあるぶんで、合成はしない（合成の結果は親のフェーズの
-    側に出る）。読めない層は `unreadable` に理由が入り、中身は空になる。
+    rules は重複を捨てたあとの、そのレイヤーから実際に判定へ入ったぶん。phases と risk は
+    そのレイヤーのファイルに書いてあるぶんで、合成はしない（合成の結果は親のフェーズの
+    側に出る）。読めないレイヤーは `unreadable` に理由が入り、中身は空になる。
     """
     said = stderr if stderr is not None else io.StringIO()
     out = []
@@ -837,7 +849,7 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
 
 
 def _rule_record(rule: rules.Rule) -> dict:
-    """ルール 1 件。id は層の名前付き、書いた綴りと翻訳後の式の両方を出す。"""
+    """ルール 1 件。id はレイヤーの名前付き、書いた綴りと翻訳後の式の両方を出す。"""
     return {
         "id": rule.id,
         "section": rule.decision,
@@ -858,7 +870,7 @@ def _rule_form(rule: rules.Rule) -> dict:
 
 
 def _phase_type_record(layer: str, pt) -> dict:
-    """フェーズの種類 1 つ。id は裸のまま、層は欄で出す（設計 11.4.1）。"""
+    """フェーズの種類 1 つ。id は裸のまま、レイヤーは欄で出す（設計 11.4.1）。"""
     return {
         "id": pt.id,
         "source": layer,

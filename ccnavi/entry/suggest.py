@@ -14,7 +14,7 @@
 
 **出すのは検証を通ったものだけ。** 候補ごとに、`--lint` と同じ読み（lint._rules）で
 ルールを確かめ、`--test-samples` と同じ判定（diagnose.try_one）で見本を回し、期待した
-タイプにならなかったものは落とす（落とした数は出す）。ルールを足す候補は、共通層の
+タイプにならなかったものは落とす（落とした数は出す）。ルールを足す候補は、共通レイヤーの
 ルールファイルの写しに 1 件足した一時ファイルで試す。本物のファイルには書かない。
 
 形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのはユーザ
@@ -104,7 +104,7 @@ class Candidate:
     tool: str
     count: int
     summary: str
-    # rules.yml に置く 1 件（書いた綴りの形）と、それをどの層のファイルに置くか。
+    # rules.yml に置く 1 件（書いた綴りの形）と、それをどのレイヤーのファイルに置くか。
     rule: dict
     layer: str
     rules_path: str
@@ -309,7 +309,7 @@ def _rule_candidates(
         with open(conf.rules, encoding="utf-8") as f:
             base = yaml.safe_load(f)
     except (OSError, yaml.YAMLError):
-        # 共通層を読めなければ、足した写しで試せない。試せない候補は出さない。
+        # 共通レイヤーを読めなければ、足した写しで試せない。試せない候補は出さない。
         return [], len(groups)
     if not isinstance(base, dict):
         return [], len(groups)

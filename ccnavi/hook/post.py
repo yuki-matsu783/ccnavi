@@ -319,7 +319,7 @@ def _committed_findings(
             uncounted.append(w.tree.name or ".")
             continue
         # 着手が写した分かどうかは、コミットされた中身で答える。ディスクで答えると、
-        # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
+        # 好きな中身でコミットしてからディスクだけ共通レイヤーの中身へ戻す形が、呼び出しごとの
         # チェック・控えと復元・ここの 3 つから同時に外れる。
         judged = (
             functools.partial(_committed_synced, synced, top, base, changes) if synced else None
@@ -492,8 +492,8 @@ class ScopeGuard:
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""
     approved: str = ""
-    # フェーズの種類。親の `project:` の層ごとに、作るときに 1 度だけ読んだもの。
-    # 変更 1 件ごとに phases.yml を開かない。読めない層は空。
+    # フェーズの種類。親の `project:` のレイヤーごとに、作るときに 1 度だけ読んだもの。
+    # 変更 1 件ごとに phases.yml を開かない。読めないレイヤーは空。
     types: dict[str, dict[str, phasetypes.PhaseType]] = field(default_factory=dict)
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
@@ -683,8 +683,9 @@ def _findings(
             continue
         if change.full in script:
             continue
-        # 着手のときに共通層でプロジェクトの層を上書きした分（`configsync.is_synced_write`）。
-        # 内容と印で見分け、読めないものは外さない。渡すのは解く前の綴り。解いた先で答えると、
+        # 着手のときに共通レイヤーでプロジェクトのレイヤーを上書きした分
+        # （`configsync.is_synced_write`）。内容と印で見分け、読めないものは外さない。
+        # 渡すのは解く前の綴り。解いた先で答えると、
         # 設定を別の写しへのシンボリックリンクに差し替えた形が、指す先の中身で外れる。
         if synced is not None and synced(_spelled(change, top or tree_root)):
             continue

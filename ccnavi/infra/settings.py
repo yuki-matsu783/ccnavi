@@ -26,8 +26,8 @@ from typing import NamedTuple
 
 # ccnavi が読む環境変数。
 #
-# 共通層の 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
-# `.ccnavi/common/` に固定で、env では動かない。3 層のうち共通層だけが別の決まり方を
+# 共通レイヤーの 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
+# `.ccnavi/common/` に固定で、env では動かない。3 つのレイヤーのうち共通レイヤーだけが別の決まり方を
 # していた非対称を無くしたもの（ADR-0052）。診断のためにここを動かすには `--rules` /
 # `--phases` / `--risk` のフラグを使う。hook は引数を渡さずに起動するので、
 # 判定の入口は固定される。
@@ -89,15 +89,16 @@ APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
 # PROJECTS_ENV はプロジェクトの置き場（設計 11）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
 # PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 11.2）。各 git プロジェクトルートからの相対で、
-# その下の `config/{rules,phases,risks}.yml` が層の 3 本になる。自身の層
-# （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が使われる。
+# その下の `config/{rules,phases,risks}.yml` がレイヤーの 3 本になる。自身のレイヤー
+# （ワークスペースルートの下）とプロジェクトのレイヤーの両方に同じ値が使われる。
 # 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # つけるか（repeat）。既定は 3。判定は変わらず、文面とユーザへの報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
-# INTEGRATION_ENV は統合先の名前（ADR-0093 の D30）。`done/` と層と置き場の綴りを読むブランチで、
+# INTEGRATION_ENV は統合先の名前（ADR-0093 の D30）。
+# `done/` とレイヤーと置き場の綴りを読むブランチで、
 # 親のブランチはここから切る。**ccnavi はこの環境変数を読まない。** 読むのは sh
 # （`ccnavi-sync.sh`）で、sh が環境変数か `.claude/settings.local.json` の `env` から決め、
 # 要る所へ `--integration-branch` で渡す。settings.local.json の `env` は Claude Code が
@@ -117,12 +118,12 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 
 # 既定の置き場。ワークスペースルートからの相対。
 #
-# ユーザが持つ設定（共通層の 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、
+# ユーザが持つ設定（共通レイヤーの 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、
 # 実行のたびに書かれる記録と控えは `logs/` に置く（ADR-0042）。
 # `.claude/` には Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを残す。
 #
-# 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
-# ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
+# 共通レイヤーの置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
+# ccnavi ディレクトリの名前は各レイヤーの綴りで、共通レイヤーはこの既定に固定されている。
 # 診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、
 # hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
 DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
@@ -205,41 +206,42 @@ def bin_command(bin_path: str) -> str:
     return f"sh {_quoted(path)}" if path.lower().endswith(".sh") else _quoted(path)
 
 
-# ccnavi ディレクトリの下の固定の綴り。層はこの形でしか置けない。
+# ccnavi ディレクトリの下の固定の綴り。レイヤーはこの形でしか置けない。
 LAYER_CONFIG_DIR = "config"
-# 層が持てる設定。3 本は独立に無くてよい。
+# レイヤーが持てる設定。3 本は独立に無くてよい。
 KIND_RULES = "rules"
 KIND_PHASES = "phases"
 KIND_RISK = "risk"
 LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
-# 層の設定のファイル名。kind は記録と `--explain --json` の鍵の綴りなので、ファイル名とは別に持つ。
+# レイヤーの設定のファイル名。
+# kind は記録と `--explain --json` の鍵の綴りなので、ファイル名とは別に持つ。
 LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
-# 層の名前。記録の `source` と id の前置きに使う綴り（設計 11.4）。ruleload が
+# レイヤーの名前。記録の `source` と id の前置きに使う綴り（設計 11.4）。ruleload が
 # 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
 LAYER_SELF = "self"
-# 層の名札に予約してある綴り。プロジェクトはこの名前を使えない。
+# レイヤーの名札に予約してある綴り。プロジェクトはこの名前を使えない。
 RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
 # 予約名のプロジェクトの控えの key につける前置き。名札の側（`rules:self`）と
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
 
-# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 11.4）。
+# レイヤーの種別。そのレイヤーがどこから来たかを、名札の綴りとは別に持つ（設計 11.4）。
 #
 # 名札の綴りでは種別を決められない。`projects/common/` の名札は `common` だが
-# 共通層ではないし、`projects/self/` の名札は `self` だがワークスペース自身の層
+# 共通レイヤーではないし、`projects/self/` の名札は `self` だがワークスペース自身のレイヤー
 # ではない。`layer == LAYER_COMMON` のような文字列比較で種別を決めると、
-# プロジェクトが名前を 1 つ選ぶだけで、共通層と同じ扱いを受けられてしまう。
+# プロジェクトが名前を 1 つ選ぶだけで、共通レイヤーと同じ扱いを受けられてしまう。
 ORIGIN_COMMON = "common-layer"
 ORIGIN_SELF = "self-layer"
 ORIGIN_PROJECT = "project-layer"
 
 
 class LayerFile(NamedTuple):
-    """層 1 つの設定ファイル。守る対象（selfguard）へ渡す形（`ruleload.layer_files`）。
+    """レイヤー 1 つの設定ファイル。守る対象（selfguard）へ渡す形（`ruleload.layer_files`）。
 
-    `origin` は層の種別（ORIGIN_*）、`layer` は名札（`common` / `self` /
+    `origin` はレイヤーの種別（ORIGIN_*）、`layer` は名札（`common` / `self` /
     プロジェクトの名前）、`kind` は rules / phases / risk、`path` はその綴り。
     種別をつけるのは、受け取る側が名札の文字列比較をしなくて済むようにするため。
     """
@@ -251,15 +253,15 @@ class LayerFile(NamedTuple):
 
 
 def is_reserved_layer_name(name: str) -> bool:
-    """その名前が層の名札に予約してあるか（`common` / `self`、設計 11.4）。
+    """その名前がレイヤーの名札に予約してあるか（`common` / `self`、設計 11.4）。
 
-    予約の判断はここ 1 か所だけで持つ。ruleload（層を数える・行き先の層を引く）、
+    予約の判断はここ 1 か所だけで持つ。ruleload（レイヤーを数える・行き先のレイヤーを引く）、
     lint（名指しする）、approval（`project:` を承認しない）、phase / risk
-    （層の phases / risk を足さない）が同じ答えを引く。片側でしか予約を
-    見ていないと、数えない層の名前で別の層の判定を引ける。
+    （レイヤーの phases / risk を足さない）が同じ答えを引く。片側でしか予約を
+    見ていないと、数えないレイヤーの名前で別のレイヤーの判定を引ける。
 
-    綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
-    `Self:schema` になり、記録を読むユーザが `self:schema`（ワークスペース自身の層）と
+    綴りの大文字小文字は問わない。`projects/Self/` を数えると、そのレイヤーの id が
+    `Self:schema` になり、記録を読むユーザが `self:schema`（ワークスペース自身のレイヤー）と
     取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも
     大文字小文字を区別せずに扱う。`--lint` が error で名指しする（lint._projects）。
     """
@@ -277,11 +279,11 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
 
 
 def layer_script_home(conf: Settings) -> str:
-    """各層の `script:` に書ける唯一の綴り（設計 11.4.2）。
+    """各レイヤーの `script:` に書ける唯一の綴り（設計 11.4.2）。
 
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
 
-    共通層だけは `.ccnavi/common/scripts/`（risk.SCRIPT_HOMES）。
+    共通レイヤーだけは `.ccnavi/common/scripts/`（risk.SCRIPT_HOMES）。
     たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
     """
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
@@ -361,7 +363,7 @@ class Settings:
     risk: str = ""
     # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、ワークスペース
     # 自身だけで動く。project_home は ccnavi ディレクトリ（git プロジェクトルートからの相対、
-    # "/" 区切り）。自身の層とプロジェクトの層の両方に使われる。
+    # "/" 区切り）。自身のレイヤーとプロジェクトのレイヤーの両方に使われる。
     projects: str = ""
     project_home: str = ""
     # project_rules_files は、名前で指したプロジェクトのルールファイルの差し替え
@@ -369,10 +371,10 @@ class Settings:
     # --test-samples / --lint / --explain）だけが使い、hook からの判定では空のまま。
     # VS Code 拡張が、編集中のプロジェクトのルールを保存せずに試すために使う。
     project_rules_files: dict[str, str] = field(default_factory=dict)
-    # project_phases_files は同じ差し替えを層のフェーズの種類に対して行う（名前 → 絶対パス）。
+    # project_phases_files は同じ差し替えをレイヤーのフェーズの種類に対して行う（名前 → 絶対パス）。
     # `--project-phases-file <名前>=<パス>` が入れる。名前は `self` かプロジェクトの名前で、
-    # 共通層の種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
-    # 編集中の層の種類を保存せずに検証するために使う。
+    # 共通レイヤーの種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
+    # 編集中のレイヤーの種類を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
     # integration_branch は統合先の名前（ADR-0093 の D30）。環境変数からは読まず、
     # `--integration-branch` で渡されたときだけ入る。いまは識別子の予約（3.1 の 5）の検査が読む。
@@ -429,7 +431,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     # 言えるようにしてある。承認済みチケットの置き場は空文字を受けない。チケット制御を切るのは
     # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
     #
-    # 共通層の 3 本（rules / phases / risk）はこの表に無い。env でも上書き設定ファイルでも
+    # 共通レイヤーの 3 本（rules / phases / risk）はこの表に無い。env でも上書き設定ファイルでも
     # 動かず、既定の `.ccnavi/common/` のまま。動かせるのはフラグだけで、そちらは
     # cli._override が重ねる（ADR-0052）。
     overrides = (
@@ -477,10 +479,10 @@ def load(root: str) -> tuple[Settings, list[str]]:
 
 
 def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> str:
-    """層の設定ファイルの絶対パス。判定と診断が読む先（設計 11.2）。
+    """レイヤーの設定ファイルの絶対パス。判定と診断が読む先（設計 11.2）。
 
-    `home_root` はその層の git プロジェクトルート。自身の層ならワークスペースルート、
-    プロジェクトの層ならその git プロジェクトルートを渡す。3 種とも同じ形なので、
+    `home_root` はそのレイヤーの git プロジェクトルート。自身のレイヤーならワークスペースルート、
+    プロジェクトのレイヤーならその git プロジェクトルートを渡す。3 種とも同じ形なので、
     rules だけの経路を別に持たない。
 
     `--project-rules-file` / `--project-phases-file` で名前が差し替えられていれば、rules / phases に
@@ -496,13 +498,13 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
 
 
 def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
-    """層の設定ファイルが本来ある場所。差し替えを見ない。"""
+    """レイヤーの設定ファイルが本来ある場所。差し替えを見ない。"""
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
     return os.path.join(home_root, home, LAYER_CONFIG_DIR, LAYER_FILE_NAMES[kind])
 
 
 def _layer_name(home_root: str) -> str:
-    """差し替えを引くときの名前。プロジェクトの層は置き場の下のディレクトリ名。"""
+    """差し替えを引くときの名前。プロジェクトのレイヤーは置き場の下のディレクトリ名。"""
     return os.path.basename(os.path.normpath(home_root)) if home_root else ""
 
 

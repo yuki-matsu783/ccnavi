@@ -201,7 +201,7 @@ def report(
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
-    # info は数えるが、終了コードには影響しない。層をまたいだ重複のように「そう
+    # info は数えるが、終了コードには影響しない。レイヤーをまたいだ重複のように「そう
     # 書いてあるとおりに働いているが、書いたユーザが知りたいはずのこと」が入る。
     infos = sum(1 for p in problems if p.severity == SEVERITY_INFO)
     if as_json:
@@ -259,10 +259,11 @@ def report(
 # 3 値（enable / dry-run / disable）を取る門なので、止めない 2 つの値それぞれに文がある。
 _CORE_FILES_VOICE = {
     selfguard.DISABLE: (
-        "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
-        "プロジェクトの層それぞれの設定 3 本）の控えを取らず、書き換えられても戻さない。"
-        "ふだん実行前に足している組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通層の"
-        " 3 本）も足さないので、ワークツリー側の層の設定は、ルールファイルが名指ししていなければ"
+        "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通レイヤー・自身のレイヤー・"
+        "プロジェクトのレイヤーそれぞれの設定 3 本）の控えを取らず、書き換えられても戻さない。"
+        "ふだん実行前に足している組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通レイヤーの"
+        " 3 本）も足さないので、ワークツリー側のレイヤーの設定は、"
+        "ルールファイルが名指ししていなければ"
         "書き込める"
     ),
     selfguard.DRY_RUN: (
@@ -356,7 +357,7 @@ def check(
     problems.extend(_ticket(conf, root))
     problems.extend(_scratch(conf, root))
     problems.extend(_projects(conf, root))
-    # 層の読み込みは判定と同じ経路（ruleload.survey）を通る。読めない層の苦情は
+    # レイヤーの読み込みは判定と同じ経路（ruleload.survey）を通る。読めないレイヤーの苦情は
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。
     problems.extend(_layers(io.StringIO(), conf, root))
     problems.extend(_layer_configs(conf, root))
@@ -393,7 +394,7 @@ def _sh_compat(root: str) -> list[Problem]:
 
     食い違っても判定は動くので warn。sh が使うフラグや出力の形が変わっていれば、sh の側で
     チケットやレビューの操作が落ちる。sh が無いワークスペース（試しの置き場）は言わない。
-    層のファイルの書式の版（`version:`）は、読む側が既に error で言う。
+    レイヤーのファイルの書式の版（`version:`）は、読む側が既に error で言う。
     """
     path = os.path.join(root, SH_COMPAT_FILE)
     try:
@@ -427,7 +428,7 @@ def _sh_compat(root: str) -> list[Problem]:
 
 
 def _risk(conf: settings.Settings, root: str) -> list[Problem]:
-    """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
+    """共通レイヤーのリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
     `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重いほうに
     なるが、そこで気づくのは子を閉じる時点になる（設計 11.4.2）。
@@ -552,8 +553,8 @@ def _copy_problems(
 def _types_resolver(conf: settings.Settings, root: str):
     """`project:` から、そのチケットに使う種類を引く（設計 11.4.1）。
 
-    承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
-    読み込みは 1 層 1 回。
+    承認の対象の中でもチケットごとにレイヤーが違いうるので、1 つに決めずに引く形で渡す。
+    読み込みは 1 レイヤー 1 回。
     """
     cache: dict[str, dict | None] = {}
 
@@ -620,7 +621,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
                     SEVERITY_ERROR,
                     "(phases)",
                     f"{t.ticket} は計画を持つのにフェーズの種類の定義"
-                    f"（{conf.phases} と {t.project or '自身'} の層）が読めない",
+                    f"（{conf.phases} と {t.project or '自身'} のレイヤー）が読めない",
                 )
             )
 
@@ -999,7 +1000,7 @@ def _worktree_problems(
 
 
 def layer_where(name: str) -> str:
-    """その層の苦情の出どころの綴り。VS Code 拡張がこの前置きでプロジェクトを引く。"""
+    """そのレイヤーの苦情の出どころの綴り。VS Code 拡張がこの前置きでプロジェクトを引く。"""
     if name == ruleload.LAYER_COMMON:
         return "(rules)"
     if name == ruleload.LAYER_SELF:
@@ -1008,13 +1009,13 @@ def layer_where(name: str) -> str:
 
 
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """層に食い違いが無いか（設計 11.9、REQ-MLT-16）。
+    """レイヤーに食い違いが無いか（設計 11.9、REQ-MLT-16）。
 
-    見るのは 2 つ。層のファイルが読めることと、層をまたいだ重複と同名の衝突。
+    見るのは 2 つ。レイヤーのファイルが読めることと、レイヤーをまたいだ重複と同名の衝突。
     `.ccnavi/config/` が無いことは言わない。
-    無いのは正常（無い層 = 空）で、言うと本当に言うべきものが埋もれる。
+    無いのは正常（無いレイヤー = 空）で、言うと本当に言うべきものが埋もれる。
 
-    共通層は `_rules` が別に見ているので、ここでは層の 2 つ目以降だけを回す。
+    共通レイヤーは `_rules` が別に見ているので、ここではレイヤーの 2 つ目以降だけを回す。
     """
     problems: list[Problem] = []
     for view in ruleload.survey(stderr, conf, root)[1:]:
@@ -1024,8 +1025,9 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"{view.path} を読めない ({view.unreadable})。この層は空として扱っている。"
-                    "共通層だけで判定しているので、ここに書いた宣言は 1 件も効いていない",
+                    f"{view.path} を読めない ({view.unreadable})。"
+                    "このレイヤーは空として扱っている。"
+                    "共通レイヤーだけで判定しているので、ここに書いた宣言は 1 件も効いていない",
                 )
             )
             continue
@@ -1040,7 +1042,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
         )
         for c in from_file:
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
-        # `survey` は層のファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
+        # `survey` はレイヤーのファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
         # 読んで言ったものは数えない。数えると同じ苦情が 2 度並び、件数も水増しされる。
         told = {(c.severity, c.rule, c.detail) for c in from_file}
         for c in view.problems:
@@ -1051,14 +1053,14 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 
 
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各層の phases / risk が、共通層と合成できるか（設計 11.4.1、11.4.2）。
+    """各レイヤーの phases / risk が、共通レイヤーと合成できるか（設計 11.4.1、11.4.2）。
 
-    見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
-    `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
-    全欄一致で捨てた重複を info で言う。共通層自身の苦情は `_phases` / `_risk` が
-    別に言うので、ここでは層の側だけを数える。
+    見るのは合成したあとの姿。同 `id` で中身が違う、`title` がレイヤーをまたいで重なる、
+    `levels` が逆転する、`script:` がレイヤーの外を指すか指す先が無い、を error で言い、
+    全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `_phases` / `_risk` が
+    別に言うので、ここではレイヤーの側だけを数える。
 
-    `.ccnavi/config/` が無いことは言わない。無いのは正常（無い層 = 空）。
+    `.ccnavi/config/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
     """
     problems: list[Problem] = []
     names = [ruleload.LAYER_SELF]
@@ -1128,8 +1130,8 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
       （その家族は決まらないので、承認も状態の操作も止まる）。閉じた家族は、親のワークツリーが
       残っていれば info（片付けてよい）、片付いていれば何も言わない（墓標）
     - 統合先の控えが壊れている・無い・読めない: error（識別子の再利用を確かめられない）
-    - 作業ツリーの層と統合先の控えの層が違う: warn
-    - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn（D28）
+    - 作業ツリーのレイヤーと統合先の控えのレイヤーが違う: warn
+    - `P` の上のプロジェクトのレイヤーが、統合先から計算したレイヤーと違う: warn（D28）
 
     親のワークツリーの外にしか無い写し（移行の検査）は、写しの `blocked` として
     `_copy_problems` が error で言う。控えの無い家族は、最初の 1 つのほかは何も言わない。
@@ -1217,7 +1219,8 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
 
 
 def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]]:
-    """比べる層のファイル（種類, ツリーからの相対 "/" 区切り）。共通層と自身の層。"""
+    """比べるレイヤーのファイル（種類, ツリーからの相対 "/" 区切り）。
+    共通レイヤーと自身のレイヤー。"""
     config = f"{home_rel}/{settings.LAYER_CONFIG_DIR}"
     out = []
     for kind in settings.LAYER_KINDS:
@@ -1247,9 +1250,9 @@ def _read_plain(path: str) -> bytes | None:
 def _layer_drift(
     conf: settings.Settings, integ: syncstate.Integration, home: str, where: str
 ) -> list[Problem]:
-    """作業ツリーの層と、統合先の控えの層（同じ綴り）が違うか（ADR-0093 の 3.4）。
+    """作業ツリーのレイヤーと、統合先の控えのレイヤー（同じ綴り）が違うか（ADR-0093 の 3.4）。
 
-    判定はまだ作業ツリーの層を読む（段階 2c では統合先の控えへ切り替えない）。違いは、統合先に
+    判定はまだ作業ツリーのレイヤーを読む（段階 2c では統合先の控えへ切り替えない）。違いは、統合先に
     入るまで他の機械と Chrome の判定に使われないという知らせ。
     """
     home_rel = fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
@@ -1286,10 +1289,10 @@ def _layer_drift(
 def _projected_layer_problems(
     conf: settings.Settings, st: syncstate.Standing, where: str
 ) -> list[Problem]:
-    """`P` の上のプロジェクトの層が、統合先から計算した層と違うか（ADR-0093 の D28）。
+    """`P` の上のプロジェクトのレイヤーが、統合先から計算したレイヤーと違うか（ADR-0093 の D28）。
 
-    計算した層は「プロジェクトの統合先の層（控え）に、ワークスペースの統合先の共通層（控え）を
-    `configsync.projected` で写したもの」。着手のときの configsync と同じく、共通層にある
+    計算したレイヤーは「プロジェクトの統合先のレイヤー（控え）に、ワークスペースの統合先の共通レイヤー（控え）を
+    `configsync.projected` で写したもの」。着手のときの configsync と同じく、共通レイヤーにある
     ファイルだけを写し、無いファイルはプロジェクトの側を残す。
     """
     selfinteg = syncstate.integration(conf.state, syncstate.SELF)
@@ -1315,9 +1318,10 @@ def _projected_layer_problems(
             Problem(
                 SEVERITY_WARN,
                 where,
-                f"親のブランチ {st.family} の上のプロジェクトの層（{rel}）が、統合先の層と"
-                "共通層から計算した層と違う。"
-                "判定は親のブランチの上の層を読まない（ADR-0093 の D28）。"
+                f"親のブランチ {st.family} の上のプロジェクトのレイヤー（{rel}）が、"
+                "統合先のレイヤーと"
+                "共通レイヤーから計算したレイヤーと違う。"
+                "判定は親のブランチの上のレイヤーを読まない（ADR-0093 の D28）。"
                 "統合先で直すか、着手のときにもう一度写してください",
             )
         )
@@ -1330,7 +1334,7 @@ def family_check(
     """取り込みの後の検査（ADR-0093 の 4.2 の 4。`ccnavi sync check <P> [<リポジトリ>]`）。
 
     この家族の承認済みチケットを判定し直し（C3）、権威の検査（親のワークツリーの外の写し・
-    決まらない）とあわせて、止める理由（error）を返す。層の食い違い（D28）は warn で返す。
+    決まらない）とあわせて、止める理由（error）を返す。レイヤーの食い違い（D28）は warn で返す。
     error があれば sh が家族の控えを `blocked` にする。`repo` は控えの名前（`self` か
     プロジェクト名）で、sh が渡す。無ければ控えのあるリポジトリを全部探す。
     """
@@ -1445,8 +1449,8 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
         return []
     problems: list[Problem] = []
     # 名乗るのは `(scratch)` の側。プロジェクトのぶんも `(projects/<名前>)` とは名乗らない。
-    # あちらはその層の設定についての苦情で、ここは追跡の話。同じ前置きにすると、
-    # 「層について何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
+    # あちらはそのレイヤーの設定についての苦情で、ここは追跡の話。同じ前置きにすると、
+    # 「レイヤーについて何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
     where = [("(scratch)", root)]
     where += [
         (f"(scratch/{p.name})", tree.project_root(conf.projects, p.name))
@@ -1497,7 +1501,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
     予約名（`common` / `self`、綴り違いも含む）を使っていないこと、プロジェクトが
-    `.claude/` を持たないことを見る。層の中身は
+    `.claude/` を持たないことを見る。レイヤーの中身は
     `_layers` が見る。
     """
     problems: list[Problem] = []
@@ -1522,12 +1526,14 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"{reserved} は層の名前として予約してある（`{settings.LAYER_COMMON}` は共通層、"
-                    f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
-                    f"層として数えていない（id の `{p.name}:` がどちらの層を指すか決まらないため。"
+                    f"{reserved} はレイヤーの名前として予約してある（`{settings.LAYER_COMMON}` "
+                    "は共通レイヤー、"
+                    f"`{settings.LAYER_SELF}` はワークスペース自身のレイヤー）。このプロジェクトは"
+                    f"レイヤーとして数えていない（id の `{p.name}:` "
+                    "がどちらのレイヤーを指すか決まらないため。"
                     "大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も効いておらず、"
                     "このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / "
-                    "Edit / NotebookEdit）は共通層だけで判定している。"
+                    "Edit / NotebookEdit）は共通レイヤーだけで判定している。"
                     "プロジェクトを別の名前に変えてください",
                 )
             )
@@ -1903,17 +1909,18 @@ def _rules(
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
     落ちるという、検証があるぶんかえって危ない形になる。
 
-    `home` は、ルールが指すファイル（additionalContextFile）を探す起点。層の
-    ルールならその層の git プロジェクトルート。省けばワークスペースルート、
+    `home` は、ルールが指すファイル（additionalContextFile）を探す起点。レイヤーの
+    ルールならそのレイヤーの git プロジェクトルート。省けばワークスペースルート、
     それも無ければルールファイルの隣。
 
-    `layer` は共通層より後ろの層かどうか。層は共通層に足すものなので、`deny` や
-    `allow` が空でも穴にはならない（空の層 = 何も足さない）。共通層で確かめている
-    「空のガードは入っていないのと同じ」の問いを、層にまで広げると、allow を
-    1 件だけ足した層が毎回 error を出し続けることになる。
+    `layer` は共通レイヤーより後ろのレイヤーかどうか。
+    レイヤーは共通レイヤーに足すものなので、`deny` や
+    `allow` が空でも穴にはならない（空のレイヤー = 何も足さない）。共通レイヤーで確かめている
+    「空のガードは入っていないのと同じ」の問いを、レイヤーにまで広げると、allow を
+    1 件だけ足したレイヤーが毎回 error を出し続けることになる。
 
-    `project` はプロジェクトの層かどうか。ターンの終わりのルール（`match: Stop`）は
-    プロジェクトの層から読まないので、そこに書いたものを言う（ADR-0090）。
+    `project` はプロジェクトのレイヤーかどうか。ターンの終わりのルール（`match: Stop`）は
+    プロジェクトのレイヤーから読まないので、そこに書いたものを言う（ADR-0090）。
     """
     home = home or root or os.path.dirname(os.path.abspath(path))
     try:
@@ -2059,7 +2066,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
 
     1. `deny` / `ask` に置いた。Stop で見るのは allow だけなので、`Stop` の部分は何も起きない
        （`Bash|Stop` なら `Bash` の部分はふつうに働く）
-    2. プロジェクトの層に置いた。ターンの終わりには共通層と自身の層しか読まない
+    2. プロジェクトのレイヤーに置いた。ターンの終わりには共通レイヤーと自身のレイヤーしか読まない
     3. 当てる先の `(stop)` に当たらない glob / regex。何も起きない
     4. `every` が 2 より小さい。実行時にも使わない（ターンの終わりのたびに止まらないように）
     """
@@ -2083,8 +2090,9 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"プロジェクトの層の {rules.STOP_MATCH} のルールは使われない。ターンの終わりには"
-                "共通層と自身の層しか読まない"
+                f"プロジェクトのレイヤーの {rules.STOP_MATCH} のルールは使われない。"
+                "ターンの終わりには"
+                "共通レイヤーと自身のレイヤーしか読まない"
                 "（外のリポジトリの 1 行でメインのターンを止めさせないため）",
             )
         ]
