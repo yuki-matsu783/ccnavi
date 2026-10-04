@@ -12,6 +12,10 @@ keywords: [要件, サイドパネル, アクティビティバー, コマンド
 
 「チケット管理」「リスク管理」「フェーズ管理」が出るのは、ワークスペースがチケット制御を使っているときだけ。配点も種類もチケットにしか読まれないので、`disable` の間はどれも何も動かさない。`.claude/settings.json`（`settings.local.json` が優先）の `env.CCNAVI_TICKET_CONTROL` が `disable` なら、入口も、コマンドパレットの「チケット管理を開く」「チケット管理を更新」「リスク管理を開く」「フェーズ管理を開く」も出ない。書いていなければ enable。設定ファイルが変われば、その場で読み直す。ボードを開いたとき、ccnavi の出力（`--explain --json` の `settings.ticket_control`）と食い違えば通知で知らせる。
 
+| ID | 区分 | 要件 |
+|---|---|---|
+| REQ-VSC-04 | 状態 | `.claude/settings.json`（`settings.local.json` が優先）の env `CCNAVI_TICKET_CONTROL` が `disable` の間、VS Code 拡張は、「チケット管理」「リスク管理」「フェーズ管理」の入口（サイドパネルとコマンドパレット）を出さず、「プロジェクト管理」「ルール管理」の入口だけを出すこと。書いていない値と読めない値は `enable` として扱うこと。ボードを開いたとき、実行ファイルの `settings.ticket_control` と食い違えば通知で知らせること（REQ-DIA-07） |
+
 ## できること
 
 | コマンド（コマンドパレット） | 動き |

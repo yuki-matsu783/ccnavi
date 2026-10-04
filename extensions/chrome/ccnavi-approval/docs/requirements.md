@@ -8,7 +8,7 @@ keywords: [要件, Chrome 拡張, 承認ボード, 承認, 取り下げ, レビ�
 
 # ccnavi 承認ボードの要件
 
-Chrome 拡張「ccnavi 承認ボード」が何をするかを書く。承認者がブラウザと PAT だけで、リモートの承認待ちを見て、承認・取り下げ・レビュー済みを親のブランチへ書き、issue から親のブランチを始める。組み立てと試験は [README](../README.md)、構成は [design.md](design.md) にある。拡張と ccnavi 本体の間の取り決め（同梱の ccnavi の呼び方、読む JSON の形、互換の版、ダイジェストの照合）は本体の [要件書](../../../../docs/requirements.md) と [設計](../../../../docs/design.md) に書く。
+Chrome 拡張「ccnavi 承認ボード」が何をするかを書く。承認者がブラウザと PAT だけで、リモートの承認待ちを見て、承認・取り下げ・レビュー済みを親のブランチへ書き、issue から親のブランチを始める。組み立てと試験は [README](../README.md)、構成は [design.md](design.md) にある。拡張と ccnavi 本体の間の取り決め（同梱の ccnavi の呼び方、読む JSON の形、互換の版、ダイジェストの照合）は本体の [要件 2.13 拡張との取り決め](../../../../docs/requirements/extension-if.md)（REQ-EXT）と [設計](../../../../docs/design.md) に書く。拡張自身の要件のうち、本体の要件から切り出したものには REQ-CHR の ID を振ってある。
 
 ## 何をするか
 
