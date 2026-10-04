@@ -159,19 +159,20 @@ class RawShareTest(PhaseHarness):
         self.assertEqual(reads.counts(), ONCE)
 
     def test_post_tool_use_reads_again_after_it_may_have_restored(self):
-        """実行後チェックが作業ツリーを戻しうる回（戻しが有効で、差し戻す変更がある）は読み直す。
+        """実行後チェックが作業ツリーを戻そうとした回（`post.check` の 2 つ目が真）は読み直す。
 
         戻した先が置き場だと、最初の読みはもう古い。読み直さないと、戻す前のチケットで
-        フェーズの知らせを組む。戻しが無効なら、同じ回でも読み直さない。
+        フェーズの知らせを組む。戻そうとしなかった回は、差し戻す変更があっても読み直さない。
         """
         self.ended_phase()
 
-        def denied(*args, **kwargs):
-            kwargs["record"].decision = audit.DENY
-            return ""
+        for tried, expected in ((True, 2), (False, 1)):
 
-        for restore, expected in (("enable", 2), ("disable", 1)):
-            with self.subTest(restore=restore):
+            def denied(*args, tried=tried, **kwargs):
+                kwargs["record"].decision = audit.DENY
+                return "", tried
+
+            with self.subTest(tried=tried):
                 payload = {
                     "hook_event_name": "PostToolUse",
                     "tool_name": "Bash",
@@ -181,11 +182,11 @@ class RawShareTest(PhaseHarness):
                 }
                 with mock.patch.object(post, "check", side_effect=denied):
                     result, reads = self.counted(
-                        lambda restore=restore, payload=payload: self.ccnavi(
+                        lambda payload=payload: self.ccnavi(
                             "--mode",
                             "enable",
                             "--restore-if-deny",
-                            restore,
+                            "enable",
                             stdin=json.dumps(payload),
                         )
                     )

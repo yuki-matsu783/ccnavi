@@ -489,7 +489,7 @@ def decide_after(
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     scope = scope_guard(conf, root, raw)
 
-    text = post.check(
+    text, restored = post.check(
         stderr,
         enforcing=mode == modes.ENABLE,
         restore=restore_setting,
@@ -515,12 +515,9 @@ def decide_after(
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
     bounced = ""
     if conf.tickets_enabled:
-        # `post.check` が作業ツリーを戻した回は、置き場のファイルも戻っていることがあるので
-        # 読み直す（戻すのは戻しが enable で、直前の実行が汚した分（deny）があるときだけ）。
-        # それ以外の回は、上で読んだ置き場をそのまま使う。
-        if restore_setting == selfguard.ENABLE and record.decision == audit.DENY:
-            raw = None
-        parent, raw = phase.parent_at(root, conf, payload.cwd, raw)
+        # `post.check` が作業ツリーを戻そうとした回は、置き場のファイルも戻っていることが
+        # あるので読み直す。それ以外の回は、上で読んだ置き場をそのまま使う。
+        parent, raw = phase.parent_at(root, conf, payload.cwd, None if restored else raw)
         said = phase.announce(stderr, root, conf, parent, raw) if parent is not None else ""
         if said:
             text = f"{text}\n\n{said}" if text else said

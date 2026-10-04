@@ -14,7 +14,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
+from ccnavi.hook import post
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -332,6 +334,26 @@ class PostToolUseTest(Harness, unittest.TestCase):
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "committed\n")
         self.assertIn("restored:", result.stderr)
+
+    def test_戻そうとしたかを呼び手に返す(self):
+        """`post.check` の 2 つ目は、戻しを試みた回だけ真。呼び手はこれで置き場を読み直す。"""
+        seen = []
+
+        def spy(*args, **kwargs):
+            out = real(*args, **kwargs)
+            seen.append(out[1])
+            return out
+
+        real = post.check
+        with mock.patch.object(post, "check", side_effect=spy):
+            self.run_hook(command="ls")
+            self.dirty()
+            self.run_hook(restore="enable", command="python build.py")
+            # 戻しが無効なら、差し戻す変更があっても戻そうとしない
+            self.run_hook(session="s2", command="ls")
+            self.dirty()
+            self.run_hook(session="s2", restore="disable", command="python build.py")
+        self.assertEqual(seen, [False, True, False, False])
 
     def test_自動復元は現れたファイルを消さずに退避する(self):
         self.run_hook(command="ls")
