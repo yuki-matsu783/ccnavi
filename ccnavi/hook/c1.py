@@ -116,8 +116,18 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     verdict, why, st = target(conf, root, parent)
     lines.append(("repo", st.repo))
     # 親のブランチ名（ADR-0100 の 5 章）。sh は識別子からブランチ名を組み立てず、これを使う
-    # （ref・fetch・push・ls-remote・家族の控えの `branch`）。
-    lines.append(("branch", st.branch or syncstate.Families(conf, root).branch_any(parent)))
+    # （ref・fetch・push・ls-remote・家族の控えの `branch`）。名前は承認済みの親の写しの `branch:`
+    # だけから引き（提案の `branch:` は使わない）、`ticket.branch_problem` と統合先の名前を通らなければ
+    # `branch` の行を出さずに `branch_refused` で理由を言う（sh はその家族を識別子の外へ動かさずに止める）。
+    fams = syncstate.Families(conf, root)
+    branch = st.branch or fams.branch_any(parent)
+    refused = fams.branch_refusal(parent, branch, _project_guess(fams, parent, st))
+    if refused:
+        lines.append(("branch_refused", refused))
+        if verdict == TARGET_YES:
+            verdict, why = TARGET_STOP, refused
+    else:
+        lines.append(("branch", branch))
     if places is not None:
         lines += [("approved", places[0]), ("review", places[1])]
     lines.append(("target", verdict))
@@ -135,6 +145,14 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     if verdict == TARGET_YES and st.home is not None:
         stdout.write(f"tree {st.home.root}\n")
     return 0
+
+
+def _project_guess(fams: syncstate.Families, parent: str, st: syncstate.Standing) -> str:
+    """家族のリポジトリ（プロジェクトの名前。ワークスペース自身なら空）の見当。"""
+    if st.imported:
+        return syncstate.project_of_key(st.repo)
+    named = [w for w in fams.worktrees() if w.name == parent]
+    return named[0].project if len(named) == 1 else ""
 
 
 def _chat_only(conf: settings.Settings, root: str, parent: str) -> bool:

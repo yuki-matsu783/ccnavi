@@ -192,7 +192,9 @@ class CoreHarness(PhaseHarness):
         place = chrome._placement(None)
         closure = chrome._closure(snap, place, request["family"])
         shutil.rmtree(os.path.join(self.state, "sync"), ignore_errors=True)
-        for rel, text in chrome.records(snap, place, closure["families"]).items():
+        for rel, text in chrome.records(
+            snap, place, closure["families"], closure["idents"]
+        ).items():
             write(os.path.join(self.state, *rel.split("/")), text)
 
     def ask_chrome(self, request):

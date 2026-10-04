@@ -303,6 +303,8 @@ MAX_BRANCH_LENGTH = 200
 # 英数字。git が許すほかの字（`$`・`;`・引用符・全角の字など）は、sh と拡張が名前を扱う箇所で意味を
 # 持つか、見た目の同じ別の名前を作るので使わない（締める向き）。
 _BRANCH = re.compile(rf"^[A-Za-z0-9][{ID_CHARS}/]*\Z")
+# 先頭の段に置けない語（git の ref の綴りとリモートの名前）。大文字小文字は区別しない。
+_REF_PREFIXES = ("refs", "heads", "remotes", "tags", "origin", "upstream", "head")
 
 
 def branch_problem(name: str) -> str:
@@ -332,14 +334,23 @@ def branch_problem(name: str) -> str:
         if part.startswith(".") or part.endswith(".lock"):
             return "git のブランチ名に使えない形（`.` で始まる段・`.lock` で終わる段）"
     folded = name.casefold()
+    parts = folded.split("/")
+    if parts[0] in _REF_PREFIXES:
+        return (
+            f"先頭の段 `{name.split('/')[0]}` は git の ref の綴り（refs・heads・remotes・tags）か"
+            "リモートの名前（origin・upstream）と紛れる。"
+            "`origin/main` のような名前は親のブランチにしない"
+        )
+    if any(p == "head" or p.endswith("_head") for p in parts):
+        return "`HEAD`・`FETCH_HEAD` のような段は git の特別な名前と紛れる"
     if (
         folded in RESERVED_BRANCH_IDS
-        or folded.startswith("release/")
+        or parts[0] in RESERVED_BRANCH_IDS
         or folded.startswith("release-")
     ):
         return (
-            "統合先や保護されたブランチの名前（main・master・develop・release・release/*・"
-            "release-*）は親のブランチにしない"
+            "統合先や保護されたブランチの名前（main・master・develop・release と、それを先頭の段に"
+            "持つ main/*・release/* など、release-*）は親のブランチにしない"
         )
     return ""
 

@@ -287,14 +287,25 @@ def family_of(ident: str) -> str:
 def _claimers(snap: dict, place: dict, name: str) -> list:
     """ブランチ `name` を自分の親のブランチだと名乗る親チケット（ADR-0100 の 5 章）。
 
-    見るのはそのブランチの置き場の開いたもの（提案の todo/・review/ と承認済みの doing/）で、親の
-    `branch:`（無ければ識別子）が `name` と同じもの。
+    見るのはそのブランチの置き場の開いたもの（提案の todo/・review/ と承認済みの doing/）で、親が
+    名乗る名前（`_claimed`）が `name` と同じもの。
     """
     return [
         t
-        for _, t in _tickets_in(_files(snap, name), place, (*ticket_mod.STATES, ticket_mod.DOING))
-        if not t.is_child and ticket_mod.branch_name(t) == name
+        for state, t in _tickets_in(
+            _files(snap, name), place, (*ticket_mod.STATES, ticket_mod.DOING)
+        )
+        if not t.is_child and _claimed(state, t) == name
     ]
+
+
+def _claimed(state: str, t) -> str:
+    """親チケットが名乗る親のブランチ名。
+
+    承認済み（doing/・review/）は `branch:`（無ければ識別子）、承認前の提案（todo/）は識別子
+    （提案の `branch:` は承認されるまで使わない。ADR-0100 の 5 章）。
+    """
+    return t.ticket if state == ticket_mod.TODO else ticket_mod.branch_name(t)
 
 
 def _family_ident(snap: dict, place: dict, name: str) -> str:
@@ -348,6 +359,16 @@ def _rival_problem(snap: dict, place: dict, name: str, ident: str) -> str:
     )
 
 
+def _ambiguous_problem(closure: dict) -> str:
+    """閉包の先行の家族を名乗るブランチが 2 本以上あれば、止める理由（ADR-0100 の 5 章）。"""
+    if not closure.get("ambiguous"):
+        return ""
+    return (
+        f"先行の家族（{', '.join(closure['ambiguous'])}）を名乗るブランチが 1 本でない。"
+        "権威が決まらないので、この家族は判定しない（ADR-0100）"
+    )
+
+
 def _hints(req: dict) -> dict[str, str]:
     """要求か snapshot の `hints`（識別子 → 親のブランチ名）。読むブランチの見当にだけ使う
     （判定には使わない。読んだブランチが名乗らなければ使わない）。"""
@@ -397,7 +418,7 @@ def _op_families(req: dict, root: str) -> dict:
         parents = [
             (state, t)
             for state, t in _tickets_in(files, place, (*ticket_mod.STATES, ticket_mod.DOING))
-            if not t.is_child and ticket_mod.branch_name(t) == name
+            if not t.is_child and _claimed(state, t) == name
         ]
         if not parents:
             continue
@@ -450,6 +471,7 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
     idents: dict[str, str] = {}
     need: list[str] = []
     rivals: list[str] = []
+    ambiguous: list[str] = []
     queue = [family]
     if family in snap["branches"]:
         idents[family] = _family_ident(snap, place, family)
@@ -470,18 +492,23 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
                 if ident in closed or fam in closed:
                     continue
                 found = owners.get(fam, [])
-                branch = found[0] if len(found) == 1 else hints.get(fam, fam)
+                if len(found) > 1:
+                    # 先行の家族を名乗るブランチが 2 本以上。判定する家族と同じく決まらない
+                    if fam not in ambiguous:
+                        ambiguous.append(fam)
+                    continue
+                branch = found[0] if found else hints.get(fam, fam)
                 if branch in families:
                     continue
                 families.append(branch)
-                if branch in snap["branches"]:
-                    idents[branch] = fam
+                idents[branch] = fam
                 queue.append(branch)
     over = len(families) > FAMILY_LIMIT
     return {
         "families": families,
         "idents": idents,
         "rivals": rivals,
+        "ambiguous": ambiguous,
         "need": [] if over else need,
         "absent": sorted(absent & set(families)),
         "over_limit": over,
@@ -498,7 +525,9 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
 # ---- 仮のツリーと承認待ち ---------------------------------------------------------------
 
 
-def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
+def _build(
+    root: str, snap: dict, place: dict, families: list[str], idents: dict | None = None
+) -> None:
     """統合先をワークスペースルートに、家族をワークツリーに置いた仮のツリーを組む。
 
     プロジェクトのリポジトリ（段階 5）は、ワークスペースの統合先をワークスペースルートに、
@@ -554,7 +583,7 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
         _head(registry, name)
         for path, text in _files(snap, name).items():
             _write(tree, path, text)
-    for rel, text in records(snap, place, families).items():
+    for rel, text in records(snap, place, families, idents).items():
         _write(root, f"{STATE_DIR}/{rel}", text)
 
 
@@ -580,7 +609,9 @@ def project_layer(snap: dict, place: dict) -> dict[str, str]:
     return out
 
 
-def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
+def records(
+    snap: dict, place: dict, families: list[str], idents: dict | None = None
+) -> dict[str, str]:
     """取り込みの控え相当（控えの置き場からの相対パス → 中身）。手元の `ccnavi-sync.sh` が書く形。
 
     - 統合先の控え（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
@@ -630,12 +661,18 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
             ident = _tree_ident(snap, place, name)
             out[f"{base}/families/{ident}"] = f"remote origin\nbranch {name}\nstate present\n"
         elif name in absent:
-            ident = name if ticket_mod.is_valid_id(name) else ""
-            if ident:
-                out[f"{base}/families/{ident}"] = (
-                    f"remote origin\nbranch {name}\nstate gone\n"
-                    f"reason 親のブランチ {name} がホストに無い\n"
+            # 読みに行った名前の家族（閉包の `idents`。無ければその名前を識別子とする）。識別子の
+            # 形でなければ控えを書けないので、黙って飛ばさず決まらないとして止める。
+            ident = (idents or {}).get(name, name)
+            if not ticket_mod.is_valid_id(ident):
+                raise Refused(
+                    f"ホストに無い親のブランチ {name} の家族（{ident}）が識別子の形でない。"
+                    "家族が決まらない"
                 )
+            out[f"{base}/families/{ident}"] = (
+                f"remote origin\nbranch {name}\nstate gone\n"
+                f"reason 親のブランチ {name} がホストに無い\n"
+            )
     return dict(sorted(out.items()))
 
 
@@ -697,13 +734,13 @@ def _op_board(req: dict, root: str) -> dict:
     if closure["need"]:
         raise Refused(f"閉包の家族をまだ読んでいない: {', '.join(closure['need'])}")
     ident = closure["idents"][family]
-    rival = _rival_problem(snap, place, family, ident)
+    rival = _rival_problem(snap, place, family, ident) or _ambiguous_problem(closure)
     if rival:
         return {"family": family, "ident": ident, "undecided": rival, "closure": closure}
     unreadable = _unreadable(snap, closure)
     if unreadable:
         return {"family": family, "undecided": unreadable, "closure": closure}
-    _build(root, snap, place, closure["families"])
+    _build(root, snap, place, closure["families"], closure["idents"])
 
     code, first, err = _preview(root, place["env"], [])
     if first is None:
@@ -870,12 +907,13 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     if closure["need"]:
         raise Refused(f"閉包の家族をまだ読んでいない: {', '.join(closure['need'])}")
     rival = _rival_problem(snap, place, family, closure["idents"][family])
+    rival = rival or _ambiguous_problem(closure)
     if rival:
         raise Refused(rival)
     unreadable = _unreadable(snap, closure)
     if unreadable:
         raise Refused(unreadable)
-    _build(root, snap, place, closure["families"])
+    _build(root, snap, place, closure["families"], closure["idents"])
     return snap, place, family, closure
 
 

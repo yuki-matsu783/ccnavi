@@ -369,36 +369,56 @@ def branch_problems(
     root: str,
     t: ticket_mod.Ticket,
     fams: syncstate.Families | None = None,
+    others: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """親の `branch:` が、その時点の統合先の名前に当たれば承認しない（ADR-0100 の 5 章）。
+    """親のブランチ名を承認してよいか（ADR-0100 の 5 章）。
 
-    固定の並び（main など）と字の検査は `ticket.branch_problem` が読むときに済ませている。ここで
-    比べるのは、そのリポジトリの統合先の名前（環境変数 `CCNAVI_INTEGRATION_BRANCH`、
-    `.claude/settings.local.json` の `env`、取り込みの控えの `head` の `branch`）で、大文字小文字を
-    区別しない。名前が分からなければ固定の並びだけで決める（`ccnavi-git.sh` の push の拒否と同じ）。
+    - `branch:` がそのリポジトリの統合先の名前に当たれば承認しない。比べる名前は
+      `Families.integration_names`（環境変数・`.claude/settings.local.json`・取り込みの控え・
+      `origin/HEAD`・`origin/main`・`origin/master`）。固定の並びと字の検査は
+      `ticket.branch_problem` が読むときに済ませている
+    - 2 つの家族が同じブランチを名乗る（この親のブランチ名が、同じリポジトリの開いた別のチケットの
+      親のブランチ名か識別子と同じ。大文字小文字は区別しない）なら承認しない。`others` は比べる
+      チケット（承認済みと承認待ち）
     """
-    if t.is_child or not t.branch:
+    if t.is_child:
         return []
     fams = fams or syncstate.Families(conf, root)
-    names = {
-        os.environ.get(settings.INTEGRATION_ENV, ""),
-        settings.integration_local(root),
-    }
-    integ = fams.integration(syncstate.repo_key(t.project)) if fams.active else None
-    if integ is not None and not integ.broken:
-        names.add(integ.branch)
-    folded = t.branch.casefold()
-    hits = sorted(n for n in names if n and n.casefold() == folded)
-    if not hits:
-        return []
-    return [
-        rules.Problem(
-            rules.SEVERITY_ERROR,
-            t.ticket,
-            f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）に当たる。"
-            "統合先を親のブランチにしない（ADR-0100）",
+    found: list[rules.Problem] = []
+    if t.branch:
+        folded = t.branch.casefold()
+        hits = [n for n in fams.integration_names(t.project or "") if n.casefold() == folded]
+        if hits:
+            found.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）に当たる。"
+                    "統合先を親のブランチにしない（ADR-0100）",
+                )
+            )
+    mine = ticket_mod.branch_name(t).casefold()
+    clash = sorted(
+        {
+            o.ticket
+            for o in others or []
+            if o.ticket != t.ticket
+            and (o.parent or o.ticket) != t.ticket
+            and o.project == t.project
+            and mine in {ticket_mod.branch_name(o).casefold(), o.ticket.casefold()}
+        }
+    )
+    if clash:
+        found.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"親のブランチ {ticket_mod.branch_name(t)} を別の家族（{', '.join(clash)}）も"
+                "親のブランチか識別子として使っている。2 つの家族が同じブランチを名乗ると権威が"
+                "決まらないので承認しない（ADR-0100）",
+            )
         )
-    ]
+    return found
 
 
 def integration_problems(

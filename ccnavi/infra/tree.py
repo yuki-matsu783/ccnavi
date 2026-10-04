@@ -228,6 +228,25 @@ def head_text(tree_root: str) -> str | None:
         return None
 
 
+def origin_head(repo_root: str) -> str:
+    """そのリポジトリの `origin/HEAD` が指すブランチ名（`refs/remotes/origin/HEAD` の中身）。
+    無ければ空。
+
+    ファイルだけを読む（git は起こさない）。`ccnavi_default_branch` が `symbolic-ref`
+    で読むものと同じ。
+    """
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return ""
+    try:
+        with open(os.path.join(gitdir, "refs", "remotes", "origin", "HEAD"), encoding="utf-8") as f:
+            text = f.read().strip()
+    except (OSError, ValueError):
+        return ""
+    prefix = "ref: refs/remotes/origin/"
+    return text[len(prefix) :].strip() if text.startswith(prefix) else ""
+
+
 def has_branch(repo_root: str, name: str) -> bool:
     """そのリポジトリに、手元のブランチか origin のブランチ `name` があるか（ADR-0100 の 5 章）。
 

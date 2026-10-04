@@ -326,7 +326,8 @@ ccnavi_is_ident() {
 # 親のブランチ名は識別子の字に段の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
 # （`ticket.branch_problem`）が字と形を確かめたものを受け取る側の 2 段目の守りで、パスや ref で意味を持つ
 # 綴りを止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる段）、`.lock` で終わる段、
-# `\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）。
+# `\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、git の ref の綴り（refs/・
+# origin/ など）や保護されたブランチの名前を先頭の段に持つもの、HEAD の段を持つもの。
 ccnavi_is_branch() {
 	case "$1" in
 	'' | -* | .* | /* | */ | *. | *..* | *//* | */.* | *.lock | *.lock/* | *\\*) return 1 ;;
@@ -335,7 +336,16 @@ ccnavi_is_branch() {
 	esac
 	# 末尾の改行が `$( )` で落ちないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
 	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
-	[ "$ccnavi_ib_rest" = '\' ]
+	[ "$ccnavi_ib_rest" = '\' ] || return 1
+	# git の ref の綴り・リモートの名前・保護されたブランチの名前を先頭の段に持つもの、`HEAD`・`*_HEAD` の段を
+	# 持つもの（`ticket.branch_problem` と同じ。大文字小文字は区別しない）。
+	ccnavi_ib_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$ccnavi_ib_low" in
+	refs | refs/* | heads | heads/* | remotes | remotes/* | tags | tags/* | origin | origin/* | upstream | upstream/*) return 1 ;;
+	main | main/* | master | master/* | develop | develop/* | release | release/* | release-*) return 1 ;;
+	head | head/* | */head | */head/* | *_head | *_head/*) return 1 ;;
+	esac
+	return 0
 }
 
 # ---- 取り込みの控えとロック（ADR-0093 の 3.6・4.2・4.3。段階 2b）
@@ -382,7 +392,8 @@ ccnavi_family_record() {
 #
 # 控えの `branch` の行で探す（`branch` の無い前の控えは、鍵の識別子をブランチ名として読む）。
 # 識別子と違う名前の親のブランチ（`branch:`）でも、ブランチ名から控えを引ける。書きかけ（`*.tmp.*`）と
-# シンボリックリンクは読まない。
+# シンボリックリンクは読まない。当たった控えを 1 行に 1 つずつ全部出す（2 つ以上なら、2 つの家族が同じ
+# ブランチを名乗っている。呼ぶ側は止める）。
 ccnavi_family_record_of_branch() {
 	ccnavi_fb_dir="$(ccnavi_state "$1")/sync/$2/families"
 	[ -d "$ccnavi_fb_dir" ] || return 0
@@ -397,17 +408,30 @@ ccnavi_family_record_of_branch() {
 		[ -n "$ccnavi_fb_branch" ] || ccnavi_fb_branch="${ccnavi_fb_file##*/}"
 		if [ "$ccnavi_fb_branch" = "$3" ]; then
 			printf '%s\n' "$ccnavi_fb_file"
-			return 0
 		fi
 	done
 	return 0
 }
 
+# 家族 <識別子> の親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
+#
+# 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
+# 当たることがある）。違う名前は ccnavi_is_branch で見る。
+ccnavi_branch_ok() {
+	if [ "$1" = "$2" ]; then
+		ccnavi_is_ident "$1"
+	else
+		ccnavi_is_branch "$1"
+	fi
+}
+
 # 家族の親のブランチ名（ADR-0100 の 5 章）。<ワークスペースルート> <識別子>
 #
-# 実行ファイルの `c1 family <識別子>` の `branch` の行（親チケットの `branch:`、無ければ識別子）。sh は
-# チケットを読まない（D33）。実行ファイルが無い・答えない・答えが親のブランチ名の形でなければ 1 を返す
-# （呼ぶ側が識別子で代えるか止めるかを決める）。ソースで動かしている ccnavi のリポジトリでは uv で起こす。
+# 実行ファイルの `c1 family <識別子>` の `branch` の行（承認済みの親チケットの `branch:`、無ければ識別子。
+# 提案の `branch:` は使わない）。sh はチケットを読まない（D33）。実行ファイルが無ければ 1、在るのに
+# 答えない・`branch` の行が無い（`branch_refused`。使えない名前か統合先の名前）・答えが親のブランチ名の
+# 形でなければ 2 を返す（呼ぶ側は識別子の外へ動かさずに止める）。ソースで動かしている ccnavi の
+# リポジトリでは uv で起こす。
 ccnavi_family_branch() {
 	if ccnavi_fbr_bin=$(ccnavi_bin "$1"); then
 		ccnavi_fbr_out=$("$ccnavi_fbr_bin" --root "$1" c1 family "$2" 2>/dev/null </dev/null) || ccnavi_fbr_out=""
@@ -418,9 +442,9 @@ ccnavi_family_branch() {
 		return 1
 	fi
 	ccnavi_fbr_out=$(printf '%s\n' "$ccnavi_fbr_out" | tr -d '\r')
-	[ "$(printf '%s\n' "$ccnavi_fbr_out" | head -n 1)" = "c1 1" ] || return 1
+	[ "$(printf '%s\n' "$ccnavi_fbr_out" | head -n 1)" = "c1 1" ] || return 2
 	ccnavi_fbr_name=$(printf '%s\n' "$ccnavi_fbr_out" | sed -n 's/^branch //p' | head -n 1)
-	ccnavi_is_branch "$ccnavi_fbr_name" || return 1
+	ccnavi_branch_ok "$ccnavi_fbr_name" "$2" || return 2
 	printf '%s\n' "$ccnavi_fbr_name"
 }
 
@@ -943,7 +967,7 @@ ccnavi_c1_family() {
 	sed -n 's/^hint //p' "$ccnavi_c1_tmp/family" >"$ccnavi_c1_tmp/hints"
 	case "$ccnavi_c1_target" in
 	yes)
-		if ! ccnavi_is_branch "$ccnavi_c1_branch"; then
+		if ! ccnavi_branch_ok "$ccnavi_c1_branch" "$ccnavi_c1_family_id"; then
 			ccnavi_c1_target=stop
 			ccnavi_c1_why="実行ファイルが親のブランチ名（branch）を答えないか、ブランチ名の形でない（${ccnavi_c1_branch:-空}）。実行ファイルを新しくしてください"
 		elif [ -z "$ccnavi_c1_tree" ] || [ ! -d "$ccnavi_c1_tree" ]; then

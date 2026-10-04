@@ -688,7 +688,9 @@ def candidates(
         complaints += approval.project_problems(t, pool, conf)
         complaints += approval.family_problems(conf, root, t, fams)
         complaints += approval.integration_problems(conf, root, t, fams)
-        complaints += approval.branch_problems(conf, root, t, fams)
+        complaints += approval.branch_problems(
+            conf, root, t, fams, list(approved) + list(pending) + list(revisions)
+        )
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
             if parent is not None:
