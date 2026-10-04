@@ -44,7 +44,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 | tag | 付けるもの | 付けないもの |
 |---|---|---|
-| `design-doc` | 設計文書（`ccnavi.md`・`requirements.md`・`wip/design/**`）、ADRの書き方や置き場についての文書、画面の構成や状態遷移などの設計を決めたADR | `design`は使わない。`design-doc`に統合した |
+| `design-doc` | 設計文書（`docs/ccnavi.md`・`docs/requirements.md`・`wip/design/**`）、ADRの書き方や置き場についての文書、画面の構成や状態遷移などの設計を決めたADR | `design`は使わない。`design-doc`に統合した |
 | `settings` | Claude Codeの`settings.json`（hookの登録・`env`・`permissions`）と、そこで渡す環境変数 | ccnavi自身の設定ファイル |
 | `config` | ccnaviの設定ファイル（`.ccnavi/common/rules.yml`・`phases.yml`・`risks.yml`）の形・読み方・層 | `settings.json`と環境変数 |
 
@@ -61,9 +61,9 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 |---|---|---|
 | `guide` | 使い方と作業の手引き。`docs/claude/*.md`、`docs/adr/README.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
 | `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない（理由は表の下）。`--type rule`では何も出ない |
-| `design` | 現在の実装の説明。`ccnavi.md`、`wip/design/**`の設計メモ | `ccnavi.md`に付いている |
-| `requirements` | 外から観測できる約束。`requirements.md` | 付いている |
-| `glossary` | 用語集。`CONTEXT.md` | 付いている |
+| `design` | 現在の実装の説明。`docs/ccnavi.md`、`wip/design/**`の設計メモ | `docs/ccnavi.md`に付いている |
+| `requirements` | 外から観測できる約束。`docs/requirements.md` | 付いている |
+| `glossary` | 用語集。`docs/CONTEXT.md` | 付いている |
 | `handover` | 引き継ぎ。`HANDOVER.md` | 付いている |
 | `adr` | 設計判断の記録。`docs/adr/NNNN-*.md` | 付いている |
 | `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`docs/skills/*/SKILL.md` | 付けていない（理由は表の下）。`name`・`description`だけを持つ。`--type skill`では何も出ない |

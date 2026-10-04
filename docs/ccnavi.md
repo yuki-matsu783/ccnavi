@@ -13,9 +13,9 @@ keywords: [設計書, 実装, 脅威モデル, 判定, ルール, hook, チケ�
 | 知りたいこと | 読む場所 |
 |---|---|
 | 外から観測できる約束 | [requirements.md](requirements.md) |
-| 使い方と設定、ルールの書き方、記録の読み方 | [README.md](README.md) |
-| 実装の現状と次の一手、未実装 | [HANDOVER.md](HANDOVER.md) |
-| 判断の理由、採らなかった案 | [docs/adr/](docs/adr/README.md) |
+| 使い方と設定、ルールの書き方、記録の読み方 | [README.md](../README.md) |
+| 実装の現状と次の一手、未実装 | [HANDOVER.md](../HANDOVER.md) |
+| 判断の理由、採らなかった案 | [docs/adr/](adr/README.md) |
 | 用語 | [CONTEXT.md](CONTEXT.md) |
 
 文中の `ADR-NNNN` はその番号の 1 枚を指す。実装と食い違いを見つけたら、要件書を優先して直す。
