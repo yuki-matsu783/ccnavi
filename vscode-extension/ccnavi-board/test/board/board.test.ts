@@ -446,9 +446,9 @@ function archivedJson(ticket: string, parent = ""): ArchivedTicketJson {
 
 test("CB-T301 退避のチケットはアーカイブの列に並び、操作も要対応も持たず、集計と親の候補に数えない", () => {
   const base = fixture();
-  const board = buildBoard({ ...base, archived: [archivedJson("old"), archivedJson("old-01", "old")] });
+  const board = buildBoard({ ...base, archived: [archivedJson("old"), archivedJson("old-01-01", "old")] });
   const archived = board.columns.find((c) => c.state === "archived")!;
-  assert.deepEqual(archived.cards.map((card) => card.id), ["old", "old-01"]);
+  assert.deepEqual(archived.cards.map((card) => card.id), ["old", "old-01-01"]);
   const parent = archived.cards[0];
   assert.equal(parent.column, "archived");
   assert.equal(parent.copyStatus, "archived");
@@ -467,8 +467,8 @@ test("CB-T301 退避のチケットはアーカイブの列に並び、操作も
 
 test("CB-T302 置き場に同じ識別子があれば、退避のカードは出さない（置き場の側が本物）", () => {
   const base = fixture();
-  const board = buildBoard({ ...base, archived: [archivedJson("i0001-01", "i0001")] });
-  const ids = board.columns.flatMap((c) => c.cards).filter((card) => card.id === "i0001-01");
+  const board = buildBoard({ ...base, archived: [archivedJson("i0001-01-01", "i0001")] });
+  const ids = board.columns.flatMap((c) => c.cards).filter((card) => card.id === "i0001-01-01");
   assert.equal(ids.length, 1);
   assert.equal(ids[0].column, "done");
   assert.equal(board.archivedCount, 0);
@@ -476,8 +476,8 @@ test("CB-T302 置き場に同じ識別子があれば、退避のカードは出
 
 test("CB-T304 退避のカードの重なりはプロジェクトと識別子で見る。別のプロジェクトの同じ識別子は出す", () => {
   const base = fixture();
-  const other = { ...archivedJson("i0001-01", "i0001"), project: "lib" };
+  const other = { ...archivedJson("i0001-01-01", "i0001"), project: "lib" };
   const board = buildBoard({ ...base, archived: [other] });
   const archived = board.columns.find((c) => c.state === "archived")!;
-  assert.deepEqual(archived.cards.map((card) => `${card.project}/${card.id}`), ["lib/i0001-01"]);
+  assert.deepEqual(archived.cards.map((card) => `${card.project}/${card.id}`), ["lib/i0001-01-01"]);
 });

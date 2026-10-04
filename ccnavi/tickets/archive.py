@@ -349,7 +349,8 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
             if held is not None and held.parent in family:
                 children.add(ident)
     # どの置き場にもチケットの無い識別子（取り下げた子など）。履歴とフローしか残っていないので、
-    # このときだけ子の形（`<親>-<連番>`）で親に結ぶ。チケットが在る識別子は `parent:` 欄で決める。
+    # このときだけ子の形（`<親>-<フェーズ番号>-<連番>`）で親に結ぶ。チケットが在る識別子は
+    # `parent:` 欄で決める。
     known = set(done) | set(_regular_md(os.path.join(approved_dir, ticket_mod.DOING)))
 
     def belongs(ident: str) -> bool:
