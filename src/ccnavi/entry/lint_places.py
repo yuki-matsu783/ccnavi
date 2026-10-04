@@ -106,7 +106,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
     予約名（`common` / `self`、表記違いも含む）を使っていないこと、プロジェクトが
     `.claude/` を持たないことを見る。層の中身は
-    `_layers` が見る。
+    `_layers` が見る。無視の確認はプロジェクトが無くても行う（clone 前に確かめる）。
 
     その前に、置き場がワークスペースの git の索引に載っていないかを見る（`_in_index`）。
     載っていれば「無視されていない」の代わりにそれを言う。プロジェクトが 1 つも無くても
@@ -118,11 +118,11 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     indexed = _in_index(root, rel) if rel else None
     if indexed is not None:
         problems.append(Problem(SEVERITY_WARN, "(projects)", indexed))
-    found = tree.projects(conf.projects)
-    if not found:
-        return problems
+    # 無視の確認はプロジェクトが無くても行う。clone 前の置き場に `.gitignore` が要るかを、
+    # clone する前に確かめられるようにするため。末尾の `/` を付けると、まだ無いパスにも
+    # `/projects/` のようなディレクトリ向けの行が当たる。
     rel = rel or os.path.relpath(conf.projects, root).replace(os.sep, "/")
-    if indexed is None and _ignored(root, rel) is False:
+    if indexed is None and _ignored(root, rel + "/") is False:
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -131,7 +131,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 "持つので、ワークスペースの `.gitignore` に入れてください",
             )
         )
-    for p in found:
+    for p in tree.projects(conf.projects):
         where = f"(projects/{p.name})"
         if settings.is_reserved_layer_name(p.name):
             reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)

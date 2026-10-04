@@ -187,7 +187,8 @@ class ProjectsCollisionTest(unittest.TestCase):
     | はい | どちらでも | どちらでも | ぶつかりの warn だけ（A5） |
     | いいえ | はい | はい | 既存の「無視されていない」（A6） |
     | いいえ | はい | いいえ | 何も言わない |
-    | いいえ | いいえ | — | 何も言わない |
+    | いいえ | いいえ | はい | 何も言わない |
+    | いいえ | いいえ | いいえ | 既存の「無視されていない」（clone 前でも確かめる） |
 
     フラグ（`--projects` など）は渡さず、`--root` の下の既定の置き場を見る。
     A5 は実装前は赤（ぶつかりの知らせがまだ無い）。A6 は今どおりで緑（回帰の見張り）。
@@ -312,10 +313,21 @@ class ProjectsCollisionTest(unittest.TestCase):
 
         self.assertEqual(self.about_projects(), [])
 
-    def test_no_tracking_and_no_project_says_nothing_about_projects(self):
-        self.no_tracking()
+    def test_no_tracking_and_no_project_but_ignored_says_nothing_about_projects(self):
+        self.no_tracking(ignore="/projects/\n")
 
         self.assertEqual(self.about_projects(), [])
+
+    def test_no_project_yet_and_not_ignored_still_says_not_ignored(self):
+        """clone 前（`projects/` が無い）でも、無視されていなければ言う。"""
+        self.no_tracking()
+        self.assertFalse(os.path.exists(self.projects))
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        self.assertIn(NOT_IGNORED, found[0]["detail"])
 
 
 # 載せ忘れの文面で、先頭の句の直後に来る句。ぶつかりとの見分けに使う（設計 §4.2）。
@@ -489,7 +501,7 @@ class ShWordTest(unittest.TestCase):
     """
 
     def test_spelling(self):
-        from ccnavi.entry.lint import _sh_word
+        from ccnavi.entry.lint_places import _sh_word
 
         cases = {
             "projects/lib": "projects/lib",
