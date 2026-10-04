@@ -174,7 +174,15 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "decide",
         "判定と、チケット・レビューを動かす操作",
         frozenset(
-            {"hook.c1", "hook.core", "hook.judge", "tickets.ops", "hook.post", "tickets.review"}
+            {
+                "hook.c1",
+                "hook.core",
+                "hook.judge",
+                "tickets.ops",
+                "hook.post",
+                "tickets.review",
+                "tickets.review_decide",
+            }
         ),
     ),
     (

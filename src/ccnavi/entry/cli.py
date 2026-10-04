@@ -24,7 +24,7 @@ from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog, prune
-from ..tickets import branchfind, configsync, history, ops, phase, review
+from ..tickets import branchfind, configsync, history, ops, phase, review, review_decide
 from ..tickets import ticket as ticket_mod
 from . import diagnose, lint, status, suggest, version
 
@@ -1260,11 +1260,11 @@ def operate(
         history.set_via(history.VIA_BOARD)
         _decide_actor(args)
         if args.preview:
-            code = review.decide_preview(
+            code = review_decide.decide_preview(
                 stdout, stderr, root, conf, cwd, args.reviewed, args.result
             )
         else:
-            code = review.decide_yes(
+            code = review_decide.decide_yes(
                 stdout,
                 stderr,
                 root,
@@ -1283,14 +1283,14 @@ def operate(
         if not _inside(_real(os.path.abspath(args.choose_out)), _real(conf.state)):
             stderr.write("ccnavi: --choose-out の書き出し先は state の置き場の下だけ\n")
             return EXIT_ERROR
-        code = review.choose(
+        code = review_decide.choose(
             stdin, stdout, stderr, root, conf, cwd, args.reviewed, args.result, args.choose_out
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
         history.set_via(history.VIA_TERMINAL)
         _decide_actor(args)
-        code = review.reviewed(
+        code = review_decide.reviewed(
             stdin,
             stdout,
             stderr,
@@ -1426,7 +1426,7 @@ def _decide_actor(args) -> None:
     """decide のマーカーと履歴に入れるアカウントと経路。
 
     `--actor` があれば履歴の行にアカウントを足し、`--via` があれば経路を差し替える。マーカーの
-    `actor`・`via` は `review.apply_decision` がこの起動の値から書く。
+    `actor`・`via` は `review_decide.apply_decision` がこの起動の値から書く。
     無ければマーカーも履歴も前と同じ。
     """
     if not args.actor:
