@@ -7,6 +7,9 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
+#   sh .ccnavi/scripts/ccnavi-review.sh ready                                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外す）
+#   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
+#   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （ユーザが端末で打つ。chat のフェーズのレビュー済み）
 #   sh .ccnavi/scripts/ccnavi-review.sh config-synced <親>    （ユーザが端末で打つ。着手で上書きした設定を見た）
 #
@@ -66,7 +69,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
                                                   wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
                                                   差分に載せる）。相対パスは打った場所から。投稿が済むと、ユーザが打つ
                                                   crit review <パス> と crit push <番号> を出す
-  confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
+  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（依頼の時刻では絞らない）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で打つ。--preview は一覧を JSON で見るだけ）
   ready                                           閉じられ、wip を片付けて push 済みなら、閉じたチケットを logs/archive/ へ退避して削除を push し、Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
