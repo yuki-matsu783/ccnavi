@@ -73,6 +73,9 @@ SPLIT = {
     "directive": "%foo bar\n---\na: 1\n",
     "flow-colon": "{a:}\n",
     "flow-question": "[? ]\n",
+    "surrogate-escape": 'a: "\\uD800"\n',
+    "surrogate-escape-long": 'a: "\\U0000DC00"\n',
+    "surrogate-pair": 'a: "\\uD83D\\uDE00"\n',
 }
 
 
@@ -180,6 +183,30 @@ class FallbackTest(unittest.TestCase):
                 yaml.CSafeLoader = saved
             importlib.reload(yamlread)
         self.assertIs(yamlread.LOADER, saved or yaml.SafeLoader)
+
+    def test_unverified_libyaml_version(self):
+        """libyaml の版が見比べた版でなければ C を使わない。"""
+        if C_LOADER is None:
+            self.skipTest(NO_C)
+        from yaml import _yaml
+
+        saved = _yaml.get_version_string
+        try:
+            for version in ("0.2.4", "0.2.6", "0.3.0", "1.0.0"):
+                _yaml.get_version_string = lambda v=version: v
+                with self.subTest(version=version):
+                    reloaded = importlib.reload(yamlread)
+                    self.assertIs(reloaded.LOADER, yaml.SafeLoader)
+                    self.assertEqual(reloaded.safe_load(DOCS[1]), yaml.safe_load(DOCS[1]))
+            _yaml.get_version_string = saved
+            for version in yamlread.VERIFIED_LIBYAML:
+                _yaml.get_version_string = lambda v=version: v
+                with self.subTest(version=version):
+                    self.assertIs(importlib.reload(yamlread).LOADER, C_LOADER)
+        finally:
+            _yaml.get_version_string = saved
+            importlib.reload(yamlread)
+        self.assertIs(yamlread.LOADER, C_LOADER)
 
 
 class DeepNestingTest(unittest.TestCase):

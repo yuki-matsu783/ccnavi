@@ -15,6 +15,16 @@ hook はツール呼び出しのたびに走り、そのたびにチケットの
 PyYAML を libyaml 無しで入れた環境（wheel の無い機械など）では `CSafeLoader` が無い。
 そのときは `SafeLoader` に戻る。読める文書と組み立てる値は同じ。
 
+## libyaml の版が確かめた版でなければ純 Python で読む
+
+下の `_SPLIT` は、libyaml 0.2.5 と純 Python の読み手を見比べて拾った一覧である。libyaml の
+版が変わると、受け入れる書き方・断る書き方も変わりうる。一覧に無い食い違いが残ると、読めるはずの
+ルールが読めず deny が ask に落ちる、承認済みチケットの範囲の制限が消える、といった形で判定が
+変わる。そこで `yaml._yaml.get_version_string()` が見比べた版の集合（`VERIFIED_LIBYAML`）に
+入っていなければ、C を使わず `SafeLoader` に戻す。遅くはなるが判定は変わらない。版を足すときは、
+その版で見比べ直してから足す。版を大小で比べないのは、新しい版で食い違いが減るとも増えるとも
+限らないため。
+
 ## 入れ子が深い文書は純 Python で読む
 
 C の読み手は、ノードを組み立てる部分が C のスタックで再帰する。入れ子が数万段ある文書
@@ -40,12 +50,15 @@ libyaml と純 Python の読み手は、次の文書で読める・読めない�
 - 行頭の `%` で始まる知らない指示子（`%foo`）。純 Python は読み飛ばし、libyaml は断る
 - フローの中で `:` の直後に区切りが来る形（`{a:}`・`[a:]`）と、`?` 単体の明示のキー
   （`[? ]`）。純 Python は読み、libyaml は断る
+- ダブルクォートの中のサロゲートのエスケープ（`"\\uD800"`・`"\\U0000DC00"`。ペアの
+  `"\\uD83D\\uDE00"` も）。純 Python は読み、libyaml は `ScannerError` で断る。`\\u`・`\\U` の
+  エスケープはすべて純 Python に回す
 
 C を使うのは速さのためで、判定は変えない。そこで、文書にこれらの書き方があれば純 Python の
 読み手に回す（`_SPLIT`）。どれも文字を見るだけの粗い当て方で、分かれない文書も回すことがある
-（BOM は先頭のものも、`?` は文字列の中のものも回す）が、遅くなるだけで結果は変わらない。
-実際のルール・設定・チケットにはまず出ないので、速さはほぼ変わらない。この一覧は、ランダムに
-組んだ短い文書で二つの読み手を見比べて拾ったもの。
+（BOM は先頭のものも、`?` は文字列の中のものも、`\\u` はサロゲートでないものも回す）が、
+遅くなるだけで結果は変わらない。実際のルール・設定・チケットにはまず出ないので、速さはほぼ
+変わらない。この一覧は、ランダムに組んだ短い文書で二つの読み手を見比べて拾ったもの。
 
 ## 例外とメッセージ
 
@@ -68,8 +81,29 @@ import re
 
 import yaml
 
-# libyaml があれば C の読み手。無ければ純 Python の読み手。
-LOADER: type = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+# `_SPLIT` を見比べて拾った libyaml の版。これ以外の版では C を使わない（上の docstring）。
+VERIFIED_LIBYAML = frozenset({"0.2.5"})
+
+
+def _libyaml_version() -> str | None:
+    """libyaml の版（`"0.2.5"` など）。取れなければ None。"""
+    try:
+        from yaml import _yaml  # noqa: PLC0415  libyaml 無しの PyYAML には無い
+
+        return str(_yaml.get_version_string())
+    except (ImportError, AttributeError):  # 取れなければ版が分からないものとして扱う
+        return None
+
+
+def _pick_loader() -> type:
+    """libyaml があり、版が `VERIFIED_LIBYAML` に入っていれば C の読み手。それ以外は純 Python。"""
+    c_loader = getattr(yaml, "CSafeLoader", None)
+    if c_loader is None or _libyaml_version() not in VERIFIED_LIBYAML:
+        return yaml.SafeLoader
+    return c_loader
+
+
+LOADER: type = _pick_loader()
 
 # C の読み手で組み立ててよい入れ子の深さ。純 Python の読み手が `RecursionError` を出す深さ
 # （300 段から 500 段の間）より十分浅く、Windows の 1 MB のスタックでも余裕がある値にする。
@@ -83,6 +117,7 @@ _SPLIT = re.compile(
     r"|(?:\A|[\r\n\x85\u2028\u2029])%"  # 行頭の `%`（指示子）
     r"|:[,\]}]"  # `:` の直後のフローの区切り
     r"|\?(?=[\s,\]}]|\Z)"  # `?` 単体（明示のキー）
+    r"|\\[uU]"  # `\u`・`\U` のエスケープ（サロゲートを含みうる）
 )
 
 # 値を組み立てる途中に PyYAML が素のまま上げる例外。`LoadError` に包む。
