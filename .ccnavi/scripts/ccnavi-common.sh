@@ -437,7 +437,7 @@ ccnavi_branch_ok() {
 ccnavi_family_branch() {
 	if ccnavi_fbr_bin=$(ccnavi_bin "$1"); then
 		ccnavi_fbr_out=$("$ccnavi_fbr_bin" --root "$1" c1 family "$2" 2>/dev/null </dev/null) || ccnavi_fbr_out=""
-	elif [ -f "$1/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+	elif [ -f "$1/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
 		ccnavi_fbr_out=$(cd "$1" && uv run --quiet python -m ccnavi --root "$1" c1 family "$2" 2>/dev/null </dev/null) ||
 			ccnavi_fbr_out=""
 	else

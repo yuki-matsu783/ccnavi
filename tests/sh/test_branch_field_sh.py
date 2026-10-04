@@ -37,7 +37,7 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, common_path
+from tests import ROOT, SRC, common_path
 from tests.ticket.test_phases import PHASES, child_text, parent_text
 from tests.ticket.test_ticket import RULES
 
@@ -56,7 +56,7 @@ APPROVED = ".ccnavi/approved"
 TODO = "wip/proposals/todo"
 
 EXE = """#!/bin/sh
-PYTHONPATH='{root}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+PYTHONPATH='{src}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
 
@@ -119,7 +119,7 @@ class BranchFieldTest(unittest.TestCase):
         git(self.ws, "push", "-q", "-u", "origin", "main")
         git(self.ws, "remote", "set-head", "origin", "main")
         self.bin = os.path.join(base, "bin", "ccnavi")
-        write(self.bin, EXE.format(root=ROOT, python=sys.executable))
+        write(self.bin, EXE.format(src=SRC, python=sys.executable))
         os.chmod(self.bin, os.stat(self.bin).st_mode | stat.S_IXUSR | stat.S_IXGRP)
         self.state = os.path.join(self.ws, "logs", "state")
         self.record = os.path.join(self.state, "sync", "self", "families", PARENT)
