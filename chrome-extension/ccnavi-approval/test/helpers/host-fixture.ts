@@ -28,11 +28,18 @@ export interface Scene {
   readonly files: Record<string, unknown>;
 }
 
+/** レビューの場面。取り下げの見本（`scene.json` の `kind` が `withdraw`）は `withdraw-fixture.ts` が読む */
 export function sceneNames(): string[] {
   return fs
     .readdirSync(SCENES)
-    .filter((n) => fs.statSync(path.join(SCENES, n)).isDirectory())
+    .filter((n) => fs.statSync(path.join(SCENES, n)).isDirectory() && sceneKind(SCENES, n) !== "withdraw")
     .sort();
+}
+
+/** 場面の種類（`scene.json` の `kind`。レビューの場面は持たない） */
+export function sceneKind(dir: string, name: string): string {
+  const meta = JSON.parse(fs.readFileSync(path.join(dir, name, "scene.json"), "utf8")) as { kind?: unknown };
+  return typeof meta.kind === "string" ? meta.kind : "";
 }
 
 export function loadScene(name: string): Scene {

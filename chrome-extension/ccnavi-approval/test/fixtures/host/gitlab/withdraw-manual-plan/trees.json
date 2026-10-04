@@ -1,0 +1,38 @@
+{
+  "1b4c4d5363153399a904005d1c13e1aaf943812c:.ccnavi/approved/doing": null,
+  "1b4c4d5363153399a904005d1c13e1aaf943812c:wip/proposals/todo": null,
+  "1b4c4d5363153399a904005d1c13e1aaf943812c:.ccnavi/approved/phases/i0001": null,
+  "92c6cc1ac11c6ef1f04dc1288e7435f6e7e2bdcb:.ccnavi/approved/doing": null,
+  "92c6cc1ac11c6ef1f04dc1288e7435f6e7e2bdcb:wip/proposals/todo": [
+    {
+      "id": "c21187351187aea6ece188a35200843923e063b7",
+      "name": "i0001.md",
+      "type": "blob",
+      "path": "wip/proposals/todo/i0001.md",
+      "mode": "100644"
+    }
+  ],
+  "92c6cc1ac11c6ef1f04dc1288e7435f6e7e2bdcb:.ccnavi/approved/phases/i0001": null,
+  "f02d81311799553e76a123df663d53cef9d21f87:.ccnavi/approved/doing": [
+    {
+      "id": "c21187351187aea6ece188a35200843923e063b7",
+      "name": "i0001.md",
+      "type": "blob",
+      "path": ".ccnavi/approved/doing/i0001.md",
+      "mode": "100644"
+    }
+  ],
+  "f02d81311799553e76a123df663d53cef9d21f87:wip/proposals/todo": null,
+  "f02d81311799553e76a123df663d53cef9d21f87:.ccnavi/approved/phases/i0001": null,
+  "9e9d529d316a8d5a4879e9b7a72ca0f24c749151:.ccnavi/approved/doing": [
+    {
+      "id": "c21187351187aea6ece188a35200843923e063b7",
+      "name": "i0001.md",
+      "type": "blob",
+      "path": ".ccnavi/approved/doing/i0001.md",
+      "mode": "100644"
+    }
+  ],
+  "9e9d529d316a8d5a4879e9b7a72ca0f24c749151:wip/proposals/todo": null,
+  "9e9d529d316a8d5a4879e9b7a72ca0f24c749151:.ccnavi/approved/phases/i0001": null
+}

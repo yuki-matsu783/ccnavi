@@ -1,0 +1,68 @@
+[
+  {
+    "id": "96b345d3020672a9eebe7a14eee33a21189d939c",
+    "short_id": "96b345d3",
+    "created_at": "2026-09-29T03:00:00.000+00:00",
+    "parent_ids": [
+      "e58173f11e7cd5af72afc83589c8ebe8689bd2fe"
+    ],
+    "title": "README を直す",
+    "message": "README を直す\n",
+    "author_name": "Hana Sato",
+    "author_email": "hana@example.com",
+    "authored_date": "2026-09-29T03:00:00.000+00:00",
+    "committer_name": "Hana Sato",
+    "committer_email": "hana@example.com",
+    "committed_date": "2026-09-29T03:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/widgets/-/commit/96b345d3020672a9eebe7a14eee33a21189d939c"
+  },
+  {
+    "id": "e58173f11e7cd5af72afc83589c8ebe8689bd2fe",
+    "short_id": "e58173f1",
+    "created_at": "2026-09-29T03:00:00.000+00:00",
+    "parent_ids": [
+      "b31bbf4a1878ce9528e1ead5ee3aa76c41de310d"
+    ],
+    "title": "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）",
+    "message": "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）\n",
+    "author_name": "Hana Sato",
+    "author_email": "hana@example.com",
+    "authored_date": "2026-09-29T03:00:00.000+00:00",
+    "committer_name": "Hana Sato",
+    "committer_email": "hana@example.com",
+    "committed_date": "2026-09-29T03:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/widgets/-/commit/e58173f11e7cd5af72afc83589c8ebe8689bd2fe"
+  },
+  {
+    "id": "b31bbf4a1878ce9528e1ead5ee3aa76c41de310d",
+    "short_id": "b31bbf4a",
+    "created_at": "2026-09-29T03:00:00.000+00:00",
+    "parent_ids": [
+      "d67a823722af28c6620b3a8f87d75adca8c1f878"
+    ],
+    "title": "i0001 を提案する",
+    "message": "i0001 を提案する\n",
+    "author_name": "Hana Sato",
+    "author_email": "hana@example.com",
+    "authored_date": "2026-09-29T03:00:00.000+00:00",
+    "committer_name": "Hana Sato",
+    "committer_email": "hana@example.com",
+    "committed_date": "2026-09-29T03:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/widgets/-/commit/b31bbf4a1878ce9528e1ead5ee3aa76c41de310d"
+  },
+  {
+    "id": "d67a823722af28c6620b3a8f87d75adca8c1f878",
+    "short_id": "d67a8237",
+    "created_at": "2026-09-29T03:00:00.000+00:00",
+    "parent_ids": [],
+    "title": "最初のコミット",
+    "message": "最初のコミット\n",
+    "author_name": "Hana Sato",
+    "author_email": "hana@example.com",
+    "authored_date": "2026-09-29T03:00:00.000+00:00",
+    "committer_name": "Hana Sato",
+    "committer_email": "hana@example.com",
+    "committed_date": "2026-09-29T03:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/widgets/-/commit/d67a823722af28c6620b3a8f87d75adca8c1f878"
+  }
+]
