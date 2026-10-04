@@ -28,6 +28,7 @@ x のチケットが判定に使われなくなる。候補のうち最も長く
 from __future__ import annotations
 
 import os
+import unicodedata
 from dataclasses import dataclass
 
 # ワークツリーの置き場。CLAUDE.md の運用と対になる。ワークスペースルートの中に置くのは、
@@ -110,7 +111,7 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
         owner = owner_of(candidate, owners)
         if owner is not None:
             found.append(
-                Tree(name, _canonical(candidate), project=owner.project, kind=KIND_WORKTREE)
+                Tree(nfc(name), _canonical(candidate), project=owner.project, kind=KIND_WORKTREE)
             )
     return found
 
@@ -280,9 +281,18 @@ def exact_name(root: str, name: str) -> bool:
     開けてしまう。名前が識別子だと言う以上、綴りまで同じであることを求める。
     """
     try:
-        return name in os.listdir(os.path.join(root, WORKTREES_DIR))
+        return nfc(name) in {nfc(n) for n in os.listdir(os.path.join(root, WORKTREES_DIR))}
     except OSError:
         return False
+
+
+def nfc(name: str) -> str:
+    """ディレクトリの名前を NFC にそろえる（ADR-0100）。
+
+    識別子は NFC に限る。macOS の HFS+ は名前を NFD で返すので、日本語の識別子のワークツリーを
+    識別子と同じ綴りとして引くためにそろえる（APFS と Windows・Linux は書いた綴りのまま返す）。
+    """
+    return unicodedata.normalize("NFC", name)
 
 
 # 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、ワークツリーの

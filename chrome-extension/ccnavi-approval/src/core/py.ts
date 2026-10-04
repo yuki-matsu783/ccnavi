@@ -204,7 +204,7 @@ export const py = {
     call: PyCall,
     body: { settings: string | null; snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
-  start: (call: PyCall, body: { settings: string | null; snapshot: Snapshot; issue: number; taken: readonly string[] }) =>
+  start: (call: PyCall, body: { settings: string | null; snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),
   confirm: (
     call: PyCall,

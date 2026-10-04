@@ -1058,12 +1058,12 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 ```yaml
 ---
 version: 1
-ticket: i0050-03
+ticket: feature-50-settings-split-03
 issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
 project: lib             # 置き場と同じ名前。省ける（決めるのは置き場。11）
-parent: i0050            # 子だけ
+parent: feature-50-settings-split  # 子だけ
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり。0 以上の整数。計画があれば 1 から
-predecessors: [i0050-01] # 子だけ。先に閉じているべき子。承認と着手で求める（ADR-0088）
+predecessors: [feature-50-settings-split-01] # 子だけ。先に閉じているべき子。承認と着手で求める（ADR-0088）
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
@@ -1087,8 +1087,15 @@ base_sha: ""
 ```
 
 - ファイル名（拡張子を除く）と `ticket:` は一致すること
-- 識別子は、親が `[A-Za-z0-9][A-Za-z0-9._-]*` の 1 語、子が `<親>-<2 桁連番>`。親の識別子が
-  名前空間になり、別の親の子と衝突しない。深さは 2 段まで
+- 識別子は、親が 1 語、子が `<親>-<2 桁連番>`。親の識別子が名前空間になり、別の親の子と衝突しない。
+  深さは 2 段まで。字は ASCII の英数字と `.` `_` `-`、ひらがな・カタカナ・長音記号・CJK 統合漢字・々（先頭は
+  ASCII の英数字）。NFC に限り、64 文字まで（ADR-0100）
+- 新しい親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、`feature-64-統合先の解決`）。
+  先頭の語は `CCNAVI_BRANCH_PREFIXES` の並び（既定は `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs`）の
+  どれか。番号は `issue:` があれば issue の番号、無ければ通し番号（番号を持つ親の識別子の最大 + 1）。プロジェクトの
+  issue なら slug の頭を `<プロジェクト名>-` にする。形に合わない新規の提案、issue と番号の食い違い、同じリポジトリの
+  番号の重なり、48 文字を超える長さ、既にあるブランチと同じ名前は `--lint` の warn（承認は止めない）。前の形
+  （`i0055` など）の承認済みチケットはそのまま読む
 - ワークツリーの名前は識別子と同じ
 - 子は親の部分集合。子の `allow` と `ask` が指す場所は親の `allow` か `ask` の中になければならない。
   部分集合かは、子の項の字義どおりの前置に 1 文字足した綴りを親に当てて決める。子に `regex` は書けない

@@ -5,7 +5,7 @@
  * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ家族・承認待ち・指紋を出す（読み取りの一致）
  * - GitLab への書き込みは Commits API の 1 コミット。事後確認（8.4 の 1 段目）: 書いたコミットの親が読んだ先頭と
  *   違えば、直前の姿で判定し直し、同じなら残し、違えば打ち消して読み直す。打ち消しも収まらなければユーザに回す
- * - 「始める」（8.6）: issue から `i<番号>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
+ * - 「始める」（8.6）: issue から `feature-<番号>-<slug>` のブランチを統合先の先頭に作る（ADR-0100）。閉じた識別子・既にある名前は拒否
  * - プロジェクトのリポジトリ（3.3 の 7）: ワークスペースの統合先の共通層で判定し、プロジェクトの親のブランチへ書く
  * - PAT は画面に渡らない。GitLab のスレッドの本文は承認の画面と同じ規則で描く
  */
@@ -236,12 +236,16 @@ test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変�
   assert.equal(late.files("i0001")[DOING], "後から変えた\n");
 });
 
-test("CX-T150 「始める」: issue から i<番号> のブランチを統合先の先頭に作る（GitHub と GitLab）。閉じた識別子・既にある名前は作らない", async () => {
+test("CX-T150 「始める」: issue から feature-<番号>-<slug> のブランチを統合先の先頭に作る（GitHub と GitLab）。閉じた識別子・既にある名前は作らない", async () => {
   for (const [mock, repo, host] of [
     [new MockGitHub(fixture()), GH_REPO, "github.com"],
     [new MockGitLab(fixture()), GITLAB_REPO, "gitlab.com"],
   ] as const) {
-    mock.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた家族と重なる" }, { number: 1, title: "開いた家族と重なる" }, { number: 30, title: "PR", pull: true });
+    mock.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "Closed" }, { number: 1, title: "open" }, { number: 30, title: "PR", pull: true });
+    // 閉じた家族（feature-5-closed）と既にあるブランチ（feature-1-open）を統合先に足す（ADR-0100）
+    const closedText = mock.files("main")[".ccnavi/approved/done/i0005.md"].replaceAll("i0005", "feature-5-closed");
+    mock.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "閉じた家族");
+    mock.branch("feature-1-open", "main");
     const d = glDeps(mock, host);
     const list = await listIssues(repo, d);
     assert.deepEqual(
@@ -251,18 +255,18 @@ test("CX-T150 「始める」: issue から i<番号> のブランチを統合�
     );
     const b = await collectRepo(repo, d);
     const taken = [...b.candidates, ...b.families.map((f) => f.family.name)];
-    const out = await startIssue(repo, 12, b.seen ?? null, taken, d);
-    assert.deepEqual(out, { kind: "started", name: "i0012", head: mock.head("main") }, host);
-    assert.deepEqual(mock.createdBranches, [{ name: "i0012", sha: mock.head("main") }]);
-    const closed = await startIssue(repo, 5, b.seen ?? null, taken, d);
+    const out = await startIssue(repo, list[0], b.seen ?? null, taken, d);
+    assert.deepEqual(out, { kind: "started", name: "feature-12-新しい機能", head: mock.head("main") }, host);
+    assert.deepEqual(mock.createdBranches, [{ name: "feature-12-新しい機能", sha: mock.head("main") }]);
+    const closed = await startIssue(repo, { number: 5, title: "Closed" }, b.seen ?? null, taken, d);
     assert.equal(closed.kind, "refused", host);
-    assert.match(closed.kind === "refused" ? closed.message : "", /i0005 は統合先 main の done\/ で閉じている[\s\S]*フォールバック/);
-    const open = await startIssue(repo, 1, b.seen ?? null, taken, d);
-    assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にある（i0001）/);
-    const again = await startIssue(repo, 12, b.seen ?? null, taken, d);
+    assert.match(closed.kind === "refused" ? closed.message : "", /feature-5-closed は統合先 main の done\/ で閉じている[\s\S]*フォールバック/);
+    const open = await startIssue(repo, { number: 1, title: "OPEN" }, b.seen ?? null, taken, d);
+    assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にある（feature-1-open）/);
+    const again = await startIssue(repo, list[0], b.seen ?? null, taken, d);
     assert.equal(again.kind, "refused", host);
     // 全部のブランチの名前を大文字小文字をそろえて比べる（直近 N 日の外のブランチも。11.9.1 の 7）
-    assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にある（i0012）/);
+    assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にある（feature-12-新しい機能）/);
     assert.equal(mock.createdBranches.length, 1, host);
   }
 });
@@ -273,12 +277,17 @@ test("CX-T151 service worker の「始める」の守り: ボードからだけ�
   const head = mock.head("main");
   const ask = (args: unknown[], sender = BOARD) => dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args }, sender, d);
   const refused: [unknown[], typeof BOARD, RegExp][] = [
-    [["acme", "widgets", "i0012", head], OPTIONS, /ボードからだけ/],
-    [["acme", "other", "i0012", head], BOARD, /登録していない/],
+    [["acme", "widgets", "feature-12-x", head], OPTIONS, /ボードからだけ/],
+    [["acme", "other", "feature-12-x", head], BOARD, /登録していない/],
     [["acme", "widgets", "main", head], BOARD, /issue から作る/],
-    [["acme", "widgets", "i12", head], BOARD, /issue から作る/],
-    [["acme", "widgets", "web-i0012", head], BOARD, /issue から作る/],
-    [["acme", "widgets", "i0012", "f".repeat(40)], BOARD, /先頭が、ボードで読んだときから動いている/],
+    [["acme", "widgets", "i0012", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "feature-012-x", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "release-12-x", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "feature-12-x-01", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "feature-12-ＡＢ", head], BOARD, /issue から作る/],
+    [["acme", "widgets", "feature-12-か\u3099", head], BOARD, /issue から作る/],
+    [["acme", "widgets", `feature-12-${"a".repeat(60)}`, head], BOARD, /issue から作る/],
+    [["acme", "widgets", "feature-12-x", "f".repeat(40)], BOARD, /先頭が、ボードで読んだときから動いている/],
   ];
   for (const [args, sender, why] of refused) {
     const res = await ask(args, sender);
@@ -286,15 +295,15 @@ test("CX-T151 service worker の「始める」の守り: ボードからだけ�
     assert.match((res as { error: string }).error, why);
   }
   assert.equal(mock.createdBranches.length, 0);
-  const made = await ask(["acme", "widgets", "i0012", head]);
+  const made = await ask(["acme", "widgets", "feature-12-統合先の解決", head]);
   assert.ok(made.ok, JSON.stringify(made));
   const issues = await dispatch({ kind: "host", host: "gitlab.com", op: "issues", args: ["acme", "other"] }, BOARD, d);
   assert.match((issues as { error: string }).error, /登録していない/);
-  // プロジェクトのリポジトリは `<名前>-i<番号>` だけ
+  // プロジェクトのリポジトリは slug の頭が `<名前>-` のものだけ
   const project: RepoConfig = { ...GITLAB_REPO, project: "web", workspace: "github.com/acme/widgets" };
   const pd: Deps = deps(mock, TOKENS, new Map(), () => new Date(NOW), [project]);
-  const bad = await dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args: ["acme", "widgets", "i0013", head] }, BOARD, pd);
-  assert.match((bad as { error: string }).error, /web-i<番号>/);
+  const bad = await dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args: ["acme", "widgets", "feature-13-login", head] }, BOARD, pd);
+  assert.match((bad as { error: string }).error, /<先頭の語>-<番号>-web-<slug>/);
   assert.ok(!JSON.stringify([made, issues, bad]).includes(TOKEN));
 });
 
@@ -418,7 +427,7 @@ test("CX-T155 GitLab・プロジェクト・「始める」で Python に投げ�
   const starter = new MockGitLab(fixture());
   const sd = glDeps(starter, "gitlab.com", undefined, spy);
   const sb = await collectRepo(GITLAB_REPO, sd);
-  assert.equal((await startIssue(GITLAB_REPO, 12, sb.seen ?? null, [], sd)).kind, "started");
+  assert.equal((await startIssue(GITLAB_REPO, { number: 12, title: "新しい機能" }, sb.seen ?? null, [], sd)).kind, "started");
   const ops = new Set(log.map((l) => l.req.op));
   for (const op of ["board", "plan", "confirm", "start"]) assert.ok(ops.has(op), op);
   for (const { req, res } of log) {

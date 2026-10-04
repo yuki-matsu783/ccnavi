@@ -643,8 +643,11 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             closed,
             review,
             conf.integration_branch or settings.integration_recorded(conf.state),
+            conf.branch_prefixes,
         )
     )
+    problems.extend(_prefix_setting_problems(conf))
+    problems.extend(_existing_branch_problems(root, conf, proposals, copies, closed, review))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -892,7 +895,12 @@ def _proposal_problems(
 
 
 def _branch_name_problems(
-    proposals: list, copies: list, closed: list, review: list, integration: str = ""
+    proposals: list,
+    copies: list,
+    closed: list,
+    review: list,
+    integration: str = "",
+    prefixes=settings.DEFAULT_BRANCH_PREFIXES,
 ) -> list[Problem]:
     """識別子を親のブランチ名にできるか（ADR-0093 の 3.1。段階 0 なので warn だけ）。
 
@@ -911,13 +919,17 @@ def _branch_name_problems(
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
     settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
+    serial = ticket_mod.next_serial([t.ticket for t in everyone], prefixes)
     said: set[str] = set()
+    fresh: list = []
     for t in proposals:
         if t.state != ticket_mod.TODO or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
-        for text in ticket_mod.branch_name_problems(t, integration):
+        fresh.append(t)
+        for text in ticket_mod.branch_name_problems(t, integration, serial, prefixes):
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（ADR-0093）"))
+    problems.extend(_number_problems(everyone, fresh, prefixes, serial))
 
     spellings: dict[str, set[str]] = {}
     for t in everyone:
@@ -950,6 +962,74 @@ def _branch_name_problems(
             )
         )
     return problems
+
+
+def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list[Problem]:
+    """新規の提案の親の識別子の番号が、同じリポジトリの別の親と重なるか（ADR-0100。warn）。
+
+    番号は issue の番号か ccnavi の通し番号で、両方が同じ数になりうる。issue の番号はリポジトリ
+    ごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。前の形（`i0055`）の番号も数える。
+    """
+    problems: list[Problem] = []
+    owners: dict[tuple[str, int], set[str]] = {}
+    for t in everyone:
+        if t.is_child:
+            continue
+        number = ticket_mod.identifier_number(t.ticket, prefixes)
+        if number is not None:
+            owners.setdefault((t.project, number), set()).add(t.ticket)
+    for t in fresh:
+        if t.is_child:
+            continue
+        number = ticket_mod.identifier_number(t.ticket, prefixes)
+        if number is None:
+            continue
+        others = sorted(owners.get((t.project, number), set()) - {t.ticket})
+        if others:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket}: 識別子の番号 {number} が {', '.join(others)} と重なる。"
+                    "issue の番号と通し番号が同じ数になっていないか確かめる"
+                    f"（issue が無いなら次の通し番号は {serial}。ADR-0100）",
+                )
+            )
+    return problems
+
+
+def _prefix_setting_problems(conf: settings.Settings) -> list[Problem]:
+    """`CCNAVI_BRANCH_PREFIXES` に書かれた、先頭の語に使えない語（ADR-0100。warn）。"""
+    if not conf.branch_prefixes_rejected:
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            "(settings)",
+            f"{settings.BRANCH_PREFIXES_ENV} の {', '.join(conf.branch_prefixes_rejected)} は"
+            "先頭の語に使えないので読まない（英小文字で始まる英小文字と数字。main・master・"
+            "develop・release は使えない）。"
+            f"使う並びは {', '.join(conf.branch_prefixes)}（ADR-0100）",
+        )
+    ]
+
+
+def _existing_branch_problems(
+    root: str, conf: settings.Settings, proposals: list, copies: list, closed: list, review: list
+) -> list[Problem]:
+    """新規の提案（親）のブランチ名が、そのリポジトリの手元か origin に既にあるか（warn）。
+
+    ADR-0100。
+
+    親のブランチ名は識別子そのもの。既にあるブランチと同じ名前で承認すると、別の作業のブランチを
+    親のブランチとして取り込み・送ることになる。止めはせず、承認の前に名指しする。
+    提案がそのブランチの上で書かれている（`.claude/worktrees/<識別子>` がそのブランチを
+    チェックアウトしていて、提案がその中にある）ときは、そのブランチが親のブランチなので言わない。
+    """
+    return [
+        Problem(SEVERITY_WARN, "(ticket)", text)
+        for text in agree.existing_branch_warnings(root, conf, proposals, copies, closed, review)
+    ]
 
 
 def _worktree_problems(

@@ -28,7 +28,7 @@ import os
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, gitstate, settings, tree
 from ..policy import rules
 from . import approval, history, phase, phasetypes, syncstate, workflow
 from . import ticket as ticket_mod
@@ -1444,3 +1444,46 @@ def validate(
             seen.add(p.detail)
             distinct.append(p)
     return problems, distinct
+
+
+def existing_branch_warnings(
+    root: str, conf: settings.Settings, proposals: list, copies: list, closed: list, review: list
+) -> list[str]:
+    """新規の提案（親）の親のブランチ名が、手元か origin に既にあるときの文（ADR-0100）。
+
+    `--lint` と `--agree --preview --verify` が warn として出す。承認は止めない。
+    提案がそのブランチの上で書かれている（`.claude/worktrees/<識別子>` がそのブランチを
+    チェックアウトしていて、提案がその中にある）ときは、そのブランチが親のブランチなので言わない。
+    """
+    settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
+    found: list[str] = []
+    cache: dict[str, set[str]] = {}
+    said: set[str] = set()
+    for t in proposals:
+        if t.state != ticket_mod.TODO or t.is_child or t.ticket in settled or t.ticket in said:
+            continue
+        said.add(t.ticket)
+        if _written_on_own_branch(root, conf, t):
+            continue
+        repo = tree.project_root(conf.projects, t.project) if t.project else root
+        if repo not in cache:
+            cache[repo] = gitstate.branch_names(repo)
+        folded = t.ticket.casefold()
+        hits = sorted(n for n in cache[repo] if n.casefold() == folded)
+        if hits:
+            found.append(
+                f"{t.ticket}: 親のブランチ名と同じブランチ（{', '.join(hits)}）が既にある。"
+                "承認すると、そのブランチを親のブランチとして取り込み・送る。"
+                "別の作業なら識別子を変える（ADR-0100）"
+            )
+    return found
+
+
+def _written_on_own_branch(root: str, conf: settings.Settings, t) -> bool:
+    """提案が、自分の識別子の名前のワークツリーの中にあり、そのワークツリーが同じ名前のブランチの上か。"""
+    if not t.path:
+        return False
+    here = tree.tree_of(root, t.path, conf.projects)
+    if here is None or here.is_main or here.name != t.ticket:
+        return False
+    return tree.branch_of(here.root) == t.ticket

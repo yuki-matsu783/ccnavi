@@ -1,0 +1,94 @@
+"""sh の識別子の検査（`ccnavi-common.sh` の `ccnavi_is_ident`。ADR-0100）。
+
+日本語の識別子を通し、パスやシェルで意味を持つ綴り（`/`・`..`・先頭の `-`・空白・制御文字・
+記号）を止める。ロケール（C・C.UTF-8）とシェル（sh・bash）を変えても答えが同じこと、
+前の形（`i0055-01`）も通ることを見る。字の種類（全角記号・NFD）は実行ファイルが止めるので、
+ここでは ASCII の外のバイトは通す（`ticket.id_problem` と並べて見る）。
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import unicodedata
+import unittest
+
+from ccnavi.tickets import ticket as ticket_mod
+from tests import ROOT
+
+COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
+SHELLS = [s for s in (shutil.which("sh"), shutil.which("bash")) if s]
+
+GOOD = [
+    "feature-64-統合先の解決",
+    "hotfix-7-ログイン画面ー",
+    "i0055",
+    "i0055-01",
+    "a",
+    "fix-1-a.b_c",
+]
+BAD = [
+    "",
+    "-x",
+    ".x",
+    "a/b",
+    "a..b",
+    "a b",
+    "a\tb",
+    "a\nb",
+    "ab\n",
+    "a$b",
+    "a;b",
+    "a`b",
+    "a'b",
+    'a"b',
+    "a\\b",
+    "a*b",
+    "a?b",
+    "a|b",
+    "a&b",
+    "a(b",
+    "a:b",
+    "a~b",
+    "a\x7fb",
+    "a\x01b",
+    "統合",
+]
+
+
+def is_ident(shell, value, locale):
+    env = {**os.environ, "LC_ALL": locale}
+    done = subprocess.run(
+        [shell, "-c", '. "$1"; ccnavi_is_ident "$2"', "x", COMMON, value],
+        env=env,
+        capture_output=True,
+    )
+    return done.returncode == 0
+
+
+@unittest.skipUnless(SHELLS, "sh が無い")
+class IsIdentTest(unittest.TestCase):
+    def test_the_answers(self):
+        for shell in SHELLS:
+            for locale in ("C", "C.UTF-8"):
+                for value in GOOD:
+                    with self.subTest(shell=shell, locale=locale, value=value):
+                        self.assertTrue(is_ident(shell, value, locale))
+                for value in BAD:
+                    with self.subTest(shell=shell, locale=locale, value=value):
+                        self.assertFalse(is_ident(shell, value, locale))
+
+    def test_what_sh_lets_through_the_executable_checks(self):
+        """sh は ASCII の外のバイトを通す。字の種類は実行ファイルが止める（2 段目の守り）。"""
+        for value in ("feature-1-ＡＢ", unicodedata.normalize("NFD", "feature-1-が")):
+            with self.subTest(value=value):
+                self.assertTrue(is_ident(SHELLS[0], value, "C"))
+                self.assertFalse(ticket_mod.is_valid_id(value))
+        for value in GOOD:
+            with self.subTest(value=value):
+                self.assertTrue(ticket_mod.is_valid_id(value))
+
+
+if __name__ == "__main__":
+    unittest.main()

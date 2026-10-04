@@ -333,20 +333,22 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   await page.close();
 });
 
-test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（i<番号>）の親のブランチを統合先の先頭に作る。閉じた識別子の issue は作らない", async () => {
-  lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "閉じた家族と重なる" });
+test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（feature-<番号>-<slug>）の親のブランチを統合先の先頭に作る。閉じた識別子の issue は作らない", async () => {
+  lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "Closed" });
+  const closedText = lab.files("main")[".ccnavi/approved/done/i0005.md"].replaceAll("i0005", "feature-5-closed");
+  lab.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "閉じた家族");
   const page = await openBoard();
   await page.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await page.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="12"]`);
   const said = await press(page, `${GL_REPO} [data-testid=start] li[data-issue="12"] button[data-action=start]`);
-  assert.match(said, /^written: 親のブランチ i0012 を作った/);
-  assert.deepEqual(lab.createdBranches, [{ name: "i0012", sha: lab.head("main") }]);
+  assert.match(said, /^written: 親のブランチ feature-12-新しい機能 を作った/);
+  assert.deepEqual(lab.createdBranches, [{ name: "feature-12-新しい機能", sha: lab.head("main") }]);
   await page.close();
   const again = await openBoard();
   await again.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await again.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="5"]`);
   const refused = await press(again, `${GL_REPO} [data-testid=start] li[data-issue="5"] button[data-action=start]`);
-  assert.match(refused, /^refused: 始めなかった: i0005 は統合先 main の done\/ で閉じている/);
+  assert.match(refused, /^refused: 始めなかった: feature-5-closed は統合先 main の done\/ で閉じている/);
   assert.equal(lab.createdBranches.length, 1);
   assert.ok(!(await again.content()).includes(TOKEN));
   await again.close();

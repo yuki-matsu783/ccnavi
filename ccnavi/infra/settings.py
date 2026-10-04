@@ -106,6 +106,17 @@ DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 INTEGRATION_ENV = "CCNAVI_INTEGRATION_BRANCH"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
 LOCAL_CLAUDE_SETTINGS = os.path.join(".claude", "settings.local.json")
+# 共有の設定。`env` に書いた値は、Claude Code が起こしたプロセスに渡る。
+SHARED_CLAUDE_SETTINGS = os.path.join(".claude", "settings.json")
+# BRANCH_PREFIXES_ENV は親の識別子の先頭の語の並び（ADR-0100）。カンマか空白で区切る
+# （`feature,hotfix,fix`）。無ければ DEFAULT_BRANCH_PREFIXES。ユーザがファイルを書かなくても
+# 既定の並びで足り、並びを変えたい人だけが settings.json（か settings.local.json）の `env` に書く。
+BRANCH_PREFIXES_ENV = "CCNAVI_BRANCH_PREFIXES"
+# 既定の先頭の語。`release` は統合先や保護されたブランチの名前（`release-*`）に当たるので入れない。
+DEFAULT_BRANCH_PREFIXES = ("feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs")
+# 先頭の語に使えない名前（`ticket.RESERVED_BRANCH_IDS` と同じ並び）。
+_RESERVED_PREFIXES = ("main", "master", "develop", "release")
+_PREFIX = re.compile(r"^[a-z][a-z0-9]*\Z")
 
 # own_project は ccnavi 自身のソースツリーを見分ける目印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -374,6 +385,10 @@ class Settings:
     # 共通層の種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
     # 編集中の層の種類を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
+    # branch_prefixes は親の識別子の先頭の語の並び（ADR-0100。`branch_prefixes`）。
+    # branch_prefixes_rejected は環境変数に書かれていたが使えない語（lint が warn で名指しする）。
+    branch_prefixes: tuple = DEFAULT_BRANCH_PREFIXES
+    branch_prefixes_rejected: tuple = ()
     # integration_branch は統合先の名前（ADR-0093 の D30）。環境変数からは読まず、
     # `--integration-branch` で渡されたときだけ入る。いまは識別子の予約（3.1 の 5）の検査が読む。
     integration_branch: str = ""
@@ -444,6 +459,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     for name, env, read, accepts_empty in overrides:
         if env in os.environ and (accepts_empty or os.environ[env]):
             setattr(settings, name, read(root, os.environ[env]))
+    settings.branch_prefixes, settings.branch_prefixes_rejected = branch_prefixes(root)
 
     if not own_source_tree(root):
         return settings, []
@@ -639,3 +655,45 @@ def integration_recorded(state: str) -> str:
     except (OSError, UnicodeDecodeError):
         return ""
     return ""
+
+
+def is_branch_prefix(word: str) -> bool:
+    """親の識別子の先頭の語に使える形か（英小文字で始まる英小文字と数字。予約の名前でない）。"""
+    return bool(_PREFIX.match(word or "")) and word not in _RESERVED_PREFIXES
+
+
+def parse_branch_prefixes(text: str) -> tuple[tuple, tuple]:
+    """先頭の語の並びを読む。答えは（使う並び, 使えない語）。使える語が無ければ既定の並び。"""
+    words: list[str] = []
+    rejected: list[str] = []
+    for word in re.split(r"[\s,]+", text or ""):
+        if not word:
+            continue
+        if is_branch_prefix(word):
+            if word not in words:
+                words.append(word)
+        else:
+            rejected.append(word)
+    return (tuple(words) or DEFAULT_BRANCH_PREFIXES), tuple(rejected)
+
+
+def branch_prefixes(root: str) -> tuple[tuple, tuple]:
+    """親の識別子の先頭の語の並び（ADR-0100）。答えは（使う並び, 使えない語）。
+
+    環境変数 `CCNAVI_BRANCH_PREFIXES` を先に見る（Claude Code が settings.json の `env` を渡す）。
+    無ければ、ユーザが端末で打つときのために `.claude/settings.local.json`、`.claude/settings.json`
+    の `env` の順に読む。どこにも無ければ既定の並び。
+    """
+    if BRANCH_PREFIXES_ENV in os.environ:
+        return parse_branch_prefixes(os.environ[BRANCH_PREFIXES_ENV])
+    for rel in (LOCAL_CLAUDE_SETTINGS, SHARED_CLAUDE_SETTINGS):
+        try:
+            with open(os.path.join(root, rel), encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        env = data.get("env") if isinstance(data, dict) else None
+        value = env.get(BRANCH_PREFIXES_ENV) if isinstance(env, dict) else None
+        if isinstance(value, str):
+            return parse_branch_prefixes(value)
+    return DEFAULT_BRANCH_PREFIXES, ()

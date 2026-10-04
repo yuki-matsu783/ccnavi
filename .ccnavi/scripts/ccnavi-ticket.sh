@@ -125,12 +125,10 @@ start | finish | cancel)
 		*) [ -n "$c1_id" ] || c1_id="$c1_arg" ;;
 		esac
 	done
-	case "$c1_id" in
-	'' | *..* | */* | *[!A-Za-z0-9._-]*)
+	if ! ccnavi_is_ident "$c1_id"; then
 		printf 'ccnavi-ticket: %s には識別子が要る（%s は識別子の形ではない）。\n' "$1" "${c1_id:-（無い）}" >&2
 		exit 2
-		;;
-	esac
+	fi
 	ccnavi_c1_family "$c1_id"
 	case "$ccnavi_c1_target" in
 	stop)
