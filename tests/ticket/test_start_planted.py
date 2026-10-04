@@ -1,10 +1,10 @@
 """手で動かした承認に仕込まれた着手の欄。
 
 承認はチケットの中身を変えないので、提案の段階で書いた `base_sha`・`started_at` は手で動かした
-承認ではそのまま承認済みチケットに入る。`ticket start` は、既にある `base_sha` がワークツリーの
-HEAD の祖先でなければ止める。`--lint` は、着手の欄があるのに状態の履歴に `started` の行が無いものを
-warn にする。着手済みで `base_sha` がワークツリーの HEAD の祖先でないものも warn にする
-（どちらも判定には入れない）。
+承認ではそのまま承認済みチケットに入る。`--lint` は、着手の欄があるのに状態の履歴に `started` の行が
+無いものと、着手済みで `base_sha` がワークツリーの HEAD の祖先でないものを warn にする。`start` では
+止めない（両方仕込めば「着手済み」で先に返り、`base_sha` だけなら判定が `blocked` で止め、`start` は
+基準点を HEAD で書き直す）。判定にも入れない。
 """
 
 from __future__ import annotations
@@ -17,36 +17,6 @@ from tests.ticket.test_ticket import git, write
 
 
 class PlantedBaseTest(PhaseHarness):
-    def plant(self, path, fields):
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        for key, value in fields.items():
-            text = text.replace(f'{key}: ""', f'{key}: "{value}"', 1)
-        write(path, text)
-
-    def test_a_base_sha_off_the_worktree_history_stops_start(self):
-        self.family(plan=["research"])
-        other = self.worktree("elsewhere", "main")
-        write(os.path.join(other, "x.txt"), "x\n")
-        git(other, "add", "-A")
-        git(other, "commit", "--quiet", "-m", "elsewhere")
-        stray = git(other, "rev-parse", "HEAD").strip()
-        self.plant(os.path.join(self.approved, "doing", "i0001.md"), {"base_sha": stray})
-        self.commit_parent("planted")
-        started = self.ccnavi("ticket", "start", "i0001")
-        self.assertNotEqual(started.returncode, 0, started.stdout)
-        self.assertIn("HEAD の祖先でない", started.stderr)
-        with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
-            self.assertIn('started_at: ""', f.read())
-
-    def test_a_base_sha_on_the_worktree_history_lets_start_through(self):
-        self.family(plan=["research"])
-        base = git(self.parent_tree, "rev-parse", "HEAD~1").strip()
-        self.plant(os.path.join(self.approved, "doing", "i0001.md"), {"base_sha": base})
-        self.commit_parent("planted")
-        started = self.ccnavi("ticket", "start", "i0001")
-        self.assertEqual(started.returncode, 0, started.stderr)
-
     def lint_says(self, ident):
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         return [
