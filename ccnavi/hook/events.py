@@ -69,15 +69,21 @@ def decide(
 
 
 def watch_context(
-    stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    record: audit.Record,
+    raw: approval.Raw | None = None,
 ) -> tuple[list[post.Watched], post.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
     通った書き込みがターンの終わりに報告される（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
+
+    `raw` は承認済みチケットの置き場を呼び手が読んだもの（`scope_guard`）。
     """
-    return watched_for(stderr, conf, root, record), scope_guard(conf, root)
+    return watched_for(stderr, conf, root, record), scope_guard(conf, root, raw)
 
 
 def watched_for(
@@ -121,11 +127,16 @@ def watched_for(
     return out
 
 
-def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
-    """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
+def scope_guard(
+    conf: settings.Settings, root: str, raw: approval.Raw | None = None
+) -> post.ScopeGuard | None:
+    """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。
+
+    `raw` は呼び手が `approval.read_raw` で読んだもの。渡せば置き場を読み直さない。
+    """
     if not conf.tickets_enabled:
         return None
-    copies, _ = approval.scan(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
     # 種類の上限は層（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
     types: dict[str, dict] = {}
     for copy in copies:
@@ -158,8 +169,13 @@ def decide_at_prompt(
     例外は、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）。
     それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
     モデルは後工程に入れない。
+
+    承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と承認の知らせ
+    （`agree.news`）の両方に渡す。間の `post.at_prompt` はターンの基準を state に書くだけで、
+    置き場のファイルを動かさないので、読み直す必要は無い。
     """
-    watched, scope = watch_context(stderr, conf, root, record)
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    watched, scope = watch_context(stderr, conf, root, record, raw)
     post.at_prompt(
         stderr,
         conf.state,
@@ -171,7 +187,7 @@ def decide_at_prompt(
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
     )
-    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id, raw)
     if told:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK

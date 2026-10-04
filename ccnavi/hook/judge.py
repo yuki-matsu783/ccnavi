@@ -343,15 +343,19 @@ def decide_before(
     # 1 度だけ読んで両方に渡す（設計 9）。ワークスペースルートへの書き込みとシェルでは読まない。
     # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
     # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
+    # 読んだ置き場（`raw`）は、下の承認の知らせ（`agree.news`）にも渡す。間の判定は
+    # 置き場を読むだけで、ファイルを動かさない。
     index = None
     scanned: list[ticket_mod.Ticket] | None = None
+    raw: approval.Raw | None = None
     if (
         conf.tickets_enabled
         and target is not None
         and not target.is_main
         and payload.tool_name in SCOPE_TOOLS
     ):
-        scanned, _ = approval.scan(conf, root)
+        raw = approval.read_raw(conf, root)
+        scanned, _ = approval.scan(conf, root, raw=raw)
         index = approval.by_id(scanned)
 
     # ワークツリーの元リポジトリと承認済みチケットの `project:` の食い違いは、ルールより先に見る。
@@ -486,7 +490,7 @@ def decide_before(
     # このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）は、
     # 判定がどれでも 1 度だけつける。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）にまとめる。
-    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id, raw)
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
     # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ経路で渡す。
     if conf.tickets_enabled:
