@@ -1,4 +1,4 @@
-"""sh の診断ログ（ccnavi-common.sh の log_*）と、3 つの言語で行が揃うこと。
+"""sh の診断ログ（ccnavi-common-log.sh の log_*）と、3 つの言語で行が揃うこと。
 
 見るのは 2 組。
 
@@ -13,7 +13,7 @@
 3. ccnavi-git.sh の reject と ccnavi-review.sh の fail が、拒否の文面ではなく識別子だけを
    診断ログに残すこと（文面は標準エラーの契約で、そちらは変わらない）
 
-使い捨てのワークスペースに ccnavi-common.sh を置き、それを読む sh を書いて走らせる。
+使い捨てのワークスペースに共通部（ccnavi-common*.sh）を置き、それを読む sh を書いて走らせる。
 """
 
 from __future__ import annotations

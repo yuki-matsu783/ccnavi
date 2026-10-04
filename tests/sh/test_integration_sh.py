@@ -1,4 +1,4 @@
-"""統合先の名前を決める順（ccnavi-common.sh の ccnavi_integration）。
+"""統合先の名前を決める順（ccnavi-common-state.sh の ccnavi_integration）。
 
 ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
 ccnavi-review.sh（マージリクエストの宛先）が同じ関数を読む。順は
