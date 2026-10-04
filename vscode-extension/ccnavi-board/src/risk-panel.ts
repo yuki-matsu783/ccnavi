@@ -42,7 +42,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/common/risks.yml";
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "risk";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
@@ -55,7 +55,7 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: RiskDocument;
   readonly riskPath: string;
-  /** ワークスペースルートからの相対で見せる綴り */
+  /** ワークスペースルートからの相対で見せるパス */
   readonly riskRel: string;
 }
 
@@ -100,7 +100,7 @@ export async function openRisk(): Promise<void> {
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -132,7 +132,7 @@ export async function openRisk(): Promise<void> {
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
   // 読むのはタブを作ってから。読めなかったときもタブは閉じず、中にエラーを出す（`showError`）。
-  // 読むのはファイル 1 本ですぐ終わるが、束ねた画面が組み上がるまでの間はほかの画面と同じ一言を見せる
+  // 読むのはファイル 1 本ですぐ終わるが、バンドルした画面が組み上がるまでの間はほかの画面と同じ一言を見せる
   reload(current);
 }
 
@@ -423,7 +423,7 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     redraw(current);
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToRisk);
     }
@@ -535,7 +535,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
+    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
     fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.riskRel)}`);
     return;
   }

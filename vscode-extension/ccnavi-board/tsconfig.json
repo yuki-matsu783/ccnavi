@@ -15,6 +15,6 @@
     "resolveJsonModule": false
   },
   "include": ["src/**/*.ts"],
-  // Webview（React）は束ねて画面に流す別物。DOM の型が要るので tsconfig.webview.json で見る
+  // Webview（React）はバンドルして画面に流す別物。DOM の型が要るので tsconfig.webview.json で見る
   "exclude": ["src/webview"]
 }

@@ -6,7 +6,7 @@
  * 画面が返すのはユーザが押した操作（`RulesMessage`）だけで、判定もせず、ファイルも書かない。
  *
  * **ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）もここに置く。** 読み書き（`rules-doc.ts`）の側に
- * 置いたままだと、画面がそこから `yaml` を辿ることになり、束ねたものに YAML の解析器が丸ごと入る。
+ * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器が丸ごと入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
@@ -27,7 +27,7 @@ export const SECTIONS = ["deny", "ask", "allow"] as const;
 export type Section = (typeof SECTIONS)[number];
 export type PatternKind = "glob" | "regex";
 
-/** タイプの言い換え。画面の見出しで `deny` などの綴りにつける */
+/** タイプの言い換え。画面の見出しで `deny` などの表記につける */
 export const SECTION_LABELS: Readonly<Record<Section, string>> = {
   deny: "拒否する",
   ask: "ユーザに確認する",
@@ -35,7 +35,7 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = {
 };
 
 /**
- * 判定が対象を取り出せるツール。ccnavi の judge.SUBJECT_FIELDS（diagnose.KNOWN_TOOLS）と同じ並び。
+ * 判定が対象を取り出せるツール。ccnavi の judge.SUBJECT_FIELDS（diagnose.KNOWN_TOOLS）と同じ順。
  * 名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を除いたもの。
  */
 export const KNOWN_TOOLS = [
@@ -75,7 +75,7 @@ export interface RuleForm {
    * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
    * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
    * 刻みを外す操作も、読めない値を画面から直す方法も書けない。読めない値は書いたまま
-   * 書き戻し、咎めるのは保存前の `ccnavi --lint`。気づかないうちに画面で直されると、lint が名指し
+   * 書き戻し、報告するのは保存前の `ccnavi --lint`。気づかないうちに画面で直されると、lint が名指し
    * している対象が消えて苦情の出どころが分からなくなる
    */
   readonly every: string;
@@ -130,7 +130,7 @@ export type RulesData =
  *
  * `judged` と `sampled` は実行ファイルに聞いた判定の結果、`suggested` は記録から起こした候補、`failed` は操作の結果をその場で言う
  * 一言、`lock` は保存してよいかの取り直し、`changed` はファイルが外で変わったという帯、
- * `picked` はダイアログで選んだファイルの綴り。どれも画面の編集には触らない
+ * `picked` はダイアログで選んだファイルのパス。どれも画面の編集には触らない
  * （`picked` は名指しした 1 欄だけを埋める）。
  */
 export type ToRules =
@@ -143,7 +143,7 @@ export type ToRules =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
-  /** 選んだファイルの綴り。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
+  /** 選んだファイルのパス。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
   | { readonly type: "picked"; readonly key: string; readonly field: FileField; readonly path: string }
   /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
   | { readonly type: "tour" }

@@ -110,11 +110,11 @@
    | Pull requests | Read-only | 開いた PR・レビュー・`reviewThreads`、Approve の有無 |
    | Issues | Read-only | 「始める」の issue の一覧 |
 
-   これより広い権限は付けません。足りずに断られたら、その文面を控えます（4.8 の X9）。
+   これより広い権限は付けません。足りずに断られたら、その文面を記録します（4.8 の X9）。
 
 ### 3.2 GitLab
 
-1. まず project access token を試します。プロジェクトの Settings → Access tokens を開き、作れるかを控えます。
+1. まず project access token を試します。プロジェクトの Settings → Access tokens を開き、作れるかを記録します。
    GitLab.com の無料版では作れない見込みです（確信中）。作れれば role は Developer 以上、スコープは `api` にします。
 2. 作れなければ、設定画面の「PAT」の下のリンク（`https://gitlab.com/-/user_settings/personal_access_tokens`）から個人の PAT を作ります。
    スコープは `api` です（Commits API は `write_repository` では書けません）。個人の PAT はプロジェクトを限れないので、期限を短くし、
@@ -142,13 +142,13 @@
 
 ## 4. 確かめる項目
 
-各項目の「控えるもの」は、ずれたとき（期待と違ったとき）に控えます。通ったときは「通った」だけで構いません。
+各項目の「記録するもの」は、ずれたとき（期待と違ったとき）に記録します。通ったときは「通った」だけで構いません。
 ホストの応答は、ブラウザの開発者ツールでは見えにくいので（service worker が呼ぶ）、`chrome://extensions` の拡張の
-「service worker」のリンクから開く開発者ツールの Network で見ます。トークンが載るヘッダ（`Authorization`・`PRIVATE-TOKEN`）は控えに入れません。
+「service worker」のリンクから開く開発者ツールの Network で見ます。トークンが載るヘッダ（`Authorization`・`PRIVATE-TOKEN`）は記録に入れません。
 
 ### 4.1 読み取りボード
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
 | R1 | 3.4 の親子のチケットを push した後、ボードを開く | 親子のチケットごとに承認待ちが並ぶ。範囲・リスク・計画が最初に開いた形で出る | 画面の文面 |
 | R2 | 設定の統合先に無いブランチ名を書いて開く | 止まり、統合先が無いと言う（既定に落ちない） | 画面の文面 |
@@ -158,21 +158,21 @@
 
 ### 4.2 承認（GitHub）
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
-| A1 | 「承認する」を押す | `i0001` に 1 コミット（見出し「ccnavi: <識別子> を承認（Chrome 拡張 <版>）」）で、`doing/` の写しと提案の削除が乗る。CI が `[skip ci]` 無しで走る | コミットの sha と変更の一覧 |
-| A2 | 2 つのブラウザ（またはタブ）で同じボードを開き、ほぼ同時に承認を押す | 片方が書き、もう片方は読み直して判定し直す。同じ指紋なら重ねて書かず、違えば見直しを求める。3 周で書けなければユーザに回す | 両方の画面の文面、`createCommitOnBranch` の競合の応答（`errors` の中身） |
-| A3 | 承認のボタンを押す直前に、手元から同じ親のブランチへ別のコミットを push する | 先頭が動いたことを捕まえ、新しい先頭で判定し直して書く（置き場の外の変更なら指紋は同じ） | 画面の文面、GraphQL の応答 |
-| A4 | 承認の後、手元で `sh .ccnavi/scripts/ccnavi-sync.sh i0001` | 取り込まれ、親子のチケットが `blocked` にならない（終了コード 0） | sync の出力、`logs/state/sync/` の親子のチケットの控え |
+| A1 | 「承認する」を押す | `i0001` に 1 コミット（見出し「ccnavi: <識別子> を承認（Chrome 拡張 <版>）」）で、`doing/` のチケットと提案の削除が乗る。CI が `[skip ci]` 無しで走る | コミットの sha と変更の一覧 |
+| A2 | 2 つのブラウザ（またはタブ）で同じボードを開き、ほぼ同時に承認を押す | 片方が書き、もう片方は読み直して判定し直す。同じダイジェストなら重ねて書かず、違えば見直しを求める。3 周で書けなければユーザの対応に切り替える | 両方の画面の文面、`createCommitOnBranch` の競合の応答（`errors` の中身） |
+| A3 | 承認のボタンを押す直前に、手元から同じ親のブランチへ別のコミットを push する | 先頭が動いたことを捕まえ、新しい先頭で判定し直して書く（置き場の外の変更ならダイジェストは同じ） | 画面の文面、GraphQL の応答 |
+| A4 | 承認の後、手元で `sh .ccnavi/scripts/ccnavi-sync.sh i0001` | 取り込まれ、親子のチケットが `blocked` にならない（終了コード 0） | sync の出力、`logs/state/sync/` の親子のチケットの取り込み状態 |
 | A5 | 承認コミットを見た後、エージェントに `start` させる | C1 で着手が `i0001` に届く | コミット |
 
 ### 4.3 取り下げ
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
 | W1 | 着手前の新規の承認に「承認を取り下げる」を押す | 1 コミットで `doing/` が消え、承認コミットの親にあった提案のバイト列が `todo/` に戻る。`events/<識別子>.ndjson` に `withdrawn` の行（`actor` が PAT の持ち主、`via: chrome`） | コミットの sha、戻った提案と元の提案の差分 |
 | W2 | 取り下げた後に承認し直し、もう一度取り下げる | 新しい方の承認コミットを選ぶ | コミット |
-| W3 | 承認を別の枝で行って merge で `i0001` に入れる（手元の端末の承認を merge する、など）| 取り下げのボタンが出ない（`GET /commits?sha=&path=` が merge コミットを返すか・飛ばすかに依らず同じ答え） | `GET /commits?sha=<P>&path=<doing の綴り>` の応答に merge コミットが入るか |
+| W3 | 承認を別の枝で行って merge で `i0001` に入れる（手元の端末の承認を merge する、など）| 取り下げのボタンが出ない（`GET /commits?sha=&path=` が merge コミットを返すか・飛ばすかに依らず同じ答え） | `GET /commits?sha=<P>&path=<doing のパス>` の応答に merge コミットが入るか |
 | W4 | 着手の後にボードを開く | 取り下げが出ず、`ccnavi-ticket.sh cancel` を案内する | 画面の文面 |
 | W5 | 取り下げの後、手元で `ccnavi-sync.sh i0001` | blocked にならない | sync の出力 |
 
@@ -181,35 +181,35 @@
 ユーザのレビューの要る子を `finish` させ、エージェントに `ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 wip/eli5/phase-<N>.html`（ELI5 の HTML はコミットして push 済み）を打たせて Draft の PR と依頼を作らせてから試します。
 Approve の付いた PR を試すには、PR の作者と別のアカウントが要ります（自分の PR に Approve は付けられません）。
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
 | V1 | 未解決のスレッドがある間にボードを開く | 「レビュー済みにする」が出ず、解決するか `decide` で受け入れると出る。ccnavi の依頼のスレッドは数えない | 画面の文面、`reviewThreads` の応答（`pageInfo`・`isResolved`・`path`・`line`・最初のコメントの `url`） |
 | V2 | 変更要求のレビューを出し、その後に同じユーザがコメントだけのレビューを出す | 変更要求が残り、通らない | `GET /pulls/<N>/reviews` の応答（`state`・`submitted_at`・`user.id`） |
-| V3 | スレッドを解決し、変更要求を Approve に変えてから「フェーズ N をレビュー済みにする」を押す | 1 コミットで子が `done/` へ動き、`phases/<親>/<N>.reviewed` に `actor`（PAT の持ち主）と `via: chrome` が入る | コミット、印の中身、GraphQL の `viewer` の応答 |
+| V3 | スレッドを解決し、変更要求を Approve に変えてから「フェーズ N をレビュー済みにする」を押す | 1 コミットで子が `done/` へ動き、`phases/<親>/<N>.reviewed` に `actor`（PAT の持ち主）と `via: chrome` が入る | コミット、マーカーの中身、GraphQL の `viewer` の応答 |
 | V4 | 依頼の後に置き場の外を変えるコミットを push してから開く | compare の変更の一覧で「動いた」かを判定する。ユーザが見るものが動いていれば通らない | `GET /compare/<base>...<head>` の応答（`status`・`files` の件数・改名の `previous_filename`） |
 | V5 | PR に Approve が付いた状態で「レビュー済み」か承認を押す | 確認の文に「このコミットで MR の Approve が外れることがある」が出る。保護ありの設定で Approve が実際に外れる | 確認の文、PR の Approve の有無 |
 | V6 | 書きかけ（PENDING）のレビューを別のアカウントで残す | 結論が変わらない | `reviews` の応答に PENDING が出るか |
-| V7 | 手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を（別の親子のチケットで）打つ | 印に `actor`（`gh`・`glab`・curl のどれでもトークンの持ち主）が入る | 印の中身 |
+| V7 | 手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を（別の親子のチケットで）打つ | マーカーに `actor`（`gh`・`glab`・curl のどれでもトークンの持ち主）が入る | マーカーの中身 |
 | V8 | `GET /pulls?state=open&head=<owner>%3A<branch>` が `:` のままと同じ答えになるか | 同じ PR を返す | 応答 |
 
 ### 4.5 GitLab
 
 GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめます。
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
 | L1 | 承認を押す | `POST repository/commits` で 1 コミット。答えの `parent_ids[0]` が読んだ先頭 | 応答の `parent_ids` |
-| L2 | 本体の書き込みで同じファイルを競合させる（下の「同じファイルを競合させる手順」の A か B。対象は承認で書き換わる `events/<識別子>.ndjson` など update になるファイル） | `last_commit_id` が合わず 400 になり書かない。拡張は読み直して周を回し、3 周で書けなければユーザに回す | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
-| L3 | 打ち消しで同じファイルを競合させる（L11 で打ち消しの `POST repository/commits` が出るときに、下の手順 A で止めて、同じファイルへ手元から push する） | 打ち消しは自分のコミットを `last_commit_id` に付けるので 400 になり、他人の変更を消さない。親子のチケットが「要確認」で出て、「確かめた」を押すまでそのブラウザから書かない | 400 の応答本文、push したコミットが残っていること |
-| L11 | 別のファイルへの書き込みが間に入るよう、2 つのブラウザで別の子の承認と取り下げを同時に押す | 事後確認で判定し直し、書くものが違えば打ち消しのコミットが積まれる。収まらなければ親子のチケットが「要確認」で出る | 両方の画面の文面、積まれたコミットの並び |
+| L2 | 本体の書き込みで同じファイルを競合させる（下の「同じファイルを競合させる手順」の A か B。対象は承認で書き換わる `events/<識別子>.ndjson` など update になるファイル） | `last_commit_id` が合わず 400 になり書かない。拡張は読み直して再試行し、3 周で書けなければユーザの対応に切り替える | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
+| L3 | 元に戻すコミットで同じファイルを競合させる（L11 で元に戻すコミットの `POST repository/commits` が出るときに、下の手順 A で止めて、同じファイルへ手元から push する） | 元に戻すコミットは自分のコミットを `last_commit_id` に付けるので 400 になり、他人の変更を消さない。親子のチケットが「要確認」で出て、「確かめた」を押すまでそのブラウザから書かない | 400 の応答本文、push したコミットが残っていること |
+| L11 | 別のファイルへの書き込みが間に入るよう、2 つのブラウザで別の子の承認と取り下げを同時に押す | 事後確認で判定し直し、書くものが違えば元に戻すコミットが積まれる。収まらなければ親子のチケットが「要確認」で出る | 両方の画面の文面、積まれたコミットの順序 |
 | L12 | MR を出したブランチを消した後に `GET projects/:id/repository/commits/refs/merge-requests/<N>/head`（または `git ls-remote origin 'refs/merge-requests/*'`）を見る | ブランチ消去後も残るか（どちらでも拡張の答えは変わらない。`seq` の前提の確認） | 応答 |
-| L13 | GraphQL（`https://<ホスト>/api/graphql`）で `project(fullPath:) { repository { blobs(ref:, paths:) { nodes { path rawTextBlob } } } }` を `curl` で投げる | 束で取れるか（拡張は REST で 1 件ずつ読む。取れれば速くできる） | 応答の形 |
+| L13 | GraphQL（`https://<ホスト>/api/graphql`）で `project(fullPath:) { repository { blobs(ref:, paths:) { nodes { path rawTextBlob } } } }` を `curl` で投げる | まとめて取れるか（拡張は REST で 1 件ずつ読む。取れれば速くできる） | 応答の形 |
 | L4 | merge コミットを挟んだ後の `last_commit_id` と `repository/commits?ref_name=&path=&first_parent=true` | 承認コミットの選び方が GitHub と同じ答え | 応答 |
 | L5 | MR の discussions と reviewers を見る | 一般のコメント（依頼の投稿）の `resolvable`、システムのノートの `resolvable: false`、`notes[].author.id`、reviewers の `state` | 応答 |
-| L6 | 置き場に大きな差分（多数のファイル・多数の行）を入れて依頼の後に push する | compare の `collapsed`・`too_large`・`compare_timeout`・450 件以上のどれかで「動いた」と数え、通らない | `repository/compare` の応答の該当の欄。インスタンスの `diff_max_files`・`diff_max_lines`（管理者の Settings → General → Diff limits。GitLab.com は公開の設定値）を控える |
+| L6 | 置き場に大きな差分（多数のファイル・多数の行）を入れて依頼の後に push する | compare の `collapsed`・`too_large`・`compare_timeout`・450 件以上のどれかで「動いた」と数え、通らない | `repository/compare` の応答の該当の欄。インスタンスの `diff_max_files`・`diff_max_lines`（管理者の Settings → General → Diff limits。GitLab.com は公開の設定値）を記録する |
 | L7 | フォークから同じ `source_branch` の MR を出す | `source_project_id` で外れ、元の MR だけを見る | 画面の文面、`merge_requests` の応答 |
 | L8 | PAT の期限 | `GET /personal_access_tokens/self` の `expires_at` が読める（個人の PAT と、作れたなら project access token の両方） | 応答の `expires_at` |
-| L9 | 入れ子のグループのリポジトリを登録して開く | `projects/<符号化した綴り>` で引ける | 画面の文面 |
+| L9 | 入れ子のグループのリポジトリを登録して開く | `projects/<符号化した表記>` で引ける | 画面の文面 |
 | L10 | `repository/tree` と `repository/blobs/:sha` | ページングで取り切れる。`encoding: base64` と `size` が合う | 応答 |
 
 同じファイルを競合させる手順（L2・L3）。**使い捨てのリポジトリに限ります。**
@@ -218,28 +218,28 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
   `repository/commits` への POST の直前（`createCommit` の中の `post(` の行）にブレークポイントを置きます（minify されているので、
   Network の Initiator から辿るか、「Pretty print」で `repository/commits` を探します）。ボードで操作を押し、止まったら手元の clone から
   同じファイル（例 `.ccnavi/approved/events/<識別子>.ndjson` に 1 行足す）をコミットして親のブランチへ push し、再開します
-- **B（curl で直接）**: `repository/files/<符号化したパス>?ref=<親のブランチ>` で今の `last_commit_id` を控え、手元から同じファイルを変えて push した後、
-  控えた古い値を付けて直接 POST します。
+- **B（curl で直接）**: `repository/files/<符号化したパス>?ref=<親のブランチ>` で今の `last_commit_id` を記録し、手元から同じファイルを変えて push した後、
+  記録した古い値を付けて直接 POST します。
 
   ```sh
   curl -sS -X POST -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H 'Content-Type: application/json' \
-    "https://gitlab.com/api/v4/projects/<符号化した綴り>/repository/commits" \
-    -d '{"branch":"i0001","commit_message":"verify","actions":[{"action":"update","file_path":"<パス>","content":"x","last_commit_id":"<控えた古い値>"}]}'
+    "https://gitlab.com/api/v4/projects/<符号化した表記>/repository/commits" \
+    -d '{"branch":"i0001","commit_message":"verify","actions":[{"action":"update","file_path":"<パス>","content":"x","last_commit_id":"<記録した古い値>"}]}'
   ```
 
   400 で書かれないことを確かめます（書かれたら L2 は「ずれた」。その親のブランチは捨てます）
 
 ### 4.6 プロジェクトのリポジトリ
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
-| P1 | 設定画面で `ccnavi-verify-proj` を、プロジェクト名 `verify`、ワークスペースのリポジトリを選んで登録する | ボードに出る。共通層・置き場の綴り・互換のマーカーはワークスペースの統合先から読む | 画面の文面 |
+| P1 | 設定画面で `ccnavi-verify-proj` を、プロジェクト名 `verify`、ワークスペースのリポジトリを選んで登録する | ボードに出る。共通層・置き場のパス・互換のマーカーはワークスペースの統合先から読む | 画面の文面 |
 | P2 | プロジェクトの親子のチケットを承認し、手元で `ccnavi-sync.sh <P>` | blocked にならない | sync の出力 |
-| P3 | 設定のプロジェクト名をわざと手元のディレクトリ名とずらして承認し、手元で `ccnavi-sync.sh <P>` | 手元の判定し直しが親子のチケットを止める（締まる向き） | sync の出力、控えの `reason` |
+| P3 | 設定のプロジェクト名をわざと手元のディレクトリ名とずらして承認し、手元で `ccnavi-sync.sh <P>` | 手元の判定し直しが親子のチケットを止める（厳しくなる向き） | sync の出力、取り込み状態の `reason` |
 
 ### 4.7 「始める」
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
 | S1 | ボードの「issue を読む」で開いた issue の「始める」を押す | 識別子 `i<4 桁>`（プロジェクトは `<名前>-i<4 桁>`）のブランチが統合先の先頭から作られる。PR/MR は作られない | 作られたブランチと起点の sha |
 | S2 | 同じ issue でもう一度押す | 拡張（Python）が既にある名前だと見て「始めなかった」と断り、ホストへブランチを作る要求が出ない（Network に `git/refs`・`repository/branches` への POST が無い） | 画面の文面 |
@@ -250,19 +250,19 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 
 ### 4.8 共通（ホストを問わない）
 
-| # | 操作 | 期待する結果 | 控えるもの |
+| # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
-| X1 | 承認の後、手元で `ccnavi-sync.sh <P>`（承認・取り下げ・レビュー済みのそれぞれの後） | 取り込まれ、blocked にならない。違えば理由に「Chrome <版> と手元 <版> で判定が違う」が付く | sync の出力、控えの `reason` |
-| X2 | 手元で push しながら承認を押す（A3 と同じことを GitLab でも） | GitHub は `expectedHeadOid` で、GitLab は事後確認で捕まえる | 画面の文面、コミットの並び |
+| X1 | 承認の後、手元で `ccnavi-sync.sh <P>`（承認・取り下げ・レビュー済みのそれぞれの後） | 取り込まれ、blocked にならない。違えば理由に「Chrome <版> と手元 <版> で判定が違う」が付く | sync の出力、取り込み状態の `reason` |
+| X2 | 手元で push しながら承認を押す（A3 と同じことを GitLab でも） | GitHub は `expectedHeadOid` で、GitLab は事後確認で捕まえる | 画面の文面、コミットの順序 |
 | X3 | GitHub の PAT を期限の欄を空にして登録し、ボードを開く | 応答ヘッダ `github-authentication-token-expiration` から期限が読まれる | 応答ヘッダの値、設定画面の期限の表示 |
 | X4 | 期限が 7 日以内の PAT を登録する | ボードの帯とアイコンのバッジで知らせる | 帯の文面、バッジ |
 | X5 | 統合先の保護と必須チェックを有効にして承認する | 統合先へは書かず、親のブランチへのコミットは通る。ccnavi のコミットでも CI が走る | コミット、CI の結果 |
 | X6 | 親のブランチの名前の形（例 `i*`）に保護と必須チェックを掛けて承認する | 設計に決まりが無い。書けなければ原因の分かる文面で止まり、親のブランチが変わらないこと | 画面の文面、ホストの応答 |
-| X7 | レート制限 | 当てるのは難しいので、当たったときだけ控える。拡張は原因と回復の時刻を言い、Retry-After が 60 秒以内なら 1 回だけ待ち直す | 画面の文面、`x-ratelimit-*`・`retry-after` のヘッダ |
+| X7 | レート制限 | 当てるのは難しいので、当たったときだけ記録する。拡張は原因と回復の時刻を言い、Retry-After が 60 秒以内なら 1 回だけ待ち直す | 画面の文面、`x-ratelimit-*`・`retry-after` のヘッダ |
 | X8 | PAT を失効させてからボードを開く | 401 で差し替えを促す | 画面の文面 |
 | X9 | 権限の足りない PAT（例 Pull requests を外す）で開く | 権限が原因だと言う | 画面の文面、応答 |
-| X11 | 古い実行ファイルと新しい sh の組み合わせ: `--version --json` を知らない古い実行ファイルか、flags に `--via` の無い実行ファイルを `CCNAVI_BIN_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を打つ | どちらも落ちず、`--actor`・`--via` を渡さずに前と同じ印を置く（`actor` が無い） | 印の中身、sh の出力 |
-| X12 | Windows の Git Bash を 2 つ開き、片方で `sh -c 'echo $$; exec sleep 300'` を打って pid を控え、もう一方から `kill -0 <pid>; echo $?` を打つ。`sleep` が終わった後にもう一度打つ | 生きている間は 0、終わった後は 0 以外（ロックの持ち主が生きているかを sh が見分けられる） | 2 回の終了コード |
+| X11 | 古い実行ファイルと新しい sh の組み合わせ: `--version --json` を知らない古い実行ファイルか、flags に `--via` の無い実行ファイルを `CCNAVI_BIN_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を打つ | どちらも落ちず、`--actor`・`--via` を渡さずに前と同じマーカーを置く（`actor` が無い） | マーカーの中身、sh の出力 |
+| X12 | Windows の Git Bash を 2 つ開き、片方で `sh -c 'echo $$; exec sleep 300'` を打って pid を記録し、もう一方から `kill -0 <pid>; echo $?` を打つ。`sleep` が終わった後にもう一度打つ | 生きている間は 0、終わった後は 0 以外（ロックの持ち主が生きているかを sh が見分けられる） | 2 回の終了コード |
 | X10 | GitHub の stale の外しにパスの除外があるか、GitLab の Code Owners で `.ccnavi/approved/` を外せるか | ホストの設定画面で確かめる（拡張の操作ではない） | 見つけた設定の名前、無ければ「無い」 |
 
 ## 5. 結果の返し方
@@ -274,7 +274,7 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
    X3: 通った（ヘッダの値: 2026-11-01 00:00:00 UTC）
    W3: ずれた — merge コミットが一覧に入った（応答の抜粋: ...）
    A2: 通った
-   L3: ずれた — 画面「...」、コミットの並び: abc1234 → def5678
+   L3: ずれた — 画面「...」、コミットの順序: abc1234 → def5678
    ```
 
    - 4 章の番号（R1・A2 など）ごとに「通った」か「ずれた」を書きます

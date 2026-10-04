@@ -393,8 +393,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("would-restore:", self.context(result))
 
     def test_読めない自動復元の値は守る側になる(self):
-        # 読めない値の行き先を off から enable に変えてある。書き損じた 1 語で守りが
-        # 消えるより、書き損じた 1 語で守りが残るほうがよい、という向き。
+        # 読めない値の行き先を off から enable に変えてある。書き損じた 1 語で保護が
+        # 消えるより、書き損じた 1 語で保護が残るほうがよい、という向き。
         # 戻す先はコミット済みの内容なので、失われるのは「宣言した保護領域を
         # 汚した未コミットの変更」だけになる。
         self.run_hook(command="ls")
@@ -448,8 +448,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
-    def test_HEADを持たない控えは基準なしとして扱う(self):
-        # heads の無い控えは、控えが無いときと同じ。コミットのぶんを数えられない
+    def test_HEADを持たない記録は基準なしとして扱う(self):
+        # heads の無い記録は、記録が無いときと同じ。コミットのぶんを数えられない
         # 基準で報告すると、このターンに入ったコミットを黙って落とす。
         self.run_hook(event="UserPromptSubmit")
         turn = os.path.join(self.state, "s1.turn.json")
@@ -465,8 +465,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
 
     def test_ターンの終わりの報告は一度伝えた変更も含む(self):
-        # 呼び出しごとの報告は控えを見て繰り返さないが、ユーザはまだ 1 度も
-        # 見ていないことがある。宛先が違うので、控えを共有しない。
+        # 呼び出しごとの報告は記録を見て繰り返さないが、ユーザはまだ 1 度も
+        # 見ていないことがある。宛先が違うので、記録を共有しない。
         self.run_hook(event="UserPromptSubmit")
         self.run_hook(command="ls")
         self.dirty()
@@ -514,7 +514,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(line["detail"], "not-a-git-worktree")
 
     def test_自分が書く場所は自分の違反にしない(self):
-        # 記録と控えを保護領域の中に置く。置き場を設定でルールが守る場所の中へ
+        # 記録と state を保護領域の中に置く。置き場を設定でルールが守る場所の中へ
         # 指したときの形。
         self.state = os.path.join(self.repo, "protected", "state")
         self.log = os.path.join(self.repo, "protected", "decisions.jsonl")
@@ -581,7 +581,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     def test_ターンが始まる前のコミットは言わない(self):
         # 前のターンや他のセッションが積んだコミットを、このターンの成果として
-        # 並べない。基準はターンの始まりに控えた HEAD。
+        # 並べない。基準はターンの始まりに記録した HEAD。
         #
         # 「何も出ない」だけを見ると、コミットを一切見ない実装でも通ってしまう。
         # 同じターンで 1 件だけ積んで、そちらは出ることも一緒に見る。
@@ -600,7 +600,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("protected/keep.txt", message, "前のターンのコミットは並べない")
 
     def test_承認のコミットはターンの報告に並べない(self):
-        # 承認はユーザが提案を .ccnavi/approved/ へ動かしてコミットする運び。
+        # 承認はユーザが提案を .ccnavi/approved/ へ動かしてコミットする進め方。
         # そこは deny でもあるので、外さないと承認のたびに違反として並ぶ。
         self.run_hook(event="UserPromptSubmit")
         write(os.path.join(self.repo, ".ccnavi", "approved", "doing", "i0001.md"), "x\n")
@@ -669,11 +669,11 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("ワークツリー wt1 では、今回のターンでこの確認ができませんでした", message)
         self.assertIn("uncounted", self.records()[-1].get("detail", ""))
 
-    def test_戻さなかった1件は控えに入りターンの終わりにユーザへ出る(self):
+    def test_戻さなかった1件は記録に入りターンの終わりにユーザへ出る(self):
         # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
         # 呼び出しの数だけ積まれるので、報告はセッションで 1 度きりにする。
         # ユーザが見るのはターンの終わりの報告（Stop）。
-        # 控え（セッション）とターンの基準の両方を、汚す前に置く。
+        # 記録（セッション）とターンの基準の両方を、汚す前に置く。
         self.run_hook(command="ls")
         self.run_hook(event="UserPromptSubmit")
         write(os.path.join(self.repo, "watched", "deps.txt"), "first\n")
@@ -716,7 +716,7 @@ allow:
 body
 """
 
-# 着手済みの版。`ticket start` が書いたあと、ユーザがコミットして親のブランチに乗った姿。
+# 着手済みの版。`ticket start` が書いたあと、ユーザがコミットして親のブランチに乗った状態。
 STARTED = TICKET.replace(
     "---\nbody", 'started_at: "2026-09-21T00:00:00Z"\nbase_sha: "1111111111111111"\n---\nbody'
 )
@@ -796,7 +796,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertTrue(os.path.exists(self.path(marker)), "退避されるとレビューの依頼が消える")
 
     def test_レビュー待ちへの移動は言わない(self):
-        # `ticket finish`。`doing/` から消えて、同じ姿が `review/` に現れる。
+        # `ticket finish`。`doing/` から消えて、正規化した内容が同じものが `review/` に現れる。
         os.remove(self.path(DOING))
         write(
             self.path("wip/proposals/review/i0001.md"),
@@ -860,7 +860,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
     def test_基準点の書き換えは言う(self):
         # `base_sha` はサブエージェント終了時チェックと実績リスクの基準点。書き換えられると
-        # コミット済みの範囲外の変更が検査から消えるので、姿から落としてはいけない。
+        # コミット済みの範囲外の変更が検査から消えるので、正規化で落としてはいけない。
         self.use(ticket_repo(text=STARTED))
         write(self.path(DOING), STARTED.replace("1111111111111111", "2222222222222222"))
 
@@ -893,9 +893,9 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
 
-    def test_同じ姿が2つ動くときは移動として外さない(self):
-        # 正規の移動 1 件に、同じ姿のチケットのただの削除が一緒に通ってはいけない。
-        # 姿が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
+    def test_同じ内容が2つ動くときは移動として外さない(self):
+        # 正規の移動 1 件に、同じ内容のチケットのただの削除が一緒に通ってはいけない。
+        # 内容が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
         write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET)
         git(self.repo, "add", "--", ".ccnavi/approved/doing/i0002.md")
         git(self.repo, "commit", "--quiet", "-m", "twin")
@@ -913,7 +913,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn("i0002", result.stderr)
 
-    def test_行き先に同じ姿が2つあるときも外さない(self):
+    def test_行き先に同じ内容が2つあるときも外さない(self):
         # 正規の移動に、行き先へ直接置いた偽物が一緒に通る形。
         self.run_hook(command="ls")
         os.remove(self.path(DOING))

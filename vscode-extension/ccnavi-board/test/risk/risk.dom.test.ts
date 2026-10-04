@@ -138,7 +138,7 @@ test("CB-T84 保存できない理由と読み込みの苦情を出し、錠は�
   }
 });
 
-test("CB-T122 項目の一覧は 1 件 1 行で、控えてある id の行は開いて出す", async () => {
+test("CB-T122 項目の一覧は 1 件 1 行で、state に残してある id の行は開いて出す", async () => {
   const dom = await openRisk({}, { open: ["ci", "q"] });
   try {
     assert.equal(dom.all("#factors > li.factor").length, 4);
@@ -147,7 +147,7 @@ test("CB-T122 項目の一覧は 1 件 1 行で、控えてある id の行は�
       ["f2", "f4"],
     );
     assert.equal(dom.all("#find").length, 1);
-    // 折りたたむと控えからも消える
+    // 折りたたむと state からも消える
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
     assert.deepEqual((dom.state() as { open: string[] }).open, ["q"]);
@@ -285,7 +285,7 @@ test("CB-D57 見た目の切り替えは body のクラスだけを付け替え�
   }
 });
 
-test("CB-D58 加点条件の選択肢は 6 つで、キーの綴りと説明を並べて出す", async () => {
+test("CB-D58 加点条件の選択肢は 6 つで、キーの表記と説明を並べて出す", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));

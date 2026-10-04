@@ -35,7 +35,7 @@ export interface ApprovePreview {
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
-  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに入る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
+  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに入る中身のダイジェスト（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
   readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
@@ -56,7 +56,7 @@ export interface ApproveResult {
 export interface ApproveMismatch {
   readonly expected: readonly string[];
   readonly current: readonly string[];
-  /** 見せた指紋（渡した値）と今の指紋 */
+  /** 見せたダイジェスト（渡した値）と今のダイジェスト */
   readonly digest: { readonly expected: string; readonly current: string };
 }
 

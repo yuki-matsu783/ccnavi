@@ -45,7 +45,7 @@ def flat(root: str) -> str:
 
 
 def grown(length: int) -> str:
-    """ちょうどその長さのルートの綴り。末尾が区切りにならないようにする。"""
+    """ちょうどその長さのルートのパス。末尾が区切りにならないようにする。"""
     body = ("d" * 9 + "\\") * (length // 10 + 2)
     root = ("C:\\" + body)[:length]
     return root[:-1] + "d" if root.endswith(("\\", "/")) else root

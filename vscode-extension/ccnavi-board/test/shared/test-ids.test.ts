@@ -51,7 +51,7 @@ function names(): Named[] {
 
 test("CB-T163 テストの ID は重複しない。足すときは最後尾の次を採る", () => {
   const found = names();
-  assert.ok(found.length > 100, `テストを数えられていない（${found.length} 件）。置き場の綴りが変わった？`);
+  assert.ok(found.length > 100, `テストを数えられていない（${found.length} 件）。置き場のパスが変わった？`);
   const seen = new Map<string, string[]>();
   for (const { id, where } of found) {
     seen.set(id, [...(seen.get(id) ?? []), where]);

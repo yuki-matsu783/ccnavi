@@ -1,13 +1,13 @@
-"""状態の跡（チケットごとの追記専用のファイル。状態の正は置き場のまま）の受入テスト。
-道具を外から呼んで、跡のファイルと応答を見る。
+"""状態の履歴（チケットごとの追記専用のファイル。状態の正は置き場のまま）の受入テスト。
+道具を外から呼んで、履歴のファイルと応答を見る。
 
 見るのは 5 つ。
 
 1. 状態を動かす操作が、動かすたびに 1 行ずつ足すこと。欄（時刻・識別子・種類・元と先の置き場・経路）
-2. マーカーの跡は親に残ること（依頼・レビュー済み・終わりの告知・開き直し）
+2. マーカーの履歴は親に残ること（依頼・レビュー済み・終わりの告知・開き直し）
 3. 書けなくても状態は動き、書けなかったことは警告として出ること
 4. ボードの JSON に新しい側が載ること
-5. 跡のファイルを、実行後チェックが「エージェントの書き込み」として咎めないこと
+5. 履歴のファイルを、実行後チェックが「エージェントの書き込み」として報告しないこと
 
 道具は並行するチケットの受入テスト（test_ticket.TicketTest）のものを借りる。借りるだけで、
 あちらのテストはここでは走らせない（`load_tests`）。
@@ -154,7 +154,7 @@ class HistoryTest(TicketTest):
         self.assertEqual(reopened[0]["cleared"], ["skipped"])
 
     def test_a_failed_write_does_not_stop_the_move_and_warns(self):
-        """跡が書けなくても（置き場の位置にファイルがある）、状態は動き、警告が出る。"""
+        """履歴が書けなくても（置き場の位置にファイルがある）、状態は動き、警告が出る。"""
         self.family()
         events = os.path.join(self.approved, "events")
         for name in os.listdir(events):
@@ -185,9 +185,9 @@ class HistoryTest(TicketTest):
         self.assertTrue(any("i0001-01 の履歴" in p for p in board["problems"]), board["problems"])
 
     def test_the_post_monitor_does_not_report_the_history_it_wrote(self):
-        """`ticket start` の跡は、実行後チェックが保護領域の変更として咎めない。
+        """`ticket start` の履歴は、実行後チェックが保護領域の変更として報告しない。
 
-        実行後チェックは、副命令の書き込みを中身の姿で見分けて外す。
+        実行後チェックは、副命令の書き込みを正規化した内容で見分けて外す。
         """
         self.family_without_starting()
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
@@ -212,7 +212,8 @@ class HistoryTest(TicketTest):
         self.assertEqual(read_json_lines(path)[-1]["kind"], "started")
 
     def test_a_broken_character_in_the_reason_is_kept_and_does_not_stop_the_move(self):
-        """不正な UTF-8 由来のサロゲートが理由に混ざっても、状態は動き、跡は元の文字列で読める。"""
+        """不正な UTF-8 由来のサロゲートが理由に混ざっても、状態は動き、
+        履歴は元の文字列で読める。"""
         self.family()
         cancelled = self.ccnavi("ticket", "cancel", "i0001-01", "--reason", "bad\udcff")
         self.assertEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
@@ -222,7 +223,7 @@ class HistoryTest(TicketTest):
         self.assertEqual((last["kind"], last["reason"]), ("cancelled", "bad\udcff"))
 
     def test_a_blocked_history_does_not_stop_a_batch_approval(self):
-        """跡が書けなくても、まとめて承認した全部が置かれ、1 件ずつ警告が出る。"""
+        """履歴が書けなくても、まとめて承認した全部が置かれ、1 件ずつ警告が出る。"""
         self.propose("i0001", allow=("src/*",))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
@@ -234,7 +235,7 @@ class HistoryTest(TicketTest):
             self.assertIn(f"ccnavi: 警告: {name} の履歴（approved）", approved.stderr)
 
     def test_a_name_that_is_not_an_identifier_is_neither_written_nor_read(self):
-        """識別子の形でなければ（区切り文字・先頭の点）、跡のファイルに使わない。書かずに言い、読みは空。"""
+        """識別子の形でなければ（区切り文字・先頭の点）、履歴のファイルに使わない。書かずに言い、読みは空。"""
         base = os.path.join(self.root, "h")
         with history.session(history.VIA_CLI, None):
             for bad in ("../x", "a/b", ".hidden", ""):
@@ -259,7 +260,7 @@ def read_json_lines(path):
 
 
 class PhaseHistoryTest(PhaseHarness):
-    """計画を持つ親で動く跡（改版・続きの子・親のマーカー・締め）を固定する。"""
+    """計画を持つ親で動く履歴（改版・続きの子・親のマーカー・早めに閉じる操作）を固定する。"""
 
     def lines(self, ticket_id):
         path = os.path.join(self.approved, "events", ticket_id + ".ndjson")

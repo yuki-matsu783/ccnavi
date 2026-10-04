@@ -7,12 +7,13 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
 見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は tests/sh/test_c1_sh.py が見る。
 
 1. `ccnavi c1 family <識別子>`: 親子のチケット（子なら親）と、C1 の対象か。
-   控えの無い親子のチケット・chat だけの親子のチケットは対象外、決まらない親子のチケットは stop
+   取り込み状態の無い親子のチケット・chat だけの親子のチケットは対象外、
+   決まらない親子のチケットは stop
 2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（ccnavi が書いたと内容で分かるもの・
-   ユーザが運ぶもの・見分けられないもの、数えない一時ファイル、
+   ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
-   （一覧は書く。着手で configsync が写した層は例外で、tests/config/test_configsync.py が見る）
+   （一覧は書く。着手で configsync がコピーした層は例外で、tests/config/test_configsync.py が見る）
 4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）は
    エージェントから止める
 """
@@ -47,7 +48,7 @@ class FamilyTest(AuthorityHarness):
         answer = self.ask("i0001-01")
         self.assertEqual(answer["family"], "i0001")
         self.assertEqual(answer["target"], "no")
-        self.assertIn("控えが無い", answer["why"])
+        self.assertIn("取り込み状態が無い", answer["why"])
         self.assertNotIn("tree", answer)
 
     def test_a_present_family_is_a_target_with_its_tree(self):
@@ -131,9 +132,9 @@ class SortTest(AuthorityHarness):
         )
 
     def test_b_is_only_the_hook_marks_of_this_family(self):
-        """跡は親の phase-mark の pending・skipped だけ。
+        """履歴は親の phase-mark の pending・skipped だけ。
 
-        別の親・別の種類・全角の数字・新しい跡のファイルは (b) にしない。
+        別の親・別の種類・全角の数字・新しい履歴のファイルは (b) にしない。
         """
         self.append_event(
             {"at": "t", "ticket": "i0001", "kind": "phase-mark", "phase": 1, "mark": "reviewed"}
@@ -164,7 +165,7 @@ class SortTest(AuthorityHarness):
         self.assertTrue(any("UTF-8" in why for why in self.last_why), self.last_why)
 
     def test_crlf_in_the_working_tree_still_reads_as_an_append(self):
-        """autocrlf で作業ツリーの跡だけが CRLF でも、hook の追記は (b)。"""
+        """autocrlf で作業ツリーの履歴だけが CRLF でも、hook の追記は (b)。"""
         path = os.path.join(self.parent_tree, *self.events().split("/"))
         with open(path, "rb") as f:
             body = f.read()
@@ -174,7 +175,7 @@ class SortTest(AuthorityHarness):
         self.assertEqual(self.sort(), [("b", self.events())])
 
     def test_moves_written_by_a_human_decision_are_c(self):
-        """ユーザのレビュー（review/ から done/）と締め（doing/ から done/）、
+        """ユーザのレビュー（review/ から done/）と早めに閉じたときの取り消し（doing/ から done/）、
         マーカーの消去は (c)。"""
         review = "wip/proposals/review/i0001-01.md"
         self.put(review, child_text("i0001-01", "i0001", 1, ["wip/research/*"]))
@@ -352,7 +353,7 @@ class HumanEntryGuardTest(AuthorityHarness):
 class RecordTreeReviewTest(PhaseHarness):
     """本物の実行ファイルで、`--record-tree` 付きの依頼・行き先・Draft 外しが置き場だけを書く。
 
-    PhaseHarness は控えの置き場を `--state` で動かしている（上書きした置き場）。下書きはそこへ
+    PhaseHarness はstate の置き場を `--state` で動かしている（上書きした置き場）。下書きはそこへ
     書かれ、一覧にも置き場の外にも数えない。
     """
 
@@ -467,8 +468,8 @@ class ChooseTest(PhaseHarness):
 
 
 class BypassTest(AuthorityHarness):
-    """C1 の対象の親子のチケット（取り込み済みで origin がある）では、C1 を通らない
-    状態の操作を断る。
+    """C1 の対象の親子のチケット（取り込み済みで origin がある）では、
+    C1 を通らない状態の操作を断る。
     """
 
     def setUp(self):

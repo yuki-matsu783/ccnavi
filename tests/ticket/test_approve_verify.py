@@ -259,7 +259,7 @@ class ApproveVerifyTest(PhaseHarness):
 
         表に allow を 1 本足す形も試したが、`todo/` が「ccnavi が言及する場所」になり、
         どのタイプも言及しないときの扱い（judge.undeclared_verdict）を通らなくなる。
-        確認できる者が居ないモードの deny も、知らない綴りのモードを ask として扱う既定も、
+        確認できる者が居ないモードの deny も、知らない表記のモードを ask として扱う既定も、
         そこだけ外れていた。**同じ場所とどのルールも言及しない場所が、
         どの権限モードでも同じ判定になること**を確かめる。文は届いたままであることも見る。
         """
@@ -285,7 +285,7 @@ class ApproveVerifyTest(PhaseHarness):
                     self.assertIn("--agree --preview --verify", context(inside))
 
     def test_the_notice_stays_inside_the_workspace(self):
-        """ワークスペースの外に同じ並びを掘っても、提案を書いたことにはしない。
+        """ワークスペースの外に同じディレクトリ構成を掘っても、提案を書いたことにはしない。
 
         当てる式はワークスペースルートに固定してある。ツリー（ワークツリー・プロジェクト）は
         どれもルートの下なので、正しい置き場は全部入り、外は入らない。

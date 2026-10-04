@@ -172,7 +172,7 @@ function scalar(rand: () => number): unknown {
     return Math.floor((rand() - 0.5) * 2 ** (1 + Math.floor(rand() * 52)));
   }
   if (r < 0.8) {
-    // 整数でない小数（指数の綴りにならない範囲）
+    // 整数でない小数（指数の表記にならない範囲）
     return Math.floor((rand() - 0.5) * 1e6) + 0.25 * (1 + Math.floor(rand() * 3));
   }
   if (r < 0.9) {
@@ -229,7 +229,7 @@ test("CB-T249 乱数の中身（固定の種、400 本）を書き出して PyYA
   });
 });
 
-test("CB-T250 画面の読み（YAML 1.2）と PyYAML の読みが違う綴りは、開くときの見比べで食い違いになる。引用符で囲めば揃う", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T250 画面の読み（YAML 1.2）と PyYAML の読みが違う表記は、開くときの見比べで食い違いになる。引用符で囲めば揃う", { skip: reader.ok ? false : reader.why }, () => {
   assert.ok(reader.ok);
   const spelled = ["0755", "yes", "on", "1:30", "0o17", "1e3", "1_000", "1.", "2026-01-01", "!!float 1", "!!binary aGk=", ".inf", "123456789012345678901", "{1: a}"];
   const texts = spelled.map((v) => `nodes:\n  - id: a\n    data:\n      v: ${v}\n`);

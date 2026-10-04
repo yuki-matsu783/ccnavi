@@ -1,10 +1,10 @@
 /**
  * 5 つの画面の CSS。置き場は画面（React）と同じ `src/webview/<名前>/` で、部品 1 つに CSS 1 本。
- * 束ねる（`scripts/bundle-webview.js`）と画面 1 つにつき 1 本になり、拡張がそれを `<style nonce>` に
+ * バンドルする（`scripts/bundle-webview.js`）と画面 1 つにつき 1 本になり、拡張がそれを `<style nonce>` に
  * 流し込む。
  *
  * ここで見るのは 3 つ。骨組み（`styles/page.css`）が 5 画面とも 1 か所から来ていること、
- * ハイコントラストのテーマ向けの書き方が残っていること、そして**置いた CSS が束ねから漏れて
+ * ハイコントラストのテーマ向けの書き方が残っていること、そして**置いた CSS がバンドルから漏れて
  * いないこと**（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
  */
 import { test } from "node:test";
@@ -45,7 +45,7 @@ function rulesOnly(): string {
   return reactPages()[4][1];
 }
 
-/** `src/webview/` の下の CSS 全部（リポジトリのルートからの綴り） */
+/** `src/webview/` の下の CSS 全部（リポジトリのルートからのパス） */
 function cssFiles(dir: string = WEBVIEW_SRC): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
@@ -58,11 +58,11 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
 
 /**
  * `@import` の行き先。`"./x.css"` はそのファイルからの相対で、`"@xyflow/react/dist/style.css"` の
- * ように `.` で始まらないものは node_modules から解く（esbuild が束ねるときと同じ解き方）。
+ * ように `.` で始まらないものは node_modules から解く（esbuild がバンドルするときと同じ解き方）。
  *
  * 外から来る CSS を入れているのは図の 1 本だけ（React Flow の CSS）。ここで解けないと、このテストは
  * 落ちるのではなく **`readFileSync` の ENOENT で例外になる**ので、行き先を間違えたのか置き忘れたのかが
- * 読めなくなる。解けない綴りは名指しで落とす。
+ * 読めなくなる。解けないパスは名指しで落とす。
  */
 function importsOf(file: string): string[] {
   const text = fs.readFileSync(file, "utf8");
@@ -79,7 +79,7 @@ function importsOf(file: string): string[] {
   });
 }
 
-/** 束ねに入る CSS 全部（入口から `@import` で辿れるもの。入口自身も含む） */
+/** バンドルに入る CSS 全部（入口から `@import` で辿れるもの。入口自身も含む） */
 function reachable(entries: string[]): Set<string> {
   const seen = new Set<string>();
   const stack = [...entries];
@@ -93,7 +93,7 @@ function reachable(entries: string[]): Set<string> {
 }
 
 /**
- * その CSS が最初に当てる選択子。束ねに入っているかを、綴りではなく中身で見る。
+ * その CSS が最初に当てる選択子。バンドルに入っているかを、パスではなく中身で見る。
  * `@import` を並べるだけの入口（`style.css`）は当てるものを持たないので undefined
  */
 function firstSelector(file: string): string | undefined {
@@ -110,7 +110,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
   // 画面を足したら、その 1 枚を reactPages に足す（足さないと、ここから下の検査に入らない）
   assert.deepEqual(reactPages().map(([name]) => name).sort(), screenNames(), "reactPages に無い画面がある");
   for (const [name, html] of reactPages()) {
-    // 拡張が入れるのは、束ねた 1 本（`out/webview/<名前>.css`）そのもの
+    // 拡張が入れるのは、バンドルした 1 本（`out/webview/<名前>.css`）そのもの
     assert.ok(html.includes(screenStyle(name)), name);
     // 規則は 1 行にまとめて見る（esbuild の並べ方が変わっても、当てるものと宣言が同じなら通す）
     const style = flatStyle(html);
@@ -144,7 +144,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   assert.match(rules, /\.row-head:hover \{ background: var\(--vscode-list-hoverBackground\); outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   // 行末のボタンは、見出しの「＋ 追加」向けの margin-left: auto を打ち消す。詳細度で採られるようにしてあるので、
-  // 束ねの並び（@import の順）が変わっても入れ替わらない
+  // バンドルの順序（@import の順）が変わっても入れ替わらない
   assert.match(rules, /\.row-body \.buttons button\.action \{ margin-left: 0; \}/);
   // 動いたカードの輪も contrast の変数を使い、他のテーマでは緑のまま。左の縁（不備・承認待ち・
   // レビュー待ち）は上書きしない（別の channel）
@@ -152,7 +152,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   assert.doesNotMatch(html, /\.card\.moved \{[^}]*border-left/);
 });
 
-test("CB-T193 動いたカードの印は、光らせない設定を尊び、色だけに頼らない", () => {
+test("CB-T193 動いた表示は、光らせない設定を尊び、色だけに頼らない", () => {
   const html = flatStyle(board());
   // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
   // 回り記号と同じ書き方）。ここを落とすと、動きを嫌うユーザに 2 秒の脈動が出る
@@ -161,19 +161,19 @@ test("CB-T193 動いたカードの印は、光らせない設定を尊び、色
   assert.match(html, /\.moved-mark \{[^}]*color: var\(--vscode-charts-green\);/);
 });
 
-test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ずその束ねに入る", () => {
+test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ずそのバンドルに入る", () => {
   const names = screenNames();
   const entries = names.map((name) => path.join(WEBVIEW_SRC, name, "style.css"));
   for (const entry of entries) {
     assert.ok(fs.existsSync(entry), `画面の CSS の入口が無い: ${entry}`);
   }
-  // 置いてあるのに、どの画面の束ねにも入らない CSS が無い（`@import` の書き忘れ）
+  // 置いてあるのに、どの画面のバンドルにも入らない CSS が無い（`@import` の書き忘れ）
   const found = reachable(entries);
   const orphans = cssFiles()
     .filter((file) => !found.has(file))
     .map((file) => path.relative(WEBVIEW_SRC, file).split(path.sep).join("/"));
-  assert.deepEqual(orphans, [], "どの画面の束ねにも入らない CSS がある。画面の style.css に @import を足す");
-  // 綴りだけでなく、束ねた 1 本に中身が入っていることも見る
+  assert.deepEqual(orphans, [], "どの画面のバンドルにも入らない CSS がある。画面の style.css に @import を足す");
+  // パスだけでなく、バンドルした 1 本に中身が入っていることも見る
   const skipped: string[] = [];
   for (const name of names) {
     const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
@@ -185,7 +185,7 @@ test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ず�
         skipped.push(file);
         continue;
       }
-      assert.ok(style.includes(`${selector} {`), `${name} の束ねに ${path.basename(file)} の ${selector} が入っていない`);
+      assert.ok(style.includes(`${selector} {`), `${name} のバンドルに ${path.basename(file)} の ${selector} が入っていない`);
     }
   }
   assert.equal(skipped.length, names.length, "入口（style.css）以外が中身の検査から外れている");

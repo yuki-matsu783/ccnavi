@@ -1,7 +1,7 @@
 /**
  * ボード画面の本体。列とカード、絞り込み、承認のオーバーレイ。
  *
- * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いたカードの印も、
+ * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いた表示も、
  * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
  * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
@@ -54,7 +54,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const requestTour = tour.request;
   /**
    * 案内の間、チケットが 1 枚も無ければ見本のボードを出す（`tour-sample.ts`）。指す先のカードが無いと、
-   * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの控えや承認の件数の元にはしない
+   * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの state や承認の件数の元にはしない
    */
   const sample = useMemo(
     () => (tour.touring && board !== undefined && board.totalCount === 0 && !(view.archived && board.archivedCount > 0) ? sampleBoard(board.root, board.generatedAt) : undefined),
@@ -134,7 +134,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     (attention && !card.attention));
 
   // 「承認待ち N 件を承認」は、押したときに承認の対象になるもの（絞り込みで見えている承認待ち）の数にする。
-  // 「絞り込み無し」は空の並びではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認になってしまう。
+  // 「絞り込み無し」は空の配列ではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認になってしまう。
   const visiblePending =
     shown?.columns.flatMap((column) => column.cards.filter((card) => card.pendingApproval && !hiddenOf(card)).map((card) => card.id)) ?? [];
 
@@ -297,7 +297,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '[data-action="refresh"]',
     title: "更新",
-    body: "チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードには印が付きます。",
+    body: "チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードには動いた表示が付きます。",
   },
   {
     target: '[data-action="tour"]',
@@ -339,7 +339,7 @@ function Column({
   const section = useRef<HTMLElement>(null);
   const visible = column.cards.filter((card) => !hiddenOf(card)).length;
   // ドラッグの最中に列が消えたら（読み直せずエラーの画面に替わる）`pointerup` を受ける相手が居なくなり、
-  // 後片付けが走らない。body に付けた印を残すと、カーソルが変わったまま文字も選べなくなる
+  // 後片付けが走らない。body に付けたクラスを残すと、カーソルが変わったまま文字も選べなくなる
   useEffect(() => () => document.body.classList.remove("resizing"), []);
   const classes = ["column"];
   if (width !== undefined) {

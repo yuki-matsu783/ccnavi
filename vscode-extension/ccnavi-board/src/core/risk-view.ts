@@ -6,7 +6,7 @@
  * ユーザが押した操作（`RiskMessage`）だけで、点も数えず、ファイルも書かない。点を数えるのは実行ファイルだけにして、答えを 2 か所に持たない。
  *
  * **配点の形（`KINDS`・`FactorForm` など）もここに置く。** 読み書き（`risk-doc.ts`）の側に
- * 置いたままだと、画面がそこから `yaml` を辿ることになり、束ねたものに YAML の解析器が丸ごと入る。
+ * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器が丸ごと入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
@@ -20,7 +20,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 
 // ---- 配点の形（画面と読み書きで分け合う）
 
-/** 加点条件。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
+/** 加点条件。1 件につき 1 つ。ccnavi の risk.KINDS と同じ順 */
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
