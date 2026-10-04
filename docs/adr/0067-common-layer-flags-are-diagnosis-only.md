@@ -10,7 +10,7 @@ keywords: [フラグ, 診断, 層, 置き場, --rules, --phases, --risk, --proje
 
 状態: 採用
 
-追記（2026-09-24）: 「`projects/` を数えない」を `CCNAVI_PROJECTS=""` で言う形は、ADR-0084 で env ごと廃止した。数えたくなければ `projects/` を作らない。
+追記（2026-09-24）: 「`projects/` を数えない」を `CCNAVI_PROJECTS=""` で言う形は、ADR-0098 で env ごと廃止した。数えたくなければ `projects/` を作らない。
 
 ## 状況
 
