@@ -558,8 +558,8 @@ Bash のコマンドに現れるパスは対象外で、コマンド文字列と
 |---|---|---|---|
 | `deny` / `ask`（組み込み・ユーザ） | 当てる | 当てる | 当てる |
 | `allow` | 読み切れたときだけ当てる（6.3） | 当てない | 当てない |
-| サブエージェントの禁止（`phase.forbidden`） | 当てる | 当てる | 当てる |
-| 止めている間でも通す形（`phase.exempt`） | 読み切れたときだけ当てる | 当てない | 当てない |
+| サブエージェントの禁止（`phase_forms.forbidden`） | 当てる | 当てる | 当てる |
+| 止めている間でも通す形（`phase_forms.exempt`） | 読み切れたときだけ当てる | 当てない | 当てない |
 | チケットの範囲（`ticket_verdict`） | Bash には当てない（9.5） | 当てない | 当てない |
 
 層は元の形の判定を消さないので、読み違えても緩くはならない。`allow` と `exempt` に当てると、`sudo -u me cat /etc/hosts` の
@@ -856,7 +856,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
 
 同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
-`DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase.prune_form`）。実行ファイルの端末要求は
+`DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
 擬似端末（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
 見るのは引用符を落としたコマンド行で、コマンドの切れ目の中に ccnavi の名前と単独の語の `--prune` が並べば止める。
 免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ形だけ。
@@ -1567,7 +1567,7 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 
 ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket_places.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
 `scratchpad/` と違って追跡される置き場なので、実行前チェック（`ticket_places.is_unscoped`）に加えて、実行後チェック
-（`post.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
+（`post.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
 外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
 大文字小文字は区別し、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
 `tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
@@ -1591,7 +1591,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 `DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-agree.sh` と `ccnavi-push-approved.sh` を
 `sh` / `bash` で打つ形も同じ理由コードで止める。大文字小文字によらない。
 `comment` / `fetch` / `origin` は sh だけの仕事なので当てていない。
-**hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase.human_path_form`）。
+**hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase_forms.human_path_form`）。
 
 - ボードの経路。`--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組。`--yes` の経路は
   端末を求めないので、ここが唯一の保護になる。`decide <N>` と `--preview` は止めない（前者は

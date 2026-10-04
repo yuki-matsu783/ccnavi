@@ -1532,7 +1532,7 @@ C1（4.3・4.4）、承認の pushの改修（4.6）、ユーザの判断の入�
 | C1 を回す入口 | `ccnavi-ticket.sh` の start・finish・cancel、`ccnavi-review.sh` の request（マーカー）・confirm・decide（`--preview` を除く）・ready | 対象でなければ前と同じ（実行ファイルに渡すだけ）。`stop` なら書かずに止め、2c の解き方を出す |
 | 承認の push（4.6） | `ccnavi-push-approved.sh [<親>...]` | 取り込み済みの親子のチケットの親のワークツリーは、ロック（入れ子を許す）→ 途中の操作 → 取り込み → 置き場（承認済み、`review/`、消えた `todo/` の提案）を `commit --only` → push → 失敗したら届いたかの確認。落ちてもコミットは残す。`<親>` を並べるとその親子のチケットだけで、取り込み済みでない親子のチケットは push しない（今のままユーザがコミットする）。省けば前どおり変更のある全ツリーで、取り込み済みの親子のチケットだけ上の手順 |
 | ユーザの判断の入口（D27） | `ccnavi-review.sh chat <N>`・`config-synced <親>`・`close-early` | 実行ファイル（`--reviewed <N> --chat`・`--config-synced`・`--close-early`）が書いた後、取り込み済みの親子のチケットなら `ccnavi-push-approved.sh <親>` を呼ぶ。送れなければ 1 で終わり、打ち直しを言う。chat と config-synced はホストに触らないので origin も jq も要らない |
-| エージェントから止める | `phase.ticket_approval_rule`・`_FORBIDDEN_COMMAND` | `ccnavi-review.sh chat / config-synced / close-early` を組み込みの deny とサブエージェントの禁止に足した（厳しくする変更） |
+| エージェントから止める | `phase_forms.ticket_approval_rule`・`_FORBIDDEN_COMMAND` | `ccnavi-review.sh chat / config-synced / close-early` を組み込みの deny とサブエージェントの禁止に足した（厳しくする変更） |
 | ボード | `vscode-extension/ccnavi-board` | フローを保存したら `ccnavi-push-approved.sh <親>` を端末に送る。状態の履歴の呼び名に `withdrawn`（承認の取り下げ）と `chrome`（Chrome 拡張）を足した |
 | REQ-APV-11 の補足 | `requirements.md` | 4.3 のそのほかの引用文のとおり |
 
