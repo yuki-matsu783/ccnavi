@@ -761,7 +761,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | 何 | 外す条件 |
 |---|---|
 | frontmatter を持たないファイル | どちらの版も持たない。マーカー・`.risk.json`・`.judge.json`・`accepted.json`・閉じの記録のほか、チケットでないファイルはすべてここに入る |
-| チケットへの書き足し | `ticket.SCRIPT_FIELDS` のうちコミット済みの版がまだ持っていない欄以外が 1 文字も変わっていない（`ticket.script_shape`） |
+| チケットへの書き足し | `ticket_model.SCRIPT_FIELDS` のうちコミット済みの版がまだ持っていない欄以外が 1 文字も変わっていない（`ticket_fields.script_shape`） |
 | `finish` / `cancel` の移動 | 正規化した内容が同じチケットが `doing/` か `review/` から消え、`review/` か `done/` に現れた組。両側とも 1 件ずつのときだけ |
 
 範囲・親・フェーズ・本文が変わったチケット、既に値のあるスクリプトの欄（`base_sha` など）の書き換え、新しく現れた
@@ -1441,7 +1441,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 ものは `--lint` も名指しする。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
 `rules.KIND_NOT_YET`）は `--lint` では warn。
 
-提案を `todo/` に書いた回に、この確認を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket.propose_notice`）。
+提案を `todo/` に書いた回に、この確認を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
 判定には足さず、ルールの文と同じ `PreToolUse` の `additionalContext` の経路で渡す。
 
 `CCNAVI_MODE=dry-run` の間は deny が止めないので、エージェントは `--yes` を打てる。承認の経路だけを
@@ -1551,11 +1551,11 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 範囲の外として扱わない（次のチケットを提案する手段を残す。提案は承認されるまで判定に何も反映されない）。状態の置き場と
 承認済みチケットは組み込みの `deny`（9.2、8.2）が先に止めるが、組み込みが入るのは実行前のルール集合だけ。
 外し方は、実行前チェック・サブエージェント終了時チェック・ターンの終わりのコミット済みのぶんは置き場ごと
-（`ticket.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post._script_writes`、7.2）。
+（`ticket_places.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post._script_writes`、7.2）。
 ワークツリーのルートからの相対パスを `/` の境で見て大文字小文字を区別しない。
 
 下書きの置き場（ワークツリーのルートの直下の `scratchpad/`）も、**実行前チェックだけ**範囲の外として扱わない
-（`ticket.is_unscoped`）。根拠は「そのツリーの git が `scratchpad/` を追跡しないこと」で、保証ではない
+（`ticket_places.is_unscoped`）。根拠は「そのツリーの git が `scratchpad/` を追跡しないこと」で、保証ではない
 （`.gitignore` は各リポジトリが持つ）。実行後チェックとサブエージェント終了時チェックは `scratchpad/` を外さない。
 入力が `git status`（`--ignored` なし）と追跡ファイルの差分なので、正しく設定されたリポジトリでは現れず、
 追跡されているときだけ報告する。`--lint` は、`scratchpad/` に追跡されているファイルがあるリポジトリと、
@@ -1565,13 +1565,13 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 追跡から外れる範囲より狭く保つ）。ルートの直下 1 段のディレクトリだけを見る（`docs/scratchpad/` や同じ名前の
 ファイルは外さない）。置き場の名前は設定で動かさない。
 
-ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
-`scratchpad/` と違って追跡される置き場なので、実行前チェック（`ticket.is_unscoped`）に加えて、実行後チェック
+ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket_places.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
+`scratchpad/` と違って追跡される置き場なので、実行前チェック（`ticket_places.is_unscoped`）に加えて、実行後チェック
 （`post.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
 外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
 大文字小文字は区別し、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
-`tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket._under`）と
-下書きの置き場（`ticket.is_scratch_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
+`tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
+下書きの置き場（`ticket_places.is_scratch_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
 `wip/` は `ready` の前に丸ごと消すので、ここに置いたものは squash した成果物に残らない。`ready` の前提は大文字小文字を区別せず、
 名前が `wip\` で始まる 1 ファイルも `wip/` の残りとして止める（区別しない FS で `WIP/eli5/` を先に作った形を拾う）。
 **この除外は、チケットの `deny` と、チケットが信頼できないときの全面停止（`LIMIT_BLOCKED`）より先に適用される**（`is_unscoped` が

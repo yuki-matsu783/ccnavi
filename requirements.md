@@ -366,7 +366,7 @@ REQ-APV-18 のマーカーのアカウントと経路は、手元でレビュー
 `ccnavi-review.sh` がトークンの持ち主を引けたときだけで、経路は端末で選んだなら `terminal`、VS Code のボードで押したなら `board`。
 引けなければ前と同じ中身。
 
-REQ-APV-19 の識別子は `ticket.issue_identifier` の 1 つだけから決め、Chrome も同梱の ccnavi で
+REQ-APV-19 の識別子は `ticket_ids.issue_identifier` の 1 つだけから決め、Chrome も同梱の ccnavi で
 同じものを呼ぶ。始められない issue は、識別子をユーザが付けて（フォールバック）手元で始める。プロジェクト名は手元の
 `projects/` の下の名前で、Chrome 拡張には設定画面でリポジトリごとに登録する。
 
