@@ -549,6 +549,9 @@ def _copy_problems(
                     "（残っていると、フローの着手中の扱いなど、着手中として数えない箇所がある）",
                 )
             )
+        unrecorded = _start_unrecorded(conf, t)
+        if unrecorded:
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
@@ -563,6 +566,29 @@ def _copy_problems(
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
     return problems
+
+
+def _start_unrecorded(conf: settings.Settings, t) -> str:
+    """着手の欄があるのに、状態の履歴に `started` の行が無いときの文。あれば空。
+
+    着手の欄（`started_at`・`base_sha`）は `ticket start` だけが書き、書くときに履歴にも残す。
+    承認はチケットの中身を変えないので、提案の段階で書かれた欄は、手で動かした承認では
+    そのまま承認済みチケットに入り、中身だけでは道具が書いたものと見分けられない。
+    履歴は ccnavi の外で動かした分を持たないので、無いことだけでは止めない
+    （warn。判定にも入れない）。
+    """
+    if not t.started_at or not t.tree_root:
+        return ""
+    where = settings.approved_dir(conf, t.tree_root)
+    entries, why = history.read(where, t.ticket, limit=0)
+    if why or any(e.get("kind") == history.KIND_STARTED for e in entries):
+        return ""
+    return (
+        "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行が無い。"
+        "ccnavi-ticket.sh start を通さずに書かれた欄かもしれない"
+        "（提案の段階で書いて手で動かした承認など）。"
+        "ユーザに started_at と base_sha を確かめてもらってください"
+    )
 
 
 def _types_resolver(conf: settings.Settings, root: str):

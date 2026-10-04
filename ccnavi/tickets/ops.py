@@ -72,6 +72,17 @@ def start(
     if not sha:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
+    if found.base_sha and not _is_ancestor(worktree, found.base_sha, sha):
+        # 着手の欄はスクリプトだけが書く。承認はチケットの中身を変えないので、手で動かした承認では
+        # 提案の段階で書かれた基準点がそのまま入りうる。範囲外の検査とリスクの基準点に使うので、
+        # ワークツリーの履歴に無い基準点の上には着手しない。
+        stderr.write(
+            f"ccnavi: {ticket_id} の承認済みチケットに基準点（base_sha: {found.base_sha}）が"
+            f"既に書かれていて、ワークツリー {worktree} の HEAD の祖先でない。"
+            "着手の欄はスクリプトだけが書くもので、提案の段階で書かれた値かもしれない。"
+            "ユーザに承認済みチケットの base_sha を確かめてもらってください\n"
+        )
+        return 1
     synced = _sync_config(stderr, root, conf, found, worktree)
     if synced is None:
         return 1
@@ -952,6 +963,12 @@ def finish_nudge(root: str, found: Unfinished) -> str:
             "この案内は同じ HEAD では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
         ]
     )
+
+
+def _is_ancestor(worktree: str, base: str, head: str) -> bool:
+    """`base` が `head` の祖先（か同じ）か。確かめられなければ偽（着手を止める側）。"""
+    done = gitcmd.run(worktree, ["merge-base", "--is-ancestor", base, head], TIMEOUT_SECONDS)
+    return done.ok
 
 
 def _head(worktree: str) -> str:
