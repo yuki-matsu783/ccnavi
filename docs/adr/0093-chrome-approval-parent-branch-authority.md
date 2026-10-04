@@ -36,7 +36,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 - 今の承認は端末（`ccnavi-approve.sh`）か VS Code 拡張のボードで、どちらも手元に ccnavi 本体と作業ツリーが要る。
   ボードは `--approve --preview --json` → `--approve --yes <ids> --digest <d> --json` を子プロセスで呼び
   （`vscode-extension/ccnavi-board/src/ccnavi.ts:264-335`）、承認後に `ccnavi-push-approved.sh` を端末に送ってコミットと push をする
-  （`ccnavi.md:1302-1310`）
+  （設計 9.4）
 - 開発者と承認者（レビュアー）は別の人であることがよくある。承認者の機械には clone も ccnavi も無いことが多い。一人で開発・承認する場合もある
 - 目的は 2 つ
   1. 承認者がブラウザと PAT だけで、リモートのブランチに対して承認できること。書き先は GitHub / GitLab の API
@@ -100,7 +100,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 - ワークツリーの置き場は `.claude/worktrees/<ブランチ名>`（`docs/claude/worktree.md:34`）
 - 着手はワークツリーの**ディレクトリ名**が識別子と大文字小文字まで一致することを求め、
   作り方として `worktree add ".claude/worktrees/<id>" -b <id>` を案内する（`ccnavi/ops.py:57-68`）。子も同じ（`ccnavi/review.py:524`）
-- 「ワークツリーの名前は識別子と同じ」は既に明文（`ccnavi.md:1059`）。識別子の形の規則は `ccnavi.md:1056-1057`
+- 「ワークツリーの名前は識別子と同じ」は既に明文（設計 9.3）。識別子の形の規則は 設計 9.3
 - 識別子とブランチ・ワークツリーの結び付きは、着手・レビュー・push の保護・本物とする側の判定のほかに
   `ops.py:339,395,707`、`diagnose.py:645,992`、`flow.py:1360`、`lint.py:910` にもある
 - 本物とする側の推定は `approval._authoritative` の `at_home`（`approval.py:275`）で、ツリー名と親の識別子を比べる
@@ -606,7 +606,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 | ユーザの操作 | 呼び方 |
 |---|---|
 | 端末の承認 `ccnavi-approve.sh` | 今どおり最後に呼ぶ（`ccnavi-approve.sh:86-87`） |
-| VS Code のボードの承認 | 今どおり端末に 1 行送る（`ccnavi.md:1302-1310`） |
+| VS Code のボードの承認 | 今どおり端末に 1 行送る（設計 9.4） |
 | `--reviewed --chat`・`--config-synced`・`--close-early` | ユーザが打つ入口を sh にする: `ccnavi-review.sh chat <N>`・`ccnavi-review.sh config-synced <親>`・`ccnavi-review.sh close-early`。中で実行ファイルを呼び出し、通ったら承認の pushを呼ぶ。エージェントが打った場合は今の deny（`phase.py:105-113`）と同じく止める |
 | ボードのフローの保存 | 保存の後、承認と同じく端末に 1 行送る |
 
