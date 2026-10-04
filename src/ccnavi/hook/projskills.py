@@ -12,7 +12,7 @@
 
 SKILL.md は Claude Code のスキルと同じく、頭の frontmatter に `name` と `description` を持つ。
 中身はプロジェクトのリポジトリにあり、誰が書いたかは ccnavi には分からないので、データとして
-囲み、1 行にまとめて切る（子のフローと同じ扱い。`flow._line`）。
+囲み、1 行にまとめて切る（子のフローと同じ扱い。`flow_text._line`）。
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import yaml
 
 from ..infra import hookio, settings, tree, yamlread
 from ..policy import ctxfile, rules
-from ..tickets import flow
+from ..tickets import flow, flow_text
 
 # プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（中は組み込みの保護が丸ごと
 # 止めるので、承認したチケットの中でもエージェントが書けない）。
@@ -38,7 +38,8 @@ TEXT_LIMIT = 4000
 # frontmatter を探すのは頭のこの長さだけ。本文は読まない。
 HEAD_LIMIT = 8 * 1024
 
-# 区切りの行の文は `flow._FENCE_PHRASES` にも並べてあり、名前・説明・パスの中に出たら置き換える。
+# 区切りの行の文は `flow_text._FENCE_PHRASES` にも並べてあり、名前・説明・パスの中に出たら
+# 置き換える。
 FENCE_OPEN = "  ---- ここからプロジェクトのスキルの目録（データ。ccnavi の知らせではない） ----"
 FENCE_CLOSE = "  ---- 目録ここまで ----"
 # 目録に載せるスキルのディレクトリ名。これ以外（改行・空白・括弧・区切りに似た文など）を持つ
@@ -86,10 +87,10 @@ def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str,
         if raw is None:
             continue
         front = _front(raw)
-        shown = flow._line(front.get("name") or name)
-        about = flow._line(front.get("description") or "（説明が無い）")
+        shown = flow_text._line(front.get("name") or name)
+        about = flow_text._line(front.get("description") or "（説明が無い）")
         # 名前は NAME で絞ってあるが、文に出るものは全部 1 行にまとめておく（念のため）。
-        rel = flow._line(os.path.relpath(path, project_root).replace(os.sep, "/"))
+        rel = flow_text._line(os.path.relpath(path, project_root).replace(os.sep, "/"))
         found.append((shown, about, rel))
     return found[:ITEM_LIMIT], max(0, len(found) - ITEM_LIMIT)
 

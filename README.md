@@ -2206,7 +2206,7 @@ ccnavi --lint --json
 `problems[].where` は、ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` や `(self) (phases) design` のような形で、
 `--flow` で渡したフローへの指摘なら `(flow)` になる。ファイル全体への指摘なら空。
 
-`flow.rendered` は文字列の配列で、`flow.render` が返したままのもの。子のパスやロックの案内は入らない。
+`flow.rendered` は文字列の配列で、`flow_render.render` が返したままのもの。子のパスやロックの案内は入らない。
 
 `flow.candidates` の `source` は `builtin` か `project`。`builtin` は `general-purpose`・`Explore`・`Plan` の 3 つで、`project` は
 ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md` から読む。`project` の名前は frontmatter の `name` で、
@@ -2656,6 +2656,10 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
 | `src/ccnavi/tickets/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
+| `src/ccnavi/tickets/flow.py` | 子チケットのフロー（作業の手順のグラフ）。置き場・着手中のロック・読み込み・子に渡す案内 |
+| `src/ccnavi/tickets/flow_text.py` | フローに書かれた文字列の整え方。制御文字・長さ・印や囲みのなりすまし |
+| `src/ccnavi/tickets/flow_shape.py` | フローの形の検査。ノード・枝・名前の食い違い |
+| `src/ccnavi/tickets/flow_render.py` | フローを文に描く。子に渡す手順の一覧 |
 | `src/ccnavi/tickets/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡した結果の判定（JSON の形は `review_host.py`）。ネットワークには出ない |
 | `src/ccnavi/tickets/review_host.py` | sh が渡す `--result` の JSON の形、投稿の目印、origin の種類（sh との契約） |
 | `src/ccnavi/tickets/review_decide.py` | 残った指摘の行き先を決める（`--reviewed` の決め方と `decide`） |

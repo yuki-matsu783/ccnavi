@@ -30,7 +30,7 @@ from unittest import mock
 import yaml
 
 from ccnavi.infra import settings
-from ccnavi.tickets import flow, ticket, ticket_model
+from ccnavi.tickets import flow, flow_render, flow_shape, flow_text, ticket, ticket_model
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -155,7 +155,7 @@ class FlowPlaceTest(unittest.TestCase):
 
 class FlowRenderTest(unittest.TestCase):
     def test_steps_follow_the_graph_and_keep_unknown_types(self):
-        lines, kinds = flow.render(WORKFLOW)
+        lines, kinds = flow_render.render(WORKFLOW)
         self.assertEqual(len(lines), 6)
         self.assertTrue(lines[0].startswith("1. [start] 開始 → 2"), lines)
         self.assertIn("2. [prompt] 読む: 既存の振る舞いを読む", lines[1])
@@ -175,9 +175,9 @@ class FlowRenderTest(unittest.TestCase):
             "type": "subAgent",
             "data": {"description": "", "agentDefinition": "旧", "prompt": "p"},
         }
-        self.assertEqual("プロンプト: p", flow._summary(node, {}))
+        self.assertEqual("プロンプト: p", flow_render._summary(node, {}))
         self.assertEqual(
-            "", flow._summary({"type": "start", "data": {"workDescription": "旧"}}, {})
+            "", flow_render._summary({"type": "start", "data": {"workDescription": "旧"}}, {})
         )
 
     def test_groups_are_not_listed_but_their_members_are(self):
@@ -195,17 +195,17 @@ class FlowRenderTest(unittest.TestCase):
                 {"id": "c3", "from": "e", "to": "g", "fromPort": "output"},
             ],
         }
-        self.assertEqual(flow.shape_problem(data), "")
-        lines, kinds = flow.render(data)
+        self.assertEqual(flow_shape.shape_problem(data), "")
+        lines, kinds = flow_render.render(data)
         self.assertEqual(lines, ["1. [start] 開始 → 2", "2. [prompt] 読む → 3", "3. [end] 終了"])
         self.assertNotIn("group", kinds)
         # グループだけのフローは何も並べない
-        self.assertEqual(flow.render({"nodes": [data["nodes"][0]]}), ([], set()))
+        self.assertEqual(flow_render.render({"nodes": [data["nodes"][0]]}), ([], set()))
 
     def test_broken_shapes_do_not_raise(self):
-        lines, _ = flow.render({"nodes": [{"id": "a"}, "junk", {"id": "b", "data": 3}]})
+        lines, _ = flow_render.render({"nodes": [{"id": "a"}, "junk", {"id": "b", "data": 3}]})
         self.assertEqual(len(lines), 2)
-        lines, _ = flow.render({"nodes": [], "connections": "x"})
+        lines, _ = flow_render.render({"nodes": [], "connections": "x"})
         self.assertEqual(lines, [])
 
     def test_crash_inputs_render_without_raising(self):
@@ -235,7 +235,7 @@ class FlowRenderTest(unittest.TestCase):
             ("top not a dict", [1, 2, 3]),
         ):
             with self.subTest(name):
-                lines, kinds = flow.render(data)
+                lines, kinds = flow_render.render(data)
                 self.assertIsInstance(lines, list)
                 self.assertIsInstance(kinds, set)
 
@@ -244,7 +244,7 @@ class FlowRenderTest(unittest.TestCase):
         for _ in range(100_000):
             deep = [deep]
         data = {"nodes": [{"id": "a", "type": "prompt", "name": deep, "data": {"prompt": deep}}]}
-        lines, _ = flow.render(data)
+        lines, _ = flow_render.render(data)
         self.assertEqual(len(lines), 1)
 
     def test_deep_nesting_in_the_file_is_a_reason_not_a_crash(self):
@@ -277,15 +277,15 @@ class FlowRenderTest(unittest.TestCase):
                 {"from": "q", "to": "n", "fromPort": "branch-1"},
             ],
         }
-        line = flow.render(data)[0][1]
+        line = flow_render.render(data)[0][1]
         self.assertIn("3（YES）", line)
         self.assertIn("4（NO）", line)
         # 出口が項目の id とちょうど同じなら、その項目。
         data["connections"][1]["fromPort"] = "b"
-        self.assertIn("3（NO）", flow.render(data)[0][1])
+        self.assertIn("3（NO）", flow_render.render(data)[0][1])
         # 数字の表記は ASCII だけ。`²` を 2 と読まない。
-        self.assertEqual(flow._port_label(node, "branch-²"), "")
-        self.assertEqual(flow._port_label(node, "xbranch-1"), "")
+        self.assertEqual(flow_render._port_label(node, "branch-²"), "")
+        self.assertEqual(flow_render._port_label(node, "xbranch-1"), "")
 
     def test_ports_are_ordered_numerically(self):
         """`branch-10` が `branch-2` より前に来ない（L5）。"""
@@ -299,14 +299,14 @@ class FlowRenderTest(unittest.TestCase):
         conns = [
             {"from": "s", "to": f"t{i}", "fromPort": f"branch-{i}"} for i in reversed(range(12))
         ]
-        lines, _ = flow.render({"nodes": nodes, "connections": conns}, limit=20)
+        lines, _ = flow_render.render({"nodes": nodes, "connections": conns}, limit=20)
         self.assertIn("[end] t2", lines[3])
         self.assertIn("[end] t10", lines[11])
         self.assertIn("→ 2（L0）, 3（L1）, 4（L2）", lines[0])
 
     def test_long_flows_are_cut(self):
         nodes = [{"id": f"n{i}", "type": "prompt", "name": f"n{i}"} for i in range(50)]
-        lines, _ = flow.render({"nodes": nodes, "connections": []}, limit=10)
+        lines, _ = flow_render.render({"nodes": nodes, "connections": []}, limit=10)
         self.assertEqual(len(lines), 11)
         self.assertIn("ほか 40 件", lines[-1])
 
@@ -322,8 +322,8 @@ class FlowRenderTest(unittest.TestCase):
             ],
             "connections": [],
         }
-        lines, _ = flow.render(many)
-        self.assertIn(f"…ほか {5000 - flow.ITEM_LIMIT} 件", lines[0])
+        lines, _ = flow_render.render(many)
+        self.assertIn(f"…ほか {5000 - flow_shape.ITEM_LIMIT} 件", lines[0])
         self.assertLess(len(lines[0]), 2000)
         fan = {
             "nodes": [{"id": "s", "type": "start"}]
@@ -332,9 +332,9 @@ class FlowRenderTest(unittest.TestCase):
                 {"from": "s", "to": f"n{i}", "condition": "C" * 200} for i in range(3000)
             ],
         }
-        lines, _ = flow.render(fan)
-        self.assertIn(f"…ほか {3000 - flow.ITEM_LIMIT} 件", lines[0])
-        self.assertLessEqual(sum(len(x) for x in lines[:-1]), flow.CHILD_TEXT_LIMIT)
+        lines, _ = flow_render.render(fan)
+        self.assertIn(f"…ほか {3000 - flow_shape.ITEM_LIMIT} 件", lines[0])
+        self.assertLessEqual(sum(len(x) for x in lines[:-1]), flow_render.CHILD_TEXT_LIMIT)
         self.assertIn("続きはファイルを読んで", lines[-1])
 
     def test_long_chains_are_fast(self):
@@ -343,7 +343,7 @@ class FlowRenderTest(unittest.TestCase):
         nodes[0]["type"] = "start"
         conns = [{"from": f"n{i}", "to": f"n{i + 1}"} for i in range(n - 1)]
         began = time.monotonic()
-        flow.render({"nodes": nodes, "connections": conns})
+        flow_render.render({"nodes": nodes, "connections": conns})
         self.assertLess(time.monotonic() - began, 2.0)
 
     def test_flow_text_cannot_pose_as_ccnavi(self):
@@ -361,12 +361,12 @@ class FlowRenderTest(unittest.TestCase):
                 }
             ],
         }
-        lines, _ = flow.render(data)
+        lines, _ = flow_render.render(data)
         text = "\n".join(lines)
         self.assertEqual(len(lines), 1)
         self.assertNotIn("[ccnavi]", text.lower())
         self.assertIn("〔ccnavi〕", text)
-        self.assertFalse(flow.impersonates(text), text)
+        self.assertFalse(flow_text.impersonates(text), text)
         for ch in ("\x1b", "‮", "\x00", "\r"):
             self.assertNotIn(ch, text)
 
@@ -414,7 +414,7 @@ class FlowRenderTest(unittest.TestCase):
                 self.assertIsNone(data)
                 self.assertTrue(why.startswith("YAML として読めない"), why)
                 self.assertNotIn("\n", why)
-                self.assertLessEqual(len(why), flow.TEXT_LIMIT + 40)
+                self.assertLessEqual(len(why), flow_text.TEXT_LIMIT + 40)
         _, why = flow.load(self.file("nodes: [\n"))
         self.assertIn("行", why)
 
@@ -836,7 +836,8 @@ class FlowLockTest(FlowHarness):
     def test_a_malformed_flow_keeps_the_rest_of_subagent_start(self):
         """型の崩れたフローでも SubagentStart は落ちず、子の一覧と範囲は渡る（H3）。
 
-        形の誤りは `--lint --flow` と同じ理由の 1 行で言い、手順は並べない（`flow.shape_problem`）。
+        形の誤りは `--lint --flow` と同じ理由の 1 行で言い、手順は並べない
+        （`flow_shape.shape_problem`）。
         """
         write(self.flow_path, "nodes:\n  - {id: s, type: start}\nconnections: 5\n")
         self.commit_parent("bad flow")
