@@ -52,7 +52,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 `disable` は起動側の環境で指定したときしか有効にならない（REQ-CMN-04）。`ccnavi.settings.local.json` の `disable` は無視して理由を出す。
 `.claude/settings.json` の `env` の `disable` はプロセス環境と区別できないので、書く経路を閉じる。`.claude/settings.json` は
-コアファイル（8 章）で、`Write` / `Edit` はルールの `deny`、シェルからの書き込みは組み込みが止め、それでも書かれたら実行後にバックアップから戻す。
+コアファイル（8 章）である。`Write` / `Edit` はルールの `deny` が、シェルからの書き込みは組み込みが止め、それでも書かれたら実行後にバックアップから戻す。
 `env` は再読み込みされないので、書けても同じセッションでは反映されない。書かれていれば `--lint` が error で名指しし、
 導入スクリプトは `--mode disable` を断る。
 
@@ -81,7 +81,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `Stop` | `{"systemMessage": "…"}`。`finish` を促すとき（`enable`）は `{"decision": "block", "reason": "…", "systemMessage": "…"}`。`dry-run` なら促しの文を `systemMessage` に載せて止めない |
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
-期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として `enable` は
+期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
 終了コード 2、`dry-run` は 0（REQ-CMN-08）。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
 git の読み取りが 2 秒で打ち切られる。
 
@@ -91,7 +91,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 ### 4.6 導入と配布
 
 `scripts/ccnavi-setup.sh <対象>` が、対象プロジェクトに設定を書き、道具を配る。何度打っても同じ形に
-落ち着き、既にある値と、ccnavi と関係のない hook はそのまま残す。
+なる。既にある値と、ccnavi と関係のない hook はそのまま残す。
 
 | 書くもの | 中身 |
 |---|---|
@@ -124,7 +124,7 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 - `bin_dir` は `..` を含むまま使い、正規化しない。シンボリックリンクも解かない
 - 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir` を出す。在るが実行できなければ `exec` が失敗して 126
 
-hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にし、配布先では
+hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にする。配布先では
 導入スクリプトが付け、付いていなければ `--lint` が error で言う（10 章）。
 
 ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse HEAD`（未コミットの変更があれば `-dirty` を付ける）を
@@ -132,9 +132,9 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 ソースで動かしたときに前の組み立ての値を出さない）。次に PyInstaller の出力を `dist/ccnavi/` に入れ替え、`dist/ccnavi.target` を
 書いたあと、`install()` で `dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする（`dist/` は導入スクリプトの配布元で、
 代わりに通る sh が env の無いときに探す先でもあるので残す）。隣の `<os>-<arch>.new` にコピーし切ってから `_swap` で入れ替える。
-`_swap` は置き場を `.old` へ退避してから新しいほうを移し（Windows でも走っている実行ファイルの名前は変えられる。付録 C）、
+`_swap` は置き場を `.old` へ退避してから新しいほうを移す（Windows でも走っている実行ファイルの名前は変えられる。付録 C）。
 落ちたら 0.3 秒おきに 5 回までやり直し、やり直しきれなければ `.old` を置き場に戻してから投げる。`install()` が落ちたら
-`build.py` は 1 を返し、`dist/` は新しく `.ccnavi/bin/<os>-<arch>/` は前のまま、と言う。
+`build.py` は 1 を返し、`dist/` は新しく、`.ccnavi/bin/<os>-<arch>/` は前のまま、と言う。
 
 - rename 2 回の間（数 ms）に来た hook は sh が 127 で終わり、その 1 回は判定が走らない
 - ワークツリーで組み立てるとコピー先はそのワークツリーの `.ccnavi/bin/` なので、走っている hook（ワークスペースルートの sh）は変わらない
@@ -150,7 +150,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 | それ以外（ユーザが決めたパス） | 書き換えず、名指しで 1 行出す。導入は止めず終了コードも変えない。`--check` では揃っていない側に数える。「値が違う env」の一覧には入れない |
 
 `--mode disable` は断る（4.3）。`--check` は書かずに揃っていないところだけを並べ、揃っていなければ終了コード 1。
-名指しした `--deploy` が組み立てられていないか、目印が無くて置き場を決められなければ終了コード 2 で断るが、
+名指しした `--deploy` が組み立てられていないか、目印が無くて置き場を決められなければ終了コード 2 で断る。ただし、
 既定の配布元が使えないだけなら理由を 1 行出して設定は書く。別の機械向けの組み立ては、その機械の置き場へ配り、
 この機械で動くものが無いことを言う。仕様は `tests/sh/test_setup.py` と `tests/sh/test_launcher.py` が固定している。
 
