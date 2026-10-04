@@ -16,7 +16,7 @@ ccnavi の実行ファイルの代わりに、承認済みチケットを 1 枚�
 
 読み返すのは終了コード・出力と、git に残ったものだけ。
 
-`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -251,6 +251,51 @@ class PushApprovedTest(Workspace):
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn(NOTHING, again.stdout)
 
+    def test_a_removed_draft_is_carried_with_the_flow(self):
+        """取り込んで消えた下書き（`wip/proposals/flows/`）は、
+        フローと一緒にコミットして push する。
+        書き直された下書き・追跡していない下書きには触れない。"""
+        tree = self.worktree("i0001")
+        drafts = "wip/proposals/flows"
+        taken = f"{drafts}/i0001-01.yml"
+        rewritten = f"{drafts}/i0001-02.yml"
+        untracked = f"{drafts}/i0001-03.yml"
+        for rel in (taken, rewritten):
+            write(os.path.join(tree, *rel.split("/")), "nodes: []\n")
+        git(tree, "add", "--", taken, rewritten)
+        git(tree, "commit", "-q", "-m", "drafts")
+        flow = ".ccnavi/approved/flows/i0001-01.yml"
+        write(os.path.join(tree, *flow.split("/")), "nodes: []\n")
+        os.remove(os.path.join(tree, *taken.split("/")))
+        write(os.path.join(tree, *rewritten.split("/")), "nodes: [x]\n")
+        write(os.path.join(tree, *untracked.split("/")), "nodes: []\n")
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 同じ中身なので、名前の付け替えとして読まずに 2 つのパスで見る。
+        out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([flow, taken]), result.stdout + result.stderr)
+        self.assertTrue(self.dirty(tree, rewritten))
+        self.assertTrue(self.dirty(tree, untracked))
+        self.assertEqual(self.dirty(tree, taken), "")
+        self.assertEqual(self.staged(tree), "")
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_drafts_alone_are_not_carried(self):
+        """フローの保存が無ければコミットしない（置き場の変更が無いツリーには入らない）。"""
+        tree = self.worktree("i0001")
+        taken = "wip/proposals/flows/i0001-01.yml"
+        write(os.path.join(tree, *taken.split("/")), "nodes: []\n")
+        git(tree, "add", "--", taken)
+        git(tree, "commit", "-q", "-m", "draft")
+        os.remove(os.path.join(tree, *taken.split("/")))
+        before = self.head(tree)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(NOTHING, result.stdout)
+        self.assertEqual(self.head(tree), before)
+
     # ---- 18. コミットするものが無い
 
     def test_nothing_to_carry_says_so(self):
@@ -321,7 +366,8 @@ class PushApprovedTest(Workspace):
         self.assertNotIn(NOTHING, result.stdout)
 
     def test_carries_the_place_named_by_ccnavi_approved(self):
-        """12. `CCNAVI_TICKETS_APPROVED` を既定と違うパスにすると、その置き場をコミットする。
+        """12. `CCNAVI_TICKETS_APPROVED` を既定と違うパスにすると、
+        その置き場をコミットして push する。
 
         既定の置き場（`.ccnavi/approved`）はコミットしない。環境変数の名前は
         `ccnavi/infra/settings.py` の `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
@@ -521,12 +567,13 @@ class PushApprovedTest(Workspace):
         for word in ("-x", "../i0001", "a/b", ""):
             wrong = self.push(word)
             self.assertEqual(wrong.returncode, 2, word + wrong.stdout + wrong.stderr)
-        # 取り込み済みでない親子チケットの名指しはコミットしない（今のまま、ユーザがコミットする）。
+        # 取り込み済みでない親子のチケットの名指しはコミットしない（今のまま、ユーザがコミットする）
+        # 。
         tree = self.worktree("i0001")
         self.place(tree)
         named = self.push("i0001")
         self.assertEqual(named.returncode, 0, named.stdout + named.stderr)
-        self.assertIn("取り込み済みの親子チケットでない", named.stdout)
+        self.assertIn("取り込み済みの親子のチケットでない", named.stdout)
         self.assertTrue(self.dirty(tree, APPROVED))
         self.assertEqual(self.remote_head("i0001"), "")
         outside = os.path.join(self._tmp.name, "elsewhere")

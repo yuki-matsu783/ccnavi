@@ -42,7 +42,7 @@ test(`CX-T115 切れる ${WARN_DAYS} 日前から知らせ、切れたら差し�
   assert.equal(badgeText([expiryNotice("a", { host: at(-1) }, NOW)]), "PAT!");
 });
 
-test("CX-T116 service worker はホストの応答から期限を読んで保存し、画面には期限だけを返す。登録のときの日付も受ける", async () => {
+test("CX-T116 service worker はホストの応答から期限を読んで記録し、画面には期限だけを返す。登録のときの日付も受ける", async () => {
   const m = new MockGitHub(fixture());
   m.expiration = "2026-10-03 00:00:00 UTC";
   const metas = new Map<string, TokenMeta>();
@@ -55,7 +55,7 @@ test("CX-T116 service worker はホストの応答から期限を読んで保存
   const after = (await dispatch({ kind: "token.status", host: "github.com" }, BOARD, d)) as { value: TokenStatus };
   assert.equal(after.value.notice?.level, "soon");
   assert.equal(after.value.notice?.daysLeft, 3);
-  // 差し替えると前のトークンの期限は捨て、入れた日付を保存する
+  // 差し替えると前のトークンの期限は捨て、入れた日付を記録する
   const set = await dispatch({ kind: "token.set", host: "github.com", token: TOKEN, expires: "2026-12-01" }, OPTIONS, d);
   assert.equal(set.ok, true);
   assert.deepEqual(metas.get("github.com"), { manual: "2026-12-01" });

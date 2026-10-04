@@ -1,5 +1,5 @@
 /**
- * ルール設定画面の本体。ルールの一覧・判定を試す・hook の 3 タブ。
+ * ルール管理画面の本体。ルールの一覧・判定を試す・hook の 3 タブ。
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
@@ -50,7 +50,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** ユーザが開いた行の鍵。state に保存するのはこちらだけ */
+  /** ユーザが開いた行の鍵。state に入るのはこちらだけ */
   readonly open: ReadonlySet<string>;
 }
 
@@ -102,7 +102,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const page = pageOf(data);
 
   /**
-   * 案内はタブを切り替えて中を指すので、始める前のタブを保存し、閉じたら戻す。**案内の間の切り替えは
+   * 案内はタブを切り替えて中を指すので、始める前のタブを覚えておき、閉じたら戻す。**案内の間の切り替えは
    * state（`saveTab`）に書かない**（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
    */
   const tabBeforeTour = useRef<TabName | undefined>(undefined);
@@ -135,7 +135,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, [dirty]);
 
   /**
-   * id を打っている途中は state を書き直さない（打ちかけの id が state に入る）。書くのは欄を
+   * id を打っている途中はstate を書き直さない（打ちかけの id が state に入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
    * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ入れる
    * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
@@ -317,7 +317,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          ルール設定画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
+          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
         </p>
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
@@ -629,7 +629,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 }
 
 /**
- * ルール設定画面の案内。`peek` は案内の間だけのタブの切り替え（state に書かない）、`before` は始める前のタブ。
+ * ルール管理画面の案内。`peek` は案内の間だけのタブの切り替え（state に書かない）、`before` は始める前のタブ。
  * 最後の段に入る前に始める前のタブへ戻す（ヘッダ右上の ? はどのタブにも出ている）
  */
 function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonly TourStep[] {

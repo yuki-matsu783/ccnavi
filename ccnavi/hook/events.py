@@ -153,7 +153,7 @@ def decide_at_prompt(
 
     原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
-    ターンの終わりに「このターンで何が変わったか」を言えるようにするための状態の保存だけ。
+    ターンの終わりに「このターンで何が変わったか」を言えるようにする記録だけ。
 
     例外は、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）。
     それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
@@ -260,13 +260,13 @@ def stop_rules_nudge(
     ルールは共通層とワークスペース自身の層からだけ引く（`ruleload.stop_rules`）。プロジェクトの層は
     外のリポジトリで、そこに書かれた 1 行が cwd に依らずメインのターンの終わりを止められて
     しまうため。本文のファイルもワークスペースルートの版だけを読む（ワークツリーやプロジェクトの
-    コピーはエージェントが書き換えられる）。
+    版はエージェントが書き換えられる）。
 
     止めない回:
 
     - `stop_hook_active` が真（Stop の hook が続けさせた連鎖の 2 回目以降）。数えもしない
     - サブエージェント（`agent_id` がある）。候補は報告につけてメインに返す決まり
-    - 数えを覚えられない（`--state ""`、状態ファイルを読めない・書けない）。覚えられないまま止めると
+    - 数えを覚えられない（`--state ""`、記録を読めない・書けない）。覚えられないまま止めると
       ターンの終わりのたびに止まるので、何も言わない側を採る（`finish` の促しと同じ）
 
     数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
@@ -307,10 +307,10 @@ def _finish_nudge(
     """`finish` の打ち忘れを促す文。促さないなら空文字。
 
     メインエージェントの Stop でだけ呼ぶ（SubagentStop は別の手順）。促すのは、同じセッションで
-    同じチケットを同じ HEAD のまま促したことが無いときだけ（保存先は状態ディレクトリの
+    同じチケットを同じ HEAD のまま促したことが無いときだけ（記録は state の置き場の
     `nudged-<セッション>.json`）。コミットを足して HEAD が進めば、また促してよい。加えて
     `stop_hook_active` が真なら（Stop の hook が続けさせた結果なら。ほかの hook が止めた分も含む）
-    何もしない。状態ディレクトリが無い（`--state ""`）か、状態ファイルを書けないときは促さない。
+    何もしない。state の置き場が無い（`--state ""`）か、記録を書けないときは促さない。
     覚えられないまま止めると、ターンの終わりのたびに止まるので、何も言わない側を採る。
     チケット制御が disable なら何もしない。
     """
@@ -321,7 +321,7 @@ def _finish_nudge(
         return ""
     failed = ops.remember_nudge(conf.state, payload.session_id, found)
     if failed:
-        stderr.write(f"ccnavi: finish を促した記録を保存できないので、促さない: {failed}\n")
+        stderr.write(f"ccnavi: finish を促した記録を残せないので、促さない: {failed}\n")
         return ""
     record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
@@ -344,7 +344,7 @@ def decide_at_start(
     deadline は hook の判定の期限（`judge.DEADLINE_SECONDS`）。md の索引を新しくするのは
     その残りまでに収める（hook の timeout を超えない）。
 
-    ここで取るのは実行ファイルで、ツール呼び出しのたびに写すには大きすぎる。
+    ここで取るのは実行ファイルで、ツール呼び出しのたびにコピーするには大きすぎる。
     このイベントは 1 セッションに 1 回しか来ないので、重い仕事を置く先になる。
 
     判定は返さない。何も起きていない時点なので、言うことは 2 つだけ。バックアップを
@@ -368,9 +368,8 @@ def decide_at_start(
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
-    # 承認の状態ファイルは捨てない。状態ファイルが無ければ、いまの承認済みチケットを
-    # 「知っているもの」として書く。それより後に置かれた承認済みチケットだけが、次の
-    # hook で「新しい承認」になる。
+    # 承認の記録は捨てない。記録が無ければ、いまの承認済みチケットを「知っているもの」として
+    # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     agree.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
     record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
@@ -397,7 +396,7 @@ def decide_at_start(
 
 
 def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
-    """記録のローテートと、古い記録・終わったセッションの状態ファイルの削除（prune）。
+    """記録のローテートと、古い記録・終わったセッションの記録の削除（prune）。
 
     ここに置くのは、セッションに 1 度しか来ない場所だから。実行前チェックに置くと、呼び出しの
     たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
@@ -406,7 +405,7 @@ def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session:
     try:
         report = prune.run(root, conf.log, conf.state, session)
     except Exception as exc:  # noqa: BLE001 - 後始末の失敗でセッションの開始を止めない
-        stderr.write(f"ccnavi: 記録と状態ファイルの後始末に失敗した: {exc}\n")
+        stderr.write(f"ccnavi: 記録と state の後始末に失敗した: {exc}\n")
         return ""
     for problem in report.problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -439,10 +438,10 @@ def decide_after(
     # 設定ファイルを先に戻す。ルールを読むより前でなければならない。あとから
     # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
     # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。
-    # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
+    # 保護の根拠を、この呼び出しが触れる前の状態に返してから読む。
     # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容とマーカーで見分けて外す
+    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と上書きの記録で見分けて外す
     # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(configsync.is_synced_write, conf, root)
     restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
@@ -454,7 +453,7 @@ def decide_after(
     # 既定に戻ったことをこのイベントでは言わない。実行前チェックが呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、写す段は無い。
+    # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、コピーする段は無い。
     scope = scope_guard(conf, root)
 
     text = post.check(

@@ -49,7 +49,7 @@ export function TourButton({ onClick }: { readonly onClick: () => void }): JSX.E
  *   最中など）`request` と同じく出るまで待つ。押した経路だけ待たないと、オーバーレイの上に案内が被さる
  * - `end`: 吹き出しを閉じたとき。`onEnd` を呼ぶ（画面はそこで様子を戻し、`tourDone` を返す）
  *
- * `onStart` は始める直前に呼ぶ。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を保存する。
+ * `onStart` は始める直前に呼ぶ。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を覚えておく。
  */
 export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; readonly onEnd: () => void }): {
   readonly touring: boolean;
@@ -173,7 +173,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [spot, index]);
 
   // 焦点は「次へ」に置く（Enter で進める）。閉じたら、案内の前に焦点があった場所へ戻す。
-  // **戻す先は最初に描くときに保存する。** effect で保存すると、先に走る「次へ」への移動のあとを読んでしまい、
+  // **戻す先は最初に描くときに覚える。** effect で覚えると、先に走る「次へ」への移動のあとを読んでしまい、
   // 閉じたときに消えた「次へ」へ戻そうとして焦点が body に移ってしまう
   const [focusBefore] = useState(() => document.activeElement as HTMLElement | null);
   useEffect(() => {

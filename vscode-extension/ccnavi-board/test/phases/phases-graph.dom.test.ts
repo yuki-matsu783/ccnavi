@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面の図を、束ねた 1 本のまま動かす。
+ * フェーズ管理画面の図を、バンドルした 1 本のまま動かす。
  *
  * **大きさの偽物が要る**（`openGraph` が渡す `measure`）。happy-dom の `ResizeObserver` は
  * 何もしないので、細工をしないと React Flow は点を隠したまま線を 1 本も描かず、
@@ -70,7 +70,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     const notes = dom.all(".graph-note").map((note) => note.textContent ?? "");
     assert.deepEqual(notes.length, 1);
     assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていません/);
-    // 線にならなかった理由は断定しない（書き間違いかもしれない）。良し悪しも言わない
+    // 線にならなかった理由は断定しない（表記違いかもしれない）。良し悪しも言わない
     assert.doesNotMatch(notes[0], /他の層の種類を指す/);
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
     // sequential でも after が無ければ、判定に使われないという注意は出さない
@@ -128,10 +128,10 @@ test("CB-D76 一覧と図はタブで切り替わり、見ていたほうは sta
   }
 });
 
-test("CB-D77 保存してある位置で点が置かれ、図を触っても phases.yml には渡らない", async () => {
+test("CB-D77 state に残してある位置で点が置かれ、図を触っても phases.yml には渡らない", async () => {
   const dom = await openGraph({ model: model(LINKED) }, { spots: { implement: { x: 40, y: 80 } } });
   try {
-    // 保存してある位置で置かれる（React Flow は CSSOM で transform を当てるので、style に出る）
+    // state に残してある位置で置かれる（React Flow は CSSOM で transform を当てるので、style に出る）
     const node = dom.all('.react-flow__node[data-id="implement"]')[0];
     assert.match((node as unknown as { style: { transform: string } }).style.transform, /translate\(40px,\s*80px\)/);
 
@@ -155,8 +155,8 @@ test("CB-D80 点を掴んで離すと、その位置が state に入る（jsdom�
     assert.notEqual(after, before, "掴んで離しても点が動いていない");
 
     const spots = (dom.state() as { spots?: Record<string, { x: number; y: number }> }).spots ?? {};
-    assert.deepEqual(Object.keys(spots), ["implement"], "動かした種類の位置が保存されていない");
-    assert.ok(Number.isFinite(spots.implement.x) && Number.isFinite(spots.implement.y), "保存した位置が数でない");
+    assert.deepEqual(Object.keys(spots), ["implement"], "動かした種類の位置が state に無い");
+    assert.ok(Number.isFinite(spots.implement.x) && Number.isFinite(spots.implement.y), "残した位置が数でない");
     // 動いた先は図の倍率で決まるので、値そのものは約束しない
 
     // ドラッグしても保存には渡らない（座標はユーザが持つ設定に入れない）

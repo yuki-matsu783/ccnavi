@@ -34,7 +34,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.equal(parent.worktreeExists, true);
   assert.match(parent.stage, /作業中/);
   assert.equal(parent.phases.length, 2);
-  // 締める（close-early）は拡張からは出さない。ターミナルで打つ
+  // 早めに閉じる操作（close-early）は拡張からは出さない。ターミナルで打つ
   assert.deepEqual(parent.actions, []);
   assert.equal(parent.family, "i0001");
 
@@ -105,7 +105,7 @@ test("CB-T08 親の無い子は不備", () => {
   assert.match(cards.get("i0002-01")!.issues[0], /親 i0002 が見つかりません/);
 });
 
-test("CB-T09 依頼済みで止まったフェーズに decide、締めた親にはバッジだけ", () => {
+test("CB-T09 依頼済みで止まったフェーズに decide、早めに閉じた親にはバッジだけ", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
@@ -225,11 +225,11 @@ test("CB-T11 親のワークツリーを引ける", () => {
   assert.equal(parentTreeOf(board, "nope"), undefined);
 });
 
-test("CB-T117 散在は実行ファイルの答えをそのまま載せ、在りか自体は数えない", () => {
+test("CB-T117 散在は実行ファイルの答えをそのまま載せ、ほかのツリー上のチケット自体は数えない", () => {
   const base = fixture();
   const cards = cardsOf(buildBoard(base));
-  // 正常な場面。提案の側にあるもの（承認待ち・レビュー待ち）が親と兄弟のワークツリーに写っていても、
-  // 実行ファイルが「優先する承認済みチケットは決まっている」と言うので散在ではない。承認済みチケットの側にあるものは提案が無いので在りかも無い
+  // 正常な場面。提案の側にあるもの（承認待ち・レビュー待ち）が親と兄弟のワークツリー上にもあっても、
+  // 実行ファイルが「本物は決まっている」と言うので散在ではない。承認済みチケットの側にあるものは提案が無いのでほかのツリー上のチケットも無い
   for (const id of ["i0001", "i0001-01", "i0001-02", "i0001-03", "i0001-04", "i0001-05"]) {
     assert.deepEqual(cards.get(id)!.scattered, [], id);
   }
@@ -258,7 +258,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、在り
     card.scattered.map((s) => `${s.tree}:${s.state}`),
     [":todo", "i0001-02:todo"],
   );
-  // 在りか自体は残す。開いたファイルからカードを引き当てるのに使う。
+  // ほかのツリー上のチケット自体は残す。開いたファイルからカードを引き当てるのに使う。
   assert.equal(card.seenIn.length, 2);
 });
 
@@ -283,7 +283,7 @@ function waitingWithMr(url: string): BoardJson {
   return { ...base, parents: [parent] };
 }
 
-test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」も付き、依頼のマーカーのマージリクエストがフェーズ行と親カードに写る", () => {
+test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」も付き、依頼のマーカーのマージリクエストがフェーズ行と親カードに載る", () => {
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
   assert.deepEqual(card.phases[1].actions, [
@@ -397,7 +397,7 @@ test("CB-T215 案内の見本のボードは、承認待ち・作業中・完了
 });
 
 test("CB-T260 履歴はカードへそのまま渡り、列・注意・バッジの材料にはならない", () => {
-  // 履歴は補助で、状態は置き場で決まる。状態の履歴が「取り消し」と言っていても、列は置き場で決まる。
+  // 履歴は補助の記録で、状態の正は置き場。履歴が「取り消し」と言っていても、列は置き場で決まる。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const history = [

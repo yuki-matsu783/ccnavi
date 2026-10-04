@@ -49,7 +49,7 @@ def _block_host_git_config() -> dict[str, str]:
 
     `/dev/null` を指さないのは Windows に無いため。本物の空ファイルなら 4 環境で同じ。
     `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` は git 2.32 以降。読めているかは
-    `tests/core/test_git_env.py` が見張るので、古い git では気づかれないまま通ることはなく落ちる。
+    `tests/core/test_git_env.py` が確かめるので、古い git では気づかれないまま通ることはなく落ちる。
     """
     home = _tempfile.mkdtemp(prefix="ccnavi-gitconfig-")
     _atexit.register(_shutil.rmtree, home, ignore_errors=True)

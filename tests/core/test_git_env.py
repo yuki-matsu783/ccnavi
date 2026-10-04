@@ -1,4 +1,4 @@
-"""走った機械の git の設定が、テストから締め出されているかを見張る。
+"""走った機械の git の設定が、テストから締め出されているかを確かめる。
 
 締め出しそのものは `tests/__init__.py` の `_block_host_git_config` が置く。ここは
 それが有効かを見る側で、無効になる経路が 3 つあるので 3 つとも見る。
@@ -41,7 +41,7 @@ class BlocksTheHostConfigTest(unittest.TestCase):
         """指し先が無いと git は何も出さずに「設定なし」として進み、締め出せたように見える。
 
         見えるだけで、名前を間違えたときも同じ見え方になる。実在を確かめておくと、
-        書き方を取り違えた回に気づける。
+        名前を取り違えた回に気づける。
         """
         self.assertTrue(os.path.isfile(GIT_ENV["GIT_CONFIG_GLOBAL"]))
         self.assertTrue(os.path.isfile(GIT_ENV["GIT_CONFIG_SYSTEM"]))

@@ -78,12 +78,12 @@ class Change:
     """作業ツリーの変更 1 件。"""
 
     kind: str = ""
-    # path は git が返したパスの表記。作業ツリーのルートからの相対で、区切りは "/"。
+    # path は git が返したパス。作業ツリーのルートからの相対で、区切りは "/"。
     # ユーザに見せる側と、元に戻す手順で git に渡す側は、こちらを使う。
     path: str = ""
     # full は行き着く先まで解いた絶対パス。ルールを当てるのはこちら。
     # 実行前チェックがファイルのパスを解いてから当てるのと同じ理由で、
-    # 書き方を変えただけでルールを外せないようにする。
+    # 表記を変えただけでルールを外せないようにする。
     full: str = ""
     # status は git の 2 文字。索引側と作業ツリー側。報告にそのまま載せる。
     status: str = ""
@@ -159,7 +159,7 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
 def head(top: str, timeout: float = TIMEOUT_SECONDS) -> str:
     """いまの HEAD。読めなければ空文字。
 
-    ターンの始まりに保存して、終わりに「このターンで何がコミットに入ったか」を
+    ターンの始まりに記録して、終わりに「このターンで何がコミットに入ったか」を
     数えるための基準にする（post.at_prompt / post.at_stop）。
     """
     if not top:
@@ -248,9 +248,9 @@ def _parse(top: str, entry: str) -> Change | None:
 
 
 def _full(top: str, path: str) -> str:
-    """git のパスの表記を、行き着く先が 1 つに決まる絶対パスに直す。
+    """git が返したパスを、行き着く先が 1 つに決まる絶対パスに直す。
 
-    実行前チェックと同じ関数（`fsio.full_path`）を通す。同じ場所が 2 通りの書き方で
+    実行前チェックと同じ関数（`fsio.full_path`）を通す。同じ場所が 2 通りのパスで
     当たると、実行前に通った書き込みが実行後に報告される（あるいはその逆）。
     """
     return fsio.full_path(path, top)

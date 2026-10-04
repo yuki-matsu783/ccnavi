@@ -12,14 +12,14 @@
  * - 実行ファイルの整数（JSON の数）は、画面の整数（`Number.isInteger`）で同じ値
  * - 実行ファイルの浮動小数（`{"$ccnavi": "float", "value"}`）は、画面の整数でない数で同じ値。整数の値を持つ
  *   浮動小数（`1.0`）は、画面が整数として持つ（書けば `1` になる）ので食い違い。有限でないものも食い違い
- * - リストは長さと各項目。マッピングは、キーの組と各値（画面の側で値が `undefined` のキーは無いものとして読む）
+ * - 配列は長さと各項目。マッピングは、キーの組と各値（画面の側で値が `undefined` のキーは無いものとして読む）
  * - ほかのタグ付きの値（範囲の外の整数・キーが文字列でない辞書・日付・バイト列・集合 など）は画面が同じ値を持てないので
  *   食い違い
  *
  * VS Code の API も node も使わない。
  */
 
-/** 実行ファイル（`flow.as_json`）がタグ付きの値に使うキー */
+/** 実行ファイル（`flow.as_json`）のタグ付きの値の鍵 */
 export const JSON_MARK = "$ccnavi";
 
 export interface FlowMismatch {
@@ -115,7 +115,7 @@ function differ(screen: unknown, exec: unknown, at: readonly Segment[]): Found |
   return here();
 }
 
-/** 場所の表記。`nodes` の中はノードの id で言う（実行ファイルの読みの id。無ければリストの位置） */
+/** 場所の表記。`nodes` の中はノードの id で言う（実行ファイルの読みの id。無ければ配列の位置） */
 function whereOf(at: readonly Segment[], executable: unknown): string {
   if (at.length === 0) {
     return "最上位";

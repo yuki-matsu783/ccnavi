@@ -38,7 +38,7 @@ test("CB-T20 設定 → settings.json → 既定 → ソースの順に探す", 
   assert.equal(locate(input([])), undefined);
 });
 
-test("CB-T21 .exe は書いていなくても試す", () => {
+test("CB-T21 .exe はパスに付いていなくても試す", () => {
   assert.deepEqual(
     locate(input(["/ws/dist/ccnavi/ccnavi.exe"])),
     { kind: "exe", path: "/ws/dist/ccnavi/ccnavi.exe" },
@@ -83,7 +83,7 @@ test("CB-T160 E1 振り分けの sh を指していれば、../bin/ のこの機
     ),
     { kind: "exe", path: "/ws/.ccnavi/bin/darwin-x86_64/ccnavi" },
   );
-  // 設定が無くても既定の表記として探す。絶対パスでも同じ。
+  // 設定が無くても既定のパスとして探す。絶対パスでも同じ。
   assert.deepEqual(
     locate(input(["/ws/.ccnavi/bin/linux-x86_64/ccnavi"])),
     { kind: "exe", path: "/ws/.ccnavi/bin/linux-x86_64/ccnavi" },
@@ -116,7 +116,7 @@ test("CB-T161 E2 振り分けの sh そのものは返さない。実体が無�
   );
 });
 
-test("CB-T119 E3 名前が ccnavi-launcher.sh でない表記は表記そのままのパスを探し、隣は見ない", () => {
+test("CB-T119 E3 名前が ccnavi-launcher.sh でないパスはそのパスそのものを探し、隣は見ない", () => {
   assert.deepEqual(
     locate(
       input(["/ws/tools/scripts/ccnavi", "/ws/tools/scripts/linux-x86_64/ccnavi"], { settingsEnvBin: "tools/scripts/ccnavi" }),

@@ -191,11 +191,11 @@ class StopNudgeTest(TicketTest):
         self.assertEqual(body.get("decision"), "block")
         self.assertIn("コミットが 2 件", body["reason"])
         self.assert_quiet(self.stop(tree))
-        # 別のセッションは自分の状態ファイルを持つ。
+        # 別のセッションは自分の記録を持つ。
         self.assertEqual(self.body(self.stop(tree, session="s2")).get("decision"), "block")
 
     def test_without_a_place_to_remember_it_does_not_ask(self):
-        """状態ディレクトリが無ければ、覚えられないので促さない（毎回止めない側）。"""
+        """state の置き場が無ければ、覚えられないので促さない（毎回止めない側）。"""
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)

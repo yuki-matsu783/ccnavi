@@ -45,7 +45,7 @@ class SectionsTest(unittest.TestCase):
         """タイプを渡してルールファイルを 1 本置く。
 
         書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
-        読み手がそのまま受け取る。タイプの強さを見たいテストで、YAML の書き方の
+        読み手がそのまま受け取る。タイプの強さを見たいテストで、YAML の表記の
         話に付き合わずに済む。
         """
         body = {"version": 1, **sections}

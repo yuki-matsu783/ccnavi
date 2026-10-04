@@ -1,7 +1,7 @@
 /**
  * フロー編集画面の「元に戻す・やり直す」の履歴。画面（`webview/flow/App.tsx`）の `edit()` だけが積む。
  *
- * 積むのは**直す前の内容**（`FlowDoc` は書き換えない値なので、そのまま持てばよい）。上限を超えたら古いほうから捨てる。
+ * 積むのは**直す前のコピー**（`FlowDoc` は書き換えないコピーなので、そのまま持てばよい）。上限を超えたら古いほうから捨てる。
  *
  * 1 回の操作で 1 件にする。
  * - ドラッグ・線を引く・足す・消すは、呼び手が 1 回だけ `record` を呼ぶので 1 件
@@ -42,8 +42,8 @@ export interface RecordOptions {
 }
 
 /**
- * 直す前の内容 `before` を積む。やり直しのリストは捨てる（戻してから別の操作をしたら、その先は無くなる）。
- * 同じ欄に続けて打っているときは積まずに時刻だけ進める（最初の 1 字の前の内容が残る）。
+ * 直す前のコピー `before` を積む。やり直しのリストは捨てる（戻してから別の操作をしたら、その先は無くなる）。
+ * 同じ欄に続けて打っているときは積まずに時刻だけ進める（最初の 1 字の前のコピーが残る）。
  */
 export function record(history: FlowHistory, before: FlowDoc, options: RecordOptions = {}): FlowHistory {
   const now = options.now ?? Date.now();
@@ -69,7 +69,7 @@ export function canRedo(history: FlowHistory): boolean {
   return history.future.length > 0;
 }
 
-/** 1 件戻す。戻せなければ undefined。`current` はいまの内容で、やり直しのリストに積む */
+/** 1 件戻す。戻せなければ undefined。`current` はいまのコピーで、やり直しのリストに積む */
 export function undo(history: FlowHistory, current: FlowDoc): { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined {
   const doc = history.past[history.past.length - 1];
   if (doc === undefined) {

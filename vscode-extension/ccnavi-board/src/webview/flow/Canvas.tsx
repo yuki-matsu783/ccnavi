@@ -3,18 +3,18 @@
  * 使っていない（あちらは AGPL。ここは React Flow の部品を組んだだけ）。
  *
  * 図が持つのは描き方だけで、フローの中身は持たない。動かす・繋ぐ・選ぶは `onMove` などで
- * 呼び手（`App.tsx`）に返し、呼び手が `core/flow-doc.ts` の関数で編集中の内容を作り直して戻す。
+ * 呼び手（`App.tsx`）に返し、呼び手が `core/flow-doc.ts` の関数でコピーを作り直して戻す。
  *
- * **点の位置は React Flow の手元（`nodes`）で動かし、放したときだけ編集中の内容に書く。** ドラッグの間に
- * 編集中の内容を作り直すと、放すまでに何十回も「未保存」にし直すことになる。内容が替わったら手元を
+ * **点の位置は React Flow の手元（`nodes`）で動かし、放したときだけコピーに書く。** ドラッグの間に
+ * コピーを作り直すと、放すまでに何十回も「未保存」にし直すことになる。コピーが替わったら手元を
  * 作り直すが、測った大きさ（`measured`）は引き継ぐ（引き継がないと点が一瞬消える）。
  *
  * グループ（`type: "group"`）は React Flow の親子で描く。中のノードに `parentId` を付け、位置は
  * グループからの位置のまま渡す。グループは点の配列の前に置き、ほかの点より奥に描く。
- * ドラッグを放したときに、どのグループに入るか・出るかは編集中の内容の側（`placeNodes`）が決める。
+ * ドラッグを放したときに、どのグループに入るか・出るかはコピーの側（`placeNodes`）が決める。
  *
  * ノードと線には × のボタンを付ける（ノードは右上、線は真ん中。載せた・選んだときだけ見える）。
- * 押すと呼び手に返すだけで、消すのは編集中の内容の側。読むだけのときは出さない。
+ * 押すと呼び手に返すだけで、消すのはコピーの側。読むだけのときは出さない。
  * Shift を押しながら押す・ドラッグして囲むと、いくつも選べる。選んだノードの id は `onPick` で返す（グループ化・コピー・複製に使う）。
  *
  * 線を引いている最中に、引けない先（開始へ入る・終了から出る・グループ・自分）は `canConnect` で断る
@@ -107,7 +107,7 @@ type FlowEdge = Edge<EdgeData, "flow">;
 
 /**
  * 点と線の部品から呼び手へ返す手段。部品は React Flow が描くので、props では渡せない。
- * `data` に関数を入れると編集中の内容が替わるたびに点を作り直すことになるので、context で渡す
+ * `data` に関数を入れるとコピーが替わるたびに点を作り直すことになるので、context で渡す
  */
 interface CanvasActions {
   readonly removeNode: (id: string) => void;
@@ -141,7 +141,7 @@ function RemoveButton({ action, label, onRemove }: { readonly action: string; re
   );
 }
 
-/** 種類を CSS のクラス名にする（知らない種類は 1 つにまとめる） */
+/** 種類を CSS の表記にする（知らない種類は 1 つにまとめる） */
 function cssType(type: string, known: boolean): string {
   return known ? type : "other";
 }
@@ -301,7 +301,7 @@ function stepsOf(doc: FlowDoc, readOnly: boolean): FlowNodeView[] {
 }
 
 function edgesOf(doc: FlowDoc, selected: Selection | undefined, readOnly: boolean): FlowEdge[] {
-  // 行き先の無い線と、グループに繋がる線は描けない（グループは出入口を持たない）。編集中の内容には残る
+  // 行き先の無い線と、グループに繋がる線は描けない（グループは出入口を持たない）。コピーには残る
   const ids = new Set(doc.nodes.filter((node) => !isGroup(node)).map((node) => node.id));
   const edges: FlowEdge[] = [];
   connectionsOf(doc).forEach((c, index) => {
@@ -377,7 +377,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   const edges = useMemo(() => edgesOf(doc, selected, readOnly), [doc, selected, readOnly]);
   const [nodes, setNodes] = useState<FlowNodeView[]>(base);
 
-  // 編集中の内容が替わったら手元を作り直す。測った大きさと、選んでいるか（Shift で選び足したものも）は引き継ぐ。
+  // コピーが替わったら手元を作り直す。測った大きさと、選んでいるか（Shift で選び足したものも）は引き継ぐ。
   // 呼び手が図の外から選んだノード（`focus`。部品箱で足したもの）は、それが替わったときだけ、それ 1 つを選ぶ。
   // 図で押したノードは React Flow が選んでいる（Shift で外したものも）ので、ここでは選び直さない
   const focused = useRef(focus);
@@ -395,7 +395,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   }, [base, focus]);
 
   const onNodesChange = useCallback((changes: NodeChange<FlowNodeView>[]) => {
-    // 消す・足すは編集中の内容の側でしかしない（Delete キーも受けない）。ここで受けるのは大きさ・位置・選択
+    // 消す・足すはコピーの側でしかしない（Delete キーも受けない）。ここで受けるのは大きさ・位置・選択
     setNodes((now) => applyNodeChanges(changes.filter((change) => change.type !== "remove" && change.type !== "add"), now));
   }, []);
 
@@ -409,7 +409,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
     [readOnly, onConnect],
   );
 
-  // 引いている最中に断る（開始へ入る・終了から出る線など）。編集中の内容の側の `connect` も同じ規則で断る
+  // 引いている最中に断る（開始へ入る・終了から出る線など）。コピーの側の `connect` も同じ規則で断る
   const isValidConnection = useCallback((connection: Connection | FlowEdge) => !readOnly && canConnect(doc, connection.source, connection.target), [doc, readOnly]);
 
   const handleSelection = useCallback(({ nodes: chosenNodes }: OnSelectionChangeParams) => onPick(chosenNodes.map((node) => node.id)), [onPick]);

@@ -28,6 +28,7 @@ import {
 import type { BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
 import { renderBoardPage } from "./core/render.js";
 import { showLoading } from "./loading.js";
+import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
@@ -36,9 +37,9 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
-/** 画面の名前。束ねる入出力のパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
-/** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
+/** ファイルの変化をまとめる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
 const TITLE = "ccnavi チケット管理";
 
@@ -69,7 +70,7 @@ interface PanelState {
   /**
    * 前の読み直しから動いたカード。**画面ではなくここが持つ。** 画面は裏に回ると捨てられ、
    * 表に戻ると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
-   * 承認の文を渡してボードに戻った時点で強調表示が消える。決めるのは `core/board-moved.ts`
+   * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
 }
@@ -101,7 +102,7 @@ export async function openBoard(project?: string): Promise<void> {
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -254,8 +255,8 @@ async function update(): Promise<void> {
  * ボードを見せる。中身を渡すのは `send`。
  *
  * **読めたボードはここを必ず通る**ので、動いたカードもここで数え直す。同じボードを渡し直すだけの
- * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の強調表示を
- * そのまま返すので、承認の文を閉じた拍子に強調表示が消えることはない。
+ * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の動いた表示を
+ * そのまま返すので、承認の文を閉じた拍子に動いた表示が消えることはない。
  */
 function show(current: PanelState, board: Board): void {
   current.moved = movedStep(current.moved, board);
@@ -340,7 +341,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
       postAppearance(current.host);
       // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-      // 閉じずにタブを閉じたら見たというフラグは残らないので、次に開いたときにもう 1 度出る
+      // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
       if (!tourSeen(SCREEN)) {
         current.host.post({ type: "tour" } satisfies ToBoard);
       }
@@ -420,7 +421,7 @@ function handleMessage(message: BoardMessage | undefined): void {
 
 /**
  * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）は realpath で解いたパスを出すので、
- * 同じ表記にする（macOS の /tmp → /private/tmp など）。解けなければ渡されたパスのまま
+ * 同じパスにする（macOS の /tmp → /private/tmp など）。解けなければ渡されたパスのまま
  */
 function realRoot(root: string): string {
   try {
@@ -495,14 +496,10 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       runInTerminal(root, pushApprovedCommand(root));
       return;
     case "copy":
-      await vscode.env.clipboard.writeText(effect.prompt);
-      vscode.window.setStatusBarMessage(`${effect.what}をコピーしました。Claude Code に貼って送ってください`, 5000);
+      await copyPrompt(effect.prompt, effect.what);
       return;
     case "openSession":
-      // 走っているセッションに送る公開の API は無いので、文を埋めて新しいセッションを開く（送信はユーザが Enter）
-      await vscode.env.openExternal(
-        vscode.Uri.parse(`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(effect.prompt)}`),
-      );
+      await openPromptInSession(effect.prompt);
       return;
     case "loadDecide": {
       const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase);

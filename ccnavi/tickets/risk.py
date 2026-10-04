@@ -112,11 +112,12 @@ class Factor:
     def key(self) -> tuple:
         """層をまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
 
-        `script:` は表記ではなく、その層のスクリプトの置き場からの相対と、指す先の中身で比べる。
-        共通層は `.ccnavi/common/scripts/`、各層は `<ccnavi ディレクトリ>/scripts/` を指すので、
-        着手で共通層を写した配点（設計 11.12）は表記が違う。表記で比べると同じ項目を
-        `<層>:<id>` として 2 重に数える。中身まで見るのは、名前だけ同じ別のスクリプトを
-        同じ項目として捨てないため。
+        `script:` は書かれたパスではなく、その層のスクリプトの置き場からの相対と、
+        指す先の中身で比べる。共通層は `.ccnavi/common/scripts/`、
+        各層は `<ccnavi ディレクトリ>/scripts/` を指すので、
+        着手で共通層をコピーした配点（設計 11.12）はパスが違う。パスで比べると同じ項目を
+        `<層>:<id>` として 2 重に数える。中身まで見るのは、
+        名前だけ同じ別のスクリプトを同じ項目として捨てないため。
         """
         value = self.value
         if self.kind == KIND_SCRIPT:
@@ -522,7 +523,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
 def definition_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の risks.yml。空の `project` はワークスペース自身の層。
 
-    予約名（`common` / `self`）のプロジェクトは層として数えないので、層の名前を持たない
+    予約名（`common` / `self`）のプロジェクトは層として数えないので、パスを持たない
     （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名前と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
     配点を書ける側が層を選べると、自分のリスクを自分で下げる方法になる。
@@ -815,7 +816,7 @@ def run_script(root: str, rel: str, worktree: str, env: dict[str, str]) -> tuple
 def judge_prompt(
     child: str, parent: str, diff: Diff, pending: list[Factor], worktree: str, root: str
 ) -> str:
-    """親がサブエージェントに渡す、定性項目の問いと差分の要約。root は sh の表記に使う。"""
+    """親がサブエージェントに渡す、定性項目の問いと差分の要約。root は sh のパスに使う。"""
     lines = [
         f"# {child} のリスク判定（定性）",
         "",

@@ -1,6 +1,6 @@
 """glob の翻訳。意味は `fnmatch` そのままで、足しているのは区切りの正規化だけ。
 
-見るのは 3 つ。文字列全体に当たること、区切り文字がどちらの書き方でも当たること、
+見るのは 3 つ。文字列全体に当たること、区切り文字がどちらの表記でも当たること、
 そして語の切れ目が入らないこと。3 つ目は失われた機能ではなく決めた仕様で、
 ここに書いておかないと、次に触る人が「入れ忘れ」と読んで戻してしまう。
 """
@@ -24,7 +24,7 @@ class TranslateTest(unittest.TestCase):
         self.assertFalse(self.hit("git push", "cd /repo && git push"))
         self.assertTrue(self.hit("*git push*", "cd /repo && git push"))
 
-    def test_区切り文字はどちらの書き方にも当たる(self):
+    def test_区切り文字はどちらの表記にも当たる(self):
         # ルールは 1 回書いて、どの機械でも同じ意味でなければならない。
         for subject in ("/repo/secrets/token.txt", "C:\\repo\\secrets\\token.txt"):
             with self.subTest(subject=subject):
@@ -53,7 +53,7 @@ class TranslateTest(unittest.TestCase):
     def test_いま使っている書き方が意図どおり当たる(self):
         # ルールファイルと組み込みの既定にある書き方を、実例で押さえる。
         # 翻訳後の式ではなく当たり方で書くのは、fnmatch の出す式が
-        # 版によって変わりうるため。守りたいのは式ではなく当たり方。
+        # 版によって変わりうるため。確かめたいのは式ではなく当たり方。
         for glob, subject, want in (
             ("*git push*", "git push origin main", True),
             ("*git push*", "cd /repo && git push", True),

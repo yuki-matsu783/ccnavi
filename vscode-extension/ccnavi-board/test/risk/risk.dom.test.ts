@@ -138,7 +138,7 @@ test("CB-T84 保存できない理由と読み込みの苦情を出し、錠は�
   }
 });
 
-test("CB-T122 項目の一覧は 1 件 1 行で、保存してある id の行は開いて出す", async () => {
+test("CB-T122 項目の一覧は 1 件 1 行で、state に残してある id の行は開いて出す", async () => {
   const dom = await openRisk({}, { open: ["ci", "q"] });
   try {
     assert.equal(dom.all("#factors > li.factor").length, 4);

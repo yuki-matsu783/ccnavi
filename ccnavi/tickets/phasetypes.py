@@ -533,7 +533,7 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
         # 子チケットの範囲と同じく、大文字小文字は区別しない（`ticket.entries`）。
         # 機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
         # 承認を拒まれ、Windows では通る。範囲はユーザが宣言する意図なので、機械の
-        # 都合ではなく表記の意味で読む。子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える。
+        # 都合ではなく書かれたパスの意味で読む。子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える。
         try:
             compiled = re.compile("^" + globmatch.translate(glob), re.IGNORECASE)
         except re.error as exc:

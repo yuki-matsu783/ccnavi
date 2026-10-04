@@ -32,7 +32,7 @@ test("CB-T192 列が変わったカードと新規起票のカードだけを出
     { id: "i0001-02", from: "doing", to: "done" },
   ]);
 
-  // 新しく現れたカードは from を持たない。消えたカードは強調表示を付ける先が無いので出さない
+  // 新しく現れたカードは from を持たない。消えたカードは動いた表示を付ける先が無いので出さない
   const { "i0001-05": _gone, ...rest } = before;
   const added: Placement = { ...rest, i0002: "todo" };
   assert.deepEqual(movedCards(before, added), [{ id: "i0002", to: "todo" }]);
@@ -41,7 +41,7 @@ test("CB-T192 列が変わったカードと新規起票のカードだけを出
   assert.deepEqual(movedCards(before, { ...before }), []);
 });
 
-test("CB-T192b 置き場所が同じかを見る（同じなら強調表示を作り直さない）", () => {
+test("CB-T192b 置き場所が同じかを見る（同じなら動いた表示を作り直さない）", () => {
   const before = placementOf(buildBoard(fixture()));
   assert.equal(samePlacement(before, { ...before }), true, "コピーは同じ");
   assert.equal(samePlacement(before, { ...before, "i0001-03": "doing" }), false, "列が変われば違う");
@@ -79,10 +79,10 @@ function without(board: ReturnType<typeof buildBoard>, ticket: string): ReturnTy
   };
 }
 
-test("CB-T192c 1 枚目は強調表示を付けず、列が動かない読み直しでは前の強調表示を持ち越す", () => {
+test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない読み直しでは前の動いた表示を持ち越す", () => {
   const board = buildBoard(fixture());
 
-  // 1 枚目。比べる相手が無いので、何にも強調表示を付けない（開いた直後に全部が光ると意味が無い）
+  // 1 枚目。比べる相手が無いので、何にも動いた表示を付けない（開いた直後に全部が光ると意味が無い）
   const first = movedStep(NOTHING_MOVED, board);
   assert.deepEqual(first.moved, []);
   assert.notEqual(first.placement, undefined);
@@ -92,12 +92,12 @@ test("CB-T192c 1 枚目は強調表示を付けず、列が動かない読み直
   assert.deepEqual(approved.moved, [{ id: "i0001-03", from: "todo", to: "doing" }]);
 
   // 同じ列のまま渡し直された（承認のオーバーレイの出し入れ、何も変わらなかった「更新」）。
-  // **ここで作り直すと、承認の文を閉じた時点で強調表示が消える**
+  // **ここで作り直すと、承認の文を閉じた時点で動いた表示が消える**
   const again = movedStep(approved, moveTo(board, "i0001-03", "doing"));
   assert.equal(again, approved, "何も変わらないなら、同じ状態をそのまま返す");
   assert.deepEqual(again.moved, [{ id: "i0001-03", from: "todo", to: "doing" }]);
 
-  // 次に何かが動いたら、前の強調表示は消えて新しい動きに入れ替わる
+  // 次に何かが動いたら、前の動いた表示は消えて新しい動きに入れ替わる
   const next = movedStep(again, moveTo(board, "i0001-02", "done"));
   // 順序は列の順（未着手 → 作業中 → 完了）
   assert.deepEqual(next.moved, [
@@ -110,7 +110,7 @@ test("CB-T192d カードが消えただけの読み直しも「変わった」�
   const board = buildBoard(fixture());
   const first = movedStep(NOTHING_MOVED, board);
 
-  // 消えたカードには強調表示を付けられないので `moved` は空。**それでも置き場所は更新する**。
+  // 消えたカードには動いた表示を付けられないので `moved` は空。**それでも置き場所は更新する**。
   // ここを「動いた分が 0 件なら据え置き」にすると、戻ってきたカードが「新規起票」にならない
   const gone = movedStep(first, without(board, "i0001-03"));
   assert.deepEqual(gone.moved, []);

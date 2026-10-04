@@ -426,7 +426,7 @@ class MergeFileTest(GitWrapperTest):
             ("merge-file", "-L", "-p", current, base, other),
             # `--` の後ろはファイル名。
             ("merge-file", "--union", "--", "-p", base, other),
-            # 打ち消しと略記は git が受け取るので、知らない書き方として止める。
+            # 否定の形と略記は git が受け取るので、知らない表記として止める。
             ("merge-file", "-p", "--no-stdout", current, base, other),
             ("merge-file", "--std", current, base, other),
             ("merge-file", "-pq", current, base, other),
@@ -984,11 +984,10 @@ class WorktreeNameTest(GitWrapperTest):
 class ParentWorktreeSwitchTest(GitWrapperTest):
     """親のワークツリーでは別のブランチへ移らない。
 
-    親のワークツリーは .claude/worktrees/<P> で、親の承認済みチケットか提案（`ticket: <P>`、
-    `parent:` なし）が
+    親のワークツリーは .claude/worktrees/<P> で、親チケットか提案（`ticket: <P>`、`parent:` なし）が
     あるもの。別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh が
     リモートでの承認をこのツリーへ取り込まなくなる。親のブランチを一度でも push したか
-    ccnavi-sync.sh で取り込んだ親（親子チケットの同期状態がある親）では、親と子のチケットの承認・
+    ccnavi-sync.sh で取り込んだ親（取り込み状態がある親）では、親と子のチケットの承認・
     状態の操作・実行前の判定も止まる。拒否文はその中身を言う。
     """
 
@@ -1053,12 +1052,11 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
 
 
 class FamilyRecordPushTest(GitWrapperTest):
-    """push が通ったら親のブランチの親子チケットの同期状態を作り、
-    同期状態が gone なら送らない。
+    """push が通ったら親子のチケットの取り込み状態を作り、取り込み状態が gone なら送らない。
 
-    最初の push で同期状態を作るので、その親子チケットは C1 の対象に入る。
+    最初の push で取り込み状態を作るので、その親子のチケットは C1 の対象に入る。
 
-    同期状態は ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
+    取り込み状態は ワークスペースルートの logs/state/sync/self/families/<P>（1 行 1 項目）。
     """
 
     def setUp(self):
@@ -1096,7 +1094,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         self.assertEqual("origin", fields["remote"])
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), fields["sha"])
         self.assertTrue(fields["fetched_at"].isdigit())
-        self.assertIn("親子チケットの同期状態を作った", result.stdout)
+        self.assertIn("の取り込み状態を作った", result.stdout)
         self.assertIn("ccnavi-sync.sh i0001", result.stdout)
 
     def test_uncommitted_store_changes_keep_the_family_out(self):
@@ -1116,7 +1114,7 @@ class FamilyRecordPushTest(GitWrapperTest):
         result = self.push()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.fields()["sha"])
-        self.assertNotIn("親子チケットの同期状態を作った", result.stdout)
+        self.assertNotIn("の取り込み状態を作った", result.stdout)
 
     def test_a_gone_family_is_not_pushed(self):
         write_text(
@@ -1146,7 +1144,7 @@ class AllowListTest(GitWrapperTest):
     """オプションは許可リストで読む。
 
     git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
-    名前を並べるやり方では止められずに通る。束ねた短いオプション（`-qbnew`）は 1 字ずつ読み、
+    名前を並べるやり方では止められずに通る。まとめた短いオプション（`-qbnew`）は 1 字ずつ読み、
     値を取る字の後ろは値として扱う。
     """
 
@@ -1235,7 +1233,7 @@ class AllowListTest(GitWrapperTest):
 
 
 class ParentWorktreeValueBundleTest(ParentWorktreeSwitchTest):
-    """親のワークツリーでは、値を束ねた書き方（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
+    """親のワークツリーでは、値をまとめた書き方（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
 
     def test_moving_away_from_the_parent_branch_is_rejected(self):
         for args in (
@@ -1293,7 +1291,8 @@ class WorktreeDetachTest(GitWrapperTest):
 
 
 class SymlinkedWorkspaceTest(GitWrapperTest):
-    """リンクを経た作業場でも守りが有効（git のパスとワークスペースのパスを揃える。中 12）。"""
+    """リンクを経た作業場でも組み込みの保護が有効
+    （git のパスとワークスペースのパスを揃える。中 12）。"""
 
     def setUp(self):
         super().setUp()
@@ -1323,11 +1322,11 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
     def test_the_family_record_is_written_through_the_link(self):
         result = run_in(self.via_link, "push", "-u", "origin", "i0001")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("親子チケットの同期状態を作った", result.stdout)
+        self.assertIn("の取り込み状態を作った", result.stdout)
 
 
 class PushRemoteResolutionTest(FamilyRecordPushTest):
-    """送り先は git と同じ順で解き、origin 以外へ送ったら同期状態を作らない。"""
+    """送り先は git と同じ順で解き、origin 以外へ送ったら取り込み状態を作らない。"""
 
     def test_a_push_remote_other_than_origin_writes_no_record(self):
         other = self.make_bare()

@@ -82,7 +82,7 @@ export interface Client {
   readonly token: string;
   readonly fetch: Fetch;
   readonly counter: Counter;
-  /** 応答から読んだもの（PAT の期限。読めなければ空）。呼び手が保存する */
+  /** 応答から読んだもの（PAT の期限。読めなければ空）。呼び手が記録する */
   readonly seen?: { expiration: string };
   /** 待つ（レート制限の Retry-After）。試験は差し替える */
   readonly sleep?: (ms: number) => Promise<void>;
@@ -529,7 +529,7 @@ export async function firstParentChain(client: Client, owner: string, repo: stri
  * あるときだけ、そのコミットと親を返す。どれかを確かめられなければ null（取り下げを出さない）。
  *
  * 「足した」はコミットの変更の一覧（`files` の `status`）に頼らない。GitHub は承認コミット（提案の削除と
- * 承認済みチケットの追加）を `renamed` と返すことがあり、一覧は 300 件で切れるため。両方の木で `path` を引いて比べる。
+ * 承認済みのチケットの追加）を `renamed` と返すことがあり、一覧は 300 件で切れるため。両方の木で `path` を引いて比べる。
  * 一覧（`GET /commits?path=`）は `git log -- path` の簡略化で、merge や別の枝のコミットも出うる。
  */
 export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
@@ -576,7 +576,7 @@ export async function pullApprovals(client: Client, owner: string, repo: string,
   return out;
 }
 
-// ---- レビュー済み。MR のスレッドとレビューのコピーと、依頼の後の変更の一覧 --------------
+// ---- レビュー済み。MR のスレッドとレビューを取得した結果と、依頼の後の変更の一覧 --------------
 
 /** スレッド 1 つ（`ccnavi-review.sh` の `threads` と同じ形） */
 export interface ReviewThread {
@@ -587,7 +587,7 @@ export interface ReviewThread {
   readonly line: number;
   readonly body: string;
   readonly created_at: string;
-  /** 最初のコメントを書いたアカウント（GitLab のコピーだけ。ccnavi の依頼のスレッドを見分ける。目印は誰でも書けるので書き手で見る） */
+  /** 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（目印は誰でも書けるので書き手で見る） */
   readonly author?: string;
 }
 
@@ -599,7 +599,7 @@ export interface PullReview {
   readonly author: string;
 }
 
-/** ホストのデータのコピー（`ccnavi-review.sh fetch` と同じ形。Python の `review.Result` が読む） */
+/** ホストから取得した結果（`ccnavi-review.sh fetch` と同じ形。Python の `review.Result` が読む） */
 export interface ReviewCopy {
   readonly host: "github" | "gitlab";
   readonly mr: { readonly number: number; readonly url: string };
@@ -694,8 +694,8 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
 }
 
 /**
- * 親のブランチの MR のスレッドとレビューのコピー。`ccnavi-review.sh fetch` と同じ形で、
- * 同じ見本（test/fixtures/host/github/）から同じコピーになることを試験が見る。MR が無ければ投げる。
+ * 親のブランチの MR のスレッドとレビューを取得した結果。`ccnavi-review.sh fetch` と同じ形で、
+ * 同じ見本（test/fixtures/host/github/）から同じ結果になることを試験が見る。MR が無ければ投げる。
  */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
   const mr = await openPull(client, owner, repo, branch);

@@ -132,8 +132,8 @@ class RootPlaceholderTest(unittest.TestCase):
         # 表記を変えても行き着く先で当たる。`..` と、大文字小文字。
         detour = os.path.join(self.root, "docs", "..", "README.md")
         self.assertEqual(self.judge("Write", detour).get("permissionDecision"), "deny")
-        # ワークスペースルートの表記も、どの機械でも区別せずに当てる。区別する機械では
-        # 別の場所を指す表記だが、それでも止める側を採る（`{root}` を機械で変えない）。
+        # ワークスペースルートのパスも、どの機械でも区別せずに当てる。区別する機械では
+        # 別の場所を指すパスだが、それでも止める側を採る（`{root}` を機械で変えない）。
         swapped = os.path.join(self.root.swapcase(), "README.md")
         self.assertEqual(self.judge("Write", swapped).get("permissionDecision"), "deny")
 

@@ -111,10 +111,10 @@ test("CB-T65 .gitignore の置き場の行を見つけ、無ければ足す", ()
   assert.match(gitignoreWithProjects(undefined, "projects"), /^# .*\n\/projects\/\n$/);
 });
 
-test("CB-T66 写すときは出どころのコメントを足し、sh のパスだけを {root} 付きにする", () => {
+test("CB-T66 コピーするときは出どころのコメントを足し、sh のパスだけを {root} 付きにする", () => {
   const source = "deny:\n  - id: raw-git\n    message: |\n      'sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド>' を使う。\n      glob: '*/.ccnavi/scripts/*' は変えない\n";
   const out = rewriteRulesForProject(source, ".ccnavi/common/rules.yml", "lib", "2026-09-12");
-  assert.match(out, /^# lib のルール。共通層の \.ccnavi\/common\/rules\.yml を 2026-09-12 に写した/);
+  assert.match(out, /^# lib のルール。共通層の \.ccnavi\/common\/rules\.yml を 2026-09-12 にコピーした/);
   assert.match(out, /共通層に足してヒットする（上書きはしない）/);
   assert.match(out, /'sh \{root\}\/\.ccnavi\/scripts\/ccnavi-git\.sh <サブコマンド>'/);
   assert.match(out, /glob: '\*\/\.ccnavi\/scripts\/\*' は変えない/);

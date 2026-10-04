@@ -1,5 +1,4 @@
-"""記録と状態ファイルの後始末。記録を大きさでローテートし、古い記録と終わったセッションの
-状態ファイルを消す。
+"""記録と state の後始末。記録を大きさでローテートし、古い記録と終わったセッションの記録を消す。
 
 走るのはセッションの開始（events.decide_at_start）と、ユーザが端末から打つ `ccnavi --prune`
 だけ。実行前チェック（PreToolUse）では走らせない。ツール呼び出しのたびに置き場を数えると、
@@ -15,9 +14,8 @@
 **診断ログ（`logs/diag/*.log`）。** 記録と同じしきい値で、大きさでローテートし、
 保持日数（CCNAVI_LOG_KEEP_DAYS）のあいだ書かれていないものを消す（_prune_diag）。
 
-**状態ディレクトリ（`logs/state/`）。** 消すのはセッションを名前に持つものだけで、
-セッションごとにまとめて
-判断する。そのセッションの状態ファイルのどれかが保持日数のうちに書かれていれば、全部を残す。
+**state（`logs/state/`）。** 消すのはセッションを名前に持つものだけで、セッションごとにまとめて
+判断する。そのセッションの記録のどれかが保持日数のうちに書かれていれば、全部を残す。
 動いているセッションは、ターンの始まりの基準（`<セッション>.turn.json`）をプロンプトの
 たびに、自己防衛のバックアップ（`selfguard/<セッション>/`）を実行前チェックのたびに書き直すので、
 必ずどれかが新しい。Claude Code はセッションの終わりを hook に知らせないので、「終わった」は
@@ -69,18 +67,18 @@ FLOORS = {
 STAMP = "%Y%m%d-%H%M%S"
 
 # 自己防衛のバックアップの置き場（selfguard.BACKUP_DIR / STORE_DIR）。selfguard は state の段なので
-# ここからは読めない。名前を写して持ち、tests/core/test_prune.py が一致を見る。
+# ここからは読めない。名前をコピーして持ち、tests/core/test_prune.py が一致を見る。
 SELFGUARD_DIR = "selfguard"
 SELFGUARD_STORE = "store"
 
-# 名前からセッションがそのまま読める状態ファイル。
+# 名前からセッションがそのまま読める記録。
 _SESSION_ONLY = (
     re.compile(r"^nudged-(?P<s>.+)\.json$"),  # ops._nudge_path
     re.compile(r"^denied-(?P<s>.+)\.json$"),  # repeat._path
     re.compile(r"^stop-(?P<s>.+)\.json$"),  # ctxfile.stop_path
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
 )
-# 名前の後ろにセッション以外の鍵が `-` で続く状態ファイル。セッションにも `-` が入るので、
+# 名前の後ろにセッション以外の鍵が `-` で続く記録。セッションにも `-` が入るので、
 # 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
 _SESSION_AND_KEY = (
     ("once-", ".json"),  # ctxfile._once_path
@@ -89,7 +87,7 @@ _SESSION_AND_KEY = (
 )
 # `<セッション>.json`（post._seen_path）。Claude Code のセッションは UUID なので、その形に
 # 限る。`.+` で読むと、置き場に置かれた別のファイル（`package.json`、レビューの結果の
-# コピーなど）をセッションの状態ファイルと読み違えて消す。形の違う名前は知らないファイルとして残す。
+# コピーなど）をセッションの記録と読み違えて消す。形の違う名前は知らないファイルとして残す。
 _SEEN = re.compile(
     r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.json$"
 )
@@ -113,7 +111,7 @@ class Report:
 
 
 def limits() -> tuple[float, float, float, list[str]]:
-    """しきい値（ローテートの MB、記録と状態ファイルの保持日数）と、読めなかった値の苦情。"""
+    """しきい値（ローテートの MB、記録の保持日数、記録の保持日数）と、読めなかった値の苦情。"""
     values = []
     problems = []
     for env, default in LIMITS:
@@ -184,7 +182,7 @@ def lines(report: Report, dry_run: bool) -> list[str]:
 
 
 def _shown(root: str, path: str) -> str:
-    """見せる表記。ワークスペースの中なら相対、外なら絶対。区切りは "/"。"""
+    """見せるパス。ワークスペースの中なら相対、外なら絶対。区切りは "/"。"""
     full = os.path.abspath(path)
     try:
         rel = os.path.relpath(full, os.path.abspath(root))
@@ -315,7 +313,7 @@ def _prune_diag(
     変える（_rotate）。そのうえで、ローテートした分も含めて最後に書かれてから保持日数を過ぎた
     `*.log` を消す。この回にローテートした 1 本はこの回には消さない（名前が変わって元の
     場所から無くなるため）。dry_run でも同じ扱いにして、本番と同じ結果を示す。
-    置き場（`logs` か `logs/diag`）がリンクなら辿らない（状態ディレクトリと同じ理由。logger も
+    置き場（`logs` か `logs/diag`）がリンクなら辿らない（state の置き場と同じ理由。logger も
     リンクの先には書かない）。
     """
     directory = os.path.join(root, diaglog.DIAG_DIR)
@@ -359,14 +357,14 @@ def _prune_diag(
 def _prune_state(
     report: Report, root: str, state_dir: str, session: str, cutoff: float, dry_run: bool
 ) -> None:
-    """終わったセッションの状態ファイルを、セッションごとにまとめて消す。
+    """終わったセッションの記録を、セッションごとにまとめて消す。
 
     置き場そのものがリンクなら、何も消さずに報告に出す。リンクの先は ccnavi の置き場とは
     限らず、辿って消すと置き場の外のファイルを消す。
     """
     if os.path.islink(state_dir):
         report.problems.append(
-            f"{_shown(root, state_dir)} はリンクなので辿らない（状態ファイルを消さない）"
+            f"{_shown(root, state_dir)} はリンクなので辿らない（記録を消さない）"
         )
         return
     groups, loose = _session_entries(report, root, state_dir)
@@ -389,7 +387,7 @@ def _prune_state(
 def _session_entries(
     report: Report, root: str, state_dir: str
 ) -> tuple[dict[str, list[str]], list[str]]:
-    """状態ディレクトリの中身を、セッションの表記ごとにまとめる。2 つめはまとめられなかったもの。"""
+    """state の置き場を、セッションの表記ごとにまとめる。2 つめはまとめられなかったもの。"""
     groups: dict[str, list[str]] = {}
     try:
         names = os.listdir(state_dir)

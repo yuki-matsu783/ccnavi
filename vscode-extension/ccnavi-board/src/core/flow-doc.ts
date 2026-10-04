@@ -26,7 +26,7 @@
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
  * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
- * ここには VS Code の API も node も DOM も入れない。画面（React）が束ねて読むため。
+ * ここには VS Code の API も node も DOM も入れない。画面（React）がバンドルして読むため。
  */
 import { Document, parseDocument, Scalar, visit } from "yaml";
 
@@ -185,7 +185,7 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
 /**
  * YAML の本文を、画面が描くために読む。**正しいかは決めない。** 読めるか（大きさ・YAML として読めるか・別名）と
  * 形（`nodes` が無い、`id` が無い・重なる など）の答えは実行ファイル（`--lint --flow`、`flow-lint.ts`）が出し、
- * 画面はそれを通ったものだけを開く。読み手はルール設定の画面（`rules-doc.ts`）と同じ `yaml` の既定。
+ * 画面はそれを通ったものだけを開く。読み手はルール管理の画面（`rules-doc.ts`）と同じ `yaml` の既定。
  *
  * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
  * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードのリスト（`id` が文字列の
@@ -767,7 +767,7 @@ export function resizeGroup(doc: FlowDoc, id: string, size: FlowSize, position?:
  * - ほかのノードは、真ん中がグループの枠の中に落ちればそのグループに入り、どの枠にも落ちなければ
  *   グループから出る。枠が重なっていれば、後ろに並ぶ（図で上に描かれる）グループに入る
  *
- * 位置もグループも変わらなければ、同じ値をそのまま返す（押しただけで未保存にしない）。
+ * 位置もグループも変わらなければ、同じものをそのまま返す（押しただけで未保存にしない）。
  */
 export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDoc {
   const index = doc.nodes.findIndex((n) => n.id === id);
@@ -813,7 +813,7 @@ export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDo
 /**
  * ドラッグで動いた点をまとめて置く。位置は React Flow の決まり（グループの中のノードはグループからの位置）で、
  * コピーの今のグループに対して読む。グループを先に置き、そのあとほかのノードを置く（一緒に動いた
- * グループの新しい位置から読むため）。何も変わらなければ同じ値を返す。
+ * グループの新しい位置から読むため）。何も変わらなければ同じものを返す。
  */
 export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; readonly position: FlowPoint }[]): FlowDoc {
   const typeOf = new Map(doc.nodes.map((node) => [node.id, isGroup(node)]));
@@ -834,7 +834,7 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
 // ---- コピー・貼り付け・複製
 
 /**
- * コピーしたノードと線（画面の中のクリップボード）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
+ * コピーしたノードと線（画面の中に保持する）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
  *
  * - `nodes` は元の配列の順（グループは中のノードより前）。`parentId` は元の id のまま持つ
  * - `absolute` はコピーした時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ

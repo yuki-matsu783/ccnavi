@@ -1,6 +1,6 @@
 """C1 の受入テスト。
 
-C1 は、取り込み済みの親子チケットで状態を書く操作を
+C1 は、取り込み済みの親子のチケットで状態を書く操作を
 「ロック → 取り込み → 書く → コミット → push」の 1 操作にし、push が通るまで完了にしない形。
 Chrome が未 push の古い状態で判定しないようにする。
 
@@ -13,23 +13,20 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 
 1. 順序: hook のマーカーと状態の履歴を先にコミット → 取り込み → 書く →
    書いたパスだけ commit --only → push。
-   統合先の同期状態も同じ回で書く
+   統合先の取り込み結果も同じ回で書く
 2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・承認の push は入れ子で通る
 3. 競合: リモートが進んでいれば取り込んでから書く。衝突したら取りやめて何も書かない
 4. 途中の操作（merge など）があれば始めない
 5. 戻し: push が通らなければ、自分のコミットを比較つきで戻し、書いたパスの中身も戻して
    1 回だけやり直す
 6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
-7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error
-   （着手で configsync が
-   プロジェクトの層へ写したものは例外。
-   tests/ticket/test_core.py と tests/config/ が見る）
+7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
+   プロジェクトの層へ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
-9. ユーザの判断の入口（ccnavi-review.sh chat など）は、
-   取り込み済みの親子チケットなら
+9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
-10. 同期状態の無い親子チケット・origin の無いリポジトリ・chat だけの親子チケットは今のまま
+10. 取り込み状態の無い親子のチケット・origin の無いリポジトリ・chat だけの親子のチケットは今のまま
     （コミットも push もしない）
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
@@ -124,7 +121,7 @@ class C1Harness(unittest.TestCase):
     """ワークスペース（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。
 
     親は承認済み（計画は mr で見る 1 フェーズ、子 1 つ）で、送ってあり、取り込み済み
-    （同期状態が present）。
+    （取り込み状態が present）。
     """
 
     plan = ("design",)
@@ -326,7 +323,8 @@ class C1TicketTest(C1Harness):
         record = fields(self.record)
         self.assertEqual(record["state"], "present")
         self.assertEqual(record["sha"], head)
-        # 統合先の同期状態も同じ回で書く（2c の相談: 送った直後に同期状態が無く承認が止まる件）。
+        # 統合先の取り込み結果も同じ回で書く
+        # （2c の相談: 送った直後に取り込み結果が無く承認が止まる件）。
         head_file = os.path.join(self.state, "sync", "self", "integration", "head")
         self.assertTrue(os.path.isfile(head_file))
         self.assertFalse(os.path.exists(self.lock_dir()))
@@ -438,7 +436,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
     def test_a_take_in_that_blocks_the_family_writes_nothing(self):
-        """取り込みの後の検査で親子チケットが止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
+        """取り込みの後の検査で親子のチケットが止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
         rel = f"{APPROVED}/doing/i0001-02.md"
         self.remote_commit(rel, "---\nticket: i0001-02\n---\n")
         result = self.ticket("start", PARENT)
@@ -683,7 +681,7 @@ class C1TicketTest(C1Harness):
         self.assertIn("C1 の対象", refused.stderr)
         self.assertEqual(self.dirty(), "")
 
-    # ---- 改行（autocrlf）と偽の履歴の行
+    # ---- 改行（autocrlf）と偽の状態の履歴
 
     def test_autocrlf_hook_events_are_carried(self):
         git(self.ws, "config", "core.autocrlf", "true")
@@ -768,7 +766,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 
-    # ---- 止める親子チケット
+    # ---- 止める親子のチケット
 
     def test_a_gone_family_is_refused_before_any_network(self):
         with open(self.record, encoding="utf-8") as f:
@@ -802,7 +800,7 @@ class C1TicketTest(C1Harness):
 
 
 class C1NotImportedTest(C1Harness):
-    """10. 同期状態の無い親子チケットは今のまま（書くだけ。コミットも push もしない）。"""
+    """10. 取り込み状態の無い親子のチケットは今のまま（書くだけ。コミットも push もしない）。"""
 
     imported = False
 
@@ -841,7 +839,7 @@ class C1NotImportedTest(C1Harness):
 
 
 class C1ChatOnlyTest(C1Harness):
-    """10. chat だけの親子チケット（マージリクエストを持たない）は、
+    """10. chat だけの親子のチケット（マージリクエストを持たない）は、
     取り込み済みでも
     C1 にしない。
     """
@@ -856,7 +854,7 @@ class C1ChatOnlyTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
         family = self.exe("c1", "family", PARENT)
         self.assertIn("target no", family.stdout)
-        self.assertIn("chat だけの親子チケット", family.stdout)
+        self.assertIn("chat だけの親子のチケット", family.stdout)
 
 
 class PhaseOne:
@@ -876,7 +874,7 @@ class PhaseOne:
 
 
 class C1HumanTest(PhaseOne, C1Harness):
-    """9. ユーザの判断の入口は、取り込み済みの親子チケットなら承認の push を自動で呼ぶ。
+    """9. ユーザの判断の入口は、取り込み済みの親子のチケットなら承認の push を自動で呼ぶ。
 
     11. 承認の push。
     """
@@ -952,6 +950,35 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
 
+    def test_push_approved_carries_a_removed_draft_with_the_flow(self):
+        """取り込んで消えた下書きは、フローと一緒にコミットして push する。書き直された下書きと
+        追跡していない下書きには触れない。"""
+        drafts = "wip/proposals/flows"
+        taken = f"{drafts}/{CHILD}.yml"
+        rewritten = f"{drafts}/{PARENT}-02.yml"
+        untracked = f"{drafts}/{PARENT}-03.yml"
+        for rel in (taken, rewritten):
+            write(os.path.join(self.tree, rel), "nodes: []\n")
+        git(self.tree, "add", "--", taken, rewritten)
+        git(self.tree, "commit", "-q", "-m", "drafts")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        flow_rel = f"{APPROVED}/flows/{CHILD}.yml"
+        write(os.path.join(self.tree, flow_rel), "nodes: []\n")
+        os.remove(os.path.join(self.tree, taken))
+        write(os.path.join(self.tree, rewritten), "nodes: [x]\n")
+        write(os.path.join(self.tree, untracked), "nodes: []\n")
+        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 同じ中身なので、名前の付け替えとして読まずに 2 つのパスで見る。
+        out = git(self.tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([flow_rel, taken]))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        left = self.dirty()
+        self.assertIn(rewritten, left)
+        self.assertIn(untracked, left)
+        self.assertNotIn(taken, left)
+        self.assertEqual(git(self.tree, "diff", "--cached", "--name-only").stdout, "")
+
     def test_push_approved_without_names_carries_the_family_through_c1(self):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
@@ -963,8 +990,8 @@ class C1HumanTest(PhaseOne, C1Harness):
 
 
 class C1NotImportedHumanTest(PhaseOne, C1Harness):
-    """10. 同期状態の無い親子チケットでは、ユーザの判断の入口は置くだけでコミットしない
-    （今のまま）。"""
+    """10. 取り込み状態の無い親子のチケットでは、
+    ユーザの判断の入口は置くだけでコミットしない（今のまま）。"""
 
     plan = ("chores", "design")
     imported = False
@@ -983,7 +1010,7 @@ class C1NotImportedHumanTest(PhaseOne, C1Harness):
 
 
 # 実行ファイルの半分の代役。残った指摘の行き先（`--reviewed ... --yes`）だけを代わりに書き
-# （親のワークツリーにレビュー済みのマーカーを置き、書いたパスの一覧を出し、
+# （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
 # 残り（`c1 family`・`c1 sort`・`sync paths` など）は本物に渡す。
 HALF = """#!/bin/sh
@@ -1298,9 +1325,9 @@ class C1HostTest(C1Harness):
 class C1ChromeConfirmTest(PhaseOne, C1Harness):
     """Chrome のレビュー済みと手元の confirm の突き合わせ。
 
-    取り込み済みの親子チケットでは、手元の CLI を直に打つと C1 に断られる
-    （`--record-tree` が無い）。そこで
-    C1 と同じ手順（`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
+    取り込み済みの親子のチケットでは、手元の CLI を直に打つと C1 に断られる
+    （`--record-tree` が無い）。そこで C1 と同じ手順
+    （`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
     回し、同じ状態から Chrome の入口が出す書くものと、C1 が親のブランチへ書いて送ったものを比べる。
     違ってよいのは経路（`via`）と時刻（`at`）と拡張の版だけ。アカウント（`actor`）は、手元は sh が
     トークンの持ち主を引いたもの、Chrome は PAT の持ち主で、同じ見本なので同じになる。
@@ -1365,7 +1392,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         return files
 
     def chrome_request(self, scene=None):
-        """拡張が組むのと同じ要求（統合先 main、親 i0001、見本のコピー、
+        """拡張が組むのと同じ要求（統合先 main、親 i0001、録った見本、
         依頼の後の変更の一覧）。"""
         from tests.ticket.test_core import _chrome
 
@@ -1465,7 +1492,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         # 手元を直に打つと C1 に断られる（だから C1 の手順で回す）。文面まで見る
         direct = self.exe("--cwd", self.tree, "review", "confirm", "--phase", "1", "--result", body)
         self.assertNotEqual(direct.returncode, 0)
-        self.assertIn(f"親子チケット {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
+        self.assertIn(f"親子のチケット {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
         self.assertIn("何も書かずに止めた", direct.stderr)
 
         before = self.sha(self.tree, "HEAD")

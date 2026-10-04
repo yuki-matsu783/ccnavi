@@ -61,7 +61,7 @@ import type { PhaseChip } from "./board.js";
 import { PUSH_APPROVED_SCRIPT, reviewedPrompt } from "./commands.js";
 
 /**
- * 承認のオーバーレイの持ち物。`overlay` が画面へ渡るぶんで、残りは拡張ホストの中だけで持つ状態。
+ * 承認のオーバーレイの持ち物。`overlay` が画面へ渡るぶんで、残りは拡張ホストの中だけに保持する。
  *
  * 画面の中に持たないのは、監視の更新でボードが入れ替わってもオーバーレイが消えないようにするため
  * （`board-view.ts` の `ApprovalOverlay`）。

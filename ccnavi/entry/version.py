@@ -51,7 +51,7 @@ BUILDINFO_MODULE = "ccnavi_buildinfo"
 
 def commit() -> str:
     """組み立ての元になったコミット。埋めていなければ `unknown`。"""
-    # 表記は BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller がまとめる。
+    # 名前は BUILDINFO_MODULE と同じ。build.py が `build/stamp/` に書き、PyInstaller がまとめる。
     try:
         import ccnavi_buildinfo  # type: ignore[import-not-found]
     except ImportError:

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard, flowCardOf } from "../../src/core/board.js";
 import { templateFlow } from "../../src/core/flow-doc.js";
-import { asFlowMessage, flowButtonLabel, flowTargetOf, flowTicketOf, lockFromFailure } from "../../src/core/flow-view.js";
+import { asFlowMessage, flowButtonLabel, flowRequestPrompt, flowTargetOf, flowTicketOf, lockFromFailure, requestLabel } from "../../src/core/flow-view.js";
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 import { fixture, fixtureText } from "../helpers/fixture.js";
 
@@ -36,7 +36,7 @@ test("CB-T225 画面から届くメッセージは形を確かめ、崩れたも
   assert.equal(asFlowMessage(null), undefined);
 });
 
-test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に使える文字列だけ受ける", () => {
+test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に使える表記だけ受ける", () => {
   assert.equal(flowTicketOf({ ticket: "i0001-01" }), "i0001-01");
   assert.equal(flowTicketOf({ ticket: "web.i0002-03" }), "web.i0002-03");
   for (const bad of ["", " i0001-01", "../i0001-01", "i0001/01", "i0001\\01", "-x"]) {
@@ -47,7 +47,7 @@ test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に
 });
 
 test("CB-T227 カードのボタンの言葉は、在るか・着手中か（実行ファイルの答え）で 作成 / 編集 / 閲覧（着手中）", () => {
-  const base = { path: "/ws/.ccnavi/approved/flows/x.yml", rel: ".ccnavi/approved/flows/x.yml", tree: "/ws", linked: false };
+  const base = { path: "/ws/.ccnavi/approved/flows/x.yml", rel: ".ccnavi/approved/flows/x.yml", tree: "/ws", linked: false, draft: null };
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: false }), "フロー: 作成");
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: false }), "フロー: 編集");
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: true }), "フロー: 閲覧（着手中）");
@@ -55,7 +55,7 @@ test("CB-T227 カードのボタンの言葉は、在るか・着手中か（実
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: true }), "フロー: 閲覧（着手中）");
 });
 
-test("CB-T228 錠は実行ファイルの flow.locked のまま。親・無い子・欄の無い子は引けない", () => {
+test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。親・無い子・欄の無い子は引けない", () => {
   const board = fixture();
   // 見本の i0001-02 は着手中（DENY_TICKET_FLOW_LOCKED で止まる）、i0001-01 は閉じていてファイルが在る
   const locked = flowTargetOf(board, "i0001-02");
@@ -126,6 +126,7 @@ test("CB-T241 閉じた子（完了・取り消し）でファイルが無けれ
     exists,
     linked: false,
     locked: false,
+    draft: null,
   });
   const old: BoardJson = {
     ...board,
@@ -167,4 +168,85 @@ test("CB-T230 置き場かその途中がリンクなら、着手前でも読む
   const parsed = parseBoardJson(JSON.stringify(raw));
   assert.ok(parsed.ok);
   assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.linked === true));
+});
+
+test("CB-T293 下書きの置き場は実行ファイルの flow.draft のコピー。欠けた欄はリンクの側、無い答えは null", () => {
+  const board = fixture();
+  const child = board.tickets.find((t) => t.ticket === "i0001-03")?.flow;
+  assert.ok(child !== null && child !== undefined);
+  assert.deepEqual(child.draft, {
+    path: "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-03.yml",
+    rel: "wip/proposals/flows/i0001-03.yml",
+    exists: false,
+    linked: false,
+  });
+  const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
+  for (const t of raw.tickets) {
+    if (t.flow !== null && t.ticket === "i0001-03") {
+      delete (t.flow.draft as Record<string, unknown>).linked;
+    }
+    if (t.flow !== null && t.ticket === "i0001-04") {
+      delete t.flow.draft;
+    }
+  }
+  const parsed = parseBoardJson(JSON.stringify(raw));
+  assert.ok(parsed.ok);
+  assert.equal(parsed.board.tickets.find((t) => t.ticket === "i0001-03")?.flow?.draft?.linked, true);
+  assert.equal(parsed.board.tickets.find((t) => t.ticket === "i0001-04")?.flow?.draft, null);
+  // 着手の前かは、ボタンを出すかだけに使う（錠は flow.locked のまま）
+  const before = flowTargetOf(board, "i0001-03");
+  assert.ok(before.ok);
+  assert.equal(before.target.beforeStart, true);
+  const started = flowTargetOf(board, "i0001-02");
+  assert.ok(started.ok);
+  assert.equal(started.target.beforeStart, false);
+  const closed = flowTargetOf(board, "i0001-01");
+  assert.ok(closed.ok);
+  assert.equal(closed.target.beforeStart, false);
+});
+
+test("CB-T294 依頼のボタンは着手の前で錠が無いときだけ。フローが無ければ作成、在れば直し、下書きが在れば頼み直す", () => {
+  const open = { beforeStart: true, locked: false, flowExists: false, draftExists: false };
+  assert.equal(requestLabel(open), "エージェントにフローの作成を頼む");
+  assert.equal(requestLabel({ ...open, flowExists: true }), "エージェントにフローの直しを頼む");
+  assert.equal(requestLabel({ ...open, draftExists: true }), "エージェントにフローを頼み直す");
+  assert.equal(requestLabel({ ...open, flowExists: true, draftExists: true }), "エージェントにフローを頼み直す");
+  // 着手中・閉じた子（着手の前でない）・錠の確認中やリンク（錠が掛かっている）には出さない
+  assert.equal(requestLabel({ ...open, beforeStart: false }), undefined);
+  assert.equal(requestLabel({ ...open, locked: true }), undefined);
+});
+
+test("CB-T295 依頼の文は子・書く置き場・いまのフロー・確かめ方・承認済みの領域に書かないことを言う", () => {
+  const base = {
+    ticket: "i0001-03",
+    title: "設計",
+    parent: "i0001",
+    draftPath: "/ws/.claude/worktrees/i0001/wip/proposals/flows/i0001-03.yml",
+    redo: false,
+    lintCommand: "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh --lint --flow /ws/.claude/worktrees/i0001/wip/proposals/flows/i0001-03.yml",
+  };
+  const made = flowRequestPrompt(base);
+  assert.match(made, /子チケット i0001-03（設計） のフローの作成を頼んだ（親 i0001）/);
+  assert.match(made, /下書きを書く置き場: \/ws\/\.claude\/worktrees\/i0001\/wip\/proposals\/flows\/i0001-03\.yml/);
+  assert.match(made, /ccnavi-launcher\.sh --lint --flow \/ws\/.*i0001-03\.yml` で確かめ、error が無くなってから/);
+  assert.match(made, /\.ccnavi\/approved\/flows\/）には書かない/);
+  assert.doesNotMatch(made, /いまのフロー/);
+  assert.doesNotMatch(made, /前の下書き/);
+  const fix = flowRequestPrompt({ ...base, flowPath: "/ws/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-03.yml", redo: true });
+  assert.match(fix, /フローの直しを頼んだ/);
+  assert.match(fix, /いまのフロー: \/ws\/.*\.ccnavi\/approved\/flows\/i0001-03\.yml/);
+  assert.match(fix, /前の下書きが残っている/);
+});
+
+test("CB-T296 画面からの依頼・提案の操作と、保存に添える取り込んだ下書きのハッシュは形を確かめてから受ける", () => {
+  for (const type of ["openProposal", "request", "requestCopy", "requestOpen"]) {
+    assert.deepEqual(asFlowMessage({ type }), { type });
+  }
+  const doc = templateFlow("i0001-01", "調査");
+  const hash = "a".repeat(64);
+  assert.deepEqual(asFlowMessage({ type: "save", doc, imported: hash }), { type: "save", doc, imported: hash });
+  // ハッシュの形でなければ、取り込みは無かったものとして受ける（下書きを消さない側）
+  for (const bad of ["", "x".repeat(64), "A".repeat(64), "a".repeat(63), 1, null]) {
+    assert.deepEqual(asFlowMessage({ type: "save", doc, imported: bad }), { type: "save", doc });
+  }
 });

@@ -12,7 +12,7 @@ keywords: [実行後チェック, 副命令, 書き込み, チケット, 内容,
 ## 状況
 
 実行後チェックは、保護領域をルールファイルの `deny` と `ask` から導く（ADR-0017）。監視の対象から
-外していたのは、記録と状態ディレクトリ（`CCNAVI_LOG`、`CCNAVI_STATE`）だけだった。
+外していたのは、記録と state の置き場（`CCNAVI_LOG`、`CCNAVI_STATE`）だけだった。
 
 承認済みチケットの置き場（`.ccnavi/approved/`）は、このリポジトリの共通層が
 `deny`（`guard-approved-tickets`）と宣言している。ワークスペースルートでは `main-tree` も

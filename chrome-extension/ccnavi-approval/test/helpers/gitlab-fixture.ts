@@ -1,6 +1,6 @@
 /**
- * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/。本物の形に合わせて手で組んだもの）を
- * 返す GitLab の代役。
+ * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/）を返す GitLab の代役。見本は本物の形に合わせて
+ * 手で組んだもの。
  *
  * リポジトリの sh の試験（tests/sh/gitlab_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
  *
@@ -11,7 +11,7 @@
  *   `discussions.<N>.json`・`reviewers.<N>.json`（無ければ `[]`。N の既定は 1）
  * - `GET /api/v4/user` → `user.json`
  *
- * 期待値（`expected.json`）は sh が見本から組んだコピーで、拡張の試験（CX-T144）は TS が組んだコピーと比べる。
+ * 期待値（`expected.json`）は sh が見本から組んだ結果で、拡張の試験（CX-T144）は TS が組んだ結果と比べる。
  */
 import fs from "node:fs";
 import path from "node:path";

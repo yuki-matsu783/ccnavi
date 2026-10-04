@@ -13,7 +13,7 @@
 5. 変更要求のレビューはユーザの端末からも通せないこと
 6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
 7. 置き場を動かすだけで承認になること、承認のときにしか当たらなかった構造の検査が
-   判定の側でも当たること（承認は置き場で決まる）
+   判定の側でも当たること（承認で本物とするのは置き場）
 """
 
 from __future__ import annotations
@@ -290,7 +290,7 @@ class TicketTest(unittest.TestCase):
     def test_scope_with_uppercase_still_matches(self):
         """大文字を含む範囲が、書いた表記のまま当たること。
 
-        ワークツリーのルートからの相対パスを normcase した文字列から作っていたので、
+        ワークツリーのルートからの相対パスを normcase したパスから作っていたので、
         大文字小文字を区別しない機械では `README.md` が `readme.md` になり、
         `README.md` と書いた範囲に永久に当たらなかった。`Dockerfile` や
         `src/Components/*` も同じ。実物の GitLab で流れを通したときに出た。
@@ -319,8 +319,8 @@ class TicketTest(unittest.TestCase):
         """表記の大文字小文字は、どの機械でも区別しない。
 
         `docs/Design/*` と書いた範囲に `docs/design/plan.md` が当たる。機械に
-        任せると、同じチケットと同じ表記で、止まる場所が Windows と Linux で
-        食い違う。範囲はユーザが宣言する意図なので、機械の都合ではなく表記の意味で
+        任せると、同じチケットと同じパスで、止まる場所が Windows と Linux で
+        食い違う。範囲はユーザが宣言する意図なので、機械の都合ではなく書かれたパスの意味で
         読む（`_fold` と `_entries` の re.IGNORECASE）。
         """
         self.propose("i0001", allow=("src/*", "README.md", "docs/Design/*"))
@@ -488,7 +488,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
 
-    # ---- 2b. 置き場を動かすだけの承認（承認は置き場で決まり、記録の欄は必須にしない）
+    # ---- 2b. 置き場を動かすだけの承認（承認で本物とするのは置き場で、記録の欄は必須にしない）
 
     def hand_move(self, name, text=""):
         """ユーザが GitHub の画面でやることと同じ。提案を承認済みの置き場へ動かすだけ。
@@ -504,7 +504,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "move " + name)
 
     def test_moving_the_file_alone_approves_it(self):
-        # 承認したかどうかは置き場で決まる。`.ccnavi/approved/` は組み込みの守りがエージェントの
+        # 承認を本物とするのは置き場。`.ccnavi/approved/` は組み込みの保護がエージェントの
         # 書き込みを止めるので、そこに在ること自体がユーザの合意になる。
         self.propose("i0001", allow=("src/*",))
         self.hand_move("i0001")
@@ -593,8 +593,8 @@ class TicketTest(unittest.TestCase):
         """親が閉じた子は、親の範囲で切り詰められないので止める。
 
         判定が `parent` を引く索引は作業中のものだけ。親を閉じると引けなくなり、
-        `scope_verdict` は子の宣言だけで範囲を決める。止めるフラグを付ける側だけが閉じた親も
-        引ける対応表を使っていたので、フラグは付かず範囲も切り詰められない、という抜けが
+        `scope_verdict` は子の宣言だけで範囲を決める。理由を付ける側だけが閉じた親も
+        引ける対応表を使っていたので、理由は付かず範囲も切り詰められない、という抜けが
         あった。親を引けない子は止める側を採る。
         """
         # 子は親（src/*）に無い範囲を宣言する。承認は警告で通す。
@@ -612,11 +612,11 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001", reason)
 
     def test_the_board_shows_that_a_blocked_ticket_is_stopped(self):
-        """止めるフラグの付いたチケットが、ボードの JSON にもその旨で出ること。
+        """信頼できない理由の付いたチケットが、ボードの JSON にもその旨で出ること。
 
         判定と `--lint` にしか伝わらないと、ボードしか見ないユーザには書き込みが全部
         止まっていることが見えず、`status` は素の `open` のままになる。あわせて
-        「フラグが付いていないのに親を引けない子」が居ないこと（対応表が分かれていないこと）も
+        「理由が付いていないのに親を引けない子」が居ないこと（対応表が分かれていないこと）も
         同じ出力から確かめる。対応表が分かれると、その子は自分の宣言だけで範囲が決まる。
         """
         self.propose("i0001", allow=("src/*",))
@@ -637,7 +637,7 @@ class TicketTest(unittest.TestCase):
                 self.assertIn(
                     record["parent"],
                     open_ids,
-                    f"{name} はフラグが付いていないのに親を引けない",
+                    f"{name} は理由が付いていないのに親を引けない",
                 )
 
     def test_parent_and_child_strictest_wins(self):
@@ -672,7 +672,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("builtin-ticket-state", self.reason(free))
 
     def test_copies_into_the_state_directory_are_read_by_their_destination(self):
-        """写す動詞の行き先は、組み込みの守りと同じ部品で読む（`-t` の値か最後の引数）。
+        """コピーする動詞の行き先は、組み込みの保護と同じ部品で読む（`-t` の値か最後の引数）。
 
         `-t` で行き先を前に出した形、行き先のあとに選択肢を回した形、状態の置き場が入っている
         ディレクトリ（提案の置き場）を行き先にして元の名前を状態の名前にした形も止める。
@@ -1004,7 +1004,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_PHASE_REVIEW", self.reason(decorated))
         self.assertIn(phase_mod.EXEMPT_NOTE, self.reason(decorated))
 
-        # サブエージェントの起動にはシェルのパスの書き方の話をしない。
+        # サブエージェントの起動にはシェルのパスの話をしない。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         self.assertNotIn(phase_mod.EXEMPT_NOTE, self.reason(spawn))
@@ -1075,10 +1075,10 @@ class TicketTest(unittest.TestCase):
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
-    # ---- レビュー（sh の代わりに、テストがリモートの情報を渡す）
+    # ---- レビュー（sh の代わりに、テストがリモートから取得した結果を渡す）
 
     def remote(self, merge=("i0001-01", "i0001-02")):
-        """origin と、合流して push した親ブランチ。リモートの情報（JSON）の置き場を返す。
+        """origin と、合流して push した親ブランチ。リモートから取得した結果（JSON）の置き場を返す。
 
         sh がリモートから取ってくる形そのもの。テストはネットワークに出ないので、
         sh の代わりにこのファイルを --result で渡す。
@@ -1206,7 +1206,7 @@ class TicketTest(unittest.TestCase):
     def test_check_does_not_mark_reviewed_when_a_child_cannot_move(self):
         """レビュー待ちの子を done/ へ動かせなければ、レビュー済みのマーカーを置かない。
 
-        done/ に同じ識別子が既に在る形（動かす途中で止まって残った）。マーカーを先に置くと、
+        done/ に同じ識別子が既に在る形（動かした形跡が残った）。マーカーを先に置くと、
         子は review/ に残ったまま「レビュー済み」になり、check も --reviewed も通らず
         取り出せなくなる。動かしてから置くので、直して打ち直せば通る。
         """
@@ -1344,7 +1344,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def two_threads(self):
-        """フェーズ 1 を依頼し、未解決の指摘を 2 件付けたリモートの情報を返す。"""
+        """フェーズ 1 を依頼し、未解決の指摘を 2 件付けた結果を返す。"""
         self.family()
         self.close_phase()
         fixture = self.remote()
@@ -1405,7 +1405,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         self.assertEqual(self.request(fixture).returncode, 0)
         data = read_json(fixture)
-        # crit push の 1 件を写した形（sh の fetch が組むスレッド。path と line は HTML のソース）
+        # crit push の 1 件をなぞった形（sh の fetch が組むスレッド。path と line は HTML のソース）
         data["threads"] = [
             {
                 "id": "crit-1",
@@ -1580,7 +1580,7 @@ class TicketTest(unittest.TestCase):
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
         self.assertFalse(os.path.exists(stale))
-        # レビュー済みのフェーズに confirm を重ねない。重ねるとマーカーと跡が書き直される
+        # レビュー済みのフェーズに confirm を重ねない。重ねるとマーカーと履歴が書き直される
         again = self.confirm(fixture)
         self.assertEqual(again.returncode, 1)
         self.assertIn("フェーズ 1 はレビュー済み", again.stderr)
@@ -1644,9 +1644,9 @@ class TicketTest(unittest.TestCase):
         self.assertIn("todo/ にも在る", lint.stdout)
 
     def test_a_ticket_in_two_homes_is_not_operated_on(self):
-        """同じ識別子が doing/ と done/ に在れば、どちらを優先するか決まらないので止める。
+        """同じ識別子が doing/ と done/ に在れば、どちらが本物か決まらないので止める。
 
-        動かす途中で止まって両方に残った形。何も言わずにどちらかを選ぶと、閉じた記録を上書きするか、
+        動かした形跡が両方に残った形。何も言わずにどちらかを選ぶと、閉じた記録を上書きするか、
         閉じたはずのものが作業中として復活する。止めて、--lint が同じ 1 行で名指しする。
         """
         self.family()
@@ -1665,11 +1665,11 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
 
     def test_folding_the_parent_worktree_does_not_stop_the_operations(self):
-        """親のワークツリーを片付けても操作は通る。元ツリーの承認済みチケットを優先する。
+        """親のワークツリーを片付けても操作は通る。元ツリー上のチケットを本物とする。
 
-        承認済みチケットは親のブランチに乗り、合流すると元ツリーにも写る。親のツリーが
-        消えたあとに行き先を決めないと、残った子のツリーの承認済みチケットと並んで「どれを優先するか
-        決まらない」になり、片付けただけの親子チケットの `start` / `finish` が全部止まる。
+        承認済みチケットは親のブランチに乗り、合流すると元ツリーにも入る。親のツリーが
+        消えたあとに行き先を決めないと、残った子のツリー上のチケットと並んで「どれが本物か
+        決まらない」になり、片付けただけの親子のチケットの `start` / `finish` が全部止まる。
         """
         self.family()
         git(self.root, "merge", "--quiet", "--no-edit", "i0001")
@@ -1679,14 +1679,14 @@ class TicketTest(unittest.TestCase):
 
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("複数の場所にある", done.stderr)
-        # 元ツリーを優先するので、置き場の移動も元ツリーに書かれる。
+        # 本物とする側が元ツリーなので、置き場の移動も元ツリーに書かれる。
         moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-02.md")
         self.assertTrue(os.path.exists(moved), moved)
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertNotIn("複数の場所にある", lint.stdout)
 
     def test_a_copy_ahead_of_the_origin_stops_the_operations(self):
-        """元ツリーより先の置き場に在る承認済みチケットがあれば、元ツリーを優先しない。
+        """元ツリーより先の置き場に在るチケットがあれば、元ツリーを本物としない。
 
         親のツリーで閉じ、子のツリーだけがそれを取り込み、元ツリーは 1 つ手前で
         止まっている形。ここで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
@@ -1713,7 +1713,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(again.returncode, 0, again.stdout)
         self.assertIn("i0001-02 が複数の場所にある", again.stderr)
         self.assertIn("i0001-02:done", again.stderr)
-        # 次の一手まで言う。承認済みチケットはどれも追跡されたファイルなので、「1 つにしてから」
+        # 次の一手まで言う。どの場所のチケットも追跡されたファイルなので、「1 つにしてから」
         # だけでは受け取った側にできることが読めない。
         self.assertIn("合流", again.stderr)
         lint = self.ccnavi("--lint", "--mode", "enable")
@@ -1739,7 +1739,7 @@ class TicketTest(unittest.TestCase):
         """閉じた承認済みチケットが複数のツリーに在るのは、報告する形ではない。
 
         承認済みチケットは git に入れて共有するので（設計 9.2）、コミットしたあとに
-        ワークツリーを切れば、その数だけ承認済みチケットのファイルができる。これを「複数の場所にある」で
+        ワークツリーを切れば、その数だけ同じチケットができる。これを「複数の場所にある」で
         止めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、
         `--lint` が常に非ゼロで終わる。
         """
@@ -1757,7 +1757,7 @@ class TicketTest(unittest.TestCase):
 
         ワークツリーはそれぞれ別のコミットを指す。閉じる前に切ったツリーは
         `doing/` のまま止まっているので、ツリーをまたいだ状態の食い違いは
-        「動かす途中で止まって残ったもの」の証拠にならない。
+        「動かす途中で止まった形跡」の証拠にならない。
         """
         approved = os.path.join(self.root, ".ccnavi", "approved")
         write(os.path.join(approved, "doing", "i0002.md"), self.CLOSED)
@@ -1772,9 +1772,7 @@ class TicketTest(unittest.TestCase):
         self.commit("close i0002")
 
         left = os.path.join(stale, ".ccnavi", "approved", "doing", "i0002.md")
-        self.assertTrue(
-            os.path.exists(left), "切ったツリーに doing/ の承認済みチケットが残っていない"
-        )
+        self.assertTrue(os.path.exists(left), "切ったツリーに doing/ のチケットが残っていない")
         self.assertTrue(os.path.exists(os.path.join(approved, "done", "i0002.md")))
 
         lint = self.ccnavi("--lint", "--mode", "enable")
@@ -1889,9 +1887,9 @@ class TicketTest(unittest.TestCase):
     def test_subagent_stop_bounces_each_worktree_when_no_agent_id_is_given(self):
         """`agent_id` が来ない payload でも、別の子で作業する相手を巻き込まない。
 
-        以前はマーカーの名前が `unknown` 1 つで、最初の 1 体が差し戻されたあと、
+        以前は記録の名前が `unknown` 1 つで、最初の 1 体が差し戻されたあと、
         同じ置き場を見るサブエージェントが誰も差し戻されなくなった。しかも
-        `agent_id` を持たないマーカーは `ignored_bounce` が消せないので、消えなかった。
+        `agent_id` を持たない記録は `ignored_bounce` が消せないので、消えなかった。
         """
         self.family()
         first_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
@@ -1907,7 +1905,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("POST_TICKET_SCOPE", second.stderr)
 
     def test_subagent_stop_bounces_again_in_the_next_session(self):
-        """マーカーはセッションで分ける。状態ディレクトリはワークスペースに 1 つしか無い。"""
+        """記録はセッションで分ける。state の置き場はワークスペースに 1 つしか無い。"""
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
         write(os.path.join(child, "src", "b", "stray.py"), "x\n")
@@ -1919,7 +1917,7 @@ class TicketTest(unittest.TestCase):
 
         later = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s2")
 
-        self.assertEqual(later.returncode, 2, "別のセッションのマーカーで通さない")
+        self.assertEqual(later.returncode, 2, "別のセッションの記録で通さない")
         self.assertIn("POST_TICKET_SCOPE", later.stderr)
 
     def test_subagent_start_lists_open_children(self):
@@ -1951,9 +1949,9 @@ class TicketTest(unittest.TestCase):
     # ---- 7. ユーザの判断の経路
 
     def test_cli_flags_take_no_abbreviation(self):
-        """ユーザの判断のフラグは全部書いたときだけ有効。
+        """ユーザの判断のフラグは省略せずに書いたときだけ有効。
 
-        組み込みの deny は全部綴った形しか見ないので、前方一致で走ると `--close` や
+        組み込みの deny は省略せずに書いた形しか見ないので、前方一致で走ると `--close` や
         `--review` がそこで止められずに通る。実行ファイルの側で受けないことを確かめる。
         """
         self.family()
@@ -2118,7 +2116,7 @@ class TicketTest(unittest.TestCase):
     def test_turning_off_the_terminal_requirement_is_denied(self):
         """端末要求を切る形は、実行ファイルをどう呼んでいても止める。
 
-        呼ぶ書き方（`uv run -m ccnavi`、名前を変えたコピー）は追い切れない。切れなければ、端末を
+        呼ぶ表記（`uv run -m ccnavi`、名前を変えたコピー）は追い切れない。切れなければ、端末を
         持たないエージェントは実行ファイルの側で止まる。
         """
         self.family()
@@ -2178,7 +2176,7 @@ class TicketTest(unittest.TestCase):
                 guard_ticket_approval="enable",
             )
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # 守りそのものを切っていれば当てない（テストと CI の設定）。
+        # 保護そのものを切っていれば当てない（テストと CI の設定）。
         result = self.hook(
             "PreToolUse",
             "Bash",
@@ -2190,7 +2188,7 @@ class TicketTest(unittest.TestCase):
     def test_approval_scripts_are_denied_in_any_letter_case(self):
         """9・10. 止める表記は大文字小文字を区別しない。文面はユーザが確かめる前提を言わない。
 
-        Windows と macOS の既定のファイルシステムは表記の大小を区別しないので、
+        Windows と macOS の既定のファイルシステムは名前の大小を区別しないので、
         表記を変えただけの sh も同じものが走る。ボードは Enter まで送るので、
         「ユーザが確かめて実行します」は実際の動きと合わない。
         """
@@ -2340,7 +2338,7 @@ class TicketTest(unittest.TestCase):
         return dest
 
     def restore(self, snap):
-        """self.root をコピーした時点に戻す。
+        """self.root をコピーの時点に戻す。
 
         コピーは同じパスへ戻す。ワークツリーの `.git`、origin の置き場、状態の置き場は
         絶対パスで互いを指すので、別の場所へ置くと前の行の木を指してしまう。
@@ -2625,7 +2623,8 @@ class TicketTest(unittest.TestCase):
         """依頼せずにレビュー済みになったフェーズへ、依頼を投稿しないこと。
 
         `close-early` は依頼していないフェーズにもレビュー済みを置く。依頼の記録が無いことを
-        先に見ていた版では、ユーザが締めたフェーズに request が通り、MR に依頼が投稿された。
+        先に見ていた版では、ユーザが早めに閉じたときのフェーズに request が通り、
+        MR に依頼が投稿された。
         """
         self.family()
         self.close_phase()
@@ -2711,7 +2710,7 @@ class TicketTest(unittest.TestCase):
 
         受け入れをフェーズのマーカーに書いていた版では、次に通った check が同じマーカーを
         `accepted: []` で上書きし、記録が飛んだ。ユーザがもう一度同じスレッドを
-        受け入れることになる。受け入れの記録はマーカーと別の場所に置く。
+        受け入れることになる。記録はマーカーと別の場所に置く。
         """
         self.family()
         self.close_phase()
@@ -2734,9 +2733,8 @@ class TicketTest(unittest.TestCase):
         kept = os.path.join(self.approved, "phases", "i0001", "accepted.json")
         self.assertIn("u1", read_json(kept)["threads"])
 
-        # check が通るとマーカーは書き換わるが、受け入れの記録は残る（レビュー済みには重ねないので、
-        # マーカーを外して
-        # から確かめる）。
+        # check が通るとマーカーは書き換わるが、記録は残る（レビュー済みには重ねないので、
+        # マーカーを外してから確かめる）。
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(self.confirm(fixture).returncode, 0)
         self.assertIn("u1", read_json(kept)["threads"])

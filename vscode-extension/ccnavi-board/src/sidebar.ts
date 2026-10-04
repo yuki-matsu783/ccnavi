@@ -34,7 +34,7 @@ const ENTRIES: readonly Entry[] = [
     needsTickets: false,
   },
   {
-    label: "ルール設定",
+    label: "ルール管理",
     description: "ルールの編集と保存、判定を試す、hook の確認",
     command: "ccnaviBoard.openRules",
     icon: "shield",

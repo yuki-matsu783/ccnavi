@@ -101,7 +101,7 @@ ROOT_DIRECTORY = "."
 
 SORTS = ("path", "mtime", "type", "title")
 FORMATS = ("table", "path", "detail", "json", "jsonl", "count")
-# `--since` / `--until` に受ける形と、その形の読み方。書き方を誤った値が気づかないうちに
+# `--since` / `--until` に受ける形と、その形の読み方。書き誤った値が気づかないうちに
 # 0 件になるのを避ける。
 _WHEN_FORMATS = {
     10: "%Y-%m-%d",
@@ -1132,7 +1132,7 @@ def run(
 
 
 def _command(conf: settings.Settings, root: str) -> str:
-    """案内に書く ccnavi のパスの表記。設定が相対ならワークスペースルートから書く。"""
+    """案内に書く ccnavi のパス。設定が相対ならワークスペースルートから書く。"""
     path = conf.bin
     if path and not os.path.isabs(path):
         path = os.path.realpath(os.path.join(root, path))

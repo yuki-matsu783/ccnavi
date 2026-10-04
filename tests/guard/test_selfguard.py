@@ -299,7 +299,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ワークツリーでないディレクトリは守らない(self):
         # `.claude/worktrees/` の下に在るだけのディレクトリ。参考実装のコピーを
-        # 置いた形がこれで、守りに行くとユーザのファイルを勝手に戻すことになる。
+        # 置いた形がこれで、保護に行くとユーザのファイルを勝手に戻すことになる。
         fake = os.path.join(self.repo, ".claude", "worktrees", "not-a-tree")
         copy = self.copy_in(fake, "settings.json")
         write(copy, "{}\n")
@@ -350,7 +350,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_プロジェクトの層は自分のgitから戻しワークツリー側の向きも元リポジトリで決まる(self):
         # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
         # なくそのプロジェクトで、ワークツリー側の設定が入るのもそのプロジェクトから切った
-        # ワークツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` は無い。
+        # ワークツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` のパスは無い。
         # 元リポジトリから切ったワークツリー側の設定は test_config_union_guard.py が
         # ブラックボックスで見る。
         self.worktree()
@@ -373,7 +373,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_root_の外を指すルールファイルにはワークツリー側が無い(self):
         # 置き場がワークスペースルートの外にあるなら、ワークツリーの中に対応する
-        # ワークツリー側には無い。無い場所を守りに行っても、報告に役に立たない 1 行が増えるだけ。
+        # ワークツリー側には無い。無い場所を保護に行っても、報告に役に立たない 1 行が増えるだけ。
         self.worktree()
         outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")
 
@@ -406,7 +406,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("builtin-guard-setting-files", result.stdout)
 
     def test_cd_で入ってから書く形も止まる(self):
-        # issue #61。守りはパスの文字列に当てるので、`cd` で入ると行き先から名前が消える。
+        # issue #61。保護はパスに当てるので、`cd` で入ると行き先から名前が消える。
         # hook の登録そのもの（.claude/settings.json と .claude/hooks/）にも及んでいた。
         for command in [
             "cd .ccnavi/common && echo x > rules.yml",
@@ -439,8 +439,8 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
-    def test_記録と状態ディレクトリもシェルからの書き込みで止まる(self):
-        # 記録と状態ディレクトリは判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
+    def test_記録と_state_の置き場もシェルからの書き込みで止まる(self):
+        # 記録と state は判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
         for command in ("rm logs/decisions.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -458,7 +458,7 @@ class SelfGuardTest(unittest.TestCase):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
-    def test_記録と状態ディレクトリは名指しのツールでも止まる(self):
+    def test_記録と_state_の置き場は名指しのツールでも止まる(self):
         # シェルの側の文面は「Write / Edit でも拒否される場所」と言う。名指しのツールで書けると、
         # 拒否の数え（denied-<セッション>.json）や記録を書き換えて自分の足跡を消せる。
         for tool in ("Write", "Edit", "NotebookEdit"):
@@ -508,7 +508,7 @@ class SelfGuardTest(unittest.TestCase):
     # 行き先の式は語の中の目印まで一致しないように直す。
 
     def rules_in_shell(self):
-        """シェルに書く形のルールファイル。引用の外に置くので区切りは `/`。"""
+        """シェルに書くパスのルールファイル。引用の外に置くので区切りは `/`。"""
         return self.rules.replace("\\", "/")
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
@@ -556,7 +556,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-binary", result.stdout)
 
-    def test_指していなければ実行ファイルの表記は当たらない(self):
+    def test_指していなければ実行ファイルのパスは当たらない(self):
         # CCNAVI_BIN_PATH が空なら、そこは守る対象ではない。パスを推測して
         # 守ると、そこに在る別のファイルを実体として扱うことになる。
         self.binary()
@@ -660,7 +660,7 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
-        # 別の名前を置くだけなら守りでは止めない。
+        # 別の名前を置くだけなら組み込みの保護では止めない。
         for command in ("cp /tmp/notes.txt dist/ccnavi/", "cp -t dist/ccnavi /tmp/notes.txt"):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", bin=path, command=command)
@@ -718,7 +718,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertIn("CCNAVI_BIN_PATH", result.stdout)
 
-    def test_拡張子を書かない表記でも実行ファイルに当たる(self):
+    def test_拡張子を書かないパスでも実行ファイルに当たる(self):
         # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
         # だけ `.exe` を付けるので、設定に書いたパスと在るファイルのパスが食い違う。
         # 書いた側を直させるのではなく、在るほうを選ぶ。
@@ -747,8 +747,8 @@ class SelfGuardTest(unittest.TestCase):
     # 振り分けの sh を `<置き場>/scripts/` に、実体を `<置き場>/bin/<os>-<arch>/` に分けた形
     #
     # 指す先の名前が振り分けの sh なら、実体は sh の隣ではなく `../bin/` に在る。守るパス
-    # （binary_clause）とバックアップを取る先（launched_executable）は同じ条件で切り替わらなければ
-    # ならない。片方だけ切り替わると、守っている場所とバックアップを取る場所が食い違う。
+    # （binary_clause）とバックアップする先（launched_executable）は同じ条件で切り替わらなければ
+    # ならない。片方だけ切り替わると、守っている場所とバックアップしている場所が食い違う。
 
     def scripts_layout(self, place=(".ccnavi",)):
         """sh を `<place>/scripts/`、実体を `<place>/bin/<この機械>/` に置く。
@@ -776,10 +776,10 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("restored", result.stdout)
 
     def test_scripts_に置いた振り分けの実体は名指しのツールから止まる(self):
-        # G2。既定の置き場では ccnavi ディレクトリの守り（`*/.ccnavi/*`）と二重に止まり、
+        # G2。既定の置き場では ccnavi ディレクトリの保護（`*/.ccnavi/*`）と二重に止まり、
         # 先に名指しされるのはそちら。ccnavi ディレクトリを動かすとそちらは外れるので、
-        # 残った実行ファイル由来の守りが止めていることをそこで確かめる
-        # （REQ-SLF-07 を ccnavi ディレクトリの守りに頼らせない）。
+        # 残った実行ファイル由来の保護が止めていることをそこで確かめる
+        # （REQ-SLF-07 を ccnavi ディレクトリの保護に頼らせない）。
         spelled, _, exe = self.scripts_layout()
         bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
 
@@ -808,7 +808,7 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
-    def test_scripts_に置いた振り分けの守りは隣ではなく_bin_の下に当たる(self):
+    def test_scripts_に置いた振り分けの保護は隣ではなく_bin_の下に当たる(self):
         # G4。sh の隣は配る場所ではない。そこに当てると守る必要の無い場所を止め、
         # 本当に実体が在る `../bin/` を外す。
         spelled, _, _ = self.scripts_layout(("tools",))
@@ -846,7 +846,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(
             os.path.normcase(os.path.realpath(launched or launcher)),
             os.path.normcase(os.path.realpath(exe)),
-            "バックアップを取る先が `../bin/<この機械>/ccnavi` になっていない",
+            "バックアップする先が `../bin/<この機械>/ccnavi` になっていない",
         )
 
         bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
@@ -856,7 +856,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("builtin-guard-binary", result.stdout)
 
     def test_浅いパスの振り分けでも実体をセッション開始でバックアップし実行後に戻す(self):
-        # G6 のバックアップを取る側を、hook を通して確かめる。
+        # G6 のバックアップする側を、hook を通して確かめる。
         spelled, _, exe = self.scripts_layout(())
 
         self.run_hook("SessionStart", bin=spelled)
@@ -868,7 +868,7 @@ class SelfGuardTest(unittest.TestCase):
     # セッション開始のバックアップ
 
     def test_dry_run_でもセッション開始でバックアップを取る(self):
-        # バックアップを取ることは誰の書きかけも消さない。ここを enable に限ると、
+        # バックアップすることは誰の書きかけも消さない。ここを enable に限ると、
         # 切り替えた最初のセッションが戻す先を持たないまま走る。
         path = self.binary()
 
@@ -887,7 +887,7 @@ class SelfGuardTest(unittest.TestCase):
     # バックアップを溜めない
 
     def test_実行ファイルのバックアップはセッションをまたいで_1_本(self):
-        # 同じビルドのまま何セッション走っても、バックアップは 1 本で済むこと。
+        # 同じビルドのまま何セッション走っても、コピーは 1 本で済むこと。
         path = self.binary()
         self.run_hook("SessionStart", bin=path, session="s1")
         self.run_hook("SessionStart", bin=path, session="s2")
@@ -988,7 +988,7 @@ class SelfGuardTest(unittest.TestCase):
 
 
 class InsertTest(unittest.TestCase):
-    """組み込みの守りを組み立てられないときの扱い。"""
+    """組み込みの保護を組み立てられないときの扱い。"""
 
     BROKEN = {
         "id": selfguard.RECORDS_RULE_ID,
@@ -997,7 +997,7 @@ class InsertTest(unittest.TestCase):
         "message": selfguard.RECORDS_MESSAGE,
     }
 
-    def test_組み立てられない守りは判定を止めずに外し診断ログに残す(self):
+    def test_組み立てられない保護は判定を止めずに外し診断ログに残す(self):
         for root, expected in (("/ws", "/ws"), ("", None)):
             with self.subTest(root=root):
                 rule_set = rules.RuleSet(version=rules.VERSION)
@@ -1011,10 +1011,10 @@ class InsertTest(unittest.TestCase):
                 fields = warned.call_args.kwargs
                 self.assertEqual(fields["rule"], selfguard.RECORDS_RULE_ID)
                 self.assertGreaterEqual(fields["problems"], 1)
-                # 守る先のパスは渡さない。
+                # 式（守る先のパスが入る）は渡さない。
                 self.assertEqual(set(fields), {"rule", "problems"})
 
-    def test_組み立てられる守りは先頭に挿し診断ログに書かない(self):
+    def test_組み立てられる保護は先頭に挿し診断ログに書かない(self):
         rule_set = rules.RuleSet(version=rules.VERSION)
         good = dict(self.BROKEN, regex="x$")
         with mock.patch.object(selfguard.diaglog, "get") as get:

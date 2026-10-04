@@ -4,12 +4,12 @@
 
 1. H-1 名前付きパイプ（FIFO）を読まない。SubagentStart が固まらない
 2. M-1 ハードリンクのフローを読まない。ハードリンクの別名への書き込みもロックで止める
-3. M-2 フローは優先するツリーの版だけを読む。着手のときにダイジェストを保存し、
-着手のあとに書き換わったら
+3. M-2 フローは本物とするツリーの版だけを読む。着手のときにハッシュを記録し、
+   着手のあとに書き換わったら
    SubagentStart と SubagentStop が知らせる（止めない）。案内は「書けない」と言わない
 4. M-4 親のツリーからの起動では手順を並べず、各子のフローのパスと「自分の担当だけ」を言う
 5. M-3 承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす
-6. L-a〜L-c 接頭辞の真似・置き場のパスの書き方・大文字小文字のそろえ方
+6. L-a〜L-c 接頭辞の真似・置き場のパス・大文字小文字のそろえ方
 7. lint は承認済みの領域のファイルを「ワークツリーにしかない」と言わない（ユーザの決定）
 """
 
@@ -236,13 +236,13 @@ class FlowNeutralTest(unittest.TestCase):
 
 
 class FlowReadPlaceTest(FlowHarness):
-    """読むのは優先するツリーの版だけ（M-2a）。案内は「書けない」と言わない（M-2c）。"""
+    """読むのは本物とするツリーの版だけ（M-2a）。案内は「書けない」と言わない（M-2c）。"""
 
     def test_the_child_worktree_copy_is_not_read(self):
         os.remove(self.flow_path)
         self.commit_parent("no flow in the parent tree")
         child_tree = self.run_child(CHILD)
-        # 子のワークツリーのフローに、エージェントがシェルから書いた版。
+        # 子のワークツリーの版に、エージェントがシェルから書いた版。
         write(self.flow_in(child_tree), WORKFLOW_YAML)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
         self.assertIn(CHILD, text)
@@ -261,7 +261,7 @@ class FlowReadPlaceTest(FlowHarness):
 
 
 class FlowDigestTest(FlowHarness):
-    """着手のときにダイジェストを保存し、着手のあとに書き換わったら知らせる（M-2b）。止めない。"""
+    """着手のときにハッシュを記録し、着手のあとに書き換わったら知らせる（M-2b）。止めない。"""
 
     def record(self):
         path = os.path.join(self.approved, "phases", "i0001", f"{CHILD}.flow.json")

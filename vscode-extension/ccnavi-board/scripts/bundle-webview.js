@@ -1,4 +1,4 @@
-// 画面（React）と、その CSS を、画面ごとに 1 本ずつへ束ねる。`pnpm run compile` と、画面を読む
+// 画面（React）と、その CSS を、画面ごとに 1 本ずつへバンドルする。`pnpm run compile` と、画面を読む
 // テストを回すとき（`scripts/test-groups.js`）に呼ばれる。
 //
 // 出来上がりは拡張が読んで `<script nonce>` と `<style nonce>` に流し込む（各画面の入れ物を組む関数）。
@@ -18,8 +18,8 @@
 // （1 本 200KB 強）に比べれば誤差になる。そのぶん、開発者ツールで読める形のまま出て、esbuild が
 // 付ける `/* src/webview/board/Card.css */` の行で、どの部品の CSS かがその場で分かる。
 //
-// 古い束ねを消すのはここではなく scripts/clean-out.js。あちらが out/webview ごと消してから
-// ここが作り直す順で、束ねる前に消す形にはしない（esbuild が落ちたときに、動いていた画面まで
+// 古いバンドルを消すのはここではなく scripts/clean-out.js。あちらが out/webview ごと消してから
+// ここが作り直す順で、バンドルする前に消す形にはしない（esbuild が落ちたときに、動いていた画面まで
 // 消えたまま残るため）。
 "use strict";
 
@@ -51,8 +51,8 @@ if (found.length === 0) {
   process.exit(1);
 }
 
-// CSS の入口が無い画面は、見た目だけが抜けた画面になる。束ねる前に名指しで止める
-// （出口が出来ないだけだと、拡張が読むところまで行ってから「束ねられていない」と言われる）。
+// CSS の入口が無い画面は、見た目だけが抜けた画面になる。バンドルする前に名指しで止める
+// （出口が出来ないだけだと、拡張が読むところまで行ってから「バンドルされていない」と言われる）。
 const styleless = found.filter((screen) => !fs.existsSync(screen.style));
 if (styleless.length > 0) {
   for (const screen of styleless) {
@@ -88,11 +88,11 @@ esbuild
   .then(() =>
     esbuild.build({
       ...common,
-      // CSS は別に束ねる。JS の入口から import させないのは、小さくするかどうかを別に決めるため
+      // CSS は別にバンドルする。JS の入口から import させないのは、小さくするかどうかを別に決めるため
       // （esbuild の minify は JS と CSS の両方に掛かる）と、画面のスクリプトが CSS を持ち回らない
       // ようにするため（CSS を挿すのは入れ物を組む側で、画面は nonce を知らない）。
       entryPoints: found.map((screen) => ({ in: screen.style, out: screen.name })),
-      // `@import` 以外で外を指す書き方（url() など）は無い。あれば esbuild が名指しでエラーにする
+      // `@import` の外を指す表記（url() など）は無い。あれば esbuild が名指しでエラーにする
       minify: false,
     }),
   )

@@ -62,7 +62,7 @@ export interface SeenInJson {
  * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
-  /** 読む先の絶対パス（優先するツリーの版、無ければ子のワークツリーの版。どちらにも無ければ優先するツリーの側の表記） */
+  /** 読む先の絶対パス（本物とする側のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ本物とする側のツリーのパス） */
   readonly path: string;
   /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.yml`） */
   readonly rel: string;
@@ -72,11 +72,24 @@ export interface FlowJson {
   /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
   readonly linked: boolean;
   readonly locked: boolean;
+  /** エージェントが書く下書き。置き場はフローと同じツリーの提案の置き場。この欄を出さない古い実行ファイルでは null */
+  readonly draft: FlowDraftJson | null;
+}
+
+/** 子のフローの下書き。効力は無く、ユーザがフロー編集画面で取り込んだものだけが効く */
+export interface FlowDraftJson {
+  /** 絶対パス（既定 `<ツリー>/wip/proposals/flows/<子>.yml`） */
+  readonly path: string;
+  /** ツリーのルートからの相対 */
+  readonly rel: string;
+  readonly exists: boolean;
+  /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
+  readonly linked: boolean;
 }
 
 /**
  * 状態の履歴の 1 行。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
- * 履歴は補助で、状態は置き場（`copy` / `proposal`）で決まる。拡張は並べるだけで、ここから状態を組み直さない。
+ * 補助の記録で、状態の正は置き場（`copy` / `proposal`）。拡張は並べるだけで、ここから状態を組み直さない。
  */
 export interface HistoryEntryJson {
   /** UTC の ISO 8601（`2026-09-26T09:00:00Z`） */
@@ -135,7 +148,7 @@ export interface TicketJson {
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly seen_in: readonly SeenInJson[];
-  /** どれを優先するか決まらない在りかの全部。決まっていれば空 */
+  /** どれが本物か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
@@ -357,7 +370,17 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     linked: raw.linked !== false,
     // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
+    draft: isRecord(raw.draft) ? flowDraft(raw.draft) : null,
   };
+}
+
+function flowDraft(raw: Record<string, unknown>): FlowDraftJson | null {
+  const path = str(raw.path);
+  if (path === "") {
+    return null;
+  }
+  // 欄が欠けていたらリンクの扱いにする（読まない）
+  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked !== false };
 }
 
 function seenIn(value: unknown): readonly SeenInJson[] {

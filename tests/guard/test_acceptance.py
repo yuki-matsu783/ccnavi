@@ -285,7 +285,7 @@ class HeredocTest(unittest.TestCase):
 
     def test_代わりの手段は名指しされる(self):
         # 止めるだけでは足りない。ここで Write を名指ししないと、
-        # 同じことを別の書き方で書き直すだけになる。
+        # 同じことを別の表記で書き直すだけになる。
         reason = verdict(
             self, run(payload=pre_tool_use("Bash", "command", "cat <<'EOF' > f\nx\nEOF"))
         )["permissionDecisionReason"]
@@ -320,8 +320,8 @@ class HeredocTest(unittest.TestCase):
 
 
 class PathTest(unittest.TestCase):
-    def test_迂回したパスの書き方でも保護領域に届く判定になる(self):
-        # 守る対象は名前ではなく場所。同じ場所を指す別の書き方で
+    def test_迂回したパスでも保護領域に届く判定になる(self):
+        # 守る対象は名前ではなく場所。同じ場所を指す別のパスで
         # ルールを外せてはいけない。
         for path in [
             ".env",

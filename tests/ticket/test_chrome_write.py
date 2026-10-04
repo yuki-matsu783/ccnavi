@@ -2,10 +2,8 @@
 
 見るのは 7 つ。
 
-1. 取り込みの同期状態に当たるもの: ホストに無く統合先でも閉じていない親子チケットは `gone` で組み、
-その
-   承認済みチケットは決まらない。判定の入力に読めない（バイナリの）
-   ファイルがあれば止める
+1. 取り込み状態相当: ホストに無く統合先でも閉じていない親子のチケットは `gone` で組み、
+   その親子のチケットは決まらない。判定の入力に読めない（バイナリの）ファイルがあれば止める
 2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
    受けない
 3. 見せた一覧とダイジェスト: 違えば書くものを出さない
@@ -80,7 +78,7 @@ class ChromeWriteHarness(CoreHarness):
 
 class RecordsTest(ChromeWriteHarness):
     def test_an_absent_family_is_gone_and_its_stale_copy_is_undecided(self):
-        """P の上に古い承認済みチケット（閉じた i0009-01）があっても、
+        """P の上に古いチケット（閉じた i0009-01）があっても、
         i0009 がホストに無ければ決まらない。"""
         self.family(plan=["research"])
         text = child_text("i0009-01", "i0009", 1, ["wip/research/*"], False).replace(
@@ -105,7 +103,8 @@ class RecordsTest(ChromeWriteHarness):
         )
         self.assertIn("state gone", records["sync/self/families/i0009"])
         self.assertIn("state present", records["sync/self/families/i0001"])
-        # 先頭の sha は同期状態に書かない（ダイジェストが関係の無い push で変わらないように。6.2）
+        # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
+        # 6.2）
         self.assertTrue(all("sha" not in text for text in records.values() if "\n" in text))
 
     def test_an_unreadable_input_stops_the_board_and_the_plan(self):
@@ -196,9 +195,8 @@ class WrittenCopyTest(ChromeWriteHarness):
         body = self.plan()
         self.assertEqual(body["identifiers"], ["i0001", "i0001-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        # 手元の同期状態は Chrome と同じ（取り込み済みの親子チケット）。
-        # 判定し直し（C3）
-        # で error が出ない
+        # 手元の取り込み状態は Chrome と同じ（取り込み済みの親子のチケット）。
+        # 判定し直し（C3）で error が出ない
         self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual(preview["batch"], [])
@@ -228,9 +226,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         )
 
     def test_a_later_local_touch_is_not_blamed_on_chrome(self):
-        """Chrome の承認の後に手元の操作（着手など）の履歴の行があれば、
-        違いを Chrome の版のせいにしない。
-        """
+        """Chrome の承認の後に手元の履歴（着手など）があれば、違いを Chrome の版のせいにしない。"""
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         body = self.plan()

@@ -10,7 +10,7 @@
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
 7. 親はフィードバック計画が承認されるまで閉じられない
 8. 残った指摘の切り出しの下書き
-9. このセッションで見るフェーズ（`review: chat`）の止め方と締め
+9. このセッションで見るフェーズ（`review: chat`）の止め方と、親を早めに閉じる操作
 
 範囲の上限（設計 wip/design/approve-carry.md 3・4）は ScopeLimitTest が見る。
 """
@@ -467,7 +467,7 @@ class PhaseTest(PhaseHarness):
         """種類の範囲の上限は、子チケットの範囲と同じく大文字小文字を区別しない。
 
         機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
-        承認を拒まれ、Windows では通る。範囲はユーザが宣言する意図なので、表記の
+        承認を拒まれ、Windows では通る。範囲はユーザが宣言する意図なので、書かれたパスの
         意味で読む（子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える）。
         """
         self.family(plan=["research", "design"])
@@ -784,7 +784,7 @@ class PhaseTest(PhaseHarness):
         preview = json.loads(shown.stdout)
         self.assertTrue(preview["can_issue"])
         choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
-        # 状態ディレクトリが無ければ、issue に回す下書きを置けないので、何も置く前に断る
+        # state の置き場が無ければ、issue に回す下書きを置けないので、何も置く前に断る
         homeless = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -802,7 +802,7 @@ class PhaseTest(PhaseHarness):
             fixture,
         )
         self.assertNotEqual(homeless.returncode, 0)
-        self.assertIn("状態ディレクトリが空", homeless.stderr)
+        self.assertIn("state の置き場が空", homeless.stderr)
         self.assertNotEqual(self.confirm(fixture, 2).returncode, 0)
         done = self.ccnavi(
             "--cwd",
@@ -826,12 +826,12 @@ class PhaseTest(PhaseHarness):
         self.assertTrue(text.startswith("レビューで残った指摘（i0001 のフェーズ 2）\n\n"))
         self.assertIn("u/7#t1", text)
         self.assertNotIn("u/7#t0", text)
-        # レビュー済みのフェーズに confirm を重ねない。重ねるとマーカーと跡が書き直される
+        # レビュー済みのフェーズに confirm を重ねない。重ねるとマーカーと履歴が書き直される
         again = self.confirm(fixture, 2)
         self.assertEqual(again.returncode, 1)
         self.assertIn("フェーズ 2 はレビュー済み", again.stderr)
 
-    # ---- 7. Draft を外す（ready）と、ユーザが締める（close-early）
+    # ---- 7. Draft を外す（ready）と、ユーザが早めに閉じる（close-early）
 
     def ready(self, fixture):
         return self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
@@ -884,7 +884,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("rm -r wip", closed.stdout)
         self.assertIn("squash", closed.stdout)
-        # 締めた記録は進め方によらず置く（REQ-TKT-47）。
+        # 閉じた記録は進め方によらず置く（REQ-TKT-47）。
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
         self.assertEqual(record["reviews"], {"1": "mr"})
         self.commit_parent("状態の移動")
@@ -908,8 +908,8 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(again.returncode, 0, again.stderr)
 
     def test_close_early_closes_early_and_files_the_rest(self):
-        """ユーザが「キリの良いところ」と締める。残りは取り消し・省略・受け入れになり、
-        issue に写る。"""
+        """ユーザが「キリの良いところ」と早めに閉じる。残りは取り消し・省略・受け入れになり、
+        issue に書き出される。"""
         self.family(plan=["research", "design", "acceptance", "implement"])
         self.propose(
             "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
@@ -917,7 +917,7 @@ class PhaseTest(PhaseHarness):
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         self.run_child("i0001-01", [("wip/research/summary.md", "s\n")])
-        # 作業中の子がいる間は締められない。
+        # 作業中の子がいる間は早めに閉じられない。
         fixture = self.remote()
         refused = self.close_early(fixture)
         self.assertNotEqual(refused.returncode, 0)
@@ -942,10 +942,10 @@ class PhaseTest(PhaseHarness):
         self.assertIn("フィードバック計画", declined.stdout)
         self.assertIn("u/7#t0", declined.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
-        # y で締める。
+        # y で早めに閉じる。
         done = self.close_early(fixture, reason="今期はここまで")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("締めた", done.stdout)
+        self.assertIn("早めに閉じた", done.stdout)
         cancelled = os.path.join(self.approved, "done", "i0001-02.md")
         self.assertTrue(os.path.exists(cancelled))
         with open(cancelled, encoding="utf-8") as f:
@@ -965,9 +965,9 @@ class PhaseTest(PhaseHarness):
         self.assertIn("実装とテスト", issue)
         self.assertIn("u/7#t0", issue)
         self.assertIn("今期はここまで", issue)
-        # 締めたので、フィードバック計画が無くても親を閉じられる。
+        # 早めに閉じたので、フィードバック計画が無くても親を閉じられる。
         explained = self.ccnavi("--explain")
-        self.assertIn("ユーザが締めた", explained.stdout)
+        self.assertIn("ユーザが早めに閉じた", explained.stdout)
         closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         # Draft はまだ外れていない。片付けて push してから ready で外す。
@@ -1171,7 +1171,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
-        # y でマーカーが置かれ、止まっていたのが解ける。承認済みチケットも依頼の記録も要らない。
+        # y でマーカーが置かれ、止まっていたのが解ける。取得した結果も依頼の記録も要らない。
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
@@ -1344,7 +1344,7 @@ class ChatReviewTest(PhaseHarness):
         self.start_parent()
         self.propose("i0001", parent_text("i0001", ["chores"], feedback=["chores-feedback"]))
         self.assertEqual(self.approve().returncode, 0)
-        # 親を着手にすると、次の hook が承認済みチケットへ started_at を写す。写した変更を
+        # 親を着手にすると、次の hook が承認済みチケットへ started_at をコピーする。コピーした形跡を
         # 残したまま先へ進むと、実行後チェックがそれを報告して告知が読めなくなる。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.commit_parent("フィードバック計画")
@@ -1365,7 +1365,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(mark["by"], "chat")
 
     def test_closing_a_chat_only_parent_records_where_each_phase_was_seen(self):
-        """締めた事実は親のブランチに残る。案内は Draft ではなく統合先に取り込むところまで。"""
+        """閉じた事実は親のブランチに残る。案内は Draft ではなく統合先に取り込むところまで。"""
         self.chat_phase(plan=["chores"])
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)

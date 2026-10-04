@@ -206,7 +206,7 @@ def reason_for(
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
     # 出所はルールの id で示す。プロジェクトのルールの id には `lib:git-push` の形で
     # プロジェクトの名前が付く（REQ-MLT-07）ので、id だけでどのファイルを見に行けばよいかが
-    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無い文字列が
+    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無いパスが
     # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
     if rule.id == phase.TICKET_APPROVAL_RULE_ID:
@@ -234,7 +234,7 @@ def ran_by(runner: str, inner: str) -> str:
     ルールは `rm` について書かれていて、`env` については何も言っていないので。
 
     `cd` で移った先から見たパスに当たったときも同じで、書いた表記（`rm settings.json`）には
-    当たったルールの名前が出てこない。どこへ書こうとしているかを書き直した表記で示す。
+    当たったルールの名前が出てこない。どこへ書こうとしているかをパスで示す。
     """
     if runner == shellread.MOVED:
         return (
@@ -343,7 +343,7 @@ def rewrite(subject: str, form: str, found: list[str]) -> str:
     )
 
 
-# 止めた文に並べる書き直しの数。1 つ直せば残りも同じ直し方になる。
+# 止めた文に並べる表記の数。1 つ直せば残りも同じ直し方になる。
 _REWRITES_SHOWN = 5
 
 # 形ごとの（見つけたものの呼び名, 書き直し方）。
@@ -396,7 +396,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
 
     言うのは線引きと入口だけにする。この文はセッションの開始（起動・再開・compact・clear）
     のたびに届くので、後から必要な場所で改めて届くものを頭では言わない。名指しするのは、
-    レビューの sh の書き方がフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
+    レビューの sh のパスがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
     ユーザがどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
     フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の書き方が
     承認のときの検査（`agree.py`）、後工程の進め方が承認済みチケットが置かれたとき

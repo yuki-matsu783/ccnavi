@@ -1,6 +1,4 @@
-"""ccnavi-review.sh がホストの応答から組む JSON と、マーカーのアカウント
-（`actor`）の
-
+"""ccnavi-review.sh がホストの応答から組む JSON と、マーカーのアカウント（`actor`）の
 受入テスト。
 
 見るのは 3 つ。
@@ -11,8 +9,8 @@
    （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ JSON を組む
 2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの `review.effective`・`_unresolved`）が
    見本の `conclusion.json` と同じ
-3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。引けなければ渡さない
-   （マーカーは前と同じ）。
+3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。
+   引けなければ渡さない（マーカーは前と同じ）。
    呼び手が `--actor` を渡しても受けない
 
 ホストの API が変わって見本を録り直したら、`CCNAVI_HOST_FIXTURE=1` を付けてこのテストを回し、
@@ -500,7 +498,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
 
     def request_stub(self, out):
         """実行ファイルの代役。`review prepare` で本文と下書きを書き、
-        `--result` の JSON を保存する。
+        `--result` の JSON を残しておく。
 
         受け取った引数は 1 行 1 つで `out/args.txt` に溜める。
         """

@@ -44,7 +44,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh done <子> --risk scratchpad/my-risk.yml
 hook は引数を渡さずに実行ファイルを起動するので、**hook からの判定の入口は前から固定**
 だった。穴が開くのは、エージェントが 2 本の sh を直接打つ経路だけ。
 
-**同じ経路には、フラグ 5 本の表に載らない穴がもう 1 つあった。** sh は自分が決めた引数を先に
+**同じ経路には、フラグ 5 本の表に載らない穴がもう 1 つあった。** sh は自分の引数を先に
 置き、エージェントの引数を後ろに繋ぐ（`exec "$bin" --root "$root" ticket "$@"`、
 `ccnavi-review.sh` は `--cwd "$here"` も渡す）。argparse は同じオプションを後勝ちで読むので、
 **後ろに `--root` を 1 本足すだけで sh が渡した本物を上書きできた。** `settings.load` は
@@ -64,7 +64,7 @@ hook は引数を渡さずに実行ファイルを起動するので、**hook �
 
 `.ccnavi/scripts/ccnavi-approve.sh` は**まさにこれを警戒していた**。「`--yes` や `--root` が
 混ざると、端末の y/N を経ない経路や別のワークスペースの承認になってしまう」と書いて、`-*` で
-始まる引数を全部断っている。`ccnavi-ticket.sh` と `ccnavi-review.sh` にその守りは無い。
+始まる引数を全部断っている。`ccnavi-ticket.sh` と `ccnavi-review.sh` にその保護は無い。
 
 ADR-0052 はこの 3 本を「診断のためのフラグ」と呼んだが、それは実装と合っていなかった。
 同 ADR は訂正だけを書き、制限は「別に設計して直す」として残していた。これがその 1 枚。
@@ -101,7 +101,7 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
   `tests/guard/test_permission_mode.py`）は、見本のルールを共通層に据えた一時の
   ワークスペース（`tests.fixture_workspace`）を `--root` に渡す
 
-**あわせて、sh が計算して渡すパス（`--root` / `--cwd`）は 2 度渡せないことにする。**
+**あわせて、sh が計算して渡す引数（`--root` / `--cwd`）は 2 度渡せないことにする。**
 2 本目が在ったら止める（`_one_wrapper_flag_each`）。数えるのは argparse に任せる
 （`action="append"`）。argv を自分で数えると、別のオプションの**値**に書いた `--root`
 という語まで数えてしまう。
@@ -120,7 +120,7 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
 **穴が実行ファイルの側で閉じる。** sh の側で名指しにする案は、実行ファイルを変えずに
 済むが、閉じるのはその 2 本の経路だけになる。実行ファイルを直に打つ経路は組み込みの
 deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
-`CCNAVI_GUARD_TICKET_APPROVAL=disable` と dry-run で外れる。守りが 2 つの設定の積に
+`CCNAVI_GUARD_TICKET_APPROVAL=disable` と dry-run で外れる。保護が 2 つの設定の積に
 なるより、入口そのものが受け付けないほうが単純で済む。
 
 `--root` / `--cwd` も同じ理由で実行ファイルの側に置く。sh を直せば済む話ではあるが、

@@ -1,15 +1,15 @@
-"""チケットの状態の履歴。1 行 1 JSON を、チケットごとのファイルに追記するだけ。
+"""チケットの状態が動いた履歴。1 行 1 JSON を、チケットごとのファイルに追記するだけ。
 
-## 補助で、状態を決めるものではない
+## 補助であって本物ではない
 
-状態は置き場で決まる（チケットがどの置き場に在るか）。ここは「いつ・どの経路で・どこからどこへ動いたか」を
+状態の正は置き場（チケットがどの置き場に在るか）。ここは「いつ・どの経路で・どこからどこへ動いたか」を
 あとから読むための履歴で、判定も状態の操作もここを読まない。置き場と食い違ったら置き場を信頼する。
-ユーザが hook の外で置き場を動かした分（手で承認する、再開する）は、状態の履歴が残らない。
+ユーザが hook の外で置き場を動かした分（手で承認する、再開する）は、履歴が残らない。
 
 ## 追記だけ
 
 書き換える・消すコードは持たない。1 行をまるごと 1 回の write で、追記で開いたハンドルに
-出す（記録の 1 行と同じ書き方。付録 B）。同じチケットの状態の履歴を 2 つのプロセスが同時に書いても
+出す（記録の 1 行と同じ書き方。付録 B）。同じチケットの履歴を 2 つのプロセスが同時に書いても
 行が混ざらないのは、POSIX の `O_APPEND`（書くたびに末尾へ位置を移してから 1 回で書く）に頼っている。
 Windows の追記はその保証が弱く、同時に書けば行が混ざりうる（読む側は読めない行を飛ばして数える）。
 
@@ -18,7 +18,7 @@ Windows の追記はその保証が弱く、同時に書けば行が混ざりう
 
 ## 書けなくても状態は止めない
 
-状態の履歴は補助なので、書けなかったことを理由に状態の操作を止めない。ただし何も言わずに捨てもしない。
+履歴は補助なので、書けなかったことを理由に状態の操作を止めない。ただし何も言わずに捨てもしない。
 書けなかった理由は `failures` に溜め、入口（`cli.run`）が `session` を抜けるときに
 標準エラーへ警告として出す（`ccnavi: ...` の 1 行。ほかの書けなかった知らせと同じ出し方）。
 置き場を動かす関数の多くは標準エラーを持たないので、溜めて入口で出す形にした。
@@ -46,7 +46,7 @@ from . import ticket as ticket_mod
 EVENTS_DIR = "events"
 SUFFIX = ".ndjson"
 
-# 1 本のファイルから読む上限（バイト）。状態の履歴は追記だけで大きくなり続けるので、ボードが毎回
+# 1 本のファイルから読む上限（バイト）。履歴は追記だけで大きくなり続けるので、ボードが毎回
 # 全部を読まないように末尾だけを読む。1 行はおよそ 200 バイトなので、既定の件数には十分。
 READ_LIMIT_BYTES = 64 * 1024
 
@@ -74,7 +74,7 @@ KIND_FINISHED = "finished"  # doing → review か done
 KIND_CANCELLED = "cancelled"  # doing → done（取り消しの欄）
 KIND_SETTLED = "settled"  # review → done（ユーザのレビューが済んだ）
 KIND_WITHDRAWN = "withdrawn"  # doing → todo（着手前の新規の承認を Chrome から取り下げた）
-# マーカー。親の状態の履歴に残す。`from` / `to` は null で、`phase` と `mark` を持つ。
+# マーカー。親の履歴に残す。`from` / `to` は null で、`phase` と `mark` を持つ。
 # フェーズのマーカーを置いた（pending / requested / reviewed / skipped）
 KIND_PHASE_MARK = "phase-mark"
 KIND_PHASE_REOPENED = "phase-reopened"  # フェーズのマーカーを消した（同じ番号に子が足された）
@@ -91,7 +91,7 @@ def session(via: str, stderr: TextIO | None, actor: str = "", version: str = "")
     前の起動の経路や溜まりが次へ漏れないようにする。
 
     `actor`・`version` は、この間に書く履歴の行に足す欄（Chrome の承認は、ホストのアカウントと
-    拡張の版を状態の履歴に残す。版は、手元と判定が食い違ったときに追えるようにするため）。空なら足さない（手元の状態の履歴は前のまま）。
+    拡張の版を履歴に残す。版は、手元と判定が食い違ったときに追えるようにするため）。空なら足さない（手元の履歴は前のまま）。
     """
     before = dict(_state)
     _state["via"] = via
@@ -115,7 +115,7 @@ def set_via(via: str) -> None:
 def set_actor(actor: str) -> None:
     """いまの起動の間に書く履歴の行に、アカウントの欄を足す（decide が使う）。
 
-    空なら何もしない（状態の履歴は前のまま）。`session` を抜けるときに前の値へ戻る。
+    空なら何もしない（履歴は前のまま）。`session` を抜けるときに前の値へ戻る。
     """
     if actor:
         _state["extra"] = {**_state["extra"], "actor": actor}
@@ -136,9 +136,9 @@ def pending_failures() -> list[str]:
 
 
 def path(approved_dir: str, ticket_id: str) -> str:
-    """状態の履歴のファイルのパス。識別子の形でなければ空文字（置き場の外を指させない）。
+    """履歴のファイルのパス。識別子の形でなければ空文字（置き場の外を指させない）。
 
-    呼び手は識別子を検査済みのチケットから渡すが、ここでも同じ検査を当てる（多重の守り）。
+    呼び手は識別子を検査済みのチケットから渡すが、ここでも同じ検査を当てる（多重の保護）。
     """
     if not ticket_mod.is_valid_id(ticket_id):
         return ""
@@ -146,7 +146,7 @@ def path(approved_dir: str, ticket_id: str) -> str:
 
 
 def stamp() -> str:
-    """状態の履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。機械をまたいでも並べて読める。
+    """履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。機械をまたいでも並べて読める。
 
     時計は fsio の差し替え点（`fsio.clock`）を通る。承認の plan は承認の記録と同じ時刻を書く。
     """
@@ -161,7 +161,7 @@ def note(
     target: str | None,
     **extra,
 ) -> str:
-    """状態の履歴に 1 行足す。書けなかったら理由を返し、同じ理由を `failures` にも溜める。
+    """履歴を 1 行足す。書けなかったら理由を返し、同じ理由を `failures` にも溜める。
 
     `source` / `target` は置き場の名前（`todo` / `doing` / `review` / `done`）。置き場が動かない
     もの（マーカー）は None。`extra` は空の値を落として足す。
@@ -198,7 +198,7 @@ def note(
     except (TypeError, ValueError) as exc:
         line, failed = "", f"JSON にできない ({exc})"
     else:
-        # 承認の plan（fsio の書き込みを溜める段）では書けなかったときの枝が走らないので、
+        # 承認の plan（fsio の溜める段）では書けなかったときの枝が走らないので、
         # 同じ知らせを Writer(FS) が溜められるようにつけておく。
         with fsio.policy(
             on_fail=fsio.FAIL_HISTORY, message=template, prefix="", undo=(), places=""
@@ -210,10 +210,7 @@ def note(
 
 
 def failed_to_write(message: str) -> None:
-    """状態の履歴を書けなかった知らせを溜める。
-
-    Writer(FS) が、溜めた追記を書けなかったときに呼ぶ。
-    """
+    """履歴を書けなかった知らせを溜める（Writer(FS) が、溜めた追記を書けなかったときに呼ぶ）。"""
     _state["failures"].append(message)
 
 
@@ -227,7 +224,7 @@ def _append(target: str, line: str) -> str:
 
 
 def read(approved_dir: str, ticket_id: str, limit: int = BOARD_LIMIT) -> tuple[list[dict], str]:
-    """状態の履歴の新しい側から `limit` 件を、古い順に。2 つめは読めなかった理由（無ければ空）。
+    """履歴の新しい側から `limit` 件を、古い順に。2 つめは読めなかった理由（無ければ空）。
 
     ファイルが無いのは履歴が無いだけで、理由は空。読めない行（書きかけ、手で壊した行）は
     飛ばして数える。末尾の `READ_LIMIT_BYTES` だけを読むので、途中で切れた先頭の 1 行は捨てる。

@@ -182,10 +182,10 @@ def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
 def relative(tree: Tree, full: str) -> str:
     """作業ツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
 
-    表記の大文字小文字は元のまま返す。normcase を掛けた表記から作ると、
+    表記の大文字小文字は元のまま返す。normcase を掛けたパスから作ると、
     区別しない機械（Windows）では全部が小文字になり、チケットが `README.md` と
     書いた範囲に `readme.md` を当てることになって、永久に当たらない。
-    `os.path.relpath` は比較にだけ normcase を使い、返す表記は元のままなので、
+    `os.path.relpath` は比較にだけ normcase を使い、返すパスは元のままなので、
     根（normcase 済み）と突き合わせても大文字小文字は保たれる。
     """
     target = _canonical(full)

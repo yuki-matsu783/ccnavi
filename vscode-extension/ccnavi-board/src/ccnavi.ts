@@ -7,13 +7,13 @@
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
  * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
- * `--suggest --json`（記録からルールの候補を起こす。ルール設定画面が読む。記録を読むので `--log ""` は付けない）。
+ * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（ワークスペースかプロジェクトの設定の種類なら `--project-phases-file <名前>=<パス>`）で
  * 差し替えられる（リスク管理画面・フェーズ管理画面）。
- * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと状態ディレクトリは外し、記録も残さない
+ * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと state の置き場は外し、記録も残さない
  * （試し打ちで記録を汚さない）。
  */
 import { execFile } from "node:child_process";
@@ -90,7 +90,7 @@ const EXPLAIN_TIMEOUT_MS = 60_000;
 
 /**
  * 診断の 4 本（`--test` / `--test-samples` / `--lint` / `--lint --json`）に付ける期限（ミリ秒）。
- * この 4 本を待つ間、ルール設定・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
+ * この 4 本を待つ間、ルール管理・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
  * 届いたときにしか活性へ戻さない。ボードと違って HTML の総取り替えも監視の読み直しも無いので、
  * 返らないと画面を閉じるまで戻れない（編集中の内容は消える）。値はボードと承認に揃えて 60 秒。
  */
@@ -104,7 +104,7 @@ function cutOff(what: string, ms: number): string {
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つかりません（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれもありません）。設定 ccnaviBoard.binPath で指定できます";
 
-/** 見るのはルールだけ。チケット制御と状態ディレクトリは外し、記録も残さない */
+/** 見るのはルールだけ。チケット制御と state の置き場は外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
 
 /**
@@ -263,7 +263,7 @@ export type { ApproveOutcome };
 
 /**
  * 承認待ちの一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
- * 記録と状態ディレクトリは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
+ * 記録と state の置き場は外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(
   root: string,
@@ -468,7 +468,7 @@ export async function runSamples(
 /**
  * 記録からルールの候補を起こす（`--suggest --json`、README「候補の JSON」）。読むのは保存済みの
  * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と見本の判定で確かめたものだけ。
- * 記録を読むので `--log ""` は付けない（状態ディレクトリは実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
+ * 記録を読むので `--log ""` は付けない（state の置き場は実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
  */
 export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {
   const launcher = findLauncher(root, setting);
@@ -598,7 +598,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 }
 
 /**
- * 親子チケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * 親子のチケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
  * フローの保存の後、承認の push を送るかを決めるのに使う。
  */
 export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {

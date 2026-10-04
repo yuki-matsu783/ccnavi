@@ -86,7 +86,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [helpOpen, setHelpOpen] = useState(false);
   /**
    * 案内を始める前の画面の様子。案内は一覧と図を切り替え、見本の行と関係の欄を開き、絞り込みを外すので、
-   * 閉じたらこれに戻す。**案内の間の一覧と図の切り替えは state（`saveView`）に書かない**（途中でタブを
+   * 閉じたらこれに戻す。**案内の間の一覧と図の切り替えはstate（`saveView`）に書かない**（途中でタブを
    * 閉じたときに、次から図で開く、ということを起こさない）。
    */
   const beforeTour = useRef<TourSnapshot | undefined>(undefined);

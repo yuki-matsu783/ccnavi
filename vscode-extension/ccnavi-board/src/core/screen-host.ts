@@ -8,7 +8,7 @@
  * | パネル | 使うもの | 裏に回ったとき |
  * |---|---|---|
  * | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost` | 画面は捨てられる。入れ物ごと入れ直す |
- * | `retainContextWhenHidden: true`（ルール設定・リスク管理・フェーズ管理） | `retainedHost` | 画面は生きている。何もしない |
+ * | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理） | `retainedHost` | 画面は生きている。何もしない |
  *
  * 取り違えると**どちらの向きでも不具合が出る**。保持する画面に `screenHost` を当てると、裏にいる間の
  * 入れ直しでユーザが打ちかけていた内容が消える。保持しない画面に `retainedHost` を当てると、
@@ -161,7 +161,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
       sync();
       // 裏にいる画面は `ready` を送らない。届いたなら、それは捨てられた画面が残していったもの。
       // これを真に受けると、作り直し中の画面へ送って落とすことになる。
-      // （`live` と `post` も表に出ていることを見るので、ここは二重の守り。単体では外から観測できない）
+      // （`live` と `post` も表に出ていることを見るので、ここは二重の確認。単体では外から観測できない）
       if (!seen) {
         return;
       }
@@ -175,7 +175,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
 }
 
 /**
- * 保持する画面（`retainContextWhenHidden: true`）に中身を渡す段取り。ルール設定・リスク管理・
+ * 保持する画面（`retainContextWhenHidden: true`）に中身を渡す段取り。ルール管理・リスク管理・
  * フェーズ管理が使う。返る形は `screenHost` と同じなので、パネルは作るところの 1 行だけが違う。
  *
  * 保持する画面は裏に回っても捨てられない。VS Code は DOM も Webview の中の状態もそのまま持ち、

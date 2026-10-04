@@ -80,7 +80,7 @@ PACKAGES: tuple[tuple[str, str], ...] = (
 
 # 段は下から上へ。下の段は上の段を知らない。
 #
-# **いまの依存の深さを写したもので、意味で先に引いた線ではない。** 設計書の章立て
+# **いまの依存の深さをなぞったもので、意味で先に引いた線ではない。** 設計書の章立て
 # （ルール・実行前・実行後・チケット）で切ると双方向の辺が残って段にならないので、
 # 深さで切ってある。注記はその段に何が居るかの説明であって、そこへ置く根拠ではない。
 # 役割の線はサブパッケージ（PACKAGES）が引く。
@@ -194,8 +194,7 @@ TIER_OF = {mod: name for name, _, mods in TIERS for mod in mods}
 TIER_MEANING = " / ".join(f"{name}: {note}" for name, note, _ in TIERS)
 PACKAGE_ORDER = {name: i for i, (name, _) in enumerate(PACKAGES)}
 PACKAGE_MEANING = " / ".join(f"{name}: {note}" for name, note in PACKAGES)
-# 直下に置いてよいモジュール。パッケージであることを示す `__init__` と、
-# `python -m ccnavi` の入口だけ。
+# 直下に置いてよいモジュール。パッケージの目印と `python -m ccnavi` の入口だけ。
 TOP_LEVEL = frozenset({"__init__", "__main__"})
 
 

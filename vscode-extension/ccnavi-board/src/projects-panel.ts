@@ -51,7 +51,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-/** 画面の名前。束ねる入出力のパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "projects";
 const TITLE = "ccnavi プロジェクト管理";
 
@@ -92,7 +92,7 @@ export async function openProjects(): Promise<void> {
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -418,7 +418,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら見たというフラグは残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToProjects);
     }

@@ -23,7 +23,7 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 | `CCNAVI_TICKETS_PROPOSAL` | `wip/proposals` | 各ツリーのルート | 既定のまま |
 | `CCNAVI_TICKETS_APPROVED` | `.ccnavi/approved` | 各ツリーのルート | 既定のまま（`--lint` が指摘する） |
 | `CCNAVI_LOG` | `logs/log.jsonl` | ワークスペースルート | 記録しない |
-| `CCNAVI_STATE` | `logs/state` | ワークスペースルート | 状態を保存しない |
+| `CCNAVI_STATE` | `logs/state` | ワークスペースルート | state を保存しない |
 
 **既定から変えている配布先は見当たらなかった。** 導入スクリプト（`scripts/ccnavi-setup.sh`）が
 配る `settings.json` に書くのは既定と同じ値だけで、`CCNAVI_LOG` は常に、残りの 4 つ
@@ -38,7 +38,7 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 | 食い違い | 起きること |
 |---|---|
 | `CCNAVI_PROJECTS` の絶対パスを、実行ファイルと `ccnavi-git.sh push` は受けるが、`ccnavi-common.sh` の `ccnavi_project` は相対パスとしてしか照合しない | ラッパーの記録が `logs/<プロジェクト>/` に分かれない |
-| `CCNAVI_STATE` の絶対パスを、実行ファイルは受けるが、`ccnavi-review.sh` は `$root/` の後ろにつなげる | `ccnavi-review.sh` だけが存在しない状態ディレクトリを見る |
+| `CCNAVI_STATE` の絶対パスを、実行ファイルは受けるが、`ccnavi-review.sh` は `$root/` の後ろにつなげる | `ccnavi-review.sh` だけが存在しないstateの置き場を見る |
 | VS Code 拡張は `CCNAVI_TICKETS_PROPOSAL` を読まず、既定のパスを監視する | 既定から動かすと、提案の増減でボードが自動で更新されない（README に注記していた） |
 | `ccnavi-push-approved.sh` は、末尾の `/` を落として空になるパスと `.` を既定に戻す | sh が、置き場が変わることを前提にした正規化とテストを抱えている |
 
@@ -56,7 +56,7 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 - `settings.py` から 6 つの定数と overrides 表の 6 行を削る。**この表は
   `ccnavi.settings.local.json`（ccnavi 自身を開発するときだけ読む上書き設定）と共有しているので、
   そちらの同じキーも読まなくなる**（ADR-0052 と同じ）
-- **空文字を受ける設定項目も消す。** 「記録しない」「状態を保存しない」「プロジェクトを数えない」は指定できなくなる。
+- **空文字を受ける設定項目も消す。** 「記録しない」「state を保存しない」「プロジェクトを数えない」は指定できなくなる。
   プロジェクトを数えたくなければ `projects/` を作らなければよい
 - 環境に値が残っていても**無視する。止めない。** 残った値のために判定を止めると、既定と同じ値を
   書いていた導入済みの環境がすべて止まる
@@ -167,8 +167,8 @@ gitlink（入れ子のリポジトリを 1 つの版として載せたもの）�
 
 失ったもの:
 
-- **「記録しない」「状態を保存しない」「プロジェクトを数えない」を env で指定できなくなる。**
-  状態を保存しないと実行後チェックが働かないので、保存を止める意味はもともと薄い。記録を止めたいユーザは
+- **「記録しない」「state を保存しない」「プロジェクトを数えない」を env で指定できなくなる。**
+  state を保存しないと実行後チェックが働かないので、state を止める意味はもともと薄い。記録を止めたいユーザは
   止められない
 - **名前がぶつかったワークスペースは、自分のソースの `projects/` を改名するしかない。**
   そのリポジトリの参照（ビルド設定、CI、import）を直す仕事になる

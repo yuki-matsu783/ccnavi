@@ -8,7 +8,7 @@
  *
  * **判定はしない。** 答えは実行ファイルの 1 か所に置く。 循環も、到達不能も、孤立も、ここは見つけない。
  * 行き先がこのファイルに無い参照は**何も言わずに線にしないだけ**で、なぜ無いのかは言わない。
- * 書き間違いなのかほかの設定の種類なのかを決めるのは実行ファイルで、`phasetypes.py` の
+ * 表記違いなのかほかの設定の種類なのかを決めるのは実行ファイルで、`phasetypes.py` の
  * `reference_problems` が合成した集合で確かめ、無ければ error を出す。画面がその手前で
  * 別の答えを出すと、2 か所が違うことを言う。
  *
@@ -60,7 +60,7 @@ export interface PhasesGraph {
   readonly unnamed: number;
   /**
    * 線にしなかった参照の数（このファイルに無い id を指す overlap / requires / after）。
-   * 書き間違いかほかの設定の種類かは言わない（頭のコメント）。数だけを図の下の注意に出す
+   * 表記違いかほかの設定の種類かは言わない（頭のコメント）。数だけを図の下の注意に出す
    */
   readonly dropped: number;
 }
@@ -220,13 +220,13 @@ function byDepth(first: ReadonlyMap<string, PhasesForm["phases"][number]>, ids: 
   return out;
 }
 
-// ---- ユーザがドラッグで動かした位置（画面の状態に保存する。`phases.yml` には書かない）
+// ---- ユーザがドラッグで動かした位置（画面の state に保持する。`phases.yml` には書かない）
 
-/** 保存した点の置き場所。鍵は種類の id */
+/** 点の置き場所の記録。鍵は種類の id */
 export type Spots = Record<string, { readonly x: number; readonly y: number }>;
 
 /**
- * ドラッグで動かした先を保存する。px は丸める（保存した値を読みやすく保つ）。
+ * ドラッグで動かした先を記録に入れる。px は丸める（記録を読みやすく保つ）。
  *
  * ここ（`core/`）に置いてあるのは、`state.ts` が `acquireVsCodeApi` を読み、node のテストから
  * import できないため。単体で試せる形にしておく（CB-T191）。
@@ -238,7 +238,7 @@ export function withSpot(spots: Spots, id: string, x: number, y: number): Spots 
   return { ...spots, [id]: { x: Math.round(x), y: Math.round(y) } };
 }
 
-/** 図に出ている種類の置き場所だけを残す。変わらなければ元のものをそのまま返す（描き直しを起こさない） */
+/** 図に出ている種類の記録だけを残す。変わらなければ元のものをそのまま返す（描き直しを起こさない） */
 export function keepSpots(spots: Spots, ids: readonly string[]): Spots {
   const next: Spots = {};
   for (const id of ids) {

@@ -5,7 +5,7 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
 
 見るのは 6 つ。
 
-1. 時計（Clock の差し替え点）: `fsio.clock` で固定した時刻を、承認の記録と状態の履歴が同じに書く
+1. 時計（Clock の差し替え点）: `fsio.clock` で固定した時刻を、承認の記録と履歴が同じに書く
 2. 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
    前の形（絶対パス・ツリーの名前）の承認済みチケットも同じに読み、判定の答えは変わらない
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
@@ -181,19 +181,18 @@ class CoreHarness(PhaseHarness):
             **extra,
         }
         if op != "confirm":
-            # レビュー済みは手元の CLI の confirm と比べる。同期状態があると手元は C1 の
-            # 対象の親子チケットとして sh を通さない書き込みを断るので、
-            # 同期状態は
+            # レビュー済みは手元の CLI の confirm と比べる。
+            # 取り込み状態があると手元は C1 の対象の親子のチケットとして
+            # sh を通さない書き込みを断るので、取り込み状態は
             # Chrome の側だけに組む。
             self.mirror_records(chrome, request)
         return request
 
     def mirror_records(self, chrome, request):
-        """Chrome の入口が仮のツリーに組む取り込みの同期状態に当たるものを、
-        手元の状態ディレクトリにも書く。
+        """Chrome の入口が仮のツリーに組む取り込み状態相当を、手元の state の置き場にも書く。
 
-        手元も同じ同期状態で判定する（取り込み済みの親子チケットとして読む）ので、
-        画面の本文とダイジェスト（判定が読んだ中身。同期状態を含む）が Chrome と同じになる。
+        手元も同じ取り込み状態で判定する（取り込み済みの親子のチケットとして読む）ので、画面の本文とダイジェスト（判定が読んだ中身。
+        取り込み状態を含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
         place = chrome._placement(None)
@@ -256,7 +255,7 @@ class SourcePathTest(CoreHarness):
             text = f.read()
         old = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
         # 前の形: 絶対パス。`source_tree` はツリーの名前で、
-        # 親のワークツリーではブランチ名と同じ名前。
+        # 親のワークツリーではブランチ名と同じ表記。
         legacy = text.replace(
             "source_path: wip/proposals/todo/i0001.md", f"source_path: {json.dumps(old)}"
         )
@@ -270,8 +269,7 @@ class SourcePathTest(CoreHarness):
         a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
         for key in ("batch", "text", "rejected", "problems"):
             self.assertEqual(a[key], b[key], key)
-        # ダイジェストは判定が読んだ中身（read_set）で作るので、
-        # 読んだ承認済みチケットの
+        # ダイジェストは判定が読んだ中身（read_set）で作るので、読んだ承認済みチケットの
         # バイト列が変われば変わる（見せたあとに承認済みチケットが書き換わった承認を通さない）。
         self.assertNotEqual(a["digest"], b["digest"])
         self.assertEqual(verify_new.returncode, verify_old.returncode)
@@ -591,7 +589,7 @@ class WriterFailureTest(CoreHarness):
         self.assertNotIn("を消した", out)
 
     def test_another_mark_that_cannot_be_removed_is_said_and_left(self):
-        """reviewed 以外は言って続ける。行と状態の履歴は実際に消せた種類だけ。"""
+        """reviewed 以外は言って続ける。行と履歴は実際に消せた種類だけ。"""
         marks = self.reopened()
         changes = self.planned()
         # 見え方（Chrome の 1 コミット）では両方消える。
@@ -682,8 +680,7 @@ class CoreChromeTest(CoreHarness):
     collected: dict = {}
 
     def setUp(self):
-        # 見本は走らせるたびに同じ中身にする。
-        # 時刻（承認の記録・状態の履歴・マーカー）は fsio の時計で、
+        # 見本は走らせるたびに同じ中身にする。時刻（承認の記録・履歴・マーカー）は fsio の時計で、
         # コミットの sha（依頼のマーカーの `head`）は git の日時で固定する。
         for key in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
             if key in os.environ:
@@ -714,7 +711,7 @@ class CoreChromeTest(CoreHarness):
         write(SCENARIOS, body + "\n")
 
     def keep_scenario(self, name, request, answer):
-        """拡張の試験の見本と突き合わせる（書き直すときは保存する）。場面ごとにその場で比べる。"""
+        """拡張の試験の見本と突き合わせる（書き直すときは記録しておく）。場面ごとにその場で比べる。"""
         CoreChromeTest.collected[name] = {"request": request, "answer": answer}
         if os.environ.get("CCNAVI_CHROME_FIXTURE"):
             return
@@ -799,10 +796,11 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent("reviewed")
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
-        # 合流した子のワークツリーを片付ける。
-        # 手元の判定は全ツリーの承認済みチケットを読む（同期状態の無い親子チケット）ので、
-        # 残すと手元だけが子のツリーの古い承認済みチケットを読み、判定が読んだ中身（read_set）で
-        # 作るダイジェストが Chrome（統合先と P だけを読む）と食い違う。
+        # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの承認済みチケットを読む
+        # （取り込み状態の無い親子のチケット）ので、残すと手元だけが子のツリーの古い承認済み
+        # チケットを読み、判定が読んだ中身（read_set）
+        # で作るダイジェストが Chrome（統合先と P だけを読む）と
+        # 食い違う。
         git(
             self.root,
             "worktree",
@@ -1029,6 +1027,26 @@ class WithdrawTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(any("改版" in p for p in self.problems({"i0001": text.encode()})))
+
+    def test_copies_left_in_a_worktree_do_not_change_the_answer(self):
+        """承認の前に切ったワークツリーに `todo/` の提案が残っていても、答えは前と同じ。"""
+        text = parent_text("i0001", ["research"])
+        self.propose("i0001", text)
+        self.commit_parent()
+        other = self.worktree("i0001-05", "i0001")  # todo/i0001 を持ったまま切る
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertEqual(self.problems({"i0001": text.encode()}), [])
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
+        # 承認済みの無い子の提案は、どのツリーに在っても止める（前と同じ）。
+        write(
+            os.path.join(other, "wip", "proposals", "todo", "i0001-01.md"),
+            child_text("i0001-01", "i0001", 1, ("wip/research/*",), False),
+        )
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("子の提案" in p for p in problems), problems)
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertTrue(any("子の提案" in p for p in listed[0][2]), listed)
 
     def test_an_unreadable_marks_place_refuses(self):
         """マーカーの置き場を読めない（ディレクトリでない）なら、無いとは言わずに止める。"""

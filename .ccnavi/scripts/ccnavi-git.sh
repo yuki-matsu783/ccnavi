@@ -49,7 +49,7 @@ unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJ
 # 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
 # 止まるので、案内に `git stash push -u` と書くと、案内された先でもう 1 度拒否される。
 # 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
-# $0 は呼ばれたときの表記そのままなので、ワークツリーの中から相対で呼ばれても合う。
+# $0 は呼ばれたときのパスそのままなので、ワークツリーの中から相対で呼ばれても合う。
 SELF="sh $0"
 # 取り込みの sh。リモートに合わせる経路はここへ案内する。
 SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
@@ -73,7 +73,7 @@ WS=$(ccnavi_workspace) ||
 	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 # 解いたルートを logger に渡し、書くたびに探し直させない。
 ccnavi_log_root="$WS"
-# git のパス（リンクを解いたもの）と比べるための、リンクを解いたルート。
+# git が返すパス（リンクを解いたもの）と比べるための、リンクを解いたルート。
 WS_P=$(ccnavi_phys "$WS")
 
 usage() {
@@ -103,7 +103,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
-                   リモートから消えた (親子チケットの同期状態が gone の) 親のブランチへは送れない)
+                   リモートから消えた (取り込み状態が gone の) 親のブランチへは送れない)
 
 通さないもの (代わりの手段):
   reset clean   sh .ccnavi/scripts/ccnavi-git.sh stash push -u で退避する。消さない
@@ -117,8 +117,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                 なってしまうので、値を見ずに一律で拒否する
 
 オプション: branch checkout switch fetch pull merge commit rm restore cat-file worktree は
-            許可リストで読む。長いオプションは略さずに書く (略した書き方は通らない)。
-            短いオプションは束ねてよく、値を取る字 (-b など) の後ろは値として読む
+            許可リストで読む。長いオプションは略さずに書く (略した表記は通らない)。
+            短いオプションはまとめて書いてよく、値を取る字 (-b など) の後ろは値として読む
 
 出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
 環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS
@@ -164,8 +164,8 @@ for arg in ${1+"$@"}; do
 		reject moved-root "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
 		;;
 	--?*)
-		# 略した書き方（`--outp=x`・`--upload-p=...`）。parse-options を使う副命令は長いオプションの
-		# 略を受けるので、止める名前の頭に当たる書き方も止める。
+		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使う副命令は長いオプションの
+		# 略を受けるので、止める名前の頭に当たる表記も止める。
 		# `--text`（diff の正式な名前）だけは textconv の頭でも通す。
 		gl_name="${arg#--}"
 		gl_name="${gl_name%%=*}"
@@ -195,25 +195,25 @@ has() {
 	return 1
 }
 
-# オプションを許可リストで読む。止める名前を並べるだけでは、長いオプションの略と束ねた短いオプションで抜けるため。
+# オプションを許可リストで読む。止める名前を並べるだけでは、長いオプションの略とまとめた短いオプションで抜けるため。
 #
 #   ow_flags="' quiet detach '"   値を取らない長いオプション（前後を空白で挟む）
 #   ow_values="' orphan '"         値を取る長いオプション（`--x=v` か次の語）
 #   ow_optvals="' track '"         値を `=` でだけ取れる長いオプション（`--x` だけでもよい）
 #   ow_sflags="qmt"               値を取らない短いオプションの字
-#   ow_svalues="b"                値を取る短いオプションの字（まとめた短いオプションの残りか次の語が値）
-#   ow_soptvals="u"               値をまとめた短いオプションの残りでだけ取れる短いオプションの字
+#   ow_svalues="b"                値を取る短いオプションの字（まとめた残りの字か次の語が値）
+#   ow_soptvals="u"               値をまとめた残りの字でだけ取れる短いオプションの字
 #   opt_walk <コールバック> [<引数>...]
 #
 # git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
-# 名前を並べるやり方では略した書き方が通ってしまう。ここは一覧と**同じ表記**の名前だけを通し、ほかの `--` は
-# 断る（略した書き方も断る）。まとめた短いオプション（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら
-# その残りを値として扱う。
+# 名前を並べるやり方では略した表記が通ってしまう。ここは一覧に**そのままの表記**である名前だけを通し、ほかの `--` は
+# 断る（略した表記も断る）。まとめた短いオプション（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら
+# 残りの字をその値として扱う。
 #
 # コールバックは `<コールバック> opt <-x か --name> <値>`・`pos <語>`・`end`（`--` を見た）で呼ぶ。
 # 止める判定はコールバックが持つ（一覧に入れた上で、名前を見て reject する）。
 ow_reject() {
-	reject option-not-allowed "$sub の $1 は通しません。通すオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した書き方を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に足してもらってください。"
+	reject option-not-allowed "$sub の $1 は通しません。通すオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に足してもらってください。"
 }
 opt_walk() {
 	ow_cb="$1"
@@ -351,7 +351,7 @@ store_hit() {
 	sh_review=$(printf '%s' "${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}/review" | tr '\\' '/')
 	case "$sh_arg" in
 	/* | [A-Za-z]:/*)
-		# 絶対パス。トップの表記は OS で揃わない（`C:/x` と `/c/x`）ので、置き場のパスを
+		# 絶対パス。トップのパスは OS で表記が揃わない（`C:/x` と `/c/x`）ので、置き場のパスを
 		# 含むかだけを見る。
 		sh_path="$sh_arg"
 		;;
@@ -457,7 +457,7 @@ grep)
 	;;
 
 branch)
-	# 許可リストで読む（略した長いオプションと、束ねた短いオプションを 1 字ずつ見る）。
+	# 許可リストで読む（略した長いオプションと、まとめた短いオプションを 1 字ずつ見る）。
 	# 消す・改名する・複製する・追跡先を書き換える形は、一覧に入れた上で名前を見て止める。
 	ow_spec "list all remotes verbose quiet show-current no-column no-color ignore-case omit-empty no-track delete create-reflog no-create-reflog force move copy unset-upstream edit-description" \
 		"sort format points-at set-upstream-to" \
@@ -528,7 +528,7 @@ worktree)
 		# できる。プロジェクトに .claude/ ができて --lint が error になり、
 		# tree_of の探す場所からも外れる（設計 4.1）。
 		#
-		# 書き換えずに止める。打った書き方と起きたことが食い違うと、記録を読んだ
+		# 書き換えずに止める。打ったパスと起きたことが食い違うと、記録を読んだ
 		# ユーザが追えなくなる。
 		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと読み飛ばす。
 		# 知らないオプションは通さない。通すと行き先を取り違え、検査そのものが
@@ -681,7 +681,7 @@ rm)
 	# 索引や HEAD と食い違うファイルを既定で拒む。`rm -rf` の代わりとして
 	# rules.yml が名指しで勧める経路なので、勧めた先が通らない形にはしない。
 	#
-	# 通さないのは -f（略した --forc とまとめた -rf も）。それを付けると、コミットしていない変更ごと消える。
+	# 通さないのは -f（略した --forc と、まとめた -rf も）。それを付けると、コミットしていない変更ごと消える。
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
 	# -r は通す。付けても、中の 1 つでも書きかけがあれば git が止める。
 	[ "$#" -eq 0 ] && reject rm-no-path "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
@@ -783,11 +783,11 @@ merge-file)
 	# ファイルを書く手段は Edit / Write にそろえる。そちらなら hook が行き先を見られる。
 	#
 	# オプションは知っているものだけ通す。git は長いオプションの略記 (--std) も
-	# 打ち消し (--no-stdout) も受け取るので、知らない書き方を通すと -p を付けたつもりで
+	# 否定の形 (--no-stdout) も受け取るので、知らない表記を通すと -p を付けたつもりで
 	# 書き込みに戻る。-L と --marker-size は値を次の語で取る。`-L -p` の -p は
 	# ラベルで、-p を付けたことにならない (git はファイルを書く)。だから値ごと読み飛ばす。
 	# `--` の後ろはファイル名。そこに -p があっても数えない。
-	# 束ねた短いオプション (-pq) は分けて書かせる。1 文字ずつ読むと -L の値を取り違える。
+	# まとめた短いオプション (-pq) は分けて書かせる。1 文字ずつ読むと -L の値を取り違える。
 	#
 	# --object-id は通す。衝突の最中なら :2:<パス> :1:<パス> :3:<パス> を直に渡せて、
 	# 一時ファイルが要らない。-p が無いと結果をオブジェクトとしてリポジトリに書くが、
@@ -843,7 +843,7 @@ checkout | switch)
 	# `git checkout -- .` は、書きかけを何も言わずに消す。取り返せない。
 	#
 	# オプションは許可リストで読む。略した長い
-	# オプション（`--force-c`・`--det`・`--orph=`）は断り、束ねた短いオプションは 1 字ずつ読んで、
+	# オプション（`--force-c`・`--det`・`--orph=`）は断り、まとめた短いオプションは 1 字ずつ読んで、
 	# 値を取る字（checkout の b・B、switch の c・C）の後ろは値として扱う（`-qbnew` は -q -b new）。
 	#
 	# 既存のブランチを別のコミットへ付け替える形（checkout -B / switch -C・--force-create）は通さない。
@@ -909,12 +909,12 @@ checkout | switch)
 		return 0
 	}
 	opt_walk checkout_cb ${1+"$@"}
-	# 親のワークツリー（.claude/worktrees/<P> で、親の承認済みチケットか提案があるもの）では、許す形
+	# 親のワークツリー（.claude/worktrees/<P> で、親チケットか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
-	# 親の承認済みチケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
+	# 親チケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
-	# このツリーへ取り込まなくなる。親子チケットの同期状態がある親（親のブランチを一度でも origin へ push したか、
+	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
 	# ccnavi-sync.sh で取り込んだ親）では、実行ファイル（syncstate.standing）が親のワークツリーを決められず、
 	# 親と子のチケットの承認・状態の操作・実行前の判定を止める。
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
@@ -1052,14 +1052,14 @@ push)
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
-	# リモートから消えた親のブランチ（親子チケットの同期状態が gone）へは送らない。
-	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子チケット）を確かめないまま
-	# 親子チケットが動き出す。毎回の ls-remote はせず、同期状態を読むだけにする。ユーザが戻した後は
-	# ccnavi-sync.sh が present に書き直して、この拒否が解ける。
+	# リモートから消えた親のブランチ（取り込み状態が gone）へは送らない。
+	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
+	# 動き出す。毎回の ls-remote はせず、取り込み状態を読むだけにする。ユーザが戻した後は ccnavi-sync.sh が
+	# present に書き直して、この拒否が解ける。
 	push_key=$(ccnavi_repo_key "${push_top:-.}" "$WS")
 	push_record=$(ccnavi_family_record "$WS" "$push_key" "$push_branch")
 	if [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
-		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（親子チケットの同期状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子チケットが動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。親子チケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_branch で親子チケットの同期状態を消します（エージェントは打ちません）。"
+		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（取り込み状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_branch で取り込み状態を消します（エージェントは打ちません）。"
 	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do
@@ -1113,17 +1113,16 @@ clone | submodule | lfs)
 	;;
 esac
 
-# push が通ったら、親のブランチなら親子チケットの同期状態を作る。
-# 最初の push からその親子チケットを C1 の
+# push が通ったら、親のブランチなら取り込み状態を作る。最初の push からその親子のチケットを C1 の
 # 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
 #
-# 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親の承認済みチケットか
-# 提案がある）で、送り先が origin のときだけ。同期状態があれば（present）sha を書き直すだけで、closed・
-# blocked は触らない。同期状態が無く、置き場に未コミットの変更があれば作らずに言う（未送信の状態を
-# 持ち込まないため）。同期状態があると SessionStart の早送りと ccnavi-sync.sh の消えたかの確かめの対象になる。
+# 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親チケットか提案が
+# ある）で、送り先が origin のときだけ。取り込み状態があれば（present）sha を書き直すだけで、closed・
+# blocked は触らない。取り込み状態が無く、置き場に未コミットの変更があれば作らずに言う（未送信の状態を
+# 持ち込まないため）。取り込み状態があると SessionStart の早送りと ccnavi-sync.sh の消えたかの確かめの対象になる。
 push_record_family() {
 	# 送り先は git と同じ順で解く: 引数のリモート → branch.<b>.pushRemote → remote.pushDefault →
-	# branch.<b>.remote → origin。origin 以外へ送ったなら同期状態を作らない（同期状態は origin の P を見る）。
+	# branch.<b>.remote → origin。origin 以外へ送ったなら取り込み状態を作らない（取り込み状態は origin の P を見る）。
 	pr_remote="${push_seen_remote:-}"
 	if [ -z "$pr_remote" ]; then
 		pr_remote=$(git config --get "branch.$push_branch.pushRemote" 2>/dev/null ||
@@ -1155,14 +1154,14 @@ push_record_family() {
 	pr_dirty=$(git -C "$push_top" status --porcelain --untracked-files=all -- \
 		"${pr_approved%/}" "${pr_proposals%/}/review" 2>/dev/null | cut -c4- | tr '\n' ' ' | sed 's/ *$//')
 	if [ -n "$pr_dirty" ]; then
-		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この親子チケットは取り込み（%s %s）の対象になる\n' \
+		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この親子のチケットは取り込み（%s %s）の対象になる\n' \
 			"$pr_dirty" "$SYNC" "$push_branch"
 		return 0
 	fi
 	if ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
 		fetched_at "$(date +%s)" state present reason ""; then
-		log_info 親子チケットの同期状態を作った -- "branch=$push_branch" "repo=$push_key"
-		printf '案内: %s の親子チケットの同期状態を作った。以後、リモートでの承認は %s %s で取り込む\n' \
+		log_info 親子のチケットの取り込み状態を作った -- "branch=$push_branch" "repo=$push_key"
+		printf '案内: %s の取り込み状態を作った。以後、リモートでの承認は %s %s で取り込む\n' \
 			"$push_branch" "$SYNC" "$push_branch"
 	fi
 	return 0

@@ -1,5 +1,5 @@
 /**
- * ルール設定画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
+ * ルール管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
@@ -45,7 +45,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
-/** 画面の名前。束ねる入出力のパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
@@ -113,11 +113,11 @@ function projectOf(target: RulesTarget): string | undefined {
 function titleOf(target: RulesTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "ccnavi ルール設定";
+      return "ccnavi ルール管理";
     case "self":
-      return "ccnavi ルール設定: ワークスペース";
+      return "ccnavi ルール管理: ワークスペース";
     case "project":
-      return `ccnavi ルール設定: プロジェクト ${target.name}`;
+      return `ccnavi ルール管理: プロジェクト ${target.name}`;
   }
 }
 
@@ -145,7 +145,7 @@ function samplesSetting(): string {
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できません");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -156,12 +156,12 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ルール設定画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`ルール管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -519,7 +519,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * ルール設定の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
+ * ルール管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
  * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
@@ -614,7 +614,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     redraw(current);
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら見たというフラグは残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToRules);
     }
@@ -785,7 +785,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情には渡した一時ファイルのパスが出るので、画面では対象のファイルのパスに直す。
+    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
     fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }

@@ -44,7 +44,7 @@ from ..policy import ruleload, rules
 from ..records import audit, repeat
 from . import diagnose, lint
 
-# `--suggest --json` の形の版。読み手は VS Code 拡張のルール設定画面。形を変えたら上げる。
+# `--suggest --json` の形の版。読み手は VS Code 拡張のルール管理画面。形を変えたら上げる。
 SUGGEST_VERSION = 1
 
 # 候補の種類。
@@ -56,7 +56,7 @@ HANDOVER_MIN = 5
 # 種類ごとに出す候補の上限と、候補 1 件につける見本の上限。
 CANDIDATE_LIMIT = 10
 SAMPLE_LIMIT = 3
-# 候補の id の前置き。ユーザが名前を付け直す前提の仮の名前であることを名前の表記で示す。
+# 候補の id の前置き。ユーザが名前を付け直す前提の仮の名前であることを表記で言う。
 ID_PREFIX = "suggest-"
 
 # 記録の subject が上限で切られた目印（audit._limited）。切れた文字列は見本にできない。
@@ -136,7 +136,7 @@ class Candidate:
 
 
 def _placeholder(subject: str, root: str) -> str:
-    """見本に書く表記。ルートを `/repo` にする（diagnose.SAMPLE_PLACEHOLDER）。"""
+    """見本に書く文字列。ルートを `/repo` にする（diagnose.SAMPLE_PLACEHOLDER）。"""
     for spelled in {os.path.realpath(root), root}:
         if spelled and spelled != "/":
             subject = subject.replace(spelled, diagnose.SAMPLE_PLACEHOLDER)
@@ -391,7 +391,7 @@ def _message_candidates(
             None,
         )
         if hit is None:
-            # ルールファイルの外から来た根拠（組み込みの守り・チケット）か、もう無いルール。
+            # ルールファイルの外から来た根拠（組み込みの保護・チケット）か、もう無いルール。
             # 文面を直せる先が無いので候補にしない。
             dropped += 1
             continue
@@ -433,7 +433,7 @@ def _message_candidates(
 
 def collect(conf: settings.Settings, root: str) -> dict:
     """候補を集めて 1 つの辞書にする。鍵は README「候補の JSON」。"""
-    # 試験と同じく状態ディレクトリを持たない。候補の検証で「1 度だけ渡す文」を消費しない。
+    # 試験と同じく記録を持たない。候補の検証で「1 度だけ渡す文」を消費しない。
     conf = dataclasses.replace(conf, state="")
     paths = log_files(conf.log)
     records = read_records(paths)

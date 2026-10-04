@@ -11,7 +11,7 @@
 CRLF が届く経路は Windows の checkout だけではない。CRLF で書く編集機、CRLF のまま
 貼り付けられた本文、Windows で作って送られてきたチケットのどれでも届く。だから
 git を通さずに、読み手に直に CRLF を渡して見る。git の変換の挙動ではなく、
-ccnavi がその書き方を読めるかがここの主題。
+ccnavi がその表記を読めるかがここの主題。
 """
 
 import os

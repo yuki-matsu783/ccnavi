@@ -33,7 +33,7 @@ test("CB-D40 列の見出しを押すと畳み、state に列名が入る。読�
   }
 });
 
-test("CB-D41 親で絞り込むと他の親子チケットのカードが隠れ、列の件数と承認ボタンは見えている数になる。承認は見えている承認待ちだけを送る", async () => {
+test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠れ、列の件数と承認ボタンは見えている数になる。承認は見えている承認待ちだけを送る", async () => {
   const base = fixture();
   // 先頭は親 i0001。同じ形でもう 1 つ親（承認待ち）を足す
   const other = { ...base.tickets[0], ticket: "i0002", title: "別の親", pending_approval: true };
@@ -64,8 +64,8 @@ test("CB-D41 親で絞り込むと他の親子チケットのカードが隠れ�
 });
 
 test("CB-D46 書き込みが止まっているカードは「要対応のみ」でも残る", async () => {
-  // フラグは不備として積まれ、`attention` が真になる（board.ts）。素の版では i0001-02 は隠れる
-  // （CB-D42）ので、フラグを付けたときだけ残ることが確かめられる。
+  // 信頼できない理由（`blocked`）は不備として積まれ、`attention` が真になる（board.ts）。素の版では
+  // i0001-02 は隠れる（CB-D42）ので、理由を付けたときだけ残ることが確かめられる。
   const base = fixture();
   const stopped = base.tickets.map((t) =>
     t.ticket === "i0001-02" ? { ...t, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" } : t,
@@ -390,7 +390,7 @@ function data(moved?: readonly Moved[]): BoardData {
   return { kind: "board", board: buildBoard(fixture()), moved };
 }
 
-test("CB-D82 渡された分にだけ強調表示を出す。渡されなければ出さない", async () => {
+test("CB-D82 渡された分にだけ動いた表示を出す。渡されなければ出さない", async () => {
   const page = await openBoard();
   try {
     // 開いた直後は拡張ホストが何も渡さない（比べる相手が無い）。全部が光ると「動いた」の意味が無くなる
@@ -405,18 +405,18 @@ test("CB-D82 渡された分にだけ強調表示を出す。渡されなけれ�
     assert.equal(card.getAttribute("data-moved"), "todo-doing");
     assert.equal(card.querySelector(".moved-mark")?.textContent, "未着手 → 作業中");
 
-    // 承認の文のオーバーレイを出し入れしても、拡張ホストが同じ分を渡し続ける限り強調表示は消えない
+    // 承認の文のオーバーレイを出し入れしても、拡張ホストが同じ分を渡し続ける限り動いた表示は消えない
     await page.send({
       type: "data",
       data: { ...data([{ id: "i0001-03", from: "todo", to: "doing" }]), approval: { kind: "done", count: 1, prompt: "文" } },
     });
     assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-03"]);
 
-    // 別のカードが動いたと渡されたら、強調表示はそちらに移る
+    // 別のカードが動いたと渡されたら、動いた表示はそちらに移る
     await page.send({ type: "data", data: data([{ id: "i0001-02", from: "doing", to: "done" }]) });
     assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-02"]);
 
-    // 何も渡されなければ強調表示は出ない（読み直せなかった画面を挟んだ後も同じ）
+    // 何も渡されなければ動いた表示は出ない（読み直せなかった画面を挟んだ後も同じ）
     await page.send({ type: "data", data: { kind: "error", error: "読めない" } });
     await page.send({ type: "data", data: data() });
     assert.deepEqual(page.all(".card.moved"), []);

@@ -8,7 +8,7 @@ UserPromptSubmit か PreToolUse で「承認済みチケットが置かれた。
 2. PreToolUse（allow になる呼び出し）でも同じ文が 1 度だけ載る
 3. セッションの最初の hook の時点で既にあった承認済みチケットは伝えない（起点）
 4. 別のセッションにはそれぞれ 1 度ずつ伝える。サブエージェントには伝えない
-5. 状態ファイルを置けない（`--state ""`）ときは伝えず、状態ファイルも作らない
+5. 記録を置けない（`--state ""`）ときは伝えず、記録も作らない
 
 文は `--agree --yes` の `prompt` と同じもの（同じ関数から出る）。
 """
@@ -54,7 +54,8 @@ class ApprovalNewsTest(PhaseHarness):
         )
 
     def approve_yes(self, tickets):
-        # ボードと同じく、見せたダイジェスト（承認画面の本文・判定が読んだ中身・写る中身）を渡す。
+        # ボードと同じく、見せたダイジェスト（承認画面の本文・判定が読んだ中身・書き込む中身）
+        # を渡す。
         # 渡さない `--yes` は承認しない。
         shown = self.ccnavi("--agree", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
@@ -124,7 +125,7 @@ class ApprovalNewsTest(PhaseHarness):
         self.parent_only()
         self.next_child()
         self.approve_yes(["i0001", "i0001-01"])
-        # このセッションの最初の hook。既にある承認済みチケットは知っているものとして保存する。
+        # このセッションの最初の hook。既にある承認済みチケットは知っているものとして記録する。
         self.assertEqual(self.prompt(), "")
         self.assertEqual(self.before(), "")
 
@@ -192,7 +193,7 @@ class ApprovalNewsTest(PhaseHarness):
         self.assertEqual(self.prompt(), "")
 
     def test_a_broken_memo_tells_instead_of_going_quiet(self):
-        """状態ファイルが壊れていたら、伝えていない承認ごと起点化せず、伝える側を採る。"""
+        """記録が壊れていたら、伝えていない承認ごと起点化せず、伝える側を採る。"""
         self.parent_only()
         self.prompt()
         self.next_child()
@@ -204,7 +205,7 @@ class ApprovalNewsTest(PhaseHarness):
         self.assertIn("i0001-01", heard)
         self.assertEqual(self.prompt(), "")
 
-    # ---- 5. 状態ファイルを置けないときは伝えない
+    # ---- 5. 記録を置けないときは伝えない
 
     def test_without_a_state_dir_nothing_is_told_and_nothing_is_written(self):
         self.parent_only()

@@ -62,7 +62,7 @@ class TheHintIsInTheFailurePathTest(unittest.TestCase):
         self.assertIn("graphql)", body)
 
     def test_the_hint_names_the_next_move(self):
-        """番号だけでは次に何をすればよいか分からない。結果の JSON の作り方まで名指しする。"""
+        """番号だけでは次に何をすればよいか分からない。取得した結果の作り方まで名指しする。"""
         body = api_failed_body(script_text())
         for word in MUST_NAME:
             with self.subTest(word=word):

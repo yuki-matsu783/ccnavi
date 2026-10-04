@@ -116,13 +116,13 @@ deny:
     why: ガードを起動する hook 本体
   - tool: Edit
     subject: "/repo/docs/../.ccnavi/common/rules.yml"
-    why: 迂回した書き方のパスでも行き着く先で当たる
+    why: 迂回したパスでも行き着く先で当たる
   - tool: Bash
     subject: "echo x > /repo/.ccnavi/common/rules.yml"
     why: Write で拒否した場所。リダイレクトで同じところに届く
   - tool: Bash
     subject: "cd /repo && printf x >> .claude/hooks/lint-py.sh"
-    why: 相対パスで書いても、追記でも同じ場所
+    why: 相対パスでも、追記でも同じ場所
   - tool: Bash
     subject: "sed -i s/deny/allow/ /repo/.ccnavi/common/rules.yml"
     why: その場で書き換える形
@@ -153,8 +153,8 @@ deny:
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.Claude/Settings.json"
     why: >-
-      大文字と小文字の表記を変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
-      組み込みの守りが表記の違いを無視して止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
+      表記を変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
+      組み込みの保護が表記の違いを無視して止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
   - tool: Bash
     subject: "GIT push origin main"
     why: >-
@@ -162,7 +162,7 @@ deny:
       機械によって止めたり通したりする
   - tool: Read
     subject: "/repo/.claude/worktrees/x/.ENV"
-    why: 認証情報の場所も大文字と小文字を問わない
+    why: 認証情報の場所も表記を問わない
   - tool: Write
     subject: "/repo/.ccnavi/scripts/ccnavi-git.sh"
     why: git の入口。書き換えれば git のルールがまとめて外れる
@@ -171,7 +171,7 @@ deny:
     why: 通さないはずのサブコマンドを通す形に変えられる
   - tool: Bash
     subject: "cd /repo/.claude/worktrees/x && echo x > ../../scripts/ccnavi-git.sh"
-    why: .claude を通らない書き方のパス。Bash の対象は解かれないので名前で捕まえる
+    why: .claude を通らないパス。Bash の対象は解かれないので名前で捕まえる
 
 ask:
   - tool: Write
@@ -196,11 +196,11 @@ ask:
     why: パイプの後ろに立つ取得も拾う。コマンドの先頭なら当たる
   - tool: Bash
     subject: "CURL https://example.com"
-    why: 勧めるほうの文面も大文字と小文字を問わない。止める側だけ区別しないと、表記の違いで案内が消える
+    why: 勧めるほうの文面も表記を問わない。止める側だけ区別しないと、案内が表記の違いで消える
   - tool: Bash
     subject: "echo curl is a tool"
     why: >-
-      引数に名前が出ただけでは当たらない。どのルールも言及せず権限モードへ渡る。
+      引数に出ただけの名前には当たらない。どのルールも言及せず権限モードへ渡る。
       当たると、取得について書く作業がそのまま止まる
   - tool: Bash
     subject: "docker run --rm alpine"
@@ -263,12 +263,12 @@ allow:
   - tool: Bash
     subject: "CAT /etc/hosts"
     why: >-
-      コマンドの名前も区別しない（大文字と小文字だけが違う名前には同じ判定）。区別しない機械では `cat` そのものなので、
-      小文字なら通る呼び出しを表記の違いだけで別扱いにしない。代償として、区別する機械で `CAT` という
+      コマンドの名前も区別しない（大文字小文字だけが違う名前には同じ判定）。区別しない機械では `cat` そのものなので、
+      小文字なら通る呼び出しを大文字か小文字かだけで別扱いにしない。代償として、区別する機械で `CAT` という
       別の実行ファイルが在れば、この allow がそれにも掛かる
   - tool: Bash
     subject: "FIND /etc -name x"
-    why: 同上。prefer-glob も大文字と小文字を問わず当てる
+    why: 同上。prefer-glob も表記を問わず当てる
   - tool: Bash
     subject: 'grep -n "git push" README.md'
     why: >-
@@ -351,5 +351,5 @@ allow:
   - tool: Write
     subject: "/repo/.claude/worktrees/lib1/docs/skills/deploy/SKILL.md"
     why: >-
-      プロジェクトから切ったワークツリーの docs/skills/（プロジェクトのスキルの置き場）。守りの外のふつうの場所で、
+      プロジェクトから切ったワークツリーの docs/skills/（プロジェクトのスキルの置き場）。組み込みの保護の外のふつうの場所で、
       worktrees の allow に当たる。チケットがあればその範囲でさらに絞られる

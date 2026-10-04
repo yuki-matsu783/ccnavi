@@ -7,7 +7,7 @@
    webview=...`）。この行が sh（`.claude/hooks/test-ext.sh`）との契約
 2. `.claude/hooks/mark-ext.sh` が、拡張のファイルを触ったときだけ書き残す
 
-`--plan` は node_modules が無くても動く（読むのはソースの文字列だけ）。組み立ても
+`--plan` は node_modules が無くても動く（読むのはソースのパスだけ）。組み立ても
 テストもしないので、このグループの時間の中に収まる。
 """
 
@@ -45,8 +45,8 @@ def groups_on_disk():
     return sorted(found)
 
 
-# `--plan` が読むもの。コピーを作って試すときはこれだけあればよい（node_modules も out も読まない）
-# 。
+# `--plan` が読むもの。コピーを作って試すときはこれだけあればよい（node_modules も
+# out も読まない）。
 PLAN_INPUTS = ("scripts", "src", "test", "package.json", "tsconfig.test.json")
 
 
@@ -68,7 +68,7 @@ def plan(*paths, root=BOARD):
 
 
 def slashed(path):
-    """区切りを `/` にそろえる。`mark-ext.sh` が一覧に書くのはこの形だけ。"""
+    """区切りを `/` にそろえる。`mark-ext.sh` がマーカーに書くのはこの形だけ。"""
     return path.replace("\\", "/")
 
 
@@ -110,8 +110,8 @@ class ExtTestPlanTest(unittest.TestCase):
         self.assertEqual(["risk"], got["groups"])
 
     def test_the_screen_calls_the_groups_that_read_the_bundle(self):
-        # 画面（React）は esbuild が束ね、テストは束ねたものを読む。import では
-        # 辿れないので、束ねたものを読むグループが挙がり、束ねる工程も入る。
+        # 画面（React）は esbuild がバンドルし、テストはバンドルしたものを読む。import では
+        # 辿れないので、バンドルを読むグループが挙がり、バンドルする工程も入る。
         got = plan("src/webview/board/App.tsx")
         self.assertIn("board", got["groups"])
         self.assertTrue(got["webview"])
@@ -135,7 +135,7 @@ class ExtTestPlanTest(unittest.TestCase):
             write(crossing, '\nimport "../board/state.js";\n', mode="a")
             got = plan("src/webview/board/state.ts", root=root)
         self.assertIn("board", got["groups"])
-        self.assertIn("projects", got["groups"], "projects の束ねにも入るので、projects も回る")
+        self.assertIn("projects", got["groups"], "projects のバンドルにも入るので、projects も回る")
 
     def test_a_new_screen_calls_its_own_group_even_without_a_test_helper(self):
         # 画面を足して `test/helpers/<名前>.ts` を作り忘れても、同じ名前のグループは回す。
@@ -166,7 +166,7 @@ class ExtTestPlanTest(unittest.TestCase):
             got = plan("src/webview/parts/main.tsx", root=root)
         self.assertTrue(got["webview"])
         self.assertTrue(got["compile"])
-        # どの画面が読むか決められないので、束ねを読むグループは全部回す（多い側へ外す）
+        # どの画面が読むか決められないので、バンドルを読むグループは全部回す（多い側へ外す）
         for group in ("board", "projects"):
             self.assertIn(group, got["groups"])
 
@@ -218,7 +218,7 @@ class ExtTestPlanTest(unittest.TestCase):
         self.assertFalse(got["compile"])
 
     def test_a_path_is_normalized_before_the_spelling_is_read(self):
-        # `./` が付いただけで別のファイルに見えると、画面を直したのに束ね直さない、
+        # `./` が付いただけで別のファイルに見えると、画面を直したのにバンドルし直さない、
         # という取りこぼしになる（回すものが減る側に外れる）。
         for given in ("src/webview/board/App.tsx", "./src/webview/board/App.tsx"):
             with self.subTest(given=given):
@@ -313,8 +313,8 @@ class TestExtHookTest(unittest.TestCase):
     """Stop の hook が、回すべきときに回し、落ちたときだけ差し戻すこと。
 
     本物のテストは回さない。触ったファイルから組み立てたパスで入口（`scripts/test-groups.js`）を
-    呼べているか、終了コードをどう読むかを見るので、入口は代わりのスクリプトを置いて渡された引数を書き出す。
-    sh の代わりに結果の JSON を渡すのと同じ考え方で、拡張の node_modules にも依存しない。
+    呼べているか、終了コードをどう読むかを見るので、入口は代わりのものを置いて渡された引数を書き出す。
+    sh の代わりに取得した結果を渡すのと同じ考え方で、拡張の node_modules にも依存しない。
     """
 
     STUB = (
@@ -338,7 +338,7 @@ class TestExtHookTest(unittest.TestCase):
             f.write(self.STUB)
         marker = os.path.join(workspace, "logs", "session", "s1.ext-files")
         touched = slashed(os.path.join(board, "src", "core", "board.ts"))
-        # 実際の一覧は mark-ext.sh が `/` にそろえ、改行は LF で書く。Windows で
+        # 実際のマーカーは mark-ext.sh が `/` にそろえ、改行は LF で書く。Windows で
         # `os.path.join` のまま・既定の改行で書くと、実運用では出ない形（バックスラッシュ、
         # 行末の CR）を渡すことになり、hook が拡張を見つけられない、引数に CR が付く。
         with open(marker, "w", encoding="utf-8", newline="\n") as f:
@@ -373,7 +373,7 @@ class TestExtHookTest(unittest.TestCase):
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(["--for", slashed(os.path.join(board, "src", "core", "board.ts"))], args)
-        # 通ったら一覧を消す。次のターンで同じものを回し直さない。
+        # 通ったらマーカーを消す。次のターンで同じものを回し直さない。
         self.assertFalse(os.path.exists(marker))
 
     def test_a_path_with_spaces_arrives_as_one_argument(self):
@@ -397,7 +397,7 @@ class TestExtHookTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("落ちたテストを直して", result.stderr)
         self.assertEqual("1", self.retries(workspace))
-        # 一覧は残す。直したあと同じグループを回し直すため。
+        # マーカーは残す。直したあと同じグループを回し直すため。
         self.assertTrue(os.path.exists(marker))
 
     def test_a_missing_environment_is_not_counted_as_a_failing_test(self):
@@ -409,7 +409,7 @@ class TestExtHookTest(unittest.TestCase):
         self.assertIsNone(self.retries(workspace))
 
     def test_pushing_back_stops_at_three(self):
-        # 同じセッションで続けて落ちる形。一覧は差し戻しても残るので、同じ workspace で回す。
+        # 同じセッションで続けて落ちる形。マーカーは差し戻しても残るので、同じ workspace で回す。
         workspace, _, _ = self.workspace()
         for expected in ("1", "2", "3"):
             result, _ = self.stop(workspace, rc=1, active=True)
@@ -429,7 +429,7 @@ class TestExtHookTest(unittest.TestCase):
         self.assertEqual("", result.stderr)
 
     def test_an_old_marker_is_still_read_in_the_same_session(self):
-        # 1 時間の掃除が自分の一覧を消してしまうと、拡張を直したのに「触っていない
+        # 1 時間の掃除が自分のマーカーを消してしまうと、拡張を直したのに「触っていない
         # ターン」に見えて気づかないうちに何も回らない。1 つのターンは 1 時間を超えることがある。
         workspace, _, marker = self.workspace()
         old = time.time() - 2 * 60 * 60
@@ -439,7 +439,7 @@ class TestExtHookTest(unittest.TestCase):
         self.assertIsNotNone(args)
 
     def test_a_marker_that_points_nowhere_is_reported_not_passed(self):
-        # 入口が無いツリーの一覧だけが残った形。何も言わずに exit 0 すると「テストが通った」と
+        # 入口が無いツリーのマーカーだけが残った形。何も言わずに exit 0 すると「テストが通った」と
         # 区別が付かない。
         workspace, board, _ = self.workspace()
         os.remove(os.path.join(board, "scripts", "test-groups.js"))

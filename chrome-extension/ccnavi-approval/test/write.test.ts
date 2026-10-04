@@ -3,7 +3,7 @@
  *
  * - 1 コミットの組み立て（`createCommitOnBranch`、`expectedHeadOid` = 読んだ P の先頭）と、書いた後の確かめ
  * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。ダイジェストが同じなら見せ直さずに書き、違えば書かない
- * - 見せたダイジェストが違えば書かない。決まらない親子チケット・版ずれでは書かない
+ * - 見せたダイジェストが違えば書かない。決まらない親子のチケット・版ずれでは書かない
  * - 取り下げ: 承認コミット（merge を飛ばす）の親の提案をそのまま戻す
  */
 import { before, test } from "node:test";
@@ -130,7 +130,7 @@ test("CX-T103 見せたダイジェストが今の中身と違えば、1 つも�
   assert.equal(mock.commitCalls.length, 0);
 });
 
-test("CX-T104 決まらない親子チケットでは書かない（読めない入力・ホストに無い P_X の古い承認済みチケット）", async () => {
+test("CX-T104 決まらない親子のチケットでは書かない（読めない入力・ホストに無い P_X の古いチケット）", async () => {
   // 統合先の done/ に読めない（バイナリの）ファイル
   const bin = world();
   const shown = shownOf(await board(bin.d), "i0001");
@@ -143,7 +143,7 @@ test("CX-T104 決まらない親子チケットでは書かない（読めない
   assert.match(out.kind === "refused" ? out.message : "", /バイナリ/);
   assert.equal(bin.mock.commitCalls.length, 0);
 
-  // ホストに無い親子チケット i0009 の古い承認済みチケットを P の上に持っていても、先行を満たしたとは数えない
+  // ホストに無い親子のチケット i0009 の古いチケットを P の上に持っていても、先行を満たしたとは数えない
   const f = fixture();
   const done = f.main.files[".ccnavi/approved/done/i0005-01.md"].replace(/i0005/g, "i0009");
   f.i0001.files[".ccnavi/approved/done/i0009-01.md"] = done;

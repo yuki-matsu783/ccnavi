@@ -1,5 +1,6 @@
 #!/bin/sh
-# ccnavi-push-approved 承認済みチケットの置き場（と、承認で todo/ から消えた提案）だけをコミットし、
+# ccnavi-push-approved 承認済みチケットの置き場（と、承認で todo/ から消えた提案、取り込んで消えた
+# フローの下書き）だけをコミットし、
 # 保護されたブランチでなければ push する。
 #
 #   sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
@@ -10,20 +11,23 @@
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
-# 取り込み済みの親子チケット（origin があり、親子チケットの同期状態が present。chat だけのものを除く）の親のワークツリーは、
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。chat だけのものを除く）のワークツリーは、
 # C1 と同じ手順でコミットして push する。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（C1 の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
-# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
+# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
 # push が落ちてもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
-# 答えない実行ファイルで親子チケットの同期状態があれば、コミットせずに止める。
+# 答えない実行ファイルで親子のチケットの取り込み状態があれば、コミットせずに止める。
 #
-# <親> を並べると、その親子チケットだけをコミットして push する。取り込み済みでない親子チケットは
+# <親> を並べると、その親子のチケットだけをコミットして push する。取り込み済みでない親子のチケットは
 # コミットしない（今のまま、ユーザがコミットする）。省けば今どおり、置き場に変更のあるツリー全部。
 #
 # 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
 # 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
-# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（写しは作らない）ので、
+# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（コピーは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）はコミットしない。
+# 同じく、ボードのフロー編集画面が取り込んだ下書き（$CCNAVI_TICKETS_PROPOSAL の flows/）を
+# フローの保存のあとに消すので、追跡されていた下書きの削除だけをコミットする。未追跡の下書きと、書き直された
+# 下書き（消えていない）はコミットしない。`ccnavi c1 sort` の置き場には足さず、消えたものだけをここで拾う。
 #
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけをコミットしない
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
@@ -45,8 +49,8 @@ usage() {
 sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
 
   承認済みチケットの置き場に変更があるツリーごとに、その置き場だけをコミットし、
-  保護されたブランチでなければ push する。取り込み済みの親子チケットの親のワークツリーは、
-  取り込んでから送る（C1 と同じ手順）。<親> を並べるとその親子チケットだけ。
+  保護されたブランチでなければ push する。取り込み済みの親子のチケットの親のワークツリーは、
+  取り込んでから送る（C1 と同じ手順）。<親> を並べるとその親子のチケットだけ。
 USAGE
 }
 
@@ -78,7 +82,7 @@ projects="${CCNAVI_PROJECTS:-projects}"
 approved="${approved%/}"
 proposals="${proposals%/}"
 projects="${projects%/}"
-# 落として空になる書き方（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
+# 落として空になるパス（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
 # ルートの直下を全部ツリーとして数え、承認済みチケットの置き場ならツリー全体をコミットする。
 # どちらも頼まれた置き場ではないので、既定に戻す。
 case "$approved" in
@@ -102,7 +106,7 @@ state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {
 trap 'rm -f "$state"; ccnavi_c1_end' EXIT
 trap 'rm -f "$state"; ccnavi_c1_end; exit 130' INT TERM HUP
 
-# ---- 取り込み済みの親子チケットは C1 と同じ手順でコミットして push する
+# ---- 取り込み済みの親子のチケットは C1 と同じ手順でコミットして push する
 ccnavi_log_root="$root"
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-push-approved
@@ -116,7 +120,8 @@ else
 fi
 tab=$(printf '\t')
 
-# 置き場の変更のパス（承認済み、レビュー待ちの review/、承認で消えた todo/ の提案）を ccnavi_c1_tmp/carry に。
+# 置き場の変更のパス（承認済み、レビュー待ちの review/、承認で消えた todo/ の提案、取り込んで消えた
+# flows/ の下書き）を ccnavi_c1_tmp/carry に。
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part*`、フローの保存の `flows/.*.tmp`、configsync の
 # `*.ccnavi-sync`）はコミットしない。
 carry_paths() {
@@ -124,13 +129,13 @@ carry_paths() {
 	git -C "$1" -c core.quotepath=false status --porcelain -z --untracked-files=all --no-renames \
 		-- "$approved" "$proposals/review" 2>/dev/null | tr '\000' '\n' |
 		sed -n 's/^...//p' >"$ccnavi_c1_tmp/carry-all" || :
-	git -C "$1" ls-files --deleted -z -- "$proposals/todo" 2>/dev/null | tr '\000' '\n' \
+	git -C "$1" ls-files --deleted -z -- "$proposals/todo" "$proposals/flows" 2>/dev/null | tr '\000' '\n' \
 		>>"$ccnavi_c1_tmp/carry-all" || :
 	grep -v -E '(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$' \
 		"$ccnavi_c1_tmp/carry-all" >"$ccnavi_c1_tmp/carry" || :
 }
 
-# 取り込み済みの親子チケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 落ちた
+# 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 落ちた
 carry_family() {
 	cf_p="$ccnavi_c1_family_id"
 	cf_tree="$ccnavi_c1_tree"
@@ -206,7 +211,7 @@ carry_family() {
 	return 1
 }
 
-# 親子チケットを名指しされたとき。取り込み済みならコミットして push し、そうでなければ何もしない（今のまま）。
+# 親子のチケットを名指しされたとき。取り込み済みならコミットして push し、そうでなければ何もしない（今のまま）。
 if [ "$#" -gt 0 ]; then
 	named_rc=0
 	for want in "$@"; do
@@ -218,7 +223,7 @@ if [ "$#" -gt 0 ]; then
 			named_rc=1
 			;;
 		*)
-			printf '%s: 取り込み済みの親子チケットでない（%s）。ここではコミットも push もしない（今のまま、ユーザがコミットする）。\n' \
+			printf '%s: 取り込み済みの親子のチケットでない（%s）。ここではコミットも push もしない（今のまま、ユーザがコミットする）。\n' \
 				"$want" "${ccnavi_c1_why:-対象外}"
 			;;
 		esac
@@ -264,7 +269,7 @@ for place in "$projects" ".claude/worktrees"; do
 				"$place/$(basename "$dir")" >&2
 			continue
 		fi
-		# glob が何にも当たらなければパターンの文字列のまま残るので、-d で落とす。
+		# glob が何にも当たらなければパターンがそのまま残るので、-d で落とす。
 		[ -d "$dir" ] || continue
 		trees="$trees
 $dir"
@@ -283,7 +288,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	changed=$(git -C "$tree" status --porcelain -- "$approved" "$skip_temp" 2>/dev/null || :)
 	[ -n "$changed" ] || continue
 
-	# 何か 1 つでもコミットする対象があったことの目印。detached で処理しなくても「無い」とは言わない。
+	# 何か 1 つでもコミットする対象があったことの記録。detached で処理しなくても「無い」とは言わない。
 	printf 'seen\n' >>"$state"
 
 	name=$(basename "$tree")
@@ -294,14 +299,14 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		continue
 	fi
 
-	# 取り込み済みの親子チケットの親のワークツリー（ディレクトリ名 = ブランチ名）は、取り込んでから送る。
+	# 取り込み済みの親子のチケットの親のワークツリー（ディレクトリ名 = ブランチ名）は、取り込んでから送る。
 	case "$tree" in
 	"$root/.claude/worktrees/$branch")
 		ccnavi_c1_family "$branch"
 		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$branch" ]; then
-			# 取り込み済みの親子チケットの子のワークツリー。承認済みチケットとマーカーは親のワークツリーに置くので、
-			# 子のツリーの置き場の変更はコミットも push もしない（子のブランチはリモートに出さない）。
-			printf 'ccnavi-push-approved: %s は親子チケット %s の子のワークツリー。子のツリーの置き場の変更はコミットも push もしない（承認済みチケットは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
+			# 取り込み済みの親子のチケットの子のワークツリー。チケットとマーカーは親のワークツリーに置くので、
+			# 子のツリーの置き場の変更はコミットしない（子のブランチはリモートに出さない）。
+			printf 'ccnavi-push-approved: %s は親子のチケット %s の子のワークツリー。子のツリーの置き場の変更はコミットしない（チケットは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
 				"$name" "$ccnavi_c1_family_id" >&2
 			printf 'fail\n' >>"$state"
 			continue
@@ -341,6 +346,17 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		done
 		scope="$approved
 $proposals/todo"
+	fi
+	# 取り込んで消えたフローの下書き。追跡されていたものの削除だけを、1 件ずつのパスで入れる。
+	# 置き場ごと pathspec に並べると、書き直されて残っている下書きまでコミットに入るため。
+	drafts=$(git -C "$tree" ls-files --deleted -z -- "$proposals/flows" 2>/dev/null | tr '\000' '\n' || :)
+	if [ -n "$drafts" ]; then
+		printf '%s\n' "$drafts" | while IFS= read -r removed; do
+			[ -n "$removed" ] || continue
+			git -C "$tree" add -u -- ":(literal)$removed" 2>/dev/null || :
+		done
+		scope="$scope
+$(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	fi
 	printf '%s\n' "$scope" | tr '\n' '\000' | xargs -0 git -C "$tree" commit --quiet -m "ccnavi: 承認済みチケットを更新" -- || {
 		printf 'ccnavi-push-approved: %s で承認済みチケットをコミットできない。\n' "$name" >&2

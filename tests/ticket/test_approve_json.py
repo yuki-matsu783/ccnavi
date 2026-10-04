@@ -284,7 +284,7 @@ class ApproveJsonTest(PhaseHarness):
                 self.assertFalse(self.copy_exists("i0001"))
                 self.assertFalse(self.copy_exists("i0001-01"))
 
-    # ---- 4c. ダイジェストは承認済みチケットに写る欄も覆う（チケット approve-carry-05 の 1〜5）
+    # ---- 4c. ダイジェストは承認済みチケットに書き込む欄も覆う（チケット approve-carry-05 の 1〜5）
 
     def pending_parent_with_issue_and_child(self, issue=4242):
         """`issue:` を持つ親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
@@ -299,7 +299,8 @@ class ApproveJsonTest(PhaseHarness):
         """見せたあとで path の old を new に書き換えてコミットすると、
         見せたダイジェストでは承認しない。
 
-        tickets は見せた一括承認の識別子。承認済みチケットがまだ無いものは、置かれないことも見る。
+        tickets は見せた一括のチケットの識別子。承認済みチケットがまだ無いものは、
+        置かれないことも見る。
         """
         tickets = list(tickets)
         missing = [name for name in tickets if not self.copy_exists(name)]
@@ -339,7 +340,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_refuses_when_only_an_unknown_field_of_a_child_changed(self):
         """見せたあとで、承認画面に出ない frontmatter の欄だけを書き換えると承認しない。
 
-        ccnavi の知らない欄（`note:`）は画面に出ないが、そのまま承認済みチケットに写る。
+        ccnavi の知らない欄（`note:`）は画面に出ないが、そのまま承認済みチケットに書き込まれる。
         """
         self.pending_parent_and_child()
         child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
@@ -357,7 +358,7 @@ class ApproveJsonTest(PhaseHarness):
         """親 i0001 を承認したあと、計画を足した改版を提案したまま（未承認）にする。
 
         足すのは `acceptance`。`implement` は `acceptance` を要る（requires）ので、単独で
-        足すと改版は拒まれて一括承認に入らない。
+        足すと改版は拒まれて一括のチケットに入らない。
         """
         self.family(plan=("research", "design"))
         path = self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
@@ -370,8 +371,8 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_refuses_when_the_revision_proposal_changed(self):
         """親の改版を見せたあとで、改版の提案の計画を書き換えると、見せたダイジェストでは承認しない。
 
-        書き換えたあとも改版として成り立つ順序（足す項を `design` に）にして、一括承認に残したまま
-        書く計画だけを変える。
+        書き換えたあとも改版として成り立つ順序（足す項を `design` に）にして、
+        一括のチケットに残したまま書く計画だけを変える。
         """
         path, shown = self.pending_revision()
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
@@ -431,7 +432,7 @@ class ApproveJsonTest(PhaseHarness):
         before = self.preview()
         self.assertEqual(before["batch"][1]["overflow"], [])
 
-        # 種類 research の scope を、子の範囲を覆わない書き方に書き換える。
+        # 種類 research の scope を、子の範囲を覆わない表記に書き換える。
         narrowed = PHASES.replace('scope: ["wip/research/*"]', 'scope: ["wip/elsewhere/*"]', 1)
         self.assertNotEqual(narrowed, PHASES)
         write(self.phases, narrowed)
@@ -483,21 +484,21 @@ class ApproveJsonTest(PhaseHarness):
     def test_shapes_match_the_extension_fixtures(self):
         self.pending_parent_and_child()
         # 種類の範囲を超える子は一覧に載り、`overflow` を持つ。計画に無い番号の子は
-        # 承認の対象にしない側に載る。拡張は両方の形を読むので、同じ一覧に並べて写す。
+        # 承認の対象にしない側に載る。拡張は両方の形を読むので、同じ一覧に並べて書き出す。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("wip/design/*",)))
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
         self.commit_parent()
         preview = self.preview()
         self._check_fixture("approve-preview.json", preview)
 
-        # 承認の答えは親と子 1 枚の形で写す。超過のある子は提案を下げてから承認する。
+        # 承認の答えは親と子 1 枚の形で書き出す。超過のある子は提案を下げてから承認する。
         os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02.md"))
         self.commit_parent()
         result = self.yes(["i0001", "i0001-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self._check_fixture("approve-yes.json", json.loads(result.stdout))
 
-        # 食い違いの形も拡張が読むので、同じく写す。
+        # 食い違いの形も拡張が読むので、同じく書き出す。
         self.propose("i0001-03", child_text("i0001-03", "i0001", 2, ("wip/design/*",)))
         self.commit_parent()
         result = self.yes(["i0001-09"])
@@ -509,7 +510,7 @@ class ApproveJsonTest(PhaseHarness):
         （README「承認の JSON」の partial）。
 
         置き場に同じ名前のディレクトリを作って、子の承認済みチケットだけ書けなくする。
-        一括承認は親 → 子の順なので、親は置かれたあとに止まる。
+        一括のチケットは親 → 子の順なので、親は置かれたあとに止まる。
         フィクスチャには入れない。理由の文面に OS の言い分（「ディレクトリです」など）が
         混じるので、機械によって変わる。
         """

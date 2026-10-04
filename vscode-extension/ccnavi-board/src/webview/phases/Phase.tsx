@@ -279,11 +279,11 @@ function ListInput({
  * 押すだけで 1 件ずつ付け外しする（`mousedown` で素の動きを止める）。素の複数選択は Ctrl / Shift なしで
  * 押すとほかの選択が外れ、気付かずに関係を消しやすい。**キー操作も同じ理由で素の動きを止める。** 素の
  * 矢印キーは、動かした先の 1 件だけを選んだ状態に縮める（見て回るだけで関係が消える）。矢印・Home・End で
- * フォーカス（`active`）だけを動かし、Space か Enter で付け外しする。フォーカスは `aria-activedescendant` で読み上げに伝える。
+ * 目印（`active`）だけを動かし、Space か Enter で付け外しする。目印は `aria-activedescendant` で読み上げに伝える。
  * `change` はそれでも届いたとき（止めきれない操作）のために、届いた選択をそのまま受ける。
  *
  * 候補は呼ぶ側が決める（自分と空を除いた、このファイルの種類）。**候補に無い値も消さずに出す**
- * （ほかの設定の種類・書き間違い・自分自身）。外せばリストから消える。値は前後の空白を落として読む
+ * （ほかの設定の種類・表記違い・自分自身）。外せばリストから消える。値は前後の空白を落として読む
  * （実行ファイルも落として解く）。空の値は出さない。
  *
  * 順序は候補の順（ファイルの中の順）に揃え、候補に無い値はその後ろに元の順で置く。選択を
@@ -351,7 +351,7 @@ function IdPicker({
     onChange(ordered(new Set(Array.from(select.selectedOptions, (option) => option.value))));
   };
   const isLocked = (id: string): boolean => blocked.has(id) && !picked.has(id);
-  // 候補が減ったときにフォーカスが外へはみ出さないよう、描くたびに収める
+  // 候補が減ったときに目印が外へはみ出さないよう、描くたびに収める
   const current = Math.min(active, options.length - 1);
   const onKeyDown = (event: KeyboardEvent<HTMLSelectElement>): void => {
     if (event.key === "Tab" || event.nativeEvent.isComposing) {

@@ -25,15 +25,15 @@
 引数に現れないので、誰にも確認が出ないまま通っている。あとから言う先がここしかない。
 
 当てる先は git が返したパスを解いた絶対パス。実行前チェックがファイルのパスを
-解いてから当てるのと同じ理由で、パスの書き方を変えただけで外せてはいけない。
+解いてから当てるのと同じ理由で、表記を変えただけで外せてはいけない。
 
 ## 前から在った変更を原因にしない
 
 作業ツリーは、セッションが始まる前から汚れていることがある。他のセッションの
 書きかけ、ユーザが直している最中のもの。それを「直前の実行が壊した」として
 差し戻すと、エージェントは他人の作業を戻しにいく。だから初回に見えたものは
-その場で既知の変更として保存し、以降は新しく現れたものだけを原因付きで報告する。
-既知の変更も 1 度は伝えるが、文面を分けて、戻すなと明示する。
+その場で記録を取り、以降は新しく現れたものだけを原因付きで報告する。
+記録した側も 1 度は伝えるが、文面を分けて、戻すなと明示する。
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ REASON_NO_TURN_BASELINE = "no-turn-baseline"
 # 全部を並べると本文が流れて 1 件も読まれない。
 REPORT_LIMIT = 12
 
-# 既知の変更として保存する件数の上限。セッションが長引いても記録が膨らまないように。
+# 記録に残す件数の上限。セッションが長引いても記録が膨らまないように。
 SEEN_LIMIT = 500
 
 # 対象の文字列を載せるときの長さの上限。
@@ -116,7 +116,7 @@ def check(
     （dry-run）では復元も行わない。呼び出しにも作業ツリーにも手を出さないことが
     そのモードの約束なので、自分の判断でファイルを動かしては意味がない。
 
-    mine は ccnavi 自身が書く場所。記録と状態ディレクトリがそれで、置き場は設定で動くので、
+    mine は ccnavi 自身が書く場所。記録と state がそれで、置き場は設定で動くので、
     ルールが守る場所の中を指すこともある。自分の書き込みを自分の違反として
     報告しはじめると、実行後チェックは 1 回目から嘘しか言わなくなる。
 
@@ -134,7 +134,7 @@ def check(
     if not read:
         return ""
 
-    # ターンの基準を持たないツリーを初めて見たら、その場で保存する。ターンの途中で
+    # ターンの基準を持たないツリーを初めて見たら、その場で記録する。ターンの途中で
     # 切られたワークツリーがこれにあたる（`at_prompt` のときには無いので基準が無く、
     # 基準が無いツリーのコミットはターンの終わりに数えられない）。ワークツリーを
     # 切ってから手を付けるのがこのリポジトリの手順なので、切ったターンがまるごと
@@ -152,7 +152,7 @@ def check(
         for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
     if not found:
-        # 違反が無くても、初回なら既知の変更の一覧を作る。ここを飛ばすと、綺麗な作業ツリーで
+        # 違反が無くても、初回なら記録を作る。ここを飛ばすと、綺麗な作業ツリーで
         # 始まったセッションはいつまでも「初回」のままになり、その後に現れた
         # 汚れが全部「前から在ったもの」になってしまい、誰も差し戻されなくなる。
         if first_time:
@@ -163,7 +163,7 @@ def check(
     fresh = [f for f in found if f.key() not in seen]
     known = [f for f in found if f.key() in seen]
     # 初めて見たセッションでは、今そこに在るものは直前の実行の結果ではない。
-    # 既知の変更として保存するだけにして、原因を付けずに 1 度だけ伝える。
+    # 記録を取るだけにして、原因を付けずに 1 度だけ伝える。
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
@@ -194,7 +194,7 @@ def check(
         state_dir,
         payload.session_id,
         seen
-        # 戻せたものは既知の変更に入れない。同じ場所がもう一度汚れたら、それは
+        # 戻せたものは記録に入れない。同じ場所がもう一度汚れたら、それは
         # すでに知っている変更ではなく新しい出来事なので、もう一度言う。
         | {f.key() for f in fresh if f.key() not in restored}
         | {f.key() for f in carried},
@@ -218,7 +218,7 @@ def check(
     if fresh:
         record.decision, record.enforced = audit.DENY, enforcing
     else:
-        # この呼び出しは何も汚していない。既知の変更の報告は状態の通知であって、
+        # この呼び出しは何も汚していない。記録した変更の報告は状態の通知であって、
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
@@ -252,10 +252,10 @@ def _note_new_trees(
     session: str,
     read: list[tuple[Watched, str, list[gitstate.Change]]],
 ) -> None:
-    """ターンの基準にまだ居ないツリーの HEAD を保存する。居るツリーには触らない。
+    """ターンの基準にまだ居ないツリーの HEAD を記録する。居るツリーには触らない。
 
-    書き直すのは、保存していないツリーが 1 本でもあるときだけ。呼び出しのたびに
-    状態ファイルを書き直すと、ツールを打つ数だけ書き込みが増える。ターンの基準そのもの
+    書き直すのは、記録に無いツリーが 1 本でもあるときだけ。呼び出しのたびに
+    記録を書き直すと、ツールを打つ数だけ書き込みが増える。ターンの基準そのもの
     （`baseline`）は動かさない。あれは「ターンの始まりに何が汚れていたか」で、
     あとから足すと、このターンで現れた汚れを前から在ったことにしてしまう。
     """
@@ -286,8 +286,8 @@ def _committed_findings(
 ) -> tuple[list[Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
-    見るのは、ターンの始まりに保存した HEAD からの差分（`gitstate.committed`）。
-    HEAD を保存していないツリー（ターンの途中で現れた、HEAD を読めなかった）は飛ばす。
+    見るのは、ターンの始まりに記録した HEAD からの差分（`gitstate.committed`）。
+    記録を持たないツリー（ターンの途中で現れた、HEAD を読めなかった）は飛ばす。
     数えていない期間を、数えたことにしない。
 
     チケットの置き場は外す。承認はユーザが提案を `.ccnavi/approved/` へ動かして
@@ -318,7 +318,7 @@ def _committed_findings(
             )
             uncounted.append(w.tree.name or ".")
             continue
-        # 着手が写した分かどうかは、コミットされた中身で答える。ディスクで答えると、
+        # 着手がコピーした分かどうかは、コミットされた中身で答える。ディスクで答えると、
         # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
         # チェック・バックアップと復元・ここの 3 つから同時に外れる。
         judged = (
@@ -349,7 +349,7 @@ def _committed_synced(
     """コミットされた中身で `synced` に答えさせる。読めなければ外さない。
 
     変更後は HEAD、変更前はターンの始まりの版の中身。どちらもバイト列のまま読む。文字列で
-    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、写した分でも食い違う。
+    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、コピーした分でも食い違う。
     """
     path = next((c.path for c in changes if c.full == full), "")
     if not path:
@@ -380,7 +380,7 @@ def at_stop(
     変えるためのもので、こちらはユーザが「このターンで何が変わったか」を 1 度で
     見るためのものになる。
 
-    セッションの状態ファイル（`seen`）は見ない。あれは「モデルへ 1 度伝えた」を
+    セッションの記録（`seen`）は見ない。あれは「モデルへ 1 度伝えた」を
     覚えているもので、ユーザはまだ 1 度も見ていないことがある。代わりに見るのは
     ターンの始まりに取った基準で、そこに無いものだけが、このターンで起きたこと。
 
@@ -596,12 +596,12 @@ class Finding:
     group: list[rules.Rule]
     source: str
     code: str
-    # どのツリーで見つけたか。ワークスペースルートなら空。既知の変更の鍵と報告に使う。
+    # どのツリーで見つけたか。ワークスペースルートなら空。記録の鍵と報告に使う。
     tree_name: str = ""
     tree_root: str = ""
 
     def key(self) -> str:
-        """既知の変更の鍵。ツリーが違えば同じ相対パスでも別の変更。"""
+        """記録の鍵。ツリーが違えば同じ相対パスでも別の変更。"""
         return f"{self.tree_name}|{self.change.key()}" if self.tree_name else self.change.key()
 
 
@@ -685,8 +685,9 @@ def _findings(
         if change.full in script:
             continue
         # 着手のときに共通層でプロジェクトの層を上書きした分（`configsync.is_synced_write`）。
-        # 内容とマーカーで見分け、読めないものは外さない。渡すのは解く前のパス。解いた先で答えると、
-        # 設定を別のコピーへのシンボリックリンクに差し替えた形が、指す先の中身で外れる。
+        # 内容と上書きの記録で見分け、読めないものは外さない。渡すのは解く前のパス。
+        # 解いた先で答えると、設定を別のコピーへのシンボリックリンクに差し替えた形が、
+        # 指す先の中身で外れる。
         if synced is not None and synced(_spelled(change, top or tree_root)):
             continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
@@ -829,10 +830,10 @@ def _restorable(finding: Finding) -> bool:
     報告は 3 つとも出したままにする。戻さないことと、報告しないことは別（`_guarding`）。
     設定の名前（`CCNAVI_RESTORE_IF_DENY`）が言うとおりの対象がここになる。
 
-    戻さなかった 1 件は既知の変更に入る（`check`）。戻していないのでファイルは汚れたままで、
+    戻さなかった 1 件は記録に入る（`check`）。戻していないのでファイルは汚れたままで、
     `git status` は次の呼び出しでも同じ 1 件を返す。毎回言えば、同じ汚れについて
     同じ文が呼び出しの数だけ積まれる。だから呼び出しごとの報告はセッションで 1 度だけで、
-    その後はターンの終わりの報告（`at_stop`）がユーザに見せる。戻した 1 件だけが既知の変更に
+    その後はターンの終わりの報告（`at_stop`）がユーザに見せる。戻した 1 件だけが記録に
     入らないのは、戻したあとに同じ場所が汚れたらそれは新しい出来事だから。
     """
     if finding.change.kind == gitstate.KIND_COMMITTED:
@@ -992,11 +993,11 @@ def _seen_path(state_dir: str, session: str) -> str:
 
 
 def _turn_path(state_dir: str, session: str) -> str:
-    """ターンの基準を置く場所。セッションの既知の変更とは別に持つ。
+    """ターンの基準を置く場所。セッションの記録とは別に持つ。
 
-    2 つは寿命が違う。セッションの既知の変更は「モデルへ 1 度伝えた」を覚えていて
+    2 つは寿命が違う。セッションの記録は「モデルへ 1 度伝えた」を覚えていて
     セッションが終わるまで残るが、こちらはターンごとに取り直す。同じファイルに
-    まとめると、ターンの区切りでセッションの既知の変更まで消えることになる。
+    まとめると、ターンの区切りでセッションの記録まで消えることになる。
     """
     name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.turn.json")
@@ -1013,7 +1014,7 @@ def at_prompt(
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
 ) -> None:
-    """ターンの始まり。いま保護領域に在る変更を保存して、このターンの基準にする。
+    """ターンの始まり。いま保護領域に在る変更を記録して、このターンの基準にする。
 
     これが無いと、ターンの終わりの報告が「今そこにある変更」しか言えない。
     ユーザ自身の書きかけも、他のセッションが置いたものも、前のターンで
@@ -1025,7 +1026,7 @@ def at_prompt(
     """
     read = _read_all(stderr, watched, record)
     if not read:
-        # 基準を取れなかった。前のターンの基準が残っていると、そこに入っている
+        # 基準を取れなかった。前のターンの記録が残っていると、そこに入っている
         # HEAD を「このターンの始まり」として読むことになり、前のターンの
         # コミットをこのターンの成果として並べる。基準の側は「言い落とす」ほうに
         # なるのに、HEAD の側だけ「言い過ぎる」ほうになるので、消しておく。
@@ -1037,7 +1038,7 @@ def at_prompt(
         for w, top, changes in read
         for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
-    # ツリーごとの HEAD も保存する。ターンの終わりに「このターンでコミットに
+    # ツリーごとの HEAD も記録する。ターンの終わりに「このターンでコミットに
     # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。
     heads = {top: gitstate.head(top) for _, top, _ in read if top}
     _save_turn(
@@ -1058,8 +1059,8 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     持っていないなら、ターンの始まりを見ていない。登録されていないか、
     そのイベントで読めなかったか。そこで「全部このターンの成果」として
     報告すると、前から在ったものまで並ぶので、そのときは何も言わない。
-    見えていない期間を、見えたことにしない。`heads` を持たない基準（壊れたものや
-    HEAD を保存する前の版）も、基準が無いときと同じく基準なしとして扱う。
+    見えていない期間を、見えたことにしない。`heads` を持たない記録（壊れたものや
+    HEAD を記録する前の版）も、記録が無いときと同じく基準なしとして扱う。
     """
     if not state_dir:
         return set(), False, {}
@@ -1097,15 +1098,15 @@ def _save_turn(
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
     """すでに報告した変更と、このセッションで初めて見るかどうかを返す。
 
-    読めなければ「初めて」として扱う。既知の変更を失ったときに、前から在った変更を
-    直前の実行のせいにするより、もう一度既知の変更を保存し直すほうが害が小さい。
+    読めなければ「初めて」として扱う。記録を失ったときに、前から在った変更を
+    直前の実行のせいにするより、もう一度記録を取り直すほうが害が小さい。
     """
     if not state_dir:
         return set(), True
     data, failed = fsio.read_json(_seen_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: 実行後チェックの状態ファイルを読めない: {failed}\n")
+            stderr.write(f"ccnavi: 実行後チェックの記録を読めない: {failed}\n")
         return set(), True
     seen = data.get("seen") if isinstance(data, dict) else None
     if not isinstance(seen, list):
@@ -1114,9 +1115,9 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
 
 
 def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> None:
-    """既知の変更を書く。書けなかったことは報告して捨てる。
+    """記録を書く。書けなかったことは報告して捨てる。
 
-    ここでの失敗はチェックを止めない。既知の変更が無ければ同じ変更をもう一度報告する
+    ここでの失敗はチェックを止めない。記録が無ければ同じ変更をもう一度報告する
     ことになり、うるさいが、見落とすよりはよい。
     """
     if not state_dir:
@@ -1125,4 +1126,4 @@ def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> 
         _seen_path(state_dir, session), {"seen": sorted(seen)[:SEEN_LIMIT]}
     )
     if failed:
-        stderr.write(f"ccnavi: 実行後チェックの状態ファイルを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 実行後チェックの記録を書けない: {failed}\n")

@@ -114,7 +114,7 @@ test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出�
   assert.equal(parsed.board.tickets[1].blocked, "");
 });
 
-test("CB-T259 history は実行ファイルが渡す状態の履歴を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら履歴を出さない。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
@@ -133,7 +133,7 @@ test("CB-T259 history は実行ファイルが渡す状態の履歴を写す。�
   const [approved, mark] = parsed.board.tickets[0].history;
   assert.equal(parsed.board.tickets[0].history.length, 2);
   assert.deepEqual(approved, { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" });
-  // 置き場が動かないもの（マーカー）は from / to が null。空の文字列にして、フェーズとマーカーの種類を持つ
+  // 置き場が動かないもの（マーカー）は from / to が null。空の表記にして、フェーズとマーカーの種類を持つ
   assert.equal(mark.from, "");
   assert.equal(mark.to, "");
   assert.equal(mark.phase, 1);
@@ -141,7 +141,7 @@ test("CB-T259 history は実行ファイルが渡す状態の履歴を写す。�
   assert.deepEqual(parsed.board.tickets[1].history, []);
 });
 
-test("CB-T262 predecessors_unmet は実行ファイルの答えを写す。欄が無ければ空（満たしている扱い）", () => {
+test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま使う。欄が無ければ空（満たしている扱い）", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
   tickets[3].predecessors_unmet = [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];

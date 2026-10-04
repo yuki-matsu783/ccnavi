@@ -233,11 +233,10 @@ class Workspace(unittest.TestCase):
         )
 
     def after_shell(self, tree, rel, session):
-        """実行前の変更一覧を保存してからシェルが rel を書いたことにし、
-        その後の PostToolUse を返す。
+        """記録を取ってからシェルが rel を書いたことにし、その後の PostToolUse を返す。
 
-        変更一覧はセッションごと。行ごとにセッションを変えれば、前の行が書いたファイルは
-        「前から在った変更」として一覧に入り、その行が書いた 1 件だけが報告の対象になる。
+        記録はセッションごと。行ごとにセッションを変えれば、前の行が書いたファイルは
+        「前から在った変更」として記録に入り、その行が書いた 1 件だけが報告の対象になる。
         """
         baseline = self.hook("PostToolUse", "Bash", tree, session=session, command="ls")
         self.assertIn(baseline.returncode, (0, 2), baseline.stderr)
@@ -347,7 +346,7 @@ class PreToolUseTable(Workspace):
             "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
             "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
             "ask": ("ask", "TICKET_ASK", "ticket", "(ticket-scope)"),
-            # チケットの範囲の中で、ルールも何も言わない。ルールの id もチケットのフラグも残らない。
+            # チケットの範囲の中で、ルールも何も言わない。ルールの id もチケットの理由も残らない。
             "allow": ("allow", "", "", None),
             # 権限モードに委ねる行。payload に permission_mode を入れないので、委ねた先の
             # 答えは見ない（判定を ask にするか渡すかは権限モード次第）。見るのはコードだけ。

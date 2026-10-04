@@ -3,9 +3,9 @@
 どれも、直さないと組み込み deny が「守っている」と言いながら回避できる形。
 `.claude/` の側も同じ当て方で守られる。
 
-- A-2 大文字小文字: `glob` と `regex` で書いたルールと組み込みの守りを、どの機械でも
+- A-2 大文字小文字: `glob` と `regex` で書いたルールと組み込みの保護を、どの機械でも
   区別せずに当てる。区別が要る `regex` は `(?-i:...)` で囲む
-- A-3 区切りが続かない書き方: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
+- A-3 区切りが続かないパス: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
 - A-4 生の `id` のコロン: 層の名前をつけた形と見分けが付かないものを error にする
 - A-5 `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
 - A-6 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、表記を変えた形でも
@@ -47,7 +47,7 @@ from tests.config.test_config_union import (
 from tests.config.test_config_union_guard import GuardHarness
 
 # A-2 の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
-# `glob` も `regex` も組み込みの守りも、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
+# `glob` も `regex` も組み込みの保護も、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
 # 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
 # 区別が要るときだけ、書いたユーザが `(?-i:...)` で囲む。
 CASE_RULES = {
@@ -175,11 +175,11 @@ COUNT_RISK = (
 
 
 class GlobCaseTest(ConfigUnionHarness):
-    """A-2: ルールに書いた表記の扱い。
+    """A-2: ルールに書いたパスの扱い。
 
     `glob` も `regex` も、`risk.py` / `phasetypes.py` / `ticket.py` の範囲と同じく、
     どの機械でも大文字小文字を区別せずに当たる。区別すると、`.ccnavi/` を `.Ccnavi/` の
-    表記で作って deny に止められずに通れる。区別が要るときは `(?-i:...)` で囲む。
+    パスで作って deny に止められずに通れる。区別が要るときは `(?-i:...)` で囲む。
     """
 
     def setUp(self):
@@ -188,7 +188,7 @@ class GlobCaseTest(ConfigUnionHarness):
 
     def test_glob_ignores_case_on_every_machine(self):
         """11.4: `glob` の deny は、どの機械でも大文字小文字を区別せずに当たる。"""
-        # 実体があると、区別しない機械では `os.path.realpath` が表記をディスクの側へ
+        # 実体があると、区別しない機械では `os.path.realpath` がパスをディスクの側へ
         # 補正してしまい、この問い自体が消える（フラグ無しでも当たる）。
         self.assertFalse(os.path.exists(os.path.join(self.ws, "secret")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "secret", "x.txt"))
@@ -203,7 +203,7 @@ class GlobCaseTest(ConfigUnionHarness):
         """11.4: `regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
 
         区別すると、`Write` の経路だけが表記違いで外れる。同じ場所へシェルから書く形は
-        組み込みの守り（selfguard._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
+        組み込みの保護（selfguard._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
         """
         self.assertFalse(os.path.exists(os.path.join(self.ws, "token")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "token", "x.txt"))
@@ -225,13 +225,13 @@ class BuiltinGlobCaseTest(GuardHarness):
     """A-2: 組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずに当たる（穴そのもの）。
 
     的は app の層。fixture の app は `.ccnavi/` を持たないので、`.Ccnavi/` は
-    ディスクに無く、`os.path.realpath` が表記を補正しない。「まだ無いところを
+    ディスクに無く、`os.path.realpath` がパスを補正しない。「まだ無いところを
     表記違いで作る」という、ちょうど回避が成り立つ形になる。
     """
 
     def test_the_builtin_project_home_deny_matches_a_swapped_spelling(self):
         """11.6: `.Ccnavi/config/rules.yml` への Write も組み込みの deny で止まる。"""
-        # ccnavi ディレクトリがディスクに無いことが前提。あると realpath が表記を補正して、
+        # ccnavi ディレクトリがディスクに無いことが前提。あると realpath がパスを補正して、
         # 問いが消える。
         self.assertFalse(os.path.exists(os.path.join(self.app, HOME)))
         exact = os.path.join(self.app, HOME, "config", "rules.yml")
@@ -239,7 +239,7 @@ class BuiltinGlobCaseTest(GuardHarness):
             self.guarded_hook("Write", self.ws, file_path=exact), "builtin-guard-project-home"
         )
 
-        # 区別する機械でも止める。組み込みの守りだけが機械で当たり方を変えると、
+        # 区別する機械でも止める。組み込みの保護だけが機械で当たり方を変えると、
         # どの機械でも区別しないルールの glob やチケットの範囲と食い違う。
         swapped = os.path.join(self.app, ".Ccnavi", "config", "rules.yml")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
@@ -247,10 +247,10 @@ class BuiltinGlobCaseTest(GuardHarness):
 
 
 class ShellPlaceTest(GuardHarness):
-    """A-3: 区切りが続かない形。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
+    """A-3: 区切りが続かないパス。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
 
     def test_removing_or_moving_the_umbrella_itself_is_denied(self):
-        """11.6: `.ccnavi` で終わる書き方も `builtin-guard-setting-files` で止まる。"""
+        """11.6: `.ccnavi` で終わるパスも `builtin-guard-setting-files` で止まる。"""
         for command in (
             "rm -rf .ccnavi",
             "rm -rf projects/lib/.ccnavi",
@@ -275,7 +275,7 @@ class ShellPlaceTest(GuardHarness):
 
         `.claudexyz` や `.ccnavi-notes.md` は別のファイル。`.claude/worktrees/` は
         守る対象ではないので、片付けは通る（`.claude` の側を ccnavi ディレクトリと同じ `_END` で
-        閉じると、ここが止まる）。ccnavi ディレクトリから外へ写すだけの読みも通る。
+        閉じると、ここが止まる）。ccnavi ディレクトリから外へコピーするだけの読みも通る。
         """
         for command in (
             "rm -rf .claudexyz",
@@ -292,7 +292,7 @@ class ShellPlaceTest(GuardHarness):
     def test_copying_out_of_a_common_layer_file_is_not_denied(self):
         """11.6: 共通層の 1 本をコピー元に書いただけの読みは通る。
 
-        共通層の節を写す側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
+        共通層の節をコピーする側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
         数えるのでコピー元に当たり、`cp .ccnavi/common/rules.yml /tmp/x` が止まっていた。
         """
         for name in ("rules.yml", "phases.yml", "risks.yml"):
@@ -321,7 +321,7 @@ class ShellPlaceTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_the_moved_umbrella_is_closed_the_same_way(self):
-        """11.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わる書き方で止まる。"""
+        """11.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わるパスで止まる。"""
         result = self.hook(
             "Bash",
             self.ws,
@@ -562,7 +562,7 @@ class CopyDestinationTest(GuardHarness):
                 self.assert_guarded(command)
 
     def test_reading_copies_pass_through_the_guard(self):
-        """守る場所が元の側にだけ出る形は、選択肢やつないだコマンドがあっても守りでは止めない。"""
+        """守る場所が元の側にだけ出る形は、選択肢やつないだコマンドがあっても組み込みの保護では止めない。"""
         for command in (
             "cp .ccnavi/common/rules.yml /tmp/x",
             "cp /repo/.ccnavi/common/rules.yml /tmp/backup.yml",
@@ -721,7 +721,7 @@ class HolderDestinationTest(GuardHarness):
                 self.assert_guarded(command)
 
     def test_other_names_and_reading_copies_pass_through_the_guard(self):
-        """別の名前を置くだけの形と、守る場所から外へ写すだけの形は守りでは止めない。"""
+        """別の名前を置くだけの形と、守る場所から外へ写すだけの形は組み込みの保護では止めない。"""
         for command in (
             "cp /tmp/notes.txt logs/",
             "mv /tmp/notes.txt logs/",
@@ -975,7 +975,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         )
 
     def test_the_layer_of_a_project_named_common_is_restored(self):
-        """11.6: 層の名前と同じ名前のプロジェクトでも、層の 3 本がバックアップと復元の対象。"""
+        """11.6: 名札と同じ名前のプロジェクトでも、層の 3 本がバックアップと復元の対象。"""
         for kind in settings.LAYER_KINDS:
             with self.subTest(kind=kind):
                 path = layer_path(self.reserved, kind)
@@ -1037,15 +1037,15 @@ class ScriptTamperTest(GuardHarness):
         self.assertEqual([p for p in errors if "count.sh" in p["detail"]], [], errors)
 
     def test_named_tools_cannot_rewrite_it(self):
-        """11.6: Write / Edit は、正しい表記でも表記を変えた形でも止まる。"""
+        """11.6: Write / Edit は、正しいパスでも表記を変えた形でも止まる。"""
         for tool in ("Write", "Edit"):
             with self.subTest(tool=tool):
                 self.assert_denied(
                     self.guarded_hook(tool, self.ws, file_path=self.script),
                     "builtin-guard-project-home",
                 )
-        # どの機械でも止める。区別しない機械では、この表記で書けば本物が書き換わる。
-        # 区別する機械では別のファイルだが、組み込みの守りの当たり方を機械で変えない。
+        # どの機械でも止める。区別しない機械では、このパスで書けば本物が書き換わる。
+        # 区別する機械では別のファイルだが、組み込みの保護の当たり方を機械で変えない。
         # 補正が無い形（ccnavi ディレクトリがまだ無いところを表記違いで作る）は
         # BuiltinGlobCaseTest。
         swapped = os.path.join(self.lib, ".Ccnavi", "scripts", "count.sh")
@@ -1065,7 +1065,7 @@ class ScriptTamperTest(GuardHarness):
                     self.guarded_hook("Bash", self.ws, command=command),
                     "builtin-guard-setting-files",
                 )
-        # シェルの側も、場所の表記はどの機械でも区別せずに当てる（selfguard._folded）。
+        # シェルの側も、場所のパスはどの機械でも区別せずに当てる（selfguard._folded）。
         swapped = "rm -rf projects/lib/.Ccnavi/scripts/count.sh"
         result = self.guarded_hook("Bash", self.ws, command=swapped)
         self.assert_denied(result, "builtin-guard-setting-files")

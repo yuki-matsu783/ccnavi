@@ -1,4 +1,4 @@
-// 組み立ての出力先とキャッシュを消す。
+// 組み立ての出力先とキャッシュ（.cache）を消す。
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

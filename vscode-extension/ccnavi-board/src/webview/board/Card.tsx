@@ -30,7 +30,7 @@ import {
 
 /**
  * `moved` は、前の読み直しからこのカードが動いたこと（`core/board-moved.ts`）。動いていなければ
- * 渡らない。何が動いたかを決めるのは画面（`App.tsx`）で、ここは受け取った分に強調表示を出すだけ。
+ * 渡らない。何が動いたかを決めるのは画面（`App.tsx`）で、ここは受け取った分に動いた表示を出すだけ。
  */
 export function CardItem({ card, hidden, moved }: { readonly card: Card; readonly hidden: boolean; readonly moved?: Moved }): JSX.Element {
   const classes = ["card", card.isParent ? "parent" : "child"];
@@ -115,8 +115,8 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
 const NOT_OPENING = "button, a, details";
 
 /**
- * 状態の履歴。既定で折りたたみ、開くと新しい順に並ぶ。履歴は補助で、列やバッジはここから決めない
- * （状態は置き場で決まる。実行ファイルが渡した新しい側だけを並べる）
+ * 状態の履歴。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
+ * （状態の正は置き場。実行ファイルが渡した新しい側だけを並べる）
  */
 function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
   return (
@@ -138,7 +138,7 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 /**
  * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
  * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
- * どれを優先するか決まらない在りか。出すバッジが無ければ行ごと出さない。
+ * 本物が決まらないチケット。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   const badges: JSX.Element[] = [];
@@ -178,7 +178,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (isHighRisk(card.riskLevel)) {
     badges.push(<Badge key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
   }
-  // 在りかが複数あること自体は普通なので数では出さない。どれを優先するか決まらないときだけ言う。
+  // ほかのツリー上にもチケットがあること自体は普通なので数では出さない。どれが本物か決まらないときだけ言う。
   if (card.scattered.length > 0) {
     const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
     badges.push(<Badge key="seen" kind="seen" text={`複数の場所にある（${card.scattered.length} か所）`} title={where} />);
@@ -188,7 +188,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 
 /**
  * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人間レビューの要否、ワークツリー、
- * マーカー（終了と依頼済は出さない）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
+ * マーカー（終了と依頼済は出さない）、Draft 解除済、早めに閉じた、リスク（MEDIUM 以下）、base、プロジェクト。
  *
  * 列やバッジと同じことは重ねて書かない。完了・取り消しの列にいる閉じたカードには、クローズと人間レビューの要否を
  * 出さない（閉じたことは列で分かり、レビューが済むかは省略／レビュー済で分かる）。提案が残っていて未着手・作業中の
@@ -220,7 +220,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="ready" kind="ready" text="Draft 解除済み" />);
   }
   if (card.wrapped) {
-    facts.push(<Fact key="wrapped" kind="wrapped" text="早期に締めた" />);
+    facts.push(<Fact key="wrapped" kind="wrapped" text="早めに閉じた" />);
   }
   if (card.riskLevel !== "" && !isHighRisk(card.riskLevel)) {
     facts.push(<Fact key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);

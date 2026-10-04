@@ -135,7 +135,7 @@ test("CB-T90 足す・消す・空のリストは欄ごと消す・scope の inh
     .filter((p) => p.id !== "acceptance")
     .map((p) => {
       if (p.id === "implement") {
-        // requires を空にすれば欄ごと消え、scope を inherit にすれば `inherit` と書く
+        // requires を空にすれば欄ごと消え、scope を inherit にすれば値として書く
         return { ...p, requires: [], inherit: true };
       }
       if (p.id === "implement-feedback") {
@@ -262,7 +262,7 @@ test("CB-T198 order と after を読み、書き戻す。sequential は元から
   const again = readPhases(out);
   assert.equal(again.model.form.order, "dag");
   assert.deepEqual(again.model.form.phases.find((p) => p.id === "implement")?.after, ["design"]);
-  // dag から sequential に戻すと、欄は `order: sequential` と書いたまま残る（書いた意図を消さない）
+  // dag から sequential に戻すと、欄は値として残る（書いた意図を消さない）
   assert.match(again.apply({ ...again.model.form, order: "sequential" }), /^order: sequential$/m);
 });
 

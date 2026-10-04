@@ -85,7 +85,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
 
     # 解釈できない値も最も強いモードになるが、それを言うことに意味がある。
     # 名前を変えた設定や打ち間違いが、何も言わないと意図した選択に見えてしまい、
-    # 誰にも見えない理由でガードが締まることになる。
+    # 誰にも見えない理由でガードが厳しくなることになる。
     stderr.write(
         f"ccnavi: {source}={value!r} is not a mode; using {ENABLE}. "
         f"Valid modes are {DISABLE}, {DRY_RUN} and {ENABLE}\n"

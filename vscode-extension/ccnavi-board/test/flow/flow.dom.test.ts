@@ -1,5 +1,5 @@
 /**
- * フロー編集画面（React）を happy-dom で動かす。図・バッジ・錠・保存・注意を見る。
+ * フロー編集画面（React）を happy-dom で動かす。図・目印・錠・保存・注意を見る。
  *
  * 図は大きさの偽物（`openPage` が渡す `measure`）で描かせる。見るのは「点と線がその数あるか」
  * 「押すと何が起きるか」まで。線の経路とドラッグは README の手動確認に回す。
@@ -24,7 +24,7 @@ function clickSvg(dom: DomPage, element: unknown): void {
   (element as { dispatchEvent: (event: unknown) => boolean }).dispatchEvent(new Mouse("click", { bubbles: true }));
 }
 
-/** バッジのある 2 種類（問いとサブエージェント）を足した雛形 */
+/** 目印のある 2 種類（問いとサブエージェント）を足した雛形 */
 function marked(): FlowDoc {
   let doc = templateFlow("i0001-01", "調査");
   doc = addNode(doc, "askUserQuestion", { x: 200, y: 300 }).doc;
@@ -32,7 +32,7 @@ function marked(): FlowDoc {
   return patchData(doc, "subAgent-1", { description: "資料を深掘りする" });
 }
 
-test("CB-D107 図はノードと線を描き、問いには「メインに戻る」、サブエージェントには「入れ子」のバッジを付ける", async () => {
+test("CB-D107 図はノードと線を描き、問いには「メインに戻る」、サブエージェントには「入れ子」の目印を付ける", async () => {
   const dom = await openFlow({ doc: marked() });
   try {
     assert.equal(dom.all(".react-flow__node").length, 4);
@@ -45,7 +45,7 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
     const sub = dom.one('.react-flow__node[data-id="subAgent-1"]');
     assert.equal(sub.querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");
     assert.equal(sub.querySelector(".flow-node-summary")?.textContent, "資料を深掘りする");
-    // 開始・終了にはバッジが無い
+    // 開始・終了には目印が無い
     assert.equal(dom.one('.react-flow__node[data-id="start"]').querySelector(".flow-badge"), null);
     // 問いの出口は選択肢ごと
     assert.deepEqual(
@@ -126,7 +126,7 @@ test("CB-D110 部品箱で足して欄で直して保存すると、知らない
   const dom = await openFlow({ doc: sample() });
   try {
     assert.equal(dom.all(".react-flow__node").length, 4);
-    // 知らない種類（mcp）はバッジを付けず、欄を持たないと言う
+    // 知らない種類（mcp）は目印を付けず、欄を持たないと言う
     const mcp = dom.one('.react-flow__node[data-id="mcp-1"] .flow-node');
     assert.equal(mcp.getAttribute("data-type"), "other");
     dom.click(dom.one('.react-flow__node[data-id="mcp-1"]'));
@@ -193,7 +193,7 @@ test("CB-D111 入れ子が子の下 2 段を超えるときだけ注意を出す
     const notices = dom.all("#flow-notices li").map((li) => li.textContent ?? "");
     assert.ok(notices.some((n) => /子の下に 3 段重なっています/.test(n)), notices.join("\n"));
     assert.ok(notices.some((n) => /サブフロー（subAgentFlows）が 2 本/.test(n)));
-    // サブフローのノードにも入れ子のバッジ
+    // サブフローのノードにも入れ子の目印
     assert.equal(dom.one('.react-flow__node[data-id="outer"]').querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");
     // 注意は保存を止めない（判定ではない）
     dom.click(dom.one('.react-flow__node[data-id="outer"]'));

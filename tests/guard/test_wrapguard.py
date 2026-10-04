@@ -1,11 +1,11 @@
 """保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（ccnavi/hook/wrapguard.py）。
 
-止める・通すの判定は hook が持ち、sh の検査は 2 重目の守りにする。
+止める・通すの判定は hook が持ち、sh の検査は 2 重目の確認にする。
 
 1. sh の検査の材料を変える環境変数を、同じコマンド行で置いて保護済みの sh を呼ぶ形
 2. 子チケットのワークツリーからの `ccnavi-git.sh push`。親エージェントが打っても止める
 
-見本の表（CHILD_CASES）は、写す版の `ccnavi-git.sh` にも同じものを渡して、sh の検査が
+見本の表（CHILD_CASES）は、コピーする版の `ccnavi-git.sh` にも同じものを渡して、sh の検査が
 2 重目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
 別の実装で持つので、食い違いはこの表で見つける。
 """
@@ -234,9 +234,9 @@ class ChildPushTest(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class ShAgreesTest(unittest.TestCase):
-    """同じ見本を写す版の sh にも渡し、2 重目として同じく止めることを確かめる。
+    """同じ見本をコピーする版の sh にも渡し、2 重目として同じく止めることを確かめる。
 
-    `CCNAVI_SH_DIR` で sh の置き場を差し替えられる（写す版は wip/design/scripts/）。
+    `CCNAVI_SH_DIR` で sh の置き場を差し替えられる（コピーする版は wip/design/scripts/）。
     """
 
     ORIGINAL = os.path.join(ROOT, ".ccnavi", "scripts")
@@ -250,7 +250,7 @@ class ShAgreesTest(unittest.TestCase):
         for name in ("ccnavi-git.sh", "ccnavi-common.sh"):
             source = os.path.join(self.SH_DIR, name)
             if not os.path.isfile(source):
-                # 写す版は変えた sh だけを置く。残りは本物を使う。
+                # コピーする版は変えた sh だけを置く。残りは本物を使う。
                 source = os.path.join(ROOT, ".ccnavi", "scripts", name)
             shutil.copy(source, scripts)
         self.git("init", "--quiet", "-b", "main", cwd=self.root)
@@ -334,7 +334,7 @@ class ShAgreesTest(unittest.TestCase):
             ticket("i0001-01", "i0001"),
         )
         result = self.run_sh(os.path.join(link, ".claude", "worktrees", "i0001-01"), "push")
-        # 本物の sh も両辺をリンクを解いたパスで比べる。比べないとリンクを経た作業場で守りが外れる。
+        # 本物の sh も両辺をリンクを解いたパスで比べる。比べないとリンクを経た作業場で保護が外れる。
         stopped = "子チケットのワークツリー" in result.stderr
         self.assertTrue(stopped, result.stderr)
 

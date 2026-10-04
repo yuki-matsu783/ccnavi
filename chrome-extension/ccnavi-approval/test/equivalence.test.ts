@@ -1,6 +1,6 @@
 /**
  * 同じ要求に、Pyodide（拡張と同じ zip）と手元の CPython が同じ答えを返すか。
- * ボードを 1 回組むあいだに Python へ投げた要求を全部保存し、手元の CPython にも投げて比べる。
+ * ボードを 1 回組むあいだに Python へ投げた要求を全部記録し、手元の CPython にも投げて比べる。
  *
  * 判定のコアの見本は `test/fixtures/core-scenarios.json`。手元の試験
  * （`tests/ticket/test_core.py`）が、手元で実際に書いたバイト列と同じ答えになることを確かめて

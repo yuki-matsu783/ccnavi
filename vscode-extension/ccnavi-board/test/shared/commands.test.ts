@@ -92,7 +92,7 @@ test("CB-T19b 承認の push の sh は、ワークスペースルートから�
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
   );
-  // 親を並べると、その親子チケットだけをコミットして push する（フローの保存の後）。
+  // 親を並べると、その親子のチケットだけをコミットして push する（フローの保存の後）。
   assert.equal(
     pushApprovedCommand("/ws", ["i0001"]),
     "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",

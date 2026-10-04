@@ -1,7 +1,7 @@
 /**
  * フェーズ管理画面（React）を happy-dom で動かす。`test/helpers/risk.ts` と同じ役割。
  *
- * 画面は束ねた 1 本（`out/webview/phases.js`）で、拡張はそれを `<script nonce>` に流し込む。
+ * 画面はバンドルした 1 本（`out/webview/phases.js`）で、拡張はそれを `<script nonce>` に流し込む。
  * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
  * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
  *
@@ -36,7 +36,7 @@ export const SAMPLE_PHASES_TEXT = `# フェーズの種類（設計 9.7）。ユ
 # \`order: dag\` なので、各項は \`after\` に挙げた種類（の祖先）だけを待ち、辺で繋がっていない
 # 種類は並行して進む。辺の書き漏れは並行として通るので、画面の図で確かめる。
 #
-# 下は雛形。scope の表記はこのプロジェクトの置き場に合わせて直す。
+# 下は雛形。scope のパスはこのプロジェクトの置き場に合わせて直す。
 version: 1
 order: dag
 

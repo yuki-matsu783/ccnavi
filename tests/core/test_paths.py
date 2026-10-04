@@ -1,6 +1,6 @@
 """ファイルのパスを当てる先に直す部分のテスト。
 
-守る対象は名前ではなく場所なので、同じ場所を指す別の書き方が同じ判定に
+守る対象は名前ではなく場所なので、同じ場所を指す別のパスが同じ判定に
 行き着かなければならない。
 """
 
@@ -22,7 +22,7 @@ class FullPathTest(unittest.TestCase):
                 os.path.join(base, "secrets", "key.pem"),
             )
 
-    def test_上に戻る書き方は畳まれる(self):
+    def test_上に戻るパスは畳まれる(self):
         # `..` を挟めば、secrets を通らないパスで secrets の中に届く。
         with tempfile.TemporaryDirectory() as base:
             base = os.path.realpath(base)
@@ -31,7 +31,7 @@ class FullPathTest(unittest.TestCase):
                 os.path.join(base, "secrets", "key.pem"),
             )
 
-    def test_同じ場所を指す書き方は同じ答えになる(self):
+    def test_同じ場所を指すパスは同じ答えになる(self):
         with tempfile.TemporaryDirectory() as base:
             base = os.path.realpath(base)
             spellings = [
@@ -42,7 +42,7 @@ class FullPathTest(unittest.TestCase):
                 os.path.join(base, "secrets", "key.pem"),
             ]
             answers = {full_path(s, base) for s in spellings}
-            self.assertEqual(len(answers), 1, f"書き方ごとに違う答えになった: {answers}")
+            self.assertEqual(len(answers), 1, f"パスごとに違う答えになった: {answers}")
 
     def test_まだ無いファイルでも絶対パスになる(self):
         # 書き込みは、まだ存在しない先に向かうほうが普通。
@@ -60,7 +60,7 @@ class FullPathTest(unittest.TestCase):
 class RuleReachTest(unittest.TestCase):
     """正規化したパスに、ルールが実際に届くかどうか。"""
 
-    def test_迂回したパスの書き方でも保護領域のルールに当たる(self):
+    def test_迂回したパスでも保護領域のルールに当たる(self):
         import re
 
         from ccnavi.infra.globmatch import translate

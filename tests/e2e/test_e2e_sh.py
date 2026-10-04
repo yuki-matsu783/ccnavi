@@ -10,16 +10,16 @@ in-process のテストでは掛からない理由が 3 つある。sh は実行
 プロセスで動く。git の作業ツリーの実物（`.git` ファイルの `gitdir:`）が要る。
 Windows のパスの表記が実物でしか出ない。
 
-git init と worktree add を何度も行い、実行ファイルを写すが、実際に測ると 20 件が 8 秒ほどで
+git init と worktree add を何度も行い、実行ファイルをコピーするが、実際に測ると 20 件が 8 秒ほどで
 終わるので、他のテストと同じく既定で走る。組み立て済みの実行ファイル（`dist/ccnavi`）が
 無ければ skip する。試すのはソースではなくその実行ファイルなので、`ccnavi/` を直したら
 `build.py` で組み立て直してから回す。
 
     uv run python -m unittest tests.e2e.test_e2e_sh -v
 
-`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。実装フェーズの成果物は
-`wip/design/scripts/` に置かれ、ユーザが写すまで `.ccnavi/scripts/` には入らない。
-写す前に新しい sh を測るときは、そこを指す。
+`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。実装フェーズの成果物は
+`wip/design/scripts/` に置かれ、ユーザがコピーするまで `.ccnavi/scripts/` には入らない。
+コピーする前に新しい sh を測るときは、そこを指す。
 
     CCNAVI_SH_DIR=wip/design/scripts uv run python -m unittest tests.e2e.test_e2e_sh
 
@@ -52,7 +52,7 @@ def walk_up_for(relative, skip_worktrees=True):
 
     これを外すと、ワークツリーから回したときにワークツリー自身を見つけてしまう。`.ccnavi/scripts/`
     は git で共有されるのでどのワークツリーにもコピーがあるが、実際に使われるのはワークスペース側の
-    1 本だけ。写したあとにワークツリーから回すと、写す前の版を測って落ちる（実際に
+    1 本だけ。コピーしたあとにワークツリーから回すと、コピーする前の版を測って落ちる（実際に
     起きた）。`dist/` は追跡外なのでワークツリーには無く、こちらは上へ歩くだけでよい。
 
     見つからなければ `ROOT` 直下のパスを返す。呼ぶ側の skip 判定がそれを見る。
@@ -163,8 +163,8 @@ class WorkspaceTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # どこを測ったかを出す。通るか落ちるかが「写したかどうか」と食い違ったとき、
-        # 最初に見る情報がこれ。出していなかったせいで、写し済みなのに落ちた
+        # どこを測ったかを出す。通るか落ちるかが「コピーしたかどうか」と食い違ったとき、
+        # 最初に見る情報がこれ。出していなかったせいで、コピー済みなのに落ちた
         # 原因（ワークツリーの古いコピーを見ていた）を突き止めるのに 1 往復かかった。
         print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)
         cls.tmp = tempfile.mkdtemp(prefix="ccnavi-e2e-")
@@ -192,7 +192,7 @@ class WorkspaceTest(unittest.TestCase):
         hooks = os.path.join(ws, ".claude", "hooks")
         os.makedirs(hooks, exist_ok=True)
         for name in ("test-py.sh",):
-            # 写す版があればそちらを優先する。CCNAVI_SH_DIR で写す前の版を
+            # コピーする版があればそちらを優先する。CCNAVI_SH_DIR でコピーする前の版を
             # 指しているとき、hook だけ古い版を測ってしまうのを防ぐ。
             src = os.path.join(SH_DIR, name)
             if not os.path.isfile(src):
@@ -407,7 +407,7 @@ class CredentialTest(WorkspaceTest):
     def assertNoSecret(self, result, *secrets):
         """伏せた結果を目で比べない。元のトークンの断片で探す。
 
-        「消えているつもりで残っている」形は、文字列を見比べると見落とす。
+        「消えているつもりで残っている」形は、パスを見比べると見落とす。
         origin を読む処理まで届いたことも確かめる。届く前に落ちた実行を
         「漏れなかった」と数えると、穴が開いたままテストが通る。
         """
@@ -467,7 +467,7 @@ class HookTest(WorkspaceTest):
         p1 = os.path.join(self.ws, "projects", "p1")
         hook = os.path.join(self.ws, ".claude", "hooks", "test-py.sh")
         if not os.path.isfile(hook):
-            self.skipTest("test-py.sh が写されていない")
+            self.skipTest("test-py.sh がコピーされていない")
         result = subprocess.run(
             [SHELL, hook],
             cwd=p1,

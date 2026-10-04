@@ -1,14 +1,14 @@
 /**
  * リポジトリ 1 つのボードを組む。書く流れ（`write.ts`）も同じ読み方で、
- * 親子チケット 1 つぶんの判定の入力を組み直す（`readFamily`）。
+ * 親子のチケット 1 組ぶんの判定の入力を組み直す（`readFamily`）。
  *
  * 流れ:
  *
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ）。設定したブランチが無ければ止める
  * 2. 統合先の `.claude/settings.json` を読み、置き場のパスを Python に出させる
  * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python
- * 4. 直近 N 日とユーザの指定のブランチ（表示用）の置き場を読み、親子チケットを Python に見分けさせる
- * 5. 親子チケットごとに、参照の閉包の足りないブランチを読み足し、Python に承認待ちを出させる。
+ * 4. 直近 N 日とユーザの指定のブランチ（表示用）の置き場を読み、親子のチケットを Python に見分けさせる
+ * 5. 親子のチケットごとに、参照の閉包の足りないブランチを読み足し、Python に承認待ちを出させる。
  *    判定の入力は統合先・`P`・閉包の `P_X` だけ。表示用のブランチは入れない
  * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、Python の
  *    `confirm` に通るかを聞く（書かない）
@@ -67,7 +67,7 @@ export interface RepoBoard {
   readonly families: readonly FamilyBoard[];
   readonly error: string;
   readonly stats: Stats;
-  /** 読んだブランチ（統合先と表示用のブランチ）。「始める」が開いた親子チケットを見分けるのに使う */
+  /** 読んだブランチ（統合先と表示用のブランチ）。「始める」が開いた親子のチケットを見分けるのに使う */
   readonly seen?: Snapshot | null;
 }
 
@@ -90,7 +90,7 @@ export class Reader {
     return this.deps.call(op, [this.repo.owner, this.repo.repo, ...args]) as Promise<T>;
   }
 
-  /** ブランチの先頭。無ければ null で、`absent` に書いておく */
+  /** ブランチの先頭。無ければ null で、`absent` に残す */
   async head(name: string): Promise<string | null> {
     const sha = await this.call<string | null>("branchHead", name);
     if (sha === null && !this.absent.includes(name)) {
@@ -233,7 +233,7 @@ async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: De
   return { integration, settings, place, compat };
 }
 
-/** リポジトリ 1 つを読んで、親子チケットごとの承認待ちを組む。失敗は `error` に入れて返す */
+/** リポジトリ 1 つを読んで、親子のチケットごとの承認待ちを組む。失敗は `error` に入れて返す */
 export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoard> {
   const empty = { repo, integration: null, compat: null, candidates: [], missingExtras: [], families: [], stats: deps.stats };
   const reader = new Reader(repo, deps);
@@ -264,7 +264,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
     }
     const families = await py.families(deps.py, settings, reader.snapshot(integration), candidates);
 
-    // 5. 親子チケットごとの承認待ち
+    // 5. 親子のチケットごとの承認待ち
     const boards: FamilyBoard[] = [];
     for (const family of families) {
       boards.push(await familyBoard(family, reader, integration, settings, place, deps));
@@ -275,7 +275,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
   }
 }
 
-/** 閉包の足りない親子チケットを読み足し、判定の入力を統合先・P・閉包だけに絞る */
+/** 閉包の足りない親子のチケットを読み足し、判定の入力を統合先・P・閉包だけに絞る */
 async function closureInput(
   family: string,
   reader: Reader,
@@ -284,7 +284,7 @@ async function closureInput(
   place: Placement,
   deps: Deps,
 ): Promise<Snapshot> {
-  // 閉包の足りない親子チケットを読み足す。無いブランチは `absent` に入り、Python が決める
+  // 閉包の足りない親子のチケットを読み足す。無いブランチは `absent` に入り、Python が決める
   for (let round = 0; round < 32; round += 1) {
     const closure = await py.closure(deps.py, settings, reader.snapshot(integration), family);
     if (closure.over_limit || closure.need.length === 0) break;
@@ -328,8 +328,8 @@ async function familyBoard(
 }
 
 /**
- * 取り下げを出すのは、承認コミットを引けて、その親に提案が読めるときだけ（判定を厳しくする向き）。
- * Python が理由を返さなかった承認済みチケットでも、引けなければ理由を足す。
+ * 取り下げを出すのは、承認コミットを引けて、その親で提案を読めるときだけにする（取り下げを出せる場合を狭める条件）。
+ * Python が理由を返さなかった承認済みのチケットでも、引けなければ理由を足す。
  */
 async function withdrawableHere(board: BoardResult, reader: Reader, place: Placement, family: string): Promise<BoardResult> {
   const head = reader.branches[family]?.head;
@@ -370,7 +370,7 @@ export interface FamilyRead extends IntegrationRead {
 }
 
 /**
- * 書く流れのために、親子チケット 1 つぶんを新しく読み直す（毎回 Snapshot を組み直す）。
+ * 書く流れのために、親子のチケット 1 組ぶんを新しく読み直す（毎回 Snapshot を組み直す）。
  * `at` を渡すと、親のブランチをその先頭で読む（GitLab の事後確認で、自分の書き込みの直前の状態を読み直す）
  */
 export async function readFamily(repo: RepoConfig, family: string, deps: Deps, at?: string): Promise<FamilyRead> {

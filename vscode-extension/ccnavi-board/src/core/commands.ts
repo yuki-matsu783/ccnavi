@@ -12,7 +12,7 @@
  */
 import * as path from "node:path";
 
-/** 承認の push（`ccnavi-push-approved.sh`）の、ワークスペースルートからの表記 */
+/** 承認の push の sh の、ワークスペースルートからのパス */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
@@ -60,7 +60,7 @@ export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
  * `ccnavi-review.sh decide <N> --preview`。残った指摘とダイジェストを JSON で見る（何も置かない）。
  * sh は実行した場所を親のワークツリーとして実行ファイルに渡すので、子プロセスの cwd を親のワークツリーにする。
  * `.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから切ったワークツリーには届かないので、
- * sh はワークスペースルートから綴る（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
+ * sh はワークスペースルートからのパスで書く（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
  */
 export function decidePreviewArgs(phase: number): readonly string[] {
   return ["decide", String(phase), "--preview"];
@@ -85,7 +85,7 @@ export function decideArgs(
  * sh が単語に分け、止めている間の例外（`\S*ccnavi-...`）にも当たらない。まず `"..."`、`"` の中でも意味を持つ
  * 文字があるときだけ単引用符にする。
  * 実行ファイルは root を realpath で解いてから組む。ここは渡されたパスをそのまま使うので、実行ファイルの
- * 案内と同じ表記にしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
+ * 案内と同じパスにしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
  */
 export function scriptCommand(root: string, name: string): string {
   const base = toPosixPath(root).replace(/\/+$/, "");
@@ -134,7 +134,7 @@ export function reviewedPrompt(
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
- * `parents` を渡すとその親子チケットだけをコミットして push する（取り込み済みのものだけが送られ、
+ * `parents` を渡すとその親子のチケットだけをコミットして push する（取り込み済みのものだけが送られ、
  * そうでないものは今どおりユーザがコミットする）。
  */
 export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {

@@ -8,7 +8,7 @@
 # 範囲が反映されない、レビュー済みなのに止まったまま、という形になる。
 #
 # 2 つめは**ワークツリーの起点になる統合先**（CCNAVI_INTEGRATION_BRANCH、無ければ ccnavi-sync.sh が
-# 同期状態に書いた名前、無ければデフォルトブランチ＝`origin/HEAD` が指すもの。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
+# 統合先の取り込み結果に書いた名前、無ければデフォルトブランチ＝`origin/HEAD` が指すもの。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
 # 切り、起点は `<統合先>` の HEAD になる。手元の `main` が古いと、そこから切るブランチも古いコミットから
 # 始まる。統合先に取り込むときに fast-forward が通らず、承認済みチケットも古い版で判定することになる。
 #
@@ -34,11 +34,11 @@
 # git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
 # 「取ってこられなかった」に戻るだけ。
 #
-# **取り込み済みの親子チケットは早送りだけ**。親のワークツリー（`.claude/worktrees/<P>`
-# で、ディレクトリ名 = ブランチ名、親の承認済みチケットか提案があり、親子チケットの同期状態がある）は、ロックを 1 回だけ試し
+# **取り込み済みの親子のチケットは早送りだけ**。親のワークツリー（`.claude/worktrees/<P>`
+# で、ディレクトリ名 = ブランチ名、親チケットか提案があり、親子のチケットの取り込み状態がある）は、ロックを 1 回だけ試し
 # （取れなければ早送りしない。待たない）、`origin/<P>` の祖先なら `merge --ff-only` する。書きかけとの重なりは
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
-# 取り込み（merge）・消えたかの確かめ・同期状態の書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
+# 取り込み（merge）・消えたかの確かめ・取り込み状態の書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
 # fetch 1 回のタイムアウトも枠の残りより長くしない（hook の上限は 60 秒）。
 #
@@ -75,7 +75,7 @@ esac
 started=$(date +%s)
 ccnavi_log_root="$root"
 
-# 落ちた origin の URL を書いておく。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
+# 落ちた origin を書いておく場所。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
 # 回るので、変数では渡らない。
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
 # dash は EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。
@@ -179,10 +179,10 @@ ccnavi_fetch_default() {
 	return 1
 }
 
-# ワークツリーの起点にするブランチ（統合先）。
+# ワークツリーの起点にするブランチ、つまり統合先の名前を出す。
 #
 # 環境変数 CCNAVI_INTEGRATION_BRANCH（SessionStart には settings.local.json の env も渡る）、
-# 無ければ ccnavi-sync.sh が同期状態（sync/<リポジトリ>/integration/head）に書いた名前、
+# 無ければ ccnavi-sync.sh が統合先の取り込み結果（sync/<リポジトリ>/integration/head）に書いた名前、
 # 無ければホストのデフォルトブランチ（ccnavi_fetch_default）。
 ccnavi_fetch_integration() {
 	if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
@@ -230,9 +230,9 @@ ccnavi_fetch_seen() {
 	return 0
 }
 
-# そのツリーが、取り込み済みの親子チケットの親のワークツリーか。<ツリー> <名前> <ブランチ>
+# そのツリーが、取り込み済みの親子のチケットの親のワークツリーか。<ツリー> <名前> <ブランチ>
 #
-# `.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の承認済みチケットか提案があり、親子チケットの同期状態がある。
+# `.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親チケットか提案があり、親子のチケットの取り込み状態がある。
 # 当たらないツリーは今までどおり（未コミットがあれば進めない）。他セッションのワークツリーを動かさないため、
 # 条件は全部満たすときだけ。
 ccnavi_fetch_family() {
@@ -248,7 +248,7 @@ ccnavi_fetch_family() {
 	return 0
 }
 
-# 取り込み済みの親子チケットを早送りする。<ツリー> <P>
+# 取り込み済みの親子のチケットを早送りする。<ツリー> <P>
 #
 # merge はしない。書きかけとの重なりは git に任せる（拒まれたら重なったパスを言う）。途中の状態
 # （MERGE_HEAD）を残さないのが早送りだけにした理由で、hook の時間の枠で切られても書きかけが残らない。
@@ -318,7 +318,7 @@ report=$(
 		branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 		[ -n "$branch" ] && [ "$branch" != "HEAD" ] || continue
 		name=$(basename "$tree")
-		# 取り込み済みの親子チケットは早送りだけ（upstream の設定に依らず origin/<P> を見る）。
+		# 取り込み済みの親子のチケットは早送りだけ（upstream の設定に依らず origin/<P> を見る）。
 		if ccnavi_fetch_family "$tree" "$name" "$branch"; then
 			ccnavi_fetch_forward "$tree" "$name"
 			continue

@@ -1,5 +1,5 @@
 /**
- * ルール設定画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
+ * ルール管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
  *
  * 判定は実行ファイルの仕事なので、その結果（`judged` / `sampled`）は拡張ホストから届いたものとして送る。
  */
@@ -64,7 +64,7 @@ test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開い�
   }
 });
 
-test("CB-D08 id を打っている途中は state を書き直さず、確定（change）したときに新しい id で保存する", async () => {
+test("CB-D08 id を打っている途中は state を書き直さず、確定（change）したときに新しい id で state に残す", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -146,7 +146,7 @@ test("CB-D0b 見た目のメッセージで body のクラスが付け替わり�
   }
 });
 
-test("CB-D02 state に保存した id の行は、読み直したあとも開いている", async () => {
+test("CB-D02 state に残した id の行は、読み直したあとも開いている", async () => {
   const dom = await openRules({}, { open: ["deps"], tab: "rules" });
   try {
     assert.ok(dom.one(rowSelector("deps")).classList.contains("open"));
@@ -411,7 +411,7 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
   }
 });
 
-test("CB-D72 読み直せなかった画面から中身が届いたあとも、id の確定で開いた行を保存する", async () => {
+test("CB-D72 読み直せなかった画面から中身が届いたあとも、id の確定で開いた行を state に残す", async () => {
   const dom = await openPage({ kind: "error", error: "ルールファイルを読めない" });
   try {
     assert.match(dom.one(".load-error").textContent ?? "", /ルールファイルを読めない/);
@@ -419,7 +419,7 @@ test("CB-D72 読み直せなかった画面から中身が届いたあとも、i
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload").map((message) => message.dirty), [false]);
     assert.ok(dom.one<HTMLButtonElement>('button[data-action="reload"]').disabled, "押した時点で止める");
-    // 中身が届いて一覧が出る。保存を受け取る側（id の確定）は、ここで張られていないと二度と張られない
+    // 中身が届いて一覧が出る。state に残す側（id の確定）は、ここで張られていないと二度と張られない
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     dom.click(dom.one(`${rowSelector("deps")} .row-head`));
     await dom.settle();
@@ -505,7 +505,7 @@ test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名�
   }
 });
 
-test("CB-T112 ルール設定画面は注意を上部に出し、無ければ出さない", async () => {
+test("CB-T112 ルール管理画面は注意を上部に出し、無ければ出さない", async () => {
   const dom = await openRules({ rulesPath: "projects/lib/.ccnavi/config/rules.yml", notices: ["実行ファイルはこのファイルを読めない: <理由>"] });
   try {
     const warned = dom.all(".banner.warn:not(.hidden)").map((banner) => banner.textContent ?? "");
@@ -523,7 +523,7 @@ test("CB-T112 ルール設定画面は注意を上部に出し、無ければ出
   }
 });
 
-test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち、開いた行を id で state に保存する", async () => {
+test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち、開いた行を id で state に残す", async () => {
   const dom = await openRules();
   try {
     assert.equal(dom.all("#find").length, 1);
@@ -534,7 +534,7 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
     dom.click(dom.one(`${rowSelector("deps")} .row-head`));
     await dom.settle();
     assert.deepEqual((dom.state() as { open: string[] }).open, ["deps"]);
-    // id が空の行は開いていても保存できない（次に開き直す手がかりが無い）
+    // id が空の行は開いていても state に残せない（次に開き直す手がかりが無い）
     dom.click(dom.one('button[data-action="add"][data-section="deny"]'));
     await dom.settle();
     const added = dom.all('[data-list="deny"] .rule').slice(-1)[0];
@@ -598,7 +598,7 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D101 ルール設定の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは state に書かない", async () => {
+test("CB-D101 ルール管理の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは state に書かない", async () => {
   const dom = await openRules({}, { tab: "hooks" });
   try {
     assert.ok(dom.one("#tab-hooks").classList.contains("active"));

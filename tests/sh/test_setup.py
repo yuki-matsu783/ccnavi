@@ -27,7 +27,7 @@ SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
 def _launcher_source():
     """偽の配布元に置く振り分けの sh の中身。
 
-    原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。ユーザが写す前の
+    原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。ユーザがコピーする前の
     ツリーにはまだ無いので、`test_launcher.py` と同じく環境変数 `CCNAVI_TEST_LAUNCHER` で
     名指しできる（相対ならリポジトリのルートから）。名指しが無ければ前の原本
     `scripts/ccnavi-launcher.sh` を読む。
@@ -265,7 +265,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_registers_the_exact_command_line_from_the_readme(self):
         """hook に書かれる 1 行そのものを見る。
 
-        「ccnavi という字が入っている」だけを見ていると、パスを取り違えても
+        「ccnavi という字が入っている」だけを見ていると、表記を取り違えても
         テストが通ってしまう。この 1 行は、何を起動するかと、ccnavi が何を
         守るか（CCNAVI_BIN_PATH）を同時に決めている。
         """
@@ -300,7 +300,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertNotIn("取り込み", checked.stdout)
 
     def test_a_fetch_registered_first_does_not_hide_the_main_hook(self):
-        """取り込みだけが先に在っても、本体の SessionStart を「別の書き方」の登録と取り違えない。"""
+        """取り込みだけが先に在っても、本体の SessionStart を「別の表記」と取り違えない。"""
         self.write_settings(
             {
                 "hooks": {
@@ -565,8 +565,8 @@ class ReadsTheRegistrationCarefully(SetupTest):
     def test_does_not_add_a_second_registration_to_an_event_that_has_one(self):
         """すでに ccnavi が登録されているイベントには足さない。
 
-        書き方は決め打ちにできないので、名前が入っているかどうかで見る。
-        別の書き方で登録してあるプロジェクトに 2 本目を足すと、
+        表記は決め打ちにできないので、名前が入っているかどうかで見る。
+        別の表記で登録してあるプロジェクトに 2 本目を足すと、
         すべての呼び出しで判定が 2 回走る。
         """
         self.write_settings(
@@ -582,7 +582,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         self.assertEqual(self.commands_of(self.read_settings(), "PreToolUse"), ["bin/CCNAVI"])
 
     def test_says_so_when_the_registration_is_spelled_differently(self):
-        """別の書き方で登録されているイベントは、足さずにユーザへ見せる。
+        """別の表記で登録されているイベントは、足さずにユーザへ見せる。
 
         どちらが正しいかをここで決められない。何も言わずに足すと判定が 2 回走り、
         何も言わずに飛ばすとそのイベントが落ちたままになる。
@@ -602,7 +602,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         result = self.run_setup()
 
         self.assertIn("PreToolUse", result.stdout)
-        self.assertIn("別の書き方", result.stdout)
+        self.assertIn("別の表記", result.stdout)
         self.assertEqual(len(self.commands_of(self.read_settings(), "PreToolUse")), 1)
 
     def test_registers_when_the_name_only_happens_to_be_a_substring(self):

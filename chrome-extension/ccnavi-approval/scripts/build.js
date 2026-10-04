@@ -5,7 +5,7 @@
 // 1. 型を見る（画面・Worker・service worker は tsconfig.json、Node で回す部品は tsconfig.node.json）
 // 2. 通信先の一覧（既定 hosts.json）から manifest.json を組む。`host_permissions` と CSP の
 //    `connect-src` は一覧の API のオリジンだけ。組織ごとのビルドは --hosts で一覧を替える
-// 3. esbuild で 4 本（background・board・options・worker）を束ねる
+// 3. esbuild で 4 本（background・board・options・worker）をバンドルする
 // 4. 同梱の Pyodide を node_modules からコピーし、scripts/pyodide-files.json のハッシュと突き合わせる
 //    （npm の lockfile の integrity とは別に、コピーした物そのものを確かめる）
 // 5. 同梱の Python（PyYAML・ccnavi・入口）を zip に組む（scripts/python.js）

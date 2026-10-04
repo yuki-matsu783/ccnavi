@@ -3,14 +3,14 @@
 見るのは 5 つ。
 
 1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）
-の親子チケットを、
+の親子のチケットを、
    手元と同じ形の仮のツリー（ワークスペースルート + `projects/<名前>` + そのワークツリー）で判定し、
-   承認で書くもの（Changes）はその親子チケットの親のブランチだけ
+   承認で書くもの（Changes）はその親子のチケットの親のブランチだけ
 2. プロジェクトの層は計算で決める（プロジェクトの統合先の層に、ワークスペースの共通層を
-   `configsync.projected` で写したもの）。親のブランチの上の層は読まない
-3. 同期状態はワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
+   `configsync.projected` でコピーしたもの）。親のブランチの上の層は読まない
+3. 取り込み状態はワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
 4. 「始める」: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
-   `done/` にある・同じ名前のブランチがある・開いた親子チケットに同じ識別子がある・
+   `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・
    互換の版が違う、のどれでも始められない
 5. プロジェクト名が予約の名前（`common`・`self`）や識別子の形でなければ受けない
 """
@@ -145,7 +145,8 @@ class ChromeProjectTest(unittest.TestCase):
             "workspace": workspace(**{".ccnavi/common/risks.yml": RISK_COMMON}),
         }
         layer = self.chrome.project_layer(snap, place)
-        # 共通層にあるファイルは写す（配点の script はプロジェクトの層の置き場へ）、無いものは残す
+        # 共通層にあるファイルはコピーし（配点の script はプロジェクトの層の置き場へ）、
+        # 無いものは残す
         self.assertEqual(layer[".ccnavi/config/phases.yml"], PHASES)
         self.assertIn("script: .ccnavi/scripts/risk.sh", layer[".ccnavi/config/risks.yml"])
         self.assertEqual(layer[".ccnavi/config/rules.yml"], '{"version": 1, "deny": []}\n')
@@ -262,7 +263,7 @@ class StartTest(unittest.TestCase):
             }
         }
         body = self.start(12, branches=other)
-        self.assertTrue(any("開いた親子チケット topic" in p for p in body["problems"]), body)
+        self.assertTrue(any("開いた親子のチケット topic" in p for p in body["problems"]), body)
 
     def test_a_different_compat_is_refused(self):
         body = self.start(12, compat=version.COMPAT + 1)

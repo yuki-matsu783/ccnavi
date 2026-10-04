@@ -33,19 +33,19 @@
 #            actor は記録で、判定には使わない。引けなければ渡さず、マーカーは前と同じ
 #   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに
 #            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
-#            → issue に回す分があればここが issue を作り、決めた内容をコメントに写す
+#            → issue に回す分があればここが issue を作り、決めた内容をコメントに書き出す
 #            ボードは同じ経路を --preview（一覧を読む）と --choices --digest（押した選択を置く）で通る
 #
 # リモートへの道具は、gh / glab があればそれ（認証はツールに任せる）、無ければ curl と
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
-# 取り込み済みの親子チケット（origin があり、親子チケットの同期状態が present。chat だけのものを除く）では、状態を書く
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。chat だけのものを除く）では、状態を書く
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
-# （Chrome 拡張から見える親子チケットに未 push の状態を溜めないため）。
+# （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
-# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの親子チケットなら
+# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
 # 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る。
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、承認の push の打ち直しを案内する。
 # それ以外は今のまま。
@@ -67,10 +67,10 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
                                                   差分に載せる）。相対パスは打った場所から。投稿が済むと、ユーザが打つ
                                                   crit review <パス> と crit push <番号> を出す
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
-  comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
+  comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で打つ。--preview は一覧を JSON で見るだけ）
   ready                                           閉じられ、wip を片付けて push 済みなら Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
-  close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（ユーザが端末で打つ）。残りを issue に写す。Draft は親が ready で外す
+  close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で打つ）。残りを issue に書き出す。Draft は親が ready で外す
   chat         <N>                                chat で見るフェーズをユーザがこのセッションで見終えた（ユーザが端末で打つ。ccnavi --reviewed <N> --chat）
   config-synced <親>                              着手で上書きした設定をユーザが端末で見た（ユーザが端末で打つ。ccnavi --config-synced <親>）
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
@@ -113,7 +113,7 @@ esac
 # ---- 場所。ワークスペースルートと、いまのワークツリー。Windows の Git Bash では pwd -W でパスの表記を直す。
 #
 # 根は git に聞かない。モード B では cwd がプロジェクトの中にあると git は
-# プロジェクトを答え、承認済みチケット・マーカー・状態の置き場がプロジェクト側を指してしまう。
+# プロジェクトを答え、チケット・マーカー・状態の置き場がプロジェクト側を指してしまう。
 # 道具の置き場は上へたどって探す（設計 11.8）。
 root=$(ccnavi_workspace) ||
 	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
@@ -126,7 +126,7 @@ state="$root/${CCNAVI_STATE:-logs/state}"
 
 # 実行ファイルと互換の版が食い違っていれば、最初に呼ぶときに 1 度だけ言う（止めない）。
 # 引数の誤りで断る経路と、実行ファイルを使わない副命令（origin / fetch / comment）では起こさない。
-# `$( )` の中から呼ぶとフラグが親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
+# `$( )` の中から呼ぶと、1 度言ったことの目印（told_skew）が親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
 told_skew=""
 tell_skew() {
 	[ -z "$told_skew" ] || return 0
@@ -150,7 +150,7 @@ fi
 
 # 実行ファイルがそのフラグを知っているか（`--version --json` の flags で見る）。
 # 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで落ちる。マーカーは前と同じ中身になる）。
-# 答えは 1 度だけ引いて保存する。`$( )` の中から呼ぶと保存した値が親に残らないので、親で呼ぶ。
+# 答えは 1 度だけ引いて覚えておく。`$( )` の中から呼ぶと覚えた値が親に残らないので、親で呼ぶ。
 exe_flags=""
 exe_flags_read=""
 exe_knows() {
@@ -173,13 +173,13 @@ esac
 if [ "$needs_host" = yes ]; then
 	origin=$(git remote get-url origin 2>/dev/null || :)
 	[ -z "$origin" ] && fail no-origin "origin が無い。レビューは実際のマージリクエストに結び付けるので、リモートが要る。"
-	# 伏せた URL を、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
+	# 伏せた表記を、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
 	# 生の $origin を文面に入れる書き方を 1 つも残さないことで、次に fail を足す人が
-	# 気づかずに生の URL を使わないようにする。URL に資格情報を埋める使い方は普通にあり、
+	# 気づかずに生の値を使わないようにする。URL に資格情報を埋める使い方は普通にあり、
 	# 出力はエージェントの文脈にも記録にも残る。
 	origin_shown=$(ccnavi_mask_url "$origin")
 	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
-	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形には
+	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形式には
 	# scheme が無いので、そこだけ https にする。
 	# host には**ポートを残す**。落とすと `:8929` のような立て方がすべて当たらなくなり、しかも
 	# 落ちたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
@@ -545,7 +545,7 @@ create_issue() {
 	fi
 }
 
-# ---- 決めた行き先を投稿する。exe が状態ディレクトリに書いた下書きから、issue を作ってコメントを残す。
+# ---- 決めた行き先を投稿する。exe が state の置き場に書いた下書きから、issue を作ってコメントを残す。
 #
 # 置いたあとの投稿なので、ここで失敗しても決めたことは戻さない。失敗は post_warning に言い、
 # 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子 = ブランチ名）。
@@ -579,7 +579,7 @@ post_decision() {
 	fi
 }
 
-# ---- トークンの持ち主（レビュー済みのマーカーの actor。記録だけで、判定には使わない）。引けなければ空で、止めない。
+# ---- トークンの持ち主（レビュー済みマーカーの actor。記録だけで、判定には使わない）。引けなければ空で、止めない。
 #
 # gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
 # GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
@@ -693,13 +693,13 @@ c1_ccnavi() {
 	fi
 }
 
-# ユーザの判断をコミットして push する。取り込み済みの親子チケットだけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
+# ユーザの判断をコミットして push する。取り込み済みの親子のチケットだけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
 carry_human() {
 	ccnavi_c1_family "$1"
 	case "$ccnavi_c1_target" in
 	yes)
 		sh "$ccnavi_c1_sh/ccnavi-push-approved.sh" "$ccnavi_c1_family_id" || {
-			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが打ち直す（送るまで、この親子チケットの状態の操作は止まる）\n' \
+			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが打ち直す（送るまで、この親子のチケットの状態の操作は止まる）\n' \
 				"$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
 			return 1
 		}
@@ -844,7 +844,7 @@ request)
 		eli5_rel="${eli5_prefix}${eli5_path##*/}"
 		# 名前に使える字を絞る。相対パスは依頼文とユーザが打つ crit の行にそのまま入るので、
 		# `'`・`$`・バッククォート・空白・改行・日本語などを通すと、打ったユーザのシェルで別のコマンドになる
-		# 文字列を置ける。C ロケールで、許す字を消して区切り（:）だけが残るかで見る（改行も 1 字として残る）。
+		# 文字列を置ける。C ロケールで、許す字を消して末尾の目印（:）だけが残るかで見る（改行も 1 字として残る）。
 		eli5_rest=$(printf '%s:' "$eli5_rel" | LC_ALL=C tr -d 'A-Za-z0-9._/-')
 		eli5_safe=yes
 		if [ "$eli5_rest" != : ]; then
@@ -870,7 +870,7 @@ request)
   - HEAD に無い（未追跡か、まだコミットしていない）"
 			elif [ "$eli5_mode" != 100644 ]; then
 				eli5_unmet="${eli5_unmet}
-  - HEAD で普通のファイルでない（モード ${eli5_mode}。シンボリックリンクや実行権限付きは使わない）"
+  - HEAD で普通のファイルでない（モード ${eli5_mode}。シンボリックリンクや実行ビット付きは使わない）"
 			elif ! git -C "$eli5_top" diff --quiet HEAD -- "$eli5_rel" 2>/dev/null; then
 				eli5_unmet="${eli5_unmet}
   - HEAD から変わっている（未コミットの変更がある）"
@@ -881,7 +881,7 @@ request)
 		fail explainer-unmet "ELI5 の HTML ($eli5) が依頼の前提を満たさない:${eli5_unmet}
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
-	# 段 0: 取り込み済みの親子チケットなら C1 の前半（ロック・取り込み）を先に済ませる。
+	# 段 0: 取り込み済みの親子のチケットなら C1 の前半（ロック・取り込み）を先に済ませる。
 	c1_start "$branch"
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
 	tell_skew
@@ -1046,7 +1046,7 @@ decide)
 		exit 1
 		;;
 	yes)
-		# 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを状態ディレクトリに書くだけ）。
+		# 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
 		chosen="$state/review-choose-$$.json"
 		ccnavi --reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
 			rm -f "$chosen"
@@ -1109,7 +1109,7 @@ ready)
 	;;
 close-early)
 	# ユーザが端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
-	# ここが残りを issue に写し、コメントを投稿する。Draft を外すのは、親が片付けて
+	# ここが残りを issue に書き出し、コメントを投稿する。Draft を外すのは、親が片付けて
 	# push したあとの ready（外す経路は 1 本）。
 	reason=""
 	make_issue=1
@@ -1128,8 +1128,8 @@ close-early)
 	done
 	[ -n "$reason" ] || fail close-early-no-reason "close-early には --reason <理由> が要る。" 2
 	fetch_all >"$result"
-	# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは状態
-	# ディレクトリの決まった名前で拾う（親の識別子 = ブランチ名）。
+	# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは state の
+	# 置き場の決まった名前で拾う（親の識別子 = ブランチ名）。
 	ccnavi --close-early --reason "$reason" --result "$result" || exit $?
 	issue_draft="$state/review-close-early-issue-$branch.md"
 	noted="$state/review-close-early-note-$branch.md"
@@ -1137,23 +1137,23 @@ close-early)
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
 		issue=$(create_issue "$issue_draft")
-		[ -z "$issue" ] && fail issue-create-failed "残りを写す issue を作れなかった。下書きは $issue_draft にある。"
+		[ -z "$issue" ] && fail issue-create-failed "残りを書き出す issue を作れなかった。下書きは $issue_draft にある。"
 		issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
 		issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
-		printf '残りを #%s に写した（%s）\n' "$issue_no" "$issue_url"
+		printf '残りを #%s に書き出した（%s）\n' "$issue_no" "$issue_url"
 		printf '残りは #%s へ: %s\n' "$issue_no" "$issue_url" >>"$noted"
 		rm -f "$issue_draft"
 	fi
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	# 取り込み済みの親子チケットなら、締めのマーカー（ユーザの判断）を承認の push で送る。
+	# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 	carry_human "$branch" || exit 1
-	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
+	printf 'OK: 早めに閉じた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
 	;;
 chat)
 	# ユーザが端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
-	# 取り込み済みの親子チケットなら、置いた後に承認の push で送る。
+	# 取り込み済みの親子のチケットなら、置いた後に承認の push で送る。
 	n="${1:-}"
 	case "$n" in
 	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
@@ -1164,7 +1164,7 @@ chat)
 	;;
 config-synced)
 	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
-	# 取り込み済みの親子チケットなら、置いた後に承認の push で送る。
+	# 取り込み済みの親子のチケットなら、置いた後に承認の push で送る。
 	parent="${1:-}"
 	case "$parent" in
 	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;

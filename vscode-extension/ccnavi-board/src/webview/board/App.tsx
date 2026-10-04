@@ -1,7 +1,7 @@
 /**
  * ボード画面の本体。列とカード、絞り込み、承認のオーバーレイ。
  *
- * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いたカードの強調表示も、
+ * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いた表示も、
  * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
  * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
@@ -53,7 +53,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const requestTour = tour.request;
   /**
    * 案内の間、チケットが 1 枚も無ければ見本のボードを出す（`tour-sample.ts`）。指す先のカードが無いと、
-   * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの保存や承認の件数の元にはしない
+   * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの state や承認の件数の元にはしない
    */
   const sample = useMemo(
     () => (tour.touring && board !== undefined && board.totalCount === 0 ? sampleBoard(board.root, board.generatedAt) : undefined),
@@ -288,7 +288,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '[data-action="refresh"]',
     title: "更新",
-    body: "チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードは強調して表示します。",
+    body: "チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードには動いた表示が付きます。",
   },
   {
     target: '[data-action="tour"]',

@@ -1,12 +1,12 @@
 /**
- * フェーズ管理画面が編集中に持つもの。編集用にコピーした種類（`Draft`）と、開いている行。
+ * フェーズ管理画面が編集中に持つもの。種類のコピー（`Draft`）と、開いている行。
  * 作りはリスク管理（`webview/risk/state.ts`）と同じで、鍵の表記だけ `p1`、`p2`、… と違う。
  *
  * 契約の `PhasesForm` は配列だけを持つが、画面は**行ごとに動かない鍵**が要る（足す・消す・
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
  * 空にも重複にもなるので鍵には使えない（この画面は重複を保存前に止める）。
  *
- * 開いている行は Webview の state に保存する（`{ open: [id, …] }`）。
+ * 開いている行は Webview の state（`{ open: [id, …] }`）に残す。
  */
 import type { PhaseForm, PhaseOrder, PhasesForm } from "../../core/phases-view.js";
 import { getState, setState } from "../vscode.js";
@@ -65,32 +65,32 @@ export function duplicates(draft: Draft): ReadonlySet<string> {
   return dup;
 }
 
-/** 保存してある「開いていた種類の id」。型が違うものは空として扱う */
+/** state に残してある「開いていた種類の id」。型が違うものは空として扱う */
 export function loadOpen(): ReadonlySet<string> {
   const saved = (getState() ?? {}) as { open?: unknown };
   const ids = Array.isArray(saved.open) ? saved.open.filter((id): id is string => typeof id === "string") : [];
   return new Set(ids);
 }
 
-/** 開いている行を保存する。id が空の行は保存しない（次に開き直す手がかりが無い） */
+/** 開いている行を state に残す。id が空の行は残さない（次に開き直す手がかりが無い） */
 export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
   const ids = draft.rows.filter((row) => open.has(row.key) && row.phase.id !== "").map((row) => row.phase.id);
   setState({ ...((getState() ?? {}) as object), open: ids });
 }
 
-/** 保存してある id から、いまの行の鍵に直す */
+/** state に残してある id から、いまの行の鍵に直す */
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   return new Set(draft.rows.filter((row) => row.phase.id !== "" && ids.has(row.phase.id)).map((row) => row.key));
 }
 
-// ---- 図（`Graph.tsx`）が保存するもの
+// ---- 図（`Graph.tsx`）が state に残すもの
 
 /** 一覧と図の、いま見ているほう */
 export type View = "list" | "graph";
 
 /**
  * ユーザがドラッグで動かした点の位置。**`phases.yml` には書かない**（ユーザが持つ設定に座標は入れない）。
- * 保存先は Webview の state で、鍵は種類の id。id を打ち替えれば保存した位置は捨てられる（`Graph.tsx`）。
+ * 残す先は Webview の state で、鍵は種類の id。id を打ち替えれば残した位置は捨てられる（`Graph.tsx`）。
  *
  * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。
  * ここ（`state.ts`）は `acquireVsCodeApi` を読むので、node のテストからは import できない。
@@ -98,7 +98,7 @@ export type View = "list" | "graph";
 export type { Spots } from "../../core/phases-graph.js";
 import type { Spots } from "../../core/phases-graph.js";
 
-/** いま見ているほう。保存した値が無いか、表記が違えば一覧 */
+/** いま見ているほう。state に無いか、表記が違えば一覧 */
 export function loadView(): View {
   const saved = (getState() ?? {}) as { view?: unknown };
   return saved.view === "graph" ? "graph" : "list";
@@ -108,7 +108,7 @@ export function saveView(view: View): void {
   setState({ ...((getState() ?? {}) as object), view });
 }
 
-/** 保存してある点の位置。Webview の state は型を持たず、値はそのまま SVG の座標になるので、数でない値はここで落とす */
+/** state に残してある点の位置。Webview の state は型を持たず、値はそのまま SVG の座標になるので、数でない値はここで落とす */
 export function loadSpots(): Spots {
   const saved = (getState() ?? {}) as { spots?: unknown };
   const raw = typeof saved.spots === "object" && saved.spots !== null ? (saved.spots as Record<string, unknown>) : {};

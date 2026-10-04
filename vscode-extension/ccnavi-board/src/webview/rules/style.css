@@ -1,9 +1,9 @@
 /*
- * ルール設定画面の CSS。**画面（React）と同じ置き場にあり、部品 1 つに CSS 1 本**（`Rule.tsx` なら
- * `Rule.css`）。ここはその束ねで、`@import` を並べるだけ。部品を足したら、同じ名前の CSS を足して
+ * ルール管理画面の CSS。**画面（React）と同じ置き場にあり、部品 1 つに CSS 1 本**（`Rule.tsx` なら
+ * `Rule.css`）。ここはそれらをバンドルする入口で、`@import` を並べるだけ。部品を足したら、同じ名前の CSS を足して
  * ここに 1 行足す（`Hooks.tsx` のように自前の CSS が要らない部品には、CSS を置かない）。
  *
- * 束ねるのは `scripts/bundle-webview.js`（出口は `out/webview/rules.css`）。拡張ホストはそれを読んで
+ * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/rules.css`）。拡張ホストはそれを読んで
  * `<style nonce>` に流し込む（`src/core/rules-render.ts`）。
  */
 @import "../styles/page.css";

@@ -215,7 +215,7 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
     """後ろの層を前の集合に足す。重複は捨て、同 id で中身が違うものは両方残す。
 
     裸の `id` が同じで `{root}` 置換後の全欄が一致する定義は、同じルールの重複と
-    みなして後ろを捨てる（info）。見本を写して始めたプロジェクトが共通層と同じ行を
+    みなして後ろを捨てる（info）。見本をコピーして始めたプロジェクトが共通層と同じ行を
     持つのは普通の形で、それを衝突と呼ぶと本当の衝突が埋もれる。
 
     中身が違えば両方判定に使う（warn）。rules は足すだけの設定なので、`deny` と `ask` は
@@ -309,7 +309,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
 
 
 def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
-    """守る対象（selfguard）に渡す、層ごとの設定ファイル（種別, 層の名前, kind, パス）。
+    """守る対象（selfguard）に渡す、層ごとの設定ファイル（種別, 名札, kind, パス）。
 
     共通層は phases と risk の 2 本だけ返す。共通層の rules は `selfguard.targets` が
     `rules_path` で受け取っているので、ここから重ねると同じファイルが 2 度並ぶ。
@@ -318,8 +318,8 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     見ない。あれは診断のためのもので、守る対象は本来の置き場のほうになる。
 
     種別（`settings.ORIGIN_*`）をつける。受け取る側はバックアップの key と、戻す先の git を
-    ここから決める。層の名前の文字列では決められない。`projects/common/` の層の名前は
-    `common` なので、名前で比べると共通層と同じ key になり、重複の排除でその層の 3 本が
+    ここから決める。名札の表記では決められない。`projects/common/` の名札は
+    `common` なので、名札で比べると共通層と同じ key になり、重複の排除でその層の 3 本が
     バックアップと復元の対象から丸ごと落ちる。
 
     予約名のプロジェクトも並べる。判定の層としては数えない（layers）が、ファイルは

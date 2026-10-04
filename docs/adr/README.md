@@ -55,13 +55,13 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 
 | いま | 旧 | 引かれている数（動かした側 / 残した側） | 動かした理由 |
 |---|---|---|---|
-| 0063 ワークスペースの外は、先読みではなく展開で書く | 0058 | 1 / 35 | 残した 0058（承認は置き場で決まる）は `ccnavi/approval.py` だけで 9 か所。桁が違う |
+| 0063 ワークスペースの外は、先読みではなく展開で書く | 0058 | 1 / 35 | 残した 0058（承認は置き場を本物とする）は `ccnavi/approval.py` だけで 9 か所。桁が違う |
 | 0064 ボードの画面を React にし、拡張ホストは中身だけを渡す | 0060 | 6 / 7 | 数はほぼ同じなので置き場で決めた。残した 0060（起点のデフォルトブランチ）は保護された `.ccnavi/scripts/ccnavi-fetch.sh` から引かれている。こちらは題に番号を書いていなかった |
 | 0065 レビューはマージリクエストのほかに、このセッションでも受ける | 0051 | 6 / 14 | 数でも置き場でも同じ側。残した 0051（`regex` も大文字小文字を区別しない）は `.ccnavi/common/rules.yml` と `rule-samples.yml` から引かれている |
 | 0067 `cd` で移った先から見た表記を、当てる先として足す | 0066 | 8 / 14 | 数で決めた。残した 0066（画面の CSS を部品と同じ置き場に移す）は、拡張の `src/` と `test/` から 14 か所。どちらも保護された場所からは引かれていないので、置き場では決まらない |
 | 0068 承認のオーバーレイの遷移を 1 か所に集め、単体で試せるようにする | 0067 | 3 / 8 | 数で決めた。残した 0067（`cd` で移った先から見た表記）は `ccnavi/shellread.py` と `judge.py` を含めて 8 か所。どちらも保護された場所からは引かれていないので、置き場では決まらない |
 | 0069 `cd` で移った先から見た表記を、当てる先として足す | 0067 | 8 / 38 | 数で決めた。1 つ上の行で残した枚が、今度は動く側になった。残した 0067（層の置き場を動かすフラグを診断の経路に限る）は `tests/config/` と `ccnavi/cli.py` を含めて 38 か所。どちらも保護された場所からは引かれていないので、置き場では決まらない |
-| 0074 ボードは「動いた」をバッジで見せ、そのバッジを時間では消さない | 0073 | 2 / 6 | 数で決めた。同じ番号が 3 枚あり、残した 0073（優先するツリーが無ければ元ツリーを採る）は `ccnavi.md`・`requirements.md`・`tests/ticket/` を含めて 6 か所。どれも保護された場所からは引かれていないので、置き場では決まらない |
+| 0074 ボードは「動いた」を表示し、その表示を時間では消さない | 0073 | 2 / 6 | 数で決めた。同じ番号が 3 枚あり、残した 0073（本物とするツリーが無ければ元ツリーを採る）は `ccnavi.md`・`requirements.md`・`tests/ticket/` を含めて 6 か所。どれも保護された場所からは引かれていないので、置き場では決まらない |
 | 0075 実行後チェックは、自分の副命令の書き込みを正規化した内容で見分ける | 0073 | 5 / 6 | 数で決めた。3 枚のうち最後に合流した枚。5 と 6 はほぼ同じだが、どちらも保護された場所からは引かれていないので置き場では決まらず、数の少ないこちらを動かした |
 
 ## 一覧
@@ -78,9 +78,9 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0006](0006-disable-from-env-only.md) | `disable` は起動側の環境からしか効かせない |
 | [0007](0007-mode-names.md) | モードの名前を `enable` / `dry-run` / `disable` にする |
 | [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する（置き換え（ADR-0044）） |
-| [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と状態ディレクトリは `logs/` に置く |
+| [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と state は `logs/` に置く |
 | [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
-| [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの状態ファイルをセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
+| [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの state をセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 | [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する |
 
@@ -105,13 +105,13 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0069](0069-cd-moves-the-reading.md) | `cd` で移った先から見た表記を、当てる先として足す |
 | [0048](0048-layers-by-path.md) | ルールの層は、パスを持つツールは行き先で、持たないツールは全部の和で選ぶ |
 | [0049](0049-unwatched-gate.md) | 未宣言の呼び出しは判断できる相手が居るモード全部に委ね、確認できない側は設定で選ぶ |
-| [0050](0050-search-tools-and-ignore.md) | 探すツールが読むファイルの守りは、ルールに足さず 3 層に分ける |
+| [0050](0050-search-tools-and-ignore.md) | 探すツールが読むファイルの保護は、ルールに足さず 3 層に分ける |
 | [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む |
 | [0063](0063-not-root-placeholder.md) | ワークスペースの外は、先読みではなく展開で書く |
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
 | [0067](0067-common-layer-flags-are-diagnosis-only.md) | 層の置き場を動かすフラグを診断の経路に限る |
 | [0098](0098-places-are-fixed-to-defaults.md) | 置き場を既定に固定し、置き場を動かす環境変数を廃止する（番号を先に置いた。実装はチケット i0064） |
-| [0056](0056-state-written-without-showing-the-middle.md) | 状態ファイルは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
+| [0056](0056-state-written-without-showing-the-middle.md) | state の記録は途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
 | [0090](0090-stop-rules-nudge-every-n.md) | `match: Stop` のルールで、ターンの終わり N 回に 1 度止めて文を渡せるようにする |
 
@@ -151,23 +151,24 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
-| [0058](0058-approval-is-the-place.md) | 承認は置き場で決まる。記録のキーは必須にせず、承認の検査を判定でも当てる |
+| [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる |
 | [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
-| [0073](0073-origin-tree-is-the-fallback-home.md) | 優先するツリーが無ければ元ツリーを採る |
+| [0073](0073-origin-tree-is-the-fallback-home.md) | 本物とするツリーが無ければ元ツリーを採る |
 | [0076](0076-drop-the-legacy-place-notice.md) | 旧の置き場への移行案内を畳む |
 | [0079](0079-subcommand-names-say-what-they-do.md) | 副命令の名前で動きを表し、ユーザの判断はフラグで受ける |
 | [0080](0080-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
 | [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
-| [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める |
+| [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める（エージェントの下書きは置き換え（ADR-0100）） |
 | [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる |
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
 | [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ |
-| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、優先する承認済みチケットを親のブランチの 1 枚に固定する（提案。段階 0 だけ実装） |
-| [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の写し方は置き換え（ADR-0095）） |
+| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装） |
+| [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の書き出し方は置き換え（ADR-0095）） |
 | [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
 | [0096](0096-eli5-place-is-unscoped-and-does-not-move-the-request.md) | `wip/eli5/` はチケットの範囲を当てず、そこだけを変えたコミットは依頼の後に動いたと数えない（除外のパスの読み方は置き換え（ADR-0097）） |
 | [0097](0097-harden-the-eli5-place-and-request.md) | ELI5 の置き場と依頼の検査を厳しくする（パスの `\` と大文字小文字、名前の字、モード、互換の版） |
+| [0100](0100-agent-drafts-child-flow-user-imports.md) | エージェントは子のフローの下書きを提案の置き場に書き、ユーザがフロー編集画面で取り込む |
 
 ### 複数のリポジトリと VS Code 拡張
 
@@ -179,10 +180,10 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0038](0038-project-from-location.md) | チケットのプロジェクトは提案を置いた場所で決める |
 | [0064](0064-extension-board-in-react.md) | ボードの画面を React にし、拡張ホストは中身だけを渡す |
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
-| [0066](0066-webview-css-beside-components.md) | 画面の CSS を部品と同じ置き場に移し、束ねたものを拡張ホストが流し込む |
+| [0066](0066-webview-css-beside-components.md) | 画面の CSS を部品と同じ置き場に移し、バンドルしたものを拡張ホストが流し込む |
 | [0068](0068-approval-overlay-state-machine.md) | 承認のオーバーレイの遷移を 1 か所に集め、単体で試せるようにする |
 | [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、置き場所は id だけで決める |
-| [0074](0074-board-shows-what-moved.md) | ボードは「動いた」をバッジで見せ、そのバッジを時間では消さない |
+| [0074](0074-board-shows-what-moved.md) | ボードは「動いた」を表示し、その表示を時間では消さない |
 | [0082](0082-phase-graph-groups-tour.md) | フェーズの図を区分の枠で分け、図の下は凡例と当てはまるときだけの注意にし、細かい案内は初回の吹き出しとヘルプに寄せる |
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |
 | [0091](0091-project-skills-in-docs-skills.md) | プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す |
