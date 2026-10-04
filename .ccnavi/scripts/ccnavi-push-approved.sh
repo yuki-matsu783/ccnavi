@@ -33,7 +33,7 @@
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
 #   1 件ずつも。辿るとワークスペースの外のリポジトリにコミットして push する
 # - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
-# - main / master / develop / release / release/* と、そのリポジトリの統合先（ccnavi-common.sh の
+# - main / master / develop / release / release/* と、そのリポジトリの統合先（ccnavi-common-state.sh の
 #   ccnavi_integration。決まらなければ固定のリストだけ）はコミットだけして push しない
 # - 1 本のツリーで add・commit・push が落ちても、他のツリーはコミットして push する
 #
