@@ -106,7 +106,7 @@ deny:
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/rule-samples.yml"
     why: >-
-      共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
+      共通レイヤーの見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
       （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒にユーザに渡す
   - tool: Edit
     subject: "/repo/.ccnavi/common/risks.yml"
@@ -347,7 +347,7 @@ allow:
     subject: "(stop)"
     why: >-
       ターンの終わり。skill-review-every-10 が使われ、10 回に 1 度止めて振り返りの手順を渡す
-      （ADR-0090）。every が無い・プロジェクトの層にしか無いルールでは判定に入らない
+      （ADR-0090）。every が無い・プロジェクトのレイヤーにしか無いルールでは判定に入らない
   - tool: Write
     subject: "/repo/.claude/worktrees/lib1/docs/skills/deploy/SKILL.md"
     why: >-
