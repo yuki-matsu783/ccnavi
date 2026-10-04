@@ -10,7 +10,7 @@ keywords: [レビュー, 依頼, 確認, mr, chat, ccnavi-review.sh]
 
 ### 9.10 レビューの依頼と確認
 
-ここは見る場所が `mr` のフェーズの話。`chat` のフェーズは `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で進める（9.8）。
+この節は、見る場所が `mr` のフェーズの話。`chat` のフェーズは `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で進める（9.8）。
 ただし `request` は `chat` のフェーズでも通る（厳しくする向きなので）。`--chat` は `mr` のフェーズに当たらない。
 
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
@@ -79,7 +79,7 @@ sh がトークンの持ち主を引けたら `--actor=<名前> --via=<terminal|
 `actor` と `via` を残す。引けないときと、実行ファイルの flags に `--actor` と `--via` のどちらかが無いときは渡さないので、
 マーカーは前と同じ中身になる。実行ファイルは、`--yes` の無い呼び方では `--via board` を受け付けない。
 
-**`comment` の段**。crit の指摘を写すのには `comment` を使わない。crit の指摘は、ユーザが `crit push` で送る
+**`comment` の段**。crit の指摘を写すには `comment` を使わない。crit の指摘は、ユーザが `crit push` で送る
 （下の「ELI5 と crit」）。
 
 **`ready` の段**。親が閉じたあとに打つ。`review ready` は次の 3 つを確かめる。親を閉じられる条件を満たしていること。
@@ -148,7 +148,7 @@ ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを
 「動いた」として扱い、出し直させる。数えるのは
 いま解決されていない指摘の全部で、付いた時刻では絞らない。除くのは機構自身の投稿
 （`<!-- ccnavi: …`）と、ユーザが `decide` で受け入れたものだけ。レビューの状態（変更要求）は
-レビュアーごとの最新だけを見て、取り下げは無い扱い。
+レビュアーごとの最新だけを見て、取り下げは無いものとして扱う。
 
 | 結果 | 動き |
 |---|---|
