@@ -627,6 +627,49 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_空白を含むパスへのリダイレクトも止まる(self):
+        # 行き先の引用が空白を含むと、語の中の目印で行き先が途切れて穴になっていた。
+        for command in [
+            'echo x > "projects/has space/.ccnavi/config/rules.yml"',
+            'echo x > "a b/.ccnavi/common/rules.yml"',
+            'echo x >> "a b/.ccnavi/common/rules.yml"',
+            'echo x >"a b/.ccnavi/common/rules.yml"',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_ワークスペースルートの絶対パスに空白があってもリダイレクトは止まる(self):
+        rules = self.rules_in_shell()
+        spaced = rules.replace("/.ccnavi/", " dir/.ccnavi/", 1)
+        result = self.run_hook("PreToolUse", command=f'echo x > "{spaced}"')
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_空白なしのリダイレクトは止まったまま(self):
+        for command in [
+            "echo x > .ccnavi/common/rules.yml",
+            f"echo x > {self.rules_in_shell()}",
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_引用の中の大なりは空白があっても書き込みではない(self):
+        for command in [
+            'echo "a > .ccnavi/common/rules.yml"',
+            'echo ">  .ccnavi/common/rules.yml"',
+            'echo "x y > .ccnavi/common/rules.yml"',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
     # 実行ファイル
 
     def test_実行ファイルはシェルからの書き込みで止まる(self):
