@@ -15,7 +15,7 @@ export function settingsDir(row: ProjectRow): string {
 
 /**
  * カードに出す指摘。`.claude/` があることは説明付きの 1 行で言い、lint の同じ指摘
- * （src/ccnavi/entry/lint.py の文面「.claude/ を持つ。…」）は重ねない。
+ * （src/ccnavi/entry/lint_places.py の文面「.claude/ を持つ。…」）は重ねない。
  * 「.claude/settings.json を読めない」のような別の指摘まで消さないよう、文面の先頭で当てる。
  */
 export function problemsOf(row: ProjectRow): readonly LintProblem[] {

@@ -1083,7 +1083,7 @@ def order_problems(
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
     前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの種類を見て
-    warn にする（`lint._approval_problems`）。
+    warn にする（`lint_ticket._approval_problems`）。
 
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
     増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた

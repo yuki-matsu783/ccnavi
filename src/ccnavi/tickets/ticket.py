@@ -1573,7 +1573,7 @@ def collisions(hits: list[Ticket]) -> list[Ticket]:
 
     まとめて 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
     状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
-    同じ条件（`lint._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
+    同じ条件（`lint_ticket._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
     普通なので、まとめて 1 つに決まるものは数えない。
     """
     folded = fold(hits)
