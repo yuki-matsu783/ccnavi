@@ -489,7 +489,7 @@ class ShWordTest(unittest.TestCase):
     """
 
     def test_spelling(self):
-        from ccnavi.entry.lint import _sh_word
+        from ccnavi.entry.lint_places import _sh_word
 
         cases = {
             "projects/lib": "projects/lib",
