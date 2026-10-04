@@ -13,3 +13,4 @@
 {"at": "2026-10-03T21:41:45Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 3, "mark": "requested"}
 {"at": "2026-10-03T21:46:24Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "board", "actor": "yuki-matsu783", "phase": 3, "mark": "reviewed"}
 {"at": "2026-10-04T01:36:17Z", "ticket": "i0064", "kind": "phase-reopened", "from": null, "to": null, "via": "board", "phase": 4, "cleared": ["requested", "reviewed", "pending"]}
+{"at": "2026-10-04T07:04:32Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 4, "mark": "pending"}
