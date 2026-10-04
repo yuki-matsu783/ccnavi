@@ -44,7 +44,7 @@ from ..policy import ruleload, rules
 from ..records import audit, repeat
 from . import diagnose, lint
 
-# `--suggest --json` の形の版。読み手は VS Code 拡張のルール設定画面。形を変えたら上げる。
+# `--suggest --json` の形の版。読み手は VS Code 拡張のルール管理画面。形を変えたら上げる。
 SUGGEST_VERSION = 1
 
 # 候補の種類。

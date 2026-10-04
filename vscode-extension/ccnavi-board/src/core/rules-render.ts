@@ -1,5 +1,5 @@
 /**
- * ルール設定画面の 1 枚の HTML を組み立てる。中身（帯・タブ・ルールの行・判定の結果・hook の表）を
+ * ルール管理画面の 1 枚の HTML を組み立てる。中身（帯・タブ・ルールの行・判定の結果・hook の表）を
  * 作るのは Webview 側の React（`src/webview/rules/`）で、ここが作るのはその入れ物だけ。
  *
  * 外部資源に依存しない 1 枚にする方針は変えていない。束ねた画面のスクリプトは
@@ -37,7 +37,7 @@ export function renderRulesPage(data: RulesData, options: RenderOptions): string
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ccnavi ルール設定</title>
+<title>ccnavi ルール管理</title>
 <style nonce="${nonce}">
 ${options.style}
 </style>

@@ -113,7 +113,7 @@ export function editable(page: PhasesPage): boolean {
 
 /**
  * 画面に見せる中身。読み直せなかったときは種類の代わりに文面を渡す。
- * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（ルール設定と同じ）
+ * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（ルール管理と同じ）
  */
 export type PhasesData =
   | { readonly kind: "page"; readonly page: PhasesPage }

@@ -771,7 +771,7 @@ VS Code を使わないときは `--no-vscode` を付ける。
 `close-early` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、
 出力の形は下の「ボードの JSON」。
 
-同じ拡張の「ルール設定画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
+同じ拡張の「ルール管理画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
 判定は `ccnavi --test --json` と `--test-samples --json` を通る（形は「試験の JSON」）。
 hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだけで書き換えない。作業中のチケット
 （承認済みチケットが `doing`）がある間は保存できない（セッションの途中で判定が変わるのを避けるため）。
@@ -1847,7 +1847,7 @@ ccnavi --suggest [--json]
 
 ### 候補の JSON
 
-`--suggest --json` の最上位。読み手は VS Code 拡張のルール設定画面。終了コードは常に 0。
+`--suggest --json` の最上位。読み手は VS Code 拡張のルール管理画面。終了コードは常に 0。
 
 | 鍵 | 何 |
 |---|---|
@@ -1864,7 +1864,7 @@ ccnavi --test Bash "cd /repo && git push" --json
 ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 ```
 
-`--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code 拡張のルール設定画面。判定は文字で出すときと同じ関数を通る
+`--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code 拡張のルール管理画面。判定は文字で出すときと同じ関数を通る
 （REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む。
 実例は `vscode-extension/ccnavi-board/test/fixtures/test.json` と `samples.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
@@ -2492,7 +2492,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/config/phases.yml` | このリポジトリ自身の層のフェーズの種類 |
 | `.ccnavi/common/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
 | `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
-| `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール設定・リスク管理・プロジェクト管理の画面 |
+| `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
 | `docs/adr/` | 設計判断の記録 |
 
 ## 配布物の条件

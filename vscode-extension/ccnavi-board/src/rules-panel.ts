@@ -1,5 +1,5 @@
 /**
- * ルール設定画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
+ * ルール管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
@@ -113,11 +113,11 @@ function projectOf(target: RulesTarget): string | undefined {
 function titleOf(target: RulesTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "ccnavi ルール設定";
+      return "ccnavi ルール管理";
     case "self":
-      return "ccnavi ルール設定: ワークスペース";
+      return "ccnavi ルール管理: ワークスペース";
     case "project":
-      return `ccnavi ルール設定: プロジェクト ${target.name}`;
+      return `ccnavi ルール管理: プロジェクト ${target.name}`;
   }
 }
 
@@ -145,7 +145,7 @@ function samplesSetting(): string {
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できません");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -161,7 +161,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ルール設定画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`ルール管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -519,7 +519,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * ルール設定の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
+ * ルール管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
  * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
