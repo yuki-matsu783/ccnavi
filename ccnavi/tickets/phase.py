@@ -777,26 +777,50 @@ def phases_of(
     return [by_number[n] for n in sorted(by_number)]
 
 
-def held_phase(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
-    """レビューが済むまで止めているフェーズ。無ければ None。"""
-    for phase in phases_of(root, conf, parent_id):
+def held_phase(
+    root: str, conf: settings.Settings, parent_id: str, raw: approval.Raw | None = None
+) -> Phase | None:
+    """レビューが済むまで止めているフェーズ。無ければ None。`raw` は `phases_of` と同じ。"""
+    for phase in phases_of(root, conf, parent_id, raw=raw):
         if phase.gate_closed:
             return phase
     return None
 
 
-def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
-    """cwd が親のワークツリーの中なら、その親の承認済みチケット。"""
+def worktree_at(root: str, conf: settings.Settings, cwd: str) -> tree.Tree | None:
+    """cwd が入っているワークツリーかプロジェクト。ワークスペースルートか外なら None。
+
+    `parent_for_cwd` が置き場を読む前に見る条件。呼び手はこれが None でないときだけ
+    置き場を読み（`approval.read_raw`）、`parent_in` に渡す。
+    """
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
+    return t
+
+
+def parent_in(
+    root: str, conf: settings.Settings, here: tree.Tree, raw: approval.Raw | None = None
+) -> ticket_mod.Ticket | None:
+    """ツリー `here`（`worktree_at` の答え）が親のワークツリーなら、その親の承認済みチケット。
+
+    `raw` は `phases_of` と同じ。
+    """
     # 承認済みチケットの側を読む。承認は親のワークツリーを作る前にも打てるので、そのときの
     # 承認済みチケットは提案があったツリー（プロジェクトのルート）に在る。
-    open_copies, _ = approval.scan(conf, root)
-    found = tree.lookup(approval.by_id(open_copies), t.name)
+    open_copies, _ = approval.scan(conf, root, raw=raw)
+    found = tree.lookup(approval.by_id(open_copies), here.name)
     if found is None or found.is_child:
         return None
     return found
+
+
+def parent_for_cwd(
+    root: str, conf: settings.Settings, cwd: str, raw: approval.Raw | None = None
+) -> ticket_mod.Ticket | None:
+    """cwd が親のワークツリーの中なら、その親の承認済みチケット。`raw` は `phases_of` と同じ。"""
+    here = worktree_at(root, conf, cwd)
+    return parent_in(root, conf, here, raw) if here is not None else None
 
 
 def hold_reason(phase: Phase, tool: str, root: str) -> str:
@@ -858,11 +882,20 @@ def _type_source(phase: Phase) -> dict:
     return {"source": phase.type.source} if phase.type is not None else {}
 
 
-def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。"""
+def announce(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    raw: approval.Raw | None = None,
+) -> str:
+    """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。
+
+    `raw` は `phases_of` と同じ。ここが書くのはマーカーだけで、置き場のチケットは動かさない。
+    """
     texts = []
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
-    phases = phases_of(root, conf, parent.ticket)
+    phases = phases_of(root, conf, parent.ticket, raw=raw)
     for phase in phases:
         if not phase.ended or phase.marks:
             continue

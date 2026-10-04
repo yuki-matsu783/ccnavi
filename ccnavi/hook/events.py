@@ -223,8 +223,13 @@ def decide_at_stop(
 
     `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
+
+    承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
+    （`ops.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
+    戻さず、`repeat.at_stop` は state を読むだけなので、置き場のファイルは動かない。
     """
-    watched, scope = watch_context(stderr, conf, root, record)
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    watched, scope = watch_context(stderr, conf, root, record, raw)
     report = post.at_stop(
         stderr,
         conf.state,
@@ -241,7 +246,7 @@ def decide_at_stop(
     repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
-    nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
+    nudge = _finish_nudge(stderr, conf, root, payload, record, mode, raw)
     if not nudge:
         # finish の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
@@ -319,6 +324,7 @@ def _finish_nudge(
     payload: hookio.Input,
     record: audit.Record,
     mode: str,
+    raw: approval.Raw | None = None,
 ) -> str:
     """`finish` の打ち忘れを促す文。促さないなら空文字。
 
@@ -329,10 +335,12 @@ def _finish_nudge(
     何もしない。state の置き場が無い（`--state ""`）か、記録を書けないときは促さない。
     覚えられないまま止めると、ターンの終わりのたびに止まるので、何も言わない側を採る。
     チケット制御が disable なら何もしない。
+
+    `raw` は呼び手が同じ hook の中で `approval.read_raw` で読んだ置き場（`decide_at_stop`）。
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
-    found = ops.unfinished_at_stop(root, conf, payload.cwd)
+    found = ops.unfinished_at_stop(root, conf, payload.cwd, raw)
     if found is None or ops.nudged_before(conf.state, payload.session_id, found):
         return ""
     failed = ops.remember_nudge(conf.state, payload.session_id, found)
@@ -470,12 +478,15 @@ def decide_after(
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
     # 範囲は実行前チェックと同じ経路で解く。状態は置き場そのもので、コピーする段は無い。
-    scope = scope_guard(conf, root)
+    # 置き場はここで 1 度だけ読み、下のフェーズの知らせ（`phase.announce`）にも渡す。
+    restore_setting = modes.effective_setting(mode, conf.restore_if_deny)
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    scope = scope_guard(conf, root, raw)
 
     text = post.check(
         stderr,
         enforcing=mode == modes.ENABLE,
-        restore=modes.effective_setting(mode, conf.restore_if_deny),
+        restore=restore_setting,
         state_dir=conf.state,
         mine=(conf.state, conf.log),
         watched=watched,
@@ -496,8 +507,18 @@ def decide_after(
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
     bounced = ""
     if conf.tickets_enabled:
-        parent = phase.parent_for_cwd(root, conf, payload.cwd)
-        said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
+        # `post.check` が作業ツリーを戻した回は、置き場のファイルも戻っていることがあるので
+        # 読み直す（戻すのは戻しが enable で、直前の実行が汚した分（deny）があるときだけ）。
+        # それ以外の回は、上で読んだ置き場をそのまま使う。
+        if restore_setting == selfguard.ENABLE and record.decision == audit.DENY:
+            raw = None
+        here = phase.worktree_at(root, conf, payload.cwd)
+        parent = None
+        if here is not None:
+            if raw is None:
+                raw = approval.read_raw(conf, root)
+            parent = phase.parent_in(root, conf, here, raw)
+        said = phase.announce(stderr, root, conf, parent, raw) if parent is not None else ""
         if said:
             text = f"{text}\n\n{said}" if text else said
         # サブエージェントが差し戻しを無視して終わったなら、親にそれを言う。

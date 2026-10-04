@@ -686,15 +686,20 @@ def _parent_still_busy(
     return bool(problems)
 
 
-def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[str]:
+def close_problems(
+    root: str, conf: settings.Settings, parent_id: str, raw: approval.Raw | None = None
+) -> list[str]:
     """親を閉じられない理由の一覧。空なら閉じてよい。
 
     `review ready`（Draft を外す）も同じ条件を見る。閉じてよい状態と、マージに
     進んでよい状態は同じもの。ユーザが close-early で早めに閉じていれば、
     開いている子以外は問わない。ユーザが早めに閉じたあとに残っているものは、
     閉じたときに別の issue へ書き出してある。
+
+    `raw` は呼び手が `approval.read_raw` で読んだ置き場。読んでから置き場のファイルを
+    動かしていないときだけ渡す。無ければここで読む。
     """
-    copies, _ = approval.scan(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
     open_children = [t.ticket for t in copies if t.parent == parent_id]
     if open_children:
         return [
@@ -717,12 +722,12 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     ):
         return []
     problems: list[str] = []
-    held = phase.held_phase(root, conf, parent_id)
+    held = phase.held_phase(root, conf, parent_id, raw)
     if held is not None:
         problems.append(
             f"{parent_id} のフェーズ {held.label} は{held.review_label}。レビューを済ませてから"
         )
-    closed_copies, _ = approval.scan(conf, root, closed=True)
+    closed_copies, _ = approval.scan(conf, root, closed=True, raw=raw)
     copy = approval.by_id(copies + closed_copies).get(parent_id)
     if copy is not None and copy.has_plan:
         if copy.feedback is None:
@@ -730,7 +735,9 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
                 f"{parent_id} はフィードバック計画がまだ。対応が無くても "
                 "`feedback: []` を改版で出して承認を受けてから"
             )
-        unfinished = [p.label for p in phase.phases_of(root, conf, parent_id) if not p.ended]
+        unfinished = [
+            p.label for p in phase.phases_of(root, conf, parent_id, raw=raw) if not p.ended
+        ]
         if unfinished:
             problems.append(
                 f"{parent_id} には終わっていないフェーズがある（{', '.join(unfinished)}）。"
@@ -843,7 +850,9 @@ class Unfinished:
     head: str = ""
 
 
-def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinished | None:
+def unfinished_at_stop(
+    root: str, conf: settings.Settings, cwd: str, raw: approval.Raw | None = None
+) -> Unfinished | None:
     """メインエージェントが終わろうとしたとき、`finish` を打ち忘れていそうなチケット。
 
     促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
@@ -857,15 +866,17 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
 
     git を読めなければ促さない。促しは保護ではないので、読めないときは今までどおり何も出さずに通す。
+
+    `raw` は `close_problems` と同じ。ここは読むだけで置き場を動かさない。
     """
     here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if here is None or here.is_main:
         return None
-    copies, _ = approval.scan(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
     bound = tree.lookup(approval.by_id(copies), here.name)
     if bound is None or not bound.in_progress or bound.blocked or not bound.base_sha:
         return None
-    if not bound.is_child and close_problems(root, conf, bound.ticket):
+    if not bound.is_child and close_problems(root, conf, bound.ticket, raw):
         return None
     rc, out = gitcmd.output(
         here.root, ["status", "--porcelain", "--untracked-files=all"], TIMEOUT_SECONDS

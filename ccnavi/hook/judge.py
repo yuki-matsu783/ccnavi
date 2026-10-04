@@ -327,12 +327,22 @@ def decide_before(
             conf=conf,
         )
 
+    # 承認済みチケットの置き場（`approval.read_raw`）。1 回の判定で読むのは 1 度だけにし、
+    # 下のレビュー待ちの止め・範囲の索引・承認の知らせ（`agree.news`）で持ち回る。
+    # 判定の途中で置き場のファイルを動かす処理は無いので、読み直さない。
+    raw: approval.Raw | None = None
+
     # HITL ポイント。人間レビュー要のフェーズが終わっていてマーカーが無い間、
     # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
-    # ルールより先に見る。
+    # ルールより先に見る。置き場を読むのは cwd がワークツリーかプロジェクトの中のときだけ
+    # （`phase.parent_for_cwd` と同じ条件）。
     if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
-        parent = phase.parent_for_cwd(root, conf, payload.cwd)
-        held = phase.held_phase(root, conf, parent.ticket) if parent is not None else None
+        here = phase.worktree_at(root, conf, payload.cwd)
+        parent = None
+        if here is not None:
+            raw = approval.read_raw(conf, root)
+            parent = phase.parent_in(root, conf, here, raw)
+        held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if held is not None and not exempt:
             record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
@@ -348,14 +358,14 @@ def decide_before(
     # 置き場を読むだけで、ファイルを動かさない。
     index = None
     scanned: list[ticket_mod.Ticket] | None = None
-    raw: approval.Raw | None = None
     if (
         conf.tickets_enabled
         and target is not None
         and not target.is_main
         and payload.tool_name in SCOPE_TOOLS
     ):
-        raw = approval.read_raw(conf, root)
+        if raw is None:
+            raw = approval.read_raw(conf, root)
         scanned, _ = approval.scan(conf, root, raw=raw)
         index = approval.by_id(scanned)
 
