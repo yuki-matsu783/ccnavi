@@ -1298,12 +1298,12 @@ frontmatter は rules.yml と同じタイプ（`deny` / `ask` / `allow`）。適
 ```yaml
 ---
 version: 1
-ticket: i0050-03
+ticket: i0050-02-01
 issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
 project: lib             # 置き場と同じ名前。省ける（提案を置いた場所が決める）
 parent: i0050            # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり
-predecessors: [i0050-01] # 子だけ。先に閉じているべき子。承認と着手（start）で求める。書き込みは止めない
+predecessors: [i0050-01-01] # 子だけ。先に閉じているべき子。承認と着手（start）で求める。書き込みは止めない
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
@@ -1322,8 +1322,9 @@ base_sha: ""
 ---
 ```
 
-- 識別子は子が `<親>-<2 桁連番>`。親の識別子はユーザが決める（issue 番号など）
-- ワークツリーの名前は識別子と同じ。`.claude/worktrees/i0050-03/`
+- 識別子は子が `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`（親 i0050 のフェーズ 2 の 1 枚目は `i0050-02-01`）。
+  フェーズ番号は `phase:` と同じ値で、食い違うと読めない（error）。親の識別子はユーザが決める（issue 番号など）
+- ワークツリーの名前は識別子と同じ。`.claude/worktrees/i0050-02-01/`
 - 子は親の部分集合として書く。親やフェーズの種類の `scope` を超える項は承認で warn に出るだけで、判定がその上限で切り詰める
 - 書いていない場所は範囲外。親子は厳しい側が採られる
 - 深さは 2 段。範囲は 20 件まで
@@ -1337,8 +1338,8 @@ base_sha: ""
 
 ```sh
 ccnavi --agree
-ccnavi --agree i0002 i0002-01   # 並べた識別子だけを承認の対象にする
-ccnavi --agree --preview --verify i0002 i0002-01   # 承認できる状態かを確かめるだけ（置かない）
+ccnavi --agree i0002 i0002-01-01   # 並べた識別子だけを承認の対象にする
+ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態かを確かめるだけ（置かない）
 ```
 
 全ツリー（ワークスペース、プロジェクト、ワークツリー）の `wip/proposals/` を走査し、未承認のものをまとめて見せる。
@@ -1610,7 +1611,7 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 残った指摘の対応方針はユーザが決める（`decide`）。ボードの「決める」か、端末で `ccnavi-review.sh decide <N>`。
 
 - **対応しない（受け入れて進む）。** `phases/<親>/accepted.json` に記録し、次の `confirm` から数えない
-- **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<次の連番>.md` に直に置く
+- **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<フェーズ番号>-<そのフェーズの次の連番>.md` に直に置く
   （範囲は見た子の範囲の和）。フェーズは開き直り、マーカーは消える
 - **issue に回す。** 受け入れたうえで、その指摘を載せた issue を作る。フィードバック計画が承認されたあとだけ選べる
 
@@ -1907,7 +1908,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 ccnavi --lint                                # 実運用と同じ設定を見る
 ccnavi --lint --rules .ccnavi/common/next.yml # 入れ替える前のファイルを見る
 ccnavi --lint --json                         # 同じ苦情を JSON で（「lint の JSON」）
-ccnavi --lint --flow .ccnavi/approved/flows/i0001-01.yml # 子のフロー 1 本も確かめる
+ccnavi --lint --flow .ccnavi/approved/flows/i0001-01-01.yml # 子のフロー 1 本も確かめる
 ```
 
 ```
@@ -1993,7 +1994,7 @@ error 2 件、warn 2 件、info 0 件
 | 深刻度 | 拾うもの |
 |---|---|
 | error | 承認済みチケットの置き場への `Write` / `Edit` をルールが止めていない（承認の意味が消える） |
-| error | 同じ識別子が複数の置き場にある、子の識別子が `<親>-<2 桁連番>` の形でない、連番が重なる |
+| error | 同じ識別子が複数の置き場にある、子の識別子が `<親>-<2 桁のフェーズ番号>-<2 桁の連番>` の形でないかフェーズ番号が `phase:` と食い違う、連番が重なる |
 | error | 孫を持つ子 |
 | warn | 範囲の超過がある子。超過は、親の範囲かフェーズの種類の `scope` を超える項と、regex の項。判定がその上限で切り詰めて止めるので、承認と同じく CI の終了コードを失敗にしない |
 | error | ワークツリーの元リポジトリと承認済みチケットの `project:` が違う |
@@ -2251,7 +2252,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 
 ```json
 {"version": 1, "ok": true, "parent": "i0050", "phase": 2,
- "reviewed": false, "followup": "i0050-03",
+ "reviewed": false, "followup": "i0050-02-02",
  "kept": ["…"], "fix": ["…"], "issue": [],
  "issue_draft": "", "prompt": "[ccnavi] ユーザが…",
  "issue_url": "", "warning": ""}

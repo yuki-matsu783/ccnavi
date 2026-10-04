@@ -156,7 +156,7 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
         { name: "i0002", root: "/ws/.claude/worktrees/i0002", project: "lib", kind: "worktree" },
       ],
       projects: ["app", "lib"],
-      tickets: fixture().tickets.map((t) => (t.ticket === "i0001-02" ? { ...t, project: "lib" } : t)),
+      tickets: fixture().tickets.map((t) => (t.ticket === "i0001-02-02" ? { ...t, project: "lib" } : t)),
     },
     lint: parsed.value,
     lintError: "",
