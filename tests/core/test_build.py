@@ -120,10 +120,6 @@ class InstallTest(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(self.bin)), ["darwin-arm64", self.TARGET])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class BuildSwapFailureTest(unittest.TestCase):
     """dist/ccnavi/ の置き換えが PermissionError で落ちたとき、build() は失敗として終わる。"""
 
@@ -164,3 +160,7 @@ class BuildSwapFailureTest(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(read(self.target), "linux-x86_64\n")
+
+
+if __name__ == "__main__":
+    unittest.main()
