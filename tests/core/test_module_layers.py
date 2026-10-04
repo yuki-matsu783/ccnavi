@@ -161,6 +161,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "hook.docsearch",
+                "hook.docsearch_index",
+                "hook.docsearch_query",
                 "hook.projskills",
                 "policy.ruleload",
                 "tickets.phasetypes",

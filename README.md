@@ -2674,6 +2674,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
 | `src/ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
 | `src/ccnavi/hook/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
+| `src/ccnavi/hook/docsearch_index.py` | md の frontmatter の索引（`index.jsonl`）を組む。変わった md だけを読み直す |
+| `src/ccnavi/hook/docsearch_query.py` | 索引の引き方。`--docs` の問いの検査、当たり、並べ方と表 |
 | `src/ccnavi/entry/` | 入口。CLI・診断・lint・提案・版。どのサブパッケージからも読まれない |
 | `src/ccnavi/entry/lint.py` | 設定とルールの検証。判定を行わない |
 | `src/ccnavi/entry/lint_rules.py` | lint のうち、ルールファイルの中身の検査。提案（`suggest.py`）も候補をここに通す |

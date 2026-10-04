@@ -10,7 +10,7 @@ import os
 import re
 from typing import TextIO
 
-from ..hook import docsearch
+from ..hook import docsearch, docsearch_query
 from ..infra import fsio, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
@@ -247,7 +247,7 @@ def _docs(
     if args.json and fmt != "json":
         stderr.write("ccnavi: --json と、json 以外の --format は同時に指定できない\n")
         return EXIT_ERROR
-    query = docsearch.Query(
+    query = docsearch_query.Query(
         types=args.type or [],
         tags=args.tag or [],
         keywords=args.keyword or [],
