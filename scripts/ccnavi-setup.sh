@@ -605,9 +605,9 @@ shape=$(printf '%s' "$current" | jq -r '
 #
 # 2 値の切り替えの環境変数（CCNAVI_GUARD_TICKET_APPROVAL と CCNAVI_GUARD_UNWATCHED）は、モードに合わせず
 # enable で書く。どちらも enable か disable しか取らず、dry-run と書くと ccnavi の --lint が
-# 指摘する。承認の経路の門（CCNAVI_GUARD_TICKET_APPROVAL）は、通ればそれで済んでしまい、
+# 指摘する。承認の経路の切り替えの環境変数（CCNAVI_GUARD_TICKET_APPROVAL）は、通ればそれで済んでしまい、
 # 済んだことは報告しても戻らない。そのため「止めずに報告する」段を持てない。確認できるユーザが
-# いないモードの門（CCNAVI_GUARD_UNWATCHED）は、切り替えの環境変数は、止めずに報告する段を CCNAVI_MODE=dry-run が
+# いないモードの切り替えの環境変数（CCNAVI_GUARD_UNWATCHED）は、止めずに報告する段を CCNAVI_MODE=dry-run が
 # 受け持つので、こちらには要らない。
 #
 # 値は --arg で 1 つずつ渡す。行にまとめてから分けると、値に混ざった改行がそのまま

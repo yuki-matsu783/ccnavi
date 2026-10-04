@@ -1068,7 +1068,7 @@ def _write_decide_comment(
     followup: str,
 ) -> None:
     """MR に写す、決めた内容のコメント。issue の表記は sh が作ったあとに書き足す。"""
-    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）の指摘の対応方針:"]
+    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）指摘の対応方針:"]
     if picked[CHOICE_KEEP]:
         lines += [
             "",

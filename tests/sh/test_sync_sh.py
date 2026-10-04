@@ -40,8 +40,8 @@ COPY = f".ccnavi/approved/doing/{PARENT}.md"
 APPROVED_AT = "2026-09-01T00:00:00+0900"
 
 
-# 読める承認済みチケットにするための範囲
-# 。取り込みの後の検査は、読めない承認済みチケットで
+# 読める承認済みチケットにするための範囲。
+# 取り込みの後の検査は、読めない承認済みチケットで
 # 親子チケットを止める。
 ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
@@ -429,8 +429,7 @@ class SyncTest(unittest.TestCase):
         self.assertNotIn("検査", done.stdout)
 
     def test_a_single_branch_clone_still_sees_the_parent_branch(self):
-        # origin の fetch の refspec が main だけでも、origin/P を進めて取り込む
-        # 。
+        # origin の fetch の refspec が main だけでも、origin/P を進めて取り込む。
         # sh の中の fetch は行き先を書く。
         git(self.ws, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
         head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
@@ -751,8 +750,7 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.record))
 
     def test_a_project_without_families_does_not_fail_the_run(self):
-        # 引数を省いた回で、親子チケットの無いプロジェクトの ls-remote が落ちても 1 にしない
-        # 。
+        # 引数を省いた回で、親子チケットの無いプロジェクトの ls-remote が落ちても 1 にしない。
         project = os.path.join(self.ws, "projects", "p")
         git(self._tmp.name, "init", "-q", "-b", "main", project)
         git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))

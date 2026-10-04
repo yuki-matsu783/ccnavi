@@ -911,7 +911,7 @@ checkout | switch)
 	opt_walk checkout_cb ${1+"$@"}
 	# 親のワークツリー（.claude/worktrees/<P> で、親の承認済みチケットか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
-	# 親の写しか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
+	# 親の承認済みチケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
 	# このツリーへ取り込まなくなる。親子チケットの同期状態がある親（親のブランチを一度でも origin へ push したか、
@@ -1113,8 +1113,8 @@ clone | submodule | lfs)
 	;;
 esac
 
-# push が通ったら、親のブランチなら親子チケットの同期状態を作る
-# 。最初の push からその親子チケットを C1 の
+# push が通ったら、親のブランチなら親子チケットの同期状態を作る。
+# 最初の push からその親子チケットを C1 の
 # 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
 #
 # 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親の承認済みチケットか

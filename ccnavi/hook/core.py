@@ -901,8 +901,8 @@ def _withdraw_problems(
     meta = meta if isinstance(meta, dict) else {}
     found: list[str] = []
     if copy.blocked:
-        # 親子チケットが決まらない・親のブランチの外にある承認済みチケットなど
-        # 。状態の操作と同じく止める
+        # 親子チケットが決まらない・親のブランチの外にある承認済みチケットなど。
+        # 状態の操作と同じく止める
         found.append(copy.blocked)
     if meta.get("revised_at") or meta.get("feedback_at"):
         found.append("改版した承認は取り下げられない（改版で動いたものを戻せない）")

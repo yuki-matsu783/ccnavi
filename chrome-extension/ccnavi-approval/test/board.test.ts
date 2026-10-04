@@ -149,7 +149,7 @@ test("CX-T049 先行の閉包が 16 親子チケットを超えたら決まら�
   const { board } = await run(b);
   const r = family(board, "i0001")?.result;
   assert.equal(r?.closure.over_limit, true);
-  assert.match(r?.undecided ?? "", /16 を超える親子チケット/);
+  assert.match(r?.undecided ?? "", /16 組を超える親子チケット/);
 });
 
 test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意のある本文は消毒して描く", async () => {

@@ -363,7 +363,7 @@ def _closure(snap: dict, place: dict, family: str) -> dict:
         "absent": sorted(absent & set(families)),
         "over_limit": over,
         "message": (
-            f"先行を辿ると {FAMILY_LIMIT} を超える親子チケットに広がった"
+            f"先行を辿ると {FAMILY_LIMIT} 組を超える親子チケットに広がった"
             f"（{', '.join(families)}）。"
             "Chrome では判定できない。計画を分けて先行を減らすか、手元で "
             "`--agree --preview --verify` を打って確かめる"
