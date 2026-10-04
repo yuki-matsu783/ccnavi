@@ -52,6 +52,7 @@ from ..policy import selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets import (
     approval,
+    approval_checks,
     flow,
     history,
     phasetypes,
@@ -517,7 +518,7 @@ def family_check(
         return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo
 
     mine = [t for t in copies if ours(t)]
-    index = approval.by_id(copies)
+    index = approval_checks.by_id(copies)
     problems: list[Problem] = []
     for t in mine:
         # チケットごとに判定し直し、error がどのチケットのものかを構造で持つ（文面の書式に頼らない）
