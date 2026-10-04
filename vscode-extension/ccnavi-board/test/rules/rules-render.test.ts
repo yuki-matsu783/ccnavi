@@ -1,5 +1,5 @@
 /**
- * ルール設定画面の入れ物（HTML）。中身は画面（React）が作るので、ここで見るのは
+ * ルール管理画面の入れ物（HTML）。中身は画面（React）が作るので、ここで見るのは
  * 守り（CSP）・埋め込む中身・束ねた画面の流し込みだけ。描くものは rules.dom.test.ts。
  */
 import { test } from "node:test";
@@ -26,7 +26,7 @@ function shell(rendered: string): string {
   return rendered.split(screenScript("rules")).join("（束ねた画面）");
 }
 
-test("CB-T48 ルール設定画面は外部資源を読まず、nonce で自分のスタイルとスクリプトだけを許す", () => {
+test("CB-T48 ルール管理画面は外部資源を読まず、nonce で自分のスタイルとスクリプトだけを許す", () => {
   const rendered = html();
   assert.match(rendered, /default-src 'none'/);
   assert.match(rendered, /style-src 'nonce-N0NCE'; script-src 'nonce-N0NCE'/);
@@ -34,7 +34,7 @@ test("CB-T48 ルール設定画面は外部資源を読まず、nonce で自分�
   assert.doesNotMatch(shell(rendered), /https?:\/\//);
   assert.doesNotMatch(shell(rendered), /<(?:script|img|iframe)[^>]*\ssrc=|<link\s/);
   assert.match(rendered, /<script type="application\/json" id="ccnavi-rules-data">/);
-  assert.match(rendered, /<title>ccnavi ルール設定<\/title>/);
+  assert.match(rendered, /<title>ccnavi ルール管理<\/title>/);
 });
 
 test("CB-T49 埋め込む中身は JSON で、文面の < は実体にして script を閉じさせない", () => {

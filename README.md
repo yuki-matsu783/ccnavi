@@ -771,7 +771,7 @@ VS Code を使わないときは `--no-vscode` を付ける。
 `close-early` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、
 出力の形は下の「ボードの JSON」。
 
-同じ拡張の「ルール設定画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
+同じ拡張の「ルール管理画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
 判定は `ccnavi --test --json` と `--test-samples --json` を通る（形は「試験の JSON」）。
 hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだけで書き換えない。作業中のチケット
 （承認済みチケットが `doing`）がある間は保存できない（セッションの途中で判定が変わるのを避けるため）。
@@ -1545,6 +1545,10 @@ feedback:                              # フィードバック計画。レビュ
   フェーズには必ず子が 1 本以上あり、親は計画・合流・依頼だけをする
 - **改版**で変えられるのは `plan`（子がまだ承認されていない番号の項）と `feedback` だけ。`feedback` の承認後は新しいフィードバック作業
   フェーズを足せないが、その中で子を足すのは何度でもできる。残る指摘はユーザが `decide` で issue に回す
+- **改版は権威のツリー（承認済みチケットが在るツリー。親のワークツリー `.claude/worktrees/<親>` に在ればそこ、無ければ元ツリー）の
+  `todo/` に書く。** 承認済みの識別子の提案は承認済みチケットの写りで決めた権威のツリーの側だけを読む。
+  ほかのツリー（子のワークツリー、ワークスペースルート）に書いた改版は承認待ちに入らず、`--agree` と `--lint` が
+  場所と書く置き場を名指しする
 
 **DAG で待たせる。** ファイルの頭に `order: dag` を書き、種類に `after:` を書くと、N 番目は種類の祖先に当たる番号だけを待ち、
 繋がっていない種類は並行して進む。
@@ -1847,7 +1851,7 @@ ccnavi --suggest [--json]
 
 ### 候補の JSON
 
-`--suggest --json` の最上位。読み手は VS Code 拡張のルール設定画面。終了コードは常に 0。
+`--suggest --json` の最上位。読み手は VS Code 拡張のルール管理画面。終了コードは常に 0。
 
 | 鍵 | 何 |
 |---|---|
@@ -1864,7 +1868,7 @@ ccnavi --test Bash "cd /repo && git push" --json
 ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 ```
 
-`--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code 拡張のルール設定画面。判定は文字で出すときと同じ関数を通る
+`--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code 拡張のルール管理画面。判定は文字で出すときと同じ関数を通る
 （REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む。
 実例は `vscode-extension/ccnavi-board/test/fixtures/test.json` と `samples.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
@@ -2127,7 +2131,7 @@ ccnavi --explain --json
 |---|---|
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から |
 | `predecessors_unmet[]` | 満たしていない先行。`{ticket, state, label}`。`state` は `todo` / `doing` / `review`（先行が閉じれば満たす）と `cancelled` / `missing` / `scattered` / `self` / `ancestor` / `cycle`（待っても満たさない）、`label` はユーザ向けの言葉（「作業中（doing/）」など）。空でなければ承認と着手（`start`）が止まる（書き込みと `finish` は止まらない）。先行が無い子・親・閉じたチケットは空。ボードはこれで「先行待ち」のバッジを出し、自分では数えない |
-| `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null` |
+| `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null`。承認済みの識別子では、権威のツリーを承認済みチケットの写りで決める。そのツリーの外に残った古い写し（承認の前に切ったワークツリーの `todo/` など）は出さない（`seen_in` には出る） |
 | `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`） |
 | `blocked` | 空でなければ「読めるが信じられない」理由。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物のワークツリーか（設計 9.5 の相互参照） |
@@ -2492,7 +2496,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/config/phases.yml` | このリポジトリ自身の層のフェーズの種類 |
 | `.ccnavi/common/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
 | `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
-| `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール設定・リスク管理・プロジェクト管理の画面 |
+| `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
 | `docs/adr/` | 設計判断の記録 |
 
 ## 配布物の条件
