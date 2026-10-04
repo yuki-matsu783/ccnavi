@@ -34,7 +34,7 @@ file=$(printf '%s' "$file" | tr '\\' '/' | tr -s '/')
 # 置き場の決まり（.claude/worktrees/）を焼き込まずに拾える。
 # 相対で来た形（先頭に `/` が無い）も受ける。
 case "$file" in
-*/vscode-extension/ccnavi-board/* | vscode-extension/ccnavi-board/*) ;;
+*/extensions/vscode/ccnavi-board/* | extensions/vscode/ccnavi-board/*) ;;
 *) exit 0 ;;
 esac
 

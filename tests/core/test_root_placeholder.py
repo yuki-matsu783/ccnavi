@@ -98,7 +98,7 @@ class RootPlaceholderTest(unittest.TestCase):
     def test_main_is_denied_and_worktrees_are_allowed(self):
         denied = [
             os.path.join(self.root, "README.md"),
-            os.path.join(self.root, "ccnavi", "entry", "cli.py"),
+            os.path.join(self.root, "src", "ccnavi", "entry", "cli.py"),
             os.path.join(self.root, ".gitignore"),
             os.path.join(self.root, ".ccnavi", "common", "rules.yml"),
             os.path.join(self.root, ".claude", "settings.json"),
@@ -111,7 +111,9 @@ class RootPlaceholderTest(unittest.TestCase):
                 self.assertIn("main-tree", out.get("permissionDecisionReason", ""))
         allowed = [
             os.path.join(self.root, ".claude", "worktrees", "x", "README.md"),
-            os.path.join(self.root, ".claude", "worktrees", "x", "ccnavi", "entry", "cli.py"),
+            os.path.join(
+                self.root, ".claude", "worktrees", "x", "src", "ccnavi", "entry", "cli.py"
+            ),
             os.path.join(self.root, ".claude", "worktrees", "x", ".ccnavi", "common", "rules.yml"),
         ]
         for path in allowed:

@@ -24,7 +24,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT
+from tests import ROOT, SRC
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
@@ -772,7 +772,7 @@ class SyncTest(unittest.TestCase):
     def launcher(self, body=None):
         path = write(
             os.path.join(self._tmp.name, "bin", "ccnavi"),
-            body or f'#!/bin/sh\nPYTHONPATH="{ROOT}" exec "{sys.executable}" -m ccnavi "$@"\n',
+            body or f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n',
         )
         os.chmod(path, 0o755)
         return path

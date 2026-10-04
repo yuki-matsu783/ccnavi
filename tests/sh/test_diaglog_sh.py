@@ -7,7 +7,7 @@
    標準出力にも標準エラーにも何も出さないこと。出さないレベルでは date を起動しないこと。
    リンク（logs・logs/diag・書き込み先）をたどらないこと、使えない字の出どころでは書かないこと、
    新しいファイルが 0600 になること
-2. 同じ入力から、sh・Python（ccnavi/records/diaglog.py）・拡張（src/log.ts を node が型を
+2. 同じ入力から、sh・Python（src/ccnavi/records/diaglog.py）・拡張（src/log.ts を node が型を
    取り除いて読む）が同じ行を出すこと。時刻と pid は除いて比べ、時刻は 3 つとも同じ形である
    ことだけを見る
 3. ccnavi-git.sh の reject と ccnavi-review.sh の fail が、拒否の文面ではなく識別子だけを
@@ -33,7 +33,7 @@ from tests import ROOT
 SHELL = shutil.which("sh") or shutil.which("bash")
 NODE = shutil.which("node")
 COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
-LOG_TS = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "src", "log.ts")
+LOG_TS = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "log.ts")
 
 HEAD = re.compile(
     r"^(?P<when>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}) "

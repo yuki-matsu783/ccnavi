@@ -27,7 +27,7 @@
 # 標準出力にも標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
 # 決まりは docs/claude/logging.md。
 
-# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの ccnavi/entry/version.py の COMPAT、
+# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの src/ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときだけ。`ccnavi --lint` もこの行を読んで比べる。
 CCNAVI_COMPAT=5
@@ -184,7 +184,7 @@ ccnavi_bin() {
 ccnavi_compat_skew() {
 	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
 	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
-	if [ -f "$1/build.py" ] && [ -f "$1/ccnavi/__main__.py" ]; then
+	if [ -f "$1/build.py" ] && [ -f "$1/src/ccnavi/__main__.py" ]; then
 		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
 		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
@@ -437,7 +437,7 @@ ccnavi_branch_ok() {
 ccnavi_family_branch() {
 	if ccnavi_fbr_bin=$(ccnavi_bin "$1"); then
 		ccnavi_fbr_out=$("$ccnavi_fbr_bin" --root "$1" c1 family "$2" 2>/dev/null </dev/null) || ccnavi_fbr_out=""
-	elif [ -f "$1/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+	elif [ -f "$1/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
 		ccnavi_fbr_out=$(cd "$1" && uv run --quiet python -m ccnavi --root "$1" c1 family "$2" 2>/dev/null </dev/null) ||
 			ccnavi_fbr_out=""
 	else
@@ -1595,7 +1595,7 @@ ccnavi_host_project_id() {
 #   log_info <本文の語>... [-- <キー>=<値>...]
 #
 # 本文の語はスペースでつなぐ。`--` の後ろは 1 つずつ `キー=値` として logfmt で並べる。
-# 出る行の形は次のとおり（Python の ccnavi/records/diaglog.py、拡張の src/log.ts と同じ）。
+# 出る行の形は次のとおり（Python の src/ccnavi/records/diaglog.py、拡張の src/log.ts と同じ）。
 #
 #   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] 拒否した sub=push reason=unapproved
 #

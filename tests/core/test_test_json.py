@@ -7,7 +7,7 @@ VS Code 拡張のルール管理画面が読む形を、`--test` と同じ判定
 2. 判定が対象を取り出せないツールは `known` が偽で出る
 3. `--test-samples` が見本をタイプの期待と突き合わせ、食い違いを数える。
    文字で出すときは食い違いがあれば終了コード 1、JSON では常に 0
-4. 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/test.json と
+4. 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/test.json と
    samples.json）と同じ形である
 
 形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。
@@ -24,7 +24,7 @@ import unittest
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-FIXTURES = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures")
+FIXTURES = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures")
 
 RULES = {
     "version": 1,

@@ -2,7 +2,7 @@
 
 Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。
 
-見本は `chrome-extension/ccnavi-approval/test/fixtures/host/gitlab/<場面>/` にある。拡張の試験
+見本は `extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/<場面>/` にある。拡張の試験
 （`test/helpers/gitlab-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
 
 - `GET /api/v4/user` → `user.json`（無ければ 403）
@@ -36,7 +36,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 SCENES = os.path.join(
-    ROOT, "chrome-extension", "ccnavi-approval", "test", "fixtures", "host", "gitlab"
+    ROOT, "extensions", "chrome", "ccnavi-approval", "test", "fixtures", "host", "gitlab"
 )
 API = "https://gitlab.com/api/v4"
 

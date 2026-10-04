@@ -12,7 +12,7 @@ Windows のパスの表記が実物でしか出ない。
 
 git init と worktree add を何度も行い、実行ファイルをコピーするが、実際に測ると 20 件が 8 秒ほどで
 終わるので、他のテストと同じく既定で走る。組み立て済みの実行ファイル（`dist/ccnavi`）が
-無ければ skip する。試すのはソースではなくその実行ファイルなので、`ccnavi/` を直したら
+無ければ skip する。試すのはソースではなくその実行ファイルなので、`src/ccnavi/` を直したら
 `build.py` で組み立て直してから回す。
 
     uv run python -m unittest tests.e2e.test_e2e_sh -v

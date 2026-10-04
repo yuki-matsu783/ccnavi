@@ -136,10 +136,10 @@ Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`Pos
 `lint-py.sh` は、編集したファイルからいちばん近い `pyproject.toml` を上に辿ってツリーを決め、
 触ったツリーを `logs/session/<セッション>.trees` に書き残す。`test-py.sh` は触ったツリーだけをテストする。
 
-拡張（`vscode-extension/ccnavi-board`）のテストも同じ形で回す。`PostToolUse` の
+拡張（`extensions/vscode/ccnavi-board`）のテストも同じ形で回す。`PostToolUse` の
 `.claude/hooks/mark-ext.sh` が、拡張のファイルを触ったら `logs/session/<セッション>.ext-files` に
 書き残し、`Stop` の `.claude/hooks/test-ext.sh` がターンの終わりに 1 回回す。回すのは触ったファイルが
-関わるグループだけで、決めるのは `vscode-extension/ccnavi-board/scripts/test-groups.js`
+関わるグループだけで、決めるのは `extensions/vscode/ccnavi-board/scripts/test-groups.js`
 （テストの `import` を辿る。辿れない 6 つだけは表に名前を書いてある）。拡張を触っていないターンは何もしない。
 差し戻しは 3 回までで、回数は `test-py.sh` と別に数える。
 
@@ -764,7 +764,7 @@ VS Code の他の設定は残し、`false` と書いてあれば変えずに並�
 VS Code を使わないときは `--no-vscode` を付ける。
 
 チケットがどのワークツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
-（`vscode-extension/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
+（`extensions/vscode/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
 並べるだけ。承認はボードのオーバーレイで一覧を見せ、ユーザが押したら `--agree --yes` を子プロセスで
 打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の「決める」で指摘ごとに対応方針を
 選び、拡張が `ccnavi-review.sh decide` を子プロセスで打つ（形は下の「残った指摘の JSON」）。
@@ -1956,7 +1956,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 
 `--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code 拡張のルール管理画面。判定は文字で出すときと同じ関数を通る
 （REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む。
-実例は `vscode-extension/ccnavi-board/test/fixtures/test.json` と `samples.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
+実例は `extensions/vscode/ccnavi-board/test/fixtures/test.json` と `samples.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 
 `--test --json` の最上位。
@@ -2211,7 +2211,7 @@ ccnavi --explain --json
 
 `--explain` のうちチケットに関わる部分を JSON で出す。読み手は VS Code の拡張「ccnavi ボード」。拡張はこれを並べるだけで、提案やマーカーを
 自分では読まない。ネットワークには出ない。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
-実例は `vscode-extension/ccnavi-board/test/fixtures/board.json`。`tests/ticket/test_board.py` が同じ例で形を確かめる
+実例は `extensions/vscode/ccnavi-board/test/fixtures/board.json`。`tests/ticket/test_board.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 
 | 鍵 | 何 |
@@ -2264,7 +2264,7 @@ ccnavi --agree --yes <識別子,…> --digest <値> --json [<絞り>...]    # �
 ```
 
 VS Code の拡張が、承認をボードのオーバーレイで行うための形。承認の対象を組むのは `--agree` と同じ関数で、`--explain --json` の
-`pending_approval` と答えが食い違わない。実例は `vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` ほか。
+`pending_approval` と答えが食い違わない。実例は `extensions/vscode/ccnavi-board/test/fixtures/approve-preview.json` ほか。
 `tests/ticket/test_approve_json.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 `version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
 
@@ -2374,7 +2374,7 @@ ccnavi --version --json
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。層のファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
 
-**互換の版**は 3 か所に同じ値で書く。実行ファイル（`ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
+**互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`src/core/version.ts` の `EXTENSION_COMPAT`）。sh や拡張が頼るフラグや出力の形を、
 呼ぶ側を直さないと動かない形に変えたときだけ上げる。フラグや欄を足すだけなら上げない（拡張は使う前に `flags` を見る）。
 層のファイルは頭の `version:` が書式の版を示し、読めない版は `--lint` が既に error を出すので、層に別の版は足さない。
@@ -2544,51 +2544,51 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | 場所 | 中身 |
 |---|---|
 | `main.py` | 配布物の入口。PyInstaller が渡すスクリプト |
-| `ccnavi/__main__.py` | `python -m ccnavi` の入口。サブパッケージは役割ごとに 6 つで、読む向きは infra < records < policy < tickets < hook < entry（`tests/core/test_module_layers.py` が見る） |
-| `ccnavi/infra/` | 土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー。どのサブパッケージも読まない |
-| `ccnavi/infra/hookio.py` | stdin の payload の解釈と、stdout に返す応答の組み立て |
-| `ccnavi/infra/globmatch.py` | glob から正規表現への翻訳 |
-| `ccnavi/infra/shellread.py` | コマンド文字列のうち実際に実行される部分の切り出し |
-| `ccnavi/infra/settings.py` | 環境と設定ファイルからの設定解決 |
-| `ccnavi/infra/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
-| `ccnavi/infra/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
-| `ccnavi/infra/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
-| `ccnavi/infra/gitcmd.py` | git を 1 回起動する |
-| `ccnavi/infra/fsio.py` | ファイルの読み書きの型。state の記録・マーカー・承認済みチケット・下書きが全部これを通る |
-| `ccnavi/infra/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての目印と、振り分けの sh が起動する実体の探し方 |
-| `ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否の数え |
-| `ccnavi/records/audit.py` | 1 行 1 件の追記記録 |
-| `ccnavi/policy/` | ルール。読み込み・照合・組み込み・層の合成・自己防衛・文脈ファイル |
-| `ccnavi/policy/rules.py` | ルールファイルの読み込みと検証 |
-| `ccnavi/policy/builtin.py` | ルールファイルを読めないときの組み込み既定 |
-| `ccnavi/policy/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
-| `ccnavi/policy/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の記録 |
-| `ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルのバックアップと復元 |
-| `ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、リスク、操作 |
-| `ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
-| `ccnavi/tickets/approval.py` | 承認済みチケット、フェーズのマーカー、子ごとの記録の置き場 |
-| `ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を組む、承認の画面、置き場へ動かす |
-| `ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
-| `ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
-| `ccnavi/tickets/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
-| `ccnavi/tickets/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す JSON の判定。ネットワークには出ない |
-| `ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
-| `ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント |
-| `ccnavi/hook/post.py` | 実行後チェック。保護領域の変更の検知、差し戻しの文、復元 |
-| `ccnavi/hook/events.py` | hook のイベントごとの手順。1 回の起動で何が起きるかはここを上から読む |
-| `ccnavi/hook/judge.py` | 実行前チェック。通す・聞く・止めるを決める |
-| `ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
-| `ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
-| `ccnavi/hook/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
-| `ccnavi/entry/` | 入口。CLI・診断・lint・提案・版。どのサブパッケージからも読まれない |
-| `ccnavi/entry/lint.py` | 設定とルールの検証。判定を行わない |
-| `ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
-| `ccnavi/entry/cli.py` | 引数の解釈と振り分け。`ticket` / `review` の副命令を ops / review へ渡す |
+| `src/ccnavi/__main__.py` | `python -m ccnavi` の入口。サブパッケージは役割ごとに 6 つで、読む向きは infra < records < policy < tickets < hook < entry（`tests/core/test_module_layers.py` が見る） |
+| `src/ccnavi/infra/` | 土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー。どのサブパッケージも読まない |
+| `src/ccnavi/infra/hookio.py` | stdin の payload の解釈と、stdout に返す応答の組み立て |
+| `src/ccnavi/infra/globmatch.py` | glob から正規表現への翻訳 |
+| `src/ccnavi/infra/shellread.py` | コマンド文字列のうち実際に実行される部分の切り出し |
+| `src/ccnavi/infra/settings.py` | 環境と設定ファイルからの設定解決 |
+| `src/ccnavi/infra/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
+| `src/ccnavi/infra/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
+| `src/ccnavi/infra/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
+| `src/ccnavi/infra/gitcmd.py` | git を 1 回起動する |
+| `src/ccnavi/infra/fsio.py` | ファイルの読み書きの型。state の記録・マーカー・承認済みチケット・下書きが全部これを通る |
+| `src/ccnavi/infra/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての目印と、振り分けの sh が起動する実体の探し方 |
+| `src/ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否の数え |
+| `src/ccnavi/records/audit.py` | 1 行 1 件の追記記録 |
+| `src/ccnavi/policy/` | ルール。読み込み・照合・組み込み・層の合成・自己防衛・文脈ファイル |
+| `src/ccnavi/policy/rules.py` | ルールファイルの読み込みと検証 |
+| `src/ccnavi/policy/builtin.py` | ルールファイルを読めないときの組み込み既定 |
+| `src/ccnavi/policy/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
+| `src/ccnavi/policy/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の記録 |
+| `src/ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルのバックアップと復元 |
+| `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、リスク、操作 |
+| `src/ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
+| `src/ccnavi/tickets/approval.py` | 承認済みチケット、フェーズのマーカー、子ごとの記録の置き場 |
+| `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を組む、承認の画面、置き場へ動かす |
+| `src/ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
+| `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
+| `src/ccnavi/tickets/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
+| `src/ccnavi/tickets/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す JSON の判定。ネットワークには出ない |
+| `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
+| `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント |
+| `src/ccnavi/hook/post.py` | 実行後チェック。保護領域の変更の検知、差し戻しの文、復元 |
+| `src/ccnavi/hook/events.py` | hook のイベントごとの手順。1 回の起動で何が起きるかはここを上から読む |
+| `src/ccnavi/hook/judge.py` | 実行前チェック。通す・聞く・止めるを決める |
+| `src/ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
+| `src/ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
+| `src/ccnavi/hook/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
+| `src/ccnavi/entry/` | 入口。CLI・診断・lint・提案・版。どのサブパッケージからも読まれない |
+| `src/ccnavi/entry/lint.py` | 設定とルールの検証。判定を行わない |
+| `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
+| `src/ccnavi/entry/cli.py` | 引数の解釈と振り分け。`ticket` / `review` の副命令を ops / review へ渡す |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
-| `vscode-extension/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
+| `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
 | `.claude/skills/ccnavi-config/` / `commit/` | 設定 3 本を足す・確かめるスキルと、コミットの手順 |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
@@ -2607,7 +2607,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/config/phases.yml` | このリポジトリ自身の層のフェーズの種類 |
 | `.ccnavi/common/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
 | `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
-| `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
+| `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
 | `docs/adr/` | 設計判断の記録 |
 
 ## 配布物の条件

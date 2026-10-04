@@ -100,7 +100,7 @@ trap 'rm -f "$result" "$host_err"' EXIT
 if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-branches: %s\n' "$skew" >&2
 	ccnavi() { "$bin" --root "$root" --cwd "$here" "$@"; }
-elif [ -f "$root/ccnavi/__main__.py" ]; then
+elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
 	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
