@@ -66,7 +66,7 @@ hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査�
 | `fix` | `main.py` / `src/ccnavi/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
 | `test` | `tests/*.py` / `tests/fixtures/` |
-| `docs` | `README.md` / `requirements.md` / `ccnavi.md` / `HANDOVER.md` |
+| `docs` | `README.md` / `docs/requirements.md`・`docs/requirements/` / `docs/design.md`・`docs/design/` / `docs/CONTEXT.md` |
 | `ai-asset` | `.claude/` 配下（settings.json / hooks / skills / ccnavi のルール）と `CLAUDE.md`・`docs/claude/`。エージェント向けの指示は docs ではなくこちら |
 | `chore` | `.gitignore` / 雑務 |
 | `build` | `pyproject.toml` / `uv.lock` |
@@ -75,7 +75,7 @@ hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査�
 | `style` | 意味に影響しない整形 |
 | `revert` | 取り消し |
 
-prefix か主題が別なら別コミットに分ける。`requirements.md`（外から観測できる約束）と `ccnavi.md`（実装の理屈）は
+prefix か主題が別なら別コミットに分ける。要件（`docs/requirements/`、外から観測できる約束）と設計（`docs/design/`、実装の理屈）は
 別の主題として扱う。説明が 1 行に収まらないなら分ける。
 
 ### 4. ファイルをフィルタする
@@ -106,7 +106,7 @@ git commit -m "<prefix>: <日本語の説明>"
   - main.py
   - src/ccnavi/policy/rules.py
 コミット2: docs: モードの呼び名を判定しない・警告・ブロックに統一
-  - requirements.md
+  - docs/requirements.md
 ```
 
 ## このリポジトリでの注意
