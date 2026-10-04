@@ -138,6 +138,12 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.risk",
                 "tickets.syncstate",
                 "tickets.ticket",
+                "tickets.ticket_fields",
+                "tickets.ticket_fold",
+                "tickets.ticket_guard",
+                "tickets.ticket_ids",
+                "tickets.ticket_model",
+                "tickets.ticket_places",
             }
         ),
     ),

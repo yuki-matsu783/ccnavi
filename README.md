@@ -2634,6 +2634,12 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルのバックアップと復元 |
 | `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、リスク、操作 |
 | `src/ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
+| `src/ccnavi/tickets/ticket_model.py` | チケットの形。書式の定数・状態の名前・範囲の項・計画の項・待ち方と `Ticket` |
+| `src/ccnavi/tickets/ticket_ids.py` | 識別子とブランチ名の規則。issue から識別子を作る手順 |
+| `src/ccnavi/tickets/ticket_places.py` | 範囲を当てない置き場（チケット・下書き・ELI5）と、状態の置き場の出入りの見分け |
+| `src/ccnavi/tickets/ticket_fold.py` | 同じ識別子のチケットのまとめ方。本物とするツリーと、決まらない形の数え方 |
+| `src/ccnavi/tickets/ticket_guard.py` | 状態の置き場を守る組み込みのルールと、提案を書いた回に渡す確認の文 |
+| `src/ccnavi/tickets/ticket_fields.py` | スクリプトが書く欄の、行単位の書き換えと読み取り |
 | `src/ccnavi/tickets/approval.py` | 承認済みチケットの置き場。読み込み・置き場の間の移動・提案の集め方・続きの子 |
 | `src/ccnavi/tickets/approval_marks.py` | フェーズのマーカー、親ごとのマーカー、子ごとの記録、受け入れたスレッドの記録（`phases/<親>/`） |
 | `src/ccnavi/tickets/approval_checks.py` | 承認済みチケットの構造の検査。親子と統合先、先行、プロジェクトの欄 |
