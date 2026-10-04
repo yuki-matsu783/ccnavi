@@ -60,10 +60,17 @@ git rev-parse --abbrev-ref HEAD
 
 ```sh
 git status --short -- .ccnavi/scripts/ wip/design/scripts/
+git diff --cached --name-only
 ```
 
-何も出ないこと。何か出れば、下の `ls-tree`（コミットした中身を見る）と作業ツリーの中身が
-食い違うので、照らしても意味が無い。**出れば先へ進まない。**
+どちらも何も出ないこと。
+
+- 1 つ目が何か出せば、下の `ls-tree`（コミットした中身を見る）と作業ツリーの中身が
+  食い違うので、照らしても意味が無い
+- 2 つ目が何か出せば、ほかにステージ済みのものがある。写す手順はパスを限ってコミットするが、
+  混ざっていないことを先に確かめておく
+
+**どちらかが出れば先へ進まない。**
 
 ### 3. blob を表と照らす
 
@@ -93,8 +100,8 @@ sh の中身を消す。
 | `ccnavi-agree.sh` | `57171ce432aae00b33dad35b4ecb10986308ea55` | `afd2eea9b40fc0057e894d7a989c8ca47be95a08` |
 | `ccnavi-common.sh` | `ae90782b63c2bd142644449561501fff87b52989` | `f7718b8f539764e4dfef6ff50fe970fa5148976d` |
 | `ccnavi-fetch.sh` | `8f25961b96a45476109d6135b8c60be5abb4112e` | `6eb146faff82beaf5921bfa24b56b5cf7360fb42` |
-| `ccnavi-git.sh` | `c04e8ed4d34f02a37f20849ef29e9086b4e25d87` | `96d88366b93262fa848fd132f7dbc054173015c9` |
-| `ccnavi-push-approved.sh` | `e1a9fa226f2b838c343bab8abe1eb3b0f8387036` | `317c01baef4ac23e3605d1a23132fd34fc4b8e38` |
+| `ccnavi-git.sh` | `c04e8ed4d34f02a37f20849ef29e9086b4e25d87` | `93cae07084b0cec44c4818ba739c67777a4f4178` |
+| `ccnavi-push-approved.sh` | `e1a9fa226f2b838c343bab8abe1eb3b0f8387036` | `69aae07177bfd5682e28021c3dc91ce8e4900753` |
 | `ccnavi-review.sh` | `9982ac592ed9ebda43d4db48e4480a1076260c9d` | `0dfabbe6ba7149f789bb5a8f2866d979dff2ae31` |
 | `ccnavi-sync.sh` | `c059b4bf0f75b9edd6ba0578d302fa79450d3ec2` | `30d7c9227a2e575836d323aa17188ca6812e24d2` |
 
@@ -122,19 +129,25 @@ cp wip/design/scripts/ccnavi-agree.sh wip/design/scripts/ccnavi-common.sh \
     .ccnavi/scripts/ccnavi-fetch.sh .ccnavi/scripts/ccnavi-git.sh \
     .ccnavi/scripts/ccnavi-push-approved.sh .ccnavi/scripts/ccnavi-review.sh \
     .ccnavi/scripts/ccnavi-sync.sh &&
-  git diff --cached --summary
+  git diff --cached --name-status
 ```
 
 コミットする前に出力を見る。
 
 - `ls-files -s` の 2 列目（blob）が、上の表の「写す版」と同じ
 - `ls-files -s` の 1 列目（モード）が、下の「実行ビット」のとおり
-- `diff --cached --summary` に `mode change` が出ない（`cp` は写す先のモードを残す）
+- `diff --cached --name-status` に、写す 7 本の `M` の 7 行だけが出る。ほかのパスが出れば、
+  別のステージ済みの変更が混ざっている
 
-どれか違えば、下の「元に戻す」で戻す。合っていればコミットする。
+どれか違えば、下の「元に戻す」で戻す。合っていればコミットする。コミットはパスを 7 本に限る
+（ほかにステージ済みのものがあっても、それはコミットに入らない）。
 
 ```sh
-git commit -m "fix: sh から置き場の env の読み取りと ADR の番号を外す（i0064-10）"
+git commit -m "fix: sh から置き場の env の読み取りと ADR の番号を外す（i0064-10）" -- \
+  .ccnavi/scripts/ccnavi-agree.sh .ccnavi/scripts/ccnavi-common.sh \
+  .ccnavi/scripts/ccnavi-fetch.sh .ccnavi/scripts/ccnavi-git.sh \
+  .ccnavi/scripts/ccnavi-push-approved.sh .ccnavi/scripts/ccnavi-review.sh \
+  .ccnavi/scripts/ccnavi-sync.sh
 ```
 
 ### 実行ビット

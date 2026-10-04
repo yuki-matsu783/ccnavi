@@ -347,7 +347,7 @@ store_hit() {
 		return 0
 		;;
 	esac
-	sh_approved=.ccnavi/approved     # 固定
+	sh_approved=.ccnavi/approved   # 固定
 	sh_review=wip/proposals/review # 固定
 	case "$sh_arg" in
 	/* | [A-Za-z]:/*)
@@ -1024,9 +1024,9 @@ push)
 			esac
 			for push_tree in "$push_root" "$push_projects"/* "$push_root"/.claude/worktrees/*; do
 				[ -d "$push_tree" ] || continue
-				# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。食い違うと、
-				# env を書いていないワークスペースで、この検査が気づかないうちに行われなくなる。
-				push_copies="$push_tree/.ccnavi/approved"  # 固定
+				# hook 側の既定（settings.py の DEFAULT_APPROVED・DEFAULT_TICKETS）と同じ場所を見る。
+				# 食い違うと、この検査が別の場所を見て、気づかないうちに行われなくなる。
+				push_copies="$push_tree/.ccnavi/approved" # 固定
 				push_proposals="$push_tree/wip/proposals" # 固定
 				# レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る。子を閉じたあと、親が
 				# 取り込んで片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
