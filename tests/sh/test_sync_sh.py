@@ -146,6 +146,51 @@ class FrontFieldTest(unittest.TestCase):
                 self.assertEqual(self.sh_value(f"base_sha: {value}"), expected)
 
 
+@unittest.skipIf(SHELL is None, "sh が無い")
+class ApprovedAtOfTest(unittest.TestCase):
+    """sh の `approved_at_of` が、Python の `syncstate._copy_fields` と同じ範囲
+    （frontmatter の `ccnavi_approved` の中）だけから承認の時刻を拾う。
+
+    本文や block scalar（`rationale: |` の下の行）に同じ語を書いた行を拾うと、古い形どうしの
+    照合で別の値を比べる。
+    """
+
+    FRONTS = (
+        "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', source_tree: main}",
+        "ccnavi_approved:\n  approved_at: 'X1'\n  source_tree: m",
+        'ccnavi_approved:\n\n  source_tree: m\n  approved_at: "X2"',
+        "rationale: |\n  approved_at: BAD\nccnavi_approved: {source_tree: m}",
+        "rationale: |\n  approved_at: BAD\nccnavi_approved:\n  approved_at: 'X3'",
+        "ccnavi_approved: |\n  approved_at: BAD",
+        "ccnavi_approved:\n  nested:\n    approved_at: BAD\n  approved_at: 'X4'\ntitle: t",
+        "ccnavi_approved: {source_tree: m,\n  approved_at: 'X5'}",
+        "title: 'approved_at: BAD'",
+        "note:\n  approved_at: BAD",
+    )
+
+    def sh_value(self, front):
+        with open(os.path.join(SH_DIR, "ccnavi-sync.sh"), encoding="utf-8") as f:
+            text = f.read()
+        script = ""
+        for name in ("frontmatter_of", "approved_at_of"):
+            start = text.index(f"{name}() {{")
+            script += text[start : text.index("\n}\n", start) + 3]
+        script += 'printf "%s\\n" "$1" | frontmatter_of | approved_at_of\n'
+        document = f"---\nticket: x\n{front}\n---\napproved_at: BODY\n"
+        done = subprocess.run(
+            [SHELL, "-c", script, "sh", document], capture_output=True, text=True, encoding="utf-8"
+        )
+        return done.stdout.rstrip("\n")
+
+    def test_the_same_range_as_python(self):
+        from ccnavi.tickets import syncstate
+
+        for front in self.FRONTS:
+            with self.subTest(front=front):
+                expected = syncstate._copy_fields(f"---\nticket: x\n{front}\n---\n").approved_at
+                self.assertEqual(self.sh_value(front), expected)
+
+
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
 class SyncHarness(unittest.TestCase):
     """ワークスペース 1 つ（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。"""
@@ -588,6 +633,23 @@ class SyncTest(SyncHarness):
         self.close_on_main(copy_text(base_sha="", body="base_sha: bbbb\n"))
         self.assertEqual("closed", self.closed_after_delete()[0])
 
+    def test_an_approval_time_in_the_body_is_not_read(self):
+        # 承認の時刻は frontmatter の ccnavi_approved の中だけから拾う。本文の同じ語の行で
+        # 閉じたと読まない（Python と同じく、照合できる欄が無いので閉じていない）。
+        bare = copy_text(base_sha="", started_at="", body=f"approved_at: {APPROVED_AT}\n")
+        self.mine(bare)
+        self.close_on_main(bare)
+        self.assertEqual("gone", self.closed_after_delete()[0])
+
+    def test_an_approval_time_in_a_block_scalar_is_not_read(self):
+        # `rationale: |` の下の行は欄ではない。古い形どうしは ccnavi_approved の中の値で比べる。
+        noisy = old_copy_text().replace(
+            "ccnavi_approved:", "rationale: |\n  approved_at: 1999-01-01\nccnavi_approved:"
+        )
+        self.mine(noisy)
+        self.close_on_main(old_copy_text())
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
     def test_a_crlf_done_copy_is_read(self):
         self.close_on_main(copy_text().replace("\n", "\r\n"))
         self.assertEqual("closed", self.closed_after_delete()[0])
@@ -761,6 +823,20 @@ class SyncTest(SyncHarness):
         self.delete_remote_branch(PARENT)
         self.sync(PARENT)
         self.assertEqual("present", fields(self.record)["state"])
+
+    def test_fields_in_the_body_of_the_archive_are_not_read(self):
+        # 退避の親チケットの ticket: と parent: も frontmatter の行頭から拾う。本文に parent: の行が
+        # あっても子とは読まず、ticket: の注記は値に含めない。
+        self.review_says("unknown", 3)
+        self.keep_record()
+        archived = copy_text(body="parent: x\n").replace(
+            f"ticket: {PARENT}\n", f"ticket: {PARENT} # 親\n"
+        )
+        self.archive_locally(archived)
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("closed", fields(self.record)["state"])
 
     def test_branch_names_are_matched_exactly(self):
         # i0001-x があっても i0001 があることにはならない（前方一致で取り違えない）。

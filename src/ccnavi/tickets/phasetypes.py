@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, globmatch, yamlread
+from ..infra import fsio, globmatch, settings, tree, yamlread
 from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from . import ticket as ticket_mod
@@ -570,3 +570,66 @@ def scope_problems(child: ticket_mod.Ticket, pt: PhaseType) -> list[Problem]:
                 )
             )
     return problems
+
+
+# ---- 層ごとの種類の読み込み（設計 11.4）
+
+
+def types_path(conf: settings.Settings, root: str, project: str) -> str:
+    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
+
+    予約名（`common` / `self`）のプロジェクトは層として数えないので、パスを持たない
+    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    名前と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
+    """
+    if settings.is_reserved_layer_name(project):
+        return ""
+    home = tree.project_root(conf.projects, project) if project else root
+    if not home:
+        return ""
+    return settings.layer_path(conf, home, settings.KIND_PHASES, project or settings.LAYER_SELF)
+
+
+def common_types(
+    conf: settings.Settings,
+) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
+    """共通層の種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
+    if not conf.phases:
+        return None, []
+    types, notes = load(conf.phases)
+    mark_source(types, settings.LAYER_COMMON)
+    return types, list(notes)
+
+
+def layer_types(
+    conf: settings.Settings, root: str, project: str = ""
+) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
+    """共通層 + その層の種類と、**その層の**苦情（設計 11.4.1）。
+
+    どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
+    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
+    言うと、層の話を読みに来たユーザが同じ文を 2 度読むことになる。
+
+    無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
+    組み込みには戻さない。共通層が在るのに戻すと、共通層の種類が消える。
+    """
+    common, notes = common_types(conf)
+    if common is None and notes:
+        # 共通層が壊れている。層は足さない（設計 11.2）。
+        return None, []
+    path = types_path(conf, root, project)
+    if not path or not os.path.exists(path):
+        return common, []
+    extra, layer_notes = load(path, refs=False)
+    if extra is None:
+        return common, list(layer_notes)
+    merged, problems = merge(common, extra, project or settings.LAYER_SELF)
+    return merged, list(layer_notes) + problems
+
+
+def load_types(
+    conf: settings.Settings, root: str = "", project: str = ""
+) -> dict[str, PhaseType] | None:
+    """判定が使うフェーズの種類。どの層にも無ければ None（番号だけの挙動）。"""
+    types, _ = layer_types(conf, root, project)
+    return types

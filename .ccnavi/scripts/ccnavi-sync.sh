@@ -717,10 +717,53 @@ front_field() {
 	'
 }
 
-# 承認の時刻（`approved_at`）。承認で欄を書いていた頃の古い形だけが持つ。ブロックの形（`  approved_at: X`）と
-# 流れの形（`{approved_at: "X", ...}`）。標準入力は frontmatter_of の出力。
+# 承認の時刻（`approved_at`）。承認で欄を書いていた頃の古い形だけが持つ。拾うのは frontmatter の行頭の
+# `ccnavi_approved:` の中だけで、Python（syncstate._copy_fields）と同じ範囲にする。本文や block scalar
+# （`rationale: |` の下の行など）に同じ語を書いた行は拾わない。中の形はブロックの形（次の行から字下げした
+# `  approved_at: X`。字下げがいちばん浅い行だけを見る）と流れの形（`{approved_at: "X", ...}`）。
+# `ccnavi_approved: |` のように対応表でない値なら何も出さない。標準入力は frontmatter_of の出力。
 approved_at_of() {
-	sed -n "s/.*approved_at:[[:space:]]*[\"']\\{0,1\\}\\([^\"',}[:space:]]*\\).*/\\1/p" | head -n 1
+	awk -v q="'" '
+		function value(v) {
+			sub(/^[ \t]+/, "", v)
+			c = substr(v, 1, 1)
+			if (c == "\"" || c == q) v = substr(v, 2)
+			n = match(v, "[\"" q ",} \t]")
+			if (n > 0) v = substr(v, 1, n - 1)
+			print v
+			exit
+		}
+		state == "" {
+			if (index($0, "ccnavi_approved:") != 1) next
+			rest = substr($0, length("ccnavi_approved:") + 1)
+			sub(/^[ \t]+/, "", rest)
+			if (substr(rest, 1, 1) == "#") rest = ""
+			if (rest == "") { state = "block"; next }
+			if (substr(rest, 1, 1) != "{") exit
+			state = "flow"
+			if (match(rest, /[{,][ \t]*approved_at:/)) {
+				rest = substr(rest, RSTART + RLENGTH)
+				value(rest)
+			}
+			if (index(rest, "}") > 0) exit
+			next
+		}
+		/^[ \t]*(#.*)?$/ { next }
+		$0 !~ /^[ \t]/ { exit }
+		state == "flow" {
+			line = $0
+			if (match(line, /(^|[{,])[ \t]*approved_at:/)) value(substr(line, RSTART + RLENGTH))
+			if (index(line, "}") > 0) exit
+			next
+		}
+		{
+			match($0, /^[ \t]*/)
+			if (depth == "") depth = RLENGTH
+			if (RLENGTH != depth) next
+			line = substr($0, RLENGTH + 1)
+			if (index(line, "approved_at:") == 1) value(substr(line, length("approved_at:") + 1))
+		}
+	'
 }
 
 # 2 つの frontmatter（$1 が親のワークツリーの親チケット、$2 が統合先か退避の親チケット）が同じ親か。
@@ -778,15 +821,16 @@ archived_locally() {
 		[ -L "$al_part" ] && return 1
 	done
 	[ -f "$al_dir/$P.md" ] || return 1
-	al_id=$(sed -n 's/^ticket:[[:space:]]*//p' "$al_dir/$P.md" | head -n 1 |
-		sed -e 's/[[:space:]]*$//' -e "s/^[\"']//" -e "s/[\"']\$//")
+	# 欄は frontmatter の行頭から拾う（closed_in_integration と同じ。本文や block scalar の行は読まない）。
+	al_front=$(frontmatter_of <"$al_dir/$P.md")
+	al_id=$(printf '%s\n' "$al_front" | front_field ticket)
 	[ "$al_id" = "$P" ] || return 1
-	grep -q '^parent:' "$al_dir/$P.md" && return 1
+	[ -z "$(printf '%s\n' "$al_front" | front_field parent)" ] || return 1
 	# 親のワークツリーに同じ識別子の承認済みチケットが残っていれば、着手と取り消しの欄でも同じ親と
 	# 言えるときだけ（same_parent。同じ識別子の別の親子のチケットの退避を、今のものと読まない）。
 	for al_file in "$tree/$approved/doing/$P.md" "$tree/$approved/done/$P.md"; do
 		[ -f "$al_file" ] || continue
-		same_parent "$(frontmatter_of <"$al_file")" "$(frontmatter_of <"$al_dir/$P.md")"
+		same_parent "$(frontmatter_of <"$al_file")" "$al_front"
 		return
 	done
 	return 0

@@ -1348,12 +1348,16 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 前の版の承認が書き足していた `ccnavi_approved: {approved_at, source_tree, source_path}`（改版の `revised_at` /
 `feedback_at`）・`project:`・`workflow:` を持つ承認済みチケットもそのまま読む（移行はしない。`workflow:` の欄を読むのは
 古いものだけ）。古い形とみなすのは、`ccnavi_approved` が前の版の必ず書いた欄（`approved_at`・`source_tree`・`source_path`）を
-揃え、`approved_at` が空でないときだけ。`ccnavi_approved: {}` のような書きかけの記録では古い形を装えない。古い形なのに
+揃え、`approved_at` が空でないときだけ。`ccnavi_approved: {}` のような書きかけの記録は古い形とみなさない。ただし欄を
+揃えた記録は手で書けるので、古い形そのものは装える。装った `workflow:` で待ち方を緩められないよう、古い形の `workflow:` の
+待ち方は、今の `phases.yml` から計算した待ち方（`workflow.compute`）と同じときだけ採り、違えば欄を使わず一直線（前の番号を
+全部待つ）で読む。`--lint` と status はそのことを warn で言う。古い形なのに
 状態の履歴に承認（`approved`、続きの子は `raised`）の行が無ければ、`--lint` が warn にする。承認画面の「提案:」はツリーからの相対パスで出すので、画面の本文とダイジェストは機械に依らない。
 
 承認の時刻は欄に持たない。表示（ボード・`--diagnose`・`ccnavi-ticket.sh status`）は、状態の履歴の `approved`（続きの子は
-`raised`）の時刻、無ければ `git log --no-renames --diff-filter=A` で `doing/<識別子>.md` を足したコミットの時刻を読む。
-`--no-renames` を付けるのは、GitHub の画面での移動が rename のコミットになるため。どちらも無ければ「未コミット（手で置いた）」と
+`raised`）の時刻、無ければ前の版の承認が書いた記録（古い形の `ccnavi_approved.approved_at`）、それも無ければ
+`git log --no-renames --diff-filter=A` で `doing/<識別子>.md` を足したコミットの時刻を読む。
+`--no-renames` を付けるのは、GitHub の画面での移動が rename のコミットになるため。どれも無ければ「未コミット（手で置いた）」と
 出す。判定は履歴も git も読まないので、判定の拒否文には承認の時刻を出さない。
 
 承認が中身を変えないので、提案に書いた値はそのまま承認済みチケットの値になる。提案（`todo/`）にスクリプトだけが書く欄の空でない値が
@@ -1461,7 +1465,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 | 項目 | 中身 |
 |---|---|
 | 置き場とツリー | `todo/` / `doing/` / `review/` / `done/` と、見つけたツリー。複数の場所にあれば、どれが本物か決まらないと言う |
-| 承認の時刻 | 上の順（状態の履歴 → `doing/` に足したコミット → 「未コミット（手で置いた）」） |
+| 承認の時刻 | 上の順（状態の履歴 → 古い形の記録の `approved_at` → `doing/` に足したコミット → 「未コミット（手で置いた）」） |
 | 着手 | 未着手か、着手済み（`started_at` と `base_sha`）か。閉じたものは完了か取り消しか |
 | 置き場のファイル | 未コミット（ファイルがまだコミットに無い）、コミット済みのファイルに未コミットの変更がある、コミット済みで未 push、push 済み。push 済みかは手元のリモート追跡の ref で見るので、古いかもしれないと添え、最新にするには `ccnavi-sync.sh` を先に打つよう言う |
 | 止まっている理由 | `blocked`、取り込み済みの親子が決まらない、C1 が状態の操作を断る親子（`c1.target` の理由）、満たしていない先行、親が未着手、取り込み済みの親子で承認済みチケットが未コミット |
@@ -2178,7 +2182,7 @@ compact の前後の hook でフローを入れ直すことはしない。どち
 見つけたら、指定ごとに `'{root}/.ccnavi/scripts/ccnavi-branches.sh --issue N'`（`--mr N`）を打ち、候補があれば一覧をユーザに
 見せて「既存のブランチで続ける（承認済みの `branch:` で使う。承認前の提案の `branch:` は使わない）・新しく
 `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ、候補が無ければ進めてよい、という文を `additionalContext` で
-渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの絶対パス）。承認の知らせ（9.4）と同じ回なら、2 つを続けて渡す。
+渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの絶対パス）。
 dry-run でも渡す。判定は返さない。
 
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）

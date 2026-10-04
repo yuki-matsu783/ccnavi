@@ -62,9 +62,9 @@ from dataclasses import dataclass, field, replace
 
 import yaml
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, settings, tree, yamlread
 from ..policy import rules
-from . import archive, flow, history, syncstate, workflow
+from . import archive, flow, history, phasetypes, syncstate, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -207,6 +207,8 @@ def load_copy(
         ticket.approved_at = str(meta.get("approved_at") or "")
         ticket.source_tree = str(meta.get("source_tree") or "")
         ticket.source_path = str(meta.get("source_path") or "")
+        # 欄の待ち方を採るかは、今の phases.yml と見比べてから決める（`settle_old_workflows`）。
+        ticket.workflow_from_record = ticket.workflow is not None
     else:
         # 新しい形では待ち方は欄に無い。手で書いた `workflow:` を承認済みの待ち方として効かせない。
         ticket.workflow = None
@@ -215,8 +217,10 @@ def load_copy(
         if why:
             ticket.workflow = None
             ticket.workflow_unreadable = why
+            ticket.workflow_from_record = False
         elif held is not None:
             ticket.workflow = held
+            ticket.workflow_from_record = False
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案をコピーしたか）とは違うもので、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
@@ -271,8 +275,9 @@ def read_workflow(approved_dir: str, parent: str) -> tuple[ticket_mod.Workflow |
             return None, f"待ち方のファイル {path} を読めない"
         return None, ""
     try:
-        raw = yaml.safe_load(data.decode("utf-8"))
-    except (UnicodeDecodeError, yaml.YAMLError):
+        raw = yamlread.safe_load(data.decode("utf-8"))
+    except (UnicodeDecodeError, yamlread.LoadError, yaml.YAMLError):
+        # 構文の誤りは YAMLError、深すぎる入れ子など組み立ての途中の失敗は LoadError で来る
         return None, f"待ち方のファイル {path} を YAML として読めない"
     wf, bad = ticket_mod.parse_workflow(parent, raw)
     if wf is None:
@@ -322,7 +327,33 @@ def scan_all(
             c.tree, c.tree_root, c.project = t.name, t.root, t.project
         found.extend(got)
         notes.extend(complaints)
+    settle_old_workflows(conf, root, found)
     return found, notes
+
+
+def settle_old_workflows(
+    conf: settings.Settings, root: str, found: list[ticket_mod.Ticket]
+) -> None:
+    """古い形の `workflow:` 欄の待ち方を、今の phases.yml から計算した待ち方と同じときだけ採る。
+
+    古い形とみなすのは記録 `ccnavi_approved` の欄が揃ったものだが、記録は手で書ける。欄の待ち方を
+    そのまま採ると、手で書いた記録と `workflow:` で、ユーザが承認していない待ち方（並行に進める
+    など）を効かせられる。そこで、今の種類から `workflow.compute` で計算した待ち方と同じときだけ
+    欄を採り、違えば欄を使わず一直線（前の番号を全部待つ。いちばん厳しい形）で読む。
+    `Ticket.workflow_record_differs` を立て、`--lint` と status が warn で言う。
+
+    承認のあとに phases.yml を直した本物の古い承認も一直線に倒れる。止まる側で、並行に戻すには
+    改版で `--agree` を通す（待ち方のファイルが書かれ、欄より先に読まれる）。
+    """
+    cache: dict[str, dict | None] = {}
+    for t in found:
+        if not t.workflow_from_record or t.workflow is None:
+            continue
+        if t.project not in cache:
+            cache[t.project] = phasetypes.load_types(conf, root, t.project)
+        if t.workflow.as_raw() != workflow.compute(t, cache[t.project]).as_raw():
+            t.workflow = None
+            t.workflow_record_differs = True
 
 
 def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
@@ -344,6 +375,7 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tick
             c.project = t.project
         found.extend(got)
         notes.extend(complaints)
+    settle_old_workflows(conf, root, found)
     return found, notes
 
 
@@ -2009,6 +2041,8 @@ def blocking_problems(
     - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は `--agree` が
       `phases/<親>/workflow.yml` に書くもので、欄を承認済みの待ち方として効かせない
     - 待ち方のファイルが読めない。一直線と読むと、ユーザが承認した待ち方と違う順で進む
+    - 親のツリーの未着手のチケットが、手元の退避の閉じたチケットと同じ識別子
+      （`archive.drop_archived`）。使い直した識別子か、退避と同じものかを見分けられない
     """
     problems = list(project_problems(t, pool, conf))
     problems.extend(content_problems(t))
@@ -2042,6 +2076,8 @@ def content_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
         )
     if t.workflow_unreadable:
         problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.workflow_unreadable))
+    if t.archived_clash:
+        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.archived_clash))
     return problems
 
 
@@ -2092,6 +2128,7 @@ def _write(path: str, text: str) -> str:
 
 # どこから引いた時刻か。
 APPROVED_FROM_HISTORY = "history"  # 状態の履歴の approved（続きの子は raised）
+APPROVED_FROM_RECORD = "record"  # 前の版の承認が書いた `ccnavi_approved.approved_at`（古い形）
 APPROVED_FROM_COMMIT = "commit"  # doing/ に足したコミットの時刻
 APPROVED_UNCOMMITTED = "uncommitted"  # 履歴もコミットも無い（手で置いて、まだコミットしていない）
 # git を打たない場（Chrome の Pyodide）では、履歴の無い承認の時刻は分からない（空）。
@@ -2120,14 +2157,16 @@ def approved_times(
 
     1. 状態の履歴 `events/<識別子>.ndjson` の `approved`（続きの子は `raised`）の
        うち新しいものの `at`
-    2. 1 で取れないチケットがあるツリーだけ、ツリーごとに 1 回
+    2. 前の版の承認が書いた記録（古い形の `ccnavi_approved.approved_at`）。前の版は承認のときに
+       この欄へ時刻を書いていた。履歴を書く前の版の承認は履歴を持たないので、コミットの時刻より先に読む
+    3. 1 と 2 で取れないチケットがあるツリーだけ、ツリーごとに 1 回
        `git log --no-renames --diff-filter=A` を打ち、`doing/<識別子>.md` を足した
        コミットのうち新しいものの時刻。`--no-renames` を付けるのは、GitHub の画面での
        移動が rename のコミットになり、付けないと足したことにならないため
-    3. どちらも無ければ「未コミット（手で置いた）」（`doing/` にあるものだけ。ほかは分からない）
+    4. どれも無ければ「未コミット（手で置いた）」（`doing/` にあるものだけ。ほかは分からない）
 
     判定は履歴も git も読まない取り決めなので、hook の判定の経路からは呼ばない。`use_git` が偽
-    （Chrome の Pyodide など、git の無い場）なら 2 を飛ばし、1 で取れなければ分からないとする。
+    （Chrome の Pyodide など、git の無い場）なら 3 を飛ばし、1 と 2 で取れなければ分からないとする。
     """
     out: dict[str, ApprovedTime] = {}
     missing: dict[str, list[ticket_mod.Ticket]] = {}
@@ -2136,6 +2175,8 @@ def approved_times(
         at = history_time(where, t.ticket) if where else ""
         if at:
             out[t.path] = ApprovedTime(at, APPROVED_FROM_HISTORY)
+        elif t.approved_at:
+            out[t.path] = ApprovedTime(t.approved_at, APPROVED_FROM_RECORD)
         elif t.tree_root:
             missing.setdefault(t.tree_root, []).append(t)
     if not use_git or sys.platform == "emscripten":
