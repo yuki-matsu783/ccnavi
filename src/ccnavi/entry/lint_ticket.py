@@ -52,6 +52,8 @@ def _copy_problems(
       承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
     - 再開（`done/` から `doing/` へ手で戻す）で残った閉じるときの欄は warn。ユーザの再開を
       止めないため、判定も止めない
+    - 作業中の子のフェーズに reviewed のマーカーが残っている形（再開）も warn。マーカーを
+      消すかはユーザが決めるので、判定も止めず、機構は消さない
     - 着手済みのチケットで、状態の履歴に着手の行が無いことと、基準点（`base_sha`）がワークツリーの
       HEAD の祖先でないことは warn。提案の段階で書かれた着手の欄かもしれないが、履歴は ccnavi の外で
       動かした分を持たず、判定は git を読まないので止めない
@@ -77,6 +79,9 @@ def _copy_problems(
                     "（残っていると、フローの着手中の扱いなど、着手中として数えない箇所がある）",
                 )
             )
+        review_left = phase.resumed_review(root, conf, t, raw)
+        if review_left:
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {review_left}"))
         unrecorded = _record_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
