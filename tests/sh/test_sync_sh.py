@@ -96,6 +96,52 @@ def os_name():
     return subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
 
 
+@unittest.skipIf(SHELL is None, "sh が無い")
+class FrontFieldTest(unittest.TestCase):
+    """sh の `front_field` が、Python の `syncstate._text`（YAML で読んだ値）と同じ値を出す。
+
+    `null`・`~`・引用符の外の注記を sh だけが値として読むと、閉じたかの照合が Python と食い違う。
+    """
+
+    VALUES = (
+        "abc",
+        '"abc # x"',
+        "'a b'",
+        "abc # c",
+        "null",
+        "Null",
+        "NULL",
+        "~",
+        "",
+        '""',
+        "#x",
+        "a#b",
+        '"q" # c',
+        "' sp '",
+    )
+
+    def sh_value(self, line):
+        with open(os.path.join(SH_DIR, "ccnavi-sync.sh"), encoding="utf-8") as f:
+            text = f.read()
+        start = text.index("front_field() {")
+        body = text[start : text.index("\n}\n", start) + 3]
+        script = body + 'printf "%s\\n" "$1" | front_field base_sha\n'
+        done = subprocess.run(
+            [SHELL, "-c", script, "sh", line], capture_output=True, text=True, encoding="utf-8"
+        )
+        return done.stdout.rstrip("\n")
+
+    def test_the_same_values_as_python(self):
+        from ccnavi.tickets import syncstate
+        from ccnavi.tickets import ticket as ticket_mod
+
+        for value in self.VALUES:
+            with self.subTest(value=value):
+                front, _, _ = ticket_mod._frontmatter(f"---\nticket: x\nbase_sha: {value}\n---\n")
+                expected = syncstate._text(front.get("base_sha"))
+                self.assertEqual(self.sh_value(f"base_sha: {value}"), expected)
+
+
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
 class SyncTest(unittest.TestCase):
     """ワークスペース 1 つ（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。"""
