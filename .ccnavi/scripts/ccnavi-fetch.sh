@@ -36,8 +36,11 @@
 # 「取ってこられなかった」に戻るだけ。
 #
 # **取り込み済みの家族は早送りだけ**（ADR-0093 の 4.2。段階 2b）。親のワークツリー（`.claude/worktrees/<P>`
-# で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある）は、ロックを 1 回だけ試し
-# （取れなければ早送りしない。待たない）、`origin/<P>` の祖先なら `merge --ff-only` する。書きかけとの重なりは
+# で、親の写しか提案があり、家族の控えがあり、控えの `branch`（親のブランチ名。親チケットの `branch:`、
+# 無ければ識別子。ADR-0100 の 5 章）をチェックアウトしている）は、ロックを 1 回だけ試し
+# （取れなければ早送りしない。待たない）、`origin/<親のブランチ>` の祖先なら `merge --ff-only` する。
+# 親のブランチ名は控えから読む（セッションの頭で待たせないよう、実行ファイルは起こさない。控えの
+# `branch` は取り込み・push・C1 が実行ファイルの答えから書いたもの）。書きかけとの重なりは
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
 # 取り込み（merge）・消えたかの確かめ・控えの書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
@@ -203,31 +206,33 @@ ccnavi_fetch_seen() {
 
 # そのツリーが、取り込み済みの家族の親のワークツリーか（ADR-0093 の 4.2）。<ツリー> <名前> <ブランチ>
 #
-# `.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の写しか提案があり、家族の控えがある。
-# 当たらないツリーは今までどおり（未コミットがあれば進めない）。他セッションのワークツリーを動かさないため、
-# 条件は全部満たすときだけ。
+# `.claude/worktrees/` の直下で、親の写しか提案があり、家族の控えがあり、居るブランチが控えの `branch`
+# （無ければディレクトリ名と同じ名前）。当たらないツリーは今までどおり（未コミットがあれば進めない）。
+# 他セッションのワークツリーを動かさないため、条件は全部満たすときだけ。
 ccnavi_fetch_family() {
 	case "$1" in
 	"$root"/.claude/worktrees/*) ;;
 	*) return 1 ;;
 	esac
-	[ "$2" = "$3" ] || return 1
 	[ -L "$1" ] && return 1
 	ccnavi_parent_tree "$1" "$2" || return 1
 	ccnavi_ff_key=$(ccnavi_repo_key "$1" "$root")
-	[ -f "$(ccnavi_family_record "$root" "$ccnavi_ff_key" "$2")" ] || return 1
+	ccnavi_ff_record=$(ccnavi_family_record "$root" "$ccnavi_ff_key" "$2")
+	[ -f "$ccnavi_ff_record" ] || return 1
+	ccnavi_ff_branch=$(ccnavi_record_get "$ccnavi_ff_record" branch)
+	[ "$3" = "${ccnavi_ff_branch:-$2}" ] || return 1
 	return 0
 }
 
-# 取り込み済みの家族を早送りする（ADR-0093 の 4.2「SessionStart の早送り」）。<ツリー> <P>
+# 取り込み済みの家族を早送りする（ADR-0093 の 4.2「SessionStart の早送り」）。<ツリー> <P> <親のブランチ>
 #
 # merge はしない。書きかけとの重なりは git に任せる（拒まれたら重なったパスを言う）。途中の状態
 # （MERGE_HEAD）を残さないのが早送りだけにした理由で、hook の時間の枠で切られても書きかけが残らない。
 ccnavi_fetch_forward() {
 	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
-	ccnavi_fetch_or_note "$1" "$2" \
+	ccnavi_fetch_or_note "$1" "$3" \
 		"${2}: リモートを取ってこられなかった。手元の版で判定する" \
-		"${2}: 親のブランチをリモートから取ってこられなかった（リモートに無い）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
+		"${2}: 親のブランチ ${3} をリモートから取ってこられなかった（リモートに無い）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
 		return 0
 	ccnavi_fw_now=$(date +%s)
 	if [ "$((ccnavi_fw_now - started))" -ge "$budget" ]; then
@@ -235,7 +240,7 @@ ccnavi_fetch_forward() {
 			"$2" "$budget" "$root" "$2"
 		return 0
 	fi
-	ccnavi_fw_remote=$(git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$2^{commit}" 2>/dev/null || :)
+	ccnavi_fw_remote=$(git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$3^{commit}" 2>/dev/null || :)
 	ccnavi_fw_local=$(git -C "$1" rev-parse --verify --quiet "HEAD^{commit}" 2>/dev/null || :)
 	[ -n "$ccnavi_fw_remote" ] && [ -n "$ccnavi_fw_local" ] || return 0
 	[ "$ccnavi_fw_remote" = "$ccnavi_fw_local" ] && return 0
@@ -251,7 +256,7 @@ ccnavi_fetch_forward() {
 	fi
 	ccnavi_fw_behind=$(git -C "$1" rev-list --count "$ccnavi_fw_local..$ccnavi_fw_remote" 2>/dev/null || echo '?')
 	if LC_ALL=C git -C "$1" merge --ff-only --quiet "$ccnavi_fw_remote" </dev/null >/dev/null 2>"$scratch/ff"; then
-		printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$2" "$ccnavi_fw_behind" "$2"
+		printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$2" "$ccnavi_fw_behind" "$3"
 	else
 		printf '%s: 早送りできなかった。%s（取り込みは sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
 			"$2" "$(ccnavi_git_refusal "$scratch/ff")" "$root" "$2"
@@ -289,9 +294,9 @@ report=$(
 		branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 		[ -n "$branch" ] && [ "$branch" != "HEAD" ] || continue
 		name=$(basename "$tree")
-		# 取り込み済みの家族は早送りだけ（upstream の設定に依らず origin/<P> を見る）。
+		# 取り込み済みの家族は早送りだけ（upstream の設定に依らず origin/<親のブランチ> を見る）。
 		if ccnavi_fetch_family "$tree" "$name" "$branch"; then
-			ccnavi_fetch_forward "$tree" "$name"
+			ccnavi_fetch_forward "$tree" "$name" "$branch"
 			continue
 		fi
 

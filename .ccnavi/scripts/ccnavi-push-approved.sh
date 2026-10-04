@@ -129,8 +129,12 @@ carry_paths() {
 }
 
 # 取り込み済みの家族 1 つを運ぶ。ccnavi_c1_family を済ませた後に呼ぶ。0 運んだ（運ぶものが無いを含む）/ 1 落ちた
+#
+# 控えの鍵とロックは識別子（ccnavi_c1_family_id）、ref・push・ls-remote と控えの branch は親のブランチ名
+# （ccnavi_c1_branch。親チケットの branch:、無ければ識別子。ADR-0100 の 5 章）。
 carry_family() {
 	cf_p="$ccnavi_c1_family_id"
+	cf_b="${ccnavi_c1_branch:-$ccnavi_c1_family_id}"
 	cf_tree="$ccnavi_c1_tree"
 	cf_rc=0
 	ccnavi_lock_take "$root" "$ccnavi_c1_repo" "$cf_p" "$(ccnavi_c1_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
@@ -180,20 +184,20 @@ carry_family() {
 		fi
 	fi
 	cf_head=$(git -C "$cf_tree" rev-parse HEAD)
-	if [ "$cf_head" = "$(git -C "$cf_tree" rev-parse --verify -q "refs/remotes/origin/$cf_p" 2>/dev/null || :)" ]; then
+	if [ "$cf_head" = "$(git -C "$cf_tree" rev-parse --verify -q "refs/remotes/origin/$cf_b" 2>/dev/null || :)" ]; then
 		printf '%s: 運ぶものは無い。\n' "$cf_p"
 		ccnavi_lock_drop
 		return 0
 	fi
 	cf_timeout=$(ccnavi_c1_number "${CCNAVI_C1_TIMEOUT:-}" 60)
 	if ccnavi_git_timed "$cf_timeout" "$ccnavi_c1_tmp/push-err" "$cf_tree" \
-		push --quiet origin "refs/heads/$cf_p:refs/heads/$cf_p" >/dev/null ||
+		push --quiet origin "refs/heads/$cf_b:refs/heads/$cf_b" >/dev/null ||
 		{ ccnavi_git_timed "$cf_timeout" "$ccnavi_c1_tmp/ls-err" "$cf_tree" \
-			ls-remote origin "refs/heads/$cf_p" >"$ccnavi_c1_tmp/ls" &&
-			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_p" "$ccnavi_c1_tmp/ls"; }; then
-		ccnavi_record_write "$cf_record" remote origin branch "$cf_p" sha "$cf_head" \
+			ls-remote origin "refs/heads/$cf_b" >"$ccnavi_c1_tmp/ls" &&
+			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_b" "$ccnavi_c1_tmp/ls"; }; then
+		ccnavi_record_write "$cf_record" remote origin branch "$cf_b" sha "$cf_head" \
 			fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state present reason "" || :
-		printf '承認済みチケットを、取り込んでから %s へ送った。\n' "$cf_p"
+		printf '承認済みチケットを、取り込んでから %s へ送った。\n' "$cf_b"
 		ccnavi_lock_drop
 		return 0
 	fi
@@ -292,11 +296,12 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		continue
 	fi
 
-	# 取り込み済みの家族の親のワークツリー（ディレクトリ名 = ブランチ名）は、取り込んでから送る。
+	# 取り込み済みの家族の親のワークツリー（ディレクトリ名 = 識別子。ブランチは親チケットの branch:、
+	# 無ければ識別子と同じ名前。ADR-0100 の 5 章）は、取り込んでから送る。
 	case "$tree" in
-	"$root/.claude/worktrees/$branch")
-		ccnavi_c1_family "$branch"
-		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$branch" ]; then
+	"$root/.claude/worktrees/"*)
+		ccnavi_c1_family "$name"
+		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$name" ]; then
 			# 取り込み済みの家族の子のワークツリー。写しとマーカーは親のワークツリーに置くので、
 			# 子のツリーの置き場の変更は運ばない（子のブランチはリモートに出さない）。
 			printf 'ccnavi-push-approved: %s は家族 %s の子のワークツリー。子のツリーの置き場の変更は運ばない（写しは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
