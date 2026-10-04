@@ -175,90 +175,38 @@ if [ "$needs_host" = yes ]; then
 	# 気づかずに生の綴りを使わないようにする。URL に資格情報を埋める使い方は普通にあり、
 	# 出力はエージェントの文脈にも記録にも残る。
 	origin_shown=$(ccnavi_mask_url "$origin")
-	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
-	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の綴りには
-	# scheme が無いので、そこだけ https にする。
-	# host には**ポートを残す**。落とすと `:8929` のような立て方がすべて当たらなくなり、しかも
-	# 落ちたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
-	case "$origin" in
-	http://*) scheme=http ;;
-	*) scheme=https ;;
-	esac
-	rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
-	[ "$rest" = "$origin" ] && fail origin-unreadable "origin の綴りを読めない ($origin_shown)。"
-	# `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
-	# 落とさないと host にトークンが入り込み、API の綴りにも `origin` の出力にも漏れる（実際に確かめた）。
-	# 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
-	authority="${rest%%/*}"
-	case "$authority" in
-	*@*) rest="${authority##*@}${rest#"$authority"}" ;;
-	esac
-	host="${rest%%/*}"
-	# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
-	# そうでなければパスの先頭なので落とす。
-	case "$host" in
-	*:*)
-		case "${host##*:}" in
-		'' | *[!0-9]*) host="${host%%:*}" ;;
+	# origin の読み方と道具の選び方は ccnavi-common.sh の「ホスト（GitHub / GitLab）への接続」にある
+	# （ccnavi-branches.sh と共有する）。ここは失敗の文面を決め、以降で使う名前に写すだけ。
+	ccnavi_host_parse "$origin" || {
+		case "$?" in
+		2) fail origin-no-host "origin からホストを読めない ($origin_shown)。" ;;
+		3) fail origin-no-path "origin からプロジェクトのパスを読めない ($origin_shown)。" ;;
+		*) fail origin-unreadable "origin の綴りを読めない ($origin_shown)。" ;;
 		esac
-		;;
-	esac
-	[ -n "$host" ] || fail origin-no-host "origin からホストを読めない ($origin_shown)。"
-	tail="${rest#"$host"}"
-	while :; do
-		case "$tail" in
-		[/:]*) tail="${tail#?}" ;;
-		*) break ;;
-		esac
-	done
-	path="${tail%.git}"
-	path="${path%/}"
-	[ -n "$path" ] || fail origin-no-path "origin からプロジェクトのパスを読めない ($origin_shown)。"
-	case "$host" in
-	github.com | github.com:*)
-		kind=github
-		token_name=GITHUB_TOKEN
-		api_base="https://api.github.com"
-		;;
-	*)
-		kind=gitlab
-		token_name=GITLAB_TOKEN
-		api_base="$scheme://$host/api/v4"
-		;;
-	esac
+	}
+	scheme="$ccnavi_h_scheme"
+	host="$ccnavi_h_host"
+	path="$ccnavi_h_path"
+	kind="$ccnavi_h_kind"
+	token_name="$ccnavi_h_token_name"
+	api_base="$ccnavi_h_api_base"
 	branch=$(git rev-parse --abbrev-ref HEAD)
 
 	# ---- 道具。絶対パスに解いて固定する。
-
-	JQ=$(command -v jq 2>/dev/null || :)
-	[ -z "$JQ" ] && fail no-jq "jq が無い。結果の JSON を組み立てられない。" 2
-	# gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
-	# 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
-	# 1 度だけ疎通を試して、通らなければ curl とトークンに切り替える。
-	transport=""
-	if [ "$kind" = github ]; then
-		CLI=$(command -v gh 2>/dev/null || :)
-		if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "repos/$path" >/dev/null 2>&1; then
-			transport=gh
-		fi
-	else
-		CLI=$(command -v glab 2>/dev/null || :)
-		if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "projects/$(printf '%s' "$path" | "$JQ" -Rr '@uri')" >/dev/null 2>&1; then
-			transport=glab
-		fi
-	fi
-	if [ -z "$transport" ]; then
-		CURL=$(command -v curl 2>/dev/null || :)
-		eval "token=\${$token_name:-}"
-		if [ "$kind" = github ]; then cli_name=gh; else cli_name=glab; fi
-		if [ -n "$CURL" ] && [ -n "$token" ]; then
-			transport=curl
-		elif [ -n "$CURL" ]; then
-			fail no-transport-token "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
-		else
-			fail no-transport "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' をユーザが打つ形にしてください。" 2
-		fi
-	fi
+	ccnavi_host_connect || {
+		case "$?" in
+		3) fail no-jq "jq が無い。結果の JSON を組み立てられない。" 2 ;;
+		4) fail no-transport-token "$ccnavi_h_cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$ccnavi_h_cli_name を $host に認証してください。" 2 ;;
+		*) fail no-transport "$ccnavi_h_cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' をユーザが打つ形にしてください。" 2 ;;
+		esac
+	}
+	JQ="$ccnavi_h_jq"
+	CLI="$ccnavi_h_cli"
+	CURL="$ccnavi_h_curl"
+	token="$ccnavi_h_token"
+	transport="$ccnavi_h_transport"
+	ccnavi_h_tmp="$state"
+	ccnavi_h_on_fail=api_failed
 fi
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 # 親の識別子（ADR-0100 の 5 章）。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
@@ -277,57 +225,11 @@ if [ -n "$review_top" ]; then
 	esac
 fi
 
-# curl の 1 回の時間の上限（秒）。応答しないホストで止まり続けないように。gh / glab は道具に任せる
-api_max_time=120
-
 # api <METHOD> <path> [<JSON body>] レスポンスの JSON を標準出力へ。path は api_base からの相対。
-#
-# 失敗したら標準出力には何も出さず、ホストが返した本文ごと標準エラーへ出して 1 を返す。
-# gh と glab は 4xx でも本文を標準出力へ書くので、そのまま流すと `{"message":"Not Found"}` が
-# jq に渡り、`{number: null}` の形で「マージリクエストができた」ことになる（実際に確かめた）。
+# 中身は ccnavi-common.sh の ccnavi_host_api。失敗したら標準出力には何も出さず、ホストが返した本文ごと
+# 標準エラーへ出して（api_failed）1 を返す。curl の 1 回の時間の上限は ccnavi_h_max_time（既定 120 秒）。
 api() {
-	method="$1"
-	rel="$2"
-	body="${3:-}"
-	case "$transport" in
-	gh | glab)
-		# 標準エラー（更新の知らせなど）は応答に混ぜない。落ちたときだけ本文と一緒に見せる
-		api_err="$state/review-api-err-$$"
-		if [ -n "$body" ]; then
-			out=$(printf '%s' "$body" | "$CLI" api --hostname "$host" --method "$method" --input - "$rel" 2>"$api_err") || {
-				api_failed "$method" "$rel" "$out$(cat "$api_err" 2>/dev/null)"
-				rm -f "$api_err"
-				return 1
-			}
-		else
-			out=$("$CLI" api --hostname "$host" --method "$method" "$rel" 2>"$api_err") || {
-				api_failed "$method" "$rel" "$out$(cat "$api_err" 2>/dev/null)"
-				rm -f "$api_err"
-				return 1
-			}
-		fi
-		rm -f "$api_err"
-		;;
-	curl)
-		if [ "$kind" = github ]; then
-			auth="Authorization: Bearer $token"
-		else
-			auth="PRIVATE-TOKEN: $token"
-		fi
-		if [ -n "$body" ]; then
-			out=$(printf '%s' "$body" | "$CURL" -fsS --connect-timeout 15 --max-time "$api_max_time" -X "$method" -H "$auth" -H 'Content-Type: application/json' --data-binary @- "$api_base/$rel" 2>&1) || {
-				api_failed "$method" "$rel" "$out"
-				return 1
-			}
-		else
-			out=$("$CURL" -fsS --connect-timeout 15 --max-time "$api_max_time" -X "$method" -H "$auth" "$api_base/$rel" 2>&1) || {
-				api_failed "$method" "$rel" "$out"
-				return 1
-			}
-		fi
-		;;
-	esac
-	printf '%s' "$out"
+	ccnavi_host_api "$@"
 }
 
 api_failed() {
@@ -347,27 +249,14 @@ api_failed() {
 
 # pages <path> 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。
 pages() {
-	rel="$1"
-	page=1
-	case "$rel" in
-	*\?*) sep='&' ;;
-	*) sep='?' ;;
-	esac
-	all='[]'
-	while :; do
-		# 呼び手が `|| ...` で受けると set -e が有効にならないので、落ちたらここで 1 を返す（並びでない答えも）
-		chunk=$(api GET "$rel${sep}per_page=100&page=$page") || return 1
-		n=$(printf '%s' "$chunk" | "$JQ" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
-		all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
-		[ "$n" -lt 100 ] && break
-		page=$((page + 1))
-		[ "$page" -gt 20 ] && fail too-many-pages "$rel が多すぎて読み切れない。"
-	done
-	printf '%s' "$all"
+	pages_rc=0
+	ccnavi_host_pages "$1" || pages_rc=$?
+	[ "$pages_rc" -eq 2 ] && fail too-many-pages "$1 が多すぎて読み切れない。"
+	return "$pages_rc"
 }
 
 encoded_path() {
-	printf '%s' "$path" | "$JQ" -Rr '@uri'
+	ccnavi_host_encoded_path
 }
 
 # ---- マージリクエスト。無ければ空。
@@ -390,12 +279,7 @@ find_mr() {
 
 # GitLab のプロジェクトの数の id。読めなければ 1
 project_id() {
-	pid_out=$(api GET "projects/$(encoded_path)") || return 1
-	pid_val=$(printf '%s' "$pid_out" | "$JQ" -r '.id // empty') || return 1
-	case "$pid_val" in
-	'' | *[!0-9]*) return 1 ;;
-	esac
-	printf '%s' "$pid_val"
+	ccnavi_host_project_id
 }
 
 # ---- マージリクエストを作る。下書きの 1 行目が題、3 行目からが本文。
@@ -627,9 +511,9 @@ account() {
 	case "$transport" in
 	gh | glab) timed "$account_max_time" "$account_out" "$CLI" api --hostname "$host" user || : >"$account_out" ;;
 	curl)
-		api_max_time="$account_max_time"
+		ccnavi_h_max_time="$account_max_time"
 		api GET user >"$account_out" 2>/dev/null || : >"$account_out"
-		api_max_time=120
+		ccnavi_h_max_time=120
 		;;
 	esac
 	who=$("$JQ" -r --arg f "$field" '.[$f] // empty' <"$account_out" 2>/dev/null | tr -d '\r') || who=""
