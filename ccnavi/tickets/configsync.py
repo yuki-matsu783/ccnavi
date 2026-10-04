@@ -32,7 +32,7 @@ from typing import TextIO
 
 import yaml
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, settings, tree, yamlread
 from ..policy import rules
 from . import approval, phasetypes, risk, syncstate
 
@@ -457,7 +457,7 @@ def _unreadable_as_layer(conf: settings.Settings, kind: str, content: bytes) -> 
             return "; ".join(p.detail for p in errors) or "配点として読めない"
         return ""
     try:
-        data = yaml.safe_load(text)
+        data = yamlread.safe_load(text)
     except yaml.YAMLError:
         return "YAML として読めない"
     if not isinstance(data, dict):
@@ -470,7 +470,7 @@ def _unreadable_as_layer(conf: settings.Settings, kind: str, content: bytes) -> 
 def _entries(kind: str, content: bytes) -> dict[str, object] | None:
     """識別子ごとの定義。読めなければ None。"""
     try:
-        data = yaml.safe_load(content.decode("utf-8"))
+        data = yamlread.safe_load(content.decode("utf-8"))
     except (ValueError, yaml.YAMLError):
         return None
     if not isinstance(data, dict):

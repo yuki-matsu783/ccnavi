@@ -28,10 +28,8 @@ import os
 import time
 from typing import TextIO
 
-import yaml
-
 from ..hook import judge
-from ..infra import hookio, modes, settings, tree
+from ..infra import hookio, modes, settings, tree, yamlread
 from ..policy import builtin, ruleload, rules, selfguard
 from ..records import audit
 from ..tickets import agree, approval, flow, history, phase, phasetypes, risk, workflow
@@ -315,7 +313,7 @@ def load_samples(path: str, root: str) -> list[dict]:
     `subject` の合言葉 `/repo` は走らせた場所に読み替える。
     """
     with open(path, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+        raw = yamlread.safe_load(f.read())
     if not isinstance(raw, dict):
         raise ValueError(f"見本の形が違う。最上位はタイプの対応表のはず: {path}")
     samples = []

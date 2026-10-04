@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, globmatch
+from ..infra import fsio, globmatch, yamlread
 from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from . import ticket as ticket_mod
@@ -190,7 +190,7 @@ def parse(
 ) -> tuple[PhaseTypes | None, list[Problem]]:
     problems: list[Problem] = []
     try:
-        data = yaml.safe_load(text)
+        data = yamlread.safe_load(text)
     except yaml.YAMLError as exc:
         return None, [Problem(SEVERITY_ERROR, where, f"YAML として読めない: {exc}")]
     if not isinstance(data, dict):

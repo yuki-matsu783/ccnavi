@@ -73,6 +73,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
+from ..infra import yamlread
 from ..infra.globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。`deny` `ask` `allow` の 3 タイプで、探すものは
@@ -468,7 +469,7 @@ def readable(content: bytes) -> bool:
 
 def _decode(text: str, path: str) -> dict:
     try:
-        data = yaml.safe_load(text)
+        data = yamlread.safe_load(text)
     except yaml.YAMLError as exc:
         raise ValueError(f"{path} を YAML として読めない: {exc}") from exc
     if not isinstance(data, dict):
