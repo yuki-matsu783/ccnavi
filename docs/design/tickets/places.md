@@ -52,7 +52,7 @@ ccnavi ディレクトリの組み込みルール（`builtin-guard-project-home`
 
 **承認済みチケットは git で共有する。** 承認した機械と作業する機械が違っても承認が届くよう、承認済み
 チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-push-approved.sh` がコミットして push する（9.4）。
-受け取る側はセッションの頭に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
+受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
 起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` の取り込み結果、無ければデフォルトブランチ＝
 `origin/HEAD` が指すもの）も、チェックアウトされていなければ `update-ref` で
 進める。統合先の決め方は `ccnavi-common.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は

@@ -28,7 +28,7 @@ dry-run でも渡す。判定は返さない。
 1. sh がホストを読む。繋ぎ方は `ccnavi-common.sh` の「ホスト（GitHub / GitLab）への接続」で、`ccnavi-review.sh` と同じ
    （gh / glab、無ければ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN`）。MR 指定はその MR の元ブランチ、issue 指定はその issue を
    参照している開いた MR の元ブランチ（GitHub は開いた PR の題・本文・元ブランチ名、GitLab は `related_merge_requests`）。
-   繋げなければ止めず、理由を書く
+   繋げないときも止めず、理由を書く
 2. 結果を `logs/state/branches-host-<pid>.json` に書き、実行ファイルの `ccnavi branches <issue|mr> <N> --result <json>` に渡す
 3. 実行ファイルが手元を読む（git の ref、ツリーの HEAD、チケット）。issue 指定なら、名前に番号を含むブランチ（手元と origin。
    番号の前後が数字でない）と、`issue: <N>` を持つ親の親のブランチ（承認済みは `branch:`、提案は識別子）を足す。どの候補にも、
