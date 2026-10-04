@@ -183,6 +183,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.cli",
                 "entry.diagnose",
                 "entry.lint",
+                "entry.lint_branch",
+                "entry.lint_ticket",
                 "entry.lint_layers",
                 "entry.lint_places",
                 "entry.lint_project",
