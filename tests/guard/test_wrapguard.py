@@ -21,7 +21,7 @@ import unittest
 
 from ccnavi.hook import wrapguard
 from ccnavi.infra import shellread
-from tests import GIT_ENV, ROOT, common_path
+from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh
 from tests.inproc import run_ccnavi
 
 GIT = ["sh", "../../../.ccnavi/scripts/ccnavi-git.sh"]
@@ -247,7 +247,13 @@ class ShAgreesTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         scripts = os.path.join(self.root, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-git.sh", "ccnavi-common.sh"):
+        # 共通部（入口と部品）は 1 か所からまとめて写す。入口と部品の版が混ざらないように。
+        common_dir = (
+            self.SH_DIR
+            if os.path.isfile(os.path.join(self.SH_DIR, "ccnavi-common.sh"))
+            else SH_SCRIPTS
+        )
+        for name in ("ccnavi-git.sh", *common_sh(common_dir)):
             source = os.path.join(self.SH_DIR, name)
             if not os.path.isfile(source):
                 # コピーする版は変えた sh だけを置く。残りは本物を使う。

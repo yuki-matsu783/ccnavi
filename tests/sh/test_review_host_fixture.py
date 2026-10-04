@@ -29,7 +29,7 @@ import unittest
 
 from ccnavi.entry import version
 from ccnavi.tickets import review
-from tests import ROOT
+from tests import ROOT, common_sh
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -87,7 +87,7 @@ class HostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
@@ -385,7 +385,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)

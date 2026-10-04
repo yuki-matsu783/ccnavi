@@ -24,13 +24,13 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, SRC
+from tests import ROOT, SRC, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
-SCRIPTS = ("ccnavi-sync.sh", "ccnavi-common.sh", "ccnavi-git.sh")
+SCRIPTS = ("ccnavi-sync.sh", *common_sh(SH_DIR), "ccnavi-git.sh")
 CONFIG = (
     ("user.email", "t@example.invalid"),
     ("user.name", "t"),
