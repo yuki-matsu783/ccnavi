@@ -229,7 +229,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
           {shown.totalCount === 0 && !(archived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
           <div className="board">
-            {/* アーカイブの列は「アーカイブ済みのチケットを表示する」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
+            {/* アーカイブの列は「アーカイブ済みチケットを表示」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
             {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
               <Column
                 key={column.state}
