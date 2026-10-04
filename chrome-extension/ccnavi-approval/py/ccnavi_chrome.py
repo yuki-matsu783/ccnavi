@@ -49,9 +49,9 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
     "workspace": {"integration": {"name": ..., "source": ..., "head": ...},
                   "files": {...}, "binary": [...], "links": [...]}
 
-段階 5 から「始める」（8.6）の `start` も答える。issue の番号から識別子を決め
-（`ticket.issue_identifier`。3.1 の 11）、始められない理由（統合先の `done/` にある・同じ名前の
-ブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版の違い）を返す。
+段階 5 から「始める」（8.6）の `start` も答える。issue の番号とタイトルから識別子を決め
+（`ticket.issue_identifier`。3.1 の 11・ADR-0100）、始められない理由（統合先の `done/` に
+ある・同じ名前のブランチがある・開いた家族に同じ識別子がある・予約の名前・互換の版の違い）を返す。
 ブランチを作るのは拡張（service worker）。
 """
 
@@ -195,7 +195,7 @@ def _snapshot(req: dict) -> dict:
         _check_files(bname, branch)
     project = snap.get("project") or ""
     if project:
-        if not isinstance(project, str) or not ticket_mod.is_valid_id(project):
+        if not isinstance(project, str) or not ticket_mod.is_valid_name(project):
             raise Refused(f"プロジェクト名が読めない: {project!r}")
         if settings.is_reserved_layer_name(project):
             raise Refused(f"プロジェクト名 {project} は層の名前として予約してある（common・self）")
@@ -677,6 +677,8 @@ def _entry(root: str, entry: dict) -> dict:
 
 # 仮のツリーの綴りの前に来てよい字（行の頭・空白・引用符・括弧・区切り）。
 # 途中の段（`wip/ws/`）は畳まない。
+# 識別子に使える字（`ticket.ID_CHARS`。日本語の字を含む。ADR-0100）。
+ID_CHARS = ticket_mod.ID_CHARS
 _BEFORE_ROOT = r"(?<![^\s'\"`(（「:：,、=])"
 
 
@@ -689,7 +691,9 @@ def _relative(root: str, text: str) -> str:
     """
     base = re.escape(os.path.join(root, *WORKTREES.split("/")) + os.sep)
     out = re.sub(
-        _BEFORE_ROOT + base + r"([A-Za-z0-9][A-Za-z0-9._-]*)" + re.escape(os.sep), r"\1:", text
+        _BEFORE_ROOT + base + rf"([A-Za-z0-9][{ID_CHARS}]*)" + re.escape(os.sep),
+        r"\1:",
+        text,
     )
     out = re.sub(_BEFORE_ROOT + re.escape(root + os.sep), "", out)
     return out.replace(os.sep, "/") if os.sep != "/" else out
@@ -977,7 +981,10 @@ def _compat(snap: dict) -> dict:
 
 
 def _op_start(req: dict, root: str) -> dict:
-    """issue から始める親のブランチの名前と、始められない理由（8.6・3.1 の 4・5・7）。
+    """issue から始める親のブランチの名前と、始められない理由（8.6・3.1 の 4・5・7、ADR-0100）。
+
+    名前は issue の番号とタイトル（`title`）から `ticket.issue_identifier` が決める。先頭の語は
+    `prefix`（無ければ `feature`）。
 
     ブランチは作らない（拡張の service worker が作る）。入力は統合先（と、プロジェクトなら
     ワークスペースの統合先）と、拡張が見たブランチ（`snapshot.branches` と `taken` の名前）。
@@ -990,13 +997,21 @@ def _op_start(req: dict, root: str) -> dict:
     taken = req.get("taken") or []
     if not isinstance(taken, list) or not all(isinstance(n, str) for n in taken):
         raise Refused("taken はブランチ名の並び")
+    title = req.get("title") or ""
+    if not isinstance(title, str) or len(title) > 1000:
+        raise Refused("title は issue のタイトル（1000 文字まで）")
+    prefix = req.get("prefix") or ticket_mod.DEFAULT_ISSUE_PREFIX
+    if not isinstance(prefix, str) or not settings.is_branch_prefix(prefix):
+        raise Refused(f"prefix は先頭の語（英小文字と数字）: {prefix!r}")
     project = _project(snap)
-    ident = ticket_mod.issue_identifier(number, project)
+    ident = ticket_mod.issue_identifier(number, title, project, prefix)
     integ = snap["integration"]["name"]
     folded = ident.casefold()
     problems = list(
         ticket_mod.branch_name_problems(
-            ticket_mod.Ticket(ticket=ident, issue=number, project=project), integ
+            ticket_mod.Ticket(ticket=ident, issue=number, project=project),
+            integ,
+            prefixes=(prefix, *settings.DEFAULT_BRANCH_PREFIXES),
         )
     )
     if folded in {i.casefold() for i in _closed(snap, place)}:

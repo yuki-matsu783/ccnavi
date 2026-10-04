@@ -56,13 +56,11 @@ case "${1:-}" in
 	;;
 esac
 for want in ${1+"$@"}; do
-	case "$want" in
-	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*)
+	if ! ccnavi_is_ident "$want"; then
 		printf 'ccnavi-push-approved: %s は親の識別子の形ではありません。\n' "$want" >&2
 		usage >&2
 		exit 2
-		;;
-	esac
+	fi
 done
 
 root=$(ccnavi_workspace) || {

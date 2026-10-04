@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import TextIO
 
@@ -111,17 +112,82 @@ MAX_SCOPE_ENTRIES = 20
 # プロジェクトの外を指す綴り、`$` は展開されるまで行き先が決まらない綴り。
 _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 
-# 識別子。親は自由な 1 語、子は `<親>-<2 桁連番>`。
-_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<seq>\d{2})$")
+# 識別子（ADR-0100）。親は 1 語、子は `<親>-<2 桁連番>`。新しい親は `<先頭の語>-<番号>-<slug>`
+# （`feature-12-login` など）の形にそろえる。形は lint の warn で、読めるかどうかは文字と長さだけで
+# 決める（`i0055` のような前の形も読む）。
+#
+# 使える文字は ASCII の英数字と `.` `_` `-`、それに日本語の字（ひらがな・カタカナ・長音記号・
+# CJK 統合漢字・々）。先頭は ASCII の英数字。全角英数・全角記号・全角空白・ほかの Unicode は
+# 使わない（見た目の同じ別の字で名前を紛らわせない。パスやシェルで意味を持つ字を入れない）。
+# 綴りは NFC に限る（macOS の NFD の綴りは、見た目が同じでもバイト列が違う別の名前になる）。
+JA_CHARS = "々ぁ-ゖァ-ヺー一-鿿"
+# 文字クラスの中身（`[...]` に入れて使う）。拡張（TS）と sh はこの並びを写す。
+ID_CHARS = "A-Za-z0-9._\\-" + JA_CHARS
+_ID = re.compile(rf"^[A-Za-z0-9][{ID_CHARS}]*\Z")
+_CHILD = re.compile(rf"^(?P<parent>[A-Za-z0-9][{ID_CHARS}]*)-(?P<seq>[0-9]{{2}})\Z")
+# プロジェクトの名前（`projects/` の下のディレクトリ名）。こちらは ASCII のまま。
+_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+
+# 識別子の長さの上限（文字数。子は親 + 3 文字なので、親は実質 61 文字まで）。
+# 識別子はパスに 2 回出ることがある（`.claude/worktrees/<親>/.ccnavi/approved/phases/<親>/...`）。
+# Windows の MAX_PATH（260）から、ワークスペースまでの綴り（40 文字ほど）と置き場の綴りを
+# 引いた残り。
+# Linux の 1 つの名前の上限（255 バイト）も、日本語 1 字 3 バイトで 64 字なら収まる。
+MAX_ID_LENGTH = 64
+# issue から作る識別子と、新規の提案に勧める長さ（lint の warn）。上限との差は子の連番と余裕。
+SUGGESTED_ID_LENGTH = 48
+
+# 新しい親の識別子の形（ADR-0100）。`<先頭の語>-<番号>-<slug>`。先頭の語は使える並び
+# （`settings.branch_prefixes`。既定は feature・hotfix・fix など）にあるものだけを形に合うと読む。
+# 番号は issue の番号か ccnavi の通し番号。
+_FORM = re.compile(
+    rf"^(?P<prefix>[a-z][a-z0-9]*)-(?P<num>[1-9][0-9]*)-"
+    rf"(?P<slug>[A-Za-z0-9{JA_CHARS}][{ID_CHARS}]*)\Z"
+)
+# issue から始めるときの既定の先頭の語。
+DEFAULT_ISSUE_PREFIX = "feature"
+# 前の形（ADR-0093 の 3.1 の 4・7）。読むのと、通し番号を数えるのにだけ使う。
+_LEGACY_ISSUE_ID = re.compile(r"^i(?P<num>[0-9]+)\Z", re.IGNORECASE)
+_LEGACY_PROJECT_ISSUE_ID = re.compile(
+    r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i(?P<num>[0-9]+)\Z", re.IGNORECASE
+)
+# issue のタイトルから slug を作るときに残さない字（残すのは英数字と日本語の字だけ）。
+_SLUG_DROP = re.compile(rf"[^A-Za-z0-9{JA_CHARS}]+")
+# タイトルから何も残らなかったときの slug。
+EMPTY_SLUG = "issue"
+
+
+def id_problem(text: str) -> str:
+    """識別子として読めない理由。読めれば空。文字・NFC・長さを見る（形は見ない）。"""
+    if not isinstance(text, str) or not text:
+        return "識別子が無い"
+    if unicodedata.normalize("NFC", text) != text:
+        return (
+            "識別子が NFC でない（macOS で濁点が分かれた NFD の綴りなど）。"
+            "見た目が同じでも別の名前になるので NFC で書く"
+        )
+    if not _ID.match(text):
+        return (
+            "識別子に使えない文字がある（先頭は ASCII の英数字、続きは英数字・`.`・`_`・`-`・"
+            "ひらがな・カタカナ・漢字）"
+        )
+    if len(text) > MAX_ID_LENGTH:
+        return f"識別子が長すぎる（{len(text)} 文字。上限は {MAX_ID_LENGTH} 文字）"
+    return ""
 
 
 def is_valid_id(text: str) -> bool:
-    """識別子の形（親は自由な 1 語、子もその形の中）か。区切り文字と先頭の `.` を持たない。
+    """識別子として読めるか（`id_problem` が空か）。区切り文字と先頭の `.` を持たない。
 
-    チケットの識別子でファイル名を組む側（history.py）が、自分でも同じ検査を当てるために使う。
+    チケットの識別子でファイル名を組む側（history.py）や、sh から渡る引数を受ける側（cli.py）が、
+    自分でも同じ検査を当てるために使う。
     """
-    return bool(_ID.match(text or ""))
+    return not id_problem(text)
+
+
+def is_valid_name(text: str) -> bool:
+    """プロジェクトの名前の形（ASCII の 1 語）か。"""
+    return bool(_NAME.match(text or ""))
 
 
 def child_pattern() -> re.Pattern:
@@ -129,45 +195,123 @@ def child_pattern() -> re.Pattern:
     return _CHILD
 
 
+def form_of(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> re.Match | None:
+    """`<先頭の語>-<番号>-<slug>` の形で、先頭の語が `prefixes` にあれば、その一致。"""
+    matched = _FORM.match(name or "")
+    if matched is None or matched.group("prefix") not in prefixes:
+        return None
+    return matched
+
+
+def has_form(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> bool:
+    """`<先頭の語>-<番号>-<slug>` の形か（先頭の語は `prefixes` のどれか）。"""
+    return form_of(name, prefixes) is not None
+
+
+def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int | None:
+    """親の識別子に含まれる番号。
+
+    読むのは `<先頭の語>-<番号>-<slug>` と前の形（`i<番号>`・`<名前>-i<番号>`）だけ。
+    """
+    matched = form_of(name, prefixes)
+    if matched:
+        return int(matched.group("num"))
+    for pattern in (_LEGACY_ISSUE_ID, _LEGACY_PROJECT_ISSUE_ID):
+        matched = pattern.match(name or "")
+        if matched:
+            return int(matched.group("num"))
+    return None
+
+
+def next_serial(names, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int:
+    """issue の無い提案に使う、次の通し番号（ADR-0100）。番号を持つ識別子の最大 + 1。
+
+    数えるのは親の識別子だけ（子は親の番号を持つ）。先頭の語が違っても同じ通し番号を使う。
+    番号を持つものが無ければ 1。
+    """
+    found = []
+    for name in names:
+        if _CHILD.match(name or ""):
+            continue
+        number = identifier_number(name, prefixes)
+        if number:
+            found.append(number)
+    return max(found, default=0) + 1
+
+
+def issue_slug(title: str, room: int = SUGGESTED_ID_LENGTH) -> str:
+    """issue のタイトルから作る slug。英数字と日本語の字だけを残し、ほかは `-` にまとめる。
+
+    NFKC で全角英数を半角に、半角カナを全角にそろえ、ASCII の英字は小文字にする。
+    前後の `-` を落とし、`room` 文字で切る。何も残らなければ空（呼び手が `EMPTY_SLUG` で埋める）。
+    """
+    text = unicodedata.normalize("NFKC", title or "")
+    text = "".join(c.lower() if c.isascii() else c for c in text)
+    slug = _SLUG_DROP.sub("-", text).strip("-")
+    return slug[: max(room, 0)].rstrip("-")
+
+
+def issue_identifier(
+    number: int, title: str = "", project: str = "", prefix: str = DEFAULT_ISSUE_PREFIX
+) -> str:
+    """issue から親の識別子を決める（ADR-0100。ADR-0093 の 3.1 の 11 の「同じ関数」）。
+
+    `<prefix>-<番号>-<slug>`（既定の prefix は `feature`）。slug は issue のタイトルから作る
+    （`issue_slug`）。プロジェクトの issue なら slug の頭に `<プロジェクト名>-` を付ける
+    （`feature-12-web-<slug>`。issue の番号はリポジトリごとなので、ワークスペースや
+    別のプロジェクトの同じ番号の issue と名前を分ける）。
+    タイトルから何も残らなければ slug は `issue`。全体は `SUGGESTED_ID_LENGTH` 文字に収める。
+    末尾が子の形（`-<2 桁>`）になるときは、その部分を落とす。
+    「issue → 識別子」はこの 1 つだけで、Chrome 拡張も Pyodide の上でこれを呼ぶ。
+    番号が正の整数でないか、プロジェクト名が形に合わなければ ValueError。
+    """
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        raise ValueError(f"issue の番号は正の整数: {number!r}")
+    if project and not _NAME.match(project):
+        raise ValueError(f"プロジェクト名が識別子の形でない: {project!r}")
+    if not isinstance(prefix, str) or not settings.is_branch_prefix(prefix):
+        raise ValueError(f"先頭の語が形に合わない: {prefix!r}")
+    head = f"{prefix}-{number}-" + (f"{project}-" if project else "")
+    slug = issue_slug(title if isinstance(title, str) else "", SUGGESTED_ID_LENGTH - len(head))
+    ident = head + slug
+    while slug and _CHILD.match(ident):
+        slug = slug[:-3].rstrip("-")
+        ident = head + slug
+    if not slug:
+        ident = head + EMPTY_SLUG
+    problem = id_problem(ident)
+    if problem:
+        raise ValueError(f"issue から識別子を作れない: {problem}")
+    return ident
+
+
 # 親のブランチ名は親の識別子そのもの（ADR-0093 の 3.1）。識別子を、ブランチ名として安全で、
-# 統合先や issue の番号と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。
+# 統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。
 #
 # 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じ並び）。
 # 大文字小文字を区別せずに比べる。`release/*` は識別子に `/` を書けないので、
 # ここでは `release` と `release-*` だけを見る。
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
-# issue から決める識別子の形（`i` + 番号）。`issue:` を持つ提案だけが使う。
-_ISSUE_ID = re.compile(r"^i\d+$", re.IGNORECASE)
-# プロジェクトの issue から決める識別子の形（`<プロジェクト名>-i<番号>`。3.1 の 7。段階 5）。
-_PROJECT_ISSUE_ID = re.compile(r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i\d+$", re.IGNORECASE)
 
 
-def issue_identifier(number: int, project: str = "") -> str:
-    """issue の番号から親の識別子を決める（ADR-0093 の 3.1 の 4・7・11）。
+def branch_name_problems(
+    t: Ticket,
+    integration: str = "",
+    serial: int = 0,
+    prefixes=settings.DEFAULT_BRANCH_PREFIXES,
+) -> list[str]:
+    """新規の提案の識別子が、親のブランチ名の規則に合わないところ。
 
-    `i` + 4 桁の 0 埋め（5 桁以上はそのまま）。プロジェクトの issue なら頭に
-    `<プロジェクト名>-` を付ける（`web-i0012`）。「issue → 識別子」はこの 1 つだけで、
-    Chrome 拡張も Pyodide の上でこれを呼ぶ。番号が正の整数でなければ ValueError。
-    """
-    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
-        raise ValueError(f"issue の番号は正の整数: {number!r}")
-    base = f"i{number:04d}"
-    if not project:
-        return base
-    if not _ID.match(project):
-        raise ValueError(f"プロジェクト名が識別子の形でない: {project!r}")
-    return f"{project}-{base}"
-
-
-def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
-    """新規の提案の識別子が、親のブランチ名の規則に合わないところ（ADR-0093 の 3.1 の 2・5・6）。
+    ADR-0093 の 3.1 の 2・5・6 と ADR-0100。
 
     見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのはユーザに見せる文で、
-    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子（3.1 の 3）と、
-    子の形に当たる親の識別子は、他のチケットと並べて見るので `lint` の側で数える。
+    深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子（3.1 の 3）、
+    子の形に当たる親の識別子、番号の重なりは、他のチケットと並べて見るので `lint` の側で数える。
 
     `integration` はその時点の統合先の名前（D30。段階 2b）。環境変数からは読まず、呼び手が
     渡したときだけ予約に足す。固定の並び（main など）と同じく大文字小文字を区別せずに比べる。
+    `serial` は次の通し番号（`next_serial`）。渡されたときだけ、形の warn の文に添える。
+    `prefixes` は使える先頭の語の並び（`settings.branch_prefixes`）。
     """
     name = t.ticket
     folded = name.casefold()
@@ -189,59 +333,68 @@ def branch_name_problems(t: Ticket, integration: str = "") -> list[str]:
         found.append(
             f"識別子が統合先の名前（{integration}）に当たる。親のブランチ名が統合先と同じになる"
         )
-    found.extend(_issue_form_problems(t))
+    found.extend(_form_problems(t, serial, prefixes))
     return found
 
 
-def _issue_form_problems(t: Ticket) -> list[str]:
-    """issue から決める形（`i<番号>`・`<プロジェクト名>-i<番号>`）の識別子が、`issue:` と
-    置き場に合っているか（3.1 の 4・5・7。段階 5 で `<名前>-i<番号>` と番号の一致を足した）。
+def _form_problems(
+    t: Ticket, serial: int = 0, prefixes=settings.DEFAULT_BRANCH_PREFIXES
+) -> list[str]:
+    """新しい親の識別子が `<先頭の語>-<番号>-<slug>` の形と `issue:` に合っているか（ADR-0100）。
 
-    形に当たらない識別子（ユーザが付けた名前）は見ない。`issue:` を持っていても
-    ユーザが付けた名前でよい（既に同じ識別子が閉じていて、
-    その issue からは始められないときのフォールバック。8.6）。
+    - 形（先頭の語は `prefixes` のどれか）に合わなければ言う。前の形（`i<番号>`・
+      `<プロジェクト名>-i<番号>`）は使わないと添える
+    - `issue:`（同じリポジトリの課題）があれば、番号が issue と同じか。プロジェクトの issue なら
+      slug の頭が `<プロジェクト名>-` か
+    - 別のリポジトリの課題（`owner/repo#N`）は番号を比べない（その番号はこのリポジトリの issue と
+      紛れるので、通し番号を使う。ADR-0093 の 3.1 の 8 と同じ考え）
+    - 長さが勧める上限（`SUGGESTED_ID_LENGTH`）を超えるか
     """
     name = t.ticket
-    project_form = _PROJECT_ISSUE_ID.match(name)
-    if _ISSUE_ID.match(name):
-        if t.issue is None:
+    matched = form_of(name, prefixes)
+    own_issue = t.issue is not None and not t.issue_repo
+    if matched is None:
+        legacy = bool(_LEGACY_ISSUE_ID.match(name) or _LEGACY_PROJECT_ISSUE_ID.match(name))
+        head = "`i<番号>` の形はもう使わない。" if legacy else ""
+        word = "・".join(prefixes)
+        shape = f"`<先頭の語>-<番号>-<slug>` の形（先頭の語は {word} のどれか）"
+        if own_issue:
+            want = f"feature-{t.issue}-" + (f"{t.project}-" if t.project else "") + "<slug>"
             return [
-                "`i<番号>` の形は issue から決める識別子なので、`issue:` の無い提案では使わない。"
-                "issue の番号と紛れる"
+                f"{head}親の識別子は {shape} にする。"
+                f"`issue: {t.issue}` から始めるなら `{want}` など（ADR-0100）"
             ]
-        expected = "" if t.issue_repo else issue_identifier(t.issue, t.project)
-    elif project_form:
-        if t.issue is None:
-            # ユーザが付けた名前（issue が無い）には、そのプロジェクトの issue から決まる名前との
-            # 重なりだけを言う
-            # （`fix-i2` のような名前をプロジェクトの外で咎めない。11.9.1 の 17）
-            if t.project and project_form.group("project").casefold() == t.project.casefold():
-                return [
-                    f"`{t.project}-i<番号>` の形はこのプロジェクトの issue から決める識別子と"
-                    "重なるので、"
-                    "`issue:` の無い提案では使わない"
-                ]
-            return []
-        expected = issue_identifier(t.issue, t.project) if t.project and not t.issue_repo else ""
-    else:
-        return []
-    if t.issue_repo:
+        hint = f"次の通し番号は {serial}" if serial else "番号は既にある識別子の番号の続き"
         return [
-            f"`issue: {issue_label(t)}` は別のリポジトリの課題。識別子は issue から決める形"
-            "（`i<番号>`・`<プロジェクト名>-i<番号>`）にせず、"
-            "ユーザが付ける（ADR-0093 の 3.1 の 8）"
+            f"{head}親の識別子は {shape} にする。"
+            f"issue が無ければ ccnavi の通し番号を使う（{hint}。ADR-0100）"
         ]
-    if not expected:
-        return [
-            "`<プロジェクト名>-i<番号>` の形はプロジェクトの issue から決める識別子なので、"
-            "ワークスペースの提案では使わない"
-        ]
-    if name != expected:
-        return [
-            f"識別子が `issue: {t.issue}` から決まる `{expected}` と違う。"
-            "issue から決める形の識別子は番号と置き場（プロジェクト）に合わせてください"
-        ]
-    return []
+    found: list[str] = []
+    number = int(matched.group("num"))
+    prefix = matched.group("prefix")
+    if own_issue and number != t.issue:
+        found.append(
+            f"識別子の番号 {number} が `issue: {t.issue}` と違う。"
+            f"issue から始める識別子は `{prefix}-{t.issue}-<slug>` にする（ADR-0100）"
+        )
+    elif (
+        own_issue
+        and t.project
+        and not matched.group("slug").casefold().startswith(t.project.casefold() + "-")
+        and matched.group("slug").casefold() != t.project.casefold()
+    ):
+        found.append(
+            f"プロジェクト {t.project} の issue から始める識別子は "
+            f"`{prefix}-{t.issue}-{t.project}-<slug>` にする。issue の番号はリポジトリごとなので、"
+            "ワークスペースや別のプロジェクトの同じ番号の issue と名前を分ける（ADR-0100）"
+        )
+    if len(name) > SUGGESTED_ID_LENGTH:
+        found.append(
+            f"識別子が {SUGGESTED_ID_LENGTH} 文字を超える（{len(name)} 文字）。"
+            "ワークツリーのパスが Windows の上限（MAX_PATH）に近づくので"
+            " slug を短くする（ADR-0100）"
+        )
+    return found
 
 
 # スクリプトだけが書く欄。ユーザもエージェントも書かない。承認済みチケットの側で
@@ -653,8 +806,9 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
         )
         return True
 
-    if not _ID.match(name):
-        problems.append(Problem(SEVERITY_ERROR, name, "識別子に使えない文字がある"))
+    problem = id_problem(name)
+    if problem:
+        problems.append(Problem(SEVERITY_ERROR, name, problem))
         return True
 
     if ticket.parent:

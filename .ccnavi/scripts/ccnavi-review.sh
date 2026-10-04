@@ -1163,9 +1163,7 @@ config-synced)
 	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
 	# 取り込み済みの家族なら、置いた後に運ぶ処理で送る（D27）。
 	parent="${1:-}"
-	case "$parent" in
-	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*) fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2 ;;
-	esac
+	ccnavi_is_ident "$parent" || fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2
 	[ "$#" -eq 1 ] || fail config-synced-bad-args "config-synced は <親> だけを取る。" 2
 	ccnavi --config-synced "$parent" || exit $?
 	carry_human "$parent" || exit 1

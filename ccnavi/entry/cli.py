@@ -25,6 +25,7 @@ from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog, prune
 from ..tickets import configsync, history, ops, phase, review
+from ..tickets import ticket as ticket_mod
 from . import diagnose, lint, suggest, version
 
 USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
@@ -1392,13 +1393,26 @@ def _decide_actor(args) -> None:
         history.set_via(args.via)
 
 
-# 親の識別子の形（ticket._ID と同じ）。sh から渡る引数なので、パスとして読まれる綴りを入れない。
-_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+class _Family:
+    """親の識別子の形（`ticket.is_valid_id` と同じ。日本語の字を含む。ADR-0100）。
+
+    sh から渡る引数なので、パスとして読まれる綴りを入れない。前は正規表現で持っていたので、
+    呼び手が使う `fullmatch` の形を残す。
+    """
+
+    @staticmethod
+    def fullmatch(text: str) -> bool:
+        return ticket_mod.is_valid_id(text)
+
+
+_FAMILY = _Family()
+# リポジトリの控えの名前（`self` かプロジェクト名）。ASCII の 1 語。
+_REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
 _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 # `c1 sort` の版。sha か `refs/remotes/origin/<親>` の形だけ（git の引数として読まれる綴りを
 # 入れない）。
-_REVISION = re.compile(r"[0-9a-f]{7,64}|refs/remotes/origin/[A-Za-z0-9][A-Za-z0-9._-]*")
+_REVISION = re.compile(rf"[0-9a-f]{{7,64}}|refs/remotes/origin/[A-Za-z0-9][{ticket_mod.ID_CHARS}]*")
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
@@ -1420,8 +1434,11 @@ def sync_check(
     `blocked` にする（ADR-0093 の 4.2 の 4）。`repo` は控えの名前（`self` かプロジェクト名）。
     ネットワークにも git にも触らない。
     """
-    for name, value in (("識別子", family), ("リポジトリ", repo or "self")):
-        if not _FAMILY.fullmatch(value) or ".." in value:
+    for name, value, pattern in (
+        ("識別子", family, _FAMILY),
+        ("リポジトリ", repo or "self", _REPO_NAME),
+    ):
+        if not pattern.fullmatch(value) or ".." in value:
             stderr.write(f"ccnavi: sync check の{name} {value!r} は識別子の形ではない\n")
             return 1
     problems = lint.family_check(conf, root, family, repo)
