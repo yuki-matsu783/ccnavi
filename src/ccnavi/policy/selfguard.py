@@ -202,7 +202,8 @@ _SETTINGS_FILES = (
 #      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の目印
 #      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中を丸ごと指す。
 #      1 のリダイレクトの行き先だけは、語の中の目印まで含めて当てると引用の中の `> 場所` が
-#      書き込み先に見えるので、そちらも除外する。
+#      書き込み先に見えるので、先頭には置かせない。語の途中で続く目印だけは通す
+#      （`> "a b/.ccnavi/..."` のように、行き先の引用が空白を含む形を当てるため）。
 #   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。`-i` は独立したオプションの語
 #      （`-i` `-i.bak` `-ni` `--in-place`。GNU sed は長いオプションの省略形 `--in` `--i` も
 #      受けるので `--i` で始まる語は全部）だけを数える。`feature-id` のように語の途中に
@@ -225,7 +226,7 @@ _SETTINGS_FILES = (
 # 読み違えて両方を見落とす形が無いように、語の分け方を _COPY_TARGET と _COPY_LAST で揃える。
 _NOT_A_WORD = re.escape(shellread.SEP) + re.escape(shellread.WORD_SEP)
 _WRITE_VERBS = (
-    rf"(>[>|&]* ?[^ {_NOT_A_WORD}]*"
+    rf"(>[>|&]* ?(?:[^ {_NOT_A_WORD}]+(?:{re.escape(shellread.WORD_SEP)}[^ {_NOT_A_WORD}]+)*)?"
     r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
     r"|(^|\x00)sed\b[^\x00]*[ \x01](-[A-Za-z]*i|--i)[^\x00]*)"
 )
