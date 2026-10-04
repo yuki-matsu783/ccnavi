@@ -92,13 +92,18 @@ FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 # --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側にほかに取れる方法がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
-# 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
+# 実際に配る sh。3 本が起動して最初に読む共通部（入口の ccnavi-common.sh と部品 5 本）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
 # 承認済みチケットをコミットして push する sh（ccnavi-push-approved.sh）も配る。
 # ボードは承認のあとこれを端末に送るので、配らないと配布先のボードは
 # 承認の push ができない（設計 approve-carry 1.5）。
 DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
+    "ccnavi-common-state.sh",
+    "ccnavi-common-lock.sh",
+    "ccnavi-common-c1.sh",
+    "ccnavi-common-host.sh",
+    "ccnavi-common-log.sh",
     "ccnavi-common.sh",
     "ccnavi-push-approved.sh",
     "ccnavi-agree.sh",

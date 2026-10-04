@@ -102,8 +102,11 @@ DEPLOY_RULES=".ccnavi/common/rules.yml"
 DEPLOY_RISK=".ccnavi/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
-# ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分。配らないと、配布先で 3 本とも
-# 起動時にエラーで止まる。ccnavi-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
+# ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
+# ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
+# 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
+# あって部品が無い状態を作らないため。
+# ccnavi-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
 # ccnavi-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。
@@ -117,7 +120,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -1245,6 +1248,9 @@ for name in $DEPLOY_SCRIPTS; do
 			;;
 		ccnavi-clean.sh | ccnavi-clean.js)
 			why="ワークツリーを片付ける前に生成物を消す"
+			;;
+		ccnavi-common-*.sh)
+			why="代わりに通る sh が起動して最初に読む共通部の部品"
 			;;
 		*)
 			why="止めている間に代わりに通る sh"
