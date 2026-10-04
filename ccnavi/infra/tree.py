@@ -28,6 +28,7 @@ x のチケットが判定に使われなくなる。候補のうち最も長く
 from __future__ import annotations
 
 import os
+import unicodedata
 from dataclasses import dataclass
 
 # ワークツリーの置き場。CLAUDE.md の運用と対になる。ワークスペースルートの中に置くのは、
@@ -110,7 +111,7 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
         owner = owner_of(candidate, owners)
         if owner is not None:
             found.append(
-                Tree(name, _canonical(candidate), project=owner.project, kind=KIND_WORKTREE)
+                Tree(nfc(name), _canonical(candidate), project=owner.project, kind=KIND_WORKTREE)
             )
     return found
 
@@ -227,6 +228,53 @@ def head_text(tree_root: str) -> str | None:
         return None
 
 
+def origin_head(repo_root: str) -> str:
+    """そのリポジトリの `origin/HEAD` が指すブランチ名（`refs/remotes/origin/HEAD` の中身）。
+    無ければ空。
+
+    ファイルだけを読む（git は起こさない）。`ccnavi_default_branch` が `symbolic-ref`
+    で読むものと同じ。
+    """
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return ""
+    try:
+        with open(os.path.join(gitdir, "refs", "remotes", "origin", "HEAD"), encoding="utf-8") as f:
+            text = f.read().strip()
+    except (OSError, ValueError):
+        return ""
+    prefix = "ref: refs/remotes/origin/"
+    return text[len(prefix) :].strip() if text.startswith(prefix) else ""
+
+
+def has_branch(repo_root: str, name: str) -> bool:
+    """そのリポジトリに、手元のブランチか origin のブランチ `name` があるか。
+
+    ファイルだけを読む（git は起こさない。承認画面を組む判定の中から呼ばれる）。見るのは git
+    ディレクトリの `refs/heads/<名前>`・`refs/remotes/origin/<名前>` と `packed-refs` の行。
+    `..` や空の段を含む名前は読まない（git ディレクトリの外を読まない）。
+    """
+    parts = name.split("/") if isinstance(name, str) else []
+    if not parts or any(p in ("", ".", "..") for p in parts):
+        return False
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return False
+    wanted = (f"refs/heads/{name}", f"refs/remotes/origin/{name}")
+    for ref in wanted:
+        if os.path.isfile(os.path.join(gitdir, *ref.split("/"))):
+            return True
+    try:
+        with open(os.path.join(gitdir, "packed-refs"), encoding="utf-8") as f:
+            for line in f:
+                _, _, ref = line.strip().partition(" ")
+                if ref in wanted:
+                    return True
+    except (OSError, ValueError):
+        pass
+    return False
+
+
 # 途中の操作の目印（git ディレクトリの中の名前）。
 BUSY_MARKS = (
     "MERGE_HEAD",
@@ -280,9 +328,18 @@ def exact_name(root: str, name: str) -> bool:
     開けてしまう。名前が識別子だと言う以上、表記まで同じであることを求める。
     """
     try:
-        return name in os.listdir(os.path.join(root, WORKTREES_DIR))
+        return nfc(name) in {nfc(n) for n in os.listdir(os.path.join(root, WORKTREES_DIR))}
     except OSError:
         return False
+
+
+def nfc(name: str) -> str:
+    """ディレクトリの名前を NFC にそろえる。
+
+    識別子は NFC に限る。macOS の HFS+ は名前を NFD で返すので、日本語の識別子のワークツリーを
+    識別子と同じ表記として引くためにそろえる（APFS と Windows・Linux は書いた表記のまま返す）。
+    """
+    return unicodedata.normalize("NFC", name)
 
 
 # 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、ワークツリーの

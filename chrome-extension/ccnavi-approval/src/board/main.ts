@@ -211,7 +211,7 @@ const actions: Actions = {
       if (!window.confirm(`issue #${issue.number} から親のブランチを統合先 ${repoBoard.integration?.name ?? ""} の先頭に作る（マージリクエストは作らない）`)) return false;
       const deps = await writeDeps(repoBoard.repo);
       const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
-      const out = await startIssue(repoBoard.repo, issue.number, repoBoard.seen ?? null, taken, deps);
+      const out = await startIssue(repoBoard.repo, issue, repoBoard.seen ?? null, taken, deps);
       result.dataset.kind = out.kind === "started" ? "written" : out.kind;
       result.className = `notice ${out.kind === "started" ? "ok" : "error"}`;
       result.textContent =

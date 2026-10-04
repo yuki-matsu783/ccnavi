@@ -16,7 +16,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard
 from ..records import audit, prune, repeat
-from ..tickets import agree, approval, configsync, ops, phase
+from ..tickets import agree, approval, branchfind, configsync, ops, phase
 from . import docsearch, judge, post, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
@@ -155,9 +155,11 @@ def decide_at_prompt(
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする記録だけ。
 
-    例外は、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた承認済みチケット）。
-    それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
-    モデルは後工程に入れない。
+    例外は 2 つ。1 つは、このセッションがまだ知らない承認（ユーザがボードで承認して置かれた
+    承認済みチケット）。それは 1 度だけ伝える。伝えないと、ユーザが「承認した」とチャットで打つまで
+    モデルは後工程に入れない。もう 1 つは、依頼文に issue・MR の指定（`#152`・`!5` など）が
+    あるとき。着手の前に紐づくブランチを探してユーザに確かめる指示を足す。
+    どちらも文を足すだけで、作業は止めない。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     post.at_prompt(
@@ -173,8 +175,10 @@ def decide_at_prompt(
         root,
     )
     told = agree.news(stderr, conf, root, payload.session_id, payload.agent_id)
-    if told:
-        hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
+    hint = branchfind.prompt_context(conf, root, payload.prompt)
+    texts = [text for text in (told, hint) if text]
+    if texts:
+        hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, "\n\n".join(texts))
     return EXIT_OK
 
 

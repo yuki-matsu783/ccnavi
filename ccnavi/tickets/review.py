@@ -605,7 +605,8 @@ def _followup_next(root: str, parent: ticket_mod.Ticket, ident: str) -> str:
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     return (
         f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
-        f"{parent.ticket}' でワークツリーを切り、'{ticket_sh} start {ident}' で着手する"
+        f"{ticket_mod.branch_name(parent)}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
+        "着手する"
     )
 
 
@@ -1301,7 +1302,8 @@ def ready(
         return 1
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     # 退避は親のワークツリーの置き場からだけ行う（ワークスペースルートの done/ には
-    # 他の親子のチケットも在り、まとめて消すことになる）。印もコメントの下書きも置く前に確かめる。
+    # 他の親子のチケットも在り、まとめて消すことになる）。
+    # マーカーもコメントの下書きも置く前に確かめる。
     misplaced = _archive_place_problem(root, conf, parent, where)
     if misplaced:
         stderr.write(f"ccnavi: {misplaced}\n")
@@ -1401,7 +1403,7 @@ def _archived_parent(
 
     次の 2 つがそろうときだけ。そろわなければ None（通常の条件の確かめへ回る）。
 
-    - ready の印（`ready/<親>.json`）が、今のツリーで書かれたものであること
+    - ready のマーカー（`ready/<親>.json`）が、今のツリーで書かれたものであること
       （`archive.ready_started`）
     - Draft を外したマーカー（`phases/<親>/ready.json`。ツリーか退避）のマージリクエストの番号が、
       今回の結果のものと同じであること

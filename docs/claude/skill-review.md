@@ -89,12 +89,12 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
 | プロジェクトのスキル | `.claude/worktrees/<プロジェクト>-skill-proposals`。無ければ`cd projects/<プロジェクト>`して、そのプロジェクトのブランチから切る |
 
 そのツリーの `wip/proposals/todo/<識別子>.md` に書いてコミットし、パスをユーザに伝えて承認を頼む。
-識別子は `skill-<スキル名>-<要点>` のように1語にする。末尾を `-<2桁の数>` にしない（子の識別子`<親>-<2桁>-<2桁>`と紛れる）。
+識別子は `chore-<番号>-skill-<スキル名>-<要点>` の形にする。番号は既にある識別子の番号の続きで、`ccnavi --lint` の warn が次の通し番号を示す。末尾を `-<2桁の数>` にしない（子の識別子`<親>-<2桁>-<2桁>`と紛れる）。
 
 ```yaml
 ---
 version: 1
-ticket: skill-commit-push-retry
+ticket: chore-72-skill-commit-push-retry
 human_review:
   required: true
   reason: エージェントの手順を変えるため

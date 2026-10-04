@@ -83,6 +83,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの state をセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 | [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する |
+| [0102](0102-identifier-prefix-number-slug.md) | 親の識別子を `<先頭の語>-<番号>-<slug>`（`feature-64-統合先の解決` など）にそろえ、日本語の字を使えるようにする。先頭の語は `CCNAVI_BRANCH_PREFIXES` で変えられる。既にあるブランチとのぶつかりを warn する。親チケットの `branch:` キーで、識別子と違う既存のブランチを親のブランチにできる |
 
 ### ルールと判定
 
@@ -170,6 +171,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0097](0097-harden-the-eli5-place-and-request.md) | ELI5 の置き場と依頼の検査を厳しくする（パスの `\` と大文字小文字、名前の字、モード、互換の版） |
 | [0100](0100-agent-drafts-child-flow-user-imports.md) | エージェントは子のフローの下書きを提案の置き場に書き、ユーザがフロー編集画面で取り込む |
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |
+| [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない） |
 
 ### 複数のリポジトリと VS Code 拡張
 

@@ -1344,6 +1344,115 @@ class PushRemoteResolutionTest(FamilyRecordPushTest):
         self.assertEqual("present", self.fields()["state"])
 
 
+class IntegrationPushTest(GitWrapperTest):
+    """固定のリスト（main など）に無い名前の統合先へも直接は送らない。
+
+    統合先の名前は ccnavi-fetch.sh と同じ順（CCNAVI_INTEGRATION_BRANCH →
+    ccnavi-sync.sh の取り込み結果 →
+    origin/HEAD → origin/main・master）で、push したツリーが属するリポジトリについて決める。
+    決まらなければ固定のリストだけで判定する（今までの挙動）。
+    """
+
+    BRANCH = "develop-v1.0.0"
+
+    def setUp(self):
+        super().setUp()
+        self.bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", self.bare)
+        git(self.dir, "checkout", "--quiet", "-b", self.BRANCH)
+
+    def push(self, cwd=None, branch=None, **env):
+        environment = {k: v for k, v in os.environ.items() if k != "CCNAVI_INTEGRATION_BRANCH"}
+        environment.update(env)
+        return subprocess.run(
+            [SHELL, SCRIPT, "push", "-u", "origin", branch or self.BRANCH],
+            cwd=cwd or self.dir,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+        )
+
+    def landed(self, bare=None):
+        return subprocess.run(
+            ["git", "--git-dir", bare or self.bare, "rev-parse", "--verify", "-q", self.BRANCH],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    def assertRefused(self, result, bare=None):
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn(f"{self.BRANCH} は統合先です", result.stderr)
+        self.assertEqual("", self.landed(bare))
+
+    def point_origin_head(self, repo, name):
+        git(repo, "update-ref", f"refs/remotes/origin/{name}", "HEAD")
+        git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{name}")
+
+    def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
+        """origin/HEAD も origin/main・master も無ければ、固定のリストに無い名前は通す。"""
+        result = self.push()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertNotEqual("", self.landed())
+
+    def test_the_branch_origin_head_points_to_is_refused(self):
+        self.point_origin_head(self.dir, self.BRANCH)
+        self.assertRefused(self.push())
+
+    def test_the_environment_names_the_integration(self):
+        self.assertRefused(self.push(CCNAVI_INTEGRATION_BRANCH=self.BRANCH))
+
+    def test_the_sync_record_names_the_integration(self):
+        write_text(
+            os.path.join(self.dir, "logs", "state", "sync", "self", "integration", "head"),
+            f"remote origin\nbranch {self.BRANCH}\nsource default\n",
+        )
+        self.assertRefused(self.push())
+
+    def test_the_environment_wins_and_the_fixed_list_still_holds(self):
+        """環境変数が別の名前なら origin/HEAD は読まない。固定のリストはそのまま止める。"""
+        self.point_origin_head(self.dir, self.BRANCH)
+        result = self.push(CCNAVI_INTEGRATION_BRANCH="trunk")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        git(self.dir, "checkout", "--quiet", "-b", "main")
+        result = self.push(branch="main", CCNAVI_INTEGRATION_BRANCH="trunk")
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("main は統合先です", result.stderr)
+
+    def test_a_project_is_judged_by_its_own_integration(self):
+        """projects/<名前>/ の中から送るときは、そのプロジェクトの統合先で判定する。"""
+        project = os.path.join(self.dir, "projects", "app")
+        os.makedirs(project)
+        git(project, "init", "-q")
+        git(project, "config", "user.email", "t@example.invalid")
+        git(project, "config", "user.name", "t")
+        git(project, "commit", "-q", "--allow-empty", "-m", "seed")
+        git(project, "checkout", "--quiet", "-b", self.BRANCH)
+        parent = tempfile.mkdtemp(prefix="ccnavi-gitwrap-origin-")
+        self.addCleanup(shutil.rmtree, parent, ignore_errors=True)
+        bare = os.path.join(parent, "app.git")
+        git(project, "init", "-q", "--bare", bare)
+        git(project, "remote", "add", "origin", bare)
+
+        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先（main）とは別なので通す。
+        self.point_origin_head(self.dir, self.BRANCH)
+        self.point_origin_head(project, "main")
+        result = self.push(project)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+        # プロジェクトの統合先（取り込み結果）が develop-v1.0.0 なら止める。
+        # 送り先は空のものに替えて見る。
+        bare2 = os.path.join(parent, "app2.git")
+        git(project, "init", "-q", "--bare", bare2)
+        git(project, "remote", "set-url", "origin", bare2)
+        write_text(
+            os.path.join(self.dir, "logs", "state", "sync", "app", "integration", "head"),
+            f"branch {self.BRANCH}\n",
+        )
+        self.assertRefused(self.push(project), bare2)
+
+
 class SafeAdditionsTest(GitWrapperTest):
     """許可リストに足した、履歴を書き換えない形。
 

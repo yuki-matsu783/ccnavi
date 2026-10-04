@@ -203,6 +203,10 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   box.dataset.family = f.family.name;
   const title = el(doc, "h3");
   title.append(el(doc, "code", "", f.family.name), doc.createTextNode(` ${f.family.title}`));
+  // 親チケットの branch: で識別子と違うブランチを使う親子のチケットは、識別子も出す
+  if (f.family.family && f.family.family !== f.family.name) {
+    title.append(doc.createTextNode(" （識別子 "), el(doc, "code", "", f.family.family), doc.createTextNode("）"));
+  }
   box.append(title);
   if (f.error) {
     box.append(notice(doc, "error", f.error));
