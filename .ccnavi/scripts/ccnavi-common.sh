@@ -237,7 +237,7 @@ ccnavi_project() {
 	else
 		ccnavi_pj_ws=$(ccnavi_workspace) || return 0
 	fi
-	ccnavi_pj_places="${CCNAVI_PROJECTS:-projects}"
+	ccnavi_pj_places=projects # 固定
 	# リンクを解いたパスで揃える（git が返すパスはリンクを解いている）。
 	ccnavi_pj_dir=$(ccnavi_phys "$ccnavi_pj_dir")
 	ccnavi_pj_ws=$(ccnavi_phys "$ccnavi_pj_ws")

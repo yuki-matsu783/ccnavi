@@ -21,7 +21,6 @@ import { localStamp } from "./stamp.js";
 export type Ask = (op: string, args: readonly unknown[]) => Promise<unknown>;
 
 export interface ConfirmInput {
-  readonly settings: string | null;
   /** 判定の入力（統合先・P・閉包の P_X） */
   readonly snapshot: Snapshot;
   readonly family: string;
@@ -34,7 +33,6 @@ export interface ConfirmInput {
 /** Python の `confirm` を呼ぶ。依頼の後に先頭が動いていれば、求められた 2 つの変更の一覧を読んで呼び直す */
 export async function askConfirm(call: PyCall, ask: Ask, input: ConfirmInput): Promise<ConfirmResult> {
   const body = {
-    settings: input.settings,
     snapshot: input.snapshot,
     family: input.family,
     phase: input.phase,
@@ -71,7 +69,7 @@ export async function reviewPanels(
   reviewable: readonly Reviewable[],
   call: PyCall,
   ask: Ask,
-  base: { settings: string | null; snapshot: Snapshot; family: string },
+  base: { snapshot: Snapshot; family: string },
   now: Date,
 ): Promise<ReviewPanel[]> {
   const out: ReviewPanel[] = [];

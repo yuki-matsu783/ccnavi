@@ -120,7 +120,7 @@ root=$(ccnavi_workspace) ||
 # 解いたルートを logger に渡し、書くたびに探し直させない。
 ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
-state="$root/${CCNAVI_STATE:-logs/state}"
+state="$root/logs/state" # 固定
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
@@ -1008,7 +1008,7 @@ ready)
 	# 見るのは退避したツリー（実行ファイルが答えたもの）。古い実行ファイルが答えなければ cwd のツリー。
 	if [ "$c1_on" != yes ]; then
 		[ -n "$ready_tree" ] || ready_tree=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || :)
-		ready_place="${ccnavi_c1_approved:-${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}}"
+		ready_place="${ccnavi_c1_approved:-.ccnavi/approved}"
 		if [ -n "$ready_tree" ] &&
 			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- ":(literal)$ready_place" 2>/dev/null)" ]; then
 			fail ready-unsent "${ready_tree} の置き場（${ready_place}）に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"

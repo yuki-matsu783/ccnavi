@@ -9,6 +9,8 @@ keywords: [decisions, 判定, 記録, ファイル名, log, ローテーショ�
 
 状態: 採用
 
+追記: `CCNAVI_LOG` は ADR-0098 で廃止した。古い `logs/log.jsonl` を読ませたいときは、ユーザがファイル名を `logs/decisions.jsonl` に変える。導入スクリプトは、以前書いた `CCNAVI_LOG=logs/log.jsonl` を既定と違う値として名指しして外す。
+
 ## 状況
 
 判定の記録（CONTEXT.md の用語）は `logs/log.jsonl` に書き、ローテートした分の名前は `logs/log.<日時>.jsonl` だった（ADR-0089）。

@@ -172,14 +172,15 @@ class CompatAgreesTest(unittest.TestCase):
         """
         self.assertGreaterEqual(version.COMPAT, 3)
 
-    def test_v9_approval_leaving_the_ticket_as_is_raised_the_compat_to_4(self):
+    def test_v9_approval_leaving_the_ticket_as_is_raised_the_compat_to_6(self):
         """V9 承認がチケットの中身を変えなくなり、待ち方の置き場（`phases/<親>/workflow.yml`）と
-        取り下げの条件が変わった。sh は `ticket status` を呼ぶ。なので 4 以上。
+        取り下げの条件が変わった。sh は `ticket status` を呼ぶ。なので 6 以上。
 
-        古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）は待ち方を一直線と読み、
-        `status` を知らないので、食い違いとして知らせる。
+        この変更は互換の版を 4 に上げて作ったが、統合先では別の変更が先に 5 へ上げていたので、
+        取り込みのときにどちらとも重ならない 6 にした。古い実行ファイル（古いコアを積んだ
+        Chrome 拡張を含む）は待ち方を一直線と読み、`status` を知らないので、食い違いとして知らせる。
         """
-        self.assertGreaterEqual(version.COMPAT, 4)
+        self.assertGreaterEqual(version.COMPAT, 6)
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")

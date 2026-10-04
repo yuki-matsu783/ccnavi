@@ -103,6 +103,20 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // アーカイブ済みのチケット（手元の退避）を出すか。既定は出さない。隠すのが既定なので、絞り込み（filtering）には数えない
   const archived = view.archived;
   const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
+  // 「アーカイブ済みチケットを表示」を入れたら、右端に足されるアーカイブの列まで横へ送る。
+  // ユーザが入れたときだけ動かす（覚えていた値で開き直したときには動かさない）。
+  // 送るのはボードの横だけ。列の scrollIntoView だと、列の高さに合わせて文書の縦まで動いてしまう
+  const revealArchived = useRef(false);
+  useEffect(() => {
+    if (!archived || !revealArchived.current) {
+      return;
+    }
+    revealArchived.current = false;
+    const board = document.querySelector<HTMLElement>(".board");
+    if (board !== null) {
+      board.scrollLeft = board.scrollWidth;
+    }
+  }, [archived]);
 
   // 絞り込み中かどうかは body に出す。カードの表示・非表示は CSS（.card.hidden）が受け持つ
   useEffect(() => {
@@ -191,7 +205,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
               </label>
               <label className="filter archived" title={FILTER_LABELS.archivedTitle}>
-                <input type="checkbox" id="archived-filter" checked={archived} onChange={(event) => setView((now) => ({ ...now, archived: event.target.checked }))} /> {FILTER_LABELS.archived}
+                <input type="checkbox" id="archived-filter" checked={archived} onChange={(event) => {
+                    const checked = event.target.checked;
+                    revealArchived.current = checked;
+                    setView((now) => ({ ...now, archived: checked }));
+                  }} /> {FILTER_LABELS.archived}
               </label>
               <button
                 type="button"
@@ -229,7 +247,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
           {shown.totalCount === 0 && !(archived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
           <div className="board">
-            {/* アーカイブの列は「アーカイブ済みのチケットを表示する」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
+            {/* アーカイブの列は「アーカイブ済みチケットを表示」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
             {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
               <Column
                 key={column.state}

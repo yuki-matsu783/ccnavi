@@ -473,7 +473,6 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
   }
   return await writeLoop(repo, family, deps, "承認し直してください", async (read, stamp) => {
     const res = await py.plan(deps.py, {
-      settings: read.settings,
       snapshot: read.input,
       family,
       only: shown.only,
@@ -510,7 +509,6 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
   return await writeLoop(repo, family, deps, "取り下げ直してください", async (read, stamp) => {
     const prior = await findPrior((op, args) => deps.call(op, [repo.owner, repo.repo, ...args]), read.place, read.head, ident);
     const res = await py.withdraw(deps.py, {
-      settings: read.settings,
       snapshot: read.input,
       family,
       ids: [ident],
@@ -544,7 +542,6 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
   return await writeLoop(repo, family, deps, "レビュー済みにし直してください", async (read, stamp) => {
     const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
     const res = await askConfirm(deps.py, ask, {
-      settings: read.settings,
       snapshot: read.input,
       family,
       phase,

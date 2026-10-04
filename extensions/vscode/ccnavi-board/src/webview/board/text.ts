@@ -12,7 +12,7 @@ export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "�
 export const FILTER_LABELS = {
   attention: "要対応のみ",
   attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
-  archived: "アーカイブ済みのチケットを表示する",
+  archived: "アーカイブ済みチケットを表示",
   archivedTitle: "Draft を外したとき（ccnavi-review.sh ready）に手元の logs/archive/ へ退避した、閉じたチケットを「アーカイブ」の列に表示します。既定では隠します",
 } as const;
 

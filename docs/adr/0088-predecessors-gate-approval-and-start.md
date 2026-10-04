@@ -7,7 +7,7 @@ keywords: [predecessors, 先行, 依存, チケット, 承認, done, 検証]
 ---
 # ADR-0088: 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ
 
-状態: 採用
+状態: 採用（続きの子の目印 `followup_of` の置き場は ADR-0104 が改める）
 
 ## 状況
 

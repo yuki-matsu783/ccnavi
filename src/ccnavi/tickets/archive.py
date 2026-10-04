@@ -265,32 +265,65 @@ def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mo
     同じチケットかは、承認の時刻ではなく着手と取り消しの欄で決める（承認はチケットの中身を
     変えないので、承認の時刻の欄は古い形にしか無い）。
 
-    - 着手も取り消しもしていない写し（欄が 3 つとも空）は、退避より前の写しとして落とす。子の
-      ワークツリーを切ったのは着手より前で、残る写しはふつうこの形。閉じた識別子は新規に承認
-      しない（`approval_checks.integration_problems` が退避の識別子を拒む）ので、同じ識別子の
-      未着手のチケットは古い写ししか無い
+    - 着手も取り消しもしていない写し（欄が 3 つとも空）は、子のワークツリー（親のツリーではない
+      ツリー）で見つけたものに限り、退避より前の写しとして落とす。子のワークツリーを切ったのは
+      着手より前で、残る写しはふつうこの形
+    - 親のツリーで見つけた、欄が 3 つとも空のチケットは落とさない。`ready` は親のツリーから
+      閉じた親子を消すので、そこに残る未着手のチケットは古い写しではなく、閉じた識別子を使い直した
+      もの（手元の退避は別の機械には無いので、別の機械で承認し直せる）。黙って落とすと、ユーザの
+      承認がどこにも出ずに消える。残して `Ticket.archived_clash` に理由を入れ、判定で止める
+      （`approval_checks.content_problems`）
     - 欄があれば、統合先の `done/` の親と同じく `syncstate.same_parent` で比べ、同じと言えるときだけ
       落とす。違えば同じ識別子の別のチケットとみなして残す
-    - 両方に古い形の承認の時刻があって違えば、どちらでも残す（前の版と同じ見方）
+    - 両方に古い形の承認の時刻があれば、違えばどちらでも残し、同じなら欄が空でも落とす（前の版と
+      同じ見方）
     """
     if not root or not tickets:
         return tickets
     out = []
     for t in tickets:
         copy = archived_fields(root, t.project, t.ticket)
-        if copy is not None and copy.ticket == t.ticket and _same_ticket(_mine(t), copy):
-            continue
+        if copy is not None and copy.ticket == t.ticket:
+            verdict = _same_ticket(_mine(t), copy, in_parent_tree=_in_parent_tree(t))
+            if verdict == _SAME:
+                continue
+            if verdict == _REUSED:
+                # レビュー待ちの走査は `mark_blocked` を通らないので、理由をここでも付ける。
+                t.archived_clash = REUSED_REASON
+                t.blocked = t.blocked or REUSED_REASON
         out.append(t)
     return out
 
 
-def _same_ticket(mine: syncstate.DoneCopy, archived: syncstate.DoneCopy) -> bool:
+# 退避の写しとの見比べの答え。
+_SAME = "same"  # 同じチケット（落とす）
+_OTHER = "other"  # 別のチケット（残す）
+_REUSED = "reused"  # 親のツリーの未着手のチケットで、退避と同じ識別子（残して止める）
+
+REUSED_REASON = (
+    "手元の退避（logs/archive/）に同じ識別子の閉じたチケットがある。閉じた識別子を別の機械で"
+    "使い直した可能性がある。このチケットは着手も取り消しもしていないので、退避と同じものかを"
+    "見分けられない。ユーザが識別子を確かめ、使い直したなら別の識別子で提案して承認し直してください"
+)
+
+
+def _in_parent_tree(t: ticket_mod.Ticket) -> bool:
+    # 親のツリー（親自身なら自分のツリー）で見つけたか。`ticket.authority` と同じ見方。
+    return t.tree == (t.parent or t.ticket)
+
+
+def _same_ticket(
+    mine: syncstate.DoneCopy, archived: syncstate.DoneCopy, in_parent_tree: bool
+) -> str:
     # 退避の写しと同じチケットか（drop_archived の説明のとおり）。
-    if mine.approved_at and archived.approved_at and mine.approved_at != archived.approved_at:
-        return False
+    if mine.approved_at and archived.approved_at:
+        if mine.approved_at != archived.approved_at:
+            return _OTHER
+        if not any(getattr(mine, name) for name in syncstate.MATCH_FIELDS):
+            return _SAME
     if not any(getattr(mine, name) for name in syncstate.MATCH_FIELDS):
-        return True
-    return syncstate.same_parent(mine, archived)
+        return _REUSED if in_parent_tree else _SAME
+    return _SAME if syncstate.same_parent(mine, archived) else _OTHER
 
 
 def _mine(t: ticket_mod.Ticket) -> syncstate.DoneCopy:

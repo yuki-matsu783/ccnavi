@@ -15,6 +15,7 @@ from ..tickets import (
     agree,
     approval,
     approval_checks,
+    approval_marks,
     history,
     ops,
     phase,
@@ -34,9 +35,7 @@ def _copy_problems(
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する。
 
-    承認で本物とするのは置き場で、チケットの中の欄ではない。
-
-    承認は置き場で決まり、`ccnavi_approved` の欄では決まらない。
+    承認は置き場で決まり、チケットの中の欄（`ccnavi_approved` など）では決まらない。
 
     置き場を動かして承認する進め方では `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
@@ -81,12 +80,16 @@ def _copy_problems(
         unrecorded = _record_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
+        if t.workflow_record_differs:
+            warned = f"{t.ticket}: {OLD_WORKFLOW_DIFFERS}"
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", warned))
         unrecorded = _start_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
         off = ops.base_off_head(root, conf, t) if t.started_at else ""
         if off:
-            # 判定には入れない（判定は git を読まない）。`start` は着手の前に同じ形で止める。
+            # 判定には入れない（判定は git を読まない）。`start` も止めない（通れば基準点を
+            # HEAD で書き直すので、止めても防げる形が無い）。ここと status が warn で知らせる。
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {off}"))
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
@@ -102,6 +105,46 @@ def _copy_problems(
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
     return problems
+
+
+def _orphan_workflows(conf: settings.Settings, root: str, raw: approval.Raw) -> list[Problem]:
+    """親の承認済みチケットがどこにも無いのに残った待ち方のファイル（`phases/<親>/workflow.yml`）。
+
+    待ち方のファイルは `--agree` が書き、取り下げが一緒に消す。親を手で動かして消した・取り下げの
+    途中で止まった、などで残ると、同じ識別子で後から承認した親（手で動かした承認は待ち方を書かない）
+    の待ち方として読まれる。判定には入れず warn で言う。
+    """
+    known = {t.ticket for t in raw.everything}
+    problems: list[Problem] = []
+    for t in approval.trees(conf, root):
+        phases_dir = os.path.join(settings.approved_dir(conf, t.root), approval_marks.PHASES_DIR)
+        try:
+            names = sorted(os.listdir(phases_dir))
+        except OSError:
+            continue
+        for name in names:
+            held = approval.workflow_path(settings.approved_dir(conf, t.root), name)
+            if name in known or not os.path.lexists(held):
+                continue
+            shown = os.path.relpath(held, root).replace(os.sep, "/")
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{shown}: 待ち方のファイルがあるのに、親 {name} の承認済みチケットがどの置き場"
+                    "（作業中・レビュー待ち・閉じた）にも無い。同じ識別子で後から承認した親の待ち方として"
+                    "読まれるので、取り下げや手での移動で残ったものなら、ユーザが消してください",
+                )
+            )
+    return problems
+
+
+OLD_WORKFLOW_DIFFERS = (
+    "古い形（承認の記録 ccnavi_approved を持つ）の workflow: 欄の待ち方が、今の phases.yml から"
+    "計算した待ち方と違うので、欄を使わず全体計画を一直線（前の番号を全部待つ）で読んでいる。"
+    "欄は手で書けるので、計算と合わない待ち方は効かせない。並行にしたければ、改版でユーザに"
+    " --agree を通してもらう"
+)
 
 
 def _record_unrecorded(conf: settings.Settings, t) -> str:
@@ -215,6 +258,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(_stale_problems(root, conf, stale, index, done))
 
     problems.extend(_copy_problems(root, conf, copies, index, closed, raw))
+    problems.extend(_orphan_workflows(conf, root, raw))
 
     resolve = _types_resolver(conf, root)
     for t in copies:
@@ -291,6 +335,9 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     （`builtin-guard-project-home`）。ルールファイルには書かせない（書かせると消せる）。
     ここで見るのは、置き場が本当に ccnavi ディレクトリの下にあるか。外に向けると、
     その 1 本が当たらず、エージェントが承認済みチケットを書けて承認の意味が無くなる。
+
+    置き場は既定に固定なので、外に向くのは診断のフラグ（`--approved` /
+    `--project-home`）で動かしたときだけ。フラグが残る間は見ておく。
     """
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
     approved = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/").strip("/")
@@ -300,8 +347,8 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
         Problem(
             SEVERITY_ERROR,
             "(ticket)",
-            f"承認済みチケットの置き場（{settings.APPROVED_ENV}={conf.approved}）が "
-            f"ccnavi ディレクトリ（{settings.PROJECT_HOME_ENV}={conf.project_home}）の外にある。"
+            f"承認済みチケットの置き場（{conf.approved}）が"
+            f"ccnavi ディレクトリ（{conf.project_home}）の外にある。"
             "組み込みの保護が及ばないので、エージェントが承認済みチケットを書き換えられ、"
             "承認が意味を持たない",
         )

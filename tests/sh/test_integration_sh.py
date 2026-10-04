@@ -113,12 +113,17 @@ class IntegrationTest(unittest.TestCase):
         self.record("self", "develop-v1.0.0")
         self.assertIntegration("trunk", CCNAVI_INTEGRATION_BRANCH="trunk")
 
-    def test_the_record_follows_ccnavi_state(self):
+    def test_the_record_does_not_follow_ccnavi_state(self):
+        """置き場の env は読まない。取り込み結果は既定の `logs/state/` から読む。
+
+        `CCNAVI_STATE` が読まれれば、env が指す置き場の develop-v2 が答えになって落ちる。
+        """
         write(
             os.path.join(self.ws, "elsewhere", "sync", "self", "integration", "head"),
             "branch develop-v2\n",
         )
-        self.assertIntegration("develop-v2", CCNAVI_STATE="elsewhere")
+        self.record("self", "develop-v1.0.0")
+        self.assertIntegration("develop-v1.0.0", CCNAVI_STATE="elsewhere")
 
     def test_a_worktree_reads_the_record_of_its_repository(self):
         tree = os.path.join(self.ws, ".claude", "worktrees", "i0001")

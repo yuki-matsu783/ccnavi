@@ -772,6 +772,15 @@ class Ticket:
     # 待ち方のファイル（`phases/<親>/workflow.yml`）が在るのに読めない理由。空なら読めたか無い。
     # 判定は読めない待ち方を一直線と読まずに止める（`approval_checks.blocking_problems`）。
     workflow_unreadable: str = ""
+    # 待ち方を古い形の `workflow:` 欄から採ったか（`approval.load_copy`）。採るのは今の phases.yml
+    # から計算した待ち方と同じときだけで、違えば欄を捨てて一直線で読み、
+    # `workflow_record_differs` を立てる（`approval.settle_old_workflows`）。
+    workflow_from_record: bool = False
+    workflow_record_differs: bool = False
+    # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
+    # 同じ識別子のときの理由（`archive.drop_archived`）。
+    # 判定は止める（`approval_checks.content_problems`）。
+    archived_clash: str = ""
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
     # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。
@@ -1200,8 +1209,8 @@ def combine(child: str, parent: str) -> str:
 def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """ツリーのルートからの相対パスが、チケットの置き場の下にあるか。
 
-    置き場は提案の置き場（`CCNAVI_TICKETS_PROPOSAL`）と承認済みチケットの置き場
-    （`CCNAVI_TICKETS_APPROVED`）。
+    置き場は提案の置き場（`wip/proposals/`）と承認済みチケットの置き場
+    （`.ccnavi/approved/`）。どちらも固定で、env では動かない。
     ここはチケットの範囲の外でも報告しない。報告すると、親が自分のワークツリーに次の子を
     提案する経路と、承認がブランチに乗る経路が使えなくなる。
 

@@ -719,6 +719,8 @@ def blocking_problems(
     - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は `--agree` が
       `phases/<親>/workflow.yml` に書くもので、欄を承認済みの待ち方として効かせない
     - 待ち方のファイルが読めない。一直線と読むと、ユーザが承認した待ち方と違う順で進む
+    - 親のツリーの未着手のチケットが、手元の退避の閉じたチケットと同じ識別子
+      （`archive.drop_archived`）。使い直した識別子か、退避と同じものかを見分けられない
     """
     problems = list(project_problems(t, pool, conf))
     problems.extend(content_problems(t))
@@ -753,6 +755,8 @@ def content_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
         )
     if t.workflow_unreadable:
         problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.workflow_unreadable))
+    if t.archived_clash:
+        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.archived_clash))
     return problems
 
 

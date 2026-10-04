@@ -47,7 +47,6 @@ export async function startIssue(
     // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
     const res = await py.start(deps.py, {
-      settings: base.settings,
       snapshot,
       issue: issue.number,
       title: issue.title,

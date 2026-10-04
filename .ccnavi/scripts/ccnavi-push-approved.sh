@@ -21,11 +21,11 @@
 # <親> を並べると、その親子のチケットだけをコミットして push する。取り込み済みでない親子のチケットは
 # コミットしない（今のまま、ユーザがコミットする）。省けば今どおり、置き場に変更のあるツリー全部。
 #
-# 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
-# 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
-# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（コピーは作らない）ので、
+# 数えるツリーは、ワークスペース、projects の下、.claude/worktrees の下。
+# 置き場は .ccnavi/approved（どの置き場も固定）。承認は提案を
+# wip/proposals の todo/ から動かす（コピーは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）はコミットしない。
-# 同じく、ボードのフロー編集画面が取り込んだ下書き（$CCNAVI_TICKETS_PROPOSAL の flows/）を
+# 同じく、ボードのフロー編集画面が取り込んだ下書き（wip/proposals の flows/）を
 # フローの保存のあとに消すので、追跡されていた下書きの削除だけをコミットする。未追跡の下書きと、書き直された
 # 下書き（消えていない）はコミットしない。`ccnavi c1 sort` の置き場には足さず、消えたものだけをここで拾う。
 #
@@ -74,9 +74,9 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
-projects="${CCNAVI_PROJECTS:-projects}"
+approved=.ccnavi/approved # 固定
+proposals=wip/proposals   # 固定
+projects=projects         # 固定
 # 末尾の / を落とす。`[ -L "projects/" ]` はリンクを辿って偽になる。
 approved="${approved%/}"
 proposals="${proposals%/}"

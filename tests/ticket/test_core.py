@@ -3,7 +3,7 @@
 判定のコアは入出力を持たない関数にし、ファイルシステム・git・API は差し替え点に分ける。
 Chrome（Pyodide）と手元が同じコアで判定するため。
 
-見るのは 6 つ。
+見るのは 7 つ。
 
 1. 時計（Clock の差し替え点）: `fsio.clock` で固定した時刻を、承認の記録と履歴が同じに書く
 2. 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
@@ -16,12 +16,15 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
    に置き、拡張の試験が Pyodide でも同じ答えになることを見る
 5. 承認の取り下げの条件
 6. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
+7. Chrome の入口は置き場を既定に固定する。統合先の `.claude/settings.json` の `env` や手元の env に
+   置き場の env を入れても既定の置き場を使い、`settings` の env 名の定数を参照しない
 
 見本の形を変えたら `CCNAVI_CHROME_FIXTURE=1` を付けてこのテストを走らせ、見本を書き直す。
 """
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import io
 import json
@@ -36,6 +39,7 @@ from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, history
+from ccnavi.tickets import ticket as ticket_mod
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
@@ -54,6 +58,15 @@ def _chrome():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _place_of(chrome):
+    """入口（`handle` の `op: placement`）が答える置き場。`_placement` の引数の形に依らない。"""
+    request = {"schema": chrome.SCHEMA, "op": "placement"}
+    answer = json.loads(chrome.handle(json.dumps(request), os.devnull))
+    if "error" in answer:
+        raise AssertionError(f"置き場を読めない: {answer['error']}")
+    return answer["placement"]
 
 
 def _files(tree_root, prefixes=PLACES):
@@ -151,7 +164,7 @@ class CoreHarness(PhaseHarness):
         依頼時の先頭と比べるので、親のブランチの本物の先頭が要る）。
         """
         chrome = _chrome()
-        place = chrome._placement(None)
+        place = _place_of(chrome)
         branches = {}
         for name, path in self.trees().items():
             if name == "main":
@@ -197,7 +210,7 @@ class CoreHarness(PhaseHarness):
         取り込み状態を含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
-        place = chrome._placement(None)
+        place = _place_of(chrome)
         closure = chrome._closure(snap, place, request["family"])
         shutil.rmtree(os.path.join(self.state, "sync"), ignore_errors=True)
         for rel, text in chrome.records(
@@ -1072,6 +1085,174 @@ SCENARIO_NAMES = (
 )
 
 
+# 置き場を既定から外す env の名前（統合先の `.claude/settings.json` に書かれうるもの）。
+# `settings` の定数ではなく綴りで持つ。定数が消えても（i0064）この試験は読み込める。
+MOVED_ENV_NAMES = ("CCNAVI_TICKETS_PROPOSAL", "CCNAVI_TICKETS_APPROVED", "CCNAVI_PROJECT_HOME")
+
+# env 名の定数（i0064 で消える）。ccnavi_chrome.py はこれを引かない。
+ENV_CONSTANTS = ("TICKETS_ENV", "APPROVED_ENV", "PROJECT_HOME_ENV")
+
+# 置き場の答えのうち、既定の置き場から組まれるはずの欄。
+PLACEMENT_KEYS = (
+    "tickets",
+    "approved",
+    "layer_dir",
+    "integration_paths",
+    "integration_files",
+    "branch_paths",
+    "workspace_paths",
+    "workspace_files",
+    "project_paths",
+)
+
+
+def _default_placement(chrome):
+    """既定の置き場（`settings.DEFAULT_*`）から組んだ、置き場の答えの欄。"""
+    tickets = settings.DEFAULT_TICKETS.replace(os.sep, "/").strip("/")
+    approved = settings.DEFAULT_APPROVED.replace(os.sep, "/").strip("/")
+    home = settings.DEFAULT_PROJECT_HOME.replace(os.sep, "/").strip("/")
+    layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
+    done = f"{approved}/{ticket_mod.DONE}"
+    return {
+        "tickets": tickets,
+        "approved": approved,
+        "layer_dir": layer,
+        "integration_paths": sorted({done, chrome.COMMON_LAYER, layer}),
+        "integration_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
+        "branch_paths": [approved, tickets],
+        "workspace_paths": sorted({chrome.COMMON_LAYER, layer}),
+        "workspace_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
+        "project_paths": sorted({done, layer}),
+    }
+
+
+def _settings_text(env):
+    """統合先の `.claude/settings.json` の中身（置き場の env と、置き場に関わらない env）。"""
+    return json.dumps({"env": {"CCNAVI_MODE": "enforce", **env}}, ensure_ascii=False)
+
+
+class ChromePlacementTest(CoreHarness):
+    """Chrome の入口は置き場を既定に固定し、置き場を動かす env を読まない。
+
+    置き場は入口（`handle`）を通して確かめ、`_placement` の引数の形には縛られない。
+    `CoreChromeTest` の見本には載せない（見本は拡張の側に置くもの）。
+    """
+
+    def ask_placement(self, chrome=None, **extra):
+        chrome = chrome or _chrome()
+        request = {"schema": chrome.SCHEMA, "op": "placement", **extra}
+        answer = json.loads(chrome.handle(json.dumps(request), os.path.join(self.root, "memfs")))
+        self.assertNotIn("error", answer, answer)
+        return chrome, answer["placement"]
+
+    def assert_default(self, chrome, place):
+        self.assertEqual(
+            {k: place.get(k) for k in PLACEMENT_KEYS}, _default_placement(chrome), place
+        )
+        # 置き場の env は答えに載らない（欄ごと消してもよい）。
+        self.assertEqual(place.get("env", {}), {}, place)
+
+    def board_request(self):
+        """手元のツリーから組んだ `board` の要求と、env を入れないときの答え。"""
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
+        self.commit_parent()
+        request = self.chrome_request("board", "i0001")
+        plain = json.loads(_chrome().handle(json.dumps(request), os.path.join(self.root, "m1")))
+        self.assertNotIn("error", plain, plain)
+        self.assertEqual([e["ticket"] for e in plain["batch"]], ["i0001", "i0001-01-01"], plain)
+        return request, plain
+
+    def test_relative_env_in_the_integration_settings_is_not_read(self):
+        # B1
+        moved = {
+            "CCNAVI_TICKETS_PROPOSAL": "moved/proposals",
+            "CCNAVI_TICKETS_APPROVED": "moved/approved",
+            "CCNAVI_PROJECT_HOME": "moved/home",
+        }
+        chrome, place = self.ask_placement(settings=_settings_text(moved))
+        self.assert_default(chrome, place)
+
+    def test_absolute_env_in_the_integration_settings_is_not_refused(self):
+        # B2
+        for form in ("/x", "C:/x", "~/x"):
+            with self.subTest(form=form):
+                moved = {name: f"{form}/{i}" for i, name in enumerate(MOVED_ENV_NAMES)}
+                chrome, place = self.ask_placement(settings=_settings_text(moved))
+                self.assert_default(chrome, place)
+
+    def test_the_board_answer_does_not_change_with_the_env(self):
+        # B3
+        request, plain = self.board_request()
+        moved = {
+            "CCNAVI_TICKETS_PROPOSAL": "moved/proposals",
+            "CCNAVI_TICKETS_APPROVED": "moved/approved",
+            "CCNAVI_PROJECT_HOME": "moved/home",
+        }
+        with_env = {**request, "settings": _settings_text(moved)}
+        answer = json.loads(_chrome().handle(json.dumps(with_env), os.path.join(self.root, "m2")))
+        self.assertEqual(answer, plain)
+
+    def test_the_module_does_not_refer_to_the_env_names(self):
+        # B4 （1 段目）ソースが env 名の定数を引かない。土台の名前（`settings.`・別名）を問わず
+        # 属性参照を拾い、`from ... import TICKETS_ENV` と、`getattr` に渡す同じ綴りの文字列も拾う。
+        path = os.path.join(CHROME, "py", "ccnavi_chrome.py")
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read(), path)
+        found = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr in ENV_CONSTANTS:
+                found.append(f"{node.lineno}: 属性 {ast.unparse(node)}")
+            elif isinstance(node, ast.ImportFrom):
+                found += [
+                    f"{node.lineno}: import {a.name}" for a in node.names if a.name in ENV_CONSTANTS
+                ]
+            elif isinstance(node, ast.Constant) and node.value in ENV_CONSTANTS:
+                found.append(f"{node.lineno}: 文字列 {node.value!r}")
+        self.assertEqual(
+            sorted(found), [], "ccnavi_chrome.py が settings の env 名の定数を参照している"
+        )
+
+    def test_the_module_loads_without_the_env_name_constants(self):
+        # B4 （2 段目）定数を外しても読み込める。外している間は読み込みだけを見る。
+        # `settings.load` は i0064 まで定数を引くので、外したまま置き場を聞くと
+        # 正しい実装でも落ちる。置き場は戻してから聞く。
+        saved = {name: getattr(settings, name) for name in ENV_CONSTANTS if hasattr(settings, name)}
+        for name, value in saved.items():
+            self.addCleanup(setattr, settings, name, value)
+        for name in saved:
+            delattr(settings, name)
+        try:
+            chrome = _chrome()
+        except (AttributeError, ImportError) as exc:
+            loaded = exc
+        else:
+            loaded = None
+        finally:
+            for name, value in saved.items():
+                setattr(settings, name, value)
+        if loaded is not None:
+            self.fail(f"settings の env 名の定数が無いと ccnavi_chrome.py を読み込めない: {loaded}")
+        _, place = self.ask_placement(chrome)
+        self.assert_default(chrome, place)
+
+    def test_the_local_process_env_is_not_read(self):
+        # B5 手元のプロセスの env は `_environ` が外す（回帰の見張り）
+        moved = {name: f"local/{i}" for i, name in enumerate(MOVED_ENV_NAMES)}
+        with mock.patch.dict(os.environ, moved):
+            chrome, place = self.ask_placement()
+        self.assert_default(chrome, place)
+        # 判定まで通る操作でも、手元の env は混ざらない。
+        request, plain = self.board_request()
+        with mock.patch.dict(os.environ, moved):
+            answer = json.loads(
+                _chrome().handle(json.dumps(request), os.path.join(self.root, "m2"))
+            )
+        self.assertEqual(answer, plain)
+
+
 class WithdrawTest(CoreHarness):
     """取り下げの条件。どれか 1 つでも当たれば何も並べない。
 
@@ -1367,7 +1548,7 @@ class RecordWritesTest(CoreHarness):
         climbing = os.path.join(self.place(), "..", "..", "..", "wip", "list.txt")
         self.refused(climbing)
         self.assertFalse(os.path.exists(outside))
-        # `--state` と `CCNAVI_STATE` で置き場を動かしても、書き出し先は動かない。
+        # `--state` で置き場を動かしても、`CCNAVI_STATE` を入れても、書き出し先は動かない。
         moved = os.path.join(self.root, "wip")
         self.refused(os.path.join(moved, "c1", "list.txt"), "--state", moved)
         with mock.patch.dict(os.environ, {"CCNAVI_STATE": moved}):

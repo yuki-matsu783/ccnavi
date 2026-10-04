@@ -468,9 +468,9 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
     assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ", "案内"]);
     // 途中の一覧と図の切り替えは state に書かない（途中でタブを閉じても、次は元の図で開く）
     assert.equal((dom.state() as { view?: string }).view, "graph");
-    // 最後の段は「完了」だけ（同じ働きのボタンを 2 つ並べない）
+    // 最後の段は「完了」。やめる × はどの段でも右上に出す
     assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");
-    assert.equal(dom.all('[data-action="tour-skip"]').length, 0);
+    assert.equal(dom.one('.tour-bubble > [data-action="tour-skip"]').textContent?.trim(), "×");
     dom.click(dom.one('[data-action="tour-next"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
@@ -492,7 +492,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
     await dom.settle();
     dom.click(dom.one('[data-action="tour-next"]'));
     await dom.settle();
-    // 2 段目：スキップ・戻る・次へ
+    // 2 段目：×・戻る・次へ
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Tab");
     await dom.settle();
@@ -510,7 +510,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
   }
 });
 
-test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
+test("CB-D91 案内は Esc か × でやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
   const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中…" });
   try {
     await dom.send({ type: "tour" });
@@ -523,6 +523,34 @@ test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDon
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D147 案内は → で次の段へ、← で前の段へ動く。端の段ではどちらも何もしない", async () => {
+  const dom = await openPhases();
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    dom.key("ArrowLeft");
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    dom.key("ArrowRight");
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "ほかの種類との関係");
+    dom.key("ArrowLeft");
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    for (let i = 0; i < 8; i += 1) {
+      dom.key("ArrowRight");
+      await dom.settle();
+    }
+    // 最後の段で → を押しても閉じない
+    assert.equal(dom.one("#tour-title").textContent, "案内");
+    assert.equal(dom.all(".tour").length, 1);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 0);
   } finally {
     await dom.close();
   }

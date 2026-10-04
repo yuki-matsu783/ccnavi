@@ -275,6 +275,12 @@ class _Family:
                 "（前の番号を全部待つ）で読んでいる。並行にしたければ、改版でユーザに"
                 " --agree を通してもらう"
             )
+        if t.workflow_record_differs:
+            warns.append(
+                "古い形の workflow: 欄の待ち方が今の phases.yml から計算した待ち方と違うので、"
+                "全体計画を一直線（前の番号を全部待つ）で読んでいる。並行にしたければ、改版でユーザに"
+                " --agree を通してもらう"
+            )
         lines = [f"    止まっている理由: {s}" for s in stops]
         lines += [f"    注意: {w}" for w in warns]
         nexts: list[str] = []

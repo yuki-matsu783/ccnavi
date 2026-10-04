@@ -562,7 +562,7 @@ def _recorded_run(
     """`--record-writes <ファイル>` つきの 1 回。書いたパスを集め、終わったら書き出す。
 
     **書き出す先**は、ワークスペースルートの既定の state の置き場（`logs/state`）の下の `c1/`
-    だけ。`--state` と `CCNAVI_STATE` の上書きは見ない（上書きで置き場を動かせば、
+    だけ。`--state` の上書きは見ない（上書きで置き場を動かせば、
     どこへでも書ける経路になる）。行き先・置き場・ルートは行き着く先（リンクを解いたパス、
     大文字小文字をそろえたもの）で比べ、`c1/` までの途中にリンクがあれば断る。書き出しは
     同じディレクトリの一時ファイルから `os.replace` で置き換えるので、行き先にリンクが
@@ -595,7 +595,7 @@ def _recorded_run(
         )
         return EXIT_ERROR
     base = _real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
-    # 上書きした state の置き場（`--state`・`CCNAVI_STATE`）も、リポジトリに入らない書き込み
+    # 上書きした state の置き場（`--state`）も、リポジトリに入らない書き込み
     # （レビューの下書きなど）の置き場なので一覧から外す。
     conf_for_state, _ = settings.load(root)
     _override(conf_for_state, args)
@@ -1409,6 +1409,8 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     sh は jq を使わず、JSON も読まない。置き場のパス（ツリーのルートからの相対）と、
     `.claude/settings.local.json` の `env` に書かれた統合先の名前をここが読んで渡す。
     統合先の名前は環境変数からは読まない（sh が先に環境変数を見る）。
+    置き場は固定（`settings.load` の既定）で、env では動かない。`ccnavi-sync.sh` は答えが
+    無いとき同じ既定を直に使う。
     ネットワークにも git にも触らない。
     """
     lines = (

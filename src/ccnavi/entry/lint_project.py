@@ -160,12 +160,14 @@ LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 # 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、タイムアウト監視と待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
 _LOCAL_FORBIDDEN = (
-    settings.TICKETS_ENV,
-    settings.APPROVED_ENV,
-    settings.PROJECTS_ENV,
-    settings.PROJECT_HOME_ENV,
-    settings.STATE_ENV,
-    settings.LOG_ENV,
+    # 置き場の env はもう読まない（置き場は既定に固定）が、置かれたら効いていると
+    # 思い込まないよう、今までどおり知らせる。
+    "CCNAVI_TICKETS_PROPOSAL",
+    "CCNAVI_TICKETS_APPROVED",
+    "CCNAVI_PROJECTS",
+    "CCNAVI_PROJECT_HOME",
+    "CCNAVI_STATE",
+    "CCNAVI_LOG",
     settings.TICKET_CONTROL_ENV,
     settings.GUARD_TICKET_APPROVAL_ENV,
     settings.GUARD_CORE_FILES_ENV,

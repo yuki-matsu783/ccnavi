@@ -6,7 +6,7 @@
 #
 # 取り込み状態は 1 行 1 項目の `<鍵> <値>`。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない
 # （JSON は実行ファイルが読んで、sh には 1 行で返す）。
-# 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
+# 置き場はワークスペースルートの `logs/state`（固定。ccnavi-review.sh と同じ）。
 #
 #   sync/<リポジトリ>/families/<P>   親子のチケットの取り込み状態（remote branch sha fetched_at state reason）
 #   sync/<リポジトリ>/integration/   統合先の取り込み結果（統合先の done/・層・置き場のパスの設定のコピーと head）
@@ -19,11 +19,7 @@
 
 # state の置き場（`logs/state/`）の絶対パス。
 ccnavi_state() {
-	case "${CCNAVI_STATE:-}" in
-	'') printf '%s\n' "$1/logs/state" ;;
-	/* | [A-Za-z]:[\\/]*) printf '%s\n' "$CCNAVI_STATE" ;;
-	*) printf '%s\n' "$1/$CCNAVI_STATE" ;;
-	esac
+	printf '%s\n' "$1/logs/state" # 固定
 }
 
 # そのツリーの取り込み状態を分ける名前。<ツリー> <ワークスペースルート>
@@ -184,8 +180,8 @@ ccnavi_integration() {
 # 子チケット（`parent:` を持つ）は数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして
 # 扱わない（ブランチに乗らないので、親のブランチで共有できない）。
 ccnavi_parent_tree() {
-	ccnavi_pt_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-	ccnavi_pt_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
+	ccnavi_pt_approved=.ccnavi/approved # 固定
+	ccnavi_pt_proposals=wip/proposals   # 固定
 	case "$ccnavi_pt_approved$ccnavi_pt_proposals" in
 	/* | [A-Za-z]:*) return 1 ;;
 	esac

@@ -49,7 +49,10 @@ export interface ApproveResult {
   readonly copies: readonly string[];
   /** ターミナルなら標準出力に出ていた行 */
   readonly lines: readonly string[];
-  /** Claude Code に渡す文。hook が次のプロンプトで渡す文と同じ */
+  /**
+   * Claude Code に渡す文（承認された識別子と後工程の進め方）。hook は承認を知らせないので、
+   * 拡張がこの文を渡す
+   */
   readonly prompt: string;
 }
 

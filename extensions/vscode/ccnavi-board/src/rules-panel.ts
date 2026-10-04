@@ -255,7 +255,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
-    // 設定ファイルの場所は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
+    // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が実行ファイルと
     // 食い違ったときに、この画面で保存したルールが判定に使われなくなる。答えは元リポジトリの版で、
     // ワークツリーの中の版は指さない（設計 11.2）。
     const board = await loadBoard(root, binSetting());

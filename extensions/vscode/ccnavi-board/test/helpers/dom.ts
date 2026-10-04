@@ -63,6 +63,8 @@ export interface LoadOptions {
    * 見るのは「点と線がその本数あるか」「押すと何が起きるか」まで）。数字は下の `SIZES`。
    */
   readonly measure?: boolean;
+  /** 画面のスクリプトを流す前に window へ細工する（マウントの最中の動きを見たいとき） */
+  readonly prepare?: (window: { readonly HTMLElement: { readonly prototype: object } }) => void;
 }
 
 /** 偽る大きさ。外枠は広め、点は `Graph.css` の `.react-flow__node-phase` と同じ幅 */
@@ -177,6 +179,7 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   if (options.measure === true) {
     fakeMeasure(window);
   }
+  options.prepare?.(window);
   document.documentElement.innerHTML = inner;
   await window.happyDOM.waitUntilComplete();
   for (const script of Array.from(document.querySelectorAll("script"))) {

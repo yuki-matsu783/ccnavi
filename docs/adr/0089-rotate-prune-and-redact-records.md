@@ -9,6 +9,8 @@ keywords: [ローテーション, 記録, ログ, セッション, rotate, prune
 
 状態: 採用
 
+追記: 決定の表の「場所を変えた置き場（`CCNAVI_LOG` / `CCNAVI_STATE`）にも当てる」は、ADR-0098 で env を廃止したので、診断のフラグ `--log` / `--state` で動かした置き場を指す。当てる範囲は変わらない。採らなかった案の「`CCNAVI_LOG` の意味（1 本のファイル）」も、固定の `logs/decisions.jsonl` 1 本と読む。
+
 ## 状況
 
 判定の記録（`logs/log.jsonl`）は追記するだけで、どこでも切り分けたり消したりしていなかった。state（`logs/state/`）も、

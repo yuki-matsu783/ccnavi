@@ -759,7 +759,7 @@ def records_regex(log_path: str = "", state_dir: str = "") -> str:
     """記録と state の置き場を、名指しのツールに当てる形（設計 11.6）。
 
     シェルの書き込みの側（`_PLACES`）と同じ `logs/decisions*.jsonl` と `logs/state/` のパスに
-    加えて、設定で動かした置き場（`--log` / `--state`、`CCNAVI_LOG` / `CCNAVI_STATE`）にも
+    加えて、診断のフラグで動かした置き場（`--log` / `--state`。env では動かない）にも
     当てる。
     記録はいま書いている 1 本と、同じディレクトリのローテートした分（`<名前>.<日時><拡張子>`）。
     書かれたパスと行き着く先の両方で当てる。

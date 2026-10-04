@@ -43,7 +43,8 @@ export interface CopyJson {
   readonly status: CopyStatus;
   readonly approved_at?: string;
   /**
-   * 承認の時刻をどこから引いたか。`history`（状態の履歴）・`commit`（doing/ に足したコミット）・
+   * 承認の時刻をどこから引いたか。`history`（状態の履歴）・`record`（前の版の承認が書いた
+   * `ccnavi_approved.approved_at`。古い形だけ）・`commit`（doing/ に足したコミット）・
    * `uncommitted`（手で置いてまだコミットしていない。approved_at は空）・空（分からない）
    */
   readonly approved_from?: string;

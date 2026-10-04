@@ -641,64 +641,11 @@ class Phase:
         return LABEL_WAITING if self.review_waiting else LABEL_PREPARING
 
 
-def types_path(conf: settings.Settings, root: str, project: str) -> str:
-    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
-
-    予約名（`common` / `self`）のプロジェクトは層として数えないので、パスを持たない
-    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
-    名前と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
-    """
-    if settings.is_reserved_layer_name(project):
-        return ""
-    home = tree.project_root(conf.projects, project) if project else root
-    if not home:
-        return ""
-    return settings.layer_path(conf, home, settings.KIND_PHASES, project or settings.LAYER_SELF)
-
-
-def common_types(
-    conf: settings.Settings,
-) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層の種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
-    if not conf.phases:
-        return None, []
-    types, notes = phasetypes.load(conf.phases)
-    phasetypes.mark_source(types, settings.LAYER_COMMON)
-    return types, list(notes)
-
-
-def layer_types(
-    conf: settings.Settings, root: str, project: str = ""
-) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 11.4.1）。
-
-    どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
-    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
-    言うと、層の話を読みに来たユーザが同じ文を 2 度読むことになる。
-
-    無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
-    組み込みには戻さない。共通層が在るのに戻すと、共通層の種類が消える。
-    """
-    common, notes = common_types(conf)
-    if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 11.2）。
-        return None, []
-    path = types_path(conf, root, project)
-    if not path or not os.path.exists(path):
-        return common, []
-    extra, layer_notes = phasetypes.load(path, refs=False)
-    if extra is None:
-        return common, list(layer_notes)
-    merged, problems = phasetypes.merge(common, extra, project or settings.LAYER_SELF)
-    return merged, list(layer_notes) + problems
-
-
-def load_types(
-    conf: settings.Settings, root: str = "", project: str = ""
-) -> dict[str, phasetypes.PhaseType] | None:
-    """判定が使うフェーズの種類。どの層にも無ければ None（番号だけの挙動）。"""
-    types, _ = layer_types(conf, root, project)
-    return types
+# 層ごとの種類の読み込みは phasetypes に置く（approval も読むため。approval は phase を読めない）。
+types_path = phasetypes.types_path
+common_types = phasetypes.common_types
+layer_types = phasetypes.layer_types
+load_types = phasetypes.load_types
 
 
 def _covered_review(phase: Phase | None) -> str:
