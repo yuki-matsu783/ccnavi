@@ -168,6 +168,51 @@ class CompatAgreesTest(unittest.TestCase):
         """
         self.assertGreaterEqual(version.COMPAT, 3)
 
+    def test_v9_approval_leaving_the_ticket_as_is_raised_the_compat_to_4(self):
+        """V9 承認がチケットの中身を変えなくなり、待ち方の置き場（`phases/<親>/workflow.yml`）と
+        取り下げの条件が変わった。sh は `ticket status` を呼ぶ。なので 4 以上。
+
+        古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）は待ち方を一直線と読み、
+        `status` を知らないので、食い違いとして知らせる。
+        """
+        self.assertGreaterEqual(version.COMPAT, 4)
+
+
+@unittest.skipIf(not SHELL, "sh も bash も見つからない")
+class TicketStatusPassTest(unittest.TestCase):
+    """`ccnavi-ticket.sh status` は親を省いても実行ファイルへ渡す（C1 を通らない）。"""
+
+    def setUp(self):
+        self.ws = tempfile.mkdtemp(prefix="ccnavi-status-")
+        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
+        shutil.copytree(SCRIPTS, os.path.join(self.ws, ".ccnavi", "scripts"))
+        write(os.path.join(self.ws, "dist", "ccnavi", "ccnavi"), STUB.format(compat=sh_compat()))
+
+    def run_ticket(self, *args):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        return subprocess.run(
+            [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), *args],
+            cwd=self.ws,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+
+    def test_status_without_a_parent_reaches_the_executable(self):
+        result = self.run_ticket("status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ticket status", result.stdout)
+
+    def test_status_with_a_parent_reaches_the_executable(self):
+        result = self.run_ticket("status", "i0001")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ticket status i0001", result.stdout)
+
+    def test_other_verbs_still_need_an_id(self):
+        result = self.run_ticket("start")
+        self.assertEqual(result.returncode, 2, result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
