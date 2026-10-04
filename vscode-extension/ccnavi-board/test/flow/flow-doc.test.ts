@@ -65,7 +65,7 @@ test("CB-T218 YAML を読んで書くだけなら、知らない欄も知らな�
   assert.doesNotMatch(text, /^\s*\{/m);
 });
 
-test("CB-T253 書き出しはユーザが読める形で、実行ファイル（YAML 1.1）が別の型に読む綴りは引用符で囲む", () => {
+test("CB-T253 書き出しはユーザが読める形で、実行ファイル（YAML 1.1）が別の型に読む表記は引用符で囲む", () => {
   // 同じ中身を 2 か所で持っても別名にしない（実行ファイルは別名を読まない）
   const shared = { x: 1, y: 2 };
   const doc: FlowDoc = {
@@ -78,7 +78,7 @@ test("CB-T253 書き出しはユーザが読める形で、実行ファイル（
   assert.doesNotMatch(text, /[&*]\w/);
   // 複数行の文は | の形
   assert.match(text, /prompt: \|\n {8}1 行目\n {8}2 行目\n/);
-  // YAML 1.1 で真偽値・八進・日付に読まれる綴りは引用符で囲む（キーも）
+  // YAML 1.1 で真偽値・八進・日付に読まれる表記は引用符で囲む（キーも）
   assert.match(text, /name: "yes"/);
   assert.match(text, /name: "no"/);
   assert.match(text, /mode: "0755"/);
@@ -89,13 +89,13 @@ test("CB-T253 書き出しはユーザが読める形で、実行ファイル（
   assert.deepEqual(read.doc, doc);
 });
 
-test("CB-T240 読みはルール設定の画面と同じ yaml の既定で、YAML 1.1 の読み方は真似しない（型の答えは実行ファイル）", () => {
+test("CB-T240 読みはルール管理の画面と同じ yaml の既定で、YAML 1.1 の読み方は真似しない（型の答えは実行ファイル）", () => {
   const read = parseFlow("nodes:\n  - {id: a, type: askUserQuestion, position: {x: 1, y: 2}, data: {multiSelect: yes, off: n, when: 2026-01-01}}\n");
   assert.ok(read.ok, read.ok ? "" : read.error);
   // `yes` `off` は文字のまま（真偽値に差し替えない）。`y` `n` も文字。日付も文字
   assert.deepEqual(read.doc.nodes[0].position, { x: 1, y: 2 });
   assert.deepEqual(read.doc.nodes[0].data, { multiSelect: "yes", off: "n", when: "2026-01-01" });
-  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む綴りを囲む（書式の側の制約）。y は囲まない
+  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む表記を囲む（書式の側の制約）。y は囲まない
   const text = serializeFlow(read.doc);
   assert.match(text, /multiSelect: "yes"/);
   assert.match(text, /"off": n/);
@@ -130,20 +130,20 @@ test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（
 });
 
 test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そのまま読み直せて注意が出ない", () => {
-  const doc = templateFlow("i0001-01", "調査");
+  const doc = templateFlow("i0001-01-01", "調査");
   assert.deepEqual(
     doc.nodes.map((node) => node.type),
     ["start", "end"],
   );
-  assert.equal(doc.id, "i0001-01-flow");
-  assert.equal(doc.name, "i0001-01 調査");
+  assert.equal(doc.id, "i0001-01-01-flow");
+  assert.equal(doc.name, "i0001-01-01 調査");
   assert.deepEqual(connectionsOf(doc), [{ id: "c-start-end", from: "start", to: "end", fromPort: "output", toPort: "input" }]);
   const read = parseFlow(serializeFlow(doc));
   assert.ok(read.ok);
   assert.deepEqual(read.doc, doc);
   assert.deepEqual(flowNotices(doc), []);
   // 題が空なら名前は識別子だけ
-  assert.equal(templateFlow("i0002-01", "").name, "i0002-01");
+  assert.equal(templateFlow("i0002-01-01", "").name, "i0002-01-01");
 });
 
 test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
@@ -263,7 +263,7 @@ test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え
   assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が 1 本")));
 });
 
-test("CB-T224 出入口は種類の既定に、読んだ線が使う綴りを足す。線の言葉は条件か出口の名前", () => {
+test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を足す。線の言葉は条件か出口の名前", () => {
   const doc = sample();
   const ask = doc.nodes[1];
   assert.deepEqual(portsOf(ask, connectionsOf(doc)), {
@@ -282,7 +282,7 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う綴りを足
   // 開始に入口は無く、終了に出口は無い
   assert.deepEqual(portsOf(doc.nodes[0], []).inputs, []);
   assert.deepEqual(portsOf(doc.nodes[3], []).outputs, []);
-  // ユーザが書いた線が別の綴りの出口を使っていれば、その出口も描く
+  // ユーザが書いた線が別の表記の出口を使っていれば、その出口も描く
   const odd = connect(doc, "mcp-1", "success", "end-1", "in-2");
   const mcpPorts = portsOf(odd.nodes[2], connectionsOf(odd));
   assert.deepEqual(
@@ -380,7 +380,7 @@ test("CB-T255 グループを解く・消すと、中のノードは図の上の
   assert.deepEqual(connectionsOf(removed).map((c) => c.id), ["c2"]);
 });
 
-test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグループに入り、外なら出る。グループは中身ごと動く。変わらなければ同じ写し", () => {
+test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグループに入り、外なら出る。グループは中身ごと動く。変わらなければ同じもの", () => {
   const grouped = groupNodes(three(), ["a"]);
   assert.ok(grouped !== undefined);
   const doc = grouped.doc;

@@ -12,7 +12,7 @@ import { buildBoard, type Board } from "./board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "./model.js";
 import type { ProjectRow } from "./projects-view.js";
 
-/** 見本の印。画面は見本を出している間、この文を帯で出す */
+/** 見本の目印。画面は見本を出している間、この文を帯で出す */
 export const SAMPLE_NOTE = "案内のための見本を表示しています。実際のチケット・プロジェクトではなく、案内を閉じると消えます。";
 
 const AT = "2026-01-01T09:00:00+0900";
@@ -65,7 +65,7 @@ function phase(fields: Partial<PhaseJson> & Pick<PhaseJson, "number" | "type" | 
 }
 
 const SAMPLE_PARENT: ParentJson = {
-  ticket: "sample-2",
+  ticket: "sample-b",
   closed: false,
   stage: "作業中（2（設計））",
   plan: ["research", "design", "implement"],
@@ -74,8 +74,8 @@ const SAMPLE_PARENT: ParentJson = {
   ready: null,
   accepted_threads: [],
   phases: [
-    phase({ number: 1, type: "research", title: "調査", state: "ended", tickets: ["sample-2-01"], states: { "sample-2-01": "done" }, risk_line: "リスク: 0 (LOW)" }),
-    phase({ number: 2, type: "design", title: "設計", state: "active", tickets: ["sample-2-02"], states: { "sample-2-02": "doing" }, review_required: true }),
+    phase({ number: 1, type: "research", title: "調査", state: "ended", tickets: ["sample-b-01-01"], states: { "sample-b-01-01": "done" }, risk_line: "リスク: 0 (LOW)" }),
+    phase({ number: 2, type: "design", title: "設計", state: "active", tickets: ["sample-b-02-01"], states: { "sample-b-02-01": "doing" }, review_required: true }),
     phase({ number: 3, type: "implement", title: "実装とテスト", state: "planned", review_required: true }),
   ],
 };
@@ -94,10 +94,10 @@ export function sampleBoard(root: string, generatedAt: string): Board {
     layers: [],
     projects: [],
     problems: [],
-    pending_approval: ["sample-1"],
+    pending_approval: ["sample-a"],
     tickets: [
       ticket({
-        ticket: "sample-1",
+        ticket: "sample-a",
         title: "（見本）ログイン画面にパスワードの再設定を足す",
         proposal: { state: "todo", tree: "", tree_root: "", path: "" },
         copy: { status: "none" },
@@ -106,12 +106,12 @@ export function sampleBoard(root: string, generatedAt: string): Board {
         human_review: { required: true, reason: "見本" },
       }),
       ticket({
-        ticket: "sample-2",
+        ticket: "sample-b",
         title: "（見本）検索の応答を速くする",
         human_review: { required: true, reason: "見本" },
       }),
-      ticket({ ticket: "sample-2-01", parent: "sample-2", phase: 1, title: "（見本）遅いクエリを調べる", copy: { status: "closed", approved_at: AT }, completed_at: AT, risk: { points: 0, level: "LOW" } }),
-      ticket({ ticket: "sample-2-02", parent: "sample-2", phase: 2, title: "（見本）索引の張り方を決める" }),
+      ticket({ ticket: "sample-b-01-01", parent: "sample-b", phase: 1, title: "（見本）遅いクエリを調べる", copy: { status: "closed", approved_at: AT }, completed_at: AT, risk: { points: 0, level: "LOW" } }),
+      ticket({ ticket: "sample-b-02-01", parent: "sample-b", phase: 2, title: "（見本）索引の張り方を決める" }),
     ],
     parents: [SAMPLE_PARENT],
   };

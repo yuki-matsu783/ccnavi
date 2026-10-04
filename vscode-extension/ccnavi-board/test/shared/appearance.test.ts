@@ -128,7 +128,7 @@ test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んで
  * 退行そのもの（`followAppearance` が `webview.postMessage` を直に呼ぶ、送り直しを落とす）は
  * `src/appearance.ts` と 5 つのパネルで起きるが、**そこは `vscode` を import するので単体では
  * 動かせない**。上の 2 本（CB-T182 / CB-T182b）が見ているのは段取りの側で、配線を戻してもテストは通ったまま。
- * 名前で見るだけなので綴りを変えて呼ぶ方法までは防げないが、うっかり落とすことは防げる。
+ * 名前で見るだけなので表記を変えて呼ぶ方法までは防げないが、うっかり落とすことは防げる。
  */
 const EXT_SRC = path.join(WEBVIEW_SRC, "..");
 
@@ -182,7 +182,7 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
  * 旧いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
  * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` にそろえたときに
  * その検査が消えた（`ScreenHost<D>.post` は `unknown` を取るので、契約から外しても通ってしまう）。
- * ここで 1 か所にまとめて確かめ直す。6 画面目を足す人は、この並びに 1 行足せば同じ検査が有効になる。
+ * ここで 1 か所にまとめて確かめ直す。6 画面目を足す人は、この配列に 1 行足せば同じ検査が有効になる。
  */
 const APPEARANCE: AppearanceMessage = { type: "appearance", value: "claude-dark" };
 const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases] = [

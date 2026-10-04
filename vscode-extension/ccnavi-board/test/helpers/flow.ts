@@ -1,8 +1,8 @@
 /**
  * フロー編集画面（React）を happy-dom で動かす。`test/helpers/phases.ts` と同じ役割。
  *
- * 画面は束ねた 1 本（`out/webview/flow.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * この入口の綴り（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
+ * 画面はバンドルした 1 本（`out/webview/flow.js`）で、拡張はそれを `<script nonce>` に流し込む。
+ * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
  *
  * 図を描くので、大きさの偽物（`measure`）を入れて読ませる。入れないと React Flow は点を隠したまま
  * 線を 1 本も描かない（`test/helpers/dom.ts` の頭）。
@@ -23,13 +23,13 @@ export function flowHtml(data: FlowData, options: Partial<RenderOptions> = {}): 
 export function page(overrides: Partial<FlowPage> = {}): FlowPage {
   return {
     root: "/ws",
-    ticket: "i0001-01",
+    ticket: "i0001-01-01",
     title: "調査",
     parent: "i0001",
-    flowPath: ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml",
-    flowRel: ".ccnavi/approved/flows/i0001-01.yml",
+    flowPath: ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml",
+    flowRel: ".ccnavi/approved/flows/i0001-01-01.yml",
     exists: true,
-    doc: templateFlow("i0001-01", "調査"),
+    doc: templateFlow("i0001-01-01", "調査"),
     lock: OPEN_LOCK,
     ...overrides,
   };

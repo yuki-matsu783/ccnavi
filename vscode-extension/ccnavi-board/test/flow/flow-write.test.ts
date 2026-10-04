@@ -8,14 +8,15 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { connectionLabel, connectionsOf, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { spawnSync } from "node:child_process";
-import { decodeFlowBytes, FLOW_FILE_LIMIT, linkedSegment, readFlowFile, writeFlowFile } from "../../src/core/flow-write.js";
+import { decodeFlowBytes, FLOW_FILE_LIMIT, linkedSegment, readFlowFile, removeDraftFile, writeFlowFile } from "../../src/core/flow-write.js";
+import * as crypto from "node:crypto";
 
 function scratch(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-write-"));
   return fs.realpathSync(dir);
 }
 
-function place(tree: string, name = "i0001-01"): string {
+function place(tree: string, name = "i0001-01-01"): string {
   return path.join(tree, ".ccnavi", "approved", "flows", `${name}.yml`);
 }
 
@@ -27,7 +28,7 @@ test("CB-T231 無い置き場は 1 段ずつ作って入れ替えで書く。一
   const written = writeFlowFile(tree, file, '{"nodes":[]}\n', NEW);
   assert.deepEqual(written, { ok: true });
   assert.equal(fs.readFileSync(file, "utf8"), '{"nodes":[]}\n');
-  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.yml"]);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01-01.yml"]);
   const read = readFlowFile(tree, file);
   assert.ok(read !== undefined);
   assert.equal(Buffer.from(read.bytes).toString("utf8"), '{"nodes":[]}\n');
@@ -36,7 +37,7 @@ test("CB-T231 無い置き場は 1 段ずつ作って入れ替えで書く。一
   assert.deepEqual(again, { ok: true });
   assert.equal(fs.readFileSync(file, "utf8"), '{"nodes":[1]}\n');
   // 無いファイルは undefined（フローは任意）
-  assert.equal(readFlowFile(tree, place(tree, "i0001-09")), undefined);
+  assert.equal(readFlowFile(tree, place(tree, "i0001-01-09")), undefined);
 });
 
 test("CB-T232 ファイルか途中のディレクトリがリンクなら、読まないし書かない。リンクの先も変わらない", () => {
@@ -84,7 +85,7 @@ test("CB-T233 読み込んでから外で作られた・変わったファイル
 });
 
 test("CB-T234 線の言葉は、出口が項目の id とちょうど同じか branch-<番号> のときだけ（実行ファイルと同じ読み方）", () => {
-  const base = templateFlow("i0001-01", "調査");
+  const base = templateFlow("i0001-01-01", "調査");
   const doc: FlowDoc = {
     ...base,
     nodes: [
@@ -120,7 +121,7 @@ test("CB-T235 ハードリンクのフローは読まないし書かない。別
   assert.equal(written.ok, false);
   assert.match(written.ok ? "" : written.error, /ハードリンク/);
   assert.equal(fs.readFileSync(alias, "utf8"), '{"nodes":[]}');
-  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.yml"]);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01-01.yml"]);
 });
 
 test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない）", { skip: process.platform === "win32" }, () => {
@@ -153,8 +154,8 @@ test("CB-T237 256KB を超えるフローは読まないし書かない。書け
   assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
 });
 
-test("CB-T238 線の言葉は真偽値を空として読み、整数の値は綴りで比べる（実行ファイルの flow._text と同じ）", () => {
-  const base = templateFlow("i0001-01", "調査");
+test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表記で比べる（実行ファイルの flow._text と同じ）", () => {
+  const base = templateFlow("i0001-01-01", "調査");
   const doc: FlowDoc = {
     ...base,
     nodes: [
@@ -196,4 +197,104 @@ test("CB-T245 読んだバイトは UTF-8 として壊れていれば文字に�
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFF\uFEFFx", "utf8")), { ok: true, text: "\uFEFFx" });
   // 途中で切れた多バイト文字も UTF-8 として読めない
   assert.equal(decodeFlowBytes(Buffer.from("あ", "utf8").subarray(0, 2)).ok, false);
+});
+
+function draftPlace(tree: string, name = "i0001-01-01"): string {
+  return path.join(tree, "wip", "proposals", "flows", `${name}.yml`);
+}
+
+function sha(text: string): string {
+  return crypto.createHash("sha256").update(text).digest("hex");
+}
+
+test("CB-T297 取り込んだ下書きは、中身が取り込んだときと同じときだけ消す。書き直されていれば消さない。無ければ何もしない", () => {
+  const tree = scratch();
+  const file = draftPlace(tree);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "nodes: []\n");
+  // 取り込んだあとにエージェントが書き直した
+  fs.writeFileSync(file, "nodes: [x]\n");
+  const rewritten = removeDraftFile(tree, file, sha("nodes: []\n"));
+  assert.equal(rewritten.ok, false);
+  assert.match(rewritten.ok ? "" : rewritten.error, /書き直されている/);
+  assert.equal(fs.readFileSync(file, "utf8"), "nodes: [x]\n");
+  // 同じ中身なら消す
+  assert.deepEqual(removeDraftFile(tree, file, sha("nodes: [x]\n")), { ok: true, removed: true });
+  assert.equal(fs.existsSync(file), false);
+  // もう無ければ何もしない
+  assert.deepEqual(removeDraftFile(tree, file, sha("nodes: [x]\n")), { ok: true, removed: false });
+});
+
+test("CB-T298 リンク・ハードリンク・ふつうのファイルでないもの・ツリーの外の下書きは消さない", () => {
+  const tree = scratch();
+  const outside = scratch();
+  const target = path.join(outside, "real.yml");
+  fs.writeFileSync(target, "keep");
+  // ファイルがリンク
+  const file = draftPlace(tree);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.symlinkSync(target, file);
+  const linked = removeDraftFile(tree, file, sha("keep"));
+  assert.equal(linked.ok, false);
+  assert.match(linked.ok ? "" : linked.error, /シンボリックリンク/);
+  assert.ok(fs.lstatSync(file).isSymbolicLink());
+  assert.equal(fs.readFileSync(target, "utf8"), "keep");
+  // 途中のディレクトリがリンク
+  const other = scratch();
+  const flows = path.join(other, "wip", "proposals", "flows");
+  fs.mkdirSync(path.dirname(flows), { recursive: true });
+  fs.symlinkSync(outside, flows);
+  const through = removeDraftFile(other, path.join(flows, "real.yml"), sha("keep"));
+  assert.equal(through.ok, false);
+  assert.equal(fs.readFileSync(target, "utf8"), "keep");
+  // ハードリンク
+  const hard = draftPlace(tree, "i0001-02-02");
+  fs.writeFileSync(hard, "nodes: []\n");
+  fs.linkSync(hard, path.join(outside, "alias.yml"));
+  const hardlinked = removeDraftFile(tree, hard, sha("nodes: []\n"));
+  assert.equal(hardlinked.ok, false);
+  assert.match(hardlinked.ok ? "" : hardlinked.error, /ハードリンク/);
+  assert.ok(fs.existsSync(hard));
+  // ツリーの外
+  const away = removeDraftFile(tree, target, sha("keep"));
+  assert.equal(away.ok, false);
+  assert.ok(fs.existsSync(target));
+  // ふつうのファイルでない（名前付きパイプ）
+  const fifo = draftPlace(tree, "i0001-02-03");
+  const made = spawnSync("mkfifo", [fifo]);
+  if (made.status === 0) {
+    const piped = removeDraftFile(tree, fifo, sha(""));
+    assert.equal(piped.ok, false);
+    assert.ok(fs.existsSync(fifo));
+  }
+});
+
+test("CB-T300 確かめてから消すまでの間に書き直された下書きは、移したものを確かめ直して元へ戻し、消さない", () => {
+  const tree = scratch();
+  const file = draftPlace(tree);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "nodes: []\n");
+  // import の名前空間は読むだけなので、本体の node:fs を差し替える（ソースの fs は呼ぶたびに本体を引く）
+  const real = require("node:fs") as { renameSync: typeof fs.renameSync };
+  const original = real.renameSync;
+  // 照合のあと、移す直前にエージェントが書き直した、を真似る
+  real.renameSync = (from, to) => {
+    if (String(from) === file) {
+      fs.writeFileSync(file, "nodes: [new]\n");
+    }
+    original(from, to);
+  };
+  try {
+    const raced = removeDraftFile(tree, file, sha("nodes: []\n"));
+    assert.equal(raced.ok, false);
+    assert.match(raced.ok ? "" : raced.error, /書き直されている/);
+  } finally {
+    real.renameSync = original;
+  }
+  assert.equal(fs.readFileSync(file, "utf8"), "nodes: [new]\n");
+  // 移した名前（.*.removing）は残らない
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01-01.yml"]);
+  // 消せたときも残らない
+  assert.deepEqual(removeDraftFile(tree, file, sha("nodes: [new]\n")), { ok: true, removed: true });
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
 });

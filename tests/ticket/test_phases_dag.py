@@ -4,9 +4,9 @@
 
 1. 種類の `order` と `after` の読み方（循環、指す先、層の合わせ方）
 2. `dag` では祖先でないフェーズを待たずに承認できる。一直線では待つ
-3. 待ち方は承認のときに親へ写し、あとで phases.yml を直しても進行中の親には反映されない
+3. 待ち方は承認のときに親へコピーし、あとで phases.yml を直しても進行中の親には反映されない
 4. 計画が同じ改版で、直した phases.yml を進行中の親に反映できる
-5. 計画の検査（並び、終端、延期の引き受け手）
+5. 計画の検査（順序、終端、延期の引き受け手）
 6. 受け入れはそのフェーズと、それを待つ番号にだけ当てはまる
 """
 
@@ -247,17 +247,23 @@ class DagApprovalTest(PhaseHarness):
         return t
 
     def close_first_phase(self):
-        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/a/*"], review=False))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/a/*"], review=False)
+        )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01", [("wip/a/x.md", "x\n")])
-        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.run_child("i0001-01-01", [("wip/a/x.md", "x\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
 
     def propose_branches(self):
-        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["tests/a/*"], review=False))
-        self.propose("i0001-03", child_text("i0001-03", "i0001", 3, ["src/a/*"], review=False))
+        self.propose(
+            "i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["tests/a/*"], review=False)
+        )
+        self.propose(
+            "i0001-03-03", child_text("i0001-03-03", "i0001", 3, ["src/a/*"], review=False)
+        )
         self.commit_parent("propose 02 03")
         return self.approve()
 
@@ -271,13 +277,13 @@ class DagApprovalTest(PhaseHarness):
         self.close_first_phase()
         result = self.propose_branches()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertTrue(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertTrue(self.approved_child("i0001-03-03"))
         # 合流点は、両方の枝が閉じるまで承認しない。
-        self.propose("i0001-04", child_text("i0001-04", "i0001", 4, ["wip/d/*"]))
+        self.propose("i0001-04-04", child_text("i0001-04-04", "i0001", 4, ["wip/d/*"]))
         self.commit_parent("propose 04")
         refused = self.approve()
-        self.assertFalse(self.approved_child("i0001-04"))
+        self.assertFalse(self.approved_child("i0001-04-04"))
         self.assertIn("閉じるまで承認しない", refused.stderr)
 
     def test_sequential_still_waits_for_every_earlier_phase(self):
@@ -285,8 +291,8 @@ class DagApprovalTest(PhaseHarness):
         self.family(plan=PLAN)
         self.close_first_phase()
         result = self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertFalse(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertFalse(self.approved_child("i0001-03-03"))
         self.assertIn("閉じるまで承認しない", result.stderr)
 
     def test_changing_phases_yml_later_does_not_loosen_a_running_parent(self):
@@ -296,8 +302,8 @@ class DagApprovalTest(PhaseHarness):
         self.use(DAG)
         self.close_first_phase()
         self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertFalse(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertFalse(self.approved_child("i0001-03-03"))
 
     def test_changing_phases_yml_later_does_not_tighten_a_running_parent(self):
         self.use(DAG)
@@ -305,7 +311,7 @@ class DagApprovalTest(PhaseHarness):
         self.use(SEQUENTIAL)
         self.close_first_phase()
         self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-03-03"))
 
     def test_a_revision_with_the_same_plan_applies_the_new_phases_yml(self):
         self.use(SEQUENTIAL)
@@ -328,7 +334,7 @@ class DagApprovalTest(PhaseHarness):
         self.assertIn("3: implement — 待つ: 1", result.stdout)
 
     def test_a_workflow_written_in_a_proposal_is_refused(self):
-        """待ち方の写しを書くのは `--agree` だけ。提案に書いてあれば承認しない。
+        """待ち方のコピーを書くのは `--agree` だけ。提案に書いてあれば承認しない。
 
         引用符付きの鍵でも同じ。
         """
@@ -346,7 +352,8 @@ class DagApprovalTest(PhaseHarness):
             self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_an_approved_parent_without_a_workflow_is_read_as_sequential(self):
-        """写しを持たない承認済みの親は、いまの phases.yml から計算せず一直線で待たせる。"""
+        """コピーした待ち方を持たない承認済みの親は、
+        いまの phases.yml から計算せず一直線で待たせる。"""
         self.use(SEQUENTIAL)
         self.family(plan=PLAN)
         path = os.path.join(self.approved, "doing", "i0001.md")
@@ -362,8 +369,8 @@ class DagApprovalTest(PhaseHarness):
         self.use(DAG)
         self.close_first_phase()
         self.propose_branches()
-        self.assertTrue(self.approved_child("i0001-02"))
-        self.assertFalse(self.approved_child("i0001-03"))
+        self.assertTrue(self.approved_child("i0001-02-02"))
+        self.assertFalse(self.approved_child("i0001-03-03"))
 
     def test_a_revision_cannot_move_a_defer_target_behind_approved_children(self):
         def reviewed(text):

@@ -1,8 +1,8 @@
 /**
  * ボード。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
- * 依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。
+ * 依頼済みのフェーズに MR のスレッドを出し、レビュー済みのマーカーを書く。
  * GitLab とプロジェクトのリポジトリも読み、「始める」（issue から親のブランチを作る）を出す。
- * GitLab へ書いて打ち消しが収まらなかった親子のチケットは「要確認」を控え（`chrome.storage.local` の `attention`）、
+ * GitLab へ書いた後、元に戻すコミットでも競合が収まらなかった親子のチケットは「要確認」として記録し（`chrome.storage.local` の `attention`）、
  * ユーザが確かめて外すまで出す。
  *
  * PAT はこのページに来ない。ホストの API は service worker に名前で頼む。
@@ -11,7 +11,8 @@ import type { TokenStatus, Response } from "../core/protocol.js";
 import type { Issue } from "../core/github.js";
 import { renderRepo, type Actions, type Extras } from "../core/render.js";
 import { createRenderer } from "../core/sanitize.js";
-import { readRepos, repoKey, type RepoConfig } from "../core/settings.js";
+import { readRepos, repoKey, saveRecentDays, type RepoConfig } from "../core/settings.js";
+import { startAutoRefresh, type AutoRefresh } from "../core/autorefresh.js";
 import { collectRepo, type Deps, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
 import { listIssues, startIssue } from "../core/start.js";
 import { approveFamily, confirmPhase, withdrawTicket, type Outcome, type WriteDeps } from "../core/write.js";
@@ -90,7 +91,7 @@ async function readAttention(): Promise<Attention> {
   return v && typeof v === "object" ? (v as Attention) : {};
 }
 
-/** 要確認の親子のチケットを控える（打ち消しが収まらない・書いたか確かめられない など。ユーザが確かめて外すまでボードに出す） */
+/** 要確認になった親子のチケットを `chrome.storage.local` に残し、ユーザが確かめて外すまでボードに出す。要確認になるのは、元に戻すコミット（revert）を積んでも競合が収まらないときや、書けたかを確かめられないときなど（8.4） */
 async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
   if (outcome.kind !== "attention") return;
   const all = await readAttention();
@@ -220,6 +221,23 @@ const actions: Actions = {
       return true;
     });
   },
+  setRecentDays(repoBoard: RepoBoard, value: string) {
+    void act(async () => {
+      const key = repoKey(repoBoard.repo);
+      try {
+        const days = await saveRecentDays(chrome.storage.local, HOSTS, key, value);
+        result.dataset.kind = "written";
+        result.className = "notice ok";
+        result.textContent = `${key} の直近の日数を ${days} 日にした。読み直す`;
+        return true;
+      } catch (err) {
+        result.dataset.kind = "refused";
+        result.className = "notice error";
+        result.textContent = `直近の日数を保存しなかった: ${(err as Error).message ?? String(err)}`;
+        return false;
+      }
+    });
+  },
   dismiss(repoBoard: RepoBoard, family: string) {
     void (async () => {
       if (!window.confirm(`${family} の要確認を外す。ホストの履歴を見て、親のブランチの置き場が正しいと確かめられたときだけ外してください`)) return;
@@ -256,21 +274,46 @@ async function act(fn: () => Promise<boolean>): Promise<void> {
   }
 }
 
-async function refresh(clearResult = true): Promise<void> {
-  document.body.dataset.state = "loading";
+/** 自動の読み直しの間隔ごとの管理（`refresh` が終わるたびに数え直す） */
+let auto: AutoRefresh | null = null;
+/** 走っている読み直し。重ねて走らせない */
+let inflight: Promise<void> | null = null;
+
+/**
+ * ボードを読み直して描き直す。`fromTimer` が真（自動）のときは、走っていれば何もせず、
+ * 操作の結果の表示を消さず、ボードを空にせず（リポジトリごとに差し替える）、描き直す間も入力欄を残す。
+ */
+async function refresh(clearResult = true, fromTimer = false): Promise<void> {
+  while (inflight) {
+    if (fromTimer) return;
+    await inflight.catch(() => undefined);
+  }
+  const run = load(clearResult && !fromTimer, fromTimer);
+  inflight = run;
+  try {
+    await run;
+  } finally {
+    inflight = null;
+    auto?.done();
+  }
+}
+
+async function load(clearResult: boolean, fromTimer: boolean): Promise<void> {
+  if (!fromTimer) document.body.dataset.state = "loading";
   if (clearResult) {
     result.textContent = "";
     delete result.dataset.kind;
   }
-  main.replaceChildren();
+  if (!fromTimer) main.replaceChildren();
   const got = await chrome.storage.local.get("repos");
   repos = readRepos(got.repos, HOSTS);
   if (repos.length === 0) {
+    main.replaceChildren();
     status.textContent = "リポジトリが登録されていない。設定画面で登録してください";
     document.body.dataset.state = "done";
     return;
   }
-  status.textContent = "Python（Pyodide）を起動している…";
+  if (!fromTimer) status.textContent = "Python（Pyodide）を起動している…";
   if (worker === null) worker = startWorker();
   const t = await worker.init();
   status.textContent = `Pyodide ${t.pyodide}: 起動 ${t.boot_ms} ms・読み込み ${t.import_ms} ms`;
@@ -285,9 +328,36 @@ async function refresh(clearResult = true): Promise<void> {
     boards.set(repoKey(repo), board);
     drawRepo(board, attention);
   }
+  if (fromTimer) {
+    // 外したリポジトリの欄を消す
+    const keep = new Set(repos.map(repoKey));
+    for (const node of main.querySelectorAll<HTMLElement>("section.repo")) if (!keep.has(node.dataset.repo ?? "")) node.remove();
+  }
   await drawBanner(repos);
   document.body.dataset.state = "done";
 }
+
+/** 自動の読み直しを飛ばす間: 読み直しが走っている、書く操作の最中、ボードの入力欄を触っている */
+function skipAuto(): boolean {
+  const active = document.activeElement;
+  return busy || inflight !== null || (active instanceof HTMLInputElement && main.contains(active));
+}
+
+auto = startAutoRefresh({
+  doc: document,
+  now: () => Date.now(),
+  setTimeout: (cb, ms) => window.setTimeout(cb, ms),
+  clearTimeout: (id) => window.clearTimeout(id as number),
+  busy: skipAuto,
+  run: async () => {
+    try {
+      await refresh(false, true);
+    } catch (err) {
+      status.textContent = `自動の読み直しに失敗した: ${(err as Error).message ?? String(err)}`;
+      throw err;
+    }
+  },
+});
 
 document.getElementById("refresh")?.addEventListener("click", () => void refresh());
 document.getElementById("options")?.addEventListener("click", () => void chrome.runtime.openOptionsPage());

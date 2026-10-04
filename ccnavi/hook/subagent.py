@@ -58,8 +58,8 @@ def at_start(
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return _say(stdout, skills)
-    # 権威のある側（親のツリー）の写しを読む。着手で書かれる基準点は親のツリーの
-    # 写しにだけ入るので、子のツリーに checkout されている版では足りない。
+    # 本物とする側（親のツリー）のチケットを読む。着手で書かれる基準点は親のツリーの
+    # チケットにだけ入るので、子のツリーに checkout されている版では足りない。
     copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     bound = tree.lookup(index, t.name)
@@ -238,17 +238,17 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
 
 
 def _bounce_path(state_dir: str, session: str, who: str) -> str:
-    """差し戻しの印の置き場。セッションと、その中で相手を見分ける鍵で分ける。
+    """差し戻しの記録の置き場。セッションと、その中で相手を見分ける鍵で分ける。
 
-    セッションを鍵に入れるのは、控えの置き場がワークスペースに 1 つしか無いから。
-    入れないと、別のセッションが置いた印を読んで、一度も差し戻していない相手を
-    「差し戻し済み」として通す。印が消えるのは、親の PostToolUse が `agentId` を
+    セッションを鍵に入れるのは、state の置き場がワークスペースに 1 つしか無いから。
+    入れないと、別のセッションが置いた記録を読んで、一度も差し戻していない相手を
+    「差し戻し済み」として通す。記録が消えるのは、親の PostToolUse が `agentId` を
     持って通ったときだけなので、残った 1 つは次の日のセッションでも有効なままになる。
 
     `who` は `agent_id`。持たない payload では、そのワークツリーの名前を使う。
-    1 つの綴り（`unknown`）に全員をまとめると、最初の 1 体が差し戻されたあと、
+    1 つの名前（`unknown`）に全員をまとめると、最初の 1 体が差し戻されたあと、
     同じ置き場を見る他のサブエージェントが誰も差し戻されなくなる。しかも
-    `agent_id` を持たない相手の印は `ignored_bounce` が消せないので、消えない。
+    `agent_id` を持たない相手の記録は `ignored_bounce` が消せないので、消えない。
     ツリーの名前なら、少なくとも別の子で作業する相手は巻き込まない。
     """
     where = fsio.safe_name(session) or "unknown"

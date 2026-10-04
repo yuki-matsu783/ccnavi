@@ -2,7 +2,7 @@
 
 文（`additionalContext`）と、ファイルの本文（`additionalContextFile`）と、
 1 度だけ渡す文（`additionalContextOnce` / `additionalContextOnceFile`）の 3 つを
-ここで並べる。どの回に渡すかを刻む `every` と、その数えの控えもここが持つ。
+ここで並べる。どの回に渡すかを刻む `every` と、その数えの記録もここが持つ。
 文脈はセッションと、サブエージェントならその 1 回の起動で分ける。
 
 `additionalContextFile` と `additionalContextOnceFile` は、文の代わりに（または文に
@@ -117,16 +117,16 @@ def for_rules(
     在ったものを読む。無ければ文だけ。数えは文とファイルで分けず、ルール 1 件で 1 回と
     数える。
 
-    控えを置く場所が無いとき（`--state ""`）は刻まず、once の文も毎回渡す。覚えられない
+    記録を置く場所が無いとき（`--state ""`）は刻まず、once の文も毎回渡す。覚えられない
     なら何も言わないのではなく言うほうを採る。届かない文は書いていないのと同じになるから。
 
-    `unsure_speaks=False` はその逆で、覚えられない回（控えの置き場が無い・読めない）には
+    `unsure_speaks=False` はその逆で、覚えられない回（記録の置き場が無い・読めない）には
     刻みを持つルールも once を持つルールも渡さない。渡すことが Stop を止めることになる呼び手
     （`events.stop_rules_nudge`）のためのもの。そこで言うほうを採ると、ターンの終わりの
     たびに止まる。
 
-    `counts_path` は数えの控えの置き場を差し替える。空なら文脈ごとの `once-*.json`。
-    Stop の促しは compact・再開をまたいで数えたいので、別の控え（`stop_path`）を渡す。
+    `counts_path` は数えの記録の置き場を差し替える。空なら文脈ごとの `once-*.json`。
+    Stop の促しは compact・再開をまたいで数えたいので、別の記録（`stop_path`）を渡す。
     """
     if not unsure_speaks and not state_dir:
         return ""
@@ -135,7 +135,7 @@ def for_rules(
     consulted = False
     for rule in group:
         has_once = bool(rule.additional_context_once or rule.additional_context_once_file)
-        # 数えを控えに残すのは、刻みを持つルールと once を持つルールだけ。ほかは
+        # 数えを記録に残すのは、刻みを持つルールと once を持つルールだけ。ほかは
         # どのみち毎回渡すので、数えても判定 1 回ぶんの書き込みが増えるだけになる。
         if state_dir and (rule.every > 1 or has_once):
             if not consulted:
@@ -146,7 +146,7 @@ def for_rules(
             if counted is None:
                 # 読めなかったときは、覚えていないものとして渡し、書き戻さない。
                 # `--state ""` と同じ「覚えられないなら言う」側だが、上書きだけは
-                # しない。ここで書くと、読めなかっただけの控えを空の中身で置き換えることになる。
+                # しない。ここで書くと、読めなかっただけの記録を空の中身で置き換えることになる。
                 delivering, first = True, True
             else:
                 # id が無いと、match/glob が同じで every だけ違う 2 本が同じ鍵を共有し、
@@ -157,7 +157,7 @@ def for_rules(
                 counted[key] = hits
                 # 渡す回は刻みの倍数になった回。その最初は刻みの回そのものなので、
                 # 「once を渡したか」を別の欄で覚えなくてよい。欄を 2 つ持つと、
-                # 片方だけ古い控えが生まれる。
+                # 片方だけ古い記録が生まれる。
                 delivering, first = hits % rule.every == 0, hits == rule.every
         else:
             delivering, first = True, True
@@ -195,7 +195,7 @@ def _with_file(stderr: TextIO, bases: list[str], text: str, rel: str) -> str:
 
 
 def bases(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[str]:
-    """ルールが指すファイルを探すルートの並び。近いほうから。
+    """ルールが指すファイルを探すルートのリスト。近いほうから。
 
     行き先（Bash なら cwd）がワークツリーの中なら、まずそのワークツリー。そこに無ければ
     その元リポジトリ、最後にワークスペースルート。ワークツリーで直している最中の
@@ -221,7 +221,7 @@ def _path_of(state_dir: str, payload: hookio.Input) -> str:
 
 
 def stop_path(state_dir: str, session: str) -> str:
-    """Stop の促し（ターンの終わり N 回に 1 度）の数えの控え。
+    """Stop の促し（ターンの終わり N 回に 1 度）の数えの記録。
 
     `once-*` と違い、compact・再開・clear では捨てない。
 
@@ -239,12 +239,12 @@ def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
     「まだ無い」と「読めない」を分けて返すのは、呼ぶ側が上書きしてよいかを
     決められるようにするため。同じ扱いにすると、読めなかった回に「まだ 1 回も
     当たっていない」ものとして書き戻し、覚えていたぶんを消してしまう。
-    読めないのは控えが在るときにしか起きないので、消す先はいつも中身のある控えになる。
+    読めないのは記録が在るときにしか起きないので、消す先はいつも中身のある記録になる。
     """
     data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: 渡した回数の控えを読めない: {failed}\n")
+            stderr.write(f"ccnavi: 渡した回数の記録を読めない: {failed}\n")
             return None
         return {}
     given = data.get("given") if isinstance(data, dict) else None
@@ -254,13 +254,13 @@ def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
 
 
 def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
-    """控えを書く。書けたか。"""
-    # 取り合いになる控えなので、途中を見せない書き方で置く。素の open(path, "w") だと
+    """記録を書く。書けたか。"""
+    # 取り合いになる記録なので、途中を見せない書き方で置く。素の open(path, "w") だと
     # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
     # なる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
-        stderr.write(f"ccnavi: 渡した回数の控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 渡した回数の記録を書けない: {failed}\n")
     return not failed
 
 
@@ -283,7 +283,7 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
     for name in os.listdir(state_dir):
         if not name.endswith(".json"):
             continue
-        # 承認を伝えた控え（agree.news）は同じ場所に置く。こちらはセッションの
+        # 承認を伝えた記録（agree.news）は同じ場所に置く。こちらはセッションの
         # 再開で捨てず、古いものだけ一緒に掃く。
         stale = name.startswith("approved-")
         if not stale and not name.startswith("once-"):

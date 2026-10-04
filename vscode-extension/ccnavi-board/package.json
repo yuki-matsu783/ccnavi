@@ -44,7 +44,7 @@
       },
       {
         "command": "ccnaviBoard.openRules",
-        "title": "ccnavi ボード: ルール設定を開く"
+        "title": "ccnavi ボード: ルール管理を開く"
       },
       {
         "command": "ccnaviBoard.openProjects",
@@ -107,7 +107,7 @@
         "ccnaviBoard.samplesPath": {
           "type": "string",
           "default": ".ccnavi/common/rule-samples.yml",
-          "description": "ルール設定画面の「サンプルを一括で判定」で使うサンプルのファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
+          "description": "ルール管理画面の「サンプルを一括で判定」で使うサンプルのファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.flowSaveReview": {
           "type": "boolean",

@@ -61,7 +61,7 @@ test("CB-D31 帯と行のボタンはそれぞれの型で送る。clone は欄�
       { type: "openBoard", name: "lib" },
       { type: "clone", url: "https://gitlab.example.com/g/tool.git", name: "tool" },
     ]);
-    // 打ちかけは Webview の state に控える。作り直されても残る
+    // 打ちかけは Webview の state に残す。作り直されても残る
     assert.deepEqual(dom.state(), { url: "https://gitlab.example.com/g/tool.git", name: "tool", nameTouched: false });
     await dom.send({ type: "cloned", message: "clone を送った" });
     assert.equal(dom.one<HTMLInputElement>("#url").value, "");
@@ -113,7 +113,7 @@ test("CB-D33 開いていたメニューは、その行が一覧から消えた�
     await dom.close();
   }
 
-  // 名前は置き場のディレクトリ名そのままで、clone の欄が通す綴りとは限らない。
+  // 名前は置き場のディレクトリ名そのままで、clone の欄が通す表記とは限らない。
   // `a:x` のメニューが `a` のものと見なされないこと（前方一致だと見なされる）
   const colon = await openProjects([row({ name: "a", rel: "projects/a" }), row({ name: "a:x", rel: "projects/a:x" })]);
   try {
@@ -170,7 +170,7 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
     assert.equal(dom.all(`${cardSelector("Self")} button[data-action="create-rules"]`).length, 0);
 
     const workspace = dom.one("section.workspace");
-    assert.match(text(workspace), /ワークスペースの設定のルール なし \.ccnavi\/config\/rules\.yml 共通の設定からコピー ルール設定/);
+    assert.match(text(workspace), /ワークスペースの設定のルール なし \.ccnavi\/config\/rules\.yml 共通の設定からコピー ルール管理/);
     assert.equal(dom.all('button[data-action="create-self-rules"]').length, 1);
     assert.ok(dom.one('button[data-action="open-self-rules"]').hasAttribute("disabled"));
   } finally {
@@ -277,7 +277,7 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
     assert.ok(!/ワークスペースの設定のフェーズの種類/.test(body));
     assert.ok(!/フェーズ管理/.test(body));
     assert.ok(!/チケット管理/.test(body));
-    // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール設定だけになる
+    // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール管理だけになる
     for (const action of ["open-rules", "fetch", "pull"]) {
       assert.equal(off.all(`${cardSelector("lib")} button[data-action="${action}"][data-name="lib"]`).length, 1, action);
     }

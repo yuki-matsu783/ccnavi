@@ -20,7 +20,7 @@ Chrome と手元の sh が同じ見本から同じ JSON を組むことを見る
   見本に置かない（依頼の記録の `poster` を試すため。ccnavi の依頼のスレッドを未解決から除くのは、
   依頼を投稿したアカウントが書いたときだけ）
 - ほかは 404
-- `FAKE_GITLAB_NO_PROJECT` を立てると、プロジェクトそのもの（`GET /projects/<綴り>`）を 404 にする
+- `FAKE_GITLAB_NO_PROJECT` を立てると、プロジェクトそのもの（`GET /projects/<パス>`）を 404 にする
 
 sh の試験は PATH の先頭に `curl` の代役を置き、このファイルを
 `python gitlab_host.py curl ...` で起こす。
@@ -138,7 +138,7 @@ def curl(argv: list[str]) -> int:
         sys.stderr.write("curl: (22) The requested URL returned error: 403\n")
         return 22
     if os.environ.get("FAKE_GITLAB_NO_PROJECT") and "/" not in url[len(API) + len("/projects/") :]:
-        # プロジェクトそのもの（`GET /projects/<符号化した綴り>`）だけを読めなくする
+        # プロジェクトそのもの（`GET /projects/<符号化したパス>`）だけを読めなくする
         sys.stderr.write("curl: (22) The requested URL returned error: 404\n")
         return 22
     status, data = answer(

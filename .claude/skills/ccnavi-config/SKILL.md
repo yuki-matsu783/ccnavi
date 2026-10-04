@@ -52,7 +52,7 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 以下で `ccnavi` と書いたら、このリポジトリでは `uv run python -m ccnavi`。配布先の
 プロジェクトでは settings.json の `CCNAVI_BIN_PATH` が指す `.ccnavi/scripts/ccnavi-launcher.sh`。
 
-診断のときは記録と控えを外す（`--log "" --state ""`）。
+診断のときは記録と state を外す（`--log "" --state ""`）。
 
 ```sh
 ccnavi --lint --log "" --state ""

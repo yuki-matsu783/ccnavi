@@ -56,10 +56,10 @@ test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み
   assert.deepEqual(f?.result?.closure.families, ["i0001", "i0003"]);
   assert.ok(mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0003"));
   assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた親子のチケットは読まない");
-  // 今の ccnavi の答え: 先行 i0003-01 が閉じていないので子は承認の対象にしない
+  // 今の ccnavi の答え: 先行 i0003-01-01 が閉じていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01 が閉じていない/);
+  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
+  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01-01 が閉じていない/);
   assert.equal(f?.result?.batch?.[0].path, "i0001:wip/proposals/todo/i0001.md");
 });
 
@@ -77,12 +77,12 @@ test("CX-T042 判定の入力は統合先・P・閉包だけ。表示用のブ�
   assert.deepEqual({ ...b, schema: 0 }, { ...a, schema: 0 });
 });
 
-test("CX-T043 先行の親子のチケットのブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
+test("CX-T043 先行の親のブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
   const { board } = await run();
   const f = family(board, "i0002");
   assert.deepEqual(f?.result?.closure.absent, ["i0007"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0002-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /i0007-01 がどの置き場/);
+  assert.equal(f?.result?.rejected?.[0].ticket, "i0002-01-01");
+  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /i0007-01-01 がどの置き場/);
 });
 
 test("CX-T044 統合先の名前: 設定したブランチが無ければ止めて名前を出す。設定どおりなら「設定」と出す", async () => {
@@ -103,7 +103,7 @@ test("CX-T045 互換のマーカーが違えば、どちらを更新するかを
   assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）が書かれていない/);
 });
 
-test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）", async () => {
+test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読む（8.2）", async () => {
   const cache = memoryCache();
   const first = await run(fixture(), {}, cache);
   assert.ok(first.board.stats.blobsFetched > 0);
@@ -114,7 +114,7 @@ test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 
-test("CX-T047 置き場の綴りは統合先の .claude/settings.json から読む", async () => {
+test("CX-T047 置き場のパスは統合先の .claude/settings.json から読む", async () => {
   const b = fixture();
   b.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets" } });
   const moved = b.i0001.files;
@@ -141,10 +141,10 @@ test("CX-T049 先行の閉包が 16 組の親子のチケットを超えたら�
   const base = b.main.files;
   const chain = Array.from({ length: 17 }, (_, i) => `c${String(i + 1).padStart(2, "0")}x`);
   const text = (id: string, pred: string) =>
-    `---\nversion: 1\nticket: ${id}\nparent: ${id.slice(0, -3)}\nphase: 1\npredecessors:\n  - ${pred}\nhuman_review:\n  required: false\n  reason: r\ntitle: t\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: "wip/research/*"\n---\n\n本文\n`;
-  b.i0001.files["wip/proposals/todo/i0001-01.md"] = text("i0001-01", `${chain[0]}-01`);
+    `---\nversion: 1\nticket: ${id}\nparent: ${id.slice(0, -6)}\nphase: 1\npredecessors:\n  - ${pred}\nhuman_review:\n  required: false\n  reason: r\ntitle: t\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: "wip/research/*"\n---\n\n本文\n`;
+  b.i0001.files["wip/proposals/todo/i0001-01-01.md"] = text("i0001-01-01", `${chain[0]}-01-01`);
   chain.forEach((fam, i) => {
-    b[fam] = { committedDate: "2026-09-01T00:00:00Z", files: { ...base, [`wip/proposals/todo/${fam}-01.md`]: text(`${fam}-01`, `${chain[i + 1] ?? "zz"}-01`) } };
+    b[fam] = { committedDate: "2026-09-01T00:00:00Z", files: { ...base, [`wip/proposals/todo/${fam}-01-01.md`]: text(`${fam}-01-01`, `${chain[i + 1] ?? "zz"}-01-01`) } };
   });
   const { board } = await run(b);
   const r = family(board, "i0001")?.result;

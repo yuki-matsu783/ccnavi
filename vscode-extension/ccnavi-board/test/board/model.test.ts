@@ -8,7 +8,7 @@ test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", (
   assert.equal(board.version, BOARD_VERSION);
   assert.deepEqual(
     board.tickets.map((t) => t.ticket),
-    ["i0001", "i0001-01", "i0001-02", "i0001-03", "i0001-04", "i0001-05"],
+    ["i0001", "i0001-01-01", "i0001-02-02", "i0001-02-03", "i0001-02-04", "i0001-02-05"],
   );
   assert.equal(board.settings.approved, ".ccnavi/approved");
   const by = new Map(board.tickets.map((t) => [t.ticket, t]));
@@ -17,16 +17,16 @@ test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", (
     board.tickets.map((t) => [t.ticket, t.proposal?.state ?? null, t.copy.status]),
     [
       ["i0001", null, "open"],
-      ["i0001-01", null, "closed"],
-      ["i0001-02", null, "open"],
-      ["i0001-03", "todo", "none"],
-      ["i0001-04", "review", "review"],
-      ["i0001-05", null, "closed"],
+      ["i0001-01-01", null, "closed"],
+      ["i0001-02-02", null, "open"],
+      ["i0001-02-03", "todo", "none"],
+      ["i0001-02-04", "review", "review"],
+      ["i0001-02-05", null, "closed"],
     ],
   );
-  assert.notEqual(by.get("i0001-05")!.cancelled_at, "");
-  assert.deepEqual(board.parents[0].phases[1].states, { "i0001-02": "doing", "i0001-04": "review", "i0001-05": "cancelled" });
-  assert.deepEqual(board.pending_approval, ["i0001-03"]);
+  assert.notEqual(by.get("i0001-02-05")!.cancelled_at, "");
+  assert.deepEqual(board.parents[0].phases[1].states, { "i0001-02-02": "doing", "i0001-02-04": "review", "i0001-02-05": "cancelled" });
+  assert.deepEqual(board.pending_approval, ["i0001-02-03"]);
   assert.equal(board.parents.length, 1);
   assert.equal(board.parents[0].phases.length, 2);
 });
@@ -114,7 +114,7 @@ test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出�
   assert.equal(parsed.board.tickets[1].blocked, "");
 });
 
-test("CB-T259 history は実行ファイルの跡を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら履歴を出さない。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
@@ -133,7 +133,7 @@ test("CB-T259 history は実行ファイルの跡を写す。欄が無ければ�
   const [approved, mark] = parsed.board.tickets[0].history;
   assert.equal(parsed.board.tickets[0].history.length, 2);
   assert.deepEqual(approved, { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" });
-  // 置き場が動かないもの（マーカー）は from / to が null。空の綴りにして、フェーズとマーカーの種類を持つ
+  // 置き場が動かないもの（マーカー）は from / to が null。空の表記にして、フェーズとマーカーの種類を持つ
   assert.equal(mark.from, "");
   assert.equal(mark.to, "");
   assert.equal(mark.phase, 1);
@@ -141,16 +141,16 @@ test("CB-T259 history は実行ファイルの跡を写す。欄が無ければ�
   assert.deepEqual(parsed.board.tickets[1].history, []);
 });
 
-test("CB-T262 predecessors_unmet は実行ファイルの答えを写す。欄が無ければ空（満たしている扱い）", () => {
+test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま使う。欄が無ければ空（満たしている扱い）", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
-  tickets[3].predecessors_unmet = [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];
+  tickets[3].predecessors_unmet = [{ ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];
   delete tickets[1].predecessors_unmet;
   const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) {
     return;
   }
-  assert.deepEqual(parsed.board.tickets[3].predecessors_unmet, [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }]);
+  assert.deepEqual(parsed.board.tickets[3].predecessors_unmet, [{ ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" }]);
   assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
 });

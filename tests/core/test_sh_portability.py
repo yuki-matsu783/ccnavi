@@ -8,7 +8,7 @@ macOS の `sh` は bash 3.2 で、Linux や Git Bash の bash では通る書き
 2. `$( )` の中に `case` を書く。C のロケールでは `)` を読み違え、ファイルを読む段で構文エラーに
    なる。`case` 文で変数に入れる
 
-走らせて確かめるのではなく、綴りを読む。bash 3.2 の無い機械でも同じ報告になるように。
+走らせて確かめるのではなく、書かれた文面を読む。bash 3.2 の無い機械でも同じ報告になるように。
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ class ShPortabilityTest(unittest.TestCase):
         names = {os.path.basename(p) for p in shell_scripts()}
         self.assertIn("ccnavi-setup.sh", names)
         self.assertIn("ccnavi-git.sh", names)
-        # 承認済みチケットを運ぶ sh（設計 approve-carry 1）。配るので、同じ検査を通す。
+        # 承認の push の sh（設計 approve-carry 1）。配るので、同じ検査を通す。
         self.assertIn("ccnavi-push-approved.sh", names)
 
     def test_variable_is_braced_before_a_wide_character(self):
@@ -95,7 +95,7 @@ class ShPortabilityTest(unittest.TestCase):
     def test_sh_files_are_checked_out_with_lf(self):
         # Windows で core.autocrlf=true だと、取り出すときに CRLF になり、シバンが
         # `#!/bin/sh\r` になって直に起動する sh（振り分けの sh）が動かない。.gitattributes で
-        # LF に固定する。綴りを読む検査ではなく、git が決める属性を聞く。
+        # LF に固定する。書かれた文面を読む検査ではなく、git が決める属性を聞く。
         git = shutil.which("git")
         if git is None:
             self.skipTest("git が無い")

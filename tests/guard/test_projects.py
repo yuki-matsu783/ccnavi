@@ -373,9 +373,9 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_wrong_project_is_refused_even_when_the_worktree_name_differs_in_case(self):
-        """区別しない機械では、綴り違いに切ったワークツリーでも取り違えを止める。
+        """区別しない機械では、表記違いで切ったワークツリーでも取り違えを止める。
 
-        範囲の判定（ticket_verdict）は綴りの違いを吸収して引く。取り違えの検査だけ厳密に
+        範囲の判定（ticket_verdict）は表記の違いを吸収して引く。取り違えの検査だけ厳密に
         引くと、範囲の中への書き込みは別のプロジェクトのツリーでも通ってしまう。
         区別する機械でも走るように、区別しない機械の引き方へ差し替えて確かめる。
         """
@@ -394,9 +394,9 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
 
     def test_project_skills_are_written_only_under_the_ticket_rules(self):
-        """docs/skills/ は守りの外のふつうの場所。チケットの範囲の中でだけ書ける。
+        """docs/skills/ は保護の外のふつうの場所。チケットの範囲の中でだけ書ける。
 
-        置き場を ccnavi ディレクトリの外にしたのは、組み込みの守りを緩めずに済ませるため。
+        置き場を ccnavi ディレクトリの外にしたのは、組み込みの保護を緩めずに済ませるため。
         範囲に入れた子のワークツリーでは通り、範囲の外とチケットの無いワークツリーでは、
         同じツリーのほかのファイルと同じ判定になる。
         """
@@ -430,14 +430,14 @@ class ProjectsTest(unittest.TestCase):
             ticket_text("i0007", allow=("src/*",)),
         )
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007-01.md"),
-            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
+            os.path.join(self.lib, "wip", "proposals", "todo", "i0007-01-01.md"),
+            ticket_text("i0007-01-01", parent="i0007", allow=("src/a/*",)),
         )
         # 承認の前から、親も子も同じプロジェクトとしてボードに出る
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
         found = {t["ticket"]: t["project"] for t in board["tickets"]}
-        self.assertEqual(found, {"i0007": "lib", "i0007-01": "lib"})
-        self.assertEqual(board["pending_approval"], ["i0007", "i0007-01"])
+        self.assertEqual(found, {"i0007": "lib", "i0007-01-01": "lib"})
+        self.assertEqual(board["pending_approval"], ["i0007", "i0007-01-01"])
 
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -445,7 +445,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("■ プロジェクト: lib", approved.stdout)
         # 継ぐ段は無いが、承認済みチケットには残る
         # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
-        for name in ("i0007", "i0007-01"):
+        for name in ("i0007", "i0007-01-01"):
             with open(self.approved_path("doing", name + ".md"), encoding="utf-8") as f:
                 self.assertIn("project: lib", f.read())
 
@@ -466,8 +466,8 @@ class ProjectsTest(unittest.TestCase):
             ticket_text("i0007", allow=("src/*",)),
         )
         write(
-            os.path.join(self.app, "wip", "proposals", "todo", "i0007-01.md"),
-            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
+            os.path.join(self.app, "wip", "proposals", "todo", "i0007-01-01.md"),
+            ticket_text("i0007-01-01", parent="i0007", allow=("src/a/*",)),
         )
         result = self.ccnavi("--agree", stdin="y\n")
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
@@ -475,11 +475,11 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子は親と同じ置き場に置いて", result.stderr)
         self.assertTrue(os.path.exists(self.approved_path("doing", "i0007.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007-01-01.md")))
 
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/proposals/ に置く。プロジェクトのワークツリーの中も普通の置き場で、
-        # 承認をプロジェクトの git で運ぶために、そこに置く（設計 9.4、REQ-MLT-14）。
+        # 承認をプロジェクトの git で共有するために、そこに置く（設計 9.4、REQ-MLT-14）。
         # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録したパスから
         # 引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
@@ -496,7 +496,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        # 着手で共通層を写したので、レビューの無いこの親はユーザが端末で見てから
+        # 着手で共通層をコピーしたので、レビューの無いこの親はユーザが端末で見てから
         # 閉じる（設計 11.12）。
         seen = self.ccnavi("--config-synced", "i0010", stdin="y\n")
         self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
@@ -555,7 +555,7 @@ class ProjectsTest(unittest.TestCase):
     def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
         """取り込み済みのプロジェクトの親子のチケットも止まる。
 
-        控えは sync/<プロジェクト>/ に置く。
+        取り込み状態は sync/<プロジェクト>/ に置く。
         """
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
@@ -568,7 +568,8 @@ class ProjectsTest(unittest.TestCase):
         target = os.path.join(tree, "src", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
-        # ワークスペースの控えに同じ名前があっても、プロジェクトの親子のチケットには当たらない。
+        # ワークスペースの取り込み状態に同じ名前があっても、
+        # プロジェクトの親子のチケットには当たらない。
         record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
         write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
         write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")
@@ -586,7 +587,7 @@ class ProjectsTest(unittest.TestCase):
     def test_post_monitoring_reads_the_project_tree_the_call_touched(self):
         started = self.hook("", self.ws, event="UserPromptSubmit")
         self.assertEqual(started.returncode, 0, started.stderr)
-        # 初回の実行後は控えを取るだけ。そのあとで app の schema/ をシェルが汚す。
+        # 初回の実行後は記録を取るだけ。そのあとで app の schema/ をシェルが汚す。
         first = self.hook("Bash", self.app, event="PostToolUse", command="python gen.py")
         self.assertEqual(first.returncode, 0, first.stderr)
         write(os.path.join(self.app, "schema", "x.sql"), "dirty\n")

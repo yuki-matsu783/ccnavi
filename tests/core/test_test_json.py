@@ -1,6 +1,6 @@
 """`--test --json` と `--test-samples`（試験の JSON）の受入テスト。
 
-VS Code 拡張のルール設定画面が読む形を、`--test` と同じ判定で組んでいることを
+VS Code 拡張のルール管理画面が読む形を、`--test` と同じ判定で組んでいることを
 確かめる。内部の関数は呼ばず、標準出力と終了コードだけを見る。見るのは 4 つ。
 
 1. `--test --json` が判定・根拠・当たったルール・返る文面を 1 つの JSON で出す
@@ -80,7 +80,7 @@ def write(directory: str, name: str, text: str) -> str:
 
 
 def ccnavi(root: str, rules_path: str, *args: str) -> subprocess.CompletedProcess:
-    """見るのはルールだけ。承認済みチケットと控えは外し、記録も残さない。"""
+    """見るのはルールだけ。承認済みチケットと state は外し、記録も残さない。"""
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     return run_ccnavi(
         [
