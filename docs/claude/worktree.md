@@ -43,14 +43,14 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 - 行き先の名前とブランチ名は揃える（`-b <行き先の名前>`）。`-B`・`--detach`・`--force`は拒否される。
   `-b`を付けずに2つ目の語を渡す場合、渡せるのは行き先と同じ名前の手元のブランチか`origin/<名前>`だけで、タグやshaは拒否される。
 - 既にある`feature/123-login`のような`/`を含むブランチで親チケットの作業をするときは、識別子は`/`を含まない
-  `feature-123-login`にし、親チケット（か提案）に`branch: feature/123-login`を書く。ワークツリーは
-  `ccnavi-git.sh worktree add .claude/worktrees/feature-123-login feature/123-login`（ブランチがまだ無ければ
-  `-b feature/123-login <統合先>`）で作る。行き先の名前と違うブランチは、行き先の名前の親チケットが`branch:`でそう名乗る
-  ときだけ通る。提案は先にワークスペースルートの`wip/proposals/todo/`に書いてよく、ワークツリーを作ったら親のワークツリーへ
-  運ぶ。子のブランチは子の識別子で、起点は親のブランチ（`-b <子> feature/123-login`）。`ccnavi-sync.sh`の引数は識別子
-  （ADR-0100の5章）
+  `feature-123-login`にし、提案に`branch: feature/123-login`を書く。承認されるまでは`branch:`は使われないので、
+  親のワークツリーは識別子のブランチで切る（`worktree add .claude/worktrees/feature-123-login -b feature-123-login <統合先>`）。
+  承認の後、親のワークツリーで`ccnavi-git.sh switch feature/123-login`を打つと、そのブランチへ移って承認済みチケットと
+  マーカーを運ぶ（既にあれば識別子のブランチをmergeし、無ければ切る。作業ツリーは綺麗にしておく）。続けて
+  `ccnavi-git.sh push -u origin feature/123-login`を打つ。子のブランチは子の識別子で、起点は親のブランチ
+  （`-b <子> feature/123-login`）。`ccnavi-sync.sh`の引数は識別子（ADR-0100の5章）
 - 親チケットのワークツリーでは、別のブランチへ`checkout` / `switch`できない。ccnaviは親のワークツリーを
-  「名前が親の識別子で、親のブランチ（親チケットの`branch:`、無ければ識別子と同じ名前）をチェックアウトしているもの」
+  「名前が親の識別子で、親のブランチ（承認済みの親チケットの`branch:`、無ければ識別子と同じ名前）をチェックアウトしているもの」
   として探すためである。
   別のブランチに移ると、リモートでの承認を取り込む処理（`ccnavi-sync.sh`と、セッション開始時に`ccnavi-fetch.sh`が
   fast-forwardで進める処理）がそのワークツリーを飛ばす。親チケットのブランチを一度でもpushしたか`ccnavi-sync.sh`で取り込んだことがあると、
