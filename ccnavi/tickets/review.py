@@ -48,7 +48,7 @@ from datetime import datetime
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, archive, configsync, history, ops, phase, phasetypes
+from . import approval, archive, configsync, history, ops, phase, phasetypes, syncstate
 from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
@@ -1257,14 +1257,14 @@ def ready(
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものはユーザが行う。
 
-    条件を確かめて印を置いたあと、親のツリーの承認済みの領域から、閉じた親（今回の親と、統合先に
+    条件を確かめてマーカーを置いたあと、親のツリーの承認済みの領域から、閉じた親（今回の親と、統合先に
     たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`events/`・`flows/` を
     手元の `logs/archive/` へ退避する（archive.py）。git の上では削除になり、C1 がコミットして
     push してから sh が Draft を外す。squash でマージすると、既定のブランチにチケットは残らない。
     退避した後に打ち直したとき（親が退避にだけある）は、条件の確かめのうちワークツリーの側
     （未コミット・push 済み）だけを見て、下書きを書き直し、前の回が途中で止まった残りを移す。
     """
-    archived = _archived_parent(root, conf, cwd)
+    archived = _archived_parent(root, conf, cwd, result_path)
     if archived is not None:
         return _ready_again(stdout, stderr, root, conf, archived, result_path)
     parent = _parent_any(stderr, root, conf, cwd)
@@ -1299,16 +1299,18 @@ def ready(
     if not conf.state:
         stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所が無い\n")
         return 1
-    wrapped = approval.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
-        parent.ticket,
-        approval.PARENT_MARK_CLOSE_EARLY,
-    )
+    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    # 退避は親のワークツリーの置き場からだけ行う（ワークスペースルートの done/ には
+    # 他の親子のチケットも在り、まとめて消すことになる）。印もコメントの下書きも置く前に確かめる。
+    misplaced = _archive_place_problem(root, conf, parent, where)
+    if misplaced:
+        stderr.write(f"ccnavi: {misplaced}\n")
+        return 1
+    wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
     path, failed = _ready_note(conf, parent.ticket, wrapped)
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     if not _parent_mark(
         stderr,
         where,
@@ -1336,6 +1338,10 @@ def _archive_closed(
     残り）。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`（sh が
     そのツリーの未コミットを確かめる）。
     """
+    misplaced = _archive_place_problem(root, conf, parent, where)
+    if misplaced:
+        stderr.write(f"ccnavi: {misplaced}\n")
+        return 1
     home = tree.tree_of(root, where, conf.projects)
     tree_root = home.root if home is not None else ""
     parents = sorted(
@@ -1350,6 +1356,27 @@ def _archive_closed(
     if tree_root:
         stdout.write(f"tree {tree_root}\n")
     return 0
+
+
+def _archive_place_problem(
+    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, where: str
+) -> str:
+    """退避の元が親のワークツリー（`.claude/worktrees/<親>`）の承認済みの領域でなければ、その理由。"""
+    home = tree.tree_of(root, where, conf.projects)
+    expected = tree.worktree_path(root, parent.ticket)
+    if (
+        home is not None
+        and not home.is_main
+        and syncstate.same_tree(os.path.realpath(home.root), os.path.realpath(expected))
+    ):
+        return ""
+    shown = home.name if home is not None and home.name else "ワークスペースルート"
+    return (
+        f"親 {parent.ticket} の承認済みチケットが親のワークツリー（{tree.WORKTREES_DIR}/"
+        f"{parent.ticket}）ではなく {shown} に在る。閉じたチケットの退避は親のワークツリーの"
+        "置き場からだけ行う（他の親子のチケットまで消さないため）。親のワークツリーで"
+        "承認済みチケットを持ってから打ち直してください。Draft はまだ外していない"
+    )
 
 
 def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> tuple[str, str]:
@@ -1367,12 +1394,21 @@ def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> t
     return path, _write_text(path, "\n".join(text) + "\n")
 
 
-def _archived_parent(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
+def _archived_parent(
+    root: str, conf: settings.Settings, cwd: str, result_path: str
+) -> ticket_mod.Ticket | None:
     """cwd のワークツリーの親が、ready の退避を始めた後なら、その親。
 
-    承認済みの領域に無く手元の退避にだけある（退避を済ませた後に Draft を外し損ねた）か、
-    `done/` に残っていても ready の印が在る（退避が途中で止まった）とき。前の回が条件を確かめて
-    いるので、打ち直しではワークツリーの側の条件だけを見て、残りを移す。
+    次の 2 つがそろうときだけ。そろわなければ None（通常の条件の確かめへ回る）。
+
+    - ready の印（`ready/<親>.json`）が、今のツリーで書かれたものであること
+      （`archive.ready_started`）
+    - Draft を外したマーカー（`phases/<親>/ready.json`。ツリーか退避）のマージリクエストの番号が、
+      今回の結果のものと同じであること
+
+    そのうえで、承認済みの領域に無く手元の退避にだけある（退避を済ませた後に Draft を外し損ねた）
+    か、`done/` に残っている（退避が途中で止まった）とき。前の回が条件を確かめているので、
+    打ち直しではワークツリーの側の条件だけを見て、残りを移す。
     """
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
@@ -1380,10 +1416,18 @@ def _archived_parent(root: str, conf: settings.Settings, cwd: str) -> ticket_mod
     approved = settings.approved_dir(conf, t.root)
     if os.path.lexists(os.path.join(approved, ticket_mod.DOING, f"{t.name}.md")):
         return None
+    if not archive.ready_started(root, t.project, t.name, t.root):
+        return None
+    result = _result(io.StringIO(), result_path)
+    if result is None or result.mr is None:
+        return None
+    marks = [
+        approval.read_parent_mark(where, t.name, approval.PARENT_MARK_READY)
+        for where in (approved, archive.base_dir(root, t.project))
+    ]
+    if not any(isinstance(m, dict) and m.get("mr") == result.mr.number for m in marks):
+        return None
     if os.path.lexists(os.path.join(approved, ticket_mod.DONE, f"{t.name}.md")):
-        # 前の回の ready が退避を始めて途中で止まった（印が在る）なら、条件は確かめてある。
-        if not archive.ready_started(root, t.project, t.name, t.root):
-            return None
         copy, _ = approval.load_copy(os.path.join(approved, ticket_mod.DONE, f"{t.name}.md"))
         if copy is None or copy.parent:
             return None
@@ -1412,9 +1456,13 @@ def _ready_again(
     if _result_with_mr(stderr, result_path) is None:
         return 1
     if not conf.state:
-        stderr.write("ccnavi: 控えの置き場が空。コメントの下書きを置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所が無い\n")
         return 1
+    # 早めに閉じたマーカーは、途中で止まった回ならツリーに、移し終えていれば退避に在る
+    where = settings.approved_dir(conf, tree.worktree_path(root, parent.ticket))
     wrapped = approval.read_parent_mark(
+        where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
+    ) or approval.read_parent_mark(
         archive.base_dir(root, parent.project), parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
     )
     path, failed = _ready_note(conf, parent.ticket, wrapped)
@@ -1422,7 +1470,6 @@ def _ready_again(
         stderr.write(f"ccnavi: {failed}\n")
         return 1
     # 前の回が途中で止まっていれば、残りをここで移す（移すものが無ければ何もしない）。
-    where = settings.approved_dir(conf, tree.worktree_path(root, parent.ticket))
     return _archive_closed(stdout, stderr, root, conf, parent, where, path)
 
 

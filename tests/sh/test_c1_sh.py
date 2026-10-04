@@ -1210,8 +1210,8 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
 
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
-class C1HostTest(C1Harness):
-    """ホストに触る副命令（request・confirm・ready・decide・close-early・config-synced）の C1。"""
+class C1HostHarness(C1Harness):
+    """ホストの代役（GitLab）と実行ファイルの代役を用意する道具。試験は持たない。"""
 
     def setUp(self):
         super().setUp()
@@ -1246,6 +1246,11 @@ class C1HostTest(C1Harness):
         self.assertIn(rel, self.committed())
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
+
+
+@unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
+class C1HostTest(C1HostHarness):
+    """ホストに触る副命令（request・confirm・ready・decide・close-early・config-synced）の C1。"""
 
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
@@ -1293,6 +1298,60 @@ class C1HostTest(C1Harness):
         self.carried(old)
         self.assertFalse(os.path.exists(os.path.join(self.tree, *old.split("/"))))
         self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", old).stdout, "")
+
+    def test_the_real_ready_moves_the_rest_again_after_a_failed_push(self):
+        """本物の実行ファイルの ready（退避を始めた後の打ち直し）を C1 の中で通す。
+
+        1 回目の push をリモートが断る → C1 が戻す → 取り込みからやり直して残りを移し、送ってから
+        Draft を外す。
+        """
+        archive_base = os.path.join(self.ws, "logs", "archive", "self")
+        # 親はもう退避にだけある（前の回が移した）。ツリーには統合先からの過去の親子が残る。
+        for rel in (f"doing/{PARENT}.md", f"doing/{CHILD}.md"):
+            git(self.tree, "rm", "-q", "--", f"{APPROVED}/{rel}")
+        write(
+            os.path.join(archive_base, "done", f"{PARENT}.md"),
+            parent_text(PARENT, list(self.plan), allow=("src/*", "wip/*")),
+        )
+        write(os.path.join(archive_base, "phases", PARENT, "ready.json"), '{"mr": 1}')
+        old = (
+            "---\nversion: 1\nticket: old\ntitle: 古い親\nrationale: r\n"
+            "human_review:\n  required: false\n  reason: t\n"
+            'allow:\n  - match: Write|Edit\n    glob: "src/*"\n---\n'
+        )
+        write(os.path.join(self.tree, APPROVED, "done", "old.md"), old)
+        write(os.path.join(self.tree, APPROVED, "phases", "old", "closed.json"), "{}\n")
+        write(os.path.join(self.tree, APPROVED, "events", "old.ndjson"), '{"a": 1}\n')
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "退避の途中")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        head = self.sha(self.tree, "HEAD")
+        write(
+            os.path.join(archive_base, "ready", f"{PARENT}.json"),
+            json.dumps(
+                {"parent": PARENT, "tree": os.path.normcase(os.path.realpath(self.tree)),
+                 "head": head, "files": []}
+            ),
+        )  # fmt: skip
+        # リモートは 1 回目の push だけ断る
+        once = os.path.join(self._tmp.name, "refused-once")
+        executable(
+            os.path.join(self.remote, "hooks", "pre-receive"),
+            f"#!/bin/sh\n[ -e '{once}' ] && exit 0\n: >'{once}'\necho refused >&2\nexit 1\n",
+        )
+        ready = self.review("ready", CCNAVI_BIN_PATH=self.bin)
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertTrue(os.path.exists(once))
+        self.assertIn("push が通らなかった", ready.stderr)
+        self.assertIn("Draft を外した", ready.stdout)
+        self.carried(f"{APPROVED}/done/old.md")
+        for rel in ("done/old.md", "phases/old/closed.json", "events/old.ndjson"):
+            self.assertEqual(
+                git(self.tree, "ls-tree", "HEAD", "--", f"{APPROVED}/{rel}").stdout, ""
+            )
+            self.assertTrue(os.path.isfile(os.path.join(archive_base, *rel.split("/"))), rel)
+        with open(os.path.join(archive_base, "events", "old.ndjson"), encoding="utf-8") as f:
+            self.assertEqual(f.read().count('"archived"'), 1)
 
     def test_a_request_is_not_posted_twice_across_runs(self):
         """投稿の後に落ちた依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
@@ -1554,12 +1613,8 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         self.assertEqual(again["problems"], ["ccnavi: フェーズ 1 はレビュー済み"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
-class C1HostNotImportedTest(C1HostTest):
+class C1HostNotImportedTest(C1HostHarness):
     """取り込み済みでない親子のチケットの ready。退避の削除は送らずに止め、Draft を外さない。"""
 
     imported = False
@@ -1603,7 +1658,5 @@ class C1HostNotImportedTest(C1HostTest):
         self.assertIn("Draft を外した", ready.stdout)
 
 
-# ホストの道具立てだけを借りる。C1HostTest の試験（C1 の中が前提）はここでは回さない。
-for _name in [n for n in dir(C1HostTest) if n.startswith("test_")]:
-    if _name not in C1HostNotImportedTest.__dict__:
-        setattr(C1HostNotImportedTest, _name, None)
+if __name__ == "__main__":
+    unittest.main()

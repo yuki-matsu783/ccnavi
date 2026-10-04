@@ -424,15 +424,16 @@ _COPY_PLACES = (
     _IN_WORD + r"ccnavi-git\.sh" + _COPY_TAIL,
 )
 # 守るものが入っているディレクトリと、その中の守る名前（holder_regex）。既定の表記のぶん。
-# `logs/` の中の記録と state の置き場。`logs/` の下の git のラッパースクリプトの記録は
-# 守らないので、名前で絞る。`.claude/` と `.ccnavi/` と `logs/state/` は、行き先がその
-# ディレクトリなら名前を問わずに止まる（上の場所の表記）ので、ここには無い。
+# `logs/` の中の記録と state の置き場と、閉じたチケットの退避（archive）。`logs/` の下の
+# git のラッパースクリプトの記録は守らないので、名前で絞る。`.claude/` と `.ccnavi/` と
+# `logs/state/` は、行き先がそのディレクトリなら名前を問わずに止まる（上の場所の表記）ので、
+# ここには無い。
 #
 # ROOT_NAMES はワークスペースルートの直下に置く、守るものを含む名前。`cp -r /tmp/.ccnavi .` は
 # ccnavi ディレクトリを丸ごと置き換える。行き先はルートを指す表記（`.` と、ルートの絶対パス）
 # だけで見る（_moved_holders がルートの表記と組む）。`.` は居場所がルートでなくても当たるが、
 # そこへ `.ccnavi` や `.claude` を写す用事は無い。
-_HOLDERS = ((under(r"logs"), r"decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state"),)
+_HOLDERS = ((under(r"logs"), r"decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|archive"),)
 ROOT_NAMES = (r"\.ccnavi", r"\.claude", r"logs")
 
 

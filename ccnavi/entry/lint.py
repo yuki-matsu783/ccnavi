@@ -54,6 +54,7 @@ from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets import (
     agree,
     approval,
+    archive,
     configsync,
     flow,
     history,
@@ -1241,7 +1242,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
     """名前が親の識別子なのに、HEAD が別のブランチを指す親のワークツリー（移行の検査）。"""
     problems: list[Problem] = []
     for work in tree.worktrees(root, conf.projects):
-        if not _holds_parent(conf, work):
+        if not _holds_parent(conf, work, root):
             continue
         branch = tree.branch_of(work.root)
         if branch == work.name:
@@ -1259,10 +1260,11 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
     return problems
 
 
-def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
+def _holds_parent(conf: settings.Settings, work: tree.Tree, root: str = "") -> bool:
     """そのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか。
 
-    sh の `ccnavi_parent_tree` と同じ見方。
+    sh の `ccnavi_parent_tree` と同じ見方。ready の後はツリーから親が消えて手元の退避
+    （`logs/archive/<リポジトリ>/done/`）へ移るので、そこに親が在っても親のワークツリーとして扱う。
     """
     approved = settings.approved_dir(conf, work.root)
     proposals = os.path.join(work.root, conf.tickets.replace("/", os.sep))
@@ -1277,7 +1279,8 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
         t, _ = ticket_mod.load(path)
         if t is not None and t.ticket == work.name and not t.parent:
             return True
-    return False
+    held = archive.archived_fields(root, work.project, work.name) if root else None
+    return held is not None and held.ticket == work.name and not held.parent
 
 
 def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]]:

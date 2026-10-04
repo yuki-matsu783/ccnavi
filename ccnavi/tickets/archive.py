@@ -6,22 +6,22 @@
 Draft を外すので、squash でマージすると既定のブランチにはチケットが残らない。
 
 - `done/` の親と子のチケット
-- `phases/<親>/` の下（マーカー・子の記録・Draft を外した印も含む）
-- `events/` の親と子の跡
+- `phases/<親>/` の下（マーカー・子の記録・Draft を外したマーカーも含む）
+- `events/` の親と子の履歴
 - `flows/` の子のフロー
 
 置き場はワークスペースルートの `logs/archive/<リポジトリ>/` で、`<リポジトリ>` は
-ワークスペース自身なら `self`、プロジェクトならその名前（取り込みの控えと同じ分け方）。
+ワークスペース自身なら `self`、プロジェクトならその名前（取り込み状態と同じ分け方）。
 その下は承認済みの領域と同じ並び
 （`done/<識別子>.md`・`phases/<親>/...`・`events/<識別子>.ndjson`・`flows/<子>.yml`）にする。
 `logs/` は git が追跡しないので、退避は手元の機械にだけ残る。
 
-退避は補助の記録で、判定の正ではない。読むのは次のところだけで、どれも「閉じた」側に締める向き。
+退避は補助の記録で、判定の正ではない。読むのは次のところだけで、どれも「閉じた」側に厳しくする向き。
 
 - 閉じた識別子の使い回しの検査（`approval.integration_problems` / `integration_closed`）と、子の連番
   （`approval.next_child_id`）。退避にある識別子は閉じたものとして数える（同じリポジトリのものだけ）
-- 先行の池（`approval.predecessor_pool_of`）。置き場のどこにも無い先行を、同じリポジトリの退避の
-  `done/` から引く
+- 先行を引く対応表（`approval.predecessor_pool_of`）。置き場のどこにも無い先行を、
+  同じリポジトリの退避の `done/` から引く
 - 判定の走査（`approval.scan`）。子のワークツリーに残った古い写しを、退避に同じ承認の写しがあれば
   作業中に戻さない（`drop_archived`）
 - 取り込み（`ccnavi-sync.sh`・`syncstate`）。マージ済みかを確かめられないときと、親のワークツリーを
@@ -44,7 +44,7 @@ import re
 import stat
 from dataclasses import dataclass, field
 
-from ..infra import fsio
+from ..infra import fsio, gitcmd
 from . import history, syncstate
 from . import ticket as ticket_mod
 
@@ -54,7 +54,7 @@ ARCHIVE_DIR = os.path.join("logs", "archive")
 PHASES_DIR = "phases"
 FLOWS_DIR = "flows"
 FLOW_SUFFIXES = (".yml", ".yaml")
-# 退避した印の跡に書く置き場の名前（`from: done` → `to: archive`）。
+# 退避したマーカーの履歴に書く置き場の名前（`from: done` → `to: archive`）。
 PLACE = "archive"
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part`）。移さない。
 _TEMP = re.compile(r"^\..*\.part(\.[^/]*)?$")
@@ -232,11 +232,27 @@ def _fields(data: bytes | None) -> syncstate.DoneCopy | None:
 
 
 def archived_fields(root: str, project: str, ident: str) -> syncstate.DoneCopy | None:
-    """退避の `done/<識別子>.md` の識別子・親・承認の時刻。無い・読めない・リンクなら None。"""
+    """退避の `done/<識別子>.md` の識別子・親・承認の時刻。無い・読めない・リンクなら None。
+
+    大文字小文字だけが違う識別子も同じものとして引く（区別しないファイルシステムでは、ブランチと
+    ワークツリーの名前がぶつかるため。使い回しの検査を緩めない向き）。
+    """
     if not ticket_mod.is_valid_id(ident):
         return None
-    copy = _fields(archived_bytes(root, project, f"{ticket_mod.DONE}/{ident}.md"))
-    return copy if copy is not None and copy.ticket == ident else None
+    name = ident
+    if archived_bytes(root, project, f"{ticket_mod.DONE}/{ident}.md") is None:
+        directory = _done_dir(root, syncstate.repo_key(project))
+        folded = [i for i in (_regular_md(directory) if directory else []) if same_id(i, ident)]
+        if not folded:
+            return None
+        name = folded[0]
+    copy = _fields(archived_bytes(root, project, f"{ticket_mod.DONE}/{name}.md"))
+    return copy if copy is not None and copy.ticket == name else None
+
+
+def same_id(a: str, b: str) -> bool:
+    """大文字小文字だけが違う識別子を同じと読む。"""
+    return a.casefold() == b.casefold()
 
 
 def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
@@ -251,7 +267,12 @@ def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mo
     out = []
     for t in tickets:
         copy = archived_fields(root, t.project, t.ticket)
-        if copy is not None and copy.approved_at and copy.approved_at == t.approved_at:
+        if (
+            copy is not None
+            and copy.ticket == t.ticket
+            and copy.approved_at
+            and copy.approved_at == t.approved_at
+        ):
             continue
         out.append(t)
     return out
@@ -264,7 +285,7 @@ def drop_archived(root: str, tickets: list[ticket_mod.Ticket]) -> list[ticket_mo
 class Plan:
     """移すもの。`files` は承認済みの領域からの相対（"/" 区切り）で、移す順に並ぶ。
 
-    順は、マーカー（`phases/`）・跡・フロー・子のチケット・親のチケットの順。止まったときに
+    順は、マーカー（`phases/`）・履歴・フロー・子のチケット・親のチケットの順。止まったときに
     `done/<親>.md` がツリーに残り、次の `ready` が同じ親を拾い直せるようにするため。
     """
 
@@ -305,8 +326,9 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
 
     親として拾うのは、`done/` に `parent:` を持たないチケットとして在るものと、手元の退避に親として
     在るもの（前の回が途中で止まった残り。`root` を渡したときだけ）。子は名前の形ではなくチケットの
-    `parent:` 欄で親に結ぶ（`rel-01` という親を `rel` の子と取り違えない）。跡とフローは、その親か、
-    `done/`（または退避）に在る子のものだけ。`phases/<親>/` は下を丸ごと。
+    `parent:` 欄で親に結ぶ（`rel-01` という親を `rel` の子と取り違えない）。履歴とフローは、
+    その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子（取り下げた子）のもの。
+    `phases/<親>/` は下を丸ごと。
     """
     done = _done_copies(approved_dir)
     family = set()
@@ -326,16 +348,28 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
             held = archived_fields(root, project, ident)
             if held is not None and held.parent in family:
                 children.add(ident)
+    # どの置き場にもチケットの無い識別子（取り下げた子など）。履歴とフローしか残っていないので、
+    # このときだけ子の形（`<親>-<連番>`）で親に結ぶ。チケットが在る識別子は `parent:` 欄で決める。
+    known = set(done) | set(_regular_md(os.path.join(approved_dir, ticket_mod.DOING)))
+
+    def belongs(ident: str) -> bool:
+        if ident in family or ident in children:
+            return True
+        if ident in known or (root and archived_fields(root, project, ident) is not None):
+            return False
+        matched = ticket_mod.child_pattern().match(ident)
+        return matched is not None and matched.group("parent") in family
+
     out = Plan(parents=sorted(family))
     for p in out.parents:
         out.files += _walk(approved_dir, f"{PHASES_DIR}/{p}")
     for name in _names(os.path.join(approved_dir, history.EVENTS_DIR)):
         ident = name[: -len(history.SUFFIX)] if name.endswith(history.SUFFIX) else ""
-        if ident and (ident in family or ident in children):
+        if ident and belongs(ident):
             out.files.append(f"{history.EVENTS_DIR}/{name}")
     for name in _names(os.path.join(approved_dir, FLOWS_DIR)):
         stem, ext = os.path.splitext(name)
-        if ext in FLOW_SUFFIXES and stem in children:
+        if ext in FLOW_SUFFIXES and stem not in family and belongs(stem):
             out.files.append(f"{FLOWS_DIR}/{name}")
     kids = sorted(i for i in done if i in children)
     elders = sorted(i for i in done if i in family)
@@ -374,7 +408,7 @@ def _walk(approved_dir: str, rel: str) -> list[str]:
 
 
 def destination(root: str, project: str, rel: str) -> str:
-    """退避の行き先の綴り。"""
+    """退避の行き先のパス。"""
     return os.path.join(base_dir(root, project), *rel.split("/"))
 
 
@@ -385,42 +419,61 @@ def same_bytes(a: bytes | None, b: bytes | None) -> bool:
     return a.replace(b"\r\n", b"\n") == b.replace(b"\r\n", b"\n")
 
 
+def _lines(data: bytes) -> list[bytes] | None:
+    """改行を LF に揃えた行の並び（末尾の空行は落とす）。"""
+    body = data.replace(b"\r\n", b"\n")
+    lines = body.split(b"\n")
+    if lines and lines[-1] == b"":
+        lines = lines[:-1]
+    return lines
+
+
+def _is_ready_line(line: bytes) -> bool:
+    try:
+        row = json.loads(line.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return False
+    return isinstance(row, dict) and _ready_row(row)
+
+
 def holds(rel: str, held: bytes | None, data: bytes | None) -> bool:
     """退避の写し `held` が、ツリーの中身 `data` を写したものか。
 
-    跡（`events/`）は、`data` が前置きで、足した部分が ready の流れの行（「退避した」と、ready が
-    同じ回に置く Draft を外した印の行）だけなら同じと読む。C1 はコミット済みの中身と比べるが、
-    ready は印を置いてから写すので、写しには印の 1 行が足されている。それ以外は中身が同じこと。
+    履歴（`events/`）は、`data` の行が全部 `held` に在り、`held` にだけ在る行が ready の流れの行
+    （「退避した」と、ready が置く Draft を外したマーカーの行）だけなら同じと読む。C1 は
+    コミット済みの中身と比べるが、ready はマーカーを置いてから写し、退避の側にだけ「退避した」を
+    足すので、写しにはその行が足されている。それ以外は中身が同じこと。
     """
     if same_bytes(held, data):
         return True
     if held is None or data is None or not rel.startswith(f"{history.EVENTS_DIR}/"):
         return False
-    head, body = data.replace(b"\r\n", b"\n"), held.replace(b"\r\n", b"\n")
-    if not body.startswith(head) or (head and not head.endswith(b"\n")):
-        return False
-    try:
-        lines = body[len(head) :].decode("utf-8").split("\n")
-    except UnicodeDecodeError:
-        return False
-    if lines and lines[-1] == "":
-        lines = lines[:-1]
-    for line in lines:
-        try:
-            row = json.loads(line)
-        except ValueError:
+    rest = list(_lines(held) or [])
+    for line in _lines(data) or []:
+        if line not in rest:
             return False
-        if not isinstance(row, dict) or not _ready_row(row):
-            return False
-    return bool(lines)
+        rest.remove(line)
+    return bool(rest) and all(_is_ready_line(line) for line in rest)
+
+
+def _merged_history(held: bytes, data: bytes) -> bytes:
+    """退避の履歴に、ツリーにあって退避に無い行だけを足す（退避の側にだけある行を消さない）。"""
+    rest = list(_lines(held) or [])
+    lines = list(rest)
+    for line in _lines(data) or []:
+        if line in rest:
+            rest.remove(line)
+        else:
+            lines.append(line)
+    return b"".join(line + b"\n" for line in lines)
 
 
 def _ready_row(row: dict) -> bool:
-    """ready の流れが跡に足す行か（「退避した」か、Draft を外した印）。"""
+    """ready の流れが履歴に足す行か（「退避した」か、Draft を外したマーカー）。"""
     kind = row.get("kind")
     if kind == history.KIND_ARCHIVED:
         return True
-    # "ready" は approval.PARENT_MARK_READY（approval はこのモジュールを読むので、綴りで持つ）。
+    # "ready" は approval.PARENT_MARK_READY（approval はこのモジュールを読むので、表記で持つ）。
     return kind == history.KIND_PARENT_MARK and row.get("mark") == "ready"
 
 
@@ -445,8 +498,9 @@ def archived_bytes(root: str, project: str, rel: str) -> bytes | None:
 # ---- ready が退避した印（どの親のワークツリーから、どのファイルを移したか）
 #
 # C1 の見分けと実行後チェックは、ready の流れで消したものだけを ccnavi の書き込みとして外す。
-# 「退避に同じ中身がある」だけで外すと、ready を経ない削除も黙って運ばれる。印は退避の置き場の
-# `ready/<親>.json` で、`logs/archive/` は記録の守りがエージェントの書き込みを止める。
+# 「退避に同じ中身がある」だけで外すと、ready を経ない削除も黙ってコミットされる。
+# ready の印は退避の置き場の `ready/<親>.json` で、`logs/archive/` は記録の守りが
+# エージェントの書き込みを止める。
 
 READY_DIR = "ready"
 
@@ -455,63 +509,84 @@ def _tree_key(tree_root: str) -> str:
     return os.path.normcase(os.path.realpath(tree_root)) if tree_root else ""
 
 
-def ready_files(root: str, project: str, tree_root: str) -> set[str]:
-    """そのツリーから ready が移したファイル（承認済みの領域からの相対）の全部。"""
-    directory = os.path.join(base_dir(root, project), READY_DIR)
-    if (
-        not root
-        or _linked(root, (*ARCHIVE_DIR.split(os.sep), syncstate.repo_key(project), READY_DIR))
-        is not False
-    ):
+# ready の印に載せてよいのは、承認済みの領域のこの 4 つの下だけ。
+READY_PLACES = (f"{ticket_mod.DONE}/", f"{PHASES_DIR}/", f"{history.EVENTS_DIR}/", f"{FLOWS_DIR}/")
+
+
+def in_ready_places(rel: str) -> bool:
+    """承認済みの領域からの相対が、ready が移す 4 つの置き場の下か（`..` などは受けない）。"""
+    parts = rel.split("/")
+    return rel.startswith(READY_PLACES) and not any(p in ("", ".", "..") for p in parts)
+
+
+def tree_head(tree_root: str, rev: str = "HEAD") -> str:
+    """ツリーの版の sha。読めなければ空文字（git はローカルの読み取りだけ）。"""
+    if not tree_root:
+        return ""
+    done = gitcmd.run(tree_root, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"])
+    return done.out.strip() if done.ok else ""
+
+
+def _read_ready(root: str, project: str, name: str) -> dict | None:
+    held = archived_bytes(root, project, f"{READY_DIR}/{name}")
+    if held is None:
+        return None
+    try:
+        data = json.loads(held.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def ready_files(root: str, project: str, tree_root: str, head: str) -> set[str]:
+    """その回の ready がそのツリーから移したファイル（承認済みの領域からの相対）。
+
+    ready の印が効くのは、印を書いたときのツリーの先頭（`head`）と、いま比べている版が同じ間だけ。
+    ready の削除がコミットされてツリーが進めば、印は以後の削除には効かない（ready の外の削除を
+    ccnavi の書き込みとしてコミットしない）。`head` が空なら何も返さない。
+    """
+    if not root or not head:
+        return set()
+    if _linked(root, (*ARCHIVE_DIR.split(os.sep), syncstate.repo_key(project), READY_DIR)):
         return set()
     key = _tree_key(tree_root)
     out: set[str] = set()
-    for name in _names(directory):
+    for name in _names(os.path.join(base_dir(root, project), READY_DIR)):
         if not name.endswith(".json"):
             continue
-        try:
-            with open(os.path.join(directory, name), "rb") as f:
-                data = json.loads(f.read().decode("utf-8"))
-        except (OSError, ValueError, UnicodeDecodeError):
-            continue
-        if not isinstance(data, dict) or data.get("tree") != key:
+        data = _read_ready(root, project, name)
+        if data is None or data.get("tree") != key or data.get("head") != head:
             continue
         files = data.get("files")
         if isinstance(files, list):
-            out |= {f for f in files if isinstance(f, str)}
+            out |= {f for f in files if isinstance(f, str) and in_ready_places(f)}
     return out
 
 
 def ready_started(root: str, project: str, parent: str, tree_root: str) -> bool:
     """そのツリーで、その親の ready が退避を始めたか（印 `ready/<親>.json` が在るか）。
 
-    印は条件を確かめた後にだけ書くので、在れば条件は前の回で確かめてある。
+    ready の印は条件を確かめた後にだけ書くので、在れば条件は前の回で確かめてある。
     """
-    held = archived_bytes(root, project, f"{READY_DIR}/{parent}.json")
-    if held is None:
-        return False
-    try:
-        data = json.loads(held.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
-        return False
-    return isinstance(data, dict) and data.get("tree") == _tree_key(tree_root)
+    data = _read_ready(root, project, f"{parent}.json")
+    return data is not None and data.get("tree") == _tree_key(tree_root)
 
 
-def _note_ready(root: str, project: str, parent: str, tree_root: str, rels: list[str]) -> str:
-    """ready の印に、これから移すファイルを足す（消す前に書く）。"""
-    rel = f"{READY_DIR}/{parent}.json"
-    held = archived_bytes(root, project, rel)
+def _note_ready(
+    root: str, project: str, parent: str, tree_root: str, rels: list[str], head: str
+) -> str:
+    """ready の印に、これから移すファイルとツリーの先頭を書く（消す前に書く）。
+
+    同じ先頭の前の回（途中で止まった）の一覧には足し、先頭が進んでいれば今回の分で書き直す。
+    """
+    data = _read_ready(root, project, f"{parent}.json")
     files: list[str] = []
-    if held is not None:
-        try:
-            data = json.loads(held.decode("utf-8"))
-            if isinstance(data, dict) and data.get("tree") == _tree_key(tree_root):
-                files = [f for f in data.get("files", []) if isinstance(f, str)]
-        except (ValueError, UnicodeDecodeError):
-            files = []
-    merged = sorted(set(files) | set(rels))
-    payload = {"parent": parent, "tree": _tree_key(tree_root), "files": merged}
-    return _write(root, project, rel, json.dumps(payload, ensure_ascii=False, indent=1).encode())
+    if data is not None and data.get("tree") == _tree_key(tree_root) and data.get("head") == head:
+        files = [f for f in data.get("files", []) if isinstance(f, str)]
+    merged = sorted(set(files) | {r for r in rels if in_ready_places(r)})
+    payload = {"parent": parent, "tree": _tree_key(tree_root), "head": head, "files": merged}
+    body = json.dumps(payload, ensure_ascii=False, indent=1).encode()
+    return _write(root, project, f"{READY_DIR}/{parent}.json", body)
 
 
 def move(
@@ -529,11 +604,11 @@ def move(
     リポジトリに入らない）。退避の置き場の途中（`logs` から行き先のディレクトリまで）にリンクが
     あれば書かずに止める。
 
-    跡（`events/`）はツリーの中身をそのまま写し、「退避した」の 1 行は退避の側にだけ足す。足すのは
-    そのチケット（`done/`）を移したときで、途中で止まっても移していないチケットに印は残らない。
+    履歴（`events/`）はツリーの中身をそのまま写し、「退避した」の 1 行は退避の側にだけ足す。足すのは
+    そのチケット（`done/`）を移したときで、途中で止まっても移していないチケットに「退避した」は残らない。
     行き先に写しが既に在るとき、ツリーの中身を写したものと読めれば（前の回の残り）写さずに元だけ
     消す。違えば、チケット（`done/`）なら上書きせずに止め（閉じた記録を書き換えない）、マーカー・
-    跡・フローなら今の中身で置き換える（push が通らずに C1 が戻した後の打ち直し）。
+    履歴・フローなら今の中身で置き換える（push が通らずに C1 が戻した後の打ち直し）。
 
     `ready_parent` と `tree_root` を渡せば、消す前に ready の印（`ready/<親>.json`）へ移すファイルを
     足す。途中で止まっても、そこまでに移した分は戻さない（元は git に残っていて、C1 が戻す）。
@@ -542,7 +617,10 @@ def move(
     if _linked(root, tuple(os.path.relpath(base, root).split(os.sep))):
         return [], f"退避の置き場（{base}）の途中にシンボリックリンクがある（辿らない）"
     if ready_parent:
-        failed = _note_ready(root, project, ready_parent, tree_root, todo.files)
+        head = tree_head(tree_root)
+        if not head:
+            return [], f"親のワークツリー（{tree_root}）の先頭を読めない。何も移していない"
+        failed = _note_ready(root, project, ready_parent, tree_root, todo.files, head)
         if failed:
             return [], failed
     moved: list[str] = []
@@ -561,7 +639,11 @@ def move(
                     f"退避の行き先 {target} に違う中身が既に在る。閉じたチケットを上書きしないので"
                     "止めた。ユーザが中身を確かめてください"
                 )
-            failed = _write(root, project, rel, data)
+            content = data
+            if held is not None and rel.startswith(f"{history.EVENTS_DIR}/"):
+                # 履歴は上書きしない。退避の側にだけある行（前の回の「退避した」など）を残す
+                content = _merged_history(held, data)
+            failed = _write(root, project, rel, content)
             if failed:
                 return moved, failed
         if rel.startswith(f"{ticket_mod.DONE}/"):
@@ -578,7 +660,7 @@ def move(
 
 
 def _note_archived(root: str, project: str, ident: str) -> str:
-    """退避の側の跡に「退避した」の 1 行を足す（ツリーの跡には書かない）。"""
+    """退避の側の履歴に「退避した」の 1 行を足す（ツリーの履歴には書かない）。"""
     entry: dict = {
         "at": history.stamp(),
         "ticket": ident,
@@ -591,7 +673,15 @@ def _note_archived(root: str, project: str, ident: str) -> str:
     rel = f"{history.EVENTS_DIR}/{ident}{history.SUFFIX}"
     held = archived_bytes(root, project, rel)
     if held is None and os.path.lexists(destination(root, project, rel)):
-        return f"退避の跡 {destination(root, project, rel)} を読めない"
+        return f"退避の履歴 {destination(root, project, rel)} を読めない"
+    # 打ち直しで同じ行を重ねない（前の回が「退避した」を書いていれば足さない）
+    for line in _lines(held or b"") or []:
+        try:
+            row = json.loads(line.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            continue
+        if isinstance(row, dict) and row.get("kind") == history.KIND_ARCHIVED:
+            return ""
     body = held or b""
     if body and not body.endswith(b"\n"):
         body += b"\n"
@@ -631,7 +721,7 @@ def _write(root: str, project: str, rel: str, data: bytes) -> str:
     理由を返す（一時ファイルは消す。半端なファイルを行き先に残さない）。
     """
     if any(p in ("", ".", "..") for p in rel.split("/")):
-        return f"退避の綴りが読めない（{rel}）"
+        return f"退避のパスが読めない（{rel}）"
     failed = _safe_dir(root, project, rel)
     if failed:
         return failed

@@ -725,8 +725,9 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         "tickets": [],
         "parents": [],
         # 手元の退避（`logs/archive/`）にある閉じたチケット。表示のためだけに載せ、判定（scan・
-        # 承認待ち・先行の池）には混ぜない。置き場に同じプロジェクトの同じ識別子がまだ在るもの
-        # （退避の後の push が戻されたなど）は `tickets` の側に出すので、ここには出さない。
+        # 承認待ち・先行を引く対応表）には混ぜない。置き場に同じプロジェクトの同じ識別子が
+        # まだ在るもの（退避の後の push が戻されたなど）は `tickets` の側に出すので、
+        # ここには出さない。
         "archived": [],
     }
     if not conf.tickets_enabled:

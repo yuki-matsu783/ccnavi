@@ -161,6 +161,8 @@ export interface Board {
   readonly projects: readonly string[];
   /** 親の絞り込みの候補。識別子順 */
   readonly parents: readonly ParentOption[];
+  /** 退避した親（アーカイブの列の親）。アーカイブを表示しているときだけ、親の絞り込みの候補に足す */
+  readonly archivedParents: readonly ParentOption[];
   readonly problems: readonly string[];
   readonly pendingApproval: readonly string[];
   /** 置き場のカードの数（アーカイブは数えない） */
@@ -195,6 +197,7 @@ export function buildBoard(json: BoardJson): Board {
     columns,
     projects: json.projects,
     parents: cards.filter((card) => card.isParent && card.column !== "archived").map((card) => ({ id: card.id, title: card.title })),
+    archivedParents: cards.filter((card) => card.isParent && card.column === "archived").map((card) => ({ id: card.id, title: card.title })),
     problems: json.problems,
     pendingApproval: json.pending_approval,
     // 集計は置き場のカードだけ。アーカイブは既定で隠すので、数に入れると見えないものを数えることになる

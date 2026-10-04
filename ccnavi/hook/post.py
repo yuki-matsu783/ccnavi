@@ -819,7 +819,7 @@ def _archived_removals(
     gone = [(change, rel) for change, rel in here if not os.path.lexists(change.full)]
     if not gone:
         return set()
-    ready = archive.ready_files(root, where.project, where.root)
+    ready = archive.ready_files(root, where.project, where.root, archive.tree_head(where.root))
     if not ready:
         return set()
     out: set[str] = set()

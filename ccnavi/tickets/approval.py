@@ -576,9 +576,10 @@ def integration_problems(
 
     手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある識別子も、閉じた
     識別子として数える。統合先には閉じたチケットを残さないので、手元ではここが閉じた記録になる
-    （別の機械では見えない）。退避は控えの有無に依らず見る。
+    （別の機械では見えない）。退避は取り込み状態の有無に依らず見る。退避との比べは大文字小文字を
+    区別しない（区別しないファイルシステムでは、ブランチとワークツリーの名前がぶつかるため）。
     """
-    if t.ticket in archive.ids(root, t.project):
+    if any(archive.same_id(t.ticket, i) for i in archive.ids(root, t.project)):
         return [
             rules.Problem(
                 rules.SEVERITY_ERROR,
@@ -631,7 +632,7 @@ def integration_closed(
     def closed(t: ticket_mod.Ticket) -> bool:
         if t.project not in archived:
             archived[t.project] = archive.ids(root, t.project)
-        if t.ticket in archived[t.project]:
+        if any(archive.same_id(t.ticket, i) for i in archived[t.project]):
             return True
         return fams.active and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
 
@@ -956,7 +957,8 @@ def settle_review(
 def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
     """この親の次の子の識別子。どの置き場に在る子よりも後ろの連番。
 
-    手元の退避（`logs/archive/`）にある子も数える（閉じた子の連番を使い回さない）。
+    手元の退避（`logs/archive/`）にある子も数える（閉じた子の連番を使い回さない）。退避の子は
+    親の識別子を大文字小文字を区別せずに比べる（`integration_problems` と同じ見方）。
     """
     seen = _everything(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
@@ -966,9 +968,13 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
     for project in sorted(projects) if projects else [None]:
         archived |= archive.ids(root, project)
     used = 0
-    for ident in [t.ticket for t in seen + proposals] + sorted(archived):
+    for ident in [t.ticket for t in seen + proposals]:
         m = ticket_mod.child_pattern().match(ident)
         if m and m.group("parent") == parent_id:
+            used = max(used, int(m.group("seq")))
+    for ident in sorted(archived):
+        m = ticket_mod.child_pattern().match(ident)
+        if m and archive.same_id(m.group("parent"), parent_id):
             used = max(used, int(m.group("seq")))
     return f"{parent_id}-{used + 1:02d}"
 

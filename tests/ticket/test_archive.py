@@ -4,12 +4,13 @@
 - `ready` が条件を確かめてから退避し、打ち直しても通ること
 - C1 の見分け（`c1.classify_all`）と実行後チェック（`post._script_writes`）が、退避の削除だけを
   ccnavi の書き込みとして外すこと
-- 閉じた識別子の使い回し・子の連番・先行の池が退避を見ること
+- 閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見ること
 - ボードの JSON に退避のチケットが載ること（判定には混ぜない）
 """
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import shutil
@@ -52,7 +53,7 @@ def closed_text(name, parent="", phase=None, predecessors=()):
     return "\n".join(lines)
 
 
-class ArchiveModuleTest(unittest.TestCase):
+class ArchiveTreeHarness(unittest.TestCase):
     """archive.py の並びと移し方。git は使わない。"""
 
     def setUp(self):
@@ -76,6 +77,10 @@ class ArchiveModuleTest(unittest.TestCase):
         write(os.path.join(self.approved, "flows", "i0001-01.yml"), "steps: []\n")
         write(os.path.join(self.approved, "flows", "open-01.yml"), "steps: []\n")
 
+
+class ArchiveModuleTest(ArchiveTreeHarness):
+    """archive.py の並びと移し方。git は使わない。"""
+
     def test_plan_takes_only_closed_families(self):
         self.assertEqual(archive.closed_parents(self.approved), ["i0001", "old"])
         todo = archive.plan(self.approved, archive.closed_parents(self.approved))
@@ -86,7 +91,7 @@ class ArchiveModuleTest(unittest.TestCase):
         self.assertIn("phases/i0001/1.reviewed.json", todo.files)
         self.assertIn("events/old.ndjson", todo.files)
         self.assertIn("flows/i0001-01.yml", todo.files)
-        # 開いた親（doing/ に在る）の子・跡・フロー・マーカーは移さない
+        # 開いた親（doing/ に在る）の子・履歴・フロー・マーカーは移さない
         for rel in todo.files:
             self.assertNotIn("open", rel)
 
@@ -130,7 +135,10 @@ class ArchiveModuleTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.approved, "done", "old.md")))
 
     def test_move_again_replaces_a_different_mark_or_trace(self):
-        """C1 が push できずに戻した後の打ち直しでは、跡と印だけが前の回と違う。置き換えて進む。"""
+        """C1 が push できずに戻した後の打ち直しでは、履歴とマーカーだけが前の回と違う。
+
+        履歴は足し、マーカーは置き換えて進む。
+        """
         todo = archive.plan(self.approved, ["i0001"])
         base = archive.base_dir(self.root, "")
         write(os.path.join(base, "events", "i0001.ndjson"), '{"a": 0}\n')
@@ -141,7 +149,8 @@ class ArchiveModuleTest(unittest.TestCase):
         with open(os.path.join(base, "phases", "i0001", "1.reviewed.json"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "{}")
         entries, _ = history.read(base, "i0001")
-        self.assertEqual(entries[0], {"a": 1})
+        # 履歴は上書きせず、ツリーにあって退避に無い行を足す
+        self.assertEqual(entries[:2], [{"a": 0}, {"a": 1}])
 
     @unittest.skipIf(os.name == "nt", "シンボリックリンクを作れないことがある")
     def test_a_linked_archive_place_is_not_followed(self):
@@ -156,8 +165,8 @@ class ArchiveModuleTest(unittest.TestCase):
         self.assertEqual(archive.ids(self.root), set())
 
 
-class ArchiveChecksTest(unittest.TestCase):
-    """閉じた識別子の使い回し・子の連番・先行の池が退避を見る。"""
+class ChecksHarness(unittest.TestCase):
+    """閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見る。"""
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-archive-checks-")
@@ -168,6 +177,10 @@ class ArchiveChecksTest(unittest.TestCase):
         write(os.path.join(base, "done", "i0001.md"), closed_text("i0001"))
         write(os.path.join(base, "done", "i0001-03.md"), closed_text("i0001-03", "i0001"))
         self.conf, _ = settings.load(self.root)
+
+
+class ArchiveChecksTest(ChecksHarness):
+    """閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見る。"""
 
     def test_a_reused_identifier_is_refused(self):
         t, _ = ticket_mod.parse(closed_text("i0001"))
@@ -195,7 +208,7 @@ class ArchiveChecksTest(unittest.TestCase):
         self.assertNotIn("i0001-03", pool)
 
 
-class ReadyArchivesTest(PhaseHarness):
+class ReadyHarness(PhaseHarness):
     """`review ready` が条件を確かめてから閉じた親子のチケットを退避する。"""
 
     def closable(self):
@@ -231,6 +244,28 @@ class ReadyArchivesTest(PhaseHarness):
     def ready(self, fixture):
         return self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
 
+    def changed(self):
+        status = git(self.parent_tree, "status", "--porcelain", "--no-renames").splitlines()
+        return sorted(line[3:] for line in status)
+
+    def sorted_kinds(self, changed=None, since=""):
+        places = (".ccnavi/approved", "wip/proposals/review")
+        return {
+            rel: kind
+            for kind, rel, _ in c1.classify_all(
+                self.parent_tree,
+                places,
+                "i0001",
+                self.changed() if changed is None else changed,
+                since,
+                (self.root, ""),
+            )
+        }
+
+
+class ReadyArchivesTest(ReadyHarness):
+    """`review ready` が条件を確かめてから閉じた親子のチケットを退避する。"""
+
     def test_ready_moves_every_closed_family_and_can_be_run_again(self):
         fixture = self.closable()
         passed = self.ready(fixture)
@@ -243,7 +278,7 @@ class ReadyArchivesTest(PhaseHarness):
         for rel in ("done/i0001.md", "done/i0001-01.md", "done/old.md", "done/old-01.md"):
             self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
             self.assertFalse(os.path.exists(os.path.join(self.approved, *rel.split("/"))), rel)
-        # Draft を外した印も一緒に退避される
+        # Draft を外したマーカーも一緒に退避される
         self.assertEqual(read_json(os.path.join(base, "phases", "i0001", "ready.json"))["mr"], 7)
         self.assertTrue(os.path.isfile(os.path.join(base, "phases", "old", "closed.json")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "phases", "i0001")))
@@ -278,11 +313,11 @@ class ReadyArchivesTest(PhaseHarness):
 
     def test_c1_and_the_post_check_count_only_the_archive_removals(self):
         fixture = self.closable()
-        self.assertEqual(self.ready(fixture).returncode, 0)
-        # 退避と関係の無い削除も 1 つ混ぜる（開いた親の跡）
+        # 退避と関係の無い削除も 1 つ混ぜる（開いた親の履歴）
         write(os.path.join(self.approved, "events", "stray.ndjson"), "{}\n")
-        git(self.parent_tree, "add", ".ccnavi/approved/events/stray.ndjson")
-        git(self.parent_tree, "commit", "--quiet", "-m", "stray", "--", ".ccnavi/approved/events")
+        self.commit_parent("stray")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertEqual(self.ready(fixture).returncode, 0)
         os.remove(os.path.join(self.approved, "events", "stray.ndjson"))
         status = git(self.parent_tree, "status", "--porcelain", "--no-renames").splitlines()
         changed = sorted(line[3:] for line in status)
@@ -330,30 +365,8 @@ class ReadyArchivesTest(PhaseHarness):
         self.assertNotIn("phases/i0001/closed.json", said)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-class ReviewFindingsTest(ReadyArchivesTest):
+class ReviewFindingsTest(ReadyHarness):
     """レビューで挙がった指摘の再現（直す前は落ちる）。"""
-
-    def changed(self):
-        status = git(self.parent_tree, "status", "--porcelain", "--no-renames").splitlines()
-        return sorted(line[3:] for line in status)
-
-    def sorted_kinds(self, changed=None, since=""):
-        places = (".ccnavi/approved", "wip/proposals/review")
-        return {
-            rel: kind
-            for kind, rel, _ in c1.classify_all(
-                self.parent_tree,
-                places,
-                "i0001",
-                self.changed() if changed is None else changed,
-                since,
-                (self.root, ""),
-            )
-        }
 
     def test_1_a_stale_doing_copy_in_a_child_tree_does_not_come_back(self):
         fixture = self.closable()
@@ -390,7 +403,7 @@ class ReviewFindingsTest(ReadyArchivesTest):
         kinds = self.sorted_kinds()
         self.assertEqual(kinds[".ccnavi/approved/events/i0001.ndjson"], c1.KIND_B)
         self.assertEqual(kinds[".ccnavi/approved/events/i0001-01.ndjson"], c1.KIND_B)
-        # 退避の跡の最後は「退避した」
+        # 退避の履歴の最後は「退避した」
         entries, _ = history.read(archive.base_dir(self.root, ""), "i0001")
         self.assertEqual(entries[-1]["kind"], history.KIND_ARCHIVED)
         # コミットしたあとの未送信の確かめ（since）でも (b)
@@ -433,7 +446,7 @@ class ReviewFindingsTest(ReadyArchivesTest):
         self.assertNotIn(c1.KIND_B, set(kinds.values()))
 
 
-class ArchiveModuleReviewTest(ArchiveModuleTest):
+class ArchiveModuleReviewTest(ArchiveTreeHarness):
     """archive.py の指摘の再現。"""
 
     def test_7_a_parent_named_like_a_child_is_not_taken(self):
@@ -473,19 +486,19 @@ class ArchiveModuleReviewTest(ArchiveModuleTest):
         write(os.path.join(base, "done", "old.md"), "違う\n")
         _, failed = archive.move(self.root, "", self.approved, todo)
         self.assertIn("違う中身", failed)
-        # old のチケットは移していないので、退避の跡にも「退避した」は無い
+        # old のチケットは移していないので、退避の履歴にも「退避した」は無い
         base = archive.base_dir(self.root, "")
         with open(os.path.join(base, "events", "old.ndjson"), encoding="utf-8") as f:
             self.assertNotIn("archived", f.read())
         entries, _ = history.read(base, "i0001")
         self.assertEqual(entries[-1]["kind"], history.KIND_ARCHIVED)
-        # ツリーの跡には書かない（退避の側にだけ書く）
+        # ツリーの履歴には書かない（退避の側にだけ書く）
         for name in os.listdir(os.path.join(self.approved, "events")):
             with open(os.path.join(self.approved, "events", name), encoding="utf-8") as f:
                 self.assertNotIn("archived", f.read(), name)
 
 
-class ArchivedStandingTest(ArchiveChecksTest):
+class ArchivedStandingTest(ChecksHarness):
     """取り込みの立ち位置: 親のワークツリーが無く、手元の退避に親があれば閉じた親子のチケット。"""
 
     def test_an_archived_family_without_its_tree_is_closed(self):
@@ -510,3 +523,134 @@ class ArchivedStandingTest(ArchiveChecksTest):
         t, _ = ticket_mod.parse(text)
         pool = approval.predecessor_pool_of([t], [], [], [], self.root)
         self.assertNotIn("i0009-01", pool)
+
+
+class SecondReviewTest(ReadyHarness):
+    """2 回目のレビューの指摘の再現（直す前は落ちる）。"""
+
+    def test_2_a_mark_of_a_finished_ready_does_not_carry_a_later_removal(self):
+        fixture = self.closable()
+        self.assertEqual(self.ready(fixture).returncode, 0)
+        self.commit_parent("退避")
+        # 退避を済ませた後に、同じ中身のチケットがツリーに戻り（取り込みなど）、ready の外で消えた
+        git(self.parent_tree, "checkout", "HEAD~1", "--", ".ccnavi/approved/done/old.md")
+        git(self.parent_tree, "commit", "--quiet", "-m", "戻った")
+        os.remove(os.path.join(self.approved, "done", "old.md"))
+        self.assertNotEqual(self.sorted_kinds()[".ccnavi/approved/done/old.md"], c1.KIND_B)
+
+    def test_2_the_mark_only_counts_the_four_places(self):
+        write(os.path.join(archive.base_dir(self.root, ""), "other", "x.md"), "x")
+        self.assertFalse(
+            c1.archived_removal("other/x.md", None, b"x", {"other/x.md"}, self.root, "")
+        )
+
+    def test_3_ready_again_needs_the_same_merge_request(self):
+        fixture = self.closable()
+        self.assertEqual(self.ready(fixture).returncode, 0)
+        self.commit_parent("退避")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        other = os.path.join(self.root, "fixture-8.json")
+        write(other, json.dumps({"host": "fixture", "mr": {"number": 8, "url": "u/8"}}))
+        self.assertNotEqual(self.ready(other).returncode, 0)
+        # ready の印が無ければ（今のツリーで退避を始めていなければ）打ち直しとして通さない
+        os.remove(os.path.join(self.root, "logs", "archive", "self", "ready", "i0001.json"))
+        self.assertNotEqual(self.ready(fixture).returncode, 0)
+
+    def test_9_the_reason_of_an_early_close_is_read_from_the_tree_too(self):
+        fixture = self.closable()
+        write(
+            os.path.join(self.approved, "phases", "i0001", "close-early.json"),
+            json.dumps({"reason": "ここまでで十分"}),
+        )
+        self.commit_parent("早めに閉じた")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        # 退避の行き先をディレクトリにして、close-early.json の手前で止める
+        base = os.path.join(self.root, "logs", "archive", "self")
+        blocker = os.path.join(base, "phases", "i0001", "close-early.json")
+        os.makedirs(blocker)
+        self.assertNotEqual(self.ready(fixture).returncode, 0)
+        self.assertTrue(
+            os.path.isfile(os.path.join(self.approved, "phases", "i0001", "close-early.json"))
+        )
+        os.rmdir(blocker)
+        again = self.ready(fixture)
+        self.assertEqual(again.returncode, 0, again.stderr)
+        with open(again.stdout.splitlines()[0], encoding="utf-8") as f:
+            self.assertIn("ここまでで十分", f.read())
+
+    def test_11_lint_sees_an_archived_parent_tree_off_its_branch(self):
+        fixture = self.closable()
+        self.assertEqual(self.ready(fixture).returncode, 0)
+        self.commit_parent("退避")
+        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
+        linted = self.ccnavi("--lint")
+        self.assertIn("i0001 のワークツリーが elsewhere の上に居る", linted.stdout + linted.stderr)
+
+
+class SecondReviewModuleTest(ArchiveTreeHarness):
+    """2 回目のレビューの指摘の再現（archive.py）。"""
+
+    def test_8_moving_again_keeps_the_rows_only_in_the_archive(self):
+        base = archive.base_dir(self.root, "")
+        archived_row = json.dumps({"ticket": "i0001", "kind": "archived", "at": "t"})
+        ready_row = json.dumps({"ticket": "i0001", "kind": "parent-mark", "mark": "ready"})
+        write(
+            os.path.join(base, "events", "i0001.ndjson"),
+            '{"a": 1}\n' + ready_row + "\n" + archived_row + "\n",
+        )
+        write(os.path.join(self.approved, "events", "i0001.ndjson"), '{"a": 1}\n{"b": 2}\n')
+        todo = archive.plan(self.approved, ["i0001"])
+        _, failed = archive.move(self.root, "", self.approved, todo)
+        self.assertEqual(failed, "")
+        entries, _ = history.read(base, "i0001")
+        kinds = [e.get("kind") for e in entries]
+        self.assertEqual(kinds.count("archived"), 1, entries)
+        self.assertIn({"b": 2}, entries)
+        self.assertIn({"a": 1}, entries)
+        self.assertEqual(kinds.count("parent-mark"), 1, entries)
+
+    def test_10_a_withdrawn_child_history_goes_with_its_family(self):
+        write(os.path.join(self.approved, "events", "i0001-09.ndjson"), '{"a": 1}\n')
+        todo = archive.plan(self.approved, ["i0001"])
+        self.assertIn("events/i0001-09.ndjson", todo.files)
+        # 開いた親（doing/ に在る）の子の履歴は拾わない
+        self.assertNotIn("events/open-01.ndjson", todo.files)
+
+
+class SecondReviewChecksTest(ChecksHarness):
+    """2 回目のレビューの指摘の再現（判定・取り込み状態）。"""
+
+    def test_4_the_archive_does_not_override_a_gone_family(self):
+        from ccnavi.tickets import syncstate
+
+        record = os.path.join(self.conf.state, "sync", "self", "families", "i0001")
+        write(record, "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate gone\nreason \n")
+        st = syncstate.standing(self.conf, self.root, "i0001")
+        self.assertFalse(st.closed)
+        self.assertIn("gone", st.stop)
+
+    def test_5_ready_does_not_archive_from_the_workspace_root(self):
+        from ccnavi.tickets import review
+
+        approved = os.path.join(self.root, ".ccnavi", "approved")
+        write(os.path.join(approved, "done", "i0001.md"), closed_text("i0001"))
+        write(os.path.join(approved, "done", "other.md"), closed_text("other"))
+        parent, _ = ticket_mod.parse(closed_text("i0001"))
+        out, err = io.StringIO(), io.StringIO()
+        code = review._archive_closed(out, err, self.root, self.conf, parent, approved, "note.md")
+        self.assertNotEqual(code, 0)
+        self.assertIn("親のワークツリー", err.getvalue())
+        self.assertTrue(os.path.isfile(os.path.join(approved, "done", "other.md")))
+        self.assertNotIn("other", archive.ids(self.root, ""))
+
+    def test_6_an_identifier_reused_with_other_letter_case_is_refused(self):
+        t, _ = ticket_mod.parse(closed_text("I0001"))
+        t.state = ticket_mod.TODO
+        self.assertEqual(len(approval.integration_problems(self.conf, self.root, t)), 1)
+        self.assertEqual(approval.integration_closed(self.conf, self.root, [t]), {"I0001"})
+        self.assertIsNotNone(archive.archived_fields(self.root, "", "I0001"))
+        self.assertEqual(approval.next_child_id(self.conf, self.root, "I0001"), "I0001-04")
+
+
+if __name__ == "__main__":
+    unittest.main()

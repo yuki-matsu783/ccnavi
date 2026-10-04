@@ -226,7 +226,10 @@ def classify_all(
     approved_rel, review_rel = places
     ready: set[str] = set()
     if archive_at is not None:
-        ready = archive.ready_files(archive_at[0], archive_at[1], tree_root)
+        # 印が効くのは、印を書いたときの先頭と比べている版が同じ間だけ（未コミットなら HEAD、
+        # 未送信の確かめなら `since`）。
+        head = archive.tree_head(tree_root, since or "HEAD")
+        ready = archive.ready_files(archive_at[0], archive_at[1], tree_root, head)
     states: dict[str, tuple[bytes | None, bytes | None, bool]] = {}
     for rel in changed:
         if since:
@@ -385,11 +388,11 @@ def archived_removal(
     """`ready` の退避が消したものか（archive.py）。`rel` は承認済みの領域からの相対。
 
     ready の印（`archive.ready_files`。そのツリーから ready が移したファイルの一覧）に載っていて、
-    消えた中身が手元の退避の写しと同じ（跡は「退避した」の行だけを足したもの）ときだけ。
-    印は `logs/archive/` に置かれ、記録の守りがエージェントの書き込みを止める。退避の置き場の
-    途中（`logs` を含む）にリンクがあれば写しを読まない。
+    消えた中身が手元の退避の写しと同じ（履歴は「退避した」の行だけを足したもの）ときだけ。
+    ready の印は `logs/archive/` に置かれ、記録の守りがエージェントの書き込みを止める。
+    退避の置き場の途中（`logs` を含む）にリンクがあれば写しを読まない。
     """
-    if now is not None or before is None or rel not in ready:
+    if now is not None or before is None or rel not in ready or not archive.in_ready_places(rel):
         return False
     return archive.holds(rel, archive.archived_bytes(root, project, rel), before)
 

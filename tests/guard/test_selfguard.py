@@ -448,6 +448,10 @@ class SelfGuardTest(unittest.TestCase):
             "mv logs/state /tmp/x",
             "rm -rf logs/archive",
             "cp /tmp/x.md logs/archive/self/done/i0001.md",
+            # 退避の置き場を丸ごと別のもので置き換える形
+            "cp -r /tmp/archive logs/",
+            "mv /tmp/x/archive logs/",
+            "cp -t logs /tmp/archive",
         ):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)

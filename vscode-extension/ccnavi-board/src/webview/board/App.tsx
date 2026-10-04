@@ -93,7 +93,10 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 
   // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、落とした後の値
   const project = projectOptions(board).includes(view.project) ? view.project : EMPTY.project;
-  const parent = board !== undefined && board.parents.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
+  // アーカイブを表示しているときは、退避した親も絞り込みの候補に入る（選んでいた親が退避されても外さない）
+  const parentOptions = board === undefined ? [] : view.archived ? [...board.parents, ...board.archivedParents] : board.parents;
+  const parent = parentOptions.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
+  const shownParents = sample === undefined ? parentOptions : (shown?.parents ?? []);
   // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が有効なままにすると、
   // 出すものが無いのに「絞り込み中」になる
   const attention = board !== undefined && view.attention;
@@ -171,12 +174,12 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              {shown.parents.length > 0 ? (
+              {shownParents.length > 0 ? (
                 <label className="filter">
                   親
                   <select id="parent-filter" value={parent} onChange={(event) => setView((now) => ({ ...now, parent: event.target.value }))}>
                     <option value="*">すべて</option>
-                    {shown.parents.map((p) => (
+                    {shownParents.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title === "" ? p.id : `${p.id} ${p.title}`}
                       </option>

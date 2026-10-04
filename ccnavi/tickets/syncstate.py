@@ -492,7 +492,15 @@ class Families:
                 ),
                 closed=True,
             )
-        if home is None and self._archived(repo, family_id):
+        if (
+            home is None
+            and not record.broken
+            and record.state == STATE_PRESENT
+            and self._named_tree(family_id, project) is None
+            and self._archived(repo, family_id)
+        ):
+            # 退避で補うのは、取り込み状態が present で、親のワークツリーを片付けた後だけ。
+            # gone・blocked・壊れているときは今までどおり止める。
             return Standing(
                 family_id,
                 repo,
@@ -584,8 +592,8 @@ def _home_parent_copy(
     return None
 
 
-# 手元の退避の置き場（ワークスペースルートから）。archive.ARCHIVE_DIR と同じ綴り
-# （archive はこのモジュールを読むので、ここでは綴りで持つ）。
+# 手元の退避の置き場（ワークスペースルートから）。archive.ARCHIVE_DIR と同じ表記
+# （archive はこのモジュールを読むので、ここでは表記で持つ）。
 ARCHIVE_PARTS = ("logs", "archive")
 
 

@@ -555,6 +555,17 @@ class SyncTest(unittest.TestCase):
         self.assertNotIn("戻し方", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
+    def test_a_merged_answer_does_not_wait_for_the_integration(self):
+        # 統合先の done/ を待つ確かめ直しは、マージ済みかの答えが得られないときだけ。
+        self.review_says("merged 42")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        started = time.monotonic()
+        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="2")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual("closed", fields(self.record)["state"])
+
     def archive_locally(self, text):
         write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
 

@@ -682,3 +682,40 @@ test("CB-D145 退避のチケットしか無いボードで表示を入れても
     await page.close();
   }
 });
+
+test("CB-D146 アーカイブの表示を入れると、親の絞り込みに退避した親も出る。選んでいた親が退避されても、入れていれば外さない", async () => {
+  const archived = {
+    ticket: "old",
+    parent: "",
+    phase: null,
+    title: "退避した親",
+    project: "",
+    path: "/ws/logs/archive/self/done/old.md",
+    approved_at: "",
+    started_at: "",
+    completed_at: "",
+    cancelled_at: "",
+    cancel_reason: "",
+    history: [],
+  };
+  const json = { ...fixture(), archived: [archived] };
+  const off = await openBoard(json, { state: { parent: "old" } });
+  try {
+    const options = off.all<Element>("#parent-filter option").map((o) => o.getAttribute("value"));
+    assert.ok(!options.includes("old"));
+    assert.equal(off.one<HTMLInputElement>("#parent-filter").value, "*");
+  } finally {
+    await off.close();
+  }
+  const on = await openBoard(json, { state: { parent: "old", archived: true } });
+  try {
+    const options = on.all<Element>("#parent-filter option").map((o) => o.getAttribute("value"));
+    assert.ok(options.includes("old"));
+    assert.equal(on.one<HTMLInputElement>("#parent-filter").value, "old");
+    assert.ok(!on.one('.card[data-id="old"]').classList.contains("hidden"));
+    assert.ok(on.one('.card[data-id="i0001"]').classList.contains("hidden"));
+    assert.equal((on.state() as { parent: string }).parent, "old");
+  } finally {
+    await on.close();
+  }
+});
