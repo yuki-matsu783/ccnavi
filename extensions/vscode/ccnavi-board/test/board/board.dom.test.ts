@@ -621,7 +621,11 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     history: [],
   };
   const json = { ...fixture(), archived: [archived] };
-  const page = await openBoard(json);
+  // ボードの横幅を偽る（happy-dom は測らない）。送ったかは scrollLeft で見る
+  const wide = (window: { readonly HTMLElement: { readonly prototype: object } }): void => {
+    Object.defineProperty(window.HTMLElement.prototype, "scrollWidth", { configurable: true, get: () => 1000 });
+  };
+  const page = await openBoard(json, { prepare: wide });
   try {
     const box = page.one<HTMLInputElement>("#archived-filter");
     assert.equal(box.checked, false);
@@ -630,6 +634,8 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     page.click(box);
     await page.settle();
     assert.equal((page.state() as { archived: boolean }).archived, true);
+    // 入れたら、右端に足されたアーカイブの列までボードを横へ送る
+    assert.equal(page.one(".board").scrollLeft, 1000);
     // 絞り込みではない（承認の送り先は変わらない）
     assert.ok(!page.document.body.classList.contains("filtering"));
     assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
@@ -647,9 +653,11 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     await page.close();
   }
   // 読み直しても入ったまま
-  const again = await openBoard(json, { state: { archived: true } });
+  const again = await openBoard(json, { state: { archived: true }, prepare: wide });
   try {
     assert.equal(again.one<HTMLInputElement>("#archived-filter").checked, true);
+    // 覚えていた値で開き直したときは送らない
+    assert.equal(again.one(".board").scrollLeft, 0);
     assert.ok(!again.one('.card[data-id="old"]').classList.contains("hidden"));
   } finally {
     await again.close();
