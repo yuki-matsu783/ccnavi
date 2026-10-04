@@ -315,7 +315,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | 判定の記録 | `logs/decisions.jsonl`（ワークスペースルートの下） |
 | state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録） |
 
-別の場所を指せるのは診断のフラグ（`--log` / `--state` / `--approved` / `--tickets` / `--projects` /
+別の場所を指せるのはフラグ（`--log` / `--state` / `--approved` / `--tickets` / `--projects` /
 `--project-home`）だけで、hook からは渡らない。共通層の置き場（`.ccnavi/common/`）は `--project-home` で
 ccnavi ディレクトリを動かしても動かず、別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけ。
 層の置き場を動かすこれらのフラグ（`--projects` / `--project-home` を含む）は診断（`--lint` / `--test` /

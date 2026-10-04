@@ -752,7 +752,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 どれかを含む `deny` / `ask` が、そのまま「この場所に書かせない」の宣言になる。
 変更の実パスがそれに当たれば違反（`POST_VIOLATION`）。そうでなく、ワークツリーに結び付くチケットの
 範囲の外（チケットの `deny` の項を含む）なら、ルールの `allow` に当たっていても `POST_TICKET_SCOPE`（9.5）。
-記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`）の下は除く。
+記録と state の置き場（`logs/decisions.jsonl`、`logs/state/` の下）は除く。ローテートした記録は除かない。
 
 チケットの置き場（`wip/proposals/`、`.ccnavi/approved/`）に現れた変更は、ccnavi の副命令
 （`ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready`）が書いたと内容から読めるぶんだけ除く。
@@ -2360,7 +2360,7 @@ Grep と Glob は、探し始める場所で層を選び、ルールもその場
 
 共通層のフェーズの種類と配点もコアに入れる。シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通層の 3 本を守るぶんも組み込み
 （`builtin-guard-common-layer`）で持つ（ルールの 1 行に任せると、書き換えたルールファイルのもとで通る）。組み込みで名指しのツールを止めるのは、
-置き場が設定で動く実行ファイル・ccnavi ディレクトリ・共通層の 3 つ。hook の登録（`.claude/settings*.json`）はルールの `deny` に任せる。
+実行ファイル・ccnavi ディレクトリ・共通層の 3 つ。hook の登録（`.claude/settings*.json`）はルールの `deny` に任せる。
 
 プロジェクトから切ったワークツリー側の設定も足す。ワークツリーは元リポジトリを添えて列挙し、ワークツリー側の設定の相対を元リポジトリから
 組む（REQ-MLT-08）。
