@@ -23,6 +23,8 @@
 
 手元の入口（`--agree` の 4 つの枝と `review confirm`）もここに置く。コアを通す入口を
 コアより下の段（agree・review）に置くと、import が循環する（tests/core/test_module_layers.py）。
+`--reviewed` の決め方（review_decide）と親を閉じる操作（review_close）は review を読む末端で、
+コアはどちらも読まない。
 """
 
 from __future__ import annotations

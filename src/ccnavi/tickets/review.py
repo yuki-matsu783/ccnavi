@@ -1,5 +1,9 @@
 """レビューの依頼と確認。`ccnavi review prepare|requested|confirm` と `ccnavi --reviewed`。
 
+sh が渡す JSON の形と投稿の目印は `review_host`、残った指摘の決め方（`--reviewed` と `decide`）は
+`review_decide`、親を閉じる操作（`ready` と `close-early`）は `review_close` に分けてある。
+review_decide と review_close は review を読む末端で、review からは読まない。
+
 ## exe が見るのは作業ツリーの中だけ
 
 ここはネットワークに出ない。フェーズが終わっているか、子のブランチが親に入っているか、
