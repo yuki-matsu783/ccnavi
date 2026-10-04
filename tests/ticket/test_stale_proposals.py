@@ -18,7 +18,8 @@ import unittest
 from ccnavi.tickets import approval
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness, parent_text
-from tests.ticket.test_ticket import write
+from tests.ticket.test_sync_authority import AuthorityHarness
+from tests.ticket.test_ticket import git, write
 
 
 class StaleProposalTest(PhaseHarness):
@@ -179,6 +180,9 @@ class StaleProposalTest(PhaseHarness):
         self.assertNotEqual(verify.returncode, 0)
         self.assertIn("承認待ちに入らない改版がある", verify.stdout)
         self.assertIn(place_rel, verify.stdout)
+        # 改版そのものができないと読める一文は出さない。同じ名指しを標準エラーに重ねない。
+        self.assertNotIn("同じ名前で置いても承認待ちにはならない", verify.stdout)
+        self.assertNotIn(place_rel, verify.stderr)
         self.assertIn(
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
         )
@@ -208,6 +212,52 @@ class StaleProposalTest(PhaseHarness):
             parent_text("i0001", ["research", "design", "chores"]),
         )
         self.verify_names_where_to_write(".claude/worktrees/i0001-01/wip/proposals/todo/i0001.md")
+
+    def test_an_old_copy_is_named_while_another_revision_waits_in_the_home_tree(self):
+        """権威のツリーに計画の違う別の改版が在るとき。改版は承認待ちに残り、子のワークツリーに
+        残った古い版は名指しする。"""
+        self.family(plan=("research", "design"))
+        self.propose("i0001", parent_text("i0001", ["research", "design", "chores"]))
+        self.commit_parent()
+        self.worktree("i0001-07", "i0001")  # 改版 1 を持ったまま切る
+        self.propose("i0001", parent_text("i0001", ["research", "chores"]))  # 改版 2
+        self.commit_parent()
+        self.assertEqual(self.pending(), ["i0001"])
+        lines = self.lint_lines("i0001-07/wip/proposals/todo/i0001.md")
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("計画の違う提案", lines[0])
+
+
+class ImportedFamilyTest(AuthorityHarness):
+    """取り込み済みの家族（ADR-0093）で、権威のツリーの外に書いた改版の案内。"""
+
+    def revision_in_root(self):
+        write(
+            os.path.join(self.root, "wip", "proposals", "todo", "i0001.md"),
+            parent_text("i0001", ["research", "design", "chores"]),
+        )
+        return self.ccnavi("--agree", "--preview", "--verify")
+
+    def test_a_settled_family_says_to_push_from_the_parent_worktree(self):
+        self.record("present")
+        verify = self.revision_in_root()
+        self.assertIn(
+            "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
+        )
+        self.assertIn(
+            "取り込み済みの家族なので、書いたら push してから承認を頼んでください", verify.stdout
+        )
+
+    def test_a_stopped_family_carries_the_reason_family_problems_gives(self):
+        """家族が止まっている（親のツリーの HEAD がブランチを指していない）なら、承認の手前で
+        言っていた止まった理由と手順（`approval.family_stop_text`）を同じ文面で添える。"""
+        self.record("present")
+        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
+        verify = self.revision_in_root()
+        self.assertIn("取り込み済みの家族が止まっている", verify.stdout)
+        self.assertIn("HEAD がブランチ i0001 を指していない", verify.stdout)
+        self.assertIn("承認しない", verify.stdout)
+        self.assertNotIn("書いたら push してから", verify.stdout)
 
 
 def _t(tree, state, project="", parent="", ticket="i0001"):
