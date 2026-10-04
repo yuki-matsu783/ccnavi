@@ -62,7 +62,7 @@ export interface SeenInJson {
  * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
-  /** 読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り） */
+  /** 読む先の絶対パス（本物とする側のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ本物とする側のツリーのパス） */
   readonly path: string;
   /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.yml`） */
   readonly rel: string;
@@ -88,7 +88,7 @@ export interface FlowDraftJson {
 }
 
 /**
- * 状態が動いた跡の 1 行。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
+ * 状態の履歴の 1 行。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
  * 補助の記録で、状態の正は置き場（`copy` / `proposal`）。拡張は並べるだけで、ここから状態を組み直さない。
  */
 export interface HistoryEntryJson {
@@ -148,13 +148,13 @@ export interface TicketJson {
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly seen_in: readonly SeenInJson[];
-  /** どれが本物か決まらない写りの全部。決まっていれば空 */
+  /** どれが本物か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
   /** 子のフロー。親と、この欄を出さない古い実行ファイルでは null */
   readonly flow: FlowJson | null;
-  /** 状態が動いた跡の新しい側（古い順）。この欄を出さない古い実行ファイルでは空 */
+  /** 状態の履歴の新しい側（古い順）。この欄を出さない古い実行ファイルでは空 */
   readonly history: readonly HistoryEntryJson[];
 }
 
@@ -223,7 +223,7 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 並びは 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
+  /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];

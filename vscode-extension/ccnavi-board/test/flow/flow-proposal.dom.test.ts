@@ -18,7 +18,7 @@ function drafted(): FlowDoc {
   return patchData(added.doc, added.id, { prompt: "既存の振る舞いを読む\nそのあと要点をまとめる" });
 }
 
-test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見せた差分から取り込むと編集中に入る。保存に取り込んだ指紋を添える", async () => {
+test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見せた差分から取り込むと編集中に入る。保存に取り込んだハッシュを添える", async () => {
   const dom = await openFlow({ offer: OFFER });
   try {
     assert.match(dom.one("#offer").textContent ?? "", /提案あり/);
@@ -52,7 +52,7 @@ test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見
     assert.deepEqual(savedDoc(dom), draft);
     const save = dom.posted.filter((m) => m.type === "save").pop();
     assert.equal(save?.imported, HASH);
-    // 保存が通って中身が届いたら、取り込みの印は消える（次の保存に添えない）
+    // 保存が通って中身が届いたら、取り込んだ記録は消える（次の保存に添えない）
     await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01-01.yml", exists: true, doc: draft, lock: { locked: false, reason: "" } } } });
     assert.equal(dom.all("#offer").length, 0, "下書きが消えれば提案ありも消える");
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
@@ -137,7 +137,7 @@ test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が
   }
 });
 
-test("CB-D142 取り込んだあとに元に戻して別の編集をした・取り込んだ中身を直したときは、保存に取り込みの指紋を添えない", async () => {
+test("CB-D142 取り込んだあとに元に戻して別の編集をした・取り込んだ中身を直したときは、保存に取り込みのハッシュを添えない", async () => {
   const dom = await openFlow({ offer: OFFER });
   try {
     const importDraft = async (): Promise<void> => {
@@ -169,7 +169,7 @@ test("CB-D142 取り込んだあとに元に戻して別の編集をした・取
   }
 });
 
-test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値の種類の違い（\"1.0.0\" と 1）は種類の印で見える", async () => {
+test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値の種類の違い（\"1.0.0\" と 1）は種類の表示で見える", async () => {
   const dom = await openFlow({ offer: OFFER });
   try {
     dom.click(dom.one('[data-action="open-proposal"]'));
@@ -180,7 +180,7 @@ test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値
     assert.equal(dom.all("#proposal-problem").length, 0);
     assert.match(dom.one("#proposal-order-only").textContent ?? "", /並び順だけ/);
     assert.ok(!dom.one<HTMLButtonElement>('[data-action="import-proposal"]').disabled);
-    // 型の違いは種類の印で見える
+    // 型の違いは種類の表示で見える
     dom.click(dom.one('[data-action="cancel-proposal"]'));
     await dom.settle();
     dom.click(dom.one('[data-action="open-proposal"]'));

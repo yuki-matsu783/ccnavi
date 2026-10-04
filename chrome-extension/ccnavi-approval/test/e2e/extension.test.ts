@@ -7,7 +7,7 @@
  * - 悪意のある Markdown を描いても、承認しても何も動かない
  * - ボードから承認と取り下げを書く（`createCommitOnBranch` の 1 コミット）
  * - 依頼済みのフェーズに MR のスレッドを出し（悪意のある本文でも何も動かず、隠れない）、
- *   ボードからレビュー済みの印を書く
+ *   ボードからレビュー済みのマーカーを書く
  * - service worker が PAT の期限のヘッダを CORS に公開されていなくても読み、ボードの帯とバッジで知らせる（模擬のホストで）
  * - PAT はボードに渡らない
  * - 通信先にセルフホストの GitLab（模擬。127.0.0.1:18788）を足したビルドで、GitLab のリポジトリを登録し、
@@ -42,7 +42,7 @@ let closeServer: () => Promise<void>;
 let profile: string;
 const mock = new MockGitHub(fixture(), "main", new Date());
 mock.apiBase = `http://127.0.0.1:${18787}`;
-// 3 日後に切れる PAT（ヘッダの綴りは GitHub と同じ「UTC」つき）
+// 3 日後に切れる PAT（ヘッダの表記は GitHub と同じ「UTC」つき）
 const EXPIRES = new Date(Date.now() + 3 * 86400000 - 3600000);
 mock.expiration = `${EXPIRES.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 const problems: string[] = [];
@@ -249,7 +249,7 @@ test("CX-T079 PAT はボードに渡らない（画面にも、service worker �
   await page.close();
 });
 
-test("CX-T138 レビュー済み: スレッドの悪意のある本文を描いても何も動かず隠れない。解決したらボードから印を 1 コミットで書く", async () => {
+test("CX-T138 レビュー済み: スレッドの悪意のある本文を描いても何も動かず隠れない。解決したらボードからマーカーを 1 コミットで書く", async () => {
   mock.branch("i0004", "main");
   const at = mock.push("i0004", reviewFamilyFiles("i0004"), "作業とレビュー待ちの子");
   mock.push("i0004", { ".ccnavi/approved/phases/i0004/1.requested": requestedMark(at) }, "ccnavi: レビューを依頼した");
@@ -352,7 +352,7 @@ test("CX-T160 「始める」: ボードで issue を読み、押すと issue �
   await again.close();
 });
 
-test("CX-T173 「要確認」: 描いた後に控えが付いた親子のチケットは、押しても書かずに「要確認のまま」と言う。外すのは確認を挟み、断れば残る", async () => {
+test("CX-T173 「要確認」: 描いた後に要確認が付いた親子のチケットは、押しても書かずに「要確認のまま」と言う。外すのは確認を挟み、断れば残る", async () => {
   const key = "gitlab.e2e/acme/widgets";
   const page = await openBoard();
   const approve = `${GL_REPO} [data-family="i0002"] button[data-action=approve]`;

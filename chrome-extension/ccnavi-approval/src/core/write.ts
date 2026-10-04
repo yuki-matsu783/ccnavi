@@ -4,22 +4,22 @@
  * 判定は Python（同梱の ccnavi）が出し、ここは Python が返した書くもの（Changes）を
  * 親のブランチ `P` への 1 コミットにして送るだけ。TS が判定を出すと手元と答えが 2 か所に分かれるため。流れは次のとおり。
  *
- * 1. preview: ボードが見せた画面の指紋（`digest`）と一覧（`ids`）を持っている
+ * 1. preview: ボードが見せた画面のダイジェスト（`digest`）と一覧（`ids`）を持っている
  * 2. yes: 親子のチケット 1 組ぶんを読み直して Snapshot を組み直し、Python に見せたものと比べさせる。
  *    違えば書かずに「見直す」（preview からやり直し）
  * 3. `plan` の変更を `createCommitOnBranch` の 1 コミットで書く。条件は `expectedHeadOid` = 読んだ `P` の先頭
  * 4. 先頭が動いていたら、新しい先頭で Snapshot を組み直して判定と plan を必ずやり直す。
- *    指紋が同じなら新しい plan を書く（見せ直さない）。違えば「見直す」。3 周しても書けなければユーザに回す
+ *    ダイジェストが同じなら新しい plan を書く（見せ直さない）。違えば「見直す」。3 周しても書けなければユーザの対応に切り替える
  * 5. 書いた後、新しい先頭の中身が書いたとおりか確かめる（blob の sha を突き合わせる）
  *
- * 取り下げも同じ流れで書く。見せた指紋は無いが、毎周 Python が条件を見直す。
+ * 取り下げも同じ流れで書く。見せたダイジェストは無いが、毎周 Python が条件を見直す。
  * レビュー済みも同じ流れで、毎周 MR のスレッドとレビューを読み直して Python の `confirm`
  * （手元の `ccnavi review confirm` と同じコア）に通るかを決めさせる。
  *
- * GitLab にも書く。GitLab の Commits API には比較つきの書き込みが無いので、事後確認と打ち消しで守る: 書いた答えのコミットの親が読んだ先頭と違えば（間に別の書き込みが入った）、自分の書き込みの
- * 直前の姿で判定し直す。同じ書くものになれば、そのまま残す。違えば（結論が変わった）打ち消しのコミットを積み、
- * 新しい先頭から読み直して周を回す。打ち消しもさらに競合して 2 回で収まらなければ、止めてユーザに回す（`attention`）。
- * ccnavi の書き込みどうしの競合を捕まえる印ファイル `seq` は書かない。そのため、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に残りうる。
+ * GitLab にも書く。GitLab の Commits API には比較つきの書き込みが無いので、事後確認と元に戻すコミット（revert）で守る: 書いた答えのコミットの親が読んだ先頭と違えば（間に別の書き込みが入った）、自分の書き込みの
+ * 直前の状態で判定し直す。同じ書くものになれば、そのまま残す。違えば（結論が変わった）元に戻すコミットを積み、
+ * 新しい先頭から読み直して再試行する。元に戻すコミットもさらに競合して 2 回で収まらなければ、止めてユーザの対応に切り替える（`attention`）。
+ * ccnavi の書き込みどうしの競合を捕まえる seq ファイルは書かない。そのため、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に残りうる。
  */
 import { py, PyError, type Actor, type ChangeRow, type PlanResult, type Written } from "./py.js";
 import type { RepoConfig } from "./settings.js";
@@ -35,7 +35,7 @@ export const MAX_ROUNDS = 3;
 export interface WriteDeps extends ReadDeps {
   /** ホストの種類（応答が落ちた書き込みの見分け方が違う。無ければ github） */
   readonly kind?: "github" | "gitlab";
-  /** 拡張の版（跡の `version` とコミットの見出し） */
+  /** 拡張の版（状態の履歴の `version` とコミットの見出し） */
   readonly version: string;
   /** 待つ（書いた直後の読み取りの遅れ）。無ければ本物の時計。試験は 0 秒にする */
   readonly sleep?: (ms: number) => Promise<void>;
@@ -47,9 +47,9 @@ const VERIFY_WAIT_MS = 1000;
 /** 見出しに並べる識別子の数。残りは件数にまとめ、全件は本文に書く */
 const HEADLINE_IDS = 3;
 
-/** service worker が書く頼みを形や守りで断ったときの status（protocol.ts の REFUSED と同じ） */
+/** service worker が書く頼みを形や保護で断ったときの status（protocol.ts の REFUSED と同じ） */
 const REFUSED = 400;
-/** GitLab が書き込みを断ったとき（`last_commit_id` が違う＝同じファイルを他人が変えた・無い）の status（`gitlab.HOST_REFUSED`）。ユーザに回す */
+/** GitLab が書き込みを断ったとき（`last_commit_id` が違う＝同じファイルを他人が変えた・無い）の status（`gitlab.HOST_REFUSED`）。ユーザの対応に切り替える */
 const HOST_REFUSED = 409;
 /** GitLab へ送る前の確認で先頭が動いていたときの status（`gitlab.HOST_MOVED`）。何も送っていないので読み直して試し直す */
 const HOST_MOVED = 412;
@@ -69,13 +69,13 @@ export type Outcome =
   | { readonly kind: "refused"; readonly message: string }
   | { readonly kind: "conflict"; readonly message: string }
   | { readonly kind: "failed"; readonly message: string }
-  /** ユーザに回す（打ち消しが収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは親子のチケットを「要確認」で出す */
+  /** ユーザの対応に切り替える（元に戻すコミットでも競合が収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは親子のチケットを「要確認」で出す */
   | { readonly kind: "attention"; readonly message: string };
 
 export interface Shown {
   readonly ids: readonly string[];
   readonly digest: string;
-  /** 指紋を出したときの絞り（ボードの答えの `only`） */
+  /** ダイジェストを出したときの絞り（ボードの答えの `only`） */
   readonly only: readonly string[] | null;
 }
 
@@ -122,7 +122,7 @@ export async function blobSha(bytes: Uint8Array): Promise<string> {
   return [...digest].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** 書いた後の確かめ: `oid` の上の各パスが書いたとおりか。違うパスの並びを返す（空なら合っている） */
+/** 書いた後の確かめ: `oid` の上の各パスが書いたとおりか。違うパスの配列を返す（空なら合っている） */
 export async function verifyWritten(deps: ReadDeps, repo: RepoConfig, oid: string, rows: readonly ChangeRow[]): Promise<string[]> {
   const wrong: string[] = [];
   for (let i = 0; i < rows.length; i += 20) {
@@ -175,7 +175,7 @@ type Attempt =
 
 /**
  * 1 コミットを送る。答えは書いたコミットと、その親。`last` を渡すと、書き換える・消す各ファイルに
- * 「最後に変えたコミット」として付ける（GitLab。打ち消しは自分のコミットを渡す）。
+ * 「最後に変えたコミット」として付ける（GitLab）。元に戻すときは、自分が書いたコミットを `last` に渡す。
  * 渡さなければ service worker が読んだ先頭の上の値を引いて付ける
  */
 async function send(
@@ -226,11 +226,11 @@ async function findWritten(deps: WriteDeps, repo: RepoConfig, now: string, read:
 }
 
 /**
- * 1 コミットで書く。service worker が形や守りで断ったら（400）、原因を言って失敗にする。GitLab で書く前の確認で先頭が
+ * 1 コミットで書く。service worker が形や保護で断ったら（400）、原因を言って失敗にする。GitLab で書く前の確認で先頭が
  * 動いていたら（412。何も送っていない）「動いた」。ほかの失敗では先頭を読み直し、動いていなければ失敗。動いていれば、
  * 応答だけが落ちた自分の書き込みを探し（`findWritten`）、見つかれば書けたとする。見つからず、今の先頭に書いた中身が
- * 在るなら（書いたか見分けられない）ユーザに回す。無ければ「動いた」（読み直して周を回す）。
- * 応答が落ちた後の確かめそのものが落ちたら（429・5xx など）、書いたかもしれないが確認できないのでユーザに回す
+ * 在るなら（書いたか見分けられない）ユーザの対応に切り替える。無ければ「動いた」（読み直して再試行する）。
+ * 応答が落ちた後の確かめそのものが落ちたら（429・5xx など）、書いたかもしれないが確認できないのでユーザの対応に切り替える
  */
 async function commitOnce(
   deps: WriteDeps,
@@ -274,7 +274,7 @@ async function commitOnce(
   }
 }
 
-/** 書いた後の確かめ。合わない・確かめが落ちたら、書いたものが残っているのでユーザに回す（failed にしない） */
+/** 書いた後の確かめ。合わない・確かめが落ちたら、書いたものが残っているのでユーザの対応に切り替える（failed にしない） */
 async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: readonly ChangeRow[], rounds: number, lines: readonly string[]): Promise<Outcome> {
   let wrong: string[];
   try {
@@ -291,7 +291,7 @@ async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: read
   return { kind: "written", oid, rounds, lines };
 }
 
-/** Python の Changes から、この親子のチケットの P に書く行を取り出す。P の外・置き場の外に及べば理由 */
+/** Python の Changes から、この親子のチケット P に書く行を取り出す。P の外・置き場の外に及べば理由 */
 export function rowsOf(res: Written, family: string, read: Pick<FamilyRead, "place">): readonly ChangeRow[] | string {
   if (res.stopped) return `${res.stopped.ticket}: ${res.stopped.reason}`;
   const names = Object.keys(res.changes ?? {});
@@ -310,11 +310,11 @@ type Planned =
 
 /**
  * 読んだ親子のチケットと時刻から書くものを決める。時刻（`stamp`）は周ごとに 1 回決め、事後確認の判定し直しにも同じ値を渡す
- * （時計が進んで跡の `at` が変わるだけで「書くものが違う」にしない）
+ * （時計が進んで状態の履歴の `at` が変わるだけで「書くものが違う」にしない）
  */
 type Plan = (read: FamilyRead, stamp: string) => Promise<Planned>;
 
-/** 同じ書くものか（パス・作るか書き換えるか消すか・中身のバイト列）。並びは問わない */
+/** 同じ書くものか（パス・作るか書き換えるか消すか・中身のバイト列）。順序は問わない */
 async function sameRows(a: readonly ChangeRow[], b: readonly ChangeRow[]): Promise<boolean> {
   if (a.length !== b.length) return false;
   const key = async (r: ChangeRow) => `${r.path}\0${r.op}\0${r.op === "delete" ? "" : await blobSha(rowBytes(r))}`;
@@ -328,7 +328,7 @@ function textBase64(text: string): string {
   return base64(new TextEncoder().encode(text));
 }
 
-/** 自分の書き込みを打ち消す書くもの: 書いた各パスを、自分の書き込みの直前（`parent`）の中身に戻す */
+/** 自分の書き込みを元に戻す書くもの: 書いた各パスを、自分の書き込みの直前（`parent`）の中身に戻す */
 async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows: readonly ChangeRow[]): Promise<ChangeRow[] | string> {
   const out: ChangeRow[] = [];
   for (let i = 0; i < rows.length; i += 20) {
@@ -354,30 +354,30 @@ async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows:
   return out;
 }
 
-/** 打ち消しを積む回数の上限（2 回で収まらなければユーザに回す） */
+/** 元に戻すコミットを積む回数の上限（2 回で収まらなければユーザの対応に切り替える） */
 export const REVERT_TRIES = 2;
 
 
-/** 書いたが確かめ切れなかった・打ち消せなかったときの答え（ユーザに回す） */
+/** 書いたが確かめ切れなかった・元に戻せなかったときの答え（ユーザの対応に切り替える） */
 function attention(family: string, done: Committed, why: string): Outcome {
   return {
     kind: "attention",
-    message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、書いたものを確かめ切れなかったか、打ち消せなかった（${why}）。ホストの履歴を確かめてください`,
+    message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、書いたものを確かめ切れなかったか、元に戻せなかった（${why}）。ホストの履歴を確かめてください`,
   };
 }
 
 /**
- * 自分の書き込み（`done`）を打ち消す。今の先頭で、書いた各パスがまだ自分の書いたとおりのときだけ積み、各ファイルに
+ * 自分の書き込み（`done`）を元に戻す。今の先頭で、書いた各パスがまだ自分の書いたとおりのときだけ積み、各ファイルに
  * 「最後に変えたのは自分のコミット」を付ける（GitLab が他人の変更の上に書かないよう断る）。
- * 送った応答が落ちたら、届いたか（今の先頭の親が送った先で、中身が戻したとおり）を見る。打ち消しがさらに競合して
- * 同じパスが変わっていれば、ユーザに回す。
+ * 送った応答が落ちたら、届いたか（今の先頭の親が送った先で、中身が戻したとおり）を見る。元に戻すコミットがさらに競合して
+ * 同じパスが変わっていれば、ユーザの対応に切り替える。
  */
 async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: Committed, rows: readonly ChangeRow[]): Promise<{ kind: "reverted" } | { kind: "stop"; outcome: Outcome }> {
   const human = (why: string): { kind: "stop"; outcome: Outcome } => ({ kind: "stop", outcome: attention(family, done, why) });
   const undo = await undoRows(deps, repo, done.parent, rows);
   if (typeof undo === "string") return human(undo);
   if (undo.length === 0) return { kind: "reverted" };
-  const message = commitMessage([family], "への書き込みを打ち消す", "打ち消した", deps.version);
+  const message = commitMessage([family], "への書き込みを元に戻す", "元に戻した", deps.version);
   for (let attempt = 1; attempt <= REVERT_TRIES; attempt += 1) {
     const cur = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
     if (cur === null) return human(`親のブランチ ${family} がホストから消えた`);
@@ -385,7 +385,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
     if (touched.length > 0) return human(`後から別の書き込みが同じファイルを変えた: ${touched.join(", ")}`);
     let res: Committed;
     try {
-      res = await send(deps, repo, family, cur, { headline: message.headline, body: `打ち消すコミット: ${done.oid}\n` }, undo, done.oid);
+      res = await send(deps, repo, family, cur, { headline: message.headline, body: `元に戻したコミット: ${done.oid}\n` }, undo, done.oid);
     } catch (err) {
       const status = (err as { status?: number }).status;
       if (status === REFUSED || status === HOST_REFUSED) return human((err as Error).message ?? String(err));
@@ -401,19 +401,19 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
     }
     // 戻した後に中身を確かめる（バイト列が元と同じか）
     const wrong = await verifySettled(deps, repo, res.oid, undo);
-    if (wrong.length > 0) return human(`打ち消した後の中身が戻したものと違う: ${wrong.join(", ")}`);
+    if (wrong.length > 0) return human(`元に戻した後の中身が戻したものと違う: ${wrong.join(", ")}`);
     if (res.parent === cur) return { kind: "reverted" };
-    // 打ち消しの間にも別の書き込みが入った。それが同じパスを変えていなければ打ち消しは反映されている
+    // 元に戻すあいだにも別の書き込みが入った。それが同じパスを変えていなければ、元に戻すコミットは反映されている
     if ((await verifyWritten(deps, repo, res.parent, rows)).length === 0) return { kind: "reverted" };
-    return human("打ち消しの間にも別の書き込みが同じファイルを変えた");
+    return human("元に戻すあいだにも別の書き込みが同じファイルを変えた");
   }
-  return human(`打ち消しが ${REVERT_TRIES} 回とも書けなかった`);
+  return human(`元に戻すコミットが ${REVERT_TRIES} 回とも書けなかった`);
 }
 
 /**
- * 事後確認。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の姿で、
- * 同じ時刻で判定し直す。同じ書くものなら残す（`kept`）。違えば打ち消す（`reverted` で周を回す）。
- * 途中でホストや Python が落ちたら（429・5xx・MR が消えた など）、書いたものを確かめ切れないのでユーザに回す
+ * 事後確認。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の状態で、
+ * 同じ時刻で判定し直す。同じ書くものなら残す（`kept`）。違えば元に戻す（`reverted` で読み直して再試行する）。
+ * 途中でホストや Python が落ちたら（429・5xx・MR が消えた など）、書いたものを確かめ切れないのでユーザの対応に切り替える
  */
 async function settleRace(
   deps: WriteDeps,
@@ -439,7 +439,7 @@ async function settleRace(
   }
 }
 
-/** 書く流れの周（読み直し・指紋の比べ・書き込み・先頭が動いたときのやり直しと、GitLab の事後確認）。周ごとに親子のチケットを読み直して書くものを決め直す */
+/** 書く流れの周（読み直し・ダイジェストの比べ・書き込み・先頭が動いたときのやり直しと、GitLab の事後確認）。周ごとに親子のチケットを読み直して書くものを決め直す */
 async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what: string, plan: Plan): Promise<Outcome> {
   try {
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
@@ -489,7 +489,7 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
   });
 }
 
-/** 親子のチケットを読み直す。読んでいる間に先頭が動いたら null（周を回す） */
+/** 親子のチケットを読み直す。読んでいる間に先頭が動いたら null（読み直して再試行する） */
 async function readOrMoved(repo: RepoConfig, family: string, deps: WriteDeps): Promise<FamilyRead | null> {
   try {
     return await readFamily(repo, family, deps);
@@ -530,7 +530,7 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
 
 /**
  * フェーズをレビュー済みにする。毎周、親子のチケットと MR のスレッド・レビューを読み直し、
- * Python の `confirm` が通したときだけ、レビュー待ちの子の `done/` への移動と印（`actor` = PAT の持ち主、
+ * Python の `confirm` が通したときだけ、レビュー待ちの子の `done/` への移動とマーカー（`actor` = PAT の持ち主、
  * `via: chrome`）を 1 コミットで書く。未解決のスレッドや変更要求が残れば書かない。
  */
 export async function confirmPhase(repo: RepoConfig, family: string, phase: number, deps: WriteDeps): Promise<Outcome> {

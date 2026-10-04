@@ -65,7 +65,7 @@ def groups() -> list[str]:
 def modules(targets: list[str]) -> list[str]:
     """回すテストモジュールを、重いと思われる順（ファイルの大きさの降順）に並べて返す。
 
-    `targets` が空なら全グループ。`tests/ticket` のようなグループの綴りか、
+    `targets` が空なら全グループ。`tests/ticket` のようなグループの表記か、
     `tests.ticket.test_ticket` のようなモジュール名を受ける。
     """
     wanted = {_normalize(target) for target in targets}
@@ -85,7 +85,7 @@ def modules(targets: list[str]) -> list[str]:
 
 def _normalize(target: str) -> str:
     """`tests/ticket`・`tests/ticket/`・`tests/ticket/test_ticket.py`・
-    `tests.ticket.test_ticket` のどれで書かれても、同じ点区切りの綴りにする。"""
+    `tests.ticket.test_ticket` のどれで書かれても、同じ点区切りの表記にする。"""
     name = target.replace("\\", "/").strip("/")
     if name.endswith(".py"):
         name = name[:-3]

@@ -98,16 +98,16 @@ export interface BoardResult {
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
-  /** 書けるか（互換の版・書く先の名前。Python が決める） */
+  /** 書けるかどうか。互換の版と書く先の名前をもとに Python が決める */
   readonly write?: { readonly allowed: boolean; readonly reason: string };
   readonly withdrawable?: readonly Withdrawable[];
   /** レビュー済みを付けられる候補 */
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
-  /** 見せた画面の指紋（承認のときに Python が読み直した中身と比べる） */
+  /** 見せた画面のダイジェスト（承認のときに Python が読み直した中身と比べる） */
   readonly digest?: string;
-  /** 承認するときに `plan` へ渡す絞り（指紋を出したときの絞り。null なら絞らない） */
+  /** 承認するときに `plan` へ渡す絞り（ダイジェストを出したときの絞り。null なら絞らない） */
   readonly only?: readonly string[] | null;
   readonly rejected?: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
   readonly problems?: readonly string[];

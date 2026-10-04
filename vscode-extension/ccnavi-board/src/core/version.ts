@@ -86,7 +86,7 @@ export function rebuildHint(fromSource: boolean): string {
 export const UPDATE_EXTENSION_HINT =
   "拡張を新しくしてください（ccnavi のリポジトリの vscode-extension/ccnavi-board で pnpm package して入れ直す）";
 
-/** 名乗りに使う実行ファイルの版とコミット（`0.1.0 abc1234`） */
+/** 表示に使う実行ファイルの版とコミット（`0.1.0 abc1234`） */
 function named(info: VersionInfo): string {
   const commit = info.commit === "unknown" ? "コミット不明" : info.commit.slice(0, 12);
   return `${info.version} ${commit}`;

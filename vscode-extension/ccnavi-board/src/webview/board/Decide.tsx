@@ -2,7 +2,7 @@
  * 残った指摘の行き先を決めるオーバーレイの中身。指摘を 1 件ずつ並べ、行き先（対応しない・
  * このフェーズで直す・issue に回す）を選ばせる。全部に選ぶまで「決める」は押せない。
  *
- * 選んでいる途中の行き先だけをここに持つ。見せる指摘・指紋・置いている最中かは拡張ホストが持ち、
+ * 選んでいる途中の行き先だけをここに持つ。見せる指摘・ダイジェスト・置いている最中かは拡張ホストが持ち、
  * ここは渡されたものを見せるだけ。押したら選んだ行き先を鍵ごとに返す（`decideConfirm`）。
  */
 import { useState, type JSX } from "react";
@@ -19,7 +19,7 @@ export function DecideBody({
   readonly deciding: boolean;
   readonly notice: string | undefined;
 }): JSX.Element {
-  // 見せ直したら（指紋が変わったら）選び直す。前の一覧で選んだ行き先を、別の指摘に持ち越さない
+  // 見せ直したら（ダイジェストが変わったら）選び直す。前の一覧で選んだ行き先を、別の指摘に持ち越さない
   const [picked, setPicked] = useState<{ readonly digest: string; readonly choices: Record<string, DecideChoice> }>({
     digest: preview.digest,
     choices: {},

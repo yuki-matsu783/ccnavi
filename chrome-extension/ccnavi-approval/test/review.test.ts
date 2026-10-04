@@ -70,7 +70,7 @@ test("CX-T118 取り下げ: GitHub が承認コミットを renamed で返して
 test("CX-T119 取り下げ: 承認コミットが P の first-parent の鎖の上に無ければ（別の枝で承認して merge）出さない（決定 B）", async () => {
   const mock = new MockGitHub(parentOnly());
   const d = depsFor(mock);
-  // 承認した中身を作るだけの写し
+  // 承認した中身を作るだけのコピー
   const copy = new MockGitHub(parentOnly());
   const cd = depsFor(copy);
   assert.equal((await approveFamily(REPO, "i0001", await shown(cd), cd)).kind, "written");
@@ -153,7 +153,7 @@ test("CX-T124 コミットの見出しは先頭の数件と件数に畳んで 20
   assert.deepEqual(commitMessage(["i0001"], "を承認", "承認した", "9.9.9"), { headline: "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）", body: "" });
 });
 
-test("CX-T125 Pyodide の仮のツリー（/ws）の下でも、置き場の綴りの途中の ws を畳まずに書く", async () => {
+test("CX-T125 Pyodide の仮のツリー（/ws）の下でも、置き場のパスの途中の ws を畳まずに書く", async () => {
   const f = parentOnly();
   const env = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/ws" } });
   for (const b of Object.values(f)) {

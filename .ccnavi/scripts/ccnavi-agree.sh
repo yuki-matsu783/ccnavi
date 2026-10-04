@@ -4,7 +4,7 @@
 #   sh .ccnavi/scripts/ccnavi-agree.sh [<識別子>...]
 #
 # 承認そのものは ccnavi の `--agree`。承認された提案は todo/ から親チケットのツリーの
-# $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）の doing/ へ動く（写しは作らない）。そこは
+# $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）の doing/ へ動く（コピーは作らない）。そこは
 # プロジェクトの git が追跡していて、コミットして push するまで他の機械には届かない（設計 9.2）。
 # A が承認して B の機械で作業する流れは、この push で成り立つ。
 #
@@ -19,7 +19,7 @@
 # セッションの書きかけがあるので、巻き込むと承認のコミットに他人の変更が入る。
 #
 # 統合先が保護されている（main / master / develop / release）ときは push しない。
-# そこへ直接送る判断はユーザのものなので、綴りを出して止める。
+# そこへ直接送る判断はユーザのものなので、ブランチ名を出して止める。
 #
 # 終了コード: 0 成功 / 1 承認が通らなかった / 2 引数か環境の誤り
 

@@ -182,10 +182,10 @@ def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
 def relative(tree: Tree, full: str) -> str:
     """作業ツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
 
-    綴りの大文字小文字は元のまま返す。normcase を掛けた綴りから作ると、
+    表記の大文字小文字は元のまま返す。normcase を掛けたパスから作ると、
     区別しない機械（Windows）では全部が小文字になり、チケットが `README.md` と
     書いた範囲に `readme.md` を当てることになって、永久に当たらない。
-    `os.path.relpath` は比較にだけ normcase を使い、返す綴りは元のままなので、
+    `os.path.relpath` は比較にだけ normcase を使い、返すパスは元のままなので、
     根（normcase 済み）と突き合わせても大文字小文字は保たれる。
     """
     target = _canonical(full)
@@ -227,7 +227,7 @@ def head_text(tree_root: str) -> str | None:
         return None
 
 
-# 途中の操作の印（git ディレクトリの中の名前）。
+# 途中の操作の目印（git ディレクトリの中の名前）。
 BUSY_MARKS = (
     "MERGE_HEAD",
     "CHERRY_PICK_HEAD",
@@ -239,7 +239,7 @@ BUSY_MARKS = (
 
 
 def busy_of(tree_root: str) -> str:
-    """このツリーで途中の操作（merge・cherry-pick・revert・rebase）があればその印の名前。無ければ空。
+    """このツリーで途中の操作（merge・cherry-pick・revert・rebase）があればその目印の名前。無ければ空。
 
     ファイルだけを見る（git は起こさない）。
     """
@@ -274,10 +274,10 @@ def worktree_path(root: str, name: str) -> str:
 
 
 def exact_name(root: str, name: str) -> bool:
-    """この名前のワークツリーが、綴りの大文字小文字までそのままで在るか。
+    """この名前のワークツリーが、表記の大文字小文字までそのままで在るか。
 
     大文字小文字を区別しない機械では `I0001-01-02` というディレクトリが `i0001-01-02` として
-    開けてしまう。名前が識別子だと言う以上、綴りまで同じであることを求める。
+    開けてしまう。名前が識別子だと言う以上、表記まで同じであることを求める。
     """
     try:
         return name in os.listdir(os.path.join(root, WORKTREES_DIR))
@@ -286,12 +286,12 @@ def exact_name(root: str, name: str) -> bool:
 
 
 # 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、ワークツリーの
-# 名前の綴りが違っても同じ識別子として結び付けるのは、この機械だけ。
+# 名前の表記が違っても同じ識別子として結び付けるのは、この機械だけ。
 CASE_INSENSITIVE = os.path.normcase("A") == "a"
 
 
 def lookup(index: dict, name: str):
-    """ワークツリーの名前で承認済みチケットを引く。区別しない機械では綴りの違いを許す。"""
+    """ワークツリーの名前で承認済みチケットを引く。区別しない機械では表記の違いを許す。"""
     found = index.get(name)
     if found is not None or not CASE_INSENSITIVE:
         return found
@@ -302,7 +302,7 @@ def lookup(index: dict, name: str):
 
 
 def _resolved(path: str) -> str:
-    """行き着く先。綴りの大文字小文字は元のまま。"""
+    """行き着く先。表記の大文字小文字は元のまま。"""
     try:
         resolved = os.path.realpath(path)
     except OSError:
@@ -311,5 +311,5 @@ def _resolved(path: str) -> str:
 
 
 def _canonical(path: str) -> str:
-    """同じ場所が同じ綴りになる形。大文字小文字は区別しない機械のために normcase。"""
+    """同じ場所が同じ表記になる形。大文字小文字は区別しない機械のために normcase。"""
     return os.path.normcase(_resolved(path))

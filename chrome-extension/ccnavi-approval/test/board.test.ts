@@ -77,7 +77,7 @@ test("CX-T042 判定の入力は統合先・P・閉包だけ。表示用のブ�
   assert.deepEqual({ ...b, schema: 0 }, { ...a, schema: 0 });
 });
 
-test("CX-T043 先行の親子のチケットのブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
+test("CX-T043 先行の親のブランチが無いときは、今の ccnavi のとおり子を承認の対象にしない", async () => {
   const { board } = await run();
   const f = family(board, "i0002");
   assert.deepEqual(f?.result?.closure.absent, ["i0007"]);
@@ -103,7 +103,7 @@ test("CX-T045 互換のマーカーが違えば、どちらを更新するかを
   assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）が書かれていない/);
 });
 
-test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）", async () => {
+test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読む（8.2）", async () => {
   const cache = memoryCache();
   const first = await run(fixture(), {}, cache);
   assert.ok(first.board.stats.blobsFetched > 0);
@@ -114,7 +114,7 @@ test("CX-T046 blob は sha で控え、2 回目は tree だけを読む（8.2）
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 
-test("CX-T047 置き場の綴りは統合先の .claude/settings.json から読む", async () => {
+test("CX-T047 置き場のパスは統合先の .claude/settings.json から読む", async () => {
   const b = fixture();
   b.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets" } });
   const moved = b.i0001.files;

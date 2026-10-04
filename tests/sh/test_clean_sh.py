@@ -8,7 +8,7 @@ sh に渡す PATH から node のあるディレクトリを外して作る。
 
 読み返すのは終了コード・出力と、ファイルシステムに残ったものだけ。
 
-`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -86,7 +86,7 @@ def path_without_node(shim):
                 continue
             dest = os.path.join(shim, os.path.basename(found))
             if os.path.lexists(dest):
-                continue  # 先に外した場所のものが採られる。PATH の並びと同じ
+                continue  # 先に外した場所のものが採られる。PATH の順序と同じ
             try:
                 os.symlink(found, dest)
             except OSError:

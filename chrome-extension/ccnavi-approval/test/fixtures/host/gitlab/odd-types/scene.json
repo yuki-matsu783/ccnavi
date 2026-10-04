@@ -3,5 +3,5 @@
   "project": "widgets",
   "branch": "i0001",
   "poster": "201",
-  "about": "型の違う欄: discussion の id が数、new_line が文字列、本文が null、書き手の無いノート、レビュアーの updated_at が無く user に username だけ。sh（jq）と同じ型で写す。未解決 2 件で止まる"
+  "about": "型の違う欄: discussion の id が数、new_line が文字列、本文が null、書き手の無いノート、レビュアーの updated_at が無く user に username だけ。sh（jq）と同じ型で組む。未解決 2 件で止まる"
 }

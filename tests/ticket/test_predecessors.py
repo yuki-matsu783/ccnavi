@@ -103,11 +103,11 @@ class PredecessorTest(TicketTest):
         self.propose_after("i0001-01-03", "i0001-01-99")
         refused = self.approve()
         self.assertIn("先行 i0001-01-99 がどの置き場", refused.stderr)
-        self.assertIn("綴りを直すか", refused.stderr)
+        self.assertIn("表記を直すか", refused.stderr)
         self.assertFalse(self.placed("i0001-01-03"))
 
     def test_a_predecessor_in_two_places_is_not_taken_as_done(self):
-        """同じ識別子が doing/ と done/ の両方に在る（動かす途中で止まった跡）なら満たさない。"""
+        """同じ識別子が doing/ と done/ の両方に在る（動かす途中で止まった形跡）なら満たさない。"""
         self.family(review=(False, False))
         self.finish("i0001-01-01")
         shutil.copyfile(
@@ -199,7 +199,7 @@ class PredecessorTest(TicketTest):
     def test_start_refuses_a_hand_moved_child_whose_predecessor_is_open(self):
         """置き場を手で動かして承認した子は承認の検査を通らない。着手が同じ検査で止める。
 
-        承認の権威は置き場なので、`doing/` へ手で動かしただけでも承認済みになる。
+        承認で本物とするのは置き場なので、`doing/` へ手で動かしただけでも承認済みになる。
         """
         self.family(review=(False, False))
         self.propose(
@@ -339,7 +339,7 @@ class PredecessorTest(TicketTest):
             decision = json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
             self.assertEqual(decision, "deny", (tool, result.stdout))
 
-        # シェルから書く形。組み込みの守り（コアファイル）を本番と同じく有効にして打つ
+        # シェルから書く形。組み込みの保護（コアファイル）を本番と同じく有効にして打つ
         # （このテストの道具は既定で切っている）。
         def bash(command, permission_mode=""):
             payload = {
@@ -358,12 +358,13 @@ class PredecessorTest(TicketTest):
                 return ""
             return json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
 
-        # リダイレクトは ccnavi ディレクトリの守りが止める。
+        # リダイレクトは ccnavi ディレクトリの保護が止める。
         self.assertEqual(bash("echo x > .ccnavi/approved/doing/i0001-01-03.md"), "deny")
         # 書き込み先を読めないコマンド（sed -i）は何も言われずに通ることはない。
         # 聞ける者が居る権限モードでは Claude Code がユーザに聞き（ccnavi は判定を出さない）、
         # 居なければ ccnavi が断る（judge.undeclared_verdict）。
-        # 書かれても実行後チェックが書き換えとして言う。副命令が書く欄のほかが変わった姿になるため。
+        # 書かれても実行後チェックが書き換えとして言う。副命令が書く欄のほかが変わった内容に
+        # なるため。
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-01-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))
         self.assertEqual(bash(sed, "bypassPermissions"), "deny")

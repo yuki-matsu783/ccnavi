@@ -12,7 +12,7 @@ import { buildBoard, type Board } from "./board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "./model.js";
 import type { ProjectRow } from "./projects-view.js";
 
-/** 見本の印。画面は見本を出している間、この文を帯で出す */
+/** 見本の目印。画面は見本を出している間、この文を帯で出す */
 export const SAMPLE_NOTE = "案内のための見本を表示しています。実際のチケット・プロジェクトではなく、案内を閉じると消えます。";
 
 const AT = "2026-01-01T09:00:00+0900";

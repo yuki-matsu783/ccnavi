@@ -1,14 +1,14 @@
 /**
- * 束ねた画面（`out/webview/<名前>.js`）と、その CSS（`out/webview/<名前>.css`）を読む。
+ * バンドルした画面（`out/webview/<名前>.js`）と、その CSS（`out/webview/<名前>.css`）を読む。
  * 拡張が `<script nonce>` と `<style nonce>` に流し込む。
  *
  * ファイルとして Webview に読ませないのは、`localResourceRoots` を空のままにして
  * 「外部資源に依存しない 1 枚の HTML」を保つため。読むのは 1 度だけで、あとは覚えておく。
- * VS Code の API には触れないが、置き場（`out/`）の綴りを知っているのでここに置く。
+ * VS Code の API には触れないが、置き場（`out/`）のパスを知っているのでここに置く。
  *
  * CSS がここに来るのは、Webview の CSP が nonce を持つ `<style>` しか通さないため。nonce は
  * 入れ物の HTML を組む側（拡張ホスト）が作るので、挿すのもそちら。CSS の中身は画面の側
- * （`src/webview/<名前>/*.css`）にあり、ここが知っているのは束ねた出口の綴りだけ。
+ * （`src/webview/<名前>/*.css`）にあり、ここが知っているのはバンドルの出口のパスだけ。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -16,7 +16,7 @@ import * as path from "node:path";
 const cache = new Map<string, string>();
 
 /**
- * 束ねたものは `out/webview/` にある。走っているのが束ねた `out/extension.js`（`__dirname` は `out/`）でも、
+ * バンドルしたものは `out/webview/` にある。走っているのがバンドルした `out/extension.js`（`__dirname` は `out/`）でも、
  * tsc が出した `out/src/webview-asset.js`（`__dirname` は `out/src/`）でも読めるように、両方を見る。
  */
 function asset(name: string): string {
@@ -38,14 +38,14 @@ function asset(name: string): string {
 }
 
 /**
- * 束ねた画面のスクリプト。渡すのは**画面の名前**（`"board"`。`src/webview/<名前>/` の `board`）で、
+ * バンドルした画面のスクリプト。渡すのは**画面の名前**（`"board"`。`src/webview/<名前>/` の `board`）で、
  * 拡張子はここが付ける。名前だけを受けるので、`.js` と `.css` を取り違えることが無い
  */
 export function webviewScript(name: string): string {
   return asset(`${name}.js`);
 }
 
-/** 束ねた画面の CSS。渡すのは画面の名前（`"board"`） */
+/** バンドルした画面の CSS。渡すのは画面の名前（`"board"`） */
 export function webviewStyle(name: string): string {
   return asset(`${name}.css`);
 }

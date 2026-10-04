@@ -1,10 +1,10 @@
 /**
  * GitLab・プロジェクトのリポジトリ・「始める」。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
- * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組む写しは、sh が組んだ期待値と同じ
- * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・指紋を出す（読み取りの一致）
+ * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組む結果は、sh が組んだ期待値と同じ
+ * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェストを出す（読み取りの一致）
  * - GitLab への書き込みは Commits API の 1 コミット。事後確認: 書いたコミットの親が読んだ先頭と
- *   違えば、直前の姿で判定し直し、同じなら残し、違えば打ち消して読み直す。打ち消しも収まらなければユーザに回す
+ *   違えば、直前の状態で判定し直し、同じなら残し、違えば元に戻して読み直す。元に戻すコミットも収まらなければユーザの対応に切り替える
  * - 「始める」: issue から `i<番号>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
  * - プロジェクトのリポジトリ: ワークスペースの統合先の共通層で判定し、プロジェクトの親のブランチへ書く
  * - PAT は画面に渡らない。GitLab のスレッドの本文は承認の画面と同じ規則で描く
@@ -81,7 +81,7 @@ const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
 
-test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む写しは sh が組んだ期待値（expected.json）と同じ", async () => {
+test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
   assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "requested-changes", "resolved"]);
   for (const name of gitlabSceneNames()) {
     const scene = loadGitLabScene(name);
@@ -94,7 +94,7 @@ test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む�
   }
 });
 
-test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・指紋・取り下げの可否を出す", async () => {
+test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェスト・取り下げの可否を出す", async () => {
   const hub = await collectRepo(GH_REPO, glDeps(new MockGitHub(fixture()), "github.com"));
   const lab = await collectRepo(GITLAB_REPO, glDeps(new MockGitLab(fixture())));
   assert.equal(lab.error, "", lab.error);
@@ -152,7 +152,7 @@ test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミ
   assert.equal(mock.files("i0001")[TODO], parentOnly().i0001.files[TODO]);
 });
 
-test("CX-T147 事後確認: 書く直前に関係の無い書き込み（コード）が割り込んでも、判定し直して同じなら残す（打ち消さない）", async () => {
+test("CX-T147 事後確認: 書く直前に関係の無い書き込み（コード）が割り込んでも、判定し直して同じなら残す（元に戻さない）", async () => {
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
@@ -161,13 +161,13 @@ test("CX-T147 事後確認: 書く直前に関係の無い書き込み（コー�
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "written", JSON.stringify(out));
   assert.equal(mock.glCommits.length, 1);
-  // 書いたコミットの親は読んだ先頭でない（間に割り込んだ）が、打ち消さない
+  // 書いたコミットの親は読んだ先頭でない（間に割り込んだ）が、元に戻さない
   assert.notEqual(mock.glCommits[0].parent, before);
   const files = mock.files("i0001");
   assert.ok(DOING in files && "src/other.py" in files);
 });
 
-test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル）が割り込むと、打ち消しのコミットを積み、読み直して見直しを求める。同じファイルなら書かずに止まる", async () => {
+test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル）が割り込むと、元に戻すコミットを積み、読み直して見直しを求める。同じファイルなら書かずに止まる", async () => {
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
@@ -182,13 +182,13 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
     mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]),
     [
       ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],
-      ["written", "ccnavi: i0001 への書き込みを打ち消す（Chrome 拡張 9.9.9）"],
+      ["written", "ccnavi: i0001 への書き込みを元に戻す（Chrome 拡張 9.9.9）"],
     ],
   );
-  // 打ち消しは各ファイルに「最後に変えたのは自分のコミット」を付ける
+  // 元に戻すコミットは各ファイルに「最後に変えたのは自分のコミット」を付ける
   const mine = mock.glCommits[0].oid;
   assert.ok(mock.glCommits[1].actions.filter((a) => a.action !== "create").every((a) => a.last_commit_id === mine));
-  // 打ち消した後の置き場は、割り込んだ書き込みの直後と同じ（承認は残らない）
+  // 元に戻した後の置き場は、割り込んだ書き込みの直後と同じ（承認は残らない）
   assert.deepEqual(placeFiles(mock.files("i0001")), placeFiles(mock.commits.get(raced)!.files));
 
   // 同じファイル（消す提案）を割り込みが変えていれば、GitLab が断るので何も書かない（last_commit_id）
@@ -202,7 +202,7 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
   assert.ok(!(DOING in same.files("i0001")));
 });
 
-test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変わると、止めてユーザに回す（要確認）。他人の変更は消さない（PROBE-1）", async () => {
+test("CX-T149 連鎖競合: 元に戻す前・元に戻すあいだに同じファイルが変わると、止めてユーザの対応に切り替える（要確認）。他人の変更は消さない（PROBE-1）", async () => {
   const CHILD = "wip/proposals/todo/i0001-01-01.md";
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
@@ -214,11 +214,11 @@ test("CX-T149 連鎖競合: 打ち消しの前・間に同じファイルが変�
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
   assert.match(out.kind === "attention" ? out.message : "", /ホストの履歴を確かめてください/);
-  // 打ち消しは last_commit_id で断られ、割り込み 2 の変更は残る（PROBE-1）
+  // 元に戻すコミットは last_commit_id で断られ、割り込み 2 の変更は残る（PROBE-1）
   assert.deepEqual(mock.glCommits.map((c) => c.result), ["written", "error"]);
   assert.equal(mock.files("i0001")[DOING], "別の書き手が書いた\n");
 
-  // 書いた後、打ち消す前に同じファイルが変わっていれば、打ち消しを送らずに止める
+  // 書いた後、元に戻す前に同じファイルが変わっていれば、元に戻すコミットを送らずに止める
   const late = new MockGitLab(parentOnly());
   const ld = glDeps(late);
   const lshown = shownOf(await collectRepo(GITLAB_REPO, ld), "i0001");
@@ -267,7 +267,7 @@ test("CX-T150 「始める」: issue から i<番号> のブランチを統合�
   }
 });
 
-test("CX-T151 service worker の「始める」の守り: ボードからだけ、登録したリポジトリだけ、issue から決める形の名前だけ、統合先の今の先頭からだけ", async () => {
+test("CX-T151 service worker の「始める」の保護: ボードからだけ、登録したリポジトリだけ、issue から決める形の名前だけ、統合先の今の先頭からだけ", async () => {
   const mock = new MockGitLab(fixture());
   const d: Deps = deps(mock, TOKENS, new Map(), () => new Date(NOW), [GITLAB_REPO]);
   const head = mock.head("main");
@@ -465,7 +465,7 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   const hostile = '<img src=x onerror="window.__pwned=\'issue\'">題';
   const html = renderRepo(dom.window.document, md, b, actions, {
     issues: { list: [{ number: 12, title: hostile, url: "javascript:window.__pwned='url'" }], error: "" },
-    attention: { i0001: "打ち消せなかった", gone: "見えない親子のチケット" },
+    attention: { i0001: "元に戻せなかった", gone: "見えない親子のチケット" },
   });
   dom.window.document.body.append(html);
   const item = html.querySelector("[data-testid=start] li[data-issue='12']") as HTMLElement;
@@ -474,7 +474,7 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   (item.querySelector("button[data-action=start]") as HTMLElement).click();
   const marks = [...html.querySelectorAll("[data-testid=attention]")];
   assert.equal(marks.length, 2);
-  assert.match(marks[0].textContent ?? "", /要確認: 打ち消せなかった/);
+  assert.match(marks[0].textContent ?? "", /要確認: 元に戻せなかった/);
   (marks[0].querySelector("button[data-action=dismiss]") as HTMLElement).click();
   assert.deepEqual(pressed, ["issues", "start 12", "dismiss i0001"]);
   assert.equal((dom.window as unknown as { __pwned?: string }).__pwned, undefined);

@@ -7,9 +7,9 @@
  * 呼び手が渡す。渡さなければボタンを出さない（読み取りだけ）。
  * 依頼済みのフェーズのレビューの欄（MR のスレッドと、通らない理由）と「レビュー済みにする」を出す。
  * スレッドの本文は承認の画面と同じ規則で描く（Markdown は消毒した断片、隠れる書き方は通さない、HTML コメントは
- * 見える印。承認者に見えないまま承認させないため）。
+ * 見える形で出す。承認者に見えないまま承認させないため）。
  * GitLab の MR（`!番号`）とプロジェクトのリポジトリ、「始める」（issue の一覧と、押すと親のブランチを
- * 作るボタン）、打ち消しが収まらなかった親子のチケットの「要確認」を出す。issue の題も素の文字列（textContent）。
+ * 作るボタン）、元に戻すコミットでも競合が収まらなかった親子のチケットの「要確認」を出す。issue の題も素の文字列（textContent）。
  */
 import type { Renderer } from "./sanitize.js";
 import type { ReviewPanel } from "./reviewed.js";
@@ -41,7 +41,7 @@ export interface Actions {
 
 /** ボードの外から足すもの。親子のチケットごとの「要確認」と、読んだ issue の一覧 */
 export interface Extras {
-  /** 親のブランチ名 → 打ち消しが収まらなかったときの文面 */
+  /** 親のブランチ名 → 元に戻すコミットでも競合が収まらなかったときの文面 */
   readonly attention?: Readonly<Record<string, string>>;
   readonly issues?: { readonly list: readonly Issue[] | null; readonly error: string };
 }
@@ -108,11 +108,11 @@ export function renderRepo(doc: Document, md: Renderer, board: RepoBoard, action
   }
   if (actions?.loadIssues && actions.start) section.append(renderStart(doc, board, actions, extras.issues));
   const s = board.stats;
-  section.append(el(doc, "p", "stats", `読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（控えから ${s.blobsCached} 件）`));
+  section.append(el(doc, "p", "stats", `読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（キャッシュから ${s.blobsCached} 件）`));
   return section;
 }
 
-/** 打ち消しが収まらなかった親子のチケット。ユーザがホストの履歴を確かめたら外す */
+/** 元に戻すコミットでも競合が収まらなかった親子のチケット。ユーザがホストの履歴を確かめたら外す */
 function attention(doc: Document, text: string, onDismiss?: () => void): HTMLElement {
   const box = el(doc, "div", "attention");
   box.dataset.testid = "attention";
@@ -190,7 +190,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
     box.append(el(doc, "p", "closure", `判定に入れたほかの親子のチケット（先行をたどって行き着くもの）: ${others.join(", ")}`));
   }
   if (r.closure.absent.length > 0) {
-    box.append(notice(doc, "warn", `先行の親子のチケットのブランチがリモートに無い: ${r.closure.absent.join(", ")}`));
+    box.append(notice(doc, "warn", `先行の親のブランチがリモートに無い: ${r.closure.absent.join(", ")}`));
   }
   if (r.undecided) {
     box.append(notice(doc, "error", r.undecided));
@@ -235,7 +235,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
     } else if (actions) {
       const bar = el(doc, "div", "actions");
       bar.append(button(doc, `承認する（${batch.map((e) => e.ticket).join(", ")}）`, "approve", actions.approve));
-      bar.append(el(doc, "span", "digest", `指紋 ${r.digest.slice(0, 12)}`));
+      bar.append(el(doc, "span", "digest", `ダイジェスト ${r.digest.slice(0, 12)}`));
       box.append(bar);
     }
   }
@@ -278,7 +278,7 @@ export function renderFamily(doc: Document, md: Renderer, f: FamilyBoard, action
   return box;
 }
 
-/** リンクを http(s)・mailto の綴りのときだけ付ける。ほかは文字だけ */
+/** リンクを http(s)・mailto の表記のときだけ付ける。ほかは文字だけ */
 function link(doc: Document, href: string, text: string): HTMLElement {
   if (!ALLOWED_URI.test(href.trim())) return el(doc, "span", "", text);
   const a = el(doc, "a", "", text);
@@ -306,8 +306,8 @@ export function renderReview(doc: Document, md: Renderer, panel: ReviewPanel, wr
     box.append(notice(doc, "error", panel.error));
     return box;
   }
-  // 並べるのは写しのとおり。GitHub では目印で始まるスレッドもユーザのものとして数え、GitLab で依頼を投稿したアカウントの
-  // ccnavi の依頼のスレッドを数えないのは Python。ここは未解決の件数を写しのとおりに出す
+  // 並べるのは取得した結果のとおり。GitHub では目印で始まるスレッドもユーザのものとして数え、GitLab で依頼を投稿したアカウントの
+  // ccnavi の依頼のスレッドを数えないのは Python。ここは未解決の件数を取得した結果のとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;
   box.append(el(doc, "p", "threads-count", `スレッド ${threads.length} 件（未解決 ${unresolved} 件）・レビュー ${panel.copy?.reviews.length ?? 0} 件`));

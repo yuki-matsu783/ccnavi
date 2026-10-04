@@ -31,7 +31,7 @@ export interface LintJson {
   readonly warns: number;
   /**
    * `--flow <パス>` を渡したときだけ在る。実行ファイルが読んだフローの中身（`data`。読めなければ null。
-   * JSON にそのまま載らない値は `{"$ccnavi": ...}` の印）。無ければ、実行ファイルがフローを見たか分からない
+   * JSON にそのまま載らない値は `{"$ccnavi": ...}` のマーカー）。無ければ、実行ファイルがフローを見たか分からない
    */
   readonly flow?: LintFlow;
 }

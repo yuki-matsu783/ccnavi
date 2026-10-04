@@ -116,7 +116,7 @@ def report(
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
     )
-    # 確認できる者が居ないモードの門。2 値しか取らないので、受け皿も分ける。
+    # 確認できる者が居ないモードの切り替えの環境変数。2 値しか取らないので、受け皿も分ける。
     unwatched_said = io.StringIO()
     guard_unwatched = selfguard.resolve(
         unwatched_said,
@@ -141,7 +141,7 @@ def report(
         Problem(SEVERITY_WARN, "(unwatched)", line.removeprefix("ccnavi: "))
         for line in unwatched_said.getvalue().splitlines()
     ]
-    # この門に dry-run は無い。書いたユーザは「止めずに報告する」つもりでいるのに、
+    # この切り替えの環境変数に dry-run は無い。書いたユーザは「止めずに報告する」つもりでいるのに、
     # 実際は enable と同じに止める。設定ファイルを読んだだけでは、その食い違いが
     # どこにも現れない。warn ではなく error にするのは、直すまで意味が変わらない、
     # つまり直さないと設定ファイルの書き方と実際の動きが食い違ったままになるため。
@@ -157,7 +157,7 @@ def report(
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
-    # チケット制御も同じ 2 値。切ったつもりの綴り違いは enable として動いているので、
+    # チケット制御も同じ 2 値。切ったつもりの書き誤りは enable として動いているので、
     # 書いたユーザが「切れている」と思い続けないよう error にする。
     declared = (conf.ticket_control_declared or "").strip().lower()
     if declared and declared not in selfguard.GATE_SETTINGS:
@@ -245,7 +245,7 @@ def report(
         stdout.write(f"  チケットの承認の経路を守る: {conf.guard_ticket_approval}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から打った検証と hook から届く環境は違うので、どちらを見た結果なのかを
-    # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
+    # 明示する。明示しないと、通った検証が別の設定についての報告になる。
     stdout.write(f"  モード: {mode}（この起動の環境から解決したもの）\n")
 
     for problem in problems:
@@ -256,11 +256,12 @@ def report(
 
 
 # 戻す働きの 2 つが、切られている・予行になっているときに言うこと。
-# 3 値（enable / dry-run / disable）を取る門なので、止めない 2 つの値それぞれに文がある。
+# 3 値（enable / dry-run / disable）を取る切り替えの環境変数なので、
+# 止めない 2 つの値それぞれに文がある。
 _CORE_FILES_VOICE = {
     selfguard.DISABLE: (
         "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
-        "プロジェクトの層それぞれの設定 3 本）の控えを取らず、書き換えられても戻さない。"
+        "プロジェクトの層それぞれの設定 3 本）のバックアップを取らず、書き換えられても戻さない。"
         "ふだん実行前に足している組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通層の"
         " 3 本）も足さないので、ワークツリー側の層の設定は、ルールファイルが名指ししていなければ"
         "書き込める"
@@ -291,15 +292,16 @@ def _shown(declared: str, mode: str) -> str:
 
 
 def _gate(name: str, declared: str, mode: str, voices: dict[str, str]) -> list[Problem]:
-    """守る働きを持つ門が、止めない値になっていることを言う。enable なら何も言わない。
+    """守る働きを持つ切り替えの環境変数が、止めない値になっていることを言う。
+    enable なら何も言わない。
 
     見るのは `CCNAVI_MODE` を反映したあとの値（`modes.effective_setting`）。書かれた値だけを
-    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた門を「守っている」と読むことに
+    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた切り替えを「守っている」と読むことに
     なる。実行時はモードに従って戻さないので、それはこの検査がいちばん言うべき
     「切れているのに揃って見える」そのものになる。
 
     実際の値が書かれた値と違うときは、そのことも言う。言わないと、直す先が
-    その門なのか `CCNAVI_MODE` なのかが読めない。
+    その切り替えの環境変数なのか `CCNAVI_MODE` なのかが読めない。
     """
     effective = modes.effective_setting(mode, declared)
     said = voices.get(effective)
@@ -367,7 +369,7 @@ def check(
     return problems
 
 
-# sh が互換の版を名乗る場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
+# sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
 # 1 か所で足りる。
 SH_COMPAT_FILE = os.path.join(".ccnavi", "scripts", "ccnavi-common.sh")
 _SH_COMPAT = re.compile(r"^CCNAVI_COMPAT=([0-9]+)[ \t]*$", re.MULTILINE)
@@ -466,7 +468,7 @@ def flow_problems(
 
     読めたフローには、手順として怪しいところを warn で足す（読むのは止めない）。線の構造
     （`flow.structure_problems`）と、`candidates`（`flow.catalog`）を渡せばサブエージェントの種類と
-    スキルの名前の綴り（`flow.name_problems`）。どれも `detail` は渡したパスで始まる。
+    スキルの名前の表記（`flow.name_problems`）。どれも `detail` は渡したパスで始まる。
     """
     shown = flow.clean(path)
     try:
@@ -511,9 +513,13 @@ def _copy_problems(
     index: dict[str, ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
 ) -> list[Problem]:
-    """作業中の承認済みチケットを検査する。承認の権威は置き場で、`ccnavi_approved` の欄ではない。
+    """作業中の承認済みチケットを検査する。
 
-    置き場を動かして承認する運びでは `--agree` を通らないので、承認のときにしか
+    承認で本物とするのは置き場で、`ccnavi_approved` の欄ではない。
+
+    承認は置き場で決まり、`ccnavi_approved` の欄では決まらない。
+
+    置き場を動かして承認する進め方では `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
     止まる場所は書き込みのときで、そこで初めて知るのは遅い。ここで全部言う。
 
@@ -608,8 +614,8 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     index = approval.by_id(copies)
     done = {t.ticket for t in closed + review}
 
-    # 承認済みの識別子の提案は、承認済みチケットの写りと合わせて権威のツリーを決める
-    # （`approval.scan_proposals` と同じまとめ方）。外に残った古い写しは別に名指しする。
+    # 承認済みの識別子の提案は、承認済みチケットと合わせて本物とするツリーを決める
+    # （`approval.scan_proposals` と同じまとめ方）。外に残った古い提案は別に名指しする。
     proposals, complaints, stale = approval.read_proposals(conf, root, raw.everything)
     problems.extend(complaints)
     problems.extend(_stale_problems(root, conf, stale, index, done))
@@ -697,7 +703,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
             "(ticket)",
             f"承認済みチケットの置き場（{settings.APPROVED_ENV}={conf.approved}）が "
             f"ccnavi ディレクトリ（{settings.PROJECT_HOME_ENV}={conf.project_home}）の外にある。"
-            "組み込みの守りが及ばないので、エージェントが承認済みチケットを書き換えられ、"
+            "組み込みの保護が及ばないので、エージェントが承認済みチケットを書き換えられ、"
             "承認が意味を持たない",
         )
     ]
@@ -772,32 +778,33 @@ def _proposal_problems(
 
     `closed` は `done/` の承認済みチケット。`proposals` は `todo/` と `review/`。作業中と
     レビュー待ちと閉じたの 3 つを横断して数えないと、`doing/` と `done/` に同じ識別子が
-    在る形（動かす途中で止まった跡）を CI が見逃し、状態の操作が「複数の場所にある」で
+    在る形（動かす途中で止まった形跡）を CI が見逃し、状態の操作が「複数の場所にある」で
     止まって初めて知ることになる。
 
-    **同じリポジトリの中ではツリーごとに数える。** 承認済みチケットは git に入れて運ぶので、
-    切ったワークツリーの数だけ写しができる。しかもワークツリーはそれぞれ別のコミットを指すので、
+    **同じリポジトリの中ではツリーごとに数える。** 承認済みチケットは git に入れて共有するので、
+    切ったワークツリーの数だけ同じチケットができる。しかもワークツリーはそれぞれ別のコミットを指すので、
     古いほうで `doing`・新しいほうで `done` になるのも普通の形。ツリーをまたいだ食い違いまで
-    咎めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、`--lint` が
+    error にすると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、`--lint` が
     常に非ゼロで終わる。捕まえたいのは 1 つのツリーの中で 2 つの状態に在る形だけ。
 
-    **リポジトリをまたいだら、状態が何であれ咎める。** プロジェクトは自分の git を持つので
-    （設計 11）、そこに同じ識別子が在るのは写しではなく違うチケットどうしの衝突。
+    **リポジトリをまたいだら、状態が何であれ error にする。** プロジェクトは自分の git を持つので
+    （設計 11）、そこに同じ識別子が在るのは同じチケットではなく違うチケットどうしの衝突。
     識別子はユーザが選ぶ短い連番で、プロジェクトが独立に振れば重なる。コミットの遅れでは説明が付かないから、
     ツリーごとの免除を当ててはいけない。
     """
     problems: list[Problem] = []
 
     # ツリーと状態は分けて持つ。同じ識別子が別のツリーに在るのは普通で（承認済みチケットは
-    # git に入れて運ぶので、切ったワークツリーの数だけ写しができる）、しかもワークツリーは
+    # git に入れて共有するので、切ったワークツリーの数だけ同じチケットができる）、
+    # しかもワークツリーは
     # それぞれ別のコミットを指すから、古いほうが doing・新しいほうが done になるのも普通。
-    # 咎めるのは 1 つのツリーの中で 2 つの状態に在る形だけ。
+    # error にするのは 1 つのツリーの中で 2 つの状態に在る形だけ。
     def place(t, state: str) -> tuple[str, str, str]:
         at = t.tree or "(ワークスペースルート)"
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
-    # 写りそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket.collisions` が
+    # チケットそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket.collisions` が
     # 決め、ボードの `scattered` と状態の操作が止まる条件に揃える（同じ答えを 2 か所で
     # 出さない）。数えるのは `index`（識別子ごとに 1 つ）ではなく全部。同じ識別子が 2 つ
     # 残っているのがまさに言いたい形なので、引き当ての表で数えると自分でまとめてしまう。
@@ -857,9 +864,9 @@ def _proposal_problems(
                     )
                 )
     for ticket_id, places in seen.items():
-        # 別のリポジトリに同じ識別子が在るのは、写しではなく**違うチケットどうしの衝突**。識別子は
-        # ユーザが選ぶ短い連番なので、プロジェクトが独立に振れば普通に重なる。コミットの遅れでは
-        # 説明できないので、状態が何であれ咎める。
+        # 別のリポジトリに同じ識別子が在るのは、同じチケットではなく**違うチケットどうしの衝突**。
+        # 識別子はユーザが選ぶ短い連番なので、プロジェクトが独立に振れば普通に重なる。
+        # コミットの遅れでは説明できないので、状態が何であれ error にする。
         repos = sorted({repo for repo, _, _ in places})
         if len(repos) > 1:
             where = ", ".join(
@@ -879,9 +886,10 @@ def _proposal_problems(
                 )
             )
             continue
-        # 権威のツリーでまとめて 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
-        # 置き場に在る形（動かす途中で止まった跡）。`todo/` に在るのは親の改版の途中なので
-        # 咎めない。ツリーをまたいだ写りはまとめれば 1 つに決まるので、ここには出てこない。
+        # 本物とするツリーでまとめて 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
+        # 置き場に在る形（動かす途中で止まった形跡）。`todo/` に在るのは親の改版の途中なので
+        # error にしない。ツリーをまたいだチケットはまとめれば 1 つに決まるので、
+        # ここには出てこない。
         caught = ticket_mod.collisions(held[ticket_id])
         if not caught:
             continue
@@ -905,17 +913,19 @@ def _rel(root: str, path: str) -> str:
 def _stale_problems(
     root: str, conf: settings.Settings, stale: list, index: dict, done: set[str]
 ) -> list[Problem]:
-    """権威のツリーの外に残った、承認済みの識別子の `todo/` の写し（`approval.stale_proposals`）。
+    """本物とするツリーの外に残った、承認済みの識別子の `todo/` の提案。
 
-    承認の対象にもボードにも入らない（権威のツリーの側だけを読む）。名指しするのは 2 つだけ。
+    `approval.stale_proposals` が返すもの。
 
-    - 計画の違う親の版。権威でないツリーに書いた改版か、改版の前に切ったワークツリーに
-      残った古い版（巻き戻しの元）。書く場所を案内する（改版は権威のツリーの `todo/` に
+    承認の対象にもボードにも入らない（本物とするツリーの側だけを読む）。名指しするのは 2 つだけ。
+
+    - 計画の違う親の版。本物としないツリーに書いた改版か、改版の前に切ったワークツリーに
+      残った古い版（巻き戻しの元）。書く場所を案内する（改版は本物とするツリーの `todo/` に
       置く）。文面は `--agree` と同じ（`approval.revision_elsewhere_text`）
-    - 閉じたかレビュー待ちの識別子の `todo/`。前から出していた再開の案内を、権威のツリーの
+    - 閉じたかレビュー待ちの識別子の `todo/`。前から出していた再開の案内を、本物とするツリーの
       外に在っても同じく出す
 
-    計画の同じ古い写しは言わない。承認の前に切ったワークツリーに残るのは普通の形で、言うと
+    計画の同じ古い提案は言わない。承認の前に切ったワークツリーに残るのは普通の形で、言うと
     ワークツリーを持つだけで WARN が並ぶ。
     """
     problems: list[Problem] = []
@@ -957,7 +967,7 @@ def _branch_name_problems(
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
     `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
-    控えに書いた名前。どちらも無ければ固定の並びだけを見る。
+    取り込み結果に書いた名前。どちらも無ければ固定のリストだけを見る。
     """
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
@@ -1062,7 +1072,7 @@ def _worktree_problems(
 
 
 def layer_where(name: str) -> str:
-    """その層の苦情の出どころの綴り。VS Code 拡張がこの前置きでプロジェクトを引く。"""
+    """その層の苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。"""
     if name == ruleload.LAYER_COMMON:
         return "(rules)"
     if name == ruleload.LAYER_SELF:
@@ -1116,7 +1126,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     """各層の phases / risk が、共通層と合成できるか（設計 11.4.1、11.4.2）。
 
-    見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
+    見るのは合成したあとの内容。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
     全欄一致で捨てた重複を info で言う。共通層自身の苦情は `_phases` / `_risk` が
     別に言うので、ここでは層の側だけを数える。
@@ -1148,11 +1158,11 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
     使われないものを書いたユーザは、書いたとおりに使われていると思ったまま進む。統合の前に
     気づけるように、ここで名前を挙げる。
 
-    足したファイルを咎めているのではない。設定を書き進める場所はワークツリーでよく、
+    足したファイルを問題にしているのではない。設定を書き進める場所はワークツリーでよく、
     そこから統合するのも普通の手順。言うのは「今はまだ使われていない」という 1 点だけ。
 
-    中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
-    差分が拾う。ここが拾うのは、元リポジトリに無くて差分にも出ない新しい綴りのほう。
+    中身の違いは見ない。同じパスのファイルが両方に在れば、それは編集で、git の
+    差分が拾う。ここが拾うのは、元リポジトリに無くて差分にも出ない新しいパスのほう。
 
     承認済みの領域（承認済みチケット・マーカー・子の記録・フロー）は数えない（ユーザの決定）。
     承認済みチケットは親のワークツリーに置かれ、判定もフローの案内もそのツリーの版を読む
@@ -1184,18 +1194,21 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _sync(conf: settings.Settings, root: str) -> list[Problem]:
-    """取り込みの控えと、取り込み済みの親子のチケットの権威（写しの権威は親のブランチ 1 枚）。
+    """取り込み状態と、取り込み済みの親子のチケットで本物とする側（親のブランチ上のチケットだけを本物とする）。
 
     - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査）
-    - 親子のチケットの控えが壊れている・gone・blocked、`present` なのに親のワークツリーが無い: error
-      （その親子のチケットは決まらないので、承認も状態の操作も止まる）。閉じた親子のチケットは、親のワークツリーが
-      残っていれば info（片付けてよい）、片付いていれば何も言わない（墓標）
-    - 統合先の控えが壊れている・無い・読めない: error（識別子の再利用を確かめられない）
-    - 作業ツリーの層と統合先の控えの層が違う: warn
+    - 親子のチケットの取り込み状態が壊れている・gone・blocked、
+      `present` なのに親のワークツリーが無い: error（その親子のチケットは決まらないので、
+      承認も状態の操作も止まる）。閉じた親子のチケットは、
+      親のワークツリーが残っていれば info（片付けてよい）、
+      片付いていれば何も言わない（削除せずに残す取り込み状態）
+    - 統合先の取り込み結果が壊れている・無い・読めない: error（識別子の再利用を確かめられない）
+    - 作業ツリーの層と統合先の取り込み結果の層が違う: warn
     - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn
 
-    親のワークツリーの外にしか無い写し（移行の検査）は、写しの `blocked` として
-    `_copy_problems` が error で言う。控えの無い親子のチケットは、最初の 1 つのほかは何も言わない。
+    親のワークツリーの外にしか無いチケット（移行の検査）は、チケットの `blocked` として
+    `_copy_problems` が error で言う。取り込み状態の無い親子のチケットには、
+    最初の 1 つのほかは何も言わない。
     """
     problems = _parent_trees_off_branch(conf, root)
     fams = syncstate.Families(conf, root)
@@ -1224,7 +1237,7 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"統合先の控えを読めない（{integ.broken}）。閉じた識別子の再利用を確かめられない"
+                    f"統合先の取り込み結果を読めない（{integ.broken}）。閉じた識別子の再利用を確かめられない"
                     "ので、このリポジトリの新規の提案は承認しない。オンラインで"
                     f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を打ち直してください",
                 )
@@ -1251,7 +1264,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                 f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
                 f"親のブランチの名前は識別子（{work.name}）と同じで、取り込み（ccnavi-sync.sh）と"
-                "権威の検査は同じ名前のブランチだけを見る。"
+                "本物とする側の検査は同じ名前のブランチだけを見る。"
                 "親が閉じるのを待ってから、ブランチを切り替えてください",
             )
         )
@@ -1259,7 +1272,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
 
 
 def _holds_parent(conf: settings.Settings, work: tree.Tree) -> bool:
-    """そのツリーに `ticket: <ツリーの名前>` の親の写しか提案があるか。
+    """そのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか。
 
     sh の `ccnavi_parent_tree` と同じ見方。
     """
@@ -1310,11 +1323,11 @@ def _read_plain(path: str) -> bytes | None:
 def _layer_drift(
     conf: settings.Settings, integ: syncstate.Integration, home: str, where: str
 ) -> list[Problem]:
-    """作業ツリーの層と、統合先の控えの層（同じ綴り）が違うか。
+    """作業ツリーの層と、統合先の取り込み結果の層（同じパス）が違うか。
 
-    手元の判定は作業ツリーの層を読み、統合先の控えへは切り替えない（統合先の層が作業ツリーより
-    緩いときに通るものが増えるため）。違いは、統合先に
-    入るまで他の機械と Chrome の判定に使われないという知らせ。
+    手元の判定は作業ツリーの層を読み、統合先の取り込み結果へは切り替えない（統合先の層が作業ツリーより
+    緩いときに通るものが増えるため）。違いは、
+    統合先に入るまで他の機械と Chrome の判定に使われないという知らせ。
     """
     home_rel = fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
     rels = [rel for _, rel in _layer_files(conf, home_rel)]
@@ -1324,7 +1337,9 @@ def _layer_drift(
     for rel in rels:
         snapshot, why = integ.file(rel)
         if why:
-            problems.append(Problem(SEVERITY_ERROR, where, f"統合先の控えを読めない（{why}）"))
+            problems.append(
+                Problem(SEVERITY_ERROR, where, f"統合先の取り込み結果を読めない（{why}）")
+            )
             continue
         local = _read_plain(os.path.join(home, *rel.split("/")))
         if _same_text(local, snapshot):
@@ -1339,7 +1354,7 @@ def _layer_drift(
             Problem(
                 SEVERITY_WARN,
                 where,
-                f"作業ツリーの {rel} が統合先（{integ.branch or '?'}）の控えと違う"
+                f"作業ツリーの {rel} が統合先（{integ.branch or '?'}）の取り込み結果と違う"
                 f"（{how}）。"
                 "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない",
             )
@@ -1355,9 +1370,9 @@ def _projected_layer_problems(
     Chrome の判定は `P` の上の層を読まず、この計算した層を使う（`P` の上で層を書き換えて
     承認やレビューを不要にできないように）。
 
-    計算した層は「プロジェクトの統合先の層（控え）に、ワークスペースの統合先の共通層（控え）を
-    `configsync.projected` で写したもの」。着手のときの configsync と同じく、共通層にある
-    ファイルだけを写し、無いファイルはプロジェクトの側を残す。
+    計算した層は「プロジェクトの統合先の層（取り込み結果）に、ワークスペースの統合先の共通層（取り込み結果）を
+    `configsync.projected` でコピーしたもの」。着手のときの configsync と同じく、共通層にある
+    ファイルだけをコピーし、無いファイルはプロジェクトの側を残す。
     """
     selfinteg = syncstate.integration(conf.state, syncstate.SELF)
     projinteg = syncstate.integration(conf.state, st.repo)
@@ -1385,7 +1400,7 @@ def _projected_layer_problems(
                 f"親のブランチ {st.family} の上のプロジェクトの層（{rel}）が、統合先の層と"
                 "共通層から計算した層と違う。"
                 "判定は親のブランチの上の層を読まない。"
-                "統合先で直すか、着手のときにもう一度写してください",
+                "統合先で直すか、着手のときにもう一度コピーしてください",
             )
         )
     return problems
@@ -1396,10 +1411,11 @@ def family_check(
 ) -> list[Problem]:
     """取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）。
 
-    この親子のチケットの承認済みチケットを判定し直し（C3）、権威の検査（親のワークツリーの外の写し・
+    この親子のチケットの承認済みチケットを判定し直し（C3）、本物とする側の検査（親のワークツリーの外のチケット・
     決まらない）とあわせて、止める理由（error）を返す。層の食い違いは warn で返す。
-    error があれば sh が親子のチケットの控えを `blocked` にする。`repo` は控えの名前（`self` か
-    プロジェクト名）で、sh が渡す。無ければ控えのあるリポジトリを全部探す。
+    error があれば sh が親子のチケットの取り込み状態を `blocked` にする。
+    `repo` は取り込み状態の名前（`self` かプロジェクト名）で、sh が渡す。
+    無ければ取り込み状態のあるリポジトリを全部探す。
     """
     fams = syncstate.Families(conf, root)
     project = None if repo is None else syncstate.project_of_key(repo)
@@ -1415,7 +1431,7 @@ def family_check(
     index = approval.by_id(copies)
     problems: list[Problem] = []
     for t in mine:
-        # 写しごとに判定し直し、error がどの写しのものかを構造で持つ（文面の書式に頼らない）
+        # チケットごとに判定し直し、error がどのチケットのものかを構造で持つ（文面の書式に頼らない）
         found = [
             p
             for p in _copy_problems(root, conf, [t], index, closed)
@@ -1430,7 +1446,7 @@ def family_check(
                 for p in found
             ]
         problems.extend(found)
-    # 親のワークツリーの中の読めない写しも止める理由（読めない写しは並びに入らないので、
+    # 親のワークツリーの中の読めないチケットも止める理由（読めないチケットはリストに入らないので、
     # 判定し直しの対象から気づかないうちに落ちる）。
     if st.home is not None:
         for _, message in approval.unreadable_copies(conf, st.home.root):
@@ -1447,13 +1463,14 @@ def family_check(
 
 
 def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | None:
-    """この写しを最後に書いたのが Chrome 拡張なら、その拡張の版。そうでなければ None。
+    """この承認済みチケットを最後に書いたのが Chrome 拡張なら、その拡張の版。
+    そうでなければ None。
 
-    跡の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
+    履歴の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
     その後に手元の
-    操作（着手・マーカーなど）の跡があれば、違いが手元の操作から来ることもあるので名指ししない。
+    操作（着手・マーカーなど）の履歴があれば、違いが手元の操作から来ることもあるので名指ししない。
     互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として版を名指しする
-    （止めるかどうかは変えない。親子のチケットの控えを `blocked` にするのは sh）。
+    （止めるかどうかは変えない。親子のチケットの取り込み状態を `blocked` にするのは sh）。
     """
     events, _ = history.read(settings.approved_dir(conf, t.tree_root), t.ticket)
     if not events:
@@ -1468,7 +1485,7 @@ def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | N
 
 
 def _files_under(base: str) -> list[str]:
-    """base の下のファイルを、base からの相対（"/" 区切り）で並べる。順は綴り順。"""
+    """base の下のファイルを、base からの相対（"/" 区切り）で並べる。順は文字列の順。"""
     found = []
     for parent, _, names in os.walk(base):
         for name in sorted(names):
@@ -1511,7 +1528,7 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
     if not conf.tickets_enabled:
         return []
     problems: list[Problem] = []
-    # 名乗るのは `(scratch)` の側。プロジェクトのぶんも `(projects/<名前>)` とは名乗らない。
+    # 前置きは `(scratch)` にする。プロジェクトのぶんも `(projects/<名前>)` は前置きにしない。
     # あちらはその層の設定についての苦情で、ここは追跡の話。同じ前置きにすると、
     # 「層について何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
     where = [("(scratch)", root)]
@@ -1563,7 +1580,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     """プロジェクトの置き場が正しい形か（REQ-MLT-16）。
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
-    予約名（`common` / `self`、綴り違いも含む）を使っていないこと、プロジェクトが
+    予約名（`common` / `self`、表記違いも含む）を使っていないこと、プロジェクトが
     `.claude/` を持たないことを見る。層の中身は
     `_layers` が見る。
     """
@@ -1625,7 +1642,7 @@ def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
     """
     parts = [p for p in conf.tickets.split("/") if p]
     if len(parts) < 2:
-        # 名前を挟む位置が置き場の綴りから決められない。言えないことは言わない。
+        # 名前を挟む位置が置き場のパスから決められない。言えないことは言わない。
         return []
     head, tail = parts[0], parts[1:]
     known = {p.name for p in tree.projects(conf.projects)}
@@ -1793,7 +1810,7 @@ def _registered(root: str, event: str = hookio.POST_TOOL_USE) -> bool | None:
     """そのイベントに ccnavi が登録されているか。設定ファイルが無ければ None。
 
     コマンド文字列に名前が含まれるかどうかで見る。実行ファイルの置き場も
-    呼び出し方もプロジェクトごとに違うので、綴りを決め打ちにはできない。
+    呼び出し方もプロジェクトごとに違うので、表記を決め打ちにはできない。
 
     無いときに「登録されていない」と言い切らないのは、hook をここ以外
     （ユーザごとの設定）に書くことができ、そちらはこの検証から見えないため。
@@ -1871,16 +1888,17 @@ def _project_settings(root: str) -> list[Problem]:
 
 
 # `.claude/settings.local.json` に置かせない、承認と判定に影響する値。
-# 置き場の綴り・プロジェクトの置き場・ccnavi ディレクトリ・控えの置き場（取り込みの控えを読む先）・
-# チケット制御と承認の守りの切り替え・動作モード。例外は統合先の名前だけ（リポジトリに置かず、
+# 置き場のパス・プロジェクトの置き場・ccnavi ディレクトリ・state の置き場（取り込み状態を読む先）・
+# チケット制御と承認の保護の切り替え・動作モード。例外は統合先の名前だけ（リポジトリに置かず、
 # 手元では環境変数で持つと決めた値なので）。
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 #
-# 守りと判定の働きを変える値（戻す働き・ccnavi 自身の設定の守り・確かめられないモードの止め・
+# 保護と判定の働きを変える値（戻す働き・ccnavi 自身の設定の保護・確かめられないモードの止め・
 # 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
-# 他の機械で、同じ親子のチケットへの守りが別になる。入れないのは、判定の答えを変えない次の値だけ。
-# 実行ファイルの綴り（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
-# 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、見張りと待ちの秒（`CCNAVI_*_TIMEOUT`・
+# 他の機械で、同じ親子のチケットに掛かる保護が別になる。入れないのは、判定の答えを変えない
+# 次の値だけ。
+# 実行ファイルのパス（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
+# 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、タイムアウト監視と待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
 _LOCAL_FORBIDDEN = (
     settings.TICKETS_ENV,
@@ -1902,9 +1920,9 @@ _LOCAL_FORBIDDEN = (
 def _local_settings(root: str) -> list[Problem]:
     """`.claude/settings.local.json` の env に、承認に影響する値が無いかを見る。
 
-    承認と判定は、置き場の綴りなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
+    承認と判定は、置き場のパスなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
-    ユーザが端末で打つ sh には使われないので、同じ親子のチケットを別の綴りで読むことになる。
+    ユーザが端末で打つ sh には使われないので、同じ親子のチケットを別のパスで読むことになる。
     例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前はリポジトリに置かず、手元では環境変数で
     持つと決めた）。
     """
@@ -1924,8 +1942,9 @@ def _local_settings(root: str) -> list[Problem]:
             SEVERITY_ERROR,
             "(project)",
             f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
-            "ファイルに置かない（Chrome と端末の sh には使われないので、同じ親子のチケットを"
-            "プロセスごとに別の綴りで読むことになる）。"
+            "ファイルに置かない（Chrome と端末の sh には使われないので、"
+            "同じ親子のチケットを"
+            "プロセスごとに別のパスで読むことになる）。"
             f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
             "渡してください。"
             f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",
@@ -1936,14 +1955,14 @@ def _local_settings(root: str) -> list[Problem]:
 
 
 def _bin_path(root: str, declared: object) -> list[Problem]:
-    """`.claude/settings.json` の env の実行ファイルの綴りを見る（設計 launcher-scripts 9 節）。
+    """`.claude/settings.json` の env の実行ファイルのパスを見る（設計 launcher-scripts 9 節）。
 
-    プロセスの環境ではなく設定ファイルを読む。hook が起動するのは、ここに書いた綴り
+    プロセスの環境ではなく設定ファイルを読む。hook が起動するのは、ここに書いたパス
     （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"`）だから。
 
     - 指す先が在るのに実行できなければ error。hook は sh を直に起動するので 126 で起動せず、
       判定そのものが動いていない。無いときは言わない。組み立ての前や、ユーザごとの設定で
-      別の綴りを渡している形があり、無いことは selfguard が missing と言う。
+      別のパスを渡している形があり、無いことは selfguard が missing と言う。
       Windows では実行ビットを持たないので見ない
     """
     if not isinstance(declared, str) or not declared:
@@ -2099,7 +2118,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     problems.extend(_every_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
-    # どちらも広さを咎めない。読めない every は 1（毎回渡る）になっているので、この式は
+    # どちらも広さを報告しない。読めない every は 1（毎回渡る）になっているので、この式は
     # 読めない every を見逃さない（rules.readable_every）。
     if (
         (rule.additional_context or rule.additional_context_file)
@@ -2200,7 +2219,7 @@ def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
             )
         ]
     # 刻むのは渡す回で、渡すものが無ければ刻んでも何も起きない。文が無くても
-    # 本文（...File）は渡るので、4 つのどれか 1 つでもあれば咎めない。
+    # 本文（...File）は渡るので、4 つのどれか 1 つでもあれば報告しない。
     if not (
         rule.additional_context
         or rule.additional_context_file
@@ -2228,7 +2247,7 @@ def _broad(rule: rules.Rule) -> str:
     ここでは扱わない。
 
     1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる
-    2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような並びは、それだけ多くの
+    2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような書き方は、それだけ多くの
        コマンドに同じ文を添えることになる
     """
     if rule.compiled is not None and rule.compiled.search("x"):
@@ -2264,9 +2283,9 @@ def _inert(match: str) -> list[str]:
     対象が空になり、rule.matches は必ず False を返す。つまりそのルールは
     書いてあるのに何も止めない。守っているつもりの穴なので warn で言う。
 
-    ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧を写すと、
+    ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧を書き写すと、
     判定側が扱うツールを増やしたときにこちらが気づかないうちに古くなり、正しいルールを
-    誤って咎めるようになる。差し込む欄の名前だけは judge の表から借りる。
+    誤って報告するようになる。差し込む欄の名前だけは judge の表から借りる。
     """
     # 対象を持つツールなら何かしら返る値を入れておく。返るかどうかだけを見る。
     probe_input = {field: "x" for field in judge.SUBJECT_FIELDS.values()}
