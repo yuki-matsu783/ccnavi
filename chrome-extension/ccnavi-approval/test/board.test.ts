@@ -114,26 +114,29 @@ test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 
-test("CX-T047 置き場のパスは統合先の .claude/settings.json から読む", async () => {
+test("CX-T047 置き場は既定に固定し、統合先の .claude/settings.json の env で動かさない", async () => {
   const b = fixture();
-  b.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets" } });
-  const moved = b.i0001.files;
-  for (const k of Object.keys(moved)) {
-    if (k.startsWith("wip/proposals/")) {
-      moved[k.replace("wip/proposals/", "wip/tickets/")] = moved[k];
-      delete moved[k];
-    }
-  }
+  const env = { CCNAVI_TICKETS_PROPOSAL: "wip/tickets", CCNAVI_TICKETS_APPROVED: "moved/approved", CCNAVI_PROJECT_HOME: "moved/home" };
+  b.main.files[".claude/settings.json"] = JSON.stringify({ env });
   b.i0001.files[".claude/settings.json"] = b.main.files[".claude/settings.json"];
+  // env の指す先にも同じ提案を置く。読むのは既定の置き場だけ
+  for (const k of Object.keys(b.i0001.files)) {
+    if (k.startsWith("wip/proposals/")) b.i0001.files[k.replace("wip/proposals/", "wip/tickets/")] = b.i0001.files[k];
+  }
   const { board } = await run(b);
-  assert.deepEqual(family(board, "i0001")?.result?.batch?.map((e) => e.path), ["i0001:wip/tickets/todo/i0001.md"]);
+  assert.equal(board.error, "");
+  assert.deepEqual(family(board, "i0001")?.result?.batch?.map((e) => e.path), ["i0001:wip/proposals/todo/i0001.md"]);
 });
 
-test("CX-T048 置き場がリポジトリの外を指すワークスペースは読まない（3.1 の 12）", async () => {
-  const b = fixture();
-  b.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_APPROVED: "/srv/approved" } });
-  const { board } = await run(b);
-  assert.match(board.error, /リポジトリの外を指している/);
+test("CX-T048 置き場の env に絶対パスを入れても止めず、既定の置き場を読む", async () => {
+  for (const form of ["/srv", "C:/srv", "~/srv"]) {
+    const b = fixture();
+    const env = { CCNAVI_TICKETS_PROPOSAL: `${form}/proposals`, CCNAVI_TICKETS_APPROVED: `${form}/approved`, CCNAVI_PROJECT_HOME: `${form}/home` };
+    b.main.files[".claude/settings.json"] = JSON.stringify({ env });
+    const { board } = await run(b);
+    assert.equal(board.error, "", form);
+    assert.deepEqual(family(board, "i0001")?.result?.batch?.map((e) => e.path), ["i0001:wip/proposals/todo/i0001.md"], form);
+  }
 });
 
 test("CX-T049 先行の閉包が 16 組の親子のチケットを超えたら決まらないで止める（3.3 の 5）", async () => {

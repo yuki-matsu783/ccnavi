@@ -153,23 +153,22 @@ test("CX-T124 コミットの見出しは先頭の数件と件数に畳んで 20
   assert.deepEqual(commitMessage(["i0001"], "を承認", "承認した", "9.9.9"), { headline: "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）", body: "" });
 });
 
-test("CX-T125 Pyodide の仮のツリー（/ws）の下でも、置き場のパスの途中の ws を畳まずに書く", async () => {
+test("CX-T125 統合先の .claude/settings.json の env で置き場を動かしても、承認は既定の置き場に書く", async () => {
   const f = parentOnly();
-  const env = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/ws" } });
+  const env = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/ws", CCNAVI_TICKETS_APPROVED: "/srv/approved" } });
   for (const b of Object.values(f)) {
     b.files[".claude/settings.json"] = env;
+    // env の指す先にも同じ提案を置く。読むのも書くのも既定の置き場だけ
     for (const k of Object.keys(b.files)) {
-      if (k.startsWith("wip/proposals/")) {
-        b.files[k.replace("wip/proposals/", "wip/ws/")] = b.files[k];
-        delete b.files[k];
-      }
+      if (k.startsWith("wip/proposals/")) b.files[k.replace("wip/proposals/", "wip/ws/")] = b.files[k];
     }
   }
   const mock = new MockGitHub(f);
   const d = depsFor(mock);
   const out = await approveFamily(REPO, "i0001", await shown(d), d);
   assert.equal(out.kind, "written", JSON.stringify(out));
-  assert.deepEqual(mock.commitCalls[0].deletions, [{ path: "wip/ws/todo/i0001.md" }]);
+  assert.deepEqual(mock.commitCalls[0].deletions, [{ path: "wip/proposals/todo/i0001.md" }]);
+  assert.ok(mock.commitCalls[0].additions.every((a: { path: string }) => a.path.startsWith(".ccnavi/approved/")), JSON.stringify(mock.commitCalls[0].additions));
 });
 
 test("CX-T126 承認の画面: ccnavi の本文を承認のボタンの上に開いた形で出し、Markdown の隠れる書き方は見える形にする（決定 A）", async () => {

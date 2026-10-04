@@ -10,7 +10,7 @@
  *
  * 書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
  * 書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か統合先の名前（ボードの値を信頼せず
- * 自分で引く）なら断り、書くパスは置き場（統合先の `.claude/settings.json` から自分で引く）の下に限る
+ * 自分で引く）なら断り、書くパスは置き場（既定に固定。統合先の `.claude/settings.json` は読まない）の下に限る
  * （Python も同じ検査をする。画面で XSS が起きても書く先を広げないための二重の確認）。PAT の期限は、
  * GitHub なら応答ヘッダから、GitLab なら `GET /personal_access_tokens/self` から読んで記録し、画面へは期限だけを返す。
  * GitLab に問い合わせるのは 1 日 1 回。
@@ -23,7 +23,7 @@
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
 import * as gitlab from "./gitlab.js";
-import { placesFromSettings, PROTECTED, writeRefusal, type Places } from "./guard.js";
+import { DEFAULT_PLACES, PROTECTED, writeRefusal } from "./guard.js";
 import type { Host } from "./hosts.js";
 import { repoKey, type RepoConfig } from "./settings.js";
 
@@ -273,20 +273,11 @@ function api(client: github.Client) {
   return client.host.kind === "gitlab" ? gitlab : github;
 }
 
-/** 統合先の先頭の `.claude/settings.json` から置き場のパスの設定を読む。答えは置き場と、統合先の先頭 */
-async function placesAt(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string): Promise<{ places: Places; head: string }> {
-  const a = api(client);
-  const head = await a.branchHead(client, cfg.owner, cfg.repo, integ);
+/** 統合先の今の先頭（リモートに無ければ断る） */
+async function integrationHead(client: github.Client, cfg: RepoConfig, integ: string): Promise<string> {
+  const head = await api(client).branchHead(client, cfg.owner, cfg.repo, integ);
   if (head === null) throw new Error(`統合先 ${integ} がリモートに無い`);
-  // プロジェクトのリポジトリは、置き場のパスをワークスペースの統合先の設定から読む
-  const where = cfg.project ? await workspaceOf(deps, cfg) : { client, cfg, integ, head };
-  const w = api(where.client);
-  const objs = await w.pathObjects(where.client, where.cfg.owner, where.cfg.repo, where.head, [".claude/settings.json"]);
-  const obj = objs[".claude/settings.json"];
-  if (!obj) return { places: placesFromSettings(null), head };
-  const blob = (await w.blobs(where.client, where.cfg.owner, where.cfg.repo, [obj.oid]))[obj.oid];
-  if (!blob || blob.binary || blob.text === null) throw new Error(".claude/settings.json を読めない");
-  return { places: placesFromSettings(blob.text), head };
+  return head;
 }
 
 /** プロジェクトのリポジトリのワークスペース（設定画面で登録したもの）の統合先の先頭 */
@@ -332,7 +323,6 @@ const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
  * 大文字小文字をそろえて）と互換の版（ワークスペースの統合先の CCNAVI_COMPAT と同梱の版）。空なら作ってよい
  */
 async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string, head: string, name: string): Promise<string> {
-  const { places } = await placesAt(deps, client, cfg, integ);
   const ws = cfg.project ? await workspaceOf(deps, cfg) : { client, cfg, integ, head };
   const text = await fileAt(ws.client, ws.cfg, ws.head, COMPAT_FILE);
   const theirs = text === null ? null : Number(/^CCNAVI_COMPAT=(\d+)\s*$/m.exec(text)?.[1] ?? NaN);
@@ -340,7 +330,7 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
     return `統合先の互換の版（${theirs ?? "無い"}）と拡張の互換の版（${deps.compat ?? "不明"}）が違うので作らない`;
   }
   const a = api(client);
-  const done = `${places.approved}/done`;
+  const done = `${DEFAULT_PLACES.approved}/done`;
   const obj = (await a.pathObjects(client, cfg.owner, cfg.repo, head, [done]))[done];
   if (obj && obj.type === "tree") {
     const entries = client.host.kind === "gitlab" ? await gitlab.tree(client, cfg.owner, cfg.repo, obj.oid, head, done) : await github.tree(client, cfg.owner, cfg.repo, obj.oid);
@@ -436,13 +426,12 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       const cfg = await registeredRepo(deps, client, o, r);
       if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなので書かない`);
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
-      let places: Places;
       try {
-        places = (await placesAt(deps, client, cfg, integ)).places;
+        await integrationHead(client, cfg, integ);
       } catch (err) {
-        return refuse(`統合先 ${integ} の置き場のパスを読めないので書かない（${(err as Error).message}）`);
+        return refuse(`統合先 ${integ} を読めないので書かない（${(err as Error).message}）`);
       }
-      const why = writeRefusal(checked.name, integ, [...checked.adds.map((e) => e.path), ...checked.dels.map((d) => d.path)], places);
+      const why = writeRefusal(checked.name, integ, [...checked.adds.map((e) => e.path), ...checked.dels.map((d) => d.path)], DEFAULT_PLACES);
       if (why) return refuse(why);
       if (lab) {
         if (checked.adds.some((e) => !e.op)) return refuse("GitLab へ書くときは作るか書き換えるか（op）が要る");

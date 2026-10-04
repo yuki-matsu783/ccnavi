@@ -12,35 +12,17 @@ export const PROTECTED = /^(?:main|master|develop|release|release[-/].*)$/i;
 /** 置き場のパスの既定（`ccnavi/infra/settings.py` の DEFAULT_TICKETS・DEFAULT_APPROVED と同じ） */
 export const DEFAULT_TICKETS = "wip/proposals";
 export const DEFAULT_APPROVED = ".ccnavi/approved";
-const TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL";
-const APPROVED_ENV = "CCNAVI_TICKETS_APPROVED";
 
 export interface Places {
   readonly tickets: string;
   readonly approved: string;
 }
 
-function place(value: unknown, fallback: string, what: string): string {
-  if (value === undefined || value === null || value === "") return fallback;
-  if (typeof value !== "string" || /^(?:[/\\~]|[A-Za-z]:)/.test(value)) {
-    throw new Error(`${what}の置き場のパスを読めない（リポジトリの外を指すか、文字列でない）`);
-  }
-  const clean = value.replace(/^\/+|\/+$/g, "");
-  if (clean === "" || clean.split("/").some((p) => p === "" || p === "." || p === "..") || clean.includes("\\")) {
-    throw new Error(`${what}の置き場のパスを読めない: ${value}`);
-  }
-  return clean;
-}
-
-/** 統合先の `.claude/settings.json` の `env` から置き場のパスを読む（無ければ既定） */
-export function placesFromSettings(text: string | null): Places {
-  let env: Record<string, unknown> = {};
-  if (text !== null) {
-    const data = JSON.parse(text) as { env?: unknown };
-    if (data && typeof data === "object" && data.env && typeof data.env === "object") env = data.env as Record<string, unknown>;
-  }
-  return { tickets: place(env[TICKETS_ENV], DEFAULT_TICKETS, "提案"), approved: place(env[APPROVED_ENV], DEFAULT_APPROVED, "承認済み") };
-}
+/**
+ * 置き場のパス。既定に固定する（`ccnavi_chrome._placement` と同じ）。統合先の `.claude/settings.json` の
+ * `env` は読まない。置き場を既定から動かしたワークスペースは Chrome の対象外
+ */
+export const DEFAULT_PLACES: Places = Object.freeze({ tickets: DEFAULT_TICKETS, approved: DEFAULT_APPROVED });
 
 /** パスが置き場（提案・承認済み）の下か */
 export function underPlaces(path: string, places: Places): boolean {
