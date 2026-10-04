@@ -2185,7 +2185,7 @@ compact の前後の hook でフローを入れ直すことはしない。どち
 見つけたら、指定ごとに `'{root}/.ccnavi/scripts/ccnavi-branches.sh --issue N'`（`--mr N`）を打ち、候補があれば一覧をユーザに
 見せて「既存のブランチで続ける（承認済みの `branch:` で使う。承認前の提案の `branch:` は使わない）・新しく
 `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ、候補が無ければ進めてよい、という文を `additionalContext` で
-渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの絶対パス）。承認の知らせ（9.4）と同じ回なら、2 つを続けて渡す。
+渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの絶対パス）。
 dry-run でも渡す。判定は返さない。
 
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）
