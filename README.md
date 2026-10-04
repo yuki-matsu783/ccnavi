@@ -1298,12 +1298,12 @@ frontmatter は rules.yml と同じタイプ（`deny` / `ask` / `allow`）。適
 ```yaml
 ---
 version: 1
-ticket: i0050-03
+ticket: feature-50-settings-split-03
 issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
 project: lib             # 置き場と同じ名前。省ける（提案を置いた場所が決める）
-parent: i0050            # 子だけ。親は書かない
+parent: feature-50-settings-split  # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり
-predecessors: [i0050-01] # 子だけ。先に閉じているべき子。承認と着手（start）で求める。書き込みは止めない（ADR-0088）
+predecessors: [feature-50-settings-split-01] # 子だけ。先に閉じているべき子。承認と着手（start）で求める。書き込みは止めない（ADR-0088）
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
@@ -1322,8 +1322,13 @@ base_sha: ""
 ---
 ```
 
-- 識別子は子が `<親>-<2 桁連番>`。親の識別子はユーザが決める（issue 番号など）
-- ワークツリーの名前は識別子と同じ。`.claude/worktrees/i0050-03/`
+- 識別子は子が `<親>-<2 桁連番>`。親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、
+  `hotfix-64-統合先の解決`）。先頭の語は既定で `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs` のどれかで、
+  チャットで「hotfix で」と言えばエージェントがその語で書く。並びを変えるときだけ `.claude/settings.json` の `env` に
+  `CCNAVI_BRANCH_PREFIXES=feature,hotfix,fix` のように書く。番号は issue があれば issue の番号、無ければ通し番号
+  （`ccnavi --lint` の warn が次の番号を示す）。slug には日本語（ひらがな・カタカナ・漢字）も使える。形に合わないものは
+  `--lint` の warn で、承認は止めない（ADR-0100）
+- ワークツリーの名前は識別子と同じ。`.claude/worktrees/feature-50-settings-split-03/`
 - 子は親の部分集合として書く。親やフェーズの種類の `scope` を超える項は承認で warn に出るだけで、判定がその上限で切り詰める
 - 書いていない場所は範囲外。親子は厳しい側が採られる
 - 深さは 2 段。範囲は 20 件まで
