@@ -24,7 +24,7 @@
 #      .claude/settings.local.json の env）、空ならホストのデフォルトブランチ（`ls-remote --symref
 #      origin HEAD`、読めなければ origin/HEAD・main・master）。設定した名前がリモートに無ければ、
 #      既定に落とさずに止める（D30）
-#   3. 統合先を fetch し、家族ごとの取り込みの後、判定に要るもの（done/・共通層・自身の層・
+#   3. 統合先を fetch し、家族ごとの取り込みの後、判定に要るもの（done/・共通レイヤー・自身のレイヤー・
 #      .claude/settings.json）を統合先の控え sync/<リポジトリ>/integration/ へ同じ並びで写し、head に
 #      remote・branch・source・sha・fetched_at を書く（D26）。統合先の先頭が前と同じなら写さない
 #

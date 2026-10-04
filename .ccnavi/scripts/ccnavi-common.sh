@@ -306,7 +306,7 @@ ccnavi_mask_url() {
 # 置き場はワークスペースルートの `${CCNAVI_STATE:-logs/state}`（ccnavi-review.sh と同じ読み）。
 #
 #   sync/<リポジトリ>/families/<P>   家族の控え（remote branch sha fetched_at state reason）
-#   sync/<リポジトリ>/integration/   統合先の控え（統合先の done/・層・置き場の綴りの設定の写しと head）
+#   sync/<リポジトリ>/integration/   統合先の控え（統合先の done/・レイヤー・置き場の綴りの設定の写しと head）
 #   locks/<リポジトリ>/<P>/          ロック（D32）。中の owner に持ち主を 1 行で書く
 #
 # <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。

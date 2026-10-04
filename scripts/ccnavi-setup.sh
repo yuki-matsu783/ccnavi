@@ -95,9 +95,9 @@ DEPLOY_BIN_DIR="dist/ccnavi"
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へ写すことはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/common/rules.yml"
-# 設定 3 本のひな形。rules と risk は汎用なので共通層（.ccnavi/common/）へ配る。
-# phases はワークスペースのレイアウト（scope の綴り）に依存するので、自身の層
-# （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
+# 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/common/）へ配る。
+# phases はワークスペースのレイアウト（scope の綴り）に依存するので、自身のレイヤー
+# （.ccnavi/config/）へ配る。共通レイヤーに phases を置くと、その scope が
 # projects/ の下のプロジェクトにも適用されてしまう（設計 11.2）。
 DEPLOY_RISK=".ccnavi/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
@@ -627,7 +627,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 # 書く利点は、あとで値を変えたくなったユーザが、設定項目の一覧を README ではなく
 # 設定ファイルの中で見つけられること。
 #
-# 共通層の 3 本（rules / phases / risk）は、ここにも書かない。置き場は `.ccnavi/common/`
+# 共通レイヤーの 3 本（rules / phases / risk）は、ここにも書かない。置き場は `.ccnavi/common/`
 # に固定で、env では変わらないので、書いても読まれない（ADR-0052）。読まれない名前を
 # 設定項目の一覧に混ぜると、そこを直せば置き場が変わるように読めてしまう。
 if [ "$all" = yes ]; then
