@@ -2,7 +2,7 @@
 
 承認者がブラウザと PAT だけで、リモートのブランチの承認待ちを見て、承認・承認の取り下げ・レビュー済みを親のブランチへ書き、
 issue から親のブランチを始める拡張。GitHub と GitLab の、ワークスペースとプロジェクトのリポジトリを扱う。
-GitLab で ccnavi の書き込みどうしの競合を捕まえる seq ファイルは、本物の GitLab で前提を確かめるまで持たない。
+GitLab で ccnavi の書き込みどうしの競合を検出する seq ファイルは、本物の GitLab で前提を確かめるまで持たない。
 
 何をするか（ふるまい）は [docs/requirements.md](docs/requirements.md)、構成は [docs/design.md](docs/design.md) にある。この README には、組み立てと試験の手順だけを書く。
 
@@ -53,7 +53,7 @@ MR のスレッドとレビューを取ってくる処理は、手元の sh（`.
 1. 見本を直す。本物の MR を `gh api`（REST）と `gh api graphql`（`ccnavi-review.sh` の `threads` と同じ問い合わせ）で取り、
    該当の場面のファイルを置き換えるか、形の変わった欄だけを手で直す。トークン・個人の名前・社内の URL は見本に残さない
 2. リポジトリのルートで `CCNAVI_HOST_FIXTURE=1 uv run python -m unittest tests.sh.test_review_host_fixture` を回し、sh が組んだ結果で
-   `expected.json` と `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で見る。
+   `expected.json` と `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
    読めていなければ `ccnavi-review.sh` を直す
 3. `pnpm test` を回す。CX-T129 が落ちたら `src/core/github.ts` を直して sh と同じ結果にする
 4. 見本・期待値・sh・TS の変更を同じコミットに入れる（片方だけ変えると、もう片方の試験が落ちる）
