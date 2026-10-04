@@ -1,4 +1,4 @@
-"""子チケットのフロー（作業の手順のグラフ）。設計 9.3.1・9.12、ADR-0085。
+"""子チケットのフロー（作業の手順のグラフ）。設計 9.3.1・9.12。着手中は書き換えを止める。
 
 子チケット 1 本につき 1 本、担当のサブエージェントが作業中に読む手順書を置ける。
 置き場は**承認済みの領域**の `<承認済みチケットの置き場>/flows/<子>.yml`
@@ -50,8 +50,9 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
 `connections` が並びでない）も読めない理由として 1 行で言う（`shape_problem`）。
 `ccnavi --lint --flow <パス>` は同じ読み手・同じ検査（`load`）でファイルを確かめ、読めなければ
 error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
-これに掛ける（ADR-0035。正しいかの答えはここ 1 か所）。`--json` なら読めた中身も載せ（`as_json`）、
-画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば開かない・保存しない。
+これに掛ける（拡張は判定を自分で出さない。正しいかの答えはここ 1 か所）。`--json` なら
+読めた中身も載せ（`as_json`）、画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば
+開かない・保存しない。
 読めたフローの線の構造（`structure_problems`）と名前の綴り（`name_problems`）は warn で足し、
 読むのは止めない。
 
@@ -552,7 +553,7 @@ def as_json(value):
     """読めた中身を JSON に載せる形にする（`--lint --json --flow` の `flow.data`）。
 
     VS Code 拡張のフロー編集画面は、自分の YAML の読み手（1.2）が読んだ中身とこれを見比べ、
-    食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ。ADR-0035）。
+    食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ）。
     文字列・真偽値・null・並び・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
     そのまま載せる。ほかは `{"$ccnavi": <種類>, ...}` の印にする。
 
@@ -1148,14 +1149,12 @@ def _summary(node: dict, flows: dict) -> str:
     if kind == "prompt":
         return _line(data.get("prompt"))
     if kind == "subAgent":
-        head = data.get("description") or data.get("agentDefinition")
-        prompt = _line(data.get("prompt"))
-        text = _line(head)
-        if prompt:
-            text += f" / プロンプト: {prompt}"
+        parts = [_line(data.get("description"))]
+        if _line(data.get("prompt")):
+            parts.append(f"プロンプト: {_line(data.get('prompt'))}")
         if _line(data.get("builtInType")):
-            text += f" / 種類: {_line(data.get('builtInType'))}"
-        return text
+            parts.append(f"種類: {_line(data.get('builtInType'))}")
+        return " / ".join(p for p in parts if p)
     if kind == ASK:
         options = " | ".join(_labels(data.get("options"), "label"))
         multi = "（複数選択）" if data.get("multiSelect") is True else ""
@@ -1180,7 +1179,7 @@ def _summary(node: dict, flows: dict) -> str:
     if kind == "codex":
         return f"Codex: {_line(data.get('prompt'))}"
     if kind in ("branchSession", "start", "end"):
-        return _line(data.get("label") or data.get("workDescription"))
+        return _line(data.get("label"))
     return ""
 
 

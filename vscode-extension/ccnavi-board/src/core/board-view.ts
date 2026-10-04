@@ -1,7 +1,7 @@
 /**
  * ボード画面の、拡張ホストと Webview の間の契約。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR: 拡張の画面を React にする）。
+ * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。
  * 拡張ホストが渡すのは「いま何を見せるか」（`BoardData`）だけで、列やカードの DOM は画面が作る。
  * 画面が返すのはユーザが押した操作（`BoardMessage`）だけで、判定も実行ファイルの呼び出しもしない。
  *
@@ -26,7 +26,7 @@ export type ApprovalOverlay =
   | { readonly kind: "error"; readonly error: string }
   /**
    * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す。
-   * `carried` は承認済みチケットを運ぶ sh を端末に**送ることにしたか**（その sh が置いてあるか）。
+   * `carried` は承認済みチケットを運ぶ sh をターミナルに**送ることにしたか**（その sh が置いてあるか）。
    * 送るのは拡張ホストで、送れたかまでは見ていない。真のときだけ、そう言う
    */
   | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean }

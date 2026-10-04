@@ -54,13 +54,13 @@ export interface AppearanceSink {
 
 /**
  * 見た目を画面へ送る。**段取りを通す**ので、組み上がっていない画面と捨てられた画面には送らない
- * （偽が返る）。落ちたぶんを持ち越す必要は無い。どちらの経路でも、後からいまの値が渡るため。
+ * （偽が返る）。届かなかったぶんを後で送り直す必要は無い。どちらの経路でも、後からいまの値が渡るため。
  *
  * - 入れ物ごと入れ直す経路（`rebuilt`）では、組む側が `appearance` を HTML に埋める（`bodyTag`）
  * - 画面が組み上がった（`ready`）ところで、呼ぶ側が送り直す
  *
  * 直に `webview.postMessage` を呼ぶと、この 2 つのどちらも通らない画面へ送ることになり、
- * 「送ったつもりで落ちている」が段取りの外に残る。
+ * 送ったつもりでも届いていないことを段取りの側で把握できなくなる。
  */
 export function sendAppearance(sink: AppearanceSink, value: Appearance): boolean {
   return sink.post({ type: "appearance", value });

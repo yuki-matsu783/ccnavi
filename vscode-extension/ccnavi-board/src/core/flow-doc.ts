@@ -1,5 +1,5 @@
 /**
- * 子チケットのフロー（設計 9.3.1、ADR-0085）の読み書き。フロー編集画面と拡張ホストが分け合う。
+ * 子チケットのフロー（設計 9.3.1）の読み書き。フロー編集画面と拡張ホストが分け合う。
  *
  * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`ccnavi/tickets/flow.py`）が読むもの。
  *
@@ -21,8 +21,8 @@
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
  * 書き出しは中身から組み直す（コメントや書き方は残らない。ユーザが保存したときだけ書く）。
  *
- * **判定はしない。** 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`、ADR-0035）、
- * 着手中に書けるかは実行ファイルが `flow.locked` で言う（ADR-0085）。
+ * **判定はしない。** 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`）、
+ * 着手中に書けるかは実行ファイルが `flow.locked` で言う。
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
  * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
@@ -103,7 +103,7 @@ export function branchPort(index: number): string {
   return `branch-${index}`;
 }
 
-// ---- 入れ子の上限（ADR-0085、付録 C）
+// ---- 入れ子の上限（付録 C）
 
 /** 入れ子の起動の既定の上限（`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`）。メインの下の段の数 */
 export const SPAWN_LIMIT = 3;
@@ -185,7 +185,7 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
 /**
  * YAML の本文を、画面が描くために読む。**正しいかは決めない。** 読めるか（大きさ・YAML として読めるか・別名）と
  * 形（`nodes` が無い、`id` が無い・重なる など）の答えは実行ファイル（`--lint --flow`、`flow-lint.ts`）が出し、
- * 画面はそれを通ったものだけを開く（ADR-0035）。読み手はルール設定の画面（`rules-doc.ts`）と同じ `yaml` の既定。
+ * 画面はそれを通ったものだけを開く。読み手はルール設定の画面（`rules-doc.ts`）と同じ `yaml` の既定。
  *
  * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
  * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードの並び（`id` が文字列の
@@ -831,15 +831,15 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
   return next;
 }
 
-// ---- 写す・貼る・複製する
+// ---- コピー・貼り付け・複製
 
 /**
- * 写したノードと線（画面の中の控え）。元のフローから切り離した深い写しで、貼るたびに id を振り直す。
+ * コピーしたノードと線（画面の中の控え）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
  *
  * - `nodes` は元の並びの順（グループは中のノードより前）。`parentId` は元の id のまま持つ
- * - `absolute` は写した時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
- *   写した）は、この位置で外に置く
- * - `connections` は写したノード同士の線だけ（片方しか写していない線は写さない）
+ * - `absolute` はコピーした時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
+ *   コピーした）は、この位置で外に置く
+ * - `connections` はコピーしたノード同士の線だけ（片方しかコピーしていない線は含めない）
  */
 export interface FlowClip {
   readonly nodes: readonly FlowNode[];
@@ -850,7 +850,7 @@ export interface FlowClip {
 /** 貼るたびにずらす量。元のノードにちょうど重ならないように */
 export const PASTE_OFFSET: FlowPoint = { x: 40, y: 40 };
 
-/** 写さない種類。開始は 1 つだけにしておく（2 つあると案内は両方から辿る。`flowNotices` の注意） */
+/** コピーしない種類。開始は 1 つだけにしておく（2 つあると案内は両方から辿る。`flowNotices` の注意） */
 export function isCopyable(node: FlowNode): boolean {
   return nodeType(node) !== "start";
 }
@@ -860,8 +860,8 @@ function deepCopy<T>(value: T): T {
 }
 
 /**
- * 選んだノードを写す。写せないノード（開始）は外す。グループを選んだら中のノードも一緒に写す
- * （枠だけ写すと空の枠になる）。写すものが無ければ undefined。
+ * 選んだノードをコピーする。コピーできないノード（開始）は外す。グループを選んだら中のノードも一緒にコピーする
+ * （枠だけコピーすると空の枠になる）。コピーするものが無ければ undefined。
  */
 export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | undefined {
   const wanted = new Set(ids);
@@ -890,16 +890,16 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
 }
 
 /**
- * 写したものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
+ * コピーしたものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
  * `parentId` を新しい id に付け替える。出口の綴り（`branch-<番号>`）と `data` はそのまま（分岐の出口の並びも
- * 一緒に写しているので、同じ出口に付く）。
+ * 一緒にコピーしているので、同じ出口に付く）。
  *
  * 置き場所は、グループの外のノードは `offset` だけずらす。グループの中のノードは、
  * - グループも一緒に貼るなら、新しいグループの中で元と同じ相対位置
  * - グループは貼らず、元のグループが貼る先にまだあるなら、同じグループの中で `offset` だけずらす
- * - 元のグループが貼る先に無ければ、写した時点の図の上の位置から `offset` だけずらして外に置く
+ * - 元のグループが貼る先に無ければ、コピーした時点の図の上の位置から `offset` だけずらして外に置く
  *
- * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（写しの並びのまま）。
+ * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（コピーしたときの並びのまま）。
  */
 export function pasteNodes(doc: FlowDoc, clip: FlowClip, offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } {
   const renamed = new Map<string, string>();
@@ -942,7 +942,7 @@ export function pasteNodes(doc: FlowDoc, clip: FlowClip, offset: FlowPoint = PAS
   return { doc: next, ids: placed.map((node) => node.id) };
 }
 
-/** 選んだノードをその場で複製する（写して `offset` だけずらして貼る）。写せるものが無ければ undefined */
+/** 選んだノードをその場で複製する（コピーして `offset` だけずらして貼る）。コピーできるものが無ければ undefined */
 export function duplicateNodes(doc: FlowDoc, ids: readonly string[], offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } | undefined {
   const clip = copyNodes(doc, ids);
   return clip === undefined ? undefined : pasteNodes(doc, clip, offset);

@@ -4,11 +4,11 @@
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
  * **判定はしない。** 「判定」も「サンプルを一括で判定」も、編集中の内容を拡張ホストへ渡し、
- * 実行ファイルが返した結果を出すだけ（ADR-0035）。
+ * 実行ファイルが返した結果を出すだけ。
  *
  * **中身（`data`）が届いたら、編集中のルールはその中身で置き換える。** 届くのは編集を捨ててよい
  * ときだけ（ユーザが「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
- * 帯（`changed`）が出るだけ（ADR-0062）。
+ * 帯（`changed`）が出るだけ。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
@@ -137,7 +137,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   /**
    * id を打っている途中は控えを書き直さない（打ちかけの id が控えに入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
-   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ写す
+   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ入れる
    * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
    */
   const latest = useRef<Editing>(editing);

@@ -4,7 +4,7 @@
  *
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
  * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の種類（`.ccnavi/common/phases.yml`。場所は固定）、
@@ -177,7 +177,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     return;
   }
 
-  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間、押しても何も起きないように見えないように。
+  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
   // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviPhases", titleOf(target), vscode.ViewColumn.One, {
@@ -260,7 +260,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesPath: string;
   const notices: string[] = [];
   if (target.kind === "common") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_PHASES` など）では動かせない。
     phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
@@ -324,10 +324,10 @@ function registerPanelHandlers(current: PanelState): void {
 
   // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
   // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが届いていなかったらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -459,7 +459,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 
 /**
  * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
- * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
+ * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;
@@ -579,7 +579,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToPhases);
 }

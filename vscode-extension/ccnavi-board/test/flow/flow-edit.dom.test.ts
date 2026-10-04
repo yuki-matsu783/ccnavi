@@ -1,5 +1,5 @@
 /**
- * フロー編集画面（React）の編集の道具を happy-dom で動かす。元に戻す・やり直す、写す・貼る・複製、
+ * フロー編集画面（React）の編集の道具を happy-dom で動かす。元に戻す・やり直す、コピー・貼り付け・複製、
  * ミニマップ、保存前の差分の一覧、未保存のまま閉じた編集を戻して開くこと、実行ファイルの答え（渡る手順・warn・候補）を見る。
  *
  * 線を引く途中の断り（`isValidConnection`）はドラッグが要るので、ここでは見ない（規則は `flow-edit-ops.test.ts`
@@ -155,7 +155,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
   try {
     assert.ok(button(dom, "copy-nodes").disabled);
     assert.ok(button(dom, "paste-nodes").disabled);
-    // 開始だけでは写せない
+    // 開始だけではコピーできない
     dom.click(dom.one('.react-flow__node[data-id="start"]'));
     await dom.settle();
     assert.ok(button(dom, "copy-nodes").disabled);
@@ -164,7 +164,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     release(dom, "c");
     await dom.settle();
     assert.match(dom.one("#status").textContent ?? "", /開始はコピーしません/);
-    // プロンプトと終了を選んで写す
+    // プロンプトと終了を選んでコピーする
     dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
     await dom.settle();
     dom.key("Shift");
@@ -181,7 +181,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     assert.equal(dom.all(".react-flow__edge").length, 3);
     assert.deepEqual(dom.all(".react-flow__node.selected").map((n) => n.getAttribute("data-id")).sort(), ["end-1", "prompt-2"]);
     assert.ok(dirty(dom));
-    // 複製（ボタン）。いま選んでいる貼ったものが増える
+    // 複製（ボタン）。いま選んでいる貼り付けたものが増える
     dom.click(button(dom, "duplicate-nodes"));
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 7);
@@ -190,7 +190,7 @@ test("CB-D126 選んだノードを Ctrl+C で写して Ctrl+V で貼ると、�
     dom.key("d", undefined, CTRL);
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 9);
-    // 貼るのも複製も 1 回で元に戻す 1 件
+    // 貼り付けも複製も 1 回で元に戻す 1 件
     dom.key("z", undefined, CTRL);
     await dom.settle();
     dom.key("z", undefined, CTRL);
@@ -337,7 +337,7 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     assert.ok(!items.some((li) => /開始（start）のノードがありません/.test(li.textContent ?? "")), "画面の注意と二重に出さない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. [prompt] プロンプト\n2. [end] 終了");
     assert.equal(dom.all("#flow-preview-checking").length, 0);
-    // 開いたままでは確かめ直さない（答えが指す写しのまま）
+    // 開いたままでは確かめ直さない（答えが指す中身のまま）
     await waitCheck(dom);
     assert.deepEqual(checksAsked(dom), []);
     // 直すと、止まってから確かめ直しを頼む。その間は前の答えを出したまま、そう言う
@@ -455,7 +455,7 @@ test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた
     assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確かめ終わったことにしない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
     assert.doesNotMatch(dom.one("body").textContent ?? "", /古い写しの答え/);
-    // 今の写しの答えは使う
+    // 今の中身に対する答えは使う
     await waitCheck(dom);
     const second = checksAsked(dom);
     assert.equal(second.length, 2);

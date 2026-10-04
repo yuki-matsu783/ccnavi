@@ -57,7 +57,7 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   assert.equal(board.layers[1].rules.unreadable, "");
   assert.equal(board.layers[1].phasesFile.path, "<root>/.ccnavi/config/phases.yml");
   assert.equal(board.layers[0].phasesFile.path, "<root>/phases.yml");
-  // 実行ファイルは常に layers を出す。欠けていれば（壊れた JSON）CB-T04 と同じく既定値の空で補う
+  // 実行ファイルは常に layers を出す。欠けていれば（不正な JSON）CB-T04 と同じく既定値の空で補う
   const missing = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
   assert.ok(missing.ok);
   assert.deepEqual(missing.board.layers, []);
@@ -74,7 +74,7 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
       version: BOARD_VERSION,
       tickets: [
         { ticket: "x", copy: { status: "weird" }, proposal: { state: "nope" } },
-        // 旧の置き場の状態（doing / done / cancelled）は提案の状態としては読まない（ADR-0055）
+        // 提案の状態は todo / review だけ。旧の状態（doing / done / cancelled）は読まない
         { ticket: "y", copy: { status: "review" }, proposal: { state: "doing" } },
       ],
       parents: [{ ticket: "x", phases: [{ number: 1, marks: { requested: "not an object" } }] }],

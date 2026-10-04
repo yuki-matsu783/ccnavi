@@ -113,7 +113,7 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
  * ワークスペースの設定は同じオプションに名札 `self` で渡す。実行ファイルは層（layer）の名前で差し替えを引き、
  * `self` を名乗るプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
- * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
+ * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =
@@ -189,7 +189,7 @@ interface Ran {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
-  /** 期限で打ち切った（execFile が殺した）。標準エラーには何も残らないので、呼び手が文面を作る */
+  /** 期限で打ち切った（execFile が強制終了した）。標準エラーには何も残らないので、呼び手が文面を作る */
   readonly killed: boolean;
 }
 
@@ -307,7 +307,7 @@ export async function runApproveYes(
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
   // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（agree.py の for cand in batch）ので、
-  // 途中で殺されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
+  // 途中で強制終了されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
   // ここで拾わないと何が起きたのか伝わらない。
   if (ran.killed) {
     return {
@@ -598,8 +598,8 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 }
 
 /**
- * 家族が C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
- * フローの保存の後、運ぶ処理を送るかを決めるのに使う（ADR-0093 の 4.6）。
+ * 親子のチケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * フローの保存の後、運ぶ処理を送るかを決めるのに使う。
  */
 export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
   const launcher = findLauncher(root, setting);

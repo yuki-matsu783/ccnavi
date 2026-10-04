@@ -1,12 +1,11 @@
 /**
  * 承認のオーバーレイの遷移。**「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけ**をここに置く。
  *
- * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push が端末に送られる）。
+ * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push がターミナルに送られる）。
  * 連打・承認中の再入・古いボードからの承認は現実に起きるので、「この状態ではこれを受けない」を
- * 書き落とさないことが要る。**散らばっていると書き落とす**ので、見張りをこの 1 ファイルに集めた
- * （ADR-0068）。
+ * 書き落とさないことが要る。**散らばっていると書き落とす**ので、見張りをこの 1 ファイルに集めた。
  *
- * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・端末に送る・クリップボードに
+ * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・ターミナルに送る・クリップボードに
  * 入れる・新しいセッションで開く・ユーザに言う）は `ApprovalEffect` として返すだけで、**実際に行うのは
  * 呼ぶ側**（`board-panel.ts`）。`core/screen-host.ts` の `Surface` と同じ形で、単体で試せる。
  *
@@ -33,12 +32,12 @@
  * | `decidePreview` | 残った指摘を見せた。押されるまで何も置かない |
  * | `deciding` | 選んだ行き先を置いている。**ここでは閉じない** |
  *
- * ## 見張り（消すと承認が壊れる順）
+ * ## 見張り（消すと承認が正しく動かなくなる順）
  *
  * | 見張り | 消すとどうなる |
  * |---|---|
  * | `approving` の間は閉じない | 承認を打っている最中に閉じられ、結果をユーザが見ないまま次へ進む |
- * | 承認を打つのは `preview` のときだけ | 二重に打てる。実行ファイルの指紋の照合（ADR-0043）は 2 本目を止めるが、止まる前提で連打させない |
+ * | 承認を打つのは `preview` のときだけ | 二重に打てる。実行ファイルが承認のときに読み直した中身の指紋と照合するので 2 本目は止まるが、止まる前提で連打させない |
  * | 承認の途中（`loading`・`preview`・`approving`）は二重に開かない | 見せている一覧が、読み直しの途中の別の一覧になってしまう |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 文を渡せるのは `done` と `prompt` のときだけ | 文の無い状態で「コピー」が通る |
@@ -158,7 +157,7 @@ export type ApprovalEffect =
       readonly digest: string;
       readonly only: readonly string[];
     }
-  /** 承認済みチケットを運ぶ sh を端末に送る */
+  /** 承認済みチケットを運ぶ sh をターミナルに送る */
   | { readonly kind: "carry" }
   /** 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す */
   | { readonly kind: "loadDecide"; readonly tree: string; readonly phase: number }
@@ -292,7 +291,7 @@ function previewed(state: ApprovalState, result: PreviewParse): ApprovalStep {
 
 /**
  * 「この N 件を承認する」。見せた識別子と指紋をそのまま渡す。実行ファイルが一覧と本文の一致を
- * 確かめ、違えば何も置かずに `mismatch` を返す（ADR-0043）
+ * 確かめ、違えば何も置かずに `mismatch` を返す
  */
 function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalStep {
   // 承認を打てるのは、一覧を見せているときだけ。承認中に押し直しても 2 本目は出ない
@@ -314,7 +313,7 @@ function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalSt
 function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolean): ApprovalStep {
   if (outcome.ok) {
     const count = outcome.value.approved.length;
-    // 運ぶ 1 行は、文を渡すのを待たずに端末へ出す。承認と同じ時点で出しておく
+    // 運ぶ 1 行は、文を渡すのを待たずにターミナルへ出す。承認と同じ時点で出しておく
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
@@ -556,7 +555,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
         overlay: {
           kind: "prompt",
           title: value.followup
-            ? `フェーズ ${value.phase} の未解決（Unresolved）の指摘の対応方針を決めました`
+            ? `フェーズ ${value.phase} の未解決（Unresolved）指摘の対応方針を決めました`
             : `フェーズ ${value.phase} をレビュー済みにしました`,
           note:
             `${note}${issued} Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、` +

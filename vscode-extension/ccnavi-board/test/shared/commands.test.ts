@@ -30,7 +30,7 @@ test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、ye
     "ab12",
     "--json",
   ]);
-  // ターミナルに `--agree` を送る経路は消した。y/N を端末で押す形には戻さない。
+  // ターミナルに `--agree` を送る経路は消した。y/N をターミナルで押す形には戻さない。
   assert.equal((commands as Record<string, unknown>).approveCommand, undefined);
 });
 
@@ -92,7 +92,7 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
     pushApprovedCommand("/tmp/it's ws"),
     `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
   );
-  // 家族を並べると、その家族だけを運ぶ（ADR-0093 の 4.6。フローの保存の後）。
+  // 親を並べると、その親子のチケットだけを運ぶ（フローの保存の後）。
   assert.equal(
     pushApprovedCommand("/ws", ["i0001"]),
     "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",

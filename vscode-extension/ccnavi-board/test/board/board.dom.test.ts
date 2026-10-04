@@ -33,7 +33,7 @@ test("CB-D40 列の見出しを押すと畳み、state に列名が入る。読�
   }
 });
 
-test("CB-D41 親で絞り込むと他の家族のカードが隠れ、列の件数と承認ボタンは見えている数になる。承認は見えている承認待ちだけを送る", async () => {
+test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠れ、列の件数と承認ボタンは見えている数になる。承認は見えている承認待ちだけを送る", async () => {
   const base = fixture();
   // 先頭は親 i0001。同じ形でもう 1 つ親（承認待ち）を足す
   const other = { ...base.tickets[0], ticket: "i0002", title: "別の親", pending_approval: true };
@@ -238,7 +238,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     await page.send({ type: "filter", project: "無い名前" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
     assert.equal((page.state() as { project: string }).project, "app");
-    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に落ちない
+    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に戻らない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");

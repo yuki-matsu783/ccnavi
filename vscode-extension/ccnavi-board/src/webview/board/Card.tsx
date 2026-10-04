@@ -115,7 +115,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
 const NOT_OPENING = "button, a, details";
 
 /**
- * 状態が動いた跡（ADR-0086）。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
+ * 状態が動いた跡。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
  * （状態の正は置き場。実行ファイルが渡した新しい側だけを並べる）
  */
 function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
@@ -150,12 +150,12 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (card.gateClosed) {
     badges.push(<Badge key="hold" kind="hold" text={holdLabel(card)} />);
   }
-  // 承認済みチケット自体が信頼できない（ADR-0058）。理由の全文は不備の行に出る（`board.cardOf`）ので、
+  // 承認済みチケット自体が信頼できない（親が引けないなど、範囲をどこで切り詰めるか決まらない）。理由の全文は不備の行に出る（`board.cardOf`）ので、
   // ここは一目で分かる短い言葉に留める。
   if (card.blocked !== "") {
     badges.push(<Badge key="blocked" kind="blocked" text="書き込み停止中" title={card.blocked} />);
   }
-  // 先行を満たしていない（ADR-0088）。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
+  // 先行を満たしていない。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
   if (card.predecessorsUnmet.length > 0) {
     // 識別子（`i0001-02`）の途中では折り返さない。折り返すのは識別子の間の空白か、見出しと括弧の間だけ
     const badge = predecessorsBadge(card);
@@ -328,7 +328,7 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
 }
 
 /**
- * 子のフロー（ADR-0085）を開くボタン。言葉は在るか・着手中か（実行ファイルの答えの写し）で変わる。
+ * 子のフローを開くボタン。言葉は在るか・着手中か（実行ファイルの答えをそのまま反映したもの）で変わる。
  * 着手中でも押せる（読むだけの画面が開く）。押したら拡張ホストへ返すだけ
  */
 function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string }): JSX.Element {

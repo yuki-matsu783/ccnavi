@@ -517,7 +517,7 @@ class ScopeGuard:
         # （追跡されないので統合先へ乗らない）が崩れている。そこは報告から外さずに言う。
         if ticket_mod.is_ticket_place(rel, self.tickets, self.approved):
             return None
-        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える。ADR-0096）。
+        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える）。
         if ticket_mod.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
@@ -540,7 +540,7 @@ class ScopeGuard:
             "blocked. "
         )
         if found.limit == phase.LIMIT_BLOCKED:
-            # 範囲の外に出たのではなく、チケット自体が信頼できない（ADR-0058）。範囲を
+            # 範囲の外に出たのではなく、チケット自体が信頼できない。範囲を
             # 見せても直しようが無いので、引っかかった検査を名指しする。
             message = (
                 f"The approved ticket {ticket.ticket} for worktree {t.name} does not hold "

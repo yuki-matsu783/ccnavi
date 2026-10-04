@@ -1,6 +1,6 @@
 /**
  * カードとフェーズ行に出す言葉。判定は実行ファイルがやっていて、ここは JSON が言ったことを
- * 言い換えるだけ。マーカーや済みから状態を組み直さない（ADR-0035）。
+ * 言い換えるだけ。マーカーや済みから状態を組み直さない。
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -103,7 +103,7 @@ export function mrText(number: number | null): string {
   return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
 }
 
-/** 依頼のマーカーが持つ URL は中身を確かめずに写してあるので、http(s) のときだけリンクにする */
+/** 依頼のマーカーが持つ URL は中身を確かめずにそのまま取り込んであるので、http(s) のときだけリンクにする */
 export function isHttpUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
@@ -134,7 +134,7 @@ export interface BodyLine {
 }
 
 /**
- * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。端末には両方の行がそのまま出るが、
+ * 本文を行に切り、説明の付く見出しには次の行をまとめて返す。ターミナルには両方の行がそのまま出るが、
  * 画面では説明を見出しのツールチップにまとめて、本文を短く保つ。
  */
 export function approvalBody(text: string): BodyLine[] {
@@ -154,7 +154,7 @@ export function approvalBody(text: string): BodyLine[] {
   return out;
 }
 
-/** 履歴（ADR-0086）の置き場の呼び名。列の名前ではなく置き場の名前で言う（`review` は作業中の列にいる） */
+/** 履歴の置き場の呼び名。列の名前ではなく置き場の名前で言う（`review` は作業中の列にいる） */
 const PLACE_LABELS: Readonly<Record<string, string>> = {
   todo: "承認待ち",
   doing: "作業中",
@@ -183,7 +183,7 @@ const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
- * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザが端末で同じ sh を打っても `cli`）ので、
+ * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザがターミナルで同じ sh を打っても `cli`）ので、
  * 誰が打ったかは断定しない
  */
 export const VIA_LABELS: Readonly<Record<string, string>> = {
@@ -224,7 +224,7 @@ export function historyAt(at: string): string {
 }
 
 /**
- * 先行を満たしていないカードのバッジ（ADR-0088）。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
+ * 先行を満たしていないカードのバッジ。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
  * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
  * `lead` と `ids` は `text` を分けたもので、画面が識別子の途中で折り返さないために使う
  */

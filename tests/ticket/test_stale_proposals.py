@@ -71,7 +71,7 @@ class StaleProposalTest(PhaseHarness):
         )
 
     def test_a_revision_in_the_home_tree_stays_waiting(self):
-        """改版は権威のツリーの todo/ に置く（ADR-0055）。承認済みチケットと並んでも承認待ちに残る。
+        """改版は権威のツリーの todo/ に置く。承認済みチケットと並んでも承認待ちに残る。
 
         古い写しを持つワークツリーがあっても、権威のツリーの改版は読む。
         """
@@ -229,7 +229,7 @@ class StaleProposalTest(PhaseHarness):
 
 
 class ImportedFamilyTest(AuthorityHarness):
-    """取り込み済みの家族（ADR-0093）で、権威のツリーの外に書いた改版の案内。"""
+    """取り込み済みの親子のチケットで、権威のツリーの外に書いた改版の案内。"""
 
     def revision_in_root(self):
         write(
@@ -245,16 +245,17 @@ class ImportedFamilyTest(AuthorityHarness):
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
         )
         self.assertIn(
-            "取り込み済みの家族なので、書いたら push してから承認を頼んでください", verify.stdout
+            "取り込み済みの親子のチケットなので、書いたら push してから承認を頼んでください",
+            verify.stdout,
         )
 
     def test_a_stopped_family_carries_the_reason_family_problems_gives(self):
-        """家族が止まっている（親のツリーの HEAD がブランチを指していない）なら、承認の手前で
-        言っていた止まった理由と手順（`approval.family_stop_text`）を同じ文面で添える。"""
+        """親子のチケットが止まっている（親のツリーの HEAD がブランチを指していない）なら、
+        承認の手前で言っていた止まった理由と手順（`approval.family_stop_text`）を同じ文面で添える。"""
         self.record("present")
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         verify = self.revision_in_root()
-        self.assertIn("取り込み済みの家族が止まっている", verify.stdout)
+        self.assertIn("取り込み済みの親子のチケットが止まっている", verify.stdout)
         self.assertIn("HEAD がブランチ i0001 を指していない", verify.stdout)
         self.assertIn("承認しない", verify.stdout)
         self.assertNotIn("書いたら push してから", verify.stdout)

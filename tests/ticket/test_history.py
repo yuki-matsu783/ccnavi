@@ -1,4 +1,5 @@
-"""状態の跡（ADR-0086）の受入テスト。道具を外から呼んで、跡のファイルと応答を見る。
+"""状態の跡（チケットごとの追記専用のファイル。状態の正は置き場のまま）の受入テスト。
+道具を外から呼んで、跡のファイルと応答を見る。
 
 見るのは 5 つ。
 
@@ -184,7 +185,10 @@ class HistoryTest(TicketTest):
         self.assertTrue(any("i0001-01 の履歴" in p for p in board["problems"]), board["problems"])
 
     def test_the_post_monitor_does_not_report_the_history_it_wrote(self):
-        """`ticket start` の跡は、実行後チェックが保護領域の変更として咎めない（ADR-0075）。"""
+        """`ticket start` の跡は、実行後チェックが保護領域の変更として咎めない。
+
+        実行後チェックは、副命令の書き込みを中身の姿で見分けて外す。
+        """
         self.family_without_starting()
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         after = self.hook(

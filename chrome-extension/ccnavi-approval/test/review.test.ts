@@ -1,5 +1,5 @@
 /**
- * 段階 3 のレビューで直したものの回帰試験（ADR-0093 の 11.7.1）。
+ * 承認と取り下げを入れたときのレビューで直したものの回帰試験。
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -139,7 +139,7 @@ test("CX-T123 service worker が書く頼みを断ったら（登録していな
   const out = await approveFamily(REPO, "i0001", seen, d);
   assert.equal(out.kind, "failed");
   assert.match(out.kind === "failed" ? out.message : "", /登録していない/);
-  // 段階 5 のレビューの後（11.9.1 の 8）は、読み取りも登録したリポジトリだけ受けるので、ホストに何も頼まない
+  // 読み取りも登録したリポジトリだけ受けるので、ホストに何も頼まない
   assert.equal(mock.calls.length, before);
   assert.equal(mock.commitCalls.length, 0);
 });

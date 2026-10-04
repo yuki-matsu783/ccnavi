@@ -70,7 +70,7 @@ def stricter(a: str, b: str) -> str:
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
 
 
-# 全体計画の待ち方（設計 9.7、ADR-0078）。sequential は一直線、dag は種類の `after` を辺にする。
+# 全体計画の待ち方（設計 9.7）。sequential は一直線、dag は種類の `after` を辺にする。
 ORDER_SEQUENTIAL = "sequential"
 ORDER_DAG = "dag"
 ORDERS = (ORDER_SEQUENTIAL, ORDER_DAG)

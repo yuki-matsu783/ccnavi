@@ -10,7 +10,7 @@
 
 `every: 1` は `every` 無しと同じ意味になるだけで誤りではないので、何も言わない。
 
-実装は入っている（ADR-0057、`lint._every_problems`）。ここが落ちたら、`--lint` の言うことが
+実装は入っている（`lint._every_problems`）。ここが落ちたら、`--lint` の言うことが
 上の 2 つと食い違ったということ。
 渡す回の刻みそのものは tests/config/test_rule_every.py。
 """

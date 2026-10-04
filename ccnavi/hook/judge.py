@@ -199,8 +199,9 @@ def decide_before(
 
     # 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼ぶ形は、ルールより
     # 先に止める。`CCNAVI_TICKETS_APPROVED=/x sh …ccnavi-git.sh push` は、sh の中の子の push
-    # の検査を外す。hook は settings.json の env で起動するので、この代入の影響を受けない
-    # （ADR-0077）。読むのは元のコマンド。`cd` を追うには区切りの残った形が要る。
+    # の検査を外す。hook は settings.json の env で起動するので、この代入の影響を受けない。
+    # 止める場所を hook に置き、sh の検査は 2 重目にする。読むのは元のコマンド。`cd` を追うには
+    # 区切りの残った形が要る。
     if payload.tool_name == "Bash" and (
         modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
@@ -277,7 +278,7 @@ def decide_before(
             )
 
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
-    # 持つが、止める場所は hook に置き、sh は 2 重目にする（ADR-0077）。
+    # 持つが、止める場所は hook に置き、sh は 2 重目にする。
     if conf.tickets_enabled and payload.tool_name == "Bash":
         name, parent, _ = wrapguard.check_child_push(
             conf, root, payload.cwd, record.subject, record.degraded
@@ -361,7 +362,7 @@ def decide_before(
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf)
 
-    # 着手中の子のフローは書き換えさせない（設計 9.3.1、ADR-0085）。ルールより先に見る。
+    # 着手中の子のフローは書き換えさせない（設計 9.3.1）。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの守りでも止まる。ロックは
     # その守りを切った設定でも当てはまり、止めた理由（着手中）を名指しする（締める向きだけ）。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
@@ -372,8 +373,9 @@ def decide_before(
             record.code, record.rules = flow.CODE_LOCKED, [flow.LOCK_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [locked], conf=conf)
 
-    # 書き直しを求める形は、ルールより先に止める（ADR-0046、ADR-0047）。ブレース展開と、実行する
-    # ときに決まるコマンド名は、ルールを当てる読みと実行されるものが食い違う。
+    # 書き直しを求める形は、ルールより先に止める（読み分けずに止めて書き直しを案内する）。
+    # ブレース展開と、実行するときに決まるコマンド名は、ルールを当てる読みと実行されるものが
+    # 食い違う。
     # `{git,push,origin,main}` も `c=git; $c push origin main` も、raw-git に当たらないまま push を
     # 実行する。バッククォートとシェルで読みが分かれる形は、読み分けると規則が増え、読み違えると
     # 止まらずに通る。どれも書き直す方法が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
@@ -497,7 +499,7 @@ def decide_before(
             if p
         )
     # cwd がプロジェクトの中に入った最初の呼び出しで、そのプロジェクトのスキルの目録を 1 度だけ
-    # つける（ADR-0091）。セッションはワークスペースルートで始まり、あとから cd で入るのがふつう。
+    # つける。セッションはワークスペースルートで始まり、あとから cd で入るのがふつう。
     skills = projskills.notice(stderr, conf, root, payload)
     if skills:
         told = "\n\n".join(p for p in (told, skills) if p)
@@ -685,7 +687,7 @@ def screen(
                 strict=True,
             )
         )
-    # `cd` で移った先から見た綴りも、中で実行されるコマンドと同じ並びに足す（ADR-0069）。
+    # `cd` で移った先から見た綴りも、中で実行されるコマンドと同じ並びに足す。
     # 書かれた綴りの当たり方は動かさず、当てる先を足すだけにする。止める側のルールにしか
     # 当たらないので、`cd` を読み違えても、当たるはずのものが当たらなくなることはない。
     inner += [
@@ -807,7 +809,7 @@ def ticket_verdict(
     """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
 
     コードは空のことが多い。記録に残す綴りを呼び手が決められないとき（範囲の外ではなく
-    チケット自体が信頼できないとき、ADR-0058）だけ、ここが返す。
+    チケット自体が信頼できないとき）だけ、ここが返す。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
     同じ識別子の承認済みチケットで判定する。ワークスペースルートの直下ならチケットは無く、ルールだけで判定する。
@@ -873,7 +875,7 @@ def ticket_verdict(
 
     if found.limit == phase.LIMIT_BLOCKED:
         # 範囲の外に書いたのではなく、チケット自体が信頼できない。範囲を見せても
-        # 直しようが無いので、代わりに引っかかった検査を名指しする（ADR-0058）。
+        # 直しようが無いので、代わりに引っかかった検査を名指しする。
         return (
             rules.DENY,
             "\n".join(
