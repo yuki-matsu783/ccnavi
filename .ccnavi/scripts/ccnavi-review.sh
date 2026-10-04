@@ -261,6 +261,21 @@ if [ "$needs_host" = yes ]; then
 	fi
 fi
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
+# 親の識別子（ADR-0100 の 5 章）。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
+# （親チケットの branch:）とは違うことがある。マージリクエストは居るブランチ（branch）で探して作り、
+# C1 の家族・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
+family="$branch"
+review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+if [ -n "$review_top" ]; then
+	review_top_p=$(ccnavi_phys "$review_top")
+	review_root_p=$(ccnavi_phys "$root")
+	case "$review_top_p" in
+	"$review_root_p"/.claude/worktrees/*)
+		family="${review_top_p#"$review_root_p"/.claude/worktrees/}"
+		family="${family%%/*}"
+		;;
+	esac
+fi
 
 # curl の 1 回の時間の上限（秒）。応答しないホストで止まり続けないように。gh / glab は道具に任せる
 api_max_time=120
@@ -547,15 +562,15 @@ create_issue() {
 # ---- 決めた行き先を投稿する。exe が控えの置き場に書いた下書きから、issue を作ってコメントを残す。
 #
 # 置いたあとの投稿なので、ここで失敗しても決めたことは戻さない。失敗は post_warning に言い、
-# 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子 = ブランチ名）。
+# 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子。ブランチ名と違うことがある）。
 
 post_decision() {
 	issue_url=""
 	post_warning=""
 	number=$("$JQ" '.mr.number' "$result")
 	url=$("$JQ" -r '.mr.url' "$result")
-	issue_draft="$state/review-issue-$branch-$1.md"
-	noted="$state/review-decide-$branch-$1.md"
+	issue_draft="$state/review-issue-$family-$1.md"
+	noted="$state/review-decide-$family-$1.md"
 	if [ -f "$issue_draft" ]; then
 		issue=$(create_issue "$issue_draft" || :)
 		if [ -n "$issue" ]; then
@@ -774,7 +789,7 @@ confirm)
 	exe_knows --actor && actor=$(account || :)
 	log_debug 印のアカウント -- "actor=${actor:+set}"
 	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
-	c1_start "$branch"
+	c1_start "$family"
 	fetch_all >"$result"
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
 	;;
@@ -881,7 +896,7 @@ request)
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
 	# 段 0: 取り込み済みの家族なら C1 の前半（ロック・取り込み）を先に済ませる。
-	c1_start "$branch"
+	c1_start "$family"
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
 	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
@@ -1012,7 +1027,7 @@ decide)
 	fi
 	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
 	# 済ませる（ロックを持ったままユーザを待たない。段階 2d のレビューの決定 A）ので、ここでは始めない。
-	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$branch"
+	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$family"
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
 		ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
@@ -1038,7 +1053,7 @@ decide)
 		printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
 		exit 0
 	fi
-	ccnavi_c1_family "$branch"
+	ccnavi_c1_family "$family"
 	case "$ccnavi_c1_target" in
 	stop)
 		ccnavi_c1_refuse
@@ -1087,7 +1102,7 @@ decide)
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
 	# ここが外してコメントを投稿する。マージはユーザ。
-	c1_start "$branch"
+	c1_start "$family"
 	fetch_all >"$result"
 	tell_skew
 	ccnavi_c1_capture="$state/review-ready-$$.out"
@@ -1128,10 +1143,10 @@ close-early)
 	[ -n "$reason" ] || fail close-early-no-reason "close-early には --reason <理由> が要る。" 2
 	fetch_all >"$result"
 	# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは控えの
-	# 置き場の決まった名前で拾う（親の識別子 = ブランチ名）。
+	# 置き場の決まった名前で拾う（親の識別子。ブランチ名と違うことがある）。
 	ccnavi --close-early --reason "$reason" --result "$result" || exit $?
-	issue_draft="$state/review-close-early-issue-$branch.md"
-	noted="$state/review-close-early-note-$branch.md"
+	issue_draft="$state/review-close-early-issue-$family.md"
+	noted="$state/review-close-early-note-$family.md"
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
@@ -1147,7 +1162,7 @@ close-early)
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
 	# 取り込み済みの家族なら、締めの印（ユーザの判断）を運ぶ処理で送る（D27）。
-	carry_human "$branch" || exit 1
+	carry_human "$family" || exit 1
 	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
 	;;
 chat)
@@ -1159,7 +1174,7 @@ chat)
 	esac
 	[ "$#" -eq 1 ] || fail chat-bad-args "chat は <N> だけを取る。" 2
 	ccnavi --reviewed "$n" --chat || exit $?
-	carry_human "$branch" || exit 1
+	carry_human "$family" || exit 1
 	;;
 config-synced)
 	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。

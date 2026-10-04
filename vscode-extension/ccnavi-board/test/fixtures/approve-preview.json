@@ -11,6 +11,8 @@
    "revision": false,
    "tree": "i0001",
    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001.md",
+   "branch": "i0001",
+   "existing_branch": false,
    "overflow": []
   },
   {
@@ -21,6 +23,8 @@
    "revision": false,
    "tree": "i0001",
    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-01.md",
+   "branch": "i0001-01",
+   "existing_branch": false,
    "overflow": []
   },
   {
@@ -31,6 +35,8 @@
    "revision": false,
    "tree": "i0001",
    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02.md",
+   "branch": "i0001-02",
+   "existing_branch": false,
    "overflow": [
     "`wip/design/*` は種類 調査 / research の範囲 wip/research/* を超えている"
    ]

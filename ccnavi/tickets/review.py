@@ -600,7 +600,8 @@ def _followup_next(root: str, parent: ticket_mod.Ticket, ident: str) -> str:
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     return (
         f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
-        f"{parent.ticket}' でワークツリーを切り、'{ticket_sh} start {ident}' で着手する"
+        f"{ticket_mod.branch_name(parent)}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
+        "着手する"
     )
 
 

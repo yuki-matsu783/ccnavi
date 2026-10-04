@@ -33,7 +33,7 @@
      }
     ]
    },
-   "digest": "2b6592d8b47648c99b57fdb920fd910377c008ccce8e0244073ea7f141afc961",
+   "digest": "f46126063d2d289a0d93e704847544e87240d8518139ae97b4caa7997ab14302",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -67,7 +67,7 @@
       "files": {
        ".ccnavi/common/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=3\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=4\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -114,7 +114,7 @@
      }
     ]
    },
-   "digest": "ee7770d9bd5b5eb0ff316b57a9aeddb400ffce73aecdbb2a40ce88144a1a1ebc",
+   "digest": "7e143a5905bf17431f1b143b2a5f561bdef61d27e1c0bfed7c3fb3b87df44587",
    "family": "i0001",
    "identifiers": [
     "i0001-02"
@@ -153,7 +153,7 @@
       "files": {
        ".ccnavi/common/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=3\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=4\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -256,7 +256,7 @@
       "files": {
        ".ccnavi/common/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=3\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=4\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -290,7 +290,7 @@
      }
     ]
    },
-   "digest": "5d9609530a49a861d54474c6f22d2449b2589bda8d81ad825df7e1e92be88ba3",
+   "digest": "6b56e0290757e0b2f9a5531830b6a6f3756d11da9402bf490156c429587996e6",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -332,7 +332,7 @@
       "files": {
        ".ccnavi/common/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=3\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=4\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -366,7 +366,7 @@
      }
     ]
    },
-   "digest": "689dc8ecb2143b867452c1bf806e732025f16f26f70b22c7b9237f72432613b0",
+   "digest": "91f69604655c1fb8ede936c5ef5b3d5edffc2cfed1c03facae777c9654ab3fe9",
    "family": "i0003",
    "identifiers": [
     "i0003-01"
@@ -422,7 +422,7 @@
       "files": {
        ".ccnavi/common/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=3\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=4\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -456,7 +456,7 @@
      }
     ]
    },
-   "digest": "3009ceab60e5e511a998431dff550e7b2b874dc0c2c71d4c7279383b0ed5e16f",
+   "digest": "0e706798b3afb389edeedffafb8e58673e80b46ad5038f59d3176363f7bcb2d8",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -491,7 +491,7 @@
       "files": {
        ".ccnavi/common/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=3\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=4\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -558,7 +558,7 @@
       "files": {
        ".ccnavi/common/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=3\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=4\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }

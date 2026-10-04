@@ -1254,21 +1254,29 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem]:
-    """名前が親の識別子なのに、HEAD が別のブランチを指す親のワークツリー（3.5 の 1）。"""
+    """名前が親の識別子なのに、HEAD が親のブランチ（`branch:`、無ければ識別子）でないブランチを
+    指す親のワークツリー（3.5 の 1、ADR-0100 の 5 章）。"""
     problems: list[Problem] = []
+    fams = syncstate.Families(conf, root)
     for work in tree.worktrees(root, conf.projects):
         if not _holds_parent(conf, work):
             continue
         branch = tree.branch_of(work.root)
-        if branch == work.name:
+        want = fams.branch(work.name, work.project)
+        if branch == want:
             continue
+        named = (
+            f"親のブランチの名前は識別子（{work.name}）と同じ"
+            if want == work.name
+            else f"親のブランチは親チケットの branch: の {want}"
+        )
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                 f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
-                f"親のブランチの名前は識別子（{work.name}）と同じで、取り込み（ccnavi-sync.sh）と"
-                "権威の検査は同じ名前のブランチだけを見る。"
+                f"{named}で、取り込み（ccnavi-sync.sh）と"
+                "権威の検査はそのブランチだけを見る。"
                 "親が閉じるのを待ってから、ブランチを切り替えてください",
             )
         )

@@ -17,6 +17,7 @@
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #   ccnavi_is_ident <語>       識別子として受けてよい綴りか（終了コードで返す）
+#   ccnavi_is_branch <語>      親のブランチ名として受けてよい綴りか（終了コードで返す。ADR-0100 の 5 章）
 #
 # 取り込みの控えとロック（ADR-0093 の段階 2b）の関数は、下の「取り込みの控えとロック」にまとめてある。
 # C1（段階 2d）の関数は、その下の「C1」にまとめてある。
@@ -28,7 +29,7 @@
 # この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときだけ。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=3
+CCNAVI_COMPAT=4
 
 # 相対パスを絶対に直す。
 #
@@ -320,6 +321,33 @@ ccnavi_is_ident() {
 	[ "$ccnavi_ii_rest" = / ]
 }
 
+# 親のブランチ名として受けてよい綴りなら 0（ADR-0100 の 5 章）。<語>
+#
+# 親のブランチ名は識別子の字に段の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
+# （`ticket.branch_problem`）が字と形を確かめたものを受け取る側の 2 段目の守りで、パスや ref で意味を持つ
+# 綴りを止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる段）、`.lock` で終わる段、
+# `\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、git の ref の綴り（refs/・
+# origin/ など）や保護されたブランチの名前を先頭の段に持つもの、HEAD の段を持つもの。
+ccnavi_is_branch() {
+	case "$1" in
+	'' | -* | .* | /* | */ | *. | *..* | *//* | */.* | *.lock | *.lock/* | *\\*) return 1 ;;
+	[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*) ;;
+	*) return 1 ;;
+	esac
+	# 末尾の改行が `$( )` で落ちないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
+	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
+	[ "$ccnavi_ib_rest" = '\' ] || return 1
+	# git の ref の綴り・リモートの名前・保護されたブランチの名前を先頭の段に持つもの、`HEAD`・`*_HEAD` の段を
+	# 持つもの（`ticket.branch_problem` と同じ。大文字小文字は区別しない）。
+	ccnavi_ib_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$ccnavi_ib_low" in
+	refs | refs/* | heads | heads/* | remotes | remotes/* | tags | tags/* | origin | origin/* | upstream | upstream/*) return 1 ;;
+	main | main/* | master | master/* | develop | develop/* | release | release/* | release-*) return 1 ;;
+	head | head/* | */head | */head/* | *_head | *_head/*) return 1 ;;
+	esac
+	return 0
+}
+
 # ---- 取り込みの控えとロック（ADR-0093 の 3.6・4.2・4.3。段階 2b）
 #
 # 控えは 1 行 1 項目の `<鍵> <値>`（D33）。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない。
@@ -354,8 +382,70 @@ ccnavi_repo_key() {
 }
 
 # 家族の控えのパス。<ワークスペースルート> <リポジトリ> <P>
+#
+# 鍵は親の識別子（`/` を含まない）。親のブランチ名は控えの中の `branch` に書く（ADR-0100 の 5 章）。
 ccnavi_family_record() {
 	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
+}
+
+# 親のブランチ名がそのブランチの家族の控え。無ければ空。<ワークスペースルート> <リポジトリ> <ブランチ>
+#
+# 控えの `branch` の行で探す（`branch` の無い前の控えは、鍵の識別子をブランチ名として読む）。
+# 識別子と違う名前の親のブランチ（`branch:`）でも、ブランチ名から控えを引ける。書きかけ（`*.tmp.*`）と
+# シンボリックリンクは読まない。当たった控えを 1 行に 1 つずつ全部出す（2 つ以上なら、2 つの家族が同じ
+# ブランチを名乗っている。呼ぶ側は止める）。
+ccnavi_family_record_of_branch() {
+	ccnavi_fb_dir="$(ccnavi_state "$1")/sync/$2/families"
+	[ -d "$ccnavi_fb_dir" ] || return 0
+	[ -L "$ccnavi_fb_dir" ] && return 0
+	for ccnavi_fb_file in "$ccnavi_fb_dir"/*; do
+		[ -f "$ccnavi_fb_file" ] || continue
+		[ -L "$ccnavi_fb_file" ] && continue
+		case "$ccnavi_fb_file" in
+		*.tmp.*) continue ;;
+		esac
+		ccnavi_fb_branch=$(ccnavi_record_get "$ccnavi_fb_file" branch)
+		[ -n "$ccnavi_fb_branch" ] || ccnavi_fb_branch="${ccnavi_fb_file##*/}"
+		if [ "$ccnavi_fb_branch" = "$3" ]; then
+			printf '%s\n' "$ccnavi_fb_file"
+		fi
+	done
+	return 0
+}
+
+# 家族 <識別子> の親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
+#
+# 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
+# 当たることがある）。違う名前は ccnavi_is_branch で見る。
+ccnavi_branch_ok() {
+	if [ "$1" = "$2" ]; then
+		ccnavi_is_ident "$1"
+	else
+		ccnavi_is_branch "$1"
+	fi
+}
+
+# 家族の親のブランチ名（ADR-0100 の 5 章）。<ワークスペースルート> <識別子>
+#
+# 実行ファイルの `c1 family <識別子>` の `branch` の行（承認済みの親チケットの `branch:`、無ければ識別子。
+# 提案の `branch:` は使わない）。sh はチケットを読まない（D33）。実行ファイルが無ければ 1、在るのに
+# 答えない・`branch` の行が無い（`branch_refused`。使えない名前か統合先の名前）・答えが親のブランチ名の
+# 形でなければ 2 を返す（呼ぶ側は識別子の外へ動かさずに止める）。ソースで動かしている ccnavi の
+# リポジトリでは uv で起こす。
+ccnavi_family_branch() {
+	if ccnavi_fbr_bin=$(ccnavi_bin "$1"); then
+		ccnavi_fbr_out=$("$ccnavi_fbr_bin" --root "$1" c1 family "$2" 2>/dev/null </dev/null) || ccnavi_fbr_out=""
+	elif [ -f "$1/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+		ccnavi_fbr_out=$(cd "$1" && uv run --quiet python -m ccnavi --root "$1" c1 family "$2" 2>/dev/null </dev/null) ||
+			ccnavi_fbr_out=""
+	else
+		return 1
+	fi
+	ccnavi_fbr_out=$(printf '%s\n' "$ccnavi_fbr_out" | tr -d '\r')
+	[ "$(printf '%s\n' "$ccnavi_fbr_out" | head -n 1)" = "c1 1" ] || return 2
+	ccnavi_fbr_name=$(printf '%s\n' "$ccnavi_fbr_out" | sed -n 's/^branch //p' | head -n 1)
+	ccnavi_branch_ok "$ccnavi_fbr_name" "$2" || return 2
+	printf '%s\n' "$ccnavi_fbr_name"
 }
 
 # 控えから 1 項目を読む。無ければ空。<ファイル> <鍵>
@@ -796,6 +886,8 @@ ccnavi_git_refusal() {
 ccnavi_c1_target=""
 ccnavi_c1_why=""
 ccnavi_c1_family_id=""
+# 親のブランチ名（ADR-0100 の 5 章）。ref・push・ls-remote・家族の控えの `branch` はこれを使う。
+ccnavi_c1_branch=""
 ccnavi_c1_repo=""
 ccnavi_c1_tree=""
 ccnavi_c1_approved=""
@@ -829,6 +921,7 @@ ccnavi_c1_family() {
 	ccnavi_c1_target=no
 	ccnavi_c1_why=""
 	ccnavi_c1_family_id=""
+	ccnavi_c1_branch=""
 	ccnavi_c1_repo=""
 	ccnavi_c1_tree=""
 	# 家族の控えが 1 つも無ければ、実行ファイルに聞かずに対象外（D11。一時ディレクトリも要らない）。
@@ -870,10 +963,14 @@ ccnavi_c1_family() {
 	ccnavi_c1_tree=$(sed -n 's/^tree //p' "$ccnavi_c1_tmp/family" | head -n 1)
 	ccnavi_c1_approved=$(sed -n 's/^approved //p' "$ccnavi_c1_tmp/family" | head -n 1)
 	ccnavi_c1_review=$(sed -n 's/^review //p' "$ccnavi_c1_tmp/family" | head -n 1)
+	ccnavi_c1_branch=$(sed -n 's/^branch //p' "$ccnavi_c1_tmp/family" | head -n 1)
 	sed -n 's/^hint //p' "$ccnavi_c1_tmp/family" >"$ccnavi_c1_tmp/hints"
 	case "$ccnavi_c1_target" in
 	yes)
-		if [ -z "$ccnavi_c1_tree" ] || [ ! -d "$ccnavi_c1_tree" ]; then
+		if ! ccnavi_branch_ok "$ccnavi_c1_branch" "$ccnavi_c1_family_id"; then
+			ccnavi_c1_target=stop
+			ccnavi_c1_why="実行ファイルが親のブランチ名（branch）を答えないか、ブランチ名の形でない（${ccnavi_c1_branch:-空}）。実行ファイルを新しくしてください"
+		elif [ -z "$ccnavi_c1_tree" ] || [ ! -d "$ccnavi_c1_tree" ]; then
 			ccnavi_c1_target=stop
 			ccnavi_c1_why="親のワークツリーが決まらない"
 		elif ! git -C "$ccnavi_c1_tree" remote get-url origin >/dev/null 2>&1; then
@@ -1012,7 +1109,7 @@ ccnavi_c1_prepare() {
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
-		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_family_id" || return 1
+		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_branch" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
 			"。運ぶ処理（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
 			"置き場に ccnavi の知らない未送信のコミットがある" \
@@ -1158,14 +1255,14 @@ ccnavi_c1_write() {
 			ccnavi_c1_inflight_h0="$ccnavi_cw_h0"
 			ccnavi_c1_inflight_list="$ccnavi_cw_list"
 		fi
-		if [ -z "$ccnavi_cw_c" ] && [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD)" = "$(git -C "$ccnavi_c1_tree" rev-parse --verify -q "refs/remotes/origin/$ccnavi_c1_family_id" 2>/dev/null)" ]; then
+		if [ -z "$ccnavi_cw_c" ] && [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD)" = "$(git -C "$ccnavi_c1_tree" rev-parse --verify -q "refs/remotes/origin/$ccnavi_c1_branch" 2>/dev/null)" ]; then
 			rm -f "$ccnavi_cw_list"
 			return 0 # 書いたものが無く、送るものも無い
 		fi
 		ccnavi_cw_head=$(git -C "$ccnavi_c1_tree" rev-parse HEAD)
 		# 9. push（--force なし）。
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_c1_tmp/push-err" "$ccnavi_c1_tree" \
-			push --quiet origin "refs/heads/$ccnavi_c1_family_id:refs/heads/$ccnavi_c1_family_id" >/dev/null; then
+			push --quiet origin "refs/heads/$ccnavi_c1_branch:refs/heads/$ccnavi_c1_branch" >/dev/null; then
 			ccnavi_c1_inflight=""
 			ccnavi_c1_sent "$ccnavi_cw_head"
 			rm -f "$ccnavi_cw_list"
@@ -1173,8 +1270,8 @@ ccnavi_c1_write() {
 		fi
 		# 10. 落ちたように見えても、届いていれば成功。
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_c1_tmp/ls-err" "$ccnavi_c1_tree" \
-			ls-remote origin "refs/heads/$ccnavi_c1_family_id" >"$ccnavi_c1_tmp/ls" &&
-			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_c1_tab}refs/heads/$ccnavi_c1_family_id" "$ccnavi_c1_tmp/ls"; then
+			ls-remote origin "refs/heads/$ccnavi_c1_branch" >"$ccnavi_c1_tmp/ls" &&
+			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_c1_tab}refs/heads/$ccnavi_c1_branch" "$ccnavi_c1_tmp/ls"; then
 			ccnavi_c1_say "push の応答は落ちたが、リモートには届いていた（${ccnavi_cw_head}）"
 			ccnavi_c1_inflight=""
 			ccnavi_c1_sent "$ccnavi_cw_head"
@@ -1218,7 +1315,7 @@ ccnavi_c1_undo() {
 	fi
 	git -C "$ccnavi_c1_tree" diff-tree --no-commit-id --name-only -r -z "$1" 2>/dev/null |
 		tr '\000' '\n' >"$ccnavi_c1_tmp/in-commit"
-	if ! git -C "$ccnavi_c1_tree" update-ref "refs/heads/$ccnavi_c1_family_id" "$2" "$1" 2>"$ccnavi_c1_tmp/err"; then
+	if ! git -C "$ccnavi_c1_tree" update-ref "refs/heads/$ccnavi_c1_branch" "$2" "$1" 2>"$ccnavi_c1_tmp/err"; then
 		ccnavi_c1_say "コミットを戻せなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）。ユーザが確かめてください"
 		return 1
 	fi
@@ -1233,7 +1330,7 @@ ccnavi_c1_undo() {
 ccnavi_c1_sent() {
 	ccnavi_cn_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 	if [ "$(ccnavi_record_get "$ccnavi_cn_record" state)" = present ]; then
-		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_family_id" sha "$1" \
+		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_branch" sha "$1" \
 			fetched_at "$(ccnavi_record_get "$ccnavi_cn_record" fetched_at)" state present reason "" ||
 			ccnavi_c1_say "家族の控え（${ccnavi_cn_record}）を書けなかった"
 	fi

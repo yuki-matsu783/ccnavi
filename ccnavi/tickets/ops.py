@@ -65,7 +65,7 @@ def start(
             f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ綴りであること）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
             f'worktree add "{worktree}" '
-            f"-b {ticket_id}' で作ってください\n"
+            f"{_branch_words(found)}' で作ってください\n"
         )
         return 1
     sha = _head(worktree)
@@ -869,19 +869,22 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     )
     if rc != 0 or out.strip():
         return None
-    ahead = _own_commits(here.root, bound)
+    parent_branch = (
+        syncstate.Families(conf, root).branch(bound.parent, bound.project) if bound.is_child else ""
+    )
+    ahead = _own_commits(here.root, bound, parent_branch)
     head = _head(here.root)
     if ahead <= 0 or not head:
         return None
     return Unfinished(bound, here.root, ahead, head)
 
 
-def _own_commits(worktree: str, t: ticket_mod.Ticket) -> int:
+def _own_commits(worktree: str, t: ticket_mod.Ticket, parent_branch: str = "") -> int:
     """基準点より先の、このチケットが自分で作ったコミットの数。数えられなければ 0（促さない側）。
 
-    取り込んだだけのコミットは数えない。子なら親のブランチ（名前は親の識別子。子のブランチを識別子で
-    引くのと同じ慣習、`review._unmet`）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
-    （`origin/HEAD`。ADR-0060）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
+    取り込んだだけのコミットは数えない。子なら親のブランチ（`parent_branch`。親チケットの
+    `branch:`、無ければ親の識別子。ADR-0100 の 5 章）の先にあるもの、親ならワークツリーの起点の
+    デフォルトブランチ（`origin/HEAD`。ADR-0060）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
     （`--no-merges`）。子で親のブランチを引けなければ、自分のものか決まらないので 0 を返す。
     親で `origin/HEAD` が無い（リモートの無いリポジトリ）ときは、除くものが無いので基準点の先を
     全部数える。
@@ -890,7 +893,7 @@ def _own_commits(worktree: str, t: ticket_mod.Ticket) -> int:
     if t.is_child:
         rc, sha = gitcmd.output(
             worktree,
-            ["rev-parse", "--verify", "--quiet", f"{t.parent}^{{commit}}"],
+            ["rev-parse", "--verify", "--quiet", f"{parent_branch or t.parent}^{{commit}}"],
             TIMEOUT_SECONDS,
         )
         if rc != 0 or not sha.strip():
@@ -950,6 +953,19 @@ def finish_nudge(root: str, found: Unfinished) -> str:
             "この案内は同じ HEAD では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
         ]
     )
+
+
+def _branch_words(t: ticket_mod.Ticket) -> str:
+    """ワークツリーを作る案内の、ブランチの語（ADR-0100 の 5 章）。
+
+    親の `branch:` が識別子と違えば、そのブランチを出す（既にあればそのまま、無ければ `-b` で
+    切る。`ccnavi-git.sh worktree add` は `branch:` と一致する名前だけを通す）。ほかは今どおり
+    `-b <識別子>`。
+    """
+    branch = ticket_mod.branch_name(t)
+    if branch == t.ticket:
+        return f"-b {t.ticket}"
+    return f"{branch}'（無ければ '-b {branch} <起点>'）"
 
 
 def _head(worktree: str) -> str:

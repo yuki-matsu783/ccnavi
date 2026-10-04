@@ -48,17 +48,32 @@ export interface Snapshot {
   /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い（段階 5） */
   readonly project?: string;
   readonly workspace?: Workspace;
+  /**
+   * 家族の識別子 → 親のブランチ名（ADR-0100 の 5 章）。閉包の先行の家族を読みに行くブランチの見当で、
+   * 判定には使わない（読んだブランチの親チケットが名乗らなければ Python は使わない）
+   */
+  readonly hints?: Readonly<Record<string, string>>;
 }
 
 export interface Family {
+  /** 親のブランチ名（拡張が読み書きするブランチ） */
   readonly name: string;
+  /** 家族の識別子（親チケットの `branch:` があればブランチ名と違う。ADR-0100 の 5 章） */
+  readonly family?: string;
   readonly title: string;
   readonly state: string;
   readonly closed: boolean;
+  /** 家族が決まらない理由（同じ家族を名乗るブランチが 2 本以上ある など）。あればこの家族は判定しない */
+  readonly conflict?: string;
 }
 
 export interface Closure {
+  /** 親のブランチ名の並び（先頭が判定する家族） */
   readonly families: readonly string[];
+  /** ブランチ名 → 家族の識別子 */
+  readonly idents?: Readonly<Record<string, string>>;
+  /** 同じ家族を名乗るブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
+  readonly rivals?: readonly string[];
   readonly need: readonly string[];
   readonly absent: readonly string[];
   readonly over_limit: boolean;
@@ -75,6 +90,10 @@ export interface BatchEntry {
   readonly path: string;
   readonly overflow: readonly string[];
   readonly body: string;
+  /** 親のブランチ名（`branch:`、無ければ識別子。ADR-0100 の 5 章） */
+  readonly branch?: string;
+  /** `branch:` が既にあるブランチを指すか */
+  readonly existing_branch?: boolean;
 }
 
 export interface Withdrawable {
@@ -95,6 +114,8 @@ export interface Reviewable {
 
 export interface BoardResult {
   readonly family: string;
+  /** 家族の識別子（親のブランチ名と違うことがある。ADR-0100 の 5 章） */
+  readonly ident?: string;
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
