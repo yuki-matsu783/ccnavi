@@ -16,3 +16,4 @@
 {"at": "2026-10-04T07:04:32Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 4, "mark": "pending"}
 {"at": "2026-10-04T07:14:02Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 4, "mark": "requested"}
 {"at": "2026-10-04T07:53:00Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 4, "mark": "requested"}
+{"at": "2026-10-04T07:59:25Z", "ticket": "i0064", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "actor": "yuki-matsu783", "phase": 4, "mark": "reviewed"}
