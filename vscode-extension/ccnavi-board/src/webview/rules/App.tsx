@@ -1,14 +1,14 @@
 /**
- * ルール設定画面の本体。ルールの一覧・判定を試す・hook の 3 タブ。
+ * ルール管理画面の本体。ルールの一覧・判定を試す・hook の 3 タブ。
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
  * **判定はしない。** 「判定」も「サンプルを一括で判定」も、編集中の内容を拡張ホストへ渡し、
- * 実行ファイルが返した結果を出すだけ（ADR-0035）。
+ * 実行ファイルが返した結果を出すだけ。
  *
  * **中身（`data`）が届いたら、編集中のルールはその中身で置き換える。** 届くのは編集を捨ててよい
  * ときだけ（ユーザが「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
- * 帯（`changed`）が出るだけ（ADR-0062）。
+ * 帯（`changed`）が出るだけ。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
@@ -50,7 +50,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** ユーザが開いた行の鍵。控え（state）に入るのはこちらだけ */
+  /** ユーザが開いた行の鍵。state に入るのはこちらだけ */
   readonly open: ReadonlySet<string>;
 }
 
@@ -70,7 +70,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [data, setData] = useState<RulesData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
   /**
-   * 判定で当たってその場だけ開いた行。**控えには入れない**（判定を繰り返しても、ユーザが決めた
+   * 判定で当たってその場だけ開いた行。**state には入れない**（判定を繰り返しても、ユーザが決めた
    * 既定の折りたたみが崩れない）。次の判定で入れ替わる。
    */
   const [transient, setTransient] = useState<ReadonlySet<string>>(new Set());
@@ -102,8 +102,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const page = pageOf(data);
 
   /**
-   * 案内はタブを切り替えて中を指すので、始める前のタブを控え、閉じたら戻す。**案内の間の切り替えは
-   * 控え（`saveTab`）に書かない**（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
+   * 案内はタブを切り替えて中を指すので、始める前のタブを覚えておき、閉じたら戻す。**案内の間の切り替えは
+   * state（`saveTab`）に書かない**（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
    */
   const tabBeforeTour = useRef<TabName | undefined>(undefined);
   const tour = useTour(data.kind === "page", {
@@ -135,9 +135,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, [dirty]);
 
   /**
-   * id を打っている途中は控えを書き直さない（打ちかけの id が控えに入る）。書くのは欄を
+   * id を打っている途中はstate を書き直さない（打ちかけの id が state に入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
-   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ写す
+   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ入れる
    * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
    */
   const latest = useRef<Editing>(editing);
@@ -251,7 +251,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   /**
    * 判定で当たった行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
-   * タイプの折りたたみも外す。**控えには入れない**ので、次の判定で元の折りたたみに戻る。
+   * タイプの折りたたみも外す。**state には入れない**ので、次の判定で元の折りたたみに戻る。
    */
   const unfoldHits = (ids: readonly string[]): void => {
     const wanted = new Set(ids);
@@ -317,7 +317,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          ルール設定画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
+          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
         </p>
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
@@ -629,7 +629,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 }
 
 /**
- * ルール設定画面の案内。`peek` は案内の間だけのタブの切り替え（控えに書かない）、`before` は始める前のタブ。
+ * ルール管理画面の案内。`peek` は案内の間だけのタブの切り替え（state に書かない）、`before` は始める前のタブ。
  * 最後の段に入る前に始める前のタブへ戻す（ヘッダ右上の ? はどのタブにも出ている）
  */
 function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonly TourStep[] {

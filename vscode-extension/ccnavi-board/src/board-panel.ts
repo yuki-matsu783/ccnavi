@@ -28,6 +28,7 @@ import {
 import type { BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
 import { renderBoardPage } from "./core/render.js";
 import { showLoading } from "./loading.js";
+import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
@@ -36,9 +37,9 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
-/** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
+/** ファイルの変化をまとめる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
 const TITLE = "ccnavi チケット管理";
 
@@ -69,7 +70,7 @@ interface PanelState {
   /**
    * 前の読み直しから動いたカード。**画面ではなくここが持つ。** 画面は裏に回ると捨てられ、
    * 表に戻ると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
-   * 承認の文を渡してボードに戻った時点で印が消える。決めるのは `core/board-moved.ts`
+   * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
 }
@@ -101,7 +102,7 @@ export async function openBoard(project?: string): Promise<void> {
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -254,8 +255,8 @@ async function update(): Promise<void> {
  * ボードを見せる。中身を渡すのは `send`。
  *
  * **読めたボードはここを必ず通る**ので、動いたカードもここで数え直す。同じボードを渡し直すだけの
- * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の印を
- * そのまま返すので、承認の文を閉じた拍子に印が消えることはない。
+ * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の動いた表示を
+ * そのまま返すので、承認の文を閉じた拍子に動いた表示が消えることはない。
  */
 function show(current: PanelState, board: Board): void {
   current.moved = movedStep(current.moved, board);
@@ -337,10 +338,10 @@ function handleMessage(message: BoardMessage | undefined): void {
       current.host.ready();
       redraw(current);
       // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
+      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
       postAppearance(current.host);
       // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-      // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+      // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
       if (!tourSeen(SCREEN)) {
         current.host.post({ type: "tour" } satisfies ToBoard);
       }
@@ -410,7 +411,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     default: {
       // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
-      // 画面のボタンだけ足して受け側を忘れる、を止める
+      // 画面のボタンだけ足して受け側を書き忘れるのを防ぐ
       const unhandled: never = message;
       void unhandled;
       return;
@@ -419,8 +420,8 @@ function handleMessage(message: BoardMessage | undefined): void {
 }
 
 /**
- * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）は realpath で解いた綴りを出すので、
- * 同じ綴りにする（macOS の /tmp → /private/tmp など）。解けなければ渡された綴りのまま
+ * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）は realpath で解いたパスを出すので、
+ * 同じパスにする（macOS の /tmp → /private/tmp など）。解けなければ渡されたパスのまま
  */
 function realRoot(root: string): string {
   try {
@@ -463,7 +464,7 @@ function dispatch(current: PanelState, input: ApprovalInput): void {
 }
 
 /**
- * 遷移が返した「やること」を行う。外へ出るのはここだけ（実行ファイル・端末・クリップボード・
+ * 遷移が返した「やること」を行う。外へ出るのはここだけ（実行ファイル・ターミナル・クリップボード・
  * 新しいセッション・通知）。返事が要るもの（一覧と承認の結果）は、返ってきたらまた `dispatch` に入れる。
  *
  * **返事を入れる前に、パネルがまだ同じかを見る。** 開き直された後のパネルに、前のパネルの
@@ -481,28 +482,24 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     }
     case "approve": {
       // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
-      // 見せた指紋（承認画面の本文・判定が読んだ中身・承認済みチケットに写る中身）も渡す。識別子が同じでも、
+      // 見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに書き込まれる中身）も渡す。識別子が同じでも、
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       if (state === current) {
-        // 運ぶ sh があるかは、承認が返ったこの時点で見る
+        // 承認の push の sh があるかは、承認が返ったこの時点で見る
         dispatch(current, { kind: "approved", outcome, carrier: isFile(path.join(root, PUSH_APPROVED_SCRIPT)) });
       }
       return;
     }
-    // 承認の実行ファイルは承認済みチケットを置くだけで、運ぶ（コミットして push する）のはこの sh
+    // 承認の実行ファイルは承認済みチケットを置くだけで、コミットして push するのはこの sh
     case "carry":
       runInTerminal(root, pushApprovedCommand(root));
       return;
     case "copy":
-      await vscode.env.clipboard.writeText(effect.prompt);
-      vscode.window.setStatusBarMessage(`${effect.what}をコピーしました。Claude Code に貼って送ってください`, 5000);
+      await copyPrompt(effect.prompt, effect.what);
       return;
     case "openSession":
-      // 走っているセッションに送る公開の API は無いので、文を埋めて新しいセッションを開く（送信はユーザが Enter）
-      await vscode.env.openExternal(
-        vscode.Uri.parse(`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(effect.prompt)}`),
-      );
+      await openPromptInSession(effect.prompt);
       return;
     case "loadDecide": {
       const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase);
@@ -624,7 +621,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "promptOpen":
       return { type: m.type };
     case "approve":
-      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きになる。
+      // 形が崩れていたら捨てる。「全部承認」として扱うと、検証に失敗したときに承認の範囲が広がってしまう。
       return Array.isArray(m.tickets) &&
         m.tickets.every((t) => typeof t === "string") &&
         typeof m.filtered === "boolean"

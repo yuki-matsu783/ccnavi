@@ -1,4 +1,4 @@
-// 拡張の本体を 1 本に束ねる。`pnpm run compile` が tsc のあとに呼ぶ。
+// 拡張の本体を 1 本にバンドルする。`pnpm run compile` が tsc のあとに呼ぶ。
 //
 // 実行時の依存（yaml）を vsix に入れるため。package.sh は vsce を --no-dependencies で
 // 走らせて node_modules を見に行かないので、依存はここで本体に取り込んでおく。

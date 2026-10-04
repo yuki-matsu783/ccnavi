@@ -7,13 +7,13 @@
  *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh。scripts/ccnavi-setup.sh が配る）
  *   5. ソースがあれば `uv run python -m ccnavi`
  *
- * どれも相対ならワークスペースルートからの相対。Windows の `.exe` は綴りに無くても試す。
+ * どれも相対ならワークスペースルートからの相対。Windows の `.exe` はパスに付いていなくても試す。
  *
  * 指す先が振り分けの sh（名前が `ccnavi-launcher.sh`）なら、実体は sh の置き場の親の
  * `bin/<os>-<arch>/` に並ぶ（`.ccnavi/scripts/` の sh なら `.ccnavi/bin/<os>-<arch>/`）。
  * 拡張は sh を通さずその実体を探し、sh そのものは返さない。Windows では sh を直接起動
  * できないので、sh を返すと起動に失敗する。実体が無ければ次の候補へ進む。
- * それ以外の綴りは、綴りそのものを探す。語は ccnavi/infra/platformtag.py と揃える。
+ * それ以外のパスは、そのパスそのものを探す。語は ccnavi/infra/platformtag.py と揃える。
  *
  * ファイルの有無は呼び手が渡す（テストで実際のファイルシステムを要らなくするため）。
  */

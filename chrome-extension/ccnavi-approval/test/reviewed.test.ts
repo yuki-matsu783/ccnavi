@@ -1,10 +1,10 @@
 /**
- * Chrome の「レビュー済み」（ADR-0093 の 8.9。段階 4）。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome の「レビュー済み」。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
- * - 録ったホストの応答の見本（test/fixtures/host/github/）から TS が組む写しが、sh が組んだ期待値と同じ
+ * - 録ったホストの応答の見本（test/fixtures/host/github/）から TS が組む結果が、sh が組んだ期待値と同じ
  * - 依頼の後の変更の一覧（compare API）は、打ち切り・祖先でない・無い、のどれでも null（動いたと数える）
  * - ボードは依頼済みのフェーズにスレッドと通らない理由を出し、通るときだけ「レビュー済みにする」を出す
- * - 押すと読み直して Python の confirm が通したときだけ 1 コミットで書く。印は PAT の持ち主（actor）と
+ * - 押すと読み直して Python の confirm が通したときだけ 1 コミットで書く。マーカーは PAT の持ち主（actor）と
  *   経路（chrome）を持つ。未解決・変更要求・依頼の後のコードの変更があれば書かない
  * - スレッドの本文は承認の画面と同じ規則で描く（実行されない・隠れない）
  * - PAT は画面に渡らない
@@ -46,7 +46,7 @@ function client(fetch: gh.Fetch) {
   return { host: HOSTS[0], token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait };
 }
 
-/** 依頼を済ませた家族 i0004 を積み、場面の見本を付けた模擬の GitHub */
+/** 依頼を済ませた親子のチケット i0004 を積み、場面の見本を付けた模擬の GitHub */
 function reviewing(scene: string): MockGitHub {
   const mock = new MockGitHub(fixture());
   mock.branch(FAMILY, "main");
@@ -69,7 +69,7 @@ async function panelOf(mock: MockGitHub) {
   return { board, fam, panel: fam.reviews?.[0] };
 }
 
-test("CX-T129 録ったホストの応答の見本ごとに、TS が組む写しは sh が組んだ期待値（expected.json）と同じ", async () => {
+test("CX-T129 録ったホストの応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
   assert.deepEqual(sceneNames(), ["changes-requested", "cr-commented", "full-page", "hostile", "paged", "pending", "resolved"]);
   for (const name of sceneNames()) {
     const scene = loadScene(name);
@@ -108,10 +108,10 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
   for (const [scene, button, why] of [
     ["resolved", 1, null],
     ["full-page", 1, null],
-    // GitHub では目印で始まるスレッドも数える（11.8.1 の決定 C）
+    // GitHub では目印で始まるスレッドも数える（目印は誰でも書ける）
     ["paged", 0, /未解決のスレッドが 4 件残っている/],
     ["changes-requested", 0, /変更要求のレビューが立っている/],
-    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない（決定 A）
+    // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない
     ["cr-commented", 0, /変更要求のレビューが立っている/],
     ["pending", 0, /変更要求のレビューが立っている/],
   ] as const) {
@@ -133,7 +133,7 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
   }
 });
 
-test("CX-T132 レビュー済みにする: 子を done/ へ動かし、印（actor = PAT の持ち主・via chrome）を 1 コミットで書く", async () => {
+test("CX-T132 レビュー済みにする: 子を done/ へ動かし、マーカー（actor = PAT の持ち主・via chrome）を 1 コミットで書く", async () => {
   const mock = reviewing("resolved");
   const before = mock.head(FAMILY);
   const out = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));
@@ -212,7 +212,7 @@ test("CX-T135 スレッドの悪意のある本文は描いても実行されず
   assert.equal(box.querySelectorAll("button").length, 0);
 });
 
-test("CX-T136 service worker の読み取り（スレッドの写し・変更の一覧）の答えに PAT は入らない。MR の無いブランチは断る", async () => {
+test("CX-T136 service worker の読み取り（スレッドを取得した結果・変更の一覧）の答えに PAT は入らない。MR の無いブランチは断る", async () => {
   const mock = reviewing("resolved");
   const d = deps(mock, new Map([["github.com", TOKEN]]));
   const at = JSON.parse(mock.files(FAMILY)[REQUESTED]).head as string;
@@ -245,10 +245,10 @@ test("CX-T137 レビュー済みで Python に投げた要求（board・confirm�
   }
 });
 
-test("CX-T139 レビューの一覧が 404・並びでないなら投げ（レビュー無しと読まない）、compare の一覧が並びでないなら null", async () => {
+test("CX-T139 レビューの一覧が 404・配列でないなら投げ（レビュー無しと読まない）、compare の一覧が配列でないなら null", async () => {
   const answer = (status: number, json: unknown) => async () => ({ status, ok: status < 300, json: async () => json, headers: { get: () => null } });
   await assert.rejects(gh.pullReviews(client(answer(404, { message: "Not Found" })), "acme", "widgets", 42), /404/);
-  await assert.rejects(gh.pullReviews(client(answer(200, { message: "?" })), "acme", "widgets", 42), /並びでない/);
+  await assert.rejects(gh.pullReviews(client(answer(200, { message: "?" })), "acme", "widgets", 42), /配列でない/);
   const a = "a".repeat(40);
   const b = "b".repeat(40);
   assert.equal((await gh.compareFiles(client(answer(200, { status: "ahead" })), "acme", "widgets", a, b)).files, null);
@@ -256,7 +256,7 @@ test("CX-T139 レビューの一覧が 404・並びでないなら投げ（レ�
   assert.deepEqual((await gh.compareFiles(client(answer(200, { status: "identical", files: [] })), "acme", "widgets", a, b)).files, []);
 });
 
-test("CX-T140 レビュー済みの読み取りの受け口も、設定画面で登録したリポジトリだけ受ける", async () => {
+test("CX-T140 レビュー済みの読み取りのハンドラも、設定画面で登録したリポジトリだけ受ける", async () => {
   const mock = reviewing("resolved");
   const d = deps(mock, new Map([["github.com", TOKEN]]), new Map(), () => new Date(), []);
   const at = JSON.parse(mock.files(FAMILY)[REQUESTED]).head as string;
@@ -271,7 +271,7 @@ test("CX-T140 レビュー済みの読み取りの受け口も、設定画面で
   assert.ok(!mock.calls.some((c) => c.includes("/pulls")), mock.calls.join("\n"));
 });
 
-test("CX-T141 同じ家族の依頼済みのフェーズが 2 つでも、MR・スレッド・レビューは 1 度だけ読む", async () => {
+test("CX-T141 同じ親子のチケットの依頼済みのフェーズが 2 つでも、MR・スレッド・レビューは 1 度だけ読む", async () => {
   const mock = new MockGitHub(fixture());
   mock.branch(FAMILY, "main");
   const at = mock.push(FAMILY, reviewFamilyFiles(FAMILY, 2), "2 フェーズぶんのレビュー待ち");

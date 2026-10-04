@@ -1,22 +1,22 @@
-"""`.ccnavi/` の組み込み deny とレイヤーの名前を、綴りを変えて回避できないことの受入テスト。
+"""`.ccnavi/` の組み込み deny とレイヤーの名前を、表記を変えて回避できないことの受入テスト。
 
 どれも、直さないと組み込み deny が「守っている」と言いながら回避できる形。
 `.claude/` の側も同じ当て方で守られる。
 
-- A-2 大文字小文字: `glob` と `regex` で書いたルールと組み込みの守りを、どの機械でも
+- A-2 大文字小文字: `glob` と `regex` で書いたルールと組み込みの保護を、どの機械でも
   区別せずに当てる。区別が要る `regex` は `(?-i:...)` で囲む
-- A-3 区切りが続かない綴り: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
+- A-3 区切りが続かないパス: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
 - A-4 生の `id` のコロン: レイヤーの名前をつけた形と見分けが付かないものを error にする
 - A-5 `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
-- A-6 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、綴りを変えた形でも
+- A-6 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、表記を変えた形でも
   区切りの無い形でも、Write / Edit とシェルの両方で書き換えられない
 
-レイヤーの名札（`self` / `common`）とプロジェクト名が同じときも、予約は両側に掛かる。
+レイヤーの名前（`self` / `common`）とプロジェクト名が同じときも、予約は両側に掛かる。
 
 - `projects/self/` への Write / Edit は、そのプロジェクトの deny で判定され、
   ワークスペース自身のレイヤーのルールに落ちない（ReservedLayerNameTest）
-- `projects/common/` のレイヤーの 3 本は、控えの key が共通レイヤーと衝突せず、
-  控えと復元の対象に入る（ReservedLayerRestoreTest）
+- `projects/common/` のレイヤーの 3 本は、バックアップの key が共通レイヤーと衝突せず、
+  バックアップと復元の対象に入る（ReservedLayerRestoreTest）
 
 道具は外から動かす（`tests/inproc.py` の `run_ccnavi`）。fixture は
 tests/config/test_config_union.py の ConfigUnionHarness と
@@ -27,9 +27,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 import unittest
 
-from ccnavi.infra import settings
+from ccnavi.infra import settings, shellread
+from ccnavi.policy import selfguard
 from tests.config.test_config_union import (
     COMMON_RISK,
     HOME,
@@ -44,7 +47,7 @@ from tests.config.test_config_union import (
 from tests.config.test_config_union_guard import GuardHarness
 
 # A-2 の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
-# `glob` も `regex` も組み込みの守りも、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
+# `glob` も `regex` も組み込みの保護も、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
 # 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
 # 区別が要るときだけ、書いたユーザが `(?-i:...)` で囲む。
 CASE_RULES = {
@@ -66,7 +69,7 @@ CASE_RULES = {
             "id": "regex-exact",
             "match": "Write|Edit",
             "regex": r"[\\/](?-i:strict)[\\/]",
-            "message": "strict は書いた綴りのとおりに当てる。",
+            "message": "strict は書いた表記のとおりに当てる。",
         },
     ],
     "allow": [{"id": "anything-read", "match": "Read", "regex": "."}],
@@ -116,7 +119,7 @@ SELF_PROJECT_RULES = {
 }
 
 # 穴 1 の的。ワークスペース自身のレイヤーに置く、広い allow と 1 本の deny。
-# 予約名のプロジェクトのレイヤーを名札で引くとこのレイヤーに当たるので、そのプロジェクトへの
+# 予約名のプロジェクトのレイヤーを名前で引くとこのレイヤーに当たるので、そのプロジェクトへの
 # Write がここの allow で通り、ここの deny で止まる。どちらも起きてはいけない。
 WIDE_OWN_RULES = {
     "version": 1,
@@ -146,7 +149,7 @@ RESERVED_PROJECT_RULES = {
 }
 
 # 穴 2 の的。予約名のプロジェクトのレイヤーの phases / risk。中身は何でもよく、
-# 控えと復元の対象に入るかだけを見る。
+# バックアップと復元の対象に入るかだけを見る。
 RESERVED_PROJECT_PHASES = """\
 version: 1
 phases:
@@ -172,11 +175,11 @@ COUNT_RISK = (
 
 
 class GlobCaseTest(ConfigUnionHarness):
-    """A-2: ルールに書いた綴りの扱い。
+    """A-2: ルールに書いたパスの扱い。
 
     `glob` も `regex` も、`risk.py` / `phasetypes.py` / `ticket.py` の範囲と同じく、
     どの機械でも大文字小文字を区別せずに当たる。区別すると、`.ccnavi/` を `.Ccnavi/` の
-    綴りで作って deny に止められずに通れる。区別が要るときは `(?-i:...)` で囲む。
+    パスで作って deny に止められずに通れる。区別が要るときは `(?-i:...)` で囲む。
     """
 
     def setUp(self):
@@ -185,7 +188,7 @@ class GlobCaseTest(ConfigUnionHarness):
 
     def test_glob_ignores_case_on_every_machine(self):
         """11.4: `glob` の deny は、どの機械でも大文字小文字を区別せずに当たる。"""
-        # 実体があると、区別しない機械では `os.path.realpath` が綴りをディスクの側へ
+        # 実体があると、区別しない機械では `os.path.realpath` がパスをディスクの側へ
         # 補正してしまい、この問い自体が消える（フラグ無しでも当たる）。
         self.assertFalse(os.path.exists(os.path.join(self.ws, "secret")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "secret", "x.txt"))
@@ -199,8 +202,8 @@ class GlobCaseTest(ConfigUnionHarness):
     def test_regex_ignores_case_on_every_machine(self):
         """11.4: `regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
 
-        区別すると、`Write` の経路だけが綴り違いで外れる。同じ場所へシェルから書く形は
-        組み込みの守り（selfguard._folded）が綴りの違いを無視して止めるので、経路で答えが分かれる。
+        区別すると、`Write` の経路だけが表記違いで外れる。同じ場所へシェルから書く形は
+        組み込みの保護（selfguard._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
         """
         self.assertFalse(os.path.exists(os.path.join(self.ws, "token")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "token", "x.txt"))
@@ -222,13 +225,13 @@ class BuiltinGlobCaseTest(GuardHarness):
     """A-2: 組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずに当たる（穴そのもの）。
 
     的は app のレイヤー。fixture の app は `.ccnavi/` を持たないので、`.Ccnavi/` は
-    ディスクに無く、`os.path.realpath` が綴りを補正しない。「まだ無いところを
-    綴り違いで作る」という、ちょうど回避が成り立つ形になる。
+    ディスクに無く、`os.path.realpath` がパスを補正しない。「まだ無いところを
+    表記違いで作る」という、ちょうど回避が成り立つ形になる。
     """
 
     def test_the_builtin_project_home_deny_matches_a_swapped_spelling(self):
         """11.6: `.Ccnavi/config/rules.yml` への Write も組み込みの deny で止まる。"""
-        # ccnavi ディレクトリがディスクに無いことが前提。あると realpath が綴りを補正して、
+        # ccnavi ディレクトリがディスクに無いことが前提。あると realpath がパスを補正して、
         # 問いが消える。
         self.assertFalse(os.path.exists(os.path.join(self.app, HOME)))
         exact = os.path.join(self.app, HOME, "config", "rules.yml")
@@ -236,7 +239,7 @@ class BuiltinGlobCaseTest(GuardHarness):
             self.guarded_hook("Write", self.ws, file_path=exact), "builtin-guard-project-home"
         )
 
-        # 区別する機械でも止める。組み込みの守りだけが機械で当たり方を変えると、
+        # 区別する機械でも止める。組み込みの保護だけが機械で当たり方を変えると、
         # どの機械でも区別しないルールの glob やチケットの範囲と食い違う。
         swapped = os.path.join(self.app, ".Ccnavi", "config", "rules.yml")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
@@ -244,10 +247,10 @@ class BuiltinGlobCaseTest(GuardHarness):
 
 
 class ShellPlaceTest(GuardHarness):
-    """A-3: 区切りが続かない綴り。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
+    """A-3: 区切りが続かないパス。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
 
     def test_removing_or_moving_the_umbrella_itself_is_denied(self):
-        """11.6: `.ccnavi` で終わる綴りも `builtin-guard-setting-files` で止まる。"""
+        """11.6: `.ccnavi` で終わるパスも `builtin-guard-setting-files` で止まる。"""
         for command in (
             "rm -rf .ccnavi",
             "rm -rf projects/lib/.ccnavi",
@@ -272,7 +275,7 @@ class ShellPlaceTest(GuardHarness):
 
         `.claudexyz` や `.ccnavi-notes.md` は別のファイル。`.claude/worktrees/` は
         守る対象ではないので、片付けは通る（`.claude` の側を ccnavi ディレクトリと同じ `_END` で
-        閉じると、ここが止まる）。ccnavi ディレクトリから外へ写すだけの読みも通る。
+        閉じると、ここが止まる）。ccnavi ディレクトリから外へコピーするだけの読みも通る。
         """
         for command in (
             "rm -rf .claudexyz",
@@ -289,7 +292,7 @@ class ShellPlaceTest(GuardHarness):
     def test_copying_out_of_a_common_layer_file_is_not_denied(self):
         """11.6: 共通レイヤーの 1 本をコピー元に書いただけの読みは通る。
 
-        共通レイヤーの節を写す側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
+        共通レイヤーの節をコピーする側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
         数えるのでコピー元に当たり、`cp .ccnavi/common/rules.yml /tmp/x` が止まっていた。
         """
         for name in ("rules.yml", "phases.yml", "risks.yml"):
@@ -319,7 +322,7 @@ class ShellPlaceTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_the_moved_umbrella_is_closed_the_same_way(self):
-        """11.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わる綴りで止まる。"""
+        """11.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わるパスで止まる。"""
         result = self.hook(
             "Bash",
             self.ws,
@@ -328,6 +331,436 @@ class ShellPlaceTest(GuardHarness):
             command="rm -rf projects/lib/.navi",
         )
         self.assert_denied(result, "builtin-guard-setting-files")
+
+    def moved_hook(self, command):
+        return self.hook(
+            "Bash",
+            self.ws,
+            guard="enable",
+            env={"CCNAVI_PROJECT_HOME": ".navi"},
+            command=command,
+        )
+
+    def test_copying_out_of_a_moved_umbrella_is_allowed(self):
+        """11.6: 動かした ccnavi ディレクトリも、cp / ln / install の元の側に出ただけなら通る。
+
+        既定の名前（`_COPY_PLACES`）と同じく、写す側は行き先（最後の引数）だけを見る。
+        動かした名前の表記（`project_home_clause`）を書き込み用のまま写す側に足すと、
+        外へ写すだけの読みまで止まる。
+        """
+        for command in (
+            "cp .navi/config/rules.yml /tmp/x",
+            "cp projects/lib/.navi/config/phases.yml /tmp/x",
+            "cp -r .navi /tmp/keep",
+            "ln -s projects/lib/.navi/config/risks.yml /tmp/x",
+            "install .navi/scripts/count.sh /tmp/x",
+            "cp .navi/config/rules.yml /tmp/x && cat /tmp/x",
+            "cp -t /tmp/out .navi/config/rules.yml",
+            "cp .navi/config/rules.yml /tmp/x -f",
+        ):
+            with self.subTest(command=command):
+                self.assertNotIn(
+                    "builtin-guard-setting-files", self.reason(self.moved_hook(command))
+                )
+
+    def test_the_directory_holding_a_moved_umbrella_is_guarded_by_name(self):
+        """11.6: 名前を動かした ccnavi ディレクトリの入っているディレクトリを行き先にした形。
+
+        行き先の表記に ccnavi ディレクトリの名前が出ないので、元の名前で見る（`_moved_holders`）。
+        いちばん上の名前は、ワークスペースルートを行き先にした形で見る。
+        """
+
+        def nested(command):
+            return self.hook(
+                "Bash",
+                self.ws,
+                guard="enable",
+                env={"CCNAVI_PROJECT_HOME": "cfg/navi"},
+                command=command,
+            )
+
+        for command in (
+            "cp -r /tmp/navi cfg/",
+            "mv /tmp/navi cfg",
+            "cp -rt cfg /tmp/navi",
+            "cp -r /tmp/cfg .",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(nested(command), "builtin-guard-setting-files")
+        for command in ("cp -r /tmp/docs cfg/", "cp -r cfg/navi /tmp/keep"):
+            with self.subTest(command=command):
+                self.assertNotIn("builtin-guard-setting-files", self.reason(nested(command)))
+
+    def test_copying_into_a_moved_umbrella_is_denied(self):
+        """11.6: 行き先が動かした ccnavi ディレクトリかその下なら、cp / ln / install は止まる。
+
+        ディレクトリそのものを行き先にした形、後ろや前に別のコマンドをつないだ形、
+        引用でつないだ語、`-t` で行き先を前に出した形も見る。書き込みの表記（mv / rm / tee /
+        sed -i / リダイレクト）は元の側に出ても今までどおり止まる。
+        """
+        for command in (
+            "cp /tmp/x .navi",
+            "cp /tmp/x projects/lib/.navi",
+            "cp /tmp/x .navi/config/rules.yml",
+            "ln -sf /tmp/x projects/lib/.navi/config/rules.yml",
+            "install /tmp/x .navi/scripts/count.sh",
+            "cp /tmp/x .navi && echo done",
+            "cp /tmp/x .navi/config/rules.yml; echo done",
+            "cp /tmp/x .navi/config/rules.yml &>/dev/null",
+            "echo go && cp /tmp/x .navi/config/rules.yml",
+            'cp "/tmp/a b" .navi/config/rules.yml',
+            'cp /tmp/x ".navi/config/rules.yml"',
+            "cp -t .navi/config /tmp/rules.yml",
+            "cp --target-directory=.navi/config /tmp/rules.yml",
+            "cp -vt projects/lib/.navi /tmp/x",
+            "cp /tmp/x .navi/config/rules.yml -f",
+            "sudo cp /tmp/x .navi/config/rules.yml",
+            "cd projects/lib && cp /tmp/x .navi/config/rules.yml",
+            "mv .navi/config/rules.yml /tmp/x",
+            "rm -rf .navi",
+            "tee .navi/config/rules.yml < /tmp/x",
+            "sed -i s/deny/allow/ .navi/config/rules.yml",
+            "echo x > .navi/config/rules.yml",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(self.moved_hook(command), "builtin-guard-setting-files")
+        # 名前の続きは別の名前。
+        self.assertNotIn(
+            "builtin-guard-setting-files", self.reason(self.moved_hook("cp /tmp/x .navix"))
+        )
+
+    def test_the_default_umbrella_is_closed_after_a_joined_command(self):
+        """11.6: 既定の名前でも、行き先のあとに別のコマンドをつないだ形は止まる。
+
+        写す側の終わり（`_COPY_END`）がコマンドの切れ目を数えないと、
+        `cp -r /tmp/scripts .ccnavi && echo` のようにつなぐだけで ccnavi ディレクトリの中身を
+        差し替えられる。
+        """
+        for command in (
+            "cp -r /tmp/scripts .ccnavi && echo done",
+            "cp /tmp/x .claude; echo done",
+            "cp /tmp/x logs/state && echo done",
+            "cp -r /tmp/scripts .ccnavi 2>&1 | cat",
+            "cp -t .ccnavi/scripts /tmp/count.sh",
+        ):
+            with self.subTest(command=command):
+                result = self.guarded_hook("Bash", self.ws, command=command)
+                self.assert_denied(result, "builtin-guard-setting-files")
+
+
+class CopyDestinationTest(GuardHarness):
+    """11.6: cp / ln / install は行き先だけで当てる（`_COPY_TARGET` / `_COPY_PLACES`）。
+
+    行き先は `-t <dir>` / `--target-directory` の値か、選択肢でない最後の引数。元の側に
+    出ただけの守る場所は読まれるだけなので止めず、行き先になる形は書き方を変えても止める。
+    """
+
+    def assert_guarded(self, command):
+        self.assert_denied(
+            self.guarded_hook("Bash", self.ws, command=command), "builtin-guard-setting-files"
+        )
+
+    def assert_not_guarded(self, command):
+        result = self.guarded_hook("Bash", self.ws, command=command)
+        self.assertNotIn("builtin-guard-setting-files", result.stdout + result.stderr)
+
+    def test_the_four_forms_of_the_report(self):
+        """読むだけのコピーは通り、行き先にした 3 形は止まる。"""
+        self.assert_not_guarded("cp .ccnavi/common/rules.yml /tmp/x")
+        for command in (
+            "cp /tmp/x .ccnavi/common/rules.yml",
+            "cp -t .ccnavi/common /tmp/x",
+            "cp --target-directory=.ccnavi/common /tmp/x",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_every_spelling_of_the_target_option_is_denied(self):
+        """`-t` は束ねても値を続けても、長い名前は頭だけでも、空白で値を渡しても同じ。"""
+        for command in (
+            "cp -t .ccnavi /tmp/x",
+            "cp -t.ccnavi /tmp/x",
+            "cp -vt .ccnavi/common /tmp/x",
+            "cp -rft .ccnavi/scripts /tmp/count.sh",
+            "cp --target-directory .ccnavi/common /tmp/x",
+            "cp --target=.ccnavi/common /tmp/x",
+            "cp --t .ccnavi/common /tmp/x",
+            "ln -st .ccnavi/common /tmp/rules.yml",
+            "ln --target-directory=.ccnavi/common /tmp/rules.yml",
+            "install -Dt .ccnavi/common /tmp/rules.yml",
+            "install -m 644 -t .ccnavi/common /tmp/rules.yml",
+            "cp -t .claude/hooks /tmp/x.sh",
+            "cp -t .claude /tmp/settings.json",
+            "cp -t .claude/ /tmp/settings.json",
+            "cp -t logs/state /tmp/x",
+            "cp -t /abs/path/.ccnavi/common /tmp/x",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_options_after_the_destination_are_skipped(self):
+        """GNU は選択肢を後ろにも置ける。足しただけで行き先が最後の引数でなくなる形も止める。"""
+        for command in (
+            "cp /tmp/x .ccnavi/common/rules.yml -f",
+            "cp /tmp/x .ccnavi/common/rules.yml -f -v",
+            "cp /tmp/x .ccnavi/common/rules.yml -S .bak",
+            "cp /tmp/x .ccnavi/common/rules.yml --suffix .bak --verbose",
+            "cp /tmp/x .ccnavi/common/rules.yml --backup=numbered",
+            "install /tmp/x .ccnavi/common/rules.yml -m 644 -o root -g root",
+            "ln -s /tmp/x .ccnavi/common/rules.yml --force",
+            "cp /tmp/x .ccnavi -r",
+            "cp /tmp/x .ccnavi/common/rules.yml -f 2>/dev/null",
+            "cp /tmp/x .ccnavi/common/rules.yml -f && echo done",
+            "cp /tmp/x .ccnavi/common/rules.yml -S -t",
+            "cp /tmp/x .ccnavi/common/rules.yml --",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_a_dash_t_that_is_a_value_does_not_hide_the_last_argument(self):
+        """値を取る選択肢の値に出た `-t`、`--` のあとの `-t` は行き先を名指ししない。
+
+        GNU は `-Svt` の `vt` を `-S` の値に、`-S -t` の `-t` を値に、`-- -t` の `-t` を元の
+        ファイルに読む。行き先は最後の引数のままなので、そちらで止める。
+        """
+        for command in (
+            "cp -Svt /tmp/x .ccnavi/common/rules.yml",
+            "cp -S -t /tmp/x .ccnavi/common/rules.yml",
+            "cp --suffix -t /tmp/x .ccnavi/common/rules.yml",
+            "install -m -t /tmp/x .ccnavi/common/rules.yml",
+            "cp -- -t /tmp/x .ccnavi/common/rules.yml",
+            "cp /tmp/x '' .ccnavi/common/rules.yml",
+            "install /tmp/x --strip .ccnavi/common/rules.yml",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_detours_around_the_destination_are_denied(self):
+        """つないだ後ろのコマンド、引用、大文字小文字、`\\` 区切り、`--`、実行役のコマンド。"""
+        for command in (
+            "echo go && cp /tmp/x .ccnavi/common/rules.yml",
+            "true; cp /tmp/x .ccnavi/common/rules.yml",
+            "cat /tmp/x | cp /dev/stdin .ccnavi/common/rules.yml",
+            "cp /tmp/x .ccnavi/common/rules.yml | cat",
+            'cp /tmp/x ".ccnavi/common/"rules.yml',
+            "cp /tmp/x '.ccnavi'/common/rules.yml",
+            "cp /tmp/x .CCNAVI/Common/RULES.yml",
+            "CP /tmp/x .ccnavi/common/rules.yml",
+            "cp /tmp/x '.ccnavi\\common\\rules.yml'",
+            "cp -- /tmp/x .ccnavi/common/rules.yml",
+            "cp -T /tmp/x .ccnavi/common/rules.yml",
+            "sudo cp /tmp/x .ccnavi/common/rules.yml",
+            "sudo -u root cp -t .ccnavi/common /tmp/x",
+            "env FOO=1 cp /tmp/x .ccnavi/common/rules.yml",
+            "nohup cp /tmp/x .ccnavi/common/rules.yml",
+            "sh -c 'cp /tmp/x .ccnavi/common/rules.yml'",
+            "cp /tmp/x .ccnavi/common/rules.yml {fd}>/dev/null",
+            "cd .ccnavi/common && cp /tmp/rules.yml .",
+            "cp /tmp/settings.json .claude/",
+            "mv /tmp/settings.json .claude/",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_reading_copies_pass_through_the_guard(self):
+        """守る場所が元の側にだけ出る形は、選択肢やつないだコマンドがあっても組み込みの保護では止めない。"""
+        for command in (
+            "cp .ccnavi/common/rules.yml /tmp/x",
+            "cp /repo/.ccnavi/common/rules.yml /tmp/backup.yml",
+            "cp -r .ccnavi /tmp/keep",
+            "cp -v .ccnavi/common/rules.yml .ccnavi/common/phases.yml /tmp/out/",
+            "cp .ccnavi/common/rules.yml /tmp/x -f",
+            "cp .ccnavi/common/rules.yml -t /tmp/out",
+            "cp -t /tmp/out .ccnavi/common/rules.yml",
+            "cp --target-directory=/tmp/out .ccnavi/common/rules.yml",
+            "cp -T .ccnavi/common /tmp/out",
+            "cp -v -t /tmp/out .ccnavi/common/rules.yml",
+            "cp --verbose -t /tmp/out .ccnavi/common/rules.yml",
+            "cp -t /tmp/out .ccnavi/common/rules.yml .ccnavi/common/phases.yml",
+            "ln -s .ccnavi/common/rules.yml /tmp/link",
+            "install -m 644 .ccnavi/common/rules.yml /tmp/x",
+            "cp .claude/settings.json /tmp/x",
+            "cp .claude/hooks/x.sh /tmp/x",
+            "cp logs/decisions.jsonl /tmp/x",
+            "cp -r logs/state /tmp/x",
+            "cp .ccnavi/scripts/ccnavi-git.sh /tmp/x",
+            "sudo cp .ccnavi/common/rules.yml /tmp/x",
+            "cp .ccnavi/common/rules.yml /tmp/x && cat /tmp/x",
+            "cp .ccnavi/common/rules.yml /tmp/x 2>/dev/null",
+        ):
+            with self.subTest(command=command):
+                self.assert_not_guarded(command)
+
+    def test_writes_from_the_source_side_are_still_denied(self):
+        """元と行き先を分けるのは cp / ln / install だけ。書き込み側は今までどおり。"""
+        for command in (
+            "mv .ccnavi/common/rules.yml /tmp/x",
+            "rm .ccnavi/common/rules.yml",
+            "tee .ccnavi/common/rules.yml < /tmp/x",
+            "dd if=/tmp/x of=.ccnavi/common/rules.yml",
+            "truncate -s 0 .ccnavi/common/rules.yml",
+            "patch .ccnavi/common/rules.yml /tmp/p",
+            "shred .ccnavi/common/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/common/rules.yml",
+            "echo x > .ccnavi/common/rules.yml",
+            "cp .ccnavi/common/rules.yml /tmp/a && rm .ccnavi/common/rules.yml",
+            "cp .ccnavi/common/rules.yml /tmp/a > .ccnavi/common/phases.yml",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_skipping_options_does_not_blow_up(self):
+        """後ろの選択肢の割り方は 1 通り。当たらない長い並びでもすぐ返る。"""
+        regex = re.compile(selfguard.guard_shell_regex(self.ws), re.IGNORECASE)
+        for tail in (" -S" * 60, " -S -" * 60, " --suffix" * 60, " -m x" * 60):
+            text = shellread.read("cp /tmp/x .ccnavi/common/rules.yml" + tail + " /tmp/y").text
+            with self.subTest(tail=tail[:12]):
+                start = time.monotonic()
+                regex.search(text)
+                self.assertLess(time.monotonic() - start, 1.0)
+
+
+class HolderDestinationTest(GuardHarness):
+    """11.6: 守るものが入っているディレクトリを行き先にした形（`selfguard.holder_regex`）。
+
+    行き先の表記に守るファイルの名前が出ないので、場所の表記では当たらない。元の側に
+    守る名前の語か、名前の決まらない語があるときだけ止め、別の名前を置くだけの形は止めない。
+    """
+
+    def assert_guarded(self, command):
+        self.assert_denied(
+            self.guarded_hook("Bash", self.ws, command=command), "builtin-guard-setting-files"
+        )
+
+    def assert_not_guarded(self, command):
+        result = self.guarded_hook("Bash", self.ws, command=command)
+        self.assertNotIn("builtin-guard-setting-files", result.stdout + result.stderr)
+
+    def test_the_forms_of_the_report_are_denied(self):
+        """報告の 2 形。cp と mv で、行き先を `logs/` だけで書く。"""
+        for command in (
+            "cp /tmp/decisions.jsonl logs/",
+            "mv /tmp/decisions.jsonl logs/",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_every_spelling_of_a_directory_destination_is_denied(self):
+        """行き先の書き方、元の名前の書き方、つなぎ方、実行役のコマンド、`cd` で移った先。"""
+        for command in (
+            "cp /tmp/decisions.jsonl logs",
+            "cp /tmp/decisions.jsonl ./logs/",
+            "cp /tmp/decisions.jsonl logs/.",
+            "cp /tmp/decisions.jsonl /repo/logs//",
+            "cp /tmp/decisions.20260101.jsonl logs/",
+            "cp -r /tmp/state logs/",
+            "cp -r /tmp/state/ logs",
+            "mv /tmp/state logs/",
+            "ln -s /tmp/decisions.jsonl logs/",
+            "install -m 644 /tmp/decisions.jsonl logs/",
+            "cp /tmp/notes.txt /tmp/decisions.jsonl logs/",
+            "cp /tmp/decisions.jsonl.bak /tmp/decisions.jsonl logs/",
+            "cp decisions.jsonl logs/",
+            "cp /tmp/decisions.jsonl logs/ -f",
+            "cp /tmp/decisions.jsonl logs/ 2>/dev/null",
+            "cp -- /tmp/decisions.jsonl logs/",
+            "cp -- /tmp/decisions.jsonl -t logs/",
+            "cp -S -t /tmp/decisions.jsonl logs/",
+            "cp -t logs /tmp/decisions.jsonl",
+            "cp -t logs/ /tmp/notes.txt /tmp/decisions.jsonl",
+            "cp -vt logs /tmp/decisions.jsonl",
+            "cp -tlogs /tmp/decisions.jsonl",
+            "cp --target-directory=logs /tmp/decisions.jsonl",
+            "cp --target logs /tmp/decisions.jsonl",
+            "cp /tmp/decisions.jsonl -t logs",
+            "mv -t logs /tmp/decisions.jsonl",
+            "CP /tmp/DECISIONS.JSONL LOGS/",
+            'cp "/tmp/decisions.jsonl" "logs/"',
+            "cp '/tmp\\decisions.jsonl' 'logs\\'",
+            "echo go && cp /tmp/decisions.jsonl logs/",
+            "true; mv /tmp/decisions.jsonl logs/",
+            "cp /tmp/decisions.jsonl logs/ | cat",
+            "sudo cp /tmp/decisions.jsonl logs/",
+            "env A=1 mv /tmp/decisions.jsonl logs/",
+            "cd logs && cp /tmp/decisions.jsonl .",
+            "cd logs && mv /tmp/decisions.jsonl ./",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_sources_whose_name_is_not_fixed_are_denied(self):
+        """名前が表記から決まらない元、中身をそのまま置く元、`-T` は止まる側に数える。"""
+        for command in (
+            "cp /tmp/* logs/",
+            "cp /tmp/dec?sions.jsonl logs/",
+            "cp /tmp/[d]ecisions.jsonl logs/",
+            'cp "$F" logs/',
+            "cp $(ls /tmp/x) logs/",
+            "cp -r /tmp/d/. logs/",
+            "cp -r . logs/",
+            "cp -rT /tmp/d logs",
+            "cp -r --no-target-directory /tmp/d logs",
+            "cp -t logs /tmp/*",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_the_workspace_root_as_a_destination_is_denied(self):
+        """ルート直下の守る名前（`.ccnavi` `.claude` `logs`）を、ルートへ写す形。"""
+        root = self.ws.replace(os.sep, "/")
+        for command in (
+            "cp -r /tmp/.ccnavi .",
+            "cp -r /tmp/.claude ./",
+            "cp -r /tmp/logs .",
+            "mv /tmp/.ccnavi .",
+            "cp -rt . /tmp/.ccnavi",
+            f"cp -r /tmp/.ccnavi {root}",
+            f"cp -r /tmp/.ccnavi {root}/",
+            "cd sub && cp -r /tmp/.ccnavi ..",
+        ):
+            with self.subTest(command=command):
+                self.assert_guarded(command)
+
+    def test_other_names_and_reading_copies_pass_through_the_guard(self):
+        """別の名前を置くだけの形と、守る場所から外へ写すだけの形は組み込みの保護では止めない。"""
+        for command in (
+            "cp /tmp/notes.txt logs/",
+            "mv /tmp/notes.txt logs/",
+            "cp -t logs /tmp/notes.txt",
+            "cp /tmp/decisions.jsonl.bak logs/",
+            "cp /tmp/mydecisions.jsonl logs/",
+            "cp /tmp/statement logs/",
+            "cp /tmp/decisions.jsonl backlogs/",
+            "cp /tmp/decisions.jsonl logs/old/",
+            "cp /tmp/decisions.jsonl /tmp/logs.d/",
+            "cp logs/decisions.jsonl /tmp/",
+            "cp -r logs/state /tmp/out/",
+            "cp -t /tmp/out logs/decisions.jsonl",
+            "cp logs/a.log logs/b.log",
+            "cp -r .ccnavi /tmp/keep",
+            "cp -r /tmp/src .",
+            "cp -r /tmp/.ccnavi /tmp/keep/",
+        ):
+            with self.subTest(command=command):
+                self.assert_not_guarded(command)
+
+    def test_scanning_many_sources_does_not_blow_up(self):
+        """元の語は最初に見つかったもので決め打ちする。当たらない長い並びでもすぐ返る。"""
+        regex = re.compile(selfguard.guard_shell_regex(self.ws), re.IGNORECASE)
+        for tail in (
+            " /tmp/decisions.jsonl" * 300,
+            " $x" * 300,
+            " -T" * 300,
+            " -t logs" * 300,
+            " -- /tmp/decisions.jsonl" * 200,
+            " -S -t" * 300,
+        ):
+            for verb in ("cp", "mv"):
+                text = shellread.read(f"{verb} /tmp/x{tail} /tmp/y").text
+                with self.subTest(verb=verb, tail=tail[:12]):
+                    start = time.monotonic()
+                    regex.search(text)
+                    self.assertLess(time.monotonic() - start, 1.0)
 
 
 class ColonIdTest(ConfigUnionHarness):
@@ -372,7 +805,7 @@ class ColonIdTest(ConfigUnionHarness):
 
 
 class ReservedSelfTest(ConfigUnionHarness):
-    """A-5: `self` は予約。`projects/Self/` のような綴り違いも同じに扱う。"""
+    """A-5: `self` は予約。`projects/Self/` のような表記違いも同じに扱う。"""
 
     def setUp(self):
         super().setUp()
@@ -394,14 +827,14 @@ class ReservedLayerNameTest(ConfigUnionHarness):
     """穴 1: 予約名のプロジェクトへの Write が、ワークスペース自身のレイヤーで判定される。
 
     `layers` は `projects/self/` を数えないのに、`layer_for` は
-    `target.project or LAYER_SELF` を名札で引いていた。`target.project` が `"self"`
-    なら名札と一致するので、ワークスペース自身のレイヤーが返る。**そのプロジェクトへの
+    `target.project or LAYER_SELF` をレイヤーの名前で引いていた。`target.project` が `"self"`
+    ならレイヤーの名前と一致するので、ワークスペース自身のレイヤーが返る。**そのプロジェクトへの
     Write / Edit が、プロジェクト自身の deny を一度も読まずに、ワークスペースのレイヤーの
     ルールで判定される。**
 
     穴が再現する形に組む。ワークスペース自身のレイヤーに広い `allow`（`self:wide`）と
     deny（`self:generated`）を置き、プロジェクトのレイヤーに deny（`secret`）を置く。
-    名札でレイヤーを引くと `self:wide` が採られて通り、`self:generated` で止まる。予約名の
+    レイヤーの名前で引くと `self:wide` が採られて通り、`self:generated` で止まる。予約名の
     プロジェクトはレイヤー無しなので共通レイヤーだけで判定し、どちらも記録に現れない。
     """
 
@@ -429,7 +862,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         result = self.hook("Write", self.ws, file_path=os.path.join(project, "secret", "x.txt"))
 
         record = self.last_record()
-        # 穴の本体。名札でレイヤーを引くと、ここに `self:wide` が入り、decision が allow になる。
+        # 穴の本体。レイヤーの名前で引くと、ここに `self:wide` が入り、decision が allow になる。
         self.assertNotIn("self:wide", record.get("rules", []), record)
         self.assertNotEqual(record["decision"], "allow", record)
         # プロジェクトのレイヤーも足さない（レイヤー無し）。
@@ -440,13 +873,13 @@ class ReservedLayerNameTest(ConfigUnionHarness):
     def check_the_workspace_deny_does_not_reach(self, name):
         """ワークスペース自身のレイヤーの deny も、予約名のプロジェクトには当たらないこと。"""
         project = self.project(name, rules=RESERVED_PROJECT_RULES)
-        # 前提。同じ綴りはワークスペースのツリーでは止まる。
+        # 前提。同じパスはワークスペースのツリーでは止まる。
         self.assert_denied(
             self.hook("Write", self.ws, file_path=os.path.join(self.ws, "generated", "x.py")),
             "self:generated",
         )
 
-        # 名札でレイヤーを引くと、ここも `self:generated` で止まる。
+        # レイヤーの名前で引くと、ここも `self:generated` で止まる。
         # レイヤー無しなら共通レイヤーだけ。
         self.assert_not_denied(
             self.hook("Write", self.ws, file_path=os.path.join(project, "generated", "x.py"))
@@ -458,7 +891,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.check_no_layer_is_borrowed(settings.LAYER_SELF)
 
     def test_the_spelling_does_not_change_it(self):
-        """11.4: `projects/Self/` も同じ（綴りの大文字小文字は問わない）。"""
+        """11.4: `projects/Self/` も同じ（表記の大文字小文字は問わない）。"""
         self.check_no_layer_is_borrowed("Self")
 
     def test_a_write_into_projects_common_is_not_judged_by_the_workspace_layer(self):
@@ -487,7 +920,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
             with self.subTest(name=name):
                 errors = self.problems("error", where=self.project_where(name))
                 self.assertTrue(any("予約" in p["detail"] for p in errors), errors)
-                # 文面から「どちらの綴りが予約か」が読めること。
+                # 文面から「どちらの表記が予約か」が読めること。
                 self.assertTrue(
                     any(
                         f"`{settings.LAYER_COMMON}`" in p["detail"]
@@ -525,7 +958,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
 
 class ReservedLayerRestoreTest(GuardHarness):
-    """穴 2: `projects/common/` のレイヤーの 3 本が控えと復元の対象から落ちる。
+    """穴 2: `projects/common/` のレイヤーの 3 本がバックアップと復元の対象から落ちる。
 
     `_layer_key` が `layer == LAYER_COMMON` の文字列比較で key を決めていた。
     `projects/common/` があると、そのレイヤーの key が `rules` / `phases` / `risk` になって
@@ -545,7 +978,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         )
 
     def test_the_layer_of_a_project_named_common_is_restored(self):
-        """11.6: 名札と同じ名前のプロジェクトでも、レイヤーの 3 本が控えと復元の対象。"""
+        """11.6: 名札と同じ名前のプロジェクトでも、レイヤーの 3 本がバックアップと復元の対象。"""
         for kind in settings.LAYER_KINDS:
             with self.subTest(kind=kind):
                 path = layer_path(self.reserved, kind)
@@ -555,7 +988,7 @@ class ReservedLayerRestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, kind))
 
     def test_the_restore_asks_the_project_git(self):
-        """11.6: 戻す先を聞く相手はそのプロジェクトの git。控えが無くても戻る。"""
+        """11.6: 戻す先を聞く相手はそのプロジェクトの git。バックアップが無くても戻る。"""
         path = layer_path(self.reserved, "rules")
         expected = read(path)
         os.remove(path)
@@ -591,7 +1024,7 @@ class ReservedLayerRestoreTest(GuardHarness):
 class ScriptTamperTest(GuardHarness):
     """A-6: 既に参照されている `.ccnavi/scripts/` のスクリプトを書き換える・消す経路。
 
-    コア（控えと復元）には入れない。止まることだけを確かめる（A-2 と A-3 の結果）。
+    コア（バックアップと復元）には入れない。止まることだけを確かめる（A-2 と A-3 の結果）。
     """
 
     def setUp(self):
@@ -602,28 +1035,28 @@ class ScriptTamperTest(GuardHarness):
         git(self.lib, "commit", "--quiet", "-m", "script")
 
     def test_the_reference_is_valid(self):
-        """11.4.2: 前提の確認。この `script:` は `--lint` に咎められない（参照が生きている）。"""
+        """11.4.2: 前提の確認。この `script:` は `--lint` に報告されない（参照が生きている）。"""
         errors = self.problems("error", where=self.project_where("lib"))
         self.assertEqual([p for p in errors if "count.sh" in p["detail"]], [], errors)
 
     def test_named_tools_cannot_rewrite_it(self):
-        """11.6: Write / Edit は、正しい綴りでも綴りを変えた形でも止まる。"""
+        """11.6: Write / Edit は、正しいパスでも表記を変えた形でも止まる。"""
         for tool in ("Write", "Edit"):
             with self.subTest(tool=tool):
                 self.assert_denied(
                     self.guarded_hook(tool, self.ws, file_path=self.script),
                     "builtin-guard-project-home",
                 )
-        # どの機械でも止める。区別しない機械では、この綴りで書けば本物が書き換わる。
-        # 区別する機械では別のファイルだが、組み込みの守りの当たり方を機械で変えない。
-        # 補正が無い形（ccnavi ディレクトリがまだ無いところを綴り違いで作る）は
+        # どの機械でも止める。区別しない機械では、このパスで書けば本物が書き換わる。
+        # 区別する機械では別のファイルだが、組み込みの保護の当たり方を機械で変えない。
+        # 補正が無い形（ccnavi ディレクトリがまだ無いところを表記違いで作る）は
         # BuiltinGlobCaseTest。
         swapped = os.path.join(self.lib, ".Ccnavi", "scripts", "count.sh")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
         self.assert_denied(result, "builtin-guard-project-home")
 
     def test_the_shell_cannot_rewrite_or_delete_it(self):
-        """11.6: シェルも同じ。ccnavi ディレクトリごと消す形も、綴りを変えた形も止まる。"""
+        """11.6: シェルも同じ。ccnavi ディレクトリごと消す形も、表記を変えた形も止まる。"""
         for command in (
             "rm -rf projects/lib/.ccnavi/scripts/count.sh",
             "echo x > projects/lib/.ccnavi/scripts/count.sh",
@@ -635,7 +1068,7 @@ class ScriptTamperTest(GuardHarness):
                     self.guarded_hook("Bash", self.ws, command=command),
                     "builtin-guard-setting-files",
                 )
-        # シェルの側も、場所の綴りはどの機械でも区別せずに当てる（selfguard._folded）。
+        # シェルの側も、場所のパスはどの機械でも区別せずに当てる（selfguard._folded）。
         swapped = "rm -rf projects/lib/.Ccnavi/scripts/count.sh"
         result = self.guarded_hook("Bash", self.ws, command=swapped)
         self.assert_denied(result, "builtin-guard-setting-files")

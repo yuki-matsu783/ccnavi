@@ -1,5 +1,5 @@
 /**
- * テストの名前に付ける ID（`CB-T…` / `CB-D…`）の決まりを、テストで守る。
+ * テストの名前に付ける ID（`CB-T…` / `CB-D…`）の決まりを、テストで確かめる。
  *
  * ID は「落ちたテストを名指しする」ためのもので、README やチケットの記録から参照する。
  * **同じ番号が 2 つあると、どちらの主題か読めない**。画面ごとに別のファイルで
@@ -51,7 +51,7 @@ function names(): Named[] {
 
 test("CB-T163 テストの ID は重複しない。足すときは最後尾の次を採る", () => {
   const found = names();
-  assert.ok(found.length > 100, `テストを数えられていない（${found.length} 件）。置き場の綴りが変わった？`);
+  assert.ok(found.length > 100, `テストを数えられていない（${found.length} 件）。置き場のパスが変わった？`);
   const seen = new Map<string, string[]>();
   for (const { id, where } of found) {
     seen.set(id, [...(seen.get(id) ?? []), where]);

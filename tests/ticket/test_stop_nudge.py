@@ -1,4 +1,4 @@
-"""`finish` の打ち忘れを Stop で促す（ADR-0087）の受入テスト。道具を外から呼んで応答だけを見る。
+"""`finish` の打ち忘れを Stop で促す受入テスト。道具を外から呼んで応答だけを見る。
 
 促すのは、cwd のワークツリーのチケットが着手済みで、未コミットの変更が無く、基準点より先に
 コミットがあるときだけ。1 回の連鎖に 1 回（`stop_hook_active`）。何を除くかをここで固定する。
@@ -191,11 +191,11 @@ class StopNudgeTest(TicketTest):
         self.assertEqual(body.get("decision"), "block")
         self.assertIn("コミットが 2 件", body["reason"])
         self.assert_quiet(self.stop(tree))
-        # 別のセッションは自分の控えを持つ。
+        # 別のセッションは自分の記録を持つ。
         self.assertEqual(self.body(self.stop(tree, session="s2")).get("decision"), "block")
 
     def test_without_a_place_to_remember_it_does_not_ask(self):
-        """控えの置き場が無ければ、覚えられないので促さない（毎回止めない側）。"""
+        """state の置き場が無ければ、覚えられないので促さない（毎回止めない側）。"""
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)
@@ -245,7 +245,7 @@ class StopNudgeTest(TicketTest):
         git(self.parent_tree, "branch", "-m", "i0001", "renamed")
         self.assert_quiet(self.stop(tree))
 
-    # ---- `match: Stop` のルール（ADR-0090）と重なったとき
+    # ---- `match: Stop` のルールと重なったとき（1 回の Stop で止める理由は 1 つにする）
 
     def test_the_finish_nudge_goes_first_and_the_stop_rule_is_not_counted(self):
         """同じ Stop で両方が止めたいとき、`finish` の促しだけを出し、ルールの数えは進めない。"""

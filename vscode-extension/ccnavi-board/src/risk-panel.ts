@@ -4,7 +4,7 @@
  *
  * 画面は React（`src/webview/risk/`）で、ここが渡すのは「いま何を見せるか」（`RiskData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
@@ -42,7 +42,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/common/risks.yml";
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "risk";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
@@ -55,7 +55,7 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: RiskDocument;
   readonly riskPath: string;
-  /** ワークスペースルートからの相対で見せる綴り */
+  /** ワークスペースルートからの相対で見せるパス */
   readonly riskRel: string;
 }
 
@@ -100,7 +100,7 @@ export async function openRisk(): Promise<void> {
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -132,12 +132,12 @@ export async function openRisk(): Promise<void> {
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
   // 読むのはタブを作ってから。読めなかったときもタブは閉じず、中にエラーを出す（`showError`）。
-  // 読むのはファイル 1 本ですぐ終わるが、束ねた画面が組み上がるまでの間はほかの画面と同じ一言を見せる
+  // 読むのはファイル 1 本ですぐ終わるが、バンドルした画面が組み上がるまでの間はほかの画面と同じ一言を見せる
   reload(current);
 }
 
 function readPage(root: string): Loaded {
-  // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
+  // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_RISK` など）では動かせない。
   const riskRel = DEFAULT_RISK;
   const riskPath = resolveIn(root, riskRel);
   let text: string;
@@ -172,10 +172,10 @@ function registerPanelHandlers(current: PanelState): void {
 
   // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
   // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが届いていなかったらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -305,7 +305,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 
 /**
  * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
- * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
+ * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;
@@ -406,7 +406,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToRisk);
 }
@@ -423,7 +423,7 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     redraw(current);
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToRisk);
     }
@@ -535,7 +535,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
+    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
     fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.riskRel)}`);
     return;
   }

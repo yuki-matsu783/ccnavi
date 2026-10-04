@@ -2,11 +2,11 @@
  * 設定画面で入れるもの（`chrome.storage.local` の `repos`）。PAT はここに持たない（別の鍵で
  * service worker だけが読む）。
  *
- * - 統合先の名前（D30）: リポジトリごと。空ならホストのデフォルトブランチ
- * - 直近 N 日（表示用。D2）: 既定 3 日。ここに入ったブランチは提案を見つけるのに使うだけで、
+ * - 統合先の名前: リポジトリごと。空ならホストのデフォルトブランチ
+ * - 直近 N 日（表示用）: 既定 3 日。ここに入ったブランチは提案を見つけるのに使うだけで、
  *   判定の入力（統合先・`P`・閉包の `P_X`）は変えない
- * - ユーザが指定したブランチ（表示用。D2）
- * - プロジェクト名（段階 5。3.3 の 7・10.3 の 1）: このリポジトリが手元で `projects/<名前>` に clone される
+ * - ユーザが指定したブランチ（表示用）
+ * - プロジェクト名: このリポジトリが手元で `projects/<名前>` に clone される
  *   プロジェクトなら、その名前。空ならワークスペース自身。プロジェクトのリポジトリは、判定に要るワークスペースの
  *   統合先（共通レイヤー・設定・互換のマーカー）を読むために、登録したワークスペースのリポジトリ（`workspace`）を名指しする
  */
@@ -22,7 +22,7 @@ export interface RepoConfig {
   readonly integration: string;
   readonly recentDays: number;
   readonly extraBranches: readonly string[];
-  /** プロジェクト名（`projects/<名前>` の名前）。空ならワークスペース自身（段階 5） */
+  /** プロジェクト名（`projects/<名前>` の名前）。空ならワークスペース自身 */
   readonly project: string;
   /** プロジェクトのリポジトリのワークスペース（`repoKey` の形）。ワークスペース自身なら空 */
   readonly workspace: string;
@@ -67,11 +67,11 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   return { host: host.id, owner, repo, integration, recentDays: days, extraBranches, project, workspace };
 }
 
-/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、レイヤーの名札に予約した名前（`settings.is_reserved_layer_name`） */
+/** プロジェクト名の形（識別子と同じ。`ticket._ID`）と、レイヤーの名前に予約した名前（`settings.is_reserved_layer_name`） */
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_LAYER = new Set(["common", "self"]);
 
-/** 保存された並びを読む。読めない行は捨てる（画面で直させる） */
+/** 保存された配列を読む。読めない行は捨てる（画面で直させる） */
 export function readRepos(value: unknown, hosts: readonly Host[]): RepoConfig[] {
   if (!Array.isArray(value)) {
     return [];

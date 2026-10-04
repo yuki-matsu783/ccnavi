@@ -18,8 +18,8 @@ from ..tickets import approval, flow, phase
 from ..tickets import ticket as ticket_mod
 from . import judge, post, projskills, reasons
 
-# サブエージェントには Stop の振り返り（ADR-0090）が届かないので、始まりに 1 行だけ渡す。
-# メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
+# サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
+# 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
 CANDIDATE_NOTE = (
     "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に"
     "「スキル候補」の節を足して書いてください（対象のスキル・何を直すか・根拠）。"
@@ -47,18 +47,19 @@ def at_start(
     子の範囲を案内し、調査役がどこで作業すればよいか分からなくなる（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
-    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（ADR-0091）。
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（本文は要るときに
+    # 自分で開く）。
     # 子チケットの一覧が無い起動（チケット制御が無い、チケットの無いツリー）でも渡す。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
-    # 振り返りの候補は、止められないサブエージェントには報告で返してもらう（ADR-0090）。
+    # 振り返りの候補は、止められないサブエージェントには報告で返してもらう。
     skills = f"{skills}\n\n{CANDIDATE_NOTE}" if skills else CANDIDATE_NOTE
     if not conf.tickets_enabled:
         return _say(stdout, skills)
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return _say(stdout, skills)
-    # 権威のある側（親のツリー）の写しを読む。着手で書かれる基準点は親のツリーの
-    # 写しにだけ入るので、子のツリーに checkout されている版では足りない。
+    # 本物とする側（親のツリー）のチケットを読む。着手で書かれる基準点は親のツリーの
+    # チケットにだけ入るので、子のツリーに checkout されている版では足りない。
     copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     bound = tree.lookup(index, t.name)
@@ -70,7 +71,7 @@ def at_start(
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ（ADR-0088）。
+    # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ。
     preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     approval.align_imported(conf, root, preds)
     lines = [
@@ -107,7 +108,7 @@ def at_start(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
-        # 子のフロー（設計 9.12、ADR-0085）。在ればファイルを名指しし、手順を並べる。
+        # 子のフロー（設計 9.12）。在ればファイルを名指しし、手順を並べる。
         # フローはユーザが書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
         scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
         try:
@@ -237,17 +238,17 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
 
 
 def _bounce_path(state_dir: str, session: str, who: str) -> str:
-    """差し戻しの印の置き場。セッションと、その中で相手を見分ける鍵で分ける。
+    """差し戻しの記録の置き場。セッションと、その中で相手を見分ける鍵で分ける。
 
-    セッションを鍵に入れるのは、控えの置き場がワークスペースに 1 つしか無いから。
-    入れないと、別のセッションが置いた印を読んで、一度も差し戻していない相手を
-    「差し戻し済み」として通す。印が消えるのは、親の PostToolUse が `agentId` を
+    セッションを鍵に入れるのは、state の置き場がワークスペースに 1 つしか無いから。
+    入れないと、別のセッションが置いた記録を読んで、一度も差し戻していない相手を
+    「差し戻し済み」として通す。記録が消えるのは、親の PostToolUse が `agentId` を
     持って通ったときだけなので、残った 1 つは次の日のセッションでも有効なままになる。
 
     `who` は `agent_id`。持たない payload では、そのワークツリーの名前を使う。
-    1 つの綴り（`unknown`）に全員をまとめると、最初の 1 体が差し戻されたあと、
+    1 つの名前（`unknown`）に全員をまとめると、最初の 1 体が差し戻されたあと、
     同じ置き場を見る他のサブエージェントが誰も差し戻されなくなる。しかも
-    `agent_id` を持たない相手の印は `ignored_bounce` が消せないので、消えない。
+    `agent_id` を持たない相手の記録は `ignored_bounce` が消せないので、消えない。
     ツリーの名前なら、少なくとも別の子で作業する相手は巻き込まない。
     """
     where = fsio.safe_name(session) or "unknown"

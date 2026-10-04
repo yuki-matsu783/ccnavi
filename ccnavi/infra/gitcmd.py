@@ -36,7 +36,7 @@ def _env() -> dict[str, str]:
 
     `GIT_NO_LAZY_FETCH=1` は partial clone の遅延取得を止める。無い blob を読むとき git は
     promisor のリモートへ取りに行くので、実行ファイルがネットワークに出ることになる
-    （docs/claude/exe-boundary.md。ADR-0093 の段階 2d のレビュー）。取れない blob は
+    （docs/claude/exe-boundary.md）。取れない blob は
     「読めない」になる。
     """
     return {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1"}
@@ -121,7 +121,7 @@ def blob(
     """その版に入っている 1 本の中身を、バイト列のまま返す。`(中身, 読めた)`。
 
     文字列で読むと、UTF-8 でない中身（Shift_JIS のコメントを持つスクリプトなど）と単独の CR が
-    読み替えられ、中身の突き合わせが食い違う。その版にその綴りが無ければ `(None, True)`、
+    読み替えられ、中身の突き合わせが食い違う。その版にそのパスが無ければ `(None, True)`、
     git を起こせない・期限に達した・版が無いときは `(None, False)`。
     """
     listed = run(cwd, ["ls-tree", "-z", rev, "--", path], timeout)

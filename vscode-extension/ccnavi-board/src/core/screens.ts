@@ -9,7 +9,7 @@
  * 組み立ての誤りなので例外で止める（ユーザの操作では起こらない）。
  */
 
-/** ルール設定画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
+/** ルール管理画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
 export type RulesTarget =
   | { readonly kind: "workspace" }
   | { readonly kind: "self" }
@@ -21,7 +21,7 @@ export type PhasesTarget =
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
 
-/** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集）。引数は開く側が解く（空の綴りや未登録のプロジェクトの扱いは各パネルの持ち物） */
+/** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {
   /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース（プロジェクト外）、`"*"` は全部、未指定は前回のまま） */
   readonly board: (project?: string) => Promise<void>;
@@ -30,7 +30,7 @@ export interface Screens {
   readonly phases: (target: PhasesTarget) => Promise<void>;
   readonly projects: () => Promise<void>;
   /**
-   * 子チケット 1 枚のフロー編集画面（ADR-0085）。ボードのカードの「フロー」からだけ開く。
+   * 子チケット 1 枚のフロー編集画面。ボードのカードの「フロー」からだけ開く。
    * タブは子ごとに 1 枚で、同じ子をもう 1 度開けば前面に出す
    */
   readonly flow: (ticket: string) => Promise<void>;

@@ -3,7 +3,7 @@
  *
  * 画面のスクリプトは文字列で HTML に埋めてあり、型検査の対象にならない。イベントの付け忘れや
  * 無い id への参照は、DOM で動かして初めて分かる。ここでは VS Code の Webview が渡す
- * `acquireVsCodeApi` を差し替え、postMessage と state を控えて、テストから読めるようにする。
+ * `acquireVsCodeApi` を差し替え、postMessage と state を記録して、テストから読めるようにする。
  *
  * happy-dom は innerHTML で入れた script を実行しないので、CSP の meta を外したうえで
  * 本文を入れ、JSON でない script だけを順に window.eval で走らせる。
@@ -160,7 +160,7 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   let state: unknown = initialState;
   (window as unknown as { acquireVsCodeApi: () => unknown }).acquireVsCodeApi = () => ({
     // 画面の中の配列やオブジェクトは happy-dom 側の realm のもので、strict な deepEqual が
-    // 「構造は同じだが参照が違う」と落とす。JSON で写してこちらの realm に移す。
+    // 「構造は同じだが参照が違う」と落とす。JSON で複製してこちらの realm に移す。
     postMessage: (message: Posted) => {
       posted.push(JSON.parse(JSON.stringify(message)) as Posted);
     },

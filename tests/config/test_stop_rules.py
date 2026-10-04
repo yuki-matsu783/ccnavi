@@ -1,8 +1,9 @@
 """`match: Stop` のルール（ターンの終わりに N 回に 1 度止めて文を渡す）の受入テスト。
 
-メインエージェントの Stop は、これまで `finish` の打ち忘れ（ADR-0087）のほかは止めなかった。
+メインエージェントの Stop は、これまで `finish` の打ち忘れのほかは止めなかった。
 `match: Stop` の `allow` のルールを書いたときだけ、渡す回（`every`）に `decision: block` で止め、
-ルールの文を `reason` に載せる（ADR-0090）。見るのは次のとおり。
+ルールの文を `reason` に載せる。Stop でモデルに文を届ける経路は、止めて `reason` に
+書くことしか無いため。見るのは次のとおり。
 
 1. 書いていなければ今までどおり止めない
 2. `every: N` で N 回に 1 度止める。本文のファイルも載る。数えはセッションごと
@@ -10,7 +11,7 @@
 4. 数えを覚えられない（`--state ""`）ときは止めない
 5. `dry-run` は止めず、止めたはずの文を `systemMessage` に載せる
 6. cwd がプロジェクトの中でも同じルールが当たる。プロジェクトのレイヤーのルールも当たる
-7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない綴り、`every` の無いものを
+7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない表記、`every` の無いものを
    warn で言う
 
 `finish` の促しと重なったときの順は tests/ticket/test_stop_nudge.py。
@@ -279,8 +280,11 @@ class StopRulesTest(unittest.TestCase):
             self.assertEqual(self.blocked(self.stop(cwd=cwd)), "")
 
     def test_a_stale_project_copy_of_the_common_rule_is_not_counted_twice(self):
-        """共通レイヤーの写し（ADR-0084）が古くなって `every` が違っても、
-        数えるのは共通レイヤーの 1 本。"""
+        """プロジェクトのレイヤーへ写した共通レイヤーが古くなって `every` が違っても、
+        数えるのは共通レイヤーの 1 本。
+
+        共通レイヤーは親の着手でプロジェクトのレイヤーへコピーするので、コピーしたレイヤーが古いまま残ることがある。
+        """
         home = self.project()
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
         stale = {"version": 1, "allow": [stop_rule(additionalContext=NUDGE, every=3)]}
@@ -298,7 +302,7 @@ class StopRulesTest(unittest.TestCase):
         self.assertNotIn("自身のレイヤー", reason)
 
     def test_the_file_is_read_from_the_workspace_root_only(self):
-        """本文のファイルはワークスペースルートの版だけ。プロジェクトやワークツリーの写しは読まない。"""
+        """本文のファイルはワークスペースルートの版だけ。プロジェクトやワークツリーの版は読まない。"""
         home = self.project()
         write(os.path.join(self.root, "docs", "review.md"), "ワークスペースの手順")
         write(os.path.join(home, "docs", "review.md"), "プロジェクトの手順")

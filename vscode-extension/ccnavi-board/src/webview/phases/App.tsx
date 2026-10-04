@@ -6,10 +6,10 @@
  *
  * **中身（`data`）が届いたら、編集中の種類はその中身で置き換える。** 届くのは編集を捨ててよい
  * ときだけ（ユーザが「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
- * 帯（`changed`）が出るだけ（ADR-0062）。
+ * 帯（`changed`）が出るだけ。
  *
  * **id の重なりだけは画面で止める。** 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
- * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す（ADR-0035）。
+ * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -86,7 +86,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [helpOpen, setHelpOpen] = useState(false);
   /**
    * 案内を始める前の画面の様子。案内は一覧と図を切り替え、見本の行と関係の欄を開き、絞り込みを外すので、
-   * 閉じたらこれに戻す。**案内の間の一覧と図の切り替えは控え（`saveView`）に書かない**（途中でタブを
+   * 閉じたらこれに戻す。**案内の間の一覧と図の切り替えはstate（`saveView`）に書かない**（途中でタブを
    * 閉じたときに、次から図で開く、ということを起こさない）。
    */
   const beforeTour = useRef<TourSnapshot | undefined>(undefined);
@@ -311,7 +311,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     post({ type: "tourDone" });
   };
 
-  /** 案内の間の一覧と図の切り替え。控えには書かない */
+  /** 案内の間の一覧と図の切り替え。state には書かない */
   const peekView = (next: View): void => setView(next);
 
   /** 案内で指す見本の行。関係（overlap / requires / after）を持つ最初の行、無ければ最初の行 */
@@ -520,7 +520,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <code>feedback:</code> に <code>feedback</code> の種類を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
             <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
-            after の書き漏れがあると、その種類は並行してよいものとして扱われるので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には反映されません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。
+            after の書き漏れがあると、その種類は並行してよいものとして扱われるので、図で確かめてください。待ち方は親チケットの承認のときに親へコピーされ、あとで直しても進行中の親には反映されません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。
             関係の欄はこのファイルのほかの種類から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の種類の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">

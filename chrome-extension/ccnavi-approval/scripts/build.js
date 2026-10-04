@@ -1,13 +1,13 @@
-// 拡張を dist/ に組む（ADR-0093 段階 1）。
+// 拡張を dist/ に組む。
 //
 //   node scripts/build.js [--hosts <一覧の JSON>] [--out <出力先>]
 //
 // 1. 型を見る（画面・Worker・service worker は tsconfig.json、Node で回す部品は tsconfig.node.json）
 // 2. 通信先の一覧（既定 hosts.json）から manifest.json を組む。`host_permissions` と CSP の
-//    `connect-src` は一覧の API のオリジンだけ（D24）。組織ごとのビルドは --hosts で一覧を替える
-// 3. esbuild で 4 本（background・board・options・worker）を束ねる
-// 4. 同梱の Pyodide を node_modules から写し、scripts/pyodide-files.json のハッシュと突き合わせる
-//    （npm の lockfile の integrity とは別に、写した物そのものを確かめる）
+//    `connect-src` は一覧の API のオリジンだけ。組織ごとのビルドは --hosts で一覧を替える
+// 3. esbuild で 4 本（background・board・options・worker）をバンドルする
+// 4. 同梱の Pyodide を node_modules からコピーし、scripts/pyodide-files.json のハッシュと突き合わせる
+//    （npm の lockfile の integrity とは別に、コピーした物そのものを確かめる）
 // 5. 同梱の Python（PyYAML・ccnavi・入口）を zip に組む（scripts/python.js）
 //
 // Pyodide（約 14MB）はリポジトリに入れない。取ってくるのは pnpm install と PyYAML の sdist だけ。

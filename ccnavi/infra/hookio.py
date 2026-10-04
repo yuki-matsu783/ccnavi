@@ -67,7 +67,8 @@ class Input:
     # 続けさせた結果（連鎖の 2 回目以降）。促しを 1 回に留めるために読む。
     stop_hook_active: bool = False
     # source は SessionStart にだけ来る。`startup` / `resume` / `clear` / `compact`。Stop の促しの
-    # 数えを捨てるのは `startup` だけ（ADR-0090、ctxfile.forget）。
+    # 数えを捨てるのは `startup` だけ（ctxfile.forget）。compact・再開・clear で捨てると、
+    # compact が N 回より先に来る長いセッションで一度も届かない。
     source: str = ""
 
     def field_value(self, name: str) -> str:
@@ -119,7 +120,7 @@ def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "")
 
     context はルールの `additionalContext`。判定と一緒に `additionalContext` として
     載せる。deny でも ask でも、理由と一緒にモデルへ届くことは実際に確かめた
-    （2026-09、Claude Code 2.1）。空なら鍵ごと出さない。
+    （Claude Code 2.1）。空なら鍵ごと出さない。
     """
     payload: dict[str, Any] = {
         "hookEventName": PRE_TOOL_USE,
@@ -203,5 +204,5 @@ def rebind_streams() -> None:
                 stream.reconfigure(encoding="utf-8", errors="replace")
             else:
                 # 出す改行は LF に固定する。Windows の既定（CRLF）だと、1 行 1 項目の答えを
-                # 読む sh（`sed -n 's/^鍵 //p'`）の値の末尾に CR が残る（ADR-0093 の段階 2d）。
+                # 読む sh（`sed -n 's/^鍵 //p'`）の値の末尾に CR が残る。
                 stream.reconfigure(encoding="utf-8", errors="replace", newline="\n")

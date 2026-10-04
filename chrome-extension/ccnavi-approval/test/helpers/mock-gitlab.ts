@@ -1,10 +1,10 @@
 /**
- * 模擬の GitLab（段階 5）。見本のリポジトリ（test/fixtures/repo.ts）を、拡張が使う GitLab の REST API（v4）の形で返す。
+ * 模擬の GitLab。見本のリポジトリ（test/fixtures/repo.ts）を、拡張が使う GitLab の REST API（v4）の形で返す。
  * コミットの置き場（sha・tree・履歴・push・merge）は模擬の GitHub と同じものを使う（`MockGitHub` を継ぐ）。
  *
  * 書き込みは Commits API（`POST repository/commits` の `actions`）。本物と同じく「先頭がこの sha のときだけ」の指定は
  * 無く、今の先頭に積む（作るのに既にある・書き換えるのに無い・消すのに無いは 400）。試験は `beforeCommit` で、
- * 拡張が先頭を読んだ後・書く前に他の書き手を割り込ませ、事後確認と打ち消し（8.4 の 1 段目）を見る。
+ * 拡張が先頭を読んだ後・書く前に他の書き手を割り込ませ、事後確認と元に戻すコミットを見る。
  *
  * MR のスレッドとレビューは、録ったホストの応答の見本（test/fixtures/host/gitlab/。`gitlab-fixture.ts`）を付けると
  * そのとおりに返す（`attachGitLabScene`）。
@@ -224,7 +224,7 @@ export class MockGitLab extends MockGitHub {
         this.glCommits.push({ ...call, result: "error" });
         return { status: 400, json: { message: a.action === "create" ? "A file with this name already exists" : "A file with this name doesn't exist" } };
       }
-      // 本物と同じく、last_commit_id がそのファイルを最後に変えたコミットでなければ断る（決定 A）
+      // 本物と同じく、last_commit_id がそのファイルを最後に変えたコミットでなければ断る
       if (a.action !== "create" && a.last_commit_id !== undefined && a.last_commit_id !== this.lastChange(parent, a.file_path)) {
         this.glCommits.push({ ...call, result: "error" });
         return { status: 400, json: { message: "You are attempting to update a file that has changed since you started editing it." } };

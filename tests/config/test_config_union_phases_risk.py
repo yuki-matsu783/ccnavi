@@ -513,7 +513,7 @@ class RiskUnionTest(ConfigUnionHarness):
 
 
 class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
-    """レイヤーを探す先を動かすフラグも、診断の外では有効でない（ADR-0067、issue #65）。
+    """レイヤーを探す先を動かすフラグも、診断の外では有効でない（issue #65）。
 
     `--projects` と `--project-home` は、共通レイヤーの中身を差し替えるのと結果が同じ。
     外すとプロジェクトのレイヤーがまるごと消えるので、そのレイヤーが足していた配点も

@@ -10,13 +10,13 @@ from ccnavi.infra import settings as _settings
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 共通レイヤーの 3 本の既定の綴り。ハーネスはここへ設定を置き、`--rules` / `--phases` /
+# 共通レイヤーの 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
-# hook の判定とチケット・レビューの副命令には届かない（ADR-0067）。
+# hook の判定とチケット・レビューの副命令には届かない。
 #
-# 綴りは実行ファイルから引く。テスト側にもう 1 つ綴りを持つと、既定が動いたときに
-# 2 つが気づかないうちに食い違う。既定の綴りそのものは tests/config/test_common_layer_place.py が
-# 直に書いて見張る。
+# パスは実行ファイルから引く。テスト側にもう 1 つパスを持つと、既定が動いたときに
+# 2 つが気づかないうちに食い違う。既定のパスそのものは tests/config/test_common_layer_place.py が
+# 直に書いて確かめる。
 _COMMON_FILES = {
     "rules": _settings.DEFAULT_RULES,
     "phases": _settings.DEFAULT_PHASES,
@@ -38,7 +38,8 @@ def _block_host_git_config() -> dict[str, str]:
       なる。テストは 1,000 回以上 commit するので、署名の有無だけで全体が倍になる
 
     どちらも「テストが緩む」ではなく「テストの答えが機械で変わる」問題で、
-    同じチケットがどの環境でも同じ場所で止まるという設計（ADR-0051、ticket.py）と
+    同じチケットがどの環境でも同じ場所で止まるという設計（regex も大文字小文字を
+    区別せずに当て、機械で答えを割らない。ticket.py）と
     合わない。
 
     空の設定ではなく `init.defaultBranch` を書いた設定を指すのは、git 自身の
@@ -48,7 +49,7 @@ def _block_host_git_config() -> dict[str, str]:
 
     `/dev/null` を指さないのは Windows に無いため。本物の空ファイルなら 4 環境で同じ。
     `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` は git 2.32 以降。読めているかは
-    `tests/core/test_git_env.py` が見張るので、古い git では気づかれないまま通ることはなく落ちる。
+    `tests/core/test_git_env.py` が確かめるので、古い git では気づかれないまま通ることはなく落ちる。
     """
     home = _tempfile.mkdtemp(prefix="ccnavi-gitconfig-")
     _atexit.register(_shutil.rmtree, home, ignore_errors=True)
@@ -77,19 +78,19 @@ _FIXTURE_WORKSPACES: dict[str, str] = {}
 
 
 def common_relpath(kind: str) -> str:
-    """共通レイヤーのファイル（rules / phases / risk）の、ワークスペースルートからの相対の綴り。"""
+    """共通レイヤーのファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。"""
     return _COMMON_FILES[kind]
 
 
 def common_path(root: str, kind: str) -> str:
-    """そのワークスペースルートの共通レイヤーのファイル（rules / phases / risk）の綴り。"""
+    """そのワークスペースルートの共通レイヤーのファイル（rules / phases / risk）のパス。"""
     return os.path.join(root, common_relpath(kind))
 
 
 def fixture_workspace(name: str = "rules.yml") -> str:
     """`tests/fixtures/<name>` を共通レイヤーのルールに据えたワークスペースルート。
 
-    `--rules` は診断でだけ有効な（ADR-0067）ので、見本のルールを指すのには使わない。
+    `--rules` は診断でだけ有効なので、見本のルールを指すのには使わない。
     `--root` にここを渡して、共通レイヤーの既定の置き場から読ませる。
 
     リポジトリ自身をルートにしないので、走った機械の `.ccnavi/common/rules.yml` が

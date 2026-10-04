@@ -8,7 +8,7 @@
 export const BOARD_VERSION = 1;
 
 /**
- * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`、ADR-0055）だが、
+ * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
  * 列は 未着手（`todo/`）/ 作業中（`approved/doing/` と `review/`）/ 完了（`approved/done/`）/ 取り消し
  * （`approved/done/` で `cancelled_at` を持つ）の 4 つ。レビュー待ちは列ではなくカードの属性で分かる
  */
@@ -57,12 +57,12 @@ export interface SeenInJson {
 }
 
 /**
- * 子チケットのフロー（設計 9.3.1、ADR-0085）。親は null。
+ * 子チケットのフロー（設計 9.3.1）。親は null。
  * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
- * 拡張は写すだけで、`started_at` などから組み直さない（ADR-0035）。
+ * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
-  /** 読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り） */
+  /** 読む先の絶対パス（本物とする側のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ本物とする側のツリーのパス） */
   readonly path: string;
   /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.yml`） */
   readonly rel: string;
@@ -72,10 +72,23 @@ export interface FlowJson {
   /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
   readonly linked: boolean;
   readonly locked: boolean;
+  /** エージェントが書く下書き。置き場はフローと同じツリーの提案の置き場。この欄を出さない古い実行ファイルでは null */
+  readonly draft: FlowDraftJson | null;
+}
+
+/** 子のフローの下書き。効力は無く、ユーザがフロー編集画面で取り込んだものだけが効く */
+export interface FlowDraftJson {
+  /** 絶対パス（既定 `<ツリー>/wip/proposals/flows/<子>.yml`） */
+  readonly path: string;
+  /** ツリーのルートからの相対 */
+  readonly rel: string;
+  readonly exists: boolean;
+  /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
+  readonly linked: boolean;
 }
 
 /**
- * 状態が動いた跡の 1 行（ADR-0086）。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
+ * 状態の履歴の 1 行。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
  * 補助の記録で、状態の正は置き場（`copy` / `proposal`）。拡張は並べるだけで、ここから状態を組み直さない。
  */
 export interface HistoryEntryJson {
@@ -98,8 +111,8 @@ export interface HistoryEntryJson {
 }
 
 /**
- * 満たしていない先行 1 本（ADR-0088）。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
- * 求める。その答えを実行ファイルが出し、拡張は写すだけ（先行の置き場から組み直さない）。
+ * 満たしていない先行 1 本。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
+ * 求める。その答えを実行ファイルが出し、拡張はそのまま受け取るだけ（先行の置き場から組み直さない）。
  */
 export interface PredecessorUnmetJson {
   readonly ticket: string;
@@ -122,7 +135,7 @@ export interface TicketJson {
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /**
-   * 空でなければ「読めるが信頼できない」理由（ADR-0058）。判定はこのチケットの
+   * 空でなければ「読めるが信頼できない」理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。判定はこのチケットの
    * ワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`copy.status` は
    * `open` のままなので、止まっていることはこの欄でしか分からない。
    */
@@ -135,13 +148,13 @@ export interface TicketJson {
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly seen_in: readonly SeenInJson[];
-  /** どれが本物か決まらない写りの全部。決まっていれば空 */
+  /** どれが本物か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
   /** 子のフロー。親と、この欄を出さない古い実行ファイルでは null */
   readonly flow: FlowJson | null;
-  /** 状態が動いた跡の新しい側（古い順）。この欄を出さない古い実行ファイルでは空 */
+  /** 状態の履歴の新しい側（古い順）。この欄を出さない古い実行ファイルでは空 */
   readonly history: readonly HistoryEntryJson[];
 }
 
@@ -210,7 +223,7 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 並びは 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
+  /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];
@@ -353,11 +366,21 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     rel: str(raw.rel),
     tree: str(raw.tree),
     exists: raw.exists === true,
-    // 欄が欠けていたら書かない側にする（リンクかを確かめられない）
+    // 欄が欠けていたら書かない扱いにする（リンクかを確かめられない）
     linked: raw.linked !== false,
-    // 欄が欠けていたら閉じる側にする（止まっているかを確かめられないので、書かせない）
+    // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
+    draft: isRecord(raw.draft) ? flowDraft(raw.draft) : null,
   };
+}
+
+function flowDraft(raw: Record<string, unknown>): FlowDraftJson | null {
+  const path = str(raw.path);
+  if (path === "") {
+    return null;
+  }
+  // 欄が欠けていたらリンクの扱いにする（読まない）
+  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked !== false };
 }
 
 function seenIn(value: unknown): readonly SeenInJson[] {

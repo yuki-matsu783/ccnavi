@@ -33,26 +33,26 @@ from tests.inproc import run_ccnavi
 # 「ワークスペースルートの外」。設計 3.2 の、置ける唯一の形。
 NOT_ROOT = "^{!root}"
 
-# 展開しても現れてはいけない綴り。設計 2.5。
+# 展開しても現れてはいけない表記。設計 2.5。
 # 繰り返しは `_unsupported` が見ないので、ここで見る。
 _QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 _LOOKAROUND = ("(?=", "(?!", "(?<=", "(?<!")
 
 
 def absolute(path: str) -> str:
-    r"""`C:\...` と書いたパスを、いまの機械で絶対パスになる綴りに直す。
+    r"""`C:\...` と書いたパスを、いまの機械で絶対パスになる形に直す。
 
-    展開はルートを 1 文字ずつ写すだけなので、区切りが `\` でも中身は変わらない。
+    展開はルートを 1 文字ずつ書き写すだけなので、区切りが `\` でも中身は変わらない。
     変わるのは**絶対かどうか**で、`rules.real_root` が呼ぶ `os.path.realpath` は、
     相対のパスなら頭に cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
     `<cwd>/C:\Users\...` になってしまい、「中」のはずのパスが全部「外」になり、長さの境界も
-    cwd のぶんだけ変わる。設計 2.3 の表は Windows の綴りのまま残して、頭だけを機械に
+    cwd のぶんだけ変わる。設計 2.3 の表は Windows の表記のまま残して、頭だけを機械に
     合わせる（docs/claude/environment.md「実行環境」: 4 つのどれでも動くように書く）。
 
     `\` は POSIX でも普通の 1 文字として残る（`realpath` が切るのは `/` だけ）。
     展開した式は `\` と `/` のどちらも区切りとして当てるので、そこは直さなくてよい。
 
-    `C:` 以外のドライブ（`D:`）は `/drive-d/` に替える。ドライブごとに別の綴りにするのは、
+    `C:` 以外のドライブ（`D:`）は `/drive-d/` に替える。ドライブごとに別の表記にするのは、
     「別々の 2 つのドライブは互いに外」を後から足したときに、気づかないうちに同じ絶対パスに
     なってしまわないようにするため。**POSIX の絶対パスはどれも `/` で始まるので、最外段
     （ルートの 1 文字目）の「違う」だけは、ここでは試せない。** その段を縛れるのは
@@ -75,10 +75,10 @@ def write(path: str, text: str) -> str:
 
 
 def rules_file(directory: str, *rule: dict, section: str = "deny") -> str:
-    """ルールファイルを 1 枚書いて綴りを返す。
+    """ルールファイルを 1 枚書いてパスを返す。
 
     置くのは共通レイヤーの既定の場所。hook として呼ぶ側は `--rules` を渡せない
-    （診断でだけ有効。ADR-0067）ので、ワークスペースルートの下の既定の綴りに要る。
+    （診断でだけ有効な）ので、ワークスペースルートの下の既定のパスに要る。
     直に `rules.load` に渡すだけのテストは、どこに在っても同じ。
     """
     return write(
@@ -99,7 +99,7 @@ def outside_rule(expression: str = NOT_ROOT, **extra) -> dict:
 
 
 class NotRootExpansionTest(unittest.TestCase):
-    """展開した式が、どの綴りを「外」と数えるか。設計 2。"""
+    """展開した式が、どの表記を「外」と数えるか。設計 2。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -142,7 +142,7 @@ class NotRootExpansionTest(unittest.TestCase):
             root,
             root + r"\README.md",
             root + r"\.claude\worktrees\x\scratchpad\draft.yml",
-            absolute("C:/Users/u/Desktop/git/ccnavi/README.md"),  # 区切りの綴りが違う
+            absolute("C:/Users/u/Desktop/git/ccnavi/README.md"),  # 区切りの表記が違う
             root.lower() + r"\readme.md",  # 大文字小文字が違う
         )
 
@@ -172,12 +172,12 @@ class NotRootExpansionTest(unittest.TestCase):
     def test_root_that_normalizes_to_nothing_is_refused(self):
         """正規化した結果が空になるルートでは「外」が定義できない。設計 2.0。
 
-        `/` の意味が機械で違うので、綴りではなく**正規化の結果**で場合分けする。
+        `/` の意味が機械で違うので、表記ではなく**正規化の結果**で場合分けする。
         POSIX では `realpath('/')` が `/` で、`rstrip` すると空になる（拒否が正しい）。
         Windows では `C:\\` を返すので `C:` が残り、それは正しく展開できる
         ルートなので拒否してはいけない。
 
-        綴りだけを見て「`/` なら拒否」と書くと、Windows でだけ落ちるテストになる。
+        表記だけを見て「`/` なら拒否」と書くと、Windows でだけ落ちるテストになる。
         """
         for root in ("\\", "/"):
             with self.subTest(root=root, real=rules.real_root(root)):
@@ -200,7 +200,7 @@ class NotRootExpansionTest(unittest.TestCase):
         self.assert_inside(root, root, root + "\\", root + "/")
         self.assert_outside(root, absolute(r"C:\Users\u\Desktop\git"), root + "-fork")
 
-    # --- 観点 4・5: 綴りの揺れ ---
+    # --- 観点 4・5: 表記の揺れ ---
 
     def test_mixed_separators_and_regex_metacharacters_in_the_root(self):
         self.assert_inside(absolute(r"C:\Users/u\Desktop"), absolute(r"C:\Users\u\Desktop\x.md"))
@@ -233,7 +233,7 @@ class NotRootExpansionTest(unittest.TestCase):
         self.assert_outside(root, root.replace("i", "j") + r"\x.md")
 
     def test_other_scripts_are_still_outside(self):
-        """トルコ語の I 系以外は、綴りが違えばきちんと「外」になる。"""
+        """トルコ語の I 系以外は、表記が違えばきちんと「外」になる。"""
         root = absolute(r"C:\Users\u\ccnavi")
         self.assert_outside(
             root,
@@ -260,7 +260,7 @@ class NotRootExpansionTest(unittest.TestCase):
             self.assertNotIn(literal, pattern)
 
     def test_the_written_spelling_is_kept(self):
-        """観点 14。書いた綴りは残り、置き換わるのは翻訳後の式だけ。
+        """観点 14。書いた表記は残り、置き換わるのは翻訳後の式だけ。
 
         既存の `{root}` と同じ扱い（rules.py の `_build` のコメント）。
         `--explain` と報告が 475 字の展開結果を出すと、ユーザには読めない。
@@ -312,7 +312,7 @@ class NotRootLimitTest(unittest.TestCase):
         self.addCleanup(self.dir.cleanup)
 
     def long_root(self, length: int) -> str:
-        """ちょうどその長さのルートの綴り。実在しなくてよい。
+        """ちょうどその長さのルートのパス。実在しなくてよい。
 
         末尾が区切りにならないようにする。区切りで終わると `rstrip` で 1 字縮み、
         測りたい境界から外れる（設計 2.0）。
@@ -369,7 +369,7 @@ class NotRootLimitTest(unittest.TestCase):
     def test_deny_falls_closed(self):
         """組み立てられない `deny` は、`match` の全部を止める。設計 4.3。
 
-        捨てると「守りが消える」ほうに落ちる。ここで止まらずに通ると、
+        捨てると「保護が消える」ほうに落ちる。ここで止まらずに通ると、
         このチケットで作ったものが丸ごと意味を失う。
         """
         path = rules_file(self.dir.name, outside_rule())
@@ -400,7 +400,7 @@ class NotRootLimitTest(unittest.TestCase):
         """組み立てに失敗しても、ユーザが書いた文面は消えない。
 
         敵対的レビューで見つかった契約違反の回帰テスト。`--explain` と記録は
-        書いた綴りを出す約束で、それは glob / regex だけでなく文面にも掛かる。
+        書いた表記を出す約束で、それは glob / regex だけでなく文面にも掛かる。
         止められた側へ返す説明は別の欄に持つ。
         """
         path = rules_file(self.dir.name, outside_rule(message="ユーザが書いた本当の文面"))

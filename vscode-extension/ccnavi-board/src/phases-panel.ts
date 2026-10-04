@@ -4,7 +4,7 @@
  *
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
  * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の種類（`.ccnavi/common/phases.yml`。場所は固定）、
@@ -53,7 +53,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
-/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
@@ -74,7 +74,7 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: PhasesDocument;
   readonly phasesPath: string;
-  /** ワークスペースルートからの相対で見せる綴り */
+  /** ワークスペースルートからの相対で見せるパス */
   readonly phasesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
@@ -168,7 +168,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     return;
   }
 
-  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -177,7 +177,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     return;
   }
 
-  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間、押しても何も起きないように見えないように。
+  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
   // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviPhases", titleOf(target), vscode.ViewColumn.One, {
@@ -260,7 +260,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesPath: string;
   const notices: string[] = [];
   if (target.kind === "common") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_PHASES` など）では動かせない。
     phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
@@ -324,10 +324,10 @@ function registerPanelHandlers(current: PanelState): void {
 
   // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
   // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが届いていなかったらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -459,7 +459,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 
 /**
  * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
- * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
+ * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
   const loaded = current.loaded;
@@ -579,7 +579,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToPhases);
 }
@@ -602,7 +602,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     redraw(current);
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は種類の中身が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToPhases);
     }
@@ -706,7 +706,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
+    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
     fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }

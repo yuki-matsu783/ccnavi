@@ -31,7 +31,7 @@ export interface LintJson {
   readonly warns: number;
   /**
    * `--flow <パス>` を渡したときだけ在る。実行ファイルが読んだフローの中身（`data`。読めなければ null。
-   * JSON にそのまま載らない値は `{"$ccnavi": ...}` の印）。無ければ、実行ファイルがフローを見たか分からない
+   * JSON にそのまま載らない値は `{"$ccnavi": ...}` のマーカー）。無ければ、実行ファイルがフローを見たか分からない
    */
   readonly flow?: LintFlow;
 }
@@ -130,7 +130,7 @@ export const FLOW_WHERE = "(flow)";
 /**
  * 渡したフローについての苦情。`where` が `(flow)` のもの。フロー編集画面はこれだけを読む
  * （ほかの設定の苦情でフローの保存を止めない）。読めるか・形が正しいかの答えは実行ファイルが出し、
- * 拡張は並べるだけ（ADR-0035）
+ * 拡張は並べるだけ
  */
 export function problemsOfFlow(lint: LintJson): LintProblem[] {
   return lint.problems.filter((p) => p.where === FLOW_WHERE);

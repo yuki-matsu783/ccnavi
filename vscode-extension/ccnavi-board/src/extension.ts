@@ -16,7 +16,7 @@ import { warnVersionSkew } from "./version-check.js";
 export function activate(context: vscode.ExtensionContext): void {
   // 画面ごとの初回の案内を見たかどうかの置き場（`globalState`）
   initTours(context);
-  // 画面の入口はここに集める。画面どうしは互いを import せず、この帳面を通して開き合う。
+  // 画面の入口はここに集める。画面どうしは互いを import せず、ここで登録した一覧を通して互いを開く。
   registerScreens({
     board: openBoard,
     rules: openRules,
@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext): void {
     projects: openProjects,
     flow: openFlow,
   });
-  // サイドパネルより先に読む。入口の並びがこの値で決まる。
+  // サイドパネルより先に読む。入口の順序がこの値で決まる。
   watchTicketControl(context);
   registerSidebar(context);
   // 実行ファイルと拡張の互換の版が食い違っていれば知らせる。待たない（起動を遅らせない）

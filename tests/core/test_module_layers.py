@@ -34,7 +34,7 @@
 **5 が要るのは、1 から 4 と 6 が import 文しか読まないから。**
 `importlib.import_module("ccnavi.hook.judge")` と、ドットの無い `import ccnavi` に
 続く `ccnavi.hook.judge.…` は、行き先が import 文に残らないので 1 つも見つからない。
-どちらも `ccnavi/` では 1 度も使っていないので、綴りごと止めるほうが安い。
+どちらも `ccnavi/` では 1 度も使っていないので、書き方ごと止めるほうが安い。
 同じ理由で、パッケージの中の書き方を相対の 2 形に限る。同じサブパッケージは
 `from . import x`、別のサブパッケージは `from ..infra import fsio`（`from ..infra.modes import
 EXIT_OK` も可）。3 段以上の相対（`from ...`）、自分のサブパッケージを `..` で指す形
@@ -80,7 +80,7 @@ PACKAGES: tuple[tuple[str, str], ...] = (
 
 # 段は下から上へ。下の段は上の段を知らない。
 #
-# **いまの依存の深さを写したもので、意味で先に引いた線ではない。** 設計書の章立て
+# **いまの依存の深さをなぞったもので、意味で先に引いた線ではない。** 設計書の章立て
 # （ルール・実行前・実行後・チケット）で切ると双方向の辺が残って段にならないので、
 # 深さで切ってある。注記はその段に何が居るかの説明であって、そこへ置く根拠ではない。
 # 役割の線はサブパッケージ（PACKAGES）が引く。
@@ -194,7 +194,7 @@ TIER_OF = {mod: name for name, _, mods in TIERS for mod in mods}
 TIER_MEANING = " / ".join(f"{name}: {note}" for name, note, _ in TIERS)
 PACKAGE_ORDER = {name: i for i, (name, _) in enumerate(PACKAGES)}
 PACKAGE_MEANING = " / ".join(f"{name}: {note}" for name, note in PACKAGES)
-# 直下に置いてよいモジュール。パッケージの印と `python -m ccnavi` の入口だけ。
+# 直下に置いてよいモジュール。パッケージの目印と `python -m ccnavi` の入口だけ。
 TOP_LEVEL = frozenset({"__init__", "__main__"})
 
 
@@ -300,7 +300,7 @@ def imports_of(module: str, known: set[str]) -> set[str]:
 
 
 def hiding_in(module: str) -> list[str]:
-    """そのモジュールで使われている、行き先を import 文から隠す綴り。
+    """そのモジュールで使われている、行き先を import 文から隠す書き方。
 
     - `import ccnavi`（ドット無し）。`import ccnavi.hook.judge` と違い、行き先が
       import 文に出ない。使うときは `ccnavi.hook.judge.…` という属性の参照になる
@@ -308,11 +308,11 @@ def hiding_in(module: str) -> list[str]:
     - 3 段以上の相対（`from ...`）。`ccnavi/` は 2 階層までなので、外へ出るか、行き先を
       読み違える
     - 自分の居るサブパッケージを `..` で指す形（`infra` の中の `from ..infra import fsio`）。
-      同じサブパッケージは `from . import fsio` と書く。2 つの綴りが同じ行き先に並ぶのを避ける
+      同じサブパッケージは `from . import fsio` と書く。2 つの書き方が同じ行き先に並ぶのを避ける
     - `from .. import infra`（`from . import infra` を直下から書くのも同じ）。行き先が
       サブパッケージそのもので、使うモジュールが import 文に出ない
     - パッケージの中の `ccnavi.` で始まる絶対の import。相対の 2 形に揃えておかないと、
-      同じ行き先に綴りが 2 つでき、読み比べにくい
+      同じ行き先に書き方が 2 つでき、読み比べにくい
     """
     found: list[str] = []
     rel = os.path.relpath(path_of(module), PACKAGE).replace(os.sep, "/")
@@ -413,7 +413,7 @@ def _only_a_docstring(path: str) -> bool:
 class ModuleTiersTest(unittest.TestCase):
     def setUp(self):
         self.modules = modules()
-        # 綴りが変わったことに気づかずに「逆流なし」と言わないため。
+        # 書き方が変わったことに気づかずに「逆流なし」と言わないため。
         self.assertGreater(len(self.modules), 20, f"モジュールを数えられていない（{PACKAGE}）")
         self.edges = graph()
 
@@ -537,13 +537,13 @@ class ModuleTiersTest(unittest.TestCase):
         )
 
     def test_no_module_hides_where_it_is_going(self):
-        """行き先を import 文から隠す綴りを使わない。"""
+        """行き先を import 文から隠す書き方を使わない。"""
         hidden = [spell for mod in self.modules for spell in hiding_in(mod)]
         self.assertEqual(
             [],
             hidden,
             "import の行き先が import 文に残らない書き方をしている。1 から 4 と 6 は"
-            "この形を見つけられないか読み違えるので、綴りのほうを止める。パッケージの中は"
+            "この形を見つけられないか読み違えるので、書き方のほうを止める。パッケージの中は"
             "`from . import x`（同じサブパッケージ）と `from ..infra import fsio`（別の"
             "サブパッケージ）の 2 形で書く。自分のサブパッケージを `..` で指さず、同じ"
             "サブパッケージの中は `from . import x`。どうしても要るなら、なぜ要るかを添えてここに"

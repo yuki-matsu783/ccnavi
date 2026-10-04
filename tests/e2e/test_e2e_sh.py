@@ -8,18 +8,18 @@ clone する形（設計 11）。ここで確かめるのは、保護済み sh �
 
 in-process のテストでは掛からない理由が 3 つある。sh は実行ファイルではなく別の
 プロセスで動く。git の作業ツリーの実物（`.git` ファイルの `gitdir:`）が要る。
-Windows のパスの綴りが実物でしか出ない。
+Windows のパスの表記が実物でしか出ない。
 
-git init と worktree add を何度も行い、実行ファイルを写すが、実際に測ると 20 件が 8 秒ほどで
+git init と worktree add を何度も行い、実行ファイルをコピーするが、実際に測ると 20 件が 8 秒ほどで
 終わるので、他のテストと同じく既定で走る。組み立て済みの実行ファイル（`dist/ccnavi`）が
 無ければ skip する。試すのはソースではなくその実行ファイルなので、`ccnavi/` を直したら
 `build.py` で組み立て直してから回す。
 
     uv run python -m unittest tests.e2e.test_e2e_sh -v
 
-`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。実装フェーズの成果物は
-`wip/design/scripts/` に置かれ、ユーザが写すまで `.ccnavi/scripts/` には入らない。
-写す前に新しい sh を測るときは、そこを指す。
+`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。実装フェーズの成果物は
+`wip/design/scripts/` に置かれ、ユーザがコピーするまで `.ccnavi/scripts/` には入らない。
+コピーする前に新しい sh を測るときは、そこを指す。
 
     CCNAVI_SH_DIR=wip/design/scripts uv run python -m unittest tests.e2e.test_e2e_sh
 
@@ -51,11 +51,11 @@ def walk_up_for(relative, skip_worktrees=True):
     候補にしない。**
 
     これを外すと、ワークツリーから回したときにワークツリー自身を見つけてしまう。`.ccnavi/scripts/`
-    は git が運ぶのでどのワークツリーにも写しがあるが、実際に使われるのはワークスペース側の
-    1 本だけ。写したあとにワークツリーから回すと、写す前の版を測って落ちる（実際に
+    は git で共有されるのでどのワークツリーにもコピーがあるが、実際に使われるのはワークスペース側の
+    1 本だけ。コピーしたあとにワークツリーから回すと、コピーする前の版を測って落ちる（実際に
     起きた）。`dist/` は追跡外なのでワークツリーには無く、こちらは上へ歩くだけでよい。
 
-    見つからなければ `ROOT` 直下の綴りを返す。呼ぶ側の skip 判定がそれを見る。
+    見つからなければ `ROOT` 直下のパスを返す。呼ぶ側の skip 判定がそれを見る。
     """
     here = ROOT
     while True:
@@ -163,9 +163,9 @@ class WorkspaceTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # どこを測ったかを出す。通るか落ちるかが「写したかどうか」と食い違ったとき、
-        # 最初に見る情報がこれ。出していなかったせいで、写し済みなのに落ちた
-        # 原因（ワークツリーの古い写しを見ていた）を突き止めるのに 1 往復かかった。
+        # どこを測ったかを出す。通るか落ちるかが「コピーしたかどうか」と食い違ったとき、
+        # 最初に見る情報がこれ。出していなかったせいで、コピー済みなのに落ちた
+        # 原因（ワークツリーの古いコピーを見ていた）を突き止めるのに 1 往復かかった。
         print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)
         cls.tmp = tempfile.mkdtemp(prefix="ccnavi-e2e-")
         cls.ws = os.path.join(cls.tmp, "ws")
@@ -192,7 +192,7 @@ class WorkspaceTest(unittest.TestCase):
         hooks = os.path.join(ws, ".claude", "hooks")
         os.makedirs(hooks, exist_ok=True)
         for name in ("test-py.sh",):
-            # 写す版があればそちらを優先する。CCNAVI_SH_DIR で写す前の版を
+            # コピーする版があればそちらを優先する。CCNAVI_SH_DIR でコピーする前の版を
             # 指しているとき、hook だけ古い版を測ってしまうのを防ぐ。
             src = os.path.join(SH_DIR, name)
             if not os.path.isfile(src):
@@ -281,7 +281,7 @@ class LogPlacementTest(WorkspaceTest):
         self.assertLogsIn("logs", result)
 
     def test_the_returned_path_can_be_opened_from_anywhere(self):
-        """返す綴りは、cwd がプロジェクトでも開ける形であること（設計 4.1）。"""
+        """返すパスは、cwd がプロジェクトでも開ける形であること（設計 4.1）。"""
         p1 = os.path.join(self.ws, "projects", "p1")
         result = self.run_sh("ccnavi-git.sh", "status", cwd=p1)
         shown = result.stdout
@@ -292,16 +292,16 @@ class LogPlacementTest(WorkspaceTest):
         opened = False
         for piece in shown.replace("\n", " ").split():
             candidate = piece.strip("()")
-            # ラッパースクリプトは `log=<綴り>` の形で返す。接頭辞を落としてから開く。
+            # ラッパースクリプトは `log=<パス>` の形で返す。接頭辞を落としてから開く。
             if "=" in candidate:
                 candidate = candidate.split("=", 1)[1]
             if not candidate.endswith(".log"):
                 continue
             # cwd（プロジェクトの中）から開けるか、絶対で開けるかを見る。
-            # ワークスペースからしか開けない綴りは、モード B では届かない。
+            # ワークスペースからしか開けないパスは、モード B では届かない。
             if os.path.isfile(os.path.join(p1, candidate)) or os.path.isfile(candidate):
                 opened = True
-        self.assertTrue(opened, f"返された綴りが cwd から開けない: {shown!r}")
+        self.assertTrue(opened, f"返されたパスが cwd から開けない: {shown!r}")
 
 
 class BinaryDiscoveryTest(WorkspaceTest):
@@ -363,7 +363,7 @@ class WorktreeAddTest(WorkspaceTest):
             os.path.exists(os.path.join(p1, ".claude", "worktrees", "x")),
             "プロジェクトの中にワークツリーができた",
         )
-        self.assertIn("../../.claude/worktrees/", result.stderr, "正しい綴りを案内していない")
+        self.assertIn("../../.claude/worktrees/", result.stderr, "正しいパスを案内していない")
 
     def test_the_correct_spelling_from_inside_a_project_works(self):
         p1 = os.path.join(self.ws, "projects", "p1")
@@ -407,7 +407,7 @@ class CredentialTest(WorkspaceTest):
     def assertNoSecret(self, result, *secrets):
         """伏せた結果を目で比べない。元のトークンの断片で探す。
 
-        「消えているつもりで残っている」形は、綴りを見比べると見落とす。
+        「消えているつもりで残っている」形は、パスを見比べると見落とす。
         origin を読む処理まで届いたことも確かめる。届く前に落ちた実行を
         「漏れなかった」と数えると、穴が開いたままテストが通る。
         """
@@ -467,7 +467,7 @@ class HookTest(WorkspaceTest):
         p1 = os.path.join(self.ws, "projects", "p1")
         hook = os.path.join(self.ws, ".claude", "hooks", "test-py.sh")
         if not os.path.isfile(hook):
-            self.skipTest("test-py.sh が写されていない")
+            self.skipTest("test-py.sh がコピーされていない")
         result = subprocess.run(
             [SHELL, hook],
             cwd=p1,

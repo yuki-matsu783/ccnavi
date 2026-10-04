@@ -5,13 +5,13 @@
 
 レイヤーは 3 種。
 
-- 共通レイヤー: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。ADR-0052）
+- 共通レイヤー: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。env では動かさない）
 - ワークスペース自身のレイヤー: `<ワークスペースルート>/.ccnavi/config/`
 - プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/`
 
 lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無いレイヤー = 空）。
 
-`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と控えの
+`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と state の
 `logs/`）。共通レイヤーの 3 本と自身のレイヤーは追跡するので、ワークスペースから切ったワークツリーに
 ワークツリー側の設定ができ、設計 11.6 が名指しした穴（ワークツリー側の設定が書けて戻らない）を
 再現できる。
@@ -173,7 +173,7 @@ APP_RULES = {
     ],
 }
 
-# lib 側の、app の `deploy` と同じ呼び出しに当たる deny。並びが名前順かを見る。
+# lib 側の、app の `deploy` と同じ呼び出しに当たる deny。名前順に並ぶかを見る。
 LIB_DEPLOY = {
     "id": "deploy-any",
     "match": "Bash",
@@ -206,7 +206,7 @@ ROOT_RULE = {
     "message": "secret.txt は置かない。",
 }
 
-# YAML として壊れている。閉じていない並び。
+# YAML として壊れている。閉じていないリスト。
 BROKEN = "version: 1\ndeny: [\n"
 
 # ccnavi ディレクトリの既定の名前（設計 11.2、`CCNAVI_PROJECT_HOME` の既定）。
@@ -243,7 +243,7 @@ FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
 
 
 def layer_path(root, kind, home=HOME):
-    """その git プロジェクトルートのレイヤーのファイル（rules / phases / risk）の綴り。"""
+    """その git プロジェクトルートのレイヤーのファイル（rules / phases / risk）のパス。"""
     return os.path.join(root, home, "config", FILE_NAMES[kind])
 
 
@@ -303,10 +303,10 @@ KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
 # 戻らない）を一度も再現できない。
 GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 
-# 雛形のワークスペース。1 度だけ組んで、以後は写しを配る。
+# 雛形のワークスペース。1 度だけ組んで、以後はコピーを配る。
 #
 # 組み直す形だと 1 件あたり git が 9 回（ワークスペースと 2 つのプロジェクトの
-# init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。写しなら
+# init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。コピーなら
 # git は雛形の 9 回だけで済む。テストごとに別のディレクトリを配るのは変わらないので、
 # テストどうしが状態を共有することもない（`setUpClass` にまとめる形との違いはここ）。
 _TEMPLATE = ""
@@ -422,10 +422,10 @@ class ConfigUnionHarness(unittest.TestCase):
     def ccnavi(self, *args, stdin="", env=None, guard="disable"):
         """実行ファイルを 1 回起動する。
 
-        レイヤーの置き場はフラグで渡さない。
-        共通レイヤーの 3 本（`--rules` / `--phases` / `--risk`）も、
+        レイヤーの置き場はフラグで渡さない。共通レイヤーの 3 本
+        （`--rules` / `--phases` / `--risk`）も、
         レイヤーを探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
-        `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる（ADR-0067）。
+        `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる。
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
@@ -725,7 +725,7 @@ class ToolLayerTest(ConfigUnionHarness):
                 self.assert_denied(self.hook("PowerShell", cwd, command="psql"), "lib:ps-psql")
 
     def test_a_layer_allow_now_reaches_grep_and_tools_without_a_path(self):
-        """ADR-0048 の代償。
+        """レイヤーをツールの種類で選ぶ形の代償。パスを持つツールは行き先のレイヤー、持たないツールは全部のレイヤーの和を足す。
 
         行き先のレイヤーの allow が Grep に当たり、レイヤーの allow がパスを持たないツールに当たる。
         """
@@ -761,7 +761,7 @@ class RootPlaceholderUnionTest(ConfigUnionHarness):
                 "id": "root-vendor",
                 "match": "Write|Edit",
                 "glob": "{root}/projects/lib/vendor/*",
-                "message": "vendor はワークスペースルートから数えた綴りで止める。",
+                "message": "vendor はワークスペースルートから数えたパスで止める。",
             },
         ]
         write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
@@ -778,7 +778,7 @@ class RootPlaceholderUnionTest(ConfigUnionHarness):
         )
 
     def test_a_copied_root_rule_is_dropped_as_a_duplicate(self):
-        """11.8: 重複の判定は置き換えた後の欄で比べる。`{root}` ごと写した定義は捨てる。"""
+        """11.8: 重複の判定は置き換えた後の欄で比べる。`{root}` ごとコピーした定義は捨てる。"""
         write(self.rules, json.dumps(dict(COMMON_RULES, deny=[*COMMON_RULES["deny"], ROOT_RULE])))
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[ROOT_RULE, *LIB_RULES["deny"]]))
 
@@ -817,7 +817,7 @@ class BashUnionTest(ConfigUnionHarness):
         self.assertEqual(self.last_record().get("source"), "lib")
 
     def test_two_non_empty_project_layers_take_part_in_name_order(self):
-        """11.4: 非空のプロジェクトのレイヤーが 2 つでも両方が和に入り、並びは名前順。"""
+        """11.4: 非空のプロジェクトのレイヤーが 2 つでも両方が和に入り、順序は名前順。"""
         write_layer(self.app, rules=APP_RULES)
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], LIB_DEPLOY]))
 
@@ -873,8 +873,8 @@ class DuplicateTest(ConfigUnionHarness):
         self.assertTrue(any("credentials" in p["detail"] for p in warns), warns)
 
     def test_bash_union_drops_identical_duplicates_too(self):
-        """11.4: Bash の和でも同じ。
-        共通レイヤーの `terraform` を写した lib の定義は 1 本にまとまる。"""
+        """11.4: Bash の和でも同じ。共通レイヤーの `terraform` をコピーした lib の定義は 1
+        本にまとまる。"""
         copied = dict(LIB_RULES)
         copied["deny"] = [*LIB_RULES["deny"], COMMON_RULES["deny"][1]]
         write_layer(self.lib, rules=copied)
@@ -984,7 +984,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
     """
 
     def start_turn(self, cwd):
-        """ターンを起こし、そのツリーの控えを取らせる。初回の実行後は控えるだけ。"""
+        """ターンを起こし、そのツリーの記録を取らせる。初回の実行後は記録するだけ。"""
         started = self.hook("", self.ws, event="UserPromptSubmit")
         self.assertEqual(started.returncode, 0, started.stderr)
         first = self.hook("Bash", cwd, event="PostToolUse", command="python gen.py")
@@ -1141,7 +1141,7 @@ class ExplainTest(ConfigUnionHarness):
         """11.9: `--explain --json` にレイヤーごとの rules 全件と phases / risk
         の定義と出どころが出る。
 
-        形は README「ボードの JSON」に足す。ここでは `layers` の並びに `name`（common / self /
+        形は README「ボードの JSON」に足す。ここでは `layers` のリストに `name`（common / self /
         プロジェクト名）と `rules` / `phases` / `risk` が在ることまでを固定する。
         """
         result = self.ccnavi("--explain", "--json")

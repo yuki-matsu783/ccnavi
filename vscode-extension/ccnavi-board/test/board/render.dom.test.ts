@@ -2,7 +2,7 @@
  * ボード画面が何を描くか。React の画面を happy-dom で動かし、出来上がった DOM を見る。
  * 操作の続き（折りたたむ・絞り込み・承認の送り先）は board.dom.test.ts。
  *
- * CSS は束ねた 1 本が `<style nonce>` に入っているので、規則そのものを見たいところは
+ * CSS はバンドルした 1 本が `<style nonce>` に入っているので、規則そのものを見たいところは
  * `flatStyle()`（1 行にまとめた CSS）を見る。
  */
 import { test } from "node:test";
@@ -54,7 +54,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.ok(body.startsWith("チケットの承認リクエスト"));
     assert.ok(body.includes("編集対象としているが"));
     assert.ok(body.includes("超えている"));
-    // 対象にしないのは形の壊れた子（計画に無い番号）。
+    // 対象にしないのは形の正しくない子（計画に無い番号）。
     assert.deepEqual(texts(page, ".approval h3"), ["承認の対象にしない提案"]);
     assert.ok(text(page, ".approval-rejected").includes("i0001-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画に無い"));
@@ -227,7 +227,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
-    // 運ぶ sh を端末に送ったときだけ、そう言う。
+    // 承認の push の sh をターミナルに送ったときだけ、そう言う。
     assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
   } finally {
     await page.close();
@@ -324,7 +324,7 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
   // 絞り込みの select は最長の選択肢の幅に広がらず、ページを横に流さない
   assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: 320px;/);
-  // カードの不備の小さい字はツールバーの「不備 N 件」に効かせない
+  // カードの不備の小さい字の指定は、ツールバーの「不備 N 件」には当てない
   assert.doesNotMatch(css(), /(^|\})\s*\.issues \{/);
   assert.match(css(), /\.card \.issues \{/);
 });
@@ -336,7 +336,7 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
     assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
-    // 識別子と「絞り込み中か」を別々に送る。空の並びを「全部」に読ませない
+    // 識別子と「絞り込み中か」を別々に送る。空の配列を「全部」に読ませない
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: false });
     // 絞り込んでも上部の集計はボード全体の数のまま（変わるのはボタンの数だけ）
     page.click(page.one("#attention-filter"));
@@ -456,7 +456,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     // 承認済みとレビューの要否はバッジにしない
     assert.equal(page.all(".badge.copy.copy-open").length, 0);
     assert.equal(page.all(".badge.review").length, 0);
-    // 写りは子のワークツリーに普通に入るので、正常な場面ではバッジを出さない
+    // 子のワークツリー上にチケットがあるのは普通なので、正常な場面ではバッジを出さない
     assert.equal(page.all(".badge.seen").length, 0);
     assert.ok(texts(page, ".card .where").includes("子 · 親 i0001 / フェーズ 2"));
     // 親のフェーズは 1 フェーズ 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
@@ -473,7 +473,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     assert.ok(page.all(".phase-full").some((full) => full.textContent === "進行中 · レビュー要"));
     // 止めていない・マーカーなし・レビュー不要は普通の状態なので書かない
     assert.ok(!texts(page, ".phase-full").some((full) => full.includes("レビュー不要")));
-    // 締める（close-early）のボタンは出さない
+    // 早めに閉じる（close-early）ボタンは出さない
     assert.equal(page.all('button[data-action="close-early"]').length, 0);
   } finally {
     await page.close();
@@ -575,7 +575,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   } finally {
     await stillClosed.close();
   }
-  // 終了の印（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
+  // 終了のマーカー（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
   // 省略はレビュー済と同じく、閉じた後もユーザのレビューを通ったかの区別として残す
   const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
   try {
@@ -602,7 +602,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   }
 });
 
-test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", async () => {
+test("CB-T13b 親の絞り込みを出し、カードにどの親子のチケットかを付ける", async () => {
   const page = await openBoard();
   try {
     assert.equal(page.all("#parent-filter").length, 1);
@@ -653,14 +653,14 @@ test("CB-T16 本文の文字列で表示を壊さない", async () => {
   const page = await openBoard({ ...base, tickets: [evil, ...base.tickets.slice(1)] });
   try {
     assert.equal(text(page, `.card[data-id="${evil.ticket}"] .title`), `<script>alert("x")</script>`);
-    // 画面の中に script は 1 本（束ねた画面）だけ。中身から増えない
+    // 画面の中に script は 1 本（バンドルした画面）だけ。中身から増えない
     assert.equal(page.all(".card script").length, 0);
   } finally {
     await page.close();
   }
 });
 
-test("CB-T118 本物が決まらない写りだけをバッジにし、場所を tooltip に出す", async () => {
+test("CB-T118 本物が決まらないチケットだけをバッジにし、場所を tooltip に出す", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
   const where = [
@@ -766,7 +766,7 @@ test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注�
   }
 });
 
-test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値を写すだけ", async () => {
+test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値をそのまま使うだけ", async () => {
   const page = await openBoard();
   try {
     const label = page.one("label.filter.attention");
@@ -813,7 +813,7 @@ test("CB-T162 読み直せなかった画面にも承認のオーバーレイが
   } finally {
     await withApproval.close();
   }
-  // 文に何が入っていても画面を壊さない
+  // 文に何が入っていても画面の構造を崩さない
   const escaped = await openPage({ kind: "error", error: "<b>", approval: { kind: "error", error: "<script>" } });
   try {
     assert.equal(text(escaped, "pre.load-error"), "<b>");
@@ -866,7 +866,7 @@ test("CB-T142 見た目の切り替えは body のクラスだけを付け替え
   }
 });
 
-test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新しい順に時刻・何が動いたか・経路が並ぶ。跡が無いカードには出さない", async () => {
+test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新しい順に時刻・何が動いたか・経路が並ぶ。履歴が無いカードには出さない", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const parent = base.tickets.find((t) => t.ticket === "i0001")!;
@@ -897,7 +897,7 @@ test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新�
       "承認（承認待ち → 作業中）",
     ]);
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
-    // cli は「sh から来た」までしか言えない（ユーザが端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
+    // cli は「sh から来た」までしか言えない（ユーザがターミナルで同じ sh を打っても cli）ので、誰が打ったかは言わない
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
     assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
       "フェーズ 2: マーカーを消した（子が足された）",

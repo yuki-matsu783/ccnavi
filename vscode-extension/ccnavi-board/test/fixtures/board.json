@@ -258,7 +258,13 @@
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": true,
     "linked": false,
-    "locked": false
+    "locked": false,
+    "draft": {
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-01.yml",
+     "rel": "wip/proposals/flows/i0001-01.yml",
+     "exists": false,
+     "linked": false
+    }
    },
    "risk": {
     "points": 0,
@@ -348,7 +354,13 @@
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
-    "locked": true
+    "locked": true,
+    "draft": {
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02.yml",
+     "rel": "wip/proposals/flows/i0001-02.yml",
+     "exists": false,
+     "linked": false
+    }
    },
    "risk": null,
    "judge": null,
@@ -424,7 +436,13 @@
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
-    "locked": false
+    "locked": false,
+    "draft": {
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-03.yml",
+     "rel": "wip/proposals/flows/i0001-03.yml",
+     "exists": false,
+     "linked": false
+    }
    },
    "risk": null,
    "judge": null,
@@ -485,7 +503,13 @@
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
-    "locked": false
+    "locked": false,
+    "draft": {
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-04.yml",
+     "rel": "wip/proposals/flows/i0001-04.yml",
+     "exists": false,
+     "linked": false
+    }
    },
    "risk": {
     "points": 0,

@@ -1,5 +1,5 @@
 /**
- * 悪意のある Markdown の描画（ADR-0093 の 5.5 の 2・6）。jsdom の上で DOMPurify を通す。
+ * 悪意のある Markdown の描画。jsdom の上で DOMPurify を通す。
  * 実機の Chromium でも同じ見本を描く（test/e2e/）。
  */
 import { test } from "node:test";
@@ -46,7 +46,7 @@ test("CX-T032 リンクは http・https・mailto だけ。javascript:・data:・
   }
 });
 
-test("CX-T033 普通の Markdown（見出し・強調・コード・表・並び）はそのまま描く", () => {
+test("CX-T033 普通の Markdown（見出し・強調・コード・表・リスト）はそのまま描く", () => {
   const div = render("## 見出し\n\n- **強い**\n- `code`\n\n| a | b |\n|---|---|\n| 1 | 2 |\n");
   assert.equal(div.querySelector("h2")?.textContent, "見出し");
   assert.equal(div.querySelector("strong")?.textContent, "強い");

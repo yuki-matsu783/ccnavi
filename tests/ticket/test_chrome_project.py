@@ -1,17 +1,18 @@
-"""Chrome の入口のプロジェクトのリポジトリと「始める」（ADR-0093 の段階 5）の受入テスト。
+"""Chrome の入口のプロジェクトのリポジトリと「始める」の受入テスト。
 
 見るのは 5 つ。
 
-1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）の家族を、
+1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）
+の親子のチケットを、
    手元と同じ形の仮のツリー（ワークスペースルート + `projects/<名前>` + そのワークツリー）で判定し、
-   承認で書くもの（Changes）はその家族の親のブランチだけ
-2. プロジェクトのレイヤーは D28 の計算（プロジェクトの統合先のレイヤーに、
+   承認で書くもの（Changes）はその親子のチケットの親のブランチだけ
+2. プロジェクトのレイヤーは計算で決める（プロジェクトの統合先のレイヤーに、
 ワークスペースの共通レイヤーを
-   `configsync.projected` で写したもの）。親のブランチの上のレイヤーは読まない
-3. 控えはワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
-4. 「始める」（8.6）: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
-   `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・互換の版が違う、
-   のどれでも始められない
+   `configsync.projected` でコピーしたもの）。親のブランチの上のレイヤーは読まない
+3. 取り込み状態はワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
+4. 「始める」: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
+   `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・
+   互換の版が違う、のどれでも始められない
 5. プロジェクト名が予約の名前（`common`・`self`）や識別子の形でなければ受けない
 """
 
@@ -67,7 +68,8 @@ def family_files(ident="web-i0012", issue=12):
         f"wip/proposals/todo/{ident}-01.md": child_text(
             f"{ident}-01", ident, 1, ["wip/research/*"], False
         ),
-        # 親のブランチの上のレイヤーは読まない（置き場の外なので拡張はそもそも読まない。3.3 の 6）
+        # 親のブランチの上のレイヤーは読まない（置き場の外なので拡張はそもそも読まない。
+        # 親のブランチの上で書き換えて承認やレビューを不要にさせない）
     }
 
 
@@ -109,7 +111,7 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01"])
         self.assertTrue(board["write"]["allowed"], board["write"])
         self.assertEqual(board["rejected"], [])
-        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーの綴りは出さない）
+        # 画面の本文はプロジェクトの置き場を名指しする（仮のツリーのパスは出さない）
         self.assertNotIn(os.path.join(self.tmp, "memfs"), board["text"])
 
     def test_approving_a_project_family_writes_only_its_branch(self):
@@ -144,7 +146,7 @@ class ChromeProjectTest(unittest.TestCase):
             "workspace": workspace(**{".ccnavi/common/risks.yml": RISK_COMMON}),
         }
         layer = self.chrome.project_layer(snap, place)
-        # 共通レイヤーにあるファイルは写し（配点の script はプロジェクトのレイヤーの置き場へ）、
+        # 共通レイヤーにあるファイルはコピーし（配点の script はプロジェクトのレイヤーの置き場へ）、
         # 無いものは残す
         self.assertEqual(layer[".ccnavi/config/phases.yml"], PHASES)
         self.assertIn("script: .ccnavi/scripts/risk.sh", layer[".ccnavi/config/risks.yml"])
@@ -201,7 +203,10 @@ class ChromeProjectTest(unittest.TestCase):
 
 
 class StartTest(unittest.TestCase):
-    """「始める」（8.6）。識別子は ticket.issue_identifier の 1 つだけから決める（3.1 の 11）。"""
+    """「始める」。識別子は ticket.issue_identifier の 1 つだけから決める。
+
+    Python と Pyodide が同じ関数を使い、名前が食い違わないようにする。
+    """
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="ccnavi-chrome-start-")
@@ -259,11 +264,11 @@ class StartTest(unittest.TestCase):
             }
         }
         body = self.start(12, branches=other)
-        self.assertTrue(any("開いた家族 topic" in p for p in body["problems"]), body)
+        self.assertTrue(any("開いた親子のチケット topic" in p for p in body["problems"]), body)
 
     def test_a_different_compat_is_refused(self):
         body = self.start(12, compat=version.COMPAT + 1)
-        self.assertTrue(any("7.3" in p for p in body["problems"]), body)
+        self.assertTrue(any("互換" in p for p in body["problems"]), body)
 
     def test_bad_numbers_are_refused(self):
         for bad in (0, -3, True, "12", None):

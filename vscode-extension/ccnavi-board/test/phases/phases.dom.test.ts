@@ -131,7 +131,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
   }
 });
 
-test("CB-D59 並びの欄は , で区切って打て、打っている途中の区切りは消えない", async () => {
+test("CB-D59 リストの欄は , で区切って打て、打っている途中の区切りは消えない", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p2")} .row-head`));
@@ -287,7 +287,7 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自分の id は候補に出ない。並びはファイルの順に揃う", async () => {
+test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自分の id は候補に出ない。順序はファイルの順に揃う", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p4")} .row-head`));
@@ -303,7 +303,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
     // after の候補は work の種類だけ。feedback の種類は待つ先にできない
     assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
     assert.deepEqual(values(".f-after", "checked"), ["acceptance"]);
-    // 後から付けても、並びはファイルの順に揃う（YAML に余計な差分を出さない）
+    // 後から付けても、順序はファイルの順に揃う（YAML に余計な差分を出さない）
     pick(dom, `${rowSelector("p4")} .f-after`, "design");
     await dom.settle();
     assert.deepEqual(values(".f-after", "checked"), ["design", "acceptance"]);
@@ -324,7 +324,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
   }
 });
 
-test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外しする。change で届いた選択はそのまま受ける", async () => {
+test("CB-D94 関係の欄は矢印でフォーカスだけを動かし、Space で付け外しする。change で届いた選択はそのまま受ける", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p4")} .row-head`));
@@ -338,7 +338,7 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
     const active = (): string | null => dom.one(`${select} option.active`).getAttribute("value");
     assert.deepEqual(selected(), ["acceptance"]);
     assert.equal(active(), "research");
-    // 矢印は印を動かすだけで、選択を 1 件に縮めない
+    // 矢印はフォーカスを動かすだけで、選択を 1 件に縮めない
     dom.key("ArrowDown", dom.one(select));
     await dom.settle();
     dom.key("ArrowDown", dom.one(select));
@@ -354,7 +354,7 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
     await dom.settle();
     assert.equal(active(), "implement-feedback");
     assert.equal(dom.one(select).getAttribute("aria-activedescendant"), dom.one(`${select} option.active`).id);
-    // 止めきれずに change が届いたときは、届いた選択を並びの順で受ける
+    // 止めきれずに change が届いたときは、届いた選択をリストの順で受ける
     for (const option of dom.all<HTMLOptionElement>(`${select} option`)) {
       option.selected = option.value === "implement-feedback" || option.value === "research";
     }
@@ -368,14 +368,14 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
   }
 });
 
-test("CB-D87 レイヤーの画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
+test("CB-D87 レイヤーの画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は目印を付けて出す", async () => {
   const base = readPhases(SAMPLE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
   const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });
   try {
     dom.click(dom.one(`${rowSelector("p3")} .row-head`));
     await dom.settle();
-    // 前後の空白は落として読み、空は出さない。自分自身は外せるように印を付けて出す
+    // 前後の空白は落として読み、空は出さない。自分自身は外せるように目印を付けて出す
     const checked = dom.all<HTMLOptionElement>(`${rowSelector("p3")} .f-overlap option`).filter((option) => option.selected);
     assert.deepEqual(checked.map((option) => option.value), ["design", "acceptance"]);
     assert.ok(dom.one(`${rowSelector("p3")} .f-overlap .id-option.foreign`).textContent?.includes("acceptance"));
@@ -446,7 +446,7 @@ test("CB-D86 図を見ているときに種類を足すと、一覧へ移って�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（図・絞り込み・開いた行）に戻り、途中の切り替えは控えに書かない", async () => {
+test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（図・絞り込み・開いた行）に戻り、途中の切り替えは state に書かない", async () => {
   const dom = await openPhases({}, { view: "graph" });
   try {
     assert.ok(dom.one("#phases").classList.contains("hidden"), "図で始まっていない");
@@ -466,7 +466,7 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
       }
     }
     assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ", "案内"]);
-    // 途中の一覧と図の切り替えは控えに書かない（途中でタブを閉じても、次は元の図で開く）
+    // 途中の一覧と図の切り替えは state に書かない（途中でタブを閉じても、次は元の図で開く）
     assert.equal((dom.state() as { view?: string }).view, "graph");
     // 最後の段は「完了」だけ（同じ働きのボタンを 2 つ並べない）
     assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");

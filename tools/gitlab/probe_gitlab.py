@@ -18,7 +18,7 @@ sh と同じ道具を使わないほうが、片方の壊れがもう片方に�
 
 ## 認証画面を出さない
 
-push は URL にトークンを埋めない（埋めると origin の綴りに混ざる）。git のラッパースクリプトは
+push は URL にトークンを埋めない（埋めると origin の URL に混ざる）。git のラッパースクリプトは
 `GIT_CONFIG_COUNT` を落とすので環境変数でも差し替えられない。一時リポジトリの
 `credential.helper` を空文字で一度リセットしてから（system / global の GCM を外す）、
 トークンを返す helper を足す。
@@ -639,7 +639,7 @@ def main() -> int:
     )
     acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:decide -->")]
     record(
-        "受け入れの note が MR に写る",
+        "受け入れの note が MR に書き込まれる",
         bool(acc) and f"#note_{disc2_note}" in acc[-1].get("body", ""),
     )
     checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
@@ -680,9 +680,9 @@ def main() -> int:
     )
     record("ready の note が MR にある", has_marker(notes_of(pid, iid), "<!-- ccnavi:ready -->"))
 
-    # ---- 5. 別の親をユーザが締める（close-early）
+    # ---- 5. 別の親をユーザが早めに閉じる（close-early）
     parent2 = worktree("i0002", "main")
-    propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で締める親")
+    propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で早めに閉じる親")
     propose(
         parent2,
         "i0002-01",
@@ -700,7 +700,7 @@ def main() -> int:
         "POST",
         f"/projects/{pid}/merge_requests",
         ROOT_TOKEN,
-        {"source_branch": "i0002", "target_branch": "main", "title": "Draft: 途中で締める親"},
+        {"source_branch": "i0002", "target_branch": "main", "title": "Draft: 途中で早めに閉じる親"},
         tag="mr-create-i0002",
     )
     record("ユーザが i0002 の MR を作る", status == 201)
@@ -725,7 +725,9 @@ def main() -> int:
             i for i in (issues if isinstance(issues, list) else []) if "残り" in i.get("title", "")
         ]
         record(
-            "残りを写す issue ができる", bool(made), f"{made[0].get('web_url') if made else '無し'}"
+            "残りを書き出す issue ができる",
+            bool(made),
+            f"{made[0].get('web_url') if made else '無し'}",
         )
         record(
             "未着手の子が cancelled/ へ動く",

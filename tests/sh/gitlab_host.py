@@ -1,4 +1,6 @@
-"""ホストの応答の見本を返す GitLab の代役（ADR-0093 の 8.9。段階 5）。
+"""ホストの応答の見本を返す GitLab の代役。
+
+Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。
 
 見本は `chrome-extension/ccnavi-approval/test/fixtures/host/gitlab/<場面>/` にある。拡張の試験
 （`test/helpers/gitlab-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
@@ -15,9 +17,10 @@
 - 依頼の投稿（`GET`/`POST .../merge_requests/<iid>/notes`）は、状態のファイル（環境変数
   `FAKE_GITLAB_STATE`）に溜めて返す。投稿したアカウントは id 201
   （名前は `FAKE_GITLAB_POSTER`、既定 `lab-bot`）。
-  見本に置かない（依頼の記録の `poster` を試すため。11.8.1 の決定 C）
+  見本に置かない（依頼の記録の `poster` を試すため。ccnavi の依頼のスレッドを未解決から除くのは、
+  依頼を投稿したアカウントが書いたときだけ）
 - ほかは 404
-- `FAKE_GITLAB_NO_PROJECT` を立てると、プロジェクトそのもの（`GET /projects/<綴り>`）を 404 にする
+- `FAKE_GITLAB_NO_PROJECT` を立てると、プロジェクトそのもの（`GET /projects/<パス>`）を 404 にする
 
 sh の試験は PATH の先頭に `curl` の代役を置き、このファイルを
 `python gitlab_host.py curl ...` で起こす。
@@ -135,7 +138,7 @@ def curl(argv: list[str]) -> int:
         sys.stderr.write("curl: (22) The requested URL returned error: 403\n")
         return 22
     if os.environ.get("FAKE_GITLAB_NO_PROJECT") and "/" not in url[len(API) + len("/projects/") :]:
-        # プロジェクトそのもの（`GET /projects/<符号化した綴り>`）だけを読めなくする
+        # プロジェクトそのもの（`GET /projects/<符号化したパス>`）だけを読めなくする
         sys.stderr.write("curl: (22) The requested URL returned error: 404\n")
         return 22
     status, data = answer(

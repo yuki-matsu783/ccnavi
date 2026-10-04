@@ -119,7 +119,7 @@ test("CB-T77 新しい glob は引用符で囲み、空の境目の点は書か�
   const again = readRisk(out).model.form;
   assert.deepEqual(again.levels, { medium: "", high: "50", critical: "" });
   assert.equal(again.factors[0].points, "1O");
-  // 全部消せば並びは空
+  // 全部消せばリストは空
   assert.equal(doc.apply({ levels: { medium: "", high: "", critical: "" }, factors: [] }), "version: 1\nfactors: []\n");
 });
 
@@ -173,7 +173,7 @@ test("CB-T97 対応表でない項目が前にあっても、後ろの項目は�
   assert.equal(out, "version: 1\nfactors:\n  # a の理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n");
 });
 
-test("CB-T98 先頭の項目を消しても並びの見出しのコメントは残り、先頭に来た項目は空行を連れてこない", () => {
+test("CB-T98 先頭の項目を消してもリストの見出しのコメントは残り、先頭に来た項目は空行を連れてこない", () => {
   const text = "version: 1\nfactors:\n  # 見出し\n  - id: a\n    points: 1\n    lines_over: 1\n\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n";
   const doc = readRisk(text);
   const [a, b] = doc.model.form.factors;
