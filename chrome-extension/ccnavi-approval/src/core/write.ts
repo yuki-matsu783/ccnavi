@@ -386,7 +386,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
     if (touched.length > 0) return human(`後から別の書き込みが同じファイルを変えた: ${touched.join(", ")}`);
     let res: Committed;
     try {
-      res = await send(deps, repo, family, cur, { headline: message.headline, body: `元に戻すコミット: ${done.oid}\n` }, undo, done.oid);
+      res = await send(deps, repo, family, cur, { headline: message.headline, body: `元に戻したコミット: ${done.oid}\n` }, undo, done.oid);
     } catch (err) {
       const status = (err as { status?: number }).status;
       if (status === REFUSED || status === HOST_REFUSED) return human((err as Error).message ?? String(err));

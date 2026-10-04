@@ -397,7 +397,9 @@ def _session_entries(
     guarded: list[str] = []
     if os.path.islink(guard):
         # 置き場そのものと同じ理由で辿らない。
-        report.problems.append(f"{_shown(root, guard)} はリンクなので辿らない（記録を消さない）")
+        report.problems.append(
+            f"{_shown(root, guard)} はリンクなので辿らない（バックアップを消さない）"
+        )
     else:
         try:
             guarded = os.listdir(guard) if os.path.isdir(guard) else []

@@ -136,7 +136,7 @@ test("CX-T048 置き場がリポジトリの外を指すワークスペースは
   assert.match(board.error, /リポジトリの外を指している/);
 });
 
-test("CX-T049 先行の閉包が 16 の親のブランチを超えたら決まらないで止める（3.3 の 5）", async () => {
+test("CX-T049 先行の閉包の親のブランチが 16 を超えたら決まらないで止める（3.3 の 5）", async () => {
   const b = fixture();
   const base = b.main.files;
   const chain = Array.from({ length: 17 }, (_, i) => `c${String(i + 1).padStart(2, "0")}x`);

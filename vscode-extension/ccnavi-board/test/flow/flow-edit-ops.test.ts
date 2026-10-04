@@ -256,7 +256,7 @@ test("CB-T276 未保存の見比べはキーの並びを見ず、差分は足し
   assert.ok(!isEmptyDiff(diff));
 });
 
-test("CB-T277 画面から届く、覚えさせるコピーと、保存前の確かめの設定は形を確かめてから受ける", () => {
+test("CB-T277 画面から届く未保存のコピーと、保存前の確かめの設定は形を確かめてから受ける", () => {
   const doc = templateFlow("i0001-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "draft", doc }), { type: "draft", doc });
   assert.deepEqual(asFlowMessage({ type: "draft", doc: null }), { type: "draft", doc: null });

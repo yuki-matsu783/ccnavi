@@ -624,7 +624,7 @@ class Phase:
         chat のフェーズに出すと打てない操作を見せることになる。
         打ったときは（実績のリスクが高いときに勧める向き。設計 9.10）
         ホストから取得する結果があるので、`mr` と同じに True でよい。
-        このセッションで見る待ちは `review_kind` と `gate_closed`で読む（設計 9.8）。
+        このセッションで見る待ちは `review_kind` と `gate_closed` で読む（設計 9.8）。
         """
         return self.gate_closed and approval.MARK_REQUESTED in self.marks
 
