@@ -113,9 +113,9 @@ test("CX-T112 書く頼み（commit）はボードからだけ、登録したリ
   assert.equal(m.files("i0001")["wip/proposals/todo/x.md"], "x\n");
 });
 
-test("CX-T117 置き場のパスは service worker が統合先の .claude/settings.json から自分で引く", async () => {
+test("CX-T117 service worker が書く先に許す置き場は既定に固定し、統合先の .claude/settings.json の env で動かさない", async () => {
   const f = fixture();
-  f.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets" } });
+  f.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "wip/tickets", CCNAVI_TICKETS_APPROVED: "moved/approved" } });
   const m = new MockGitHub(f);
   const d = deps(m, new Map([["github.com", TOKEN]]));
   const commit = (path: string) => ({
@@ -124,8 +124,25 @@ test("CX-T117 置き場のパスは service worker が統合先の .claude/setti
     op: "commit",
     args: ["acme", "widgets", "i0001", m.head("i0001"), "見出し", "", [{ path, contents: "eAo=" }], []],
   });
-  assert.match(((await dispatch(commit("wip/proposals/todo/x.md"), BOARD, d)) as { error: string }).error, /置き場.*の外/);
-  assert.equal((await dispatch(commit("wip/tickets/todo/x.md"), BOARD, d)).ok, true);
+  assert.match(((await dispatch(commit("wip/tickets/todo/x.md"), BOARD, d)) as { error: string }).error, /置き場.*の外/);
+  assert.match(((await dispatch(commit("moved/approved/doing/x.md"), BOARD, d)) as { error: string }).error, /置き場.*の外/);
+  assert.equal((await dispatch(commit("wip/proposals/todo/x.md"), BOARD, d)).ok, true);
+  assert.equal((await dispatch(commit(".ccnavi/approved/doing/x.md"), BOARD, d)).ok, true);
+});
+
+test("CX-T213 置き場の env に絶対パスを入れても、service worker は書く頼みを止めず既定の置き場に書く", async () => {
+  const f = fixture();
+  f.main.files[".claude/settings.json"] = JSON.stringify({ env: { CCNAVI_TICKETS_PROPOSAL: "/srv/proposals", CCNAVI_TICKETS_APPROVED: "C:/srv/approved" } });
+  const m = new MockGitHub(f);
+  const d = deps(m, new Map([["github.com", TOKEN]]));
+  const commit = (path: string) => ({
+    kind: "host",
+    host: "github.com",
+    op: "commit",
+    args: ["acme", "widgets", "i0001", m.head("i0001"), "見出し", "", [{ path, contents: "eAo=" }], []],
+  });
+  const ok = await dispatch(commit("wip/proposals/todo/x.md"), BOARD, d);
+  assert.equal(ok.ok, true, JSON.stringify(ok));
   assert.equal((await dispatch(commit(".ccnavi/approved/doing/x.md"), BOARD, d)).ok, true);
 });
 

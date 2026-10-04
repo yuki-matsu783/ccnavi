@@ -25,7 +25,7 @@ import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
 import { listIssues, startIssue } from "../src/core/start.js";
 import { approveFamily, confirmPhase, withdrawTicket, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, projectFixture, requestedMark, reviewFamilyFiles, type FixtureBranch } from "./fixtures/repo.js";
-import { gitlabSceneFetch, gitlabSceneNames, GITLAB_SCENES, loadGitLabScene } from "./helpers/gitlab-fixture.js";
+import { gitlabSceneFetch, gitlabSceneNames, GITLAB_SCENES, loadGitLabScene, type GitLabScene } from "./helpers/gitlab-fixture.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats, OPTIONS } from "./helpers/host.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
 import { GL_LOGIN, MockGitLab } from "./helpers/mock-gitlab.js";
@@ -315,13 +315,15 @@ test("CX-T151 service worker の「始める」の保護: ボードからだけ�
 const FAMILY = "i0004";
 const REQUESTED = `.ccnavi/approved/phases/${FAMILY}/1.requested`;
 
-function reviewingOnGitLab(scene: string, host: "github" | "gitlab" = "gitlab"): MockGitLab {
+function reviewingOnGitLab(scene: string, host: "github" | "gitlab" = "gitlab", edit: (s: GitLabScene) => void = () => undefined): MockGitLab {
   const mock = new MockGitLab(fixture());
   mock.branch(FAMILY, "main");
   const at = mock.push(FAMILY, reviewFamilyFiles(FAMILY), "作業とレビュー待ちの子");
   // 依頼を投稿したアカウントは id で残る（見本の lab-bot は id 201）
   mock.push(FAMILY, { [REQUESTED]: requestedMark(at, 7, host, "201") }, "ccnavi: レビューを依頼した");
-  mock.attachGitLabScene(FAMILY, loadGitLabScene(scene));
+  const loaded = loadGitLabScene(scene);
+  edit(loaded);
+  mock.attachGitLabScene(FAMILY, loaded);
   return mock;
 }
 
@@ -376,10 +378,10 @@ test("CX-T153 GitLab のスレッドの悪意のある本文は描いても実�
 });
 
 /** ワークスペース（GitHub）とプロジェクト（GitLab）を 1 つの fetch で返す */
-function twoHosts() {
+function twoHosts(name = "web") {
   const hub = new MockGitHub(fixture());
-  const lab = new MockGitLab(projectFixture());
-  const project: RepoConfig = { ...GITLAB_REPO, project: "web", workspace: "github.com/acme/widgets" };
+  const lab = new MockGitLab(projectFixture(name));
+  const project: RepoConfig = { ...GITLAB_REPO, project: name, workspace: "github.com/acme/widgets" };
   const repos = [GH_REPO, project];
   const fetch: Deps["fetch"] = (url, init) => (url.startsWith("https://gitlab.com/") ? lab.fetch(url, init) : hub.fetch(url, init));
   const make = (pyCall: PyCall = py): WriteDeps => {
@@ -492,4 +494,25 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   (marks[0].querySelector("button[data-action=dismiss]") as HTMLElement).click();
   assert.deepEqual(pressed, ["issues", "start 12", "dismiss i0001"]);
   assert.equal((dom.window as unknown as { __pwned?: string }).__pwned, undefined);
+});
+
+test("CX-T181 Pyodide の仮のツリー（/ws）の下でも、文面の途中の ws を畳まない（プロジェクト ws・スレッドの本文の projects/ws/）", async () => {
+  // プロジェクトの名前が ws でも、一覧の行き先と書く先は変わらない
+  const { lab, project, make } = twoHosts("ws");
+  const b = await collectRepo(project, make());
+  assert.equal(b.error, "", b.error);
+  const fam = b.families.find((f) => f.family.name === "ws-i0012");
+  assert.deepEqual(fam?.result?.batch?.map((e) => e.path), ["ws-i0012:wip/proposals/todo/ws-i0012.md", "ws-i0012:wip/proposals/todo/ws-i0012-01-01.md"]);
+  const out = await approveFamily(project, "ws-i0012", shownOf(b, "ws-i0012"), make());
+  assert.equal(out.kind, "written", JSON.stringify(out));
+  assert.ok(".ccnavi/approved/doing/ws-i0012.md" in lab.files("ws-i0012"));
+  // スレッドの本文の途中にある /ws/ は、Python が文面を畳むときに消さない
+  const mock = reviewingOnGitLab("impostor", "gitlab", (scene) => {
+    for (const d of scene.files["discussions.1.json"] as { notes: { id: number; body: string }[] }[]) {
+      for (const n of d.notes) if (n.id === 5203) n.body = "projects/ws/src/app.ts と a/ws/b を見直す";
+    }
+  });
+  const { panel } = await panelOn(mock);
+  assert.equal(panel?.error, "");
+  assert.match(panel?.problems.join("\n") ?? "", /#note_5203 :0 projects\/ws\/src\/app\.ts と a\/ws\/b を見直す/);
 });
