@@ -34,8 +34,8 @@
 #   - P がリモートにある: fetch して、早送りできれば早送り、分かれていれば merge。merge は
 #     索引が HEAD と同じときだけで、衝突したら、この sh が始めた merge だけを取りやめて
 #     ユーザに回す。親子のチケットの取り込み状態を present で書く
-#   - P がリモートに無い: まず統合先の done/ にこの親子のチケットの親チケット（識別子と承認の時刻が同じ）が
-#     あれば閉じた親子のチケット（closed）。無く、送った形跡（取り込み状態・origin/<P>・追跡の設定）も無ければ、
+#   - P がリモートに無い: まず統合先の done/ にこの親子のチケットの親チケット（識別子が同じで、着手と取り消しの欄で
+#     同じ親と言えるもの。closed_in_integration）があれば閉じた親子のチケット（closed）。無く、送った形跡（取り込み状態・origin/<P>・追跡の設定）も無ければ、
 #     一度も送っていない親子のチケットで今のまま。送った形跡があれば観測ずれを疑い、統合先を取り直して
 #     確かめ直す（既定 3 回、5 秒おき）。それでも無ければ ccnavi-review.sh merged に聞き、
 #     マージ済みなら「反映待ち」、答えが得られなければ「確かめられなかった」で止める（取り込み状態は
@@ -601,30 +601,88 @@ sync_present() {
 	return 0
 }
 
-# 承認の時刻（`approved_at`）。ブロックの形（`  approved_at: X`）と流れの形（`{approved_at: "X", ...}`）。標準入力から。
+# frontmatter の行だけ（1 行目の `---` から次の `---` の手前まで）。行末の CR は落とす。標準入力から。
+# 1 行目が `---` でなければ何も出さない。本文に同じ語を書いた行を欄と読まないために、欄はここから拾う。
+frontmatter_of() {
+	awk '
+		{ sub(/\r$/, "") }
+		NR == 1 { if ($0 !~ /^---[ \t]*$/) exit; next }
+		/^---[ \t]*$/ { exit }
+		{ print }
+	'
+}
+
+# frontmatter の行頭にある欄 <名前> の値（最初の 1 つ）。前後の空白と、値を囲む引用符を外す。
+# 値の無い欄・空文字（`""`・`''`）は空を出す。YAML と同じく、引用符の外の ` #` から後ろは注記として落とし、
+# 引用符の無い `null`・`Null`・`NULL`・`~` は値が無いとみなす（Python の syncstate._text と同じ結果にする）。
+# 標準入力は frontmatter_of の出力。
+front_field() {
+	awk -v key="$1" -v q="'" '
+		index($0, key ":") == 1 {
+			v = substr($0, length(key) + 2)
+			sub(/^[ \t]+/, "", v)
+			c = substr(v, 1, 1)
+			if (c == "\"" || c == q) {
+				rest = substr(v, 2)
+				end = index(rest, c)
+				v = end > 0 ? substr(rest, 1, end - 1) : rest
+			} else {
+				if (c == "#") v = ""
+				p = match(v, /[ \t]#/)
+				if (p > 0) v = substr(v, 1, p - 1)
+				sub(/[ \t]+$/, "", v)
+				if (v == "null" || v == "Null" || v == "NULL" || v == "~") v = ""
+			}
+			sub(/^[ \t]+/, "", v)
+			sub(/[ \t]+$/, "", v)
+			print v
+			exit
+		}
+	'
+}
+
+# 承認の時刻（`approved_at`）。承認で欄を書いていた頃の古い形だけが持つ。ブロックの形（`  approved_at: X`）と
+# 流れの形（`{approved_at: "X", ...}`）。標準入力は frontmatter_of の出力。
 approved_at_of() {
 	sed -n "s/.*approved_at:[[:space:]]*[\"']\\{0,1\\}\\([^\"',}[:space:]]*\\).*/\\1/p" | head -n 1
 }
 
 # 統合先の done/ に、この親子のチケットの親チケットがあるか。統合先は取ってきた後の refs/remotes/origin/<統合先>。
 #
-# 在るだけでは見ない。識別子（`ticket:`）が P で、子（`parent:`）でなく、承認の時刻が親のワークツリーの
-# 親チケットと同じときだけ「閉じた」とする（同じ識別子の古い親子のチケットを、今のものと読まない）。
-# 親のワークツリーに承認済みの親チケットが無い（承認前の提案だけ）なら、この親子のチケットは閉じようがない。
+# 在るだけでは見ない。識別子（`ticket:`）が P で、子（`parent:`）でなく、親のワークツリーの親チケットと
+# 同じ親だと言えるときだけ「閉じた」とする（同じ識別子の古い親子のチケットを、今のものと読まない）。
+# 同じ親かは、スクリプトだけが書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ
+# 欄が同じかで決める。空どうしは一致としない。どの欄でも照合できないとき、親のワークツリーに承認済みの
+# 親チケットが無いときは閉じていない側に倒す（止めて戻し方を出す）。
+# 承認で欄を書いていた頃の古い形どうし（両方に 3 つとも無い）だけは、両方にある approved_at で比べる。
 closed_in_integration() {
 	ci_body=$(git -C "$repo" show "refs/remotes/origin/$integ:$approved/done/$P.md" 2>/dev/null) || return 1
-	ci_id=$(printf '%s\n' "$ci_body" | sed -n 's/^ticket:[[:space:]]*//p' | head -n 1 |
-		sed -e 's/[[:space:]]*$//' -e "s/^[\"']//" -e "s/[\"']\$//")
+	ci_theirs=$(printf '%s\n' "$ci_body" | frontmatter_of)
+	ci_id=$(printf '%s\n' "$ci_theirs" | front_field ticket)
 	[ "$ci_id" = "$P" ] || return 1
-	printf '%s\n' "$ci_body" | grep -q '^parent:' && return 1
-	ci_mine=""
-	for ci_file in "$tree/$approved/doing/$P.md" "$tree/$approved/done/$P.md"; do
-		[ -f "$ci_file" ] || continue
-		ci_mine=$(approved_at_of <"$ci_file")
-		[ -z "$ci_mine" ] || break
+	printf '%s\n' "$ci_theirs" | grep -q '^parent:' && return 1
+	ci_file=""
+	for ci_try in "$tree/$approved/doing/$P.md" "$tree/$approved/done/$P.md"; do
+		[ -f "$ci_try" ] || continue
+		ci_file="$ci_try"
+		break
 	done
-	[ -n "$ci_mine" ] || return 1
-	[ "$(printf '%s\n' "$ci_body" | approved_at_of)" = "$ci_mine" ]
+	[ -n "$ci_file" ] || return 1
+	ci_mine=$(frontmatter_of <"$ci_file")
+	ci_seen=""
+	for ci_key in base_sha started_at cancelled_at; do
+		ci_a=$(printf '%s\n' "$ci_mine" | front_field "$ci_key")
+		ci_b=$(printf '%s\n' "$ci_theirs" | front_field "$ci_key")
+		if [ -n "$ci_a" ] && [ -n "$ci_b" ]; then
+			[ "$ci_a" = "$ci_b" ]
+			return
+		fi
+		[ -z "$ci_a$ci_b" ] || ci_seen=yes
+	done
+	[ -z "$ci_seen" ] || return 1
+	ci_a=$(printf '%s\n' "$ci_mine" | approved_at_of)
+	[ -n "$ci_a" ] || return 1
+	[ "$(printf '%s\n' "$ci_theirs" | approved_at_of)" = "$ci_a" ]
 }
 
 # P がリモートに無い。閉じたか、消えたか。
