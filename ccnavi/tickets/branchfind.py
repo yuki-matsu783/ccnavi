@@ -33,6 +33,8 @@ KINDS = (ISSUE, MR)
 
 # 1 回の依頼から拾う指定の上限。貼り付けた一覧から何十本も拾って指示を長くしない。
 MAX_REFS = 5
+# 依頼文のうち読む長さ。貼り付けた長いログで hook の判定の期限を使い切らないように、頭だけを読む。
+MAX_PROMPT = 20000
 # 番号。0 で始まるもの（`#000`・`#012345` のような色や連番）は issue・MR の番号として読まない。
 _NUM = r"([1-9][0-9]{0,8})(?![0-9A-Za-z_])"
 # 囲みのコードブロック。貼り付けたコードやログの `#123` を拾わない。
@@ -40,8 +42,10 @@ _FENCE = re.compile(r"```.*?(?:```|\Z)", re.S)
 # URL。GitHub の `/issues/N`・`/pull/N`、GitLab の `/-/issues/N`・`/-/merge_requests/N`。
 # 前の 2 段（`owner/repo`。GitLab の入れ子のグループはその最後の 2 段）を、
 # どのリポジトリかの手がかりに残す。
-_URL_ISSUE = re.compile(r"(?:([\w.-]+/[\w.-]+)/)?(?:-/)?issues/" + _NUM)
-_URL_MR = re.compile(r"(?:([\w.-]+/[\w.-]+)/)?(?:-/)?(?:pull|pulls|merge_requests)/" + _NUM)
+_URL_ISSUE = re.compile(r"(?:([\w.-]{1,100}/[\w.-]{1,100})/)?(?:-/)?issues/" + _NUM)
+_URL_MR = re.compile(
+    r"(?:([\w.-]{1,100}/[\w.-]{1,100})/)?(?:-/)?(?:pull|pulls|merge_requests)/" + _NUM
+)
 # 語のあとの番号。`issue 152`・`issue #152`・`Issue: 152`・`issue-152`。
 _WORD_ISSUE = re.compile(r"(?<![A-Za-z0-9_])issues?[ \t]*[:：#＃-]?[ \t]*" + _NUM, re.I)
 _WORD_MR = re.compile(
@@ -83,7 +87,7 @@ def prompt_refs(text: str) -> list[Ref]:
     """依頼文の中の issue・MR の指定。見つけた順に、同じ種類と番号は 1 つにまとめる。"""
     if not isinstance(text, str) or not text:
         return []
-    body = _FENCE.sub(" ", text)
+    body = _FENCE.sub(" ", text[:MAX_PROMPT])
     found: list[tuple[int, Ref]] = []
     for pattern, kind in ((_URL_ISSUE, ISSUE), (_URL_MR, MR)):
         for m in pattern.finditer(body):
