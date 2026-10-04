@@ -208,6 +208,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {
                 "__main__",
                 "entry.cli",
+                "entry.cli_usage",
+                "entry.cli_args",
+                "entry.cli_ops",
                 "entry.diagnose",
                 "entry.lint",
                 "entry.lint_branch",

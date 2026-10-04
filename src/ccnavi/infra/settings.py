@@ -35,7 +35,7 @@ MODE_ENV = "CCNAVI_MODE"
 # 置き場（記録・state・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）も env では
 # 動かない。既定に固定で、下の DEFAULT_* がそれ。診断のために動かす道は `--log` /
 # `--state` / `--tickets` / `--approved` / `--projects` / `--project-home` のフラグだけで、
-# cli._override が重ねる。
+# cli_args._override が重ねる。
 #
 # 戻す働きは 2 つあり、守る対象の決まり方が違うので環境変数も分けてある。
 #
@@ -433,7 +433,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     #
     # 置き場（共通層の 3 本、記録・state・提案・承認済みチケット・プロジェクト・ccnavi
     # ディレクトリ）はこの表に無い。env でも上書き設定ファイルでも動かず、既定のまま。
-    # 動かせるのはフラグだけで、そちらは cli._override が重ねる。
+    # 動かせるのはフラグだけで、そちらは cli_args._override が重ねる。
     # 残る `bin` は置き場ではなく、hook が起動する実行ファイルの指定で、既定を持たない。
     overrides = (("bin", BIN_ENV, _resolve_bin),)
     for name, env, read in overrides:
