@@ -25,7 +25,7 @@ from typing import TextIO
 
 from ..hook import c1
 from ..infra import fsio, gitcmd, settings, tree
-from ..tickets import approval, history, ops, syncstate
+from ..tickets import approval, approval_times, history, ops, syncstate
 from ..tickets import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 10.0
@@ -125,7 +125,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         return 0
 
     pool = approval.predecessor_pool_of(doing, review, closed, proposals)
-    times = approval.approved_times(conf, doing + review + closed)
+    times = approval_times.approved_times(conf, doing + review + closed)
     files = _file_states(root, [h for e in entries.values() for h in e.hits])
     fams = syncstate.Families(conf, root)
     sync = settings.script_command(root, "ccnavi-sync.sh")

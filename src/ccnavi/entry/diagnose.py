@@ -32,7 +32,18 @@ from ..hook import judge
 from ..infra import hookio, modes, settings, tree, yamlread
 from ..policy import builtin, ruleload, rules, selfguard
 from ..records import audit
-from ..tickets import agree, approval, archive, flow, history, phase, phasetypes, risk, workflow
+from ..tickets import (
+    agree,
+    approval,
+    approval_times,
+    archive,
+    flow,
+    history,
+    phase,
+    phasetypes,
+    risk,
+    workflow,
+)
 from ..tickets import ticket as ticket_mod
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
@@ -630,12 +641,12 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     preds = approval.predecessor_pool_of(copies, review, closed, proposals, root)
     approval.align_imported(conf, root, preds)
-    times = approval.approved_times(conf, copies + review)
+    times = approval_times.approved_times(conf, copies + review)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
         place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
-        when = times.get(t.path, approval.ApprovedTime()).label()
+        when = times.get(t.path, approval_times.ApprovedTime()).label()
         head = f"{t.ticket}（{t.title}、承認 {when}、{place}、{bound}）"
         if t.is_child:
             unmet = approval.unmet_predecessors(t, preds)
@@ -793,7 +804,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     }
 
     # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
-    times = approval.approved_times(
+    times = approval_times.approved_times(
         conf, [t for t in (*open_index.values(), *closed_index.values()) if t is not None]
     )
     for ticket_id in sorted(set(proposal_index) | set(open_index) | set(closed_index)):
@@ -844,7 +855,7 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 "path": t.path,
                 # 承認は欄を書かない。古い形の欄が無ければ、退避した状態の履歴の承認の時刻。
                 "approved_at": t.approved_at
-                or approval.history_time(archive.base_dir(root, t.project), t.ticket),
+                or approval_times.history_time(archive.base_dir(root, t.project), t.ticket),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
                 "cancelled_at": t.cancelled_at,
@@ -975,7 +986,7 @@ def _ticket_record(
     scattered: list[dict],
     problems: list[str],
     preds: dict[str, list[ticket_mod.Ticket]],
-    times: dict[str, approval.ApprovedTime],
+    times: dict[str, approval_times.ApprovedTime],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -1028,12 +1039,12 @@ def _ticket_record(
         "copy": (
             {
                 "status": status,
-                # 承認の時刻（`approval.approved_times`）。`approved_from` はどこから引いたか:
+                # 承認の時刻（`approval_times.approved_times`）。`approved_from` はどこから引いたか:
                 # history（状態の履歴）/ commit（doing/ に足したコミット）/
                 # uncommitted（履歴もコミットも無い。手で置いてまだコミットしていない）/
                 # 空（分からない）。uncommitted と空のとき approved_at は空。
-                "approved_at": times.get(copy.path, approval.ApprovedTime()).at,
-                "approved_from": times.get(copy.path, approval.ApprovedTime()).source,
+                "approved_at": times.get(copy.path, approval_times.ApprovedTime()).at,
+                "approved_from": times.get(copy.path, approval_times.ApprovedTime()).source,
                 "source_tree": copy.source_tree,
                 "path": copy.path,
             }
