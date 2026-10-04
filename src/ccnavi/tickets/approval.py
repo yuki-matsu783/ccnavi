@@ -4,6 +4,10 @@
 どこにどう置かれているかを読み書きする。提案を集めてユーザに見せ、合意を受けて置き場へ動かす
 手続き（`ccnavi --agree`）は `agree.py` にある。approval は agree を知らない。
 
+マーカーと記録の読み書きは `approval_marks`、構造の検査（親子・統合先・先行・プロジェクト）は
+`approval_checks`、承認の時刻（表示だけ）は `approval_times` に分けてある。
+どれも approval を読まない。
+
 ## なぜ承認済みチケットを本物とするのか
 
 チケットの提案はエージェントが書ける。判定が提案を直接読むと、範囲の外で
@@ -55,32 +59,28 @@
 
 from __future__ import annotations
 
-import json
 import os
-import sys
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 
 import yaml
 
-from ..infra import fsio, gitcmd, settings, tree, yamlread
+from ..infra import fsio, settings, tree, yamlread
 from ..policy import rules
-from . import archive, flow, history, phasetypes, syncstate, workflow
+from . import (
+    approval_checks,
+    approval_marks,
+    archive,
+    flow,
+    history,
+    phasetypes,
+    syncstate,
+    workflow,
+)
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
 DOING_DIR = ticket_mod.DOING
 DONE_DIR = ticket_mod.DONE
-PHASES_DIR = "phases"
-
-# フェーズのマーカーの種類。
-MARK_REQUESTED = "requested"
-MARK_REVIEWED = "reviewed"
-MARK_SKIPPED = "skipped"
-# pending は「終わったと 1 度伝えた」のマーカー。同じ文を呼び出しごとに繰り返さないため。
-MARK_PENDING = "pending"
-MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
-# 全体計画の待ち方を固定するファイル（`phases/<親>/workflow.yml`）。
-WORKFLOW_FILE = "workflow.yml"
 # 続きの子の目印（トップレベルの欄）。前の版は承認の記録（`ccnavi_approved`）の中に書いていた。
 FOLLOWUP_KEY = "followup_of"
 
@@ -203,7 +203,7 @@ def load_copy(
     if require_record and not ticket.completed_at:
         return None, "`completed_at` が無い。`finish` を通っていない"
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
-    if has_record(ticket):
+    if approval_checks.has_record(ticket):
         ticket.approved_at = str(meta.get("approved_at") or "")
         ticket.source_tree = str(meta.get("source_tree") or "")
         ticket.source_path = str(meta.get("source_path") or "")
@@ -227,28 +227,11 @@ def load_copy(
     return ticket, ""
 
 
-# 前の版の承認が記録（`ccnavi_approved`）に必ず書いていた欄。続きの子も `source_tree` と
-# `source_path` を空で書いていた。
-_RECORD_KEYS = ("approved_at", "source_tree", "source_path")
-
-
-def has_record(t: ticket_mod.Ticket) -> bool:
-    """前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットか。
-
-    古い形として扱うと、取り下げは中身の一致を見ずに記録の欄で決まり、`workflow:` の欄も
-    待ち方として読まれる。`ccnavi_approved: {}` のような書きかけの記録で古い形を装えないよう、
-    前の版が必ず書いた欄が揃い、`approved_at` が空でないときだけ古い形とみなす。提案に
-    記録の欄があれば `--agree` と `--lint` が error にする（`agree.record_field_problems`）。
-    """
-    meta = t.raw.get(ticket_mod.APPROVAL_KEY)
-    if not isinstance(meta, dict) or not all(k in meta for k in _RECORD_KEYS):
-        return False
-    return bool(str(meta.get("approved_at") or "").strip())
-
-
 def workflow_path(approved_dir: str, parent: str) -> str:
     """親の待ち方を固定するファイル（`phases/<親>/workflow.yml`）。"""
-    return os.path.join(approved_dir, PHASES_DIR, parent, WORKFLOW_FILE)
+    return os.path.join(
+        approved_dir, approval_marks.PHASES_DIR, parent, approval_marks.WORKFLOW_FILE
+    )
 
 
 def workflow_bytes(wf: ticket_mod.Workflow) -> bytes:
@@ -433,8 +416,8 @@ def scan(
         kept = _authoritative(found, raw.everything)
         if not closed:
             kept = archive.drop_archived(root, kept)
-            mark_blocked(conf, kept)
-            mark_imported(conf, root, kept)
+            approval_checks.mark_blocked(conf, kept)
+            approval_checks.mark_imported(conf, root, kept)
         return kept, list(notes)
     found, notes = scan_all(conf, root, closed)
     # 読んだ側を `_everything` に渡す。渡さないと、この同じ式の中でまったく同じ
@@ -449,8 +432,8 @@ def scan(
         # 作業中に戻さない（archive.drop_archived）。
         kept = archive.drop_archived(root, kept)
         # 判定が読むのは作業中の側だけ。閉じたものに理由は要らない。
-        mark_blocked(conf, kept)
-        mark_imported(conf, root, kept)
+        approval_checks.mark_blocked(conf, kept)
+        approval_checks.mark_imported(conf, root, kept)
     return kept, notes
 
 
@@ -460,11 +443,11 @@ def scan_review(
     """レビュー待ちのチケット。本物とするツリーの側だけを残す（`scan` と同じ規則）。"""
     if raw is not None:
         kept = archive.drop_archived(root, _authoritative(raw.review, raw.everything))
-        mark_imported(conf, root, kept)
+        approval_checks.mark_imported(conf, root, kept)
         return kept, list(raw.review_notes)
     found, notes = review_all(conf, root)
     kept = archive.drop_archived(root, _authoritative(found, _everything(conf, root, review=found)))
-    mark_imported(conf, root, kept)
+    approval_checks.mark_imported(conf, root, kept)
     return kept, notes
 
 
@@ -518,9 +501,9 @@ def stale_proposals(
     ならない）。
     """
     kept_ids = {id(t) for t in kept}
-    settled = _by_id(everything)
+    settled = approval_checks._by_id(everything)
     out: list[tuple[ticket_mod.Ticket, str]] = []
-    for ticket_id, hits in _by_id(found).items():
+    for ticket_id, hits in approval_checks._by_id(found).items():
         copies = settled.get(ticket_id)
         if not copies:
             continue
@@ -581,9 +564,12 @@ def revision_elsewhere_text(
     )
     fams = fams or syncstate.Families(conf, root)
     if fams.active:
-        st = family_standing(conf, root, t, fams)
+        st = approval_checks.family_standing(conf, root, t, fams)
         if st.imported and st.stop:
-            text += "。取り込み済みの親子のチケットが止まっている: " + family_stop_text(root, st)
+            text += (
+                "。取り込み済みの親子のチケットが止まっている: "
+                + approval_checks.family_stop_text(root, st)
+            )
         elif st.imported and st.home is not None:
             text += (
                 "。取り込み済みの親子のチケットなので、書いたら push してから承認を頼んでください"
@@ -599,249 +585,6 @@ def tree_path(conf: settings.Settings, root: str, name: str, project: str = "") 
         return name or "ワークスペースルート"
     rel = os.path.relpath(pick.root, root).replace(os.sep, "/")
     return "ワークスペースルート" if rel == "." else rel
-
-
-def mark_imported(
-    conf: settings.Settings,
-    root: str,
-    kept: list[ticket_mod.Ticket],
-    fams: syncstate.Families | None = None,
-) -> None:
-    """取り込み済みの親子のチケットに、信頼できない理由を付ける。
-
-    取り込み済みの親子のチケットとは、取り込み状態のある親子のチケットのこと。
-
-    本物とするのは親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
-    上のチケットだけ。次のチケットは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
-
-    - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・壊れている、
-      `present` なのに親のワークツリーが無い）
-    - 親子のチケットが閉じている（統合先の `done/` を本物とする）
-    - 親のワークツリーの外にしか無いチケット（元ツリーに未コミットで残ったチケットなど）
-
-    **チケットのリストは変えない（落とさない）。
-    ** 落とすと「在る」ことで止まっていたもの（承認待ちの
-    重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけなので、取り込み状態の無い親子のチケットと、
-    取り込み状態があってもチケットが親のワークツリーにだけある親子のチケットでは、答えは前と同じ。すでに理由（`mark_blocked`）が
-    あれば、理由を連ねる（前の理由を消さない）。
-    """
-    fams = fams or syncstate.Families(conf, root)
-    if not fams.active:
-        return
-    for t in kept:
-        st = family_standing(conf, root, t, fams)
-        if not st.imported:
-            continue
-        why = st.stop
-        if not why and st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
-            why = outside_reason(st, t)
-        if why and why not in t.blocked:
-            t.blocked = f"{t.blocked} / {why}" if t.blocked else why
-
-
-def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
-    """親のワークツリーの外にしか無いチケットを信頼しない理由と、ユーザが親のブランチへ移してコミットする手順。"""
-    return (
-        f"親のブランチ {st.branch_name} のワークツリーの外"
-        f"（{t.tree or 'ワークスペースルート'}）にしか無いチケット。"
-        "取り込み済みの親子のチケットでは、親のブランチ上のチケットだけが本物。ユーザがそのチケットを親のワークツリー"
-        f"（.claude/worktrees/{st.family}）の同じ置き場へ移してコミットと push をし、"
-        "元のチケットを消す"
-    )
-
-
-def family_standing(
-    conf: settings.Settings,
-    root: str,
-    t: ticket_mod.Ticket,
-    fams: syncstate.Families | None = None,
-) -> syncstate.Standing:
-    """このチケットが属する親子のチケットの立ち位置（`syncstate.Families.standing`）。
-
-    親子のチケットは `parent`（無ければ自分）の識別子で引く。
-    """
-    fams = fams or syncstate.Families(conf, root)
-    return fams.standing(t.parent or t.ticket, t.project or "")
-
-
-def family_problems(
-    conf: settings.Settings,
-    root: str,
-    t: ticket_mod.Ticket,
-    fams: syncstate.Families | None = None,
-) -> list[rules.Problem]:
-    """取り込み済みの親子のチケットの提案を承認しない理由。
-
-    親子のチケットが決まらない・閉じているなら承認しない。提案は親のブランチの上で書き、
-    push してから承認を頼む決まりなので、
-    親のワークツリーの外にある提案も承認しない。取り込み状態の無い親子のチケットには何も言わない。
-    """
-    fams = fams or syncstate.Families(conf, root)
-    if not fams.active:
-        return []
-    st = family_standing(conf, root, t, fams)
-    if not st.imported:
-        return []
-    if st.stop:
-        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, family_stop_text(root, st))]
-    if st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"提案が親のブランチ {st.branch_name} のワークツリーの外"
-                f"（{t.tree or 'ワークスペースルート'}）にある。"
-                "取り込み済みの親子のチケットの提案は"
-                f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
-                "承認を頼んでください",
-            )
-        ]
-    return []
-
-
-def branch_problems(
-    conf: settings.Settings,
-    root: str,
-    t: ticket_mod.Ticket,
-    fams: syncstate.Families | None = None,
-    others: list[ticket_mod.Ticket] | None = None,
-) -> list[rules.Problem]:
-    """親のブランチ名を承認してよいか。
-
-    - `branch:` がそのリポジトリの統合先の名前に当たれば承認しない。比べる名前は
-      `Families.integration_names`（環境変数・`.claude/settings.local.json`・統合先の取り込み結果・
-      `origin/HEAD`・`origin/main`・`origin/master`）。固定のリストと字の検査は
-      `ticket.branch_problem` が読むときに済ませている
-    - 2 つの親子のチケットが同じブランチを名乗る（この親のブランチ名が、同じリポジトリの開いた別の
-      チケットの親のブランチ名か識別子と同じ。大文字小文字は区別しない）なら承認しない。`others` は
-      比べるチケット（承認済みと承認待ち）
-    """
-    if t.is_child:
-        return []
-    fams = fams or syncstate.Families(conf, root)
-    found: list[rules.Problem] = []
-    if t.branch:
-        folded = t.branch.casefold()
-        hits = [n for n in fams.integration_names(t.project or "") if n.casefold() == folded]
-        if hits:
-            found.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）に当たる。"
-                    "統合先を親のブランチにしない",
-                )
-            )
-    mine = ticket_mod.branch_name(t).casefold()
-    clash = sorted(
-        {
-            o.ticket
-            for o in others or []
-            if o.ticket != t.ticket
-            and (o.parent or o.ticket) != t.ticket
-            and o.project == t.project
-            and mine in {ticket_mod.branch_name(o).casefold(), o.ticket.casefold()}
-        }
-    )
-    if clash:
-        found.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"親のブランチ {ticket_mod.branch_name(t)} を別の親子のチケット"
-                f"（{', '.join(clash)}）も親のブランチか識別子として使っている。"
-                "2 つの親子のチケットが同じブランチを名乗ると、"
-                "どちらのチケットを本物とするか決まらないので承認しない",
-            )
-        )
-    return found
-
-
-def family_stop_text(root: str, st: syncstate.Standing) -> str:
-    """親子のチケットが決まらない・閉じているので承認しない理由と、ユーザが打つ手順（`family_problems`）。"""
-    hint = " / ".join(syncstate.guidance(root, st))
-    return f"{st.stop}。承認しない。{hint}"
-
-
-def integration_problems(
-    conf: settings.Settings,
-    root: str,
-    t: ticket_mod.Ticket,
-    fams: syncstate.Families | None = None,
-) -> list[rules.Problem]:
-    """新規の提案の識別子を統合先の `done/` と比べる。
-
-    開いた親子のチケットでも統合先の `done/` は常に一緒に読む。古い統合先から切った `P` で、
-    閉じた識別子の再利用が新規の承認として通らないように。統合先の `done/` は取り込み結果（最後に
-    取り込んだ `origin/<統合先>` から書き出したもの）から、親子のチケットの取り込み状態の有無に
-    依らず、取り込んだことのあるリポジトリ（`sync/<リポジトリ>/`）の全提案に当てる。
-    取り込み結果が壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
-    承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
-    （今のまま）。
-
-    手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある識別子も、閉じた
-    識別子として数える。統合先には閉じたチケットを残さないので、手元ではここが閉じた記録になる
-    （別の機械では見えない）。退避は取り込み状態の有無に依らず見る。退避との比べは大文字小文字を
-    区別しない（区別しないファイルシステムでは、ブランチとワークツリーの名前がぶつかるため）。
-    """
-    if any(archive.same_id(t.ticket, i) for i in archive.ids(root, t.project)):
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"{t.ticket} は手元の退避（{archive.ARCHIVE_DIR.replace(os.sep, '/')}/）で"
-                "閉じている。閉じた識別子を新規に承認しない。識別子を変えて出し直してください",
-            )
-        ]
-    fams = fams or syncstate.Families(conf, root)
-    if not fams.active:
-        return []
-    repo = syncstate.repo_key(t.project)
-    integ = fams.integration(repo)
-    if integ is None:
-        return []
-    sync = settings.script_command(root, "ccnavi-sync.sh")
-    ids, why = fams.done(repo)
-    if why:
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"統合先の取り込み結果（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
-                "再利用を確かめられないので決まらない。承認しない。オンラインで"
-                f" '{sync}' を打って統合先を取り込み直してください",
-            )
-        ]
-    if t.ticket in ids:
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"{t.ticket} は統合先（{integ.branch or '?'}）の done/ で閉じている。"
-                "閉じた識別子を新規に承認しない。識別子を変えて出し直してください",
-            )
-        ]
-    return []
-
-
-def integration_closed(
-    conf: settings.Settings, root: str, proposals: list[ticket_mod.Ticket]
-) -> set[str]:
-    """統合先の取り込み結果の `done/` か手元の退避に同じ識別子がある新規の提案。
-
-    閉じた識別子の再利用を見つける。
-    """
-    fams = syncstate.Families(conf, root)
-    archived: dict[str, set[str]] = {}
-
-    def closed(t: ticket_mod.Ticket) -> bool:
-        if t.project not in archived:
-            archived[t.project] = archive.ids(root, t.project)
-        if any(archive.same_id(t.ticket, i) for i in archived[t.project]):
-            return True
-        return fams.active and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
-
-    return {t.ticket for t in proposals if t.state == ticket_mod.TODO and closed(t)}
 
 
 def _everything(
@@ -885,23 +628,15 @@ def _authoritative(
     # 本物とする側を決めるとどちらかが気づかないうちに消え、`--lint` の「複数のリポジトリにある」も
     # 出なくなる。決め方は `ticket.authority` の 1 つで、承認済みの識別子の提案
     # （`ticket.fold`）も同じ関数で決める。
-    seen = _by_id(everything)
+    seen = approval_checks._by_id(everything)
     kept: list[ticket_mod.Ticket] = []
-    for ticket_id, hits in _by_id(found).items():
+    for ticket_id, hits in approval_checks._by_id(found).items():
         where = ticket_mod.authority(seen.get(ticket_id) or hits)
         if where is None:
             kept.extend(hits)
         else:
             kept.extend(t for t in hits if t.tree == where)
     return kept
-
-
-def _by_id(found: list[ticket_mod.Ticket]) -> dict[str, list[ticket_mod.Ticket]]:
-    """識別子ごとのチケットの全部。順序は見つけた順。"""
-    grouped: dict[str, list[ticket_mod.Ticket]] = {}
-    for t in found:
-        grouped.setdefault(t.ticket, []).append(t)
-    return grouped
 
 
 def home_dir(
@@ -1047,7 +782,7 @@ def update_fields(path: str, fields: dict) -> str:
             text = f.read()
     except OSError as exc:
         return f"読めない ({exc})"
-    return _write(path, ticket_mod.set_fields(text, fields))
+    return approval_marks._write(path, ticket_mod.set_fields(text, fields))
 
 
 def close_copy(approved_dir: str, ticket_id: str) -> str:
@@ -1293,7 +1028,7 @@ def followup(
     body += [f"- {item}" for item in items] or ["（指摘の一覧は無い）"]
     body.append("")
     t = ticket_mod.Ticket(ticket=ident, raw=front, body="\n".join(body))
-    failed = _write(copy_path(where, ident), ticket_mod.render(t))
+    failed = approval_marks._write(copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed
     history.note(
@@ -1305,103 +1040,12 @@ def followup(
         phase=phase_no,
         followup_of=[c.ticket for c in children],
     )
-    cleared = clear_marks(where, parent.ticket, phase_no)
+    cleared = approval_marks.clear_marks(where, parent.ticket, phase_no)
     for warning in cleared.warnings:
         history.failed_to_write(warning)
     if cleared.failed:
         return ident, cleared.failed
     return ident, ""
-
-
-def by_id(tickets: list[ticket_mod.Ticket]) -> dict[str, ticket_mod.Ticket]:
-    return {t.ticket: t for t in tickets}
-
-
-# ---- 先行（`predecessors`）を満たしているか。承認と着手の両方で求める
-
-# 先行の状態。満たしたとみなすのは `done` だけ（`.ccnavi/approved/done/` に在り、取り消しでない）。
-PRED_DONE = ticket_mod.DONE
-PRED_CANCELLED = ticket_mod.CANCELLED
-PRED_MISSING = "missing"
-PRED_SCATTERED = "scattered"
-# 形の上で満たせない先行。待っても通らないので、ふつうの error にする。
-PRED_SELF = "self"  # 自分自身
-PRED_ANCESTOR = "ancestor"  # 自分の親（子は親の中の作業で、親は子より先に閉じない）
-PRED_CYCLE = "cycle"  # 先行を辿ると自分に戻る
-# 取り込み済みの親子のチケットの先行で、その親子のチケットが決まらない・親のブランチ上に無い。
-PRED_UNDECIDED = "undecided"
-# 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
-PRED_WAITING = (ticket_mod.TODO, ticket_mod.DOING, ticket_mod.REVIEW)
-PRED_LABELS = {
-    ticket_mod.TODO: "承認待ち（todo/）",
-    ticket_mod.DOING: "作業中（doing/）",
-    ticket_mod.REVIEW: "レビュー待ち（review/）",
-    PRED_CANCELLED: "取り消し済み（done/ で cancelled_at を持つ）",
-    PRED_MISSING: "どの置き場にも無い",
-    PRED_SCATTERED: "複数の場所にある",
-    PRED_SELF: "自分自身",
-    PRED_ANCESTOR: "自分の親",
-    PRED_CYCLE: "先行を辿ると自分に戻る",
-    PRED_UNDECIDED: "親子のチケットが決まらない",
-}
-
-
-@dataclass
-class Predecessor:
-    """先行 1 本の今。`where` は複数の場所にあるときの在り処（`ツリー:置き場` のリスト）。"""
-
-    ticket: str
-    state: str
-    where: str = ""
-
-    @property
-    def met(self) -> bool:
-        return self.state == PRED_DONE
-
-    @property
-    def waiting(self) -> bool:
-        """先行が閉じれば満たす状態か。取り消し・無い・複数の場所は、待っても満たさない。"""
-        return self.state in PRED_WAITING
-
-    @property
-    def label(self) -> str:
-        text = PRED_LABELS.get(self.state, self.state)
-        return f"{text}: {self.where}" if self.where else text
-
-
-def predecessor_pool_of(
-    open_copies: list[ticket_mod.Ticket],
-    review: list[ticket_mod.Ticket],
-    closed: list[ticket_mod.Ticket],
-    proposals: list[ticket_mod.Ticket],
-    root: str = "",
-) -> dict[str, list[ticket_mod.Ticket]]:
-    """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops._places` と同じ集め方）。
-
-    承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
-    承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
-    残れば、どれが本物か決まらない。
-
-    `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
-    `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
-    引くのはリストのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
-    """
-    pool = _by_id(open_copies + review + closed)
-    for t in proposals:
-        if t.state == ticket_mod.TODO and t.ticket not in pool:
-            pool.setdefault(t.ticket, []).append(t)
-    if root:
-        # 引くのは、その先行を書いたチケットと同じリポジトリ（プロジェクト）の退避だけ。
-        wanted: dict[str, set[str]] = {}
-        for t in open_copies + review + closed + proposals:
-            for ident in t.predecessors:
-                if ident not in pool:
-                    wanted.setdefault(ident, set()).add(t.project)
-        for ident in sorted(wanted):
-            found = [h for p in sorted(wanted[ident]) for h in archive.find(root, ident, p)]
-            if found:
-                pool[ident] = found
-    return pool
 
 
 def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticket_mod.Ticket]]:
@@ -1410,835 +1054,6 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
     review, _ = scan_review(conf, root)
     closed, _ = scan(conf, root, closed=True)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    pool = predecessor_pool_of(open_copies, review, closed, proposals, root)
-    align_imported(conf, root, pool)
+    pool = approval_checks.predecessor_pool_of(open_copies, review, closed, proposals, root)
+    approval_checks.align_imported(conf, root, pool)
     return pool
-
-
-def align_imported(
-    conf: settings.Settings, root: str, pool: dict[str, list[ticket_mod.Ticket]]
-) -> None:
-    """取り込み済みの親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
-
-    Chrome は先行を、参照の閉包にある親子のチケット `P` から引く。手元もそれに揃える。
-    ただし**通る向きには読み替えない**（厳しくする向きだけ）。
-
-    - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・壊れている、
-      親のワークツリーが無い）:「親子のチケットが決まらない」にする（切り直しを案内する）
-    - 親のワークツリーにその識別子のチケットが無い: 同じく「親子のチケットが決まらない」
-      （親のブランチの外にしか無い）
-    - 親のワークツリーのチケットが 1 つで、
-      閉じていない（作業中・レビュー待ち・承認待ち）: それを採る
-    - 親のワークツリーのチケットが閉じている、
-      チケットが 2 つ以上: 前の対応表のまま（手元の全ツリーから
-      引いた答え。前の対応表で満たしていなければ満たさないまま）
-    - 閉じた親子のチケット（統合先の `done/` に親のチケットがある）と、取り込み状態の無い
-      親子のチケット: 前の対応表のまま
-    """
-    fams = syncstate.Families(conf, root)
-    if not fams.active:
-        return
-    for ident, hits in list(pool.items()):
-        if not hits:
-            continue
-        # 手元の退避から引いた先行は閉じたもの。親のブランチ上のチケットでは読み直さない。
-        if all(archive.is_archived_path(root, h.path) for h in hits):
-            continue
-        st = family_standing(conf, root, hits[0], fams)
-        if not st.imported or st.closed:
-            continue
-        if st.stop:
-            pool[ident] = [_undecided(hits[0], st.stop)]
-            continue
-        mine = [
-            h
-            for h in hits
-            if st.home is not None and syncstate.same_tree(h.tree_root, st.home.root)
-        ]
-        if not mine:
-            pool[ident] = [
-                _undecided(
-                    hits[0],
-                    f"親のブランチ {st.family} のワークツリーに {ident} のチケットが無い"
-                    f"（{', '.join(h.tree or '(ワークスペースルート)' for h in hits)} にしか無い）",
-                )
-            ]
-        elif len(mine) == 1 and mine[0].state != PRED_DONE:
-            pool[ident] = mine
-
-
-def _undecided(sample: ticket_mod.Ticket, why: str) -> ticket_mod.Ticket:
-    """先行の対応表に置く「親子のチケットが決まらない」の項目。理由は `blocked` に入れて渡す。"""
-    return replace(sample, state=PRED_UNDECIDED, blocked=why)
-
-
-def predecessor_states(
-    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]]
-) -> list[Predecessor]:
-    """このチケットの先行のそれぞれの今。順序は `predecessors` の順（重ねて書いたものは 1 つ）。"""
-    out: list[Predecessor] = []
-    for ident in dict.fromkeys(t.predecessors):
-        hits = pool.get(ident, [])
-        if ident == t.ticket:
-            out.append(Predecessor(ident, PRED_SELF))
-            continue
-        if t.parent and ident == t.parent:
-            out.append(Predecessor(ident, PRED_ANCESTOR))
-            continue
-        if len(hits) == 1 and hits[0].state != PRED_DONE:
-            loop = _loop_back(t.ticket, ident, pool)
-            if loop:
-                out.append(Predecessor(ident, PRED_CYCLE, " → ".join([t.ticket, *loop])))
-                continue
-        if not hits:
-            out.append(Predecessor(ident, PRED_MISSING))
-        elif len(hits) == 1 and hits[0].state == PRED_UNDECIDED:
-            out.append(Predecessor(ident, PRED_UNDECIDED, hits[0].blocked))
-        elif len(hits) > 1:
-            where = ", ".join(f"{h.tree or '(ワークスペースルート)'}:{h.state}" for h in hits)
-            out.append(Predecessor(ident, PRED_SCATTERED, where))
-        else:
-            out.append(Predecessor(ident, hits[0].state or ticket_mod.DOING))
-    return out
-
-
-def _loop_back(origin: str, first: str, pool: dict[str, list[ticket_mod.Ticket]]) -> list[str]:
-    """`first` から先行を辿って `origin` に戻る経路。戻らなければ空。
-
-    辿るのは対応表で 1 つに決まるチケットだけ（決まらないものは別の苦情になる）。閉じた（`done/`）
-    チケットの先の先行は辿らない。閉じたものは満たしているので、そこで循環が切れる。
-    """
-    seen: set[str] = set()
-    stack: list[tuple[str, list[str]]] = [(first, [first])]
-    while stack:
-        ident, route = stack.pop()
-        if ident in seen:
-            continue
-        seen.add(ident)
-        hits = pool.get(ident, [])
-        if len(hits) != 1 or hits[0].state == PRED_DONE or not hits[0].is_child:
-            continue
-        for nxt in hits[0].predecessors:
-            if nxt == origin:
-                return [*route, origin]
-            stack.append((nxt, [*route, nxt]))
-    return []
-
-
-def unmet_predecessors(
-    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]]
-) -> list[Predecessor]:
-    """満たしていない先行。子だけが先行を持つ（親の `predecessors` は読まない）。"""
-    if not t.is_child:
-        return []
-    return [p for p in predecessor_states(t, pool) if not p.met]
-
-
-def predecessor_problems(
-    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]], approved_rel: str
-) -> list[rules.Problem]:
-    """承認で落とす先行の苦情。
-
-    満たしたとみなすのは `done/` に在って取り消しでないものだけ。
-
-    先行が閉じれば同じ提案が通るもの（承認待ち・作業中・レビュー待ち）は `rules.KIND_NOT_YET`。
-    書いた側に直すものは無く、`--lint` は warn で言う（フェーズの順序と同じ扱い）。取り消し・
-    どこにも無い・複数の場所は、待っても満たさないので、ふつうの error にする。
-    """
-    problems: list[rules.Problem] = []
-    for p in unmet_predecessors(t, pool):
-        if p.waiting:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"先行 {p.ticket} が閉じていない（いまは {p.label}）。{p.ticket} が "
-                    f"{approved_rel}/{ticket_mod.DONE}/ に入る（作業を終え、レビューが要るなら"
-                    "ユーザのレビューが済む）まで承認しない。先行が要らないなら "
-                    "predecessors から外して"
-                    "出し直してください",
-                    rules.KIND_NOT_YET,
-                )
-            )
-        elif p.state == PRED_CANCELLED:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"先行 {p.ticket} は{p.label}。取り消した先行は満たせないので承認しない。"
-                    "predecessors から外して出し直してください",
-                )
-            )
-        elif p.state in (PRED_SELF, PRED_ANCESTOR, PRED_CYCLE):
-            why = {
-                PRED_SELF: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
-                PRED_ANCESTOR: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、"
-                "待っても満たさない",
-                PRED_CYCLE: f"先行が輪になっている（{p.where}）。どれも他が閉じるのを待つので、"
-                "待っても満たさない",
-            }[p.state]
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"先行 {p.ticket} は{PRED_LABELS[p.state]}。{why}。"
-                    "predecessors から外して出し直してください",
-                )
-            )
-        elif p.state == PRED_UNDECIDED:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"先行 {p.ticket} が属する親子のチケットが決まらない（{p.where}）。"
-                    "取り込み済みの親子のチケットの先行は"
-                    "その親のブランチ上のチケットで確かめる。親のワークツリーを切り直すか、"
-                    "'ccnavi-sync.sh' で取り込み直してから出し直してください",
-                )
-            )
-        elif p.state == PRED_MISSING:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"先行 {p.ticket} がどの置き場（todo/・doing/・review/・done/）にも無い。"
-                    "表記を直すか、predecessors から外して出し直してください",
-                )
-            )
-        else:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"先行 {p.ticket} が{p.label}。"
-                    "どれが本物か決まらないので満たしたとみなさない。"
-                    "先に 1 つに決めてください"
-                    "（先へ進んだ側を合流させるか、残ったワークツリーを片付ける）",
-                )
-            )
-    return problems
-
-
-def children_of(tickets: list[ticket_mod.Ticket], parent_id: str) -> list[ticket_mod.Ticket]:
-    return [t for t in tickets if t.parent == parent_id]
-
-
-def mark_path(approved_dir: str, parent: str, phase: int, kind: str) -> str:
-    return os.path.join(approved_dir, PHASES_DIR, parent, f"{phase}.{kind}")
-
-
-def read_mark(approved_dir: str, parent: str, phase: int, kind: str) -> dict | None:
-    return fsio.read_dict(mark_path(approved_dir, parent, phase, kind))
-
-
-def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict) -> str:
-    payload = dict(data)
-    payload.setdefault("at", now())
-    failed = _write(
-        mark_path(approved_dir, parent, phase, kind), json.dumps(payload, ensure_ascii=False)
-    )
-    if not failed:
-        history.note(
-            approved_dir, parent, history.KIND_PHASE_MARK, None, None, phase=phase, mark=kind
-        )
-    return failed
-
-
-@dataclass
-class Cleared:
-    """`clear_marks` の答え。`kinds` は消せた種類（書き込みを溜める段では消す種類）。
-
-    `failed` は reviewed を消せなかった理由（空でなければ呼び手は止める）。`warnings` は
-    ほかの種類を消せなかった知らせ（残っていて判定に使われる）。
-    """
-
-    kinds: list[str]
-    failed: str = ""
-    warnings: list[str] = field(default_factory=list)
-
-
-# 消す順。reviewed を先に消す。消せなければ止めるので、ほかの種類に手を付ける前に決める。
-_CLEAR_ORDER = (MARK_REVIEWED,) + tuple(k for k in MARKS if k != MARK_REVIEWED)
-
-
-def clear_marks(
-    approved_dir: str,
-    parent: str,
-    phase: int,
-    announce=None,
-) -> Cleared:
-    """このフェーズのマーカーを全部消す（同じ番号に子を足した。REQ-TKT-21）。
-
-    reviewed を消せなければ止める（`failed`）。残ればフェーズは済んだまま読まれ、足した子を
-    見ないまま先へ進めてしまう（判定を厳しくする向き）。ほかの種類は
-    消せなくても止めず、残っていて判定に使われると言う（`warnings`）。
-    履歴（phase-reopened の `cleared`）には実際に消せた種類だけを書く。
-
-    書き込みを溜める段（承認の plan）では、消す書き込みに同じ扱いをつけ、
-    履歴と見せる行は Writer(FS) が書けた種類で書く（`fsio.Call`）。
-    `announce` は消せた種類から見せる行を作る関数。
-    """
-    stage = fsio.current_stage()
-    present = [k for k in _CLEAR_ORDER if fsio.lexists(mark_path(approved_dir, parent, phase, k))]
-    if stage is not None:
-        group = stage.new_group()
-        for kind in present:
-            path = mark_path(approved_dir, parent, phase, kind)
-            with fsio.policy(group=group, tag=kind, **_clear_policy(path, phase, kind)):
-                fsio.unlink(path)
-        kinds = [k for k in MARKS if k in present]
-        if kinds:
-            # 見え方（Changes）には全部消えた後の履歴を載せる。ディスクへは Call が書く。
-            with fsio.view_only():
-                _note_reopened(approved_dir, parent, phase, kinds)
-
-        # 履歴の時刻と経路は並べたときのもの（書く時に時計を読み直すと、Changes と食い違う）。
-        at, via = fsio.stamp(), history.via()
-
-        def run(done: set[str]) -> list[str]:
-            cleared = [k for k in MARKS if k in done]
-            if cleared:
-                before = history.via()
-                history.set_via(via)
-                try:
-                    with fsio.clock(at):
-                        _note_reopened(approved_dir, parent, phase, cleared)
-                finally:
-                    history.set_via(before)
-            return announce(cleared) if announce is not None and cleared else []
-
-        planned = announce(kinds) if announce is not None and kinds else []
-        stage.items.append(fsio.Call(run, group, planned))
-        return Cleared(kinds)
-    cleared: list[str] = []
-    warnings: list[str] = []
-    failed = ""
-    for kind in present:
-        path = mark_path(approved_dir, parent, phase, kind)
-        reason = fsio.unlink(path)
-        if not reason:
-            cleared.append(kind)
-            continue
-        text = fsio.failure_text(fsio.Policy(**_clear_policy(path, phase, kind)), reason)
-        if kind == MARK_REVIEWED:
-            failed = text
-            break
-        warnings.append(text)
-    cleared = [k for k in MARKS if k in cleared]
-    if cleared:
-        _note_reopened(approved_dir, parent, phase, cleared)
-    return Cleared(cleared, failed, warnings)
-
-
-def _clear_policy(path: str, phase: int, kind: str) -> dict:
-    if kind == MARK_REVIEWED:
-        return {
-            "on_fail": fsio.FAIL_STOP,
-            "prefix": "",
-            "message": (
-                f"フェーズ {phase} のレビュー済みのマーカー {path} を消せない（{{reason}}）。"
-                "残るとフェーズは済んだまま読まれるので、ここで止める。ユーザがマーカーを消す"
-            ),
-        }
-    return {
-        "on_fail": fsio.FAIL_WARN,
-        "prefix": "",
-        "message": (
-            f"フェーズ {phase} のマーカー {path} を消せなかった（{{reason}}）。"
-            f"{kind} は残っていて効く"
-        ),
-    }
-
-
-def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str]) -> None:
-    history.note(
-        approved_dir,
-        parent,
-        history.KIND_PHASE_REOPENED,
-        None,
-        None,
-        phase=phase,
-        cleared=cleared,
-    )
-
-
-# 親ごとのマーカー。フェーズの番号に付かないもの。
-#   ready.json   Draft を外した（外してよいと確かめた）。「マージに進んでよい」の合図
-#   close-early.json  ユーザが「キリの良いところまでやった」と早めに閉じた。残りは別の issue へ
-#   closed.json  親を閉じた（`ticket finish <親>`）。どのフェーズをどこで見たかを残す
-#
-# closed.json が要るのは、提案（wip/）が統合先に取り込む前に消えるから。マージリクエストを
-# 作らない進め方（全フェーズが `review: chat`）では、親を閉じた事実の残る先がここしか無い。
-PARENT_MARK_READY = "ready"
-PARENT_MARK_CLOSE_EARLY = "close-early"
-PARENT_MARK_CLOSED = "closed"
-
-
-def parent_mark_path(approved_dir: str, parent: str, name: str) -> str:
-    return os.path.join(approved_dir, PHASES_DIR, parent, f"{name}.json")
-
-
-def read_parent_mark(approved_dir: str, parent: str, name: str) -> dict | None:
-    return fsio.read_dict(parent_mark_path(approved_dir, parent, name))
-
-
-# 親のマーカーのうち、状態の履歴（history）に残すもの。親の閉じ方と Draft を外したこと。上書きの記録
-# （configsync）は状態ではないので残さない。
-PARENT_MARKS_IN_HISTORY = (PARENT_MARK_READY, PARENT_MARK_CLOSE_EARLY, PARENT_MARK_CLOSED)
-
-
-def write_parent_mark(approved_dir: str, parent: str, name: str, data: dict) -> str:
-    payload = dict(data)
-    payload.setdefault("at", now())
-    failed = _write(
-        parent_mark_path(approved_dir, parent, name),
-        json.dumps(payload, ensure_ascii=False, indent=1),
-    )
-    if not failed and name in PARENT_MARKS_IN_HISTORY:
-        history.note(approved_dir, parent, history.KIND_PARENT_MARK, None, None, mark=name)
-    return failed
-
-
-# 子ごとの記録。実績のリスク（閉じるときに数えた点）と、定性項目の判定。
-#   phases/<親>/<子>.risk.json   {points, level, hits, unmeasured, head, at}
-#   phases/<親>/<子>.judge.json  {<項目>: {hit, reason, head, at}}
-CHILD_RECORD_RISK = "risk"
-CHILD_RECORD_JUDGE = "judge"
-
-
-def child_record_path(approved_dir: str, parent: str, child: str, kind: str) -> str:
-    return os.path.join(approved_dir, PHASES_DIR, parent, f"{child}.{kind}.json")
-
-
-def read_child_record(approved_dir: str, parent: str, child: str, kind: str) -> dict | None:
-    return fsio.read_dict(child_record_path(approved_dir, parent, child, kind))
-
-
-def write_child_record(approved_dir: str, parent: str, child: str, kind: str, data: dict) -> str:
-    return _write(
-        child_record_path(approved_dir, parent, child, kind),
-        json.dumps(data, ensure_ascii=False, indent=1),
-    )
-
-
-# ユーザが受け入れたスレッドの記録。フェーズのマーカーとは別の場所に、親ごとに 1 つ置く。
-ACCEPTED_FILE = "accepted.json"
-
-
-def accepted_path(approved_dir: str, parent: str) -> str:
-    return os.path.join(approved_dir, PHASES_DIR, parent, ACCEPTED_FILE)
-
-
-def accepted_threads(
-    approved_dir: str,
-    parent: str,
-    phase: int | None = None,
-    owner: ticket_mod.Ticket | None = None,
-) -> set[str]:
-    """この親で、ユーザが「未解決のまま進める」と受け入れたスレッドの識別。
-
-    `phase` を渡すと、その番号のレビューで受け入れ済みと数えてよいものだけを返す。
-    受け入れはそのフェーズと、それを待つ番号（コピーした待ち方の `waits`）にだけ当てはまる（設計
-    9.8）。並行した別の枝のレビューには当てはまらない。番号を持たない受け入れ（`close-early`）は
-    親全体に当てはまる。
-    """
-    data = fsio.read_dict(accepted_path(approved_dir, parent))
-    if not data:
-        return set()
-    threads = {str(x) for x in data.get("threads") or [] if str(x)}
-    if phase is None or owner is None:
-        return threads
-    at = data.get("phases") if isinstance(data.get("phases"), dict) else {}
-    reach = {phase, *workflow.waits_of(owner, phase, None)}
-    kept = set()
-    for thread in threads:
-        where = at.get(thread)
-        scoped = isinstance(where, list)
-        if not scoped or any(isinstance(n, int) and n in reach for n in where):
-            kept.add(thread)
-    return kept
-
-
-def remember_accepted(
-    approved_dir: str, parent: str, threads: list[str], phase: int | None = None
-) -> str:
-    """受け入れたスレッドを記録に足す。失敗したら、その説明を返す。
-
-    フェーズのマーカーとは別の場所に置く。マーカーは 2 つの理由で消える。同じ番号のマーカーは
-    `confirm` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
-    丸ごと消す。どちらでも受け入れの記録が消え、ユーザがもう一度同じスレッドを
-    受け入れることになる。ユーザが 1 度言った「これは承知で進める」は、
-    取り消されるまで残す。
-    """
-    if not threads:
-        return ""
-    path = accepted_path(approved_dir, parent)
-    data = fsio.read_dict(path) or {}
-    at = dict(data.get("phases")) if isinstance(data.get("phases"), dict) else {}
-    added = {str(t) for t in threads if str(t)}
-    threads_before = accepted_threads(approved_dir, parent)
-    keep = sorted(threads_before | added)
-    for thread in added:
-        if phase is None:
-            # 番号を持たない受け入れ（`close-early`）は親全体に当てはまる。
-            at.pop(thread, None)
-        elif thread in at or thread not in threads_before:
-            # 受け入れた番号を足していく。別の枝で受け入れ直した分も数に入れる。
-            known = [n for n in at.get(thread, []) if isinstance(n, int)]
-            at[thread] = sorted(set(known) | {phase})
-    # 読んで、足して、書き戻す形。同じファイルの `_write_known` と同じく、
-    # 途中を見せない書き方で置く。
-    body = {"threads": keep, "phases": dict(sorted(at.items())), "at": now()}
-    failed = fsio.write_json_atomic(path, body, indent=1)
-    return f"{path} ({failed})" if failed else ""
-
-
-def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:
-    found = {}
-    for kind in MARKS:
-        data = read_mark(approved_dir, parent, phase, kind)
-        if data is not None:
-            found[kind] = data
-    return found
-
-
-def now() -> str:
-    return fsio.stamp()
-
-
-def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """`project:` が層の名前に予約してある表記なら error（設計 11.4）。"""
-    if not t.project or not settings.is_reserved_layer_name(t.project):
-        return []
-    reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
-    return [
-        rules.Problem(
-            rules.SEVERITY_ERROR,
-            t.ticket,
-            f"`project: {t.project}` は層の名前として予約してある表記（{reserved}）。"
-            "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
-            "ワークスペース自身の提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"
-            "そのプロジェクトの名前を変えてから置いてください",
-        )
-    ]
-
-
-def project_problems(
-    t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], conf: settings.Settings
-) -> list[rules.Problem]:
-    """`project` が置き場と合っているか（REQ-MLT-11）。
-
-    プロジェクトを決めるのは提案を置いた場所（設計 11.5）。frontmatter の `project:` は
-    宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
-    無い。承認の画面が置き場から引いた値を出し、それが承認済みチケットに残る。
-
-    予約名（`common` / `self`）は指せない。置き場にその名前のディレクトリが在っても
-    層としては数えないので（`ruleload.layers`）、指せると「層が決まらないチケット」を
-    承認することになる。
-    """
-    if t.declared_project and t.declared_project != t.project:
-        where = conf.tickets
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"`project: {t.declared_project}` が置き場"
-                f"（{t.project or 'ワークスペース'}）と違う。"
-                f"{t.declared_project} の提案はワークスペースの {where}/ に置いてください",
-            )
-        ]
-    reserved = _reserved_project(t)
-    if reserved:
-        return reserved
-    if t.is_child:
-        parent = pool.get(t.parent)
-        if parent is None or t.project == parent.project:
-            return []
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"置き場（{t.project or 'ワークスペース'}）が親 {parent.ticket} の"
-                f"置き場（{parent.project or 'ワークスペース'}）と違う。"
-                "子は親と同じ置き場に置いてください",
-            )
-        ]
-    # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それは層では
-    # ないので、指せてはいけない。素の一覧で見ると通ってしまう。
-    known = {
-        p.name for p in tree.projects(conf.projects) if not settings.is_reserved_layer_name(p.name)
-    }
-    if t.project and t.project not in known:
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"`project: {t.project}` は置き場 {conf.projects or '(無し)'} に無い",
-            )
-        ]
-    return []
-
-
-def child_problems(
-    t: ticket_mod.Ticket, parent: ticket_mod.Ticket | None, missing: str = ""
-) -> list[rules.Problem]:
-    """子と親の構造の検査。承認（`validate`）と判定（`blocking_problems`）が同じ答えを引く。
-
-    どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認でも判定でも
-    通さない。1 か所に置くのは、置き場を動かして承認する進め方で判定の側の
-    検査だけが古くなると、承認を通ったチケットと通らないチケットで答えが分かれるから。
-
-    「種類の定義が読めない」はここに入れない。壊れているのは設定で、チケットの形は
-    正しい。判定は注記を添えて親の範囲で切り詰める（`judge.ticket_verdict`）。
-    """
-    if parent is None:
-        # 文面だけは呼び手が差し替える。承認のときは「まだ承認されていない」しか起きないが、
-        # 判定のときは「承認されたが閉じた」も同じ検査に当たる。検査は同じで、読むユーザの
-        # 次にすることが違うだけなので、分けるのは言葉だけにする。
-        detail = missing or f"親 {t.parent} が承認されていない"
-        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, detail)]
-    if parent.is_child:
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} 自身が子。深さは 2 段まで"
-            )
-        ]
-    if parent.has_plan and t.phase is not None and parent.item_at(t.phase) is None:
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"{t.phase} 番目のフェーズは親 {parent.ticket} の計画に無い"
-                f"（計画は {len(parent.numbered())} 番目まで）",
-            )
-        ]
-    return []
-
-
-def blocking_problems(
-    conf: settings.Settings, t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]
-) -> list[rules.Problem]:
-    """判定がこの承認済みチケットを信頼できない理由。空なら信頼してよい。
-
-    承認のときにしか当たらなかった検査のうち、当たらないと「範囲をどこで切り詰めるか」が
-    決まらないものだけを置く。置き場を動かして承認する進め方は `--agree` を通らないので、
-    同じ検査を判定の側でも当てる。当たれば範囲は使われず、その場所は止まる。
-
-    ここに入れないもの。
-    - 計画の形（`plan_problems`）。範囲に影響しないので `--lint` が言う
-    - フェーズの順序（`phase.order_problems`）。順序が狂っていても、その子の範囲を
-      どの親で切り詰めるかは決まる。順序で止めるのは `held_phase`（レビュー待ちの間 `Agent` と
-      シェルを止める）で、この検査とは別の仕組み。
-      止めると、レビュー待ちの間その子が一切書けなくなり、レビュー待ちでも Write を通す形
-      とは結果が食い違う。`--lint` が warn で言う
-    - 範囲の超過。判定が親と種類の上限で切り詰めるので、止める理由が無い
-    - 再開（`done/` から `doing/` へ手で戻す）で残った `completed_at` などの欄。ユーザの再開を
-      止めないよう、`--lint` が warn で言うだけにする
-
-    ここに入れる、中身だけで分かる矛盾。
-    - `started_at` が無いのに `base_sha` がある。`start` は 2 つを一緒に書くので道具を通らない形で、
-      `base_sha` は範囲外の検査とリスクの基準点に使われる
-    - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は `--agree` が
-      `phases/<親>/workflow.yml` に書くもので、欄を承認済みの待ち方として効かせない
-    - 待ち方のファイルが読めない。一直線と読むと、ユーザが承認した待ち方と違う順で進む
-    - 親のツリーの未着手のチケットが、手元の退避の閉じたチケットと同じ識別子
-      （`archive.drop_archived`）。使い直した識別子か、退避と同じものかを見分けられない
-    """
-    problems = list(project_problems(t, pool, conf))
-    problems.extend(content_problems(t))
-    if t.is_child:
-        missing = f"親 {t.parent} の承認済みチケットが作業中に無い（未承認か、閉じている）"
-        problems.extend(child_problems(t, pool.get(t.parent), missing))
-    return [p for p in problems if p.severity == rules.SEVERITY_ERROR]
-
-
-def content_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """作業中の承認済みチケットの、中身だけで分かる欄の矛盾（判定が止める分）。"""
-    problems: list[rules.Problem] = []
-    if t.base_sha and not t.started_at:
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                "`started_at` が無いのに `base_sha` がある。2 つは着手（`start`）が一緒に書く欄で、"
-                "片方だけの形は道具を通っていない。ユーザが承認済みチケットを確かめて直してください",
-            )
-        )
-    if ticket_mod.WORKFLOW_KEY in t.raw and not has_record(t):
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"`{ticket_mod.WORKFLOW_KEY}:` の欄がある。待ち方は --agree が "
-                f"{PHASES_DIR}/<親>/{WORKFLOW_FILE} に書くもので、チケットには書かない。"
-                "ユーザが欄を消してください",
-            )
-        )
-    if t.workflow_unreadable:
-        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.workflow_unreadable))
-    if t.archived_clash:
-        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.archived_clash))
-    return problems
-
-
-def resumed_fields(t: ticket_mod.Ticket) -> list[str]:
-    """作業中（`doing/`）なのに値が残っている、閉じるときに書く欄の名前。
-
-    `finish` と `cancel` は `doing/` から動かすので、道具を通る限り残らない。残るのは、ユーザが
-    `done/` から `doing/` へ手で戻した再開の形。判定では止めず、`--lint` が warn で言う。
-    """
-    values = {
-        "completed_at": t.completed_at,
-        "cancelled_at": t.cancelled_at,
-        "cancel_reason": t.cancel_reason,
-    }
-    return [name for name, value in values.items() if value]
-
-
-def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:
-    """判定が読む承認済みチケットに、信頼できない理由を付ける。
-
-    理由を読むのは `phase.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
-    終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
-    呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
-
-    **親を引く対応表は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
-    別の対応表で引くと、ここでは親が見つかって理由が付かないのに、判定の側では見つからず
-    `parent=None` のまま子の宣言だけで範囲が決まる（閉じた親やレビュー待ちの親まで
-    引ける対応表にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
-    承認していない範囲に書ける経路そのものなので、引けないなら止める側を採る。
-
-    親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
-    開いた子のある親を閉じさせない）。置き場を手で動かして起きたなら、親を閉じたのは
-    ユーザなので、その子を止めるのがユーザの意思に沿う。
-    """
-    pool = by_id(kept)
-    for t in kept:
-        problems = blocking_problems(conf, t, pool)
-        t.blocked = problems[0].detail if problems else ""
-
-
-def _write(path: str, text: str) -> str:
-    with fsio.policy(message="書けない ({reason})"):
-        failed = fsio.write_text(path, text)
-    return f"書けない ({failed})" if failed else ""
-
-
-# ---- 承認の時刻（表示だけ） -------------------------------------------------------------------
-
-# どこから引いた時刻か。
-APPROVED_FROM_HISTORY = "history"  # 状態の履歴の approved（続きの子は raised）
-APPROVED_FROM_RECORD = "record"  # 前の版の承認が書いた `ccnavi_approved.approved_at`（古い形）
-APPROVED_FROM_COMMIT = "commit"  # doing/ に足したコミットの時刻
-APPROVED_UNCOMMITTED = "uncommitted"  # 履歴もコミットも無い（手で置いて、まだコミットしていない）
-# git を打たない場（Chrome の Pyodide）では、履歴の無い承認の時刻は分からない（空）。
-
-
-@dataclass(frozen=True)
-class ApprovedTime:
-    """承認済みチケットの承認の時刻。`at` が空で `source` も空なら分からない。"""
-
-    at: str = ""
-    source: str = ""
-
-    def label(self) -> str:
-        """人に見せる 1 語。"""
-        if self.source == APPROVED_UNCOMMITTED:
-            return "未コミット（手で置いた）"
-        return self.at or "不明"
-
-
-def approved_times(
-    conf: settings.Settings, found: list[ticket_mod.Ticket], use_git: bool = True
-) -> dict[str, ApprovedTime]:
-    """承認済みチケットごと（パスで引く）の承認の時刻。表示（ボード・`--diagnose`）だけが読む。
-
-    次の順で引く。
-
-    1. 状態の履歴 `events/<識別子>.ndjson` の `approved`（続きの子は `raised`）の
-       うち新しいものの `at`
-    2. 前の版の承認が書いた記録（古い形の `ccnavi_approved.approved_at`）。前の版は承認のときに
-       この欄へ時刻を書いていた。履歴を書く前の版の承認は履歴を持たないので、コミットの時刻より先に読む
-    3. 1 と 2 で取れないチケットがあるツリーだけ、ツリーごとに 1 回
-       `git log --no-renames --diff-filter=A` を打ち、`doing/<識別子>.md` を足した
-       コミットのうち新しいものの時刻。`--no-renames` を付けるのは、GitHub の画面での
-       移動が rename のコミットになり、付けないと足したことにならないため
-    4. どれも無ければ「未コミット（手で置いた）」（`doing/` にあるものだけ。ほかは分からない）
-
-    判定は履歴も git も読まない取り決めなので、hook の判定の経路からは呼ばない。`use_git` が偽
-    （Chrome の Pyodide など、git の無い場）なら 3 を飛ばし、1 と 2 で取れなければ分からないとする。
-    """
-    out: dict[str, ApprovedTime] = {}
-    missing: dict[str, list[ticket_mod.Ticket]] = {}
-    for t in found:
-        where = settings.approved_dir(conf, t.tree_root) if t.tree_root else ""
-        at = history_time(where, t.ticket) if where else ""
-        if at:
-            out[t.path] = ApprovedTime(at, APPROVED_FROM_HISTORY)
-        elif t.approved_at:
-            out[t.path] = ApprovedTime(t.approved_at, APPROVED_FROM_RECORD)
-        elif t.tree_root:
-            missing.setdefault(t.tree_root, []).append(t)
-    if not use_git or sys.platform == "emscripten":
-        return out
-    for tree_root, waiting in missing.items():
-        added, ok = _added_times(conf, tree_root)
-        for t in waiting:
-            if t.ticket in added:
-                out[t.path] = ApprovedTime(added[t.ticket], APPROVED_FROM_COMMIT)
-            elif ok and t.state == ticket_mod.DOING:
-                out[t.path] = ApprovedTime("", APPROVED_UNCOMMITTED)
-    return out
-
-
-def history_time(approved_dir: str, ident: str) -> str:
-    """履歴の最後の承認の時刻。最後の承認のあとに取り下げがあれば空（次の手段の git に任せる）。
-
-    取り下げたあとに手で動かして承認し直すと、履歴には前の承認の行しか残らない。それを今の
-    承認の時刻と言わないため。
-    """
-    entries, _ = history.read(approved_dir, ident, limit=0)
-    kinds = (history.KIND_APPROVED, history.KIND_RAISED)
-    for entry in reversed(entries):
-        if entry.get("kind") == history.KIND_WITHDRAWN:
-            return ""
-        if entry.get("kind") in kinds and isinstance(entry.get("at"), str):
-            return entry["at"]
-    return ""
-
-
-def _added_times(conf: settings.Settings, tree_root: str) -> tuple[dict[str, str], bool]:
-    """ツリーの `doing/` に足したコミットの時刻（識別子ごとに新しいもの）と、git を読めたか。"""
-    doing = os.path.join(settings.approved_dir(conf, tree_root), DOING_DIR)
-    rel = os.path.relpath(doing, tree_root).replace(os.sep, "/")
-    if rel.startswith(".."):
-        return {}, False
-    done = gitcmd.run(
-        tree_root,
-        [
-            "log",
-            "--no-renames",
-            "--diff-filter=A",
-            "--relative",
-            "--format=%x00%cI",
-            "--name-only",
-            "--",
-            rel,
-        ],
-        raw_paths=True,
-    )
-    if not done.ok:
-        return {}, False
-    found: dict[str, str] = {}
-    when = ""
-    for line in done.out.splitlines():
-        if line.startswith("\0"):
-            when = line[1:].strip()
-            continue
-        name = line.strip()
-        if not name.startswith(rel + "/") or not name.endswith(".md"):
-            continue
-        ident = name[len(rel) + 1 : -len(".md")]
-        if "/" not in ident and ident not in found:
-            found[ident] = when
-    return found, True

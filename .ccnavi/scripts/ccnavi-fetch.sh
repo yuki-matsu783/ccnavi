@@ -166,7 +166,7 @@ ccnavi_fetch_or_note() {
 # 無ければ ccnavi-sync.sh が統合先の取り込み結果（sync/<リポジトリ>/integration/head）に書いた名前、
 # 無ければホストのデフォルトブランチ（`origin/HEAD`、無ければ `origin/main`・`origin/master`）。
 # 決め方は ccnavi-git.sh の push の拒否・ccnavi-review.sh のマージリクエストの宛先と揃えるため、
-# ccnavi-common.sh の ccnavi_integration に 1 つだけ置いてある。
+# ccnavi-common-state.sh の ccnavi_integration に 1 つだけ置いてある。
 ccnavi_fetch_integration() {
 	ccnavi_integration "$1" "$root"
 }

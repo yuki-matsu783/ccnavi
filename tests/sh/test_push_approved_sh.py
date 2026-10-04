@@ -29,12 +29,12 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-PUSH_SCRIPTS = ("ccnavi-push-approved.sh", "ccnavi-common.sh")
+PUSH_SCRIPTS = ("ccnavi-push-approved.sh", *common_sh(SH_DIR))
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"

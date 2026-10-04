@@ -20,7 +20,7 @@ import unittest
 
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import agree, approval, syncstate
+from ccnavi.tickets import agree, approval, approval_checks, syncstate
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, to_old_form, write
 
@@ -571,7 +571,7 @@ class MarkTest(AuthorityHarness):
         t = Ticket(
             ticket="i0001-01-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
         )
-        approval.mark_imported(self.conf(), self.root, [t])
+        approval_checks.mark_imported(self.conf(), self.root, [t])
         self.assertTrue(t.blocked.startswith("前の理由 / "), t.blocked)
         self.assertIn("gone", t.blocked)
 
@@ -740,7 +740,7 @@ class PredecessorTest(AuthorityHarness):
         stale = Ticket(ticket="i0001-01-09", parent="i0001", state="doing", tree_root=self.root)
         pool = {"i0001-01-09": [done, stale]}
         self.record("present")
-        approval.align_imported(self.conf(), self.root, pool)
+        approval_checks.align_imported(self.conf(), self.root, pool)
         self.assertEqual([done, stale], pool["i0001-01-09"])
         # 親のワークツリーで閉じていなければ、それを採る（前の対応表が満たしていても）。
         doing = Ticket(
@@ -748,7 +748,7 @@ class PredecessorTest(AuthorityHarness):
         )
         closed = Ticket(ticket="i0001-01-08", parent="i0001", state="done", tree_root=self.root)
         pool = {"i0001-01-08": [doing, closed]}
-        approval.align_imported(self.conf(), self.root, pool)
+        approval_checks.align_imported(self.conf(), self.root, pool)
         self.assertEqual([doing], pool["i0001-01-08"])
 
 
@@ -906,7 +906,7 @@ class LintTest(AuthorityHarness):
         self.assertIn("phases.yml", drift[0]["detail"])
 
     def test_the_projected_layer_on_the_parent_branch_is_compared(self):
-        from ccnavi.entry import lint
+        from ccnavi.entry import lint_layers
 
         conf = self.conf()
         self_base = os.path.join(self.state, "sync", "self", "integration")
@@ -922,14 +922,14 @@ class LintTest(AuthorityHarness):
             record=syncstate.Family("w0001", "web", "present"),
             home=approval.tree.Tree("w0001", home, project="web", kind="worktree"),
         )
-        problems = lint._projected_layer_problems(conf, st, "(x)")
+        problems = lint_layers._projected_layer_problems(conf, st, "(x)")
         # 共通層の rules と、プロジェクトの統合先の phases が P の上に無い。
         self.assertEqual(2, len(problems), problems)
         write(os.path.join(home, ".ccnavi", "config", "rules.yml"), "rules: []\n")
         write(os.path.join(home, ".ccnavi", "config", "phases.yml"), "types: {}\r\n")
-        self.assertEqual([], lint._projected_layer_problems(conf, st, "(x)"))
+        self.assertEqual([], lint_layers._projected_layer_problems(conf, st, "(x)"))
         write(os.path.join(home, ".ccnavi", "config", "risks.yml"), "x: 1\n")
-        problems = lint._projected_layer_problems(conf, st, "(x)")
+        problems = lint_layers._projected_layer_problems(conf, st, "(x)")
         self.assertEqual(1, len(problems))
         self.assertIn("risks.yml", problems[0].detail)
 

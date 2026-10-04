@@ -14,7 +14,7 @@ from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard
 from ..records import audit, repeat
-from ..tickets import approval, flow, phase
+from ..tickets import approval, approval_checks, flow, phase
 from ..tickets import ticket as ticket_mod
 from . import projskills, reasons, wrapguard
 
@@ -361,7 +361,7 @@ def decide_before(
         if raw is None:
             raw = approval.read_raw(conf, root)
         scanned, _ = approval.scan(conf, root, raw=raw)
-        index = approval.by_id(scanned)
+        index = approval_checks.by_id(scanned)
 
     # ワークツリーの元リポジトリと承認済みチケットの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
@@ -377,7 +377,7 @@ def decide_before(
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         locked, scanned = flow_lock(conf, root, payload, record.subject, scanned)
         if index is None and scanned is not None:
-            index = approval.by_id(scanned)
+            index = approval_checks.by_id(scanned)
         if locked:
             record.code, record.rules = flow.CODE_LOCKED, [flow.LOCK_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [locked], conf=conf)

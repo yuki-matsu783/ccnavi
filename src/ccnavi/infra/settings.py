@@ -260,7 +260,7 @@ def is_reserved_layer_name(name: str) -> bool:
     名前の大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
     `Self:schema` になり、記録を読むユーザが `self:schema`（ワークスペース自身の層）と
     取り違える。機械が表記を区別するかどうかとは別の話なので、どの機械でも
-    大文字小文字を区別せずに扱う。`--lint` が error で名指しする（lint._projects）。
+    大文字小文字を区別せずに扱う。`--lint` が error で名指しする（lint_places._projects）。
     """
     folded = (name or "").casefold()
     return any(folded == reserved.casefold() for reserved in RESERVED_LAYER_NAMES)

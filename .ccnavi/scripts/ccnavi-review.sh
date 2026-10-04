@@ -7,6 +7,9 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
+#   sh .ccnavi/scripts/ccnavi-review.sh ready                                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外す）
+#   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
+#   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （ユーザが端末で打つ。chat のフェーズのレビュー済み）
 #   sh .ccnavi/scripts/ccnavi-review.sh config-synced <親>    （ユーザが端末で打つ。着手で上書きした設定を見た）
 #
@@ -66,7 +69,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
                                                   wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
                                                   差分に載せる）。相対パスは打った場所から。投稿が済むと、ユーザが打つ
                                                   crit review <パス> と crit push <番号> を出す
-  confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
+  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（依頼の時刻では絞らない）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で打つ。--preview は一覧を JSON で見るだけ）
   ready                                           閉じられ、wip を片付けて push 済みなら、閉じたチケットを logs/archive/ へ退避して削除を push し、Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
@@ -178,7 +181,7 @@ if [ "$needs_host" = yes ]; then
 	# 気づかずに生の値を使わないようにする。URL に資格情報を埋める使い方は普通にあり、
 	# 出力はエージェントの文脈にも記録にも残る。
 	origin_shown=$(ccnavi_mask_url "$origin")
-	# origin の読み方と道具の選び方は ccnavi-common.sh の「ホスト（GitHub / GitLab）への接続」にある
+	# origin の読み方と道具の選び方は ccnavi-common-host.sh の「ホスト（GitHub / GitLab）への接続」にある
 	# （ccnavi-branches.sh と共有する）。ここは失敗の文面を決め、以降で使う変数に入れるだけ。
 	ccnavi_host_parse "$origin" || {
 		case "$?" in
@@ -229,7 +232,7 @@ if [ -n "$review_top" ]; then
 fi
 
 # api <METHOD> <path> [<JSON body>] レスポンスの JSON を標準出力へ。path は api_base からの相対。
-# 中身は ccnavi-common.sh の ccnavi_host_api。失敗したら標準出力には何も出さず、ホストが返した本文ごと
+# 中身は ccnavi-common-host.sh の ccnavi_host_api。失敗したら標準出力には何も出さず、ホストが返した本文ごと
 # 標準エラーへ出して（api_failed）1 を返す。curl の 1 回の時間の上限は ccnavi_h_max_time（既定 120 秒）。
 api() {
 	ccnavi_host_api "$@"
@@ -289,7 +292,7 @@ project_id() {
 
 default_branch() {
 	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH →
-	# ccnavi-sync.sh の取り込み結果 → origin/HEAD → origin/main・master。ccnavi-common.sh の ccnavi_integration）で、
+	# ccnavi-sync.sh の取り込み結果 → origin/HEAD → origin/main・master。ccnavi-common-state.sh の ccnavi_integration）で、
 	# cwd のツリーが属するリポジトリについて決める。どれも決まらなければ main。
 	db_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	db_name=$(ccnavi_integration "${db_tree:-.}" "$root") || db_name=""

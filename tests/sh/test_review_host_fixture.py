@@ -7,8 +7,8 @@
    （`extensions/chrome/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む JSON
    （`fetch`。`fetched_at` を除く）が、見本の期待値（`expected.json`）と同じ。拡張の試験
    （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ JSON を組む
-2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの `review.effective`・`_unresolved`）が
-   見本の `conclusion.json` と同じ
+2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの
+   `review_host.effective`・`_unresolved`）が見本の `conclusion.json` と同じ
 3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。
    引けなければ渡さない（マーカーは前と同じ）。
    呼び手が `--actor` を渡しても受けない
@@ -28,8 +28,8 @@ import tempfile
 import unittest
 
 from ccnavi.entry import version
-from ccnavi.tickets import review
-from tests import ROOT
+from ccnavi.tickets import review_host
+from tests import ROOT, common_sh
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -68,11 +68,11 @@ def conclusion(copy: dict, poster: str = "") -> dict:
     GitLab は依頼を投稿したアカウント（`poster`）の ccnavi の依頼のスレッドを数えない。
     目印は誰でも書けるので、書いたアカウントでも確かめる。
     """
-    result = review.Result.from_data(copy)
+    result = review_host.Result.from_data(copy)
     changes = [
-        r for r in review.effective(result.reviews) if r.state.upper() == "CHANGES_REQUESTED"
+        r for r in review_host.effective(result.reviews) if r.state.upper() == "CHANGES_REQUESTED"
     ]
-    unresolved = review._unresolved(result.threads, set(), result.host, poster)
+    unresolved = review_host._unresolved(result.threads, set(), result.host, poster)
     return {
         "changes_requested": sorted(r.url for r in changes),
         "unresolved": sorted(t.id for t in unresolved),
@@ -87,7 +87,7 @@ class HostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
@@ -385,7 +385,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)

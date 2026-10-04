@@ -1,7 +1,7 @@
 /**
  * 診断ログ。ワークスペースルートの `logs/diag/<出どころ>.log` に 1 行ずつ足す（docs/claude/logging.md）。
  *
- * sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と実行ファイル（`src/ccnavi/records/diaglog.py`）と
+ * sh（`.ccnavi/scripts/ccnavi-common-log.sh` の log_*）と実行ファイル（`src/ccnavi/records/diaglog.py`）と
  * 同じ形の行を出す。
  *
  *     2026-09-27T10:15:03+09:00 ERROR ccnavi-board[4242] 画面の前提が崩れている screen=rules

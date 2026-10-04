@@ -13,7 +13,7 @@
 #
 # 役割の分け方（docs/claude/exe-boundary.md）:
 #   - ホスト（GitHub / GitLab）はこの sh が読む。MR 指定なら、その MR の元ブランチ。issue 指定なら、
-#     その issue を参照している開いた MR の元ブランチ。繋ぎ方は ccnavi-common.sh の「ホスト（GitHub /
+#     その issue を参照している開いた MR の元ブランチ。繋ぎ方は ccnavi-common-host.sh の「ホスト（GitHub /
 #     GitLab）への接続」（ccnavi-review.sh と同じ。gh / glab か、curl と GITHUB_TOKEN / GITLAB_TOKEN）
 #   - 読んだ結果を JSON（形は設計 9.13）に書き、実行ファイルの
 #     `ccnavi branches <issue|mr> <番号> --result <json>` に渡す。手元の候補（名前に番号を含むブランチ・

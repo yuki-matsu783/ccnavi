@@ -1,7 +1,8 @@
 """保護済みの sh（`.ccnavi/scripts/ccnavi-*.sh`）を呼ぶ形のうち、実行前に止めるもの 2 つ。
 
 1. **sh の検査の材料を変える環境変数を、同じコマンド行で置く形。** sh はワークスペースルート・
-   実行ファイルを環境変数から読む（`ccnavi-common.sh`）。
+   実行ファイルを環境変数から読む（`ccnavi-common.sh` とその部品の
+   `ccnavi-common-*.sh`）。
    `CCNAVI_WORKSPACE=<子のワークツリー> sh …ccnavi-git.sh push` は、子のワークツリーを
    ワークスペースルートと読ませ、`.claude/worktrees/` の下に居ないことにして子の push を
    通す。拒否されたエージェントが言い換えて再試行する形そのもので、2.1 の「逸れていく LLM」の

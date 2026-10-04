@@ -19,7 +19,7 @@ import unittest
 
 from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, archive, history
+from ccnavi.tickets import approval, approval_checks, archive, history
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, read_json, write
@@ -185,12 +185,12 @@ class ArchiveChecksTest(ChecksHarness):
     def test_a_reused_identifier_is_refused(self):
         t, _ = ticket_mod.parse(closed_text("i0001"))
         t.state = ticket_mod.TODO
-        problems = approval.integration_problems(self.conf, self.root, t)
+        problems = approval_checks.integration_problems(self.conf, self.root, t)
         self.assertEqual(len(problems), 1)
         self.assertIn("退避", problems[0].detail)
-        self.assertEqual(approval.integration_closed(self.conf, self.root, [t]), {"i0001"})
+        self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), {"i0001"})
         fresh, _ = ticket_mod.parse(closed_text("i0002"))
-        self.assertEqual(approval.integration_problems(self.conf, self.root, fresh), [])
+        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, fresh), [])
 
     def test_the_next_child_skips_the_archived_numbers(self):
         self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04")
@@ -200,11 +200,11 @@ class ArchiveChecksTest(ChecksHarness):
         t, problems = ticket_mod.parse(text)
         self.assertIsNotNone(t, problems)
         self.assertEqual(t.predecessors, ["i0001-01-03"])
-        pool = approval.predecessor_pool_of([t], [], [], [], self.root)
+        pool = approval_checks.predecessor_pool_of([t], [], [], [], self.root)
         self.assertEqual([h.state for h in pool["i0001-01-03"]], ["done"])
-        self.assertEqual(approval.unmet_predecessors(t, pool), [])
+        self.assertEqual(approval_checks.unmet_predecessors(t, pool), [])
         # root を渡さなければ見ない（前のまま）
-        pool = approval.predecessor_pool_of([t], [], [], [])
+        pool = approval_checks.predecessor_pool_of([t], [], [], [])
         self.assertNotIn("i0001-01-03", pool)
 
 
@@ -523,7 +523,7 @@ class ArchivedStandingTest(ChecksHarness):
         )
         text = closed_text("i0002-01-01", "i0002", predecessors=["i0009-01-01"])
         t, _ = ticket_mod.parse(text)
-        pool = approval.predecessor_pool_of([t], [], [], [], self.root)
+        pool = approval_checks.predecessor_pool_of([t], [], [], [], self.root)
         self.assertNotIn("i0009-01-01", pool)
 
 
@@ -632,14 +632,16 @@ class SecondReviewChecksTest(ChecksHarness):
         self.assertIn("gone", st.stop)
 
     def test_5_ready_does_not_archive_from_the_workspace_root(self):
-        from ccnavi.tickets import review
+        from ccnavi.tickets import review_close
 
         approved = os.path.join(self.root, ".ccnavi", "approved")
         write(os.path.join(approved, "done", "i0001.md"), closed_text("i0001"))
         write(os.path.join(approved, "done", "other.md"), closed_text("other"))
         parent, _ = ticket_mod.parse(closed_text("i0001"))
         out, err = io.StringIO(), io.StringIO()
-        code = review._archive_closed(out, err, self.root, self.conf, parent, approved, "note.md")
+        code = review_close._archive_closed(
+            out, err, self.root, self.conf, parent, approved, "note.md"
+        )
         self.assertNotEqual(code, 0)
         self.assertIn("親のワークツリー", err.getvalue())
         self.assertTrue(os.path.isfile(os.path.join(approved, "done", "other.md")))
@@ -648,8 +650,8 @@ class SecondReviewChecksTest(ChecksHarness):
     def test_6_an_identifier_reused_with_other_letter_case_is_refused(self):
         t, _ = ticket_mod.parse(closed_text("I0001"))
         t.state = ticket_mod.TODO
-        self.assertEqual(len(approval.integration_problems(self.conf, self.root, t)), 1)
-        self.assertEqual(approval.integration_closed(self.conf, self.root, [t]), {"I0001"})
+        self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
+        self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), {"I0001"})
         self.assertIsNotNone(archive.archived_fields(self.root, "", "I0001"))
         self.assertEqual(approval.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04")
 
@@ -678,7 +680,7 @@ class ReusedIdentifierTest(ChecksHarness):
         for t in kept:
             self.assertIn("別の機械で使い直した", t.archived_clash)
             self.assertIn("logs/archive", t.blocked)
-            found = [p.detail for p in approval.content_problems(t)]
+            found = [p.detail for p in approval_checks.content_problems(t)]
             self.assertIn(archive.REUSED_REASON, found)
 
 
@@ -767,7 +769,7 @@ class PhaseChildIdsChecksTest(ChecksHarness):
         self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01")
         t, _ = ticket_mod.parse(closed_text("i0001-02-07", "i0001", 2))
         t.state = ticket_mod.TODO
-        self.assertEqual(len(approval.integration_problems(self.conf, self.root, t)), 1)
+        self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
 
 
 if __name__ == "__main__":

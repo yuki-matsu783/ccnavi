@@ -25,7 +25,7 @@ dry-run でも渡す。判定は返さない。
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）
 について探す。読むだけ。
 
-1. sh がホストを読む。繋ぎ方は `ccnavi-common.sh` の「ホスト（GitHub / GitLab）への接続」で、`ccnavi-review.sh` と同じ
+1. sh がホストを読む。繋ぎ方は `ccnavi-common-host.sh` の「ホスト（GitHub / GitLab）への接続」で、`ccnavi-review.sh` と同じ
    （gh / glab、無ければ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN`）。MR 指定はその MR の元ブランチ、issue 指定はその issue を
    参照している開いた MR の元ブランチ（GitHub は開いた PR の題・本文・元ブランチ名、GitLab は `related_merge_requests`）。
    繋げないときも止めず、理由を書く

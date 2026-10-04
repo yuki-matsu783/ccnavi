@@ -187,7 +187,9 @@ class ProjectsCollisionTest(unittest.TestCase):
     | はい | どちらでも | どちらでも | ぶつかりの warn だけ（A5） |
     | いいえ | はい | はい | 既存の「無視されていない」（A6） |
     | いいえ | はい | いいえ | 何も言わない |
-    | いいえ | いいえ | — | 何も言わない |
+    | いいえ | いいえ（`projects/` は在る） | はい | 何も言わない |
+    | いいえ | いいえ（`projects/` は在る） | いいえ | 既存の「無視されていない」 |
+    | いいえ | いいえ（`projects/` が無い） | どちらでも | 何も言わない |
 
     フラグ（`--projects` など）は渡さず、`--root` の下の既定の置き場を見る。
     A5 は実装前は赤（ぶつかりの知らせがまだ無い）。A6 は今どおりで緑（回帰の見張り）。
@@ -312,10 +314,69 @@ class ProjectsCollisionTest(unittest.TestCase):
 
         self.assertEqual(self.about_projects(), [])
 
-    def test_no_tracking_and_no_project_says_nothing_about_projects(self):
-        self.no_tracking()
+    def test_no_tracking_and_no_project_but_ignored_says_nothing_about_projects(self):
+        self.no_tracking(ignore="/projects/\n")
 
         self.assertEqual(self.about_projects(), [])
+
+    def test_no_projects_dir_says_nothing_about_projects(self):
+        """`projects/` が無い（プロジェクトを使わない）ワークスペースには何も言わない。"""
+        self.no_tracking()
+        self.assertFalse(os.path.exists(self.projects))
+
+        self.assertEqual(self.about_projects(), [])
+
+    def test_empty_projects_dir_and_ignored_says_nothing_about_projects(self):
+        self.no_tracking(ignore="/projects/\n")
+        os.makedirs(self.projects)
+
+        self.assertEqual(self.about_projects(), [])
+
+    def test_empty_projects_dir_and_not_ignored_says_not_ignored(self):
+        """`projects/` は在るがプロジェクトが 0 件でも、無視されていなければ言う。"""
+        self.no_tracking()
+        os.makedirs(self.projects)
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        self.assertIn(NOT_IGNORED, found[0]["detail"])
+
+    def test_symlinked_projects_dir_not_ignored_still_says_not_ignored(self):
+        """`projects` がシンボリックリンクでも言う。`projects/` で問うと git が rc=128 で断る。"""
+        self.no_tracking()
+        target = tempfile.mkdtemp(prefix="ccnavi-linked-")
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        try:
+            os.symlink(target, self.projects, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertIn(NOT_IGNORED, found[0]["detail"])
+
+    def test_empty_projects_flag_does_not_crash_the_lint(self):
+        """`--projects ""`（診断のフラグ）でも `--lint` は落ちず、置き場の苦情は出さない。"""
+        self.no_tracking()
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+
+        result = run_ccnavi(
+            ["--root", self.ws, "--projects", "", "--lint", "--json", "--mode", "enable"],
+            input="",
+            env=environment,
+        )
+
+        # 終了コードは見ない（この部屋の rules.yml は空で、`deny` が空の error が出る）。
+        # 落ちたなら JSON の報告が無い。
+        try:
+            problems = json.loads(result.stdout)["problems"]
+        except (ValueError, KeyError) as exc:
+            self.fail(f"--lint が報告を出さずに落ちた: {exc}\n{result.stdout}\n{result.stderr}")
+        self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
 
 
 # 載せ忘れの文面で、先頭の句の直後に来る句。ぶつかりとの見分けに使う（設計 §4.2）。
@@ -483,13 +544,13 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
 
 
 class ShWordTest(unittest.TestCase):
-    """案内のコマンドに載せるパスの綴り（`lint._sh_word`）。
+    """案内のコマンドに載せるパスの綴り（`lint_places._sh_word`）。
 
     導入スクリプトの `sh_word` と同じ綴りにする（`tests/sh/test_setup.py` が両方を比べる）。
     """
 
     def test_spelling(self):
-        from ccnavi.entry.lint import _sh_word
+        from ccnavi.entry.lint_places import _sh_word
 
         cases = {
             "projects/lib": "projects/lib",

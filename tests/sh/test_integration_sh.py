@@ -1,4 +1,4 @@
-"""統合先の名前を決める順（ccnavi-common.sh の ccnavi_integration）。
+"""統合先の名前を決める順（ccnavi-common-state.sh の ccnavi_integration）。
 
 ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
 ccnavi-review.sh（マージリクエストの宛先）が同じ関数を読む。順は
@@ -17,10 +17,9 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import SH_SCRIPTS, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
-COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
 
 
 def git(cwd, *args):
@@ -54,15 +53,18 @@ class IntegrationTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        shutil.copy(COMMON, scripts)
+        for name in common_sh():
+            shutil.copy(os.path.join(SH_SCRIPTS, name), scripts)
         seed(self.ws)
 
     def integration(self, tree, **env):
         full = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         full.update(env)
-        script = '. "$1/.ccnavi/scripts/ccnavi-common.sh"\nccnavi_integration "$2" "$1"\n'
+        # `$0` に入口のパスを渡す。保護済み sh と同じく、部品は `$0` のディレクトリから読む。
+        script = '. "$0"\nccnavi_integration "$2" "$1"\n'
+        common = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-common.sh")
         return subprocess.run(
-            [SHELL, "-c", script, "sh", self.ws, tree],
+            [SHELL, "-c", script, common, self.ws, tree],
             cwd=tree,
             env=full,
             capture_output=True,

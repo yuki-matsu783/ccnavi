@@ -28,12 +28,12 @@ import threading
 import time
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-SCRIPTS = ("ccnavi-fetch.sh", "ccnavi-common.sh")
+SCRIPTS = ("ccnavi-fetch.sh", *common_sh(SH_DIR))
 CONFIG = (
     ("user.email", "t@example.invalid"),
     ("user.name", "t"),

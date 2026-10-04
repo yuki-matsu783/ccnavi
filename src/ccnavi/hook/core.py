@@ -23,6 +23,8 @@
 
 手元の入口（`--agree` の 4 つの枝と `review confirm`）もここに置く。コアを通す入口を
 コアより下の段（agree・review）に置くと、import が循環する（tests/core/test_module_layers.py）。
+`--reviewed` の決め方（review_decide）と親を閉じる操作（review_close）は review を読む末端で、
+コアはどちらも読まない。
 """
 
 from __future__ import annotations
@@ -34,7 +36,16 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, modes, settings, tree
-from ..tickets import agree, approval, history, phase, review, workflow
+from ..tickets import (
+    agree,
+    approval,
+    approval_checks,
+    approval_marks,
+    history,
+    phase,
+    review,
+    workflow,
+)
 from ..tickets import ticket as ticket_mod
 
 # ---- 入力 -----------------------------------------------------------------------------------
@@ -624,8 +635,8 @@ def confirm(
     """レビュー済みにしてよいかを見て、通れば書くもの（子を `done/` へ、
     レビュー済みのマーカー）を並べる。
 
-    `result` はホストから取得した結果（`review.Result`、`ccnavi-review.sh` が組む形）。読めなかった
-    ときの扱い（`--result` が無い、読めない）は読む側（手元は `confirm_local`）が持つ。
+    `result` はホストから取得した結果（`review_host.Result`、`ccnavi-review.sh` が組む形）。
+    読めなかったときの扱い（`--result` が無い、読めない）は読む側（手元は `confirm_local`）が持つ。
     `changed_since_request` は依頼の後にユーザが見るものが動いたかの説明（空なら動いていない）。
     手元は git の差分、Chrome は compare API から作る。
     """
@@ -638,10 +649,10 @@ def confirm(
     ph = review._phase(root, conf, parent, phase_no)
     if ph is None:
         return Checked([f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"], None)
-    if approval.MARK_REVIEWED in ph.marks:
+    if approval_marks.MARK_REVIEWED in ph.marks:
         # 重ね打ちでマーカーと履歴を書き直さない（`_already_requested` と同じ文面の形）
         return Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if requested_mark is None:
         return Checked(["ccnavi: 依頼の記録が無い。先に request してください"], None)
     if changed_since_request:
@@ -713,13 +724,13 @@ def confirm_local(
     if found is None:
         return 1
     parent, ph = found
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     moved = ""
     result = None
     # 読む順は前と同じ。依頼の記録が無ければ差分も取得した結果も見ない。
     # 動いていれば取得した結果を読まない。レビュー済みなら差分も取得した結果も読まない
     # （コアが「レビュー済み」で止める。Chrome と同じ文面）
-    if requested_mark is not None and approval.MARK_REVIEWED not in ph.marks:
+    if requested_mark is not None and approval_marks.MARK_REVIEWED not in ph.marks:
         moved = review._moved_since_request(
             tree.worktree_path(root, parent.ticket), conf, requested_mark
         )
@@ -747,8 +758,8 @@ def reviewable(snapshot: Snapshot, parent_id: str) -> list[dict]:
         return []
     out = []
     for ph in phase.phases_of(snapshot.root, snapshot.conf, parent.ticket):
-        mark = ph.marks.get(approval.MARK_REQUESTED)
-        if mark is None or approval.MARK_REVIEWED in ph.marks:
+        mark = ph.marks.get(approval_marks.MARK_REQUESTED)
+        if mark is None or approval_marks.MARK_REVIEWED in ph.marks:
             continue
         try:
             mr = int(mark.get("mr") or 0)
@@ -769,7 +780,7 @@ def _requested_mark(snapshot: Snapshot, parent_id: str, phase_no: int) -> dict |
     """依頼のマーカー。親・フェーズ・依頼の記録のどれかが無ければ None。"""
     parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
     ph = review._phase(snapshot.root, snapshot.conf, parent, phase_no) if parent else None
-    return ph.marks.get(approval.MARK_REQUESTED) if ph is not None else None
+    return ph.marks.get(approval_marks.MARK_REQUESTED) if ph is not None else None
 
 
 def requested_head(snapshot: Snapshot, parent_id: str, phase_no: int) -> str | None:
@@ -797,7 +808,7 @@ def moved_on_host(
 def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_mod.Ticket | None:
     """作業中の親の承認済みチケット（本物とする側）。`phase.parent_for_cwd` と同じ引き方。"""
     open_copies, _ = approval.scan(conf, root)
-    found = tree.lookup(approval.by_id(open_copies), parent_id)
+    found = tree.lookup(approval_checks.by_id(open_copies), parent_id)
     if found is None or found.is_child:
         return None
     return found
@@ -828,7 +839,7 @@ def withdraw(
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review_waiting, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = approval.scan_proposals(conf, root, raw.everything)
-    open_index = approval.by_id(approved)
+    open_index = approval_checks.by_id(approved)
     problems: list[str] = []
     wanted = [i for i in dict.fromkeys(ids) if i]
     if not wanted:
@@ -942,7 +953,7 @@ def _withdraw_problems(
         # 親子のチケットが決まらない・親のブランチの外のチケットなど。
         # 状態の操作と同じく止める
         found.append(copy.blocked)
-    if approval.has_record(copy):
+    if approval_checks.has_record(copy):
         # 承認で記録（`ccnavi_approved`）を書いていた頃の古い形。承認で欄が足されているので
         # 承認コミットの親の提案とは一致しない。記録の欄で決める（前の条件のまま）。
         meta = copy.raw[ticket_mod.APPROVAL_KEY]
@@ -976,17 +987,17 @@ def _withdraw_problems(
         if any(t.parent == ident and t.state == ticket_mod.TODO for t in proposals):
             found.append("todo/ に子の提案がある")
         marks_dir = os.path.join(
-            settings.approved_dir(conf, copy.tree_root), approval.PHASES_DIR, ident
+            settings.approved_dir(conf, copy.tree_root), approval_marks.PHASES_DIR, ident
         )
         try:
             # 待ち方のファイルはマーカーではない（承認で置く）。中身は `_content_problems` が見る。
-            if [n for n in fsio.listdir(marks_dir) if n != approval.WORKFLOW_FILE]:
-                found.append(f"{approval.PHASES_DIR}/{ident}/ にマーカーがある")
+            if [n for n in fsio.listdir(marks_dir) if n != approval_marks.WORKFLOW_FILE]:
+                found.append(f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある")
         except FileNotFoundError:
             pass
         except OSError as exc:
             # 読めないなら、無いとは言えない（取り下げを緩めない）。
-            found.append(f"{approval.PHASES_DIR}/{ident}/ を読めない ({exc})")
+            found.append(f"{approval_marks.PHASES_DIR}/{ident}/ を読めない ({exc})")
     todo = os.path.join(
         copy.tree_root, conf.tickets.replace("/", os.sep), ticket_mod.TODO, ident + ".md"
     )
@@ -994,7 +1005,7 @@ def _withdraw_problems(
         found.append("todo/ に同じ識別子の提案がある（戻す先が塞がっている）")
     if ident not in prior_proposals:
         found.append("承認コミットの親に提案が無い（承認コミットを引けない）")
-    elif compare and not approval.has_record(copy):
+    elif compare and not approval_checks.has_record(copy):
         found += _content_problems(conf, root, copy, prior_proposals[ident])
     return found
 
@@ -1028,7 +1039,9 @@ def _content_problems(
     path = approval.workflow_path(where, copy.ticket)
     held = fsio.read_bytes(path)
     if held is None and fsio.lexists(path):
-        return [f"{approval.PHASES_DIR}/{copy.ticket}/{approval.WORKFLOW_FILE} を読めない"]
+        return [
+            f"{approval_marks.PHASES_DIR}/{copy.ticket}/{approval_marks.WORKFLOW_FILE} を読めない"
+        ]
     if held is None:
         # 手で動かした承認（計画を持つ親でも待ち方のファイルを書かない）か、計画の無い親。
         # 改版は必ず待ち方のファイルを書くので、無ければ待ち方の改版は起きていない。

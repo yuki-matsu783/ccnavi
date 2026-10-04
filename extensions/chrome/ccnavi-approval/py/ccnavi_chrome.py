@@ -83,7 +83,7 @@ import sys
 from ccnavi.entry import cli, lint, version
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import configsync, history, review, syncstate
+from ccnavi.tickets import configsync, history, review, review_host, syncstate
 from ccnavi.tickets import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
@@ -1090,7 +1090,7 @@ def _op_confirm(req: dict, root: str) -> dict:
     phase_no = req.get("phase")
     if not isinstance(phase_no, int) or isinstance(phase_no, bool):
         raise Refused("phase はフェーズの番号")
-    result = review.Result.from_data(req.get("result"))
+    result = review_host.Result.from_data(req.get("result"))
     if result.error:
         raise Refused(f"result を読めない: {result.error}")
     head = str(snap["branches"][family].get("head") or "")

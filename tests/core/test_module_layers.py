@@ -134,6 +134,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.archive",
                 "tickets.flow",
                 "tickets.history",
+                "tickets.review_host",
                 "tickets.risk",
                 "tickets.syncstate",
                 "tickets.ticket",
@@ -161,6 +162,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "hook.reasons",
                 "tickets.agree",
                 "tickets.approval",
+                "tickets.approval_checks",
+                "tickets.approval_marks",
+                "tickets.approval_times",
                 "tickets.branchfind",
                 "tickets.configsync",
                 "tickets.phase",
@@ -171,7 +175,16 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "decide",
         "判定と、チケット・レビューを動かす操作",
         frozenset(
-            {"hook.c1", "hook.core", "hook.judge", "tickets.ops", "hook.post", "tickets.review"}
+            {
+                "hook.c1",
+                "hook.core",
+                "hook.judge",
+                "tickets.ops",
+                "hook.post",
+                "tickets.review",
+                "tickets.review_close",
+                "tickets.review_decide",
+            }
         ),
     ),
     (
@@ -183,6 +196,12 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.cli",
                 "entry.diagnose",
                 "entry.lint",
+                "entry.lint_branch",
+                "entry.lint_ticket",
+                "entry.lint_layers",
+                "entry.lint_places",
+                "entry.lint_project",
+                "entry.lint_rules",
                 "entry.status",
                 "entry.suggest",
                 "entry.version",

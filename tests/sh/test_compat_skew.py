@@ -133,11 +133,13 @@ class CompatSkewTest(unittest.TestCase):
             fake, f'#!/bin/sh\ncd "{ROOT}" && PYTHONPATH="{SRC}" exec "{python}" -m ccnavi "$@"\n'
         )
         script = (
-            '. "$1/.ccnavi/scripts/ccnavi-common.sh"\n'
+            '. "$0"\n'
             'if said=$(ccnavi_compat_skew "$1" "$2"); then echo same; else echo "$said"; fi\n'
         )
+        # `$0` に入口のパスを渡す。保護済み sh と同じく、部品は `$0` のディレクトリから読む。
+        common = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-common.sh")
         result = subprocess.run(
-            [SHELL, "-c", script, "sh", self.ws, fake],
+            [SHELL, "-c", script, common, self.ws, fake],
             env=env,
             capture_output=True,
             text=True,

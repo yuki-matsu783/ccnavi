@@ -14,7 +14,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import gitcmd, settings
-from ccnavi.tickets import approval, history
+from ccnavi.tickets import approval, approval_times, history
 from tests.ticket.test_phases import PhaseHarness, child_text
 from tests.ticket.test_ticket import git, write
 
@@ -45,7 +45,7 @@ class ApprovedTimeTest(PhaseHarness):
         events, _ = history.read(self.approved, "i0001")
         approved = [e for e in events if e["kind"] == history.KIND_APPROVED]
         self.assertEqual(copy["approved_at"], approved[-1]["at"])
-        self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_HISTORY)
+        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_HISTORY)
 
     def test_an_old_record_is_read_after_the_history_and_before_git(self):
         """前の版の承認が書いた記録（古い形）の時刻は、履歴が無ければコミットより先に読む。"""
@@ -59,16 +59,16 @@ class ApprovedTimeTest(PhaseHarness):
         self.move_by_hand("i0001-01-01", old)
         copy = self.board_copy("i0001-01-01")
         self.assertEqual(copy["approved_at"], "2026-01-01T00:00:00+09:00")
-        self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_RECORD)
+        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_RECORD)
         # git の無い場でも記録は読める
         held = self.copies()["i0001-01-01"]
-        times = approval.approved_times(self.conf(), [held], use_git=False)
-        self.assertEqual(times[held.path].source, approval.APPROVED_FROM_RECORD)
+        times = approval_times.approved_times(self.conf(), [held], use_git=False)
+        self.assertEqual(times[held.path].source, approval_times.APPROVED_FROM_RECORD)
         # 履歴があれば履歴が先
         with history.session(history.VIA_TERMINAL, None):
             history.note(self.approved, "i0001-01-01", history.KIND_APPROVED, "todo", "doing")
         self.assertEqual(
-            self.board_copy("i0001-01-01")["approved_from"], approval.APPROVED_FROM_HISTORY
+            self.board_copy("i0001-01-01")["approved_from"], approval_times.APPROVED_FROM_HISTORY
         )
 
     def test_a_committed_manual_approval_reads_the_commit_time(self):
@@ -78,7 +78,7 @@ class ApprovedTimeTest(PhaseHarness):
         when = git(self.parent_tree, "log", "-1", "--format=%cI").strip()
         copy = self.board_copy("i0001-01-01")
         self.assertEqual(copy["approved_at"], when)
-        self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_COMMIT)
+        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
 
     def test_a_rename_commit_counts_as_added(self):
         # GitHub の画面での移動は rename のコミットになる。--no-renames で足したことにする。
@@ -93,7 +93,7 @@ class ApprovedTimeTest(PhaseHarness):
         shown = git(self.parent_tree, "show", "--stat", "-M", "--format=", "HEAD")
         self.assertIn("=>", shown)
         copy = self.board_copy("i0001-01-01")
-        self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_COMMIT)
+        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
 
     def test_a_reapproval_after_a_withdrawal_reads_the_commit_time(self):
         """取り下げのあとに手で動かして承認し直したら、前の承認の行は使わず、コミットの時刻を読む。"""
@@ -107,7 +107,7 @@ class ApprovedTimeTest(PhaseHarness):
         self.move_by_hand("i0001", text)
         when = git(self.parent_tree, "log", "-1", "--format=%cI").strip()
         copy = self.board_copy("i0001")
-        self.assertEqual(copy["approved_from"], approval.APPROVED_FROM_COMMIT)
+        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
         self.assertEqual(copy["approved_at"], when)
 
     def test_an_uncommitted_manual_approval_is_said_so(self):
@@ -116,7 +116,7 @@ class ApprovedTimeTest(PhaseHarness):
         self.move_by_hand("i0001-01-01", child, commit=False)
         copy = self.board_copy("i0001-01-01")
         self.assertEqual(copy["approved_at"], "")
-        self.assertEqual(copy["approved_from"], approval.APPROVED_UNCOMMITTED)
+        self.assertEqual(copy["approved_from"], approval_times.APPROVED_UNCOMMITTED)
         shown = self.ccnavi("--explain").stdout
         self.assertIn("i0001-01-01（", shown)
         self.assertIn("承認 未コミット（手で置いた）", shown)
@@ -135,13 +135,15 @@ class ApprovedTimeTest(PhaseHarness):
             return real(cwd, args, *rest, **kw)
 
         with mock.patch.object(gitcmd, "run", counted):
-            times = approval.approved_times(self.conf(), list(found.values()))
+            times = approval_times.approved_times(self.conf(), list(found.values()))
         self.assertEqual(runs, ["log"])
-        self.assertEqual(times[found["i0001"].path].source, approval.APPROVED_FROM_HISTORY)
-        self.assertEqual(times[found["i0001-01-02"].path].source, approval.APPROVED_FROM_COMMIT)
+        self.assertEqual(times[found["i0001"].path].source, approval_times.APPROVED_FROM_HISTORY)
+        self.assertEqual(
+            times[found["i0001-01-02"].path].source, approval_times.APPROVED_FROM_COMMIT
+        )
         runs.clear()
         with mock.patch.object(gitcmd, "run", counted):
-            times = approval.approved_times(self.conf(), list(found.values()), use_git=False)
+            times = approval_times.approved_times(self.conf(), list(found.values()), use_git=False)
         self.assertEqual(runs, [])
         self.assertNotIn(found["i0001-01-02"].path, times)
 
@@ -149,7 +151,7 @@ class ApprovedTimeTest(PhaseHarness):
         self.family(plan=["research"])
         with history.session(history.VIA_TERMINAL, None):
             history.note(self.approved, "i0001-01-07", history.KIND_RAISED, None, "doing")
-        self.assertTrue(approval.history_time(self.approved, "i0001-01-07"))
+        self.assertTrue(approval_times.history_time(self.approved, "i0001-01-07"))
 
     def test_the_refusal_text_does_not_carry_the_approval_time(self):
         self.family(plan=["research"])
@@ -169,7 +171,7 @@ class GitMissingTest(unittest.TestCase):
     def test_a_tree_that_is_not_a_repository_gives_no_time(self):
         with tempfile.TemporaryDirectory() as root:
             conf, _ = settings.load(root)
-            found, ok = approval._added_times(conf, root)
+            found, ok = approval_times._added_times(conf, root)
         self.assertEqual((found, ok), ({}, False))
 
 

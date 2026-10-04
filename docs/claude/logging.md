@@ -3,7 +3,7 @@ type: guide
 title: 診断ログを書く
 description: sh、Python、TypeScriptで診断ログを書くときの決まり。形式、置き場、レベル
 tags: [records, state]
-keywords: [診断ログ, ログ, logger, sh, Python, TypeScript, logfmt, ccnavi-common.sh, diaglog]
+keywords: [診断ログ, ログ, logger, sh, Python, TypeScript, logfmt, ccnavi-common.sh, ccnavi-common-log.sh, diaglog]
 ---
 
 # 診断ログを書く
@@ -13,7 +13,7 @@ loggerは言語ごとに1つずつあり、どれも同じ形式の行を同じ�
 
 | 言語 | logger | 呼び方 |
 |---|---|---|
-| sh（`.ccnavi/scripts/`） | `ccnavi-common.sh`の`log_debug` `log_info` `log_warn` `log_error` | `log_info "本文" -- key=value` |
+| sh（`.ccnavi/scripts/`） | `ccnavi-common-log.sh`の`log_debug` `log_info` `log_warn` `log_error`（`ccnavi-common.sh`を読めば一緒に読まれる） | `log_info "本文" -- key=value` |
 | Python（`src/ccnavi/`） | `src/ccnavi/records/diaglog.py` | `diaglog.get("<出どころ>", root).info("本文", key=value)` |
 | TypeScript（拡張） | `extensions/vscode/ccnavi-board/src/log.ts` | `diaglog.get("ccnavi-board", root).error("本文", { key: value })` |
 

@@ -720,9 +720,9 @@ class WriterFailureTest(CoreHarness):
         self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        from ccnavi.tickets import review
+        from ccnavi.tickets import review_host
 
-        result = review.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
+        result = review_host.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
         checked = core.confirm(self.snapshot(), "i0001", 1, result, "")
         done = write(os.path.join(self.approved, "done", "i0001-01-01.md"), "other\n")
         applied, out, err = self.write_changes(checked.changes)
@@ -1632,6 +1632,8 @@ class RecordWritesTest(CoreHarness):
         names = ("tickets.approval", "tickets.agree", "tickets.history", "tickets.configsync")
         names += ("tickets.ops", "tickets.flow", "tickets.risk", "hook.core", "tickets.review")
         names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
+        names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
+        names += ("tickets.review_host", "tickets.review_decide", "tickets.review_close")
         for dotted in names:
             package, name = dotted.split(".")
             path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")
