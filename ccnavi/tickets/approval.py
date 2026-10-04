@@ -231,8 +231,37 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tick
     return found, notes
 
 
+@dataclass
+class Raw:
+    """全ツリーの承認済みチケットを、まとめる前のまま読んだもの（作業中・閉じた・レビュー待ち）。
+
+    1 回の判定の中で `scan`・`scan(closed=True)`・`scan_review`・`scan_proposals` を続けて呼ぶ
+    呼び手が、同じ置き場を何度も読まないために持ち回る（`read_raw`）。控えではなく、その
+    呼び出しの中で今しがた読んだもの（`_everything` と同じ考え方）。
+    """
+
+    open_all: list[ticket_mod.Ticket]
+    open_notes: list[str]
+    closed_all: list[ticket_mod.Ticket]
+    closed_notes: list[str]
+    review: list[ticket_mod.Ticket]
+    review_notes: list[str]
+
+    @property
+    def everything(self) -> list[ticket_mod.Ticket]:
+        return self.open_all + self.closed_all + self.review
+
+
+def read_raw(conf: settings.Settings, root: str) -> Raw:
+    """承認済みチケットの置き場を 1 度ずつ読む（`Raw`）。"""
+    open_all, open_notes = scan_all(conf, root)
+    closed_all, closed_notes = scan_all(conf, root, closed=True)
+    review, review_notes = review_all(conf, root)
+    return Raw(open_all, open_notes, closed_all, closed_notes, review, review_notes)
+
+
 def scan(
-    conf: settings.Settings, root: str, closed: bool = False
+    conf: settings.Settings, root: str, closed: bool = False, raw: Raw | None = None
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """判定と承認が読む承認済みチケット。権威のあるツリーの側だけを残す。
 
@@ -247,7 +276,17 @@ def scan(
     返す前に `mark_blocked` が「信頼できない理由」の印を付ける。承認のときにしか
     当たらなかった構造の検査を、判定の側でも当てるため（置き場を手で動かす承認は
     `--agree` を通らない）。
+
+    `raw` は呼び手が `read_raw` で読んだもの。渡せば置き場を読み直さない。
     """
+    if raw is not None:
+        found = raw.closed_all if closed else raw.open_all
+        notes = raw.closed_notes if closed else raw.open_notes
+        kept = _authoritative(found, raw.everything)
+        if not closed:
+            mark_blocked(conf, kept)
+            mark_imported(conf, root, kept)
+        return kept, list(notes)
     found, notes = scan_all(conf, root, closed)
     # 読んだ側を `_everything` に渡す。渡さないと、この同じ式の中でまったく同じ
     # `scan_all` をもう 1 度呼ぶことになる（下記）。
@@ -263,12 +302,151 @@ def scan(
     return kept, notes
 
 
-def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
+def scan_review(
+    conf: settings.Settings, root: str, raw: Raw | None = None
+) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """レビュー待ちのチケット。権威のあるツリーの側だけを残す（`scan` と同じ規則）。"""
+    if raw is not None:
+        kept = _authoritative(raw.review, raw.everything)
+        mark_imported(conf, root, kept)
+        return kept, list(raw.review_notes)
     found, notes = review_all(conf, root)
     kept = _authoritative(found, _everything(conf, root, review=found))
     mark_imported(conf, root, kept)
     return kept, notes
+
+
+def scan_proposals(
+    conf: settings.Settings,
+    root: str,
+    everything: list[ticket_mod.Ticket] | None = None,
+) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Problem]]:
+    """提案（`todo/` と `review/`）を、承認済みチケットの写りに従ってまとめる。
+
+    承認済みの識別子の提案は、承認済みチケットの写りで権威のツリー（親のツリー → 元ツリー →
+    決まらない。`ticket.authority`）を決め、そのツリーに在るものだけを残す。
+    承認で権威のツリーの `todo/` が消えても、承認の前に切ったワークツリーには `todo/` の写しが
+    残る。提案だけでまとめると、その古い写しが承認待ちや改版（巻き戻し）として読まれる。
+    承認済みチケットの側（`_authoritative`）は「権威に無ければ落とす」なので、それと揃える。
+
+    `everything` は承認済みチケットの写りの全部（`Raw.everything` の形）。呼び手が読んであれば
+    渡す。取り込み済みの親子のチケットも権威は親のブランチ `P` のワークツリー（名前 `P`）
+    なので、同じ規則で決まる（印を付けるのは `mark_imported` と `family_problems`）。
+    """
+    kept, problems, _ = read_proposals(conf, root, everything)
+    return kept, problems
+
+
+def read_proposals(
+    conf: settings.Settings,
+    root: str,
+    everything: list[ticket_mod.Ticket] | None = None,
+) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Problem], list[tuple[ticket_mod.Ticket, str]]]:
+    """`scan_proposals` と同じもの（残した提案と苦情）。
+
+    権威のツリーの外に残った `todo/` の写し（`stale_proposals`）を 3 つ目に添える。
+    """
+    if everything is None:
+        everything = _everything(conf, root)
+    found, problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
+    kept = ticket_mod.dedupe(found, everything)
+    return kept, problems, stale_proposals(found, kept, everything)
+
+
+def stale_proposals(
+    found: list[ticket_mod.Ticket],
+    kept: list[ticket_mod.Ticket],
+    everything: list[ticket_mod.Ticket],
+) -> list[tuple[ticket_mod.Ticket, str]]:
+    """承認済みの識別子の `todo/` の提案のうち、権威のツリーの外に在るので読まなかった写し。
+
+    (写し, 権威のツリーの名前) の並び。`found` はまとめる前の提案、`kept` は残した側。
+    権威のツリーの `todo/` に同じ中身の提案が在る写り（親のツリーの改版が子のワークツリーに
+    写っているだけ）は入れない。`review/` の写しも入れない（置き場が動いた跡で、承認の対象に
+    ならない）。
+    """
+    kept_ids = {id(t) for t in kept}
+    settled = _by_id(everything)
+    out: list[tuple[ticket_mod.Ticket, str]] = []
+    for ticket_id, hits in _by_id(found).items():
+        copies = settled.get(ticket_id)
+        if not copies:
+            continue
+        where = ticket_mod.authority(copies)
+        if where is None:
+            continue
+        there = [t for t in hits if id(t) in kept_ids and t.state == ticket_mod.TODO]
+        for t in hits:
+            if t.state != ticket_mod.TODO or id(t) in kept_ids or t.tree == where:
+                continue
+            if any(_same_todo(t, u) for u in there):
+                continue
+            out.append((t, where))
+    return out
+
+
+def _same_todo(t: ticket_mod.Ticket, u: ticket_mod.Ticket) -> bool:
+    """同じ中身の `todo/` の写りか。計画まで比べる。"""
+    return t.plan == u.plan and t.feedback == u.feedback and t.raw == u.raw
+
+
+def revision_elsewhere(t: ticket_mod.Ticket, current: ticket_mod.Ticket | None) -> bool:
+    """権威のツリーの外の `todo/` の写しが、計画の違う親の版（場所違いの改版か巻き戻しの元）か。
+
+    条件は承認の改版（`agree.waiting`）と同じく、作業中の承認済みチケットがある親で、計画か
+    フィードバック計画が違うもの。
+    """
+    return current is not None and not t.is_child and t.has_plan and plan_differs(t, current)
+
+
+def plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:
+    """提案の計画（全体計画かフィードバック計画）が承認済みチケットと違うか。改版の条件。"""
+    return proposal.plan != current.plan or proposal.feedback != current.feedback
+
+
+def revision_elsewhere_text(
+    conf: settings.Settings,
+    root: str,
+    t: ticket_mod.Ticket,
+    where: str,
+    fams: syncstate.Families | None = None,
+) -> str:
+    """権威のツリーの外に在る計画の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
+
+    場所はどちらもワークスペースルートからのパスで出す（ツリーの名前ではなく、
+    `.claude/worktrees/<親>` や `projects/<名前>`）。`--lint` と `--agree`（`--verify` も）が
+    同じ文面を出す。取り込み済みの親子のチケットでは、親子のチケットが決まらない・閉じているなら止まった理由と
+    手順（`family_stop_text`。`family_problems` と同じ文面）を足す。決まっていれば、権威の
+    ツリーが親のワークツリー（`family_problems` が言う書く場所と同じ）なので、場所は繰り返さず
+    push してから頼むことだけを足す。
+    """
+    rel = os.path.relpath(t.path, root).replace(os.sep, "/")
+    place = tree_path(conf, root, where, t.project)
+    todo = f"{conf.tickets}/{ticket_mod.TODO}/"
+    text = (
+        f"{t.ticket} の計画の違う提案が {rel} に在るが、権威のツリー（{place}）の外なので"
+        f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら消してください"
+    )
+    fams = fams or syncstate.Families(conf, root)
+    if fams.active:
+        st = family_standing(conf, root, t, fams)
+        if st.imported and st.stop:
+            text += "。取り込み済みの親子のチケットが止まっている: " + family_stop_text(root, st)
+        elif st.imported and st.home is not None:
+            text += (
+                "。取り込み済みの親子のチケットなので、書いたら push してから承認を頼んでください"
+            )
+    return text
+
+
+def tree_path(conf: settings.Settings, root: str, name: str, project: str = "") -> str:
+    """ツリーの名前を、ワークスペースルートからのパスに直す。ルート自身は「ワークスペースルート」。"""
+    found = [t for t in trees(conf, root) if t.name == name]
+    pick = next((t for t in found if t.project == project), found[0] if found else None)
+    if pick is None:
+        return name or "ワークスペースルート"
+    rel = os.path.relpath(pick.root, root).replace(os.sep, "/")
+    return "ワークスペースルート" if rel == "." else rel
 
 
 def mark_imported(
@@ -352,8 +530,7 @@ def family_problems(
     if not st.imported:
         return []
     if st.stop:
-        hint = " / ".join(syncstate.guidance(root, st))
-        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"{st.stop}。承認しない。{hint}")]
+        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, family_stop_text(root, st))]
     if st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
         return [
             rules.Problem(
@@ -367,6 +544,12 @@ def family_problems(
             )
         ]
     return []
+
+
+def family_stop_text(root: str, st: syncstate.Standing) -> str:
+    """親子のチケットが決まらない・閉じているので承認しない理由と、ユーザが打つ手順（`family_problems`）。"""
+    hint = " / ".join(syncstate.guidance(root, st))
+    return f"{st.stop}。承認しない。{hint}"
 
 
 def integration_problems(
@@ -461,34 +644,22 @@ def _everything(
 def _authoritative(
     found: list[ticket_mod.Ticket], everything: list[ticket_mod.Ticket]
 ) -> list[ticket_mod.Ticket]:
-    at_home = {t.ticket for t in everything if t.tree == (t.parent or t.ticket)}
-    seen = _by_id(everything)
+    # 権威は親のツリー → 元ツリー（先へ進んだ写しが無いときだけ）→ 決まらない（全部残す）。
     # 親のツリーが無いとき（作る前と、合流して片付けた後）は元ツリーが権威。ワークツリーは
     # 片付ければ消えるが、元ツリー（ワークスペースルート。プロジェクトのチケットならその
-    # プロジェクト）は消えない。ただし元ツリーより先の置き場に在る写しがあれば採らない
-    # （合流していない側が新しい形）。`ticket.fold` と同じ順・同じ条件で決める。
-    at_origin = {ticket_id for ticket_id, hits in seen.items() if _origin_is_current(hits)}
-    # リポジトリをまたいだ衝突はまとめない（`ticket.fold` と同じ）。違うチケットなので、権威を
-    # 決めるとどちらかが気づかないうちに消え、`--lint` の「複数のリポジトリにある」も出なくなる。
-    crossing = {ticket_id for ticket_id, hits in seen.items() if len({t.project for t in hits}) > 1}
+    # プロジェクト）は消えない。リポジトリをまたいだ衝突はまとめない（違うチケットなので、
+    # 権威を決めるとどちらかが気づかないうちに消え、`--lint` の「複数のリポジトリにある」も
+    # 出なくなる）。決め方は `ticket.authority` の 1 つで、承認済みの識別子の提案
+    # （`ticket.fold`）も同じ関数で決める。
+    seen = _by_id(everything)
     kept: list[ticket_mod.Ticket] = []
     for ticket_id, hits in _by_id(found).items():
-        home = hits[0].parent or hits[0].ticket
-        if ticket_id in crossing:
+        where = ticket_mod.authority(seen.get(ticket_id) or hits)
+        if where is None:
             kept.extend(hits)
-        elif ticket_id in at_home:
-            kept.extend(t for t in hits if t.tree == home)
-        elif ticket_id in at_origin:
-            kept.extend(t for t in hits if t.tree == ticket_mod.origin_tree(t))
         else:
-            kept.extend(hits)
+            kept.extend(t for t in hits if t.tree == where)
     return kept
-
-
-def _origin_is_current(hits: list[ticket_mod.Ticket]) -> bool:
-    """元ツリーがその識別子を持ち、かつ先へ進んだ写しが他に無いか（`ticket.fold` と同じ）。"""
-    origin = [t for t in hits if t.tree == ticket_mod.origin_tree(t)]
-    return bool(origin) and not ticket_mod.behind(origin, hits)
 
 
 def _by_id(found: list[ticket_mod.Ticket]) -> dict[str, list[ticket_mod.Ticket]]:

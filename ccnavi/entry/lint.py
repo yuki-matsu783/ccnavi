@@ -593,22 +593,26 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
 
     problems.extend(_approved_guarded(conf, root))
 
-    copies, notes = approval.scan(conf, root)
+    raw = approval.read_raw(conf, root)
+    copies, notes = approval.scan(conf, root, raw=raw)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
     # 閉じた承認済みチケットの苦情も拾う。判定は閉じたものを読まないが、読めないファイルが
     # 置き場に残っていること自体は書いたユーザの思い違いで、言わないと他の機械へそのまま届く。
-    closed, notes = approval.scan(conf, root, closed=True)
+    closed, notes = approval.scan(conf, root, closed=True, raw=raw)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
-    review, notes = approval.scan_review(conf, root)
+    review, notes = approval.scan_review(conf, root, raw=raw)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
     index = approval.by_id(copies)
     done = {t.ticket for t in closed + review}
 
-    proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
+    # 承認済みの識別子の提案は、承認済みチケットの写りと合わせて権威のツリーを決める
+    # （`approval.scan_proposals` と同じまとめ方）。外に残った古い写しは別に名指しする。
+    proposals, complaints, stale = approval.read_proposals(conf, root, raw.everything)
     problems.extend(complaints)
+    problems.extend(_stale_problems(root, conf, stale, index, done))
 
     problems.extend(_copy_problems(root, conf, copies, index, closed))
 
@@ -636,7 +640,9 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
     # 名指しする。
     done |= approval.integration_closed(conf, root, proposals)
-    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
+    problems.extend(
+        _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
+    )
     problems.extend(
         _branch_name_problems(
             proposals,
@@ -755,6 +761,7 @@ def _proposal_problems(
     done: set[str],
     repo_of: dict[str, str],
     preds: dict | None = None,
+    root: str = "",
 ) -> list[Problem]:
     """提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。
 
@@ -808,27 +815,22 @@ def _proposal_problems(
             continue
         if t.ticket in index:
             current = index[t.ticket]
-            if not t.is_child and t.has_plan and agree._plan_differs(t, current):
+            if not t.is_child and t.has_plan and approval.plan_differs(t, current):
                 continue  # 親の改版。承認待ちに入る
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
-                    f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る。"
+                    f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る"
+                    f"（{_rel(root, t.path)}）。"
                     "計画の改版でなければ todo/ の側を消してください",
                 )
             )
             continue
         if t.ticket in done:
             problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    "(ticket)",
-                    f"{t.ticket} は閉じたかレビュー待ちなのに todo/ にも在る。"
-                    "todo/ の側は承認の対象にならない。再開するには、"
-                    "ユーザが承認済みチケットを戻す",
-                )
+                Problem(SEVERITY_WARN, "(ticket)", _closed_todo_text(t.ticket, _rel(root, t.path)))
             )
             continue
         problems.append(
@@ -891,6 +893,51 @@ def _proposal_problems(
             Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
         )
     return problems
+
+
+def _rel(root: str, path: str) -> str:
+    """名指しに使う、ワークスペースルートからの相対パス（`/` 区切り）。"""
+    if not root or not path:
+        return path
+    return os.path.relpath(path, root).replace(os.sep, "/")
+
+
+def _stale_problems(
+    root: str, conf: settings.Settings, stale: list, index: dict, done: set[str]
+) -> list[Problem]:
+    """権威のツリーの外に残った、承認済みの識別子の `todo/` の写し（`approval.stale_proposals`）。
+
+    承認の対象にもボードにも入らない（権威のツリーの側だけを読む）。名指しするのは 2 つだけ。
+
+    - 計画の違う親の版。権威でないツリーに書いた改版か、改版の前に切ったワークツリーに
+      残った古い版（巻き戻しの元）。書く場所を案内する（改版は権威のツリーの `todo/` に
+      置く）。文面は `--agree` と同じ（`approval.revision_elsewhere_text`）
+    - 閉じたかレビュー待ちの識別子の `todo/`。前から出していた再開の案内を、権威のツリーの
+      外に在っても同じく出す
+
+    計画の同じ古い写しは言わない。承認の前に切ったワークツリーに残るのは普通の形で、言うと
+    ワークツリーを持つだけで WARN が並ぶ。
+    """
+    problems: list[Problem] = []
+    for t, where in stale:
+        current = index.get(t.ticket)
+        if approval.revision_elsewhere(t, current):
+            text = approval.revision_elsewhere_text(conf, root, t, where)
+        elif current is None and t.ticket in done:
+            text = _closed_todo_text(t.ticket, _rel(root, t.path))
+        else:
+            continue
+        problems.append(Problem(SEVERITY_WARN, "(ticket)", text))
+    return problems
+
+
+def _closed_todo_text(ticket_id: str, rel: str) -> str:
+    """閉じたかレビュー待ちの識別子が `todo/` にも在るときの案内。"""
+    return (
+        f"{ticket_id} は閉じたかレビュー待ちなのに todo/ にも在る（{rel}）。"
+        "todo/ の側は承認の対象にならない。再開するには、"
+        "ユーザが承認済みチケットを戻す"
+    )
 
 
 def _branch_name_problems(
