@@ -24,7 +24,16 @@ from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog, prune
-from ..tickets import branchfind, configsync, history, ops, phase, review, review_decide
+from ..tickets import (
+    branchfind,
+    configsync,
+    history,
+    ops,
+    phase,
+    review,
+    review_close,
+    review_decide,
+)
 from ..tickets import ticket as ticket_mod
 from . import diagnose, lint, status, suggest, version
 
@@ -1248,7 +1257,9 @@ def operate(
         if not _from_terminal(stdin, conf, stderr, "--close-early"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
-        code = review.close_early(stdin, stdout, stderr, root, conf, cwd, args.reason, args.result)
+        code = review_close.close_early(
+            stdin, stdout, stderr, root, conf, cwd, args.reason, args.result
+        )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
         if args.preview and args.yes:
@@ -1350,7 +1361,7 @@ def operate(
         if not args.result:
             stderr.write("ccnavi: review ready には --result <json> が要る\n")
         else:
-            code = review.ready(stdout, stderr, root, conf, cwd, args.result)
+            code = review_close.ready(stdout, stderr, root, conf, cwd, args.result)
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR

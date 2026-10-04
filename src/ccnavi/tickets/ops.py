@@ -249,7 +249,7 @@ def _close_parent(
     案内は進め方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
     無いなら統合先に取り込むところまで。ccnavi はどちらでもマージしない。
     Draft を外す `ready` は、閉じたチケットとその記録を手元の `logs/archive/` へ退避してから外す
-    （`review.ready`・archive.py）。この記録（`closed.json`）も一緒に退避される。
+    （`review_close.ready`・archive.py）。この記録（`closed.json`）も一緒に退避される。
     """
     where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
     venues = phase.review_venues(root, conf, found.ticket)

@@ -632,14 +632,16 @@ class SecondReviewChecksTest(ChecksHarness):
         self.assertIn("gone", st.stop)
 
     def test_5_ready_does_not_archive_from_the_workspace_root(self):
-        from ccnavi.tickets import review
+        from ccnavi.tickets import review_close
 
         approved = os.path.join(self.root, ".ccnavi", "approved")
         write(os.path.join(approved, "done", "i0001.md"), closed_text("i0001"))
         write(os.path.join(approved, "done", "other.md"), closed_text("other"))
         parent, _ = ticket_mod.parse(closed_text("i0001"))
         out, err = io.StringIO(), io.StringIO()
-        code = review._archive_closed(out, err, self.root, self.conf, parent, approved, "note.md")
+        code = review_close._archive_closed(
+            out, err, self.root, self.conf, parent, approved, "note.md"
+        )
         self.assertNotEqual(code, 0)
         self.assertIn("親のワークツリー", err.getvalue())
         self.assertTrue(os.path.isfile(os.path.join(approved, "done", "other.md")))
