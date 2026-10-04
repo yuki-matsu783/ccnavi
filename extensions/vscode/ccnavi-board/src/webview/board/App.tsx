@@ -103,7 +103,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // アーカイブ済みのチケット（手元の退避）を出すか。既定は出さない。隠すのが既定なので、絞り込み（filtering）には数えない
   const archived = view.archived;
   const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
-  // 「アーカイブ済みのチケットを表示する」を入れたら、右端に足されるアーカイブの列まで横へ送る。
+  // 「アーカイブ済みチケットを表示」を入れたら、右端に足されるアーカイブの列まで横へ送る。
   // ユーザが入れたときだけ動かす（覚えていた値で開き直したときには動かさない）
   const revealArchived = useRef(false);
   useEffect(() => {
@@ -243,7 +243,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
           {shown.totalCount === 0 && !(archived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
           <div className="board">
-            {/* アーカイブの列は「アーカイブ済みのチケットを表示する」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
+            {/* アーカイブの列は「アーカイブ済みチケットを表示」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
             {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
               <Column
                 key={column.state}

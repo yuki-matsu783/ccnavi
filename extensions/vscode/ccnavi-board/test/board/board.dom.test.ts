@@ -605,7 +605,7 @@ test("CB-D123 履歴を開け閉めしてもカードの提案は開かない。
   }
 });
 
-test("CB-D144 「アーカイブ済みのチケットを表示する」は既定で外れていて、入れるとアーカイブの列と退避のカードが出る。state に残る", async () => {
+test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れていて、入れるとアーカイブの列と退避のカードが出る。state に残る", async () => {
   const archived = {
     ticket: "old",
     parent: "",
@@ -625,7 +625,7 @@ test("CB-D144 「アーカイブ済みのチケットを表示する」は既定
   try {
     const box = page.one<HTMLInputElement>("#archived-filter");
     assert.equal(box.checked, false);
-    assert.match(box.parentElement?.textContent ?? "", /アーカイブ済みのチケットを表示する/);
+    assert.match(box.parentElement?.textContent ?? "", /アーカイブ済みチケットを表示/);
     assert.equal(page.all('.column[data-state="archived"]').length, 0);
     // 入れたら、右端に足されたアーカイブの列まで横へ送る
     const scrolled: { state: string | undefined; options: unknown }[] = [];
