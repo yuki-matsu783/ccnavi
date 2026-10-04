@@ -146,13 +146,13 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0030](0030-three-human-touches.md) | push とマージリクエストの作成を親に渡し、ユーザの手を 3 回にする |
 | [0031](0031-unresolved-not-by-time.md) | 未解決の指摘は時刻で絞らず、いま残っている全部を数える |
 | [0039](0039-approve-narrowing.md) | 承認の対象は識別子で狭められる（狭めるだけ） |
-| [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える |
+| [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える（hook が伝えることは ADR-0104 が改める） |
 | [0043](0043-approve-carry.md) | 承認済みチケットは sh がコミットして push し、範囲の超過は判定で止め、ボードの承認はダイジェストで照合する |
 | [0065](0065-review-in-chat.md) | レビューはマージリクエストのほかに、このセッションでも受ける |
 | [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
-| [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる |
+| [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる（承認で記録の欄と `project:` を書き足すことは ADR-0104 が改める） |
 | [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
 | [0073](0073-origin-tree-is-the-fallback-home.md) | 本物とするツリーが無ければ元ツリーを採る |
@@ -161,10 +161,10 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0080](0080-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
 | [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
 | [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める（エージェントの下書きは置き換え（ADR-0100）） |
-| [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる |
+| [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる（承認の時刻の出どころは ADR-0104 が改める） |
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
-| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ |
-| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装） |
+| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ（続きの子の目印の置き場は ADR-0104 が改める） |
+| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装。「閉じた」の照合と取り下げの条件は ADR-0104 が改める） |
 | [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の書き出し方は置き換え（ADR-0095）） |
 | [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
 | [0096](0096-eli5-place-is-unscoped-and-does-not-move-the-request.md) | `wip/eli5/` はチケットの範囲を当てず、そこだけを変えたコミットは依頼の後に動いたと数えない（除外のパスの読み方は置き換え（ADR-0097）） |
