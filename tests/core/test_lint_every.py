@@ -154,6 +154,51 @@ class LintScriptPathTest(unittest.TestCase):
         self.assertEqual(self.said(done.stdout, "rooted"), [], done.stdout)
         self.assertEqual(self.said(done.stdout, "plain"), [], done.stdout)
 
+    def lint_rules(self, *allow: dict) -> str:
+        body = {
+            "version": 1,
+            "deny": [self.deny("push", "push はユーザが行う")],
+            "allow": list(allow),
+        }
+        done = self.lint(write(os.path.join(self.root, "rules.yml"), json.dumps(body)))
+        self.assertEqual(done.returncode, 0, done.stdout)
+        return done.stdout
+
+    def test_other_text_fields_are_checked_and_named(self):
+        sh = "sh .ccnavi/scripts/x.sh"
+        out = self.lint_rules(
+            rule("ctx", additionalContext=sh),
+            rule("once", additionalContextOnce=sh),
+        )
+        ctx = self.said(out, "ctx")
+        once = self.said(out, "once")
+        self.assertTrue(any("warn:" in s and "additionalContext の" in s for s in ctx), out)
+        self.assertTrue(any("warn:" in s and "additionalContextOnce の" in s for s in once), out)
+
+    def test_absolute_paths_are_not_warned(self):
+        cases = {
+            "slash": "sh /opt/ws/.ccnavi/scripts/x.sh",
+            "home": "sh ~/ws/.ccnavi/scripts/x.sh",
+            "quoted": "sh '/opt/myws/.ccnavi/scripts/x.sh'",
+            "drive-back": "sh C:\\ws/.ccnavi/scripts/x.sh",
+            "drive-fwd": 'sh "d:/ws/.ccnavi/scripts/x.sh"',
+            "rooted": "sh {root}/.ccnavi/scripts/x.sh",
+        }
+        out = self.lint_rules(*(rule(k, additionalContext=v) for k, v in cases.items()))
+        for k in cases:
+            self.assertEqual(self.said(out, k), [], out)
+
+    def test_relative_paths_are_still_warned(self):
+        cases = {
+            "bare": "sh .ccnavi/scripts/x.sh",
+            "dot": "sh ./.ccnavi/scripts/x.sh",
+            "up": "sh ../../.ccnavi/scripts/x.sh",
+            "mixed": "sh /abs/.ccnavi/scripts/a.sh と sh .ccnavi/scripts/b.sh",
+        }
+        out = self.lint_rules(*(rule(k, additionalContext=v) for k, v in cases.items()))
+        for k in cases:
+            self.assertTrue(any(s.startswith("warn:") for s in self.said(out, k)), (k, out))
+
 
 if __name__ == "__main__":
     unittest.main()

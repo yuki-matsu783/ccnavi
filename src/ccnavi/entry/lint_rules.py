@@ -17,6 +17,23 @@ from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # `{root}/` が前に付いていない `.ccnavi/scripts/`（文面の sh は `{root}/` から書く）。
 _BARE_SCRIPTS = re.compile(r"(?<!\{root\}/)\.ccnavi/scripts/")
+# 語（空白・引用符で区切られた塊）の先頭が絶対パスの印: `/`、`~`、`C:\` や `C:/` のドライブ表記。
+_ABSOLUTE_START = re.compile(r"^(?:[/~]|[A-Za-z]:[\\/])")
+_WORD_BREAK = " \t\r\n'\"`"
+
+
+def _has_relative_scripts(text: str) -> bool:
+    """文面に、絶対パスでも `{root}/` 始まりでもない `.ccnavi/scripts/` があるか。
+
+    絶対パスは cwd に左右されないので警告しない。判定は `.ccnavi/scripts/` を含む語の先頭。
+    """
+    for hit in _BARE_SCRIPTS.finditer(text):
+        start = hit.start()
+        while start > 0 and text[start - 1] not in _WORD_BREAK:
+            start -= 1
+        if not _ABSOLUTE_START.match(text[start:]):
+            return True
+    return False
 
 
 def _rules(
@@ -123,16 +140,24 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
 
     # 文面の sh は `{root}` から書く。相対の `.ccnavi/scripts/...` は、cwd がプロジェクトの中
     # だと見つからない（docs/claude/projects.md「ルールの文面にshを書くとき」）。
+    # 絶対パスは cwd に左右されないので言わない。
     # 判定は変わらず、案内を受けたモデルの実行が失敗するだけなので warn。
-    if _BARE_SCRIPTS.search(rule.message):
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                name,
-                "message の `.ccnavi/scripts/` に `{root}` が付いていない。cwd がプロジェクトの"
-                "中だと相対パスの sh が見つからない。`{root}/.ccnavi/scripts/...` と書いてください",
+    # 見る欄は、モデルに渡る文面の 3 つ。`...File` は rules.yml の外のファイルを指すので見ない。
+    for field_name, text in (
+        ("message", rule.message),
+        ("additionalContext", rule.additional_context),
+        ("additionalContextOnce", rule.additional_context_once),
+    ):
+        if _has_relative_scripts(text):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    f"{field_name} の `.ccnavi/scripts/` に `{{root}}` が付いていない。cwd が"
+                    "プロジェクトの中だと相対パスの sh が見つからない。"
+                    "`{root}/.ccnavi/scripts/...` と書いてください",
+                )
             )
-        )
 
     # ルールが指すファイルは、ルートの中を指していて、いま在って、上限に収まるか。
     # 無いのは warn。作るまで何も足さないだけで、判定は変わらない。
