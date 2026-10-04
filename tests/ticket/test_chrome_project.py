@@ -5,8 +5,9 @@
 1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの。3.3 の 7）の家族を、
    手元と同じ形の仮のツリー（ワークスペースルート + `projects/<名前>` + そのワークツリー）で判定し、
    承認で書くもの（Changes）はその家族の親のブランチだけ
-2. プロジェクトの層は D28 の計算（プロジェクトの統合先の層に、ワークスペースの共通層を
-   `configsync.projected` で写したもの）。親のブランチの上の層は読まない
+2. プロジェクトのレイヤーは D28 の計算（プロジェクトの統合先のレイヤーに、
+ワークスペースの共通レイヤーを
+   `configsync.projected` で写したもの）。親のブランチの上のレイヤーは読まない
 3. 控えはワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
 4. 「始める」（8.6）: issue の番号から識別子（`i0012`・`web-i0012`）を決め、統合先の
    `done/` にある・同じ名前のブランチがある・開いた家族に同じ識別子がある・互換の版が違う、
@@ -33,7 +34,7 @@ ACTOR = {"account": "lab-approver", "version": "9.9.9"}
 RISK_COMMON = """version: 1
 factors:
   - id: common-script
-    title: 共通層のスクリプトの変更
+    title: 共通レイヤーのスクリプトの変更
     script: .ccnavi/common/scripts/risk.sh
     points: 1
 """
@@ -66,7 +67,7 @@ def family_files(ident="web-i0012", issue=12):
         f"wip/proposals/todo/{ident}-01.md": child_text(
             f"{ident}-01", ident, 1, ["wip/research/*"], False
         ),
-        # 親のブランチの上の層は読まない（置き場の外なので拡張はそもそも読まない。3.3 の 6）
+        # 親のブランチの上のレイヤーは読まない（置き場の外なので拡張はそもそも読まない。3.3 の 6）
     }
 
 
@@ -143,7 +144,8 @@ class ChromeProjectTest(unittest.TestCase):
             "workspace": workspace(**{".ccnavi/common/risks.yml": RISK_COMMON}),
         }
         layer = self.chrome.project_layer(snap, place)
-        # 共通層にあるファイルは写し（配点の script はプロジェクトの層の置き場へ）、無いものは残す
+        # 共通レイヤーにあるファイルは写し（配点の script はプロジェクトのレイヤーの置き場へ）、
+        # 無いものは残す
         self.assertEqual(layer[".ccnavi/config/phases.yml"], PHASES)
         self.assertIn("script: .ccnavi/scripts/risk.sh", layer[".ccnavi/config/risks.yml"])
         self.assertEqual(layer[".ccnavi/config/rules.yml"], '{"version": 1, "deny": []}\n')

@@ -142,7 +142,7 @@ class TestJsonTest(unittest.TestCase):
                 self.assertEqual(body["verdict"], "deny", done.stdout + done.stderr)
 
     def test_rule_problems_are_said_once(self):
-        # 試験は判定と当たったルールの一覧で共通層を 2 度読み、見本は 1 件ずつ判定する。
+        # 試験は判定と当たったルールの一覧で共通レイヤーを 2 度読み、見本は 1 件ずつ判定する。
         # どちらでも、同じ苦情を 2 度出さない。
         silent = {"id": "silent", "match": "Bash", "glob": "*nothing matches*"}
         body = {**RULES, "deny": [*RULES["deny"], silent]}

@@ -49,7 +49,7 @@ class SectionsTest(unittest.TestCase):
         話に付き合わずに済む。
         """
         body = {"version": 1, **sections}
-        # 置くのは共通層の既定の場所。`--rules` は診断でだけ有効で、hook の判定には
+        # 置くのは共通レイヤーの既定の場所。`--rules` は診断でだけ有効で、hook の判定には
         # 届かない（ADR-0067）。
         return write(common_path(self.root, "rules"), json.dumps(body))
 

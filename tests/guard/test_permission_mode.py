@@ -127,7 +127,7 @@ class NoJudgeTest(unittest.TestCase):
         self.assertEqual("deny", decision_of(self, result))
 
     def test_the_project_can_open_this_gate(self):
-        """CCNAVI_GUARD_UNWATCHED=disable にした層では、ここも渡す側になる。"""
+        """CCNAVI_GUARD_UNWATCHED=disable にしたレイヤーでは、ここも渡す側になる。"""
         for permission_mode in ("dontAsk", "bypassPermissions"):
             with self.subTest(permission_mode=permission_mode):
                 result, record = run(permission_mode, guard_unwatched="disable")

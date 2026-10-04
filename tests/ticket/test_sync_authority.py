@@ -849,7 +849,7 @@ class LintTest(AuthorityHarness):
             home=approval.tree.Tree("w0001", home, project="web", kind="worktree"),
         )
         problems = lint._projected_layer_problems(conf, st, "(x)")
-        # 共通層の rules と、プロジェクトの統合先の phases が P の上に無い。
+        # 共通レイヤーの rules と、プロジェクトの統合先の phases が P の上に無い。
         self.assertEqual(2, len(problems), problems)
         write(os.path.join(home, ".ccnavi", "config", "rules.yml"), "rules: []\n")
         write(os.path.join(home, ".ccnavi", "config", "phases.yml"), "types: {}\r\n")

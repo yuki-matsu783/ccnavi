@@ -106,8 +106,8 @@ DEPLOY_SCRIPTS = (
     "ccnavi-clean.js",
 )
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
-# --deploy が配る残りの設定 2 本（設計 11.9）。リスクの配点は共通層、
-# フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
+# --deploy が配る残りの設定 2 本（設計 11.9）。リスクの配点は共通レイヤー、
+# フェーズの種類は自身のレイヤー（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
 # 置き場は 2 つに分けて固定する（設計 launcher-scripts 1）。hook が起動する振り分けの sh は
@@ -323,7 +323,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_LOG"], "logs/decisions.jsonl")
 
     def test_does_not_write_the_common_layer_paths(self):
-        """ADR-0052: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
+        """ADR-0052: 共通レイヤーの 3 本は `.ccnavi/common/` 固定なので、env には書かない。
 
         既定と同じ値を書いても動きは変わらないが、読まれない語が設定に残ると、
         そこを直せば置き場が動くと読める。`--all` の一覧にも書かない。
@@ -813,7 +813,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 11.9）。
+            # 設定 3 本のひな形。risk は共通レイヤー、phases は自身のレイヤー（設計 11.9）。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
             os.makedirs(os.path.join(src, ".ccnavi", "config"))

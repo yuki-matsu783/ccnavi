@@ -3,16 +3,16 @@
 道具を外から動かす。一時ディレクトリにワークスペース 1 つとプロジェクト 2 つ
 （lib と app）を組み、hook の payload を標準入力で渡して判定と記録を読む。
 
-層は 3 種。
+レイヤーは 3 種。
 
-- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。ADR-0052）
-- ワークスペース自身の層: `<ワークスペースルート>/.ccnavi/config/`
-- プロジェクトの層: `projects/<名前>/.ccnavi/config/`
+- 共通レイヤー: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。ADR-0052）
+- ワークスペース自身のレイヤー: `<ワークスペースルート>/.ccnavi/config/`
+- プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/`
 
-lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空）。
+lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無いレイヤー = 空）。
 
 `.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と控えの
-`logs/`）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切ったワークツリーに
+`logs/`）。共通レイヤーの 3 本と自身のレイヤーは追跡するので、ワークスペースから切ったワークツリーに
 ワークツリー側の設定ができ、設計 11.6 が名指しした穴（ワークツリー側の設定が書けて戻らない）を
 再現できる。
 
@@ -34,7 +34,7 @@ import unittest
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-# 共通層。どのツリーにも当てたい deny と、ワークスペースの allow。
+# 共通レイヤー。どのツリーにも当てたい deny と、ワークスペースの allow。
 COMMON_RULES = {
     "version": 1,
     "deny": [
@@ -63,7 +63,7 @@ COMMON_RULES = {
     ],
 }
 
-# ワークスペース自身の層。ワークスペースのツリーにだけ当たる。
+# ワークスペース自身のレイヤー。ワークスペースのツリーにだけ当たる。
 OWN_RULES = {
     "version": 1,
     "deny": [
@@ -83,7 +83,7 @@ OWN_RULES = {
     "allow": [{"id": "docs", "match": "Write|Edit", "glob": "*/docs/*"}],
 }
 
-# lib の層。lib のツリーにだけ当たる。
+# lib のレイヤー。lib のツリーにだけ当たる。
 LIB_RULES = {
     "version": 1,
     "deny": [
@@ -153,7 +153,8 @@ factors:
   - {id: schema, points: 30, glob: "schema/**", message: スキーマに触った}
 """
 
-# app の層。fixture では置かない（無い層 = 空）。2 つ目の非空の層を要るテストだけが置く。
+# app のレイヤー。fixture では置かない（無いレイヤー = 空）。
+# 2 つ目の非空のレイヤーを要るテストだけが置く。
 APP_RULES = {
     "version": 1,
     "deny": [
@@ -180,7 +181,7 @@ LIB_DEPLOY = {
     "message": "deploy is run by a human.",
 }
 
-# 共通層の `ask`。プロジェクトの層の `allow` で緩められないことを見る（11.4 代償）。
+# 共通レイヤーの `ask`。プロジェクトのレイヤーの `allow` で緩められないことを見る（11.4 代償）。
 ASK_VENDOR = {
     "id": "ask-vendor",
     "match": "Write|Edit",
@@ -196,7 +197,8 @@ NOTEBOOK_RULE = {
     "message": "ノートはユーザが回す。",
 }
 
-# `{root}` を含む定義。共通層と層の両方に同じものを置いて、置換後の全欄一致を見る（11.8）。
+# `{root}` を含む定義。
+# 共通レイヤーとレイヤーの両方に同じものを置いて、置換後の全欄一致を見る（11.8）。
 ROOT_RULE = {
     "id": "root-secret",
     "match": "Write|Edit",
@@ -241,12 +243,12 @@ FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
 
 
 def layer_path(root, kind, home=HOME):
-    """その git プロジェクトルートの層のファイル（rules / phases / risk）の綴り。"""
+    """その git プロジェクトルートのレイヤーのファイル（rules / phases / risk）の綴り。"""
     return os.path.join(root, home, "config", FILE_NAMES[kind])
 
 
 def write_layer(root, *, rules=None, phases=None, risk=None, home=HOME):
-    """層の 3 本を置く。None の欄は置かない（無い = 空）。dict は JSON で書く。"""
+    """レイヤーの 3 本を置く。None の欄は置かない（無い = 空）。dict は JSON で書く。"""
     for kind, body in (("rules", rules), ("phases", phases), ("risk", risk)):
         if body is None:
             continue
@@ -265,7 +267,8 @@ def ticket_text(
     review=False,
     title="作業",
 ):
-    """提案の本文。親は plan を、子は parent と phase を持つ。project は行き先の層を決める。"""
+    """提案の本文。親は plan を、子は parent と phase を持つ。
+    project は行き先のレイヤーを決める。"""
     lines = ["---", "version: 1", f"ticket: {name}"]
     if project:
         lines.append(f"project: {project}")
@@ -295,8 +298,8 @@ def ticket_text(
 KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
 
 # ワークスペースの git が無視するもの。実物の .gitignore と同じ 3 つだけ。
-# `/.ccnavi/` を丸ごと無視すると共通層の 3 本が追跡されず、ワークツリー側の設定ができない。
-# それができないと、設計 11.6 が名指しした穴（共通層のワークツリー側の設定が書けて
+# `/.ccnavi/` を丸ごと無視すると共通レイヤーの 3 本が追跡されず、ワークツリー側の設定ができない。
+# それができないと、設計 11.6 が名指しした穴（共通レイヤーのワークツリー側の設定が書けて
 # 戻らない）を一度も再現できない。
 GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 
@@ -310,7 +313,7 @@ _TEMPLATE = ""
 
 
 def build_project(root, *, rules=None, phases=None, risk=None, home=HOME):
-    """git 初期化したプロジェクトを 1 つ置く。層は渡したぶんだけ。"""
+    """git 初期化したプロジェクトを 1 つ置く。レイヤーは渡したぶんだけ。"""
     os.makedirs(root)
     git(root, "init", "--quiet", "-b", "main")
     for rel in KEEP:
@@ -419,8 +422,9 @@ class ConfigUnionHarness(unittest.TestCase):
     def ccnavi(self, *args, stdin="", env=None, guard="disable"):
         """実行ファイルを 1 回起動する。
 
-        層の置き場はフラグで渡さない。共通層の 3 本（`--rules` / `--phases` / `--risk`）も、
-        層を探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
+        レイヤーの置き場はフラグで渡さない。
+        共通レイヤーの 3 本（`--rules` / `--phases` / `--risk`）も、
+        レイヤーを探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
         `--explain`）でだけ有効で、hook の判定とチケットの副命令では落ちる（ADR-0067）。
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
@@ -480,7 +484,7 @@ class ConfigUnionHarness(unittest.TestCase):
         """その深刻度の Problem。`where` を渡すと、その出どころで先に絞る。
 
         `detail` の部分一致だけで見ると、`self` や `lib` のようなありふれた語が
-        別の苦情の文面に紛れていても通ってしまう。どの層の話かは `where` が持つ。
+        別の苦情の文面に紛れていても通ってしまう。どのレイヤーの話かは `where` が持つ。
         """
         return [
             p
@@ -526,14 +530,15 @@ class ConfigUnionHarness(unittest.TestCase):
 
 
 class WriteUnionTest(ConfigUnionHarness):
-    """Write / Edit は共通層 + 行き先の層の和（11.4、REQ-MLT-03 の変更）。"""
+    """Write / Edit は共通レイヤー + 行き先のレイヤーの和（11.4、REQ-MLT-03 の変更）。"""
 
     def test_each_layer_deny_applies_to_its_own_files(self):
-        """11.4: 3 種の層の deny は、それぞれの層が対象とするファイルで当たる。
+        """11.4: 3 種のレイヤーの deny は、それぞれのレイヤーが対象とするファイルで当たる。
 
-        id は共通層なら裸、プロジェクトの層なら `lib:`、自身の層なら `self:` が付く。
-        記録の `source` はその層、`project` は行き先のプロジェクトで、ワークスペースの
-        ファイルなら持たない。cwd は行き先と別の側に置く。層を選ぶのは行き先で、cwd ではない。
+        id は共通レイヤーなら裸、プロジェクトのレイヤーなら `lib:`、
+        自身のレイヤーなら `self:` が付く。
+        記録の `source` はそのレイヤー、`project` は行き先のプロジェクトで、ワークスペースの
+        ファイルなら持たない。cwd は行き先と別の側に置く。レイヤーを選ぶのは行き先で、cwd ではない。
         """
         for source, target, cwd, rule_id, message in (
             ("common", (self.lib, ".env"), self.ws, "credentials", "credentials are not edited"),
@@ -552,9 +557,9 @@ class WriteUnionTest(ConfigUnionHarness):
                     self.assertNotIn("project", record)
 
     def test_a_layer_deny_does_not_reach_other_trees(self):
-        """11.4: 層の deny は対象の外には当たらない。
+        """11.4: レイヤーの deny は対象の外には当たらない。
 
-        プロジェクトの層は他のプロジェクトにもワークスペースにも、自身の層はプロジェクトにも足さない。
+        プロジェクトのレイヤーは他のプロジェクトにもワークスペースにも、自身のレイヤーはプロジェクトにも足さない。
         """
         for rule_id, target in (
             ("lib:schema", (self.app, "schema", "x.sql")),
@@ -565,9 +570,11 @@ class WriteUnionTest(ConfigUnionHarness):
                 self.assert_not_denied(self.hook("Write", self.ws, file_path=os.path.join(*target)))
 
     def test_a_worktree_gets_the_layers_of_the_tree_it_was_cut_from(self):
-        """11.4: 切ったワークツリーには、共通層 + 切り元の層。記録の `tree` はワークツリーの名前。
+        """11.4: 切ったワークツリーには、共通レイヤー + 切り元のレイヤー。
+        記録の `tree` はワークツリーの名前。
 
-        ワークスペースから切ったもの（w1）には自身の層、lib から切ったもの（i0007）には lib の層。
+        ワークスペースから切ったもの（w1）には自身のレイヤー、lib から切ったもの（i0007）
+        には lib のレイヤー。
         """
         trees = {"w1": self.worktree(self.ws, "w1"), "i0007": self.worktree(self.lib, "i0007")}
         for tree, rel, rule_id in (
@@ -581,12 +588,13 @@ class WriteUnionTest(ConfigUnionHarness):
                 self.assertEqual(self.last_record()["tree"], tree)
 
     def test_project_allow_stays_inside_the_project(self):
-        """11.4 代償: 層の allow は行き先の 1 層にしか足さない。"""
+        """11.4 代償: レイヤーの allow は行き先の 1 レイヤーにしか足さない。"""
         allowed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "src", "a.py"))
         self.assert_not_denied(allowed)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow")
-        # 11.4「順は 共通層 → 自身の層 → プロジェクトの層」。先に当たるのは共通層の ws-src。
+        # 11.4「順は 共通レイヤー → 自身のレイヤー → プロジェクトのレイヤー」。
+        # 先に当たるのは共通レイヤーの ws-src。
         # ここを「どちらでも良い」にすると、逆順に並べた実装でも通ってしまう。
         self.assertEqual(record["rules"][0], "ws-src", record)
 
@@ -598,7 +606,8 @@ class WriteUnionTest(ConfigUnionHarness):
         self.assertNotIn("self:docs", self.last_record().get("rules", []))
 
     def test_notebook_edit_goes_through_the_same_union(self):
-        """11.4: NotebookEdit も書き込み系。共通層 + 行き先の層の和で、欄は notebook_path。"""
+        """11.4: NotebookEdit も書き込み系。
+        共通レイヤー + 行き先のレイヤーの和で、欄は notebook_path。"""
         deny = [*LIB_RULES["deny"], NOTEBOOK_RULE]
         write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
 
@@ -612,7 +621,7 @@ class WriteUnionTest(ConfigUnionHarness):
         self.assertEqual(record["rules"], ["lib:notebook"])
         self.assertEqual(record.get("source"), "lib")
 
-        # 共通層の guard-approved も NotebookEdit を持つ。プロジェクトのツリーでも当たる。
+        # 共通レイヤーの guard-approved も NotebookEdit を持つ。プロジェクトのツリーでも当たる。
         common = self.hook(
             "NotebookEdit",
             self.ws,
@@ -621,7 +630,8 @@ class WriteUnionTest(ConfigUnionHarness):
         self.assert_denied(common, "guard-approved")
 
     def test_a_project_allow_does_not_loosen_the_common_ask(self):
-        """11.4 代償: 共通層の `ask` を、プロジェクトの層の `allow` では緩められない。"""
+        """11.4 代償: 共通レイヤーの `ask` を、
+        プロジェクトのレイヤーの `allow` では緩められない。"""
         write(self.rules, json.dumps(dict(COMMON_RULES, ask=[ASK_VENDOR])))
         allow = [
             *LIB_RULES["allow"],
@@ -641,7 +651,7 @@ class WriteUnionTest(ConfigUnionHarness):
 
 
 class ToolLayerTest(ConfigUnionHarness):
-    """パスを持つツールは行き先の層、持たないツールは全部の層の和（11.4）。"""
+    """パスを持つツールは行き先のレイヤー、持たないツールは全部のレイヤーの和（11.4）。"""
 
     SECRETS = {
         "id": "secrets",
@@ -651,7 +661,7 @@ class ToolLayerTest(ConfigUnionHarness):
     }
 
     def test_grep_and_glob_use_the_layer_of_the_place_they_search(self):
-        """11.4: Grep と Glob は Read と同じく行き先の層。探す場所を省けば cwd。"""
+        """11.4: Grep と Glob は Read と同じく行き先のレイヤー。探す場所を省けば cwd。"""
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], self.SECRETS]))
         secrets = os.path.join(self.lib, "secrets")
 
@@ -660,13 +670,13 @@ class ToolLayerTest(ConfigUnionHarness):
         self.assert_denied(self.hook("Glob", self.ws, pattern="*", path=secrets), "lib:secrets")
         # 探す場所を省くと cwd。
         self.assert_denied(self.hook("Grep", secrets, pattern="token"), "lib:secrets")
-        # 行き先の層だけなので、app の secrets には lib のルールは当たらない。
+        # 行き先のレイヤーだけなので、app の secrets には lib のルールは当たらない。
         self.assert_not_denied(
             self.hook("Grep", self.ws, pattern="token", path=os.path.join(self.app, "secrets"))
         )
 
     def test_tools_without_a_path_use_the_union_of_every_layer(self):
-        """11.4: WebFetch・Skill・Agent は、Bash と同じく全部の層の和。cwd によらない。"""
+        """11.4: WebFetch・Skill・Agent は、Bash と同じく全部のレイヤーの和。cwd によらない。"""
         own = {
             "id": "fetch-internal",
             "match": "WebFetch",
@@ -696,7 +706,8 @@ class ToolLayerTest(ConfigUnionHarness):
                 )
 
     def test_glob_without_a_path_and_powershell_follow_the_same_split(self):
-        """11.4: Glob は探す場所を省けば cwd の層。PowerShell は Bash と同じく全部の層の和。"""
+        """11.4: Glob は探す場所を省けば cwd のレイヤー。
+        PowerShell は Bash と同じく全部のレイヤーの和。"""
         powershell = {
             "id": "ps-psql",
             "match": "PowerShell",
@@ -716,7 +727,7 @@ class ToolLayerTest(ConfigUnionHarness):
     def test_a_layer_allow_now_reaches_grep_and_tools_without_a_path(self):
         """ADR-0048 の代償。
 
-        行き先の層の allow が Grep に当たり、層の allow がパスを持たないツールに当たる。
+        行き先のレイヤーの allow が Grep に当たり、レイヤーの allow がパスを持たないツールに当たる。
         """
         allow = [
             *LIB_RULES["allow"],
@@ -730,7 +741,8 @@ class ToolLayerTest(ConfigUnionHarness):
         self.assertEqual(record["decision"], "allow", record)
         self.assertEqual(record["rules"], ["lib:grep-src"], record)
 
-        # lib の層の allow は、app に居る WebFetch にも当たる（パスを持たないツールは全部の和）。
+        # lib のレイヤーの allow は、
+        # app に居る WebFetch にも当たる（パスを持たないツールは全部の和）。
         self.hook("WebFetch", self.app, url="https://docs.example.com/a", prompt="read")
         record = self.last_record()
         self.assertEqual(record["decision"], "allow", record)
@@ -738,10 +750,11 @@ class ToolLayerTest(ConfigUnionHarness):
 
 
 class RootPlaceholderUnionTest(ConfigUnionHarness):
-    """`{root}` の置換先はどの層でもワークスペースルート（11.8）。"""
+    """`{root}` の置換先はどのレイヤーでもワークスペースルート（11.8）。"""
 
     def test_root_in_a_project_layer_is_the_workspace_root(self):
-        """11.8: プロジェクトの層の `{root}` も、そのプロジェクトではなくワークスペースルート。"""
+        """11.8: プロジェクトのレイヤーの `{root}` も、
+        そのプロジェクトではなくワークスペースルート。"""
         deny = [
             *LIB_RULES["deny"],
             {
@@ -779,10 +792,11 @@ class RootPlaceholderUnionTest(ConfigUnionHarness):
 
 
 class BashUnionTest(ConfigUnionHarness):
-    """Bash は共通層 + 自身の層 + 全プロジェクトの層（11.4、REQ-MLT-05 の変更）。"""
+    """Bash は共通レイヤー + 自身のレイヤー + 全プロジェクトのレイヤー（11.4、
+    REQ-MLT-05 の変更）。"""
 
     def test_bash_is_the_union_of_every_layer_regardless_of_cwd(self):
-        """11.4: どの層の deny も cwd によらず当たる。"""
+        """11.4: どのレイヤーの deny も cwd によらず当たる。"""
         for cwd in (self.ws, self.lib, self.app):
             with self.subTest(cwd=os.path.basename(cwd)):
                 self.assert_denied(
@@ -794,7 +808,7 @@ class BashUnionTest(ConfigUnionHarness):
                 )
 
     def test_bash_record_names_the_layer_of_the_deciding_rule(self):
-        """11.9: 記録の `source` は判定を下したルール（`rules` の先頭）の層。"""
+        """11.9: 記録の `source` は判定を下したルール（`rules` の先頭）のレイヤー。"""
         self.hook("Bash", self.app, command="dropdb prod")
         record = self.last_record()
         self.assertEqual(record["rules"][0], "self:dropdb")
@@ -803,7 +817,7 @@ class BashUnionTest(ConfigUnionHarness):
         self.assertEqual(self.last_record().get("source"), "lib")
 
     def test_two_non_empty_project_layers_take_part_in_name_order(self):
-        """11.4: 非空のプロジェクトの層が 2 つでも両方が和に入り、並びは名前順。"""
+        """11.4: 非空のプロジェクトのレイヤーが 2 つでも両方が和に入り、並びは名前順。"""
         write_layer(self.app, rules=APP_RULES)
         write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], LIB_DEPLOY]))
 
@@ -826,7 +840,8 @@ class DuplicateTest(ConfigUnionHarness):
     """同 `id` の扱い（11.4「重複は後ろを捨てる」「同 id で中身が違うとき」）。"""
 
     def test_identical_definition_in_a_later_layer_is_dropped(self):
-        """11.4: 裸の id と全欄が一致する定義は後ろの層を捨てる。記録に 1 本、--lint は info。"""
+        """11.4: 裸の id と全欄が一致する定義は後ろのレイヤーを捨てる。
+        記録に 1 本、--lint は info。"""
         copied = dict(LIB_RULES)
         copied["deny"] = [COMMON_RULES["deny"][0], *LIB_RULES["deny"]]
         write_layer(self.lib, rules=copied)
@@ -858,7 +873,8 @@ class DuplicateTest(ConfigUnionHarness):
         self.assertTrue(any("credentials" in p["detail"] for p in warns), warns)
 
     def test_bash_union_drops_identical_duplicates_too(self):
-        """11.4: Bash の和でも同じ。共通層の `terraform` を写した lib の定義は 1 本にまとまる。"""
+        """11.4: Bash の和でも同じ。
+        共通レイヤーの `terraform` を写した lib の定義は 1 本にまとまる。"""
         copied = dict(LIB_RULES)
         copied["deny"] = [*LIB_RULES["deny"], COMMON_RULES["deny"][1]]
         write_layer(self.lib, rules=copied)
@@ -868,10 +884,10 @@ class DuplicateTest(ConfigUnionHarness):
 
 
 class LayerFailureTest(ConfigUnionHarness):
-    """層が無い・壊れている・共通層自身が壊れている、の 3 つ（11.2）。"""
+    """レイヤーが無い・壊れている・共通レイヤー自身が壊れている、の 3 つ（11.2）。"""
 
     def test_missing_layer_is_empty_without_fallback(self):
-        """11.2: 層のファイルが無い = 空。fallback は付かず、--lint も言わない。"""
+        """11.2: レイヤーのファイルが無い = 空。fallback は付かず、--lint も言わない。"""
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))
         self.assert_not_denied(passed)
         record = self.last_record()
@@ -884,7 +900,8 @@ class LayerFailureTest(ConfigUnionHarness):
         )
 
     def test_broken_layer_is_empty_and_named_in_the_record(self):
-        """11.2 / REQ-MLT-06: 壊れた層は空 + 記録の `fallback` に層の名前。組み込みには戻らない。"""
+        """11.2 / REQ-MLT-06: 壊れたレイヤーは空 + 記録の `fallback` にレイヤーの名前。
+        組み込みには戻らない。"""
         write(layer_path(self.lib, "rules"), BROKEN)
 
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
@@ -895,7 +912,7 @@ class LayerFailureTest(ConfigUnionHarness):
         self.assertNotIn("built-in defaults", self.reason(passed))
 
     def test_broken_layer_keeps_the_common_deny(self):
-        """11.2: 壊れた層の上でも共通層の deny は当たったまま。"""
+        """11.2: 壊れたレイヤーの上でも共通レイヤーの deny は当たったまま。"""
         write(layer_path(self.lib, "rules"), BROKEN)
 
         denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, ".env"))
@@ -903,14 +920,14 @@ class LayerFailureTest(ConfigUnionHarness):
         self.assertEqual(self.last_record().get("fallback"), "lib")
 
     def test_broken_layer_is_a_lint_error(self):
-        """11.9: 層のファイルが壊れている（空として扱っている）は --lint の error。"""
+        """11.9: レイヤーのファイルが壊れている（空として扱っている）は --lint の error。"""
         write(layer_path(self.lib, "rules"), BROKEN)
 
         errors = self.problems("error")
         self.assertTrue(any(p["where"].startswith("(projects/lib)") for p in errors), errors)
 
     def test_broken_layer_drops_out_of_the_bash_union(self):
-        """11.4: Bash の和からも壊れた層は外れ、記録がそれを言う。"""
+        """11.4: Bash の和からも壊れたレイヤーは外れ、記録がそれを言う。"""
         write(layer_path(self.lib, "rules"), BROKEN)
 
         self.assert_not_denied(self.hook("Bash", self.lib, command="psql"))
@@ -918,7 +935,8 @@ class LayerFailureTest(ConfigUnionHarness):
         self.assertIn("lib", self.last_record().get("detail", ""))
 
     def test_broken_common_layer_falls_back_to_builtin_as_before(self):
-        """11.2 / REQ-PRE-06: 共通層自身が読めないときは今どおり組み込みの既定。層は足さない。"""
+        """11.2 / REQ-PRE-06: 共通レイヤー自身が読めないときは今どおり組み込みの既定。
+        レイヤーは足さない。"""
         write(self.rules, BROKEN)
 
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
@@ -932,8 +950,9 @@ class LayerFailureTest(ConfigUnionHarness):
 class ProblemsSaidOnceTest(ConfigUnionHarness):
     """ルールの苦情は、1 回の起動で 1 度だけ出す。
 
-    hook はツリーの層ごとに共通層を読み直し、`--lint` は層のファイルを 2 つの経路で読む。
-    読むたびに言うと、同じ苦情が層やツリーの数だけ並ぶ。
+    hook はツリーのレイヤーごとに共通レイヤーを読み直し、
+    `--lint` はレイヤーのファイルを 2 つの経路で読む。
+    読むたびに言うと、同じ苦情がレイヤーやツリーの数だけ並ぶ。
     """
 
     SILENT = {"id": "silent", "match": "Bash", "glob": "*nothing matches*"}
@@ -953,15 +972,15 @@ class ProblemsSaidOnceTest(ConfigUnionHarness):
             for p in self.lint_json()["problems"]
             if p["where"].startswith(self.project_where("lib")) and "silent" in p["where"]
         ]
-        self.assertTrue(said, "層の苦情が出ていない")
+        self.assertTrue(said, "レイヤーの苦情が出ていない")
         self.assertEqual(len(said), len(set(said)), said)
 
 
 class PostMonitoringUnionTest(ConfigUnionHarness):
-    """実行後チェックも「共通層 + そのツリーの層」の和（11.7）。
+    """実行後チェックも「共通レイヤー + そのツリーのレイヤー」の和（11.7）。
 
-    行き先の層 1 本のままの実装では、共通層の deny の場所が保護領域に数えられない。
-    プロジェクトのツリー（共通層）と、ワークスペースのワークツリー（自身の層）の両方で見る。
+    行き先のレイヤー 1 本のままの実装では、共通レイヤーの deny の場所が保護領域に数えられない。
+    プロジェクトのツリー（共通レイヤー）と、ワークスペースのワークツリー（自身のレイヤー）の両方で見る。
     """
 
     def start_turn(self, cwd):
@@ -972,7 +991,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
 
     def test_a_project_tree_is_watched_with_the_common_layer_too(self):
-        """11.7: プロジェクトのツリーでも、共通層の deny の場所が保護領域に入る。"""
+        """11.7: プロジェクトのツリーでも、共通レイヤーの deny の場所が保護領域に入る。"""
         self.start_turn(self.lib)
         write(os.path.join(self.lib, ".env"), "SECRET=1\n")
 
@@ -984,7 +1003,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         self.assertEqual(self.last_record()["rules"], ["credentials"])
 
     def test_a_project_tree_is_watched_with_its_own_layer_as_well(self):
-        """11.7: 和なので、そのプロジェクトの層の deny も同じターンで並ぶ。"""
+        """11.7: 和なので、そのプロジェクトのレイヤーの deny も同じターンで並ぶ。"""
         self.start_turn(self.lib)
         write(os.path.join(self.lib, "schema", "keep.sql"), "-- dirty\n")
         write(os.path.join(self.lib, ".env"), "SECRET=1\n")
@@ -996,7 +1015,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         self.assertIn("tree: lib", after.stderr)
 
     def test_a_workspace_worktree_is_watched_with_the_own_layer(self):
-        """11.7: ワークスペースから切ったワークツリーには、共通層 + 自身の層。"""
+        """11.7: ワークスペースから切ったワークツリーには、共通レイヤー + 自身のレイヤー。"""
         tree = self.worktree(self.ws, "w1")
         self.start_turn(tree)
         write(os.path.join(tree, "generated", "keep.py"), "dirty\n")
@@ -1009,7 +1028,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         self.assertEqual(self.last_record()["tree"], "w1")
 
     def test_a_workspace_worktree_is_watched_with_the_common_layer(self):
-        """11.7: 同じワークツリーで、共通層の deny の場所も見る。"""
+        """11.7: 同じワークツリーで、共通レイヤーの deny の場所も見る。"""
         tree = self.worktree(self.ws, "w2")
         self.start_turn(tree)
         write(os.path.join(tree, ".env"), "SECRET=1\n")
@@ -1060,8 +1079,10 @@ class WiringTest(ConfigUnionHarness):
         )
 
     def test_workspace_without_projects_or_own_layer_is_unchanged(self):
-        """REQ-MLT-15: `projects/` を数えず自身の層も無ければ、共通層だけで判定し記録する。"""
-        # 自身の層だけを消す。共通層も同じ ccnavi ディレクトリの下（`.ccnavi/common/`）にある。
+        """REQ-MLT-15: `projects/` を数えず自身のレイヤーも無ければ、
+        共通レイヤーだけで判定し記録する。"""
+        # 自身のレイヤーだけを消す。
+        # 共通レイヤーも同じ ccnavi ディレクトリの下（`.ccnavi/common/`）にある。
         shutil.rmtree(os.path.join(self.ws, HOME, "config"))
 
         no_projects = {"CCNAVI_PROJECTS": ""}
@@ -1084,33 +1105,41 @@ class WiringTest(ConfigUnionHarness):
 
 
 class ExplainTest(ConfigUnionHarness):
-    """`--explain` は層ごとに全件（11.9、REQ-MLT-17 の変更）。"""
+    """`--explain` はレイヤーごとに全件（11.9、REQ-MLT-17 の変更）。"""
 
     def test_explain_lists_rules_per_layer_and_the_phase_and_risk_tables(self):
-        """11.9: rules を共通層・自身の層・各プロジェクトの順に、phases と risk の表を足す。"""
+        """11.9: rules を共通レイヤー・自身のレイヤー・各プロジェクトの順に、
+        phases と risk の表を足す。"""
         result = self.ccnavi("--explain")
         out = result.stdout
         self.assertEqual(result.returncode, 0, result.stderr)
-        for heading in ("■ rules 共通層", "■ rules 自身の層", "■ rules lib", "■ phases", "■ risk"):
+        for heading in (
+            "■ rules 共通レイヤー",
+            "■ rules 自身のレイヤー",
+            "■ rules lib",
+            "■ phases",
+            "■ risk",
+        ):
             self.assertIn(heading, out)
-        self.assertLess(out.index("■ rules 共通層"), out.index("■ rules 自身の層"))
-        self.assertLess(out.index("■ rules 自身の層"), out.index("■ rules lib"))
+        self.assertLess(out.index("■ rules 共通レイヤー"), out.index("■ rules 自身のレイヤー"))
+        self.assertLess(out.index("■ rules 自身のレイヤー"), out.index("■ rules lib"))
         self.assertIn("self:generated", out)
         self.assertIn("lib:schema", out)
-        # phases と risk は id と出どころの層。
+        # phases と risk は id と出どころのレイヤー。
         self.assertIn("build", out)
         self.assertIn("big-diff", out)
         self.assertIn("schema", out)
 
     def test_explain_shows_a_broken_layer_as_unreadable_and_empty(self):
-        """11.9: 読めない層はその位置に「読めない」と、空として扱っていることを出す。"""
+        """11.9: 読めないレイヤーはその位置に「読めない」と、空として扱っていることを出す。"""
         write(layer_path(self.lib, "rules"), BROKEN)
         out = self.ccnavi("--explain").stdout
         self.assertIn("■ rules lib", out)
         self.assertIn("読めない", out)
 
     def test_explain_json_carries_every_layer(self):
-        """11.9: `--explain --json` に層ごとの rules 全件と phases / risk の定義と出どころが出る。
+        """11.9: `--explain --json` にレイヤーごとの rules 全件と phases / risk
+        の定義と出どころが出る。
 
         形は README「ボードの JSON」に足す。ここでは `layers` の並びに `name`（common / self /
         プロジェクト名）と `rules` / `phases` / `risk` が在ることまでを固定する。

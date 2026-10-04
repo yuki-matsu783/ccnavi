@@ -128,7 +128,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
+        # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない（ADR-0067）。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
@@ -692,7 +692,7 @@ class TicketTest(unittest.TestCase):
         """リモートに置く枝は親ブランチ 1 本で、送るのは親の仕事。
 
         ラッパースクリプトは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
-        cd して打てばラッパースクリプトは通す。素性で止める層を hook に持つ。
+        cd して打てばラッパースクリプトは通す。素性で止めるレイヤーを hook に持つ。
         """
         self.family()
         for command in (

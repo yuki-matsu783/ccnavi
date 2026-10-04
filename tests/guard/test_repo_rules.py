@@ -362,8 +362,8 @@ class RunnerTest(LauncherJudgeTest):
                 with self.subTest(subject=subject):
                     self.assert_denied_by(subject, rule_id)
 
-    def test_env_越しの承認のスクリプトは途中の層で止まる(self):
-        # W1 の続き。`sh …approve.sh` は `env` を外した途中の層で、
+    def test_env_越しの承認のスクリプトは途中のレイヤーで止まる(self):
+        # W1 の続き。`sh …approve.sh` は `env` を外した途中のレイヤーで、
         # そこに承認の `script` の枝が当たる。
         self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL)
 
