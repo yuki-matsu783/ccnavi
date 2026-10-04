@@ -78,17 +78,12 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 ### 未了: Python 側
 
-1. **シェル実行への組み込みの保護は、空白を含むパスへの `>` の書き込みを止めない。** リダイレクトの行き先を拾う形
-   （`selfguard._WRITE_VERBS`）が引用の中の空白の目印（`\x01`）で止まる。
-   `echo x > "projects/has space/.ccnavi/config/rules.yml"` は `builtin-guard-setting-files` に当たらず、
-   ルールが何も言わなければ ask になる。`tee` `cp` `mv`、`cd` してからの相対の `>`、Write / Edit は止まる。
-   ワークスペースルートの絶対パスに空白があるときも同じ
-2. **`--lint` が、まだリポジトリの無い `projects/` の無視を確かめない。** `lint_places._projects` は
+1. **`--lint` が、まだリポジトリの無い `projects/` の無視を確かめない。** `lint_places._projects` は
    `tree.projects()` が空なら先に返る。clone する前が一番確かめたい時点
-3. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと列挙から外れ、その中のパスがワークスペースルートとして
+2. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと列挙から外れ、その中のパスがワークスペースルートとして
    判定される（プロジェクトの `deny` が外れる）。判定は変えず `--lint` と `--explain` が名指しする方針だが、まだ言わない
-4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` のパスがある」を warn で言うようにする
-5. 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
+3. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` のパスがある」を warn で言うようにする
+4. 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
 
 ### ccnavi 自身の設計の穴
 
