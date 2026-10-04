@@ -604,3 +604,118 @@ test("CB-D123 履歴を開け閉めしてもカードの提案は開かない。
     await page.close();
   }
 });
+
+test("CB-D144 「アーカイブ済みのチケットを表示する」は既定で外れていて、入れるとアーカイブの列と退避のカードが出る。state に残る", async () => {
+  const archived = {
+    ticket: "old",
+    parent: "",
+    phase: null,
+    title: "退避した親",
+    project: "",
+    path: "/ws/logs/archive/self/done/old.md",
+    approved_at: "",
+    started_at: "",
+    completed_at: "",
+    cancelled_at: "",
+    cancel_reason: "",
+    history: [],
+  };
+  const json = { ...fixture(), archived: [archived] };
+  const page = await openBoard(json);
+  try {
+    const box = page.one<HTMLInputElement>("#archived-filter");
+    assert.equal(box.checked, false);
+    assert.match(box.parentElement?.textContent ?? "", /アーカイブ済みのチケットを表示する/);
+    assert.equal(page.all('.column[data-state="archived"]').length, 0);
+    page.click(box);
+    await page.settle();
+    assert.equal((page.state() as { archived: boolean }).archived, true);
+    // 絞り込みではない（承認の送り先は変わらない）
+    assert.ok(!page.document.body.classList.contains("filtering"));
+    assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
+    assert.equal(page.one('.column[data-state="archived"] > h2 > .count').textContent, "1");
+    assert.equal(page.one('button.fold[data-fold="archived"]').textContent, "アーカイブ");
+    // 押すと退避したファイルを開く
+    page.click(page.one('.card[data-id="old"]'));
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "open", filePath: "/ws/logs/archive/self/done/old.md" });
+    // 「要対応のみ」と重ねると隠れる（アーカイブは要対応に入らない）
+    page.click(page.one("#attention-filter"));
+    await page.settle();
+    assert.ok(page.one('.card[data-id="old"]').classList.contains("hidden"));
+  } finally {
+    await page.close();
+  }
+  // 読み直しても入ったまま
+  const again = await openBoard(json, { state: { archived: true } });
+  try {
+    assert.equal(again.one<HTMLInputElement>("#archived-filter").checked, true);
+    assert.ok(!again.one('.card[data-id="old"]').classList.contains("hidden"));
+  } finally {
+    await again.close();
+  }
+});
+
+test("CB-D145 退避のチケットしか無いボードで表示を入れても、「チケットなし」も案内の見本も出さない", async () => {
+  const archived = {
+    ticket: "old",
+    parent: "",
+    phase: null,
+    title: "退避した親",
+    project: "",
+    path: "/ws/logs/archive/self/done/old.md",
+    approved_at: "",
+    started_at: "",
+    completed_at: "",
+    cancelled_at: "",
+    cancel_reason: "",
+    history: [],
+  };
+  const page = await openBoard({ ...fixture(), tickets: [], parents: [], pending_approval: [], archived: [archived] }, { state: { archived: true } });
+  try {
+    assert.equal(page.all(".board-empty").length, 0);
+    assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
+    await page.send({ type: "tour" });
+    await page.settle();
+    assert.equal(page.all(".tour-sample").length, 0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-D146 アーカイブの表示を入れると、親の絞り込みに退避した親も出る。選んでいた親が退避されても、入れていれば外さない", async () => {
+  const archived = {
+    ticket: "old",
+    parent: "",
+    phase: null,
+    title: "退避した親",
+    project: "",
+    path: "/ws/logs/archive/self/done/old.md",
+    approved_at: "",
+    started_at: "",
+    completed_at: "",
+    cancelled_at: "",
+    cancel_reason: "",
+    history: [],
+  };
+  const json = { ...fixture(), archived: [archived] };
+  const off = await openBoard(json, { state: { parent: "old" } });
+  try {
+    const options = off.all<Element>("#parent-filter option").map((o) => o.getAttribute("value"));
+    assert.ok(!options.includes("old"));
+    assert.equal(off.one<HTMLInputElement>("#parent-filter").value, "*");
+  } finally {
+    await off.close();
+  }
+  const on = await openBoard(json, { state: { parent: "old", archived: true } });
+  try {
+    const options = on.all<Element>("#parent-filter option").map((o) => o.getAttribute("value"));
+    assert.ok(options.includes("old"));
+    assert.equal(on.one<HTMLInputElement>("#parent-filter").value, "old");
+    assert.ok(!on.one('.card[data-id="old"]').classList.contains("hidden"));
+    assert.ok(on.one('.card[data-id="i0001"]').classList.contains("hidden"));
+    assert.equal((on.state() as { parent: string }).parent, "old");
+  } finally {
+    await on.close();
+  }
+});

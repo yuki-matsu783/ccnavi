@@ -34,6 +34,10 @@ export interface Moved {
 export function placementOf(board: Board): Placement {
   const placement: Record<string, ProposalState> = {};
   for (const column of board.columns) {
+    // アーカイブ（手元の退避）は置き場ではない。完了からアーカイブへ移ったカードを「動いた」と数えない
+    if (column.state === "archived") {
+      continue;
+    }
     for (const card of column.cards) {
       placement[card.id] = column.state;
     }

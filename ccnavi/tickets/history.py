@@ -74,6 +74,8 @@ KIND_FINISHED = "finished"  # doing → review か done
 KIND_CANCELLED = "cancelled"  # doing → done（取り消しの欄）
 KIND_SETTLED = "settled"  # review → done（ユーザのレビューが済んだ）
 KIND_WITHDRAWN = "withdrawn"  # doing → todo（着手前の新規の承認を Chrome から取り下げた）
+# done → archive（ready が閉じた親子のチケットを手元の logs/archive/ へ退避した。履歴も一緒に移る）
+KIND_ARCHIVED = "archived"
 # マーカー。親の履歴に残す。`from` / `to` は null で、`phase` と `mark` を持つ。
 # フェーズのマーカーを置いた（pending / requested / reviewed / skipped）
 KIND_PHASE_MARK = "phase-mark"
