@@ -15,6 +15,15 @@ Write / Edit / NotebookEdit を止め、パスの出るシェルからの書き�
 副命令の書き込みとして外す（`post._script_writes`）。だからユーザが保存したフローが
 エージェントの範囲外の変更として咎められることもない。
 
+## 下書き
+
+エージェントは、頼まれたときに子のフローの下書きを提案の置き場の `flows/<子>.yml`
+（既定 `wip/proposals/flows/<子>.yml`）に書ける。置くツリーはフローと同じ。提案の置き場は
+範囲の外なので、判定も組み込みの保護も変えずに書ける。下書きには効力が無い。`SubagentStart` の案内
+（`briefing`）も着手の指紋（`fingerprint`）も読まず、承認の指紋にも入らない。ユーザがボードの
+フロー編集画面で差分を読んで取り込み、`flows/<子>.yml`（承認済みの領域）に保存したものだけが効く。
+ここが持つのは置き場のパス（`draft_rel`）と、ボードへ渡す有無（`info` の `draft`）だけ。
+
 ## 形
 
 YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー編集画面が書き、ここが読む。
@@ -205,17 +214,22 @@ def _is_absolute(rel: str) -> bool:
     return os.path.isabs(rel) or rel.startswith("/") or rel[1:3] == ":/"
 
 
+def _place_rel(raw: str) -> str:
+    """置き場のパスを整える（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。"""
+    raw = raw.replace("\\", "/")
+    if _is_absolute(raw):
+        return posixpath.normpath(raw).rstrip("/") or "/"
+    norm = posixpath.normpath(raw).strip("/")
+    return raw.strip("/") if norm in ("", ".") else norm
+
+
 def approved_rel(conf: settings.Settings) -> str:
     """承認済みチケットの置き場のパス（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。
 
     `./`・`//`・`x/..` は整える（L-b）。整えないと、判定が整えたパスに当てたときに
     置き場のパスと食い違い、ロックが外れる。
     """
-    raw = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/")
-    if _is_absolute(raw):
-        return posixpath.normpath(raw).rstrip("/") or "/"
-    norm = posixpath.normpath(raw).strip("/")
-    return raw.strip("/") if norm in ("", ".") else norm
+    return _place_rel(conf.approved or settings.DEFAULT_APPROVED)
 
 
 def flow_rel(conf: settings.Settings, ticket_id: str) -> str:
@@ -228,6 +242,23 @@ def flow_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
     return os.path.normpath(
         os.path.join(settings.approved_dir(conf, tree_root), FLOWS_DIR, f"{ticket_id}{SUFFIX}")
     )
+
+
+def draft_rel(conf: settings.Settings, ticket_id: str) -> str:
+    """子のフローの下書きの置き場。提案の置き場の `flows/<子>.yml`。
+
+    承認済みの領域で `flows/` が `doing/` `done/` と並ぶのに揃え、提案の置き場でも
+    `todo/` `review/` と並べる。提案の置き場は丸ごとチケットの範囲の外で、`flows/` は守る状態の
+    置き場でも走査の対象でもないので、エージェントは判定を変えずに書ける。下書きに効力は無い
+    （`briefing` も着手の指紋も読まない）。効くのはユーザが取り込んで `flow_rel` に保存した
+    ものだけ。
+    """
+    return f"{_place_rel(conf.tickets or settings.DEFAULT_TICKETS)}/{FLOWS_DIR}/{ticket_id}{SUFFIX}"
+
+
+def draft_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
+    """このツリーでの子のフローの下書きの絶対パス。"""
+    return os.path.normpath(os.path.join(tree_root, *draft_rel(conf, ticket_id).split("/")))
 
 
 def linked(tree_root: str, path: str) -> bool:
@@ -275,12 +306,17 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
 
     `tree` はファイルを持つツリーのルート。ボードはそこからファイルまでの途中にリンクが
     あれば書かない。`linked` はその途中にリンクがあるか（在るときだけ見る）。
+
+    `draft` はエージェントが書く下書きの `{path, rel, exists, linked}`。置くツリーは
+    フローと同じ（`tree`）。ボードはパスを組まずにここを読む。下書きの中身はここでも読まない。
     """
     if not child.is_child:
         return None
     path, base, exists = resolve(conf, root, child)
     if not exists and child.state in (ticket_mod.DONE, ticket_mod.CANCELLED):
         return None
+    draft = draft_file(conf, base, child.ticket)
+    draft_exists = os.path.lexists(draft)
     return {
         "path": path,
         "rel": flow_rel(conf, child.ticket),
@@ -288,6 +324,12 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
         "exists": exists,
         "linked": exists and linked(base, path),
         "locked": child.in_progress and child.state == ticket_mod.DOING,
+        "draft": {
+            "path": draft,
+            "rel": draft_rel(conf, child.ticket),
+            "exists": draft_exists,
+            "linked": draft_exists and linked(base, draft),
+        },
     }
 
 

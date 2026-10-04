@@ -20,6 +20,9 @@
  * その先に書きうる。差し替えられるのは承認済みの領域を書ける者（ユーザ）だけで、エージェントの書き込みは判定が
  * 止める。`rename` の直前にもう一度確かめて、隙間を狭めてある。
  *
+ * 取り込んだ下書きを消すのもここ（`removeDraftFile`）。保存が成功したあと、取り込んだときと同じ中身の
+ * ときだけ、読むときと同じ保護をかけて消す。
+ *
  * VS Code の API は使わない（単体テストで確かめる）。
  */
 import * as crypto from "node:crypto";
@@ -271,4 +274,91 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
 
 function hardLinkedError(file: string, what: string): string {
   return `${file} はハードリンク（ほかのパスからも同じ中身を開ける）のため、${what}。承認済みの領域の外のパスから書き換えられる可能性があります。リンクを外してから開き直してください`;
+}
+
+// ---- 取り込んだ下書きを消す
+
+export type DraftRemoveResult =
+  | { readonly ok: true; readonly removed: boolean }
+  | { readonly ok: false; readonly error: string };
+
+/**
+ * 取り込んだ下書きを消す。呼ぶのは、取り込んだ内容の保存が成功したあとだけ。
+ *
+ * 消すのは、いまの中身の指紋（sha256 の 16 進）が取り込んだときの `hash` と同じときだけ。違えば（取り込んだあとに
+ * エージェントが書き直した）消さずにそう言う。ユーザが読んでいない新しい案を消さないため。読むときと同じ保護をかけ、
+ * リンク（ファイルそのものか、ツリーのルートからの途中）・ハードリンク・ふつうのファイルでないものは消さない。
+ * もう無ければ何もしない（`removed: false`）。
+ */
+export function removeDraftFile(tree: string, file: string, hash: string): DraftRemoveResult {
+  let read: { readonly bytes: Uint8Array; readonly mtimeMs: number } | undefined;
+  try {
+    // ツリーの外・リンク・ハードリンク・ふつうのファイルでないものは、ここで断られる
+    read = readFlowFile(tree, file);
+  } catch (error) {
+    return { ok: false, error: `下書きは消しません: ${(error as Error).message}` };
+  }
+  if (read === undefined) {
+    return { ok: true, removed: false };
+  }
+  if (crypto.createHash("sha256").update(read.bytes).digest("hex") !== hash) {
+    return { ok: false, error: "下書きは、取り込んだあとに書き直されているため消しません。新しい案は「提案あり」から確かめてください" };
+  }
+  const linked = linkedSegment(tree, file);
+  if (linked !== undefined) {
+    return { ok: false, error: `下書きは消しません: ${linked} がシンボリックリンクです` };
+  }
+  // 確かめてから消すまでの間に書き直されると、新しい案を消してしまう。先に同じディレクトリの別の名前へ移し
+  // （ほかの書き手はもう触れない）、移したものを確かめ直してから消す。違えば元の名前へ戻す
+  const aside = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.removing`);
+  try {
+    fs.renameSync(file, aside);
+  } catch (error) {
+    if (code(error) === "ENOENT") {
+      return { ok: true, removed: false };
+    }
+    return { ok: false, error: `下書きを消せません: ${(error as Error).message}` };
+  }
+  let again: string;
+  try {
+    // 移したものもリンク・ハードリンク・ふつうのファイルでないものなら消さない（移す直前に差し替えられた）
+    const moved = readFlowFile(tree, aside);
+    again = moved === undefined ? "" : crypto.createHash("sha256").update(moved.bytes).digest("hex");
+  } catch {
+    again = "";
+  }
+  if (again !== hash) {
+    return { ok: false, error: putBack(aside, file, "下書きは、取り込んだあとに書き直されているため消しません。新しい案は「提案あり」から確かめてください") };
+  }
+  try {
+    fs.unlinkSync(aside);
+  } catch (error) {
+    return { ok: false, error: putBack(aside, file, `下書きを消せません: ${(error as Error).message}`) };
+  }
+  return { ok: true, removed: true };
+}
+
+/**
+ * 移した下書きを元の名前へ戻す。元の名前に新しいファイルが在れば上書きしない（`link` は在れば失敗する。Windows の NTFS でも
+ * 使える）。戻せなければ、移した先の名前を言う
+ */
+function putBack(aside: string, file: string, why: string): string {
+  try {
+    fs.linkSync(aside, file);
+    fs.unlinkSync(aside);
+    return why;
+  } catch (error) {
+    if (code(error) !== "EEXIST") {
+      try {
+        // ハードリンクを作れないファイルシステム。元の名前がまだ無いときだけ名前を戻す
+        if (!fs.existsSync(file)) {
+          fs.renameSync(aside, file);
+          return why;
+        }
+      } catch {
+        // 下で移した先を言う
+      }
+    }
+    return `${why}（移した下書きは ${aside} に残っています）`;
+  }
 }

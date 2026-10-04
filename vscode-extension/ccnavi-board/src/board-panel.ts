@@ -28,6 +28,7 @@ import {
 import type { BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
 import { renderBoardPage } from "./core/render.js";
 import { showLoading } from "./loading.js";
+import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
@@ -495,14 +496,10 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       runInTerminal(root, pushApprovedCommand(root));
       return;
     case "copy":
-      await vscode.env.clipboard.writeText(effect.prompt);
-      vscode.window.setStatusBarMessage(`${effect.what}をコピーしました。Claude Code に貼って送ってください`, 5000);
+      await copyPrompt(effect.prompt, effect.what);
       return;
     case "openSession":
-      // 走っているセッションに送る公開の API は無いので、文を埋めて新しいセッションを開く（送信はユーザが Enter）
-      await vscode.env.openExternal(
-        vscode.Uri.parse(`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(effect.prompt)}`),
-      );
+      await openPromptInSession(effect.prompt);
       return;
     case "loadDecide": {
       const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase);

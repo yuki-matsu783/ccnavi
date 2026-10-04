@@ -14,6 +14,8 @@
    ノードでの動き方を渡す。フローが壊れていても残りの文は渡す
 7. `--explain --json` の子に `flow` の欄が出る（ボードが読む）。閉じた子でフローが無ければ出さない
 8. 入れ子のサブエージェントが差し戻しを無視して終わったら、`systemMessage` にも載せる
+9. エージェントの下書き（`wip/proposals/flows/<子>.yml`）は書ける。効力は無く、
+   SubagentStart も着手の指紋も読まない。置き場と有無は `flow.draft` に出る
 """
 
 from __future__ import annotations
@@ -545,6 +547,37 @@ class FlowInfoTest(unittest.TestCase):
         self.assertTrue(shown["exists"])
         self.assertFalse(shown["locked"])
 
+    def test_the_draft_sits_in_the_same_tree_under_the_proposal_place(self):
+        """下書きの置き場は提案の置き場の `flows/<子>.yml`。置くツリーはフローと同じ。"""
+        shown = flow.info(self.conf, self.root, self.child(ticket.TODO))
+        draft = shown["draft"]
+        self.assertEqual(draft["rel"], f"wip/proposals/flows/{CHILD}.yml")
+        self.assertEqual(
+            os.path.realpath(draft["path"]),
+            os.path.realpath(os.path.join(self.root, "wip", "proposals", "flows", f"{CHILD}.yml")),
+        )
+        self.assertFalse(draft["exists"])
+        self.assertFalse(draft["linked"])
+        write(draft["path"], WORKFLOW_YAML)
+        draft = flow.info(self.conf, self.root, self.child(ticket.TODO))["draft"]
+        self.assertTrue(draft["exists"])
+        self.assertFalse(draft["linked"])
+        # プロジェクトの子は、そのプロジェクトのツリーの提案の置き場（フローと同じツリー）。
+        project = os.path.join(self.root, "projects", "web")
+        child = self.child(ticket.DOING)
+        child.tree_root = project
+        shown = flow.info(self.conf, self.root, child)
+        self.assertEqual(os.path.realpath(shown["tree"]), os.path.realpath(project))
+        self.assertEqual(
+            os.path.realpath(shown["draft"]["path"]),
+            os.path.realpath(os.path.join(project, "wip", "proposals", "flows", f"{CHILD}.yml")),
+        )
+        self.assertEqual(shown["draft"]["rel"], f"wip/proposals/flows/{CHILD}.yml")
+        # 提案の置き場を変えれば下書きの置き場も付いて動く。
+        conf = conf_with()
+        conf.tickets = "./work/props/"
+        self.assertEqual(flow.draft_rel(conf, CHILD), f"work/props/flows/{CHILD}.yml")
+
 
 class FlowHarness(PhaseHarness):
     """親 1 本（research）と、フローを持つ子 1 本。親の範囲に承認済みの領域は入らない。
@@ -872,6 +905,137 @@ class NestedBounceTest(PhaseHarness):
         out = json.loads(self.ccnavi("--mode", "enable", stdin=json.dumps(payload)).stdout)
         self.assertIn("差し戻されたまま", out["hookSpecificOutput"]["additionalContext"])
         self.assertNotIn("systemMessage", out)
+
+
+class FlowDraftTest(FlowHarness):
+    """エージェントの下書き。書けるが効力は無い。判定と組み込みの保護は今までどおり。"""
+
+    def draft_in(self, tree_root, name=CHILD):
+        return os.path.join(tree_root, "wip", "proposals", "flows", f"{name}.yml")
+
+    def decision(self, result):
+        if not result.stdout.strip():
+            return ""
+        return json.loads(result.stdout).get("hookSpecificOutput", {}).get("permissionDecision", "")
+
+    def test_agent_may_write_the_draft_but_not_the_flow(self):
+        for tool in ("Write", "Edit"):
+            for agent_id in ("", "sub-1"):
+                with self.subTest(tool=tool, agent_id=agent_id):
+                    draft = self.draft_in(self.parent_tree)
+                    result = self.write_to(draft, tool=tool, agent_id=agent_id, guard="enable")
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertNotEqual(self.decision(result), "deny", result.stdout)
+                    self.assertNotIn("builtin-guard", result.stdout)
+        # シェルから書いても止めない。
+        rel = f"wip/proposals/flows/{CHILD}.yml"
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"command": f"cp /tmp/x {rel}"},
+        }
+        result = self.ccnavi(
+            "--guard-core-files", "enable", "--mode", "enable", stdin=json.dumps(payload)
+        )
+        self.assertNotEqual(self.decision(result), "deny", result.stdout)
+        # 効力のあるフローは今までどおり止まる。
+        result = self.write_to(self.flow_path, guard="enable")
+        self.assertEqual(self.decision(result), "deny", result.stdout)
+        self.assertIn("builtin-guard-project-home", self.reason(result))
+
+    def test_the_draft_can_be_written_while_the_child_is_in_progress(self):
+        """着手中のロックが止めるのはフローだけ。下書きは止めない（取り込みはボードが止める）。"""
+        self.run_child(CHILD)
+        self.assert_locked(self.write_to(self.flow_path))
+        self.assert_not_locked(self.write_to(self.draft_in(self.parent_tree)))
+        self.assertNotEqual(self.decision(self.write_to(self.draft_in(self.parent_tree))), "deny")
+
+    def test_the_draft_is_not_part_of_the_post_check(self):
+        """下書きは範囲の外の変更として咎めない（提案の置き場は丸ごとチケットの範囲の外）。"""
+        write(self.draft_in(self.parent_tree), WORKFLOW_YAML)
+        ok = write(os.path.join(self.parent_tree, "wip", "a.md"), "a\n")
+        result = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok, content="a")
+        said = result.stdout + result.stderr
+        self.assertNotIn("POST_TICKET_SCOPE", said)
+        self.assertNotIn("POST_VIOLATION", said)
+
+    def test_subagent_start_does_not_read_the_draft(self):
+        os.remove(self.flow_path)
+        write(self.draft_in(self.parent_tree), WORKFLOW_YAML)
+        self.commit_parent("draft only")
+        child_tree = self.run_child(CHILD)
+        write(self.draft_in(child_tree), WORKFLOW_YAML)
+        text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
+        self.assertIn(CHILD, text)
+        self.assertNotIn("フロー", text)
+        self.assertNotIn("方針", text)
+        self.assertNotIn("proposals/flows", text.replace("\\", "/"))
+
+    def test_the_start_digest_does_not_read_the_draft(self):
+        """着手の指紋は下書きを読まない。着手のあとに下書きを書いても知らせない。"""
+        write(self.draft_in(self.parent_tree), "nodes: []\n")
+        self.commit_parent("draft")
+        child_tree = self.run_child(CHILD)
+        record = os.path.join(self.approved, "phases", "i0001", f"{CHILD}.flow.json")
+        with open(record, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["fingerprint"], flow.fingerprint(self.flow_path))
+        self.assertEqual(data["path"], f".ccnavi/approved/flows/{CHILD}.yml")
+        write(self.draft_in(self.parent_tree), WORKFLOW_YAML)
+        start = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
+        stop = self.hook("SubagentStop", "", child_tree, agent_id="sub-1")
+        for result in (start, stop):
+            self.assertNotIn(flow.CODE_CHANGED, result.stdout)
+            self.assertNotIn("systemMessage", result.stdout)
+
+    def test_the_board_gets_the_draft_place_and_whether_it_exists(self):
+        shown = self.board_flow(CHILD)["draft"]
+        self.assertEqual(shown["rel"], f"wip/proposals/flows/{CHILD}.yml")
+        self.assertEqual(
+            os.path.realpath(shown["path"]), os.path.realpath(self.draft_in(self.parent_tree))
+        )
+        self.assertFalse(shown["exists"])
+        self.assertFalse(shown["linked"])
+        write(self.draft_in(self.parent_tree), WORKFLOW_YAML)
+        shown = self.board_flow(CHILD)["draft"]
+        self.assertTrue(shown["exists"])
+        self.assertFalse(shown["linked"])
+        # 下書きは走査されず、チケットとして読まれない。
+        result = self.ccnavi("--explain", "--json")
+        ids = sorted(t["ticket"] for t in json.loads(result.stdout)["tickets"])
+        self.assertEqual(ids, ["i0001", CHILD])
+        lint = self.ccnavi("--lint")
+        errors = [x for x in lint.stdout.splitlines() if x.startswith("error:")]
+        self.assertFalse([x for x in errors if "proposals/flows" in x.replace("\\", "/")], errors)
+
+    def test_the_draft_is_not_in_the_approval_digest(self):
+        """承認の指紋（`--agree --preview --json` の digest）に下書きは入らない。"""
+        other = "i0001-02"
+        self.propose(other, child_text(other, "i0001", 1, ("wip/research/*",)))
+        self.commit_parent("another child")
+        before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
+        self.assertTrue(before)
+        write(self.draft_in(self.parent_tree, other), WORKFLOW_YAML)
+        write(self.draft_in(self.parent_tree), WORKFLOW_YAML)
+        after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
+        self.assertEqual(before, after)
+        # 承認の前の子にも、提案のツリーの置き場で欄が出る
+        shown = self.board_flow(other)["draft"]
+        self.assertTrue(shown["exists"])
+        self.assertEqual(
+            os.path.realpath(shown["path"]),
+            os.path.realpath(self.draft_in(self.parent_tree, other)),
+        )
+
+    def test_a_linked_draft_is_named(self):
+        real = write(os.path.join(self.parent_tree, "wip", "draft-real.yml"), WORKFLOW_YAML)
+        os.makedirs(os.path.dirname(self.draft_in(self.parent_tree)), exist_ok=True)
+        os.symlink(real, self.draft_in(self.parent_tree))
+        shown = self.board_flow(CHILD)["draft"]
+        self.assertTrue(shown["exists"])
+        self.assertTrue(shown["linked"])
 
 
 if __name__ == "__main__":

@@ -1047,7 +1047,12 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     )
 
 
-def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
+def scan(
+    root: str,
+    tickets_rel: str,
+    projects_dir: str = "",
+    approved: list[Ticket] | None = None,
+) -> tuple[list[Ticket], list[Problem]]:
     """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場をつける。
 
     集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
@@ -1056,9 +1061,14 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
     プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 11.5、REQ-MLT-14）。
     ワークスペースの `wip/<名前>/proposals/` は読まない。
     同じ識別子が複数のツリーにあれば、本物とするツリーの側だけを残す。
+
+    `approved` は、まとめる前の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。
+    渡せば、承認済みの識別子の提案は、承認済みチケットで決めた本物とするツリーの側だけを残す
+    （`dedupe`）。組むのは `approval.scan_proposals`（承認済みチケットはそちらが読む）。
+    渡さないと、本物とするツリーの外に残った古い提案も残る。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
-    return dedupe(found), problems
+    return dedupe(found, approved), problems
 
 
 def scan_all(
@@ -1132,7 +1142,7 @@ def scan_all(
     return found, problems
 
 
-def fold(hits: list[Ticket]) -> list[Ticket]:
+def fold(hits: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticket]:
     """同じ識別子のチケットを、本物とするツリーの側にまとめる。
 
     子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
@@ -1156,17 +1166,56 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
     リポジトリをまたいだ衝突はまとめない。識別子はユーザが選ぶ短い連番なので、プロジェクトが
     独立に振ればぶつかる（設計 11）。それは同じチケットではなく違うチケットなので、どちらかを本物と
     すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
+
+    `approved` は同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。
+    在れば、本物とするツリーは**承認済みチケットだけで**同じ順・同じ条件で決め
+    （`authority`。承認済みチケットの側の `approval._authoritative` と同じ関数）、そのツリーに
+    在る提案だけを残す。そこに提案が無ければ何も残らない。承認で本物とするツリーの `todo/` が
+    消えたあと、承認の前に切ったワークツリーに残った `todo/` の提案を承認待ちや改版と読まない
+    ため。提案だけで本物とする側を決めると、承認済みチケットが元ツリーにしか無いのに親の名前の
+    ワークツリーに古い `todo/` が残る形で、古い側が本物になる。改版は本物とするツリーの `todo/` に
+    置くので、改版は残る。
+
+    **`approved` を渡さないと、承認済みの識別子でも提案だけでまとめる。** 本物とするツリーの
+    外に残った古い提案が残るので、承認待ち・改版・ボードの提案の欄を決める呼び手は
+    `approval.scan_proposals` を通す。
     """
-    if len({t.project for t in hits}) > 1:
+    if approved and len({t.project for t in [*approved, *hits]}) > 1:
         return hits
-    home = hits[0].parent or hits[0].ticket
-    at_home = [t for t in hits if t.tree == home]
-    if at_home:
-        return at_home
-    at_origin = [t for t in hits if t.tree == origin_tree(t)]
-    if not at_origin or behind(at_origin, hits):
+    if not approved:
+        if len({t.project for t in hits}) > 1:
+            return hits
+        home = hits[0].parent or hits[0].ticket
+        at_home = [t for t in hits if t.tree == home]
+        if at_home:
+            return at_home
+        at_origin = [t for t in hits if t.tree == origin_tree(t)]
+        if not at_origin or behind(at_origin, hits):
+            return hits
+        return at_origin
+    where = authority(approved)
+    if where is None:
         return hits
-    return at_origin
+    return [t for t in hits if t.tree == where]
+
+
+def authority(copies: list[Ticket]) -> str | None:
+    """同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）から、本物とするツリーの名前を決める。
+
+    親のツリー（親自身なら自分のツリー）→ 元ツリー（先へ進んだチケットが無いときだけ）の順。
+    決まらないとき（どちらにも無い、元ツリーより先のチケットがある、リポジトリをまたぐ）は None。
+    承認済みチケット（`approval._authoritative`）と、承認済みの識別子の提案（`fold`）が
+    この 1 つの関数で決める。
+    """
+    if not copies or len({t.project for t in copies}) > 1:
+        return None
+    for t in copies:
+        if t.tree == (t.parent or t.ticket):
+            return t.tree
+    at_origin = [t for t in copies if t.tree == origin_tree(t)]
+    if not at_origin or behind(at_origin, copies):
+        return None
+    return origin_tree(at_origin[0])
 
 
 def origin_tree(t: Ticket) -> str:
@@ -1233,11 +1282,18 @@ def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
     return grouped
 
 
-def dedupe(found: list[Ticket]) -> list[Ticket]:
-    """同じ識別子が複数のツリーにあるとき、本物とするツリーの側だけを残す。"""
+def dedupe(found: list[Ticket], approved: list[Ticket] | None = None) -> list[Ticket]:
+    """同じ識別子が複数のツリーにあるとき、本物とするツリーの側だけを残す。
+
+    `approved` は、まとめる前の承認済みチケットの全部。承認済みの識別子は、そのチケットで
+    本物とするツリーを決める（`fold`）。承認済みの無い識別子（新規の提案）は今までどおり。
+    渡さないと、承認済みの識別子でも提案だけでまとめるので、本物とするツリーの外に残った
+    古い提案（承認の前に切ったワークツリーの `todo/` など）が残る。
+    """
+    settled = by_ticket(approved or [])
     kept: list[Ticket] = []
-    for hits in by_ticket(found).values():
-        kept.extend(fold(hits))
+    for ticket_id, hits in by_ticket(found).items():
+        kept.extend(fold(hits, settled.get(ticket_id)))
     return kept
 
 

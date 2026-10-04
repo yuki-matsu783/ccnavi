@@ -47,7 +47,7 @@ KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
 
 # `--test --json` と `--test-samples --json` の形の版。読み手は VS Code 拡張の
-# ルール設定画面。形を変えたら上げる。
+# ルール管理画面。形を変えたら上げる。
 TEST_VERSION = 1
 
 # 見本のパスに書く合言葉。走らせた場所に読み替える。見本を絶対パスで
@@ -240,7 +240,7 @@ def test_json(
     tool: str,
     subject: str,
 ) -> int:
-    """`--test` と同じ判定を JSON で出す。読み手は VS Code 拡張のルール設定画面。"""
+    """`--test` と同じ判定を JSON で出す。読み手は VS Code 拡張のルール管理画面。"""
     body = {"version": TEST_VERSION, "root": root, "rules_path": conf.rules}
     body.update(try_one(stderr, conf, root, tool, subject))
     stdout.write(json.dumps(body, ensure_ascii=True, indent=1))
@@ -731,13 +731,17 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
 
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     problems.extend(str(p) for p in scan_problems)
-    proposals = ticket_mod.dedupe(everything)
+    # 承認済みの識別子の提案は、承認済みチケットと合わせて本物とするツリーを決める
+    # （`approval.scan_proposals` と同じまとめ方）。本物とするツリーの外に残った古い提案を
+    # 承認待ちや作業中として出さないため。
+    settled = approval._everything(conf, root)
+    proposals = ticket_mod.dedupe(everything, settled)
     # 複数のツリーにあるチケットの一覧（`seen_in` / `scattered`）は、
     # 承認済みチケットの置き場に在るものも数える。チケットは 1 本のファイルで、
     # どの置き場に在っても子のワークツリーにも入る。
     # `review/` は提案の置き場でもあり承認済みチケットでもあるので、2 つの走査が同じファイルを拾う。
     # 同じ実体を 2 つと数えると「複数の場所にある」になるので、パスでまとめる。
-    everything = _one_per_file(everything + approval._everything(conf, root))
+    everything = _one_per_file(everything + settled)
     open_copies, notes = approval.scan(conf, root)
     problems.extend(notes)
     closed_copies, notes = approval.scan(conf, root, closed=True)
@@ -992,7 +996,8 @@ def _ticket_record(
         "seen_in": seen_in,
         "scattered": scattered,
         # 子のフロー（設計 9.3.1。着手中は書き換えを止める）。
-        # `{path, rel, tree, exists, linked, locked}`。親は null。
+        # `{path, rel, tree, exists, linked, locked, draft}`。draft はエージェントの下書きの
+        # `{path, rel, exists, linked}`（効力は無い）。親は null。
         # locked は判定がそのフローへの書き込みを止めているか（着手中）。読むのは承認済み
         # チケットがあればその側、無ければ提案。
         "flow": flow.info(conf, root, copy if copy is not None else source),

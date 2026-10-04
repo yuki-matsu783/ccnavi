@@ -94,6 +94,9 @@ class Gathered:
     refused: str = ""
     # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを承認の対象にする」）。
     note: str = ""
+    # 本物とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
+    # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文と指紋には入れない）。
+    elsewhere: list[str] = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -125,15 +128,25 @@ def gather(
     `project:` が決める（設計 11.4.1）ので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` に持たせる。画面は候補が持つ種類を使う。
     """
-    proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
+    raw = approval.read_raw(conf, root)
+    proposals, problems, stale = approval.read_proposals(conf, root, raw.everything)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
-    approved, notes = approval.scan(conf, root)
+    approved, notes = approval.scan(conf, root, raw=raw)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review, _ = approval.scan_review(conf, root, raw=raw)
+    # 本物とするツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
+    # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core._say_elsewhere` と
+    # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
+    open_index = approval.by_id(approved)
+    elsewhere = [
+        approval.revision_elsewhere_text(conf, root, t, where)
+        for t, where in stale
+        if approval.revision_elsewhere(t, open_index.get(t.ticket))
+    ]
 
     pending, revisions = waiting(
         proposals, approved, closed, review, types_resolver(conf, root, approved)
@@ -155,7 +168,7 @@ def gather(
             ]
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
-            return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
+            return Gathered([], [], texts, {}, False, broken, "\n".join(lines), elsewhere=elsewhere)
         # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らなければ
         # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
         skipped = {t.ticket for t in revisions if t.ticket not in wanted}
@@ -167,21 +180,21 @@ def gather(
             lines.append("何も承認しない。親の改版も承認の対象に入れてください")
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
-            return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
+            return Gathered([], [], texts, {}, False, broken, "\n".join(lines), elsewhere=elsewhere)
         waiting_count = len(pending) + len(revisions)
         pending = [t for t in pending if t.ticket in wanted]
         revisions = [t for t in revisions if t.ticket in wanted]
         note = f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを承認の対象にする。"
 
     if not pending and not revisions:
-        return Gathered([], [], texts, {}, True, broken, "", note)
+        return Gathered([], [], texts, {}, True, broken, "", note, elsewhere=elsewhere)
 
     batch, rejected, pool = candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
             stderr.write(f"  {p}\n")
-    return Gathered(batch, rejected, texts, pool, False, broken, "", note)
+    return Gathered(batch, rejected, texts, pool, False, broken, "", note, elsewhere=elsewhere)
 
 
 def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
@@ -226,12 +239,17 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     unreadable = _unreadable(gathered)
     if gathered.refused:
         return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
+    elsewhere = _elsewhere(gathered)
     if gathered.nothing_pending:
-        text = (
-            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
-            "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
+        text = f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
+        # 場所違いの改版を名指ししたときは「同じ名前で置いても承認待ちにならない」を言わない。
+        # 改版そのものができないと読めるため（書く場所は上の段が言う）。
+        text += (
+            "。\n"
+            if elsewhere
+            else "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
         )
-        return Verdict(False, VERIFY_NOTHING, head + text + unreadable)
+        return Verdict(False, VERIFY_NOTHING, head + elsewhere + text + unreadable)
 
     lines = [head]
     if gathered.note:
@@ -252,6 +270,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         lines.append(f"  {name.ljust(width)}  {mark}\n")
         lines += [_note_line(note) for note in notes]
 
+    lines.append(elsewhere)
     lines.append(unreadable)
 
     if gathered.rejected:
@@ -265,6 +284,15 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。ユーザに承認を依頼してよい。\n"
     lines.append(tail)
     return Verdict(reason == VERIFY_OK, reason, "".join(lines))
+
+
+def _elsewhere(gathered: Gathered) -> str:
+    """本物とするツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。"""
+    if not gathered.elsewhere:
+        return ""
+    lines = ["\n承認待ちに入らない改版がある（本物とするツリーの外）。\n"]
+    lines += [_note_line(line) for line in gathered.elsewhere]
+    return "".join(lines)
 
 
 def _unreadable(gathered: Gathered) -> str:
@@ -1119,7 +1147,7 @@ def waiting(
         and not t.is_child
         and t.has_plan
         and (
-            _plan_differs(t, open_index[t.ticket])
+            approval.plan_differs(t, open_index[t.ticket])
             or _workflow_differs(t, open_index[t.ticket], types_for)
         )
     ]
@@ -1144,10 +1172,6 @@ def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod
         return cache[name]
 
     return types_for
-
-
-def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:
-    return proposal.plan != current.plan or proposal.feedback != current.feedback
 
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:

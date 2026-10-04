@@ -1,5 +1,5 @@
 /**
- * ルール設定画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
+ * ルール管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
  *
  * 判定は実行ファイルの仕事なので、その結果（`judged` / `sampled`）は拡張ホストから届いたものとして送る。
  */
@@ -505,7 +505,7 @@ test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名�
   }
 });
 
-test("CB-T112 ルール設定画面は注意を上部に出し、無ければ出さない", async () => {
+test("CB-T112 ルール管理画面は注意を上部に出し、無ければ出さない", async () => {
   const dom = await openRules({ rulesPath: "projects/lib/.ccnavi/config/rules.yml", notices: ["実行ファイルはこのファイルを読めない: <理由>"] });
   try {
     const warned = dom.all(".banner.warn:not(.hidden)").map((banner) => banner.textContent ?? "");
@@ -598,7 +598,7 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D101 ルール設定の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは state に書かない", async () => {
+test("CB-D101 ルール管理の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは state に書かない", async () => {
   const dom = await openRules({}, { tab: "hooks" });
   try {
     assert.ok(dom.one("#tab-hooks").classList.contains("active"));

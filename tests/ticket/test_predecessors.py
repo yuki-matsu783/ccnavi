@@ -193,7 +193,7 @@ class PredecessorTest(TicketTest):
     def test_start_refuses_a_hand_moved_child_whose_predecessor_is_open(self):
         """置き場を手で動かして承認した子は承認の検査を通らない。着手が同じ検査で止める。
 
-        承認の権威は置き場なので、`doing/` へ手で動かしただけでも承認済みになる。
+        承認で本物とするのは置き場なので、`doing/` へ手で動かしただけでも承認済みになる。
         """
         self.family(review=(False, False))
         self.propose(

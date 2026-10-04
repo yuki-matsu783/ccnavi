@@ -1,0 +1,35 @@
+/*
+ * エージェントの提案の差分と、依頼の文（`Proposal.tsx`）。幕と 1 枚は `SaveReview.css` のものを使う。
+ * 前は消える側（削除の色）、後は入る側（追加の色）で、文はそのまま折り返して見せる。
+ */
+.review.proposal { width: min(820px, 100%); }
+.proposal-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.proposal-change { margin: 0 0 10px; }
+.proposal-head { font-size: .95em; overflow-wrap: anywhere; }
+.proposal-kind { font-weight: 600; color: var(--vscode-descriptionForeground); }
+.proposal-texts { margin: 4px 0 0 12px; font-size: .9em; }
+.proposal-field { margin: 0 0 6px; }
+.proposal-field dt { color: var(--vscode-descriptionForeground); }
+.proposal-field dd { margin: 2px 0 0; padding: 2px 6px; border-left: 3px solid transparent; }
+.proposal-field pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--vscode-editor-font-family); }
+.proposal-before {
+  border-left-color: var(--vscode-diffEditor-removedTextBorder, var(--vscode-editorError-foreground)) !important;
+  background: var(--vscode-diffEditor-removedTextBackground, color-mix(in srgb, var(--vscode-editorError-foreground) 12%, transparent));
+}
+.proposal-before::before { content: "前"; float: right; font-size: .8em; color: var(--vscode-descriptionForeground); }
+.proposal-after {
+  border-left-color: var(--vscode-diffEditor-insertedTextBorder, var(--vscode-gitDecoration-addedResourceForeground)) !important;
+  background: var(--vscode-diffEditor-insertedTextBackground, color-mix(in srgb, var(--vscode-gitDecoration-addedResourceForeground) 12%, transparent));
+}
+.proposal-after::before { content: "後"; float: right; font-size: .8em; color: var(--vscode-descriptionForeground); }
+.proposal-error, .proposal-locked { color: var(--error-text, var(--vscode-errorForeground)); overflow-wrap: anywhere; }
+.proposal-dirty { color: var(--warn-text, var(--vscode-editorWarning-foreground)); }
+.request-prompt {
+  margin: 8px 0 0; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9em;
+  background: var(--vscode-textCodeBlock-background, transparent);
+  border: 1px solid var(--vscode-panel-border);
+}
+.proposal-value-kind {
+  float: left; margin-right: 6px; padding: 0 4px; border-radius: 3px; font-size: .8em;
+  color: var(--vscode-badge-foreground); background: var(--vscode-badge-background);
+}

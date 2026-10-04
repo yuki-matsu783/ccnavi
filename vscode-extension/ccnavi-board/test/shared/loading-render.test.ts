@@ -11,14 +11,14 @@ import { renderRiskPage } from "../../src/core/risk-render.js";
 import { renderRulesPage } from "../../src/core/rules-render.js";
 
 test("CB-T200 読み込み中の 1 枚はスクリプトを持たず、名前を逃がして出し、見た目のクラスと画面の CSS を持つ", () => {
-  const html = renderLoadingPage("ccnavi ルール設定: <a&b>", "<a&b> のルール", { nonce: "N1", style: ".empty { color: red; }", appearance: "claude-dark" });
+  const html = renderLoadingPage("ccnavi ルール管理: <a&b>", "<a&b> のルール", { nonce: "N1", style: ".empty { color: red; }", appearance: "claude-dark" });
   // スクリプトは走らせない。CSP も script を通さない（`ready` を送らないので、段取りは「入れ物をまだ入れていない」状態のまま）
   assert.doesNotMatch(html, /<script/);
   assert.doesNotMatch(html, /script-src/);
   assert.match(html, /default-src 'none'/);
   assert.match(html, /<style nonce="N1">\n\.empty \{ color: red; \}\n<\/style>/);
   assert.match(html, /<body class="ccnavi-claude-dark">/);
-  assert.match(html, /<title>ccnavi ルール設定: &lt;a&amp;b&gt;<\/title>/);
+  assert.match(html, /<title>ccnavi ルール管理: &lt;a&amp;b&gt;<\/title>/);
   assert.match(html, /<p class="empty" id="ccnavi-loading">&lt;a&amp;b&gt; のルールを読み込み中…<\/p>/);
   // 見た目を渡さなければ VS Code のテーマに従う
   assert.match(renderLoadingPage("x", "x", { nonce: "N2", style: "" }), /<body>/);

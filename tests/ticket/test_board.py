@@ -170,6 +170,71 @@ class BoardTest(PhaseHarness):
             len({(s["tree"], s["state"]) for s in waiting["seen_in"]}), len(waiting["seen_in"])
         )
 
+    def test_a_stale_todo_copy_left_in_a_worktree_is_not_waiting_after_approval(self):
+        """場面 A。承認の前に切ったワークツリーの `todo/` の提案は、承認のあとは提案に出さない。
+
+        親のツリーで承認すると、親のツリーの `todo/` は消えて承認済みチケットになる。切った
+        ワークツリーには `todo/` が残る。提案だけでまとめると、本物とするツリーに提案が無いので
+        残りの古い提案が提案に見え、ボードで「未着手」に戻る。
+        """
+        self.scene()
+        self.assertEqual(self.approve().returncode, 0)
+        stale = os.path.join(
+            self.root, ".claude", "worktrees", "i0001-02", "wip", "proposals", "todo"
+        )
+        self.assertTrue(os.path.isfile(os.path.join(stale, "i0001-03.md")))
+
+        board = self.board()
+        by_id = {t["ticket"]: t for t in board["tickets"]}
+        self.assertIsNone(by_id["i0001-03"]["proposal"])
+        self.assertEqual(by_id["i0001-03"]["copy"]["status"], "open")
+        self.assertEqual(by_id["i0001-03"]["scattered"], [])
+        self.assertEqual(board["pending_approval"], [])
+        # ワークツリーにあること自体は seen_in に残る。
+        self.assertIn(
+            ("i0001-02", "todo"), {(s["tree"], s["state"]) for s in by_id["i0001-03"]["seen_in"]}
+        )
+
+        # 計画の同じ古い提案は `--lint` も言わない（承認の前に切ったワークツリーに残る普通の形）。
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotIn("i0001-02/wip/proposals/todo/i0001-03.md", lint.stdout)
+
+    def test_a_stale_review_copy_left_in_a_worktree_is_not_in_progress_after_closing(self):
+        """場面 B。`review/` の古いチケットが残ったワークツリーがあっても、閉じたものは
+        閉じたまま。"""
+        self.scene()
+        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.commit_parent()
+        self.worktree("i0001-09", "i0001")  # review/i0001-02 を持ったまま切る
+        # 親のツリーで閉じる（レビューを終えて done/ へ）。
+        self.move_to_done("i0001-02")
+
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertIsNone(by_id["i0001-02"]["proposal"])
+        self.assertEqual(by_id["i0001-02"]["copy"]["status"], "closed")
+
+        # review/ の古いチケットは `--lint` も言わない（ボードと承認待ちからは外す）。
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotIn("i0001-09/wip/proposals/review/i0001-02.md", lint.stdout)
+
+    def test_a_review_copy_in_a_worktree_matching_the_home_tree_is_not_named(self):
+        """本物とするツリーと同じ置き場のチケットは、子のワークツリーに入っているだけ。名指ししない。"""
+        self.scene()
+        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.commit_parent()
+        self.worktree("i0001-09", "i0001")
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(by_id["i0001-02"]["copy"]["status"], "review")
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotIn("i0001-09/wip/proposals/review/i0001-02.md", lint.stdout)
+
+    def move_to_done(self, ticket_id):
+        source = os.path.join(self.parent_tree, "wip", "proposals", "review", ticket_id + ".md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        os.remove(source)
+        write(os.path.join(self.approved, "done", ticket_id + ".md"), text)
+
     def test_pending_approval_lists_proposals_without_a_copy(self):
         self.scene()
         self.assertEqual(self.board()["pending_approval"], ["i0001-03"])

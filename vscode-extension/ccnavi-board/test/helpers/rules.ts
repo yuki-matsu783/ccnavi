@@ -1,5 +1,5 @@
 /**
- * ルール設定画面（React）を happy-dom で動かす。`test/helpers/risk.ts` と同じ役割。
+ * ルール管理画面（React）を happy-dom で動かす。`test/helpers/risk.ts` と同じ役割。
  *
  * 画面はバンドルした 1 本（`out/webview/rules.js`）で、拡張はそれを `<script nonce>` に流し込む。
  * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
