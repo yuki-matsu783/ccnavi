@@ -57,6 +57,7 @@ from ..tickets import (
     configsync,
     flow,
     history,
+    ops,
     phase,
     phasetypes,
     review,
@@ -530,6 +531,9 @@ def _copy_problems(
       承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
     - 再開（`done/` から `doing/` へ手で戻す）で残った閉じるときの欄は warn。ユーザの再開を
       止めないため、判定も止めない
+    - 着手済みのチケットで、状態の履歴に着手の行が無いことと、基準点（`base_sha`）がワークツリーの
+      HEAD の祖先でないことは warn。提案の段階で書かれた着手の欄かもしれないが、履歴は ccnavi の外で
+      動かした分を持たず、判定は git を読まないので止めない
     """
     problems: list[Problem] = []
     pool = dict(index)
@@ -552,6 +556,10 @@ def _copy_problems(
         unrecorded = _start_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
+        off = ops.base_off_head(root, conf, t) if t.started_at else ""
+        if off:
+            # 判定には入れない（判定は git を読まない）。`start` は着手の前に同じ形で止める。
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {off}"))
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
