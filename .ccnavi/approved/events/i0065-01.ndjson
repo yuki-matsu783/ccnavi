@@ -1,2 +1,0 @@
-{"at": "2026-10-04T02:45:19Z", "ticket": "i0065-01", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "528988f2153b24116860196c122930699f039761"}
-{"at": "2026-10-04T07:06:17Z", "ticket": "i0065-01", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
