@@ -64,7 +64,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 承認の検査（親子・計画・`project:` と置き場・先行）は今までどおり承認のときに当て、判定の側でも当てる | — | 変えない。やめるのは書き足しだけ |
 | 提案（`todo/`）に、スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`: `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason`）の空でない値があれば、`--agree` と `--lint` で error にする。判定では提案に当てない | 今のまま見ない。判定でも当てる | 承認が中身を変えないので、提案に書いた値がそのまま承認済みチケットの値になる。下の `review/` の必須欄と、閉じた親の照合は、これらの欄がスクリプトだけが書いたものであることを前提にする。今はどこも見ていない（`SCRIPT_FIELDS` の値を検査する経路は無い）。判定で承認済みチケットに同じ検査を当てると、着手済みの `doing/` が全部止まる |
 | 承認済みチケットには、中身だけで分かる欄の組み合わせの矛盾を検査する。`started_at` が無いのに `base_sha` がある `doing/` は `blocked` にする（判定で止める）。`doing/` に `completed_at`・`cancelled_at`・`cancel_reason` の値があるものは、`--lint` と status で warn にとどめ、判定では止めない | `doing/` の `completed_at` などを `blocked` にする | `start` は `started_at` と `base_sha` を一緒に書くので、前者だけが無い形は道具を通らない。`finish` は `doing/` から `review/` か `done/` へ、`cancel` は `done/` へ動かすので、道具を通る限り `doing/` に `completed_at` や `cancelled_at` は残らない。ただしユーザが `done/` から `doing/` へ手で戻す再開（状態の履歴の注記と `--lint` の案内が認めている運び）では欄が残ったまま `doing/` に来る。止めると、ユーザの再開がどこにも書けなくなる |
-| 手で動かした承認に仕込まれた `started_at` / `base_sha` は、中身だけでは道具が書いたものと見分けられない。`start`・status・`--lint` で「チケットのワークツリーがあり、`base_sha` がその HEAD の祖先か」と「状態の履歴に `started` の行があるか」を確かめる。前者が満たされなければ `start` は止まり、status はその理由（`base_sha` がワークツリーの HEAD の祖先でない）を出す。`--lint` は着手済みの `doing/` で前者が満たされなければ warn にする。後者だけが欠ければ warn にする。判定には入れない | 判定でも確かめる | 判定は履歴も git も読まない取り決め（ADR-0086、下の「判定の拒否文」の行）。履歴は ccnavi の外で動かした分を持たないので、無いことだけでは止められない |
+| 手で動かした承認に仕込まれた `started_at` / `base_sha` は、中身だけでは道具が書いたものと見分けられない。status と `--lint` で「チケットのワークツリーがあり、`base_sha` がその HEAD の祖先か」と「状態の履歴に `started` の行があるか」を確かめ、どちらも warn にする（status は「注意」で出す）。`start` では止めない。判定には入れない | 判定でも確かめる。`start` で止める（一度は採ったが、下の「ユーザが決めたこと」の 5 で改めた） | 判定は履歴も git も読まない取り決め（ADR-0086、下の「判定の拒否文」の行）。履歴は ccnavi の外で動かした分を持たないので、無いことだけでは止められない。`start` で止めても効かない。`started_at` と `base_sha` を両方仕込めば `start` は「着手済み」で先に返って検査に届かず、`base_sha` だけなら判定が `blocked` で既に止め、`start` は通れば基準点を HEAD で書き直す |
 | 承認で `project:` を書き足さない。承認済みチケットのプロジェクトは置き場（ツリー）から決まる | 書き足し続ける | 読む側は既に置き場で決めている（`scan_all`）。`ticket.py` の注記（1136 行付近）は「親が閉じたとき judge が子の `project` を見る」と書くので、実装の前に、その経路が欄ではなくツリーから決まることを確かめる |
 | 改版の `revised_at` / `feedback_at` は書かない。改版の時刻は状態の履歴の `revised`（`feedback: true` を含む）に残る | `ccnavi_approved` に書き続ける | 改版は計画を書き換えるので中身が変わるのは避けられないが、時刻まで中身に書く理由は無い。読んでいたのは承認の知らせの版（外す）と取り下げの検査（中身の一致に代える）だけ |
 | 続きの子の目印 `followup_of` は、`ccnavi_approved` の外のトップレベルの欄として、ccnavi が `doing/` に直に書くときに書く | 目印を持たせない | 続きの子は提案を経ずに ccnavi が新しく作るチケットで、作るときに書く欄は「承認で中身を変える」に当たらない。取り下げで理由を名指しするのに使う |
@@ -74,7 +74,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 | 決めたこと | 採らなかった側 | なぜ |
 |---|---|---|
-| `wip/proposals/review/` で必須にする欄を、`ccnavi_approved` から `completed_at`（**値が空でない**）に替える。`review_all` の docstring と `load_copy` の `require_record` の説明も改める。古い形は両方を満たすので読める | 必須をやめる。`finish` が別の目印を書く | `completed_at` は `finish` が書くスクリプトの欄で、`review/` に来るものは必ず持つ。提案に書けば error になる（上）ので、エージェントが `review/` に置いたファイルは読まれない。2 枚目の保護の働きはそのまま残る |
+| `wip/proposals/review/` で必須にする欄を、`ccnavi_approved` から `completed_at`（**値が空でない**）に替える。`review_all` の docstring と `load_copy` の `require_record` の説明も改める。古い形は両方を満たすので読める | 必須をやめる。`finish` が別の目印を書く | `completed_at` は `finish` が書くスクリプトの欄で、`review/` に来るものは必ず持つ。必須の欄が `ccnavi_approved` から `completed_at` に替わるだけで、どちらも組み込みの deny が破れてエージェントが `review/` に書ければ偽れる。2 枚目の保護としての強さは変わらない |
 | 取り下げの戻し先は今までどおり承認済みチケットのツリーの `wip/proposals/todo/<識別子>.md`（プロジェクト向けは `projects/<名前>/` 配下）。欄は読まない | `source_path` を読んで戻す | 戻し先は置き場から決まる。いまのコードも `source_path` を戻し先には使っていない |
 | 取り下げを書く側（`core.withdraw`）は、「`doing/` の中身が、承認コミットの親の提案（`prior_proposals`）とバイト単位で同じ」で通す。比べるのはバイト列で、`fsio.read_text`（改行を揃える）は使わない。親の取り下げでは、加えて、`phases/<親>/workflow.yml` の中身が、承認コミットの親の提案と今の `phases.yml` から `workflow.compute` で計算した待ち方と同じであることを求める。違えば止める。`workflow.yml` が無ければ（手で動かした計画付きの親）、改版は必ず `workflow.yml` を書くので待ち方の改版は起きていないとみなし、待ち方の検査を通す（中身のバイト一致は見る）。通れば `workflow.yml` を一緒に消す。続きの子（`followup_of`）は理由を名指しして止める | 状態の履歴（`revised` / `started`）を読んで決める。`workflow.yml` があれば止める | 一致すれば、改版も着手（`started_at` / `base_sha` を書く）もされていない。手で動かした承認も取り下げられる。履歴を読んで状態の操作を決めると、ADR-0086 の「正は置き場。判定も状態の操作も履歴を読まない」を崩す。待ち方だけの改版は `doing/` を変えない（待ち方は別のファイル）ので、待ち方の中身で見る。「あれば止める」にすると、`--agree` で承認した計画付きの親は必ず `workflow.yml` を持つので、必ず取り下げられなくなる。承認のあとに `phases.yml` が変わっていれば計算が変わって一致せず、止める側に倒れる（取り下げられないだけで、待ち方が勝手に変わることはない） |
 | 取り下げの「`phases/<親>/` にマーカーがある」の検査（`hook/core.py` の `_withdraw_problems`、930〜942 行付近。今はディレクトリが空でなければ止める）から `workflow.yml` を外す | 今のまま | 外さないと、上と同じく計画付きの親が必ず止まる。待ち方は上の行で別に見る |
@@ -139,7 +139,10 @@ sh で止める変更は、この ADR ではしない。
 3. 取り下げの一致の判定は、本物のホストの応答に合わせた見本（`chrome-extension/ccnavi-approval/test/fixtures/host/` の下）で
    テストし、統合先に取り込む前にユーザが本物の Chrome で 1 回試す
 4. 再開で `doing/` に `completed_at`・`cancelled_at`・`cancel_reason` が残った形は、`--lint` と status の warn にとどめ、判定では止めない
-5. `base_sha` がチケットのワークツリーの HEAD の祖先でないとき、`start` は止め、status は理由を出す
+5. `base_sha` がチケットのワークツリーの HEAD の祖先でないとき、`start` は止め、status は理由を出す。
+   **同じ日に改めた**: `start` では止めず、`--lint` と status の warn で知らせる。`started_at` と `base_sha` を両方仕込むと
+   `start` は「着手済み」で先に返り検査に届かない。`base_sha` だけなら判定が `blocked` で既に止める。`start` は通れば
+   `base_sha` を HEAD で書き直す。止めても防げる形が無いため
 
 実装の途中（同じ日）に、次の 3 点を追加で決めた。
 
@@ -211,7 +214,8 @@ sh で止める変更は、この ADR ではしない。
 - 得たもの: 承認済みチケットの状態を、ファイルを読んで推測せずに ccnavi に聞ける
 - 得たもの: 開始時の取り込みで届いた承認を取りこぼす経路（知らせ）が無くなり、状態は聞けば常に今のものが返る
 - 得たもの: 提案にスクリプトの欄を書いた形は `--agree` と `--lint` が、`workflow:` を書いた形は `--agree`・`--lint`・判定が
-  error にする。承認済みチケットでは、`started_at` の無い `base_sha` を判定が止める
+  error にする。承認済みチケットでは、`started_at` の無い `base_sha` を判定が止める。`base_sha` がワークツリーの HEAD の
+  祖先でない着手は、status と `--lint` が warn で知らせる
 - 失ったもの: **作業の途中（`PreToolUse`）にエージェントが自分で承認に気づく経路が無くなる。** ユーザがセッションに何か送るか、
   エージェントが status を打つまで、承認に気づかない
 - 失ったもの: 承認の時刻を引くのに履歴か git を読むことになる。未コミットのうえ履歴も無い承認は時刻が出ない
@@ -224,7 +228,7 @@ sh で止める変更は、この ADR ではしない。
   `--agree` を通らない経路なので提案の検査は当たらず、判定はその値を信じる。`base_sha` は、サブエージェント終了時と
   実行後の範囲外の検査（`phase.scope_findings` の `base_sha..HEAD`）、実績のリスクの基準点（`risk.measure`）、取り込み済みの
   親子の「閉じた」の照合に使われるので、基準点をずらされると、範囲外の書き込みとリスクの数え漏れ、別の親子を閉じたと読む
-  取り違えが起きうる。`start`・status・`--lint` が祖先の関係と履歴で確かめるが、判定は確かめない。手で動かせるのは
+  取り違えが起きうる。status と `--lint` が祖先の関係と履歴で確かめて warn にするが、`start` と判定は止めない。手で動かせるのは
   承認済みの置き場に書ける権限を持つユーザだけなので、仕込めるのもその人か、その人が置いたファイルを書いた者に限られる
 - 失ったもの: 判定の拒否文から承認の時刻が消える
 - 失ったもの: 手で置かれて未コミットの承認は、ユーザが `ccnavi-push-approved.sh` を打つまで子のワークツリーと
