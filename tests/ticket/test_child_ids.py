@@ -90,9 +90,17 @@ class ChildIdFormTest(unittest.TestCase):
         self.assertIn("`i0012-05-<2 桁の連番>`", messages[0])
 
     def test_a_phase_of_three_digits_cannot_be_written(self):
-        t, problems = ticket_mod.parse(child_text("i0012-99-01", "i0012", 100))
-        self.assertIsNone(t)
-        self.assertTrue(any("食い違う" in m for m in errors(problems)), problems)
+        for name in ("i0012-99-01", "i0012-00-01"):
+            with self.subTest(name=name):
+                t, problems = ticket_mod.parse(child_text(name, "i0012", 100))
+                self.assertIsNone(t)
+                messages = errors(problems)
+                self.assertEqual(1, len(messages), problems)
+                self.assertIn("`phase: 100` は子の識別子に書けない", messages[0])
+                # 書けない識別子（`i0012-100-..`）を勧めない
+                self.assertNotIn("i0012-100", messages[0])
+        t, problems = ticket_mod.parse(child_text("i0012-99-01", "i0012", 99))
+        self.assertIsNotNone(t, problems)
 
     def test_the_old_form_is_an_error(self):
         for name in ("i0012-01", "i0012-05", "web-i0012-01"):
@@ -167,6 +175,77 @@ class NextChildIdTest(unittest.TestCase):
         self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
         self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 0), "i0001-00-01")
         self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001-x", 2), "i0001-x-02-08")
+
+    def test_numbers_past_two_digits_are_refused(self):
+        self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)
+        with self.assertRaises(ValueError) as caught:
+            approval.next_child_id(self.conf, self.ws, "i0001", 2)
+        self.assertIn("連番 99 まで埋まっている", str(caught.exception))
+        with self.assertRaises(ValueError):
+            approval.next_child_id(self.conf, self.ws, "i0001", 100)
+        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
+
+
+class FollowupRefusesTest(NextChildIdTest):
+    """続きの子は、組めない識別子や先に在るファイルの上では何も書かずに止まる。"""
+
+    def parent(self):
+        return ticket_mod.Ticket(ticket="i0001", raw={}, body="")
+
+    def snapshot(self):
+        found = {}
+        for current, dirs, names in os.walk(self.ws):
+            dirs[:] = [d for d in dirs if d != ".git"]
+            for name in names:
+                path = os.path.join(current, name)
+                with open(path, "rb") as f:
+                    found[os.path.relpath(path, self.ws)] = f.read()
+        return found
+
+    def followup(self, phase_no):
+        return approval.followup(
+            self.conf, self.ws, self.parent(), phase_no, [], ["指摘"], "2026-10-04T00:00:00Z"
+        )
+
+    def test_a_full_phase_writes_nothing(self):
+        self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)
+        before = self.snapshot()
+        ident, failed = self.followup(2)
+        self.assertEqual(ident, "")
+        self.assertIn("連番 99 まで埋まっている", failed)
+        self.assertEqual(before, self.snapshot())
+
+    def test_a_phase_past_two_digits_writes_nothing(self):
+        before = self.snapshot()
+        ident, failed = self.followup(100)
+        self.assertEqual(ident, "")
+        self.assertIn("フェーズ 100 は子の識別子に書けない", failed)
+        self.assertEqual(before, self.snapshot())
+
+    def test_an_existing_file_is_not_overwritten_even_if_unreadable(self):
+        self.put(".ccnavi/approved/done", "i0001-02-01", "i0001", 2)
+        # 読めないファイル（frontmatter が壊れている）は採番に数えられないが、名前で拾って止まる
+        for where in (".ccnavi/approved/doing", "wip/proposals/review", "wip/proposals/todo"):
+            with self.subTest(where=where):
+                path = os.path.join(self.ws, *where.split("/"), "I0001-02-02.md")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write("壊れた中身\n")
+                before = self.snapshot()
+                ident, failed = self.followup(2)
+                self.assertEqual(ident, "i0001-02-02")
+                self.assertIn("すでに在る", failed)
+                self.assertIn("I0001-02-02.md", failed)
+                self.assertEqual(before, self.snapshot())
+                os.remove(path)
+
+    def test_a_free_number_is_written(self):
+        self.put(".ccnavi/approved/done", "i0001-02-01", "i0001", 2)
+        ident, failed = self.followup(2)
+        self.assertEqual((ident, failed), ("i0001-02-02", ""))
+        self.assertTrue(
+            os.path.exists(os.path.join(self.ws, ".ccnavi", "approved", "doing", ident + ".md"))
+        )
 
 
 if __name__ == "__main__":
