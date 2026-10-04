@@ -310,6 +310,8 @@ def _write_op(op: fsio.Op) -> str:
         return fsio.write_text_atomic(op.path, op.text, op.newline)
     if op.kind == fsio.OP_BYTES:
         return fsio.write_bytes(op.path, op.content or b"")
+    if op.kind == fsio.OP_BYTES_ATOMIC:
+        return fsio.write_bytes_atomic(op.path, op.content or b"")
     if op.kind == fsio.OP_NEW:
         return fsio.write_new(op.path, op.content or b"")
     if op.kind == fsio.OP_REMOVE:
@@ -878,7 +880,7 @@ def withdraw(
             with fsio.policy(
                 on_fail=fsio.FAIL_STOP, ticket=ident, message="書けない ({reason})", prefix=""
             ):
-                fsio.write_bytes(todo, prior_proposals[ident])
+                fsio.write_bytes_atomic(todo, prior_proposals[ident])
                 # 消せなければ戻した提案を消して、両方に残さない（`approval.admit` と同じ）。
                 with fsio.policy(
                     message="承認済みチケットを doing/ から消せない ({reason})", undo=(todo,)

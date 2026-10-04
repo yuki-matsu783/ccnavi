@@ -599,7 +599,7 @@ class WriterFailureTest(CoreHarness):
         todo = os.path.join("todo", "i0001.md")
         for name, when in (
             ("unlink", lambda path: path.endswith(todo)),
-            ("write_bytes", lambda path, data: path.endswith(doing)),
+            ("write_bytes_atomic", lambda path, data: path.endswith(doing)),
         ):
             with self.subTest(name=name):
                 self.propose("i0001", parent_text("i0001", ["research"]))

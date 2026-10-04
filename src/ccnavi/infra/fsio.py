@@ -299,6 +299,90 @@ def write_bytes(path: str, content: bytes) -> str:
     return _recorded(path, _write_with_retry(write))
 
 
+def write_bytes_atomic(path: str, content: bytes) -> str:
+    """中身をそのまま、途中を見せず電源断にも耐える形で書く。書けたら空文字、駄目なら理由。
+
+    承認済みチケット（`doing/<識別子>.md`）と、それと組になる待ち方・戻す提案を書く。
+    `write_bytes` の `open(path, "wb")` は開いた時点で中身を捨てるので、途中で落ちると
+    空か書きかけのチケットが残る。承認済みチケットは判定が範囲を読む元で、承認は提案と
+    バイト単位で同じことが条件なので、壊れたものが残ると取り返しが付かない。
+
+    書き方は `write_text_atomic` と同じく、同じディレクトリの一時ファイルに書き切って
+    `os.replace` で差し替える。違うのは 2 つ。
+
+    - **差し替えの前に一時ファイルを `fsync` し、差し替えの後に親ディレクトリも `fsync` する。**
+      記録と違って取り直せないので、電源断の直後に「差し替わっているが中身が空」を残さない。
+      macOS の `fsync` はディスクの書き込みキャッシュまでは届かないので、`F_FULLFSYNC` が
+      使えればそちらを使う。親ディレクトリの `fsync` は POSIX だけで、開けない（Windows）・
+      できないファイルシステムでは黙って飛ばす。差し替えはもう済んでいるので、ここで落ちたことには
+      しない
+    - **一時ファイルの名前は `.<元の名前>.<一意>.part`。** 先頭の `.` と末尾の `.part` は、
+      落ちて残ったものを `ccnavi-push-approved.sh` がコミットせず、承認済みチケットの読み手
+      （`.md` だけを読む）が拾わないため。元の拡張子で終わらせると、`doing/` の残骸が
+      識別子とファイル名の違うチケットとして読まれる
+
+    中身は変えない（改行も BOM も解釈しない）。権限は `write_text_atomic` と同じく引き継ぐ。
+    """
+    if _STAGE["current"] is not None:
+        return _stage_put(Op(OP_BYTES_ATOMIC, path, bytes(content)))
+    directory = os.path.dirname(path) or "."
+    name = os.path.basename(path)
+
+    def write() -> None:
+        os.makedirs(directory, exist_ok=True)
+        handle, part = tempfile.mkstemp(dir=directory, prefix=f".{name}.", suffix=".part")
+        try:
+            os.chmod(part, _mode_for(path))
+            try:
+                stream = os.fdopen(handle, "wb")
+            except BaseException:
+                os.close(handle)
+                raise
+            with stream as f:
+                f.write(content)
+                f.flush()
+                _sync_file(f.fileno())
+            os.replace(part, path)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.remove(part)
+            raise
+        _sync_directory(directory)
+
+    return _recorded(path, _write_with_retry(write))
+
+
+def _sync_file(fd: int) -> None:
+    """開いたファイルの中身をディスクまで届ける。macOS は `F_FULLFSYNC` を先に試す。"""
+    try:
+        import fcntl  # POSIX だけ。Windows には無い
+    except ImportError:
+        fcntl = None
+    full = getattr(fcntl, "F_FULLFSYNC", None) if fcntl is not None else None
+    if full is not None:
+        try:
+            fcntl.fcntl(fd, full)
+            return
+        except OSError:
+            # 対応しないファイルシステム（ネットワークのものなど）では os.fsync に落とす。
+            pass
+    os.fsync(fd)
+
+
+def _sync_directory(directory: str) -> None:
+    """差し替えた名前をディスクまで届ける（POSIX だけ）。できなければ何もしない。"""
+    try:
+        fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def read_json(path: str) -> tuple[Any, Exception | None]:
     """JSON を読む。読めなければ (None, 例外)。
 
@@ -375,12 +459,15 @@ def remove(path: str) -> None:
 
 
 def put_back(pairs: tuple[tuple[str, bytes | None], ...]) -> None:
-    """パスごとに前の中身へ戻す（中身が None なら消す）。戻せなくても何も出さない。"""
+    """パスごとに前の中身へ戻す（中身が None なら消す）。戻せなくても何も出さない。
+
+    戻すのは承認で書いた待ち方などなので、承認済みチケットと同じ書き方（`write_bytes_atomic`）で戻す。
+    """
     for path, data in pairs:
         if data is None:
             remove(path)
         else:
-            write_bytes(path, data)
+            write_bytes_atomic(path, data)
 
 
 def unlink(path: str) -> str:
@@ -706,6 +793,7 @@ def _recorded(path: str, failed: str) -> str:
 OP_TEXT = "text"  # write_text
 OP_TEXT_ATOMIC = "text-atomic"  # write_text_atomic / write_json_atomic
 OP_BYTES = "bytes"  # write_bytes
+OP_BYTES_ATOMIC = "bytes-atomic"  # write_bytes_atomic
 OP_NEW = "new"  # write_new（在れば書かない）
 OP_REMOVE = "remove"  # remove（無くても消せなくても何も出さない）
 OP_UNLINK = "unlink"  # unlink（消せなければ理由）
