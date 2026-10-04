@@ -167,3 +167,27 @@ test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意の
   // 画面の本文（ccnavi が出したもの）は textContent で入る
   assert.equal(doc.querySelector('[data-family="i0001"] pre')?.children.length, 0);
 });
+
+test("CX-T180 親チケットの branch: で識別子と違う名前のブランチ（/ を含む）を家族にする。同じ家族を名乗るブランチが 2 本なら判定しない（ADR-0100 の 5 章）", async () => {
+  const b = fixture();
+  const files = { ...b.i0001.files };
+  files["wip/proposals/todo/i0001.md"] = files["wip/proposals/todo/i0001.md"].replace("ticket: i0001\n", "ticket: i0001\nbranch: feature/1-login\n");
+  b["feature/1-login"] = { ...b.i0001, files };
+  delete b.i0001;
+  const { board } = await run(b);
+  assert.equal(board.error, "");
+  const f = family(board, "feature/1-login");
+  assert.equal(f?.family.family, "i0001");
+  assert.equal(f?.error, "");
+  assert.equal(f?.result?.ident, "i0001");
+  assert.deepEqual(f?.result?.closure.families, ["feature/1-login", "i0003"]);
+  assert.deepEqual(f?.result?.batch?.map((e) => [e.ticket, e.branch]), [["i0001", "feature/1-login"]]);
+  assert.match(f?.result?.text ?? "", /既存のブランチ feature\/1-login を使う/);
+
+  // 識別子と同じ名前のブランチにも branch: の無い親の提案があれば、同じ家族を名乗るブランチが 2 本
+  const rival = fixture();
+  rival["feature/1-login"] = { ...rival.i0001, files };
+  const two = await run(rival);
+  const g = family(two.board, "feature/1-login");
+  assert.match(g?.error ?? "", /1 本でない/);
+});
