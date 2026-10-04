@@ -8,7 +8,7 @@ VS Code のボード拡張が読む形を、判定と同じ関数で組んでい
 3. 親のフェーズとレビュー待ちが `parents` に出る
 4. チケット制御が disable なら、空のボードと理由を返す
 
-拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/board.json）と
+拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/board.json）と
 同じ形であることも見る。形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを
 走らせ、フィクスチャを書き直す。
 """
@@ -23,7 +23,9 @@ import unittest
 from tests.ticket.test_phases import PhaseHarness, child_text
 from tests.ticket.test_ticket import ROOT, write
 
-FIXTURE = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures", "board.json")
+FIXTURE = os.path.join(
+    ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "board.json"
+)
 
 
 class BoardTest(PhaseHarness):

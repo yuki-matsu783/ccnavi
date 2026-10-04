@@ -212,7 +212,17 @@ class StartTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.chrome = _chrome()
 
-    def start(self, issue, project="", branches=None, taken=(), compat=version.COMPAT, done=()):
+    def start(
+        self,
+        issue,
+        project="",
+        branches=None,
+        taken=(),
+        compat=version.COMPAT,
+        done=(),
+        title="Login form",
+        prefix=None,
+    ):
         integ = {
             ".claude/settings.json": "{}\n",
             COMPAT: f"#!/bin/sh\nCCNAVI_COMPAT={compat}\n",
@@ -231,35 +241,63 @@ class StartTest(unittest.TestCase):
             "op": "start",
             "snapshot": snapshot,
             "issue": issue,
+            "title": title,
             "taken": list(taken),
         }
+        if prefix is not None:
+            request["prefix"] = prefix
         return json.loads(self.chrome.handle(json.dumps(request), os.path.join(self.tmp, "m")))
 
     def test_the_identifier_comes_from_the_issue(self):
+        """`feature-<番号>-<slug>`。slug は issue のタイトルから作る。"""
         self.assertEqual(
             self.start(12),
-            {"identifier": "i0012", "integration": "main", "problems": [], "schema": 1},
+            {
+                "identifier": "feature-12-login-form",
+                "integration": "main",
+                "problems": [],
+                "schema": 1,
+            },
         )
-        self.assertEqual(self.start(12345)["identifier"], "i12345")
+        self.assertEqual(self.start(12345, title="")["identifier"], "feature-12345-issue")
+        self.assertEqual(
+            self.start(64, title="統合先の解決")["identifier"], "feature-64-統合先の解決"
+        )
         body = self.start(12, project="web")
-        self.assertEqual((body["identifier"], body["problems"]), ("web-i0012", []))
+        self.assertEqual((body["identifier"], body["problems"]), ("feature-12-web-login-form", []))
+        body = self.start(7, prefix="hotfix", title="ログイン")
+        self.assertEqual((body["identifier"], body["problems"]), ("hotfix-7-ログイン", []))
+
+    def test_bad_titles_and_prefixes_are_refused(self):
+        self.assertIn("error", self.start(12, title=["x"]))
+        self.assertIn("error", self.start(12, title="x" * 1001))
+        for bad in ("release", "Main", "a-b", 3):
+            with self.subTest(bad=bad):
+                self.assertIn("error", self.start(12, prefix=bad))
+
+    def test_a_hostile_title_becomes_a_safe_name(self):
+        body = self.start(9, title="$(rm -rf /); ../../x `id` \\ \n 'q'")
+        self.assertEqual(body["identifier"], "feature-9-rm-rf-x-id-q")
 
     def test_a_closed_identifier_is_refused(self):
-        body = self.start(55, done=["i0055"])
+        body = self.start(55, done=["feature-55-login-form"])
         self.assertTrue(any("done/ で閉じている" in p for p in body["problems"]), body)
         self.assertIn("フォールバック", body["problems"][-1])
-        body = self.start(55, done=["I0055"])
+        body = self.start(55, done=["Feature-55-Login-Form"])
         self.assertTrue(any("done/ で閉じている" in p for p in body["problems"]), body)
+        # 前の形（i0055）で閉じていても、新しい名前とは重ならない
+        self.assertEqual([], self.start(55, done=["i0055"])["problems"])
 
     def test_an_existing_branch_or_open_family_is_refused(self):
-        body = self.start(12, taken=["I0012"])
+        body = self.start(12, taken=["FEATURE-12-login-form"])
         self.assertTrue(any("同じ名前のブランチ" in p for p in body["problems"]), body)
+        name = "feature-12-login-form"
         other = {
             "topic": {
                 "head": HEAD,
                 "files": {
-                    "wip/proposals/todo/i0012-01-01.md": child_text(
-                        "i0012-01-01", "i0012", 1, ["src/*"]
+                    f"wip/proposals/todo/{name}-01-01.md": child_text(
+                        f"{name}-01-01", name, 1, ["src/*"]
                     )
                 },
             }

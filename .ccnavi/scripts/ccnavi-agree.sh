@@ -18,7 +18,8 @@
 # コミットはパスを限る。`-a` も `add -A` も使わない。親のワークツリーにはユーザや他の
 # セッションの書きかけがあるので、巻き込むと承認のコミットに他人の変更が入る。
 #
-# 統合先が保護されている（main / master / develop / release）ときは push しない。
+# 統合先が保護されている（main / master / develop / release / release/*）か、そのリポジトリの
+# 統合先（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 → origin/HEAD）の上に居るときは push しない。
 # そこへ直接送る判断はユーザのものなので、ブランチ名を出して止める。
 #
 # 終了コード: 0 成功 / 1 承認が通らなかった / 2 引数か環境の誤り
@@ -73,7 +74,7 @@ root=$(ccnavi_workspace) || {
 if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-agree: %s\n' "$skew" >&2
 	set -- "$bin" --root "$root" --agree "$@"
-elif [ -f "$root/ccnavi/__main__.py" ]; then
+elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	set -- uv run python -m ccnavi --root "$root" --agree "$@"
 else
 	printf 'ccnavi-agree: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2

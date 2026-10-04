@@ -28,7 +28,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT
+from tests import ROOT, SRC
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
@@ -228,7 +228,7 @@ class SyncHarness(unittest.TestCase):
     def launcher(self, body=None):
         path = write(
             os.path.join(self._tmp.name, "bin", "ccnavi"),
-            body or f'#!/bin/sh\nPYTHONPATH="{ROOT}" exec "{sys.executable}" -m ccnavi "$@"\n',
+            body or f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n',
         )
         os.chmod(path, 0o755)
         return path
@@ -556,16 +556,88 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
 
-    def test_a_merged_request_waits_instead_of_calling_it_gone(self):
-        # MR がマージ済みと分かれば観測の食い違い。消えたとは言わない。
+    def test_a_merged_request_is_closed_without_a_done_copy(self):
+        # 統合先には閉じたチケットを残さない（ready が退避して消し、squash でマージする）ので、
+        # MR がマージ済みと分かれば閉じた親子のチケット。消えたとは言わない。
         self.review_says("merged 42")
         self.keep_record()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="1")
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def test_a_merged_answer_does_not_wait_for_the_integration(self):
+        # 統合先の done/ を待つ確かめ直しは、マージ済みかの答えが得られないときだけ。
+        self.review_says("merged 42")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        started = time.monotonic()
+        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="2")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def archive_locally(self, text):
+        write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
+
+    def test_a_parent_in_the_local_archive_is_closed_when_merge_is_unknown(self):
+        # マージ済みかを確かめられないときだけ、手元の退避（ready が移した先）の親で補う。
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("logs/archive/self/done/", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def archive_the_parent(self):
+        """ready の後の状態。親チケットをツリーから消して push し、手元の退避に置く。"""
+        rel = f".ccnavi/approved/doing/{PARENT}.md"
+        self.archive_locally(copy_text())
+        git(self.tree, "rm", "-q", "--", rel)
+        git(self.tree, "commit", "-q", "-m", "退避")
+        git(self.tree, "push", "-q", "origin", PARENT)
+
+    def test_a_parent_tree_whose_copy_was_archived_is_still_a_parent_tree(self):
+        self.keep_record()
+        self.archive_the_parent()
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+        listed = self.sync()
+        self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+        self.assertIn(PARENT, listed.stdout)
+
+    def test_the_local_archive_does_not_override_an_unmerged_answer(self):
+        # マージされていないと分かれば、退避があっても閉じたとは読まない。
+        self.review_says("none")
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
+        self.assertEqual("gone", fields(self.record)["state"])
+
+    def test_an_archive_of_another_approval_is_not_this_family(self):
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text(approved_at="2020-01-01T00:00:00+0900"))
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+
+    def test_a_child_in_the_local_archive_is_not_the_parent(self):
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text().replace("ticket: i0001\n", "ticket: i0001\nparent: x\n"))
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
         self.assertEqual("present", fields(self.record)["state"])
 
     def test_branch_names_are_matched_exactly(self):

@@ -12,7 +12,7 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
    書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
 4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
    （新規・マーカーの消去・改版・フィードバック計画・多段の先行と落ちる提案・取り下げ・レビュー済み）。
-   同じ要求と答えを拡張の試験の見本（`chrome-extension/ccnavi-approval/test/fixtures/core-scenarios.json`）
+   同じ要求と答えを拡張の試験の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）
    に置き、拡張の試験が Pyodide でも同じ答えになることを見る
 5. 承認の取り下げの条件
 6. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
@@ -39,7 +39,7 @@ from ccnavi.tickets import approval, history
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 
-CHROME = os.path.join(ROOT, "chrome-extension", "ccnavi-approval")
+CHROME = os.path.join(ROOT, "extensions", "chrome", "ccnavi-approval")
 SCENARIOS = os.path.join(CHROME, "test", "fixtures", "core-scenarios.json")
 STAMP = "2026-09-29T12:00:00+0900"
 PLACES = (".ccnavi", "wip")
@@ -198,7 +198,9 @@ class CoreHarness(PhaseHarness):
         place = chrome._placement(None)
         closure = chrome._closure(snap, place, request["family"])
         shutil.rmtree(os.path.join(self.state, "sync"), ignore_errors=True)
-        for rel, text in chrome.records(snap, place, closure["families"]).items():
+        for rel, text in chrome.records(
+            snap, place, closure["families"], closure["idents"]
+        ).items():
             write(os.path.join(self.state, *rel.split("/")), text)
 
     def ask_chrome(self, request):
@@ -1240,7 +1242,7 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
         for dotted in names:
             package, name = dotted.split(".")
-            path = os.path.join(ROOT, "ccnavi", package, name + ".py")
+            path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")
             with open(path, encoding="utf-8") as f:
                 lines = f.read().splitlines()
             hits = [

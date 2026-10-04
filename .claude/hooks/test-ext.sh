@@ -66,7 +66,7 @@ sort -u "$files" >"$files.sorted" || exit 0
 # （Windows の `C:/Users/First Last/`）が語に割れ、どの語も test-groups.js を持たないので
 # 何も回さずに通ってしまう。同じ理由で、絞り込みは sed の正規表現ではなく case の
 # 文字列比較で行う（パスに `#` や `[` が入ると sed が構文エラーになる）。
-sed -n 's#^\(.*/vscode-extension/ccnavi-board\)/.*#\1#p' "$files.sorted" |
+sed -n 's#^\(.*/extensions/vscode/ccnavi-board\)/.*#\1#p' "$files.sorted" |
 	sort -u >"$files.roots"
 
 failed=""

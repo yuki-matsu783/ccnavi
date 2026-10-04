@@ -897,12 +897,15 @@ class PhaseTest(PhaseHarness):
         # 片付いて push 済み。ready が通り、マーカーと note の下書きができる。
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
-        with open(passed.stdout.strip(), encoding="utf-8") as f:
+        with open(passed.stdout.splitlines()[0], encoding="utf-8") as f:
             note = f.read()
         self.assertIn("ccnavi:ready", note)
         self.assertIn("squash", note)
-        mark = read_json(os.path.join(self.approved, "phases", "i0001", "ready.json"))
+        # マーカーは閉じたチケットと一緒に手元の退避（logs/archive/）へ移る
+        archived = os.path.join(self.root, "logs", "archive", "self")
+        mark = read_json(os.path.join(archived, "phases", "i0001", "ready.json"))
         self.assertEqual(mark["mr"], 7)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "done", "i0001.md")))
         # 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し）。
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)

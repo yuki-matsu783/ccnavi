@@ -1,0 +1,497 @@
+/**
+ * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
+ *
+ * 列は 未着手 / 作業中 / 完了 / 取り消し / アーカイブ。置き場との対応は、未着手 = `wip/proposals/todo/`、
+ * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの属性で言う）、
+ * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの、アーカイブ = 手元の退避
+ * （`logs/archive/`。JSON の `archived` の欄。既定では画面が隠す）。承認済みチケット・マーカー・
+ * レビュー待ち・ワークツリーはカードのバッジで出す。止まっているかや承認待ちの判断はここでやり直さない。JSON が
+ * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
+ */
+import type {
+  ArchivedTicketJson,
+  BoardJson,
+  CopyStatus,
+  FlowJson,
+  HistoryEntryJson,
+  ParentJson,
+  PredecessorUnmetJson,
+  PhaseJson,
+  ProposalState,
+  ProposalJson,
+  SeenInJson,
+  TicketJson,
+} from "./model.js";
+
+export interface ColumnDef {
+  readonly state: ProposalState;
+  readonly label: string;
+}
+
+/** 列の順序。該当が 0 件でも落とさない */
+export const COLUMNS: readonly ColumnDef[] = [
+  { state: "todo", label: "未着手" },
+  { state: "doing", label: "作業中" },
+  { state: "done", label: "完了" },
+  { state: "cancelled", label: "取り消し" },
+  { state: "archived", label: "アーカイブ" },
+];
+
+/**
+ * ユーザが押せる操作。承認と受け入れは実行ファイルかターミナルへ、レビュー済みの連絡は Claude Code に渡す文を組む
+ * （判定は動かさない。`confirm` を打つのはその文を受けたエージェント）。
+ */
+export type Action =
+  | { readonly kind: "approve" }
+  | { readonly kind: "decide"; readonly parent: string; readonly phase: number }
+  | { readonly kind: "reviewed"; readonly parent: string; readonly phase: number };
+
+export interface PhaseChip {
+  readonly parent: string;
+  readonly number: number;
+  readonly label: string;
+  readonly state: PhaseJson["state"];
+  readonly marks: readonly string[];
+  readonly gateClosed: boolean;
+  /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。JSON の `review_waiting` をそのまま持つ */
+  readonly reviewWaiting: boolean;
+  readonly reviewRequired: boolean;
+  /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
+  readonly riskLevel: string;
+  readonly riskLine: string;
+  readonly tickets: readonly string[];
+  /** 依頼のマーカーが持つマージリクエストの URL（依頼の投稿を指す）。無ければ空 */
+  readonly mrUrl: string;
+  /** 依頼のマーカーが持つマージリクエストの番号。無ければ null */
+  readonly mrNumber: number | null;
+  readonly actions: readonly Action[];
+}
+
+export interface Card {
+  readonly id: string;
+  readonly title: string;
+  readonly parent: string;
+  readonly phase: number | null;
+  readonly project: string;
+  readonly isParent: boolean;
+  readonly column: ProposalState;
+  /** 提案の置き場（todo / review）。承認済みチケットの側にあれば null */
+  readonly proposalState: ProposalJson["state"] | null;
+  readonly proposalTree: string;
+  /** 絞り込みの単位。親なら自分、子なら親の識別子 */
+  readonly family: string;
+  /** カードを選んだときに開くファイル。提案があれば提案、無ければ承認済みチケット */
+  readonly openPath: string;
+  readonly copyStatus: CopyStatus;
+  readonly approvedAt: string;
+  readonly reviewRequired: boolean;
+  readonly reviewReason: string;
+  readonly worktreeExists: boolean;
+  readonly worktreePath: string;
+  readonly baseSha: string;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  /** 取り消した時刻。空でなければ取り消しの列 */
+  readonly cancelledAt: string;
+  readonly cancelReason: string;
+  readonly riskLevel: string;
+  readonly riskPoints: number | null;
+  readonly seenIn: readonly SeenInJson[];
+  /** どれが本物か決まらないチケットの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
+  readonly scattered: readonly SeenInJson[];
+  /** 子なら自分のフェーズのマーカー、親なら空 */
+  readonly marks: readonly string[];
+  readonly gateClosed: boolean;
+  /** 子なら自分のフェーズがユーザのレビュー待ちか、親なら false */
+  readonly reviewWaiting: boolean;
+  readonly pendingApproval: boolean;
+  /** 親だけ */
+  readonly stage: string;
+  readonly wrapped: boolean;
+  readonly ready: boolean;
+  readonly phases: readonly PhaseChip[];
+  readonly actions: readonly Action[];
+  /** 読み手が気づくべき食い違い */
+  readonly issues: readonly string[];
+  /**
+   * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。
+   * `copyStatus` は `open` のままなので、列や承認済みのバッジからは分からない。
+   */
+  readonly blocked: string;
+  /** 親だけ。フェーズの依頼のマーカーから引いたマージリクエストの URL（依頼の投稿ではなくマージリクエスト自体）。無ければ空 */
+  readonly mrUrl: string;
+  readonly mrNumber: number | null;
+  /**
+   * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
+   * 親の改版。バッジの「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
+   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらないチケット、不備、
+   * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
+   */
+  readonly attention: boolean;
+  /**
+   * 子のフロー。親は null。在るか・着手中で書けないかは実行ファイルの答えをそのまま持ち、
+   * カードの「フロー」ボタンの言葉だけに使う。ユーザが動く必要（`attention`）には数えない
+   */
+  readonly flow: FlowJson | null;
+  /**
+   * 状態の履歴の新しい側（古い順）。補助の記録で、列やバッジはここから組まない。
+   * カードの折りたためる「履歴」に並べるだけ
+   */
+  readonly history: readonly HistoryEntryJson[];
+  /**
+   * 満たしていない先行。空でなければ、承認も着手も止まる。実行ファイルの答えをそのまま持ち、
+   * カードの「先行待ち」のバッジに使う
+   */
+  readonly predecessorsUnmet: readonly PredecessorUnmetJson[];
+}
+
+export interface BoardColumn extends ColumnDef {
+  readonly cards: readonly Card[];
+  readonly count: number;
+}
+
+/** 親の絞り込みの候補。識別子と題名 */
+export interface ParentOption {
+  readonly id: string;
+  readonly title: string;
+}
+
+export interface Board {
+  readonly columns: readonly BoardColumn[];
+  readonly projects: readonly string[];
+  /** 親の絞り込みの候補。識別子順 */
+  readonly parents: readonly ParentOption[];
+  /** 退避した親（アーカイブの列の親）。アーカイブを表示しているときだけ、親の絞り込みの候補に足す */
+  readonly archivedParents: readonly ParentOption[];
+  readonly problems: readonly string[];
+  readonly pendingApproval: readonly string[];
+  /** 置き場のカードの数（アーカイブは数えない） */
+  readonly totalCount: number;
+  readonly remainingCount: number;
+  readonly issueCount: number;
+  /** アーカイブのカードの数 */
+  readonly archivedCount: number;
+  readonly generatedAt: string;
+  readonly root: string;
+}
+
+const REMAINING: readonly ProposalState[] = ["todo", "doing"];
+
+export function buildBoard(json: BoardJson): Board {
+  const parents = new Map<string, ParentJson>(json.parents.map((p) => [p.ticket, p]));
+  const ids = new Set(json.tickets.map((t) => t.ticket));
+  const pending = new Set(json.pending_approval);
+  const live = json.tickets.map((t) => toCard(t, parents, ids, pending));
+  // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が本物）
+  // 鍵はプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
+  const liveKeys = new Set(json.tickets.map((t) => `${t.project}\u0000${t.ticket}`));
+  const archived = (json.archived ?? []).filter((a) => !liveKeys.has(`${a.project}\u0000${a.ticket}`)).map(toArchivedCard);
+  const cards = [...live, ...archived];
+  cards.sort(compareCards);
+
+  const columns: BoardColumn[] = COLUMNS.map((column) => {
+    const own = cards.filter((card) => card.column === column.state);
+    return { ...column, cards: own, count: own.length };
+  });
+  return {
+    columns,
+    projects: json.projects,
+    parents: cards.filter((card) => card.isParent && card.column !== "archived").map((card) => ({ id: card.id, title: card.title })),
+    archivedParents: cards.filter((card) => card.isParent && card.column === "archived").map((card) => ({ id: card.id, title: card.title })),
+    problems: json.problems,
+    pendingApproval: json.pending_approval,
+    // 集計は置き場のカードだけ。アーカイブは既定で隠すので、数に入れると見えないものを数えることになる
+    totalCount: live.length,
+    remainingCount: live.filter((card) => REMAINING.includes(card.column)).length,
+    issueCount: live.filter((card) => card.issues.length > 0).length,
+    archivedCount: archived.length,
+    generatedAt: json.generated_at,
+    root: json.root,
+  };
+}
+
+/** 親のあとにその子が並ぶ。親の識別子、次に自分の識別子で引く */
+function compareCards(a: Card, b: Card): number {
+  const familyA = a.parent || a.id;
+  const familyB = b.parent || b.id;
+  if (familyA !== familyB) {
+    return familyA < familyB ? -1 : 1;
+  }
+  if (a.isParent !== b.isParent) {
+    return a.isParent ? -1 : 1;
+  }
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function toCard(
+  t: TicketJson,
+  parents: ReadonlyMap<string, ParentJson>,
+  ids: ReadonlySet<string>,
+  pending: ReadonlySet<string>,
+): Card {
+  const issues: string[] = [];
+  // 止まっていることは不備として挙げる。バッジは一目で分かる短い言葉しか出せないので、
+  // 理由の全文はここに置く（`attention` もこれで真になる）。
+  if (t.blocked !== "") {
+    issues.push(`書き込みが止まっています: ${t.blocked}`);
+  }
+  const isParent = t.parent === "";
+  const column = columnOf(t, issues);
+  if (!isParent && !ids.has(t.parent)) {
+    issues.push(`親 ${t.parent} が見つかりません`);
+  }
+
+  const ownParent = parents.get(isParent ? t.ticket : t.parent);
+  const ownPhase =
+    ownParent && t.phase !== null
+      ? ownParent.phases.find((p) => p.number === t.phase)
+      : undefined;
+  const marks = ownPhase ? Object.keys(ownPhase.marks).sort() : [];
+  const phases = isParent && ownParent ? ownParent.phases.map((p) => toChip(ownParent, p)) : [];
+  const mr = isParent ? mrOf(phases) : { url: "", number: null };
+
+  const actions: Action[] = [];
+  if (pending.has(t.ticket)) {
+    actions.push({ kind: "approve" });
+  }
+  const wrapped = ownParent?.close_early !== null && ownParent?.close_early !== undefined;
+  const riskLevel = typeof t.risk?.level === "string" ? t.risk.level : "";
+  const gateClosed = !isParent && (ownPhase?.gate_closed ?? false);
+  const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
+  const attention =
+    pending.has(t.ticket) ||
+    gateClosed ||
+    (!t.worktree.exists && (column === "todo" || column === "doing")) ||
+    reviewWaiting ||
+    isHighRisk(riskLevel) ||
+    t.scattered.length > 0 ||
+    issues.length > 0 ||
+    phases.some((p) => p.gateClosed || p.reviewWaiting || isHighRisk(p.riskLevel));
+
+  return {
+    id: t.ticket,
+    title: t.title,
+    parent: t.parent,
+    phase: t.phase,
+    project: t.project,
+    isParent,
+    column,
+    proposalState: t.proposal?.state ?? null,
+    proposalTree: t.proposal?.tree ?? "",
+    family: isParent ? t.ticket : t.parent,
+    openPath: t.proposal?.path || t.copy.path || "",
+    copyStatus: t.copy.status,
+    approvedAt: t.copy.approved_at ?? "",
+    reviewRequired: t.human_review.required,
+    reviewReason: t.human_review.reason,
+    worktreeExists: t.worktree.exists,
+    worktreePath: t.worktree.path,
+    baseSha: t.base_sha,
+    startedAt: t.started_at,
+    completedAt: t.completed_at,
+    cancelledAt: t.cancelled_at,
+    cancelReason: t.cancel_reason,
+    riskLevel,
+    riskPoints: typeof t.risk?.points === "number" ? t.risk.points : null,
+    seenIn: t.seen_in,
+    scattered: t.scattered,
+    marks: isParent ? [] : marks,
+    gateClosed,
+    reviewWaiting,
+    pendingApproval: pending.has(t.ticket),
+    stage: ownParent && isParent ? ownParent.stage : "",
+    wrapped: isParent && wrapped,
+    ready: isParent && ownParent?.ready !== null && ownParent?.ready !== undefined,
+    phases,
+    actions,
+    issues,
+    blocked: t.blocked,
+    mrUrl: mr.url,
+    mrNumber: mr.number,
+    attention,
+    flow: isParent ? null : flowOf(t.flow, column),
+    history: t.history,
+    predecessorsUnmet: t.predecessors_unmet,
+  };
+}
+
+/**
+ * 手元の退避にある閉じたチケットのカード。表示するだけで、操作も要対応も持たない。
+ * 選ぶと退避したファイルを開く（`isKnownPath` は列のカードの `openPath` を見るので、そのまま開ける）
+ */
+function toArchivedCard(a: ArchivedTicketJson): Card {
+  const isParent = a.parent === "";
+  return {
+    id: a.ticket,
+    title: a.title,
+    parent: a.parent,
+    phase: a.phase,
+    project: a.project,
+    isParent,
+    column: "archived",
+    proposalState: null,
+    proposalTree: "",
+    family: isParent ? a.ticket : a.parent,
+    openPath: a.path,
+    copyStatus: "archived",
+    approvedAt: a.approved_at,
+    reviewRequired: false,
+    reviewReason: "",
+    worktreeExists: false,
+    worktreePath: "",
+    baseSha: "",
+    startedAt: a.started_at,
+    completedAt: a.completed_at,
+    cancelledAt: a.cancelled_at,
+    cancelReason: a.cancel_reason,
+    riskLevel: "",
+    riskPoints: null,
+    seenIn: [],
+    scattered: [],
+    marks: [],
+    gateClosed: false,
+    reviewWaiting: false,
+    pendingApproval: false,
+    stage: "",
+    wrapped: false,
+    ready: false,
+    phases: [],
+    actions: [],
+    issues: [],
+    blocked: "",
+    mrUrl: "",
+    mrNumber: null,
+    attention: false,
+    flow: null,
+    history: a.history,
+    predecessorsUnmet: [],
+  };
+}
+
+/**
+ * カードに載せる子のフロー。閉じた子（完了・取り消し）でファイルが無ければ null（作る先が無いので「作成」を出さない）。
+ * 実行ファイルもこの子には `flow` を null で返すが、古い実行ファイルの答えでもボタンを出さないための念押し。
+ * ファイルが在れば閉じた子でも残す（中身を見られる）
+ */
+function flowOf(flow: FlowJson | null, column: ProposalState): FlowJson | null {
+  if (flow === null) {
+    return null;
+  }
+  return (column === "done" || column === "cancelled") && !flow.exists ? null : flow;
+}
+
+function isHighRisk(level: string): boolean {
+  return level === "HIGH" || level === "CRITICAL";
+}
+
+/**
+ * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
+ * 断片を落としてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
+ * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうを採る）。
+ */
+function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | null } {
+  for (let i = phases.length - 1; i >= 0; i -= 1) {
+    const p = phases[i];
+    if (p.mrUrl !== "") {
+      return { url: p.mrUrl.replace(/#.*$/, ""), number: p.mrNumber };
+    }
+  }
+  return { url: "", number: null };
+}
+
+/**
+ * 列は置き場から引く。提案の側にあれば `todo/` は未着手、`review/` は作業中（レビュー待ちは属性で言う）。
+ * 無ければ承認済みチケットから。閉じた承認済みチケット（`done/`）は取り消しの時刻があれば cancelled、無ければ done。
+ * 開いている承認済みチケット（`doing/`）は doing。どちらにも無いのは食い違いなので、todo に置いたうえで不備として言う。
+ */
+function columnOf(t: TicketJson, issues: string[]): ProposalState {
+  if (t.proposal !== null) {
+    return t.proposal.state === "review" ? "doing" : "todo";
+  }
+  if (t.copy.status === "closed") {
+    return t.cancelled_at !== "" ? "cancelled" : "done";
+  }
+  if (t.copy.status === "open") {
+    return "doing";
+  }
+  issues.push("提案が見つかりません（承認済みチケットだけがあります）");
+  return "todo";
+}
+
+function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
+  const marks = Object.keys(p.marks).sort();
+  const actions: Action[] = [];
+  // 残った指摘を決められるのは、ユーザのレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
+  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済み」・「対応方針を決める」の操作はみな
+  // それを読み、止まっているかとマーカーからここで組み直さない。
+  if (p.review_waiting) {
+    actions.push({ kind: "decide", parent: parent.ticket, phase: p.number });
+    actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
+  }
+  // 依頼のマーカー `{head, mr, url, host, since}`（設計 9.10）。URL は依頼の投稿を指す。中身を解釈せずそのまま渡すだけ。
+  // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
+  const requested = p.marks.requested ?? {};
+  return {
+    parent: parent.ticket,
+    number: p.number,
+    label: p.label,
+    state: p.state,
+    marks,
+    gateClosed: p.gate_closed,
+    reviewWaiting: p.review_waiting,
+    reviewRequired: p.review_required,
+    riskLevel: typeof p.risk?.level === "string" ? p.risk.level : "",
+    riskLine: p.risk_line,
+    tickets: p.tickets,
+    mrUrl: typeof requested.url === "string" ? requested.url : "",
+    mrNumber: typeof requested.mr === "number" ? requested.mr : null,
+    actions,
+  };
+}
+
+/** Webview から届いたパスが、いま表示しているカードのどれかのものであるときだけ true */
+export function isKnownPath(board: Board, filePath: string): boolean {
+  if (filePath === "") {
+    return false;
+  }
+  return board.columns.some((column) =>
+    column.cards.some(
+      (card) => card.openPath === filePath || card.seenIn.some((s) => s.path === filePath),
+    ),
+  );
+}
+
+/** 親の識別子から、その親のワークツリーのパス。承認の sh はそこで打つ */
+export function parentTreeOf(board: Board, parent: string): string | undefined {
+  const card = parentCardOf(board, parent);
+  return card !== undefined && card.worktreeExists ? card.worktreePath : undefined;
+}
+
+/** 親の識別子から、その親のカード。無ければ undefined */
+export function parentCardOf(board: Board, parent: string): Card | undefined {
+  for (const column of board.columns) {
+    for (const card of column.cards) {
+      if (card.id === parent && card.isParent) {
+        return card;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** 子の識別子から、フローを持つ子のカード。親・無い識別子・フローの欄が無い子は undefined */
+export function flowCardOf(board: Board, ticket: string): Card | undefined {
+  for (const column of board.columns) {
+    for (const card of column.cards) {
+      if (card.id === ticket && !card.isParent && card.flow !== null) {
+        return card;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */
+export function phaseChipOf(board: Board, parent: string, phase: number): PhaseChip | undefined {
+  return parentCardOf(board, parent)?.phases.find((p) => p.number === phase);
+}

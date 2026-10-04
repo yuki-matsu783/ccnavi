@@ -20,7 +20,7 @@
 # bin_dir は `..` を含むまま使い、正規化しない。`${here%/*}` で切る形は here が `.` や
 # 1 段の名前のときに正しいパスにならない。シンボリックリンクは解かない。
 #
-# 語は ccnavi/infra/platformtag.py と scripts/ccnavi-setup.sh の host_target と揃える。
+# 語は src/ccnavi/infra/platformtag.py と scripts/ccnavi-setup.sh の host_target と揃える。
 #
 # 見つからなければ 127 で終わる。実行ファイルそのものが無いときにシェルが返すのと
 # 同じ値で、hook からは「起動できなかった」として扱われる。

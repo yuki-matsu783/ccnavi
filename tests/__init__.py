@@ -3,12 +3,19 @@
 import atexit as _atexit
 import os
 import shutil as _shutil
+import sys as _sys
 import tempfile as _tempfile
-
-from ccnavi.infra import settings as _settings
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# ccnavi パッケージの置き場（src レイアウト）。パッケージとして入れていない Python で回しても
+# このツリーのソースを読むよう、先頭に足す。子プロセスで `-m ccnavi` を起こすときは
+# PYTHONPATH に渡す。
+SRC = os.path.join(ROOT, "src")
+if SRC not in _sys.path:
+    _sys.path.insert(0, SRC)
+
+from ccnavi.infra import settings as _settings  # noqa: E402
 
 # 共通層の 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
@@ -68,7 +75,7 @@ def _block_host_git_config() -> dict[str, str]:
 #
 # ここで `os.environ` に入れるのは、テストが git を起こす経路が 1 つではないため。
 # 各テストの `git()` ヘルパ（13 か所ある）だけでなく、検査対象の sh
-# （`ccnavi-git.sh` など）も、ccnavi 自身（`ccnavi/infra/gitcmd.py`）も git を起こす。
+# （`ccnavi-git.sh` など）も、ccnavi 自身（`src/ccnavi/infra/gitcmd.py`）も git を起こす。
 # 引数に `-c` を足す形では、自分が直に起こす分しか防げない。
 GIT_ENV = _block_host_git_config()
 os.environ.update(GIT_ENV)

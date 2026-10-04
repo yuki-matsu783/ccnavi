@@ -429,6 +429,50 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("deny", result.stdout)
 
+    def test_sed_の書き換えの表記は止まる(self):
+        # 緩めたのは語の途中の `-i` だけ。独立したオプションの `-i` は今までどおり止める。
+        rules = self.rules_in_shell()
+        for opt in [
+            "-i",
+            "-i.bak",
+            "-i''",
+            "-iE",
+            "-Ei",
+            "-ni",
+            "--in-place",
+            "--in-place=.bak",
+            "--in",
+            "--i",
+            "--in-pl=.bak",
+            "'-i'",
+            '"-i"',
+        ]:
+            for command in [
+                f"sed {opt} s/a/b/ {rules}",
+                f"sed -e s/a/b/ {opt} {rules}",
+                f"sed {opt} -e s/a/b/ {rules}",
+            ]:
+                with self.subTest(command=command):
+                    result = self.run_hook("PreToolUse", command=command)
+
+                    self.assertIn("deny", result.stdout)
+                    self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_sed_で読むだけなら語の途中の_i_があっても通る(self):
+        # `feature-id` のようなワークツリー名や式の中の `-i` は、オプションではない。
+        rules = self.rules_in_shell()
+        for command in [
+            f"sed -n 1,20p {rules}",
+            "sed -n 1,20p /x/.claude/worktrees/feature-id/.ccnavi/common/rules.yml",
+            "sed -n 1,20p /x/.claude/worktrees/feature-12-improve/.ccnavi/common/rules.yml",
+            f"sed -E -e s/a-i/b/ {rules}",
+            f"sed -ne 's/a-i/b/p' {rules}",
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
     def test_disable_なら止める側も足さない(self):
         result = self.run_hook(
             "PreToolUse", setting="disable", command="echo x > .ccnavi/common/rules.yml"
@@ -438,7 +482,18 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_記録と_state_の置き場もシェルからの書き込みで止まる(self):
         # 記録と state は判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
-        for command in ("rm logs/decisions.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
+        # 閉じたチケットの退避（logs/archive）も、閉じた記録として判定が読むので同じく守る。
+        for command in (
+            "rm logs/decisions.jsonl",
+            "rm -rf logs/state",
+            "mv logs/state /tmp/x",
+            "rm -rf logs/archive",
+            "cp /tmp/x.md logs/archive/self/done/i0001.md",
+            # 退避の置き場を丸ごと別のもので置き換える形
+            "cp -r /tmp/archive logs/",
+            "mv /tmp/x/archive logs/",
+            "cp -t logs /tmp/archive",
+        ):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
@@ -465,6 +520,7 @@ class SelfGuardTest(unittest.TestCase):
                 os.path.join(self.repo, "logs", "decisions.jsonl"),
                 os.path.join(self.repo, "logs", "decisions.20260927-120000.jsonl"),
                 os.path.join(self.repo, "Logs", "State", "x.json"),
+                os.path.join(self.repo, "logs", "archive", "self", "done", "i0001.md"),
                 # 置き場を動かしてある（--state / --log）。
                 os.path.join(self.state, "denied-x.json"),
                 self.log,
@@ -481,6 +537,7 @@ class SelfGuardTest(unittest.TestCase):
             os.path.join(self.repo, "logs", "git-20260913-000000-1.log"),
             os.path.join(self.repo, "logs", "notes.md"),
             os.path.join(self.repo, "logstate", "x.json"),
+            os.path.join(self.repo, "logs", "archived-notes.md"),
             os.path.join(self.repo, "src", "logs", "catalog.jsonl"),
             os.path.join(self.repo, "state-notes", "x.md"),
         ):

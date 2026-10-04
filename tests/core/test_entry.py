@@ -14,7 +14,7 @@ import subprocess
 import sys
 import unittest
 
-from tests import ROOT, fixture_workspace
+from tests import ROOT, SRC, fixture_workspace
 
 
 def spawn(*args, payload=""):
@@ -26,6 +26,7 @@ def spawn(*args, payload=""):
     # 親から Python の入出力の指定は渡さない。
     environment.pop("PYTHONIOENCODING", None)
     environment.pop("PYTHONUTF8", None)
+    environment["PYTHONPATH"] = SRC
     return subprocess.run(
         [sys.executable, "-m", "ccnavi", "--root", fixture_workspace(), "--log", "", *args],
         input=payload.encode("utf-8"),

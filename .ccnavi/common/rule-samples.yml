@@ -22,7 +22,7 @@ deny:
     subject: "/repo/README.md"
     why: main の作業ツリーでは編集しない。作業はワークツリーの中で
   - tool: Edit
-    subject: "/repo/ccnavi/cli.py"
+    subject: "/repo/src/ccnavi/cli.py"
     why: 同上。ソースも main では触らない
   - tool: Write
     subject: "/repo/.gitignore"
@@ -226,6 +226,9 @@ ask:
     subject: "sed -n 1,20p /repo/.ccnavi/common/rules.yml"
     why: ガードの設定でも、-i が無ければ書き換えない。deny には当たらない
   - tool: Bash
+    subject: "sed -n 1,20p /repo/.claude/worktrees/feature-id/.ccnavi/common/rules.yml"
+    why: パスの途中に -i があるだけの読み。独立したオプションの -i ではないので deny に当たらない
+  - tool: Bash
     subject: "uv run python -m unittest discover -s tests -t ."
     why: 検査コマンド。どのルールも言及しない
   - tool: Bash
@@ -258,7 +261,7 @@ allow:
     subject: "cd /repo && sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
     why: このプロジェクトの作業手順。コマンド列の途中でも通る
   - tool: Bash
-    subject: "grep -n TODO ccnavi/cli.py"
+    subject: "grep -n TODO src/ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
   - tool: Bash
     subject: "CAT /etc/hosts"
@@ -293,7 +296,7 @@ allow:
     subject: "# git push origin main"
     why: コメントだけの行は何も走らない
   - tool: Write
-    subject: "/repo/.claude/worktrees/x/ccnavi/cli.py"
+    subject: "/repo/.claude/worktrees/x/src/ccnavi/cli.py"
     why: ワークツリーの中のソース。main の側は deny
   - tool: Write
     subject: "/repo/.claude/worktrees/x/tests/test_glob.py"

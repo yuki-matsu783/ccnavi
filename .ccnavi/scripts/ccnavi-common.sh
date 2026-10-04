@@ -7,7 +7,7 @@
 # 同じディレクトリを指す。**この読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない**（下の ccnavi_workspace の但し書き）。
 #
-# ここにあるのは 6 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 7 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
@@ -16,18 +16,21 @@
 #   ccnavi_compat_skew <ワークスペースルート> <実行ファイル>  実行ファイルと互換の版が食い違えば直し方を出す
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
+#   ccnavi_is_ident <語>       識別子として受けてよい書き方か（終了コードで返す）
+#   ccnavi_is_branch <語>      親のブランチ名として受けてよい書き方か（終了コードで返す）
 #
 # 取り込み状態とロックの関数は、下の「取り込み状態とロック」にまとめてある。
 # C1 の関数は、その下の「C1」にまとめてある。
+# ホスト（GitHub / GitLab）の API に繋ぐ関数は、その下の「ホスト（GitHub / GitLab）への接続」にまとめてある。
 #
 # ほかに診断ログの 4 つ（log_debug / log_info / log_warn / log_error）がある。こちらは
 # 標準出力にも標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
 # 決まりは docs/claude/logging.md。
 
-# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの ccnavi/entry/version.py の COMPAT、
+# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの src/ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときだけ。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=4
+CCNAVI_COMPAT=5
 
 # 相対パスを絶対に直す。
 #
@@ -181,7 +184,7 @@ ccnavi_bin() {
 ccnavi_compat_skew() {
 	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
 	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
-	if [ -f "$1/build.py" ] && [ -f "$1/ccnavi/__main__.py" ]; then
+	if [ -f "$1/build.py" ] && [ -f "$1/src/ccnavi/__main__.py" ]; then
 		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
 		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
@@ -300,6 +303,52 @@ ccnavi_mask_url() {
 		-e 's#^[^/:@]*:[^/@]*@#<伏せた>@#'
 }
 
+# 親や子の識別子として受けてよい書き方なら 0。<語>
+#
+# 識別子は ASCII の英数字と `.` `_` `-` に、日本語の字（ひらがな・カタカナ・漢字）を足した形。
+# `LC_ALL=C` の `case` の文字クラスはマルチバイトの字を 1 字として扱えず、ロケールによって
+# 範囲（`[a-z]`）の読み方も変わるので、ここでは字の種類を細かく見ない。止めるのは、パスや
+# シェルで意味を持つ書き方だけ: 空、先頭の `-` と `.`、`..`、`/`、`\`、ASCII の英数字と `.` `_` `-`
+# 以外の ASCII の字（空白・制御文字・`$` `;` `*` などの記号）。ASCII の外のバイトは通し、
+# 字の種類（全角記号や NFD を止める）は実行ファイル（`ticket.id_problem`）が確かめる。
+ccnavi_is_ident() {
+	case "$1" in
+	'' | -* | .* | *..* | */* | *\\*) return 1 ;;
+	[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*) ;;
+	*) return 1 ;;
+	esac
+	# 末尾の改行が `$( )` で落ちないよう、最後に `/`（上で止めた字なので本文には無い）を足して比べる。
+	ccnavi_ii_rest=$(printf '%s/' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._\200-\377-')
+	[ "$ccnavi_ii_rest" = / ]
+}
+
+# 親のブランチ名として受けてよい書き方なら 0。<語>
+#
+# 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
+# （`ticket.branch_problem`）が字と形を確かめたものを受け取る側の 2 段目の確認で、パスや ref で意味を持つ
+# 書き方を止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる階層）、`.lock` で終わる
+# 階層、`\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、git の ref の名前
+# （refs/・origin/ など）や保護されたブランチの名前を先頭の階層に持つもの、HEAD の階層を持つもの。
+ccnavi_is_branch() {
+	case "$1" in
+	'' | -* | .* | /* | */ | *. | *..* | *//* | */.* | *.lock | *.lock/* | *\\*) return 1 ;;
+	[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*) ;;
+	*) return 1 ;;
+	esac
+	# 末尾の改行が `$( )` で落ちないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
+	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
+	[ "$ccnavi_ib_rest" = '\' ] || return 1
+	# git の ref の名前・リモートの名前・保護されたブランチの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の
+	# 階層を持つもの（`ticket.branch_problem` と同じ。大文字小文字は区別しない）。
+	ccnavi_ib_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$ccnavi_ib_low" in
+	refs | refs/* | heads | heads/* | remotes | remotes/* | tags | tags/* | origin | origin/* | upstream | upstream/*) return 1 ;;
+	main | main/* | master | master/* | develop | develop/* | release | release/* | release-*) return 1 ;;
+	head | head/* | */head | */head/* | *_head | *_head/*) return 1 ;;
+	esac
+	return 0
+}
+
 # ---- 取り込み状態とロック
 #
 # 取り込み状態は 1 行 1 項目の `<鍵> <値>`。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない
@@ -311,6 +360,9 @@ ccnavi_mask_url() {
 #   locks/<リポジトリ>/<P>/          ロック。中の owner に持ち主を 1 行で書く
 #
 # <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。
+#
+# 統合先の名前を決める ccnavi_integration（と、その最後の手の ccnavi_default_branch）も、
+# 統合先の取り込み結果を読むのでここに置く。
 
 # state の置き場（`logs/state/`）の絶対パス。
 ccnavi_state() {
@@ -328,8 +380,70 @@ ccnavi_repo_key() {
 }
 
 # 親子のチケットの取り込み状態のパス。<ワークスペースルート> <リポジトリ> <P>
+#
+# 鍵は親の識別子（`/` を含まない）。親のブランチ名は取り込み状態の中の `branch` に書く。
 ccnavi_family_record() {
 	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
+}
+
+# 親のブランチ名がそのブランチの親子のチケットの取り込み状態。無ければ空。<ワークスペースルート> <リポジトリ> <ブランチ>
+#
+# 取り込み状態の `branch` の行で探す（`branch` の無い前の取り込み状態は、鍵の識別子をブランチ名として読む）。
+# 識別子と違う名前の親のブランチ（`branch:`）でも、ブランチ名から取り込み状態を引ける。書きかけ（`*.tmp.*`）と
+# シンボリックリンクは読まない。当たった取り込み状態を 1 行に 1 つずつ全部出す（2 つ以上なら、2 つの親子の
+# チケットが同じブランチを名乗っている。呼ぶ側は止める）。
+ccnavi_family_record_of_branch() {
+	ccnavi_fb_dir="$(ccnavi_state "$1")/sync/$2/families"
+	[ -d "$ccnavi_fb_dir" ] || return 0
+	[ -L "$ccnavi_fb_dir" ] && return 0
+	for ccnavi_fb_file in "$ccnavi_fb_dir"/*; do
+		[ -f "$ccnavi_fb_file" ] || continue
+		[ -L "$ccnavi_fb_file" ] && continue
+		case "$ccnavi_fb_file" in
+		*.tmp.*) continue ;;
+		esac
+		ccnavi_fb_branch=$(ccnavi_record_get "$ccnavi_fb_file" branch)
+		[ -n "$ccnavi_fb_branch" ] || ccnavi_fb_branch="${ccnavi_fb_file##*/}"
+		if [ "$ccnavi_fb_branch" = "$3" ]; then
+			printf '%s\n' "$ccnavi_fb_file"
+		fi
+	done
+	return 0
+}
+
+# 親子のチケット <識別子> の親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
+#
+# 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
+# 当たることがある）。違う名前は ccnavi_is_branch で見る。
+ccnavi_branch_ok() {
+	if [ "$1" = "$2" ]; then
+		ccnavi_is_ident "$1"
+	else
+		ccnavi_is_branch "$1"
+	fi
+}
+
+# 親子のチケットの親のブランチ名。<ワークスペースルート> <識別子>
+#
+# 実行ファイルの `c1 family <識別子>` の `branch` の行（承認済みの親チケットの `branch:`、無ければ識別子。
+# 提案の `branch:` は使わない）。sh はチケットを読まない（読むのは実行ファイル）。実行ファイルが無ければ 1、
+# 在るのに答えない・`branch` の行が無い（`branch_refused`。使えない名前か統合先の名前）・答えが親のブランチ名の
+# 形でなければ 2 を返す（呼ぶ側は識別子の外へ動かさずに止める）。ソースで動かしている ccnavi の
+# リポジトリでは uv で起こす。
+ccnavi_family_branch() {
+	if ccnavi_fbr_bin=$(ccnavi_bin "$1"); then
+		ccnavi_fbr_out=$("$ccnavi_fbr_bin" --root "$1" c1 family "$2" 2>/dev/null </dev/null) || ccnavi_fbr_out=""
+	elif [ -f "$1/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+		ccnavi_fbr_out=$(cd "$1" && uv run --quiet python -m ccnavi --root "$1" c1 family "$2" 2>/dev/null </dev/null) ||
+			ccnavi_fbr_out=""
+	else
+		return 1
+	fi
+	ccnavi_fbr_out=$(printf '%s\n' "$ccnavi_fbr_out" | tr -d '\r')
+	[ "$(printf '%s\n' "$ccnavi_fbr_out" | head -n 1)" = "c1 1" ] || return 2
+	ccnavi_fbr_name=$(printf '%s\n' "$ccnavi_fbr_out" | sed -n 's/^branch //p' | head -n 1)
+	ccnavi_branch_ok "$ccnavi_fbr_name" "$2" || return 2
+	printf '%s\n' "$ccnavi_fbr_name"
 }
 
 # 取り込み状態から 1 項目を読む。無ければ空。<ファイル> <鍵>
@@ -362,11 +476,56 @@ ccnavi_record_write() {
 	}
 }
 
+# そのリポジトリのデフォルトブランチの名前。分からなければ 1。<リポジトリ>
+#
+# `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
+# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
+# どちらも無ければ「分からない」。当てずっぽうで別のブランチを名乗らない。
+# ネットワークには出ない（手元の ref だけを読む）。
+ccnavi_default_branch() {
+	ccnavi_db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
+	case "$ccnavi_db_head" in
+	origin/?*)
+		printf '%s\n' "${ccnavi_db_head#origin/}"
+		return 0
+		;;
+	esac
+	for ccnavi_db_try in main master; do
+		if git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$ccnavi_db_try" >/dev/null 2>&1; then
+			printf '%s\n' "$ccnavi_db_try"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# そのツリーが属するリポジトリの統合先の名前。分からなければ 1。<ツリー> <ワークスペースルート>
+#
+# 環境変数 CCNAVI_INTEGRATION_BRANCH、無ければ ccnavi-sync.sh が統合先の取り込み結果
+# （sync/<リポジトリ>/integration/head の branch）に書いた名前、無ければデフォルトブランチ
+# （ccnavi_default_branch）。ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への
+# push の拒否）・ccnavi-review.sh（マージリクエストの宛先）が同じ順で読むよう、ここに 1 つだけ置く。
+# ワークツリーは元リポジトリの取り込み結果を読む（ccnavi_repo_key）。
+ccnavi_integration() {
+	if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
+		printf '%s\n' "$CCNAVI_INTEGRATION_BRANCH"
+		return 0
+	fi
+	ccnavi_ig_key=$(ccnavi_repo_key "$1" "$2")
+	ccnavi_ig_name=$(ccnavi_record_get "$(ccnavi_state "$2")/sync/$ccnavi_ig_key/integration/head" branch)
+	if [ -n "$ccnavi_ig_name" ]; then
+		printf '%s\n' "$ccnavi_ig_name"
+		return 0
+	fi
+	ccnavi_default_branch "$1"
+}
+
 # そのツリーが、名前の親子のチケットの親のワークツリーか。<ツリー> <名前>
 #
 # 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親チケットか提案が
-# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。子チケット（`parent:` を持つ）は
-# 数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして扱わない（ブランチに乗らないので、親のブランチで共有できない）。
+# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。ready が退避した後は、手元の退避の親チケットも見る。
+# 子チケット（`parent:` を持つ）は数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして
+# 扱わない（ブランチに乗らないので、親のブランチで共有できない）。
 ccnavi_parent_tree() {
 	ccnavi_pt_approved=.ccnavi/approved # 固定
 	ccnavi_pt_proposals=wip/proposals   # 固定
@@ -386,7 +545,26 @@ ccnavi_parent_tree() {
 			sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
 		[ "$ccnavi_pt_id" = "$2" ] && return 0
 	done
-	return 1
+	# ready の後は、親子のチケットは手元の退避（<ワークスペース>/logs/archive/<リポジトリ>/done/）へ
+	# 移り、ツリーには残らない。そこに親（`parent:` を持たない）が在れば、まだ親のワークツリーとして扱う
+	# （Draft を外し損ねた ready の打ち直し・取り込み・早送りのため）。ワークスペースは
+	# `.claude/worktrees/<名前>` の 2 つ上。途中にリンクがあれば信じない。
+	case "$1" in
+	*/.claude/worktrees/*) ccnavi_pt_ws="${1%/.claude/worktrees/*}" ;;
+	*) return 1 ;;
+	esac
+	ccnavi_pt_key=$(ccnavi_repo_key "$1" "$ccnavi_pt_ws")
+	ccnavi_pt_file="$ccnavi_pt_ws/logs"
+	for ccnavi_pt_part in archive "$ccnavi_pt_key" done "$2.md"; do
+		[ -L "$ccnavi_pt_file" ] && return 1
+		ccnavi_pt_file="$ccnavi_pt_file/$ccnavi_pt_part"
+	done
+	[ -L "$ccnavi_pt_file" ] && return 1
+	[ -f "$ccnavi_pt_file" ] || return 1
+	grep -q '^parent:' "$ccnavi_pt_file" 2>/dev/null && return 1
+	ccnavi_pt_id=$(sed -n 's/^ticket:[[:space:]]*//p' "$ccnavi_pt_file" 2>/dev/null | head -n 1 |
+		sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
+	[ "$ccnavi_pt_id" = "$2" ]
 }
 
 # ロック。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
@@ -727,6 +905,8 @@ ccnavi_git_refusal() {
 ccnavi_c1_target=""
 ccnavi_c1_why=""
 ccnavi_c1_family_id=""
+# 親のブランチ名。ref・push・ls-remote・取り込み状態の `branch` はこれを使う。
+ccnavi_c1_branch=""
 ccnavi_c1_repo=""
 ccnavi_c1_tree=""
 ccnavi_c1_approved=""
@@ -760,6 +940,7 @@ ccnavi_c1_family() {
 	ccnavi_c1_target=no
 	ccnavi_c1_why=""
 	ccnavi_c1_family_id=""
+	ccnavi_c1_branch=""
 	ccnavi_c1_repo=""
 	ccnavi_c1_tree=""
 	# 取り込み状態が 1 つも無ければ、実行ファイルに聞かずに対象外（一時ディレクトリも要らない）。
@@ -802,10 +983,14 @@ ccnavi_c1_family() {
 	ccnavi_c1_tree=$(sed -n 's/^tree //p' "$ccnavi_c1_tmp/family" | head -n 1)
 	ccnavi_c1_approved=$(sed -n 's/^approved //p' "$ccnavi_c1_tmp/family" | head -n 1)
 	ccnavi_c1_review=$(sed -n 's/^review //p' "$ccnavi_c1_tmp/family" | head -n 1)
+	ccnavi_c1_branch=$(sed -n 's/^branch //p' "$ccnavi_c1_tmp/family" | head -n 1)
 	sed -n 's/^hint //p' "$ccnavi_c1_tmp/family" >"$ccnavi_c1_tmp/hints"
 	case "$ccnavi_c1_target" in
 	yes)
-		if [ -z "$ccnavi_c1_tree" ] || [ ! -d "$ccnavi_c1_tree" ]; then
+		if ! ccnavi_branch_ok "$ccnavi_c1_branch" "$ccnavi_c1_family_id"; then
+			ccnavi_c1_target=stop
+			ccnavi_c1_why="実行ファイルが親のブランチ名（branch）を答えないか、ブランチ名の形でない（${ccnavi_c1_branch:-空}）。実行ファイルを新しくしてください"
+		elif [ -z "$ccnavi_c1_tree" ] || [ ! -d "$ccnavi_c1_tree" ]; then
 			ccnavi_c1_target=stop
 			ccnavi_c1_why="親のワークツリーが決まらない"
 		elif ! git -C "$ccnavi_c1_tree" remote get-url origin >/dev/null 2>&1; then
@@ -944,7 +1129,7 @@ ccnavi_c1_prepare() {
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
-		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_family_id" || return 1
+		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_branch" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
 			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
 			"置き場に ccnavi の知らない未送信のコミットがある" \
@@ -1090,14 +1275,14 @@ ccnavi_c1_write() {
 			ccnavi_c1_inflight_h0="$ccnavi_cw_h0"
 			ccnavi_c1_inflight_list="$ccnavi_cw_list"
 		fi
-		if [ -z "$ccnavi_cw_c" ] && [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD)" = "$(git -C "$ccnavi_c1_tree" rev-parse --verify -q "refs/remotes/origin/$ccnavi_c1_family_id" 2>/dev/null)" ]; then
+		if [ -z "$ccnavi_cw_c" ] && [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD)" = "$(git -C "$ccnavi_c1_tree" rev-parse --verify -q "refs/remotes/origin/$ccnavi_c1_branch" 2>/dev/null)" ]; then
 			rm -f "$ccnavi_cw_list"
 			return 0 # 書いたものが無く、送るものも無い
 		fi
 		ccnavi_cw_head=$(git -C "$ccnavi_c1_tree" rev-parse HEAD)
 		# 9. push（--force なし）。
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_c1_tmp/push-err" "$ccnavi_c1_tree" \
-			push --quiet origin "refs/heads/$ccnavi_c1_family_id:refs/heads/$ccnavi_c1_family_id" >/dev/null; then
+			push --quiet origin "refs/heads/$ccnavi_c1_branch:refs/heads/$ccnavi_c1_branch" >/dev/null; then
 			ccnavi_c1_inflight=""
 			ccnavi_c1_sent "$ccnavi_cw_head"
 			rm -f "$ccnavi_cw_list"
@@ -1105,8 +1290,8 @@ ccnavi_c1_write() {
 		fi
 		# 10. 落ちたように見えても、届いていれば成功。
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_c1_tmp/ls-err" "$ccnavi_c1_tree" \
-			ls-remote origin "refs/heads/$ccnavi_c1_family_id" >"$ccnavi_c1_tmp/ls" &&
-			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_c1_tab}refs/heads/$ccnavi_c1_family_id" "$ccnavi_c1_tmp/ls"; then
+			ls-remote origin "refs/heads/$ccnavi_c1_branch" >"$ccnavi_c1_tmp/ls" &&
+			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_c1_tab}refs/heads/$ccnavi_c1_branch" "$ccnavi_c1_tmp/ls"; then
 			ccnavi_c1_say "push の応答は落ちたが、リモートには届いていた（${ccnavi_cw_head}）"
 			ccnavi_c1_inflight=""
 			ccnavi_c1_sent "$ccnavi_cw_head"
@@ -1150,7 +1335,7 @@ ccnavi_c1_undo() {
 	fi
 	git -C "$ccnavi_c1_tree" diff-tree --no-commit-id --name-only -r -z "$1" 2>/dev/null |
 		tr '\000' '\n' >"$ccnavi_c1_tmp/in-commit"
-	if ! git -C "$ccnavi_c1_tree" update-ref "refs/heads/$ccnavi_c1_family_id" "$2" "$1" 2>"$ccnavi_c1_tmp/err"; then
+	if ! git -C "$ccnavi_c1_tree" update-ref "refs/heads/$ccnavi_c1_branch" "$2" "$1" 2>"$ccnavi_c1_tmp/err"; then
 		ccnavi_c1_say "コミットを戻せなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）。ユーザが確かめてください"
 		return 1
 	fi
@@ -1165,7 +1350,7 @@ ccnavi_c1_undo() {
 ccnavi_c1_sent() {
 	ccnavi_cn_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 	if [ "$(ccnavi_record_get "$ccnavi_cn_record" state)" = present ]; then
-		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_family_id" sha "$1" \
+		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_branch" sha "$1" \
 			fetched_at "$(ccnavi_record_get "$ccnavi_cn_record" fetched_at)" state present reason "" ||
 			ccnavi_c1_say "親子のチケットの取り込み状態（${ccnavi_cn_record}）を書けなかった"
 	fi
@@ -1199,12 +1384,214 @@ ccnavi_c1_end() {
 	return 0
 }
 
+# ---- ホスト（GitHub / GitLab）への接続（ccnavi-review.sh と ccnavi-branches.sh が使う）
+#
+# origin の URL でホストを見分け、gh / glab（認証は道具に任せる）か curl とトークン
+# （GITHUB_TOKEN / GITLAB_TOKEN）でホストの API を読み書きする。結果の組み立てには jq が要る。
+# 道具は ccnavi_host_connect で絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
+#
+#   ccnavi_host_parse <origin>  origin を読み、ccnavi_h_scheme・ccnavi_h_host・ccnavi_h_path・
+#                               ccnavi_h_kind（github / gitlab）・ccnavi_h_token_name・ccnavi_h_api_base を決める。
+#                               読めなければ 1（URL の形式）・2（ホスト）・3（パス）
+#   ccnavi_host_connect         道具を選ぶ。ccnavi_h_jq・ccnavi_h_cli・ccnavi_h_cli_name・ccnavi_h_curl・
+#                               ccnavi_h_token・ccnavi_h_transport（gh / glab / curl）を決める。
+#                               jq が無ければ 3、curl はあるがトークンが無ければ 4、curl も無ければ 5
+#   ccnavi_host_api <METHOD> <path> [<JSON>]  応答の JSON を標準出力へ。path は ccnavi_h_api_base からの相対
+#   ccnavi_host_pages <path>    100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページを超えたら 2
+#   ccnavi_host_encoded_path    プロジェクトのパスを URL に入れる表記（GitLab の projects/<ここ>）
+#   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
+#
+# 失敗したときの文面は呼ぶ側が決める（ここは標準エラーに何も書かない）。ccnavi_host_api が落ちたら、
+# ccnavi_h_on_fail に名前を入れた関数を `<METHOD> <path> <ホストの返事>` で呼んで 1 を返す。
+# ccnavi_h_tmp は gh / glab の標準エラーを一時に受ける置き場（無ければ TMPDIR）、ccnavi_h_max_time は
+# curl の 1 回の時間の上限（秒。応答しないホストで止まり続けないように。gh / glab は道具に任せる）。
+
+ccnavi_h_on_fail=""
+ccnavi_h_tmp=""
+ccnavi_h_max_time=120
+
+ccnavi_host_parse() {
+	ccnavi_hp_origin="$1"
+	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
+	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形式には
+	# scheme が無いので、そこだけ https にする。
+	# host には**ポートを残す**。落とすと `:8929` のような立て方がすべて当たらなくなり、しかも
+	# 落ちたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
+	case "$ccnavi_hp_origin" in
+	http://*) ccnavi_h_scheme=http ;;
+	*) ccnavi_h_scheme=https ;;
+	esac
+	ccnavi_hp_rest=$(printf '%s' "$ccnavi_hp_origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
+	[ "$ccnavi_hp_rest" = "$ccnavi_hp_origin" ] && return 1
+	# `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
+	# 落とさないと host にトークンが入り込み、API の URL にも `origin` の出力にも漏れる（実際に確かめた）。
+	# 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
+	ccnavi_hp_authority="${ccnavi_hp_rest%%/*}"
+	case "$ccnavi_hp_authority" in
+	*@*) ccnavi_hp_rest="${ccnavi_hp_authority##*@}${ccnavi_hp_rest#"$ccnavi_hp_authority"}" ;;
+	esac
+	ccnavi_h_host="${ccnavi_hp_rest%%/*}"
+	# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
+	# そうでなければパスの先頭なので落とす。
+	case "$ccnavi_h_host" in
+	*:*)
+		case "${ccnavi_h_host##*:}" in
+		'' | *[!0-9]*) ccnavi_h_host="${ccnavi_h_host%%:*}" ;;
+		esac
+		;;
+	esac
+	[ -n "$ccnavi_h_host" ] || return 2
+	ccnavi_hp_tail="${ccnavi_hp_rest#"$ccnavi_h_host"}"
+	while :; do
+		case "$ccnavi_hp_tail" in
+		[/:]*) ccnavi_hp_tail="${ccnavi_hp_tail#?}" ;;
+		*) break ;;
+		esac
+	done
+	ccnavi_h_path="${ccnavi_hp_tail%.git}"
+	ccnavi_h_path="${ccnavi_h_path%/}"
+	[ -n "$ccnavi_h_path" ] || return 3
+	case "$ccnavi_h_host" in
+	github.com | github.com:*)
+		ccnavi_h_kind=github
+		ccnavi_h_token_name=GITHUB_TOKEN
+		ccnavi_h_api_base="https://api.github.com"
+		;;
+	*)
+		ccnavi_h_kind=gitlab
+		ccnavi_h_token_name=GITLAB_TOKEN
+		ccnavi_h_api_base="$ccnavi_h_scheme://$ccnavi_h_host/api/v4"
+		;;
+	esac
+	return 0
+}
+
+ccnavi_host_connect() {
+	ccnavi_h_jq=$(command -v jq 2>/dev/null || :)
+	[ -n "$ccnavi_h_jq" ] || return 3
+	# gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
+	# 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
+	# 1 度だけ疎通を試して、通らなければ curl とトークンに切り替える。
+	ccnavi_h_transport=""
+	ccnavi_h_curl=""
+	ccnavi_h_token=""
+	if [ "$ccnavi_h_kind" = github ]; then
+		ccnavi_h_cli_name=gh
+		ccnavi_h_cli=$(command -v gh 2>/dev/null || :)
+		if [ -n "$ccnavi_h_cli" ] && "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" "repos/$ccnavi_h_path" >/dev/null 2>&1; then
+			ccnavi_h_transport=gh
+		fi
+	else
+		ccnavi_h_cli_name=glab
+		ccnavi_h_cli=$(command -v glab 2>/dev/null || :)
+		if [ -n "$ccnavi_h_cli" ] && "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" "projects/$(ccnavi_host_encoded_path)" >/dev/null 2>&1; then
+			ccnavi_h_transport=glab
+		fi
+	fi
+	[ -n "$ccnavi_h_transport" ] && return 0
+	ccnavi_h_curl=$(command -v curl 2>/dev/null || :)
+	eval "ccnavi_h_token=\${$ccnavi_h_token_name:-}"
+	if [ -n "$ccnavi_h_curl" ] && [ -n "$ccnavi_h_token" ]; then
+		ccnavi_h_transport=curl
+		return 0
+	fi
+	[ -n "$ccnavi_h_curl" ] && return 4
+	return 5
+}
+
+# 失敗したら標準出力には何も出さず、ホストが返した本文ごと ccnavi_h_on_fail に渡して 1 を返す。
+# gh と glab は 4xx でも本文を標準出力へ書くので、そのまま流すと `{"message":"Not Found"}` が
+# jq に渡り、`{number: null}` の形で「マージリクエストができた」ことになる（実際に確かめた）。
+ccnavi_host_api() {
+	ccnavi_ha_method="$1"
+	ccnavi_ha_rel="$2"
+	ccnavi_ha_body="${3:-}"
+	case "$ccnavi_h_transport" in
+	gh | glab)
+		# 標準エラー（更新の知らせなど）は応答に混ぜない。落ちたときだけ本文と一緒に渡す
+		ccnavi_ha_err="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-err-$$"
+		if [ -n "$ccnavi_ha_body" ]; then
+			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --input - "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {
+				ccnavi_host_failed "$ccnavi_ha_out$(cat "$ccnavi_ha_err" 2>/dev/null)"
+				rm -f "$ccnavi_ha_err"
+				return 1
+			}
+		else
+			ccnavi_ha_out=$("$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {
+				ccnavi_host_failed "$ccnavi_ha_out$(cat "$ccnavi_ha_err" 2>/dev/null)"
+				rm -f "$ccnavi_ha_err"
+				return 1
+			}
+		fi
+		rm -f "$ccnavi_ha_err"
+		;;
+	curl)
+		if [ "$ccnavi_h_kind" = github ]; then
+			ccnavi_ha_auth="Authorization: Bearer $ccnavi_h_token"
+		else
+			ccnavi_ha_auth="PRIVATE-TOKEN: $ccnavi_h_token"
+		fi
+		if [ -n "$ccnavi_ha_body" ]; then
+			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_curl" -fsS --connect-timeout 15 --max-time "$ccnavi_h_max_time" -X "$ccnavi_ha_method" -H "$ccnavi_ha_auth" -H 'Content-Type: application/json' --data-binary @- "$ccnavi_h_api_base/$ccnavi_ha_rel" 2>&1) || {
+				ccnavi_host_failed "$ccnavi_ha_out"
+				return 1
+			}
+		else
+			ccnavi_ha_out=$("$ccnavi_h_curl" -fsS --connect-timeout 15 --max-time "$ccnavi_h_max_time" -X "$ccnavi_ha_method" -H "$ccnavi_ha_auth" "$ccnavi_h_api_base/$ccnavi_ha_rel" 2>&1) || {
+				ccnavi_host_failed "$ccnavi_ha_out"
+				return 1
+			}
+		fi
+		;;
+	*) return 1 ;;
+	esac
+	printf '%s' "$ccnavi_ha_out"
+}
+
+ccnavi_host_failed() {
+	[ -n "$ccnavi_h_on_fail" ] || return 0
+	"$ccnavi_h_on_fail" "$ccnavi_ha_method" "$ccnavi_ha_rel" "$1"
+}
+
+ccnavi_host_pages() {
+	ccnavi_hg_rel="$1"
+	ccnavi_hg_page=1
+	case "$ccnavi_hg_rel" in
+	*\?*) ccnavi_hg_sep='&' ;;
+	*) ccnavi_hg_sep='?' ;;
+	esac
+	ccnavi_hg_all='[]'
+	while :; do
+		# 呼び手が `|| ...` で受けると set -e が有効にならないので、落ちたらここで 1 を返す（配列でない答えも）
+		ccnavi_hg_chunk=$(ccnavi_host_api GET "$ccnavi_hg_rel${ccnavi_hg_sep}per_page=100&page=$ccnavi_hg_page") || return 1
+		ccnavi_hg_n=$(printf '%s' "$ccnavi_hg_chunk" | "$ccnavi_h_jq" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
+		ccnavi_hg_all=$(printf '%s\n%s' "$ccnavi_hg_all" "$ccnavi_hg_chunk" | "$ccnavi_h_jq" -s '.[0] + .[1]')
+		[ "$ccnavi_hg_n" -lt 100 ] && break
+		ccnavi_hg_page=$((ccnavi_hg_page + 1))
+		[ "$ccnavi_hg_page" -gt 20 ] && return 2
+	done
+	printf '%s' "$ccnavi_hg_all"
+}
+
+ccnavi_host_encoded_path() {
+	printf '%s' "$ccnavi_h_path" | "$ccnavi_h_jq" -Rr '@uri'
+}
+
+ccnavi_host_project_id() {
+	ccnavi_hi_out=$(ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)") || return 1
+	ccnavi_hi_val=$(printf '%s' "$ccnavi_hi_out" | "$ccnavi_h_jq" -r '.id // empty') || return 1
+	case "$ccnavi_hi_val" in
+	'' | *[!0-9]*) return 1 ;;
+	esac
+	printf '%s' "$ccnavi_hi_val"
+}
+
 # ---- 診断ログ（docs/claude/logging.md）
 #
 #   log_info <本文の語>... [-- <キー>=<値>...]
 #
 # 本文の語はスペースでつなぐ。`--` の後ろは 1 つずつ `キー=値` として logfmt で並べる。
-# 出る行の形は次のとおり（Python の ccnavi/records/diaglog.py、拡張の src/log.ts と同じ）。
+# 出る行の形は次のとおり（Python の src/ccnavi/records/diaglog.py、拡張の src/log.ts と同じ）。
 #
 #   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] 拒否した sub=push reason=unapproved
 #

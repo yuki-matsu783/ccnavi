@@ -46,10 +46,10 @@ uv run python -m unittest discover -s tests/<グループ> -t .
 表に当たらない変更や、統合先に取り込む前・MR に出す前は全件（`discover -s tests -t .`）を回す。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
-拡張（`vscode-extension/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
+拡張（`extensions/vscode/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
 
 ```sh
-cd vscode-extension/ccnavi-board
+cd extensions/vscode/ccnavi-board
 pnpm install --frozen-lockfile                        # node_modules が無いときだけ
 pnpm test:for src/core/rules-doc.ts src/webview/board/App.tsx   # 変えたファイルをまとめて渡す
 pnpm test                                             # 統合先に取り込む前・MR に出す前
@@ -62,8 +62,8 @@ hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査�
 
 | prefix | このリポジトリでの対象 |
 |---|---|
-| `feat` | `main.py` / `ccnavi/` への機能追加 |
-| `fix` | `main.py` / `ccnavi/` / hook スクリプトのバグ修正 |
+| `feat` | `main.py` / `src/ccnavi/` への機能追加 |
+| `fix` | `main.py` / `src/ccnavi/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
 | `test` | `tests/*.py` / `tests/fixtures/` |
 | `docs` | `README.md` / `requirements.md` / `ccnavi.md` / `HANDOVER.md` |
@@ -104,7 +104,7 @@ git commit -m "<prefix>: <日本語の説明>"
 ```
 コミット1: feat: PreToolUse のルール照合と判定の記録を追加
   - main.py
-  - ccnavi/policy/rules.py
+  - src/ccnavi/policy/rules.py
 コミット2: docs: モードの呼び名を判定しない・警告・ブロックに統一
   - requirements.md
 ```
