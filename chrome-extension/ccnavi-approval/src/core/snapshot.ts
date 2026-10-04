@@ -5,7 +5,7 @@
  * 流れ:
  *
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ）。設定したブランチが無ければ止める
- * 2. 統合先の `.claude/settings.json` を読み、置き場の綴りを Python に出させる
+ * 2. 統合先の `.claude/settings.json` を読み、置き場のパスを Python に出させる
  * 3. 統合先の `done/`・共通層・自身の層・互換のマーカーを読む。互換の比べは Python
  * 4. 直近 N 日とユーザの指定のブランチ（表示用）の置き場を読み、親子のチケットを Python に見分けさせる
  * 5. 親子のチケットごとに、参照の閉包の足りないブランチを読み足し、Python に承認待ちを出させる。
@@ -13,7 +13,7 @@
  * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、Python の
  *    `confirm` に通るかを聞く（書かない）
  *
- * blob は sha で引き、控え（IndexedDB）にあれば読まない。判定はここでは出さない。
+ * blob は sha で引き、キャッシュ（IndexedDB）にあれば読まない。判定はここでは出さない。
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
 import { BLOB_BATCH, LINK_MODE, type ApprovalCommit } from "./github.js";
@@ -90,7 +90,7 @@ export class Reader {
     return this.deps.call(op, [this.repo.owner, this.repo.repo, ...args]) as Promise<T>;
   }
 
-  /** ブランチの先頭。無ければ null で、`absent` に控える */
+  /** ブランチの先頭。無ければ null で、`absent` に残す */
   async head(name: string): Promise<string | null> {
     const sha = await this.call<string | null>("branchHead", name);
     if (sha === null && !this.absent.includes(name)) {
@@ -120,7 +120,7 @@ export class Reader {
         // GitLab は tree の sha でなく、コミットとパスで引く（GitHub は後ろの 2 つを使わない）
         const entries = await this.call<TreeEntry[]>("tree", obj.oid, head, p);
         for (const e of entries) {
-          // シンボリックリンクは中身（指す先の綴り）をファイルとして読まない。Python が「決まらない」にする
+          // シンボリックリンクは中身（指す先のパス）をファイルとして読まない。Python が「決まらない」にする
           if (e.mode === LINK_MODE) {
             if (!links.includes(`${p}/${e.path}`)) links.push(`${p}/${e.path}`);
           } else {
@@ -197,7 +197,7 @@ async function integrationOf(repo: RepoConfig, reader: Reader, what: string): Pr
   return { name, source, head } as const;
 }
 
-/** 1〜3: 統合先を決め、置き場の綴り・統合先の中身・互換のマーカーを読む。統合先が無ければ投げる */
+/** 1〜3: 統合先を決め、置き場のパス・統合先の中身・互換のマーカーを読む。統合先が無ければ投げる */
 export async function readIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   if (repo.project) return await readProjectIntegration(repo, reader, deps);
   const integration = await integrationOf(repo, reader, "");
@@ -211,7 +211,7 @@ export async function readIntegration(repo: RepoConfig, reader: Reader, deps: De
 }
 
 /**
- * プロジェクトのリポジトリ: 置き場の綴り・共通層・互換のマーカーはワークスペースの統合先から、
+ * プロジェクトのリポジトリ: 置き場のパス・共通層・互換のマーカーはワークスペースの統合先から、
  * 閉じたもの（`done/`）とプロジェクトの層はプロジェクトの統合先から読む。プロジェクトの層の計算は Python
  */
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
@@ -239,7 +239,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
   const reader = new Reader(repo, deps);
   let integration: Snapshot["integration"] | null = null;
   try {
-    // 1〜3. 統合先、置き場の綴り、統合先の中身、互換のマーカー
+    // 1〜3. 統合先、置き場のパス、統合先の中身、互換のマーカー
     const base = await readIntegration(repo, reader, deps);
     integration = base.integration;
     const { settings, place, compat } = base;
@@ -328,8 +328,8 @@ async function familyBoard(
 }
 
 /**
- * 取り下げを出すのは、承認コミットを引けて、その親に提案が読めるときだけ（締める向き）。
- * Python が理由を返さなかった写しでも、引けなければ理由を足す。
+ * 取り下げを出すのは、承認コミットを引けて、その親で提案を読めるときだけにする（取り下げを出せる場合を狭める条件）。
+ * Python が理由を返さなかった承認済みのチケットでも、引けなければ理由を足す。
  */
 async function withdrawableHere(board: BoardResult, reader: Reader, place: Placement, family: string): Promise<BoardResult> {
   const head = reader.branches[family]?.head;

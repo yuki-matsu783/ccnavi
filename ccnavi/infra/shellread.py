@@ -20,7 +20,7 @@
 読み分けると規則が増えるか、読み違えると止まらずに通る形（バッククォート、ブレース展開、
 実行するときに決まるコマンド名、シェルによって読みが分かれる形）は、読み解かずに並べて判定が止める。
 語の分割はそのあと shlex に任せる。引用の規則を 2 か所で持つことになるが、shlex の
-状態機械は公開されておらず、中身を写すと Python の版によって動かなくなる
+状態機械は公開されておらず、中身をコピーすると Python の版によって動かなくなる
 （wip/design/shellread-subst.md 1.1）。
 
 仕事を文字列として受け取って実行するコマンドは、読み切れないものとして扱う。
@@ -94,7 +94,7 @@ REASON_BACKQUOTE = "backquote"
 # ---- 書き直しを求める形
 #
 # 書き直す方法が必ずあり、読み分けると規則が増えるか、読み違えると止まらずに通る形。読みはこれを
-# 読み解かずに Reading.rewrites に（形, 綴り）で並べ、判定がルールより先に止めて、形ごとの
+# 読み解かずに Reading.rewrites に（形, 表記）で並べ、判定がルールより先に止めて、形ごとの
 # 書き直し方を案内する。
 #
 # 引用の外のブレース展開。`{git,push,origin,main}` は 1 語に見えるが、bash は
@@ -102,7 +102,7 @@ REASON_BACKQUOTE = "backquote"
 # zsh だけが広げ、`{01..03}` は bash 3.2 だけが 0 を落とす）。
 FORM_BRACE = "brace-expansion"
 # 実行するときにシェルが決めるコマンド名。変数（`$c push`）、置換（`$(echo git) push`）、
-# グロブ（`/usr/bin/gi? push`）。どのプログラムが走るかが綴りに無いので、どのルールも当たらない。
+# グロブ（`/usr/bin/gi? push`）。どのプログラムが走るかが表記に無いので、どのルールも当たらない。
 FORM_COMMAND_NAME = "command-name-expansion"
 # バッククォート。二重引用の中でも実行される。`$( )` か単一引用で必ず書き直せる。
 FORM_BACKQUOTE = "backquote"
@@ -112,7 +112,7 @@ FORM_AMBIGUOUS = "ambiguous-form"
 # 読みを止めた理由のうち、書き直しを求める形になるもの。
 _FORM_OF_REASON = {REASON_BACKQUOTE: FORM_BACKQUOTE, REASON_AMBIGUOUS_SUBST: FORM_AMBIGUOUS}
 
-# シェルによって読みが分かれる形の綴り。文面に並べる。
+# シェルによって読みが分かれる形の表記。文面に並べる。
 _CASE_IN_SUBST = "case inside $( )"
 _ARITHMETIC_OR_SUBST = "$((…) …)"
 _TOO_DEEP = "$( ) nested more than 16 deep"
@@ -190,19 +190,19 @@ _TAKES_CODE_FLAG = {
 
 # ---- `cd` が移った先
 #
-# 守りもルールも、当てる先は語の綴り。`cd` で入ってから書くと、行き先の綴りから
+# 保護もルールも、当てる先は語の表記。`cd` で入ってから書くと、行き先のパスから
 # ディレクトリの名前が消えるので当たらない（`cd .claude && echo x > settings.json`）。
-# だから `cd` の行き先を読んで、後ろのコマンドの引数の綴りに継ぎ足す。
+# だから `cd` の行き先を読んで、後ろのコマンドの引数のパスに継ぎ足す。
 #
-# 継ぎ足した綴りは text には入れず、当てる先として足すだけ（Reading.moved）。書かれた
-# 綴りを動かすと、コマンドの頭に名前を固定して書かれたルールが外れて、いま止まって
+# 継ぎ足したパスは text には入れず、当てる先として足すだけ（Reading.moved）。書かれた
+# 表記を動かすと、コマンドの頭に名前を固定して書かれたルールが外れて、いま止まって
 # いるものが止まらなくなる。同じ理由で、コマンドの位置の語には継ぎ足さない。
 #
 # 行き先が読めなくなったら、そこから先は継ぎ足さない。読みそのものは変えない。
 # 縮退させると生の文字列で見ることになり、`cd - && rm -f <守られた場所>` のように
 # **今は止まっている形**が止まらなくなる（敵対的レビュー）。
 
-# 行き先を綴りに持たないもの。読めない行き先として扱う。
+# 行き先を表記に持たないもの。読めない行き先として扱う。
 _PUSHD = frozenset({"pushd", "popd"})
 
 # 後ろの語をそのまま実行する組み込みコマンド。`builtin cd x` と `command cd x` は
@@ -219,15 +219,15 @@ _MOVES_TO = {"env": ("-C", "--chdir"), "sudo": ("-D", "--chdir")}
 # 左がサブシェルになる区切り。`cd a | b` と `cd a & b` の `cd` は、右にも後ろにも影響しない。
 _FORKED = frozenset({"|", "|&", "&"})
 
-# 綴りの中にあると、実行するときまでシェルが中身を決める文字。変数と置換（走査が `$` 1 文字に
-# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。行き先の綴りとコマンド名の両方に使う。
+# 表記の中にあると、実行するときまでシェルが中身を決める文字。変数と置換（走査が `$` 1 文字に
+# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。行き先のパスとコマンド名の両方に使う。
 # 行き先では先頭の `~` を別に見る。コマンド名では `[` だけの test コマンドと `[[` は当たらない。
 _EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
 
 # 絶対パス。継ぎ足さずにそのまま使う。Windows のドライブ文字も絶対。
 _ABSOLUTE = re.compile(r"[\\/]|[A-Za-z]:[\\/]")
 
-# 居場所の綴りの長さの上限。越えたら、そこから先は継ぎ足さない。`cd a` を数千回
+# 居場所のパスの長さの上限。越えたら、そこから先は継ぎ足さない。`cd a` を数千回
 # 並べると居場所が伸び、整理し直す時間が長さに比例するので全体が二乗になる。判定の期限
 # （judge の 3 秒）は読み終えたあとに見るので、読みの中で伸びるものには自分で上限を置く
 # （`$( )` の _MAX_DEPTH と同じ向き）。実際のパスはここまで深くならない。
@@ -249,7 +249,7 @@ MOVED_WORDS = 2000
 # 含む（`echo "$(env rm x)"` の `rm x`）。
 #
 # 一覧は組み込みで持つ。ルールファイルから足せるようにすると、消すこともできる。
-# 守りの根拠を守られる側に置かない。一覧に無い実行役のコマンド（`script -c`・`watch`・
+# 保護の根拠を守られる側に置かない。一覧に無い実行役のコマンド（`script -c`・`watch`・
 # `ssh host cmd`・`python -c` など）は外さない。
 
 # 深さの上限。元の形は数えない。判定の期限に影響するので、層の数をここで抑える。
@@ -331,7 +331,7 @@ _FIND_EXEC = frozenset(_TAKES_CODE_FLAG["find"])
 # シェルはこの形の語をコマンドの前に並べられ、残りをコマンドとして実行する。
 _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")
 
-# `env` と `sudo` が代入として読む引数。どちらも `=` を含む引数を名前の綴りを問わず代入に
+# `env` と `sudo` が代入として読む引数。どちらも `=` を含む引数を名前の表記を問わず代入に
 # 数える（`env a+=1 rm x` は `a+` という変数を置いて rm を実行する）。シェルの代入より広い。
 _RUNNER_ASSIGNMENT = re.compile(r"[^=-][^=]*=")
 
@@ -381,8 +381,8 @@ class Reading:
     # ような形こそ、中で何が実行されるかを見たい。閉じない引用と閉じない
     # ヒアドキュメントのように、走査か shlex が止まった形では作らない。
     unwrapped: str = ""
-    # `cd` で移った先から見たコマンド。SEP でつないだもの。綴りの変わったコマンドだけが並ぶ。
-    # text には足さない。継ぎ足した綴りで当たる形を増やすだけにして、いま当たっている形を
+    # `cd` で移った先から見たコマンド。SEP でつないだもの。表記の変わったコマンドだけが並ぶ。
+    # text には足さない。継ぎ足したパスで当たる形を増やすだけにして、いま当たっている形を
     # 動かさないため。呼び手は中で実行されるコマンドの層と同じに扱い、
     # 止める側のルール（deny と ask）にだけ当てる。degraded のときは空。
     moved: str = ""
@@ -392,14 +392,14 @@ class Reading:
     # 層ごとの、引用の中から切り出したコマンドから作った層かどうか。unwrapped と同じ並び。
     # 層は bare に当て直せないので、文面の断り（引用の中に当たった）はこれで決める。
     quoted_layers: list[bool] = field(default_factory=list)
-    # 書き直しを求める形の（形, 綴り）。形は FORM_* のどれか。書かれた順で、重なりは除く。
+    # 書き直しを求める形の（形, 表記）。形は FORM_* のどれか。書かれた順で、重なりは除く。
     # 置換の中身、`sh -c` と `eval` に渡った文字列、実行役のコマンドを外した層の中のものも含む。
     # degraded でも、見つけたものは並ぶ。判定はこれがあればルールより先に止める。
     rewrites: list[tuple[str, str]] = field(default_factory=list)
 
     @property
     def braces(self) -> list[str]:
-        """ブレース展開の綴り。"""
+        """ブレース展開の表記。"""
         return [text for form, text in self.rewrites if form == FORM_BRACE]
 
 
@@ -409,7 +409,7 @@ class _Unreadable(Exception):
     def __init__(self, reason: str, form: str = "") -> None:
         super().__init__(reason)
         self.reason = reason
-        # 止めたのが書き直しを求める形なら、文面に並べる綴り。
+        # 止めたのが書き直しを求める形なら、文面に並べる表記。
         self.form = form
 
 
@@ -423,7 +423,7 @@ class _OpenBrace:
     comma: bool = False
     # 中身の文字。引用・エスケープ・置換・入れ子が入ったら None で、範囲の端にならない。
     inner: str | None = ""
-    # 中で見つけた展開。自分も展開なら、自分の綴りに置き換わる。
+    # 中で見つけた展開。自分も展開なら、自分の表記に置き換わる。
     found: list[str] = field(default_factory=list)
 
 
@@ -467,7 +467,7 @@ class _Braces:
         brace = self.open.pop()
         found = brace.found
         if brace.comma or (brace.inner is not None and _SEQUENCE.fullmatch(brace.inner)):
-            # 入れ子は外側の綴りだけを並べる。`{a,{b,c}}` を 2 件と言っても直す先は 1 つ。
+            # 入れ子は外側の表記だけを並べる。`{a,{b,c}}` を 2 件と言っても直す先は 1 つ。
             found = [self.x.s[brace.start : end]]
         self.keep(found)
 
@@ -501,7 +501,7 @@ class _Scanner:
         # 引用の外でヒアドキュメントの始まりとして読んだ `<<` の数。
         # read() が、shlex の返した `<<` と数を比べる。
         self.heads = 0
-        # 引用の外で見つけたブレース展開の綴り。
+        # 引用の外で見つけたブレース展開の表記。
         self.braces: list[str] = []
 
     def emit(self, text: str, collect: bool) -> None:
@@ -753,7 +753,7 @@ class _Scanner:
                         self.emit("))", collect)
                         self.i += 2
                         return
-                    # `$((cmd) | x)` のような形。算術かコマンド置換かが綴りから決まらない。
+                    # `$((cmd) | x)` のような形。算術かコマンド置換かが表記から決まらない。
                     raise _Unreadable(REASON_AMBIGUOUS_SUBST, _ARITHMETIC_OR_SUBST)
                 depth -= 1
             self.emit(c, collect)
@@ -905,7 +905,7 @@ def read(src: str) -> Reading:
 def placed(src: str) -> list[tuple[list[str], str | None]]:
     """外側のコマンド 1 本ずつの（語の並び, そのコマンドが居る場所）。
 
-    居る場所は `cd` を追った先で、読みの起点（打たれた場所）から見た綴り。起点そのものは
+    居る場所は `cd` を追った先で、読みの起点（打たれた場所）から見たパス。起点そのものは
     空文字、読めなくなったら None（6.3.2 と同じ追い方）。置換の中身は並べない。
     読み切れない形（走査か shlex が止まる）なら空のリストを返す。呼び手は read() の
     degraded を先に見て、そちらで扱う。
@@ -928,7 +928,7 @@ def _prepare(src: str) -> str:
     2 行に割ったコマンドは 1 行で書いたのと同じ語の並びになる。
     走査より先に消すのは、改行をコマンドの区切りに読ませないため。
     シングルクォートの中では 2 文字とも文字通りなのでそこでは取りこぼすが、
-    誰も書かない綴りだし、変わるのは引数の文字列であってどのコマンドが走るかではない。
+    誰も書かない表記だし、変わるのは引数の文字列であってどのコマンドが走るかではない。
     """
     src = src.replace(SEP, " ").replace(WORD_SEP, " ")
     return src.replace("\\\r\n", "").replace("\\\n", "")
@@ -957,7 +957,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
         # `$'…\'…'` のように 2 つの読みが分かれる形。読み切れないものとして扱う。
         return Reading(degraded=True, reason=REASON_UNTERMINATED, rewrites=rewrites), []
 
-    # `cd` が移った先から見た綴りを別に組む。元のトークン列は動かさない。
+    # `cd` が移った先から見たパスを別に組む。元のトークン列は動かさない。
     moved_tokens = _resolve_cd(tokens)
 
     commands = _split_commands(tokens)
@@ -996,7 +996,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     # 中身は `\x00` の直後に来るので `(^|\x00)` のルールもそのまま当たる。
     texts = [_render(commands)]
     bares = [texts[0]]
-    # 移った先から見た綴りは、外側のコマンドと、切り出した中身の両方から集める。
+    # 移った先から見たパスは、外側のコマンドと、切り出した中身の両方から集める。
     # 中身は別の読みなので外側の行き先は及ばないが、中身の中で `cd` した先は及ぶ
     # （`echo "$(cd .claude && rm settings.json)"`）。
     moveds = [_render(_moved_layers(commands, moved_tokens, tokens))]
@@ -1058,7 +1058,7 @@ def _drop_arithmetic(tokens: list[str]) -> list[str]:
 
     中でコマンドは走らないので、判定に足すものが何も無い（中の置換は走査が
     切り出してある）。落とす理由は別にあって、左シフトの `<<` がヒアドキュメントの
-    区切り記号と同じ綴りだから。`echo $((1 << 2))` の `<<` を残すと、走査が
+    区切り記号と同じ表記だから。`echo $((1 << 2))` の `<<` を残すと、走査が
     ヒアドキュメントと読まなかった `<<` として縮退する。
     """
     kept: list[str] = []
@@ -1104,7 +1104,7 @@ def _split_commands(tokens: list[str]) -> list[list[str]]:
 def _resolve_cd(
     tokens: list[str], places: list[tuple[list[str], str | None]] | None = None
 ) -> list[str]:
-    """`cd` の行き先を、後ろのコマンドの引数の綴りに継ぎ足したトークン列を返す。
+    """`cd` の行き先を、後ろのコマンドの引数のパスに継ぎ足したトークン列を返す。
 
     継ぎ足すものが無ければ、元のリストをそのまま返す（呼び手はそれを見て、移った先の
     組み立てを丸ごと飛ばす）。行き先が読めなくなったら、そこから先は継ぎ足さない。
@@ -1115,7 +1115,7 @@ def _resolve_cd(
     サブシェルの閉じではないので、`case` から `esac` までは読まない（取りこぼす側）。
 
     places を渡すと、コマンド 1 本ずつの（語の並び, そのコマンドが居る場所）を足していく。
-    居る場所は読みの起点から見た綴りで、起点そのものは空文字、読めなければ None。
+    居る場所は読みの起点から見たパスで、起点そのものは空文字、読めなければ None。
     """
     out: list[str] = []
     segment: list[str] = []
@@ -1167,10 +1167,10 @@ def _flush(
 
 
 def _moved(commands: list[list[str]], resolved: list[list[str]]) -> list[list[str]]:
-    """移った先から見た綴りが、書かれた綴りと変わったコマンドだけ。
+    """移った先から見たパスが、書かれたパスと変わったコマンドだけ。
 
     語の数は変わらないので並びは 1 対 1 で対応する。対応しなければ何も返さない。
-    継ぎ足した綴りは当てる先を増やすためのもので、数が合わないまま並べると、
+    継ぎ足したパスは当てる先を増やすためのもので、数が合わないまま並べると、
     どのコマンドのことを言っているのか分からない文面になる。
     """
     if len(commands) != len(resolved):
@@ -1185,7 +1185,7 @@ def _moved_layers(
 
     層まで並べるのは、止める側のルールの多くが名前をコマンドの頭に固定して書かれて
     いるから。`cd .claude && sudo rm settings.json` の移った先は
-    `sudo rm .claude/settings.json` で、`(^|\x00)rm` はそこに当たらない。書かれた綴りと
+    `sudo rm .claude/settings.json` で、`(^|\x00)rm` はそこに当たらない。書かれた表記と
     同じように 1 枚ずつ外した層（実行役の中で実行されるコマンド）も並べて、はじめて当たる。
     """
     if moved_tokens is tokens:
@@ -1228,7 +1228,7 @@ def _chdir(segment: list[str], here: str | None, out: list[str], budget: list[in
         if at < 0:
             out.extend(rest)
             return None
-        # 行き先の語そのものは書かれた綴りのまま残す。`cd` は書き込みではないので、
+        # 行き先の語そのものは書かれた表記のまま残す。`cd` は書き込みではないので、
         # 当てる先に並べても止めるものが無く、`cd a && cd b && …` のぶんだけ当てる先が
         # 増えるだけになる。移った先は here が持つ。
         out.extend(rest)
@@ -1238,7 +1238,7 @@ def _chdir(segment: list[str], here: str | None, out: list[str], budget: list[in
         return None
     if here is None or budget[0] <= 0 or _classify([rest]):
         # 行き先が読めない、語数の上限を越えた、または文字列をコードとして実行する形
-        # （`sh -c` `eval` `xargs` `find -exec`）。最後のものは、どの語がパスかが綴りに
+        # （`sh -c` `eval` `xargs` `find -exec`）。最後のものは、どの語がパスかが表記に
         # 無い。この読み全体が縮退するので、判定は生の文字列で下る。
         out.extend(rest)
         return here
@@ -1259,7 +1259,7 @@ def _inside(rest: list[str], k: int, here: str) -> tuple[int, str | None]:
     意味の無い層になるので、`_peel` と同じ読み方で位置を出す。中で実行されるコマンドは
     元の語の並びの後ろ側そのものなので、語の数の差がそのまま位置になる。
 
-    `env -C <パス>` と `sudo --chdir=<パス>` は、その 1 本だけ居場所を移す。綴りから
+    `env -C <パス>` と `sudo --chdir=<パス>` は、その 1 本だけ居場所を移す。表記から
     決まらなければ None を返す（その 1 本には継ぎ足さない）。
     """
     depth = 0
@@ -1334,7 +1334,7 @@ def _destination(rest: list[str], k: int) -> int:
     """`cd` の行き先の語の位置。読み切れなければ -1。
 
     読み切れないのは、引数なし（`$HOME` へ移る）、`cd -`（直前の場所）、`cd old new`
-    （綴りの置き換え）、一覧に無いオプション、先頭の `~`、変数・置換・グロブを含む綴り。
+    （表記の置き換え）、一覧に無いオプション、先頭の `~`、変数・置換・グロブを含む表記。
     """
     where: list[int] = []
     j = k + 1
@@ -1360,7 +1360,7 @@ def _destination(rest: list[str], k: int) -> int:
 
 
 def _target(here: str | None, word: str) -> str | None:
-    """移る先を、読みの起点から見た綴りにする。決まらなければ None。"""
+    """移る先を、読みの起点から見たパスにする。決まらなければ None。"""
     if _EXPANDS.search(word) or word.startswith("~"):
         return None
     if _ABSOLUTE.match(word):
@@ -1376,7 +1376,7 @@ def _capped(path: str) -> str | None:
 
 
 def _under(here: str, word: str) -> str:
-    """いま居る場所から見た綴りを、読みの起点から見た綴りに直す。
+    """いま居る場所から見たパスを、読みの起点から見たパスに直す。
 
     起点は、元のコマンドが打たれた場所。絶対パスと `-` で始まる語はそのまま返す。
     `dd of=x` のように値にパスを取る語は、名前を残して値だけ継ぎ足す。
@@ -1394,10 +1394,10 @@ def _under(here: str, word: str) -> str:
 
 
 def _normal(path: str) -> str:
-    """`.` と `..` を整理する。区切りはどちらの綴りも受け、`/` で返す。
+    """`.` と `..` を整理する。区切りはどちらの表記も受け、`/` で返す。
 
     先頭の区切り（絶対パス）と末尾の区切り（ディレクトリと書いた形）は残す。末尾を
-    落とすと、名前がそこで終わる形に当てる守り（`_END`）の当たり方が変わる。
+    落とすと、名前がそこで終わる形に当てる保護（`_END`）の当たり方が変わる。
     起点より上に出る `..` は整理せずに残す。
     """
     parts: list[str] = []
@@ -1417,7 +1417,7 @@ def _classify(commands: list[list[str]]) -> str:
     """読みを止めたものがあれば、それが何かを返す。"""
     for command in commands:
         # 文字列を実行することが仕事のコマンドは、先頭の語だけを見る。
-        # 引数に現れた同じ綴りは実行体ではない。"." はシェルの source だが、
+        # 引数に現れた同じ表記は実行体ではない。"." はシェルの source だが、
         # 引数としては「このディレクトリ」で、ruff check . のような書き方は
         # いくらでもある。ここを全語で見ると、そういう普通の作業が読めなくなる。
         # パイプや ";" の後ろは別のコマンドになるので、xargs や eval も
@@ -1483,7 +1483,7 @@ def _with_time(commands: list[list[str]]) -> list[list[str]]:
 def _expanded_names(commands: list[list[str]]) -> list[str]:
     """コマンドの位置に、実行するときにシェルが決める語があれば並べる。"""
     found: list[str] = []
-    # 並べた綴りの、パスを落とした形。`/usr/bin/gi?` は、パスを落とした層にも `gi?` として現れる。
+    # 並べた表記の、パスを落とした形。`/usr/bin/gi?` は、パスを落とした層にも `gi?` として現れる。
     # 同じものを 2 度並べない。コマンドを数万本並べても線形で済むよう、集合で引く。
     seen: set[str] = set()
     previous: list[str] = []
@@ -1610,7 +1610,7 @@ def _peel(command: list[str], rewrites: list[tuple[str, str]]) -> tuple[str, lis
     if name != head and name:
         return head, [[name, *command[1:]]], True
 
-    # find の述語の `;` は `\;` と書くが、shlex は区切り記号の `;` と同じ綴りで返すので、
+    # find の述語の `;` は `\;` と書くが、shlex は区切り記号の `;` と同じ表記で返すので、
     # 2 つめの `-exec` からは別のコマンドの頭に来る。そこも find の続きとして読む。
     if name == "find" or name in _FIND_EXEC:
         return "find", _find_commands(command), True

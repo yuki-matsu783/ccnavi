@@ -12,7 +12,7 @@
 
 読み返すのは終了コード・標準出力と、git に残った ref だけ。
 
-`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -85,7 +85,7 @@ class FetchTest(unittest.TestCase):
     # ---- 道具
 
     def repository(self, path):
-        """git のリポジトリと、その bare のリモートを作る。リモートの綴りを返す。"""
+        """git のリポジトリと、その bare のリモートを作る。リモートのパスを返す。"""
         git(self._tmp.name, "init", "-q", "-b", "main", path)
         for key, value in CONFIG:
             git(path, "config", key, value)
@@ -306,8 +306,8 @@ class FetchTest(unittest.TestCase):
     # SessionStart は親のワークツリーを早送りするだけで、merge はしない。
 
     def family(self, name="i0001", record=True):
-        """親のワークツリー .claude/worktrees/<name>（親の写しを送ってある）と、
-        親子のチケットの控え。
+        """親のワークツリー .claude/worktrees/<name>（親チケットを送ってある）と、
+        親子のチケットの取り込み状態。
         """
         self.leave_main()
         tree = os.path.join(self.ws, ".claude", "worktrees", name)
@@ -325,7 +325,8 @@ class FetchTest(unittest.TestCase):
         return tree
 
     def test_a_family_is_fast_forwarded_past_unrelated_work_in_progress(self):
-        # 前は未コミットの変更があるだけで進めなかった。親子のチケットでは重なりを git に任せる。
+        # 前は未コミットの変更があるだけで進めなかった。
+        # 取り込み済みの親子のチケットでは重なりを git に任せる。
         tree = self.family()
         head = self.advance(self.remote, "i0001")
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
@@ -465,7 +466,8 @@ class FetchTest(unittest.TestCase):
         self.assertIn("nope（統合先）がリモートに無い", done.stdout)
 
     def test_a_worktree_without_a_record_keeps_the_old_rule(self):
-        # 控えの無い（取り込み済みでない）親子のチケットは今までどおり。書きかけがあれば進めない。
+        # 取り込み状態の無い（取り込み済みでない）親子のチケットは今までどおり。
+        # 書きかけがあれば進めない。
         tree = self.family(record=False)
         before = self.sha(tree, "HEAD")
         self.advance(self.remote, "i0001")

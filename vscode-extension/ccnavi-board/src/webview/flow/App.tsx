@@ -11,13 +11,18 @@
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
  * だけ（再読込・保存が通った）。履歴もそこで空にする。
  *
- * **写しを替えるのは `edit()` だけ。** 直す前の写しを履歴（`core/flow-history.ts`）に積んでから替える。
+ * **コピーを替えるのは `edit()` だけ。** 直す前のコピーを履歴（`core/flow-history.ts`）に積んでから替える。
  * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts` の `sameFlow`）ので、
  * 元に戻して読み込んだときと同じ中身になれば消える。
  *
  * **実行ファイルが言ったこと（`FlowChecks`）は画面で作らない。** 開くときの答えは中身と一緒に届き、編集したら
  * 止まってから（`CHECK_MS`）拡張ホストに確かめ直しを頼む（`check` → `checked`。書きはしない）。答えの
  * warn は画面の注意と並べて出し、渡る手順は右の列のプレビュー、候補の名前は右の欄の選択肢に使う。
+ *
+ * **エージェントの下書き。** 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
+ * 実行ファイルに確かめさせた中身が届き（`proposal`）、文の前後まで見せる差分（`Proposal.tsx`）から「取り込む」で
+ * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きの指紋を添え、拡張ホストは
+ * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`request`）は着手の前だけ拡張ホストが言葉を渡す。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -45,7 +50,7 @@ import {
   type PaletteType,
 } from "../../core/flow-doc.js";
 import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
-import type { FlowChecks, FlowData, FlowLock, FlowPage, ToFlow } from "../../core/flow-view.js";
+import type { FlowChecks, FlowData, FlowLock, FlowOffer, FlowPage, FlowProposal, ToFlow } from "../../core/flow-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { getState, setState } from "../vscode.js";
@@ -53,12 +58,13 @@ import { Canvas, type Selection } from "./Canvas.js";
 import { Inspector } from "./Inspector.js";
 import { post } from "./post.js";
 import { Preview } from "./Preview.js";
+import { ProposalReview, RequestText, type ProposalView } from "./Proposal.js";
 import { SaveReview } from "./SaveReview.js";
 import { badgeOf } from "./text.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: FlowLock = { locked: true, reason: "" };
-/** 編集中の写しを拡張ホストへ控えさせるまでの間（打つたびに送らない） */
+/** 編集中のコピーを拡張ホストへ送って覚えさせるまでの間（打つたびに送らない） */
 const DRAFT_MS = 300;
 /** 編集が止まってから実行ファイルに確かめ直させるまでの間 */
 const CHECK_MS = 800;
@@ -159,7 +165,7 @@ const TOUR_STEPS: readonly TourStep[] = [
 
 export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [data, setData] = useState<FlowData>(initial);
-  // 読み込んだ中身（未保存の見比べと、保存前の差分の元）と、編集中の写し
+  // 読み込んだ中身（未保存の見比べと、保存前の差分の元）と、編集中のコピー
   const [base, setBase] = useState<FlowDoc | undefined>(() => pageOf(initial)?.doc);
   const [doc, setDoc] = useState<FlowDoc | undefined>(() => pageOf(initial)?.draft ?? pageOf(initial)?.doc);
   const [history, setHistory] = useState<FlowHistory>(emptyHistory);
@@ -174,12 +180,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [minimap, setMinimap] = useState(minimapShown);
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
-  // コピーしたノード（画面の中の控え）と、同じ控えを何回貼り付けたか（貼り付けるたびに少しずつずらす）
+  // コピーしたノード（画面の中に保持する）と、同じものを何回貼り付けたか（貼り付けるたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
-  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指す写し、`pendingDoc` は頼んで答えを待っている写し、
-  // `checkSeq` は最後に頼んだ確認の番号。写しが替わるたびに番号を進め、待っていた答えは捨てる
-  // （答えを待つ間に直すと、古い写しの答えを今の答えと取り違えるため）
+  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指すコピー、`pendingDoc` は頼んで答えを待っているコピー、
+  // `checkSeq` は最後に頼んだ確認の番号。コピーが替わるたびに番号を進め、待っていた答えは捨てる
+  // （答えを待つ間に直すと、古いコピーの答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | undefined>(undefined);
@@ -188,6 +194,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const checkSeq = useRef(0);
   // 外で変わった知らせを受けているか。拡張ホストはタブを表に戻すたびに送り直すので、最初の 1 回だけ履歴を空にする
   const changedSeen = useRef(false);
+  // エージェントの下書き。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きの指紋
+  const [request, setRequest] = useState<string | undefined>(() => pageOf(initial)?.request);
+  const [offer, setOffer] = useState<FlowOffer | undefined>(() => pageOf(initial)?.offer);
+  const [proposal, setProposal] = useState<ProposalView | undefined>(undefined);
+  const [requestText, setRequestText] = useState<string | undefined>(undefined);
+  // 取り込んだ下書きの指紋と中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に添える（違えば下書きを消させない）
+  const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
@@ -218,6 +231,23 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         setChecks(page?.checks);
         setChecking(false);
         setCheckError(undefined);
+        setRequest(page?.request);
+        setOffer(page?.offer);
+        setProposal(undefined);
+        setRequestText(undefined);
+        imported.current = undefined;
+      } else if (message.type === "offer") {
+        const answer = message as { request?: string; offer?: FlowOffer };
+        setRequest(answer.request);
+        setOffer(answer.offer);
+      } else if (message.type === "proposal") {
+        const answer = message as { proposal?: FlowProposal; error?: string };
+        // 閉じたあとに届いた答えは捨てる
+        setProposal((now) =>
+          now === undefined ? now : answer.proposal !== undefined ? { kind: "ready", proposal: answer.proposal } : { kind: "error", error: String(answer.error ?? "") },
+        );
+      } else if (message.type === "requestText") {
+        setRequestText(String((message as { prompt?: unknown }).prompt ?? ""));
       } else if (message.type === "failed") {
         setBusy(false);
         setStatus({ text: String(message.message ?? ""), error: true });
@@ -270,8 +300,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
   }, [dirty]);
 
-  // 未保存の写しを拡張ホストに控えさせる（未保存のまま閉じられたら、開き直して戻せるように）。
-  // 打つたびには送らず、止まってから送る。未保存でなくなったら控えを消させる
+  // 未保存のコピーを拡張ホストに覚えさせる（未保存のまま閉じられたら、開き直して戻せるように）。
+  // 打つたびには送らず、止まってから送る。未保存でなくなったら覚えたコピーを消させる
   const sentDraft = useRef(false);
   useEffect(() => {
     if (!dirty) {
@@ -299,16 +329,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
 
-  // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指す写しと同じなら頼まない
+  // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指すコピーと同じなら頼まない
   useEffect(() => {
     if (doc === undefined || pendingDoc.current === doc) {
       return;
     }
-    // 写しが替わった。待っていた答えは古い写しのものなので捨てる（番号を進める）
+    // コピーが替わった。待っていた答えは古いコピーのものなので捨てる（番号を進める）
     checkSeq.current += 1;
     pendingDoc.current = undefined;
     if (checkedDoc.current === doc) {
-      // 答えが指す写しに戻った（元に戻すなど）。確かめ直さない
+      // 答えが指すコピーに戻った（元に戻すなど）。確かめ直さない
       setChecking(false);
       return;
     }
@@ -319,6 +349,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       post({ type: "check", seq: checkSeq.current, doc });
     }, CHECK_MS);
     return () => clearTimeout(timer);
+  }, [doc]);
+
+  // 取り込んだ中身から編集で離れたら、取り込んだ記録を外す（元に戻して同じ中身にしても付け直さない。下書きを消さない側）
+  useEffect(() => {
+    const taken = imported.current;
+    if (taken !== undefined && doc !== undefined && !sameFlow(doc, taken.doc)) {
+      imported.current = undefined;
+    }
   }, [doc]);
 
   // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
@@ -356,7 +394,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const readOnly = lock.locked || busy;
 
   /**
-   * 写しを替える唯一の入り口。直す前の写しを履歴に積む。`typing` は欄に打った文字のときの欄の名前で、
+   * コピーを替える唯一の入り口。直す前のコピーを履歴に積む。`typing` は欄に打った文字のときの欄の名前で、
    * 同じ欄に続けて打ったものは 1 件にまとめる
    */
   const edit = (next: FlowDoc, typing?: string): void => {
@@ -368,7 +406,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setDoc(next);
   };
 
-  /** 戻した・やり直した写しに無いものを選んでいたら外す（線は並びの位置で指すので、線の選択は外す） */
+  /** 戻した・やり直したコピーに無いものを選んでいたら外す（線は並びの位置で指すので、線の選択は外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
     if (moved === undefined || readOnly) {
       return;
@@ -479,7 +517,25 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setReview(undefined);
     setBusy(true);
     setStatus({ text: "着手中でないかを確かめて保存中…", error: false });
-    post({ type: "save", doc });
+    const taken = imported.current;
+    post({ type: "save", doc, ...(taken !== undefined && sameFlow(doc, taken.doc) ? { imported: taken.hash } : {}) });
+  };
+
+  const openProposal = (): void => {
+    setProposal({ kind: "loading" });
+    post({ type: "openProposal" });
+  };
+
+  /** 下書きの中身を編集中の内容に入れる。書かない（保存はいつもの経路）。着手中は入れない */
+  const importProposal = (taken: FlowProposal): void => {
+    if (lock.locked) {
+      return;
+    }
+    edit(taken.doc);
+    imported.current = { hash: taken.hash, doc: taken.doc };
+    setProposal(undefined);
+    setSelected(undefined);
+    setStatus({ text: "下書きを取り込みました（まだ保存していません）。そのまま保存すると、取り込んだ下書きは消えます（直してから保存したときは残します）", error: false });
   };
 
   const save = (): void => {
@@ -500,6 +556,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
+    if (proposal !== undefined || requestText !== undefined) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setProposal(undefined);
+        setRequestText(undefined);
+      }
+      return;
+    }
     if (review !== undefined) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -541,6 +605,17 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           再読込
         </button>
       </div>
+      {offer !== undefined && (
+        <div id="offer" className="banner missing" role="status">
+          <span>
+            提案あり: エージェントの下書き（{offer.draftPath}）が、いまのフローと違います。
+            {offer.problem !== undefined && <span className="dim">（読めません: {offer.problem}）</span>}
+          </span>
+          <button type="button" className="action" data-action="open-proposal" disabled={busy} onClick={openProposal}>
+            提案を見る
+          </button>
+        </div>
+      )}
       <header className="toolbar">
         <div className="summary">
           <span className="flow-ticket">
@@ -583,6 +658,18 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <button type="button" className="action" data-action="toggle-minimap" aria-pressed={minimap} title="図の右下のミニマップを出す・隠す" onClick={toggleMinimap}>
             {minimap ? "ミニマップを隠す" : "ミニマップを出す"}
           </button>
+          {request !== undefined && !lock.locked && (
+            <button
+              type="button"
+              className="action"
+              data-action="request-flow"
+              disabled={busy}
+              title="エージェントへの依頼の文を組みます。エージェントは下書きを書くだけで、取り込むかはこの画面で決めます"
+              onClick={() => post({ type: "request" })}
+            >
+              {request}
+            </button>
+          )}
           <button type="button" className="action" data-action="open-flow" disabled={!page.exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
@@ -631,7 +718,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           minimap={minimap}
           onPick={pick}
           onMove={(moves) => {
-            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じ写しを返す）
+            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じものを返す）
             const next = placeNodes(doc, moves);
             if (next !== doc) {
               edit(next);
@@ -641,7 +728,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           onRemoveNode={removeNodeAt}
           onRemoveEdge={removeEdgeAt}
           onResizeGroup={(id, size, position) => {
-            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じ写しを返す）
+            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じものを返す）
             const next = resizeGroup(doc, id, size, position);
             if (next !== doc) {
               edit(next);
@@ -655,6 +742,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       </div>
       {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
       {review !== undefined && <SaveReview diff={review} onConfirm={confirmSave} onCancel={() => setReview(undefined)} />}
+      {proposal !== undefined && (
+        <ProposalReview view={proposal} base={base} lock={lock} dirty={dirty} onImport={importProposal} onCancel={() => setProposal(undefined)} />
+      )}
+      {requestText !== undefined && <RequestText prompt={requestText} onClose={() => setRequestText(undefined)} />}
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>

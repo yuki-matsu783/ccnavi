@@ -16,7 +16,7 @@ import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * 配点の形（`KINDS`・`FactorForm`・`RiskForm` など）は画面との契約（`risk-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿って束ねたものに解析器が丸ごと入る。
+ * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
  */
 
 /** 実行ファイルが読む版（risk.VERSION） */

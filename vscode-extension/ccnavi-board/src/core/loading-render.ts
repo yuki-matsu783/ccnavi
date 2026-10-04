@@ -9,27 +9,27 @@
  * 入れ物はまだ 1 枚も入っていないので、読み終えて最初に渡す中身は必ず入れ物ごと
  * （`rebuilt`）になり、この 1 枚と入れ替わる。スクリプトは持たず、`ready` も送らない。
  *
- * CSS はその画面の束ね（`out/webview/<名前>.css`）をそのまま流し込む。地の色と見た目の切り替え
+ * CSS はその画面のバンドル（`out/webview/<名前>.css`）をそのまま流し込む。地の色と見た目の切り替え
  * （body のクラス）が、読み終えた後の画面と同じになる。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
 
 export interface LoadingOptions {
   readonly nonce: string;
-  /** その画面の束ねた CSS */
+  /** その画面のバンドルした CSS */
   readonly style: string;
   /** 見た目。無ければ VS Code のテーマに従う */
   readonly appearance?: Appearance;
 }
 
-/** 読み込み中の一言。`what` は読むもの（「チケット」「web のルール」）。5 画面と切り替え中の表示で綴りを揃える */
+/** 読み込み中の一言。`what` は読むもの（「チケット」「web のルール」）。5 画面と切り替え中の表示で表記を揃える */
 export function loadingText(what: string): string {
   return `${what}を読み込み中…`;
 }
 
 /**
  * 読み込み中の一言を段落にしたもの（HTML としてエスケープする）。この 1 枚の本文のほか、各画面の入れ物の
- * `<div id="root">` にも入れる。入れ物を入れてから束ねた画面が組み上がるまでの間、白いままにしないため。
+ * `<div id="root">` にも入れる。入れ物を入れてからバンドルした画面が組み上がるまでの間、白いままにしないため。
  * 組み上がると React が中身を入れ替えるので、残らない
  */
 export function loadingMarkup(what: string): string {

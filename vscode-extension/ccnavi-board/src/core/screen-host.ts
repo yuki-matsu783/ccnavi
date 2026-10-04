@@ -161,7 +161,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
       sync();
       // 裏にいる画面は `ready` を送らない。届いたなら、それは捨てられた画面が残していったもの。
       // これを真に受けると、作り直し中の画面へ送って落とすことになる。
-      // （`live` と `post` も表に出ていることを見るので、ここは二重の守り。単体では外から観測できない）
+      // （`live` と `post` も表に出ていることを見るので、ここは二重の確認。単体では外から観測できない）
       if (!seen) {
         return;
       }

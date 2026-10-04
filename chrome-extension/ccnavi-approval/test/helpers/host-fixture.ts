@@ -1,5 +1,5 @@
 /**
- * 録ったホストの応答の見本（test/fixtures/host/github/<場面>/）を返す代役。
+ * 録ったホストの応答の見本（test/fixtures/host/github/<場面>/）。
  *
  * リポジトリの sh の試験（tests/sh/github_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
  *
@@ -12,7 +12,7 @@
  * - `GET /user` → `user.json`
  * - GraphQL は、見本の応答が持つ欄（`THREAD_FIELDS`）が問い合わせに語として全部あるときだけ答える
  *
- * 期待値（`expected.json`）は sh が見本から組んだ写しで、拡張の試験（CX-T129）は TS が組んだ写しと比べる。
+ * 期待値（`expected.json`）は sh が見本から組んだ結果で、拡張の試験（CX-T129）は TS が組んだ結果と比べる。
  */
 import fs from "node:fs";
 import path from "node:path";

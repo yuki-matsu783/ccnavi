@@ -1,13 +1,15 @@
-"""レビュー済みの印の `actor` と、依頼の後に動いたかの判定の受入テスト。
+"""レビュー済みのマーカーの `actor` と、依頼の後に動いたかの判定の受入テスト。
 
 見るのは 4 つ。
 
-1. 手元の `review confirm --actor <アカウント>` は、印に `actor` と `via: cli` を書き、
-   跡にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）印も跡も前と同じ中身
+1. 手元の `review confirm --actor <アカウント>` は、マーカーに `actor` と `via: cli` を書き、
+   履歴にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）
+   マーカーも履歴も前と同じ中身
 2. `--actor` の形と、`review confirm` の外で渡されたときは断る
 3. 依頼の後にユーザが見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）
    で決める。Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
-4. Chrome のレビュー済みの印は、手元の `--actor` つきの印と経路（`via`）と時刻のほかは同じ
+4. Chrome のレビュー済みのマーカーは、
+   手元の `--actor` つきのマーカーと経路（`via`）と時刻のほかは同じ
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ class ActorHarness(CoreHarness):
         return os.path.join(self.parent_tree, ".ccnavi", "approved", "phases", "i0001", f"1.{kind}")
 
     def ready(self):
-        """フェーズ 1 を依頼まで進め、写しを置いた fixture を返す。"""
+        """フェーズ 1 を依頼まで進め、取得した結果を置いた fixture を返す。"""
         fixture = self.reviewed_phase_one()
         self.commit_parent("requested")
         write(fixture, json.dumps(RESULT))
@@ -208,8 +210,8 @@ class ReviewableTest(ActorHarness):
             board["reviewable"],
             [{"phase": 1, "mr": 7, "host": "fixture", "children": ["i0001-01"]}],
         )
-        # ボードの要求は取り込みの控え相当を手元にも写す（手元は C1 の対象になり、直打ちの
-        # confirm を断る）。ここでは手元の印を置くためだけに控えを外す
+        # ボードの要求は取り込み状態相当を手元にもコピーする（手元は C1 の対象になり、直打ちの
+        # confirm を断る）。ここでは手元のマーカーを置くためだけに取り込み状態を外す
         shutil.rmtree(os.path.join(self.state, "sync"))
         self.assertEqual(self.confirm_as(fixture).returncode, 0)
         self.commit_parent("reviewed")
@@ -218,7 +220,7 @@ class ReviewableTest(ActorHarness):
 
 
 class ReviewRuleTest(ActorHarness):
-    """Chrome のレビュー済みを入れた後のレビューで決めたこと。どれも締める向き。
+    """Chrome のレビュー済みを入れた後のレビューで決めたこと。どれも厳しくする向き。
 
     ユーザごとの最新のレビューは Approve・変更要求・dismiss だけで選ぶ。レビュー済みのフェーズに
     confirm を重ねない。ccnavi の投稿のスレッドを未解決から除くのは、GitLab で依頼を投稿した
@@ -316,7 +318,7 @@ class ReviewRuleTest(ActorHarness):
 
 
 class DecideActorTest(ActorHarness):
-    """decide の印にも `actor` と `via`（confirm と同じ形）。"""
+    """decide のマーカーにも `actor` と `via`（confirm と同じ形）。"""
 
     def decide(self, fixture, *extra):
         preview = self.ccnavi(
@@ -365,13 +367,13 @@ class DecideActorTest(ActorHarness):
                 mark = read_json(self.mark_path())
                 self.assertEqual(list(mark), ["mr", "accepted", "actor", "via", "at"])
                 self.assertEqual((mark["actor"], mark["via"]), ("octo-reviewer", via))
-                # 印を置いた跡（親の phase-mark）にもアカウントと経路が入る
+                # マーカーを置いた履歴（親の phase-mark）にもアカウントと経路が入る
                 event = self.last_event("i0001")
                 self.assertEqual(event["kind"], history.KIND_PHASE_MARK)
                 self.assertEqual((event["actor"], event["via"]), ("octo-reviewer", via))
 
     def again(self):
-        """印を外して、同じフェーズをもう 1 度決められるようにする。"""
+        """マーカーを外して、同じフェーズをもう 1 度決められるようにする。"""
         os.remove(self.mark_path())
         fixture = os.path.join(self.root, "again.json")
         write(fixture, json.dumps(RESULT))

@@ -101,7 +101,7 @@ ROOT_DIRECTORY = "."
 
 SORTS = ("path", "mtime", "type", "title")
 FORMATS = ("table", "path", "detail", "json", "jsonl", "count")
-# `--since` / `--until` に受ける形と、その形の読み方。綴りを誤った値が気づかないうちに
+# `--since` / `--until` に受ける形と、その形の読み方。書き誤った値が気づかないうちに
 # 0 件になるのを避ける。
 _WHEN_FORMATS = {
     10: "%Y-%m-%d",
@@ -201,7 +201,7 @@ def _ignored(base: str, paths: list[str], timeout: float = GIT_TIMEOUT_SECONDS) 
         return set()
     # check-ignore は渡したパスを pathspec として読み、`:` で始まるもの（`:(exclude)x/` という
     # 名前のディレクトリなど）を magic として 128 で止まる。`--literal-pathspecs` も受けないので、
-    # 頭に `./` を付けて magic と読ませない。出てくる綴りも `./` 付きなので外して返す。
+    # 頭に `./` を付けて magic と読ませない。出てくるパスも `./` 付きなので外して返す。
     done = gitcmd.run(
         base,
         ["check-ignore", "-z", "--stdin"],
@@ -349,7 +349,7 @@ def _check_json(value: Any) -> None:
     """どの出力の形（`--format json` の字下げを含む）でも書けるか。書けなければ ValueError。
 
     字下げのある `json.dumps` は C の速い経路を使わず再帰するので、詰めた形で書けた行でも
-    深い入れ子で RecursionError になる。NaN・Infinity は JSON に無い綴りを出すので弾く。
+    深い入れ子で RecursionError になる。NaN・Infinity は JSON に無い表記を出すので弾く。
     """
     if _deep(value):
         raise ValueError("入れ子が深すぎる")
@@ -463,7 +463,7 @@ class _Writer:
 
     `.git` が作業ツリーと別のファイルシステムにあると `os.replace` が EXDEV で落ちるので、
     そのときは作業ツリーの同じディレクトリの下に `.ccnavi-tmp-*/index.jsonl` を作って置き換える。
-    その綴りが git に無視されることを先に確かめ、`git status` を汚さない。
+    そのパスが git に無視されることを先に確かめ、`git status` を汚さない。
     """
 
     def __init__(self, base: str, tmp_dir: str, deadline: float | None) -> None:
@@ -737,7 +737,7 @@ def _rel(path: str, root: str) -> str:
 
 @dataclass
 class Place:
-    """索引を組む 1 つの git の作業ツリー。prefix は concept_id の頭に付ける綴り。"""
+    """索引を組む 1 つの git の作業ツリー。prefix は concept_id の頭に付ける文字列。"""
 
     name: str
     base: str
@@ -1129,7 +1129,7 @@ def run(
 
 
 def _command(conf: settings.Settings, root: str) -> str:
-    """案内に書く ccnavi の綴り。設定が相対ならワークスペースルートから書く。"""
+    """案内に書く ccnavi のパス。設定が相対ならワークスペースルートから書く。"""
     path = conf.bin
     if path and not os.path.isabs(path):
         path = os.path.realpath(os.path.join(root, path))

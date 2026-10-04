@@ -15,7 +15,7 @@
 //   node scripts/test-groups.js --plan --for <パス>...    何を回すかだけ出す（走らせない）
 //   node scripts/test-groups.js --dom --all              画面（*.dom.test.js）だけ
 //
-// `--plan` は node_modules が無くても動く。読むのはソースの綴りだけで、
+// `--plan` は node_modules が無くても動く。読むのはソースの文字だけで、
 // コンパイルも実行もしないため。ターンの終わりの hook（.claude/hooks/test-ext.sh）は
 // これを使って「回すものが無いターン」を見分ける。
 "use strict";
@@ -35,15 +35,15 @@ const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 // ターンの終わりの hook は、これを差し戻しに数えずユーザへ言う。
 const NOT_READY = 3;
 
-// 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では辿れないので、
-// 画面とテストの結び付きだけは綴りの約束で決める。**表では持たない**（表は、画面を足したときに
+// 画面（React）は esbuild がバンドルし、テストはバンドルしたものを読む。その道は import では辿れないので、
+// 画面とテストの結び付きだけはパスの付け方の約束で決める。**表では持たない**（表は、画面を足したときに
 // 気づかないうちに古くなる。このファイルがグループの表を持たないのと同じ理由）。
 //
 //   画面      `src/webview/<名前>/main.tsx` があるもの（`scripts/bundle-webview.js` と同じ見つけ方）
-//   CSS       同じ置き場の `src/webview/<名前>/style.css`（部品の CSS を `@import` で束ねる入口）
-//   テスト    `test/helpers/<名前>.ts`（束ねたものを読む入口）と、同じ名前のグループ `test/<名前>/`
+//   CSS       同じ置き場の `src/webview/<名前>/style.css`（部品の CSS を `@import` でバンドルする入口）
+//   テスト    `test/helpers/<名前>.ts`（バンドルしたものを読む入口）と、同じ名前のグループ `test/<名前>/`
 //
-// これを辿るグループだけ、tsconfig.webview.json の型の検査と esbuild の束ねが要る。
+// これを辿るグループだけ、tsconfig.webview.json の型の検査と esbuild のバンドルが要る。
 const WEBVIEW_DIR = path.join(ROOT, "src", "webview");
 
 /** 画面の一覧。`{ name, entry, helper }` を名前順で返す */
@@ -71,9 +71,9 @@ function groupNames() {
 }
 
 /**
- * import の綴りを、このリポジトリの中のファイルに解く。
+ * import のパスを、このリポジトリの中のファイルに解く。
  *
- * テストは `../../src/core/hooks.js` と書く（module: Node16 なので出力側の綴り）。
+ * テストは `../../src/core/hooks.js` と書く（module: Node16 なので出力側のパス）。
  * 解く先は `.ts` か `.tsx`。`node:fs` や `happy-dom` のような外のものは null。
  */
 function resolveImport(from, spec) {
@@ -83,7 +83,7 @@ function resolveImport(from, spec) {
   if (base.endsWith(".js")) {
     candidates.push(base.slice(0, -3) + ".ts", base.slice(0, -3) + ".tsx");
   }
-  // CSS は綴りのまま（`@import "./Card.css"`）。拡張子を落とした形は書かない
+  // CSS は書いたパスのまま（`@import "./Card.css"`）。拡張子を落とした形は書かない
   if (base.endsWith(".css")) {
     candidates.push(base);
   }
@@ -105,7 +105,7 @@ function resolveImport(from, spec) {
 // 見張るものが無いので、片方だけ拾うと気づかないうちに取りこぼす）。
 const IMPORT = /(?:^|\s)(?:import|export)\b[^;]*?from\s*["']([^"']+)["']/g;
 const SIDE_EFFECT_IMPORT = /(?:^|\s)import\s*["']([^"']+)["']/g;
-// CSS の `@import "./Card.css";`。画面の CSS は、これだけで束ねに入る
+// CSS の `@import "./Card.css";`。画面の CSS は、これだけでバンドルに入る
 const CSS_IMPORT = /@import\s*["']([^"']+)["']/g;
 
 /** 1 ファイルが読むもの（相対 import だけ）。 */
@@ -157,11 +157,11 @@ function closureFrom(roots) {
   return seen;
 }
 
-// 画面の束ねに入るファイル。触ったパス 1 つごとに取り直すと、画面の数だけ全体を歩き直す。
+// 画面のバンドルに入るファイル。触ったパス 1 つごとに取り直すと、画面の数だけ全体を歩き直す。
 const screenFileCache = new Map();
 
 /**
- * 画面の束ねに入るファイル全部（2 つの入口から辿れるもの）。1 度取ったら覚えておく。
+ * 画面のバンドルに入るファイル全部（2 つの入口から辿れるもの）。1 度取ったら覚えておく。
  *
  * 入口は 2 つある。画面（`main.tsx` から `import` で辿る）と、CSS（`style.css` から `@import` で辿る）。
  * CSS は画面のスクリプトから import しないので（挿すのは拡張ホスト）、`main.tsx` だけを起点にすると
@@ -190,10 +190,10 @@ function closures() {
 }
 
 /**
- * 束ねた画面を読むグループ。
+ * バンドルした画面を読むグループ。
  *
- * `rel`（触ったファイル）を渡すと、**その画面の束ねに入るファイルか** を閉包で見て絞る。
- * 置き場の綴り（`src/webview/<名前>/` で始まるか）では決めない。画面をまたぐ import が
+ * `rel`（触ったファイル）を渡すと、**その画面のバンドルに入るファイルか** を閉包で見て絞る。
+ * 置き場のパス（`src/webview/<名前>/` で始まるか）では決めない。画面をまたぐ import が
  * 1 本でも入ると、直したのに回らない側（回すものが減る側）に判断がずれるため。
  *
  * どの画面の閉包にも入らないもの（`src/webview/vscode.ts` のような共通の部品）は全部のグループに関わると見る。
@@ -205,7 +205,7 @@ function webviewGroups(map, rel) {
   const wanted = matched.length === 0 ? all : matched;
   const groups = groupsFor(wanted, map);
   // 絞った先にグループが 1 つも無い（グループも入口も無い置き方をされている）。どれが読むか
-  // 決められないので、束ねを読むグループを全部返す。決められないときは、回すものが多くなるほうを選ぶ
+  // 決められないので、バンドルを読むグループを全部返す。決められないときは、回すものが多くなるほうを選ぶ
   if (groups.length === 0 && wanted !== all) {
     return groupsFor(all, map);
   }
@@ -216,11 +216,11 @@ function webviewGroups(map, rel) {
 function groupsFor(wanted, map) {
   const groups = new Set();
   for (const screen of wanted) {
-    // その画面の束ねを読むテストを持つグループ
+    // その画面のバンドルを読むテストを持つグループ
     for (const [group, files] of map) {
       if (files.has(screen.helper)) groups.add(group);
     }
-    // 画面と同じ名前のグループは、テストの入口の綴りが約束と違っても必ず回す。
+    // 画面と同じ名前のグループは、テストの入口のパスが約束と違っても必ず回す。
     // ここが無いと、画面を足して `test/helpers/<名前>.ts` を作り忘れたときに、
     // その画面のテストだけが気づかないうちに回らなくなる
     if (map.has(screen.name)) groups.add(screen.name);
@@ -241,7 +241,7 @@ function relativeToExtension(given) {
   const inside = at >= 0 ? slashed.slice(at + marker.length) : slashed;
   if (at < 0 && path.isAbsolute(slashed)) return null;
   // `./src/x.ts` や `src/../src/x.ts` を `src/x.ts` に直す。直さないまま
-  // `startsWith("src/webview/")` のような綴りの比較に渡すと、`./` が付いただけで
+  // `startsWith("src/webview/")` のようなパスの比較に渡すと、`./` が付いただけで
   // 別のファイルとして扱われ、回すものが減る側に判断がずれる。
   const normalized = path.posix.normalize(inside);
   if (normalized.startsWith("../")) return null;
@@ -284,8 +284,8 @@ function callFor(rel, map) {
   const absolute = path.join(ROOT, rel);
   const groups = all.filter((group) => map.get(group).has(absolute));
 
-  // 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では
-  // 辿れないので、束ねたものを読むグループを足す。辿れたぶん（テストが画面のファイルを
+  // 画面（React）は esbuild がバンドルし、テストはバンドルしたものを読む。その道は import では
+  // 辿れないので、バンドルしたものを読むグループを足す。辿れたぶん（テストが画面のファイルを
   // 直に import している場合）は落とさずに和を取る。
   // 画面のファイルは `tsconfig.json` が exclude するので、`tsconfig.test.json` では型を見ない。
   // esbuild も型を見ない。回すグループが 0 本でも、画面の型の検査だけは必ず通す
@@ -343,7 +343,7 @@ function run(command, args) {
   return result.status === null ? 1 : result.status;
 }
 
-/** ローカルに入れた実行ファイル。pnpm を通さずに呼ぶので、hook からも同じ綴りで動く。 */
+/** ローカルに入れた実行ファイル。pnpm を通さずに呼ぶので、hook からも同じ書き方で動く。 */
 function localBin(relative) {
   return path.join(ROOT, "node_modules", relative);
 }
@@ -413,9 +413,9 @@ function main(argv) {
     if (code !== 0) return code;
   }
 
-  // 束ねるのは、型を見ないときでも必ず。`clean-out.js` が `out/webview` を消すので、
-  // ここで作り直さないと、束ねたものを読む側（拡張の webview-asset.ts、board の
-  // テスト）が「画面が束ねられていない」で落ちる。esbuild は 0.1 秒ほど。
+  // バンドルするのは、型を見ないときでも必ず。`clean-out.js` が `out/webview` を消すので、
+  // ここで作り直さないと、バンドルしたものを読む側（拡張の webview-asset.ts、board の
+  // テスト）が「画面がバンドルされていない」で落ちる。esbuild は 0.1 秒ほど。
   code = run(process.execPath, [path.join("scripts", "bundle-webview.js")]);
   if (code !== 0) return code;
 

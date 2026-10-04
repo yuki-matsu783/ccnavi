@@ -7,14 +7,15 @@
 2 か所に分かれるため。
 
 判定のコア（`ccnavi.hook.core`）の `plan`・`withdraw`・`confirm` も呼べる。どれも書くもの
-（Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio の控える段）。拡張は
-`plan`（承認）・`withdraw`（取り下げ）・`confirm`（レビュー済み）の答えを、親のブランチへの
+（Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。
+拡張は `plan`（承認）・`withdraw`（取り下げ）・`confirm`（レビュー済み）の答えを、親のブランチへの
 1 コミットにして書く。
-ボードの答えの `reviewable` が候補のフェーズで、ホストのスレッドとレビューの写しは拡張が組んで
-`result` で渡す。
+ボードの答えの `reviewable` が候補のフェーズで、ホストからスレッドとレビューを取得した結果は
+拡張が組んで `result` で渡す。
 
-仮のツリーには、手元の取り込みの控え相当（`logs/state/sync/self/`。統合先の `done/`・層・設定の
-写しと、閉包の親子のチケットの控え）も組む。手元と同じ判定のコードが、取り込み済みの親子のチケットとして読む:
+仮のツリーには、手元の取り込み状態に当たるもの（`logs/state/sync/self/`。統合先の取り込み結果
+である `done/`・層・設定のコピーと、閉包の親子のチケットの取り込み状態）も組む。
+手元と同じ判定のコードが、これを取り込み済みの親子のチケットとして読む。
 
 - ホストに在る親子のチケット（`P` と閉包の `P_X`）は `present`
 - ホストに無く、統合先の `done/` でも閉じていない親子のチケットは `gone`。親チケットのブランチが無く
@@ -45,8 +46,8 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む:
 ワークスペースルートにワークスペースの統合先、`projects/<名前>/` にプロジェクトの統合先
 （`done/` と、プロジェクトの統合先の層に共通層を写した層）、親子のチケットは
-`projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。控えは `sync/self/` と
-`sync/<名前>/` に分けて組む。
+`projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。取り込み状態は
+`sync/self/` と `sync/<名前>/` に分けて組む。
 
     "project": "<プロジェクト名>",
     "workspace": {"integration": {"name": ..., "source": ..., "head": ...},
@@ -77,30 +78,31 @@ from ccnavi.tickets import ticket as ticket_mod
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
 SCHEMA = 1
 
-# 控えの名前（ワークスペース自身）。
+# 取り込み状態の名前（ワークスペース自身）。
 SELF_REPO = syncstate.SELF
 
-# 参照の閉包で辿る親子のチケットの上限。1 組あたり tree 1 回と blob の束 1 回なので、
+# 参照の閉包で辿る親子のチケットの上限。1 組あたり tree 1 回と blob をまとめて読む 1 回なので、
 # 承認 1 回の読み取りが 40 回ほどに収まる。超えたら「決まらない」で止め、手元での確かめを案内する。
 FAMILY_LIMIT = 16
 
-# ワークツリーの置き場。tree.WORKTREES_DIR と同じ綴りを "/" で持つ。
+# ワークツリーの置き場。tree.WORKTREES_DIR と同じパスを "/" で持つ。
 WORKTREES = ".claude/worktrees"
 
-# 統合先から読むもの（置き場の綴りに依らないもの）。手元の統合先の控えに書き出すものと同じ並び。
+# 統合先から読むもの（置き場のパスの設定に依らないもの）。
+# 手元の統合先の取り込み結果に書き出すものと同じ並び。
 COMMON_LAYER = ".ccnavi/common"
 SETTINGS_FILE = ".claude/settings.json"
 COMPAT_FILE = lint.SH_COMPAT_FILE.replace(os.sep, "/")
 
-# 置き場の綴りに効く環境変数。統合先の `.claude/settings.json` の `env` から読む。
+# 置き場のパスを変える環境変数。統合先の `.claude/settings.json` の `env` から読む。
 # 親のブランチから読むと、そこで書き換えて承認やレビューを外せるため。
 PLACEMENT_ENV = (settings.TICKETS_ENV, settings.APPROVED_ENV, settings.PROJECT_HOME_ENV)
 
-# 取り込みの控え相当の置き場（仮のツリーの中。手元の既定の控えの置き場と同じ綴り）。
+# 取り込み状態に当たるものの置き場（仮のツリーの中。手元の既定の state の置き場と同じパス）。
 STATE_DIR = settings.DEFAULT_STATE.replace(os.sep, "/")
 
-# 絶対パスの綴り。置き場がリポジトリの外を指すワークスペースは Chrome の対象外。
-# ブランチに乗らないので、親のブランチを権威にできない。
+# 絶対パスの表記。置き場がリポジトリの外を指すワークスペースは Chrome の対象外。
+# ブランチに乗らないので、親のブランチを本物とする側にできない。
 _ABSOLUTE = re.compile(r"^(?:[/\\~]|[A-Za-z]:)")
 
 
@@ -126,11 +128,11 @@ def handle(request: str, root: str = "/ws") -> str:
     return json.dumps({"schema": SCHEMA, **body}, ensure_ascii=False)
 
 
-# ---- 置き場の綴り -------------------------------------------------------------------
+# ---- 置き場のパス -------------------------------------------------------------------
 
 
 def _env_from_settings(text: str | None) -> dict[str, str]:
-    """統合先の `.claude/settings.json` の `env` のうち、置き場の綴りに効くものだけ。"""
+    """統合先の `.claude/settings.json` の `env` のうち、置き場のパスを変えるものだけ。"""
     if not text:
         return {}
     try:
@@ -148,7 +150,7 @@ def _placement(settings_text: str | None) -> dict:
     absolute = sorted(k for k, v in env.items() if _ABSOLUTE.match(v))
     if absolute:
         raise Refused(
-            "置き場の綴りがリポジトリの外を指している（"
+            "置き場のパスがリポジトリの外を指している（"
             + ", ".join(f"{k}={env[k]}" for k in absolute)
             + "）。ブランチに乗らないので Chrome では読めない"
         )
@@ -159,17 +161,17 @@ def _placement(settings_text: str | None) -> dict:
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
     for name, value in (("提案", tickets), ("承認済み", approved), ("層", home)):
         if not value or ".." in value.split("/"):
-            raise Refused(f"{name}の置き場の綴りを読めない: {value!r}")
+            raise Refused(f"{name}の置き場のパスを読めない: {value!r}")
     own_layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
     return {
         "tickets": tickets,
         "approved": approved,
         "env": env,
-        # 統合先から読むもの。承認済みは閉じたものだけ（作業中のものの権威は `P`。
+        # 統合先から読むもの。承認済みは閉じたものだけ（作業中のものは `P` を本物とする。
         # 古い統合先から切った `P` でも閉じた識別子の使い直しを見つけるため、`done/` は常に読む）。
         "integration_paths": sorted({f"{approved}/{ticket_mod.DONE}", COMMON_LAYER, own_layer}),
         "integration_files": [SETTINGS_FILE, COMPAT_FILE],
-        # 親子のチケットのブランチから読むもの。
+        # 親のブランチから読むもの。
         "branch_paths": [approved, tickets],
         # プロジェクトのリポジトリ。ワークスペースの統合先から読むもの（共通層・自身の層・
         # 設定・互換のマーカー）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
@@ -293,7 +295,7 @@ def _op_families(req: dict, root: str) -> dict:
     """候補のブランチのうち、親のブランチ（親子のチケットのブランチ）であるもの。
 
     親子のチケットのブランチ = そのブランチの置き場に、ブランチ名と同じ識別子の親の提案か
-    写しがある。
+    承認済みのチケットがある。
     閉じた親（`done/`）しか無いブランチは数えない。
     """
     snap = _snapshot(req)
@@ -324,7 +326,7 @@ def _op_closure(req: dict, root: str) -> dict:
 
     先行を多段で辿るので、1 段だけでは手元と答えが変わる。
 
-    提案と写しの `predecessors` を辿り、統合先の `done/` にあるもので止める。
+    提案と承認済みのチケットの `predecessors` を辿り、統合先の `done/` にあるもので止める。
     まだ読んでいない親子のチケットは `need` で返し、拡張が読んでから呼び直す。
     """
     snap = _snapshot(req)
@@ -378,7 +380,8 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
     """統合先をワークスペースルートに、親子のチケットをワークツリーに置いた仮のツリーを組む。
 
     プロジェクトのリポジトリは、ワークスペースの統合先をワークスペースルートに、
-    プロジェクトの統合先を `projects/<名前>/` に置き、親子のチケットをそのプロジェクトの
+    プロジェクトの統合先を `projects/<名前>/` に置き、
+    親子のチケットをそのプロジェクトの
     ワークツリーにする。
     """
     shutil.rmtree(root, ignore_errors=True)
@@ -413,7 +416,7 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
         if name not in snap["branches"] or name == integ:
             continue
         if not ticket_mod.is_valid_id(name):
-            raise Refused(f"親子のチケットのブランチ名が識別子の形でない: {name!r}")
+            raise Refused(f"親のブランチ名が識別子の形でない: {name!r}")
         tree = os.path.join(root, *WORKTREES.split("/"), name)
         os.makedirs(tree, exist_ok=True)
         registry = os.path.join(owner, ".git", "worktrees", name)
@@ -454,15 +457,17 @@ def project_layer(snap: dict, place: dict) -> dict[str, str]:
 
 
 def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
-    """取り込みの控え相当（控えの置き場からの相対パス → 中身）。手元の `ccnavi-sync.sh` が書く形。
+    """取り込み状態に当たるもの（state の置き場からの相対パス → 中身）。
+    手元の `ccnavi-sync.sh` が書く形。
 
-    - 統合先の控え（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
-      `.claude/settings.json` の写しと `head`
-    - 親子のチケットの控え（`sync/self/families/<P>`）: ホストに在れば `present`、無ければ `gone`
+    - 統合先の取り込み結果（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
+      `.claude/settings.json` のコピーと `head`
+    - 親子のチケットの取り込み状態（`sync/self/families/<P>`）: ホストに在れば `present`、
+      無ければ `gone`
 
     先頭の sha と取り込んだ時刻は書かない。判定が読んだ中身（read_set）に入り、指紋が
     関係の無い push で変わるため。手元の試験も
-    これを控えの置き場に書き、同じ控えで判定させる。
+    これを state の置き場に書き、同じ取り込み状態で判定させる。
     """
     integ = snap["integration"]
     project = _project(snap)
@@ -478,7 +483,8 @@ def records(snap: dict, place: dict, families: list[str]) -> dict[str, str]:
             if path.startswith(keep) or path == SETTINGS_FILE:
                 out[f"{base}/integration/{path}"] = text
     else:
-        # プロジェクトの統合先の控え（閉じたものとプロジェクトの層）と、ワークスペースの統合先の控え
+        # プロジェクトの統合先の取り込み結果（閉じたものとプロジェクトの層）と、
+        # ワークスペースの統合先の取り込み結果
         keep = tuple(p + "/" for p in place["project_paths"])
         for path, text in _files(snap, integ["name"]).items():
             if path.startswith(keep):
@@ -520,7 +526,7 @@ def _write(base: str, rel: str, text: str) -> None:
 
 
 class _environ:
-    """置き場の綴りの環境変数を、この呼び出しのあいだだけ入れる。他の ccnavi の変数は外す。"""
+    """置き場のパスの環境変数を、この呼び出しのあいだだけ入れる。他の ccnavi の変数は外す。"""
 
     def __init__(self, env: dict[str, str]):
         self.env = env
@@ -587,20 +593,22 @@ def _op_board(req: dict, root: str) -> dict:
     return {
         "family": family,
         "closure": closure,
-        # 書けるか（互換の版・書く先の名前）。書けなければ表示だけにする。
+        # 互換の版と書く先の名前から、書けるかを見る。書けなければ表示だけにする。
         "write": {
             "allowed": not _write_refusal(snap, family),
             "reason": _write_refusal(snap, family),
         },
         "withdrawable": _withdrawable(req, root, place, family),
-        # レビュー済みを付けられる候補。通るかは `confirm` がホストの写しで決める
+        # レビュー済みを付けられる候補。
+        # 通るかは `confirm` がホストから取得した結果で決める
         "reviewable": _reviewable(root, place, family),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出すので、手を加えずに返す。
-        # 指紋はこの本文と写しの中身を覆い、手元の `--agree --preview` と同じ値になる。
+        # 指紋はこの本文と承認済みのチケットの中身を覆い、
+        # 手元の `--agree --preview` と同じ値になる。
         "text": body["text"] if batch else "",
         "digest": body["digest"] if batch else "",
-        # 承認するときに `plan` へ渡す絞り（この指紋を出したときの絞り。絞らなければ null）
+        # 承認するときに `plan` へ渡す絞り。この指紋を出したときの絞りで、絞らなければ null
         "only": mine if narrowed else None,
         "rejected": [
             {"ticket": r["ticket"], "problems": [_relative(root, p) for p in r["problems"]]}
@@ -614,10 +622,10 @@ def _op_board(req: dict, root: str) -> dict:
 def _unreadable(snap: dict, closure: dict) -> str:
     """判定の入力に本文を読めなかったファイルがあれば、止める理由。
 
-    バイナリ（`binary`）とシンボリックリンク（`links`。中身は指す先の綴りで、手元の読み方と違う）は
-    読まない。判定がそれを読むかは分からないので、無いとも空とも読ませず「決まらない」で止める
-    （取っていないファイルと同じ扱い。書く操作があるので、言うだけにせず止める）。
-    リンクを含む親子のチケットは止まるので、リンクの綴りへ書くことも無い。
+    バイナリ（`binary`）とシンボリックリンク（`links`）は読まない。シンボリックリンクの中身は指す先の
+    パスの文字列で、手元でリンクを辿って読む中身とは違う。判定がそれらを読むかは分からないので、
+    無いとも空とも読ませず「決まらない」として止める（取っていないファイルと同じ扱い。書く操作が
+    あるので、言うだけにせず止める）。シンボリックリンクを含む親子のチケットは止まるので、リンクが指すパスへ書き込むことも無い。
     """
     names = [snap["integration"]["name"], *closure["families"]]
     found = [
@@ -642,7 +650,7 @@ def _unreadable(snap: dict, closure: dict) -> str:
 
 
 def _write_refusal(snap: dict, family: str) -> str:
-    """この親子のチケットの `P` へ書けない理由（空なら書ける）。
+    """この親子のチケット `P` へ書けない理由（空なら書ける）。
 
     - 同梱の互換の版が統合先と違う。表示だけにする
     - 書く先が予約の名前か統合先の名前（保護されたブランチと統合先へは書かない）
@@ -661,7 +669,7 @@ def _write_refusal(snap: dict, family: str) -> str:
 
 
 def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
-    """作業中の写しごとの取り下げの可否。仮のツリーは組んである前提。"""
+    """作業中のチケットごとの取り下げの可否。仮のツリーは組んである前提。"""
     with _environ(place["env"]):
         conf, _ = settings.load(root)
         snapshot = core.read_fs(conf, root)
@@ -688,16 +696,16 @@ def _entry(root: str, entry: dict) -> dict:
     }
 
 
-# 仮のツリーの綴りの前に来てよい字（行の頭・空白・引用符・括弧・区切り）。
+# 仮のツリーのパスの前に来てよい字（行の頭・空白・引用符・括弧・区切り）。
 # 途中の段（`wip/ws/`）は畳まない。
 _BEFORE_ROOT = r"(?<![^\s'\"`(（「:：,、=])"
 
 
 def _relative(root: str, text: str) -> str:
-    """文面の中の仮のツリーの綴りを畳む。
+    """文面の中の仮のツリーのパスを畳む。
 
-    `<root>/.claude/worktrees/<P>/` を `<P>:` に、`<root>/` を空にする。畳むのは綴りの頭（行の頭か、
-    空白・引用符・括弧・区切りの直後）に在るときだけで、パスの途中の同じ綴り（`wip/ws/x`）は
+    `<root>/.claude/worktrees/<P>/` を `<P>:` に、`<root>/` を空にする。畳むのはパスの頭（行の頭か、
+    空白・引用符・括弧・区切りの直後）に在るときだけで、パスの途中にある同じ表記（`wip/ws/x`）は
     畳まない。書くもの（Changes）のパスは既にツリーからの相対なので、ここを通さない。
     """
     base = re.escape(os.path.join(root, *WORKTREES.split("/")) + os.sep)
@@ -735,7 +743,8 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
 
 
 def _unwritten(root: str, notes: str) -> None:
-    """並べる段で跡を書けないと分かったら、書くものを出さずに止める（`core.withdraw` と揃える）。"""
+    """並べる段で状態の履歴を書けないと分かったら、
+    書くものを出さずに止める（`core.withdraw` と揃える）。"""
     lines = [
         _relative(root, line.replace("ccnavi: 警告: ", "ccnavi: ", 1))
         for line in notes.splitlines()
@@ -896,7 +905,8 @@ def _op_withdraw(req: dict, root: str) -> dict:
 def _op_confirm(req: dict, root: str) -> dict:
     """レビュー済みで書くもの。書かない。
 
-    `result` は `ccnavi-review.sh` が組むのと同じ形の写し（`{host, mr, threads, reviews}`）。
+    `result` は `ccnavi-review.sh` が組むのと同じ形の、
+    取得した結果（`{host, mr, threads, reviews}`）。
     依頼の後にユーザが見るものが動いたかは、手元の confirm と同じ関数（`review.moved_since`）
     で決める。材料は読んだ `P` の先頭と、依頼時の先頭からの変更の一覧（`compare`）。
     依頼時の先頭は Python がマーカーから読み、一覧が要るのに無ければ

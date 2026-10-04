@@ -1,8 +1,8 @@
 /**
  * ボード。承認待ちを並べ、承認と承認の取り下げを親のブランチへ書く。
- * 依頼済みのフェーズに MR のスレッドを出し、レビュー済みの印を書く。
+ * 依頼済みのフェーズに MR のスレッドを出し、レビュー済みのマーカーを書く。
  * GitLab とプロジェクトのリポジトリも読み、「始める」（issue から親のブランチを作る）を出す。
- * GitLab へ書いて打ち消しが収まらなかった親子のチケットは「要確認」を控え（`chrome.storage.local` の `attention`）、
+ * GitLab へ書いた後、元に戻すコミットでも競合が収まらなかった親子のチケットは「要確認」として記録し（`chrome.storage.local` の `attention`）、
  * ユーザが確かめて外すまで出す。
  *
  * PAT はこのページに来ない。ホストの API は service worker に名前で頼む。
@@ -90,7 +90,7 @@ async function readAttention(): Promise<Attention> {
   return v && typeof v === "object" ? (v as Attention) : {};
 }
 
-/** 要確認の親子のチケットを控える（打ち消しが収まらない・書いたか確かめられない など。ユーザが確かめて外すまでボードに出す） */
+/** 要確認になった親子のチケットを `chrome.storage.local` に残し、ユーザが確かめて外すまでボードに出す。要確認になるのは、元に戻すコミット（revert）を積んでも競合が収まらないときや、書けたかを確かめられないときなど（8.4） */
 async function noteAttention(repo: RepoConfig, family: string, outcome: Outcome): Promise<void> {
   if (outcome.kind !== "attention") return;
   const all = await readAttention();

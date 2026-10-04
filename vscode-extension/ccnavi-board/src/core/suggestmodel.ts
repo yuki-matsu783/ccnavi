@@ -67,7 +67,7 @@ export function parseSuggestJson(text: string): Parsed<SuggestJson> {
       rules_path: str(raw.rules_path),
       logs: list(raw.logs).filter((p): p is string => typeof p === "string"),
       records: num(raw.records),
-      // 出るのは deny と ask だけの約束。違う綴りが来ても、通す側の候補は並べない
+      // 出るのは deny と ask だけの約束。違う表記が来ても、通す側の候補は並べない
       candidates: list(raw.candidates)
         .filter(isRecord)
         .filter((c) => c.section === "deny" || c.section === "ask")

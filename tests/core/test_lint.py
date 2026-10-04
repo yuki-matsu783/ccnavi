@@ -43,7 +43,7 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     """ルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
 
     書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
-    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の綴りの
+    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の表記の
     話に付き合わずに済む。
     """
     body: dict = {"version": version, "deny": list(rules)}
@@ -270,7 +270,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 0)
 
     def test_チケット制御に読めない値を書いたらerrorになる(self):
-        # 切ったつもりの綴り違いは enable として動く。守りは消えないが、
+        # 切ったつもりの書き誤りは enable として動く。保護は消えないが、
         # 書いたユーザは切れていると思い続けるので、直すまで error で名指しする。
         result = ccnavi(
             self.root,
@@ -305,7 +305,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 0)
 
     def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
-        # 動かす途中で止まった跡（写せたが消せなかった）。状態の操作は「複数の場所にある」で
+        # 動かす途中で止まった形跡（コピーできたが消せなかった）。状態の操作は「複数の場所にある」で
         # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
         # 閉じた側との重複だけが通る。
         for state in ("doing", "done"):
@@ -388,7 +388,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("BOM (U+FEFF)", result.stdout)
 
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
-        # 承認の権威は置き場。`.ccnavi/approved/` は組み込みの守りが
+        # 承認を本物とするのは置き場。`.ccnavi/approved/` は組み込みの保護が
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
         # 読む。端末もボードも無いユーザが、置き場を動かすだけで承認できる方法。
         write(
@@ -403,8 +403,8 @@ class LintTest(unittest.TestCase):
         self.assertNotIn("を読めない", result.stdout)
 
     def test_レビュー待ちの置き場では承認の記録を求める(self):
-        # `wip/proposals/review/` はエージェントが書ける側にある。守りが組み込みの deny
-        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の守りとして残す。
+        # `wip/proposals/review/` はエージェントが書ける側にある。保護が組み込みの deny
+        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の保護として残す。
         write(
             os.path.join(self.root, "wip", "proposals", "review"),
             "i0001.md",

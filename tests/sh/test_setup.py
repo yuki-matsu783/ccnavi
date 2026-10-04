@@ -27,7 +27,7 @@ SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
 def _launcher_source():
     """偽の配布元に置く振り分けの sh の中身。
 
-    原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。ユーザが写す前の
+    原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。ユーザがコピーする前の
     ツリーにはまだ無いので、`test_launcher.py` と同じく環境変数 `CCNAVI_TEST_LAUNCHER` で
     名指しできる（相対ならリポジトリのルートから）。名指しが無ければ前の原本
     `scripts/ccnavi-launcher.sh` を読む。
@@ -83,7 +83,7 @@ TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# hook に登録される 1 行。README「設定」の見本と対になる。綴りが変わると、
+# hook に登録される 1 行。README「設定」の見本と対になる。表記が変わると、
 # ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものが食い違う。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
@@ -116,7 +116,7 @@ PHASES_PARTS = (".ccnavi", "config", "phases.yml")
 BIN_DIR_PARTS = (".ccnavi", "bin")
 LAUNCHER_NAME = "ccnavi-launcher.sh"
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
-# CCNAVI_BIN_PATH に書く綴り。固定。
+# CCNAVI_BIN_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
 # 配布先の .gitignore に足す `--docs` の索引の 1 行と見出し。docsearch は git がそこの
 # index.jsonl を無視しているときだけ書く（README「ドキュメントの索引」）。
@@ -127,7 +127,7 @@ INDEX_HEADER = "# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 def section(stdout, heading):
     """見出しで始まる塊の、字下げされた行を並べる。
 
-    文面の中に綴りが 1 回出るだけを見ると、別の塊（置き換える env など）に出た綴りでも
+    文面の中にパスが 1 回出るだけを見ると、別の塊（置き換える env など）に出たパスでも
     通ってしまう。どの塊に並んだかまで見る。
     """
     out = []
@@ -141,7 +141,7 @@ def section(stdout, heading):
 
 
 def names(lines, path):
-    """行のどれかが、その綴りそのもので始まるか。長い綴りの頭と取り違えない。"""
+    """行のどれかが、そのパスそのもので始まるか。長いパスの頭と取り違えない。"""
     pattern = re.compile(re.escape(path) + r"(?![\w./-])")
     return any(pattern.match(line) for line in lines)
 
@@ -264,7 +264,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_registers_the_exact_command_line_from_the_readme(self):
         """hook に書かれる 1 行そのものを見る。
 
-        「ccnavi という字が入っている」だけを見ていると、綴りを取り違えても
+        「ccnavi という字が入っている」だけを見ていると、表記を取り違えても
         テストが通ってしまう。この 1 行は、何を起動するかと、ccnavi が何を
         守るか（CCNAVI_BIN_PATH）を同時に決めている。
         """
@@ -299,7 +299,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertNotIn("取り込み", checked.stdout)
 
     def test_a_fetch_registered_first_does_not_hide_the_main_hook(self):
-        """取り込みだけが先に在っても、本体の SessionStart を「別の綴り」と取り違えない。"""
+        """取り込みだけが先に在っても、本体の SessionStart を「別の表記」と取り違えない。"""
         self.write_settings(
             {
                 "hooks": {
@@ -477,9 +477,9 @@ class KeepsWhatItFinds(SetupTest):
         self.assertEqual(len(self.commands_of(data, "PostToolUse")), 2)
 
     def test_keeps_the_copy_it_took_before_the_first_change(self):
-        """控えは最初の 1 回だけ取る。
+        """バックアップは最初の 1 回だけ取る。
 
-        毎回取り直すと、打ち直した数だけ控えが新しくなり、戻れるのは 1 手前
+        毎回取り直すと、打ち直した数だけバックアップが新しくなり、戻れるのは 1 手前
         までになる。そこには既に ccnavi が入っているので、入れる前の姿へ
         戻す手立てが消える。
         """
@@ -564,8 +564,8 @@ class ReadsTheRegistrationCarefully(SetupTest):
     def test_does_not_add_a_second_registration_to_an_event_that_has_one(self):
         """すでに ccnavi が登録されているイベントには足さない。
 
-        綴りは決め打ちにできないので、名前が入っているかどうかで見る。
-        別の綴りで登録してあるプロジェクトに 2 本目を足すと、
+        表記は決め打ちにできないので、名前が入っているかどうかで見る。
+        別の表記で登録してあるプロジェクトに 2 本目を足すと、
         すべての呼び出しで判定が 2 回走る。
         """
         self.write_settings(
@@ -581,7 +581,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         self.assertEqual(self.commands_of(self.read_settings(), "PreToolUse"), ["bin/CCNAVI"])
 
     def test_says_so_when_the_registration_is_spelled_differently(self):
-        """別の綴りで登録されているイベントは、足さずにユーザへ見せる。
+        """別の表記で登録されているイベントは、足さずにユーザへ見せる。
 
         どちらが正しいかをここで決められない。何も言わずに足すと判定が 2 回走り、
         何も言わずに飛ばすとそのイベントが落ちたままになる。
@@ -601,7 +601,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         result = self.run_setup()
 
         self.assertIn("PreToolUse", result.stdout)
-        self.assertIn("別の綴り", result.stdout)
+        self.assertIn("別の表記", result.stdout)
         self.assertEqual(len(self.commands_of(self.read_settings(), "PreToolUse")), 1)
 
     def test_registers_when_the_name_only_happens_to_be_a_substring(self):
@@ -829,7 +829,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 ) as f:
                     f.write(f"# {name}\n")
             if launcher:
-                # 振り分けの sh は本物を写し、代わりに通る sh と同じ置き場に置く。配布先で
+                # 振り分けの sh は本物をコピーし、代わりに通る sh と同じ置き場に置く。配布先で
                 # 中身が同じであることを見るため。モードは落として置く。配布元の置き方に
                 # 依らず、配った先で実行ビットが付くことを見るため。
                 shutil.copy(LAUNCHER, os.path.join(src, *LAUNCHER_PARTS))
@@ -931,7 +931,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_puts_the_executable_in_the_fixed_place(self):
         """実行ファイルは .ccnavi/bin/<built>/ に置く。置き場は固定（S3）。
 
-        設定に書く綴りと実体の置き場が食い違うと、設定は書けているのに hook が
+        設定に書くパスと実体の置き場が食い違うと、設定は書けているのに hook が
         どこにも無いものを起動する形になる。sh は自分の隣でなく ../bin/ を探すので、
         置き場がこの 1 か所に決まっていれば食い違わない。
         """
@@ -1497,12 +1497,12 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
 
 
 class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
-    """既定でない CCNAVI_BIN_PATH（ユーザが決めた綴り）は書き換えず、名指しする。"""
+    """既定でない CCNAVI_BIN_PATH（ユーザが決めたパス）は書き換えず、名指しする。"""
 
     def test_leaves_a_path_it_did_not_write_and_names_it(self):
-        """既定でない綴りは書き換えず、名指しで 1 行出す。終了コードは 0（S10）。
+        """既定でないパスは書き換えず、名指しで 1 行出す。終了コードは 0（S10）。
 
-        ユーザが決めた綴りの先で何が使われているかを、このスクリプトは決められない。
+        ユーザが決めたパスの先で何が使われているかを、このスクリプトは決められない。
         案内は settings.json の値の直し方。
         """
         custom = "dist/ccnavi/ccnavi"
@@ -1518,7 +1518,7 @@ class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
 
     def test_check_is_not_settled_by_a_path_it_did_not_write(self):
-        """既定でない綴りは、--check では「揃っていない」に数える（S10）。"""
+        """既定でないパスは、--check では「揃っていない」に数える（S10）。"""
         src = self.make_source()
         self.run_setup("--deploy", src)
         settled = self.run_setup("--deploy", src, "--check")
@@ -1546,7 +1546,7 @@ class WritesTheVscodeSettings(SetupTest):
         self.assertEqual(self.read_vscode(), {"git.detectWorktrees": True})
 
     def test_keeps_settings_that_have_nothing_to_do_with_ccnavi(self):
-        """VS Code の他の設定は残す。控えも 1 つ取る。"""
+        """VS Code の他の設定は残す。バックアップも 1 つ取る。"""
         self.write_vscode({"editor.tabSize": 2})
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)

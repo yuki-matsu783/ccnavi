@@ -1,24 +1,24 @@
-"""着手の前に、共通層の設定をプロジェクトの層へ写す（設計 11.12）。
+"""着手の前に、共通層の設定をプロジェクトの層へコピーする（設計 11.12）。
 
 共通層（`.ccnavi/common/`）は、共通の設定を各プロジェクトへ配るための定義で、正本は
 各プロジェクトの `.ccnavi/config/`。共通層はワークスペースの git にあるので、プロジェクトだけを
 clone したユーザからは見えない。そこで親チケットに着手するとき、共通層の各ファイルと、親の
 ワークツリーにあるプロジェクトの層の同じ名前のファイルを比べ、違えば共通層で上書きする。
 
-- 写すのは共通層にあるファイルだけ。共通層に無いファイル（このワークスペースでは
+- コピーするのは共通層にあるファイルだけ。共通層に無いファイル（このワークスペースでは
   `phases.yml`）は、プロジェクトの側を消さずに残す
-- 配点の `script:` が指す共通層のスクリプトも写し、指す先をプロジェクトの層の綴りに直す。
-  層から共通層のスクリプトは指せないので、直さずに写すとプロジェクトの配点が壊れる
-- 写す前に、プロジェクトの層として読めるかを確かめる。読めなければ何も写さず、着手しない
+- 配点の `script:` が指す共通層のスクリプトもコピーし、指す先をプロジェクトの層のパスに直す。
+  層から共通層のスクリプトは指せないので、直さずにコピーするとプロジェクトの配点が壊れる
+- コピーする前に、プロジェクトの層として読めるかを確かめる。読めなければ何もコピーせず、着手しない
 - 上書きで消える識別子と、中身の変わる識別子を名指しする
-- 写す先に未コミットの変更があれば、ユーザの書きかけを上書きしないよう何も写さない
-- 写したことは親の印 `config-sync.json` に残し、最初のレビューで知らせる。レビューが無いまま
-  親を閉じようとしたら止め、ユーザが端末で見たことを残すまで閉じさせない
+- コピー先に未コミットの変更があれば、ユーザの書きかけを上書きしないよう何もコピーしない
+- コピーしたことは親の上書きの記録 `config-sync.json` に残し、最初のレビューで知らせる。
+  レビューが無いまま親を閉じようとしたら止め、ユーザが端末で見たことを残すまで閉じさせない
 
-写したファイルは、実行後チェックと控えと復元（どちらも `.ccnavi/` を守る）から見れば
+写した層のファイルは、実行後チェックとバックアップと復元（どちらも `.ccnavi/` を守る）から見れば
 エージェントの書き込みと区別が付かない。区別は内容で付ける（`is_synced_write`）。
 誰が書いたかの台帳は持たない。台帳は git に入らないので、clone した別の機械には届かず、
-同じ写しがその機械でだけ報告される。内容で見れば、印は git を通じて届く。
+同じ写した層がその機械でだけ報告される。内容で見れば、上書きの記録は git を通じて届く。
 """
 
 from __future__ import annotations
@@ -35,11 +35,11 @@ from ..infra import fsio, gitcmd, settings, tree
 from ..policy import rules
 from . import approval, phasetypes, risk, syncstate
 
-# 親ごとの印の名前。`phases/<親>/config-sync.json`。
+# 親ごとの上書きの記録の名前。`phases/<親>/config-sync.json`。
 MARK = "config-sync"
-# 印の `files` で、配点が指すスクリプトを表す種類。
+# 上書きの記録の `files` で、配点が指すスクリプトを表す種類。
 KIND_SCRIPT = "script"
-# `is_synced_write` の `prior` を渡さなかった印。None は「その版に無い」の意味で使う。
+# `is_synced_write` の `prior` を渡さなかった目印。None は「その版に無い」の意味で使う。
 UNSET = object()
 # 端末で見たと残すときの `notified` の値。
 NOTIFIED_TERMINAL = "terminal"
@@ -47,7 +47,7 @@ NOTIFIED_TERMINAL = "terminal"
 
 @dataclass
 class Copied:
-    """写す（写した）1 本。"""
+    """コピーする（コピーした）1 本。"""
 
     kind: str
     # 親のワークツリーからの相対。"/" 区切り。
@@ -92,7 +92,7 @@ def projected(conf: settings.Settings, kind: str, content: bytes) -> bytes:
     """共通層の中身を、プロジェクトの層に置くときの形にする。
 
     配点だけ、`script:` の値の頭にある共通層の置き場を、プロジェクトの層の置き場へ直す。
-    直すのは `script:` の値だけ。`glob` や `message` に同じ綴りがあっても触らない
+    直すのは `script:` の値だけ。`glob` や `message` に同じ文字列があっても触らない
     （「共通層のスクリプトの変更に点を付ける」項目が、意味ごと別の項目に変わるため）。
     """
     if kind != settings.KIND_RISK:
@@ -107,13 +107,13 @@ def projected(conf: settings.Settings, kind: str, content: bytes) -> bytes:
 
 
 def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Copied], str]:
-    """写すものの一覧。写せない理由があれば、それを返す（何も写さない）。"""
+    """コピーするものの一覧。コピーできない理由があれば、それを返す（何もコピーしない）。"""
     out: list[Copied] = []
     scripts: list[tuple[str, str]] = []
     for kind, common in common_files(conf).items():
         raw, why = _read_strict(common)
         # 一覧を作ったあとに消えたもの（raw が None）も読めないとして止める。空として
-        # 写すと、プロジェクトの層を中身の無い設定で上書きする。
+        # コピーすると、プロジェクトの層を中身の無い設定で上書きする。
         if why or raw is None:
             name = os.path.basename(common)
             return [], f"共通層の {name} を読めない ({why or '無い'})"
@@ -145,7 +145,7 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Copie
 
 
 def dirty(tree_root: str, copied: list[Copied]) -> tuple[list[str], str]:
-    """写す先のうち、未コミットの変更があるもの。git を読めなければ理由を返す。"""
+    """コピー先のうち、未コミットの変更があるもの。git を読めなければ理由を返す。"""
     if not copied:
         return [], ""
     rc, out = gitcmd.output(
@@ -162,10 +162,10 @@ def dirty(tree_root: str, copied: list[Copied]) -> tuple[list[str], str]:
 
 
 def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
-    """印を置いてから上書きする。書けなかった理由を返す。書けたら空文字。
+    """上書きの記録を置いてから上書きする。書けなかった理由を返す。書けたら空文字。
 
-    先に印を置くのは、上書きのあとに着手が止まっても、上書きしたことが知らせに残るように
-    するため。1 本でも書けなければ、書いた分と印を元に戻す。
+    先に上書きの記録を置くのは、上書きのあとに着手が止まっても、上書きしたことが知らせに残るように
+    するため。1 本でも書けなければ、書いた分と上書きの記録を元に戻す。
     """
     path = approval.parent_mark_path(approved_dir, parent, MARK)
     previous = _read(path)
@@ -189,7 +189,7 @@ def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
         {"files": list(entries.values()), "notified": "", "prepared": None},
     )
     if failed:
-        return f"印を書けない: {failed}"
+        return f"上書きの記録を書けない: {failed}"
     written: list[Copied] = []
     for c in copied:
         failed = _replace(c.target, c.content)
@@ -199,7 +199,7 @@ def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
                 stuck.append(path)
             if stuck:
                 return f"{c.rel} を書けない: {failed}（戻せなかったもの: {', '.join(stuck)}）"
-            return f"{c.rel} を書けない: {failed}（書いた分と印は戻した）"
+            return f"{c.rel} を書けない: {failed}（書いた分と上書きの記録は戻した）"
         written.append(c)
     return ""
 
@@ -211,7 +211,7 @@ def is_synced_write(
     content: bytes | None = None,
     prior: bytes | None | object = UNSET,
 ) -> bool:
-    """その変更が、親の着手で共通層を写したものだと読めるか。
+    """その変更が、親の着手で共通層をコピーしたものだと読めるか。
 
     `content` は変更後の中身（渡さなければディスク上の今の中身）、`prior` は変更前として
     比べるコミット済みの中身（渡さなければそのワークツリーの HEAD。None はその版に無い）。
@@ -223,12 +223,13 @@ def is_synced_write(
     1. 置き場が、プロジェクトから切った**承認済みの親チケットの**ワークツリー（名前が親の
        識別子で、そのチケットの `project:` がワークツリーのプロジェクトと同じ）の中。
        元リポジトリ、子のワークツリー、チケットの無いワークツリー、他のプロジェクトは外さない
-    2. その綴りの途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で答えてしまう
+    2. そのパスの途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で答えてしまう
     3. その中身が、共通層の対応するもの（設定はプロジェクトの層の形に直したもの、
        スクリプトはそのまま）と同じ（改行の違いは見ない）
-    4. **その親の**印 `config-sync.json` が、その相対パスとその中身の指紋を名指ししている
-    5. 変更前のコミット済みの中身が、印に残した上書き前の中身と同じ。外すのは写してから
-       コミットするまでの間だけで、ユーザが直してコミットしたあとに共通層の中身へ戻す書き込みは外さない
+    4. **その親の**上書きの記録 `config-sync.json` が、その相対パスとその中身の指紋を名指ししている
+    5. 変更前のコミット済みの中身が、上書きの記録に残した上書き前の中身と同じ。
+       外すのはコピーしてからコミットするまでの間だけで、
+       ユーザが直してコミットしたあとに共通層の中身へ戻す書き込みは外さない
 
     読めないものは外さない。
     """
@@ -283,7 +284,7 @@ def _approved_parent(conf: settings.Settings, root: str, where: tree.Tree) -> bo
 
 
 def pending(approved_dir: str, parent: str) -> dict | None:
-    """まだ知らせていない印。無いか知らせ済みなら None。"""
+    """まだ知らせていない上書きの記録。無いか知らせ済みなら None。"""
     mark = approval.read_parent_mark(approved_dir, parent, MARK)
     if not mark or mark.get("notified") or not mark.get("files"):
         return None
@@ -316,7 +317,8 @@ def notice(mark: dict) -> str:
 
 
 def mark_prepared(approved_dir: str, parent: str, phase_no: int) -> str:
-    """依頼の本文に知らせを載せた、と印に残す。`requested` はこれを見て知らせ済みにする。"""
+    """依頼の本文に知らせを載せた、と上書きの記録に残す。
+    `requested` はこれを見て知らせ済みにする。"""
     mark = approval.read_parent_mark(approved_dir, parent, MARK)
     if not mark:
         return ""
@@ -331,7 +333,7 @@ def prepared_for(approved_dir: str, parent: str, phase_no: int) -> bool:
 
 
 def mark_notified(approved_dir: str, parent: str, where: str) -> str:
-    """知らせたことを印に残す。2 回目以降のレビューでは繰り返さない。"""
+    """知らせたことを上書きの記録に残す。2 回目以降のレビューでは繰り返さない。"""
     mark = approval.read_parent_mark(approved_dir, parent, MARK)
     if not mark:
         return ""
@@ -371,18 +373,18 @@ def acknowledge(
         return 1
     failed = mark_notified(home, parent, NOTIFIED_TERMINAL)
     if failed:
-        stderr.write(f"ccnavi: 印を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 上書きの記録を書けない: {failed}\n")
         return 1
     stdout.write(f"OK: {parent} の設定の上書きを見たものとして残した\n")
     return 0
 
 
 def _compare(kind: str, tree_root: str, target: str, content: bytes) -> tuple[Copied | None, str]:
-    """写す先と比べる。同じなら None。写せない理由があればそれを返す。"""
+    """コピー先と比べる。同じなら None。コピーできない理由があればそれを返す。"""
     if not _inside(tree_root, target) or _linked(tree_root, target):
         return (
             None,
-            f"{_rel_plain(tree_root, target)} がシンボリックリンクか、その下にある。写さない",
+            f"{_rel_plain(tree_root, target)} がシンボリックリンクか、その下にある。コピーしない",
         )
     before, why = _read_strict(target)
     if why:
@@ -403,7 +405,7 @@ def _compare(kind: str, tree_root: str, target: str, content: bytes) -> tuple[Co
 
 
 def _scripts_of(conf: settings.Settings, root: str, raw: bytes) -> list[tuple[str, str]]:
-    """共通層の配点が指すスクリプト。（共通層の実体, 写す先のツリーからの相対）。"""
+    """共通層の配点が指すスクリプト。（共通層の実体, コピー先のツリーからの相対）。"""
     definition, _ = risk.parse(raw.decode("utf-8", errors="replace"), "(risk)")
     if definition is None:
         return []
@@ -421,7 +423,7 @@ def _scripts_of(conf: settings.Settings, root: str, raw: bytes) -> list[tuple[st
 
 
 def _expected(conf: settings.Settings, root: str, rel: str) -> bytes | None:
-    """ツリーからの相対 rel に写るはずの、共通層の中身。対応するものが無ければ None。"""
+    """ツリーからの相対 rel にコピーされるはずの、共通層の中身。対応するものが無ければ None。"""
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
     for kind, common in common_files(conf).items():
         if rel == f"{home}/{settings.LAYER_CONFIG_DIR}/{settings.LAYER_FILE_NAMES[kind]}":
@@ -492,7 +494,7 @@ def _entries(kind: str, content: bytes) -> dict[str, object] | None:
 def _linked(tree_root: str, path: str) -> bool:
     """tree_root から path までの途中（path 自身を含む）に、シンボリックリンクがあるか。
 
-    綴りのままさかのぼり、実体が tree_root に着いたところで止める。tree_root より上の
+    パスのままさかのぼり、実体が tree_root に着いたところで止める。tree_root より上の
     リンク（macOS の `/tmp` など）は数えない。着けなければ（外を指している）リンクと同じに扱う。
     """
     base = _key(tree_root)
@@ -508,7 +510,7 @@ def _linked(tree_root: str, path: str) -> bool:
 
 
 def _rel_plain(base: str, path: str) -> str:
-    """リンクを解かない相対。ユーザに見せる綴り。"""
+    """リンクを解かない相対。ユーザに見せるパス。"""
     return os.path.relpath(os.path.abspath(path), os.path.abspath(base)).replace(os.sep, "/")
 
 
@@ -562,7 +564,7 @@ def _replace(path: str, content: bytes) -> str:
 
 
 def _restore(path: str, previous: bytes | None) -> bool:
-    """写した 1 本や印を前の中身へ戻す。前が無かったなら消す。戻せたか。"""
+    """コピーした 1 本や上書きの記録を前の中身へ戻す。前が無かったなら消す。戻せたか。"""
     if previous is None:
         if not os.path.lexists(path):
             return True

@@ -1,7 +1,7 @@
 /**
- * blob の控え。ボードを開くたびに読むのを tree だけにするため、blob を sha で引いて IndexedDB に控える。
+ * blob のキャッシュ。ボードを開くたびに読むのを tree だけにするため、blob を sha で引いて IndexedDB に残す。
  * sha が同じなら中身は同じなので、失効を持たない。
- * IndexedDB が使えなければ控えずに読む（毎回取る）。
+ * IndexedDB が使えなければキャッシュせずに読む（毎回取る）。
  */
 import type { BlobCache } from "../core/snapshot.js";
 
