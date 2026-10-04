@@ -62,7 +62,7 @@ from dataclasses import dataclass, field, replace
 
 import yaml
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, settings, tree, yamlread
 from ..policy import rules
 from . import archive, flow, history, syncstate, workflow
 from . import ticket as ticket_mod
@@ -271,8 +271,9 @@ def read_workflow(approved_dir: str, parent: str) -> tuple[ticket_mod.Workflow |
             return None, f"待ち方のファイル {path} を読めない"
         return None, ""
     try:
-        raw = yaml.safe_load(data.decode("utf-8"))
-    except (UnicodeDecodeError, yaml.YAMLError):
+        raw = yamlread.safe_load(data.decode("utf-8"))
+    except (UnicodeDecodeError, yamlread.LoadError, yaml.YAMLError):
+        # 構文の誤りは YAMLError、深すぎる入れ子など組み立ての途中の失敗は LoadError で来る
         return None, f"待ち方のファイル {path} を YAML として読めない"
     wf, bad = ticket_mod.parse_workflow(parent, raw)
     if wf is None:

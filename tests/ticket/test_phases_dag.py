@@ -454,6 +454,19 @@ class DagApprovalTest(PhaseHarness):
         self.assertIn("待ち方のファイル", held.workflow_unreadable)
         self.assertTrue(approval.content_problems(held))
 
+    def test_a_deeply_nested_workflow_file_is_unreadable_and_blocks(self):
+        """入れ子が深すぎる待ち方のファイルで例外が漏れず、読めないものとして止める。"""
+        self.use(DAG)
+        self.family(plan=PLAN)
+        write(approval.workflow_path(self.approved, "i0001"), "[" * 5000 + "\n")
+        wf, why = approval.read_workflow(self.approved, "i0001")
+        self.assertIsNone(wf)
+        self.assertIn("YAML として読めない", why)
+        held = self.copy()
+        self.assertIsNone(held.workflow)
+        self.assertIn("待ち方のファイル", held.workflow_unreadable)
+        self.assertTrue(approval.content_problems(held))
+
     def test_a_revision_cannot_move_a_defer_target_behind_approved_children(self):
         def reviewed(text):
             return text.replace(
