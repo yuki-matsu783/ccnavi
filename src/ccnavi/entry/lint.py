@@ -54,12 +54,15 @@ from ..tickets import (
     approval,
     approval_checks,
     flow,
+    flow_render,
+    flow_shape,
+    flow_text,
     history,
     phasetypes,
     risk,
     syncstate,
+    ticket_model,
 )
-from ..tickets import ticket as ticket_mod
 from . import lint_layers, lint_places, lint_project, lint_rules, lint_ticket, version
 
 # `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
@@ -447,8 +450,8 @@ def flow_problems(
 ) -> tuple[list[Problem], object, list[str] | None]:
     """子のフローのファイル 1 本が、SubagentStart が読むのと同じ読みで読めるか（`--lint --flow`）。
 
-    (苦情, 読めた中身を `flow.as_json` にしたもの, `SubagentStart` で渡る手順の行（`flow.render`）)
-    を返す。読めなければ中身と行は None。
+    (苦情, 読めた中身を `flow.as_json` にしたもの,
+    `SubagentStart` で渡る手順の行（`flow_render.render`）) を返す。読めなければ中身と行は None。
     読み手も検査も `flow.load` そのもの（大きさ、リンク・ふつうのファイルでない・ハードリンク、
     UTF-8 として読めない、YAML として読めない、別名、形）。ここで別に書くと、画面が
     「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（読みの答えは
@@ -458,10 +461,10 @@ def flow_problems(
     中身を返すのは、拡張が値の意味（`0755` や `yes` を何と読むか）を自分で決めずに済ませるため。
 
     読めたフローには、手順として怪しいところを warn で足す（読むのは止めない）。線の構造
-    （`flow.structure_problems`）と、`candidates`（`flow.catalog`）を渡せばサブエージェントの種類と
-    スキルの名前の表記（`flow.name_problems`）。どれも `detail` は渡したパスで始まる。
+    （`flow_shape.structure_problems`）と、`candidates`（`flow.catalog`）を渡せばサブエージェントの種類と
+    スキルの名前の表記（`flow_shape.name_problems`）。どれも `detail` は渡したパスで始まる。
     """
-    shown = flow.clean(path)
+    shown = flow_text.clean(path)
     try:
         exists = os.path.lexists(path)
     except (OSError, ValueError):
@@ -481,11 +484,11 @@ def flow_problems(
     except RecursionError:
         deep = f"{shown}: 入れ子が深すぎて中身を渡せない"
         return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None, None
-    said = flow.structure_problems(data)
+    said = flow_shape.structure_problems(data)
     if candidates is not None:
-        said += flow.name_problems(data, candidates)
+        said += flow_shape.name_problems(data, candidates)
     warns = [Problem(SEVERITY_WARN, FLOW_WHERE, f"{shown}: {line}") for line in said]
-    rendered, _ = flow.render(data)
+    rendered, _ = flow_render.render(data)
     return warns, shaped, rendered
 
 
@@ -515,7 +518,7 @@ def family_check(
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
 
-    def ours(t: ticket_mod.Ticket) -> bool:
+    def ours(t: ticket_model.Ticket) -> bool:
         return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo
 
     mine = [t for t in copies if ours(t)]
@@ -553,7 +556,7 @@ def family_check(
     return problems
 
 
-def _written_by_chrome(conf: settings.Settings, t: ticket_mod.Ticket) -> str | None:
+def _written_by_chrome(conf: settings.Settings, t: ticket_model.Ticket) -> str | None:
     """この承認済みチケットを最後に書いたのが Chrome 拡張なら、その拡張の版。
     そうでなければ None。
 

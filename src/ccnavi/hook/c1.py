@@ -44,8 +44,7 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
-from ..tickets import approval_marks, archive, history, phase, syncstate
-from ..tickets import ticket as ticket_mod
+from ..tickets import approval_marks, archive, history, phase, syncstate, ticket_ids, ticket_model
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
 HEAD = "c1 1"
@@ -85,7 +84,7 @@ def family_of(ident: str) -> str:
 
     子の形（`<親>-<2 桁>-<2 桁>`）なら右から 2 段を剥がした親、そうでなければ自身。
     """
-    matched = ticket_mod.child_pattern().match(ident)
+    matched = ticket_ids.child_pattern().match(ident)
     return matched.group("parent") if matched else ident
 
 
@@ -99,7 +98,7 @@ def _relative_places(conf: settings.Settings) -> tuple[str, str] | None:
     raw = (conf.approved or "", conf.tickets or "")
     if any(os.path.isabs(v) or re.match(r"^[A-Za-z]:", v) for v in raw if v):
         return None
-    return approved, f"{tickets.strip('/')}/{ticket_mod.REVIEW}"
+    return approved, f"{tickets.strip('/')}/{ticket_model.REVIEW}"
 
 
 def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, syncstate.Standing]:
@@ -132,7 +131,7 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     lines.append(("repo", st.repo))
     # 親のブランチ名。sh は識別子からブランチ名を組み立てず、これを使う
     # （ref・fetch・push・ls-remote・取り込み状態の `branch`）。名前は承認済みの親チケットの
-    # `branch:` だけから引き（提案の `branch:` は使わない）、`ticket.branch_problem` と統合先の
+    # `branch:` だけから引き（提案の `branch:` は使わない）、`ticket_ids.branch_problem` と統合先の
     # 名前を通らなければ `branch` の行を出さずに `branch_refused` で理由を言う（sh はその親子の
     # チケットを識別子の外へ動かさずに止める）。
     fams = syncstate.Families(conf, root)
@@ -284,7 +283,7 @@ def classify_all(
             continue
         if rel.startswith(review_rel + "/"):
             name = rel[len(review_rel) + 1 :]
-            moved = removed(rel) and added(f"{approved_rel}/{ticket_mod.DONE}/{name}")
+            moved = removed(rel) and added(f"{approved_rel}/{ticket_model.DONE}/{name}")
             out.append((KIND_C, rel, "") if moved else (KIND_D, rel, ""))
             continue
         inside = rel[len(approved_rel) + 1 :] if rel.startswith(approved_rel + "/") else ""
@@ -444,15 +443,15 @@ def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool
     rel = f"{approved_rel}/{'/'.join(parts)}"
     if len(parts) == 2 and parts[0] == "flows" and parts[1].endswith((".yml", ".yaml")):
         return True
-    if len(parts) == 2 and parts[0] == ticket_mod.DOING:
+    if len(parts) == 2 and parts[0] == ticket_model.DOING:
         if added(rel):
             return True  # ユーザの承認で置かれた承認済みチケット
         # 親を早めに閉じたとき（close-early）の取り消しで done/ へ動いた
-        return removed(rel) and added(f"{approved_rel}/{ticket_mod.DONE}/{parts[1]}")
-    if len(parts) == 2 and parts[0] == ticket_mod.DONE and added(rel):
+        return removed(rel) and added(f"{approved_rel}/{ticket_model.DONE}/{parts[1]}")
+    if len(parts) == 2 and parts[0] == ticket_model.DONE and added(rel):
         # ユーザのレビュー（review/ から）か早めに閉じたときの取り消し（doing/ から）で動いた先
         return removed(f"{review_rel}/{parts[1]}") or removed(
-            f"{approved_rel}/{ticket_mod.DOING}/{parts[1]}"
+            f"{approved_rel}/{ticket_model.DOING}/{parts[1]}"
         )
     if len(parts) == 3 and parts[0] == approval_marks.PHASES_DIR:
         name = parts[2]

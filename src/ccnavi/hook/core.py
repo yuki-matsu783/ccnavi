@@ -38,12 +38,16 @@ from typing import TextIO
 from ..infra import fsio, modes, settings, tree
 from ..tickets import (
     agree,
+    agree_candidates,
+    agree_digest,
+    agree_screen,
     approval,
     approval_checks,
     approval_marks,
     history,
     phase,
     review,
+    ticket_model,
     workflow,
 )
 from ..tickets import ticket as ticket_mod
@@ -101,7 +105,7 @@ class Verdict:
     read_set: dict[str, str] = field(default_factory=dict)
 
     @property
-    def batch(self) -> list[agree.Candidate]:
+    def batch(self) -> list[agree_candidates.Candidate]:
         return self.gathered.batch
 
     @property
@@ -145,11 +149,11 @@ def judge_approval(
         if shown_ids is not None and gathered.refused:
             shown = agree.gather(err, snapshot.conf, snapshot.root)
         # 書き込む中身は読みの中で組む。動かす提案のバイト列を判定の読みにも入れるため。
-        carried = [agree.carried(cand) for cand in shown.batch]
-    read = agree.read_set(snapshot.conf, snapshot.root, seen)
-    read.update(agree.settings_read_set(snapshot.conf, snapshot.root))
+        carried = [agree_digest.carried(cand) for cand in shown.batch]
+    read = agree_digest.read_set(snapshot.conf, snapshot.root, seen)
+    read.update(agree_digest.settings_read_set(snapshot.conf, snapshot.root))
     text = shown.text
-    digest = agree.approval_digest(text, shown.batch, read, carried)
+    digest = agree_digest.approval_digest(text, shown.batch, read, carried)
     mismatch = None
     if shown_ids is not None:
         wanted = sorted({s.strip() for s in shown_ids if s.strip()})
@@ -480,7 +484,7 @@ def verify(
     verdict = agree.verify_verdict(gathered, conf.tickets)
     # 新規の親のブランチ名が既にあるブランチと同じか。warn なので答えは変えない。
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
-    branches = agree.existing_branch_warnings(root, conf, fresh, [], [], [])
+    branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])
     if as_json:
         body = agree.preview_body(root, gathered, judged.digest)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
@@ -582,7 +586,7 @@ def approve_yes(
         return applied.code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = agree.approved_text(tickets, revisions, root)
+    prompt = agree_screen.approved_text(tickets, revisions, root)
     if not as_json:
         stdout.write(lines.getvalue())
         return 0
@@ -805,7 +809,7 @@ def moved_on_host(
     return "" if mark is None else review.moved_since(snapshot.conf, mark, head, changed)
 
 
-def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_mod.Ticket | None:
+def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_model.Ticket | None:
     """作業中の親の承認済みチケット（本物とする側）。`phase.parent_for_cwd` と同じ引き方。"""
     open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval_checks.by_id(open_copies), parent_id)
@@ -873,7 +877,7 @@ def withdraw(
             copy = open_index[ident]
             where = settings.approved_dir(conf, copy.tree_root)
             todo = os.path.join(
-                copy.tree_root, conf.tickets.replace("/", os.sep), ticket_mod.TODO, ident + ".md"
+                copy.tree_root, conf.tickets.replace("/", os.sep), ticket_model.TODO, ident + ".md"
             )
             with fsio.policy(
                 on_fail=fsio.FAIL_STOP, ticket=ident, message="書けない ({reason})", prefix=""
@@ -892,8 +896,8 @@ def withdraw(
                 where,
                 ident,
                 history.KIND_WITHDRAWN,
-                ticket_mod.DOING,
-                ticket_mod.TODO,
+                ticket_model.DOING,
+                ticket_model.TODO,
                 actor=actor.account,
                 version=actor.version,
                 reason=reason,
@@ -936,9 +940,9 @@ def _withdraw_problems(
     conf: settings.Settings,
     root: str,
     ident: str,
-    copy: ticket_mod.Ticket | None,
-    everything: list[ticket_mod.Ticket],
-    proposals: list[ticket_mod.Ticket],
+    copy: ticket_model.Ticket | None,
+    everything: list[ticket_model.Ticket],
+    proposals: list[ticket_model.Ticket],
     prior_proposals: dict[str, bytes],
     compare: bool = False,
 ) -> list[str]:
@@ -956,7 +960,7 @@ def _withdraw_problems(
     if approval_checks.has_record(copy):
         # 承認で記録（`ccnavi_approved`）を書いていた頃の古い形。承認で欄が足されているので
         # 承認コミットの親の提案とは一致しない。記録の欄で決める（前の条件のまま）。
-        meta = copy.raw[ticket_mod.APPROVAL_KEY]
+        meta = copy.raw[ticket_model.APPROVAL_KEY]
         # 今の改版は時刻を書かないが、待ち方のファイルを必ず書く。古い形の承認は待ち方を
         # 欄に持ち、ファイルを持たないので、ファイルがあれば改版したものとして止める。
         held = approval.workflow_path(settings.approved_dir(conf, copy.tree_root), ident)
@@ -984,7 +988,7 @@ def _withdraw_problems(
     if not copy.is_child:
         if any(t.parent == ident for t in everything):
             found.append("子の承認済みチケットがある")
-        if any(t.parent == ident and t.state == ticket_mod.TODO for t in proposals):
+        if any(t.parent == ident and t.state == ticket_model.TODO for t in proposals):
             found.append("todo/ に子の提案がある")
         marks_dir = os.path.join(
             settings.approved_dir(conf, copy.tree_root), approval_marks.PHASES_DIR, ident
@@ -999,7 +1003,7 @@ def _withdraw_problems(
             # 読めないなら、無いとは言えない（取り下げを緩めない）。
             found.append(f"{approval_marks.PHASES_DIR}/{ident}/ を読めない ({exc})")
     todo = os.path.join(
-        copy.tree_root, conf.tickets.replace("/", os.sep), ticket_mod.TODO, ident + ".md"
+        copy.tree_root, conf.tickets.replace("/", os.sep), ticket_model.TODO, ident + ".md"
     )
     if fsio.lexists(todo):
         found.append("todo/ に同じ識別子の提案がある（戻す先が塞がっている）")
@@ -1011,7 +1015,7 @@ def _withdraw_problems(
 
 
 def _content_problems(
-    conf: settings.Settings, root: str, copy: ticket_mod.Ticket, prior: bytes
+    conf: settings.Settings, root: str, copy: ticket_model.Ticket, prior: bytes
 ) -> list[str]:
     """新しい形の承認済みチケットが、承認したときのままか。
 

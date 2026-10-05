@@ -103,7 +103,7 @@ base_sha: ""
 効力のあるフロー（承認済みの領域）はエージェントに書かせない（エージェントが書けるのは下の下書きだけ）。承認済みの領域は、どのツリーでも `builtin-guard-project-home`（`Write` / `Edit` /
 `NotebookEdit`）と `builtin-guard-setting-files`（シェル）が止める。承認済みチケットと同じ保護。ユーザが保存した
 フローは実行後チェックでも違反として報告しない（範囲の検査は承認済みの領域を外し、呼び出しごとの実行後チェックは frontmatter の無い
-ファイルを副命令の書き込みとして外す。`post._script_writes`）。コミットと push は `ccnavi-push-approved.sh` が
+ファイルを副命令の書き込みとして外す。`post_findings._script_writes`）。コミットと push は `ccnavi-push-approved.sh` が
 置き場ごとまとめて行う。
 
 **エージェントの下書き。** エージェントは頼まれたときに、効力の無い下書きを提案の置き場の
@@ -172,7 +172,7 @@ subAgentFlows:             # 無くてよい
 
 **壊れたフローで止まらない。** 読むときも並べるときも、例外を外へ出さない。UTF-8 として読めない・YAML として
 読めない・別名がある・入れ子が深すぎる・形の誤り（最上位がマッピングでない、`nodes` が無い、ノードに文字列の
-`id` が無い・`id` が重なる、`connections` が配列でない。`flow.shape_problem`）は、読めないと 1 行で言う。
+`id` が無い・`id` が重なる、`connections` が配列でない。`flow_shape.shape_problem`）は、読めないと 1 行で言う。
 ノードの中の欄の型が違う（`data` が配列、など）ときは、並べられるところまで並べる。`SubagentStart` は
 フローの案内が例外を出しても 1 行の知らせにして、子の一覧と範囲は渡す。上限は、ファイル 256KB（超えたら
 読まずにそう言う。ボードの読み書きも同じ）、1 ノードの選択肢・分岐・次は 10 件（残りは「…ほか N 件」）、
@@ -189,13 +189,13 @@ subAgentFlows:             # 無くてよい
 開くときは読んだバイトを、保存の前は書き出す本文を、呼ぶたびに別の名前の一時ファイルに書いてこれで確かめ、
 error があれば理由を出して開かない・保存しない。
 
-**手順として怪しいところは warn。** 読めたフローには、線の構造（`flow.structure_problems`。無いノードを指す線、
+**手順として怪しいところは warn。** 読めたフローには、線の構造（`flow_shape.structure_problems`。無いノードを指す線、
 `start` から届かないノード、`start` に入る線・`end` から出る線、分岐・問いの出口に線が無い、`start` / `end` が無い。
 出口は画面の `portsOf` と同じに読み、複数選択の問いは `output` の 1 本、グループへ出る線も出口を使ったと数える。
 無いノードを指す線は `ITEM_LIMIT` 件まで言い、残りは数だけ）と、
-`subAgent` の種類・`skill` の名前の表記（`flow.name_problems`。候補は `flow.catalog`）を `(flow)` の warn で足す。
+`subAgent` の種類・`skill` の名前の表記（`flow_shape.name_problems`。候補は `flow.catalog`）を `(flow)` の warn で足す。
 読むのも保存も止めない（既に在るフローを読めなくしない）。巡回は意図して書くことがあるので言わない。`SubagentStart` は
-これを見ない。`--json` には、渡る手順の行（`flow.rendered`。`flow.render` のまま）と選べる名前（`flow.candidates`。
+これを見ない。`--json` には、渡る手順の行（`flow.rendered`。`flow_render.render` のまま）と選べる名前（`flow.candidates`。
 組み込みと、ワークスペースの `.claude/agents` `.claude/skills`。ディレクトリの中だけを見る）も載せる。
 
 **値の意味も実行ファイルが言う。** 画面の読み手（`yaml`、YAML 1.2）と PyYAML（YAML 1.1）は同じ表記を別の値に

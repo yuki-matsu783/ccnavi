@@ -1,5 +1,8 @@
 """合意の手続き。ユーザが提案に合意する（承認する）までの手続きを持つ。
 
+承認の候補とその検査は `agree_candidates`、承認の画面は `agree_screen`、承認の対象の指紋と
+書く本文は `agree_digest` に分けてある。どれも agree を読まない。
+
 置き場は approval、合意の手続きは agree。approval は承認済みチケット・マーカー・子の記録が
 どこにどう置かれているかを読み書きするだけで、ここ（agree）を知らない。agree は approval の
 置き場を読み、提案を承認済みチケットの置き場へ動かす。向きは agree → approval の 1 本だけ。
@@ -8,15 +11,17 @@
 
 `ccnavi --agree` が呼ぶ手続きの全部。
 
-- 承認の対象を組む（`gather`・`candidates`）。提案を走査し、承認済みチケットと突き合わせ、
-  載せるものと落とすものに分ける。形の検査（`validate`・`plan_problems`・`revision_problems`）は
-  ここで当てる
-- ユーザに見せる（`screen`・`preview_body`）。見せたものと承認するものを同じ答えにするため、
-  一覧を組む関数は 1 つ（`gather`）にしてある
-- 見せたものから変わっていないかを確かめる（`approval_digest`・`read_set`・`verify_verdict`）
+- 承認の対象を組む（`gather`・`agree_candidates.candidates`）。提案を走査し、
+  承認済みチケットと突き合わせ、載せるものと落とすものに分ける。形の検査（`agree_candidates` の
+  `validate`・`plan_problems`・`revision_problems`）はここで当てる
+- ユーザに見せる（`agree_screen.screen`・`preview_body`）。見せたものと承認するものを
+  同じ答えにするため、一覧を組む関数は 1 つ（`gather`）にしてある
+- 見せたものから変わっていないかを確かめる（`agree_digest` の `approval_digest`・`read_set`、
+  `verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す。新規の承認は提案の
   中身を変えずに動かし、全体計画の待ち方は `phases/<親>/workflow.yml` に固定する
-- 承認の事実をモデルに伝える文を組む（`approved_text`。拡張が `--agree --yes` の `prompt` で渡す）
+- 承認の事実をモデルに伝える文を組む（`agree_screen.approved_text`。拡張が `--agree --yes` の
+  `prompt` で渡す）
 
 判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で本物とするのは置き場）。置き場を手で
 動かす進め方もあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
@@ -24,64 +29,23 @@
 
 from __future__ import annotations
 
-import hashlib
-import os
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import fsio, gitstate, settings, tree
+from ..infra import fsio, settings
 from ..policy import rules
 from . import (
+    agree_candidates,
+    agree_digest,
+    agree_screen,
     approval,
     approval_checks,
     approval_marks,
-    history,
     phase,
-    phasetypes,
-    syncstate,
+    ticket_ids,
+    ticket_model,
     workflow,
 )
-from . import ticket as ticket_mod
-
-
-@dataclass
-class Candidate:
-    """承認の対象の 1 件。新規の提案か、親の改版か。
-
-    リスクの点はここに無い。点は子を閉じるときに実績（差分）で数え、宣言の広さでは
-    数えない（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
-    """
-
-    ticket: ticket_mod.Ticket
-    complaints: list[rules.Problem] = field(default_factory=list)
-    # 範囲の超過（親の範囲・種類の上限を超えた項、regex の項）。承認は止めず、判定が
-    # 切り詰める。判定に影響する（止まる）ので、判定に影響しない記述の注意（complaints の warn）
-    # とは分けて持つ。
-    overflow: list[rules.Problem] = field(default_factory=list)
-    # 改版なら、いま使われている承認済みチケット。
-    current: ticket_mod.Ticket | None = None
-    # このチケットに使うフェーズの種類（共通レイヤー + `project:` が指すレイヤー、設計 11.4.1）。
-    # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持っておく。
-    types: dict | None = None
-    # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
-    notes: list[str] = field(default_factory=list)
-    # 親の `branch:` が既にあるブランチ（手元か origin、または提案がそのブランチの上）を指すか
-    # 。承認画面に「既存のブランチ <名前> を使う」と出す。
-    existing_branch: bool = False
-
-    @property
-    def is_revision(self) -> bool:
-        return self.current is not None
-
-    @property
-    def plans_feedback(self) -> bool:
-        return (
-            self.is_revision
-            and self.current is not None
-            and self.current.feedback is None
-            and self.ticket.feedback is not None
-        )
-
 
 # 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が出す。
 # VS Code のボード拡張が読み、知らない番号なら読まずに版の違いを言う。
@@ -97,8 +61,8 @@ class Gathered:
     `waiting` を通る。
     """
 
-    batch: list[Candidate]
-    rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]]
+    batch: list[agree_candidates.Candidate]
+    rejected: list[tuple[ticket_model.Ticket, list[rules.Problem]]]
     problems: list[str]
     pool: dict
     nothing_pending: bool
@@ -115,7 +79,7 @@ class Gathered:
     def text(self) -> str:
         if self.nothing_pending:
             return "承認待ちのチケットは無い。"
-        return screen(self.batch, self.pool)
+        return agree_screen.screen(self.batch, self.pool)
 
     @property
     def identifiers(self) -> list[str]:
@@ -162,7 +126,7 @@ def gather(
     ]
 
     pending, revisions = waiting(
-        proposals, approved, closed, review, types_resolver(conf, root, approved)
+        proposals, approved, closed, review, agree_candidates.types_resolver(conf, root, approved)
     )
     broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
     texts = [str(p) for p in problems] + list(notes)
@@ -202,7 +166,7 @@ def gather(
     if not pending and not revisions:
         return Gathered([], [], texts, {}, True, broken, "", note, elsewhere=elsewhere)
 
-    batch, rejected, pool = candidates(root, conf, pending, revisions, approved)
+    batch, rejected, pool = agree_candidates.candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
@@ -334,196 +298,7 @@ def _note_line(note: str) -> str:
     return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
 
 
-def approval_digest(
-    text: str,
-    batch: list[Candidate],
-    read: dict[str, str] | None = None,
-    carried_parts: list[bytes] | None = None,
-) -> str:
-    """承認のダイジェスト。承認画面の本文・判定が読んだ中身（`read_set`）・承認済みチケットに書き込む中身の
-    SHA-256 の 16 進（小文字）。
-
-    ボードは preview のダイジェストを `--yes` に `--digest` で返す。識別子だけを比べると、
-    見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
-    本文だけを比べても、画面に出ないのに承認済みチケットへ書き込む欄（`issue`、Markdown の
-    本文、知らない frontmatter の欄）は見せたあとに書き換えられる。
-
-    **判定が読んだ中身（`read_set`）をダイジェストに含める。** 提案だけでなく、
-    判定が読んだ承認済みチケット・マーカー・フェーズの種類・統合先の取り込み結果のどれかが見せたあとに
-    変われば、ダイジェストが変わる（読んだ先が増えた・減ったも同じ）。全ブランチの先頭（`head_sha`）は
-    入れない（無関係なコミットで承認が通らなくならないように）。`read` は `read_set` の返す形
-    （`<ブランチ>:<相対パス>` → 中身のハッシュ）。
-
-    一括のチケットの書き込む中身（`carried`）も残してダイジェストに含める。読んだ中身から決まるものだが、読みの
-    記録（`fsio.reading`）を通らない読みが紛れても、書き込む中身の変化は取りこぼさないように。
-    中身はバイト列で入れる。新規の承認は提案のバイト列をそのまま動かすので、改行や BOM だけの
-    書き換えもダイジェストを変える。`carried` は呼び手が判定の読みの中で組んで渡す
-    （`core.judge_approval`）。
-    渡さなければここで組む。
-
-    部分をそのままつながず、部分ごとのハッシュを件数と一緒に並べて、そのリストのハッシュを取る。
-    区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
-    本文は生の制御文字（`\\x00` も）をそのまま通すので、どの文字も「中身に出ない」とは言えない。
-    読んだ中身の部分は `<鍵>\\n<中身のハッシュ>`（ハッシュは 16 進の固定長なので、最後の改行で
-    切れる）。
-    """
-    if carried_parts is None:
-        carried_parts = [carried(cand) for cand in batch]
-    parts = [text.encode("utf-8")] + list(carried_parts)
-    if read is not None:
-        parts += [f"{key}\n{digest}".encode() for key, digest in sorted(read.items())]
-    lines = [str(len(parts))] + [hashlib.sha256(p).hexdigest() for p in parts]
-    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
-
-
-def read_set(conf: settings.Settings, root: str, seen: dict[str, str]) -> dict[str, str]:
-    """判定が読んだ中身（`fsio.reading` に溜めた内容）を、
-    機械に依らない鍵に直す。
-
-    鍵は `<リポジトリ>:<ブランチ>:<ツリーからの相対パス>`（"/" 区切り）。リポジトリは
-    ワークスペース自身なら `self`、プロジェクトならその名前（取り込み状態の名前と同じ。ブランチ名が
-    リポジトリをまたいで重なっても鍵は同じにならない。git の ref に `:` は使えない）。
-    ブランチはそのツリーの HEAD が指すブランチ名（読めなければツリーの名前。ワークスペースルートの
-    名前は空）で、`Changes.per_branch` と同じ決め方。ツリーは承認済みチケットを持ちうるもの全部
-    （`trees`）で、最長一致。鍵に使ったツリーの HEAD の中身も `<リポジトリ>:<ブランチ>:(HEAD)` で
-    入れる（切り離した HEAD の sha が変わればツリーの名前の鍵は同じでもダイジェストが変わる）。
-    state の置き場の下は、取り込み状態（`sync/`）だけを `(控え):<相対パス>` で
-    入れ、ほかの記録（セッションごとの一時の状態）は入れない（判定の入力ではなく、読むたびに
-    変わりうる）。ワークスペースの外は絶対パスのまま。
-    """
-    # 溜めた読みのパスはリンクをたどった先（`fsio.note_read`）なので、比べる側も
-    # たどった先に揃えてから大文字小文字をそろえる（macOS の /tmp のようなリンクを経たルート、
-    # Windows の表記の揺れ）。
-    held = sorted(
-        ((_real(t.root), t) for t in approval.trees(conf, root)),
-        key=lambda x: len(x[0]),
-        reverse=True,
-    )
-    folded_roots = [(_folded(real), real, t) for real, t in held]
-    state_real = _real(conf.state) if conf.state else ""
-    state = _folded(state_real) if state_real else ""
-    names: dict[str, str] = {}
-    out: dict[str, str] = {}
-    for path, digest in seen.items():
-        folded = _folded(path)
-        if state and (folded == state or folded.startswith(state + os.sep)):
-            rel = os.path.relpath(path, state_real).replace(os.sep, "/")
-            if rel.split("/", 1)[0] == syncstate.SYNC_DIR:
-                out[f"(控え):{rel}"] = digest
-            continue
-        owner = next(
-            (
-                (real, t)
-                for key, real, t in folded_roots
-                if folded == key or folded.startswith(key + os.sep)
-            ),
-            None,
-        )
-        if owner is None:
-            out[f"(外):{fsio.slashed(path)}"] = digest
-            continue
-        real, t = owner
-        if real not in names:
-            prefix = f"{syncstate.repo_key(t.project)}:{tree.branch_of(t.root) or t.name}"
-            names[real] = prefix
-            head = tree.head_text(t.root)
-            out[f"{prefix}:(HEAD)"] = fsio.content_digest(head) if head is not None else "-"
-        rel = os.path.relpath(path, real).replace(os.sep, "/")
-        out[f"{names[real]}:{rel}"] = digest
-    return out
-
-
-# 判定の置き場と働きを決める設定（`settings.load` と Claude Code の設定）の読み先。
-_SETTINGS_FILES = (
-    "pyproject.toml",
-    settings.LOCAL_FILE,
-    os.path.join(".claude", "settings.json"),
-    settings.LOCAL_CLAUDE_SETTINGS,
-)
-# 承認の判定に影響する設定の値（環境変数からも来るので、ファイルの中身とは別に値そのものを入れる）。
-# 置き場のパスとチケット制御だけ。state の置き場（`state`）は入れない（取り込み状態は中身で
-# `(控え):` に入る。置き場のパスだけが違う起動で見せ直しにならないように）。モードと承認の保護は
-# 承認の答えを変えない（端末を求めるかどうか）ので入れない。
-_SETTINGS_VALUES = ("tickets", "approved", "projects", "project_home")
-
-
-def settings_read_set(conf: settings.Settings, root: str) -> dict[str, str]:
-    """判定が読んだ設定（read_set に足す）。
-
-    `settings.load` が読むファイル（`pyproject.toml`・`ccnavi.settings.local.json`）と
-    Claude Code の設定（`.claude/settings.json`・`.claude/settings.local.json`）の中身を
-    `(設定):<相対パス>` で、判定に影響する値（置き場のパス・チケット制御など。
-    環境変数から来るもの）を `(設定値):<名前>` で入れる。
-    見せたあとに置き場のパスや設定が変われば、同じ画面でもダイジェストが変わる。
-    """
-    out: dict[str, str] = {}
-    for rel in _SETTINGS_FILES:
-        try:
-            with open(os.path.join(root, rel), "rb") as f:
-                out[f"(設定):{rel.replace(os.sep, '/')}"] = fsio.content_digest(f.read())
-        except OSError:
-            out[f"(設定):{rel.replace(os.sep, '/')}"] = fsio.READ_ABSENT
-    for name in _SETTINGS_VALUES:
-        value = str(getattr(conf, name, "") or "")
-        if value and os.path.isabs(value):
-            inside = os.path.relpath(value, root)
-            if not inside.startswith(".."):
-                value = inside.replace(os.sep, "/")
-        out[f"(設定値):{name}"] = fsio.content_digest(value)
-    # チケット制御は書かれた値（空・enable）ではなく有効かどうかで入れる。
-    out["(設定値):ticket_control"] = fsio.content_digest(str(conf.tickets_enabled))
-    return out
-
-
-def _real(path: str) -> str:
-    try:
-        return os.path.realpath(path)
-    except OSError:
-        return os.path.abspath(path)
-
-
-def _folded(path: str) -> str:
-    return os.path.normcase(os.path.normpath(path))
-
-
-def carried(cand: Candidate) -> bytes:
-    """承認で書き込む中身のバイト列。承認済みチケットと、親なら待ち方のファイル。
-
-    新規は提案のバイト列そのもの（`approval.admit` が動かす中身）。読んだバイト列のダイジェストを
-    判定の読み（`read_set`）にも入れる。読みの記録は改行を揃えた本文でダイジェストを取るので、それだけでは
-    改行や BOM だけの書き換えを覆わない。改版は承認済みチケットの frontmatter の計画だけを差し替え、
-    本文は承認済みチケットのものを残す（`revise_copy`）。待ち方は `phases/<親>/workflow.yml` に
-    書く中身（`approval.workflow_bytes`）を後ろに足す。区切りは件数つきのダイジェストの並びで決まる
-    （`approval_digest`）ので、ここでは長さを頭に付けてつなぐ。
-    """
-    t = cand.ticket
-    if cand.is_revision and cand.current is not None:
-        front, body = revised_front(cand.current, t), cand.current.body
-        ticket_bytes = ticket_mod.render(replace(cand.current, raw=front, body=body)).encode(
-            "utf-8"
-        )
-    else:
-        ticket_bytes = fsio.read_bytes(t.path) or b""
-        fsio.note_exact(t.path, ticket_bytes)
-    wf = _workflow_to_write(cand)
-    workflow_bytes = approval.workflow_bytes(wf) if wf is not None else b""
-    return b"%d\n" % len(ticket_bytes) + ticket_bytes + workflow_bytes
-
-
-def _workflow_to_write(cand: Candidate) -> ticket_mod.Workflow | None:
-    """この承認で `phases/<親>/workflow.yml` に書く待ち方。書かないなら None。
-
-    新規は計画を持つ親だけ。改版はいつも書く（計画か待ち方が変わったから改版になる）。
-    """
-    t = cand.ticket
-    if t.is_child:
-        return None
-    if cand.is_revision or t.has_plan:
-        return workflow.compute(t, cand.types)
-    return None
-
-
-def _batch_entry(cand: Candidate) -> dict:
+def _batch_entry(cand: agree_candidates.Candidate) -> dict:
     t = cand.ticket
     return {
         "ticket": t.ticket,
@@ -534,223 +309,10 @@ def _batch_entry(cand: Candidate) -> dict:
         "tree": t.tree or "",
         "path": t.path,
         # 親のブランチ名。`branch:` が無ければ識別子。
-        "branch": ticket_mod.branch_name(t),
+        "branch": ticket_ids.branch_name(t),
         "existing_branch": cand.existing_branch,
         "overflow": [p.detail for p in cand.overflow],
     }
-
-
-def approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
-    """チケットが承認されたことをモデルに伝える文。
-
-    `--agree --yes` の `prompt`（拡張が Claude Code に渡す）がここから出る。hook は承認を
-    伝えない。ほかの経路の承認は、エージェントが `ccnavi-ticket.sh status` で聞く。
-
-    tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
-    revisions は親の改版だった識別子。root はワークスペースルートで、sh のパスに使う。
-    """
-    lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
-    for t in tickets:
-        if t.ticket in revisions:
-            where = "親の改版。計画が新しくなった"
-        elif t.is_child:
-            where = f"親 {t.parent}、フェーズ {t.phase}"
-        else:
-            where = "親"
-        title = f": {t.title}" if t.title else ""
-        lines.append(f"- {t.ticket}{title}（{where}）")
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    # 子の着手は親の着手を前提にする（設計 9.6、REQ-TKT-48）。順をここで言わないと、
-    # 最初の子の着手で止まってから読むことになる。ただし勧めるのは、この回に承認された
-    # 親が居るときだけ。改版と子だけの回で `start <親>` を勧めると、親は着手済みなので
-    # 案内どおりに打つと「着手済み」で終わる。
-    guide = "後工程を進める。"
-    if any(not t.is_child and t.ticket not in revisions for t in tickets):
-        guide += f"親は自分のワークツリーで '{ticket_sh} start <親>' を先に打つ。"
-    if any(t.is_child for t in tickets):
-        guide += (
-            "子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-            f"'{ticket_sh} start <識別子>' で着手する（親が未着手だと止まる）。"
-        )
-    lines.append(guide)
-    return "\n".join(lines)
-
-
-def candidates(
-    root: str,
-    conf: settings.Settings,
-    pending: list[ticket_mod.Ticket],
-    revisions: list[ticket_mod.Ticket],
-    approved: list[ticket_mod.Ticket],
-) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
-    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための対応表。
-
-    承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
-    ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
-    （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に何も言わなかった）。
-    """
-    open_index = approval_checks.by_id(approved)
-    # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。落ちた親を対応表に残すと、
-    # 承認されない親の範囲で子が検証され、親の承認を経ずに子の承認済みチケットができる。
-    # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
-    # 親の通過が決まっている。
-    pool = approval_checks.by_id(approved)
-    batch: list[Candidate] = []
-    rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
-    # レイヤーごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じレイヤーのチケットが
-    # 何件あっても、ファイルを読むのはそのレイヤーにつき 1 度で足りる。
-    cache: dict[str, dict | None] = {}
-    # 先行を引く対応表。先行を書いた子が居るときだけ、最初の 1 回で組む。
-    preds: dict[str, list[ticket_mod.Ticket]] | None = None
-    # 親子のチケットの立ち位置と統合先の取り込み結果。
-    # 1 回の承認で 1 度ずつだけ読む。
-    fams = syncstate.Families(conf, root)
-
-    def types_for(t: ticket_mod.Ticket) -> dict | None:
-        name = project_of(t, pool)
-        if name not in cache:
-            cache[name] = phase.load_types(conf, root, name)
-        return cache[name]
-
-    for t in sorted(revisions, key=lambda x: x.ticket):
-        current = open_index[t.ticket]
-        types = types_for(t)
-        complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
-        complaints += revision_problems(root, conf, t, current, types)
-        complaints += approval_checks.family_problems(conf, root, t, fams)
-        if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
-            rejected.append((t, complaints))
-            continue
-        cand = Candidate(ticket=t, complaints=complaints, current=current, types=types)
-        if cand.plans_feedback:
-            cand.notes = feedback_notes(root, conf, t)
-        batch.append(cand)
-        # 通った改版だけ、一緒に承認する子から見える親にする。落ちた改版の計画で子を
-        # 通すと、承認されない番号の子が承認済みチケットになる。
-        pool[t.ticket] = t
-
-    # 今回の承認で通った子を親ごとに。後に続く子の順序の検査が、そのフェーズを
-    # 開き直したものとして読む。
-    # 子はフェーズの番号の順に並べる。識別子の順だと、後のフェーズの子（-02）が前のフェーズに
-    # 足す子（-03）より先に検査され、開き直す前のマーカーで通ってしまう。
-    added: dict[str, list[ticket_mod.Ticket]] = {}
-    for t in sorted(
-        pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
-    ):
-        types = types_for(t)
-        complaints, overflow = validate(t, pool, types)
-        complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
-        complaints += approval_checks.project_problems(t, pool, conf)
-        complaints += approval_checks.family_problems(conf, root, t, fams)
-        complaints += approval_checks.integration_problems(conf, root, t, fams)
-        complaints += approval_checks.branch_problems(
-            conf, root, t, fams, list(approved) + list(pending) + list(revisions)
-        )
-        if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
-            parent = pool.get(t.parent)
-            if parent is not None:
-                complaints += phase.order_problems(
-                    root, conf, t, parent, types, added.get(t.parent)
-                )
-        if t.is_child and t.predecessors:
-            # 先行は `done/` に在って取り消しでないことを求める。同じ承認で通る
-            # 先行も、まだ `todo/` に在るので満たさない。
-            if preds is None:
-                preds = approval.predecessor_pool(conf, root)
-            complaints += approval_checks.predecessor_problems(t, preds, conf.approved)
-        if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
-            rejected.append((t, complaints))
-            continue
-        batch.append(
-            Candidate(
-                ticket=t,
-                complaints=complaints,
-                overflow=overflow,
-                types=types,
-                existing_branch=bool(t.branch) and branch_exists(root, conf, t),
-            )
-        )
-        pool[t.ticket] = t
-        if t.is_child:
-            added.setdefault(t.parent, []).append(t)
-    return batch, rejected, pool
-
-
-def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案に待ち方の欄（`workflow:`）が書いてあれば拒む。待ち方を書くのは `--agree` だけで、
-    置き場は `phases/<親>/workflow.yml`（承認はチケットの中身を変えない）。"""
-    if ticket_mod.WORKFLOW_KEY not in t.raw:
-        return []
-    return [
-        rules.Problem(
-            rules.SEVERITY_ERROR,
-            t.ticket,
-            f"`{ticket_mod.WORKFLOW_KEY}` の欄は提案に書かない。待ち方は --agree が"
-            f" {approval_marks.PHASES_DIR}/<親>/{approval_marks.WORKFLOW_FILE} に書く",
-        )
-    ]
-
-
-def script_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案にスクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）の空でない値があれば拒む。
-
-    承認は提案の中身を変えずに動かすので、提案に書いた値はそのまま承認済みチケットの値になる。
-    `review/` の 2 つめの保護（`completed_at`）や着手の基準点（`base_sha`）は、これらの欄を
-    スクリプトだけが書くことを前提にしている。
-    """
-    found = [
-        name
-        for name in ticket_mod.SCRIPT_FIELDS
-        if t.raw.get(name) not in (None, "") and str(t.raw.get(name)).strip()
-    ]
-    if not found:
-        return []
-    names = ", ".join(f"`{name}`" for name in found)
-    return [
-        rules.Problem(
-            rules.SEVERITY_ERROR,
-            t.ticket,
-            f"{names} はスクリプト（ccnavi-ticket.sh）だけが書く欄。"
-            "提案には値を書かない（空にするか消す）。改版の提案では、承認済みチケットを写したときに"
-            "入る started_at・completed_at・base_sha・cancelled_at・cancel_reason を空にする"
-            "（改版は承認済みチケットの側の値を残し、計画だけを差し替える）",
-        )
-    ]
-
-
-def record_field_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """提案に承認の記録（`ccnavi_approved`）か続きの子の目印（`followup_of`）があれば拒む。
-
-    承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。前の版の承認の
-    記録を持つ古い形は取り下げを記録の欄で決め、`workflow:` の欄も待ち方として読む。続きの子の
-    目印は取り下げを止める。どちらもユーザの判断（承認・レビューの行き先）だけが残すもので、
-    提案に書かせると古い形や続きの子を装える。
-    """
-    found = [name for name in (ticket_mod.APPROVAL_KEY, approval.FOLLOWUP_KEY) if name in t.raw]
-    if not found:
-        return []
-    names = ", ".join(f"`{name}`" for name in found)
-    return [
-        rules.Problem(
-            rules.SEVERITY_ERROR,
-            t.ticket,
-            f"{names} は承認の記録で、ユーザの承認（と続きの子を起こすレビューの行き先）だけが"
-            "残すもの。提案には書かない（改版の提案で承認済みチケットを写したときも消す）",
-        )
-    ]
-
-
-def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
-    """このチケットのレイヤーを決める `project:`（設計 11.4.1）。
-
-    子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
-    `project_problems` が落とす。親が対応表に居ないときだけ、子の置き場の値をそのまま読む。
-    """
-    if t.is_child:
-        parent = pool.get(t.parent)
-        if parent is not None:
-            return parent.project
-    return t.project
 
 
 @dataclass
@@ -788,7 +350,9 @@ class Planned:
     stopped: tuple[str, str] | None
 
 
-def plan_batch(root: str, conf: settings.Settings, batch: list[Candidate], stamp: str) -> Planned:
+def plan_batch(
+    root: str, conf: settings.Settings, batch: list[agree_candidates.Candidate], stamp: str
+) -> Planned:
     """承認の書き込みを、ディスクに書かずに並べる。時刻は `stamp` に固定する。
 
     書き込みを並べる（ここ、plan）と、並べたものを書く
@@ -804,7 +368,7 @@ def _apply_steps(
     stage: fsio.Stage,
     root: str,
     conf: settings.Settings,
-    batch: list[Candidate],
+    batch: list[agree_candidates.Candidate],
     stamp: str,
 ) -> tuple[str, str] | None:
     """`plan_batch` の中身。書き込みは fsio の書き込みを溜める段に積み、見せる行も同じ順序で積む。
@@ -828,7 +392,9 @@ def _apply_steps(
                     conf, root, t.ticket, t.parent, t.tree_root, project=t.project
                 )
                 with fsio.policy(places=t.ticket):
-                    failed = revise_copy(where, cand.current, t, cand.plans_feedback, cand.types)
+                    failed = agree_digest.revise_copy(
+                        where, cand.current, t, cand.plans_feedback, cand.types
+                    )
                 if failed:
                     return t.ticket, failed
                 removing = "改版の提案を todo/ から消せない ({reason})"
@@ -863,7 +429,9 @@ def _apply_steps(
             where = approval.home_dir(
                 conf, root, t.ticket, t.parent, t.tree_root, project=t.project
             )
-            failed = approval.admit(where, t, approval.source_branch(t), _workflow_to_write(cand))
+            failed = approval.admit(
+                where, t, approval.source_branch(t), agree_digest._workflow_to_write(cand)
+            )
             if failed:
                 return t.ticket, failed
             if t.is_child:
@@ -897,237 +465,13 @@ def _apply_steps(
     return None
 
 
-def _origin_line(t: ticket_mod.Ticket) -> str:
-    """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
-
-    プロジェクトは提案を置いた場所で決まる。ユーザはここで、書き込みが向かうリポジトリを
-    見て承認する。提案はそのツリーからの相対パスで見せる。絶対パスは
-    機械ごとに違い、承認のダイジェスト（画面の本文を含む）が Chrome と手元で揃わない。
-    """
-    return (
-        f"■ プロジェクト: {t.project or 'ワークスペース'}"
-        f"  ワークツリー: {t.tree or 'ワークスペースルート'}  提案: {approval.source_path(t)}"
-    )
-
-
-def screen(
-    batch: list[Candidate],
-    pool: dict[str, ticket_mod.Ticket],
-) -> str:
-    """承認を求める画面を組む。
-
-    frontmatter の全文は見せない。ユーザに見せるのは「何が新たに書けるようになるか」
-    「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
-    新たに書けるようになる領域を最初に置く（REQ-APV-01）。
-
-    種類は候補が持っているものを使う。承認の対象の中でもチケットごとにレイヤーが違いうるので、
-    画面の側で 1 つに決めない。
-    """
-    lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
-    for cand in batch:
-        t = cand.ticket
-        cand_types = cand.types
-        if cand.is_revision and cand.current is not None:
-            lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
-            lines += _plan_diff_lines(cand.current, t, cand_types)
-            for note in cand.notes:
-                lines.append(f"    {note}")
-            lines.append(_origin_line(t))
-            continue
-        lines += [
-            "",
-            f"== {t.ticket}: {t.title}"
-            + (
-                f"  親 {t.parent} / フェーズ {_phase_label(t, pool, cand_types)}"
-                if t.is_child
-                else "  親チケット"
-            ),
-        ]
-        if t.is_child:
-            # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
-            # 「承認済みチケットが無い」になる。
-            parent = pool.get(t.parent)
-            lines.append("■ この子チケットで編集可能な範囲")
-            lines.append(
-                "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
-                "親の範囲に無い場所がここで新しく編集できるようになることはない"
-            )
-            head = "親の範囲: " + (
-                ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
-                if parent
-                else "親がまだ承認されていない"
-            )
-            lines.append(f"    {head}")
-            bound = _type_of(t, pool, cand_types)
-            if bound is not None and not bound.inherits_scope:
-                lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
-        else:
-            lines.append("■ このチケットで編集可能な範囲")
-            lines.append(
-                "    下に並ぶ場所にだけ、このチケットで編集できるようになる。"
-                "allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、"
-                "deny はこのチケットでも編集できない場所"
-            )
-            # チケットの範囲はルールの allow より強い（設計 7）。承認するユーザは「ルールで
-            # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
-            lines.append(
-                "    ルールの allow で許可してある場所も、この範囲の外では止まる。"
-                "ルールの deny はこの範囲の中でも止まる"
-            )
-        for name in rules.SECTIONS:
-            paths = t.paths(name)
-            if paths:
-                lines.append(f"    {name}: " + ", ".join(paths))
-        if cand.overflow:
-            # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に影響しない記述の
-            # 注意と混ぜると、承認すれば書けると読み違える。
-            # **「編集対象」と「書き込めない」は意図して分けてある。** 前半はチケットが宣言した側、
-            # 後半は実際の書き込みが止まる側の話で、どちらか一方の語に揃えると、宣言と実行の
-            # どちらを指しているのかが読めなくなる。ほかの見出しが「編集」で揃っているのを見て、
-            # ここも揃えたくなるが、揃えない。
-            lines.append("■ チケットで編集対象としているが、書き込めない場所")
-            lines.append(
-                "    親の範囲かフェーズの種類の上限を超えている。"
-                "承認は可能だが、編集しようとすると判定が止める"
-            )
-            lines += [f"    {p.detail}" for p in cand.overflow]
-        if t.is_child:
-            state = "要" if t.review_required else "不要"
-            lines.append(f"■ 人間レビュー: {state}")
-            if t.review_reason:
-                lines.append(f"    理由: {t.review_reason}")
-            if t.predecessors:
-                lines.append(f"■ 先行: {', '.join(t.predecessors)}")
-                lines.append(
-                    "    どれも done/ に在って取り消しでないこと。"
-                    "満たしていなければ、承認も着手も止まる"
-                )
-        elif t.has_plan:
-            lines.append("■ 全体計画")
-            lines.append(
-                "    承認すると、この順序で進めることに合意したことになる。"
-                "前のフェーズが閉じるまで、次のフェーズの子は承認できない"
-            )
-            lines += _plan_lines(t.plan, 1, cand_types)
-            lines += _workflow_lines(t, workflow.compute(t, cand_types))
-            if t.feedback is not None:
-                lines.append("■ フィードバック計画")
-                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
-        if not t.is_child and t.issue is not None:
-            lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
-            lines.append(
-                "    この親のマージリクエストの本文に Closes として書く番号。"
-                "マージされると、この課題も閉じる"
-            )
-        if not t.is_child and t.branch:
-            lines.append(f"■ ブランチ: {t.branch}")
-            if cand.existing_branch:
-                lines.append(
-                    f"    既存のブランチ {t.branch} を使う。識別子（{t.ticket}）と別の名前で、"
-                    f"ワークツリーは .claude/worktrees/{t.ticket}。"
-                    "取り込み・送る・マージリクエストはこのブランチで行う"
-                )
-            else:
-                lines.append(
-                    f"    新しく切るブランチ。識別子（{t.ticket}）と別の名前で、"
-                    f"ワークツリーは .claude/worktrees/{t.ticket}。"
-                    "取り込み・送る・マージリクエストはこのブランチで行う"
-                )
-        if t.rationale.strip():
-            lines.append("■ エージェントが書いた理由")
-            lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
-        lines.append(_origin_line(t))
-        warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
-        if warnings:
-            lines.append("■ 判定に効かない記述")
-            lines.append(
-                "    提案に書いてあっても、判定はこれを読まない。"
-                "承認しても、編集できる場所は変わらない"
-            )
-            lines += [f"    {p.detail}" for p in warnings]
-    return "\n".join(lines)
-
-
-def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None) -> list[str]:
-    lines = []
-    for i, item in enumerate(items):
-        n = start + i
-        pt = (types or {}).get(item.type)
-        title = pt.title if pt is not None else item.type
-        review = ""
-        if item.deferred:
-            review = "レビューは次と一緒に"
-        elif item.review == ticket_mod.PLAN_REVIEW_MR:
-            review = "レビュー要: 計画で強めた"
-        elif pt is not None:
-            review = {
-                phasetypes.REVIEW_MR: "レビュー要: マージリクエスト",
-                phasetypes.REVIEW_CHAT: "レビュー要: このセッションで",
-            }.get(pt.review, "レビュー不要")
-        lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
-    return lines
-
-
-def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
-    """`dag` の計画の待ち。辺の書き漏れをユーザが見つける場所（設計 9.7）。"""
-    found = workflow.lines(t, wf)
-    if not found:
-        return []
-    return [
-        "■ 待ち方（承認すると親にコピーし、後から phases.yml を直しても変わらない）",
-        *("    " + x for x in found),
-    ]
-
-
-def _plan_diff_lines(
-    current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None
-) -> list[str]:
-    lines = []
-    if current.plan != revised.plan:
-        lines.append("■ 全体計画の変更")
-        lines.append("    いま:")
-        lines += ["    " + x for x in _plan_lines(current.plan, 1, types)]
-        lines.append("    改版:")
-        lines += ["    " + x for x in _plan_lines(revised.plan, 1, types)]
-    fresh = workflow.compute(revised, types)
-    held = current.workflow
-    if held is None or held.as_raw() != fresh.as_raw():
-        lines.append("■ 待ち方の変更")
-        before = workflow.lines(current, held) if held is not None else []
-        after = workflow.lines(revised, fresh)
-        lines.append("    いま:")
-        lines += ["        " + x for x in before] or ["        一直線（前の番号を全部待つ）"]
-        lines.append("    改版:")
-        lines += ["        " + x for x in after] or ["        一直線（前の番号を全部待つ）"]
-    if current.feedback != revised.feedback:
-        lines.append("■ フィードバック計画")
-        start = len(revised.plan) + 1
-        lines += _plan_lines(revised.feedback or [], start, types) or [
-            "    対応なし。見たうえで対応しない、という記録になる"
-        ]
-    return lines
-
-
-def _phase_label(t: ticket_mod.Ticket, pool: dict, types: dict | None) -> str:
-    pt = _type_of(t, pool, types)
-    return f"{t.phase}: {pt.title}" if pt is not None else str(t.phase)
-
-
-def _type_of(t: ticket_mod.Ticket, pool: dict, types: dict | None):
-    parent = pool.get(t.parent) if t.is_child else None
-    if parent is None or not parent.has_plan or t.phase is None or not types:
-        return None
-    item = parent.item_at(t.phase)
-    return types.get(item.type) if item is not None else None
-
-
 def waiting(
-    proposals: list[ticket_mod.Ticket],
-    approved: list[ticket_mod.Ticket],
-    closed: list[ticket_mod.Ticket],
-    review: list[ticket_mod.Ticket],
+    proposals: list[ticket_model.Ticket],
+    approved: list[ticket_model.Ticket],
+    closed: list[ticket_model.Ticket],
+    review: list[ticket_model.Ticket],
     types_for,
-) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
+) -> tuple[list[ticket_model.Ticket], list[ticket_model.Ticket]]:
     """いま `--agree` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
@@ -1142,7 +486,7 @@ def waiting(
     """
     known = approval_checks.by_id(approved + closed + review)
     open_index = approval_checks.by_id(approved)
-    todo = [t for t in proposals if t.state == ticket_mod.TODO]
+    todo = [t for t in proposals if t.state == ticket_model.TODO]
     pending = [t for t in todo if t.ticket not in known]
     revisions = [
         t
@@ -1158,397 +502,9 @@ def waiting(
     return pending, revisions
 
 
-def _workflow_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket, types_for) -> bool:
+def _workflow_differs(
+    proposal: ticket_model.Ticket, current: ticket_model.Ticket, types_for
+) -> bool:
     fresh = workflow.compute(proposal, types_for(proposal)).as_raw()
     held = current.workflow.as_raw() if current.workflow is not None else None
     return fresh != held
-
-
-def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod.Ticket]):
-    """チケットに使う種類を引く関数。レイヤーごとの読み込みは 1 プロジェクト 1 回。"""
-    pool = approval_checks.by_id(approved)
-    cache: dict[str, dict | None] = {}
-
-    def types_for(t: ticket_mod.Ticket) -> dict | None:
-        name = project_of(t, pool)
-        if name not in cache:
-            cache[name] = phase.load_types(conf, root, name)
-        return cache[name]
-
-    return types_for
-
-
-def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
-    """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
-    accepted = approval_marks.accepted_threads(
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
-    )
-    notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
-    if not parent.feedback:
-        notes.append("対応なし。見たうえで対応しない、という記録になる")
-        if accepted:
-            notes.append("別に追うものは issue に回したか（ccnavi-review.sh decide）")
-    return notes
-
-
-def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
-    """親の計画が種類の定義と合っているか（設計 9.7）。"""
-    problems: list[rules.Problem] = []
-    if not t.has_plan:
-        return problems
-    if types is None:
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                "`plan` があるのにフェーズの種類の定義（phases.yml）が読めない",
-            )
-        )
-        return problems
-    for key, items, kind in (
-        ("plan", t.plan, phasetypes.KIND_WORK),
-        ("feedback", t.feedback or [], phasetypes.KIND_FEEDBACK),
-    ):
-        seen_types = {item.type for item in items}
-        for i, item in enumerate(items):
-            pt = types.get(item.type)
-            if pt is None:
-                problems.append(
-                    rules.Problem(
-                        rules.SEVERITY_ERROR, t.ticket, f"`{key}[{i}]` の種類 `{item.type}` は無い"
-                    )
-                )
-                continue
-            if pt.kind != kind:
-                where = "全体計画" if key == "plan" else "フィードバック計画"
-                problems.append(
-                    rules.Problem(
-                        rules.SEVERITY_ERROR,
-                        t.ticket,
-                        f"`{key}[{i}]` の `{item.type}` は kind `{pt.kind}`。{where}には置けない",
-                    )
-                )
-            if item.deferred and pt.review == phasetypes.REVIEW_NONE:
-                problems.append(
-                    rules.Problem(
-                        rules.SEVERITY_ERROR,
-                        t.ticket,
-                        f"`{key}[{i}]` の `{item.type}` はレビュー不要の種類。延期するものが無い",
-                    )
-                )
-            for need in pt.requires:
-                if need not in seen_types:
-                    problems.append(
-                        rules.Problem(
-                            rules.SEVERITY_ERROR,
-                            t.ticket,
-                            f"`{item.type}` を置くなら `{need}` も {key} に要る（requires）",
-                        )
-                    )
-        # 延期の先は、レビューがある項でなければならない。全体計画は待ち方（`workflow`）が
-        # 引き受け手を決めるので、そちらで見る。
-        if key == "plan":
-            continue
-        for i, item in enumerate(items):
-            if not item.deferred:
-                continue
-            target = next((x for x in items[i + 1 :] if not x.deferred), None)
-            if target is None:
-                continue
-            tpt = types.get(target.type)
-            if tpt is not None and tpt.review == phasetypes.REVIEW_NONE and target.review != "mr":
-                problems.append(
-                    rules.Problem(
-                        rules.SEVERITY_ERROR,
-                        t.ticket,
-                        f"`{key}[{i}]` を延期した先の `{target.type}` にレビューが無い",
-                    )
-                )
-    if not any(p.severity == rules.SEVERITY_ERROR for p in problems):
-        problems.extend(workflow.problems(t, types))
-    return problems
-
-
-def revision_problems(
-    root: str,
-    conf: settings.Settings,
-    revised: ticket_mod.Ticket,
-    current: ticket_mod.Ticket,
-    types: dict | None,
-) -> list[rules.Problem]:
-    """親の改版を受けてよいか（設計 9.7）。"""
-    problems = plan_problems(revised, types)
-    if any(p.severity == rules.SEVERITY_ERROR for p in problems):
-        return problems
-    # 変えられるのは計画だけ。
-    if _scope_signature(revised) != _scope_signature(current):
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。範囲が承認済みチケットと違う",
-            )
-        )
-    if (
-        revised.title != current.title
-        or revised.issue != current.issue
-        or revised.issue_repo != current.issue_repo
-    ):
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。題か課題番号が承認済みチケットと違う",
-            )
-        )
-    if revised.branch != current.branch:
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。`branch:` が承認済みチケットと違う"
-                "（親のブランチは承認で決まる）",
-            )
-        )
-    # 全体計画: 子がある番号までは同じ順序でなければならない。
-    if revised.plan != current.plan:
-        frozen = _last_phase_with_children(conf, root, current.ticket)
-        if frozen > len(revised.plan) or revised.plan[:frozen] != current.plan[:frozen]:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    revised.ticket,
-                    f"全体計画の {frozen} 番目までは子が承認されているので変えられない。"
-                    "番号がずれると子の phase が指す先が変わる",
-                )
-            )
-    # 延期の引き受け手: 子がある番号までは変えない。引き受け手が前へ動くと、延期した作業を
-    # 済んだレビューが引き受けたことになり、誰にも見られずに終わる。
-    frozen = _last_phase_with_children(conf, root, current.ticket)
-    held = workflow.effective(current, types).review_at
-    fresh = workflow.compute(revised, types).review_at
-    moved = [
-        n
-        for n in sorted(set(held) | set(fresh))
-        if held.get(n) != fresh.get(n)
-        and (
-            n <= frozen
-            or any(at is not None and at <= frozen for at in (held.get(n), fresh.get(n)))
-        )
-    ]
-    if moved:
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                revised.ticket,
-                f"延期の引き受け手が変わる（{', '.join(map(str, moved))} 番目）。"
-                f"{frozen} 番目までは子が承認されているので、延期の行き先は変えられない",
-            )
-        )
-    # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
-    if revised.feedback != current.feedback:
-        if current.feedback is not None:
-            # 残りの切り出し先は進め方で違う。マージリクエストがあれば issue に切り出せるが、
-            # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
-            elsewhere = (
-                "残りは新しい親チケットの提案として wip/proposals/todo/ に書いてください"
-                if phase.chat_only(root, conf, current.ticket)
-                else "残りは別 issue に回してください（ccnavi-review.sh decide）"
-            )
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    revised.ticket,
-                    "フィードバック計画は 1 回だけ。承認済みのフィードバック作業フェーズに"
-                    f"子を足してやり直すか、{elsewhere}",
-                )
-            )
-        elif not phase.plan_finished(root, conf, current):
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    revised.ticket,
-                    "フィードバック計画は、全体計画のフェーズが全部閉じてレビューが済んでから出す。"
-                    "作業が終わるまで対応は計画できない",
-                )
-            )
-    return problems
-
-
-def revise_copy(
-    approved_dir: str,
-    current: ticket_mod.Ticket,
-    revised: ticket_mod.Ticket,
-    feedback_planned: bool,
-    types: dict | None = None,
-) -> str:
-    """承認済みチケットの計画を差し替え、待ち方を `phases/<親>/workflow.yml` に書き直す。
-
-    範囲と本文はそのまま。改版の時刻はチケットに書かない（状態の履歴の `revised` に残る。
-    フィードバック計画の改版は `feedback: true` を添える）。
-
-    待ち方を先に書き、チケットを書く段で落ちたら待ち方を前の中身へ戻す。片方だけが新しい形
-    （新しい計画に古い待ち方、古い計画に新しい待ち方）を残さないため。
-    """
-    held = approval.workflow_path(approved_dir, current.ticket)
-    restore = ((held, fsio.read_bytes(held)),)
-    failed = approval.write_workflow(approved_dir, current.ticket, workflow.compute(revised, types))
-    if failed:
-        return failed
-    current.raw = revised_front(current, revised)
-    with fsio.policy(restore=restore):
-        failed = approval_marks._write(
-            approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
-        )
-    if failed:
-        fsio.put_back(restore)
-        return failed
-    history.note(
-        approved_dir,
-        current.ticket,
-        history.KIND_REVISED,
-        ticket_mod.DOING,
-        ticket_mod.DOING,
-        feedback=True if feedback_planned else None,
-    )
-    return ""
-
-
-def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dict:
-    """改版で書く frontmatter。承認済みチケットの frontmatter の計画を差し替えたコピー。
-
-    `current` は書き換えない。承認のダイジェスト（`digest`）も同じものから組むので、見せた
-    中身と書く中身が食い違わない。待ち方は書かない（`phases/<親>/workflow.yml` に書く）。
-    前の版の承認済みチケットに残る `workflow:` 欄はそのまま残す（ファイルが在ればファイルを読む）。
-    """
-    front = dict(current.raw)
-    front["plan"] = [item.as_raw() for item in revised.plan]
-    if revised.feedback is not None:
-        front["feedback"] = [item.as_raw() for item in revised.feedback]
-    return front
-
-
-def _scope_signature(t: ticket_mod.Ticket) -> tuple:
-    return tuple((e.decision, e.glob, e.regex) for e in t.entries)
-
-
-def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str) -> int:
-    """この親で、子が承認された（開いていても閉じていても）いちばん後ろの番号。"""
-    numbers = [
-        t.phase
-        for t in approval._everything(conf, root)
-        if t.parent == parent_id and t.phase is not None
-    ]
-    return max(numbers) if numbers else 0
-
-
-def validate(
-    t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], types: dict | None = None
-) -> tuple[list[rules.Problem], list[rules.Problem]]:
-    """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
-
-    返すのは 2 つのリスト。1 つめはチケットの形の苦情で、error があれば承認しない。
-    2 つめは範囲の超過（親の範囲・種類の上限を超えた項、regex の項）で、承認は止めない。
-    判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。
-
-    形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
-    検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
-    判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
-    承認はユーザがまとめて見て決める場所なので、そこで落ちるものはそこで言う。
-    """
-    problems: list[rules.Problem] = []
-    overflow: list[rules.Problem] = []
-    if not t.is_child:
-        return plan_problems(t, types), overflow
-    parent = pool.get(t.parent)
-    problems.extend(approval_checks.child_problems(t, parent))
-    if parent is None or parent.is_child:
-        return problems, overflow
-    overflow.extend(ticket_mod.subset_problems(t, parent))
-    if problems:
-        # 番号が親の計画に無い。種類を引けないので、ここから先は見ても意味が無い。
-        return problems, overflow
-    if parent.has_plan and t.phase is not None:
-        item = parent.item_at(t.phase)
-        pt = (types or {}).get(item.type)
-        if pt is None:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"{t.phase} 番目の種類 `{item.type}` の定義が読めない",
-                )
-            )
-            return problems, overflow
-        overflow.extend(phasetypes.scope_problems(t, pt))
-    # regex の項は親の検査と種類の検査が同じ文で言う。画面に 2 度並べない。
-    seen: set[str] = set()
-    distinct = []
-    for p in overflow:
-        if p.detail not in seen:
-            seen.add(p.detail)
-            distinct.append(p)
-    return problems, distinct
-
-
-def existing_branch_warnings(
-    root: str, conf: settings.Settings, proposals: list, copies: list, closed: list, review: list
-) -> list[str]:
-    """新規の提案（親）の親のブランチ名が、手元か origin に既にあるときの文。
-
-    `--lint` と `--agree --preview --verify` が warn として出す。承認は止めない。
-    提案がそのブランチの上で書かれている（`.claude/worktrees/<識別子>` がそのブランチを
-    チェックアウトしていて、提案がその中にある）ときは、そのブランチが親のブランチなので言わない。
-    """
-    settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
-    found: list[str] = []
-    cache: dict[str, set[str]] = {}
-    said: set[str] = set()
-    for t in proposals:
-        if t.state != ticket_mod.TODO or t.is_child or t.ticket in settled or t.ticket in said:
-            continue
-        said.add(t.ticket)
-        if t.branch:
-            # `branch:` で既にあるブランチを指すのは、そのブランチで作業するという宣言。warn は
-            # 出さず、承認画面に「既存のブランチ <名前> を使う」と出す。
-            continue
-        if _written_on_own_branch(root, conf, t):
-            continue
-        repo = tree.project_root(conf.projects, t.project) if t.project else root
-        if repo not in cache:
-            cache[repo] = gitstate.branch_names(repo)
-        folded = t.ticket.casefold()
-        hits = sorted(n for n in cache[repo] if n.casefold() == folded)
-        if hits:
-            found.append(
-                f"{t.ticket}: 親のブランチ名と同じブランチ（{', '.join(hits)}）が既にある。"
-                "承認すると、そのブランチを親のブランチとして取り込み・送る。"
-                "別の作業なら識別子を変える"
-            )
-    return found
-
-
-def _written_on_own_branch(root: str, conf: settings.Settings, t) -> bool:
-    """提案が、自分の識別子の名前のワークツリーの中にあり、そのワークツリーが親のブランチ
-    （`branch:`、無ければ識別子）の上か。"""
-    if not t.path:
-        return False
-    here = tree.tree_of(root, t.path, conf.projects)
-    if here is None or here.is_main or here.name != t.ticket:
-        return False
-    return tree.branch_of(here.root) == ticket_mod.branch_name(t)
-
-
-def branch_exists(root: str, conf: settings.Settings, t) -> bool:
-    """親の `branch:` のブランチが既にあるか。
-
-    提案がそのブランチの上で書かれている（`_written_on_own_branch`）か、そのリポジトリの手元か
-    origin にそのブランチがある（`tree.has_branch`。ファイルだけを読む）とき。Chrome の仮の
-    ツリーでは提案はいつも親のブランチの上にある。
-    """
-    if not t.branch:
-        return False
-    if _written_on_own_branch(root, conf, t):
-        return True
-    repo = tree.project_root(conf.projects, t.project) if t.project else root
-    return tree.has_branch(repo, t.branch)

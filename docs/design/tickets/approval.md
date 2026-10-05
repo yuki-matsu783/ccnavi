@@ -152,7 +152,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 ものは `--lint` も名指しする。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
 `rules.KIND_NOT_YET`）は `--lint` では warn。
 
-提案を `todo/` に書いた回に、この確認を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket.propose_notice`）。
+提案を `todo/` に書いた回に、この確認を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
 判定には足さず、ルールの文と同じ `PreToolUse` の `additionalContext` の経路で渡す。
 
 `CCNAVI_MODE=dry-run` の間は deny が止めないので、エージェントは `--yes` を打てる。承認の経路だけを
@@ -160,7 +160,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 
 **承認したことは、拡張が渡す文と `status` で伝わる。** hook は承認を伝えない。
 
-- ボードの承認は、`--agree --yes` の `prompt`（`agree.approved_text`）を拡張が通知からユーザに渡し、ユーザが進行中の
+- ボードの承認は、`--agree --yes` の `prompt`（`agree_screen.approved_text`）を拡張が通知からユーザに渡し、ユーザが進行中の
   セッションに貼るか、新しいセッションを開く
 - 端末・GitHub の画面・Chrome 拡張の承認では、ユーザがそのあとセッションに一言送る。エージェントは、承認済みチケットの状態を
   確かめるとき（着手の前、引き継ぎを読んだあと、承認の有無に迷ったとき）に、ファイルを読んで推測せず

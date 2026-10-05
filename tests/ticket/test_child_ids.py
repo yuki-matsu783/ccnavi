@@ -20,7 +20,7 @@ import unittest
 
 from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval
+from ccnavi.tickets import approval, ticket_ids, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -64,22 +64,22 @@ class ChildIdFormTest(unittest.TestCase):
                 self.assertTrue(t.is_child)
 
     def test_the_pattern_strips_two_steps_from_the_right(self):
-        m = ticket_mod.child_pattern().match("web-i0012-05-01")
+        m = ticket_ids.child_pattern().match("web-i0012-05-01")
         self.assertIsNotNone(m)
         self.assertEqual(
             (m.group("parent"), m.group("phase"), m.group("seq")), ("web-i0012", "05", "01")
         )
-        m = ticket_mod.child_pattern().match("x-01-02-03")
+        m = ticket_ids.child_pattern().match("x-01-02-03")
         self.assertEqual(
             (m.group("parent"), m.group("phase"), m.group("seq")), ("x-01", "02", "03")
         )
         for name in ("i0012", "i0012-05", "i0012-5-01", "i0012-05-1", "-05-01", "i0012-05-01-"):
             with self.subTest(name=name):
-                self.assertIsNone(ticket_mod.child_pattern().match(name))
+                self.assertIsNone(ticket_ids.child_pattern().match(name))
 
     def test_child_id_pads_both_numbers(self):
-        self.assertEqual(ticket_mod.child_id("i0012", 5, 1), "i0012-05-01")
-        self.assertEqual(ticket_mod.child_id("web-i0012", 0, 12), "web-i0012-00-12")
+        self.assertEqual(ticket_ids.child_id("i0012", 5, 1), "i0012-05-01")
+        self.assertEqual(ticket_ids.child_id("web-i0012", 0, 12), "web-i0012-00-12")
 
     def test_a_phase_that_disagrees_with_the_id_is_an_error(self):
         t, problems = ticket_mod.parse(child_text("i0012-02-01", "i0012", 5))
@@ -192,7 +192,7 @@ class FollowupRefusesTest(NextChildIdTest):
     """続きの子は、組めない識別子や先に在るファイルの上では何も書かずに止まる。"""
 
     def parent(self):
-        return ticket_mod.Ticket(ticket="i0001", raw={}, body="")
+        return ticket_model.Ticket(ticket="i0001", raw={}, body="")
 
     def snapshot(self):
         found = {}

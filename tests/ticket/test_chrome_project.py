@@ -204,7 +204,7 @@ class ChromeProjectTest(unittest.TestCase):
 
 
 class StartTest(unittest.TestCase):
-    """「始める」。識別子は ticket.issue_identifier の 1 つだけから決める。
+    """「始める」。識別子は ticket_ids.issue_identifier の 1 つだけから決める。
 
     Python と Pyodide が同じ関数を使い、名前が食い違わないようにする。
     """

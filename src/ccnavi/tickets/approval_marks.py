@@ -15,8 +15,7 @@ import os
 from dataclasses import dataclass, field
 
 from ..infra import fsio
-from . import history, workflow
-from . import ticket as ticket_mod
+from . import history, ticket_model, workflow
 
 PHASES_DIR = "phases"
 
@@ -241,7 +240,7 @@ def accepted_threads(
     approved_dir: str,
     parent: str,
     phase: int | None = None,
-    owner: ticket_mod.Ticket | None = None,
+    owner: ticket_model.Ticket | None = None,
 ) -> set[str]:
     """この親で、ユーザが「未解決のまま進める」と受け入れたスレッドの識別。
 

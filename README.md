@@ -2262,7 +2262,7 @@ ccnavi --lint --json
 `problems[].where` は、ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` や `(self) (phases) design` のような形で、
 `--flow` で渡したフローへの指摘なら `(flow)` になる。ファイル全体への指摘なら空。
 
-`flow.rendered` は文字列の配列で、`flow.render` が返したままのもの。子のパスやロックの案内は入らない。
+`flow.rendered` は文字列の配列で、`flow_render.render` が返したままのもの。子のパスやロックの案内は入らない。
 
 `flow.candidates` の `source` は `builtin` か `project`。`builtin` は `general-purpose`・`Explore`・`Plan` の 3 つで、`project` は
 ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md` から読む。`project` の名前は frontmatter の `name` で、
@@ -2672,6 +2672,9 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/infra/hookio.py` | stdin の payload の解釈と、stdout に返す応答の組み立て |
 | `src/ccnavi/infra/globmatch.py` | glob から正規表現への翻訳 |
 | `src/ccnavi/infra/shellread.py` | コマンド文字列のうち実際に実行される部分の切り出し |
+| `src/ccnavi/infra/shellread_scan.py` | 原文の走査。引用の状態を持ったまま、置換・ヒアドキュメント・コメント・改行を片付ける |
+| `src/ccnavi/infra/shellread_words.py` | コマンドの語の見分け。コマンド名・実行役のコマンド・オプションの幅・リダイレクト |
+| `src/ccnavi/infra/shellread_cd.py` | `cd` で移った先の追跡 |
 | `src/ccnavi/infra/settings.py` | 環境と設定ファイルからの設定解決 |
 | `src/ccnavi/infra/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
 | `src/ccnavi/infra/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
@@ -2688,28 +2691,49 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/policy/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
 | `src/ccnavi/policy/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の記録 |
 | `src/ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルのバックアップと復元 |
+| `src/ccnavi/policy/selfguard_targets.py` | 守る対象の一覧。設定ファイル・層の 3 本・実行ファイルと、ワークツリー側の写し |
+| `src/ccnavi/policy/selfguard_shell.py` | 守る対象へのシェルからの書き込みを止める組み込みのルール（正規表現と `add_rules`） |
 | `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、リスク、操作 |
 | `src/ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
+| `src/ccnavi/tickets/ticket_model.py` | チケットの形。書式の定数・状態の名前・範囲の項・計画の項・待ち方と `Ticket` |
+| `src/ccnavi/tickets/ticket_ids.py` | 識別子とブランチ名の規則。issue から識別子を作る手順 |
+| `src/ccnavi/tickets/ticket_places.py` | 範囲を当てない置き場（チケット・下書き・ELI5）と、状態の置き場の出入りの見分け |
+| `src/ccnavi/tickets/ticket_fold.py` | 同じ識別子のチケットのまとめ方。本物とするツリーと、決まらない形の数え方 |
+| `src/ccnavi/tickets/ticket_guard.py` | 状態の置き場を守る組み込みのルールと、提案を書いた回に渡す確認の文 |
+| `src/ccnavi/tickets/ticket_fields.py` | スクリプトが書く欄の、行単位の書き換えと読み取り |
 | `src/ccnavi/tickets/approval.py` | 承認済みチケットの置き場。読み込み・置き場の間の移動・提案の集め方・続きの子 |
 | `src/ccnavi/tickets/approval_marks.py` | フェーズのマーカー、親ごとのマーカー、子ごとの記録、受け入れたスレッドの記録（`phases/<親>/`） |
 | `src/ccnavi/tickets/approval_checks.py` | 承認済みチケットの構造の検査。親子と統合先、先行、プロジェクトの欄 |
 | `src/ccnavi/tickets/approval_times.py` | 承認の時刻（表示だけ）。状態の履歴か git から引く |
-| `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を組む、承認の画面、置き場へ動かす |
+| `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を集めて `--preview` / `--verify` に答え、書き込みを並べて置き場へ動かす。承認待ちの一覧 |
+| `src/ccnavi/tickets/agree_candidates.py` | 承認の候補と、その検査（計画・改版・欄・ブランチ） |
+| `src/ccnavi/tickets/agree_screen.py` | 承認の画面の文面と、承認を伝える文 |
+| `src/ccnavi/tickets/agree_digest.py` | 承認の対象の指紋（ダイジェストと読みの範囲）と、承認で書く本文 |
 | `src/ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
-| `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
+| `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。フェーズの組み立てと順序の検査、止めたときの文、親がいまどの局面にいるか |
+| `src/ccnavi/tickets/phase_forms.py` | ユーザだけが打つコマンドの形（承認・レビュー済み・ガードの切り替え・記録の片付け）を見分ける組み込みのルール |
+| `src/ccnavi/tickets/phase_scope.py` | 子チケットの範囲の当て方と、範囲の外の変更の洗い出し |
 | `src/ccnavi/tickets/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
+| `src/ccnavi/tickets/flow.py` | 子チケットのフロー（作業の手順のグラフ）。置き場・着手中のロック・読み込み・子に渡す案内 |
+| `src/ccnavi/tickets/flow_text.py` | フローに書かれた文字列の整え方。制御文字・長さ・印や囲みのなりすまし |
+| `src/ccnavi/tickets/flow_shape.py` | フローの形の検査。ノード・枝・名前の食い違い |
+| `src/ccnavi/tickets/flow_render.py` | フローを文に描く。子に渡す手順の一覧 |
 | `src/ccnavi/tickets/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡した結果の判定（JSON の形は `review_host.py`）。ネットワークには出ない |
 | `src/ccnavi/tickets/review_host.py` | sh が渡す `--result` の JSON の形、投稿の目印、origin の種類（sh との契約） |
 | `src/ccnavi/tickets/review_decide.py` | 残った指摘の行き先を決める（`--reviewed` の決め方と `decide`） |
 | `src/ccnavi/tickets/review_close.py` | 親を閉じる（`review ready` と `close-early`） |
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント |
-| `src/ccnavi/hook/post.py` | 実行後チェック。保護領域の変更の検知、差し戻しの文、復元 |
+| `src/ccnavi/hook/post.py` | 実行後チェックの手順。作業ツリーの読み取り、前からあった変更の記録、復元 |
+| `src/ccnavi/hook/post_findings.py` | 変わったファイルを、守る場所とチケットの範囲に当てる。スクリプト自身の書き込みの見分け |
+| `src/ccnavi/hook/post_report.py` | 実行後チェックの差し戻しの文 |
 | `src/ccnavi/hook/events.py` | hook のイベントごとの手順。1 回の起動で何が起きるかはここを上から読む |
 | `src/ccnavi/hook/judge.py` | 実行前チェック。通す・聞く・止めるを決める |
 | `src/ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
 | `src/ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
-| `src/ccnavi/hook/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
+| `src/ccnavi/hook/docsearch.py` | `--docs` と `SessionStart` の入口。索引を置く場所（ワークスペースとプロジェクト）を決めて集め、引き方を案内する |
+| `src/ccnavi/hook/docsearch_index.py` | md の frontmatter の索引（`index.jsonl`）を組む。変わった md だけを読み直す |
+| `src/ccnavi/hook/docsearch_query.py` | 索引の引き方。`--docs` の問いの検査、当たり、並べ方と表 |
 | `src/ccnavi/entry/` | 入口。CLI・診断・lint・提案・版。どのサブパッケージからも読まれない |
 | `src/ccnavi/entry/lint.py` | 設定とルールの検証。判定を行わない |
 | `src/ccnavi/entry/lint_rules.py` | lint のうち、ルールファイルの中身の検査。提案（`suggest.py`）も候補をここに通す |
@@ -2719,7 +2743,10 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
 | `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
-| `src/ccnavi/entry/cli.py` | 引数の解釈と振り分け。`ticket` / `review` の副命令を ops / review へ渡す |
+| `src/ccnavi/entry/cli.py` | 1 回の起動の入口。標準入出力とコマンドラインを判定や各コマンドへ振り分け、ワークスペースルートを見つける |
+| `src/ccnavi/entry/cli_usage.py` | `--help` の本文 |
+| `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け |
+| `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |

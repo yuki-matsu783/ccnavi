@@ -154,7 +154,7 @@ test("CB-T237 256KB を超えるフローは読まないし書かない。書け
   assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
 });
 
-test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表記で比べる（実行ファイルの flow._text と同じ）", () => {
+test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表記で比べる（実行ファイルの flow_text._text と同じ）", () => {
   const base = templateFlow("i0001-01-01", "調査");
   const doc: FlowDoc = {
     ...base,

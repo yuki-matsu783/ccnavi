@@ -32,7 +32,7 @@ import time
 import unittest
 
 from ccnavi.infra import settings, shellread
-from ccnavi.policy import selfguard
+from ccnavi.policy import selfguard_shell
 from tests.config.test_config_union import (
     COMMON_RISK,
     HOME,
@@ -203,7 +203,7 @@ class GlobCaseTest(ConfigUnionHarness):
         """11.4: `regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
 
         区別すると、`Write` の経路だけが表記違いで外れる。同じ場所へシェルから書く形は
-        組み込みの保護（selfguard._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
+        組み込みの保護（selfguard_shell._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
         """
         self.assertFalse(os.path.exists(os.path.join(self.ws, "token")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "token", "x.txt"))
@@ -503,7 +503,7 @@ class CopyDestinationTest(GuardHarness):
 
     def test_skipping_options_does_not_blow_up(self):
         """後ろの選択肢の割り方は 1 通り。当たらない長い並びでもすぐ返る。"""
-        regex = re.compile(selfguard.guard_shell_regex(self.ws), re.IGNORECASE)
+        regex = re.compile(selfguard_shell.guard_shell_regex(self.ws), re.IGNORECASE)
         for tail in (" -S" * 60, " -S -" * 60, " --suffix" * 60, " -m x" * 60):
             text = shellread.read("cp /tmp/x .ccnavi/common/rules.yml" + tail + " /tmp/y").text
             with self.subTest(tail=tail[:12]):
@@ -513,7 +513,7 @@ class CopyDestinationTest(GuardHarness):
 
 
 class HolderDestinationTest(GuardHarness):
-    """11.6: 守るものが入っているディレクトリを行き先にした形（`selfguard.holder_regex`）。
+    """11.6: 守るものが入っているディレクトリを行き先にした形（`selfguard_shell.holder_regex`）。
 
     行き先の表記に守るファイルの名前が出ないので、場所の表記では当たらない。元の側に
     守る名前の語か、名前の決まらない語があるときだけ止め、別の名前を置くだけの形は止めない。
@@ -638,7 +638,7 @@ class HolderDestinationTest(GuardHarness):
 
     def test_scanning_many_sources_does_not_blow_up(self):
         """元の語は最初に見つかったもので決め打ちする。当たらない長い並びでもすぐ返る。"""
-        regex = re.compile(selfguard.guard_shell_regex(self.ws), re.IGNORECASE)
+        regex = re.compile(selfguard_shell.guard_shell_regex(self.ws), re.IGNORECASE)
         for tail in (
             " /tmp/decisions.jsonl" * 300,
             " $x" * 300,
@@ -960,7 +960,7 @@ class ScriptTamperTest(GuardHarness):
                     self.guarded_hook("Bash", self.ws, command=command),
                     "builtin-guard-setting-files",
                 )
-        # シェルの側も、場所のパスはどの機械でも区別せずに当てる（selfguard._folded）。
+        # シェルの側も、場所のパスはどの機械でも区別せずに当てる（selfguard_shell._folded）。
         swapped = "rm -rf projects/lib/.Ccnavi/scripts/count.sh"
         result = self.guarded_hook("Bash", self.ws, command=swapped)
         self.assert_denied(result, "builtin-guard-setting-files")

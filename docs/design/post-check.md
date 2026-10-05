@@ -37,7 +37,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | 何 | 外す条件 |
 |---|---|
 | frontmatter を持たないファイル | どちらの版も持たない。マーカー・`.risk.json`・`.judge.json`・`accepted.json`・閉じの記録のほか、チケットでないファイルはすべてここに入る |
-| チケットへの書き足し | `ticket.SCRIPT_FIELDS` のうちコミット済みの版がまだ持っていない欄以外が 1 文字も変わっていない（`ticket.script_shape`） |
+| チケットへの書き足し | `ticket_model.SCRIPT_FIELDS` のうちコミット済みの版がまだ持っていない欄以外が 1 文字も変わっていない（`ticket_fields.script_shape`） |
 | `finish` / `cancel` の移動 | 正規化した内容が同じチケットが `doing/` か `review/` から消え、`review/` か `done/` に現れた組。両側とも 1 件ずつのときだけ |
 
 範囲・親・フェーズ・本文が変わったチケット、既に値のあるスクリプトの欄（`base_sha` など）の書き換え、新しく現れた
@@ -83,7 +83,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 `CCNAVI_RESTORE_IF_DENY` が `enable`（既定）のとき、新しく現れた違反のうち、ルールが `deny` と
 宣言した場所のものだけを戻す。`ask` と承認済みチケットの範囲外は、報告はするが戻さない
-（報告する範囲 `post._guarding` より戻す範囲 `post._restorable` が狭い）。中身が変わった・
+（報告する範囲 `post_findings._guarding` より戻す範囲 `post._restorable` が狭い）。中身が変わった・
 消えたものは `git restore --staged --worktree`、現れたものは消さずに
 `state/aside/<日時>/<path>` へ退避し、退避先を報告に載せる（索引にあれば先に `git rm --cached`）。
 `dry-run` は戻さず、報告に `would-restore` の行を足す。`disable` は戻さず、その行も出さない。

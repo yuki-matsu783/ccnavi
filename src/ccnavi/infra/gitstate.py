@@ -210,7 +210,7 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
     作業し、`merge <統合先>` を打ってから統合先へ取り込むのがこのリポジトリの手順なので、
     それを打つたびに、ユーザが統合先で直した保護領域が毎回報告に並ぶ。
 
-    `--no-renames` と `--ignore-submodules=none` は phase.scope_findings と同じ理由。
+    `--no-renames` と `--ignore-submodules=none` は phase_scope.scope_findings と同じ理由。
     改名を 1 行にまとめられると移動元が消え、submodule の進みは `.gitmodules` の
     `ignore = all` で丸ごと消える。どちらも差分から行が消える経路になる。
     """

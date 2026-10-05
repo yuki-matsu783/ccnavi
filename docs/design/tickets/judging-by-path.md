@@ -76,11 +76,11 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 範囲の外として扱わない（次のチケットを提案する手段を残すため。提案は承認されるまで判定に何も反映されない）。状態の置き場と
 承認済みチケットは組み込みの `deny`（9.2、8.2）が先に止めるが、組み込みが入るのは実行前のルール集合だけ。
 外し方は、実行前チェック・サブエージェント終了時チェック・ターンの終わりのコミット済みのぶんは置き場ごと
-（`ticket.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post._script_writes`、7.2）。
+（`ticket_places.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post_findings._script_writes`、7.2）。
 ワークツリーのルートからの相対パスを `/` の境で見て大文字小文字を区別しない。
 
 下書きの置き場（ワークツリーのルートの直下の `scratchpad/`）も、**実行前チェックだけ**範囲の外として扱わない
-（`ticket.is_unscoped`）。根拠は「そのツリーの git が `scratchpad/` を追跡しないこと」で、保証ではない
+（`ticket_places.is_unscoped`）。根拠は「そのツリーの git が `scratchpad/` を追跡しないこと」で、保証ではない
 （`.gitignore` は各リポジトリが持つ）。実行後チェックとサブエージェント終了時チェックは `scratchpad/` を外さない。
 入力が `git status`（`--ignored` なし）と追跡ファイルの差分なので、正しく設定されたリポジトリでは現れず、
 追跡されているときだけ報告する。`--lint` は、`scratchpad/` に追跡されているファイルがあるリポジトリと、
@@ -90,13 +90,13 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 追跡から外れる範囲より狭く保つ）。ルートの直下 1 段のディレクトリだけを見る（`docs/scratchpad/` や同じ名前の
 ファイルは外さない）。置き場の名前は設定で動かさない。
 
-ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
-`scratchpad/` と違って追跡される置き場なので、実行前チェック（`ticket.is_unscoped`）に加えて、実行後チェック
-（`post.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
+ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket_places.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
+`scratchpad/` と違って追跡される置き場なので、実行前チェック（`ticket_places.is_unscoped`）に加えて、実行後チェック
+（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
 外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
 大文字小文字は区別し、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
-`tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket._under`）と
-下書きの置き場（`ticket.is_scratch_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
+`tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
+下書きの置き場（`ticket_places.is_scratch_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
 `wip/` は `ready` の前に丸ごと消すので、ここに置いたものは squash した成果物に残らない。`ready` の前提は大文字小文字を区別せず、
 名前が `wip\` で始まる 1 ファイルも `wip/` の残りとして止める（区別しない FS で `WIP/eli5/` を先に作った形を拾う）。
 **この除外は、チケットの `deny` と、チケットが信頼できないときの全面停止（`LIMIT_BLOCKED`）より先に適用される**（`is_unscoped` が
@@ -116,7 +116,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 `DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-agree.sh` と `ccnavi-push-approved.sh` を
 `sh` / `bash` で打つ形も同じ理由コードで止める。大文字小文字によらない。
 `comment` / `fetch` / `origin` は sh だけの仕事なので当てていない。
-**hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase.human_path_form`）。
+**hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase_forms.human_path_form`）。
 
 - ボードの経路。`--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組。`--yes` の経路は
   端末を求めないので、ここが唯一の保護になる。`decide <N>` と `--preview` は止めない（前者は
@@ -136,5 +136,5 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 呼び出しで走らせる形、擬似端末（`script`・`pty`）で端末要求を満たす形。hook は最終防衛線ではない（12.4）。
 
 どちらも実行役のコマンド越し（`env`・`sudo`・`sh -c`・`source`・`find -exec`）に打った形を、中で実行される
-コマンドで止める（6.3.1）。実行ファイルのパスには `selfguard.binary_clause`（8.2）が入るので、
+コマンドで止める（6.3.1）。実行ファイルのパスには `selfguard_shell.binary_clause`（8.2）が入るので、
 `sh .ccnavi/bin/<os>-<arch>/ccnavi --agree …` も同じルールで止まる。

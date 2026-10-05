@@ -15,7 +15,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import cli
-from ccnavi.tickets import phase
+from ccnavi.tickets import phase_forms
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -61,7 +61,7 @@ class ApproveRenamedTest(unittest.TestCase):
     def test_the_builtin_deny_still_stops_the_agent_from_typing_it(self):
         """エージェントが打つ `--approve` は、組み込みの deny が先に止める（案内には届かない）。"""
         with tempfile.TemporaryDirectory() as root:
-            rule = phase.ticket_approval_rule("", root)
+            rule = phase_forms.ticket_approval_rule("", root)
         for command in ("ccnavi --approve", "ccnavi --approve i0002", "ccnavi --approve --yes x"):
             with self.subTest(command=command):
                 self.assertIsNotNone(rule.compiled.search(command))

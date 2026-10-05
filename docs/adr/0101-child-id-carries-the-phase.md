@@ -19,7 +19,7 @@ keywords: [子チケット, 識別子, フェーズ番号, 連番, 採番, next_
 フェーズ 2 に `-07`・`-08` で入る。一覧を番号で並べると、フェーズ 2 の直しがフェーズ 5 の後ろに来る。
 識別子だけを見ても、どのフェーズの子かが分からない。
 
-識別子だけから親を割り出す箇所は 4 つあった。`ticket.py` の `_CHILD`（`child_pattern()`。Chrome 拡張の
+識別子だけから親を割り出す箇所は 4 つあった。`ticket_ids.py` の `_CHILD`（`child_pattern()`。Chrome 拡張の
 `family_of` もこれを使う）、hook の C1 の `family_of`、`ccnavi-common.sh` の `ccnavi_c1_family`（`%-[0-9][0-9]` で
 末尾を剥がす）、lint の「親なのに子の形」の検査。
 

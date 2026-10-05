@@ -34,6 +34,7 @@ from ..policy import builtin, ruleload, rules, selfguard
 from ..records import audit
 from ..tickets import (
     agree,
+    agree_candidates,
     approval,
     approval_checks,
     approval_marks,
@@ -44,6 +45,8 @@ from ..tickets import (
     phase,
     phasetypes,
     risk,
+    ticket_fold,
+    ticket_model,
     workflow,
 )
 from ..tickets import ticket as ticket_mod
@@ -657,7 +660,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
-        place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
+        place = "レビュー待ち" if t.state == ticket_model.REVIEW else "作業中"
         when = times.get(t.path, approval_times.ApprovedTime()).label()
         head = f"{t.ticket}（{t.title}、承認 {when}、{place}、{bound}）"
         if t.is_child:
@@ -773,7 +776,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     # 積で増える。ボードは読むだけで、置き場のファイルを動かさない。
     raw = approval.read_raw(conf, root)
     settled = raw.everything
-    proposals = ticket_mod.dedupe(everything, settled)
+    proposals = ticket_fold.dedupe(everything, settled)
     # 複数のツリーにあるチケットの一覧（`seen_in` / `scattered`）は、
     # 承認済みチケットの置き場に在るものも数える。チケットは 1 本のファイルで、
     # どの置き場に在っても子のワークツリーにも入る。
@@ -792,7 +795,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         open_copies,
         closed_copies,
         review_copies,
-        agree.types_resolver(conf, root, open_copies),
+        agree_candidates.types_resolver(conf, root, open_copies),
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
     preds = approval_checks.predecessor_pool_of(
@@ -812,11 +815,12 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     # 同じ識別子があるツリーの全部。本物とする側は proposal に、残りは seen_in に出す。
     # 複数のツリーにあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
     # 食い違いを意味しない。どれが本物か決まらないぶんだけを scattered に出す。数え方は
-    # `ticket.collisions` に置いてあり、--lint と同じ関数を通る（同じ答えを 2 か所で出さない）。
-    grouped = ticket_mod.by_ticket(everything)
+    # `ticket_fold.collisions` に置いてあり、--lint と同じ関数を通る
+    # （同じ答えを 2 か所で出さない）。
+    grouped = ticket_fold.by_ticket(everything)
     seen = {tid: [_where(t) for t in hits] for tid, hits in grouped.items()}
     scattered = {
-        tid: [_where(t) for t in ticket_mod.collisions(hits)] for tid, hits in grouped.items()
+        tid: [_where(t) for t in ticket_fold.collisions(hits)] for tid, hits in grouped.items()
     }
 
     # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
@@ -967,12 +971,12 @@ def _factor_record(layer: str, factor) -> dict:
     }
 
 
-def _where(t: ticket_mod.Ticket) -> dict:
+def _where(t: ticket_model.Ticket) -> dict:
     """チケット 1 つの場所。どのツリーの、どの置き場の、どのファイルか。"""
     return {"tree": t.tree, "state": t.state, "path": t.path}
 
 
-def _one_per_file(found: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
+def _one_per_file(found: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]:
     """同じツリーで同じファイルを 2 度読んだぶんをまとめる。順序は見つけた順で、先を残す。
 
     鍵にツリーを入れるのは、まとめるのを「1 つの走査の重なり」に限るため。2 つのツリーが
@@ -980,7 +984,7 @@ def _one_per_file(found: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
     同じチケットが 2 つのツリーに在るのと同じで、判定の側（`approval._authoritative`）もまとめない。
     ここだけまとめると、ボードに何も出ていないのに操作が止まる。
     """
-    kept: list[ticket_mod.Ticket] = []
+    kept: list[ticket_model.Ticket] = []
     seen: set[tuple[str, str]] = set()
     for t in found:
         key = (t.tree, os.path.normcase(os.path.abspath(t.path)))
@@ -995,14 +999,14 @@ def _ticket_record(
     conf: settings.Settings,
     root: str,
     ticket_id: str,
-    proposal: ticket_mod.Ticket | None,
+    proposal: ticket_model.Ticket | None,
     open_index: dict,
     closed_index: dict,
     worktrees: dict,
     seen_in: list[dict],
     scattered: list[dict],
     problems: list[str],
-    preds: dict[str, list[ticket_mod.Ticket]],
+    preds: dict[str, list[ticket_model.Ticket]],
     times: dict[str, approval_times.ApprovedTime],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
@@ -1010,7 +1014,7 @@ def _ticket_record(
     source = proposal or copy
     assert source is not None
     if ticket_id in open_index:
-        status = "review" if open_index[ticket_id].state == ticket_mod.REVIEW else "open"
+        status = "review" if open_index[ticket_id].state == ticket_model.REVIEW else "open"
     elif ticket_id in closed_index:
         status = "closed"
     else:
@@ -1139,7 +1143,7 @@ def _phase_record(ph: phase.Phase) -> dict:
 def _parent_record(
     conf: settings.Settings,
     root: str,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     closed_index: dict,
     raw: approval.Raw | None = None,
 ) -> dict:

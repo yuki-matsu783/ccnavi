@@ -21,7 +21,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.tickets import flow
+from ccnavi.tickets import flow, flow_render, flow_shape
 from tests.inproc import run_ccnavi
 from tests.ticket.test_flow import WORKFLOW_YAML
 from tests.ticket.test_ticket import write
@@ -252,16 +252,16 @@ connections:
 
 
 class FlowStructureTest(unittest.TestCase):
-    """線の構造（`flow.structure_problems`）。読むのは止めない warn で、巡回は言わない。"""
+    """線の構造（`flow_shape.structure_problems`）。読むのは止めない warn で、巡回は言わない。"""
 
     def problems(self, text: str) -> list[str]:
         data, why = flow.parse(text.encode("utf-8"))
         self.assertEqual(why, "")
-        return flow.structure_problems(data)
+        return flow_shape.structure_problems(data)
 
     def test_a_sound_flow_says_nothing(self):
         self.assertEqual(self.problems(STRUCTURE_BASE), [])
-        self.assertEqual(flow.structure_problems(yaml_load(WORKFLOW_YAML)), [])
+        self.assertEqual(flow_shape.structure_problems(yaml_load(WORKFLOW_YAML)), [])
 
     def test_lines_to_missing_nodes(self):
         said = self.problems(STRUCTURE_BASE + "  - {id: c5, from: p1, to: nowhere}\n")
@@ -348,17 +348,17 @@ connections:
 
     def test_lines_to_missing_nodes_are_capped(self):
         extra = "".join(
-            f"  - {{id: x{i}, from: p1, to: ghost{i}}}\n" for i in range(flow.ITEM_LIMIT + 3)
+            f"  - {{id: x{i}, from: p1, to: ghost{i}}}\n" for i in range(flow_shape.ITEM_LIMIT + 3)
         )
         said = self.problems(STRUCTURE_BASE + extra)
         missing = [line for line in said if "無いノード" in line]
-        self.assertEqual(len(missing), flow.ITEM_LIMIT + 1, said)
+        self.assertEqual(len(missing), flow_shape.ITEM_LIMIT + 1, said)
         self.assertEqual(missing[-1], "無いノードを指す線は…ほか 3 件")
 
     def test_broken_shapes_do_not_raise(self):
         for data in ({"nodes": [{"id": "a", "data": [1]}], "connections": [{"from": [1]}]}, 5):
             with self.subTest(data=data):
-                self.assertIsInstance(flow.structure_problems(data), list)
+                self.assertIsInstance(flow_shape.structure_problems(data), list)
 
 
 def yaml_load(text: str):
@@ -412,7 +412,7 @@ nodes:
 subAgentFlows:
   - {id: f, nodes: [{id: in, type: skill, data: {name: nested}}]}
 """
-        said = flow.name_problems(yaml_load(text), cat)
+        said = flow_shape.name_problems(yaml_load(text), cat)
         self.assertEqual(len(said), 4, said)
         self.assertIn("a1", said[0])
         self.assertIn("大文字小文字が違う（Explore）", said[0])
@@ -464,7 +464,9 @@ class FlowLintExtrasTest(unittest.TestCase):
 
     def test_rendered_is_what_subagent_start_lists(self):
         payload = self.lint(WORKFLOW_YAML)
-        self.assertEqual(payload["flow"]["rendered"], flow.render(yaml_load(WORKFLOW_YAML))[0])
+        self.assertEqual(
+            payload["flow"]["rendered"], flow_render.render(yaml_load(WORKFLOW_YAML))[0]
+        )
         self.assertTrue(payload["flow"]["rendered"][0].startswith("1. [start] 開始"))
         broken = self.lint("nodes: [\n")
         self.assertIsNone(broken["flow"]["rendered"])

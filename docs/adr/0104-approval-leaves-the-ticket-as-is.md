@@ -18,10 +18,10 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 書き足すもの | 書く場所（この ADR を書いた時点） |
 |---|---|
 | `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval.admit`） |
-| `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree.revise_copy`） |
+| `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree_digest.revise_copy`） |
 | `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval.followup`。`doing/` に直に起こす） |
 | `project:`（frontmatter に無ければ） | 新規の承認（`approval.admit`） |
-| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval.admit`、`agree.revised_front`） |
+| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval.admit`、`agree_digest.revised_front`） |
 
 しかも `admit` は提案をテキストで読み（`fsio.load_text`。改行を LF に揃える）、欄を差し込んで書き直す
 （`insert_front` と `write_text`）。欄を足さない場合でも、CRLF の提案は承認で 1 バイト以上変わる。
@@ -49,7 +49,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 承認済みの置き場をコミットすることについての今の事実も書いておく。`ccnavi-git.sh` は承認済みの置き場への
 `add`・`commit` を止めていない（止めているのは置き場を過去の中身に戻す `restore --source` などだけ）。
-エージェントに止めているのは `ccnavi-push-approved.sh` などのスクリプトの文字列で（`tickets/phase.py` 362〜380 行付近の
+エージェントに止めているのは `ccnavi-push-approved.sh` などのスクリプトの文字列で（`tickets/phase_forms.py` 329 行付近の
 `ticket_approval_rule`。組み込みの deny）、置き場をコミットした差分は、ターンの報告で違反に数えない（`hook/post.py` 294 行付近）。
 **この ADR はそこを変えない。** 別の件として扱う。
 
@@ -62,7 +62,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | **承認はチケットの中身を変えない。** 新規の承認は提案のファイルを `todo/` から `doing/` へ rename するか、バイト単位でコピーして（`fsio.read_bytes` / `write_bytes`）元を消す。`ccnavi_approved`・`project:`・`workflow:` を書き足さず、改行も BOM も変えない。端末・ボード・Chrome 拡張・手で動かす、のどれで承認しても、承認済みチケットは提案とバイト単位で同じになる | 欄を承認で書き続け、手で動かした承認には欄が無いことを「正常」と案内する | 欄の有無が経路を表す限り、読む側（エージェントも人も）は欄の無いものを壊れたものと読む。案内で直すより、違いを無くすほうが確か。本物とするのは前から置き場で、欄は記録でしかない（ADR-0058）。バイト単位にするのは、取り下げを中身の一致で決めるため（下） |
 | 承認の指紋（`digest`）に入る「書き出す中身」（`agree._carried`）を、`render()` した姿ではなく、動かすバイト列にする。`read_set` もバイト列で取る。提案の走査（`ticket.py` 1140 行付近）が `raw["project"]` に差し込む値は指紋に入らなくなる（書かないものを指紋に入れない） | 今の `render()` のまま | 書くものと見せたものの指紋が別の姿になると、照合が「書いたもの」を覆わない。承認が中身を変えないなら、動かすバイト列がそのまま書く中身 |
 | 承認の検査（親子・計画・`project:` と置き場・先行）は今までどおり承認のときに当て、判定の側でも当てる | — | 変えない。やめるのは書き足しだけ |
-| 提案（`todo/`）に、スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`: `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason`）の空でない値があれば、`--agree` と `--lint` で error にする。判定では提案に当てない | 今のまま見ない。判定でも当てる | 承認が中身を変えないので、提案に書いた値がそのまま承認済みチケットの値になる。下の `review/` の必須欄と、閉じた親の照合は、これらの欄がスクリプトだけが書いたものであることを前提にする。今はどこも見ていない（`SCRIPT_FIELDS` の値を検査する経路は無い）。判定で承認済みチケットに同じ検査を当てると、着手済みの `doing/` が全部止まる |
+| 提案（`todo/`）に、スクリプトだけが書く欄（`ticket_model.SCRIPT_FIELDS`: `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason`）の空でない値があれば、`--agree` と `--lint` で error にする。判定では提案に当てない | 今のまま見ない。判定でも当てる | 承認が中身を変えないので、提案に書いた値がそのまま承認済みチケットの値になる。下の `review/` の必須欄と、閉じた親の照合は、これらの欄がスクリプトだけが書いたものであることを前提にする。今はどこも見ていない（`SCRIPT_FIELDS` の値を検査する経路は無い）。判定で承認済みチケットに同じ検査を当てると、着手済みの `doing/` が全部止まる |
 | 承認済みチケットには、中身だけで分かる欄の組み合わせの矛盾を検査する。`started_at` が無いのに `base_sha` がある `doing/` は `blocked` にする（判定で止める）。`doing/` に `completed_at`・`cancelled_at`・`cancel_reason` の値があるものは、`--lint` と status で warn にとどめ、判定では止めない | `doing/` の `completed_at` などを `blocked` にする | `start` は `started_at` と `base_sha` を一緒に書くので、前者だけが無い形は道具を通らない。`finish` は `doing/` から `review/` か `done/` へ、`cancel` は `done/` へ動かすので、道具を通る限り `doing/` に `completed_at` や `cancelled_at` は残らない。ただしユーザが `done/` から `doing/` へ手で戻す再開（状態の履歴の注記と `--lint` の案内が認めている運び）では欄が残ったまま `doing/` に来る。止めると、ユーザの再開がどこにも書けなくなる |
 | 手で動かした承認に仕込まれた `started_at` / `base_sha` は、中身だけでは道具が書いたものと見分けられない。status と `--lint` で「チケットのワークツリーがあり、`base_sha` がその HEAD の祖先か」と「状態の履歴に `started` の行があるか」を確かめ、どちらも warn にする（status は「注意」で出す）。`start` では止めない。判定には入れない | 判定でも確かめる。`start` で止める（一度は採ったが、下の「ユーザが決めたこと」の 5 で改めた） | 判定は履歴も git も読まない取り決め（ADR-0086、下の「判定の拒否文」の行）。履歴は ccnavi の外で動かした分を持たないので、無いことだけでは止められない。`start` で止めても効かない。`started_at` と `base_sha` を両方仕込めば `start` は「着手済み」で先に返って検査に届かず、`base_sha` だけなら判定が `blocked` で既に止め、`start` は通れば基準点を HEAD で書き直す |
 | 承認で `project:` を書き足さない。承認済みチケットのプロジェクトは置き場（ツリー）から決まる | 書き足し続ける | 読む側は既に置き場で決めている（`scan_all`）。`ticket.py` の注記（1136 行付近）は「親が閉じたとき judge が子の `project` を見る」と書くので、実装の前に、その経路が欄ではなくツリーから決まることを確かめる |
@@ -89,7 +89,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 判定の拒否文（`hook/judge.py`）からは承認の時刻を外す。hook の中では履歴も git も読まない | 拒否文にも同じ順で時刻を出す | 判定は hook のたびに走る。時刻のために判定の経路で履歴と git を読むと遅くなるうえ、判定が履歴を読まない取り決めの境目が曖昧になる。時刻が要れば status で聞ける |
 | 全体計画の待ち方は承認のときに固定する（下の「`workflow:` を調べた結果」）。置き場をマーカーと同じ `<承認済みの置き場>/phases/<親>/workflow.yml` に移し、`--agree`（新規と改版）が書き、取り下げが一緒に消す。判定・延期・改版の比べ方はこのファイルを読む | 承認済みチケットに書き続ける。固定をやめて毎回 `phases.yml` から計算する | 前者は中身を変える。後者は承認のあとに `phases.yml` が変わると、作業中の親の待ち方と延期の引き受け手がユーザの見ていないところで変わる。マーカーの置き場に置けば、運び方・取り込み・指紋の扱いをマーカーに揃えられる |
 | `workflow.yml` の扱いをマーカーに揃える。`ccnavi-push-approved.sh` は承認済みの置き場をまるごと add するので足すものは無い。Chrome 拡張は親のブランチの承認済みの置き場をまるごと読み、書くのは実行ファイルのコアが並べたものなので、足すものは無い見込み（実装で確かめる）。指紋は判定が読んだものを `read_set` で覆うので、読めば入る。**C1（`hook/c1.py`）には足す。** 今の `_human` は `phases/<親>/` の下で決まった名前（`close-early.json`・`config-sync.json`・受け入れたスレッド）と番号のマーカーだけをユーザの判断の形と見て、ほかは「見分けられないもの」（d）として止める。`phases/<親>/workflow.yml` をユーザの判断（`--agree`）が書く形として (c) に足す | `flows/` に置く。承認済みの置き場の直下に新しい置き場を作る | `flows/` は子のフローの置き場で、役目が違う。新しい置き場を作ると、運ぶ・取り込む・読む経路のすべてに足すことになる |
-| 古い `workflow:` 欄を読むのは、`ccnavi_approved` を持つ古い承認済みチケットだけにする。それ以外（提案、新しい形の承認済みチケット）に `workflow:` があれば、`--lint`・判定・`--agree` で error にする。**同じ日に改めた**: 古い形でも、欄の待ち方は今の `phases.yml` から計算した待ち方と同じときだけ採り、違えば一直線で読む（下の「残る弱点」） | どれでも欄を読む | 新しい形では待ち方はファイルにしか無い。欄を読むと、手で書いた `workflow:` が承認済みの待ち方として効く。提案に書いた欄は今も `--agree` が error にしている（`agree._workflow_field`）が、判定と手で動かした承認には当たっていない |
+| 古い `workflow:` 欄を読むのは、`ccnavi_approved` を持つ古い承認済みチケットだけにする。それ以外（提案、新しい形の承認済みチケット）に `workflow:` があれば、`--lint`・判定・`--agree` で error にする。**同じ日に改めた**: 古い形でも、欄の待ち方は今の `phases.yml` から計算した待ち方と同じときだけ採り、違えば一直線で読む（下の「残る弱点」） | どれでも欄を読む | 新しい形では待ち方はファイルにしか無い。欄を読むと、手で書いた `workflow:` が承認済みの待ち方として効く。提案に書いた欄は今も `--agree` が error にしている（`agree_candidates._workflow_field`）が、判定と手で動かした承認には当たっていない |
 
 ### 状態を聞く副命令
 
@@ -98,7 +98,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | `ccnavi-ticket.sh status [<親>]` を足す。親を渡せばその親子、渡さなければ全部の、各チケットについて次を ccnavi が判断して出す: 置き場とツリー、承認の時刻（上の順）、着手しているか、置き場のファイルが未コミットか・コミット済みで未 push か、止まっている理由（`blocked`・先行・親が未着手・待ち方の固定が無い）、次の一手 | エージェントにファイルと `git status` を読ませて推測させる | 推測が今回の読み違えを生んだ。「欄が無い」「未コミット」の意味は ccnavi が知っていて、ccnavi が言えば読み違えない |
 | 未コミットの承認済みチケットには、未コミットであることと「ユーザに `ccnavi-push-approved.sh <親>` を打ってもらう」ことを出す。エージェントは運ばない。そのうえで status は、その親子が C1 の対象か（`ccnavi c1 family <親>` と同じ `c1.target`）を見て、対象なら「ユーザが `ccnavi-push-approved.sh <親>` で運ぶまで `start` は止まる」と、対象でなければ「`start` へ進んでよい」と言う | エージェントが `ccnavi-git.sh` で親のブランチへコミットして送る。C1 の対象かを見ずに「進んでよい」と言う | 承認で中身を変えないと、「手で置いた」と「`--agree` が置いてまだ運んでいない」がバイト単位で同じで見分けられない。エージェントが保護をすり抜けて置いたものまで、status が運ぶ道具になる。判定は未コミットの承認済みチケットも読むので、C1 の対象でなければ運ばなくても `start` へ進める。取り込み済みの親子（C1 の対象）では、`start` の C1 が親のワークツリーの未コミットの `doing/` の追加を「ユーザが運ぶもの」(c) と分けて止める（`hook/c1.py` の冒頭の説明と `_human`）。GitHub の画面だけのユーザでは承認は最初からコミットとして届くので、未コミットは起きない。運ぶのはユーザという設計 9.4 と ADR-0043 は変えない |
 | status は読むだけで、ネットワークに出ない（取り込みはしない）。push 済みかは手元のリモート追跡の ref で見る。古いかもしれないことを出力に添え、最新にしたければ `ccnavi-sync.sh` を先に打つよう言う | 打つたびに取ってくる | 実行ファイルはネットワークに出ない（設計 P11） |
-| status はサブエージェントにも許す。実行ファイルは呼び手がサブエージェントかを知らない（sh に `agent_id` は渡らない）ので、出力を分けず、状態を動かす・運ぶコマンドを出す行には「親（メインエージェント）だけが実行する」と書く | サブエージェント向けに出力を分ける。サブエージェントには許さない | 分けるには sh か hook から呼び手を渡す経路が要る。サブエージェントの `start` などは今も hook が止める（`phase._FORBIDDEN_COMMAND` に副命令の名前を並べている。`status` は並べない）ので、行を読んで打っても止まる |
+| status はサブエージェントにも許す。実行ファイルは呼び手がサブエージェントかを知らない（sh に `agent_id` は渡らない）ので、出力を分けず、状態を動かす・運ぶコマンドを出す行には「親（メインエージェント）だけが実行する」と書く | サブエージェント向けに出力を分ける。サブエージェントには許さない | 分けるには sh か hook から呼び手を渡す経路が要る。サブエージェントの `start` などは今も hook が止める（`phase_forms._FORBIDDEN_COMMAND` に副命令の名前を並べている。`status` は並べない）ので、行を読んで打っても止まる |
 | CLAUDE.md の詳細の表と `docs/claude/projects.md` に「承認済みチケットの状態を確かめるとき（着手の前、引き継ぎを読んだあと、承認の有無に迷ったとき）は、ファイルを読んで推測せず status を打つ」と書く | hook で毎回案内する | 下の「採らなかった案」 |
 
 ### 承認の知らせを外す
@@ -106,7 +106,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 決めたこと | 採らなかった側 | なぜ |
 |---|---|---|
 | `agree.news` / `agree.baseline` と記録 `<state>/approved-<session>-<agent>.json`、`UserPromptSubmit`（`hook/events.py`）・`PreToolUse`（`hook/judge.py`）・`SessionStart`（`hook/events.py`）からの呼び出しを消す。`ctxfile` の古い `approved-` ファイルの掃除は、残ったファイルを消すために残す | 知らせを残し、起点の取り方を直す | 知らせが確実に効くのはセッションの途中の承認だけで、開始時の取り込みで届いた承認は起点に含まれて取りこぼす。ボードの承認は拡張が同じ文（`--agree --yes` の `prompt`）をクリップボードか新しいセッションで渡す（`extensions/vscode/ccnavi-board/src/prompt-handover.ts`）。端末・GitHub・Chrome の承認では、ユーザがそのあとセッションに一言送るので、status で足りる |
-| 承認を伝える文 `agree.approved_text` は残す（`--agree --yes` の `prompt` が使う）。提案を書いた回に承認の前の確認を勧める文（`ticket.propose_notice`、REQ-APV-14）は、同じ `PreToolUse` の `additionalContext` の経路で今までどおり渡す | 一緒に外す | 確認の案内は承認の知らせと経路を共有しているだけで、役目は別 |
+| 承認を伝える文 `agree_screen.approved_text` は残す（`--agree --yes` の `prompt` が使う）。提案を書いた回に承認の前の確認を勧める文（`ticket_guard.propose_notice`、REQ-APV-14）は、同じ `PreToolUse` の `additionalContext` の経路で今までどおり渡す | 一緒に外す | 確認の案内は承認の知らせと経路を共有しているだけで、役目は別 |
 
 ### 互換の版と取り込む順序
 
@@ -195,7 +195,7 @@ sh で止める変更は、この ADR ではしない。
   設計 9.4（承認の確認の経路と「承認されたことは hook が伝える」）、設計 9.6（状態遷移の表の書く欄）。
   README.md の承認の節と `copy.approved_at`（2152 行付近）
 - コードの注記: `tickets/ops.py` 4 行の「サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）」は
-  事実でない。止めているのは hook の判定（`hook/judge.py` が `phase.forbidden` で `DENY_SUBAGENT_TICKET_OP`）で、
+  事実でない。止めているのは hook の判定（`hook/judge.py` が `phase_forms.forbidden` で `DENY_SUBAGENT_TICKET_OP`）で、
   `cli.py` は `agent_id` を見ていない。`ccnavi-ticket.sh` 17 行の同じ趣旨の注記も同様
 - 保護された sh: `ccnavi-ticket.sh` は通す副命令の一覧（`start | finish | cancel | record-risk`）に `status` を足し、
   引数の数の検査（`[ "$#" -ge 2 ]`）を `status` だけ 1 個で通すように直す。`ccnavi-sync.sh` は `closed_in_integration` を
@@ -227,7 +227,7 @@ sh で止める変更は、この ADR ではしない。
   C1 が見分ける形も 1 つ増える。手で動かした `order: dag` の親は今と同じく一直線で読む
 - 失ったもの（残る弱点）: **手で動かした承認に、提案の段階で `started_at` と `base_sha` を仕込まれると、中身だけでは見分けられない。**
   `--agree` を通らない経路なので提案の検査は当たらず、判定はその値を信じる。`base_sha` は、サブエージェント終了時と
-  実行後の範囲外の検査（`phase.scope_findings` の `base_sha..HEAD`）、実績のリスクの基準点（`risk.measure`）、取り込み済みの
+  実行後の範囲外の検査（`phase_scope.scope_findings` の `base_sha..HEAD`）、実績のリスクの基準点（`risk.measure`）、取り込み済みの
   親子の「閉じた」の照合に使われるので、基準点をずらされると、範囲外の書き込みとリスクの数え漏れ、別の親子を閉じたと読む
   取り違えが起きうる。status と `--lint` が祖先の関係と履歴で確かめて warn にするが、`start` と判定は止めない。手で動かせるのは
   承認済みの置き場に書ける権限を持つユーザだけなので、仕込めるのもその人か、その人が置いたファイルを書いた者に限られる

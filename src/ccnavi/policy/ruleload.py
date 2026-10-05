@@ -320,8 +320,9 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
 def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     """守る対象（selfguard）に渡す、レイヤーごとの設定ファイル（種別, 名札, kind, パス）。
 
-    共通レイヤーは phases と risk の 2 本だけ返す。共通レイヤーの rules は `selfguard.targets` が
-    `rules_path` で受け取っているので、ここから重ねると同じファイルが 2 度並ぶ。
+    共通レイヤーは phases と risk の 2 本だけ返す。共通レイヤーの rules は
+    `selfguard_targets.targets` が `rules_path` で受け取っているので、ここから重ねると同じファイルが
+    2 度並ぶ。
 
     自身のレイヤーとプロジェクトのレイヤーは 3 本とも返す。差し替え（`--project-rules-file`）は
     見ない。あれは診断のためのもので、守る対象は本来の置き場のほうになる。
