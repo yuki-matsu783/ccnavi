@@ -432,7 +432,18 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     return "\n".join(lines)
 
 
-def conventions(conf: settings.Settings, root: str, docs: bool = False) -> str:
+# 作業の決まりのうち、ワークツリーと git の行を支える deny の id（書かれたままの表記）。
+# この id のルールがワークスペースに無ければ、その行は出さない。
+RULE_MAIN_TREE = "main-tree"
+RULE_RAW_GIT = "raw-git"
+
+
+def conventions(
+    conf: settings.Settings,
+    root: str,
+    docs: bool = False,
+    deny_ids: set[str] | None = None,
+) -> str:
     """セッションの頭で渡す、ccnavi の動作が前提にしている作業の決まり（REQ-SES-06）。
 
     ワークスペースの CLAUDE.md に書いていた決まりのうち、ccnavi の判定・置き場・入口に
@@ -444,21 +455,32 @@ def conventions(conf: settings.Settings, root: str, docs: bool = False) -> str:
     理由と代わりの手段は拒否の文面、承認済みチケットの状態は `ccnavi-ticket.sh status`、
     それ以外の詳しい決まりは `--docs`（ワークスペースの文書の frontmatter の索引）。
 
+    - ワークツリーの行は、ワークスペースのルール（共通レイヤーと自身のレイヤー）に
+      `main-tree` の deny があるときだけ、git の行は `raw-git` の deny があるときだけ出す。
+      決まりを支えるのはそのルールで、ルールが無いワークスペースでは文と判定が食い違う。
+      ルールの有無は `deny_ids`（判定と同じ読み方）で見る
     - `projects` の行は、プロジェクトの置き場にプロジェクトがあるときだけ出す
     - `status` の行は、チケット制御が有効なときだけ出す
     - `--docs` の行は、索引の案内を出す回（`docs` が真）だけ出す。
       文書が無いワークスペースで引き方だけを案内しても、何も当たらない
     """
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
-    worktrees = tree.WORKTREES_DIR.replace("\\", "/")
-    lines = [
-        "[ccnavi] ccnavi が前提にしている作業の決まり。",
-        f"- 編集する前にワークツリー（{worktrees}/<名前>）を切り、その中で編集する。"
-        "切り方は ccnavi-git.sh の --help（worktree add）。",
-        f"- git は直接呼ばず {git_sh} を通す。止められたら迂回せず、出力の案内に従う。",
+    declared = deny_ids if deny_ids is not None else set()
+    lines = ["[ccnavi] ccnavi が前提にしている作業の決まり。"]
+    if RULE_MAIN_TREE in declared:
+        worktrees = tree.WORKTREES_DIR.replace("\\", "/")
+        lines.append(
+            f"- 編集する前にワークツリー（{worktrees}/<名前>）を切り、その中で編集する。"
+            "切り方は ccnavi-git.sh の --help（worktree add）。"
+        )
+    if RULE_RAW_GIT in declared:
+        git_sh = settings.script_command(root, "ccnavi-git.sh")
+        lines.append(
+            f"- git は直接呼ばず {git_sh} を通す。止められたら迂回せず、出力の案内に従う。"
+        )
+    lines.append(
         f"- 下書きと使い捨てのファイルはワークツリーの {ticket_places.SCRATCH}/ に置く"
-        "（追跡されず、範囲外の変更としても報告されない）。",
-    ]
+        "（追跡されず、範囲外の変更としても報告されない）。"
+    )
     if tree.projects(conf.projects):
         home = os.path.relpath(conf.projects, root).replace("\\", "/")
         lines.append(

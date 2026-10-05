@@ -412,7 +412,14 @@ def decide_at_start(
     # チケット制御の有無によらず出す。サブエージェントには出さない。作業の進め方より前に
     # 置くのは、dry-run の注記を進め方の最後の行のまま残すため。
     if not payload.agent_id:
-        texts.append(reasons.conventions(conf, root, docs.startswith(docsearch.GUIDE_HEAD)))
+        texts.append(
+            reasons.conventions(
+                conf,
+                root,
+                docs.startswith(docsearch.GUIDE_HEAD),
+                ruleload.deny_ids(conf, root),
+            )
+        )
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
