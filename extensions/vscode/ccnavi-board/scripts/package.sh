@@ -17,7 +17,8 @@ target="$out/ccnavi-board-$version.vsix"
 
 # --no-dependencies: 実行時の依存が無いので node_modules を見に行かない（pnpm の配置も読まない）。
 # --skip-license / --allow-missing-repository: ローカル配布なので Marketplace 向けの確認は要らない。
-pnpm exec vsce package --no-dependencies --skip-license --allow-missing-repository -o "$target"
+# --no-rewrite-relative-links: ローカル配布なので README の相対リンクを書き換えず、リポジトリ URL もリポジトリに残さない。
+pnpm exec vsce package --no-dependencies --skip-license --allow-missing-repository --no-rewrite-relative-links -o "$target"
 
 echo "$target"
 echo "入れるには: code --install-extension \"$target\""
