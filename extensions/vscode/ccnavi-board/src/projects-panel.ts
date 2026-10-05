@@ -11,9 +11,8 @@
  * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
  * そのルールファイルの場所は layers（レイヤー）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
  *
- * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
- * の出現を監視して拾う。書くのは、ユーザがボタンを押したときの `.gitignore`、置き場のディレクトリ、
- * プロジェクトかワークスペースの設定のルールファイル（無いときだけ）の 3 つ。
+ * clone は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
+ * の出現を監視して拾う。書くのは、ユーザがボタンを押したときの `.gitignore` だけ。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -29,12 +28,9 @@ import {
   checkRemote,
   cloneCommand,
   duplicateOf,
-  fetchCommand,
   findStrayGitDirs,
   gitignoreHasProjects,
   gitignoreWithProjects,
-  pullCommand,
-  rewriteRulesForProject,
   type DirEntry,
   type ProjectsPage,
 } from "./core/projects.js";
@@ -42,15 +38,11 @@ import { renderProjectsPage } from "./core/projects-render.js";
 import { showLoading } from "./loading.js";
 import type { ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
-import { screens } from "./core/screens.js";
 import { readOrigin } from "./git.js";
 import { runInTerminal } from "./terminal.js";
-import { ticketControl } from "./ticket-control.js";
-import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 300;
-const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "projects";
 const TITLE = "ccnavi プロジェクト管理";
@@ -417,15 +409,6 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
     // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
     postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
-    if (!tourSeen(SCREEN)) {
-      current.host.post({ type: "tour" } satisfies ToProjects);
-    }
-    return;
-  }
-  if (message.type === "tourDone") {
-    markTourSeen(SCREEN);
     return;
   }
   // 「更新」は一覧が無くても通す。読み直せなかったところからユーザが抜け出す方法がこれしかない
@@ -437,53 +420,10 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
   if (page === undefined) {
     return;
   }
-  const root = current.folder.uri.fsPath;
-  switch (message.type) {
-    case "clone":
-      clone(current, page, message.url, message.name);
-      return;
-    case "fixIgnore":
-      fixIgnore(current, page);
-      return;
-    case "createRules":
-      createRules(current, page, message.name);
-      return;
-    case "createSelfRules":
-      createSelfRules(current, page);
-      return;
-    case "openRules":
-      await screens().rules(message.name === "" ? { kind: "workspace" } : { kind: "project", name: message.name });
-      return;
-    case "openSelfRules":
-      await screens().rules({ kind: "self" });
-      return;
-    case "openPhases":
-    case "openSelfPhases":
-    case "openBoard":
-      // 画面のボタンは disable なら描かれないが、古い画面が開いたままの間は押せる。
-      // 開く側でも見るので、ここは画面の中に理由を出すためだけに見る。
-      if (ticketControl() !== "enable") {
-        const what = message.type === "openBoard" ? "チケット管理画面" : "フェーズ管理画面";
-        fail(current, `${what}は開けません。このワークスペースはチケット制御が無効です（CCNAVI_TICKET_CONTROL=disable）。一覧が古いので「更新」を押してください`);
-        return;
-      }
-      if (message.type === "openBoard") {
-        await screens().board(message.name);
-        return;
-      }
-      await screens().phases(message.type === "openSelfPhases" ? { kind: "self" } : { kind: "project", name: message.name });
-      return;
-    case "fetch":
-    case "pull": {
-      const row = page.rows.find((r) => r.name === message.name);
-      if (row === undefined) {
-        fail(current, `プロジェクト ${message.name} が一覧にありません。更新してから押し直してください`);
-        return;
-      }
-      runInTerminal(root, message.type === "fetch" ? fetchCommand(row.root) : pullCommand(row.root));
-      info(current, `${message.name} で git ${message.type} をターミナルに送りました`);
-      return;
-    }
+  if (message.type === "clone") {
+    clone(current, page, message.url, message.name);
+  } else if (message.type === "fixIgnore") {
+    fixIgnore(current, page);
   }
 }
 
@@ -530,77 +470,18 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
   void update();
 }
 
-function createRules(current: PanelState, page: ProjectsPage, name: string): void {
-  const row = page.rows.find((r) => r.name === name);
-  if (row === undefined) {
-    fail(current, `プロジェクト ${name} が一覧にありません。更新してから押し直してください`);
-    return;
-  }
-  if (row.rulesRel === "") {
-    fail(current, `プロジェクト ${name} は設定の対象になっていないので、ルールのコピー先がありません`);
-    return;
-  }
-  copyCommonRules(current, row.rulesRel, name, "プロジェクトの git");
-}
-
-function createSelfRules(current: PanelState, page: ProjectsPage): void {
-  if (page.selfRulesRel === "") {
-    fail(current, "ccnavi の出力にワークスペースの設定が無いので、コピー先を決められません。更新してから押し直してください");
-    return;
-  }
-  copyCommonRules(current, page.selfRulesRel, "自身のレイヤー（self）", "ワークスペースの git");
-}
-
-/** 共通の設定のルールをワークスペースかプロジェクトの設定のルールファイル（ルートからの相対）に複製する。既にあれば上書きしない */
-function copyCommonRules(current: PanelState, targetRel: string, label: string, repo: string): void {
-  const root = current.folder.uri.fsPath;
-  const target = path.join(root, ...targetRel.split("/"));
-  if (fs.existsSync(target)) {
-    fail(current, `${targetRel} は既にあるので、上書きしません`);
-    return;
-  }
-  // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_RULES` など）では動かせない。
-  const sourceRel = DEFAULT_RULES;
-  const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
-  if (source === undefined) {
-    fail(current, `共通の設定のルール ${sourceRel} を読めません`);
-    return;
-  }
-  try {
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, rewriteRulesForProject(source, sourceRel, label, new Date().toISOString().slice(0, 10)), { encoding: "utf8", flag: "wx" });
-  } catch (error) {
-    fail(current, `${targetRel} に書けません: ${(error as Error).message}`);
-    return;
-  }
-  info(current, `${targetRel} に共通の設定のルールをコピーしました。中身を確かめてから${repo}にコミットしてください`);
-  void update();
-}
-
 function asMessage(message: unknown): ProjectsMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
   const m = message as { type?: unknown; url?: unknown; name?: unknown };
-  const named = typeof m.name === "string" ? m.name : undefined;
   switch (m.type) {
     case "ready":
     case "refresh":
-    case "tourDone":
     case "fixIgnore":
-    case "createSelfRules":
-    case "openSelfRules":
-    case "openSelfPhases":
       return { type: m.type };
     case "clone":
-      return typeof m.url === "string" && named !== undefined ? { type: "clone", url: m.url, name: named } : undefined;
-    case "createRules":
-    case "openRules":
-    case "openPhases":
-    case "openBoard":
-    case "fetch":
-    case "pull":
-      return named !== undefined ? { type: m.type, name: named } : undefined;
+      return typeof m.url === "string" && typeof m.name === "string" ? { type: "clone", url: m.url, name: m.name } : undefined;
     default:
       return undefined;
   }

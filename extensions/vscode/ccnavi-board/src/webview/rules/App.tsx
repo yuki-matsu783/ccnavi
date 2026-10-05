@@ -20,6 +20,7 @@ import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
 import { JudgeResult, SamplesResult, SuggestResult, type Judged } from "./Judge.js";
+import { TargetSelect } from "../TargetSelect.js";
 import { post } from "./post.js";
 import { Rule } from "./Rule.js";
 import {
@@ -317,8 +318,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
+          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。
         </p>
+        <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
           更新
@@ -425,6 +427,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </div>
       <header className="toolbar">
         <div className="summary">
+          <TargetSelect
+            target={page?.target}
+            targets={page?.targets}
+            disabled={busy}
+            onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })}
+          />
           <span className="path" title={page?.root ?? ""}>
             {page?.rulesPath ?? ""}
           </span>

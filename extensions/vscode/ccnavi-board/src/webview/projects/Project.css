@@ -17,8 +17,6 @@
 .field.wide { grid-column: 1 / -1; }
 .field dt { font-size: .85em; color: var(--vscode-descriptionForeground); }
 .field dd { margin: 0; overflow-wrap: anywhere; }
-.field dd button.action { vertical-align: middle; }
-.ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
 .badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); white-space: nowrap; }
 .badge.doing { color: var(--doing-text); border-color: var(--vscode-charts-yellow); }
 .badge.warn { color: var(--warn-text); border-color: var(--vscode-editorWarning-foreground); }

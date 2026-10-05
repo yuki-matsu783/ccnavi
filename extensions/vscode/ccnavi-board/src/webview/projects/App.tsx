@@ -2,15 +2,12 @@
  * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース（プロジェクト外）。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、ユーザが触って決めるもの
- * （clone の欄、どのメニューを開いているか、直前の操作の一言）だけ。clone も書き込みも画面はしない。
+ * （clone の欄、直前の操作の一言）だけ。clone も書き込みも画面はしない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
-import { SAMPLE_NOTE, sampleProjectRow } from "../../core/tour-sample.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
-import { MENU_KINDS, menuId } from "./Menu.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
@@ -28,9 +25,6 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
    * ここで消すと案内が一瞬で消える
    */
   const [status, setStatus] = useState<CloneStatus | undefined>(undefined);
-  const [openMenu, setOpenMenu] = useState<string | undefined>(undefined);
-  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
-  const requestTour = tour.request;
 
   // 受け取る側（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので ref へ入れておく
   const cloneRef = useRef<CloneState>(clone);
@@ -46,13 +40,6 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       const message = (event.data ?? {}) as Partial<ToProjects>;
       if (message.type === "data" && message.data !== undefined) {
         setData(message.data);
-        // 開いていたメニューの持ち主が一覧から消えていたら閉じる。残すと、同じ名前で
-        // 戻ってきたときに押していないメニューが開いた状態で出る。
-        // 一致は `menuId` が組んだ表記そのもので見る（前方一致だと、`:` を含む名前の
-        // メニューを、その接頭辞になっている別のプロジェクトのものと取り違える）
-        const rows = message.data.kind === "page" ? message.data.page.rows : [];
-        const alive = new Set(rows.flatMap((r) => MENU_KINDS.map((kind) => menuId(r.name, kind))));
-        setOpenMenu((now) => (now !== undefined && !alive.has(now) ? undefined : now));
         // 一覧が新しくなったので、それを見て言った失敗はもう今のことではない
         setStatus((now) => (now?.kind === "failed" ? undefined : now));
       } else if (message.type === "failed") {
@@ -64,8 +51,6 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         setClone(EMPTY);
         saveClone(EMPTY);
         setStatus({ kind: "info", message: String(message.message ?? "") });
-      } else if (message.type === "tour") {
-        requestTour();
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -75,28 +60,6 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
     // 作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);
-  }, [requestTour]);
-
-  // メニューは 1 つだけ開く。外を押すか Esc で閉じる（項目を押したときは Project が閉じる）
-  useEffect(() => {
-    const onDown = (event: Event): void => {
-      const target = event.target as Element | null;
-      const inside = typeof target?.closest === "function" ? target.closest("details.menu") : null;
-      if (inside === null) {
-        setOpenMenu(undefined);
-      }
-    };
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        setOpenMenu(undefined);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
   }, []);
 
   if (data.kind === "error") {
@@ -109,13 +72,9 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   }
 
   const page = data.page;
-  // 案内の間、プロジェクトが 1 つも無ければ見本の行を出す（`tour-sample.ts`）。指す先の行が無いと、
-  // 案内が行のメニューを説明できないため。見本は描くだけで、覆いがあるので押せない
-  const sample = tour.touring && page.rows.length === 0 ? [sampleProjectRow(page.projectsRel)] : undefined;
-  const rows = sample ?? page.rows;
+  const rows = page.rows;
   return (
     <>
-      {sample !== undefined && <div className="banner tour-sample">{SAMPLE_NOTE}</div>}
       <header className="toolbar">
         <div className="summary">
           <span>プロジェクト {rows.length} 件</span>
@@ -124,26 +83,10 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           </span>
         </div>
         <div className="controls">
-          <button
-            type="button"
-            className="action"
-            data-action="open-rules"
-            data-name=""
-            title="共通の設定のルール（どのツリーにも適用されます。既定は .ccnavi/common/rules.yml）を編集し、判定を試します"
-            onClick={() => post({ type: "openRules", name: "" })}
-          >
-            ルール管理
-          </button>
-          {page.ticketsEnabled && (
-            <button type="button" className="action" data-action="open-board" data-name="*" onClick={() => post({ type: "openBoard", name: "*" })}>
-              チケット管理
-            </button>
-          )}
           <button type="button" className="action" data-action="refresh" onClick={() => post({ type: "refresh" })}>
             更新
           </button>
         </div>
-        <TourButton onClick={tour.start} />
       </header>
       <Banners page={page} />
       <section className="clone">
@@ -201,7 +144,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         ) : (
           <ul className="projects">
             {rows.map((row) => (
-              <Project key={row.name} row={row} ticketsEnabled={page.ticketsEnabled} openMenu={openMenu} onOpenMenu={setOpenMenu} />
+              <Project key={row.name} row={row} ticketsEnabled={page.ticketsEnabled} />
             ))}
           </ul>
         )}
@@ -218,39 +161,9 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       <footer className="foot">
         最終更新 {page.generatedAt}（{page.root}）
       </footer>
-      {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
     </>
   );
 }
-
-/** プロジェクト管理画面の案内。画面の様子は動かさないので、閉じても戻すものは無い */
-const TOUR_STEPS: readonly TourStep[] = [
-  {
-    target: "section.clone",
-    title: "clone する",
-    body: "URL を入れて「clone」を押すと、git clone を「ccnavi」ターミナルで実行し、プロジェクトのフォルダの直下に clone します。名前は URL から自動で入ります。認証が要るならターミナルで入力してください。",
-  },
-  {
-    target: "section.list",
-    title: "プロジェクト",
-    body: "プロジェクトのフォルダの直下にある git リポジトリが 1 行ずつ出ます。「開く ▾」からルール管理画面（チケット制御が有効ならフェーズ管理画面とチケット管理画面も）を開き、「git ▾」から fetch と pull をターミナルで実行できます。検証で見つかった問題も行に出ます。",
-  },
-  {
-    target: "section.workspace",
-    title: "ワークスペース（プロジェクト外）",
-    body: "ワークスペースの設定のルールとフェーズ定義です。ワークスペースの設定のルールが無ければ、共通の設定からコピーして作れます。",
-  },
-  {
-    target: '.toolbar [data-action="open-rules"]',
-    title: "共通の設定のルール",
-    body: "どのツリーにも適用される共通の設定のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
-  },
-  {
-    target: '[data-action="tour"]',
-    title: "案内",
-    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
-  },
-];
 
 /**
  * 上部の帯。`.gitignore` の帯（直すボタン付き）と同じ事象は 2 度出さない。
@@ -291,59 +204,14 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
   return <>{banners}</>;
 }
 
-/**
- * ワークスペースの設定のルール。無いのは正常なので warn の色は使わない。
- * フェーズ定義の行は、チケット制御が disable なら出さない（定義はチケットにしか読まれない）。
- */
+/** ワークスペースの設定のルールの有無。無いのは正常なので warn の色は使わない */
 function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
   return (
-    <>
-      <div className="self-rules">
-        <span>ワークスペースの設定のルール</span>{" "}
-        {page.selfRulesExists ? (
-          <>
-            <span className="ok">あり</span> <span className="mono small">{page.selfRulesRel}</span>
-          </>
-        ) : (
-          <>
-            <span className="dim">なし</span> <span className="mono small">{page.selfRulesRel}</span>{" "}
-            <button
-              type="button"
-              className="action small"
-              data-action="create-self-rules"
-              title="共通の設定の rules.yml をワークスペースの設定にコピーします。ルールの文面にある sh のパスは、先頭に {root} を付けた形に置き換えます"
-              onClick={() => post({ type: "createSelfRules" })}
-            >
-              共通の設定からコピー
-            </button>
-          </>
-        )}{" "}
-        <button
-          type="button"
-          className="action small"
-          data-action="open-self-rules"
-          disabled={!page.selfRulesExists}
-          title="ワークスペースの設定のルールを編集し、判定を試します。このルールは共通の設定のルールに足され、ワークスペース（プロジェクト外）のツリーへの書き込みと、すべてのツリーの Bash でヒットします"
-          onClick={() => post({ type: "openSelfRules" })}
-        >
-          ルール管理
-        </button>
-      </div>
-      {page.ticketsEnabled && (
-        <div className="self-rules">
-          <span>ワークスペースの設定のフェーズ定義</span>{" "}
-          <button
-            type="button"
-            className="action small"
-            data-action="open-self-phases"
-            title="プロジェクト外のチケット（project: が空）の計画で、共通の設定の定義に足して使う定義を編集します。ファイルが無ければ画面から作れます"
-            onClick={() => post({ type: "openSelfPhases" })}
-          >
-            フェーズ管理
-          </button>
-        </div>
-      )}
-    </>
+    <div className="self-rules">
+      <span>ワークスペースの設定のルール</span>{" "}
+      {page.selfRulesExists ? <span className="ok">あり</span> : <span className="dim">なし</span>}{" "}
+      <span className="mono small">{page.selfRulesRel}</span>
+    </div>
   );
 }
 

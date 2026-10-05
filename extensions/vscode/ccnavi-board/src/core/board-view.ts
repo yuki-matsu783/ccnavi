@@ -79,7 +79,7 @@ export type BoardData =
        */
       readonly moved?: readonly Moved[];
       /**
-       * 開いた直後に選ぶプロジェクトの絞り込み。プロジェクト管理画面からの導線でだけ入る。
+       * 開いた直後に選ぶプロジェクトの絞り込み（いまは呼び出し元が無い）。
        * 入るのは 1 枚目の HTML に埋めるときだけで、`ToBoard` の `data` では渡さない
        * （画面が組み上がった後は `filter` のメッセージで渡す）
        */
@@ -95,7 +95,7 @@ export type BoardData =
 /** 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ） */
 export type ToBoard =
   | DataMessage<BoardData>
-  /** プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき */
+  /** 開くときにプロジェクトを指定されたとき（いまは呼び出し元が無い） */
   | { readonly type: "filter"; readonly project: string }
   /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
   | { readonly type: "tour" }

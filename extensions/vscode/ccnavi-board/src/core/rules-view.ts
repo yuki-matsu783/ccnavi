@@ -18,6 +18,7 @@ import type { AppearanceMessage } from "./appearance.js";
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
+import type { TargetOption } from "./targets.js";
 import type { SuggestJson } from "./suggestmodel.js";
 import type { SamplesJson, TestJson } from "./testmodel.js";
 
@@ -109,6 +110,9 @@ export interface RulesPage {
   readonly lock: Lock;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
+  /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
+  readonly target?: { readonly kind: string; readonly name: string };
+  readonly targets?: readonly TargetOption[];
 }
 
 // ---- やり取り
@@ -122,7 +126,8 @@ export interface RulesPage {
  */
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
-  | { readonly kind: "error"; readonly error: string }
+  /** `targets` は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
+  | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
   | { readonly kind: "loading"; readonly text: string };
 
 /**
@@ -169,7 +174,9 @@ export type RulesMessage =
   | { readonly type: "suggest" }
   | { readonly type: "pickFile"; readonly key: string; readonly field: FileField }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
-  | { readonly type: "tourDone" };
+  | { readonly type: "tourDone" }
+  /** 開いたまま別の設定へ切り替える。未保存の変更があれば、拡張ホストが破棄してよいかを聞く */
+  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string };
 
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
 export const DATA_ID = "ccnavi-rules-data";

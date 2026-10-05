@@ -15,6 +15,7 @@
 import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
+import type { TargetOption } from "./targets.js";
 
 // ---- 定義の形（画面と読み書きで分け合う）
 
@@ -102,6 +103,9 @@ export interface PhasesPage {
   readonly layer?: boolean;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
+  /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
+  readonly target?: { readonly kind: string; readonly name: string };
+  readonly targets?: readonly TargetOption[];
 }
 
 /** 欄を触れるか。共通の設定はファイルが無ければ触れない（画面からは作らせない）。ワークスペースとプロジェクトの設定は無くても足して保存できる */
@@ -117,7 +121,8 @@ export function editable(page: PhasesPage): boolean {
  */
 export type PhasesData =
   | { readonly kind: "page"; readonly page: PhasesPage }
-  | { readonly kind: "error"; readonly error: string }
+  /** `targets` は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
+  | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
   | { readonly kind: "loading"; readonly text: string };
 
 /** 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める */
@@ -140,11 +145,13 @@ export type PhasesMessage =
   /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  /** 共通レイヤーのファイルが無いときの案内から、自身のレイヤーを開く（プロジェクト管理画面の入口と同じ経路） */
+  /** 共通レイヤーのファイルが無いときの案内から、自身のレイヤーを開く（切り替えの欄で「ワークスペース」を選ぶのと同じ経路） */
   | { readonly type: "openSelf" }
   | { readonly type: "save"; readonly form: PhasesForm }
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */
-  | { readonly type: "tourDone" };
+  | { readonly type: "tourDone" }
+  /** 開いたまま別の設定へ切り替える。未保存の変更があれば、拡張ホストが破棄してよいかを聞く */
+  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string };
 
 /** 最初の中身を埋める `<script type="application/json">` の id */
 export const DATA_ID = "ccnavi-phases-data";

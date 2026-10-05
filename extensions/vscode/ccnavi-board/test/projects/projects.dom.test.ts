@@ -1,53 +1,24 @@
 /**
- * プロジェクト管理画面（React）を happy-dom で動かす。メニューの開閉、各ボタンの送り先、
- * カードに出るレイヤーの置き場と苦情、チケット制御が disable のときの入口。
+ * プロジェクト管理画面（React）を happy-dom で動かす。clone と .gitignore のボタンの送り先、
+ * カードに出るレイヤーの置き場と苦情、チケット制御が disable のときの件数の欄。
  *
  * 移す前は拡張ホストが組んだ HTML の文字列を正規表現で見ていた（CB-T113 / CB-T123 / CB-T133）。
  * 確かめている中身はそのままで、見る先を DOM に移してある。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cardSelector, openProjects, page, problem, projectsHtml, row } from "../helpers/projects.js";
-import { flatStyle } from "../helpers/bundle.js";
-import type { HTMLDetailsElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
+import { cardSelector, openProjects, page, problem, row } from "../helpers/projects.js";
+import type { HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 要素の文字。前後の空白は落とす */
 function text(element: { textContent: string | null } | null | undefined): string {
   return (element?.textContent ?? "").trim();
 }
 
-test("CB-D30 メニューは 1 つだけ開き、項目を押すと名前付きで送って閉じる。Esc でも閉じる", async () => {
-  const dom = await openProjects([row(), row({ name: "app", rel: "projects/app", root: "/ws/projects/app" })]);
-  try {
-    const menus = dom.all<HTMLDetailsElement>(`${cardSelector("lib")} details.menu`);
-    assert.equal(menus.length, 2);
-    dom.click(menus[0].querySelector("summary")!);
-    await dom.settle();
-    assert.ok(menus[0].open);
-    dom.click(menus[1].querySelector("summary")!);
-    await dom.settle();
-    assert.ok(!menus[0].open, "別のメニューを開くと前のは閉じる");
-    assert.ok(menus[1].open);
-    dom.click(dom.one(`${cardSelector("lib")} button[data-action="pull"]`));
-    await dom.settle();
-    assert.deepEqual(dom.posted, [{ type: "ready" }, { type: "pull", name: "lib" }]);
-    assert.ok(!menus[1].open, "項目を押すと閉じる");
-    dom.click(menus[0].querySelector("summary")!);
-    await dom.settle();
-    dom.key("Escape");
-    await dom.settle();
-    assert.ok(!menus[0].open);
-  } finally {
-    await dom.close();
-  }
-});
-
-test("CB-D31 帯と行のボタンはそれぞれの型で送る。clone は欄の URL と名前を送り、名前は URL から埋まる", async () => {
-  const dom = await openProjects([row({ rulesExists: false })], { ignored: false });
+test("CB-D31 .gitignore の帯のボタンと clone は、それぞれの型で送る。clone は欄の URL と名前を送り、名前は URL から埋まる", async () => {
+  const dom = await openProjects([row()], { ignored: false });
   try {
     dom.click(dom.one('button[data-action="fix-ignore"]'));
-    dom.click(dom.one('button[data-action="create-rules"][data-name="lib"]'));
-    dom.click(dom.one('button[data-action="open-board"][data-name="lib"]'));
     await dom.settle();
     dom.type(dom.one("#url"), "https://gitlab.example.com/g/tool.git");
     await dom.settle();
@@ -57,8 +28,6 @@ test("CB-D31 帯と行のボタンはそれぞれの型で送る。clone は欄�
     assert.deepEqual(dom.posted, [
       { type: "ready" },
       { type: "fixIgnore" },
-      { type: "createRules", name: "lib" },
-      { type: "openBoard", name: "lib" },
       { type: "clone", url: "https://gitlab.example.com/g/tool.git", name: "tool" },
     ]);
     // 打ちかけは Webview の state に残す。作り直されても残る
@@ -91,47 +60,6 @@ test("CB-D32 中身は postMessage で入れ替わり、読み直せなければ
   }
 });
 
-test("CB-D33 開いていたメニューは、その行が一覧から消えたら閉じる", async () => {
-  const dom = await openProjects([row(), row({ name: "app", rel: "projects/app" })]);
-  try {
-    const summary = (name: string) => dom.one(`${cardSelector(name)} details.menu summary`);
-    dom.click(summary("lib"));
-    await dom.settle();
-    assert.ok(dom.one<HTMLDetailsElement>(`${cardSelector("lib")} details.menu`).open);
-    // lib が消えて app だけになる。app のメニューは開かない
-    await dom.send({ type: "data", data: { kind: "page", page: page([row({ name: "app", rel: "projects/app" })]) } });
-    assert.ok(!dom.one<HTMLDetailsElement>(`${cardSelector("app")} details.menu`).open);
-    // 同じ名前で戻ってきても、押していないメニューは閉じたまま
-    await dom.send({ type: "data", data: { kind: "page", page: page([row(), row({ name: "app", rel: "projects/app" })]) } });
-    assert.ok(!dom.one<HTMLDetailsElement>(`${cardSelector("lib")} details.menu`).open);
-    // 残っている行のメニューは、読み直しても開いたまま（打ちかけと同じ扱い）
-    dom.click(summary("app"));
-    await dom.settle();
-    await dom.send({ type: "data", data: { kind: "page", page: page([row(), row({ name: "app", rel: "projects/app" })]) } });
-    assert.ok(dom.one<HTMLDetailsElement>(`${cardSelector("app")} details.menu`).open);
-  } finally {
-    await dom.close();
-  }
-
-  // 名前は置き場のディレクトリ名そのままで、clone の欄が通す表記とは限らない。
-  // `a:x` のメニューが `a` のものと見なされないこと（前方一致だと見なされる）
-  const colon = await openProjects([row({ name: "a", rel: "projects/a" }), row({ name: "a:x", rel: "projects/a:x" })]);
-  try {
-    colon.click(colon.one(`${cardSelector("a:x")} details.menu summary`));
-    await colon.settle();
-    assert.ok(colon.one<HTMLDetailsElement>(`${cardSelector("a:x")} details.menu`).open);
-    // a:x が消えて a だけになる。戻ってきたとき、押していないメニューが開いていてはいけない
-    await colon.send({ type: "data", data: { kind: "page", page: page([row({ name: "a", rel: "projects/a" })]) } });
-    await colon.send({
-      type: "data",
-      data: { kind: "page", page: page([row({ name: "a", rel: "projects/a" }), row({ name: "a:x", rel: "projects/a:x" })]) },
-    });
-    assert.ok(!colon.one<HTMLDetailsElement>(`${cardSelector("a:x")} details.menu`).open);
-  } finally {
-    await colon.close();
-  }
-});
-
 test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は残る", async () => {
   const dom = await openProjects();
   try {
@@ -153,7 +81,7 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
   }
 });
 
-test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す", async () => {
+test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す。操作のボタンは無い", async () => {
   const dom = await openProjects([
     row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/rules.yml" }),
     row({ rulesExists: false }),
@@ -162,31 +90,26 @@ test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤ
   try {
     const rules = (name: string): string => text(dom.one(`${cardSelector(name)} .field:nth-child(2) dd`));
     assert.equal(rules("app"), "あり projects/app/.ccnavi/config/rules.yml");
-    assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/rules.yml 共通の設定からコピー");
-    assert.equal(dom.all(`${cardSelector("lib")} button[data-action="create-rules"][data-name="lib"]`).length, 1);
-    assert.ok(dom.one<HTMLInputElement>(`${cardSelector("lib")} button[data-action="open-rules"]`).hasAttribute("disabled"));
-    // 予約名のプロジェクトはレイヤーが無いので、置く先も作るボタンも出さない
+    assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/rules.yml");
+    // 予約名のプロジェクトはレイヤーが無いので、置く先も出さない
     assert.match(rules("Self"), /設定の対象になっていません/);
-    assert.equal(dom.all(`${cardSelector("Self")} button[data-action="create-rules"]`).length, 0);
+    assert.equal(dom.all("section.list button").length, 0, "カードに操作のボタンがある");
 
-    const workspace = dom.one("section.workspace");
-    assert.match(text(workspace), /ワークスペースの設定のルール なし \.ccnavi\/config\/rules\.yml 共通の設定からコピー ルール管理/);
-    assert.equal(dom.all('button[data-action="create-self-rules"]').length, 1);
-    assert.ok(dom.one('button[data-action="open-self-rules"]').hasAttribute("disabled"));
+    assert.match(text(dom.one("section.workspace")), /ワークスペースの設定のルール なし \.ccnavi\/config\/rules\.yml$/);
+    assert.equal(dom.all("section.workspace button").length, 0);
   } finally {
     await dom.close();
   }
 
   const exists = await openProjects([], { selfRulesExists: true });
   try {
-    assert.equal(exists.all('button[data-action="create-self-rules"]').length, 0);
-    assert.ok(!exists.one('button[data-action="open-self-rules"]').hasAttribute("disabled"));
+    assert.match(text(exists.one("section.workspace")), /ワークスペースの設定のルール あり \.ccnavi\/config\/rules\.yml$/);
   } finally {
     await exists.close();
   }
 });
 
-test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだけ出し、行末のボタンは 2 つのメニューにまとめる", async () => {
+test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだけ出す", async () => {
   const dom = await openProjects(
     [
       row({
@@ -219,13 +142,6 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     assert.ok(lint.some((l) => l === "warn: .claude/settings.json を読めない: 壊れている"), lint.join(" / "));
     assert.ok(lint.some((l) => /\.claude\/ があります。Claude Code は.*プロジェクトの設定は \.ccnavi\/config\/ に置いてください/.test(l)), lint.join(" / "));
     assert.ok(lint.some((l) => l === "error: 文面が無い"), lint.join(" / "));
-    // 行末は「開く ▾」と「git ▾」の 2 つ。中のボタンの data-action は前のまま
-    const menus = dom.all(`${cardSelector("lib")} details.menu`);
-    assert.equal(menus.length, 2);
-    assert.deepEqual(menus.map((m) => text(m.querySelector("summary"))), ["開く ▾", "git ▾"]);
-    for (const action of ["open-rules", "open-phases", "open-board", "fetch", "pull"]) {
-      assert.equal(dom.all(`${cardSelector("lib")} button[data-action="${action}"][data-name="lib"]`).length, 1, action);
-    }
   } finally {
     await dom.close();
   }
@@ -242,11 +158,6 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   } finally {
     await flat.close();
   }
-
-  // メニューの項目は HC で枠が出る書き方（contrastBorder の変数）。押せない項目は点線
-  const css = flatStyle(projectsHtml({ kind: "page", page: page([row()]) }));
-  assert.match(css, /\.menu > \.menu-items > button\.action \{ justify-content: flex-start; border-color: var\(--vscode-contrastBorder, transparent\);/);
-  assert.match(css, /\.menu > \.menu-items > button\.action:disabled \{ border-style: dashed; \}/);
 
   // .gitignore が済んでいれば lint の指摘はそのまま出る
   const fine = await openProjects([row()], { dirProblems: [problem("warn", "projects/ がワークスペースの git で無視されていない", "(projects)")] });
@@ -268,10 +179,7 @@ const ADDED_BY_MISTAKE =
 async function trackedBanners(detail: string, ignored: boolean): Promise<{ banners: string[]; fixButtons: number }> {
   const dom = await openProjects([row()], { ignored, dirProblems: [problem("warn", detail, "(projects)"), problem("warn", "別の指摘", "(projects)")] });
   try {
-    return {
-      banners: dom.all(".banner").map((b) => text(b)),
-      fixButtons: dom.all('button[data-action="fix-ignore"]').length,
-    };
+    return { banners: dom.all(".banner").map((b) => text(b)), fixButtons: dom.all('button[data-action="fix-ignore"]').length };
   } finally {
     await dom.close();
   }
@@ -297,77 +205,18 @@ test("CB-D149 A10b 載せ忘れ（入れ子のリポジトリが索引に載っ�
   }
 });
 
-test("CB-T133 チケット制御が disable なら、チケット管理とフェーズ管理の入口を出さない", async () => {
-  const enabled = await openProjects([row()]);
+test("CB-T133 チケット制御が disable なら、チケットの件数の欄を出さない", async () => {
+  const enabled = await openProjects([row({ tickets: 3 })]);
   try {
-    for (const action of ["open-board", "open-phases", "open-self-phases"]) {
-      assert.ok(enabled.all(`button[data-action="${action}"]`).length > 0, action);
-    }
+    assert.match(text(enabled.one(cardSelector("lib"))), /チケット\s*3 件/);
   } finally {
     await enabled.close();
   }
 
-  // 配点とフェーズ定義はチケットにしか読まれない。disable の間は入口ごと消す
-  const off = await openProjects([row()], { ticketsEnabled: false });
+  const off = await openProjects([row({ tickets: 3 })], { ticketsEnabled: false });
   try {
-    for (const action of ["open-board", "open-phases", "open-self-phases"]) {
-      assert.equal(off.all(`button[data-action="${action}"]`).length, 0, action);
-    }
-    const body = text(off.document.body);
-    assert.ok(!/ワークスペースの設定のフェーズ定義/.test(body));
-    assert.ok(!/フェーズ管理/.test(body));
-    assert.ok(!/チケット管理/.test(body));
-    // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール管理だけになる
-    for (const action of ["open-rules", "fetch", "pull"]) {
-      assert.equal(off.all(`${cardSelector("lib")} button[data-action="${action}"][data-name="lib"]`).length, 1, action);
-    }
-    assert.deepEqual(
-      off.all(`${cardSelector("lib")} button[data-action^="open-"]`).map((b) => b.getAttribute("data-action")),
-      ["open-rules"],
-    );
-    assert.equal(off.all('button[data-action="open-self-rules"]').length, 1);
-    assert.match(text(off.one("section.workspace")), /ワークスペースの設定のルール/);
-    // チケットの件数の欄も出さない
     assert.ok(!/チケット/.test(text(off.one(cardSelector("lib")))));
   } finally {
     await off.close();
-  }
-});
-
-test("CB-D98 プロジェクトが無い画面では、案内の間だけ見本の行を出し、閉じたら消して tourDone を返す", async () => {
-  const dom = await openProjects([]);
-  try {
-    assert.equal(dom.all("li.project").length, 0);
-    await dom.send({ type: "tour" });
-    await dom.settle();
-    assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯が無い");
-    assert.equal(dom.all('li.project[data-name="sample-app"]').length, 1);
-    const titles: string[] = [];
-    while (dom.all(".tour").length > 0) {
-      titles.push(dom.one("#tour-title").textContent ?? "");
-      dom.click(dom.one('[data-action="tour-next"]'));
-      await dom.settle();
-    }
-    assert.deepEqual(titles, ["clone する", "プロジェクト", "ワークスペース（プロジェクト外）", "共通の設定のルール", "案内"]);
-    assert.equal(dom.all("li.project").length, 0, "閉じたのに見本が残った");
-    assert.equal(dom.all(".tour-sample").length, 0);
-    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
-  } finally {
-    await dom.close();
-  }
-});
-
-test("CB-D99 プロジェクトがある画面では見本を出さず、「？ 案内」から案内を出せる", async () => {
-  const dom = await openProjects();
-  try {
-    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 5 画面とも右上に揃える
-    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
-    dom.click(dom.one('[data-action="tour"]'));
-    await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "clone する");
-    assert.equal(dom.all(".tour-sample").length, 0);
-    assert.equal(dom.all("li.project").length, 1);
-  } finally {
-    await dom.close();
   }
 });
