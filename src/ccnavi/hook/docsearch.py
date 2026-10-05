@@ -305,6 +305,9 @@ def _has_md(root: str) -> bool:
 
 # 案内で名指しする、触らなかった index.jsonl の数の上限。
 FOREIGN_SHOWN = 3
+# 引き方の案内の頭。作業の決まり（`reasons.conventions`）が、この案内を出した回にだけ
+# 「詳しくは --docs で引く」を添えるのに使う。
+GUIDE_HEAD = "[ccnavi] ドキュメント（*.md）を探すときは"
 
 
 def notice(conf: settings.Settings, root: str, found: Collected) -> str:
@@ -327,7 +330,7 @@ def notice(conf: settings.Settings, root: str, found: Collected) -> str:
         return "\n".join(f"[ccnavi] md の索引（--docs）: {e}" for e in extra)
     command = _command(conf, root)
     lines = [
-        f"[ccnavi] ドキュメント（*.md）を探すときは、grep・Glob より先に '{command} --docs' で"
+        f"{GUIDE_HEAD}、grep・Glob より先に '{command} --docs' で"
         " frontmatter の索引を引いてください（ワークスペースとプロジェクトを横断。パスは"
         "ワークスペースルートから）。grep は本文中の文字列を探すときか、0 件だったときに"
         "使ってください。",

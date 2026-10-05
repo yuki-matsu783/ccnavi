@@ -3,7 +3,7 @@
 見るのは 3 つ。
 
 1. チケット制御が有効なセッションの頭で、直接作業とチケット作業の使い分けが届く
-2. `CCNAVI_TICKET_CONTROL=disable` なら届かない
+2. `CCNAVI_TICKET_CONTROL=disable` なら届かない（チケットに依らない作業の決まりは届く）
 3. 入口の sh のパスと、dry-run の注記。頭では言わないもの（レビューの sh、設定ファイルの
    パス）が載っていないこと
 """
@@ -62,17 +62,25 @@ class TicketControlTest(unittest.TestCase):
         self.assertNotIn("phases.yml", text)
         self.assertNotIn("risks.yml", text)
 
-    def test_disableなら何も届かない(self):
+    # disable でも、ccnavi が前提にしている作業の決まり（ワークツリー・git の入口など）は
+    # チケットに依らないので届く（tests/core/test_session_conventions.py）。ここでは
+    # チケットに関わる文が 1 つも載らないことを見る。
+    def assert_no_ticket_text(self, text: str) -> None:
+        self.assertNotIn("チケット制御を使っている", text)
+        self.assertNotIn("直接作業", text)
+        self.assertNotIn("ccnavi-ticket.sh", text)
+
+    def test_disableならチケットの文は届かない(self):
         text = self.context(self.start("--mode", "enable", "--ticket-control", "disable"))
 
-        self.assertEqual(text, "")
+        self.assert_no_ticket_text(text)
 
     def test_環境変数でもdisableにできる(self):
         text = self.context(
             self.start("--mode", "enable", env={"CCNAVI_TICKET_CONTROL": "disable"})
         )
 
-        self.assertEqual(text, "")
+        self.assert_no_ticket_text(text)
 
     def test_読めない値はenableとして届く(self):
         result = self.start("--mode", "enable", env={"CCNAVI_TICKET_CONTROL": "off"})

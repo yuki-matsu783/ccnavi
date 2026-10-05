@@ -385,14 +385,9 @@ def stop_rules(conf: settings.Settings, root: str) -> list[rules.Rule]:
     - 同じ id（レイヤーの前置きを除いた表記）は最初の 1 本だけ
     - `every` が 2 より小さいものは使わない。ターンの終わりのたびに止まる（`--lint` も言う）
     """
-    said = io.StringIO()
-    rule_set, source = load_rules(said, conf, audit.Record(), root)
-    if source != builtin.SOURCE:
-        own = [layer for layer in layers(conf, root) if layer.name == LAYER_SELF]
-        add_layers(said, rule_set, own, root, audit.Record())
     picked: list[rules.Rule] = []
     seen: set[str] = set()
-    for rule in rule_set.allow:
+    for rule in _workspace_rules(conf, root).allow:
         if rule.every < 2 or not rule.matches(rules.STOP_MATCH, rules.STOP_SUBJECT):
             continue
         key = rule.bare_id or rule.id
@@ -401,3 +396,27 @@ def stop_rules(conf: settings.Settings, root: str) -> list[rules.Rule]:
         seen.add(key)
         picked.append(rule)
     return picked
+
+
+def _workspace_rules(conf: settings.Settings, root: str) -> rules.RuleSet:
+    """共通レイヤーとワークスペース自身のレイヤーの和。苦情は読み捨て、記録には残さない。
+
+    判定の経路ではない場面（ターンの終わり、セッションの開始）で、ワークスペースが何を
+    宣言しているかを見るため。苦情を言う場所は判定と `--lint`。共通レイヤーが読めずに
+    組み込みの既定に戻ったときは、レイヤーを足さない（判定と同じ）。
+    """
+    said = io.StringIO()
+    rule_set, source = load_rules(said, conf, audit.Record(), root)
+    if source != builtin.SOURCE:
+        own = [layer for layer in layers(conf, root) if layer.name == LAYER_SELF]
+        add_layers(said, rule_set, own, root, audit.Record())
+    return rule_set
+
+
+def deny_ids(conf: settings.Settings, root: str) -> set[str]:
+    """共通レイヤーとワークスペース自身のレイヤーにある deny の id（書かれたままの表記）。
+
+    セッション開始の作業の決まり（`reasons.conventions`）が、その決まりを支えるルールを
+    ワークスペースが置いているときだけ行を出すのに使う。
+    """
+    return {rule.bare_id or rule.id for rule in _workspace_rules(conf, root).deny if rule.id}
