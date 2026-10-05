@@ -17,11 +17,11 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 | 書き足すもの | 書く場所（この ADR を書いた時点） |
 |---|---|
-| `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval.admit`） |
+| `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval_ops.admit`） |
 | `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree_digest.revise_copy`） |
-| `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval.followup`。`doing/` に直に起こす） |
-| `project:`（frontmatter に無ければ） | 新規の承認（`approval.admit`） |
-| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval.admit`、`agree_digest.revised_front`） |
+| `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval_ops.followup`。`doing/` に直に起こす） |
+| `project:`（frontmatter に無ければ） | 新規の承認（`approval_ops.admit`） |
+| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval_ops.admit`、`agree_digest.revised_front`） |
 
 しかも `admit` は提案をテキストで読み（`fsio.load_text`。改行を LF に揃える）、欄を差し込んで書き直す
 （`insert_front` と `write_text`）。欄を足さない場合でも、CRLF の提案は承認で 1 バイト以上変わる。
@@ -39,7 +39,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 | 働き | いまの読み方 |
 |---|---|
-| 承認の取り下げ（Chrome 拡張だけが打つ） | `hook/core.py` の `_withdraw_problems`（918 行付近）が「`revised_at` / `feedback_at` がある」「`followup_of` がある、または `source_path` が無い」で止める。**戻し先と戻す中身は欄を読まない。** 戻し先は承認済みチケットのツリーの `wip/proposals/todo/<識別子>.md`、中身は Chrome 拡張が引いた承認コミットの親の提案（`prior_proposals`）。手で動かした承認は `source_path` が無いので取り下げられない |
+| 承認の取り下げ（Chrome 拡張だけが打つ） | `hook/core_withdraw.py` の `_withdraw_problems`（144 行付近）が「`revised_at` / `feedback_at` がある」「`followup_of` がある、または `source_path` が無い」で止める。**戻し先と戻す中身は欄を読まない。** 戻し先は承認済みチケットのツリーの `wip/proposals/todo/<識別子>.md`、中身は Chrome 拡張が引いた承認コミットの親の提案（`prior_proposals`）。手で動かした承認は `source_path` が無いので取り下げられない |
 | 取り込み済みの親子で、統合先の `done/` の親が手元の親と同じものか | `tickets/syncstate.py` の `_closed_in_integration`（548 行付近）が `approved_at` を比べる。手元の親が無い、**または手元の親に `approved_at` が無い**と「閉じた」とする。sh の側（`.ccnavi/scripts/ccnavi-sync.sh` の `closed_in_integration`）は逆で、手元に `approved_at` が無ければ「閉じていない」とする。Python の注記は「sh の見方と同じ」と書くが、ここだけ食い違っている。sh の `approved_at_of` は本文を含むどの行の `approved_at:` も拾う |
 | `wip/proposals/review/` の 2 枚目の保護 | `approval.review_all` が `require_record=True` で `ccnavi_approved` を必須にしている（ADR-0058）。欄を書かなくなると、新しいチケットが `finish` で `review/` へ動いたとき読まれなくなる |
 | 承認の時刻を見せる | ボード（`--explain --json` の `copy.approved_at` → `approvedAt`）、`--diagnose`（`entry/diagnose.py` 636 行と 979 行）、判定の拒否文（`hook/judge.py` 902 行）。手で置いたものは空 |
@@ -68,7 +68,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 承認で `project:` を書き足さない。承認済みチケットのプロジェクトは置き場（ツリー）から決まる | 書き足し続ける | 読む側は既に置き場で決めている（`scan_all`）。`ticket.py` の注記（1136 行付近）は「親が閉じたとき judge が子の `project` を見る」と書くので、実装の前に、その経路が欄ではなくツリーから決まることを確かめる |
 | 改版の `revised_at` / `feedback_at` は書かない。改版の時刻は状態の履歴の `revised`（`feedback: true` を含む）に残る | `ccnavi_approved` に書き続ける | 改版は計画を書き換えるので中身が変わるのは避けられないが、時刻まで中身に書く理由は無い。読んでいたのは承認の知らせの版（外す）と取り下げの検査（中身の一致に代える）だけ |
 | 続きの子の目印 `followup_of` は、`ccnavi_approved` の外のトップレベルの欄として、ccnavi が `doing/` に直に書くときに書く | 目印を持たせない | 続きの子は提案を経ずに ccnavi が新しく作るチケットで、作るときに書く欄は「承認で中身を変える」に当たらない。取り下げで理由を名指しするのに使う |
-| 既存の承認済みチケットに残る `ccnavi_approved`・`project:`・`workflow:` は消さない。移行はしない | 移行で欄を消す | 読んでも害が無い。保存済みのデータの表記を変えると既存のワークスペースとの互換が崩れる（ADR-0099 の「変えなかったもの」、`approval.admit` の「前の形も読む」と同じ方針）。承認済みの置き場はエージェントが書けないので、消すにはユーザの手が要る |
+| 既存の承認済みチケットに残る `ccnavi_approved`・`project:`・`workflow:` は消さない。移行はしない | 移行で欄を消す | 読んでも害が無い。保存済みのデータの表記を変えると既存のワークスペースとの互換が崩れる（ADR-0099 の「変えなかったもの」、`approval_ops.admit` の「前の形も読む」と同じ方針）。承認済みの置き場はエージェントが書けないので、消すにはユーザの手が要る |
 
 ### 欄が担っていた働きの代わり
 
@@ -77,7 +77,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | `wip/proposals/review/` で必須にする欄を、`ccnavi_approved` から `completed_at`（**値が空でない**）に替える。`review_all` の docstring と `load_copy` の `require_record` の説明も改める。古い形は両方を満たすので読める | 必須をやめる。`finish` が別の目印を書く | `completed_at` は `finish` が書くスクリプトの欄で、`review/` に来るものは必ず持つ。必須の欄が `ccnavi_approved` から `completed_at` に替わるだけで、どちらも組み込みの deny が破れてエージェントが `review/` に書ければ偽れる。2 枚目の保護としての強さは変わらない |
 | 取り下げの戻し先は今までどおり承認済みチケットのツリーの `wip/proposals/todo/<識別子>.md`（プロジェクト向けは `projects/<名前>/` 配下）。欄は読まない | `source_path` を読んで戻す | 戻し先は置き場から決まる。いまのコードも `source_path` を戻し先には使っていない |
 | 取り下げを書く側（`core.withdraw`）は、「`doing/` の中身が、承認コミットの親の提案（`prior_proposals`）とバイト単位で同じ」で通す。比べるのはバイト列で、`fsio.read_text`（改行を揃える）は使わない。親の取り下げでは、加えて、`phases/<親>/workflow.yml` の中身が、承認コミットの親の提案と今の `phases.yml` から `workflow.compute` で計算した待ち方と同じであることを求める。違えば止める。`workflow.yml` が無ければ（手で動かした計画付きの親）、改版は必ず `workflow.yml` を書くので待ち方の改版は起きていないとみなし、待ち方の検査を通す（中身のバイト一致は見る）。通れば `workflow.yml` を一緒に消す。続きの子（`followup_of`）は理由を名指しして止める | 状態の履歴（`revised` / `started`）を読んで決める。`workflow.yml` があれば止める | 一致すれば、改版も着手（`started_at` / `base_sha` を書く）もされていない。手で動かした承認も取り下げられる。履歴を読んで状態の操作を決めると、ADR-0086 の「正は置き場。判定も状態の操作も履歴を読まない」を崩す。待ち方だけの改版は `doing/` を変えない（待ち方は別のファイル）ので、待ち方の中身で見る。「あれば止める」にすると、`--agree` で承認した計画付きの親は必ず `workflow.yml` を持つので、必ず取り下げられなくなる。承認のあとに `phases.yml` が変わっていれば計算が変わって一致せず、止める側に倒れる（取り下げられないだけで、待ち方が勝手に変わることはない） |
-| 取り下げの「`phases/<親>/` にマーカーがある」の検査（`hook/core.py` の `_withdraw_problems`、930〜942 行付近。今はディレクトリが空でなければ止める）から `workflow.yml` を外す | 今のまま | 外さないと、上と同じく計画付きの親が必ず止まる。待ち方は上の行で別に見る |
+| 取り下げの「`phases/<親>/` にマーカーがある」の検査（`hook/core_withdraw.py` の `_withdraw_problems`、198〜204 行付近。今はディレクトリが空でなければ止める）から `workflow.yml` を外す | 今のまま | 外さないと、上と同じく計画付きの親が必ず止まる。待ち方は上の行で別に見る |
 | 取り下げを出すかの一覧（`core.withdrawable`。`prior_proposals` に空のバイト列を渡して呼ぶ）は粗く見る。「`ccnavi_approved` が無い新しい形」か「古い形で今の条件を満たす」なら出す。一致は書く側だけが見る | 一覧でも中身の一致を見る | 一覧は承認コミットを引く前に組むので、比べる相手が無い。出しすぎても、押したときに書く側が止める（判定は緩めない） |
 | `ccnavi_approved` を持つ古い承認済みチケットの取り下げは、今の条件（欄を読む）のまま | 古いものも中身の一致で決める | 古いものは承認で欄が足されているので、承認コミットの親の提案と一致しない。一致で決めると、取り下げられたものが取り下げられなくなる |
 | 取り下げの一致は、BOM 付きの提案など、ホストの API が読んだ姿と手元のバイト列が違うものでは一致しない側に倒れると見込む。一致の判定は、本物のホストの応答に合わせた見本（Chrome 拡張の見本の置き場 `extensions/chrome/ccnavi-approval/test/fixtures/host/` の下）でテストし、統合先に取り込む前にユーザが本物の Chrome で 1 回試す。承認コミットがマージ（親が 2 つ）のときは今と同じく引けず、取り下げは出ない | 見本を作らずに実装だけで確かめる | どちらも止める側で、取り下げられないだけ。ただしホストの応答の形（改行・BOM・base64 の扱い）は手元では作れないので、見本と 1 回の実地で確かめる |

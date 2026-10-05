@@ -36,10 +36,10 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import lint, version
-from ccnavi.hook import core
+from ccnavi.hook import core, core_base
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, history, ticket_model
+from ccnavi.tickets import approval, approval_ops, history, ticket_model
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
@@ -640,7 +640,7 @@ class DurableWiringTest(CoreHarness):
         """着手・終わりの欄の書き直し（`update_fields`）も、承認済みチケットを途中を見せずに書く。"""
         parent = self.approved_parent_copy()
         with durable_writes() as seen:
-            self.assertEqual(approval.update_fields(parent.path, {"started_at": "x"}), "")
+            self.assertEqual(approval_ops.update_fields(parent.path, {"started_at": "x"}), "")
         self.assertEqual(seen, [_norm(parent.path)])
         with open(parent.path, encoding="utf-8") as f:
             self.assertIn('started_at: "x"', f.read())
@@ -649,7 +649,7 @@ class DurableWiringTest(CoreHarness):
         """続きの子（`followup`）は `doing/` に直に起こすので、同じ書き方で置く。"""
         parent = self.approved_parent_copy()
         with durable_writes() as seen:
-            ident, failed = approval.followup(self.conf(), self.root, parent, 1, [], ["指摘"])
+            ident, failed = approval_ops.followup(self.conf(), self.root, parent, 1, [], ["指摘"])
         self.assertEqual(failed, "")
         written = [
             p for p in seen if p.endswith(os.path.normcase(os.path.join("doing", ident + ".md")))
@@ -661,10 +661,10 @@ class DurableWiringTest(CoreHarness):
         target = os.path.join(self.root, "flows-test", "a.yml")
         op = fsio.Op(fsio.OP_NEW_DURABLE, target, b"new")
         with durable_writes() as seen:
-            self.assertEqual(core._write_op(op), "")
+            self.assertEqual(core_base._write_op(op), "")
         self.assertEqual(seen, [_norm(target)])
         with durable_writes() as seen:
-            self.assertNotEqual(core._write_op(fsio.Op(fsio.OP_NEW_DURABLE, target, b"x")), "")
+            self.assertNotEqual(core_base._write_op(fsio.Op(fsio.OP_NEW_DURABLE, target, b"x")), "")
         self.assertEqual(seen, [])
         with open(target, "rb") as f:
             self.assertEqual(f.read(), b"new")
@@ -1763,6 +1763,8 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.agree_candidates", "tickets.agree_digest", "tickets.agree_screen")
         names += ("tickets.phase_forms", "tickets.phase_scope")
         names += ("tickets.flow_text", "tickets.flow_shape", "tickets.flow_render")
+        names += ("tickets.approval_ops", "tickets.ops_close", "tickets.ops_stop")
+        names += ("hook.core_base", "hook.core_approve", "hook.core_review", "hook.core_withdraw")
         for dotted in names:
             package, name = dotted.split(".")
             path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")

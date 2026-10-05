@@ -30,7 +30,7 @@ from ..tickets import (
     approval_checks,
     approval_times,
     history,
-    ops,
+    ops_stop,
     phase,
     syncstate,
     ticket_model,
@@ -263,7 +263,7 @@ class _Family:
                     "確かめてもらう"
                 )
         # 基準点が HEAD の祖先でないのは warn。`start` は止めない（基準点を HEAD で書き直す）。
-        off = ops.base_off_head(self.root, self.conf, t)
+        off = ops_stop.base_off_head(self.root, self.conf, t)
         if off:
             warns.append(off)
         left = approval_checks.resumed_fields(t)

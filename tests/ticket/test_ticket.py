@@ -764,7 +764,7 @@ class TicketTest(unittest.TestCase):
     def close_parent_by_hand(self, name="i0001"):
         """親の承認済みチケットを `doing/` から `done/` へ手で動かす。
 
-        道具は開いた子がある親を閉じさせない（`ops.close_problems`）ので、この形は
+        道具は開いた子がある親を閉じさせない（`ops_close.close_problems`）ので、この形は
         置き場を手で動かしたときにしか作れない。GitHub の画面で閉じるのがそれにあたる。
         """
         os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
@@ -1092,7 +1092,7 @@ class TicketTest(unittest.TestCase):
     def test_a_child_without_any_parent_at_all_is_named(self):
         """親の提案がどこにも無い子は、親が無いと言って止めること。
 
-        ユーザが子だけ置き場へ動かし、親を書き忘れた形。`_find` は子を引けるので、親の側を
+        ユーザが子だけ置き場へ動かし、親を書き忘れた形。`find` は子を引けるので、親の側を
         引いたときの「無い」をここで言わないと、ワークツリーの検査まで進んで別の話になる。
         """
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))

@@ -18,7 +18,7 @@ from ..tickets import (
     approval_checks,
     approval_marks,
     history,
-    ops,
+    ops_stop,
     phase,
     review_host,
     ticket_fold,
@@ -93,7 +93,7 @@ def _copy_problems(
         unrecorded = _start_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
-        off = ops.base_off_head(root, conf, t) if t.started_at else ""
+        off = ops_stop.base_off_head(root, conf, t) if t.started_at else ""
         if off:
             # 判定には入れない（判定は git を読まない）。`start` も止めない（通れば基準点を
             # HEAD で書き直すので、止めても防げる形が無い）。ここと status が warn で知らせる。

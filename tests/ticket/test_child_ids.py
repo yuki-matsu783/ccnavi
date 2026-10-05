@@ -20,7 +20,7 @@ import unittest
 
 from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, ticket_ids, ticket_model
+from ccnavi.tickets import approval_ops, ticket_ids, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -172,20 +172,22 @@ class NextChildIdTest(unittest.TestCase):
         self.put("wip/proposals/todo", "i0001-05-03", "i0001", 5)
         # 別の親の子は数えない（親が同じ綴りで始まっても）
         self.put(".ccnavi/approved/doing", "i0001-x-02-07", "i0001-x", 2)
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 2), "i0001-02-02")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 5), "i0001-05-04")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 0), "i0001-00-01")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001-x", 2), "i0001-x-02-08")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 2), "i0001-02-02")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 5), "i0001-05-04")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 0), "i0001-00-01")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.ws, "i0001-x", 2), "i0001-x-02-08"
+        )
 
     def test_numbers_past_two_digits_are_refused(self):
         self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)
         with self.assertRaises(ValueError) as caught:
-            approval.next_child_id(self.conf, self.ws, "i0001", 2)
+            approval_ops.next_child_id(self.conf, self.ws, "i0001", 2)
         self.assertIn("連番 99 まで埋まっている", str(caught.exception))
         with self.assertRaises(ValueError):
-            approval.next_child_id(self.conf, self.ws, "i0001", 100)
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
+            approval_ops.next_child_id(self.conf, self.ws, "i0001", 100)
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
 
 
 class FollowupRefusesTest(NextChildIdTest):
@@ -205,7 +207,7 @@ class FollowupRefusesTest(NextChildIdTest):
         return found
 
     def followup(self, phase_no):
-        return approval.followup(self.conf, self.ws, self.parent(), phase_no, [], ["指摘"])
+        return approval_ops.followup(self.conf, self.ws, self.parent(), phase_no, [], ["指摘"])
 
     def test_a_full_phase_writes_nothing(self):
         self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)
