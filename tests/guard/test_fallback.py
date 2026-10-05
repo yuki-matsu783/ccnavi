@@ -23,7 +23,7 @@ def run(root, payload, log="", env=None):
     """道具を 1 回動かす。ワークスペースルートを呼び出しごとに変えられる。
 
     ルールは `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には
-    届かない。読めないルールは `--root` の下の共通層に置く。
+    届かない。読めないルールは `--root` の下の共通レイヤーに置く。
 
     コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
@@ -68,7 +68,7 @@ class FallbackTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        # 共通層のルールが読めないワークスペース。
+        # 共通レイヤーのルールが読めないワークスペース。
         self.root = self.directory.name
         self.broken = common_path(self.root, "rules")
         os.makedirs(os.path.dirname(self.broken), exist_ok=True)
@@ -166,7 +166,7 @@ class FallbackTest(unittest.TestCase):
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_既定のシェルの保護は設定で動かした置き場にも当たる(self):
-        # 実行ファイルは設定で動く（ccnavi ディレクトリと共通層は固定）。
+        # 実行ファイルは設定で動く（ccnavi ディレクトリと共通レイヤーは固定）。
         # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
         # 壊れたときにだけそこへの書き込みが止まらない（issue #14）。
         # 絶対パスは `/` で書いて shlex.quote で引用する。bash は引用されない `\` を落とすので、

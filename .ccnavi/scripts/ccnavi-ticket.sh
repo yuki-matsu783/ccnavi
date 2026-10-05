@@ -58,9 +58,9 @@ sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <
   レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm / decide、
   ccnavi --reviewed）。
 
-  提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通層の
-  .ccnavi/common/phases.yml、自身の層の .ccnavi/config/phases.yml、
-  プロジェクトは projects/<名前>/.ccnavi/config/phases.yml。どの層にも無ければ
+  提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通レイヤーの
+  .ccnavi/common/phases.yml、自身のレイヤーの .ccnavi/config/phases.yml、
+  プロジェクトは projects/<名前>/.ccnavi/config/phases.yml。どのレイヤーにも無ければ
   フェーズは番号だけになる
 USAGE
 }

@@ -9,7 +9,7 @@
 # 置き場はワークスペースルートの `logs/state`（固定。ccnavi-review.sh と同じ）。
 #
 #   sync/<リポジトリ>/families/<P>   親子のチケットの取り込み状態（remote branch sha fetched_at state reason）
-#   sync/<リポジトリ>/integration/   統合先の取り込み結果（統合先の done/・層・置き場のパスの設定のコピーと head）
+#   sync/<リポジトリ>/integration/   統合先の取り込み結果（統合先の done/・レイヤー・置き場のパスの設定のコピーと head）
 #   locks/<リポジトリ>/<P>/          ロック。中の owner に持ち主を 1 行で書く
 #
 # <リポジトリ> はワークスペース自身なら `self`、プロジェクトならその名前。

@@ -13,7 +13,8 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
    ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
-   （一覧は書く。着手で configsync がコピーした層は例外で、tests/config/test_configsync.py が見る）
+   （一覧は書く。着手で configsync がコピーしたレイヤーは例外で、
+   tests/config/test_configsync.py が見る）
 4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）は
    エージェントから止める
 """

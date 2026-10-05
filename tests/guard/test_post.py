@@ -165,7 +165,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
+        # 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")

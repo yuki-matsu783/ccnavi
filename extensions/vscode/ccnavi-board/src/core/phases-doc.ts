@@ -11,7 +11,7 @@
  * 文字の配列で持つ。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
- * 要否が決まる）。雛形も持たない（共通層に雛形を置くと、層の同じ id と中身が食い違い、その層が
+ * 要否が決まる）。雛形も持たない（共通レイヤーに雛形を置くと、レイヤーの同じ id と中身が食い違い、そのレイヤーが
  * 空として扱われる）。
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";

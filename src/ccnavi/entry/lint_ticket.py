@@ -195,8 +195,8 @@ def _start_unrecorded(conf: settings.Settings, t) -> str:
 def _types_resolver(conf: settings.Settings, root: str):
     """`project:` から、そのチケットに使う種類を引く（設計 11.4.1）。
 
-    承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
-    読み込みは 1 層 1 回。
+    承認の対象の中でもチケットごとにレイヤーが違いうるので、1 つに決めずに引く形で渡す。
+    読み込みは 1 レイヤー 1 回。
     """
     cache: dict[str, dict | None] = {}
 
@@ -268,7 +268,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
                     SEVERITY_ERROR,
                     "(phases)",
                     f"{t.ticket} は計画を持つのにフェーズの種類の定義"
-                    f"（{conf.phases} と {t.project or '自身'} の層）が読めない",
+                    f"（{conf.phases} と {t.project or '自身'} のレイヤー）が読めない",
                 )
             )
 
