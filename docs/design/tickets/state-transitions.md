@@ -37,7 +37,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | `todo` → `doing`（手で） | ユーザが hook の外で動かす | 無し。動かせること自体が条件（その置き場にエージェントは書けない）。承認の検査は判定が当てる | ― |
 | `todo`（改版）→ 消える | `ccnavi --agree`（ユーザ） | 同じ識別子が `doing/` にあり、計画だけが違う。`doing/` の側の計画を差し替える | `plan` / `feedback`（`workflow.yml` も書き直す） |
 | `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い、表記が大文字小文字まで同じ。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない | `started_at`、`base_sha`（そのワークツリーの HEAD） |
-| `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。種類の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
+| `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`close-early`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
 | `review` → `done` | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、`close-early`、フィードバック計画の承認 | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
@@ -116,7 +116,7 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 | 任意 → 無し | `ccnavi --agree` で同じ番号の子が承認された | 4 種を全部消す |
 
 マーカーはユーザが子を再開しても残る（機構は消さない）。再開は想定しない運用で、された場合は `--lint` と
-`ticket status` が、作業中の子のフェーズに `reviewed` が残っていると warn で言う（閉じ直したときにレビューが要らないフェーズ、つまり種類が `review: none` で、再開された子も
+`ticket status` が、作業中の子のフェーズに `reviewed` が残っていると warn で言う（閉じ直したときにレビューが要らないフェーズ、つまりフェーズ定義が `review: none` で、再開された子も
 `human_review` を求めていないフェーズは言わない。判定と `start` は止めない）。再開の意図がレビューのやり直しなら、そのフェーズのマーカーを人が手で消す
 （マーカーがあるツリー、つまり `approval.home_dir` が決めるツリーで `ccnavi-git.sh rm .ccnavi/approved/phases/<親>/<N>.reviewed`
 を打ち、削除をコミットする。取り込み済み（origin があり、取り込み状態が present）で、chat だけの親子でなければ、
