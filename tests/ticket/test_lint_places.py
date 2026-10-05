@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from tests.inproc import run_ccnavi
 
@@ -372,6 +373,47 @@ class ProjectsCollisionTest(unittest.TestCase):
 
         # 終了コードは見ない（この部屋の rules.yml は空で、`deny` が空の error が出る）。
         # 落ちたなら JSON の報告が無い。
+        try:
+            problems = json.loads(result.stdout)["problems"]
+        except (ValueError, KeyError) as exc:
+            self.fail(f"--lint が報告を出さずに落ちた: {exc}\n{result.stdout}\n{result.stderr}")
+        self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
+
+    def test_projects_on_another_drive_does_not_crash_the_lint(self):
+        """`--projects` が別のドライブを指して `relpath` が ValueError でも `--lint` は落ちない。
+
+        Windows 以外では別のドライブが作れないので、`--projects` に置き場のディレクトリを渡し、
+        `relpath` がそのパスだけ ValueError を投げるように差し替える（Windows の挙動の再現）。
+        """
+        self.no_tracking()
+        elsewhere = tempfile.mkdtemp(prefix="ccnavi-drive-")
+        self.addCleanup(shutil.rmtree, elsewhere, ignore_errors=True)
+        real = os.path.relpath
+
+        def relpath(path, *args, **kwargs):
+            if os.path.normcase(os.fspath(path)) == os.path.normcase(elsewhere):
+                raise ValueError("path is on mount 'D:', start on mount 'C:'")
+            return real(path, *args, **kwargs)
+
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+
+        with mock.patch("os.path.relpath", relpath):
+            result = run_ccnavi(
+                [
+                    "--root",
+                    self.ws,
+                    "--projects",
+                    elsewhere,
+                    "--lint",
+                    "--json",
+                    "--mode",
+                    "enable",
+                ],
+                input="",
+                env=environment,
+            )
+
         try:
             problems = json.loads(result.stdout)["problems"]
         except (ValueError, KeyError) as exc:

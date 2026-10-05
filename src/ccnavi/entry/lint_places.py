@@ -309,7 +309,9 @@ def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
         return []
     head, tail = parts[0], parts[1:]
     known = {p.name for p in tree.projects(conf.projects)}
-    where = os.path.relpath(conf.projects, root).replace(os.sep, "/") if conf.projects else "(無し)"
+    # 相対が求まらない（`--projects ""`・ワークスペースの外・別のドライブ）ときは、
+    # `relpath` を呼ばずに指定の文字列をそのまま使う（`_projects` と同じ扱い）。
+    where = _projects_rel(conf, root) or conf.projects or "(無し)"
     problems: list[Problem] = []
     try:
         names = sorted(os.listdir(os.path.join(root, head)))
