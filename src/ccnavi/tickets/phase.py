@@ -1056,12 +1056,33 @@ def resumed_review(
         return (
             f"作業中（doing/）ですが、フェーズ {ph.label} の reviewed マーカーが残っています。"
             "レビューをやり直すならマーカーを消してください"
-            f"（消し方: ユーザが親 {child.parent} のワークツリーで '{git} rm {mark}' を打ち、"
-            f"'{push} {child.parent}' でコミットして送る）。"
+            f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を打ち、"
+            "削除をコミットする。取り込み済みで origin があり、chat だけでない親子なら "
+            f"'{push} {child.parent}' が取り込んでから送る。それ以外は何もしないので、"
+            "ユーザが自分でコミットする）。"
             "続きの作業だけなら、そのままで構いません。"
             "運用の基本は、新しいチケットを作り直すことです"
         )
     return ""
+
+
+def _marker_tree(root: str, conf: settings.Settings, child: ticket_mod.Ticket) -> str:
+    """マーカーを置くツリー（`approval.home_dir` が決める）を、ルートからの相対で言う。
+
+    置き場の設定が絶対パスなどで、ツリーのルートを引けないときは「マーカーがあるツリー」。
+    """
+    where = approval.home_dir(conf, root, child.parent, "", project=child.project)
+    rel = (conf.approved or settings.DEFAULT_APPROVED).replace("/", os.sep)
+    suffix = os.sep + rel
+    if not where.endswith(suffix):
+        return "マーカーがあるツリー"
+    tree_root = where[: -len(suffix)]
+    shown = os.path.relpath(tree_root, root).replace(os.sep, "/")
+    if shown == ".":
+        return "ワークスペースルート"
+    if shown.startswith(".."):
+        return f"ツリー {tree_root}"
+    return f"ツリー {shown}"
 
 
 def order_problems(
