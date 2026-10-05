@@ -53,7 +53,7 @@ from . import rules, selfguard_targets
 # 読み違えて両方を見落とす形が無いように、語の分け方を _COPY_TARGET と _COPY_LAST で揃える。
 _NOT_A_WORD = re.escape(shellread.SEP) + re.escape(shellread.WORD_SEP)
 _WRITE_VERBS = (
-    rf"(>[>|&]* ?[^ {_NOT_A_WORD}]*"
+    rf"((?:^|[ {re.escape(shellread.SEP)}])>[>|&]* ?[^ {re.escape(shellread.SEP)}]*"
     r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
     r"|(^|\x00)sed\b[^\x00]*[ \x01](-[A-Za-z]*i|--i)[^\x00]*)"
 )
