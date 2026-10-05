@@ -8,10 +8,12 @@
 
 from __future__ import annotations
 
-from ..infra import settings, shellread, shellread_scan, shellread_words
+import os
+
+from ..infra import settings, shellread, shellread_scan, shellread_words, tree
 from ..infra.modes import DRY_RUN
 from ..policy import rules
-from ..tickets import phase, phase_forms
+from ..tickets import phase, phase_forms, ticket_places
 
 # 返す理由に載せる理由コード。設計 付録 B の体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
@@ -426,5 +428,58 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
         lines.append(
             f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny にヒットしても止まらない。"
             "通ったことを許可と読まず、表示された案内に次からは従う）"
+        )
+    return "\n".join(lines)
+
+
+def conventions(conf: settings.Settings, root: str, docs: bool = False) -> str:
+    """セッションの頭で渡す、ccnavi の動作が前提にしている作業の決まり（REQ-SES-06）。
+
+    ワークスペースの CLAUDE.md に書いていた決まりのうち、ccnavi の判定・置き場・入口に
+    依存するものをここに寄せる。ccnavi を入れたワークスペースなら、どこでも同じ文が届く。
+
+    各項目は 1 行の要点に留め、詳しいことは ccnavi に聞く形にする。この文は起動・再開・
+    compact・clear のたびに届く常駐の文脈なので、長くすると毎回それだけ重くなる。聞く先は
+    新しく作らず、今ある入口を名指しする。git の通る形は `ccnavi-git.sh --help`、止めた
+    理由と代わりの手段は拒否の文面、承認済みチケットの状態は `ccnavi-ticket.sh status`、
+    それ以外の詳しい決まりは `--docs`（ワークスペースの文書の frontmatter の索引）。
+
+    - `projects` の行は、プロジェクトの置き場にプロジェクトがあるときだけ出す
+    - `status` の行は、チケット制御が有効なときだけ出す
+    - `--docs` の行は、索引の案内を出す回（`docs` が真）だけ出す。
+      文書が無いワークスペースで引き方だけを案内しても、何も当たらない
+    """
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    worktrees = tree.WORKTREES_DIR.replace("\\", "/")
+    lines = [
+        "[ccnavi] ccnavi が前提にしている作業の決まり。",
+        f"- 編集する前にワークツリー（{worktrees}/<名前>）を切り、その中で編集する。"
+        "切り方は ccnavi-git.sh の --help（worktree add）。",
+        f"- git は直接呼ばず {git_sh} を通す。止められたら迂回せず、出力の案内に従う。",
+        f"- 下書きと使い捨てのファイルはワークツリーの {ticket_places.SCRATCH}/ に置く"
+        "（追跡されず、範囲外の変更としても報告されない）。",
+    ]
+    if tree.projects(conf.projects):
+        home = os.path.relpath(conf.projects, root).replace("\\", "/")
+        lines.append(
+            f"- {home}/<名前>/ を直すときは、そこへ cd してから作業する"
+            "（git の操作は cwd のリポジトリに向く）。"
+        )
+    lines += [
+        "- 実装・調査・テストはサブエージェントにバックグラウンドで任せる。"
+        "メインはユーザとの相談・判断・報告を受け持つ。",
+        "- 判定が緩む・ユーザとのやり取りの形が変わる・元に戻せない・影響範囲を読み切れない変更は、"
+        "実装する前にユーザと合意する。",
+    ]
+    if conf.tickets_enabled:
+        ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+        lines.append(
+            "- 承認済みチケットの状態は、ファイルを読んで推測せず"
+            f" {ticket_sh} status [<親>] で確かめる。"
+        )
+    if docs:
+        lines.append(
+            "詳しい決まりは下の案内の --docs で、--keyword <語> を付けて引いてください"
+            "（例: ワークツリー、下書き、サブエージェント、相談）。"
         )
     return "\n".join(lines)
