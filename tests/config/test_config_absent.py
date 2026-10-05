@@ -70,6 +70,24 @@ class AbsentRulesTest(ConfigUnionHarness):
                 )
                 self.assertNotIn("fallback", self.last_record())
 
+    def test_the_builtin_credentials_deny_has_a_leading_boundary(self):
+        """土台の認証情報の止めは、本物の `.env`・`.ssh/` を止め、フィールド参照は巻き込まない。"""
+        self.remove_common_rules()
+        for tool, field, value in (
+            ("Bash", "command", "cat .env"),
+            ("Bash", "command", "cat ~/.ssh/id_rsa"),
+            ("Read", "file_path", os.path.join(self.ws, ".env")),
+            ("Write", "file_path", os.path.join(self.ws, "x", ".npmrc")),
+        ):
+            with self.subTest(value=value):
+                self.assert_denied(
+                    self.hook(tool, self.ws, **{field: value}), "builtin-credentials"
+                )
+        for command in ("jq -r '.hooks[0],.env.X' a.json", "echo process.env.HOME"):
+            with self.subTest(command=command):
+                self.hook("Bash", self.ws, command=command)
+                self.assertNotIn("builtin-credentials", self.last_record().get("rules", []))
+
     def test_builtin_deny_stays_on_under_the_common_layer(self):
         """共通レイヤーが在っても、組み込みの deny は土台として当たる。"""
         denied = self.hook("Bash", self.ws, command="git reset --hard HEAD~1")
