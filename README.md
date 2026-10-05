@@ -458,7 +458,7 @@ sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で�
 | `.ccnavi/common/rules.yml` | 同じパス |
 | `.ccnavi/common/risks.yml` | 同じパス |
 | `.ccnavi/config/phases.yml` | 同じパス |
-| `.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,clean}.sh`、`ccnavi-common-{state,lock,c1,host,log}.sh`、`ccnavi-clean.js` | 同じパス |
+| `.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,clean,branches,start}.sh`、`ccnavi-common-{state,lock,c1,host,log}.sh`、`ccnavi-clean.js` | 同じパス |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じパス。配ったあと実行ビットを付ける |
 
 ルールと配点のひな形は共通レイヤー（`.ccnavi/common/`）へ、フェーズの種類のひな形はワークスペース自身のレイヤー
@@ -1868,22 +1868,22 @@ factors:
 
 「#152 を直して」「!5 の指摘に対応して」のように issue や MR を指定して頼むと、`UserPromptSubmit` で ccnavi が依頼文から
 指定（`#152`・`issue 152`・`.../issues/152`、`!5`・`MR 5`・`PR #12`・`.../pull/5`・`.../-/merge_requests/5`）を見つけ、
-着手の前に紐づくブランチを探してユーザに確かめるよう、エージェントに指示を足す。
+着手の前に `ccnavi-start.sh` を打つよう、エージェントに指示を足す。
 **止めはしない**（指示を足すだけ）。コードブロックの中、`# 見出し`、色の `#fff`、`C#` などは拾わない。チケット制御が disable なら足さない。
 
-エージェントが打つのは次の 1 本で、読むだけ。
+エージェントが打つのは次の 1 本。既存の候補（下の `ccnavi-branches.sh` が探す）が無ければ、Draft MR・ワークツリー・ブランチを作る。
 
 ```sh
-sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-branches.sh --issue 152   # MR なら --mr 5。--json で JSON
+sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5
 ```
 
-出すのは、MR の元ブランチ、issue を参照している開いた MR の元ブランチ（ホストは `ccnavi-review.sh` と同じく gh / glab か、
+候補を探すのは `ccnavi-branches.sh`（読むだけ。`--json` で JSON）で、出すのは、MR の元ブランチ、issue を参照している開いた MR の元ブランチ（ホストは `ccnavi-review.sh` と同じく gh / glab か、
 curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含むブランチ（手元と origin）、`issue: 152` を持つチケットの親のブランチ。
 1 候補 1 行で、チェックアウトしているワークツリーと結び付くチケットを添える。ホストに繋げなければ手元の候補だけを出し、
 「ホストは見ていない」と理由を書く。`projects/<名前>/` の中から打てば、そのプロジェクトのリポジトリを見る。
 
-候補があれば、エージェントは一覧を見せて「既存のブランチで続ける・新しく `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞き、
-返事を待つ。既存のブランチで続けるときは、親チケットの `branch:` に書いて承認を受け、承認の後に `ccnavi-git.sh switch <ブランチ>`
+候補が複数（終了コード 3）なら、エージェントは一覧を見せて「既存のブランチで続ける・新しく `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞き、
+返事を待つ。ホストに届かない（終了コード 4）ときは、出力の案内どおり MCP で代行し、同じコマンドを打ち直す。終了コード 1・2 のときは、出力の理由をユーザに伝える。既存のブランチで続けるときは、親チケットの `branch:` に書いて承認を受け、承認の後に `ccnavi-git.sh switch <ブランチ>`
 で移る（承認前の提案の `branch:` は使わない）。
 
 ### サブエージェントに渡すもの
@@ -2735,6 +2735,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になるデフォルトブランチを取ってくる。進めるのは fast-forward だけ |
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを閉じた・消えたに分け、親子のチケットの取り込み状態と統合先の取り込み結果を書く |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
+| `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、ユーザが手で回す道具。自動テストは呼ばない |
