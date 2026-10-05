@@ -32,7 +32,7 @@ def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> st
     return settings.layer_path(conf, layer_home(conf, root, name), kind, name)
 
 
-def _written(entry) -> str:
+def written(entry) -> str:
     """範囲の 1 件を、書かれた表記で出す。翻訳後の式ではなく、ユーザが書いたほう。"""
     return entry.glob or entry.regex
 
@@ -71,7 +71,7 @@ def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str
     return list(definition.factors), ""
 
 
-def _rule_form(rule: rules.Rule) -> dict:
+def rule_form(rule: rules.Rule) -> dict:
     """ルールの書き方。書いた表記と、翻訳後の式。"""
     return {
         "kind": "glob" if rule.glob else "regex",

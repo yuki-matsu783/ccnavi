@@ -44,7 +44,7 @@ def start(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> int:
     """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。置き場は動かない。"""
-    found = ops_close._find(stderr, root, conf, ticket_id)
+    found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
     if found.state != ticket_model.DOING:
@@ -61,9 +61,9 @@ def start(
     if found.started_at:
         stderr.write(f"ccnavi: {ticket_id} は着手済み（{found.started_at}）\n")
         return 1
-    if ops_close._parent_not_started(stderr, root, conf, found):
+    if ops_close.parent_not_started(stderr, root, conf, found):
         return 1
-    if ops_close._predecessors_unmet(stderr, root, conf, found):
+    if ops_close.predecessors_unmet(stderr, root, conf, found):
         return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
@@ -190,7 +190,7 @@ def finish(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> int:
     """`doing/` → `review/`（レビュー要）か `done/`（不要）。完了の時刻を書く。"""
-    found = ops_close._find(stderr, root, conf, ticket_id)
+    found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
     if found.state != ticket_model.DOING:
@@ -203,9 +203,9 @@ def finish(
             "を通してください\n"
         )
         return 1
-    if ops_close._parent_still_busy(stderr, root, conf, found):
+    if ops_close.parent_still_busy(stderr, root, conf, found):
         return 1
-    if ops_close._deliverables_missing(stderr, root, conf, found):
+    if ops_close.deliverables_missing(stderr, root, conf, found):
         return 1
     # 子は、閉じる前に実績のリスクを数える（risk.py）。定性項目の判定が揃わなければ閉じない。
     scored = _score_child(stdout, stderr, root, conf, found)
@@ -296,7 +296,7 @@ def cancel(
     if not reason.strip():
         stderr.write("ccnavi: 取り消しには --reason <理由> が要る\n")
         return 1
-    found = ops_close._find(stderr, root, conf, ticket_id)
+    found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
     if found.state == ticket_model.TODO:
@@ -308,7 +308,7 @@ def cancel(
     if found.state != ticket_model.DOING:
         stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
         return 1
-    if ops_close._parent_still_busy(stderr, root, conf, found):
+    if ops_close.parent_still_busy(stderr, root, conf, found):
         return 1
     fields = {"cancelled_at": approval_marks.now(), "cancel_reason": reason.strip()}
     return _move(
@@ -344,7 +344,7 @@ def record_risk(
     if not reason.strip():
         stderr.write("ccnavi: record-risk には --reason <根拠> が要る\n")
         return 1
-    found = ops_close._find(stderr, root, conf, ticket_id)
+    found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
     if not found.is_child:

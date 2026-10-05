@@ -1092,7 +1092,7 @@ class TicketTest(unittest.TestCase):
     def test_a_child_without_any_parent_at_all_is_named(self):
         """親の提案がどこにも無い子は、親が無いと言って止めること。
 
-        ユーザが子だけ置き場へ動かし、親を書き忘れた形。`_find` は子を引けるので、親の側を
+        ユーザが子だけ置き場へ動かし、親を書き忘れた形。`find` は子を引けるので、親の側を
         引いたときの「無い」をここで言わないと、ワークツリーの検査まで進んで別の話になる。
         """
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))

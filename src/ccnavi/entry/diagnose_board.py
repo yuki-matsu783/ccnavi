@@ -231,7 +231,7 @@ def _rule_record(rule: rules.Rule) -> dict:
         "section": rule.decision,
         "source": rule.source,
         "match": rule.match,
-        **diagnose_shared._rule_form(rule),
+        **diagnose_shared.rule_form(rule),
         "message": rule.message,
     }
 
@@ -246,7 +246,7 @@ def _phase_type_record(layer: str, pt) -> dict:
         "review": pt.review,
         # scope は `inherit`（親の範囲を継ぐ）のとき None。空のリストと区別が付くように、
         # 継ぐことは `inherit` の 1 語で出す。
-        "scope": [diagnose_shared._written(e) for e in pt.scope] if pt.scope else ["inherit"],
+        "scope": [diagnose_shared.written(e) for e in pt.scope] if pt.scope else ["inherit"],
     }
 
 

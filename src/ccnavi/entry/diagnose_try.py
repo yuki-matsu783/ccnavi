@@ -130,7 +130,7 @@ def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
             "id": rule.id,
             "source": "file",
             "section": rule.decision,
-            **diagnose_shared._rule_form(rule),
+            **diagnose_shared.rule_form(rule),
         }
         for rule in picked
     ]
@@ -274,7 +274,7 @@ def _rules_hit(
                 "id": name,
                 "source": "file",
                 "section": rule.decision,
-                **diagnose_shared._rule_form(rule),
+                **diagnose_shared.rule_form(rule),
             }
         )
     return hits

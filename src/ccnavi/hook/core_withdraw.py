@@ -109,7 +109,7 @@ def withdraw(
             )
             stage.line(f"  {ident} の承認を取り下げた（doing/ → todo/）")
     if notes.getvalue():
-        return core_base.Checked(core_base._unwritten(notes.getvalue()), None)
+        return core_base.Checked(core_base.unwritten(notes.getvalue()), None)
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
 
 

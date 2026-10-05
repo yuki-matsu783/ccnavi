@@ -23,7 +23,7 @@
 そのまま通る。ここは入口と出口の形を揃えるだけで、判定は変えない。
 
 このモジュールは入力・判定・書き込みの共通部分だけを持つ。`confirm` の答え（`Checked`）と
-`reviewed_mark`、並べる段で履歴を書けないと分かったときの知らせ（`_unwritten`）も、
+`reviewed_mark`、並べる段で履歴を書けないと分かったときの知らせ（`unwritten`）も、
 `core_review` と `core_withdraw` の両方が使うのでここに置く。他の `core_*` はこのモジュールを読み、
 `core` は全部を読んで名前を再エクスポートする（呼び出し側は `core.<名前>` のまま引く）。
 
@@ -114,7 +114,7 @@ class Verdict:
         return self.gathered.identifiers
 
 
-def _say_elsewhere(stderr: TextIO, gathered: agree.Gathered) -> None:
+def say_elsewhere(stderr: TextIO, gathered: agree.Gathered) -> None:
     """本物とするツリーの外に在る計画の違う版の案内（`Gathered.elsewhere`）を標準エラーに出す。
 
     `--verify` のテキストは本文に同じ段を持つので、そこでは呼ばない（同じ名指しを 2 度出さない）。
@@ -348,7 +348,7 @@ class Checked:
     changes: Changes | None
 
 
-def _unwritten(text: str) -> list[str]:
+def unwritten(text: str) -> list[str]:
     """並べる段で履歴を書けないと分かった知らせ。書いても履歴が残らないので、error として返す。
 
     手元の Writer(FS) なら警告で続ける所だが、ここで分かるのは書く前（識別子の形が違う、

@@ -65,7 +65,7 @@ def _explain_phases(
             )
         for pt in items:
             scope = (
-                ", ".join(diagnose_shared._written(e) for e in pt.scope) if pt.scope else "inherit"
+                ", ".join(diagnose_shared.written(e) for e in pt.scope) if pt.scope else "inherit"
             )
             head = f"  {pt.id:<16}{layer_label(name):<10}{pt.kind:<8}{pt.title:<16}"
             stdout.write(f"{head}{pt.review:<8}{scope}\n")

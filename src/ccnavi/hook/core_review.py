@@ -91,7 +91,7 @@ def confirm(
             core_base.reviewed_mark(result.mr.number, [], snapshot.actor),
         )
     if notes.getvalue():
-        return core_base.Checked(core_base._unwritten(notes.getvalue()), None)
+        return core_base.Checked(core_base.unwritten(notes.getvalue()), None)
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
 
 

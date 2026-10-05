@@ -59,7 +59,7 @@ def approve(
     snapshot = core_base.read_fs(conf, root)
     verdict = core_base.judge_approval(snapshot, only)
     stderr.write(verdict.messages)
-    core_base._say_elsewhere(stderr, verdict.gathered)
+    core_base.say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
     if gathered.refused:
         return 1
@@ -108,7 +108,7 @@ def preview(
     """
     verdict = core_base.judge_approval(core_base.read_fs(conf, root), only)
     stderr.write(verdict.messages)
-    core_base._say_elsewhere(stderr, verdict.gathered)
+    core_base.say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
     if gathered.refused:
         return 1
@@ -167,7 +167,7 @@ def verify(
     if as_json:
         # テキストの本文には `verify_verdict` が名指しの段を入れる。JSON の本体には無いので
         # 標準エラーへ出す。
-        core_base._say_elsewhere(stderr, judged.gathered)
+        core_base.say_elsewhere(stderr, judged.gathered)
     gathered = judged.gathered
     verdict = agree.verify_verdict(gathered, conf.tickets)
     # 新規の親のブランチ名が既にあるブランチと同じか。warn なので答えは変えない。
@@ -227,7 +227,7 @@ def approve_yes(
     snapshot = core_base.read_fs(conf, root)
     verdict = core_base.judge_approval(snapshot, narrowed, shown_ids=wanted, shown_digest=digest)
     stderr.write(verdict.messages)
-    core_base._say_elsewhere(stderr, verdict.gathered)
+    core_base.say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
     if verdict.mismatch is not None:
         current = verdict.mismatch["current"]

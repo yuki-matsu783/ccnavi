@@ -1,6 +1,6 @@
 """チケットを引いて、動かしてよいかを検査する。`ops.py` の `start` / `finish` / `cancel` が使う。
 
-置き場を全部引いて 1 つに決める（`_find`）、取り込み済みの親子のチケットが決まらない・閉じて
+置き場を全部引いて 1 つに決める（`find`）、取り込み済みの親子のチケットが決まらない・閉じて
 いるときに止める（`family_stopped`）、子の着手の前（親の着手・先行）と終了の前（親を閉じられる・
 成果物が揃う）の検査。`close_problems` は `review ready` と Stop の促しも同じ条件で使う。
 ここは置き場を読むだけで動かさない。
@@ -95,7 +95,7 @@ def _undecided(
     )
 
 
-def _find(
+def find(
     stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> ticket_model.Ticket | None:
     """この識別子のチケットを、どの置き場に在っても 1 つ引く。`state` に置き場が入る。
@@ -150,7 +150,7 @@ def family_stopped(
     return False
 
 
-def _parent_not_started(
+def parent_not_started(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 9.6、REQ-TKT-48）。
@@ -198,7 +198,7 @@ def _parent_not_started(
     return False
 
 
-def _predecessors_unmet(
+def predecessors_unmet(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """子の先行が全部 `done/` に在って取り消しでないか。欠けていれば止めて言う。
@@ -235,7 +235,7 @@ def _predecessors_unmet(
     return True
 
 
-def _parent_still_busy(
+def parent_still_busy(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """親を閉じてよいか。開いている子やレビュー待ちのフェーズがある間は閉じさせない。
@@ -314,7 +314,7 @@ def close_problems(
     return problems
 
 
-def _deliverables_missing(
+def deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
     """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 9.8）。
