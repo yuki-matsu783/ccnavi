@@ -36,7 +36,7 @@
  * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
  *
  * **エージェントの下書き。** 置き場は実行ファイルに聞く（`tickets[].flow.draft`）。下書きが在り、中身が
- * いまのフローと違えば（`sameFlow` が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
+ * いまのフローと違えば（`sameFlowIgnoringLayout` が偽。位置とグループ化は見ない）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
  * 掛け、error なら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
  * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときのハッシュと同じときだけ消し
  * （`core/flow-write.ts` の `removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
@@ -51,7 +51,7 @@ import * as vscode from "vscode";
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runC1Target, runFlowLint } from "./ccnavi.js";
 import { PUSH_APPROVED_SCRIPT, pushApprovedCommand, scriptCommand, shellQuote, toPosixPath } from "./core/commands.js";
-import { sameFlow } from "./core/flow-diff.js";
+import { sameFlowIgnoringLayout } from "./core/flow-diff.js";
 import { flowMismatch, openMismatchText, saveMismatchText } from "./core/flow-match.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
@@ -343,7 +343,7 @@ function readOffer(root: string, target: FlowTarget, current: FlowDoc): FlowOffe
   const decoded = decodeFlowBytes(read.bytes);
   const value = decoded.ok ? parseFlowValue(decoded.text) : undefined;
   const doc = value?.ok === true ? asFlowDoc(value.value) : undefined;
-  if (doc !== undefined && sameFlow(doc, current)) {
+  if (doc !== undefined && sameFlowIgnoringLayout(doc, current)) {
     return undefined;
   }
   return { draftPath };
