@@ -660,6 +660,7 @@ class SetupTest(unittest.TestCase):
             "ccnavi-clean.sh",
             "ccnavi-clean.js",
             "ccnavi-branches.sh",
+            "ccnavi-start.sh",
         ):
             write(os.path.join(src, ".ccnavi", "scripts", name), f"# {name}\n")
         return src
