@@ -210,7 +210,7 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
 3. **`P` が無く、統合先の `done/` にも親が無い**: **決まらない → その親子のチケットの承認も状態の操作も止める**（3.6）。
    「統合先で未承認なら新規扱い」にすると、改版の制約（`approval.py:2270-2285`）を新規の承認として迂回できるため
 4. **開いた親子のチケットでも、統合先の `done/` は常に一緒に読む**。古い統合先から切った `P` で、識別子の再利用が新規として通らないようにするため
-5. **参照先の親子のチケットは閉包で集める**（D2）: 先行（`predecessor_pool`、`approval.py:688-694`）は `_loop_back`（`:725-745`）で多段を辿るので、
+5. **参照先の親子のチケットは閉包で集める**（D2）: 先行（`approval_ops.predecessor_pool`、`approval_ops.py:373-380`）は `_loop_back`（`:725-745`）で多段を辿るので、
    1 段の `P_X` だけでは Chrome と手元で答えが変わる。
    - 親子のチケットの引き方: 識別子 `X` が `_CHILD`（`ticket_ids.py:28-30`）に当たれば、その `parent` の組が親。当たらなければ `X` 自身が親。
      親の識別子に `-\d{2}$` を使わせない（3.1 の 6）ので、この引き方は一意に決まる。既存の親に当たる形が無いことは段階 0 の lint で確かめる
@@ -255,9 +255,9 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
 | `approval._authoritative`（`approval.py:272-296`） | 親のツリー → 元ツリー → 全部残す | 3.3。「全部残す」を廃止し、決まらないときは `Ticket.blocked` を付けて止める |
 | `approval._origin_is_current`（`:299-302`） | 元ツリーの採否 | 取り込み済みの親子のチケットでは使わず、統合先の `done/` は取り込み結果から常に読む |
 | `approval.home_dir`（`:313-347`） | 持っているツリー → 親 → 提案 → ワークスペースルート | 取り込み済みの親子のチケットは `P` のツリーだけ（無ければ書けない）。**それ以外は今のまま**（D11 と合わせる。origin の無い親子のチケットの「承認の後にワークツリーを作る」流れを止めない） |
-| `approval_ops.predecessor_pool`（`:688-694`） | 手元の全ツリー | 取り込み済みの親子のチケットは 3.3 の 5 の閉包から作る対応表（Chrome と同じ）。それ以外は今のまま |
+| `approval_ops.predecessor_pool`（`approval_ops.py:373-380`） | 手元の全ツリー | 取り込み済みの親子のチケットは 3.3 の 5 の閉包から作る対応表（Chrome と同じ）。それ以外は今のまま |
 | `ticket_fold.fold` / `behind` / `dedupe`（`ticket_fold.py:13-169`） | 同じ識別子を 1 つにまとめる | 残す（提案の重複をまとめる処理は別の用途） |
-| 全ツリーの走査（`_everything`） | 子の番号や先の計画を全ツリーから引く | 残す（`next_child_id` `approval.py:528`、`_last_phase_with_children` `:2404`、`diagnose.py:749`） |
+| 全ツリーの走査（`_everything`） | 子の番号や先の計画を全ツリーから引く | 残す（`next_child_id` `approval_ops.py:219`、`_last_phase_with_children` `:2404`、`diagnose.py:749`） |
 | `phasetypes.types_path`（`phasetypes.py:583-595`） | ワークスペース自身のレイヤーはワークスペースルートの作業ツリー、プロジェクトのレイヤーは `projects/<名前>` の作業ツリー（`tree.project_root`、`:591-594`）から読む | 手元は変えない（決定 B1。3.3 の 6）。統合先の取り込み結果のレイヤー・D28 の計算との違いは lint の warn。Chrome は統合先のレイヤーと D28 の計算を読む |
 | `ops_close._undecided` と ADR-0073 の文面 | 「1 つにしてから」 | 3.6 の案内 |
 | `ccnavi-git.sh` push の保護（`:531-563`） | 全ツリーを探して子を見分ける | 子の見分けは変えない。親子のチケットの取り込み状態が `gone` の `P` への push を拒否。push が通ったら取り込み状態を作る（4.3 の最初の push） |
@@ -498,7 +498,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 #### fsio の「この実行で書いたパス」の記録レイヤー
 
 「書いたパス」の一覧をコアの `Changes`（6.2）だけから取ると漏れます。コアの外で書いている箇所があるためです:
-`ops.start`・`finish`・`cancel`、`approval_ops.followup`（`approval.py:540-615`）、`configsync.apply`（`configsync.py:159`）、
+`ops.start`・`finish`・`cancel`、`approval_ops.followup`（`approval_ops.py:286-372`）、`configsync.apply`（`configsync.py:159`）、
 フローのハッシュ `flow.record_digest`（`flow.py:964-`）、リスクの記録 `phases/<親>/<子>.risk.json`（`approval.py:914`）。
 
 - `fsio` の書き込みの関数（`write_text`・`write_text_atomic`・`write_bytes`・`write_json_atomic`・`remove`、`fsio.py:143-293`）に、
@@ -736,13 +736,13 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 ### 6.1 今 I/O が混ざっている所（読んだもの）
 
 - 読み: `gather` が提案・承認済みチケット・閉じたもの・レビュー待ちを走査（`approval.py:1170-1178`）。`phase.phases_of` が中で `approval.scan` を 2 回呼ぶ（`phase.py:703-704`）。
-  `candidates` がレイヤーごとに `phase.load_types` でファイルを読む（`approval.py:1726-1730`）。`predecessor_pool`（`:688-694`。`scan(closed=True)` で `done/` を全部読む）、`accepted_threads`（`:943`）
-- 書き: `_apply`（`approval.py:1821-1895`）が `admit`（`:349-394`）、`revise_copy`、`phase.settle_last_review`、`settle_review`（`:504-525`）、
-  `carry_flow`（`:419-466`）、`clear_marks`、`history.note` を直接呼ぶ
+  `candidates` がレイヤーごとに `phase.load_types` でファイルを読む（`approval.py:1726-1730`）。`predecessor_pool`（`approval_ops.py:373-380`。`scan(closed=True)` で `done/` を全部読む）、`accepted_threads`（`:943`）
+- 書き: `_apply`（`approval.py:1821-1895`）が `admit`（`approval_ops.py:30-88`）、`revise_copy`、`phase.settle_last_review`、`settle_review`（`approval_ops.py:190-218`）、
+  `carry_flow`（`approval_ops.py:114-168`）、`clear_marks`、`history.note` を直接呼ぶ
 - コアの外の書き手: `ops.start`・`finish`・`cancel`、`approval_ops.followup`、`configsync.apply`、`flow.record_digest`、リスクの記録（4.3 の記録レイヤー）
 - レビュー済み: `review.confirm`（`review.py:368-446`）が `_moved_since_request`（`:1831-1868`）、`_matching`・`_unresolved`、`_settle_children`、`_mark` を順に呼ぶ
 - 時計: `fsio.stamp()`（`fsio.py:30-32`）と `history.stamp()`（`history.py:129`、`time.gmtime()` を直に呼ぶ）。どちらも Clock の差し替え点に移す
-- 出所: `admit` が `source_path` に提案の絶対パスを書く（`approval.py:360-364`）。D22 で相対パスに、`source_tree` はブランチ名にする（読む側は `diagnose.py:983` の表示だけ）
+- 出所: `admit` が `source_path` に提案の絶対パスを書く（`approval_ops.py:30-88`）。D22 で相対パスに、`source_tree` はブランチ名にする（読む側は `diagnose.py:983` の表示だけ）
 - 依存: `ticket.py` は `selfguard`・`hookio`・`ctxfile`・`rules` を import する（`ticket.py:72`）。コアに移すとき、hook の入出力を引き込まないよう依存を切り離す
 
 ### 6.2 境目
@@ -864,7 +864,7 @@ Chrome は ccnavi の .pyc を同梱するので、手元の ccnavi と版がず
 - **blob は sha で引き、IndexedDB に保存する**（sha が同じなら中身は同じなので、失効が要らない）。ボードを開くたびに読むのは tree だけになる
 - **まとめて取る**: GitHub は GraphQL の別名（`f1: object(expression: "P:path") { ... on Blob { text } }` を並べる）で、IndexedDB に無い blob を 1 回に最大 50 件ほど取る。
   GitLab は GraphQL の `repository { blobs(paths: [...], ref:) }` を使う見込みで、確度は中程度。段階 5 では確かめられなかったので、REST の `repository/blobs/:sha` を 1 件ずつ引いて IndexedDB に保存する（11.9）
-- **統合先の `done/`**: 今の `predecessor_pool` は `scan(closed=True)` で `done/` を全部読む（`approval.py:688-694`）。
+- **統合先の `done/`**: 今の `predecessor_pool` は `scan(closed=True)` で `done/` を全部読む（`approval_ops.py:373-380`）。
   MEMFS で今のコードを動かす間（段階 1〜2a）は `done/` の blob を全部取る。コアに移ってからは、判定が要るもの（閉包の先行、同じ識別子の検査で当たったもの）だけを取り、
   取らなかったものは `NOT_FETCHED`（6.2）にする
 
@@ -958,7 +958,7 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
 **条件**（すべて満たすときだけ出す。判定はコアの `withdraw`）:
 
 - 承認済みチケットが `P` の `doing/` にあり、**新規の承認**である（`ccnavi_approved` に `revised_at`・`feedback_at` が無い）。改版は `settle_review` などが走っていて戻せない
-- **followup で起こしたチケットではない**: `followup_of` を持つチケット、または `source_path` が空のチケット（`approval_ops.followup`、`approval.py:540-615` が作ったもの）は対象外
+- **followup で起こしたチケットではない**: `followup_of` を持つチケット、または `source_path` が空のチケット（`approval_ops.followup`、`approval_ops.py:286-372` が作ったもの）は対象外
 - **未着手**: `started_at` が空。着手は C1 で必ず `P` に送られている前提（対象外の親子のチケットは Chrome に見えない）
 - **子が無い**（親のチケットのとき）: その親を `parent:` に持つチケットが `doing/`・`review/`・`done/` に無く、**`todo/` にも子の提案が無く**、`phases/<親>/` にマーカーが無い
 - **`P` に `todo/<識別子>.md` が無い**（戻す先に別の提案がある間は出さない）
@@ -1074,7 +1074,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | 要件 | REQ-APV-11 | 補足（4.3 のそのほかの引用文）: C1 の push は未送信のコミットをすべて送る。置き場については、書いたパスと (b) 以外に未送信の変更があれば止める |
 | 要件 | REQ-APV-10・12、REQ-MLT-30 | 本物とする側の規則を書き直す。REQ-APV-14 に「push してから依頼」 |
 | 要件 | 新規 | 取り下げの条件（8.8）、マーカーの `actor`（8.9）、`P` が無いときの扱い（3.6）、C1 の対象・最初の push・戻し（4.3）、ユーザの判断の push（4.6）、統合先（3.3）、版ずれ（7.3） |
-| コード | `approval._authoritative` / `home_dir` / `_origin_is_current` / `predecessor_pool`、`ops_close._undecided` | 3.4 |
+| コード | `approval._authoritative` / `home_dir` / `_origin_is_current` / `approval_ops.predecessor_pool`、`ops_close._undecided` | 3.4 |
 | コード | `approval.gather` / `_apply` / `phase.phases_of`、`history.stamp` | 6 章のコアと差し替え点へ |
 | コード | `phase.types_path` とレイヤーの読み | 取り込み済みの親子のチケットは統合先の取り込み結果、プロジェクトのレイヤーは 3.3 の 6 |
 | コード | `fsio` と fsio を通らない書き込み | 記録レイヤー（4.3）。`approval.py` の `os.remove`・`os.rename`・`shutil.copy2`、`history.note`、`configsync._replace` を揃える |
