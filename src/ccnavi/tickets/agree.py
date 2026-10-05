@@ -116,7 +116,7 @@ def gather(
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
     # 本物とするツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
-    # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core._say_elsewhere` と
+    # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core_base._say_elsewhere` と
     # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
     open_index = approval_checks.by_id(approved)
     elsewhere = [
