@@ -25,6 +25,7 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
 from __future__ import annotations
 
 import ast
+import contextlib
 import importlib.util
 import io
 import json
@@ -559,6 +560,88 @@ class PlanWriterTest(CoreHarness):
         self.assertNotIn("から", out.split("へ移せない")[1].split("\n")[0])
         self.assertTrue(os.path.exists(flow))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
+
+
+@contextlib.contextmanager
+def durable_writes():
+    """一時ファイル→fsync→os.replace の書き方（`fsio._replace_durably`）を通ったパスを集める。
+
+    呼び出し側が素の書き方（`write_bytes`・`write_new`）に戻されると、ここに載らない。
+    """
+    seen: list[str] = []
+    real = fsio._replace_durably
+
+    def record(path, content):
+        seen.append(os.path.normcase(os.path.abspath(path)))
+        return real(path, content)
+
+    with mock.patch.object(fsio, "_replace_durably", record):
+        yield seen
+
+
+def _norm(path: str) -> str:
+    return os.path.normcase(os.path.abspath(path))
+
+
+class DurableWiringTest(CoreHarness):
+    """承認の書き込みが、途中を見せず fsync する書き方を通ること（呼び出し側の配線）。"""
+
+    def planned(self):
+        snapshot = self.snapshot()
+        with history.session(history.VIA_CHROME, None):
+            return core.plan(snapshot, core.judge_approval(snapshot))
+
+    def test_approval_writes_the_ticket_and_the_workflow_durably(self):
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        changes = self.planned()
+        with durable_writes() as seen:
+            applied, out, err = self.write_changes(changes)
+        self.assertEqual(applied.code, 0, out + err)
+        self.assertIn(_norm(os.path.join(self.approved, "doing", "i0001.md")), seen)
+        self.assertIn(_norm(os.path.join(self.approved, "phases", "i0001", "workflow.yml")), seen)
+
+    def test_a_carried_flow_is_written_durably(self):
+        self.family(plan=["design"])
+        todo = os.path.join(self.root, "wip", "proposals", "todo")
+        write(
+            os.path.join(todo, "i0001-01-01.md"),
+            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
+        )
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml"),
+            "version: 1\nsteps: []\n",
+        )
+        changes = self.planned()
+        with durable_writes() as seen:
+            applied, out, err = self.write_changes(changes)
+        self.assertEqual(applied.code, 0, out + err)
+        self.assertIn(_norm(os.path.join(self.approved, "flows", "i0001-01-01.yml")), seen)
+
+    def test_a_withdrawal_puts_the_proposal_back_durably(self):
+        text = parent_text("i0001", ["research"])
+        self.propose("i0001", text)
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
+        self.assertEqual(checked.problems, [])
+        with durable_writes() as seen:
+            applied, out, err = self.write_changes(checked.changes)
+        self.assertEqual(applied.code, 0, out + err)
+        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        self.assertIn(_norm(todo), seen)
+
+    def test_the_new_durable_op_does_not_overwrite_and_goes_durably(self):
+        target = os.path.join(self.root, "flows-test", "a.yml")
+        op = fsio.Op(fsio.OP_NEW_DURABLE, target, b"new")
+        with durable_writes() as seen:
+            self.assertEqual(core._write_op(op), "")
+        self.assertEqual(seen, [_norm(target)])
+        with durable_writes() as seen:
+            self.assertNotEqual(core._write_op(fsio.Op(fsio.OP_NEW_DURABLE, target, b"x")), "")
+        self.assertEqual(seen, [])
+        with open(target, "rb") as f:
+            self.assertEqual(f.read(), b"new")
 
 
 class WriterFailureTest(CoreHarness):
@@ -1454,8 +1537,10 @@ class WithdrawTest(CoreHarness):
         """書きかけで落ちて残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
         text = self.approved_parent()
         marks = os.path.join(self.approved, "phases", "i0001")
+        # 実際に残りうる名前。待ち方（write_bytes_atomic）と、受け入れた指摘の記録
+        # （write_json_atomic）の書きかけ。マーカーは一時ファイルを作らずに書く。
         write(os.path.join(marks, ".workflow.yml.abc12345.part"), "half")
-        write(os.path.join(marks, ".1.pending.abc12345.part"), "half")
+        write(os.path.join(marks, ".accepted.abc12345.part.json"), "half")
         problems = self.problems({"i0001": text.encode()})
         self.assertFalse(any("マーカー" in p for p in problems), problems)
         # 本物のマーカーが一緒に在れば、今までどおり止める。
