@@ -117,19 +117,23 @@ class SelfGuardTest(unittest.TestCase):
         session="s1",
         tool="Bash",
         bin="",
+        permission_mode="",
+        extra_env=None,
         **tool_input,
     ):
-        payload = json.dumps(
-            {
-                "hook_event_name": event,
-                "tool_name": tool,
-                "tool_input": tool_input or {"command": "ls"},
-                "session_id": session,
-            }
-        )
+        body = {
+            "hook_event_name": event,
+            "tool_name": tool,
+            "tool_input": tool_input or {"command": "ls"},
+            "session_id": session,
+        }
+        if permission_mode:
+            body["permission_mode"] = permission_mode
+        payload = json.dumps(body)
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         if bin:
             environment["CCNAVI_BIN_PATH"] = bin
+        environment.update(extra_env or {})
         return run_ccnavi(
             [
                 "--root",
@@ -820,6 +824,104 @@ class SelfGuardTest(unittest.TestCase):
         result = self.run_hook("PreToolUse", command=harmless)
         self.assertNotIn("REDIRECT_LIMIT_ASK", result.stdout)
         self.assertNotIn("deny", result.stdout)
+
+    def test_確認できないモードでは上限を超えると確認ではなく止める(self):
+        # ask は確認に答える者が居ないモードでは誰も答えないまま通る。保護を当てていないので、
+        # そこでは止める。確認できるモードでは確認に回す。
+        protected = (
+            "echo "
+            + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+            + '; echo x > .ccnavi/common/rules.yml; echo "'
+        )
+        unrelated = 'echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        expected = {
+            "default": ("ask", "REDIRECT_LIMIT_ASK"),
+            "acceptEdits": ("ask", "REDIRECT_LIMIT_ASK"),
+            "plan": ("ask", "REDIRECT_LIMIT_ASK"),
+            "dontAsk": ("deny", "DENY_REDIRECT_LIMIT"),
+            "bypassPermissions": ("deny", "DENY_REDIRECT_LIMIT"),
+        }
+        for mode, (decision, code) in expected.items():
+            for name, command in (("protected", protected), ("unrelated", unrelated)):
+                with self.subTest(mode=mode, command=name):
+                    self.assertTrue(shellread.read(command).degraded)
+                    result = self.run_hook("PreToolUse", permission_mode=mode, command=command)
+                    got, reason = self.verdict(result)
+                    self.assertEqual(got, decision)
+                    self.assertIn(f"[ccnavi] {code}", reason)
+                    if decision == "deny":
+                        self.assertIn(selfguard.REDIRECT_LIMIT_DENY_MESSAGE, reason)
+                        self.assertIn("確認ではなく止めました", reason)
+                    else:
+                        self.assertIn(selfguard.REDIRECT_LIMIT_MESSAGE, reason)
+                    self.assertEqual(self.records()[-1]["code"], code)
+
+    def test_確認できないモードでも上限を超えたルールの拒否はそのまま(self):
+        command = 'git push; echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        for mode in ("default", "bypassPermissions"):
+            with self.subTest(mode=mode):
+                got, reason = self.verdict(
+                    self.run_hook("PreToolUse", permission_mode=mode, command=command)
+                )
+                self.assertEqual(got, "deny")
+                self.assertIn("rule: push", reason)
+                self.assertNotIn("REDIRECT_LIMIT", reason)
+
+    def test_大なりは並びではなく文字の数で数える(self):
+        # `>>` も `2>&1` も、並びの数ではなく `>` の文字の数で足す。
+        over = [
+            'echo "' + " >>a" * 26,  # 文字は 52 個、並びは 26 個
+            'echo "' + " 2>&1" * 20 + " >>a" * 16,  # 文字は 52 個、並びは 36 個
+        ]
+        for command in over:
+            with self.subTest(command=command):
+                self.assertGreater(command.count(">"), selfguard.REDIRECT_LIMIT)
+                got, reason = self.verdict(self.run_hook("PreToolUse", command=command))
+                self.assertEqual(got, "ask")
+                self.assertIn("REDIRECT_LIMIT_ASK", reason)
+        under = 'echo "' + " >>a" * 25  # 文字は 50 個ちょうど
+        got, reason = self.verdict(self.run_hook("PreToolUse", command=under))
+        self.assertNotIn("REDIRECT_LIMIT", reason)
+
+    def test_PowerShell_の生の文字列にも上限を掛ける(self):
+        # PowerShell は読まずに生の文字列に当てる。チケットの置き場を守る 1 本が当たる。
+        command = 'Write-Output "' + ">" * (selfguard.REDIRECT_LIMIT + 1) + '"'
+        got, reason = self.verdict(self.run_hook("PreToolUse", tool="PowerShell", command=command))
+        self.assertEqual(got, "ask")
+        self.assertIn("REDIRECT_LIMIT_ASK", reason)
+
+    def test_上限で確認に上げても_allow_のルールは理由に並べない(self):
+        rules_data = json.loads(json.dumps(RULES))
+        rules_data["allow"][0]["match"] = "Bash|PowerShell|Read|Write|Edit"
+        write(self.rules, json.dumps(rules_data))
+        command = 'Write-Output "' + ">" * (selfguard.REDIRECT_LIMIT + 1) + '"'
+
+        got, reason = self.verdict(
+            self.run_hook(
+                "PreToolUse", tool="PowerShell", permission_mode="default", command=command
+            )
+        )
+
+        self.assertEqual(got, "ask")
+        self.assertIn("REDIRECT_LIMIT_ASK", reason)
+        self.assertNotIn("anything-else", reason)
+        self.assertNotIn("DENY_", reason)
+        self.assertEqual(self.records()[-1]["rules"], ["(redirect-limit)"])
+
+    def test_外す保護が当たらないなら上限を掛けない(self):
+        # 保護を切り、チケット制御も切ると、シェルから書き込む形の保護は 1 本も無い。
+        # 当てない保護が無いので、上限で確認に上げる理由も無い。
+        off = {"CCNAVI_TICKET_CONTROL": "disable"}
+        bash = 'echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        result = self.run_hook("PreToolUse", setting="disable", extra_env=off, command=bash)
+        self.assertNotIn("REDIRECT_LIMIT", result.stdout)
+        # 既定の組み込みに戻っても、その 1 本は Bash にしか当たらない。PowerShell には掛けない。
+        write(self.rules, "version: [broken")
+        power = 'Write-Output "' + ">" * (selfguard.REDIRECT_LIMIT + 1) + '"'
+        result = self.run_hook("PreToolUse", tool="PowerShell", extra_env=off, command=power)
+        self.assertNotIn("REDIRECT_LIMIT", result.stdout)
+        result = self.run_hook("PreToolUse", extra_env=off, command=bash)
+        self.assertIn("REDIRECT_LIMIT_ASK", result.stdout)
 
     def test_上限で外す保護の_id_は実際に足すルールの_id(self):
         # 名前が変わると上限が効かなくなり、2 乗の照合に戻る。
