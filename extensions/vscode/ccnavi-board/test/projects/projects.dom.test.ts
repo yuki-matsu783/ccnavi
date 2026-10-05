@@ -1,6 +1,6 @@
 /**
  * プロジェクト管理画面（React）を happy-dom で動かす。メニューの開閉、各ボタンの送り先、
- * カードに出る層の置き場と苦情、チケット制御が disable のときの入口。
+ * カードに出るレイヤーの置き場と苦情、チケット制御が disable のときの入口。
  *
  * 移す前は拡張ホストが組んだ HTML の文字列を正規表現で見ていた（CB-T113 / CB-T123 / CB-T133）。
  * 確かめている中身はそのままで、見る先を DOM に移してある。
@@ -153,7 +153,7 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
   }
 });
 
-test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠に出す", async () => {
+test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す", async () => {
   const dom = await openProjects([
     row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/rules.yml" }),
     row({ rulesExists: false }),
@@ -165,7 +165,7 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
     assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/rules.yml 共通の設定からコピー");
     assert.equal(dom.all(`${cardSelector("lib")} button[data-action="create-rules"][data-name="lib"]`).length, 1);
     assert.ok(dom.one<HTMLInputElement>(`${cardSelector("lib")} button[data-action="open-rules"]`).hasAttribute("disabled"));
-    // 予約名のプロジェクトは層が無いので、置く先も作るボタンも出さない
+    // 予約名のプロジェクトはレイヤーが無いので、置く先も作るボタンも出さない
     assert.match(rules("Self"), /設定の対象になっていません/);
     assert.equal(dom.all(`${cardSelector("Self")} button[data-action="create-rules"]`).length, 0);
 
@@ -230,7 +230,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     await dom.close();
   }
 
-  // 置き場の案内は層のルールの置き場から逆算する。ディレクトリを挟まない形や層でない行は既定
+  // 置き場の案内はレイヤーのルールの置き場から逆算する。ディレクトリを挟まない形やレイヤーでない行は既定
   const flat = await openProjects([
     row({ hasClaudeDir: true, rulesRel: "projects/lib/rules.yml" }),
     row({ name: "app", rel: "projects/app", hasClaudeDir: true, rulesRel: "projects/app/conf/ccnavi/rules.yml" }),

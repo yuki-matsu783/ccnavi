@@ -153,7 +153,7 @@ class Workspace(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
+        # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "decisions.jsonl")
@@ -391,7 +391,7 @@ class PreToolUseTable(Workspace):
                     self.assertEqual(rules[0], first_rule, rules)
 
                 if text_from == "ticket":
-                    # 判定を下したのが層を持たないチケットなら、層の欄は空。
+                    # 判定を下したのがレイヤーを持たないチケットなら、レイヤーの欄は空。
                     self.assertEqual(record.get("source", ""), "", record)
                     # 足す行は場面ごとに独立していて、重なれば（ルールを狭め、かつチケットの
                     # deny に当たった）両方載る。

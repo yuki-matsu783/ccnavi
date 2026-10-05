@@ -99,7 +99,7 @@ function main(argv) {
     console.error(
       "ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）は" +
         "どのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で" +
-        " .claude/worktrees/ の外へ出してください（HANDOVER.md の「ワークツリーが消せない」）。",
+        " .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。",
     );
     return 1;
   }

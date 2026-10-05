@@ -107,7 +107,7 @@ def prepare(
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # ユーザが読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
-    # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
+    # 着手のときに共通レイヤーでプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
     # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が上書きの記録に残す。
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     synced = configsync.pending(home, parent.ticket)

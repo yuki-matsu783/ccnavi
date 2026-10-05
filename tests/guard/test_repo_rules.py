@@ -147,7 +147,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertEqual(body["code"], "UNDECLARED")
 
     def test_引用だけの二重の山括弧は読めないまま止まる(self):
-        # 許容した誤検知（ccnavi.md 12.2、tests/guard/test_acceptance.py）。生の文字列に
+        # 許容した誤検知（設計 12.2、tests/guard/test_acceptance.py）。生の文字列に
         # heredoc が当たり、読めなかったことを名乗る。
         body = judge("Bash", 'grep -n "<<" README.md')
         self.assertEqual(body["verdict"], "deny")
@@ -362,8 +362,8 @@ class RunnerTest(LauncherJudgeTest):
                 with self.subTest(subject=subject):
                     self.assert_denied_by(subject, rule_id)
 
-    def test_env_越しの承認のスクリプトは途中の層で止まる(self):
-        # W1 の続き。`sh …approve.sh` は `env` を外した途中の層で、
+    def test_env_越しの承認のスクリプトは途中のレイヤーで止まる(self):
+        # W1 の続き。`sh …approve.sh` は `env` を外した途中のレイヤーで、
         # そこに承認の `script` の枝が当たる。
         self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL)
 

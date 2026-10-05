@@ -1,7 +1,7 @@
 """並行するチケット（REQ-TKT）の受入テスト。道具を外から呼んで応答だけを見る。
 
 本物の git リポジトリとワークツリーを一時ディレクトリに作る。親 1 本と子 2 本を
-フェーズ 1 つで通す（requirements.md の受け入れ条件 9）。
+フェーズ 1 つで通す（要件 受け入れ条件 9）。
 
 見るのは 7 つ。
 
@@ -162,7 +162,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
+        # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
@@ -920,7 +920,7 @@ class TicketTest(unittest.TestCase):
         """リモートに置く枝は親ブランチ 1 本で、送るのは親の仕事。
 
         ラッパースクリプトは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
-        cd して打てばラッパースクリプトは通す。素性で止める層を hook に持つ。
+        cd して打てばラッパースクリプトは通す。素性で止めるレイヤーを hook に持つ。
         """
         self.family()
         for command in (

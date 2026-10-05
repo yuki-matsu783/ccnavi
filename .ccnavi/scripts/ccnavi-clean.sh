@@ -226,7 +226,7 @@ $cw_targets
 EOF
 
 	if [ -n "$cw_failed" ]; then
-		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（HANDOVER.md の「ワークツリーが消せない」）。\n' >&2
+		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。\n' >&2
 		return 1
 	fi
 	return 0

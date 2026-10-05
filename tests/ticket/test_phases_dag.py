@@ -2,7 +2,7 @@
 
 見るのは 6 つ。
 
-1. 種類の `order` と `after` の読み方（循環、指す先、層の合わせ方）
+1. 種類の `order` と `after` の読み方（循環、指す先、レイヤーの合わせ方）
 2. `dag` では祖先でないフェーズを待たずに承認できる。一直線では待つ
 3. 待ち方は承認のときに親へコピーし、あとで phases.yml を直しても進行中の親には反映されない
 4. 計画が同じ改版で、直した phases.yml を進行中の親に反映できる
@@ -90,7 +90,8 @@ class TypesTest(unittest.TestCase):
         self.assertEqual(types.ancestors("design"), set())
 
     def test_dag_only_when_every_layer_says_so(self):
-        """ファイルを持つ層が全部 `dag` と書いたときだけ `dag`。プロジェクト 1 本で緩めない。"""
+        """ファイルを持つレイヤーが全部 `dag` と書いたときだけ `dag`。
+        プロジェクト 1 本で緩めない。"""
         common = types_of(SEQUENTIAL)
         layer = types_of(
             "version: 1\norder: dag\nphases:\n  extra: {title: 追加, after: [design]}\n",

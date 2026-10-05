@@ -129,7 +129,7 @@ def _blank(text: str, *patterns: re.Pattern) -> str:
 
 
 def prompt_context(conf: settings.Settings, root: str, text: str) -> str:
-    """依頼文に issue・MR の指定があれば、紐づくブランチを探してユーザに確かめる指示。無ければ空。
+    """依頼文に issue・MR の指定があれば、`ccnavi-start.sh` で着手させる指示。無ければ空。
 
     チケット制御が disable なら出さない（指示の中身が親の識別子と `branch:` の承認に寄るため）。
     """
@@ -138,25 +138,29 @@ def prompt_context(conf: settings.Settings, root: str, text: str) -> str:
     refs = prompt_refs(text)
     if not refs:
         return ""
-    sh = settings.script_command(root, "ccnavi-branches.sh")
+    sh = settings.script_command(root, "ccnavi-start.sh")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     labels = "・".join(r.label() for r in refs)
     lines = [
         f"[ccnavi] 依頼に {labels} の指定がある。"
-        "着手の前に、紐づくブランチが既にあるかを次で確かめる"
-        "（読むだけ。プロジェクトの issue・MR なら projects/<名前>/ に cd してから打つ）。"
+        "着手の前に、次を打つ。既存の候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る"
+        "（プロジェクトの issue・MR なら projects/<名前>/ に cd してから打つ）。"
     ]
     for r in refs:
         lines.append(f"- '{sh} --{r.kind} {r.number}'")
     lines += [
-        "候補が出たら、一覧をユーザに見せ、次のどれにするかを聞いて返事を待つ。",
+        "終了コード 0 なら、出たワークツリーのパスで作業を続ける。",
+        "終了コード 3（候補が複数）なら、何も作られていない。"
+        "一覧をユーザに見せ、次のどれにするかを聞いて返事を待つ。",
         "1. 既存のブランチで続ける（既存のチケットに結び付くならそのチケットで続ける。"
         "新しい親の提案なら branch: <ブランチ> を書き、承認の後に親のワークツリーで"
         f" '{git_sh} switch <ブランチ>' で移る。承認前の提案の branch: は使わない）",
         "2. 新しく <先頭の語>-<番号>-<slug> のブランチを切る",
         "3. やめる",
-        "候補が無ければ、そのまま進めてよい（「ホストは見ていない」と出たら、そのことをユーザへの報告に添える）。"
-        "このセッションで同じ番号を既に確かめてユーザの返事を得ていれば、繰り返さなくてよい。",
+        "終了コード 4（ホストに届かない）なら、"
+        "出力の案内どおり MCP で代行し、同じコマンドを打ち直す。",
+        "終了コード 1・2 なら、出力の理由をユーザに伝える。",
+        "このセッションで同じ番号を既に処理してユーザの返事を得ていれば、繰り返さなくてよい。",
     ]
     return "\n".join(lines)
 
@@ -247,7 +251,7 @@ def _clean(value, limit: int = 200) -> str:
 def read_host(path: str) -> Host:
     """sh が書いたホストの結果。無い・読めない・形が違うなら「見ていない」として理由を付ける。
 
-    形は ccnavi.md の 9.13 にある。
+    形は 設計 9.13 にある。
     """
     if not path:
         return Host(reason="ホストの結果が渡されていない（--result が無い）")

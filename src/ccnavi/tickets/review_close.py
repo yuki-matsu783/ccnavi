@@ -2,7 +2,7 @@
 
 `ready` は Draft を外す前に、閉じたチケットとその記録を `logs/archive/` へ退避する。標準出力の
 1 行目にコメントの下書きのパス、2 行目に `tree <退避したツリーのルート>` を出し、sh はその
-ツリーで未コミットの変更を確かめてから Draft を外す（ccnavi.md 9.10）。下書きのファイル名・
+ツリーで未コミットの変更を確かめてから Draft を外す（設計 9.10）。下書きのファイル名・
 目印・標準出力の形は sh との契約で、値と形を変えない。
 review から分けた。review を読む末端で、review からは読まれない。
 """
@@ -333,7 +333,7 @@ def close_early(
         return 1
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     left = _leftovers(home, parent, phases, result)
-    # 着手で共通層をコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
+    # 着手で共通レイヤーをコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
     # y で閉じたら見たものとして残す。見せないと、
     # 早めに閉じたあとの finish でもう 1 度端末を求めることになる。
     synced = configsync.pending(home, parent.ticket)

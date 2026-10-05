@@ -15,7 +15,7 @@ export interface Placement {
   /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの */
   readonly workspace_paths: readonly string[];
   readonly workspace_files: readonly string[];
-  /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層） */
+  /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトのレイヤー） */
   readonly project_paths: readonly string[];
 }
 
@@ -33,7 +33,7 @@ export interface Integration {
   readonly head: string;
 }
 
-/** プロジェクトのリポジトリのワークスペースの統合先の中身（共通層・自身の層・設定・互換のマーカー） */
+/** プロジェクトのリポジトリのワークスペースの統合先の中身（共通レイヤー・自身のレイヤー・設定・互換のマーカー） */
 export interface Workspace {
   readonly integration: Integration;
   readonly files: Record<string, string>;
