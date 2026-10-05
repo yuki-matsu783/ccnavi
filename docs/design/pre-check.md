@@ -209,7 +209,7 @@ subject: env rm -f .ccnavi/common/rules.yml
 - `deny` のコードは、当たったルールが全部層で当たったなら、縮退していても `DENY_COMMAND_PATTERN`。1 本でも元の形で当たり、
   縮退していれば `PARSE_UNCERTAIN`。ただし承認のルール（`builtin-guard-ticket-approval`）が当たった件に入っていれば、
   どこで当たったか・縮退しているかに依らず `DENY_TICKET_APPROVAL_CLI` を優先する（元の形が縮退していれば読めなかった
-  断りは付く）。`PARSE_UNCERTAIN` の件数で数える集計とはずれる。`ask` は `RULE_ASK` のまま
+  断りは付く）。`PARSE_UNCERTAIN` の件数で数える集計とはずれる。`ask` は `RULE_ASK` のまま。ただし生の文字列の `>` が上限（50 個）を超えて組み込みの保護を当てなかった回は、`ask` なら `REDIRECT_LIMIT_ASK`、確認できる者が居ないモードで止めたなら `DENY_REDIRECT_LIMIT`
 - 記録の欄 `unwrapped` には、当たった層だけを `\x00` でつないで残す（同じ層は 1 回）。元の形で当たったルールの分は空。
   サブエージェントの禁止は、元の形で当たらず層で当たったときにその層を残す。`--test --json` にも同じ欄が出る
 
@@ -275,6 +275,7 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 理由コードは `UNDECLARED`。ルールの `ask` に当たった呼び出し（`RULE_ASK`）は権限モードによらず確認に出す。判断できる相手が居る
 4 つのモードでは確認を上乗せしない。確認できる者が居ないモードで通さないのは、ask が「誰も答えないまま通る」に
 変わってしまうため。縮退した呼び出しは委ねない（6.3）。`CCNAVI_GUARD_UNWATCHED=disable` でも委ねない。
+生の文字列の `>` が上限を超えて組み込みの保護を当てなかった回（`REDIRECT_LIMIT_ASK`）も同じ理由で、`dontAsk` / `bypassPermissions` では確認ではなく止める（`DENY_REDIRECT_LIMIT`）。`CCNAVI_GUARD_UNWATCHED=disable` でも止める。
 
 端末からの試験（10 章）には `permission_mode` が来ないので、言及の無い呼び出しは `ask` として出る。
 
