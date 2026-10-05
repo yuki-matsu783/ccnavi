@@ -433,9 +433,10 @@ def decide_before(
     # 書き込む形の保護の照合が長さの 2 乗で遅くなる（selfguard_shell.REDIRECT_LIMIT）。
     # 期限を越えると判定に達せず、enable では block（終了コード 2）で止まるだけになり、
     # 何が起きたかも言えない。そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に
-    # 当てず、ほかの deny と ask のルールを当てたうえで、確認できる者が居るモードでは確認、
-    # 居ないモードでは拒否にする（cap_verdict）。照合を飛ばして通すと、上限の後ろに書いた
-    # 保護対象への書き込みが素通りする。deny に当たる形は今までどおり止まる。allow は当てない
+    # 当てず、ほかの deny と ask のルールを当てたうえで、権限モードに依らず拒否にし、理由と
+    # 書き直し方を返す。期限切れの block と同じく止める側に置き、確認には回さない。照合を
+    # 飛ばして通すと、上限の後ろに書いた保護対象への書き込みが素通りする。ルールの deny に
+    # 当たる形は、そのルールの deny のまま返す。allow は当てない
     # （保護を当てていないので、通す根拠にならない）。中で実行されるコマンドと `cd` の行き先は
     # 読み解けた形なので、保護もそのまま当てる。
     # 外す保護がこのツールに当たらないなら（既定の組み込みの 1 本は Bash だけ）、上限も掛けない。
@@ -489,10 +490,11 @@ def decide_before(
         if group:
             verdict = name
             break
-    # 保護を当てなかったぶん、deny でなければ確認（確認できないモードでは拒否）に上げる。
+    # 保護を当てなかったぶん、ルールの deny に当たっていなければ拒否に上げる。権限モードでも
+    # CCNAVI_GUARD_UNWATCHED でも分けない（保護の照合を終えていないので、委ねる先が無い）。
     capped = capped and verdict != rules.DENY
     if capped:
-        verdict = cap_verdict(payload.permission_mode)
+        verdict = rules.DENY
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
@@ -577,13 +579,10 @@ def decide_before(
     # どちらの文面を返すかは、判定を決めた側で分ける。ルールが当たっていても、
     # チケットが強かった回はチケットの文面になる（ticket_reason があるのはその回だけ）。
     if verdict == rules.DENY and capped:
-        # `>` の上限で、確認できる者が居ないモードなので止めた。当たった ask のルールがあれば、
-        # その文も後ろに並べる。
+        # `>` の上限で止めた。当たった ask のルールがあれば、その文も後ろに並べる。
         texts = [
             reasons.builtin_refusal(
-                reasons.CODE_REDIRECT_LIMIT_DENY,
-                subject,
-                selfguard_shell.REDIRECT_LIMIT_DENY_MESSAGE,
+                reasons.CODE_REDIRECT_LIMIT_DENY, subject, selfguard_shell.REDIRECT_LIMIT_MESSAGE
             ),
             *(
                 reasons.reason_for(
@@ -622,16 +621,6 @@ def decide_before(
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
         record.code = reasons.CODE_RULE_ASK
-        if capped:
-            # 確認にしたのは `>` の上限。当たった ask のルールがあれば、その文も後ろに並べる。
-            texts.insert(
-                0,
-                reasons.builtin_refusal(
-                    reasons.CODE_REDIRECT_LIMIT, subject, selfguard_shell.REDIRECT_LIMIT_MESSAGE
-                ),
-            )
-            record.code = reasons.CODE_REDIRECT_LIMIT
-            record.rules = [reasons.REDIRECT_LIMIT_RULE, *record.rules]
     elif verdict == rules.ASK:
         # チケットが ask と書いた場所。ユーザが 1 度見る場所として宣言されている。
         # ルールは何も言わないか、allow に当たっている。
@@ -1049,19 +1038,6 @@ def ticket_verdict(
         notice,
         "",
     )
-
-
-def cap_verdict(permission_mode: str) -> str:
-    """`>` の上限で保護を当てなかった呼び出しを、権限モードごとにどう扱うか。
-
-    確認できる者が居るモード（空・不明を含む）では確認にする。居ないモード（dontAsk /
-    bypassPermissions）では止める。ask を返すと「誰も答えないまま通る」になり、保護対象への
-    書き込みが緩むので（REQ-PRE-08）。保護の照合を終えていない呼び出しなので、
-    CCNAVI_GUARD_UNWATCHED を disable にしていても委ねない。
-    """
-    if permission_mode in PERMISSION_NO_JUDGE:
-        return rules.DENY
-    return rules.ASK
 
 
 def undeclared_verdict(permission_mode: str, degraded: str, guard_unwatched: str = "") -> str:

@@ -58,9 +58,8 @@ CODE_TICKET_SCOPE = "DENY_TICKET_SCOPE"
 CODE_TICKET_ASK = "TICKET_ASK"
 
 # 生の文字列の `>` が上限（selfguard_shell.REDIRECT_LIMIT）を超え、シェルから書き込む形の保護を
-# 当てずに確認へ回した（ASK）か、確認できる者が居ないモードなので止めた（DENY）。ルールに
-# 当たったのではないので、記録のルール名は括弧付きの REDIRECT_LIMIT_RULE にする。
-CODE_REDIRECT_LIMIT = "REDIRECT_LIMIT_ASK"
+# 当てられなかったので止めた。権限モードに依らず止め、確認には回さない。ルールに当たったのでは
+# ないので、記録のルール名は括弧付きの REDIRECT_LIMIT_RULE にする。
 CODE_REDIRECT_LIMIT_DENY = "DENY_REDIRECT_LIMIT"
 REDIRECT_LIMIT_RULE = "(redirect-limit)"
 
