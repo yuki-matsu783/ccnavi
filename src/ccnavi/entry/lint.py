@@ -58,7 +58,6 @@ from ..tickets import (
     flow_shape,
     flow_text,
     history,
-    phasetypes,
     risk,
     syncstate,
     ticket_model,
@@ -346,7 +345,10 @@ def check(
     problems.extend(lint_project._project_settings(root))
     problems.extend(_sh_compat(root))
     problems.extend(lint_project._after(root))
-    problems.extend(lint_rules._rules(conf.rules, root))
+    if os.path.exists(conf.rules) or _named_rules(conf, root):
+        # 共通レイヤーのルールが無いのは「設定が無い」正常（無い = 空）。壊れているときだけ言う。
+        # 診断の `--rules` で名指しされたファイルが無いのは、置き場が空なのとは別なので言う。
+        problems.extend(lint_rules._rules(conf.rules, root))
     problems.extend(_phases(conf))
     problems.extend(_risk(conf, root))
     problems.extend(lint_ticket._ticket(conf, root))
@@ -361,6 +363,14 @@ def check(
     problems.extend(lint_project._local_settings(root))
     problems.extend(lint_layers._sync(conf, root))
     return problems
+
+
+def _named_rules(conf: settings.Settings, root: str) -> bool:
+    """共通レイヤーのルールの置き場が、既定の場所ではなくフラグ（`--rules`）で名指しされたものか。"""
+    default = os.path.join(root, settings.DEFAULT_RULES)
+    return os.path.normcase(os.path.abspath(conf.rules)) != os.path.normcase(
+        os.path.abspath(default)
+    )
 
 
 # sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
@@ -493,11 +503,22 @@ def flow_problems(
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
-    """フェーズ定義が読めるか。無いのは不備ではない（番号だけの挙動）。"""
-    if not conf.phases:
+    """共通レイヤーに `phases.yml` が置かれていないか（設計 11.4.1）。
+
+    フェーズ定義は config の 1 本だけで、共通レイヤーには置けない。あれば error で名指しする。
+    判定には使わず、空として扱っている。無いのは正常で、何も言わない。
+    各レイヤーの `phases.yml` が読めるかは `lint_layers._layer_configs` が見る。
+    """
+    if not conf.phases or not os.path.exists(conf.phases):
         return []
-    _, notes = phasetypes.load(conf.phases)
-    return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
+    return [
+        Problem(
+            SEVERITY_ERROR,
+            "(phases)",
+            f"{conf.phases} は共通レイヤーには置けない。判定に使わず、空として扱っている。"
+            "フェーズ定義は、使うレイヤーの .ccnavi/config/phases.yml に置いてください",
+        )
+    ]
 
 
 def family_check(
@@ -551,8 +572,6 @@ def family_check(
     where = f"(sync/{st.repo}/{family})"
     if st.imported and st.stop and not st.closed:
         problems.append(Problem(SEVERITY_ERROR, where, st.stop))
-    if st.imported and not st.stop and st.repo != syncstate.SELF and st.home is not None:
-        problems.extend(lint_layers._projected_layer_problems(conf, st, where))
     return problems
 
 

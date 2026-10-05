@@ -11,7 +11,6 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （ユーザが端末で打つ。chat のフェーズのレビュー済み）
-#   sh .ccnavi/scripts/ccnavi-review.sh config-synced <親>    （ユーザが端末で打つ。着手で上書きした設定を見た）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
@@ -48,7 +47,7 @@
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
-# ユーザの判断（chat・config-synced・close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
+# ユーザの判断（chat・close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
 # 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る。
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、承認の push の打ち直しを案内する。
 # それ以外は今のまま。
@@ -60,7 +59,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|chat|config-synced|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|chat|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>]
 
   request      --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
@@ -75,7 +74,6 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   ready                                           閉じられ、wip を片付けて push 済みなら、閉じたチケットを logs/archive/ へ退避して削除を push し、Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
   close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で打つ）。残りを issue に書き出す。Draft は親が ready で外す
   chat         <N>                                chat で見るフェーズをユーザがこのセッションで見終えた（ユーザが端末で打つ。ccnavi --reviewed <N> --chat）
-  config-synced <親>                              着手で上書きした設定をユーザが端末で見た（ユーザが端末で打つ。ccnavi --config-synced <親>）
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
   merged                                          いまのブランチのマージリクエストがマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
@@ -103,13 +101,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | confirm | comment | decide | ready | close-early | chat | config-synced | fetch | origin | merged) ;;
+request | confirm | comment | decide | ready | close-early | chat | fetch | origin | merged) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / chat / config-synced / fetch / origin / merged です。" 2
+	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / chat / fetch / origin / merged です。" 2
 	;;
 esac
 
@@ -168,10 +166,10 @@ exe_knows() {
 }
 
 # ---- リモート。origin の URL でホストを見分ける。
-# ユーザの判断の入口（chat・config-synced）はホストに触らないので、origin も道具も要らない。
+# ユーザの判断の入口（chat）はホストに触らないので、origin も道具も要らない。
 needs_host=yes
 case "$sub" in
-chat | config-synced) needs_host=no ;;
+chat) needs_host=no ;;
 esac
 if [ "$needs_host" = yes ]; then
 	origin=$(git remote get-url origin 2>/dev/null || :)
@@ -1080,14 +1078,5 @@ chat)
 	[ "$#" -eq 1 ] || fail chat-bad-args "chat は <N> だけを取る。" 2
 	ccnavi --reviewed "$n" --chat || exit $?
 	carry_human "$family" || exit 1
-	;;
-config-synced)
-	# ユーザが端末で打つ。着手で上書きした設定を見たと残す（ccnavi --config-synced <親>）。
-	# 取り込み済みの親子のチケットなら、置いた後に承認の push で送る。
-	parent="${1:-}"
-	ccnavi_is_ident "$parent" || fail config-synced-no-parent "config-synced には <親>（親の識別子）が要る。" 2
-	[ "$#" -eq 1 ] || fail config-synced-bad-args "config-synced は <親> だけを取る。" 2
-	ccnavi --config-synced "$parent" || exit $?
-	carry_human "$parent" || exit 1
 	;;
 esac

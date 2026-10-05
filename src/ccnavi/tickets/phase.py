@@ -267,7 +267,6 @@ class Phase:
 # レイヤーごとの定義の読み込みは phasetypes に置く
 # （approval も読むため。approval は phase を読めない）。
 types_path = phasetypes.types_path
-common_types = phasetypes.common_types
 layer_types = phasetypes.layer_types
 load_types = phasetypes.load_types
 

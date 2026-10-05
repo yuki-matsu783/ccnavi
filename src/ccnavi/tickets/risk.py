@@ -547,15 +547,21 @@ def layer_definition(
     共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
     言うと同じ文を 2 度読むことになる。共通レイヤーが壊れていれば組み込みに戻り、
     そのときはレイヤーを足さない（設計 11.2）。
+
+    ファイルが無いのは正常（無い = 空）。共通レイヤーにも config にも `risks.yml` が無ければ
+    組み込みの 4 項目を使う。共通レイヤーだけが無く config が在れば、共通レイヤーは空として
+    config の項目だけを数える。
     """
-    definition, _ = load(conf.risk)
-    mark_layer(definition, settings.LAYER_COMMON, root)
-    if definition.fallback:
-        return definition, []
     home = tree.project_root(conf.projects, project) if project else root
     layer = project or settings.LAYER_SELF
     path = definition_path(conf, root, project)
-    if not path or not os.path.exists(path):
+    layer_present = bool(path) and os.path.exists(path)
+    if layer_present and not (conf.risk and os.path.exists(conf.risk)):
+        definition = Definition(source=conf.risk or BUILTIN)
+    else:
+        definition, _ = load(conf.risk)
+    mark_layer(definition, settings.LAYER_COMMON, root)
+    if definition.fallback or not layer_present:
         return definition, []
     extra, notes = load_layer(path, (settings.layer_script_home(conf),))
     if extra is None:

@@ -20,7 +20,6 @@ from . import (
     approval,
     approval_marks,
     approval_ops,
-    configsync,
     history,
     phase,
     phasetypes,
@@ -662,11 +661,6 @@ def _reviewed_in_chat(
     if approval_marks.MARK_REVIEWED in ph.marks:
         stdout.write(f"OK: フェーズ {ph.number} はすでにレビュー済み\n")
         return 0
-    synced = configsync.pending(
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
-    )
-    if synced:
-        stdout.write(configsync.notice(synced))
     stdout.write(f"フェーズ {ph.label}（親 {parent.ticket}）の子:\n")
     for t in ph.tickets:
         stdout.write(f"  - {t.ticket} {t.title}\n")
@@ -702,8 +696,6 @@ def _reviewed_in_chat(
         data,
     ):
         return 1
-    if synced:
-        review._note_synced(stderr, conf, root, parent.ticket, phasetypes.REVIEW_CHAT, None)
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
     # 残した指摘があれば、続きの子を起こす。ホストから取得した結果が無いので、指摘はユーザが打つ。
     stdout.write(

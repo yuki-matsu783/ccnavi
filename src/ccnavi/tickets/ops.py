@@ -132,56 +132,35 @@ def _sync_config(
     found: ticket_model.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """親の着手の前に、共通レイヤーでプロジェクトのレイヤーを上書きする（設計 11.12）。
+    """親の着手の前に、共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする（設計 11.12）。
 
-    返すのは着手の出力に足す行。コピーできなければ None（着手しない）。子は親のブランチに
-    乗るので比べない。ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので比べない。
+    返すのは着手の出力に足す行。ミラーできなければ None（着手しない）。子は親のブランチに
+    乗るので配らない。ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので配らない。
+    プロジェクトの `.ccnavi/config/` には触れない。
     """
     if found.is_child or not found.project:
         return []
-    copied, why = configsync.plan(conf, root, worktree)
+    changes, why = configsync.plan(conf, root, worktree)
     if why:
-        stderr.write(f"ccnavi: {found.ticket} の設定を共通レイヤーからコピーできない: {why}\n")
+        stderr.write(f"ccnavi: {found.ticket} の共通レイヤーをミラーできない: {why}\n")
         return None
-    if not copied:
+    if not changes:
         return []
-    busy, why = configsync.dirty(worktree, copied)
-    if why or busy:
-        stderr.write(
-            f"ccnavi: {found.ticket} の設定を共通レイヤーからコピーできない: "
-            + (
-                why
-                or f"未コミットの変更がある（{', '.join(busy)}）。"
-                "ユーザの書きかけを上書きしないよう、ここで止める"
-            )
-            + "\n"
-        )
-        return None
-    where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
-    failed = configsync.apply(where, found.ticket, copied)
+    failed = configsync.apply(changes, configsync.mirror_dir(conf, worktree))
     if failed:
-        stderr.write(f"ccnavi: {found.ticket} の設定を共通レイヤーからコピーできない: {failed}\n")
+        stderr.write(f"ccnavi: {found.ticket} の共通レイヤーをミラーできない: {failed}\n")
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
-        f"共通レイヤーとプロジェクト {found.project} の設定が違っていたので、"
-        "共通レイヤーで上書きした。"
-        "最初のレビューで知らせる（レビューが無ければ、親を閉じる前にユーザが端末で見る）:"
+        f"共通レイヤーとプロジェクト {found.project} のミラー（.ccnavi/common/）が違っていたので、"
+        "共通レイヤーの中身に揃えた（プロジェクトの .ccnavi/config/ には触れていない）:"
     ]
-    for c in copied:
-        line = f"  - {c.rel}（{'上書き' if c.existed else '新しく置いた'}）"
-        if c.lost:
-            line += "。消えた識別子: " + ", ".join(c.lost)
-        if c.changed:
-            line += "。中身が変わった識別子: " + ", ".join(c.changed)
-        if c.unparsed:
-            line += "。上書き前を読めなかった"
-        lines.append(line)
-    mark = approval_marks.parent_mark_path(where, found.ticket, configsync.MARK)
+    for c in changes:
+        state = "消した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
+        lines.append(f"  - {c.rel}（{state}）")
     lines.append(
-        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
-        f" '{git_sh} add' してコミットしてください。"
-        f"上書きの記録 {mark} も、それを持つツリーでコミットしてください"
+        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in changes)} を"
+        f" '{git_sh} add' してコミットしてください"
     )
     return lines
 

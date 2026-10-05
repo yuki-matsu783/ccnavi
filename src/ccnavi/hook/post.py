@@ -313,9 +313,7 @@ def _committed_findings(
         # 着手がコピーした分かどうかは、コミットされた中身で答える。ディスクで答えると、
         # 好きな中身でコミットしてからディスクだけ共通レイヤーの中身へ戻す形が、呼び出しごとの
         # チェック・バックアップと復元・ここの 3 つから同時に外れる。
-        judged = (
-            functools.partial(_committed_synced, synced, top, base, changes) if synced else None
-        )
+        judged = functools.partial(_committed_synced, synced, top, changes) if synced else None
         for finding in post_findings._findings(
             changes, w.rule_set, mine, w.source, scope, w.tree, synced=judged
         ):
@@ -329,25 +327,21 @@ def _committed_findings(
 def _committed_synced(
     synced: Callable[..., bool],
     top: str,
-    base: str,
     changes: list[gitstate.Change],
     full: str,
 ) -> bool:
     """コミットされた中身で `synced` に答えさせる。読めなければ外さない。
 
-    変更後は HEAD、変更前はターンの始まりの版の中身。どちらもバイト列のまま読む。文字列で
-    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、コピーした分でも食い違う。
+    変更後は HEAD の中身（無ければ消えたこと）。バイト列のまま読む。文字列で
+    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、ミラーした分でも食い違う。
     """
     path = next((c.path for c in changes if c.full == full), "")
     if not path:
         return False
     now, readable = gitcmd.blob(top, "HEAD", path)
-    if not readable or now is None:
-        return False
-    prior, readable = gitcmd.blob(top, base, path)
     if not readable:
         return False
-    return synced(os.path.join(top, path.replace("/", os.sep)), now, prior)
+    return synced(os.path.join(top, path.replace("/", os.sep)), now)
 
 
 def at_stop(

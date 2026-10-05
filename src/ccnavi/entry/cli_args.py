@@ -165,7 +165,6 @@ _NOT_WITH_DOCS = (
     "--agree",
     "--reviewed",
     "--close-early",
-    "--config-synced",
     "--yes",
     "--preview",
     "--verify",

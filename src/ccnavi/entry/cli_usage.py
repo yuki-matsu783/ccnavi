@@ -221,10 +221,4 @@ A human closes a parent early ("good enough for now") with
 
 which runs `ccnavi --close-early --reason <why> --result <json>` and then
 un-drafts the merge request and files the leftovers as a new issue.
-
-When starting a project parent overwrote the project's .ccnavi/ with the common
-layer, the first review shows it. A parent that closes without any review stops
-until a human has seen it at the terminal with
-
-    ccnavi --config-synced <parent>
 """

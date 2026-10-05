@@ -161,8 +161,6 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # ユーザが端末で打つ、親を早めに閉じる操作。`--agree` / `--reviewed` と同じく、
     # ユーザの判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
-    # ユーザが端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 11.12）。
-    parser.add_argument("--config-synced", default="")
     parser.add_argument("-h", "--help", action="store_true")
     # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
     parser.add_argument("--version", action="store_true")
@@ -171,7 +169,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--record-writes", default="")
     # 一覧の基点（C1 の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error
-    # （例外は `start` の中で configsync が写したプロジェクトのレイヤーだけ）。
+    # （例外は `start` の中で configsync が写したミラーだけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
     # 何も置かない（state の置き場の
@@ -320,8 +318,8 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
 
     C1 がコミットするのは状態だけ。
 
-    例外は 1 つだけ。`ticket start` の中で configsync がコピーしたプロジェクトのレイヤーと、
-    指す先を直した配点のスクリプト（`configsync.is_synced_write` が内容で読めるもの）。
+    例外は 1 つだけ。`ticket start` の中で configsync がミラーしたプロジェクトの
+    `.ccnavi/common/`（`configsync.is_synced_write` が内容で読めるもの）。
     """
     conf, _ = settings.load(root)
     cli_args._override(conf, args)
@@ -573,19 +571,6 @@ def _parsed(
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
-    # 着手で上書きした設定を、ユーザが端末で見たと残す。
-    #
-    # レビューの代わりなので、ユーザの判断と同じ扱いにする。
-    if args.config_synced:
-        if not conf.tickets_enabled:
-            stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
-            return EXIT_ERROR
-        if not cli_args._from_terminal(stdin, conf, stderr, "--config-synced"):
-            return EXIT_ERROR
-        history.set_via(history.VIA_TERMINAL)
-        code = configsync.acknowledge(stdin, stdout, stderr, conf, root, args.config_synced)
-        return EXIT_OK if code == 0 else EXIT_ERROR
-
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR

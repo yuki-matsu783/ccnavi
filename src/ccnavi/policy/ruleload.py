@@ -1,14 +1,17 @@
 """この呼び出しに当てるルール集合を決める。
 
-共通レイヤーに、そのツリーのレイヤーを足したものが答えになる（設計 11.4）。足すだけで、
-後ろのレイヤーが前のレイヤーを上書きしたり取り消したりすることはない。共通レイヤーが読めなければ
-組み込みの既定に戻り、戻ったことを記録に残す。判定そのものはここに無い。
+組み込みの deny を土台に、共通レイヤーを足し、そのツリーのレイヤーを足したものが答えになる
+（設計 11.4）。足すだけで、後ろのレイヤーが前のレイヤーを上書きしたり取り消したりすることは
+ない。組み込みの deny（取り返しの付かない操作の止め）は、共通レイヤーと config の有無・状態に
+よらず常に当たる。判定そのものはここに無い。
 
 ## レイヤーは 3 種
 
 - 共通レイヤー: `.ccnavi/common/rules.yml`。どのツリーにも当てはまる。
-  置き場は固定で、env では動かない
+  置き場は固定で、env では動かない。プロジェクトを単体で clone したときは、そのプロジェクトの
+  `.ccnavi/common/`（ミラー）がこれになる。ワークスペースの中では、プロジェクトのミラーは読まない
 - 自身のレイヤー: ワークスペースルートの `.ccnavi/config/rules.yml`
+  （単体 clone では、そのプロジェクトの `.ccnavi/config/rules.yml`）
 - プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/rules.yml`
 
 自身のレイヤーとプロジェクトのレイヤーの置き場も固定で、env では動かない。
@@ -23,10 +26,11 @@
 
 ## 無いレイヤーと壊れたレイヤー
 
-ファイルが無いレイヤーは空。不備ではないので、記録にも `--lint` にも出さない。壊れている
-レイヤーも空として扱うが、そちらは記録の `fallback` にレイヤーの名前を残し、`--lint` が error で
-言う。組み込みの既定には戻さない。共通レイヤーが在るのに組み込みへ戻すと、共通レイヤーの
-deny が消える側になる。共通レイヤー自身が読めないときだけ、今までどおり組み込みに戻り、
+ファイルが無いレイヤー（共通レイヤーを含む）は空。不備ではないので、記録にも `--lint` にも出さない。
+共通レイヤーと config が両方無ければ、組み込みの既定（`Read` を通す allow を含む）だけで判定する。
+壊れているレイヤーも空として扱うが、そちらは記録の `fallback` にレイヤーの名前を残し、`--lint` が
+error で言う。組み込みの既定には戻さない。共通レイヤーが在るのに組み込みへ戻すと、共通レイヤーの
+deny が消える側になる。共通レイヤー自身が読めないときだけ、今までどおり組み込みの既定に戻り、
 そのときレイヤーは足さない（REQ-PRE-06）。
 """
 
@@ -63,33 +67,78 @@ class Layer:
     path: str
 
 
-def load_rules(
+def read_common(
     stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str
-) -> tuple[rules.RuleSet, str]:
-    """共通レイヤーのルール集合と、それがどこから来たかを返す。
+) -> rules.RuleSet:
+    """共通レイヤーのルールファイルだけを読む。組み込みの deny の土台は足さない。
 
+    ファイルが無いのは「設定が無い」正常で、空として扱う（記録の `fallback` に残さない）。
     読めなければ組み込みの既定に戻る。「設定が読めない」は「判断できない」
     ではなく「設定が壊れている」。拒否にすると、壊れたファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
     ファイルを置く前に hook を登録しただけでセッションの呼び出しが全部止まる（REQ-PRE-06）。
     既定は設定を丸ごと受け取る。守る場所のパスは設定で動くので（builtin.rule_data）。
+    """
+    rules_path = conf.rules
+    if not os.path.exists(rules_path):
+        rule_set, problems = rules.RuleSet(version=rules.VERSION), []
+    else:
+        try:
+            rule_set, problems = rules.load(rules_path, root)
+        except (OSError, ValueError) as exc:
+            stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
+            rule_set, problems = builtin.load(root, conf)
+            record.fallback = builtin.FALLBACK
+            record.detail = rules_path
+    for problem in problems:
+        stderr.write(f"ccnavi: {problem}\n")
+    mark_source(rule_set, LAYER_COMMON)
+    return rule_set
+
+
+def load_rules(
+    stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str
+) -> tuple[rules.RuleSet, str]:
+    """共通レイヤーのルール集合（組み込みの deny の土台つき）と、それがどこから来たかを返す。
+
+    組み込みの deny は共通レイヤーの有無・状態によらず常に足す（設計 11.2）。共通レイヤーが
+    読めずに組み込みの既定へ戻ったときは、既定が同じ deny を持つので足さない。
 
     出所は、いま当てているルールがどこから来たか。既定を使っているなら
     読めなかったファイルではない。そのファイルを出所として出すと、見に行ったユーザが
     当たったルールを見つけられない。
     """
-    rules_path = conf.rules
-    try:
-        rule_set, problems = rules.load(rules_path, root)
-    except (OSError, ValueError) as exc:
-        stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
-        rule_set, problems = builtin.load(root, conf)
-        record.fallback = builtin.FALLBACK
-        record.detail = rules_path
+    rule_set = read_common(stderr, conf, record, root)
+    if record.fallback != builtin.FALLBACK:
+        add_base(rule_set, stderr)
+    return rule_set, builtin.SOURCE if record.fallback else conf.rules
+
+
+def add_base(rule_set: rules.RuleSet, stderr: TextIO | None = None) -> None:
+    """組み込みの deny（土台）を足す。共通レイヤーのルールの後ろ、レイヤーより前に並ぶ。"""
+    base, problems = builtin.load_base()
     for problem in problems:
-        stderr.write(f"ccnavi: {problem}\n")
-    mark_source(rule_set, LAYER_COMMON)
-    return rule_set, builtin.SOURCE if record.fallback else rules_path
+        if stderr is not None:
+            stderr.write(f"ccnavi: {problem}\n")
+    mark_source(base, LAYER_COMMON)
+    rule_set.deny.extend(base.deny)
+
+
+def bare(conf: settings.Settings, record: audit.Record, chosen: list[Layer]) -> bool:
+    """共通レイヤーも足すレイヤーも、ルールのファイルが 1 本も無いか（組み込みの既定だけの形）。
+
+    共通レイヤーが壊れているとき（`fallback`）は、既に組み込みの既定を使っているので当てはまらない。
+    """
+    if record.fallback == builtin.FALLBACK:
+        return False
+    return not os.path.exists(conf.rules) and not any(os.path.exists(c.path) for c in chosen)
+
+
+def add_read_allow(rule_set: rules.RuleSet) -> None:
+    """組み込みの既定の「`Read` を通す」allow を足す。`bare` のときだけ呼ぶ。"""
+    allow = builtin.read_allow()
+    mark_source(rules.RuleSet(version=rules.VERSION, allow=allow), LAYER_COMMON)
+    rule_set.allow.extend(allow)
 
 
 # 行き先のレイヤーで判定するツール。subject に解決済みのパスが入っている（judge.subject_of）。
@@ -179,11 +228,13 @@ def rules_for(
         # 何が判定に使われているのかをユーザが読めない。
         return rule_set, source, target
 
-    if payload.tool_name in PATH_TOOLS:
-        add_layers(stderr, rule_set, layer_for(conf, root, target), root, record)
-        return rule_set, source, target
-    add_layers(stderr, rule_set, layers(conf, root), root, record)
-    return rule_set, source, None
+    by_path = payload.tool_name in PATH_TOOLS
+    chosen = layer_for(conf, root, target) if by_path else layers(conf, root)
+    add_layers(stderr, rule_set, chosen, root, record)
+    if bare(conf, record, chosen):
+        # 共通レイヤーも config も無い。組み込みの既定だけで判定する（`Read` を通す allow も含む）。
+        add_read_allow(rule_set)
+    return rule_set, source, target
 
 
 def add_layers(
@@ -286,10 +337,12 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     `merge_rules` の 1 本にまとめてある。
     """
     record = audit.Record()
-    common, _ = load_rules(stderr, conf, record, root)
+    common = read_common(stderr, conf, record, root)
     views = [LayerView(LAYER_COMMON, conf.rules, common)]
     if record.fallback == builtin.FALLBACK:
         views[0].unreadable = record.detail or conf.rules
+    elif not os.path.exists(conf.rules):
+        views[0].missing = True
     merged = rules.RuleSet(version=common.version)
     for name in rules.SECTIONS:
         merged.section(name).extend(common.section(name))
@@ -315,6 +368,37 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
         for section in rules.SECTIONS:
             view.rule_set.section(section).extend(merged.section(section)[before[section] :])
     return views
+
+
+def sum_view(stderr: TextIO, conf: settings.Settings, root: str, layer: Layer) -> LayerView:
+    """共通レイヤーに 1 つのレイヤーを足した和を、判定と同じ読み方で読む。診断用。
+
+    `survey` は全レイヤーを順に重ねる（先のレイヤーと全欄が同じ定義は後ろを捨てる）ので、
+    後ろのプロジェクトの欄は、他のレイヤーの定義に引かれて欠ける。
+    ここは「共通 + そのレイヤー」だけで重ね、パスを持つツールの判定と同じ和を返す。
+    返す `rule_set` は共通レイヤーを含む和で、組み込みの deny の土台は含まない。
+    """
+    record = audit.Record()
+    common = read_common(stderr, conf, record, root)
+    merged = rules.RuleSet(version=common.version)
+    for name in rules.SECTIONS:
+        merged.section(name).extend(common.section(name))
+    view = LayerView(layer.name, layer.path, merged)
+    if record.fallback == builtin.FALLBACK:
+        view.unreadable = record.detail or conf.rules
+        return view
+    if not os.path.exists(layer.path):
+        view.missing = True
+        return view
+    try:
+        extra, notes = rules.load(layer.path, root)
+    except (OSError, ValueError) as exc:
+        view.unreadable = str(exc)
+        return view
+    view.problems.extend(notes)
+    prefix_ids(extra, layer.name)
+    view.problems.extend(merge_rules(merged, extra, layer.name))
+    return view
 
 
 def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
@@ -354,6 +438,18 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
             found.append(
                 settings.LayerFile(origin, name, kind, settings.layer_real_path(conf, home, kind))
             )
+        if origin == settings.ORIGIN_PROJECT:
+            # 共通レイヤーのミラー。ワークスペースの中では判定に読まないが、書き換えられたら
+            # 戻す（設計 11.6）。
+            for kind in settings.LAYER_KINDS:
+                found.append(
+                    settings.LayerFile(
+                        settings.ORIGIN_MIRROR,
+                        name,
+                        kind,
+                        settings.mirror_real_path(conf, home, kind),
+                    )
+                )
     return found
 
 

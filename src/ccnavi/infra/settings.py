@@ -206,6 +206,8 @@ def bin_command(bin_path: str) -> str:
 
 # ccnavi ディレクトリの下の固定のパス。レイヤーはこの形でしか置けない。
 LAYER_CONFIG_DIR = "config"
+# 共通レイヤーとそのミラーの置き場（ccnavi ディレクトリからの相対）。
+COMMON_DIR = "common"
 # レイヤーが持てる設定。3 本は独立に無くてよい。
 KIND_RULES = "rules"
 KIND_PHASES = "phases"
@@ -224,6 +226,8 @@ RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
 # 予約名のプロジェクトのバックアップの key につける前置き。名札の側（`rules:self`）と
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
+# ミラーのバックアップの key につける前置き（`rules:mirror/lib`）。
+MIRROR_KEY_HOME = "mirror/"
 
 # レイヤーの種別。そのレイヤーがどこから来たかを、名札の表記とは別に持つ（設計 11.4）。
 #
@@ -234,6 +238,9 @@ PROJECT_KEY_HOME = "projects/"
 ORIGIN_COMMON = "common-layer"
 ORIGIN_SELF = "self-layer"
 ORIGIN_PROJECT = "project-layer"
+# プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー。設計 11.12）。ワークスペースの中では
+# 判定に読まれないが、守る対象には入る。
+ORIGIN_MIRROR = "mirror-layer"
 
 
 class LayerFile(NamedTuple):
@@ -278,11 +285,13 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
 
 
 def layer_script_home(conf: Settings) -> str:
-    """各レイヤーの `script:` に書ける唯一のパス（設計 11.4.2）。
+    """自身のレイヤーとプロジェクトのレイヤーの `script:` に書ける唯一のパス（設計 11.4.2）。
 
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
+    解く基準はそのレイヤーの git プロジェクトルート。
 
-    共通レイヤーだけは `.ccnavi/common/scripts/`（risk.SCRIPT_HOMES）。
+    共通レイヤー（と単体 clone でそれになるミラー）だけは `.ccnavi/common/scripts/`
+    （risk.SCRIPT_HOMES。解く基準は、そのとき共通レイヤーを持つルート）。
     たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
     """
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
@@ -496,6 +505,12 @@ def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
     """レイヤーの設定ファイルが本来ある場所。差し替えを見ない。"""
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
     return os.path.join(home_root, home, LAYER_CONFIG_DIR, LAYER_FILE_NAMES[kind])
+
+
+def mirror_real_path(conf: Settings, home_root: str, kind: str) -> str:
+    """プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー）の設定ファイルの場所。"""
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    return os.path.join(home_root, home, COMMON_DIR, LAYER_FILE_NAMES[kind])
 
 
 def _layer_name(home_root: str) -> str:

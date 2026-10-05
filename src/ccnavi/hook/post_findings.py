@@ -216,9 +216,8 @@ def _findings(
             continue
         if change.full in script:
             continue
-        # 着手のときに共通レイヤーでプロジェクトのレイヤーを上書きした分
-        # （`configsync.is_synced_write`）。
-        # 内容と上書きの記録で見分け、読めないものは外さない。渡すのは解く前のパス。
+        # 着手のときに共通レイヤーをミラーした分（`configsync.is_synced_write`）。
+        # 置き場・パスの途中のリンク・内容で見分け、読めないものは外さない。渡すのは解く前のパス。
         # 解いた先で答えると、設定を別のコピーへのシンボリックリンクに差し替えた形が、
         # 指す先の中身で外れる。
         if synced is not None and synced(_spelled(change, top or tree_root)):

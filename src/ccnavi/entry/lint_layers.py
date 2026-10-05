@@ -13,7 +13,7 @@ from typing import TextIO
 from ..infra import fsio, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import approval, archive, configsync, phase, risk, syncstate, ticket_model
+from ..tickets import approval, archive, phase, risk, syncstate, ticket_model
 from ..tickets import ticket as ticket_mod
 from . import lint_rules
 
@@ -124,6 +124,10 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
         for rel in _files_under(os.path.join(work.root, home)):
             if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
                 continue
+            if work.project and rel.startswith(f"{settings.COMMON_DIR}/"):
+                # プロジェクトのワークツリーの `.ccnavi/common/` は、親の着手がミラーした
+                # 共通レイヤー（設計 11.12）。ワークスペースの中では読まれないので、言わない。
+                continue
             where = os.path.normcase(
                 os.path.normpath(os.path.join(work.root, home, rel.replace("/", os.sep)))
             )
@@ -152,7 +156,6 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
       片付いていれば何も言わない（削除せずに残す取り込み状態）
     - 統合先の取り込み結果が壊れている・無い・読めない: error（識別子の再利用を確かめられない）
     - 作業ツリーのレイヤーと統合先の取り込み結果のレイヤーが違う: warn
-    - `P` の上のプロジェクトのレイヤーが、統合先から計算したレイヤーと違う: warn
 
     親のワークツリーの外にしか無いチケット（移行の検査）は、チケットの `blocked` として
     `_copy_problems` が error で言う。取り込み状態の無い親子のチケットには、
@@ -173,8 +176,6 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
                 problems.append(Problem(SEVERITY_INFO, where, f"{st.stop}。{hint}"))
         elif st.stop:
             problems.append(Problem(SEVERITY_ERROR, where, f"{st.stop}。{hint}"))
-        elif st.repo != syncstate.SELF and st.home is not None:
-            problems.extend(_projected_layer_problems(conf, st, where))
     for repo in syncstate.repos(conf.state):
         integ = fams.integration(repo)
         if integ is None:
@@ -316,51 +317,6 @@ def _layer_drift(
                 f"作業ツリーの {rel} が統合先（{integ.branch or '?'}）の取り込み結果と違う"
                 f"（{how}）。"
                 "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない",
-            )
-        )
-    return problems
-
-
-def _projected_layer_problems(
-    conf: settings.Settings, st: syncstate.Standing, where: str
-) -> list[Problem]:
-    """`P` の上のプロジェクトのレイヤーが、統合先から計算したレイヤーと違うか。
-
-    Chrome の判定は `P` の上のレイヤーを読まず、この計算したレイヤーを使う
-    （`P` の上でレイヤーを書き換えて承認やレビューを不要にできないように）。
-
-    計算したレイヤーは「プロジェクトの統合先のレイヤー（取り込み結果）に、
-    ワークスペースの統合先の共通レイヤー（取り込み結果）を
-    `configsync.projected` でコピーしたもの」。着手のときの configsync と同じく、共通レイヤーにある
-    ファイルだけをコピーし、無いファイルはプロジェクトの側を残す。
-    """
-    selfinteg = syncstate.integration(conf.state, syncstate.SELF)
-    projinteg = syncstate.integration(conf.state, st.repo)
-    if selfinteg is None or projinteg is None or selfinteg.broken or projinteg.broken:
-        return []
-    home_rel = fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
-    problems: list[Problem] = []
-    for kind, rel in _layer_files(conf, home_rel):
-        common, why = selfinteg.file(_common_rel(kind))
-        if why:
-            continue
-        if common is not None:
-            expected: bytes | None = configsync.projected(conf, kind, common)
-        else:
-            expected, why = projinteg.file(rel)
-            if why:
-                continue
-        actual = _read_plain(os.path.join(st.home.root, *rel.split("/")))
-        if _same_text(actual, expected):
-            continue
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                where,
-                f"親のブランチ {st.family} の上のプロジェクトのレイヤー（{rel}）が、"
-                "統合先のレイヤーと共通レイヤーから計算したレイヤーと違う。"
-                "判定は親のブランチの上のレイヤーを読まない。"
-                "統合先で直すか、着手のときにもう一度コピーしてください",
             )
         )
     return problems

@@ -350,6 +350,11 @@ class Rule:
     # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。指摘するのは
     # --lint の仕事で、そのために書かれた値をそのまま持つ。書いていなければ None。
     every_written: object = None
+    # base は、共通レイヤーと config の有無・状態によらず常に当たる組み込みの deny（土台）で
+    # あること（`builtin.load_base`）。同じ呼び出しがレイヤーの deny にも当たったときは、そちらを
+    # 文面と記録に載せ、土台は載せない（同じ拒否を 2 度言わない。拒否は変わらない。
+    # `judge.decide_before`）。
+    base: bool = False
     # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""

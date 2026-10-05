@@ -147,6 +147,8 @@ def _layer_key(origin: str, layer: str, kind: str) -> str:
     """
     if origin == settings.ORIGIN_COMMON:
         return kind
+    if origin == settings.ORIGIN_MIRROR:
+        return f"{kind}:{settings.MIRROR_KEY_HOME}{layer}"
     if origin == settings.ORIGIN_PROJECT and settings.is_reserved_layer_name(layer):
         return f"{kind}:{settings.PROJECT_KEY_HOME}{layer}"
     return f"{kind}:{layer}"
@@ -163,7 +165,7 @@ def _layer_home(root: str, projects_dir: str, origin: str, layer: str) -> str:
     名前を引けないものはワークスペースルートとして扱う。そこから切ったワークツリーに
     ワークツリー側の設定が無ければ対象から落ちるだけで、別の場所を保護に行くことにはならない。
     """
-    if origin != settings.ORIGIN_PROJECT:
+    if origin not in (settings.ORIGIN_PROJECT, settings.ORIGIN_MIRROR):
         return root
     return tree.project_root(projects_dir, layer) or root
 

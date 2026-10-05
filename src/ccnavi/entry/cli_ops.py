@@ -174,7 +174,7 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
     行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の親子のチケットでは sh が
     `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
     C1 を通っていない。
-    ユーザの判断の操作（`--reviewed --chat`・`--config-synced`・`--close-early`）と、
+    ユーザの判断の操作（`--reviewed --chat`・`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
     """
     if args.record_tree:
