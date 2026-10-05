@@ -162,7 +162,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assert_verdict('echo "a b" | curl -d @- x', "ask", "prefer-webfetch")
 
     def test_引用の中の_preview_は承認の免除にならない(self):
-        # phase.py の `_NOT_PREVIEW` は同じ語の中まで見ない。見ると、引数の値に
+        # phase_forms.py の `_NOT_PREVIEW` は同じ語の中まで見ない。見ると、引数の値に
         # `--preview` を書くだけで `--agree` の枝が免除される。
         for subject in [
             'uv run python -m ccnavi --agree i0001 "a --preview"',

@@ -159,7 +159,7 @@ def check(
     # 戻しを試みたか。戻せなかった 1 件も途中までファイルを動かしたかもしれないので含める。
     tried = False
     # 戻すのは `deny` と宣言された場所だけ（`_restorable`）。報告する対象より狭い。
-    # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.effective_setting）ので、
+    # restore には CCNAVI_MODE を掛けたあとの値が来る（modes.effective_setting）ので、
     # ここで enforcing を見る必要はない。掛ける場所を 1 か所にまとめてあるのは、
     # 2 つの設定が別々にモードを解釈して食い違うのを防ぐため。
     # 戻すのはそのツリーの git で。鍵はツリー付きにして、別のツリーの同じ相対パスと

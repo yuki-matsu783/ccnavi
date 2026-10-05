@@ -64,7 +64,7 @@ class Record:
 
     mode: str = ""
     # permission_mode は、呼び出しが来たときの Claude Code の権限モード。
-    # ルールが言及しない呼び出しの結末がこれで変わる（cli.undeclared_verdict）
+    # ルールが言及しない呼び出しの結末がこれで変わる（judge.undeclared_verdict）
     # ので、残さないと
     # 同じ subject に別の結末が並ぶ理由を、記録だけでは説明できなくなる。
     permission_mode: str = ""

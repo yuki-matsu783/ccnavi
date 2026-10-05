@@ -49,7 +49,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 承認済みの置き場をコミットすることについての今の事実も書いておく。`ccnavi-git.sh` は承認済みの置き場への
 `add`・`commit` を止めていない（止めているのは置き場を過去の中身に戻す `restore --source` などだけ）。
-エージェントに止めているのは `ccnavi-push-approved.sh` などのスクリプトの文字列で（`tickets/phase.py` 362〜380 行付近の
+エージェントに止めているのは `ccnavi-push-approved.sh` などのスクリプトの文字列で（`tickets/phase_forms.py` 329 行付近の
 `ticket_approval_rule`。組み込みの deny）、置き場をコミットした差分は、ターンの報告で違反に数えない（`hook/post.py` 294 行付近）。
 **この ADR はそこを変えない。** 別の件として扱う。
 

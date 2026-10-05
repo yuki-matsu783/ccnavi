@@ -99,7 +99,7 @@ def _preexisting(finding: post_findings.Finding) -> str:
 def _source(source: str, group: list[rules.Rule]) -> str:
     """どの設定がこの場所を守ると言っているかを名指しする。
 
-    実行前の理由（cli.reason_for）と同じで、名乗るのはルールの id。プロジェクトの
+    実行前の理由（reasons.reason_for）と同じで、名乗るのはルールの id。プロジェクトの
     ルールの id にはプロジェクトの名前が付くので、id だけで直しに行く先が決まる。
     id を持たないルールだけ、代わりにファイルを名乗る。
     """

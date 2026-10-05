@@ -38,7 +38,8 @@ CODE_RULE_ASK = "RULE_ASK"
 # 断った回の両方に付く。どちらだったかは記録の decision 側が持つ。
 CODE_UNDECLARED = "UNDECLARED"
 
-# 実行後チェックが出すコードは post.py にある。あちらは判定ではなく、
+# 実行後チェックが出すコードは post_findings.py（CODE_VIOLATION・CODE_TICKET_SCOPE）と
+# post_report.py（CODE_PREEXISTING）にある。あちらは判定ではなく、
 # すでに起きたことの報告なので、同じ表に混ぜていない。
 # 読み切れないコマンドの根拠は、宣言された禁止に当たったことではなく、
 # 対象を確定できなかったこと。こちらは権限モードに委ねない。読めなかった
@@ -399,7 +400,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     レビューの sh のパスがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
     ユーザがどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
     フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の書き方が
-    承認のときの検査（`agree.py`）、後工程の進め方が承認済みチケットが置かれたとき
+    承認のときの検査（`agree_candidates.py`）、後工程の進め方が承認済みチケットが置かれたとき
     （`agree_screen.approved_text`）。
 
     dry-run の注記は「止まらない」だけで終えない。止まらないことだけを伝えると、通った

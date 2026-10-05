@@ -404,7 +404,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
 
     def test_モードが予行なら戻しの宣言によらず予行として言う(self):
-        # CCNAVI_MODE=dry-run は戻しの側も予行に落とす（cli.effective_setting）。
+        # CCNAVI_MODE=dry-run は戻しの側も予行に落とす（modes.effective_setting）。
         self.run_hook(mode="dry-run", command="ls")
         self.dirty()
 

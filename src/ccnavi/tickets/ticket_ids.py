@@ -87,8 +87,8 @@ def id_problem(text: str) -> str:
 def is_valid_id(text: str) -> bool:
     """識別子として読めるか（`id_problem` が空か）。区切り文字と先頭の `.` を持たない。
 
-    チケットの識別子でファイル名を組む側（history.py）や、sh から渡る引数を受ける側（cli.py）が、
-    自分でも同じ検査を当てるために使う。
+    チケットの識別子でファイル名を組む側（history.py）や、sh から渡る引数を受ける側
+    （cli_args.py・cli_ops.py）が、自分でも同じ検査を当てるために使う。
     """
     return not id_problem(text)
 

@@ -93,8 +93,8 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
 `--project-home` はシンボリックリンクも要らない。フラグ 1 本で層が消え、**ユーザのレビューを
 飛ばして閉じられる。**
 
-- `cli.py` は `diagnosing` を `_override` より前で決め、`_drop_outside_diagnosis` が
-  5 本を「渡されなかった」値に戻す。渡されたかどうかの読み方は `_override` と揃える
+- `cli.py` は `diagnosing` を `cli_args._override` より前で決め、`cli_args._drop_outside_diagnosis` が
+  5 本を「渡されなかった」値に戻す。渡されたかどうかの読み方は `cli_args._override` と揃える
   （`--rules ""` は指定と数えず、`--risk ""` は数える）
 - テストのハーネスは 3 本をフラグで渡すのをやめ、`--root` の下の既定の置き場
   （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。パスは `tests.common_path` が
@@ -164,7 +164,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
   外れるので、ユーザが手で打ち直すときに引っかかることがある。文面が「1 度しか渡せない」と
   言うので、そこで気付ける
 - **閉じたのは層の置き場だけ。** `--approved` / `--tickets` / `--state` / `--log` は今も
-  `_override` が診断かどうかに関わらず上書きする。実測では採点も種類の判定も
+  `cli_args._override` が診断かどうかに関わらず上書きする。実測では採点も種類の判定も
   差し替えられなかったが（`--approved` はチケットが見つからず、`--state` / `--log` は
   点が変わらない）、`--tickets` はレビュー待ちのチケットを別の置き場へ動かせる。
   「sh が `"$@"` をそのまま渡す」という原因も残っている。これらを同じ制限の対象にすると
