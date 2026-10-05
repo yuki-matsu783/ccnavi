@@ -719,6 +719,10 @@ class SelfGuardTest(unittest.TestCase):
             'echo "1>2" .ccnavi/common/rules.yml',
             'grep -n "regex: (>" .ccnavi/common/rules.yml',
             'echo x > "a b" .ccnavi/scripts/count.sh',
+            # 行き先の語は目印で終わらない。引用の中の空白のあとに保護対象の名前が続いても、
+            # 行き先は `a .ccnavi` という別のディレクトリの下で、保護対象ではない。
+            'echo x > "a .ccnavi/scripts/count.sh"',
+            'echo x > "a .claude/settings.json"',
         ]:
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -926,6 +930,45 @@ class SelfGuardTest(unittest.TestCase):
         self.assertNotIn("REDIRECT_LIMIT", result.stdout)
         result = self.run_hook("PreToolUse", extra_env=off, command=bash)
         self.assertIn("DENY_REDIRECT_LIMIT", result.stdout)
+
+    def test_上限で止めた回の記録は組み込みの拒否と同じく出所を持たない(self):
+        # ask のルールにも当たった回。判定を決めたのは上限なので、ask のルールのレイヤーを残さない。
+        rules_data = json.loads(json.dumps(RULES))
+        rules_data["ask"] = [
+            {"id": "askme", "match": "Bash", "regex": "askme", "message": "ask the user."}
+        ]
+        write(self.rules, json.dumps(rules_data))
+        self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+        builtin_deny = self.records()[-1]
+        self.assertEqual(builtin_deny["rules"], ["builtin-guard-setting-files"])
+
+        command = 'askme; echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+        result = self.run_hook("PreToolUse", command=command)
+
+        self.assert_limit_denied(result, command)
+        record = self.records()[-1]
+        self.assertEqual(record["rules"], ["(redirect-limit)", "askme"])
+        self.assertEqual(record.get("source", ""), builtin_deny.get("source", ""))
+        self.assertEqual(record.get("source", ""), "")
+
+    def test_上限を超えても中で実行されるコマンドには保護を当てる(self):
+        # `grep -n "<<"` で縮退させる。この縮退は読みを止めても実行役の中身（レイヤー）を作るので、
+        # 生の文字列の経路に入りつつ、`sudo` が実行する `tee` がレイヤーに出る。上限で外すのは
+        # 生の文字列への照合だけで、レイヤーには保護をそのまま当てる。
+        command = 'grep -n "<<" f; sudo tee .ccnavi/common/rules.yml </dev/null; echo' + " >a" * (
+            selfguard_shell.REDIRECT_LIMIT + 1
+        )
+        reading = shellread.read(command)
+        self.assertTrue(reading.degraded)
+        self.assertIn("tee .ccnavi/common/rules.yml", reading.unwrapped)
+        self.assertGreater(command.count(">"), selfguard_shell.REDIRECT_LIMIT)
+
+        decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
+
+        self.assertEqual(decision, "deny")
+        self.assertIn("builtin-guard-setting-files", reason)
+        self.assertNotIn("REDIRECT_LIMIT", reason)
+        self.assertEqual(self.records()[-1]["rules"], ["builtin-guard-setting-files"])
 
     def test_上限で外す保護の_id_は実際に足すルールの_id(self):
         # 名前が変わると上限が効かなくなり、2 乗の照合に戻る。
