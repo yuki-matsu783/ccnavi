@@ -19,7 +19,7 @@ src/
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付け（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
   prompt-handover.ts  Claude Code に文を渡す 2 つの経路（コピー / 新しいセッションで開く）。ボードとフロー編集画面が使う（vscode に依存する）
-  projects-panel.ts   プロジェクト管理画面の Webview パネル。clone / fetch / pull の送信、.gitignore とルールの雛形の書き込み（vscode に依存する）
+  projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信（vscode に依存する。ファイルは書かない）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / --agree --yes … --json / --suggest --json の実行（Node の子プロセス）
@@ -56,9 +56,10 @@ src/
     flow-history.ts   フロー編集の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
-    tour-sample.ts    案内の間だけ出す見本（ボードのカード、プロジェクトの行）。チケットやプロジェクトがまだ無いワークスペースで、案内が指す先を作る
+    tour-sample.ts    案内の間だけ出す見本（ボードのカード）。チケットがまだ無いワークスペースで、案内が指す先を作る
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
-    projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone / fetch / pull の行、プロジェクトになっていない .git の探索、.gitignore と雛形の加工、画面の中身の組み立て
+    targets.ts        ルール管理とフェーズ管理が切り替える設定の対象（共通・ワークスペース・プロジェクト）の一覧と、欄の値
+    projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone の行、プロジェクトになっていない .git の探索、.gitignore の行の有無、画面の中身の組み立て
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
@@ -73,7 +74,8 @@ src/
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
     appearance.ts     見た目の切り替え（body のクラスの付け替え）。5 画面で 1 本
-    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。5 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。5 画面で同じ位置）で出る
+    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。4 画面（ボード・ルール管理・リスク管理・フェーズ管理）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。4 画面で同じ位置）で出る
+    TargetSelect.tsx  ルール管理とフェーズ管理の、設定の対象を切り替える欄
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
     styles/page.css   5 画面で共通の骨組み（本文・ツールバー・帯・欄・脚注）。button.css と appearance.css を @import する
     styles/button.css 5 画面で同じボタン（button.action）
@@ -94,12 +96,10 @@ src/
     projects/style.css   プロジェクト管理画面の CSS の入口
     projects/App.css     App.tsx の CSS（節・clone の欄・一覧の入れ物）
     projects/Project.css Project.tsx の CSS（カード 1 枚・バッジ・検証）
-    projects/Menu.css    Menu.tsx の CSS（行末のメニュー）
     projects/post.ts  プロジェクト管理の送り口。契約に無いものは型で止まる
     projects/main.tsx プロジェクト管理画面の入口。埋め込みの JSON を読んでマウントする
-    projects/App.tsx  ツールバー・帯・clone の欄・一覧・認識されない git・ワークスペース（プロジェクト外）と、拡張ホストからのメッセージの受け
-    projects/Project.tsx カード 1 枚（名前・バッジ・項目・検証・行末のメニュー）
-    projects/Menu.tsx 行末のメニュー（開いているのは画面ぜんたいで 1 つだけ）
+    projects/App.tsx  ツールバー（更新）・帯・clone の欄・一覧・認識されない git・ワークスペース（プロジェクト外）と、拡張ホストからのメッセージの受け
+    projects/Project.tsx カード 1 枚（名前・バッジ・項目・検証）
     projects/state.ts 画面が覚えるもの（clone の欄）の読み書き
     projects/text.ts  カードに出す言葉（プロジェクトの設定の場所、重ねない苦情）
     risk/style.css    リスク管理画面の CSS の入口
