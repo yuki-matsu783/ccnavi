@@ -159,6 +159,7 @@ def prompt_context(conf: settings.Settings, root: str, text: str) -> str:
         "3. やめる",
         "終了コード 4（ホストに届かない）なら、"
         "出力の案内どおり MCP で代行し、同じコマンドを打ち直す。",
+        "終了コード 1・2 なら、出力の理由をユーザに伝える。",
         "このセッションで同じ番号を既に処理してユーザの返事を得ていれば、繰り返さなくてよい。",
     ]
     return "\n".join(lines)
