@@ -10,7 +10,7 @@ import { KNOWN_TOOLS, type Sections } from "../../src/core/rules-view.js";
 import type { RuleHitJson, TestJson } from "../../src/core/testmodel.js";
 import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
 import type { DomPage } from "../helpers/dom.js";
-import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 直前に送った保存の中身 */
 function savedSections(dom: DomPage): Sections {
@@ -642,5 +642,34 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
     assert.equal(dom.all(".tour").length, 0, "ユーザが始めていない案内が出直した");
   } finally {
     await dom.close();
+  }
+});
+
+test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけなら出さない", async () => {
+  const targets = [
+    { kind: "workspace", name: "", label: "共通の設定" },
+    { kind: "self", name: "", label: "ワークスペース" },
+    { kind: "project", name: "app:x", label: "プロジェクト app:x" },
+  ];
+  const dom = await openRules({ target: { kind: "workspace", name: "" }, targets });
+  try {
+    const select = dom.one<HTMLSelectElement>("select#target");
+    assert.deepEqual(
+      [...select.options].map((o) => o.textContent),
+      ["共通の設定", "ワークスペース", "プロジェクト app:x"],
+    );
+    assert.equal(select.value, "workspace:");
+    dom.change(select, "project:app:x");
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "project", name: "app:x" }]);
+  } finally {
+    await dom.close();
+  }
+
+  const single = await openRules({ target: { kind: "workspace", name: "" }, targets: targets.slice(0, 1) });
+  try {
+    assert.equal(single.all("select#target").length, 0);
+  } finally {
+    await single.close();
   }
 });

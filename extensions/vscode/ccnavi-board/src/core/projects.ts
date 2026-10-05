@@ -129,14 +129,6 @@ export function cloneCommand(root: string, projectsDir: string, url: string, nam
   return `cd ${shellQuote(toPosixPath(root))} && git clone -- ${shellQuote(url)} ${shellQuote(target)}`;
 }
 
-export function fetchCommand(projectRoot: string): string {
-  return `cd ${shellQuote(toPosixPath(projectRoot))} && git fetch`;
-}
-
-export function pullCommand(projectRoot: string): string {
-  return `cd ${shellQuote(toPosixPath(projectRoot))} && git pull`;
-}
-
 // ---- プロジェクトになっていない .git
 
 export interface DirEntry {
@@ -195,7 +187,7 @@ export function findStrayGitDirs(input: StrayInput): Stray[] {
   return found.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-// ---- clone 後の設定
+// ---- .gitignore
 
 /** `.gitignore` の本文に置き場が書かれているか。`/projects/`、`projects/`、`/projects`、`projects` のどれか */
 export function gitignoreHasProjects(text: string | undefined, projectsRel: string): boolean {
@@ -204,32 +196,6 @@ export function gitignoreHasProjects(text: string | undefined, projectsRel: stri
   }
   const accepted = new Set([projectsRel, `/${projectsRel}`, `${projectsRel}/`, `/${projectsRel}/`]);
   return text.split(/\r?\n/).some((line) => accepted.has(line.trim()));
-}
-
-/** `.gitignore` に置き場の行を足した本文。既にあればそのまま */
-export function gitignoreWithProjects(text: string | undefined, projectsRel: string): string {
-  if (gitignoreHasProjects(text, projectsRel)) {
-    return text ?? "";
-  }
-  const head = text === undefined || text === "" ? "" : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
-  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 11.2）。\n/${projectsRel}/\n`;
-}
-
-/**
- * 共通の設定のルールをプロジェクトかワークスペースの設定のルールファイルへ複製するときの加工。
- * 先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` を `sh {root}/.ccnavi/scripts/` にする。
- * プロジェクトの中に cwd があるエージェントには `.ccnavi/scripts/` が届かず、`{root}` はルールを
- * 読むときにワークスペースルートの絶対パスへ置き換わる（設計 11.8）。置換は 1 種類だけ。
- */
-export function rewriteRulesForProject(text: string, sourceRel: string, layer: string, date: string): string {
-  const header = [
-    `# ${layer} のルール。共通レイヤーの ${sourceRel} を ${date} にコピーした（ccnavi ボード）。`,
-    "# このファイルは共通レイヤーに足してヒットする（上書きはしない）。共通レイヤーと全欄が同じ行は重複として捨てられ、--lint が info で言う。",
-    "# 文面の sh のパスは {root}/.ccnavi/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
-    "# 置き換えた行は共通レイヤーの行と中身が違う扱いになり、両方効く（--lint が warn で言う）。要らない行は消す。",
-    "",
-  ].join("\n");
-  return header + text.split("sh .ccnavi/scripts/").join("sh {root}/.ccnavi/scripts/");
 }
 
 // ---- 画面の中身

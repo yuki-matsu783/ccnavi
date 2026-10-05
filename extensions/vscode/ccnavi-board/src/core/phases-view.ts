@@ -15,6 +15,7 @@
 import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
+import type { TargetOption } from "./targets.js";
 
 // ---- 定義の形（画面と読み書きで分け合う）
 
@@ -102,6 +103,9 @@ export interface PhasesPage {
   readonly layer?: boolean;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
+  /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
+  readonly target?: { readonly kind: string; readonly name: string };
+  readonly targets?: readonly TargetOption[];
 }
 
 /** 欄を触れるか。共通の設定はファイルが無ければ触れない（画面からは作らせない）。ワークスペースとプロジェクトの設定は無くても足して保存できる */
@@ -144,7 +148,9 @@ export type PhasesMessage =
   | { readonly type: "openSelf" }
   | { readonly type: "save"; readonly form: PhasesForm }
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */
-  | { readonly type: "tourDone" };
+  | { readonly type: "tourDone" }
+  /** 開いたまま別の設定へ切り替える。未保存の変更があれば、拡張ホストが破棄してよいかを聞く */
+  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string };
 
 /** 最初の中身を埋める `<script type="application/json">` の id */
 export const DATA_ID = "ccnavi-phases-data";

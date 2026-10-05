@@ -20,6 +20,7 @@ import { applyAppearance } from "../appearance.js";
 import { Graph, Legend } from "./Graph.js";
 import { Phase } from "./Phase.js";
 import { Tour, TourButton, type TourStep } from "../Tour.js";
+import { TargetSelect } from "../TargetSelect.js";
 import { post } from "./post.js";
 import { countText, duplicateNote, emptyNote, findText, graphNotices, hasRelations } from "./text.js";
 import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, openedFromIds, saveOpen, saveView, type Draft, type View } from "./state.js";
@@ -421,6 +422,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       </div>
       <header className="toolbar">
         <div className="summary">
+          <TargetSelect
+            target={page?.target}
+            targets={page?.targets}
+            disabled={busy}
+            onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })}
+          />
           <span className="path" title={page?.root ?? ""}>
             {page?.phasesPath ?? ""}
           </span>

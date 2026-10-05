@@ -6,15 +6,11 @@ import {
   checkRemote,
   cloneCommand,
   duplicateOf,
-  fetchCommand,
   findStrayGitDirs,
   gitignoreHasProjects,
-  gitignoreWithProjects,
-  pullCommand,
   REASON_OUTSIDE,
   REASON_TOO_DEEP,
   remoteKeyOf,
-  rewriteRulesForProject,
   type DirEntry,
 } from "../../src/core/projects.js";
 import { parseLintJson } from "../../src/core/lintmodel.js";
@@ -59,13 +55,11 @@ test("CB-T62 名前は ASCII に絞り、既存のツリー名と大文字小文
   assert.ok(!worktree.ok);
 });
 
-test("CB-T63 clone / fetch / pull はターミナル向けの 1 行になる", () => {
+test("CB-T63 clone はターミナル向けの 1 行になる", () => {
   assert.equal(
     cloneCommand("C:\\ws", "C:\\ws\\projects", "git@host:g/p.git", "p"),
     "cd 'C:/ws' && git clone -- 'git@host:g/p.git' 'C:/ws/projects/p'",
   );
-  assert.equal(fetchCommand("/ws/projects/lib"), "cd '/ws/projects/lib' && git fetch");
-  assert.equal(pullCommand("/ws/projects/lib"), "cd '/ws/projects/lib' && git pull");
 });
 
 test("CB-T64 プロジェクトになっていない .git を深さ 2 まで探し、置き場の中は 1 段深く見る", () => {
@@ -100,29 +94,11 @@ test("CB-T64 プロジェクトになっていない .git を深さ 2 まで探�
   ]);
 });
 
-test("CB-T65 .gitignore の置き場の行を見つけ、無ければ足す", () => {
+test("CB-T65 .gitignore の置き場の行を見つける", () => {
   assert.equal(gitignoreHasProjects("/dist/\n/projects/\n", "projects"), true);
   assert.equal(gitignoreHasProjects("projects\n", "projects"), true);
   assert.equal(gitignoreHasProjects("/projects/lib/\n", "projects"), false);
   assert.equal(gitignoreHasProjects(undefined, "projects"), false);
-  const added = gitignoreWithProjects("/dist/", "projects");
-  assert.match(added, /^\/dist\/\n\n# .*\n\/projects\/\n$/);
-  assert.equal(gitignoreWithProjects("/dist/\n/projects/\n", "projects"), "/dist/\n/projects/\n");
-  assert.match(gitignoreWithProjects(undefined, "projects"), /^# .*\n\/projects\/\n$/);
-});
-
-test("CB-T66 コピーするときは出どころのコメントを足し、sh のパスだけを {root} 付きにする", () => {
-  const source = "deny:\n  - id: raw-git\n    message: |\n      'sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド>' を使う。\n      glob: '*/.ccnavi/scripts/*' は変えない\n";
-  const out = rewriteRulesForProject(source, ".ccnavi/common/rules.yml", "lib", "2026-09-12");
-  assert.match(out, /^# lib のルール。共通レイヤーの \.ccnavi\/common\/rules\.yml を 2026-09-12 にコピーした/);
-  assert.match(out, /共通レイヤーに足してヒットする（上書きはしない）/);
-  assert.match(out, /'sh \{root\}\/\.ccnavi\/scripts\/ccnavi-git\.sh <サブコマンド>'/);
-  assert.match(out, /glob: '\*\/\.ccnavi\/scripts\/\*' は変えない/);
-  // 置き換えは 1 種類だけで、既に {root} 付きのパスには重ねない
-  assert.ok(!out.includes("sh .ccnavi/scripts/"));
-  const twice = rewriteRulesForProject(out, "x", "lib", "d");
-  assert.ok(!twice.includes("{root}/{root}"));
-  assert.ok(!twice.includes("sh {root}/.ccnavi/scripts/{root}"));
 });
 
 test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引ける", () => {

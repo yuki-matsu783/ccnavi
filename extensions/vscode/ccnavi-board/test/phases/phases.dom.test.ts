@@ -5,7 +5,7 @@ import { readPhases } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
 import { openPage, openPhases, page, rowSelector, SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { DomPage } from "../helpers/dom.js";
-import type { HTMLButtonElement, HTMLInputElement, HTMLOptionElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLInputElement, HTMLOptionElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 直前に送った保存の中身 */
 function savedForm(dom: DomPage): PhasesForm {
@@ -576,5 +576,34 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
   } finally {
     await dom.close();
+  }
+});
+
+test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけなら出さない", async () => {
+  const targets = [
+    { kind: "common", name: "", label: "共通の設定" },
+    { kind: "self", name: "", label: "ワークスペース" },
+    { kind: "project", name: "app:x", label: "プロジェクト app:x" },
+  ];
+  const dom = await openPhases({ target: { kind: "common", name: "" }, targets });
+  try {
+    const select = dom.one<HTMLSelectElement>("select#target");
+    assert.deepEqual(
+      [...select.options].map((o) => o.textContent),
+      ["共通の設定", "ワークスペース", "プロジェクト app:x"],
+    );
+    assert.equal(select.value, "common:");
+    dom.change(select, "project:app:x");
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "project", name: "app:x" }]);
+  } finally {
+    await dom.close();
+  }
+
+  const single = await openPhases({ target: { kind: "common", name: "" }, targets: targets.slice(0, 1) });
+  try {
+    assert.equal(single.all("select#target").length, 0);
+  } finally {
+    await single.close();
   }
 });

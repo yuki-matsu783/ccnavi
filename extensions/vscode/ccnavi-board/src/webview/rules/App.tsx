@@ -20,6 +20,7 @@ import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
 import { JudgeResult, SamplesResult, SuggestResult, type Judged } from "./Judge.js";
+import { TargetSelect } from "../TargetSelect.js";
 import { post } from "./post.js";
 import { Rule } from "./Rule.js";
 import {
@@ -425,6 +426,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </div>
       <header className="toolbar">
         <div className="summary">
+          <TargetSelect
+            target={page?.target}
+            targets={page?.targets}
+            disabled={busy}
+            onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })}
+          />
           <span className="path" title={page?.root ?? ""}>
             {page?.rulesPath ?? ""}
           </span>

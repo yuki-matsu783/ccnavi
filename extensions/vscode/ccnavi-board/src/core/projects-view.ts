@@ -3,7 +3,7 @@
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
  * 「いま何を見せるか」（`ProjectsData`）だけで、カードとメニューの DOM は画面が作る。
- * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけで、clone も書き込みもしない。
+ * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけで、clone もしない。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
  * 片方だけが持てるものを置くとバンドルできなくなる。
@@ -86,8 +86,6 @@ export type ToProjects =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "info"; readonly message: string }
   | { readonly type: "cloned"; readonly message: string }
-  /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
-  | { readonly type: "tour" }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（projects-panel の `asMessage`）が形を確かめてから使う */
@@ -95,19 +93,7 @@ export type ProjectsMessage =
   /** 画面が組み上がった。裏に回って作り直された画面が、いまの中身をもらい直すために送る */
   | { readonly type: "ready" }
   | { readonly type: "refresh" }
-  | { readonly type: "clone"; readonly url: string; readonly name: string }
-  | { readonly type: "fixIgnore" }
-  | { readonly type: "createRules"; readonly name: string }
-  | { readonly type: "createSelfRules" }
-  | { readonly type: "openRules"; readonly name: string }
-  | { readonly type: "openSelfRules" }
-  | { readonly type: "openPhases"; readonly name: string }
-  | { readonly type: "openSelfPhases" }
-  | { readonly type: "openBoard"; readonly name: string }
-  | { readonly type: "fetch"; readonly name: string }
-  | { readonly type: "pull"; readonly name: string }
-  /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
-  | { readonly type: "tourDone" };
+  | { readonly type: "clone"; readonly url: string; readonly name: string };
 
 /** clone の欄の下に出す一言。`failed` は失敗を示す */
 export interface CloneStatus {
