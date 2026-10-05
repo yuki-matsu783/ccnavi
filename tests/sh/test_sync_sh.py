@@ -9,6 +9,10 @@ ccnavi-sync.sh は親のブランチを取り込み（早送りか merge）、�
 読み返すのは終了コード・標準出力と、git に残った ref、
 取り込み状態（logs/state/sync/...）の中身だけ。
 MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めた代役の sh に差し替える。
+
+`CCNAVI_SH_DIR` で、写す sh（`SCRIPTS` の 3 本）の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。`.ccnavi/scripts/` に写す前の版
+（`wip/design/scripts/` など）を確かめるときに使う（`tests/sh/test_gitwrap.py` と同じ）。
 """
 
 from __future__ import annotations
@@ -24,13 +28,13 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT
+from tests import ROOT, SRC, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
 GIT = shutil.which("git")
-SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
-SCRIPTS = ("ccnavi-sync.sh", "ccnavi-common.sh", "ccnavi-git.sh")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SCRIPTS = ("ccnavi-sync.sh", *common_sh(SH_DIR), "ccnavi-git.sh")
 CONFIG = (
     ("user.email", "t@example.invalid"),
     ("user.name", "t"),
@@ -39,6 +43,8 @@ CONFIG = (
 PARENT = "i0001"
 COPY = f".ccnavi/approved/doing/{PARENT}.md"
 APPROVED_AT = "2026-09-01T00:00:00+0900"
+BASE_SHA = "1" * 40
+STARTED_AT = "2026-09-02T00:00:00+09:00"
 
 
 # 読める承認済みチケットにするための範囲
@@ -46,8 +52,16 @@ APPROVED_AT = "2026-09-01T00:00:00+0900"
 ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
 
-def copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
-    """親の承認済みチケット（ブロックの形の ccnavi_approved）。"""
+def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", body=""):
+    """着手済みの親の承認済みチケット（承認で欄を書かない形。着手の欄はスクリプトが書く）。"""
+    head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
+    fields = f"base_sha: {base_sha}\n" if base_sha else ""
+    fields += f"started_at: '{started_at}'\n" if started_at else ""
+    return f"{head}{fields}{extra}---\n{body}"
+
+
+def old_copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
+    """承認で欄を書いていた頃の、未着手の親の承認済みチケット（ブロックの形の ccnavi_approved）。"""
     head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
     return f"{head}ccnavi_approved:\n  approved_at: {approved_at}\n---\n{body}"
 
@@ -86,8 +100,99 @@ def os_name():
     return subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
 
 
+@unittest.skipIf(SHELL is None, "sh が無い")
+class FrontFieldTest(unittest.TestCase):
+    """sh の `front_field` が、Python の `syncstate._text`（YAML で読んだ値）と同じ値を出す。
+
+    `null`・`~`・引用符の外の注記を sh だけが値として読むと、閉じたかの照合が Python と食い違う。
+    """
+
+    VALUES = (
+        "abc",
+        '"abc # x"',
+        "'a b'",
+        "abc # c",
+        "null",
+        "Null",
+        "NULL",
+        "~",
+        "",
+        '""',
+        "#x",
+        "a#b",
+        '"q" # c',
+        "' sp '",
+    )
+
+    def sh_value(self, line):
+        with open(os.path.join(SH_DIR, "ccnavi-sync.sh"), encoding="utf-8") as f:
+            text = f.read()
+        start = text.index("front_field() {")
+        body = text[start : text.index("\n}\n", start) + 3]
+        script = body + 'printf "%s\\n" "$1" | front_field base_sha\n'
+        done = subprocess.run(
+            [SHELL, "-c", script, "sh", line], capture_output=True, text=True, encoding="utf-8"
+        )
+        return done.stdout.rstrip("\n")
+
+    def test_the_same_values_as_python(self):
+        from ccnavi.tickets import syncstate
+        from ccnavi.tickets import ticket as ticket_mod
+
+        for value in self.VALUES:
+            with self.subTest(value=value):
+                front, _, _ = ticket_mod._frontmatter(f"---\nticket: x\nbase_sha: {value}\n---\n")
+                expected = syncstate._text(front.get("base_sha"))
+                self.assertEqual(self.sh_value(f"base_sha: {value}"), expected)
+
+
+@unittest.skipIf(SHELL is None, "sh が無い")
+class ApprovedAtOfTest(unittest.TestCase):
+    """sh の `approved_at_of` が、Python の `syncstate._copy_fields` と同じ範囲
+    （frontmatter の `ccnavi_approved` の中）だけから承認の時刻を拾う。
+
+    本文や block scalar（`rationale: |` の下の行）に同じ語を書いた行を拾うと、古い形どうしの
+    照合で別の値を比べる。
+    """
+
+    FRONTS = (
+        "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', source_tree: main}",
+        "ccnavi_approved:\n  approved_at: 'X1'\n  source_tree: m",
+        'ccnavi_approved:\n\n  source_tree: m\n  approved_at: "X2"',
+        "rationale: |\n  approved_at: BAD\nccnavi_approved: {source_tree: m}",
+        "rationale: |\n  approved_at: BAD\nccnavi_approved:\n  approved_at: 'X3'",
+        "ccnavi_approved: |\n  approved_at: BAD",
+        "ccnavi_approved:\n  nested:\n    approved_at: BAD\n  approved_at: 'X4'\ntitle: t",
+        "ccnavi_approved: {source_tree: m,\n  approved_at: 'X5'}",
+        "title: 'approved_at: BAD'",
+        "note:\n  approved_at: BAD",
+    )
+
+    def sh_value(self, front):
+        with open(os.path.join(SH_DIR, "ccnavi-sync.sh"), encoding="utf-8") as f:
+            text = f.read()
+        script = ""
+        for name in ("frontmatter_of", "approved_at_of"):
+            start = text.index(f"{name}() {{")
+            script += text[start : text.index("\n}\n", start) + 3]
+        script += 'printf "%s\\n" "$1" | frontmatter_of | approved_at_of\n'
+        document = f"---\nticket: x\n{front}\n---\napproved_at: BODY\n"
+        done = subprocess.run(
+            [SHELL, "-c", script, "sh", document], capture_output=True, text=True, encoding="utf-8"
+        )
+        return done.stdout.rstrip("\n")
+
+    def test_the_same_range_as_python(self):
+        from ccnavi.tickets import syncstate
+
+        for front in self.FRONTS:
+            with self.subTest(front=front):
+                expected = syncstate._copy_fields(f"---\nticket: x\n{front}\n---\n").approved_at
+                self.assertEqual(self.sh_value(front), expected)
+
+
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
-class SyncTest(unittest.TestCase):
+class SyncHarness(unittest.TestCase):
     """ワークスペース 1 つ（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。"""
 
     def setUp(self):
@@ -221,6 +326,17 @@ class SyncTest(unittest.TestCase):
         )
         return done.stdout.strip()
 
+    def launcher(self, body=None):
+        path = write(
+            os.path.join(self._tmp.name, "bin", "ccnavi"),
+            body or f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n',
+        )
+        os.chmod(path, 0o755)
+        return path
+
+
+@unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
+class SyncTest(SyncHarness):
     # ---- 取り込み（P がリモートにある）
 
     def test_fast_forward_and_records(self):
@@ -447,10 +563,20 @@ class SyncTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(os.path.dirname(self.record), "i0002")))
         self.assertTrue(os.path.isdir(tree))
 
-    def close_on_main(self, approved_at=APPROVED_AT):
-        self.remote_commit(
-            "main", f".ccnavi/approved/done/{PARENT}.md", copy_text(approved_at=approved_at)
-        )
+    def close_on_main(self, text=None):
+        self.remote_commit("main", f".ccnavi/approved/done/{PARENT}.md", text or copy_text())
+
+    def mine(self, text):
+        """親のワークツリーの承認済みの親チケットを置き換える。"""
+        self.local_commit(COPY, text)
+        git(self.tree, "push", "-q", "origin", PARENT)
+
+    def closed_after_delete(self):
+        self.review_says("none")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        return fields(self.record)["state"], done
 
     def test_a_merged_and_deleted_branch_is_closed(self):
         self.keep_record()
@@ -473,15 +599,86 @@ class SyncTest(unittest.TestCase):
         self.assertEqual("closed", fields(self.record)["state"])
 
     def test_an_old_done_copy_of_the_same_id_is_not_this_family(self):
-        # 同じ識別子の古い親チケット（承認の時刻が違う）は、
-        # 今の親子のチケットが閉じた記録ではない。
-        self.review_says("none")
-        self.keep_record()
-        self.close_on_main(approved_at="2020-01-01T00:00:00+0900")
-        self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
+        # 同じ識別子の古い親チケット（着手の基準点が違う）は、
+        # 今の親子のチケットが閉じた記録ではない。後ろの欄（started_at）が同じでも見ない。
+        self.close_on_main(copy_text(base_sha="2" * 40))
+        state, done = self.closed_after_delete()
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("gone", fields(self.record)["state"])
+        self.assertEqual("gone", state)
+
+    def test_started_at_is_compared_when_base_sha_is_on_one_side_only(self):
+        self.mine(copy_text(base_sha=""))
+        self.close_on_main(copy_text())
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_a_parent_cancelled_before_start_is_matched_by_cancelled_at(self):
+        # 未着手のまま取り消した親は cancelled_at で照合する（永久に止まらない）。
+        unstarted = copy_text(base_sha="", started_at="", extra="cancelled_at: '2026-09-03'\n")
+        self.mine(unstarted)
+        self.close_on_main(unstarted)
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_nothing_to_compare_is_not_closed(self):
+        # どの欄でも照合できない（空どうし、空文字）なら閉じていない側に倒し、止めて戻し方を出す。
+        bare = copy_text(base_sha="''", started_at="")
+        self.mine(bare)
+        self.close_on_main(bare)
+        state, done = self.closed_after_delete()
+        self.assertEqual("gone", state)
+        self.assertIn("戻し方", done.stdout)
+
+    def test_fields_in_the_body_are_not_read(self):
+        # 欄は frontmatter の行頭だけから拾う。本文の同じ語の行で別の値を拾わない。
+        self.mine(copy_text(base_sha="", body="base_sha: aaaa\n"))
+        self.close_on_main(copy_text(base_sha="", body="base_sha: bbbb\n"))
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_an_approval_time_in_the_body_is_not_read(self):
+        # 承認の時刻は frontmatter の ccnavi_approved の中だけから拾う。本文の同じ語の行で
+        # 閉じたと読まない（Python と同じく、照合できる欄が無いので閉じていない）。
+        bare = copy_text(base_sha="", started_at="", body=f"approved_at: {APPROVED_AT}\n")
+        self.mine(bare)
+        self.close_on_main(bare)
+        self.assertEqual("gone", self.closed_after_delete()[0])
+
+    def test_an_approval_time_in_a_block_scalar_is_not_read(self):
+        # `rationale: |` の下の行は欄ではない。古い形どうしは ccnavi_approved の中の値で比べる。
+        noisy = old_copy_text().replace(
+            "ccnavi_approved:", "rationale: |\n  approved_at: 1999-01-01\nccnavi_approved:"
+        )
+        self.mine(noisy)
+        self.close_on_main(old_copy_text())
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_a_crlf_done_copy_is_read(self):
+        self.close_on_main(copy_text().replace("\n", "\r\n"))
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_old_copies_on_both_sides_compare_the_approval_time(self):
+        # 承認で欄を書いていた頃の形どうしは、移行の間だけ approved_at で比べる。
+        self.mine(old_copy_text())
+        self.close_on_main(old_copy_text())
+        self.assertEqual("closed", self.closed_after_delete()[0])
+
+    def test_old_copies_with_another_approval_time_are_not_closed(self):
+        self.mine(old_copy_text())
+        self.close_on_main(old_copy_text(approved_at="2020-01-01T00:00:00+0900"))
+        self.assertEqual("gone", self.closed_after_delete()[0])
+
+    def test_an_old_done_copy_is_not_matched_with_a_new_one(self):
+        # 片方に着手の欄があれば approved_at では比べない。
+        self.close_on_main(old_copy_text())
+        self.assertEqual("gone", self.closed_after_delete()[0])
+
+    def test_a_parent_missing_in_the_parent_tree_is_not_closed(self):
+        # 承認前の提案だけが残る親のワークツリー（この親子のチケットは閉じようがない）。
+        os.makedirs(os.path.join(self.tree, "wip", "proposals", "todo"))
+        git(self.tree, "mv", "--", COPY, f"wip/proposals/todo/{PARENT}.md")
+        git(self.tree, "commit", "-q", "-m", "back to todo")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        self.close_on_main()
+        state, done = self.closed_after_delete()
+        self.assertEqual("gone", state, done.stdout + done.stderr)
 
     def test_a_child_copy_in_done_is_not_the_parent(self):
         self.review_says("none")
@@ -541,17 +738,105 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
 
-    def test_a_merged_request_waits_instead_of_calling_it_gone(self):
-        # MR がマージ済みと分かれば観測の食い違い。消えたとは言わない。
+    def test_a_merged_request_is_closed_without_a_done_copy(self):
+        # 統合先には閉じたチケットを残さない（ready が退避して消し、squash でマージする）ので、
+        # MR がマージ済みと分かれば閉じた親子のチケット。消えたとは言わない。
         self.review_says("merged 42")
         self.keep_record()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="1")
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def test_a_merged_answer_does_not_wait_for_the_integration(self):
+        # 統合先の done/ を待つ確かめ直しは、マージ済みかの答えが得られないときだけ。
+        self.review_says("merged 42")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        started = time.monotonic()
+        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="2")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def archive_locally(self, text):
+        write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
+
+    def test_a_parent_in_the_local_archive_is_closed_when_merge_is_unknown(self):
+        # マージ済みかを確かめられないときだけ、手元の退避（ready が移した先）の親で補う。
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("logs/archive/self/done/", done.stdout)
+        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertEqual("closed", fields(self.record)["state"])
+
+    def archive_the_parent(self):
+        """ready の後の状態。親チケットをツリーから消して push し、手元の退避に置く。"""
+        rel = f".ccnavi/approved/doing/{PARENT}.md"
+        self.archive_locally(copy_text())
+        git(self.tree, "rm", "-q", "--", rel)
+        git(self.tree, "commit", "-q", "-m", "退避")
+        git(self.tree, "push", "-q", "origin", PARENT)
+
+    def test_a_parent_tree_whose_copy_was_archived_is_still_a_parent_tree(self):
+        self.keep_record()
+        self.archive_the_parent()
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
+        listed = self.sync()
+        self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+        self.assertIn(PARENT, listed.stdout)
+
+    def test_the_local_archive_does_not_override_an_unmerged_answer(self):
+        # マージされていないと分かれば、退避があっても閉じたとは読まない。
+        self.review_says("none")
+        self.keep_record()
+        self.archive_locally(copy_text())
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
+        self.assertEqual("gone", fields(self.record)["state"])
+
+    def test_an_archive_of_another_approval_is_not_this_family(self):
+        # 親のワークツリーに親チケットが残っていれば、着手の欄（base_sha）でも
+        # 同じ親と言えるときだけ。
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text(base_sha="0000000"))
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("present", fields(self.record)["state"])
+
+    def test_a_child_in_the_local_archive_is_not_the_parent(self):
+        self.review_says("unknown", 3)
+        self.keep_record()
+        self.archive_locally(copy_text().replace("ticket: i0001\n", "ticket: i0001\nparent: x\n"))
+        self.delete_remote_branch(PARENT)
+        self.sync(PARENT)
+        self.assertEqual("present", fields(self.record)["state"])
+
+    def test_fields_in_the_body_of_the_archive_are_not_read(self):
+        # 退避の親チケットの ticket: と parent: も frontmatter の行頭から拾う。本文に parent: の行が
+        # あっても子とは読まず、ticket: の注記は値に含めない。
+        self.review_says("unknown", 3)
+        self.keep_record()
+        archived = copy_text(body="parent: x\n").replace(
+            f"ticket: {PARENT}\n", f"ticket: {PARENT} # 親\n"
+        )
+        self.archive_locally(archived)
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("closed", fields(self.record)["state"])
 
     def test_branch_names_are_matched_exactly(self):
         # i0001-x があっても i0001 があることにはならない（前方一致で取り違えない）。
@@ -696,14 +981,6 @@ class SyncTest(unittest.TestCase):
         self.assertNotEqual(head, before)
         self.assertFalse(os.path.exists(self.mirror))
         self.assertFalse(os.path.exists(self.record))
-
-    def launcher(self, body=None):
-        path = write(
-            os.path.join(self._tmp.name, "bin", "ccnavi"),
-            body or f'#!/bin/sh\nPYTHONPATH="{ROOT}" exec "{sys.executable}" -m ccnavi "$@"\n',
-        )
-        os.chmod(path, 0o755)
-        return path
 
     def test_settings_local_json_names_the_integration_branch(self):
         # ユーザが端末で打つ sh には settings.local.json の env が反映されない。
@@ -886,6 +1163,77 @@ class SyncTest(unittest.TestCase):
     def kill_group(self, proc):
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(proc.pid, signal.SIGKILL)
+
+
+@unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
+class PlacesAreNotReadTest(SyncHarness):
+    """置き場を動かす環境変数は読まない（置き場は固定。A9）。
+
+    `.ccnavi/scripts/` が写す版（i0064-10）になる前は落ちる。写す前の sh は、
+    `ccnavi-common.sh` の `ccnavi_state` が `CCNAVI_STATE` を、`ccnavi_parent_tree` が
+    `CCNAVI_TICKETS_APPROVED`・`CCNAVI_TICKETS_PROPOSAL` を読み、`ccnavi-sync.sh` の予備が
+    `CCNAVI_TICKETS_*`・`CCNAVI_PROJECT_HOME` を、`projects` が `CCNAVI_PROJECTS` を読むため。
+    """
+
+    def moved(self):
+        """既定と違う綴りの 5 つ。控えはワークスペースの外の絶対パス、ほかは相対。"""
+        self.outside = os.path.join(self._tmp.name, "elsewhere-state")
+        return {
+            "CCNAVI_STATE": self.outside,
+            "CCNAVI_TICKETS_APPROVED": "tickets/approved",
+            "CCNAVI_TICKETS_PROPOSAL": "tickets/proposals/",
+            "CCNAVI_PROJECT_HOME": ".nav",
+            "CCNAVI_PROJECTS": "repos",
+        }
+
+    def arrange(self):
+        """リモートに親の 1 件、統合先に done/ とレイヤー、提案だけの家族、
+        家族の無いプロジェクト。"""
+        self.head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
+        self.remote_commit("main", ".ccnavi/approved/done/old.md", "old\n")
+        self.remote_commit("main", ".ccnavi/config/phases.yml", "phases\n")
+        # 提案（wip/proposals/todo/）だけがある親。既定の提案の置き場で家族と見つける。
+        other = os.path.join(self.ws, ".claude", "worktrees", "i0002")
+        git(self.ws, "worktree", "add", "-q", other, "-b", "i0002", "main")
+        rel = "wip/proposals/todo/i0002.md"
+        write(os.path.join(other, rel), "---\nversion: 1\nticket: i0002\n---\n")
+        git(other, "add", "--", rel)
+        git(other, "commit", "-q", "-m", "propose")
+        git(other, "push", "-q", "-u", "origin", "i0002")
+        project = os.path.join(self.ws, "projects", "p")
+        git(self._tmp.name, "init", "-q", "-b", "main", project)
+        git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))
+
+    def assertDefaultPlaces(self, done):
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        # 親のワークツリーを既定の置き場（.ccnavi/approved・wip/proposals）で家族と見つけた。
+        self.assertEqual(self.head, self.sha(self.tree, "HEAD"))
+        self.assertEqual("present", fields(self.record)["state"])
+        self.assertEqual(self.head, fields(self.record)["sha"])
+        other = os.path.join(self.state, "sync", "self", "families", "i0002")
+        self.assertEqual("present", fields(other)["state"])
+        # 統合先の控えは既定の置き場の done/ とレイヤー（.ccnavi/config）を写す。
+        for rel in (".ccnavi/approved/done/old.md", ".ccnavi/config/phases.yml"):
+            self.assertTrue(os.path.isfile(os.path.join(self.mirror, rel)), rel)
+        # プロジェクトは既定の projects/ の下で見つける。
+        self.assertIn("p: リモートのブランチの一覧を取ってこられなかった", done.stdout)
+        # env が指す場所には何も作らない。
+        self.assertFalse(os.path.exists(self.outside), "CCNAVI_STATE を読んでいる")
+        for rel in ("tickets", ".nav", "repos"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws, rel)), rel)
+            self.assertFalse(os.path.exists(os.path.join(self.mirror, rel)), rel)
+
+    def test_the_variables_do_not_move_the_places(self):
+        """実行ファイルが `sync paths` に答える道。env を入れても既定の置き場で取り込む。"""
+        self.arrange()
+        done = self.sync(CCNAVI_BIN_PATH=self.launcher(), **self.moved())
+        self.assertDefaultPlaces(done)
+
+    def test_the_fallback_without_an_answer_uses_the_defaults(self):
+        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。"""
+        self.arrange()
+        done = self.sync(CCNAVI_BIN_PATH=self.launcher("#!/bin/sh\nexit 0\n"), **self.moved())
+        self.assertDefaultPlaces(done)
 
 
 if __name__ == "__main__":

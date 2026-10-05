@@ -116,7 +116,6 @@ class SelfGuardTest(unittest.TestCase):
         session="s1",
         tool="Bash",
         bin="",
-        home="",
         **tool_input,
     ):
         payload = json.dumps(
@@ -130,8 +129,6 @@ class SelfGuardTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         if bin:
             environment["CCNAVI_BIN_PATH"] = bin
-        if home:
-            environment["CCNAVI_PROJECT_HOME"] = home
         return run_ccnavi(
             [
                 "--root",
@@ -407,6 +404,43 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_シェルの守りの式は_Bash_のときだけ組み立てる(self):
+        # 式は守る先を全部並べた大きなもので、組み立てとコンパイルに時間がかかる。
+        # `match: Bash` の 1 本なので、Bash 以外のツールでは組み立てない。
+        with mock.patch.object(
+            selfguard, "guard_shell_regex", wraps=selfguard.guard_shell_regex
+        ) as built:
+            for tool, field in (("Edit", "file_path"), ("Read", "file_path"), ("bash", "command")):
+                with self.subTest(tool=tool):
+                    built.reset_mock()
+                    self.run_hook("PreToolUse", tool=tool, **{field: "README.md"})
+                    self.assertEqual(built.call_count, 0)
+            built.reset_mock()
+            result = self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+            self.assertEqual(built.call_count, 1)
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_ツール名を渡したときもシェルの守りは同じ1本(self):
+        # 足すかどうかを決めるのは `Rule.matches` と同じツール名の当て方（rules.tool_matches）。
+        # Bash に足した 1 本は、ツール名を渡さない呼び手（従来）が足すものと同じ。
+        def built(tool):
+            rule_set = rules.RuleSet(version=rules.VERSION)
+            selfguard.add_rules(rule_set, root=self.repo, tool=tool)
+            return rule_set.deny
+
+        everything = built(None)
+        shell = next(r for r in everything if r.id == selfguard.SHELL_RULE_ID)
+        command = "echo x > .ccnavi/common/rules.yml"
+        self.assertTrue(shell.matches("Bash", command))
+        self.assertEqual([r.key() for r in built("Bash")], [r.key() for r in everything])
+        rest = [r.key() for r in everything if r.id != selfguard.SHELL_RULE_ID]
+        for tool in ("Edit", "Write", "Read", "bash", "BASH", " Bash", "mcp__shell__Bash", ""):
+            with self.subTest(tool=tool):
+                self.assertEqual([r.key() for r in built(tool)], rest)
+                # 足さなかったツールでは、足していても当たらなかった。
+                self.assertFalse(shell.matches(tool, command))
+
     def test_cd_で入ってから書く形も止まる(self):
         # issue #61。保護はパスに当てるので、`cd` で入ると行き先から名前が消える。
         # hook の登録そのもの（.claude/settings.json と .claude/hooks/）にも及んでいた。
@@ -434,6 +468,50 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("deny", result.stdout)
 
+    def test_sed_の書き換えの表記は止まる(self):
+        # 緩めたのは語の途中の `-i` だけ。独立したオプションの `-i` は今までどおり止める。
+        rules = self.rules_in_shell()
+        for opt in [
+            "-i",
+            "-i.bak",
+            "-i''",
+            "-iE",
+            "-Ei",
+            "-ni",
+            "--in-place",
+            "--in-place=.bak",
+            "--in",
+            "--i",
+            "--in-pl=.bak",
+            "'-i'",
+            '"-i"',
+        ]:
+            for command in [
+                f"sed {opt} s/a/b/ {rules}",
+                f"sed -e s/a/b/ {opt} {rules}",
+                f"sed {opt} -e s/a/b/ {rules}",
+            ]:
+                with self.subTest(command=command):
+                    result = self.run_hook("PreToolUse", command=command)
+
+                    self.assertIn("deny", result.stdout)
+                    self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_sed_で読むだけなら語の途中の_i_があっても通る(self):
+        # `feature-id` のようなワークツリー名や式の中の `-i` は、オプションではない。
+        rules = self.rules_in_shell()
+        for command in [
+            f"sed -n 1,20p {rules}",
+            "sed -n 1,20p /x/.claude/worktrees/feature-id/.ccnavi/common/rules.yml",
+            "sed -n 1,20p /x/.claude/worktrees/feature-12-improve/.ccnavi/common/rules.yml",
+            f"sed -E -e s/a-i/b/ {rules}",
+            f"sed -ne 's/a-i/b/p' {rules}",
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
     def test_disable_なら止める側も足さない(self):
         result = self.run_hook(
             "PreToolUse", setting="disable", command="echo x > .ccnavi/common/rules.yml"
@@ -443,7 +521,18 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_記録と_state_の置き場もシェルからの書き込みで止まる(self):
         # 記録と state は判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
-        for command in ("rm logs/decisions.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
+        # 閉じたチケットの退避（logs/archive）も、閉じた記録として判定が読むので同じく守る。
+        for command in (
+            "rm logs/decisions.jsonl",
+            "rm -rf logs/state",
+            "mv logs/state /tmp/x",
+            "rm -rf logs/archive",
+            "cp /tmp/x.md logs/archive/self/done/i0001.md",
+            # 退避の置き場を丸ごと別のもので置き換える形
+            "cp -r /tmp/archive logs/",
+            "mv /tmp/x/archive logs/",
+            "cp -t logs /tmp/archive",
+        ):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
@@ -470,6 +559,7 @@ class SelfGuardTest(unittest.TestCase):
                 os.path.join(self.repo, "logs", "decisions.jsonl"),
                 os.path.join(self.repo, "logs", "decisions.20260927-120000.jsonl"),
                 os.path.join(self.repo, "Logs", "State", "x.json"),
+                os.path.join(self.repo, "logs", "archive", "self", "done", "i0001.md"),
                 # 置き場を動かしてある（--state / --log）。
                 os.path.join(self.state, "denied-x.json"),
                 self.log,
@@ -486,6 +576,7 @@ class SelfGuardTest(unittest.TestCase):
             os.path.join(self.repo, "logs", "git-20260913-000000-1.log"),
             os.path.join(self.repo, "logs", "notes.md"),
             os.path.join(self.repo, "logstate", "x.json"),
+            os.path.join(self.repo, "logs", "archived-notes.md"),
             os.path.join(self.repo, "src", "logs", "catalog.jsonl"),
             os.path.join(self.repo, "state-notes", "x.md"),
         ):
@@ -779,21 +870,22 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_scripts_に置いた振り分けの実体は名指しのツールから止まる(self):
         # G2。既定の置き場では ccnavi ディレクトリの保護（`*/.ccnavi/*`）と二重に止まり、
-        # 先に名指しされるのはそちら。ccnavi ディレクトリを動かすとそちらは外れるので、
-        # 残った実行ファイル由来の保護が止めていることをそこで確かめる
-        # （REQ-SLF-07 を ccnavi ディレクトリの保護に頼らせない）。
+        # 先に名指しされるのはそちら。ccnavi ディレクトリの名前は動かせない（置き場は固定）ので、
+        # 残った実行ファイル由来の保護が止めていることは、`.ccnavi/` の外に置いた
+        # 振り分け（`tools/`）で確かめる（REQ-SLF-07 を ccnavi ディレクトリの保護に
+        # 頼らせない）。
         spelled, _, exe = self.scripts_layout()
         bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
 
-        with self.subTest(home="(既定)"):
+        with self.subTest(place="(既定)"):
             result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
 
             self.assertIn("deny", result.stdout)
 
-        with self.subTest(home=".navi"):
-            result = self.run_hook(
-                "PreToolUse", bin=spelled, home=".navi", tool="Write", file_path=bundled
-            )
+        with self.subTest(place="tools"):
+            spelled, _, exe = self.scripts_layout(("tools",))
+            bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
+            result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
 
             self.assertIn("deny", result.stdout)
             self.assertIn("builtin-guard-binary", result.stdout)

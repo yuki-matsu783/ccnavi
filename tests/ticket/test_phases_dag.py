@@ -16,7 +16,8 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets import approval, phasetypes, workflow
+from ccnavi.infra import settings
+from ccnavi.tickets import approval, approval_checks, approval_marks, phasetypes, workflow
 from ccnavi.tickets import ticket as ticket_mod
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -202,21 +203,21 @@ class AcceptedScopeTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, home, ignore_errors=True)
         owner = ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in PLAN])
         owner.workflow = workflow.compute(owner, types_of(DAG))
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-2"], 2), "")
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-all"]), "")
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 2), "")
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"]), "")
         # 2（acceptance）で受け入れたものは、並行した 3（implement）では数えない。
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-all"})
         # 2 と、2 を待つ 4（docs）では受け入れ済み。
-        self.assertEqual(approval.accepted_threads(home, "i0001", 2, owner), {"t-2", "t-all"})
-        self.assertEqual(approval.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 2, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
         # 番号を渡さなければ親全体。
-        self.assertEqual(approval.accepted_threads(home, "i0001"), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001"), {"t-2", "t-all"})
         # 並行した 3 で同じスレッドを受け入れ直せば、3 でも有効
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-2"], 3), "")
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 3), "")
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
         # 親全体で受け入れたものは、番号付きで受け入れ直しても狭まらない
-        self.assertEqual(approval.remember_accepted(home, "i0001", ["t-all"], 2), "")
-        self.assertEqual(approval.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
+        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"], 2), "")
+        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-2", "t-all"})
 
 
 class NextHintTest(unittest.TestCase):
@@ -232,7 +233,7 @@ class NextHintTest(unittest.TestCase):
             ph = phase_mod.Phase("i0001", n, item=owner.plan[n - 1], owner=owner)
             if n in (1, 3):
                 ph.tickets, ph.states = [done], {"c": ticket_mod.DONE}
-                ph.marks = {approval.MARK_SKIPPED: {}}
+                ph.marks = {approval_marks.MARK_SKIPPED: {}}
             phases.append(ph)
         hint = phase_mod._next_hint(owner, phases, 3)
         self.assertIn("次に始められるのは 2", hint)
@@ -243,9 +244,17 @@ class DagApprovalTest(PhaseHarness):
         write(common_path(self.root, "phases"), text)
 
     def copy(self, name="i0001"):
-        t, problems = ticket_mod.load(os.path.join(self.approved, "doing", name + ".md"))
-        self.assertIsNotNone(t, problems)
+        # 待ち方は承認済みチケットの外（`phases/<親>/workflow.yml`）に在るので、置き場を渡して読む。
+        path = os.path.join(self.approved, "doing", name + ".md")
+        t, why = approval.load_copy(path, approved_dir=self.approved)
+        self.assertIsNotNone(t, why)
         return t
+
+    def scanned(self, name="i0001"):
+        """判定が読むのと同じ走査（`approval.scan`）で読んだ承認済みチケット。"""
+        conf, _ = settings.load(self.root)
+        kept, _ = approval.scan(conf, self.root)
+        return next(t for t in kept if t.ticket == name)
 
     def close_first_phase(self):
         self.propose(
@@ -349,22 +358,30 @@ class DagApprovalTest(PhaseHarness):
             self.commit_parent()
             result = self.approve()
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("--agree が書く欄", result.stderr)
+            self.assertIn("の欄は提案に書かない", result.stderr)
             self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+
+    def test_the_workflow_is_fixed_in_its_own_file_and_not_in_the_ticket(self):
+        """承認は待ち方を `phases/<親>/workflow.yml` に固定し、承認済みチケットには書き足さない。"""
+        self.use(DAG)
+        self.propose("i0001", parent_text("i0001", PLAN))
+        self.commit_parent()
+        proposal = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(proposal, "rb") as f:
+            before = f.read()
+        self.assertEqual(self.approve().returncode, 0)
+        with open(os.path.join(self.approved, "doing", "i0001.md"), "rb") as f:
+            self.assertEqual(before, f.read())
+        held = approval.workflow_path(self.approved, "i0001")
+        self.assertTrue(os.path.isfile(held))
+        self.assertEqual(self.copy().workflow.order, ticket_mod.WORKFLOW_DAG)
 
     def test_an_approved_parent_without_a_workflow_is_read_as_sequential(self):
         """コピーした待ち方を持たない承認済みの親は、
         いまの phases.yml から計算せず一直線で待たせる。"""
         self.use(SEQUENTIAL)
         self.family(plan=PLAN)
-        path = os.path.join(self.approved, "doing", "i0001.md")
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        head, rest = text.split("workflow:", 1)
-        tail = rest.split("\n", 1)[1]
-        while tail.startswith(" "):
-            tail = tail.split("\n", 1)[1]
-        write(path, head + tail)
+        os.remove(approval.workflow_path(self.approved, "i0001"))
         self.commit_parent("drop workflow")
         self.assertIsNone(self.copy().workflow)
         self.use(DAG)
@@ -372,6 +389,132 @@ class DagApprovalTest(PhaseHarness):
         self.propose_branches()
         self.assertTrue(self.approved_child("i0001-02-02"))
         self.assertFalse(self.approved_child("i0001-03-03"))
+
+    def _rewrite_copy(self, extra: str) -> None:
+        """承認済みの親の frontmatter の頭に欄を足し、待ち方のファイルを消す。"""
+        os.remove(approval.workflow_path(self.approved, "i0001"))
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        write(path, text.replace("---\n", "---\n" + extra, 1))
+
+    def test_an_old_copy_with_the_record_still_reads_its_workflow_field(self):
+        """前の版の承認（記録 `ccnavi_approved` と `workflow:` を書き足した形）は、
+        欄の待ち方が今の phases.yml から計算した待ち方と同じなら、欄の待ち方で読む。"""
+        self.use(DAG)
+        self.family(plan=PLAN)
+        self._rewrite_copy(
+            "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', source_tree: main, "
+            "source_path: wip/proposals/todo/i0001.md}\n"
+            "workflow: {order: dag, waits: {1: [], 2: [1], 3: [1], 4: [1, 2, 3]}, review_at: {}}\n"
+        )
+        held = self.copy()
+        self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertEqual(held.approved_at, "2026-01-01T00:00:00+09:00")
+        self.assertEqual([], approval_checks.content_problems(held))
+        self.commit_parent("old form")
+        held = self.scanned()
+        self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertFalse(held.workflow_record_differs)
+
+    def test_a_forged_old_workflow_that_differs_from_the_computed_one_is_read_as_sequential(self):
+        """記録を揃えて書いた古い形でも、欄の待ち方が今の phases.yml から計算した待ち方と
+        違えば欄を使わず一直線で読み、`--lint` と status が warn で言う。"""
+        self.use(SEQUENTIAL)
+        self.family(plan=PLAN)
+        self._rewrite_copy(
+            "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', source_tree: main, "
+            "source_path: wip/proposals/todo/i0001.md}\n"
+            "workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}, review_at: {}}\n"
+        )
+        self.commit_parent("forge")
+        held = self.scanned()
+        self.assertTrue(approval_checks.has_record(held))
+        self.assertIsNone(held.workflow)
+        self.assertTrue(held.workflow_record_differs)
+        self.assertEqual(
+            workflow.effective(held, None).as_raw(), workflow.compute(held, None).as_raw()
+        )
+        self.assertEqual(workflow.waits_of(held, 4, None), [1, 2, 3])
+        linted = self.ccnavi("--lint")
+        self.assertIn("今の phases.yml から計算した待ち方と違う", linted.stdout + linted.stderr)
+        status = self.ccnavi("ticket", "status", "i0001")
+        self.assertIn("今の phases.yml から計算した待ち方と違う", status.stdout)
+
+    def test_a_workflow_field_in_a_new_copy_is_not_read_and_blocks(self):
+        """記録を持たない承認済みチケットの `workflow:` 欄は、承認済みの待ち方として
+        効かせず、止める。"""
+        self.use(SEQUENTIAL)
+        self.family(plan=PLAN)
+        self._rewrite_copy("workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\n")
+        held = self.copy()
+        self.assertIsNone(held.workflow)
+        found = [p.detail for p in approval_checks.content_problems(held)]
+        self.assertTrue(any("workflow" in d for d in found), found)
+
+    def test_a_half_written_record_does_not_pass_for_the_old_form(self):
+        """書きかけの記録（`{}`・`approved_at` が空・欄が足りない）は古い形とみなさず、
+        `workflow:` 欄で止める。"""
+        self.use(SEQUENTIAL)
+        self.family(plan=PLAN)
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        held_path = approval.workflow_path(self.approved, "i0001")
+        with open(path, "rb") as f:
+            original = f.read()
+        with open(held_path, "rb") as f:
+            held_bytes = f.read()
+        for record in (
+            "ccnavi_approved: {}\n",
+            "ccnavi_approved: {approved_at: '', source_tree: main, source_path: p}\n",
+            "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00'}\n",
+        ):
+            with open(path, "wb") as f:
+                f.write(original)
+            with open(held_path, "wb") as f:
+                f.write(held_bytes)
+            self._rewrite_copy(
+                record + "workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\n"
+            )
+            held = self.copy()
+            self.assertFalse(approval_checks.has_record(held), record)
+            self.assertIsNone(held.workflow, record)
+            found = [p.detail for p in approval_checks.content_problems(held)]
+            self.assertTrue(any("workflow" in d for d in found), (record, found))
+
+    def test_an_unreadable_workflow_file_blocks(self):
+        self.use(DAG)
+        self.family(plan=PLAN)
+        write(approval.workflow_path(self.approved, "i0001"), "order: nope\n")
+        held = self.copy()
+        self.assertIsNone(held.workflow)
+        self.assertIn("待ち方のファイル", held.workflow_unreadable)
+        self.assertTrue(approval_checks.content_problems(held))
+
+    def test_a_deeply_nested_workflow_file_is_unreadable_and_blocks(self):
+        """入れ子が深すぎる待ち方のファイルで例外が漏れず、読めないものとして止める。"""
+        self.use(DAG)
+        self.family(plan=PLAN)
+        write(approval.workflow_path(self.approved, "i0001"), "[" * 5000 + "\n")
+        wf, why = approval.read_workflow(self.approved, "i0001")
+        self.assertIsNone(wf)
+        self.assertIn("YAML として読めない", why)
+        held = self.copy()
+        self.assertIsNone(held.workflow)
+        self.assertIn("待ち方のファイル", held.workflow_unreadable)
+        self.assertTrue(approval_checks.content_problems(held))
+
+    def test_a_workflow_file_left_without_its_parent_is_warned_by_lint(self):
+        """親の承認済みチケットがどこにも無いのに残った待ち方のファイルを、
+        `--lint` が warn で言う。"""
+        self.use(DAG)
+        self.family(plan=PLAN)
+        said = "待ち方のファイルがあるのに、親 i0001 の承認済みチケットがどの置き場"
+        linted = self.ccnavi("--lint")
+        self.assertNotIn(said, linted.stdout + linted.stderr)
+        os.remove(os.path.join(self.approved, "doing", "i0001.md"))
+        self.commit_parent("drop the parent")
+        linted = self.ccnavi("--lint")
+        self.assertIn(".ccnavi/approved/phases/i0001/workflow.yml: " + said, linted.stdout)
 
     def test_a_revision_cannot_move_a_defer_target_behind_approved_children(self):
         def reviewed(text):

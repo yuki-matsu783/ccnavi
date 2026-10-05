@@ -3,6 +3,9 @@
 URL にトークンを埋めた形（`https://oauth2:<token>@host/g/p.git`）は普通にある。
 ホストにユーザ情報が入り込むと API の URLが壊れ、`origin` の出力にトークンが漏れる。
 実物の GitLab で実際に起きた穴なので、両方の読み手で固定する。
+
+`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
 from __future__ import annotations
@@ -14,10 +17,11 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi.tickets import review
+from ccnavi.tickets import review_host
 from tests import ROOT
 
-SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-review.sh")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SCRIPT = os.path.join(SH_DIR, "ccnavi-review.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
@@ -46,7 +50,7 @@ class RemoteKindTest(unittest.TestCase):
         }
         for url, kind in cases.items():
             with self.subTest(url=url):
-                self.assertEqual(review.remote_kind(url), kind)
+                self.assertEqual(review_host.remote_kind(url), kind)
 
 
 @unittest.skipUnless(SHELL and JQ and CURL, "sh / jq / curl のどれかが無い")
@@ -78,9 +82,10 @@ class OriginSubcommandTest(unittest.TestCase):
             check=True,
         )
 
-    def origin(self, url: str) -> subprocess.CompletedProcess:
+    def origin(self, url: str, extra_env=None) -> subprocess.CompletedProcess:
         subprocess.run(["git", "remote", "add", "origin", url], cwd=self.dir, check=True)
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.update(extra_env or {})
         # `origin` は exe を呼ばない。在ることだけ見るので、確実に在る実行ファイルを指す。
         env["CCNAVI_BIN_PATH"] = sys.executable
         env["GITLAB_TOKEN"] = "x"
@@ -105,6 +110,20 @@ class OriginSubcommandTest(unittest.TestCase):
         self.assertIn("api_base=http://127.0.0.1:9/api/v4\n", result.stdout)
         self.assertNotIn("glpat-secret", result.stdout + result.stderr)
         self.assertIn("origin=http://<伏せた>@127.0.0.1:9/root/p.git", result.stdout)
+
+    def test_the_state_variable_is_not_read(self):
+        """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（置き場は固定。A9）。
+
+        sh は起動のたびに控えの置き場を作る（`mkdir -p "$state"`）。以前は `$root/` に
+        `CCNAVI_STATE` を継ぎ足すので、絶対パスを入れると存在しない置き場を見ていた。
+        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+        写す前の sh（`ccnavi-review.sh`）は `CCNAVI_STATE` を読むため。
+        """
+        result = self.origin("http://127.0.0.1:9/root/p.git", extra_env={"CCNAVI_STATE": "/x"})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        state = os.path.join(self.dir, "logs", "state")
+        self.assertTrue(os.path.isdir(state), "logs/state/ が無い")
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "x")), "CCNAVI_STATE を読んでいる")
 
 
 if __name__ == "__main__":

@@ -86,7 +86,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   一覧      branch (-d は可 / -D -m -M -C -f -u は不可)  tag (一覧のみ)
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
             worktree add は行き先の名前とブランチ名を揃える形だけ
-                  (add <行き先> -b <行き先の名前> [<起点>]。-B / --detach / -f は不可)
+                  (add <行き先> -b <行き先の名前> [<起点>]。-B / --detach / -f は不可。
+                  親チケットに branch: があれば、行き先の名前 = 識別子で、ブランチ名 = branch: の値)
   変える    add  commit (--no-verify は不可)  rm <パス> (-f は不可)
             restore <パス>  (衝突の解決は restore --ours / --theirs -- <パス>)
             checkout / switch (ブランチを移る形だけ。-f・checkout -B・switch -C と -- <パス> は不可。
@@ -101,7 +102,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
                    : や + を含む引数 (refspec・URL) は不可。手元の ref は ccnavi-sync.sh が進める)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
-                   main master develop release へ直接は送れない。
+                   main master develop release と統合先 (CCNAVI_INTEGRATION_BRANCH、無ければ
+                   ccnavi-sync.sh の取り込み結果、無ければ origin/HEAD) へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
                    リモートから消えた (取り込み状態が gone の) 親のブランチへは送れない)
 
@@ -347,8 +349,8 @@ store_hit() {
 		return 0
 		;;
 	esac
-	sh_approved=$(printf '%s' "${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" | tr '\\' '/')
-	sh_review=$(printf '%s' "${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}/review" | tr '\\' '/')
+	sh_approved=.ccnavi/approved   # 固定
+	sh_review=wip/proposals/review # 固定
 	case "$sh_arg" in
 	/* | [A-Za-z]:/*)
 		# 絶対パス。トップのパスは OS で表記が揃わない（`C:/x` と `/c/x`）ので、置き場のパスを
@@ -623,9 +625,27 @@ worktree)
 		# 行き先の名前 = ブランチ名。-b が無く 2 つ目の語も無ければ、
 		# git は行き先の名前でブランチを切るので揃う。
 		wt_leaf="${wt_abs##*/}"
-		if [ -n "$wt_new" ]; then
+		# 親チケットの branch:。行き先の名前（識別子）の承認済みチケットが名乗る
+		# ブランチ名なら、行き先の名前と違うブランチを通す（提案の branch: は使わない）。名前は実行ファイルに聞く（sh は
+		# チケットを読まない）。聞けなければ識別子と同じ名前だけを通す（厳しくする向き）。
+		wt_home=""
+		if { [ -n "$wt_new" ] && [ "$wt_new" != "$wt_leaf" ]; } ||
+			{ [ -z "$wt_new" ] && [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; }; then
+			wt_home=$(ccnavi_family_branch "$WS" "$wt_leaf") || wt_home=""
+			[ "$wt_home" != "$wt_leaf" ] || wt_home=""
+		fi
+		if [ -n "$wt_new" ] && [ -n "$wt_home" ] && [ "$wt_new" = "$wt_home" ]; then
+			: # -b <branch:> で、識別子の名前の行き先に新しく切る
+		elif [ -z "$wt_new" ] && [ -n "$wt_home" ] && [ "$wt_base" = "$wt_home" ]; then
+			# 既にある branch: のブランチを、識別子の名前の行き先に出す。ブランチでない（タグ・sha）なら
+			# ブランチの外に作るので止める。
+			if ! git show-ref --verify --quiet "refs/heads/$wt_base" &&
+				! git show-ref --verify --quiet "refs/remotes/origin/$wt_base"; then
+				reject worktree-detach "worktree add $wt_dest $wt_base の $wt_base は手元のブランチでも origin/$wt_base でもないので、ブランチの外（detached HEAD）にワークツリーを作ります。新しく切るなら $SELF worktree add $wt_dest -b $wt_base <起点> にしてください。"
+			fi
+		elif [ -n "$wt_new" ]; then
 			if [ "$wt_new" != "$wt_leaf" ]; then
-				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします。ccnavi は親チケットのワークツリーを、名前が親チケットの識別子で、同じ名前のブランチをチェックアウトしているものとして探します。親チケットのブランチを識別子と違う名前のワークツリーに出すと、リモートでの承認を取り込む処理（ccnavi-sync.sh と、セッション開始時に ccnavi-fetch.sh が fast-forward で進める処理）がそのワークツリーを見つけられません。親チケットのブランチを一度でも push したか ccnavi-sync.sh で取り込んだことがあると、親と子のチケットの承認・状態の操作（start・finish など）・実行前の判定も止まります。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。"
+				reject worktree-name "worktree add の新しいブランチ名（-b ${wt_new}）が行き先の名前（${wt_leaf}）と違います。ワークツリーの名前はブランチ名と同じにします。ccnavi は親チケットのワークツリーを、名前が親チケットの識別子で、同じ名前のブランチをチェックアウトしているものとして探します。親チケットのブランチを識別子と違う名前のワークツリーに出すと、リモートでの承認を取り込む処理（ccnavi-sync.sh と、セッション開始時に ccnavi-fetch.sh が fast-forward で進める処理）がそのワークツリーを見つけられません。親チケットのブランチを一度でも push したか ccnavi-sync.sh で取り込んだことがあると、親と子のチケットの承認・状態の操作（start・finish など）・実行前の判定も止まります。$SELF worktree add .claude/worktrees/$wt_new -b $wt_new <起点> の形にしてください。識別子と違う名前のブランチで作業するなら、親チケット（${wt_leaf}）に branch: $wt_new を書いて承認を受けてから打ってください。"
 			fi
 		elif [ -n "$wt_base" ] && [ "$wt_base" = "$wt_leaf" ] &&
 			! git show-ref --verify --quiet "refs/heads/$wt_base" &&
@@ -633,7 +653,7 @@ worktree)
 			# 名前が揃っていても、ブランチでない（タグ・sha）ならブランチの外に作る。
 			reject worktree-detach "worktree add $wt_dest $wt_base の $wt_base は手元のブランチでも origin/$wt_base でもないので、ブランチの外（detached HEAD）にワークツリーを作ります。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf <起点> にしてください。"
 		elif [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; then
-			reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う行き先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前はブランチ名と同じにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$wt_base にしてください。"
+			reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う行き先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前はブランチ名と同じにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$wt_base にしてください。既にあるブランチを識別子の名前のワークツリーで使うなら、親チケット（${wt_leaf}）に branch: $wt_base を書いて承認を受けてから打ってください。"
 		fi
 		;;
 	list | prune | remove)
@@ -707,7 +727,7 @@ restore)
 	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
 	# 衝突したときに解く方法はここしかない。ルールファイルに衝突マーカーが
 	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
-	# 既定もこの形は止めない（ccnavi/policy/builtin.py）。
+	# 既定もこの形は止めない（src/ccnavi/policy/builtin.py）。
 	#
 	# 別のコミットの中身で戻す形（--source）と、衝突を片側の中身で解く形（--ours / --theirs）は、
 	# 承認済みチケットの置き場に当たるパスには使わせない。
@@ -917,6 +937,73 @@ checkout | switch)
 	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
 	# ccnavi-sync.sh で取り込んだ親）では、実行ファイル（syncstate.standing）が親のワークツリーを決められず、
 	# 親と子のチケットの承認・状態の操作・実行前の判定を止める。
+	#
+	# 承認済みの branch: のブランチへ移る: 親のワークツリーが識別子のブランチの上に居て、
+	# 承認済みの親チケットが branch: <B> を名乗るときだけ、checkout / switch <B>（-b・--create も同じ）を
+	# 次の 1 操作にする。作業ツリーが綺麗で、途中の操作が無く、取り込み状態が無いか識別子のブランチの
+	# present のときだけ。B が無ければ今の先頭から切る。在れば（手元か origin）B へ移ってから識別子の
+	# ブランチを merge し、承認済みチケットとマーカーを B に乗せる。merge が落ちたら取りやめて識別子の
+	# ブランチへ戻る。取り込み状態は、移った後に B を push したとき書き直る（push_record_family）。
+	co_carry() {
+		cc_B="$co_home"
+		cc_X="$co_name"
+		if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+			reject carry-dirty "親のブランチ $cc_B へ移る前に、作業ツリーの変更をコミットしてください（承認済みチケットとマーカーはコミットに入ったものだけが $cc_B へ移ります）。"
+		fi
+		for cc_mark in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply; do
+			if [ -e "$(git rev-parse --git-path "$cc_mark" 2>/dev/null)" ]; then
+				reject carry-busy "途中の操作（${cc_mark}）があります。済ませるか取りやめてから、親のブランチ $cc_B へ移ってください。"
+			fi
+		done
+		cc_key=$(ccnavi_repo_key "$co_top" "$WS")
+		cc_record=$(ccnavi_family_record "$WS" "$cc_key" "$cc_X")
+		if [ -f "$cc_record" ] || [ -L "$cc_record" ]; then
+			cc_kept=$(ccnavi_record_get "$cc_record" branch)
+			cc_state=$(ccnavi_record_get "$cc_record" state)
+			case "$cc_kept" in
+			'' | "$cc_X" | "$cc_B") ;;
+			*) reject carry-record "親子のチケット $cc_X の取り込み状態は親のブランチを $cc_kept としています。$cc_B へは移りません。ユーザが確かめてください。" ;;
+			esac
+			[ "$cc_state" = present ] ||
+				reject carry-record "親子のチケット $cc_X の取り込み状態が ${cc_state:-読めない} です。$cc_B へは移りません。$SYNC $cc_X の案内に従ってください。"
+		fi
+		cc_others=$(ccnavi_family_record_of_branch "$WS" "$cc_key" "$cc_B" | grep -v -x -F -- "$cc_record" || :)
+		if [ -n "$cc_others" ]; then
+			reject carry-claimed "$cc_B は別の親子のチケット（${cc_others##*/}）の親のブランチです。2 つの親子のチケットが同じブランチを名乗ると、どちらのチケットを本物とするか決まらないので移りません。"
+		fi
+		cc_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-carry) || reject carry-tmp "一時ファイルが作れません。"
+		if git show-ref --verify --quiet "refs/heads/$cc_B" || git show-ref --verify --quiet "refs/remotes/origin/$cc_B"; then
+			if ! git checkout -q "$cc_B" >"$cc_out" 2>&1; then
+				printf 'fail  git %s  親のブランチ %s へ移れなかった\n' "$sub" "$cc_B"
+				tail -n "$FAIL_LINES" "$cc_out"
+				rm -f "$cc_out"
+				exit 1
+			fi
+			if ! git merge --no-edit -q -m "ccnavi: $cc_X の承認済みチケットを $cc_B へ取り込む" "refs/heads/$cc_X" >"$cc_out" 2>&1; then
+				git merge --abort >/dev/null 2>&1 || :
+				git checkout -q "$cc_X" >/dev/null 2>&1 || :
+				printf 'fail  git %s  %s の承認済みチケットを %s へ取り込めなかった（merge を取りやめて %s に戻った）。どちらを採るかはユーザに伝えてください\n' "$sub" "$cc_X" "$cc_B" "$cc_X"
+				tail -n "$FAIL_LINES" "$cc_out"
+				rm -f "$cc_out"
+				log_info 親のブランチへ移れなかった -- "reason=carry-merge"
+				exit 1
+			fi
+			cc_how="既存のブランチ $cc_B へ移り、$cc_X を merge して承認済みチケットとマーカーを取り込んだ"
+		else
+			if ! git checkout -q -b "$cc_B" >"$cc_out" 2>&1; then
+				printf 'fail  git %s  親のブランチ %s を切れなかった\n' "$sub" "$cc_B"
+				tail -n "$FAIL_LINES" "$cc_out"
+				rm -f "$cc_out"
+				exit 1
+			fi
+			cc_how="$cc_X の先頭から $cc_B を切った（承認済みチケットとマーカーはそのまま乗る）"
+		fi
+		rm -f "$cc_out"
+		log_info 親のブランチへ移った -- "family=$cc_X"
+		printf 'ok  git %s  親のブランチ %s へ移った\n' "$sub" "$cc_B"
+		printf '%s。続けて %s push -u origin %s を打つと、取り込み状態が %s で作られる（書き直る）\n' "$cc_how" "$SELF" "$cc_B" "$cc_B"
+		exit 0
+	}
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
 	case "$co_top" in
 	"$WS_P"/.claude/worktrees/*)
@@ -931,10 +1018,25 @@ checkout | switch)
 			elif [ "$co_words" -eq 1 ] || { [ "$co_words" -ge 2 ] && [ "$sub" = switch ]; }; then
 				co_to="$co_one"
 			fi
+			# 親のブランチは承認済みの親チケットの branch:（無ければ識別子。提案の branch: は使わない）。
+			# 移り先があるときだけ実行ファイルに聞く。聞けない・名前が使えないなら
+			# 識別子だけを親のブランチとする（厳しくする向き）。
+			co_home="$co_name"
 			case "$co_to" in
-			'' | "$co_name" | HEAD) ;;
+			'' | HEAD) ;;
+			*) co_home=$(ccnavi_family_branch "$WS" "$co_name") || co_home="$co_name" ;;
+			esac
+			# 承認済みの branch: のブランチへ移る（識別子のブランチの上で承認を受けた後の 1 回だけ）。
+			# 移った先へ承認済みチケットとマーカーを取り込むので、ここで済ませて終える（co_carry）。
+			co_cur=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
+			if [ -n "$co_to" ] && [ "$co_to" = "$co_home" ] && [ "$co_home" != "$co_name" ] &&
+				[ "$co_cur" = "$co_name" ]; then
+				co_carry
+			fi
+			case "$co_to" in
+			'' | "$co_home" | HEAD) ;;
 			*)
-				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移れません。ccnavi は親チケットのワークツリーを、名前が親チケットの識別子で、同じ名前のブランチをチェックアウトしているものとして探します。別のブランチに移ると、リモートでの承認を取り込む処理（ccnavi-sync.sh と、セッション開始時に ccnavi-fetch.sh が fast-forward で進める処理）がこのワークツリーを飛ばします。親チケットのブランチを一度でも push したか ccnavi-sync.sh で取り込んだことがあると、親と子のチケットの承認・状態の操作（start・finish など）・実行前の判定も止まります。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
+				reject parent-worktree-switch "親のワークツリー（.claude/worktrees/${co_name}）では別のブランチ（${co_to}）へ移れません。親のブランチは ${co_home} です。ccnavi は親チケットのワークツリーを、名前が親チケットの識別子で、親のブランチ（承認済みの親チケットの branch:、無ければ識別子と同じ名前）をチェックアウトしているものとして探します。別のブランチに移ると、リモートでの承認を取り込む処理（ccnavi-sync.sh と、セッション開始時に ccnavi-fetch.sh が fast-forward で進める処理）がこのワークツリーを飛ばします。親チケットのブランチを一度でも push したか ccnavi-sync.sh で取り込んだことがあると、親と子のチケットの承認・状態の操作（start・finish など）・実行前の判定も止まります。別の作業は別のワークツリーを切ってください（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
 				;;
 			esac
 		fi
@@ -1017,23 +1119,17 @@ push)
 			# ccnavi が承認済みチケットを探すのと同じツリー（ワークスペースルート・projects/ の下・
 			# .claude/worktrees/ の下。approval.trees）を全部見る。識別子は重ならないので、
 			# どこで見つかってもこのツリーの子のもの。
-			push_projects="${CCNAVI_PROJECTS:-projects}"
+			push_projects=projects # 固定
 			case "$push_projects" in
 			/* | [A-Za-z]:*) ;;
 			*) push_projects="$push_root/$push_projects" ;;
 			esac
 			for push_tree in "$push_root" "$push_projects"/* "$push_root"/.claude/worktrees/*; do
 				[ -d "$push_tree" ] || continue
-				case "${CCNAVI_TICKETS_APPROVED:-}" in
-				/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
-				# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。食い違うと、
-				# env を書いていないワークスペースで、この検査が気づかないうちに行われなくなる。
-				*) push_copies="$push_tree/${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" ;;
-				esac
-				case "${CCNAVI_TICKETS_PROPOSAL:-}" in
-				/* | [A-Za-z]:*) push_proposals="$CCNAVI_TICKETS_PROPOSAL" ;;
-				*) push_proposals="$push_tree/${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}" ;;
-				esac
+				# hook 側の既定（settings.py の DEFAULT_APPROVED・DEFAULT_TICKETS）と同じ場所を見る。
+				# 食い違うと、この検査が別の場所を見て、気づかないうちに行われなくなる。
+				push_copies="$push_tree/.ccnavi/approved" # 固定
+				push_proposals="$push_tree/wip/proposals" # 固定
 				# レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る。子を閉じたあと、親が
 				# 取り込んで片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
 				for push_copy in "$push_copies/doing/$push_name.md" "$push_copies/done/$push_name.md" \
@@ -1052,14 +1148,32 @@ push)
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
+	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。名前は ccnavi-fetch.sh が
+	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 →
+	# origin/HEAD → origin/main・master）で、このツリーが属するリポジトリ（プロジェクトならその
+	# プロジェクト）について決める。決まらなければ上の固定のリストだけで判定する。
+	push_integ=$(ccnavi_integration "${push_top:-.}" "$WS") || push_integ=""
+	log_debug push の統合先 -- "integration=$push_integ"
+	if [ -n "$push_integ" ] && [ "$push_branch" = "$push_integ" ]; then
+		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
+	fi
 	# リモートから消えた親のブランチ（取り込み状態が gone）へは送らない。
 	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
 	# 動き出す。毎回の ls-remote はせず、取り込み状態を読むだけにする。ユーザが戻した後は ccnavi-sync.sh が
 	# present に書き直して、この拒否が解ける。
+	# 取り込み状態は識別子を鍵にして、中の branch に親のブランチ名を持つ。居るブランチの名前で
+	# 取り込み状態の branch を探す（識別子と違う名前の親のブランチでも引ける）。
 	push_key=$(ccnavi_repo_key "${push_top:-.}" "$WS")
-	push_record=$(ccnavi_family_record "$WS" "$push_key" "$push_branch")
-	if [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
-		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（取り込み状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_branch が出します）、戻した後に $SYNC $push_branch を打ち直すと送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_branch で取り込み状態を消します（エージェントは打ちません）。"
+	push_record=$(ccnavi_family_record_of_branch "$WS" "$push_key" "$push_branch")
+	case "$push_record" in
+	*"
+"*)
+		reject push-ambiguous-family "$push_branch を親のブランチとする取り込み状態が 2 つ以上あります（$(printf '%s' "$push_record" | sed 's|.*/||' | tr '\n' ' ')）。2 つの親子のチケットが同じブランチを名乗ると、どちらのチケットを本物とするか決まらないので送りません。ユーザが確かめてください。"
+		;;
+	esac
+	if [ -n "$push_record" ] && [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
+		push_family="${push_record##*/}"
+		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（親子のチケット $push_family の取り込み状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので通しません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_family が出します）、戻した後に $SYNC $push_family を打ち直すと送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_family で取り込み状態を消します（エージェントは打ちません）。"
 	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do
@@ -1116,10 +1230,12 @@ esac
 # push が通ったら、親のブランチなら取り込み状態を作る。最初の push からその親子のチケットを C1 の
 # 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
 #
-# 送った先が親のブランチ（.claude/worktrees/<P> で、ディレクトリ名 = ブランチ名、親チケットか提案が
-# ある）で、送り先が origin のときだけ。取り込み状態があれば（present）sha を書き直すだけで、closed・
-# blocked は触らない。取り込み状態が無く、置き場に未コミットの変更があれば作らずに言う（未送信の状態を
-# 持ち込まないため）。取り込み状態があると SessionStart の早送りと ccnavi-sync.sh の消えたかの確かめの対象になる。
+# 送った先が親のブランチ（.claude/worktrees/<P> で、居るブランチが親のブランチ（親チケットの branch:、
+# 無ければディレクトリ名と同じ名前）、親チケットか提案がある）で、送り先が origin のときだけ。取り込み状態の
+# 鍵は識別子（ディレクトリ名）で、中の branch に親のブランチ名を書く。取り込み状態があれば（present）sha を
+# 書き直すだけで、closed・blocked は触らない。取り込み状態が無く、置き場に未コミットの変更があれば作らずに言う
+# （未送信の状態を持ち込まないため）。取り込み状態があると SessionStart の早送りと ccnavi-sync.sh の消えたかの
+# 確かめの対象になる。
 push_record_family() {
 	# 送り先は git と同じ順で解く: 引数のリモート → branch.<b>.pushRemote → remote.pushDefault →
 	# branch.<b>.remote → origin。origin 以外へ送ったなら取り込み状態を作らない（取り込み状態は origin の P を見る）。
@@ -1134,13 +1250,32 @@ push_record_family() {
 	"$WS_P"/.claude/worktrees/*) ;;
 	*) return 0 ;;
 	esac
-	[ "${push_top##*/}" = "$push_branch" ] || return 0
-	ccnavi_parent_tree "$push_top" "$push_branch" || return 0
+	# ワークツリーの名前が親の識別子で、居るブランチが親のブランチ（親チケットの branch:、無ければ識別子）の
+	# ときだけ。親のブランチ名は実行ファイルに聞き、聞けなければ識別子と同じ名前のときだけ。
+	pr_name="${push_top##*/}"
+	ccnavi_parent_tree "$push_top" "$pr_name" || return 0
+	pr_rc=0
+	pr_want=$(ccnavi_family_branch "$WS" "$pr_name") || pr_rc=$?
+	case "$pr_rc" in
+	0) ;;
+	1) pr_want="$pr_name" ;; # 実行ファイルが無い。識別子と同じ名前のときだけ（前の動き）
+	*) return 0 ;;           # 名前が使えない・答えない。取り込み状態を作らない
+	esac
+	[ "$pr_want" = "$push_branch" ] || return 0
 	pr_sha=$(git rev-parse --verify --quiet HEAD 2>/dev/null || :)
 	[ -n "$pr_sha" ] || return 0
+	push_record=$(ccnavi_family_record "$WS" "$push_key" "$pr_name")
+	pr_kept=$(ccnavi_record_get "$push_record" branch)
+	# 取り込み状態が識別子のブランチのままなら、承認済みの branch: のブランチへ移った（co_carry）後の最初の push。
+	# present のときだけ親のブランチ名を書き直す。
+	[ -z "$pr_kept" ] || [ "$pr_kept" = "$push_branch" ] || [ "$pr_kept" = "$pr_name" ] || return 0
 	pr_state=$(ccnavi_record_get "$push_record" state)
 	case "$pr_state" in
 	present)
+		if [ -n "$pr_kept" ] && [ "$pr_kept" != "$push_branch" ]; then
+			printf '案内: 親子のチケット %s の取り込み状態の親のブランチを %s から %s に書き直した\n' "$pr_name" "$pr_kept" "$push_branch"
+			log_info 取り込み状態の親のブランチを書き直した -- "family=$pr_name"
+		fi
 		ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
 			fetched_at "$(ccnavi_record_get "$push_record" fetched_at)" state present \
 			reason "$(ccnavi_record_get "$push_record" reason)" || :
@@ -1149,20 +1284,20 @@ push_record_family() {
 	'') ;;
 	*) return 0 ;;
 	esac
-	pr_approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-	pr_proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
+	pr_approved=.ccnavi/approved # 固定
+	pr_proposals=wip/proposals   # 固定
 	pr_dirty=$(git -C "$push_top" status --porcelain --untracked-files=all -- \
 		"${pr_approved%/}" "${pr_proposals%/}/review" 2>/dev/null | cut -c4- | tr '\n' ' ' | sed 's/ *$//')
 	if [ -n "$pr_dirty" ]; then
 		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この親子のチケットは取り込み（%s %s）の対象になる\n' \
-			"$pr_dirty" "$SYNC" "$push_branch"
+			"$pr_dirty" "$SYNC" "$pr_name"
 		return 0
 	fi
 	if ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
 		fetched_at "$(date +%s)" state present reason ""; then
-		log_info 親子のチケットの取り込み状態を作った -- "branch=$push_branch" "repo=$push_key"
+		log_info 親子のチケットの取り込み状態を作った -- "family=$pr_name" "repo=$push_key"
 		printf '案内: %s の取り込み状態を作った。以後、リモートでの承認は %s %s で取り込む\n' \
-			"$push_branch" "$SYNC" "$push_branch"
+			"$pr_name" "$SYNC" "$pr_name"
 	fi
 	return 0
 }

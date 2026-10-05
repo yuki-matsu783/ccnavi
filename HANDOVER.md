@@ -74,7 +74,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 実行の最初に出る `sh =` がワークスペースルート側を指していることを確かめる。実際に使われるのはワークスペース側の 1 本だけ。
 写す前の版を測るときは `CCNAVI_SH_DIR=<場所>` で差し替える。組み立て済みの実行ファイルを試すので、
-`ccnavi/` を直したら組み立て直してから回す（無ければ skip）。モード B（`projects/` を使う形）に触ったら回す。
+`src/ccnavi/` を直したら組み立て直してから回す（無ければ skip）。モード B（`projects/` を使う形）に触ったら回す。
 
 ### 未了: Python 側
 
@@ -83,7 +83,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
    `echo x > "projects/has space/.ccnavi/config/rules.yml"` は `builtin-guard-setting-files` に当たらず、
    ルールが何も言わなければ ask になる。`tee` `cp` `mv`、`cd` してからの相対の `>`、Write / Edit は止まる。
    ワークスペースルートの絶対パスに空白があるときも同じ
-2. **`--lint` が、まだリポジトリの無い `projects/` の無視を確かめない。** `lint._projects` は
+2. **`--lint` が、まだリポジトリの無い `projects/` の無視を確かめない。** `lint_places._projects` は
    `tree.projects()` が空なら先に返る。clone する前が一番確かめたい時点
 3. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと列挙から外れ、その中のパスがワークスペースルートとして
    判定される（プロジェクトの `deny` が外れる）。判定は変えず `--lint` と `--explain` が名指しする方針だが、まだ言わない

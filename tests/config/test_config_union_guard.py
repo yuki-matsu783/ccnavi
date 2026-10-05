@@ -289,14 +289,6 @@ class DenyTest(GuardHarness):
                     result = self.guarded_hook(tool, self.ws, file_path=path)
                     self.assert_denied(result, "builtin-guard-project-home")
 
-    def test_project_home_deny_follows_the_env(self):
-        """11.6: パスは `CCNAVI_PROJECT_HOME` の値で組む。"""
-        moved = os.path.join(self.lib, ".navi", "config", "rules.yml")
-        result = self.hook(
-            "Write", self.ws, guard="enable", env={"CCNAVI_PROJECT_HOME": ".navi"}, file_path=moved
-        )
-        self.assert_denied(result, "builtin-guard-project-home")
-
     def test_shell_writes_into_project_home_are_denied(self):
         """11.6: シェルからの書き込みは `builtin-guard-setting-files` の 1 本で止まる。"""
         for command in (
@@ -340,23 +332,6 @@ class DenyTest(GuardHarness):
                 with self.subTest(tool=tool, path=os.path.basename(path)):
                     result = self.guarded_hook(tool, self.ws, file_path=path)
                     self.assert_denied(result, "builtin-guard-common-layer")
-
-    def test_common_layer_deny_holds_when_the_project_home_is_moved(self):
-        """11.6: ccnavi ディレクトリの名前を動かしても、既定の置き場の共通レイヤーは止まる。
-
-        共通レイヤーの置き場は ccnavi ディレクトリの名前に付いて動かないので、
-        `*/.navi/*` からは外れる。
-        """
-        for path in (self.rules, self.phases, self.risk):
-            with self.subTest(path=os.path.basename(path)):
-                result = self.hook(
-                    "Write",
-                    self.ws,
-                    guard="enable",
-                    env={"CCNAVI_PROJECT_HOME": ".navi"},
-                    file_path=path,
-                )
-                self.assert_denied(result, "builtin-guard-common-layer")
 
     def test_common_layer_copies_in_a_worktree_are_denied(self):
         """11.6: ワークスペースから切ったワークツリー側の共通レイヤーも止まる。
@@ -653,7 +628,8 @@ class SetupTest(unittest.TestCase):
     def make_source(self):
         """配布元のふり。実行ファイルと、共通レイヤーの rules / risk と、自身のレイヤーの phases。
 
-        代わりに通る sh 3 本は起動して最初に共通部（ccnavi-common.sh）を読むので、配布元にも
+        代わりに通る sh 3 本は起動して最初に共通部（ccnavi-common.sh と部品の
+        ccnavi-common-*.sh）を読むので、配布元にも
         それを置く。無いと「配布元に無くて配れないもの」として名指しされる。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-union-source-")
@@ -676,6 +652,11 @@ class SetupTest(unittest.TestCase):
             "ccnavi-ticket.sh",
             "ccnavi-review.sh",
             "ccnavi-git.sh",
+            "ccnavi-common-state.sh",
+            "ccnavi-common-lock.sh",
+            "ccnavi-common-c1.sh",
+            "ccnavi-common-host.sh",
+            "ccnavi-common-log.sh",
             "ccnavi-common.sh",
             "ccnavi-push-approved.sh",
             "ccnavi-agree.sh",
@@ -683,6 +664,7 @@ class SetupTest(unittest.TestCase):
             "ccnavi-sync.sh",
             "ccnavi-clean.sh",
             "ccnavi-clean.js",
+            "ccnavi-branches.sh",
         ):
             write(os.path.join(src, ".ccnavi", "scripts", name), f"# {name}\n")
         return src
@@ -711,13 +693,6 @@ class SetupTest(unittest.TestCase):
         self.assertIn(".ccnavi/common/rules.yml", result.stdout)
         self.assertIn(".ccnavi/common/risks.yml", result.stdout)
         self.assertIn(".ccnavi/config/phases.yml", result.stdout)
-
-    def test_all_writes_project_home(self):
-        """11.9: `--all` の env に `CCNAVI_PROJECT_HOME: ".ccnavi"` を足す。"""
-        result = self.run_setup("--all", "--no-deploy")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        env = self.settings()["env"]
-        self.assertEqual(env.get("CCNAVI_PROJECT_HOME"), ".ccnavi")
 
 
 if __name__ == "__main__":

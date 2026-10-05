@@ -5,7 +5,7 @@
 // 名前の検査と未コミットの変更の確認は sh が済ませている。ここがするのは、決まった
 // 名前の生成物を探して消すことだけ。
 //
-// Node で消すのは vscode-extension/ccnavi-board/scripts/clean.js と同じ理由。pnpm の
+// Node で消すのは extensions/vscode/ccnavi-board/scripts/clean.js と同じ理由。pnpm の
 // node_modules は深く（Windows の 260 文字を超える）、junction も含む。fs.rmSync は
 // 長いパスを扱え、symlink と junction はたどらずにリンクそのものだけを消す。
 "use strict";

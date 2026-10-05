@@ -1,0 +1,442 @@
+/**
+ * ボード画面の本体。列とカード、絞り込み、承認のオーバーレイ。
+ *
+ * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いた表示も、
+ * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
+ * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
+ */
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+
+import type { Board, BoardColumn, Card } from "../../core/board.js";
+import type { Moved } from "../../core/board-moved.js";
+import type { BoardData, ToBoard } from "../../core/board-view.js";
+import { SAMPLE_NOTE, sampleBoard } from "../../core/tour-sample.js";
+import { applyAppearance } from "../appearance.js";
+import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { post } from "./post.js";
+import { Approval } from "./Approval.js";
+import { CardItem } from "./Card.js";
+import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
+import { FILTER_LABELS } from "./text.js";
+
+/** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSS の min-width と同じ値 */
+const MIN_WIDTH = 220;
+
+/**
+ * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース（プロジェクト外）」（空）と各プロジェクト。
+ * プロジェクトが無いボードでは欄を出さないので、候補も「すべて」だけ。覚えていた値がここに無ければ使わない
+ * （欄が無いまま「絞り込み中」になると、ユーザには解除する手立てが無い）
+ */
+function projectOptions(board: Board | undefined): readonly string[] {
+  return board === undefined || board.projects.length === 0 ? [EMPTY.project] : [EMPTY.project, "", ...board.projects];
+}
+
+export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
+  const [data, setData] = useState<BoardData>(initial);
+  const [view, setView] = useState<ViewState>(() => {
+    const saved = loadState();
+    // プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき。候補に無ければ触らない
+    const asked = initial.filter;
+    const board = initial.kind === "board" ? initial.board : undefined;
+    return asked !== undefined && projectOptions(board).includes(asked) ? { ...saved, project: asked } : saved;
+  });
+  // 「更新」は押した時点で非活性にして回り記号を出す。活性に戻すのは、拡張ホストが読み直しを終えて
+  // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す経路は要らない。
+  // 実行ファイルが返らない場合は期限（ccnavi.ts）で打ち切る。
+  const [refreshing, setRefreshing] = useState(false);
+
+  const board = data.kind === "board" ? data.board : undefined;
+  // 受け取る側（メッセージ）はいまのボードを知らないので、描くたびに ref へ入れておく
+  const boardRef = useRef<Board | undefined>(board);
+  boardRef.current = board;
+  // 初回の案内はボードが出てから始める。承認のオーバーレイが出ている間は、その下を指しても見えないので待つ
+  const tour = useTour(board !== undefined && data.approval === undefined, { onEnd: () => post({ type: "tourDone" }) });
+  const requestTour = tour.request;
+  /**
+   * 案内の間、チケットが 1 枚も無ければ見本のボードを出す（`tour-sample.ts`）。指す先のカードが無いと、
+   * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの state や承認の件数の元にはしない
+   */
+  const sample = useMemo(
+    () => (tour.touring && board !== undefined && board.totalCount === 0 && !(view.archived && board.archivedCount > 0) ? sampleBoard(board.root, board.generatedAt) : undefined),
+    [tour.touring, board, view.archived],
+  );
+  const shown = sample ?? board;
+
+  useEffect(() => {
+    /** 拡張ホストが指す絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない） */
+    const pickProject = (value: string): void => {
+      if (!projectOptions(boardRef.current).includes(value)) {
+        return;
+      }
+      setView((now) => ({ ...now, project: value }));
+    };
+    const onMessage = (event: MessageEvent): void => {
+      const message = (event.data ?? {}) as Partial<ToBoard>;
+      if (message.type === "data" && message.data !== undefined) {
+        // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目からは filter で届く
+        setData(message.data);
+        setRefreshing(false);
+      } else if (message.type === "filter" && typeof message.project === "string") {
+        pickProject(message.project);
+      } else if (message.type === "tour") {
+        requestTour();
+      } else if (message.type === "appearance") {
+        applyAppearance(message.value);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    // 組み上がったと伝える。裏に回って捨てられた画面は、表に戻ると拡張ホストが入れてある HTML から
+    // 作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
+    post({ type: "ready" });
+    return () => window.removeEventListener("message", onMessage);
+  }, [requestTour]);
+
+  // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、落とした後の値
+  const project = projectOptions(board).includes(view.project) ? view.project : EMPTY.project;
+  // アーカイブを表示しているときは、退避した親も絞り込みの候補に入る（選んでいた親が退避されても外さない）
+  const parentOptions = board === undefined ? [] : view.archived ? [...board.parents, ...board.archivedParents] : board.parents;
+  const parent = parentOptions.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
+  const shownParents = sample === undefined ? parentOptions : (shown?.parents ?? []);
+  // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が有効なままにすると、
+  // 出すものが無いのに「絞り込み中」になる
+  const attention = board !== undefined && view.attention;
+  // アーカイブ済みのチケット（手元の退避）を出すか。既定は出さない。隠すのが既定なので、絞り込み（filtering）には数えない
+  const archived = view.archived;
+  const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
+  // 「アーカイブ済みチケットを表示」を入れたら、右端に足されるアーカイブの列まで横へ送る。
+  // ユーザが入れたときだけ動かす（覚えていた値で開き直したときには動かさない）。
+  // 送るのはボードの横だけ。列の scrollIntoView だと、列の高さに合わせて文書の縦まで動いてしまう
+  const revealArchived = useRef(false);
+  useEffect(() => {
+    if (!archived || !revealArchived.current) {
+      return;
+    }
+    revealArchived.current = false;
+    const board = document.querySelector<HTMLElement>(".board");
+    if (board !== null) {
+      board.scrollLeft = board.scrollWidth;
+    }
+  }, [archived]);
+
+  // 絞り込み中かどうかは body に出す。カードの表示・非表示は CSS（.card.hidden）が受け持つ
+  useEffect(() => {
+    document.body.classList.toggle("filtering", filtering);
+  }, [filtering]);
+
+  /**
+   * 覚える。落とした後の値（候補に無い絞り込みは「すべて」）で書くので、消えた親の絞り込みは
+   * ここで正規化される。ユーザが触ったときだけでなく、拡張ホストから絞り込みを渡されたときも通る。
+   *
+   * 読み直せなかった画面（絞り込みの部品が無い）では書かない。書くと、覚えていた絞り込みが
+   * 既定で上書きされる。
+   */
+  useEffect(() => {
+    if (board === undefined) {
+      return;
+    }
+    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths });
+  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths]);
+
+  // 前の読み直しから動いたカード。数えるのは拡張ホスト（`core/board-moved.ts`）で、画面は出すだけ
+  const moved = new Map((data.kind === "board" ? (data.moved ?? []) : []).map((m) => [m.id, m]));
+  const movedOf = (card: Card): Moved | undefined => (card.column === "archived" ? undefined : moved.get(card.id));
+
+  // 見本は絞り込みに当てない。見本のカードはどのプロジェクトにも親にも属さないので、覚えていた絞り込みが
+  // 有効なままだと全部隠れ、案内が指す先を失う
+  const hiddenOf = (card: Card): boolean =>
+    sample === undefined &&
+    ((!archived && card.column === "archived") ||
+    (project !== EMPTY.project && card.project !== project) ||
+    (parent !== EMPTY.parent && card.family !== parent) ||
+    (attention && !card.attention));
+
+  // 「承認待ち N 件を承認」は、押したときに承認の対象になるもの（絞り込みで見えている承認待ち）の数にする。
+  // 「絞り込み無し」は空の配列ではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認になってしまう。
+  const visiblePending =
+    shown?.columns.flatMap((column) => column.cards.filter((card) => card.pendingApproval && !hiddenOf(card)).map((card) => card.id)) ?? [];
+
+  return (
+    <>
+      {shown === undefined ? (
+        <>
+          <p className="board-empty">チケット管理画面を読み込めませんでした。原因を直してから「ccnavi ボード: チケット管理を更新」を実行してください。</p>
+          <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
+        </>
+      ) : (
+        <>
+          {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+          <header className="toolbar">
+            <div className="summary">
+              {shown.pendingApproval.length > 0 ? <span className="pending warn">承認待ち {shown.pendingApproval.length} 件</span> : null}
+              {shown.issueCount > 0 ? <span className="issues warn">不備 {shown.issueCount} 件</span> : null}
+              <span className="counts">
+                残り {shown.remainingCount} / 全 {shown.totalCount}
+              </span>
+            </div>
+            <div className="controls">
+              {shown.projects.length > 0 ? (
+                <label className="filter">
+                  プロジェクト
+                  <select id="project-filter" value={project} onChange={(event) => setView((now) => ({ ...now, project: event.target.value }))}>
+                    <option value="*">すべて</option>
+                    <option value="">ワークスペース（プロジェクト外）</option>
+                    {shown.projects.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {shownParents.length > 0 ? (
+                <label className="filter">
+                  親
+                  <select id="parent-filter" value={parent} onChange={(event) => setView((now) => ({ ...now, parent: event.target.value }))}>
+                    <option value="*">すべて</option>
+                    {shownParents.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title === "" ? p.id : `${p.id} ${p.title}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <label className="filter attention" title={FILTER_LABELS.attentionTitle}>
+                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
+              </label>
+              <label className="filter archived" title={FILTER_LABELS.archivedTitle}>
+                <input type="checkbox" id="archived-filter" checked={archived} onChange={(event) => {
+                    const checked = event.target.checked;
+                    revealArchived.current = checked;
+                    setView((now) => ({ ...now, archived: checked }));
+                  }} /> {FILTER_LABELS.archived}
+              </label>
+              <button
+                type="button"
+                className={refreshing ? "action busy" : "action"}
+                data-action="refresh"
+                disabled={refreshing}
+                aria-busy={refreshing ? "true" : undefined}
+                onClick={() => {
+                  setRefreshing(true);
+                  post({ type: "refresh" });
+                }}
+              >
+                <span className="spin" aria-hidden="true" />
+                <span className="label">{refreshing ? "更新中…" : "更新"}</span>
+              </button>
+              <button
+                type="button"
+                className="action primary"
+                data-action="approve"
+                disabled={visiblePending.length === 0}
+                onClick={() => post({ type: "approve", tickets: visiblePending, filtered: filtering })}
+              >
+                承認待ち {visiblePending.length} 件を承認
+              </button>
+            </div>
+            <TourButton onClick={tour.start} />
+          </header>
+          {(board?.problems.length ?? 0) > 0 ? (
+            <ul className="problems">
+              {(board?.problems ?? []).map((problem, i) => (
+                <li key={i}>{problem}</li>
+              ))}
+            </ul>
+          ) : null}
+          {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
+          {shown.totalCount === 0 && !(archived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
+          <div className="board">
+            {/* アーカイブの列は「アーカイブ済みチケットを表示」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
+            {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
+              <Column
+                key={column.state}
+                column={column}
+                hiddenOf={hiddenOf}
+                movedOf={movedOf}
+                folded={view.folded.includes(column.state)}
+                width={view.widths[column.state]}
+                onFold={(folded) =>
+                  setView((now) => ({
+                    ...now,
+                    folded: folded ? [...now.folded, column.state] : now.folded.filter((f) => f !== column.state),
+                  }))
+                }
+                onWidth={(width) =>
+                  setView((now) => {
+                    const widths = { ...now.widths };
+                    if (width === undefined) {
+                      delete widths[column.state];
+                    } else {
+                      widths[column.state] = width;
+                    }
+                    return { ...now, widths };
+                  })
+                }
+              />
+            ))}
+          </div>
+          <Footer board={shown} />
+        </>
+      )}
+      {data.approval !== undefined ? <Approval overlay={data.approval} /> : null}
+      {tour.touring && board !== undefined ? <Tour steps={TOUR_STEPS} onClose={tour.end} /> : null}
+    </>
+  );
+}
+
+/**
+ * ボード画面の案内。指す先が無い（チケットが 1 枚も無い、絞り込みで全部隠れた）段は、吹き出しを
+ * 画面の中ほどに出して文だけを見せる（`Tour.tsx`）。画面の様子は動かさないので、閉じても戻すものは無い
+ */
+const TOUR_STEPS: readonly TourStep[] = [
+  {
+    target: ".toolbar .summary",
+    title: "集計",
+    body: "承認待ちと不備の件数、残りのチケット数です。絞り込みに関係なく、チケット管理画面全体の数を表示します。",
+  },
+  {
+    target: ".filter.attention",
+    title: "絞り込み",
+    body: "プロジェクトと親チケットで絞り込めます（プロジェクトや親があるときだけ欄が出ます）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、ユーザが対応する必要があるカードだけを表示します。",
+  },
+  {
+    target: ".board",
+    title: "列",
+    body: "チケットは「未着手 → 作業中 → 完了（または取り消し）」の順に列を移ります。見出しを押すと列を畳み、右端をドラッグすると幅を変えられます（ダブルクリックで元に戻ります）。",
+  },
+  {
+    target: ".column:not(.folded) .card:not(.hidden)",
+    title: "カード",
+    body: "1 枚が 1 チケットです。カードには、親か子か、フェーズの進み具合、ユーザが対応する必要がある状態を示すバッジが出ます。押すとチケットのファイルを開きます。承認やレビュー済みの連絡のボタンは、要るときだけカードに出ます。",
+  },
+  {
+    target: '[data-action="approve"]',
+    title: "承認",
+    body: "絞り込みで見えている承認待ちをまとめて承認します。押すと承認する内容がオーバーレイに出るので、確かめてから承認してください。承認のあと、Claude Code に伝える文を渡せます。",
+  },
+  {
+    target: '[data-action="refresh"]',
+    title: "更新",
+    body: "チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードには動いた表示が付きます。",
+  },
+  {
+    target: '[data-action="tour"]',
+    title: "案内",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
+  },
+];
+
+function Footer({ board }: { readonly board: Board }): JSX.Element {
+  return (
+    <footer className="foot">
+      最終更新 {board.generatedAt} / {board.root}
+    </footer>
+  );
+}
+
+/**
+ * 1 つの列。見出しを押すと折りたたみ、右端の取っ手をドラッグすると幅が px で固定される
+ * （ダブルクリックで元の伸び縮みに戻る）。件数は絞り込みで見えているカードの数。
+ * 上部の集計（残り・全・不備・承認待ち）は絞り込みに関係なくボード全体の数のまま。
+ */
+function Column({
+  column,
+  hiddenOf,
+  movedOf,
+  folded,
+  width,
+  onFold,
+  onWidth,
+}: {
+  readonly column: BoardColumn;
+  readonly hiddenOf: (card: Card) => boolean;
+  readonly movedOf: (card: Card) => Moved | undefined;
+  readonly folded: boolean;
+  readonly width: number | undefined;
+  readonly onFold: (folded: boolean) => void;
+  readonly onWidth: (width: number | undefined) => void;
+}): JSX.Element {
+  const section = useRef<HTMLElement>(null);
+  const visible = column.cards.filter((card) => !hiddenOf(card)).length;
+  // ドラッグの最中に列が消えたら（読み直せずエラーの画面に替わる）`pointerup` を受ける相手が居なくなり、
+  // 後片付けが走らない。body に付けたクラスを残すと、カーソルが変わったまま文字も選べなくなる
+  useEffect(() => () => document.body.classList.remove("resizing"), []);
+  const classes = ["column"];
+  if (width !== undefined) {
+    classes.push("sized");
+  }
+  if (folded) {
+    classes.push("folded");
+  }
+
+  /**
+   * ドラッグしている間の幅は DOM に直に書く。動かすたびに React へ流すと、指を動かすあいだ中
+   * ボード全体を描き直すことになる。離したときに覚える（そこで React の持ち物に戻る）。
+   */
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (event.button !== 0 || section.current === null) {
+      return;
+    }
+    event.preventDefault();
+    const handle = event.currentTarget;
+    const element = section.current;
+    const startX = event.clientX;
+    const startWidth = element.getBoundingClientRect().width;
+    let last = Math.max(MIN_WIDTH, Math.round(startWidth));
+    // 動かさずに押して離しただけなら、幅は決めない。押しただけで px に固定されると、
+    // その列は窓の幅に追従しなくなる
+    let dragged = false;
+    element.classList.add("resizing");
+    document.body.classList.add("resizing");
+    handle.setPointerCapture(event.pointerId);
+    const move = (moved: PointerEvent): void => {
+      last = Math.max(MIN_WIDTH, Math.round(startWidth + moved.clientX - startX));
+      dragged = true;
+      element.classList.add("sized");
+      element.style.width = `${last}px`;
+    };
+    const finish = (): void => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", finish);
+      handle.removeEventListener("pointercancel", finish);
+      element.classList.remove("resizing");
+      document.body.classList.remove("resizing");
+      if (dragged) {
+        onWidth(last);
+      }
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+  };
+
+  return (
+    <section className={classes.join(" ")} data-state={column.state} style={width === undefined ? undefined : { width: `${width}px` }} ref={section}>
+      <h2>
+        <button
+          type="button"
+          className="fold"
+          data-fold={column.state}
+          aria-expanded={folded ? "false" : "true"}
+          title="列を折りたたむ／広げる"
+          onClick={() => onFold(!folded)}
+        >
+          <span className="fold-mark" aria-hidden="true" />
+          <span className="label">{column.label}</span>
+        </button>
+        <span className="count">{visible}</span>
+      </h2>
+      {column.cards.length === 0 ? (
+        <p className="empty">チケットなし</p>
+      ) : (
+        <ul className="cards">
+          {column.cards.map((card) => (
+            <CardItem key={`${card.project}/${card.id}`} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
+          ))}
+        </ul>
+      )}
+      <div className="resizer" data-resize={column.state} title="ドラッグで幅を変える／ダブルクリックで戻す" onPointerDown={onPointerDown} onDoubleClick={() => onWidth(undefined)} />
+    </section>
+  );
+}

@@ -1,5 +1,6 @@
 #!/bin/sh
-# ccnavi (Python) と ccnavi-board (VS Code 拡張機能) をビルドし、このマシンにインストールする。
+# ccnavi (Python)、ccnavi-board (VS Code 拡張機能)、ccnavi-approval (Chrome 拡張機能) をビルドし、
+# ccnavi と ccnavi-board はこのマシンにインストールする。
 #
 #   sh scripts/ccnavi-build-install.sh
 #
@@ -11,7 +12,7 @@
 # ccnavi は、build.py がビルドと .ccnavi/bin/<os>-<arch>/ への配置を両方行う
 # （scripts/../build.py 参照）。
 #
-# 拡張機能は、code にインストール済みのバージョンが vscode-extension/ccnavi-board/package.json の
+# 拡張機能は、code にインストール済みのバージョンが extensions/vscode/ccnavi-board/package.json の
 # バージョン以上なら、インストール済みのバージョンのパッチを 1 つ上げてからビルドする。
 # package.json のほうが大きければ、そのままビルドする。VS Code は、インストール済みと同じか
 # 古いバージョンの vsix を入れ直しとして受け付けない。そのため、インストール済みのバージョンを超える番号にする。
@@ -19,6 +20,12 @@
 # インストール時に「PATH へ追加」を外していると、端末からは code が見つからないため。
 # 環境変数 CODE で場所を渡せば、それを使う。どこにも無いマシン（VS Code の入っていない Linux など）
 # では、バージョンの比較を飛ばし、いまのバージョンのままビルドだけを行う。
+#
+# ccnavi-approval (extensions/chrome/ccnavi-approval) は、pnpm install --frozen-lockfile と pnpm build で
+# 拡張機能のディレクトリの dist/ に組む。Chrome へはコマンドで入れられないため、ビルドのあとに、chrome://extensions の
+# 「パッケージ化されていない拡張機能を読み込む」で選ぶ dist/ の場所を表示する。
+# プロキシの内側（HTTPS_PROXY か https_proxy がある）で NODE_USE_ENV_PROXY が未設定のときは、
+# このビルドのコマンドにだけ NODE_USE_ENV_PROXY=1 を付ける。Node がプロキシを使って Pyodide などを取れるようにするため。
 #
 # バージョンを上げるときは package.json を書き換えるだけで、コミットはしない。チェックアウトした
 # ブランチ直下でこのスクリプトを実行すると、その書き換えが未コミットの変更として残る。
@@ -63,7 +70,7 @@ main() {
   # このスクリプトは scripts/ にあるので、1 つ上をリポジトリのルートとして扱う。
   ROOT=$(cd "$(dirname "$0")/.." && pwd)
   # 拡張機能のソースがあるディレクトリ。
-  EXT_DIR="$ROOT/vscode-extension/ccnavi-board"
+  EXT_DIR="$ROOT/extensions/vscode/ccnavi-board"
 
   # .git がディレクトリなら、ワークツリーではなく本体で実行している。そのときだけリモートから取り込む。
   # （ワークツリーでは .git はファイルになる）
@@ -151,6 +158,26 @@ console.log(i[0] + "." + i[1] + "." + ((i[2] || 0) + 1));
     echo "code コマンドが見つからないため、インストールをスキップします。次のコマンドで手動でインストールしてください。"
     echo "  code --install-extension \"${vsix}\""
   fi
+
+  echo ""
+  echo "== ccnavi-approval (Chrome 拡張) のビルド =="
+  chrome_dir="$ROOT/extensions/chrome/ccnavi-approval"
+  # 作業ディレクトリを変えた影響を、あとの処理へ残さないようにサブシェルで実行する。
+  (
+    cd "$chrome_dir"
+    # プロキシの内側では、Node に環境変数のプロキシを使わせる必要がある。未設定のときだけ 1 を付ける。
+    if [ -n "${HTTPS_PROXY:-}${https_proxy:-}" ] && [ -z "${NODE_USE_ENV_PROXY:-}" ]; then
+      NODE_USE_ENV_PROXY=1
+      export NODE_USE_ENV_PROXY
+    fi
+    pnpm install --frozen-lockfile
+    pnpm build
+  )
+
+  # Chrome へはコマンドでインストールできないため、手で読み込むための場所を表示する。
+  echo ""
+  echo "Chrome へは自動でインストールできません。chrome://extensions の「パッケージ化されていない拡張機能を読み込む」で、次のディレクトリを選んでください。"
+  echo "  ${chrome_dir}/dist"
 }
 
 # exit $? を同じ行に置くのは、実行中にファイルが書き換わっても、この行より後ろを読まずに終わらせるため。

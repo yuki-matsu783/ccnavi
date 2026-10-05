@@ -2,7 +2,7 @@
 
 Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。
 
-見本は `chrome-extension/ccnavi-approval/test/fixtures/host/gitlab/<場面>/` にある。拡張の試験
+見本は `extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/<場面>/` にある。拡張の試験
 （`test/helpers/gitlab-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
 
 - `GET /api/v4/user` → `user.json`（無ければ 403）
@@ -36,13 +36,26 @@ from urllib.parse import parse_qs, quote, urlsplit
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 SCENES = os.path.join(
-    ROOT, "chrome-extension", "ccnavi-approval", "test", "fixtures", "host", "gitlab"
+    ROOT, "extensions", "chrome", "ccnavi-approval", "test", "fixtures", "host", "gitlab"
 )
 API = "https://gitlab.com/api/v4"
 
 
 def scene_names() -> list[str]:
-    return sorted(n for n in os.listdir(SCENES) if os.path.isdir(os.path.join(SCENES, n)))
+    """レビューの場面。
+
+    取り下げの見本（`scene.json` の `kind` が `withdraw`）は拡張の試験だけが読む。
+    """
+    return sorted(
+        n
+        for n in os.listdir(SCENES)
+        if os.path.isdir(os.path.join(SCENES, n)) and _kind(n) != "withdraw"
+    )
+
+
+def _kind(scene: str) -> str:
+    with open(os.path.join(SCENES, scene, "scene.json"), encoding="utf-8") as f:
+        return str(json.load(f).get("kind") or "")
 
 
 def _load(scene: str, name: str):

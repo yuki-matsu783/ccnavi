@@ -14,6 +14,9 @@ sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周�
 
 実行ファイルは代役（引数を記録し、決まった答えと下書きを書く sh）。判定そのものは
 `tests/ticket` が見る。GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ経路だけを返す。
+
+`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
 from __future__ import annotations
@@ -28,12 +31,12 @@ import tempfile
 import threading
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 NEEDS = [tool for tool in ("jq", "curl") if shutil.which(tool) is None]
-SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 TOKEN = "t0k"
 
 # 実行ファイルの代役。引数を 1 行ずつ記録し、`--preview` なら一覧、`--yes` なら下書きを書いて
@@ -153,7 +156,7 @@ class ReviewDecideShTest(unittest.TestCase):
         self.ws = os.path.join(self.work, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.state = os.path.join(self.ws, "logs", "state")
         os.makedirs(self.state)

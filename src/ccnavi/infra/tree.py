@@ -1,0 +1,372 @@
+"""ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先。
+
+## なぜ行き先で決めるか
+
+サブエージェントは親と作業ディレクトリを共有することがある。そこから子の
+ワークツリーへ絶対パスで書いた呼び出しを `cwd` で判定すると、親のチケットで
+判定されてしまう。行き先で決めれば、誰が書いてもその場所のチケットで判定され、
+サブエージェントの起動の仕方が判定に影響しない（REQ-TKT-01）。
+
+参考にした運用はここを `cwd` で決めていて、そのために並行実施に踏み切れずにいた。
+「隔離はされるが統制は効かない」という穴の実体がこれ。
+
+## ワークツリーの確かめ方
+
+`.claude/worktrees/<名前>/` の下にあるだけではワークツリーと呼ばない。
+`.git` ファイルの `gitdir:` がワークスペースルートの `.git/worktrees/<名前>` を指し、そこの
+`gitdir` ファイルが候補を指し返す、という相互参照が成り立つものだけを数える。
+片方向だけだと、同じ名前のただのディレクトリをワークツリーと読み違える。
+
+## 最長一致
+
+ワークツリーはワークスペースルートの中にあるので、短い側（ワークスペースルート）に
+先に割り当てると、`.claude/worktrees/x/src/a` がワークスペースルートの
+`.claude/worktrees/x/src/a` として判定され、
+x のチケットが判定に使われなくなる。候補のうち最も長く一致したものを採る。
+"""
+
+from __future__ import annotations
+
+import os
+import unicodedata
+from dataclasses import dataclass
+
+# ワークツリーの置き場。CLAUDE.md の運用と対になる。ワークスペースルートの中に置くのは、
+# セッションの道具と権限がそこまで届くようにするため。
+WORKTREES_DIR = os.path.join(".claude", "worktrees")
+
+# ワークスペースルートの名前。空文字。チケットは持たない。
+MAIN = ""
+
+# ツリーの種類（設計 11.3）。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
+# リポジトリ）、ワークツリー。プロジェクトはワークスペースの git には入らず、自分の git を持つ。
+KIND_MAIN = "main"
+KIND_PROJECT = "project"
+KIND_WORKTREE = "worktree"
+
+
+@dataclass
+class Tree:
+    """ツリー 1 つ。name が空ならワークスペースルート。
+
+    project は、このツリーがどのプロジェクトのものか。ワークスペースなら空、
+    プロジェクトならその名前、ワークツリーなら元リポジトリがプロジェクトなら
+    その名前（ワークスペースから切ったワークツリーなら空）。
+    """
+
+    name: str
+    root: str
+    project: str = ""
+    kind: str = KIND_MAIN
+
+    @property
+    def is_main(self) -> bool:
+        """チケットを持たないツリーか。ワークスペースルートとプロジェクトがこれ。"""
+        return self.kind != KIND_WORKTREE
+
+
+def main_tree(root: str) -> Tree:
+    return Tree(MAIN, _canonical(root))
+
+
+def projects(projects_dir: str) -> list[Tree]:
+    """プロジェクトの一覧。置き場の直下で `.git` を持つディレクトリだけ。深さ 1。
+
+    置き場を空にしたプロジェクトはプロジェクトを持たない。`.git` はディレクトリでも
+    ファイルでもよい（プロジェクトが submodule として置かれた形も、自分の git を持つ）。
+    """
+    if not projects_dir:
+        return []
+    try:
+        names = sorted(os.listdir(projects_dir))
+    except OSError:
+        return []
+    found = []
+    for name in names:
+        candidate = os.path.join(projects_dir, name)
+        if os.path.isdir(candidate) and os.path.exists(os.path.join(candidate, ".git")):
+            found.append(Tree(name, _canonical(candidate), project=name, kind=KIND_PROJECT))
+    return found
+
+
+def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
+    """ワークスペースルートの下にある、本物のワークツリーの一覧。
+
+    元リポジトリはワークスペースでもプロジェクトでもよい。
+
+    読むのはファイルシステムだけで、git は起こさない。実行前チェックの中で
+    呼ばれるので、外部プロセスを起こす場所にはできない。
+    """
+    base = os.path.join(root, WORKTREES_DIR)
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return []
+    owners = [main_tree(root), *projects(projects_dir)]
+    found = []
+    for name in names:
+        candidate = os.path.join(base, name)
+        if not os.path.isdir(candidate):
+            continue
+        owner = owner_of(candidate, owners)
+        if owner is not None:
+            found.append(
+                Tree(nfc(name), _canonical(candidate), project=owner.project, kind=KIND_WORKTREE)
+            )
+    return found
+
+
+def owner_of(candidate: str, owners: list[Tree]) -> Tree | None:
+    """このワークツリーの元リポジトリ。ワークスペースかプロジェクトのどれかで、相互参照が成り立つもの。"""
+    for owner in owners:
+        if is_worktree_of(owner.root, candidate):
+            return owner
+    return None
+
+
+def all_trees(root: str, projects_dir: str = "") -> list[Tree]:
+    """ワークスペースルート、プロジェクト、ワークツリーの順。"""
+    return [main_tree(root), *projects(projects_dir), *worktrees(root, projects_dir)]
+
+
+def project_root(projects_dir: str, project: str) -> str:
+    """この名前の git プロジェクトルート。無くても返す。空の名前はワークスペース（空文字）。"""
+    return os.path.join(projects_dir, project) if project and projects_dir else ""
+
+
+def is_worktree_of(root: str, candidate: str) -> bool:
+    """candidate が root のワークツリーであることを、相互参照で確かめる。"""
+    gitfile = os.path.join(candidate, ".git")
+    if not os.path.isfile(gitfile):
+        return False
+    try:
+        with open(gitfile, encoding="utf-8") as f:
+            line = f.read().strip()
+    except OSError:
+        return False
+    if not line.startswith("gitdir:"):
+        return False
+    gitdir = line[len("gitdir:") :].strip()
+    if not os.path.isabs(gitdir):
+        gitdir = os.path.join(candidate, gitdir)
+    gitdir = _canonical(gitdir)
+
+    registry = _canonical(os.path.join(root, ".git", "worktrees"))
+    if not gitdir.startswith(registry + os.sep):
+        return False
+
+    try:
+        with open(os.path.join(gitdir, "gitdir"), encoding="utf-8") as f:
+            back = f.read().strip()
+    except OSError:
+        return False
+    return _canonical(back) == _canonical(gitfile)
+
+
+def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
+    """このパスが属するツリー。ワークスペースルートの外なら None。
+
+    候補はワークスペースルート、プロジェクト、ワークツリーの全部で、最長一致を採る。上限は
+    ワークスペースルートで、外に行き先があれば判定を持たない。
+    """
+    if not full:
+        return None
+    target = _canonical(full)
+    best: Tree | None = None
+    for tree in all_trees(root, projects_dir):
+        inside = target == tree.root or target.startswith(tree.root + os.sep)
+        if inside and (best is None or len(tree.root) > len(best.root)):
+            best = tree
+    return best
+
+
+def relative(tree: Tree, full: str) -> str:
+    """作業ツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
+
+    表記の大文字小文字は元のまま返す。normcase を掛けたパスから作ると、
+    区別しない機械（Windows）では全部が小文字になり、チケットが `README.md` と
+    書いた範囲に `readme.md` を当てることになって、永久に当たらない。
+    `os.path.relpath` は比較にだけ normcase を使い、返すパスは元のままなので、
+    根（normcase 済み）と突き合わせても大文字小文字は保たれる。
+    """
+    target = _canonical(full)
+    if target == tree.root:
+        return ""
+    return os.path.relpath(_resolved(full), tree.root).replace(os.sep, "/")
+
+
+def git_dir(tree_root: str) -> str | None:
+    """このツリーの git ディレクトリ。分からなければ None。ファイルだけを読む（git は起こさない）。
+
+    `.git` がディレクトリならそれ、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその場所。
+    """
+    dotgit = os.path.join(tree_root, ".git")
+    if not os.path.isfile(dotgit):
+        return dotgit if os.path.isdir(dotgit) else None
+    try:
+        with open(dotgit, encoding="utf-8") as f:
+            line = f.read().strip()
+    except (OSError, ValueError):
+        return None
+    if not line.startswith("gitdir:"):
+        return None
+    gitdir = line[len("gitdir:") :].strip()
+    if not os.path.isabs(gitdir):
+        gitdir = os.path.join(tree_root, gitdir)
+    return gitdir
+
+
+def head_text(tree_root: str) -> str | None:
+    """このツリーの `HEAD` の中身（前後の空白を落とす）。読めなければ None。"""
+    gitdir = git_dir(tree_root)
+    if gitdir is None:
+        return None
+    try:
+        with open(os.path.join(gitdir, "HEAD"), encoding="utf-8") as f:
+            return f.read().strip()
+    except (OSError, ValueError):
+        return None
+
+
+def origin_head(repo_root: str) -> str:
+    """そのリポジトリの `origin/HEAD` が指すブランチ名（`refs/remotes/origin/HEAD` の中身）。
+    無ければ空。
+
+    ファイルだけを読む（git は起こさない）。`ccnavi_default_branch` が `symbolic-ref`
+    で読むものと同じ。
+    """
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return ""
+    try:
+        with open(os.path.join(gitdir, "refs", "remotes", "origin", "HEAD"), encoding="utf-8") as f:
+            text = f.read().strip()
+    except (OSError, ValueError):
+        return ""
+    prefix = "ref: refs/remotes/origin/"
+    return text[len(prefix) :].strip() if text.startswith(prefix) else ""
+
+
+def has_branch(repo_root: str, name: str) -> bool:
+    """そのリポジトリに、手元のブランチか origin のブランチ `name` があるか。
+
+    ファイルだけを読む（git は起こさない。承認画面を組む判定の中から呼ばれる）。見るのは git
+    ディレクトリの `refs/heads/<名前>`・`refs/remotes/origin/<名前>` と `packed-refs` の行。
+    `..` や空の段を含む名前は読まない（git ディレクトリの外を読まない）。
+    """
+    parts = name.split("/") if isinstance(name, str) else []
+    if not parts or any(p in ("", ".", "..") for p in parts):
+        return False
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return False
+    wanted = (f"refs/heads/{name}", f"refs/remotes/origin/{name}")
+    for ref in wanted:
+        if os.path.isfile(os.path.join(gitdir, *ref.split("/"))):
+            return True
+    try:
+        with open(os.path.join(gitdir, "packed-refs"), encoding="utf-8") as f:
+            for line in f:
+                _, _, ref = line.strip().partition(" ")
+                if ref in wanted:
+                    return True
+    except (OSError, ValueError):
+        pass
+    return False
+
+
+# 途中の操作の目印（git ディレクトリの中の名前）。
+BUSY_MARKS = (
+    "MERGE_HEAD",
+    "CHERRY_PICK_HEAD",
+    "REVERT_HEAD",
+    "rebase-merge",
+    "rebase-apply",
+    "sequencer",
+)
+
+
+def busy_of(tree_root: str) -> str:
+    """このツリーで途中の操作（merge・cherry-pick・revert・rebase）があればその目印の名前。無ければ空。
+
+    ファイルだけを見る（git は起こさない）。
+    """
+    gitdir = git_dir(tree_root)
+    if gitdir is None:
+        return ""
+    for name in BUSY_MARKS:
+        if os.path.lexists(os.path.join(gitdir, name)):
+            return name
+    return ""
+
+
+def branch_of(tree_root: str) -> str | None:
+    """このツリーの作業ツリーが今いるブランチの名前。分からなければ None。
+
+    読むのはファイルだけで、git は起こさない（判定の中から呼ばれうる）。`.git` が
+    ディレクトリならその `HEAD`、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその
+    場所の `HEAD`。`ref: refs/heads/<名前>` の形だけを名前として読み、切り離した HEAD
+    （sha）・空・壊れた中身・読めないものは None（呼び手はツリーの名前で代える）。
+    """
+    head = head_text(tree_root)
+    if head is None:
+        return None
+    prefix = "ref: refs/heads/"
+    name = head[len(prefix) :].strip() if head.startswith(prefix) else ""
+    return name or None
+
+
+def worktree_path(root: str, name: str) -> str:
+    """この名前のワークツリーが置かれるはずの場所。在るかどうかは見ない。"""
+    return os.path.join(root, WORKTREES_DIR, name)
+
+
+def exact_name(root: str, name: str) -> bool:
+    """この名前のワークツリーが、表記の大文字小文字までそのままで在るか。
+
+    大文字小文字を区別しない機械では `I0001-01-02` というディレクトリが `i0001-01-02` として
+    開けてしまう。名前が識別子だと言う以上、表記まで同じであることを求める。
+    """
+    try:
+        return nfc(name) in {nfc(n) for n in os.listdir(os.path.join(root, WORKTREES_DIR))}
+    except OSError:
+        return False
+
+
+def nfc(name: str) -> str:
+    """ディレクトリの名前を NFC にそろえる。
+
+    識別子は NFC に限る。macOS の HFS+ は名前を NFD で返すので、日本語の識別子のワークツリーを
+    識別子と同じ表記として引くためにそろえる（APFS と Windows・Linux は書いた表記のまま返す）。
+    """
+    return unicodedata.normalize("NFC", name)
+
+
+# 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、ワークツリーの
+# 名前の表記が違っても同じ識別子として結び付けるのは、この機械だけ。
+CASE_INSENSITIVE = os.path.normcase("A") == "a"
+
+
+def lookup(index: dict, name: str):
+    """ワークツリーの名前で承認済みチケットを引く。区別しない機械では表記の違いを許す。"""
+    found = index.get(name)
+    if found is not None or not CASE_INSENSITIVE:
+        return found
+    for key, value in index.items():
+        if key.lower() == name.lower():
+            return value
+    return None
+
+
+def _resolved(path: str) -> str:
+    """行き着く先。表記の大文字小文字は元のまま。"""
+    try:
+        resolved = os.path.realpath(path)
+    except OSError:
+        resolved = os.path.abspath(path)
+    return os.path.normpath(resolved)
+
+
+def _canonical(path: str) -> str:
+    """同じ場所が同じ表記になる形。大文字小文字は区別しない機械のために normcase。"""
+    return os.path.normcase(_resolved(path))

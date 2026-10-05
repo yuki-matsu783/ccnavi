@@ -106,7 +106,7 @@ def write(path, text):
     return path
 
 
-# レイヤーの 3 本の置き場（`CCNAVI_PROJECT_HOME` の既定）。
+# レイヤーの 3 本の置き場（既定の ccnavi ディレクトリ）。
 LAYER = os.path.join(".ccnavi", "config")
 
 
@@ -190,7 +190,8 @@ class ProjectsTest(unittest.TestCase):
 
         `--projects` は渡さない。レイヤーを探す先を動かすフラグは診断でだけ有効な
         ので、置き場は `--root` の下の既定のまま。「`projects/` を
-        数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
+        数えない」は `projects/` を作らないワークスペースで言う（置き場は固定で、空文字の口は
+        無い）。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -443,11 +444,14 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる（REQ-MLT-11）
         self.assertIn("■ プロジェクト: lib", approved.stdout)
-        # 継ぐ段は無いが、承認済みチケットには残る
-        # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
+        # 承認は `project:` を書き足さない（中身を変えない）。承認済みチケットのプロジェクトも
+        # 置き場（ツリー）から決まる
         for name in ("i0007", "i0007-01-01"):
             with open(self.approved_path("doing", name + ".md"), encoding="utf-8") as f:
-                self.assertIn("project: lib", f.read())
+                self.assertNotIn("project:", f.read())
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        found = {t["ticket"]: t["project"] for t in board["tickets"]}
+        self.assertEqual(found, {"i0007": "lib", "i0007-01-01": "lib"})
 
     def test_a_declaration_that_disagrees_with_the_place_is_not_approved(self):
         write(
@@ -617,9 +621,10 @@ class ProjectsTest(unittest.TestCase):
     def test_lint_names_project_config_problems(self):
         write(layer_rules(self.app), "version: 1\ndeny: [\n")
         os.makedirs(os.path.join(self.lib, ".claude"))
+        # `projects/` を無視しない。追跡はしない: ここで `git add -A` すると、入れ子の
+        # リポジトリが `projects/app` の名前で索引に載り、「追跡されている」の側の
+        # 知らせ（置き場は固定）に切り替わって、「無視されていない」を確かめられなくなる。
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
-        git(self.ws, "add", "-A")
-        git(self.ws, "commit", "--quiet", "-m", "stop ignoring projects")
 
         result = self.ccnavi("--lint")
         out = result.stdout + result.stderr
@@ -654,18 +659,38 @@ class ProjectsTest(unittest.TestCase):
     # ---- 7. projects/ を数えない設定では前と同じ
 
     def test_without_a_projects_dir_everything_is_judged_by_the_workspace_rules(self):
-        no_projects = {"CCNAVI_PROJECTS": ""}
-        passed = self.hook(
-            "Write", self.ws, env=no_projects, file_path=os.path.join(self.app, "schema", "x.sql")
-        )
+        # 「数えない」を言う口は、`projects/` を作らないこと（置き場は固定）。
+        # 消さずに `projects/` の外へ動かす（Windows は .git の中の読み取り専用を消せない）。
+        # 動かした先の app は入れ子の git のまま。`projects/` の外なら、その中でも
+        # ワークスペースのルールで判定される。
+        moved = os.path.join(self.ws, "moved-away")
+        os.rename(self.projects, moved)
+        app = os.path.join(moved, "app")
+        passed = self.hook("Write", self.ws, file_path=os.path.join(app, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
         record = self.last_record()
         self.assertNotIn("project", record)
 
-        passed = self.hook("Bash", self.app, env=no_projects, command="psql")
+        passed = self.hook("Bash", app, command="psql")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
+
+    def test_an_empty_projects_env_still_counts_the_projects(self):
+        # A3（置き場の固定）。`CCNAVI_PROJECTS=""` は「プロジェクトを数えない」と読まれていた。
+        # 6 つの env を廃止したので、空文字を入れても `projects/` の下は数えられる。
+        # 実装前は赤。赤の理由は、まだ `CCNAVI_PROJECTS` の空文字を読んでいること。
+        env = {"CCNAVI_PROJECTS": ""}
+        denied = self.hook(
+            "Write", self.ws, env=env, file_path=os.path.join(self.app, "schema", "x.sql")
+        )
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("app:schema", self.reason(denied))
+        self.assertEqual(self.last_record()["project"], "app")
+
+        denied = self.hook("Bash", self.ws, env=env, command="psql -c 'select 1'")
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("lib:raw-psql", self.reason(denied))
 
     # ---- 8. --project-rules-file は診断でだけ 1 つのプロジェクトのルールを差し替える
 

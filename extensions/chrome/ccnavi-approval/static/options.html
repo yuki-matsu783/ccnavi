@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ccnavi 承認ボード: 設定</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1>設定</h1>
+<section>
+  <h2>リポジトリ</h2>
+  <ul id="repo-list"></ul>
+  <form id="repo-form">
+    <label>ホスト <select name="host" id="repo-host"></select></label>
+    <label>owner <input name="owner" required></label>
+    <label>リポジトリ <input name="repo" required></label>
+    <label>統合先の名前 <input name="integration" placeholder="空ならデフォルトブランチ"></label>
+    <label>直近の日数（表示用） <input name="recentDays" type="number" min="0" max="90" value="7"></label>
+    <label>指定のブランチ（表示用。空白かカンマで区切る） <input name="extraBranches"></label>
+    <label>プロジェクト名（手元の projects/ の下の名前。空ならワークスペース自身） <input name="project" id="repo-project"></label>
+    <label>ワークスペースのリポジトリ（プロジェクトを登録するとき） <select name="workspace" id="repo-workspace"><option value="">（選ぶ）</option></select></label>
+    <button type="submit">登録</button>
+  </form>
+  <p id="repo-msg" role="status"></p>
+  <p class="note">直近の日数と指定のブランチは、承認待ちを見つけるのに使うだけです。判定には、統合先と親のブランチ、先行をたどって行き着く親のブランチだけを入れます。見せ方の設定で判定の答えが変わらないようにするためです。</p>
+  <p class="note">プロジェクトのリポジトリ（手元で projects/&lt;名前&gt; に clone するもの）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通レイヤー・設定・互換のマーカーはワークスペースの統合先から読みます。置き場のパスは既定（wip/proposals・.ccnavi/approved）に固定で、.claude/settings.json の env では動きません。GitLab の入れ子のグループは owner に group/sub と書きます。</p>
+</section>
+<section>
+  <h2>PAT</h2>
+  <ul id="token-list"></ul>
+  <form id="token-form">
+    <label>ホスト <select name="host" id="token-host"></select></label>
+    <label>PAT <input id="token-value" type="password" autocomplete="off" required></label>
+    <label>期限（ホストの応答から読めないときに使う。YYYY-MM-DD） <input id="token-expires" name="expires" type="date"></label>
+    <button type="submit">登録</button>
+    <button type="button" id="token-clear">消す</button>
+  </form>
+  <p id="token-msg" role="status"></p>
+  <p class="note">PAT は、承認・取り下げ・レビュー済みを親のブランチへ書くのと、「始める」で issue から親のブランチを作るのに使います。GitHub では fine-grained token を作り、対象のリポジトリを絞って、Contents: Read and write（ブランチを作るのにも使う）・Metadata: Read-only・Pull requests: Read-only・Issues: Read-only を選びます。GitLab では api スコープを選びます（Commits API は write_repository では書けないため）。project access token が使えればプロジェクトを絞れます。使えなければ個人の PAT になり、プロジェクトは絞れません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT はこのブラウザのプロファイルに平文で置かれ、同じ OS ユーザーのプロセスからは読めます。リポジトリを絞った最小の権限のトークンにしてください。期限はホストの応答から読みます。読めないときは上の欄の日付を使い、切れる 7 日前からボードとアイコンで知らせます。</p>
+  <ul id="token-links"></ul>
+</section>
+<script type="module" src="options.js"></script>
+</body>
+</html>

@@ -20,7 +20,7 @@ import shutil
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
-from ccnavi.tickets import history, review
+from ccnavi.tickets import history, review, review_host
 from tests.ticket.test_core import STAMP, CoreHarness
 from tests.ticket.test_phases import child_text
 from tests.ticket.test_ticket import git, read_json, write
@@ -229,40 +229,44 @@ class ReviewRuleTest(ActorHarness):
 
     @staticmethod
     def review(state, at, author="9001"):
-        return review.Review(state, f"r/{state}/{at}", at, author)
+        return review_host.Review(state, f"r/{state}/{at}", at, author)
 
     def test_a_comment_or_a_pending_review_does_not_clear_a_change_request(self):
         cr = self.review("CHANGES_REQUESTED", "2026-09-29T01:00:00Z")
         for later in ("COMMENTED", "PENDING"):
-            got = review.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
+            got = review_host.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
             self.assertEqual([r.state for r in got], ["CHANGES_REQUESTED"], later)
-        pending = review.Review("PENDING", "r/p", "", "9001")
-        self.assertEqual([r.state for r in review.effective([cr, pending])], ["CHANGES_REQUESTED"])
+        pending = review_host.Review("PENDING", "r/p", "", "9001")
+        self.assertEqual(
+            [r.state for r in review_host.effective([cr, pending])], ["CHANGES_REQUESTED"]
+        )
         for later, left in (("APPROVED", ["APPROVED"]), ("DISMISSED", [])):
-            got = review.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
+            got = review_host.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
             self.assertEqual([r.state for r in got], left, later)
-        self.assertEqual(review.effective([self.review("COMMENTED", "2026-09-29T00:00:00Z")]), [])
+        self.assertEqual(
+            review_host.effective([self.review("COMMENTED", "2026-09-29T00:00:00Z")]), []
+        )
 
     def test_a_marker_thread_is_skipped_only_on_gitlab_by_the_poster(self):
-        marker = review.Thread(id="t", body="<!-- ccnavi:request i0001:1 -->", author="bot")
-        self.assertEqual(review._unresolved([marker], set(), "github", "bot"), [marker])
-        self.assertEqual(review._unresolved([marker], set(), "gitlab", ""), [marker])
-        self.assertEqual(review._unresolved([marker], set(), "gitlab", "someone"), [marker])
-        self.assertEqual(review._unresolved([marker], set(), "gitlab", "bot"), [])
+        marker = review_host.Thread(id="t", body="<!-- ccnavi:request i0001:1 -->", author="bot")
+        self.assertEqual(review_host._unresolved([marker], set(), "github", "bot"), [marker])
+        self.assertEqual(review_host._unresolved([marker], set(), "gitlab", ""), [marker])
+        self.assertEqual(review_host._unresolved([marker], set(), "gitlab", "someone"), [marker])
+        self.assertEqual(review_host._unresolved([marker], set(), "gitlab", "bot"), [])
 
     def test_a_crit_push_thread_is_counted_even_from_the_poster(self):
         """crit push の行のスレッドは目印で始まらないので、依頼を投稿したアカウントからでも数える。
 
         ユーザが依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める。
         """
-        crit = review.Thread(
+        crit = review_host.Thread(
             id="d1", body="ここは X ではなく Y では", author="bot", path="wip/eli5/phase-1.html"
         )
         for host in ("github", "gitlab"):
-            self.assertEqual(review._unresolved([crit], set(), host, "bot"), [crit], host)
+            self.assertEqual(review_host._unresolved([crit], set(), host, "bot"), [crit], host)
 
     def test_a_request_record_without_host_or_mr_is_not_matched(self):
-        result = review.Result(host="github", mr=review.MergeRequest(7, "u"))
+        result = review_host.Result(host="github", mr=review_host.MergeRequest(7, "u"))
         for mark in ({"mr": 7}, {"host": "github"}, {}):
             self.assertIn("依頼し直してください", review.matching_problems(result, mark)[0], mark)
         self.assertEqual(review.matching_problems(result, {"host": "github", "mr": 7}), [])

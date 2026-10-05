@@ -29,12 +29,12 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-PUSH_SCRIPTS = ("ccnavi-push-approved.sh", "ccnavi-common.sh")
+PUSH_SCRIPTS = ("ccnavi-push-approved.sh", *common_sh(SH_DIR))
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
@@ -320,6 +320,71 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.remote_head("main"), "")
         self.assertIn("main", result.stderr)
 
+    # 固定のリストに無い名前の統合先。決め方は ccnavi_integration。
+
+    def assertNotPushed(self, result, tree, branch):
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.remote_head(branch), "")
+        self.assertIn(f"統合先 {branch}", result.stderr)
+
+    def test_the_branch_origin_head_points_to_is_committed_but_not_pushed(self):
+        tree = self.worktree("develop-v1.0.0")
+        ref = "refs/remotes/origin/develop-v1.0.0"
+        git(self.ws, "update-ref", ref, "HEAD")
+        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
+        self.place(tree)
+        self.assertNotPushed(self.push(), tree, "develop-v1.0.0")
+
+    def test_the_environment_and_the_record_name_the_integration(self):
+        tree = self.worktree("develop-v1.0.0")
+        self.place(tree)
+        env = self.env(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
+        self.assertNotPushed(self.push(env=env), tree, "develop-v1.0.0")
+
+        other = self.worktree("release-2")
+        self.place(other)
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "remote origin\nbranch release-2\nsource default\n",
+        )
+        self.assertNotPushed(self.push(), other, "release-2")
+
+    def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
+        """統合先が決まらない（origin/HEAD も origin/main・master も無い）なら今までどおり送る。"""
+        tree = self.worktree("develop-v1.0.0")
+        self.place(tree)
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("develop-v1.0.0"), self.head(tree))
+
+    def test_a_project_is_judged_by_its_own_integration(self):
+        """projects/<名前>/ のツリーは、そのプロジェクトの統合先で判定する。"""
+        project = os.path.join(self.ws, "projects", "app")
+        remote = self.repository(project, "develop-v1.0.0")
+        self.place(project)
+        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先は別
+        # （取り込み結果が無く origin も空）。
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "branch develop-v1.0.0\n",
+        )
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.head_of(remote, "develop-v1.0.0"), self.head(project))
+
+        write(os.path.join(project, *APPROVED.split("/"), "i0002.md"), "approved\n")
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "app", "integration", "head"),
+            "branch develop-v1.0.0\n",
+        )
+        before = self.head_of(remote, "develop-v1.0.0")
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("統合先 develop-v1.0.0", result.stderr)
+        self.assertEqual(self.head_of(remote, "develop-v1.0.0"), before)
+        self.assertNotEqual(self.head(project), before)
+
     # ---- 20. push が落ちる
 
     def test_failed_push_exits_1_and_keeps_the_commit(self):
@@ -365,24 +430,74 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.head_of(remote, "work"), self.head(project))
         self.assertNotIn(NOTHING, result.stdout)
 
-    def test_carries_the_place_named_by_ccnavi_approved(self):
-        """12. `CCNAVI_TICKETS_APPROVED` を既定と違うパスにすると、
-        その置き場をコミットして push する。
+    def test_does_not_read_the_place_variables(self):
+        """12（改）. 置き場を動かす環境変数は読まない。既定の置き場だけをコミットして push する
+        （置き場は固定。A9）。
 
-        既定の置き場（`.ccnavi/approved`）はコミットしない。環境変数の名前は
-        `ccnavi/infra/settings.py` の `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
+        `CCNAVI_PROJECTS` / `CCNAVI_TICKETS_APPROVED` / `CCNAVI_TICKETS_PROPOSAL` を既定と違う
+        値で入れても、`projects/` の下と既定の置き場（`.ccnavi/approved`）をコミットして
+        push し、既定の提案の置き場（`wip/proposals/todo`）で消えた提案の削除を
+        同じコミットに入れる。
+        env が指した置き場はコミットしない。以前は 12（`CCNAVI_TICKETS_APPROVED` で置き場が動く）と
+        パスの正規化の 2 本（`CCNAVI_PROJECTS=/`・`CCNAVI_TICKETS_APPROVED=.`）が見ていた。
+
+        3 つのどれか 1 つでも読まれれば、下の確かめのどれかが落ちる。
+
+        - `CCNAVI_PROJECTS`: `projects/app` がコミットされず、env が指す `x/stray` がコミットされる
+        - `CCNAVI_TICKETS_APPROVED`: 既定の置き場の代わりに `approved/tickets` がコミットされる
+        - `CCNAVI_TICKETS_PROPOSAL`: `wip/proposals/todo` の削除がコミットされず、env が指す
+          `elsewhere/proposals/todo` の削除がコミットされる
+
+        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+        写す前の sh は 3 つの値を読むため。
         """
-        other = "approved/tickets"
+        project = os.path.join(self.ws, "projects", "app")
+        remote = self.repository(project, "work")
+        self.place(project)
         tree = self.worktree("i0001")
-        write(os.path.join(tree, *other.split("/"), "i0001.md"), "approved\n")
-        self.place(tree, "i0002")
+        # 承認で todo/ から動いた提案の形。既定の置き場と env が指す置き場に 1 枚ずつ
+        # 追跡させてから消す。運ばれてよいのは既定の側の削除だけ。
+        kept = "elsewhere/proposals/todo/x.md"
+        gone = "wip/proposals/todo/x.md"
+        for rel in (gone, kept):
+            write(os.path.join(tree, *rel.split("/")), "proposal\n")
+        git(tree, "add", "--", gone, kept)
+        git(tree, "commit", "-q", "-m", "proposals")
+        for rel in (gone, kept):
+            os.remove(os.path.join(tree, *rel.split("/")))
+        self.place(tree)
+        # env が指す承認済みチケットの置き場。読まれたときにだけコミットされる。
+        other = "approved/tickets"
+        write(os.path.join(tree, *other.split("/"), "i0009.md"), "approved\n")
+        # env が指すプロジェクトの置き場（`/x` は末尾の / を落とすとルートの下の `x`）。
+        # 読まれたときにだけ、その下のリポジトリが運ばれる。
+        stray = os.path.join(self.ws, "x", "stray")
+        stray_remote = self.repository(stray, "work")
+        self.place(stray)
+        stray_before = self.head(stray)
 
-        result = self.push(env=self.env(CCNAVI_TICKETS_APPROVED=other))
+        result = self.push(
+            env=self.env(
+                CCNAVI_PROJECTS="/x",
+                CCNAVI_TICKETS_APPROVED=other,
+                CCNAVI_TICKETS_PROPOSAL="elsewhere/proposals",
+            )
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.subject(tree), MESSAGE)
-        self.assertEqual(self.committed(tree), [f"{other}/i0001.md"])
-        self.assertTrue(self.dirty(tree, APPROVED))
+        # `projects/` の下のプロジェクトと、切ったワークツリーの既定の置き場を運ぶ。
+        self.assertEqual(self.subject(project), MESSAGE, result.stderr)
+        self.assertEqual(self.committed(project), [f"{APPROVED}/i0001.md"])
+        self.assertEqual(self.head_of(remote, "work"), self.head(project))
+        # ワークツリーは既定の置き場と、既定の提案の置き場で消えた提案を 1 つのコミットで運ぶ。
+        self.assertEqual(self.subject(tree), MESSAGE, result.stderr)
+        self.assertEqual(self.committed(tree), sorted([f"{APPROVED}/i0001.md", gone]))
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
+        # env が指した置き場は運ばない。承認済みチケットの置き場も、消えた提案も、
+        # その下のリポジトリも。
+        self.assertTrue(self.dirty(tree, other))
+        self.assertTrue(self.dirty(tree, kept))
+        self.assertEqual(self.head(stray), stray_before)
+        self.assertEqual(self.head_of(stray_remote, "work"), "")
 
     # ---- チケット approve-carry-05 の 7・8
 
@@ -492,38 +607,6 @@ class PushApprovedTest(Workspace):
         result = self.push()
         self.assertTrue(self.said(result, "worktrees"), result.stderr)
         self.assert_not_carried(app, remote, before)
-
-    def test_projects_that_names_the_workspace_root_falls_back_to_the_default(self):
-        """`CCNAVI_PROJECTS=/` は末尾の `/` を落とすと空になり、ルートの直下を全部数えることになる。
-
-        既定の `projects` に戻すので、ルートの直下に置いた別のリポジトリはコミットしない。
-        本物のワークツリーはコミットして push する。
-        """
-        app = os.path.join(self.ws, "stray")
-        remote = self.repository(app, "work")
-        self.place(app)
-        before = self.head(app)
-        tree = self.worktree("i0002")
-        self.place(tree, "i0002")
-
-        result = self.push(env=self.env(CCNAVI_PROJECTS="/"))
-        self.assert_not_carried(app, remote, before)
-        self.assertEqual(self.subject(tree), MESSAGE, result.stderr)
-        self.assertEqual(self.remote_head("i0002"), self.head(tree))
-
-    def test_approved_place_that_names_the_tree_root_falls_back_to_the_default(self):
-        """`CCNAVI_TICKETS_APPROVED=.` はツリー全体を指す。
-
-        既定の置き場に戻し、書きかけはコミットしない。
-        """
-        tree = self.worktree("i0001")
-        self.place(tree)
-        write(os.path.join(tree, "README.md"), "書きかけ\n")
-
-        result = self.push(env=self.env(CCNAVI_TICKETS_APPROVED="."))
-        self.assertEqual(self.subject(tree), MESSAGE, result.stderr)
-        self.assertTrue(self.dirty(tree, "README.md"))
-        self.assertFalse(self.dirty(tree, APPROVED))
 
     def test_leaves_nothing_of_others_in_the_index(self):
         """13. 実行後、同じツリーの他人の変更がステージ（インデックス）に載っていない。

@@ -1,14 +1,22 @@
 """テストの共通の置き場。"""
 
 import atexit as _atexit
+import glob as _glob
 import os
 import shutil as _shutil
+import sys as _sys
 import tempfile as _tempfile
-
-from ccnavi.infra import settings as _settings
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# ccnavi パッケージの置き場（src レイアウト）。パッケージとして入れていない Python で回しても
+# このツリーのソースを読むよう、先頭に足す。子プロセスで `-m ccnavi` を起こすときは
+# PYTHONPATH に渡す。
+SRC = os.path.join(ROOT, "src")
+if SRC not in _sys.path:
+    _sys.path.insert(0, SRC)
+
+from ccnavi.infra import settings as _settings  # noqa: E402
 
 # 共通レイヤーの 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
@@ -68,7 +76,7 @@ def _block_host_git_config() -> dict[str, str]:
 #
 # ここで `os.environ` に入れるのは、テストが git を起こす経路が 1 つではないため。
 # 各テストの `git()` ヘルパ（13 か所ある）だけでなく、検査対象の sh
-# （`ccnavi-git.sh` など）も、ccnavi 自身（`ccnavi/infra/gitcmd.py`）も git を起こす。
+# （`ccnavi-git.sh` など）も、ccnavi 自身（`src/ccnavi/infra/gitcmd.py`）も git を起こす。
 # 引数に `-c` を足す形では、自分が直に起こす分しか防げない。
 GIT_ENV = _block_host_git_config()
 os.environ.update(GIT_ENV)
@@ -106,3 +114,26 @@ def fixture_workspace(name: str = "rules.yml") -> str:
         _shutil.copyfile(os.path.join(ROOT, "tests", "fixtures", name), target)
         _FIXTURE_WORKSPACES[name] = ws
     return _FIXTURE_WORKSPACES[name]
+
+
+# 保護済み sh の置き場。
+SH_SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
+
+
+def common_sh(scripts_dir: str = SH_SCRIPTS) -> tuple[str, ...]:
+    """保護済み sh が起動して最初に `.` で読む共通部のファイル名。
+
+    入口の `ccnavi-common.sh` と、入口が同じディレクトリから読む部品（`ccnavi-common-*.sh`）。
+    sh を使い捨ての木へ写すテストは、名前を並べずにこれで全部を一緒に写す。
+    部品は入口が `$0` のディレクトリから読むので、1 本でも欠けると sh は起動の段で落ちる。
+    共通部が 1 本のままでも、部品に分かれていても同じ書き方で済む。
+    """
+    names = tuple(
+        sorted(
+            os.path.basename(path)
+            for path in _glob.glob(os.path.join(scripts_dir, "ccnavi-common*.sh"))
+        )
+    )
+    if "ccnavi-common.sh" not in names:
+        raise FileNotFoundError(os.path.join(scripts_dir, "ccnavi-common.sh"))
+    return names

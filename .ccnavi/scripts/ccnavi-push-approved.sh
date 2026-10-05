@@ -21,11 +21,11 @@
 # <親> を並べると、その親子のチケットだけをコミットして push する。取り込み済みでない親子のチケットは
 # コミットしない（今のまま、ユーザがコミットする）。省けば今どおり、置き場に変更のあるツリー全部。
 #
-# 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
-# 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
-# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かす（コピーは作らない）ので、
+# 数えるツリーは、ワークスペース、projects の下、.claude/worktrees の下。
+# 置き場は .ccnavi/approved（どの置き場も固定）。承認は提案を
+# wip/proposals の todo/ から動かす（コピーは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）はコミットしない。
-# 同じく、ボードのフロー編集画面が取り込んだ下書き（$CCNAVI_TICKETS_PROPOSAL の flows/）を
+# 同じく、ボードのフロー編集画面が取り込んだ下書き（wip/proposals の flows/）を
 # フローの保存のあとに消すので、追跡されていた下書きの削除だけをコミットする。未追跡の下書きと、書き直された
 # 下書き（消えていない）はコミットしない。`ccnavi c1 sort` の置き場には足さず、消えたものだけをここで拾う。
 #
@@ -33,7 +33,8 @@
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
 #   1 件ずつも。辿るとワークスペースの外のリポジトリにコミットして push する
 # - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
-# - main / master / develop / release / release/* はコミットだけして push しない
+# - main / master / develop / release / release/* と、そのリポジトリの統合先（ccnavi-common-state.sh の
+#   ccnavi_integration。決まらなければ固定のリストだけ）はコミットだけして push しない
 # - 1 本のツリーで add・commit・push が落ちても、他のツリーはコミットして push する
 #
 # 終了コード: 0 コミットするものが無い・全部コミットした（push しなかったブランチ、処理しなかったツリーを含む） /
@@ -61,13 +62,11 @@ case "${1:-}" in
 	;;
 esac
 for want in ${1+"$@"}; do
-	case "$want" in
-	'' | -* | *..* | */* | *[!A-Za-z0-9._-]*)
+	if ! ccnavi_is_ident "$want"; then
 		printf 'ccnavi-push-approved: %s は親の識別子の形ではありません。\n' "$want" >&2
 		usage >&2
 		exit 2
-		;;
-	esac
+	fi
 done
 
 root=$(ccnavi_workspace) || {
@@ -75,9 +74,9 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
-projects="${CCNAVI_PROJECTS:-projects}"
+approved=.ccnavi/approved # 固定
+proposals=wip/proposals   # 固定
+projects=projects         # 固定
 # 末尾の / を落とす。`[ -L "projects/" ]` はリンクを辿って偽になる。
 approved="${approved%/}"
 proposals="${proposals%/}"
@@ -113,7 +112,7 @@ ccnavi_c1_label=ccnavi-push-approved
 ccnavi_c1_sh="$(dirname "$0")"
 if bin=$(ccnavi_bin "$root"); then
 	ccnavi_c1_exe() { "$bin" --root "$root" "$@"; }
-elif [ -f "$root/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
 	ccnavi_c1_exe() { (cd "$root" && uv run --quiet python -m ccnavi --root "$root" "$@"); }
 else
 	ccnavi_c1_exe() { return 1; }
@@ -136,8 +135,12 @@ carry_paths() {
 }
 
 # 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 落ちた
+#
+# 取り込み状態の鍵とロックは識別子（ccnavi_c1_family_id）、ref・push・ls-remote と取り込み状態の branch は
+# 親のブランチ名（ccnavi_c1_branch。親チケットの branch:、無ければ識別子）。
 carry_family() {
 	cf_p="$ccnavi_c1_family_id"
+	cf_b="${ccnavi_c1_branch:-$ccnavi_c1_family_id}"
 	cf_tree="$ccnavi_c1_tree"
 	cf_rc=0
 	ccnavi_lock_take "$root" "$ccnavi_c1_repo" "$cf_p" "$(ccnavi_c1_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
@@ -187,20 +190,20 @@ carry_family() {
 		fi
 	fi
 	cf_head=$(git -C "$cf_tree" rev-parse HEAD)
-	if [ "$cf_head" = "$(git -C "$cf_tree" rev-parse --verify -q "refs/remotes/origin/$cf_p" 2>/dev/null || :)" ]; then
+	if [ "$cf_head" = "$(git -C "$cf_tree" rev-parse --verify -q "refs/remotes/origin/$cf_b" 2>/dev/null || :)" ]; then
 		printf '%s: コミットして push するものは無い。\n' "$cf_p"
 		ccnavi_lock_drop
 		return 0
 	fi
 	cf_timeout=$(ccnavi_c1_number "${CCNAVI_C1_TIMEOUT:-}" 60)
 	if ccnavi_git_timed "$cf_timeout" "$ccnavi_c1_tmp/push-err" "$cf_tree" \
-		push --quiet origin "refs/heads/$cf_p:refs/heads/$cf_p" >/dev/null ||
+		push --quiet origin "refs/heads/$cf_b:refs/heads/$cf_b" >/dev/null ||
 		{ ccnavi_git_timed "$cf_timeout" "$ccnavi_c1_tmp/ls-err" "$cf_tree" \
-			ls-remote origin "refs/heads/$cf_p" >"$ccnavi_c1_tmp/ls" &&
-			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_p" "$ccnavi_c1_tmp/ls"; }; then
-		ccnavi_record_write "$cf_record" remote origin branch "$cf_p" sha "$cf_head" \
+			ls-remote origin "refs/heads/$cf_b" >"$ccnavi_c1_tmp/ls" &&
+			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_b" "$ccnavi_c1_tmp/ls"; }; then
+		ccnavi_record_write "$cf_record" remote origin branch "$cf_b" sha "$cf_head" \
 			fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state present reason "" || :
-		printf '承認済みチケットを、取り込んでから %s へ送った。\n' "$cf_p"
+		printf '承認済みチケットを、取り込んでから %s へ送った。\n' "$cf_b"
 		ccnavi_lock_drop
 		return 0
 	fi
@@ -299,11 +302,12 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		continue
 	fi
 
-	# 取り込み済みの親子のチケットの親のワークツリー（ディレクトリ名 = ブランチ名）は、取り込んでから送る。
+	# 取り込み済みの親子のチケットの親のワークツリー（ディレクトリ名 = 識別子。ブランチは親チケットの branch:、
+	# 無ければ識別子と同じ名前）は、取り込んでから送る。
 	case "$tree" in
-	"$root/.claude/worktrees/$branch")
-		ccnavi_c1_family "$branch"
-		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$branch" ]; then
+	"$root/.claude/worktrees/"*)
+		ccnavi_c1_family "$name"
+		if [ "$ccnavi_c1_target" != no ] && [ "$ccnavi_c1_family_id" != "$name" ]; then
 			# 取り込み済みの親子のチケットの子のワークツリー。チケットとマーカーは親のワークツリーに置くので、
 			# 子のツリーの置き場の変更はコミットしない（子のブランチはリモートに出さない）。
 			printf 'ccnavi-push-approved: %s は親子のチケット %s の子のワークツリー。子のツリーの置き場の変更はコミットしない（チケットは親のワークツリーに置く）。ユーザが中身を確かめる。\n' \
@@ -370,6 +374,15 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 		continue
 		;;
 	esac
+	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も送らない。名前は ccnavi-fetch.sh・
+	# ccnavi-git.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 → origin/HEAD →
+	# origin/main・master）で、そのツリーが属するリポジトリについて決める。決まらなければ固定のリストだけ。
+	integ=$(ccnavi_integration "$tree" "$root") || integ=""
+	if [ -n "$integ" ] && [ "$branch" = "$integ" ]; then
+		printf 'ccnavi-push-approved: %s は統合先 %s の上に居るので push しません。送るかどうかはユーザが決めます。\n' \
+			"$name" "$branch" >&2
+		continue
+	fi
 
 	# push は落ちても巻き戻さない。コミットは残るので、ユーザがもう一度送れる。
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then

@@ -24,7 +24,7 @@ from ccnavi.infra import settings
 from ccnavi.tickets import history
 from tests.ticket.test_core import CoreHarness, _chrome
 from tests.ticket.test_phases import child_text, parent_text
-from tests.ticket.test_ticket import git, write
+from tests.ticket.test_ticket import git, to_old_form, write
 
 ACTOR = {"account": "alice", "version": "9.9.9"}
 
@@ -100,9 +100,7 @@ class RecordsTest(ChromeWriteHarness):
         self.assertTrue(
             any("i0009" in p and "gone" in p for p in rejected["i0001-01-01"]), rejected
         )
-        records = _chrome().records(
-            request["snapshot"], _chrome()._placement(None), ["i0001", "i0009"]
-        )
+        records = _chrome().records(request["snapshot"], _chrome()._placement(), ["i0001", "i0009"])
         self.assertIn("state gone", records["sync/self/families/i0009"])
         self.assertIn("state present", records["sync/self/families/i0001"])
         # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
@@ -259,6 +257,16 @@ class EntryDetailTest(ChromeWriteHarness):
         )
         self.assertEqual(chrome._relative("/ws", "'/ws/a' と a/ws/b"), "'a' と a/ws/b")
 
+    def test_host_paths_that_leave_the_tree_are_refused(self):
+        """ホストから来たパスは、根から始まるもの・区切りが `\\` のもの・`..` を含むものを断る。"""
+        chrome = _chrome()
+        self.assertEqual(
+            chrome._check_rel("wip/proposals/todo/i0001.md"), "wip/proposals/todo/i0001.md"
+        )
+        for path in ("/a", "~/a", "C:/a", "a\\b", "a/../b"):
+            with self.subTest(path=path), self.assertRaises(chrome.Refused):
+                chrome._check_rel(path)
+
     def test_a_history_that_cannot_be_written_stops_the_plan(self):
         chrome = _chrome()
         chrome._unwritten("/ws", "")
@@ -284,6 +292,9 @@ class WithdrawableTest(ChromeWriteHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
+        # 承認の記録を持つ古い形には、前の条件（欄を読む）を当てる。
+        to_old_form(self.approved, "i0001")
+        self.commit_parent("old form")
         board = self.answer(self.chrome_request("board", "i0001"))
         self.assertEqual(
             board["withdrawable"],

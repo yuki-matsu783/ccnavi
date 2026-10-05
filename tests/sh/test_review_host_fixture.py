@@ -4,17 +4,17 @@
 見るのは 3 つ。
 
 1. 録ったホストの応答の見本
-   （`chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む JSON
+   （`extensions/chrome/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む JSON
    （`fetch`。`fetched_at` を除く）が、見本の期待値（`expected.json`）と同じ。拡張の試験
    （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ JSON を組む
-2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの `review.effective`・`_unresolved`）が
-   見本の `conclusion.json` と同じ
+2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの
+   `review_host.effective`・`_unresolved`）が見本の `conclusion.json` と同じ
 3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。
    引けなければ渡さない（マーカーは前と同じ）。
    呼び手が `--actor` を渡しても受けない
 
 ホストの API が変わって見本を録り直したら、`CCNAVI_HOST_FIXTURE=1` を付けてこのテストを回し、
-期待値を書き直す（手順は chrome-extension/ccnavi-approval/README.md の「ホストの応答の見本」）。
+期待値を書き直す（手順は extensions/chrome/ccnavi-approval/README.md の「ホストの応答の見本」）。
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ import tempfile
 import unittest
 
 from ccnavi.entry import version
-from ccnavi.tickets import review
-from tests import ROOT
+from ccnavi.tickets import review_host
+from tests import ROOT, common_sh
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -48,6 +48,9 @@ exit 0
 """
 
 
+# マージリクエストを作ったときのホストの返事（GitLab の形）。
+CREATED = '{"iid": 9, "web_url": "https://gitlab.com/acme/widgets/-/merge_requests/9"}'
+
 # ELI5 の HTML の既定の置き場。ワークツリーの wip/ の下にコミットし、マージリクエストの差分に載せる
 ELI5 = "wip/eli5/phase-1.html"
 
@@ -65,11 +68,11 @@ def conclusion(copy: dict, poster: str = "") -> dict:
     GitLab は依頼を投稿したアカウント（`poster`）の ccnavi の依頼のスレッドを数えない。
     目印は誰でも書けるので、書いたアカウントでも確かめる。
     """
-    result = review.Result.from_data(copy)
+    result = review_host.Result.from_data(copy)
     changes = [
-        r for r in review.effective(result.reviews) if r.state.upper() == "CHANGES_REQUESTED"
+        r for r in review_host.effective(result.reviews) if r.state.upper() == "CHANGES_REQUESTED"
     ]
-    unresolved = review._unresolved(result.threads, set(), result.host, poster)
+    unresolved = review_host._unresolved(result.threads, set(), result.host, poster)
     return {
         "changes_requested": sorted(r.url for r in changes),
         "unresolved": sorted(t.id for t in unresolved),
@@ -84,7 +87,7 @@ class HostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
@@ -382,7 +385,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+        for name in ("ccnavi-review.sh", *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
@@ -551,6 +554,84 @@ class GitLabHostFixtureTest(unittest.TestCase):
             self.assertEqual(result["mr"]["number"], 7)
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)
+
+    def created_target(self, **extra):
+        """マージリクエストが無い親で request を打ち、作るときに送った宛先（target_branch）を返す。
+
+        見本の場面は i0001 の MR しか持たないので、i0002 に移ると作る側へ進む。作る要求
+        （POST .../merge_requests）だけはこの試験の curl が受けて本文を書き留め、ほかは代役に回す。
+        作った後の投稿は見本に無い MR へ向かうので落ちてよい。見るのは宛先だけ。
+        """
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        html = self.eli5()
+        subprocess.run(["git", "-C", self.ws, "checkout", "-q", "-b", "i0002"], check=True)
+        sent = os.path.join(self._tmp.name, "created.json")
+        catcher = os.path.join(self._tmp.name, "bin-create")
+        write(
+            os.path.join(catcher, "curl"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            f'*" -X POST "*"/merge_requests "*) cat >\'{sent}\'\n'
+            f"  printf '%s' '{CREATED}'\n"
+            "  exit 0 ;;\n"
+            "esac\n"
+            f"exec '{os.path.join(self.bin, 'curl')}' \"$@\"\n",
+        )
+        os.chmod(os.path.join(catcher, "curl"), 0o755)
+        path = os.pathsep.join([catcher, self.bin, os.environ.get("PATH", "")])
+        done = self.review(
+            "resolved",
+            *("request", "--phase", "1", "--body-file", "x", "--eli5", html),
+            CCNAVI_BIN_PATH=stub,
+            PATH=path,
+            **extra,
+        )
+        self.assertTrue(os.path.exists(sent), done.stdout + done.stderr)
+        with open(sent, encoding="utf-8") as f:
+            return json.load(f)["target_branch"]
+
+    def test_request_targets_the_origin_head_branch(self):
+        """宛先はデフォルトブランチ（origin/HEAD）。develop-v1.0.0 のような名前でも読む。"""
+        ref = "refs/remotes/origin/develop-v1.0.0"
+        subprocess.run(["git", "-C", self.ws, "update-ref", ref, "HEAD"], check=True)
+        subprocess.run(
+            ["git", "-C", self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref], check=True
+        )
+        self.assertEqual(self.created_target(), "develop-v1.0.0")
+
+    def test_request_targets_the_recorded_integration(self):
+        """宛先は ccnavi-fetch.sh と同じ順で決める。
+
+        統合先の取り込み結果は origin/master より先に読む。
+        """
+        subprocess.run(
+            ["git", "-C", self.ws, "update-ref", "refs/remotes/origin/master", "HEAD"], check=True
+        )
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "remote origin\nbranch develop-v1.0.0\nsource default\n",
+        )
+        self.assertEqual(self.created_target(), "develop-v1.0.0")
+
+    def test_request_targets_the_environment_first(self):
+        """環境変数は統合先の取り込み結果より先に読む。"""
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "branch develop-v1.0.0\n",
+        )
+        self.assertEqual(self.created_target(CCNAVI_INTEGRATION_BRANCH="trunk"), "trunk")
+
+    def test_request_falls_back_to_main(self):
+        """どれも決まらなければ今までどおり main。"""
+        self.assertEqual(self.created_target(), "main")
+
+    def test_request_targets_origin_master_without_origin_head(self):
+        """origin/HEAD が無く origin/master だけあれば master（以前は main を宛先にしていた）。"""
+        subprocess.run(
+            ["git", "-C", self.ws, "update-ref", "refs/remotes/origin/master", "HEAD"], check=True
+        )
+        self.assertEqual(self.created_target(), "master")
 
     def test_request_stops_without_an_eli5_html(self):
         """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める。

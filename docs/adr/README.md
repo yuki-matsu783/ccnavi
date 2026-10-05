@@ -83,6 +83,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの state をセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 | [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する |
+| [0102](0102-identifier-prefix-number-slug.md) | 親の識別子を `<先頭の語>-<番号>-<slug>`（`feature-64-統合先の解決` など）にそろえ、日本語の字を使えるようにする。先頭の語は `CCNAVI_BRANCH_PREFIXES` で変えられる。既にあるブランチとのぶつかりを warn する。親チケットの `branch:` キーで、識別子と違う既存のブランチを親のブランチにできる |
 
 ### ルールと判定
 
@@ -105,12 +106,12 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0069](0069-cd-moves-the-reading.md) | `cd` で移った先から見た表記を、当てる先として足す |
 | [0048](0048-layers-by-path.md) | ルールのレイヤーは、パスを持つツールは行き先で、持たないツールは全部の和で選ぶ |
 | [0049](0049-unwatched-gate.md) | 未宣言の呼び出しは判断できる相手が居るモード全部に委ね、確認できない側は設定で選ぶ |
-| [0050](0050-search-tools-and-ignore.md) | 探すツールが読むファイルの保護は、ルールに足さず 3 層に分ける |
+| [0050](0050-search-tools-and-ignore.md) | 探すツールが読むファイルの保護は、ルールに足さず 3 レイヤーに分ける |
 | [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む |
 | [0063](0063-not-root-placeholder.md) | ワークスペースの外は、先読みではなく展開で書く |
 | [0052](0052-common-layer-fixed.md) | 共通レイヤーの置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
 | [0067](0067-common-layer-flags-are-diagnosis-only.md) | レイヤーの置き場を動かすフラグを診断の経路に限る |
-| [0098](0098-places-are-fixed-to-defaults.md) | 置き場を既定に固定し、置き場を動かす環境変数を廃止する（番号を先に置いた。実装はチケット i0064） |
+| [0098](0098-places-are-fixed-to-defaults.md) | 置き場を既定に固定し、置き場を動かす環境変数を廃止する |
 | [0056](0056-state-written-without-showing-the-middle.md) | state の記録は途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
 | [0090](0090-stop-rules-nudge-every-n.md) | `match: Stop` のルールで、ターンの終わり N 回に 1 度止めて文を渡せるようにする |
@@ -145,13 +146,13 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0030](0030-three-human-touches.md) | push とマージリクエストの作成を親に渡し、ユーザの手を 3 回にする |
 | [0031](0031-unresolved-not-by-time.md) | 未解決の指摘は時刻で絞らず、いま残っている全部を数える |
 | [0039](0039-approve-narrowing.md) | 承認の対象は識別子で狭められる（狭めるだけ） |
-| [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える |
+| [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える（hook が伝えることは ADR-0104 が改める） |
 | [0043](0043-approve-carry.md) | 承認済みチケットは sh がコミットして push し、範囲の超過は判定で止め、ボードの承認はダイジェストで照合する |
 | [0065](0065-review-in-chat.md) | レビューはマージリクエストのほかに、このセッションでも受ける |
 | [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
-| [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる |
+| [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる（承認で記録の欄と `project:` を書き足すことは ADR-0104 が改める） |
 | [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
 | [0073](0073-origin-tree-is-the-fallback-home.md) | 本物とするツリーが無ければ元ツリーを採る |
@@ -160,16 +161,18 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0080](0080-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
 | [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
 | [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める（エージェントの下書きは置き換え（ADR-0100）） |
-| [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる |
+| [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる（承認の時刻の出どころは ADR-0104 が改める） |
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
-| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ |
-| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装） |
+| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ（続きの子の目印の置き場は ADR-0104 が改める） |
+| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装。「閉じた」の照合と取り下げの条件は ADR-0104 が改める） |
 | [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の書き出し方は置き換え（ADR-0095）） |
 | [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
 | [0096](0096-eli5-place-is-unscoped-and-does-not-move-the-request.md) | `wip/eli5/` はチケットの範囲を当てず、そこだけを変えたコミットは依頼の後に動いたと数えない（除外のパスの読み方は置き換え（ADR-0097）） |
 | [0097](0097-harden-the-eli5-place-and-request.md) | ELI5 の置き場と依頼の検査を厳しくする（パスの `\` と大文字小文字、名前の字、モード、互換の版） |
 | [0100](0100-agent-drafts-child-flow-user-imports.md) | エージェントは子のフローの下書きを提案の置き場に書き、ユーザがフロー編集画面で取り込む |
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |
+| [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない） |
+| [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す |
 
 ### 複数のリポジトリと VS Code 拡張
 

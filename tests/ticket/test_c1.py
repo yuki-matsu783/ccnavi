@@ -232,6 +232,14 @@ class SortTest(AuthorityHarness):
         found = dict((path, kind) for kind, path in self.sort())
         self.assertEqual(found, {flow: "c", copy: "c", other: "d", review: "d"})
 
+    def test_the_workflow_fixed_by_an_approval_is_c(self):
+        """承認（`--agree` の新規と改版）が固定する待ち方 `phases/<親>/workflow.yml` は
+        ユーザが運ぶもの。"""
+        held = f"{APPROVED}/phases/i0001/workflow.yml"
+        self.put(held, "order: dag\nwaits:\n  1: []\nreview_at: {}\n")
+        found = dict((path, kind) for kind, path in self.sort())
+        self.assertEqual(found, {held: "c"})
+
     def test_judge_records_are_kept_and_temp_files_skipped(self):
         judge = f"{APPROVED}/phases/i0001/i0001-01-01.judge.json"
         temp = f"{APPROVED}/flows/.i0001-01-01.yml.123.tmp"
@@ -419,9 +427,8 @@ class RecordTreeReviewTest(PhaseHarness):
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         passed = self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
-        self.assertTrue(
-            read_json(os.path.join(self.approved, "phases", "i0001", "ready.json"))["mr"]
-        )
+        archived = os.path.join(self.root, "logs", "archive", "self")
+        self.assertTrue(read_json(os.path.join(archived, "phases", "i0001", "ready.json"))["mr"])
         self.assertEqual(len(self.recorded), 3)
         self.places_only()
 

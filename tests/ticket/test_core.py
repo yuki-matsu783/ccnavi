@@ -3,7 +3,7 @@
 判定のコアは入出力を持たない関数にし、ファイルシステム・git・API は差し替え点に分ける。
 Chrome（Pyodide）と手元が同じコアで判定するため。
 
-見るのは 6 つ。
+見るのは 7 つ。
 
 1. 時計（Clock の差し替え点）: `fsio.clock` で固定した時刻を、承認の記録と履歴が同じに書く
 2. 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
@@ -12,16 +12,19 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
    書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
 4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
    （新規・マーカーの消去・改版・フィードバック計画・多段の先行と落ちる提案・取り下げ・レビュー済み）。
-   同じ要求と答えを拡張の試験の見本（`chrome-extension/ccnavi-approval/test/fixtures/core-scenarios.json`）
+   同じ要求と答えを拡張の試験の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）
    に置き、拡張の試験が Pyodide でも同じ答えになることを見る
 5. 承認の取り下げの条件
 6. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
+7. Chrome の入口は置き場を既定に固定する。統合先の `.claude/settings.json` の `env` や手元の env に
+   置き場の env を入れても既定の置き場を使い、`settings` の env 名の定数を参照しない
 
 見本の形を変えたら `CCNAVI_CHROME_FIXTURE=1` を付けてこのテストを走らせ、見本を書き直す。
 """
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import io
 import json
@@ -36,10 +39,13 @@ from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, history
+from ccnavi.tickets import ticket as ticket_mod
+from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
-from tests.ticket.test_ticket import ROOT, git, read_json, write
+from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
+from tests.ticket.test_ticket import ROOT, git, read_json, to_old_form, with_old_record, write
 
-CHROME = os.path.join(ROOT, "chrome-extension", "ccnavi-approval")
+CHROME = os.path.join(ROOT, "extensions", "chrome", "ccnavi-approval")
 SCENARIOS = os.path.join(CHROME, "test", "fixtures", "core-scenarios.json")
 STAMP = "2026-09-29T12:00:00+0900"
 PLACES = (".ccnavi", "wip")
@@ -52,6 +58,15 @@ def _chrome():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _place_of(chrome):
+    """入口（`handle` の `op: placement`）が答える置き場。`_placement` の引数の形に依らない。"""
+    request = {"schema": chrome.SCHEMA, "op": "placement"}
+    answer = json.loads(chrome.handle(json.dumps(request), os.devnull))
+    if "error" in answer:
+        raise AssertionError(f"置き場を読めない: {answer['error']}")
+    return answer["placement"]
 
 
 def _files(tree_root, prefixes=PLACES):
@@ -149,7 +164,7 @@ class CoreHarness(PhaseHarness):
         依頼時の先頭と比べるので、親のブランチの本物の先頭が要る）。
         """
         chrome = _chrome()
-        place = chrome._placement(None)
+        place = _place_of(chrome)
         branches = {}
         for name, path in self.trees().items():
             if name == "main":
@@ -195,10 +210,12 @@ class CoreHarness(PhaseHarness):
         取り込み状態を含む）が Chrome と同じになる。
         """
         snap = request["snapshot"]
-        place = chrome._placement(None)
+        place = _place_of(chrome)
         closure = chrome._closure(snap, place, request["family"])
         shutil.rmtree(os.path.join(self.state, "sync"), ignore_errors=True)
-        for rel, text in chrome.records(snap, place, closure["families"]).items():
+        for rel, text in chrome.records(
+            snap, place, closure["families"], closure["idents"]
+        ).items():
             write(os.path.join(self.state, *rel.split("/")), text)
 
     def ask_chrome(self, request):
@@ -225,20 +242,50 @@ class ClockTest(unittest.TestCase):
             pass
 
 
-class SourcePathTest(CoreHarness):
-    """承認の記録の出所は、リポジトリからの相対パスとブランチ名。"""
+def _approved_rows(approved_dir: str, ident: str) -> list[dict]:
+    """状態の履歴の `approved` の行。"""
+    path = os.path.join(approved_dir, history.EVENTS_DIR, ident + history.SUFFIX)
+    with open(path, encoding="utf-8") as f:
+        rows = [json.loads(line) for line in f if line.strip()]
+    return [r for r in rows if r.get("kind") == history.KIND_APPROVED]
 
-    def test_the_copy_records_a_relative_path_and_the_branch(self):
+
+class SourcePathTest(CoreHarness):
+    """承認は提案の中身を変えない。出所（ブランチ名）は状態の履歴に残る。
+
+    前の版の承認が書いた記録（相対パスか絶対パスの `source_path`、ツリーの名前の
+    `source_tree`）を持つ承認済みチケットも同じに読む。
+    """
+
+    def test_the_copy_is_the_proposal_and_the_history_records_the_branch(self):
         text = parent_text("i0001", ["research"])
         self.propose("i0001", text)
         self.commit_parent()
+        proposal = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(proposal, "rb") as f:
+            before = f.read()
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertIn("提案: wip/proposals/todo/i0001.md", preview["text"])
         self.assertNotIn(self.root, preview["text"])
         self.assertEqual(self.approve().returncode, 0)
-        copy, _ = approval.load_copy(os.path.join(self.approved, "doing", "i0001.md"))
-        self.assertEqual(copy.source_path, "wip/proposals/todo/i0001.md")
-        self.assertEqual(copy.source_tree, "i0001")
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        with open(path, "rb") as f:
+            self.assertEqual(before, f.read())
+        copy, _ = approval.load_copy(path)
+        self.assertEqual(copy.source_path, "")
+        self.assertEqual(copy.approved_at, "")
+        self.assertEqual([r.get("tree") for r in _approved_rows(self.approved, "i0001")], ["i0001"])
+
+    def test_a_crlf_proposal_moves_byte_for_byte(self):
+        text = parent_text("i0001", ["research"]).replace("\n", "\r\n")
+        path = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(text.encode("utf-8"))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        with open(os.path.join(self.approved, "doing", "i0001.md"), "rb") as f:
+            self.assertEqual(text.encode("utf-8"), f.read())
 
     def test_a_copy_written_in_the_old_form_reads_the_same(self):
         """前の形（絶対パス・ツリーの名前）の承認済みチケットと今の形の承認済みチケットで、判定の答えが同じ。"""
@@ -256,11 +303,9 @@ class SourcePathTest(CoreHarness):
         with open(path, encoding="utf-8") as f:
             text = f.read()
         old = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
-        # 前の形: 絶対パス。`source_tree` はツリーの名前で、
-        # 親のワークツリーではブランチ名と同じ表記。
-        legacy = text.replace(
-            "source_path: wip/proposals/todo/i0001.md", f"source_path: {json.dumps(old)}"
-        )
+        # 前の形: 承認が記録の欄を書き足し、`source_path` は絶対パス。`source_tree` は
+        # ツリーの名前で、親のワークツリーではブランチ名と同じ表記。
+        legacy = with_old_record(text, old)
         self.assertNotEqual(legacy, text)
         write(path, legacy)
         copy, _ = approval.load_copy(path)
@@ -293,15 +338,13 @@ class SourcePathTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        before = json.loads(self.ccnavi("--explain", "--json").stdout)
         path = os.path.join(self.approved, "doing", "i0001.md")
         with open(path, encoding="utf-8") as f:
             text = f.read()
+        write(path, with_old_record(text, "wip/proposals/todo/i0001.md"))
+        before = json.loads(self.ccnavi("--explain", "--json").stdout)
         windows = r"C:\Users\someone\git\ccnavi\.claude\worktrees\i0001\wip\proposals\todo\i0001.md"
-        write(
-            path,
-            text.replace("source_path: wip/proposals/todo/i0001.md", f"source_path: {windows}"),
-        )
+        write(path, with_old_record(text, windows))
         copy, _ = approval.load_copy(path)
         self.assertEqual(copy.source_path, windows)
         after = json.loads(self.ccnavi("--explain", "--json").stdout)
@@ -345,14 +388,19 @@ class BranchOfTest(unittest.TestCase):
 
 
 class SourceBranchTest(CoreHarness):
-    """`source_tree` はブランチ名。分からなければツリーの名前（`per_branch` と同じ決め方）。"""
+    """履歴の `tree` はブランチ名。分からなければツリーの名前（`per_branch` と同じ決め方）。"""
 
     def approve_one(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        copy, _ = approval.load_copy(os.path.join(self.approved, "doing", "i0001.md"))
-        return copy.source_tree
+        return _approved_rows(self.approved, "i0001")[-1].get("tree")
+
+    @staticmethod
+    def approved_tree(rows):
+        events = next(r for r in rows if r["path"].endswith("events/i0001.ndjson"))
+        found = [json.loads(line) for line in events["content"].decode().splitlines()]
+        return [r.get("tree") for r in found if r.get("kind") == history.KIND_APPROVED]
 
     def test_a_detached_head_falls_back_to_the_tree_name(self):
         git(self.parent_tree, "checkout", "--quiet", "--detach")
@@ -371,12 +419,7 @@ class SourceBranchTest(CoreHarness):
             self.propose("i0001", parent_text("i0001", ["research"]))
             with history.session(history.VIA_CHROME, None):
                 changes = core.plan(snapshot, core.judge_approval(snapshot))
-            copy = next(
-                row
-                for row in changes.per_branch()["i0001"]
-                if row["path"].endswith("doing/i0001.md")
-            )
-            self.assertIn(b"source_tree: i0001", copy["content"])
+            self.assertEqual(self.approved_tree(changes.per_branch()["i0001"]), ["i0001"])
         finally:
             write(head, kept)
 
@@ -389,9 +432,9 @@ class SourceBranchTest(CoreHarness):
         with history.session(history.VIA_CHROME, None):
             changes = core.plan(snapshot, core.judge_approval(snapshot))
         rows = [r for rows in changes.per_branch().values() for r in rows]
+        self.assertEqual(self.approved_tree(rows), ["main"])
         copy = next(r for r in rows if r["path"].endswith("doing/i0001.md"))
-        self.assertIn(b"source_tree: main", copy["content"])
-        self.assertIn(b"source_path: wip/proposals/todo/i0001.md", copy["content"])
+        self.assertEqual(copy["content"], parent_text("i0001", ["research"]).encode())
 
 
 class PlanWriterTest(CoreHarness):
@@ -432,6 +475,8 @@ class PlanWriterTest(CoreHarness):
                 ("create", ".ccnavi/approved/doing/i0001.md"),
                 ("create", ".ccnavi/approved/events/i0001-01-01.ndjson"),
                 ("create", ".ccnavi/approved/events/i0001.ndjson"),
+                # 待ち方は承認済みチケットに書き足さず、マーカーの置き場に固定する
+                ("create", ".ccnavi/approved/phases/i0001/workflow.yml"),
                 ("delete", "wip/proposals/todo/i0001-01-01.md"),
                 ("delete", "wip/proposals/todo/i0001.md"),
             ],
@@ -439,7 +484,12 @@ class PlanWriterTest(CoreHarness):
         event = json.loads(rows[3]["content"].decode())
         self.assertEqual(event["at"], "2026-09-29T03:00:00Z")
         self.assertEqual(event["tree"], "i0001")
-        self.assertIn(b"approved_at: 2026-09-29T12:00:00+0900", rows[1]["content"])
+        # 承認済みチケットは提案のバイト列のまま（承認の記録を書き足さない）
+        self.assertEqual(rows[1]["content"], parent_text("i0001", ["research", "design"]).encode())
+        self.assertEqual(
+            rows[4]["content"],
+            approval.workflow_bytes(approval.read_workflow(self.approved, "i0001")[0]),
+        )
 
     def test_revision_and_feedback_plan(self):
         self.family(plan=["design"])
@@ -540,6 +590,42 @@ class WriterFailureTest(CoreHarness):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertNotIn("承認した。", out)
 
+    def held(self):
+        return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
+
+    def test_a_failed_move_does_not_leave_the_workflow_alone(self):
+        """待ち方は提案を動かす前に書く。動かす段で落ちたら待ち方も戻す。"""
+        doing = os.path.join("doing", "i0001.md")
+        todo = os.path.join("todo", "i0001.md")
+        for name, when in (
+            ("unlink", lambda path: path.endswith(todo)),
+            ("write_bytes", lambda path, data: path.endswith(doing)),
+        ):
+            with self.subTest(name=name):
+                self.propose("i0001", parent_text("i0001", ["research"]))
+                self.commit_parent()
+                changes = self.planned()
+                with self.failing(name, when):
+                    applied, out, err = self.write_changes(changes)
+                self.assertEqual(applied.code, 1, out + err)
+                self.assertFalse(os.path.exists(os.path.join(self.approved, doing)))
+                self.assertFalse(os.path.exists(self.held()), err)
+
+    def test_a_failed_revision_puts_the_workflow_back(self):
+        """改版でチケットを書く段で落ちたら、先に書いた待ち方を前の中身へ戻す。"""
+        self.family(plan=["research", "design"])
+        with open(self.held(), "rb") as f:
+            before = f.read()
+        self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
+        self.commit_parent()
+        changes = self.planned()
+        doing = os.path.join("doing", "i0001.md")
+        with self.failing("write_text", lambda path, *rest: path.endswith(doing)):
+            applied, out, err = self.write_changes(changes)
+        self.assertEqual(applied.code, 1, out + err)
+        with open(self.held(), "rb") as f:
+            self.assertEqual(f.read(), before)
+
     def test_a_revised_proposal_that_cannot_be_removed_is_said_and_goes_on(self):
         self.family(plan=["research", "design"])
         self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
@@ -634,9 +720,9 @@ class WriterFailureTest(CoreHarness):
         self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        from ccnavi.tickets import review
+        from ccnavi.tickets import review_host
 
-        result = review.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
+        result = review_host.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
         checked = core.confirm(self.snapshot(), "i0001", 1, result, "")
         done = write(os.path.join(self.approved, "done", "i0001-01-01.md"), "other\n")
         applied, out, err = self.write_changes(checked.changes)
@@ -878,6 +964,10 @@ class CoreChromeTest(CoreHarness):
         self.propose("i0001", text)
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
+        # 承認は中身を変えないので、承認済みチケットは提案とバイト単位で同じ。待ち方のファイルも
+        # 一緒に消す。
+        held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
+        self.assertTrue(os.path.exists(held))
         request = self.chrome_request(
             "withdraw", "i0001", ids=["i0001"], prior={"i0001": text}, reason="押し間違い"
         )
@@ -896,6 +986,7 @@ class CoreChromeTest(CoreHarness):
         ) as f:
             self.assertEqual(f.read(), text)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+        self.assertFalse(os.path.exists(held))
         events, _ = history.read(self.approved, "i0001")
         self.assertEqual(events[-1]["kind"], history.KIND_WITHDRAWN)
         self.assertEqual(events[-1]["via"], history.VIA_CHROME)
@@ -994,15 +1085,314 @@ SCENARIO_NAMES = (
 )
 
 
+# 置き場を既定から外す env の名前（統合先の `.claude/settings.json` に書かれうるもの）。
+# `settings` の定数ではなく綴りで持つ。定数が消えても（i0064）この試験は読み込める。
+MOVED_ENV_NAMES = ("CCNAVI_TICKETS_PROPOSAL", "CCNAVI_TICKETS_APPROVED", "CCNAVI_PROJECT_HOME")
+
+# env 名の定数（i0064 で消える）。ccnavi_chrome.py はこれを引かない。
+ENV_CONSTANTS = ("TICKETS_ENV", "APPROVED_ENV", "PROJECT_HOME_ENV")
+
+# 置き場の答えのうち、既定の置き場から組まれるはずの欄。
+PLACEMENT_KEYS = (
+    "tickets",
+    "approved",
+    "layer_dir",
+    "integration_paths",
+    "integration_files",
+    "branch_paths",
+    "workspace_paths",
+    "workspace_files",
+    "project_paths",
+)
+
+
+def _default_placement(chrome):
+    """既定の置き場（`settings.DEFAULT_*`）から組んだ、置き場の答えの欄。"""
+    tickets = settings.DEFAULT_TICKETS.replace(os.sep, "/").strip("/")
+    approved = settings.DEFAULT_APPROVED.replace(os.sep, "/").strip("/")
+    home = settings.DEFAULT_PROJECT_HOME.replace(os.sep, "/").strip("/")
+    layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
+    done = f"{approved}/{ticket_mod.DONE}"
+    return {
+        "tickets": tickets,
+        "approved": approved,
+        "layer_dir": layer,
+        "integration_paths": sorted({done, chrome.COMMON_LAYER, layer}),
+        "integration_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
+        "branch_paths": [approved, tickets],
+        "workspace_paths": sorted({chrome.COMMON_LAYER, layer}),
+        "workspace_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
+        "project_paths": sorted({done, layer}),
+    }
+
+
+def _settings_text(env):
+    """統合先の `.claude/settings.json` の中身（置き場の env と、置き場に関わらない env）。"""
+    return json.dumps({"env": {"CCNAVI_MODE": "enforce", **env}}, ensure_ascii=False)
+
+
+class ChromePlacementTest(CoreHarness):
+    """Chrome の入口は置き場を既定に固定し、置き場を動かす env を読まない。
+
+    置き場は入口（`handle`）を通して確かめ、`_placement` の引数の形には縛られない。
+    `CoreChromeTest` の見本には載せない（見本は拡張の側に置くもの）。
+    """
+
+    def ask_placement(self, chrome=None, **extra):
+        chrome = chrome or _chrome()
+        request = {"schema": chrome.SCHEMA, "op": "placement", **extra}
+        answer = json.loads(chrome.handle(json.dumps(request), os.path.join(self.root, "memfs")))
+        self.assertNotIn("error", answer, answer)
+        return chrome, answer["placement"]
+
+    def assert_default(self, chrome, place):
+        self.assertEqual(
+            {k: place.get(k) for k in PLACEMENT_KEYS}, _default_placement(chrome), place
+        )
+        # 置き場の env は答えに載らない（欄ごと消してもよい）。
+        self.assertEqual(place.get("env", {}), {}, place)
+
+    def board_request(self):
+        """手元のツリーから組んだ `board` の要求と、env を入れないときの答え。"""
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
+        self.commit_parent()
+        request = self.chrome_request("board", "i0001")
+        plain = json.loads(_chrome().handle(json.dumps(request), os.path.join(self.root, "m1")))
+        self.assertNotIn("error", plain, plain)
+        self.assertEqual([e["ticket"] for e in plain["batch"]], ["i0001", "i0001-01-01"], plain)
+        return request, plain
+
+    def test_relative_env_in_the_integration_settings_is_not_read(self):
+        # B1
+        moved = {
+            "CCNAVI_TICKETS_PROPOSAL": "moved/proposals",
+            "CCNAVI_TICKETS_APPROVED": "moved/approved",
+            "CCNAVI_PROJECT_HOME": "moved/home",
+        }
+        chrome, place = self.ask_placement(settings=_settings_text(moved))
+        self.assert_default(chrome, place)
+
+    def test_absolute_env_in_the_integration_settings_is_not_refused(self):
+        # B2
+        for form in ("/x", "C:/x", "~/x"):
+            with self.subTest(form=form):
+                moved = {name: f"{form}/{i}" for i, name in enumerate(MOVED_ENV_NAMES)}
+                chrome, place = self.ask_placement(settings=_settings_text(moved))
+                self.assert_default(chrome, place)
+
+    def test_the_board_answer_does_not_change_with_the_env(self):
+        # B3
+        request, plain = self.board_request()
+        moved = {
+            "CCNAVI_TICKETS_PROPOSAL": "moved/proposals",
+            "CCNAVI_TICKETS_APPROVED": "moved/approved",
+            "CCNAVI_PROJECT_HOME": "moved/home",
+        }
+        with_env = {**request, "settings": _settings_text(moved)}
+        answer = json.loads(_chrome().handle(json.dumps(with_env), os.path.join(self.root, "m2")))
+        self.assertEqual(answer, plain)
+
+    def test_the_module_does_not_refer_to_the_env_names(self):
+        # B4 （1 段目）ソースが env 名の定数を引かない。土台の名前（`settings.`・別名）を問わず
+        # 属性参照を拾い、`from ... import TICKETS_ENV` と、`getattr` に渡す同じ綴りの文字列も拾う。
+        path = os.path.join(CHROME, "py", "ccnavi_chrome.py")
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read(), path)
+        found = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr in ENV_CONSTANTS:
+                found.append(f"{node.lineno}: 属性 {ast.unparse(node)}")
+            elif isinstance(node, ast.ImportFrom):
+                found += [
+                    f"{node.lineno}: import {a.name}" for a in node.names if a.name in ENV_CONSTANTS
+                ]
+            elif isinstance(node, ast.Constant) and node.value in ENV_CONSTANTS:
+                found.append(f"{node.lineno}: 文字列 {node.value!r}")
+        self.assertEqual(
+            sorted(found), [], "ccnavi_chrome.py が settings の env 名の定数を参照している"
+        )
+
+    def test_the_module_loads_without_the_env_name_constants(self):
+        # B4 （2 段目）定数を外しても読み込める。外している間は読み込みだけを見る。
+        # `settings.load` は i0064 まで定数を引くので、外したまま置き場を聞くと
+        # 正しい実装でも落ちる。置き場は戻してから聞く。
+        saved = {name: getattr(settings, name) for name in ENV_CONSTANTS if hasattr(settings, name)}
+        for name, value in saved.items():
+            self.addCleanup(setattr, settings, name, value)
+        for name in saved:
+            delattr(settings, name)
+        try:
+            chrome = _chrome()
+        except (AttributeError, ImportError) as exc:
+            loaded = exc
+        else:
+            loaded = None
+        finally:
+            for name, value in saved.items():
+                setattr(settings, name, value)
+        if loaded is not None:
+            self.fail(f"settings の env 名の定数が無いと ccnavi_chrome.py を読み込めない: {loaded}")
+        _, place = self.ask_placement(chrome)
+        self.assert_default(chrome, place)
+
+    def test_the_local_process_env_is_not_read(self):
+        # B5 手元のプロセスの env は `_environ` が外す（回帰の見張り）
+        moved = {name: f"local/{i}" for i, name in enumerate(MOVED_ENV_NAMES)}
+        with mock.patch.dict(os.environ, moved):
+            chrome, place = self.ask_placement()
+        self.assert_default(chrome, place)
+        # 判定まで通る操作でも、手元の env は混ざらない。
+        request, plain = self.board_request()
+        with mock.patch.dict(os.environ, moved):
+            answer = json.loads(
+                _chrome().handle(json.dumps(request), os.path.join(self.root, "m2"))
+            )
+        self.assertEqual(answer, plain)
+
+
 class WithdrawTest(CoreHarness):
-    """取り下げの条件。どれか 1 つでも当たれば何も並べない。"""
+    """取り下げの条件。どれか 1 つでも当たれば何も並べない。
+
+    承認は提案を中身を変えずに動かすので、新しい形は「`doing/` の中身が承認コミットの親の提案と
+    バイト単位で同じ」「待ち方のファイルが、その提案と今の phases.yml から計算したものと同じ」で
+    決める。承認の記録（`ccnavi_approved`）を持つ古い形には、前の条件（欄を読む）を当てる
+    （`approved_parent`。`to_old_form` で古い形にする）。
+    """
 
     def approved_parent(self):
         text = parent_text("i0001", ["research"])
         self.propose("i0001", text)
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
+        to_old_form(self.approved, "i0001")
         return text
+
+    def new_parent(self, text=None, plan=("research",)):
+        text = text or parent_text("i0001", list(plan))
+        self.propose("i0001", text)
+        self.commit_parent()
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        return text
+
+    def held(self):
+        return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
+
+    def test_a_new_form_parent_is_withdrawn_with_its_workflow(self):
+        text = self.new_parent()
+        self.assertTrue(os.path.exists(self.held()))
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
+        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
+        self.assertEqual(checked.problems, [])
+        applied, out, err = self.write_changes(checked.changes)
+        self.assertEqual(applied.code, 0, out + err)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+        self.assertFalse(os.path.exists(self.held()))
+        with open(
+            os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md"), "rb"
+        ) as f:
+            self.assertEqual(f.read(), text.encode())
+
+    def test_a_half_written_record_does_not_skip_the_content_check(self):
+        """`approved_at` の空な記録で古い形を装っても、中身の一致の検査は飛ばない。"""
+        text = self.new_parent()
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        forged = "ccnavi_approved: {approved_at: '', source_tree: i0001, source_path: p}\n"
+        write(path, text.replace("---\n", "---\n" + forged, 1) + "書き足した\n")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
+
+    def test_a_manually_moved_child_is_withdrawn(self):
+        """手で動かした承認（`todo/` から `doing/` へ rename しただけ）も取り下げられる。
+
+        中身が提案と同じなら。
+        """
+        self.new_parent()
+        self.start_parent()
+        child = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        write(os.path.join(self.approved, "doing", "i0001-01-01.md"), child)
+        self.commit_parent("moved by hand")
+        checked = core.withdraw(self.snapshot(), ["i0001-01-01"], {"i0001-01-01": child.encode()})
+        self.assertEqual(checked.problems, [])
+
+    def test_a_changed_copy_is_not_withdrawn(self):
+        text = self.new_parent()
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        write(path, text.replace("本文", "本文を書き換えた"))
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
+        # 一覧は中身を見ない（承認コミットを引く前に組むので）。押したときに止める。
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertEqual(listed[0][2], [])
+
+    def test_bytes_are_compared_without_folding_newlines(self):
+        text = self.new_parent(parent_text("i0001", ["research"]).replace("\n", "\r\n"))
+        with open(os.path.join(self.approved, "doing", "i0001.md"), "rb") as f:
+            self.assertIn(b"\r\n", f.read())
+        self.assertEqual(self.problems({"i0001": text.encode()}), [])
+        folded = text.replace("\r\n", "\n").encode()
+        problems = self.problems({"i0001": folded})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
+
+    def test_a_changed_workflow_is_not_withdrawn(self):
+        text = self.new_parent()
+        with open(self.held(), encoding="utf-8") as f:
+            held = f.read()
+        write(self.held(), held + "# 手で足した行\n")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("待ち方が変わった" in p for p in problems), problems)
+
+    def test_a_planned_parent_without_workflow_is_withdrawn(self):
+        """手で動かした計画を持つ親は待ち方のファイルを持たない。改版は必ずファイルを書くので、
+        無いのは待ち方の改版が起きていない形として取り下げられる（中身の一致は今どおり見る）。"""
+        text = self.new_parent()
+        os.remove(self.held())
+        self.assertEqual(self.problems({"i0001": text.encode()}), [])
+        write(os.path.join(self.approved, "doing", "i0001.md"), text + "x")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
+
+    def test_phases_yml_changed_after_the_approval_is_not_withdrawn(self):
+        self.use(SEQUENTIAL)
+        text = self.new_parent(plan=PLAN)
+        self.assertEqual(self.problems({"i0001": text.encode()}), [])
+        self.use(DAG)
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("待ち方が変わった" in p for p in problems), problems)
+
+    def test_a_revision_of_the_waits_only_is_not_withdrawn(self):
+        """同じ計画で phases.yml だけを変えた改版。
+
+        承認済みチケットの中身か待ち方が、承認のときと違う。
+        """
+        self.use(SEQUENTIAL)
+        text = self.new_parent(plan=PLAN)
+        self.use(DAG)
+        self.propose("i0001", text)
+        self.commit_parent("revise")
+        revised = self.approve()
+        self.assertEqual(revised.returncode, 0, revised.stdout + revised.stderr)
+        self.assertIn("待ち方の変更", revised.stdout)
+        self.use(SEQUENTIAL)
+        self.assertTrue(self.problems({"i0001": text.encode()}))
+
+    def test_a_followup_child_is_named(self):
+        self.new_parent()
+        self.start_parent()
+        child = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        child = child.replace("human_review:", "followup_of: [i0001-01-09]\nhuman_review:", 1)
+        write(os.path.join(self.approved, "doing", "i0001-01-01.md"), child)
+        problems = core.withdraw(self.snapshot(), ["i0001-01-01"], {"i0001-01-01": child.encode()})
+        self.assertTrue(any("続きの子" in p for p in problems.problems), problems.problems)
+        listed = dict((i, p) for i, _, p in core.withdrawable(self.snapshot(), "i0001"))
+        self.assertTrue(any("続きの子" in p for p in listed["i0001-01-01"]), listed)
+
+    def use(self, text):
+        write(common_path(self.root, "phases"), text)
 
     def problems(self, prior):
         return core.withdraw(self.snapshot(), ["i0001"], prior).problems
@@ -1034,7 +1424,10 @@ class WithdrawTest(CoreHarness):
         self.assertTrue(any("戻す先" in p for p in self.problems({"i0001": text.encode()})))
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.assertEqual(self.approve().returncode, 0)
-        self.assertTrue(any("改版" in p for p in self.problems({"i0001": text.encode()})))
+        # 改版は時刻をチケットに書かなくなった。古い形には無い待ち方のファイルが置かれるので、
+        # 改版したものとして止まる。
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("改版した承認" in p for p in problems), problems)
 
     def test_copies_left_in_a_worktree_do_not_change_the_answer(self):
         """承認の前に切ったワークツリーに `todo/` の提案が残っていても、答えは前と同じ。"""
@@ -1043,6 +1436,7 @@ class WithdrawTest(CoreHarness):
         self.commit_parent()
         other = self.worktree("i0001-01-05", "i0001")  # todo/i0001 を持ったまま切る
         self.assertEqual(self.approve().returncode, 0)
+        to_old_form(self.approved, "i0001")
         self.assertEqual(self.problems({"i0001": text.encode()}), [])
         listed = core.withdrawable(self.snapshot(), "i0001")
         self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
@@ -1154,7 +1548,7 @@ class RecordWritesTest(CoreHarness):
         climbing = os.path.join(self.place(), "..", "..", "..", "wip", "list.txt")
         self.refused(climbing)
         self.assertFalse(os.path.exists(outside))
-        # `--state` と `CCNAVI_STATE` で置き場を動かしても、書き出し先は動かない。
+        # `--state` で置き場を動かしても、`CCNAVI_STATE` を入れても、書き出し先は動かない。
         moved = os.path.join(self.root, "wip")
         self.refused(os.path.join(moved, "c1", "list.txt"), "--state", moved)
         with mock.patch.dict(os.environ, {"CCNAVI_STATE": moved}):
@@ -1238,9 +1632,11 @@ class RecordWritesTest(CoreHarness):
         names = ("tickets.approval", "tickets.agree", "tickets.history", "tickets.configsync")
         names += ("tickets.ops", "tickets.flow", "tickets.risk", "hook.core", "tickets.review")
         names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
+        names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
+        names += ("tickets.review_host", "tickets.review_decide", "tickets.review_close")
         for dotted in names:
             package, name = dotted.split(".")
-            path = os.path.join(ROOT, "ccnavi", package, name + ".py")
+            path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")
             with open(path, encoding="utf-8") as f:
                 lines = f.read().splitlines()
             hits = [
