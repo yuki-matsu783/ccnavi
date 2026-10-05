@@ -108,7 +108,6 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 | `ccnavi.entry.version` | `VERSION`・`COMPAT` |
 | `ccnavi.infra.fsio` | `clock(fixed)`・`stamp()` |
 | `ccnavi.infra.settings` | `DEFAULT_TICKETS`・`DEFAULT_APPROVED`・`DEFAULT_STATE`・`DEFAULT_PROJECTS`・`DEFAULT_PROJECT_HOME`・`DEFAULT_BRANCH_PREFIXES`・`LAYER_CONFIG_DIR`・`LAYER_FILE_NAMES`・`load(root)`・`is_branch_prefix(word)`・`is_reserved_layer_name(name)` |
-| `ccnavi.tickets.configsync` | `projected(conf, kind, content)` |
 | `ccnavi.tickets.history` | `session(via, stderr, actor="", version="")`・`VIA_CHROME` |
 | `ccnavi.tickets.review_host` | `Result.from_data(data)`（戻り値の `error`） |
 | `ccnavi.tickets.review` | `_is_sha(value)` |
