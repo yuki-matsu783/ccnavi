@@ -2375,6 +2375,7 @@ ccnavi --explain --json
 | `settings` | `ticket_control`（チケット制御を使うか）/ `tickets`（提案の置き場、相対）/ `approved`（承認済みチケットの置き場）/ `projects`（プロジェクトの置き場） |
 | `trees[]` | ワークスペースルート・プロジェクト・ワークツリー。`{name, root, project, kind}`。`kind` は `main` / `project` / `worktree` |
 | `layers[]` | レイヤーごとの宣言。順序は 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。`{name, rules, phases, risk, phases_file}`。`name` は `common` / `self` / プロジェクトの名前。`rules` は `{path, unreadable, deny, ask, allow}` で、各タイプはそのレイヤーから実際に判定へ入ったルール `{id, section, source, match, kind, written, pattern, message}`（重複で捨てたものは入らない）。`phases` はそのレイヤーのファイルに書いてあるフェーズ定義 `{id, source, kind, title, review, scope}`、`risk` は `{path, unreadable, factors}`、`phases_file` は `{path, unreadable}`。phases と risk は合成前の、そのレイヤーのぶんだけ |
+| `sums[]` | ワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和（判定と同じ合成。拡張は足し直さずこれを見せる）。順序は 自身のレイヤー → プロジェクト（名前順）。`{name, layers, rules, risk, phases}`。`name` は `self` / プロジェクトの名前、`layers` は `["common", <name>]`。`rules` は `{path, unreadable, missing, deny, ask, allow}` で、各タイプは共通レイヤーに足した和（`layers[]` と違い、他のレイヤーの定義で欠けない）。`risk` は `{levels, factors, fallback, problems}`（`levels` は実際に使う境目の点）、`phases` は使う 1 本 `{path, unreadable, order, types}`（足し算はしない） |
 | `projects[]` | プロジェクトの名前 |
 | `problems[]` | 読めなかった提案や承認済みチケットの説明。あっても他は出す |
 | `pending_approval[]` | `--agree` で承認の対象に入る識別子（承認済みチケットの無い提案と、親の改版） |
