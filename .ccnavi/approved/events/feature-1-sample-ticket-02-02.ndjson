@@ -1,1 +1,2 @@
 {"at": "2026-10-05T23:03:41Z", "ticket": "feature-1-sample-ticket-02-02", "kind": "raised", "from": null, "to": "doing", "via": "board", "actor": "yuki-matsu783", "phase": 2, "followup_of": ["feature-1-sample-ticket-02-01"]}
+{"at": "2026-10-05T23:04:58Z", "ticket": "feature-1-sample-ticket-02-02", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "567ba9d5863dcda6ce7349515f72442d7413e491"}
