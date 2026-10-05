@@ -2,9 +2,11 @@ import re
 import time
 import unittest
 
-from ccnavi.infra import shellread
-from ccnavi.infra.shellread import REASON_TAKEN_AS_CODE, REASON_UNTERMINATED, SEP, read
-from ccnavi.tickets import phase
+from ccnavi.infra import shellread, shellread_cd, shellread_scan
+from ccnavi.infra.shellread import SEP, read
+from ccnavi.infra.shellread_scan import REASON_UNTERMINATED
+from ccnavi.infra.shellread_words import REASON_TAKEN_AS_CODE
+from ccnavi.tickets import phase_forms
 
 # 語の中の切れ目の目印。コマンドの区切り（SEP）と別の文字になる予定で、
 # 実装が入るまでは無い。無い間は、それを前提にしたテストを skip する。
@@ -525,7 +527,9 @@ def marked(text):
     return text.replace("␀", SEP).replace("␁", WORD_SEP or "")
 
 
-@unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+@unittest.skipUnless(
+    hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
+)
 class MovedTest(unittest.TestCase):
     """`cd` で移った先から見たパス（issue #61）。
 
@@ -768,8 +772,8 @@ class MovedTest(unittest.TestCase):
         self.assertFalse(result.degraded)
 
     def test_語数の上限を越えたら継ぎ足さない(self):
-        many = "cd a && " + " && ".join(f"rm x{i}" for i in range(shellread.MOVED_WORDS))
-        self.assertLess(len(self.moved(many)), shellread.MOVED_WORDS)
+        many = "cd a && " + " && ".join(f"rm x{i}" for i in range(shellread_cd.MOVED_WORDS))
+        self.assertLess(len(self.moved(many)), shellread_cd.MOVED_WORDS)
 
 
 class SubstTest(unittest.TestCase):
@@ -803,12 +807,12 @@ class SubstTest(unittest.TestCase):
 
     def test_縮退の理由は読みを止めたものを名指しする(self):
         cases = [
-            ('grep -n "<<" f', shellread.REASON_UNTERMINATED),
-            ('echo "$(git push"', shellread.REASON_UNTERMINATED),
-            ("echo $(git push", shellread.REASON_UNTERMINATED_SUBST),
-            ("echo `git push", shellread.REASON_BACKQUOTE),
-            ('echo "`git push"', shellread.REASON_BACKQUOTE),
-            ('echo "$(case a in a) git push;; esac)"', shellread.REASON_AMBIGUOUS_SUBST),
+            ('grep -n "<<" f', shellread_scan.REASON_UNTERMINATED),
+            ('echo "$(git push"', shellread_scan.REASON_UNTERMINATED),
+            ("echo $(git push", shellread_scan.REASON_UNTERMINATED_SUBST),
+            ("echo `git push", shellread_scan.REASON_BACKQUOTE),
+            ('echo "`git push"', shellread_scan.REASON_BACKQUOTE),
+            ('echo "$(case a in a) git push;; esac)"', shellread_scan.REASON_AMBIGUOUS_SUBST),
             ('echo "$(xargs echo < f)"', REASON_TAKEN_AS_CODE),
             ("cat <<'EOF' > notes.md", REASON_UNTERMINATED),
         ]
@@ -827,7 +831,7 @@ class SubstTest(unittest.TestCase):
             with self.subTest(depth=depth):
                 result = read(nested(depth))
                 self.assertTrue(result.degraded)
-                self.assertEqual(result.reason, shellread.REASON_AMBIGUOUS_SUBST)
+                self.assertEqual(result.reason, shellread_scan.REASON_AMBIGUOUS_SUBST)
 
     def test_切り出さない表記は文字のまま(self):
         # 文字として書く方法（単一引用、$'…'、\$(、\`、引用付き heredoc）を必ず残す。
@@ -846,17 +850,17 @@ class SubstTest(unittest.TestCase):
     def test_止めている間の免除はコマンドが全部ラッパースクリプトのときだけ(self):
         substituted = read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(cat f)"')
         self.assertFalse(
-            phase.exempt(substituted.text, substituted.reason),
+            phase_forms.exempt(substituted.text, substituted.reason),
             "置換の中の cat まで免除した",
         )
         lines = read(
             "sh .ccnavi/scripts/ccnavi-ticket.sh finish x\nsh .ccnavi/scripts/ccnavi-git.sh status"
         )
-        self.assertTrue(phase.exempt(lines.text, lines.reason), show(lines.text))
+        self.assertTrue(phase_forms.exempt(lines.text, lines.reason), show(lines.text))
 
     def test_置換の中の状態を動かすスクリプトもサブエージェントに許さない(self):
         inner = read('echo "$(sh .ccnavi/scripts/ccnavi-ticket.sh finish x)"')
-        self.assertTrue(phase.forbidden(inner.text), show(inner.text))
+        self.assertTrue(phase_forms.forbidden(inner.text), show(inner.text))
 
 
 class BraceTest(unittest.TestCase):

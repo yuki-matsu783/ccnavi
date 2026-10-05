@@ -12,23 +12,23 @@ from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
 from ..policy import rules
-from . import approval_marks, archive, syncstate
-from . import ticket as ticket_mod
+from . import approval_marks, archive, syncstate, ticket_ids, ticket_model
 
 # 前の版の承認が記録（`ccnavi_approved`）に必ず書いていた欄。続きの子も `source_tree` と
 # `source_path` を空で書いていた。
 _RECORD_KEYS = ("approved_at", "source_tree", "source_path")
 
 
-def has_record(t: ticket_mod.Ticket) -> bool:
+def has_record(t: ticket_model.Ticket) -> bool:
     """前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットか。
 
     古い形として扱うと、取り下げは中身の一致を見ずに記録の欄で決まり、`workflow:` の欄も
     待ち方として読まれる。`ccnavi_approved: {}` のような書きかけの記録で古い形を装えないよう、
     前の版が必ず書いた欄が揃い、`approved_at` が空でないときだけ古い形とみなす。提案に
-    記録の欄があれば `--agree` と `--lint` が error にする（`agree.record_field_problems`）。
+    記録の欄があれば `--agree` と `--lint` が error にする
+    （`agree_candidates.record_field_problems`）。
     """
-    meta = t.raw.get(ticket_mod.APPROVAL_KEY)
+    meta = t.raw.get(ticket_model.APPROVAL_KEY)
     if not isinstance(meta, dict) or not all(k in meta for k in _RECORD_KEYS):
         return False
     return bool(str(meta.get("approved_at") or "").strip())
@@ -37,7 +37,7 @@ def has_record(t: ticket_mod.Ticket) -> bool:
 def mark_imported(
     conf: settings.Settings,
     root: str,
-    kept: list[ticket_mod.Ticket],
+    kept: list[ticket_model.Ticket],
     fams: syncstate.Families | None = None,
 ) -> None:
     """取り込み済みの親子のチケットに、信頼できない理由を付ける。
@@ -72,7 +72,7 @@ def mark_imported(
             t.blocked = f"{t.blocked} / {why}" if t.blocked else why
 
 
-def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
+def outside_reason(st: syncstate.Standing, t: ticket_model.Ticket) -> str:
     """親のワークツリーの外にしか無いチケットを信頼しない理由と、ユーザが親のブランチへ移してコミットする手順。"""
     return (
         f"親のブランチ {st.branch_name} のワークツリーの外"
@@ -86,7 +86,7 @@ def outside_reason(st: syncstate.Standing, t: ticket_mod.Ticket) -> str:
 def family_standing(
     conf: settings.Settings,
     root: str,
-    t: ticket_mod.Ticket,
+    t: ticket_model.Ticket,
     fams: syncstate.Families | None = None,
 ) -> syncstate.Standing:
     """このチケットが属する親子のチケットの立ち位置（`syncstate.Families.standing`）。
@@ -100,7 +100,7 @@ def family_standing(
 def family_problems(
     conf: settings.Settings,
     root: str,
-    t: ticket_mod.Ticket,
+    t: ticket_model.Ticket,
     fams: syncstate.Families | None = None,
 ) -> list[rules.Problem]:
     """取り込み済みの親子のチケットの提案を承認しない理由。
@@ -135,16 +135,16 @@ def family_problems(
 def branch_problems(
     conf: settings.Settings,
     root: str,
-    t: ticket_mod.Ticket,
+    t: ticket_model.Ticket,
     fams: syncstate.Families | None = None,
-    others: list[ticket_mod.Ticket] | None = None,
+    others: list[ticket_model.Ticket] | None = None,
 ) -> list[rules.Problem]:
     """親のブランチ名を承認してよいか。
 
     - `branch:` がそのリポジトリの統合先の名前に当たれば承認しない。比べる名前は
       `Families.integration_names`（環境変数・`.claude/settings.local.json`・統合先の取り込み結果・
       `origin/HEAD`・`origin/main`・`origin/master`）。固定のリストと字の検査は
-      `ticket.branch_problem` が読むときに済ませている
+      `ticket_ids.branch_problem` が読むときに済ませている
     - 2 つの親子のチケットが同じブランチを名乗る（この親のブランチ名が、同じリポジトリの開いた別の
       チケットの親のブランチ名か識別子と同じ。大文字小文字は区別しない）なら承認しない。`others` は
       比べるチケット（承認済みと承認待ち）
@@ -165,7 +165,7 @@ def branch_problems(
                     "統合先を親のブランチにしない",
                 )
             )
-    mine = ticket_mod.branch_name(t).casefold()
+    mine = ticket_ids.branch_name(t).casefold()
     clash = sorted(
         {
             o.ticket
@@ -173,7 +173,7 @@ def branch_problems(
             if o.ticket != t.ticket
             and (o.parent or o.ticket) != t.ticket
             and o.project == t.project
-            and mine in {ticket_mod.branch_name(o).casefold(), o.ticket.casefold()}
+            and mine in {ticket_ids.branch_name(o).casefold(), o.ticket.casefold()}
         }
     )
     if clash:
@@ -181,7 +181,7 @@ def branch_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"親のブランチ {ticket_mod.branch_name(t)} を別の親子のチケット"
+                f"親のブランチ {ticket_ids.branch_name(t)} を別の親子のチケット"
                 f"（{', '.join(clash)}）も親のブランチか識別子として使っている。"
                 "2 つの親子のチケットが同じブランチを名乗ると、"
                 "どちらのチケットを本物とするか決まらないので承認しない",
@@ -199,7 +199,7 @@ def family_stop_text(root: str, st: syncstate.Standing) -> str:
 def integration_problems(
     conf: settings.Settings,
     root: str,
-    t: ticket_mod.Ticket,
+    t: ticket_model.Ticket,
     fams: syncstate.Families | None = None,
 ) -> list[rules.Problem]:
     """新規の提案の識別子を統合先の `done/` と比べる。
@@ -258,7 +258,7 @@ def integration_problems(
 
 
 def integration_closed(
-    conf: settings.Settings, root: str, proposals: list[ticket_mod.Ticket]
+    conf: settings.Settings, root: str, proposals: list[ticket_model.Ticket]
 ) -> set[str]:
     """統合先の取り込み結果の `done/` か手元の退避に同じ識別子がある新規の提案。
 
@@ -267,33 +267,33 @@ def integration_closed(
     fams = syncstate.Families(conf, root)
     archived: dict[str, set[str]] = {}
 
-    def closed(t: ticket_mod.Ticket) -> bool:
+    def closed(t: ticket_model.Ticket) -> bool:
         if t.project not in archived:
             archived[t.project] = archive.ids(root, t.project)
         if any(archive.same_id(t.ticket, i) for i in archived[t.project]):
             return True
         return fams.active and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
 
-    return {t.ticket for t in proposals if t.state == ticket_mod.TODO and closed(t)}
+    return {t.ticket for t in proposals if t.state == ticket_model.TODO and closed(t)}
 
 
-def _by_id(found: list[ticket_mod.Ticket]) -> dict[str, list[ticket_mod.Ticket]]:
+def _by_id(found: list[ticket_model.Ticket]) -> dict[str, list[ticket_model.Ticket]]:
     """識別子ごとのチケットの全部。順序は見つけた順。"""
-    grouped: dict[str, list[ticket_mod.Ticket]] = {}
+    grouped: dict[str, list[ticket_model.Ticket]] = {}
     for t in found:
         grouped.setdefault(t.ticket, []).append(t)
     return grouped
 
 
-def by_id(tickets: list[ticket_mod.Ticket]) -> dict[str, ticket_mod.Ticket]:
+def by_id(tickets: list[ticket_model.Ticket]) -> dict[str, ticket_model.Ticket]:
     return {t.ticket: t for t in tickets}
 
 
 # ---- 先行（`predecessors`）を満たしているか。承認と着手の両方で求める
 
 # 先行の状態。満たしたとみなすのは `done` だけ（`.ccnavi/approved/done/` に在り、取り消しでない）。
-PRED_DONE = ticket_mod.DONE
-PRED_CANCELLED = ticket_mod.CANCELLED
+PRED_DONE = ticket_model.DONE
+PRED_CANCELLED = ticket_model.CANCELLED
 PRED_MISSING = "missing"
 PRED_SCATTERED = "scattered"
 # 形の上で満たせない先行。待っても通らないので、ふつうの error にする。
@@ -303,11 +303,11 @@ PRED_CYCLE = "cycle"  # 先行を辿ると自分に戻る
 # 取り込み済みの親子のチケットの先行で、その親子のチケットが決まらない・親のブランチ上に無い。
 PRED_UNDECIDED = "undecided"
 # 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
-PRED_WAITING = (ticket_mod.TODO, ticket_mod.DOING, ticket_mod.REVIEW)
+PRED_WAITING = (ticket_model.TODO, ticket_model.DOING, ticket_model.REVIEW)
 PRED_LABELS = {
-    ticket_mod.TODO: "承認待ち（todo/）",
-    ticket_mod.DOING: "作業中（doing/）",
-    ticket_mod.REVIEW: "レビュー待ち（review/）",
+    ticket_model.TODO: "承認待ち（todo/）",
+    ticket_model.DOING: "作業中（doing/）",
+    ticket_model.REVIEW: "レビュー待ち（review/）",
     PRED_CANCELLED: "取り消し済み（done/ で cancelled_at を持つ）",
     PRED_MISSING: "どの置き場にも無い",
     PRED_SCATTERED: "複数の場所にある",
@@ -342,13 +342,13 @@ class Predecessor:
 
 
 def predecessor_pool_of(
-    open_copies: list[ticket_mod.Ticket],
-    review: list[ticket_mod.Ticket],
-    closed: list[ticket_mod.Ticket],
-    proposals: list[ticket_mod.Ticket],
+    open_copies: list[ticket_model.Ticket],
+    review: list[ticket_model.Ticket],
+    closed: list[ticket_model.Ticket],
+    proposals: list[ticket_model.Ticket],
     root: str = "",
-) -> dict[str, list[ticket_mod.Ticket]]:
-    """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops._places` と同じ集め方）。
+) -> dict[str, list[ticket_model.Ticket]]:
+    """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops_close._places` と同じ集め方）。
 
     承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
@@ -360,7 +360,7 @@ def predecessor_pool_of(
     """
     pool = _by_id(open_copies + review + closed)
     for t in proposals:
-        if t.state == ticket_mod.TODO and t.ticket not in pool:
+        if t.state == ticket_model.TODO and t.ticket not in pool:
             pool.setdefault(t.ticket, []).append(t)
     if root:
         # 引くのは、その先行を書いたチケットと同じリポジトリ（プロジェクト）の退避だけ。
@@ -377,7 +377,7 @@ def predecessor_pool_of(
 
 
 def align_imported(
-    conf: settings.Settings, root: str, pool: dict[str, list[ticket_mod.Ticket]]
+    conf: settings.Settings, root: str, pool: dict[str, list[ticket_model.Ticket]]
 ) -> None:
     """取り込み済みの親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
 
@@ -428,13 +428,13 @@ def align_imported(
             pool[ident] = mine
 
 
-def _undecided(sample: ticket_mod.Ticket, why: str) -> ticket_mod.Ticket:
+def _undecided(sample: ticket_model.Ticket, why: str) -> ticket_model.Ticket:
     """先行の対応表に置く「親子のチケットが決まらない」の項目。理由は `blocked` に入れて渡す。"""
     return replace(sample, state=PRED_UNDECIDED, blocked=why)
 
 
 def predecessor_states(
-    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]]
+    t: ticket_model.Ticket, pool: dict[str, list[ticket_model.Ticket]]
 ) -> list[Predecessor]:
     """このチケットの先行のそれぞれの今。順序は `predecessors` の順（重ねて書いたものは 1 つ）。"""
     out: list[Predecessor] = []
@@ -459,11 +459,11 @@ def predecessor_states(
             where = ", ".join(f"{h.tree or '(ワークスペースルート)'}:{h.state}" for h in hits)
             out.append(Predecessor(ident, PRED_SCATTERED, where))
         else:
-            out.append(Predecessor(ident, hits[0].state or ticket_mod.DOING))
+            out.append(Predecessor(ident, hits[0].state or ticket_model.DOING))
     return out
 
 
-def _loop_back(origin: str, first: str, pool: dict[str, list[ticket_mod.Ticket]]) -> list[str]:
+def _loop_back(origin: str, first: str, pool: dict[str, list[ticket_model.Ticket]]) -> list[str]:
     """`first` から先行を辿って `origin` に戻る経路。戻らなければ空。
 
     辿るのは対応表で 1 つに決まるチケットだけ（決まらないものは別の苦情になる）。閉じた（`done/`）
@@ -487,7 +487,7 @@ def _loop_back(origin: str, first: str, pool: dict[str, list[ticket_mod.Ticket]]
 
 
 def unmet_predecessors(
-    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]]
+    t: ticket_model.Ticket, pool: dict[str, list[ticket_model.Ticket]]
 ) -> list[Predecessor]:
     """満たしていない先行。子だけが先行を持つ（親の `predecessors` は読まない）。"""
     if not t.is_child:
@@ -496,7 +496,7 @@ def unmet_predecessors(
 
 
 def predecessor_problems(
-    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]], approved_rel: str
+    t: ticket_model.Ticket, pool: dict[str, list[ticket_model.Ticket]], approved_rel: str
 ) -> list[rules.Problem]:
     """承認で落とす先行の苦情。
 
@@ -514,7 +514,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} が閉じていない（いまは {p.label}）。{p.ticket} が "
-                    f"{approved_rel}/{ticket_mod.DONE}/ に入る（作業を終え、レビューが要るなら"
+                    f"{approved_rel}/{ticket_model.DONE}/ に入る（作業を終え、レビューが要るなら"
                     "ユーザのレビューが済む）まで承認しない。先行が要らないなら "
                     "predecessors から外して"
                     "出し直してください",
@@ -580,11 +580,11 @@ def predecessor_problems(
     return problems
 
 
-def children_of(tickets: list[ticket_mod.Ticket], parent_id: str) -> list[ticket_mod.Ticket]:
+def children_of(tickets: list[ticket_model.Ticket], parent_id: str) -> list[ticket_model.Ticket]:
     return [t for t in tickets if t.parent == parent_id]
 
 
-def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
+def _reserved_project(t: ticket_model.Ticket) -> list[rules.Problem]:
     """`project:` がレイヤーの名前に予約してある表記なら error（設計 11.4）。"""
     if not t.project or not settings.is_reserved_layer_name(t.project):
         return []
@@ -602,7 +602,7 @@ def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
 
 
 def project_problems(
-    t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], conf: settings.Settings
+    t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket], conf: settings.Settings
 ) -> list[rules.Problem]:
     """`project` が置き場と合っているか（REQ-MLT-11）。
 
@@ -658,7 +658,7 @@ def project_problems(
 
 
 def child_problems(
-    t: ticket_mod.Ticket, parent: ticket_mod.Ticket | None, missing: str = ""
+    t: ticket_model.Ticket, parent: ticket_model.Ticket | None, missing: str = ""
 ) -> list[rules.Problem]:
     """子と親の構造の検査。承認（`validate`）と判定（`blocking_problems`）が同じ答えを引く。
 
@@ -694,7 +694,7 @@ def child_problems(
 
 
 def blocking_problems(
-    conf: settings.Settings, t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]
+    conf: settings.Settings, t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]
 ) -> list[rules.Problem]:
     """判定がこの承認済みチケットを信頼できない理由。空なら信頼してよい。
 
@@ -730,7 +730,7 @@ def blocking_problems(
     return [p for p in problems if p.severity == rules.SEVERITY_ERROR]
 
 
-def content_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
+def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
     """作業中の承認済みチケットの、中身だけで分かる欄の矛盾（判定が止める分）。"""
     problems: list[rules.Problem] = []
     if t.base_sha and not t.started_at:
@@ -742,12 +742,12 @@ def content_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
                 "片方だけの形は道具を通っていない。ユーザが承認済みチケットを確かめて直してください",
             )
         )
-    if ticket_mod.WORKFLOW_KEY in t.raw and not has_record(t):
+    if ticket_model.WORKFLOW_KEY in t.raw and not has_record(t):
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"`{ticket_mod.WORKFLOW_KEY}:` の欄がある。待ち方は --agree が "
+                f"`{ticket_model.WORKFLOW_KEY}:` の欄がある。待ち方は --agree が "
                 f"{approval_marks.PHASES_DIR}/<親>/{approval_marks.WORKFLOW_FILE} "
                 "に書くもので、チケットには書かない。"
                 "ユーザが欄を消してください",
@@ -760,7 +760,7 @@ def content_problems(t: ticket_mod.Ticket) -> list[rules.Problem]:
     return problems
 
 
-def resumed_fields(t: ticket_mod.Ticket) -> list[str]:
+def resumed_fields(t: ticket_model.Ticket) -> list[str]:
     """作業中（`doing/`）なのに値が残っている、閉じるときに書く欄の名前。
 
     `finish` と `cancel` は `doing/` から動かすので、道具を通る限り残らない。残るのは、ユーザが
@@ -774,10 +774,10 @@ def resumed_fields(t: ticket_mod.Ticket) -> list[str]:
     return [name for name, value in values.items() if value]
 
 
-def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:
+def mark_blocked(conf: settings.Settings, kept: list[ticket_model.Ticket]) -> None:
     """判定が読む承認済みチケットに、信頼できない理由を付ける。
 
-    理由を読むのは `phase.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
+    理由を読むのは `phase_scope.scope_verdict` で、実行前チェック・実行後チェック・サブエージェント
     終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
 
@@ -787,7 +787,7 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None
     引ける対応表にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
     承認していない範囲に書ける経路そのものなので、引けないなら止める側を採る。
 
-    親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
+    親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops_close.close_problems` が
     開いた子のある親を閉じさせない）。置き場を手で動かして起きたなら、親を閉じたのは
     ユーザなので、その子を止めるのがユーザの意思に沿う。
     """

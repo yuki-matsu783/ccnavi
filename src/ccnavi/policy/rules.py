@@ -412,7 +412,7 @@ def tool_matches(match: str, tool: str) -> bool:
     """`match:`（`|` 区切り）がこのツール名を含むか。大文字小文字を区別した完全一致。
 
     `Rule.matches` のツール名の側。組み込みの保護を、当たりようの無いツールで組み立てずに
-    済ませる判断（`selfguard.add_rules`）も、同じこの 1 本で決める。
+    済ませる判断（`selfguard_shell.add_rules`）も、同じこの 1 本で決める。
     """
     return any(want.strip() == tool for want in match.split("|"))
 
@@ -655,7 +655,7 @@ def _build(
     # 保護を `.Ccnavi/` と書くだけで止められずに通せ、どの機械でも区別しないチケットの範囲とも
     # 食い違う。
     # ルールはユーザが宣言する場所の意図なので、機械の都合ではなく書かれたパスの意味で読む
-    # （phasetypes._globs / risk._factors / selfguard._folded / チケットの範囲と同じ形）。
+    # （phasetypes._globs / risk._factors / selfguard_shell._folded / チケットの範囲と同じ形）。
     # 区別が要る `regex` は `(?-i:...)` で囲む。
     flags = re.IGNORECASE
 

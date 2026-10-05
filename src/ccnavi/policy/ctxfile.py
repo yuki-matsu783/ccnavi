@@ -280,7 +280,10 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
             os.remove(stop_path(state_dir, session))
     mine = os.path.basename(_once_path(state_dir, session, "")).rsplit("-", 1)[0] + "-"
     cutoff = time.time() - ONCE_KEEP_DAYS * 86400
-    for name in os.listdir(state_dir):
+    for entry in os.listdir(state_dir):
+        # 書きかけで落ちて残った一時ファイル（`.once-….part.json`）も、
+        # 先頭の `.` を外して同じ条件で掃く。
+        name = fsio.temp_origin(entry)
         if not name.endswith(".json"):
             continue
         # 承認を伝えた記録（`approved-<セッション>-<エージェント>.json`）は、hook が承認を
@@ -288,7 +291,7 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
         stale = name.startswith("approved-")
         if not stale and not name.startswith("once-"):
             continue
-        path = os.path.join(state_dir, name)
+        path = os.path.join(state_dir, entry)
         try:
             if (not stale and name.startswith(mine)) or os.path.getmtime(path) < cutoff:
                 os.remove(path)

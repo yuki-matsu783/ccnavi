@@ -35,14 +35,14 @@ MODE_ENV = "CCNAVI_MODE"
 # 置き場（記録・state・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）も env では
 # 動かない。既定に固定で、下の DEFAULT_* がそれ。診断のために動かす道は `--log` /
 # `--state` / `--tickets` / `--approved` / `--projects` / `--project-home` のフラグだけで、
-# cli._override が重ねる。
+# cli_args._override が重ねる。
 #
 # 戻す働きは 2 つあり、守る対象の決まり方が違うので環境変数も分けてある。
 #
 # RESTORE_IF_DENY_ENV は、ルールが `deny` と宣言した場所を戻す。対象は
 # ルールファイル次第で動くので、プロジェクトが書いたぶんだけ広がる。
 # 戻すのは `deny` だけで、`ask` と承認済みチケットの範囲外は報告に留める
-# （post._restorable）。実行後チェックが見る範囲（post._guarding）より狭い。
+# （post._restorable）。実行後チェックが見る範囲（post_findings._guarding）より狭い。
 # GUARD_CORE_FILES_ENV は、ccnavi 自身を成り立たせている設定ファイルを
 # 戻す。対象は組み込みで固定されていて、ルールファイルには書かない。
 #
@@ -102,7 +102,7 @@ SHARED_CLAUDE_SETTINGS = os.path.join(".claude", "settings.json")
 BRANCH_PREFIXES_ENV = "CCNAVI_BRANCH_PREFIXES"
 # 既定の先頭の語。`release` は統合先や保護されたブランチの名前（`release-*`）に当たるので入れない。
 DEFAULT_BRANCH_PREFIXES = ("feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs")
-# 先頭の語に使えない名前（`ticket.RESERVED_BRANCH_IDS` と同じリスト）。
+# 先頭の語に使えない名前（`ticket_ids.RESERVED_BRANCH_IDS` と同じリスト）。
 _RESERVED_PREFIXES = ("main", "master", "develop", "release")
 _PREFIX = re.compile(r"^[a-z][a-z0-9]*\Z")
 
@@ -434,7 +434,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     #
     # 置き場（共通レイヤーの 3 本、記録・state・提案・承認済みチケット・プロジェクト・ccnavi
     # ディレクトリ）はこの表に無い。env でも上書き設定ファイルでも動かず、既定のまま。
-    # 動かせるのはフラグだけで、そちらは cli._override が重ねる。
+    # 動かせるのはフラグだけで、そちらは cli_args._override が重ねる。
     # 残る `bin` は置き場ではなく、hook が起動する実行ファイルの指定で、既定を持たない。
     overrides = (("bin", BIN_ENV, _resolve_bin),)
     for name, env, read in overrides:

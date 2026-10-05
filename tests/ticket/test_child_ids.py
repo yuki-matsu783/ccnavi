@@ -20,7 +20,7 @@ import unittest
 
 from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval
+from ccnavi.tickets import approval_ops, ticket_ids, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -64,22 +64,22 @@ class ChildIdFormTest(unittest.TestCase):
                 self.assertTrue(t.is_child)
 
     def test_the_pattern_strips_two_steps_from_the_right(self):
-        m = ticket_mod.child_pattern().match("web-i0012-05-01")
+        m = ticket_ids.child_pattern().match("web-i0012-05-01")
         self.assertIsNotNone(m)
         self.assertEqual(
             (m.group("parent"), m.group("phase"), m.group("seq")), ("web-i0012", "05", "01")
         )
-        m = ticket_mod.child_pattern().match("x-01-02-03")
+        m = ticket_ids.child_pattern().match("x-01-02-03")
         self.assertEqual(
             (m.group("parent"), m.group("phase"), m.group("seq")), ("x-01", "02", "03")
         )
         for name in ("i0012", "i0012-05", "i0012-5-01", "i0012-05-1", "-05-01", "i0012-05-01-"):
             with self.subTest(name=name):
-                self.assertIsNone(ticket_mod.child_pattern().match(name))
+                self.assertIsNone(ticket_ids.child_pattern().match(name))
 
     def test_child_id_pads_both_numbers(self):
-        self.assertEqual(ticket_mod.child_id("i0012", 5, 1), "i0012-05-01")
-        self.assertEqual(ticket_mod.child_id("web-i0012", 0, 12), "web-i0012-00-12")
+        self.assertEqual(ticket_ids.child_id("i0012", 5, 1), "i0012-05-01")
+        self.assertEqual(ticket_ids.child_id("web-i0012", 0, 12), "web-i0012-00-12")
 
     def test_a_phase_that_disagrees_with_the_id_is_an_error(self):
         t, problems = ticket_mod.parse(child_text("i0012-02-01", "i0012", 5))
@@ -172,27 +172,29 @@ class NextChildIdTest(unittest.TestCase):
         self.put("wip/proposals/todo", "i0001-05-03", "i0001", 5)
         # 別の親の子は数えない（親が同じ綴りで始まっても）
         self.put(".ccnavi/approved/doing", "i0001-x-02-07", "i0001-x", 2)
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 2), "i0001-02-02")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 5), "i0001-05-04")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 0), "i0001-00-01")
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001-x", 2), "i0001-x-02-08")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 2), "i0001-02-02")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 5), "i0001-05-04")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 0), "i0001-00-01")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.ws, "i0001-x", 2), "i0001-x-02-08"
+        )
 
     def test_numbers_past_two_digits_are_refused(self):
         self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)
         with self.assertRaises(ValueError) as caught:
-            approval.next_child_id(self.conf, self.ws, "i0001", 2)
+            approval_ops.next_child_id(self.conf, self.ws, "i0001", 2)
         self.assertIn("連番 99 まで埋まっている", str(caught.exception))
         with self.assertRaises(ValueError):
-            approval.next_child_id(self.conf, self.ws, "i0001", 100)
-        self.assertEqual(approval.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
+            approval_ops.next_child_id(self.conf, self.ws, "i0001", 100)
+        self.assertEqual(approval_ops.next_child_id(self.conf, self.ws, "i0001", 3), "i0001-03-01")
 
 
 class FollowupRefusesTest(NextChildIdTest):
     """続きの子は、組めない識別子や先に在るファイルの上では何も書かずに止まる。"""
 
     def parent(self):
-        return ticket_mod.Ticket(ticket="i0001", raw={}, body="")
+        return ticket_model.Ticket(ticket="i0001", raw={}, body="")
 
     def snapshot(self):
         found = {}
@@ -205,7 +207,7 @@ class FollowupRefusesTest(NextChildIdTest):
         return found
 
     def followup(self, phase_no):
-        return approval.followup(self.conf, self.ws, self.parent(), phase_no, [], ["指摘"])
+        return approval_ops.followup(self.conf, self.ws, self.parent(), phase_no, [], ["指摘"])
 
     def test_a_full_phase_writes_nothing(self):
         self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)

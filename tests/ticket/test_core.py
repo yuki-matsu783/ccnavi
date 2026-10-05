@@ -25,6 +25,7 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
 from __future__ import annotations
 
 import ast
+import contextlib
 import importlib.util
 import io
 import json
@@ -36,11 +37,10 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import lint, version
-from ccnavi.hook import core
+from ccnavi.hook import core, core_base
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, history
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import approval, approval_ops, history, ticket_model
 from tests import common_path, requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
@@ -567,6 +567,115 @@ class PlanWriterTest(CoreHarness):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
 
 
+@contextlib.contextmanager
+def durable_writes():
+    """一時ファイル→fsync→os.replace の書き方（`fsio._replace_durably`）を通ったパスを集める。
+
+    呼び出し側が素の書き方（`write_bytes`・`write_new`）に戻されると、ここに載らない。
+    """
+    seen: list[str] = []
+    real = fsio._replace_durably
+
+    def record(path, content):
+        seen.append(os.path.normcase(os.path.abspath(path)))
+        return real(path, content)
+
+    with mock.patch.object(fsio, "_replace_durably", record):
+        yield seen
+
+
+def _norm(path: str) -> str:
+    return os.path.normcase(os.path.abspath(path))
+
+
+class DurableWiringTest(CoreHarness):
+    """承認の書き込みが、途中を見せず fsync する書き方を通ること（呼び出し側の配線）。"""
+
+    def planned(self):
+        snapshot = self.snapshot()
+        with history.session(history.VIA_CHROME, None):
+            return core.plan(snapshot, core.judge_approval(snapshot))
+
+    def test_approval_writes_the_ticket_and_the_workflow_durably(self):
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        changes = self.planned()
+        with durable_writes() as seen:
+            applied, out, err = self.write_changes(changes)
+        self.assertEqual(applied.code, 0, out + err)
+        self.assertIn(_norm(os.path.join(self.approved, "doing", "i0001.md")), seen)
+        self.assertIn(_norm(os.path.join(self.approved, "phases", "i0001", "workflow.yml")), seen)
+
+    def test_a_carried_flow_is_written_durably(self):
+        self.family(plan=["design"])
+        todo = os.path.join(self.root, "wip", "proposals", "todo")
+        write(
+            os.path.join(todo, "i0001-01-01.md"),
+            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
+        )
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml"),
+            "version: 1\nsteps: []\n",
+        )
+        changes = self.planned()
+        with durable_writes() as seen:
+            applied, out, err = self.write_changes(changes)
+        self.assertEqual(applied.code, 0, out + err)
+        self.assertIn(_norm(os.path.join(self.approved, "flows", "i0001-01-01.yml")), seen)
+
+    def test_a_withdrawal_puts_the_proposal_back_durably(self):
+        text = parent_text("i0001", ["research"])
+        self.propose("i0001", text)
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
+        self.assertEqual(checked.problems, [])
+        with durable_writes() as seen:
+            applied, out, err = self.write_changes(checked.changes)
+        self.assertEqual(applied.code, 0, out + err)
+        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        self.assertIn(_norm(todo), seen)
+
+    def approved_parent_copy(self):
+        self.family(plan=["design"])
+        found, _ = approval.scan(self.conf(), self.root)
+        (parent,) = [t for t in found if t.ticket == "i0001"]
+        return parent
+
+    def test_start_and_finish_fields_are_rewritten_durably(self):
+        """着手・終わりの欄の書き直し（`update_fields`）も、承認済みチケットを途中を見せずに書く。"""
+        parent = self.approved_parent_copy()
+        with durable_writes() as seen:
+            self.assertEqual(approval_ops.update_fields(parent.path, {"started_at": "x"}), "")
+        self.assertEqual(seen, [_norm(parent.path)])
+        with open(parent.path, encoding="utf-8") as f:
+            self.assertIn('started_at: "x"', f.read())
+
+    def test_a_followup_child_is_written_durably(self):
+        """続きの子（`followup`）は `doing/` に直に起こすので、同じ書き方で置く。"""
+        parent = self.approved_parent_copy()
+        with durable_writes() as seen:
+            ident, failed = approval_ops.followup(self.conf(), self.root, parent, 1, [], ["指摘"])
+        self.assertEqual(failed, "")
+        written = [
+            p for p in seen if p.endswith(os.path.normcase(os.path.join("doing", ident + ".md")))
+        ]
+        self.assertEqual(len(written), 1, seen)
+        self.assertTrue(os.path.exists(written[0]))
+
+    def test_the_new_durable_op_does_not_overwrite_and_goes_durably(self):
+        target = os.path.join(self.root, "flows-test", "a.yml")
+        op = fsio.Op(fsio.OP_NEW_DURABLE, target, b"new")
+        with durable_writes() as seen:
+            self.assertEqual(core_base._write_op(op), "")
+        self.assertEqual(seen, [_norm(target)])
+        with durable_writes() as seen:
+            self.assertNotEqual(core_base._write_op(fsio.Op(fsio.OP_NEW_DURABLE, target, b"x")), "")
+        self.assertEqual(seen, [])
+        with open(target, "rb") as f:
+            self.assertEqual(f.read(), b"new")
+
+
 class WriterFailureTest(CoreHarness):
     """Writer(FS) の落ち方。並べる段では書き込みが落ちないので、書くときの枝を試す。"""
 
@@ -605,7 +714,7 @@ class WriterFailureTest(CoreHarness):
         todo = os.path.join("todo", "i0001.md")
         for name, when in (
             ("unlink", lambda path: path.endswith(todo)),
-            ("write_bytes", lambda path, data: path.endswith(doing)),
+            ("write_bytes_atomic", lambda path, data: path.endswith(doing)),
         ):
             with self.subTest(name=name):
                 self.propose("i0001", parent_text("i0001", ["research"]))
@@ -626,7 +735,7 @@ class WriterFailureTest(CoreHarness):
         self.commit_parent()
         changes = self.planned()
         doing = os.path.join("doing", "i0001.md")
-        with self.failing("write_text", lambda path, *rest: path.endswith(doing)):
+        with self.failing("write_text_durable", lambda path, *rest: path.endswith(doing)):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 1, out + err)
         with open(self.held(), "rb") as f:
@@ -1141,7 +1250,7 @@ def _default_placement(chrome):
     approved = settings.DEFAULT_APPROVED.replace(os.sep, "/").strip("/")
     home = settings.DEFAULT_PROJECT_HOME.replace(os.sep, "/").strip("/")
     layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
-    done = f"{approved}/{ticket_mod.DONE}"
+    done = f"{approved}/{ticket_model.DONE}"
     return {
         "tickets": tickets,
         "approved": approved,
@@ -1479,6 +1588,21 @@ class WithdrawTest(CoreHarness):
         listed = core.withdrawable(self.snapshot(), "i0001")
         self.assertTrue(any("子の提案" in p for p in listed[0][2]), listed)
 
+    def test_a_leftover_temporary_file_is_not_a_marker(self):
+        """書きかけで落ちて残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
+        text = self.approved_parent()
+        marks = os.path.join(self.approved, "phases", "i0001")
+        # 実際に残りうる名前。待ち方（write_bytes_atomic）と、受け入れた指摘の記録
+        # （write_json_atomic）の書きかけ。マーカーは一時ファイルを作らずに書く。
+        write(os.path.join(marks, ".workflow.yml.abc12345.part"), "half")
+        write(os.path.join(marks, ".accepted.abc12345.part.json"), "half")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertFalse(any("マーカー" in p for p in problems), problems)
+        # 本物のマーカーが一緒に在れば、今までどおり止める。
+        write(os.path.join(marks, "1.pending"), "{}")
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("マーカーがある" in p for p in problems), problems)
+
     def test_an_unreadable_marks_place_refuses(self):
         """マーカーの置き場を読めない（ディレクトリでない）なら、無いとは言わずに止める。"""
         text = self.approved_parent()
@@ -1665,6 +1789,13 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
         names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
         names += ("tickets.review_host", "tickets.review_decide", "tickets.review_close")
+        names += ("tickets.ticket_model", "tickets.ticket_ids", "tickets.ticket_places")
+        names += ("tickets.ticket_fold", "tickets.ticket_guard", "tickets.ticket_fields")
+        names += ("tickets.agree_candidates", "tickets.agree_digest", "tickets.agree_screen")
+        names += ("tickets.phase_forms", "tickets.phase_scope")
+        names += ("tickets.flow_text", "tickets.flow_shape", "tickets.flow_render")
+        names += ("tickets.approval_ops", "tickets.ops_close", "tickets.ops_stop")
+        names += ("hook.core_base", "hook.core_approve", "hook.core_review", "hook.core_withdraw")
         for dotted in names:
             package, name = dotted.split(".")
             path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")

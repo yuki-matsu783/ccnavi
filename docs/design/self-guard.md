@@ -38,14 +38,14 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
 
 同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
-`DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase.prune_form`）。実行ファイルの端末要求は
+`DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
 擬似端末（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
 見るのは引用符を落としたコマンド行で、コマンドの切れ目の中に ccnavi の名前と単独の語の `--prune` が並べば止める。
 免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ形だけ。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
-実行ファイルのパス（`selfguard.binary_clause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも当てる。
+実行ファイルのパス（`selfguard_shell.binary_clause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも当てる。
 このパスは `builtin-guard-binary` と、`builtin-guard-setting-files` の場所の一覧と、承認のルール（9.5）の実行ファイルの名前に入る。
 パスを `.` `..` を落とした要素に割り、名前で 2 つの形を切り替える。
 

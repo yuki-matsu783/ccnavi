@@ -17,8 +17,14 @@ import os
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, approval_checks, approval_marks, phasetypes, workflow
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import (
+    approval,
+    approval_checks,
+    approval_marks,
+    phasetypes,
+    ticket_model,
+    workflow,
+)
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import write
@@ -113,11 +119,13 @@ class TypesTest(unittest.TestCase):
 
 class ComputeTest(unittest.TestCase):
     def parent(self, plan):
-        return ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in plan])
+        return ticket_model.Ticket(
+            ticket="i0001", plan=[ticket_model.PlanItem(type=t) for t in plan]
+        )
 
     def test_dag_waits_only_for_ancestors(self):
         wf = workflow.compute(self.parent(PLAN), types_of(DAG))
-        self.assertEqual(wf.order, ticket_mod.WORKFLOW_DAG)
+        self.assertEqual(wf.order, ticket_model.WORKFLOW_DAG)
         self.assertEqual(wf.waits, {1: [], 2: [1], 3: [1], 4: [1, 2, 3]})
 
     def test_sequential_waits_for_everything_before(self):
@@ -131,12 +139,12 @@ class ComputeTest(unittest.TestCase):
 
     def test_an_unreadable_type_makes_the_plan_sequential(self):
         wf = workflow.compute(self.parent(["design", "nope", "implement"]), types_of(DAG))
-        self.assertEqual(wf.order, ticket_mod.WORKFLOW_SEQUENTIAL)
+        self.assertEqual(wf.order, ticket_model.WORKFLOW_SEQUENTIAL)
         self.assertEqual(wf.waits[3], [1, 2])
 
     def test_defer_goes_to_the_smallest_later_descendant(self):
         parent = self.parent(PLAN)
-        parent.plan[1] = ticket_mod.PlanItem(type="acceptance", review="defer")
+        parent.plan[1] = ticket_model.PlanItem(type="acceptance", review="defer")
         wf = workflow.compute(parent, types_of(DAG))
         # 3（implement）は acceptance を待たないので引き受けない。4（docs）が引き受ける。
         self.assertEqual(wf.review_at, {2: 4})
@@ -149,21 +157,23 @@ class ComputeTest(unittest.TestCase):
             "  wrap: {title: 締め, review: mr, scope: inherit, after: [docs, acceptance]}",
         ).replace("acceptance: {title: 受入,", "acceptance: {title: 受入, overlap: [docs],")
         parent = self.parent(["design", "acceptance", "implement", "docs", "wrap"])
-        parent.plan[1] = ticket_mod.PlanItem(type="acceptance", review="defer")
+        parent.plan[1] = ticket_model.PlanItem(type="acceptance", review="defer")
         wf = workflow.compute(parent, types_of(text))
         self.assertNotIn(2, wf.waits[4])
         self.assertEqual(wf.review_at, {2: 5})
 
     def test_feedback_plan_is_always_sequential(self):
         parent = self.parent(PLAN)
-        parent.feedback = [ticket_mod.PlanItem(type="fixup"), ticket_mod.PlanItem(type="fixup")]
+        parent.feedback = [ticket_model.PlanItem(type="fixup"), ticket_model.PlanItem(type="fixup")]
         parent.workflow = workflow.compute(parent, types_of(DAG))
         self.assertEqual(workflow.waits_of(parent, 6, types_of(DAG)), [1, 2, 3, 4, 5])
 
 
 class PlanProblemsTest(unittest.TestCase):
     def problems(self, plan):
-        parent = ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in plan])
+        parent = ticket_model.Ticket(
+            ticket="i0001", plan=[ticket_model.PlanItem(type=t) for t in plan]
+        )
         return [p.detail for p in workflow.problems(parent, types_of(DAG))]
 
     def test_a_good_plan_passes(self):
@@ -182,12 +192,12 @@ class PlanProblemsTest(unittest.TestCase):
         self.assertEqual(self.problems(PLAN + ["docs"]), [])
 
     def test_defer_without_a_descendant_is_refused(self):
-        parent = ticket_mod.Ticket(
+        parent = ticket_model.Ticket(
             ticket="i0001",
             plan=[
-                ticket_mod.PlanItem(type="design"),
-                ticket_mod.PlanItem(type="acceptance", review="defer"),
-                ticket_mod.PlanItem(type="implement"),
+                ticket_model.PlanItem(type="design"),
+                ticket_model.PlanItem(type="acceptance", review="defer"),
+                ticket_model.PlanItem(type="implement"),
             ],
         )
         found = [p.detail for p in workflow.problems(parent, types_of(DAG))]
@@ -201,7 +211,9 @@ class AcceptedScopeTest(unittest.TestCase):
 
         home = tempfile.mkdtemp(prefix="ccnavi-accepted-")
         self.addCleanup(shutil.rmtree, home, ignore_errors=True)
-        owner = ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in PLAN])
+        owner = ticket_model.Ticket(
+            ticket="i0001", plan=[ticket_model.PlanItem(type=t) for t in PLAN]
+        )
         owner.workflow = workflow.compute(owner, types_of(DAG))
         self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 2), "")
         self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"]), "")
@@ -225,14 +237,16 @@ class NextHintTest(unittest.TestCase):
         """3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる。"""
         from ccnavi.tickets import phase as phase_mod
 
-        owner = ticket_mod.Ticket(ticket="i0001", plan=[ticket_mod.PlanItem(type=t) for t in PLAN])
+        owner = ticket_model.Ticket(
+            ticket="i0001", plan=[ticket_model.PlanItem(type=t) for t in PLAN]
+        )
         owner.workflow = workflow.compute(owner, types_of(DAG))
-        done = ticket_mod.Ticket(ticket="c", parent="i0001", review_required=False)
+        done = ticket_model.Ticket(ticket="c", parent="i0001", review_required=False)
         phases = []
         for n in range(1, 5):
             ph = phase_mod.Phase("i0001", n, item=owner.plan[n - 1], owner=owner)
             if n in (1, 3):
-                ph.tickets, ph.states = [done], {"c": ticket_mod.DONE}
+                ph.tickets, ph.states = [done], {"c": ticket_model.DONE}
                 ph.marks = {approval_marks.MARK_SKIPPED: {}}
             phases.append(ph)
         hint = phase_mod._next_hint(owner, phases, 3)
@@ -326,14 +340,14 @@ class DagApprovalTest(PhaseHarness):
     def test_a_revision_with_the_same_plan_applies_the_new_phases_yml(self):
         self.use(SEQUENTIAL)
         self.family(plan=PLAN)
-        self.assertEqual(self.copy().workflow.order, ticket_mod.WORKFLOW_SEQUENTIAL)
+        self.assertEqual(self.copy().workflow.order, ticket_model.WORKFLOW_SEQUENTIAL)
         self.use(DAG)
         self.propose("i0001", parent_text("i0001", PLAN))
         self.commit_parent("revise")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("待ち方の変更", result.stdout)
-        self.assertEqual(self.copy().workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertEqual(self.copy().workflow.order, ticket_model.WORKFLOW_DAG)
 
     def test_the_approval_screen_shows_what_runs_in_parallel(self):
         self.use(DAG)
@@ -374,7 +388,7 @@ class DagApprovalTest(PhaseHarness):
             self.assertEqual(before, f.read())
         held = approval.workflow_path(self.approved, "i0001")
         self.assertTrue(os.path.isfile(held))
-        self.assertEqual(self.copy().workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertEqual(self.copy().workflow.order, ticket_model.WORKFLOW_DAG)
 
     def test_an_approved_parent_without_a_workflow_is_read_as_sequential(self):
         """コピーした待ち方を持たない承認済みの親は、
@@ -409,12 +423,12 @@ class DagApprovalTest(PhaseHarness):
             "workflow: {order: dag, waits: {1: [], 2: [1], 3: [1], 4: [1, 2, 3]}, review_at: {}}\n"
         )
         held = self.copy()
-        self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertEqual(held.workflow.order, ticket_model.WORKFLOW_DAG)
         self.assertEqual(held.approved_at, "2026-01-01T00:00:00+09:00")
         self.assertEqual([], approval_checks.content_problems(held))
         self.commit_parent("old form")
         held = self.scanned()
-        self.assertEqual(held.workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertEqual(held.workflow.order, ticket_model.WORKFLOW_DAG)
         self.assertFalse(held.workflow_record_differs)
 
     def test_a_forged_old_workflow_that_differs_from_the_computed_one_is_read_as_sequential(self):
@@ -536,7 +550,7 @@ class DagApprovalTest(PhaseHarness):
         self.commit_parent("revise")
         result = self.approve()
         self.assertIn("延期の引き受け手が変わる", result.stderr)
-        self.assertEqual(self.copy().workflow.order, ticket_mod.WORKFLOW_DAG)
+        self.assertEqual(self.copy().workflow.order, ticket_model.WORKFLOW_DAG)
 
     def test_a_plan_that_breaks_the_dag_is_not_approved(self):
         self.use(DAG)

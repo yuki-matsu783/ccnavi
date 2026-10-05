@@ -15,8 +15,7 @@ import os
 from dataclasses import dataclass, field
 
 from ..infra import fsio
-from . import history, workflow
-from . import ticket as ticket_mod
+from . import history, ticket_model, workflow
 
 PHASES_DIR = "phases"
 
@@ -241,7 +240,7 @@ def accepted_threads(
     approved_dir: str,
     parent: str,
     phase: int | None = None,
-    owner: ticket_mod.Ticket | None = None,
+    owner: ticket_model.Ticket | None = None,
 ) -> set[str]:
     """この親で、ユーザが「未解決のまま進める」と受け入れたスレッドの識別。
 
@@ -317,4 +316,15 @@ def now() -> str:
 def _write(path: str, text: str) -> str:
     with fsio.policy(message="書けない ({reason})"):
         failed = fsio.write_text(path, text)
+    return f"書けない ({failed})" if failed else ""
+
+
+def write_ticket(path: str, text: str) -> str:
+    """承認済みチケットを書き直す。返し方は `_write` と同じ。
+
+    途中で落ちても前の中身か新しい中身を残す。一時ファイルに書き切って fsync してから
+    差し替える（`fsio.write_text_durable`）。改行は `_write` と同じ。
+    """
+    with fsio.policy(message="書けない ({reason})"):
+        failed = fsio.write_text_durable(path, text)
     return f"書けない ({failed})" if failed else ""

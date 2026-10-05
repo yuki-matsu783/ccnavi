@@ -42,8 +42,7 @@ from typing import TextIO
 
 from ..infra.modes import EXIT_OK
 from ..policy import rules
-from ..tickets import phasetypes, risk
-from ..tickets import ticket as ticket_mod
+from ..tickets import phasetypes, risk, ticket_model
 
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
@@ -91,7 +90,7 @@ def formats() -> dict[str, int]:
         "phases": phasetypes.VERSION,
         "risks": risk.VERSION,
         "rules": rules.VERSION,
-        "ticket": ticket_mod.VERSION,
+        "ticket": ticket_model.VERSION,
     }
 
 

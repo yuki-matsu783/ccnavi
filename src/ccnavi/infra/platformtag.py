@@ -28,7 +28,7 @@ SYSTEMS = ("darwin", "linux", "windows")
 EXECUTABLE_NAMES = ("ccnavi", "ccnavi.exe")
 
 # 振り分けの sh の名前。この名前なら実体は `../bin/<語>/` に在り、それ以外の名前は
-# 実行ファイルそのものとして読む。selfguard.binary_clause も同じ条件で切り替える。
+# 実行ファイルそのものとして読む。selfguard_shell.binary_clause も同じ条件で切り替える。
 # どちらかだけ条件を足すと、守る場所とバックアップする場所が食い違う。
 LAUNCHER_NAME = "ccnavi-launcher.sh"
 

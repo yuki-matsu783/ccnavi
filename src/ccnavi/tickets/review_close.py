@@ -21,12 +21,14 @@ from . import (
     archive,
     configsync,
     ops,
+    ops_close,
     phase,
     review,
     review_host,
     syncstate,
+    ticket_model,
+    ticket_places,
 )
-from . import ticket as ticket_mod
 
 # Draft を外すときにマージリクエストへ残すコメント。sh が Draft を外してから投稿する。
 READY_FILE = "review-ready-{parent}.md"
@@ -45,8 +47,8 @@ def ready(
 ) -> int:
     """Draft を外してよいかを確かめ、マーカーとコメントの下書きを置く。外すのは sh。
 
-    条件は「親を閉じられる」と同じ（ops.close_problems）に、「親の承認済みチケットが `done/` に
-    ある」を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
+    条件は「親を閉じられる」と同じ（ops_close.close_problems）に、「親の承認済みチケットが
+    `done/` にある」を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものはユーザが行う。
 
@@ -63,13 +65,13 @@ def ready(
     parent = review._parent_any(stderr, root, conf, cwd)
     if parent is None:
         return 1
-    problems = ops.close_problems(root, conf, parent.ticket)
+    problems = ops_close.close_problems(root, conf, parent.ticket)
     # 親のチケットが done/ に無いまま Draft を外すと、
     # そのままマージされたときに done/ に親が無いまま親のブランチが消え、
     # 親子のチケットの判定が「決まらない」になる。それを防ぐ（判定を厳しくする向き）。
-    if parent.state != ticket_mod.DONE:
+    if parent.state != ticket_model.DONE:
         problems.append(
-            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_mod.DONE}/ に無い"
+            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_model.DONE}/ に無い"
             f"（いまは {parent.state}/）。先に "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish {parent.ticket}' で"
             "親を閉じ、コミットして push してから打ち直してください"
@@ -124,7 +126,7 @@ def _archive_closed(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     where: str,
     path: str,
 ) -> int:
@@ -155,7 +157,7 @@ def _archive_closed(
 
 
 def _archive_place_problem(
-    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, where: str
+    root: str, conf: settings.Settings, parent: ticket_model.Ticket, where: str
 ) -> str:
     """退避の元が親のワークツリー（`.claude/worktrees/<親>`）の承認済みの領域でなければ、その理由。"""
     home = tree.tree_of(root, where, conf.projects)
@@ -179,7 +181,7 @@ def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> t
     """Draft を外したときのコメントの下書きを書く。パスと、書けなかった理由（無ければ空）。"""
     text = [review_host.MARKER_READY, f"チケット `{parent}` の作業は終わり、Draft を外した。"]
     text.append(
-        f"`{ticket_mod.WIP_ROOT}/` は片付けてある。閉じたチケットとその記録"
+        f"`{ticket_places.WIP_ROOT}/` は片付けてある。閉じたチケットとその記録"
         f"（`{conf.approved}/` の done/・phases/・events/・flows/）は手元の `logs/archive/` へ"
         "退避し、このブランチからは消してある。マージするかどうかはユーザが決める。"
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
@@ -192,7 +194,7 @@ def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> t
 
 def _archived_parent(
     root: str, conf: settings.Settings, cwd: str, result_path: str
-) -> ticket_mod.Ticket | None:
+) -> ticket_model.Ticket | None:
     """cwd のワークツリーの親が、ready の退避を始めた後なら、その親。
 
     次の 2 つがそろうときだけ。そろわなければ None（通常の条件の確かめへ回る）。
@@ -210,7 +212,7 @@ def _archived_parent(
     if t is None or t.is_main:
         return None
     approved = settings.approved_dir(conf, t.root)
-    if os.path.lexists(os.path.join(approved, ticket_mod.DOING, f"{t.name}.md")):
+    if os.path.lexists(os.path.join(approved, ticket_model.DOING, f"{t.name}.md")):
         return None
     if not archive.ready_started(root, t.project, t.name, t.root):
         return None
@@ -223,8 +225,8 @@ def _archived_parent(
     ]
     if not any(isinstance(m, dict) and m.get("mr") == result.mr.number for m in marks):
         return None
-    if os.path.lexists(os.path.join(approved, ticket_mod.DONE, f"{t.name}.md")):
-        copy, _ = approval.load_copy(os.path.join(approved, ticket_mod.DONE, f"{t.name}.md"))
+    if os.path.lexists(os.path.join(approved, ticket_model.DONE, f"{t.name}.md")):
+        copy, _ = approval.load_copy(os.path.join(approved, ticket_model.DONE, f"{t.name}.md"))
         if copy is None or copy.parent:
             return None
         copy.project = t.project
@@ -237,7 +239,7 @@ def _ready_again(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     result_path: str,
 ) -> int:
     """退避を済ませた親に打ち直した `ready`。ワークツリーの側の条件だけを見て、下書きを書き直す。"""
@@ -323,7 +325,7 @@ def close_early(
         t.ticket
         for ph in phases
         for t in ph.tickets
-        if ph.states.get(t.ticket) == ticket_mod.DOING and t.started_at
+        if ph.states.get(t.ticket) == ticket_model.DOING and t.started_at
     ]
     if doing:
         stderr.write(
@@ -390,7 +392,7 @@ def close_early(
     # state の置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
         f"OK: {parent.ticket} を早めに閉じた。あとは親に、状態の移動をコミットし、"
-        f"'ticket finish {parent.ticket}' で閉じ、`{ticket_mod.WIP_ROOT}/` を消して push し、"
+        f"'ticket finish {parent.ticket}' で閉じ、`{ticket_places.WIP_ROOT}/` を消して push し、"
         "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
     return 0
@@ -401,7 +403,7 @@ class Leftovers:
     """早めに閉じるときに残っているもの。見せるものと、閉じたあとに issue へ書き出すもの。"""
 
     # 未着手の子。取り消す。
-    todo: list[ticket_mod.Ticket]
+    todo: list[ticket_model.Ticket]
     # 終わっていないフェーズ。省略のマーカーを置く。
     not_ended: list[phase.Phase]
     # 終わっていないフェーズのうち、手を付けていないもの（子が無いか全部未着手）。
@@ -422,15 +424,15 @@ class Leftovers:
 
 def _leftovers(
     approved_dir: str,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     phases: list[phase.Phase],
     result: review_host.Result,
 ) -> Leftovers:
     not_ended = [ph for ph in phases if not ph.ended]
 
-    def untouched(t: ticket_mod.Ticket, ph: phase.Phase) -> bool:
+    def untouched(t: ticket_model.Ticket, ph: phase.Phase) -> bool:
         # 承認されたが着手していない子。`doing/` に在って着手の欄が空。
-        return ph.states.get(t.ticket) == ticket_mod.DOING and not t.started_at
+        return ph.states.get(t.ticket) == ticket_model.DOING and not t.started_at
 
     return Leftovers(
         todo=[t for ph in phases for t in ph.tickets if untouched(t, ph)],
@@ -446,7 +448,7 @@ def _leftovers(
     )
 
 
-def _show_leftovers(stdout: TextIO, parent: ticket_mod.Ticket, left: Leftovers) -> None:
+def _show_leftovers(stdout: TextIO, parent: ticket_model.Ticket, left: Leftovers) -> None:
     """残っているものと、早めに閉じたら何が起きるかをユーザに見せて、y/N を促す。"""
     stdout.write(f"{parent.ticket}（{parent.title}）を早めに閉じる。残っているもの:\n")
     for t in left.todo:
@@ -470,7 +472,7 @@ def _settle(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     phases: list[phase.Phase],
     left: Leftovers,
     mr_number: int,
@@ -522,7 +524,7 @@ def _settle(
 
 def _close_early_drafts(
     conf: settings.Settings,
-    parent: ticket_mod.Ticket,
+    parent: ticket_model.Ticket,
     result: review_host.Result,
     reason: str,
     stamp: str,

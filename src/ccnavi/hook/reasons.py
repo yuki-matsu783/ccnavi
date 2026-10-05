@@ -8,10 +8,10 @@
 
 from __future__ import annotations
 
-from ..infra import settings, shellread
+from ..infra import settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
 from ..policy import rules
-from ..tickets import phase
+from ..tickets import phase, phase_forms
 
 # 返す理由に載せる理由コード。設計 付録 B の体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
@@ -38,7 +38,8 @@ CODE_RULE_ASK = "RULE_ASK"
 # 断った回の両方に付く。どちらだったかは記録の decision 側が持つ。
 CODE_UNDECLARED = "UNDECLARED"
 
-# 実行後チェックが出すコードは post.py にある。あちらは判定ではなく、
+# 実行後チェックが出すコードは post_findings.py（CODE_VIOLATION・CODE_TICKET_SCOPE）と
+# post_report.py（CODE_PREEXISTING）にある。あちらは判定ではなく、
 # すでに起きたことの報告なので、同じ表に混ぜていない。
 # 読み切れないコマンドの根拠は、宣言された禁止に当たったことではなく、
 # 対象を確定できなかったこと。こちらは権限モードに委ねない。読めなかった
@@ -55,6 +56,12 @@ CODE_TICKET_SCOPE = "DENY_TICKET_SCOPE"
 
 # チケットが `ask` と書いた場所。ルールの `ask` と同じく、ユーザが 1 度見る場所。
 CODE_TICKET_ASK = "TICKET_ASK"
+
+# 生の文字列の `>` が上限（selfguard_shell.REDIRECT_LIMIT）を超え、シェルから書き込む形の保護を
+# 当てられなかったので止めた。権限モードに依らず止め、確認には回さない。ルールに当たったのでは
+# ないので、記録のルール名は括弧付きの REDIRECT_LIMIT_RULE にする。
+CODE_REDIRECT_LIMIT_DENY = "DENY_REDIRECT_LIMIT"
+REDIRECT_LIMIT_RULE = "(redirect-limit)"
 
 # ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
@@ -209,10 +216,10 @@ def reason_for(
     # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無いパスが
     # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
-    if rule.id == phase.TICKET_APPROVAL_RULE_ID:
+    if rule.id == phase_forms.TICKET_APPROVAL_RULE_ID:
         # 組み込み。ルールファイルには無いので、そこを探させない。
         code, source = (
-            phase.CODE_TICKET_APPROVAL,
+            phase_forms.CODE_TICKET_APPROVAL,
             f"builtin rule: {rule.id} ({settings.GUARD_TICKET_APPROVAL_ENV})",
         )
 
@@ -286,11 +293,11 @@ def unreadable(reason: str) -> str:
     後者なのに前者を渡された読み手は、書いた覚えのないコマンドを探しに行く。
     """
     what = {
-        shellread.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
-        shellread.REASON_TAKEN_AS_CODE: (
+        shellread_scan.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
+        shellread_words.REASON_TAKEN_AS_CODE: (
             "this command hands a string to something that runs it as code"
         ),
-        shellread.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
+        shellread_scan.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
     }.get(reason, "this command could not be read")
     return (
         "note: " + what + ", so this rule was matched against the raw text of the "
@@ -399,8 +406,8 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     レビューの sh のパスがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
     ユーザがどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
     フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の書き方が
-    承認のときの検査（`agree.py`）、後工程の進め方が承認済みチケットが置かれたとき
-    （`agree.approved_text`）。
+    承認のときの検査（`agree_candidates.py`）、後工程の進め方が承認済みチケットが置かれたとき
+    （`agree_screen.approved_text`）。
 
     dry-run の注記は「止まらない」だけで終えない。止まらないことだけを伝えると、通った
     ことが許可の証拠として読まれる。案内に従うところまでを 1 行に入れる。

@@ -75,7 +75,7 @@ keywords: [共通レイヤー, 置き場, .ccnavi/common, 環境変数, 固定, 
 
 ## 残したもの
 
-`selfguard.common_shell_clause` は**消さなかった。** これは「共通レイヤーが既定の外にあるとき、
+`selfguard_shell.common_shell_clause` は**消さなかった。** これは「共通レイヤーが既定の外にあるとき、
 そのパスをシェルの書き込みの禁止に足す」働きで、当初は「固定になれば `_PLACES` の
 `\.ccnavi` が丸ごと拾う」として削除する計画だった。
 

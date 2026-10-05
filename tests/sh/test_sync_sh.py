@@ -1232,16 +1232,15 @@ class PlacesAreNotReadTest(SyncHarness):
         self.assertDefaultPlaces(done)
 
     def test_the_fallback_without_an_answer_uses_the_defaults(self):
-        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。"""
+        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。
+
+        `sync paths` だけを空で返し、ほか（`c1 family` の `branch` の行）は本物に答えさせる。
+        `c1 family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
+        """
         self.arrange()
-        # `sync paths` には空で答え、親のブランチ名（`c1 family`）には本物が答える。後者を
-        # 答えない実行ファイルは、親のブランチ名を決められず取り込みを止める。
         body = (
-            "#!/bin/sh\n"
-            'case "$*" in\n'
-            f'*"c1 family"*) PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@" ;;\n'
-            "esac\n"
-            "exit 0\n"
+            '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'
+            f'PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n'
         )
         done = self.sync(CCNAVI_BIN_PATH=self.launcher(body), **self.moved())
         self.assertDefaultPlaces(done)

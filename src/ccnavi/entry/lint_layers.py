@@ -13,14 +13,7 @@ from typing import TextIO
 from ..infra import fsio, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import (
-    approval,
-    archive,
-    configsync,
-    phase,
-    risk,
-    syncstate,
-)
+from ..tickets import approval, archive, configsync, phase, risk, syncstate, ticket_model
 from ..tickets import ticket as ticket_mod
 from . import lint_rules
 
@@ -245,8 +238,8 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree, root: str = "") -> b
     for path in (
         approval.copy_path(approved, work.name),
         approval.closed_path(approved, work.name),
-        os.path.join(proposals, ticket_mod.TODO, f"{work.name}.md"),
-        os.path.join(proposals, ticket_mod.REVIEW, f"{work.name}.md"),
+        os.path.join(proposals, ticket_model.TODO, f"{work.name}.md"),
+        os.path.join(proposals, ticket_model.REVIEW, f"{work.name}.md"),
     ):
         if not os.path.isfile(path):
             continue

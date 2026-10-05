@@ -311,7 +311,7 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
 
 /**
  * 大文字小文字をそろえる（「始める」の重なりの検査）。作る名前は ASCII の英数字と記号、それに NFKC で変わらない
- * 日本語の字（ひらがな・カタカナ・長音記号・CJK 統合漢字・々）に限る（`startName`・Python の `ticket._ID`）ので
+ * 日本語の字（ひらがな・カタカナ・長音記号・CJK 統合漢字・々）に限る（`startName`・Python の `ticket_ids._ID`）ので
  * Python の casefold と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
  * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（厳しくする向き）
  */
@@ -345,13 +345,13 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
   return "";
 }
 
-/** 識別子に使える日本語の字（Python の `ticket.JA_CHARS` と同じ文字クラス） */
+/** 識別子に使える日本語の字（Python の `ticket_ids.JA_CHARS` と同じ文字クラス） */
 const JA = "\\u3005\\u3041-\\u3096\\u30a1-\\u30fa\\u30fc\\u4e00-\\u9fff";
-/** issue から作る親の識別子の形（`<先頭の語>-<番号>-<slug>`。Python の `ticket._FORM` と同じ） */
+/** issue から作る親の識別子の形（`<先頭の語>-<番号>-<slug>`。Python の `ticket_ids._FORM` と同じ） */
 const ISSUE_BRANCH = new RegExp(`^(?<prefix>[a-z][a-z0-9]*)-[1-9][0-9]*-(?<slug>[A-Za-z0-9${JA}][A-Za-z0-9._\\-${JA}]*)$`, "u");
 /** 先頭の語に使えない名前（統合先や保護されたブランチ。Python の `settings._RESERVED_PREFIXES`） */
 const RESERVED_PREFIXES = new Set(["main", "master", "develop", "release"]);
-/** 識別子の長さの上限（Python の `ticket.MAX_ID_LENGTH`） */
+/** 識別子の長さの上限（Python の `ticket_ids.MAX_ID_LENGTH`） */
 const MAX_ID_LENGTH = 64;
 
 /**

@@ -14,7 +14,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree, review
+from ccnavi.tickets import agree_candidates, review, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 
 
@@ -65,15 +65,15 @@ class IssueRefTest(unittest.TestCase):
         self.assertIn("Closes #12", review.mr_draft(same).splitlines())
         self.assertIn("Closes acme/other#12", review.mr_draft(other).splitlines())
         self.assertEqual("acme/other#12", ticket_mod.issue_label(other))
-        self.assertEqual("", ticket_mod.issue_label(ticket_mod.Ticket(ticket="x")))
+        self.assertEqual("", ticket_mod.issue_label(ticket_model.Ticket(ticket="x")))
 
     def test_a_revision_cannot_move_the_issue_to_another_repository(self):
         current, _ = self.parse("12")
         revised, _ = self.parse("acme/other#12")
         conf, _ = settings.load("/nonexistent-ccnavi-root")
         # 計画の検査（種類の定義を読む）はここでは見ない
-        with mock.patch.object(agree, "plan_problems", return_value=[]):
-            found = agree.revision_problems(
+        with mock.patch.object(agree_candidates, "plan_problems", return_value=[]):
+            found = agree_candidates.revision_problems(
                 "/nonexistent-ccnavi-root", conf, revised, current, None
             )
         self.assertTrue(any("課題番号" in p.detail for p in found), found)

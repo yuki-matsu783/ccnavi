@@ -1,6 +1,6 @@
 """sh が識別子だけから親子のチケットの親を割り出すこと（ccnavi-common-c1.sh の ccnavi_c1_family）。
 
-子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁の連番>`。sh も Python（`ticket.child_pattern`）と
+子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁の連番>`。sh も Python（`ticket_ids.child_pattern`）と
 同じく右から 2 段を剥がして親にする。親が `-` や数字を含んでも
 （`web-i0012-05-01` の親は `web-i0012`）割り出し方は 1 通りに決まる。
 

@@ -2,8 +2,8 @@
 
 - 退避の構成と移し方（archive.py）
 - `ready` が条件を確かめてから退避し、打ち直しても通ること
-- C1 の見分け（`c1.classify_all`）と実行後チェック（`post._script_writes`）が、退避の削除だけを
-  ccnavi の書き込みとして外すこと
+- C1 の見分け（`c1.classify_all`）と実行後チェック（`post_findings._script_writes`）が、
+  退避の削除だけを ccnavi の書き込みとして外すこと
 - 閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見ること
 - ボードの JSON に退避のチケットが載ること（判定には混ぜない）
 """
@@ -19,7 +19,7 @@ import unittest
 
 from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, approval_checks, archive, history
+from ccnavi.tickets import approval, approval_checks, approval_ops, archive, history, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, read_json, write
@@ -184,7 +184,7 @@ class ArchiveChecksTest(ChecksHarness):
 
     def test_a_reused_identifier_is_refused(self):
         t, _ = ticket_mod.parse(closed_text("i0001"))
-        t.state = ticket_mod.TODO
+        t.state = ticket_model.TODO
         problems = approval_checks.integration_problems(self.conf, self.root, t)
         self.assertEqual(len(problems), 1)
         self.assertIn("退避", problems[0].detail)
@@ -193,7 +193,9 @@ class ArchiveChecksTest(ChecksHarness):
         self.assertEqual(approval_checks.integration_problems(self.conf, self.root, fresh), [])
 
     def test_the_next_child_skips_the_archived_numbers(self):
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04"
+        )
 
     def test_a_predecessor_in_the_archive_is_met(self):
         text = closed_text("i0002-01-01", "i0002", predecessors=["i0001-01-03"])
@@ -649,11 +651,13 @@ class SecondReviewChecksTest(ChecksHarness):
 
     def test_6_an_identifier_reused_with_other_letter_case_is_refused(self):
         t, _ = ticket_mod.parse(closed_text("I0001"))
-        t.state = ticket_mod.TODO
+        t.state = ticket_model.TODO
         self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
         self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), {"I0001"})
         self.assertIsNotNone(archive.archived_fields(self.root, "", "I0001"))
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04"
+        )
 
 
 class ReusedIdentifierTest(ChecksHarness):
@@ -665,7 +669,7 @@ class ReusedIdentifierTest(ChecksHarness):
     def found(self, text, tree):
         t, problems = ticket_mod.parse(text)
         self.assertIsNotNone(t, problems)
-        t.tree, t.state = tree, ticket_mod.DOING
+        t.tree, t.state = tree, ticket_model.DOING
         return t
 
     def test_an_unstarted_copy_in_a_child_tree_is_dropped(self):
@@ -765,10 +769,14 @@ class PhaseChildIdsChecksTest(ChecksHarness):
     def test_the_next_child_counts_the_archived_children_of_the_same_phase(self):
         base = archive.base_dir(self.root, "")
         write(os.path.join(base, "done", "i0001-02-07.md"), closed_text("i0001-02-07", "i0001", 2))
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 2), "i0001-02-08")
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "i0001", 2), "i0001-02-08"
+        )
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01"
+        )
         t, _ = ticket_mod.parse(closed_text("i0001-02-07", "i0001", 2))
-        t.state = ticket_mod.TODO
+        t.state = ticket_model.TODO
         self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
 
 

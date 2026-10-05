@@ -17,11 +17,11 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 | 書き足すもの | 書く場所（この ADR を書いた時点） |
 |---|---|
-| `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval.admit`） |
-| `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree.revise_copy`） |
-| `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval.followup`。`doing/` に直に起こす） |
-| `project:`（frontmatter に無ければ） | 新規の承認（`approval.admit`） |
-| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval.admit`、`agree.revised_front`） |
+| `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval_ops.admit`） |
+| `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree_digest.revise_copy`） |
+| `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval_ops.followup`。`doing/` に直に起こす） |
+| `project:`（frontmatter に無ければ） | 新規の承認（`approval_ops.admit`） |
+| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval_ops.admit`、`agree_digest.revised_front`） |
 
 しかも `admit` は提案をテキストで読み（`fsio.load_text`。改行を LF に揃える）、欄を差し込んで書き直す
 （`insert_front` と `write_text`）。欄を足さない場合でも、CRLF の提案は承認で 1 バイト以上変わる。
@@ -39,7 +39,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 | 働き | いまの読み方 |
 |---|---|
-| 承認の取り下げ（Chrome 拡張だけが打つ） | `hook/core.py` の `_withdraw_problems`（918 行付近）が「`revised_at` / `feedback_at` がある」「`followup_of` がある、または `source_path` が無い」で止める。**戻し先と戻す中身は欄を読まない。** 戻し先は承認済みチケットのツリーの `wip/proposals/todo/<識別子>.md`、中身は Chrome 拡張が引いた承認コミットの親の提案（`prior_proposals`）。手で動かした承認は `source_path` が無いので取り下げられない |
+| 承認の取り下げ（Chrome 拡張だけが打つ） | `hook/core_withdraw.py` の `_withdraw_problems`（144 行付近）が「`revised_at` / `feedback_at` がある」「`followup_of` がある、または `source_path` が無い」で止める。**戻し先と戻す中身は欄を読まない。** 戻し先は承認済みチケットのツリーの `wip/proposals/todo/<識別子>.md`、中身は Chrome 拡張が引いた承認コミットの親の提案（`prior_proposals`）。手で動かした承認は `source_path` が無いので取り下げられない |
 | 取り込み済みの親子で、統合先の `done/` の親が手元の親と同じものか | `tickets/syncstate.py` の `_closed_in_integration`（548 行付近）が `approved_at` を比べる。手元の親が無い、**または手元の親に `approved_at` が無い**と「閉じた」とする。sh の側（`.ccnavi/scripts/ccnavi-sync.sh` の `closed_in_integration`）は逆で、手元に `approved_at` が無ければ「閉じていない」とする。Python の注記は「sh の見方と同じ」と書くが、ここだけ食い違っている。sh の `approved_at_of` は本文を含むどの行の `approved_at:` も拾う |
 | `wip/proposals/review/` の 2 枚目の保護 | `approval.review_all` が `require_record=True` で `ccnavi_approved` を必須にしている（ADR-0058）。欄を書かなくなると、新しいチケットが `finish` で `review/` へ動いたとき読まれなくなる |
 | 承認の時刻を見せる | ボード（`--explain --json` の `copy.approved_at` → `approvedAt`）、`--diagnose`（`entry/diagnose.py` 636 行と 979 行）、判定の拒否文（`hook/judge.py` 902 行）。手で置いたものは空 |
@@ -49,7 +49,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 承認済みの置き場をコミットすることについての今の事実も書いておく。`ccnavi-git.sh` は承認済みの置き場への
 `add`・`commit` を止めていない（止めているのは置き場を過去の中身に戻す `restore --source` などだけ）。
-エージェントに止めているのは `ccnavi-push-approved.sh` などのスクリプトの文字列で（`tickets/phase.py` 362〜380 行付近の
+エージェントに止めているのは `ccnavi-push-approved.sh` などのスクリプトの文字列で（`tickets/phase_forms.py` 329 行付近の
 `ticket_approval_rule`。組み込みの deny）、置き場をコミットした差分は、ターンの報告で違反に数えない（`hook/post.py` 294 行付近）。
 **この ADR はそこを変えない。** 別の件として扱う。
 
@@ -62,13 +62,13 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | **承認はチケットの中身を変えない。** 新規の承認は提案のファイルを `todo/` から `doing/` へ rename するか、バイト単位でコピーして（`fsio.read_bytes` / `write_bytes`）元を消す。`ccnavi_approved`・`project:`・`workflow:` を書き足さず、改行も BOM も変えない。端末・ボード・Chrome 拡張・手で動かす、のどれで承認しても、承認済みチケットは提案とバイト単位で同じになる | 欄を承認で書き続け、手で動かした承認には欄が無いことを「正常」と案内する | 欄の有無が経路を表す限り、読む側（エージェントも人も）は欄の無いものを壊れたものと読む。案内で直すより、違いを無くすほうが確か。本物とするのは前から置き場で、欄は記録でしかない（ADR-0058）。バイト単位にするのは、取り下げを中身の一致で決めるため（下） |
 | 承認の指紋（`digest`）に入る「書き出す中身」（`agree._carried`）を、`render()` した姿ではなく、動かすバイト列にする。`read_set` もバイト列で取る。提案の走査（`ticket.py` 1140 行付近）が `raw["project"]` に差し込む値は指紋に入らなくなる（書かないものを指紋に入れない） | 今の `render()` のまま | 書くものと見せたものの指紋が別の姿になると、照合が「書いたもの」を覆わない。承認が中身を変えないなら、動かすバイト列がそのまま書く中身 |
 | 承認の検査（親子・計画・`project:` と置き場・先行）は今までどおり承認のときに当て、判定の側でも当てる | — | 変えない。やめるのは書き足しだけ |
-| 提案（`todo/`）に、スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`: `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason`）の空でない値があれば、`--agree` と `--lint` で error にする。判定では提案に当てない | 今のまま見ない。判定でも当てる | 承認が中身を変えないので、提案に書いた値がそのまま承認済みチケットの値になる。下の `review/` の必須欄と、閉じた親の照合は、これらの欄がスクリプトだけが書いたものであることを前提にする。今はどこも見ていない（`SCRIPT_FIELDS` の値を検査する経路は無い）。判定で承認済みチケットに同じ検査を当てると、着手済みの `doing/` が全部止まる |
+| 提案（`todo/`）に、スクリプトだけが書く欄（`ticket_model.SCRIPT_FIELDS`: `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason`）の空でない値があれば、`--agree` と `--lint` で error にする。判定では提案に当てない | 今のまま見ない。判定でも当てる | 承認が中身を変えないので、提案に書いた値がそのまま承認済みチケットの値になる。下の `review/` の必須欄と、閉じた親の照合は、これらの欄がスクリプトだけが書いたものであることを前提にする。今はどこも見ていない（`SCRIPT_FIELDS` の値を検査する経路は無い）。判定で承認済みチケットに同じ検査を当てると、着手済みの `doing/` が全部止まる |
 | 承認済みチケットには、中身だけで分かる欄の組み合わせの矛盾を検査する。`started_at` が無いのに `base_sha` がある `doing/` は `blocked` にする（判定で止める）。`doing/` に `completed_at`・`cancelled_at`・`cancel_reason` の値があるものは、`--lint` と status で warn にとどめ、判定では止めない | `doing/` の `completed_at` などを `blocked` にする | `start` は `started_at` と `base_sha` を一緒に書くので、前者だけが無い形は道具を通らない。`finish` は `doing/` から `review/` か `done/` へ、`cancel` は `done/` へ動かすので、道具を通る限り `doing/` に `completed_at` や `cancelled_at` は残らない。ただしユーザが `done/` から `doing/` へ手で戻す再開（状態の履歴の注記と `--lint` の案内が認めている運び）では欄が残ったまま `doing/` に来る。止めると、ユーザの再開がどこにも書けなくなる |
 | 手で動かした承認に仕込まれた `started_at` / `base_sha` は、中身だけでは道具が書いたものと見分けられない。status と `--lint` で「チケットのワークツリーがあり、`base_sha` がその HEAD の祖先か」と「状態の履歴に `started` の行があるか」を確かめ、どちらも warn にする（status は「注意」で出す）。`start` では止めない。判定には入れない | 判定でも確かめる。`start` で止める（一度は採ったが、下の「ユーザが決めたこと」の 5 で改めた） | 判定は履歴も git も読まない取り決め（ADR-0086、下の「判定の拒否文」の行）。履歴は ccnavi の外で動かした分を持たないので、無いことだけでは止められない。`start` で止めても効かない。`started_at` と `base_sha` を両方仕込めば `start` は「着手済み」で先に返って検査に届かず、`base_sha` だけなら判定が `blocked` で既に止め、`start` は通れば基準点を HEAD で書き直す |
 | 承認で `project:` を書き足さない。承認済みチケットのプロジェクトは置き場（ツリー）から決まる | 書き足し続ける | 読む側は既に置き場で決めている（`scan_all`）。`ticket.py` の注記（1136 行付近）は「親が閉じたとき judge が子の `project` を見る」と書くので、実装の前に、その経路が欄ではなくツリーから決まることを確かめる |
 | 改版の `revised_at` / `feedback_at` は書かない。改版の時刻は状態の履歴の `revised`（`feedback: true` を含む）に残る | `ccnavi_approved` に書き続ける | 改版は計画を書き換えるので中身が変わるのは避けられないが、時刻まで中身に書く理由は無い。読んでいたのは承認の知らせの版（外す）と取り下げの検査（中身の一致に代える）だけ |
 | 続きの子の目印 `followup_of` は、`ccnavi_approved` の外のトップレベルの欄として、ccnavi が `doing/` に直に書くときに書く | 目印を持たせない | 続きの子は提案を経ずに ccnavi が新しく作るチケットで、作るときに書く欄は「承認で中身を変える」に当たらない。取り下げで理由を名指しするのに使う |
-| 既存の承認済みチケットに残る `ccnavi_approved`・`project:`・`workflow:` は消さない。移行はしない | 移行で欄を消す | 読んでも害が無い。保存済みのデータの表記を変えると既存のワークスペースとの互換が崩れる（ADR-0099 の「変えなかったもの」、`approval.admit` の「前の形も読む」と同じ方針）。承認済みの置き場はエージェントが書けないので、消すにはユーザの手が要る |
+| 既存の承認済みチケットに残る `ccnavi_approved`・`project:`・`workflow:` は消さない。移行はしない | 移行で欄を消す | 読んでも害が無い。保存済みのデータの表記を変えると既存のワークスペースとの互換が崩れる（ADR-0099 の「変えなかったもの」、`approval_ops.admit` の「前の形も読む」と同じ方針）。承認済みの置き場はエージェントが書けないので、消すにはユーザの手が要る |
 
 ### 欄が担っていた働きの代わり
 
@@ -77,7 +77,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | `wip/proposals/review/` で必須にする欄を、`ccnavi_approved` から `completed_at`（**値が空でない**）に替える。`review_all` の docstring と `load_copy` の `require_record` の説明も改める。古い形は両方を満たすので読める | 必須をやめる。`finish` が別の目印を書く | `completed_at` は `finish` が書くスクリプトの欄で、`review/` に来るものは必ず持つ。必須の欄が `ccnavi_approved` から `completed_at` に替わるだけで、どちらも組み込みの deny が破れてエージェントが `review/` に書ければ偽れる。2 枚目の保護としての強さは変わらない |
 | 取り下げの戻し先は今までどおり承認済みチケットのツリーの `wip/proposals/todo/<識別子>.md`（プロジェクト向けは `projects/<名前>/` 配下）。欄は読まない | `source_path` を読んで戻す | 戻し先は置き場から決まる。いまのコードも `source_path` を戻し先には使っていない |
 | 取り下げを書く側（`core.withdraw`）は、「`doing/` の中身が、承認コミットの親の提案（`prior_proposals`）とバイト単位で同じ」で通す。比べるのはバイト列で、`fsio.read_text`（改行を揃える）は使わない。親の取り下げでは、加えて、`phases/<親>/workflow.yml` の中身が、承認コミットの親の提案と今の `phases.yml` から `workflow.compute` で計算した待ち方と同じであることを求める。違えば止める。`workflow.yml` が無ければ（手で動かした計画付きの親）、改版は必ず `workflow.yml` を書くので待ち方の改版は起きていないとみなし、待ち方の検査を通す（中身のバイト一致は見る）。通れば `workflow.yml` を一緒に消す。続きの子（`followup_of`）は理由を名指しして止める | 状態の履歴（`revised` / `started`）を読んで決める。`workflow.yml` があれば止める | 一致すれば、改版も着手（`started_at` / `base_sha` を書く）もされていない。手で動かした承認も取り下げられる。履歴を読んで状態の操作を決めると、ADR-0086 の「正は置き場。判定も状態の操作も履歴を読まない」を崩す。待ち方だけの改版は `doing/` を変えない（待ち方は別のファイル）ので、待ち方の中身で見る。「あれば止める」にすると、`--agree` で承認した計画付きの親は必ず `workflow.yml` を持つので、必ず取り下げられなくなる。承認のあとに `phases.yml` が変わっていれば計算が変わって一致せず、止める側に倒れる（取り下げられないだけで、待ち方が勝手に変わることはない） |
-| 取り下げの「`phases/<親>/` にマーカーがある」の検査（`hook/core.py` の `_withdraw_problems`、930〜942 行付近。今はディレクトリが空でなければ止める）から `workflow.yml` を外す | 今のまま | 外さないと、上と同じく計画付きの親が必ず止まる。待ち方は上の行で別に見る |
+| 取り下げの「`phases/<親>/` にマーカーがある」の検査（`hook/core_withdraw.py` の `_withdraw_problems`、198〜204 行付近。今はディレクトリが空でなければ止める）から `workflow.yml` を外す | 今のまま | 外さないと、上と同じく計画付きの親が必ず止まる。待ち方は上の行で別に見る |
 | 取り下げを出すかの一覧（`core.withdrawable`。`prior_proposals` に空のバイト列を渡して呼ぶ）は粗く見る。「`ccnavi_approved` が無い新しい形」か「古い形で今の条件を満たす」なら出す。一致は書く側だけが見る | 一覧でも中身の一致を見る | 一覧は承認コミットを引く前に組むので、比べる相手が無い。出しすぎても、押したときに書く側が止める（判定は緩めない） |
 | `ccnavi_approved` を持つ古い承認済みチケットの取り下げは、今の条件（欄を読む）のまま | 古いものも中身の一致で決める | 古いものは承認で欄が足されているので、承認コミットの親の提案と一致しない。一致で決めると、取り下げられたものが取り下げられなくなる |
 | 取り下げの一致は、BOM 付きの提案など、ホストの API が読んだ姿と手元のバイト列が違うものでは一致しない側に倒れると見込む。一致の判定は、本物のホストの応答に合わせた見本（Chrome 拡張の見本の置き場 `extensions/chrome/ccnavi-approval/test/fixtures/host/` の下）でテストし、統合先に取り込む前にユーザが本物の Chrome で 1 回試す。承認コミットがマージ（親が 2 つ）のときは今と同じく引けず、取り下げは出ない | 見本を作らずに実装だけで確かめる | どちらも止める側で、取り下げられないだけ。ただしホストの応答の形（改行・BOM・base64 の扱い）は手元では作れないので、見本と 1 回の実地で確かめる |
@@ -89,7 +89,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 判定の拒否文（`hook/judge.py`）からは承認の時刻を外す。hook の中では履歴も git も読まない | 拒否文にも同じ順で時刻を出す | 判定は hook のたびに走る。時刻のために判定の経路で履歴と git を読むと遅くなるうえ、判定が履歴を読まない取り決めの境目が曖昧になる。時刻が要れば status で聞ける |
 | 全体計画の待ち方は承認のときに固定する（下の「`workflow:` を調べた結果」）。置き場をマーカーと同じ `<承認済みの置き場>/phases/<親>/workflow.yml` に移し、`--agree`（新規と改版）が書き、取り下げが一緒に消す。判定・延期・改版の比べ方はこのファイルを読む | 承認済みチケットに書き続ける。固定をやめて毎回 `phases.yml` から計算する | 前者は中身を変える。後者は承認のあとに `phases.yml` が変わると、作業中の親の待ち方と延期の引き受け手がユーザの見ていないところで変わる。マーカーの置き場に置けば、運び方・取り込み・指紋の扱いをマーカーに揃えられる |
 | `workflow.yml` の扱いをマーカーに揃える。`ccnavi-push-approved.sh` は承認済みの置き場をまるごと add するので足すものは無い。Chrome 拡張は親のブランチの承認済みの置き場をまるごと読み、書くのは実行ファイルのコアが並べたものなので、足すものは無い見込み（実装で確かめる）。指紋は判定が読んだものを `read_set` で覆うので、読めば入る。**C1（`hook/c1.py`）には足す。** 今の `_human` は `phases/<親>/` の下で決まった名前（`close-early.json`・`config-sync.json`・受け入れたスレッド）と番号のマーカーだけをユーザの判断の形と見て、ほかは「見分けられないもの」（d）として止める。`phases/<親>/workflow.yml` をユーザの判断（`--agree`）が書く形として (c) に足す | `flows/` に置く。承認済みの置き場の直下に新しい置き場を作る | `flows/` は子のフローの置き場で、役目が違う。新しい置き場を作ると、運ぶ・取り込む・読む経路のすべてに足すことになる |
-| 古い `workflow:` 欄を読むのは、`ccnavi_approved` を持つ古い承認済みチケットだけにする。それ以外（提案、新しい形の承認済みチケット）に `workflow:` があれば、`--lint`・判定・`--agree` で error にする。**同じ日に改めた**: 古い形でも、欄の待ち方は今の `phases.yml` から計算した待ち方と同じときだけ採り、違えば一直線で読む（下の「残る弱点」） | どれでも欄を読む | 新しい形では待ち方はファイルにしか無い。欄を読むと、手で書いた `workflow:` が承認済みの待ち方として効く。提案に書いた欄は今も `--agree` が error にしている（`agree._workflow_field`）が、判定と手で動かした承認には当たっていない |
+| 古い `workflow:` 欄を読むのは、`ccnavi_approved` を持つ古い承認済みチケットだけにする。それ以外（提案、新しい形の承認済みチケット）に `workflow:` があれば、`--lint`・判定・`--agree` で error にする。**同じ日に改めた**: 古い形でも、欄の待ち方は今の `phases.yml` から計算した待ち方と同じときだけ採り、違えば一直線で読む（下の「残る弱点」） | どれでも欄を読む | 新しい形では待ち方はファイルにしか無い。欄を読むと、手で書いた `workflow:` が承認済みの待ち方として効く。提案に書いた欄は今も `--agree` が error にしている（`agree_candidates._workflow_field`）が、判定と手で動かした承認には当たっていない |
 
 ### 状態を聞く副命令
 
@@ -98,7 +98,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | `ccnavi-ticket.sh status [<親>]` を足す。親を渡せばその親子、渡さなければ全部の、各チケットについて次を ccnavi が判断して出す: 置き場とツリー、承認の時刻（上の順）、着手しているか、置き場のファイルが未コミットか・コミット済みで未 push か、止まっている理由（`blocked`・先行・親が未着手・待ち方の固定が無い）、次の一手 | エージェントにファイルと `git status` を読ませて推測させる | 推測が今回の読み違えを生んだ。「欄が無い」「未コミット」の意味は ccnavi が知っていて、ccnavi が言えば読み違えない |
 | 未コミットの承認済みチケットには、未コミットであることと「ユーザに `ccnavi-push-approved.sh <親>` を打ってもらう」ことを出す。エージェントは運ばない。そのうえで status は、その親子が C1 の対象か（`ccnavi c1 family <親>` と同じ `c1.target`）を見て、対象なら「ユーザが `ccnavi-push-approved.sh <親>` で運ぶまで `start` は止まる」と、対象でなければ「`start` へ進んでよい」と言う | エージェントが `ccnavi-git.sh` で親のブランチへコミットして送る。C1 の対象かを見ずに「進んでよい」と言う | 承認で中身を変えないと、「手で置いた」と「`--agree` が置いてまだ運んでいない」がバイト単位で同じで見分けられない。エージェントが保護をすり抜けて置いたものまで、status が運ぶ道具になる。判定は未コミットの承認済みチケットも読むので、C1 の対象でなければ運ばなくても `start` へ進める。取り込み済みの親子（C1 の対象）では、`start` の C1 が親のワークツリーの未コミットの `doing/` の追加を「ユーザが運ぶもの」(c) と分けて止める（`hook/c1.py` の冒頭の説明と `_human`）。GitHub の画面だけのユーザでは承認は最初からコミットとして届くので、未コミットは起きない。運ぶのはユーザという設計 9.4 と ADR-0043 は変えない |
 | status は読むだけで、ネットワークに出ない（取り込みはしない）。push 済みかは手元のリモート追跡の ref で見る。古いかもしれないことを出力に添え、最新にしたければ `ccnavi-sync.sh` を先に打つよう言う | 打つたびに取ってくる | 実行ファイルはネットワークに出ない（設計 P11） |
-| status はサブエージェントにも許す。実行ファイルは呼び手がサブエージェントかを知らない（sh に `agent_id` は渡らない）ので、出力を分けず、状態を動かす・運ぶコマンドを出す行には「親（メインエージェント）だけが実行する」と書く | サブエージェント向けに出力を分ける。サブエージェントには許さない | 分けるには sh か hook から呼び手を渡す経路が要る。サブエージェントの `start` などは今も hook が止める（`phase._FORBIDDEN_COMMAND` に副命令の名前を並べている。`status` は並べない）ので、行を読んで打っても止まる |
+| status はサブエージェントにも許す。実行ファイルは呼び手がサブエージェントかを知らない（sh に `agent_id` は渡らない）ので、出力を分けず、状態を動かす・運ぶコマンドを出す行には「親（メインエージェント）だけが実行する」と書く | サブエージェント向けに出力を分ける。サブエージェントには許さない | 分けるには sh か hook から呼び手を渡す経路が要る。サブエージェントの `start` などは今も hook が止める（`phase_forms._FORBIDDEN_COMMAND` に副命令の名前を並べている。`status` は並べない）ので、行を読んで打っても止まる |
 | CLAUDE.md の詳細の表と `docs/claude/projects.md` に「承認済みチケットの状態を確かめるとき（着手の前、引き継ぎを読んだあと、承認の有無に迷ったとき）は、ファイルを読んで推測せず status を打つ」と書く | hook で毎回案内する | 下の「採らなかった案」 |
 
 ### 承認の知らせを外す
@@ -106,7 +106,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 決めたこと | 採らなかった側 | なぜ |
 |---|---|---|
 | `agree.news` / `agree.baseline` と記録 `<state>/approved-<session>-<agent>.json`、`UserPromptSubmit`（`hook/events.py`）・`PreToolUse`（`hook/judge.py`）・`SessionStart`（`hook/events.py`）からの呼び出しを消す。`ctxfile` の古い `approved-` ファイルの掃除は、残ったファイルを消すために残す | 知らせを残し、起点の取り方を直す | 知らせが確実に効くのはセッションの途中の承認だけで、開始時の取り込みで届いた承認は起点に含まれて取りこぼす。ボードの承認は拡張が同じ文（`--agree --yes` の `prompt`）をクリップボードか新しいセッションで渡す（`extensions/vscode/ccnavi-board/src/prompt-handover.ts`）。端末・GitHub・Chrome の承認では、ユーザがそのあとセッションに一言送るので、status で足りる |
-| 承認を伝える文 `agree.approved_text` は残す（`--agree --yes` の `prompt` が使う）。提案を書いた回に承認の前の確認を勧める文（`ticket.propose_notice`、REQ-APV-14）は、同じ `PreToolUse` の `additionalContext` の経路で今までどおり渡す | 一緒に外す | 確認の案内は承認の知らせと経路を共有しているだけで、役目は別 |
+| 承認を伝える文 `agree_screen.approved_text` は残す（`--agree --yes` の `prompt` が使う）。提案を書いた回に承認の前の確認を勧める文（`ticket_guard.propose_notice`、REQ-APV-14）は、同じ `PreToolUse` の `additionalContext` の経路で今までどおり渡す | 一緒に外す | 確認の案内は承認の知らせと経路を共有しているだけで、役目は別 |
 
 ### 互換の版と取り込む順序
 
@@ -195,7 +195,7 @@ sh で止める変更は、この ADR ではしない。
   設計 9.4（承認の確認の経路と「承認されたことは hook が伝える」）、設計 9.6（状態遷移の表の書く欄）。
   README.md の承認の節と `copy.approved_at`（2152 行付近）
 - コードの注記: `tickets/ops.py` 4 行の「サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）」は
-  事実でない。止めているのは hook の判定（`hook/judge.py` が `phase.forbidden` で `DENY_SUBAGENT_TICKET_OP`）で、
+  事実でない。止めているのは hook の判定（`hook/judge.py` が `phase_forms.forbidden` で `DENY_SUBAGENT_TICKET_OP`）で、
   `cli.py` は `agent_id` を見ていない。`ccnavi-ticket.sh` 17 行の同じ趣旨の注記も同様
 - 保護された sh: `ccnavi-ticket.sh` は通す副命令の一覧（`start | finish | cancel | record-risk`）に `status` を足し、
   引数の数の検査（`[ "$#" -ge 2 ]`）を `status` だけ 1 個で通すように直す。`ccnavi-sync.sh` は `closed_in_integration` を
@@ -227,7 +227,7 @@ sh で止める変更は、この ADR ではしない。
   C1 が見分ける形も 1 つ増える。手で動かした `order: dag` の親は今と同じく一直線で読む
 - 失ったもの（残る弱点）: **手で動かした承認に、提案の段階で `started_at` と `base_sha` を仕込まれると、中身だけでは見分けられない。**
   `--agree` を通らない経路なので提案の検査は当たらず、判定はその値を信じる。`base_sha` は、サブエージェント終了時と
-  実行後の範囲外の検査（`phase.scope_findings` の `base_sha..HEAD`）、実績のリスクの基準点（`risk.measure`）、取り込み済みの
+  実行後の範囲外の検査（`phase_scope.scope_findings` の `base_sha..HEAD`）、実績のリスクの基準点（`risk.measure`）、取り込み済みの
   親子の「閉じた」の照合に使われるので、基準点をずらされると、範囲外の書き込みとリスクの数え漏れ、別の親子を閉じたと読む
   取り違えが起きうる。status と `--lint` が祖先の関係と履歴で確かめて warn にするが、`start` と判定は止めない。手で動かせるのは
   承認済みの置き場に書ける権限を持つユーザだけなので、仕込めるのもその人か、その人が置いたファイルを書いた者に限られる

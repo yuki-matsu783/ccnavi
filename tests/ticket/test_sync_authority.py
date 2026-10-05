@@ -20,7 +20,14 @@ import unittest
 
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import agree, approval, approval_checks, syncstate
+from ccnavi.tickets import (
+    agree_digest,
+    approval,
+    approval_checks,
+    approval_ops,
+    syncstate,
+    ticket_model,
+)
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, to_old_form, write
@@ -574,7 +581,7 @@ class BusyParentTest(AuthorityHarness):
 class MarkTest(AuthorityHarness):
     def test_an_earlier_reason_is_kept(self):
         self.record("gone")
-        Ticket = approval.ticket_mod.Ticket
+        Ticket = ticket_model.Ticket
         t = Ticket(
             ticket="i0001-01-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
         )
@@ -741,7 +748,7 @@ class PredecessorTest(AuthorityHarness):
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
         # 厳しくする向きだけ: 親のワークツリーで閉じていても、
         # 前の対応表で満たしていなければ満たさない。
-        Ticket = approval.ticket_mod.Ticket
+        Ticket = ticket_model.Ticket
         done = Ticket(
             ticket="i0001-01-09", parent="i0001", state="done", tree_root=self.parent_tree
         )
@@ -804,7 +811,7 @@ class DigestTest(AuthorityHarness):
         with fsio.reading() as seen:
             fsio.note_read(once, "a")
             fsio.note_read(record, "b")
-        keys = agree.read_set(self.conf(), self.root, seen)
+        keys = agree_digest.read_set(self.conf(), self.root, seen)
         self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
 
     @requires_symlink
@@ -818,7 +825,7 @@ class DigestTest(AuthorityHarness):
         target = os.path.join(linked, ".claude", "worktrees", "i0001", "x.md")
         with fsio.reading() as seen:
             fsio.note_read(target, "x")
-        keys = agree.read_set(self.conf(), linked, seen)
+        keys = agree_digest.read_set(self.conf(), linked, seen)
         self.assertIn("self:i0001:x.md", keys)
         self.assertFalse([k for k in keys if k.startswith("(外)")], keys)
 
@@ -839,7 +846,7 @@ class DigestTest(AuthorityHarness):
             fsio.note_read(os.path.join(project, "x.md"), "b")
         conf = self.conf()
         conf.projects = os.path.join(self.root, "projects")
-        keys = agree.read_set(conf, self.root, seen)
+        keys = agree_digest.read_set(conf, self.root, seen)
         self.assertIn("self:main:x.md", keys)
         self.assertIn("web:main:x.md", keys)
         self.assertNotEqual(keys["self:main:x.md"], keys["web:main:x.md"])
@@ -954,7 +961,7 @@ class HookNoProcessTest(AuthorityHarness):
         with mock.patch.object(subprocess, "Popen", side_effect=AssertionError("起こした")):
             conf = self.conf()
             copies, _ = approval.scan(conf, self.root)
-            approval.predecessor_pool(conf, self.root)
+            approval_ops.predecessor_pool(conf, self.root)
             syncstate.integration(conf.state, "self")
         self.assertTrue(copies)
 

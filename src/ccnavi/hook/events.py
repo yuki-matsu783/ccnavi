@@ -14,10 +14,10 @@ from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
-from ..policy import builtin, ctxfile, ruleload, rules, selfguard
+from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
 from ..records import audit, prune, repeat
-from ..tickets import approval, approval_checks, branchfind, configsync, ops, phase
-from . import docsearch, judge, post, projskills, reasons, subagent
+from ..tickets import approval, approval_checks, branchfind, configsync, ops_stop, phase
+from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -74,7 +74,7 @@ def watch_context(
     root: str,
     record: audit.Record,
     raw: approval.Raw | None = None,
-) -> tuple[list[post.Watched], post.ScopeGuard | None]:
+) -> tuple[list[post.Watched], post_findings.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
@@ -130,7 +130,7 @@ def watched_for(
 
 def scope_guard(
     conf: settings.Settings, root: str, raw: approval.Raw | None = None
-) -> post.ScopeGuard | None:
+) -> post_findings.ScopeGuard | None:
     """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。
 
     `raw` は呼び手が `approval.read_raw` で読んだもの。渡せば置き場を読み直さない。
@@ -143,7 +143,7 @@ def scope_guard(
     for copy in copies:
         if copy.has_plan and copy.project not in types:
             types[copy.project] = phase.load_types(conf, root, copy.project) or {}
-    return post.ScopeGuard(
+    return post_findings.ScopeGuard(
         root=root,
         copies=approval_checks.by_id(copies),
         projects=conf.projects,
@@ -167,7 +167,7 @@ def decide_at_prompt(
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする記録だけ。
 
-    承認されたことも伝えない。ボードの承認は拡張が承認の文（`agree.approved_text`）を渡し、
+    承認されたことも伝えない。ボードの承認は拡張が承認の文（`agree_screen.approved_text`）を渡し、
     ほかの経路の承認は、エージェントが `ccnavi-ticket.sh status` で聞く。hook が起点を取って
     増えた承認を数える形は、セッションの開始時の取り込みで届いた承認を起点に含めて取りこぼした。
 
@@ -228,7 +228,7 @@ def decide_at_stop(
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
-    （`ops.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
+    （`ops_stop.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
     戻さず、`repeat.at_stop` は state を読むだけなので、置き場のファイルは動かない。
     """
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
@@ -344,17 +344,17 @@ def _finish_nudge(
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
-    found = ops.unfinished_at_stop(root, conf, payload.cwd, raw)
-    if found is None or ops.nudged_before(conf.state, payload.session_id, found):
+    found = ops_stop.unfinished_at_stop(root, conf, payload.cwd, raw)
+    if found is None or ops_stop.nudged_before(conf.state, payload.session_id, found):
         return ""
-    failed = ops.remember_nudge(conf.state, payload.session_id, found)
+    failed = ops_stop.remember_nudge(conf.state, payload.session_id, found)
     if failed:
         stderr.write(f"ccnavi: finish を促した記録を残せないので、促さない: {failed}\n")
         return ""
-    record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
+    record.decision, record.code = audit.NUDGE, ops_stop.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
     record.tree = found.ticket.ticket
-    return ops.finish_nudge(root, found)
+    return ops_stop.finish_nudge(root, found)
 
 
 def decide_at_start(
@@ -388,7 +388,7 @@ def decide_at_start(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(
+        selfguard_targets.targets(
             root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
         ),
     )

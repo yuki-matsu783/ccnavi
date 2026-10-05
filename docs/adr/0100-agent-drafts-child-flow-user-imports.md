@@ -21,9 +21,9 @@ keywords: [フロー, 子チケット, 下書き, 提案, 取り込み, wip/prop
 
 調べて分かったこと。
 
-- 提案の置き場 `wip/proposals/` は、丸ごとチケットの範囲の外として扱われる（`ticket.is_ticket_place`）。実行前・実行後・
+- 提案の置き場 `wip/proposals/` は、丸ごとチケットの範囲の外として扱われる（`ticket_places.is_ticket_place`）。実行前・実行後・
   サブエージェント終了時のどのチェックでも報告しない。組み込みが止めるのは `review/` への直接の作成と移動だけ
-  （`ticket.guard_rules`、`GUARDED_STATES`）。提案として走査するのは `todo/` と `review/` だけ（`ticket.STATES`）
+  （`ticket_guard.guard_rules`、`GUARDED_STATES`）。提案として走査するのは `todo/` と `review/` だけ（`ticket_model.STATES`）
 - 依頼の後に `wip/proposals/` だけを変えたコミットは、「ユーザが見るものが動いた」に数えない（`review._moved_since_request`）
 - `wip/` は `ready` の前に丸ごと消してコミットする。ここに置いたものは squash した成果物に残らない
 - フローは `SubagentStart` の hook（`flow.briefing`）が案内として渡すだけで、強制はしない。読むのは本物とするツリーの

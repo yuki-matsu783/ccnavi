@@ -3,7 +3,7 @@
 一時ディレクトリの git で、識別子 `feature-12-login` の親に `branch: feature/12-login` を書く。
 見るのは次のとおり（sh を通す主な経路は tests/sh/test_branch_field_sh.py が見る）。
 
-1. 字と形（`ticket.branch_problem`）。保護されたブランチの名前と git で使えない表記は error
+1. 字と形（`ticket_ids.branch_problem`）。保護されたブランチの名前と git で使えない表記は error
 2. 子に書いた `branch:` は warn で読まない。使えない名前の提案は読めない（error）
 3. 承認画面と JSON: 「■ ブランチ」と「既存のブランチ <名前> を使う」/「新しく切るブランチ」、
    `branch`・`existing_branch`。既にあるブランチとのぶつかりの warn は出さない
@@ -26,6 +26,7 @@ import unittest
 
 from ccnavi.entry import version
 from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import ticket_ids, ticket_model
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_core import STAMP, _chrome
@@ -49,7 +50,7 @@ class BranchProblemTest(unittest.TestCase):
     def test_names_that_can_be_a_parent_branch(self):
         for name in ("feature/123-login", "hotfix/45", "user/x_y.z", "feature-1-x", "a/日本語"):
             with self.subTest(name=name):
-                self.assertEqual(ticket_mod.branch_problem(name), "")
+                self.assertEqual(ticket_ids.branch_problem(name), "")
 
     def test_names_that_cannot(self):
         for name in (
@@ -101,14 +102,14 @@ class BranchProblemTest(unittest.TestCase):
             "x" * 201,
         ):
             with self.subTest(name=name):
-                self.assertNotEqual(ticket_mod.branch_problem(name), "")
+                self.assertNotEqual(ticket_ids.branch_problem(name), "")
 
     def test_the_branch_name_of_a_ticket(self):
-        parent = ticket_mod.Ticket(ticket=PARENT, branch=BRANCH)
-        self.assertEqual(ticket_mod.branch_name(parent), BRANCH)
-        self.assertEqual(ticket_mod.branch_name(ticket_mod.Ticket(ticket=PARENT)), PARENT)
-        child = ticket_mod.Ticket(ticket=CHILD, parent=PARENT, branch=BRANCH)
-        self.assertEqual(ticket_mod.branch_name(child), CHILD)
+        parent = ticket_model.Ticket(ticket=PARENT, branch=BRANCH)
+        self.assertEqual(ticket_ids.branch_name(parent), BRANCH)
+        self.assertEqual(ticket_ids.branch_name(ticket_model.Ticket(ticket=PARENT)), PARENT)
+        child = ticket_model.Ticket(ticket=CHILD, parent=PARENT, branch=BRANCH)
+        self.assertEqual(ticket_ids.branch_name(child), CHILD)
 
 
 class BranchFieldParseTest(unittest.TestCase):
