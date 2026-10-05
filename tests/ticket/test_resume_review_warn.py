@@ -54,7 +54,12 @@ class ResumedReviewWarnTest(PhaseHarness):
             self.assertIn(MARKER_WORDS, text)
             self.assertIn("フェーズ 1（設計）", text)
             self.assertIn("ccnavi-git.sh rm .ccnavi/approved/phases/i0001/1.reviewed", text)
+            # マーカーのツリーを、ワークスペースルートからの相対で示す
+            self.assertIn("ツリー .claude/worktrees/i0001で", text)
+            # 取り込み済みの親子だけ push-approved が送る。それ以外はユーザがコミットする
+            self.assertIn("取り込み済みで origin があり、chat だけでない親子なら", text)
             self.assertIn("ccnavi-push-approved.sh i0001", text)
+            self.assertIn("ユーザが自分でコミットする", text)
             self.assertIn("新しいチケットを作り直す", text)
         # マーカーは消さない
         self.assertTrue(
