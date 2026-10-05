@@ -1030,40 +1030,63 @@ def resumed_review(
     （消すかはレビューをやり直すかどうかで、ユーザが決める）。判定も `start` も止めず、
     `--lint` と `status` がこの文を warn で言う。
 
-    レビューが要らないフェーズ（`reviewed_or_skipped` が `reviewed` を見ずに通る、
-    レビュー不要と延期）は、マーカーが残っていても止める条件に入らないので言わない。文には子の識別子を入れない
-    （呼び手が前に付ける）。
+    延期したフェーズの子は、引き受けた側（`review_at`）の `reviewed` が残っているときに言う
+    （消すのはその引き受けた側のマーカー。延期の `skipped` は消さない）。引き受けた側がまだ
+    レビュー前なら、これからのレビューが再開後の作業も覆うので言わない。
+    レビューが要らないフェーズ（`reviewed_or_skipped` が `reviewed` を見ずに通る）と、
+    レビューが要らない引き受け手は、マーカーが残っていても止める条件に入らないので言わない。
+    文には子の識別子を入れない（呼び手が前に付ける）。
     """
     if child.state != ticket_mod.DOING or not child.is_child or child.phase is None:
         return ""
-    for ph in phases_of(root, conf, child.parent, raw=raw):
+    phases = phases_of(root, conf, child.parent, raw=raw)
+    for ph in phases:
         if ph.number != child.phase:
             continue
-        if ph.deferred or not ph.review_required:
+        if ph.deferred:
+            # 延期したフェーズは、引き受けた側 M のレビューが覆う。M が済んでいれば、再開後の作業は
+            # そのレビューに含まれない。M がまだなら、これからのレビューが再開後の作業も見る。
+            owner = next((p for p in phases if p.number == ph.review_at), None)
+            if owner is None or owner is ph or not owner.review_required:
+                return ""
+            if approval_marks.MARK_REVIEWED not in owner.marks:
+                return ""
+            lead = (
+                f"作業中（doing/）ですが、このフェーズ {ph.label} は {ph.number} から "
+                f"{owner.number} へ延期されていて、フェーズ {owner.label} の reviewed マーカーが"
+                "残っています。再開後の作業は、そのレビューに含まれていません。"
+            )
+            return lead + _erase_steps(root, conf, child, owner.number)
+        if not ph.review_required:
             return ""
         if approval_marks.MARK_REVIEWED not in ph.marks:
             return ""
-        mark = "/".join(
-            (
-                conf.approved or settings.DEFAULT_APPROVED,
-                approval_marks.PHASES_DIR,
-                child.parent,
-                f"{ph.number}.{approval_marks.MARK_REVIEWED}",
-            )
-        )
-        git = settings.script_command(root, "ccnavi-git.sh")
-        push = settings.script_command(root, "ccnavi-push-approved.sh")
-        return (
-            f"作業中（doing/）ですが、フェーズ {ph.label} の reviewed マーカーが残っています。"
-            "レビューをやり直すならマーカーを消してください"
-            f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を打ち、"
-            "削除をコミットする。取り込み済みで origin があり、chat だけでない親子なら "
-            f"'{push} {child.parent}' が取り込んでから送る。それ以外は何もしないので、"
-            "ユーザが自分でコミットする）。"
-            "続きの作業だけなら、そのままで構いません。"
-            "運用の基本は、新しいチケットを作り直すことです"
-        )
+        lead = f"作業中（doing/）ですが、フェーズ {ph.label} の reviewed マーカーが残っています。"
+        return lead + _erase_steps(root, conf, child, ph.number)
     return ""
+
+
+def _erase_steps(root: str, conf: settings.Settings, child: ticket_mod.Ticket, number: int) -> str:
+    """`number` 番の reviewed マーカーを消す手順と、残してよい場合の言い添え。"""
+    mark = "/".join(
+        (
+            conf.approved or settings.DEFAULT_APPROVED,
+            approval_marks.PHASES_DIR,
+            child.parent,
+            f"{number}.{approval_marks.MARK_REVIEWED}",
+        )
+    )
+    git = settings.script_command(root, "ccnavi-git.sh")
+    push = settings.script_command(root, "ccnavi-push-approved.sh")
+    return (
+        "レビューをやり直すならマーカーを消してください"
+        f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を打ち、"
+        "削除をコミットする。取り込み済みで origin があり、chat だけでない親子なら "
+        f"'{push} {child.parent}' が取り込んでから送る。それ以外は何もしないので、"
+        "ユーザが自分でコミットする）。"
+        "続きの作業だけなら、そのままで構いません。"
+        "運用の基本は、新しいチケットを作り直すことです"
+    )
 
 
 def _marker_tree(root: str, conf: settings.Settings, child: ticket_mod.Ticket) -> str:
