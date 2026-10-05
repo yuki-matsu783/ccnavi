@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -331,7 +332,8 @@ class StartShTest(unittest.TestCase):
         self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
 
     def test_title_unreadable_prints_issue_read_guidance(self):
-        self.route({PULLS: [200, []]})
+        # API が落ちた（500）。ホストには届いていないので MCP の案内と終了コード 4
+        self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [500, {"message": "boom"}]})
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertIn("mcp__github__issue_read", done.stdout)
@@ -342,6 +344,7 @@ class StartShTest(unittest.TestCase):
         self.route(
             {
                 PULLS: [200, []],
+                f"GET {GITHUB}/issues/152": [500, {"message": "boom"}],
                 f"GET {GITHUB}/pulls?state=open&head=acme:feature-152-login": [200, []],
                 f"POST {GITHUB}/pulls": [
                     201,
@@ -390,15 +393,96 @@ class StartShTest(unittest.TestCase):
         # POST は落ちた 1 回と、打ち直しの 1 回だけ（重複して作っていない）
         self.assertEqual(len(self.posts()), 2)
 
-    def test_rerun_after_mcp_made_the_mr_only_reports(self):
-        self.github_new(created=False)
-        self.assertEqual(self.run_sh("--issue", "152").returncode, 4)
-        attempts = len(self.posts())
-        # エージェントが MCP で PR を作った。ホストは（この環境では）見られないまま打ち直す
-        done = self.run_sh("--issue", "152", token=False)
+    def guided_args(self, out, marker):
+        """案内の行（marker の後ろ）にあるコマンドを、sh と同じ字句の切り方で引数に戻す。"""
+        prefix = "sh .ccnavi/scripts/ccnavi-start.sh "
+        for line in out.splitlines():
+            if marker in line:
+                cmd = line.split(marker, 1)[1].lstrip()
+                cmd = cmd.split("（", 1)[0].strip()
+                self.assertTrue(cmd.startswith(prefix), cmd)
+                return cmd, shlex.split(cmd[len(prefix) :])
+        self.fail(f"{marker} の行が無い: {out}")
+
+    def test_rerun_after_mcp_made_the_mr_follows_the_guided_commands(self):
+        # 案内どおりの流れ。search 段 → --mcp-checked で打ち直す → create 段
+        # → MCP で PR を作った想定 → 案内のコマンドを打ち直す
+        search = self.run_sh("--issue", "152", "--slug", "login", token=False)
+        self.assertEqual(search.returncode, 4, search.stdout + search.stderr)
+        _, args = self.guided_args(search.stdout, "打ち直す: ")
+        self.assertIn("--mcp-checked", args)
+        create = self.run_sh(*args, token=False)
+        self.assertEqual(create.returncode, 4, create.stdout + create.stderr)
+        self.assertIn("mcp__github__create_pull_request", create.stdout)
+        self.assertEqual(self.posts(), [])
+        cmd, args = self.guided_args(create.stdout, "打ち直す: ")
+        self.assertNotIn("--mcp-checked", cmd)
+        self.assertEqual(args[:4], ["--issue", "152", "--slug", "login"])
+        # エージェントが MCP で PR を作った。ホストは見られないまま、案内のコマンドを打つ
+        done = self.run_sh(*args, token=False)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertTrue(self.fields(done.stdout)["ワークツリー"].endswith(f"worktrees/{BRANCH}"))
-        self.assertEqual(len(self.posts()), attempts)
+        self.assertTrue(
+            self.fields(done.stdout)["ワークツリー"].endswith("worktrees/feature-152-login")
+        )
+        self.assertEqual(self.posts(), [])
+
+    def test_guided_command_keeps_quoting(self):
+        title = 'It\'s $HOME  "x" `a`'
+        first = self.run_sh(
+            "--issue", "152", "--slug", "login", "--title", title, "--mcp-checked", token=False
+        )
+        self.assertEqual(first.returncode, 4, first.stdout + first.stderr)
+        cmd, args = self.guided_args(first.stdout, "打ち直す: ")
+        self.assertEqual(args, ["--issue", "152", "--slug", "login", "--title", title])
+        self.assertIn("'It'\\''s $HOME  \"x\" `a`'", cmd)
+        again = self.run_sh(*args, token=False)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+
+    def test_issue_not_found_exits_2_with_reason(self):
+        # 404 はホストには届いている。MCP へ回さず、番号を確かめてもらう
+        self.route({PULLS: [200, []]})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("issue #152 が見つからない", done.stderr)
+        self.assertNotIn("mcp__github__", done.stdout)
+        self.assertEqual(self.local_branches(), ["main"])
+        # --slug を付けても、存在しない issue のブランチは作らない
+        again = self.run_sh("--issue", "152", "--slug", "login")
+        self.assertEqual(again.returncode, 2, again.stdout + again.stderr)
+        self.assertEqual(self.local_branches(), ["main"])
+
+    def test_issue_forbidden_exits_2(self):
+        self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [403, {"message": "no"}]})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("issue #152", done.stderr)
+        self.assertIn("権限", done.stderr)
+
+    def test_number_of_a_pull_request_exits_2(self):
+        self.route(
+            {
+                PULLS: [200, []],
+                f"GET {GITHUB}/issues/152": [200, {"title": "PR", "pull_request": {"url": "x"}}],
+            }
+        )
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("#152 は issue ではなく PR", done.stderr)
+        self.assertEqual(self.local_branches(), ["main"])
+
+    # ---- 4. 古いブランチ
+
+    def test_stale_branch_without_mr_or_initial_commit_asks_instead_of_resuming(self):
+        # 取り込み済みで消し忘れた、統合先と同じ先頭のブランチ。作りかけと見て MR を作ってはいけない
+        git(self.ws, "branch", "feature-152-old", "origin/main")
+        self.route({PULLS: [200, []]})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("feature-152-old", done.stdout)
+        self.assertEqual(self.posts(), [])
+        self.assertFalse(os.path.isdir(self.wt("feature-152-old")))
+        self.assertEqual(git(self.ws, "rev-list", "--count", "origin/main..feature-152-old"), "0")
+        self.assertEqual(self.remote_branches(), ["main"])
 
     def test_mcp_checked_goes_on_without_the_host_and_stops_at_create(self):
         done = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked", token=False)
@@ -441,6 +525,7 @@ class StartShTest(unittest.TestCase):
         self.route(
             {
                 PULLS: [200, []],
+                f"GET {GITHUB}/issues/152": [200, {"title": "Add login"}],
                 f"GET {GITHUB}/pulls?state=open&head=acme:fix-152-login": [200, []],
             }
         )
@@ -518,6 +603,16 @@ class StartShGitLabTest(StartShTest):
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertIn("GitLab の API に届かず", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)
+
+    def test_gitlab_issue_not_found_exits_2(self):
+        self.gitlab_routes()
+        with open(self.routes, encoding="utf-8") as f:
+            routes = json.load(f)
+        del routes[f"GET {GITLAB}/issues/152"]
+        self.route(routes)
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("issue #152 が見つからない", done.stderr)
 
     def test_gitlab_fork_mr_is_refused(self):
         mr = {

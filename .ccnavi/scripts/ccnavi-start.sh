@@ -66,7 +66,20 @@ opt_prefix="feature"
 opt_title=""
 dry=""
 mcp_checked=""
-orig_args="$*"
+# 打ち直しの案内に使う。引数ごとに ' で包み（中の ' は '\''）、そのまま打てば同じ引数になるようにする。
+# rerun_args は --mcp-checked を除いたもの（MR を作る段の打ち直しに使う。付けたままだと、MCP で作った MR を見ずに止まり続ける）
+sh_quote() {
+	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+orig_args=""
+rerun_args=""
+for arg in "$@"; do
+	q=$(sh_quote "$arg")
+	orig_args="$orig_args $q"
+	[ "$arg" = --mcp-checked ] || rerun_args="$rerun_args $q"
+done
+orig_args="${orig_args# }"
+rerun_args="${rerun_args# }"
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--issue | --mr)
@@ -139,7 +152,7 @@ mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）
 scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
-trap 'rm -f "$host_err" "$cand_json"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$cand_json"' EXIT
 log_info 始めた -- "kind=$what" "number=$number" "dry=${dry:-no}"
 
 # ---- ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す（cwd で動く）。
@@ -196,21 +209,52 @@ host_open() {
 # API が落ちたら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
+	# ホストが HTTP のエラーを返したなら、その番号も残す（届いてはいるのか、届かないのかを見分けるため）。
+	# curl は「returned error: 404」、gh は「(HTTP 404)」、glab は「404 Not Found」の形
+	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1 >"$host_err.status"
 }
 api_failed_reason() {
 	what_failed=$(cat "$host_err" 2>/dev/null || :)
 	printf 'ホストの API が失敗した（%s）' "${what_failed:-?}"
 }
 
-# issue の題（1 行、制御文字は空白）。読めなければ 1
-issue_title() {
+# 親のシェルで呼ぶ。結果は issue_title_read（題。1 行、制御文字は空白）と issue_why（失敗の理由）に入れる。
+# 戻り値: 0 読めた / 1 API が落ちた（ホストに届いていない） / 2 issue が無い・権限が無い（ホストには届いた） / 3 PR の番号だった
+issue_title_read=""
+issue_why=""
+issue_title_get() {
+	issue_title_read=""
+	issue_why=""
+	rm -f "$host_err" "$host_err.status"
 	if [ "$ccnavi_h_kind" = github ]; then
-		got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/issues/$number") || return 1
-		printf '%s' "$got" | "$ccnavi_h_jq" -r 'select((.pull_request // null) == null) | .title // empty'
+		it_path="repos/$ccnavi_h_path/issues/$number"
 	else
-		got=$(ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)/issues/$number") || return 1
-		printf '%s' "$got" | "$ccnavi_h_jq" -r '.title // empty'
-	fi | head -n 1 | LC_ALL=C tr '\001-\037\177' ' ' | sed -e 's/^ *//' -e 's/ *$//'
+		it_path="projects/$(ccnavi_host_encoded_path)/issues/$number"
+	fi
+	it_got=$(ccnavi_host_api GET "$it_path") || {
+		it_status=$(cat "$host_err.status" 2>/dev/null || :)
+		case "$it_status" in
+		401 | 403)
+			issue_why="権限が無い（HTTP ${it_status}）"
+			return 2
+			;;
+		404 | 410)
+			issue_why="見つからない（HTTP ${it_status}）"
+			return 2
+			;;
+		esac
+		return 1
+	}
+	if [ "$ccnavi_h_kind" = github ]; then
+		it_pr=$(printf '%s' "$it_got" | "$ccnavi_h_jq" -r '(.pull_request // null) != null') || return 1
+		if [ "$it_pr" = true ]; then
+			issue_why="PR の番号だった"
+			return 3
+		fi
+	fi
+	it_raw=$(printf '%s' "$it_got" | "$ccnavi_h_jq" -r '.title // empty') || return 1
+	issue_title_read=$(printf '%s\n' "$it_raw" | head -n 1 | LC_ALL=C tr '\001-\037\177' ' ' | sed -e 's/^ *//' -e 's/ *$//')
+	return 0
 }
 
 # 題から ASCII の小文字・数字・ハイフンの slug を作る（40 字まで）。作れなければ空
@@ -271,7 +315,12 @@ stop_host() {
 	fi
 	sh_owner="${ccnavi_h_path%%/*}"
 	sh_repo="${ccnavi_h_path#*/}"
-	sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh $orig_args"
+	# MR を作る段では --mcp-checked を除く。付けたままだと、MCP で作った MR を見ずに ensure_mr が止まり続ける
+	if [ "$sh_stage" = create ]; then
+		sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh $rerun_args"
+	else
+		sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh $orig_args"
+	fi
 	if [ "$ccnavi_h_kind" = github ]; then
 		case "$sh_stage" in
 		search) printf 'ccnavi-start: GitHub の API に届かず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作らずに止めた。MCP（mcp__github__ のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
@@ -522,7 +571,6 @@ make_title() {
 		printf '#%s %s' "$number" "$1"
 	fi
 }
-issue_title_read=""
 
 # ---- 1. 既存の候補
 if ! sh "$scripts/ccnavi-branches.sh" "--$what" "$number" --json >"$cand_json"; then
@@ -579,8 +627,13 @@ if [ "$total" -eq 0 ]; then
 	if [ "$host_rc" -eq 1 ]; then
 		fail host-unreadable "MR を作れません（${host_why}）。origin を確かめてください。"
 	fi
+	issue_rc=0
 	if [ "$host_rc" -eq 0 ] && [ -z "$opt_title" ]; then
-		issue_title_read=$(issue_title) || issue_title_read=""
+		issue_title_get || issue_rc=$?
+		case "$issue_rc" in
+		2) fail issue-missing "issue #${number} が見つからない、または読む権限が無い（${issue_why}）。番号を確かめてください。" 2 ;;
+		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
+		esac
 	fi
 	slug="$opt_slug"
 	[ -n "$slug" ] || slug=$(slugify "${opt_title:-$issue_title_read}")
@@ -589,7 +642,9 @@ if [ "$total" -eq 0 ]; then
 			if [ "$host_rc" -eq 2 ]; then
 				stop_host title "$host_why"
 			fi
-			stop_host title "issue の題を読めなかった"
+			if [ "$issue_rc" -eq 1 ]; then
+				stop_host title "$(api_failed_reason)"
+			fi
 		fi
 		fail no-slug "issue の題から slug を作れない（ASCII の語が無い）。--slug <語> を付けて打ち直してください。" 2
 	fi
@@ -640,8 +695,10 @@ fi
 	printf 'ccnavi-start: 案内: MR !%s は %s。元ブランチ %s で続ける\n' "$c_mrnum" "$c_state" "$cb"
 [ -z "$unchecked" ] || printf 'ccnavi-start: 案内: ホストは見ていない（%s）。手元の候補 %s だけで続ける。既存の MR があるかは確かめていない\n' "$host_reason" "$cb"
 
-# 作りかけ（ccnavi-start.sh が途中で落ちた跡）か。ホストを見ていて MR が無く、統合先より進んでいない、
-# または初期コミットだけで、名前に / を含まないなら、残りの段（コミット・push・MR）を続ける
+# 作りかけ（ccnavi-start.sh が途中で落ちた跡）か。ホストを見ていて MR が無く、初期コミット（init_subject）だけ
+# 積んであり、名前に / を含まないなら、残りの段（push・MR）を続ける。
+# 統合先より進んでいない（c_ahead=0）ブランチは作りかけと見なさない。取り込み済みで消し忘れた古いブランチと区別できず、
+# 続けると空コミット・push・新しい Draft MR を作ってしまう。一覧を出してユーザに聞く
 resume=""
 if [ "$what" = issue ] && [ -z "$unchecked" ] && [ "$c_mrs" -eq 0 ]; then
 	case "$cb" in
@@ -651,7 +708,13 @@ if [ "$what" = issue ] && [ -z "$unchecked" ] && [ "$c_mrs" -eq 0 ]; then
 		if [ -n "$cref" ] && ref_exists "refs/remotes/origin/$integration"; then
 			c_ahead=$(git rev-list --count "origin/$integration..$cref" 2>/dev/null || echo 9)
 			c_subject=$(git log -1 --format=%s "$cref" 2>/dev/null || :)
-			if [ "$c_ahead" -eq 0 ] || { [ "$c_ahead" -eq 1 ] && [ "$c_subject" = "$init_subject" ]; }; then
+			if [ "$c_ahead" -eq 0 ]; then
+				show_list
+				printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR も無い（取り込み済みで消し忘れた古いブランチかもしれない）。何も作らずに止めた。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
+				log_info 古いブランチらしい -- "branch=$cb"
+				exit "$EXIT_MULTI"
+			fi
+			if [ "$c_ahead" -eq 1 ] && [ "$c_subject" = "$init_subject" ]; then
 				resume=1
 			fi
 		fi
@@ -682,7 +745,7 @@ if [ -n "$resume" ]; then
 	host_rc=0
 	host_open || host_rc=$?
 	if [ "$host_rc" -eq 0 ] && [ -z "$opt_title" ]; then
-		issue_title_read=$(issue_title) || issue_title_read=""
+		issue_title_get || :
 	fi
 	ensure_initial_commit
 	ensure_push "$cb"
