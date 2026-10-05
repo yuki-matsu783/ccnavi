@@ -64,7 +64,7 @@ TIMEOUT_SECONDS = 2.0
 class Phase:
     """1 つの親の 1 つのフェーズ。
 
-    親が計画を持てば、番号に種類と計画の項が付く（設計 9.7）。持たなければ
+    親が計画を持てば、番号に定義と計画の項が付く（設計 9.7）。持たなければ
     番号だけで、今までどおり子の `human_review` からレビューの要否を決める。
     """
 
@@ -73,13 +73,13 @@ class Phase:
     tickets: list[ticket_model.Ticket] = field(default_factory=list)
     states: dict[str, str] = field(default_factory=dict)
     marks: dict[str, dict] = field(default_factory=dict)
-    # 計画があるときだけ。item は計画の項、type は種類、owner は親の承認済みチケット。
+    # 計画があるときだけ。item は計画の項、type は定義、owner は親の承認済みチケット。
     item: ticket_model.PlanItem | None = None
     type: phasetypes.PhaseType | None = None
     owner: ticket_model.Ticket | None = None
     # 子ごとの実績のリスク（閉じるときに数えた記録）。子の識別子 → 記録。
     risks: dict[str, dict] = field(default_factory=dict)
-    # 延期を引き受けた前のフェーズが、種類として宣言している「見る場所」。引き受けた側は
+    # 延期を引き受けた前のフェーズが、定義として宣言している「見る場所」。引き受けた側は
     # 厳しい側で見る（`review_kind`）。組むのは `phases_of`。
     covered_reviews: list[str] = field(default_factory=list)
 
@@ -120,7 +120,7 @@ class Phase:
 
     @property
     def title(self) -> str:
-        """ユーザ向けの名前。種類が無ければ番号だけ。"""
+        """ユーザ向けの名前。定義が無ければ番号だけ。"""
         if self.type is not None:
             return self.type.title
         if self.item is not None:
@@ -163,11 +163,11 @@ class Phase:
 
     @property
     def declared_review(self) -> str | None:
-        """このフェーズの種類と計画の項が言う「見る場所」。宣言が無ければ None。
+        """このフェーズ定義と計画の項が言う「見る場所」。宣言が無ければ None。
 
         計画の項は `mr` にだけ強められる（`ticket_model.PLAN_REVIEWS`）ので、項が `mr` なら
-        種類より優先する。種類の無い番号（計画が無い、種類のファイルが無い、その名前の
-        種類が読めない）は、言っている者が居ないので None。
+        定義より優先する。定義の無い番号（計画が無い、定義のファイルが無い、その名前の
+        定義が読めない）は、言っている者が居ないので None。
         """
         if self.item is not None and self.item.review == ticket_model.PLAN_REVIEW_MR:
             return phasetypes.REVIEW_MR
@@ -179,13 +179,13 @@ class Phase:
     def review_kind(self) -> str:
         """このフェーズの終わりにユーザがどこで見るか。`none` / `chat` / `mr`（設計 9.8）。
 
-        見る場所を言えるのは、種類と計画の項と、引き受けた延期だけ。そのうち厳しい側を
+        見る場所を言えるのは、定義と計画の項と、引き受けた延期だけ。そのうち厳しい側を
         採る。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
         場所は言わないので、宣言が「見ない」だったフェーズを `chat` へ上げるにとどまる。
         どちらも止める向きにしか働かず、宣言された `mr` を `chat` に下げることはない。
 
-        場所を言う者が 1 人も居なければ（計画が無い、種類が読めない）今までどおりで、
-        子が「ユーザが見る」と言うか実績が高ければ `mr`。緩い側を採ると、種類のファイルが
+        場所を言う者が 1 人も居なければ（計画が無い、定義が読めない）今までどおりで、
+        子が「ユーザが見る」と言うか実績が高ければ `mr`。緩い側を採ると、定義のファイルが
         読めないときにレビューの行き先が消える。延期を引き受けている番号は、覆っている分の
         宣言が読めなくても `mr` を受け取る（`_covered_review`）ので、この扱いにはならない。
 
@@ -264,7 +264,7 @@ class Phase:
         return LABEL_WAITING if self.review_waiting else LABEL_PREPARING
 
 
-# レイヤーごとの種類の読み込みは phasetypes に置く
+# レイヤーごとの定義の読み込みは phasetypes に置く
 # （approval も読むため。approval は phase を読めない）。
 types_path = phasetypes.types_path
 common_types = phasetypes.common_types
@@ -319,7 +319,7 @@ def phases_of(
         # 引き受けた側が chat のままになり、宣言した mr が消える。
         #
         # 覆っている分の宣言が読めない番号は `mr` として扱う。延期できるのはレビューのある
-        # 種類だけ（承認が確かめる）なので、そこには必ず見る場所を言った者が居た。
+        # 定義だけ（承認が確かめる）なので、そこには必ず見る場所を言った者が居た。
         # 読めなくなったことを理由に、その番号のレビューが消えてはいけない。
         for phase in by_number.values():
             phase.covered_reviews = [_covered_review(by_number.get(c)) for c in phase.covers]
@@ -462,10 +462,10 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置くマーカーに足す、その種類のレイヤー（設計 11.9）。
+    """定義を根拠に置くマーカーに足す、その定義のレイヤー（設計 11.9）。
 
-    `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
-    レイヤーを書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
+    `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは定義を見ずに置くので、
+    レイヤーを書いても根拠にならない。定義の無いフェーズでは欄そのものを置かない。
     """
     return {"source": phase.type.source} if phase.type is not None else {}
 
@@ -531,7 +531,7 @@ def announce(
                 # 先へ進めるのは端末のユーザで、エージェントには打てない。
                 advise = (
                     "実績のリスクが高いので、マージリクエストで見てもらうことを勧めます"
-                    "（種類の `review` を mr にするか、ユーザに相談）。それでも chat で"
+                    "（定義の `review` を mr にするか、ユーザに相談）。それでも chat で"
                     "通すかはユーザが決めます。"
                     if phase.risk_escalates
                     else ""
@@ -613,7 +613,7 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
     nxt = following[0]
     return (
         f"次は {nxt.label} の計画です。そのフェーズの子チケットを提案して承認を受けてください。"
-        + (f"（種類の案内: {nxt.type.when}）" if nxt.type is not None and nxt.type.when else "")
+        + (f"（定義の案内: {nxt.type.when}）" if nxt.type is not None and nxt.type.when else "")
     )
 
 
@@ -658,7 +658,7 @@ def resumed_review(
     延期したフェーズの子は、引き受けた側（`review_at`）の `reviewed` が残っているときに言う
     （消すのはその引き受けた側のマーカー。延期の `skipped` は消さない）。引き受けた側がまだ
     レビュー前なら、これからのレビューが再開後の作業も覆うので言わない。
-    閉じ直したときにレビューが要らないフェーズ（種類が `review: none` で、この子も
+    閉じ直したときにレビューが要らないフェーズ（定義が `review: none` で、この子も
     `human_review` を求めていない）と、レビューが要らない引き受け手は、マーカーが残っていても
     止める条件に入らないので言わない。
     引き受け手 M は、ゲートと同じく計画の待ち方のコピーから引く `review_at`（`N.skipped` の
@@ -755,10 +755,10 @@ def order_problems(
     """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 9.7）。
 
     待つ番号は親の待ち方のコピー（`workflow`）が決める。一直線なら前の全部、`dag` なら
-    種類の祖先に当たる前の番号。`overlap` の組はコピーを作るときに待ちから外してある。
+    定義の祖先に当たる前の番号。`overlap` の組はコピーを作るときに待ちから外してある。
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
-    前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの種類を見て
+    前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの定義を見て
     warn にする（`lint_ticket._approval_problems`）。
 
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が

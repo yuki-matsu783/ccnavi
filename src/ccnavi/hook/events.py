@@ -138,7 +138,7 @@ def scope_guard(
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root, raw=raw)
-    # 種類の上限はレイヤー（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
+    # 定義の上限はレイヤー（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
     types: dict[str, dict] = {}
     for copy in copies:
         if copy.has_plan and copy.project not in types:

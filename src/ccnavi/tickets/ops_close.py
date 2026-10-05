@@ -317,7 +317,7 @@ def close_problems(
 def deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
-    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 9.8）。
+    """フェーズの最後の子を閉じる前に、定義の成果物が揃っているか（設計 9.8）。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
     「調査したことにする」は防げる。

@@ -12,7 +12,7 @@ from . import phasetypes, ticket_model
 
 
 def _order(parent: ticket_model.Ticket, types: dict | None) -> str:
-    """使う `order`。計画に読めない種類が 1 つでもあれば一直線。
+    """使う `order`。計画に読めない定義が 1 つでもあれば一直線。
 
     祖先が分からないものを並行にしない。
     """
@@ -24,7 +24,7 @@ def _order(parent: ticket_model.Ticket, types: dict | None) -> str:
 
 
 def _depends(types, later: str, earlier: str) -> bool:
-    """`later` の種類が `earlier` の種類を待つか。祖先か同じ種類なら待つ。"""
+    """`later` の定義が `earlier` の定義を待つか。祖先か同じ定義なら待つ。"""
     return later == earlier or earlier in types.ancestors(later)
 
 
@@ -74,7 +74,7 @@ def _defer_target(
 def effective(parent: ticket_model.Ticket, types: dict | None) -> ticket_model.Workflow:
     """判定に使う待ち方。承認済みの親はコピーした待ち方だけを読む。
 
-    コピーした待ち方を持たない承認済みの親は一直線で読み、いまの種類からは計算しない。種類から計算するのは、
+    コピーした待ち方を持たない承認済みの親は一直線で読み、いまの定義からは計算しない。定義から計算するのは、
     まだ承認されていない提案（同じ承認で通る親と、改版の提案）だけ。
     """
     if parent.workflow is not None:
@@ -135,7 +135,7 @@ def problems(parent: ticket_model.Ticket, types: dict | None) -> list[rules.Prob
                     rules.SEVERITY_ERROR,
                     parent.ticket,
                     f"最後の項 `{last.type}` が {', '.join(f'`{t}`' for t in dict.fromkeys(loose))}"
-                    " を待たない。終端は 1 つにしてください（合流の種類を最後に置く）",
+                    " を待たない。終端は 1 つにしてください（合流の定義を最後に置く）",
                 )
             )
     for n, item in enumerate(items, start=1):

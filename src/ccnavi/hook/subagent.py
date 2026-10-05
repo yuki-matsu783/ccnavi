@@ -98,7 +98,7 @@ def at_start(
         if pt is not None:
             label = f"{t.phase}: {pt.title}"
             if pt.agent:
-                hint = f" 種類の案内: エージェント {pt.agent}"
+                hint = f" 定義の案内: エージェント {pt.agent}"
         lines.append(
             f"  {t.ticket}（親 {t.parent}、フェーズ {label}）: {where} [{state}]"
             + (f" 先行が未完了: {', '.join(waiting)}" if waiting else "")
@@ -154,7 +154,7 @@ def at_stop(
 
     見るのは、cwd が子のワークツリーならその子、親のワークツリーならその親の開いている
     子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
-    範囲は実行前チェックと同じく親の範囲と種類の上限で切り詰め、子の範囲の中でも
+    範囲は実行前チェックと同じく親の範囲と定義の上限で切り詰め、子の範囲の中でも
     上限の外なら、どの上限かをパスの後ろにつける。
     """
     record.decision, record.enforced = audit.ALLOW, True
@@ -216,7 +216,7 @@ def _limit_note(child: ticket_model.Ticket, found: phase_scope.ScopeVerdict) -> 
     if found.limit == phase_scope.LIMIT_BLOCKED:
         return f"（チケットを信頼できない: {child.blocked}）"
     if found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
-        return f"（種類 {found.type.title} の上限の外）"
+        return f"（定義 {found.type.title} の上限の外）"
     if found.limit == phase_scope.LIMIT_PARENT:
         return f"（親 {child.parent} の範囲の外）"
     return ""

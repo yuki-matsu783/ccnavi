@@ -72,7 +72,7 @@ phases:
 # 共通レイヤーの design と全欄が同じ定義を持つ lib のレイヤー。
 LIB_PHASES_COPIED = LIB_PHASES + COMMON_PHASES.split("phases:\n", 1)[1]
 
-# 閉じるときの点を見るための、範囲の上限が無くレビュー不要の種類。
+# 閉じるときの点を見るための、範囲の上限が無くレビュー不要の定義。
 LIB_PHASES_WORK = """\
 version: 1
 phases:
@@ -96,8 +96,8 @@ class PhaseUnionTest(ConfigUnionHarness):
         return [p for p in self.problems(severity, where=where) if "phases" in p["where"]]
 
     def test_plan_can_name_a_type_from_the_project_layer(self):
-        """11.4.1: `plan:` がプロジェクトのレイヤーの種類を指せる。
-        レイヤーから共通レイヤーの種類も指せる。"""
+        """11.4.1: `plan:` がプロジェクトのレイヤーの定義を指せる。
+        レイヤーから共通レイヤーの定義も指せる。"""
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["design", "release"], allow=("src/*",)),
@@ -110,7 +110,7 @@ class PhaseUnionTest(ConfigUnionHarness):
 
     def test_the_layer_follows_the_project_of_the_parent(self):
         """11.4.1: 空の `project:` は自身のレイヤー。
-        プロジェクトのレイヤーの種類は他から指せない。"""
+        プロジェクトのレイヤーの定義は他から指せない。"""
         self.propose("i0002", ticket_text("i0002", plan=["docs"], allow=("docs/*",)))
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -175,8 +175,8 @@ class PhaseUnionTest(ConfigUnionHarness):
     def test_scope_stays_relative_to_the_worktree(self):
         """11.4.1: `scope` はワークツリーのルートからの相対のまま。
 
-        種類の超過は承認を拒まず、承認画面の「編集対象としているが」に出る（設計 approve-carry
-        3.1）。相対で読めていれば、`src/a/*` は種類 build の `src/*` に入り、`docs/*` だけが出る。
+        定義の超過は承認を拒まず、承認画面の「編集対象としているが」に出る（設計 approve-carry
+        3.1）。相対で読めていれば、`src/a/*` は定義 build の `src/*` に入り、`docs/*` だけが出る。
         """
         self.propose(
             "i0001",
@@ -196,13 +196,13 @@ class PhaseUnionTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertIn("編集対象としているが", approved.stdout)
-        self.assertIn("`docs/*` は種類", approved.stdout)
-        self.assertNotIn("`src/a/*` は種類", approved.stdout)
+        self.assertIn("`docs/*` は定義", approved.stdout)
+        self.assertNotIn("`src/a/*` は定義", approved.stdout)
         self.assertTrue(os.path.exists(self.approved_copy("i0001-01-01")))
         self.assertTrue(os.path.exists(self.approved_copy("i0001-01-02")))
 
     def test_broken_project_phases_is_an_error_and_the_layer_is_empty(self):
-        """11.2: 壊れたレイヤーの phases は空 + --lint error。共通レイヤーの種類は使える。"""
+        """11.2: 壊れたレイヤーの phases は空 + --lint error。共通レイヤーの定義は使える。"""
         write(layer_path(self.lib, "phases"), "version: 1\nphases: [\n")
 
         self.assertTrue(self.phase_problems("error", "lib"))
@@ -500,7 +500,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(record["untested"].get("source"), "lib", record)
 
     def test_the_mark_that_rests_on_a_type_names_its_layer(self):
-        """11.9: 種類を根拠に置くマーカー（`review: none` の skipped）には、その種類のレイヤー。"""
+        """11.9: 定義を根拠に置くマーカー（`review: none` の skipped）には、その定義のレイヤー。"""
         tree = self.one_child()
         self.commit(tree, "src/a.py", "1\n")
         closed = self.ccnavi("ticket", "finish", "i0001-01-01")
@@ -517,7 +517,7 @@ class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
 
     `--projects` と `--project-home` は、共通レイヤーの中身を差し替えるのと結果が同じ。
     外すとプロジェクトのレイヤーがまるごと消えるので、そのレイヤーが足していた配点も
-    フェーズの種類も落ちる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数をそのまま渡すので、
+    フェーズ定義も落ちる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数をそのまま渡すので、
     この形はエージェントが Bash で打てる。
 
     土台の子は共通レイヤーの `big-diff`（25）と lib の `schema`（30）で 55 点、

@@ -2,7 +2,7 @@
 
 見るのは 6 つ。
 
-1. 種類の `order` と `after` の読み方（循環、指す先、レイヤーの合わせ方）
+1. 定義の `order` と `after` の読み方（循環、指す先、レイヤーの合わせ方）
 2. `dag` では祖先でないフェーズを待たずに承認できる。一直線では待つ
 3. 待ち方は承認のときに親へコピーし、あとで phases.yml を直しても進行中の親には反映されない
 4. 計画が同じ改版で、直した phases.yml を進行中の親に反映できる
@@ -133,7 +133,7 @@ class ComputeTest(unittest.TestCase):
         self.assertEqual(wf.waits, {1: [], 2: [1], 3: [1, 2], 4: [1, 2, 3]})
 
     def test_skipped_type_passes_its_wait_on(self):
-        """計画に置かなかった種類は飛ばし、その種類が待っていたものを先へ引き継ぐ。"""
+        """計画に置かなかった定義は飛ばし、その定義が待っていたものを先へ引き継ぐ。"""
         wf = workflow.compute(self.parent(["design", "docs"]), types_of(DAG))
         self.assertEqual(wf.waits, {1: [], 2: [1]})
 

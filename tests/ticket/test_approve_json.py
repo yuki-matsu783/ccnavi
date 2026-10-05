@@ -66,7 +66,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_preview_lists_the_batch_and_does_not_place_copies(self):
         self.pending_parent_and_child()
-        # 種類の範囲を超える子。超過は承認を拒まないので一覧に載り、overflow[] を持つ
+        # 定義の範囲を超える子。超過は承認を拒まないので一覧に載り、overflow[] を持つ
         # （設計 approve-carry 3.3）。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/design/*",)))
         # 計画に無い番号の子。形が壊れているので、承認の対象にしない側に載る。
@@ -91,7 +91,7 @@ class ApproveJsonTest(PhaseHarness):
             child["path"].replace("\\", "/").endswith("wip/proposals/todo/i0001-01-01.md")
         )
         self.assertEqual(child["overflow"], [])
-        # 超えた項は文字列のリストで、種類の名前と「超えている」を含む。
+        # 超えた項は文字列のリストで、定義の名前と「超えている」を含む。
         self.assertTrue(beyond["overflow"], beyond)
         self.assertTrue(all(isinstance(p, str) for p in beyond["overflow"]), beyond)
         self.assertTrue(
@@ -111,7 +111,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertFalse(self.copy_exists("i0001-01-02"))
 
     def test_letter_case_alone_is_not_an_overflow(self):
-        """表記の大文字小文字だけが種類の範囲と違う子は、超過にならない（overflow[] が空）。"""
+        """表記の大文字小文字だけが定義の範囲と違う子は、超過にならない（overflow[] が空）。"""
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("WIP/Research/*",), False)
@@ -451,12 +451,12 @@ class ApproveJsonTest(PhaseHarness):
         self.assert_refused_after_edit(child, "前\x00後\n", "前後\x00\n", shown)
 
     def test_digest_changes_when_only_the_overflow_changes(self):
-        """3. 提案はそのままで、種類の scope が変わって子の超過が増えると、ダイジェストが変わる。"""
+        """3. 提案はそのままで、定義の scope が変わって子の超過が増えると、ダイジェストが変わる。"""
         self.pending_parent_and_child()
         before = self.preview()
         self.assertEqual(before["batch"][1]["overflow"], [])
 
-        # 種類 research の scope を、子の範囲を覆わない表記に書き換える。
+        # 定義 research の scope を、子の範囲を覆わない表記に書き換える。
         narrowed = PHASES.replace('scope: ["wip/research/*"]', 'scope: ["wip/elsewhere/*"]', 1)
         self.assertNotEqual(narrowed, PHASES)
         write(self.phases, narrowed)
@@ -507,7 +507,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_shapes_match_the_extension_fixtures(self):
         self.pending_parent_and_child()
-        # 種類の範囲を超える子は一覧に載り、`overflow` を持つ。計画に無い番号の子は
+        # 定義の範囲を超える子は一覧に載り、`overflow` を持つ。計画に無い番号の子は
         # 承認の対象にしない側に載る。拡張は両方の形を読むので、同じ一覧に並べて書き出す。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/design/*",)))
         self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))

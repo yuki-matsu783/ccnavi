@@ -87,10 +87,10 @@ class RiskTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        # 配点と種類は共通レイヤーの既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
+        # 配点と定義は共通レイヤーの既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
         # `ticket` の副命令には届かない。差し替えるテストはこの形に書き直す。
         self.risk = write(common_path(self.root, "risk"), RISK)
-        # 範囲の上限が無く、レビュー不要の種類。宣言では「レビュー不要」な作業を実績で上書きする。
+        # 範囲の上限が無く、レビュー不要の定義。宣言では「レビュー不要」な作業を実績で上書きする。
         write(
             self.phases,
             "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n"
@@ -140,7 +140,7 @@ class RiskTest(PhaseHarness):
         self.assertEqual(
             {"big-diff", "many-files", "ci", "deletes"}, {h["id"] for h in record["hits"]}
         )
-        # 種類は review: none、子も required: false。それでもレビューで止まる。
+        # 定義は review: none、子も required: false。それでもレビューで止まる。
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("実績のリスクが高い", self.reason(said))
         self.commit_parent("close 01")

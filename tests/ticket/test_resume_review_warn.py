@@ -7,7 +7,7 @@
 1. 作業中の子があり、レビューが要るフェーズに `reviewed` が残っていれば、lint と status が言う
 2. 言わないもの: `reviewed` が無い、子が閉じている（`done/`）、レビューが要らないフェーズ
 3. 警告は判定と `start` を止めない
-4. 種類が `review: none` でも、再開された子が `human_review` を求めれば言う（閉じ直すと要る）
+4. 定義が `review: none` でも、再開された子が `human_review` を求めれば言う（閉じ直すと要る）
 5. 延期したフェーズの子が作業中で、引き受けた側に `reviewed` が残っていれば言う。
    消すのは引き受けた側。引き受けた側がレビュー前なら言わない
 """
@@ -183,7 +183,7 @@ class ResumedReviewWarnTest(PhaseHarness):
         self.assertEqual(warned.returncode, 0, warned.stdout)
         self.assertIn("error 0 件", warned.stdout)
 
-    # ---- 5. 種類が review: none でも、再開された子が human_review を求める
+    # ---- 5. 定義が review: none でも、再開された子が human_review を求める
 
     def test_a_resumed_child_asking_for_review_is_warned_even_if_the_kind_needs_none(self):
         # 調査は review: none。doing の子は review_kind に数えられないが、閉じ直すと要る。

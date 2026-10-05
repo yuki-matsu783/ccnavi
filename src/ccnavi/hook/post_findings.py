@@ -63,14 +63,14 @@ class ScopeGuard:
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""
     approved: str = ""
-    # フェーズの種類。親の `project:` のレイヤーごとに、作るときに 1 度だけ読んだもの。
+    # フェーズ定義。親の `project:` のレイヤーごとに、作るときに 1 度だけ読んだもの。
     # 変更 1 件ごとに phases.yml を開かない。読めないレイヤーは空。
     types: dict[str, dict[str, phasetypes.PhaseType]] = field(default_factory=dict)
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
         """この変更が範囲の外なら、報告する文面と出所を返す。中なら None。
 
-        範囲は実行前チェックと同じく、親の範囲と種類の上限で切り詰める（phase_scope.scope_verdict）。
+        範囲は実行前チェックと同じく、親の範囲と定義の上限で切り詰める（phase_scope.scope_verdict）。
         チケットの置き場は外でも報告しない。次のチケットを提案できなくすると、
         いちど承認した範囲から永久に出られなくなる。外し方は実行前チェックと同じ関数。
         """

@@ -1,8 +1,8 @@
-"""フェーズの種類。`.ccnavi/common/phases.yml` を読む（設計 9.7）。
+"""フェーズ定義。`.ccnavi/common/phases.yml` を読む（設計 9.7）。
 
-## 種類はユーザが持つ
+## 定義はユーザが持つ
 
-エージェントが種類を書けると、レビュー不要の種類を作ってから使える。だから置き場は
+エージェントが定義を書けると、レビュー不要の定義を作ってから使える。だから置き場は
 ルールの `guard-ccnavi-config` の内側で、ワークツリー側の設定も含めてエージェントの Write は
 止まる。組み込みの既定は持たない。
 既定を組み込むと、意図せずレビューの要否が決まる。ファイルが無ければ、フェーズは
@@ -10,8 +10,8 @@
 
 ## 用語
 
-**フェーズの種類**はここで定義される名前付きの型。**フェーズ**は親の計画に並ぶ番号付きの
-実体で、子が `phase: N` で指す。N 番目が何の種類かは親の計画が言う。
+**フェーズ定義**はここに書く名前付きの型。**フェーズ**は親の計画に並ぶ番号付きの
+実体で、子が `phase: N` で指す。N 番目が何の定義かは親の計画が言う。
 
 ## 書式
 
@@ -24,9 +24,9 @@
         review: none          # none | chat | mr
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
-        overlap: [design]     # 並行してよい種類（対称）
-        requires: [design]    # 計画に置くなら一緒に要る種類
-        after: [design]       # order: dag のとき、先に閉じてレビューが済んでいるべき種類
+        overlap: [design]     # 並行してよい定義（対称）
+        requires: [design]    # 計画に置くなら一緒に要る定義
+        after: [design]       # order: dag のとき、先に閉じてレビューが済んでいるべき定義
         agent: explorer       # 案内にだけ使う
         when: 既存の振る舞いが分からないとき   # 案内にだけ使う
 """
@@ -71,14 +71,14 @@ def stricter(a: str, b: str) -> str:
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
 
 
-# 全体計画の待ち方（設計 9.7）。sequential は一直線、dag は種類の `after` を辺にする。
+# 全体計画の待ち方（設計 9.7）。sequential は一直線、dag は定義の `after` を辺にする。
 ORDER_SEQUENTIAL = "sequential"
 ORDER_DAG = "dag"
 ORDERS = (ORDER_SEQUENTIAL, ORDER_DAG)
 
 
 class PhaseTypes(dict):
-    """種類の集合。id → 種類の辞書に、ファイルの頭の `order` を持たせたもの。"""
+    """定義の集合。id → 定義の辞書に、ファイルの頭の `order` を持たせたもの。"""
 
     def __init__(self, *args, order: str = ORDER_SEQUENTIAL, **kwargs):
         super().__init__(*args, **kwargs)
@@ -98,7 +98,7 @@ class PhaseTypes(dict):
         return found
 
 
-# 種類の範囲が「親の範囲そのまま」であることを言う表記。
+# 定義の範囲が「親の範囲そのまま」であることを言う表記。
 INHERIT = "inherit"
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -119,7 +119,7 @@ class PhaseType:
     after: list[str] = field(default_factory=list)
     agent: str = ""
     when: str = ""
-    # source はこの種類が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
+    # source はこの定義が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
     # id は裸のままで、レイヤーは記録と `--explain` の欄に出す（設計 11.4.1）。
     source: str = ""
 
@@ -148,7 +148,7 @@ class PhaseType:
         )
 
     def decide(self, rel: str) -> str:
-        """この種類の範囲が、ワークツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
+        """この定義の範囲が、ワークツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
         if self.scope is None:
             return rules.ALLOW
         for entry in self.scope:
@@ -162,10 +162,10 @@ class PhaseType:
 
 
 def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]]:
-    """種類を読む。ファイルが無ければ None（種類を使わない）。壊れていれば None と苦情。
+    """定義を読む。ファイルが無ければ None（定義を使わない）。壊れていれば None と苦情。
 
     `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。レイヤーの
-    ファイルを単独で読むときに使う。レイヤーは共通レイヤーの種類を指してよく（設計 11.4.1）、
+    ファイルを単独で読むときに使う。レイヤーは共通レイヤーの定義を指してよく（設計 11.4.1）、
     その相手はファイルの中に無いので、1 本だけで確かめると必ず落ちる。確かめる
     のは合成したあと（`merge`）。
     """
@@ -178,10 +178,10 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
         # ファイルとして苦情付きで返す。上げると、判定（実行前・レビューで止めるところ・
-        # 実行後チェック）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う処理まで
+        # 実行後チェック）が例外で落ち、読めない定義を「定義では切り詰めない」として扱う処理まで
         # 進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
-    # 承認のダイジェスト（read_set）に入れる。種類は待ち方と止め方を決める判定の入力。
+    # 承認のダイジェスト（read_set）に入れる。定義は待ち方と止め方を決める判定の入力。
     fsio.note_read(path, text)
     return parse(text, path, refs)
 
@@ -232,7 +232,7 @@ def parse(
             problems.append(Problem(SEVERITY_ERROR, ident, "識別子に使えない文字がある"))
             continue
         if not isinstance(body, dict):
-            problems.append(Problem(SEVERITY_ERROR, ident, "種類の中身が辞書ではない"))
+            problems.append(Problem(SEVERITY_ERROR, ident, "定義の中身が辞書ではない"))
             continue
         pt, own = _one(ident, body)
         problems.extend(own)
@@ -261,10 +261,10 @@ def parse(
 def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
     """`overlap` / `requires` / `after` が指す先が、その集合の中にあるか。
 
-    `after` の先は `kind: work` の種類でなければならない。
+    `after` の先は `kind: work` の定義でなければならない。
 
-    見るのは `checked` の側だけで、あってよい先は `pool` 全部。レイヤーの種類が共通レイヤーの
-    種類を指す形（設計 11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
+    見るのは `checked` の側だけで、あってよい先は `pool` 全部。レイヤーの定義が共通レイヤーの
+    定義を指す形（設計 11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
     """
     problems: list[Problem] = []
     for pt in checked:
@@ -272,14 +272,14 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
             if name not in pool:
                 problems.append(
                     Problem(
-                        SEVERITY_ERROR, pt.id, f"`{name}` という種類は無い（overlap / requires）"
+                        SEVERITY_ERROR, pt.id, f"`{name}` という定義は無い（overlap / requires）"
                     )
                 )
         for name in pt.after:
             target = pool.get(name)
             if target is None:
                 problems.append(
-                    Problem(SEVERITY_ERROR, pt.id, f"`{name}` という種類は無い（after）")
+                    Problem(SEVERITY_ERROR, pt.id, f"`{name}` という定義は無い（after）")
                 )
             elif target.kind != KIND_WORK:
                 problems.append(
@@ -349,7 +349,7 @@ def cycle_problems(pool: dict[str, PhaseType]) -> list[Problem]:
 
 
 def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
-    """この集合の種類に、どのレイヤーから来たかを持たせる。記録の `source` になる。"""
+    """この集合の定義に、どのレイヤーから来たかを持たせる。記録の `source` になる。"""
     for pt in (types or {}).values():
         pt.source = layer
 
@@ -366,17 +366,17 @@ def merged_order(*layers: PhaseTypes | None) -> str:
 def merge(
     common: PhaseTypes | None, extra: PhaseTypes | None, layer: str
 ) -> tuple[PhaseTypes, list[Problem]]:
-    """共通レイヤーの種類に、行き先のレイヤーの種類を id ごとに足す（設計 11.4.1）。
+    """共通レイヤーの定義に、行き先のレイヤーの定義を id ごとに足す（設計 11.4.1）。
 
     足すだけで、後ろのレイヤーが前のレイヤーを上書きすることはない。同 `id` で全欄が一致する
     ものは重複とみなして後ろを捨て（info）、中身が違えば error。`title` の重なりも
     レイヤーをまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
 
-    error があるとき、そのレイヤーは空として扱い、共通レイヤーの種類だけを返す。衝突した片方を
+    error があるとき、そのレイヤーは空として扱い、共通レイヤーの定義だけを返す。衝突した片方を
     何も言わずに採ると、どちらの `review:` が使われているかをユーザが読めない。止まる側を採る。
 
     `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。
-    レイヤーから共通レイヤーの種類を
+    レイヤーから共通レイヤーの定義を
     指すのは正しい形なので、レイヤー 1 本の中では確かめられない。
 
     `order` は、ファイルを持つレイヤーが全部 `dag` と書いたときだけ `dag`（`merged_order`）。
@@ -465,7 +465,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
             Problem(
                 SEVERITY_ERROR,
                 ident,
-                f"フィードバック対応の種類に `review: {REVIEW_NONE}` は書けない"
+                f"フィードバック対応の定義に `review: {REVIEW_NONE}` は書けない"
                 f"（`{REVIEW_CHAT}` か `{REVIEW_MR}`）",
             )
         )
@@ -507,7 +507,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_WARN, ident, "自分自身を overlap / requires に挙げている"))
     if pt.after and kind != KIND_WORK:
         problems.append(
-            Problem(SEVERITY_ERROR, ident, f"`after` を持てるのは kind `{KIND_WORK}` の種類だけ")
+            Problem(SEVERITY_ERROR, ident, f"`after` を持てるのは kind `{KIND_WORK}` の定義だけ")
         )
         return None, problems
 
@@ -536,9 +536,9 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], l
             continue
         glob = glob.replace("\\", "/").strip("/")
         # 子チケットの範囲と同じく、大文字小文字は区別しない（`ticket.entries`）。
-        # 機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
+        # 機械ごとに変えると、同じ提案が Linux では「定義の上限を超えている」で
         # 承認を拒まれ、Windows では通る。範囲はユーザが宣言する意図なので、機械の
-        # 都合ではなく書かれたパスの意味で読む。子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える。
+        # 都合ではなく書かれたパスの意味で読む。子 ⊆ 定義 ⊆ 親 の 3 つを 1 つの規則で揃える。
         try:
             compiled = re.compile("^" + globmatch.translate(glob), re.IGNORECASE)
         except re.error as exc:
@@ -549,9 +549,9 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], l
 
 
 def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
-    """子の範囲が種類の上限を超えている項を名指しする。子 ⊆ 種類。
+    """子の範囲が定義の上限を超えている項を名指しする。子 ⊆ 定義。
 
-    超えていても承認は止めない（warn）。判定が種類の上限でも切り詰める（phase_scope.scope_verdict）。
+    超えていても承認は止めない（warn）。判定が定義の上限でも切り詰める（phase_scope.scope_verdict）。
     """
     if pt.inherits_scope:
         return []
@@ -570,14 +570,14 @@ def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     child.ticket,
-                    f"`{entry.glob}` は種類 {pt.title} / {pt.id} の範囲 "
+                    f"`{entry.glob}` は定義 {pt.title} / {pt.id} の範囲 "
                     f"{', '.join(pt.scope_globs)} を超えている",
                 )
             )
     return problems
 
 
-# ---- レイヤーごとの種類の読み込み（設計 11.4）
+# ---- レイヤーごとの定義の読み込み（設計 11.4）
 
 
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
@@ -598,7 +598,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
 def common_types(
     conf: settings.Settings,
 ) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """共通レイヤーの種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
+    """共通レイヤーの定義。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
     if not conf.phases:
         return None, []
     types, notes = load(conf.phases)
@@ -609,7 +609,7 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """共通レイヤー + そのレイヤーの種類と、**そのレイヤーの**苦情（設計 11.4.1）。
+    """共通レイヤー + そのレイヤーの定義と、**そのレイヤーの**苦情（設計 11.4.1）。
 
     どのレイヤーを足すかは親の承認済みチケットの `project:` が決める。
     空ならワークスペース自身のレイヤー。
@@ -617,7 +617,7 @@ def layer_types(
     言うと、レイヤーの話を読みに来たユーザが同じ文を 2 度読むことになる。
 
     無いレイヤーは空（苦情なし）。壊れたレイヤーも空として扱うが、そちらは error を返す。
-    組み込みには戻さない。共通レイヤーが在るのに戻すと、共通レイヤーの種類が消える。
+    組み込みには戻さない。共通レイヤーが在るのに戻すと、共通レイヤーの定義が消える。
     """
     common, notes = common_types(conf)
     if common is None and notes:
@@ -636,6 +636,6 @@ def layer_types(
 def load_types(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> dict[str, PhaseType] | None:
-    """判定が使うフェーズの種類。どのレイヤーにも無ければ None（番号だけの挙動）。"""
+    """判定が使うフェーズ定義。どのレイヤーにも無ければ None（番号だけの挙動）。"""
     types, _ = layer_types(conf, root, project)
     return types

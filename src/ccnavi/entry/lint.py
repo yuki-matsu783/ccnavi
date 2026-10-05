@@ -493,7 +493,7 @@ def flow_problems(
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
-    """フェーズの種類の定義が読めるか。無いのは不備ではない（番号だけの挙動）。"""
+    """フェーズ定義が読めるか。無いのは不備ではない（番号だけの挙動）。"""
     if not conf.phases:
         return []
     _, notes = phasetypes.load(conf.phases)

@@ -683,7 +683,7 @@ class ColonIdTest(ConfigUnionHarness):
         )
 
     def test_a_colon_in_a_phase_type_id_is_named_by_lint(self):
-        """11.4.1: フェーズの種類の識別子も同じ。"""
+        """11.4.1: フェーズ定義の識別子も同じ。"""
         write_layer(self.lib, phases=COLON_PHASES)
         errors = self.problems("error", where=self.project_where("lib"))
         self.assertTrue(any("lib:build" in p["where"] for p in errors), errors)

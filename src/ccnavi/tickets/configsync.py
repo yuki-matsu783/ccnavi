@@ -451,7 +451,7 @@ def _unreadable_as_layer(conf: settings.Settings, kind: str, content: bytes) -> 
         types, problems = phasetypes.parse(text, "(phases)", refs=False)
         errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
         if types is None or errors:
-            return "; ".join(p.detail for p in errors) or "フェーズの種類として読めない"
+            return "; ".join(p.detail for p in errors) or "フェーズ定義として読めない"
         return ""
     if kind == settings.KIND_RISK:
         definition, problems = risk.parse(text, "(risk)", (settings.layer_script_home(conf),))
