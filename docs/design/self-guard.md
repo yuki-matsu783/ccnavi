@@ -18,7 +18,7 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 | 対象 | 何が懸かっているか | バックアップを取る時点 |
 |---|---|---|
 | `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前 |
-| 共通レイヤーの 3 本（`.ccnavi/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前 |
+| 共通レイヤーのファイル（`.ccnavi/common/{rules,risks}.yml`。置かれた `phases.yml` も） | 判定の中身そのもの | ツール実行前 |
 | 自身のレイヤーと各プロジェクトのレイヤーの `.ccnavi/config/{rules,phases,risks}.yml` | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル（振り分けの sh）と、sh がこの機械で起動する実行ファイル | 判定器の実体 | セッション開始 |
 
