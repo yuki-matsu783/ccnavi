@@ -280,6 +280,67 @@ class WriteBytesAtomicTest(unittest.TestCase):
         self.assertEqual(self._read(), b"before")
         self.assertEqual(self._names(), ["i0001.md"])
 
+    @unittest.skipIf(os.name == "nt", "fcntl は POSIX だけ")
+    def test_failed_os_fsync_is_a_failed_write(self):
+        """`_sync_file` を差し替えずに os.fsync を落とす。握りつぶさず、書けなかったことにする。"""
+        import fcntl
+
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        # macOS の F_FULLFSYNC の枝を通らないようにして、os.fsync を確実に呼ばせる。
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", None, create=True),
+            mock.patch("os.fsync", side_effect=OSError(errno.EIO, "io")),
+        ):
+            failed = fsio.write_bytes_atomic(self.path, b"after")
+        self.assertNotEqual(failed, "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    @unittest.skipIf(os.name == "nt", "fcntl は POSIX だけ")
+    def test_full_fsync_is_tried_first_and_falls_back_to_fsync(self):
+        """F_FULLFSYNC（macOS）を先に試し、受け付けなければ os.fsync に落とす。"""
+        import fcntl
+
+        full = getattr(fcntl, "F_FULLFSYNC", None) or 51
+        tried: list[int] = []
+        synced: list[int] = []
+
+        def refuse(fd, cmd, *args):
+            tried.append(cmd)
+            raise OSError(errno.ENOTSUP, "not supported")
+
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", full, create=True),
+            mock.patch.object(fcntl, "fcntl", refuse),
+            mock.patch.object(fsio, "_sync_directory"),
+            mock.patch("os.fsync", side_effect=synced.append),
+        ):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"x"), "")
+        self.assertEqual(tried, [full])
+        self.assertEqual(len(synced), 1)
+        self.assertEqual(self._read(), b"x")
+
+        # F_FULLFSYNC が通れば os.fsync は呼ばない。
+        synced.clear()
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", full, create=True),
+            mock.patch.object(fcntl, "fcntl", lambda fd, cmd, *a: 0),
+            mock.patch.object(fsio, "_sync_directory"),
+            mock.patch("os.fsync", side_effect=synced.append),
+        ):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"y"), "")
+        self.assertEqual(synced, [])
+
+        # 両方落ちれば書けなかったことにし、前の中身を残す。
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", full, create=True),
+            mock.patch.object(fcntl, "fcntl", refuse),
+            mock.patch("os.fsync", side_effect=OSError(errno.EIO, "io")),
+        ):
+            self.assertNotEqual(fsio.write_bytes_atomic(self.path, b"z"), "")
+        self.assertEqual(self._read(), b"y")
+        self.assertEqual(self._names(), ["i0001.md"])
+
     def test_syncs_before_replacing(self):
         order: list[str] = []
         real_replace = os.replace
