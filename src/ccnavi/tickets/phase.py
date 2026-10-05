@@ -644,7 +644,7 @@ def reviewed_or_skipped(phase: Phase) -> bool:
 def resumed_review(
     root: str,
     conf: settings.Settings,
-    child: ticket_mod.Ticket,
+    child: ticket_model.Ticket,
     raw: approval.Raw | None = None,
 ) -> str:
     """作業中（`doing/`）の子のフェーズに、レビュー済みのマーカーが残っている形の警告文。無ければ空。
@@ -662,7 +662,7 @@ def resumed_review(
     レビューが要らない引き受け手は、マーカーが残っていても止める条件に入らないので言わない。
     文には子の識別子を入れない（呼び手が前に付ける）。
     """
-    if child.state != ticket_mod.DOING or not child.is_child or child.phase is None:
+    if child.state != ticket_model.DOING or not child.is_child or child.phase is None:
         return ""
     phases = phases_of(root, conf, child.parent, raw=raw)
     for ph in phases:
@@ -691,7 +691,9 @@ def resumed_review(
     return ""
 
 
-def _erase_steps(root: str, conf: settings.Settings, child: ticket_mod.Ticket, number: int) -> str:
+def _erase_steps(
+    root: str, conf: settings.Settings, child: ticket_model.Ticket, number: int
+) -> str:
     """`number` 番の reviewed マーカーを消す手順と、残してよい場合の言い添え。"""
     mark = "/".join(
         (
@@ -714,7 +716,7 @@ def _erase_steps(root: str, conf: settings.Settings, child: ticket_mod.Ticket, n
     )
 
 
-def _marker_tree(root: str, conf: settings.Settings, child: ticket_mod.Ticket) -> str:
+def _marker_tree(root: str, conf: settings.Settings, child: ticket_model.Ticket) -> str:
     """マーカーを置くツリー（`approval.home_dir` が決める）を、ルートからの相対で言う。
 
     置き場の設定が絶対パスなどで、ツリーのルートを引けないときは「マーカーがあるツリー」。

@@ -104,15 +104,16 @@ PATH_TOOLS = ruleload.PATH_TOOLS
 # 空のままにすると、場所を書かない呼び出しがどのルールにも当たらずに通る。
 SEARCH_TOOLS = ("Grep", "Glob")
 
-# シェルから書き込む形を止める組み込みの保護。どれも書き込む動詞の式（selfguard._WRITE_VERBS）を
-# 持ち、生の文字列では `>` の個数に対して 2 乗で遅くなる。ガード自身の設定を守る 1 本は、
-# ルールファイルが読める間は selfguard が足し、読めずに組み込みの既定に戻った間は builtin が持つ。
+# シェルから書き込む形を止める組み込みの保護。どれも書き込む動詞の式
+# （selfguard_shell._WRITE_VERBS）を持ち、生の文字列では `>` の個数に対して 2 乗で遅くなる。
+# ガード自身の設定を守る 1 本は、ルールファイルが読める間は selfguard_shell が足し、読めずに
+# 組み込みの既定に戻った間は builtin が持つ。
 # チケットの状態の置き場を守る 1 本は、チケット制御が有効なときに足す。
 # 生の文字列の `>` が上限を超えたときは、これらを生の文字列に当てない（decide_before）。
 SHELL_GUARD_RULE_IDS = (
-    selfguard.SHELL_RULE_ID,
+    selfguard_shell.SHELL_RULE_ID,
     builtin.CONFIG_VIA_BASH_RULE_ID,
-    ticket_mod.STATE_SHELL_RULE_ID,
+    ticket_guard.STATE_SHELL_RULE_ID,
 )
 
 
@@ -429,20 +430,21 @@ def decide_before(
         return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf)
 
     # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから
-    # 書き込む形の保護の照合が長さの 2 乗で遅くなる（selfguard.REDIRECT_LIMIT）。期限を越えると
-    # 判定に達せず、enable では block（終了コード 2）で止まるだけになり、何が起きたかも言えない。
-    # そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に当てず、ほかの deny と ask の
-    # ルールを当てたうえで、確認できる者が居るモードでは確認、居ないモードでは拒否にする
-    # （cap_verdict）。照合を飛ばして通すと、上限の後ろに書いた保護対象への書き込みが素通りする。
-    # deny に当たる形は今までどおり止まる。allow は当てない（保護を当てていないので、通す根拠に
-    # ならない）。中で実行されるコマンドと `cd` の行き先は読み解けた形なので、保護もそのまま当てる。
+    # 書き込む形の保護の照合が長さの 2 乗で遅くなる（selfguard_shell.REDIRECT_LIMIT）。
+    # 期限を越えると判定に達せず、enable では block（終了コード 2）で止まるだけになり、
+    # 何が起きたかも言えない。そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に
+    # 当てず、ほかの deny と ask のルールを当てたうえで、確認できる者が居るモードでは確認、
+    # 居ないモードでは拒否にする（cap_verdict）。照合を飛ばして通すと、上限の後ろに書いた
+    # 保護対象への書き込みが素通りする。deny に当たる形は今までどおり止まる。allow は当てない
+    # （保護を当てていないので、通す根拠にならない）。中で実行されるコマンドと `cd` の行き先は
+    # 読み解けた形なので、保護もそのまま当てる。
     # 外す保護がこのツールに当たらないなら（既定の組み込みの 1 本は Bash だけ）、上限も掛けない。
     unread = bool(record.degraded) or (
-        payload.tool_name in phase.SHELL_TOOLS and payload.tool_name != "Bash"
+        payload.tool_name in phase_forms.SHELL_TOOLS and payload.tool_name != "Bash"
     )
     capped = (
         unread
-        and selfguard.too_many_redirects(subject)
+        and selfguard_shell.too_many_redirects(subject)
         and any(
             rule.id in SHELL_GUARD_RULE_IDS and rules.tool_matches(rule.match, payload.tool_name)
             for rule in rule_set.deny
@@ -579,7 +581,9 @@ def decide_before(
         # その文も後ろに並べる。
         texts = [
             reasons.builtin_refusal(
-                reasons.CODE_REDIRECT_LIMIT_DENY, subject, selfguard.REDIRECT_LIMIT_DENY_MESSAGE
+                reasons.CODE_REDIRECT_LIMIT_DENY,
+                subject,
+                selfguard_shell.REDIRECT_LIMIT_DENY_MESSAGE,
             ),
             *(
                 reasons.reason_for(
@@ -623,7 +627,7 @@ def decide_before(
             texts.insert(
                 0,
                 reasons.builtin_refusal(
-                    reasons.CODE_REDIRECT_LIMIT, subject, selfguard.REDIRECT_LIMIT_MESSAGE
+                    reasons.CODE_REDIRECT_LIMIT, subject, selfguard_shell.REDIRECT_LIMIT_MESSAGE
                 ),
             )
             record.code = reasons.CODE_REDIRECT_LIMIT
