@@ -411,19 +411,24 @@ def decide_before(
         return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf)
 
     # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから
-    # 書き込む形の保護の照合が長さの 2 乗で遅くなり、期限を越えて止める判定を出せなくなる
-    # （selfguard.REDIRECT_LIMIT）。そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に
-    # 当てず、ほかのルールを当てたうえで少なくとも確認にする。照合を飛ばして通すと、上限の後ろに
-    # 書いた保護対象への書き込みが素通りする。ほかのルールは当てたままなので、deny に当たる形は
-    # 今までどおり止まる。中で実行されるコマンドと `cd` の行き先は読み解けた形なので、保護も
-    # そのまま当てる。
+    # 書き込む形の保護の照合が長さの 2 乗で遅くなる（selfguard.REDIRECT_LIMIT）。期限を越えると
+    # 判定に達せず、enable では block（終了コード 2）で止まるだけになり、何が起きたかも言えない。
+    # そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に当てず、ほかの deny と ask の
+    # ルールを当てたうえで、確認できる者が居るモードでは確認、居ないモードでは拒否にする
+    # （cap_verdict）。照合を飛ばして通すと、上限の後ろに書いた保護対象への書き込みが素通りする。
+    # deny に当たる形は今までどおり止まる。allow は当てない（保護を当てていないので、通す根拠に
+    # ならない）。中で実行されるコマンドと `cd` の行き先は読み解けた形なので、保護もそのまま当てる。
+    # 外す保護がこのツールに当たらないなら（既定の組み込みの 1 本は Bash だけ）、上限も掛けない。
     unread = bool(record.degraded) or (
         payload.tool_name in phase.SHELL_TOOLS and payload.tool_name != "Bash"
     )
     capped = (
         unread
         and selfguard.too_many_redirects(subject)
-        and any(rule.id in SHELL_GUARD_RULE_IDS for rule in rule_set.deny)
+        and any(
+            rule.id in SHELL_GUARD_RULE_IDS and rules.tool_matches(rule.match, payload.tool_name)
+            for rule in rule_set.deny
+        )
     )
     verdict, group = "", []
     # group と同じリストで、中で実行されるコマンドで当たったときの
@@ -431,7 +436,7 @@ def decide_before(
     # 元の形で当たったルールは ("", "", False)。
     via: list[tuple[str, str, bool]] = []
     for name in rules.SECTIONS:
-        if name == rules.ALLOW and record.degraded:
+        if name == rules.ALLOW and (record.degraded or capped):
             # 読み切れなかったコマンドに allow は当てない。当てる先は
             # 実行される部分ではなく生の文字列なので、そこで許可を出すのは
             # 「読めなかった文字列にそう書いてあった」を根拠に通すことになる。
@@ -464,10 +469,10 @@ def decide_before(
         if group:
             verdict = name
             break
-    # 保護を当てなかったぶん、deny でなければ確認に上げる。allow に当たっていても上げる。
+    # 保護を当てなかったぶん、deny でなければ確認（確認できないモードでは拒否）に上げる。
     capped = capped and verdict != rules.DENY
     if capped:
-        verdict = rules.ASK
+        verdict = cap_verdict(payload.permission_mode)
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
@@ -551,7 +556,23 @@ def decide_before(
 
     # どちらの文面を返すかは、判定を決めた側で分ける。ルールが当たっていても、
     # チケットが強かった回はチケットの文面になる（ticket_reason があるのはその回だけ）。
-    if verdict == rules.DENY and not ticket_reason:
+    if verdict == rules.DENY and capped:
+        # `>` の上限で、確認できる者が居ないモードなので止めた。当たった ask のルールがあれば、
+        # その文も後ろに並べる。
+        texts = [
+            reasons.builtin_refusal(
+                reasons.CODE_REDIRECT_LIMIT_DENY, subject, selfguard.REDIRECT_LIMIT_DENY_MESSAGE
+            ),
+            *(
+                reasons.reason_for(
+                    rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                )
+                for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
+            ),
+        ]
+        record.code = reasons.CODE_REDIRECT_LIMIT_DENY
+        record.rules = [reasons.REDIRECT_LIMIT_RULE, *record.rules]
+    elif verdict == rules.DENY and not ticket_reason:
         # ルールの deny。当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
@@ -1006,6 +1027,19 @@ def ticket_verdict(
         notice,
         "",
     )
+
+
+def cap_verdict(permission_mode: str) -> str:
+    """`>` の上限で保護を当てなかった呼び出しを、権限モードごとにどう扱うか。
+
+    確認できる者が居るモード（空・不明を含む）では確認にする。居ないモード（dontAsk /
+    bypassPermissions）では止める。ask を返すと「誰も答えないまま通る」になり、保護対象への
+    書き込みが緩むので（REQ-PRE-08）。保護の照合を終えていない呼び出しなので、
+    CCNAVI_GUARD_UNWATCHED を disable にしていても委ねない。
+    """
+    if permission_mode in PERMISSION_NO_JUDGE:
+        return rules.DENY
+    return rules.ASK
 
 
 def undeclared_verdict(permission_mode: str, degraded: str, guard_unwatched: str = "") -> str:
