@@ -13,6 +13,7 @@ from . import (
     approval,
     approval_checks,
     approval_marks,
+    approval_ops,
     phase,
     phasetypes,
     syncstate,
@@ -142,7 +143,7 @@ def candidates(
             # 先行は `done/` に在って取り消しでないことを求める。同じ承認で通る
             # 先行も、まだ `todo/` に在るので満たさない。
             if preds is None:
-                preds = approval.predecessor_pool(conf, root)
+                preds = approval_ops.predecessor_pool(conf, root)
             complaints += approval_checks.predecessor_problems(t, preds, conf.approved)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))

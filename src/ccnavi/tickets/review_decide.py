@@ -19,6 +19,7 @@ from ..infra import fsio, settings, tree
 from . import (
     approval,
     approval_marks,
+    approval_ops,
     configsync,
     history,
     phase,
@@ -61,7 +62,7 @@ def _followup_from_choice(
 ) -> str | None:
     """ユーザが選んだ続きの子を `doing/` に起こし、識別子を返す。起こせなければ None。"""
     children = [t for t in ph.tickets if ph.states.get(t.ticket) in ticket_model.FINISHED]
-    ident, failed = approval.followup(conf, root, parent, ph.number, children, items)
+    ident, failed = approval_ops.followup(conf, root, parent, ph.number, children, items)
     if failed:
         stderr.write(f"ccnavi: 続きの子チケットを起こせない: {failed}\n")
         return None

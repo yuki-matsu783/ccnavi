@@ -1,4 +1,4 @@
-"""チケットを置き場から置き場へ動かす（approval.move_file）の受入テスト。
+"""チケットを置き場から置き場へ動かす（approval_ops.move_file）の受入テスト。
 
 承認済みチケットは 1 本のファイルとして doing/ → review/ → done/ と動く。
 動かす途中で止まると同じ識別子が 2 か所に残り、以後どの操作も「複数の場所にある」で
@@ -19,7 +19,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import approval
+from ccnavi.tickets import approval_ops
 
 TEXT = "---\nticket: i0001\n---\nbody\n"
 
@@ -40,14 +40,14 @@ class MoveFileTest(unittest.TestCase):
             return f.read()
 
     def test_moves_by_rename_and_keeps_the_text(self):
-        self.assertEqual(approval.move_file(self.source, self.target), "")
+        self.assertEqual(approval_ops.move_file(self.source, self.target), "")
         self.assertFalse(os.path.exists(self.source))
         self.assertEqual(self.read(self.target), TEXT)
 
     def test_copies_and_removes_when_rename_is_refused(self):
         # 別のファイルシステムをまたぐ形。rename は EXDEV で通らない。
         with mock.patch("os.rename", side_effect=OSError(errno.EXDEV, "cross-device")):
-            self.assertEqual(approval.move_file(self.source, self.target), "")
+            self.assertEqual(approval_ops.move_file(self.source, self.target), "")
         self.assertFalse(os.path.exists(self.source))
         self.assertEqual(self.read(self.target), TEXT)
 
@@ -66,7 +66,7 @@ class MoveFileTest(unittest.TestCase):
             mock.patch("os.rename", side_effect=OSError(errno.EXDEV, "cross-device")),
             mock.patch("os.remove", side_effect=remove),
         ):
-            failed = approval.move_file(self.source, self.target)
+            failed = approval_ops.move_file(self.source, self.target)
         self.assertIn("busy", failed)
         self.assertEqual(self.read(self.source), TEXT)
         self.assertFalse(os.path.exists(self.target))
@@ -75,7 +75,7 @@ class MoveFileTest(unittest.TestCase):
         os.makedirs(os.path.dirname(self.target))
         with open(self.target, "w", encoding="utf-8") as f:
             f.write("older\n")
-        failed = approval.move_file(self.source, self.target)
+        failed = approval_ops.move_file(self.source, self.target)
         self.assertIn("行き先に既に在る", failed)
         self.assertEqual(self.read(self.source), TEXT)
         self.assertEqual(self.read(self.target), "older\n")
@@ -92,7 +92,7 @@ class MoveFileTest(unittest.TestCase):
             raise FileNotFoundError(errno.ENOENT, "no such file", src)
 
         with mock.patch("os.rename", side_effect=rename):
-            failed = approval.move_file(self.source, self.target)
+            failed = approval_ops.move_file(self.source, self.target)
         self.assertIn("no such file", failed)
         self.assertEqual(self.read(self.target), TEXT)
 

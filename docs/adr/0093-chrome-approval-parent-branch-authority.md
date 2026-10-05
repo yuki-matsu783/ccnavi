@@ -255,7 +255,7 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
 | `approval._authoritative`（`approval.py:272-296`） | 親のツリー → 元ツリー → 全部残す | 3.3。「全部残す」を廃止し、決まらないときは `Ticket.blocked` を付けて止める |
 | `approval._origin_is_current`（`:299-302`） | 元ツリーの採否 | 取り込み済みの親子のチケットでは使わず、統合先の `done/` は取り込み結果から常に読む |
 | `approval.home_dir`（`:313-347`） | 持っているツリー → 親 → 提案 → ワークスペースルート | 取り込み済みの親子のチケットは `P` のツリーだけ（無ければ書けない）。**それ以外は今のまま**（D11 と合わせる。origin の無い親子のチケットの「承認の後にワークツリーを作る」流れを止めない） |
-| `approval.predecessor_pool`（`:688-694`） | 手元の全ツリー | 取り込み済みの親子のチケットは 3.3 の 5 の閉包から作る対応表（Chrome と同じ）。それ以外は今のまま |
+| `approval_ops.predecessor_pool`（`:688-694`） | 手元の全ツリー | 取り込み済みの親子のチケットは 3.3 の 5 の閉包から作る対応表（Chrome と同じ）。それ以外は今のまま |
 | `ticket_fold.fold` / `behind` / `dedupe`（`ticket_fold.py:13-169`） | 同じ識別子を 1 つにまとめる | 残す（提案の重複をまとめる処理は別の用途） |
 | 全ツリーの走査（`_everything`） | 子の番号や先の計画を全ツリーから引く | 残す（`next_child_id` `approval.py:528`、`_last_phase_with_children` `:2404`、`diagnose.py:749`） |
 | `phasetypes.types_path`（`phasetypes.py:583-595`） | ワークスペース自身のレイヤーはワークスペースルートの作業ツリー、プロジェクトのレイヤーは `projects/<名前>` の作業ツリー（`tree.project_root`、`:591-594`）から読む | 手元は変えない（決定 B1。3.3 の 6）。統合先の取り込み結果のレイヤー・D28 の計算との違いは lint の warn。Chrome は統合先のレイヤーと D28 の計算を読む |
@@ -432,7 +432,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 #### 1 操作の中身（sh が持つ。D17）
 
 `ccnavi-ticket.sh`（start・finish・cancel）、`ccnavi-review.sh`（request のマーカー・confirm・decide・ready）、
-続きの子を起こす操作（`approval.followup` を呼ぶ経路）は、対象の親子のチケットなら次の順に進めます。
+続きの子を起こす操作（`approval_ops.followup` を呼ぶ経路）は、対象の親子のチケットなら次の順に進めます。
 
 1. **ロック**（D32、下）を取る
 2. **途中の操作を確かめる**: `git rev-parse --git-path <名前>` で引いた `MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`rebase-merge/`・`rebase-apply/`・`sequencer/`・`index.lock`
@@ -498,7 +498,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 #### fsio の「この実行で書いたパス」の記録レイヤー
 
 「書いたパス」の一覧をコアの `Changes`（6.2）だけから取ると漏れます。コアの外で書いている箇所があるためです:
-`ops.start`・`finish`・`cancel`、`approval.followup`（`approval.py:540-615`）、`configsync.apply`（`configsync.py:159`）、
+`ops.start`・`finish`・`cancel`、`approval_ops.followup`（`approval.py:540-615`）、`configsync.apply`（`configsync.py:159`）、
 フローのハッシュ `flow.record_digest`（`flow.py:964-`）、リスクの記録 `phases/<親>/<子>.risk.json`（`approval.py:914`）。
 
 - `fsio` の書き込みの関数（`write_text`・`write_text_atomic`・`write_bytes`・`write_json_atomic`・`remove`、`fsio.py:143-293`）に、
@@ -739,7 +739,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
   `candidates` がレイヤーごとに `phase.load_types` でファイルを読む（`approval.py:1726-1730`）。`predecessor_pool`（`:688-694`。`scan(closed=True)` で `done/` を全部読む）、`accepted_threads`（`:943`）
 - 書き: `_apply`（`approval.py:1821-1895`）が `admit`（`:349-394`）、`revise_copy`、`phase.settle_last_review`、`settle_review`（`:504-525`）、
   `carry_flow`（`:419-466`）、`clear_marks`、`history.note` を直接呼ぶ
-- コアの外の書き手: `ops.start`・`finish`・`cancel`、`approval.followup`、`configsync.apply`、`flow.record_digest`、リスクの記録（4.3 の記録レイヤー）
+- コアの外の書き手: `ops.start`・`finish`・`cancel`、`approval_ops.followup`、`configsync.apply`、`flow.record_digest`、リスクの記録（4.3 の記録レイヤー）
 - レビュー済み: `review.confirm`（`review.py:368-446`）が `_moved_since_request`（`:1831-1868`）、`_matching`・`_unresolved`、`_settle_children`、`_mark` を順に呼ぶ
 - 時計: `fsio.stamp()`（`fsio.py:30-32`）と `history.stamp()`（`history.py:129`、`time.gmtime()` を直に呼ぶ）。どちらも Clock の差し替え点に移す
 - 出所: `admit` が `source_path` に提案の絶対パスを書く（`approval.py:360-364`）。D22 で相対パスに、`source_tree` はブランチ名にする（読む側は `diagnose.py:983` の表示だけ）
@@ -958,7 +958,7 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
 **条件**（すべて満たすときだけ出す。判定はコアの `withdraw`）:
 
 - 承認済みチケットが `P` の `doing/` にあり、**新規の承認**である（`ccnavi_approved` に `revised_at`・`feedback_at` が無い）。改版は `settle_review` などが走っていて戻せない
-- **followup で起こしたチケットではない**: `followup_of` を持つチケット、または `source_path` が空のチケット（`approval.followup`、`approval.py:540-615` が作ったもの）は対象外
+- **followup で起こしたチケットではない**: `followup_of` を持つチケット、または `source_path` が空のチケット（`approval_ops.followup`、`approval.py:540-615` が作ったもの）は対象外
 - **未着手**: `started_at` が空。着手は C1 で必ず `P` に送られている前提（対象外の親子のチケットは Chrome に見えない）
 - **子が無い**（親のチケットのとき）: その親を `parent:` に持つチケットが `doing/`・`review/`・`done/` に無く、**`todo/` にも子の提案が無く**、`phases/<親>/` にマーカーが無い
 - **`P` に `todo/<識別子>.md` が無い**（戻す先に別の提案がある間は出さない）
@@ -1284,7 +1284,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | `reviewed_mark`（8.9） | `core.reviewed_mark`・`review.reviewed_mark` | `confirm` と `decide` が使う。キーは 8.9 の順序（`mr`・`accepted`・`actor`・`via`・`at`）で、`actor` はアカウントが分かるときだけ、`via` は経路が分かるときだけ書く（Chrome は `via: chrome`）。段階 2a の手元はどちらも渡さないので、手元のマーカーは前と同じバイト列 |
 | `withdraw`（8.8） | `core.withdraw` | 条件（新規・followup でない・未着手・子もマーカーも無い・戻す先が空いている・承認コミットの親の提案がある）と書くもの（`doing/` を消し、`todo/` に元のバイト列、状態の履歴）。呼ぶのは Chrome の入口の試験だけ（画面は段階 3）。履歴の種類 `withdrawn` と経路 `chrome` を `history` に足した（コアの書くものに要るため） |
 | 時計（Clock） | `fsio.clock`・`stamp`・`utc_stamp`、`history.stamp` | 固定した 1 つの時刻から、承認の記録（オフセット付き）と状態の履歴（UTC）を出す。plan の間は `Snapshot.stamp`（空なら今）に固定する |
-| D22 | `approval.admit`・`source_path`・`source_branch`・`_origin_line`、`tree.branch_of` | `source_path` は提案のツリーからの相対（"/"。別のドライブならパスのまま）、`source_tree` はそのツリーの HEAD が指すブランチ名（ファイルだけを読み、git は起こさない）。HEAD が切り離し（sha）・空・壊れている・読めないときはツリーの名前（ワークスペースルートなら空）を使い、`Changes.per_branch` の名前と同じ決め方にした。承認画面の「提案:」も相対パスにした |
+| D22 | `approval_ops.admit`・`source_path`・`source_branch`・`_origin_line`、`tree.branch_of` | `source_path` は提案のツリーからの相対（"/"。別のドライブならパスのまま）、`source_tree` はそのツリーの HEAD が指すブランチ名（ファイルだけを読み、git は起こさない）。HEAD が切り離し（sha）・空・壊れている・読めないときはツリーの名前（ワークスペースルートなら空）を使い、`Changes.per_branch` の名前と同じ決め方にした。承認画面の「提案:」も相対パスにした |
 | 書き込みを溜める段 | `fsio.staging`・`Stage`・`Op`・`Line` | 中では書き込みを溜め、読み（`read_*`・`exists`・`lexists`・`listdir`・`load_text`）は溜めた内容を先に見る。承認の手順は、同じ承認の中で動かした後の置き場を読む（`home_dir`・`settle_review`・マーカー・状態の履歴） |
 | fsio の記録レイヤー（4.3） | `fsio.recording`、`cli` の `--record-writes <ファイル>` | 書いた・消したパスを 1 行 1 つ、ワークスペースルートからの相対（"/"）で書き出す。比べるのは行き着く先のパス（リンクを解き、大文字小文字を区別しない）。ルートの外と別のドライブは絶対パス、既定の state の置き場の下（リポジトリに入らない）と一覧自身は載せない。書き出し先は 11.3.1 の 1 |
 | fsio を通らない書き込みを揃えた | `approval`（`admit`・`carry_flow`・`move_file`・`clear_marks`・改版の提案の削除）、`history._append`、`configsync._replace`・`_restore`、読みの `ticket.load`・`approval._load_dir`・`home_dir` | `fsio.unlink`・`move`・`write_new`・`append`・`replace_bytes` を足して通した。置き場を書くモジュールに素の書き込みが残っていないことを試験で見る |
@@ -1314,7 +1314,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | # | 何 | 直し方 |
 |---|---|---|
 | 1 | `--record-writes` の書き出し先の制限に抜けがあった | 置き場は `--state`・`CCNAVI_STATE` で上書きする前の既定（ワークスペースルートの `logs/state/c1/`）だけ。行き先・置き場・ルートは行き着く先（`realpath`、大文字小文字を区別しない）で比べ、`..`・上書きした置き場・`c1/` の下のリンク・行き先そのもののリンクを断る。書き出しは同じディレクトリの一時ファイルから `os.replace` で置き換える（行き先のリンクの先を開かない。Windows でも同じ）。**C1（段階 2d）の前提**: コマンドが落ちても、そこまでに書いたパスで一覧を書き、終了コードはコマンドのもの。一覧を書けなければ、コマンドの結果に依らず 1 で終わる。行き先を断ったときはコマンドを走らせずに 1 |
-| 2（決定 A） | 子を足してマーカーを消すとき、在るのに消せなかったマーカーも「消した」と出ていた | reviewed を先に消し、消せなければその場で止める（残るとフェーズが済んだまま読まれる。判定を厳しくする変更で、ユーザが承認）。ほかの種類は消せなければ「消せなかった（理由）。<種類> は残っていて効く」と言って続ける（`FAIL_WARN`）。行と履歴（`phase-reopened` の `cleared`）は Writer(FS) が実際に消せた種類だけで書く（`fsio.Call`）。Changes（Chrome の 1 コミット）は全部消した状態。書き込みを溜める段の消去はリンクを辿らない（`lexists`）。続きの子（`approval.followup`）も同じ規則 |
+| 2（決定 A） | 子を足してマーカーを消すとき、在るのに消せなかったマーカーも「消した」と出ていた | reviewed を先に消し、消せなければその場で止める（残るとフェーズが済んだまま読まれる。判定を厳しくする変更で、ユーザが承認）。ほかの種類は消せなければ「消せなかった（理由）。<種類> は残っていて効く」と言って続ける（`FAIL_WARN`）。行と履歴（`phase-reopened` の `cleared`）は Writer(FS) が実際に消せた種類だけで書く（`fsio.Call`）。Changes（Chrome の 1 コミット）は全部消した状態。書き込みを溜める段の消去はリンクを辿らない（`lexists`）。続きの子（`approval_ops.followup`）も同じ規則 |
 | 3 | macOS などで記録の一覧が絶対パスになった | 1 と同じく行き着く先のパスで記録し、比べる |
 | 4 | Chrome の `confirm` の履歴の経路が `cli` になっていた | 並べる段を Snapshot の経路の `history.session` で包む（取り下げと同じ形）。マーカーの `via` は 8.9 のとおり経路が分かるときに書く |
 | 5 | 取り下げの条件で、マーカーの置き場を読めないときも「無い」とみなしていた | 無い（`FileNotFoundError`）だけを無いとし、ほかの読めない理由は問題として返す（緩めない） |

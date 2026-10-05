@@ -19,7 +19,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 退避は補助の記録で、判定の正ではない。読むのは次のところだけで、どれも「閉じた」側に厳しくする向き。
 
 - 閉じた識別子の使い回しの検査（`approval_checks.integration_problems` / `integration_closed`）と、
-  子の連番（`approval.next_child_id`）。退避にある識別子は閉じたものとして数える（同じリポジトリのものだけ）
+  子の連番（`approval_ops.next_child_id`）。退避にある識別子は閉じたものとして数える（同じリポジトリのものだけ）
 - 先行を引く対応表（`approval_checks.predecessor_pool_of`）。置き場のどこにも無い先行を、
   同じリポジトリの退避の `done/` から引く
 - 判定の走査（`approval.scan`）。子のワークツリーに残った古いチケットを、退避に同じ承認のチケットが
