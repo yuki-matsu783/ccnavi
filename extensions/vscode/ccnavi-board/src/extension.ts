@@ -31,15 +31,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // 実行ファイルと拡張の互換の版が食い違っていれば知らせる。待たない（起動を遅らせない）
   void warnVersionSkew();
   context.subscriptions.push(
-    // 引数はプロジェクト管理画面からの導線でだけ渡る。パレットとサイドパネルからは無い。
-    vscode.commands.registerCommand("ccnaviBoard.open", (project?: unknown) =>
-      void screens().board(typeof project === "string" ? project : undefined),
-    ),
+    vscode.commands.registerCommand("ccnaviBoard.open", () => void screens().board()),
     vscode.commands.registerCommand("ccnaviBoard.refresh", refreshBoard),
     // 承認はボードのボタンだけ。パレットからは打てない（承認内容を見ずに押せる入口を作らない）。
-    vscode.commands.registerCommand("ccnaviBoard.openRules", (project?: unknown) =>
-      void screens().rules(typeof project === "string" && project !== "" ? { kind: "project", name: project } : { kind: "workspace" }),
-    ),
+    vscode.commands.registerCommand("ccnaviBoard.openRules", () => void screens().rules({ kind: "workspace" })),
     vscode.commands.registerCommand("ccnaviBoard.openProjects", () => void screens().projects()),
     vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void screens().risk()),
     vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void screens().phases({ kind: "common" })),

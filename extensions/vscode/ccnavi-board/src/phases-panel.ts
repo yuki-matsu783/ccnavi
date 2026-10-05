@@ -25,8 +25,7 @@
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
  *
  * チケット制御が disable のワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
- * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット・
- * プロジェクト管理画面のボタン）も同じ鍵で隠れる。
+ * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じ鍵で隠れる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -45,6 +44,7 @@ import type { PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/pha
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { showLoading } from "./loading.js";
 import type { PhasesTarget } from "./core/screens.js";
+import { targetOptions, type TargetOption } from "./core/targets.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
@@ -78,6 +78,8 @@ interface Loaded {
   readonly phasesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
+  /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
+  readonly targets: readonly TargetOption[];
 }
 
 interface PanelState {
@@ -259,6 +261,9 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesRel: string;
   let phasesPath: string;
   const notices: string[] = [];
+  // 切り替えの一覧のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧が縮むだけ
+  const board = await loadBoard(root, binSetting());
+  const targets = targetOptions(board.ok ? board.board : undefined, "common", { kind: target.kind, name: target.kind === "project" ? target.name : "" });
   if (target.kind === "common") {
     // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_PHASES` など）では動かせない。
     phasesRel = DEFAULT_PHASES;
@@ -266,7 +271,6 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   } else {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が食い違ったときに
     // この画面で保存した定義が承認と着手に反映されなくなる。答えは元リポジトリの版（設計 11.2）。
-    const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
@@ -302,13 +306,13 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   if (target.kind === "common" && !exists) {
     notices.push(
-      "定義はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた定義は、すべてのプロジェクトに適用されます。ワークスペースやプロジェクトの設定に、同じ id で中身の違う定義があると、その設定は空として扱われます",
+      "定義はワークスペースの設定とプロジェクトの設定にも置けます（画面上部の切り替えから開きます）。共通の設定に置いた定義は、すべてのプロジェクトに適用されます。ワークスペースやプロジェクトの設定に、同じ id で中身の違う定義があると、その設定は空として扱われます",
     );
   }
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。
   const parsed = readPhases(text);
   const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
-  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices };
+  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, targets };
 }
 
 function resolveIn(root: string, filePath: string): string {
@@ -479,6 +483,8 @@ function show(current: PanelState): void {
       lock: current.lock,
       layer: current.target.kind !== "common",
       notices: loaded.notices,
+      target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
+      targets: loaded.targets,
     },
   });
 }
@@ -487,7 +493,13 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
-  current.host.send({ kind: "error", error });
+  const target = currentKey(current.target);
+  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "common", target) });
+}
+
+/** 開いている対象の欄の値（`targets.ts` の `kind` と `name`） */
+function currentKey(target: PhasesTarget): { kind: string; name: string } {
+  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 /**
@@ -645,8 +657,21 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       );
       return;
     }
+    case "switchTarget": {
+      // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
+      const option = (current.loaded?.targets ?? targetOptions(undefined, "common", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
+      if (option === undefined) {
+        return;
+      }
+      const target: PhasesTarget =
+        option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "self" ? { kind: "self" } : { kind: "common" };
+      if (!sameTarget(current.target, target)) {
+        await switchTarget(current, target);
+      }
+      return;
+    }
     case "openSelf": {
-      // プロジェクト管理画面の「ワークスペース自身」の「フェーズ管理」と同じ入口。未保存の変更があれば
+      // 切り替えの欄から「ワークスペース」を選ぶのと同じ。未保存の変更があれば
       // 切り替えの前に聞く（共通レイヤーのファイルが無い間は欄を触れないので、ふつうは聞かずに切り替わる）
       await openPhases({ kind: "self" });
       return;
@@ -764,8 +789,10 @@ function asMessage(message: unknown): PhasesMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; dirty?: unknown; form?: unknown };
+  const m = message as { type?: unknown; dirty?: unknown; form?: unknown; kind?: unknown; name?: unknown };
   switch (m.type) {
+    case "switchTarget":
+      return typeof m.kind === "string" && typeof m.name === "string" ? { type: "switchTarget", kind: m.kind, name: m.name } : undefined;
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
     case "dirty":

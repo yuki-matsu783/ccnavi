@@ -37,6 +37,7 @@ import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToR
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
+import { targetOptions, type TargetOption } from "./core/targets.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import * as diaglog from "./log.js";
 import { markTourSeen, tourSeen } from "./tour.js";
@@ -60,6 +61,8 @@ interface Loaded {
   readonly rulesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
+  /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
+  readonly targets: readonly TargetOption[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly mode: string;
@@ -250,6 +253,9 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesPath: string;
   let rulesRel: string;
   const notices: string[] = [];
+  // 切り替えの一覧のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧が縮むだけ
+  const board = await loadBoard(root, binSetting());
+  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", { kind: target.kind, name: target.kind === "project" ? target.name : "" });
   if (target.kind === "workspace") {
     // 共通の設定の場所は `.ccnavi/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
@@ -258,7 +264,6 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が実行ファイルと
     // 食い違ったときに、この画面で保存したルールが判定に使われなくなる。答えは元リポジトリの版で、
     // ワークツリーの中の版は指さない（設計 11.2）。
-    const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
@@ -282,7 +287,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     text = fs.readFileSync(rulesPath, "utf8");
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
   } catch (error) {
-    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通の設定からコピー」で作ってください";
+    const hint = target.kind === "workspace" ? "" : "。無ければ共通の設定の rules.yml をコピーして作ってください";
     throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}${hint}`);
   }
   const hooks = [
@@ -297,6 +302,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     rulesPath,
     rulesRel,
     notices,
+    targets,
     hooks,
     hookFiles: { settings: settingsText !== undefined, settingsLocal: localText !== undefined },
     mode: env("CCNAVI_MODE"),
@@ -468,6 +474,8 @@ function show(current: PanelState): void {
       samplesPath: loaded.samplesRel,
       lock: current.lock,
       notices: loaded.notices,
+      target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
+      targets: loaded.targets,
     },
   });
 }
@@ -476,7 +484,13 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
-  current.host.send({ kind: "error", error });
+  const target = currentKey(current.target);
+  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
+}
+
+/** 開いている対象の欄の値（`targets.ts` の `kind` と `name`） */
+function currentKey(target: RulesTarget): { kind: string; name: string } {
+  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 async function reload(current: PanelState): Promise<void> {
@@ -648,6 +662,19 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         }
       }
       await reload(current);
+      return;
+    }
+    case "switchTarget": {
+      // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
+      const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
+      if (option === undefined) {
+        return;
+      }
+      const target: RulesTarget =
+        option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "self" ? { kind: "self" } : { kind: "workspace" };
+      if (!sameTarget(current.target, target)) {
+        await switchTarget(current, target);
+      }
       return;
     }
     case "openFile": {
@@ -831,8 +858,10 @@ function asMessage(message: unknown): RulesMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; dirty?: unknown; which?: unknown; sections?: unknown; tool?: unknown; subject?: unknown; key?: unknown; field?: unknown };
+  const m = message as { type?: unknown; dirty?: unknown; which?: unknown; sections?: unknown; tool?: unknown; subject?: unknown; key?: unknown; field?: unknown; kind?: unknown; name?: unknown };
   switch (m.type) {
+    case "switchTarget":
+      return typeof m.kind === "string" && typeof m.name === "string" ? { type: "switchTarget", kind: m.kind, name: m.name } : undefined;
     case "ready":
     case "tourDone":
     case "suggest":

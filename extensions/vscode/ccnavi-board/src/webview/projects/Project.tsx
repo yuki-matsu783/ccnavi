@@ -8,30 +8,20 @@ import type { JSX } from "react";
 
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { ProjectRow } from "../../core/projects-view.js";
-import { Menu, menuId } from "./Menu.js";
-import { post } from "./post.js";
 import { problemsOf } from "./text.js";
 
 export interface ProjectProps {
   readonly row: ProjectRow;
   readonly ticketsEnabled: boolean;
-  /** いま開いているメニューの名前。App が持つ */
-  readonly openMenu: string | undefined;
-  readonly onOpenMenu: (id: string | undefined) => void;
 }
 
-export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectProps): JSX.Element {
+export function Project({ row, ticketsEnabled }: ProjectProps): JSX.Element {
   const problems = problemsOf(row);
   const flags = [
     row.doing > 0 ? { key: "doing", className: "badge doing", text: `作業中 ${row.doing}` } : undefined,
     problems.some((p) => p.severity === "error") ? { key: "error", className: "badge error", text: "error" } : undefined,
     problems.some((p) => p.severity === "warn") ? { key: "warn", className: "badge warn", text: "warn" } : undefined,
   ].filter((f) => f !== undefined);
-  // メニューの中の項目を押したら、送ってから閉じる
-  const send = (message: Parameters<typeof post>[0]): void => {
-    post(message);
-    onOpenMenu(undefined);
-  };
   return (
     <li className={`project${problems.length > 0 ? " has-problem" : ""}`} data-name={row.name}>
       <div className="project-head">
@@ -91,75 +81,11 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
           <dd>{problems.length === 0 ? <span className="ok">問題なし</span> : <Problems problems={problems} />}</dd>
         </div>
       </dl>
-      <div className="ops">
-        <Menu id={menuId(row.name, "open")} label="開く ▾" open={openMenu === menuId(row.name, "open")} onOpen={onOpenMenu}>
-          <button
-            type="button"
-            className="action"
-            data-action="open-rules"
-            data-name={row.name}
-            disabled={!row.rulesExists}
-            title={`このプロジェクトの ${row.rulesRel === "" ? "ルール" : row.rulesRel} を編集し、判定を試します`}
-            onClick={() => send({ type: "openRules", name: row.name })}
-          >
-            ルール管理
-          </button>
-          {/* フェーズ定義は親チケットの計画と子の範囲にしか読まれない。チケット制御が disable の間は
-              何も動かさないので、開く側（phases-panel）と揃えて入口を出さない */}
-          {ticketsEnabled && (
-            <button
-              type="button"
-              className="action"
-              data-action="open-phases"
-              data-name={row.name}
-              disabled={row.rulesRel === ""}
-              title="このプロジェクトのチケットの計画で、共通の設定の定義に足して使うフェーズ定義を編集します。ファイルが無ければ画面から作れます"
-              onClick={() => send({ type: "openPhases", name: row.name })}
-            >
-              フェーズ管理
-            </button>
-          )}
-          {ticketsEnabled && (
-            <button
-              type="button"
-              className="action"
-              data-action="open-board"
-              data-name={row.name}
-              title="このプロジェクトに絞ってチケット管理画面を開きます"
-              onClick={() => send({ type: "openBoard", name: row.name })}
-            >
-              チケット管理
-            </button>
-          )}
-        </Menu>
-        <Menu id={menuId(row.name, "git")} label="git ▾" open={openMenu === menuId(row.name, "git")} onOpen={onOpenMenu}>
-          <button
-            type="button"
-            className="action"
-            data-action="fetch"
-            data-name={row.name}
-            title="git fetch をターミナルで実行します"
-            onClick={() => send({ type: "fetch", name: row.name })}
-          >
-            fetch
-          </button>
-          <button
-            type="button"
-            className="action"
-            data-action="pull"
-            data-name={row.name}
-            title="git pull をターミナルで実行します。衝突があれば git が止めます"
-            onClick={() => send({ type: "pull", name: row.name })}
-          >
-            pull
-          </button>
-        </Menu>
-      </div>
     </li>
   );
 }
 
-/** プロジェクトの設定のルールファイル。プロジェクトの設定として数えられていない（予約名）なら、置く先も作るボタンも出さない */
+/** プロジェクトの設定のルールファイル。プロジェクトの設定として数えられていない（予約名）なら、置く先も出さない */
 function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   if (row.rulesRel === "") {
     return <span className="dim">設定の対象になっていません（検証の error を確かめてください）</span>;
@@ -173,17 +99,7 @@ function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   }
   return (
     <>
-      <span className="warn-text">なし</span> <span className="mono small dim">{row.rulesRel}</span>{" "}
-      <button
-        type="button"
-        className="action small"
-        data-action="create-rules"
-        data-name={row.name}
-        title="共通の設定の rules.yml をこのプロジェクトの設定にコピーします。ルールの文面にある sh のパスは、先頭に {root} を付けた形に置き換えます"
-        onClick={() => post({ type: "createRules", name: row.name })}
-      >
-        共通の設定からコピー
-      </button>
+      <span className="warn-text">なし</span> <span className="mono small dim">{row.rulesRel}</span>
     </>
   );
 }

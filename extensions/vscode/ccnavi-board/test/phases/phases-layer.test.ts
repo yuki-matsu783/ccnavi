@@ -36,7 +36,7 @@ test("CB-T239 共通レイヤーのファイルが無いときは雛形を作ら
     const banner = common.one(".banner.missing").textContent;
     assert.match(banner, /共通の設定に定義はありません/);
     assert.match(banner, /定義はワークスペースかプロジェクトの設定に置いてください/);
-    assert.match(banner, /プロジェクト管理画面の「フェーズ管理」から開けます/);
+    assert.match(banner, /画面上部の「設定」の欄から開けます/);
     assert.equal(common.all('button[data-action="create"]').length, 0, "共通の設定に雛形を作るボタンは出さない");
     assert.ok(!/雛形/.test(common.one("body").textContent), "雛形で作る道を案内しない");
     // 欄は触れない（画面から共通の設定のファイルを作らせない）。注意が無ければ帯を足さない

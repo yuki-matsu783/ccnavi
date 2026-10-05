@@ -10,7 +10,6 @@
  */
 import { buildBoard, type Board } from "./board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "./model.js";
-import type { ProjectRow } from "./projects-view.js";
 
 /** 見本の目印。画面は見本を出している間、この文を帯で出す */
 export const SAMPLE_NOTE = "案内のための見本を表示しています。実際のチケット・プロジェクトではなく、案内を閉じると消えます。";
@@ -116,23 +115,4 @@ export function sampleBoard(root: string, generatedAt: string): Board {
     parents: [SAMPLE_PARENT],
   };
   return buildBoard(json);
-}
-
-/** プロジェクト管理画面の見本の行。`projectsRel` は今の置き場（`projects` など） */
-export function sampleProjectRow(projectsRel: string): ProjectRow {
-  const rel = `${projectsRel}/sample-app`;
-  return {
-    name: "sample-app",
-    root: "",
-    rel,
-    rulesRel: `${rel}/.ccnavi/config/rules.yml`,
-    rulesExists: true,
-    hasClaudeDir: true,
-    origin: "https://gitlab.example.com/group/sample-app.git",
-    originKey: "",
-    worktrees: [],
-    tickets: 2,
-    doing: 1,
-    problems: [],
-  };
 }

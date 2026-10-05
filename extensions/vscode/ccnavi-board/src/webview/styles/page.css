@@ -38,6 +38,7 @@ code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
 .toolbar, .foot { position: sticky; z-index: 4; background: var(--vscode-editor-background); }
 .toolbar { top: 0; padding-top: 6px; }
 .summary { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+.target-select { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
 .summary .warn { color: var(--warn-text); font-weight: 600; }
 .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
 .dirty { color: var(--warn-text); font-weight: 600; }
