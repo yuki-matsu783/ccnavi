@@ -4,3 +4,4 @@
 {"at": "2026-10-05T22:04:36Z", "ticket": "feature-1-sample-ticket", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 2, "mark": "pending"}
 {"at": "2026-10-05T22:05:56Z", "ticket": "feature-1-sample-ticket", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 2, "mark": "requested"}
 {"at": "2026-10-05T23:03:41Z", "ticket": "feature-1-sample-ticket", "kind": "phase-reopened", "from": null, "to": null, "via": "board", "actor": "yuki-matsu783", "phase": 2, "cleared": ["requested", "pending"]}
+{"at": "2026-10-05T23:08:30Z", "ticket": "feature-1-sample-ticket", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 2, "mark": "pending"}
