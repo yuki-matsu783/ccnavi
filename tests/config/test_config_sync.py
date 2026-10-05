@@ -23,7 +23,7 @@ import os
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import configsync, ops, phase_forms, risk
+from ccnavi.tickets import configsync, ops_close, phase_forms, risk
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
@@ -576,7 +576,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         conf = self.settings()
         self.start_parent()
 
-        problems = ops.close_problems(self.ws, conf, "i0001")
+        problems = ops_close.close_problems(self.ws, conf, "i0001")
 
         self.assertTrue(any("config-synced i0001" in p for p in problems), problems)
 

@@ -21,6 +21,7 @@ from . import (
     archive,
     configsync,
     ops,
+    ops_close,
     phase,
     review,
     review_host,
@@ -46,8 +47,8 @@ def ready(
 ) -> int:
     """Draft を外してよいかを確かめ、マーカーとコメントの下書きを置く。外すのは sh。
 
-    条件は「親を閉じられる」と同じ（ops.close_problems）に、「親の承認済みチケットが `done/` に
-    ある」を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
+    条件は「親を閉じられる」と同じ（ops_close.close_problems）に、「親の承認済みチケットが
+    `done/` にある」を足したもの。親を閉じてから打つ（閉じた承認済みチケットも引く）。
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものはユーザが行う。
 
@@ -64,7 +65,7 @@ def ready(
     parent = review._parent_any(stderr, root, conf, cwd)
     if parent is None:
         return 1
-    problems = ops.close_problems(root, conf, parent.ticket)
+    problems = ops_close.close_problems(root, conf, parent.ticket)
     # 親のチケットが done/ に無いまま Draft を外すと、
     # そのままマージされたときに done/ に親が無いまま親のブランチが消え、
     # 親子のチケットの判定が「決まらない」になる。それを防ぐ（判定を厳しくする向き）。

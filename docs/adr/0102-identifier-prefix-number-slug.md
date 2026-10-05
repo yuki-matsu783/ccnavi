@@ -240,7 +240,7 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識
 | 承認 | `approval.branch_problems` | 統合先の名前（`origin/HEAD` を含む）に当たる `branch:` と、2 つの親子のチケットが同じブランチを名乗る形を断る |
 | lint | `lint._parent_trees_off_branch` | 親のワークツリーが親のブランチの上に居るかを `Families.branch` で見る |
 | 実行ファイル | `c1.family`・`cli` の `c1 sort` の版の検査 | 答えに `branch`（使えなければ `branch_refused`）を足す。`c1 sort` の版に `refs/remotes/origin/<親のブランチ>` を受ける |
-| 実行ファイル | `ops._own_commits`（ADR-0087 の終える促しの取り込み元） | 子なら親のブランチ（`Families.branch`）の先を除く |
+| 実行ファイル | `ops_stop._own_commits`（ADR-0087 の終える促しの取り込み元） | 子なら親のブランチ（`Families.branch`）の先を除く |
 | 実行ファイル | `ops.start` の案内、`review._followup_next` | ワークツリーを作る案内と子の起点に親のブランチ名を使う |
 | 取り込み状態 | `ccnavi_family_record`・`syncstate.family` | 鍵は識別子のまま、中の `branch` に親のブランチ名を書く（前の取り込み状態は識別子を書いている） |
 | `ccnavi-git.sh` | worktree の節 | 行き先の名前（識別子）の親チケットが名乗る名前なら、`<行き先> <ブランチ>` と `<行き先> -b <ブランチ>` を通す |

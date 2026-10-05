@@ -348,7 +348,7 @@ def predecessor_pool_of(
     proposals: list[ticket_model.Ticket],
     root: str = "",
 ) -> dict[str, list[ticket_model.Ticket]]:
-    """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops._places` と同じ集め方）。
+    """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops_close._places` と同じ集め方）。
 
     承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
@@ -787,7 +787,7 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_model.Ticket]) -> No
     引ける対応表にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
     承認していない範囲に書ける経路そのものなので、引けないなら止める側を採る。
 
-    親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
+    親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops_close.close_problems` が
     開いた子のある親を閉じさせない）。置き場を手で動かして起きたなら、親を閉じたのは
     ユーザなので、その子を止めるのがユーザの意思に沿う。
     """
