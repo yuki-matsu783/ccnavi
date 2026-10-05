@@ -274,13 +274,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 hook は、そのイベントに ccnavi が登録されていなければ足す。別の表記で登録されているように
 見えるイベントは、足さずに名前を挙げる（知らせずに足すと判定が 2 回走る）。
 
-置き場の env 6 つ（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
-`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）は書かない。既にある `env` に残っていれば外す
-（置き場は固定で、書いても読まれない。下の「置き場は固定」の段落）。外した値が既定と違っていれば、
-名前と値を 1 行ずつ出す。**以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` も、既定
-（`logs/decisions.jsonl`）と違う値として名指しされる。** 記録の書き先が変わり、古い `logs/log.jsonl` は
-もう書かれず `--suggest` も数えないので、黙っては外さない。導入は止めず、終了コードも変えない
-（`--check` では「揃っていない」に数える）。
+置き場の env は書かない（置き場は固定で、書いても読まれない。下の「置き場は固定」の段落）。
 
 入れ終わったところで、ワークスペースの git の索引に `projects/` の下が載っていないかを見る。
 載っていれば `--lint` の `(projects)` と同じ条件で、同じ案内を出す。ワークスペース自身のソースに
@@ -408,8 +402,7 @@ ccnavi ディレクトリを動かしても動かず、別の場所を指せる�
 
 以前は 6 つの環境変数（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
 `CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）で置き場を動かせたが、廃止した。
-`settings.json` の `env` に残っていても読まない。導入スクリプトを打ち直すと外れ、既定と違う値だったものは
-名前と値が 1 行ずつ出る（以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` もここで名指しされる）。
+`settings.json` の `env` に残っていても読まない（外す処理も、指摘する処理も無い）。
 「記録しない」「state を保存しない」「プロジェクトを数えない」も指定できない。プロジェクトを数えたくなければ
 `projects/` を作らない。
 
