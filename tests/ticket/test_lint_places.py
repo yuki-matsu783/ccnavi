@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from tests.inproc import run_ccnavi
 
@@ -372,6 +373,36 @@ class ProjectsCollisionTest(unittest.TestCase):
 
         # 終了コードは見ない（この部屋の rules.yml は空で、`deny` が空の error が出る）。
         # 落ちたなら JSON の報告が無い。
+        try:
+            problems = json.loads(result.stdout)["problems"]
+        except (ValueError, KeyError) as exc:
+            self.fail(f"--lint が報告を出さずに落ちた: {exc}\n{result.stdout}\n{result.stderr}")
+        self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
+
+    def test_projects_on_another_drive_does_not_crash_the_lint(self):
+        """`--projects` が別ドライブ（relpath が ValueError）でも `--lint` は落ちない（#234）。
+
+        Windows 以外では別ドライブを作れないので、その置き場に限って relpath を ValueError にする。
+        """
+        self.no_tracking()
+        other = os.path.join(tempfile.gettempdir(), "ccnavi-other-drive-projects")
+        real = os.path.relpath
+
+        def relpath(path, *args, **kwargs):
+            if os.path.normcase(os.fspath(path)) == os.path.normcase(other):
+                raise ValueError("path is on mount 'D:', start on mount 'C:'")
+            return real(path, *args, **kwargs)
+
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+
+        with mock.patch("os.path.relpath", relpath):
+            result = run_ccnavi(
+                ["--root", self.ws, "--projects", other, "--lint", "--json", "--mode", "enable"],
+                input="",
+                env=environment,
+            )
+
         try:
             problems = json.loads(result.stdout)["problems"]
         except (ValueError, KeyError) as exc:

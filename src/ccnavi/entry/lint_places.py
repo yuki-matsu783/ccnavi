@@ -312,7 +312,8 @@ def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
         return []
     head, tail = parts[0], parts[1:]
     known = {p.name for p in tree.projects(conf.projects)}
-    where = os.path.relpath(conf.projects, root).replace(os.sep, "/") if conf.projects else "(無し)"
+    # 別ドライブ（Windows）や外を指す診断のフラグでも落ちない。空は `--projects ""` と同じ扱い。
+    where = _projects_rel(conf, root) or "(無し)"
     problems: list[Problem] = []
     try:
         names = sorted(os.listdir(os.path.join(root, head)))
