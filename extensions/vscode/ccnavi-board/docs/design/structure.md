@@ -19,7 +19,7 @@ src/
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付け（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
   prompt-handover.ts  Claude Code に文を渡す 2 つの経路（コピー / 新しいセッションで開く）。ボードとフロー編集画面が使う（vscode に依存する）
-  projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信（vscode に依存する。ファイルは書かない）
+  projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / --agree --yes … --json / --suggest --json の実行（Node の子プロセス）
@@ -59,7 +59,7 @@ src/
     tour-sample.ts    案内の間だけ出す見本（ボードのカード）。チケットがまだ無いワークスペースで、案内が指す先を作る
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     targets.ts        ルール管理とフェーズ管理が切り替える設定の対象（共通・ワークスペース・プロジェクト）の一覧と、欄の値
-    projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone の行、プロジェクトになっていない .git の探索、.gitignore の行の有無、画面の中身の組み立て
+    projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone の行、プロジェクトになっていない .git の探索、.gitignore の行の有無と追記、画面の中身の組み立て
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み

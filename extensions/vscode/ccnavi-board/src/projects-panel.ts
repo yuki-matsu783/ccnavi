@@ -12,7 +12,7 @@
  * そのルールファイルの場所は layers（レイヤー）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
  *
  * clone は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
- * の出現を監視して拾う。この画面はファイルを書かない。
+ * の出現を監視して拾う。書くのは、ユーザがボタンを押したときの `.gitignore` だけ。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -30,6 +30,7 @@ import {
   duplicateOf,
   findStrayGitDirs,
   gitignoreHasProjects,
+  gitignoreWithProjects,
   type DirEntry,
   type ProjectsPage,
 } from "./core/projects.js";
@@ -421,6 +422,8 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
   }
   if (message.type === "clone") {
     clone(current, page, message.url, message.name);
+  } else if (message.type === "fixIgnore") {
+    fixIgnore(current, page);
   }
 }
 
@@ -454,6 +457,19 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   );
 }
 
+function fixIgnore(current: PanelState, page: ProjectsPage): void {
+  const file = path.join(current.folder.uri.fsPath, ".gitignore");
+  const before = readText(file);
+  try {
+    fs.writeFileSync(file, gitignoreWithProjects(before, page.projectsRel), "utf8");
+  } catch (error) {
+    fail(current, `.gitignore に書けません: ${(error as Error).message}`);
+    return;
+  }
+  info(current, `.gitignore に /${page.projectsRel}/ を足しました。コミットは自分でしてください`);
+  void update();
+}
+
 function asMessage(message: unknown): ProjectsMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
@@ -462,6 +478,7 @@ function asMessage(message: unknown): ProjectsMessage | undefined {
   switch (m.type) {
     case "ready":
     case "refresh":
+    case "fixIgnore":
       return { type: m.type };
     case "clone":
       return typeof m.url === "string" && typeof m.name === "string" ? { type: "clone", url: m.url, name: m.name } : undefined;

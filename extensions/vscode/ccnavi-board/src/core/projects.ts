@@ -198,6 +198,15 @@ export function gitignoreHasProjects(text: string | undefined, projectsRel: stri
   return text.split(/\r?\n/).some((line) => accepted.has(line.trim()));
 }
 
+/** `.gitignore` に置き場の行を足した本文。既にあればそのまま */
+export function gitignoreWithProjects(text: string | undefined, projectsRel: string): string {
+  if (gitignoreHasProjects(text, projectsRel)) {
+    return text ?? "";
+  }
+  const head = text === undefined || text === "" ? "" : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
+  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 11.2）。\n/${projectsRel}/\n`;
+}
+
 // ---- 画面の中身
 
 export interface PageInput {

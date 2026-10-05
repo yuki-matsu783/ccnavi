@@ -8,6 +8,7 @@ import {
   duplicateOf,
   findStrayGitDirs,
   gitignoreHasProjects,
+  gitignoreWithProjects,
   REASON_OUTSIDE,
   REASON_TOO_DEEP,
   remoteKeyOf,
@@ -94,11 +95,15 @@ test("CB-T64 プロジェクトになっていない .git を深さ 2 まで探�
   ]);
 });
 
-test("CB-T65 .gitignore の置き場の行を見つける", () => {
+test("CB-T65 .gitignore の置き場の行を見つけ、無ければ足す", () => {
   assert.equal(gitignoreHasProjects("/dist/\n/projects/\n", "projects"), true);
   assert.equal(gitignoreHasProjects("projects\n", "projects"), true);
   assert.equal(gitignoreHasProjects("/projects/lib/\n", "projects"), false);
   assert.equal(gitignoreHasProjects(undefined, "projects"), false);
+  const added = gitignoreWithProjects("/dist/", "projects");
+  assert.match(added, /^\/dist\/\n\n# .*\n\/projects\/\n$/);
+  assert.equal(gitignoreWithProjects("/dist/\n/projects/\n", "projects"), "/dist/\n/projects/\n");
+  assert.match(gitignoreWithProjects(undefined, "projects"), /^# .*\n\/projects\/\n$/);
 });
 
 test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引ける", () => {

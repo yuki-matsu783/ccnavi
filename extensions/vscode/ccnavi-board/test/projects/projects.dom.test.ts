@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面（React）を happy-dom で動かす。clone の送り先、
+ * プロジェクト管理画面（React）を happy-dom で動かす。clone と .gitignore のボタンの送り先、
  * カードに出るレイヤーの置き場と苦情、チケット制御が disable のときの件数の欄。
  *
  * 移す前は拡張ホストが組んだ HTML の文字列を正規表現で見ていた（CB-T113 / CB-T123 / CB-T133）。
@@ -15,9 +15,11 @@ function text(element: { textContent: string | null } | null | undefined): strin
   return (element?.textContent ?? "").trim();
 }
 
-test("CB-D31 clone は欄の URL と名前を送り、名前は URL から埋まる", async () => {
-  const dom = await openProjects();
+test("CB-D31 .gitignore の帯のボタンと clone は、それぞれの型で送る。clone は欄の URL と名前を送り、名前は URL から埋まる", async () => {
+  const dom = await openProjects([row()], { ignored: false });
   try {
+    dom.click(dom.one('button[data-action="fix-ignore"]'));
+    await dom.settle();
     dom.type(dom.one("#url"), "https://gitlab.example.com/g/tool.git");
     await dom.settle();
     assert.equal(dom.one<HTMLInputElement>("#name").value, "tool");
@@ -25,6 +27,7 @@ test("CB-D31 clone は欄の URL と名前を送り、名前は URL から埋ま
     await dom.settle();
     assert.deepEqual(dom.posted, [
       { type: "ready" },
+      { type: "fixIgnore" },
       { type: "clone", url: "https://gitlab.example.com/g/tool.git", name: "tool" },
     ]);
     // 打ちかけは Webview の state に残す。作り直されても残る
@@ -128,8 +131,8 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   );
   try {
     const banners = dom.all(".banner").map((b) => text(b));
-    // .gitignore の帯があるので、lint の「無視されていない」は重ねない。別の指摘は出る
-    assert.equal(banners.filter((b) => /\.gitignore/.test(b)).length, 1, banners.join(" / "));
+    // .gitignore の帯（直すボタン付き）があるので、lint の「無視されていない」は重ねない。別の指摘は出る
+    assert.equal(dom.all('button[data-action="fix-ignore"]').length, 1);
     assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
     assert.ok(banners.some((b) => b === "warn: 別の指摘"), banners.join(" / "));
     // .claude/ の説明があるので、lint の同じ指摘（実物の文面「.claude/ を持つ。…」）は重ねない。
@@ -172,18 +175,19 @@ const COLLISION =
 const ADDED_BY_MISTAKE =
   "`projects/` はワークスペースの git が追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで `git rm -r --cached projects` を打ち、`.gitignore` に `/projects/` を足して、コミットする";
 
-/** 置き場の苦情の帯・`.gitignore` の帯を見る */
-async function trackedBanners(detail: string, ignored: boolean): Promise<{ banners: string[] }> {
+/** 置き場の苦情の帯・`.gitignore` の帯とボタンを見る */
+async function trackedBanners(detail: string, ignored: boolean): Promise<{ banners: string[]; fixButtons: number }> {
   const dom = await openProjects([row()], { ignored, dirProblems: [problem("warn", detail, "(projects)"), problem("warn", "別の指摘", "(projects)")] });
   try {
-    return { banners: dom.all(".banner").map((b) => text(b)) };
+    return { banners: dom.all(".banner").map((b) => text(b)), fixButtons: dom.all('button[data-action="fix-ignore"]').length };
   } finally {
     await dom.close();
   }
 }
 
-test("CB-D148 A10 置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignore の帯と「無視されていない」の帯を出さない", async () => {
-  const { banners } = await trackedBanners(COLLISION, false);
+test("CB-D148 A10 置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignore のボタンと「無視されていない」の帯を出さない", async () => {
+  const { banners, fixButtons } = await trackedBanners(COLLISION, false);
+  assert.equal(fixButtons, 0);
   assert.ok(banners.includes(`warn: ${COLLISION}`), banners.join(" / "));
   assert.ok(!banners.some((b) => /\.gitignore.*が無い/.test(b)), banners.join(" / "));
   assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
@@ -193,7 +197,8 @@ test("CB-D148 A10 置き場がワークスペースのソースとぶつかっ�
 
 test("CB-D149 A10b 載せ忘れ（入れ子のリポジトリが索引に載った）でも同じ。.gitignore に /projects/ が既にあっても苦情の帯は出たまま", async () => {
   for (const ignored of [false, true]) {
-    const { banners } = await trackedBanners(ADDED_BY_MISTAKE, ignored);
+    const { banners, fixButtons } = await trackedBanners(ADDED_BY_MISTAKE, ignored);
+    assert.equal(fixButtons, 0, `ignored=${ignored}`);
     assert.ok(banners.includes(`warn: ${ADDED_BY_MISTAKE}`), `ignored=${ignored}: ${banners.join(" / ")}`);
     assert.ok(!banners.some((b) => /\.gitignore.*が無い/.test(b)), banners.join(" / "));
     assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));

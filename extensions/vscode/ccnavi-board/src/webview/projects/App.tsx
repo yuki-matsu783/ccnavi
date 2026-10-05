@@ -2,7 +2,7 @@
  * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース（プロジェクト外）。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、ユーザが触って決めるもの
- * （clone の欄、直前の操作の一言）だけ。clone も画面はしない。
+ * （clone の欄、直前の操作の一言）だけ。clone も書き込みも画面はしない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
@@ -166,7 +166,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
 }
 
 /**
- * 上部の帯。`.gitignore` の帯と同じ事象は 2 度出さない。
+ * 上部の帯。`.gitignore` の帯（直すボタン付き）と同じ事象は 2 度出さない。
  *
  * 置き場がワークスペースの git の索引に載っている（ぶつかりか載せ忘れ。`isTrackedProjectsDir`）ときは、
  * `.gitignore` の帯も「無視されていない」も出さず、実行ファイルの苦情の帯だけを出す。
@@ -187,6 +187,9 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
       <div key="ignore" className="banner warn">
         <code>.gitignore</code> に <code>/{page.projectsRel}/</code>{" "}
         がありません。各プロジェクトは自分の git リポジトリを持つので、ワークスペースの git からは除外してください。
+        <button type="button" className="action" data-action="fix-ignore" onClick={() => post({ type: "fixIgnore" })}>
+          .gitignore に追加
+        </button>
       </div>,
     );
   }

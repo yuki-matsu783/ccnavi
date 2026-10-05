@@ -3,7 +3,7 @@
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
  * 「いま何を見せるか」（`ProjectsData`）だけで、カードとメニューの DOM は画面が作る。
- * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけで、clone もしない。
+ * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけで、clone も書き込みもしない。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
  * 片方だけが持てるものを置くとバンドルできなくなる。
@@ -93,6 +93,7 @@ export type ProjectsMessage =
   /** 画面が組み上がった。裏に回って作り直された画面が、いまの中身をもらい直すために送る */
   | { readonly type: "ready" }
   | { readonly type: "refresh" }
+  | { readonly type: "fixIgnore" }
   | { readonly type: "clone"; readonly url: string; readonly name: string };
 
 /** clone の欄の下に出す一言。`failed` は失敗を示す */
