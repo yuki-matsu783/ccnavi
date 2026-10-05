@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -116,19 +117,23 @@ class SelfGuardTest(unittest.TestCase):
         session="s1",
         tool="Bash",
         bin="",
+        permission_mode="",
+        extra_env=None,
         **tool_input,
     ):
-        payload = json.dumps(
-            {
-                "hook_event_name": event,
-                "tool_name": tool,
-                "tool_input": tool_input or {"command": "ls"},
-                "session_id": session,
-            }
-        )
+        body = {
+            "hook_event_name": event,
+            "tool_name": tool,
+            "tool_input": tool_input or {"command": "ls"},
+            "session_id": session,
+        }
+        if permission_mode:
+            body["permission_mode"] = permission_mode
+        payload = json.dumps(body)
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         if bin:
             environment["CCNAVI_BIN_PATH"] = bin
+        environment.update(extra_env or {})
         return run_ccnavi(
             [
                 "--root",
@@ -628,6 +633,355 @@ class SelfGuardTest(unittest.TestCase):
 
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_空白を含むパスへのリダイレクトも止まる(self):
+        # 行き先の引用が空白を含むと、語の中の目印で行き先が途切れて穴になっていた。
+        for command in [
+            'echo x > "projects/has space/.ccnavi/config/rules.yml"',
+            'echo x > "a b/.ccnavi/common/rules.yml"',
+            'echo x >> "a b/.ccnavi/common/rules.yml"',
+            'echo x >"a b/.ccnavi/common/rules.yml"',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_ワークスペースルートの絶対パスに空白があってもリダイレクトは止まる(self):
+        rules = self.rules_in_shell()
+        spaced = rules.replace("/.ccnavi/", " dir/.ccnavi/", 1)
+        result = self.run_hook("PreToolUse", command=f'echo x > "{spaced}"')
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_空白なしのリダイレクトは止まったまま(self):
+        for command in [
+            "echo x > .ccnavi/common/rules.yml",
+            f"echo x > {self.rules_in_shell()}",
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_引用の中の大なりは空白があっても書き込みではない(self):
+        for command in [
+            'echo "a > .ccnavi/common/rules.yml"',
+            'echo ">  .ccnavi/common/rules.yml"',
+            'echo "x y > .ccnavi/common/rules.yml"',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_引用の中で目印が続くパスへのリダイレクトも止まる(self):
+        # 引用の中の空白の連続と、空白に隣り合う演算子の文字は、語の中の目印が 2 つ続く形になる。
+        # 目印 1 つずつしか通さない式では、この形が穴になっていた。
+        for command in [
+            'echo x > "projects/New folder (2)/.ccnavi/common/rules.yml"',
+            'echo x > "projects/has  space/.ccnavi/config/rules.yml"',
+            'echo x > "projects/R & D/.ccnavi/config/rules.yml"',
+            'echo x > "a; b/.ccnavi/common/rules.yml"',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_空白を含む行き先のほかの書き方も止まったまま(self):
+        for command in [
+            'echo x > "a(1)/.ccnavi/common/rules.yml"',
+            'echo x > "R&D/.ccnavi/common/rules.yml"',
+            'echo x > "a b /.ccnavi/common/rules.yml"',
+            'echo x > "C:\\my dir\\.ccnavi\\common\\rules.yml"',
+            'echo x >| "a b/.ccnavi/common/rules.yml"',
+            'echo x &> "a b/.ccnavi/common/rules.yml"',
+            'echo x 2> "a b/.ccnavi/common/rules.yml"',
+            'echo x >& "a b/.ccnavi/common/rules.yml"',
+            "echo x > a\\ b/.ccnavi/common/rules.yml",
+            'echo x > "a\tb/.ccnavi/common/rules.yml"',
+            'cat <<EOF > "a b/.ccnavi/common/rules.yml"\nx\nEOF',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_引用の中の大なりは目印が続いても書き込みではない(self):
+        for command in [
+            'echo "a >b c/.ccnavi/common/rules.yml"',
+            'echo "a  >  b/.ccnavi/common/rules.yml"',
+            'echo "1>2" .ccnavi/common/rules.yml',
+            'grep -n "regex: (>" .ccnavi/common/rules.yml',
+            'echo x > "a b" .ccnavi/scripts/count.sh',
+            # 行き先の語は目印で終わらない。引用の中の空白のあとに保護対象の名前が続いても、
+            # 行き先は `a .ccnavi` という別のディレクトリの下で、保護対象ではない。
+            'echo x > "a .ccnavi/scripts/count.sh"',
+            'echo x > "a .claude/settings.json"',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_リダイレクトの当て始めは大なりの並びの頭だけ(self):
+        # 並びの途中の `>` からも当て直せると、`>` が n 個続く入力で当て始めが n 通りに増え、
+        # それぞれが行き先の語を読み直す。手数は時間で測ると揺れるので、当て始めの数で見る。
+        redirect = re.compile(selfguard_shell._REDIRECT)
+        text = shellread.read("echo x " + ">" * 50 + ' "a b"').text
+
+        starts = [i for i in range(len(text)) if redirect.match(text, i)]
+
+        self.assertEqual([text.index(">") - 1], starts)
+
+    def test_リダイレクトの行き先の語は大なりの並びの文字で始まらない(self):
+        # 並びと語が同じ文字を取り合うと、割り方が並びの長さのぶんだけ増える。
+        # shellread は演算子のあとに空白を置くので、語の頭にこの文字は来ない。
+        redirect = re.compile(selfguard_shell._REDIRECT + r"\Z")
+        for text in [" > >a", " > |a", " > &a"]:
+            with self.subTest(text=text):
+                self.assertIsNone(redirect.match(text))
+
+    def test_大なりを長く並べても後ろの書き込みは止まる(self):
+        n = 500
+        command = "echo x " + ">" * n + '"' + "a " * n + '"\necho x > .ccnavi/common/rules.yml'
+
+        result = self.run_hook("PreToolUse", command=command)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    # 生の文字列の `>` の個数の上限（selfguard_shell.REDIRECT_LIMIT）。時間ではなく個数で確かめる。
+
+    def verdict(self, result):
+        out = json.loads(result.stdout)["hookSpecificOutput"]
+        return out.get("permissionDecision"), out.get("permissionDecisionReason", "")
+
+    # 上限を超えたときは、権限モードに依らず止める。確認には回さない。
+    MODES = ("default", "acceptEdits", "plan", "dontAsk", "bypassPermissions")
+
+    def assert_limit_denied(self, result, command):
+        decision, reason = self.verdict(result)
+        self.assertEqual(decision, "deny")
+        # 既存の拒否と同じ見出し（コード・subject・本文）で、書き直し方まで言う。
+        self.assertTrue(reason.startswith("[ccnavi] DENY_REDIRECT_LIMIT\nsubject: "), reason)
+        self.assertIn(selfguard_shell.REDIRECT_LIMIT_MESSAGE, reason)
+        self.assertIn("止めました", reason)
+        self.assertIn("Write / Edit", reason)
+        self.assertNotIn("確認に答える人", reason)
+        self.assertNotIn("REDIRECT_LIMIT_ASK", reason)
+        record = self.records()[-1]
+        self.assertEqual(record["decision"], "deny")
+        self.assertEqual(record["code"], "DENY_REDIRECT_LIMIT")
+        self.assertEqual(record["rules"][0], "(redirect-limit)")
+        return reason
+
+    def test_上限ちょうどの大なりなら生の文字列にも保護を当てる(self):
+        # 閉じない引用で縮退させ、生の文字列に当てる。`>` は保護対象への 1 個と合わせて 50 個。
+        command = (
+            "echo x > .ccnavi/common/rules.yml; echo "
+            + ">a" * (selfguard_shell.REDIRECT_LIMIT - 1)
+            + ' "'
+        )
+        self.assertEqual(command.count(">"), selfguard_shell.REDIRECT_LIMIT)
+        self.assertTrue(shellread.read(command).degraded)
+        unrelated = 'echo "' + ">a" * selfguard_shell.REDIRECT_LIMIT
+        self.assertEqual(unrelated.count(">"), selfguard_shell.REDIRECT_LIMIT)
+
+        for mode in self.MODES:
+            with self.subTest(mode=mode):
+                result = self.run_hook("PreToolUse", permission_mode=mode, command=command)
+                decision, reason = self.verdict(result)
+                self.assertEqual(decision, "deny")
+                self.assertIn("builtin-guard-setting-files", reason)
+                self.assertNotIn("REDIRECT_LIMIT", reason)
+                result = self.run_hook("PreToolUse", permission_mode=mode, command=unrelated)
+                self.assertNotIn("REDIRECT_LIMIT", result.stdout)
+
+    def test_上限を超える大なりは止めて書き方を案内する(self):
+        command = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+
+        self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
+
+    def test_上限を超える大なりの後ろの保護対象への書き込みは素通りしない(self):
+        # 上限より前では止まる形。上限を超えると保護を当てずに止める。通しはしない。
+        command = (
+            "echo "
+            + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+            + '; echo x > .ccnavi/common/rules.yml; echo "'
+        )
+        self.assertTrue(shellread.read(command).degraded)
+
+        self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
+
+    def test_上限を超えてもほかのルールの拒否はそのまま(self):
+        # 上限で外すのは保護の照合だけ。ルールファイルの deny は生の文字列に当て続ける。
+        command = 'git push; echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+
+        decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
+
+        self.assertEqual(decision, "deny")
+        self.assertIn("rule: push", reason)
+        self.assertNotIn("REDIRECT_LIMIT", reason)
+
+    def test_読み解けた形には上限を掛けない(self):
+        many = ">a" * (selfguard_shell.REDIRECT_LIMIT + 10)
+        protected = f"echo {many}; echo x > .ccnavi/common/rules.yml"
+        harmless = f"echo {many}"
+        for command in (protected, harmless):
+            self.assertFalse(shellread.read(command).degraded)
+
+        decision, reason = self.verdict(self.run_hook("PreToolUse", command=protected))
+        self.assertEqual(decision, "deny")
+        self.assertIn("builtin-guard-setting-files", reason)
+
+        result = self.run_hook("PreToolUse", command=harmless)
+        self.assertNotIn("REDIRECT_LIMIT", result.stdout)
+        self.assertNotIn("deny", result.stdout)
+
+    def test_上限を超えるとどの権限モードでも止める(self):
+        # 確認できるモードでも確認には回さない。保護を当てていない呼び出しなので止める側に置く。
+        protected = (
+            "echo "
+            + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+            + '; echo x > .ccnavi/common/rules.yml; echo "'
+        )
+        unrelated = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+        for mode in self.MODES:
+            for name, command in (("protected", protected), ("unrelated", unrelated)):
+                with self.subTest(mode=mode, command=name):
+                    self.assertTrue(shellread.read(command).degraded)
+                    result = self.run_hook("PreToolUse", permission_mode=mode, command=command)
+                    self.assert_limit_denied(result, command)
+
+    def test_言及の無い呼び出しを委ねる設定でも上限を超えると止める(self):
+        # CCNAVI_GUARD_UNWATCHED=disable でも、保護の照合を終えていないので委ねない。
+        unwatched = {"CCNAVI_GUARD_UNWATCHED": "disable"}
+        command = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+        for mode in self.MODES:
+            with self.subTest(mode=mode):
+                result = self.run_hook(
+                    "PreToolUse", permission_mode=mode, extra_env=unwatched, command=command
+                )
+                self.assert_limit_denied(result, command)
+
+    def test_どの権限モードでも上限を超えたルールの拒否はそのまま(self):
+        command = 'git push; echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+        for mode in self.MODES:
+            with self.subTest(mode=mode):
+                got, reason = self.verdict(
+                    self.run_hook("PreToolUse", permission_mode=mode, command=command)
+                )
+                self.assertEqual(got, "deny")
+                self.assertIn("rule: push", reason)
+                self.assertNotIn("REDIRECT_LIMIT", reason)
+
+    def test_大なりは並びではなく文字の数で数える(self):
+        # `>>` も `2>&1` も、並びの数ではなく `>` の文字の数で足す。
+        over = [
+            'echo "' + " >>a" * 26,  # 文字は 52 個、並びは 26 個
+            'echo "' + " 2>&1" * 20 + " >>a" * 16,  # 文字は 52 個、並びは 36 個
+        ]
+        for command in over:
+            with self.subTest(command=command):
+                self.assertGreater(command.count(">"), selfguard_shell.REDIRECT_LIMIT)
+                self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
+        under = 'echo "' + " >>a" * 25  # 文字は 50 個ちょうど
+        got, reason = self.verdict(self.run_hook("PreToolUse", command=under))
+        self.assertNotIn("REDIRECT_LIMIT", reason)
+
+    def test_PowerShell_の生の文字列にも上限を掛ける(self):
+        # PowerShell は読まずに生の文字列に当てる。チケットの置き場を守る 1 本が当たる。
+        command = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
+        result = self.run_hook("PreToolUse", tool="PowerShell", command=command)
+        self.assert_limit_denied(result, command)
+
+    def test_上限で止めても_allow_のルールは理由に並べない(self):
+        rules_data = json.loads(json.dumps(RULES))
+        rules_data["allow"][0]["match"] = "Bash|PowerShell|Read|Write|Edit"
+        write(self.rules, json.dumps(rules_data))
+        command = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
+
+        result = self.run_hook(
+            "PreToolUse", tool="PowerShell", permission_mode="default", command=command
+        )
+
+        reason = self.assert_limit_denied(result, command)
+        self.assertNotIn("anything-else", reason)
+        self.assertEqual(reason.count("[ccnavi] "), 1)
+        self.assertEqual(self.records()[-1]["rules"], ["(redirect-limit)"])
+
+    def test_外す保護が当たらないなら上限を掛けない(self):
+        # 保護を切り、チケット制御も切ると、シェルから書き込む形の保護は 1 本も無い。
+        # 当てない保護が無いので、上限で止める理由も無い。
+        off = {"CCNAVI_TICKET_CONTROL": "disable"}
+        bash = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+        result = self.run_hook("PreToolUse", setting="disable", extra_env=off, command=bash)
+        self.assertNotIn("REDIRECT_LIMIT", result.stdout)
+        # 既定の組み込みに戻っても、その 1 本は Bash にしか当たらない。PowerShell には掛けない。
+        write(self.rules, "version: [broken")
+        power = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
+        result = self.run_hook("PreToolUse", tool="PowerShell", extra_env=off, command=power)
+        self.assertNotIn("REDIRECT_LIMIT", result.stdout)
+        result = self.run_hook("PreToolUse", extra_env=off, command=bash)
+        self.assertIn("DENY_REDIRECT_LIMIT", result.stdout)
+
+    def test_上限で止めた回の記録は組み込みの拒否と同じく出所を持たない(self):
+        # ask のルールにも当たった回。判定を決めたのは上限なので、ask のルールのレイヤーを残さない。
+        rules_data = json.loads(json.dumps(RULES))
+        rules_data["ask"] = [
+            {"id": "askme", "match": "Bash", "regex": "askme", "message": "ask the user."}
+        ]
+        write(self.rules, json.dumps(rules_data))
+        self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+        builtin_deny = self.records()[-1]
+        self.assertEqual(builtin_deny["rules"], ["builtin-guard-setting-files"])
+
+        command = 'askme; echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
+        result = self.run_hook("PreToolUse", command=command)
+
+        self.assert_limit_denied(result, command)
+        record = self.records()[-1]
+        self.assertEqual(record["rules"], ["(redirect-limit)", "askme"])
+        self.assertEqual(record.get("source", ""), builtin_deny.get("source", ""))
+        self.assertEqual(record.get("source", ""), "")
+
+    def test_上限を超えても中で実行されるコマンドには保護を当てる(self):
+        # `grep -n "<<"` で縮退させる。この縮退は読みを止めても実行役の中身（レイヤー）を作るので、
+        # 生の文字列の経路に入りつつ、`sudo` が実行する `tee` がレイヤーに出る。上限で外すのは
+        # 生の文字列への照合だけで、レイヤーには保護をそのまま当てる。
+        command = 'grep -n "<<" f; sudo tee .ccnavi/common/rules.yml </dev/null; echo' + " >a" * (
+            selfguard_shell.REDIRECT_LIMIT + 1
+        )
+        reading = shellread.read(command)
+        self.assertTrue(reading.degraded)
+        self.assertIn("tee .ccnavi/common/rules.yml", reading.unwrapped)
+        self.assertGreater(command.count(">"), selfguard_shell.REDIRECT_LIMIT)
+
+        decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
+
+        self.assertEqual(decision, "deny")
+        self.assertIn("builtin-guard-setting-files", reason)
+        self.assertNotIn("REDIRECT_LIMIT", reason)
+        self.assertEqual(self.records()[-1]["rules"], ["builtin-guard-setting-files"])
+
+    def test_上限で外す保護の_id_は実際に足すルールの_id(self):
+        # 名前が変わると上限が効かなくなり、2 乗の照合に戻る。
+        from ccnavi.hook import judge
+        from ccnavi.policy import builtin
+        from ccnavi.tickets import ticket_guard
+
+        rule_set = rules.RuleSet(version=rules.VERSION)
+        selfguard_shell.add_rules(rule_set, root=self.repo, tool="Bash")
+        ids = {r.id for r in rule_set.deny}
+        ids.add(builtin._config_via_bash("x")["id"])
+        ids.update(r.id for r in ticket_guard.guard_rules("wip/proposals", self.repo))
+        self.assertLessEqual(set(judge.SHELL_GUARD_RULE_IDS), ids)
 
     # 実行ファイル
 

@@ -307,6 +307,12 @@ def _write_op(op: fsio.Op) -> str:
         return fsio.write_text_atomic(op.path, op.text, op.newline)
     if op.kind == fsio.OP_BYTES:
         return fsio.write_bytes(op.path, op.content or b"")
+    if op.kind == fsio.OP_TEXT_DURABLE:
+        return fsio.write_text_durable(op.path, op.text, op.newline)
+    if op.kind == fsio.OP_BYTES_ATOMIC:
+        return fsio.write_bytes_atomic(op.path, op.content or b"")
+    if op.kind == fsio.OP_NEW_DURABLE:
+        return fsio.write_new_durable(op.path, op.content or b"")
     if op.kind == fsio.OP_NEW:
         return fsio.write_new(op.path, op.content or b"")
     if op.kind == fsio.OP_REMOVE:

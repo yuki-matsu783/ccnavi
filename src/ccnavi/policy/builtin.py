@@ -82,9 +82,12 @@ def rule_data(root: str, conf: settings.Settings) -> dict:
     }
 
 
+CONFIG_VIA_BASH_RULE_ID = "builtin-guard-config-via-bash"
+
+
 def _config_via_bash(regex: str) -> dict:
     return {
-        "id": "builtin-guard-config-via-bash",
+        "id": CONFIG_VIA_BASH_RULE_ID,
         "match": "Bash",
         # 当てる形は selfguard と同じものを 1 か所から取る（`guard_shell_regex`）。
         # 書き写すと既定のほうだけが弱くなり、ルールファイルを壊すことが

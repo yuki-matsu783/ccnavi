@@ -282,7 +282,7 @@ def write_workflow(approved_dir: str, parent: str, wf: ticket_model.Workflow) ->
     if fsio.read_bytes(path) == content:
         return ""
     with fsio.policy(message="待ち方を書けない ({reason})"):
-        failed = fsio.write_bytes(path, content)
+        failed = fsio.write_bytes_atomic(path, content)
     return f"待ち方を書けない ({failed})" if failed else ""
 
 

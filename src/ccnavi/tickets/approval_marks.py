@@ -317,3 +317,14 @@ def _write(path: str, text: str) -> str:
     with fsio.policy(message="書けない ({reason})"):
         failed = fsio.write_text(path, text)
     return f"書けない ({failed})" if failed else ""
+
+
+def write_ticket(path: str, text: str) -> str:
+    """承認済みチケットを書き直す。返し方は `_write` と同じ。
+
+    途中で落ちても前の中身か新しい中身を残す。一時ファイルに書き切って fsync してから
+    差し替える（`fsio.write_text_durable`）。改行は `_write` と同じ。
+    """
+    with fsio.policy(message="書けない ({reason})"):
+        failed = fsio.write_text_durable(path, text)
+    return f"書けない ({failed})" if failed else ""

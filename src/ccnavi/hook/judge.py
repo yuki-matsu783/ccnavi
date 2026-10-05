@@ -104,6 +104,18 @@ PATH_TOOLS = ruleload.PATH_TOOLS
 # 空のままにすると、場所を書かない呼び出しがどのルールにも当たらずに通る。
 SEARCH_TOOLS = ("Grep", "Glob")
 
+# シェルから書き込む形を止める組み込みの保護。どれも書き込む動詞の式
+# （selfguard_shell._WRITE_VERBS）を持ち、生の文字列では `>` の個数に対して 2 乗で遅くなる。
+# ガード自身の設定を守る 1 本は、ルールファイルが読める間は selfguard_shell が足し、読めずに
+# 組み込みの既定に戻った間は builtin が持つ。
+# チケットの状態の置き場を守る 1 本は、チケット制御が有効なときに足す。
+# 生の文字列の `>` が上限を超えたときは、これらを生の文字列に当てない（decide_before）。
+SHELL_GUARD_RULE_IDS = (
+    selfguard_shell.SHELL_RULE_ID,
+    builtin.CONFIG_VIA_BASH_RULE_ID,
+    ticket_guard.STATE_SHELL_RULE_ID,
+)
+
 
 def guard_setting_files(
     mode: str,
@@ -417,16 +429,35 @@ def decide_before(
         ]
         return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf)
 
-    # 強いタイプから順に見て、最初に当たったところで止める。deny に当たった
-    # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
-    # 確認もしろ」という読めない結論になる経路ができる。
+    # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから
+    # 書き込む形の保護の照合が `>` の個数 × 尾の長さで遅くなる（selfguard_shell.REDIRECT_LIMIT）。
+    # 期限を越えると判定に達せず、enable では block（終了コード 2）で止まるだけになり、
+    # 何が起きたかも言えない。そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に
+    # 当てず、ほかの deny と ask のルールを当てたうえで、権限モードに依らず拒否にし、理由と
+    # 書き直し方を返す。期限切れの block と同じく止める側に置き、確認には回さない。照合を
+    # 飛ばして通すと、上限の後ろに書いた保護対象への書き込みが素通りする。ルールの deny に
+    # 当たる形は、そのルールの deny のまま返す。allow は当てない
+    # （保護を当てていないので、通す根拠にならない）。中で実行されるコマンドと `cd` の行き先は
+    # 読み解けた形なので、保護もそのまま当てる。
+    # 外す保護がこのツールに当たらないなら（既定の組み込みの 1 本は Bash だけ）、上限も掛けない。
+    unread = bool(record.degraded) or (
+        payload.tool_name in phase_forms.SHELL_TOOLS and payload.tool_name != "Bash"
+    )
+    capped = (
+        unread
+        and selfguard_shell.too_many_redirects(subject)
+        and any(
+            rule.id in SHELL_GUARD_RULE_IDS and rules.tool_matches(rule.match, payload.tool_name)
+            for rule in rule_set.deny
+        )
+    )
     verdict, group = "", []
     # group と同じリストで、中で実行されるコマンドで当たったときの
     # （実行役のコマンド, そのコマンド, 引用の中から切り出したコマンドの層か）。
     # 元の形で当たったルールは ("", "", False)。
     via: list[tuple[str, str, bool]] = []
     for name in rules.SECTIONS:
-        if name == rules.ALLOW and record.degraded:
+        if name == rules.ALLOW and (record.degraded or capped):
             # 読み切れなかったコマンドに allow は当てない。当てる先は
             # 実行される部分ではなく生の文字列なので、そこで許可を出すのは
             # 「読めなかった文字列にそう書いてあった」を根拠に通すことになる。
@@ -446,7 +477,8 @@ def decide_before(
                 stderr.write("ccnavi: 判定を終える前に期限に達した\n")
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
                 return modes.fail_closed(mode)
-            if rule.matches(payload.tool_name, subject):
+            raw_skipped = capped and rule.id in SHELL_GUARD_RULE_IDS
+            if not raw_skipped and rule.matches(payload.tool_name, subject):
                 group.append(rule)
                 via.append(("", "", False))
                 continue
@@ -458,6 +490,11 @@ def decide_before(
         if group:
             verdict = name
             break
+    # 保護を当てなかったぶん、ルールの deny に当たっていなければ拒否に上げる。権限モードでも
+    # CCNAVI_GUARD_UNWATCHED でも分けない（保護の照合を終えていないので、委ねる先が無い）。
+    capped = capped and verdict != rules.DENY
+    if capped:
+        verdict = rules.DENY
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
@@ -541,7 +578,25 @@ def decide_before(
 
     # どちらの文面を返すかは、判定を決めた側で分ける。ルールが当たっていても、
     # チケットが強かった回はチケットの文面になる（ticket_reason があるのはその回だけ）。
-    if verdict == rules.DENY and not ticket_reason:
+    if verdict == rules.DENY and capped:
+        # `>` の上限で止めた。当たった ask のルールがあれば、その文も後ろに並べる。
+        texts = [
+            reasons.builtin_refusal(
+                reasons.CODE_REDIRECT_LIMIT_DENY, subject, selfguard_shell.REDIRECT_LIMIT_MESSAGE
+            ),
+            *(
+                reasons.reason_for(
+                    rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                )
+                for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
+            ),
+        ]
+        record.code = reasons.CODE_REDIRECT_LIMIT_DENY
+        record.rules = [reasons.REDIRECT_LIMIT_RULE, *record.rules]
+        # 判定を決めたのはレイヤーを持たない組み込み（上限）。並べた ask のルールのレイヤーを
+        # 残すと、ルールファイルのルールが止めたように読める。チケットが止めた回と同じく空にする。
+        record.source = ""
+    elif verdict == rules.DENY and not ticket_reason:
         # ルールの deny。当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [

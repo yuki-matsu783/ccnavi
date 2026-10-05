@@ -58,7 +58,7 @@ def admit(
         if failed:
             return failed
     with fsio.policy(message="書けない ({reason})", restore=restore):
-        failed = fsio.write_bytes(target, content)
+        failed = fsio.write_bytes_atomic(target, content)
     if failed:
         fsio.put_back(restore)
         return f"書けない ({failed})"
@@ -93,7 +93,7 @@ def update_fields(path: str, fields: dict) -> str:
             text = f.read()
     except OSError as exc:
         return f"読めない ({exc})"
-    return approval_marks._write(path, ticket_fields.set_fields(text, fields))
+    return approval_marks.write_ticket(path, ticket_fields.set_fields(text, fields))
 
 
 def close_copy(approved_dir: str, ticket_id: str) -> str:
@@ -152,7 +152,9 @@ def carry_flow(
     # 落ちたときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
     cannot = f"{proposal.ticket} のフローを {target} へ移せない ({{reason}})。{source} に残っている"
     with fsio.policy(message=cannot):
-        failed = fsio.write_new(target, raw)
+        # 途中で落ちても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
+        # ボードの保存が割り込むと上書きしうるが、書きかけのフローを残すよりよいと採った。
+        failed = fsio.write_new_durable(target, raw)
     if failed:
         return [cannot.replace("{reason}", failed)]
     kept = (
@@ -350,7 +352,7 @@ def followup(
     body += [f"- {item}" for item in items] or ["（指摘の一覧は無い）"]
     body.append("")
     t = ticket_model.Ticket(ticket=ident, raw=front, body="\n".join(body))
-    failed = approval_marks._write(approval.copy_path(where, ident), ticket_mod.render(t))
+    failed = approval_marks.write_ticket(approval.copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed
     history.note(

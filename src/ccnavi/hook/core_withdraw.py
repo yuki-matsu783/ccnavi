@@ -87,7 +87,7 @@ def withdraw(
             with fsio.policy(
                 on_fail=fsio.FAIL_STOP, ticket=ident, message="書けない ({reason})", prefix=""
             ):
-                fsio.write_bytes(todo, prior_proposals[ident])
+                fsio.write_bytes_atomic(todo, prior_proposals[ident])
                 # 消せなければ戻した提案を消して、両方に残さない（`approval_ops.admit` と同じ）。
                 with fsio.policy(
                     message="承認済みチケットを doing/ から消せない ({reason})", undo=(todo,)
@@ -200,7 +200,9 @@ def _withdraw_problems(
         )
         try:
             # 待ち方のファイルはマーカーではない（承認で置く）。中身は `_content_problems` が見る。
-            if [n for n in fsio.listdir(marks_dir) if n != approval_marks.WORKFLOW_FILE]:
+            # 書きかけで落ちて残った一時ファイル（`.<名前>.<一意>.part`）もマーカーではない。
+            names = fsio.listdir(marks_dir)
+            if [n for n in names if n != approval_marks.WORKFLOW_FILE and not fsio.is_temp_name(n)]:
                 found.append(f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある")
         except FileNotFoundError:
             pass

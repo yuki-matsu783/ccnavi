@@ -13,6 +13,8 @@ from ..policy import ctxfile, rules, selfguard_shell
 from . import ticket_model
 
 STATE_RULE_ID = "builtin-ticket-state"
+# 同じ置き場をシェルからの書き込みで守る 1 本。
+STATE_SHELL_RULE_ID = STATE_RULE_ID + "-shell"
 # 提案を書いた回に、承認を頼む前の確認を伝えるルールの id。
 PROPOSE_RULE_ID = "builtin-ticket-propose"
 
@@ -73,7 +75,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
         )
     )
     shell_rule = rules.Rule(
-        id=STATE_RULE_ID + "-shell",
+        id=STATE_SHELL_RULE_ID,
         match="Bash|PowerShell",
         regex=shell,
         message=message,
