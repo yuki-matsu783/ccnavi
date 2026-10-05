@@ -28,17 +28,17 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 ## いま動くもの
 
 hook の 7 イベントの全部、実行前のルール照合、実行後チェック、コアファイルの自己防衛、チケット制御、
-複数のリポジトリ（層の和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
+複数のリポジトリ（レイヤーの和。設計 11、REQ-MLT）、診断（`--test` `--test-samples` `--explain` `--lint`）、
 VS Code 拡張（ボード・ルール管理・リスク管理・プロジェクト管理・フェーズ管理）。
 このリポジトリ自身には dry-run で仕掛けてある。
 
 チケットは 1 本のファイルで、提案の置き場（`wip/proposals/`）と承認済みチケットの置き場
-（`.ccnavi/approved/`）を行き来し、どこに在るかが状態を表す（設計 9.2・9.6）。層の和は設計 11.2〜11.4.2。
-共通層は `.ccnavi/common/` に固定で、環境変数では動かない。ユーザが持つ設定は ccnavi ディレクトリの下、
+（`.ccnavi/approved/`）を行き来し、どこに在るかが状態を表す（設計 9.2・9.6）。レイヤーの和は設計 11.2〜11.4.2。
+共通レイヤーは `.ccnavi/common/` に固定で、環境変数では動かない。ユーザが持つ設定は ccnavi ディレクトリの下、
 記録と state の置き場は `logs/` に置く（設計 11.2）。ファイルの構成と開発用 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh`
 `test-ext.sh`）は README の「構成」「開発」。
 
-リスク管理画面は共通層の 1 本だけを開く（設計 11.11）。ルール管理画面とフェーズ管理画面は層に追従する。
+リスク管理画面は共通レイヤーの 1 本だけを開く（設計 11.11）。ルール管理画面とフェーズ管理画面はレイヤーに追従する。
 
 確認コマンド。
 
@@ -88,12 +88,12 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 3. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと列挙から外れ、その中のパスがワークスペースルートとして
    判定される（プロジェクトの `deny` が外れる）。判定は変えず `--lint` と `--explain` が名指しする方針だが、まだ言わない
 4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い `.ccnavi/scripts/` のパスがある」を warn で言うようにする
-5. 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
+5. レイヤーが無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える）は別の issue で決める
 
 ### ccnavi 自身の設計の穴
 
 1. **保護済みファイル（`.ccnavi/scripts/`、`.claude/hooks/`、`rules.yml`）を直すチケットは `implement` では承認されない。**
-   `staging` 種別（自身の層の `phases.yml`、`scope: [wip/design/*, tests/*]`）のフェーズで完成品を
+   `staging` 種別（自身のレイヤーの `phases.yml`、`scope: [wip/design/*, tests/*]`）のフェーズで完成品を
    `wip/design/scripts/` に全文で置き、ユーザが写してコミットする。写す順は `ccnavi-common.sh` が先
    （3 本が起動時に読む）。`phases.yml` はユーザが持つ設定で、エージェントは足せない
 2. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。** コマンドに `.ccnavi` が

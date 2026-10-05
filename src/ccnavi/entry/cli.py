@@ -276,15 +276,15 @@ OVERRIDES = (
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
-# 層の置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
+# レイヤーの置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
 # 同じで診断の経路でだけ使われる。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
 # RELATIVE_OVERRIDES と同じ読み方で決めるため（`--rules ""` は指定と数えず、
 # `--risk ""` は数える）。
 #
-# 前の 3 本は共通層の中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
-# **層を探す先**。`--projects` はプロジェクトの層の置き場、`--project-home` は
+# 前の 3 本は共通レイヤーの中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
+# **レイヤーを探す先**。`--projects` はプロジェクトのレイヤーの置き場、`--project-home` は
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
-# プロジェクトの層がまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
+# プロジェクトのレイヤーがまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
 # 閉じた。中身を差し替えるのと結果が同じなので、同じ制限に載せる。
 LAYER_OVERRIDES = (
@@ -301,7 +301,7 @@ DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）で�
 #
 # sh は自分のぶんを先に置き、エージェントの引数を後ろに繋ぐ
 # （`exec "$bin" --root "$root" ticket "$@"`）。argparse は同じオプションを後勝ちで読むので、
-# 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
+# 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通レイヤーの 3 本も
 # `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
 # 実際に試すと、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
 # 本物の置き場に「リスク 0」で閉じられた。
@@ -329,11 +329,11 @@ def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
 
 
 def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
-    """診断の外で渡された層の置き場の差し替えを、標準エラーに出して落とす。
+    """診断の外で渡されたレイヤーの置き場の差し替えを、標準エラーに出して落とす。
 
     フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
-    `phases.yml` / `risks.yml` で判定と採点が走り、層そのものも外せる。届く経路は
-    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す。だから層を動かす
+    `phases.yml` / `risks.yml` で判定と採点が走り、レイヤーそのものも外せる。届く経路は
+    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す。だからレイヤーを動かす
     フラグは診断の経路（`--lint`・`--test` など）でだけ受ける。
     """
     for flag, name, absent in LAYER_OVERRIDES:
@@ -454,8 +454,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
     # VS Code 拡張が編集中のプロジェクトのルールを保存せずに試すために渡す。
     parser.add_argument("--project-rules-file", default="")
-    # 同じ差し替えを層のフェーズの種類に対して行う（<名前>=<パス>、名前は self かプロジェクト）。
-    # VS Code 拡張のフェーズ管理画面が、編集中の層の種類を保存せずに検証するために渡す。
+    # 同じ差し替えをレイヤーのフェーズの種類に対して行う（<名前>=<パス>、
+    # 名前は self かプロジェクト）。
+    # VS Code 拡張のフェーズ管理画面が、編集中のレイヤーの種類を保存せずに検証するために渡す。
     parser.add_argument("--project-phases-file", default="")
     # 子チケットのフロー 1 本を、SubagentStart と同じ読みで確かめる（`--lint` だけ）。
     # VS Code 拡張のフロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルで渡す。
@@ -496,7 +497,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （fsio の記録層が記録する）。C1 の sh が渡し、一覧のパスだけをコミットする。
     parser.add_argument("--record-writes", default="")
     # 一覧の基点（C1 の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
-    # 置き場の外に書いたら error（例外は `start` の中で configsync が写したプロジェクトの層だけ）。
+    # 置き場の外に書いたら error
+    # （例外は `start` の中で configsync が写したプロジェクトのレイヤーだけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
     # 何も置かない（state の置き場の
@@ -637,7 +639,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
 
     C1 がコミットするのは状態だけ。
 
-    例外は 1 つだけ。`ticket start` の中で configsync がコピーしたプロジェクトの層と、
+    例外は 1 つだけ。`ticket start` の中で configsync がコピーしたプロジェクトのレイヤーと、
     指す先を直した配点のスクリプト（`configsync.is_synced_write` が内容で読めるもの）。
     """
     conf, _ = settings.load(root)
@@ -724,7 +726,7 @@ def _parsed(
         return version.report(stdout, parser, args.json)
     if not _one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
-    # `--docs` に添えたほかの経路のフラグは、黙って無視せずに止める。層の置き場の差し替えは
+    # `--docs` に添えたほかの経路のフラグは、黙って無視せずに止める。レイヤーの置き場の差し替えは
     # この後で落とされ、`--ticket-control` などは設定に重ねられるので、その前に見る。
     if args.docs:
         refused = _not_with_docs(args)
@@ -735,7 +737,8 @@ def _parsed(
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
 
-    # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ使われる。
+    # レイヤーの置き場（中身の 3 本と、レイヤーを探す先の 2 本）
+    # の差し替えは診断の経路でだけ使われる。
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
     # 設定を保存せずに緩める経路になるので、そこでは無視する。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
@@ -789,7 +792,7 @@ def _parsed(
     else:
         return _docs(stdout, stderr, conf, root, args)
 
-    # 1 つの層だけを差し替える形。使われる経路は共通層の 3 本と同じ。
+    # 1 つのレイヤーだけを差し替える形。使われる経路は共通レイヤーの 3 本と同じ。
     for flag, value, swaps in (
         ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
         ("--project-phases-file", args.project_phases_file, conf.project_phases_files),
@@ -922,7 +925,7 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 取り込みの後の検査（本物とする側と層の食い違い）。
+    # 取り込みの後の検査（本物とする側とレイヤーの食い違い）。
     # error があれば sh が親子のチケットの取り込みを止める。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None
@@ -1092,7 +1095,7 @@ _NOT_WITH_DOCS = (
     "--project-rules-file",
     "--project-phases-file",
     # 判定・チケット・レビューの経路の設定と、sh が渡すパス。`--docs` は読まない。
-    # 層の置き場（`--rules` から `--project-home`）は診断の外では落として先へ進むが、
+    # レイヤーの置き場（`--rules` から `--project-home`）は診断の外では落として先へ進むが、
     # `--docs` で落とすと「そのプロジェクトの置き場で引いた」と読まれるので止める。
     # `--root` は引く場所そのもの、`--log` / `--state` は記録の置き場で `--docs` は何も記録
     # しないので、受けて効かせる（結果は変わらない）。

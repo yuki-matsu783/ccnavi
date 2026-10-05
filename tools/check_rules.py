@@ -19,7 +19,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# 共通層のルールと見本の置き場。
+# 共通レイヤーのルールと見本の置き場。
 RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
 SAMPLES = os.path.join(ROOT, ".ccnavi", "common", "rule-samples.yml")
 

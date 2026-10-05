@@ -10,7 +10,7 @@
 3. `stop_hook_active` が真の回は止めず、数えも進めない。サブエージェント（`agent_id`）も同じ
 4. 数えを覚えられない（`--state ""`）ときは止めない
 5. `dry-run` は止めず、止めたはずの文を `systemMessage` に載せる
-6. cwd がプロジェクトの中でも同じルールが当たる。プロジェクトの層のルールも当たる
+6. cwd がプロジェクトの中でも同じルールが当たる。プロジェクトのレイヤーのルールも当たる
 7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない表記、`every` の無いものを
    warn で言う
 
@@ -253,7 +253,7 @@ class StopRulesTest(unittest.TestCase):
         self.session_start("startup")
         self.assertEqual([bool(self.blocked(self.stop())) for _ in range(3)], [False, False, True])
 
-    # --- 6. 層とプロジェクト ------------------------------------------------------------
+    # --- 6. レイヤーとプロジェクト ------------------------------------------------------------
 
     def project(self, name: str = "lib") -> str:
         home = os.path.join(self.root, "projects", name)
@@ -267,7 +267,8 @@ class StopRulesTest(unittest.TestCase):
         self.assertIn(NUDGE, self.blocked(self.stop(cwd=self.root)))
 
     def test_project_layer_rules_do_not_stop_the_main_session(self):
-        """プロジェクトの層（外のリポジトリ）の `match: Stop` は見ない。cwd がどこでも同じ。"""
+        """プロジェクトのレイヤー（外のリポジトリ）の `match: Stop` は見ない。
+        cwd がどこでも同じ。"""
         home = self.project()
         self.rules(ruleset({"id": "src", "match": "Write", "glob": "*/src/*"}))
         layer = {
@@ -279,9 +280,10 @@ class StopRulesTest(unittest.TestCase):
             self.assertEqual(self.blocked(self.stop(cwd=cwd)), "")
 
     def test_a_stale_project_copy_of_the_common_rule_is_not_counted_twice(self):
-        """プロジェクトの層へ写した共通層が古くなって `every` が違っても、数えるのは共通層の 1 本。
+        """プロジェクトのレイヤーへ写した共通レイヤーが古くなって `every` が違っても、
+        数えるのは共通レイヤーの 1 本。
 
-        共通層は親の着手でプロジェクトの層へコピーするので、コピーした層が古いまま残ることがある。
+        共通レイヤーは親の着手でプロジェクトのレイヤーへコピーするので、コピーしたレイヤーが古いまま残ることがある。
         """
         home = self.project()
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
@@ -291,13 +293,13 @@ class StopRulesTest(unittest.TestCase):
         self.assertEqual(got, [False, True, False, True, False, True])
 
     def test_the_workspace_own_layer_applies_and_the_same_id_counts_once(self):
-        own = {"version": 1, "allow": [stop_rule(additionalContext="自身の層", every=2)]}
+        own = {"version": 1, "allow": [stop_rule(additionalContext="自身のレイヤー", every=2)]}
         write(os.path.join(self.root, ".ccnavi", "config", "rules.yml"), json.dumps(own))
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
         self.stop()
         reason = self.blocked(self.stop())
         self.assertIn(NUDGE, reason)
-        self.assertNotIn("自身の層", reason)
+        self.assertNotIn("自身のレイヤー", reason)
 
     def test_the_file_is_read_from_the_workspace_root_only(self):
         """本文のファイルはワークスペースルートの版だけ。プロジェクトやワークツリーの版は読まない。"""

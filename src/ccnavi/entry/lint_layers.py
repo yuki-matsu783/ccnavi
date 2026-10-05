@@ -1,8 +1,8 @@
-"""`--lint` のうち、設定の層（共通層・自身の層・プロジェクトの層）の検査。
+"""`--lint` のうち、設定のレイヤー（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）の検査。
 
-層どうしの食い違い、各層の phases / risk が共通層と合成できるか、ワークツリーの
-ccnavi ディレクトリに元リポジトリに無いファイルが無いか、取り込み状態と統合先の層が
-手元の層と食い違っていないかを見る。
+レイヤーどうしの食い違い、各レイヤーの phases / risk が共通レイヤーと合成できるか、ワークツリーの
+ccnavi ディレクトリに元リポジトリに無いファイルが無いか、取り込み状態と統合先のレイヤーが
+手元のレイヤーと食い違っていないかを見る。
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from . import lint_rules
 
 
 def layer_where(name: str) -> str:
-    """その層の苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。"""
+    """そのレイヤーの苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。"""
     if name == ruleload.LAYER_COMMON:
         return "(rules)"
     if name == ruleload.LAYER_SELF:
@@ -35,13 +35,13 @@ def layer_where(name: str) -> str:
 
 
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """層に食い違いが無いか（設計 11.9、REQ-MLT-16）。
+    """レイヤーに食い違いが無いか（設計 11.9、REQ-MLT-16）。
 
-    見るのは 2 つ。層のファイルが読めることと、層をまたいだ重複と同名の衝突。
+    見るのは 2 つ。レイヤーのファイルが読めることと、レイヤーをまたいだ重複と同名の衝突。
     `.ccnavi/config/` が無いことは言わない。
-    無いのは正常（無い層 = 空）で、言うと本当に言うべきものが埋もれる。
+    無いのは正常（無いレイヤー = 空）で、言うと本当に言うべきものが埋もれる。
 
-    共通層は `_rules` が別に見ているので、ここでは層の 2 つ目以降だけを回す。
+    共通レイヤーは `_rules` が別に見ているので、ここではレイヤーの 2 つ目以降だけを回す。
     """
     problems: list[Problem] = []
     for view in ruleload.survey(stderr, conf, root)[1:]:
@@ -51,8 +51,9 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"{view.path} を読めない ({view.unreadable})。この層は空として扱っている。"
-                    "共通層だけで判定しているので、ここに書いた宣言は 1 件も効いていない",
+                    f"{view.path} を読めない ({view.unreadable})。"
+                    "このレイヤーは空として扱っている。"
+                    "共通レイヤーだけで判定しているので、ここに書いた宣言は 1 件も効いていない",
                 )
             )
             continue
@@ -67,7 +68,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
         )
         for c in from_file:
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
-        # `survey` は層のファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
+        # `survey` はレイヤーのファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
         # 読んで言ったものは数えない。数えると同じ苦情が 2 度並び、件数も水増しされる。
         told = {(c.severity, c.rule, c.detail) for c in from_file}
         for c in view.problems:
@@ -78,14 +79,14 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 
 
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各層の phases / risk が、共通層と合成できるか（設計 11.4.1、11.4.2）。
+    """各レイヤーの phases / risk が、共通レイヤーと合成できるか（設計 11.4.1、11.4.2）。
 
-    見るのは合成したあとの内容。同 `id` で中身が違う、`title` が層をまたいで重なる、
-    `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
-    全欄一致で捨てた重複を info で言う。共通層自身の苦情は `_phases` / `_risk` が
-    別に言うので、ここでは層の側だけを数える。
+    見るのは合成したあとの内容。同 `id` で中身が違う、`title` がレイヤーをまたいで重なる、
+    `levels` が逆転する、`script:` がレイヤーの外を指すか指す先が無い、を error で言い、
+    全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `_phases` / `_risk` が
+    別に言うので、ここではレイヤーの側だけを数える。
 
-    `.ccnavi/config/` が無いことは言わない。無いのは正常（無い層 = 空）。
+    `.ccnavi/config/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
     """
     problems: list[Problem] = []
     names = [ruleload.LAYER_SELF]
@@ -157,8 +158,8 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
       親のワークツリーが残っていれば info（片付けてよい）、
       片付いていれば何も言わない（削除せずに残す取り込み状態）
     - 統合先の取り込み結果が壊れている・無い・読めない: error（識別子の再利用を確かめられない）
-    - 作業ツリーの層と統合先の取り込み結果の層が違う: warn
-    - `P` の上のプロジェクトの層が、統合先から計算した層と違う: warn
+    - 作業ツリーのレイヤーと統合先の取り込み結果のレイヤーが違う: warn
+    - `P` の上のプロジェクトのレイヤーが、統合先から計算したレイヤーと違う: warn
 
     親のワークツリーの外にしか無いチケット（移行の検査）は、チケットの `blocked` として
     `_copy_problems` が error で言う。取り込み状態の無い親子のチケットには、
@@ -257,7 +258,8 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree, root: str = "") -> b
 
 
 def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]]:
-    """比べる層のファイル（種類, ツリーからの相対 "/" 区切り）。共通層と自身の層。"""
+    """比べるレイヤーのファイル（種類, ツリーからの相対 "/" 区切り）。
+    共通レイヤーと自身のレイヤー。"""
     config = f"{home_rel}/{settings.LAYER_CONFIG_DIR}"
     out = []
     for kind in settings.LAYER_KINDS:
@@ -287,9 +289,9 @@ def _read_plain(path: str) -> bytes | None:
 def _layer_drift(
     conf: settings.Settings, integ: syncstate.Integration, home: str, where: str
 ) -> list[Problem]:
-    """作業ツリーの層と、統合先の取り込み結果の層（同じパス）が違うか。
+    """作業ツリーのレイヤーと、統合先の取り込み結果のレイヤー（同じパス）が違うか。
 
-    手元の判定は作業ツリーの層を読み、統合先の取り込み結果へは切り替えない（統合先の層が作業ツリーより
+    手元の判定は作業ツリーのレイヤーを読み、統合先の取り込み結果へは切り替えない（統合先のレイヤーが作業ツリーより
     緩いときに通るものが増えるため）。違いは、
     統合先に入るまで他の機械と Chrome の判定に使われないという知らせ。
     """
@@ -329,13 +331,14 @@ def _layer_drift(
 def _projected_layer_problems(
     conf: settings.Settings, st: syncstate.Standing, where: str
 ) -> list[Problem]:
-    """`P` の上のプロジェクトの層が、統合先から計算した層と違うか。
+    """`P` の上のプロジェクトのレイヤーが、統合先から計算したレイヤーと違うか。
 
-    Chrome の判定は `P` の上の層を読まず、この計算した層を使う（`P` の上で層を書き換えて
-    承認やレビューを不要にできないように）。
+    Chrome の判定は `P` の上のレイヤーを読まず、この計算したレイヤーを使う
+    （`P` の上でレイヤーを書き換えて承認やレビューを不要にできないように）。
 
-    計算した層は「プロジェクトの統合先の層（取り込み結果）に、ワークスペースの統合先の共通層（取り込み結果）を
-    `configsync.projected` でコピーしたもの」。着手のときの configsync と同じく、共通層にある
+    計算したレイヤーは「プロジェクトの統合先のレイヤー（取り込み結果）に、
+    ワークスペースの統合先の共通レイヤー（取り込み結果）を
+    `configsync.projected` でコピーしたもの」。着手のときの configsync と同じく、共通レイヤーにある
     ファイルだけをコピーし、無いファイルはプロジェクトの側を残す。
     """
     selfinteg = syncstate.integration(conf.state, syncstate.SELF)
@@ -361,9 +364,9 @@ def _projected_layer_problems(
             Problem(
                 SEVERITY_WARN,
                 where,
-                f"親のブランチ {st.family} の上のプロジェクトの層（{rel}）が、統合先の層と"
-                "共通層から計算した層と違う。"
-                "判定は親のブランチの上の層を読まない。"
+                f"親のブランチ {st.family} の上のプロジェクトのレイヤー（{rel}）が、"
+                "統合先のレイヤーと共通レイヤーから計算したレイヤーと違う。"
+                "判定は親のブランチの上のレイヤーを読まない。"
                 "統合先で直すか、着手のときにもう一度コピーしてください",
             )
         )

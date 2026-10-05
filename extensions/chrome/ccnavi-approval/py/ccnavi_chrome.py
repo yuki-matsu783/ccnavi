@@ -14,7 +14,7 @@
 拡張が組んで `result` で渡す。
 
 仮のツリーには、手元の取り込み状態に当たるもの（`logs/state/sync/self/`。統合先の取り込み結果
-である `done/`・層・設定のコピーと、閉包の親子のチケットの取り込み状態）も組む。
+である `done/`・レイヤー・設定のコピーと、閉包の親子のチケットの取り込み状態）も組む。
 手元と同じ判定のコードが、これを取り込み済みの親子のチケットとして読む。
 
 - ホストに在る親子のチケット（`P` と閉包の `P_X`）は `present`
@@ -43,10 +43,10 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 統合先のブランチも `branches` に入る。読むのは置き場のサブツリーだけ。
 
 プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）も読む。Snapshot に
-`project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの統合先の中身。共通層・
-自身の層・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む:
+`project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの統合先の中身。共通レイヤー・
+自身のレイヤー・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む:
 ワークスペースルートにワークスペースの統合先、`projects/<名前>/` にプロジェクトの統合先
-（`done/` と、プロジェクトの統合先の層に共通層をコピーした層）、親子のチケットは
+（`done/` と、プロジェクトの統合先のレイヤーに共通レイヤーをコピーしたレイヤー）、親子のチケットは
 `projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。取り込み状態は
 `sync/self/` と `sync/<名前>/` に分けて組む。
 
@@ -156,8 +156,10 @@ def _placement() -> dict:
         "integration_files": [SETTINGS_FILE, COMPAT_FILE],
         # 親のブランチから読むもの。
         "branch_paths": [approved, tickets],
-        # プロジェクトのリポジトリ。ワークスペースの統合先から読むもの（共通層・自身の層・
-        # 設定・互換のマーカー）と、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの層）
+        # プロジェクトのリポジトリ。
+        # ワークスペースの統合先から読むもの（共通レイヤー・自身のレイヤー・
+        # 設定・互換のマーカー）と、
+        # プロジェクトの統合先から読むもの（閉じたもの・プロジェクトのレイヤー）
         "workspace_paths": sorted({COMMON_LAYER, own_layer}),
         "workspace_files": [SETTINGS_FILE, COMPAT_FILE],
         "project_paths": sorted({f"{approved}/{ticket_mod.DONE}", own_layer}),
@@ -190,7 +192,9 @@ def _snapshot(req: dict) -> dict:
         if not isinstance(project, str) or not ticket_mod.is_valid_name(project):
             raise Refused(f"プロジェクト名が読めない: {project!r}")
         if settings.is_reserved_layer_name(project):
-            raise Refused(f"プロジェクト名 {project} は層の名前として予約してある（common・self）")
+            raise Refused(
+                f"プロジェクト名 {project} はレイヤーの名前として予約してある（common・self）"
+            )
         ws = snap.get("workspace")
         if not isinstance(ws, dict) or not isinstance(ws.get("integration"), dict):
             raise Refused("プロジェクトのリポジトリにはワークスペースの統合先（workspace）が要る")
@@ -216,7 +220,7 @@ def _project(snap: dict) -> str:
 
 
 def _workspace_files(snap: dict) -> dict[str, str]:
-    """ワークスペースの統合先の中身（共通層・設定・互換のマーカー）。ワークスペース自身なら統合先。"""
+    """ワークスペースの統合先の中身（共通レイヤー・設定・互換のマーカー）。ワークスペース自身なら統合先。"""
     if _project(snap):
         return snap["workspace"]["files"]
     return _files(snap, snap["integration"]["name"])
@@ -578,12 +582,13 @@ def _build(
 
 
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
-    """プロジェクトの層（プロジェクトからの相対パス → 中身）。
+    """プロジェクトのレイヤー（プロジェクトからの相対パス → 中身）。
 
-    「プロジェクトの統合先の現在の層に、ワークスペースの統合先の共通層を `configsync.projected` で
-    写したもの」。共通層にあるファイルだけを写し、無いファイルはプロジェクトの側を残す（着手の
-    configsync と同じ）。`P` の上の層は読まない。`P` の上で層を書き換えて承認やレビューを
-    外せないようにするため。
+    「プロジェクトの統合先の現在のレイヤーに、ワークスペースの統合先の共通レイヤーを
+    `configsync.projected` で写したもの」。
+    共通レイヤーにあるファイルだけを写し、無いファイルはプロジェクトの側を残す（着手の
+    configsync と同じ）。`P` の上のレイヤーは読まない。`P` の上でレイヤーを書き換えて
+    承認やレビューを外せないようにするため。
     """
     ws = snap["workspace"]["files"]
     own = _files(snap, snap["integration"]["name"])
@@ -606,7 +611,8 @@ def records(
     """取り込み状態に当たるもの（state の置き場からの相対パス → 中身）。
     手元の `ccnavi-sync.sh` が書く形。
 
-    - 統合先の取り込み結果（`sync/self/integration/`）: 統合先の `done/`・共通層・自身の層・
+    - 統合先の取り込み結果（`sync/self/integration/`）: 統合先の `done/`・共通レイヤー・
+    自身のレイヤー・
       `.claude/settings.json` のコピーと `head`
     - 親子のチケットの取り込み状態（`sync/self/families/<P>`）: ホストに在れば `present`、
       無ければ `gone`
@@ -629,7 +635,7 @@ def records(
             if path.startswith(keep) or path == SETTINGS_FILE:
                 out[f"{base}/integration/{path}"] = text
     else:
-        # プロジェクトの統合先の取り込み結果（閉じたものとプロジェクトの層）と、
+        # プロジェクトの統合先の取り込み結果（閉じたものとプロジェクトのレイヤー）と、
         # ワークスペースの統合先の取り込み結果
         keep = tuple(p + "/" for p in place["project_paths"])
         for path, text in _files(snap, integ["name"]).items():

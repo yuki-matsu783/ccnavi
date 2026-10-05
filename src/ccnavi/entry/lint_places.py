@@ -40,8 +40,8 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
         return []
     problems: list[Problem] = []
     # 前置きは `(scratch)` にする。プロジェクトのぶんも `(projects/<名前>)` は前置きにしない。
-    # あちらはその層の設定についての苦情で、ここは追跡の話。同じ前置きにすると、
-    # 「層について何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
+    # あちらはそのレイヤーの設定についての苦情で、ここは追跡の話。同じ前置きにすると、
+    # 「レイヤーについて何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
     where = [("(scratch)", root)]
     where += [
         (f"(scratch/{p.name})", tree.project_root(conf.projects, p.name))
@@ -143,12 +143,14 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"{reserved} は層の名前として予約してある（`{settings.LAYER_COMMON}` は共通層、"
-                    f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
-                    f"層として数えていない（id の `{p.name}:` がどちらの層を指すか決まらないため。"
+                    f"{reserved} はレイヤーの名前として予約してある"
+                    f"（`{settings.LAYER_COMMON}` は共通レイヤー、"
+                    f"`{settings.LAYER_SELF}` はワークスペース自身のレイヤー）。このプロジェクトは"
+                    f"レイヤーとして数えていない"
+                    f"（id の `{p.name}:` がどちらのレイヤーを指すか決まらないため。"
                     "大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も効いておらず、"
                     "このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / "
-                    "Edit / NotebookEdit）は共通層だけで判定している。"
+                    "Edit / NotebookEdit）は共通レイヤーだけで判定している。"
                     "プロジェクトを別の名前に変えてください",
                 )
             )

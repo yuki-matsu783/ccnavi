@@ -333,7 +333,7 @@ def close_early(
         return 1
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     left = _leftovers(home, parent, phases, result)
-    # 着手で共通層をコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
+    # 着手で共通レイヤーをコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
     # y で閉じたら見たものとして残す。見せないと、
     # 早めに閉じたあとの finish でもう 1 度端末を求めることになる。
     synced = configsync.pending(home, parent.ticket)

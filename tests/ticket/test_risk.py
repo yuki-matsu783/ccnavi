@@ -42,7 +42,8 @@ class DefinitionTest(unittest.TestCase):
         self.assertEqual(4, len(definition.factors))
 
     def test_undecodable_file_is_a_complaint_not_an_exception(self):
-        """UTF-8 として読めない定義は、共通層なら組み込みへ、層なら空へ落ちて苦情を返す。"""
+        """UTF-8 として読めない定義は、共通レイヤーなら組み込みへ、
+        レイヤーなら空へ落ちて苦情を返す。"""
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "risks.yml")
             with open(path, "wb") as f:
@@ -86,7 +87,7 @@ class RiskTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        # 配点と種類は共通層の既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
+        # 配点と種類は共通レイヤーの既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
         # `ticket` の副命令には届かない。差し替えるテストはこの形に書き直す。
         self.risk = write(common_path(self.root, "risk"), RISK)
         # 範囲の上限が無く、レビュー不要の種類。宣言では「レビュー不要」な作業を実績で上書きする。
@@ -345,7 +346,7 @@ class RiskTest(PhaseHarness):
 
         sh は自分の `--root` を先に置き、エージェントの引数を後ろに繋ぐ
         （`exec "$bin" --root "$root" ticket "$@"`）。argparse は後勝ちなので、後ろに
-        1 本足すと sh が渡した本物を上書きできた。`--root` からは共通層の 3 本も
+        1 本足すと sh が渡した本物を上書きできた。`--root` からは共通レイヤーの 3 本も
         `projects` も `approved` も導かれるので、`--risk` を使わずに同じ差し替えができる。
         実際に確かめると、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
         「リスク 0」で**本物の置き場に**閉じられた。

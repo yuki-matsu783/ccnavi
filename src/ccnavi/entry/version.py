@@ -20,10 +20,11 @@ sh が古い実行ファイルの知らない副命令を呼ぶようになっ�
 フラグを足すだけ、JSON の欄を足すだけで、データの形も変わらないなら上げない。足したものが
 在るかは `flags` を見れば分かる。
 
-層（共通層・自身の層・プロジェクトの層）の 3 本は、ファイルの頭の `version:` に書式の版を
+レイヤー（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）の 3 本は、
+ファイルの頭の `version:` に書式の版を
 書く。読めない版は、読む側（rules / phasetypes / risk）がもう error にしている
 （`--lint` が名指しする）。ここでは実行ファイルが読む版を `formats` に並べるだけで、
-層ごとに別の版を足さない。
+レイヤーごとに別の版を足さない。
 
 組み立ての元のコミットは build.py が組み立てのときに `ccnavi_buildinfo` として埋める。
 ソースで動かしているときはその部品が無いので `unknown` と言う。実行ファイルは git に
@@ -85,7 +86,7 @@ def flags(parser: argparse.ArgumentParser) -> list[str]:
 
 
 def formats() -> dict[str, int]:
-    """読む設定とチケットの書式の版。層のファイルの `version:` と比べるもの。"""
+    """読む設定とチケットの書式の版。レイヤーのファイルの `version:` と比べるもの。"""
     return {
         "phases": phasetypes.VERSION,
         "risks": risk.VERSION,

@@ -58,7 +58,7 @@ class EveryTest(unittest.TestCase):
         self.addCleanup(self.dir.cleanup)
 
     def rules(self, *allow: dict) -> str:
-        """共通層の既定の場所にルールを 1 本置く。
+        """共通レイヤーの既定の場所にルールを 1 本置く。
 
         `--rules` では渡さない。あれは診断でだけ有効で、hook の判定には届かない。
         """

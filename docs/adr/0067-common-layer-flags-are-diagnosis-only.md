@@ -1,12 +1,12 @@
 ---
 type: adr
-title: 層の置き場を動かすフラグを診断の経路に限る
-description: 共通層・プロジェクト層の置き場を変更するフラグを診断コマンド（--lint、--test など）だけに限定
+title: レイヤーの置き場を動かすフラグを診断の経路に限る
+description: 共通レイヤー・プロジェクトのレイヤーの置き場を変更するフラグを診断コマンド（--lint、--test など）だけに限定
 tags: [config, rules]
-keywords: [フラグ, 診断, 層, 置き場, --rules, --phases, --risk, --projects]
+keywords: [フラグ, 診断, レイヤー, 置き場, --rules, --phases, --risk, --projects]
 ---
 
-# ADR-0067: 層の置き場を動かすフラグを診断の経路に限る
+# ADR-0067: レイヤーの置き場を動かすフラグを診断の経路に限る
 
 状態: 採用
 
@@ -39,7 +39,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh done <子> --risk scratchpad/my-risk.yml
 `check` に `--phases` を足せば、そのフェーズの `review` の種類（`mr` が要るか `chat` で
 足りるか）を差し替えられた。
 
-**記録側に差し替えた形跡が残らない。** `.risk.json` の `source` は層の名前（`common`）だけで、どの
+**記録側に差し替えた形跡が残らない。** `.risk.json` の `source` はレイヤーの名前（`common`）だけで、どの
 物理ファイルを読んだかを持たない。フェーズのマーカーも同じ。あとから見て「別の配点で
 採点された」とは分からない。
 
@@ -50,7 +50,7 @@ hook は引数を渡さずに実行ファイルを起動するので、**hook �
 置き、エージェントの引数を後ろに繋ぐ（`exec "$bin" --root "$root" ticket "$@"`、
 `ccnavi-review.sh` は `--cwd "$here"` も渡す）。argparse は同じオプションを後勝ちで読むので、
 **後ろに `--root` を 1 本足すだけで sh が渡した本物を上書きできた。** `settings.load` は
-共通層の 3 本も `projects` も `approved` も `root` から導くので、1 本で全部動く。実測は次のとおり。
+共通レイヤーの 3 本も `projects` も `approved` も `root` から導くので、1 本で全部動く。実測は次のとおり。
 
 ```
 本物のツリーへシンボリックリンクを張り、.ccnavi だけ自前にした偽のルートを作って
@@ -78,19 +78,19 @@ ADR-0052 はこの 3 本を「診断のためのフラグ」と呼んだが、�
 （`--lint` / `--test` / `--test-samples` / `--explain`）でなければ落とし、落としたことを
 標準エラーに書く。文面も同じものを使う。
 
-前の 3 本は共通層の**中身**、後の 2 本は**層を探す先**。`--projects` はプロジェクトの層の
+前の 3 本は共通レイヤーの**中身**、後の 2 本は**レイヤーを探す先**。`--projects` はプロジェクトのレイヤーの
 置き場、`--project-home` は各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、
-どちらも外すとプロジェクトの層がまるごと消える。中身を差し替えるのと結果が同じなので、
+どちらも外すとプロジェクトのレイヤーがまるごと消える。中身を差し替えるのと結果が同じなので、
 同じ制限の対象にする。実測（敵対的レビューで出た）は次のとおり。
 
 ```
-lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critical は 50）
+lib の子（共通レイヤーの big-diff 25 + lib の schema 30 = 55、lib の critical は 50）
   素の done                      → 55 (CRITICAL)、wip/proposals/review/ へ（ユーザのレビュー待ち）
   --project-home .nothere を足す → 25 (MEDIUM)、.ccnavi/approved/done/ へ直行
   --projects <偽> を足す         → 同じ
 ```
 
-`--project-home` はシンボリックリンクも要らない。フラグ 1 本で層が消え、**ユーザのレビューを
+`--project-home` はシンボリックリンクも要らない。フラグ 1 本でレイヤーが消え、**ユーザのレビューを
 飛ばして閉じられる。**
 
 - `cli.py` は `diagnosing` を `_override` より前で決め、`_drop_outside_diagnosis` が
@@ -100,7 +100,7 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
   （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。パスは `tests.common_path` が
   実行ファイルの既定から引く
 - 受入テスト（`tests/guard/test_acceptance.py`、`tests/core/test_entry.py`、
-  `tests/guard/test_permission_mode.py`）は、見本のルールを共通層に据えた一時の
+  `tests/guard/test_permission_mode.py`）は、見本のルールを共通レイヤーに据えた一時の
   ワークスペース（`tests.fixture_workspace`）を `--root` に渡す
 
 **あわせて、sh が計算して渡す引数（`--root` / `--cwd`）は 2 度渡せないことにする。**
@@ -139,17 +139,17 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 得たもの。
 
 - `ccnavi-ticket.sh` / `ccnavi-review.sh` に余分なフラグを足しても、採点とフェーズの
-  種類の判定は共通層のまま。落としたことは標準エラーに出るので、知らないうちに適用される形が無くなる
+  種類の判定は共通レイヤーのまま。落としたことは標準エラーに出るので、知らないうちに適用される形が無くなる
 - `--root` を後ろに足してワークスペースごと差し替える形も止まる
 - 受入テストが、実行した機械の設定に左右されなくなる
 
 失ったもの。
 
-- **共通層を既定の外に置いたまま実運用する手段が無くなる。** ADR-0052 の「代償」は、
+- **共通レイヤーを既定の外に置いたまま実運用する手段が無くなる。** ADR-0052 の「代償」は、
   env を廃したあとも「hook の command にフラグを書き足す」手段が残ると書いていた。
   その手段も無くなる。複数のワークスペースで 1 本の `rules.yml` を共有したいユーザは
   シンボリックリンクに頼ることになる
-- `selfguard.common_shell_clause`（共通層が既定の外にあるとき、そのパスをシェルの
+- `selfguard.common_shell_clause`（共通レイヤーが既定の外にあるとき、そのパスをシェルの
   書き込みの禁止に足す働き）は、**判定の経路では当たらなくなる。** 消さなかったのは、
   診断（`--test`）が判定と同じ関数を通るため、そこで動かした先を守らないと
   「`Write` では止まってシェルでは通る」食い違いが残るから（ADR-0051 と同じ判断）。
@@ -163,7 +163,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 - **`--root` / `--cwd` を 2 度書くと止まる。** argparse の普通の振る舞い（後勝ち）から
   外れるので、ユーザが手で打ち直すときに引っかかることがある。文面が「1 度しか渡せない」と
   言うので、そこで気付ける
-- **閉じたのは層の置き場だけ。** `--approved` / `--tickets` / `--state` / `--log` は今も
+- **閉じたのはレイヤーの置き場だけ。** `--approved` / `--tickets` / `--state` / `--log` は今も
   `_override` が診断かどうかに関わらず上書きする。実測では採点も種類の判定も
   差し替えられなかったが（`--approved` はチケットが見つからず、`--state` / `--log` は
   点が変わらない）、`--tickets` はレビュー待ちのチケットを別の置き場へ動かせる。
@@ -189,9 +189,9 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 
 ## 関連
 
-- ADR-0052（共通層の置き場を `.ccnavi/common/` に固定する）。この穴を見つけて訂正を
+- ADR-0052（共通レイヤーの置き場を `.ccnavi/common/` に固定する）。この穴を見つけて訂正を
   書き、制限は別に設計するとした回
-- ADR-0042（設定と記録の置き場）。共通層の既定を `.ccnavi/common/` と決めた回
+- ADR-0042（設定と記録の置き場）。共通レイヤーの既定を `.ccnavi/common/` と決めた回
 - ADR-0051（`regex` も大文字小文字を区別しない）。同じ場所への書き込みが経路で食い違う
   形を作らない、という判断。`common_shell_clause` を残した理由がこれ
 - issue #65
