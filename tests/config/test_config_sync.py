@@ -197,18 +197,19 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertIn("新しく置いた", started.stdout)
         self.assertFalse(os.path.exists(config_of(tree, "rules")))
 
-    def test_a_missing_common_layer_empties_the_mirror(self):
-        """1: 共通レイヤーが無ければ、ミラーの中身は空（写しなので）。config は残る。"""
-        shutil_target = os.path.join(self.ws, ".ccnavi", "common")
-        for name in os.listdir(shutil_target):
-            os.remove(os.path.join(shutil_target, name))
+    def test_a_missing_or_empty_common_layer_leaves_the_mirror_alone(self):
+        """1: 共通レイヤーが無い（空）なら配らず、ミラーを消さない。着手は止めない。"""
+        common = os.path.join(self.ws, ".ccnavi", "common")
+        for name in os.listdir(common):
+            os.remove(os.path.join(common, name))
         write(mirror_of(self.lib, "rules.yml"), json.dumps(COMMON_RULES))
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "--quiet", "-m", "old mirror")
 
-        tree, _ = self.start_parent()
+        tree, started = self.start_parent()
 
-        self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
+        self.assertEqual(json.loads(read(mirror_of(tree, "rules.yml"))), COMMON_RULES)
+        self.assertNotIn("ミラー", started.stdout)
         self.assertTrue(os.path.isfile(config_of(tree, "rules")))
 
     def test_workspace_tickets_are_not_mirrored(self):
