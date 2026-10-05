@@ -5,6 +5,7 @@
 共通レイヤーの中身を、親のワークツリーにあるプロジェクトの `.ccnavi/common/` へ写す。
 プロジェクトの `.ccnavi/config/` には触れない。
 
+- 共通レイヤーが無い、または空なら、何も配らず、ミラーも消さない（着手は止めない）
 - 写すのは `rules.yml`・`risks.yml`・`rule-samples.yml` と、配点の `script:` が指す
   `.ccnavi/common/scripts/` の下。中身の違うものだけ上書きし、共通レイヤーから無くなった
   ファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
@@ -113,6 +114,10 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Chang
     wanted, why = sources(conf, root)
     if why:
         return [], why
+    if not wanted:
+        # 共通レイヤーが無い、または空。「設定が無い」正常で、配るものが無い。ミラーは消さない
+        # （共通を消し忘れた・取り違えたときに、ミラーを全部失わないため）。着手は止めない。
+        return [], ""
     base = mirror_dir(conf, tree_root)
     if not _inside(tree_root, base) or _linked(tree_root, base):
         return [], f"{_rel_plain(tree_root, base)} がシンボリックリンクか、その下にある。写さない"
