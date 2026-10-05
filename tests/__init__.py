@@ -4,8 +4,10 @@ import atexit as _atexit
 import glob as _glob
 import os
 import shutil as _shutil
+import subprocess as _subprocess
 import sys as _sys
 import tempfile as _tempfile
+import unittest as _unittest
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -81,6 +83,16 @@ def _block_host_git_config() -> dict[str, str]:
 GIT_ENV = _block_host_git_config()
 os.environ.update(GIT_ENV)
 
+# Git for Windows の sh（MSYS）は、ネイティブの exe に渡す引数のうち `/` を含み `:` で
+# 区切られたものをパスの一覧とみなして Windows 形式に書き換える
+# （`refs/remotes/origin/main:.claude/x` が `refs\remotes\origin\main;.claude\x` になり、
+# git が object を解けない）。sh の中で `git cat-file -e <ref>:<path>` を打つ検査対象の sh が
+# テストの中では本来の動きをするよう、書き換えを止める。POSIX では何も起きない環境変数。
+#
+# 全部を止める（`*`）と、sh が `/tmp/...` で渡すパスを git が読めなくなる（書き換えは
+# 必要な場面もある）。止めるのは、`<ref>:<path>` の形になる ref の頭（`refs/`・`origin/`）だけ。
+os.environ.setdefault("MSYS2_ARG_CONV_EXCL", "refs/;origin/")
+
 
 _FIXTURE_WORKSPACES: dict[str, str] = {}
 
@@ -114,6 +126,46 @@ def fixture_workspace(name: str = "rules.yml") -> str:
         _shutil.copyfile(os.path.join(ROOT, "tests", "fixtures", name), target)
         _FIXTURE_WORKSPACES[name] = ws
     return _FIXTURE_WORKSPACES[name]
+
+
+def can_symlink() -> bool:
+    """シンボリックリンクを実際に作れるか。Windows は特権が無いと作れない。
+
+    OS の名前では決めず、使い捨ての置き場で 1 本作って確かめる。作れない環境では、
+    リンクを辿らないことを見るテストは成り立たないので、`requires_symlink` で skip する。
+    """
+    with _tempfile.TemporaryDirectory(prefix="ccnavi-symlink-probe-") as tmp:
+        try:
+            os.symlink(tmp, os.path.join(tmp, "link"))
+        except (OSError, NotImplementedError):
+            return False
+    return True
+
+
+def live_sh_pid(test) -> int:
+    """sh の `kill -0` から生きて見えるプロセスの pid。テストごとに 1 つ起こして使い回す。
+
+    ロックの持ち主を「生きているプロセス」にしたいテストは、自分の `os.getpid()` を書いていた。
+    Windows の Python の pid は Git Bash（MSYS）の pid の表に無く、sh からは死んで見える。
+    sh 自身に起こさせた sleep の pid（sh の `$$`）なら、どこでも sh から生きて見える。
+    """
+    pid = getattr(test, "_live_sh_pid", None)
+    if pid is None:
+        sh = _shutil.which("sh") or _shutil.which("bash")
+        proc = _subprocess.Popen(
+            [sh, "-c", "echo $$; exec sleep 600"],
+            stdout=_subprocess.PIPE,
+            stderr=_subprocess.DEVNULL,
+            text=True,
+        )
+        test.addCleanup(proc.wait)
+        test.addCleanup(proc.kill)
+        pid = int(proc.stdout.readline())
+        test._live_sh_pid = pid
+    return pid
+
+
+requires_symlink = _unittest.skipUnless(can_symlink(), "シンボリックリンクを作れない")
 
 
 # 保護済み sh の置き場。
