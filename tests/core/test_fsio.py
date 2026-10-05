@@ -309,6 +309,32 @@ class WriteBytesAtomicTest(unittest.TestCase):
             self.assertEqual(fsio.write_bytes_atomic(self.path, b"x"), "")
         self.assertEqual(self._read(), b"x")
 
+    def test_chmod_refused_by_the_filesystem_still_writes(self):
+        """chmod を受け付けないファイルシステム（vfat など）でも書ける。
+
+        権限の引き継ぎは最善努力。
+        """
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        with mock.patch("os.chmod", side_effect=PermissionError(errno.EPERM, "not permitted")):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"after"), "")
+        self.assertEqual(self._read(), b"after")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    def test_put_back_restores_durably(self):
+        """戻すのも承認済みチケットと同じ書き方。素の書き方に戻されると落ちる。"""
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"new"), "")
+        seen: list[str] = []
+        real = fsio._replace_durably
+
+        def record(path, content):
+            seen.append(path)
+            return real(path, content)
+
+        with mock.patch.object(fsio, "_replace_durably", record):
+            fsio.put_back(((self.path, b"before"),))
+        self.assertEqual(seen, [self.path])
+        self.assertEqual(self._read(), b"before")
+
     @unittest.skipIf(os.name == "nt", "POSIX の権限ビットを見る")
     def test_keeps_the_mode_of_the_file_it_replaces(self):
         with open(self.path, "wb") as f:
