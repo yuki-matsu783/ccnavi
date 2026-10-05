@@ -1,8 +1,8 @@
-"""フェーズの種類と計画（REQ-TKT-26〜35、設計 9.7）の受入テスト。
+"""フェーズ定義と計画（REQ-TKT-26〜35、設計 9.7）の受入テスト。
 
 見るのは 9 つ。
 
-1. 種類の定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
+1. フェーズ定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
 2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
 3. 順序は承認で止まる（前が閉じてレビューが済むまで次の番号は承認されない、overlap は例外）
 4. 成果物が無ければフェーズの最後の子を閉じられない
@@ -332,7 +332,7 @@ class ApproveOnlyTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design", "acceptance", "implement"]))
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
-        # 絞らないときは、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
+        # 絞らないときは、改版後の計画で検証される。定義の超過は承認を拒まず、承認画面に
         # 「編集対象としているが」として出る（設計 approve-carry 3.2）。n で何も適用しない
         whole = self.ccnavi("--agree", stdin="n\n")
         self.assertIn("編集対象としているが", whole.stdout)
@@ -360,7 +360,7 @@ class ApproveOnlyTest(PhaseHarness):
 
 
 class PhaseTest(PhaseHarness):
-    # ---- 1. 種類の定義
+    # ---- 1. フェーズ定義
 
     def test_phase_types_must_be_unique_and_well_formed(self):
         from ccnavi.tickets import phasetypes
@@ -443,13 +443,13 @@ class PhaseTest(PhaseHarness):
                 )
 
     def test_child_must_fit_the_phase_type(self):
-        """種類の範囲の超過は承認を拒まず、承認画面で見せる。計画に無い番号は今までどおり拒む。
+        """定義の範囲の超過は承認を拒まず、承認画面で見せる。計画に無い番号は今までどおり拒む。
 
         超過は判定が切り詰めるので、承認で止める理由が無い（設計 approve-carry 3.1）。
         チケットの形の誤り（計画に無い番号）は判定で補えないので、承認で止める。
         """
         self.family(plan=["research", "design"])
-        # 種類の範囲を超える子。承認でき、承認済みチケットが置かれる。
+        # 定義の範囲を超える子。承認でき、承認済みチケットが置かれる。
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/a/*"]))
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -465,14 +465,14 @@ class PhaseTest(PhaseHarness):
         self.assertIn("計画に無い", refused.stderr)
 
     def test_phase_scope_ignores_letter_case_on_every_machine(self):
-        """種類の範囲の上限は、子チケットの範囲と同じく大文字小文字を区別しない。
+        """定義の範囲の上限は、子チケットの範囲と同じく大文字小文字を区別しない。
 
-        機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
+        機械ごとに変えると、同じ提案が Linux では「定義の上限を超えている」で
         承認を拒まれ、Windows では通る。範囲はユーザが宣言する意図なので、書かれたパスの
-        意味で読む（子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える）。
+        意味で読む（子 ⊆ 定義 ⊆ 親 の 3 つを 1 つの規則で揃える）。
         """
         self.family(plan=["research", "design"])
-        # 種類は `wip/research/*`。子は表記だけ違う `WIP/Research/*` を宣言する。
+        # 定義は `wip/research/*`。子は表記だけ違う `WIP/Research/*` を宣言する。
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["WIP/Research/*"]))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -499,7 +499,7 @@ class PhaseTest(PhaseHarness):
         self.run_child("i0001-01-01", [("wip/research/summary.md", "まとめ\n")])
         self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
-        # レビュー不要の種類なので、マーカーは skipped。2 番目が承認される。
+        # レビュー不要の定義なので、マーカーは skipped。2 番目が承認される。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1068,12 +1068,12 @@ def scoped_child_text(name, parent, phase, allow=(), ask=(), regex=()):
     return "\n".join(lines) + "\n"
 
 
-# 種類 research を消した phases.yml。親の計画の 1 番目の種類が引けなくなる。
+# 定義 research を消した phases.yml。親の計画の 1 番目の定義が引けなくなる。
 PHASES_WITHOUT_RESEARCH = PHASES.split("  research:", 1)[0] + (
     "  design:" + PHASES.split("  design:", 1)[1]
 )
 
-# scope を inherit にした作業の種類だけを持つ phases.yml。
+# scope を inherit にした作業の定義だけを持つ phases.yml。
 PHASES_INHERIT = """
 version: 1
 phases:
@@ -1108,10 +1108,10 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
 
 
 class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
-    """`ticket` の副命令に `--phases` を足しても、種類は共通レイヤーのまま（issue #65）。
+    """`ticket` の副命令に `--phases` を足しても、定義は共通レイヤーのまま（issue #65）。
 
     `.ccnavi/scripts/ccnavi-ticket.sh` が引数をそのまま渡すので、この形はエージェントが
-    Bash で打てる。通していた頃は、`review: mr` の種類を `review: none` と名乗る
+    Bash で打てる。通していた頃は、`review: mr` の定義を `review: none` と名乗る
     ファイルに差し替えて、レビュー待ちを飛ばせた。
     """
 
@@ -1139,7 +1139,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
             os.path.exists(
                 os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
             ),
-            "レビュー待ちへ動いていない（渡した種類で判定された）",
+            "レビュー待ちへ動いていない（渡した定義で判定された）",
         )
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "done", "i0001-01-01.md")),
@@ -1310,7 +1310,7 @@ class ChatReviewTest(PhaseHarness):
         )
 
     def test_a_covered_phase_falls_back_to_a_merge_request_when_the_type_is_unreadable(self):
-        """覆っている分の種類が読めなくなっても、延期したレビューは消えない。"""
+        """覆っている分の定義が読めなくなっても、延期したレビューは消えない。"""
         self.family(plan=[("design", "defer"), "chores"])
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"], review=False)
@@ -1329,7 +1329,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent("close 02")
         self.merge("i0001-02-02")
-        # 承認のあとで種類が読めなくなる（ユーザが phases.yml を触っている最中、
+        # 承認のあとで定義が読めなくなる（ユーザが phases.yml を触っている最中、
         # レイヤーの切り替え）。
         write(self.phases, "version: 1\nphases: {}\n")
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
@@ -1423,9 +1423,9 @@ class ChatReviewTest(PhaseHarness):
 class ScopeLimitTest(PhaseHarness):
     """範囲の上限（設計 wip/design/approve-carry.md 3・4、6.1〜6.2）。
 
-    承認は範囲の超過を拒まず「編集対象としているが」として見せる。判定は子 → 親 → 種類の
+    承認は範囲の超過を拒まず「編集対象としているが」として見せる。判定は子 → 親 → 定義の
     厳しい側で切り詰め、外へ出した上限を `limit:` 行で名指しする。
-    親の範囲は既定で `src/*`, `wip/*`, `tests/*`、フェーズ 1 の種類 research は `wip/research/*`。
+    親の範囲は既定で `src/*`, `wip/*`, `tests/*`、フェーズ 1 の定義 research は `wip/research/*`。
     """
 
     def approved_child(self, text, name="i0001-01-01", plan=("research", "design")):
@@ -1475,7 +1475,7 @@ class ScopeLimitTest(PhaseHarness):
     # ---- 6.2 判定
 
     def test_write_beyond_the_phase_type_is_denied_and_names_the_type(self):
-        """7. enable: 種類の上限の外で子の範囲の中への Write は DENY_TICKET_SCOPE。"""
+        """7. enable: 定義の上限の外で子の範囲の中への Write は DENY_TICKET_SCOPE。"""
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
@@ -1507,7 +1507,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("limit: phase type", text)
 
     def test_ask_inside_the_phase_type_stays_ask(self):
-        """9. 種類の上限の中で子が `ask` と書いた場所は TICKET_ASK のまま。外なら止まる。"""
+        """9. 定義の上限の中で子が `ask` と書いた場所は TICKET_ASK のまま。外なら止まる。"""
         tree = self.approved_child(
             scoped_child_text(
                 "i0001-01-01",
@@ -1520,13 +1520,13 @@ class ScopeLimitTest(PhaseHarness):
         asked = self.write_to(tree, "wip/research/b/x.md")
         self.assertEqual(self.decision(asked), "ask", asked.stdout)
         self.assertIn("TICKET_ASK", self.reason(asked))
-        # 種類は allow か外しか言わない。ask と書いた場所でも種類の外なら外を採る。
+        # 定義は allow か外しか言わない。ask と書いた場所でも定義の外なら外を採る。
         beyond = self.write_to(tree, "src/b/x.py")
         self.assertEqual(self.decision(beyond), "deny", beyond.stdout)
         self.assertIn("limit: phase type", self.reason(beyond))
 
     def test_inherit_scope_does_not_cut_by_the_type(self):
-        """10. 種類の scope が inherit なら、種類では切り詰めない。"""
+        """10. 定義の scope が inherit なら、定義では切り詰めない。"""
         write(self.phases, PHASES_INHERIT)
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["src/a/*"]), plan=["open"]
@@ -1537,7 +1537,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotIn("limit:", self.reason(result))
 
     def test_no_phases_file_anywhere_does_not_cut_by_type(self):
-        """11. どのレイヤーにも phases.yml が無ければ種類では切り詰めない（番号だけの挙動）。"""
+        """11. どのレイヤーにも phases.yml が無ければ定義では切り詰めない（番号だけの挙動）。"""
         from tests.ticket.test_ticket import ticket_text
 
         os.remove(self.phases)
@@ -1558,12 +1558,12 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotIn("limit:", self.reason(outside))
 
     def test_unreadable_type_does_not_cut_by_type_but_says_so(self):
-        """12. 親が計画を持ち番号の種類が読めないとき、種類では切り詰めず notice。親では止まる。"""
+        """12. 親が計画を持ち番号の定義が読めないとき、定義では切り詰めず notice。親では止まる。"""
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
         )
         for label, text in (
-            ("種類を消した", PHASES_WITHOUT_RESEARCH),
+            ("定義を消した", PHASES_WITHOUT_RESEARCH),
             ("phases.yml が壊れた", "version: 1\nphases: [\n"),
         ):
             with self.subTest(label):
@@ -1572,7 +1572,7 @@ class ScopeLimitTest(PhaseHarness):
                 self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
                 self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
                 self.assertIn("research", self.reason(inside))
-                self.assertIn("種類の上限では切り詰めていない", self.reason(inside))
+                self.assertIn("定義の上限では切り詰めていない", self.reason(inside))
                 beyond_parent = self.write_to(tree, "docs/x.md")
                 self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
                 self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
@@ -1600,10 +1600,10 @@ class ScopeLimitTest(PhaseHarness):
         self.break_phases_encoding()
         result = self.write_to(tree, "src/a/x.py")
         self.assert_answered(result)
-        # 読めない種類は「壊れている」と同じ扱い。種類では切り詰めず、そう言う。
+        # 読めない定義は「壊れている」と同じ扱い。定義では切り詰めず、そう言う。
         self.assertNotEqual(self.decision(result), "deny", result.stdout)
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
-        self.assertIn("種類の上限では切り詰めていない", self.reason(result))
+        self.assertIn("定義の上限では切り詰めていない", self.reason(result))
 
     def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
         """7. 同じ状態で、Bash の実行前チェック（止めるかどうかの経路）も例外で終わらない。"""
@@ -1622,7 +1622,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_no_phases_file_with_a_plan_says_nothing_about_the_type(self):
         """8. 親が計画を持ち番号が計画にあっても、phases.yml がどのレイヤーにも無ければ注記しない。
 
-        「種類が読めない」は phases.yml が在って読めないときだけ。無いのは番号だけの挙動
+        「定義が読めない」は phases.yml が在って読めないときだけ。無いのは番号だけの挙動
         （設計 4.2 の表の 1 行目）で、注記を出すと毎回の Write に余計な 1 行が載る。
         """
         tree = self.approved_child(
@@ -1640,7 +1640,7 @@ class ScopeLimitTest(PhaseHarness):
                 self.assertNotIn("limit:", self.reason(result))
 
     def test_regex_child_is_judged_by_the_real_path(self):
-        """14. regex の子: 実際のパスで親と種類に当てる。"""
+        """14. regex の子: 実際のパスで親と定義に当てる。"""
         tree = self.approved_child(
             scoped_child_text("i0001-01-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",))
         )
@@ -1682,25 +1682,25 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
 
-        # 種類の上限（glob）には当たる表記だが、子の範囲が区別するので止まる。
+        # 定義の上限（glob）には当たる表記だが、子の範囲が区別するので止まる。
         outside = self.write_to(tree, "wip/Research/x.md")
         self.assertEqual(self.decision(outside), "deny", outside.stdout)
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
-        """15. 実行後チェック: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
+        """15. 実行後チェック: Bash が定義の上限の外に書くと POST_TICKET_SCOPE。"""
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         self.hook("UserPromptSubmit", "", tree)
         first = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
         self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-        # 種類の中への書き込みは言わない。
+        # 定義の中への書き込みは言わない。
         write(os.path.join(tree, "wip", "research", "gen.md"), "ok\n")
         quiet = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
         self.assertEqual(quiet.returncode, 0, quiet.stdout + quiet.stderr)
         self.assertNotIn("POST_TICKET_SCOPE", quiet.stdout + quiet.stderr)
-        # 子の範囲の中だが種類の外。
+        # 子の範囲の中だが定義の外。
         write(os.path.join(tree, "src", "a", "gen.py"), "x\n")
         after = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
         self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
@@ -1709,7 +1709,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("調査", after.stderr)
 
     def test_subagent_stop_bounces_a_change_beyond_the_type_and_names_it(self):
-        """16. SubagentStop: 種類の上限の外の変更で差し戻し、上限の名指しが付く。"""
+        """16. SubagentStop: 定義の上限の外の変更で差し戻し、上限の名指しが付く。"""
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
@@ -1721,7 +1721,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("POST_TICKET_SCOPE", result.stderr)
         self.assertIn("src/a/stray.py", result.stderr)
-        self.assertIn("（種類 調査 の上限の外）", result.stderr)
+        self.assertIn("（定義 調査 の上限の外）", result.stderr)
         self.assertNotIn("wip/research/ok.md", result.stderr)
 
 

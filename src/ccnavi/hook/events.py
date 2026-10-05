@@ -138,7 +138,7 @@ def scope_guard(
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root, raw=raw)
-    # 種類の上限はレイヤー（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
+    # 定義の上限はレイヤー（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
     types: dict[str, dict] = {}
     for copy in copies:
         if copy.has_plan and copy.project not in types:
@@ -375,9 +375,10 @@ def decide_at_start(
     ここで取るのは実行ファイルで、ツール呼び出しのたびにコピーするには大きすぎる。
     このイベントは 1 セッションに 1 回しか来ないので、重い仕事を置く先になる。
 
-    判定は返さない。何も起きていない時点なので、言うことは 2 つだけ。バックアップを
-    取れなかったこと（あれば）と、チケット制御が有効なときの作業の進め方。
-    後者は起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
+    判定は返さない。何も起きていない時点なので、言うことは 3 つだけ。バックアップを
+    取れなかったこと（あれば）と、チケット制御が有効なときの作業の進め方と、ccnavi が
+    前提にしている作業の決まり（REQ-SES-06）。
+    後の 2 つは起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
     改めて届かないと、compact のあとのモデルは進め方を知らないまま続ける。
     サブエージェントには出さない（SubagentStart は別の手順で、チケットを起こす
     立場にない）。
@@ -402,19 +403,31 @@ def decide_at_start(
     if outcomes:
         record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
         texts.append(selfguard.report(outcomes))
+    # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
+    # サブエージェントには出さない。壊れても何も出さない
+    # （docsearch.at_start が例外を外に出さない）。先に組むのは、作業の決まりの
+    # 「詳しくは --docs で引く」を、索引の案内を出す回にだけ添えるため。
+    docs = "" if payload.agent_id else docsearch.at_start(conf, root, deadline)
+    # ccnavi が前提にしている作業の決まり（ワークツリー・git の入口・下書きの置き場など）。
+    # チケット制御の有無によらず出す。サブエージェントには出さない。作業の進め方より前に
+    # 置くのは、dry-run の注記を進め方の最後の行のまま残すため。
+    if not payload.agent_id:
+        texts.append(
+            reasons.conventions(
+                conf,
+                root,
+                docs.startswith(docsearch.GUIDE_HEAD),
+                ruleload.deny_ids(conf, root),
+            )
+        )
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
-    # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
-    # サブエージェントには出さない。壊れても何も出さない
-    # （docsearch.at_start が例外を外に出さない）。
-    if not payload.agent_id:
-        docs = docsearch.at_start(conf, root, deadline)
-        if docs:
-            texts.append(docs)
+    if docs:
+        texts.append(docs)
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK

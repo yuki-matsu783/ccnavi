@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { openGraph, openGraphJsdom, openPhases } from "../helpers/phases.js";
 import { readPhases } from "../../src/core/phases-doc.js";
 
-/** 2 つの種類が requires で結ばれ、1 つは独り。線は 1 本 */
+/** 2 つの定義が requires で結ばれ、1 つは独り。線は 1 本 */
 const LINKED = `version: 1
 phases:
   acceptance:
@@ -66,17 +66,17 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     assert.match(legend, /並行できる（overlap）/);
     assert.match(legend, /区分の枠（作業 \/ フィードバック対応）/);
     assert.match(legend, /レビュー後（枠の間）/);
-    // docs の requires はこのファイルに無い種類を指すので、線にしていないと件数で言う
+    // docs の requires はこのファイルに無い定義を指すので、線にしていないと件数で言う
     const notes = dom.all(".graph-note").map((note) => note.textContent ?? "");
     assert.deepEqual(notes.length, 1);
-    assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていません/);
+    assert.match(notes[0], /このファイルに無い定義を指す関係が 1 件あり、線にしていません/);
     // 線にならなかった理由は断定しない（表記違いかもしれない）。良し悪しも言わない
-    assert.doesNotMatch(notes[0], /他のレイヤーの種類を指す/);
+    assert.doesNotMatch(notes[0], /他のレイヤーの定義を指す/);
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
     // sequential でも after が無ければ、判定に使われないという注意は出さない
     assert.doesNotMatch(notes.join(""), /sequential/);
     // 「ユーザが見る」の意味はバッジのツールチップにある
-    assert.match(dom.one(".tag.hitl").getAttribute("title") ?? "", /種類の宣言（review）/);
+    assert.match(dom.one(".tag.hitl").getAttribute("title") ?? "", /定義の宣言（review）/);
   } finally {
     await dom.close();
   }
@@ -90,7 +90,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
   }
 });
 
-test("CB-D75 点を押すと一覧へ戻り、その種類の行が開く", async () => {
+test("CB-D75 点を押すと一覧へ戻り、その定義の行が開く", async () => {
   const dom = await openGraph({ model: model(LINKED) });
   try {
     assert.ok(dom.one("#phases").className.includes("hidden"), "図を出しているのに一覧が出ている");
@@ -155,7 +155,7 @@ test("CB-D80 点を掴んで離すと、その位置が state に入る（jsdom�
     assert.notEqual(after, before, "掴んで離しても点が動いていない");
 
     const spots = (dom.state() as { spots?: Record<string, { x: number; y: number }> }).spots ?? {};
-    assert.deepEqual(Object.keys(spots), ["implement"], "動かした種類の位置が state に無い");
+    assert.deepEqual(Object.keys(spots), ["implement"], "動かした定義の位置が state に無い");
     assert.ok(Number.isFinite(spots.implement.x) && Number.isFinite(spots.implement.y), "残した位置が数でない");
     // 動いた先は図の倍率で決まるので、値そのものは約束しない
 
@@ -170,7 +170,7 @@ function loadDrag(): ReturnType<typeof openGraphJsdom> {
   return openGraphJsdom({ model: model(LINKED) });
 }
 
-test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", async () => {
+test("CB-D78 id が空の定義は図に出ず、その数を一言が言う", async () => {
   const dom = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n") });
   try {
     assert.equal(dom.all(".react-flow__node").length, 1);
@@ -180,14 +180,14 @@ test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", a
     await dom.close();
   }
 
-  // 一覧で種類を足すと id が空の行が 1 つできる。図はその数を言う
+  // 一覧で定義を足すと id が空の行が 1 つできる。図はその数を言う
   const added = await openPhases();
   try {
     added.click(added.one('[data-action="add"]'));
     await added.settle();
     added.click(added.one('[data-action="show-graph"]'));
     await added.settle();
-    assert.match(added.one(".graph-note").textContent ?? "", /id が空の種類は図に出ません（1 件）/);
+    assert.match(added.one(".graph-note").textContent ?? "", /id が空の定義は図に出ません（1 件）/);
   } finally {
     await added.close();
   }
@@ -224,7 +224,7 @@ test("CB-D89 見本の図は after の矢印で流れを描き、work と feedba
     assert.match(dom.one('.phase-group[data-kind="work"]').textContent ?? "", /作業（plan:）/);
     assert.match(dom.one('.phase-group[data-kind="feedback"]').textContent ?? "", /フィードバック対応（feedback:）/);
     assert.match(dom.one(".phase-group-arrow").textContent ?? "", /レビュー後/);
-    // 見本は dag で、線にならなかった参照も id の空の種類も無いので、注意は 1 つも出ない
+    // 見本は dag で、線にならなかった参照も id の空の定義も無いので、注意は 1 つも出ない
     assert.equal(dom.all(".graph-note").length, 0);
   } finally {
     await dom.close();

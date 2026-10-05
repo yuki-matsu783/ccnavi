@@ -39,7 +39,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   const page = await openBoard(fixture(), { approval: { kind: "preview", preview } });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "preview");
-    // 種類の範囲を超える子（i0001-01-02）は承認を止めないので一覧に載り、超過は本文の見出しに出る。
+    // 定義の範囲を超える子（i0001-01-02）は承認を止めないので一覧に載り、超過は本文の見出しに出る。
     assert.equal(text(page, "#approval-title"), "承認待ちのチケット 3 件");
     assert.deepEqual(texts(page, ".approval-batch td.approval-id"), ["i0001", "i0001-01-01", "i0001-01-02"]);
     const confirm = page.one('button[data-action="approve-confirm"]');

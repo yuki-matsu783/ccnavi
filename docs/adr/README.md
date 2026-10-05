@@ -84,6 +84,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 | [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する |
 | [0102](0102-identifier-prefix-number-slug.md) | 親の識別子を `<先頭の語>-<番号>-<slug>`（`feature-64-統合先の解決` など）にそろえ、日本語の字を使えるようにする。先頭の語は `CCNAVI_BRANCH_PREFIXES` で変えられる。既にあるブランチとのぶつかりを warn する。親チケットの `branch:` キーで、識別子と違う既存のブランチを親のブランチにできる |
+| [0106](0106-conventions-at-session-start.md) | ccnavi が前提にしている作業の決まりは、セッション開始で要点だけを渡し、詳しいことは今ある入口に聞かせる |
 
 ### ルールと判定
 

@@ -12,7 +12,7 @@ function shell(rendered: string): string {
   return rendered.split(screenScript("phases")).join("（バンドルした画面）");
 }
 
-test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSON で埋め込む", () => {
+test("CB-T95 フェーズ管理画面は外部資源を持たず、定義を JSON で埋め込む", () => {
   const rendered = phasesHtml({ kind: "page", page: page() }, { nonce: "n0nce" });
   assert.match(rendered, /<meta http-equiv="Content-Security-Policy" content="default-src 'none';/);
   assert.match(rendered, /style-src 'nonce-n0nce'; script-src 'nonce-n0nce'/);
@@ -35,8 +35,8 @@ test("CB-T121 バンドルした画面を nonce 付きの script に流し込み
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 
-test("CB-T156 読み直せなかったときは種類の代わりに理由を渡す", () => {
-  const rendered = phasesHtml({ kind: "error", error: "種類のファイルを読めない" });
+test("CB-T156 読み直せなかったときは定義の代わりに理由を渡す", () => {
+  const rendered = phasesHtml({ kind: "error", error: "定義のファイルを読めない" });
   assert.match(rendered, /"kind":"error"/);
-  assert.match(rendered, /種類のファイルを読めない/);
+  assert.match(rendered, /定義のファイルを読めない/);
 });

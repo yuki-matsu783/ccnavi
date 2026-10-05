@@ -104,7 +104,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
           >
             ルール管理
           </button>
-          {/* フェーズの種類は親チケットの計画と子の範囲にしか読まれない。チケット制御が disable の間は
+          {/* フェーズ定義は親チケットの計画と子の範囲にしか読まれない。チケット制御が disable の間は
               何も動かさないので、開く側（phases-panel）と揃えて入口を出さない */}
           {ticketsEnabled && (
             <button
@@ -113,7 +113,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
               data-action="open-phases"
               data-name={row.name}
               disabled={row.rulesRel === ""}
-              title="このプロジェクトのチケットの計画で、共通の設定の種類に足して使うフェーズの種類を編集します。ファイルが無ければ画面から作れます"
+              title="このプロジェクトのチケットの計画で、共通の設定の定義に足して使うフェーズ定義を編集します。ファイルが無ければ画面から作れます"
               onClick={() => send({ type: "openPhases", name: row.name })}
             >
               フェーズ管理

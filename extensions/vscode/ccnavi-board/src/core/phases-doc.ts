@@ -1,11 +1,11 @@
 /**
- * フェーズの種類（phases.yml）の読み書き。コメントを残したまま書き戻す。
+ * フェーズ定義（phases.yml）の読み書き。コメントを残したまま書き戻す。
  *
- * phases.yml は先頭に使い方の説明、種類の前に理由のコメントを持つ。risk-doc と同じく
- * `yaml` の Document を保ち、変えるところだけを差し替える。種類の入れ替えや改名は
+ * phases.yml は先頭に使い方の説明、定義の前に理由のコメントを持つ。risk-doc と同じく
+ * `yaml` の Document を保ち、変えるところだけを差し替える。定義の入れ替えや改名は
  * 元のノード（対応表の 1 組）をそのまま別のリストへ移す。
  *
- * ここは種類の意味（どの子がどこまで書けるか、レビューが要るか）には触れない。判定は
+ * ここは定義の意味（どの子がどこまで書けるか、レビューが要るか）には触れない。判定は
  * 実行ファイル（phasetypes.py）の仕事で、書式の検証も `--lint --phases <一時ファイル>` に聞く。
  * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables / overlap / requires / after）は
  * 文字の配列で持つ。
@@ -20,7 +20,7 @@ import { ORDERS, PHASE_KINDS, REVIEWS, type PhaseForm, type PhaseKind, type Phas
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
- * 種類の形（`PHASE_KINDS`・`PhaseForm`・`PhasesForm` など）は画面との契約（`phases-view.ts`）にある。
+ * 定義の形（`PHASE_KINDS`・`PhaseForm`・`PhasesForm` など）は画面との契約（`phases-view.ts`）にある。
  * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
  */
 
@@ -34,7 +34,7 @@ export const INHERIT = "inherit";
 export const LIST_KEYS = ["deliverables", "overlap", "requires", "after"] as const;
 export type ListKey = (typeof LIST_KEYS)[number];
 
-/** 種類の中の欄を書く順。無い欄はこの順の直前の欄の後ろに入る */
+/** 定義の中の欄を書く順。無い欄はこの順の直前の欄の後ろに入る */
 const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "overlap", "requires", "after", "agent", "when"] as const;
 
 export interface PhasesDocument {
@@ -74,20 +74,20 @@ export function readPhases(text: string): PhasesDocument {
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
-    problems.push("phases がありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します。種類を 1 つ以上足して保存してください");
+    problems.push("phases がありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します。定義を 1 つ以上足して保存してください");
   } else if (!isMap(raw)) {
-    problems.push("phases がマップ（キーと値の組の集まり）ではありません。種類は画面に出しません。保存すると中身を捨てて空のマップから始めます");
+    problems.push("phases がマップ（キーと値の組の集まり）ではありません。定義は画面に出しません。保存すると中身を捨てて空のマップから始めます");
   } else {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
       if (!isMap(pair.value)) {
-        problems.push(`種類 ${id || `（${index + 1} 件目）`} の中身がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの種類は消えます（実行ファイルも読めません）`);
+        problems.push(`定義 ${id || `（${index + 1} 件目）`} の中身がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの定義は消えます（実行ファイルも読めません）`);
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
     });
     if (phases.length === 0 && problems.length === 0) {
-      problems.push("種類が 1 つもありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します");
+      problems.push("定義が 1 つもありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します");
     }
   }
 
@@ -115,12 +115,12 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
   const kindText = scalarText(map, "kind") || "work";
   const kind: PhaseKind = (PHASE_KINDS as readonly string[]).includes(kindText) ? (kindText as PhaseKind) : "work";
   if (kind !== kindText) {
-    problems.push(`種類 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join(" か ")} ではありません。画面は work として出し、保存すると work になります`);
+    problems.push(`定義 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join(" か ")} ではありません。画面は work として出し、保存すると work になります`);
   }
   const reviewText = scalarText(map, "review") || "mr";
   const review: Review = (REVIEWS as readonly string[]).includes(reviewText) ? (reviewText as Review) : "mr";
   if (review !== reviewText) {
-    problems.push(`種類 ${id} の review \`${reviewText}\` は ${REVIEWS.join(" か ")} ではありません。画面は mr として出し、保存すると mr になります`);
+    problems.push(`定義 ${id} の review \`${reviewText}\` は ${REVIEWS.join(" か ")} ではありません。画面は mr として出し、保存すると mr になります`);
   }
 
   const rawScope = map.get("scope", true);
@@ -130,14 +130,14 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     inherit = true;
   } else if (rawScope instanceof Scalar) {
     if (rawScope.value !== INHERIT && rawScope.value !== null) {
-      problems.push(`種類 ${id} の scope \`${String(rawScope.value)}\` は glob のリストか inherit ではありません。画面は inherit として出します`);
+      problems.push(`定義 ${id} の scope \`${String(rawScope.value)}\` は glob のリストか inherit ではありません。画面は inherit として出します`);
     }
     inherit = true;
   } else if (isSeq(rawScope)) {
     inherit = false;
     scope = seqTexts(rawScope);
   } else {
-    problems.push(`種類 ${id} の scope がリストでも inherit でもありません。画面は inherit として出します`);
+    problems.push(`定義 ${id} の scope がリストでも inherit でもありません。画面は inherit として出します`);
   }
 
   const lists = {} as Record<ListKey, string[]>;
@@ -148,7 +148,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     } else if (isSeq(raw)) {
       lists[key] = seqTexts(raw);
     } else {
-      problems.push(`種類 ${id} の ${key} がリスト（配列）ではありません。画面は空として出し、保存すると欄が消えます`);
+      problems.push(`定義 ${id} の ${key} がリスト（配列）ではありません。画面は空として出し、保存すると欄が消えます`);
       lists[key] = [];
     }
   }
@@ -196,14 +196,14 @@ function applyTo(doc: Document, edited: PhasesForm): string {
   for (const form of edited.phases) {
     const id = form.id.trim();
     if (seen.has(id)) {
-      // 同じキーを 2 つ書くと、実行ファイル（yaml.safe_load）は後ろで何も出さずに上書きし、種類が 1 つ消える。
-      throw new Error(`id \`${id}\` が 2 つあります。同じ id の種類は 1 つにしてください`);
+      // 同じキーを 2 つ書くと、実行ファイル（yaml.safe_load）は後ろで何も出さずに上書きし、定義が 1 つ消える。
+      throw new Error(`id \`${id}\` が 2 つあります。同じ id の定義は 1 つにしてください`);
     }
     seen.add(id);
     if (form.origin !== null) {
       if (seenOrigins.has(form.origin)) {
         // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出て、キーも重なる。
-        throw new Error(`${form.origin + 1} 件目の種類が 2 回送られました。更新してから編集し直してください`);
+        throw new Error(`${form.origin + 1} 件目の定義が 2 回送られました。更新してから編集し直してください`);
       }
       seenOrigins.add(form.origin);
     }
@@ -264,7 +264,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     return pair;
   });
   if (isMap(existing) && !existing.flow) {
-    // 先頭の種類を消したときは、付け替えたコメントを対応表の見出しとして戻す。
+    // 先頭の定義を消したときは、付け替えたコメントを対応表の見出しとして戻す。
     if (adopted !== undefined && !pairs.includes(adopted) && !existing.commentBefore) {
       existing.commentBefore = (adopted.key as Scalar).commentBefore ?? null;
     }
@@ -283,7 +283,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
 
 /**
  * 対応表の先頭の組の前にあるコメントは、読み込みでは対応表のほうに付く。
- * そのままだと先頭の種類を移したときにコメントが置き去りになるので、組のキーに付け直す。
+ * そのままだと先頭の定義を移したときにコメントが置き去りになるので、組のキーに付け直す。
  * 付け直した組を返す（呼び手は、その組が消えたときにコメントを対応表へ戻す）。
  */
 function adoptLeadingComment(map: YAMLMap, first: Pair | undefined): Pair | undefined {
@@ -300,8 +300,8 @@ function adoptLeadingComment(map: YAMLMap, first: Pair | undefined): Pair | unde
 }
 
 /**
- * 種類の前の空行は、種類ではなく「対応表の何番目か」に付いていたものとして揃える。
- * 先頭に来た種類と一緒に空行も移ると `phases:` の直後に空白だけの行が出るため。
+ * 定義の前の空行は、定義ではなく「対応表の何番目か」に付いていたものとして揃える。
+ * 先頭に来た定義と一緒に空行も移ると `phases:` の直後に空白だけの行が出るため。
  */
 function keepSpacing(before: readonly Pair[], after: readonly Pair[]): void {
   const slots = before.map((p) => isNode(p.key) && p.key.spaceBefore === true);
@@ -313,7 +313,7 @@ function keepSpacing(before: readonly Pair[], after: readonly Pair[]): void {
   });
 }
 
-/** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符）を残す。新しい種類は kind と review を必ず書く */
+/** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符）を残す。新しい定義は kind と review を必ず書く */
 function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolean): void {
   // kind と review は実行ファイルに既定がある（work / mr）。元から欄が無くて既定のままなら足さない。
   if (isNew || node.has("kind") || form.kind !== "work") {
@@ -344,7 +344,7 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
     setList(doc, node, "scope", form.scope, Scalar.QUOTE_DOUBLE, true);
   }
 
-  // deliverables は glob なので引用符付き。overlap / requires / after は種類の id なので裸のまま。
+  // deliverables は glob なので引用符付き。overlap / requires / after は定義の id なので裸のまま。
   setList(doc, node, "deliverables", form.deliverables, Scalar.QUOTE_DOUBLE, false);
   setList(doc, node, "overlap", form.overlap, Scalar.PLAIN, false);
   setList(doc, node, "requires", form.requires, Scalar.PLAIN, false);

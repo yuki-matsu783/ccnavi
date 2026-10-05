@@ -71,7 +71,7 @@ class IssueRefTest(unittest.TestCase):
         current, _ = self.parse("12")
         revised, _ = self.parse("acme/other#12")
         conf, _ = settings.load("/nonexistent-ccnavi-root")
-        # 計画の検査（種類の定義を読む）はここでは見ない
+        # 計画の検査（フェーズ定義を読む）はここでは見ない
         with mock.patch.object(agree_candidates, "plan_problems", return_value=[]):
             found = agree_candidates.revision_problems(
                 "/nonexistent-ccnavi-root", conf, revised, current, None

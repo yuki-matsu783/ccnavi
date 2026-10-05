@@ -33,7 +33,7 @@ REQ-APV、REQ-RSK。用語は CONTEXT.md。
 compact・clear のどの回も）で、この使い分けをモデルへ渡す。サブエージェントには渡さない。
 
 渡す文に入れるのは線引きと入口（提案の置き場と `ccnavi-ticket.sh`）だけ。レビューの手順・フェーズの
-種類・リスクの配点・後工程の進め方は、それが要る場面の文や `--help` が名指しする。
+フェーズ定義・リスクの配点・後工程の進め方は、それが要る場面の文や `--help` が名指しする。
 
 dry-run のときは末尾に 1 行足し、通ったことを許可と読まないことまで言う（dry-run では deny に当たった
 呼び出しもそのまま実行される）。
@@ -47,7 +47,7 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 9.4 | [tickets/approval.md](tickets/approval.md) | `ccnavi --agree` による承認の対象と手順 |
 | 9.5 | [tickets/judging-by-path.md](tickets/judging-by-path.md) | 書き込みの行き先のワークツリーから承認済みチケットを選んで判定する |
 | 9.6 | [tickets/state-transitions.md](tickets/state-transitions.md) | チケットの置き場とマーカーの状態遷移 |
-| 9.7 | [tickets/phases.md](tickets/phases.md) | phases.yml のフェーズの種類と、親の計画 |
+| 9.7 | [tickets/phases.md](tickets/phases.md) | phases.yml のフェーズ定義と、親の計画 |
 | 9.8 | [tickets/hitl.md](tickets/hitl.md) | フェーズの終わりにユーザの手が入る HITL ポイント |
 | 9.9 | [tickets/risk.md](tickets/risk.md) | 子を閉じるときに差分から測るリスク |
 | 9.10 | [tickets/review.md](tickets/review.md) | レビューの依頼と確認 |

@@ -34,13 +34,13 @@ class Candidate:
 
     ticket: ticket_model.Ticket
     complaints: list[rules.Problem] = field(default_factory=list)
-    # 範囲の超過（親の範囲・種類の上限を超えた項、regex の項）。承認は止めず、判定が
+    # 範囲の超過（親の範囲・定義の上限を超えた項、regex の項）。承認は止めず、判定が
     # 切り詰める。判定に影響する（止まる）ので、判定に影響しない記述の注意（complaints の warn）
     # とは分けて持つ。
     overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま使われている承認済みチケット。
     current: ticket_model.Ticket | None = None
-    # このチケットに使うフェーズの種類（共通レイヤー + `project:` が指すレイヤー、設計 11.4.1）。
+    # このチケットに使うフェーズ定義（共通レイヤー + `project:` が指すレイヤー、設計 11.4.1）。
     # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持っておく。
     types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
@@ -230,7 +230,7 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
 def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> str:
     """このチケットのレイヤーを決める `project:`（設計 11.4.1）。
 
-    子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
+    子は親と同じ置き場に並ぶので、定義を引くには親のプロジェクトを使う。食い違えば
     `project_problems` が落とす。親が対応表に居ないときだけ、子の置き場の値をそのまま読む。
     """
     if t.is_child:
@@ -241,7 +241,7 @@ def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> 
 
 
 def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_model.Ticket]):
-    """チケットに使う種類を引く関数。レイヤーごとの読み込みは 1 プロジェクト 1 回。"""
+    """チケットに使う定義を引く関数。レイヤーごとの読み込みは 1 プロジェクト 1 回。"""
     pool = approval_checks.by_id(approved)
     cache: dict[str, dict | None] = {}
 
@@ -268,7 +268,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_model.Tick
 
 
 def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Problem]:
-    """親の計画が種類の定義と合っているか（設計 9.7）。"""
+    """親の計画がフェーズ定義と合っているか（設計 9.7）。"""
     problems: list[rules.Problem] = []
     if not t.has_plan:
         return problems
@@ -277,7 +277,7 @@ def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Prob
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                "`plan` があるのにフェーズの種類の定義（phases.yml）が読めない",
+                "`plan` があるのにフェーズ定義（phases.yml）が読めない",
             )
         )
         return problems
@@ -291,7 +291,7 @@ def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Prob
             if pt is None:
                 problems.append(
                     rules.Problem(
-                        rules.SEVERITY_ERROR, t.ticket, f"`{key}[{i}]` の種類 `{item.type}` は無い"
+                        rules.SEVERITY_ERROR, t.ticket, f"`{key}[{i}]` の定義 `{item.type}` は無い"
                     )
                 )
                 continue
@@ -309,7 +309,7 @@ def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Prob
                     rules.Problem(
                         rules.SEVERITY_ERROR,
                         t.ticket,
-                        f"`{key}[{i}]` の `{item.type}` はレビュー不要の種類。延期するものが無い",
+                        f"`{key}[{i}]` の `{item.type}` はレビュー不要の定義。延期するものが無い",
                     )
                 )
             for need in pt.requires:
@@ -471,8 +471,8 @@ def validate(
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
 
     返すのは 2 つのリスト。1 つめはチケットの形の苦情で、error があれば承認しない。
-    2 つめは範囲の超過（親の範囲・種類の上限を超えた項、regex の項）で、承認は止めない。
-    判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。
+    2 つめは範囲の超過（親の範囲・定義の上限を超えた項、regex の項）で、承認は止めない。
+    判定が親と定義の上限で切り詰めるので、承認で止める理由が無い。
 
     形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
     検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
@@ -489,7 +489,7 @@ def validate(
         return problems, overflow
     overflow.extend(ticket_mod.subset_problems(t, parent))
     if problems:
-        # 番号が親の計画に無い。種類を引けないので、ここから先は見ても意味が無い。
+        # 番号が親の計画に無い。定義を引けないので、ここから先は見ても意味が無い。
         return problems, overflow
     if parent.has_plan and t.phase is not None:
         item = parent.item_at(t.phase)
@@ -499,12 +499,12 @@ def validate(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"{t.phase} 番目の種類 `{item.type}` の定義が読めない",
+                    f"{t.phase} 番目の定義 `{item.type}` の定義が読めない",
                 )
             )
             return problems, overflow
         overflow.extend(phasetypes.scope_problems(t, pt))
-    # regex の項は親の検査と種類の検査が同じ文で言う。画面に 2 度並べない。
+    # regex の項は親の検査と定義の検査が同じ文で言う。画面に 2 度並べない。
     seen: set[str] = set()
     distinct = []
     for p in overflow:

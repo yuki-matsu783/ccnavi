@@ -1,14 +1,14 @@
 /**
- * 種類 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
+ * 定義 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * 出番の少ない 5 欄（ほかの種類との関係と補足）は見出し 1 行に折りたたみ、値がある種類だけ最初から開く。
+ * 出番の少ない 5 欄（ほかの定義との関係と補足）は見出し 1 行に折りたたみ、値がある定義だけ最初から開く。
  *
- * 関係の 3 欄（overlap / requires / after）は、このファイルのほかの種類の id を複数選択のセレクトボックスで選ぶ
- * （`IdPicker`）。自分の id は候補に出さない。`after` の候補は work の種類だけ（feedback の種類は
- * 待つ先にできず、feedback の種類は `after` を持てない。`phasetypes.py`）。同じ id を `after` と
+ * 関係の 3 欄（overlap / requires / after）は、このファイルのほかの定義の id を複数選択のセレクトボックスで選ぶ
+ * （`IdPicker`）。自分の id は候補に出さない。`after` の候補は work の定義だけ（feedback の定義は
+ * 待つ先にできず、feedback の定義は `after` を持てない。`phasetypes.py`）。同じ id を `after` と
  * `overlap` の両方には挙げられない（同じく error）ので、片方で選んだ id はもう片方で選べなくする。
- * ワークスペースとプロジェクトの設定はほかの設定の種類を指せるので、候補に無い id を打つ欄も出す。
+ * ワークスペースとプロジェクトの設定はほかの設定の定義を指せるので、候補に無い id を打つ欄も出す。
  * 共通の設定はほかの設定を指せない（照合は自分のファイルの中だけ）ので、その欄は出さない。
  */
 import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from "react";
@@ -24,15 +24,15 @@ export interface PhaseProps {
   readonly hidden: boolean;
   readonly open: boolean;
   /**
-   * 「ほかの種類との関係・補足」を開いているか。**決めるのは呼ぶ側**（行ごとに 1 度だけ値の有無で決め、あとは
+   * 「ほかの定義との関係・補足」を開いているか。**決めるのは呼ぶ側**（行ごとに 1 度だけ値の有無で決め、あとは
    * ユーザの開閉で動く）。ここで値の有無から決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly moreOpen: boolean;
-  /** このファイルの種類の id と区分（並び順）。関係の欄の候補にする */
+  /** このファイルの定義の id と区分（並び順）。関係の欄の候補にする */
   readonly kinds: ReadonlyMap<string, PhaseKind>;
-  /** ワークスペースかプロジェクトの設定の画面か。この 2 つだけがほかの設定の種類を指せる */
+  /** ワークスペースかプロジェクトの設定の画面か。この 2 つだけがほかの設定の定義を指せる */
   readonly layer: boolean;
-  /** id が他の種類と重なっている。保存は止まる */
+  /** id が他の定義と重なっている。保存は止まる */
   readonly duplicate: boolean;
   /** 欄を触れるか。保存の往復の間と、共通の設定でファイルが無い間は触れない */
   readonly disabled: boolean;
@@ -106,7 +106,7 @@ export function Phase(props: PhaseProps): JSX.Element {
           props.onToggle();
         }}
       >
-        <button type="button" className="twist" title="この種類を開く／畳む" aria-expanded={props.open}>
+        <button type="button" className="twist" title="この定義を開く／畳む" aria-expanded={props.open}>
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
@@ -183,28 +183,28 @@ export function Phase(props: PhaseProps): JSX.Element {
           onToggle={(event) => props.onToggleMore((event.currentTarget as HTMLDetailsElement).open)}
         >
           <summary>
-            <b>ほかの種類との関係・補足</b>
+            <b>ほかの定義との関係・補足</b>
             {relationsNote(phase)}
           </summary>
           <div className="sub">
-            <Captioned name="並行できる種類" yamlKey="overlap">
-              {ids("overlap", "並行できる種類", "f-overlap", "この種類と並行して進めてよい種類")}
+            <Captioned name="並行できる定義" yamlKey="overlap">
+              {ids("overlap", "並行できる定義", "f-overlap", "この定義と並行して進めてよい定義")}
             </Captioned>
-            <Captioned name="一緒に必要な種類" yamlKey="requires">
-              {ids("requires", "一緒に必要な種類", "f-requires", "計画にこの種類を入れるなら、一緒に入れる必要がある種類")}
+            <Captioned name="一緒に必要な定義" yamlKey="requires">
+              {ids("requires", "一緒に必要な定義", "f-requires", "計画にこの定義を入れるなら、一緒に入れる必要がある定義")}
             </Captioned>
-            <Captioned name="先に済ませる種類" yamlKey="after">
+            <Captioned name="先に済ませる定義" yamlKey="after">
               {phase.kind === "feedback" && phase.after.length === 0 ? (
-                <span className="f-after dim">feedback の種類には設定できません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
+                <span className="f-after dim">feedback の定義には設定できません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
               ) : (
-                ids("after", "先に済ませる種類", "f-after", "待ち方が dag のとき、この種類より先に閉じてレビューを終えておく work の種類")
+                ids("after", "先に済ませる定義", "f-after", "待ち方が dag のとき、この定義より先に閉じてレビューを終えておく work の定義")
               )}
             </Captioned>
             <Captioned name="案内するエージェント" yamlKey="agent">
               {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしない）")}
             </Captioned>
             <Captioned name="使う場面" yamlKey="when">
-              {text("when", "f-when", "この種類を計画に入れる場面（エージェントへの案内にだけ使う）")}
+              {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使う）")}
             </Captioned>
           </div>
         </details>
@@ -274,7 +274,7 @@ function ListInput({
 }
 
 /**
- * 関係の欄。ほかの種類の id を複数選択のセレクトボックスで選ぶ。
+ * 関係の欄。ほかの定義の id を複数選択のセレクトボックスで選ぶ。
  *
  * 押すだけで 1 件ずつ付け外しする（`mousedown` で素の動きを止める）。素の複数選択は Ctrl / Shift なしで
  * 押すとほかの選択が外れ、気付かずに関係を消しやすい。**キー操作も同じ理由で素の動きを止める。** 素の
@@ -282,8 +282,8 @@ function ListInput({
  * 目印（`active`）だけを動かし、Space か Enter で付け外しする。目印は `aria-activedescendant` で読み上げに伝える。
  * `change` はそれでも届いたとき（止めきれない操作）のために、届いた選択をそのまま受ける。
  *
- * 候補は呼ぶ側が決める（自分と空を除いた、このファイルの種類）。**候補に無い値も消さずに出す**
- * （ほかの設定の種類・表記違い・自分自身）。外せばリストから消える。値は前後の空白を落として読む
+ * 候補は呼ぶ側が決める（自分と空を除いた、このファイルの定義）。**候補に無い値も消さずに出す**
+ * （ほかの設定の定義・表記違い・自分自身）。外せばリストから消える。値は前後の空白を落として読む
  * （実行ファイルも落として解く）。空の値は出さない。
  *
  * 順序は候補の順（ファイルの中の順）に揃え、候補に無い値はその後ろに元の順で置く。選択を
@@ -382,7 +382,7 @@ function IdPicker({
           onKeyDown={onKeyDown}
         >
           {options.map((id, index) => {
-            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? (typed ? "このファイルに無い id です（共通の設定の種類か、入力ミス）" : "このファイルに無い id です（入力ミス）") : !candidates.includes(id) ? "ここには挙げられない種類です（外してください）" : undefined;
+            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? (typed ? "このファイルに無い id です（共通の設定の定義か、入力ミス）" : "このファイルに無い id です（入力ミス）") : !candidates.includes(id) ? "ここには挙げられない定義です（外してください）" : undefined;
             const locked = isLocked(id);
             const tip = [locked ? blockedNote : undefined, note].filter((part) => part !== undefined).join("／");
             return (
@@ -410,7 +410,7 @@ function IdPicker({
           })}
         </select>
       )}
-      {options.length === 0 && <span className="dim">選べる種類がありません</span>}
+      {options.length === 0 && <span className="dim">選べる定義がありません</span>}
       {typed && (
         <input
           type="text"

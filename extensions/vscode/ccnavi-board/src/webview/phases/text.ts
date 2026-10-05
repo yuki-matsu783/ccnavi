@@ -1,19 +1,19 @@
 /**
  * フェーズ管理画面に出す言葉。要約に出す範囲の文、絞り込みが当てる文字列、id の重なりの文面。
  *
- * 種類の意味は判定しない。ここが作るのは並べて読めるようにした文だけ。
+ * 定義の意味は判定しない。ここが作るのは並べて読めるようにした文だけ。
  */
 import type { PhasesGraph } from "../../core/phases-graph.js";
 import type { PhaseForm, PhasesForm } from "../../core/phases-view.js";
 
-/** ほかの種類との関係と補足（overlap / requires / after / agent / when）に何か入っているか */
+/** ほかの定義との関係と補足（overlap / requires / after / agent / when）に何か入っているか */
 export function hasRelations(phase: PhaseForm): boolean {
   return phase.overlap.length > 0 || phase.requires.length > 0 || phase.after.length > 0 || phase.agent !== "" || phase.when !== "";
 }
 
-/** 「ほかの種類との関係・補足」の見出しにつける一言 */
+/** 「ほかの定義との関係・補足」の見出しにつける一言 */
 export function relationsNote(phase: PhaseForm): string {
-  return hasRelations(phase) ? "（設定あり）" : "（未設定）。並行できる種類・一緒に必要な種類・先に済ませる種類・案内するエージェント・使う場面";
+  return hasRelations(phase) ? "（設定あり）" : "（未設定）。並行できる定義・一緒に必要な定義・先に済ませる定義・案内するエージェント・使う場面";
 }
 
 /** 要約に出す範囲。inherit ならその表記、glob が無ければ未設定と言う */
@@ -42,7 +42,7 @@ export function findText(phase: PhaseForm): string {
   return `${phase.id} ${phase.title} ${phase.scope.join(" ")} ${phase.deliverables.join(" ")} ${phase.when}`.toLowerCase();
 }
 
-/** 種類の数。絞り込んでいるときは「一致 / 全体（開いたまま N）」 */
+/** 定義の数。絞り込んでいるときは「一致 / 全体（開いたまま N）」 */
 export function countText(total: number, query: string, shown: number, kept: number): string {
   if (query === "") {
     return String(total);
@@ -61,9 +61,9 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
  * 細かい説明（「ユーザが見る」の意味、待ち方が決まる時点）はバッジのツールチップとヘルプに置く。
  * 毎回 6 文を並べていたときは、要る注意がほかの文に埋もれていた。
  *
- * **線が落ちた理由は言わない。** 表記違いかもしれないし、ほかの設定の種類かもしれない。
+ * **線が落ちた理由は言わない。** 表記違いかもしれないし、ほかの設定の定義かもしれない。
  * 決めるのは実行ファイルで、`phasetypes.py` の `reference_problems` が合成した集合で
- * 確かめ、無ければ error を出す。画面がその手前で「ほかの設定の種類だ」と言うと、保存したときに
+ * 確かめ、無ければ error を出す。画面がその手前で「ほかの設定の定義だ」と言うと、保存したときに
  * 実行ファイルが逆のことを言う。ここは「線にしていない」までしか言わない。
  */
 export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolean): readonly string[] {
@@ -80,22 +80,22 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
   if (graph.dropped > 0) {
     out.push(
       layer
-        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（共通の設定の種類を指しているならそのままで構いません。入力ミスなら保存のときの検証で分かります）。共通の設定の種類を待つ種類は、図では根として表示されます`
-        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（入力ミスなら保存のときの検証で分かります）`,
+        ? `このファイルに無い定義を指す関係が ${graph.dropped} 件あり、線にしていません（共通の設定の定義を指しているならそのままで構いません。入力ミスなら保存のときの検証で分かります）。共通の設定の定義を待つ定義は、図では根として表示されます`
+        : `このファイルに無い定義を指す関係が ${graph.dropped} 件あり、線にしていません（入力ミスなら保存のときの検証で分かります）`,
     );
   }
   if (graph.unnamed > 0) {
-    out.push(`id が空の種類は図に出ません（${graph.unnamed} 件）`);
+    out.push(`id が空の定義は図に出ません（${graph.unnamed} 件）`);
   }
   return out;
 }
 
-/** 種類が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */
+/** 定義が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */
 export function emptyNote(exists: boolean, editable: boolean): string {
   if (exists) {
-    return "種類がありません。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足してください";
+    return "定義がありません。定義が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足してください";
   }
   return editable
-    ? "ファイルがありません（無ければこの設定は空で、共通の設定の種類だけが使われます）。種類を足して保存すると、ファイルが作られます"
-    : "ファイルがありません。種類はワークスペースかプロジェクトの設定に置いてください。ワークスペースの設定は上の案内のボタンから、プロジェクトの設定はプロジェクト管理画面から開けます";
+    ? "ファイルがありません（無ければこの設定は空で、共通の設定の定義だけが使われます）。定義を足して保存すると、ファイルが作られます"
+    : "ファイルがありません。定義はワークスペースかプロジェクトの設定に置いてください。ワークスペースの設定は上の案内のボタンから、プロジェクトの設定はプロジェクト管理画面から開けます";
 }

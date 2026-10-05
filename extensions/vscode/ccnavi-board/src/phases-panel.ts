@@ -7,24 +7,24 @@
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
- * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の種類（`.ccnavi/common/phases.yml`。場所は固定）、
- * ワークスペースの設定の種類（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの設定の種類
+ * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の定義（`.ccnavi/common/phases.yml`。場所は固定）、
+ * ワークスペースの設定の定義（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの設定の定義
  * （既定 `projects/<名前>/.ccnavi/config/phases.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
  *
  * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら `--lint --phases <パス>`、
- * ワークスペースかプロジェクトの設定なら `--lint --project-phases-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。その種類は
+ * ワークスペースかプロジェクトの設定なら `--lint --project-phases-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。その定義は
  * 共通の設定と合成して確かめられる（同じ id で中身が違う、表示名の重なり、overlap / requires の指す先）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う。
  * 作業中のチケットは、共通の設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分を見る
- * （種類は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
- * ファイルが無いとき、共通の設定は空の画面と「種類はワークスペースかプロジェクトの設定に置く」案内（ワークスペースの設定を開くボタン）を見せ、画面からは作らせない。
- * ワークスペースとプロジェクトの設定にも雛形は置かない（雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる）。
- * 代わりに画面で種類を足させ、検証を通った最初の保存でファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
+ * （定義は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
+ * ファイルが無いとき、共通の設定は空の画面と「定義はワークスペースかプロジェクトの設定に置く」案内（ワークスペースの設定を開くボタン）を見せ、画面からは作らせない。
+ * ワークスペースとプロジェクトの設定にも雛形は置かない（雛形の id は共通の設定の定義と重なりやすく、中身が違えばその設定が空として扱われる）。
+ * 代わりに画面で定義を足させ、検証を通った最初の保存でファイルを作る。定義の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
  *
- * チケット制御が disable のワークスペースでは、対象がどれでも開かない。種類は親チケットの計画と
+ * チケット制御が disable のワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
  * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット・
  * プロジェクト管理画面のボタン）も同じ鍵で隠れる。
  */
@@ -59,7 +59,7 @@ const SCREEN = "phases";
 const OWN_WRITE_GRACE_MS = 1500;
 /** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
-  "# このレイヤーのフェーズの種類。共通レイヤーの種類に足して使う（設計 11.4.1）。",
+  "# このレイヤーのフェーズ定義。共通レイヤーの定義に足して使う（設計 11.4.1）。",
   "# 共通レイヤーと同じ id を書くなら中身も同じにする。違えば --lint が error を出し、このレイヤーは空として扱われる。",
   "",
 ].join("\n");
@@ -150,7 +150,7 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openPhases` の本体。引数なしは共通の設定の種類 */
+/** `ccnaviBoard.openPhases` の本体。引数なしは共通の設定の定義 */
 export async function openPhases(target: PhasesTarget = { kind: "common" }): Promise<void> {
   if (!requireTickets("フェーズ管理画面")) {
     return;
@@ -265,7 +265,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     phasesPath = resolveIn(root, phasesRel);
   } else {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が食い違ったときに
-    // この画面で保存した種類が承認と着手に反映されなくなる。答えは元リポジトリの版（設計 11.2）。
+    // この画面で保存した定義が承認と着手に反映されなくなる。答えは元リポジトリの版（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
@@ -281,7 +281,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     phasesPath = resolveIn(root, layer.phasesFile.path);
     phasesRel = path.relative(root, phasesPath).split(path.sep).join("/");
     if (layer.phasesFile.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、この設定の種類を空として扱っています（共通の設定の種類だけで進みます）: ${layer.phasesFile.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定の定義を空として扱っています（共通の設定の定義だけで進みます）: ${layer.phasesFile.unreadable}`);
     }
   }
   let text: string;
@@ -293,7 +293,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フェーズの種類のファイルを読めません（${phasesRel}）: ${(error as Error).message}`);
+      throw new Error(`フェーズ定義のファイルを読めません（${phasesRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（番号だけのフェーズ、無い設定は空）。画面は空を見せ、「作る」だけができる。
     text = "";
@@ -302,7 +302,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   if (target.kind === "common" && !exists) {
     notices.push(
-      "種類はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた種類は、すべてのプロジェクトに適用されます。ワークスペースやプロジェクトの設定に、同じ id で中身の違う種類があると、その設定は空として扱われます",
+      "定義はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた定義は、すべてのプロジェクトに適用されます。ワークスペースやプロジェクトの設定に、同じ id で中身の違う定義があると、その設定は空として扱われます",
     );
   }
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。
@@ -373,7 +373,7 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * 種類のファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
+ * 定義のファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
  * 対象のパスは設定で変わるので、再読込のたびに張り直す。絶対パスはワークスペース相対の glob に
  * ならないので、そのディレクトリを起点にする。
  */
@@ -443,7 +443,7 @@ function scheduleLock(current: PanelState): void {
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 共通の設定の種類はどのツリーの承認・着手・閉じるときにも読まれるので、どのツリーの doing でも止める。
+ * 共通の設定の定義はどのツリーの承認・着手・閉じるときにも読まれるので、どのツリーの doing でも止める。
  * ワークスペースの設定も同じに止める（プロジェクト外のチケットだけに影響するが、絞らずに止める側にする）。
  * プロジェクトの設定は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトの doing だけを見る。
  */
@@ -575,7 +575,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, "画面を更新したので、この保存は取りやめました。更新後の種類で編集し直してください");
+  fail(current, "画面を更新したので、この保存は取りやめました。更新後の定義で編集し直してください");
   return true;
 }
 
@@ -601,7 +601,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     current.host.ready();
     redraw(current);
     postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は種類の中身が出てから始め、閉じたら `tourDone` を返す。
+    // 初回だけ吹き出しの案内を頼む。画面は定義の中身が出てから始め、閉じたら `tourDone` を返す。
     // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToPhases);
@@ -612,7 +612,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     markTourSeen(SCREEN);
     return;
   }
-  // 読み直せていない画面では、種類に当たる操作はどれも行き先が無い（「更新」は
+  // 読み直せていない画面では、定義に当たる操作はどれも行き先が無い（「更新」は
   // 押せるが、その経路は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
@@ -676,7 +676,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   const layer = current.target.kind !== "common";
   if (!loaded.exists && !layer) {
-    fail(current, `${loaded.phasesRel} がありません。共通の設定は画面から作りません。種類はワークスペースかプロジェクトの設定に置いてください`);
+    fail(current, `${loaded.phasesRel} がありません。共通の設定は画面から作りません。定義はワークスペースかプロジェクトの設定に置いてください`);
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -692,7 +692,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
 
-  // 1. 検証。error が 1 件でもあれば保存しない。承認済みの計画がこの種類で読めるかもここで分かる。
+  // 1. 検証。error が 1 件でもあれば保存しない。承認済みの計画がこの定義で読めるかもここで分かる。
   //    ワークスペースかプロジェクトの設定なら共通の設定との合成もここで確かめる。
   const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
   if (!alive(current)) {
@@ -730,15 +730,15 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     try {
       mtimeMs = fs.statSync(loaded.phasesPath).mtimeMs;
     } catch (error) {
-      fail(current, `フェーズの種類のファイルを確かめられません: ${(error as Error).message}`);
+      fail(current, `フェーズ定義のファイルを確かめられません: ${(error as Error).message}`);
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズの種類のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+      fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズの種類のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
+    fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
     return;
   }
 
@@ -752,7 +752,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     }
   } catch (error) {
     current.wroteAt = 0;
-    fail(current, `フェーズの種類のファイルに書けません: ${(error as Error).message}`);
+    fail(current, `フェーズ定義のファイルに書けません: ${(error as Error).message}`);
     return;
   }
   await reload(current);

@@ -127,9 +127,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
     # VS Code 拡張が編集中のプロジェクトのルールを保存せずに試すために渡す。
     parser.add_argument("--project-rules-file", default="")
-    # 同じ差し替えをレイヤーのフェーズの種類に対して行う（<名前>=<パス>、
+    # 同じ差し替えをレイヤーのフェーズ定義に対して行う（<名前>=<パス>、
     # 名前は self かプロジェクト）。
-    # VS Code 拡張のフェーズ管理画面が、編集中のレイヤーの種類を保存せずに検証するために渡す。
+    # VS Code 拡張のフェーズ管理画面が、編集中のレイヤーの定義を保存せずに検証するために渡す。
     parser.add_argument("--project-phases-file", default="")
     # 子チケットのフロー 1 本を、SubagentStart と同じ読みで確かめる（`--lint` だけ）。
     # VS Code 拡張のフロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルで渡す。

@@ -19,12 +19,7 @@
 ## 常に守ること
 
 - sh は Windows (Git Bash / WSL)・Linux・macOS のどれでも動くように書く
-- 編集する前にワークツリーを切る。置き場はワークスペースの `.claude/worktrees/<名前>` にする
-- git は直接呼ばず `ccnavi-git.sh` を通す。拒否されたときの出力に、コマンドが案内されるため、その内容に従う。
-- 下書きはワークツリーの `scratchpad/` に置く。無ければセッションのスクラッチパッドに置く
-- `projects/<名前>/` 配下を編集するときは、そのプロジェクトに `cd` してから作業する
-- 実装・調査・テストは作業内容に適したモデルのサブエージェントでバックグラウンド実行する
-- 権限が緩む変更、ユーザとのIFが変わる変更、元に戻せない変更、影響範囲を読み切れない変更は、実装する前にユーザと合意する
+- ccnavi の動作に依存する決まり（ワークツリー・git の入口・下書きの置き場・サブエージェントへの委任・合意が要る変更の範囲）は、セッション開始時に ccnavi が渡す。細かいことは、その案内の `--docs` で ccnavi に聞く
 
 ## 詳細
 
@@ -33,7 +28,6 @@
 | ワークツリーを切る・`<統合先>` に取り込む・片付ける、他セッションの変更の影響を受けた、issue・MR を指定して作業を頼まれた | `docs/claude/worktree.md` |
 | 下書きや使い捨てのファイルを置く | `docs/claude/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `docs/claude/projects.md` |
-| 承認済みチケットの状態を確かめる（着手の前、引き継ぎを読んだあと、承認の有無に迷ったとき）。ファイルを読んで推測せず `sh .ccnavi/scripts/ccnavi-ticket.sh status` を打つ | `docs/claude/projects.md` |
 | 提案を書く、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `docs/claude/decisions.md` |
 | sh やスクリプトを書く、ワークスペースルート・統合先ブランチなどの用語を確かめる、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `docs/claude/environment.md` |
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |

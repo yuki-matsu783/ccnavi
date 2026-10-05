@@ -1,6 +1,6 @@
 """ボードの中身（`--explain --json`）。
 
-ルール・フェーズの種類・リスク・チケットを 1 つの辞書にまとめる。
+ルール・フェーズ定義・リスク・チケットを 1 つの辞書にまとめる。
 """
 
 from __future__ import annotations
@@ -237,7 +237,7 @@ def _rule_record(rule: rules.Rule) -> dict:
 
 
 def _phase_type_record(layer: str, pt) -> dict:
-    """フェーズの種類 1 つ。id は裸のまま、レイヤーは欄で出す（設計 11.4.1）。"""
+    """フェーズ定義 1 つ。id は裸のまま、レイヤーは欄で出す（設計 11.4.1）。"""
     return {
         "id": pt.id,
         "source": layer,

@@ -88,7 +88,7 @@ _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 
 
 def _plan(name: str, key: str, raw) -> tuple[list[ticket_model.PlanItem] | None, list[Problem]]:
-    """計画のリストを読む。種類が在るかはここでは見ない（種類を読むのは承認の側）。"""
+    """計画のリストを読む。定義が在るかはここでは見ない（定義を読むのは承認の側）。"""
     problems: list[Problem] = []
     if not isinstance(raw, list):
         problems.append(Problem(SEVERITY_ERROR, name, f"`{key}` はリストで書く"))
@@ -117,7 +117,7 @@ def _plan(name: str, key: str, raw) -> tuple[list[ticket_model.PlanItem] | None,
                 return None, problems
             items.append(ticket_model.PlanItem(type=kind, review=review))
             continue
-        problems.append(Problem(SEVERITY_ERROR, name, f"{where} は種類の名前か {{type, review}}"))
+        problems.append(Problem(SEVERITY_ERROR, name, f"{where} は定義の名前か {{type, review}}"))
         return None, problems
     if items and items[-1].deferred:
         problems.append(
@@ -512,13 +512,13 @@ def subset_problems(child: ticket_model.Ticket, parent: ticket_model.Ticket) -> 
 
 
 def regex_overflow_detail(regex: str) -> str:
-    """子の範囲の regex を名指しする文。親の検査と種類の検査の両方が同じ文を使う。
+    """子の範囲の regex を名指しする文。親の検査と定義の検査の両方が同じ文を使う。
 
     同じ文にしておけば、承認の画面で 2 度並べずにまとめられる。
     """
     return (
         f"子の範囲に regex `{regex}` は書けない。"
-        "親と種類の上限に収まるかは、判定のときに当てて確かめる"
+        "親と定義の上限に収まるかは、判定のときに当てて確かめる"
     )
 
 

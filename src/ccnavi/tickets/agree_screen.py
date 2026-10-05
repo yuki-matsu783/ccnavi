@@ -76,7 +76,7 @@ def screen(
     「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
-    種類は候補が持っているものを使う。承認の対象の中でもチケットごとにレイヤーが違いうるので、
+    定義は候補が持っているものを使う。承認の対象の中でもチケットごとにレイヤーが違いうるので、
     画面の側で 1 つに決めない。
     """
     lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
@@ -116,7 +116,7 @@ def screen(
             lines.append(f"    {head}")
             bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
-                lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
+                lines.append(f"    定義「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
         else:
             lines.append("■ このチケットで編集可能な範囲")
             lines.append(
@@ -143,7 +143,7 @@ def screen(
             # ここも揃えたくなるが、揃えない。
             lines.append("■ チケットで編集対象としているが、書き込めない場所")
             lines.append(
-                "    親の範囲かフェーズの種類の上限を超えている。"
+                "    親の範囲かフェーズ定義の上限を超えている。"
                 "承認は可能だが、編集しようとすると判定が止める"
             )
             lines += [f"    {p.detail}" for p in cand.overflow]

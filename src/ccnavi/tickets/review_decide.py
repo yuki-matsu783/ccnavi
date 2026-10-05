@@ -207,7 +207,7 @@ def reviewed(
     書き出す。sh がそれを投稿する。
 
     `chat` はこのセッションで見たフェーズ（`review: chat`）を通す枝。取得した結果も依頼の記録も
-    要らない代わりに、種類が chat と宣言しているフェーズにしか使えない。
+    要らない代わりに、定義が chat と宣言しているフェーズにしか使えない。
     """
     if chat:
         found = review._parent_phase(stderr, root, conf, cwd, phase_no)

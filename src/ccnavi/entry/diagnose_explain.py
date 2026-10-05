@@ -45,7 +45,7 @@ def _shown(root: str, path: str) -> str:
 def _explain_phases(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """レイヤーごとのフェーズの種類（設計 11.9）。id は裸のまま、レイヤーは欄で出す。"""
+    """レイヤーごとのフェーズ定義（設計 11.9）。id は裸のまま、レイヤーは欄で出す。"""
     tables = [
         (
             v.name,
