@@ -8,11 +8,33 @@
 from __future__ import annotations
 
 import os
+import re
 
 from ..hook import judge
 from ..infra import hookio
 from ..policy import ctxfile, rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+
+# `.ccnavi/scripts/` のヒット。直前の `./` と `../` の連なりは、相対の書き方なので手前にたどる。
+_SCRIPTS = re.compile(r"(?:\.{1,2}/)*\.ccnavi/scripts/")
+# その手前の 1 文字がこれなら、ヒットはパスの途中（絶対パス・`$VAR/`・`{root}/`・`~/`・
+# ディレクトリ名の続き）。空白・引用符・括弧・`=`・`:` や語頭は、パスの始まりとして相対に数える。
+_PATH_MID = frozenset("/\\}~$._-")
+
+
+def _has_relative_scripts(text: str) -> bool:
+    """文面に、cwd に左右される相対パスの `.ccnavi/scripts/` があるか。
+
+    ヒットの直前（`./` と `../` の連なりを除いた位置）の 1 文字を見る。`/` `\\` `}` `~` `$`
+    `.` 英数字 `_` `-` ならパスの途中（絶対パス、`{root}/`、`$VAR/`、`~/` など）なので言わない。
+    語頭や、空白・引用符・括弧・`=`・`:` の直後なら相対パスの始まりとして言う。
+    """
+    for hit in _SCRIPTS.finditer(text):
+        before = text[hit.start() - 1] if hit.start() > 0 else ""
+        if before and (before.isascii() and before.isalnum() or before in _PATH_MID):
+            continue
+        return True
+    return False
 
 
 def _rules(
@@ -117,6 +139,27 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                 "additionalContext に書き、message は消してください",
             )
         )
+
+    # 文面の sh は `{root}` から書く。相対の `.ccnavi/scripts/...` は、cwd がプロジェクトの中
+    # だと見つからない（docs/claude/projects.md「ルールの文面にshを書くとき」）。
+    # 絶対パスは cwd に左右されないので言わない。
+    # 判定は変わらず、案内を受けたモデルの実行が失敗するだけなので warn。
+    # 見る欄は、モデルに渡る文面の 3 つ。`...File` は rules.yml の外のファイルを指すので見ない。
+    for field_name, text in (
+        ("message", rule.message),
+        ("additionalContext", rule.additional_context),
+        ("additionalContextOnce", rule.additional_context_once),
+    ):
+        if _has_relative_scripts(text):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    f"{field_name} の `.ccnavi/scripts/` に `{{root}}` が付いていない。cwd が"
+                    "プロジェクトの中だと相対パスの sh が見つからない。"
+                    "`{root}/.ccnavi/scripts/...` と書いてください",
+                )
+            )
 
     # ルールが指すファイルは、ルートの中を指していて、いま在って、上限に収まるか。
     # 無いのは warn。作るまで何も足さないだけで、判定は変わらない。

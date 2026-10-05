@@ -146,12 +146,8 @@ usage の `confirm` の説明が「依頼より後の未解決スレッドが無
 
 ### 未了: 別件
 
-- `build.py` の置き換えが `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
 - ワークスペースの `.git` の commit-graph の分割ファイルの一覧が、欠けた分割ファイルを指している。`git commit-graph write --reachable --split=replace` で直る
 - 承認済みチケットの書き込みが原子的でない。途中で機械が落ちると中身が NUL で埋まる
-- Windows で `tests.guard.test_fallback` が 1 件落ちる。テストが絶対パスを引用せずに埋め込んでおり、bash が `\` を落とす。
-  ガードの判定は正しく、テストに埋め込むパスの書き方を直す
-- 未解決の一覧で、位置の無いスレッドが ` :0 ` と出る
 
 ## 実測で分かった落とし穴
 

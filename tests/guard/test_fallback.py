@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import tempfile
 import unittest
 
@@ -168,11 +169,11 @@ class FallbackTest(unittest.TestCase):
         # 実行ファイルは設定で動く（ccnavi ディレクトリと共通レイヤーは固定）。
         # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
         # 壊れたときにだけそこへの書き込みが止まらない（issue #14）。
-        # 絶対パスは `/` で書く。bash は引用されない `\` を落とすので、`\` の表記のままでは
-        # そのコマンドは設定ファイルに書かない。
+        # 絶対パスは `/` で書いて shlex.quote で引用する。bash は引用されない `\` を落とすので、
+        # `\` の表記のまま埋め込むと、ガードが見る行き先が変わる。
         for env, command in [
             ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
-            ({}, f"echo x > {self.broken.replace(os.sep, '/')}"),
+            ({}, f"echo x > {shlex.quote(self.broken.replace(os.sep, '/'))}"),
         ]:
             with self.subTest(command=command):
                 out = out_of(
