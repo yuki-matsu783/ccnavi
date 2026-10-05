@@ -254,6 +254,22 @@ class StatePruneTest(_Base):
         for path in [*kept, live_leftover]:
             self.assertTrue(os.path.exists(path), path)
 
+    def test_leftover_temporary_files_of_other_shapes(self):
+        """`.nudged-…` などはそれ自身の日付で消え、seen と turn の一時ファイルは消さずに残る。"""
+        self.session_files(S_OLD, 20)
+        own_date = _write(
+            os.path.join(self.state, f".nudged-{S_OLD}.abc12345.part.json"), age_days=20
+        )
+        fresh = _write(os.path.join(self.state, f".denied-{S_OLD}.zz998877.part.json"))
+        kept = [
+            _write(os.path.join(self.state, f".{S_OLD}.abc12345.part.json"), age_days=20),
+            _write(os.path.join(self.state, f".{S_OLD}.turn.abc12345.part.json"), age_days=20),
+        ]
+        self.run_prune()
+        self.assertFalse(os.path.exists(own_date))
+        for path in [fresh, *kept]:
+            self.assertTrue(os.path.exists(path), path)
+
     def test_files_without_a_session_are_left_alone(self):
         keep = [
             _write(os.path.join(self.state, "review-request-i0001-1.md"), age_days=90),

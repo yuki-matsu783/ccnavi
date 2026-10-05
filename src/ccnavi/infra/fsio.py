@@ -405,7 +405,11 @@ def _replace_durably(path: str, content: bytes) -> None:
     os.makedirs(directory, exist_ok=True)
     handle, part = tempfile.mkstemp(dir=directory, prefix=f".{name}.", suffix=".part")
     try:
-        os.chmod(part, _mode_for(path))
+        # 権限の引き継ぎは最善努力。chmod を受け付けないファイルシステム（vfat・一部の CIFS）では
+        # EPERM になるが、前の書き方（素の open）はそこでも書けた。書けないことにはせず、
+        # mkstemp が作った 0600 のまま置く。
+        with contextlib.suppress(OSError):
+            os.chmod(part, _mode_for(path))
         try:
             stream = os.fdopen(handle, "wb")
         except BaseException:

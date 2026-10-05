@@ -416,8 +416,16 @@ def _session_entries(
         path = os.path.join(state_dir, entry)
         if not os.path.isfile(path):
             continue
-        # 書きかけで落ちて残った一時ファイル（`.once-….part.json`）は、先頭の `.` を外して本番と同じ
-        # 条件で当てる。同じセッションの記録と一緒に消える。
+        # 書きかけで落ちて残った `write_text_atomic` の一時ファイル
+        # （`.<名前>.<一意>.part.json`）は、先頭の `.` を外した名前で当てる。
+        # 当たり方は名前の形で違う。
+        # - `.once-…`・`.approved-…`: 同じセッションの記録と一緒に消える
+        #   （セッションの組が他に無ければ、まとめられなかったものとして、それ自身の日付で）
+        # - `.nudged-…`・`.denied-…`・`.stop-…`: 当てる形の「セッション」に
+        #   `.<一意>.part` まで入るので別の組になり、それ自身の日付で消える
+        # - `.<セッション>.<一意>.part.json`（seen）と
+        #   `.<セッション>.turn.<一意>.part.json`（turn）: どの形にも当たらず、消さずに残る。
+        #   形を広げて当てると、知らないファイルまで消しうるので広げない
         name = fsio.temp_origin(entry)
         pair = next(
             ((p, s) for p, s in _SESSION_AND_KEY if name.startswith(p) and name.endswith(s)),
