@@ -2649,12 +2649,12 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/approval_marks.py` | フェーズのマーカー、親ごとのマーカー、子ごとの記録、受け入れたスレッドの記録（`phases/<親>/`） |
 | `src/ccnavi/tickets/approval_checks.py` | 承認済みチケットの構造の検査。親子と統合先、先行、プロジェクトの欄 |
 | `src/ccnavi/tickets/approval_times.py` | 承認の時刻（表示だけ）。状態の履歴か git から引く |
-| `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を組む、承認の画面、置き場へ動かす |
+| `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を集めて `--preview` / `--verify` に答え、書き込みを並べて置き場へ動かす。承認待ちの一覧 |
 | `src/ccnavi/tickets/agree_candidates.py` | 承認の候補と、その検査（計画・改版・欄・ブランチ） |
 | `src/ccnavi/tickets/agree_screen.py` | 承認の画面の文面と、承認を伝える文 |
 | `src/ccnavi/tickets/agree_digest.py` | 承認の対象の指紋（ダイジェストと読みの範囲）と、承認で書く本文 |
 | `src/ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
-| `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
+| `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。フェーズの組み立てと順序の検査、止めたときの文、親がいまどの局面にいるか |
 | `src/ccnavi/tickets/phase_forms.py` | ユーザだけが打つコマンドの形（承認・レビュー済み・ガードの切り替え・記録の片付け）を見分ける組み込みのルール |
 | `src/ccnavi/tickets/phase_scope.py` | 子チケットの範囲の当て方と、範囲の外の変更の洗い出し |
 | `src/ccnavi/tickets/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
@@ -2675,7 +2675,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/hook/judge.py` | 実行前チェック。通す・聞く・止めるを決める |
 | `src/ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
 | `src/ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
-| `src/ccnavi/hook/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
+| `src/ccnavi/hook/docsearch.py` | `--docs` と `SessionStart` の入口。索引を置く場所（ワークスペースとプロジェクト）を決めて集め、引き方を案内する |
 | `src/ccnavi/hook/docsearch_index.py` | md の frontmatter の索引（`index.jsonl`）を組む。変わった md だけを読み直す |
 | `src/ccnavi/hook/docsearch_query.py` | 索引の引き方。`--docs` の問いの検査、当たり、並べ方と表 |
 | `src/ccnavi/entry/` | 入口。CLI・診断・lint・提案・版。どのサブパッケージからも読まれない |
@@ -2687,7 +2687,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
 | `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
-| `src/ccnavi/entry/cli.py` | 引数の解釈と振り分け。`ticket` / `review` の副命令を ops / review へ渡す |
+| `src/ccnavi/entry/cli.py` | 1 回の起動の入口。標準入出力とコマンドラインを判定や各コマンドへ振り分け、ワークスペースルートを見つける |
 | `src/ccnavi/entry/cli_usage.py` | `--help` の本文 |
 | `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け |
 | `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
