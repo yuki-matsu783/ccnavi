@@ -30,7 +30,7 @@ ADR-0102 の 5 章で、親チケットは `branch:` キーで既存のブラン
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | UserPromptSubmit で依頼文（payload の `prompt`）から issue・MR の指定を探し、あれば `additionalContext` で指示を足す（`branchfind.prompt_context`）。判定は返さない | ユーザの決定 1。依頼の直後、エージェントが手を動かす前に届く経路はこれだけ | PreToolUse で `worktree add` を止める（決定 1 に反する。止めると判定が増える） |
-| 指示の中身は「`sh {root}/.ccnavi/scripts/ccnavi-branches.sh --issue N` / `--mr N` を打ち、候補があれば一覧を見せて 3 択を聞き、返事を待つ。候補が無ければ進めてよい」。sh の表記はワークスペースルートの絶対パス（`settings.script_command`。ルールの `{root}` と同じ考え方） | プロジェクトやワークツリーの中からも打てる表記にする（docs/claude/projects.md） | 相対の `sh .ccnavi/scripts/...` |
+| 指示の中身は「`sh {root}/.ccnavi/scripts/ccnavi-start.sh --issue N` / `--mr N` を打つ。`ccnavi-start.sh` が `ccnavi-branches.sh` で候補を探す。終了コード 0 は完了（候補が 1 件ならそのブランチのワークツリーのパスが出る。`--issue` で候補が 0 件なら Draft MR・ワークツリー・ブランチを作る）。3 は候補が複数などで何も作られていないので、一覧を見せて 3 択（既存のブランチで続ける・新しく切る・やめる）を聞き、返事を待つ。4 はホストに届かないので、出力の案内どおり MCP で代行して打ち直す。1・2 は出力の理由をユーザに伝える」。sh の表記はワークスペースルートの絶対パス（`settings.script_command`。ルールの `{root}` と同じ考え方） | プロジェクトやワークツリーの中からも打てる表記にする（docs/claude/projects.md） | 相対の `sh .ccnavi/scripts/...` |
 | 既存のブランチで続けるときは、承認済みの `branch:` で使う（新しい親の提案に `branch:` を書き、承認の後に `ccnavi-git.sh switch <B>`）。承認前の提案の `branch:` は使わないことを指示に書く | ADR-0102 の 5.2 をそのまま使う。新しい経路を作らない | 指示の中で既存のブランチへ直に移らせる |
 | チケット制御が disable なら指示を出さない。モードが disable なら hook 全体が何もしない（既存の入口）。dry-run でも出す | 指示が親の識別子と `branch:` の承認に寄る。承認の知らせ（`agree.news`）と同じ扱い。止めないので dry-run で黙る理由が無い | — |
 | 紐づくブランチを探すのは新しい sh `ccnavi-branches.sh`。ホストは sh が読み、手元（ブランチ・ワークツリー・チケット）は実行ファイルの副命令 `ccnavi branches <issue\|mr> <番号> --result <json>` が読む | 実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。チケットの読み方（承認済み・提案・本物とする側のあるツリー）を sh に写さない | 全部を sh で（チケットの YAML を sh で読むことになる） |

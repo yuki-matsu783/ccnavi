@@ -192,7 +192,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env 6 つ（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）は書かず、既にあれば外す（置き場は固定）。外した値が既定と違えば名前と値を 1 行ずつ出す。以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` も、既定の `logs/decisions.jsonl` と違うので名指しする（記録の書き先が変わるので黙らない）。導入は止めず、終了コードも変えない（`--check` では「揃っていない」に数える） |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,launcher}.sh`、共通部の部品 `ccnavi-common-{state,lock,c1,host,log}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
+| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,branches,start,launcher}.sh`、共通部の部品 `ccnavi-common-{state,lock,c1,host,log}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
 | 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`index.jsonl` の行が既にあれば足さない。`index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトには足さない |
 
 置き場は 2 つに分けて固定する。
@@ -2181,10 +2181,12 @@ compact の前後の hook でフローを入れ直すことはしない。どち
 **UserPromptSubmit。** チケット制御が有効なら、依頼文（payload の `prompt`）から issue・MR の指定を探す
 （`branchfind.prompt_refs`。`#152`・`issue 152`・`/issues/152`、`!5`・`MR 5`・`PR #12`・`/pull/5`・`/-/merge_requests/5`）。
 囲みのコードブロックの中、`C#`・`&#123;`・`##12`・`# 見出し`・`#fff`・0 で始まる番号・CSS の色の値・`すごい!5` は拾わない。
-見つけたら、指定ごとに `'{root}/.ccnavi/scripts/ccnavi-branches.sh --issue N'`（`--mr N`）を打ち、候補があれば一覧をユーザに
-見せて「既存のブランチで続ける（承認済みの `branch:` で使う。承認前の提案の `branch:` は使わない）・新しく
-`<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ、候補が無ければ進めてよい、という文を `additionalContext` で
-渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの絶対パス）。
+見つけたら、指定ごとに `'{root}/.ccnavi/scripts/ccnavi-start.sh --issue N'`（`--mr N`）を打たせる。`ccnavi-start.sh` は既存の候補を
+探し、無ければ Draft MR・ワークツリー・ブランチを作る。終了コードの扱いも添える。3（候補が複数）は何も作られていないので、
+一覧をユーザに見せて「既存のブランチで続ける（承認済みの `branch:` で使う。承認前の提案の `branch:` は使わない）・新しく
+`<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ。4（ホストに届かない）は出力の案内どおり MCP で代行し、
+同じコマンドを打ち直す。1・2 は出力の理由をユーザに伝える、という文を `additionalContext` で渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの
+絶対パス）。
 dry-run でも渡す。判定は返さない。
 
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）
