@@ -146,7 +146,8 @@ def _project_settings(root: str) -> list[Problem]:
 
 # `.claude/settings.local.json` に置かせない、承認と判定に影響する値。
 # チケット制御と承認の保護の切り替え・動作モード。例外は統合先の名前だけ（リポジトリに置かず、
-# 手元では環境変数で持つと決めた値なので）。
+# 手元では環境変数で持つと決めた値なので）。置き場は既定に固定で env では動かないので、
+# 置き場の env は数えない。
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 
 
@@ -172,9 +173,9 @@ _LOCAL_FORBIDDEN = (
 def _local_settings(root: str) -> list[Problem]:
     """`.claude/settings.local.json` の env に、承認に影響する値が無いかを見る。
 
-    承認と判定は、置き場のパスなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
+    承認と判定は、保護の切り替えや動作モードを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
-    ユーザが端末で打つ sh には使われないので、同じ親子のチケットを別のパスで読むことになる。
+    ユーザが端末で打つ sh には使われないので、同じ親子のチケットにプロセスごとに別の保護が掛かる。
     例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前はリポジトリに置かず、手元では環境変数で
     持つと決めた）。
     """
@@ -195,8 +196,8 @@ def _local_settings(root: str) -> list[Problem]:
             "(project)",
             f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
             "ファイルに置かない（Chrome と端末の sh には使われないので、"
-            "同じ親子のチケットを"
-            "プロセスごとに別のパスで読むことになる）。"
+            "同じ親子のチケットに"
+            "プロセスごとに別の保護が掛かることになる）。"
             f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
             "渡してください。"
             f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",
