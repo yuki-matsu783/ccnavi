@@ -25,7 +25,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
       ["i0001-01-02", "i0001", 1, false],
     ],
   );
-  // 種類の範囲を超える子は承認を止めず、一覧に載って超過を持つ（判定で止まる）。
+  // 定義の範囲を超える子は承認を止めず、一覧に載って超過を持つ（判定で止まる）。
   assert.deepEqual(preview.batch[0].overflow, []);
   assert.deepEqual(preview.batch[1].overflow, []);
   assert.equal(preview.batch[2].overflow.length, 1);

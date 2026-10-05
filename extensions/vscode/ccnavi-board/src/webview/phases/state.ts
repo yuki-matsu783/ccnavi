@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面が編集中に持つもの。種類のコピー（`Draft`）と、開いている行。
+ * フェーズ管理画面が編集中に持つもの。定義のコピー（`Draft`）と、開いている行。
  * 作りはリスク管理（`webview/risk/state.ts`）と同じで、鍵の表記だけ `p1`、`p2`、… と違う。
  *
  * 契約の `PhasesForm` は配列だけを持つが、画面は**行ごとに動かない鍵**が要る（足す・消す・
@@ -41,15 +41,15 @@ export function formOf(draft: Draft): PhasesForm {
 }
 
 /**
- * 新しい種類。既定の範囲は inherit（`scope: []` の種類を、glob を埋め忘れただけで作らないため）。
- * レビューは mr（足した種類が気づかないうちにレビュー無しにならないように）。
+ * 新しい定義。既定の範囲は inherit（`scope: []` の定義を、glob を埋め忘れただけで作らないため）。
+ * レビューは mr（足した定義が気づかないうちにレビュー無しにならないように）。
  */
 export function emptyPhase(): PhaseForm {
   return { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "" };
 }
 
 /**
- * 同じ id の種類。実行ファイルは後ろで何も出さずに上書きするので、画面で止める。
+ * 同じ id の定義。実行ファイルは後ろで何も出さずに上書きするので、画面で止める。
  * 前後の空白は落として見る（`--lint` が見るのと同じ形）。
  */
 export function duplicates(draft: Draft): ReadonlySet<string> {
@@ -65,7 +65,7 @@ export function duplicates(draft: Draft): ReadonlySet<string> {
   return dup;
 }
 
-/** state に残してある「開いていた種類の id」。型が違うものは空として扱う */
+/** state に残してある「開いていた定義の id」。型が違うものは空として扱う */
 export function loadOpen(): ReadonlySet<string> {
   const saved = (getState() ?? {}) as { open?: unknown };
   const ids = Array.isArray(saved.open) ? saved.open.filter((id): id is string => typeof id === "string") : [];
@@ -90,7 +90,7 @@ export type View = "list" | "graph";
 
 /**
  * ユーザがドラッグで動かした点の位置。**`phases.yml` には書かない**（ユーザが持つ設定に座標は入れない）。
- * 残す先は Webview の state で、鍵は種類の id。id を打ち替えれば残した位置は捨てられる（`Graph.tsx`）。
+ * 残す先は Webview の state で、鍵は定義の id。id を打ち替えれば残した位置は捨てられる（`Graph.tsx`）。
  *
  * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。
  * ここ（`state.ts`）は `acquireVsCodeApi` を読むので、node のテストからは import できない。

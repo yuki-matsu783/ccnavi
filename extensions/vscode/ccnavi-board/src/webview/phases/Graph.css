@@ -97,7 +97,7 @@
   font-size: 0.8em;
 }
 
-/* feedback の種類と、レビューを求める種類は、縁で見分ける（色だけに頼らない） */
+/* feedback の定義と、レビューを求める定義は、縁で見分ける（色だけに頼らない） */
 .phase-node[data-kind="feedback"] {
   border-style: dashed;
 }
@@ -107,7 +107,7 @@
   border-color: var(--vscode-focusBorder);
 }
 
-/* ユーザが見る種類（HITL）。縁を太くし、バッジを添える。色だけに頼らない */
+/* ユーザが見る定義（HITL）。縁を太くし、バッジを添える。色だけに頼らない */
 .phase-node:not([data-review="none"]) {
   border-width: 2px;
   border-color: var(--vscode-focusBorder);
@@ -176,7 +176,7 @@
   white-space: nowrap;
 }
 
-/* 枠の間の「レビュー後」の矢印。区分の順で、種類どうしの関係ではない */
+/* 枠の間の「レビュー後」の矢印。区分の順で、定義どうしの関係ではない */
 .graph .phase-group-arrow {
   pointer-events: none;
 }

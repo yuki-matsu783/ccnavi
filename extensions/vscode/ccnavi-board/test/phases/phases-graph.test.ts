@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { graphOf, keepSpots, withSpot } from "../../src/core/phases-graph.js";
 import type { PhaseForm, PhasesForm } from "../../src/core/phases-view.js";
 
-/** 種類 1 つ。要るところだけ渡す */
+/** 定義 1 つ。要るところだけ渡す */
 function phase(id: string, overrides: Partial<PhaseForm> = {}): PhaseForm {
   return { origin: null, id, title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "", ...overrides };
 }
@@ -55,7 +55,7 @@ test("CB-T186 図は判定をしない（循環も、行き先の無い参照も
   // 図の形に「循環」「不正」を名指しする欄は無い
   assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 
-  // このファイルに無い種類への参照は、何も言わずに線にしない（表記違いか他のレイヤーかは、画面は言わない）
+  // このファイルに無い定義への参照は、何も言わずに線にしない（表記違いか他のレイヤーかは、画面は言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["外の種類"] }))), []);
   // 自分自身への参照も線にしない（--lint が警告する。画面は何も言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["a"], overlap: ["a"] }))), []);
@@ -86,11 +86,11 @@ test("CB-T187 置き場所は id だけで決まる。関係を直しても、�
   assert.equal(new Set(places).size, places.length, "点が重なっている");
 });
 
-test("CB-T188 id が空の種類は図に出ず、数だけ返る。同じ id は先に出てきたほうだけ", () => {
+test("CB-T188 id が空の定義は図に出ず、数だけ返る。同じ id は先に出てきたほうだけ", () => {
   const graph = graphOf(form(phase("a"), phase("  "), phase(""), phase("a", { title: "あと", requires: ["b"] }), phase("b")));
   assert.deepEqual(graph.nodes.map((node) => node.id), ["a", "b"]);
   assert.equal(graph.nodes[0].title, "", "後ろの同じ id で上書きされている");
-  assert.equal(graph.unnamed, 2, "id が空の種類を数えていない");
+  assert.equal(graph.unnamed, 2, "id が空の定義を数えていない");
   // 後ろの重複が持つ関係は線にしない。出ている点の欄に無い線が描かれることになるため
   assert.deepEqual(edges(form(phase("a"), phase("a", { requires: ["b"] }), phase("b"))), []);
 });
@@ -118,14 +118,14 @@ test("CB-T190b id にハイフンが入っていても、線が別の線に潰�
   assert.equal(new Set(graph.edges.map((edge) => edge.id)).size, 2);
 });
 
-test("CB-T191 位置の記録は、動かした点を丸めて入れ、図から消えた種類を落とす", () => {
+test("CB-T191 位置の記録は、動かした点を丸めて入れ、図から消えた定義を落とす", () => {
   // ドラッグそのものは jsdom で見る（CB-D80）。ここで見るのは、それが呼ぶ中身
   assert.deepEqual(withSpot({}, "a", 10.4, 20.6), { a: { x: 10, y: 21 } });
   assert.deepEqual(withSpot({ a: { x: 1, y: 2 } }, "b", 3, 4), { a: { x: 1, y: 2 }, b: { x: 3, y: 4 } });
-  // 同じ種類を動かし直すと上書き
+  // 同じ定義を動かし直すと上書き
   assert.deepEqual(withSpot({ a: { x: 1, y: 2 } }, "a", 9, 9), { a: { x: 9, y: 9 } });
 
-  // 図に出ている種類の記録だけを残す（id を打ち替えるたびに溜まるため）
+  // 図に出ている定義の記録だけを残す（id を打ち替えるたびに溜まるため）
   assert.deepEqual(keepSpots({ a: { x: 1, y: 2 }, b: { x: 3, y: 4 } }, ["a"]), { a: { x: 1, y: 2 } });
   // 変わらないときは、同じものをそのまま返す（返す形が変わると図が描き直される）
   const same = { a: { x: 1, y: 2 } };
@@ -169,7 +169,7 @@ test("CB-T197 dag で after が循環しても止まらず、並べ方も切り�
   assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 });
 
-test("CB-T211 線にしなかった参照は、同じ種類・同じ関係・同じ id を 1 件に数え、自分自身と空と id の無い行は数えない", () => {
+test("CB-T211 線にしなかった参照は、同じ定義・同じ関係・同じ id を 1 件に数え、自分自身と空と id の無い行は数えない", () => {
   const graph = graphOf(
     form(
       phase("a", { requires: ["ghost", " ghost ", ""], overlap: ["ghost", "a"], after: ["b"] }),

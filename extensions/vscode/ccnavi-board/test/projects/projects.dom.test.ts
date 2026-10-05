@@ -307,14 +307,14 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
     await enabled.close();
   }
 
-  // 配点とフェーズの種類はチケットにしか読まれない。disable の間は入口ごと消す
+  // 配点とフェーズ定義はチケットにしか読まれない。disable の間は入口ごと消す
   const off = await openProjects([row()], { ticketsEnabled: false });
   try {
     for (const action of ["open-board", "open-phases", "open-self-phases"]) {
       assert.equal(off.all(`button[data-action="${action}"]`).length, 0, action);
     }
     const body = text(off.document.body);
-    assert.ok(!/ワークスペースの設定のフェーズの種類/.test(body));
+    assert.ok(!/ワークスペースの設定のフェーズ定義/.test(body));
     assert.ok(!/フェーズ管理/.test(body));
     assert.ok(!/チケット管理/.test(body));
     // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール管理だけになる

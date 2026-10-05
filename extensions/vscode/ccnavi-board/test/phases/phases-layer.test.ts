@@ -1,5 +1,5 @@
 /**
- * レイヤー（自身のレイヤー・プロジェクト）と共通レイヤーの種類。ファイルが無いときの見せ方と、無いファイルへの書き戻し。
+ * レイヤー（自身のレイヤー・プロジェクト）と共通レイヤーの定義。ファイルが無いときの見せ方と、無いファイルへの書き戻し。
  * 画面の側は React なので happy-dom で動かして見る。
  */
 import { test } from "node:test";
@@ -11,7 +11,7 @@ import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "res
 
 const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { order: "sequential", phases: [] }, problems: [] } };
 
-test("CB-T114 レイヤーの種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
+test("CB-T114 レイヤーの定義のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
   const layer = await openPhases({ ...MISSING, layer: true, notices: ["読めない <理由>"] });
   try {
     assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られます/);
@@ -19,9 +19,9 @@ test("CB-T114 レイヤーの種類のファイルが無いときは雛形を置
     // 文面はそのまま出る（React が文字として入れるので、実体参照に変わらない）
     assert.equal(layer.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(layer.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
-    // 無いレイヤーでも種類を足して保存できる
+    // 無いレイヤーでも定義を足して保存できる
     assert.ok(!layer.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(layer.one("#phases .empty").textContent, /種類を足して保存すると、ファイルが作られます/);
+    assert.match(layer.one("#phases .empty").textContent, /定義を足して保存すると、ファイルが作られます/);
     layer.click(layer.one('button[data-action="add"]'));
     await layer.settle();
     assert.ok(!layer.one<HTMLInputElement>(".phase input.f-id").disabled);
@@ -30,18 +30,18 @@ test("CB-T114 レイヤーの種類のファイルが無いときは雛形を置
   }
 });
 
-test("CB-T239 共通レイヤーのファイルが無いときは雛形を作らせず、種類はレイヤーに置くと案内して自身のレイヤーを開く道だけを出す", async () => {
+test("CB-T239 共通レイヤーのファイルが無いときは雛形を作らせず、定義はレイヤーに置くと案内して自身のレイヤーを開く道だけを出す", async () => {
   const common = await openPhases({ ...MISSING, phasesPath: ".ccnavi/common/phases.yml" });
   try {
     const banner = common.one(".banner.missing").textContent;
-    assert.match(banner, /共通の設定に種類はありません/);
-    assert.match(banner, /種類はワークスペースかプロジェクトの設定に置いてください/);
+    assert.match(banner, /共通の設定に定義はありません/);
+    assert.match(banner, /定義はワークスペースかプロジェクトの設定に置いてください/);
     assert.match(banner, /プロジェクト管理画面の「フェーズ管理」から開けます/);
     assert.equal(common.all('button[data-action="create"]').length, 0, "共通の設定に雛形を作るボタンは出さない");
     assert.ok(!/雛形/.test(common.one("body").textContent), "雛形で作る道を案内しない");
     // 欄は触れない（画面から共通の設定のファイルを作らせない）。注意が無ければ帯を足さない
     assert.ok(common.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(common.one("#phases .empty").textContent, /種類はワークスペースかプロジェクトの設定に置いてください/);
+    assert.match(common.one("#phases .empty").textContent, /定義はワークスペースかプロジェクトの設定に置いてください/);
     assert.equal(common.all(".banner.warn:not(#changed)").length, 0);
     // 自身のレイヤーを開くボタンは、拡張ホストへ openSelf だけを送る（ファイルは作らない）
     assert.equal(common.one('button[data-action="open-self"]').textContent, "ワークスペースの設定を開く");
@@ -56,7 +56,7 @@ test("CB-T239 共通レイヤーのファイルが無いときは雛形を作ら
   }
 });
 
-test("CB-T116 無いファイル（空の本文）に種類を足して書き戻すと、version と種類を持つ読めるファイルになる", () => {
+test("CB-T116 無いファイル（空の本文）に定義を足して書き戻すと、version と定義を持つ読めるファイルになる", () => {
   const text = readPhases("").apply({
     order: "sequential",
     phases: [

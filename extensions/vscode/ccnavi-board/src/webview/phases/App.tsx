@@ -1,10 +1,10 @@
 /**
- * フェーズ管理画面の本体。注意の帯と、フェーズの種類の一覧。
+ * フェーズ管理画面の本体。注意の帯と、フェーズ定義の一覧。
  *
  * 見せる中身は拡張ホストが渡す（`PhasesData`）。画面が持つのは、ユーザが触って決めるもの
- * （編集中の種類、開いている行、絞り込み、直前の操作の一言）だけ。種類の意味は判定しない。
+ * （編集中の定義、開いている行、絞り込み、直前の操作の一言）だけ。定義の意味は判定しない。
  *
- * **中身（`data`）が届いたら、編集中の種類はその中身で置き換える。** 届くのは編集を捨ててよい
+ * **中身（`data`）が届いたら、編集中の定義はその中身で置き換える。** 届くのは編集を捨ててよい
  * ときだけ（ユーザが「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  *
@@ -49,7 +49,7 @@ interface Editing {
   /** 開いている行の鍵 */
   readonly open: ReadonlySet<string>;
   /**
-   * 「ほかの種類との関係・補足」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとはユーザの開閉で動く。**
+   * 「ほかの定義との関係・補足」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとはユーザの開閉で動く。**
    * 描くたびに値の有無で決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly more: ReadonlyMap<string, boolean>;
@@ -164,7 +164,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     post({ type: "reload", dirty });
   };
 
-  // 初回の案内は、種類の中身が出てから始める（読み込み中やエラーの画面には指す先が無い）
+  // 初回の案内は、定義の中身が出てから始める（読み込み中やエラーの画面には指す先が無い）
   useEffect(() => {
     if (tourPending && data.kind === "page") {
       setTourPending(false);
@@ -329,17 +329,17 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const tourSteps: readonly TourStep[] = [
     {
       target: "#phases",
-      title: "フェーズの種類",
-      body: "工程の型です。作業（work）の種類は親チケットの計画 plan: に、フィードバック対応（feedback）の種類はレビューのあとの feedback: に並べます。行を押すと欄が開き、「＋ 種類を追加」で増やせます。",
+      title: "フェーズ定義",
+      body: "工程の型です。作業（work）の定義は親チケットの計画 plan: に、フィードバック対応（feedback）の定義はレビューのあとの feedback: に並べます。行を押すと欄が開き、「＋ 定義を追加」で増やせます。",
       before: () => peekView("list"),
     },
     {
       target: sample === undefined ? "#phases" : `.phase[data-key="${sample.key}"] details.more`,
-      title: "ほかの種類との関係",
+      title: "ほかの定義との関係",
       body:
         sample === undefined
-          ? "種類を足して行を開くと「ほかの種類との関係」の欄があり、並行できる種類・一緒に必要な種類・先に済ませる種類を複数選択のリストで選べます（押すたびに付け外し）。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になります。"
-          : "並行できる種類・一緒に必要な種類・先に済ませる種類を、複数選択のリストで選びます（押すたびに付け外し）。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になります。",
+          ? "定義を足して行を開くと「ほかの定義との関係」の欄があり、並行できる定義・一緒に必要な定義・先に済ませる定義を複数選択のリストで選べます（押すたびに付け外し）。先に済ませる定義（after）は、待ち方が dag のときに判定が待つ相手になります。"
+          : "並行できる定義・一緒に必要な定義・先に済ませる定義を、複数選択のリストで選びます（押すたびに付け外し）。先に済ませる定義（after）は、待ち方が dag のときに判定が待つ相手になります。",
       before: () => {
         peekView("list");
         openSample();
@@ -348,7 +348,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     {
       target: "#f-order",
       title: "全体計画の待ち方",
-      body: "sequential は plan: に並べた順に一つずつ進みます。dag は after でつないだ種類だけを待ち、つながっていない種類は並行して進みます。合わせて使う設定のどれかが sequential なら、判定は sequential で待ちます。",
+      body: "sequential は plan: に並べた順に一つずつ進みます。dag は after でつないだ定義だけを待ち、つながっていない定義は並行して進みます。合わせて使う設定のどれかが sequential なら、判定は sequential で待ちます。",
     },
     {
       target: "#phase-graph",
@@ -375,7 +375,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   ];
 
   /**
-   * 種類を足す。**図を見ていても一覧へ移す。** 足した種類は id が空で図に出ないので、図のままだと
+   * 定義を足す。**図を見ていても一覧へ移す。** 足した定義は id が空で図に出ないので、図のままだと
    * 押しても何も変わらないように見える。絞り込みも外す（id が空の行は絞り込みに当たらず隠れる）。
    */
   const add = (): void => {
@@ -383,7 +383,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
     showView("list");
     setFind("");
-    // 足した種類は関係も補足も空なので、「ほかの種類との関係・補足」は折りたたんで出す
+    // 足した定義は関係も補足も空なので、「ほかの定義との関係・補足」は折りたたんで出す
     setEditing((now) => ({ ...now, more: new Map(now.more).set(row.key, false) }));
     setFocusKey(row.key);
   };
@@ -465,12 +465,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {page !== undefined && !page.exists && <Missing page={page} busy={busy} onOpenSelf={() => post({ type: "openSelf" })} />}
       <section className="block">
         <h2>
-          フェーズの種類{" "}
+          フェーズ定義{" "}
           <span className="count" id="phase-count">
             {countText(draft.rows.length, query, shown, kept)}
           </span>
           <button type="button" className="action small" data-action="add" disabled={busy || !editable} onClick={add}>
-            ＋ 種類を追加
+            ＋ 定義を追加
           </button>
           <button
             type="button"
@@ -516,16 +516,16 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         {helpOpen && (
           <div className="help-panel" id="help">
             <p className="hint">
-            親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--agree</code> が通ることが合意になります。レビューのあとは{" "}
-            <code>feedback:</code> に <code>feedback</code> の種類を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
+            親チケットの <code>plan:</code> に <code>work</code> の定義を順に並べたものが全体計画で、<code>--agree</code> が通ることが合意になります。レビューのあとは{" "}
+            <code>feedback:</code> に <code>feedback</code> の定義を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
-            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
-            after の書き漏れがあると、その種類は並行してよいものとして扱われるので、図で確かめてください。待ち方は親チケットの承認のときに親へコピーされ、あとで直しても進行中の親には反映されません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。
-            関係の欄はこのファイルのほかの種類から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の種類の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
+            <code>overlap</code> は並行してよい定義（対称）、<code>requires</code> は計画に入れるなら一緒に必要な定義です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき定義）で、書かない定義は何も待ちません。
+            after の書き漏れがあると、その定義は並行してよいものとして扱われるので、図で確かめてください。待ち方は親チケットの承認のときに親へコピーされ、あとで直しても進行中の親には反映されません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。
+            関係の欄はこのファイルのほかの定義から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の定義の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
-              図の「ユーザが見る」は種類の宣言（<code>review</code>）で、計画の延期や実績のリスクで実際に見る場所は変わります。判定が使う待ち方は、設定を合わせたうえで親チケットの承認のときに決まります（合わせる設定のどれかが{" "}
-              <code>sequential</code> なら <code>sequential</code>）。図はこのファイルの中だけを描くので、ほかの設定の種類を指す関係は線になりません。
+              図の「ユーザが見る」は定義の宣言（<code>review</code>）で、計画の延期や実績のリスクで実際に見る場所は変わります。判定が使う待ち方は、設定を合わせたうえで親チケットの承認のときに決まります（合わせる設定のどれかが{" "}
+              <code>sequential</code> なら <code>sequential</code>）。図はこのファイルの中だけを描くので、ほかの設定の定義を指す関係は線になりません。
             </p>
           </div>
         )}
@@ -574,15 +574,15 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
 /**
  * ファイルが無いときの帯。ワークスペースとプロジェクトの設定は欄を触れ、最初の保存でファイルを作る。
- * どの設定にも雛形は置かない。雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる。
- * 共通の設定は画面から作らせず、種類を置くワークスペースの設定を開く方法だけを出す。
+ * どの設定にも雛形は置かない。雛形の id は共通の設定の定義と重なりやすく、中身が違えばその設定が空として扱われる。
+ * 共通の設定は画面から作らせず、定義を置くワークスペースの設定を開く方法だけを出す。
  */
 function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readonly busy: boolean; readonly onOpenSelf: () => void }): JSX.Element {
   if (page.layer === true) {
     return (
       <div className="banner missing">
         <span>
-          {page.phasesPath} がありません。ファイルが無ければこの設定は空で、共通の設定の種類だけが使われます。この設定に種類を足すなら、下で足して保存してください（最初の保存でファイルが作られます）。雛形は作りません。雛形の id は共通の設定の種類と重なりやすく、中身が違えばこの設定が空として扱われるためです。
+          {page.phasesPath} がありません。ファイルが無ければこの設定は空で、共通の設定の定義だけが使われます。この設定に定義を足すなら、下で足して保存してください（最初の保存でファイルが作られます）。雛形は作りません。雛形の id は共通の設定の定義と重なりやすく、中身が違えばこの設定が空として扱われるためです。
         </span>
       </div>
     );
@@ -590,7 +590,7 @@ function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readon
   return (
     <div className="banner missing">
       <span>
-        共通の設定に種類はありません（{page.phasesPath} がありません）。種類はワークスペースかプロジェクトの設定に置いてください。プロジェクト管理画面の「フェーズ管理」から開けます。
+        共通の設定に定義はありません（{page.phasesPath} がありません）。定義はワークスペースかプロジェクトの設定に置いてください。プロジェクト管理画面の「フェーズ管理」から開けます。
       </span>
       <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
         ワークスペースの設定を開く

@@ -238,7 +238,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "section.workspace",
     title: "ワークスペース（プロジェクト外）",
-    body: "ワークスペースの設定のルールとフェーズの種類です。ワークスペースの設定のルールが無ければ、共通の設定からコピーして作れます。",
+    body: "ワークスペースの設定のルールとフェーズ定義です。ワークスペースの設定のルールが無ければ、共通の設定からコピーして作れます。",
   },
   {
     target: '.toolbar [data-action="open-rules"]',
@@ -293,7 +293,7 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
 
 /**
  * ワークスペースの設定のルール。無いのは正常なので warn の色は使わない。
- * フェーズの種類の行は、チケット制御が disable なら出さない（種類はチケットにしか読まれない）。
+ * フェーズ定義の行は、チケット制御が disable なら出さない（定義はチケットにしか読まれない）。
  */
 function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
   return (
@@ -331,12 +331,12 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
       </div>
       {page.ticketsEnabled && (
         <div className="self-rules">
-          <span>ワークスペースの設定のフェーズの種類</span>{" "}
+          <span>ワークスペースの設定のフェーズ定義</span>{" "}
           <button
             type="button"
             className="action small"
             data-action="open-self-phases"
-            title="プロジェクト外のチケット（project: が空）の計画で、共通の設定の種類に足して使う種類を編集します。ファイルが無ければ画面から作れます"
+            title="プロジェクト外のチケット（project: が空）の計画で、共通の設定の定義に足して使う定義を編集します。ファイルが無ければ画面から作れます"
             onClick={() => post({ type: "openSelfPhases" })}
           >
             フェーズ管理

@@ -15,7 +15,7 @@ export type RulesTarget =
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
 
-/** フェーズ管理画面が直す種類のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
+/** フェーズ管理画面が直す定義のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
 export type PhasesTarget =
   | { readonly kind: "common" }
   | { readonly kind: "self" }

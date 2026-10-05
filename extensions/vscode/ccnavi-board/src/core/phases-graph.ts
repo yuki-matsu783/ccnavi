@@ -1,18 +1,18 @@
 /**
- * フェーズ管理画面の図。種類のリスト（`PhasesForm`）から、点と線と置き場所を組む純関数。
+ * フェーズ管理画面の図。定義のリスト（`PhasesForm`）から、点と線と置き場所を組む純関数。
  *
  * **向きを持つのは `after` の線だけ。** `after` は `order: dag` のときの依存で、
- * 待たれる側 → 待つ側に矢印を描く。`requires` は「計画にこの種類を置くなら一緒に置くべき種類」で、
+ * 待たれる側 → 待つ側に矢印を描く。`requires` は「計画にこの定義を置くなら一緒に置くべき定義」で、
  * 実行ファイル（`agree.py`）が見るのは `plan:` に入っているかどうかだけ。前後は見ない。
  * `overlap` は定義からして対称。この 2 つに矢印を描くと、無い制約を描くことになる。
  *
  * **判定はしない。** 答えは実行ファイルの 1 か所に置く。 循環も、到達不能も、孤立も、ここは見つけない。
  * 行き先がこのファイルに無い参照は**何も言わずに線にしないだけ**で、なぜ無いのかは言わない。
- * 表記違いなのかほかの設定の種類なのかを決めるのは実行ファイルで、`phasetypes.py` の
+ * 表記違いなのかほかの設定の定義なのかを決めるのは実行ファイルで、`phasetypes.py` の
  * `reference_problems` が合成した集合で確かめ、無ければ error を出す。画面がその手前で
  * 別の答えを出すと、2 か所が違うことを言う。
  *
- * **このファイルの中しか見えない。** 設定をまたぐ参照（プロジェクトの種類が共通の設定の種類を挙げる）は、
+ * **このファイルの中しか見えない。** 設定をまたぐ参照（プロジェクトの定義が共通の設定の定義を挙げる）は、
  * 画面には解けない。受け取るのがその設定 1 本だけだから。解こうとするとレイヤー（layer）の合成を拡張が作り直すことになる。
  *
  * **置き場所は id と `after` だけで決まる。** `order: sequential` なら id の順の格子。`order: dag` なら
@@ -21,10 +21,10 @@
  * 関係を直しながら確かめる作業の妨げになる。それを `after` についてだけ受け入れる（深さで並べないと、
  * 合流と分岐が交差した線に埋もれる）。ユーザがドラッグで置いた点は動かない（`state.ts`）。
  *
- * **work と feedback は分けて置く。** work の種類は上の決まりで並べ、feedback の種類はその右に 1 列で
- * 縦に並べる（`FEEDBACK_GAP` だけ離す）。feedback の種類は全体計画（`plan:`）には入らず、レビューの
+ * **work と feedback は分けて置く。** work の定義は上の決まりで並べ、feedback の定義はその右に 1 列で
+ * 縦に並べる（`FEEDBACK_GAP` だけ離す）。feedback の定義は全体計画（`plan:`）には入らず、レビューの
  * あとに `feedback:` へ並べる対応なので、図は区分ごとの枠と、枠の間の「レビュー後」の矢印でその順を見せる
- * （`Graph.tsx`）。feedback の種類は `after` を持てない（`phasetypes.py`）ので、種類どうしの線では描けない。
+ * （`Graph.tsx`）。feedback の定義は `after` を持てない（`phasetypes.py`）ので、定義どうしの線では描けない。
  *
  * **循環は見つけたと言わない。** 深さを辿る途中で同じ点に戻ったら、そこで打ち切るだけ。並べ方も
  * 切り替えない。循環の error は実行ファイル（`phasetypes.cycle_problems`）が出す。
@@ -56,11 +56,11 @@ export interface PhasesGraph {
   readonly order: PhaseOrder;
   readonly nodes: readonly GraphNode[];
   readonly edges: readonly GraphEdge[];
-  /** 図に出せなかった種類の数（id が空で、指すことも指されることもできない） */
+  /** 図に出せなかった定義の数（id が空で、指すことも指されることもできない） */
   readonly unnamed: number;
   /**
    * 線にしなかった参照の数（このファイルに無い id を指す overlap / requires / after）。
-   * 表記違いかほかの設定の種類かは言わない（頭のコメント）。数だけを図の下の注意に出す
+   * 表記違いかほかの設定の定義かは言わない（頭のコメント）。数だけを図の下の注意に出す
    */
   readonly dropped: number;
 }
@@ -96,7 +96,7 @@ function edgeId(relation: Relation, a: string, b: string): string {
  * 線を組む。行き先がこのファイルに無いものは落とす。同じ組は 1 本にする
  * （`a` が `b` を、`b` が `a` を挙げていても 1 本）。
  *
- * 辿るのは**先に出てきた種類だけ**（`kept`）。同じ id が 2 つあるとき、点は先のほうを出すので、
+ * 辿るのは**先に出てきた定義だけ**（`kept`）。同じ id が 2 つあるとき、点は先のほうを出すので、
  * 後ろの重複から線を作ると、出ている点の欄に無い関係が描かれることになる。
  */
 function edgesOf(kept: readonly PhasesForm["phases"][number][], known: ReadonlySet<string>): GraphEdge[] {
@@ -116,7 +116,7 @@ function edgesOf(kept: readonly PhasesForm["phases"][number][], known: ReadonlyS
     for (const relation of ["requires", "overlap"] as const) {
       for (const raw of phase[relation]) {
         const to = raw.trim();
-        // 自分自身を挙げている種類は、実行ファイルが --lint で警告する。ここは線にしないだけ
+        // 自分自身を挙げている定義は、実行ファイルが --lint で警告する。ここは線にしないだけ
         if (!known.has(to) || to === from) {
           continue;
         }
@@ -132,7 +132,7 @@ function edgesOf(kept: readonly PhasesForm["phases"][number][], known: ReadonlyS
 }
 
 /**
- * 図を組む。id が空の種類は出さない（指すことも指されることもできないので、線を持てない）。
+ * 図を組む。id が空の定義は出さない（指すことも指されることもできないので、線を持てない）。
  * 同じ id が 2 つあるときは先に出てきたほうだけを出す（保存は画面が止めるので、直すまでの間の表示）。
  */
 export function graphOf(form: PhasesForm): PhasesGraph {
@@ -152,7 +152,7 @@ export function graphOf(form: PhasesForm): PhasesGraph {
   const kept = ids.map((id) => first.get(id) as PhasesForm["phases"][number]);
   const known = new Set(ids);
   const edges = edgesOf(kept, known);
-  // 同じ種類が同じ関係で同じ id を 2 度挙げても 1 件（線と同じまとめ方）。関係が違えば別に数える
+  // 同じ定義が同じ関係で同じ id を 2 度挙げても 1 件（線と同じまとめ方）。関係が違えば別に数える
   const missing = new Set<string>();
   for (const phase of kept) {
     for (const relation of ["overlap", "requires", "after"] as const) {
@@ -222,7 +222,7 @@ function byDepth(first: ReadonlyMap<string, PhasesForm["phases"][number]>, ids: 
 
 // ---- ユーザがドラッグで動かした位置（画面の state に保持する。`phases.yml` には書かない）
 
-/** 点の置き場所の記録。鍵は種類の id */
+/** 点の置き場所の記録。鍵は定義の id */
 export type Spots = Record<string, { readonly x: number; readonly y: number }>;
 
 /**
@@ -238,7 +238,7 @@ export function withSpot(spots: Spots, id: string, x: number, y: number): Spots 
   return { ...spots, [id]: { x: Math.round(x), y: Math.round(y) } };
 }
 
-/** 図に出ている種類の記録だけを残す。変わらなければ元のものをそのまま返す（描き直しを起こさない） */
+/** 図に出ている定義の記録だけを残す。変わらなければ元のものをそのまま返す（描き直しを起こさない） */
 export function keepSpots(spots: Spots, ids: readonly string[]): Spots {
   const next: Spots = {};
   for (const id of ids) {
