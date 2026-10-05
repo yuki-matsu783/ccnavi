@@ -430,7 +430,7 @@ def decide_before(
         return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf)
 
     # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから
-    # 書き込む形の保護の照合が長さの 2 乗で遅くなる（selfguard_shell.REDIRECT_LIMIT）。
+    # 書き込む形の保護の照合が `>` の個数 × 尾の長さで遅くなる（selfguard_shell.REDIRECT_LIMIT）。
     # 期限を越えると判定に達せず、enable では block（終了コード 2）で止まるだけになり、
     # 何が起きたかも言えない。そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に
     # 当てず、ほかの deny と ask のルールを当てたうえで、権限モードに依らず拒否にし、理由と
@@ -593,6 +593,9 @@ def decide_before(
         ]
         record.code = reasons.CODE_REDIRECT_LIMIT_DENY
         record.rules = [reasons.REDIRECT_LIMIT_RULE, *record.rules]
+        # 判定を決めたのはレイヤーを持たない組み込み（上限）。並べた ask のルールのレイヤーを
+        # 残すと、ルールファイルのルールが止めたように読める。チケットが止めた回と同じく空にする。
+        record.source = ""
     elif verdict == rules.DENY and not ticket_reason:
         # ルールの deny。当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
