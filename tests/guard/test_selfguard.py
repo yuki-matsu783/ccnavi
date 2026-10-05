@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -669,6 +670,81 @@ class SelfGuardTest(unittest.TestCase):
                 result = self.run_hook("PreToolUse", command=command)
 
                 self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_引用の中で目印が続くパスへのリダイレクトも止まる(self):
+        # 引用の中の空白の連続と、空白に隣り合う演算子の文字は、語の中の目印が 2 つ続く形になる。
+        # 目印 1 つずつしか通さない式では、この形が穴になっていた。
+        for command in [
+            'echo x > "projects/New folder (2)/.ccnavi/common/rules.yml"',
+            'echo x > "projects/has  space/.ccnavi/config/rules.yml"',
+            'echo x > "projects/R & D/.ccnavi/config/rules.yml"',
+            'echo x > "a; b/.ccnavi/common/rules.yml"',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_空白を含む行き先のほかの書き方も止まったまま(self):
+        for command in [
+            'echo x > "a(1)/.ccnavi/common/rules.yml"',
+            'echo x > "R&D/.ccnavi/common/rules.yml"',
+            'echo x > "a b /.ccnavi/common/rules.yml"',
+            'echo x > "C:\\my dir\\.ccnavi\\common\\rules.yml"',
+            'echo x >| "a b/.ccnavi/common/rules.yml"',
+            'echo x &> "a b/.ccnavi/common/rules.yml"',
+            'echo x 2> "a b/.ccnavi/common/rules.yml"',
+            'echo x >& "a b/.ccnavi/common/rules.yml"',
+            "echo x > a\\ b/.ccnavi/common/rules.yml",
+            'echo x > "a\tb/.ccnavi/common/rules.yml"',
+            'cat <<EOF > "a b/.ccnavi/common/rules.yml"\nx\nEOF',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_引用の中の大なりは目印が続いても書き込みではない(self):
+        for command in [
+            'echo "a >b c/.ccnavi/common/rules.yml"',
+            'echo "a  >  b/.ccnavi/common/rules.yml"',
+            'echo "1>2" .ccnavi/common/rules.yml',
+            'grep -n "regex: (>" .ccnavi/common/rules.yml',
+            'echo x > "a b" .ccnavi/scripts/count.sh',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_リダイレクトの当て始めは大なりの並びの頭だけ(self):
+        # 並びの途中の `>` からも当て直せると、`>` が n 個続く入力で当て始めが n 通りに増え、
+        # それぞれが行き先の語を読み直す。手数は時間で測ると揺れるので、当て始めの数で見る。
+        redirect = re.compile(selfguard._REDIRECT)
+        text = shellread.read("echo x " + ">" * 50 + ' "a b"').text
+
+        starts = [i for i in range(len(text)) if redirect.match(text, i)]
+
+        self.assertEqual([text.index(">") - 1], starts)
+
+    def test_リダイレクトの行き先の語は大なりの並びの文字で始まらない(self):
+        # 並びと語が同じ文字を取り合うと、割り方が並びの長さのぶんだけ増える。
+        # shellread は演算子のあとに空白を置くので、語の頭にこの文字は来ない。
+        redirect = re.compile(selfguard._REDIRECT + r"\Z")
+        for text in [" > >a", " > |a", " > &a"]:
+            with self.subTest(text=text):
+                self.assertIsNone(redirect.match(text))
+
+    def test_大なりを長く並べても後ろの書き込みは止まる(self):
+        n = 500
+        command = "echo x " + ">" * n + '"' + "a " * n + '"\necho x > .ccnavi/common/rules.yml'
+
+        result = self.run_hook("PreToolUse", command=command)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
 
     # 実行ファイル
 
