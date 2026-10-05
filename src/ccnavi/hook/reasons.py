@@ -56,6 +56,12 @@ CODE_TICKET_SCOPE = "DENY_TICKET_SCOPE"
 # チケットが `ask` と書いた場所。ルールの `ask` と同じく、ユーザが 1 度見る場所。
 CODE_TICKET_ASK = "TICKET_ASK"
 
+# 読み切れなかったコマンドの `>` が上限（selfguard.REDIRECT_LIMIT）を超え、シェルから
+# 書き込む形の保護を生の文字列に当てずに確認へ回した。ルールに当たったのではないので、
+# 記録のルール名は括弧付きの REDIRECT_LIMIT_RULE にする。
+CODE_REDIRECT_LIMIT = "REDIRECT_LIMIT_ASK"
+REDIRECT_LIMIT_RULE = "(redirect-limit)"
+
 # ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 

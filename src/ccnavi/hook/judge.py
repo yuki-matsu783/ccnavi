@@ -86,6 +86,17 @@ PATH_TOOLS = ruleload.PATH_TOOLS
 # 空のままにすると、場所を書かない呼び出しがどのルールにも当たらずに通る。
 SEARCH_TOOLS = ("Grep", "Glob")
 
+# シェルから書き込む形を止める組み込みの保護。どれも書き込む動詞の式（selfguard._WRITE_VERBS）を
+# 持ち、生の文字列では `>` の個数に対して 2 乗で遅くなる。ガード自身の設定を守る 1 本は、
+# ルールファイルが読める間は selfguard が足し、読めずに組み込みの既定に戻った間は builtin が持つ。
+# チケットの状態の置き場を守る 1 本は、チケット制御が有効なときに足す。
+# 生の文字列の `>` が上限を超えたときは、これらを生の文字列に当てない（decide_before）。
+SHELL_GUARD_RULE_IDS = (
+    selfguard.SHELL_RULE_ID,
+    builtin.CONFIG_VIA_BASH_RULE_ID,
+    ticket_mod.STATE_SHELL_RULE_ID,
+)
+
 
 def guard_setting_files(
     mode: str,
@@ -399,9 +410,21 @@ def decide_before(
         ]
         return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf)
 
-    # 強いタイプから順に見て、最初に当たったところで止める。deny に当たった
-    # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
-    # 確認もしろ」という読めない結論になる経路ができる。
+    # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから
+    # 書き込む形の保護の照合が長さの 2 乗で遅くなり、期限を越えて止める判定を出せなくなる
+    # （selfguard.REDIRECT_LIMIT）。そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に
+    # 当てず、ほかのルールを当てたうえで少なくとも確認にする。照合を飛ばして通すと、上限の後ろに
+    # 書いた保護対象への書き込みが素通りする。ほかのルールは当てたままなので、deny に当たる形は
+    # 今までどおり止まる。中で実行されるコマンドと `cd` の行き先は読み解けた形なので、保護も
+    # そのまま当てる。
+    unread = bool(record.degraded) or (
+        payload.tool_name in phase.SHELL_TOOLS and payload.tool_name != "Bash"
+    )
+    capped = (
+        unread
+        and selfguard.too_many_redirects(subject)
+        and any(rule.id in SHELL_GUARD_RULE_IDS for rule in rule_set.deny)
+    )
     verdict, group = "", []
     # group と同じリストで、中で実行されるコマンドで当たったときの
     # （実行役のコマンド, そのコマンド, 引用の中から切り出したコマンドの層か）。
@@ -428,7 +451,8 @@ def decide_before(
                 stderr.write("ccnavi: 判定を終える前に期限に達した\n")
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
                 return modes.fail_closed(mode)
-            if rule.matches(payload.tool_name, subject):
+            raw_skipped = capped and rule.id in SHELL_GUARD_RULE_IDS
+            if not raw_skipped and rule.matches(payload.tool_name, subject):
                 group.append(rule)
                 via.append(("", "", False))
                 continue
@@ -440,6 +464,10 @@ def decide_before(
         if group:
             verdict = name
             break
+    # 保護を当てなかったぶん、deny でなければ確認に上げる。allow に当たっていても上げる。
+    capped = capped and verdict != rules.DENY
+    if capped:
+        verdict = rules.ASK
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
@@ -551,6 +579,16 @@ def decide_before(
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
         record.code = reasons.CODE_RULE_ASK
+        if capped:
+            # 確認にしたのは `>` の上限。当たった ask のルールがあれば、その文も後ろに並べる。
+            texts.insert(
+                0,
+                reasons.builtin_refusal(
+                    reasons.CODE_REDIRECT_LIMIT, subject, selfguard.REDIRECT_LIMIT_MESSAGE
+                ),
+            )
+            record.code = reasons.CODE_REDIRECT_LIMIT
+            record.rules = [reasons.REDIRECT_LIMIT_RULE, *record.rules]
     elif verdict == rules.ASK:
         # チケットが ask と書いた場所。ユーザが 1 度見る場所として宣言されている。
         # ルールは何も言わないか、allow に当たっている。
