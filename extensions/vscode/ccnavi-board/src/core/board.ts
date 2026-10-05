@@ -111,7 +111,7 @@ export interface Card {
   readonly ready: boolean;
   readonly phases: readonly PhaseChip[];
   readonly actions: readonly Action[];
-  /** 読み手が気づくべき食い違い */
+  /** 読み手が気づくべき食い違い。実行ファイルの `issues` をそのまま持つ */
   readonly issues: readonly string[];
   /**
    * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。
@@ -122,10 +122,8 @@ export interface Card {
   readonly mrUrl: string;
   readonly mrNumber: number | null;
   /**
-   * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
-   * 親の改版。バッジの「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
-   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらないチケット、不備、
-   * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
+   * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。実行ファイルの `attention` をそのまま持ち、
+   * 条件はここで組み直さない（条件は ccnavi の README「ボードの JSON」）
    */
   readonly attention: boolean;
   /**
@@ -179,9 +177,8 @@ const REMAINING: readonly ProposalState[] = ["todo", "doing"];
 
 export function buildBoard(json: BoardJson): Board {
   const parents = new Map<string, ParentJson>(json.parents.map((p) => [p.ticket, p]));
-  const ids = new Set(json.tickets.map((t) => t.ticket));
   const pending = new Set(json.pending_approval);
-  const live = json.tickets.map((t) => toCard(t, parents, ids, pending));
+  const live = json.tickets.map((t) => toCard(t, parents, pending));
   // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が本物）
   // 鍵はプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
   const liveKeys = new Set(json.tickets.map((t) => `${t.project}\u0000${t.ticket}`));
@@ -226,20 +223,10 @@ function compareCards(a: Card, b: Card): number {
 function toCard(
   t: TicketJson,
   parents: ReadonlyMap<string, ParentJson>,
-  ids: ReadonlySet<string>,
   pending: ReadonlySet<string>,
 ): Card {
-  const issues: string[] = [];
-  // 止まっていることは不備として挙げる。バッジは一目で分かる短い言葉しか出せないので、
-  // 理由の全文はここに置く（`attention` もこれで真になる）。
-  if (t.blocked !== "") {
-    issues.push(`書き込みが止まっています: ${t.blocked}`);
-  }
   const isParent = t.parent === "";
-  const column = columnOf(t, issues);
-  if (!isParent && !ids.has(t.parent)) {
-    issues.push(`親 ${t.parent} が見つかりません`);
-  }
+  const column = columnOf(t);
 
   const ownParent = parents.get(isParent ? t.ticket : t.parent);
   const ownPhase =
@@ -258,15 +245,6 @@ function toCard(
   const riskLevel = typeof t.risk?.level === "string" ? t.risk.level : "";
   const gateClosed = !isParent && (ownPhase?.gate_closed ?? false);
   const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
-  const attention =
-    pending.has(t.ticket) ||
-    gateClosed ||
-    (!t.worktree.exists && (column === "todo" || column === "doing")) ||
-    reviewWaiting ||
-    isHighRisk(riskLevel) ||
-    t.scattered.length > 0 ||
-    issues.length > 0 ||
-    phases.some((p) => p.gateClosed || p.reviewWaiting || isHighRisk(p.riskLevel));
 
   return {
     id: t.ticket,
@@ -304,11 +282,11 @@ function toCard(
     ready: isParent && ownParent?.ready !== null && ownParent?.ready !== undefined,
     phases,
     actions,
-    issues,
+    issues: t.issues,
     blocked: t.blocked,
     mrUrl: mr.url,
     mrNumber: mr.number,
-    attention,
+    attention: t.attention,
     flow: isParent ? null : flowOf(t.flow, column),
     history: t.history,
     predecessorsUnmet: t.predecessors_unmet,
@@ -380,10 +358,6 @@ function flowOf(flow: FlowJson | null, column: ProposalState): FlowJson | null {
   return (column === "done" || column === "cancelled") && !flow.exists ? null : flow;
 }
 
-function isHighRisk(level: string): boolean {
-  return level === "HIGH" || level === "CRITICAL";
-}
-
 /**
  * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
  * 断片を落としてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
@@ -402,9 +376,9 @@ function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | nul
 /**
  * 列は置き場から引く。提案の側にあれば `todo/` は未着手、`review/` は作業中（レビュー待ちは属性で言う）。
  * 無ければ承認済みチケットから。閉じた承認済みチケット（`done/`）は取り消しの時刻があれば cancelled、無ければ done。
- * 開いている承認済みチケット（`doing/`）は doing。どちらにも無いのは食い違いなので、todo に置いたうえで不備として言う。
+ * 開いている承認済みチケット（`doing/`）は doing。どちらにも無いのは食い違いなので todo に置く（不備の文は実行ファイルの `issues`）。
  */
-function columnOf(t: TicketJson, issues: string[]): ProposalState {
+function columnOf(t: TicketJson): ProposalState {
   if (t.proposal !== null) {
     return t.proposal.state === "review" ? "doing" : "todo";
   }
@@ -414,7 +388,6 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
   if (t.copy.status === "open") {
     return "doing";
   }
-  issues.push("提案が見つかりません（承認済みチケットだけがあります）");
   return "todo";
 }
 

@@ -828,8 +828,8 @@ test("CB-T141 止まっているカードに「書き込み停止中」のバッ
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
   const reason = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
-  const stopped: TicketJson = { ...child, blocked: reason };
-  // 親も渡す。外すと「親が見つからない」不備も同時に出て、見たい不備が 1 つに絞れない。
+  // 不備の文は実行ファイルが組んで渡す（ボードはそのまま出す）
+  const stopped: TicketJson = { ...child, blocked: reason, issues: [`書き込みが止まっています: ${reason}`], attention: true };
   const parent = base.tickets.find((t) => t.ticket === "i0001")!;
   const page = await openBoard({ ...base, tickets: [parent, stopped] });
   try {

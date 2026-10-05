@@ -40,6 +40,8 @@ function ticket(fields: Partial<TicketJson> & Pick<TicketJson, "ticket" | "title
     judge: null,
     flow: null,
     history: [],
+    issues: [],
+    attention: false,
     ...fields,
   };
 }
@@ -103,6 +105,8 @@ export function sampleBoard(root: string, generatedAt: string): Board {
         worktree: { exists: false, path: "" },
         started_at: "",
         human_review: { required: true, reason: "見本" },
+        // 実行ファイルなら承認待ちを要対応と言う
+        attention: true,
       }),
       ticket({
         ticket: "sample-b",
