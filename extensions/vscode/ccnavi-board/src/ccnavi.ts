@@ -11,7 +11,7 @@
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
- * 検証はリスクの配点も `--risk` で、フェーズ定義も `--phases`（ワークスペースかプロジェクトの設定の定義なら `--project-phases-file <名前>=<パス>`）で
+ * 検証はリスクの配点も `--risk` で、フェーズ定義も `--project-phases-file <名前>=<パス>`（ワークスペースの設定は `self=<パス>`）で
  * 差し替えられる（リスク管理画面・フェーズ管理画面）。
  * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと state の置き場は外し、記録も残さない
  * （試し打ちで記録を汚さない）。
@@ -123,14 +123,13 @@ export type RulesOverride =
 
 /**
  * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、リスクの配点を `--risk` で、
- * 共通の設定のフェーズ定義を `--phases` で、ワークスペースの設定（`self`）かプロジェクトの設定の定義を
- * `--project-phases-file <名前>=<パス>` で差し替えられる。後者の定義は共通の設定と合成して確かめられる。
+ * ワークスペースの設定（`self`）かプロジェクトの設定のフェーズ定義を `--project-phases-file <名前>=<パス>` で差し替えられる。
+ * フェーズ定義は足し算をしないので、その 1 本の中だけで確かめられる（共通の設定の `--phases` は使わない）。
  * 判定（`--test`）には配点も定義も関係ないので、そちらは RulesOverride だけを受ける。
  */
 export type LintOverride =
   | RulesOverride
   | { readonly kind: "risk"; readonly path: string }
-  | { readonly kind: "phases"; readonly path: string }
   | { readonly kind: "layerPhases"; readonly name: string; readonly path: string };
 
 function overrideArgs(override: LintOverride): string[] {
@@ -143,8 +142,6 @@ function overrideArgs(override: LintOverride): string[] {
       return ["--project-rules-file", `self=${override.path}`];
     case "risk":
       return ["--risk", override.path];
-    case "phases":
-      return ["--phases", override.path];
     case "layerPhases":
       return ["--project-phases-file", `${override.name}=${override.path}`];
   }

@@ -21,6 +21,8 @@ import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
 import { JudgeResult, SamplesResult, SuggestResult, type Judged } from "./Judge.js";
 import { TargetSelect } from "../TargetSelect.js";
+import { defaultSum } from "../../core/sums.js";
+import { Sum } from "./Sum.js";
 import { post } from "./post.js";
 import { Rule } from "./Rule.js";
 import {
@@ -441,7 +443,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="open-rules" onClick={() => post({ type: "openFile", which: "rules" })}>
+          <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
@@ -548,6 +550,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             </section>
           );
         })}
+        {page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />}
       </section>
       <section id="tab-judge" className={tab === "judge" ? "pane active" : "pane"}>
         <p className="hint">

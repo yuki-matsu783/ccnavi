@@ -45,7 +45,7 @@
   {
    "name": "common",
    "rules": {
-    "path": "<root>/rules.yml",
+    "path": "<root>/.ccnavi/common/rules.yml",
     "unreadable": "",
     "deny": [
      {
@@ -62,66 +62,14 @@
     "ask": [],
     "allow": []
    },
-   "phases": [
-    {
-     "id": "research",
-     "source": "common",
-     "kind": "work",
-     "title": "調査",
-     "review": "none",
-     "scope": [
-      "wip/research/*"
-     ]
-    },
-    {
-     "id": "design",
-     "source": "common",
-     "kind": "work",
-     "title": "設計",
-     "review": "mr",
-     "scope": [
-      "wip/design/*"
-     ]
-    },
-    {
-     "id": "acceptance",
-     "source": "common",
-     "kind": "work",
-     "title": "受入テスト作成",
-     "review": "mr",
-     "scope": [
-      "tests/*"
-     ]
-    },
-    {
-     "id": "implement",
-     "source": "common",
-     "kind": "work",
-     "title": "実装とテスト",
-     "review": "mr",
-     "scope": [
-      "src/*",
-      "tests/*"
-     ]
-    },
-    {
-     "id": "implement-feedback",
-     "source": "common",
-     "kind": "feedback",
-     "title": "実装フィードバック対応",
-     "review": "mr",
-     "scope": [
-      "inherit"
-     ]
-    }
-   ],
+   "phases": [],
    "risk": {
     "path": "<root>/.ccnavi/common/risks.yml",
     "unreadable": "",
     "factors": []
    },
    "phases_file": {
-    "path": "<root>/phases.yml",
+    "path": "<root>/.ccnavi/common/phases.yml",
     "unreadable": ""
    }
   },
@@ -134,7 +82,79 @@
     "ask": [],
     "allow": []
    },
-   "phases": [],
+   "phases": [
+    {
+     "id": "research",
+     "source": "self",
+     "kind": "work",
+     "title": "調査",
+     "review": "none",
+     "scope": [
+      "wip/research/*"
+     ]
+    },
+    {
+     "id": "design",
+     "source": "self",
+     "kind": "work",
+     "title": "設計",
+     "review": "mr",
+     "scope": [
+      "wip/design/*"
+     ]
+    },
+    {
+     "id": "acceptance",
+     "source": "self",
+     "kind": "work",
+     "title": "受入テスト作成",
+     "review": "mr",
+     "scope": [
+      "tests/*"
+     ]
+    },
+    {
+     "id": "implement",
+     "source": "self",
+     "kind": "work",
+     "title": "実装とテスト",
+     "review": "mr",
+     "scope": [
+      "src/*",
+      "tests/*"
+     ]
+    },
+    {
+     "id": "implement-feedback",
+     "source": "self",
+     "kind": "feedback",
+     "title": "実装フィードバック対応",
+     "review": "mr",
+     "scope": [
+      "inherit"
+     ]
+    },
+    {
+     "id": "chores",
+     "source": "self",
+     "kind": "work",
+     "title": "片付け",
+     "review": "chat",
+     "scope": [
+      "src/*"
+     ]
+    },
+    {
+     "id": "chores-feedback",
+     "source": "self",
+     "kind": "feedback",
+     "title": "片付けフィードバック対応",
+     "review": "chat",
+     "scope": [
+      "inherit"
+     ]
+    }
+   ],
    "risk": {
     "path": "<root>/.ccnavi/config/risks.yml",
     "unreadable": "",
@@ -143,6 +163,155 @@
    "phases_file": {
     "path": "<root>/.ccnavi/config/phases.yml",
     "unreadable": ""
+   }
+  }
+ ],
+ "sums": [
+  {
+   "name": "self",
+   "layers": [
+    "common",
+    "self"
+   ],
+   "rules": {
+    "path": "<root>/.ccnavi/config/rules.yml",
+    "unreadable": "",
+    "missing": true,
+    "deny": [
+     {
+      "id": "guard-approved",
+      "section": "deny",
+      "source": "common",
+      "match": "Write|Edit|NotebookEdit",
+      "kind": "glob",
+      "written": "*/.ccnavi/*",
+      "pattern": "(?s:(?>.*?[///]/.ccnavi[///]).*)/Z",
+      "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。"
+     }
+    ],
+    "ask": [],
+    "allow": []
+   },
+   "risk": {
+    "levels": {
+     "medium": 20,
+     "high": 40,
+     "critical": 70
+    },
+    "factors": [
+     {
+      "id": "big-diff",
+      "source": "common",
+      "kind": "lines_over",
+      "value": 300,
+      "points": 25,
+      "message": "行数が多い"
+     },
+     {
+      "id": "many-files",
+      "source": "common",
+      "kind": "files_over",
+      "value": 10,
+      "points": 15,
+      "message": "ファイルが多い"
+     },
+     {
+      "id": "ci",
+      "source": "common",
+      "kind": "glob",
+      "value": ".github/**",
+      "points": 35,
+      "message": "CI やエージェント定義に触った"
+     },
+     {
+      "id": "deletes",
+      "source": "common",
+      "kind": "deleted_over",
+      "value": 3,
+      "points": 20,
+      "message": "消したファイルが多い"
+     }
+    ],
+    "fallback": "",
+    "problems": []
+   },
+   "phases": {
+    "path": "<root>/.ccnavi/config/phases.yml",
+    "unreadable": "",
+    "order": "sequential",
+    "types": [
+     {
+      "id": "research",
+      "source": "self",
+      "kind": "work",
+      "title": "調査",
+      "review": "none",
+      "scope": [
+       "wip/research/*"
+      ]
+     },
+     {
+      "id": "design",
+      "source": "self",
+      "kind": "work",
+      "title": "設計",
+      "review": "mr",
+      "scope": [
+       "wip/design/*"
+      ]
+     },
+     {
+      "id": "acceptance",
+      "source": "self",
+      "kind": "work",
+      "title": "受入テスト作成",
+      "review": "mr",
+      "scope": [
+       "tests/*"
+      ]
+     },
+     {
+      "id": "implement",
+      "source": "self",
+      "kind": "work",
+      "title": "実装とテスト",
+      "review": "mr",
+      "scope": [
+       "src/*",
+       "tests/*"
+      ]
+     },
+     {
+      "id": "implement-feedback",
+      "source": "self",
+      "kind": "feedback",
+      "title": "実装フィードバック対応",
+      "review": "mr",
+      "scope": [
+       "inherit"
+      ]
+     },
+     {
+      "id": "chores",
+      "source": "self",
+      "kind": "work",
+      "title": "片付け",
+      "review": "chat",
+      "scope": [
+       "src/*"
+      ]
+     },
+     {
+      "id": "chores-feedback",
+      "source": "self",
+      "kind": "feedback",
+      "title": "片付けフィードバック対応",
+      "review": "chat",
+      "scope": [
+       "inherit"
+      ]
+     }
+    ]
    }
   }
  ],

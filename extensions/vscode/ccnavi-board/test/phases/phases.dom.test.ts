@@ -181,10 +181,10 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
     assert.ok(!dom.one("#changed").classList.contains("hidden"));
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調べる", "帯が出ても編集は消さない");
     // 再読込が通ったら、その中身で描き直す
-    await dom.send({ type: "data", data: { kind: "page", page: page({ phasesPath: ".ccnavi/common/phases.yml" }) } });
+    await dom.send({ type: "data", data: { kind: "page", page: page({ phasesPath: ".ccnavi/config/phases.yml" }) } });
     assert.ok(dom.one("#changed").classList.contains("hidden"));
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
-    assert.equal(dom.one(".path").textContent, ".ccnavi/common/phases.yml");
+    assert.equal(dom.one(".path").textContent, ".ccnavi/config/phases.yml");
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p6")} input.f-title`).value, "調査");
   } finally {
     await dom.close();
@@ -312,7 +312,7 @@ test("CB-D85 関係の欄はほかの定義の id を複数選択で選べ、自
     // after に挙げた id は overlap で選べない（両方に挙げると検証が止める）
     assert.ok(dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="design"]`).disabled);
     assert.ok(!dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="implement-feedback"]`).disabled);
-    // 共通レイヤーではほかのレイヤーを指せないので、id を打つ欄は出さない
+    // フェーズ定義は足し算をしないので、ほかの設定の定義は指せない。id を打つ欄は出さない
     assert.equal(dom.all(`${rowSelector("p4")} input.id-extra`).length, 0);
     dom.click(dom.one("#save"));
     await dom.settle();
@@ -368,53 +368,35 @@ test("CB-D94 関係の欄は矢印でフォーカスだけを動かし、Space �
   }
 });
 
-test("CB-D87 レイヤーの画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は目印を付けて出す", async () => {
+test("CB-D87 関係の欄は、前後の空白と空を落として読み、無い id と自分自身は目印を付けて出す。id を打つ欄は無い", async () => {
   const base = readPhases(SAMPLE_PHASES_TEXT).model;
-  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
-  const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });
+  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance", "外の種類"] } : p));
+  const dom = await openPhases({ model: { ...base, form: { ...base.form, phases } } });
   try {
     dom.click(dom.one(`${rowSelector("p3")} .row-head`));
     await dom.settle();
-    // 前後の空白は落として読み、空は出さない。自分自身は外せるように目印を付けて出す
+    // 前後の空白は落として読み、空は出さない。自分自身とこのファイルに無い id は外せるように目印を付けて出す
     const checked = dom.all<HTMLOptionElement>(`${rowSelector("p3")} .f-overlap option`).filter((option) => option.selected);
-    assert.deepEqual(checked.map((option) => option.value), ["design", "acceptance"]);
-    assert.ok(dom.one(`${rowSelector("p3")} .f-overlap .id-option.foreign`).textContent?.includes("acceptance"));
-    dom.type(dom.one(`${rowSelector("p3")} .f-requires input.id-extra`), "外の種類, acceptance");
-    await dom.settle();
-    dom.key("Enter", dom.one(`${rowSelector("p3")} .f-requires input.id-extra`));
-    await dom.settle();
-    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-requires input.id-extra`).value, "");
-    assert.ok(dom.one(`${rowSelector("p3")} .f-requires .id-option.foreign`).textContent?.includes("外の種類"));
+    assert.deepEqual(checked.map((option) => option.value), ["design", "acceptance", "外の種類"]);
+    const foreign = dom.all(`${rowSelector("p3")} .f-overlap .id-option.foreign`).map((option) => option.textContent);
+    assert.ok(foreign.some((text) => text?.includes("acceptance")));
+    assert.ok(foreign.some((text) => text?.includes("外の種類")));
+    // 共通の設定の定義を打って足す欄は無い（足し算をしない）。このファイルに無い id は入力ミスとだけ言う
+    assert.equal(dom.all("input.id-extra").length, 0);
+    const title = dom.one(`${rowSelector("p3")} .f-overlap option[value="外の種類"]`).getAttribute("title") ?? "";
+    assert.match(title, /このファイルに無い id です（入力ミス）/);
+    assert.ok(!title.includes("共通の設定"), title);
+    // 目印の付いた id は外せば消える
     pick(dom, `${rowSelector("p3")} .f-overlap`, "acceptance");
+    await dom.settle();
+    pick(dom, `${rowSelector("p3")} .f-overlap`, "外の種類");
     await dom.settle();
     dom.click(dom.one("#save"));
     await dom.settle();
-    const saved = savedForm(dom).phases[2];
-    assert.deepEqual(saved.overlap, ["design"]);
-    assert.deepEqual(saved.requires, ["外の種類"]);
+    assert.deepEqual(savedForm(dom).phases[2].overlap, ["design"]);
   } finally {
     await dom.close();
   }
-});
-
-test("CB-D115 このファイルに無い id の説明は、共通の設定の画面では入力ミスとだけ言い、ワークスペースとプロジェクトの設定の画面では共通の設定の定義かもしれないと言う", async () => {
-  const base = readPhases(SAMPLE_PHASES_TEXT).model;
-  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: ["外の種類"] } : p));
-  const titleOf = async (layer: boolean): Promise<string> => {
-    const dom = await openPhases({ layer, model: { ...base, form: { ...base.form, phases } } });
-    try {
-      dom.click(dom.one(`${rowSelector("p3")} .row-head`));
-      await dom.settle();
-      return dom.one(`${rowSelector("p3")} .f-overlap option[value="外の種類"]`).getAttribute("title") ?? "";
-    } finally {
-      await dom.close();
-    }
-  };
-  const common = await titleOf(false);
-  assert.match(common, /このファイルに無い id です（入力ミス）/);
-  assert.ok(!common.includes("共通の設定の定義か"), common);
-  const layered = await titleOf(true);
-  assert.match(layered, /このファイルに無い id です（共通の設定の定義か、入力ミス）/);
 });
 
 test("CB-D88 feedback の定義は先に済ませる定義を持てないと言い、欄を出さない", async () => {
@@ -581,18 +563,18 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
 
 test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけなら出さない", async () => {
   const targets = [
-    { kind: "common", name: "", label: "共通の設定" },
     { kind: "self", name: "", label: "ワークスペース" },
     { kind: "project", name: "app:x", label: "プロジェクト app:x" },
+    { kind: "project", name: "lib", label: "プロジェクト lib" },
   ];
-  const dom = await openPhases({ target: { kind: "common", name: "" }, targets });
+  const dom = await openPhases({ target: { kind: "self", name: "" }, targets });
   try {
     const select = dom.one<HTMLSelectElement>("select#target");
     assert.deepEqual(
       [...select.options].map((o) => o.textContent),
-      ["共通の設定", "ワークスペース", "プロジェクト app:x"],
+      ["ワークスペース", "プロジェクト app:x", "プロジェクト lib"],
     );
-    assert.equal(select.value, "common:");
+    assert.equal(select.value, "self:");
     dom.change(select, "project:app:x");
     await dom.settle();
     assert.deepEqual(dom.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "project", name: "app:x" }]);
@@ -600,7 +582,7 @@ test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前
     await dom.close();
   }
 
-  const single = await openPhases({ target: { kind: "common", name: "" }, targets: targets.slice(0, 1) });
+  const single = await openPhases({ target: { kind: "self", name: "" }, targets: targets.slice(0, 1) });
   try {
     assert.equal(single.all("select#target").length, 0);
   } finally {
@@ -608,13 +590,12 @@ test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前
   }
 });
 
-test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄を出し、共通の設定へ戻れる", async () => {
+test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄を出し、ワークスペースの設定へ戻れる", async () => {
   const dom = await openPage({
     kind: "error",
     error: "ファイルを読めません",
     target: { kind: "project", name: "app" },
     targets: [
-      { kind: "common", name: "", label: "共通の設定" },
       { kind: "self", name: "", label: "ワークスペース" },
       { kind: "project", name: "app", label: "プロジェクト app" },
     ],
@@ -622,9 +603,9 @@ test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄
   try {
     const select = dom.one<HTMLSelectElement>("select#target");
     assert.equal(select.value, "project:app");
-    dom.change(select, "common:");
+    dom.change(select, "self:");
     await dom.settle();
-    assert.deepEqual(dom.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "common", name: "" }]);
+    assert.deepEqual(dom.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "self", name: "" }]);
   } finally {
     await dom.close();
   }

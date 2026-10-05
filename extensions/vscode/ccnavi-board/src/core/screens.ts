@@ -15,9 +15,11 @@ export type RulesTarget =
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
 
-/** フェーズ管理画面が直す定義のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
+/** リスク管理画面が直す配点のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
+export type RiskTarget = RulesTarget;
+
+/** フェーズ管理画面が直す定義のファイル。ワークスペースの設定とプロジェクト 1 つの設定だけ（共通の設定には置けない） */
 export type PhasesTarget =
-  | { readonly kind: "common" }
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
 
@@ -26,7 +28,7 @@ export interface Screens {
   /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース（プロジェクト外）、`"*"` は全部、未指定は前回のまま） */
   readonly board: (project?: string) => Promise<void>;
   readonly rules: (target: RulesTarget) => Promise<void>;
-  readonly risk: () => Promise<void>;
+  readonly risk: (target: RiskTarget) => Promise<void>;
   readonly phases: (target: PhasesTarget) => Promise<void>;
   readonly projects: () => Promise<void>;
   /**

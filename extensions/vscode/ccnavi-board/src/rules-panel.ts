@@ -13,6 +13,9 @@
  * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
+ * ファイルが無いのは「設定が無い」正常な状態で、空として出す（保存でファイルを作る）。
+ * 編集する 1 本とは別に、読み取り専用の足し算（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。
+ * 足し算は実行ファイルが出した結果で、拡張は判定も合成もしない。
  *
  * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら `--rules`、
  * ワークスペースかプロジェクトの設定なら `--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
@@ -35,6 +38,7 @@ import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
 import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
+import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
@@ -54,6 +58,9 @@ const OWN_WRITE_GRACE_MS = 1500;
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを `stale` が見る */
   readonly target: RulesTarget;
+  /** ファイルが在るか。無ければ空として出し、保存で作る */
+  readonly exists: boolean;
+  /** 無いときは 0 */
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
@@ -63,6 +70,8 @@ interface Loaded {
   readonly notices: readonly string[];
   /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
+  /** 読み取り専用の足し算（実行ファイルの `sums[]`） */
+  readonly sums: readonly RulesSum[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly mode: string;
@@ -283,12 +292,19 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   }
   let text: string;
   let mtimeMs: number;
+  let exists: boolean;
   try {
     text = fs.readFileSync(rulesPath, "utf8");
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
+    exists = true;
   } catch (error) {
-    const hint = target.kind === "workspace" ? "" : "。無ければ共通の設定の rules.yml をコピーして作ってください";
-    throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}${hint}`);
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}`);
+    }
+    // 無いのは不備ではない（「設定が無い」正常な状態）。空として出し、ルールを足して保存すればファイルが作られる。
+    text = "";
+    mtimeMs = 0;
+    exists = false;
   }
   const hooks = [
     ...(settingsText === undefined ? [] : parseHooks(settingsText, "settings")),
@@ -297,12 +313,15 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   const samplesRel = samplesSetting();
   return {
     target,
+    exists,
     mtimeMs,
-    doc: readRules(text),
+    // 無いファイルは、書式の版だけを持つ空のルールとして読む（版が無いファイルは実行ファイルが読めないので、保存で作るときに先頭へ置く）
+    doc: readRules(exists ? text : "version: 1\n"),
     rulesPath,
     rulesRel,
     notices,
     targets,
+    sums: rulesSums(board.ok ? board.board : undefined),
     hooks,
     hookFiles: { settings: settingsText !== undefined, settingsLocal: localText !== undefined },
     mode: env("CCNAVI_MODE"),
@@ -467,6 +486,7 @@ function show(current: PanelState): void {
     page: {
       root: current.folder.uri.fsPath,
       rulesPath: loaded.rulesRel,
+      exists: loaded.exists,
       mode: loaded.mode,
       model: loaded.doc.model,
       hooks: loaded.hooks,
@@ -476,6 +496,7 @@ function show(current: PanelState): void {
       notices: loaded.notices,
       target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
       targets: loaded.targets,
+      sums: loaded.sums,
     },
   });
 }
@@ -827,22 +848,32 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
 
-  // 3. 読み込んでから外で変わっていないこと。
-  let mtimeMs: number;
-  try {
-    mtimeMs = fs.statSync(loaded.rulesPath).mtimeMs;
-  } catch (error) {
-    fail(current, `ルールファイルを確かめられません: ${(error as Error).message}`);
-    return;
-  }
-  if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "ルールファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+  // 3. 読み込んでから外で変わっていないこと。無かったファイルは、まだ無いこと。
+  if (loaded.exists) {
+    let mtimeMs: number;
+    try {
+      mtimeMs = fs.statSync(loaded.rulesPath).mtimeMs;
+    } catch (error) {
+      fail(current, `ルールファイルを確かめられません: ${(error as Error).message}`);
+      return;
+    }
+    if (mtimeMs !== loaded.mtimeMs) {
+      fail(current, "ルールファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+      return;
+    }
+  } else if (fs.existsSync(loaded.rulesPath)) {
+    fail(current, "ルールファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
     return;
   }
 
   try {
     current.wroteAt = Date.now();
-    fs.writeFileSync(loaded.rulesPath, text, "utf8");
+    if (loaded.exists) {
+      fs.writeFileSync(loaded.rulesPath, text, "utf8");
+    } else {
+      fs.mkdirSync(path.dirname(loaded.rulesPath), { recursive: true });
+      fs.writeFileSync(loaded.rulesPath, text, { encoding: "utf8", flag: "wx" });
+    }
   } catch (error) {
     // 書けなかったのに猶予を残したままだと、その間の本物の外部変更が知らされない。
     current.wroteAt = 0;

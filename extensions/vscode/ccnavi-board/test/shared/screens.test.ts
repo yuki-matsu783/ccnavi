@@ -9,7 +9,7 @@ function spy(): { readonly screens: Screens; readonly calls: string[] } {
     screens: {
       board: async (project) => void calls.push(`board:${project ?? "-"}`),
       rules: async (target) => void calls.push(`rules:${target.kind}`),
-      risk: async () => void calls.push("risk"),
+      risk: async (target) => void calls.push(`risk:${target.kind}`),
       phases: async (target) => void calls.push(`phases:${target.kind}`),
       projects: async () => void calls.push("projects"),
       flow: async (ticket) => void calls.push(`flow:${ticket}`),
@@ -23,10 +23,10 @@ test("CB-T136 登録した入口を帳面から開く。要求する側は相手
   await screens().board("lib");
   await screens().rules({ kind: "project", name: "lib" });
   await screens().phases({ kind: "self" });
-  await screens().risk();
+  await screens().risk({ kind: "workspace" });
   await screens().projects();
   await screens().flow("i0001-01-01");
-  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "risk", "projects", "flow:i0001-01-01"]);
+  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "risk:workspace", "projects", "flow:i0001-01-01"]);
   forgetScreens();
 });
 

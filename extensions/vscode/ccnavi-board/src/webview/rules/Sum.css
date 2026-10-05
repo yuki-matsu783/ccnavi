@@ -1,0 +1,8 @@
+/*
+ * 「足し算」（`Sum.tsx`）。読み取り専用の表。表の骨組みは `App.css`（hook の一覧と同じ表）を使い、ここは節の間隔だけ足す。
+ */
+.sum { margin: 14px 0 6px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 10px; }
+.sum > summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
+.sum-pick { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
+.sum-section { margin: 0 0 12px; }
+.sum-section h3 { margin: 0 0 4px; font-size: 1em; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

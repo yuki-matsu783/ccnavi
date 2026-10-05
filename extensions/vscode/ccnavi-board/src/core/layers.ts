@@ -11,7 +11,15 @@ import type { BoardJson, LayerJson } from "./model.js";
 export const LAYER_SELF = "self";
 
 /** レイヤー（layer）の名前に予約してある表記。この名前のプロジェクトはプロジェクトの設定として数えない */
-const RESERVED = ["common", LAYER_SELF];
+/** 共通の設定に付けるレイヤーの名前 */
+export const LAYER_COMMON = "common";
+
+const RESERVED = [LAYER_COMMON, LAYER_SELF];
+
+/** 共通の設定。実行ファイルは常に出す。JSON に無ければ undefined */
+export function commonLayer(board: BoardJson): LayerJson | undefined {
+  return board.layers.find((l) => l.name === LAYER_COMMON);
+}
 
 /** ワークスペースの設定。実行ファイルは常に出す。JSON に無ければ undefined */
 export function selfLayer(board: BoardJson): LayerJson | undefined {

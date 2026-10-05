@@ -13,22 +13,23 @@ function phase(id: string, overrides: Partial<PhaseForm> = {}): PhaseForm {
   return { origin: null, id, title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "", ...overrides };
 }
 
-function notices(f: PhasesForm, layer = false): readonly string[] {
-  return graphNotices(graphOf(f), f, layer);
+function notices(f: PhasesForm): readonly string[] {
+  return graphNotices(graphOf(f), f);
 }
 
-test("CB-T212 注意は当てはまるときだけ。sequential の after は、線にならない（ほかのレイヤーを指す）ものでも言う", () => {
+test("CB-T212 注意は当てはまるときだけ。sequential の after は、線にならない（このファイルに無い定義を指す）ものでも言う", () => {
   assert.deepEqual(notices({ order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] }), []);
   // 行き先がこのファイルに無い after だけでも、sequential では判定に使われないと言う
-  const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外のレイヤーの種類"] })] }, true);
+  const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外の種類"] })] });
   assert.ok(seq.some((line) => /sequential なので、after は判定に使われません/.test(line)));
-  assert.ok(seq.some((line) => /共通の設定の定義を指しているならそのままで構いません/.test(line)));
+  assert.ok(seq.some((line) => /このファイルに無い定義を指す関係が 1 件あり、線にしていません/.test(line)));
+  // フェーズ定義は足し算をしないので、共通の設定の定義かもしれないとは言わない
+  assert.ok(!seq.some((line) => /共通の設定/.test(line)));
 });
 
-test("CB-T213 レイヤーの画面で dag を選んでいたら、ほかのレイヤーが sequential なら効かないと言う。共通レイヤーでは言わない", () => {
+test("CB-T213 フェーズ定義は足し算をしないので、dag を選んでいても、共通の設定が sequential ならという注意は出さない", () => {
   const f: PhasesForm = { order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] };
-  assert.ok(notices(f, true).some((line) => /共通の設定が sequential なら、合わせたときの判定は sequential で待ちます/.test(line)));
-  assert.ok(!notices(f, false).some((line) => /共通の設定/.test(line)));
+  assert.deepEqual(notices(f), []);
 });
 
 test("CB-T214 吹き出しは画面の外に出ない。下に収まらなければ上、どちらにも収まらなければ画面の下端に寄せる", () => {

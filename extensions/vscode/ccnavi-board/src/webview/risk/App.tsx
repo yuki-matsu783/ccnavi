@@ -13,8 +13,11 @@ import { useEffect, useRef, useState, type JSX } from "react";
 import type { Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { applyAppearance } from "../appearance.js";
+import { TargetSelect } from "../TargetSelect.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { defaultSum } from "../../core/sums.js";
 import { Captioned, Factor } from "./Factor.js";
+import { Sum } from "./Sum.js";
 import { post } from "./post.js";
 import { countText, findText } from "./text.js";
 import { draftOf, emptyFactor, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
@@ -65,8 +68,23 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const { draft, open } = editing;
   const page = pageOf(data);
   const exists = page?.exists === true;
+  /** 組み込みの配点を読み取り専用で見せている。欄は止め、「作る」だけができる */
+  const readOnly = page?.builtin === true;
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
+
+  /**
+   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
+   * このタブの中身が入れ替わるので、拡張ホストはこれを見て「破棄して切り替える？」を聞く。
+   * 送るのは変わったときだけ（最初の「変更なし」は拡張ホストも同じ前提で始まるので送らない）
+   */
+  const sentDirty = useRef(false);
+  useEffect(() => {
+    if (sentDirty.current !== dirty) {
+      sentDirty.current = dirty;
+      post({ type: "dirty", dirty });
+    }
+  }, [dirty]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
@@ -124,12 +142,21 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     post({ type: "reload", dirty });
   };
 
+  if (data.kind === "loading") {
+    return (
+      <p className="empty" id="ccnavi-loading">
+        {data.text}
+      </p>
+    );
+  }
+
   if (data.kind === "error") {
     return (
       <>
         <p className="empty">
-          リスク管理画面を読み込めませんでした。原因を直してから「更新」を押してください（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: リスク管理を開く」を実行してください。開いたままでは前面に出るだけです）。
+          リスク管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。
         </p>
+        <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
@@ -191,6 +218,11 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
 
   return (
     <>
+      {(page?.notices ?? []).map((notice, index) => (
+        <div className="banner warn" key={index}>
+          {notice}
+        </div>
+      ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
         <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
@@ -199,6 +231,12 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       </div>
       <header className="toolbar">
         <div className="summary">
+          <TargetSelect
+            target={page?.target}
+            targets={page?.targets}
+            disabled={busy}
+            onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })}
+          />
           <span className="path" title={page?.root ?? ""}>
             {page?.riskPath ?? ""}
           </span>
@@ -218,7 +256,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             className="action primary"
             id="save"
             data-action="save"
-            disabled={!dirty || lock.locked || busy || !exists}
+            disabled={!dirty || lock.locked || busy || readOnly}
             onClick={() => {
               setBusy(true);
               setStatus({ text: "検証して保存中…", error: false });
@@ -240,7 +278,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           ))}
         </ul>
       )}
-      {page !== undefined && !exists && (
+      {page !== undefined && readOnly && (
         <div className="banner missing">
           <span>{page.riskPath} がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。配点を直すには、まずファイルを作ってください。</span>
           <button
@@ -285,7 +323,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
                 title={`${name.toUpperCase()} 以上になる点`}
                 placeholder={`既定 ${BUILTIN_LEVELS[name]}`}
                 value={draft.levels[name]}
-                disabled={busy || !exists}
+                disabled={busy || readOnly}
                 onChange={(event) => editDraft({ ...draft, levels: { ...draft.levels, [name]: event.target.value } as Readonly<Record<LevelName, string>> })}
               />
             </Captioned>
@@ -298,7 +336,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <span className="count" id="factor-count">
             {countText(draft.rows.length, query, shown, kept)}
           </span>
-          <button type="button" className="action small" data-action="add" disabled={busy || !exists} onClick={add}>
+          <button type="button" className="action small" data-action="add" disabled={busy || readOnly} onClick={add}>
             ＋ 項目を追加
           </button>
         </h2>
@@ -321,7 +359,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               find={row.find}
               hidden={row.hidden}
               open={open.has(row.key)}
-              disabled={busy || !exists}
+              disabled={busy || readOnly}
               onToggle={() => toggle(row.key)}
               onChange={(factor) => editRow(row.key, factor)}
               onMove={(delta) => move(row.key, delta)}
@@ -331,7 +369,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           {draft.rows.length === 0 && <li className="empty">項目がありません。加点する項目が無ければ、どの子も LOW のまま閉じます</li>}
         </ul>
       </section>
-      {tour.touring && <Tour steps={exists ? TOUR_STEPS : [MISSING_STEP, ...TOUR_STEPS]} onClose={tour.end} />}
+      {page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />}
+      {tour.touring && <Tour steps={readOnly ? [MISSING_STEP, ...TOUR_STEPS] : TOUR_STEPS} onClose={tour.end} />}
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>

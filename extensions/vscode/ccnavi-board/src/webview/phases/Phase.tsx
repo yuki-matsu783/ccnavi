@@ -8,8 +8,8 @@
  * （`IdPicker`）。自分の id は候補に出さない。`after` の候補は work の定義だけ（feedback の定義は
  * 待つ先にできず、feedback の定義は `after` を持てない。`phasetypes.py`）。同じ id を `after` と
  * `overlap` の両方には挙げられない（同じく error）ので、片方で選んだ id はもう片方で選べなくする。
- * ワークスペースとプロジェクトの設定はほかの設定の定義を指せるので、候補に無い id を打つ欄も出す。
- * 共通の設定はほかの設定を指せない（照合は自分のファイルの中だけ）ので、その欄は出さない。
+ * フェーズ定義は足し算をしない（使うのは 1 本だけ）ので、ほかの設定の定義は指せない。候補はこのファイルの定義だけで、
+ * 候補に無い id を打つ欄は出さない。
  */
 import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from "react";
 
@@ -30,11 +30,9 @@ export interface PhaseProps {
   readonly moreOpen: boolean;
   /** このファイルの定義の id と区分（並び順）。関係の欄の候補にする */
   readonly kinds: ReadonlyMap<string, PhaseKind>;
-  /** ワークスペースかプロジェクトの設定の画面か。この 2 つだけがほかの設定の定義を指せる */
-  readonly layer: boolean;
   /** id が他の定義と重なっている。保存は止まる */
   readonly duplicate: boolean;
-  /** 欄を触れるか。保存の往復の間と、共通の設定でファイルが無い間は触れない */
+  /** 欄を触れるか。保存の往復の間は触れない */
   readonly disabled: boolean;
   readonly onToggle: () => void;
   readonly onToggleMore: (open: boolean) => void;
@@ -86,7 +84,6 @@ export function Phase(props: PhaseProps): JSX.Element {
         known={props.kinds}
         blocked={new Set(blocked.map((id) => id.trim()))}
         blockedNote={`${blockedBy} にも挙げているので選べません（両方に挙げると保存のときの検証で止まります）`}
-        typed={props.layer}
         value={phase[name]}
         disabled={disabled}
         onChange={(next) => props.onChange({ ...phase, [name]: next })}
@@ -288,10 +285,7 @@ function ListInput({
  *
  * 順序は候補の順（ファイルの中の順）に揃え、候補に無い値はその後ろに元の順で置く。選択を
  * 付け外しするたびに順序が入れ替わって差分が出る、ということをしない。
- *
- * 候補に無い id を打つ欄は `typed` のときだけ出す（ワークスペースとプロジェクトの設定の画面）。打った文字は Enter か、欄を離れたときに
- * 足す（`,` 区切りで複数も可）。自分の id は打っても足さない。
- */
+ * */
 function IdPicker({
   value,
   self,
@@ -299,7 +293,6 @@ function IdPicker({
   known,
   blocked,
   blockedNote,
-  typed,
   className,
   label,
   title,
@@ -312,14 +305,12 @@ function IdPicker({
   readonly known: ReadonlyMap<string, PhaseKind>;
   readonly blocked: ReadonlySet<string>;
   readonly blockedNote: string;
-  readonly typed: boolean;
   readonly className: string;
   readonly label: string;
   readonly title: string;
   readonly disabled: boolean;
   readonly onChange: (next: readonly string[]) => void;
 }): JSX.Element {
-  const [extra, setExtra] = useState("");
   const [active, setActive] = useState(0);
   const listId = useId();
   const chosen = Array.from(new Set(value.map((id) => id.trim()).filter((id) => id !== "")));
@@ -334,18 +325,6 @@ function IdPicker({
       next.delete(id);
     }
     onChange(ordered(next));
-  };
-  const addExtra = (): void => {
-    const next = new Set(picked);
-    for (const id of splitList(extra)) {
-      if (id !== self) {
-        next.add(id);
-      }
-    }
-    if (next.size !== picked.size) {
-      onChange(ordered(next));
-    }
-    setExtra("");
   };
   const choose = (select: HTMLSelectElement): void => {
     onChange(ordered(new Set(Array.from(select.selectedOptions, (option) => option.value))));
@@ -382,7 +361,7 @@ function IdPicker({
           onKeyDown={onKeyDown}
         >
           {options.map((id, index) => {
-            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? (typed ? "このファイルに無い id です（共通の設定の定義か、入力ミス）" : "このファイルに無い id です（入力ミス）") : !candidates.includes(id) ? "ここには挙げられない定義です（外してください）" : undefined;
+            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? "このファイルに無い id です（入力ミス）" : !candidates.includes(id) ? "ここには挙げられない定義です（外してください）" : undefined;
             const locked = isLocked(id);
             const tip = [locked ? blockedNote : undefined, note].filter((part) => part !== undefined).join("／");
             return (
@@ -411,25 +390,6 @@ function IdPicker({
         </select>
       )}
       {options.length === 0 && <span className="dim">選べる定義がありません</span>}
-      {typed && (
-        <input
-          type="text"
-          className="id-extra"
-          spellCheck={false}
-          aria-label={`${label}に共通の設定の id を足す`}
-          placeholder="共通の設定の id を入力して Enter"
-          value={extra}
-          disabled={disabled}
-          onChange={(event) => setExtra(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              addExtra();
-            }
-          }}
-          onBlur={addExtra}
-        />
-      )}
     </div>
   );
 }

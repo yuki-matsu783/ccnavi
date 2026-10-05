@@ -1,0 +1,17 @@
+/*
+ * 「足し算」（`Sum.tsx`）。読み取り専用の枠と表。
+ */
+.sum { margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 10px; }
+.sum > summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
+.sum-pick { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
+.sum-levels { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+.sum-level { font-variant-numeric: tabular-nums; }
+table.sum-table { border-collapse: collapse; width: 100%; font-size: .95em; }
+/* 表は入れ物の中で横へ送る。狭い画面でも表の外（ページ全体）は横に流れない */
+.sum .table-scroll { overflow-x: auto; }
+.sum .table-scroll > table { min-width: 32em; }
+.sum-table th, .sum-table td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; }
+.sum-table th { color: var(--vscode-descriptionForeground); font-weight: 600; }
+.sum-table td code { overflow-wrap: anywhere; }
+.sum-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.sum-table td.why { min-width: 10em; }

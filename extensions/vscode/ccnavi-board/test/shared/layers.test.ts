@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { projectLayer, selfLayer } from "../../src/core/layers.js";
+import { commonLayer, projectLayer, selfLayer } from "../../src/core/layers.js";
 import type { BoardJson, LayerJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 
 function layer(name: string, path: string): LayerJson {
-  return { name, rules: { path, unreadable: "" }, phasesFile: { path: "", unreadable: "" } };
+  return { name, rules: { path, unreadable: "" }, risk: { path: "", unreadable: "" }, phasesFile: { path: "", unreadable: "" } };
 }
 
 function board(layers: readonly LayerJson[]): BoardJson {
@@ -18,6 +18,7 @@ test("CB-T111 レイヤーは layers[] から名前で引き、予約名のプ�
     layer("self", "/ws/.ccnavi/config/rules.yml"),
     layer("lib", "/ws/projects/lib/.ccnavi/config/rules.yml"),
   ]);
+  assert.equal(commonLayer(b)?.rules.path, "/ws/.ccnavi/common/rules.yml");
   assert.equal(selfLayer(b)?.rules.path, "/ws/.ccnavi/config/rules.yml");
   assert.equal(projectLayer(b, "lib")?.rules.path, "/ws/projects/lib/.ccnavi/config/rules.yml");
   // projects/self は自身のレイヤーを、projects/Common は共通レイヤーを引いてはいけない
