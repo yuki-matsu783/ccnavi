@@ -2,7 +2,7 @@
 type: requirements
 title: ccnavi 要件書 4 適用範囲外
 description: ccnavi が約束しないこと（適用範囲外）
-tags: [design-doc]
+tags: [design-doc, judging]
 keywords: [要件, 適用範囲外, 対象外, 約束しない, sandbox]
 ---
 

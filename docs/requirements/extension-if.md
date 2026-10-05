@@ -25,7 +25,7 @@ JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design
 | ID | 型 | 要求 |
 |---|---|---|
 | REQ-EXT-01 | 常時 | ccnavi は、振り分けの sh の名前を `ccnavi-launcher.sh` とし、その名前の sh が起動する実行ファイルを、sh の置き場の親の `bin/<os>-<arch>/ccnavi`（Windows は `ccnavi.exe`）に置くこと。`<os>` は `darwin`・`linux`・`windows`、`<arch>` は `x86_64`・`arm64` とすること。arm64 の macOS と Windows では、自分向けが無いときだけ `x86_64` の実行ファイルを起動すること。配布先では sh を `.ccnavi/scripts/ccnavi-launcher.sh` に置き、`.claude/settings.json` の env `CCNAVI_BIN_PATH` にそのパスを書くこと |
-| REQ-EXT-02 | 事象 | `--root <パス>` を受けたとき、ccnavi は、そのパスをワークスペースルートとして読むこと。`--root` が 2 度渡されたときは、標準エラーに理由を出して何もしないこと |
+| REQ-EXT-02 | 事象 | `--root <パス>` を受けたとき、ccnavi は、そのパスをワークスペースルートとして読むこと。`--root` が 2 度渡されたときは、標準エラーに理由を出して何もしないこと。ただし `--version` は `--root` を読まずに版を返すこと（REQ-EXT-04） |
 | REQ-EXT-03 | 常時 | ccnavi は、標準出力と標準エラーを、コンソールの文字コードによらず UTF-8・改行 LF で書くこと。`--explain --json`・`--test --json`・`--test-samples --json`・`--lint --json`・`--suggest --json`・`--version --json` の JSON は ASCII に落として（ASCII でない字は `\u` で）書き、承認の JSON（`--agree … --json`）と残った指摘の JSON は UTF-8 の字のまま書くこと |
 | REQ-EXT-04 | 事象 | `--version --json` を求められたとき、ccnavi は、設定もワークスペースも読まず、`schema`・`version`・`commit`・`built`・`compat`・`flags`・`formats` を返して 0 で終わること。`flags` は引数の定義から引き、足したフラグがそのまま並ぶこと |
 | REQ-EXT-05 | 常時 | ccnavi は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh、VS Code 拡張、Chrome 拡張）の契約の版（互換の版）を持ち、実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）・sh（`.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`）・VS Code 拡張（`src/core/version.ts` の `EXTENSION_COMPAT`）に同じ値を書くこと。呼ぶ側が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたとき、データの形（承認済みの置き場に置くものの並び、待ち方の置き場、取り下げの条件など）を変えたとき、sh が古い実行ファイルの知らない副命令を呼ぶようになったときに 1 上げること。フラグや欄を足すだけでデータの形も変わらないなら上げないこと |
@@ -110,7 +110,8 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 | `ccnavi.infra.settings` | `DEFAULT_TICKETS`・`DEFAULT_APPROVED`・`DEFAULT_STATE`・`DEFAULT_PROJECTS`・`DEFAULT_PROJECT_HOME`・`DEFAULT_BRANCH_PREFIXES`・`LAYER_CONFIG_DIR`・`LAYER_FILE_NAMES`・`load(root)`・`is_branch_prefix(word)`・`is_reserved_layer_name(name)` |
 | `ccnavi.tickets.configsync` | `projected(conf, kind, content)` |
 | `ccnavi.tickets.history` | `session(via, stderr, actor="", version="")`・`VIA_CHROME` |
-| `ccnavi.tickets.review` | `Result.from_data(data)`（戻り値の `error`）・`_is_sha(value)` |
+| `ccnavi.tickets.review_host` | `Result.from_data(data)`（戻り値の `error`） |
+| `ccnavi.tickets.review` | `_is_sha(value)` |
 | `ccnavi.tickets.syncstate` | `SELF` |
 | `ccnavi.tickets.ticket` | `TODO`・`DOING`・`DONE`・`STATES`・`ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`）・`parse(text)`・`load(path)`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_name(t)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`issue_identifier(number, title="", project="", prefix="feature")` |
 

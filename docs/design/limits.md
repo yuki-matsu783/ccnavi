@@ -2,7 +2,7 @@
 type: design
 title: 12. 限界と保証しないこと
 description: 保証しないこと、許容する誤検知、未実装、最終防衛線
-tags: [design-doc]
+tags: [design-doc, judging]
 keywords: [限界, 保証しないこと, 誤検知, 未実装, 最終防衛線]
 ---
 
