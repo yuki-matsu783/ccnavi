@@ -126,6 +126,11 @@ phases:
 LIB_PHASES = """\
 version: 1
 phases:
+  design:
+    kind: work
+    title: 設計
+    review: mr
+    scope: ["wip/design/*"]
   build:
     kind: work
     title: ビルド
@@ -336,7 +341,6 @@ def build_template():
     write_layer(ws, rules=OWN_RULES, phases=OWN_PHASES)
     common = os.path.join(ws, ".ccnavi", "common")
     write(os.path.join(common, "rules.yml"), json.dumps(COMMON_RULES))
-    write(os.path.join(common, "phases.yml"), COMMON_PHASES)
     write(os.path.join(common, "risks.yml"), COMMON_RISK)
     git(ws, "add", "-A")
     git(ws, "commit", "--quiet", "-m", "init")
@@ -519,6 +523,12 @@ class ConfigUnionHarness(unittest.TestCase):
             lines = [line for line in f if line.strip()]
         return json.loads(lines[-1])
 
+    def hit_rules(self, record=None):
+        """記録の `rules` のうち、レイヤーのルール。組み込みの deny（`builtin-` で始まる id。
+        共通レイヤーと config の有無によらず常に当たる）は数えない。"""
+        record = record if record is not None else self.last_record()
+        return [name for name in record["rules"] if not name.startswith("builtin-")]
+
     def assert_denied(self, result, *ids):
         self.assertEqual(self.decision(result), "deny", result.stdout + result.stderr)
         for rule_id in ids:
@@ -549,7 +559,7 @@ class WriteUnionTest(ConfigUnionHarness):
                 denied = self.hook("Write", cwd, file_path=os.path.join(*target))
                 self.assert_denied(denied, rule_id, message)
                 record = self.last_record()
-                self.assertEqual(record["rules"], [rule_id])
+                self.assertEqual(self.hit_rules(record), [rule_id])
                 self.assertEqual(record.get("source"), source)
                 if target[0] == self.lib:
                     self.assertEqual(record["project"], "lib")
@@ -848,7 +858,7 @@ class DuplicateTest(ConfigUnionHarness):
 
         denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, ".env"))
         self.assert_denied(denied, "credentials")
-        self.assertEqual(self.last_record()["rules"], ["credentials"])
+        self.assertEqual(self.hit_rules(), ["credentials"])
 
         where = self.project_where("lib")
         infos = self.problems("info", where=where)
@@ -867,7 +877,7 @@ class DuplicateTest(ConfigUnionHarness):
 
         denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "secrets", ".env"))
         self.assert_denied(denied, "credentials", "lib:credentials")
-        self.assertEqual(sorted(self.last_record()["rules"]), ["credentials", "lib:credentials"])
+        self.assertEqual(sorted(self.hit_rules()), ["credentials", "lib:credentials"])
 
         warns = self.problems("warn", where=self.project_where("lib"))
         self.assertTrue(any("credentials" in p["detail"] for p in warns), warns)
@@ -1000,7 +1010,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         self.assertIn("POST_VIOLATION", after.stderr)
         self.assertIn("credentials", after.stderr)
         self.assertIn(".env", after.stderr)
-        self.assertEqual(self.last_record()["rules"], ["credentials"])
+        self.assertEqual(self.hit_rules(), ["credentials"])
 
     def test_a_project_tree_is_watched_with_its_own_layer_as_well(self):
         """11.7: 和なので、そのプロジェクトのレイヤーの deny も同じターンで並ぶ。"""
@@ -1073,7 +1083,7 @@ class WiringTest(ConfigUnionHarness):
 
         denied = self.hook("Write", self.ws, file_path=os.path.join(self.ws, ".env"))
         self.assert_denied(denied, "credentials")
-        self.assertEqual(self.last_record()["rules"], ["credentials"])
+        self.assertEqual(self.hit_rules(), ["credentials"])
         self.assert_not_denied(self.hook("Bash", self.ws, command="psql"))
 
 
@@ -1129,7 +1139,8 @@ class ExplainTest(ConfigUnionHarness):
         self.assertIn("self:generated", ids(layers["self"]["rules"]["deny"]))
         self.assertIn("lib:schema", ids(layers["lib"]["rules"]["deny"]))
         self.assertEqual(layers["app"]["rules"]["deny"], [])
-        self.assertIn("design", ids(layers["common"]["phases"]))
+        # フェーズ定義は config の 1 本だけ。共通レイヤーには何も無い（置けない）。
+        self.assertEqual(layers["common"]["phases"], [])
         self.assertIn("build", ids(layers["lib"]["phases"]))
         self.assertIn("big-diff", ids(layers["common"]["risk"]["factors"]))
         self.assertIn("schema", ids(layers["lib"]["risk"]["factors"]))

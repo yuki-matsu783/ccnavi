@@ -1,9 +1,10 @@
 """`--project-phases-file <名前>=<パス>` の受入テスト（REQ-DIA-09）。
 
 VS Code 拡張のフェーズ管理画面が、
-編集中のレイヤーの定義を保存せずに共通レイヤーと合成して検証するための
-差し替え。fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ
-（共通レイヤーに `design`「設計」、自身のレイヤーに `docs`、lib のレイヤーに `build` / `release`）。
+編集中のレイヤーの定義を保存せずに検証するための差し替え。フェーズ定義は足し算をしないので、
+検証するのはその 1 本の中身だけ。fixture は tests/config/test_config_union.py の
+ConfigUnionHarness を継ぐ（自身のレイヤーに `docs`「文書」、lib のレイヤーに
+`design`「設計」/ `build` / `release`）。
 """
 
 from __future__ import annotations
@@ -14,10 +15,10 @@ import unittest
 
 from tests.config.test_config_union import LIB_PHASES, ConfigUnionHarness, layer_path, read, write
 
-# lib のレイヤーの build の表示名を、共通レイヤーの design と同じ「設計」にしたもの。
+# lib のレイヤーの build の表示名を、同じ 1 本の中の design と同じ「設計」にしたもの。
 LIB_TITLE_OVERLAP = LIB_PHASES.replace("title: ビルド", "title: 設計")
 
-# 共通レイヤーの定義と id も表示名も重ならない定義。`phases:` の続きに繋げる。
+# 同じ 1 本の定義と id も表示名も重ならない定義。`phases:` の続きに繋げる。
 NOTES_TYPE = "  notes:\n    kind: work\n    title: メモ\n    review: none\n    scope: inherit\n"
 
 # 定義の無いレイヤー。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
@@ -28,8 +29,8 @@ class ProjectPhasesFileTest(ConfigUnionHarness):
     def phase_errors(self, where, *args):
         return [p for p in self.problems("error", *args, where=where) if "(phases)" in p["where"]]
 
-    def test_swaps_one_layers_phase_types_and_lints_them_merged_with_the_common_layer(self):
-        # 差し替えなしなら lib のレイヤーは共通レイヤーと合成できる。
+    def test_swaps_one_layers_phase_types_and_lints_the_one_file(self):
+        # 差し替えなしなら lib のレイヤーは読める。
         self.assertEqual(self.phase_errors("(projects/lib)"), [])
 
         edited = write(os.path.join(self.ws, "tmp", "lib-phases.yml"), LIB_TITLE_OVERLAP)
@@ -42,12 +43,12 @@ class ProjectPhasesFileTest(ConfigUnionHarness):
         own = read(layer_path(self.ws, "phases"))
         edited = write(
             os.path.join(self.ws, "tmp", "self-phases.yml"),
-            own + "  clash:\n    kind: work\n    title: 設計\n    review: mr\n    scope: inherit\n",
+            own + "  clash:\n    kind: work\n    title: 文書\n    review: mr\n    scope: inherit\n",
         )
         errors = self.phase_errors("(self)", "--project-phases-file", f"self={edited}")
         self.assertTrue(errors, "自身のレイヤーの差し替えが検証に届かない")
 
-        # 共通レイヤーと重ならない定義を足しただけなら通る。
+        # 重ならない定義を足しただけなら通る。
         added = write(os.path.join(self.ws, "tmp", "self-added.yml"), own + NOTES_TYPE)
         self.assertEqual(self.phase_errors("(self)", "--project-phases-file", f"self={added}"), [])
 

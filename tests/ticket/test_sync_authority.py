@@ -589,19 +589,6 @@ class MarkTest(AuthorityHarness):
         self.assertTrue(t.blocked.startswith("前の理由 / "), t.blocked)
         self.assertIn("gone", t.blocked)
 
-    def test_config_synced_stops_for_an_undecided_family(self):
-        import io
-
-        from ccnavi.tickets import configsync
-
-        self.record("gone")
-        err = io.StringIO()
-        code = configsync.acknowledge(
-            io.StringIO("y\n"), io.StringIO(), err, self.conf(), self.root, "i0001"
-        )
-        self.assertEqual(1, code)
-        self.assertIn("gone", err.getvalue())
-
     def test_the_same_family_in_two_repositories_is_not_guessed(self):
         self.record("present")
         self.record("present", repo="web")
@@ -908,46 +895,18 @@ class LintTest(AuthorityHarness):
         base = os.path.join(self.state, "sync", "self", "integration")
         write(os.path.join(base, "head"), "branch main\nsha abc\n")
         with open(self.phases, encoding="utf-8") as f:
-            write(os.path.join(base, ".ccnavi", "common", "phases.yml"), f.read())
+            write(os.path.join(base, ".ccnavi", "config", "phases.yml"), f.read())
         with open(self.rules, encoding="utf-8") as f:
             write(os.path.join(base, ".ccnavi", "common", "rules.yml"), f.read())
         problems = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         drift = [p for p in problems if p["where"] == "(sync/self/integration)"]
         self.assertEqual([], drift)
-        write(os.path.join(base, ".ccnavi", "common", "phases.yml"), "types: {}\n")
+        write(os.path.join(base, ".ccnavi", "config", "phases.yml"), "types: {}\n")
         problems = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         drift = [p for p in problems if p["where"] == "(sync/self/integration)"]
         self.assertEqual(1, len(drift), drift)
         self.assertEqual("warn", drift[0]["severity"])
         self.assertIn("phases.yml", drift[0]["detail"])
-
-    def test_the_projected_layer_on_the_parent_branch_is_compared(self):
-        from ccnavi.entry import lint_layers
-
-        conf = self.conf()
-        self_base = os.path.join(self.state, "sync", "self", "integration")
-        proj_base = os.path.join(self.state, "sync", "web", "integration")
-        write(os.path.join(self_base, "head"), "branch main\n")
-        write(os.path.join(proj_base, "head"), "branch main\n")
-        write(os.path.join(self_base, ".ccnavi", "common", "rules.yml"), "rules: []\n")
-        write(os.path.join(proj_base, ".ccnavi", "config", "phases.yml"), "types: {}\n")
-        home = tempfile.mkdtemp(dir=self.root)
-        st = syncstate.Standing(
-            "w0001",
-            "web",
-            record=syncstate.Family("w0001", "web", "present"),
-            home=approval.tree.Tree("w0001", home, project="web", kind="worktree"),
-        )
-        problems = lint_layers._projected_layer_problems(conf, st, "(x)")
-        # 共通レイヤーの rules と、プロジェクトの統合先の phases が P の上に無い。
-        self.assertEqual(2, len(problems), problems)
-        write(os.path.join(home, ".ccnavi", "config", "rules.yml"), "rules: []\n")
-        write(os.path.join(home, ".ccnavi", "config", "phases.yml"), "types: {}\r\n")
-        self.assertEqual([], lint_layers._projected_layer_problems(conf, st, "(x)"))
-        write(os.path.join(home, ".ccnavi", "config", "risks.yml"), "x: 1\n")
-        problems = lint_layers._projected_layer_problems(conf, st, "(x)")
-        self.assertEqual(1, len(problems))
-        self.assertIn("risks.yml", problems[0].detail)
 
 
 class HookNoProcessTest(AuthorityHarness):

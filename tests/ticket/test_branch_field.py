@@ -27,7 +27,7 @@ import unittest
 from ccnavi.entry import version
 from ccnavi.tickets import ticket as ticket_mod
 from ccnavi.tickets import ticket_ids, ticket_model
-from tests import ROOT, common_path
+from tests import ROOT, common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_core import STAMP, _chrome
 from tests.ticket.test_phases import PHASES, child_text, parent_text
@@ -149,7 +149,7 @@ class BranchFieldApprovalTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
         write(common_path(self.root, "rules"), json.dumps(RULES))
-        write(common_path(self.root, "phases"), PHASES)
+        write(config_path(self.root, "phases"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.tree = os.path.join(self.root, ".claude", "worktrees", PARENT)
 
@@ -322,7 +322,7 @@ def _workspace_files():
     compat = os.path.join(".ccnavi", "scripts", "ccnavi-common.sh").replace(os.sep, "/")
     return {
         ".claude/settings.json": json.dumps({"env": {"CCNAVI_TICKET_CONTROL": "enable"}}) + "\n",
-        ".ccnavi/common/phases.yml": PHASES,
+        ".ccnavi/config/phases.yml": PHASES,
         ".ccnavi/common/rules.yml": json.dumps(RULES),
         compat: f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
     }

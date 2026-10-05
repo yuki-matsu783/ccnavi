@@ -500,10 +500,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        # 着手で共通レイヤーをコピーしたので、レビューの無いこの親はユーザが端末で見てから
-        # 閉じる（設計 11.12）。
-        seen = self.ccnavi("--config-synced", "i0010", stdin="y\n")
-        self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
+        # 着手で共通レイヤーをミラーしても、知らせも閉じるのを止める処理も無い（設計 11.12）。
         done = self.ccnavi("ticket", "finish", "i0010")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         closed = os.path.join(tree, ".ccnavi", "approved", "done", "i0010.md")

@@ -37,7 +37,7 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, SRC, common_path
+from tests import ROOT, SRC, common_path, config_path
 from tests.ticket.test_phases import PHASES, child_text, parent_text
 from tests.ticket.test_ticket import RULES
 
@@ -109,7 +109,7 @@ class BranchFieldTest(unittest.TestCase):
             git(self.ws, "config", key, value)
         write(os.path.join(self.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
         write(common_path(self.ws, "rules"), json.dumps(RULES))
-        write(common_path(self.ws, "phases"), PHASES)
+        write(config_path(self.ws, "phases"), PHASES)
         write(os.path.join(self.ws, "src", "keep.py"), "print(1)\n")
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "-q", "-m", "seed")

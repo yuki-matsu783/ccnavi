@@ -13,9 +13,9 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
    ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
-   （一覧は書く。着手で configsync がコピーしたレイヤーは例外で、
-   tests/config/test_configsync.py が見る）
-4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / config-synced / close-early`）は
+   （一覧は書く。着手で configsync がミラーした `.ccnavi/common/` は例外で、
+   tests/config/test_config_sync.py が見る）
+4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / close-early`）は
    エージェントから止める
 """
 
@@ -317,7 +317,6 @@ class HumanEntryGuardTest(AuthorityHarness):
     def test_the_human_entries_are_denied_to_the_agent(self):
         for command in (
             "sh .ccnavi/scripts/ccnavi-review.sh chat 1",
-            "sh .ccnavi/scripts/ccnavi-review.sh config-synced i0001",
             "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason r",
             # シェルに選択肢を付けた形も同じ
             "sh -x .ccnavi/scripts/ccnavi-push-approved.sh",

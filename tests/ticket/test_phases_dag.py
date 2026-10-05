@@ -25,7 +25,7 @@ from ccnavi.tickets import (
     ticket_model,
     workflow,
 )
-from tests import common_path
+from tests import config_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import write
 
@@ -95,25 +95,19 @@ class TypesTest(unittest.TestCase):
         self.assertEqual(types.ancestors("docs"), {"design", "acceptance", "implement"})
         self.assertEqual(types.ancestors("design"), set())
 
-    def test_dag_only_when_every_layer_says_so(self):
-        """ファイルを持つレイヤーが全部 `dag` と書いたときだけ `dag`。
-        プロジェクト 1 本で緩めない。"""
-        common = types_of(SEQUENTIAL)
-        layer = types_of(
-            "version: 1\norder: dag\nphases:\n  extra: {title: 追加, after: [design]}\n",
-            refs=False,
-        )
-        merged, problems = phasetypes.merge(common, layer, "lib")
-        self.assertEqual(merged.order, phasetypes.ORDER_SEQUENTIAL)
-        self.assertTrue(any("食い違う" in p.detail for p in problems), problems)
-        merged, _ = phasetypes.merge(types_of(DAG), layer, "lib")
-        self.assertEqual(merged.order, phasetypes.ORDER_DAG)
+    def test_dag_only_when_the_one_file_says_so(self):
+        """`dag` になるのは、使う 1 本（親の `project:` が指す config）が `dag` と書いたときだけ。
+        レイヤーを足さないので、他のレイヤーの `order` とは食い違わない。"""
+        self.assertEqual(types_of(SEQUENTIAL).order, phasetypes.ORDER_SEQUENTIAL)
+        self.assertEqual(types_of(DAG).order, phasetypes.ORDER_DAG)
+        unwritten = types_of("version: 1\nphases:\n  docs: {title: 文書, review: mr}\n")
+        self.assertEqual(unwritten.order, phasetypes.ORDER_SEQUENTIAL)
 
-    def test_after_counts_in_the_layer_comparison(self):
-        """`after` だけが違う同じ id を「全欄同じ」として捨てない。"""
-        common = types_of(DAG)
-        layer = types_of("version: 1\norder: dag\nphases:\n  docs: {title: 文書, review: mr}\n")
-        _, problems = phasetypes.merge(common, layer, "lib")
+    def test_after_must_name_a_type_in_the_same_file(self):
+        """`after` の先は、同じ 1 本の中の定義でなければならない（他レイヤーを指す特例は無い）。"""
+        _, problems = phasetypes.parse(
+            "version: 1\norder: dag\nphases:\n  extra: {title: 追加, after: [design]}\n"
+        )
         self.assertTrue(any(p.severity == "error" for p in problems), problems)
 
 
@@ -255,7 +249,7 @@ class NextHintTest(unittest.TestCase):
 
 class DagApprovalTest(PhaseHarness):
     def use(self, text):
-        write(common_path(self.root, "phases"), text)
+        write(config_path(self.root, "phases"), text)
 
     def copy(self, name="i0001"):
         # 待ち方は承認済みチケットの外（`phases/<親>/workflow.yml`）に在るので、置き場を渡して読む。
