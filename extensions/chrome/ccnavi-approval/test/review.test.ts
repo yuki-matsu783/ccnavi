@@ -113,7 +113,7 @@ test("CX-T121 Approve は 100 件を超えるレビューも Link で読み切�
   reviews.push({ user: "bob", state: "APPROVED" });
   mock.pulls.i0001 = [{ number: 7, reviews }];
   assert.deepEqual(await gh.pullApprovals(client(mock), "acme", "widgets", "i0001"), [{ number: 7, approvals: 1 }]);
-  const text = mock.files("main")[".ccnavi/common/phases.yml"];
+  const text = mock.files("main")[".ccnavi/config/phases.yml"];
   mock.truncatedBlobs.add(blobSha(text));
   await assert.rejects(gh.blobs(client(mock), "acme", "widgets", [blobSha(text)]), /isTruncated/);
 });

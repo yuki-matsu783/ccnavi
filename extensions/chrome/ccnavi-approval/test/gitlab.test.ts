@@ -514,5 +514,5 @@ test("CX-T181 Pyodide の仮のツリー（/ws）の下でも、文面の途中�
   });
   const { panel } = await panelOn(mock);
   assert.equal(panel?.error, "");
-  assert.match(panel?.problems.join("\n") ?? "", /#note_5203 :0 projects\/ws\/src\/app\.ts と a\/ws\/b を見直す/);
+  assert.match(panel?.problems.join("\n") ?? "", /#note_5203 projects\/ws\/src\/app\.ts と a\/ws\/b を見直す/);
 });

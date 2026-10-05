@@ -84,7 +84,6 @@ from ccnavi.entry import cli, lint, version
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.tickets import (
-    configsync,
     history,
     review,
     review_host,
@@ -592,25 +591,21 @@ def _build(
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
     """プロジェクトのレイヤー（プロジェクトからの相対パス → 中身）。
 
-    「プロジェクトの統合先の現在のレイヤーに、ワークスペースの統合先の共通レイヤーを
-    `configsync.projected` で写したもの」。
-    共通レイヤーにあるファイルだけを写し、無いファイルはプロジェクトの側を残す（着手の
-    configsync と同じ）。`P` の上のレイヤーは読まない。`P` の上でレイヤーを書き換えて
-    承認やレビューを外せないようにするため。
+    プロジェクトの統合先の `.ccnavi/config/` を、そのまま写す。共通レイヤーは混ぜない。
+    共通レイヤーはワークスペースの統合先の `.ccnavi/common/` だけで
+    （`_build` がワークスペースルートに置く）、プロジェクトの `.ccnavi/common/`
+    （親の着手が配るミラー）は読まない。ワークスペースの中でミラーを共通として読むと、
+    ミラーがずれている間、ワークスペースの共通レイヤーと違う判定になるため
+    （ミラーを共通として読むのは、そのプロジェクトを単体で clone した手元だけ）。
+    `P` の上のレイヤーも読まない。`P` の上でレイヤーを書き換えて承認やレビューを
+    外せないようにするため。
     """
-    ws = snap["workspace"]["files"]
-    own = _files(snap, snap["integration"]["name"])
-    with _environ():
-        conf, _ = settings.load("/nonexistent-ccnavi-root")
-    out: dict[str, str] = {}
-    for kind, name in settings.LAYER_FILE_NAMES.items():
-        rel = f"{place['layer_dir']}/{name}"
-        common = ws.get(f"{COMMON_LAYER}/{name}")
-        if common is not None:
-            out[rel] = configsync.projected(conf, kind, common.encode("utf-8")).decode("utf-8")
-        elif rel in own:
-            out[rel] = own[rel]
-    return out
+    prefix = f"{place['layer_dir']}/"
+    return {
+        path: text
+        for path, text in _files(snap, snap["integration"]["name"]).items()
+        if path.startswith(prefix)
+    }
 
 
 def records(

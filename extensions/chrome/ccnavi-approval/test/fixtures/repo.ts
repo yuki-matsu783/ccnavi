@@ -157,7 +157,8 @@ export interface FixtureBranch {
 const MAIN_FILES: Record<string, string> = {
   ".claude/settings.json": JSON.stringify({ env: { CCNAVI_TICKET_CONTROL: "enable" } }, null, 2) + "\n",
   ".ccnavi/scripts/ccnavi-common.sh": COMMON_SH(1),
-  ".ccnavi/common/phases.yml": PHASES,
+  // フェーズ定義は config にだけ置く（共通レイヤーには置けない）。ワークスペースの親は自身の config の定義を使う
+  ".ccnavi/config/phases.yml": PHASES,
   ".ccnavi/common/rules.yml": RULES,
   ".ccnavi/approved/done/i0005.md": done("i0005", null, null),
   ".ccnavi/approved/done/i0005-01-01.md": done("i0005-01-01", "i0005", 1),
@@ -255,14 +256,17 @@ export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" =
 /**
  * プロジェクトのリポジトリ（手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
  *
- * - `main`（プロジェクトの統合先）: 閉じた親子のチケット web-i0003 の `done/` とプロジェクトのレイヤー（rules.yml だけ）。
- *   共通レイヤー・設定・互換のマーカーはワークスペース（`fixture()` の `main`）から読む（置き場のパスは既定に固定）
+ * - `main`（プロジェクトの統合先）: 閉じた親子のチケット web-i0003 の `done/` とプロジェクトのレイヤー（rules.yml と phases.yml。
+ *   フェーズ定義は親の `project:` が指すこのプロジェクトの config の 1 本だけが使われる）。
+ *   共通レイヤー・設定・互換のマーカーはワークスペース（`fixture()` の `main`）から読む（置き場のパスは既定に固定）。
+ *   プロジェクトの `.ccnavi/common/`（親の着手が配るミラー）はワークスペースの中では共通として読まない
  * - `web-i0012`（直近）: issue #12 から始めた親と子の提案
  * - `web-i0012` の上の `.ccnavi/config/phases.yml` は読まない（置き場の外）
  */
 export function projectFixture(name = "web"): Record<string, FixtureBranch> {
   const main = {
     ".ccnavi/config/rules.yml": RULES,
+    ".ccnavi/config/phases.yml": PHASES,
     [`.ccnavi/approved/done/${name}-i0003.md`]: done(`${name}-i0003`, null, null),
     "README.md": "プロジェクト\n",
   };
