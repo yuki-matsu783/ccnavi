@@ -46,6 +46,13 @@ workspace's own layer; the common layer uses --phases):
 
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
 
+The risk weights of one layer are handed in the same way (--project-risk-file;
+the common layer uses --risk). They are checked together with the common
+layer: the boundaries of levels after the merge, ids that collide, and whether
+each script: exists under that layer's own git project root:
+
+    ccnavi --lint --project-risk-file lib=/tmp/risks.yml
+
 One child ticket's flow is checked the same way, read by the same reader and
 the same checks that SubagentStart uses (--lint only; the VS Code extension
 hands the edited flow in before it opens or saves one):

@@ -898,7 +898,7 @@ hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだ
 （承認済みチケットが `doing`）がある間は保存できない（セッションの途中で判定が変わるのを避けるため）。
 
 同じ拡張の「リスク管理画面」で、実績で測るリスクの配点（`.ccnavi/common/risks.yml`、ワークスペースとプロジェクトの `.ccnavi/config/risks.yml`）の境目の点と項目を
-画面で直せる。編集する 1 本は切り替えられ、共通+ワークスペース、共通+プロジェクトの足し算は読み取りで見られる。保存の前に `--lint --risk` を通す。点を数えるのは実行ファイルで、拡張は差分を数えない。
+画面で直せる。編集する 1 本は切り替えられ、共通+ワークスペース、共通+プロジェクトの足し算は読み取りで見られる。保存の前に `--lint` を通す（共通は `--risk`、ワークスペースとプロジェクトは `--project-risk-file` で、共通の設定と合わせて検証する）。点を数えるのは実行ファイルで、拡張は差分を数えない。
 ファイルが無ければ組み込みと同じ値で作れる。`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない。
 
 同じ拡張の「フェーズ管理画面」で、フェーズ定義（「フェーズ定義と計画」の節）を画面で直せる。対象は自身のレイヤー
@@ -2348,11 +2348,14 @@ ccnavi --test Write projects/lib/src/a.py --json --project-rules-file lib=/tmp/e
 ccnavi --lint --json --project-rules-file lib=/tmp/edited.yml
 ccnavi --lint --json --project-phases-file self=/tmp/phases.yml
 ccnavi --lint --json --project-phases-file lib=/tmp/phases.yml
+ccnavi --lint --json --project-risk-file self=/tmp/risks.yml
+ccnavi --lint --json --project-risk-file lib=/tmp/risks.yml
 ```
 
 - `--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルの代わりに `<パス>` を読む
-- `--project-phases-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）のフェーズ定義の代わりに `<パス>` を読み、その 1 本として確かめる（足し算はしない）。配点（risk）のレイヤーには差し替えがまだ無い
-- レイヤーの置き場を動かすフラグ 7 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 2 本）は、`--test` / `--test-samples` /
+- `--project-phases-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）のフェーズ定義の代わりに `<パス>` を読み、その 1 本として確かめる（足し算はしない）。配点（risk）のレイヤーには次の `--project-risk-file` がある
+- `--project-risk-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）の配点の代わりに `<パス>` を読む。phases と違って足し算なので、共通レイヤーの配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がそのレイヤーの git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通レイヤーの配点は今までどおり `--risk`。ファイルの無いレイヤーに渡しても、そのレイヤーの配点として合成する
+- レイヤーの置き場を動かすフラグ 8 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 3 本）は、`--test` / `--test-samples` /
   `--lint` / `--explain` でだけ有効になる。診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと無視し、標準エラーにその旨を出す。
   守る対象（コアファイル）も差し替えを見ない
 - `--root` と `--cwd` は 1 度しか渡せない（2 本目が在れば止める）。sh が自分のぶんを先に置くので、後勝ちの上書きを防ぐため

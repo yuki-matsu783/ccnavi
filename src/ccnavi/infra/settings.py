@@ -385,6 +385,11 @@ class Settings:
     # 共通レイヤーの定義は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
     # 編集中のレイヤーの定義を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
+    # project_risk_files は同じ差し替えをレイヤーのリスクの配点に対して行う（名前 → 絶対パス）。
+    # `--project-risk-file <名前>=<パス>` が入れる。名前は `self` かプロジェクトの名前で、
+    # 共通レイヤーの配点は今までどおり `--risk` で差し替える。VS Code 拡張のリスク管理画面が、
+    # 編集中のレイヤーの配点を保存せずに、共通レイヤーと合わせて検証するために使う。
+    project_risk_files: dict[str, str] = field(default_factory=dict)
     # branch_prefixes は親の識別子の先頭の語のリスト（`branch_prefixes`）。
     # branch_prefixes_rejected は環境変数に書かれていたが使えない語（lint が warn で名指しする）。
     branch_prefixes: tuple = DEFAULT_BRANCH_PREFIXES
@@ -489,11 +494,15 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
     プロジェクトのレイヤーならその git プロジェクトルートを渡す。3 種とも同じ形なので、
     rules だけの経路を別に持たない。
 
-    `--project-rules-file` / `--project-phases-file` で名前が差し替えられていれば、rules / phases に
-    限ってそのパス。差し替えは診断のためのもので、risk には当てはまらない。守る対象（selfguard）は
+    `--project-rules-file` / `--project-phases-file` / `--project-risk-file` で名前が差し替えられて
+    いれば、その種類のそのパス。差し替えは診断のためのもので、守る対象（selfguard）は
     差し替えを見ない `layer_real_path` を使う。
     """
-    swaps = {KIND_RULES: conf.project_rules_files, KIND_PHASES: conf.project_phases_files}.get(kind)
+    swaps = {
+        KIND_RULES: conf.project_rules_files,
+        KIND_PHASES: conf.project_phases_files,
+        KIND_RISK: conf.project_risk_files,
+    }.get(kind)
     if swaps:
         override = swaps.get(layer or _layer_name(home_root))
         if override:
