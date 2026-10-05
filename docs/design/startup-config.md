@@ -82,7 +82,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
 期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
-終了コード 2、`dry-run` は 0（REQ-CMN-08）。この block は理由を返せないので、照合が長さの 2 乗で遅くなる入力（生の文字列に `>` が 50 個を超えて並ぶもの）は、照合の前に `DENY_REDIRECT_LIMIT` で止めて理由と書き直し方を返す（付録 A）。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
+終了コード 2、`dry-run` は 0（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを当てずに、ほかのルールの `deny` と `ask` を当てたあとで、`deny` に当たっていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
 git の読み取りが 2 秒で打ち切られる。
 
 payload が JSON でない・オブジェクトでない・`hook_event_name` が無いときは `payload-unusable` で
