@@ -728,7 +728,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_リダイレクトの当て始めは大なりの並びの頭だけ(self):
         # 並びの途中の `>` からも当て直せると、`>` が n 個続く入力で当て始めが n 通りに増え、
         # それぞれが行き先の語を読み直す。手数は時間で測ると揺れるので、当て始めの数で見る。
-        redirect = re.compile(selfguard._REDIRECT)
+        redirect = re.compile(selfguard_shell._REDIRECT)
         text = shellread.read("echo x " + ">" * 50 + ' "a b"').text
 
         starts = [i for i in range(len(text)) if redirect.match(text, i)]
@@ -738,7 +738,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_リダイレクトの行き先の語は大なりの並びの文字で始まらない(self):
         # 並びと語が同じ文字を取り合うと、割り方が並びの長さのぶんだけ増える。
         # shellread は演算子のあとに空白を置くので、語の頭にこの文字は来ない。
-        redirect = re.compile(selfguard._REDIRECT + r"\Z")
+        redirect = re.compile(selfguard_shell._REDIRECT + r"\Z")
         for text in [" > >a", " > |a", " > &a"]:
             with self.subTest(text=text):
                 self.assertIsNone(redirect.match(text))
@@ -752,7 +752,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-setting-files", result.stdout)
 
-    # 生の文字列の `>` の個数の上限（selfguard.REDIRECT_LIMIT）。時間ではなく個数で確かめる。
+    # 生の文字列の `>` の個数の上限（selfguard_shell.REDIRECT_LIMIT）。時間ではなく個数で確かめる。
 
     def verdict(self, result):
         out = json.loads(result.stdout)["hookSpecificOutput"]
@@ -762,10 +762,10 @@ class SelfGuardTest(unittest.TestCase):
         # 閉じない引用で縮退させ、生の文字列に当てる。`>` は保護対象への 1 個と合わせて 50 個。
         command = (
             "echo x > .ccnavi/common/rules.yml; echo "
-            + ">a" * (selfguard.REDIRECT_LIMIT - 1)
+            + ">a" * (selfguard_shell.REDIRECT_LIMIT - 1)
             + ' "'
         )
-        self.assertEqual(command.count(">"), selfguard.REDIRECT_LIMIT)
+        self.assertEqual(command.count(">"), selfguard_shell.REDIRECT_LIMIT)
         self.assertTrue(shellread.read(command).degraded)
 
         decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
@@ -775,13 +775,13 @@ class SelfGuardTest(unittest.TestCase):
         self.assertNotIn("REDIRECT_LIMIT_ASK", reason)
 
     def test_上限を超える大なりは確認に回し書き方を案内する(self):
-        command = 'echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        command = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
 
         decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
 
         self.assertEqual(decision, "ask")
         self.assertIn("[ccnavi] REDIRECT_LIMIT_ASK", reason)
-        self.assertIn(selfguard.REDIRECT_LIMIT_MESSAGE, reason)
+        self.assertIn(selfguard_shell.REDIRECT_LIMIT_MESSAGE, reason)
         self.assertIn("Write / Edit", reason)
         record = self.records()[-1]
         self.assertEqual(record["decision"], "ask")
@@ -792,7 +792,7 @@ class SelfGuardTest(unittest.TestCase):
         # 上限より前では止まる形。上限を超えると保護を当てずに確認に回す。通しはしない。
         command = (
             "echo "
-            + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+            + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
             + '; echo x > .ccnavi/common/rules.yml; echo "'
         )
         self.assertTrue(shellread.read(command).degraded)
@@ -804,7 +804,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_上限を超えてもほかのルールの拒否はそのまま(self):
         # 上限で外すのは保護の照合だけ。ルールファイルの deny は生の文字列に当て続ける。
-        command = 'git push; echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        command = 'git push; echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
 
         decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
 
@@ -813,7 +813,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertNotIn("REDIRECT_LIMIT_ASK", reason)
 
     def test_読み解けた形には上限を掛けない(self):
-        many = ">a" * (selfguard.REDIRECT_LIMIT + 10)
+        many = ">a" * (selfguard_shell.REDIRECT_LIMIT + 10)
         protected = f"echo {many}; echo x > .ccnavi/common/rules.yml"
         harmless = f"echo {many}"
         for command in (protected, harmless):
@@ -832,10 +832,10 @@ class SelfGuardTest(unittest.TestCase):
         # そこでは止める。確認できるモードでは確認に回す。
         protected = (
             "echo "
-            + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+            + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
             + '; echo x > .ccnavi/common/rules.yml; echo "'
         )
-        unrelated = 'echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        unrelated = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
         expected = {
             "default": ("ask", "REDIRECT_LIMIT_ASK"),
             "acceptEdits": ("ask", "REDIRECT_LIMIT_ASK"),
@@ -852,14 +852,14 @@ class SelfGuardTest(unittest.TestCase):
                     self.assertEqual(got, decision)
                     self.assertIn(f"[ccnavi] {code}", reason)
                     if decision == "deny":
-                        self.assertIn(selfguard.REDIRECT_LIMIT_DENY_MESSAGE, reason)
+                        self.assertIn(selfguard_shell.REDIRECT_LIMIT_DENY_MESSAGE, reason)
                         self.assertIn("確認ではなく止めました", reason)
                     else:
-                        self.assertIn(selfguard.REDIRECT_LIMIT_MESSAGE, reason)
+                        self.assertIn(selfguard_shell.REDIRECT_LIMIT_MESSAGE, reason)
                     self.assertEqual(self.records()[-1]["code"], code)
 
     def test_確認できないモードでも上限を超えたルールの拒否はそのまま(self):
-        command = 'git push; echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        command = 'git push; echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
         for mode in ("default", "bypassPermissions"):
             with self.subTest(mode=mode):
                 got, reason = self.verdict(
@@ -877,7 +877,7 @@ class SelfGuardTest(unittest.TestCase):
         ]
         for command in over:
             with self.subTest(command=command):
-                self.assertGreater(command.count(">"), selfguard.REDIRECT_LIMIT)
+                self.assertGreater(command.count(">"), selfguard_shell.REDIRECT_LIMIT)
                 got, reason = self.verdict(self.run_hook("PreToolUse", command=command))
                 self.assertEqual(got, "ask")
                 self.assertIn("REDIRECT_LIMIT_ASK", reason)
@@ -887,7 +887,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_PowerShell_の生の文字列にも上限を掛ける(self):
         # PowerShell は読まずに生の文字列に当てる。チケットの置き場を守る 1 本が当たる。
-        command = 'Write-Output "' + ">" * (selfguard.REDIRECT_LIMIT + 1) + '"'
+        command = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
         got, reason = self.verdict(self.run_hook("PreToolUse", tool="PowerShell", command=command))
         self.assertEqual(got, "ask")
         self.assertIn("REDIRECT_LIMIT_ASK", reason)
@@ -896,7 +896,7 @@ class SelfGuardTest(unittest.TestCase):
         rules_data = json.loads(json.dumps(RULES))
         rules_data["allow"][0]["match"] = "Bash|PowerShell|Read|Write|Edit"
         write(self.rules, json.dumps(rules_data))
-        command = 'Write-Output "' + ">" * (selfguard.REDIRECT_LIMIT + 1) + '"'
+        command = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
 
         got, reason = self.verdict(
             self.run_hook(
@@ -914,12 +914,12 @@ class SelfGuardTest(unittest.TestCase):
         # 保護を切り、チケット制御も切ると、シェルから書き込む形の保護は 1 本も無い。
         # 当てない保護が無いので、上限で確認に上げる理由も無い。
         off = {"CCNAVI_TICKET_CONTROL": "disable"}
-        bash = 'echo "' + ">a" * (selfguard.REDIRECT_LIMIT + 1)
+        bash = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
         result = self.run_hook("PreToolUse", setting="disable", extra_env=off, command=bash)
         self.assertNotIn("REDIRECT_LIMIT", result.stdout)
         # 既定の組み込みに戻っても、その 1 本は Bash にしか当たらない。PowerShell には掛けない。
         write(self.rules, "version: [broken")
-        power = 'Write-Output "' + ">" * (selfguard.REDIRECT_LIMIT + 1) + '"'
+        power = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
         result = self.run_hook("PreToolUse", tool="PowerShell", extra_env=off, command=power)
         self.assertNotIn("REDIRECT_LIMIT", result.stdout)
         result = self.run_hook("PreToolUse", extra_env=off, command=bash)
@@ -929,13 +929,13 @@ class SelfGuardTest(unittest.TestCase):
         # 名前が変わると上限が効かなくなり、2 乗の照合に戻る。
         from ccnavi.hook import judge
         from ccnavi.policy import builtin
-        from ccnavi.tickets import ticket
+        from ccnavi.tickets import ticket_guard
 
         rule_set = rules.RuleSet(version=rules.VERSION)
-        selfguard.add_rules(rule_set, root=self.repo, tool="Bash")
+        selfguard_shell.add_rules(rule_set, root=self.repo, tool="Bash")
         ids = {r.id for r in rule_set.deny}
         ids.add(builtin._config_via_bash("x")["id"])
-        ids.update(r.id for r in ticket.guard_rules("wip/proposals", self.repo))
+        ids.update(r.id for r in ticket_guard.guard_rules("wip/proposals", self.repo))
         self.assertLessEqual(set(judge.SHELL_GUARD_RULE_IDS), ids)
 
     # 実行ファイル
