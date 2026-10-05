@@ -3,7 +3,8 @@
 実体は 4 つのモジュールに分けてある。呼び手（`entry.cli` と Chrome 拡張）は
 `core.<名前>` のまま引く。
 
-- `core_base`: 入力（Snapshot・Actor）・判定（judge_approval）・書くもの（Changes・plan）・Writer（write_fs）
+- `core_base`: 入力（Snapshot・Actor）・判定（judge_approval）・書くもの（Changes・plan）・
+  Writer（write_fs）
 - `core_approve`: 手元の承認の入口（approve・preview・verify・approve_yes）
 - `core_review`: レビュー済み（confirm・confirm_local・reviewable・requested_head・moved_on_host）
 - `core_withdraw`: 承認の取り下げ（withdraw・withdrawable）
