@@ -34,6 +34,17 @@ import unittest
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
+
+def _case_insensitive_fs() -> bool:
+    """今の置き場が大文字小文字を区別しないか。実際にファイルを作って確かめる。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        with open(os.path.join(tmp, "probe"), "w", encoding="utf-8"):
+            pass
+        return os.path.exists(os.path.join(tmp, "PROBE"))
+
+
+CASE_INSENSITIVE_FS = _case_insensitive_fs()
+
 NOTE = "ルールの additionalContext。判定を決めた側に関わらず載る。"
 
 WORKTREES = "*/.claude/worktrees/*"
@@ -707,6 +718,10 @@ class Eli5Place(Workspace):
         for name, tree in (("親", self.parent_tree), ("子", self.child)):
             for rel, exempt, why in self.CASES:
                 with self.subTest(tree=name, path=rel, why=why):
+                    if CASE_INSENSITIVE_FS and rel != rel.lower():
+                        self.skipTest(
+                            "大文字小文字を区別しないファイルシステムでは、表記違いが同じ場所になる"
+                        )
                     result = self.write_hook(tree, rel)
                     want = "allow" if exempt else "deny"
                     code = "" if exempt else "DENY_TICKET_SCOPE"

@@ -31,6 +31,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import unittest
 from unittest import mock
 
@@ -40,7 +41,7 @@ from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, history
 from ccnavi.tickets import ticket as ticket_mod
-from tests import common_path
+from tests import common_path, requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
 from tests.ticket.test_ticket import ROOT, git, read_json, to_old_form, with_old_record, write
@@ -67,6 +68,11 @@ def _place_of(chrome):
     if "error" in answer:
         raise AssertionError(f"置き場を読めない: {answer['error']}")
     return answer["placement"]
+
+
+def _text(raw: bytes) -> str:
+    """ファイルの中身を本文にする。Windows が書く改行（CRLF）は LF に揃える。"""
+    return raw.decode().replace("\r\n", "\n")
 
 
 def _files(tree_root, prefixes=PLACES):
@@ -113,9 +119,9 @@ class CoreHarness(PhaseHarness):
                 if path in old and path not in new:
                     rows.append({"op": "delete", "path": path})
                 elif path not in old:
-                    rows.append({"op": "create", "path": path, "content": new[path].decode()})
+                    rows.append({"op": "create", "path": path, "content": _text(new[path])})
                 elif old[path] != new[path]:
-                    rows.append({"op": "update", "path": path, "content": new[path].decode()})
+                    rows.append({"op": "update", "path": path, "content": _text(new[path])})
             if rows:
                 out[name] = rows
         return out
@@ -697,6 +703,7 @@ class WriterFailureTest(CoreHarness):
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
         self.assertEqual([e["cleared"] for e in self.reopened_events()], [["reviewed"]])
 
+    @requires_symlink
     def test_a_mark_that_is_a_link_is_removed_as_a_link(self):
         """溜める段の消去はリンクを辿らない（行き先を消さない）。"""
         marks = self.reopened()
@@ -740,6 +747,8 @@ def _normalized(changes):
         for row in rows:
             row = dict(row)
             content = row.get("content")
+            if isinstance(content, str):
+                content = row["content"] = content.replace("\r\n", "\n")
             if content is not None and row["path"].endswith(".ndjson"):
                 lines = [json.loads(line) for line in content.splitlines() if line]
                 for line in lines:
@@ -752,6 +761,24 @@ def _normalized(changes):
             kept.append(row)
         out[name] = kept
     return out
+
+
+def _machine_newline_is_lf() -> bool:
+    """機械の既定の改行が LF か。実際にテキストで書いて確かめる（Windows は CRLF になる）。
+
+    ccnavi は改行を指定しない書き込みを機械の改行で書き、承認のダイジェストと git のコミットは
+    そのバイト列で決まる。見本（core-scenarios.json）は LF で作ってあるので、CRLF の機械では
+    ダイジェストとコミットの値が合わない。
+    """
+    with tempfile.TemporaryDirectory(prefix="ccnavi-newline-probe-") as tmp:
+        path = os.path.join(tmp, "probe")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("a\n")
+        with open(path, "rb") as f:
+            return f.read() == b"a\n"
+
+
+MACHINE_NEWLINE_IS_LF = _machine_newline_is_lf()
 
 
 def _flat(lines):
@@ -805,6 +832,8 @@ class CoreChromeTest(CoreHarness):
         CoreChromeTest.collected[name] = {"request": request, "answer": answer}
         if os.environ.get("CCNAVI_CHROME_FIXTURE"):
             return
+        if not MACHINE_NEWLINE_IS_LF:
+            self.skipTest("機械の改行が CRLF で、見本（LF で作ってある）とダイジェストが合わない")
         with open(SCENARIOS, encoding="utf-8") as f:
             held = json.load(f)
         self.assertIn(
@@ -1555,6 +1584,7 @@ class RecordWritesTest(CoreHarness):
             self.refused(os.path.join(moved, "c1", "list.txt"))
         self.assertFalse(os.path.exists(os.path.join(moved, "c1")))
 
+    @requires_symlink
     def test_links_under_the_place_are_not_followed(self):
         outside = os.path.join(self.root, "wip", "elsewhere")
         os.makedirs(outside)
@@ -1570,6 +1600,7 @@ class RecordWritesTest(CoreHarness):
         with open(victim, encoding="utf-8") as f:
             self.assertEqual(f.read(), "keep\n")
 
+    @requires_symlink
     def test_a_linked_workspace_root_lists_relative_paths(self):
         """ワークスペースルートがリンク越し（macOS の /var → /private/var）でも、相対で書く。"""
         linked = self.root + "-link"

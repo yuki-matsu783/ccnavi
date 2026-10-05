@@ -156,7 +156,11 @@ class MovedSinceTest(ActorHarness):
         self.assertEqual(local.returncode, 1)
         # 手元の案内はワークスペースルートからの絶対パス、Chrome は仮のツリーの部分を除いた相対パス
         said = local.stderr.replace(self.root + os.sep, "").splitlines()
-        self.assertEqual(chrome["problems"], said)
+        # Windows では案内の中のパスが `/` 区切りで来るので、区切りを揃えてから根を落とす。
+        root = self.root.replace(os.sep, "/")
+        same = [p.replace(os.sep, "/").replace(f"{root}/memfs/", "") for p in chrome["problems"]]
+        said = [line.replace(os.sep, "/").replace(f"{root}/", "") for line in said]
+        self.assertEqual([p.replace(f"{root}/", "") for p in same], said)
         self.assertIn("依頼の後に親の HEAD が動いている", chrome["problems"][0])
         self.assertIsNone(chrome["changes"])
 

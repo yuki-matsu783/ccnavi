@@ -31,6 +31,7 @@ import yaml
 
 from ccnavi.infra import settings
 from ccnavi.tickets import flow, ticket
+from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -116,7 +117,7 @@ class FlowPlaceTest(unittest.TestCase):
         self.assertEqual(flow.flow_rel(conf_with("x/appr/"), CHILD), "x/appr/flows/i0001-01-01.yml")
         self.assertEqual(
             flow.flow_file(conf_with(), "/w", CHILD),
-            os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01-01.yml"),
+            os.path.normpath(os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01-01.yml")),
         )
 
     def test_the_old_flow_field_is_silently_ignored(self):
@@ -437,6 +438,7 @@ class FlowRenderTest(unittest.TestCase):
         self.assertIsNone(data)
         self.assertTrue(why.startswith("YAML として読めない"), why)
 
+    @requires_symlink
     def test_linked_files_and_folders_are_not_read(self):
         """ファイルそのものか、ツリーのルートからの途中がリンクなら読まない（H2）。"""
         root = tempfile.mkdtemp(prefix="ccnavi-flow-")
@@ -747,6 +749,7 @@ class FlowLockTest(FlowHarness):
         # 別の子の置き場は止めない。
         self.assert_not_locked(self.write_to(self.flow_in(self.parent_tree, "i0001-01-09")))
 
+    @requires_symlink
     def test_links_do_not_get_around_the_lock(self):
         """置き場を指すリンク越しのパスも、リンクに差し替えたフローのパスも止める（H2）。"""
         real = write(os.path.join(self.parent_tree, "wip", "flow-real.yml"), WORKFLOW_YAML)
@@ -795,7 +798,7 @@ class FlowLockTest(FlowHarness):
         child_tree = self.run_child(CHILD)
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         text = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-        self.assertIn(self.flow_path, text)
+        self.assertIn(os.path.normcase(self.flow_path), os.path.normcase(text))
         self.assertIn("読み直して", text)
         self.assertIn("着手中なので", text)
         self.assertIn(flow.FENCE_OPEN, text)
@@ -1031,6 +1034,7 @@ class FlowDraftTest(FlowHarness):
             os.path.realpath(self.draft_in(self.parent_tree, other)),
         )
 
+    @requires_symlink
     def test_a_linked_draft_is_named(self):
         real = write(os.path.join(self.parent_tree, "wip", "draft-real.yml"), WORKFLOW_YAML)
         os.makedirs(os.path.dirname(self.draft_in(self.parent_tree)), exist_ok=True)

@@ -21,6 +21,7 @@ import unittest
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.tickets import agree, approval, approval_checks, syncstate
+from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, to_old_form, write
 
@@ -60,6 +61,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual("", found.state)
         self.assertIn("state", found.broken)
 
+    @requires_symlink
     def test_links_on_the_way_are_not_followed(self):
         real = self.put("elsewhere/i0001", record_text("i0001", "present"))
         os.makedirs(os.path.join(self.state, "sync", "self", "families"))
@@ -82,6 +84,7 @@ class ReaderTest(unittest.TestCase):
         )
         self.assertIn("リンク", syncstate.integration(self.state, "self").broken)
 
+    @requires_symlink
     def test_files_and_names_inside_the_integration_do_not_follow_links(self):
         self.put("sync/self/integration/head", "branch main\nsha abc\nsource default\n")
         self.put("sync/self/integration/.ccnavi/approved/done/i0009.md", "x\n")
@@ -348,7 +351,10 @@ class PresentTest(AuthorityHarness):
         # 元ツリーに同じ識別子のチケットがあっても、書く先は親のブランチ。
         write(os.path.join(self.root, ".ccnavi", "approved", "done", "i0001.md"), "x\n")
         where = approval.home_dir(self.conf(), self.root, "i0001", "")
-        self.assertEqual(os.path.join(self.parent_tree, ".ccnavi", "approved"), where)
+        self.assertEqual(
+            os.path.normcase(os.path.join(self.parent_tree, ".ccnavi", "approved")),
+            os.path.normcase(where),
+        )
 
 
 class UndecidedTest(AuthorityHarness):
@@ -383,6 +389,7 @@ class UndecidedTest(AuthorityHarness):
             )
         )
 
+    @requires_symlink
     def test_a_record_behind_a_link_is_broken(self):
         real = write(os.path.join(self.root, "elsewhere"), record_text("i0001", "present"))
         os.makedirs(os.path.join(self.state, "sync", "self", "families"))
@@ -677,6 +684,7 @@ class IntegrationDoneTest(AuthorityHarness):
         self.assertNotIn("i0005", [b["ticket"] for b in preview["batch"]])
         self.assertTrue(self.rejected_with(preview, "i0005", "done/ で閉じている"), preview)
 
+    @requires_symlink
     def test_a_broken_or_missing_integration_does_not_pass_silently(self):
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent()
@@ -799,6 +807,7 @@ class DigestTest(AuthorityHarness):
         keys = agree.read_set(self.conf(), self.root, seen)
         self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
 
+    @requires_symlink
     def test_keys_do_not_depend_on_a_linked_root(self):
         # 溜めた読みは行き着く先のパス。ルートをリンク越しに渡しても（macOS の /tmp など）
         # 同じ鍵になる。

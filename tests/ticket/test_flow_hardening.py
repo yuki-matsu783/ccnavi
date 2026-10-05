@@ -389,7 +389,7 @@ class FlowParentBriefingTest(PhaseHarness):
         self.assertNotIn(flow.FENCE_OPEN, text)
         self.assertNotIn("[askUserQuestion]", text)
         for path in paths:
-            self.assertIn(f"フロー: {path}", text)
+            self.assertIn(os.path.normcase(f"フロー: {path}"), os.path.normcase(text))
         self.assertIn(
             "自分の担当の子チケットのフローだけを読んで従ってください。他の子のフローには従わない",
             text,

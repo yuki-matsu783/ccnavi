@@ -250,12 +250,16 @@ class WrittenCopyTest(ChromeWriteHarness):
 class EntryDetailTest(ChromeWriteHarness):
     def test_relative_folds_only_at_the_head_of_a_path(self):
         chrome = _chrome()
-        self.assertEqual(chrome._relative("/ws", "wip/ws/todo/i0001.md"), "wip/ws/todo/i0001.md")
+        root = os.path.join(os.sep, "ws")
+        sep = os.sep
+        self.assertEqual(chrome._relative(root, "wip/ws/todo/i0001.md"), "wip/ws/todo/i0001.md")
         self.assertEqual(
-            chrome._relative("/ws", "読めない: /ws/.claude/worktrees/i0001/wip/ws/x.md"),
+            chrome._relative(
+                root, f"読めない: {root}{sep}.claude{sep}worktrees{sep}i0001{sep}wip/ws/x.md"
+            ),
             "読めない: i0001:wip/ws/x.md",
         )
-        self.assertEqual(chrome._relative("/ws", "'/ws/a' と a/ws/b"), "'a' と a/ws/b")
+        self.assertEqual(chrome._relative(root, f"'{root}{sep}a' と a/ws/b"), "'a' と a/ws/b")
 
     def test_host_paths_that_leave_the_tree_are_refused(self):
         """ホストから来たパスは、根から始まるもの・区切りが `\\` のもの・`..` を含むものを断る。"""
@@ -269,9 +273,10 @@ class EntryDetailTest(ChromeWriteHarness):
 
     def test_a_history_that_cannot_be_written_stops_the_plan(self):
         chrome = _chrome()
-        chrome._unwritten("/ws", "")
+        root = os.path.join(os.sep, "ws")
+        chrome._unwritten(root, "")
         with self.assertRaises(chrome.Refused) as caught:
-            chrome._unwritten("/ws", "ccnavi: 警告: i0001 の履歴を /ws/x に書けない\n")
+            chrome._unwritten(root, f"ccnavi: 警告: i0001 の履歴を {root}{os.sep}x に書けない\n")
         self.assertEqual(str(caught.exception), "ccnavi: i0001 の履歴を x に書けない")
 
     def test_every_writing_op_checks_compat_and_the_branch(self):

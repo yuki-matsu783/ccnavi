@@ -22,6 +22,7 @@ import tempfile
 import unittest
 
 from ccnavi.tickets import flow
+from tests import requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_flow import WORKFLOW_YAML
 from tests.ticket.test_ticket import write
@@ -106,6 +107,7 @@ class FlowLintTest(unittest.TestCase):
         # connections が無いフローは読める（並べるときは線なし）。start・end が無いのは warn。
         self.assertEqual(self.flow_errors(self.file("nodes:\n  - {id: a, type: prompt}\n")), [])
 
+    @requires_symlink
     def test_links_and_non_regular_files_are_errors(self):
         real = self.file(WORKFLOW_YAML, "real.yml")
         link = os.path.join(self.outside, "link.yml")
@@ -143,7 +145,7 @@ class FlowLintTest(unittest.TestCase):
         flows = [p for p in json.loads(result.stdout)["problems"] if p["where"] == "(flow)"]
         self.assertEqual(len(flows), 1)
         self.assertIn(
-            os.path.realpath(self.outside), os.path.realpath(flows[0]["detail"].split(":")[0])
+            os.path.realpath(self.outside), os.path.realpath(flows[0]["detail"].split(": ")[0])
         )
 
     def flow_data(self, text: str):

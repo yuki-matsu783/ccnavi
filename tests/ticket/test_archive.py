@@ -273,7 +273,7 @@ class ReadyArchivesTest(ReadyHarness):
         lines = passed.stdout.splitlines()
         with open(lines[0], encoding="utf-8") as f:
             self.assertIn("logs/archive/", f.read())
-        self.assertEqual(lines[1], f"tree {self.parent_tree}")
+        self.assertEqual(os.path.normcase(lines[1]), os.path.normcase(f"tree {self.parent_tree}"))
         base = os.path.join(self.root, "logs", "archive", "self")
         for rel in ("done/i0001.md", "done/i0001-01-01.md", "done/old.md", "done/old-01-01.md"):
             self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
