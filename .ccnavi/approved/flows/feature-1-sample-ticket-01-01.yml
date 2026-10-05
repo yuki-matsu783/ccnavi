@@ -1,0 +1,51 @@
+id: feature-1-sample-ticket-01-01
+name: サンプル調査
+version: 1.0.0
+nodes:
+  - id: s
+    type: start
+    name: 開始
+    position:
+      x: -62
+      y: 15
+    data:
+      label: 開始
+  - id: group-1
+    type: group
+    name: グループ
+    position:
+      x: 203
+      y: -126
+    data: {}
+    style:
+      width: 469
+      height: 273
+  - id: p1
+    type: prompt
+    name: 調査
+    position:
+      x: 24
+      y: 52
+    data:
+      prompt: サンプル調査を行い、成果物を wip/research/sample-ticket/ に置く（サンプルのため実際には作らない）。
+    parentId: group-1
+  - id: e
+    type: end
+    name: 終了
+    position:
+      x: 255
+      y: 159
+    data:
+      label: 終了
+    parentId: group-1
+connections:
+  - id: c2
+    from: p1
+    to: e
+    fromPort: output
+    toPort: input
+  - id: c-s-p1
+    from: s
+    to: p1
+    fromPort: output
+    toPort: input
