@@ -314,7 +314,7 @@ def _write_op(op: fsio.Op) -> str:
     if op.kind == fsio.OP_UNLINK:
         return fsio.unlink(op.path)
     if op.kind == fsio.OP_MOVE:
-        # 並べた後に行き先が置かれていたら動かさない（上書きしない。`approval.move_file`）。
+        # 並べた後に行き先が置かれていたら動かさない（上書きしない。`approval_ops.move_file`）。
         if os.path.lexists(op.path):
             return "行き先に既に在る"
         return fsio.move(op.source, op.path)

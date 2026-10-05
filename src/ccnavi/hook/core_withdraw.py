@@ -88,7 +88,7 @@ def withdraw(
                 on_fail=fsio.FAIL_STOP, ticket=ident, message="書けない ({reason})", prefix=""
             ):
                 fsio.write_bytes(todo, prior_proposals[ident])
-                # 消せなければ戻した提案を消して、両方に残さない（`approval.admit` と同じ）。
+                # 消せなければ戻した提案を消して、両方に残さない（`approval_ops.admit` と同じ）。
                 with fsio.policy(
                     message="承認済みチケットを doing/ から消せない ({reason})", undo=(todo,)
                 ):

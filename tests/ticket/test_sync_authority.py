@@ -20,7 +20,14 @@ import unittest
 
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import agree_digest, approval, approval_checks, syncstate, ticket_model
+from ccnavi.tickets import (
+    agree_digest,
+    approval,
+    approval_checks,
+    approval_ops,
+    syncstate,
+    ticket_model,
+)
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, to_old_form, write
 
@@ -945,7 +952,7 @@ class HookNoProcessTest(AuthorityHarness):
         with mock.patch.object(subprocess, "Popen", side_effect=AssertionError("起こした")):
             conf = self.conf()
             copies, _ = approval.scan(conf, self.root)
-            approval.predecessor_pool(conf, self.root)
+            approval_ops.predecessor_pool(conf, self.root)
             syncstate.integration(conf.state, "self")
         self.assertTrue(copies)
 

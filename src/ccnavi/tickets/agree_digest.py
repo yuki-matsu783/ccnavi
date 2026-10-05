@@ -178,8 +178,8 @@ def _folded(path: str) -> str:
 def carried(cand: agree_candidates.Candidate) -> bytes:
     """承認で書き込む中身のバイト列。承認済みチケットと、親なら待ち方のファイル。
 
-    新規は提案のバイト列そのもの（`approval.admit` が動かす中身）。読んだバイト列のダイジェストを
-    判定の読み（`read_set`）にも入れる。読みの記録は改行を揃えた本文でダイジェストを取るので、それだけでは
+    新規は提案のバイト列そのもの（`approval_ops.admit` が動かす中身）。読んだバイト列の
+    ダイジェストを判定の読み（`read_set`）にも入れる。読みの記録は改行を揃えた本文でダイジェストを取るので、それだけでは
     改行や BOM だけの書き換えを覆わない。改版は承認済みチケットの frontmatter の計画だけを差し替え、
     本文は承認済みチケットのものを残す（`revise_copy`）。待ち方は `phases/<親>/workflow.yml` に
     書く中身（`approval.workflow_bytes`）を後ろに足す。区切りは件数つきのダイジェストの並びで決まる

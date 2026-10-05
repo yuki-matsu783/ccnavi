@@ -17,11 +17,11 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 
 | 書き足すもの | 書く場所（この ADR を書いた時点） |
 |---|---|
-| `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval.admit`） |
+| `ccnavi_approved: {approved_at, source_tree, source_path}` | 新規の承認（`approval_ops.admit`） |
 | `ccnavi_approved.revised_at` / `feedback_at` | 親の改版（`agree_digest.revise_copy`） |
-| `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval.followup`。`doing/` に直に起こす） |
-| `project:`（frontmatter に無ければ） | 新規の承認（`approval.admit`） |
-| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval.admit`、`agree_digest.revised_front`） |
+| `ccnavi_approved: {approved_at, source_tree: "", source_path: "", followup_of}` | 続きの子（`approval_ops.followup`。`doing/` に直に起こす） |
+| `project:`（frontmatter に無ければ） | 新規の承認（`approval_ops.admit`） |
+| `workflow:`（全体計画の待ち方のコピー） | 親の新規の承認と改版（`approval_ops.admit`、`agree_digest.revised_front`） |
 
 しかも `admit` は提案をテキストで読み（`fsio.load_text`。改行を LF に揃える）、欄を差し込んで書き直す
 （`insert_front` と `write_text`）。欄を足さない場合でも、CRLF の提案は承認で 1 バイト以上変わる。
@@ -68,7 +68,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | 承認で `project:` を書き足さない。承認済みチケットのプロジェクトは置き場（ツリー）から決まる | 書き足し続ける | 読む側は既に置き場で決めている（`scan_all`）。`ticket.py` の注記（1136 行付近）は「親が閉じたとき judge が子の `project` を見る」と書くので、実装の前に、その経路が欄ではなくツリーから決まることを確かめる |
 | 改版の `revised_at` / `feedback_at` は書かない。改版の時刻は状態の履歴の `revised`（`feedback: true` を含む）に残る | `ccnavi_approved` に書き続ける | 改版は計画を書き換えるので中身が変わるのは避けられないが、時刻まで中身に書く理由は無い。読んでいたのは承認の知らせの版（外す）と取り下げの検査（中身の一致に代える）だけ |
 | 続きの子の目印 `followup_of` は、`ccnavi_approved` の外のトップレベルの欄として、ccnavi が `doing/` に直に書くときに書く | 目印を持たせない | 続きの子は提案を経ずに ccnavi が新しく作るチケットで、作るときに書く欄は「承認で中身を変える」に当たらない。取り下げで理由を名指しするのに使う |
-| 既存の承認済みチケットに残る `ccnavi_approved`・`project:`・`workflow:` は消さない。移行はしない | 移行で欄を消す | 読んでも害が無い。保存済みのデータの表記を変えると既存のワークスペースとの互換が崩れる（ADR-0099 の「変えなかったもの」、`approval.admit` の「前の形も読む」と同じ方針）。承認済みの置き場はエージェントが書けないので、消すにはユーザの手が要る |
+| 既存の承認済みチケットに残る `ccnavi_approved`・`project:`・`workflow:` は消さない。移行はしない | 移行で欄を消す | 読んでも害が無い。保存済みのデータの表記を変えると既存のワークスペースとの互換が崩れる（ADR-0099 の「変えなかったもの」、`approval_ops.admit` の「前の形も読む」と同じ方針）。承認済みの置き場はエージェントが書けないので、消すにはユーザの手が要る |
 
 ### 欄が担っていた働きの代わり
 

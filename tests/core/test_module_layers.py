@@ -183,6 +183,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.approval",
                 "tickets.approval_checks",
                 "tickets.approval_marks",
+                "tickets.approval_ops",
                 "tickets.approval_times",
                 "tickets.branchfind",
                 "tickets.configsync",

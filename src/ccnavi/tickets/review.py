@@ -51,6 +51,7 @@ from . import (
     approval,
     approval_checks,
     approval_marks,
+    approval_ops,
     configsync,
     ops,
     phase,
@@ -379,7 +380,9 @@ def settle_and_mark(
     with fsio.policy(
         on_fail=fsio.FAIL_STOP, ticket="", message="{reason}", prefix="", undo=(), places=""
     ):
-        moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
+        moved, failed = approval_ops.settle_review(
+            conf, root, parent.ticket, [*ph.covers, ph.number]
+        )
         if failed:
             return "", failed
         if moved:
@@ -416,7 +419,7 @@ def _settle_children(
     拒み、`--reviewed --chat` も「すでにレビュー済み」で戻るので、取り出す操作が無くなる。
     逆順なら、動いたのにマーカーが置けなくても、次の `confirm` が置き直す（動かす分は空）。
     """
-    moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
+    moved, failed = approval_ops.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return False

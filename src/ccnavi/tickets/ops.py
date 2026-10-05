@@ -22,6 +22,7 @@ from . import (
     approval,
     approval_checks,
     approval_marks,
+    approval_ops,
     configsync,
     flow,
     history,
@@ -90,7 +91,7 @@ def start(
     if synced is None:
         return 1
     fields = {"started_at": approval_marks.now(), "base_sha": sha}
-    failed = approval.update_fields(found.path, fields)
+    failed = approval_ops.update_fields(found.path, fields)
     if failed:
         stderr.write(f"ccnavi: {ticket_id} に着手の欄を書けない: {failed}\n")
         return 1
@@ -667,7 +668,7 @@ def _predecessors_unmet(
     手で動かして承認する進め方があるので、着手の手前でもう一度見る。どの先行が何の
     状態か、どうすればよいかを 1 本ずつ言う。
     """
-    unmet = approval_checks.unmet_predecessors(found, approval.predecessor_pool(conf, root))
+    unmet = approval_checks.unmet_predecessors(found, approval_ops.predecessor_pool(conf, root))
     if not unmet:
         return False
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
@@ -835,16 +836,16 @@ def _move(
     said: str,
 ) -> int:
     """`doing/` の承認済みチケットに欄を書き、`review/` か `done/` へ動かす。"""
-    failed = approval.update_fields(found.path, fields)
+    failed = approval_ops.update_fields(found.path, fields)
     if failed:
         stderr.write(f"ccnavi: {found.ticket} に欄を書けない: {failed}\n")
         return 1
     where = os.path.dirname(os.path.dirname(found.path))
     if state == ticket_model.REVIEW:
-        failed = approval.to_review(where, found.tree_root, conf.tickets, found.ticket)
+        failed = approval_ops.to_review(where, found.tree_root, conf.tickets, found.ticket)
         place = f"{conf.tickets}/{ticket_model.REVIEW}/"
     else:
-        failed = approval.close_copy(where, found.ticket)
+        failed = approval_ops.close_copy(where, found.ticket)
         place = f"{conf.approved}/{ticket_model.DONE}/"
     if failed:
         stderr.write(f"ccnavi: {found.ticket}: {failed}\n")

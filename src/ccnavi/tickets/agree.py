@@ -41,6 +41,7 @@ from . import (
     approval,
     approval_checks,
     approval_marks,
+    approval_ops,
     phase,
     ticket_ids,
     ticket_model,
@@ -414,7 +415,7 @@ def _apply_steps(
                     if failed:
                         return t.ticket, f"マーカーを置けない: {failed}"
                     # 全体計画の子でレビュー待ちに残っているものは、見たうえでの計画なので閉じる。
-                    moved, failed = approval.settle_review(
+                    moved, failed = approval_ops.settle_review(
                         conf, root, t.ticket, list(range(1, len(t.plan) + 1))
                     )
                     if failed:
@@ -429,7 +430,7 @@ def _apply_steps(
             where = approval.home_dir(
                 conf, root, t.ticket, t.parent, t.tree_root, project=t.project
             )
-            failed = approval.admit(
+            failed = approval_ops.admit(
                 where, t, approval.source_branch(t), agree_digest._workflow_to_write(cand)
             )
             if failed:
@@ -437,7 +438,7 @@ def _apply_steps(
             if t.is_child:
                 group = stage.new_group()
                 with fsio.policy(on_fail=fsio.FAIL_LINE, group=group):
-                    carried = approval.carry_flow(conf, root, t, where)
+                    carried = approval_ops.carry_flow(conf, root, t, where)
                 for line in carried:
                     stage.line(f"  {line}", group=group)
             # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは

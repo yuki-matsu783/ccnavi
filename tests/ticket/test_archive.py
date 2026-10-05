@@ -19,7 +19,7 @@ import unittest
 
 from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, approval_checks, archive, history, ticket_model
+from ccnavi.tickets import approval, approval_checks, approval_ops, archive, history, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, read_json, write
@@ -193,7 +193,9 @@ class ArchiveChecksTest(ChecksHarness):
         self.assertEqual(approval_checks.integration_problems(self.conf, self.root, fresh), [])
 
     def test_the_next_child_skips_the_archived_numbers(self):
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04"
+        )
 
     def test_a_predecessor_in_the_archive_is_met(self):
         text = closed_text("i0002-01-01", "i0002", predecessors=["i0001-01-03"])
@@ -653,7 +655,9 @@ class SecondReviewChecksTest(ChecksHarness):
         self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
         self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), {"I0001"})
         self.assertIsNotNone(archive.archived_fields(self.root, "", "I0001"))
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04"
+        )
 
 
 class ReusedIdentifierTest(ChecksHarness):
@@ -765,8 +769,12 @@ class PhaseChildIdsChecksTest(ChecksHarness):
     def test_the_next_child_counts_the_archived_children_of_the_same_phase(self):
         base = archive.base_dir(self.root, "")
         write(os.path.join(base, "done", "i0001-02-07.md"), closed_text("i0001-02-07", "i0001", 2))
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 2), "i0001-02-08")
-        self.assertEqual(approval.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01")
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "i0001", 2), "i0001-02-08"
+        )
+        self.assertEqual(
+            approval_ops.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01"
+        )
         t, _ = ticket_mod.parse(closed_text("i0001-02-07", "i0001", 2))
         t.state = ticket_model.TODO
         self.assertEqual(len(approval_checks.integration_problems(self.conf, self.root, t)), 1)
