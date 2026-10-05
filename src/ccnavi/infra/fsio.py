@@ -402,6 +402,11 @@ def _replace_durably(path: str, content: bytes) -> None:
     """`write_bytes_atomic` の本体。書けなければ OSError を投げる。"""
     directory = os.path.dirname(path) or "."
     name = os.path.basename(path)
+    # 差し替えはディレクトリの書き込み権だけで通るので、読み取り専用にしたファイル（0444、Windows の
+    # 読み取り専用属性）も上書きできてしまう。素の open で書いていた頃と同じく、行き先に書き込み権が
+    # 無ければ書かない。ユーザが chmod で止めた書き換えを、差し替えで素通りさせない。
+    if os.path.lexists(path) and not os.access(path, os.W_OK):
+        raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), path)
     os.makedirs(directory, exist_ok=True)
     handle, part = tempfile.mkstemp(dir=directory, prefix=f".{name}.", suffix=".part")
     try:

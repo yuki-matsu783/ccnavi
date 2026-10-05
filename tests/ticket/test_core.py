@@ -631,6 +631,33 @@ class DurableWiringTest(CoreHarness):
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
         self.assertIn(_norm(todo), seen)
 
+    def approved_parent_copy(self):
+        self.family(plan=["design"])
+        found, _ = approval.scan(self.conf(), self.root)
+        (parent,) = [t for t in found if t.ticket == "i0001"]
+        return parent
+
+    def test_start_and_finish_fields_are_rewritten_durably(self):
+        """着手・終わりの欄の書き直し（`update_fields`）も、承認済みチケットを途中を見せずに書く。"""
+        parent = self.approved_parent_copy()
+        with durable_writes() as seen:
+            self.assertEqual(approval.update_fields(parent.path, {"started_at": "x"}), "")
+        self.assertEqual(seen, [_norm(parent.path)])
+        with open(parent.path, encoding="utf-8") as f:
+            self.assertIn('started_at: "x"', f.read())
+
+    def test_a_followup_child_is_written_durably(self):
+        """続きの子（`followup`）は `doing/` に直に起こすので、同じ書き方で置く。"""
+        parent = self.approved_parent_copy()
+        with durable_writes() as seen:
+            ident, failed = approval.followup(self.conf(), self.root, parent, 1, [], ["指摘"])
+        self.assertEqual(failed, "")
+        written = [
+            p for p in seen if p.endswith(os.path.normcase(os.path.join("doing", ident + ".md")))
+        ]
+        self.assertEqual(len(written), 1, seen)
+        self.assertTrue(os.path.exists(written[0]))
+
     def test_the_new_durable_op_does_not_overwrite_and_goes_durably(self):
         target = os.path.join(self.root, "flows-test", "a.yml")
         op = fsio.Op(fsio.OP_NEW_DURABLE, target, b"new")
