@@ -7,14 +7,18 @@
 1. 作業中の子があり、レビューが要るフェーズに `reviewed` が残っていれば、lint と status が言う
 2. 言わないもの: `reviewed` が無い、子が閉じている（`done/`）、レビューが要らないフェーズ
 3. 警告は判定と `start` を止めない
-4. 延期したフェーズの子が作業中で、引き受けた側に `reviewed` が残っていれば言う。
+4. 種類が `review: none` でも、再開された子が `human_review` を求めれば言う（閉じ直すと要る）
+5. 延期したフェーズの子が作業中で、引き受けた側に `reviewed` が残っていれば言う。
    消すのは引き受けた側。引き受けた側がレビュー前なら言わない
 """
 
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 
+from ccnavi.infra import settings
+from ccnavi.tickets import approval, phase
 from tests.ticket.test_phases import PhaseHarness, child_text
 from tests.ticket.test_ticket import write
 
@@ -178,3 +182,28 @@ class ResumedReviewWarnTest(PhaseHarness):
         self.assertIn("延期されていて", warned.stdout)
         self.assertEqual(warned.returncode, 0, warned.stdout)
         self.assertIn("error 0 件", warned.stdout)
+
+    # ---- 5. 種類が review: none でも、再開された子が human_review を求める
+
+    def test_a_resumed_child_asking_for_review_is_warned_even_if_the_kind_needs_none(self):
+        # 調査は review: none。doing の子は review_kind に数えられないが、閉じ直すと要る。
+        self.setup_child("research", True, marker=True)
+        for text in (self.lint(), self.status_of_child()):
+            self.assertIn(MARKER_WORDS, text)
+            self.assertIn("ccnavi-git.sh rm .ccnavi/approved/phases/i0001/1.reviewed", text)
+
+    def test_no_warning_for_the_same_form_without_a_marker(self):
+        self.setup_child("research", True, marker=False)
+        self.assertNotIn(MARKER_WORDS, self.lint())
+        self.assertNotIn(MARKER_WORDS, self.status_of_child())
+
+    # ---- 6. 呼び手に頼らず、閉じた子には言わない
+
+    def test_resumed_review_is_empty_for_a_closed_child_when_called_directly(self):
+        self.setup_child("design", True, marker=True)
+        conf, _ = settings.load(self.root)
+        doing, _ = approval.scan(conf, self.root)
+        child = next(t for t in doing if t.ticket == "i0001-01-01")
+        self.assertIn(MARKER_WORDS, phase.resumed_review(self.root, conf, child))
+        closed = replace(child, state="done")
+        self.assertEqual(phase.resumed_review(self.root, conf, closed), "")
