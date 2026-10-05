@@ -1635,6 +1635,9 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.review_host", "tickets.review_decide", "tickets.review_close")
         names += ("tickets.ticket_model", "tickets.ticket_ids", "tickets.ticket_places")
         names += ("tickets.ticket_fold", "tickets.ticket_guard", "tickets.ticket_fields")
+        names += ("tickets.agree_candidates", "tickets.agree_digest", "tickets.agree_screen")
+        names += ("tickets.phase_forms", "tickets.phase_scope")
+        names += ("tickets.flow_text", "tickets.flow_shape", "tickets.flow_render")
         for dotted in names:
             package, name = dotted.split(".")
             path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")
