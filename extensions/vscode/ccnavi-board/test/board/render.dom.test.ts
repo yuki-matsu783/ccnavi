@@ -349,14 +349,13 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   }
 });
 
-test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー準備中／レビュー待ち・HIGH 以上）だけ。マーカーの経過と MEDIUM 以下のリスクは全文にだけ出る", async () => {
+test("CB-T13c フェーズ行は状態の全文だけを出す。段の名前・マーカーの経過・レビューの要否・リスクの点と理由まで並ぶ", async () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
     phases: base.parents[0].phases.map((p): PhaseJson => {
       if (p.number === 1) {
-        // 依頼して済んだレビューと HIGH のリスク。要約はリスクだけ（止まらなくなれば段の名前は出ない）、
-        // 全文には点と理由とマーカーが残る
+        // 依頼して済んだレビューと HIGH のリスク。止まらなくなれば段の名前は出ず、点と理由とマーカーが残る
         return {
           ...p,
           review_required: true,
@@ -365,7 +364,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
           risk_line: "リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）",
         };
       }
-      // 依頼済みで止まったまま（判定は review_waiting で言う）。要約に「レビュー待ち」と
+      // 依頼済みで止まったまま（判定は review_waiting で言う）。「レビュー待ち」と
       // 残った指摘を決めるボタンが並ぶ
       return { ...p, state: "ended", gate_closed: true, review_waiting: true, marks: { requested: { at: "t" } } };
     }),
@@ -373,27 +372,23 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   const page = await openBoard({ ...base, parents: [parent] });
   try {
     const rows = page.all(".card.parent .phase");
-    assert.equal(rows[0].querySelector(".phase-brief")?.textContent, "リスク HIGH");
-    assert.equal(rows[0].querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
-    assert.equal(rows[1].querySelector(".phase-brief")?.textContent, "レビュー待ち");
-    assert.equal(rows[1].querySelector(".phase-full")?.textContent, "終了 · レビュー待ち · レビュー依頼済み · レビュー要");
+    assert.equal(rows[0].querySelector(".phase-status")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
+    assert.equal(rows[1].querySelector(".phase-status")?.textContent, "終了 · レビュー待ち · レビュー依頼済み · レビュー要");
     assert.equal(rows[1].querySelectorAll('button[data-action="decide"]').length, 1);
     // 状態は項目ごとの塊で、区切りの「·」は前の項目の末尾に付く。ボタンは状態の列ではなく 2 段目
     assert.deepEqual(
-      [...rows[0].querySelectorAll(".phase-brief .phase-item")].map((item) => item.textContent),
-      ["リスク HIGH"],
-    );
-    assert.deepEqual(
-      [...rows[1].querySelectorAll(".phase-full .phase-item")].map((item) => item.textContent),
+      [...rows[1].querySelectorAll(".phase-status .phase-item")].map((item) => item.textContent),
       ["終了 ·", "レビュー待ち ·", "レビュー依頼済み ·", "レビュー要"],
     );
     assert.equal(rows[1].querySelectorAll(".phase-status button").length, 0);
     assert.equal(rows[1].querySelectorAll('.phase-actions button[data-action="decide"]').length, 1);
     assert.equal(rows[0].querySelectorAll(".phase-actions").length, 0, "リンクもボタンも無い行には 2 段目を出さない");
+    // 状態は 1 か所にだけ描く（要約と全文の二重描画はしない）
+    assert.equal(page.all(".phase-brief, .phase-full").length, 0);
   } finally {
     await page.close();
   }
-  // MEDIUM は要約に出ない
+  // MEDIUM も点と理由ごと出る
   const medium: ParentJson = {
     ...parent,
     phases: parent.phases.map((p): PhaseJson => (p.number === 1 ? { ...p, risk: { ...(p.risk ?? {}), level: "MEDIUM" }, risk_line: "リスク: 25 (MEDIUM)" } : p)),
@@ -401,8 +396,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   const page2 = await openBoard({ ...base, parents: [medium] });
   try {
     const row = page2.all(".card.parent .phase")[0];
-    assert.equal(row.querySelector(".phase-brief")?.textContent, "");
-    assert.equal(row.querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 25 (MEDIUM)");
+    assert.equal(row.querySelector(".phase-status")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 25 (MEDIUM)");
   } finally {
     await page2.close();
   }
@@ -414,15 +408,14 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   const page3 = await openBoard({ ...base, parents: [unasked] });
   try {
     const row = page3.all(".card.parent .phase")[1];
-    assert.equal(row.querySelector(".phase-brief")?.textContent, "レビュー準備中");
-    assert.equal(row.querySelector(".phase-full")?.textContent, "終了 · レビュー準備中 · レビュー要");
+    assert.equal(row.querySelector(".phase-status")?.textContent, "終了 · レビュー準備中 · レビュー要");
     assert.equal(row.querySelectorAll("button").length, 0);
   } finally {
     await page3.close();
   }
-  // 狭いとき全文は画面の外に置くだけで、読み上げには残す。要約は見た目だけ
-  assert.match(css(), /\.phase-full \{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset\(50%\); white-space: nowrap; \}/);
-  assert.doesNotMatch(css(), /\.phase-full \{ display: none/);
+  // 要約と全文の二重描画はやめた。見えている全文がそのまま読み上げに渡り、幅で入れ替えない
+  assert.doesNotMatch(css(), /\.phase-(brief|full)\b/);
+  assert.doesNotMatch(css(), /@container \(min-width: 480px\)/);
 });
 
 test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジはユーザが動く状態だけで、属性は枠無しの行に出す", async () => {
@@ -459,20 +452,18 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     // 子のワークツリー上にチケットがあるのは普通なので、正常な場面ではバッジを出さない
     assert.equal(page.all(".badge.seen").length, 0);
     assert.ok(texts(page, ".card .where").includes("子 · 親 i0001 / フェーズ 2"));
-    // 親のフェーズは 1 フェーズ 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
-    // 順調に終わったフェーズ（LOW のリスク）も、レビューが要るだけの進行中の段階も、要約は空。
+    // 親のフェーズは 1 フェーズ 1 行。状態は全文だけを出す。見えているので行の title には重ねない
     const rows = page.all(".card.parent .phase");
     assert.equal(rows[0].getAttribute("class"), "phase phase-ended");
-    assert.equal(rows[0].getAttribute("title"), "終了 · リスク: 0 (LOW)");
+    assert.equal(rows[0].getAttribute("title"), null);
     assert.equal(rows[0].querySelector(".phase-label")?.textContent, "1（調査）");
     assert.equal(rows[0].querySelector(".phase-tickets")?.textContent, "i0001-01-01");
     assert.equal(rows[0].querySelector(".phase-dot")?.getAttribute("aria-hidden"), "true");
-    assert.equal(rows[0].querySelector(".phase-brief")?.textContent, "");
-    assert.equal(rows[0].querySelector(".phase-brief")?.getAttribute("aria-hidden"), "true");
-    assert.equal(rows[0].querySelector(".phase-full")?.textContent, "終了 · リスク: 0 (LOW)");
-    assert.ok(page.all(".phase-full").some((full) => full.textContent === "進行中 · レビュー要"));
+    assert.equal(rows[0].querySelector(".phase-status")?.textContent, "終了 · リスク: 0 (LOW)");
+    assert.equal(rows[0].querySelector(".phase-status")?.getAttribute("aria-hidden"), null);
+    assert.ok(page.all(".phase-status").some((full) => full.textContent === "進行中 · レビュー要"));
     // 止めていない・マーカーなし・レビュー不要は普通の状態なので書かない
-    assert.ok(!texts(page, ".phase-full").some((full) => full.includes("レビュー不要")));
+    assert.ok(!texts(page, ".phase-status").some((full) => full.includes("レビュー不要")));
     // 早めに閉じる（close-early）ボタンは出さない
     assert.equal(page.all('button[data-action="close-early"]').length, 0);
   } finally {
@@ -496,11 +487,6 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
   assert.ok(narrow, "狭いときの @container の塊がある");
   assert.match(narrow[0], /\.phase \{ grid-template-columns: 12px minmax\(0, 1fr\); \}/);
   assert.match(narrow[0], /\.phase-status \{ grid-column: 2;/);
-  // 狭いときは要約だけを見せ、480px 以上で全文に替わる
-  const wide = css().match(/@container \(min-width: 480px\) \{[^@]*?\} \}/);
-  assert.ok(wide, "@container の塊がある");
-  assert.match(wide[0], /\.phase-brief \{ display: none; \}/);
-  assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
   // 止めているフェーズ行はフェーズ名も右の状態も赤（文字用に前景色へ寄せた赤）
   assert.match(css(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--board-error-text\); \}/);
   // 止めているカードの左線は承認待ちの左線より後に書き、こちらが採られる
@@ -538,33 +524,30 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
       ),
     })),
   });
-  const brief = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-brief")?.textContent ?? "";
-  const full = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-full")?.textContent ?? "";
+  const full = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-status")?.textContent ?? "";
 
   // クローズ・レビュー済み・止まっていない子（完了列の i0001-01-01）。バッジは出さず、レビュー済みは枠無しの行に出る。
-  // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済み · レビュー済み」が残る
+  // 親カードのフェーズ行にも段の名前は出ない。経過として「レビュー依頼済み · レビュー済み」が残る
   const done = await openBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false));
   try {
     assert.equal(done.all(".badge.hold").length, 0);
     assert.ok(texts(done, ".fact.mark.mark-reviewed").includes("レビュー済み"));
-    assert.equal(brief(done), "");
     assert.equal(full(done), "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 0 (LOW)");
   } finally {
     await done.close();
   }
-  // 依頼済のマーカーだけで止まっていない（判定が待ちと言わない）子にも、バッジと要約は出ない
+  // 依頼済のマーカーだけで止まっていない（判定が待ちと言わない）子にも、バッジと段の名前は出ない
   const reopened = await openBoard(withMarks({ requested: { at: "t" } }, false));
   try {
     assert.equal(reopened.all(".badge.hold").length, 0);
-    assert.equal(brief(reopened), "");
+    assert.equal(full(reopened), "終了 · レビュー依頼済み · レビュー要 · リスク: 0 (LOW)");
   } finally {
     await reopened.close();
   }
-  // 依頼を出したのに止まったままの子にはバッジが出て、親のフェーズ行の要約にも出る。reviewed の有無では分岐しない
+  // 依頼を出したのに止まったままの子にはバッジが出て、親のフェーズ行にも段の名前が出る。reviewed の有無では分岐しない
   const waiting = await openBoard(withMarks({ requested: { at: "t" } }, true));
   try {
     assert.ok(texts(waiting, ".badge.hold").includes("レビュー待ち"));
-    assert.equal(brief(waiting), "レビュー待ち");
     assert.equal(full(waiting), "終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 0 (LOW)");
   } finally {
     await waiting.close();
@@ -595,7 +578,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   const notRequested = await openBoard(withMarks({}, true));
   try {
     assert.ok(texts(notRequested, ".badge.hold").includes("レビュー準備中"));
-    assert.equal(brief(notRequested), "レビュー準備中");
+    assert.equal(full(notRequested), "終了 · レビュー準備中 · レビュー要 · リスク: 0 (LOW)");
     assert.ok(!notRequested.document.body.textContent.includes("レビュー依頼済み"));
   } finally {
     await notRequested.close();
