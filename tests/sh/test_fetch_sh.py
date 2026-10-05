@@ -28,7 +28,7 @@ import threading
 import time
 import unittest
 
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, live_sh_pid
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -368,7 +368,7 @@ class FetchTest(unittest.TestCase):
         lock = os.path.join(self.ws, "logs", "state", "locks", "self", "i0001")
         os.makedirs(lock)
         now = int(time.time())
-        pid = os.getpid()
+        pid = live_sh_pid(self)
         write(os.path.join(lock, "owner"), f"{socket.gethostname()} {pid} {now} {pid}-{now}\n")
         before = self.sha(tree, "HEAD")
         self.advance(self.remote, "i0001")

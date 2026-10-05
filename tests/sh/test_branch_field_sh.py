@@ -145,7 +145,7 @@ class BranchFieldTest(unittest.TestCase):
 
     def exe(self, *args, cwd=None):
         return subprocess.run(
-            [self.bin, "--root", self.ws, *args],
+            [SHELL, self.bin, "--root", self.ws, *args],
             cwd=cwd or self.ws,
             env=self.env(),
             capture_output=True,

@@ -58,9 +58,10 @@ BAD = [
 
 
 def is_ident(shell, value, locale):
-    env = {**os.environ, "LC_ALL": locale}
+    # 値は引数でなく環境変数で渡す。Windows の引数は、改行や `'` をそのまま運べない。
+    env = {**os.environ, "LC_ALL": locale, "CCNAVI_PROBE": value}
     done = subprocess.run(
-        [shell, "-c", '. "$0"; ccnavi_is_ident "$1"', COMMON, value],
+        [shell, "-c", '. "$0"; ccnavi_is_ident "$CCNAVI_PROBE"', COMMON],
         env=env,
         capture_output=True,
     )
@@ -139,9 +140,10 @@ BRANCH_BAD = [
 
 
 def is_branch(shell, value, locale):
-    env = {**os.environ, "LC_ALL": locale}
+    # 値は引数でなく環境変数で渡す。Windows の引数は、改行や `'` をそのまま運べない。
+    env = {**os.environ, "LC_ALL": locale, "CCNAVI_PROBE": value}
     done = subprocess.run(
-        [shell, "-c", '. "$0"; ccnavi_is_branch "$1"', COMMON, value],
+        [shell, "-c", '. "$0"; ccnavi_is_branch "$CCNAVI_PROBE"', COMMON],
         env=env,
         capture_output=True,
     )

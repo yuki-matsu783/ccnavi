@@ -394,6 +394,12 @@ class PassTest(GitWrapperTest):
         self.assertIn("topic", head.stdout)
 
 
+def merge_file_knows_object_id() -> bool:
+    """`git merge-file` が `--object-id` を持つか（git 2.43 以降）。使い方の表示で確かめる。"""
+    done = subprocess.run(["git", "merge-file", "-h"], capture_output=True, text=True, check=False)
+    return "--object-id" in done.stdout + done.stderr
+
+
 class MergeFileTest(GitWrapperTest):
     """merge-file は結果を標準出力に出す形 (-p / --stdout) だけ通す。
 
@@ -473,6 +479,9 @@ class MergeFileTest(GitWrapperTest):
         self.assertEqual(before, git_out(self.dir, "count-objects"))
         self.assertEqual(conflicted, self.read("tracked.txt"))
 
+    @unittest.skipUnless(
+        merge_file_knows_object_id(), "この git の merge-file は --object-id を知らない"
+    )
     def test_union_of_the_three_stages_goes_through_and_writes_nothing(self):
         # 使い方が勧める 1 回で済む形。一時ファイルを作らずに両方を取り込んだ結果を読む。
         conflicted = self.conflict()

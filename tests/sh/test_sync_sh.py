@@ -28,7 +28,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, SRC, common_sh
+from tests import ROOT, SRC, common_sh, live_sh_pid
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
@@ -758,9 +758,10 @@ class SyncTest(SyncHarness):
         self.keep_record()
         self.delete_remote_branch(PARENT)
         started = time.monotonic()
-        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="2")
+        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="30")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertLess(time.monotonic() - started, 5)
+        # 待てば 30 秒を超える。1 回の取り込みに時間のかかる機械（Windows）でも、待ちと見分けられる。
+        self.assertLess(time.monotonic() - started, 30)
         self.assertEqual("closed", fields(self.record)["state"])
 
     def archive_locally(self, text):
@@ -1063,7 +1064,7 @@ class SyncTest(SyncHarness):
     # ---- ロック（mkdir で取り、ホスト名・pid・開始時刻を書く。古いロックは mv で強制取得する）
 
     def test_a_held_lock_stops_the_family(self):
-        lock = self.own_lock(os.getpid(), int(time.time()))
+        lock = self.own_lock(live_sh_pid(self), int(time.time()))
         head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
@@ -1096,13 +1097,13 @@ class SyncTest(SyncHarness):
 
     def test_a_live_owner_is_not_robbed_after_ten_minutes(self):
         # 同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない。
-        lock = self.own_lock(os.getpid(), int(time.time()) - 3600)
+        lock = self.own_lock(live_sh_pid(self), int(time.time()) - 3600)
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(lock))
 
     def test_an_old_lock_of_another_os_is_taken_over_by_time(self):
-        lock = self.own_lock(os.getpid(), int(time.time()) - 3600, os_part="OtherOS")
+        lock = self.own_lock(live_sh_pid(self), int(time.time()) - 3600, os_part="OtherOS")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(lock))
@@ -1118,7 +1119,7 @@ class SyncTest(SyncHarness):
 
     def test_a_forged_nesting_mark_is_not_trusted(self):
         # CCNAVI_LOCK_HELD の持ち主の情報がロックの持ち主と合わなければ入れ子として扱わない。
-        lock = self.own_lock(os.getpid(), int(time.time()))
+        lock = self.own_lock(live_sh_pid(self), int(time.time()))
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0", CCNAVI_LOCK_HELD=f"self/{PARENT}:1-2")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("ロックを持っている", done.stdout)
@@ -1126,13 +1127,14 @@ class SyncTest(SyncHarness):
 
     def test_a_true_nesting_mark_is_trusted_and_left_in_place(self):
         started = int(time.time())
-        lock = self.own_lock(os.getpid(), started)
-        mark = f"{os.getpid()}-{started}"
+        lock = self.own_lock(live_sh_pid(self), started)
+        mark = f"{live_sh_pid(self)}-{started}"
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0", CCNAVI_LOCK_HELD=f"self/{PARENT}:{mark}")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(lock), "入れ子で取ったロックを外した")
 
     @unittest.skipIf(DASH is None, "dash が無い")
+    @unittest.skipUnless(hasattr(os, "killpg"), "os.killpg が無い")
     def test_a_terminated_run_releases_its_lock_under_dash(self):
         # dash は EXIT の trap を TERM で走らせない。TERM でもロックを外す。
         write(os.path.join(self.scripts, "ccnavi-review.sh"), "#!/bin/sh\nsleep 30\n")
@@ -1232,7 +1234,16 @@ class PlacesAreNotReadTest(SyncHarness):
     def test_the_fallback_without_an_answer_uses_the_defaults(self):
         """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。"""
         self.arrange()
-        done = self.sync(CCNAVI_BIN_PATH=self.launcher("#!/bin/sh\nexit 0\n"), **self.moved())
+        # `sync paths` には空で答え、親のブランチ名（`c1 family`）には本物が答える。後者を
+        # 答えない実行ファイルは、親のブランチ名を決められず取り込みを止める。
+        body = (
+            "#!/bin/sh\n"
+            'case "$*" in\n'
+            f'*"c1 family"*) PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@" ;;\n'
+            "esac\n"
+            "exit 0\n"
+        )
+        done = self.sync(CCNAVI_BIN_PATH=self.launcher(body), **self.moved())
         self.assertDefaultPlaces(done)
 
 

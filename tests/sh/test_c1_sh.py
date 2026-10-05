@@ -49,7 +49,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path
+from tests import ROOT, common_path, live_sh_pid, requires_symlink
 from tests.ticket.test_phases import PHASES, child_text, parent_text
 from tests.ticket.test_ticket import RULES
 
@@ -217,7 +217,7 @@ class C1Harness(unittest.TestCase):
 
     def exe(self, *args, cwd=None, stdin=""):
         return subprocess.run(
-            [self.bin, "--root", self.ws, *args],
+            [SHELL, self.bin, "--root", self.ws, *args],
             cwd=cwd or self.ws,
             env=self.env(),
             capture_output=True,
@@ -427,7 +427,7 @@ class C1TicketTest(C1Harness):
         now = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout)
         write(
             os.path.join(self.lock_dir(), "owner"),
-            f"{host} {os.getpid()} {now} {os.getpid()}-{now} {system}\n",
+            f"{host} {live_sh_pid(self)} {now} {live_sh_pid(self)}-{now} {system}\n",
         )
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -572,6 +572,7 @@ class C1TicketTest(C1Harness):
         self.assertIn("戻さずに止めた", result.stderr)
         self.assertEqual(self.subjects(2), ["other", f"ccnavi: {PARENT} に着手"])
 
+    @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
     def test_a_term_before_the_push_ends_undoes_the_commit(self):
         """送る前に TERM が来たら、自分のコミットを戻して抜ける。"""
         import signal
@@ -729,7 +730,7 @@ class C1TicketTest(C1Harness):
         old = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout) - 3600
         write(
             os.path.join(self.lock_dir(), "owner"),
-            f"{host} {os.getpid()} {old} {os.getpid()}-{old} {system}\n",
+            f"{host} {live_sh_pid(self)} {old} {live_sh_pid(self)}-{old} {system}\n",
         )
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -743,17 +744,18 @@ class C1TicketTest(C1Harness):
         old = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout) - 3600
         write(
             os.path.join(self.lock_dir(), "owner"),
-            f"{host} {os.getpid()} {old} {os.getpid()}-{old} {system}\n",
+            f"{host} {live_sh_pid(self)} {old} {live_sh_pid(self)}-{old} {system}\n",
         )
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(old))
-        self.assertIn(f"持ち主は pid {os.getpid()}・ホスト {host}・開始 {at}", result.stderr)
+        self.assertIn(f"持ち主は pid {live_sh_pid(self)}・ホスト {host}・開始 {at}", result.stderr)
         self.assertIn("ユーザに終了させてもらってから打ち直して", result.stderr)
         self.assertTrue(os.path.isdir(self.lock_dir()))
 
     # ---- 基点のリンク
 
+    @requires_symlink
     def test_a_linked_workspace_still_carries(self):
         linked = self.ws + "-link"
         os.symlink(self.ws, linked)
@@ -824,7 +826,7 @@ class PlacesAreNotReadTest(C1Harness):
         now = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout)
         write(
             os.path.join(self.lock_dir(), "owner"),
-            f"{host} {os.getpid()} {now} {os.getpid()}-{now} {system}\n",
+            f"{host} {live_sh_pid(self)} {now} {live_sh_pid(self)}-{now} {system}\n",
         )
 
     def test_the_state_variable_does_not_move_the_lock_or_the_record(self):

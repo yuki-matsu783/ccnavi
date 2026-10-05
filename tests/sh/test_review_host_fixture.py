@@ -29,11 +29,51 @@ import unittest
 
 from ccnavi.entry import version
 from ccnavi.tickets import review_host
-from tests import ROOT, common_sh
+from tests import ROOT, can_symlink, common_sh
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
+
+
+def can_pass_argument(size: int) -> bool:
+    """sh から jq へ、`size` 字の引数を渡せるか。実際に渡して確かめる。
+
+    取ってきた状態は `jq --argjson` の引数で渡すので、1 引数の上限（Windows は約 32,000 字）を
+    超える場面は、上限のある環境では取れない。
+    """
+    if SHELL is None or not NEEDED:
+        return True
+    done = subprocess.run(
+        [SHELL, "-c", "a=$(cat); jq -n --arg a \"$a\" '$a|length'"],
+        input="x" * size,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.returncode == 0 and done.stdout.strip() == str(size)
+
+
+def argument_keeps_quote() -> bool:
+    """引数の `'` が、そのまま sh に届くか。実際に渡して確かめる。"""
+    if SHELL is None:
+        return True
+    probe = "a'$(id)'.html"
+    done = subprocess.run(
+        [SHELL, "-c", 'printf %s "$1"', "probe", probe],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.stdout == probe
+
+
+def skip_if_too_big_for_argument(test: unittest.TestCase, scene_dir: str) -> None:
+    """場面の取ってきた状態が引数の上限を超えるなら、その場面を skip する。"""
+    size = os.path.getsize(os.path.join(scene_dir, "expected.json"))
+    if not can_pass_argument(size):
+        test.skipTest(f"{size} 字の引数を jq に渡せない（引数の上限）")
+
 
 # 実行ファイルの代役。受けた引数を 1 行ずつ書き残し、何も書かずに 0 で終わる。
 STUB = """#!/bin/sh
@@ -146,6 +186,7 @@ class HostFixtureTest(unittest.TestCase):
         )
         for scene in github_host.scene_names():
             with self.subTest(scene=scene):
+                skip_if_too_big_for_argument(self, os.path.join(github_host.SCENES, scene))
                 done = self.review(scene, "fetch")
                 self.assertEqual(done.returncode, 0, done.stderr)
                 copy = json.loads(done.stdout)
@@ -450,6 +491,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         )
         for scene in gitlab_host.scene_names():
             with self.subTest(scene=scene):
+                skip_if_too_big_for_argument(self, os.path.join(gitlab_host.SCENES, scene))
                 self.origin_of(scene)
                 done = self.review(scene, "fetch")
                 self.assertEqual(done.returncode, 0, done.stderr)
@@ -533,7 +575,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
             subprocess.run([*git, "add", "--", rel], check=True)
             subprocess.run([*git, "commit", "-q", "-m", f"add {rel}"], check=True)
-        return path
+        return path.replace(os.sep, "/")
 
     def test_request_records_the_account_that_posted(self):
         """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
@@ -652,13 +694,16 @@ class GitLabHostFixtureTest(unittest.TestCase):
         dirty = self.eli5("wip/eli5/phase-2.html")
         write(dirty, "<p>書き換えた</p>\n")
         outside = write(os.path.join(self._tmp.name, "elsewhere", "eli5.html"), "<p>x</p>\n")
+        outside = outside.replace(os.sep, "/")
         quote = self.eli5("wip/eli5/a'$(id)'.html")
         dollar = self.eli5("wip/eli5/a$HOME.html")
         space = self.eli5("wip/eli5/a b.html")
         japanese = self.eli5("wip/eli5/説明.html")
         self.eli5("wip/eli5/target.html")
         link = os.path.join(self.ws, "wip", "eli5", "link.html")
-        os.symlink("target.html", link)
+        linked = can_symlink()
+        if linked:
+            os.symlink("target.html", link)
         executable = self.eli5("wip/eli5/run.html", commit=False)
         os.chmod(executable, 0o755)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
@@ -669,7 +714,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 "core.fileMode=true",
                 "add",
                 "--",
-                "wip/eli5/link.html",
+                *(["wip/eli5/link.html"] if linked else []),
                 "wip/eli5/run.html",
             ],
             check=True,
@@ -694,9 +739,20 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "名前に $": (["--eli5", dollar], 1, bad_name),
             "名前に空白": (["--eli5", space], 1, bad_name),
             "名前に日本語": (["--eli5", japanese], 1, bad_name),
-            "シンボリックリンク": (["--eli5", link], 1, ["普通のファイルでない（モード 120000"]),
             "実行ビット付き": (["--eli5", executable], 1, ["普通のファイルでない（モード 100755"]),
         }
+        if not os.stat(executable).st_mode & 0o111:
+            # 実行ビットを持てないファイルシステム（NTFS）では、モード 100755 のファイルを作れない。
+            del cases["実行ビット付き"]
+        if not argument_keeps_quote():
+            # 引数の `'` が sh に届く前に落ちる環境では、名前に `'` を持つファイルを名指しできない。
+            del cases["名前に '"]
+        if linked:
+            cases["シンボリックリンク"] = (
+                ["--eli5", link],
+                1,
+                ["普通のファイルでない（モード 120000"],
+            )
         for name, (flag, code, said) in cases.items():
             with self.subTest(name):
                 done = self.review(

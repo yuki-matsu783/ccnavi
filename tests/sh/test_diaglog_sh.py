@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import re
 import shlex
 import shutil
@@ -92,7 +93,7 @@ class _Workspace(unittest.TestCase):
         """
         path = os.path.join(self.ws, ".ccnavi", "scripts", name)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write('set -eu\n. "$(dirname "$0")/ccnavi-common.sh"\n')
+            f.write('set -eu\n. "$(dirname "$0")/ccnavi-common.sh"\ncr=$(printf \'\\r\')\n')
             f.write(calls)
             f.write("\nprintf 'done\\n'\n")
         return subprocess.run(
@@ -113,11 +114,19 @@ class _Workspace(unittest.TestCase):
             return []
 
 
+def sh_word(text: str) -> str:
+    """sh の 1 語。CR は script の中に生で書かず、`$cr`（run_sh が作る）でつなぐ。
+
+    Git Bash の sh は、script を読むときに生の CR を落とす。
+    """
+    return '"$cr"'.join(shlex.quote(part) for part in text.split("\r"))
+
+
 def sh_call(level: str, msg: str, fields: list[tuple[str, str]]) -> str:
-    words = [f"log_{level.lower()}", shlex.quote(msg)]
+    words = [f"log_{level.lower()}", sh_word(msg)]
     if fields:
         words.append("--")
-        words += [shlex.quote(f"{k}={v}") for k, v in fields]
+        words += [sh_word(f"{k}={v}") for k, v in fields]
     return " ".join(words)
 
 
@@ -422,7 +431,7 @@ class SameLineTest(_Workspace):
         cases = [[level, msg, dict(fields)] for level, msg, fields in CASES]
         with open(driver, "w", encoding="utf-8", newline="\n") as f:
             f.write(
-                f"import * as log from {json.dumps(LOG_TS.replace(os.sep, '/'))};\n"
+                f"import * as log from {json.dumps(pathlib.Path(LOG_TS).as_uri())};\n"
                 f"const logger = log.get('probe', {json.dumps(root)});\n"
                 f"for (const [level, msg, fields] of {json.dumps(cases)}) {{\n"
                 "  (logger as any)[level.toLowerCase()](msg, fields);\n"
